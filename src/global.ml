@@ -220,19 +220,27 @@ let predefined_pop_aspecs = []
 (* let pop_wpspecs = init_register_list () *)
 (* let predefined_pop_wpspecs = [] *)
 
-(** Table of games *)
+(** Table of games and their interfaces *)
 
 let game_tbl = init_register_hash () (*(fun g -> g.g_name)*)
+let igame_tbl = init_register_hash ()
 
 (** The current game *)
+type scope =
+  | SC_Game  of game
+  | SC_IGame of game_interface_body
 
-let current_game = ref None
+let current_scope = ref (None : scope option)
 
 let cur_game msg =
-  match !current_game with
-    | Some g -> g
-    | None -> bug "No current game for %s !" msg
+  match !current_scope with
+    | Some (SC_Game g) -> g
+    | _ -> bug "No current game for %s" msg
 
+let cur_igame msg =
+  match !current_scope with
+    | Some (SC_IGame ig) -> ig
+    | _ -> bug "No current game interface of %s" msg
 
 (*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*)
 (*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*)
@@ -425,6 +433,8 @@ let find_op ?(prob=false) pos name type_args : oper * type_exp =
   in find ops
 
 (* Finding games and functions *)
+let find_igame name = Hashtbl.find igame_tbl name
+
 let find_game gname = Hashtbl.find game_tbl gname
 
 let iter_game f = Hashtbl.iter f game_tbl
@@ -591,29 +601,65 @@ let add_fct pos name params t_res body =
   game.g_functions <- (name, fct) :: game.g_functions;
   fct
 
-let start_game name pos =
-  if !current_game <> None then
-    bug "start a game while the last one is not closed";
+let start_igame name pos =
+  if !current_scope <> None then
+    bug "already in a opened scope";
+  check_not_in_tbl "igame" igame_tbl name pos;
+  let ig =
+    { gi_name      = name;
+      gi_pos       = pos ;
+      gi_functions = []  ; }
+  in
+    debug db_add_loc "[global start game interface: %s@." name;
+    Hashtbl.add igame_tbl name ig;
+    current_scope := Some (SC_IGame ig)
+
+let close_igame () =
+  let igame = cur_igame "close_igame" in
+    igame.gi_functions <- List.rev (igame.gi_functions);
+    debug db_glob "[global] end game interface: %s@." igame.gi_name;
+    debug db_glob "%a@." PpAst.pp_igame igame;
+    current_scope := None
+
+let abort_igame () =
+  try
+    let igame = cur_igame "abort_igame" in
+      debug db_glob "[global] abort game interface: %s@." igame.gi_name;
+      Hashtbl.remove igame_tbl igame.gi_name;
+      current_scope := None
+  with _ -> ()
+
+let start_game name interface pos =
+  if !current_scope <> None then
+    bug "already in a opened scope";
   check_not_in_tbl "game" game_tbl name pos;
-  let g = {g_name = name; g_pos = pos; g_vars = []; g_functions = [] } in
-  debug db_add_loc "[global] start game : %s@." name;
-  Hashtbl.add game_tbl name g;
-  current_game := Some g
+  let g =
+    let i = GI_Named interface in
+      { g_name      = name;
+        g_pos       = pos ;
+        g_interface = i   ;
+        g_vars      = []  ;
+        g_functions = []  ;
+      }
+  in
+    debug db_add_loc "[global] start game: %s@." name;
+    Hashtbl.add game_tbl name g;
+    current_scope := Some (SC_Game g)
 
 let close_game () =
   let game = cur_game "close_game" in
   game.g_vars <- List.rev (game.g_vars);
   game.g_functions <- List.rev (game.g_functions);
-  debug db_glob "[global] end game %s :@." game.g_name;
-  debug (db_glob + 1) "%a@." PpAst.pp_game game;
-  current_game := None
+  debug db_glob "[global] end game: %s@." game.g_name;
+  debug db_glob "%a@." PpAst.pp_game game;
+  current_scope := None
 
 let abort_game () =
   try
     let game = cur_game "close_game" in
-    debug db_glob "[global] abort game %s :@." game.g_name;
+    debug db_glob "[global] abort game: %s@." game.g_name;
     Hashtbl.remove game_tbl game.g_name;
-    current_game := None
+    current_scope := None
   with _ -> ()
 
 (*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*)

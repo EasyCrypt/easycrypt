@@ -635,6 +635,15 @@ let mk_fct game pos f_decl f_body =
   let body = mk_fct_body venv pos t_res f_body in
   fpos, name, params, t_res, body
 
+let mk_ifct ((pos, name), params, rty) =
+  if not (EcUtil.uniq (List.map (fun x -> snd (fst x)) params)) then
+    pos_error pos "duplicate names in function parameters" ;
+  let rty    = mk_type_exp pos rty in
+  let params = List.map (fun ((_, x), ty) -> (x, mk_type_exp pos ty)) params in
+    { if_pos    = pos   ;
+      if_name   = name  ;
+      if_params = params;
+      if_type   = rty   ; }
 
 let mk_adv_decl pos (fun_decl, odecl) =
   let venv = Global.empty_venv () in
@@ -1215,3 +1224,33 @@ let mk_apredicate (pos, dom) =
   let dom = List.map (fun ty -> mk_t pos ty) dom in
     TyVarsMap.iter tvars (fun _ tvar -> tvar.tv_def <- Open);
     dom
+
+(* -------------------------------------------------------------------- *)
+type igame_match_error =
+    | IGM_Missing of string
+    | IGM_SigMismatch of string
+
+exception IGameMatchError of igame_match_error
+
+let interface_match g ig =
+  let check_for_decl decl =
+    let pred = fun (x, _) -> x = decl.if_name in
+      match EcUtil.try_find pred g.g_functions with
+        | None        -> raise (IGameMatchError (IGM_Missing decl.if_name))
+        | Some (_, f) ->
+          let inames, itypes = List.split decl.if_params
+          and names , types  =
+            List.split (List.map (fun p -> (p.v_name, p.v_type)) f.f_param)
+          in
+            if names <> inames then
+              raise (IGameMatchError (IGM_SigMismatch decl.if_name));
+            try
+              Unification.unify_type_list types itypes;
+              Unification.unify_type decl.if_type f.f_res.v_type;
+            with Unification.TypeMismatch _ ->
+              raise (IGameMatchError (IGM_SigMismatch decl.if_name))
+  in
+    try
+      List.iter check_for_decl ig.gi_functions;
+      true
+    with IGameMatchError _ -> false

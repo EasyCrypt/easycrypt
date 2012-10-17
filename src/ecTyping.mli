@@ -45,6 +45,7 @@ val mk_rnd_info:
   (string option * AstYacc.p_exp) AstLogic.rnd_bij_info ->
   (Fol.lvar * Fol.term) AstLogic.rnd_bij_info
 
+val mk_ifct: AstYacc.fun_decl -> Ast.ifct
 
 val mk_fct: Ast.game -> EcUtil.pos ->
   AstYacc.fun_decl -> AstYacc.fun_def_body ->
@@ -91,3 +92,6 @@ val mk_apredicate :
   EcUtil.pos * AstYacc.type_exp list -> Ast.type_exp list
 
 val mkeq_globals : Ast.fct -> Ast.fct -> Fol.pred
+
+(* -------------------------------------------------------------------- *)
+val interface_match : Ast.game -> Ast.game_interface_body -> bool

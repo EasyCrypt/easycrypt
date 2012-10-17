@@ -542,11 +542,10 @@ let aux_name = function
   | PGdef _             -> EPEmpty
   | PGredef (name, _,_) -> EPStr name
 
-let p_game (name, body) = 
-  [ EPInstr [ EPKw "game"; EPStr name; EPStr "="; aux_name body ];
+let p_game (name, iname, body) = 
+  [ EPInstr [EPKw "game"; EPStr name; EPStr "="; EPStr iname;
+             EPStr "="; aux_name body];
     p_game_body body]
-
-
 
 let p_p_fol = p_p_exp
 
@@ -821,7 +820,7 @@ let p_global = function
   | Gapred apred      -> EPInstr [ EPList (p_apred apred); EPStr "." ]
   | Gtactic tactic    -> EPIseq  [ EPInstr ( p_tactic tactic @ [EPStr "."]) ]
   | Ggame game        -> EPList (EPNewline :: (p_game game))
-  | Gpop_spec (_,_,_)   -> EPInstr [ EPKw "spec" ] (*TODO*)
+  | Gpop_spec (_,_,_) -> EPInstr [ EPKw "spec" ] (*TODO*)
   | Gpop_aspec(_,_)   -> EPInstr [ EPKw "aspec"] (*TODO*)
   | Gsave             -> EPInstr [EPKw "save."]
   | _                 -> EPEmpty 

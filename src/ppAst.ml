@@ -367,11 +367,30 @@ let pp_fct fmt fct =
         fct.f_name pp_tvar_list fct.f_param pp_type_exp (fct.f_res.v_type)
       pp_fct_def def
 
+let pp_ifct fmt ifct =
+  let pp_param fmt (v, ty) =
+    Format.fprintf fmt "%s : %a" v pp_type_exp ty
+  in
+    Format.fprintf fmt "%s(%a) : %a"
+      ifct.if_name
+      (pp_list ~sep:", " pp_param) ifct.if_params
+      pp_type_exp ifct.if_type
+
+let pp_igame fmt ig =
+  Format.fprintf fmt "@[<v 2>game interface %s = {@\n%a\n}@\n"
+    ig.gi_name
+    (pp_list ~sep:"" pp_ifct) ig.gi_functions
+
 let pp_game fmt g =
-  Format.fprintf fmt "@[<v 2>game %s = {@\n%a%a@]@\n}@\n"
-    g.g_name
-    (pp_list ~sep:"" pp_gvar_decl) (List.map snd g.g_vars)
-    (pp_list ~sep:"" pp_fct) (List.map snd g.g_functions)
+  let iname =
+    match g.g_interface with
+      | GI_Named x     -> x
+      | GI_Resolved ig -> ig.gi_name
+  in
+    Format.fprintf fmt "@[<v 2>game %s : %s = {@\n%a%a@]@\n}@\n"
+      g.g_name iname
+      (pp_list ~sep:"" pp_gvar_decl) (List.map snd g.g_vars)
+      (pp_list ~sep:"" pp_fct) (List.map snd g.g_functions)
 
 (*
   let pp_equiv_kind fmt = function

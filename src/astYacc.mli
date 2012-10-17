@@ -82,7 +82,11 @@ type game_body =
   | PGdef of (pos * pg_elem) list
   | PGredef of string * (p_var list * (p_var list * type_exp) list) * redef list
 
-type game = string * game_body
+type igame_body = (pos * fun_decl) list
+
+type game = string * string * game_body
+
+type igame = string * igame_body
 
 type proba = qualif_fct_name * exp
 
@@ -151,6 +155,7 @@ type global =
   | Gpop of pop_decl
   | Gadv of adv_decl
   | Ggame of game
+  | Gigame of igame
   | Gclaim of claim
   | Gequiv of equiv
   | Gtactic of

@@ -154,11 +154,31 @@ let rec process_pg_elem (pos, pg_elem) =
       let fct = Global.add_fct pos name params adv.adv_res body in
       add_ast_fct fct pg_elem
 
+(** Program interface element *)
+let process_ipg_elem (_pos, ifct) =
+  let igame = Global.cur_igame "process_ipg_elem" in
+  let ifct  = EcTyping.mk_ifct ifct in
+    igame.gi_functions <- ifct :: igame.gi_functions
+
+(** Game interface *)
+let process_igame pos (ig_name, ig_body) =
+  Global.start_igame ig_name pos;
+  try
+    List.iter process_ipg_elem ig_body;
+    Global.close_igame ()
+  with e ->
+    Global.abort_igame ();
+    raise e
 
 (** Game *)
-let process_game pos (game_name, game_body) =
-  Global.start_game game_name pos;
+let process_game pos (game_name, game_iname, game_body) =
+  Global.start_game game_name game_iname pos;
   try
+    let interface =
+      try  Global.find_igame game_iname
+      with Not_found ->
+        pos_error pos "cannot find interface `%s'" game_iname
+    and game = Global.cur_game "process_game" in
     begin match game_body with
       | AstYacc.PGdef pg_elem_list ->
         List.iter (process_pg_elem) pg_elem_list
@@ -189,6 +209,9 @@ let process_game pos (game_name, game_body) =
           process_pg_elem (pos, pg_elem) in
         List.iter process_fct old_g.g_functions
     end;
+    if not (EcTyping.interface_match game interface) then
+      pos_error pos "The game does not match its interface";
+    game.g_interface <- GI_Resolved interface;
     Global.close_game ()
   with e -> Global.abort_game (); raise e
 
@@ -535,7 +558,8 @@ and process_global path (pos, g) =
       | AstYacc.Gapred apred -> process_apred pos apred
       | AstYacc.Gaxiom ax -> process_axiom pos ax
       | AstYacc.Ggame game -> process_game pos game
-      | AstYacc.Gclaim claim -> process_claim pos claim;
+      | AstYacc.Gigame igame -> process_igame pos igame
+      | AstYacc.Gclaim claim -> process_claim pos claim
       | AstYacc.Gadv adv -> process_adv pos adv
       | AstYacc.Gpop_spec popspec -> process_popspec pos popspec
       | AstYacc.Gpop_aspec pop_aspec -> process_pop_aspec pos pop_aspec

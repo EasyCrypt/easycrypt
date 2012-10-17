@@ -185,7 +185,8 @@
       "abort",       ABORT;
       "include",     INCLUDE;
       "prover",      PROVER;
-      "drop",        DROP ]
+      "drop",        DROP;
+      "interface",   INTERFACE; ]
 
 (*Please DON'T delete the newline before this comment*)
 (* END *)

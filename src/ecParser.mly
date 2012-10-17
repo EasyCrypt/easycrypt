@@ -67,6 +67,7 @@ let exp_let     x e1 e2    = Ast.Elet   (x, e1, e2)
 %token IMPL
 %token IN
 %token INCLUDE
+%token INTERFACE
 %token KW_AND
 %token LBRACKET
 %token LEFTARROW
@@ -486,7 +487,24 @@ pg_body:
 ;
 
 pg_def:
-| GAME x=ident EQ body=pg_body { (x, body) }
+| GAME x=ident COLON i=ident EQ body=pg_body { (x, i, body) }
+;
+
+(* -------------------------------------------------------------------- *)
+(* Games interfaces                                                     *)
+
+ipg_elem:
+| FUN decl=fun_decl { decl }
+;
+
+ipg_body:
+| x=loc(ipg_elem)* { x }
+;
+
+ipg_def:
+| GAME INTERFACE x=ident EQ LKEY body=ipg_body RKEY {
+    (x, body)
+  }
 ;
 
 (* -------------------------------------------------------------------- *)
@@ -924,6 +942,7 @@ setunset_all:
 global_:
 | INCLUDE s=STRING                       { Ginclude s }
 | pg_def                                 { Ggame $1 }
+| ipg_def                                { Gigame $1 }
 | type_decl_or_def                       { Gtype $1 }
 | cnst_decl_or_def                       { Gcnst $1 }
 | opd=loc(op_decl)                       { let l, opd = opd in Gop (l, opd) }

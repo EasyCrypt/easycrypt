@@ -109,7 +109,11 @@ val add_fct : pos -> string -> vars_decl -> type_exp -> fct_body -> fct
 
 val add_global : pos -> string -> type_exp -> unit
 
-val start_game : string -> pos -> unit
+val start_igame : string -> pos -> unit
+val close_igame : unit -> unit
+val abort_igame : unit -> unit
+
+val start_game : string -> string -> pos -> unit
 val close_game : unit -> unit
 val abort_game : unit -> unit
 (*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*)
@@ -134,7 +138,11 @@ val find_op : ?prob:bool -> pos -> string -> type_exp list ->  oper * type_exp
 
 val find_adv : string -> pos -> adversary
 
+val find_igame : string -> game_interface_body
+
 val find_game : string -> game
+
+val cur_igame : string -> game_interface_body
 
 val cur_game : string -> game
 

@@ -269,3 +269,11 @@ module StringMap = Map.Make(struct
   let  compare = (Pervasives.compare : t -> t -> int)
 end)
 
+let rec uniq xs =
+  match xs with
+    | []      -> true
+    | x :: xs -> (not (List.mem x xs)) && (uniq xs)
+
+let try_find p xs =
+  try  Some (List.find p xs)
+  with Not_found -> None
