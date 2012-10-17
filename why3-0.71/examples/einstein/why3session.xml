@@ -1,0 +1,228 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE why3session SYSTEM "why3session.dtd">
+<why3session
+ name="examples/einstein/why3session.xml">
+ <prover
+  id="alt-ergo"
+  name="Alt-Ergo"
+  version="0.93"/>
+ <prover
+  id="coq"
+  name="Coq"
+  version="8.3pl2"/>
+ <prover
+  id="cvc3"
+  name="CVC3"
+  version="2.2"/>
+ <prover
+  id="eprover"
+  name="Eprover"
+  version="1.4 Namring"/>
+ <prover
+  id="gappa"
+  name="Gappa"
+  version="0.15.1"/>
+ <prover
+  id="simplify"
+  name="Simplify"
+  version="1.5.4"/>
+ <prover
+  id="spass"
+  name="Spass"
+  version="3.7"/>
+ <prover
+  id="vampire"
+  name="Vampire"
+  version="0.6"/>
+ <prover
+  id="verit"
+  name="veriT"
+  version="dev"/>
+ <prover
+  id="yices"
+  name="Yices"
+  version="1.0.25"/>
+ <prover
+  id="z3"
+  name="Z3"
+  version="2.19"/>
+ <file
+  name="../einstein.why"
+  verified="false"
+  expanded="true">
+  <theory
+   name="Bijection"
+   verified="true"
+   expanded="true">
+  </theory>
+  <theory
+   name="Einstein"
+   verified="true"
+   expanded="true">
+  </theory>
+  <theory
+   name="EinsteinClues"
+   verified="true"
+   expanded="true">
+  </theory>
+  <theory
+   name="Goals"
+   verified="false"
+   expanded="true">
+   <goal
+    name="G1"
+    sum="4e666b5243bdb1064743ec6e271cb8ec"
+    proved="true"
+    expanded="true"
+    shape="ainfix =ato_aFishaGerman">
+    <proof
+     prover="cvc3"
+     timelimit="5"
+     edited=""
+     obsolete="false">
+     <result status="valid" time="2.44"/>
+    </proof>
+    <proof
+     prover="eprover"
+     timelimit="5"
+     edited=""
+     obsolete="false">
+     <result status="timeout" time="4.98"/>
+    </proof>
+    <proof
+     prover="z3"
+     timelimit="2"
+     edited=""
+     obsolete="false">
+     <result status="valid" time="0.03"/>
+    </proof>
+    <proof
+     prover="yices"
+     timelimit="5"
+     edited=""
+     obsolete="false">
+     <result status="timeout" time="5.11"/>
+    </proof>
+    <proof
+     prover="vampire"
+     timelimit="5"
+     edited=""
+     obsolete="false">
+     <result status="timeout" time="2.99"/>
+    </proof>
+    <proof
+     prover="spass"
+     timelimit="5"
+     edited=""
+     obsolete="false">
+     <result status="timeout" time="5.00"/>
+    </proof>
+   </goal>
+   <goal
+    name="Wrong"
+    sum="1a0ed387ff3cda5c8323f4eb21fd248c"
+    proved="false"
+    expanded="true"
+    shape="ainfix =ato_aCatsaSwede">
+    <proof
+     prover="simplify"
+     timelimit="2"
+     edited=""
+     obsolete="false">
+     <result status="timeout" time="2.31"/>
+    </proof>
+    <proof
+     prover="cvc3"
+     timelimit="2"
+     edited=""
+     obsolete="false">
+     <result status="timeout" time="5.02"/>
+    </proof>
+    <proof
+     prover="eprover"
+     timelimit="5"
+     edited=""
+     obsolete="false">
+     <result status="timeout" time="4.98"/>
+    </proof>
+    <proof
+     prover="z3"
+     timelimit="2"
+     edited=""
+     obsolete="false">
+     <result status="timeout" time="5.03"/>
+    </proof>
+    <proof
+     prover="yices"
+     timelimit="5"
+     edited=""
+     obsolete="false">
+     <result status="timeout" time="5.12"/>
+    </proof>
+    <proof
+     prover="vampire"
+     timelimit="5"
+     edited=""
+     obsolete="false">
+     <result status="timeout" time="3.08"/>
+    </proof>
+    <proof
+     prover="spass"
+     timelimit="5"
+     edited=""
+     obsolete="false">
+     <result status="timeout" time="5.04"/>
+    </proof>
+   </goal>
+   <goal
+    name="G2"
+    sum="44df905be1d95d899616a903f2a08529"
+    proved="true"
+    expanded="true"
+    shape="ainfix =ato_aCatsaNorwegian">
+    <proof
+     prover="cvc3"
+     timelimit="5"
+     edited=""
+     obsolete="false">
+     <result status="valid" time="1.88"/>
+    </proof>
+    <proof
+     prover="eprover"
+     timelimit="5"
+     edited=""
+     obsolete="false">
+     <result status="timeout" time="4.99"/>
+    </proof>
+    <proof
+     prover="z3"
+     timelimit="2"
+     edited=""
+     obsolete="false">
+     <result status="valid" time="0.03"/>
+    </proof>
+    <proof
+     prover="yices"
+     timelimit="5"
+     edited=""
+     obsolete="false">
+     <result status="timeout" time="5.02"/>
+    </proof>
+    <proof
+     prover="vampire"
+     timelimit="5"
+     edited=""
+     obsolete="false">
+     <result status="timeout" time="3.08"/>
+    </proof>
+    <proof
+     prover="spass"
+     timelimit="5"
+     edited=""
+     obsolete="false">
+     <result status="timeout" time="4.99"/>
+    </proof>
+   </goal>
+  </theory>
+ </file>
+</why3session>

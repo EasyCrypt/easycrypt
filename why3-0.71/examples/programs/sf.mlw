@@ -1,0 +1,150 @@
+
+(* Program verification examples from the book "Software Foundations"
+   http://www.cis.upenn.edu/~bcpierce/sf/
+
+   Note: we are using int (not nat), so we need extra precondition (e.g. x >= 0)
+   Note: we are also proving termination
+*)
+
+module HoareLogic
+
+  use import int.Int
+  use import module ref.Ref
+
+  (* Example: Slow Subtraction *)
+
+  let slow_subtraction (x: ref int) (z: ref int) =
+    { !x >= 0 }
+'Init:
+    while !x <> 0 do
+      invariant { 0 <= !x /\ !z - !x = at !z 'Init - at !x 'Init } variant { !x }
+      z := !z - 1;
+      x := !x - 1
+    done
+    { !z = old !z - old !x }
+
+  (* Example: Reduce to Zero *)
+
+  let reduce_to_zero (x: ref int) =
+    { !x >= 0 }
+    while !x <> 0 do invariant { !x >= 0 } variant { !x } x := !x - 1 done
+    { !x = 0 }
+
+  (* Exercise: Slow Addition *)
+
+  let slow_addition (x: ref int) (z: ref int) =
+    { !x >= 0 }
+'Init:
+    while !x <> 0 do
+      invariant { 0 <= !x /\ !z + !x = at !z 'Init + at !x 'Init } variant { !x }
+      z := !z + 1;
+      x := !x - 1
+    done
+    { !z = old !z + old !x }
+
+  (* Example: Parity *)
+
+  inductive even int =
+    | even_0 : even 0
+    | even_odd : forall x:int. even x -> even (x+2)
+
+  lemma even_not_odd : forall x:int. even x -> even (x+1) -> false
+
+  let parity (x: ref int) (y: ref int) =
+    { !x >= 0 }
+    y := 0;
+'Init:
+    while !x <> 0 do
+      invariant { 0 <= !x /\ (!y=0 /\ even (at !x 'Init - !x) \/
+                               !y=1 /\ even (at !x 'Init - !x + 1)) }
+      variant { !x }
+      y := 1 - !y;
+      x := !x - 1
+    done
+    { !y=0 <-> even (old !x) }
+
+  (* Example: Finding Square Roots *)
+
+  let sqrt (x: ref int) (z: ref int) =
+    { !x >= 0 }
+    z := 0;
+    while (!z + 1) * (!z + 1) <= !x do
+      invariant { 0 <= !z /\ !z * !z <= !x } variant { !x - !z * !z }
+      z := !z + 1
+    done
+    { !z * !z <= !x < (!z + 1) * (!z + 1) }
+
+  (* Exercise: Factorial *)
+
+  function fact int : int
+  axiom fact_0 : fact 0 = 1
+  axiom fact_n : forall n:int. 0 < n -> fact n = n * fact (n-1)
+
+  let factorial (x: ref int) (y: ref int) (z: ref int) =
+    { !x >= 0 }
+    y := 1;
+    z := !x;
+    while !z <> 0 do
+      invariant { 0 <= !z /\ !y * fact !z = fact !x } variant { !z }
+      y := !y * !z;
+      z := !z - 1
+    done
+    { !y = fact !x }
+
+end
+
+module MoreHoareLogic
+
+  use import int.Int
+  use import module ref.Ref
+  use import list.List
+  use import list.HdTl
+  use import list.Length
+
+  function sum (l : list int) : int = match l with
+  | Nil -> 0
+  | Cons x r -> x + sum r
+  end
+
+  val head : l:list 'a -> { l<>Nil } 'a { Some result = hd l }
+  val tail : l:list 'a -> { l<>Nil } list 'a { Some result = tl l }
+
+  let list_sum (l: ref (list int)) (y: ref int) =
+    {}
+    y := 0;
+'Init:
+    while !l <> Nil do
+      invariant { length !l <= length (at !l 'Init) /\
+                  !y + sum !l = sum (at !l 'Init) }
+      variant { length !l }
+      y := !y + head !l;
+      l := tail !l
+    done
+    { !y = sum (old !l) }
+
+  use import list.Mem
+  use import list.Append
+
+  (* note: we avoid the use of an existential quantifier in the invariant *)
+  let list_member (x : ref (list 'a)) (y: 'a) (z: ref int) =
+    {}
+    z := 0;
+'Init:
+    while !x <> Nil do
+      invariant { length !x <= length (at !x 'Init) /\
+                  (mem y !x -> mem y (at !x 'Init)) /\
+                  (!z=1 /\ mem y (at !x 'Init) \/
+                   !z=0 /\ (mem y (at !x 'Init) -> mem y !x)) }
+      variant { length !x }
+      if y = head !x then z := 1;
+      x := tail !x
+    done
+    { !z=1 <-> mem y (old !x) }
+
+end
+
+(*
+Local Variables:
+compile-command: "unset LANG; make -C ../.. examples/programs/sf.gui"
+End:
+*)

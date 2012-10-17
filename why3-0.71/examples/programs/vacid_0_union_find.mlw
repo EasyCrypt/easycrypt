@@ -1,0 +1,129 @@
+module M
+
+  use import int.Int
+  use import module ref.Ref
+  use import module array.Array
+
+  type uf = {| link : array int;
+               dist : array int; (* distance to representative *)
+               num  : int;       (* number of classes *) |}
+
+  function size (u: uf) : int = length u.link
+
+  predicate inv (u : uf) =
+    let s = length u.link in
+    length u.dist = s /\
+    (forall i:int. 0 <= i < s -> 0 <= u.link[i] < s) /\
+    (forall i:int. 0 <= i < s ->
+       (  (u.dist[i] = 0 /\ u.link[i] = i)
+       \/ (u.dist[i] > 0 /\ u.dist[u.link[i]] < u.dist[i])))
+
+  inductive repr (u:uf) (x:int) (r:int) =
+  | Repr_root: forall u:uf. inv u ->
+               forall x:int. 0 <= x < size u ->
+               (link u)[x] = x -> repr u x x
+  | Repr_link: forall u:uf. inv u ->
+               forall x:int. 0 <= x < size u ->
+               forall r:int. repr u (link u)[x] r -> repr u x r
+
+  lemma Repr_bounds_2:
+    forall u:uf, x y:int. repr u x y -> 0 <= y < size u
+  lemma Repr_dist_1:
+    forall u:uf, x y:int. repr u x y -> u.dist[y] = 0
+
+  predicate same (u:uf) (x y:int) =
+    forall r:int. repr u x r <-> repr u y r
+
+  predicate same_reprs (u1 u2 : uf) =
+    forall x r:int. repr u1 x r <-> repr u2 x r
+
+  axiom OneClass :
+    forall u:uf. num u = 1 ->
+    forall x y:int. 0 <= x < size u -> 0 <= y < size u -> same u x y
+
+  let get_num_classes (u: uf) =
+    {} num u { result = num u }
+
+  let create (n:int) =
+    { 0 <= n }
+    let l = make n 0 in
+    for i = 0 to n-1 do
+      invariant { forall j:int. 0 <= j < i -> l[j] = j }
+      l[i] <- i
+    done;
+    {| link = l; dist = make n 0; num = n |}
+    { inv result /\
+      num result = n /\ size result = n /\
+      forall x:int. 0 <= x < n -> repr result x x }
+
+  let path_compression (u: uf) x r =
+    { inv u /\ 0 <= x < size u /\ u.dist[x] > 0 /\ repr u x r }
+    u.link[x] <- r;
+    u.dist[x] <- 1
+    { inv u /\ size u = size (old u) /\
+      num u = num (old u) /\ same_reprs (old u) u }
+
+  let rec find (u: uf) (x: int) variant { u.dist[x] } =
+    { inv u /\ 0 <= x < size u }
+    let y = (link u)[x] in
+    if y <> x then begin
+      let r = find u y in
+      path_compression u x r;
+      r
+    end else
+      x
+    { inv u /\
+      repr u x result /\
+      size u = size (old u) /\ num u = num (old u) /\
+      same_reprs u (old u) }
+
+  (***
+
+  val ghost_find : u:ref uf -> x:int ->
+    { inv !u /\ 0 <= x < size !u }
+    int reads u
+    { repr !u x result }
+
+  let increment u r =
+    { inv !u /\ 0 <= r < size !u }
+    let i = ref 0 in
+    let d = ref (dist !u) in
+    while !i < size !u do
+      invariant { 0 <= !i <= size !u /\
+                  forall j:int. 0 <= j < size !u ->
+                  !d#j = dist(!u)#j +
+                         if repr !u j r /\ j < !i then 1 else 0 }
+      variant { size !u - !i }
+      if ghost_find u !i = r then
+        d := A.set !d !i (A.get !d !i + 1)
+    done;
+    !d
+    { forall i:int. 0 <= i < size !u ->
+        result#i = (dist !u)#i + if repr !u i r then 1 else 0 }
+
+  let union u a b =
+    { inv !u /\
+      0 <= a < size !u /\ 0 <= b < size !u /\ not same !u a b }
+    let ra = find u a in
+    let rb = find u b in
+    let l = link !u in
+    let d = increment u ra in
+    u := UF (A.set l ra rb) d (size !u) (num !u - 1)
+    { inv !u /\
+      same !u a b /\
+      size !u = size (old !u) /\ num !u = num (old !u) - 1 /\
+      forall x y:int. 0 <= x < size !u -> 0 <= y < size !u ->
+        same !u x y <->
+        same (old !u) x y \/
+        same (old !u) x a /\ same (old !u) b y \/
+        same (old !u) x b /\ same (old !u) a y }
+
+  ***)
+
+end
+
+(*
+Local Variables:
+compile-command: "unset LANG; make -C ../.. examples/programs/vacid_0_union_find"
+End:
+*)

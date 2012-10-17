@@ -1,0 +1,62 @@
+(** Dijkstra's "Dutch national flag" *)
+
+module Flag
+
+  use import int.Int
+  use import module ref.Ref
+  use import module array.Array
+  use import module array.ArrayPermut
+
+  type color = Blue | White | Red
+
+  predicate monochrome (a:array color) (i:int) (j:int) (c:color) =
+    forall k:int. i <= k < j -> a[k]=c
+
+  let swap (a:array color) (i:int) (j:int) =
+    { 0 <= i < length a /\ 0 <= j < length a }
+    let v = a[i] in
+    begin
+      a[i] <- a[j];
+      a[j] <- v
+    end
+    { exchange (old a) a i j }
+
+  let dutch_flag (a:array color) (n:int) =
+    { 0 <= n /\ length a = n }
+    let b = ref 0 in
+    let i = ref 0 in
+    let r = ref n in
+'Init:
+    while !i < !r do
+       invariant { 0 <= !b <= !i <= !r <= n /\
+                   monochrome a 0  !b Blue /\
+                   monochrome a !b !i White /\
+                   monochrome a !r n  Red /\
+                   length a = n /\
+                   permut_sub (at a 'Init) a 0 n }
+       variant { !r - !i }
+       match a[!i] with
+       | Blue ->
+         swap a !b !i;
+         b := !b + 1;
+         i := !i + 1
+       | White ->
+         i := !i + 1
+       | Red ->
+         r := !r - 1;
+         swap a !r !i
+       end
+    done
+    { (exists b:int. exists r:int.
+        monochrome a 0 b Blue /\
+        monochrome a b r White /\
+        monochrome a r n Red)
+      /\ permut (old a) a }
+
+end
+
+(*
+Local Variables:
+compile-command: "unset LANG; make -C ../.. examples/programs/flag.gui"
+End:
+*)

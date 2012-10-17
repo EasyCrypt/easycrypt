@@ -1,0 +1,71 @@
+
+SRC_MLI = $(wildcard $(SRCDIR)/*.mli)
+DOC_SRC = $(SRC_MLI) $(ALL_ML)
+NOT_IN_DOT = $(SRCDIR)/ecUtil.ml $(SRCDIR)/ast.mli $(SRCDIR)/ppAst.ml
+DOC_SRC_DOT=$(filter-out $(NOT_IN_DOT), $(DOC_SRC))
+
+DOCDIR=$(TOOLDIR)/doc
+CODEDOCDIR=$(DOCDIR)/Code
+INFODOC = $(CODEDOCDIR)/info.ocamldoc
+
+OCAMLDOC = ocamldoc -rectypes -I $(SRCDIR) -stars -m A
+OCAMLDOC_HTML = $(OCAMLDOC) -html -d $(CODEDOCDIR)
+OCAMLDOC_MOD = $(OCAMLDOC) -dot # -dot-include-all
+OCAMLDOC_TYPES = $(OCAMLDOC) -dot -dot-types
+
+$(INFODOC) : $(EXE) $(DOC_SRC)
+	@$(ECHO_CIBLE)
+	mkdir -p $(dir $@)
+	$(OCAMLDOC) -dump $@ $(DOC_SRC)
+
+$(CODEDOCDIR)/index.html : $(INFODOC) $(DOCDIR)/intro.txt
+	@$(ECHO_CIBLE)
+	mkdir -p $(dir $@)
+	$(OCAMLDOC_HTML) -intro $(DOCDIR)/intro.txt -load $(INFODOC)
+	rm $(CODEDOCDIR)/style.css
+
+$(CODEDOCDIR)/modules.dot : $(INFODOC)
+	@$(ECHO_CIBLE)
+	mkdir -p $(dir $@)
+	$(OCAMLDOC_MOD) -o $@.tmp $(DOC_SRC_DOT)
+	sed "s/rotate=90;//" $@.tmp > $@
+	rm -f $@.tmp
+
+$(CODEDOCDIR)/types.dot : $(INFODOC)
+	@$(ECHO_CIBLE)
+	mkdir -p $(dir $@)
+	$(OCAMLDOC_TYPES) -o $@.tmp -load $(INFODOC)
+	sed "s/rotate=90;//" $@.tmp > $@
+	rm -f $@.tmp
+
+%.svg : %.dot
+	@$(ECHO_CIBLE)
+	sed "s/\(digraph .*\)/\1 node [href=\"\\\\N.html\"];/" $< > $<.tmp
+	dot -Tsvg -o $@ $<.tmp
+	rm -f $<.tmp
+
+.PHONY : doc_graphs doc_html doc clean_doc
+
+$(CODEDOCDIR)/style.css : $(DOCDIR)/style.css
+	cp $< $@
+
+doc_graphs : $(CODEDOCDIR)/types.svg $(CODEDOCDIR)/modules.svg
+
+doc_html : $(CODEDOCDIR)/index.html $(CODEDOCDIR)/style.css
+
+doc: doc_html doc_graphs
+
+dist_doc : 
+	@mkdir -p $(DIST_DIR)
+	@cp -R doc $(DIST_DIR)/doc
+
+install_doc :
+	echo ""
+
+uninstall_doc :
+	echo ""
+
+clean_doc :
+	@$(ECHO_CIBLE)
+	rm -rf $(CODEDOCDIR)
+

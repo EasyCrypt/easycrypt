@@ -1,0 +1,509 @@
+
+\chapter{\EasyCrypt language}
+
+
+\section{Basic declarations}
+\paragraph*{Types, constants, operators.}
+\index{types}\index{constants}\index{operators}
+
+\EasyCrypt provides native basic types such as \verb|unit|,
+\verb|bool|, \verb|int|, \verb|real|, \verb|bitstring| as well as
+polymorphic lists \verb|list|, polymorphic maps \verb|map|, product
+types \verb!*! (infix notation), and \verb|option| types.
+%
+Abstract types can be declared with statements of the form 
+\verb+type+~\textit{type_ident}, as in the following example:
+\begin{verbatim} 
+type secret_key.
+type group.
+\end{verbatim} 
+Parametric type declarations are also supported. Type variables start
+with a \verb|'| symbol:
+\begin{verbatim}
+type 'a list.
+\end{verbatim}
+%
+Types synonyms can be declared with declaration of the form 
+\verb+type+~\textit{type_ident}~\verb+=+~\textit{type_exp},
+where \textit{type_exp} is built from basic types, type instantiation,
+and other user-declared types, as in the following example:
+\begin{verbatim} 
+type secret_key = int.
+type pkey = group.
+type ciphertext = group * group. 
+\end{verbatim} 
+
+Constants are introduced with declarations of the form
+\verb+cnst+~\textit{ident}\verb+:+~\textit{type_exp}~[\textit{exp}],
+where \textit{exp} is an optional expression defining the constant.
+For example, the following declarations introduce constants with
+identifiers {\tt g} and {\tt empty_map} of types {\tt group} and {\tt
+  ('a, 'b) map}, respectively:
+\begin{verbatim}
+cnst g : group.
+cnst empty_map : ('a, 'b) map.
+\end{verbatim}
+
+Operators are introduced with declarations of the form
+\verb+op+~\textit{op_ident}~\verb+:+~\textit{fun_type}~[\verb+as+~\textit{id}]
+where the operator \textit{op_ident} can be either an alpha-numerical
+identifier or a binary operator ---which may include extra symbols
+such as \verb'=', \verb'<', \verb'~', \verb'+', \verb'%', and \verb'^'
+for example--- enclosed in square backets.  The identifier
+\textit{gt_int} is required when defining a binary operator enclosed
+in brackets, and is used as an internal identifier following the
+syntactic conventions of the tools in which \EasyCrypt relies.  The
+signature \textit{fun_type} is defined with the syntax
+\textit{type_exp}~\verb+->+~\textit{type_exp}, or
+\verb+(+\textit{type_exp}${}_1$\verb+,+...\verb+,+\textit{type_exp}${}_k$\verb+)+~\verb+->+~\textit{type_exp},
+where \textit{type_exp} stands for type expressions and 
+\textit{type_exp}${}_1$\verb+,+...\verb+,+\textit{type_exp}${}_k$ is a
+possibly empty list of type expressions.
+%
+For example:
+\begin{verbatim}
+op exp : real -> real
+\end{verbatim}
+The first operator is declared as infix and denoted by the symbol
+\verb|>|. The operator \verb|exp| is a prefix operator. 
+%
+The definition of polymorphic operators is also allowed by the use of
+type variables, e.g., the \verb+hd+ operator defined in the
+\EasyCrypt prelude:
+\begin{verbatim}
+op hd : 'a list -> 'a.
+\end{verbatim}
+%
+As well as constants, operators can be defined by an expression using
+the following syntax:
+\\
+\verb+op+~\textit{op_ident}\verb+(+\textit{params}\verb+) = +\textit{exp}~[\verb+as+~\textit{id}]
+\\
+\noindent
+notice that the result type is not required in this case.
+The following are examples of operators defined in the \EasyCrypt prelude:
+\begin{verbatim}
+op fst(c : 'a * 'b) = let a,b = c in a.
+op [>] (x,y:int) = y < x as gt_int.
+\end{verbatim}
+
+
+\paragraph*{Probabilistic operators.}\index{probabilistic operators}
+Probability distributions (see random samplings in the definition of
+probabilistic statements) can be defined by declaring operators with
+the syntax \verb+pop+~\textit{ident}~\verb+:+~\textit{fun_type} where,
+as well as in the definition of deterministic operators, the function
+signature \textit{fun_type} is defined with the syntax
+\textit{type_exp}~\verb+->+~\textit{type_exp}, or
+\verb+(+\textit{type_exp}${}_1$\verb+,+...\verb+,+\textit{type_exp}${}_k$\verb+)+~\verb+->+~\textit{type_exp},
+where \textit{type_exp} stands for type expressions and
+\textit{type_exp}${}_1$\verb+,+...\verb+,+\textit{type_exp}${}_k$ is a
+possibly empty list of type expressions.  For example:
+\begin{verbatim}
+pop gen_secret_key : int -> secret_key.
+\end{verbatim}
+
+\paragraph*{Logical formulae.}
+Formulae are built from boolean expressions, standard logical
+connectives, defined predicates, and logical variable
+quantification. Boolean expressions are built by the application of
+native or user-defined operators.
+
+Logical formulae must be closed with respect to logical variables. The
+syntax for universal quantification is of the form:
+\begin{verbatim}
+ forall (x,y:int,z:real), p(x,y,z)
+\end{verbatim}
+where \verb|p| is a first-order formula and \verb|x,y,z| are logical
+variables, and similarly with existential quantification (\verb+exists+).
+
+In addition to logical variables, in some contexts, predicates may
+contain program variables tagged with a \verb|{1}| or \verb|{2}|
+flag. A formula defining an axiom must contain only logical variables,
+whereas formulae describing pre and postconditions on a relational
+judgment (discussed below) usually refers to tagged program variables.
+
+
+The special notation to specify that the states on the left and right
+are equal over a subset of variables. For example, one can write
+\verb|={x,y,z}| to denote the equivalent relational predicate
+\begin{verbatim}
+x{1}=x{2} && y{1}=y{2} && z{1}=z{2}
+\end{verbatim}
+% (the special keyword \verb|res| refers to function return value) 
+
+
+
+\paragraph*{Predicates.}\index{predicates}
+Predicates are introduced with the syntax
+\verb+pred+~\textit{ident}\verb+(+\textit{params}\verb+)=+~\textit{p}
+where \textit{params} is a list of formal argument declarations and
+\textit{p} is a first-order non-relational formula. For example:
+\begin{verbatim}
+pred injective(T:('a, 'b) map) = 
+  forall (x,y:'a), in_dom(x,T) => in_dom(y,T) => T[x] = T[y] => x = y.
+\end{verbatim}
+
+
+
+\paragraph*{Axioms and Lemmas.}\index{axioms}\index{lemmas}
+
+Axioms are used to describe properties of abstract operators and
+types, or to introduce hypotheses over declared constants. Axioms are
+defined by a declaration of the form
+\verb+lemma+~\textit{ident}~\verb+:+~\textit{p}, where \textit{ident}
+is a valid identifier and $p$ is a first-order non-relational formula.
+For example:
+\begin{verbatim}
+axiom head_def : forall (a: 'a, l: 'a list),  hd(a::l) = a.
+
+axiom empty_in_dom : forall (a:'a), !in_dom(a, empty_map).
+\end{verbatim}
+%
+The axiom \verb+head_def+ defines the list operator \verb+hd+. 
+The axiom \verb+empty_in_dom+ characterizes \verb+empty_map+ as a
+map with an empty domain.
+
+Lemmas can also be introduced to facilitate the verification of later
+goals. The syntax is similar to the one of axioms:
+\verb+lemma+~\textit{ident}~\verb+:+~\textit{p}, where $p$ is a
+first-order non-relational formula. 
+%
+When a lemma statement is found, \EasyCrypt proves it by calling the
+available provers/SMT provers through the Why3 tool.
+
+
+\section{Game declarations}
+Games are defined by three components: variables describing the global
+state, defined procedures and abstract adversary declarations.
+
+
+\subsection{Probabilistic statements.}
+
+Statements are defined as a list, possible empty, of basic
+instructions (assignments and function calls) ending on a semicolon,
+or composed instructions (conditional and while loops). No semicolon
+is accepted after a conditional or loop
+statement. Conditional statements follow the syntax 
+%
+\verb+if (+\textit{b}\verb+) {+ \textit{stmt} \verb+}+ where \textit{stmt} is
+a probabilistic statement and \textit{b} is a boolean guard.  While
+loop statements follow the syntax \verb+while (+\textit{b}\verb+) {+
+  \textit{stmt} \verb+}+. Curly brackets are not required when
+\textit{stmt} contains a single instruction.
+
+Probabilistic assignments are of the form 
+%
+\verb+ident+ \verb+=+ \textit{d_exp}
+%
+where \textit{d_exp} is a probability expression, such as uniform
+distributions over booleans (\verb+{0,1}+), integer intervals
+\verb+[i..j]+, and bitstrings of arbitrary length
+(\verb+{0,1}^k+), or distributions defined in terms of probabilistic
+operators.  Assume \verb|gen_secret_key : int -> secret_key| is a
+defined probabilistic operator, the following are valid probabilistic
+assignments:
+\begin{verbatim}
+x = {0,1}
+x = [0..q-1]
+x = {0,1}^k
+x = gen_secret_key(0)
+\end{verbatim}
+
+
+\subsection{Function Definition.}
+
+Functions are defined either by a function body containing variable
+declarations and probabilistic statements or as synonyms of functions
+of already defined games.
+
+\begin{itemize}
+\item 
+\verb+fun+ \textit{fun_ident} \verb+(+%
+\textit{typed_args}\verb+) : +\textit{ret_type} \verb+ = { +%
+\textit{fun_body} \verb+}+
+
+\textit{fun_ident} is a valid function identifier, a list of typed
+formal parameters \textit{typed_args}, the return type
+\textit{ret_type} and its body \textit{fun_body}. The function body is
+defined as a list of local variable declarations of the form
+%
+\verb+var+ \textit{ident} \verb+:+ \textit{type}\verb+;+, a
+%
+probabilistic statement, and a return instruction of the form
+\verb+return+ \textit{exp}, where \textit{exp} is a deterministic
+expression.
+
+\item
+\verb+fun+ \textit{fun_ident} \verb+=+ \textit{game_ident}\verb+.+\textit{fun_ident}
+
+The resulting function has the same formal parameters and function
+body than the function on the right.
+\end{itemize}
+
+
+\subsection{Adversary Signature and Declaration.}
+Adversary signatures are defined outside a game declaration with a
+syntax of the form:
+
+\verb+adversary+
+\textit{adv_sign_ident}\verb+(+\textit{typed_args}\verb+) :+
+\textit{res_type} \verb+{+\textit{o_sign}${}_1$\verb+,+...\verb+,+\textit{o_sign}${}_k$\verb+}.+
+
+\noindent
+where \textit{res_type} is a type expression specifying the return
+type and \textit{o_sign}${}_1$\verb+,+...\verb+,+\textit{o_sign}${}_k$
+is a list (possibly empty), of oracle signatures.
+In the following example
+\begin{verbatim}
+adversary A1_sign(pk:pkey)  : message * message { group -> message}.
+adversary A2_sign(c:cipher) : bool              { group -> message}.
+\end{verbatim}
+the type expressions \verb|message*message| and \verb|bool| indicate
+the return type. A list of signatures in square brackets indicates the
+signature of the oracles that can be invoked by adversaries with these
+signatures. In this particular example both signatures belong to
+adversaries that can invoke a single oracle with type
+\verb|group -> message|.
+
+As well as function definition, adversaries are either declared abstractly
+or as adversary synonyms.
+Abstract declarations follow the syntax:\\
+\verb+abs+ \textit{adv_ident} \verb+=+ \textit{adv_sign_ident}
+\verb+{+ \textit{ident}${}_1$\verb+,+...\verb+,+\textit{ident}${}_k$\verb+}+
+
+\noindent
+For the adversary signature above we can write for example:
+\begin{verbatim}
+  abs A1 = A1_sign {H_A}
+  abs A2 = A2_sign {H_A}
+\end{verbatim}
+where \verb|H_A| is a defined function representing an
+oracle. Clearly, \EasyCrypt requires the function \verb|H_A| to have
+the signature \verb|group -> message|.
+
+Adversary synonyms follow a similar syntax to function synonyms:
+
+\verb+fun+ \textit{adv_ident} \verb+=+ \textit{game_ident}\verb+.+\textit{adv_ident}
+
+\noindent
+The result of this declaration is, however, not necessarily an
+abstract adversary.
+
+\subsection{Game definition}
+
+
+\begin{itemize}
+\item A game can be defined by the following syntax:  
+  \Syntax
+  \verb+game+ \textit{ident} \verb+=+ \verb+{+\textit{game_body}\verb+}+
+  % 
+  The body of a game \textit{game_body} is composed of a global
+  variable declaration, function definitions and abstract adversary
+  declarations. The declaration of global variables consists of a list
+  of statements of the form
+  % 
+  \verb+var+ \textit{ident} \verb+:+ \textit{type} 
+  % 
+  as in the definition of function local variables, except that they
+  are not separated by a semicolon.
+\item Alternatively, one can redefine a game by removing or adding
+  variables, and redefining functions from an already defined game.
+  \Syntax \verb+game+ \textit{ident} \verb+=+
+  \textit{g_ident} \textit{var_modifs} \\
+  \verb+           where+ \textit{ident${}_1$} \verb+= {+ \textit{fun_body} \verb+} and+ ...
+  \verb+and+ \textit{ident${}_k$} \verb+= {+ \textit{fun_body} \verb+}+.
+
+  The \textit{g_ident} identifier refers to an existing game,
+  \textit{var_modifs} consists of an optional statement of the form
+  \verb+remove+
+  \textit{ident${}_1$}\verb+,+..\verb+,+\textit{ident${}_k$} and a
+  possible empty list of new variable declarations. Finally, a list of
+  function redefinitions is given separated by the \verb+and+ keyword.
+\end{itemize}
+
+
+
+
+
+\chapter{Probabilistic Relational Hoare Logic}
+
+\section{Foundations}
+Probabilistic Relational Hoare Logic (pRHL) judgments are quadruples
+of the form:
+%
+$$ \Equiv{c_1}{c_2}{\Pre}{\Post} $$
+%
+where $c_1, c_2$ are programs and $\Pre, \Post$ are first-order
+relational formulae. Relational formulae are first-order formulae over
+logical variables and program variables tagged with either \verb|{1}|
+or \verb|{2}| to denote their interpretation in the left or right-hand
+side program. The special keyword \verb|res| denotes the return value
+of a procedure and can be used in the place of a program variable. One
+can also write \verb|e{i}| for the expression |e| in which all program
+variables are tagged with \verb|{i}|. A relational formula is
+interpreted as a relation on program memories.  See the related
+articles~\cite{Barthe:2009} for more information on this logic.
+
+\section{Judgements}
+In \EasyCrypt, pRHL judgments are introduced with judgments
+of the form
+\begin{verbatim}
+equiv Fact : Game1.f1 ~ Game2.f2 : Pre ==> Post.
+\end{verbatim}
+where \verb|Fact| is a judgment identifier, \verb!Game1! and
+\verb!Game2! are games, \verb!f1! and \verb!f2! are identifiers for
+procedures in \verb!Game1! and \verb!Game2! respectively. The
+procedures \verb!f1! and \verb!f2! may be abstract or concrete;
+however, judgments between two abstract procedures can only be defined
+only if the two abstract procedures correspond to the same adversary.
+
+The pre-condition \verb!Pre! and post-condition \verb!Post! are
+relational formulae, and define relations between the parameters and
+the global variables of the two procedures, the post-condition is a
+relation between the global variables and a special variable named
+\verb+res+, representing the return value of the procedures.  More
+precisely \verb+res{1}+ stands for return value of the left procedure
+and \verb+res{2}+ stands for the return value of the right
+procedure. For convenience, \EasyCrypt also allows pre-conditions and
+post-conditions to include sub-formulae of the form
+\verb!={x1, ..., xn}! stating that the values of \verb!x1 ... xn!
+  coincide in the left and right memories. That is,
+  \verb!={x1, ..., xn}! is a shorthand for
+  \verb!x1{1}=x1{2} && ... && xn{1}=xn{2}!.
+
+\EasyCrypt also supports judgments of the form:
+\begin{verbatim}
+equiv Fact : Game1.f1 ~ Game2.f2 : (Inv).
+\end{verbatim}
+as a shorthand for 
+\begin{verbatim}
+equiv Fact : Game1.f1 ~ Game2.f2 : ={params} && Inv  ==>  ={res} && Inv.
+\end{verbatim}
+where \verb!params! is the list of parameters of \verb!f1! and
+\verb!f2!. Note that in order for the judgment to be meaningful, the
+procedures must have the same return type and the same signature type.
+
+
+
+
+
+
+\section{Proof process}
+A statement of the form 
+\begin{verbatim}
+equiv Fact : G1.f1 ~ G2.f2 : Pre ==> Post.
+\end{verbatim}
+opens a verification process, provided \verb!f1! and \verb!f2! are
+both abstract procedures, or both concrete procedures. 
+
+
+In case \verb!f1! and \verb!f2! are both abstract procedures, the only
+available tactic is \verb!auto!. Note that, since abstract procedures
+are allowed to call concrete procedures, it is sometimes useful to
+prove invariants on the latter prior to proving equivalence properties
+on \verb!f1! and \verb!f2!.
+
+
+In case both procedures \verb!f1!  and \verb!f2! are concrete,
+\EasyCrypt automatically transforms the judgment into a judgment on
+their bodies. The pre-condition remains unchanged, but the
+post-condition is modified by replacing the variables \verb+res{1}+
+and \verb+res{2}+ by the return expressions of \verb!f1! and \verb!f2!
+respectively.
+
+For example, in the file \verb+examples/elgamal.ec+ after the
+definition of the game \verb+DDH0+ we can start a new judgment,
+stating that the two procedures \verb!INDCPA.Main! and
+\verb! DDH0.Main! are equivalent if we observe their results
+(\verb+={res}+ stands for \verb+res{1} = res{2}+):
+\begin{verbatim}
+equiv CPA_DDH0 : INDCPA.Main ~ DDH0.Main : true ==> ={res}.
+\end{verbatim}
+The judgment is automatically transformed into the following goal:
+\begin{verbatim}
+pre   = true
+stmt1 =   1 : (sk, pk) = KG ();
+          2 : (m0, m1) = A1 (pk);
+          3 : b = {0,1};
+          4 : mb = if b then m0 else m1;
+          5 : c = Enc (pk, mb);
+          6 : b' = A2 (pk, c);
+stmt2 =   1 : x = [0..q - 1];
+          2 : y = [0..q - 1];
+          3 : d = B (g ^ x, g ^ y, g ^ (x * y));
+post  = (b{1} = b'{1}) = d{2}
+\end{verbatim}
+At this point, the \EasyCrypt interpreter expects the user to provide
+tactics to guide the verification of the judgment. Each tactic may
+generate both logical verification goals (first-order formulae) that
+are sent to SMT solvers and new verification subgoals that are stacked
+for later verification by the user. The interactive verification task
+concludes when there are no more goals in the stack and the result is
+\emph{saved} (by typing \verb|save|) or when the verification goal is
+\emph{aborted}.
+%
+
+
+Note that we have not implemented support to reason about the case
+where one procedure is abstract, and another concrete. One possible
+workaround is to wrap the abstract procedure, say \verb!f1!, into
+a concrete procedure \verb!f1c! that simply calls \verb!f1!.  
+
+
+
+ 
+
+
+
+
+\section{Tactics}
+\input{tactics}
+
+\section{Miscellaneous tool directives}
+\begin{itemize}
+\item {\verb+include+~\textit{filename}}: Loads and processes the
+  contents of the \EasyCrypt file \textit{filename}.
+
+\item {\verb+timeout+ \textit{secs}:} Sets the current timeout given
+  to SMT solvers to the value \textit{secs}. Used to increase the
+  default timeout value when no SMT solver manage to prove the
+  required logical goals.
+
+\item %
+  {\verb+prover+~\textit{prover${}_1$}\verb+,+..\verb+,+\textit{prover${}_k$}:}
+  Sets the list of provers (separated by '\verb+,+') that are
+  available to discharge the logical verification conditions. By
+  default, \EasyCrypt tries with all provers recognized when invoking
+  \verb|why3config --detect|. A prover name can be given either as an
+  identifier or a string.
+
+\item {\verb+check+~\textit{name}/ \verb+print+~\textit{name}} Show
+  information about the object associated to the name \textit{name}. 
+  
+
+\item {\verb+checkproof+:} Enables and disables the verification of
+  logical verification conditions. 
+
+\item {\verb+set+~\textit{name}/\verb+unset+~\textit{name}}: Make the
+  axiom or lemma with name \textit{name} available/unavailable as
+  hypothesis for the verification of logical formulae.
+
+\item {\verb+transparent+~\textit{name}/ \verb+opaque+~\textit{name}}:
+  Set the definition of the predicate with name \textit{name} as
+  transparent or opaque. If a predicate is opaque then its definition
+  is not unfolded during the verification of logical formulae.
+
+
+\end{itemize}
+
+\chapter{Probability Claims and Computation}
+\input{proba}
+
+\chapter{Example: elgamal}
+\input{elgamal}
+
+%%% Local Variables: 
+%%% mode: latex
+%%% TeX-master: "easycrypt"
+%%% End: 

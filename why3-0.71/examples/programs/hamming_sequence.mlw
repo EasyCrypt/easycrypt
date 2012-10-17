@@ -1,0 +1,45 @@
+
+
+(*
+
+Hamming sequence is the infinite sequence of integers
+1,2,3,4,5,6,8,9,10,12,... divisible by no primes other than 2,3 and 5.
+
+This program computes the n first numbers in this sequence
+
+See Gries, The Science of Programming, page 243
+
+*)
+
+
+module HammingSequence
+
+  use import module array.Array
+  use import module ref.Ref
+
+
+  let hamming (n:int) : array int =
+    { n >= 1 }
+    let t = create n in
+    let x2 = ref 2 in let j2 = ref 0 in
+    let x3 = ref 3 in let j3 = ref 0 in
+    let x5 = ref 5 in let j5 = ref 0 in
+    for i=0 to n-1 do
+      invariant {
+        !x2 = 2*t[j2] /\
+        !x3 = 3*t[j3] /\
+        !x5 = 5*t[j5] /\
+        !x2 > t[i] /\
+        !x3 > t[i] /\
+        !x5 > t[i] /\
+      }
+      let next = min(x2,min(x3,x5)) in
+      t[i] <- next;
+      while !x2 <= next do j2 := !j2+1; x2 := 2*t[j2] done;
+      while !x3 <= next do j3 := !j3+1; x3 := 3*t[j3] done;
+      while !x5 <= next do j5 := !j5+1; x5 := 5*t[j5] done;
+    done;
+    t
+    { forall k:int. 0 <= k < n -> result[k] = hamming k }
+
+end

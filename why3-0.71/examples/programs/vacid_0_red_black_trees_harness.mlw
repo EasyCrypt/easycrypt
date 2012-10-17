@@ -1,0 +1,62 @@
+module M
+
+  use import module ref.Ref
+
+  type key = int
+  type value = int
+  type rbt
+  function default rbt : value
+  predicate mem rbt key value
+
+  val create :
+    d:value ->
+    {}
+    ref rbt
+    { default !result = d /\
+      forall k:key, v:value. mem !result k v <-> v = d }
+
+  val replace :
+    m:ref rbt -> k:key -> v:value ->
+    {}
+    unit writes m
+    { default !m = default (old !m) /\
+      forall k':key, v':value.
+      mem !m k' v' <-> if k' = k then v' = v else mem (old !m) k' v' }
+
+  val lookup :
+    m:ref rbt -> k:key ->
+    {}
+    value reads m
+    { mem !m k result }
+
+  val remove :
+    m:ref rbt -> k:key ->
+    {}
+    unit writes m
+    { default !m = default (old !m) /\
+      forall k':key, v':value.
+      mem !m k' v' <-> if k' = k then v' = default !m else mem (old !m) k' v' }
+
+  let harness () =
+    let a = create 0 in
+    let b = create 1 in
+    replace a 1 1; replace b 1 10;
+    replace a 2 2; replace b 2 20;
+    let a1  = lookup a 1  in assert { a1  = 1  };
+    let a42 = lookup a 42 in assert { a42 = 0  };
+    let b1  = lookup b 1  in assert { b1  = 10 };
+    let b42 = lookup b 42 in assert { b42 = 1  };
+    remove a 1; remove b 2;
+    let a1  = lookup a 1  in assert { a1  = 0 };
+    let a42 = lookup a 42 in assert { a42 = 0 };
+    let b2  = lookup b 2  in assert { b2  = 1 };
+    let b42 = lookup b 42 in assert { b42 = 1 };
+    ()
+
+  end
+
+(*
+Local Variables:
+compile-command: "unset LANG; make -C ../.. examples/programs/vacid_0_red_black_trees_harness"
+End:
+*)

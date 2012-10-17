@@ -1,0 +1,202 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE why3session SYSTEM "why3session.dtd">
+<why3session
+ name="programs/vstte10_queens/why3session.xml">
+ <prover
+  id="alt-ergo"
+  name="Alt-Ergo"
+  version="0.93"/>
+ <prover
+  id="coq"
+  name="Coq"
+  version="8.3pl2"/>
+ <prover
+  id="cvc3"
+  name="CVC3"
+  version="2.2"/>
+ <prover
+  id="eprover"
+  name="Eprover"
+  version="1.4 Namring"/>
+ <prover
+  id="gappa"
+  name="Gappa"
+  version="0.15.1"/>
+ <prover
+  id="simplify"
+  name="Simplify"
+  version="1.5.4"/>
+ <prover
+  id="spass"
+  name="Spass"
+  version="3.7"/>
+ <prover
+  id="vampire"
+  name="Vampire"
+  version="0.6"/>
+ <prover
+  id="verit"
+  name="veriT"
+  version="dev"/>
+ <prover
+  id="yices"
+  name="Yices"
+  version="1.0.25"/>
+ <prover
+  id="z3"
+  name="Z3"
+  version="2.19"/>
+ <file
+  name="../vstte10_queens.mlw"
+  verified="true"
+  expanded="true">
+  <theory
+   name="WP NQueens"
+   verified="true"
+   expanded="true">
+   <goal
+    name="eq_board_set"
+    sum="317792b5e05c2c9084ca4babf9a14651"
+    proved="true"
+    expanded="true"
+    shape="aeq_boardV0amixfix [<-]V0V2V3V1Iainfix <=V1V2F">
+    <proof
+     prover="alt-ergo"
+     timelimit="20"
+     edited=""
+     obsolete="false">
+     <result status="valid" time="0.02"/>
+    </proof>
+   </goal>
+   <goal
+    name="eq_board_sym"
+    sum="b9291361e6cf0c47377653b41ef865b2"
+    proved="true"
+    expanded="true"
+    shape="aeq_boardV1V0V2Iaeq_boardV0V1V2F">
+    <proof
+     prover="alt-ergo"
+     timelimit="20"
+     edited=""
+     obsolete="false">
+     <result status="valid" time="0.01"/>
+    </proof>
+   </goal>
+   <goal
+    name="eq_board_trans"
+    sum="93291f560d088f61c24d11bc92036ab3"
+    proved="true"
+    expanded="true"
+    shape="aeq_boardV0V2V3Iaeq_boardV1V2V3Iaeq_boardV0V1V3F">
+    <proof
+     prover="alt-ergo"
+     timelimit="20"
+     edited=""
+     obsolete="false">
+     <result status="valid" time="0.01"/>
+    </proof>
+   </goal>
+   <goal
+    name="eq_board_extension"
+    sum="67f421580f756f84d3ff0dd05231c211"
+    proved="true"
+    expanded="true"
+    shape="aeq_boardV0V1ainfix +V2c1Iainfix =amixfix []V0V2amixfix []V1V2Iaeq_boardV0V1V2F">
+    <proof
+     prover="alt-ergo"
+     timelimit="20"
+     edited=""
+     obsolete="false">
+     <result status="valid" time="0.01"/>
+    </proof>
+   </goal>
+   <goal
+    name="consistent_row_eq"
+    sum="d5a0202d62ffd09754623957a0c80cc4"
+    proved="true"
+    expanded="true"
+    shape="aconsistent_rowV1V2V3Iaconsistent_rowV0V2V3Iainfix <V3V2Aainfix <=c0V3FIaeq_boardV0V1ainfix +V2c1F">
+    <proof
+     prover="alt-ergo"
+     timelimit="20"
+     edited=""
+     obsolete="false">
+     <result status="valid" time="0.04"/>
+    </proof>
+   </goal>
+   <goal
+    name="is_consistent_eq"
+    sum="37a3af6f124498ef39ff351500e97b17"
+    proved="true"
+    expanded="true"
+    shape="ais_consistentV1V2Iais_consistentV0V2Iaeq_boardV0V1ainfix +V2c1F">
+    <proof
+     prover="alt-ergo"
+     timelimit="20"
+     edited=""
+     obsolete="false">
+     <result status="valid" time="0.10"/>
+    </proof>
+   </goal>
+   <goal
+    name="WP_parameter check_is_consistent"
+    expl="parameter check_is_consistent"
+    sum="63e8e8fd379d72241c1d4b9ab71fd604"
+    proved="true"
+    expanded="true"
+    shape="Lamk arrayV0V2ais_consistentV3V1Iaconsistent_rowV3V1V4Iainfix <V4ainfix +ainfix -V1c1c1Aainfix <=c0V4FALagetV2V5LagetV2V1iainfix =V6V7ais_consistentV3V1NAaconsistent_rowV3V1V5Niainfix =ainfix -V6V7ainfix -V1V5ais_consistentV3V1NAaconsistent_rowV3V1V5Niainfix =ainfix -V7V6ainfix -V1V5ais_consistentV3V1NAaconsistent_rowV3V1V5Naconsistent_rowV3V1V8Iainfix <V8ainfix +V5c1Aainfix <=c0V8FAainfix <V1V0Aainfix <=c0V1Aainfix <V5V0Aainfix <=c0V5Iaconsistent_rowV3V1V9Iainfix <V9V5Aainfix <=c0V9FIainfix <=V5ainfix -V1c1Aainfix <=c0V5FAaconsistent_rowV3V1V10Iainfix <V10c0Aainfix <=c0V10FIainfix <=c0ainfix -V1c1Aais_consistentV3V1Iainfix >c0ainfix -V1c1Iainfix <V1V0Aainfix <=c0V1FFF">
+    <proof
+     prover="cvc3"
+     timelimit="20"
+     edited=""
+     obsolete="false">
+     <result status="valid" time="0.02"/>
+    </proof>
+   </goal>
+   <goal
+    name="solution_eq_board"
+    sum="ca774ccd6d8291d04767525a1aa89733"
+    proved="true"
+    expanded="true"
+    shape="asolutionV1V2IasolutionV0V2Iaeq_boardV0V1V2Iainfix =alengthV0alengthV1F">
+    <proof
+     prover="coq"
+     timelimit="20"
+     edited="vstte10_queens_NQueens_solution_eq_board_1.v"
+     obsolete="false">
+     <result status="valid" time="0.63"/>
+    </proof>
+   </goal>
+   <goal
+    name="WP_parameter bt_queens"
+    expl="parameter bt_queens"
+    sum="c8f9458497c3d9d056c3c6a7b5a9f61a"
+    proved="true"
+    expanded="true"
+    shape="Lamk arrayV0V3iainfix =V2V1asolutionV4V1Lamk arrayV0V5Lamk arrayV7V8asolutionV9V1NIaeq_boardV6V9V2Iais_boardV9V1Iainfix =V7V1FAaeq_boardV6V4V2ILamk arrayV10V11asolutionV12V1NIainfix <agetV11V2ainfix +ainfix -V1c1c1Aainfix <=c0agetV11V2Iaeq_boardV6V12V2Iais_boardV12V1Iainfix =V10V1FAaeq_boardV6V4V2ALamk arrayV0V14iainfix =V16aTrueLamk arrayV0V17asolutionV18V1IasolutionV18V1FALamk arrayV0V19Lamk arrayV21V22asolutionV23V1NIainfix <agetV22V2ainfix +V13c1Aainfix <=c0agetV22V2Iaeq_boardV20V23V2Iais_boardV23V1Iainfix =V21V1FAaeq_boardV20V4V2ILamk arrayV24V25asolutionV26V1NIaeq_boardV20V26ainfix +V2c1Iais_boardV26V1Iainfix =V24V1FAaeq_boardV20V15ainfix +V2c1FAasolutionV15ainfix +V2c1Aainfix <=ainfix +V2c1V1Aainfix <=c0ainfix +V2c1Aainfix =V0V1Aainfix <ainfix -V1ainfix +V2c1ainfix -V1V2Aainfix <=c0ainfix -V1V2Lamk arrayV27V28asolutionV29V1NIainfix <agetV28V2ainfix +V13c1Aainfix <=c0agetV28V2Iaeq_boardV15V29V2Iais_boardV29V1Iainfix =V27V1FAaeq_boardV15V4V2Iais_consistentV15V2qainfix =V16aTrueFAainfix <V2V0Aainfix <=c0V2Iainfix =V14asetV5V2V13FAainfix <V2V0Aainfix <=c0V2ILamk arrayV30V31asolutionV32V1NIainfix <agetV31V2V13Aainfix <=c0agetV31V2Iaeq_boardV6V32V2Iais_boardV32V1Iainfix =V30V1FAaeq_boardV6V4V2Iainfix <=V13ainfix -V1c1Aainfix <=c0V13FFALamk arrayV33V34asolutionV35V1NIainfix <agetV34V2c0Aainfix <=c0agetV34V2Iaeq_boardV4V35V2Iais_boardV35V1Iainfix =V33V1FAaeq_boardV4V4V2Iainfix <=c0ainfix -V1c1ALamk arrayV36V37asolutionV38V1NIaeq_boardV4V38V2Iais_boardV38V1Iainfix =V36V1FAaeq_boardV4V4V2Iainfix >c0ainfix -V1c1IasolutionV4V2Aainfix <=V2V1Aainfix <=c0V2Aainfix =V0V1FFFF">
+    <proof
+     prover="cvc3"
+     timelimit="20"
+     edited=""
+     obsolete="false">
+     <result status="valid" time="0.29"/>
+    </proof>
+   </goal>
+   <goal
+    name="WP_parameter queens"
+    expl="parameter queens"
+    sum="7dcf162660233f01058d98609b7cefe5"
+    proved="true"
+    expanded="true"
+    shape="Lamk arrayV0V2Lamk arrayV0V4asolutionV5V1IasolutionV5V1FALamk arrayV0V6Lamk arrayV8V9asolutionV10V1NIais_boardV10V1Iainfix =V8V1FILamk arrayV11V12asolutionV13V1NIaeq_boardV7V13c0Iais_boardV13V1Iainfix =V11V1FAaeq_boardV7V3c0FAasolutionV3c0Aainfix <=c0V1Aainfix <=c0c0Aainfix =V0V1Iainfix =V0V1Aainfix <=c0V0FFF">
+    <proof
+     prover="alt-ergo"
+     timelimit="20"
+     edited=""
+     obsolete="false">
+     <result status="valid" time="0.02"/>
+    </proof>
+   </goal>
+  </theory>
+ </file>
+</why3session>

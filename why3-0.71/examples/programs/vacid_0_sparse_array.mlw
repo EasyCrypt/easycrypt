@@ -1,0 +1,138 @@
+module SparseArray
+
+(*
+      If the sparse array contains three elements x y z, at index
+      a b c respectively, then the three arrays look like this:
+
+              b     a      c
+values +-----+-+---+-+----+-+----+
+       |     |y|   |x|    |z|    |
+       +-----+-+---+-+----+-+----+
+
+index  +-----+-+---+-+----+-+----+
+       |     |1|   |0|    |2|    |
+       +-----+-+---+-+----+-+----+
+
+        0 1 2  n=3
+back   +-+-+-+-------------------+
+       |a|b|c|                   |
+       +-+-+-+-------------------+
+
+*)
+
+  use import int.Int
+  use import module array.Array as A
+
+  type sparse_array 'a = {| values : array 'a;
+                            index  : array int;
+                            back   : array int;
+                    mutable card   : int;
+                            def    : 'a; |}
+
+  predicate is_elt (a: sparse_array 'a) (i: int) =
+    0 <= a.index[i] < a.card /\ a.back[a.index[i]] = i
+
+  function value (a: sparse_array 'a) (i: int) : 'a =
+    if is_elt a i then
+      a.values[i]
+    else
+      a.def
+
+  (* invariant *)
+
+  function maxlen : int = 1000
+
+  function length (a: sparse_array 'a) : int = A.length a.values
+
+  predicate sa_inv (a: sparse_array 'a) =
+    0 <= a.card <= length a <= maxlen /\
+    A.length a.values = A.length a.index = A.length a.back /\
+    forall i : int.
+      0 <= i < a.card ->
+      0 <= a.back[i] < length a /\ a.index[a.back[i]] = i
+
+  (* creation *)
+
+  val malloc : n:int -> {} array 'a { A.length result = n }
+
+  let create (sz: int) (d: 'a) =
+    { 0 <= sz <= maxlen }
+    {| values = malloc sz;
+       index  = malloc sz;
+       back   = malloc sz;
+       card   = 0;
+       def    = d |}
+    { sa_inv result /\ result.card = 0 /\
+      result.def = d /\ length result = sz }
+
+  (* access *)
+
+  let test (a: sparse_array 'a) i =
+    { 0 <= i < length a /\ sa_inv a }
+    0 <= a.index[i] && a.index[i] < a.card && a.back[a.index[i]] = i
+    { result=True <-> is_elt a i }
+
+  let get (a: sparse_array 'a) i =
+    { 0 <= i < length a /\ sa_inv a }
+    if test a i then
+      a.values[i]
+    else
+      a.def
+    { result = value a i }
+
+  (* assignment *)
+
+  use import map.MapInjection
+
+  lemma permutation :
+    forall a: sparse_array 'a. sa_inv a ->
+    a.card = a.length ->
+    forall i: int. 0 <= i < a.length -> is_elt a i
+
+  let set (a: sparse_array 'a) i v =
+    { 0 <= i < length a /\ sa_inv a }
+    a.values[i] <- v;
+    if not (test a i) then begin
+      assert { a.card < length a };
+      a.index[i] <- a.card;
+      a.back[a.card] <- i;
+      a.card <- a.card + 1
+    end
+    { sa_inv a /\
+      value a i = v /\
+      forall j:int. j <> i -> value a j = value (old a) j }
+
+end
+
+module Harness
+
+  use import module SparseArray
+
+  type elt
+  function def : elt
+
+  function c1 : elt
+  function c2 : elt
+
+  let harness () =
+    let a = create 10 def in
+    let b = create 20 def in
+    let get_a_5 = get a 5 in assert { get_a_5 = def };
+    let get_b_7 = get b 7 in assert { get_b_7 = def };
+    set a 5 c1;
+    set b 7 c2;
+    let get_a_5 = get a 5 in assert { get_a_5 = c1 };
+    let get_b_7 = get b 7 in assert { get_b_7 = c2 };
+    let get_a_7 = get a 7 in assert { get_a_7 = def };
+    let get_b_5 = get b 5 in assert { get_b_5 = def };
+    let get_a_0 = get a 0 in assert { get_a_0 = def };
+    let get_b_0 = get b 0 in assert { get_b_0 = def };
+    ()
+
+end
+
+(*
+Local Variables:
+compile-command: "unset LANG; make -C ../.. examples/programs/vacid_0_sparse_array.gui"
+End:
+*)

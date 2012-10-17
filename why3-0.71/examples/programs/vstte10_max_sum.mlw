@@ -1,0 +1,84 @@
+(*
+   VSTTE'10 competition http://www.macs.hw.ac.uk/vstte10/Competition.html
+   Problem 1: maximum /\ sum of an array
+
+   Author: Jean-Christophe Filliatre (CNRS)
+   Tool:   Why3 (see http://why3.lri.fr/)
+*)
+
+module MaxAndSum
+
+  use import int.Int
+  use import module ref.Ref
+  use import module array.Array
+
+  let max_sum (a: array int) (n: int) =
+    { 0 <= n = length a /\ forall i:int. 0 <= i < n -> a[i] >= 0 }
+    let sum = ref 0 in
+    let max = ref 0 in
+    for i = 0 to n - 1 do
+      invariant { !sum <= i * !max }
+      if !max < a[i] then max := a[i];
+      sum := !sum + a[i]
+    done;
+    (!sum, !max)
+    { let (sum, max) = result in sum <= n * max }
+
+end
+
+module MaxAndSum2
+
+  use import int.Int
+  use import module ref.Ref
+  use import module array.Array
+  use import module array.ArraySum
+
+  predicate is_max (a: array int) (l h: int) (m: int) =
+    (forall k: int. l <= k < h -> a[k] <= m) &&
+    ((h <= l && m = 0) ||
+     (l <  h && exists k: int. l <= k < h && m = a[k]))
+
+  let max_sum (a: array int) (n: int) =
+    { 0 <= n = length a /\ forall i:int. 0 <= i < n -> a[i] >= 0 }
+    let s = ref 0 in
+    let m = ref 0 in
+    for i = 0 to n - 1 do
+      invariant { !s = sum a 0 i /\ is_max a 0 i !m /\ !s <= i * !m }
+      if !m < a[i] then m := a[i];
+      s := !s + a[i]
+    done;
+    (!s, !m)
+    { let (s, m) = result in s = sum a 0 n /\ is_max a 0 n m /\ s <= n * m }
+
+end
+
+module TestCase
+
+  use import module MaxAndSum2
+  use import module array.Array
+  use import module array.ArraySum
+
+  let test_case () =
+    let n = 10 in
+    let a = make n 0 in
+    a[0] <- 9;
+    a[1] <- 5;
+    a[2] <- 0;
+    a[3] <- 2;
+    a[4] <- 7;
+    a[5] <- 3;
+    a[6] <- 2;
+    a[7] <- 1;
+    a[8] <- 10;
+    a[9] <- 6;
+    let (s, m) = max_sum a n in
+    assert { s = 45 };
+    assert { m = 10 }
+
+end
+
+(*
+Local Variables:
+compile-command: "unset LANG; make -C ../.. examples/programs/vstte10_max_sum.gui"
+End:
+*)

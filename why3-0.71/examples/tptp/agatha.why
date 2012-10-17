@@ -1,0 +1,52 @@
+
+theory Agatha
+
+  type person = Agatha | Butler | Charles
+
+  predicate hates person person
+  predicate richer person person
+  predicate lives person
+  predicate killed person person
+
+  axiom Lives1 : lives Agatha
+  axiom Lives2 : lives Charles
+  axiom Lives3 : lives Butler
+  axiom NoOneLivesForever :
+    forall x:person.
+    lives x -> x = Agatha \/ x = Charles \/ x = Butler
+
+  axiom MURDER :
+    exists x:person.
+    lives x /\ killed x Agatha
+
+  axiom Hate_and_killed :
+    forall p1 p2:person. killed p1 p2 -> hates p1 p2
+
+  axiom Killed_and_wealth :
+    forall p1 p2:person. killed p1 p2 -> not (richer p1 p2)
+
+  lemma Diff1 : Agatha <> Butler
+
+  lemma Diff2 : Agatha <> Charles
+
+  lemma Diff3 : Charles <> Butler
+
+  axiom H1 :
+    forall x:person. hates Agatha x -> not (hates Charles x)
+
+  axiom H2 :
+    forall x:person. x <> Butler -> hates Agatha x
+
+  axiom H3 :
+    forall x:person. not (richer x Agatha) -> hates Butler x
+
+  axiom H4 :
+    forall x:person. hates Agatha x -> hates Butler x
+
+  axiom H5 :
+    forall x:person. exists y:person. not (hates x y)
+
+  goal Enigma: killed Agatha Agatha
+
+
+end

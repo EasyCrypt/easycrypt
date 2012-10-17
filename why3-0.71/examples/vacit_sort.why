@@ -1,0 +1,74 @@
+theory Sorted
+       use import int.Int
+       use real.Real
+       use import map.Map
+       
+       type array = map int real
+       type multi = map real int
+
+       function n : int = 4
+
+       predicate sorted (m : array) =
+             forall x y:int. x<=y -> Real.(<=) m[x] m[y]
+
+       function count(m : array) (i j : int) (v : real) : int
+  axiom Count :
+  forall m : array. forall i j : int. forall v : real. count m i j v =
+  (if i = j then 0 else
+  let c = count m (i+1) j v in
+  (if m[i] = v then c + 1 else c))
+
+       predicate model(m1 : array) (m2 : multi) =
+             forall v:real. count m1 1 (n+1) v = m2[v]
+
+(*
+       function model_aux(m1 : array, i : int) : multi
+       axiom Model_aux_def1 : 
+       forall m1 : array. forall i : int. forall v : real.
+              1 <= i /\ i <= n -> 
+              get(model_aux(m1,i),v) =
+               if get(m1,i)=v then get(model_aux(m1,i+1),v) + 1
+                                 else get(model_aux(m1,i+1),v)
+
+       axiom Model_aux_def2 : 
+       forall m1 : array. forall v : real. get(model_aux(m1,n+1),v) = 0
+               
+       predicate model(m1 : array, m2 : multi) = model_aux(m1, 1) = m2
+*)
+
+       (*axiom TPTP : 1 < 2 /\ 2 < 3 /\ 3 < 4 /\ 13 < 42 /\
+                  0+1 = 1 /\ 1+1 = 2 /\ 2+1 = 3 /\ 3+1 = 4
+
+       axiom TPTP2 : forall x,y : real. x < y -> x<>y*)
+
+       goal G : 
+            forall m1 : array.
+            m1[1] = 42. ->
+            m1[2] = 13. ->
+            m1[3] = 42. ->
+            m1[4] = 45. ->
+            forall m2 : array.
+            forall multi : multi.
+            model m1 multi ->
+            model m2 multi ->
+            sorted m2 ->
+            m2[1] = 13. /\
+            m2[2] = 42. /\
+            m2[3] = 42. /\
+            m2[4] = 45.
+
+(*       goal G_false : 
+            forall m1 : array.
+            m1[1] = 42. ->
+            m1[2] = 13. ->
+            m1[3] = 42. ->
+            forall m2 : array.
+            forall multi : multi.
+            model m1 multi ->
+            model m2 multi ->
+            sorted m2 ->
+            m2[1] = 42. /\
+            m2[2] = 13. /\
+            m2[3] = 42.
+*)           
+end

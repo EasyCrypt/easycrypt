@@ -1,0 +1,46 @@
+(*
+
+The classical example of the Scottish private club puzzle
+
+The club follows six rules:
+
+ - every non-scotti``sh members wear red socks
+
+ - every member wears a kilt or doesn't wear socks
+
+ - the married members don't go out on sunday
+
+ - a member goes out on sunday if and only if he is scottish
+
+ - every member who wears a kilt is scottish and married
+
+ - every scottish member wears a kilt
+
+Problem: prove that there is nobody in this club !
+
+*)
+
+theory ScottishClubProblem "the Scottish private club puzzle"
+
+  predicate is_scottish
+  predicate wears_red_socks
+  predicate wears_kilt
+  predicate is_married
+  predicate goes_out_on_sunday
+
+  axiom R1: not is_scottish -> wears_red_socks
+
+  axiom R2: wears_kilt \/ not wears_red_socks
+
+  axiom R3: is_married -> not goes_out_on_sunday
+
+  axiom R4: goes_out_on_sunday <-> is_scottish
+
+  axiom R5: wears_kilt -> is_scottish /\ is_married
+
+  axiom R6: is_scottish -> wears_kilt
+
+  goal ThereIsNobodyInTheClub: false
+
+end
+

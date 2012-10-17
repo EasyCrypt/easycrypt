@@ -1,0 +1,217 @@
+theory EndoRelation
+  type t
+  predicate rel t t
+end
+
+theory Reflexive
+  clone export EndoRelation
+  axiom Refl : forall x:t. rel x x
+end
+
+theory Irreflexive
+  clone export EndoRelation
+  axiom Strict : forall x:t. not rel x x
+end
+
+theory Transitive
+  clone export EndoRelation
+  axiom Trans : forall x y z:t. rel x y -> rel y z -> rel x z
+end
+
+theory Symmetric
+  clone export EndoRelation
+  axiom Symm : forall x y:t. rel x y -> rel y x
+end
+
+theory Asymmetric
+  clone export EndoRelation
+  axiom Asymm : forall x y:t. rel x y -> not rel y x
+end
+
+theory Antisymmetric
+  clone export EndoRelation
+  axiom Antisymm : forall x y:t. rel x y -> rel y x -> x = y
+end
+
+theory Total
+  clone export EndoRelation
+  axiom Total : forall x y:t. rel x y \/ rel y x
+end
+
+theory PreOrder
+  clone export Reflexive
+  clone export Transitive with type t = t, predicate rel = rel
+end
+
+theory Equivalence
+  clone export PreOrder
+  clone export Asymmetric with type t = t, predicate rel = rel
+end
+
+theory TotalPreOrder
+  clone export PreOrder
+  clone export Total with type t = t, predicate rel = rel
+end
+
+theory PartialOrder
+  clone export PreOrder
+  clone export Antisymmetric with type t = t, predicate rel = rel
+end
+
+theory TotalOrder
+  clone export PartialOrder
+  clone export Total with type t = t, predicate rel = rel
+end
+
+theory PartialStrictOrder
+  clone export Transitive
+  clone export Asymmetric with type t = t, predicate rel = rel
+end
+
+theory TotalStrictOrder
+  clone export PartialStrictOrder
+  axiom Trichotomy : forall x y:t. rel x y \/ rel y x \/ x = y
+end
+
+theory Inverse
+  clone export EndoRelation
+
+  predicate inv_rel (x y : t) = rel y x
+end
+
+theory ReflClosure
+  clone export EndoRelation
+
+  inductive relR t t =
+  | BaseRefl : forall x:t. relR x x
+  | StepRefl : forall x y:t. rel x y -> relR x y
+end
+
+theory TransClosure
+  clone export EndoRelation
+
+  inductive relT t t =
+  | BaseTrans : forall x y:t. rel x y -> relT x y
+  | StepTrans : forall x y z:t. relT x y -> rel y z -> relT x z
+
+  lemma relT_transitive:
+    forall x y z: t. relT x y -> relT y z -> relT x z
+end
+
+theory ReflTransClosure
+  clone export EndoRelation
+
+  inductive relTR t t =
+  | BaseTransRefl : forall x:t. relTR x x
+  | StepTransRefl : forall x y z:t. relTR x y -> rel y z -> relTR x z
+
+  lemma relTR_transitive:
+    forall x y z: t. relTR x y -> relTR y z -> relTR x z
+end
+
+(*
+theory PreOrder
+
+  type t
+  predicate le t t
+  axiom Refl : forall x:t. le(x,x)
+  axiom Trans : forall x y z:t. le x y /\ le y z -> le x z
+
+end
+
+theory Equiv
+
+  type t
+
+  predicate eq t t
+
+  clone PreOrder with type t = t, predicate le = eq
+
+  axiom Symm : forall x y:t. eq x y -> eq y x
+
+end
+
+theory TotalPreOrder
+
+  type t
+  predicate le t t
+
+  clone export PreOrder with type t = t, predicate le = le
+
+  axiom Totality: forall x y:t. le x y \/ le y x
+
+end
+*)
+
+
+(*
+theory TotalOrder
+
+  type t
+
+  predicate eq t t
+  clone Equiv with type t = t, predicate eq = eq
+
+  predicate le t t
+  clone PreOrder with type t = t, predicate le = le
+
+
+  axiom Totality: forall x y:t. eq x y \/ le x y \/ le y x
+
+  predicate lt (x y : t) = le x y /\ not eq x y
+
+  lemma Lt_antirefl: forall x:t. not lt x x
+  lemma Lt_trans: forall x y z:t. lt x y /\ lt y z -> lt x z
+  lemma Le_lt_trans: forall x y z:t. le x y /\ lt y z -> lt x z
+  lemma Lt_le_trans: forall x y z:t. lt x y /\ le y z -> lt x z
+
+end
+*)
+
+theory Lex
+
+  type t1
+  type t2
+
+  predicate rel1 t1 t1
+  predicate rel2 t2 t2
+
+  inductive lex (t1, t2) (t1, t2) =
+  | Lex_1: forall x1 x2 : t1, y1 y2 : t2.
+       rel1 x1 x2 -> lex (x1,y1) (x2,y2)
+  | Lex_2: forall x : t1, y1 y2 : t2.
+       rel2 y1 y2 -> lex (x,y1) (x,y2)
+
+end
+
+(*
+theory MinMax
+
+  clone export TotalOrder
+
+  function min t t : t
+  function max t t : t
+
+end
+*)
+
+theory WellFounded
+
+  type t
+
+  predicate r t t
+
+  inductive acc (x: t) =
+  | acc_x: forall x: t. (forall y: t. r y x -> acc y) -> acc x
+
+  axiom well_founded: forall x: t. acc x
+
+end
+
+(*
+Local Variables:
+compile-command: "make -C .. theories/relations"
+End:
+*)
+
+

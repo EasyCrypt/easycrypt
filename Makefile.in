@@ -1,0 +1,171 @@
+
+TMPNAME=easycrypt-1.0
+
+# paths to install set by ./configure
+#######################################################################
+datarootdir=@datarootdir@
+bindir=$(DESTDIR)@bindir@
+sbindir=$(DESTDIR)@sbindir@
+docdir=$(DESTDIR)@docdir@
+libdir=$(DESTDIR)@libdir@
+includedir=$(DESTDIR)@includedir@
+includedir_aux=$(includedir)/$(TMPNAME)
+
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+BINDIR=$(DESTDIR)@bindir@
+INSTALLPATH=$(DESTDIR)@INSTALLPATH@
+PROOF_GENERAL_PATH=$(DESTDIR)@PROOF_GENERAL_PATH@
+
+
+MAK_DIR=mak
+
+# other variables set by ./configure
+#######################################################################
+
+PACKAGE  = @PACKAGE_NAME@
+VERSION  = @PACKAGE_VERSION@ 
+OCAMLC   = @OCAMLC@
+OCAMLOPT = @OCAMLOPT@
+OCAMLDEP = @OCAMLDEP@
+OCAMLLEX = @OCAMLLEX@
+OCAMLYACC= @OCAMLYACC@
+OCAMLDOC=@OCAMLDOC@
+OCAMLLIB = @OCAMLLIB@
+OCAMLBEST= @OCAMLBEST@
+OCAMLVERSION = @OCAMLVERSION@
+OCAMLWEB = @OCAMLWEB@
+OCAMLWIN32 = @OCAMLWIN32@
+OCAMLMKTOP = @OCAMLMKTOP@
+MENHIR     = @MENHIR@ --ocamldep "@OCAMLDEP@" --ocamlc "@OCAMLC@"
+MENHIRLIBS = @MENHIRLIBS@
+TOOLDIR=.
+#EXE = @EXE@
+
+DIST_DIR=$(TOOLDIR)/$(TMPNAME)
+
+EXE = ./easycrypt
+all: src 
+
+
+# some library paths set by ./configure
+#######################################################################
+OCAMLGRAPHLIB = @OCAMLGRAPHLIB@
+WHY3LIB = @WHY3LIB@
+
+# tools:
+#    Export rules: tools, install_tools, uninstall_tools, 
+#                  dist_tools, clean_tools
+#######################################################################
+ifeq (@enable_tools@,yes)
+-include $(MAK_DIR)/Makefile.tools
+TOOLS_INSTALL=install_tools
+TOOLS_UNINSTALL=uninstall_tools
+TOOLS_DIST=dist_tools
+TOOLS_CLEAN=clean_tools
+endif
+
+# doc 
+#    Export rules: doc, install_doc, uninstall_doc, dist_doc, clean_doc
+#######################################################################
+ifeq (@enable_doc@,yes)
+-include $(MAK_DIR)/Makefile.doc
+DOC_INSTALL=install_doc
+DOC_UNINSTALL=uninstall_doc
+DOC_DIST=dist_doc
+DOC_CLEAN=clean_doc
+endif
+
+# test 
+#    Export rules: test, install_tests, uninstall_tests, 
+#                  dist_tests, clean_test 
+#######################################################################
+ifeq (@enable_tests@,yes)
+-include $(MAK_DIR)/Makefile.tests
+TESTS_INSTALL=install_tests
+TESTS_UNINSTALL=uninstall_tests
+TESTS_DIST=dist_tests
+TESTS_CLEAN=clean_tests
+endif
+
+# src 
+#    Export rules: src, install_src, uninstall_src, dist_src, clean_src
+#######################################################################
+-include $(MAK_DIR)/Makefile.src
+
+
+
+
+# common 
+#    Export rules: 
+#######################################################################
+-include $(MAK_DIR)/Makefile.common
+
+
+# Proof General mode
+#    Export rules:
+#######################################################################
+ifeq (@WITH_EMACS@,yes)
+-include $(MAK_DIR)/Makefile.emacs
+PROOF_GENERAL_INSTALL=install_proofgeneral install_message
+PROOF_GENERAL_UNINSTALL=uninstall_proofgeneral
+PROOF_GENERAL_DIST=dist_proofgeneral
+endif
+
+# dist 
+#######################################################################
+
+dist_examples:
+	@mkdir -p $(DIST_DIR) 
+	@cp -R examples $(DIST_DIR)/examples
+
+dist: $(TOOLS_CLEAN) dist_common $(TESTS_DIST) dist_examples $(DOC_DIST) dist_src $(TOOLS_DIST) $(PROOF_GENERAL_DIST)
+	@echo "****************************************************************"
+	@echo " Creating dist file..... $(TMPNAME).tar.gz"
+	@echo "****************************************************************"
+	tar czf $(TMPNAME).tar.gz $(TMPNAME) 
+	@echo "****************************************************************"
+	@rm -fR $(TMPNAME)
+
+
+
+# install  
+#######################################################################
+
+install: install_common $(TOOLS_INSTALL) $(PROOF_GENERAL_INSTALL)
+	@echo "****************************************************************"
+	@echo " Finished."
+	@echo "****************************************************************"
+
+uninstall: uninstall_common $(TOOLS_UNINSTALL) $(PROOF_GENERAL_UNINSTALL)
+	@echo "****************************************************************"
+	@echo " Finished."
+	@echo "****************************************************************"
+
+
+# clean
+#######################################################################
+
+clean: clean_src $(TOOLS_CLEAN) $(DOC_CLEAN) $(TESTS_CLEAN) 
+
+
+distclean: clean
+	rm -fR autom4te.cache
+	rm -f config.status
+	rm -f aclocal.m4
+	rm -f Makefile
+	rm -f config.log
+
+# Makefile is rebuilt whenever Makefile.in or configure.ac is modified
+#######################################################################
+
+Makefile: Makefile.in config.status
+	./config.status
+
+config.status: configure
+	./config.status --recheck
+
+configure: configure.ac
+	aclocal -I mak 
+	autoconf 
+

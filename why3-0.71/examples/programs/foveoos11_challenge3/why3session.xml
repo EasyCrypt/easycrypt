@@ -1,0 +1,986 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE why3session SYSTEM "why3session.dtd">
+<why3session
+ name="programs/foveoos11_challenge3/why3session.xml">
+ <prover
+  id="alt-ergo"
+  name="Alt-Ergo"
+  version="0.93"/>
+ <prover
+  id="coq"
+  name="Coq"
+  version="8.3pl2"/>
+ <prover
+  id="cvc3"
+  name="CVC3"
+  version="2.2"/>
+ <prover
+  id="eprover"
+  name="Eprover"
+  version="1.4 Namring"/>
+ <prover
+  id="gappa"
+  name="Gappa"
+  version="0.15.1"/>
+ <prover
+  id="simplify"
+  name="Simplify"
+  version="1.5.4"/>
+ <prover
+  id="spass"
+  name="Spass"
+  version="3.7"/>
+ <prover
+  id="vampire"
+  name="Vampire"
+  version="0.6"/>
+ <prover
+  id="verit"
+  name="veriT"
+  version="dev"/>
+ <prover
+  id="yices"
+  name="Yices"
+  version="1.0.25"/>
+ <prover
+  id="z3"
+  name="Z3"
+  version="2.19"/>
+ <file
+  name="../foveoos11_challenge3.mlw"
+  verified="true"
+  expanded="true">
+  <theory
+   name="WP TwoEqualElements"
+   verified="true"
+   expanded="true">
+   <goal
+    name="WP_parameter two_equal_elements"
+    expl="parameter two_equal_elements"
+    sum="1547f0f4a81cb0c8f64c2a33e95c6a33"
+    proved="true"
+    expanded="true"
+    shape="Lamk arrayV0V2ainfix =V5V4NAaappear_twiceV3V4ainfix +V1c2Aaappear_twiceV3V5ainfix +V1c2Iaappear_twiceV3V7ainfix +ainfix +V1c1c1NIainfix =V7V5NIainfix <V7V1Aainfix <=c0V7FIainfix =V4aprefix -c1Aaappear_twiceV3V8ainfix +ainfix +V1c1c1NIainfix <V8V1Aainfix <=c0V8FIainfix =V5aprefix -c1Aiainfix =agetV6V9aTrueainfix =agetV2V10V9Aainfix <V10ainfix +ainfix +V1c1c1Aainfix <=c0V10Eainfix =agetV2V11V9NIainfix <V11ainfix +ainfix +V1c1c1Aainfix <=c0V11FIainfix <V9V1Aainfix <=c0V9FAainfix =V4V5NAaappear_twiceV3V4ainfix +ainfix +V1c1c1Iainfix =V4aprefix -c1NAaappear_twiceV3V5ainfix +ainfix +V1c1c1Iainfix =V5aprefix -c1NAainfix =V4aprefix -c1Iainfix =V5aprefix -c1ALagetV2V12iainfix =agetV6V13aTrueiainfix =V5aprefix -c1aappear_twiceV3V15ainfix +V12c1NIainfix =V15V14NIainfix <V15V1Aainfix <=c0V15FIainfix =V4aprefix -c1Aaappear_twiceV3V16ainfix +V12c1NIainfix <V16V1Aainfix <=c0V16FIainfix =V14aprefix -c1Aiainfix =agetV6V17aTrueainfix =agetV2V18V17Aainfix <V18ainfix +V12c1Aainfix <=c0V18Eainfix =agetV2V19V17NIainfix <V19ainfix +V12c1Aainfix <=c0V19FIainfix <V17V1Aainfix <=c0V17FAainfix =V4V14NAaappear_twiceV3V4ainfix +V12c1Iainfix =V4aprefix -c1NAaappear_twiceV3V14ainfix +V12c1Iainfix =V14aprefix -c1NAainfix =V4aprefix -c1Iainfix =V14aprefix -c1Iainfix =V14V13Fiainfix =V4aprefix -c1iainfix =V13V5Naappear_twiceV3V21ainfix +V12c1NIainfix =V21V5NIainfix <V21V1Aainfix <=c0V21FIainfix =V20aprefix -c1Aaappear_twiceV3V22ainfix +V12c1NIainfix <V22V1Aainfix <=c0V22FIainfix =V5aprefix -c1Aiainfix =agetV6V23aTrueainfix =agetV2V24V23Aainfix <V24ainfix +V12c1Aainfix <=c0V24Eainfix =agetV2V25V23NIainfix <V25ainfix +V12c1Aainfix <=c0V25FIainfix <V23V1Aainfix <=c0V23FAainfix =V20V5NAaappear_twiceV3V20ainfix +V12c1Iainfix =V20aprefix -c1NAaappear_twiceV3V5ainfix +V12c1Iainfix =V5aprefix -c1NAainfix =V20aprefix -c1Iainfix =V5aprefix -c1Iainfix =V20V13Faappear_twiceV3V26ainfix +V12c1NIainfix =V26V5NIainfix <V26V1Aainfix <=c0V26FIainfix =V4aprefix -c1Aaappear_twiceV3V27ainfix +V12c1NIainfix <V27V1Aainfix <=c0V27FIainfix =V5aprefix -c1Aiainfix =agetV6V28aTrueainfix =agetV2V29V28Aainfix <V29ainfix +V12c1Aainfix <=c0V29Eainfix =agetV2V30V28NIainfix <V30ainfix +V12c1Aainfix <=c0V30FIainfix <V28V1Aainfix <=c0V28FAainfix =V4V5NAaappear_twiceV3V4ainfix +V12c1Iainfix =V4aprefix -c1NAaappear_twiceV3V5ainfix +V12c1Iainfix =V5aprefix -c1NAainfix =V4aprefix -c1Iainfix =V5aprefix -c1aappear_twiceV3V31ainfix +V12c1NIainfix =V31V5NIainfix <V31V1Aainfix <=c0V31FIainfix =V4aprefix -c1Aaappear_twiceV3V32ainfix +V12c1NIainfix <V32V1Aainfix <=c0V32FIainfix =V5aprefix -c1Aiainfix =agetV6V33aTrueainfix =agetV2V34V33Aainfix <V34ainfix +V12c1Aainfix <=c0V34Eainfix =agetV2V35V33NIainfix <V35ainfix +V12c1Aainfix <=c0V35FIainfix <V33V1Aainfix <=c0V33FAainfix =V4V5NAaappear_twiceV3V4ainfix +V12c1Iainfix =V4aprefix -c1NAaappear_twiceV3V5ainfix +V12c1Iainfix =V5aprefix -c1NAainfix =V4aprefix -c1Iainfix =V5aprefix -c1aappear_twiceV3V37ainfix +V12c1NIainfix =V37V5NIainfix <V37V1Aainfix <=c0V37FIainfix =V4aprefix -c1Aaappear_twiceV3V38ainfix +V12c1NIainfix <V38V1Aainfix <=c0V38FIainfix =V5aprefix -c1Aiainfix =agetV36V39aTrueainfix =agetV2V40V39Aainfix <V40ainfix +V12c1Aainfix <=c0V40Eainfix =agetV2V41V39NIainfix <V41ainfix +V12c1Aainfix <=c0V41FIainfix <V39V1Aainfix <=c0V39FAainfix =V4V5NAaappear_twiceV3V4ainfix +V12c1Iainfix =V4aprefix -c1NAaappear_twiceV3V5ainfix +V12c1Iainfix =V5aprefix -c1NAainfix =V4aprefix -c1Iainfix =V5aprefix -c1Iainfix =V36asetV6V13aTrueFAainfix <V13V1Aainfix <=c0V13Aainfix <V13V1Aainfix <=c0V13Aainfix <V12V0Aainfix <=c0V12Iaappear_twiceV3V42V12NIainfix =V42V5NIainfix <V42V1Aainfix <=c0V42FIainfix =V4aprefix -c1Aaappear_twiceV3V43V12NIainfix <V43V1Aainfix <=c0V43FIainfix =V5aprefix -c1Aiainfix =agetV6V44aTrueainfix =agetV2V45V44Aainfix <V45V12Aainfix <=c0V45Eainfix =agetV2V46V44NIainfix <V46V12Aainfix <=c0V46FIainfix <V44V1Aainfix <=c0V44FAainfix =V4V5NAaappear_twiceV3V4V12Iainfix =V4aprefix -c1NAaappear_twiceV3V5V12Iainfix =V5aprefix -c1NAainfix =V4aprefix -c1Iainfix =V5aprefix -c1Iainfix <=V12ainfix +V1c1Aainfix <=c0V12FFFFAaappear_twiceV3V47c0NIainfix =V47aprefix -c1NIainfix <V47V1Aainfix <=c0V47FIainfix =aprefix -c1aprefix -c1Aaappear_twiceV3V48c0NIainfix <V48V1Aainfix <=c0V48FIainfix =aprefix -c1aprefix -c1Aiainfix =agetaconstaFalseV49aTrueainfix =agetV2V50V49Aainfix <V50c0Aainfix <=c0V50Eainfix =agetV2V51V49NIainfix <V51c0Aainfix <=c0V51FIainfix <V49V1Aainfix <=c0V49FAainfix =aprefix -c1aprefix -c1NAaappear_twiceV3aprefix -c1c0Iainfix =aprefix -c1aprefix -c1NAaappear_twiceV3aprefix -c1c0Iainfix =aprefix -c1aprefix -c1NAainfix =aprefix -c1aprefix -c1Iainfix =aprefix -c1aprefix -c1Iainfix <=c0ainfix +V1c1ALaprefix -c1Laprefix -c1ainfix =V52V53NAaappear_twiceV3V53ainfix +V1c2Aaappear_twiceV3V52ainfix +V1c2Iainfix >c0ainfix +V1c1Aainfix >=V1c0Iainfix =V55V54NAaappear_twiceV3V55ainfix +V1c2EAaappear_twiceV3V54ainfix +V1c2EAainfix <agetV2V56V1Aainfix <=c0agetV2V56Iainfix <V56V0Aainfix <=c0V56FAainfix >=V1c2Aainfix =V0ainfix +V1c2FFF">
+    <transf
+     name="split_goal"
+     proved="true"
+     expanded="true">
+     <goal
+      name="WP_parameter two_equal_elements.1"
+      expl="precondition"
+      sum="19db981c2648d206419b19ab75faabc5"
+      proved="true"
+      expanded="true"
+      shape="Lamk arrayV0V2ainfix >=V1c0Iainfix =V5V4NAaappear_twiceV3V5ainfix +V1c2EAaappear_twiceV3V4ainfix +V1c2EAainfix <agetV2V6V1Aainfix <=c0agetV2V6Iainfix <V6V0Aainfix <=c0V6FAainfix >=V1c2Aainfix =V0ainfix +V1c2FFF">
+      <proof
+       prover="alt-ergo"
+       timelimit="10"
+       edited=""
+       obsolete="false">
+       <result status="valid" time="0.01"/>
+      </proof>
+     </goal>
+     <goal
+      name="WP_parameter two_equal_elements.2"
+      expl="normal postcondition"
+      sum="ea2becd23e98a7abb1607efcbb425ed0"
+      proved="true"
+      expanded="true"
+      shape="Lamk arrayV0V2Laprefix -c1Laprefix -c1ainfix =V4V5NAaappear_twiceV3V5ainfix +V1c2Aaappear_twiceV3V4ainfix +V1c2Iainfix >c0ainfix +V1c1Iainfix >=V1c0Iainfix =V7V6NAaappear_twiceV3V7ainfix +V1c2EAaappear_twiceV3V6ainfix +V1c2EAainfix <agetV2V8V1Aainfix <=c0agetV2V8Iainfix <V8V0Aainfix <=c0V8FAainfix >=V1c2Aainfix =V0ainfix +V1c2FFF">
+      <proof
+       prover="alt-ergo"
+       timelimit="10"
+       edited=""
+       obsolete="false">
+       <result status="valid" time="0.01"/>
+      </proof>
+     </goal>
+     <goal
+      name="WP_parameter two_equal_elements.3"
+      expl="for loop initialization"
+      sum="bfe3a803f6a6a7e5ac3a13cf2360a2ff"
+      proved="true"
+      expanded="true"
+      shape="Lamk arrayV0V2aappear_twiceV3V4c0NIainfix =V4aprefix -c1NIainfix <V4V1Aainfix <=c0V4FIainfix =aprefix -c1aprefix -c1Aaappear_twiceV3V5c0NIainfix <V5V1Aainfix <=c0V5FIainfix =aprefix -c1aprefix -c1Aiainfix =agetaconstaFalseV6aTrueainfix =agetV2V7V6Aainfix <V7c0Aainfix <=c0V7Eainfix =agetV2V8V6NIainfix <V8c0Aainfix <=c0V8FIainfix <V6V1Aainfix <=c0V6FAainfix =aprefix -c1aprefix -c1NAaappear_twiceV3aprefix -c1c0Iainfix =aprefix -c1aprefix -c1NAaappear_twiceV3aprefix -c1c0Iainfix =aprefix -c1aprefix -c1NAainfix =aprefix -c1aprefix -c1Iainfix =aprefix -c1aprefix -c1Iainfix <=c0ainfix +V1c1Iainfix >=V1c0Iainfix =V10V9NAaappear_twiceV3V10ainfix +V1c2EAaappear_twiceV3V9ainfix +V1c2EAainfix <agetV2V11V1Aainfix <=c0agetV2V11Iainfix <V11V0Aainfix <=c0V11FAainfix >=V1c2Aainfix =V0ainfix +V1c2FFF">
+      <transf
+       name="split_goal"
+       proved="true"
+       expanded="true">
+       <goal
+        name="WP_parameter two_equal_elements.3.1"
+        expl="parameter two_equal_elements"
+        sum="79aab9a8c0dc665214dea560eb40e0b7"
+        proved="true"
+        expanded="true"
+        shape="Lamk arrayV0V2ainfix =aprefix -c1aprefix -c1Iainfix =aprefix -c1aprefix -c1Iainfix <=c0ainfix +V1c1Iainfix >=V1c0Iainfix =V5V4NAaappear_twiceV3V5ainfix +V1c2EAaappear_twiceV3V4ainfix +V1c2EAainfix <agetV2V6V1Aainfix <=c0agetV2V6Iainfix <V6V0Aainfix <=c0V6FAainfix >=V1c2Aainfix =V0ainfix +V1c2FFF">
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.01"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter two_equal_elements.3.2"
+        expl="parameter two_equal_elements"
+        sum="65c10572abfb865dbf66b199c38ec4bb"
+        proved="true"
+        expanded="true"
+        shape="Lamk arrayV0V2aappear_twiceV3aprefix -c1c0Iainfix =aprefix -c1aprefix -c1NIainfix <=c0ainfix +V1c1Iainfix >=V1c0Iainfix =V5V4NAaappear_twiceV3V5ainfix +V1c2EAaappear_twiceV3V4ainfix +V1c2EAainfix <agetV2V6V1Aainfix <=c0agetV2V6Iainfix <V6V0Aainfix <=c0V6FAainfix >=V1c2Aainfix =V0ainfix +V1c2FFF">
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.01"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter two_equal_elements.3.3"
+        expl="parameter two_equal_elements"
+        sum="65c10572abfb865dbf66b199c38ec4bb"
+        proved="true"
+        expanded="true"
+        shape="Lamk arrayV0V2aappear_twiceV3aprefix -c1c0Iainfix =aprefix -c1aprefix -c1NIainfix <=c0ainfix +V1c1Iainfix >=V1c0Iainfix =V5V4NAaappear_twiceV3V5ainfix +V1c2EAaappear_twiceV3V4ainfix +V1c2EAainfix <agetV2V6V1Aainfix <=c0agetV2V6Iainfix <V6V0Aainfix <=c0V6FAainfix >=V1c2Aainfix =V0ainfix +V1c2FFF">
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.01"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter two_equal_elements.3.4"
+        expl="parameter two_equal_elements"
+        sum="0fc6e250da2c638ff2206f763d7dcd65"
+        proved="true"
+        expanded="true"
+        shape="Lamk arrayV0V2ainfix =aprefix -c1aprefix -c1NIainfix =aprefix -c1aprefix -c1NIainfix <=c0ainfix +V1c1Iainfix >=V1c0Iainfix =V5V4NAaappear_twiceV3V5ainfix +V1c2EAaappear_twiceV3V4ainfix +V1c2EAainfix <agetV2V6V1Aainfix <=c0agetV2V6Iainfix <V6V0Aainfix <=c0V6FAainfix >=V1c2Aainfix =V0ainfix +V1c2FFF">
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.01"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter two_equal_elements.3.5"
+        expl="parameter two_equal_elements"
+        sum="78f2ea5a4a365d10c8c50ef3522e1f26"
+        proved="true"
+        expanded="true"
+        shape="Lamk arrayV0V2ainfix =agetV2V5V4Aainfix <V5c0Aainfix <=c0V5EIainfix =agetaconstaFalseV4aTrueIainfix <V4V1Aainfix <=c0V4FIainfix <=c0ainfix +V1c1Iainfix >=V1c0Iainfix =V7V6NAaappear_twiceV3V7ainfix +V1c2EAaappear_twiceV3V6ainfix +V1c2EAainfix <agetV2V8V1Aainfix <=c0agetV2V8Iainfix <V8V0Aainfix <=c0V8FAainfix >=V1c2Aainfix =V0ainfix +V1c2FFF">
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter two_equal_elements.3.6"
+        expl="parameter two_equal_elements"
+        sum="b6b7babf06a22ea5e7fd2d0d9c052b04"
+        proved="true"
+        expanded="true"
+        shape="Lamk arrayV0V2ainfix =agetV2V5V4NIainfix <V5c0Aainfix <=c0V5FIainfix =agetaconstaFalseV4aTrueNIainfix <V4V1Aainfix <=c0V4FIainfix <=c0ainfix +V1c1Iainfix >=V1c0Iainfix =V7V6NAaappear_twiceV3V7ainfix +V1c2EAaappear_twiceV3V6ainfix +V1c2EAainfix <agetV2V8V1Aainfix <=c0agetV2V8Iainfix <V8V0Aainfix <=c0V8FAainfix >=V1c2Aainfix =V0ainfix +V1c2FFF">
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.01"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter two_equal_elements.3.7"
+        expl="parameter two_equal_elements"
+        sum="2c586cdbf4a1202146235f312ac94ca6"
+        proved="true"
+        expanded="true"
+        shape="Lamk arrayV0V2aappear_twiceV3V4c0NIainfix <V4V1Aainfix <=c0V4FIainfix =aprefix -c1aprefix -c1Iainfix <=c0ainfix +V1c1Iainfix >=V1c0Iainfix =V6V5NAaappear_twiceV3V6ainfix +V1c2EAaappear_twiceV3V5ainfix +V1c2EAainfix <agetV2V7V1Aainfix <=c0agetV2V7Iainfix <V7V0Aainfix <=c0V7FAainfix >=V1c2Aainfix =V0ainfix +V1c2FFF">
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.01"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter two_equal_elements.3.8"
+        expl="parameter two_equal_elements"
+        sum="0e5846e2f540425d9b873d2ca6d9694a"
+        proved="true"
+        expanded="true"
+        shape="Lamk arrayV0V2aappear_twiceV3V4c0NIainfix =V4aprefix -c1NIainfix <V4V1Aainfix <=c0V4FIainfix =aprefix -c1aprefix -c1Iainfix <=c0ainfix +V1c1Iainfix >=V1c0Iainfix =V6V5NAaappear_twiceV3V6ainfix +V1c2EAaappear_twiceV3V5ainfix +V1c2EAainfix <agetV2V7V1Aainfix <=c0agetV2V7Iainfix <V7V0Aainfix <=c0V7FAainfix >=V1c2Aainfix =V0ainfix +V1c2FFF">
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+       </goal>
+      </transf>
+     </goal>
+     <goal
+      name="WP_parameter two_equal_elements.4"
+      expl="for loop preservation"
+      sum="623b4de6511c56f42202a4f5ee57d715"
+      proved="true"
+      expanded="true"
+      shape="Lamk arrayV0V2LagetV2V7iainfix =agetV6V8aTrueiainfix =V5aprefix -c1aappear_twiceV3V10ainfix +V7c1NIainfix =V10V9NIainfix <V10V1Aainfix <=c0V10FIainfix =V4aprefix -c1Aaappear_twiceV3V11ainfix +V7c1NIainfix <V11V1Aainfix <=c0V11FIainfix =V9aprefix -c1Aiainfix =agetV6V12aTrueainfix =agetV2V13V12Aainfix <V13ainfix +V7c1Aainfix <=c0V13Eainfix =agetV2V14V12NIainfix <V14ainfix +V7c1Aainfix <=c0V14FIainfix <V12V1Aainfix <=c0V12FAainfix =V4V9NAaappear_twiceV3V4ainfix +V7c1Iainfix =V4aprefix -c1NAaappear_twiceV3V9ainfix +V7c1Iainfix =V9aprefix -c1NAainfix =V4aprefix -c1Iainfix =V9aprefix -c1Iainfix =V9V8Fiainfix =V4aprefix -c1iainfix =V8V5Naappear_twiceV3V16ainfix +V7c1NIainfix =V16V5NIainfix <V16V1Aainfix <=c0V16FIainfix =V15aprefix -c1Aaappear_twiceV3V17ainfix +V7c1NIainfix <V17V1Aainfix <=c0V17FIainfix =V5aprefix -c1Aiainfix =agetV6V18aTrueainfix =agetV2V19V18Aainfix <V19ainfix +V7c1Aainfix <=c0V19Eainfix =agetV2V20V18NIainfix <V20ainfix +V7c1Aainfix <=c0V20FIainfix <V18V1Aainfix <=c0V18FAainfix =V15V5NAaappear_twiceV3V15ainfix +V7c1Iainfix =V15aprefix -c1NAaappear_twiceV3V5ainfix +V7c1Iainfix =V5aprefix -c1NAainfix =V15aprefix -c1Iainfix =V5aprefix -c1Iainfix =V15V8Faappear_twiceV3V21ainfix +V7c1NIainfix =V21V5NIainfix <V21V1Aainfix <=c0V21FIainfix =V4aprefix -c1Aaappear_twiceV3V22ainfix +V7c1NIainfix <V22V1Aainfix <=c0V22FIainfix =V5aprefix -c1Aiainfix =agetV6V23aTrueainfix =agetV2V24V23Aainfix <V24ainfix +V7c1Aainfix <=c0V24Eainfix =agetV2V25V23NIainfix <V25ainfix +V7c1Aainfix <=c0V25FIainfix <V23V1Aainfix <=c0V23FAainfix =V4V5NAaappear_twiceV3V4ainfix +V7c1Iainfix =V4aprefix -c1NAaappear_twiceV3V5ainfix +V7c1Iainfix =V5aprefix -c1NAainfix =V4aprefix -c1Iainfix =V5aprefix -c1aappear_twiceV3V26ainfix +V7c1NIainfix =V26V5NIainfix <V26V1Aainfix <=c0V26FIainfix =V4aprefix -c1Aaappear_twiceV3V27ainfix +V7c1NIainfix <V27V1Aainfix <=c0V27FIainfix =V5aprefix -c1Aiainfix =agetV6V28aTrueainfix =agetV2V29V28Aainfix <V29ainfix +V7c1Aainfix <=c0V29Eainfix =agetV2V30V28NIainfix <V30ainfix +V7c1Aainfix <=c0V30FIainfix <V28V1Aainfix <=c0V28FAainfix =V4V5NAaappear_twiceV3V4ainfix +V7c1Iainfix =V4aprefix -c1NAaappear_twiceV3V5ainfix +V7c1Iainfix =V5aprefix -c1NAainfix =V4aprefix -c1Iainfix =V5aprefix -c1aappear_twiceV3V32ainfix +V7c1NIainfix =V32V5NIainfix <V32V1Aainfix <=c0V32FIainfix =V4aprefix -c1Aaappear_twiceV3V33ainfix +V7c1NIainfix <V33V1Aainfix <=c0V33FIainfix =V5aprefix -c1Aiainfix =agetV31V34aTrueainfix =agetV2V35V34Aainfix <V35ainfix +V7c1Aainfix <=c0V35Eainfix =agetV2V36V34NIainfix <V36ainfix +V7c1Aainfix <=c0V36FIainfix <V34V1Aainfix <=c0V34FAainfix =V4V5NAaappear_twiceV3V4ainfix +V7c1Iainfix =V4aprefix -c1NAaappear_twiceV3V5ainfix +V7c1Iainfix =V5aprefix -c1NAainfix =V4aprefix -c1Iainfix =V5aprefix -c1Iainfix =V31asetV6V8aTrueFAainfix <V8V1Aainfix <=c0V8Aainfix <V8V1Aainfix <=c0V8Aainfix <V7V0Aainfix <=c0V7Iaappear_twiceV3V37V7NIainfix =V37V5NIainfix <V37V1Aainfix <=c0V37FIainfix =V4aprefix -c1Aaappear_twiceV3V38V7NIainfix <V38V1Aainfix <=c0V38FIainfix =V5aprefix -c1Aiainfix =agetV6V39aTrueainfix =agetV2V40V39Aainfix <V40V7Aainfix <=c0V40Eainfix =agetV2V41V39NIainfix <V41V7Aainfix <=c0V41FIainfix <V39V1Aainfix <=c0V39FAainfix =V4V5NAaappear_twiceV3V4V7Iainfix =V4aprefix -c1NAaappear_twiceV3V5V7Iainfix =V5aprefix -c1NAainfix =V4aprefix -c1Iainfix =V5aprefix -c1Iainfix <=V7ainfix +V1c1Aainfix <=c0V7FFFFIainfix <=c0ainfix +V1c1Iainfix >=V1c0Iainfix =V43V42NAaappear_twiceV3V43ainfix +V1c2EAaappear_twiceV3V42ainfix +V1c2EAainfix <agetV2V44V1Aainfix <=c0agetV2V44Iainfix <V44V0Aainfix <=c0V44FAainfix >=V1c2Aainfix =V0ainfix +V1c2FFF">
+      <transf
+       name="split_goal"
+       proved="true"
+       expanded="true">
+       <goal
+        name="WP_parameter two_equal_elements.4.1"
+        expl="for loop preservation"
+        sum="50c25ebcd6f9ff738d9cfc58ac321442"
+        proved="true"
+        expanded="true"
+        shape="Lamk arrayV0V2ainfix <V7V0Aainfix <=c0V7Iaappear_twiceV3V8V7NIainfix =V8V5NIainfix <V8V1Aainfix <=c0V8FIainfix =V4aprefix -c1Aaappear_twiceV3V9V7NIainfix <V9V1Aainfix <=c0V9FIainfix =V5aprefix -c1Aiainfix =agetV6V10aTrueainfix =agetV2V11V10Aainfix <V11V7Aainfix <=c0V11Eainfix =agetV2V12V10NIainfix <V12V7Aainfix <=c0V12FIainfix <V10V1Aainfix <=c0V10FAainfix =V4V5NAaappear_twiceV3V4V7Iainfix =V4aprefix -c1NAaappear_twiceV3V5V7Iainfix =V5aprefix -c1NAainfix =V4aprefix -c1Iainfix =V5aprefix -c1Iainfix <=V7ainfix +V1c1Aainfix <=c0V7FFFFIainfix <=c0ainfix +V1c1Iainfix >=V1c0Iainfix =V14V13NAaappear_twiceV3V14ainfix +V1c2EAaappear_twiceV3V13ainfix +V1c2EAainfix <agetV2V15V1Aainfix <=c0agetV2V15Iainfix <V15V0Aainfix <=c0V15FAainfix >=V1c2Aainfix =V0ainfix +V1c2FFF">
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.01"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter two_equal_elements.4.2"
+        expl="for loop preservation"
+        sum="5c19452dd94c90988083f652e9fc12b0"
+        proved="true"
+        expanded="true"
+        shape="Lamk arrayV0V2LagetV2V7ainfix <V8V1Aainfix <=c0V8Iainfix <V7V0Aainfix <=c0V7Iaappear_twiceV3V9V7NIainfix =V9V5NIainfix <V9V1Aainfix <=c0V9FIainfix =V4aprefix -c1Aaappear_twiceV3V10V7NIainfix <V10V1Aainfix <=c0V10FIainfix =V5aprefix -c1Aiainfix =agetV6V11aTrueainfix =agetV2V12V11Aainfix <V12V7Aainfix <=c0V12Eainfix =agetV2V13V11NIainfix <V13V7Aainfix <=c0V13FIainfix <V11V1Aainfix <=c0V11FAainfix =V4V5NAaappear_twiceV3V4V7Iainfix =V4aprefix -c1NAaappear_twiceV3V5V7Iainfix =V5aprefix -c1NAainfix =V4aprefix -c1Iainfix =V5aprefix -c1Iainfix <=V7ainfix +V1c1Aainfix <=c0V7FFFFIainfix <=c0ainfix +V1c1Iainfix >=V1c0Iainfix =V15V14NAaappear_twiceV3V15ainfix +V1c2EAaappear_twiceV3V14ainfix +V1c2EAainfix <agetV2V16V1Aainfix <=c0agetV2V16Iainfix <V16V0Aainfix <=c0V16FAainfix >=V1c2Aainfix =V0ainfix +V1c2FFF">
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.03"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter two_equal_elements.4.3"
+        expl="for loop preservation"
+        sum="da914fed23771fda838c0ff30e5e85c6"
+        proved="true"
+        expanded="true"
+        shape="Lamk arrayV0V2LagetV2V7ainfix =V4aprefix -c1Iainfix =V9aprefix -c1Iainfix =V9V8FIainfix =V5aprefix -c1Iainfix =agetV6V8aTrueIainfix <V8V1Aainfix <=c0V8Iainfix <V7V0Aainfix <=c0V7Iaappear_twiceV3V10V7NIainfix =V10V5NIainfix <V10V1Aainfix <=c0V10FIainfix =V4aprefix -c1Aaappear_twiceV3V11V7NIainfix <V11V1Aainfix <=c0V11FIainfix =V5aprefix -c1Aiainfix =agetV6V12aTrueainfix =agetV2V13V12Aainfix <V13V7Aainfix <=c0V13Eainfix =agetV2V14V12NIainfix <V14V7Aainfix <=c0V14FIainfix <V12V1Aainfix <=c0V12FAainfix =V4V5NAaappear_twiceV3V4V7Iainfix =V4aprefix -c1NAaappear_twiceV3V5V7Iainfix =V5aprefix -c1NAainfix =V4aprefix -c1Iainfix =V5aprefix -c1Iainfix <=V7ainfix +V1c1Aainfix <=c0V7FFFFIainfix <=c0ainfix +V1c1Iainfix >=V1c0Iainfix =V16V15NAaappear_twiceV3V16ainfix +V1c2EAaappear_twiceV3V15ainfix +V1c2EAainfix <agetV2V17V1Aainfix <=c0agetV2V17Iainfix <V17V0Aainfix <=c0V17FAainfix >=V1c2Aainfix =V0ainfix +V1c2FFF">
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter two_equal_elements.4.4"
+        expl="for loop preservation"
+        sum="9fd59ed8fd163a415e28ccbd24df9e9c"
+        proved="true"
+        expanded="true"
+        shape="Lamk arrayV0V2LagetV2V7aappear_twiceV3V9ainfix +V7c1Iainfix =V9aprefix -c1NIainfix =V9V8FIainfix =V5aprefix -c1Iainfix =agetV6V8aTrueIainfix <V8V1Aainfix <=c0V8Iainfix <V7V0Aainfix <=c0V7Iaappear_twiceV3V10V7NIainfix =V10V5NIainfix <V10V1Aainfix <=c0V10FIainfix =V4aprefix -c1Aaappear_twiceV3V11V7NIainfix <V11V1Aainfix <=c0V11FIainfix =V5aprefix -c1Aiainfix =agetV6V12aTrueainfix =agetV2V13V12Aainfix <V13V7Aainfix <=c0V13Eainfix =agetV2V14V12NIainfix <V14V7Aainfix <=c0V14FIainfix <V12V1Aainfix <=c0V12FAainfix =V4V5NAaappear_twiceV3V4V7Iainfix =V4aprefix -c1NAaappear_twiceV3V5V7Iainfix =V5aprefix -c1NAainfix =V4aprefix -c1Iainfix =V5aprefix -c1Iainfix <=V7ainfix +V1c1Aainfix <=c0V7FFFFIainfix <=c0ainfix +V1c1Iainfix >=V1c0Iainfix =V16V15NAaappear_twiceV3V16ainfix +V1c2EAaappear_twiceV3V15ainfix +V1c2EAainfix <agetV2V17V1Aainfix <=c0agetV2V17Iainfix <V17V0Aainfix <=c0V17FAainfix >=V1c2Aainfix =V0ainfix +V1c2FFF">
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.56"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter two_equal_elements.4.5"
+        expl="for loop preservation"
+        sum="81a3128e5969897f6398c376eace6431"
+        proved="true"
+        expanded="true"
+        shape="Lamk arrayV0V2LagetV2V7aappear_twiceV3V4ainfix +V7c1Iainfix =V4aprefix -c1NIainfix =V9V8FIainfix =V5aprefix -c1Iainfix =agetV6V8aTrueIainfix <V8V1Aainfix <=c0V8Iainfix <V7V0Aainfix <=c0V7Iaappear_twiceV3V10V7NIainfix =V10V5NIainfix <V10V1Aainfix <=c0V10FIainfix =V4aprefix -c1Aaappear_twiceV3V11V7NIainfix <V11V1Aainfix <=c0V11FIainfix =V5aprefix -c1Aiainfix =agetV6V12aTrueainfix =agetV2V13V12Aainfix <V13V7Aainfix <=c0V13Eainfix =agetV2V14V12NIainfix <V14V7Aainfix <=c0V14FIainfix <V12V1Aainfix <=c0V12FAainfix =V4V5NAaappear_twiceV3V4V7Iainfix =V4aprefix -c1NAaappear_twiceV3V5V7Iainfix =V5aprefix -c1NAainfix =V4aprefix -c1Iainfix =V5aprefix -c1Iainfix <=V7ainfix +V1c1Aainfix <=c0V7FFFFIainfix <=c0ainfix +V1c1Iainfix >=V1c0Iainfix =V16V15NAaappear_twiceV3V16ainfix +V1c2EAaappear_twiceV3V15ainfix +V1c2EAainfix <agetV2V17V1Aainfix <=c0agetV2V17Iainfix <V17V0Aainfix <=c0V17FAainfix >=V1c2Aainfix =V0ainfix +V1c2FFF">
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.01"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter two_equal_elements.4.6"
+        expl="for loop preservation"
+        sum="9af498e7dc0f40e149208ef55674c243"
+        proved="true"
+        expanded="true"
+        shape="Lamk arrayV0V2LagetV2V7ainfix =V4V9NIainfix =V4aprefix -c1NIainfix =V9V8FIainfix =V5aprefix -c1Iainfix =agetV6V8aTrueIainfix <V8V1Aainfix <=c0V8Iainfix <V7V0Aainfix <=c0V7Iaappear_twiceV3V10V7NIainfix =V10V5NIainfix <V10V1Aainfix <=c0V10FIainfix =V4aprefix -c1Aaappear_twiceV3V11V7NIainfix <V11V1Aainfix <=c0V11FIainfix =V5aprefix -c1Aiainfix =agetV6V12aTrueainfix =agetV2V13V12Aainfix <V13V7Aainfix <=c0V13Eainfix =agetV2V14V12NIainfix <V14V7Aainfix <=c0V14FIainfix <V12V1Aainfix <=c0V12FAainfix =V4V5NAaappear_twiceV3V4V7Iainfix =V4aprefix -c1NAaappear_twiceV3V5V7Iainfix =V5aprefix -c1NAainfix =V4aprefix -c1Iainfix =V5aprefix -c1Iainfix <=V7ainfix +V1c1Aainfix <=c0V7FFFFIainfix <=c0ainfix +V1c1Iainfix >=V1c0Iainfix =V16V15NAaappear_twiceV3V16ainfix +V1c2EAaappear_twiceV3V15ainfix +V1c2EAainfix <agetV2V17V1Aainfix <=c0agetV2V17Iainfix <V17V0Aainfix <=c0V17FAainfix >=V1c2Aainfix =V0ainfix +V1c2FFF">
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter two_equal_elements.4.7"
+        expl="for loop preservation"
+        sum="0b9bcb421cbcb7fb094265301603bb20"
+        proved="true"
+        expanded="true"
+        shape="Lamk arrayV0V2LagetV2V7ainfix =agetV2V11V10Aainfix <V11ainfix +V7c1Aainfix <=c0V11EIainfix =agetV6V10aTrueIainfix <V10V1Aainfix <=c0V10FIainfix =V9V8FIainfix =V5aprefix -c1Iainfix =agetV6V8aTrueIainfix <V8V1Aainfix <=c0V8Iainfix <V7V0Aainfix <=c0V7Iaappear_twiceV3V12V7NIainfix =V12V5NIainfix <V12V1Aainfix <=c0V12FIainfix =V4aprefix -c1Aaappear_twiceV3V13V7NIainfix <V13V1Aainfix <=c0V13FIainfix =V5aprefix -c1Aiainfix =agetV6V14aTrueainfix =agetV2V15V14Aainfix <V15V7Aainfix <=c0V15Eainfix =agetV2V16V14NIainfix <V16V7Aainfix <=c0V16FIainfix <V14V1Aainfix <=c0V14FAainfix =V4V5NAaappear_twiceV3V4V7Iainfix =V4aprefix -c1NAaappear_twiceV3V5V7Iainfix =V5aprefix -c1NAainfix =V4aprefix -c1Iainfix =V5aprefix -c1Iainfix <=V7ainfix +V1c1Aainfix <=c0V7FFFFIainfix <=c0ainfix +V1c1Iainfix >=V1c0Iainfix =V18V17NAaappear_twiceV3V18ainfix +V1c2EAaappear_twiceV3V17ainfix +V1c2EAainfix <agetV2V19V1Aainfix <=c0agetV2V19Iainfix <V19V0Aainfix <=c0V19FAainfix >=V1c2Aainfix =V0ainfix +V1c2FFF">
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter two_equal_elements.4.8"
+        expl="for loop preservation"
+        sum="ba835fb25de74d3215733c35568255af"
+        proved="true"
+        expanded="true"
+        shape="Lamk arrayV0V2LagetV2V7ainfix =agetV2V11V10NIainfix <V11ainfix +V7c1Aainfix <=c0V11FIainfix =agetV6V10aTrueNIainfix <V10V1Aainfix <=c0V10FIainfix =V9V8FIainfix =V5aprefix -c1Iainfix =agetV6V8aTrueIainfix <V8V1Aainfix <=c0V8Iainfix <V7V0Aainfix <=c0V7Iaappear_twiceV3V12V7NIainfix =V12V5NIainfix <V12V1Aainfix <=c0V12FIainfix =V4aprefix -c1Aaappear_twiceV3V13V7NIainfix <V13V1Aainfix <=c0V13FIainfix =V5aprefix -c1Aiainfix =agetV6V14aTrueainfix =agetV2V15V14Aainfix <V15V7Aainfix <=c0V15Eainfix =agetV2V16V14NIainfix <V16V7Aainfix <=c0V16FIainfix <V14V1Aainfix <=c0V14FAainfix =V4V5NAaappear_twiceV3V4V7Iainfix =V4aprefix -c1NAaappear_twiceV3V5V7Iainfix =V5aprefix -c1NAainfix =V4aprefix -c1Iainfix =V5aprefix -c1Iainfix <=V7ainfix +V1c1Aainfix <=c0V7FFFFIainfix <=c0ainfix +V1c1Iainfix >=V1c0Iainfix =V18V17NAaappear_twiceV3V18ainfix +V1c2EAaappear_twiceV3V17ainfix +V1c2EAainfix <agetV2V19V1Aainfix <=c0agetV2V19Iainfix <V19V0Aainfix <=c0V19FAainfix >=V1c2Aainfix =V0ainfix +V1c2FFF">
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter two_equal_elements.4.9"
+        expl="for loop preservation"
+        sum="31fae29fdc9b579fe93ac1f51b1fdabc"
+        proved="true"
+        expanded="true"
+        shape="Lamk arrayV0V2LagetV2V7aappear_twiceV3V10ainfix +V7c1NIainfix <V10V1Aainfix <=c0V10FIainfix =V9aprefix -c1Iainfix =V9V8FIainfix =V5aprefix -c1Iainfix =agetV6V8aTrueIainfix <V8V1Aainfix <=c0V8Iainfix <V7V0Aainfix <=c0V7Iaappear_twiceV3V11V7NIainfix =V11V5NIainfix <V11V1Aainfix <=c0V11FIainfix =V4aprefix -c1Aaappear_twiceV3V12V7NIainfix <V12V1Aainfix <=c0V12FIainfix =V5aprefix -c1Aiainfix =agetV6V13aTrueainfix =agetV2V14V13Aainfix <V14V7Aainfix <=c0V14Eainfix =agetV2V15V13NIainfix <V15V7Aainfix <=c0V15FIainfix <V13V1Aainfix <=c0V13FAainfix =V4V5NAaappear_twiceV3V4V7Iainfix =V4aprefix -c1NAaappear_twiceV3V5V7Iainfix =V5aprefix -c1NAainfix =V4aprefix -c1Iainfix =V5aprefix -c1Iainfix <=V7ainfix +V1c1Aainfix <=c0V7FFFFIainfix <=c0ainfix +V1c1Iainfix >=V1c0Iainfix =V17V16NAaappear_twiceV3V17ainfix +V1c2EAaappear_twiceV3V16ainfix +V1c2EAainfix <agetV2V18V1Aainfix <=c0agetV2V18Iainfix <V18V0Aainfix <=c0V18FAainfix >=V1c2Aainfix =V0ainfix +V1c2FFF">
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter two_equal_elements.4.10"
+        expl="for loop preservation"
+        sum="d21161dbc3304338acb3920e53e3d9c9"
+        proved="true"
+        expanded="true"
+        shape="Lamk arrayV0V2LagetV2V7aappear_twiceV3V10ainfix +V7c1NIainfix =V10V9NIainfix <V10V1Aainfix <=c0V10FIainfix =V4aprefix -c1Iainfix =V9V8FIainfix =V5aprefix -c1Iainfix =agetV6V8aTrueIainfix <V8V1Aainfix <=c0V8Iainfix <V7V0Aainfix <=c0V7Iaappear_twiceV3V11V7NIainfix =V11V5NIainfix <V11V1Aainfix <=c0V11FIainfix =V4aprefix -c1Aaappear_twiceV3V12V7NIainfix <V12V1Aainfix <=c0V12FIainfix =V5aprefix -c1Aiainfix =agetV6V13aTrueainfix =agetV2V14V13Aainfix <V14V7Aainfix <=c0V14Eainfix =agetV2V15V13NIainfix <V15V7Aainfix <=c0V15FIainfix <V13V1Aainfix <=c0V13FAainfix =V4V5NAaappear_twiceV3V4V7Iainfix =V4aprefix -c1NAaappear_twiceV3V5V7Iainfix =V5aprefix -c1NAainfix =V4aprefix -c1Iainfix =V5aprefix -c1Iainfix <=V7ainfix +V1c1Aainfix <=c0V7FFFFIainfix <=c0ainfix +V1c1Iainfix >=V1c0Iainfix =V17V16NAaappear_twiceV3V17ainfix +V1c2EAaappear_twiceV3V16ainfix +V1c2EAainfix <agetV2V18V1Aainfix <=c0agetV2V18Iainfix <V18V0Aainfix <=c0V18FAainfix >=V1c2Aainfix =V0ainfix +V1c2FFF">
+        <proof
+         prover="coq"
+         timelimit="10"
+         edited="foveoos11_challenge3_WP_TwoEqualElements_WP_parameter_two_equal_elements_1.v"
+         obsolete="false">
+         <result status="valid" time="11.56"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter two_equal_elements.4.11"
+        expl="for loop preservation"
+        sum="06bd7678ae9c7523d6aa03b4bfb3c650"
+        proved="true"
+        expanded="true"
+        shape="Lamk arrayV0V2LagetV2V7ainfix =V9aprefix -c1Iainfix =V5aprefix -c1Iainfix =V9V8FIainfix =V8V5NIainfix =V4aprefix -c1Iainfix =V5aprefix -c1NIainfix =agetV6V8aTrueIainfix <V8V1Aainfix <=c0V8Iainfix <V7V0Aainfix <=c0V7Iaappear_twiceV3V10V7NIainfix =V10V5NIainfix <V10V1Aainfix <=c0V10FIainfix =V4aprefix -c1Aaappear_twiceV3V11V7NIainfix <V11V1Aainfix <=c0V11FIainfix =V5aprefix -c1Aiainfix =agetV6V12aTrueainfix =agetV2V13V12Aainfix <V13V7Aainfix <=c0V13Eainfix =agetV2V14V12NIainfix <V14V7Aainfix <=c0V14FIainfix <V12V1Aainfix <=c0V12FAainfix =V4V5NAaappear_twiceV3V4V7Iainfix =V4aprefix -c1NAaappear_twiceV3V5V7Iainfix =V5aprefix -c1NAainfix =V4aprefix -c1Iainfix =V5aprefix -c1Iainfix <=V7ainfix +V1c1Aainfix <=c0V7FFFFIainfix <=c0ainfix +V1c1Iainfix >=V1c0Iainfix =V16V15NAaappear_twiceV3V16ainfix +V1c2EAaappear_twiceV3V15ainfix +V1c2EAainfix <agetV2V17V1Aainfix <=c0agetV2V17Iainfix <V17V0Aainfix <=c0V17FAainfix >=V1c2Aainfix =V0ainfix +V1c2FFF">
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter two_equal_elements.4.12"
+        expl="for loop preservation"
+        sum="48c2fc2cb302360a03315658bbd33f95"
+        proved="true"
+        expanded="true"
+        shape="Lamk arrayV0V2LagetV2V7aappear_twiceV3V5ainfix +V7c1Iainfix =V5aprefix -c1NIainfix =V9V8FIainfix =V8V5NIainfix =V4aprefix -c1Iainfix =V5aprefix -c1NIainfix =agetV6V8aTrueIainfix <V8V1Aainfix <=c0V8Iainfix <V7V0Aainfix <=c0V7Iaappear_twiceV3V10V7NIainfix =V10V5NIainfix <V10V1Aainfix <=c0V10FIainfix =V4aprefix -c1Aaappear_twiceV3V11V7NIainfix <V11V1Aainfix <=c0V11FIainfix =V5aprefix -c1Aiainfix =agetV6V12aTrueainfix =agetV2V13V12Aainfix <V13V7Aainfix <=c0V13Eainfix =agetV2V14V12NIainfix <V14V7Aainfix <=c0V14FIainfix <V12V1Aainfix <=c0V12FAainfix =V4V5NAaappear_twiceV3V4V7Iainfix =V4aprefix -c1NAaappear_twiceV3V5V7Iainfix =V5aprefix -c1NAainfix =V4aprefix -c1Iainfix =V5aprefix -c1Iainfix <=V7ainfix +V1c1Aainfix <=c0V7FFFFIainfix <=c0ainfix +V1c1Iainfix >=V1c0Iainfix =V16V15NAaappear_twiceV3V16ainfix +V1c2EAaappear_twiceV3V15ainfix +V1c2EAainfix <agetV2V17V1Aainfix <=c0agetV2V17Iainfix <V17V0Aainfix <=c0V17FAainfix >=V1c2Aainfix =V0ainfix +V1c2FFF">
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.06"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter two_equal_elements.4.13"
+        expl="for loop preservation"
+        sum="74121e833ed6f5c5e321a8dca5f92ff7"
+        proved="true"
+        expanded="true"
+        shape="Lamk arrayV0V2LagetV2V7aappear_twiceV3V9ainfix +V7c1Iainfix =V9aprefix -c1NIainfix =V9V8FIainfix =V8V5NIainfix =V4aprefix -c1Iainfix =V5aprefix -c1NIainfix =agetV6V8aTrueIainfix <V8V1Aainfix <=c0V8Iainfix <V7V0Aainfix <=c0V7Iaappear_twiceV3V10V7NIainfix =V10V5NIainfix <V10V1Aainfix <=c0V10FIainfix =V4aprefix -c1Aaappear_twiceV3V11V7NIainfix <V11V1Aainfix <=c0V11FIainfix =V5aprefix -c1Aiainfix =agetV6V12aTrueainfix =agetV2V13V12Aainfix <V13V7Aainfix <=c0V13Eainfix =agetV2V14V12NIainfix <V14V7Aainfix <=c0V14FIainfix <V12V1Aainfix <=c0V12FAainfix =V4V5NAaappear_twiceV3V4V7Iainfix =V4aprefix -c1NAaappear_twiceV3V5V7Iainfix =V5aprefix -c1NAainfix =V4aprefix -c1Iainfix =V5aprefix -c1Iainfix <=V7ainfix +V1c1Aainfix <=c0V7FFFFIainfix <=c0ainfix +V1c1Iainfix >=V1c0Iainfix =V16V15NAaappear_twiceV3V16ainfix +V1c2EAaappear_twiceV3V15ainfix +V1c2EAainfix <agetV2V17V1Aainfix <=c0agetV2V17Iainfix <V17V0Aainfix <=c0V17FAainfix >=V1c2Aainfix =V0ainfix +V1c2FFF">
+        <proof
+         prover="cvc3"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.03"/>
+        </proof>
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="1.64"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter two_equal_elements.4.14"
+        expl="for loop preservation"
+        sum="1bed0d1d0c2b8645082653d8cdbf8d2f"
+        proved="true"
+        expanded="true"
+        shape="Lamk arrayV0V2LagetV2V7ainfix =V9V5NIainfix =V9aprefix -c1NIainfix =V9V8FIainfix =V8V5NIainfix =V4aprefix -c1Iainfix =V5aprefix -c1NIainfix =agetV6V8aTrueIainfix <V8V1Aainfix <=c0V8Iainfix <V7V0Aainfix <=c0V7Iaappear_twiceV3V10V7NIainfix =V10V5NIainfix <V10V1Aainfix <=c0V10FIainfix =V4aprefix -c1Aaappear_twiceV3V11V7NIainfix <V11V1Aainfix <=c0V11FIainfix =V5aprefix -c1Aiainfix =agetV6V12aTrueainfix =agetV2V13V12Aainfix <V13V7Aainfix <=c0V13Eainfix =agetV2V14V12NIainfix <V14V7Aainfix <=c0V14FIainfix <V12V1Aainfix <=c0V12FAainfix =V4V5NAaappear_twiceV3V4V7Iainfix =V4aprefix -c1NAaappear_twiceV3V5V7Iainfix =V5aprefix -c1NAainfix =V4aprefix -c1Iainfix =V5aprefix -c1Iainfix <=V7ainfix +V1c1Aainfix <=c0V7FFFFIainfix <=c0ainfix +V1c1Iainfix >=V1c0Iainfix =V16V15NAaappear_twiceV3V16ainfix +V1c2EAaappear_twiceV3V15ainfix +V1c2EAainfix <agetV2V17V1Aainfix <=c0agetV2V17Iainfix <V17V0Aainfix <=c0V17FAainfix >=V1c2Aainfix =V0ainfix +V1c2FFF">
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter two_equal_elements.4.15"
+        expl="for loop preservation"
+        sum="5d2e71fc2ce3a948d0a1cc68adb18a0e"
+        proved="true"
+        expanded="true"
+        shape="Lamk arrayV0V2LagetV2V7ainfix =agetV2V11V10Aainfix <V11ainfix +V7c1Aainfix <=c0V11EIainfix =agetV6V10aTrueIainfix <V10V1Aainfix <=c0V10FIainfix =V9V8FIainfix =V8V5NIainfix =V4aprefix -c1Iainfix =V5aprefix -c1NIainfix =agetV6V8aTrueIainfix <V8V1Aainfix <=c0V8Iainfix <V7V0Aainfix <=c0V7Iaappear_twiceV3V12V7NIainfix =V12V5NIainfix <V12V1Aainfix <=c0V12FIainfix =V4aprefix -c1Aaappear_twiceV3V13V7NIainfix <V13V1Aainfix <=c0V13FIainfix =V5aprefix -c1Aiainfix =agetV6V14aTrueainfix =agetV2V15V14Aainfix <V15V7Aainfix <=c0V15Eainfix =agetV2V16V14NIainfix <V16V7Aainfix <=c0V16FIainfix <V14V1Aainfix <=c0V14FAainfix =V4V5NAaappear_twiceV3V4V7Iainfix =V4aprefix -c1NAaappear_twiceV3V5V7Iainfix =V5aprefix -c1NAainfix =V4aprefix -c1Iainfix =V5aprefix -c1Iainfix <=V7ainfix +V1c1Aainfix <=c0V7FFFFIainfix <=c0ainfix +V1c1Iainfix >=V1c0Iainfix =V18V17NAaappear_twiceV3V18ainfix +V1c2EAaappear_twiceV3V17ainfix +V1c2EAainfix <agetV2V19V1Aainfix <=c0agetV2V19Iainfix <V19V0Aainfix <=c0V19FAainfix >=V1c2Aainfix =V0ainfix +V1c2FFF">
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.04"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter two_equal_elements.4.16"
+        expl="for loop preservation"
+        sum="7d9075c932d13d4546f7a4e2377c0b28"
+        proved="true"
+        expanded="true"
+        shape="Lamk arrayV0V2LagetV2V7ainfix =agetV2V11V10NIainfix <V11ainfix +V7c1Aainfix <=c0V11FIainfix =agetV6V10aTrueNIainfix <V10V1Aainfix <=c0V10FIainfix =V9V8FIainfix =V8V5NIainfix =V4aprefix -c1Iainfix =V5aprefix -c1NIainfix =agetV6V8aTrueIainfix <V8V1Aainfix <=c0V8Iainfix <V7V0Aainfix <=c0V7Iaappear_twiceV3V12V7NIainfix =V12V5NIainfix <V12V1Aainfix <=c0V12FIainfix =V4aprefix -c1Aaappear_twiceV3V13V7NIainfix <V13V1Aainfix <=c0V13FIainfix =V5aprefix -c1Aiainfix =agetV6V14aTrueainfix =agetV2V15V14Aainfix <V15V7Aainfix <=c0V15Eainfix =agetV2V16V14NIainfix <V16V7Aainfix <=c0V16FIainfix <V14V1Aainfix <=c0V14FAainfix =V4V5NAaappear_twiceV3V4V7Iainfix =V4aprefix -c1NAaappear_twiceV3V5V7Iainfix =V5aprefix -c1NAainfix =V4aprefix -c1Iainfix =V5aprefix -c1Iainfix <=V7ainfix +V1c1Aainfix <=c0V7FFFFIainfix <=c0ainfix +V1c1Iainfix >=V1c0Iainfix =V18V17NAaappear_twiceV3V18ainfix +V1c2EAaappear_twiceV3V17ainfix +V1c2EAainfix <agetV2V19V1Aainfix <=c0agetV2V19Iainfix <V19V0Aainfix <=c0V19FAainfix >=V1c2Aainfix =V0ainfix +V1c2FFF">
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.04"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter two_equal_elements.4.17"
+        expl="for loop preservation"
+        sum="7ccad6acfeb924b74ee5c72bfff2fb8c"
+        proved="true"
+        expanded="true"
+        shape="Lamk arrayV0V2LagetV2V7aappear_twiceV3V10ainfix +V7c1NIainfix <V10V1Aainfix <=c0V10FIainfix =V5aprefix -c1Iainfix =V9V8FIainfix =V8V5NIainfix =V4aprefix -c1Iainfix =V5aprefix -c1NIainfix =agetV6V8aTrueIainfix <V8V1Aainfix <=c0V8Iainfix <V7V0Aainfix <=c0V7Iaappear_twiceV3V11V7NIainfix =V11V5NIainfix <V11V1Aainfix <=c0V11FIainfix =V4aprefix -c1Aaappear_twiceV3V12V7NIainfix <V12V1Aainfix <=c0V12FIainfix =V5aprefix -c1Aiainfix =agetV6V13aTrueainfix =agetV2V14V13Aainfix <V14V7Aainfix <=c0V14Eainfix =agetV2V15V13NIainfix <V15V7Aainfix <=c0V15FIainfix <V13V1Aainfix <=c0V13FAainfix =V4V5NAaappear_twiceV3V4V7Iainfix =V4aprefix -c1NAaappear_twiceV3V5V7Iainfix =V5aprefix -c1NAainfix =V4aprefix -c1Iainfix =V5aprefix -c1Iainfix <=V7ainfix +V1c1Aainfix <=c0V7FFFFIainfix <=c0ainfix +V1c1Iainfix >=V1c0Iainfix =V17V16NAaappear_twiceV3V17ainfix +V1c2EAaappear_twiceV3V16ainfix +V1c2EAainfix <agetV2V18V1Aainfix <=c0agetV2V18Iainfix <V18V0Aainfix <=c0V18FAainfix >=V1c2Aainfix =V0ainfix +V1c2FFF">
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter two_equal_elements.4.18"
+        expl="for loop preservation"
+        sum="864724b346bce68f654a7d41662ff3fb"
+        proved="true"
+        expanded="true"
+        shape="Lamk arrayV0V2LagetV2V7aappear_twiceV3V10ainfix +V7c1NIainfix =V10V5NIainfix <V10V1Aainfix <=c0V10FIainfix =V9aprefix -c1Iainfix =V9V8FIainfix =V8V5NIainfix =V4aprefix -c1Iainfix =V5aprefix -c1NIainfix =agetV6V8aTrueIainfix <V8V1Aainfix <=c0V8Iainfix <V7V0Aainfix <=c0V7Iaappear_twiceV3V11V7NIainfix =V11V5NIainfix <V11V1Aainfix <=c0V11FIainfix =V4aprefix -c1Aaappear_twiceV3V12V7NIainfix <V12V1Aainfix <=c0V12FIainfix =V5aprefix -c1Aiainfix =agetV6V13aTrueainfix =agetV2V14V13Aainfix <V14V7Aainfix <=c0V14Eainfix =agetV2V15V13NIainfix <V15V7Aainfix <=c0V15FIainfix <V13V1Aainfix <=c0V13FAainfix =V4V5NAaappear_twiceV3V4V7Iainfix =V4aprefix -c1NAaappear_twiceV3V5V7Iainfix =V5aprefix -c1NAainfix =V4aprefix -c1Iainfix =V5aprefix -c1Iainfix <=V7ainfix +V1c1Aainfix <=c0V7FFFFIainfix <=c0ainfix +V1c1Iainfix >=V1c0Iainfix =V17V16NAaappear_twiceV3V17ainfix +V1c2EAaappear_twiceV3V16ainfix +V1c2EAainfix <agetV2V18V1Aainfix <=c0agetV2V18Iainfix <V18V0Aainfix <=c0V18FAainfix >=V1c2Aainfix =V0ainfix +V1c2FFF">
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter two_equal_elements.4.19"
+        expl="for loop preservation"
+        sum="101aac09422a4661e337a0c6bc169c7e"
+        proved="true"
+        expanded="true"
+        shape="Lamk arrayV0V2LagetV2V7ainfix =V4aprefix -c1Iainfix =V5aprefix -c1Iainfix =V8V5NNIainfix =V4aprefix -c1Iainfix =V5aprefix -c1NIainfix =agetV6V8aTrueIainfix <V8V1Aainfix <=c0V8Iainfix <V7V0Aainfix <=c0V7Iaappear_twiceV3V9V7NIainfix =V9V5NIainfix <V9V1Aainfix <=c0V9FIainfix =V4aprefix -c1Aaappear_twiceV3V10V7NIainfix <V10V1Aainfix <=c0V10FIainfix =V5aprefix -c1Aiainfix =agetV6V11aTrueainfix =agetV2V12V11Aainfix <V12V7Aainfix <=c0V12Eainfix =agetV2V13V11NIainfix <V13V7Aainfix <=c0V13FIainfix <V11V1Aainfix <=c0V11FAainfix =V4V5NAaappear_twiceV3V4V7Iainfix =V4aprefix -c1NAaappear_twiceV3V5V7Iainfix =V5aprefix -c1NAainfix =V4aprefix -c1Iainfix =V5aprefix -c1Iainfix <=V7ainfix +V1c1Aainfix <=c0V7FFFFIainfix <=c0ainfix +V1c1Iainfix >=V1c0Iainfix =V15V14NAaappear_twiceV3V15ainfix +V1c2EAaappear_twiceV3V14ainfix +V1c2EAainfix <agetV2V16V1Aainfix <=c0agetV2V16Iainfix <V16V0Aainfix <=c0V16FAainfix >=V1c2Aainfix =V0ainfix +V1c2FFF">
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter two_equal_elements.4.20"
+        expl="for loop preservation"
+        sum="dc9fa8ad494e6f65940de7cc12c38f76"
+        proved="true"
+        expanded="true"
+        shape="Lamk arrayV0V2LagetV2V7aappear_twiceV3V5ainfix +V7c1Iainfix =V5aprefix -c1NIainfix =V8V5NNIainfix =V4aprefix -c1Iainfix =V5aprefix -c1NIainfix =agetV6V8aTrueIainfix <V8V1Aainfix <=c0V8Iainfix <V7V0Aainfix <=c0V7Iaappear_twiceV3V9V7NIainfix =V9V5NIainfix <V9V1Aainfix <=c0V9FIainfix =V4aprefix -c1Aaappear_twiceV3V10V7NIainfix <V10V1Aainfix <=c0V10FIainfix =V5aprefix -c1Aiainfix =agetV6V11aTrueainfix =agetV2V12V11Aainfix <V12V7Aainfix <=c0V12Eainfix =agetV2V13V11NIainfix <V13V7Aainfix <=c0V13FIainfix <V11V1Aainfix <=c0V11FAainfix =V4V5NAaappear_twiceV3V4V7Iainfix =V4aprefix -c1NAaappear_twiceV3V5V7Iainfix =V5aprefix -c1NAainfix =V4aprefix -c1Iainfix =V5aprefix -c1Iainfix <=V7ainfix +V1c1Aainfix <=c0V7FFFFIainfix <=c0ainfix +V1c1Iainfix >=V1c0Iainfix =V15V14NAaappear_twiceV3V15ainfix +V1c2EAaappear_twiceV3V14ainfix +V1c2EAainfix <agetV2V16V1Aainfix <=c0agetV2V16Iainfix <V16V0Aainfix <=c0V16FAainfix >=V1c2Aainfix =V0ainfix +V1c2FFF">
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.04"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter two_equal_elements.4.21"
+        expl="for loop preservation"
+        sum="cae802f55da28dce6691ee5f7e61a6e5"
+        proved="true"
+        expanded="true"
+        shape="Lamk arrayV0V2LagetV2V7aappear_twiceV3V4ainfix +V7c1Iainfix =V4aprefix -c1NIainfix =V8V5NNIainfix =V4aprefix -c1Iainfix =V5aprefix -c1NIainfix =agetV6V8aTrueIainfix <V8V1Aainfix <=c0V8Iainfix <V7V0Aainfix <=c0V7Iaappear_twiceV3V9V7NIainfix =V9V5NIainfix <V9V1Aainfix <=c0V9FIainfix =V4aprefix -c1Aaappear_twiceV3V10V7NIainfix <V10V1Aainfix <=c0V10FIainfix =V5aprefix -c1Aiainfix =agetV6V11aTrueainfix =agetV2V12V11Aainfix <V12V7Aainfix <=c0V12Eainfix =agetV2V13V11NIainfix <V13V7Aainfix <=c0V13FIainfix <V11V1Aainfix <=c0V11FAainfix =V4V5NAaappear_twiceV3V4V7Iainfix =V4aprefix -c1NAaappear_twiceV3V5V7Iainfix =V5aprefix -c1NAainfix =V4aprefix -c1Iainfix =V5aprefix -c1Iainfix <=V7ainfix +V1c1Aainfix <=c0V7FFFFIainfix <=c0ainfix +V1c1Iainfix >=V1c0Iainfix =V15V14NAaappear_twiceV3V15ainfix +V1c2EAaappear_twiceV3V14ainfix +V1c2EAainfix <agetV2V16V1Aainfix <=c0agetV2V16Iainfix <V16V0Aainfix <=c0V16FAainfix >=V1c2Aainfix =V0ainfix +V1c2FFF">
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter two_equal_elements.4.22"
+        expl="for loop preservation"
+        sum="793edc6cd0fbb11ff6c1b43975f05bfb"
+        proved="true"
+        expanded="true"
+        shape="Lamk arrayV0V2LagetV2V7ainfix =V4V5NIainfix =V4aprefix -c1NIainfix =V8V5NNIainfix =V4aprefix -c1Iainfix =V5aprefix -c1NIainfix =agetV6V8aTrueIainfix <V8V1Aainfix <=c0V8Iainfix <V7V0Aainfix <=c0V7Iaappear_twiceV3V9V7NIainfix =V9V5NIainfix <V9V1Aainfix <=c0V9FIainfix =V4aprefix -c1Aaappear_twiceV3V10V7NIainfix <V10V1Aainfix <=c0V10FIainfix =V5aprefix -c1Aiainfix =agetV6V11aTrueainfix =agetV2V12V11Aainfix <V12V7Aainfix <=c0V12Eainfix =agetV2V13V11NIainfix <V13V7Aainfix <=c0V13FIainfix <V11V1Aainfix <=c0V11FAainfix =V4V5NAaappear_twiceV3V4V7Iainfix =V4aprefix -c1NAaappear_twiceV3V5V7Iainfix =V5aprefix -c1NAainfix =V4aprefix -c1Iainfix =V5aprefix -c1Iainfix <=V7ainfix +V1c1Aainfix <=c0V7FFFFIainfix <=c0ainfix +V1c1Iainfix >=V1c0Iainfix =V15V14NAaappear_twiceV3V15ainfix +V1c2EAaappear_twiceV3V14ainfix +V1c2EAainfix <agetV2V16V1Aainfix <=c0agetV2V16Iainfix <V16V0Aainfix <=c0V16FAainfix >=V1c2Aainfix =V0ainfix +V1c2FFF">
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter two_equal_elements.4.23"
+        expl="for loop preservation"
+        sum="24881c15a2a08482689f058905eede3e"
+        proved="true"
+        expanded="true"
+        shape="Lamk arrayV0V2LagetV2V7ainfix =agetV2V10V9Aainfix <V10ainfix +V7c1Aainfix <=c0V10EIainfix =agetV6V9aTrueIainfix <V9V1Aainfix <=c0V9FIainfix =V8V5NNIainfix =V4aprefix -c1Iainfix =V5aprefix -c1NIainfix =agetV6V8aTrueIainfix <V8V1Aainfix <=c0V8Iainfix <V7V0Aainfix <=c0V7Iaappear_twiceV3V11V7NIainfix =V11V5NIainfix <V11V1Aainfix <=c0V11FIainfix =V4aprefix -c1Aaappear_twiceV3V12V7NIainfix <V12V1Aainfix <=c0V12FIainfix =V5aprefix -c1Aiainfix =agetV6V13aTrueainfix =agetV2V14V13Aainfix <V14V7Aainfix <=c0V14Eainfix =agetV2V15V13NIainfix <V15V7Aainfix <=c0V15FIainfix <V13V1Aainfix <=c0V13FAainfix =V4V5NAaappear_twiceV3V4V7Iainfix =V4aprefix -c1NAaappear_twiceV3V5V7Iainfix =V5aprefix -c1NAainfix =V4aprefix -c1Iainfix =V5aprefix -c1Iainfix <=V7ainfix +V1c1Aainfix <=c0V7FFFFIainfix <=c0ainfix +V1c1Iainfix >=V1c0Iainfix =V17V16NAaappear_twiceV3V17ainfix +V1c2EAaappear_twiceV3V16ainfix +V1c2EAainfix <agetV2V18V1Aainfix <=c0agetV2V18Iainfix <V18V0Aainfix <=c0V18FAainfix >=V1c2Aainfix =V0ainfix +V1c2FFF">
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.04"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter two_equal_elements.4.24"
+        expl="for loop preservation"
+        sum="c2cd949ad4dcdc5d22dbc84fbb123656"
+        proved="true"
+        expanded="true"
+        shape="Lamk arrayV0V2LagetV2V7ainfix =agetV2V10V9NIainfix <V10ainfix +V7c1Aainfix <=c0V10FIainfix =agetV6V9aTrueNIainfix <V9V1Aainfix <=c0V9FIainfix =V8V5NNIainfix =V4aprefix -c1Iainfix =V5aprefix -c1NIainfix =agetV6V8aTrueIainfix <V8V1Aainfix <=c0V8Iainfix <V7V0Aainfix <=c0V7Iaappear_twiceV3V11V7NIainfix =V11V5NIainfix <V11V1Aainfix <=c0V11FIainfix =V4aprefix -c1Aaappear_twiceV3V12V7NIainfix <V12V1Aainfix <=c0V12FIainfix =V5aprefix -c1Aiainfix =agetV6V13aTrueainfix =agetV2V14V13Aainfix <V14V7Aainfix <=c0V14Eainfix =agetV2V15V13NIainfix <V15V7Aainfix <=c0V15FIainfix <V13V1Aainfix <=c0V13FAainfix =V4V5NAaappear_twiceV3V4V7Iainfix =V4aprefix -c1NAaappear_twiceV3V5V7Iainfix =V5aprefix -c1NAainfix =V4aprefix -c1Iainfix =V5aprefix -c1Iainfix <=V7ainfix +V1c1Aainfix <=c0V7FFFFIainfix <=c0ainfix +V1c1Iainfix >=V1c0Iainfix =V17V16NAaappear_twiceV3V17ainfix +V1c2EAaappear_twiceV3V16ainfix +V1c2EAainfix <agetV2V18V1Aainfix <=c0agetV2V18Iainfix <V18V0Aainfix <=c0V18FAainfix >=V1c2Aainfix =V0ainfix +V1c2FFF">
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.04"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter two_equal_elements.4.25"
+        expl="for loop preservation"
+        sum="811a2adfc717741b1d7db6433405e972"
+        proved="true"
+        expanded="true"
+        shape="Lamk arrayV0V2LagetV2V7aappear_twiceV3V9ainfix +V7c1NIainfix <V9V1Aainfix <=c0V9FIainfix =V5aprefix -c1Iainfix =V8V5NNIainfix =V4aprefix -c1Iainfix =V5aprefix -c1NIainfix =agetV6V8aTrueIainfix <V8V1Aainfix <=c0V8Iainfix <V7V0Aainfix <=c0V7Iaappear_twiceV3V10V7NIainfix =V10V5NIainfix <V10V1Aainfix <=c0V10FIainfix =V4aprefix -c1Aaappear_twiceV3V11V7NIainfix <V11V1Aainfix <=c0V11FIainfix =V5aprefix -c1Aiainfix =agetV6V12aTrueainfix =agetV2V13V12Aainfix <V13V7Aainfix <=c0V13Eainfix =agetV2V14V12NIainfix <V14V7Aainfix <=c0V14FIainfix <V12V1Aainfix <=c0V12FAainfix =V4V5NAaappear_twiceV3V4V7Iainfix =V4aprefix -c1NAaappear_twiceV3V5V7Iainfix =V5aprefix -c1NAainfix =V4aprefix -c1Iainfix =V5aprefix -c1Iainfix <=V7ainfix +V1c1Aainfix <=c0V7FFFFIainfix <=c0ainfix +V1c1Iainfix >=V1c0Iainfix =V16V15NAaappear_twiceV3V16ainfix +V1c2EAaappear_twiceV3V15ainfix +V1c2EAainfix <agetV2V17V1Aainfix <=c0agetV2V17Iainfix <V17V0Aainfix <=c0V17FAainfix >=V1c2Aainfix =V0ainfix +V1c2FFF">
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter two_equal_elements.4.26"
+        expl="for loop preservation"
+        sum="e90930d551d46f0d6e50501a852bd857"
+        proved="true"
+        expanded="true"
+        shape="Lamk arrayV0V2LagetV2V7aappear_twiceV3V9ainfix +V7c1NIainfix =V9V5NIainfix <V9V1Aainfix <=c0V9FIainfix =V4aprefix -c1Iainfix =V8V5NNIainfix =V4aprefix -c1Iainfix =V5aprefix -c1NIainfix =agetV6V8aTrueIainfix <V8V1Aainfix <=c0V8Iainfix <V7V0Aainfix <=c0V7Iaappear_twiceV3V10V7NIainfix =V10V5NIainfix <V10V1Aainfix <=c0V10FIainfix =V4aprefix -c1Aaappear_twiceV3V11V7NIainfix <V11V1Aainfix <=c0V11FIainfix =V5aprefix -c1Aiainfix =agetV6V12aTrueainfix =agetV2V13V12Aainfix <V13V7Aainfix <=c0V13Eainfix =agetV2V14V12NIainfix <V14V7Aainfix <=c0V14FIainfix <V12V1Aainfix <=c0V12FAainfix =V4V5NAaappear_twiceV3V4V7Iainfix =V4aprefix -c1NAaappear_twiceV3V5V7Iainfix =V5aprefix -c1NAainfix =V4aprefix -c1Iainfix =V5aprefix -c1Iainfix <=V7ainfix +V1c1Aainfix <=c0V7FFFFIainfix <=c0ainfix +V1c1Iainfix >=V1c0Iainfix =V16V15NAaappear_twiceV3V16ainfix +V1c2EAaappear_twiceV3V15ainfix +V1c2EAainfix <agetV2V17V1Aainfix <=c0agetV2V17Iainfix <V17V0Aainfix <=c0V17FAainfix >=V1c2Aainfix =V0ainfix +V1c2FFF">
+        <proof
+         prover="coq"
+         timelimit="10"
+         edited="foveoos11_challenge3_WP_TwoEqualElements_WP_parameter_two_equal_elements_2.v"
+         obsolete="false">
+         <result status="valid" time="4.12"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter two_equal_elements.4.27"
+        expl="for loop preservation"
+        sum="cf9a1401eddbf5abf4b3fea65f1be818"
+        proved="true"
+        expanded="true"
+        shape="Lamk arrayV0V2LagetV2V7ainfix =V4aprefix -c1Iainfix =V5aprefix -c1Iainfix =V4aprefix -c1NIainfix =V5aprefix -c1NIainfix =agetV6V8aTrueIainfix <V8V1Aainfix <=c0V8Iainfix <V7V0Aainfix <=c0V7Iaappear_twiceV3V9V7NIainfix =V9V5NIainfix <V9V1Aainfix <=c0V9FIainfix =V4aprefix -c1Aaappear_twiceV3V10V7NIainfix <V10V1Aainfix <=c0V10FIainfix =V5aprefix -c1Aiainfix =agetV6V11aTrueainfix =agetV2V12V11Aainfix <V12V7Aainfix <=c0V12Eainfix =agetV2V13V11NIainfix <V13V7Aainfix <=c0V13FIainfix <V11V1Aainfix <=c0V11FAainfix =V4V5NAaappear_twiceV3V4V7Iainfix =V4aprefix -c1NAaappear_twiceV3V5V7Iainfix =V5aprefix -c1NAainfix =V4aprefix -c1Iainfix =V5aprefix -c1Iainfix <=V7ainfix +V1c1Aainfix <=c0V7FFFFIainfix <=c0ainfix +V1c1Iainfix >=V1c0Iainfix =V15V14NAaappear_twiceV3V15ainfix +V1c2EAaappear_twiceV3V14ainfix +V1c2EAainfix <agetV2V16V1Aainfix <=c0agetV2V16Iainfix <V16V0Aainfix <=c0V16FAainfix >=V1c2Aainfix =V0ainfix +V1c2FFF">
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter two_equal_elements.4.28"
+        expl="for loop preservation"
+        sum="9984b670da18387c0c5dc3323d46e1de"
+        proved="true"
+        expanded="true"
+        shape="Lamk arrayV0V2LagetV2V7aappear_twiceV3V5ainfix +V7c1Iainfix =V5aprefix -c1NIainfix =V4aprefix -c1NIainfix =V5aprefix -c1NIainfix =agetV6V8aTrueIainfix <V8V1Aainfix <=c0V8Iainfix <V7V0Aainfix <=c0V7Iaappear_twiceV3V9V7NIainfix =V9V5NIainfix <V9V1Aainfix <=c0V9FIainfix =V4aprefix -c1Aaappear_twiceV3V10V7NIainfix <V10V1Aainfix <=c0V10FIainfix =V5aprefix -c1Aiainfix =agetV6V11aTrueainfix =agetV2V12V11Aainfix <V12V7Aainfix <=c0V12Eainfix =agetV2V13V11NIainfix <V13V7Aainfix <=c0V13FIainfix <V11V1Aainfix <=c0V11FAainfix =V4V5NAaappear_twiceV3V4V7Iainfix =V4aprefix -c1NAaappear_twiceV3V5V7Iainfix =V5aprefix -c1NAainfix =V4aprefix -c1Iainfix =V5aprefix -c1Iainfix <=V7ainfix +V1c1Aainfix <=c0V7FFFFIainfix <=c0ainfix +V1c1Iainfix >=V1c0Iainfix =V15V14NAaappear_twiceV3V15ainfix +V1c2EAaappear_twiceV3V14ainfix +V1c2EAainfix <agetV2V16V1Aainfix <=c0agetV2V16Iainfix <V16V0Aainfix <=c0V16FAainfix >=V1c2Aainfix =V0ainfix +V1c2FFF">
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.04"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter two_equal_elements.4.29"
+        expl="for loop preservation"
+        sum="f2e3fe31be583d396d84732a17bf2e65"
+        proved="true"
+        expanded="true"
+        shape="Lamk arrayV0V2LagetV2V7aappear_twiceV3V4ainfix +V7c1Iainfix =V4aprefix -c1NIainfix =V4aprefix -c1NIainfix =V5aprefix -c1NIainfix =agetV6V8aTrueIainfix <V8V1Aainfix <=c0V8Iainfix <V7V0Aainfix <=c0V7Iaappear_twiceV3V9V7NIainfix =V9V5NIainfix <V9V1Aainfix <=c0V9FIainfix =V4aprefix -c1Aaappear_twiceV3V10V7NIainfix <V10V1Aainfix <=c0V10FIainfix =V5aprefix -c1Aiainfix =agetV6V11aTrueainfix =agetV2V12V11Aainfix <V12V7Aainfix <=c0V12Eainfix =agetV2V13V11NIainfix <V13V7Aainfix <=c0V13FIainfix <V11V1Aainfix <=c0V11FAainfix =V4V5NAaappear_twiceV3V4V7Iainfix =V4aprefix -c1NAaappear_twiceV3V5V7Iainfix =V5aprefix -c1NAainfix =V4aprefix -c1Iainfix =V5aprefix -c1Iainfix <=V7ainfix +V1c1Aainfix <=c0V7FFFFIainfix <=c0ainfix +V1c1Iainfix >=V1c0Iainfix =V15V14NAaappear_twiceV3V15ainfix +V1c2EAaappear_twiceV3V14ainfix +V1c2EAainfix <agetV2V16V1Aainfix <=c0agetV2V16Iainfix <V16V0Aainfix <=c0V16FAainfix >=V1c2Aainfix =V0ainfix +V1c2FFF">
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.04"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter two_equal_elements.4.30"
+        expl="for loop preservation"
+        sum="c3665827809bd7610b858f367b9f1cee"
+        proved="true"
+        expanded="true"
+        shape="Lamk arrayV0V2LagetV2V7ainfix =V4V5NIainfix =V4aprefix -c1NIainfix =V4aprefix -c1NIainfix =V5aprefix -c1NIainfix =agetV6V8aTrueIainfix <V8V1Aainfix <=c0V8Iainfix <V7V0Aainfix <=c0V7Iaappear_twiceV3V9V7NIainfix =V9V5NIainfix <V9V1Aainfix <=c0V9FIainfix =V4aprefix -c1Aaappear_twiceV3V10V7NIainfix <V10V1Aainfix <=c0V10FIainfix =V5aprefix -c1Aiainfix =agetV6V11aTrueainfix =agetV2V12V11Aainfix <V12V7Aainfix <=c0V12Eainfix =agetV2V13V11NIainfix <V13V7Aainfix <=c0V13FIainfix <V11V1Aainfix <=c0V11FAainfix =V4V5NAaappear_twiceV3V4V7Iainfix =V4aprefix -c1NAaappear_twiceV3V5V7Iainfix =V5aprefix -c1NAainfix =V4aprefix -c1Iainfix =V5aprefix -c1Iainfix <=V7ainfix +V1c1Aainfix <=c0V7FFFFIainfix <=c0ainfix +V1c1Iainfix >=V1c0Iainfix =V15V14NAaappear_twiceV3V15ainfix +V1c2EAaappear_twiceV3V14ainfix +V1c2EAainfix <agetV2V16V1Aainfix <=c0agetV2V16Iainfix <V16V0Aainfix <=c0V16FAainfix >=V1c2Aainfix =V0ainfix +V1c2FFF">
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter two_equal_elements.4.31"
+        expl="for loop preservation"
+        sum="84b6f2f8d8364342cfb045e8d66fb957"
+        proved="true"
+        expanded="true"
+        shape="Lamk arrayV0V2LagetV2V7ainfix =agetV2V10V9Aainfix <V10ainfix +V7c1Aainfix <=c0V10EIainfix =agetV6V9aTrueIainfix <V9V1Aainfix <=c0V9FIainfix =V4aprefix -c1NIainfix =V5aprefix -c1NIainfix =agetV6V8aTrueIainfix <V8V1Aainfix <=c0V8Iainfix <V7V0Aainfix <=c0V7Iaappear_twiceV3V11V7NIainfix =V11V5NIainfix <V11V1Aainfix <=c0V11FIainfix =V4aprefix -c1Aaappear_twiceV3V12V7NIainfix <V12V1Aainfix <=c0V12FIainfix =V5aprefix -c1Aiainfix =agetV6V13aTrueainfix =agetV2V14V13Aainfix <V14V7Aainfix <=c0V14Eainfix =agetV2V15V13NIainfix <V15V7Aainfix <=c0V15FIainfix <V13V1Aainfix <=c0V13FAainfix =V4V5NAaappear_twiceV3V4V7Iainfix =V4aprefix -c1NAaappear_twiceV3V5V7Iainfix =V5aprefix -c1NAainfix =V4aprefix -c1Iainfix =V5aprefix -c1Iainfix <=V7ainfix +V1c1Aainfix <=c0V7FFFFIainfix <=c0ainfix +V1c1Iainfix >=V1c0Iainfix =V17V16NAaappear_twiceV3V17ainfix +V1c2EAaappear_twiceV3V16ainfix +V1c2EAainfix <agetV2V18V1Aainfix <=c0agetV2V18Iainfix <V18V0Aainfix <=c0V18FAainfix >=V1c2Aainfix =V0ainfix +V1c2FFF">
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.04"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter two_equal_elements.4.32"
+        expl="for loop preservation"
+        sum="e2edfc11f135fa45a8adafffa4e28bad"
+        proved="true"
+        expanded="true"
+        shape="Lamk arrayV0V2LagetV2V7ainfix =agetV2V10V9NIainfix <V10ainfix +V7c1Aainfix <=c0V10FIainfix =agetV6V9aTrueNIainfix <V9V1Aainfix <=c0V9FIainfix =V4aprefix -c1NIainfix =V5aprefix -c1NIainfix =agetV6V8aTrueIainfix <V8V1Aainfix <=c0V8Iainfix <V7V0Aainfix <=c0V7Iaappear_twiceV3V11V7NIainfix =V11V5NIainfix <V11V1Aainfix <=c0V11FIainfix =V4aprefix -c1Aaappear_twiceV3V12V7NIainfix <V12V1Aainfix <=c0V12FIainfix =V5aprefix -c1Aiainfix =agetV6V13aTrueainfix =agetV2V14V13Aainfix <V14V7Aainfix <=c0V14Eainfix =agetV2V15V13NIainfix <V15V7Aainfix <=c0V15FIainfix <V13V1Aainfix <=c0V13FAainfix =V4V5NAaappear_twiceV3V4V7Iainfix =V4aprefix -c1NAaappear_twiceV3V5V7Iainfix =V5aprefix -c1NAainfix =V4aprefix -c1Iainfix =V5aprefix -c1Iainfix <=V7ainfix +V1c1Aainfix <=c0V7FFFFIainfix <=c0ainfix +V1c1Iainfix >=V1c0Iainfix =V17V16NAaappear_twiceV3V17ainfix +V1c2EAaappear_twiceV3V16ainfix +V1c2EAainfix <agetV2V18V1Aainfix <=c0agetV2V18Iainfix <V18V0Aainfix <=c0V18FAainfix >=V1c2Aainfix =V0ainfix +V1c2FFF">
+        <proof
+         prover="cvc3"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter two_equal_elements.4.33"
+        expl="for loop preservation"
+        sum="ecf5ba1ca1bcac5437633ae421b8c2e5"
+        proved="true"
+        expanded="true"
+        shape="Lamk arrayV0V2LagetV2V7aappear_twiceV3V9ainfix +V7c1NIainfix <V9V1Aainfix <=c0V9FIainfix =V5aprefix -c1Iainfix =V4aprefix -c1NIainfix =V5aprefix -c1NIainfix =agetV6V8aTrueIainfix <V8V1Aainfix <=c0V8Iainfix <V7V0Aainfix <=c0V7Iaappear_twiceV3V10V7NIainfix =V10V5NIainfix <V10V1Aainfix <=c0V10FIainfix =V4aprefix -c1Aaappear_twiceV3V11V7NIainfix <V11V1Aainfix <=c0V11FIainfix =V5aprefix -c1Aiainfix =agetV6V12aTrueainfix =agetV2V13V12Aainfix <V13V7Aainfix <=c0V13Eainfix =agetV2V14V12NIainfix <V14V7Aainfix <=c0V14FIainfix <V12V1Aainfix <=c0V12FAainfix =V4V5NAaappear_twiceV3V4V7Iainfix =V4aprefix -c1NAaappear_twiceV3V5V7Iainfix =V5aprefix -c1NAainfix =V4aprefix -c1Iainfix =V5aprefix -c1Iainfix <=V7ainfix +V1c1Aainfix <=c0V7FFFFIainfix <=c0ainfix +V1c1Iainfix >=V1c0Iainfix =V16V15NAaappear_twiceV3V16ainfix +V1c2EAaappear_twiceV3V15ainfix +V1c2EAainfix <agetV2V17V1Aainfix <=c0agetV2V17Iainfix <V17V0Aainfix <=c0V17FAainfix >=V1c2Aainfix =V0ainfix +V1c2FFF">
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter two_equal_elements.4.34"
+        expl="for loop preservation"
+        sum="1447b20e8ef8f6c247990daa2f64c91b"
+        proved="true"
+        expanded="true"
+        shape="Lamk arrayV0V2LagetV2V7aappear_twiceV3V9ainfix +V7c1NIainfix =V9V5NIainfix <V9V1Aainfix <=c0V9FIainfix =V4aprefix -c1Iainfix =V4aprefix -c1NIainfix =V5aprefix -c1NIainfix =agetV6V8aTrueIainfix <V8V1Aainfix <=c0V8Iainfix <V7V0Aainfix <=c0V7Iaappear_twiceV3V10V7NIainfix =V10V5NIainfix <V10V1Aainfix <=c0V10FIainfix =V4aprefix -c1Aaappear_twiceV3V11V7NIainfix <V11V1Aainfix <=c0V11FIainfix =V5aprefix -c1Aiainfix =agetV6V12aTrueainfix =agetV2V13V12Aainfix <V13V7Aainfix <=c0V13Eainfix =agetV2V14V12NIainfix <V14V7Aainfix <=c0V14FIainfix <V12V1Aainfix <=c0V12FAainfix =V4V5NAaappear_twiceV3V4V7Iainfix =V4aprefix -c1NAaappear_twiceV3V5V7Iainfix =V5aprefix -c1NAainfix =V4aprefix -c1Iainfix =V5aprefix -c1Iainfix <=V7ainfix +V1c1Aainfix <=c0V7FFFFIainfix <=c0ainfix +V1c1Iainfix >=V1c0Iainfix =V16V15NAaappear_twiceV3V16ainfix +V1c2EAaappear_twiceV3V15ainfix +V1c2EAainfix <agetV2V17V1Aainfix <=c0agetV2V17Iainfix <V17V0Aainfix <=c0V17FAainfix >=V1c2Aainfix =V0ainfix +V1c2FFF">
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter two_equal_elements.4.35"
+        expl="for loop preservation"
+        sum="b4f08416f2a4f58748c471efb147ae2b"
+        proved="true"
+        expanded="true"
+        shape="Lamk arrayV0V2LagetV2V7ainfix <V8V1Aainfix <=c0V8Iainfix =agetV6V8aTrueNIainfix <V8V1Aainfix <=c0V8Iainfix <V7V0Aainfix <=c0V7Iaappear_twiceV3V9V7NIainfix =V9V5NIainfix <V9V1Aainfix <=c0V9FIainfix =V4aprefix -c1Aaappear_twiceV3V10V7NIainfix <V10V1Aainfix <=c0V10FIainfix =V5aprefix -c1Aiainfix =agetV6V11aTrueainfix =agetV2V12V11Aainfix <V12V7Aainfix <=c0V12Eainfix =agetV2V13V11NIainfix <V13V7Aainfix <=c0V13FIainfix <V11V1Aainfix <=c0V11FAainfix =V4V5NAaappear_twiceV3V4V7Iainfix =V4aprefix -c1NAaappear_twiceV3V5V7Iainfix =V5aprefix -c1NAainfix =V4aprefix -c1Iainfix =V5aprefix -c1Iainfix <=V7ainfix +V1c1Aainfix <=c0V7FFFFIainfix <=c0ainfix +V1c1Iainfix >=V1c0Iainfix =V15V14NAaappear_twiceV3V15ainfix +V1c2EAaappear_twiceV3V14ainfix +V1c2EAainfix <agetV2V16V1Aainfix <=c0agetV2V16Iainfix <V16V0Aainfix <=c0V16FAainfix >=V1c2Aainfix =V0ainfix +V1c2FFF">
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter two_equal_elements.4.36"
+        expl="for loop preservation"
+        sum="7a172f40d2ac339d11174a7400dfa85b"
+        proved="true"
+        expanded="true"
+        shape="Lamk arrayV0V2LagetV2V7ainfix =V4aprefix -c1Iainfix =V5aprefix -c1Iainfix =V9asetV6V8aTrueFIainfix <V8V1Aainfix <=c0V8Iainfix =agetV6V8aTrueNIainfix <V8V1Aainfix <=c0V8Iainfix <V7V0Aainfix <=c0V7Iaappear_twiceV3V10V7NIainfix =V10V5NIainfix <V10V1Aainfix <=c0V10FIainfix =V4aprefix -c1Aaappear_twiceV3V11V7NIainfix <V11V1Aainfix <=c0V11FIainfix =V5aprefix -c1Aiainfix =agetV6V12aTrueainfix =agetV2V13V12Aainfix <V13V7Aainfix <=c0V13Eainfix =agetV2V14V12NIainfix <V14V7Aainfix <=c0V14FIainfix <V12V1Aainfix <=c0V12FAainfix =V4V5NAaappear_twiceV3V4V7Iainfix =V4aprefix -c1NAaappear_twiceV3V5V7Iainfix =V5aprefix -c1NAainfix =V4aprefix -c1Iainfix =V5aprefix -c1Iainfix <=V7ainfix +V1c1Aainfix <=c0V7FFFFIainfix <=c0ainfix +V1c1Iainfix >=V1c0Iainfix =V16V15NAaappear_twiceV3V16ainfix +V1c2EAaappear_twiceV3V15ainfix +V1c2EAainfix <agetV2V17V1Aainfix <=c0agetV2V17Iainfix <V17V0Aainfix <=c0V17FAainfix >=V1c2Aainfix =V0ainfix +V1c2FFF">
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter two_equal_elements.4.37"
+        expl="for loop preservation"
+        sum="0d643b02bbc27ae0c356836fcdd5438e"
+        proved="true"
+        expanded="true"
+        shape="Lamk arrayV0V2LagetV2V7aappear_twiceV3V5ainfix +V7c1Iainfix =V5aprefix -c1NIainfix =V9asetV6V8aTrueFIainfix <V8V1Aainfix <=c0V8Iainfix =agetV6V8aTrueNIainfix <V8V1Aainfix <=c0V8Iainfix <V7V0Aainfix <=c0V7Iaappear_twiceV3V10V7NIainfix =V10V5NIainfix <V10V1Aainfix <=c0V10FIainfix =V4aprefix -c1Aaappear_twiceV3V11V7NIainfix <V11V1Aainfix <=c0V11FIainfix =V5aprefix -c1Aiainfix =agetV6V12aTrueainfix =agetV2V13V12Aainfix <V13V7Aainfix <=c0V13Eainfix =agetV2V14V12NIainfix <V14V7Aainfix <=c0V14FIainfix <V12V1Aainfix <=c0V12FAainfix =V4V5NAaappear_twiceV3V4V7Iainfix =V4aprefix -c1NAaappear_twiceV3V5V7Iainfix =V5aprefix -c1NAainfix =V4aprefix -c1Iainfix =V5aprefix -c1Iainfix <=V7ainfix +V1c1Aainfix <=c0V7FFFFIainfix <=c0ainfix +V1c1Iainfix >=V1c0Iainfix =V16V15NAaappear_twiceV3V16ainfix +V1c2EAaappear_twiceV3V15ainfix +V1c2EAainfix <agetV2V17V1Aainfix <=c0agetV2V17Iainfix <V17V0Aainfix <=c0V17FAainfix >=V1c2Aainfix =V0ainfix +V1c2FFF">
+        <proof
+         prover="cvc3"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.05"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter two_equal_elements.4.38"
+        expl="for loop preservation"
+        sum="6bcf0c1f5dc467c99d26d2ef7838bfbb"
+        proved="true"
+        expanded="true"
+        shape="Lamk arrayV0V2LagetV2V7aappear_twiceV3V4ainfix +V7c1Iainfix =V4aprefix -c1NIainfix =V9asetV6V8aTrueFIainfix <V8V1Aainfix <=c0V8Iainfix =agetV6V8aTrueNIainfix <V8V1Aainfix <=c0V8Iainfix <V7V0Aainfix <=c0V7Iaappear_twiceV3V10V7NIainfix =V10V5NIainfix <V10V1Aainfix <=c0V10FIainfix =V4aprefix -c1Aaappear_twiceV3V11V7NIainfix <V11V1Aainfix <=c0V11FIainfix =V5aprefix -c1Aiainfix =agetV6V12aTrueainfix =agetV2V13V12Aainfix <V13V7Aainfix <=c0V13Eainfix =agetV2V14V12NIainfix <V14V7Aainfix <=c0V14FIainfix <V12V1Aainfix <=c0V12FAainfix =V4V5NAaappear_twiceV3V4V7Iainfix =V4aprefix -c1NAaappear_twiceV3V5V7Iainfix =V5aprefix -c1NAainfix =V4aprefix -c1Iainfix =V5aprefix -c1Iainfix <=V7ainfix +V1c1Aainfix <=c0V7FFFFIainfix <=c0ainfix +V1c1Iainfix >=V1c0Iainfix =V16V15NAaappear_twiceV3V16ainfix +V1c2EAaappear_twiceV3V15ainfix +V1c2EAainfix <agetV2V17V1Aainfix <=c0agetV2V17Iainfix <V17V0Aainfix <=c0V17FAainfix >=V1c2Aainfix =V0ainfix +V1c2FFF">
+        <proof
+         prover="cvc3"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.04"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter two_equal_elements.4.39"
+        expl="for loop preservation"
+        sum="269cbf778b13d32fb313870a45438e95"
+        proved="true"
+        expanded="true"
+        shape="Lamk arrayV0V2LagetV2V7ainfix =V4V5NIainfix =V4aprefix -c1NIainfix =V9asetV6V8aTrueFIainfix <V8V1Aainfix <=c0V8Iainfix =agetV6V8aTrueNIainfix <V8V1Aainfix <=c0V8Iainfix <V7V0Aainfix <=c0V7Iaappear_twiceV3V10V7NIainfix =V10V5NIainfix <V10V1Aainfix <=c0V10FIainfix =V4aprefix -c1Aaappear_twiceV3V11V7NIainfix <V11V1Aainfix <=c0V11FIainfix =V5aprefix -c1Aiainfix =agetV6V12aTrueainfix =agetV2V13V12Aainfix <V13V7Aainfix <=c0V13Eainfix =agetV2V14V12NIainfix <V14V7Aainfix <=c0V14FIainfix <V12V1Aainfix <=c0V12FAainfix =V4V5NAaappear_twiceV3V4V7Iainfix =V4aprefix -c1NAaappear_twiceV3V5V7Iainfix =V5aprefix -c1NAainfix =V4aprefix -c1Iainfix =V5aprefix -c1Iainfix <=V7ainfix +V1c1Aainfix <=c0V7FFFFIainfix <=c0ainfix +V1c1Iainfix >=V1c0Iainfix =V16V15NAaappear_twiceV3V16ainfix +V1c2EAaappear_twiceV3V15ainfix +V1c2EAainfix <agetV2V17V1Aainfix <=c0agetV2V17Iainfix <V17V0Aainfix <=c0V17FAainfix >=V1c2Aainfix =V0ainfix +V1c2FFF">
+        <proof
+         prover="cvc3"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.01"/>
+        </proof>
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter two_equal_elements.4.40"
+        expl="for loop preservation"
+        sum="1877e762899ddfb47e7a3dda56bcef92"
+        proved="true"
+        expanded="true"
+        shape="Lamk arrayV0V2LagetV2V7ainfix =agetV2V11V10Aainfix <V11ainfix +V7c1Aainfix <=c0V11EIainfix =agetV9V10aTrueIainfix <V10V1Aainfix <=c0V10FIainfix =V9asetV6V8aTrueFIainfix <V8V1Aainfix <=c0V8Iainfix =agetV6V8aTrueNIainfix <V8V1Aainfix <=c0V8Iainfix <V7V0Aainfix <=c0V7Iaappear_twiceV3V12V7NIainfix =V12V5NIainfix <V12V1Aainfix <=c0V12FIainfix =V4aprefix -c1Aaappear_twiceV3V13V7NIainfix <V13V1Aainfix <=c0V13FIainfix =V5aprefix -c1Aiainfix =agetV6V14aTrueainfix =agetV2V15V14Aainfix <V15V7Aainfix <=c0V15Eainfix =agetV2V16V14NIainfix <V16V7Aainfix <=c0V16FIainfix <V14V1Aainfix <=c0V14FAainfix =V4V5NAaappear_twiceV3V4V7Iainfix =V4aprefix -c1NAaappear_twiceV3V5V7Iainfix =V5aprefix -c1NAainfix =V4aprefix -c1Iainfix =V5aprefix -c1Iainfix <=V7ainfix +V1c1Aainfix <=c0V7FFFFIainfix <=c0ainfix +V1c1Iainfix >=V1c0Iainfix =V18V17NAaappear_twiceV3V18ainfix +V1c2EAaappear_twiceV3V17ainfix +V1c2EAainfix <agetV2V19V1Aainfix <=c0agetV2V19Iainfix <V19V0Aainfix <=c0V19FAainfix >=V1c2Aainfix =V0ainfix +V1c2FFF">
+        <proof
+         prover="cvc3"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.14"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter two_equal_elements.4.41"
+        expl="for loop preservation"
+        sum="8a96f532761f703f93d6854725f97083"
+        proved="true"
+        expanded="true"
+        shape="Lamk arrayV0V2LagetV2V7ainfix =agetV2V11V10NIainfix <V11ainfix +V7c1Aainfix <=c0V11FIainfix =agetV9V10aTrueNIainfix <V10V1Aainfix <=c0V10FIainfix =V9asetV6V8aTrueFIainfix <V8V1Aainfix <=c0V8Iainfix =agetV6V8aTrueNIainfix <V8V1Aainfix <=c0V8Iainfix <V7V0Aainfix <=c0V7Iaappear_twiceV3V12V7NIainfix =V12V5NIainfix <V12V1Aainfix <=c0V12FIainfix =V4aprefix -c1Aaappear_twiceV3V13V7NIainfix <V13V1Aainfix <=c0V13FIainfix =V5aprefix -c1Aiainfix =agetV6V14aTrueainfix =agetV2V15V14Aainfix <V15V7Aainfix <=c0V15Eainfix =agetV2V16V14NIainfix <V16V7Aainfix <=c0V16FIainfix <V14V1Aainfix <=c0V14FAainfix =V4V5NAaappear_twiceV3V4V7Iainfix =V4aprefix -c1NAaappear_twiceV3V5V7Iainfix =V5aprefix -c1NAainfix =V4aprefix -c1Iainfix =V5aprefix -c1Iainfix <=V7ainfix +V1c1Aainfix <=c0V7FFFFIainfix <=c0ainfix +V1c1Iainfix >=V1c0Iainfix =V18V17NAaappear_twiceV3V18ainfix +V1c2EAaappear_twiceV3V17ainfix +V1c2EAainfix <agetV2V19V1Aainfix <=c0agetV2V19Iainfix <V19V0Aainfix <=c0V19FAainfix >=V1c2Aainfix =V0ainfix +V1c2FFF">
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.10"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter two_equal_elements.4.42"
+        expl="for loop preservation"
+        sum="9fdfc0692d6c95cb41df7468e8f4c856"
+        proved="true"
+        expanded="true"
+        shape="Lamk arrayV0V2LagetV2V7aappear_twiceV3V10ainfix +V7c1NIainfix <V10V1Aainfix <=c0V10FIainfix =V5aprefix -c1Iainfix =V9asetV6V8aTrueFIainfix <V8V1Aainfix <=c0V8Iainfix =agetV6V8aTrueNIainfix <V8V1Aainfix <=c0V8Iainfix <V7V0Aainfix <=c0V7Iaappear_twiceV3V11V7NIainfix =V11V5NIainfix <V11V1Aainfix <=c0V11FIainfix =V4aprefix -c1Aaappear_twiceV3V12V7NIainfix <V12V1Aainfix <=c0V12FIainfix =V5aprefix -c1Aiainfix =agetV6V13aTrueainfix =agetV2V14V13Aainfix <V14V7Aainfix <=c0V14Eainfix =agetV2V15V13NIainfix <V15V7Aainfix <=c0V15FIainfix <V13V1Aainfix <=c0V13FAainfix =V4V5NAaappear_twiceV3V4V7Iainfix =V4aprefix -c1NAaappear_twiceV3V5V7Iainfix =V5aprefix -c1NAainfix =V4aprefix -c1Iainfix =V5aprefix -c1Iainfix <=V7ainfix +V1c1Aainfix <=c0V7FFFFIainfix <=c0ainfix +V1c1Iainfix >=V1c0Iainfix =V17V16NAaappear_twiceV3V17ainfix +V1c2EAaappear_twiceV3V16ainfix +V1c2EAainfix <agetV2V18V1Aainfix <=c0agetV2V18Iainfix <V18V0Aainfix <=c0V18FAainfix >=V1c2Aainfix =V0ainfix +V1c2FFF">
+        <proof
+         prover="coq"
+         timelimit="10"
+         edited="foveoos11_challenge3_WP_TwoEqualElements_WP_parameter_two_equal_elements_3.v"
+         obsolete="false">
+         <result status="valid" time="25.05"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter two_equal_elements.4.43"
+        expl="for loop preservation"
+        sum="d60f04f4a877f0c806a7adc2b8f2cc5e"
+        proved="true"
+        expanded="true"
+        shape="Lamk arrayV0V2LagetV2V7aappear_twiceV3V10ainfix +V7c1NIainfix =V10V5NIainfix <V10V1Aainfix <=c0V10FIainfix =V4aprefix -c1Iainfix =V9asetV6V8aTrueFIainfix <V8V1Aainfix <=c0V8Iainfix =agetV6V8aTrueNIainfix <V8V1Aainfix <=c0V8Iainfix <V7V0Aainfix <=c0V7Iaappear_twiceV3V11V7NIainfix =V11V5NIainfix <V11V1Aainfix <=c0V11FIainfix =V4aprefix -c1Aaappear_twiceV3V12V7NIainfix <V12V1Aainfix <=c0V12FIainfix =V5aprefix -c1Aiainfix =agetV6V13aTrueainfix =agetV2V14V13Aainfix <V14V7Aainfix <=c0V14Eainfix =agetV2V15V13NIainfix <V15V7Aainfix <=c0V15FIainfix <V13V1Aainfix <=c0V13FAainfix =V4V5NAaappear_twiceV3V4V7Iainfix =V4aprefix -c1NAaappear_twiceV3V5V7Iainfix =V5aprefix -c1NAainfix =V4aprefix -c1Iainfix =V5aprefix -c1Iainfix <=V7ainfix +V1c1Aainfix <=c0V7FFFFIainfix <=c0ainfix +V1c1Iainfix >=V1c0Iainfix =V17V16NAaappear_twiceV3V17ainfix +V1c2EAaappear_twiceV3V16ainfix +V1c2EAainfix <agetV2V18V1Aainfix <=c0agetV2V18Iainfix <V18V0Aainfix <=c0V18FAainfix >=V1c2Aainfix =V0ainfix +V1c2FFF">
+        <proof
+         prover="coq"
+         timelimit="10"
+         edited="foveoos11_challenge3_WP_TwoEqualElements_WP_parameter_two_equal_elements_4.v"
+         obsolete="false">
+         <result status="valid" time="38.49"/>
+        </proof>
+       </goal>
+      </transf>
+     </goal>
+     <goal
+      name="WP_parameter two_equal_elements.5"
+      expl="normal postcondition"
+      sum="f2c4e3a485e3a446c2ebeed5557a4da3"
+      proved="true"
+      expanded="true"
+      shape="Lamk arrayV0V2ainfix =V5V4NAaappear_twiceV3V4ainfix +V1c2Aaappear_twiceV3V5ainfix +V1c2Iaappear_twiceV3V7ainfix +ainfix +V1c1c1NIainfix =V7V5NIainfix <V7V1Aainfix <=c0V7FIainfix =V4aprefix -c1Aaappear_twiceV3V8ainfix +ainfix +V1c1c1NIainfix <V8V1Aainfix <=c0V8FIainfix =V5aprefix -c1Aiainfix =agetV6V9aTrueainfix =agetV2V10V9Aainfix <V10ainfix +ainfix +V1c1c1Aainfix <=c0V10Eainfix =agetV2V11V9NIainfix <V11ainfix +ainfix +V1c1c1Aainfix <=c0V11FIainfix <V9V1Aainfix <=c0V9FAainfix =V4V5NAaappear_twiceV3V4ainfix +ainfix +V1c1c1Iainfix =V4aprefix -c1NAaappear_twiceV3V5ainfix +ainfix +V1c1c1Iainfix =V5aprefix -c1NAainfix =V4aprefix -c1Iainfix =V5aprefix -c1FFFIainfix <=c0ainfix +V1c1Iainfix >=V1c0Iainfix =V13V12NAaappear_twiceV3V13ainfix +V1c2EAaappear_twiceV3V12ainfix +V1c2EAainfix <agetV2V14V1Aainfix <=c0agetV2V14Iainfix <V14V0Aainfix <=c0V14FAainfix >=V1c2Aainfix =V0ainfix +V1c2FFF">
+      <transf
+       name="split_goal"
+       proved="true"
+       expanded="true">
+       <goal
+        name="WP_parameter two_equal_elements.5.1"
+        expl="parameter two_equal_elements"
+        sum="fc334b8d5454767fa722e7d003601c92"
+        proved="true"
+        expanded="true"
+        shape="Lamk arrayV0V2aappear_twiceV3V5ainfix +V1c2Iaappear_twiceV3V7ainfix +ainfix +V1c1c1NIainfix =V7V5NIainfix <V7V1Aainfix <=c0V7FIainfix =V4aprefix -c1Aaappear_twiceV3V8ainfix +ainfix +V1c1c1NIainfix <V8V1Aainfix <=c0V8FIainfix =V5aprefix -c1Aiainfix =agetV6V9aTrueainfix =agetV2V10V9Aainfix <V10ainfix +ainfix +V1c1c1Aainfix <=c0V10Eainfix =agetV2V11V9NIainfix <V11ainfix +ainfix +V1c1c1Aainfix <=c0V11FIainfix <V9V1Aainfix <=c0V9FAainfix =V4V5NAaappear_twiceV3V4ainfix +ainfix +V1c1c1Iainfix =V4aprefix -c1NAaappear_twiceV3V5ainfix +ainfix +V1c1c1Iainfix =V5aprefix -c1NAainfix =V4aprefix -c1Iainfix =V5aprefix -c1FFFIainfix <=c0ainfix +V1c1Iainfix >=V1c0Iainfix =V13V12NAaappear_twiceV3V13ainfix +V1c2EAaappear_twiceV3V12ainfix +V1c2EAainfix <agetV2V14V1Aainfix <=c0agetV2V14Iainfix <V14V0Aainfix <=c0V14FAainfix >=V1c2Aainfix =V0ainfix +V1c2FFF">
+        <proof
+         prover="cvc3"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter two_equal_elements.5.2"
+        expl="parameter two_equal_elements"
+        sum="98fe90f969f0c0aaee32f9e552266adc"
+        proved="true"
+        expanded="true"
+        shape="Lamk arrayV0V2aappear_twiceV3V4ainfix +V1c2Iaappear_twiceV3V7ainfix +ainfix +V1c1c1NIainfix =V7V5NIainfix <V7V1Aainfix <=c0V7FIainfix =V4aprefix -c1Aaappear_twiceV3V8ainfix +ainfix +V1c1c1NIainfix <V8V1Aainfix <=c0V8FIainfix =V5aprefix -c1Aiainfix =agetV6V9aTrueainfix =agetV2V10V9Aainfix <V10ainfix +ainfix +V1c1c1Aainfix <=c0V10Eainfix =agetV2V11V9NIainfix <V11ainfix +ainfix +V1c1c1Aainfix <=c0V11FIainfix <V9V1Aainfix <=c0V9FAainfix =V4V5NAaappear_twiceV3V4ainfix +ainfix +V1c1c1Iainfix =V4aprefix -c1NAaappear_twiceV3V5ainfix +ainfix +V1c1c1Iainfix =V5aprefix -c1NAainfix =V4aprefix -c1Iainfix =V5aprefix -c1FFFIainfix <=c0ainfix +V1c1Iainfix >=V1c0Iainfix =V13V12NAaappear_twiceV3V13ainfix +V1c2EAaappear_twiceV3V12ainfix +V1c2EAainfix <agetV2V14V1Aainfix <=c0agetV2V14Iainfix <V14V0Aainfix <=c0V14FAainfix >=V1c2Aainfix =V0ainfix +V1c2FFF">
+        <proof
+         prover="cvc3"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.04"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter two_equal_elements.5.3"
+        expl="parameter two_equal_elements"
+        sum="fcda5df862bc556cac8296e0882fae37"
+        proved="true"
+        expanded="true"
+        shape="Lamk arrayV0V2ainfix =V5V4NIaappear_twiceV3V7ainfix +ainfix +V1c1c1NIainfix =V7V5NIainfix <V7V1Aainfix <=c0V7FIainfix =V4aprefix -c1Aaappear_twiceV3V8ainfix +ainfix +V1c1c1NIainfix <V8V1Aainfix <=c0V8FIainfix =V5aprefix -c1Aiainfix =agetV6V9aTrueainfix =agetV2V10V9Aainfix <V10ainfix +ainfix +V1c1c1Aainfix <=c0V10Eainfix =agetV2V11V9NIainfix <V11ainfix +ainfix +V1c1c1Aainfix <=c0V11FIainfix <V9V1Aainfix <=c0V9FAainfix =V4V5NAaappear_twiceV3V4ainfix +ainfix +V1c1c1Iainfix =V4aprefix -c1NAaappear_twiceV3V5ainfix +ainfix +V1c1c1Iainfix =V5aprefix -c1NAainfix =V4aprefix -c1Iainfix =V5aprefix -c1FFFIainfix <=c0ainfix +V1c1Iainfix >=V1c0Iainfix =V13V12NAaappear_twiceV3V13ainfix +V1c2EAaappear_twiceV3V12ainfix +V1c2EAainfix <agetV2V14V1Aainfix <=c0agetV2V14Iainfix <V14V0Aainfix <=c0V14FAainfix >=V1c2Aainfix =V0ainfix +V1c2FFF">
+        <proof
+         prover="cvc3"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+       </goal>
+      </transf>
+     </goal>
+    </transf>
+   </goal>
+  </theory>
+ </file>
+</why3session>

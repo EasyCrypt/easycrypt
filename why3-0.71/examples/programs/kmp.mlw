@@ -1,0 +1,156 @@
+(**************************************************************************)
+(*                                                                        *)
+(* Proof of the Knuth-Morris-Pratt Algorithm.                             *)
+(*                                                                        *)
+(* Jean-Christophe Filliâtre (LRI, Université Paris Sud)                  *)
+(* November 1998                                                          *)
+(*                                                                        *)
+(**************************************************************************)
+
+module KnuthMorrisPratt
+
+  use import int.Int
+  use import module ref.Ref
+  use import module array.Array
+
+  type char
+
+  predicate matches (a1: array char) (i1: int)
+                    (a2: array char) (i2: int) (n: int) =
+    0 <= i1 <= length a1 - n /\
+    0 <= i2 <= length a2 - n /\
+    forall i: int. 0 <= i < n -> a1[i1 + i] = a2[i2 + i]
+
+  lemma matches_empty:
+    forall a1 a2: array char, i1 i2: int.
+    0 <= i1 <= length a1 ->
+    0 <= i2 <= length a2 ->
+    matches a1 i1 a2 i2 0
+
+  lemma matches_right_extension:
+    forall a1 a2: array char, i1 i2 n: int.
+    matches a1 i1 a2 i2 n ->
+    i1 <= length a1 - n - 1 ->
+    i2 <= length a2 - n - 1 ->
+    a1[i1 + n] = a2[i2 + n] ->
+    matches a1 i1 a2 i2 (n + 1)
+
+  lemma matches_contradiction_at_first:
+    forall a1 a2: array char, i1 i2 n: int.
+    0 < n -> a1[i1] <> a2[i2] -> not (matches a1 i1 a2 i2 n)
+
+  lemma matches_contradiction_at_i :
+    forall a1 a2: array char, i1 i2 i n: int.
+    0 < n ->
+    0 <= i < n ->
+    a1[i1 + i] <> a2[i2 + i] -> not (matches a1 i1 a2 i2 n)
+
+  lemma matches_right_weakening:
+    forall a1 a2: array char, i1 i2 n n': int.
+    matches a1 i1 a2 i2 n -> n' < n -> matches a1 i1 a2 i2 n'
+
+  lemma matches_left_weakening:
+    forall a1 a2: array char, i1 i2 n n': int.
+    matches a1 (i1 - (n - n')) a2 (i2 - (n - n')) n ->
+    n' < n -> matches a1 i1 a2 i2 n'
+
+  lemma matches_sym:
+    forall a1 a2: array char, i1 i2 n: int.
+    matches a1 i1 a2 i2 n -> matches a2 i2 a1 i1 n
+
+  lemma matches_trans:
+    forall a1 a2 a3: array char, i1 i2 i3 n: int.
+    matches a1 i1 a2 i2 n -> matches a2 i2 a3 i3 n -> matches a1 i1 a3 i3 n
+
+  predicate is_next (p: array char) (j n: int) =
+    0 <= n < j /\
+    matches p (j - n) p 0 n /\
+    forall z: int. n < z < j -> not (matches p (j - z) p 0 z)
+
+  lemma next_iteration:
+    forall p a: array char, i j n: int.
+    0 < j < length p ->
+    j <= i <= length a ->
+    matches a (i - j) p 0 j -> is_next p j n -> matches a (i - n) p 0 n
+
+  lemma next_is_maximal:
+    forall p a: array char, i j n k: int.
+    0 < j < length p ->
+    j <= i <= length a ->
+    i - j < k < i - n ->
+    matches a (i - j) p 0 j ->
+    is_next p j n -> not (matches a k p 0 (length p))
+
+  lemma next_1_0:
+    forall p: array char. 1 <= length p -> is_next p 1 0
+
+  use import int.Lex2
+
+  (* The pattern *)
+
+  val p : array char
+
+  (* We first compute a global table next with the procedure initnext.
+   * That table only depends on p. *)
+
+  val next : array int
+
+  let initnext () =
+    { 1 <= length next = length p }
+    let m = length p in
+    if 1 < m then begin
+      next[1] <- 0;
+      let i = ref 1 in
+      let j = ref 0 in
+      while !i < m - 1 do
+        invariant { 0 <= !j < !i <= m
+         /\ matches p (!i - !j) p 0 !j
+         /\ (forall z:int. !j+1 < z < !i+1 -> not matches p (!i + 1 - z) p 0 z)
+         /\ (forall k:int. 0 < k <= !i -> is_next p k next[k]) }
+        variant { (m - !i, !j) } with lex
+        if p[!i] = p[!j] then begin
+          i := !i + 1; j := !j + 1; next[!i] <- !j
+        end else
+          if !j = 0 then begin i := !i + 1; next[!i] <- 0 end else j := next[!j]
+      done
+    end
+   { forall j:int. 0 < j < p.length -> is_next p j next[j] }
+
+  (* The algorithm looks for an occurrence of the pattern p in a text a
+   * which is an array of length N.
+   * The function kmp returns an index i within 0..N-1 if there is an occurrence
+   * at the position i and N otherwise. *)
+
+  predicate first_occur (p a: array char) (r: int) =
+    (0 <= r < length a -> matches a r p 0 (length p)) /\
+    (forall k: int. 0 <= k < r -> not (matches a k p 0 (length p)))
+
+  let kmp (a: array char) =
+    { 1 <= length next = length p /\ 0 <= length a }
+    let m = length p in
+    let n = length a in
+    let i = ref 0 in
+    let j = ref 0 in
+    initnext ();
+    while !j < m && !i < n do
+      invariant { 0 <= !j <= m /\ !j <= !i <= n
+           /\ matches a (!i - !j) p 0 !j
+           /\ forall k:int. 0 <= k < !i - !j -> not (matches a k p 0 m) }
+      variant { (n - !i, !j) } with lex
+      if a[!i] = p[!j] then begin
+        i := !i+1; j := !j+1
+      end else
+        if !j = 0 then i := !i+1 else j := next[!j]
+    done;
+    if !j = m then !i - m else !i
+    { first_occur p a result }
+
+end
+
+
+(*
+Local Variables:
+compile-command: "unset LANG; make -C ../.. examples/programs/kmp.gui"
+End:
+*)
+

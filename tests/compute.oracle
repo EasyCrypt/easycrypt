@@ -1,0 +1,118 @@
+add type 'a list.
+add type 'a option.
+add type ('a,'b)map.
+add op [=] : ('a, 'a) -> bool.
+add op [&&] : (bool, bool) -> bool.
+add op [||] : (bool, bool) -> bool.
+add op [^^] : (bool, bool) -> bool.
+add op [!] : bool -> bool.
+add op [<] : (int, int) -> bool.
+add op [<=] : (int, int) -> bool.
+add op [-] : int -> int.
+add op [+] : (int, int) -> int.
+add op [-] : (int, int) -> int.
+add op [*] : (int, int) -> int.
+add op [/] : (int, int) -> int.
+add op [%] : (int, int) -> int.
+add op [^] : (int, int) -> int.
+add op abs : int -> int.
+add op [<] : (real, real) -> bool.
+add op [<=] : (real, real) -> bool.
+add op [-] : real -> real.
+add op [+] : (real, real) -> real.
+add op [-] : (real, real) -> real.
+add op [*] : (real, real) -> real.
+add op [/] : (real, real) -> real.
+add op [^] : (real, real) -> real.
+add op real_of_int : int -> real.
+add op real_of_bool : bool -> real.
+add op abs : real -> real.
+add op exp : real -> real.
+add op Some : 'a -> 'a option.
+add cnst None : 'a option
+add op [::] : ('a, 'a list) -> 'a list.
+add cnst [] : 'a list
+add op mem : ('a, 'a list) -> bool.
+add op length : 'a list -> int.
+add op [++] : ('a list, 'a list) -> 'a list.
+add op upd : (('a,'b)map, 'a, 'b) -> ('a,'b)map.
+add op get : (('a,'b)map, 'a) -> 'b.
+add op in_dom : ('a, ('a,'b)map) -> bool.
+add op in_rng : ('b, ('a,'b)map) -> bool.
+ Read src/easycrypt_base.ec
+add op [>] (x, y : int) = y < x.
+add op [>=] (x, y : int) = y <= x.
+add op [>] (x, y : real) = y < x.
+add op [>=] (x, y : real) = y <= x.
+add op fst (p : 'a * 'b) = (let a,b = p in a).
+add op snd (p : 'a * 'b) = (let a,b = p in b).
+add axiom Some_inj : forall (x, y : 'a),Some (x) = Some (y) => x = y
+add op proj : 'a option -> 'a.
+add axiom Proj_Some : forall (x : 'a),proj (Some (x)) = x
+add axiom Proj_eq :
+  forall (o1, o2 : 'a option),
+    o1 <> None => o2 <> None => proj (o1) = proj (o2) => o1 = o2
+add axiom Some_or_None :
+  forall (o : 'a option),o = None || (exists (x : 'a),o = Some (x))
+add op hd : 'a list -> 'a.
+add op tl : 'a list -> 'a list.
+add axiom head_def : forall (a : 'a, l : 'a list),hd (a :: l) = a
+add axiom tail_def : forall (a : 'a, l : 'a list),tl (a :: l) = l
+add cnst empty_map : ('a,'b)map
+add axiom get_upd_map_same :
+  forall (m : ('a,'b)map, a1, a2 : 'a, b : 'b),a1 = a2 => m[a1 <- b][a2] = b
+add axiom get_upd_map_diff :
+  forall (m : ('a,'b)map, a1, a2 : 'a, b : 'b),
+    a1 <> a2 => m[a1 <- b][a2] = m[a2]
+add axiom upd_map_comm :
+  forall (m : ('a,'b)map, a, a' : 'a, b, b' : 'b),
+    a <> a' => m[a <- b][a' <- b'] = m[a' <- b'][a <- b]
+add axiom upd_in_dom_same :
+  forall (m : ('a,'b)map, a, a' : 'a, b : 'b),a = a' => in_dom (a',m[a <- b])
+add axiom upd_in_dom_diff :
+  forall (m : ('a,'b)map, a, a' : 'a, b : 'b),
+    a <> a' => in_dom (a',m[a <- b]) <=> in_dom (a',m)
+add axiom upd_in_rng_same :
+  forall (m : ('a,'b)map, a : 'a, b, b' : 'b),b = b' => in_rng (b',m[a <- b])
+add axiom upd_in_rng_diff :
+  forall (m : ('a,'b)map, a : 'a, b, b' : 'b),
+    b <> b' => in_rng (b',m[a <- b]) <=> in_rng (b',m)
+add axiom in_dom_in_rng :
+  forall (m : ('a,'b)map, a : 'a),in_dom (a,m) => in_rng (m[a],m)
+add axiom in_rng_in_dom :
+  forall (m : ('a,'b)map, b : 'b),
+    in_rng (b,m) => exists (a : 'a),in_dom (a,m) && m[a] = b
+add axiom empty_in_dom : forall (a : 'a),!in_dom (a,empty_map)
+add axiom empty_in_rng : forall (b : 'b),!in_rng (b,empty_map)
+add axiom real_of_bool_true : real_of_bool (true) = 1%r
+add axiom real_of_bool_false : real_of_bool (false) = 0%r
+add axiom real_of_int_le_compat : forall (x, y : int),x <= y => x%r <= y%r
+add axiom real_of_int_lt_compat : forall (x, y : int),x < y => x%r < y%r
+add axiom rmult_le_compat_l :
+  forall (x, y, z : real),0%r <= x => y <= z => x * y <= x * z
+add axiom rmult_le_compat_r :
+  forall (x, y, z : real),0%r <= z => x <= y => x * z <= y * z
+add axiom rmul_plus_distr_r :
+  forall (x, y, z : real),(x + y) * z = x * z + y * z
+add axiom rdiv_le_compat :
+  forall (x1, x2, y1, y2 : real),
+    0%r < y2 => y2 <= y1 => 0%r <= x1 => x1 <= x2 => x1 / y1 <= x2 / y2
+add axiom rdiv_0_le :
+  forall (x, y : real),0%r < y => 0%r <= x => 0%r <= x / y
+add axiom pow2_pos : forall (n : int),0 <= n => 0 < 2 ^ n
+ Read tests/compute.ec
+[global] end game G :
+current prover is alt-ergo
+ 
+ 
+ 
+ 
+ Proved claim test : G.f[res && x <= y] <= 1%r / 2%r * G.f[x < y || x = y].
+
+[global] end game GW :
+ 
+ 
+ 
+ 
+ Proved claim testW : GW.f[res && x <= y] <= 1%r / 2%r * GW.f[x < y || x = y].
+

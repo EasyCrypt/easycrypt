@@ -1,0 +1,149 @@
+(* Why driver for SMT syntax *)
+
+prelude ";;; this is a prelude for Yices "
+
+printer "yices"
+filename "%f-%t-%g.ycs"
+
+valid "\\bunsat\\b"
+unknown "\\bunknown\\b\\|\\bsat\\b\\|feature not supported: non linear problem" "Unknown"
+time "why3cpulimit time : %s s"
+
+(* À discuter *)
+(*transformation "simplify_recursive_definition"*)
+transformation "inline_trivial"
+
+transformation "eliminate_builtin"
+transformation "eliminate_definition"
+transformation "eliminate_inductive"
+transformation "eliminate_algebraic_smt"
+
+transformation "simplify_formula"
+(*transformation "simplify_trivial_quantification"*)
+
+transformation "discriminate"
+transformation "encoding_smt"
+
+theory BuiltIn
+  syntax type int   "int"
+  syntax type real  "real"
+  syntax predicate (=)  "(= %1 %2)"
+
+  meta "encoding : kept" type int
+end
+
+theory int.Int
+
+  prelude ";;; this is a prelude for Yices integer arithmetic"
+
+  syntax function zero "0"
+  syntax function one  "1"
+
+  syntax function (+)  "(+ %1 %2)"
+  syntax function (-)  "(- %1 %2)"
+  syntax function (*)  "(* %1 %2)"
+  syntax function (-_) "(0 - %1)"
+
+  syntax predicate (<=) "(<= %1 %2)"
+  syntax predicate (<)  "(< %1 %2)"
+  syntax predicate (>=) "(>= %1 %2)"
+  syntax predicate (>)  "(> %1 %2)"
+
+  remove prop CommutativeGroup.Comm.Comm
+  remove prop CommutativeGroup.Assoc.Assoc
+  remove prop CommutativeGroup.Unit_def
+  remove prop CommutativeGroup.Inv_def
+  remove prop Assoc.Assoc
+  remove prop Mul_distr
+  remove prop Comm.Comm
+  remove prop Unitary
+  remove prop Refl
+  remove prop Trans
+  remove prop Antisymm
+  remove prop Total
+  remove prop NonTrivialRing
+  remove prop CompatOrderAdd
+
+end
+
+
+theory real.Real
+
+  prelude ";;; this is a prelude for Yices real arithmetic"
+
+  syntax function zero "0"
+  syntax function one  "1"
+
+  syntax function (+)  "(+ %1 %2)"
+  syntax function (-)  "(- %1 %2)"
+  syntax function (*)  "(* %1 %2)"
+  (* Yices division doesn't accept anything else than constant on
+  denominator so we don't use it (except for constant cf printer) *)
+  (* syntax function (/)  "(/ %1 %2)" *)
+  syntax function (-_) "(- 0 %1)" 
+  (* syntax function inv  "(/ 1 %1)" *)
+
+  syntax predicate (<=) "(<= %1 %2)"
+  syntax predicate (<)  "(< %1 %2)"
+  syntax predicate (>=) "(>= %1 %2)"
+  syntax predicate (>)  "(> %1 %2)"
+
+  remove prop CommutativeGroup.Comm.Comm
+  remove prop CommutativeGroup.Assoc.Assoc
+  remove prop CommutativeGroup.Unit_def
+  remove prop CommutativeGroup.Inv_def
+  remove prop Inverse
+  remove prop Assoc.Assoc
+  remove prop Mul_distr
+  remove prop Comm.Comm
+  remove prop Unitary
+  remove prop Refl
+  remove prop Trans
+  remove prop Antisymm
+  remove prop Total
+  remove prop NonTrivialRing
+  remove prop CompatOrderAdd
+
+  meta "encoding : kept" type real
+
+end
+
+theory bool.Bool
+   syntax type     bool  "bool"
+   syntax function True  "true"
+   syntax function False "false"
+   syntax function andb  "(and %1 %2)"
+   syntax function orb   "(or %1 %2)"
+   syntax function notb  "(not %1)"
+   meta "encoding : kept" type bool
+end
+
+
+theory int.EuclideanDivision
+   syntax function div "(div %1 %2)"
+   syntax function mod "(mod %1 %2)"
+   remove prop Mod_bound
+   remove prop Div_mod
+   remove prop Mod_1
+   remove prop Div_1
+end
+
+
+
+theory map.Map
+  syntax type map "(-> %1 %2)"
+  meta "encoding : lskept" function get
+  meta "encoding : lskept" function set
+  meta "encoding : lskept" function const
+
+  syntax function get   "(%1 %2)"
+  syntax function set   "(update %1 (%2) %3)"
+end
+
+
+(*
+Local Variables:
+mode: why
+compile-command: "unset LANG; make -C .. bench"
+End:
+*)

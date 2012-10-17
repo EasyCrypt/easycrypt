@@ -1,0 +1,93 @@
+(*
+   VSTTE'10 competition http://www.macs.hw.ac.uk/vstte10/Competition.html
+   Problem 2: inverting an injection
+
+   Author: Jean-Christophe Filliatre (CNRS)
+   Tool:   Why3 (see http://why3.lri.fr/)
+*)
+
+module InvertingAnInjection
+
+  use import int.Int
+  use import module array.Array
+  use map.MapInjection as M
+
+  predicate injective (a: array int) (n: int) = M.injective a.elts n
+
+  predicate surjective (a: array int) (n: int) = M.surjective a.elts n
+
+  predicate range (a: array int) (n: int) = M.range a.elts n
+
+  let inverting (a: array int) (b: array int) (n: int) =
+    { 0 <= n = length a = length b /\ injective a n /\ range a n }
+    for i = 0 to n - 1 do
+      invariant { forall j: int. 0 <= j < i -> b[a[j]] = j }
+      b[a[i]] <- i
+    done
+    { injective b n }
+
+  (* variant where array b is returned /\ with additional post *)
+
+  let inverting2 (a: array int) (n: int) =
+    { 0 <= n = length a /\ injective a n /\ range a n }
+    let b = make n 0 in
+    for i = 0 to n - 1 do
+      invariant { forall j: int. 0 <= j < i -> b[a[j]] = j }
+      b[a[i]] <- i
+    done;
+    b
+    { length result = n /\ injective result n /\
+      forall i: int. 0 <= i < n -> result[a[i]] = i }
+
+end
+
+module Test
+
+  use import module array.Array
+  use import module InvertingAnInjection
+
+  let test () =
+    let a = make 10 0 in
+    a[0] <- 9;
+    a[1] <- 3;
+    a[2] <- 8;
+    a[3] <- 2;
+    a[4] <- 7;
+    a[5] <- 4;
+    a[6] <- 0;
+    a[7] <- 1;
+    a[8] <- 5;
+    a[9] <- 6;
+    assert {
+      a[0] = 9 &&
+      a[1] = 3 &&
+      a[2] = 8 &&
+      a[3] = 2 &&
+      a[4] = 7 &&
+      a[5] = 4 &&
+      a[6] = 0 &&
+      a[7] = 1 &&
+      a[8] = 5 &&
+      a[9] = 6
+    };
+    let b = inverting2 a 10 in
+    assert {
+      b[0] = 6 &&
+      b[1] = 7 &&
+      b[2] = 3 &&
+      b[3] = 1 &&
+      b[4] = 5 &&
+      b[5] = 8 &&
+      b[6] = 9 &&
+      b[7] = 4 &&
+      b[8] = 2 &&
+      b[9] = 0
+    }
+
+end
+
+(*
+Local Variables:
+compile-command: "unset LANG; make -C ../.. examples/programs/vstte10_inverting.gui"
+End:
+*)

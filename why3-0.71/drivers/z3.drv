@@ -1,0 +1,9 @@
+import "z3_bare.drv"
+import "discrimination.gen"
+
+(*
+Local Variables:
+mode: why
+compile-command: "unset LANG; make -C .. bench"
+End:
+*)

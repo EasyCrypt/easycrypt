@@ -1,0 +1,205 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+
+Copyright (C) 2010-
+  Francois Bobot
+  Jean-Christophe Filliatre
+  Johannes Kanig
+  Andrei Paskevich
+ 
+This software is free software; you can redistribute it and/or 
+modify it under the terms of the GNU Library General Public 
+License version 2.1, with the special exception on linking 
+described in file LICENSE.
+
+This software is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+-->
+<!--
+ This file was based on ocaml.lang by 
+ Copyright (C) 2007 Eric Cooper <ecc@cmu.edu>
+ Copyright (C) 2007 Eric Norige <thelema314@gmail.com>
+-->
+<language id="why" _name="Why3" version="2.0" _section="Sources">
+  <metadata>
+    <property name="mimetypes">text/x-why</property>
+    <property name="globs">*.ml;*.mli;*.mll;*.mly</property>
+    <property name="block-comment-start">(*</property>
+    <property name="block-comment-end">*)</property>
+  </metadata>
+
+  <styles>
+    <style id="comment" _name="Comment" map-to="def:comment"/>
+    <style id="base-n-integer" _name="Base-N Integer" map-to="def:base-n-integer"/>
+    <style id="floating-point" _name="Floating Point number" map-to="def:floating-point"/>
+    <style id="decimal" _name="Decimal number" map-to="def:decimal"/>
+    <style id="string" _name="String" map-to="def:string"/>
+    <style id="keyword" _name="Keyword" map-to="def:keyword"/>
+    <style id="meta-keyword" _name="Type, module or object keyword" map-to="def:keyword"/>
+    <style id="fun-keyword" _name="Builtin-function keyword" map-to="def:keyword"/>
+    <style id="type" _name="Data Type" map-to="def:type"/>
+    <style id="label" _name="Labeled argument" map-to="def:type"/>
+    <style id="poly-variant" _name="Polymorphic Variant" map-to="def:type"/>
+    <style id="variant" _name="Variant Constructor" map-to="def:type"/>
+    <style id="type-var" _name="Type Variable" map-to="def:type"/>
+    <style id="module" _name="Module Path" map-to="def:type"/>
+    <style id="escape" _name="Escaped Character" map-to="def:special-char"/>
+    <style id="boolean" _name="Boolean value" map-to="def:boolean"/>
+    <style id="error" _name="Error" map-to="def:error"/>
+  </styles>
+
+  <definitions>
+    <define-regex id="cap-ident">\b[A-Z][A-Za-z0-9_']*</define-regex>
+    <define-regex id="low-ident">\b[a-z][A-Za-z0-9_']*</define-regex>
+    <define-regex id="char-esc">\\((\\|"|'|n|t|b|r)|[0-9]{3}|x[0-9a-fA-F]{2})</define-regex>
+    <!-- " -->
+    <context id="escape-seq" style-ref="escape">
+      <match>\%{char-esc}</match>
+    </context>
+    <!-- here's the main context -->
+    <context id="why">
+      <include>
+	<context id="symbol-star">
+	  <match>\(\*\)</match>
+	</context>
+	<context id="comment" style-ref="comment">
+	  <start>\(\*</start>
+	  <end>\*\)</end>
+	  <include>
+	    <context ref="symbol-star"/>
+	    <context id="comment-in-comment" style-ref="comment">
+	      <start>\(\*</start>
+	      <end>\*\)</end>
+	      <include>
+		<context ref="string"/>
+		<context ref="symbol-star"/>
+		<context ref="comment-in-comment"/>
+		<context ref="def:in-comment:*"/>
+	      </include>
+	    </context>
+	    <context ref="string"/>
+	    <context ref="def:in-comment:*"/>
+	  </include>
+	</context>
+	<context id="decimal" style-ref="decimal">
+	  <match>[-]?[0-9][0-9_]*[lLn]?</match>
+	</context>
+	<context id="hex-number" style-ref="base-n-integer">
+	  <match>[-]?0[xX][0-9A-Fa-f][0-9A-Fa-f_]*[lL]?</match>
+	</context>
+	<context id="octal-number" style-ref="base-n-integer">
+	  <match>[-]?0[oO][0-7][0-7_]*[lL]?</match>
+	</context>
+	<context id="binary-number" style-ref="base-n-integer">
+	  <match>[-]?0[bB][01][01_]*[lL]?</match>
+	</context>
+	<context id="floating-point-number" style-ref="floating-point">
+	  <match>[-]?[0-9][0-9_]*(\.[0-9_]*)?([Ee][+-]?[0-9][0-9_]*)?</match>
+	</context>
+	<context id="label" style-ref="label">
+	  <match>[~?]\%{low-ident}</match>
+	</context>
+	<context id="poly-variant" style-ref="poly-variant">
+	  <match>`\%{cap-ident}</match>
+	</context>
+	<context id="modpath" style-ref="module">
+	  <!-- include final '.'?  At the moment, no.  -->
+	  <match>\%{cap-ident}(\.\%{cap-ident})*(?=\.)</match>
+	</context>
+	<context id="variant" style-ref="variant">
+	  <match>\%{cap-ident}</match>
+	</context>
+	<context id="string" style-ref="string">
+	  <start>"</start>
+	  <end>"</end>
+	  <include>
+	    <context ref="escape-seq"/>
+	  </include>
+	</context>
+	<context id="character-constant" style-ref="string">
+	  <match>('\%{char-esc}')|('[^\\']')</match>
+	</context>
+	<context id="type-var" style-ref="type-var">
+	  <match>'\%{low-ident}</match>
+	</context>
+	<context id="arraylit">
+	  <start>\[\|</start>
+	  <end>\|\]</end>
+	  <include>
+	    <context ref="why"/>
+	  </include>
+	</context>
+	<context id="badarray" style-ref="error" extend-parent="false">
+	  <match>\|\]</match>
+	</context>
+	<context id="listlit">
+	  <start>\[</start>
+	  <end>(?&lt;!\|)\]</end>
+	  <include>
+	    <context ref="why"/>
+	  </include>
+	</context>
+	<context id="badlist" style-ref="error" extend-parent="false">
+	  <match>\]</match>
+	</context>
+	<context id="keywords" style-ref="meta-keyword">
+          <keyword>axiom</keyword>
+          <keyword>clone</keyword>
+          <keyword>end</keyword>
+          <keyword>exception</keyword>
+          <keyword>export</keyword>
+          <keyword>function</keyword>
+          <keyword>goal</keyword>
+          <keyword>import</keyword>
+          <keyword>inductive</keyword>
+          <keyword>lemma</keyword>
+          <keyword>module</keyword>
+          <keyword>namespace</keyword>
+          <keyword>predicate</keyword>
+          <keyword>theory</keyword>
+          <keyword>type</keyword>
+          <keyword>use</keyword>
+          <keyword>val</keyword>
+          <keyword>with</keyword>
+	</context>
+	<context id="meta-words" style-ref="keyword">
+          <keyword>absurd</keyword>
+          <keyword>assert</keyword>
+          <keyword>begin</keyword>
+          <keyword>do</keyword>
+          <keyword>done</keyword>
+          <keyword>downto</keyword>
+          <keyword>else</keyword>
+          <keyword>exists</keyword>
+          <keyword>for</keyword>
+          <keyword>forall</keyword>
+          <keyword>if</keyword>
+          <keyword>in</keyword>
+          <keyword>invariant</keyword>
+          <keyword>let</keyword>
+          <keyword>match</keyword>
+          <keyword>raise</keyword>
+          <keyword>raises</keyword>
+          <keyword>reads</keyword>
+          <keyword>rec</keyword>
+          <keyword>then</keyword>
+          <keyword>to</keyword>
+          <keyword>try</keyword>
+          <keyword>variant</keyword>
+          <keyword>while</keyword>
+          <keyword>writes</keyword>
+	  <keyword>-&gt;</keyword>
+	</context>
+	<context id="types" style-ref="type">
+	  <!-- pervasives types -->
+	  <keyword>int</keyword>
+ 	  <keyword>real</keyword>
+	</context>
+	<context id="var">
+	  <match>\%{low-ident}</match>
+	</context>
+      </include>
+    </context>
+  </definitions>
+</language>

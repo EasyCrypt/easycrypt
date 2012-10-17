@@ -1,0 +1,59 @@
+
+(***
+
+Algorithm 65
+
+C. A. R. Hoare
+Elliott Brothers Ltd., Hertfordshire, England, U.K.
+
+Communications of the ACM  archive
+Volume 4 ,  Issue 7  (July 1961) table of contents
+Pages: 321 - 322
+
+***)
+
+module Algo65
+
+  use import int.Int
+  use import module ref.Ref
+  use import module array.Array
+  use import module array.ArrayPermut
+
+  (* algorithm 63 *)
+
+  val partition :
+    a : array int -> m:int -> n:int -> i:ref int -> j:ref int ->
+    { 0 <= m < n < length a }
+    unit writes a i j
+    { m <= !j < !i <= n /\ permut_sub (old a) a m n /\
+      exists x:int.
+        (forall r:int. m <= r <= !j -> a[r] <= x) /\
+        (forall r:int. !j < r < !i -> a[r] = x) /\
+        (forall r:int. !i <= r <= n -> a[r] >= x) }
+
+  (* Algorithm 65 (fixed version) *)
+
+  let rec find (a:array int) (m:int) (n:int) (k:int) : unit variant { n-m } =
+    { 0 <= m <= k <= n < length a }
+    if m < n then begin
+      let i = ref 0 in
+      let j = ref 0 in
+'L1:
+      partition a m n i j;
+      assert { permut_sub (at a 'L1) a m n };
+'L2:
+      if k <= !j then find a m !j k;
+      assert { permut_sub (at a 'L2) a m n };
+      if !i <= k then find a !i n k
+    end
+    { permut_sub (old a) a m n /\
+      (forall r:int. m <= r <= k -> a[r] <= a[k]) /\
+      (forall r:int. k <= r <= n -> a[k] <= a[r]) }
+
+end
+
+(*
+Local Variables:
+compile-command: "unset LANG; make -C ../.. examples/programs/algo65.gui"
+End:
+*)

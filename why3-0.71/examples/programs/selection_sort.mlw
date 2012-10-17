@@ -1,0 +1,47 @@
+
+(* Selection sort. *)
+
+module SelectionSort
+
+  use import int.Int
+  use import module ref.Ref
+  use import module array.Array
+  use import module array.ArraySorted
+  use import module array.ArrayPermut
+  use import module array.ArrayEq
+
+  let swap (a: array int) (i: int) (j: int) =
+    { 0 <= i < length a /\ 0 <= j < length a }
+    let v = a[i] in
+    a[i] <- a[j];
+    a[j] <- v
+    { exchange (old a) a i j }
+
+  let selection_sort (a: array int) =
+    { }
+'L:
+    for i = 0 to length a - 1 do
+      (* a[0..i[ is sorted; now find minimum of a[i..n[ *)
+      invariant
+        { sorted_sub a 0 i /\ permut (at a 'L) a /\
+          forall k1 k2: int. 0 <= k1 < i <= k2 < length a -> a[k1] <= a[k2] }
+      let min = ref i in
+      for j = i + 1 to length a - 1 do
+        invariant
+          { i <= !min < j && forall k: int. i <= k < j -> a[!min] <= a[k] }
+        if a[j] < a[!min] then min := j
+      done;
+'L1:
+      if !min <> i then swap a !min i;
+      assert { permut (at a 'L1) a }
+    done
+    { sorted a /\ permut (old a) a }
+
+end
+
+(*
+Local Variables:
+compile-command: "unset LANG; make -C ../.. examples/programs/selection_sort.gui"
+End:
+*)
+

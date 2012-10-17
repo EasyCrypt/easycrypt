@@ -1,0 +1,55 @@
+
+theory Abs
+
+  type t
+  predicate ge t t
+  function neg t : t
+  function zero : t
+
+  function abs t : t
+
+  axiom Pos: forall x:t. ge x zero -> abs x = x
+  axiom Neg: forall x:t. not ge x zero -> abs x = neg x
+
+(*
+  function abs(x : t) : t
+  axiom Abs_def : if ge x zero then abs x = x else abs x = neg x
+*)
+end
+
+
+theory MinMax
+
+  type t
+  predicate ge t t
+
+  function min t t : t
+  function max t t : t
+
+  axiom Max_is_ge   : forall x y:t. ge (max x y) x /\ ge (max x y) y
+  axiom Max_is_some : forall x y:t. max x y = x \/ max x y = y
+  axiom Min_is_le   : forall x y:t. ge x (min x y) /\ ge y (min x y)
+  axiom Min_is_some : forall x y:t. min x y = x \/ min x y = y
+
+  axiom Max_x : forall x y:t. ge x y -> max x y = x
+  axiom Max_y : forall x y:t. ge y x -> max x y = y
+  axiom Min_x : forall x y:t. ge y x -> min x y = x
+  axiom Min_y : forall x y:t. ge x y -> min x y = y
+
+  lemma Max_sym: forall x y:t. ge x y -> max x y = max y x
+  lemma Min_sym: forall x y:t. ge x y -> min x y = min y x
+
+(*
+  function min (x y : t) : t
+  axiom Min_def : if ge x y then min x y = y else min x y = x
+  function max (x y : t) : t
+  axiom Max_def : if ge x y then max x y = x else max x y = y
+*)
+
+(*
+  function min (x y : t) : t = if ge x y then y else x
+  function max (x y : t) : t = if ge x y then x else y
+*)
+
+
+end

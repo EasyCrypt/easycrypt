@@ -1,0 +1,5 @@
+description = "The Why3 Ocaml library"
+version = "0.71"
+archive(byte) = "why3.cma"
+archive(native) = "why3.cmxa"
+requires = "str unix num dynlink ocamlgraph"

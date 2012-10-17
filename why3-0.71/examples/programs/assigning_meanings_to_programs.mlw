@@ -1,0 +1,60 @@
+
+(* Program proofs from Floyd's "Assigning Meanings to Programs" (1967) *)
+
+module Sum
+
+  (* computes the sum a[1] + ... + a[n] *)
+
+  use import int.Int
+  use import module ref.Ref
+  use import module array.Array
+  use import module array.ArraySum
+
+  let sum (a: array int) (n: int) =
+    { 0 <= n < a.length }
+    let i = ref 1 in
+    let s = ref 0 in
+    while !i <= n do
+      invariant { 1 <= !i <= n+1 /\ !s = sum a 1 !i }
+      variant { n - !i }
+      s := !s + a[!i];
+      i := !i + 1
+    done;
+    !s
+    { result = sum a 1 (n+1) }
+
+end
+
+module Division
+
+  (* Quotient and remainder of X div Y
+
+     Floyd's lexicographic variant is unnecessarily complex here, since
+     we do not seek for a variant which decreases at each statement, but
+     only at each execution of the loop body. *)
+
+  use import int.Int
+  use import module ref.Ref
+
+  let division (x: int) (y: int) =
+    { 0 <= x /\ 0 < y }
+    let q = ref 0 in
+    let r = ref x in
+    while !r >= y do
+      invariant { 0 <= !r /\ x = !q * y + !r }
+      variant { !r }
+      r := !r - y;
+      q := !q + 1
+    done;
+    (!q, !r)
+    { let q,r = result in 0 <= r < y /\ x = q * y + r }
+
+end
+
+
+(*
+Local Variables:
+compile-command: "unset LANG; make -C ../.. examples/programs/assigning_meanings_to_programs.gui"
+End:
+*)
+

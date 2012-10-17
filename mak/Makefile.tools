@@ -1,0 +1,59 @@
+EP_TOOLDIR=$(TOOLDIR)/tools/src
+EP_NAME = ec-tex 
+EP_PACK_TOOLS= epLatex epOutput epLayout epParser epLexer epProcess epMain
+
+
+
+EP_PACK_ML=$(EP_PACK_TOOLS:%=$(EP_TOOLDIR)/%.ml)
+EP_PACK_CMO=$(EP_PACK_ML:%.ml=%.cmo)
+
+EP_ALL=$(EP_PACK_ML)
+
+EP_SOURCES = epLatex.ml epOutput.ml epLayout.ml epParser.mly epLexer.mll epProcess.ml epMain.ml
+   
+   
+OCAMLFLAGS = -dtypes -rectypes
+
+debug_tools:
+	echo "EP_SRC = $(EP_SRC)"
+	echo "SMLIY = $(SMLIY)"
+	echo "SMLIYL = $(SMLIYL)"
+	echo "OBJS = $(OBJS)"
+	echo "SMLYL = $(SMLYL)"
+	echo "EP_PACK_ML = $(EP_PACK_ML)"
+	echo "EP_PACK_CMO = $(EP_PACK_CMO)"
+
+# Important rules: 
+#   'tools', 'dist-tools', 'install-tools', 'uninstall-tools'
+#   'clean-tools'
+
+tools: $(EP_PACK_CMO)
+	$(OCAMLC) -I $(EP_TOOLDIR) -o $(EP_TOOLDIR)/$(EP_NAME) $(EP_PACK_CMO) 
+
+dist_tools:
+	@mkdir -p $(DIST_DIR)
+	@cp -R tools $(DIST_DIR)/tools
+
+install_tools: tools
+	mkdir -p $(BINDIR)
+	cp -R $(EP_TOOLDIR)/$(EP_NAME) $(BINDIR)/$(EP_NAME)
+
+
+uninstall_tools:
+	rm -f $(BINDIR)/$(EP_NAME)
+
+clean_tools:
+	rm -f $(EP_TOOLDIR)/epParser.ml
+	rm -f $(EP_TOOLDIR)/epParser.mli
+	rm -f $(EP_TOOLDIR)/epLexer.ml
+	rm -f $(EP_TOOLDIR)/$(EP_NAME)
+	rm -f $(EP_TOOLDIR)/*.annot
+	rm -f $(EP_TOOLDIR)/*.cm[iox] $(EP_TOOLDIR)/*~ 
+
+depend_tools: $(EP_TOOLDIR)/.depend
+
+
+$(EP_TOOLDIR)/.depend:: $(EP_ALL) 
+	@$(OCAMLDEP) -I $(EP_TOOLDIR) $(EP_ALL) > $@
+
+-include $(EP_TOOLDIR)/.depend

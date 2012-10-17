@@ -1,0 +1,18 @@
+
+                  Installation instructions
+
+Shortly, installation is done by
+
+./configure
+make
+make install (as root)
+
+To install also the Ocaml library do
+
+make byte
+make install-lib (as root)
+
+
+
+For detailed instructions and required dependencies, please see
+the manual (doc/manual.pdf), Section 8.1 "Compilation, Installation".

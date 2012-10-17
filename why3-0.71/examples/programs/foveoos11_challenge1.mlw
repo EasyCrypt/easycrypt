@@ -1,0 +1,36 @@
+
+(* FoVeOOS 2011 verification competition
+   http://foveoos2011.cost-ic0701.org/verification-competition
+
+   Challenge 1
+*)
+
+module Max
+
+  use import module ref.Refint
+  use import module array.Array
+
+  let max (a: array int) =
+    { length a > 0 }
+    let x = ref 0 in
+    let y = ref (length a - 1) in
+    while !x <> !y do
+      invariant {
+        0 <= !x <= !y < length a /\
+        forall i: int. (0 <= i < !x \/ !y < i < length a) ->
+                       (a[i] <= a[!y] \/ a[i] <= a[!x])
+      }
+      variant { !y - !x }
+      if a[!x] <= a[!y] then incr x else decr y
+    done;
+    !x
+    { 0 <= result < length a /\
+      forall i: int. 0 <= i < length a -> a[i] <= a[result] }
+
+end
+
+(*
+Local Variables:
+compile-command: "unset LANG; make -C ../.. examples/programs/foveoos11_challenge1.gui"
+End:
+*)

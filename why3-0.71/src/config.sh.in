@@ -1,0 +1,42 @@
+#!/bin/sh
+
+config=src/config.ml
+
+libdir="$LIBDIR/why3"
+datadir="$DATADIR/why3"
+localdir="None"
+plugins="false"
+
+if [ "@enable_local@" = "yes" ]; then
+    libdir="@LOCALDIR@/plugins"
+    datadir="@LOCALDIR@/share"
+    localdir="Some \"@LOCALDIR@\""
+fi
+
+if [ "@enable_plugins@" = "yes" ]; then
+    plugins="true"
+fi
+
+echo "
+let version   = \"@VERSION@\"
+let builddate = \"@BUILDDATE@\"
+
+let libdir    = \"$libdir\"
+let datadir   = \"$datadir\"
+let localdir  = $localdir
+
+let plugins   = $plugins
+
+module Dynlink_ = struct
+  let is_native = true
+  let loadfile_private _ = assert false
+
+  type error
+  exception Error of error
+  let error_message _ = (assert false : string)
+end
+
+module Dynlink = struct
+  include @DYNLINK@
+end
+" > $config

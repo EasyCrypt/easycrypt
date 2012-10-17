@@ -1,0 +1,74 @@
+theory Map
+  use import list.List
+
+  use HighOrd as HO
+
+  function map (fn : HO.func 'a 'b) (l : list 'a) : list 'b = match l with
+    | Cons x r -> Cons (fn x) (map fn r)
+    | Nil -> Nil
+  end
+
+  predicate forall2 (pr : HO.func 'a (HO.pred 'b)) (l1 : list 'a) (l2 : list 'b) =
+    match l1, l2 with
+    | Cons x1 r1, Cons x2 r2 -> pr x1 x2 /\ forall2 pr r1 r2
+    | _, _ -> true
+    end
+
+  use export int.Int
+
+  function double (l : list int) : list int = map (\ i : int . i * 2) l
+  function double_let (l : list int) : list int =
+    let x = 2 in
+    map (\ i : int . i * x) l
+
+  predicate lequal (l1 l2 : list int) =
+    forall2 (\ i1 i2 : int . i1 = i2) l1 l2
+end
+
+theory Induction2
+  use import list.List
+  use import list.Length
+
+  predicate p (list 'a) (list 'b)
+
+  axiom Induction :
+    p (Nil : list 'a) (Nil : list 'b) ->
+    (forall x1:'a, x2:'b, l1:list 'a, l2:list 'b.
+       p l1 l2 -> p (Cons x1 l1) (Cons x2 l2)) ->
+    forall l1:list 'a, l2:list 'b. length l1 = length l2 -> p l1 l2
+end
+
+theory Test1
+  use export int.Int
+  use export list.List
+  use export list.Length
+  use Map as M
+
+  goal G1 : length (Cons 1 Nil) = 1
+  goal G2 : length (Cons 1 (Cons 2 Nil)) = 1 + 1
+
+  function zip (l1 : list 'a) (l2 : list 'b) : list ('a,'b) =
+    match l1, l2 with
+    | Cons x1 r1, Cons x2 r2 -> Cons (x1,x2) (zip r1 r2)
+    | _, _ -> Nil (* to make it total *)
+    end
+
+  predicate foo (l1 : list 'a) (l2 : list 'b) =
+    length (zip l1 l2) = length l1
+
+  clone Induction2 with predicate p = foo
+
+  lemma G3 : forall l1: list 'a, l2 : list 'b.
+    length l1 = length l2 ->
+    length (zip l1 l2) = length l1
+
+  goal G4 : zip (Cons 1  (Cons 2  Nil))
+                (Cons 1. (Cons 2. Nil)) =
+                Cons (1, 1.) (Cons (2, 2.) Nil)
+
+  goal G5 : forall l1: list 'a, l2 : list 'b, l3: list 'c, l4: list 'd.
+    length l1 = length l2 /\ length l2 = length l3 /\
+      length l3 = length l4 ->
+    length (zip (zip l1 l2) (zip l3 l4)) = length l3
+
+end

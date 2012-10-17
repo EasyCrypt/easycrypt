@@ -1,0 +1,183 @@
+
+theory UnionFind
+
+  use import int.Int
+
+  type uf
+
+  predicate repr uf int int
+  function size uf : int
+  function num uf : int
+
+  axiom Repr_function_1:
+    forall u:uf, x:int.
+    0 <= x < size u -> exists y:int. 0 <= y < size u /\ repr u x y
+  axiom Repr_function_2:
+    forall u:uf, x y z:int.
+    0 <= x < size u -> repr u x y -> repr u x z -> y = z
+
+  predicate same (u:uf) (x y:int) =
+     forall r:int. repr u x r <-> repr u y r
+
+  predicate same_reprs (u1 u2 : uf) =
+     forall x r:int. repr u1 x r <-> repr u2 x r
+
+  axiom OneClass :
+    forall u:uf. num u = 1 ->
+    forall x y:int. 0 <= x < size u -> 0 <= y < size u -> same u x y
+
+end
+
+module UnionFind_sig
+
+  use import int.Int
+  use import module ref.Ref
+
+  use export UnionFind
+
+  val create :
+    n:int ->
+      { 0 <= n }
+      ref uf
+      { num !result = n /\ size !result = n /\
+        forall x:int. 0 <= x < n -> repr !result x x }
+
+  val find :
+    u:ref uf -> x:int ->
+      { 0 <= x < size !u }
+      int writes u
+      { repr !u x result /\
+        size !u = size (old !u) /\ num !u = num (old !u) /\
+        same_reprs !u (old !u) }
+
+  val union :
+    u:ref uf -> a:int -> b:int ->
+      { 0 <= a < size !u /\ 0 <= b < size !u /\ not same !u a b }
+      unit writes u
+      { same !u a b /\
+        size !u = size (old !u) /\ num !u = num (old !u) - 1 /\
+        forall x y:int. 0 <= x < size !u -> 0 <= y < size !u ->
+           same !u x y <->
+           same (old !u) x y \/
+           same (old !u) x a /\ same (old !u) b y \/
+           same (old !u) x b /\ same (old !u) a y }
+
+  val get_num_classes :
+    u:ref uf -> {} int reads u { result = num !u }
+
+end
+
+theory Graph
+
+  type vertex
+
+  type graph
+
+  inductive path graph vertex vertex =
+    | Path_refl : forall g:graph, x:vertex. path g x x
+    | Path_sym  : forall g:graph, x y:vertex. path g x y -> path g y x
+    | Path_trans:
+        forall g:graph, x y z:vertex. path g x y -> path g y z -> path g x z
+
+end
+
+theory Graph_int
+
+  clone export Graph with type vertex = int
+
+end
+
+module Graph_sig
+
+  use import int.Int
+  use import module ref.Ref
+
+  (* clone export Graph with type vertex = int *)
+  use export Graph_int
+
+  val graph : ref graph
+
+  val num_edges : ref int
+
+  val add_edge : a:int -> b:int ->
+    { not path !graph a b }
+    unit writes num_edges graph
+    { !num_edges = old !num_edges + 1 /\
+      (forall x y:int.
+          path !graph x y <->
+          path (old !graph) x y \/
+          path (old !graph) x a /\ path (old !graph) b y \/
+          path (old !graph) x b /\ path (old !graph) a y)
+   }
+
+end
+
+module BuildMaze
+
+  use import int.Int
+  use import module ref.Ref
+
+  use import module UnionFind_sig
+  use import module Graph_sig
+
+  val rand : s:int -> { 0 < s } int { 0 <= result < s }
+
+  lemma Ineq1 :
+    forall n x y:int. 0 <= n -> 0 <= x < n -> 0 <= y < n -> 0 <= x*n+y < n*n
+
+  let add_edge_and_union (u: ref uf) (a:int) (b:int) =
+    { 0 <= a < size !u /\ 0 <= b < size !u /\
+      not same !u a b /\ not path !graph a b /\
+      forall x y:int.
+        0 <= x < size !u -> 0 <= y < size !u ->
+        same !u x y <-> path !graph x y
+    }
+    add_edge a b;
+    union u a b
+    { !num_edges = old !num_edges + 1 /\
+      same !u a b /\
+      size !u = size (old !u) /\ num !u = num (old !u) - 1 /\
+      (forall x y:int.
+         0 <= x < size !u -> 0 <= y < size !u ->
+         same !u x y <-> path !graph x y)
+    }
+
+let build_maze (n:int) =
+  { 1 <= n /\
+    !num_edges = 0 /\
+    forall x y:int. x=y <-> path !graph x y
+  }
+    let u = create (n*n) in
+    assert { forall x y:int. 0 <= x < n*n -> 0 <= y < n*n ->
+             same !u x y -> (repr !u x y && repr !u x x && x = y) };
+    while get_num_classes u > 1 do
+      invariant
+        { 1 <= num !u /\ num !u + !num_edges = size !u = n*n /\
+          forall x y:int. 0 <= x < n*n -> 0 <= y < n*n ->
+                          (same !u x y <-> path !graph x y)
+        }
+      let x = rand n in
+      let y = rand n in
+      let d = rand 2 in
+      let w = if d = 0 then x+1 else x in
+      let z = if d = 0 then y else y+1 in
+      if w < n && z < n then begin
+        let a = y * n + x in
+        assert { 0 <= a < n*n };
+        let b = w * n + z in
+        assert { 0 <= b < n*n };
+        if find u a <> find u b then
+          add_edge_and_union u a b
+      end
+    done
+  { !num_edges = n*n-1 /\
+    forall x y:int. 0 <= x < n*n -> 0 <= y < n*n ->
+      path !graph x y }
+
+end
+
+(*
+Local Variables:
+compile-command: "unset LANG; make -C ../.. examples/programs/vacid_0_build_maze"
+End:
+*)

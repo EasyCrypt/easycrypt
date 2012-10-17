@@ -1,0 +1,606 @@
+\documentclass[notes,page number]{beamer}
+
+%\usecolortheme{crane}
+\mode<presentation>
+{
+ \usetheme{Singapore} %
+}
+
+\usepackage{beamerthemesplit}
+\usepackage{beamerfontthemeprofessionalfonts}
+\usepackage{fancyhdr, epsfig, psfrag}
+\usepackage{beamerthemeshadow}
+\setbeamertemplate{navigation symbols}{}
+\usepackage[english]{babel}
+
+\usepackage{bbm}
+%\usepackage{pstricks,pst-grad,pst-node}
+
+\usepackage{tikz}
+\usetikzlibrary{shadows,positioning}
+\title{Verified Security of Hashed Authenticated Key-Exchange Protocols} 
+%\subtitle{Work in progress}
+
+
+%\author{
+%  G. Barthe\inst{1}
+%  \and
+%  J. M. Crespo\inst{1}
+%  \and
+%  C. Ene\inst{2}
+%  \and 
+%  C. Kunz\inst{1}
+%  \and\\
+%  Y. Lakhnech\inst{2}
+%  \and
+%  B. Gregoire\inst{3}
+%  \and
+%   S. Zanella B\'eguelin\inst{4}
+%}
+
+%\institute{\inst{1} IMDEA Software, Madrid, Spain \\
+%  \inst{2}University of Grenoble, CNRS - VERIMAG, France\\
+%\inst{3} INRIA, Sophia-Antipolis\\
+%\inst{4} MSR, Cambridge, UK}
+\date{Shiva Meeting}
+
+\input{macros}
+
+\begin{document}
+
+\begin{frame}
+\titlepage
+\end{frame}
+%\section{Introduction}
+\begin{frame}
+  \frametitle{Key Exchange Protocols}
+A pool of $n$ participants try to establish a comon symmetric session key, in the presence of an adversary.
+
+%\begin{tikzpicture}
+%\node (n1) {\includegraphics[width=0.3\textwidth]{alice.pdf}};
+%\node (n2) [right= of n1] {\includegraphics[width=0.3\textwidth]{spy.pdf}}edge[thin, <-] node[] {} (n1);
+
+%\node (n3) [right= of n2] {\includegraphics[width=0.3\textwidth]{bob.pdf}} edge[thin, <-] node[] {} (n2);
+
+
+
+%\end{tikzpicture}
+
+\end{frame}
+\begin{frame}
+  \frametitle{Security Goals}
+  \begin{block}{Definition (Key privacy)}
+No one except the legitimate parties can distinguish the established key from a random key.
+  \end{block}
+\begin{block}{Definition (implicit key authentication)}
+In presence of a passive adversary, two legitimate parties engaged in
+a session, will compute the same key.
+\end{block}
+Not to be confused with key confirmation: no one can make a legitimate
+partner believe he shares a key with a partner, unless this is the
+case.
+\end{frame}
+\begin{frame}
+  \frametitle{Diffie-Hellman}
+\begin{figure}
+\begin{displaymath}
+\begin{array}{c@{}c@{}c} A&&B\\
+\begin{array}[m]{c}
+x\xleftarrow{\$}\mathbb{Z}_q\\[5ex]
+\end{array}
+&
+\begin{array}[m]{c}
+\begin{tikzpicture}
+\node (n1) {};
+\node (n2) [right=120pt of n1] {}
+ edge[thick,<-] node[yshift=7pt]
+ {$A, X=g^{x}$} (n1);
+\node (n1') [below= 15pt of n1] {};
+\node (n2') [right=120pt of n1'] {$y\xleftarrow{\$}\mathbb{Z}_q$}
+ edge[thick,->] node[yshift=7pt]
+ {$B, Y=g^{y}$} (n1');
+\end{tikzpicture}
+\end{array}
+\end{array}
+\end{displaymath}
+\end{figure}
+\end{frame}
+\begin{frame}
+  \frametitle{Hashed DH-based key Exchange Protocols}
+  \begin{itemize}
+  \item Participants exchange messages that allow each party to compute at the end of a session a bitstring, called \emph{session string}.
+  \item The session key is derived from the session string by applying a hash function.
+  \end{itemize}
+Two types of protocols :
+  \begin{itemize}
+  \item the flow of messages is that of DH;
+    it is the way the session string is
+    computed that guarantees authentication. May suppose public keys, or
+    symmetric keys,... . Matsumoto, Takashima and Imai'86
+  \item the flow of messages is modified
+    modified, e.g., by adding signatures, encryptions, further rounds,.... Bellovin and Merrit'92
+  \end{itemize}
+\end{frame}
+%% \begin{frame}
+%%   \frametitle{Basic Authenticated Diffie-Hellman}
+%% \begin{figure}
+%% \begin{displaymath}
+%% \begin{tikzpicture}
+%% \node (n0){$A$};
+%% \node (n0') [right=140 pt of n0] {$B$};
+%% \node (n1) [below=15 pt of n0] {};
+%% \node (n1') [below= 15pt of n0'] {};
+%% \node (n2) [right=0 pt of n1] {$x\xleftarrow{\$}\mathbb{Z}_q$} edge[thick, ->] node[yshift=7pt]{$A, X=g^{x}$}(n1');
+%% \node (n3) [below=15pt of n2] {};
+%% \node (n3')[right=10pt of n3]{};
+%% \node (n2') [right=130 pt of n3] {$y\xleftarrow{\$}\mathbb{Z}_q$}
+%%  edge[thick,->] node[yshift=10pt]
+%%  {$B, Y=g^{y}, \sig_B(X,Y)$} (n3');
+%% \node (n4) [below=15pt of n3]{};
+%% \node (n5) [right=10pt of n4]{};
+%% \node (n4') [right= 130pt of n4] {}
+%%  edge[thick,<-] node[yshift=7pt]
+%%  {$\sig_A(Y,g^{x})$}(n5);
+
+%% \end{tikzpicture}
+%% \end{displaymath}
+%% \end{figure}
+%% \end{frame}
+\begin{frame}
+  \frametitle{HMQV}
+A variant of MQV.
+
+\[\pA=g^a,\;\pB=g^b\]
+\begin{figure}
+\begin{displaymath}
+\begin{array}{c@{}c@{}c} A&&B\\
+\begin{array}[m]{c}
+x\xleftarrow{\$}\mathbb{Z}_q\\[5ex]
+\end{array}
+&
+\begin{array}[m]{c}
+\begin{tikzpicture}
+\node (n1) {};
+\node (n2) [right=120pt of n1] {}
+ edge[thick,<-] node[yshift=7pt]
+ {$A, X=g^{x}$} (n1);
+\node (n1') [below= 15pt of n1] {};
+\node (n2') [right=120pt of n1'] {$y\xleftarrow{\$}\mathbb{Z}_q $}
+ edge[thick,->] node[yshift=7pt]
+ {$B, Y=g^{y}$} (n1');
+\end{tikzpicture}
+\end{array}
+\end{array}
+\end{displaymath}
+\end{figure}
+\[\s(\pA,\pB,g^x,g^y)=g^{(x+H_1(B,X)a)(y+H_1(A,Y)b)}\]
+\[K=H(\s(\pA,\pB,g^x,g^y))\]
+
+\end{frame}
+\begin{frame}
+  \frametitle{\NAXOS}
+Initializaton:\\
+n participants, for each participants:
+\[\sA\xleftarrow{\$}\mathbb{Z}_q;\;\pA=g^\sA\]
+\vspace{-5em}
+\begin{figure}
+\begin{displaymath}
+\begin{array}{c@{}l@{}l}\\
+\begin{array}[m]{c}
+A\\
+x\xleftarrow{\$}\{0,1\}^\lambda\\[5ex]
+\end{array}
+&
+\begin{array}[m]{c}
+\begin{tikzpicture}
+\node (n1) {};
+\node (n2) [right=120pt of n1] {}
+ edge[thick,<-] node[yshift=7pt]
+ {$A, X=g^{H_1(x,\sA)}$} (n1);
+\node (n1') [below= 15pt of n1] {};
+\node (n2') [right=120pt of n1'] {}
+ edge[thick,->] node[yshift=7pt]
+ {$B, Y=g^{H_1(y,\sB)}$} (n1');
+\end{tikzpicture}
+\end{array}
+&
+\begin{array}[m]{c}
+B\\[1em]
+y\xleftarrow{\$}\{0,1\}^\lambda\\[3ex]
+\end{array}
+\end{array}
+\end{displaymath}
+\end{figure}
+\[K=H(\s(\pA,\pB,X,Y)),\mbox{ where }\]
+\[\s(\pA,\pB,X,Y))=(Y^\sA,B^{H_1(x,a)},Y^{H_1(x,\sA)},A,B)\]
+\end{frame}
+
+
+
+\begin{frame}
+  \frametitle{Generic Protocol}
+Initialization:\\
+n participants, for each participants:
+\[\sA\xleftarrow{\$}\Pv;\;\pA=\priv(\sA)\]
+\vspace{-5em}
+\begin{figure}
+\begin{displaymath}
+\begin{array}{c@{}l@{}l}\\
+\begin{array}[m]{c}
+A\\
+x\xleftarrow{\$}\Eph\\
+r\xleftarrow{\$}{U}\\[3ex]
+\end{array}
+&
+\begin{array}[m]{c}
+\begin{tikzpicture}
+\node (n1) {};
+\node (n2) [right=120pt of n1] {}
+ edge[thick,<-] node[yshift=7pt]
+ {$A, X=\inpmess(x,\sA,r)$} (n1);
+\node (n1') [below= 15pt of n1] {};
+\node (n2') [right=120pt of n1'] {}
+ edge[thick,->] node[yshift=7pt]
+ {$B, Y=\respmess(y,\sB,r')$} (n1');
+\end{tikzpicture}
+\end{array}
+&
+\begin{array}[m]{c}
+B\\
+r'\xleftarrow{\$}{U}\\
+y\xleftarrow{\$}\Eph\\[3ex]
+\end{array}
+\end{array}
+\end{displaymath}
+\end{figure}
+\[K=H(\s(\pA,\pB,X,Y))\]
+$\s(\pA,\pB,X,Y))$ is called the session string.
+\end{frame}
+
+\begin{frame}
+  \frametitle{Protocol model}
+  \begin{itemize}
+  \item A protocol is described by two roles:
+    \begin{enumerate}
+    \item An initiator with actions defined by oracles 
+\begin{itemize}
+\item $\Init(\pA,\pB)$ starts a session $(\pA,\pB,X)$, where $\pA$ is the initiator
+  and $\pB$ is the responder, and returns $X$.
+\item $\Comp(\pA,\pB,X,Y)$ completes the incomplete session
+  $(\pA,\pB,X)$, if it exists.
+\end{itemize}
+\item A responder with actions defined by oracle $\Resp(\pA,\pB,X)$
+  that completes a session $(\pA,\pB,X,Y)$ and returns $X$.
+    \end{enumerate}
+  \end{itemize}
+\end{frame}
+ 
+\begin{frame}
+  \frametitle{Security Model}
+  \begin{block}
+    {Queries that define the adversary capabilities}
+    \begin{itemize}
+    \item Corruption: $\Corrupt(\pA)$ returns the private key of $\pA$
+    \item Key reveal: $\SessionKeyReveal(\pA,\pB,X, Y)$ reveals the
+      session key: $\pA$ checks that she has a {\sl completed} session
+      $(\pA,\pB, X, Y)$. If not, she ignores the call. Otherwise, she
+      outputs the session key.
+\item Ephemeral values reveal: $\SessionRandomReveal(\pA,\pB, X, -)$
+  reveals the ephemeral random values of a session: $\pA$ checks that
+  she has an open session $(\pA,\pB, X, -)$. If not, she ignores the
+  call. Otherwise, she outputs the ephemeral key sampled within the
+  above session.
+    \end{itemize}
+  \end{block}
+\end{frame}
+\begin{frame}
+  \frametitle{Security Model}
+  \begin{block}
+    {A query for defining the security game}
+$\Test(\pA,\pB, X, Y)$ depending on a randomly chosen bit
+$b$, $\pA$ returns either the actual session key of the session
+$(\pA,\pB, X, Y)$, or a session key drawn randomly from the session
+key distribution.
+  \end{block}
+\end{frame}
+\begin{frame}
+  \frametitle{Unexposed sessions}
+%%   \begin{block}
+%%     {Matching sessions}
+%% $(\pA,\pB,X,Y)$ and $(\pB,\pA,Y,X)$ match.
+%%   \end{block}
+
+%% The adversary trivially wins, ih he tests a session $(\pA,\pB,X,Y)$ for
+%% which 
+%% \begin{itemize}
+%% \item he asks $\SessionKeyReveal(\pA,\pB,X,Y)$ or
+%%   $\SessionKeyReveal(\pB,\pA,Y,X)$,
+%% \item $\Corrupt(\pA)$ and $\SessionRandomReveal(\pA,\pB,X,Y)$,  or
+%% \item $\Corrupt(\pB)$ and $\neg\SessionRandomReveal(\pB,-,Y,-)$ or
+%% \item  $\Corrupt(\pB)$ and $Y$ has been computed by 
+%% \end{itemize}
+  \begin{block}{Fresh sessions} A completed session $(A,B,X,Y)$ is fresh (clean,
+    unexposed), if the following conditions hold:
+    \begin{itemize}
+    \item $\Corrupt(\pA)\implies \SessionRandomReveal(\pA,\pB,X,Y)$
+      has not been asked.
+    \item $\Corrupt(\pB)\implies \Honest(\pB,Y)$ and
+      $\SessionRandomReveal(\pB,-,Y,-)$ has not been asked.
+    \item neither $\SessionKeyReveal(\pA,\pB,X,Y)$ nor
+      $\SessionKeyReveal(\pB,\pA,Y,X)$ has been asked.
+    \end{itemize}
+  \end{block}
+ In order to make the security definition meaningful, the adversary should
+only run a $\Test$ query on {\sl unexposed} sessions. 
+\end{frame}
+\begin{frame}
+  \frametitle{Covered Security Properties}
+\begin{itemize}
+\item Key-compromise impersonation:  the adversary learns a
+long-term secret key of a party and then impersonates others to this party.
+\item Weak Perfect Foward Secrecy: Perfect forward secrecy means that
+  established keys remain secret, even when the long-term keys are known
+  after the session is completed. Krawczyk provides a generic attack
+  for 2-message implicitly authenticated DH-baed protocols.
+
+   Weak Perfect Serecy: the same but for passive sessions.
+\item It covers eCK$^{\omega}$ proposed by Cas Cremers.
+\end{itemize}
+\end{frame}
+\begin{frame}
+  \frametitle{Objectives} Kudla and Paterson reduce the security of an
+  AKE protocol to the security of a similar protocol without
+  $\SessionKeyReveal$ and $\Test$ and where the adversary has to guess
+  a session string. The reduction uses Gap DH.
+
+Our objective:
+\begin{enumerate}
+\item Develop an automated proof of an extended version of the Kudla
+  and Paterson reduction, in EasyCrypt. The reduction is in an extended
+  model of CK (including $\SessionRandomReveal$), does not rely on Gap DH by
+  construction, removes $\SessionKeyReveal$, $\Test$ and
+  $\SessionRandomReveal$,
+  and reduces to three attacks.
+\item Apply the reduction to prove security of Naxos, HMQV, etc...
+\end{enumerate}
+
+\end{frame}
+\begin{frame}
+  \frametitle{A sample attack}
+Consider the following oracles:
+ \begin{enumerate}
+  \item $\SameSeS$: given two sessions, $\SameSeS$ decides whether they have
+    the same session string
+  \item $\EqS$: given a session and a bitstring, $\EqS$ decides whether
+    the latter is the session string of the former.
+  \end{enumerate}
+\begin{enumerate}
+\item The adversay is given:
+  \begin{itemize}
+  \item  the long-term key $a$ of $\pA$,
+  \item a message $X$ computed with $a$ and an ephemral value $x$,
+  \item access to oracles run by a party $\pB$,
+  \item $\SameSeS$ and $\EqS$.
+  \end{itemize}
+He wins, if he can provide a message $\beta$ and a bitstring $bs$ such that
+$bs$ is the session string of $(A,B,X,\beta)$. 
+ 
+\end{enumerate}
+\end{frame}
+%% \begin{frame}[c]
+%% \bf {\Large \EasyCrypt}\\[2pt] {\large Computer-aided proofs for the
+%%   working cryptographer}
+%% \end{frame}
+
+\begin{frame}{\EasyCrypt}
+A proof is a sequence of games related by \textbf{claims}.\\
+Automatic or at least tool-supported verification  such claims.
+
+\begin{block}{Rationale}
+\begin{itemize}
+\item Claims are based on probabilistic statements that have a direct translation to 
+      relational Hoare judgments
+\item Verification of Hoare judgments reduces to the validity of
+  formulae - verification conditions. Such verification conditions are
+  automatically computed by EasyCrypt and submitted to SMT solvers.
+\item Invariant generation for oracles.
+\item Code-based sound transformations, e.g., eager sampling, ....
+\end{itemize}
+\end{block}
+\end{frame}
+
+
+
+%% \begin{frame}{Automatic verification of relational Hoare judgments}
+%% Verify the validity of
+%% $$\Equiv{\mathsf{G}_1}{\mathsf{G}_2}{\Pre}{\Post}$$
+%% by generating VCs and sending them to an SMT solver
+
+%% \begin{block}{Key idea}
+%% Use one-sided rules (a.k.a. self-composition), except for:
+%% \begin{itemize}
+%% \item Procedure calls (procedures have relational specs!): 
+%% \begin{itemize}
+%% \item use inlining if possible
+%% \item if not (e.g. adversary calls), use two-sided rules. Needs call
+%%   graphs to be similar
+%% \end{itemize}
+%% \item Random assignments:
+%% \begin{itemize}
+%% \item put programs in static single (random) assignment form 
+%% \item hoist random assignments
+%% \item use specialized two-sided Hoare rule for random assignments
+%% \end{itemize}
+%% \end{itemize}
+%% \end{block}
+%% \end{frame}
+
+
+%% \begin{frame}{\EasyCrypt tool chain}
+
+%% \tikzstyle{base}=[draw, fill=blue!20, text width=5em, 
+%%     text centered, minimum height=2.5em,drop shadow]
+%% \tikzstyle{component} = [base, text width=9em, fill=red!40, 
+%%     minimum height=3em, rounded corners, drop shadow]
+%% \tikzstyle{external} = [base, text width=9em,  
+%%     minimum height=3em, rounded corners, drop shadow]
+
+%% \centering
+%% \begin{tikzpicture}[node distance=1cm]
+
+%%  \node(PM) [component] at (4.5,7) {Parsing mode};
+%%  \node(TL) [component] at (4.5,5) {OCaml toplevel};
+%%  \node(WH) [external] at (2,3){Why};
+%%  \node(CC) [component] at (7,3) {CertiCrypt};
+%%  \node(CQ) [external] at (7,1){Coq};
+%%  \node(SM) [external] at (2,1) {SMT solvers};
+
+%%  \path[->,thick] (PM) edge (TL);
+%%  \path[->,thick] (TL) edge (CC);
+%%  \path[->,thick] (CC) edge (CQ);
+%%  \path[->,thick] (TL) edge (WH);
+%%  \path[->,thick] (WH) edge (SM);
+
+%% \end{tikzpicture}
+%% \end{frame}
+\begin{frame}
+  \frametitle{Remarks about the model and the proof}
+  \begin{itemize}
+  \item In order to reason about a class of protocols, our model
+    contains abstract data types and abstract operations that are specified
+    by axioms. Notice that abstract operations are stateless.
+  \item Thus, the proved statement is a universal quantification over
+    all implementations of such abstract data types.
+\[\begin{array}{l}
+\forall \vec{t}\forall
+\vec{op},\;\Axiom(\vec{op},\vec{t})\implies\\
+\quad \forall A\exists B_1\exists B_2\exists B_3,\\
+\Pr[G_1(A,\vec{t},\vec{op}):b=b']-\frac{1}{2}\leq\\
+\qquad\Pr[G_8(B_1,\vec{t},\vec{op}):E_1]+\Pr[G_9(B_2,\vec{t},\vec{op}):E_2]+\\
+\qquad\Pr[G_{10}(B_3,\vec{t},\vec{op}):E_3]
+\end{array}
+\]
+  \item About 11 Kloc - model + invariants + proof
+  \end{itemize}
+\end{frame}
+\begin{frame}
+  \frametitle{\NAXOS}
+Initializaton:\\
+n participants, for each participants:
+\[\sA\xleftarrow{\$}\mathbb{Z}_q;\;\pA=g^\sA\]
+\vspace{-5em}
+\begin{figure}
+\begin{displaymath}
+\begin{array}{c@{}l@{}l}\\
+\begin{array}[m]{c}
+A\\
+x\xleftarrow{\$}\{0,1\}^\lambda\\[5ex]
+\end{array}
+&
+\begin{array}[m]{c}
+\begin{tikzpicture}
+\node (n1) {};
+\node (n2) [right=120pt of n1] {}
+ edge[thick,<-] node[yshift=7pt]
+ {$A, X=g^{H_1(x,\sA)}$} (n1);
+\node (n1') [below= 15pt of n1] {};
+\node (n2') [right=120pt of n1'] {}
+ edge[thick,->] node[yshift=7pt]
+ {$B, Y=g^{H_1(y,\sB)}$} (n1');
+\end{tikzpicture}
+\end{array}
+&
+\begin{array}[m]{c}
+B\\[1em]
+y\xleftarrow{\$}\{0,1\}^\lambda\\[3ex]
+\end{array}
+\end{array}
+\end{displaymath}
+\end{figure}
+\[K=H(\s(\pA,\pB,X,Y)),\mbox{ where }\]
+\[\s(\pA,\pB,X,Y))=(Y^\sA,B^{H_1(x,a)},Y^{H_1(x,\sA)},A,B)\]
+\end{frame}
+\begin{frame}
+  \frametitle{}
+\NAXOS\ uses an extra hash function $H_1$. Which is not part of the
+generic model.
+
+Solution: reduce security of \NAXOS\ to security of \NAXOS'\ by
+``internalizing'' $H_1$.
+\vspace{-5em}
+\begin{figure}
+\begin{displaymath}
+\begin{array}{c@{}l@{}l}\\
+\begin{array}[m]{c}
+A\\
+x\xleftarrow{\$}\{0,1\}^\lambda\\
+r\xleftarrow{\$}\mathbb{Z}_q\\
+\end{array}
+&
+\begin{array}[m]{c}
+\begin{tikzpicture}
+\node (n1) {};
+\node (n2) [right=120pt of n1] {}
+ edge[thick,<-] node[yshift=7pt]
+ {$A, X=g^r$} (n1);
+\node (n1') [below= 15pt of n1] {};
+\node (n2') [right=120pt of n1'] {}
+ edge[thick,->] node[yshift=7pt]
+ {$B, Y=g^{r'}$} (n1');
+\end{tikzpicture}
+\end{array}
+&
+\begin{array}[m]{c}
+B\\
+r'\xleftarrow{\$}\mathbb{Z}_q\\
+y\xleftarrow{\$}\{0,1\}^\lambda\\[3ex]
+\end{array}
+\end{array}
+\end{displaymath}
+\end{figure}
+\[K=H(\s(\pA,\pB,X,Y)),\mbox{ where }\]
+\[\s(\pA,\pB,X,Y))=(Y^\sA,B^{r},Y^{r},A,B)\]
+For all adversaries $A$ there is an adversary $B$ s.t.
+\[
+\begin{array}{l}
+\Pr[G'_1(A,\NAXOS):b'=b]=\\
+\quad\Pr[G_1(B,\NAXOS'):b'=b]+\Pr[G_1(B,\NAXOS):\mbox{Guess fresh
+  }a\mbox{ or } x]
+    
+\end{array}\]
+\end{frame}
+\begin{frame}
+  \frametitle{}
+Using the same generic proof, we can bound the probability of 
+\[\Pr[G_1(B,\NAXOS):\mbox{ Guess fresh
+  }a\mbox{ or } x]\]
+with respect to Gap Discrete Log.
+
+Gap Discrete Log: 
+
+Given $g^a$, compute $a$ while having access to a restricted DDH
+oracle:
+
+\[(g^x,z):\; z\stackrel{?}{=}g^{ax}\]
+\end{frame}
+\begin{frame}
+  \frametitle{Conclusion}
+  \begin{itemize}
+  \item An automated proof in EasyCrypt of a modular reduction of the
+    key security of hashed key exchange protocols to simplified
+    session string unforgery. 
+  \item Applications: HMQV, \NAXOS, a new family of protocols based on
+    twin DH we designed.
+  \end{itemize}
+  \begin{block}
+    {Several challenges for EasyCrypt}
+    \begin{itemize}
+    \item Introduction of an instantiation mechanism.
+    \item Automatic invariant generation.
+    \item Better handling of verification conditions.
+    \item Improvement of the undelying logic - exploiting CIL
+      (Computational Indistinguishability Logic)
+    \end{itemize}
+  \end{block}
+\end{frame}
+\end{document}

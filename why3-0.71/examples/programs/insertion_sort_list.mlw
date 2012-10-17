@@ -1,0 +1,33 @@
+
+(* Sorting a list of integers using insertion sort *)
+
+module M
+
+  use import int.Int
+  use import list.Length
+  use import list.SortedInt
+  use import list.Permut
+
+  let rec insert x l variant { length l } =
+    { sorted l }
+    match l with
+    | Nil -> Cons x Nil
+    | Cons y r -> if x <= y then Cons x l else Cons y (insert x r)
+    end
+    { sorted result /\ permut (Cons x l) result }
+
+  let rec insertion_sort l variant { length l } =
+    { }
+    match l with
+    | Nil -> Nil
+    | Cons x r -> insert x (insertion_sort r)
+    end
+    { sorted result /\ permut l result }
+
+end
+
+(*
+Local Variables:
+compile-command: "unset LANG; make -C ../.. examples/programs/insertion_sort_list.gui"
+End:
+*)

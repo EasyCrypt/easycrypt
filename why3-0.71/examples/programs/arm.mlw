@@ -1,0 +1,143 @@
+
+(* experiments related to ARM program verification *)
+
+module M
+
+  use import module ref.Refint
+  use import module array.Array
+
+  val a : array int
+
+  predicate inv (a : array int) =
+    a[0] = 0 /\ length a = 11 /\ forall k:int. 1 <= k <= 10 -> 0 < a[k]
+
+  val loop1 : ref int
+  val loop2 : ref int
+
+  let insertion_sort () =
+    { inv a /\
+      (* ghost *) !loop1 = 0 /\ !loop2 = 0 }
+    let i = ref 2 in
+    while !i <= 10 do
+      invariant { 2 <= !i <= 11 /\ inv a /\
+                  (* ghost *) !loop1 = !i - 2 /\ 2 * !loop2 <= (!i-2) * (!i-1) }
+      variant { 10 - !i }
+      (* ghost *) incr loop1;
+      let j = ref !i in
+      while a[!j] < a[!j - 1] do
+        invariant { 1 <= !j <= !i /\ inv a /\
+                    (* ghost *) 2 * !loop2 <= (!i-2) * (!i-1) + 2*(!i - !j) }
+        variant { !j }
+        (* ghost *) incr loop2;
+        let temp = a[!j] in
+        a[!j] <- a[!j - 1];
+        a[!j - 1] <- temp;
+        decr j
+      done;
+      incr i
+    done
+    { !loop1 = 9 /\ !loop2 <= 45 }
+
+end
+
+module ARM
+
+  use export int.Int
+  use export map.Map
+  use export module ref.Ref
+
+  (* memory *)
+  val mem : ref (map int int)
+  val mem_ldr : a:int -> {} int reads mem.contents { result = !mem[a] }
+  val mem_str : a:int -> v:int ->
+    {} int writes mem.contents { !mem = (old !mem)[a <- v] }
+
+  (* data segment *)
+  (*
+  val data : ref (t int int)
+  val data_ldr : a:int -> {} int reads data { result = data[a] }
+  val data_str :
+    a:int -> v:int -> {} int writes data { data = (old data)[a <- v] }
+  *)
+
+  (* registers *)
+  val r0 : ref int
+  val r1 : ref int
+  val r2 : ref int
+  val r3 : ref int
+  (* ... *)
+  val fp : ref int
+  val pc : ref int (* pc *)
+
+  val ldr :
+    r:ref int -> a:int -> {} unit reads mem.contents writes r.contents { !r = !mem[a] }
+  val str :
+    r:ref int -> a:int -> {} unit reads r.contents writes mem.contents { !mem = (old !mem)[a <- !r] }
+
+  (* condition flags *)
+  val le : ref bool
+
+  val cmp : r:ref int -> v:int ->
+    {}
+    unit reads r.contents writes le.contents
+    { !le=True <-> !r <= v }
+
+end
+
+(*
+@@ logic separation (fp : int) = a+10 < fp-24
+
+main:
+    @@ assume separation fp
+
+.L2:@@ invariant ...
+
+.L3:
+
+.L4:@@ invariant ...
+
+*)
+
+module InsertionSortExample
+
+  use import module ARM
+
+  (* i = fp-16
+     j = fp-20
+     temp = fp-24 *)
+
+  val l4 : ref int
+  val l7 : ref int
+
+  function a : int
+
+  (* stack and data segment do not overlap *)
+  predicate separation (fp : int) = a+10 < fp-24
+
+  predicate inv (mem: map int int) =
+    mem[a] = 0 /\ forall k:int. 1 <= k <= 10 -> 0 < mem[a + k]
+
+  predicate inv_l2 (mem: map int int) (fp : int) (l4 : int) =
+    2 <= mem[fp - 16] <= 11 /\ l4 = mem[fp-16] - 2 /\ inv mem
+
+  let path_init_l2 () =
+    { separation !fp /\ inv !mem }
+    (* ghost *) l4 := 0; l7 := 0;
+    r3 := 2;
+    str r3 (!fp - 16)
+    { inv_l2 !mem !fp !l4 }
+
+  let path_l2_exit () =
+    { separation !fp /\ inv_l2 !mem !fp !l4 }
+    ldr r3 (!fp - 16);
+    cmp r3 10;
+    assume { !le = False }
+    { !l4 = 9 }
+
+end
+
+(*
+Local Variables:
+compile-command: "unset LANG; make -C ../.. examples/programs/arm.gui"
+End:
+*)

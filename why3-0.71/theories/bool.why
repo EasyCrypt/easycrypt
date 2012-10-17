@@ -1,0 +1,43 @@
+
+theory Bool
+
+  type bool = True | False
+
+  function andb (x y : bool) : bool =
+    match x, y with
+    | True, True -> True
+    | _   , _    -> False
+    end
+
+  function orb (x y : bool) : bool =
+    match x, y with
+    | False, False -> False
+    | _    , _     -> True
+    end
+
+  function xorb (x y : bool) : bool =
+    match x, y with
+    | True,  False -> True
+    | False, True  -> True
+    | _    , _     -> False
+    end
+
+  function notb (x : bool) : bool =
+    match x with
+    | False -> True
+    | True  -> False
+    end
+
+end
+
+theory Ite
+
+  use import Bool
+
+  function ite (b:bool) (x y : 'a) : 'a =
+    match b with
+    | True  -> x
+    | False -> y
+    end
+
+end

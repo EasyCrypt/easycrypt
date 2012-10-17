@@ -1,0 +1,32 @@
+
+theory Sum "Sum of the elements of an indexed container"
+
+  use import int.Int
+
+  type container
+
+  (* [f c i] is the [i]-th element in the container [c] *)
+  function f container int : int
+
+  (* [sum c i j] is the sum Sum_{i <= k < j} f c k *)
+  function sum container int int : int
+
+  axiom Sum_def_empty :
+    forall c : container, i j : int. j <= i -> sum c i j = 0
+
+  axiom Sum_def_non_empty :
+    forall c: container, i j : int. i < j -> sum c i j = f c i + sum c (i+1) j
+
+  lemma Sum_right_extension:
+    forall c : container, i j : int.
+    i < j -> sum c i j = sum c i (j-1) + f c (j-1)
+
+  lemma Sum_transitivity :
+    forall c : container, i k j : int. i <= k <= j ->
+    sum c i j = sum c i k + sum c k j
+
+  lemma Sum_eq :
+    forall c1 c2 : container, i j : int.
+    (forall k : int. i <= k < j -> f c1 k = f c2 k) -> sum c1 i j = sum c2 i j
+
+end

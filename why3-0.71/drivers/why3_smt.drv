@@ -1,0 +1,31 @@
+(* Why driver for Why3 syntax *)
+
+printer "why3"
+filename "%f-%t-%g.why"
+
+transformation "inline_trivial"
+
+transformation "eliminate_builtin"
+transformation "eliminate_recursion"
+transformation "eliminate_inductive"
+transformation "eliminate_algebraic_smt"
+
+transformation "discriminate"
+transformation "encoding_smt"
+
+theory BuiltIn
+  syntax type  int  "int"
+  syntax type  real "real"
+  syntax predicate (=)  "(%1 = %2)"
+
+  meta "encoding : kept" type int
+  meta "encoding : kept" type real
+end
+
+theory map.Map
+  meta "encoding : lskept" function get
+  meta "encoding : lskept" function set
+  meta "encoding : lskept" function const
+end
+
+import "discrimination.gen"

@@ -1,0 +1,930 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE why3session SYSTEM "why3session.dtd">
+<why3session
+ name="programs/edit_distance/why3session.xml">
+ <prover
+  id="alt-ergo"
+  name="Alt-Ergo"
+  version="0.93"/>
+ <prover
+  id="coq"
+  name="Coq"
+  version="8.3pl2"/>
+ <prover
+  id="cvc3"
+  name="CVC3"
+  version="2.2"/>
+ <prover
+  id="eprover"
+  name="Eprover"
+  version="1.4 Namring"/>
+ <prover
+  id="gappa"
+  name="Gappa"
+  version="0.15.1"/>
+ <prover
+  id="simplify"
+  name="Simplify"
+  version="1.5.4"/>
+ <prover
+  id="spass"
+  name="Spass"
+  version="3.7"/>
+ <prover
+  id="vampire"
+  name="Vampire"
+  version="0.6"/>
+ <prover
+  id="verit"
+  name="veriT"
+  version="dev"/>
+ <prover
+  id="yices"
+  name="Yices"
+  version="1.0.25"/>
+ <prover
+  id="z3"
+  name="Z3"
+  version="2.19"/>
+ <file
+  name="../edit_distance.mlw"
+  verified="true"
+  expanded="false">
+  <theory
+   name="Word"
+   verified="true"
+   expanded="false">
+   <goal
+    name="first_last_explicit"
+    sum="4362242a0ff2013b76b9b1bc4743a62d"
+    proved="true"
+    expanded="false"
+    shape="ainfix =ainfix ++abut_lastV1V0aConsalast_charV1V0aNilaConsV1V0F">
+    <proof
+     prover="coq"
+     timelimit="10"
+     edited="edit_distance_Word_first_last_explicit_1.v"
+     obsolete="false">
+     <result status="valid" time="0.50"/>
+    </proof>
+   </goal>
+   <goal
+    name="first_last"
+    sum="4db1be0af96f4670c1997ebb5bc26161"
+    proved="true"
+    expanded="false"
+    shape="ainfix =alengthV2alengthV1Aainfix =ainfix ++V2aConsV3aNilaConsV0V1EF">
+    <proof
+     prover="coq"
+     timelimit="10"
+     edited="edit_distance_Word_first_last_1.v"
+     obsolete="false">
+     <result status="valid" time="0.52"/>
+    </proof>
+   </goal>
+   <goal
+    name="key_lemma_right"
+    sum="a6ba10601aecaa1f6eb72f062fcaef3e"
+    proved="true"
+    expanded="false"
+    shape="ainfix <=ainfix +V7alengthV5ainfix +V2c1AadistV6V4V7Aainfix =V0ainfix ++V5V6EIainfix =V1aConsV3V4FIadistV0V1V2F">
+    <proof
+     prover="coq"
+     timelimit="10"
+     edited="edit_distance_Word_key_lemma_right_1.v"
+     obsolete="false">
+     <result status="valid" time="0.56"/>
+    </proof>
+   </goal>
+   <goal
+    name="dist_symetry"
+    sum="f86b9df55dfe68dea0072d4082ec36e7"
+    proved="true"
+    expanded="false"
+    shape="adistV1V0V2IadistV0V1V2F">
+    <proof
+     prover="coq"
+     timelimit="10"
+     edited="edit_distance_Word_dist_symetry_1.v"
+     obsolete="false">
+     <result status="valid" time="0.52"/>
+    </proof>
+   </goal>
+   <goal
+    name="key_lemma_left"
+    sum="df0dcbb097382797788c0d727ce2ffb6"
+    proved="true"
+    expanded="false"
+    shape="ainfix <=ainfix +V6alengthV4ainfix +V2c1AadistV0V5V6Aainfix =V1ainfix ++V4V5EIadistaConsV3V0V1V2F">
+    <proof
+     prover="z3"
+     timelimit="10"
+     edited=""
+     obsolete="false">
+     <result status="valid" time="0.06"/>
+    </proof>
+   </goal>
+   <goal
+    name="dist_concat_left"
+    sum="091b887eb99c304149d356bed7d18589"
+    proved="true"
+    expanded="false"
+    shape="adistainfix ++V0V1V2ainfix +alengthV0V3IadistV1V2V3F">
+    <proof
+     prover="coq"
+     timelimit="10"
+     edited="edit_distance_Word_dist_concat_left_1.v"
+     obsolete="false">
+     <result status="valid" time="0.51"/>
+    </proof>
+   </goal>
+   <goal
+    name="dist_concat_right"
+    sum="ae7faf54357646d65fff0c322d42c807"
+    proved="true"
+    expanded="false"
+    shape="adistV1ainfix ++V0V2ainfix +alengthV0V3IadistV1V2V3F">
+    <proof
+     prover="alt-ergo"
+     timelimit="30"
+     edited=""
+     obsolete="false">
+     <result status="valid" time="0.02"/>
+    </proof>
+   </goal>
+   <goal
+    name="min_dist_equal"
+    sum="7812ecd78ae8ff35c4ae04d31bb831e8"
+    proved="true"
+    expanded="false"
+    shape="amin_distaConsV2V0aConsV2V1V3Iamin_distV0V1V3F">
+    <proof
+     prover="coq"
+     timelimit="10"
+     edited="edit_distance_Word_min_dist_equal_1.v"
+     obsolete="false">
+     <result status="valid" time="0.60"/>
+    </proof>
+   </goal>
+   <goal
+    name="min_dist_diff"
+    sum="0ea534ea1196a06528b583352d768ba2"
+    proved="true"
+    expanded="false"
+    shape="amin_distaConsV2V0aConsV3V1ainfix +aminV4V5c1Iamin_distV0aConsV3V1V4Iamin_distaConsV2V0V1V5Iainfix =V2V3NF">
+    <proof
+     prover="coq"
+     timelimit="10"
+     edited="edit_distance_Word_min_dist_diff_1.v"
+     obsolete="false">
+     <result status="valid" time="0.58"/>
+    </proof>
+   </goal>
+   <goal
+    name="min_dist_eps"
+    sum="d73c848de69f6f273dbda2d610106e62"
+    proved="true"
+    expanded="false"
+    shape="amin_distaConsV1V0aNilainfix +V2c1Iamin_distV0aNilV2F">
+    <proof
+     prover="coq"
+     timelimit="20"
+     edited="edit_distance_Word_min_dist_eps_1.v"
+     obsolete="false">
+     <result status="valid" time="0.54"/>
+    </proof>
+   </goal>
+   <goal
+    name="min_dist_eps_length"
+    sum="0137d99ec15de5a7dd2311155cfadedc"
+    proved="true"
+    expanded="false"
+    shape="amin_distaNilV0alengthV0F">
+    <proof
+     prover="coq"
+     timelimit="20"
+     edited="edit_distance_Word_min_dist_eps_length_1.v"
+     obsolete="false">
+     <result status="valid" time="0.56"/>
+    </proof>
+   </goal>
+  </theory>
+  <theory
+   name="WP EditDistance"
+   verified="true"
+   expanded="false">
+   <goal
+    name="suffix_length"
+    sum="3a7195b2bd8b50c85328f3e5990fad98"
+    proved="true"
+    expanded="false"
+    shape="ainfix =alengthasuffixV0V1ainfix -alengthV0V1Iainfix <=V1alengthV0Aainfix <=c0V1F">
+    <proof
+     prover="coq"
+     timelimit="20"
+     edited="edit_distance_WP_EditDistance_suffix_length_1.v"
+     obsolete="false">
+     <result status="valid" time="0.62"/>
+    </proof>
+   </goal>
+   <goal
+    name="WP_parameter distance"
+    expl="parameter distance"
+    sum="08a70fa25811fbc50a875cbdb431af58"
+    proved="true"
+    expanded="false"
+    shape="Lamk arrayV1V2Lamk arrayV0V3amin_distasuffixV5c0asuffixV4c0agetV7c0Aainfix <c0ainfix +V1c1Aainfix <=c0c0Iamin_distasuffixV5ainfix +ainfix +c0c-1c1asuffixV4V8agetV7V8Iainfix <=V8V1Aainfix <=c0V8FAamin_distasuffixV5ainfix +ainfix +V9c-1c1asuffixV4V13agetV12V13Iainfix <=V13V1Aainfix <=c0V13FIamin_distasuffixV5ainfix +V9c1asuffixV4ainfix +ainfix +c0c-1c1V11Aamin_distasuffixV5ainfix +V9c1asuffixV4V14agetV12V14Iainfix <=V14ainfix +c0c-1Aainfix <=c0V14FAamin_distasuffixV5V9asuffixV4V15agetV12V15Iainfix <=V15V1Aainfix <ainfix +c0c-1V15FAiainfix =agetV3V9agetV2V16amin_distasuffixV5ainfix +V9c1asuffixV4ainfix +ainfix +V16c-1c1V17Aamin_distasuffixV5ainfix +V9c1asuffixV4V19agetV18V19Iainfix <=V19ainfix +V16c-1Aainfix <=c0V19FAamin_distasuffixV5V9asuffixV4V20agetV18V20Iainfix <=V20V1Aainfix <ainfix +V16c-1V20FIainfix =V18asetV12V16V11FAainfix <V16ainfix +V1c1Aainfix <=c0V16amin_distasuffixV5ainfix +V9c1asuffixV4ainfix +ainfix +V16c-1c1V17Aamin_distasuffixV5ainfix +V9c1asuffixV4V22agetV21V22Iainfix <=V22ainfix +V16c-1Aainfix <=c0V22FAamin_distasuffixV5V9asuffixV4V23agetV21V23Iainfix <=V23V1Aainfix <ainfix +V16c-1V23FIainfix =V21asetV12V16ainfix +aminagetV12V16agetV12ainfix +V16c1c1FAainfix <V16ainfix +V1c1Aainfix <=c0V16Aainfix <ainfix +V16c1ainfix +V1c1Aainfix <=c0ainfix +V16c1Aainfix <V16ainfix +V1c1Aainfix <=c0V16Aainfix <V16V1Aainfix <=c0V16Aainfix <V9V0Aainfix <=c0V9Iainfix =V17agetV12V16FAainfix <V16ainfix +V1c1Aainfix <=c0V16Iamin_distasuffixV5ainfix +V9c1asuffixV4ainfix +V16c1V11Aamin_distasuffixV5ainfix +V9c1asuffixV4V24agetV12V24Iainfix <=V24V16Aainfix <=c0V24FAamin_distasuffixV5V9asuffixV4V25agetV12V25Iainfix <=V25V1Aainfix <V16V25FIainfix >=V16c0Aainfix >=ainfix -V1c1V16FFFAamin_distasuffixV5ainfix +V9c1asuffixV4ainfix +ainfix -V1c1c1agetV7V1Aamin_distasuffixV5ainfix +V9c1asuffixV4V26agetV10V26Iainfix <=V26ainfix -V1c1Aainfix <=c0V26FAamin_distasuffixV5V9asuffixV4V27agetV10V27Iainfix <=V27V1Aainfix <ainfix -V1c1V27FIainfix >=ainfix -V1c1c0Aamin_distasuffixV5ainfix +ainfix +V9c-1c1asuffixV4V28agetV10V28Iainfix <=V28V1Aainfix <=c0V28FIainfix <ainfix -V1c1c0Iainfix =V10asetV7V1ainfix +agetV7V1c1FAainfix <V1ainfix +V1c1Aainfix <=c0V1Aainfix <V1ainfix +V1c1Aainfix <=c0V1Aainfix <V1ainfix +V1c1Aainfix <=c0V1Iamin_distasuffixV5ainfix +V9c1asuffixV4V29agetV7V29Iainfix <=V29V1Aainfix <=c0V29FIainfix >=V9c0Aainfix >=ainfix -V0c1V9FFAamin_distasuffixV5ainfix +ainfix -V0c1c1asuffixV4V30agetV6V30Iainfix <=V30V1Aainfix <=c0V30FIainfix >=ainfix -V0c1c0Aamin_distasuffixV5c0asuffixV4c0agetV6c0Aainfix <c0ainfix +V1c1Aainfix <=c0c0Iainfix <ainfix -V0c1c0Iainfix =agetV6V31ainfix -V1V31Iainfix <V31ainfix +V1c1Aainfix <=c0V31FAainfix =agetV33V34ainfix -V1V34Iainfix <V34ainfix +V32c1Aainfix <=c0V34FIainfix =V33asetV6V32ainfix -V1V32FAainfix <V32ainfix +V1c1Aainfix <=c0V32Iainfix =agetV6V35ainfix -V1V35Iainfix <V35V32Aainfix <=c0V35FIainfix <=V32V1Aainfix <=c0V32FFAainfix =agetaconstc0V36ainfix -V1V36Iainfix <V36c0Aainfix <=c0V36FIainfix <=c0V1Aamin_distasuffixV5c0asuffixV4c0agetV37c0Aainfix <c0ainfix +V1c1Aainfix <=c0c0Iamin_distasuffixV5ainfix +ainfix +c0c-1c1asuffixV4V38agetV37V38Iainfix <=V38V1Aainfix <=c0V38FAamin_distasuffixV5ainfix +ainfix +V39c-1c1asuffixV4V43agetV42V43Iainfix <=V43V1Aainfix <=c0V43FIamin_distasuffixV5ainfix +V39c1asuffixV4ainfix +ainfix +c0c-1c1V41Aamin_distasuffixV5ainfix +V39c1asuffixV4V44agetV42V44Iainfix <=V44ainfix +c0c-1Aainfix <=c0V44FAamin_distasuffixV5V39asuffixV4V45agetV42V45Iainfix <=V45V1Aainfix <ainfix +c0c-1V45FAiainfix =agetV3V39agetV2V46amin_distasuffixV5ainfix +V39c1asuffixV4ainfix +ainfix +V46c-1c1V47Aamin_distasuffixV5ainfix +V39c1asuffixV4V49agetV48V49Iainfix <=V49ainfix +V46c-1Aainfix <=c0V49FAamin_distasuffixV5V39asuffixV4V50agetV48V50Iainfix <=V50V1Aainfix <ainfix +V46c-1V50FIainfix =V48asetV42V46V41FAainfix <V46ainfix +V1c1Aainfix <=c0V46amin_distasuffixV5ainfix +V39c1asuffixV4ainfix +ainfix +V46c-1c1V47Aamin_distasuffixV5ainfix +V39c1asuffixV4V52agetV51V52Iainfix <=V52ainfix +V46c-1Aainfix <=c0V52FAamin_distasuffixV5V39asuffixV4V53agetV51V53Iainfix <=V53V1Aainfix <ainfix +V46c-1V53FIainfix =V51asetV42V46ainfix +aminagetV42V46agetV42ainfix +V46c1c1FAainfix <V46ainfix +V1c1Aainfix <=c0V46Aainfix <ainfix +V46c1ainfix +V1c1Aainfix <=c0ainfix +V46c1Aainfix <V46ainfix +V1c1Aainfix <=c0V46Aainfix <V46V1Aainfix <=c0V46Aainfix <V39V0Aainfix <=c0V39Iainfix =V47agetV42V46FAainfix <V46ainfix +V1c1Aainfix <=c0V46Iamin_distasuffixV5ainfix +V39c1asuffixV4ainfix +V46c1V41Aamin_distasuffixV5ainfix +V39c1asuffixV4V54agetV42V54Iainfix <=V54V46Aainfix <=c0V54FAamin_distasuffixV5V39asuffixV4V55agetV42V55Iainfix <=V55V1Aainfix <V46V55FIainfix >=V46c0Aainfix >=ainfix -V1c1V46FFFAamin_distasuffixV5ainfix +V39c1asuffixV4ainfix +ainfix -V1c1c1agetV37V1Aamin_distasuffixV5ainfix +V39c1asuffixV4V56agetV40V56Iainfix <=V56ainfix -V1c1Aainfix <=c0V56FAamin_distasuffixV5V39asuffixV4V57agetV40V57Iainfix <=V57V1Aainfix <ainfix -V1c1V57FIainfix >=ainfix -V1c1c0Aamin_distasuffixV5ainfix +ainfix +V39c-1c1asuffixV4V58agetV40V58Iainfix <=V58V1Aainfix <=c0V58FIainfix <ainfix -V1c1c0Iainfix =V40asetV37V1ainfix +agetV37V1c1FAainfix <V1ainfix +V1c1Aainfix <=c0V1Aainfix <V1ainfix +V1c1Aainfix <=c0V1Aainfix <V1ainfix +V1c1Aainfix <=c0V1Iamin_distasuffixV5ainfix +V39c1asuffixV4V59agetV37V59Iainfix <=V59V1Aainfix <=c0V59FIainfix >=V39c0Aainfix >=ainfix -V0c1V39FFAamin_distasuffixV5ainfix +ainfix -V0c1c1asuffixV4V60agetaconstc0V60Iainfix <=V60V1Aainfix <=c0V60FIainfix >=ainfix -V0c1c0Aamin_distasuffixV5c0asuffixV4c0agetaconstc0c0Aainfix <c0ainfix +V1c1Aainfix <=c0c0Iainfix <ainfix -V0c1c0Iainfix >c0V1Aainfix >=ainfix +V1c1c0Iainfix >=V1c0Aainfix >=V0c0FFFF">
+    <transf
+     name="split_goal"
+     proved="true"
+     expanded="false">
+     <goal
+      name="WP_parameter distance.1"
+      expl="precondition"
+      sum="383e7f9e5ad05d82f68a1b022ce470f8"
+      proved="true"
+      expanded="false"
+      shape="Lamk arrayV1V2Lamk arrayV0V3ainfix >=ainfix +V1c1c0Iainfix >=V1c0Aainfix >=V0c0FFFF">
+      <proof
+       prover="alt-ergo"
+       timelimit="30"
+       edited=""
+       obsolete="false">
+       <result status="valid" time="0.02"/>
+      </proof>
+     </goal>
+     <goal
+      name="WP_parameter distance.2"
+      expl="precondition"
+      sum="125adb6f7e627393d930b6220ef16e68"
+      proved="true"
+      expanded="false"
+      shape="Lamk arrayV1V2Lamk arrayV0V3ainfix <c0ainfix +V1c1Aainfix <=c0c0Iainfix <ainfix -V0c1c0Iainfix >c0V1Iainfix >=ainfix +V1c1c0Iainfix >=V1c0Aainfix >=V0c0FFFF">
+      <proof
+       prover="alt-ergo"
+       timelimit="30"
+       edited=""
+       obsolete="false">
+       <result status="valid" time="0.02"/>
+      </proof>
+     </goal>
+     <goal
+      name="WP_parameter distance.3"
+      expl="normal postcondition"
+      sum="1c1e59cf46b6a6ad30e281ea3aae547b"
+      proved="true"
+      expanded="false"
+      shape="Lamk arrayV1V2Lamk arrayV0V3amin_distasuffixV5c0asuffixV4c0agetaconstc0c0Iainfix <c0ainfix +V1c1Aainfix <=c0c0Iainfix <ainfix -V0c1c0Iainfix >c0V1Iainfix >=ainfix +V1c1c0Iainfix >=V1c0Aainfix >=V0c0FFFF">
+      <proof
+       prover="alt-ergo"
+       timelimit="30"
+       edited=""
+       obsolete="false">
+       <result status="valid" time="0.02"/>
+      </proof>
+     </goal>
+     <goal
+      name="WP_parameter distance.4"
+      expl="for loop initialization"
+      sum="10ad7c23470c86d07a885a6efbb8a581"
+      proved="true"
+      expanded="false"
+      shape="Lamk arrayV1V2Lamk arrayV0V3amin_distasuffixV5ainfix +ainfix -V0c1c1asuffixV4V6agetaconstc0V6Iainfix <=V6V1Aainfix <=c0V6FIainfix >=ainfix -V0c1c0Iainfix >c0V1Iainfix >=ainfix +V1c1c0Iainfix >=V1c0Aainfix >=V0c0FFFF">
+      <proof
+       prover="alt-ergo"
+       timelimit="30"
+       edited=""
+       obsolete="false">
+       <result status="valid" time="0.02"/>
+      </proof>
+     </goal>
+     <goal
+      name="WP_parameter distance.5"
+      expl="for loop preservation"
+      sum="9e684fa813de15b8fa923260a3a4fb51"
+      proved="true"
+      expanded="false"
+      shape="Lamk arrayV1V2Lamk arrayV0V3amin_distasuffixV5ainfix +ainfix +V7c-1c1asuffixV4V11agetV10V11Iainfix <=V11V1Aainfix <=c0V11FIamin_distasuffixV5ainfix +V7c1asuffixV4ainfix +ainfix +c0c-1c1V9Aamin_distasuffixV5ainfix +V7c1asuffixV4V12agetV10V12Iainfix <=V12ainfix +c0c-1Aainfix <=c0V12FAamin_distasuffixV5V7asuffixV4V13agetV10V13Iainfix <=V13V1Aainfix <ainfix +c0c-1V13FAiainfix =agetV3V7agetV2V14amin_distasuffixV5ainfix +V7c1asuffixV4ainfix +ainfix +V14c-1c1V15Aamin_distasuffixV5ainfix +V7c1asuffixV4V17agetV16V17Iainfix <=V17ainfix +V14c-1Aainfix <=c0V17FAamin_distasuffixV5V7asuffixV4V18agetV16V18Iainfix <=V18V1Aainfix <ainfix +V14c-1V18FIainfix =V16asetV10V14V9FAainfix <V14ainfix +V1c1Aainfix <=c0V14amin_distasuffixV5ainfix +V7c1asuffixV4ainfix +ainfix +V14c-1c1V15Aamin_distasuffixV5ainfix +V7c1asuffixV4V20agetV19V20Iainfix <=V20ainfix +V14c-1Aainfix <=c0V20FAamin_distasuffixV5V7asuffixV4V21agetV19V21Iainfix <=V21V1Aainfix <ainfix +V14c-1V21FIainfix =V19asetV10V14ainfix +aminagetV10V14agetV10ainfix +V14c1c1FAainfix <V14ainfix +V1c1Aainfix <=c0V14Aainfix <ainfix +V14c1ainfix +V1c1Aainfix <=c0ainfix +V14c1Aainfix <V14ainfix +V1c1Aainfix <=c0V14Aainfix <V14V1Aainfix <=c0V14Aainfix <V7V0Aainfix <=c0V7Iainfix =V15agetV10V14FAainfix <V14ainfix +V1c1Aainfix <=c0V14Iamin_distasuffixV5ainfix +V7c1asuffixV4ainfix +V14c1V9Aamin_distasuffixV5ainfix +V7c1asuffixV4V22agetV10V22Iainfix <=V22V14Aainfix <=c0V22FAamin_distasuffixV5V7asuffixV4V23agetV10V23Iainfix <=V23V1Aainfix <V14V23FIainfix >=V14c0Aainfix >=ainfix -V1c1V14FFFAamin_distasuffixV5ainfix +V7c1asuffixV4ainfix +ainfix -V1c1c1agetV6V1Aamin_distasuffixV5ainfix +V7c1asuffixV4V24agetV8V24Iainfix <=V24ainfix -V1c1Aainfix <=c0V24FAamin_distasuffixV5V7asuffixV4V25agetV8V25Iainfix <=V25V1Aainfix <ainfix -V1c1V25FIainfix >=ainfix -V1c1c0Aamin_distasuffixV5ainfix +ainfix +V7c-1c1asuffixV4V26agetV8V26Iainfix <=V26V1Aainfix <=c0V26FIainfix <ainfix -V1c1c0Iainfix =V8asetV6V1ainfix +agetV6V1c1FAainfix <V1ainfix +V1c1Aainfix <=c0V1Aainfix <V1ainfix +V1c1Aainfix <=c0V1Aainfix <V1ainfix +V1c1Aainfix <=c0V1Iamin_distasuffixV5ainfix +V7c1asuffixV4V27agetV6V27Iainfix <=V27V1Aainfix <=c0V27FIainfix >=V7c0Aainfix >=ainfix -V0c1V7FFIainfix >=ainfix -V0c1c0Iainfix >c0V1Iainfix >=ainfix +V1c1c0Iainfix >=V1c0Aainfix >=V0c0FFFF">
+      <transf
+       name="split_goal"
+       proved="true"
+       expanded="false">
+       <goal
+        name="WP_parameter distance.5.1"
+        expl="for loop preservation"
+        sum="eeead6f7b056a06697633e68aa8ad4a0"
+        proved="true"
+        expanded="false"
+        shape="Lamk arrayV1V2Lamk arrayV0V3ainfix <V1ainfix +V1c1Aainfix <=c0V1Iamin_distasuffixV5ainfix +V7c1asuffixV4V8agetV6V8Iainfix <=V8V1Aainfix <=c0V8FIainfix >=V7c0Aainfix >=ainfix -V0c1V7FFIainfix >=ainfix -V0c1c0Iainfix >c0V1Iainfix >=ainfix +V1c1c0Iainfix >=V1c0Aainfix >=V0c0FFFF">
+        <proof
+         prover="alt-ergo"
+         timelimit="20"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter distance.5.2"
+        expl="for loop preservation"
+        sum="cb49de4c132112e7f41864c068bf658d"
+        proved="true"
+        expanded="false"
+        shape="Lamk arrayV1V2Lamk arrayV0V3ainfix <V1ainfix +V1c1Aainfix <=c0V1Iainfix <V1ainfix +V1c1Aainfix <=c0V1Iamin_distasuffixV5ainfix +V7c1asuffixV4V8agetV6V8Iainfix <=V8V1Aainfix <=c0V8FIainfix >=V7c0Aainfix >=ainfix -V0c1V7FFIainfix >=ainfix -V0c1c0Iainfix >c0V1Iainfix >=ainfix +V1c1c0Iainfix >=V1c0Aainfix >=V0c0FFFF">
+        <proof
+         prover="alt-ergo"
+         timelimit="20"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.01"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter distance.5.3"
+        expl="for loop preservation"
+        sum="1696aab35f97e5c3cdf1873356c12a27"
+        proved="true"
+        expanded="false"
+        shape="Lamk arrayV1V2Lamk arrayV0V3ainfix <V1ainfix +V1c1Aainfix <=c0V1Iainfix <V1ainfix +V1c1Aainfix <=c0V1Iainfix <V1ainfix +V1c1Aainfix <=c0V1Iamin_distasuffixV5ainfix +V7c1asuffixV4V8agetV6V8Iainfix <=V8V1Aainfix <=c0V8FIainfix >=V7c0Aainfix >=ainfix -V0c1V7FFIainfix >=ainfix -V0c1c0Iainfix >c0V1Iainfix >=ainfix +V1c1c0Iainfix >=V1c0Aainfix >=V0c0FFFF">
+        <proof
+         prover="alt-ergo"
+         timelimit="20"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.01"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter distance.5.4"
+        expl="for loop preservation"
+        sum="0857ed895aadae964ff2071c6079fdeb"
+        proved="true"
+        expanded="false"
+        shape="Lamk arrayV1V2Lamk arrayV0V3amin_distasuffixV5ainfix +ainfix +V7c-1c1asuffixV4V9agetV8V9Iainfix <=V9V1Aainfix <=c0V9FIainfix <ainfix -V1c1c0Iainfix =V8asetV6V1ainfix +agetV6V1c1FIainfix <V1ainfix +V1c1Aainfix <=c0V1Iainfix <V1ainfix +V1c1Aainfix <=c0V1Iainfix <V1ainfix +V1c1Aainfix <=c0V1Iamin_distasuffixV5ainfix +V7c1asuffixV4V10agetV6V10Iainfix <=V10V1Aainfix <=c0V10FIainfix >=V7c0Aainfix >=ainfix -V0c1V7FFIainfix >=ainfix -V0c1c0Iainfix >c0V1Iainfix >=ainfix +V1c1c0Iainfix >=V1c0Aainfix >=V0c0FFFF">
+        <proof
+         prover="alt-ergo"
+         timelimit="20"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter distance.5.5"
+        expl="for loop preservation"
+        sum="a35290ad76bc965c411249413cf17554"
+        proved="true"
+        expanded="false"
+        shape="Lamk arrayV1V2Lamk arrayV0V3amin_distasuffixV5ainfix +V7c1asuffixV4ainfix +ainfix -V1c1c1agetV6V1Aamin_distasuffixV5ainfix +V7c1asuffixV4V9agetV8V9Iainfix <=V9ainfix -V1c1Aainfix <=c0V9FAamin_distasuffixV5V7asuffixV4V10agetV8V10Iainfix <=V10V1Aainfix <ainfix -V1c1V10FIainfix >=ainfix -V1c1c0Iainfix =V8asetV6V1ainfix +agetV6V1c1FIainfix <V1ainfix +V1c1Aainfix <=c0V1Iainfix <V1ainfix +V1c1Aainfix <=c0V1Iainfix <V1ainfix +V1c1Aainfix <=c0V1Iamin_distasuffixV5ainfix +V7c1asuffixV4V11agetV6V11Iainfix <=V11V1Aainfix <=c0V11FIainfix >=V7c0Aainfix >=ainfix -V0c1V7FFIainfix >=ainfix -V0c1c0Iainfix >c0V1Iainfix >=ainfix +V1c1c0Iainfix >=V1c0Aainfix >=V0c0FFFF">
+        <proof
+         prover="alt-ergo"
+         timelimit="20"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter distance.5.6"
+        expl="for loop preservation"
+        sum="57f22a78dead3f3c9b363d71d9d7c413"
+        proved="true"
+        expanded="false"
+        shape="Lamk arrayV1V2Lamk arrayV0V3iainfix =agetV3V7agetV2V11amin_distasuffixV5ainfix +V7c1asuffixV4ainfix +ainfix +V11c-1c1V12Aamin_distasuffixV5ainfix +V7c1asuffixV4V14agetV13V14Iainfix <=V14ainfix +V11c-1Aainfix <=c0V14FAamin_distasuffixV5V7asuffixV4V15agetV13V15Iainfix <=V15V1Aainfix <ainfix +V11c-1V15FIainfix =V13asetV10V11V9FAainfix <V11ainfix +V1c1Aainfix <=c0V11amin_distasuffixV5ainfix +V7c1asuffixV4ainfix +ainfix +V11c-1c1V12Aamin_distasuffixV5ainfix +V7c1asuffixV4V17agetV16V17Iainfix <=V17ainfix +V11c-1Aainfix <=c0V17FAamin_distasuffixV5V7asuffixV4V18agetV16V18Iainfix <=V18V1Aainfix <ainfix +V11c-1V18FIainfix =V16asetV10V11ainfix +aminagetV10V11agetV10ainfix +V11c1c1FAainfix <V11ainfix +V1c1Aainfix <=c0V11Aainfix <ainfix +V11c1ainfix +V1c1Aainfix <=c0ainfix +V11c1Aainfix <V11ainfix +V1c1Aainfix <=c0V11Aainfix <V11V1Aainfix <=c0V11Aainfix <V7V0Aainfix <=c0V7Iainfix =V12agetV10V11FAainfix <V11ainfix +V1c1Aainfix <=c0V11Iamin_distasuffixV5ainfix +V7c1asuffixV4ainfix +V11c1V9Aamin_distasuffixV5ainfix +V7c1asuffixV4V19agetV10V19Iainfix <=V19V11Aainfix <=c0V19FAamin_distasuffixV5V7asuffixV4V20agetV10V20Iainfix <=V20V1Aainfix <V11V20FIainfix >=V11c0Aainfix >=ainfix -V1c1V11FFFIainfix >=ainfix -V1c1c0Iainfix =V8asetV6V1ainfix +agetV6V1c1FIainfix <V1ainfix +V1c1Aainfix <=c0V1Iainfix <V1ainfix +V1c1Aainfix <=c0V1Iainfix <V1ainfix +V1c1Aainfix <=c0V1Iamin_distasuffixV5ainfix +V7c1asuffixV4V21agetV6V21Iainfix <=V21V1Aainfix <=c0V21FIainfix >=V7c0Aainfix >=ainfix -V0c1V7FFIainfix >=ainfix -V0c1c0Iainfix >c0V1Iainfix >=ainfix +V1c1c0Iainfix >=V1c0Aainfix >=V0c0FFFF">
+        <proof
+         prover="alt-ergo"
+         timelimit="20"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter distance.5.7"
+        expl="for loop preservation"
+        sum="a2f656357bad993d4643a8533f70d83a"
+        proved="true"
+        expanded="false"
+        shape="Lamk arrayV1V2Lamk arrayV0V3amin_distasuffixV5ainfix +ainfix +V7c-1c1asuffixV4V11agetV10V11Iainfix <=V11V1Aainfix <=c0V11FIamin_distasuffixV5ainfix +V7c1asuffixV4ainfix +ainfix +c0c-1c1V9Aamin_distasuffixV5ainfix +V7c1asuffixV4V12agetV10V12Iainfix <=V12ainfix +c0c-1Aainfix <=c0V12FAamin_distasuffixV5V7asuffixV4V13agetV10V13Iainfix <=V13V1Aainfix <ainfix +c0c-1V13FFFIainfix >=ainfix -V1c1c0Iainfix =V8asetV6V1ainfix +agetV6V1c1FIainfix <V1ainfix +V1c1Aainfix <=c0V1Iainfix <V1ainfix +V1c1Aainfix <=c0V1Iainfix <V1ainfix +V1c1Aainfix <=c0V1Iamin_distasuffixV5ainfix +V7c1asuffixV4V14agetV6V14Iainfix <=V14V1Aainfix <=c0V14FIainfix >=V7c0Aainfix >=ainfix -V0c1V7FFIainfix >=ainfix -V0c1c0Iainfix >c0V1Iainfix >=ainfix +V1c1c0Iainfix >=V1c0Aainfix >=V0c0FFFF">
+        <proof
+         prover="alt-ergo"
+         timelimit="20"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+       </goal>
+      </transf>
+     </goal>
+     <goal
+      name="WP_parameter distance.6"
+      expl="precondition"
+      sum="bed05826e28ca1b74ada20e22225f5cb"
+      proved="true"
+      expanded="false"
+      shape="Lamk arrayV1V2Lamk arrayV0V3ainfix <c0ainfix +V1c1Aainfix <=c0c0Iamin_distasuffixV5ainfix +ainfix +c0c-1c1asuffixV4V7agetV6V7Iainfix <=V7V1Aainfix <=c0V7FFIainfix >=ainfix -V0c1c0Iainfix >c0V1Iainfix >=ainfix +V1c1c0Iainfix >=V1c0Aainfix >=V0c0FFFF">
+      <proof
+       prover="alt-ergo"
+       timelimit="30"
+       edited=""
+       obsolete="false">
+       <result status="valid" time="0.01"/>
+      </proof>
+     </goal>
+     <goal
+      name="WP_parameter distance.7"
+      expl="normal postcondition"
+      sum="498c3672d1a026b1f461288f98064678"
+      proved="true"
+      expanded="false"
+      shape="Lamk arrayV1V2Lamk arrayV0V3amin_distasuffixV5c0asuffixV4c0agetV6c0Iainfix <c0ainfix +V1c1Aainfix <=c0c0Iamin_distasuffixV5ainfix +ainfix +c0c-1c1asuffixV4V7agetV6V7Iainfix <=V7V1Aainfix <=c0V7FFIainfix >=ainfix -V0c1c0Iainfix >c0V1Iainfix >=ainfix +V1c1c0Iainfix >=V1c0Aainfix >=V0c0FFFF">
+      <proof
+       prover="alt-ergo"
+       timelimit="30"
+       edited=""
+       obsolete="false">
+       <result status="valid" time="0.02"/>
+      </proof>
+     </goal>
+     <goal
+      name="WP_parameter distance.8"
+      expl="for loop initialization"
+      sum="47b84ecaca073c5d74f5775f6f48b5c9"
+      proved="true"
+      expanded="false"
+      shape="Lamk arrayV1V2Lamk arrayV0V3ainfix =agetaconstc0V6ainfix -V1V6Iainfix <V6c0Aainfix <=c0V6FIainfix <=c0V1Iainfix >=ainfix +V1c1c0Iainfix >=V1c0Aainfix >=V0c0FFFF">
+      <proof
+       prover="alt-ergo"
+       timelimit="30"
+       edited=""
+       obsolete="false">
+       <result status="valid" time="0.02"/>
+      </proof>
+     </goal>
+     <goal
+      name="WP_parameter distance.9"
+      expl="for loop preservation"
+      sum="a48f6ff33c06a13098b2c31c4da19d91"
+      proved="true"
+      expanded="false"
+      shape="Lamk arrayV1V2Lamk arrayV0V3ainfix =agetV8V9ainfix -V1V9Iainfix <V9ainfix +V7c1Aainfix <=c0V9FIainfix =V8asetV6V7ainfix -V1V7FAainfix <V7ainfix +V1c1Aainfix <=c0V7Iainfix =agetV6V10ainfix -V1V10Iainfix <V10V7Aainfix <=c0V10FIainfix <=V7V1Aainfix <=c0V7FFIainfix <=c0V1Iainfix >=ainfix +V1c1c0Iainfix >=V1c0Aainfix >=V0c0FFFF">
+      <transf
+       name="split_goal"
+       proved="true"
+       expanded="false">
+       <goal
+        name="WP_parameter distance.9.1"
+        expl="for loop preservation"
+        sum="11453019e0e1a9c2cf8cdf87098b249b"
+        proved="true"
+        expanded="false"
+        shape="Lamk arrayV1V2Lamk arrayV0V3ainfix <V7ainfix +V1c1Aainfix <=c0V7Iainfix =agetV6V8ainfix -V1V8Iainfix <V8V7Aainfix <=c0V8FIainfix <=V7V1Aainfix <=c0V7FFIainfix <=c0V1Iainfix >=ainfix +V1c1c0Iainfix >=V1c0Aainfix >=V0c0FFFF">
+        <proof
+         prover="alt-ergo"
+         timelimit="30"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter distance.9.2"
+        expl="for loop preservation"
+        sum="448ea83cb6435771cf677c9fd26264db"
+        proved="true"
+        expanded="false"
+        shape="Lamk arrayV1V2Lamk arrayV0V3ainfix =agetV8V9ainfix -V1V9Iainfix <V9ainfix +V7c1Aainfix <=c0V9FIainfix =V8asetV6V7ainfix -V1V7FIainfix <V7ainfix +V1c1Aainfix <=c0V7Iainfix =agetV6V10ainfix -V1V10Iainfix <V10V7Aainfix <=c0V10FIainfix <=V7V1Aainfix <=c0V7FFIainfix <=c0V1Iainfix >=ainfix +V1c1c0Iainfix >=V1c0Aainfix >=V0c0FFFF">
+        <proof
+         prover="alt-ergo"
+         timelimit="20"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+       </goal>
+      </transf>
+     </goal>
+     <goal
+      name="WP_parameter distance.10"
+      expl="precondition"
+      sum="5fcb9208cc7c7d0c2ce752ae7ff4913f"
+      proved="true"
+      expanded="false"
+      shape="Lamk arrayV1V2Lamk arrayV0V3ainfix <c0ainfix +V1c1Aainfix <=c0c0Iainfix <ainfix -V0c1c0Iainfix =agetV6V7ainfix -V1V7Iainfix <V7ainfix +V1c1Aainfix <=c0V7FFIainfix <=c0V1Iainfix >=ainfix +V1c1c0Iainfix >=V1c0Aainfix >=V0c0FFFF">
+      <proof
+       prover="alt-ergo"
+       timelimit="30"
+       edited=""
+       obsolete="false">
+       <result status="valid" time="0.01"/>
+      </proof>
+     </goal>
+     <goal
+      name="WP_parameter distance.11"
+      expl="normal postcondition"
+      sum="9abd82f4b0a16d6d6655405362a39631"
+      proved="true"
+      expanded="false"
+      shape="Lamk arrayV1V2Lamk arrayV0V3amin_distasuffixV5c0asuffixV4c0agetV6c0Iainfix <c0ainfix +V1c1Aainfix <=c0c0Iainfix <ainfix -V0c1c0Iainfix =agetV6V7ainfix -V1V7Iainfix <V7ainfix +V1c1Aainfix <=c0V7FFIainfix <=c0V1Iainfix >=ainfix +V1c1c0Iainfix >=V1c0Aainfix >=V0c0FFFF">
+      <transf
+       name="split_goal"
+       proved="true"
+       expanded="false">
+       <goal
+        name="WP_parameter distance.11.1"
+        expl="normal postcondition"
+        sum="9abd82f4b0a16d6d6655405362a39631"
+        proved="true"
+        expanded="false"
+        shape="Lamk arrayV1V2Lamk arrayV0V3amin_distasuffixV5c0asuffixV4c0agetV6c0Iainfix <c0ainfix +V1c1Aainfix <=c0c0Iainfix <ainfix -V0c1c0Iainfix =agetV6V7ainfix -V1V7Iainfix <V7ainfix +V1c1Aainfix <=c0V7FFIainfix <=c0V1Iainfix >=ainfix +V1c1c0Iainfix >=V1c0Aainfix >=V0c0FFFF">
+        <proof
+         prover="alt-ergo"
+         timelimit="20"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+       </goal>
+      </transf>
+     </goal>
+     <goal
+      name="WP_parameter distance.12"
+      expl="for loop initialization"
+      sum="897de09e0eee14e58182fcdcc446f446"
+      proved="true"
+      expanded="false"
+      shape="Lamk arrayV1V2Lamk arrayV0V3amin_distasuffixV5ainfix +ainfix -V0c1c1asuffixV4V7agetV6V7Iainfix <=V7V1Aainfix <=c0V7FIainfix >=ainfix -V0c1c0Iainfix =agetV6V8ainfix -V1V8Iainfix <V8ainfix +V1c1Aainfix <=c0V8FFIainfix <=c0V1Iainfix >=ainfix +V1c1c0Iainfix >=V1c0Aainfix >=V0c0FFFF">
+      <proof
+       prover="alt-ergo"
+       timelimit="30"
+       edited=""
+       obsolete="false">
+       <result status="valid" time="0.04"/>
+      </proof>
+     </goal>
+     <goal
+      name="WP_parameter distance.13"
+      expl="for loop preservation"
+      sum="9bf339af1d1d08a16acbff438766edba"
+      proved="true"
+      expanded="false"
+      shape="Lamk arrayV1V2Lamk arrayV0V3amin_distasuffixV5ainfix +ainfix +V8c-1c1asuffixV4V12agetV11V12Iainfix <=V12V1Aainfix <=c0V12FIamin_distasuffixV5ainfix +V8c1asuffixV4ainfix +ainfix +c0c-1c1V10Aamin_distasuffixV5ainfix +V8c1asuffixV4V13agetV11V13Iainfix <=V13ainfix +c0c-1Aainfix <=c0V13FAamin_distasuffixV5V8asuffixV4V14agetV11V14Iainfix <=V14V1Aainfix <ainfix +c0c-1V14FAiainfix =agetV3V8agetV2V15amin_distasuffixV5ainfix +V8c1asuffixV4ainfix +ainfix +V15c-1c1V16Aamin_distasuffixV5ainfix +V8c1asuffixV4V18agetV17V18Iainfix <=V18ainfix +V15c-1Aainfix <=c0V18FAamin_distasuffixV5V8asuffixV4V19agetV17V19Iainfix <=V19V1Aainfix <ainfix +V15c-1V19FIainfix =V17asetV11V15V10FAainfix <V15ainfix +V1c1Aainfix <=c0V15amin_distasuffixV5ainfix +V8c1asuffixV4ainfix +ainfix +V15c-1c1V16Aamin_distasuffixV5ainfix +V8c1asuffixV4V21agetV20V21Iainfix <=V21ainfix +V15c-1Aainfix <=c0V21FAamin_distasuffixV5V8asuffixV4V22agetV20V22Iainfix <=V22V1Aainfix <ainfix +V15c-1V22FIainfix =V20asetV11V15ainfix +aminagetV11V15agetV11ainfix +V15c1c1FAainfix <V15ainfix +V1c1Aainfix <=c0V15Aainfix <ainfix +V15c1ainfix +V1c1Aainfix <=c0ainfix +V15c1Aainfix <V15ainfix +V1c1Aainfix <=c0V15Aainfix <V15V1Aainfix <=c0V15Aainfix <V8V0Aainfix <=c0V8Iainfix =V16agetV11V15FAainfix <V15ainfix +V1c1Aainfix <=c0V15Iamin_distasuffixV5ainfix +V8c1asuffixV4ainfix +V15c1V10Aamin_distasuffixV5ainfix +V8c1asuffixV4V23agetV11V23Iainfix <=V23V15Aainfix <=c0V23FAamin_distasuffixV5V8asuffixV4V24agetV11V24Iainfix <=V24V1Aainfix <V15V24FIainfix >=V15c0Aainfix >=ainfix -V1c1V15FFFAamin_distasuffixV5ainfix +V8c1asuffixV4ainfix +ainfix -V1c1c1agetV7V1Aamin_distasuffixV5ainfix +V8c1asuffixV4V25agetV9V25Iainfix <=V25ainfix -V1c1Aainfix <=c0V25FAamin_distasuffixV5V8asuffixV4V26agetV9V26Iainfix <=V26V1Aainfix <ainfix -V1c1V26FIainfix >=ainfix -V1c1c0Aamin_distasuffixV5ainfix +ainfix +V8c-1c1asuffixV4V27agetV9V27Iainfix <=V27V1Aainfix <=c0V27FIainfix <ainfix -V1c1c0Iainfix =V9asetV7V1ainfix +agetV7V1c1FAainfix <V1ainfix +V1c1Aainfix <=c0V1Aainfix <V1ainfix +V1c1Aainfix <=c0V1Aainfix <V1ainfix +V1c1Aainfix <=c0V1Iamin_distasuffixV5ainfix +V8c1asuffixV4V28agetV7V28Iainfix <=V28V1Aainfix <=c0V28FIainfix >=V8c0Aainfix >=ainfix -V0c1V8FFIainfix >=ainfix -V0c1c0Iainfix =agetV6V29ainfix -V1V29Iainfix <V29ainfix +V1c1Aainfix <=c0V29FFIainfix <=c0V1Iainfix >=ainfix +V1c1c0Iainfix >=V1c0Aainfix >=V0c0FFFF">
+      <transf
+       name="split_goal"
+       proved="true"
+       expanded="false">
+       <goal
+        name="WP_parameter distance.13.1"
+        expl="for loop preservation"
+        sum="1d888113c539ce50d0cc1e5d4fd7b734"
+        proved="true"
+        expanded="false"
+        shape="Lamk arrayV1V2Lamk arrayV0V3ainfix <V1ainfix +V1c1Aainfix <=c0V1Iamin_distasuffixV5ainfix +V8c1asuffixV4V9agetV7V9Iainfix <=V9V1Aainfix <=c0V9FIainfix >=V8c0Aainfix >=ainfix -V0c1V8FFIainfix >=ainfix -V0c1c0Iainfix =agetV6V10ainfix -V1V10Iainfix <V10ainfix +V1c1Aainfix <=c0V10FFIainfix <=c0V1Iainfix >=ainfix +V1c1c0Iainfix >=V1c0Aainfix >=V0c0FFFF">
+        <proof
+         prover="alt-ergo"
+         timelimit="20"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter distance.13.2"
+        expl="for loop preservation"
+        sum="30b09e7c2bfdc49c39061e7f0edca819"
+        proved="true"
+        expanded="false"
+        shape="Lamk arrayV1V2Lamk arrayV0V3ainfix <V1ainfix +V1c1Aainfix <=c0V1Iainfix <V1ainfix +V1c1Aainfix <=c0V1Iamin_distasuffixV5ainfix +V8c1asuffixV4V9agetV7V9Iainfix <=V9V1Aainfix <=c0V9FIainfix >=V8c0Aainfix >=ainfix -V0c1V8FFIainfix >=ainfix -V0c1c0Iainfix =agetV6V10ainfix -V1V10Iainfix <V10ainfix +V1c1Aainfix <=c0V10FFIainfix <=c0V1Iainfix >=ainfix +V1c1c0Iainfix >=V1c0Aainfix >=V0c0FFFF">
+        <proof
+         prover="alt-ergo"
+         timelimit="20"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter distance.13.3"
+        expl="for loop preservation"
+        sum="8ef2410f89921c9fe0f56813e9c5085b"
+        proved="true"
+        expanded="false"
+        shape="Lamk arrayV1V2Lamk arrayV0V3ainfix <V1ainfix +V1c1Aainfix <=c0V1Iainfix <V1ainfix +V1c1Aainfix <=c0V1Iainfix <V1ainfix +V1c1Aainfix <=c0V1Iamin_distasuffixV5ainfix +V8c1asuffixV4V9agetV7V9Iainfix <=V9V1Aainfix <=c0V9FIainfix >=V8c0Aainfix >=ainfix -V0c1V8FFIainfix >=ainfix -V0c1c0Iainfix =agetV6V10ainfix -V1V10Iainfix <V10ainfix +V1c1Aainfix <=c0V10FFIainfix <=c0V1Iainfix >=ainfix +V1c1c0Iainfix >=V1c0Aainfix >=V0c0FFFF">
+        <proof
+         prover="alt-ergo"
+         timelimit="20"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.01"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter distance.13.4"
+        expl="for loop preservation"
+        sum="2a83da9c1f2bf2900117bbbe85e1069a"
+        proved="true"
+        expanded="false"
+        shape="Lamk arrayV1V2Lamk arrayV0V3amin_distasuffixV5ainfix +ainfix +V8c-1c1asuffixV4V10agetV9V10Iainfix <=V10V1Aainfix <=c0V10FIainfix <ainfix -V1c1c0Iainfix =V9asetV7V1ainfix +agetV7V1c1FIainfix <V1ainfix +V1c1Aainfix <=c0V1Iainfix <V1ainfix +V1c1Aainfix <=c0V1Iainfix <V1ainfix +V1c1Aainfix <=c0V1Iamin_distasuffixV5ainfix +V8c1asuffixV4V11agetV7V11Iainfix <=V11V1Aainfix <=c0V11FIainfix >=V8c0Aainfix >=ainfix -V0c1V8FFIainfix >=ainfix -V0c1c0Iainfix =agetV6V12ainfix -V1V12Iainfix <V12ainfix +V1c1Aainfix <=c0V12FFIainfix <=c0V1Iainfix >=ainfix +V1c1c0Iainfix >=V1c0Aainfix >=V0c0FFFF">
+        <transf
+         name="inline_goal"
+         proved="true"
+         expanded="false">
+         <goal
+          name="WP_parameter distance.13.4.1"
+          expl="for loop preservation"
+          sum="6fad22887140dfed196ab16a4382e734"
+          proved="true"
+          expanded="false"
+          shape="Lamk arrayV1V2Lamk arrayV0V3ainfix <=agetV9V10V11IadistasuffixV5ainfix +ainfix +V8c-1c1asuffixV4V10V11FAadistasuffixV5ainfix +ainfix +V8c-1c1asuffixV4V10agetV9V10Iainfix =V10V1Oainfix <V10V1Aainfix =c0V10Oainfix <c0V10FIainfix <ainfix -V1c1c0Iainfix =V9asetV7V1ainfix +agetV7V1c1FIainfix <V1ainfix +V1c1Aainfix =c0V1Oainfix <c0V1Iainfix <V1ainfix +V1c1Aainfix =c0V1Oainfix <c0V1Iainfix <V1ainfix +V1c1Aainfix =c0V1Oainfix <c0V1Iainfix <=agetV7V12V13IadistasuffixV5ainfix +V8c1asuffixV4V12V13FAadistasuffixV5ainfix +V8c1asuffixV4V12agetV7V12Iainfix =V12V1Oainfix <V12V1Aainfix =c0V12Oainfix <c0V12FIainfix <=c0V8Aainfix <=V8ainfix -V0c1FFIainfix <=c0ainfix -V0c1Iainfix =agetV6V14ainfix +V1aprefix -V14Iainfix <V14ainfix +V1c1Aainfix =c0V14Oainfix <c0V14FFIainfix =c0V1Oainfix <c0V1Iainfix <=c0ainfix +V1c1Iainfix <=c0V1Aainfix <=c0V0FFFF">
+          <proof
+           prover="z3"
+           timelimit="30"
+           edited=""
+           obsolete="false">
+           <result status="valid" time="0.26"/>
+          </proof>
+         </goal>
+        </transf>
+       </goal>
+       <goal
+        name="WP_parameter distance.13.5"
+        expl="for loop preservation"
+        sum="b676ab62f14a9ff5e9f6a5ab6f3b6b99"
+        proved="true"
+        expanded="false"
+        shape="Lamk arrayV1V2Lamk arrayV0V3amin_distasuffixV5ainfix +V8c1asuffixV4ainfix +ainfix -V1c1c1agetV7V1Aamin_distasuffixV5ainfix +V8c1asuffixV4V10agetV9V10Iainfix <=V10ainfix -V1c1Aainfix <=c0V10FAamin_distasuffixV5V8asuffixV4V11agetV9V11Iainfix <=V11V1Aainfix <ainfix -V1c1V11FIainfix >=ainfix -V1c1c0Iainfix =V9asetV7V1ainfix +agetV7V1c1FIainfix <V1ainfix +V1c1Aainfix <=c0V1Iainfix <V1ainfix +V1c1Aainfix <=c0V1Iainfix <V1ainfix +V1c1Aainfix <=c0V1Iamin_distasuffixV5ainfix +V8c1asuffixV4V12agetV7V12Iainfix <=V12V1Aainfix <=c0V12FIainfix >=V8c0Aainfix >=ainfix -V0c1V8FFIainfix >=ainfix -V0c1c0Iainfix =agetV6V13ainfix -V1V13Iainfix <V13ainfix +V1c1Aainfix <=c0V13FFIainfix <=c0V1Iainfix >=ainfix +V1c1c0Iainfix >=V1c0Aainfix >=V0c0FFFF">
+        <proof
+         prover="alt-ergo"
+         timelimit="20"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="4.99"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter distance.13.6"
+        expl="for loop preservation"
+        sum="ab407dbcb0bc6d8c413879bdd021abb6"
+        proved="true"
+        expanded="false"
+        shape="Lamk arrayV1V2Lamk arrayV0V3iainfix =agetV3V8agetV2V12amin_distasuffixV5ainfix +V8c1asuffixV4ainfix +ainfix +V12c-1c1V13Aamin_distasuffixV5ainfix +V8c1asuffixV4V15agetV14V15Iainfix <=V15ainfix +V12c-1Aainfix <=c0V15FAamin_distasuffixV5V8asuffixV4V16agetV14V16Iainfix <=V16V1Aainfix <ainfix +V12c-1V16FIainfix =V14asetV11V12V10FAainfix <V12ainfix +V1c1Aainfix <=c0V12amin_distasuffixV5ainfix +V8c1asuffixV4ainfix +ainfix +V12c-1c1V13Aamin_distasuffixV5ainfix +V8c1asuffixV4V18agetV17V18Iainfix <=V18ainfix +V12c-1Aainfix <=c0V18FAamin_distasuffixV5V8asuffixV4V19agetV17V19Iainfix <=V19V1Aainfix <ainfix +V12c-1V19FIainfix =V17asetV11V12ainfix +aminagetV11V12agetV11ainfix +V12c1c1FAainfix <V12ainfix +V1c1Aainfix <=c0V12Aainfix <ainfix +V12c1ainfix +V1c1Aainfix <=c0ainfix +V12c1Aainfix <V12ainfix +V1c1Aainfix <=c0V12Aainfix <V12V1Aainfix <=c0V12Aainfix <V8V0Aainfix <=c0V8Iainfix =V13agetV11V12FAainfix <V12ainfix +V1c1Aainfix <=c0V12Iamin_distasuffixV5ainfix +V8c1asuffixV4ainfix +V12c1V10Aamin_distasuffixV5ainfix +V8c1asuffixV4V20agetV11V20Iainfix <=V20V12Aainfix <=c0V20FAamin_distasuffixV5V8asuffixV4V21agetV11V21Iainfix <=V21V1Aainfix <V12V21FIainfix >=V12c0Aainfix >=ainfix -V1c1V12FFFIainfix >=ainfix -V1c1c0Iainfix =V9asetV7V1ainfix +agetV7V1c1FIainfix <V1ainfix +V1c1Aainfix <=c0V1Iainfix <V1ainfix +V1c1Aainfix <=c0V1Iainfix <V1ainfix +V1c1Aainfix <=c0V1Iamin_distasuffixV5ainfix +V8c1asuffixV4V22agetV7V22Iainfix <=V22V1Aainfix <=c0V22FIainfix >=V8c0Aainfix >=ainfix -V0c1V8FFIainfix >=ainfix -V0c1c0Iainfix =agetV6V23ainfix -V1V23Iainfix <V23ainfix +V1c1Aainfix <=c0V23FFIainfix <=c0V1Iainfix >=ainfix +V1c1c0Iainfix >=V1c0Aainfix >=V0c0FFFF">
+        <transf
+         name="split_goal"
+         proved="true"
+         expanded="false">
+         <goal
+          name="WP_parameter distance.13.6.1"
+          expl="for loop preservation"
+          sum="660a0c67e4538d5388d218881959d949"
+          proved="true"
+          expanded="false"
+          shape="Lamk arrayV1V2Lamk arrayV0V3ainfix <V12ainfix +V1c1Aainfix <=c0V12Iamin_distasuffixV5ainfix +V8c1asuffixV4ainfix +V12c1V10Aamin_distasuffixV5ainfix +V8c1asuffixV4V13agetV11V13Iainfix <=V13V12Aainfix <=c0V13FAamin_distasuffixV5V8asuffixV4V14agetV11V14Iainfix <=V14V1Aainfix <V12V14FIainfix >=V12c0Aainfix >=ainfix -V1c1V12FFFIainfix >=ainfix -V1c1c0Iainfix =V9asetV7V1ainfix +agetV7V1c1FIainfix <V1ainfix +V1c1Aainfix <=c0V1Iainfix <V1ainfix +V1c1Aainfix <=c0V1Iainfix <V1ainfix +V1c1Aainfix <=c0V1Iamin_distasuffixV5ainfix +V8c1asuffixV4V15agetV7V15Iainfix <=V15V1Aainfix <=c0V15FIainfix >=V8c0Aainfix >=ainfix -V0c1V8FFIainfix >=ainfix -V0c1c0Iainfix =agetV6V16ainfix -V1V16Iainfix <V16ainfix +V1c1Aainfix <=c0V16FFIainfix <=c0V1Iainfix >=ainfix +V1c1c0Iainfix >=V1c0Aainfix >=V0c0FFFF">
+          <proof
+           prover="alt-ergo"
+           timelimit="20"
+           edited=""
+           obsolete="false">
+           <result status="valid" time="0.02"/>
+          </proof>
+         </goal>
+         <goal
+          name="WP_parameter distance.13.6.2"
+          expl="for loop preservation"
+          sum="7a2c897c68e359f03a252608417864ee"
+          proved="true"
+          expanded="false"
+          shape="Lamk arrayV1V2Lamk arrayV0V3ainfix <V8V0Aainfix <=c0V8Iainfix =V13agetV11V12FIainfix <V12ainfix +V1c1Aainfix <=c0V12Iamin_distasuffixV5ainfix +V8c1asuffixV4ainfix +V12c1V10Aamin_distasuffixV5ainfix +V8c1asuffixV4V14agetV11V14Iainfix <=V14V12Aainfix <=c0V14FAamin_distasuffixV5V8asuffixV4V15agetV11V15Iainfix <=V15V1Aainfix <V12V15FIainfix >=V12c0Aainfix >=ainfix -V1c1V12FFFIainfix >=ainfix -V1c1c0Iainfix =V9asetV7V1ainfix +agetV7V1c1FIainfix <V1ainfix +V1c1Aainfix <=c0V1Iainfix <V1ainfix +V1c1Aainfix <=c0V1Iainfix <V1ainfix +V1c1Aainfix <=c0V1Iamin_distasuffixV5ainfix +V8c1asuffixV4V16agetV7V16Iainfix <=V16V1Aainfix <=c0V16FIainfix >=V8c0Aainfix >=ainfix -V0c1V8FFIainfix >=ainfix -V0c1c0Iainfix =agetV6V17ainfix -V1V17Iainfix <V17ainfix +V1c1Aainfix <=c0V17FFIainfix <=c0V1Iainfix >=ainfix +V1c1c0Iainfix >=V1c0Aainfix >=V0c0FFFF">
+          <proof
+           prover="alt-ergo"
+           timelimit="20"
+           edited=""
+           obsolete="false">
+           <result status="valid" time="0.02"/>
+          </proof>
+         </goal>
+         <goal
+          name="WP_parameter distance.13.6.3"
+          expl="for loop preservation"
+          sum="9d4b12fee284a678e19a2692a87a1cac"
+          proved="true"
+          expanded="false"
+          shape="Lamk arrayV1V2Lamk arrayV0V3ainfix <V12V1Aainfix <=c0V12Iainfix <V8V0Aainfix <=c0V8Iainfix =V13agetV11V12FIainfix <V12ainfix +V1c1Aainfix <=c0V12Iamin_distasuffixV5ainfix +V8c1asuffixV4ainfix +V12c1V10Aamin_distasuffixV5ainfix +V8c1asuffixV4V14agetV11V14Iainfix <=V14V12Aainfix <=c0V14FAamin_distasuffixV5V8asuffixV4V15agetV11V15Iainfix <=V15V1Aainfix <V12V15FIainfix >=V12c0Aainfix >=ainfix -V1c1V12FFFIainfix >=ainfix -V1c1c0Iainfix =V9asetV7V1ainfix +agetV7V1c1FIainfix <V1ainfix +V1c1Aainfix <=c0V1Iainfix <V1ainfix +V1c1Aainfix <=c0V1Iainfix <V1ainfix +V1c1Aainfix <=c0V1Iamin_distasuffixV5ainfix +V8c1asuffixV4V16agetV7V16Iainfix <=V16V1Aainfix <=c0V16FIainfix >=V8c0Aainfix >=ainfix -V0c1V8FFIainfix >=ainfix -V0c1c0Iainfix =agetV6V17ainfix -V1V17Iainfix <V17ainfix +V1c1Aainfix <=c0V17FFIainfix <=c0V1Iainfix >=ainfix +V1c1c0Iainfix >=V1c0Aainfix >=V0c0FFFF">
+          <proof
+           prover="alt-ergo"
+           timelimit="20"
+           edited=""
+           obsolete="false">
+           <result status="valid" time="0.02"/>
+          </proof>
+         </goal>
+         <goal
+          name="WP_parameter distance.13.6.4"
+          expl="for loop preservation"
+          sum="cd0a5f01f566ce8822b038ae2ec3862e"
+          proved="true"
+          expanded="false"
+          shape="Lamk arrayV1V2Lamk arrayV0V3ainfix <V12ainfix +V1c1Aainfix <=c0V12Iainfix =agetV3V8agetV2V12Iainfix <V12V1Aainfix <=c0V12Iainfix <V8V0Aainfix <=c0V8Iainfix =V13agetV11V12FIainfix <V12ainfix +V1c1Aainfix <=c0V12Iamin_distasuffixV5ainfix +V8c1asuffixV4ainfix +V12c1V10Aamin_distasuffixV5ainfix +V8c1asuffixV4V14agetV11V14Iainfix <=V14V12Aainfix <=c0V14FAamin_distasuffixV5V8asuffixV4V15agetV11V15Iainfix <=V15V1Aainfix <V12V15FIainfix >=V12c0Aainfix >=ainfix -V1c1V12FFFIainfix >=ainfix -V1c1c0Iainfix =V9asetV7V1ainfix +agetV7V1c1FIainfix <V1ainfix +V1c1Aainfix <=c0V1Iainfix <V1ainfix +V1c1Aainfix <=c0V1Iainfix <V1ainfix +V1c1Aainfix <=c0V1Iamin_distasuffixV5ainfix +V8c1asuffixV4V16agetV7V16Iainfix <=V16V1Aainfix <=c0V16FIainfix >=V8c0Aainfix >=ainfix -V0c1V8FFIainfix >=ainfix -V0c1c0Iainfix =agetV6V17ainfix -V1V17Iainfix <V17ainfix +V1c1Aainfix <=c0V17FFIainfix <=c0V1Iainfix >=ainfix +V1c1c0Iainfix >=V1c0Aainfix >=V0c0FFFF">
+          <proof
+           prover="alt-ergo"
+           timelimit="20"
+           edited=""
+           obsolete="false">
+           <result status="valid" time="0.02"/>
+          </proof>
+         </goal>
+         <goal
+          name="WP_parameter distance.13.6.5"
+          expl="for loop preservation"
+          sum="9b4e6c707eecfd36276436225ccdfd19"
+          proved="true"
+          expanded="false"
+          shape="Lamk arrayV1V2Lamk arrayV0V3amin_distasuffixV5V8asuffixV4V15agetV14V15Iainfix <=V15V1Aainfix <ainfix +V12c-1V15FIainfix =V14asetV11V12V10FIainfix <V12ainfix +V1c1Aainfix <=c0V12Iainfix =agetV3V8agetV2V12Iainfix <V12V1Aainfix <=c0V12Iainfix <V8V0Aainfix <=c0V8Iainfix =V13agetV11V12FIainfix <V12ainfix +V1c1Aainfix <=c0V12Iamin_distasuffixV5ainfix +V8c1asuffixV4ainfix +V12c1V10Aamin_distasuffixV5ainfix +V8c1asuffixV4V16agetV11V16Iainfix <=V16V12Aainfix <=c0V16FAamin_distasuffixV5V8asuffixV4V17agetV11V17Iainfix <=V17V1Aainfix <V12V17FIainfix >=V12c0Aainfix >=ainfix -V1c1V12FFFIainfix >=ainfix -V1c1c0Iainfix =V9asetV7V1ainfix +agetV7V1c1FIainfix <V1ainfix +V1c1Aainfix <=c0V1Iainfix <V1ainfix +V1c1Aainfix <=c0V1Iainfix <V1ainfix +V1c1Aainfix <=c0V1Iamin_distasuffixV5ainfix +V8c1asuffixV4V18agetV7V18Iainfix <=V18V1Aainfix <=c0V18FIainfix >=V8c0Aainfix >=ainfix -V0c1V8FFIainfix >=ainfix -V0c1c0Iainfix =agetV6V19ainfix -V1V19Iainfix <V19ainfix +V1c1Aainfix <=c0V19FFIainfix <=c0V1Iainfix >=ainfix +V1c1c0Iainfix >=V1c0Aainfix >=V0c0FFFF">
+          <proof
+           prover="coq"
+           timelimit="20"
+           edited="edit_distance_WP_EditDistance_WP_parameter_distance_1.v"
+           obsolete="false">
+           <result status="valid" time="0.67"/>
+          </proof>
+         </goal>
+         <goal
+          name="WP_parameter distance.13.6.6"
+          expl="for loop preservation"
+          sum="8515b988e8d14d8b0c0b326134d0a777"
+          proved="true"
+          expanded="false"
+          shape="Lamk arrayV1V2Lamk arrayV0V3amin_distasuffixV5ainfix +V8c1asuffixV4V15agetV14V15Iainfix <=V15ainfix +V12c-1Aainfix <=c0V15FIainfix =V14asetV11V12V10FIainfix <V12ainfix +V1c1Aainfix <=c0V12Iainfix =agetV3V8agetV2V12Iainfix <V12V1Aainfix <=c0V12Iainfix <V8V0Aainfix <=c0V8Iainfix =V13agetV11V12FIainfix <V12ainfix +V1c1Aainfix <=c0V12Iamin_distasuffixV5ainfix +V8c1asuffixV4ainfix +V12c1V10Aamin_distasuffixV5ainfix +V8c1asuffixV4V16agetV11V16Iainfix <=V16V12Aainfix <=c0V16FAamin_distasuffixV5V8asuffixV4V17agetV11V17Iainfix <=V17V1Aainfix <V12V17FIainfix >=V12c0Aainfix >=ainfix -V1c1V12FFFIainfix >=ainfix -V1c1c0Iainfix =V9asetV7V1ainfix +agetV7V1c1FIainfix <V1ainfix +V1c1Aainfix <=c0V1Iainfix <V1ainfix +V1c1Aainfix <=c0V1Iainfix <V1ainfix +V1c1Aainfix <=c0V1Iamin_distasuffixV5ainfix +V8c1asuffixV4V18agetV7V18Iainfix <=V18V1Aainfix <=c0V18FIainfix >=V8c0Aainfix >=ainfix -V0c1V8FFIainfix >=ainfix -V0c1c0Iainfix =agetV6V19ainfix -V1V19Iainfix <V19ainfix +V1c1Aainfix <=c0V19FFIainfix <=c0V1Iainfix >=ainfix +V1c1c0Iainfix >=V1c0Aainfix >=V0c0FFFF">
+          <proof
+           prover="alt-ergo"
+           timelimit="20"
+           edited=""
+           obsolete="false">
+           <result status="valid" time="0.02"/>
+          </proof>
+         </goal>
+         <goal
+          name="WP_parameter distance.13.6.7"
+          expl="for loop preservation"
+          sum="ffcabe09af5b2916b00b5332e426bd27"
+          proved="true"
+          expanded="false"
+          shape="Lamk arrayV1V2Lamk arrayV0V3amin_distasuffixV5ainfix +V8c1asuffixV4ainfix +ainfix +V12c-1c1V13Iainfix =V14asetV11V12V10FIainfix <V12ainfix +V1c1Aainfix <=c0V12Iainfix =agetV3V8agetV2V12Iainfix <V12V1Aainfix <=c0V12Iainfix <V8V0Aainfix <=c0V8Iainfix =V13agetV11V12FIainfix <V12ainfix +V1c1Aainfix <=c0V12Iamin_distasuffixV5ainfix +V8c1asuffixV4ainfix +V12c1V10Aamin_distasuffixV5ainfix +V8c1asuffixV4V15agetV11V15Iainfix <=V15V12Aainfix <=c0V15FAamin_distasuffixV5V8asuffixV4V16agetV11V16Iainfix <=V16V1Aainfix <V12V16FIainfix >=V12c0Aainfix >=ainfix -V1c1V12FFFIainfix >=ainfix -V1c1c0Iainfix =V9asetV7V1ainfix +agetV7V1c1FIainfix <V1ainfix +V1c1Aainfix <=c0V1Iainfix <V1ainfix +V1c1Aainfix <=c0V1Iainfix <V1ainfix +V1c1Aainfix <=c0V1Iamin_distasuffixV5ainfix +V8c1asuffixV4V17agetV7V17Iainfix <=V17V1Aainfix <=c0V17FIainfix >=V8c0Aainfix >=ainfix -V0c1V8FFIainfix >=ainfix -V0c1c0Iainfix =agetV6V18ainfix -V1V18Iainfix <V18ainfix +V1c1Aainfix <=c0V18FFIainfix <=c0V1Iainfix >=ainfix +V1c1c0Iainfix >=V1c0Aainfix >=V0c0FFFF">
+          <proof
+           prover="alt-ergo"
+           timelimit="20"
+           edited=""
+           obsolete="false">
+           <result status="valid" time="0.02"/>
+          </proof>
+         </goal>
+         <goal
+          name="WP_parameter distance.13.6.8"
+          expl="for loop preservation"
+          sum="b8ab8bb81b2045f7324436109aa854ff"
+          proved="true"
+          expanded="false"
+          shape="Lamk arrayV1V2Lamk arrayV0V3ainfix <V12ainfix +V1c1Aainfix <=c0V12Iainfix =agetV3V8agetV2V12NIainfix <V12V1Aainfix <=c0V12Iainfix <V8V0Aainfix <=c0V8Iainfix =V13agetV11V12FIainfix <V12ainfix +V1c1Aainfix <=c0V12Iamin_distasuffixV5ainfix +V8c1asuffixV4ainfix +V12c1V10Aamin_distasuffixV5ainfix +V8c1asuffixV4V14agetV11V14Iainfix <=V14V12Aainfix <=c0V14FAamin_distasuffixV5V8asuffixV4V15agetV11V15Iainfix <=V15V1Aainfix <V12V15FIainfix >=V12c0Aainfix >=ainfix -V1c1V12FFFIainfix >=ainfix -V1c1c0Iainfix =V9asetV7V1ainfix +agetV7V1c1FIainfix <V1ainfix +V1c1Aainfix <=c0V1Iainfix <V1ainfix +V1c1Aainfix <=c0V1Iainfix <V1ainfix +V1c1Aainfix <=c0V1Iamin_distasuffixV5ainfix +V8c1asuffixV4V16agetV7V16Iainfix <=V16V1Aainfix <=c0V16FIainfix >=V8c0Aainfix >=ainfix -V0c1V8FFIainfix >=ainfix -V0c1c0Iainfix =agetV6V17ainfix -V1V17Iainfix <V17ainfix +V1c1Aainfix <=c0V17FFIainfix <=c0V1Iainfix >=ainfix +V1c1c0Iainfix >=V1c0Aainfix >=V0c0FFFF">
+          <proof
+           prover="alt-ergo"
+           timelimit="20"
+           edited=""
+           obsolete="false">
+           <result status="valid" time="0.02"/>
+          </proof>
+         </goal>
+         <goal
+          name="WP_parameter distance.13.6.9"
+          expl="for loop preservation"
+          sum="71a81b54e24a2ac84ab1d8fb8b79f2c8"
+          proved="true"
+          expanded="false"
+          shape="Lamk arrayV1V2Lamk arrayV0V3ainfix <ainfix +V12c1ainfix +V1c1Aainfix <=c0ainfix +V12c1Iainfix <V12ainfix +V1c1Aainfix <=c0V12Iainfix =agetV3V8agetV2V12NIainfix <V12V1Aainfix <=c0V12Iainfix <V8V0Aainfix <=c0V8Iainfix =V13agetV11V12FIainfix <V12ainfix +V1c1Aainfix <=c0V12Iamin_distasuffixV5ainfix +V8c1asuffixV4ainfix +V12c1V10Aamin_distasuffixV5ainfix +V8c1asuffixV4V14agetV11V14Iainfix <=V14V12Aainfix <=c0V14FAamin_distasuffixV5V8asuffixV4V15agetV11V15Iainfix <=V15V1Aainfix <V12V15FIainfix >=V12c0Aainfix >=ainfix -V1c1V12FFFIainfix >=ainfix -V1c1c0Iainfix =V9asetV7V1ainfix +agetV7V1c1FIainfix <V1ainfix +V1c1Aainfix <=c0V1Iainfix <V1ainfix +V1c1Aainfix <=c0V1Iainfix <V1ainfix +V1c1Aainfix <=c0V1Iamin_distasuffixV5ainfix +V8c1asuffixV4V16agetV7V16Iainfix <=V16V1Aainfix <=c0V16FIainfix >=V8c0Aainfix >=ainfix -V0c1V8FFIainfix >=ainfix -V0c1c0Iainfix =agetV6V17ainfix -V1V17Iainfix <V17ainfix +V1c1Aainfix <=c0V17FFIainfix <=c0V1Iainfix >=ainfix +V1c1c0Iainfix >=V1c0Aainfix >=V0c0FFFF">
+          <proof
+           prover="alt-ergo"
+           timelimit="20"
+           edited=""
+           obsolete="false">
+           <result status="valid" time="0.02"/>
+          </proof>
+         </goal>
+         <goal
+          name="WP_parameter distance.13.6.10"
+          expl="for loop preservation"
+          sum="5fcab252d10a95c65240370ecdb828d2"
+          proved="true"
+          expanded="false"
+          shape="Lamk arrayV1V2Lamk arrayV0V3ainfix <V12ainfix +V1c1Aainfix <=c0V12Iainfix <ainfix +V12c1ainfix +V1c1Aainfix <=c0ainfix +V12c1Iainfix <V12ainfix +V1c1Aainfix <=c0V12Iainfix =agetV3V8agetV2V12NIainfix <V12V1Aainfix <=c0V12Iainfix <V8V0Aainfix <=c0V8Iainfix =V13agetV11V12FIainfix <V12ainfix +V1c1Aainfix <=c0V12Iamin_distasuffixV5ainfix +V8c1asuffixV4ainfix +V12c1V10Aamin_distasuffixV5ainfix +V8c1asuffixV4V14agetV11V14Iainfix <=V14V12Aainfix <=c0V14FAamin_distasuffixV5V8asuffixV4V15agetV11V15Iainfix <=V15V1Aainfix <V12V15FIainfix >=V12c0Aainfix >=ainfix -V1c1V12FFFIainfix >=ainfix -V1c1c0Iainfix =V9asetV7V1ainfix +agetV7V1c1FIainfix <V1ainfix +V1c1Aainfix <=c0V1Iainfix <V1ainfix +V1c1Aainfix <=c0V1Iainfix <V1ainfix +V1c1Aainfix <=c0V1Iamin_distasuffixV5ainfix +V8c1asuffixV4V16agetV7V16Iainfix <=V16V1Aainfix <=c0V16FIainfix >=V8c0Aainfix >=ainfix -V0c1V8FFIainfix >=ainfix -V0c1c0Iainfix =agetV6V17ainfix -V1V17Iainfix <V17ainfix +V1c1Aainfix <=c0V17FFIainfix <=c0V1Iainfix >=ainfix +V1c1c0Iainfix >=V1c0Aainfix >=V0c0FFFF">
+          <proof
+           prover="alt-ergo"
+           timelimit="20"
+           edited=""
+           obsolete="false">
+           <result status="valid" time="0.02"/>
+          </proof>
+         </goal>
+         <goal
+          name="WP_parameter distance.13.6.11"
+          expl="for loop preservation"
+          sum="405219ed954dd67ab09d7312ea3267b9"
+          proved="true"
+          expanded="false"
+          shape="Lamk arrayV1V2Lamk arrayV0V3amin_distasuffixV5V8asuffixV4V15agetV14V15Iainfix <=V15V1Aainfix <ainfix +V12c-1V15FIainfix =V14asetV11V12ainfix +aminagetV11V12agetV11ainfix +V12c1c1FIainfix <V12ainfix +V1c1Aainfix <=c0V12Iainfix <ainfix +V12c1ainfix +V1c1Aainfix <=c0ainfix +V12c1Iainfix <V12ainfix +V1c1Aainfix <=c0V12Iainfix =agetV3V8agetV2V12NIainfix <V12V1Aainfix <=c0V12Iainfix <V8V0Aainfix <=c0V8Iainfix =V13agetV11V12FIainfix <V12ainfix +V1c1Aainfix <=c0V12Iamin_distasuffixV5ainfix +V8c1asuffixV4ainfix +V12c1V10Aamin_distasuffixV5ainfix +V8c1asuffixV4V16agetV11V16Iainfix <=V16V12Aainfix <=c0V16FAamin_distasuffixV5V8asuffixV4V17agetV11V17Iainfix <=V17V1Aainfix <V12V17FIainfix >=V12c0Aainfix >=ainfix -V1c1V12FFFIainfix >=ainfix -V1c1c0Iainfix =V9asetV7V1ainfix +agetV7V1c1FIainfix <V1ainfix +V1c1Aainfix <=c0V1Iainfix <V1ainfix +V1c1Aainfix <=c0V1Iainfix <V1ainfix +V1c1Aainfix <=c0V1Iamin_distasuffixV5ainfix +V8c1asuffixV4V18agetV7V18Iainfix <=V18V1Aainfix <=c0V18FIainfix >=V8c0Aainfix >=ainfix -V0c1V8FFIainfix >=ainfix -V0c1c0Iainfix =agetV6V19ainfix -V1V19Iainfix <V19ainfix +V1c1Aainfix <=c0V19FFIainfix <=c0V1Iainfix >=ainfix +V1c1c0Iainfix >=V1c0Aainfix >=V0c0FFFF">
+          <proof
+           prover="coq"
+           timelimit="20"
+           edited="edit_distance_WP_EditDistance_WP_parameter_distance_2.v"
+           obsolete="false">
+           <result status="valid" time="0.79"/>
+          </proof>
+         </goal>
+         <goal
+          name="WP_parameter distance.13.6.12"
+          expl="for loop preservation"
+          sum="26bc8ed012ab6097177cf73bb3444bab"
+          proved="true"
+          expanded="false"
+          shape="Lamk arrayV1V2Lamk arrayV0V3amin_distasuffixV5ainfix +V8c1asuffixV4V15agetV14V15Iainfix <=V15ainfix +V12c-1Aainfix <=c0V15FIainfix =V14asetV11V12ainfix +aminagetV11V12agetV11ainfix +V12c1c1FIainfix <V12ainfix +V1c1Aainfix <=c0V12Iainfix <ainfix +V12c1ainfix +V1c1Aainfix <=c0ainfix +V12c1Iainfix <V12ainfix +V1c1Aainfix <=c0V12Iainfix =agetV3V8agetV2V12NIainfix <V12V1Aainfix <=c0V12Iainfix <V8V0Aainfix <=c0V8Iainfix =V13agetV11V12FIainfix <V12ainfix +V1c1Aainfix <=c0V12Iamin_distasuffixV5ainfix +V8c1asuffixV4ainfix +V12c1V10Aamin_distasuffixV5ainfix +V8c1asuffixV4V16agetV11V16Iainfix <=V16V12Aainfix <=c0V16FAamin_distasuffixV5V8asuffixV4V17agetV11V17Iainfix <=V17V1Aainfix <V12V17FIainfix >=V12c0Aainfix >=ainfix -V1c1V12FFFIainfix >=ainfix -V1c1c0Iainfix =V9asetV7V1ainfix +agetV7V1c1FIainfix <V1ainfix +V1c1Aainfix <=c0V1Iainfix <V1ainfix +V1c1Aainfix <=c0V1Iainfix <V1ainfix +V1c1Aainfix <=c0V1Iamin_distasuffixV5ainfix +V8c1asuffixV4V18agetV7V18Iainfix <=V18V1Aainfix <=c0V18FIainfix >=V8c0Aainfix >=ainfix -V0c1V8FFIainfix >=ainfix -V0c1c0Iainfix =agetV6V19ainfix -V1V19Iainfix <V19ainfix +V1c1Aainfix <=c0V19FFIainfix <=c0V1Iainfix >=ainfix +V1c1c0Iainfix >=V1c0Aainfix >=V0c0FFFF">
+          <proof
+           prover="alt-ergo"
+           timelimit="20"
+           edited=""
+           obsolete="false">
+           <result status="valid" time="0.03"/>
+          </proof>
+         </goal>
+         <goal
+          name="WP_parameter distance.13.6.13"
+          expl="for loop preservation"
+          sum="78b083e07c9b6e70c3bff83c333dc993"
+          proved="true"
+          expanded="false"
+          shape="Lamk arrayV1V2Lamk arrayV0V3amin_distasuffixV5ainfix +V8c1asuffixV4ainfix +ainfix +V12c-1c1V13Iainfix =V14asetV11V12ainfix +aminagetV11V12agetV11ainfix +V12c1c1FIainfix <V12ainfix +V1c1Aainfix <=c0V12Iainfix <ainfix +V12c1ainfix +V1c1Aainfix <=c0ainfix +V12c1Iainfix <V12ainfix +V1c1Aainfix <=c0V12Iainfix =agetV3V8agetV2V12NIainfix <V12V1Aainfix <=c0V12Iainfix <V8V0Aainfix <=c0V8Iainfix =V13agetV11V12FIainfix <V12ainfix +V1c1Aainfix <=c0V12Iamin_distasuffixV5ainfix +V8c1asuffixV4ainfix +V12c1V10Aamin_distasuffixV5ainfix +V8c1asuffixV4V15agetV11V15Iainfix <=V15V12Aainfix <=c0V15FAamin_distasuffixV5V8asuffixV4V16agetV11V16Iainfix <=V16V1Aainfix <V12V16FIainfix >=V12c0Aainfix >=ainfix -V1c1V12FFFIainfix >=ainfix -V1c1c0Iainfix =V9asetV7V1ainfix +agetV7V1c1FIainfix <V1ainfix +V1c1Aainfix <=c0V1Iainfix <V1ainfix +V1c1Aainfix <=c0V1Iainfix <V1ainfix +V1c1Aainfix <=c0V1Iamin_distasuffixV5ainfix +V8c1asuffixV4V17agetV7V17Iainfix <=V17V1Aainfix <=c0V17FIainfix >=V8c0Aainfix >=ainfix -V0c1V8FFIainfix >=ainfix -V0c1c0Iainfix =agetV6V18ainfix -V1V18Iainfix <V18ainfix +V1c1Aainfix <=c0V18FFIainfix <=c0V1Iainfix >=ainfix +V1c1c0Iainfix >=V1c0Aainfix >=V0c0FFFF">
+          <proof
+           prover="alt-ergo"
+           timelimit="20"
+           edited=""
+           obsolete="false">
+           <result status="valid" time="0.02"/>
+          </proof>
+         </goal>
+        </transf>
+       </goal>
+       <goal
+        name="WP_parameter distance.13.7"
+        expl="for loop preservation"
+        sum="20773c96c64c704b0d85efe7f2f1e413"
+        proved="true"
+        expanded="false"
+        shape="Lamk arrayV1V2Lamk arrayV0V3amin_distasuffixV5ainfix +ainfix +V8c-1c1asuffixV4V12agetV11V12Iainfix <=V12V1Aainfix <=c0V12FIamin_distasuffixV5ainfix +V8c1asuffixV4ainfix +ainfix +c0c-1c1V10Aamin_distasuffixV5ainfix +V8c1asuffixV4V13agetV11V13Iainfix <=V13ainfix +c0c-1Aainfix <=c0V13FAamin_distasuffixV5V8asuffixV4V14agetV11V14Iainfix <=V14V1Aainfix <ainfix +c0c-1V14FFFIainfix >=ainfix -V1c1c0Iainfix =V9asetV7V1ainfix +agetV7V1c1FIainfix <V1ainfix +V1c1Aainfix <=c0V1Iainfix <V1ainfix +V1c1Aainfix <=c0V1Iainfix <V1ainfix +V1c1Aainfix <=c0V1Iamin_distasuffixV5ainfix +V8c1asuffixV4V15agetV7V15Iainfix <=V15V1Aainfix <=c0V15FIainfix >=V8c0Aainfix >=ainfix -V0c1V8FFIainfix >=ainfix -V0c1c0Iainfix =agetV6V16ainfix -V1V16Iainfix <V16ainfix +V1c1Aainfix <=c0V16FFIainfix <=c0V1Iainfix >=ainfix +V1c1c0Iainfix >=V1c0Aainfix >=V0c0FFFF">
+        <proof
+         prover="cvc3"
+         timelimit="20"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+        <proof
+         prover="alt-ergo"
+         timelimit="20"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+       </goal>
+      </transf>
+     </goal>
+     <goal
+      name="WP_parameter distance.14"
+      expl="precondition"
+      sum="f09af3bdefd6735747ae7f8d84f28289"
+      proved="true"
+      expanded="false"
+      shape="Lamk arrayV1V2Lamk arrayV0V3ainfix <c0ainfix +V1c1Aainfix <=c0c0Iamin_distasuffixV5ainfix +ainfix +c0c-1c1asuffixV4V8agetV7V8Iainfix <=V8V1Aainfix <=c0V8FFIainfix >=ainfix -V0c1c0Iainfix =agetV6V9ainfix -V1V9Iainfix <V9ainfix +V1c1Aainfix <=c0V9FFIainfix <=c0V1Iainfix >=ainfix +V1c1c0Iainfix >=V1c0Aainfix >=V0c0FFFF">
+      <proof
+       prover="alt-ergo"
+       timelimit="30"
+       edited=""
+       obsolete="false">
+       <result status="valid" time="0.02"/>
+      </proof>
+     </goal>
+     <goal
+      name="WP_parameter distance.15"
+      expl="normal postcondition"
+      sum="f706753455331178a5f6c17120d7ebe8"
+      proved="true"
+      expanded="false"
+      shape="Lamk arrayV1V2Lamk arrayV0V3amin_distasuffixV5c0asuffixV4c0agetV7c0Iainfix <c0ainfix +V1c1Aainfix <=c0c0Iamin_distasuffixV5ainfix +ainfix +c0c-1c1asuffixV4V8agetV7V8Iainfix <=V8V1Aainfix <=c0V8FFIainfix >=ainfix -V0c1c0Iainfix =agetV6V9ainfix -V1V9Iainfix <V9ainfix +V1c1Aainfix <=c0V9FFIainfix <=c0V1Iainfix >=ainfix +V1c1c0Iainfix >=V1c0Aainfix >=V0c0FFFF">
+      <proof
+       prover="alt-ergo"
+       timelimit="30"
+       edited=""
+       obsolete="false">
+       <result status="valid" time="0.02"/>
+      </proof>
+     </goal>
+    </transf>
+   </goal>
+  </theory>
+ </file>
+</why3session>

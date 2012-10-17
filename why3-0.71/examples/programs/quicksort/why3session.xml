@@ -1,0 +1,618 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE why3session SYSTEM "why3session.dtd">
+<why3session
+ name="programs/quicksort/why3session.xml">
+ <prover
+  id="alt-ergo"
+  name="Alt-Ergo"
+  version="0.93"/>
+ <prover
+  id="coq"
+  name="Coq"
+  version="8.3pl2"/>
+ <prover
+  id="cvc3"
+  name="CVC3"
+  version="2.2"/>
+ <prover
+  id="eprover"
+  name="Eprover"
+  version="1.4 Namring"/>
+ <prover
+  id="gappa"
+  name="Gappa"
+  version="0.15.1"/>
+ <prover
+  id="simplify"
+  name="Simplify"
+  version="1.5.4"/>
+ <prover
+  id="spass"
+  name="Spass"
+  version="3.7"/>
+ <prover
+  id="vampire"
+  name="Vampire"
+  version="0.6"/>
+ <prover
+  id="verit"
+  name="veriT"
+  version="dev"/>
+ <prover
+  id="yices"
+  name="Yices"
+  version="1.0.25"/>
+ <prover
+  id="z3"
+  name="Z3"
+  version="2.19"/>
+ <file
+  name="../quicksort.mlw"
+  verified="true"
+  expanded="true">
+  <theory
+   name="WP Quicksort"
+   verified="true"
+   expanded="true">
+   <goal
+    name="WP_parameter swap"
+    expl="parameter swap"
+    sum="3ad1de4201230ce8d136babc9b7f04c9"
+    proved="true"
+    expanded="false"
+    shape="aexchangeV3V5V1V2Iainfix =V5asetV4V2agetV3V1FAainfix <V2V0Aainfix <=c0V2Iainfix =V4asetV3V1agetV3V2FAainfix <V1V0Aainfix <=c0V1Aainfix <V2V0Aainfix <=c0V2Aainfix <V1V0Aainfix <=c0V1Iainfix <V2V0Aainfix <=c0V2Aainfix <V1V0Aainfix <=c0V1FFFF">
+    <proof
+     prover="alt-ergo"
+     timelimit="29"
+     edited=""
+     obsolete="false">
+     <result status="valid" time="0.02"/>
+    </proof>
+   </goal>
+   <goal
+    name="WP_parameter quick_rec"
+    expl="parameter quick_rec"
+    sum="e5e4244767d1b580d52584d2509cebde"
+    proved="true"
+    expanded="true"
+    shape="iainfix <V1V2LagetV3V1apermut_subV3V9V1ainfix +V2c1Aasorted_subV9V1ainfix +V2c1Iapermut_subV8V9ainfix +V5c1ainfix +V2c1Aasorted_subV9ainfix +V5c1ainfix +V2c1FAainfix <V2V0Aainfix <=c0ainfix +V5c1Aainfix <ainfix -ainfix +c1V2ainfix +V5c1ainfix -ainfix +c1V2V1Aainfix <=c0ainfix -ainfix +c1V2V1Iapermut_subV7V8V1ainfix +ainfix -V5c1c1Aasorted_subV8V1ainfix +ainfix -V5c1c1FAainfix <ainfix -V5c1V0Aainfix <=c0V1Aainfix <ainfix -ainfix +c1ainfix -V5c1V1ainfix -ainfix +c1V2V1Aainfix <=c0ainfix -ainfix +c1V2V1IaexchangeV6V7V1V5FAainfix <V5V0Aainfix <=c0V5Aainfix <V1V0Aainfix <=c0V1Iainfix <V5ainfix +V2c1Aainfix <=V1V5Aainfix =agetV6V1V4Aapermut_subV3V6V1ainfix +V2c1Aainfix >=agetV6V10V4Iainfix <V10ainfix +V2c1Aainfix <V5V10FAainfix <agetV6V11V4Iainfix <=V11V5Aainfix <V1V11FAiainfix <agetV6V12V4ainfix <V13ainfix +V12c1Aainfix <=V1V13Aainfix =agetV14V1V4Aapermut_subV3V14V1ainfix +V2c1Aainfix >=agetV14V15V4Iainfix <V15ainfix +V12c1Aainfix <V13V15FAainfix <agetV14V16V4Iainfix <=V16V13Aainfix <V1V16FIaexchangeV6V14V12V13FAainfix <V13V0Aainfix <=c0V13Aainfix <V12V0Aainfix <=c0V12Iainfix =V13ainfix +V5c1Fainfix <V5ainfix +V12c1Aainfix <=V1V5Aainfix =agetV6V1V4Aapermut_subV3V6V1ainfix +V2c1Aainfix >=agetV6V17V4Iainfix <V17ainfix +V12c1Aainfix <V5V17FAainfix <agetV6V18V4Iainfix <=V18V5Aainfix <V1V18FAainfix <V12V0Aainfix <=c0V12Iainfix <V5V12Aainfix <=V1V5Aainfix =agetV6V1V4Aapermut_subV3V6V1ainfix +V2c1Aainfix >=agetV6V19V4Iainfix <V19V12Aainfix <V5V19FAainfix <agetV6V20V4Iainfix <=V20V5Aainfix <V1V20FIainfix <=V12V2Aainfix <=ainfix +V1c1V12FFFAainfix <V1ainfix +V1c1Aainfix <=V1V1Aainfix =agetV3V1V4Aapermut_subV3V3V1ainfix +V2c1Aainfix >=agetV3V21V4Iainfix <V21ainfix +V1c1Aainfix <V1V21FAainfix <agetV3V22V4Iainfix <=V22V1Aainfix <V1V22FIainfix <=ainfix +V1c1V2Aapermut_subV3V25V1ainfix +V2c1Aasorted_subV25V1ainfix +V2c1Iapermut_subV24V25ainfix +V1c1ainfix +V2c1Aasorted_subV25ainfix +V1c1ainfix +V2c1FAainfix <V2V0Aainfix <=c0ainfix +V1c1Aainfix <ainfix -ainfix +c1V2ainfix +V1c1ainfix -ainfix +c1V2V1Aainfix <=c0ainfix -ainfix +c1V2V1Iapermut_subV23V24V1ainfix +ainfix -V1c1c1Aasorted_subV24V1ainfix +ainfix -V1c1c1FAainfix <ainfix -V1c1V0Aainfix <=c0V1Aainfix <ainfix -ainfix +c1ainfix -V1c1V1ainfix -ainfix +c1V2V1Aainfix <=c0ainfix -ainfix +c1V2V1IaexchangeV3V23V1V1FAainfix <V1V0Aainfix <=c0V1Aainfix <V1V0Aainfix <=c0V1Iainfix >ainfix +V1c1V2Aainfix <V1V0Aainfix <=c0V1apermut_subV3V3V1ainfix +V2c1Aasorted_subV3V1ainfix +V2c1Iainfix <V2V0Aainfix <=c0V1FFFF">
+    <transf
+     name="split_goal"
+     proved="true"
+     expanded="true">
+     <goal
+      name="WP_parameter quick_rec.1"
+      expl="precondition"
+      sum="6dac3dbbf9c68551592782dbd0c120bb"
+      proved="true"
+      expanded="false"
+      shape="ainfix <V1V0Aainfix <=c0V1Iainfix <V1V2Iainfix <V2V0Aainfix <=c0V1FFFF">
+      <proof
+       prover="alt-ergo"
+       timelimit="29"
+       edited=""
+       obsolete="false">
+       <result status="valid" time="0.02"/>
+      </proof>
+     </goal>
+     <goal
+      name="WP_parameter quick_rec.2"
+      expl="precondition"
+      sum="b5d94c37dec3a9d461db9c1fc8f61c1f"
+      proved="true"
+      expanded="false"
+      shape="LagetV3V1ainfix <V1V0Aainfix <=c0V1Aainfix <V1V0Aainfix <=c0V1Iainfix >ainfix +V1c1V2Iainfix <V1V0Aainfix <=c0V1Iainfix <V1V2Iainfix <V2V0Aainfix <=c0V1FFFF">
+      <proof
+       prover="alt-ergo"
+       timelimit="10"
+       edited=""
+       obsolete="false">
+       <result status="valid" time="0.02"/>
+      </proof>
+     </goal>
+     <goal
+      name="WP_parameter quick_rec.3"
+      expl="precondition"
+      sum="325780d75a8d04c65c2d124c4b0e3a8e"
+      proved="true"
+      expanded="false"
+      shape="LagetV3V1ainfix <ainfix -V1c1V0Aainfix <=c0V1Aainfix <ainfix -ainfix +c1ainfix -V1c1V1ainfix -ainfix +c1V2V1Aainfix <=c0ainfix -ainfix +c1V2V1IaexchangeV3V5V1V1FIainfix <V1V0Aainfix <=c0V1Aainfix <V1V0Aainfix <=c0V1Iainfix >ainfix +V1c1V2Iainfix <V1V0Aainfix <=c0V1Iainfix <V1V2Iainfix <V2V0Aainfix <=c0V1FFFF">
+      <proof
+       prover="alt-ergo"
+       timelimit="10"
+       edited=""
+       obsolete="false">
+       <result status="valid" time="0.02"/>
+      </proof>
+     </goal>
+     <goal
+      name="WP_parameter quick_rec.4"
+      expl="precondition"
+      sum="d3d0e55cb7421a0cbc0b96fd5e71934b"
+      proved="true"
+      expanded="false"
+      shape="LagetV3V1ainfix <V2V0Aainfix <=c0ainfix +V1c1Aainfix <ainfix -ainfix +c1V2ainfix +V1c1ainfix -ainfix +c1V2V1Aainfix <=c0ainfix -ainfix +c1V2V1Iapermut_subV5V6V1ainfix +ainfix -V1c1c1Aasorted_subV6V1ainfix +ainfix -V1c1c1FIainfix <ainfix -V1c1V0Aainfix <=c0V1Aainfix <ainfix -ainfix +c1ainfix -V1c1V1ainfix -ainfix +c1V2V1Aainfix <=c0ainfix -ainfix +c1V2V1IaexchangeV3V5V1V1FIainfix <V1V0Aainfix <=c0V1Aainfix <V1V0Aainfix <=c0V1Iainfix >ainfix +V1c1V2Iainfix <V1V0Aainfix <=c0V1Iainfix <V1V2Iainfix <V2V0Aainfix <=c0V1FFFF">
+      <proof
+       prover="alt-ergo"
+       timelimit="29"
+       edited=""
+       obsolete="false">
+       <result status="valid" time="0.02"/>
+      </proof>
+     </goal>
+     <goal
+      name="WP_parameter quick_rec.5"
+      expl="normal postcondition"
+      sum="5045854e3fca4222a491749ff15024e3"
+      proved="true"
+      expanded="false"
+      shape="LagetV3V1apermut_subV3V7V1ainfix +V2c1Aasorted_subV7V1ainfix +V2c1Iapermut_subV6V7ainfix +V1c1ainfix +V2c1Aasorted_subV7ainfix +V1c1ainfix +V2c1FIainfix <V2V0Aainfix <=c0ainfix +V1c1Aainfix <ainfix -ainfix +c1V2ainfix +V1c1ainfix -ainfix +c1V2V1Aainfix <=c0ainfix -ainfix +c1V2V1Iapermut_subV5V6V1ainfix +ainfix -V1c1c1Aasorted_subV6V1ainfix +ainfix -V1c1c1FIainfix <ainfix -V1c1V0Aainfix <=c0V1Aainfix <ainfix -ainfix +c1ainfix -V1c1V1ainfix -ainfix +c1V2V1Aainfix <=c0ainfix -ainfix +c1V2V1IaexchangeV3V5V1V1FIainfix <V1V0Aainfix <=c0V1Aainfix <V1V0Aainfix <=c0V1Iainfix >ainfix +V1c1V2Iainfix <V1V0Aainfix <=c0V1Iainfix <V1V2Iainfix <V2V0Aainfix <=c0V1FFFF">
+      <proof
+       prover="alt-ergo"
+       timelimit="29"
+       edited=""
+       obsolete="false">
+       <result status="valid" time="0.02"/>
+      </proof>
+     </goal>
+     <goal
+      name="WP_parameter quick_rec.6"
+      expl="for loop initialization"
+      sum="8fce870493fd1a89f86d7026933a1ffb"
+      proved="true"
+      expanded="false"
+      shape="LagetV3V1ainfix <V1ainfix +V1c1Aainfix <=V1V1Aainfix =agetV3V1V4Aapermut_subV3V3V1ainfix +V2c1Aainfix >=agetV3V5V4Iainfix <V5ainfix +V1c1Aainfix <V1V5FAainfix <agetV3V6V4Iainfix <=V6V1Aainfix <V1V6FIainfix <=ainfix +V1c1V2Iainfix <V1V0Aainfix <=c0V1Iainfix <V1V2Iainfix <V2V0Aainfix <=c0V1FFFF">
+      <proof
+       prover="alt-ergo"
+       timelimit="29"
+       edited=""
+       obsolete="false">
+       <result status="valid" time="0.02"/>
+      </proof>
+     </goal>
+     <goal
+      name="WP_parameter quick_rec.7"
+      expl="for loop preservation"
+      sum="284ee5a31c2eb6316b44ab0a43686261"
+      proved="true"
+      expanded="true"
+      shape="LagetV3V1iainfix <agetV6V7V4ainfix <V8ainfix +V7c1Aainfix <=V1V8Aainfix =agetV9V1V4Aapermut_subV3V9V1ainfix +V2c1Aainfix >=agetV9V10V4Iainfix <V10ainfix +V7c1Aainfix <V8V10FAainfix <agetV9V11V4Iainfix <=V11V8Aainfix <V1V11FIaexchangeV6V9V7V8FAainfix <V8V0Aainfix <=c0V8Aainfix <V7V0Aainfix <=c0V7Iainfix =V8ainfix +V5c1Fainfix <V5ainfix +V7c1Aainfix <=V1V5Aainfix =agetV6V1V4Aapermut_subV3V6V1ainfix +V2c1Aainfix >=agetV6V12V4Iainfix <V12ainfix +V7c1Aainfix <V5V12FAainfix <agetV6V13V4Iainfix <=V13V5Aainfix <V1V13FAainfix <V7V0Aainfix <=c0V7Iainfix <V5V7Aainfix <=V1V5Aainfix =agetV6V1V4Aapermut_subV3V6V1ainfix +V2c1Aainfix >=agetV6V14V4Iainfix <V14V7Aainfix <V5V14FAainfix <agetV6V15V4Iainfix <=V15V5Aainfix <V1V15FIainfix <=V7V2Aainfix <=ainfix +V1c1V7FFFIainfix <=ainfix +V1c1V2Iainfix <V1V0Aainfix <=c0V1Iainfix <V1V2Iainfix <V2V0Aainfix <=c0V1FFFF">
+      <transf
+       name="split_goal"
+       proved="true"
+       expanded="true">
+       <goal
+        name="WP_parameter quick_rec.7.1"
+        expl="for loop preservation"
+        sum="c6a8724060e0846d4e719985ee25f3f6"
+        proved="true"
+        expanded="false"
+        shape="LagetV3V1ainfix <V7V0Aainfix <=c0V7Iainfix <V5V7Aainfix <=V1V5Aainfix =agetV6V1V4Aapermut_subV3V6V1ainfix +V2c1Aainfix >=agetV6V8V4Iainfix <V8V7Aainfix <V5V8FAainfix <agetV6V9V4Iainfix <=V9V5Aainfix <V1V9FIainfix <=V7V2Aainfix <=ainfix +V1c1V7FFFIainfix <=ainfix +V1c1V2Iainfix <V1V0Aainfix <=c0V1Iainfix <V1V2Iainfix <V2V0Aainfix <=c0V1FFFF">
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter quick_rec.7.2"
+        expl="for loop preservation"
+        sum="01a139834c5e328ce4af5ee8d2fcd5e7"
+        proved="true"
+        expanded="false"
+        shape="LagetV3V1ainfix <V8V0Aainfix <=c0V8Aainfix <V7V0Aainfix <=c0V7Iainfix =V8ainfix +V5c1FIainfix <agetV6V7V4Iainfix <V7V0Aainfix <=c0V7Iainfix <V5V7Aainfix <=V1V5Aainfix =agetV6V1V4Aapermut_subV3V6V1ainfix +V2c1Aainfix >=agetV6V9V4Iainfix <V9V7Aainfix <V5V9FAainfix <agetV6V10V4Iainfix <=V10V5Aainfix <V1V10FIainfix <=V7V2Aainfix <=ainfix +V1c1V7FFFIainfix <=ainfix +V1c1V2Iainfix <V1V0Aainfix <=c0V1Iainfix <V1V2Iainfix <V2V0Aainfix <=c0V1FFFF">
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter quick_rec.7.3"
+        expl="for loop preservation"
+        sum="7afcf2a80188b4dbf4ab8d7f7fe9ddc4"
+        proved="true"
+        expanded="false"
+        shape="LagetV3V1ainfix <agetV9V10V4Iainfix <=V10V8Aainfix <V1V10FIaexchangeV6V9V7V8FIainfix <V8V0Aainfix <=c0V8Aainfix <V7V0Aainfix <=c0V7Iainfix =V8ainfix +V5c1FIainfix <agetV6V7V4Iainfix <V7V0Aainfix <=c0V7Iainfix <V5V7Aainfix <=V1V5Aainfix =agetV6V1V4Aapermut_subV3V6V1ainfix +V2c1Aainfix >=agetV6V11V4Iainfix <V11V7Aainfix <V5V11FAainfix <agetV6V12V4Iainfix <=V12V5Aainfix <V1V12FIainfix <=V7V2Aainfix <=ainfix +V1c1V7FFFIainfix <=ainfix +V1c1V2Iainfix <V1V0Aainfix <=c0V1Iainfix <V1V2Iainfix <V2V0Aainfix <=c0V1FFFF">
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.03"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter quick_rec.7.4"
+        expl="for loop preservation"
+        sum="930d97742a0d3555515f294cd12d241a"
+        proved="true"
+        expanded="false"
+        shape="LagetV3V1ainfix >=agetV9V10V4Iainfix <V10ainfix +V7c1Aainfix <V8V10FIaexchangeV6V9V7V8FIainfix <V8V0Aainfix <=c0V8Aainfix <V7V0Aainfix <=c0V7Iainfix =V8ainfix +V5c1FIainfix <agetV6V7V4Iainfix <V7V0Aainfix <=c0V7Iainfix <V5V7Aainfix <=V1V5Aainfix =agetV6V1V4Aapermut_subV3V6V1ainfix +V2c1Aainfix >=agetV6V11V4Iainfix <V11V7Aainfix <V5V11FAainfix <agetV6V12V4Iainfix <=V12V5Aainfix <V1V12FIainfix <=V7V2Aainfix <=ainfix +V1c1V7FFFIainfix <=ainfix +V1c1V2Iainfix <V1V0Aainfix <=c0V1Iainfix <V1V2Iainfix <V2V0Aainfix <=c0V1FFFF">
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.04"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter quick_rec.7.5"
+        expl="for loop preservation"
+        sum="731909dd6c848b3c4fb31817b336400d"
+        proved="true"
+        expanded="true"
+        shape="LagetV3V1apermut_subV3V9V1ainfix +V2c1IaexchangeV6V9V7V8FIainfix <V8V0Aainfix <=c0V8Aainfix <V7V0Aainfix <=c0V7Iainfix =V8ainfix +V5c1FIainfix <agetV6V7V4Iainfix <V7V0Aainfix <=c0V7Iainfix <V5V7Aainfix <=V1V5Aainfix =agetV6V1V4Aapermut_subV3V6V1ainfix +V2c1Aainfix >=agetV6V10V4Iainfix <V10V7Aainfix <V5V10FAainfix <agetV6V11V4Iainfix <=V11V5Aainfix <V1V11FIainfix <=V7V2Aainfix <=ainfix +V1c1V7FFFIainfix <=ainfix +V1c1V2Iainfix <V1V0Aainfix <=c0V1Iainfix <V1V2Iainfix <V2V0Aainfix <=c0V1FFFF">
+        <proof
+         prover="coq"
+         timelimit="10"
+         edited="quicksort_WP_Quicksort_WP_parameter_quick_rec_1.v"
+         obsolete="false">
+         <result status="valid" time="0.56"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter quick_rec.7.6"
+        expl="for loop preservation"
+        sum="20ed7d07cc9d445da18bec6aecc40d8b"
+        proved="true"
+        expanded="false"
+        shape="LagetV3V1ainfix =agetV9V1V4IaexchangeV6V9V7V8FIainfix <V8V0Aainfix <=c0V8Aainfix <V7V0Aainfix <=c0V7Iainfix =V8ainfix +V5c1FIainfix <agetV6V7V4Iainfix <V7V0Aainfix <=c0V7Iainfix <V5V7Aainfix <=V1V5Aainfix =agetV6V1V4Aapermut_subV3V6V1ainfix +V2c1Aainfix >=agetV6V10V4Iainfix <V10V7Aainfix <V5V10FAainfix <agetV6V11V4Iainfix <=V11V5Aainfix <V1V11FIainfix <=V7V2Aainfix <=ainfix +V1c1V7FFFIainfix <=ainfix +V1c1V2Iainfix <V1V0Aainfix <=c0V1Iainfix <V1V2Iainfix <V2V0Aainfix <=c0V1FFFF">
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter quick_rec.7.7"
+        expl="for loop preservation"
+        sum="e32de3a3b7ff2e7c86b47dba22696f80"
+        proved="true"
+        expanded="false"
+        shape="LagetV3V1ainfix <=V1V8IaexchangeV6V9V7V8FIainfix <V8V0Aainfix <=c0V8Aainfix <V7V0Aainfix <=c0V7Iainfix =V8ainfix +V5c1FIainfix <agetV6V7V4Iainfix <V7V0Aainfix <=c0V7Iainfix <V5V7Aainfix <=V1V5Aainfix =agetV6V1V4Aapermut_subV3V6V1ainfix +V2c1Aainfix >=agetV6V10V4Iainfix <V10V7Aainfix <V5V10FAainfix <agetV6V11V4Iainfix <=V11V5Aainfix <V1V11FIainfix <=V7V2Aainfix <=ainfix +V1c1V7FFFIainfix <=ainfix +V1c1V2Iainfix <V1V0Aainfix <=c0V1Iainfix <V1V2Iainfix <V2V0Aainfix <=c0V1FFFF">
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter quick_rec.7.8"
+        expl="for loop preservation"
+        sum="d331d1c7691a4ca7f42924b81def984e"
+        proved="true"
+        expanded="false"
+        shape="LagetV3V1ainfix <V8ainfix +V7c1IaexchangeV6V9V7V8FIainfix <V8V0Aainfix <=c0V8Aainfix <V7V0Aainfix <=c0V7Iainfix =V8ainfix +V5c1FIainfix <agetV6V7V4Iainfix <V7V0Aainfix <=c0V7Iainfix <V5V7Aainfix <=V1V5Aainfix =agetV6V1V4Aapermut_subV3V6V1ainfix +V2c1Aainfix >=agetV6V10V4Iainfix <V10V7Aainfix <V5V10FAainfix <agetV6V11V4Iainfix <=V11V5Aainfix <V1V11FIainfix <=V7V2Aainfix <=ainfix +V1c1V7FFFIainfix <=ainfix +V1c1V2Iainfix <V1V0Aainfix <=c0V1Iainfix <V1V2Iainfix <V2V0Aainfix <=c0V1FFFF">
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter quick_rec.7.9"
+        expl="for loop preservation"
+        sum="9a8d9abfae8501e115ef02444bf282fe"
+        proved="true"
+        expanded="false"
+        shape="LagetV3V1ainfix <agetV6V8V4Iainfix <=V8V5Aainfix <V1V8FIainfix <agetV6V7V4NIainfix <V7V0Aainfix <=c0V7Iainfix <V5V7Aainfix <=V1V5Aainfix =agetV6V1V4Aapermut_subV3V6V1ainfix +V2c1Aainfix >=agetV6V9V4Iainfix <V9V7Aainfix <V5V9FAainfix <agetV6V10V4Iainfix <=V10V5Aainfix <V1V10FIainfix <=V7V2Aainfix <=ainfix +V1c1V7FFFIainfix <=ainfix +V1c1V2Iainfix <V1V0Aainfix <=c0V1Iainfix <V1V2Iainfix <V2V0Aainfix <=c0V1FFFF">
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter quick_rec.7.10"
+        expl="for loop preservation"
+        sum="6de378c97f4a15f56848ea1a3b7b922a"
+        proved="true"
+        expanded="false"
+        shape="LagetV3V1ainfix >=agetV6V8V4Iainfix <V8ainfix +V7c1Aainfix <V5V8FIainfix <agetV6V7V4NIainfix <V7V0Aainfix <=c0V7Iainfix <V5V7Aainfix <=V1V5Aainfix =agetV6V1V4Aapermut_subV3V6V1ainfix +V2c1Aainfix >=agetV6V9V4Iainfix <V9V7Aainfix <V5V9FAainfix <agetV6V10V4Iainfix <=V10V5Aainfix <V1V10FIainfix <=V7V2Aainfix <=ainfix +V1c1V7FFFIainfix <=ainfix +V1c1V2Iainfix <V1V0Aainfix <=c0V1Iainfix <V1V2Iainfix <V2V0Aainfix <=c0V1FFFF">
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter quick_rec.7.11"
+        expl="for loop preservation"
+        sum="a890cecadc184c4a318a54a1ba2c1e1d"
+        proved="true"
+        expanded="false"
+        shape="LagetV3V1apermut_subV3V6V1ainfix +V2c1Iainfix <agetV6V7V4NIainfix <V7V0Aainfix <=c0V7Iainfix <V5V7Aainfix <=V1V5Aainfix =agetV6V1V4Aapermut_subV3V6V1ainfix +V2c1Aainfix >=agetV6V8V4Iainfix <V8V7Aainfix <V5V8FAainfix <agetV6V9V4Iainfix <=V9V5Aainfix <V1V9FIainfix <=V7V2Aainfix <=ainfix +V1c1V7FFFIainfix <=ainfix +V1c1V2Iainfix <V1V0Aainfix <=c0V1Iainfix <V1V2Iainfix <V2V0Aainfix <=c0V1FFFF">
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter quick_rec.7.12"
+        expl="for loop preservation"
+        sum="11cca04e003c1c89e1b9087e56947d60"
+        proved="true"
+        expanded="false"
+        shape="LagetV3V1ainfix =agetV6V1V4Iainfix <agetV6V7V4NIainfix <V7V0Aainfix <=c0V7Iainfix <V5V7Aainfix <=V1V5Aainfix =agetV6V1V4Aapermut_subV3V6V1ainfix +V2c1Aainfix >=agetV6V8V4Iainfix <V8V7Aainfix <V5V8FAainfix <agetV6V9V4Iainfix <=V9V5Aainfix <V1V9FIainfix <=V7V2Aainfix <=ainfix +V1c1V7FFFIainfix <=ainfix +V1c1V2Iainfix <V1V0Aainfix <=c0V1Iainfix <V1V2Iainfix <V2V0Aainfix <=c0V1FFFF">
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter quick_rec.7.13"
+        expl="for loop preservation"
+        sum="7d33d8688380bdae568b17b687b85dd8"
+        proved="true"
+        expanded="false"
+        shape="LagetV3V1ainfix <=V1V5Iainfix <agetV6V7V4NIainfix <V7V0Aainfix <=c0V7Iainfix <V5V7Aainfix <=V1V5Aainfix =agetV6V1V4Aapermut_subV3V6V1ainfix +V2c1Aainfix >=agetV6V8V4Iainfix <V8V7Aainfix <V5V8FAainfix <agetV6V9V4Iainfix <=V9V5Aainfix <V1V9FIainfix <=V7V2Aainfix <=ainfix +V1c1V7FFFIainfix <=ainfix +V1c1V2Iainfix <V1V0Aainfix <=c0V1Iainfix <V1V2Iainfix <V2V0Aainfix <=c0V1FFFF">
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter quick_rec.7.14"
+        expl="for loop preservation"
+        sum="39be702801be6387a518782b18f697fa"
+        proved="true"
+        expanded="false"
+        shape="LagetV3V1ainfix <V5ainfix +V7c1Iainfix <agetV6V7V4NIainfix <V7V0Aainfix <=c0V7Iainfix <V5V7Aainfix <=V1V5Aainfix =agetV6V1V4Aapermut_subV3V6V1ainfix +V2c1Aainfix >=agetV6V8V4Iainfix <V8V7Aainfix <V5V8FAainfix <agetV6V9V4Iainfix <=V9V5Aainfix <V1V9FIainfix <=V7V2Aainfix <=ainfix +V1c1V7FFFIainfix <=ainfix +V1c1V2Iainfix <V1V0Aainfix <=c0V1Iainfix <V1V2Iainfix <V2V0Aainfix <=c0V1FFFF">
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.01"/>
+        </proof>
+       </goal>
+      </transf>
+     </goal>
+     <goal
+      name="WP_parameter quick_rec.8"
+      expl="precondition"
+      sum="476abed88103a013237bcec8131d5f81"
+      proved="true"
+      expanded="false"
+      shape="LagetV3V1ainfix <V5V0Aainfix <=c0V5Aainfix <V1V0Aainfix <=c0V1Iainfix <V5ainfix +V2c1Aainfix <=V1V5Aainfix =agetV6V1V4Aapermut_subV3V6V1ainfix +V2c1Aainfix >=agetV6V7V4Iainfix <V7ainfix +V2c1Aainfix <V5V7FAainfix <agetV6V8V4Iainfix <=V8V5Aainfix <V1V8FFFIainfix <=ainfix +V1c1V2Iainfix <V1V0Aainfix <=c0V1Iainfix <V1V2Iainfix <V2V0Aainfix <=c0V1FFFF">
+      <transf
+       name="split_goal"
+       proved="true"
+       expanded="false">
+       <goal
+        name="WP_parameter quick_rec.8.1"
+        expl="parameter quick_rec"
+        sum="02c0bdba7968b79e177b25b87af9f724"
+        proved="true"
+        expanded="false"
+        shape="LagetV3V1ainfix <=c0V1Iainfix <V5ainfix +V2c1Aainfix <=V1V5Aainfix =agetV6V1V4Aapermut_subV3V6V1ainfix +V2c1Aainfix >=agetV6V7V4Iainfix <V7ainfix +V2c1Aainfix <V5V7FAainfix <agetV6V8V4Iainfix <=V8V5Aainfix <V1V8FFFIainfix <=ainfix +V1c1V2Iainfix <V1V0Aainfix <=c0V1Iainfix <V1V2Iainfix <V2V0Aainfix <=c0V1FFFF">
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.01"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter quick_rec.8.2"
+        expl="parameter quick_rec"
+        sum="377cc65f526b566126f635dfe992cfbd"
+        proved="true"
+        expanded="false"
+        shape="LagetV3V1ainfix <V1V0Iainfix <V5ainfix +V2c1Aainfix <=V1V5Aainfix =agetV6V1V4Aapermut_subV3V6V1ainfix +V2c1Aainfix >=agetV6V7V4Iainfix <V7ainfix +V2c1Aainfix <V5V7FAainfix <agetV6V8V4Iainfix <=V8V5Aainfix <V1V8FFFIainfix <=ainfix +V1c1V2Iainfix <V1V0Aainfix <=c0V1Iainfix <V1V2Iainfix <V2V0Aainfix <=c0V1FFFF">
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter quick_rec.8.3"
+        expl="parameter quick_rec"
+        sum="22ad22d72e8c8aa18dae378cb5acf796"
+        proved="true"
+        expanded="false"
+        shape="LagetV3V1ainfix <=c0V5Iainfix <V5ainfix +V2c1Aainfix <=V1V5Aainfix =agetV6V1V4Aapermut_subV3V6V1ainfix +V2c1Aainfix >=agetV6V7V4Iainfix <V7ainfix +V2c1Aainfix <V5V7FAainfix <agetV6V8V4Iainfix <=V8V5Aainfix <V1V8FFFIainfix <=ainfix +V1c1V2Iainfix <V1V0Aainfix <=c0V1Iainfix <V1V2Iainfix <V2V0Aainfix <=c0V1FFFF">
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.01"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter quick_rec.8.4"
+        expl="parameter quick_rec"
+        sum="fa7f0b7a0e926c13d40a188836d484b1"
+        proved="true"
+        expanded="false"
+        shape="LagetV3V1ainfix <V5V0Iainfix <V5ainfix +V2c1Aainfix <=V1V5Aainfix =agetV6V1V4Aapermut_subV3V6V1ainfix +V2c1Aainfix >=agetV6V7V4Iainfix <V7ainfix +V2c1Aainfix <V5V7FAainfix <agetV6V8V4Iainfix <=V8V5Aainfix <V1V8FFFIainfix <=ainfix +V1c1V2Iainfix <V1V0Aainfix <=c0V1Iainfix <V1V2Iainfix <V2V0Aainfix <=c0V1FFFF">
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+       </goal>
+      </transf>
+     </goal>
+     <goal
+      name="WP_parameter quick_rec.9"
+      expl="precondition"
+      sum="539c22a9bbd19747822daa5208053180"
+      proved="true"
+      expanded="false"
+      shape="LagetV3V1ainfix <ainfix -V5c1V0Aainfix <=c0V1Aainfix <ainfix -ainfix +c1ainfix -V5c1V1ainfix -ainfix +c1V2V1Aainfix <=c0ainfix -ainfix +c1V2V1IaexchangeV6V7V1V5FIainfix <V5V0Aainfix <=c0V5Aainfix <V1V0Aainfix <=c0V1Iainfix <V5ainfix +V2c1Aainfix <=V1V5Aainfix =agetV6V1V4Aapermut_subV3V6V1ainfix +V2c1Aainfix >=agetV6V8V4Iainfix <V8ainfix +V2c1Aainfix <V5V8FAainfix <agetV6V9V4Iainfix <=V9V5Aainfix <V1V9FFFIainfix <=ainfix +V1c1V2Iainfix <V1V0Aainfix <=c0V1Iainfix <V1V2Iainfix <V2V0Aainfix <=c0V1FFFF">
+      <proof
+       prover="alt-ergo"
+       timelimit="10"
+       edited=""
+       obsolete="false">
+       <result status="valid" time="0.03"/>
+      </proof>
+     </goal>
+     <goal
+      name="WP_parameter quick_rec.10"
+      expl="precondition"
+      sum="46d3a0c1d08e20f55416a32730b62984"
+      proved="true"
+      expanded="false"
+      shape="LagetV3V1ainfix <V2V0Aainfix <=c0ainfix +V5c1Aainfix <ainfix -ainfix +c1V2ainfix +V5c1ainfix -ainfix +c1V2V1Aainfix <=c0ainfix -ainfix +c1V2V1Iapermut_subV7V8V1ainfix +ainfix -V5c1c1Aasorted_subV8V1ainfix +ainfix -V5c1c1FIainfix <ainfix -V5c1V0Aainfix <=c0V1Aainfix <ainfix -ainfix +c1ainfix -V5c1V1ainfix -ainfix +c1V2V1Aainfix <=c0ainfix -ainfix +c1V2V1IaexchangeV6V7V1V5FIainfix <V5V0Aainfix <=c0V5Aainfix <V1V0Aainfix <=c0V1Iainfix <V5ainfix +V2c1Aainfix <=V1V5Aainfix =agetV6V1V4Aapermut_subV3V6V1ainfix +V2c1Aainfix >=agetV6V9V4Iainfix <V9ainfix +V2c1Aainfix <V5V9FAainfix <agetV6V10V4Iainfix <=V10V5Aainfix <V1V10FFFIainfix <=ainfix +V1c1V2Iainfix <V1V0Aainfix <=c0V1Iainfix <V1V2Iainfix <V2V0Aainfix <=c0V1FFFF">
+      <proof
+       prover="alt-ergo"
+       timelimit="10"
+       edited=""
+       obsolete="false">
+       <result status="valid" time="0.02"/>
+      </proof>
+     </goal>
+     <goal
+      name="WP_parameter quick_rec.11"
+      expl="normal postcondition"
+      sum="5b77825634492fbc8a2accf9a2dfe7ce"
+      proved="true"
+      expanded="false"
+      shape="LagetV3V1apermut_subV3V9V1ainfix +V2c1Aasorted_subV9V1ainfix +V2c1Iapermut_subV8V9ainfix +V5c1ainfix +V2c1Aasorted_subV9ainfix +V5c1ainfix +V2c1FIainfix <V2V0Aainfix <=c0ainfix +V5c1Aainfix <ainfix -ainfix +c1V2ainfix +V5c1ainfix -ainfix +c1V2V1Aainfix <=c0ainfix -ainfix +c1V2V1Iapermut_subV7V8V1ainfix +ainfix -V5c1c1Aasorted_subV8V1ainfix +ainfix -V5c1c1FIainfix <ainfix -V5c1V0Aainfix <=c0V1Aainfix <ainfix -ainfix +c1ainfix -V5c1V1ainfix -ainfix +c1V2V1Aainfix <=c0ainfix -ainfix +c1V2V1IaexchangeV6V7V1V5FIainfix <V5V0Aainfix <=c0V5Aainfix <V1V0Aainfix <=c0V1Iainfix <V5ainfix +V2c1Aainfix <=V1V5Aainfix =agetV6V1V4Aapermut_subV3V6V1ainfix +V2c1Aainfix >=agetV6V10V4Iainfix <V10ainfix +V2c1Aainfix <V5V10FAainfix <agetV6V11V4Iainfix <=V11V5Aainfix <V1V11FFFIainfix <=ainfix +V1c1V2Iainfix <V1V0Aainfix <=c0V1Iainfix <V1V2Iainfix <V2V0Aainfix <=c0V1FFFF">
+      <proof
+       prover="coq"
+       timelimit="10"
+       edited="quicksort_WP_Quicksort_WP_parameter_quick_rec_2.v"
+       obsolete="false">
+       <result status="valid" time="1.61"/>
+      </proof>
+     </goal>
+     <goal
+      name="WP_parameter quick_rec.12"
+      expl="normal postcondition"
+      sum="e0b6482fac81da77597e69143f95073e"
+      proved="true"
+      expanded="false"
+      shape="apermut_subV3V3V1ainfix +V2c1Aasorted_subV3V1ainfix +V2c1Iainfix <V1V2NIainfix <V2V0Aainfix <=c0V1FFFF">
+      <transf
+       name="split_goal"
+       proved="true"
+       expanded="false">
+       <goal
+        name="WP_parameter quick_rec.12.1"
+        expl="parameter quick_rec"
+        sum="53c57ec61ffd208891e9e1ce7c924278"
+        proved="true"
+        expanded="false"
+        shape="asorted_subV3V1ainfix +V2c1Iainfix <V1V2NIainfix <V2V0Aainfix <=c0V1FFFF">
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter quick_rec.12.2"
+        expl="parameter quick_rec"
+        sum="c6b9deb510dfc77c14a332bfdc34b5fc"
+        proved="true"
+        expanded="false"
+        shape="apermut_subV3V3V1ainfix +V2c1Iainfix <V1V2NIainfix <V2V0Aainfix <=c0V1FFFF">
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+       </goal>
+      </transf>
+     </goal>
+    </transf>
+   </goal>
+   <goal
+    name="WP_parameter quicksort"
+    expl="parameter quicksort"
+    sum="7280441389da8383e1c400326a1b4d35"
+    proved="true"
+    expanded="false"
+    shape="Lamk arrayV0V2apermutamk arrayV0V1V3AasortedV3Iapermut_subV1V2c0ainfix +ainfix -V0c1c1Aasorted_subV2c0ainfix +ainfix -V0c1c1FAainfix <ainfix -V0c1V0Aainfix <=c0c0FF">
+    <transf
+     name="split_goal"
+     proved="true"
+     expanded="false">
+     <goal
+      name="WP_parameter quicksort.1"
+      expl="precondition"
+      sum="f8313c46714fed8cd9c4f31f23e93f28"
+      proved="true"
+      expanded="false"
+      shape="ainfix <ainfix -V0c1V0Aainfix <=c0c0FF">
+      <proof
+       prover="cvc3"
+       timelimit="10"
+       edited=""
+       obsolete="false">
+       <result status="valid" time="0.00"/>
+      </proof>
+      <proof
+       prover="alt-ergo"
+       timelimit="10"
+       edited=""
+       obsolete="false">
+       <result status="valid" time="0.01"/>
+      </proof>
+      <proof
+       prover="z3"
+       timelimit="10"
+       edited=""
+       obsolete="false">
+       <result status="valid" time="0.00"/>
+      </proof>
+     </goal>
+     <goal
+      name="WP_parameter quicksort.2"
+      expl="normal postcondition"
+      sum="b80e9c7513a6485d4a2b40f39cf59905"
+      proved="true"
+      expanded="false"
+      shape="Lamk arrayV0V2apermutamk arrayV0V1V3AasortedV3Iapermut_subV1V2c0ainfix +ainfix -V0c1c1Aasorted_subV2c0ainfix +ainfix -V0c1c1FIainfix <ainfix -V0c1V0Aainfix <=c0c0FF">
+      <proof
+       prover="alt-ergo"
+       timelimit="10"
+       edited=""
+       obsolete="false">
+       <result status="valid" time="0.05"/>
+      </proof>
+     </goal>
+    </transf>
+   </goal>
+  </theory>
+ </file>
+</why3session>

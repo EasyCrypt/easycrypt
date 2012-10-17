@@ -1,0 +1,11 @@
+(* Why driver for Why3 syntax *)
+
+printer "why3"
+filename "%f-%t-%g.why"
+
+theory BuiltIn
+  syntax type  int  "int"
+  syntax type  real "real"
+  syntax predicate (=)  "(%1 = %2)"
+end
+

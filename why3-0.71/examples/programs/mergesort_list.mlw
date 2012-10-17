@@ -1,0 +1,60 @@
+
+(* Sorting a list of integers using mergesort *)
+
+module M
+
+  use import int.Int
+  use import list.Length
+  use import list.SortedInt
+  use import list.Append
+  use import list.Permut
+
+  lemma Permut_cons_append:
+    forall x : 'a, l1 l2 : list 'a.
+    permut (Cons x l1 ++ l2) (l1 ++ Cons x l2)
+
+  lemma Permut_append:
+    forall l1 l2 k1 k2 : list 'a.
+    permut l1 k1 -> permut l2 k2 -> permut (l1 ++ l2) (k1 ++ k2)
+
+  let split l0 =
+    {  length l0 >= 2 }
+    let rec split_aux (l1 : list 'a) l2 l variant { length l } =
+      { length l2 = length l1 \/ length l2 = length l1 + 1 }
+      match l with
+      | Nil -> (l1, l2)
+      | Cons x r -> split_aux l2 (Cons x l1) r
+      end
+      { let r1, r2 = result in
+        (length r2 = length r1 \/ length r2 = length r1 + 1) /\
+        permut (r1 ++ r2) (l1 ++ (l2 ++ l)) }
+    in
+    split_aux Nil Nil l0
+    { let (l1, l2) = result in
+      1 <= length l1 /\ 1 <= length l2 /\ permut l0 (l1 ++ l2) }
+
+  let rec merge l1 l2 variant { length l1 + length l2 } =
+    { sorted l1 /\ sorted l2 }
+    match l1, l2 with
+    | Nil, _ -> l2
+    | _, Nil -> l1
+    | Cons x1 r1, Cons x2 r2 ->
+       if x1 <= x2 then Cons x1 (merge r1 l2) else Cons x2 (merge l1 r2)
+    end
+    { sorted result /\ permut result (l1 ++ l2) }
+
+  let rec mergesort l variant { length l } =
+    { }
+    match l with
+      | Nil | Cons _ Nil -> l
+      | _ -> let l1, l2 = split l in merge (mergesort l1) (mergesort l2)
+    end
+    { sorted result /\ permut l result }
+
+end
+
+(*
+Local Variables:
+compile-command: "unset LANG; make -C ../.. examples/programs/mergesort_list.gui"
+End:
+*)

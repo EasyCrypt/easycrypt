@@ -1,0 +1,30 @@
+theory Injective
+  type a
+  type v
+  function to_ a : v
+  function from v : a
+
+  axiom Inj : forall x : a. from(to_ x) = x
+
+  goal G1 : forall x y : a. to_(x)=to_(y) -> x = y
+  goal G2 : forall y : a. exists x : v. from(x)=y
+
+end
+
+theory Surjective
+  type a
+  type v
+  function to_ a : v
+  function from v : a
+
+  clone import Injective with type v = a, type a = v,
+    function to_ = from, function from = to_
+
+end
+
+theory Bijective
+
+  use import Injective
+  clone Surjective with namespace . = .
+
+end

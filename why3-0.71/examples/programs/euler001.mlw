@@ -1,0 +1,123 @@
+(* Euler Project, problem 1
+
+If we list all the natural numbers below 10 that are multiples of 3 or
+5, we get 3, 5, 6 and 9. The sum of these multiples is 23.
+
+Find the sum of all the multiples of 3 or 5 below 1000.
+
+*)
+
+theory DivModHints
+
+  use import int.Int
+  use import int.ComputerDivision
+
+  lemma mod_div_unique :
+    forall x y q r:int. x >= 0 /\ y > 0 /\ x = q*y + r /\ 0 <= r < y ->
+      q = div x y /\ r = mod x y 
+
+  lemma mod_succ_1 :
+    forall x y:int. x >= 0 /\ y > 0 ->
+      mod (x+1) y <> 0 -> mod (x+1) y = (mod x y) + 1
+
+  lemma mod_succ_2 :
+    forall x y:int. x >= 0 /\ y > 0 ->
+      mod (x+1) y = 0 -> mod x y = y-1
+
+  lemma div_succ_1 :
+    forall x y:int. x >= 0 /\ y > 0 ->
+      mod (x+1) y = 0 -> div (x+1) y = (div x y) + 1
+
+  lemma div_succ_2 :
+    forall x y:int. x >= 0 /\ y > 0 ->
+      mod (x+1) y <> 0 -> div (x+1) y = (div x y)
+
+end
+
+
+theory SumMultiple
+
+  use import int.Int
+  use import int.ComputerDivision
+
+  (* [sum_multiple_3_5_lt n] is the sum of all the multiples
+     of 3 or 5 below n] *)
+  function sum_multiple_3_5_lt int : int
+
+  axiom SumEmpty: sum_multiple_3_5_lt 0 = 0
+
+  axiom SumNo : forall n:int. n >= 0 ->
+    mod n 3 <> 0 /\ mod n 5 <> 0 ->
+    sum_multiple_3_5_lt (n+1) = sum_multiple_3_5_lt n
+
+  axiom SumYes: forall n:int. n >= 0 ->
+    mod n 3 = 0 \/ mod n 5 = 0 ->
+    sum_multiple_3_5_lt (n+1) = sum_multiple_3_5_lt n + n
+
+  function closed_formula (n:int) : int =
+    let n3 = div n 3 in
+    let n5 = div n 5 in
+    let n15 = div n 15 in
+    div (3 * n3 * (n3+1) +
+         5 * n5 * (n5+1) -
+         15 * n15 * (n15+1)) 2
+
+  predicate p (n:int) = sum_multiple_3_5_lt (n+1) = closed_formula n
+
+  lemma Closed_formula_0: p 0
+
+  use DivModHints
+
+  lemma mod_15:
+    forall n:int.
+      mod n 15 = 0 <-> mod n 3 = 0 /\ mod n 5 = 0
+
+  lemma triangle_numbers:
+    forall n:int.
+      2 * div (n*(n+1)) 2 = n*(n+1)
+
+  lemma Closed_formula_n:
+    forall n:int. n >= 0 -> p n ->
+      mod (n+1) 3 <> 0 /\ mod (n+1) 5 <> 0 -> p (n+1)
+
+  lemma Closed_formula_n_3:
+    forall n:int. n >= 0 -> p n ->
+      mod (n+1) 3 = 0 /\ mod (n+1) 5 <> 0 -> p (n+1)
+
+  lemma Closed_formula_n_5:
+    forall n:int. n >= 0 -> p n ->
+      mod (n+1) 3 <> 0 /\ mod (n+1) 5 = 0 -> p (n+1)
+
+  lemma Closed_formula_n_15:
+    forall n:int. n >= 0 -> p n ->
+      mod (n+1) 3 = 0 /\ mod (n+1) 5 = 0 -> p (n+1)
+
+  clone int.Induction as I with predicate p = p
+
+  lemma Closed_formula:
+    forall n:int. 0 <= n -> p n
+
+end
+
+module Euler001
+
+  use import SumMultiple
+  use import int.Int
+  use import int.ComputerDivision
+
+  let solve n =
+    { n >= 1 }
+    let n3 = div (n-1) 3 in
+    let n5 = div (n-1) 5 in
+    let n15 = div (n-1) 15 in
+    div (3 * n3 * (n3+1) + 5 * n5 * (n5+1) - 15 * n15 * (n15+1)) 2
+    { result = sum_multiple_3_5_lt n }
+
+end
+
+(*
+Local Variables:
+compile-command: "unset LANG; make -C ../.. examples/programs/euler001.gui"
+End:
+*)
+

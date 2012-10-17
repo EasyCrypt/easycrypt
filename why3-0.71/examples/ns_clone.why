@@ -1,0 +1,64 @@
+theory Sig
+  type t
+  type elt
+
+  predicate mem elt t
+  function add elt t : t
+
+  axiom AddMem : forall e:elt, s:t. mem e (add e s)
+end
+
+theory Struct
+  type elt
+  type t = Empty | Holds elt
+
+  predicate mem (e:elt) (s:t) = match s with
+    | Holds d -> e = d
+    | Empty -> false
+  end
+
+  function add (e:elt) (s:t) : t = Holds e
+
+  (* this is the equivalent of Struct : Sig *)
+  clone Sig with namespace . = ., lemma AddMem
+end
+
+theory Shared
+  type obj = Roses | Violets
+end
+
+theory AbstractUser
+  use export Shared
+  clone import Sig with type elt = obj
+
+  function program (s : t) : t = add Roses (add Violets s)
+end
+
+theory ConcreteUser
+  use export Shared
+  clone Struct as S with type elt = obj
+
+  (* note that the generated lemma AddMem is trivial,
+     since S contains an axiom of precisely the same form *)
+  clone export AbstractUser with namespace Sig = S, lemma Sig.AddMem
+end
+
+(*
+   AbstractUser acts as a functor on Sig. Or, to be more precise,
+   on Sig where type elt = Shared.obj. ConcreteUser instantiates
+   the implementation Struct on Shared.obj and then instantiates
+   AbstractUser on the resulting implementation S.
+
+   Note that the definition of the type obj cannot be given in
+   AbstractUser. Otherwise, we cannot define S in ConcreteUser.
+   In OCaml, can we constraint a functor's parameter with what
+   is defined in the functor itself?
+
+   Also note that "lemma AddMem" added to the clone statements
+   play the role of TCCs and/or refinement constraints. Later,
+   when we will start to clone program modules containing pre-
+   and post-conditions, these proof obligations would be produced
+   automatically.
+*)
+
+

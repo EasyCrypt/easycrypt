@@ -1,0 +1,267 @@
+add type 'a list.
+add type 'a option.
+add type ('a,'b)map.
+add op [=] : ('a, 'a) -> bool.
+add op [&&] : (bool, bool) -> bool.
+add op [||] : (bool, bool) -> bool.
+add op [^^] : (bool, bool) -> bool.
+add op [!] : bool -> bool.
+add op [<] : (int, int) -> bool.
+add op [<=] : (int, int) -> bool.
+add op [-] : int -> int.
+add op [+] : (int, int) -> int.
+add op [-] : (int, int) -> int.
+add op [*] : (int, int) -> int.
+add op [/] : (int, int) -> int.
+add op [%] : (int, int) -> int.
+add op [^] : (int, int) -> int.
+add op abs : int -> int.
+add op [<] : (real, real) -> bool.
+add op [<=] : (real, real) -> bool.
+add op [-] : real -> real.
+add op [+] : (real, real) -> real.
+add op [-] : (real, real) -> real.
+add op [*] : (real, real) -> real.
+add op [/] : (real, real) -> real.
+add op [^] : (real, real) -> real.
+add op real_of_int : int -> real.
+add op real_of_bool : bool -> real.
+add op abs : real -> real.
+add op exp : real -> real.
+add op Some : 'a -> 'a option.
+add cnst None : 'a option
+add op [::] : ('a, 'a list) -> 'a list.
+add cnst [] : 'a list
+add op mem : ('a, 'a list) -> bool.
+add op length : 'a list -> int.
+add op [++] : ('a list, 'a list) -> 'a list.
+add op upd : (('a,'b)map, 'a, 'b) -> ('a,'b)map.
+add op get : (('a,'b)map, 'a) -> 'b.
+add op in_dom : ('a, ('a,'b)map) -> bool.
+add op in_rng : ('b, ('a,'b)map) -> bool.
+ Read src/easycrypt_base.ec
+add op [>] (x, y : int) = y < x.
+add op [>=] (x, y : int) = y <= x.
+add op [>] (x, y : real) = y < x.
+add op [>=] (x, y : real) = y <= x.
+add op fst (p : 'a * 'b) = (let a,b = p in a).
+add op snd (p : 'a * 'b) = (let a,b = p in b).
+add axiom Some_inj : forall (x, y : 'a),Some (x) = Some (y) => x = y
+add op proj : 'a option -> 'a.
+add axiom Proj_Some : forall (x : 'a),proj (Some (x)) = x
+add axiom Proj_eq :
+  forall (o1, o2 : 'a option),
+    o1 <> None => o2 <> None => proj (o1) = proj (o2) => o1 = o2
+add axiom Some_or_None :
+  forall (o : 'a option),o = None || (exists (x : 'a),o = Some (x))
+add op hd : 'a list -> 'a.
+add op tl : 'a list -> 'a list.
+add axiom head_def : forall (a : 'a, l : 'a list),hd (a :: l) = a
+add axiom tail_def : forall (a : 'a, l : 'a list),tl (a :: l) = l
+add cnst empty_map : ('a,'b)map
+add axiom get_upd_map_same :
+  forall (m : ('a,'b)map, a1, a2 : 'a, b : 'b),a1 = a2 => m[a1 <- b][a2] = b
+add axiom get_upd_map_diff :
+  forall (m : ('a,'b)map, a1, a2 : 'a, b : 'b),
+    a1 <> a2 => m[a1 <- b][a2] = m[a2]
+add axiom upd_map_comm :
+  forall (m : ('a,'b)map, a, a' : 'a, b, b' : 'b),
+    a <> a' => m[a <- b][a' <- b'] = m[a' <- b'][a <- b]
+add axiom upd_in_dom_same :
+  forall (m : ('a,'b)map, a, a' : 'a, b : 'b),a = a' => in_dom (a',m[a <- b])
+add axiom upd_in_dom_diff :
+  forall (m : ('a,'b)map, a, a' : 'a, b : 'b),
+    a <> a' => in_dom (a',m[a <- b]) <=> in_dom (a',m)
+add axiom upd_in_rng_same :
+  forall (m : ('a,'b)map, a : 'a, b, b' : 'b),b = b' => in_rng (b',m[a <- b])
+add axiom upd_in_rng_diff :
+  forall (m : ('a,'b)map, a : 'a, b, b' : 'b),
+    b <> b' => in_rng (b',m[a <- b]) <=> in_rng (b',m)
+add axiom in_dom_in_rng :
+  forall (m : ('a,'b)map, a : 'a),in_dom (a,m) => in_rng (m[a],m)
+add axiom in_rng_in_dom :
+  forall (m : ('a,'b)map, b : 'b),
+    in_rng (b,m) => exists (a : 'a),in_dom (a,m) && m[a] = b
+add axiom empty_in_dom : forall (a : 'a),!in_dom (a,empty_map)
+add axiom empty_in_rng : forall (b : 'b),!in_rng (b,empty_map)
+add axiom real_of_bool_true : real_of_bool (true) = 1%r
+add axiom real_of_bool_false : real_of_bool (false) = 0%r
+add axiom real_of_int_le_compat : forall (x, y : int),x <= y => x%r <= y%r
+add axiom real_of_int_lt_compat : forall (x, y : int),x < y => x%r < y%r
+add axiom rmult_le_compat_l :
+  forall (x, y, z : real),0%r <= x => y <= z => x * y <= x * z
+add axiom rmult_le_compat_r :
+  forall (x, y, z : real),0%r <= z => x <= y => x * z <= y * z
+add axiom rmul_plus_distr_r :
+  forall (x, y, z : real),(x + y) * z = x * z + y * z
+add axiom rdiv_le_compat :
+  forall (x1, x2, y1, y2 : real),
+    0%r < y2 => y2 <= y1 => 0%r <= x1 => x1 <= x2 => x1 / y1 <= x2 / y2
+add axiom rdiv_0_le :
+  forall (x, y : real),0%r < y => 0%r <= x => 0%r <= x / y
+add axiom pow2_pos : forall (n : int),0 <= n => 0 < 2 ^ n
+ Read tests/loop_unroll.ec
+add cnst k : int
+add cnst n : int
+add type msg = bool list.
+add op [^^] : (bitstring{k}, bitstring{k}) -> bitstring{k}.
+add cnst bs0_k : bitstring{k}
+add lemma xor_k_comm : forall (x, y : bitstring{k}),x ^^ y = y ^^ x
+add lemma xor_k_assoc :
+  forall (x, y, z : bitstring{k}),x ^^ y ^^ z = x ^^ (y ^^ z)
+add lemma xor_k_zero_r : forall (x : bitstring{k}),x ^^ bs0_k = x
+add lemma xor_k_cancel : forall (x : bitstring{k}),x ^^ x = bs0_k
+add type block = bitstring{k}.
+add op [^^] : (bitstring{n}, bitstring{n}) -> bitstring{n}.
+add cnst bs0_n : bitstring{n}
+add lemma xor_n_comm : forall (x, y : bitstring{n}),x ^^ y = y ^^ x
+add lemma xor_n_assoc :
+  forall (x, y, z : bitstring{n}),x ^^ y ^^ z = x ^^ (y ^^ z)
+add lemma xor_n_zero_r : forall (x : bitstring{n}),x ^^ bs0_n = x
+add lemma xor_n_cancel : forall (x : bitstring{n}),x ^^ x = bs0_n
+add type state = bitstring{n}.
+add op pad : msg -> block list.
+add op tail : 'a list -> 'a list.
+add axiom padnotempty : forall (m : msg),pad (m) <> []
+add axiom tail_length :
+  forall (l : 'a list),l <> [] => length (tail (l)) = length (l) - 1
+[global] end game Game1 :
+[global] end game Game2 :
+current prover is alt-ergo
+Proving equiv Game12_RO : Game1.RO ~ Game2.RO : ={m,ROmap} ==> ={res,ROmap}
+Current goal
+Pending subgoals: 1
+pre   = ={m,ROmap}
+stmt1 =   1 : z = {0,1}^n;
+          2 : if (!in_dom (m,ROmap)) ROmap[m] = z;
+stmt2 =   1 : bs = pad (m);
+          2 : while (bs <> []) {
+                z = {0,1}^n;
+                if (!in_dom (m,ROmap)) ROmap[m] = z;
+                z = ROmap[m];
+                bs = tail (bs);
+              }
+post  = ROmap{1}[m{1}] = ROmap{2}[m{2}] && ={ROmap}
+
+Current goal
+Pending subgoals: 1
+pre   = ={m,ROmap}
+stmt1 =   1 : z = {0,1}^n;
+          2 : if (!in_dom (m,ROmap)) ROmap[m] = z;
+stmt2 =   1 : bs = pad (m);
+          2 : while (bs <> []) {
+                z = {0,1}^n;
+                if (!in_dom (m,ROmap)) ROmap[m] = z;
+                z = ROmap[m];
+                bs = tail (bs);
+              }
+post  = ROmap{1}[m{1}] = ROmap{2}[m{2}] && ={ROmap}
+
+Current goal
+Pending subgoals: 1
+pre   = bs{2} = pad (m{2}) && ={m,ROmap}
+stmt1 =   1 : z = {0,1}^n;
+          2 : if (!in_dom (m,ROmap)) ROmap[m] = z;
+stmt2 =   1 : while (bs <> []) {
+                z = {0,1}^n;
+                if (!in_dom (m,ROmap)) ROmap[m] = z;
+                z = ROmap[m];
+                bs = tail (bs);
+              }
+post  = ROmap{1}[m{1}] = ROmap{2}[m{2}] && ={ROmap}
+
+Current goal
+Pending subgoals: 1
+pre   = bs{2} = pad (m{2}) && ={m,ROmap}
+stmt1 =   1 : z = {0,1}^n;
+          2 : if (!in_dom (m,ROmap)) ROmap[m] = z;
+stmt2 =   1 : if (bs <> []) {
+                z = {0,1}^n;
+                if (!in_dom (m,ROmap)) ROmap[m] = z;
+                z = ROmap[m];
+                bs = tail (bs);
+              }
+          2 : while (bs <> []) {
+                z = {0,1}^n;
+                if (!in_dom (m,ROmap)) ROmap[m] = z;
+                z = ROmap[m];
+                bs = tail (bs);
+              }
+post  = ROmap{1}[m{1}] = ROmap{2}[m{2}] && ={ROmap}
+
+ 
+Current goal
+Pending subgoals: 1
+pre   = bs{2} = pad (m{2}) && ={m,ROmap}
+stmt1 =   1 : z = {0,1}^n;
+          2 : if (!in_dom (m,ROmap)) ROmap[m] = z;
+stmt2 =   1 : z = {0,1}^n;
+          2 : if (!in_dom (m,ROmap)) ROmap[m] = z;
+          3 : z = ROmap[m];
+          4 : bs = tail (bs);
+          5 : while (bs <> []) {
+                z = {0,1}^n;
+                if (!in_dom (m,ROmap)) ROmap[m] = z;
+                z = ROmap[m];
+                bs = tail (bs);
+              }
+post  = ROmap{1}[m{1}] = ROmap{2}[m{2}] && ={ROmap}
+
+Current goal
+Pending subgoals: 1
+pre   = z{2} = z{1} && bs{2} = pad (m{2}) && ={m,ROmap}
+stmt1 =   1 : if (!in_dom (m,ROmap)) ROmap[m] = z;
+stmt2 =   1 : if (!in_dom (m,ROmap)) ROmap[m] = z;
+          2 : z = ROmap[m];
+          3 : bs = tail (bs);
+          4 : while (bs <> []) {
+                z = {0,1}^n;
+                if (!in_dom (m,ROmap)) ROmap[m] = z;
+                z = ROmap[m];
+                bs = tail (bs);
+              }
+post  = ROmap{1}[m{1}] = ROmap{2}[m{2}] && ={ROmap}
+
+Current goal
+Pending subgoals: 1
+pre   = exists (bs : block list),
+          bs{2} = tail (bs) &&
+           (exists (z : state),
+              z{2} = ROmap{2}[m{2}] &&
+               ((exists (l_2 : (msg,state)map),
+                   l_2[m{2} <- z] = ROmap{2} &&
+                    ((exists (l_0 : (msg,state)map),
+                        l_0[m{1} <- z{1}] = ROmap{1} &&
+                         (z = z{1} && bs = pad (m{2}) && ={m} && l_0 = l_2) &&
+                          !in_dom (m{1},l_0)) ||
+                      (z = z{1} && bs = pad (m{2}) && ={m} && ROmap{1} = l_2) &&
+                       in_dom (m{1},ROmap{1})) &&
+                     !in_dom (m{2},l_2)) ||
+                 ((exists (l_0 : (msg,state)map),
+                     l_0[m{1} <- z{1}] = ROmap{1} &&
+                      (z = z{1} && bs = pad (m{2}) && ={m} && l_0 = ROmap{2}) &&
+                       !in_dom (m{1},l_0)) ||
+                   (z = z{1} && bs = pad (m{2}) && ={m,ROmap}) &&
+                    in_dom (m{1},ROmap{1})) &&
+                  in_dom (m{2},ROmap{2})))
+stmt1 = 
+stmt2 =   1 : while (bs <> []) {
+                z = {0,1}^n;
+                if (!in_dom (m,ROmap)) ROmap[m] = z;
+                z = ROmap[m];
+                bs = tail (bs);
+              }
+post  = ROmap{1}[m{1}] = ROmap{2}[m{2}] && ={ROmap}
+
+Proving ={ROmap} => !0 < length (bs{2}) =>
+ bs{2} = []
+ 
+ 
+ 
+ 
+ 
+QED
+ Proved specification
+  equiv Game12_RO : Game1.RO ~ Game2.RO : ={m,ROmap} ==> ={res,ROmap}.
+
+

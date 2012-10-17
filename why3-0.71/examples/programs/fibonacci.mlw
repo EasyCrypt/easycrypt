@@ -1,0 +1,126 @@
+
+theory Fibonacci "Fibonacci numbers"
+
+  use export int.Int
+
+  function fib int : int
+
+  axiom fib0: fib 0 = 0
+  axiom fib1: fib 1 = 1
+  axiom fibn: forall n:int. n >= 2 -> fib n = fib (n-1) + fib (n-2)
+
+end
+
+theory FibonacciTest
+
+  use import Fibonacci
+
+  lemma isfib_2_1 : fib 2 = 1
+  lemma isfib_6_8 : fib 6 = 8
+
+  lemma not_isfib_2_2 : fib 2 <> 2
+
+end
+
+module FibonacciLinear
+
+  use import Fibonacci
+  use import int.Int
+  use import module ref.Ref
+
+  let fib (n:int) : int =
+    { n >= 0 }
+    let y = ref 0 in
+    let x = ref 1 in
+    for i = 0 to n - 1 do
+      invariant { 0 <= i <= n /\ fib (i+1) = !x /\ fib i = !y }
+      let aux = !y in
+      y := !x;
+      x := !x + aux
+    done;
+    !y
+    { fib n = result}
+
+end
+
+theory Mat22 "2x2 integer matrices"
+
+  use import int.Int
+
+  type t = {| a11: int; a12: int; a21: int; a22: int |}
+
+  function id : t = {| a11 = 1; a12 = 0; a21 = 0; a22 = 1 |}
+
+  function mult (x: t) (y: t) : t =
+    {|
+    a11 = x.a11 * y.a11 + x.a12 * y.a21; a12 = x.a11 * y.a12 + x.a12 * y.a22;
+    a21 = x.a21 * y.a11 + x.a22 * y.a21; a22 = x.a21 * y.a12 + x.a22 * y.a22;
+    |}
+
+  (* holds, but not useful *)
+  (* clone algebra.Assoc with type t = t, function op = mult, lemma Assoc *)
+
+  clone export
+    int.Exponentiation with type t = t, function one = id, function (*) = mult
+
+  (* already in int.Exponentiation 
+  lemma power_sum :
+    forall x: t, n m: int.
+    n >= 0 -> m >= 0 -> power x (n + m) = mult (power x n) (power x m)
+  *)
+  
+end
+
+module FibonacciLogarithmic
+
+  use import Fibonacci
+  use import int.EuclideanDivision
+  use import Mat22
+
+  function m1110 : t = {| a11 = 1; a12 = 1;
+                       a21 = 1; a22 = 0 |}
+
+  (* computes ((1 1) (1 0))^n in O(log(n)) time
+
+     since it is a matrix of the shape ((a+b b) (b a)),
+     we only return the pair (a, b) *)
+
+  let rec logfib n variant { n } =
+    { n >= 0 }
+    if n = 0 then
+      (1, 0)
+    else begin
+      let a, b = logfib (div n 2) in
+      let c = a + b in
+      if mod n 2 = 0 then
+        (a*a + b*b, b*(a + c))
+      else
+        (b*(a + c), c*c + b*b)
+    end
+    { let a, b = result in
+      power m1110 n = {| a11 = a+b; a12 = b; a21 = b; a22 = a |} }
+
+  (* by induction, we easily prove that
+
+     (1 1)^n = (F(n+1) F(n)  )
+     (1 0)     (F(n)   F(n-1))
+
+    thus, we can compute F(n) in O(log(n)) using funtion logfib above
+  *)
+
+  lemma fib_m :
+    forall n: int. n >= 0 ->
+    let p = power m1110 n in fib (n+1) = p.a11 /\ fib n = p.a21
+
+  let fibo n =
+    { n >= 0 }
+    let _, b = logfib n in b
+    { result = fib n }
+
+end
+
+(*
+Local Variables:
+compile-command: "unset LANG; make -C ../.. examples/programs/fibonacci.gui"
+End:
+*)

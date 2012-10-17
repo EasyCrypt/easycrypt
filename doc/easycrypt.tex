@@ -1,0 +1,130 @@
+\documentclass[a4paper,notitlepage]{book}
+\usepackage{anysize}
+\marginsize{3cm}{2cm}{1cm}{1cm}
+
+\usepackage{todonotes}
+\usepackage{url}
+\usepackage{xspace}
+\usepackage{syntax}
+\usepackage{framed}
+\usepackage{stmaryrd}
+\usepackage{infer}
+\usepackage{makeidx}
+\usepackage{verbatim}
+% \usepackage{fancyhdr}
+% \pagestyle{fancy}
+
+\input{defs}
+\newcommand{\rwp}{\textsc{wp}\xspace}
+\makeindex
+
+\begin{document}
+
+\input{cover}
+\tableofcontents
+
+% \input{installation}
+
+\part{An introduction to \EasyCrypt}
+  \input{introduction}
+
+\part{Language Reference}
+  \input{language}
+
+\iffalse
+\part{Experimental Features}
+  \chapter{Coq backend}
+  \chapter{Approximate Probabilistic Relational Hoare Logic}
+  There is preliminary support in EasyCrypt for handling an
+  approximate variant of RHL, which can be used to reason about
+  statistical distance and differential privacy. Note that some of the
+  tactics described above have approximate variants that usually take
+  extra arguments. For instance, the tactic 'app' has an approximate
+  variant whose extra arguments are used to specify the 'skew' and the
+  'slack'.
+
+  \subsection{Tactic Support}
+  The following commands can be used to switch between the approximate
+  and exact variants of RHL during a proof:
+
+  \begin{itemize}
+  \item \verb+pRHL+
+
+    Translates an approximate goal into the standard variant of RHL,
+    when the skew is 1 and the slack is 0.
+
+  \item \verb+apRHL+
+
+    Translates a pRHL goal into its approximate form, with skew 1 and
+    slack 0.
+  \end{itemize}
+
+  \section{Probabilistic operators and specs}
+
+
+
+\subsection{Probabilistic operators}
+Probabilistic operators are introduced with the following syntax:
+\begin{verbatim}
+pop gen_secret_key : unit -> secret_key.
+pop encrypt : (plaintext, key) -> ciphertext
+pop laplacian : (int, int, real) -> real.
+\end{verbatim}
+
+Probabilistic operators can be specified either by two-sided or one
+sided rules. Two-sided rules adhere to the following syntax
+\begin{verbatim}
+spec lap_spec(v1:int,k:int,eps:real,v2:int) :
+  x1=lap(v1,k,eps) ~ x2=lap(v2,k,eps):
+  (v1-v2<=k && v2-v1<=k) ==[exp(eps);0%r]==> x1=x2.
+\end{verbatim}
+The skew \verb|exp(eps)| and the slack \verb|0%r| are optional.
+We also support assert statements to specify the probabilistic
+operator restricted to a condition on the sampled value:
+\begin{verbatim}
+spec choose_tu(g1:graph,g2:graph,n:int,i1:int,i2:int,eps:real) : 
+  v1=choose(g1,eps,n,i1); assert (t=v1 || u=v1) ~ 
+  v2=choose(g2,eps,n,i2); assert (t=v2 || u=v2) :
+i1=i2 ==[exp(eps/4%r);0%r]==> v1=v2.
+\end{verbatim}
+
+One sided specifications are given using the following syntax:
+\begin{verbatim}
+type plaintext.
+type key.
+type ciphertext.
+
+pop gen_secret_key :  unit -> key.
+pop encrypt : (plaintext, key) -> ciphertext.
+op decrypt : (ciphertext,key) -> plaintext.
+
+aspec dec_spec(a:plaintext,k:key) : x = encrypt(a,k) : true ==> decrypt(x,k)=a.
+\end{verbatim}
+
+Both one-sided and two-sided specifications can be given for any
+distribution expression, not only for those defined by a probabilistic
+operator.
+
+
+  \subsection{Tactic Support}
+  \verb+apply[{1|2}]: <spec> (e1,..,e2)+
+
+  Applies a probabilistic operator specification previously introduced
+  using the \verb|spec| directive. Restrictions on the usage of
+  \emph{side} parameters may apply due to the two-sided or one
+  sided-nature of the specification. In addition to the optional side
+  parameter, this tactic takes a list of arguments to instantiate the
+  rule, and generate the corresponding verification conditions.
+  
+\todo{this can also be used outside of the app logic. Add examples of
+  specs and usage for pRHL.}
+\fi
+
+% \clearpage
+% \addcontentsline{toc}{chapter}{Index}
+% \printindex
+
+
+
+
+\end{document}

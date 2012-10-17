@@ -1,0 +1,202 @@
+
+(* Actually the axiomatic is unconsistent, but its unclear why :
+ - the shift is wrong it musn't shift all vars
+ - provers are amazing to find so easily the bug
+*)
+
+theory LambdaCalc
+
+  type nat =
+  | Zero
+  | S nat
+
+  type term 'a =
+  | Var nat
+  | Lambda (term 'a)
+
+
+(** The problem is this shift no? *)
+  function shift (x:term 'a) : term 'a = match x with
+  | Var i -> Var (S i)
+  | Lambda l -> Lambda (shift l)
+  end
+
+  function subst (term 'a) nat (term 'b) : term 'a
+
+(*
+  axiom Subst_def : forall t1 : term 'a. forall i : nat.
+  forall t2 : term 'b.
+  subst t1 i t2 =
+  match t1 with
+  | Var j -> if i = j then t2 else t1
+  | Lambda t -> Lambda (subst t (i+1) (shift t2))
+  end
+*)
+
+  axiom Subst_def0 : forall i j : nat.
+  forall t : term 'b.
+  subst (Var j) i t = if i = j then t else (Var j)  (* correct ?*)
+
+  axiom Subst_def1 : forall i j : nat.
+  forall t : term 'b. subst (Var i) i t = t
+
+  axiom Subst_def2 : forall t1 : term 'a. forall i : nat.
+  forall t2 : term 'b.
+  subst (Lambda t1) i t2 = Lambda (subst t1 (S i) (shift t2))
+
+
+  function app (t1 : term 'a) (t2 : term 'b) : term 'a
+
+  axiom App_def :
+  forall t1 : term 'a. forall i : nat. forall t2 : term 'b.
+  app (Lambda t1) t2 = subst t1 Zero t2
+
+(* When we remove one of the following example the axiomatic is not anymore inconsistent *)
+  axiom Subst_app :
+  forall t1 : term 'a. forall i : nat. forall t2 : term 'b. forall t3 : term 'c.
+  subst (app t1 t2) i t3 = app (subst t1 i t3) (subst t2 i t3)
+
+  axiom Shift_app :
+  forall t1 : term 'a. forall t2 : term 'b.
+  shift (app t1 t2) = app (shift t1) (shift t2)
+
+end
+
+theory Example
+  use import LambdaCalc
+
+  type tt
+  type t =  term tt
+
+  function a : t
+  axiom Shift_a : shift a = a
+  axiom Subst_a : forall t : term 'a. forall i : nat. subst a i t = a
+
+  goal G1 : app (Lambda (Var Zero : t)) a = a
+
+  function b : t
+  axiom Shift_b : shift b = b
+  axiom Subst_b : forall t : term 'a. forall i : nat. subst b i t = b
+
+  goal G2 : app (Lambda (Var Zero : t)) a = b
+
+  function id : term 'a = (Lambda (Var Zero))
+
+  goal G5b :
+  let t1 = Lambda (subst (Var (S Zero) : t) (S Zero) a) in
+  let t2 = Lambda a in
+  t1 = t2
+
+  goal G5c :
+  let t1 = subst (Lambda (Var (S Zero) : t)) Zero a in
+  let t2 = Lambda a in
+  t1 = t2
+
+  goal G5 :
+  let t1 = Lambda (Lambda (Var (S Zero) : t)) in
+  let t2 = Lambda a in
+  (app t1 a) = t2
+
+  goal G3 :
+  let t1 = Lambda (Lambda (app (Var Zero : t) (Var (S Zero) : t))) in
+  app (app t1 a) (id : t) = a
+
+  goal G4 :
+  let t1 = Lambda (Lambda (app (Var Zero : t) (Var (S Zero) : t))) in
+  let t2 = Lambda (app (Var Zero : t) a) in
+  (app t1 a) = t2
+
+end
+
+(* Here term are not anymore 'a term but 'a, :)
+its also inconsistent
+*)
+theory LambdaCalc2
+
+  type nat =
+  | Zero
+  | S nat
+
+  type app 'a 'b
+
+  function var nat : 'a
+
+  function lambda 'a : app 'b 'a
+
+  function shift (x:'a) : 'a
+
+  axiom Shift_var : forall i : nat. shift (var i : 'a) = var (S i)
+  axiom Shift_lambda : forall t : 'b. shift (lambda t) : app 'a 'b = lambda (shift t)
+
+  function subst ('a) nat ('b) : 'a
+
+  axiom Subst_def0 : forall i j : nat.
+  forall t : 'a.
+  subst (var i : 'a) i t = if i = j then t else (var j) (* correct ?*)
+
+  axiom Subst_def1 : forall t1 : 'b. forall i : nat.
+  forall t2 : 'c.
+  subst (lambda t1) i t2 : app 'a 'b = lambda (subst t1 (S i) (shift t2))
+
+
+  function app (t1 : app 'b 'a) (t2 : 'b) : 'a
+
+  axiom App_def :
+  forall t1 : 'a. forall i : nat. forall t2 : 'b.
+  app (lambda t1) t2 = subst t1 Zero t2
+
+  (* axiom Subst_app : *)
+  (* forall t1 : app 'a 'b. forall i : nat. forall t2 : 'a. forall t3 : 'c. *)
+  (* subst (app t1 t2) i t3 = app (subst t1 i t3) (subst t2 i t3) *)
+
+  axiom Shift_app :
+  forall t1 : app 'a 'b. forall t2 : 'a.
+  shift (app t1 t2) = app (shift t1) (shift t2)
+
+end
+
+
+theory Example2
+  use import LambdaCalc2
+
+  type t
+
+  function a : t
+  axiom Shift_a : shift a = a
+  axiom Subst_a : forall t : 'a. forall i : nat. subst a i t = a
+
+  goal G1 : app (lambda (var Zero : t)) a = a
+
+  function b : t
+  axiom Shift_b : shift b = b
+  axiom Subst_b : forall t : 'a. forall i : nat. subst b i t = b
+
+  goal G2 : app (lambda (var Zero : t)) a = b
+
+  function id : app 'a 'a = (lambda (var Zero))
+
+  goal G5b :
+  let t1 = lambda (subst (var (S Zero) : t) (S Zero) a) in
+  let t2 = lambda a : app t t in
+  t1 = t2
+
+  goal G5c :
+  let t1 = subst (lambda (var (S Zero) : t)) Zero a in
+  let t2 = lambda a : app t t in
+  t1 = t2
+
+  goal G5 :
+  let t1 = lambda (lambda (var (S Zero) : t)) in
+  let t2 = lambda a : app t t in
+  (app t1 a) = t2
+
+  goal G3 :
+  let t1 = lambda (lambda (app (var Zero : app t t) (var (S Zero) : t))) in
+  app (app t1 a) (id : app t t) = a
+
+  goal G4 :
+  let t1 = lambda (lambda (app (var Zero : app t t) (var (S Zero) : t))) in
+  let t2 = lambda (app (var Zero : app t t) a) : app t t in
+  (app t1 a) = t2
+
+end

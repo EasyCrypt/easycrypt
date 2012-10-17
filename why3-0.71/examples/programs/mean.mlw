@@ -1,0 +1,12 @@
+module M
+
+  use import int.Int
+  use import int.EuclideanDivision as E
+  use import int.ComputerDivision
+
+  let mean (x:int) (y:int) =
+    { 0 <= x <= y }
+    x + div (y - x) 2
+    { result = E.div (x + y) 2 = div (x + y) 2 }
+
+end

@@ -1,0 +1,91 @@
+(* Binary search
+
+   A classical example. Searches a sorted array for a given value v. *)
+
+module BinarySearch
+
+  use import int.Int
+  use import int.ComputerDivision
+  use import module ref.Ref
+  use import module array.Array
+
+  (* the code and its specification *)
+
+  exception Break int (* raised to exit the loop *)
+  exception Not_found (* raised to signal a search failure *)
+
+  let binary_search (a :array int) (v : int) =
+    { forall i1 i2 : int. 0 <= i1 <= i2 < length a -> a[i1] <= a[i2] }
+    try
+      let l = ref 0 in
+      let u = ref (length a - 1) in
+      while !l <= !u do
+        invariant {
+          0 <= !l /\ !u < length a /\
+          forall i : int. 0 <= i < length a -> a[i] = v -> !l <= i <= !u }
+        variant { !u - !l }
+        let m = !l + div (!u - !l) 2 in
+        assert { !l <= m <= !u };
+        if a[m] < v then
+          l := m + 1
+        else if a[m] > v then
+          u := m - 1
+        else
+          raise (Break m)
+      done;
+      raise Not_found
+    with Break i ->
+      i
+    end
+    { 0 <= result < length a /\ a[result] = v }
+    | Not_found -> { forall i:int. 0 <= i < length a -> a[i] <> v }
+
+end
+
+(* A generalization: the midpoint is computed by some abstract function.
+   The only requirement is that is lies between l and u. *)
+
+module BinarySearchAnyMidPoint
+
+  use import int.Int
+  use import module ref.Ref
+  use import module array.Array
+
+  exception Break int (* raised to exit the loop *)
+  exception Not_found (* raised to signal a search failure *)
+
+  val midpoint: l:int -> u:int -> { l <= u } int { l <= result <= u }
+
+  let binary_search (a :array int) (v : int) =
+    { forall i1 i2 : int. 0 <= i1 <= i2 < length a -> a[i1] <= a[i2] }
+    try
+      let l = ref 0 in
+      let u = ref (length a - 1) in
+      while !l <= !u do
+        invariant {
+          0 <= !l /\ !u < length a /\
+          forall i : int. 0 <= i < length a -> a[i] = v -> !l <= i <= !u }
+        variant { !u - !l }
+        let m = midpoint !l !u in
+        if a[m] < v then
+          l := m + 1
+        else if a[m] > v then
+          u := m - 1
+        else
+          raise (Break m)
+      done;
+      raise Not_found
+    with Break i ->
+      i
+    end
+    { 0 <= result < length a /\ a[result] = v }
+    | Not_found -> { forall i:int. 0 <= i < length a -> a[i] <> v }
+
+end
+
+(*
+Local Variables:
+compile-command: "unset LANG; make -C ../.. examples/programs/binary_search.gui"
+End:
+*)
+

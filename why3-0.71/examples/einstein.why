@@ -1,0 +1,135 @@
+(*
+   This problem is usually referred to as Einstein's Logic Problem.
+   see http://en.wikipedia.org/wiki/Zebra_Puzzle
+   (contribution by Stéphane Lescuyer)
+*)
+
+theory Bijection
+  type t
+  type u
+
+  function of t : u
+  function to_ u : t
+
+  axiom To_of : forall x : t. to_ (of x) = x
+  axiom Of_to : forall y : u. of (to_ y) = y
+end
+
+theory Einstein "Einstein's problem"
+  (* Types *)
+  type house  = H1 | H2 | H3 | H4 | H5
+  type color  = Blue | Green | Red | White | Yellow
+  type person = Dane | Englishman | German | Norwegian | Swede
+  type drink  = Beer | Coffee | Milk | Tea | Water
+  type cigar  = Blend | BlueMaster | Dunhill | PallMall | Prince
+  type pet    = Birds | Cats | Dogs | Fish | Horse
+  
+  (* Each house is associated bijectively to a color and a person *)
+  clone Bijection as Color with type t = house, type u = color
+  clone Bijection as Owner with type t = house, type u = person
+
+  (* Each drink, cigar brand and pet are associated bijectively to a person *)
+  clone Bijection as Drink with type t = person, type u = drink
+  clone Bijection as Cigar with type t = person, type u = cigar
+  clone Bijection as Pet   with type t = person, type u = pet
+
+  (* Relative positions of the houses *)
+  predicate leftof (h1 h2 : house) =
+    match h1, h2 with
+    | H1, H2 
+    | H2, H3 
+    | H3, H4 
+    | H4, H5 -> true
+    | _      -> false
+    end
+  predicate rightof (h1 h2 : house) =
+    leftof h2 h1
+  predicate neighbour (h1 h2 : house) =
+    leftof h1 h2 \/ rightof h1 h2
+end
+
+theory EinsteinClues "Clues"
+  use import Einstein
+
+  (* The Englishman lives in a red house *)
+  axiom Clue1: Color.of (Owner.to_ Englishman) = Red
+
+  (* The Swede has dogs *)
+  axiom Clue2: Pet.of Swede = Dogs
+
+  (* The Dane drinks tea *)
+  axiom Clue3: Drink.of Dane = Tea
+
+  (* The green house is on the left of the white one *)
+  axiom Clue4: leftof (Color.to_ Green) (Color.to_ White)
+
+  (* The green house's owner drinks coffee *)
+  axiom Clue5: Drink.of (Owner.of (Color.to_ Green)) = Coffee
+
+  (* The person who smokes Pall Mall has birds *)
+  axiom Clue6: Pet.of (Cigar.to_ PallMall) = Birds
+
+  (* The yellow house's owner smokes Dunhill *)
+  axiom Clue7: Cigar.of (Owner.of (Color.to_ Yellow)) = Dunhill
+
+  (* In the house in the center lives someone who drinks milk *)
+  axiom  Clue8: Drink.of (Owner.of H3) = Milk
+
+  (* The Norwegian lives in the first house *)
+  axiom Clue9: Owner.of H1 = Norwegian
+
+  (* The man who smokes Blends lives next to the one who has cats *)
+  axiom Clue10: neighbour 
+    (Owner.to_ (Cigar.to_ Blend)) (Owner.to_ (Pet.to_ Cats))
+
+  (* The man who owns a horse lives next to the one who smokes Dunhills *)
+  axiom Clue11: neighbour
+    (Owner.to_ (Pet.to_ Horse)) (Owner.to_ (Cigar.to_ Dunhill))
+
+  (* The man who smokes Blue Masters drinks beer *)
+  axiom Clue12:
+    Drink.of (Cigar.to_ BlueMaster) = Beer
+
+  (* The German smokes Prince *)
+  axiom Clue13:
+    Cigar.of German = Prince
+
+  (* The Norwegian lives next to the blue house *)
+  axiom Clue14:
+    neighbour (Owner.to_ Norwegian) (Color.to_ Blue)
+
+  (* The man who smokes Blends has a neighbour who drinks water *)
+  axiom Clue15:
+    neighbour (Owner.to_ (Cigar.to_ Blend)) (Owner.to_ (Drink.to_ Water))
+
+end
+
+theory Goals "Goals about Einstein's problem"
+  use import Einstein
+  use import EinsteinClues
+
+(*
+  lemma First_House_Not_White: Color.of H1 <> White
+  lemma Last_House_Not_Green: Color.of H5 <> Green
+
+  lemma Blue_not_Red: Blue <> Red
+  lemma Englishman_not_H2: Owner.to_ Englishman <> H2
+  lemma Englishman_not_H1: Owner.to_ Englishman <> H1
+
+  lemma Second_House_Blue: Color.of H2 = Blue
+  lemma Green_H4 : Color.of H4 = Green
+  lemma White_H5 : Color.of H5 = White
+  lemma Red_H3 : Color.of H3 = Red
+  lemma Yellow_H1 : Color.of H1 = Yellow
+*)
+  goal G1: Pet.to_ Fish = German
+  goal Wrong: Pet.to_ Cats = Swede 
+  goal G2: Pet.to_ Cats = Norwegian
+
+end
+
+(*
+Local Variables: 
+compile-command: "make -C .. examples/einstein.gui"
+End: 
+*)

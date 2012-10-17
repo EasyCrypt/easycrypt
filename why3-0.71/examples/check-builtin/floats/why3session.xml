@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE why3session SYSTEM "why3session.dtd">
+<why3session
+ name="check-builtin/floats/why3session.xml">
+ <prover
+  id="alt-ergo"
+  name="Alt-Ergo"
+  version="0.93"/>
+ <prover
+  id="coq"
+  name="Coq"
+  version="8.3pl2"/>
+ <prover
+  id="cvc3"
+  name="CVC3"
+  version="2.2"/>
+ <prover
+  id="eprover"
+  name="Eprover"
+  version="1.4 Namring"/>
+ <prover
+  id="gappa"
+  name="Gappa"
+  version="0.15.1"/>
+ <prover
+  id="simplify"
+  name="Simplify"
+  version="1.5.4"/>
+ <prover
+  id="spass"
+  name="Spass"
+  version="3.7"/>
+ <prover
+  id="vampire"
+  name="Vampire"
+  version="0.6"/>
+ <prover
+  id="verit"
+  name="veriT"
+  version="dev"/>
+ <prover
+  id="yices"
+  name="Yices"
+  version="1.0.25"/>
+ <prover
+  id="z3"
+  name="Z3"
+  version="2.19"/>
+ <file
+  name="../floats.why"
+  verified="true"
+  expanded="true">
+  <theory
+   name="TestGappa"
+   verified="true"
+   expanded="true">
+   <goal
+    name="Round_single_01"
+    sum="1f37810fcd1edad41454751a0c27522e"
+    proved="true"
+    expanded="true"
+    shape="ainfix =aroundaNearestTiesToEvenc0.1c0x1.99999ap-4">
+    <proof
+     prover="gappa"
+     timelimit="5"
+     edited=""
+     obsolete="false">
+     <result status="valid" time="0.00"/>
+    </proof>
+   </goal>
+   <goal
+    name="Round_double_01"
+    sum="5c9766988706b798158bb24be3621620"
+    proved="true"
+    expanded="true"
+    shape="ainfix =aroundaNearestTiesToEvenc0.1c0x1.999999999999ap-4">
+    <proof
+     prover="gappa"
+     timelimit="5"
+     edited=""
+     obsolete="false">
+     <result status="valid" time="0.00"/>
+    </proof>
+   </goal>
+   <goal
+    name="Test00"
+    sum="06ca4a49618b8cde48a492c8e65a9788"
+    proved="true"
+    expanded="true"
+    shape="ainfix <=aprefix -c3.0V0Iainfix <=aabsV0c2.0F">
+    <proof
+     prover="cvc3"
+     timelimit="5"
+     edited=""
+     obsolete="false">
+     <result status="valid" time="0.00"/>
+    </proof>
+    <proof
+     prover="alt-ergo"
+     timelimit="5"
+     edited=""
+     obsolete="false">
+     <result status="valid" time="0.02"/>
+    </proof>
+    <proof
+     prover="z3"
+     timelimit="5"
+     edited=""
+     obsolete="false">
+     <result status="valid" time="0.02"/>
+    </proof>
+    <proof
+     prover="gappa"
+     timelimit="5"
+     edited=""
+     obsolete="false">
+     <result status="valid" time="0.00"/>
+    </proof>
+   </goal>
+   <goal
+    name="Test01"
+    sum="b0e61c210d8a6c52b23743ce5c8c7823"
+    proved="true"
+    expanded="true"
+    shape="ainfix <=aabsainfix -ainfix *avalueV0avalueV0aroundaNearestTiesToEvenainfix *avalueV0avalueV0c0x1.p-52Iainfix <=avalueV0c2.0Aainfix <=aprefix -c2.0avalueV0F">
+    <proof
+     prover="gappa"
+     timelimit="5"
+     edited=""
+     obsolete="false">
+     <result status="valid" time="0.00"/>
+    </proof>
+   </goal>
+   <goal
+    name="Test02"
+    sum="1b95e5abb53beb3bf679820c5ed7ca89"
+    proved="true"
+    expanded="true"
+    shape="ainfix <=aabsainfix -ainfix *avalueV1avalueV1aroundaNearestTiesToEvenainfix *avalueV0avalueV0c0x1.p-52Iainfix =V1V0Iainfix <=aabsavalueV0c2.0F">
+    <proof
+     prover="gappa"
+     timelimit="5"
+     edited=""
+     obsolete="false">
+     <result status="valid" time="0.00"/>
+    </proof>
+   </goal>
+   <goal
+    name="Test03"
+    sum="87fd186418a343a100367a521ecc7305"
+    proved="true"
+    expanded="true"
+    shape="ainfix <=asqrtainfix *ainfix -avalueV2ainfix *avalueV0avalueV0ainfix -avalueV1ainfix *avalueV0avalueV0c0x1.p-52Iainfix =V2V1Iainfix =avalueV1aroundaNearestTiesToEvenainfix *avalueV0avalueV0Iainfix <=aabsavalueV0c2.0F">
+    <proof
+     prover="gappa"
+     timelimit="5"
+     edited=""
+     obsolete="false">
+     <result status="valid" time="0.00"/>
+    </proof>
+   </goal>
+  </theory>
+ </file>
+</why3session>

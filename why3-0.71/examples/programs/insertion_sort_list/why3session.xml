@@ -1,0 +1,226 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE why3session SYSTEM "why3session.dtd">
+<why3session
+ name="programs/insertion_sort_list/why3session.xml">
+ <prover
+  id="alt-ergo"
+  name="Alt-Ergo"
+  version="0.93"/>
+ <prover
+  id="coq"
+  name="Coq"
+  version="8.3pl2"/>
+ <prover
+  id="cvc3"
+  name="CVC3"
+  version="2.2"/>
+ <prover
+  id="eprover"
+  name="Eprover"
+  version="1.4 Namring"/>
+ <prover
+  id="gappa"
+  name="Gappa"
+  version="0.15.1"/>
+ <prover
+  id="simplify"
+  name="Simplify"
+  version="1.5.4"/>
+ <prover
+  id="spass"
+  name="Spass"
+  version="3.7"/>
+ <prover
+  id="vampire"
+  name="Vampire"
+  version="0.6"/>
+ <prover
+  id="verit"
+  name="veriT"
+  version="dev"/>
+ <prover
+  id="yices"
+  name="Yices"
+  version="1.0.25"/>
+ <prover
+  id="z3"
+  name="Z3"
+  version="2.19"/>
+ <file
+  name="../insertion_sort_list.mlw"
+  verified="true"
+  expanded="true">
+  <theory
+   name="WP M"
+   verified="true"
+   expanded="true">
+   <goal
+    name="WP_parameter insert"
+    expl="parameter insert"
+    sum="2774a4fface6924e90ecb30206d58339"
+    proved="true"
+    expanded="true"
+    shape="CV1aNilapermutaConsV0V1aConsV0aNilAasortedaConsV0aNilaConsVViainfix <=V0V2apermutaConsV0V1aConsV0V1AasortedaConsV0V1apermutaConsV0V1aConsV2V4AasortedaConsV2V4IapermutaConsV0V3V4AasortedV4FAasortedV3Aainfix <alengthV3alengthV1Aainfix <=c0alengthV1IasortedV1FF">
+    <transf
+     name="split_goal"
+     proved="true"
+     expanded="true">
+     <goal
+      name="WP_parameter insert.1"
+      expl="parameter insert"
+      sum="65df5152b203a86102c15664b128474b"
+      proved="true"
+      expanded="true"
+      shape="CV1aNilapermutaConsV0V1aConsV0aNilAasortedaConsV0aNilaConsVVtIasortedV1FF">
+      <proof
+       prover="alt-ergo"
+       timelimit="10"
+       edited=""
+       obsolete="false">
+       <result status="valid" time="0.03"/>
+      </proof>
+     </goal>
+     <goal
+      name="WP_parameter insert.2"
+      expl="parameter insert"
+      sum="b615dcf7c69715ac96d7c2478c4ec674"
+      proved="true"
+      expanded="true"
+      shape="CV1aNiltaConsVVapermutaConsV0V1aConsV0V1AasortedaConsV0V1Iainfix <=V0V2IasortedV1FF">
+      <proof
+       prover="cvc3"
+       timelimit="10"
+       edited=""
+       obsolete="false">
+       <result status="valid" time="0.01"/>
+      </proof>
+     </goal>
+     <goal
+      name="WP_parameter insert.3"
+      expl="parameter insert"
+      sum="c9c9d4fad157b3689e38312fc5f8d195"
+      proved="true"
+      expanded="true"
+      shape="CV1aNiltaConsVVasortedV3Aainfix <alengthV3alengthV1Aainfix <=c0alengthV1Iainfix <=V0V2NIasortedV1FF">
+      <proof
+       prover="cvc3"
+       timelimit="10"
+       edited=""
+       obsolete="false">
+       <result status="valid" time="0.00"/>
+      </proof>
+     </goal>
+     <goal
+      name="WP_parameter insert.4"
+      expl="parameter insert"
+      sum="fd1bf78e5a62220ce8c407627791b74d"
+      proved="true"
+      expanded="true"
+      shape="CV1aNiltaConsVVapermutaConsV0V1aConsV2V4AasortedaConsV2V4IapermutaConsV0V3V4AasortedV4FIasortedV3Aainfix <alengthV3alengthV1Aainfix <=c0alengthV1Iainfix <=V0V2NIasortedV1FF">
+      <proof
+       prover="cvc3"
+       timelimit="10"
+       edited=""
+       obsolete="false">
+       <result status="valid" time="0.11"/>
+      </proof>
+     </goal>
+    </transf>
+   </goal>
+   <goal
+    name="WP_parameter insertion_sort"
+    expl="parameter insertion_sort"
+    sum="79a19ba5d28d64b176d4676c2267792c"
+    proved="true"
+    expanded="true"
+    shape="CV0aNilapermutV0aNilAasortedaNilaConsVVapermutV0V4AasortedV4IapermutaConsV1V3V4AasortedV4FAasortedV3IapermutV2V3AasortedV3FAainfix <alengthV2alengthV0Aainfix <=c0alengthV0F">
+    <transf
+     name="split_goal"
+     proved="true"
+     expanded="true">
+     <goal
+      name="WP_parameter insertion_sort.1"
+      expl="parameter insertion_sort"
+      sum="4c7ffd0e5d76840e1f85c9ee77a3621e"
+      proved="true"
+      expanded="true"
+      shape="CV0aNilapermutV0aNilAasortedaNilaConsVVtF">
+      <proof
+       prover="cvc3"
+       timelimit="10"
+       edited=""
+       obsolete="false">
+       <result status="valid" time="0.00"/>
+      </proof>
+     </goal>
+     <goal
+      name="WP_parameter insertion_sort.2"
+      expl="parameter insertion_sort"
+      sum="35907db656be9d0195dea8edae1c406d"
+      proved="true"
+      expanded="true"
+      shape="CV0aNiltaConsVVainfix <alengthV2alengthV0Aainfix <=c0alengthV0F">
+      <proof
+       prover="cvc3"
+       timelimit="10"
+       edited=""
+       obsolete="false">
+       <result status="valid" time="0.01"/>
+      </proof>
+      <proof
+       prover="alt-ergo"
+       timelimit="10"
+       edited=""
+       obsolete="false">
+       <result status="valid" time="0.02"/>
+      </proof>
+     </goal>
+     <goal
+      name="WP_parameter insertion_sort.3"
+      expl="parameter insertion_sort"
+      sum="ae2f40c4541e0437e7c5ba7a3596cea9"
+      proved="true"
+      expanded="true"
+      shape="CV0aNiltaConsVVasortedV3IapermutV2V3AasortedV3FIainfix <alengthV2alengthV0Aainfix <=c0alengthV0F">
+      <proof
+       prover="cvc3"
+       timelimit="10"
+       edited=""
+       obsolete="false">
+       <result status="valid" time="0.00"/>
+      </proof>
+      <proof
+       prover="alt-ergo"
+       timelimit="10"
+       edited=""
+       obsolete="false">
+       <result status="valid" time="0.01"/>
+      </proof>
+     </goal>
+     <goal
+      name="WP_parameter insertion_sort.4"
+      expl="parameter insertion_sort"
+      sum="e5628dc9e2003ca3e00da8bbb94407d6"
+      proved="true"
+      expanded="true"
+      shape="CV0aNiltaConsVVapermutV0V4AasortedV4IapermutaConsV1V3V4AasortedV4FIasortedV3IapermutV2V3AasortedV3FIainfix <alengthV2alengthV0Aainfix <=c0alengthV0F">
+      <proof
+       prover="cvc3"
+       timelimit="10"
+       edited=""
+       obsolete="false">
+       <result status="valid" time="0.03"/>
+      </proof>
+      <proof
+       prover="alt-ergo"
+       timelimit="10"
+       edited=""
+       obsolete="false">
+       <result status="valid" time="0.03"/>
+      </proof>
+     </goal>
+    </transf>
+   </goal>
+  </theory>
+ </file>
+</why3session>

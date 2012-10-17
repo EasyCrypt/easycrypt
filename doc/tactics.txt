@@ -1,0 +1,59 @@
+A rough description of what most used tactics do:
+
+
+
+
+
+* case[{1|2}]: <bool-exp>
+
+Does a case analysis on the value of the Boolean expression given as
+argument, resulting in two sub-goals.
+
+
+
+
+* let[{1|2}] [at n] <var> : <type> = <exp>
+
+Inserts an auxiliary assignment (at position n, 1 by default).
+
+
+* admit
+
+Admits the current goal without proof.
+
+
+* expand p_1,..,p_n
+
+Expands the definition of predicates p_1,..,p_n in the current goal.
+
+
+* apply[{1|2}]: <spec> (e1,..,e2)
+
+Applies a probabilistic operator specification previously introduced
+using the 'spec' directive. 
+
+
+Some tactics implement heuristics and strategies in order to solve or
+simplify a goal:
+
+
+
+
+There is preliminary support in EasyCrypt for handling an approximate
+variant of RHL, which can be used to reason about statistical distance
+and differential privacy. Note that some of the tactics described
+above have approximate variants that usually take extra arguments. For
+instance, the tactic 'app' has an approximate variant whose extra
+arguments are used to specify the 'skew' and the 'slack'. The
+following commands can be used to switch between the approximate and
+exact variants of RHL during a proof:
+
+* pRHL
+
+Translates an approximate goal into the standard variant of RHL, when
+the skew is 1 and the slack is 0.
+
+* apRHL
+
+Translates a pRHL goal into its approximate form, with skew 1 and
+slack 0.

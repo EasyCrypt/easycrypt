@@ -1,0 +1,103 @@
+# test 
+#######################################################################
+
+TESTS_DIR=$(TOOLDIR)/tests
+
+EC_TESTS=$(wildcard $(TESTS_DIR)/*.ec)
+EC_TESTS_LOG=$(EC_TESTS:%.ec=%.log)
+TOP_TESTS=$(wildcard $(TESTS_DIR)/*.top)
+TOP_TESTS_LOG=$(TOP_TESTS:%.top=%.log)
+ML_TESTS=$(wildcard $(TESTS_DIR)/*.ml)
+ML_TESTS_LOG=$(ML_TESTS:%.ml=%.log)
+
+TESTS_LOG=$(EC_TESTS_LOG) $(TOP_TESTS_LOG) $(ML_TESTS_LOG)
+TESTS_OK=$(TESTS_LOG:%.log=%.ok)
+
+DEMO_DIR=$(TOOLDIR)/examples
+
+EC_DEMO=$(wildcard $(DEMO_DIR)/*.ec)
+EC_DEMO_LOG=$(EC_DEMO:%.ec=%.log)
+TOP_DEMO=$(wildcard $(DEMO_DIR)/*.top)
+TOP_DEMO_LOG=$(TOP_DEMO:%.top=%.log)
+ML_DEMO=$(wildcard $(DEMO_DIR)/*.ml)
+ML_DEMO_LOG=$(ML_DEMO:%.ml=%.log)
+
+DEMO_LOG=$(EC_DEMO_LOG) $(TOP_DEMO_LOG) $(ML_DEMO_LOG)
+DEMO_OK=$(DEMO_LOG:%.log=%.ok)
+
+ECHO_CIBLE = @echo "   * Generating $@"
+
+.PHONY: tests exple
+
+tests : src $(TESTS_OK)
+
+.PRECIOUS : $(TESTS_LOG:%.log=%.oracle) $(TESTS_LOG)
+
+exple : $(DEMO_OK)
+
+.PRECIOUS : $(DEMO_LOG:%.log=%.oracle) $(DEMO_LOG)
+
+$(TESTS_LOG) $(DEMO_LOG) : $(EXE)
+
+%.log : %.ec 
+	$(ECHO_CIBLE)
+	@$(EXE) $< \
+	| sed -e "s/, coq file .*//" \
+	| sed -e "s/prover .* returned .*//" \
+	1> $@ 2>/dev/null
+
+%.log : %.top 
+	$(ECHO_CIBLE)
+	@$(EXE) -top < $< \
+	| sed -e "s/, coq file .*//" \
+	| sed -e "s/prover .* returned .*//" \
+	| sed -e "/Objective Caml version/s=3.1[0-9]\.[0-9]=3.1x.x=" \
+	1> $@
+
+%.log : %.ml
+	$(ECHO_CIBLE)
+	@$(EXE) -caml < $< \
+	| sed -e "s/, coq file .*//" \
+	| sed -e "s/prover .* returned .*//" \
+	> $@
+	@sed -i -e "/Objective Caml version/s=3.1[0-9]\.[0-9]=3.1x.x=" $@
+
+%.ok : %.log %.oracle
+	$(ECHO_CIBLE)
+	@if diff $*.oracle $*.log > /dev/null ; then \
+          echo "Bravo... Test [32mOk[0m" ; \
+          touch $@ ; \
+        else \
+          echo "[31mDifferences found[0m: diff $*.oracle $*.log" ; \
+          echo "To force execution of the test:" ; \
+	  echo "  rm -f $*.log ; make $*.ok"; \
+          echo "[31mTo accept the new result[0m: " ; \
+          echo "  cp $*.log $*.oracle" ; \
+          rm -f $@ ; \
+        fi
+
+# The test oracle should ideally be created by the user 
+# Generate one if there is none
+%.oracle :
+	$(ECHO_CIBLE) "[WARNING: automatically generating test oracle]"
+	$(MAKE) $*.log
+	cp $*.log $*.oracle
+
+
+dist_tests :
+	@mkdir -p $(DIST_DIR)/tests
+	@cp tests/*.ec $(DIST_DIR)/tests
+	@cp tests/*.oracle $(DIST_DIR)/tests
+
+install_tests :
+	echo ""
+
+uninstall_tests :
+	echo ""
+
+
+clean_tests :
+	rm -f $(TESTS_OK) $(TESTS_LOG)
+	rm -f $(DEMO_OK) $(DEMO_LOG)
+
+

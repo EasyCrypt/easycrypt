@@ -1,0 +1,11 @@
+theory HelloProof "My very first Why3 theory"
+
+  goal G1 : true
+
+  goal G2 : (true -> false) /\ (true \/ false)
+
+  use import int.Int
+
+  goal G3: forall x:int. x*x >= 0
+
+end

@@ -1,0 +1,34 @@
+TODO: Explain ...
+TODO2: Remove this 'configure.ac' and create a general configure for easycript
+
+1.REQUIREMENTS
+==============
+
+  You need 'preview.sty' 
+
+
+
+
+
+2.INSTALL
+=========
+ As usual:
+
+  ./configure [-prefix=dir]
+  make 
+  [sudo] make install
+
+
+3.UNINSTALL
+===========
+
+  make uninstall
+
+
+4.
+==========
+
+  make clean
+  make distclean
+  make dist
+

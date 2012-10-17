@@ -1,0 +1,168 @@
+
+module Char
+
+  use import int.Int
+
+  type char model int
+
+  val chr : x:int -> { 0 <= x <= 255 } char { result = x }
+
+  val code : c:char -> {} int { result = c /\ 0 <= c <= 255 }
+
+  function uppercase int : int
+  function lowercase int : int
+
+  axiom uppercase_alpha:
+    forall c:int. 97 <= c <= 122 -> uppercase c = c - 32
+  axiom uppercase_other:
+    forall c:int. 0 <= c < 97 \/ 122 < c <= 127 -> uppercase c = c
+
+  axiom lowercase_alpha:
+    forall c:int. 65 <= c <= 90 -> lowercase c = c + 32
+  axiom lowercase_other:
+    forall c:int. 0 <= c < 65 \/ 90 < c <= 127 -> lowercase c = c
+
+  val uppercase : c:char -> {} char { result = uppercase c }
+  val lowercase : c:char -> {} char { result = lowercase c }
+
+  (* TODO
+     - compare ?
+   *)
+
+end
+
+module String
+
+  use import int.Int
+  use import module Char
+  use import map.Map as M
+
+  type string model {| length: int; mutable chars: map int char |}
+
+  val create : len:int -> { len >= 0 } string { length result = len }
+
+  function ([]) (s: string) (i :int) : char = M.([]) s.chars i
+  function get (s: string) (i :int) : char = M.([]) s.chars i
+
+  val make : len:int -> c:char ->
+    { len >= 0 }
+    string
+    { length result = len /\
+      forall i:int. 0 <= i < len -> result[i] = c }
+
+  val get : s:string -> i:int ->
+    { 0 <= i < length s } char reads s { result = s[i] }
+  val unsafe_get : s:string -> i:int ->
+    { } char reads s { result = s[i] }
+
+  val set : s:string -> i:int -> v:char ->
+    { 0 <= i < length s } unit writes s { s.chars = (old s.chars)[i <- v] }
+  val unsafe_set : s:string -> i:int -> v:char ->
+    { } unit writes s { s.chars = (old s.chars)[i <- v] }
+
+  val length : s:string -> {} int reads s { result = length s }
+
+  val copy : s:string ->
+    {}
+    string
+    { length result = length s /\
+      forall i:int. 0 <= i < length result -> result[i] = s[i] }
+
+  val uppercase : s:string ->
+    {}
+    string
+    { length result = length s /\
+      forall i:int. 0 <= i < length result ->
+        result[i] = Char.uppercase s[i] }
+
+  val lowercase : s:string ->
+    {}
+    string
+    { length result = length s /\
+      forall i:int. 0 <= i < length result ->
+        result[i] = Char.lowercase s[i] }
+
+  (* TODO
+     - copy
+     - sub
+     - fill
+     - blit
+     - concat
+     - index / rindex / index_from / rindex_from
+     - contains / contains_from / rcontains_from
+     - capitalize / uncapitalize
+  *)
+
+end
+
+module Buffer
+
+  use import int.Int
+  use import module Char
+  use import module String as S
+  use import map.Map as M
+
+  type t model {| mutable length: int; mutable contents: map int char |}
+
+  val create : size:int -> { size >= 0 } t { result.length = 0 }
+    (** [size] is only given as a hint for the initial size *)
+
+  val contents : b:t -> { } string { S.length result = length b }
+
+  val add_char :
+    b:t -> c:char ->
+    { }
+    unit writes b.length b.contents
+    { length b = old (length b) + 1 /\
+      (forall i: int.
+         0 <= i < length b -> b.contents[i] = (old b.contents)[i]) /\
+      b.contents[length b - 1] = c }
+
+  val add_string :
+    b:t -> s:string ->
+    { }
+    unit reads s writes b.length b.contents
+    { length b = old (length b) + S.length s /\
+      (forall i: int.
+         0 <= i < old (length b) -> b.contents[i] = (old b.contents)[i]) /\
+      (forall i: int.
+         0 <= i < S.length s -> b.contents[old (length b) + i] = S.get s i) }
+
+  (* TODO
+     - add_substring
+     - add_buffer
+  *)
+
+end
+
+(***
+module Test
+
+  use module Char
+  use module String
+  use module Buffer
+
+  let test1 () =
+    let b = Buffer.create 1024 in
+    let c = Char.chr 65 in
+    Buffer.add_char b c;
+    let s = String.create 100 in
+    Buffer.add_string b s;
+    assert { S.length b = 101 }
+
+  let test2 () =
+    let s = String.make 100 (Char.chr 65) in
+    assert { S.get s 42 = 65 }; (* 'A' *)
+    let c = Char.lowercase (String.get s 42) in
+    assert { c = 97 }; (* 'a' *)
+    let u = String.lowercase s in
+    assert { S.get u 41 = 97 }
+
+end
+***)
+
+(*
+Local Variables:
+compile-command: "unset LANG; make -C .. modules/string"
+End:
+*)

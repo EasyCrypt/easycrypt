@@ -1,0 +1,39 @@
+
+(* Various programs computing the factorial. *)
+
+module FactRecursive
+
+  use import int.Fact
+
+  let rec fact_rec (x:int) : int variant {x} =
+    { x >= 0 }
+    if x = 0 then 1 else x * fact_rec (x-1)
+    { result = fact x }
+
+end
+
+module FactImperative
+
+  use import int.Fact
+  use import module ref.Ref
+
+  let fact_imp (x:int) : int =
+    { x >= 0 }
+    let y = ref 0 in
+    let r = ref 1 in
+    while !y < x do
+      invariant { 0 <= !y <= x /\ !r = fact !y }
+      y := !y + 1;
+      r := !r * !y
+    done;
+    !r
+    { result = fact x }
+
+end
+
+(*
+Local Variables:
+compile-command: "unset LANG; make -C ../.. examples/programs/fact.gui"
+End:
+*)
+

@@ -1,0 +1,299 @@
+
+theory Int
+
+  function zero : int = 0
+  function one  : int = 1
+
+  predicate (< ) int int
+  predicate (> ) (x y : int) = y < x
+  predicate (<=) (x y : int) = x < y \/ x = y
+
+  clone export algebra.OrderedUnitaryCommutativeRing with type t = int,
+    function zero = zero, function one = one, predicate (<=) = (<=)
+
+end
+
+theory Abs
+
+  use import Int
+
+  function abs (x:int) : int = if x >= 0 then x else -x
+
+  lemma Abs_le: forall x y:int. abs x <= y <-> -y <= x <= y
+
+  lemma Abs_pos: forall x:int. abs x >= 0
+
+(*
+  lemma Abs_zero: forall x:int. abs x = 0 -> x = 0
+*)
+
+end
+
+theory MinMax
+
+  use import Int
+  clone export comparison.MinMax with type t = int, predicate ge = (>=)
+
+end
+
+theory Lex2
+
+  use import Int
+
+  predicate lt_nat (x y: int) = 0 <= y /\ x < y
+
+  clone export relations.Lex with type t1 = int, type t2 = int,
+    predicate rel1 = lt_nat, predicate rel2 = lt_nat
+
+end
+
+theory EuclideanDivision
+
+  (* division and modulo operators with the convention that division
+     rounds down, and thus modulo is always non-negative *)
+
+  use import Int
+  use import Abs
+
+  function div int int : int
+  function mod int int : int
+
+  axiom Div_mod:
+    forall x y:int. y <> 0 -> x = y * div x y + mod x y
+
+  axiom Div_bound:
+    forall x y:int. x >= 0 /\ y > 0 -> 0 <= div x y <= x
+
+  axiom Mod_bound:
+    forall x y:int. y <> 0 -> 0 <= mod x y < abs y
+
+  lemma Mod_1: forall x:int. mod x 1 = 0
+
+  lemma Div_1: forall x:int. div x 1 = x
+
+end
+
+theory ComputerDivision
+
+  (* division and modulo operators with the same conventions as
+     mainstream programming language such C, Java, OCaml, that is
+     division rounds towards zero, and thus (x mod y) as the same sign
+     as x *)
+
+  use import Int
+  use import Abs
+
+  function div int int : int
+  function mod int int : int
+
+  axiom Div_mod:
+    forall x y:int. y <> 0 -> x = y * div x y + mod x y
+
+  axiom Div_bound:
+    forall x y:int. x >= 0 /\ y > 0 -> 0 <= div x y <= x
+
+  axiom Mod_bound:
+    forall x y:int. y <> 0 -> - abs y < mod x y < abs y
+
+  axiom Div_sign_pos:
+    forall x y:int. x >= 0 /\ y > 0 -> div x y >= 0
+
+  axiom Div_sign_neg:
+    forall x y:int. x <= 0 /\ y > 0 -> div x y <= 0
+
+  axiom Mod_sign_pos:
+    forall x y:int. x >= 0 /\ y <> 0 -> mod x y >= 0
+
+  axiom Mod_sign_neg:
+    forall x y:int. x <= 0 /\ y <> 0 -> mod x y <= 0
+
+  lemma Rounds_toward_zero:
+    forall x y:int. y <> 0 -> abs (div x y * y) <= abs x
+
+  lemma Div_1: forall x:int. div x 1 = x
+
+  lemma Mod_1: forall x:int. mod x 1 = 0
+
+  lemma Div_inf: forall x y:int. 0 <= x < y -> div x y = 0
+
+  lemma Mod_inf: forall x y:int. 0 <= x < y -> mod x y = x
+
+  lemma Div_mult: forall x y z:int [div (x * y + z) x].
+          x > 0 /\ y >= 0 /\ z >= 0 ->
+          div (x * y + z) x = y + div z x
+
+  lemma Mod_mult: forall x y z:int [mod (x * y + z) x].
+          x > 0 /\ y >= 0 /\ z >= 0 ->
+          mod (x * y + z) x = mod z x
+
+end
+
+theory Exponentiation
+  use import Int
+
+  type t
+  function one : t
+  function (*) t t : t
+
+  function power t int : t
+
+  axiom Power_0 : forall x: t. power x 0 = one
+
+  axiom Power_s : forall x: t, n: int. n >= 0 -> power x (n+1) = x * power x n
+
+  lemma Power_1 : forall x : t. power x 1 = x
+
+  lemma Power_sum : forall x: t, n m: int. n >= 0 /\ m >= 0 -> 
+    power x (n+m) = power x n * power x m
+
+  lemma Power_mult : forall x:t, n m : int. 0 <= n -> 0 <= m ->
+    power x (Int.(*) n m) = power (power x n) m
+
+end
+
+theory Power
+
+  use import Int
+
+  clone export
+    Exponentiation with type t = int, function one = one, function (*) = (*)
+
+end
+
+theory NumOfParam
+
+  type param
+
+  use import Int
+
+  predicate pr param int
+
+  (** number of [n] such that [a <= n < b] and [pr(p,n)] *)
+  function num_of (p : param) (a b : int) : int
+
+  axiom Num_of_empty :
+    forall p : param, a b : int.
+    b <= a -> num_of p a b = 0
+
+  axiom Num_of_right_no_add :
+    forall p : param, a b : int.
+    a < b -> not (pr p (b-1)) -> num_of p a b = num_of p a (b-1)
+  axiom Num_of_right_add :
+    forall p : param, a b : int.
+    a < b -> pr p (b-1) -> num_of p a b = 1 + num_of p a (b-1)
+
+  lemma Num_of_bounds :
+    forall p : param, a b : int. a < b -> 0 <= num_of p a b <= b - a
+    (* direct when a>=b, by induction on b when a <= b *)
+
+  lemma Num_of_append :
+    forall p : param, a b c : int.
+    a <= b <= c -> num_of p a c = num_of p a b + num_of p b c
+    (* by induction on c *)
+
+  lemma Num_of_left_no_add :
+    forall p : param, a b : int.
+    a < b -> not pr p a -> num_of p a b = num_of p (a+1) b
+    (* by Num_of_append *)
+  lemma Num_of_left_add :
+    forall p : param, a b : int.
+    a < b -> pr p a -> num_of p a b = 1 + num_of p (a+1) b
+    (* by Num_of_append *)
+
+  lemma Empty :
+    forall p : param, a b : int.
+    (forall n : int. a <= n < b -> not pr p n) -> num_of p a b = 0
+    (* by induction on b *)
+
+  lemma Full :
+    forall p : param, a b : int. a < b ->
+    (forall n : int. a <= n < b -> pr p n) -> num_of p a b = b - a
+    (* by induction on b *)
+
+  lemma num_of_increasing:
+    forall p : param, i j k : int.
+    i <= j <= k -> num_of p i j <= num_of p i k
+    (* by Num_of_append and Num_of_non_negative *)
+
+  lemma num_of_strictly_increasing:
+    forall p: param, i j k l: int.
+    i <= j <= k < l -> pr p k -> num_of p i j < num_of p i l
+    (* by Num_of_append and num_of_increasing *)
+
+  lemma num_of_change_any:
+    forall p1 p2: param, a b: int.
+    (forall j: int. a <= j < b -> pr p1 j -> pr p2 j) ->
+    num_of p2 a b >= num_of p1 a b
+
+  lemma num_of_change_some:
+    forall p1 p2: param, a b i: int. a <= i < b ->
+    (forall j: int. a <= j < b -> pr p1 j -> pr p2 j) ->
+    not (pr p1 i) -> pr p2 i ->
+    num_of p2 a b > num_of p1 a b
+
+end
+
+theory NumOf
+
+  predicate pr int
+
+  predicate pr0 () (n : int) = pr n
+
+  clone NumOfParam as N with type param = tuple0, predicate pr = pr0
+
+  function num_of (a b : int) : int = N.num_of () a b
+
+end
+
+theory Fact "Factorial"
+
+  use export Int
+
+  function fact int : int
+
+  axiom fact0: fact 0 = 1
+  axiom factn: forall n:int. n >= 1 -> fact n = n * fact (n-1)
+
+end
+
+theory Iter
+
+  use import Int
+
+  type t
+  function f t : t
+
+  function iter int t : t
+
+  axiom iter_0: forall x: t. iter 0 x = x
+  axiom iter_s: forall k: int, x: t. 0 < k -> iter k x = iter (k-1) (f x)
+
+  lemma iter_1: forall x: t. iter 1 x = f x
+  lemma iter_s2: forall k: int, x: t. 0 < k -> iter k x = f (iter (k-1) x)
+
+end
+
+theory Induction
+
+  use import Int
+
+  predicate p int
+
+  lemma Induction :
+    (forall n:int. 0 <= n -> (forall k:int. 0 <= k < n -> p k) -> p n) ->
+    forall n:int. 0 <= n -> p n
+
+  function bound : int
+
+  lemma Induction_bound :
+    (forall n:int. bound <= n ->
+      (forall k:int. bound <= k < n -> p k) -> p n) ->
+    forall n:int. bound <= n -> p n
+
+end
+
+(*
+Local Variables:
+compile-command: "make -C .. theories/int.gui"
+End:
+*)

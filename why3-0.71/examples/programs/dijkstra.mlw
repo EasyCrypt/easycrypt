@@ -1,0 +1,217 @@
+(* Dijkstra's shortest path algorithm *)
+
+module M
+
+  use import int.Int
+  use import module ref.Ref
+  use set.Fset as S
+  use import map.Map as M
+
+  (* iteration on a set *)
+
+  val set_has_next :
+    s:ref (S.set 'a) ->
+      {}
+      bool reads s
+      { if result=True then S.is_empty !s else not S.is_empty !s }
+
+  val set_next :
+    s:ref (S.set 'a) ->
+      { not S.is_empty !s }
+      'a writes s
+      { S.mem result (old !s) /\ !s = S.remove result (old !s) }
+
+  (* the graph *)
+
+  type vertex
+
+  function v : S.set vertex
+
+  function g_succ(vertex) : S.set vertex
+
+  axiom G_succ_sound :
+    forall x:vertex. S.subset (g_succ x) v
+
+  function weight vertex vertex : int (* edge weight, if there is an edge *)
+
+  axiom Weight_nonneg : forall x y:vertex. weight x y >= 0
+
+  val eq_vertex :
+    x:vertex -> y:vertex -> {} bool { if result=True then x=y else x<>y }
+
+  (* visited vertices *)
+
+  val visited : ref (S.set vertex)
+
+  val visited_add :
+    x:vertex -> {} unit writes visited { !visited = S.add x (old !visited) }
+
+  (* current distances *)
+
+  val d : ref (M.map vertex int)
+
+  (* priority queue *)
+
+  val q : ref (S.set vertex)
+
+  val q_is_empty :
+    unit ->
+      {}
+      bool reads q
+      { if result=True then S.is_empty !q else not S.is_empty !q }
+
+  val init :
+    src:vertex ->
+      {}
+      unit writes visited q d
+      { S.is_empty !visited /\
+        !q = S.add src S.empty /\
+        !d = (old !d)[src <- 0] }
+
+  let relax u v =
+    {}
+    if not (S.mem v !visited) then
+      let x = !d[u] + weight u v in
+      if S.mem v !q then begin
+        if x < !d[v] then d := !d[v <- x]
+      end else begin
+        q := S.add v !q;
+        d := !d[v <- x]
+      end
+    { (S.mem v !visited /\ !q = old !q /\ !d = old !d)
+      \/
+      (S.mem v !q /\ !d[u] + weight u v >= !d[v] /\
+          !q = old !q /\ !d = old !d)
+      \/
+      (S.mem v !q /\ (old !d)[u] + weight u v < (old !d)[v] /\
+          !q = old !q /\ !d = (old !d)[v <- (old !d)[u] + weight u v])
+      \/
+      (not S.mem v !visited /\ not S.mem v (old !q) /\ !q = S.add v (old !q) /\
+          !d = (old !d)[v <- (old !d)[u] + weight u v]) }
+
+  predicate min (m:vertex) (q:S.set vertex) (d:M.map vertex int) =
+    S.mem m q /\
+    forall x:vertex. S.mem x q -> d[m] <= d[x]
+
+  val q_extract_min :
+    unit ->
+      { not S.is_empty !q }
+      vertex reads d writes q
+      { min result (old !q) !d /\ !q = S.remove result (old !q) }
+
+  (* paths and shortest paths
+     path x y d =
+        there is a path from x to y of length d
+     shortest_path x y d =
+        there is a path from x to y of length d, and no shorter path *)
+
+  inductive path vertex vertex int =
+    | Path_nil  :
+        forall x:vertex. path x x 0
+    | Path_cons :
+        forall x y z:vertex. forall d:int.
+        path x y d -> S.mem z (g_succ y) -> path x z (d+weight y z)
+
+  lemma Length_nonneg : forall x y:vertex. forall d:int. path x y d -> d >= 0
+
+  predicate shortest_path (x y:vertex) (d:int) =
+    path x y d /\ forall d':int. path x y d' -> d <= d'
+
+  lemma Path_inversion :
+    forall src v:vertex. forall d:int. path src v d ->
+    (v = src /\ d = 0) \/
+    (exists v':vertex. path src v' (d - weight v' v) /\ S.mem v (g_succ v'))
+
+  lemma Path_shortest_path :
+    forall src v:vertex. forall d:int. path src v d ->
+    exists d':int. shortest_path src v d' /\ d' <= d
+
+  (* lemmas (those requiring induction) *)
+
+  lemma Main_lemma :
+    forall src v:vertex. forall d:int.
+    path src v d -> not shortest_path src v d ->
+    exists v':vertex. exists d':int.
+      shortest_path src v' d' /\ S.mem v (g_succ v') /\ d' + weight v' v < d
+
+  lemma Completeness_lemma :
+    forall s:S.set vertex. forall src:vertex. forall dst:vertex. forall d:int.
+    (* if s is closed under g_succ *)
+    (forall v:vertex.
+       S.mem v s -> forall w:vertex. S.mem w (g_succ v) -> S.mem w s) ->
+    (* and if s contains src *)
+    S.mem src s ->
+    (* then any vertex reachable from s is also in s *)
+    path src dst d -> S.mem dst s
+
+  (* definitions used in loop invariants *)
+
+  predicate inv_src (src:vertex) (s q:S.set vertex) =
+    S.mem src s \/ S.mem src q
+
+  predicate inv (src:vertex) (s q:S.set vertex) (d:M.map vertex int) =
+    inv_src src s q
+    (* S,Q are contained in V *)
+    /\ S.subset s v /\ S.subset q v
+    (* S /\ Q are disjoint *)
+    /\
+    (forall v:vertex. S.mem v q -> S.mem v s -> false)
+    (* we already found the shortest paths for vertices in S *)
+    /\
+    (forall v:vertex. S.mem v s -> shortest_path src v d[v])
+    (* there are paths for vertices in Q *)
+    /\
+    (forall v:vertex. S.mem v q -> path src v d[v])
+    (* vertices at distance < min(Q) are already in S *)
+    /\
+    (forall m:vertex. min m q d ->
+       forall x:vertex. forall dx:int. shortest_path src x dx ->
+         dx < d[m] -> S.mem x s)
+
+  predicate inv_succ (src:vertex) (s q : S.set vertex) =
+    (* successors of vertices in S are either in S or in Q *)
+    (forall x:vertex. S.mem x s ->
+       forall y:vertex. S.mem y (g_succ x) -> S.mem y s \/ S.mem y q)
+
+  predicate inv_succ2 (src:vertex) (s q : S.set vertex)
+                  (u:vertex) (su:S.set vertex) =
+    (* successors of vertices in S are either in S or in Q,
+       unless they are successors of u still in su *)
+    (forall x:vertex. S.mem x s ->
+       forall y:vertex. S.mem y (g_succ x) ->
+         (x<>u \/ (x=u /\ not S.mem y su)) -> S.mem y s \/ S.mem y q)
+
+  (* code *)
+
+  let shortest_path_code (src:vertex) (dst:vertex) =
+    { S.mem src v /\ S.mem dst v }
+    init src;
+    while not (q_is_empty ()) do
+      invariant { inv src !visited !q !d /\ inv_succ src !visited !q }
+      variant   { S.cardinal v - S.cardinal !visited }
+      let u = q_extract_min () in
+      assert { shortest_path src u !d[u] };
+      visited_add u;
+      let su = ref (g_succ u) in
+      while not (set_has_next su) do
+        invariant
+        {  S.subset !su (g_succ u) /\
+           inv src !visited !q !d /\ inv_succ2 src !visited !q u !su }
+        variant { S.cardinal !su }
+        let v = set_next su in
+        relax u v
+      done
+    done
+    { (forall v:vertex.
+         S.mem v !visited -> shortest_path src v !d[v])
+      /\
+      (forall v:vertex.
+         not S.mem v !visited -> forall dv:int. not path src v dv) }
+
+  end
+
+(*
+Local Variables:
+compile-command: "unset LANG; make -C ../.. examples/programs/dijkstra"
+End:
+*)

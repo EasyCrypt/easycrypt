@@ -1,0 +1,31 @@
+theory Bool
+  type bool = T  | F
+  goal G1 : T <> F
+end
+
+(*
+theory Length
+  clone import List as L
+  use import int.Int
+
+  function length (l:list) : int =
+    match l with
+    | Nil -> 0
+    | Cons _ r -> 1 + length r
+    end
+ 
+  lemma Length_nonnegative : forall l:list. length l >= 0
+end
+
+theory LengthInt
+  clone import Length as LL with type L.elem = int
+end
+
+theory Toto 
+ use import LengthInt as LLL
+ 
+ goal G1 : LL.L.Nil = LL.L.Nil
+end
+
+
+*)

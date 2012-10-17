@@ -1,0 +1,64 @@
+
+(***
+
+Algorithm 64
+
+C. A. R. Hoare
+Elliott Brothers Ltd., Hertfordshire, England, U.K.
+
+Communications of the ACM  archive
+Volume 4 ,  Issue 7  (July 1961) table of contents
+Pages: 321 - 322
+
+***)
+
+module Algo64
+
+  use import int.Int
+  use import module ref.Ref
+  use import module array.Array
+  use import module array.ArrayPermut
+
+  predicate sorted_sub (a: array int) (l u: int)
+(*
+  clone import module array.ArraySorted with
+    type elt = int, predicate le = (<=)
+*)
+
+  (* Algorithm 63 *)
+
+  val partition :
+    a:array int -> m:int -> n:int -> i:ref int -> j:ref int ->
+    { 0 <= m < n < length a }
+    unit writes a i j
+    { m <= !j < !i <= n /\ permut_sub (old a) a m n /\
+      exists x:int.
+        (forall r:int. m <= r <= !j -> a[r] <= x) /\
+        (forall r:int. !j < r < !i -> a[r] = x) /\
+        (forall r:int. !i <= r <= n -> a[r] >= x) }
+
+  (* Algorithm 64 *)
+
+  let rec quicksort (a:array int) (m:int) (n:int) : unit variant { n-m } =
+    { 0 <= m <= n < length a }
+'Init:
+    if m < n then begin
+      let i = ref 0 in
+      let j = ref 0 in
+      partition a m n i j;
+'L1:  quicksort a m !j;
+      assert { permut_sub (at a 'L1) a m n };
+'L2:  quicksort a !i n;
+      assert { permut_sub (at a 'L2) a m n }
+    end
+    { permut_sub (old a) a m n /\ sorted_sub a m n }
+
+end
+
+(*
+Local Variables:
+compile-command: "unset LANG; make -C ../.. examples/programs/algo64.gui"
+End:
+*)
+
+

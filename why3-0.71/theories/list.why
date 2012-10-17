@@ -1,0 +1,311 @@
+
+theory List
+
+  type list 'a = Nil | Cons 'a (list 'a)
+
+end
+
+theory Length
+  use import int.Int
+  use import List
+
+  function length (l: list 'a) : int =
+    match l with
+    | Nil      -> 0
+    | Cons _ r -> 1 + length r
+    end
+
+  lemma Length_nonnegative: forall l: list 'a. length l >= 0
+
+  lemma Length_nil: forall l: list 'a. length l = 0 <-> l = Nil
+
+end
+
+theory Mem
+  use export List
+
+  predicate mem (x: 'a) (l: list 'a) = match l with
+    | Nil      -> false
+    | Cons y r -> x = y \/ mem x r
+    end
+
+end
+
+theory Nth
+  use export List
+  use export option.Option
+  use import int.Int
+
+  function nth (n: int) (l: list 'a) : option 'a = match l with
+    | Nil      -> None
+    | Cons x r -> if n = 0 then Some x else nth (n - 1) r
+  end
+
+end
+
+theory HdTl "head and tail"
+
+  use export List
+  use export option.Option
+
+  function hd (l: list 'a) : option 'a = match l with
+    | Nil      -> None
+    | Cons h _ -> Some h
+  end
+
+  function tl (l: list 'a) : option (list 'a) = match l with
+    | Nil      -> None
+    | Cons _ t -> Some t
+  end
+
+end
+
+theory NthHdTl
+
+  use import int.Int
+  use import Nth
+  use import HdTl
+
+  lemma Nth_tl:
+    forall l1 l2: list 'a. tl l1 = Some l2 ->
+    forall i: int. nth i l2 = nth (i+1) l1
+
+  lemma Nth0_head:
+    forall l: list 'a. nth 0 l = hd l
+
+end
+
+
+theory Append
+  use export List
+
+  function (++) (l1 l2: list 'a) : list 'a = match l1 with
+    | Nil -> l2
+    | Cons x1 r1 -> Cons x1 (r1 ++ l2)
+  end
+
+  lemma Append_assoc:
+    forall l1 l2 l3: list 'a.
+    l1 ++ (l2 ++ l3) = (l1 ++ l2) ++ l3
+
+  lemma Append_l_nil:
+    forall l: list 'a. l ++ Nil = l
+
+  use import Length
+  use import int.Int
+
+  lemma Append_length:
+    forall l1 l2: list 'a. length (l1 ++ l2) = length l1 + length l2
+
+  use import Mem
+
+  lemma mem_append:
+    forall x: 'a, l1 l2: list 'a.
+    mem x (l1 ++ l2) <-> mem x l1 \/ mem x l2
+
+  lemma mem_decomp:
+    forall x: 'a, l: list 'a.
+    mem x l -> exists l1 l2: list 'a. l = l1 ++ Cons x l2
+
+end
+
+theory Reverse
+
+  use export List
+  use import Append
+
+  function reverse (l: list 'a) : list 'a = match l with
+    | Nil      -> Nil
+    | Cons x r -> reverse r ++ Cons x Nil
+  end
+
+  lemma reverse_append: forall l1 l2: list 'a, x: 'a.
+  (reverse (Cons x l1)) ++ l2 = (reverse l1) ++ (Cons x l2)
+
+  use import Length
+
+  lemma Reverse_length:
+    forall l: list 'a. length (reverse l) = length l
+
+end
+
+theory Sorted
+
+  use export List
+
+  type t
+  predicate le t t
+
+  inductive sorted (l: list t) =
+    | Sorted_Nil:
+        sorted Nil
+    | Sorted_One:
+        forall x: t. sorted (Cons x Nil)
+    | Sorted_Two:
+        forall x y: t, l: list t.
+        le x y -> sorted (Cons y l) -> sorted (Cons x (Cons y l))
+
+  use import Mem
+
+  lemma sorted_mem:
+    forall x: t, l: list t.
+    (forall y: t. mem y l -> le x y) /\ sorted l <-> sorted (Cons x l)
+
+end
+
+theory SortedInt
+
+  use import int.Int
+  clone export Sorted with type t = int, predicate le = (<=)
+
+end
+
+theory NumOcc
+
+  use import int.Int
+  use import List
+
+  (* number of occurence of x in l *)
+  function num_occ (x: 'a) (l: list 'a) : int =
+    match l with
+    | Nil      -> 0
+    | Cons y r -> (if x = y then 1 else 0) + num_occ x r
+   end
+
+  use import Mem
+
+  lemma Mem_Num_Occ :
+    forall x: 'a, l: list 'a. mem x l <-> num_occ x l > 0
+
+end
+
+theory Permut
+
+  use import NumOcc
+  use import List
+
+  predicate permut (l1: list 'a) (l2: list 'a) =
+    forall x: 'a. num_occ x l1 = num_occ x l2
+
+  lemma Permut_refl: forall l: list 'a. permut l l
+
+  lemma Permut_sym: forall l1 l2: list 'a. permut l1 l2 -> permut l2 l1
+
+  lemma Permut_trans:
+    forall l1 l2 l3: list 'a. permut l1 l2 -> permut l2 l3 -> permut l1 l3
+
+  lemma Permut_cons:
+    forall x: 'a, l1 l2: list 'a.
+    permut l1 l2 -> permut (Cons x l1) (Cons x l2)
+
+  lemma Permut_swap:
+    forall x y: 'a, l: list 'a. permut (Cons x (Cons y l)) (Cons y (Cons x l))
+
+  use import Mem
+
+  lemma Permut_mem:
+    forall x: 'a, l1 l2: list 'a. permut l1 l2 -> mem x l1 -> mem x l2
+
+  use import Length
+
+  lemma Permut_length:
+    forall l1 l2: list 'a. permut l1 l2 -> length l1 = length l2
+
+end
+
+theory Distinct
+
+  use import List
+  use import Mem
+
+  inductive distinct (l: list 'a) =
+    | distinct_zero: distinct (Nil: list 'a)
+    | distinct_one : forall x:'a. distinct (Cons x Nil)
+    | distinct_many:
+        forall x:'a, l: list 'a.
+        not (mem x l) -> distinct l -> distinct (Cons x l)
+
+  use import Append
+
+  lemma distinct_append:
+    forall l1 l2: list 'a.
+    distinct l1 -> distinct l2 -> (forall x:'a. mem x l1 -> not (mem x l2)) ->
+    distinct (l1 ++ l2)
+
+end
+
+theory Induction
+  use import List
+
+  type elt
+
+  predicate p (list elt)
+
+  axiom Induction:
+    p (Nil: list elt) ->
+    (forall x:elt. forall l:list elt. p l -> p (Cons x l)) ->
+    forall l:list elt. p l
+
+end
+
+theory Map
+  use import List
+
+  type a
+  type b
+  function f a : b
+
+  function map (l: list a) : list b =
+    match l with
+    | Nil      -> Nil
+    | Cons x r -> Cons (f x) (map r)
+    end
+end
+
+theory FoldLeft
+  use import List
+
+  type a
+  type b
+  function f b a : b
+
+  function fold_left (acc: b) (l: list a) : b =
+    match l with
+    | Nil      -> acc
+    | Cons x r -> fold_left (f acc x) r
+    end
+end
+
+theory FoldRight
+  use import List
+
+  type a
+  type b
+  function f a b : b
+
+  function fold_right (l: list a) (acc: b) : b =
+    match l with
+    | Nil      -> acc
+    | Cons x r -> f x (fold_right r acc)
+    end
+end
+
+theory ListRich
+  use export List
+  use export Length
+  use export Mem
+  use export Nth
+  use export HdTl
+  use export NthHdTl
+  use export Append
+  use export Reverse
+  use export Sorted
+  use export NumOcc
+  use export Permut
+end
+
+(*
+Local Variables:
+compile-command: "make -C .. theories/list"
+End:
+*)

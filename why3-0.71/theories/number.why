@@ -1,0 +1,187 @@
+
+(* number theory *)
+
+theory Parity
+
+  use import int.Int
+
+  predicate even (n: int) = exists k: int. n = 2 * k
+  predicate odd (n: int) = exists k: int. n = 2 * k + 1
+
+  lemma even_or_odd: forall n: int. even n \/ odd n
+
+  lemma even_not_odd: forall n: int. even n -> not (odd n)
+  lemma odd_not_even: forall n: int. odd n -> not (even n)
+
+  lemma even_odd: forall n: int. even n -> odd (n + 1)
+  lemma odd_even: forall n: int. odd n -> even (n + 1)
+
+  lemma even_even: forall n: int. even n -> even (n + 2)
+  lemma odd_odd: forall n: int. odd n -> odd (n + 2)
+
+  lemma even_2k: forall k: int. even (2 * k)
+  lemma odd_2k1: forall k: int. odd (2 * k + 1)
+
+end
+
+theory Divisibility
+
+  use export int.Int
+
+  predicate divides (d:int) (n:int) = exists q:int. n = q * d
+
+  lemma divides_refl: forall n:int. divides n n
+  lemma divides_1_n : forall n:int. divides 1 n
+  lemma divides_0   : forall n:int. divides n 0
+
+  lemma divides_left : forall a b c: int. divides a b -> divides (c*a) (c*b)
+  lemma divides_right: forall a b c: int. divides a b -> divides (a*c) (b*c)
+
+  lemma divides_oppr: forall a b: int. divides a b -> divides a (-b)
+  lemma divides_oppl: forall a b: int. divides a b -> divides (-a) b
+  lemma divides_oppr_rev: forall a b: int. divides (-a) b -> divides a b
+  lemma divides_oppl_rev: forall a b: int. divides a (-b) -> divides a b
+
+  lemma divides_plusr:
+    forall a b c: int. divides a b -> divides a c -> divides a (b + c)
+  lemma divides_minusr:
+    forall a b c: int. divides a b -> divides a c -> divides a (b - c)
+  lemma divides_multl:
+    forall a b c: int. divides a b -> divides a (c * b)
+  lemma divides_multr:
+    forall a b c: int. divides a b -> divides a (b * c)
+
+  lemma divides_factorl: forall a b: int. divides a (b * a)
+  lemma divides_factorr: forall a b: int. divides a (a * b)
+
+  lemma divides_n_1: forall n: int. divides n 1 -> n = 1 \/ n = -1
+
+  lemma divides_antisym:
+    forall a b: int. divides a b -> divides b a -> a = b \/ a = -b
+
+  lemma divides_trans:
+    forall a b c: int. divides a b -> divides b c -> divides a c
+
+  use import int.Abs
+
+  lemma divides_bounds:
+    forall a b: int. divides a b -> b <> 0 -> abs a <= abs b
+
+  use int.EuclideanDivision
+
+  lemma mod_divides_euclidean:
+    forall a b: int. b <> 0 -> EuclideanDivision.mod a b = 0 -> divides b a
+  lemma divides_mod_euclidean:
+    forall a b: int. b <> 0 -> divides b a -> EuclideanDivision.mod a b = 0
+
+  use int.ComputerDivision
+
+  lemma mod_divides_computer:
+    forall a b: int. b <> 0 -> ComputerDivision.mod a b = 0 -> divides b a
+  lemma divides_mod_computer:
+    forall a b: int. b <> 0 -> divides b a -> ComputerDivision.mod a b = 0
+
+  use import Parity
+
+  lemma even_divides: forall a: int. even a <-> divides 2 a
+  lemma odd_divides: forall a: int. odd a <-> not (divides 2 a)
+
+end
+
+theory Gcd
+
+  use export int.Int
+  use import Divisibility
+
+  function gcd int int : int
+
+  axiom gcd_nonneg: forall a b: int. 0 <= gcd a b
+  axiom gcd_def1  : forall a b: int. divides (gcd a b) a
+  axiom gcd_def2  : forall a b: int. divides (gcd a b) b
+  axiom gcd_def3  :
+    forall a b x: int. divides x a -> divides x b -> divides x (gcd a b)
+  axiom gcd_unique:
+    forall a b d: int.
+    0 <= d -> divides d a -> divides d b ->
+    (forall x: int. divides x a -> divides x b -> divides x d) ->
+    d = gcd a b
+
+  (* gcd is associative commutative *)
+
+  clone algebra.AC with type t = int, function op = gcd,
+    lemma Comm.Comm, lemma Assoc.Assoc
+
+  (* FIXME: Alt-Ergo proves gcd_0_pos even without gcd_unique *)
+  lemma gcd_0_pos: forall a: int. 0 <= a -> gcd a 0 = a
+  lemma gcd_0_neg: forall a: int. a <  0 -> gcd a 0 = -a
+
+  lemma gcd_opp: forall a b: int. gcd a b = gcd (-a) b
+
+  lemma gcd_euclid: forall a b q: int. gcd a b = gcd a (b - q * a)
+
+  use int.ComputerDivision
+
+  lemma Gcd_computer_mod:
+    forall a b: int [gcd a (ComputerDivision.mod a b)].
+    b <> 0 -> gcd a (ComputerDivision.mod a b) = gcd a b
+
+  use int.EuclideanDivision
+
+  lemma Gcd_euclidean_mod:
+    forall a b g: int [gcd a (EuclideanDivision.mod a b)].
+    b <> 0 -> gcd a (EuclideanDivision.mod a b) = gcd a b
+
+  lemma gcd_mult: forall a b c: int. 0 <= c -> gcd (c * a) (c * b) = c * gcd a b
+
+end
+
+theory Prime
+
+  use export int.Int
+  use import Divisibility
+
+  predicate prime (p: int) =
+    2 <= p /\ forall n: int. 1 < n < p -> not (divides n p)
+
+  lemma not_prime_1: not (prime 1)
+  lemma prime_2    : prime 2
+  lemma prime_3    : prime 3
+
+  lemma prime_divisors:
+    forall p: int. prime p ->
+    forall d: int. divides d p -> d = 1 \/ d = -1 \/ d = p \/ d = -p
+
+  lemma small_divisors:
+    forall p: int. 2 <= p ->
+    (forall d: int. 2 <= d -> prime d -> 1 < d*d <= p -> not (divides d p)) ->
+    prime p
+
+  use import Parity
+
+  lemma even_prime: forall p: int. prime p -> even p -> p = 2
+
+  lemma odd_prime: forall p: int. prime p -> p >= 3 -> odd p
+
+end
+
+theory Coprime
+
+  use export int.Int
+  use import Divisibility
+  use import Gcd
+
+  predicate coprime (a b: int) = gcd a b = 1
+
+  use import Prime
+
+  lemma prime_coprime:
+    forall p: int.
+    prime p <-> 2 <= p && forall n:int. 1 <= n < p -> coprime n p
+
+end
+
+(*
+Local Variables:
+compile-command: "make -C .. theories/number"
+End:
+*)

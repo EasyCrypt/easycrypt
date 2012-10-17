@@ -1,0 +1,153 @@
+(* Why driver for Alt-Ergo *)
+
+prelude "(* this is a prelude for Alt-Ergo*)"
+
+printer "alt-ergo"
+filename "%f-%t-%g.why"
+
+valid "Valid"
+invalid "Invalid"
+unknown "I don't know" "Unknown"
+fail "typing error:\\(.*\\)$" "Failure : File generation error : \\1"
+time "Valid (%s)"
+time "why3cpulimit time : %s s"
+
+(* À discuter *)
+(*transformation "simplify_recursive_definition"*)
+transformation "inline_trivial"
+
+transformation "eliminate_builtin"
+transformation "eliminate_recursion"
+transformation "eliminate_inductive"
+transformation "eliminate_algebraic_smt"
+transformation "eliminate_if"
+transformation "eliminate_let"
+
+transformation "split_premise"
+transformation "simplify_formula"
+(*transformation "simplify_trivial_quantification_in_goal"*)
+
+theory BuiltIn
+  syntax type int   "int"
+  syntax type real  "real"
+
+  syntax predicate (=)  "(%1 = %2)"
+end
+
+theory int.Int
+
+  prelude "(* this is a prelude for Alt-Ergo integer arithmetic *)"
+
+  syntax function zero "0"
+  syntax function one  "1"
+
+  syntax function (+)  "(%1 + %2)"
+  syntax function (-)  "(%1 - %2)"
+  syntax function (*)  "(%1 * %2)"
+  syntax function (-_) "(-%1)"
+
+  syntax predicate (<=) "(%1 <= %2)"
+  syntax predicate (<)  "(%1 <  %2)"
+  syntax predicate (>=) "(%1 >= %2)"
+  syntax predicate (>)  "(%1 >  %2)"
+
+  remove prop CommutativeGroup.Comm.Comm
+  remove prop CommutativeGroup.Assoc.Assoc
+  remove prop CommutativeGroup.Unit_def
+  remove prop CommutativeGroup.Inv_def
+  remove prop Assoc.Assoc
+  remove prop Mul_distr
+  remove prop Comm.Comm
+  remove prop Unitary
+  remove prop Refl
+  remove prop Trans
+  remove prop Total
+  remove prop Antisymm
+  remove prop NonTrivialRing
+  remove prop CompatOrderAdd
+
+end
+
+theory int.EuclideanDivision
+
+  syntax function div "(%1 / %2)"
+  syntax function mod "(%1 % %2)"
+
+end
+
+
+theory real.Real
+
+  prelude "(* this is a prelude for Alt-Ergo real arithmetic *)"
+
+  syntax function zero "0.0"
+  syntax function one  "1.0"
+
+  syntax function (+)  "(%1 + %2)"
+  syntax function (-)  "(%1 - %2)"
+  syntax function (*)  "(%1 * %2)"
+  syntax function (/)  "(%1 / %2)"
+  syntax function (-_) "(-%1)"
+  syntax function inv  "(1.0 / %1)"
+
+  syntax predicate (<=) "(%1 <= %2)"
+  syntax predicate (<)  "(%1 <  %2)"
+  syntax predicate (>=) "(%1 >= %2)"
+  syntax predicate (>)  "(%1 >  %2)"
+
+  remove prop CommutativeGroup.Comm.Comm
+  remove prop CommutativeGroup.Assoc.Assoc
+  remove prop CommutativeGroup.Unit_def
+  remove prop CommutativeGroup.Inv_def
+  remove prop Assoc.Assoc
+  remove prop Mul_distr
+  remove prop Comm.Comm
+  remove prop Unitary
+  remove prop Refl
+  remove prop Trans
+  remove prop Total
+  remove prop Antisymm
+  remove prop Inverse
+  remove prop NonTrivialRing
+  remove prop CompatOrderAdd
+
+end
+
+theory real.RealInfix
+
+  syntax function (+.)  "(%1 + %2)"
+  syntax function (-.)  "(%1 - %2)"
+  syntax function ( *.) "(%1 * %2)"
+  syntax function (/.)  "(%1 / %2)"
+  syntax function (-._) "(-%1)"
+
+  syntax predicate (<=.) "(%1 <= %2)"
+  syntax predicate (<.)  "(%1 <  %2)"
+  syntax predicate (>=.) "(%1 >= %2)"
+  syntax predicate (>.)  "(%1 >  %2)"
+
+end
+
+theory bool.Bool
+  syntax type     bool  "bool"
+  syntax function True  "true"
+  syntax function False "false"
+end
+
+theory Tuple0
+  syntax type     tuple0 "unit"
+  syntax function Tuple0 "void"
+end
+
+theory algebra.AC
+  meta cloned AC function op
+  remove cloned prop Comm.Comm
+  remove cloned prop Assoc.Assoc
+end
+
+(*
+Local Variables:
+mode: why
+compile-command: "make -C .. bench"
+End:
+*)

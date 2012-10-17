@@ -1,0 +1,51 @@
+theory Order
+  type t
+  predicate (<=) t t
+
+  axiom le_refl : forall x : t. x <= x
+  axiom le_asym : forall x y : t. x <= y -> y <= x -> x = y
+  axiom le_trans: forall x y z : t. x <= y -> y <= z -> x <= z
+end
+
+theory List
+  type list 'a = Nil | Cons 'a (list 'a)
+
+  predicate mem (x: 'a) (l: list 'a) = match l with
+    | Nil -> false
+    | Cons y r -> x = y \/ mem x r
+  end
+end
+
+theory SortedList
+  use import List
+  clone import Order as O
+
+  inductive sorted (l : list t) =
+    | sorted_nil :
+        sorted Nil
+    | sorted_one :
+        forall x:t. sorted (Cons x Nil)
+    | sorted_two :
+        forall x y : t, l : list t.
+        x <= y -> sorted (Cons y l) -> sorted (Cons x (Cons y l))
+
+  lemma sorted_inf: 
+    forall x y: t, l: list t. x <= y -> sorted (Cons y l) -> 
+      sorted (Cons x l)  
+    
+
+  lemma sorted_mem: 
+    forall x: t, l: list t. sorted (Cons x l) -> 
+    forall y: t. mem y l -> x <= y
+    (* by induction on l *)
+
+end
+
+theory SortedIntList
+  use import int.Int
+  use import List
+  clone import SortedList with type O.t = int, predicate O.(<=) = (<=)
+
+  goal sorted123: sorted (Cons 1 (Cons 2 (Cons 3 Nil)))
+end
+

@@ -1,0 +1,1647 @@
+
+\subsection{Basic Tactics}
+
+
+\subsubsection{The \texttt{app} tactic}\label{tac:app} \DONE
+\Syntax
+\verb+app+ \textit{num} \textit{num} \textit{relational-formula}
+
+\Description
+Applies the RHL rule for sequential composition:
+$$
+\infrule{\Equiv{c_1}{c_2}{\post}{\post'} \quad
+         \Equiv{c_1'}{c_2'}{\post'}{\post''}}
+        {\Equiv{c_1;c_1'}{c_2;c_2'}{\post}{\post''}}[\textrm{R-Seq}]
+$$
+The application of tactic \verb+app m n p+ defines $c_1$ as the first
+\verb+m+ instructions of the program on the left-hand side and $c_2$ as
+the first \verb+n+ instructions of the program on the right-hand side
+and $\post'$ as \verb+p+.
+
+\Example
+The application of the tactic \verb+app 1 1 ={x}+ on the left goal,
+yields the two goals on the right.
+
+\begin{minicode}{0.5}
+pre   = true 
+stmt1 =   1: x = [0..10];
+          2: if (x = 10) x = 0;
+                else x = x - 1;
+stmt2 =   1: x = [0..10];
+          2: if (x = 10) x = 0;
+                else x = x - 1;
+post  = x{1} + 22 + 1 = x{2} + 23
+\end{minicode}
+\begin{minicode}{0.5}
+pre   = true
+stmt1 =   1: x = [0..10];
+stmt2 =   1: x = [0..10];
+post  = ={x}
+
+
+pre   = ={x}
+stmt1 =   1: if (x = 10) x = 0;
+                else x = x - 1;
+stmt2 =   1: if (x = 10) x = 0;
+                else x = x - 1;
+post  = x{1} + 22 + 1 = x{2} + 23
+\end{minicode}
+
+
+\subsubsection{The \texttt{rnd} tactic} \DONE
+\Syntax 
+    \verb+rnd+ [\textit{side}] [\textit{dir}] 
+               [ \verb+(+\textit{fct}\verb+)+ $|$ 
+                \verb+(+\textit{fct}\verb+)+  
+                \verb+(+\textit{fct}\verb+)+] 
+
+    where 
+    \textit{side} is \verb+{1}+ or \verb+{2}+ and
+    \textit{dir} is \verb+<<+ or \verb+>>+ and 
+    \textit{fct} is \textit{relational-expr}
+     or \textit{ident} \verb+->+ \textit{relational-expr}
+
+\Description
+The application of this tactic supports several variants depending on
+its optional arguments:
+\begin{itemize}
+  \item the optional argument \textit{side} may be used to indicate
+    the application of the one-sided logical rule for random
+    sampling. If missing, then the two-sided rule for random
+    assignment is considered 
+  \item the optional argument \textit{dir} indicates whether the
+    random samplings appear at the bottom (\verb+<<+) or at the top
+    (\verb+>>+) of the instructions in the current goal. When this
+    argument is missing, the default option (\verb+<<+) is considered. 
+  \item Additionally, for the two-sided case, the \verb+rnd+ tactic
+    takes as parameter a representation of a bijective function. If a
+    single function $f$ is given then it is required to be an
+    involution. If a pair of functions $f$ and $g$ are given then g is
+    required to be the inverse of $f$. 
+    When no function is given the identity function is considered.
+    % 
+
+    Two syntactic forms are currently supported for the representation
+    of the optional function arguments. The recommended form is
+    $v$\verb+->+$e$, where $e$ is a relational expression (an
+    expression with \verb+{1}+ and \verb+{2}+ tags) and $v$ is a valid
+    variable identifier. Alternatively (and for the time being), and
+    only in case the first or last instruction of the right program is
+    an assignment, one can simply give an expression $e$, in which
+    case the bound variable $v$ is set to the lhs of the assignment.
+
+    % 
+\end{itemize}
+
+The application of the \verb+rnd+ tactic always expects the
+expressions at right of and assignment to be a simple random
+expression, even though the programming syntax allows more complex
+expressions like \verb?x = [0..10] + 3?, or even multiple samplings of
+the form \verb+(x,y) = ({0,1},{0,1}^k)+. To deal with random
+expressions occurring in mode complex constructions one must first
+make use of the \verb+derandomize+ tactic.
+
+\paragraph*{One-sided application.}
+The following table describes the result of one-sided application of
+the \verb+rnd+ tactic. In the following, we denote $A$ as the support
+of sampled distribution. In the particular case of the uniform
+distribution over the integer interval \texttt{[$k_1$..$k_2$]}, the
+expression $a\in A$ corresponds to the condition \texttt{$k_1$<=$a$ \&\&
+  $a$<=$k_2$}.
+
+\begin{center}
+\begin{tabular}{c|c}
+Syntax & Rule \\
+\hline\\
+\verb+rnd{1}+ or \verb+rnd{1}<<+ &  
+$
+\infrule{\Equiv{c_1}{c_2}{\pre}{\forall a,~(a \in A \Rightarrow \post\subst{x\sidel}{a})}}
+        {\Equiv{c_1;\Rand{x}{d}}{c_2}{\pre}{\post}}
+$ \\[3ex]
+\hline
+\\
+\verb+rnd{2}+ or \verb+rnd{2}<<+ &  
+$
+\infrule{\Equiv{c_1}{c_2}{\pre}{\forall a,~( a\in A \Rightarrow \post\subst{x\sider}{a})}}
+        {\Equiv{c_1}{c_2;\Rand{x}{d}}{\pre}{\post}}
+$ \\[3ex]
+\hline
+\\
+\verb+rnd>>{1}+ &  
+$
+\infrule{\Equiv{c_1}{c_2}{\exists z,~(x\sidel \in A \land \pre\subst{x\sidel}{z})}{\post}}
+        {\Equiv{\Rand{x}{d};c_1}{c_2}{\pre}{\post}}
+$ \\[3ex]
+\hline
+\\
+\verb+rnd>>{2}+ &
+$
+\infrule{\Equiv{c_1}{c_2}{\exists z,~(x\sider \in A \land  \pre\subst{x\sider}{z})}{\post}}
+        {\Equiv{c_1}{\Rand{x}{d};c_2}{\pre}{\post}}
+$ \\[3ex]
+\end{tabular}
+\end{center}
+
+
+\Example In this simple example, the application of the tactic
+\verb+rnd{1}+ (or equivalently \verb+rnd{1}<<+), yields the goal on
+the right at the top. An application of the \verb+rnd{e}>>+ over the
+latter returns the right goal at the bottom, which can be
+easily discharged by the \verb+trivial+ tactic:
+
+\begin{minicode}{0.4}
+pre   = 0 <= x{1}
+stmt1 =   1 : z = [x * x..y];
+stmt2 =   1 : z = [y..y];
+post  = 0 <= z{1} && z{2} = y{2}
+\end{minicode}
+\begin{minicode}{0.5}
+pre   = 0 <= x{1}
+stmt1 = 
+stmt2 =   1 : z = [y..y];
+post  = forall (z : int),
+          x{1} * x{1} <= z => z <= y{1} => 
+            0 <= z && z{2} = y{2}
+
+
+pre   = y{2} <= z{2} && z{2} <= y{2} && 0<=x{1}
+stmt1 = 
+stmt2 = 
+post  = forall (z : int),
+          x{1} * x{1} <= z => z <= y{1} => 
+            0 <= z && z{2} = y{2}
+\end{minicode}
+
+
+\paragraph*{Two-sided application.}
+The following table describes the two-sided applications of the
+\verb+rnd+ tactic. The expression
+$\mathsf{bij}(f,g,a)$ stand for the condition $g(f(a))=a \land f(g(a))=a$ and 
+the $\mathsf{invol}(f,a)$ stands for $f(f(a))=a$. 
+
+
+\begin{center}
+\begin{tabular}{c|c}
+Syntax & Rule \\
+\hline
+\\
+\verb+rnd+ or \verb+rnd<<+ &
+$ 
+\infrule{\Equiv{c_1}{c_2}{\pre}{d=d' \land \forall a,~(a\in A \Rightarrow \post\subst{x\sidel}{a}\subst{y\sider}{a})}}
+        {\Equiv{c_1;\Rand{x}{d}}{c_2;\Rand{y}{d'}}{\pre}{\post}}
+$
+\\[3ex]
+\hline
+\\
+\verb+rnd>>+ &  
+$ 
+\infrule{\Equiv{c_1}{c_2}{d=d'\Rightarrow x\sidel\in A \land
+    x\sidel=x\sider \land \exists_{x,y} \pre\subst{x\sidel}{x}\subst{y\sider}{y}}{\post}}
+        {\Equiv{\Rand{x}{d};c_1}{\Rand{y}{d'};c_2}{\pre}{\post}}
+$
+\\[3ex]
+\hline
+\\
+\texttt{rnd ($f$),($g$)}
+ & 
+$ 
+\infrule{\Equiv{c_1}{c_2}{\pre}{d=d' \land \forall a,~(a\in A \Rightarrow
+     \mathsf{bij}(f,g,a) \land \post\subst{x\sidel}{a}\subst{y\sider}{f a})}}
+        {\Equiv{c_1;\Rand{x}{d}}{c_2;\Rand{y}{d'}}{\pre}{\post}}
+$
+\\[3ex]
+\hline 
+\\
+\texttt{rnd ($f$)}
+ & 
+$ 
+\infrule{\Equiv{c_1}{c_2}{\pre}{d=d' \land \forall a,~(a\in A \Rightarrow
+    \mathsf{invol}(f,a)  \land \post\subst{x\sidel}{a}\subst{y\sider}{f a})}}
+        {\Equiv{c_1;\Rand{x}{d}}{c_2;\Rand{y}{d'}}{\pre}{\post}}
+$
+\\[3ex]
+\hline
+\\
+\texttt{rnd>> ($f$,$g$)}
+ & 
+$ 
+\infrule{\Equiv{c_1}{c_2}{
+    \begin{array}{l}
+    d=d'\Rightarrow \mathsf{bij}(f,g,a) \Rightarrow
+\\\quad 
+    x\sidel\in A \land
+    x\sidel=x\sider \land \exists_{x,y}
+    \pre\subst{x\sidel}{x}\subst{y\sider}{y}
+  \end{array}
+}{\post}}
+        {\Equiv{\Rand{x}{d};c_1}{\Rand{y}{d'};c_2}{\pre}{\post}}
+$
+\\[3ex]
+\hline 
+\\
+\texttt{rnd>> ($f$)}
+& 
+$ 
+\infrule{\Equiv{c_1}{c_2}{
+    \begin{array}{l}
+      d=d'\Rightarrow \mathsf{invol}(f,g,a) \Rightarrow 
+\\\quad
+      x\sidel\in A \land
+      x\sidel=x\sider \land \exists_{x,y}
+      \pre\subst{x\sidel}{x}\subst{y\sider}{y}
+   \end{array}
+}{\post}
+}
+        {\Equiv{\Rand{x}{d};c_1}{\Rand{y}{d'};c_2}{\pre}{\post}}
+$
+\\[3ex]
+\end{tabular}
+\end{center}
+
+The \verb+rnd+ tactic also accepts (in all its forms) random samplings
+assigning a tuple of variables or updating a map. The application of
+the \verb+rnd+ tactic in the assignment of multiple variable
+assignments and map updates requires using the syntax \verb+v->e+ for
+the function parameters.
+
+
+\Example The example below shows the effect of the application of the tactic
+\verb+rnd (c ^^ m{2})+, the original left goal and the final
+right goal.
+
+\begin{minicode}{0.4}
+pre   = true
+stmt1 =   1 : m = M ();
+          2 : k_0 = {0,1}^l;
+stmt2 =   1 : m = M ();
+          2 : c = {0,1}^l;
+post  = (k_0{1} ^^ m{1},m{1}) 
+            = (c{2},m{2})
+\end{minicode}
+\begin{minicode}{0.5}
+pre   = true
+stmt1 =   1 : m = M ();
+stmt2 =   1 : m = M ();
+post  = forall (r : bitstring{l}),
+          r ^^ m{2} ^^ m{2} = r 
+          && (r ^^ m{2} ^^ m{2} = r =>
+            (r ^^ m{1},m{1}) = (r ^^ m{2},m{2}))
+\end{minicode}
+\vspace{2ex}
+
+Notice the verification condition for the function \verb+(c->c^^m{2})+
+(written simply \verb+c^^m{2}+ since \verb+c+ is the assigned variable at the
+right side): \verb+r ^^ m{2} ^^ m{2} = r+, requiring the function to
+be an involution.
+
+\subsubsection{The \texttt{case} tactic}\label{tac:case}\DONE
+\Syntax \verb+case+ [\textit{side}] : \textit{prog-expr}
+
+\Description The case tactic allows to split the proof in two
+branches, depending of the initial value of an expression.  The
+\textit{side} argument may be used to to indicate the application of
+the one-sided logical rule.  If no argument is provided, then the
+two-sided rule is used. In this case, the rule requires that the
+precondition implies the equality of \textit{prog-expr} on the two
+sides.  The tactic corresponds to the following pRHL rules:
+
+\begin{center}
+\begin{tabular}{c|c}
+Syntax & Rule \\
+\hline\\
+\verb+case{1} e+ &
+$
+\infrule{\Equiv{c_1}{c_2}{\pre \land e\sidel}{\post}
+        \quad \Equiv{c_1}{c_2}{\pre \land \neg e\sidel}{\post}}
+        {\Equiv{c_1}{c_2}{\pre}{\post}}
+$\\
+\\\hline\\
+\verb+case{2} e+ &
+$
+\infrule{\Equiv{c_1}{c_2}{\pre \land e\sider}{\post}
+        \quad \Equiv{c_1}{c_2}{\pre \land \neg e\sider}{\post}}
+        {\Equiv{c_1}{c_2}{\pre}{\post}}
+$\\
+\\\hline\\
+\verb+case e+ &
+$
+\infrule{
+ \begin{array}{c}
+   \vdash \pre \Rightarrow e\sidel = e\sider \\
+   \Equiv{c_1}{c_2}{\pre \land e\sidel \land e\sider}{\post}\\
+   \Equiv{c_1}{c_2}{\pre \land \neg e\sidel \land \neg e\sider}{\post}
+ \end{array}
+}{\Equiv{c_1}{c_2}{\pre}{\post}}
+$\\
+\end{tabular}
+\end{center}
+
+\Example The application of \verb+case : x = y+ transforms the
+left goal into the two goals on the right:
+
+\begin{minicode}{0.5}
+pre   = true
+stmt1 =   1: x = 0;
+          2: y = 1;
+stmt2 =   1: y = 1;
+          2: x = 0;
+post  = x{1} + y{1} = x{2} + y{2}
+\end{minicode}
+\begin{minicode}{0.5}
+pre   = x{1} = y{1} && x{2} = y{2}
+stmt1 =   1 : x = 0;
+          2 : y = 1;
+stmt2 =   1 : y = 1;
+          2 : x = 0;
+
+
+pre   = x{1} <> y{1} && x{2} <> y{2}
+stmt1 =   1 : x = 0;
+          2 : y = 1;
+stmt2 =   1 : y = 1;
+          2 : x = 0;
+post  = x{1} + y{1} = x{2} + y{2}
+\end{minicode}
+
+\subsubsection{The \texttt{if} tactic}\label{tac:if}\DONE
+
+\Syntax \verb+if+ [\textit{side}]
+
+\Description Applies the pRHL rule for conditional.
+If the \textit{side} argument is given then the corresponding
+one side rule is used, else the two side rule is used.
+The \verb+if+ tactic expects an conditional as first instruction,
+if it is not the case, the \verb+ifsync+ tactic~\ref{tac:ifsync}
+or \verb+cond+ tactic~\ref{tac:cond} can be used. 
+\begin{center}
+\begin{tabular}{c|c}
+Syntax & Rule \\
+\hline\\
+\verb+if{1}+ &
+$
+\infrule{\Equiv{c_1;c}{c'}{\pre \land e\sidel}{\post}
+        \quad \Equiv{c_2;c}{c'}{\pre \land \neg e\sidel}{\post}}
+        {\Equiv{\Cond{e}{c_1}{c_2};c}{c'}{\pre}{\post}}
+$\\
+\\\hline\\
+\verb+if{2}+ &
+$
+\infrule{\Equiv{c'}{c_1;c}{\pre \land e\sider}{\post}
+        \quad \Equiv{c'}{c_2;c}{\pre \land \neg e\sider}{\post}}
+        {\Equiv{c'}{\Cond{e}{c_1}{c_2};c}{\pre}{\post}}
+$\\
+\\\hline\\
+\verb+if+ &
+$
+\infrule{
+ \begin{array}{c}
+   \vdash \pre \Rightarrow e\sidel = e'\sider \\
+   \Equiv{c_1;c}{c'_1;c'}{\pre \land e\sidel \land e'\sider}{\post}\\
+   \Equiv{c_2;c}{c'_2;c'}{\pre \land \neg e\sidel \land \neg e'\sider}{\post}
+ \end{array}
+}{\Equiv{\Cond{e}{c_1}{c_2};c}
+        {\Cond{e'}{c'_1}{c'_2};c'}
+        {\pre}{\post}}
+$\\
+\end{tabular}
+\end{center}
+
+\Example
+The application of the tactic \verb+if+ on the goal of the left,
+yields the two goals on the right.
+
+\begin{minicode}{0.5}
+pre   = ={x} 
+stmt1 =   1: if (x = 10) x = 0;
+                else x = x - 1;
+          2: x = x + 22;
+          3: x = x + 1;
+stmt2 =   1: if (x = 10) x = 0;
+                else x = x - 1;
+          2: x = x + 23;
+post  = ={x}
+\end{minicode}
+\begin{minicode}{0.5}
+pre   = ={x} && x{1} = 10 && x{2} = 10
+stmt1 =   1: x = 0;
+          2: x = x + 22;
+          3: x = x + 1;
+stmt2 =   1: x = 0;
+          2: x = x + 23;
+post  = ={x}
+
+pre   = ={x} && && x{1} <> 10 && x{2} <> 10
+stmt1 =   1: x = x - 1;
+          2: x = x + 22;
+          3: x = x + 1;
+stmt2 =   1: x = x - 1;
+          2: x = x + 23;
+post  = ={x}
+\end{minicode}
+
+\subsubsection{The \texttt{ifsync} tactic}\label{tac:ifsync}
+
+\Syntax 
+\Description 
+\Example
+
+\subsubsection{The \texttt{while} tactic}\label{tac:while} \DONE
+
+
+\Syntax 
+
+\verb+while+ [\textit{side}] [\textit{dir}] 
+: \textit{relational-formula} 
+[: \textit{relational-expr}, \textit{relational-expr}]
+
+\Description This tactic applies the pRHL verification rules for
+loops:
+\begin{itemize}
+\item the optional argument \textit{side} can be either \verb+{1}+ or
+  \verb+{2}+ to indicate the application of one-sided versions of the
+  rule. If missing, the two-sided rule for loops is considered.
+\item the argument \textit{relational-formula} is mandatory and
+  is used as loop invariant. It can refer to variables in both the
+  left and right programs. 
+\item the pair of relational expressions are required (and accepted
+  only) in the one-sided application of the rule. They are used to
+  prove termination of the while loop; the first one corresponds to a
+  decreasing variant expression and the second one to a lower
+  bound. If no expressions are given in the one-sided case, \EasyCrypt
+  tries to infer them.
+\end{itemize}
+
+In the forward version (\verb+>>+) the information that is provided by
+the precondition about variables that are not modified in the loop
+body is used as invariant and propagated after the loop. Similarly
+with the postcondition in the backwards case (\verb+<<+).
+
+
+\paragraph{Two-sided version.}
+\Syntax \verb+while+ [\textit{dir}] \verb+:+ \textit{relational-formula}
+\Description Applies the two-sided RHL rule for while loops, 
+using the \textit{relational-formula} as loop invariant. The
+\textit{dir} is used to indicate if the backward rule (\verb+<<+) or
+the forward rule (\verb+>>+) should be used. If no \textit{dir} argument
+is given then the backward rule is used. The backward rule require
+that the last instruction of the each statements are loop instruction
+(the first for the forward rule).
+
+\begin{center}
+\begin{tabular}{c|c}
+Syntax & Rule \\\hline\\
+\verb+while+ \verb+>>+ \verb+:+ $I$ & 
+$
+\infrule{ \begin{array}{c}
+            \vdash \pre \Rightarrow I \land e\sidel = e'\sider \\
+            \Equiv{c_1}{c'_1}{I \land e\sidel \land e'\sider \land \exists M, \pre}{I \land  e\sidel = e'\sider}\\
+            \Equiv{c_2}{c'_2}{I \land \neg e\sidel \land \neg e'\sider  \land \exists M, \pre}{\post}
+          \end{array}
+        }
+        {\Equiv{\While{e}{c_1};c_2}{\While{e'}{c'_1};c'_2}{\pre}{\post}}
+$
+\\
+\\\hline\\
+\verb+while+ [\verb+<<+] \verb+:+ $I$ & 
+$
+\infrule{ \begin{array}{c}
+            \Equiv{c_2}{c'_2}{I \land e\sidel \land e'\sider}{I \land  e\sidel = e'\sider}\\
+            \Equiv{c_1}{c'_1}{\pre}{ I \land e\sidel = e'\sider \land 
+              \forall M, (I \land \neg e\sidel \land \neg e'\sider \Rightarrow \post)}
+          \end{array}
+        }
+        {\Equiv{c_1;\While{e}{c_2}}{c'_1;\While{e'}{c'_1}}{\pre}{\post}}
+$
+\\
+\end{tabular}
+\end{center}
+
+\Example The application of the tactic \verb+while : ={x} && x{1} <= 10+ 
+to the left goal, yields the two goals on the right.\\
+
+\begin{minicode}{0.4}
+pre   = ={y}
+stmt1 =   1 : x = 0;
+          2 : while (x < 10) 
+                x = x + 1;
+stmt2 =   1 : x = 0;
+          2 : while (x < 10)
+                x = x + 1;
+post  = ={x,y} && x{1} = 10
+\end{minicode}
+\begin{minicode}{0.6}
+pre   = (x{1} < 10 = (x{2} < 10) &&
+        ={x} && x{1} <= 10) && x{1} < 10
+stmt1 =   1 : x = x + 1;
+stmt2 =   1 : x = x + 1;
+post  = x{1} < 10 = (x{2} < 10) &&
+        ={x} && x{1} <= 10
+
+
+pre   = ={y}
+stmt1 =   1 : x = 0;
+stmt2 =   1 : x = 0;
+post  = (={x} && x{1} <= 10) &&
+        x{1} < 10 = (x{2} < 10) &&
+        (forall (x_L, x_R : int),
+           x_L < 10 = (x_R < 10) => 
+           x_L = x_R => x_L <= 10 => 
+          !x_L < 10 =>
+          (x_L = x_R && ={y}) && x_L = 10)
+\end{minicode}
+
+\Example The application of the tactic
+\verb+while >> : ={x} && x{1} <= 10+ to the left goal, yields
+the two goals on the right, plus a
+logical verification condition (not shown) that is sent to the available SMT solvers.\\
+
+\begin{minicode}{0.4}
+pre   = x{2}=0 && x{1}=0 && ={y}
+stmt1 =   1 : while (x < 10) 
+                x = x + 1;
+          2 : y = y + 1;
+stmt2 =   1 : while (x < 10) 
+                x = x + 1;
+          2 : y = y + 1;
+post  = ={x,y} && x{1} = 10
+\end{minicode}
+\begin{minicode}{0.6}
+pre   = (exists (x_L, x_R : int),  
+          x_R = 0 && x_L = 0 && ={y}) &&
+        (x{1} < 10 = (x{2} < 10) && 
+        ={x} && x{1} <= 10) && x{1} < 10
+stmt1 =   1 : x = x + 1;
+stmt2 =   1 : x = x + 1;
+post  = x{1} < 10 = (x{2} < 10) && 
+        ={x} && x{1} <= 10
+
+
+pre   = (exists (x_L, x_R : int),  
+          x_R = 0 && x_L = 0 && ={y}) &&
+        (x{1} < 10 = (x{2} < 10) && 
+        ={x} && x{1} <= 10) && !x{1} < 10
+stmt1 =   1 : y = y + 1;
+stmt2 =   1 : y = y + 1;
+post  = ={x,y} && x{1} = 10
+
+\end{minicode}
+
+\paragraph{One-sided version.}
+
+\Syntax \verb+while+ \textit{side} [\textit{dir}] :
+\textit{relational-formula} [\verb+:+ \textit{variant},
+\textit{bound}] \Description Applies the one-sided pRHL rule for while
+loops, using \textit{relational-formula} as loop invariant,
+\textit{variant} as the decreasing variant (a
+\textit{relational-term}) and \textit{bound} as the lower bound (a
+\textit{relational-term}). The variant and the bound are used to check
+termination.  If no variant and bound are given then \easycrypt tries
+to infer them automatically.  The one-sided rules are described in the
+following table; only the left (\verb+{1}+) variants are shown, the
+right (\verb+{2}+) variants are symmetric. In the table, the
+expressions $\forall X,~\varphi$ and $\exists X,~\varphi$ denote the
+multiple universal and existential quantification of the set of
+variables $X$ modified by the loop body $c$.
+
+\begin{center}
+\begin{tabular}{c|c}
+Syntax & Rule \\\hline\\
+\texttt{while\{1\} : I : var, b}
+&
+$
+\infrule{
+  \begin{array}{c}
+  \vdash Inv \land var < b \Rightarrow \neg e  \\
+  \Equiv{c}{}{b=B \land var=C \land e \land I }{b=B \land var<C \land I} \\
+  \Equiv{c_1}{c_2}{\pre}{I \land \forall X, (I \land \neg e
+    \Rightarrow \post)}
+\end{array}
+}
+{
+  \Equiv{c_1;\While{e}{c}}{c_2}{\pre}{\post}
+}
+$
+\\[3ex]\hline\\
+\texttt{while\{1\}>> : I : var, b}
+&$
+\infrule{
+  \begin{array}{c}
+  \vdash Inv \land var < b \Rightarrow \neg e  \\
+  \Equiv{c}{\Skip}{b=B \land var=C \land (\exists X,~\pre)\land e \land I }{b=B \land var<C \land I} \\
+  \Equiv{c_1}{c_2}{(\exists X,~\pre)\land \neg e \land I}{\post}
+\end{array}
+}
+{
+  \Equiv{\While{e}{c};c_1}{c_2}{\pre}{\post}
+}
+$
+\\[3ex]\hline
+
+\end{tabular}
+\end{center}
+
+\Example The call of the one-sided tactic \verb+while{1} : x{1} <= 10+ to the
+left goal returns a goal for the verification of the loop body
+(on the right, top) and a goal for the verification of the rest of the
+program (on the right, bottom).
+
+\begin{minicode}{.4}
+pre   = ={y}
+stmt1 =   1 : x = 0;
+          2 : while (x < 10) 
+                x = x + 1;
+stmt2 =   1 : x = 10;
+post  = ={x,y} && x{1} = 10
+\end{minicode}
+\begin{minicode}{.5}
+pre   = (bnd{1} = 0 && 10 - x{1} = vrnt{1}) 
+           && x{1} <= 10 && x{1} < 10
+stmt1 =   1 : x = x + 1;
+stmt2 = 
+post  = (bnd{1} = 0 && 10 - x{1} < vrnt{1}) 
+           && x{1} <= 10
+
+
+pre   = ={y}
+stmt1 =   1 : x = 0;
+stmt2 =   1 : x = 10;
+post  = x{1} <= 10 &&
+         (forall (x_L : int),
+            x_L <= 10 => !x_L < 10 => 
+               (x_L = x{2} && ={y}) && x_L = 10)
+\end{minicode}
+
+
+\Example Similarly, one can invoke first the \verb+sp+ tactic to the
+original goal of the previous example, obtaining the left goal. The
+\verb+while{1} >> : x{1} <= 10+ tactic returns the goals on the right,
+corresponding to the verification of the loop body and the remaining
+program statements:
+
+\begin{minicode}{.4}
+pre   = x{2} = 10 && x{1} = 0 
+           && ={y}
+stmt1 =   1 : while (x < 10) 
+                x = x + 1;
+stmt2 = 
+post  = ={x,y} && x{1} = 10
+\end{minicode}
+\begin{minicode}{.5}
+pre   = (bnd{1} = 0 && 10 - x{1} = vrnt{1}) &&
+         (exists (x_L : int),  x{2} = 10 
+             && x_L = 0 && ={y}) &&
+          x{1} <= 10 && x{1} < 10
+stmt1 =   1 : x = x + 1;
+stmt2 = 
+post  = (bnd{1} = 0 && 10 - x{1} < vrnt{1}) 
+           && x{1} <= 10
+
+
+pre   = (exists (x_L : int),  x{2} = 10 
+            && x_L = 0 && ={y}) &&
+         x{1} <= 10 && !x{1} < 10
+stmt1 = 
+stmt2 = 
+post  = ={x,y} && x{1} = 10
+\end{minicode}
+
+
+
+
+\subsubsection{The \texttt{call} tactic} \DONE
+
+\Syntax \verb+call+ \textit{auto-info}
+\Description The tactic \verb+call+ applies the two-sided
+  Relational Hoare Logic rule for procedure calls. 
+  The basic use of the \verb+call+ is the following
+  \begin{center}
+    \begin{tabular}{c|c}
+      Syntax & Rule \\\hline\\
+\verb+call using id+ & 
+$
+\infrule{\begin{array}{c}
+         \texttt{id} :\  \Equiv{f}{g}{\pre_{fg}}{\post_{fg}} \\
+         \Equiv{c_1}{c_2}{\pre}{
+            \pre_{fg}\subst{f.\Params, g.\Params}{\vec{a},\vec{b}} \land 
+            \forall r_1\ r_2\ M,\ 
+              post_{fg} \Rightarrow \post\subst{x\sidel,y\sidel}{r_1,r2}}
+         \end{array}}
+        {\Equiv{c_1;\Call{x}{f}{\vec{a}}}
+               {c_2;\Call{y}{g}{\vec{b}}}
+               {\pre}
+               {\post}}
+$
+\end{tabular}
+  \end{center}
+The tactic checks that the specification named \verb+id+ exists and
+that the two functions used in the specification correspond to 
+the one used in the call instruction of each statements.
+ 
+\Example Assume that we have already proved the following specification
+\begin{verbatim}
+equiv f_12 : Gcall1.f ~ Gcall2.f : ={y} && x{2} = 1 ==> P(res{1},res{2})
+\end{verbatim}
+Then the application of the tactic \verb+call using f_12+ transform the
+left goal into the right goal
+
+\begin{minicode}{0.4}
+
+pre   = ={z} && x{2} = 1
+stmt1 =   1 : w = f (0);
+stmt2 =   1 : w = f (0);
+post  = P(w{1} + 1,w{2} + 1)
+\end{minicode}
+\begin{minicode}{0.6}
+pre   = ={z} && x{2} = 1
+stmt1 = 
+stmt2 = 
+post  = x{2} = 1 &&
+         (forall (res_R, res_L : int),
+            P(res_L,res_R) => P(res_L + 1,res_R + 1))
+
+\end{minicode}
+
+Sometime \easycrypt perform some simple automatic simplifications on the 
+post-condition, leading to an equivalent formula. For example the if we use
+the \verb+=+ predicate instead of \verb+P+ in the previous example the post-condition
+become simply \verb+x{2} = 1+.
+
+In general, it is not needed to start by proving a specification for the 
+pair of functions (here \verb+f_12+). 
+It is possible give an invariant which will be used to
+prove the specification automatically (see section~\ref{tac:byauto}).
+If the invariant is omitted, it is assumed that the invariant is equality
+over all common global variables of the two games in the judgment.
+For example the application of the tactic \verb+call (x{2} = 1)+ declare a new
+specification 
+\begin{verbatim}
+equiv inferred_Gcall1_f_Gcall2_f_0 : Gcall1.f ~ Gcall2.f : 
+          ={y} && x{2} = 1 ==> ={res} && x{2} = 1
+\end{verbatim}
+and transform the goal as following:
+
+\begin{minicode}{0.4}
+
+pre   = ={z} && x{2} = 1
+stmt1 =   1 : w = f (0);
+stmt2 =   1 : w = f (0);
+post  = P(w{1} + 1,w{2} + 1)
+\end{minicode}
+\begin{minicode}{0.6}
+pre   = ={z} && x{2} = 1
+stmt1 = 
+stmt2 = 
+post  = x{2} = 1 &&
+         (forall (res_R : int),  
+            x{2} = 1 => P(res_R + 1,res_R + 1))
+
+\end{minicode}
+\subsubsection{The \texttt{unfold} tactic.}
+
+\Syntax \verb+unfold+ [$p_1$ , ... , $p_n$]
+
+\Description unfolds the definition of provided predicates $p_1$, ...,
+$p_n$ in the pre and postcondition. If the list of predicates is
+empty, every defined predicate is unfolded.
+
+\Example Assume we have defined the predicates 
+
+\begin{minicode}{1}
+pred eq(x,y:int) = x=y.
+pred geq(x,y:int) = x<=y.
+pred gt(x,y:int) = x<y.
+\end{minicode}
+\\
+
+\noindent
+A call of the tactics \verb+unfold eq+ and \verb+unfold+ to the goal
+on the left returns the goals on the right (at the top and bottom respectively).
+
+\begin{minicode}{0.5}
+pre   = geq(z{1},z{2}) && !gt(z{1},z{2})
+stmt1 = 
+stmt2 = 
+post  = eq(z{1},z{2})
+\end{minicode}
+\begin{minicode}{0.5}
+pre   = geq(z{1},z{2}) && !gt(z{1},z{2})
+stmt1 = 
+stmt2 = 
+post  = ={z}
+
+pre   = z{1} <= z{2} && !z{1} < z{2}
+stmt1 = 
+stmt2 = 
+post  = ={z}
+\end{minicode}
+
+\subsection{Program Tansformation Tactics}
+Some \easycrypt tactics implement standard program transformations
+that are commonly used when doing crypto proofs, like function
+inlining or code motion or when dealing with loops, like loop
+unrolling. These are described next and examples are provided (pre and
+postconditions will be omitted when they do not change). 
+
+\subsubsection{The \texttt{let} tactic}\label{tac:let}\DONE
+\Syntax 
+\verb+let+ [\textit{side}] [\textit{position}] \textit{ident} : \textit{type-expr}
+ \verb+=+ \textit{prog-expr}
+
+\Description
+Add an assignment to a variable, which should be fresh at a given position.
+The default position is 1. If no side argument is given then  apply the
+transformation to both statements.
+
+\Example The application of the tactic 
+\verb+let{1} at 2 w : int = x + 1+ transforms the left goal into the
+right goal:
+
+\begin{minipage}[b]{0.5\linewidth}
+\centering
+\begin{verbatim}
+pre   = true
+stmt1 =   1: x = 0;
+          2: y = 1;
+stmt2 =   1: y = 1;
+          2: x = 0;
+post  = x{1} + y{1} = x{2} + y{2}
+\end{verbatim}
+\end{minipage}
+\begin{minipage}[b]{0.5\linewidth}
+\centering
+\begin{verbatim}
+pre   = true
+stmt1 =   1: x = 0;
+          2: w = x + 1;
+          3: y = 1;
+stmt2 =   1: y = 1;
+          2: x = 0;
+post  = x{1} + y{1} = x{2} + y{2}
+\end{verbatim}
+\end{minipage}
+
+
+\subsubsection{The \texttt{ifneg} tactic}\label{tac:ifneg} \DONE
+\Syntax \verb+ifneg+ [\textit{side}] [\textit{position}]
+
+\Description Negate the value of conditional instruction and exchange its branches.
+
+\begin{itemize}
+ \item the optional argument \textit{side} can be either \verb+{1}+ or
+  \verb+{2}+ and it indicates whether the
+  transformation must be applied in the left or right
+  statement respectively. 
+  If missing, the transformation is applied to both statements.
+ \item The optional argument \textit{position} determines which instruction is
+  the target of the transformation. It can be either
+  \begin{itemize}
+  \item \verb+at n+ applies the transformation on the \verb+if+ instruction
+  at position \verb+n+.
+  \item \verb+at n1, .., np+ applies the transformation at positions \verb+n1+, \verb+n2+, \ldots, \verb+np+. 
+  \item \verb+last+ applies the transformation to the last \verb+if+ instruction.
+  \item If no \textit{position} argument is given the tactic applies the transformation to the first \verb+if+
+  instruction.
+\end{itemize} 
+\end{itemize}
+
+\Example The tactic \verb+ifneg at 2+ transforms the left goal into the right goal
+
+\begin{minicode}{0.5}
+pre   = true
+stmt1 =   1 : x = [0..10];
+          2 : if (x <> 10) x = x - 1;
+              else x = 0;
+stmt2 =   1 : x = [0..10];
+          2 : if (x <> 10) x = x - 1;
+              else x = 0;
+post  = x{1} + 22 + 1 = x{2} + 23
+\end{minicode}
+\begin{minicode}{0.5}
+pre   = true
+stmt1 =   1 : x = [0..10];
+          2 : if (x = 10) x = 0;
+              else x = x - 1;
+stmt2 =   1 : x = [0..10];
+          2 : if (x = 10) x = 0;
+              else x = x - 1;
+post  = x{1} + 22 + 1 = x{2} + 23
+\end{minicode}
+
+\subsubsection{The \texttt{inline} tactic}\label{tac:inline} \DONE
+
+\Syntax \verb+inline+ [\textit{side}] [\verb+P1,..,Pj+ $\mid$ \textit{position} ] where \textit{position} is \verb+at n1,..,ni+ or \verb+last+.
+
+\Description Inline the definition of concrete procedures. 
+The \textit{side} argument indicate if the transformation should be applied
+on the left statement (\verb+{1}+) or on the right statement  (\verb+{2}+),
+if no \textit{side} argument is provided the transformation is applied on
+both statement. The second argument indicate which procedure should
+be inlined. 
+\begin{itemize} 
+ \item In the first variant, the procedure \verb+P1+ is inlined first,
+       then the procedure \verb+P2+ and so on until the procedure \verb+Pj+.
+       Notice that the order is important. 
+ \item In the second variant,  the list of the procedure calls to be
+      inlined is specified by giving the positions where they appear in the
+      game. This allows to inline just one call to a procedure.
+ \item If no argument is provided then every concrete procedure is inlined.
+\end{itemize}
+
+\Example The effect of the tactic \verb+inline+ applied to the left goal
+yields the right goal.
+
+\begin{minicode}{0.5}
+
+stmt1 = y = [0..100];
+        x = f (y);
+stmt2 = y = [0..100];
+        x = f (y);
+\end{minicode}
+\begin{minicode}{0.5}
+
+stmt1 =   1 : y = [0..100];
+          2 : k = y;
+          3 : aux = 1;
+          4 : res = 0;
+          5 : while (aux <> 0) { 
+                aux = [0..k];
+                res = res + aux;
+              }
+          6 : x = res;
+stmt2 =   1 : y = [0..100];
+          2 : k = y;
+          3 : aux = 1;
+          4 : res = 0;
+          5 : while (aux <> 0) { 
+                aux = [0..k];
+                res = res + aux;
+              }
+          6 : x = res;
+
+\end{minicode}
+
+
+
+\subsubsection{The \texttt{swap} tactic}\label{tac:swap} \DONE
+
+\Syntax \verb+swap+ [\textit{side}]  \verb+[+\textit{num}\verb+-+\textit{num} \verb+]+ $|$ \textit{num} ]  \textit{num}
+
+\Description Moves intructions forwards or backwards whenever it is
+admissible, otherwise it fails. In general, the transformation is
+admissible if the swapped instructions are independent. Additionally,
+\EasyCrypt tries to swap two instructions $s_1$ and $s_2$ if
+$s_1$ is a sequence of assignments over variables that are read by
+$s_2$, by doing the appropriate substitutions. For example, althought
+the two first assignments are not independent in the program on the
+left, the swap tactic allows the following transformation:
+\begin{displaymath}
+x=2;\, y=5;\, \Condt{0\leq x}{z=f(z+y)} \qquad\longrightarrow\qquad  
+\Condt{0\leq 2}{z=f(z+5)};\, x=2;\, y=5
+\end{displaymath}
+
+  \begin{itemize}
+   \item The optional parameter \textit{side} indicates whether the
+   transformation must be applied to the left (\verb+{1}+) or right
+  (\verb+{2}+) statement. If this argument is missing, both the left and
+  right statement are affected.
+   \item The second optional parameter indicates which block of instructions
+   should be moved.  
+   \item The last \textit{num} arguments indicate if the block of instruction
+   should be moved down (if \textit{num} is positive), or up 
+   (if \textit{num} is negative).
+   \item \verb+swap [i-j] n+ pushes the block of instructions on
+     lines between \verb+i+ and \verb+j+ of \verb+n+ positions down if 
+     \verb+n+ is positive, and of \verb+n+ positions up if \verb+n+
+     is negative. 
+   \item \verb+swap i n+ is a shortcut for \verb+swap [i-i] n+.
+   \item \verb+swap n+ pushes the first instruction \verb+n+ positions down,
+    if \verb+n+ is positive.  Pushes the last instruction \verb+n+ positions 
+    up if \verb+n+ is negative.    
+  \end{itemize}
+
+\Example The effect of the tactic \verb+swap{1} 1+ applied to the 
+left goal yields to the right goal.
+
+\begin{minicode}{0.5}
+
+stmt1 =   1: aux = {0,1};
+          2: res = {0,1};
+stmt2 =   1: res = {0,1};
+          2: aux = {0,1};
+
+\end{minicode}
+\begin{minicode}{0.5}
+
+stmt1 =   1: res = {0,1};
+          2: aux = {0,1};
+stmt2 =   1: res = {0,1};
+          2: aux = {0,1};
+
+\end{minicode}
+
+
+\subsubsection{The \texttt{unroll} tactic}\label{tac:unroll} \DONE
+
+\Syntax \verb+unroll+ [\textit{side}] [\textit{position}]
+
+\Description Unrolls one iteration of the specified while loop. 
+The loop unrolling is defined as a transformation  of the form
+\begin{displaymath}
+\While{b}{c} \qquad\longrightarrow\qquad \Condt{b}{c};\While{b}{c}
+\end{displaymath}
+In contrast to the \verb+condt+ tactic, the condition $b$ is not
+required to hold before the loop entrance.
+\begin{itemize}
+  \item the optional argument \textit{side} can be either \verb+{1}+ or
+  \verb+{2}+ and it indicates whether the
+  transformation must be applied on the left or right
+  statement respectively. 
+  If missing, the transformation is applied to both statements.
+  \item The optional argument \textit{position} determines which while loop is
+  the target of the transformation. It can be either
+  \begin{itemize}
+  \item \verb+at n+ unroll the loop at position \verb+n+. 
+  \item \verb+at n1, .., np+ unroll the loop at positions \verb+n1+, \verb+n2+, \ldots, \verb+np+. 
+  \item \verb+last+ unroll the last loop.
+  \item If no \textit{position} argument is given the tactic unroll the first loop.
+\end{itemize} 
+\end{itemize}
+
+\Example The tactic \verb+unroll last+ transforms the left goal into the right goal.
+
+\begin{minicode}{0.5}
+
+pre   = ={x}
+stmt1 =   1 : x = x + 1;
+          2 : while (x <= 10) x = x + 2;
+          3 : x = x + 3;
+          4 : while (x <= 20) x = x + 4;
+          5 : x = x + 5;
+stmt2 =   1 : x = x + 1;
+          2 : while (x <= 10) x = x + 2;
+          3 : x = x + 3;
+          4 : while (x <= 20) x = x + 4;
+          5 : x = x + 5;
+post  = ={x}
+
+\end{minicode}
+\begin{minicode}{0.5}
+
+pre   = ={x}
+stmt1 =   1 : x = x + 1;
+          2 : while (x <= 10) x = x + 2;
+          3 : x = x + 3;
+          4 : if (x <= 20) x = x + 4;
+          5 : while (x <= 20) x = x + 4;
+          6 : x = x + 5;
+stmt2 =   1 : x = x + 1;
+          2 : while (x <= 10) x = x + 2;
+          3 : x = x + 3;
+          4 : if (x <= 20) x = x + 4;
+          5 : while (x <= 20) x = x + 4;
+          6 : x = x + 5;
+post  = ={x}
+
+\end{minicode}
+
+\subsubsection{The \texttt{splitw} tactic}\label{tac:splitw} \DONE
+
+\Syntax \verb+splitw+ [\textit{side}] [\textit{position}] : \textit{bool-exp}
+
+\Description Splits a while loop into two loops. It replaces
+the instruction \verb+while (e) { c }+ by the two instructions
+\verb+(while (e && bool-exp) { c }; while (e) { c }+
+\begin{itemize}
+ \item If \textit{side} is \verb+{1}+ apply the transformation on the left
+   statement.  If \textit{side} is \verb+{2}+ apply the transformation on the
+   right statement. If no side argument is provided apply the transformation
+   on both statement.
+ \item The optional argument \textit{position} determines which while loop is
+  the target of the transformation. It can be either
+  \begin{itemize}
+     \item \verb+at n+ unroll the loop at position \verb+n+. 
+     \item \verb+at n1, .., np+ unroll the loop at positions \verb+n1+, 
+           \verb+n2+, \ldots, \verb+np+. 
+     \item \verb+last+ unroll the last loop.
+     \item If no \textit{position} argument is given the tactic unroll 
+           the first loop.
+  \end{itemize} 
+ \item The last argument \verb+bool-exp+ is a deterministic program expression.
+\end{itemize} 
+
+\Example the tactic \verb+splitw at 2: x < 10+ transforms the left goal into
+the right one
+
+\begin{minicode}{0.4}
+
+pre   = ={x}
+stmt1 =   1 : x = x + 1;
+          2 : while (x <= 10) 
+                x = x + 2;
+          3 : x = x + 3;
+stmt2 =   1 : x = x + 1;
+          2 : while (x <= 10) 
+                x = x + 2;
+          3 : x = x + 3;
+post  = ={x}
+
+\end{minicode}
+\begin{minicode}{0.6}
+
+pre   = ={x}
+stmt1 =   1 : x = x + 1;
+          2 : while (x < 10 && x <= 10) 
+                x = x + 2;
+          3 : while (x <= 10) 
+                x = x + 2;
+          4 : x = x + 3;
+stmt2 =   1 : x = x + 1;
+          2 : while (x < 10 && x <= 10) 
+                x = x + 2;
+          3 : while (x <= 10) 
+                x = x + 2;
+          4 : x = x + 3;
+post  = ={x}
+
+\end{minicode}
+
+\subsubsection{The \texttt{condt} and \texttt{condf} tactic}\label{tac:cond} \DONE
+
+\Syntax (\verb+condt+ $|$ \verb+condf+) [\textit{side}] [\textit{position}] 
+where \textit{position} is \verb+at n+ or \verb+last+.
+
+\Description Remove the conditional instruction 
+(a \verb+if+ or a \verb+while+) at position \textit{position} to
+its true branch (\verb+condt+) or its false branch (\verb+condf+).
+It require to show that the corresponding test is true for \verb+condt+ 
+or false of \verb+condf+.
+\begin{itemize}
+ \item If \textit{side} is \verb+{1}+ apply the transformation on the left
+   statement.  If \textit{side} is \verb+{2}+ apply the transformation on the
+   right statement. If no side argument is provided apply the transformation
+   on both statement.
+ \item The optional argument \textit{position} determines in which instruction the 
+  the transformation should be applied. It can be either
+  \begin{itemize}
+  \item \verb+at n+ applies the transformation to the conditional instruction at 
+  position \verb+n+.
+  \item \verb+at n1, .., np+ applies the transformation to the conditional instructions 
+   at positions \verb+n1+, \verb+n2+, \ldots, \verb+np+. 
+  \item \verb+last+ applies the transformation to the last conditional instruction
+  \item If no \textit{position} argument is given the tactic applies the transformation
+    to the first conditional instruction
+  \end{itemize} 
+\end{itemize}
+
+In the general case, the tactic generates two goals. The first one is
+used to prove that the value of the test as the expected one (true for
+\verb+condt+ and false for \verb+condf+). The second one correspond to
+the initial statement where the conditional instruction is replaced by
+the corresponding branch. If the position is 1 then the tactic
+directly try to prove the first goal. If the position is the last
+instruction and the corresponding branch is empty (this appear
+frequently with \verb+condf+ if the last instruction is a loop) then
+the tactic generate only one goal where the original post-condition is
+extended with the condition on the test.
+
+
+\Example The tactic \verb+condt{1} last+ transforms the left goal into the two right goals
+
+\begin{minicode}{0.5}
+
+pre   = ={x} && x{1} <= 9
+stmt1 =   1 : x = x + 1;
+          2 : while (x <= 10) x = x + 2;
+stmt2 = 
+post  = x{2} <= x{1} + 3
+
+\end{minicode}
+\begin{minicode}{0.5}
+
+pre   = ={x} && x{1} <= 9
+stmt1 =   1 : x = x + 1;
+stmt2 = 
+post  = x{1} <= 10
+
+pre   = ={x} && x{1} <= 9
+stmt1 =   1 : x = x + 1;
+          2 : x = x + 2;
+          3 : while (x <= 10) x = x + 2;
+stmt2 = 
+post  = x{2} <= x{1} + 3
+
+\end{minicode}
+
+\Example The tactic \verb+condf{1} last+ transforms the left goal 
+into the right goal  
+
+\begin{minicode}{0.5}
+
+pre   = ={x} && 10 < x{1}
+stmt1 =   1 : x = x + 1;
+          2 : while (x <= 10) x = x + 2;
+stmt2 = 
+post  = x{1} + 3 = x{2}
+
+\end{minicode}
+\begin{minicode}{0.5}
+
+pre   = ={x} && 10 < x{1}
+stmt1 =   1 : x = x + 1;
+stmt2 = 
+post  = !x{1} <= 10 && x{1} + 3 = x{2}
+
+\end{minicode}
+
+\subsection{Combination of Tactics}
+EasyCrypt provides a simple combination mechanism that can be used to build
+more complex tactics from basic tactics. The following is brief a
+description of the tactic language of EasyCrypt:
+
+\begin{itemize}
+\item\verb+idtac+: this tactic always succeeds and has no effect on the
+  current goal.
+
+\item \textit{tactic${}_1$}\verb+;+\textit{tactic${}_2$}: this tactic
+  applies first the \textit{tactic${}_1$} to the current goal and then
+  \textit{tactic${}_2$} to every subgoal generated by \textit{tactic${}_1$}
+
+
+\item \textit{tactic}\verb+; [+ \textit{tactic${}_1$} \verb+|+
+  .. \verb+|+ \textit{tactic${}_k$}: Applies
+  \verb+<tactic>+, which must generate exactly $k$ subgoals. Then it
+  applies \textit{tactic${}_i$} to the $i^{th}$-subgoal. 
+  If a tactic is left unspecified the implicit tactic \verb+idtac+ is assumed.
+  For example \verb+condt at 2;[trivial | ]+ is equivalent
+  to  \verb+condt at 2;[trivial | idtac]+
+
+
+\item\verb+*+\textit{tactic} Prefixing any tactic expression
+  \textit{tactic} with '\verb+*+' results in the tactic being
+  repeatedly applied until it fails.
+
+\item\verb+!+\textit{n} \textit{tactic} Repeats the tactic
+  \textit{tactic} given at most \textit{n} times.
+
+
+\item\verb+try+ \textit{tactic} Tries to apply the tactic given as argument,
+  if it fails, it catches the error.
+\end{itemize}
+
+\subsection{Automated Tactics}
+In order to simplify proves, \easycrypt defines a set of heuristic
+tactics. In this subsection we provide a description of each of this
+high level tactics and some examples ilustrating the effects on
+goals. 
+
+\subsubsection{The \texttt{wp} tactic}\label{tac:wp} \DONE
+
+\Syntax \verb+wp+ [\textit{pos1} \textit{pos2}]
+
+\Description Computes the relational weakest-precondition of
+deterministic, loop and procedure-call free program fragments
+(i.e. deterministic assignments and conditionals).  The tactic
+processes instructions from bottom to top until a random sampling, a
+loop or a function call is found. In particular, the computation of
+the weakest precondition over a conditional instruction is only
+possible if its branches contain only deterministic assignments or
+deterministic conditionals.
+
+The optional position parameters \textit{pos1} and \textit{pos2}
+restricting the range of instructions affected by the tactic
+application. When given two values $k_1$ and $k_2$, the weakest
+precondition computation stops on the $k_1$-th instruction of the left
+statement and on the $k_2$-th instruction of the right statement.
+
+The application of this tactic fails when no instruction can be
+processed, e.g., Calling the same tactic \verb+wp+ over the last goal
+returns a failure message.
+
+  
+
+\paragraph{Example:} Assume the predicate \verb+pos(m)+ is defined as
+\verb+forall (b:bool), in_dom(b,m) => 0<=m[b]+, and \verb+k1+ and
+\verb+k2+ are positive constants. An invocation of the tactic
+\verb+wp+ over the left goal below returns the goal on the right,
+i.e., stopping at the random assignments in line 4:
+
+\begin{minicode}{0.5}
+
+pre   = 0 <= x{1} && pos(m{1})
+stmt1 =   1 : (x, y) = (x + k1,x + k2);
+          2 : z = [x..y];
+          3 : b = {0,1};
+          4 : m[b] = y;
+stmt2 =   1 : (x, y) = (x + k1,x + k2);
+          2 : z = [x..y];
+          3 : b = {0,1};
+          4 : m[b] = y;
+post  = pos(m{1}) && ={b}
+
+\end{minicode}
+\begin{minicode}{0.5}
+
+pre   = 0 <= x{1} && pos(m{1})
+stmt1 =   1 : (x, y) = (x + k1,x + k2);
+          2 : z = [x..y];
+          3 : b = {0,1};
+stmt2 =   1 : (x, y) = (x + k1,x + k2);
+          2 : z = [x..y];
+          3 : b = {0,1};
+post  = pos(m{1}[b{1} <- y{1}]) && ={b}
+
+\end{minicode}
+
+Next, an invocation of \verb+rnd;rnd{1}.+ returns the goal on the left
+below, which can be further process by \verb+wp+ returning the goal on
+the right, which can be discharged by \verb+simpl+:
+
+\begin{minicode}{0.5}
+
+pre   = 0 <= x{1} && pos(m{1})
+stmt1 =   1 : (x, y) = (x + k1,x + k2);
+stmt2 =   1 : (x, y) = (x + k1,x + k2);
+          2 : z = [x..y];
+post  = forall (z : int),
+          x{1} <= z => z <= y{1} => 
+            forall (r : bool),  
+              pos(m{1}[r <- y{1}])
+\end{minicode}
+\begin{minicode}{0.5}
+
+pre   = 0 <= x{1} && pos(m{1})
+stmt1 = 
+stmt2 =   1 : (x, y) = (x + k1,x + k2);
+          2 : z = [x..y];
+post  = (let y_L = x{1} + k2 in
+        forall (z : int),
+          x{1} + k1 <= z => z <= y_L =>
+            forall (r : bool),  
+              pos(m{1}[r <- y_L]))
+
+\end{minicode}
+
+
+\subsubsection{The \texttt{sp} tactic}\label{tac:sp} \DONE
+\Syntax \verb+sp+ [\textit{pos1} \textit{pos2}]
+
+\Description
+Implements a strongest postcondition transformer over deterministic,
+loop free and procedure-call free instructions. The invocation of this
+tactic processes, from top to bottom, the instructions at the left and
+right of the goal until a random sampling, a loop, or a procedure call
+is found. If no instruction can be processed, it returns a failure
+message.
+
+The partial application of the \verb+sp+ tactic with optional
+arguments \textit{pos1} and \textit{pos2} process at most the first
+\textit{pos1} instructions at the left and the \textit{pos2}
+instructions at the right of the current goal.
+
+\Example The example verified using \verb+wp+ can be dually verified
+with the \verb+sp+ tactic. 
+Assume the predicate \verb+pos(m)+ is defined as
+\verb+forall (b:bool), in_dom(b,m) => 0<=m[b]+, and \verb+k1+ and
+\verb+k2+ are positive constants. An invocation of the tactic
+\verb+sp+ over the left goal below returns the goal on the right,
+i.e., stopping at the random assignments in line 2:
+
+\begin{minicode}{0.5}
+
+pre   = 0 <= x{1} && pos(m{1})
+stmt1 =   1 : (x, y) = (x + k1,x + k2);
+          2 : z = [x..y];
+          3 : b = {0,1};
+          4 : m[b] = y;
+stmt2 =   1 : (x, y) = (x + k1,x + k2);
+          2 : z = [x..y];
+          3 : b = {0,1};
+          4 : m[b] = y;
+post  = pos(m{1}) && ={b}
+\end{minicode}
+\begin{minicode}{0.5}
+
+pre   = exists (x : int),
+          y{2} = x + k2 &&
+           x{2} = x + k1 &&
+            (exists (x_0 : int),
+               y{1} = x_0 + k2 && 
+               x{1} = x_0 + k1 && 
+               0 <= x_0 && pos(m{1}))
+stmt1 =   1 : z = [x..y];
+          2 : b = {0,1};
+          3 : m[b] = y;
+stmt2 =   1 : z = [x..y];
+          2 : b = {0,1};
+          3 : m[b] = y;
+post  = pos(m{1}) && ={b}
+
+\end{minicode}
+
+\noindent
+Notice the introduction of existential quantifiers due to the use of
+\verb+sp+. The invocation of the forward \verb+rnd+ tactic
+\verb+rnd{1}>>;rnd{2}>>;rnd>>+ to the last goal returns the goal
+below:
+\begin{verbatim}
+pre   = ={b} && (x{2} <= z{2} && z{2} <= y{2}) &&
+                 (x{1} <= z{1} && z{1} <= y{1}) &&
+                  (exists (x : int),
+                     y{2} = x + k2 &&
+                      x{2} = x + k1 &&
+                       (exists (x_0 : int),
+                          y{1} = x_0 + k2 &&
+                           x{1} = x_0 + k1 && 0 <= x_0 && pos(m{1})))
+stmt1 =   1 : m[b] = y;
+stmt2 =   1 : m[b] = y;
+post  = pos(m{1}) && ={b}
+\end{verbatim}
+\noindent
+which can be further processed by \verb+sp+ returning following goal,
+dischargeable by \verb+trivial+:
+\begin{verbatim}
+pre   = exists (l : (bool,int)map),
+          l[b{2} <- y{2}] = m{2} &&
+           (exists (l_0 : (bool,int)map),
+              l_0[b{1} <- y{1}] = m{1} &&
+               ={b} && (x{2} <= z{2} && z{2} <= y{2}) &&
+                        (x{1} <= z{1} && z{1} <= y{1}) &&
+                         (exists (x : int),
+                            y{2} = x + k2 &&
+                             x{2} = x + k1 &&
+                              (exists (x_0 : int),
+                                 y{1} = x_0 + k2 &&
+                                  x{1} = x_0 + k1 && 0 <= x_0 && pos(l_0))))
+stmt1 = 
+stmt2 = 
+post  = pos(m{1}) && ={b}
+\end{verbatim}
+
+\subsubsection{The \texttt{simpl} tactic}\label{tac:simpl}
+%
+  Computes the weakest precondition of the deterministic, loop-free
+  suffix of the games in the judgment. It then simplifies the
+  resulting post-condition by eliminating absurd and trivial cases.
+  If the resulting post-condition is \verb+true+ and the resulting
+  statement are lossless (terminate absolutely) then it resolve the goal.
+
+\subsubsection{The \texttt{trivial} tactic}\label{tac:trivial}
+%
+  Combines wp and rnd to simplify the goal. It tries to match random
+  assignments in both programs applying the two-sided rule; if this
+  fails it will apply the one-side rule. If the resulting goal contains two
+  empty statement it try to prove the post-condition using the pre-condition.
+  As for the tactic \verb+simpl+~\ref{tac:simpl} the part of the post-condition which is proved are 
+  removed. If the resulting post-condition become simply \verb+true+, the
+  goal is resolved.
+
+\subsubsection{The \texttt{auto} tactic}\label{tac:auto} 
+%
+  Computes the weakest precondition of the deterministic, loop-free
+  suffix of the games in the judgment. When encountering procedure
+  calls, it looks for a matching proven 'equiv' statement; if none is
+  found it tries to prove one using the optional ``rel-exp'' argument as
+  invariant. It stops when it encounters a random assignment.
+
+% \subsubsection{The \texttt{autosync} tactic??}
+
+% \subsubsection{The \texttt{rauto} tactic??}
+
+\subsubsection{The \texttt{derandomize} tactic}
+
+\subsubsection{The \texttt{eqobs\_in} tactic}
+
+\Syntax
+\verb+eqobs_in+~\verb+(+\textit{g_eqs}\verb+)+~\verb+(+\textit{invariant}\verb+)+~\verb+(+\textit{eqs}\verb+)+
+       
+
+ where \textit{equalities} are conjonction of equalities between variables of each side 
+        (i.e. of the form \verb+x{1} = y{2}+ or \verb+={u,v}+)
+
+\Description The \verb+eqobs_in+ tactic applies a fast but incomplete
+strategy to verify goals with a particular pattern:
+%
+\newcommand{\mkEQ}[1]{{=}{\left\{#1\right\}}}
+\begin{displaymath}
+\infrule{
+  \begin{array}{c@{\qquad}c}
+    \Equiv{c_1'}{c_2'}{\Pre}{\varphi \land \mkEQ{Y}} &
+    \Equiv{c_1}{c_2}{\varphi \land \mkEQ{Y}}{\varphi \land \mkEQ{X}} \\
+    \vdash \varphi \land \mkEQ{X} \Rightarrow \Post &
+    \mbox{$c_1,c_2$ do not modify $\varphi$} \\
+  \end{array}
+}{
+\Equiv{c_1';c_1}{c_2';c_2}{\Pre}{\Post}
+}
+\end{displaymath}
+%
+where $\mkEQ{X}$ stands for the left-right equality of a set of
+variables $X$.  In fact, \verb+eqobs_in+ returns only the first
+subgoal $\Equiv{c_1'}{c_2'}{\Pre}{\varphi \land \mkEQ{Y}}$ and
+computes the set $Y$ such that the second subgoal
+$\Equiv{c_1}{c_2}{\varphi \land \mkEQ{Y}}{\varphi \land \mkEQ{X}}$
+holds trivially. The strategy implemented by \verb+eqobs_in+ consumes
+the statements from bottom to top until it fails to proceed, for
+instance when it finds an assignment to a variable in $\varphi$.
+
+\begin{itemize}
+\item The argument \textit{invariant} is a relational formula that
+  cannot be modified by the statements (it corresponds to $\varphi$ in
+  the rule above).
+\item The argument \textit{eqs} is a relational formula, defined as a
+  conjunction of equalities between variables of each side (i.e. of
+  the form \verb+x{1} = y{2}+ or \verb+={u,v}+) (it corresponds to
+  $\mkEQ{X}$ in the rule above).
+\item Similarly to \textit{eqs}, the argument \textit{g_eqs} is a
+  conjunction of variable equalities, restricted to global variables,
+  and required to hold as invariant of every call in the current goal.
+\end{itemize}
+%
+The conjunction of \textit{invariant} and \textit{eqs} is
+required to imply the postcondition of the current goal.
+
+\Example The following example shows the result of applying the tactic
+\\
+\noindent
+\verb+eqobs_in (true) (0<=z{1}) (={y,l} && x{1}=w{2})+ to the goal on
+the left:
+
+\begin{minicode}{0.5}
+
+pre   = ={y} && x{1} = w{2}
+stmt1 =   1 : z = 1;
+          2 : b = {0,1};
+          3 : if (b) x = y + z;
+          4 : while (x <= 10) x = x + 2;
+          5 : l = 2;
+stmt2 =   1 : z = 1;
+          2 : b = {0,1};
+          3 : if (b) w = y + z;
+          4 : while (w <= 10) {
+                w = w + 2;
+                b = !b;
+              }
+          5 : l = 2;
+post  = x{1} = w{2} && ={l}
+
+\end{minicode}
+\begin{minicode}{0.5}
+pre   = ={y} && x{1} = w{2}
+stmt1 =   1 : z = 1;
+stmt2 =   1 : z = 1;
+post  = (={z,y} && x{1} = w{2}) && 0 <= z{1}
+\end{minicode}
+
+\noindent
+Notice that:
+\begin{itemize}
+\item the computation stopped until the assignments to \verb+z+ at
+  position 1, since it was modifying a variable occurring in the
+  invariant \verb+0<=z{1}+
+\item the conjunction of the equalities \verb+={y,l} && x{1}=w{2}+ and
+  the invariant \verb+0<=z{1}+ implies the postcondition
+  \verb+x{1} = w{2} && ={l}+
+\item in order to establish the equality \verb+x{1}=w{2}+, the tactic
+  requires the equalities \verb+x{1}=w{2}+, and \verb+={y,z}+ after
+  the assignment to \verb+z+. More precisely, before the while loop it
+  is enough to require the equality \verb+x{1}=w{2}+, but before the
+  conditional statements both \verb+x{1}=w{2}+ and \verb+={y,z}+ are
+  required, plus the equality on the guards (\verb+={b}+) which is later
+  removed by the two-sided random assignment rule.
+\item replacing the redundant invariant \verb+0<=z{1}+ by \verb+true+
+  returns a subgoal with empty statements that does not require
+  \verb+={z}+ in the postcondition:
+\begin{verbatim}
+pre   = ={y} && x{1} = w{2}
+stmt1 = 
+stmt2 = 
+post  = ={y} && x{1} = w{2}
+\end{verbatim}
+  
+\end{itemize}
+
+
+\subsection{by auto, by eager}
+
+\begin{itemize}
+\item \verb+auto [<rel-exp>]+
+%
+  Computes the weakest precondition of the deterministic, loop-free
+  suffix of the games in the judgment. When encountering procedure
+  calls, it looks for a matching proven 'equiv' statement; if none is
+  found it tries to prove one using the optional ``rel-exp'' argument as
+  invariant. It stops when it encounters a random assignment.
+
+\end{itemize}
+
+\subsection{Open equiv goal}
+
+\begin{verbatim}
+equiv name : G1.f1 ~ G2.f2 : pre ==> post
+equiv name : G1.f1 ~ G2.f2 : (inv)
+\end{verbatim}
+
+%%% Local Variables: 
+%%% mode: latex
+%%% TeX-master: "easycrypt"
+%%% End: 

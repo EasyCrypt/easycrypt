@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE why3session SYSTEM "why3session.dtd">
+<why3session
+ name="array_max/why3session.xml">
+ <prover
+  id="alt-ergo"
+  name="Alt-Ergo"
+  version="0.93"/>
+ <prover
+  id="coq"
+  name="Coq"
+  version="8.2pl1"/>
+ <prover
+  id="coq-realize"
+  name="Coq Realize"
+  version="8.2pl1"/>
+ <prover
+  id="cvc3"
+  name="CVC3"
+  version="2.2"/>
+ <prover
+  id="eprover"
+  name="Eprover"
+  version="1.4 Namring"/>
+ <prover
+  id="gappa"
+  name="Gappa"
+  version="0.15.1"/>
+ <prover
+  id="simplify"
+  name="Simplify"
+  version="1.5.4"/>
+ <prover
+  id="spass"
+  name="Spass"
+  version="3.7"/>
+ <prover
+  id="vampire"
+  name="Vampire"
+  version="0.6"/>
+ <prover
+  id="verit"
+  name="veriT"
+  version="dev"/>
+ <prover
+  id="yices"
+  name="Yices"
+  version="1.0.25"/>
+ <prover
+  id="z3"
+  name="Z3"
+  version="2.19"/>
+ <file
+  name="../array_max.mlw"
+  verified="true"
+  expanded="true">
+  <theory
+   name="WP ArrayMax"
+   verified="true"
+   expanded="true">
+   <goal
+    name="WP_parameter max"
+    expl="parameter max"
+    sum="2768148ac35094487438cd07493363d4"
+    proved="true"
+    expanded="true"
+    shape="iainfix =V3V2Niainfix <=agetV1V3agetV1V2ainfix <ainfix -V2V4ainfix -V2V3Aainfix <=c0ainfix -V2V3Aainfix <=agetV1V5amaxagetV1V4agetV1V2Iainfix <V5V0Aainfix <V2V5Oainfix <V5V4Aainfix <=c0V5FAainfix <V2V0Aainfix <=V4V2Aainfix <=c0V4Iainfix =V4ainfix +V3c1Fainfix <ainfix -V6V3ainfix -V2V3Aainfix <=c0ainfix -V2V3Aainfix <=agetV1V7amaxagetV1V3agetV1V6Iainfix <V7V0Aainfix <V6V7Oainfix <V7V3Aainfix <=c0V7FAainfix <V6V0Aainfix <=V3V6Aainfix <=c0V3Iainfix =V6ainfix -V2c1FAainfix <V2V0Aainfix <=c0V2Aainfix <V3V0Aainfix <=c0V3ainfix <=agetV1V8agetV1V3Iainfix <V8V0Aainfix <=c0V8FAainfix <V3V0Aainfix <=c0V3Iainfix <=agetV1V9amaxagetV1V3agetV1V2Iainfix <V9V0Aainfix <V2V9Oainfix <V9V3Aainfix <=c0V9FAainfix <V2V0Aainfix <=V3V2Aainfix <=c0V3FFAainfix <=agetV1V10amaxagetV1c0agetV1ainfix -V0c1Iainfix <V10V0Aainfix <ainfix -V0c1V10Oainfix <V10c0Aainfix <=c0V10FAainfix <ainfix -V0c1V0Aainfix <=c0ainfix -V0c1Aainfix <=c0c0Iainfix <c0V0FF">
+    <proof
+     prover="cvc3"
+     timelimit="5"
+     edited=""
+     obsolete="false">
+     <result status="valid" time="0.09"/>
+    </proof>
+    <proof
+     prover="alt-ergo"
+     timelimit="5"
+     edited=""
+     obsolete="false">
+     <result status="valid" time="3.46"/>
+    </proof>
+    <proof
+     prover="z3"
+     timelimit="5"
+     edited=""
+     obsolete="false">
+     <result status="valid" time="0.05"/>
+    </proof>
+   </goal>
+  </theory>
+ </file>
+</why3session>

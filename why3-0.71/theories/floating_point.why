@@ -1,0 +1,215 @@
+
+
+(* definition of IEEE-754 rounding modes *)
+theory Rounding
+
+  type mode = NearestTiesToEven | ToZero | Up | Down | NearTiesToAway
+    (** nearest ties to even, to zero, upward, downward, nearest ties to away *)
+
+end
+
+
+(* handling of IEEE-754 special values +\infty, -\infty, NaN, +0, -0 *)
+theory SpecialValues
+
+  type class = Finite | Infinite | NaN
+
+  type sign = Neg | Pos
+
+  use import real.Real
+
+  inductive same_sign_real sign real =
+    | Neg_case: forall x:real. x < 0.0 -> same_sign_real Neg x
+    | Pos_case: forall x:real. x > 0.0 -> same_sign_real Pos x
+
+end
+
+theory GenFloat
+
+  use import Rounding
+  use import real.Real
+  use import real.Abs
+  use import real.FromInt
+  use int.Int
+
+  type t
+
+  function round mode real : real
+  function round_logic mode real : t
+
+  function value t : real
+  function exact t : real
+  function model t : real
+
+  function round_error (x : t) : real = abs (value x - exact x)
+  function total_error (x : t) : real = abs (value x - model x)
+
+  function max : real
+
+  predicate no_overflow (m:mode) (x:real) = abs (round m x) <= max
+
+  axiom Bounded_real_no_overflow :
+    forall m:mode, x:real. abs x <= max -> no_overflow m x
+
+  axiom Round_monotonic :
+    forall m:mode, x y:real. x <= y -> round m x <= round m y
+
+  axiom Round_idempotent :
+    forall m1 m2:mode, x:real. round m1 (round m2 x) = round m2 x
+
+  axiom Round_value :
+    forall m:mode, x:t. round m (value x) = value x
+
+  axiom Bounded_value :
+    forall x:t. abs (value x) <= max
+
+  function max_representable_integer : int
+
+  axiom Exact_rounding_for_integers:
+    forall m:mode,i:int.
+      Int.(<=) (Int.(-_) max_representable_integer) i /\
+      Int.(<=) i max_representable_integer ->
+        round m (from_int i) = from_int i
+
+  (* rounding up and down *)
+  axiom Round_down_le:
+    forall x:real. round Down x <= x
+  axiom Round_up_ge:
+    forall x:real. round Up x >= x
+  axiom Round_down_neg:
+    forall x:real. round Down (-x) = - round Up x
+  axiom Round_up_neg:
+    forall x:real. round Up (-x) = - round Down x
+
+end
+
+theory Single
+
+  type single
+
+  function max_single : real = 0x1.FFFFFEp127
+  function max_int : int = 16777216 (* 2^24 *)
+
+  clone export GenFloat with
+    type t = single,
+    function max = max_single,
+    function max_representable_integer = max_int
+
+end
+
+
+
+theory Double
+
+  type double
+
+  function max_double : real = 0x1.FFFFFFFFFFFFFp1023
+  function max_int : int = 9007199254740992 (* 2^53 *)
+
+  clone export GenFloat with
+    type t = double,
+    function max = max_double,
+    function max_representable_integer = max_int
+
+end
+
+
+
+theory GenFloatFull
+
+  use import SpecialValues
+  use import Rounding
+  use import real.Real
+
+  clone export GenFloat
+
+  (* special values *)
+  function class t : class
+
+  predicate is_finite (x:t) = class x = Finite
+  predicate is_infinite (x:t) = class x = Infinite
+  predicate is_NaN (x:t) = class x = NaN
+  predicate is_not_NaN (x:t) = is_finite x \/ is_infinite x
+
+  lemma is_not_NaN: forall x:t. is_not_NaN x <-> not (is_NaN x)
+
+  function sign t  : sign
+
+  predicate same_sign (x:t) (y:t)  = sign x = sign y
+
+  predicate is_minus_infinity (x:t) = is_infinite x /\ sign x = Neg
+  predicate is_plus_infinity (x:t) = is_infinite x /\ sign x = Pos
+  predicate is_gen_zero (x:t) = is_finite x /\ value x = 0.0
+  predicate is_gen_zero_plus (x:t) = is_gen_zero x /\ sign x = Pos
+  predicate is_gen_zero_minus (x:t) = is_gen_zero x /\ sign x = Neg
+
+  predicate le_full (x:t) (y:t) =
+    (is_finite x /\ is_finite y /\ value x <= value y)
+    \/ (is_minus_infinity x /\ is_not_NaN y)
+    \/ (is_not_NaN x /\ is_plus_infinity y)
+
+  predicate lt_full (x:t) (y:t) =
+    (is_finite x /\ is_finite y /\ value x < value y)
+    \/ (is_minus_infinity x /\ is_not_NaN y /\ not (is_minus_infinity y))
+    \/ (is_not_NaN x /\ not (is_plus_infinity x) /\ is_plus_infinity y)
+
+  predicate ge_full (x:t) (y:t) = le_full y x
+
+  predicate gt_full (x:t) (y:t) = lt_full y x
+
+  predicate eq_full (x:t) (y:t) =
+    is_not_NaN x /\ is_not_NaN y /\
+      ((is_finite x /\ is_finite y /\ value x = value y) \/
+       (is_infinite x /\ is_infinite y /\ same_sign x y))
+
+  predicate ne_full (x:t) (y:t) = not (eq_full x y)
+
+  lemma le_lt_full_trans:
+    forall x y z:t. le_full x y /\ lt_full y z -> lt_full x z
+
+  lemma lt_le_full_trans:
+    forall x y z:t. lt_full x y /\ le_full y z -> lt_full x z
+
+  lemma le_ge_full_asym:
+    forall x y:t. le_full x y /\ ge_full x y -> eq_full x y
+
+  lemma not_lt_ge_full: forall x y:t.
+    not (lt_full x y) /\ is_not_NaN x /\ is_not_NaN y -> ge_full x y
+
+  lemma not_gt_le_full: forall x y:t.
+    not (gt_full x y) /\ is_not_NaN x /\ is_not_NaN y -> le_full x y
+
+end
+
+
+
+
+theory SingleFull
+
+  type single
+
+  function max_single : real = 0x1.FFFFFEp127
+  function max_int : int = 16777216 (* 2^24 *)
+
+  clone export GenFloatFull with
+    type t = single,
+    function max = max_single,
+    function max_representable_integer = max_int
+
+end
+
+
+
+theory DoubleFull
+
+  type double
+
+  function max_double : real = 0x1.FFFFFFFFFFFFFp1023
+  function max_int : int = 9007199254740992 (* 2^23 *)
+
+  clone export GenFloatFull with
+    type t = double,
+    function max = max_double,
+    function max_representable_integer = max_int
+
+end

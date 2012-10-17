@@ -1,0 +1,20 @@
+(* Why driver for Why3 syntax *)
+
+printer "why3"
+filename "%f-%t-%g.why"
+
+transformation "inline_trivial"
+
+transformation "eliminate_builtin"
+transformation "eliminate_definition"
+transformation "eliminate_inductive"
+transformation "eliminate_algebraic"
+transformation "eliminate_if"
+transformation "eliminate_let"
+
+transformation "discriminate"
+transformation "encoding_tptp"
+
+theory BuiltIn
+  syntax predicate (=)  "(%1 = %2)"
+end

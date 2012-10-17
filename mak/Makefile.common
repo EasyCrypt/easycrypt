@@ -1,0 +1,49 @@
+WARN_OPT= -w +a-e-9 
+OCAMLFLAGS = -I $(EP_TOOLDIR) -I $(SRCDIR) -I +why3 $(WARN_OPT) -g -dtypes -rectypes 
+
+
+%.cmo : %.ml
+	$(OCAMLC) $(OCAMLFLAGS) -c $<
+
+%.cmi : %.mli
+	$(OCAMLC) $(OCAMLFLAGS) -c $<
+
+%.ml : %.mll
+	$(OCAMLLEX) $<
+
+%.mli : %.mly
+	$(MENHIR) $<
+
+%.ml : %.mly
+	$(MENHIR) $<
+
+
+
+dist_common:
+	@mkdir -p $(DIST_DIR)
+	@cp -f README $(DIST_DIR)
+	@cp -f Makefile.in $(DIST_DIR)
+	@mkdir -p $(DIST_DIR)/mak
+	@cp -f $(MAK_DIR)/Makefile.tools $(DIST_DIR)/mak/Makefile.tools
+	@cp -f $(MAK_DIR)/Makefile.src $(DIST_DIR)/mak/Makefile.src
+	@cp -f $(MAK_DIR)/Makefile.doc $(DIST_DIR)/mak/Makefile.doc
+	@cp -f $(MAK_DIR)/Makefile.tests $(DIST_DIR)/mak/Makefile.tests
+	@cp -f $(MAK_DIR)/Makefile.common $(DIST_DIR)/mak/Makefile.common
+	@cp -f configure  $(DIST_DIR)
+	@cp -f configure.ac $(DIST_DIR)
+	@cp -f easycrypt $(DIST_DIR)
+
+install_common: src
+	mkdir -p $(BINDIR)
+	mkdir -p $(includedir_aux)
+	cp -f easycrypt $(BINDIR)/easycrypt
+	cp -f easycrypt.top $(BINDIR)/easycrypt.top
+	cp -f src/easycrypt_base.ec $(includedir_aux)/	
+
+
+uninstall_common:
+	rm -f $(BINDIR)/easycrypt
+	rm -f $(BINDIR)/easycrypt.top
+	rm -f $(includedir_aux)/easycrypt_base.ec
+	rm -Rf $(includedir_aux)
+

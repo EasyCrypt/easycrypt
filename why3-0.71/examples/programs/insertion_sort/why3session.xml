@@ -1,0 +1,639 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE why3session SYSTEM "why3session.dtd">
+<why3session
+ name="programs/insertion_sort/why3session.xml">
+ <prover
+  id="alt-ergo"
+  name="Alt-Ergo"
+  version="0.93"/>
+ <prover
+  id="coq"
+  name="Coq"
+  version="8.3pl2"/>
+ <prover
+  id="cvc3"
+  name="CVC3"
+  version="2.2"/>
+ <prover
+  id="eprover"
+  name="Eprover"
+  version="1.4 Namring"/>
+ <prover
+  id="gappa"
+  name="Gappa"
+  version="0.15.1"/>
+ <prover
+  id="simplify"
+  name="Simplify"
+  version="1.5.4"/>
+ <prover
+  id="spass"
+  name="Spass"
+  version="3.7"/>
+ <prover
+  id="vampire"
+  name="Vampire"
+  version="0.6"/>
+ <prover
+  id="verit"
+  name="veriT"
+  version="dev"/>
+ <prover
+  id="yices"
+  name="Yices"
+  version="1.0.25"/>
+ <prover
+  id="z3"
+  name="Z3"
+  version="2.19"/>
+ <file
+  name="../insertion_sort.mlw"
+  verified="true"
+  expanded="true">
+  <theory
+   name="WP InsertionSort"
+   verified="true"
+   expanded="true">
+   <goal
+    name="WP_parameter insertion_sort"
+    expl="parameter insertion_sort"
+    sum="c3fb0f7eaae049b722e6325b11389c61"
+    proved="true"
+    expanded="true"
+    shape="Lamk arrayV0V1Lamk arrayV0V3apermutV2V4AasortedV4IapermutV2V4Aasorted_subV3c0ainfix +ainfix -V0c1c1ALagetV3V5Lamk arrayV0V8iainfix >V7c0iainfix >agetV8ainfix -V7c1V6Lamk arrayV0V10ainfix <V12V7Aainfix <=c0V7Aainfix <V6agetV10V13Iainfix <=V13V5Aainfix <=ainfix +V12c1V13FAainfix <=agetV10V14agetV10V15Iainfix =V15V12NIainfix =V14V12NIainfix <=V15V5Aainfix <=V14V15Aainfix <=c0V14FAapermutV2asetV11V12V6Aainfix <=V12V5Aainfix <=c0V12Iainfix =V12ainfix -V7c1FAaexchangeCasetV9V7V6amk arraywVV16CasetV11ainfix -V7c1V6amk arraywVV17ainfix -V7c1V7Iainfix =V10asetV8V7agetV8ainfix -V7c1FAainfix <V7V0Aainfix <=c0V7Aainfix <ainfix -V7c1V0Aainfix <=c0ainfix -V7c1apermutV2amk arrayV0V18Aasorted_subV18c0ainfix +V5c1Iainfix =V18asetV8V7V6FAainfix <V7V0Aainfix <=c0V7Aainfix <=agetV8V19V6Iainfix <V19V7Aainfix <=c0V19FAainfix <ainfix -V7c1V0Aainfix <=c0ainfix -V7c1apermutV2amk arrayV0V20Aasorted_subV20c0ainfix +V5c1Iainfix =V20asetV8V7V6FAainfix <V7V0Aainfix <=c0V7Aainfix <=agetV8V21V6Iainfix <V21V7Aainfix <=c0V21FIainfix <V6agetV8V22Iainfix <=V22V5Aainfix <=ainfix +V7c1V22FAainfix <=agetV8V23agetV8V24Iainfix =V24V7NIainfix =V23V7NIainfix <=V24V5Aainfix <=V23V24Aainfix <=c0V23FAapermutV2asetV9V7V6Aainfix <=V7V5Aainfix <=c0V7FFAainfix <V6agetV3V25Iainfix <=V25V5Aainfix <=ainfix +V5c1V25FAainfix <=agetV3V26agetV3V27Iainfix =V27V5NIainfix =V26V5NIainfix <=V27V5Aainfix <=V26V27Aainfix <=c0V26FAapermutV2asetV4V5V6Aainfix <=V5V5Aainfix <=c0V5Aainfix <V5V0Aainfix <=c0V5IapermutV2V4Aasorted_subV3c0V5Iainfix <=V5ainfix -V0c1Aainfix <=c1V5FFAapermutV2V2Aasorted_subV1c0c1Iainfix <=c1ainfix -V0c1AapermutV2V2AasortedV2Iainfix >c1ainfix -V0c1FF">
+    <transf
+     name="split_goal"
+     proved="true"
+     expanded="true">
+     <goal
+      name="WP_parameter insertion_sort.1"
+      expl="normal postcondition"
+      sum="9f6694ad807b118a5f0fddd59e67a228"
+      proved="true"
+      expanded="true"
+      shape="Lamk arrayV0V1apermutV2V2AasortedV2Iainfix >c1ainfix -V0c1FF">
+      <proof
+       prover="alt-ergo"
+       timelimit="30"
+       edited=""
+       obsolete="false">
+       <result status="valid" time="0.03"/>
+      </proof>
+      <proof
+       prover="z3"
+       timelimit="10"
+       edited=""
+       obsolete="false">
+       <result status="valid" time="0.02"/>
+      </proof>
+     </goal>
+     <goal
+      name="WP_parameter insertion_sort.2"
+      expl="for loop initialization"
+      sum="cb8b6ae95496b38d429b311f78e2d140"
+      proved="true"
+      expanded="true"
+      shape="Lamk arrayV0V1apermutV2V2Aasorted_subV1c0c1Iainfix <=c1ainfix -V0c1FF">
+      <transf
+       name="split_goal"
+       proved="true"
+       expanded="true">
+       <goal
+        name="WP_parameter insertion_sort.2.1"
+        expl="parameter insertion_sort"
+        sum="3ea1c94f4c6acb05f08c86fee238bd16"
+        proved="true"
+        expanded="true"
+        shape="Lamk arrayV0V1asorted_subV1c0c1Iainfix <=c1ainfix -V0c1FF">
+        <proof
+         prover="alt-ergo"
+         timelimit="30"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.01"/>
+        </proof>
+        <proof
+         prover="z3"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter insertion_sort.2.2"
+        expl="parameter insertion_sort"
+        sum="6ee03106a2df81518b80771f7dd290c3"
+        proved="true"
+        expanded="true"
+        shape="Lamk arrayV0V1apermutV2V2Iainfix <=c1ainfix -V0c1FF">
+        <proof
+         prover="cvc3"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+        <proof
+         prover="z3"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+       </goal>
+      </transf>
+     </goal>
+     <goal
+      name="WP_parameter insertion_sort.3"
+      expl="for loop preservation"
+      sum="04782df90b21381a3974db8b76fc3496"
+      proved="true"
+      expanded="true"
+      shape="Lamk arrayV0V1Lamk arrayV0V3LagetV3V5Lamk arrayV0V8iainfix >V7c0iainfix >agetV8ainfix -V7c1V6Lamk arrayV0V10ainfix <V12V7Aainfix <=c0V7Aainfix <V6agetV10V13Iainfix <=V13V5Aainfix <=ainfix +V12c1V13FAainfix <=agetV10V14agetV10V15Iainfix =V15V12NIainfix =V14V12NIainfix <=V15V5Aainfix <=V14V15Aainfix <=c0V14FAapermutV2asetV11V12V6Aainfix <=V12V5Aainfix <=c0V12Iainfix =V12ainfix -V7c1FAaexchangeCasetV9V7V6amk arraywVV16CasetV11ainfix -V7c1V6amk arraywVV17ainfix -V7c1V7Iainfix =V10asetV8V7agetV8ainfix -V7c1FAainfix <V7V0Aainfix <=c0V7Aainfix <ainfix -V7c1V0Aainfix <=c0ainfix -V7c1apermutV2amk arrayV0V18Aasorted_subV18c0ainfix +V5c1Iainfix =V18asetV8V7V6FAainfix <V7V0Aainfix <=c0V7Aainfix <=agetV8V19V6Iainfix <V19V7Aainfix <=c0V19FAainfix <ainfix -V7c1V0Aainfix <=c0ainfix -V7c1apermutV2amk arrayV0V20Aasorted_subV20c0ainfix +V5c1Iainfix =V20asetV8V7V6FAainfix <V7V0Aainfix <=c0V7Aainfix <=agetV8V21V6Iainfix <V21V7Aainfix <=c0V21FIainfix <V6agetV8V22Iainfix <=V22V5Aainfix <=ainfix +V7c1V22FAainfix <=agetV8V23agetV8V24Iainfix =V24V7NIainfix =V23V7NIainfix <=V24V5Aainfix <=V23V24Aainfix <=c0V23FAapermutV2asetV9V7V6Aainfix <=V7V5Aainfix <=c0V7FFAainfix <V6agetV3V25Iainfix <=V25V5Aainfix <=ainfix +V5c1V25FAainfix <=agetV3V26agetV3V27Iainfix =V27V5NIainfix =V26V5NIainfix <=V27V5Aainfix <=V26V27Aainfix <=c0V26FAapermutV2asetV4V5V6Aainfix <=V5V5Aainfix <=c0V5Aainfix <V5V0Aainfix <=c0V5IapermutV2V4Aasorted_subV3c0V5Iainfix <=V5ainfix -V0c1Aainfix <=c1V5FFIainfix <=c1ainfix -V0c1FF">
+      <transf
+       name="split_goal"
+       proved="true"
+       expanded="true">
+       <goal
+        name="WP_parameter insertion_sort.3.1"
+        expl="for loop preservation"
+        sum="36c9579122422401315e24cf86398d35"
+        proved="true"
+        expanded="true"
+        shape="Lamk arrayV0V1Lamk arrayV0V3ainfix <V5V0Aainfix <=c0V5IapermutV2V4Aasorted_subV3c0V5Iainfix <=V5ainfix -V0c1Aainfix <=c1V5FFIainfix <=c1ainfix -V0c1FF">
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+        <proof
+         prover="z3"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter insertion_sort.3.2"
+        expl="for loop preservation"
+        sum="cf8fbccecc629ebddc02dba5fd824067"
+        proved="true"
+        expanded="true"
+        shape="Lamk arrayV0V1Lamk arrayV0V3LagetV3V5ainfix <V6agetV3V7Iainfix <=V7V5Aainfix <=ainfix +V5c1V7FAainfix <=agetV3V8agetV3V9Iainfix =V9V5NIainfix =V8V5NIainfix <=V9V5Aainfix <=V8V9Aainfix <=c0V8FAapermutV2asetV4V5V6Aainfix <=V5V5Aainfix <=c0V5Iainfix <V5V0Aainfix <=c0V5IapermutV2V4Aasorted_subV3c0V5Iainfix <=V5ainfix -V0c1Aainfix <=c1V5FFIainfix <=c1ainfix -V0c1FF">
+        <proof
+         prover="cvc3"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter insertion_sort.3.3"
+        expl="for loop preservation"
+        sum="4ca3ce80547057ef4d92fa49efa51187"
+        proved="true"
+        expanded="true"
+        shape="Lamk arrayV0V1Lamk arrayV0V3LagetV3V5Lamk arrayV0V8ainfix <ainfix -V7c1V0Aainfix <=c0ainfix -V7c1Iainfix >V7c0Iainfix <V6agetV8V10Iainfix <=V10V5Aainfix <=ainfix +V7c1V10FAainfix <=agetV8V11agetV8V12Iainfix =V12V7NIainfix =V11V7NIainfix <=V12V5Aainfix <=V11V12Aainfix <=c0V11FAapermutV2asetV9V7V6Aainfix <=V7V5Aainfix <=c0V7FFIainfix <V5V0Aainfix <=c0V5IapermutV2V4Aasorted_subV3c0V5Iainfix <=V5ainfix -V0c1Aainfix <=c1V5FFIainfix <=c1ainfix -V0c1FF">
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.01"/>
+        </proof>
+        <proof
+         prover="z3"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.08"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter insertion_sort.3.4"
+        expl="for loop preservation"
+        sum="1919a068a16530adb85c505603e99c9f"
+        proved="true"
+        expanded="true"
+        shape="Lamk arrayV0V1Lamk arrayV0V3LagetV3V5Lamk arrayV0V8ainfix <ainfix -V7c1V0Aainfix <=c0ainfix -V7c1Iainfix >agetV8ainfix -V7c1V6Iainfix <ainfix -V7c1V0Aainfix <=c0ainfix -V7c1Iainfix >V7c0Iainfix <V6agetV8V10Iainfix <=V10V5Aainfix <=ainfix +V7c1V10FAainfix <=agetV8V11agetV8V12Iainfix =V12V7NIainfix =V11V7NIainfix <=V12V5Aainfix <=V11V12Aainfix <=c0V11FAapermutV2asetV9V7V6Aainfix <=V7V5Aainfix <=c0V7FFIainfix <V5V0Aainfix <=c0V5IapermutV2V4Aasorted_subV3c0V5Iainfix <=V5ainfix -V0c1Aainfix <=c1V5FFIainfix <=c1ainfix -V0c1FF">
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.01"/>
+        </proof>
+        <proof
+         prover="z3"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.00"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter insertion_sort.3.5"
+        expl="for loop preservation"
+        sum="32e0a0fd5f5fca7190b78b741d4c4f0b"
+        proved="true"
+        expanded="true"
+        shape="Lamk arrayV0V1Lamk arrayV0V3LagetV3V5Lamk arrayV0V8ainfix <V7V0Aainfix <=c0V7Iainfix <ainfix -V7c1V0Aainfix <=c0ainfix -V7c1Iainfix >agetV8ainfix -V7c1V6Iainfix <ainfix -V7c1V0Aainfix <=c0ainfix -V7c1Iainfix >V7c0Iainfix <V6agetV8V10Iainfix <=V10V5Aainfix <=ainfix +V7c1V10FAainfix <=agetV8V11agetV8V12Iainfix =V12V7NIainfix =V11V7NIainfix <=V12V5Aainfix <=V11V12Aainfix <=c0V11FAapermutV2asetV9V7V6Aainfix <=V7V5Aainfix <=c0V7FFIainfix <V5V0Aainfix <=c0V5IapermutV2V4Aasorted_subV3c0V5Iainfix <=V5ainfix -V0c1Aainfix <=c1V5FFIainfix <=c1ainfix -V0c1FF">
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.01"/>
+        </proof>
+        <proof
+         prover="z3"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter insertion_sort.3.6"
+        expl="for loop preservation"
+        sum="78ee63a751a2c38b4a3eab0eee2586e4"
+        proved="true"
+        expanded="true"
+        shape="Lamk arrayV0V1Lamk arrayV0V3LagetV3V5Lamk arrayV0V8Lamk arrayV0V10aexchangeCasetV9V7V6amk arraywVV12CasetV11ainfix -V7c1V6amk arraywVV13ainfix -V7c1V7Iainfix =V10asetV8V7agetV8ainfix -V7c1FIainfix <V7V0Aainfix <=c0V7Iainfix <ainfix -V7c1V0Aainfix <=c0ainfix -V7c1Iainfix >agetV8ainfix -V7c1V6Iainfix <ainfix -V7c1V0Aainfix <=c0ainfix -V7c1Iainfix >V7c0Iainfix <V6agetV8V14Iainfix <=V14V5Aainfix <=ainfix +V7c1V14FAainfix <=agetV8V15agetV8V16Iainfix =V16V7NIainfix =V15V7NIainfix <=V16V5Aainfix <=V15V16Aainfix <=c0V15FAapermutV2asetV9V7V6Aainfix <=V7V5Aainfix <=c0V7FFIainfix <V5V0Aainfix <=c0V5IapermutV2V4Aasorted_subV3c0V5Iainfix <=V5ainfix -V0c1Aainfix <=c1V5FFIainfix <=c1ainfix -V0c1FF">
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="1.53"/>
+        </proof>
+        <proof
+         prover="z3"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.11"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter insertion_sort.3.7"
+        expl="for loop preservation"
+        sum="25f9085815168ad0d989a4b02463d7c6"
+        proved="true"
+        expanded="true"
+        shape="Lamk arrayV0V1Lamk arrayV0V3LagetV3V5Lamk arrayV0V8Lamk arrayV0V10ainfix <V6agetV10V13Iainfix <=V13V5Aainfix <=ainfix +V12c1V13FAainfix <=agetV10V14agetV10V15Iainfix =V15V12NIainfix =V14V12NIainfix <=V15V5Aainfix <=V14V15Aainfix <=c0V14FAapermutV2asetV11V12V6Aainfix <=V12V5Aainfix <=c0V12Iainfix =V12ainfix -V7c1FIaexchangeCasetV9V7V6amk arraywVV16CasetV11ainfix -V7c1V6amk arraywVV17ainfix -V7c1V7Iainfix =V10asetV8V7agetV8ainfix -V7c1FIainfix <V7V0Aainfix <=c0V7Iainfix <ainfix -V7c1V0Aainfix <=c0ainfix -V7c1Iainfix >agetV8ainfix -V7c1V6Iainfix <ainfix -V7c1V0Aainfix <=c0ainfix -V7c1Iainfix >V7c0Iainfix <V6agetV8V18Iainfix <=V18V5Aainfix <=ainfix +V7c1V18FAainfix <=agetV8V19agetV8V20Iainfix =V20V7NIainfix =V19V7NIainfix <=V20V5Aainfix <=V19V20Aainfix <=c0V19FAapermutV2asetV9V7V6Aainfix <=V7V5Aainfix <=c0V7FFIainfix <V5V0Aainfix <=c0V5IapermutV2V4Aasorted_subV3c0V5Iainfix <=V5ainfix -V0c1Aainfix <=c1V5FFIainfix <=c1ainfix -V0c1FF">
+        <transf
+         name="split_goal"
+         proved="true"
+         expanded="true">
+         <goal
+          name="WP_parameter insertion_sort.3.7.1"
+          expl="for loop preservation"
+          sum="aeb3f4146d2814af44f6cdc93bf4e8ca"
+          proved="true"
+          expanded="true"
+          shape="Lamk arrayV0V1Lamk arrayV0V3LagetV3V5Lamk arrayV0V8Lamk arrayV0V10ainfix <=c0V12Iainfix =V12ainfix -V7c1FIaexchangeCasetV9V7V6amk arraywVV13CasetV11ainfix -V7c1V6amk arraywVV14ainfix -V7c1V7Iainfix =V10asetV8V7agetV8ainfix -V7c1FIainfix <V7V0Aainfix <=c0V7Iainfix <ainfix -V7c1V0Aainfix <=c0ainfix -V7c1Iainfix >agetV8ainfix -V7c1V6Iainfix <ainfix -V7c1V0Aainfix <=c0ainfix -V7c1Iainfix >V7c0Iainfix <V6agetV8V15Iainfix <=V15V5Aainfix <=ainfix +V7c1V15FAainfix <=agetV8V16agetV8V17Iainfix =V17V7NIainfix =V16V7NIainfix <=V17V5Aainfix <=V16V17Aainfix <=c0V16FAapermutV2asetV9V7V6Aainfix <=V7V5Aainfix <=c0V7FFIainfix <V5V0Aainfix <=c0V5IapermutV2V4Aasorted_subV3c0V5Iainfix <=V5ainfix -V0c1Aainfix <=c1V5FFIainfix <=c1ainfix -V0c1FF">
+          <proof
+           prover="alt-ergo"
+           timelimit="10"
+           edited=""
+           obsolete="false">
+           <result status="valid" time="0.02"/>
+          </proof>
+          <proof
+           prover="z3"
+           timelimit="10"
+           edited=""
+           obsolete="false">
+           <result status="valid" time="0.02"/>
+          </proof>
+         </goal>
+         <goal
+          name="WP_parameter insertion_sort.3.7.2"
+          expl="for loop preservation"
+          sum="257edacfbc258e6d76e0d0868f0ae00c"
+          proved="true"
+          expanded="true"
+          shape="Lamk arrayV0V1Lamk arrayV0V3LagetV3V5Lamk arrayV0V8Lamk arrayV0V10ainfix <=V12V5Iainfix =V12ainfix -V7c1FIaexchangeCasetV9V7V6amk arraywVV13CasetV11ainfix -V7c1V6amk arraywVV14ainfix -V7c1V7Iainfix =V10asetV8V7agetV8ainfix -V7c1FIainfix <V7V0Aainfix <=c0V7Iainfix <ainfix -V7c1V0Aainfix <=c0ainfix -V7c1Iainfix >agetV8ainfix -V7c1V6Iainfix <ainfix -V7c1V0Aainfix <=c0ainfix -V7c1Iainfix >V7c0Iainfix <V6agetV8V15Iainfix <=V15V5Aainfix <=ainfix +V7c1V15FAainfix <=agetV8V16agetV8V17Iainfix =V17V7NIainfix =V16V7NIainfix <=V17V5Aainfix <=V16V17Aainfix <=c0V16FAapermutV2asetV9V7V6Aainfix <=V7V5Aainfix <=c0V7FFIainfix <V5V0Aainfix <=c0V5IapermutV2V4Aasorted_subV3c0V5Iainfix <=V5ainfix -V0c1Aainfix <=c1V5FFIainfix <=c1ainfix -V0c1FF">
+          <proof
+           prover="alt-ergo"
+           timelimit="10"
+           edited=""
+           obsolete="false">
+           <result status="valid" time="0.02"/>
+          </proof>
+          <proof
+           prover="z3"
+           timelimit="10"
+           edited=""
+           obsolete="false">
+           <result status="valid" time="0.02"/>
+          </proof>
+         </goal>
+         <goal
+          name="WP_parameter insertion_sort.3.7.3"
+          expl="for loop preservation"
+          sum="af55e7bbd143610aabeb59376cdf6524"
+          proved="true"
+          expanded="true"
+          shape="Lamk arrayV0V1Lamk arrayV0V3LagetV3V5Lamk arrayV0V8Lamk arrayV0V10apermutV2asetV11V12V6Iainfix =V12ainfix -V7c1FIaexchangeCasetV9V7V6amk arraywVV13CasetV11ainfix -V7c1V6amk arraywVV14ainfix -V7c1V7Iainfix =V10asetV8V7agetV8ainfix -V7c1FIainfix <V7V0Aainfix <=c0V7Iainfix <ainfix -V7c1V0Aainfix <=c0ainfix -V7c1Iainfix >agetV8ainfix -V7c1V6Iainfix <ainfix -V7c1V0Aainfix <=c0ainfix -V7c1Iainfix >V7c0Iainfix <V6agetV8V15Iainfix <=V15V5Aainfix <=ainfix +V7c1V15FAainfix <=agetV8V16agetV8V17Iainfix =V17V7NIainfix =V16V7NIainfix <=V17V5Aainfix <=V16V17Aainfix <=c0V16FAapermutV2asetV9V7V6Aainfix <=V7V5Aainfix <=c0V7FFIainfix <V5V0Aainfix <=c0V5IapermutV2V4Aasorted_subV3c0V5Iainfix <=V5ainfix -V0c1Aainfix <=c1V5FFIainfix <=c1ainfix -V0c1FF">
+          <proof
+           prover="coq"
+           timelimit="10"
+           edited="insertion_sort_WP_InsertionSort_WP_parameter_insertion_sort_1.v"
+           obsolete="false">
+           <result status="valid" time="0.59"/>
+          </proof>
+         </goal>
+         <goal
+          name="WP_parameter insertion_sort.3.7.4"
+          expl="for loop preservation"
+          sum="344f09c50a42c6d59cab6878c7625c8b"
+          proved="true"
+          expanded="true"
+          shape="Lamk arrayV0V1Lamk arrayV0V3LagetV3V5Lamk arrayV0V8Lamk arrayV0V10ainfix <=agetV10V13agetV10V14Iainfix =V14V12NIainfix =V13V12NIainfix <=V14V5Aainfix <=V13V14Aainfix <=c0V13FIainfix =V12ainfix -V7c1FIaexchangeCasetV9V7V6amk arraywVV15CasetV11ainfix -V7c1V6amk arraywVV16ainfix -V7c1V7Iainfix =V10asetV8V7agetV8ainfix -V7c1FIainfix <V7V0Aainfix <=c0V7Iainfix <ainfix -V7c1V0Aainfix <=c0ainfix -V7c1Iainfix >agetV8ainfix -V7c1V6Iainfix <ainfix -V7c1V0Aainfix <=c0ainfix -V7c1Iainfix >V7c0Iainfix <V6agetV8V17Iainfix <=V17V5Aainfix <=ainfix +V7c1V17FAainfix <=agetV8V18agetV8V19Iainfix =V19V7NIainfix =V18V7NIainfix <=V19V5Aainfix <=V18V19Aainfix <=c0V18FAapermutV2asetV9V7V6Aainfix <=V7V5Aainfix <=c0V7FFIainfix <V5V0Aainfix <=c0V5IapermutV2V4Aasorted_subV3c0V5Iainfix <=V5ainfix -V0c1Aainfix <=c1V5FFIainfix <=c1ainfix -V0c1FF">
+          <proof
+           prover="z3"
+           timelimit="10"
+           edited=""
+           obsolete="false">
+           <result status="valid" time="0.12"/>
+          </proof>
+         </goal>
+         <goal
+          name="WP_parameter insertion_sort.3.7.5"
+          expl="for loop preservation"
+          sum="a5e971e6e33d37495ace3aa6aa481d90"
+          proved="true"
+          expanded="true"
+          shape="Lamk arrayV0V1Lamk arrayV0V3LagetV3V5Lamk arrayV0V8Lamk arrayV0V10ainfix <V6agetV10V13Iainfix <=V13V5Aainfix <=ainfix +V12c1V13FIainfix =V12ainfix -V7c1FIaexchangeCasetV9V7V6amk arraywVV14CasetV11ainfix -V7c1V6amk arraywVV15ainfix -V7c1V7Iainfix =V10asetV8V7agetV8ainfix -V7c1FIainfix <V7V0Aainfix <=c0V7Iainfix <ainfix -V7c1V0Aainfix <=c0ainfix -V7c1Iainfix >agetV8ainfix -V7c1V6Iainfix <ainfix -V7c1V0Aainfix <=c0ainfix -V7c1Iainfix >V7c0Iainfix <V6agetV8V16Iainfix <=V16V5Aainfix <=ainfix +V7c1V16FAainfix <=agetV8V17agetV8V18Iainfix =V18V7NIainfix =V17V7NIainfix <=V18V5Aainfix <=V17V18Aainfix <=c0V17FAapermutV2asetV9V7V6Aainfix <=V7V5Aainfix <=c0V7FFIainfix <V5V0Aainfix <=c0V5IapermutV2V4Aasorted_subV3c0V5Iainfix <=V5ainfix -V0c1Aainfix <=c1V5FFIainfix <=c1ainfix -V0c1FF">
+          <proof
+           prover="alt-ergo"
+           timelimit="10"
+           edited=""
+           obsolete="false">
+           <result status="valid" time="0.46"/>
+          </proof>
+          <proof
+           prover="z3"
+           timelimit="10"
+           edited=""
+           obsolete="false">
+           <result status="valid" time="0.11"/>
+          </proof>
+         </goal>
+        </transf>
+       </goal>
+       <goal
+        name="WP_parameter insertion_sort.3.8"
+        expl="for loop preservation"
+        sum="b93be90724a9ab6efcdebc7fdd6be902"
+        proved="true"
+        expanded="true"
+        shape="Lamk arrayV0V1Lamk arrayV0V3LagetV3V5Lamk arrayV0V8Lamk arrayV0V10ainfix <V12V7Aainfix <=c0V7Iainfix <V6agetV10V13Iainfix <=V13V5Aainfix <=ainfix +V12c1V13FAainfix <=agetV10V14agetV10V15Iainfix =V15V12NIainfix =V14V12NIainfix <=V15V5Aainfix <=V14V15Aainfix <=c0V14FAapermutV2asetV11V12V6Aainfix <=V12V5Aainfix <=c0V12Iainfix =V12ainfix -V7c1FIaexchangeCasetV9V7V6amk arraywVV16CasetV11ainfix -V7c1V6amk arraywVV17ainfix -V7c1V7Iainfix =V10asetV8V7agetV8ainfix -V7c1FIainfix <V7V0Aainfix <=c0V7Iainfix <ainfix -V7c1V0Aainfix <=c0ainfix -V7c1Iainfix >agetV8ainfix -V7c1V6Iainfix <ainfix -V7c1V0Aainfix <=c0ainfix -V7c1Iainfix >V7c0Iainfix <V6agetV8V18Iainfix <=V18V5Aainfix <=ainfix +V7c1V18FAainfix <=agetV8V19agetV8V20Iainfix =V20V7NIainfix =V19V7NIainfix <=V20V5Aainfix <=V19V20Aainfix <=c0V19FAapermutV2asetV9V7V6Aainfix <=V7V5Aainfix <=c0V7FFIainfix <V5V0Aainfix <=c0V5IapermutV2V4Aasorted_subV3c0V5Iainfix <=V5ainfix -V0c1Aainfix <=c1V5FFIainfix <=c1ainfix -V0c1FF">
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+        <proof
+         prover="z3"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter insertion_sort.3.9"
+        expl="for loop preservation"
+        sum="d3580b5137a171db700d35bdbb349c2a"
+        proved="true"
+        expanded="true"
+        shape="Lamk arrayV0V1Lamk arrayV0V3LagetV3V5Lamk arrayV0V8ainfix <=agetV8V10V6Iainfix <V10V7Aainfix <=c0V10FIainfix >agetV8ainfix -V7c1V6NIainfix <ainfix -V7c1V0Aainfix <=c0ainfix -V7c1Iainfix >V7c0Iainfix <V6agetV8V11Iainfix <=V11V5Aainfix <=ainfix +V7c1V11FAainfix <=agetV8V12agetV8V13Iainfix =V13V7NIainfix =V12V7NIainfix <=V13V5Aainfix <=V12V13Aainfix <=c0V12FAapermutV2asetV9V7V6Aainfix <=V7V5Aainfix <=c0V7FFIainfix <V5V0Aainfix <=c0V5IapermutV2V4Aasorted_subV3c0V5Iainfix <=V5ainfix -V0c1Aainfix <=c1V5FFIainfix <=c1ainfix -V0c1FF">
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+        <proof
+         prover="z3"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter insertion_sort.3.10"
+        expl="for loop preservation"
+        sum="2ff18833f28bc7e9aa3ecb883a22c553"
+        proved="true"
+        expanded="true"
+        shape="Lamk arrayV0V1Lamk arrayV0V3LagetV3V5Lamk arrayV0V8ainfix <V7V0Aainfix <=c0V7Iainfix <=agetV8V10V6Iainfix <V10V7Aainfix <=c0V10FIainfix >agetV8ainfix -V7c1V6NIainfix <ainfix -V7c1V0Aainfix <=c0ainfix -V7c1Iainfix >V7c0Iainfix <V6agetV8V11Iainfix <=V11V5Aainfix <=ainfix +V7c1V11FAainfix <=agetV8V12agetV8V13Iainfix =V13V7NIainfix =V12V7NIainfix <=V13V5Aainfix <=V12V13Aainfix <=c0V12FAapermutV2asetV9V7V6Aainfix <=V7V5Aainfix <=c0V7FFIainfix <V5V0Aainfix <=c0V5IapermutV2V4Aasorted_subV3c0V5Iainfix <=V5ainfix -V0c1Aainfix <=c1V5FFIainfix <=c1ainfix -V0c1FF">
+        <proof
+         prover="cvc3"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+        <proof
+         prover="z3"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter insertion_sort.3.11"
+        expl="for loop preservation"
+        sum="dd54db4d0d590ca9c11509706fc817e5"
+        proved="true"
+        expanded="true"
+        shape="Lamk arrayV0V1Lamk arrayV0V3LagetV3V5Lamk arrayV0V8asorted_subV10c0ainfix +V5c1Iainfix =V10asetV8V7V6FIainfix <V7V0Aainfix <=c0V7Iainfix <=agetV8V11V6Iainfix <V11V7Aainfix <=c0V11FIainfix >agetV8ainfix -V7c1V6NIainfix <ainfix -V7c1V0Aainfix <=c0ainfix -V7c1Iainfix >V7c0Iainfix <V6agetV8V12Iainfix <=V12V5Aainfix <=ainfix +V7c1V12FAainfix <=agetV8V13agetV8V14Iainfix =V14V7NIainfix =V13V7NIainfix <=V14V5Aainfix <=V13V14Aainfix <=c0V13FAapermutV2asetV9V7V6Aainfix <=V7V5Aainfix <=c0V7FFIainfix <V5V0Aainfix <=c0V5IapermutV2V4Aasorted_subV3c0V5Iainfix <=V5ainfix -V0c1Aainfix <=c1V5FFIainfix <=c1ainfix -V0c1FF">
+        <proof
+         prover="cvc3"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.04"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter insertion_sort.3.12"
+        expl="for loop preservation"
+        sum="4c855988cefe517d7b4f68b16ade1ee6"
+        proved="true"
+        expanded="true"
+        shape="Lamk arrayV0V1Lamk arrayV0V3LagetV3V5Lamk arrayV0V8apermutV2amk arrayV0V10Iainfix =V10asetV8V7V6FIainfix <V7V0Aainfix <=c0V7Iainfix <=agetV8V11V6Iainfix <V11V7Aainfix <=c0V11FIainfix >agetV8ainfix -V7c1V6NIainfix <ainfix -V7c1V0Aainfix <=c0ainfix -V7c1Iainfix >V7c0Iainfix <V6agetV8V12Iainfix <=V12V5Aainfix <=ainfix +V7c1V12FAainfix <=agetV8V13agetV8V14Iainfix =V14V7NIainfix =V13V7NIainfix <=V14V5Aainfix <=V13V14Aainfix <=c0V13FAapermutV2asetV9V7V6Aainfix <=V7V5Aainfix <=c0V7FFIainfix <V5V0Aainfix <=c0V5IapermutV2V4Aasorted_subV3c0V5Iainfix <=V5ainfix -V0c1Aainfix <=c1V5FFIainfix <=c1ainfix -V0c1FF">
+        <proof
+         prover="cvc3"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="3.51"/>
+        </proof>
+        <proof
+         prover="z3"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.03"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter insertion_sort.3.13"
+        expl="for loop preservation"
+        sum="e98a864c85c9f99eccdeb057ff843261"
+        proved="true"
+        expanded="true"
+        shape="Lamk arrayV0V1Lamk arrayV0V3LagetV3V5Lamk arrayV0V8ainfix <=agetV8V10V6Iainfix <V10V7Aainfix <=c0V10FIainfix >V7c0NIainfix <V6agetV8V11Iainfix <=V11V5Aainfix <=ainfix +V7c1V11FAainfix <=agetV8V12agetV8V13Iainfix =V13V7NIainfix =V12V7NIainfix <=V13V5Aainfix <=V12V13Aainfix <=c0V12FAapermutV2asetV9V7V6Aainfix <=V7V5Aainfix <=c0V7FFIainfix <V5V0Aainfix <=c0V5IapermutV2V4Aasorted_subV3c0V5Iainfix <=V5ainfix -V0c1Aainfix <=c1V5FFIainfix <=c1ainfix -V0c1FF">
+        <proof
+         prover="cvc3"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.01"/>
+        </proof>
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+        <proof
+         prover="z3"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter insertion_sort.3.14"
+        expl="for loop preservation"
+        sum="a7f9971facedb21e8e5112741adfa09b"
+        proved="true"
+        expanded="true"
+        shape="Lamk arrayV0V1Lamk arrayV0V3LagetV3V5Lamk arrayV0V8ainfix <V7V0Aainfix <=c0V7Iainfix <=agetV8V10V6Iainfix <V10V7Aainfix <=c0V10FIainfix >V7c0NIainfix <V6agetV8V11Iainfix <=V11V5Aainfix <=ainfix +V7c1V11FAainfix <=agetV8V12agetV8V13Iainfix =V13V7NIainfix =V12V7NIainfix <=V13V5Aainfix <=V12V13Aainfix <=c0V12FAapermutV2asetV9V7V6Aainfix <=V7V5Aainfix <=c0V7FFIainfix <V5V0Aainfix <=c0V5IapermutV2V4Aasorted_subV3c0V5Iainfix <=V5ainfix -V0c1Aainfix <=c1V5FFIainfix <=c1ainfix -V0c1FF">
+        <proof
+         prover="cvc3"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+        <proof
+         prover="z3"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter insertion_sort.3.15"
+        expl="for loop preservation"
+        sum="527dce7345b61d18f9d852f9811500b8"
+        proved="true"
+        expanded="true"
+        shape="Lamk arrayV0V1Lamk arrayV0V3LagetV3V5Lamk arrayV0V8asorted_subV10c0ainfix +V5c1Iainfix =V10asetV8V7V6FIainfix <V7V0Aainfix <=c0V7Iainfix <=agetV8V11V6Iainfix <V11V7Aainfix <=c0V11FIainfix >V7c0NIainfix <V6agetV8V12Iainfix <=V12V5Aainfix <=ainfix +V7c1V12FAainfix <=agetV8V13agetV8V14Iainfix =V14V7NIainfix =V13V7NIainfix <=V14V5Aainfix <=V13V14Aainfix <=c0V13FAapermutV2asetV9V7V6Aainfix <=V7V5Aainfix <=c0V7FFIainfix <V5V0Aainfix <=c0V5IapermutV2V4Aasorted_subV3c0V5Iainfix <=V5ainfix -V0c1Aainfix <=c1V5FFIainfix <=c1ainfix -V0c1FF">
+        <proof
+         prover="cvc3"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.04"/>
+        </proof>
+       </goal>
+       <goal
+        name="WP_parameter insertion_sort.3.16"
+        expl="for loop preservation"
+        sum="fa09a6ceeccfa19a62167c858fd9059e"
+        proved="true"
+        expanded="true"
+        shape="Lamk arrayV0V1Lamk arrayV0V3LagetV3V5Lamk arrayV0V8apermutV2amk arrayV0V10Iainfix =V10asetV8V7V6FIainfix <V7V0Aainfix <=c0V7Iainfix <=agetV8V11V6Iainfix <V11V7Aainfix <=c0V11FIainfix >V7c0NIainfix <V6agetV8V12Iainfix <=V12V5Aainfix <=ainfix +V7c1V12FAainfix <=agetV8V13agetV8V14Iainfix =V14V7NIainfix =V13V7NIainfix <=V14V5Aainfix <=V13V14Aainfix <=c0V13FAapermutV2asetV9V7V6Aainfix <=V7V5Aainfix <=c0V7FFIainfix <V5V0Aainfix <=c0V5IapermutV2V4Aasorted_subV3c0V5Iainfix <=V5ainfix -V0c1Aainfix <=c1V5FFIainfix <=c1ainfix -V0c1FF">
+        <proof
+         prover="cvc3"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+        <proof
+         prover="alt-ergo"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="2.92"/>
+        </proof>
+        <proof
+         prover="z3"
+         timelimit="10"
+         edited=""
+         obsolete="false">
+         <result status="valid" time="0.02"/>
+        </proof>
+       </goal>
+      </transf>
+     </goal>
+     <goal
+      name="WP_parameter insertion_sort.4"
+      expl="normal postcondition"
+      sum="c7dc76ba27c92e9fee6c680cba2e813b"
+      proved="true"
+      expanded="true"
+      shape="Lamk arrayV0V1Lamk arrayV0V3apermutV2V4AasortedV4IapermutV2V4Aasorted_subV3c0ainfix +ainfix -V0c1c1FIainfix <=c1ainfix -V0c1FF">
+      <proof
+       prover="alt-ergo"
+       timelimit="30"
+       edited=""
+       obsolete="false">
+       <result status="valid" time="0.02"/>
+      </proof>
+      <proof
+       prover="z3"
+       timelimit="10"
+       edited=""
+       obsolete="false">
+       <result status="valid" time="0.16"/>
+      </proof>
+     </goal>
+    </transf>
+   </goal>
+  </theory>
+ </file>
+</why3session>

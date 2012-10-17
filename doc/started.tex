@@ -1,0 +1,324 @@
+Before presenting in detail \EasyCrypt, we illustrate its key
+ingredients with a simple example: a game-based proof of
+the \INDCPA-security of the ElGamal public-key encryption scheme.
+
+The ElGamal encryption scheme is based on any cyclic group $G$ of
+order $q$ with generator $g$ and is defined by the following triple of
+algorithms
+
+\begin{itemize} 
+\item The key generation algorithm $\KG()$ selects uniformly a random
+      number $x$ from $\{0,\ldots,q-1\}$; the secret (private) key is
+      $x$, the public key is $g^x$.
+
+\item Given a public key $pk$ and a plaintext $m$ (an element of the
+      group $G$), the encryption algorithm $\Enc(pk, m)$ chooses
+      uniformly a random element $y$ from $\{0,\ldots,q-1\}$ and
+      returns the ciphertext $(g^y, pk^y * m)$.
+
+\item Given a secret key $sk$ and a ciphertext $c$, 
+      the decryption algorithm $\Dec(sk, c)$, parses $c$ as
+      $(\beta,\zeta)$ and returns a plaintext computed as
+      $\zeta * \beta^{-x}$.
+\end{itemize}
+
+To begin the proof of the \INDCPA-security of ElGamal, we open a new
+input file that we will name \verb|elgamal.ec|. We start by declaring
+a type for elements of the group $G$, and defining type synonyms for
+the type of public and secret keys, plaintexts and ciphertexts:
+%
+\begin{verbatim} 
+type group 
+type skey = int 
+type pkey = group 
+type plaintext = group 
+type ciphertext = group * group 
+\end{verbatim} 
+%
+The order of the group $q$ and its generator $g$ are declared as
+constants:
+%
+
+\begin{verbatim}
+cnst q : int
+cnst g : group
+\end{verbatim}
+
+%
+We then declare operators that will denote the group law in $G$,
+exponentiation and discrete logarithm (in base $g$).
+%
+\begin{verbatim}
+op (*) : group, group -> group = group_mult
+op (^) : group, int -> group   = group_pow
+op log : group-> int           = group_log
+\end{verbatim}
+%
+The first two operators are declared as infix, and denoted by the
+symbols \verb|*| and \verb|^|, respectively. The operator
+corresponding to the discrete logarithm is a normal prefix
+operator. The names appearing on the right of the declaration are
+identifiers that will be used as internal names for the operators when
+generating proof obligations that are sent to SMT solvers (this is
+needed because fancy identifiers like \verb|*| are not valid
+identifiers, and useful to avoid name clashes with predefined
+operators).
+
+At this point the operators and constants that we declared above are
+completely abstract, nothing is known about them besides their
+type. To specify
+
+At that point nothing say that the type \verb+group+ is a cyclic
+group, we only known that the type come with three
+operators \verb+*+, \verb+^+ and \verb+log+. We should specify the
+behavior of the operators this is done using axioms:
+
+\begin{verbatim}
+axiom q_pos : {0 < q}
+
+axiom group_pow_add : 
+ forall (x:int, y:int). { g ^ (x + y) == g ^ x * g ^ y }
+
+axiom group_pow_mult :
+ forall (x:int, y:int). { (g ^ x) ^ y == g ^ (x * y) } 
+
+axiom log_pow : 
+ forall (g':group). { g ^ log(g') == g' }
+
+axiom pow_mod : 
+ forall (z:int). { g ^ (z%q) == g ^ z }
+\end{verbatim}
+      The first axiom \verb+q_pos+ expresses that the integer \verb+q+ 
+      representing the order of the group is positive. 
+      The next \verb+group_pow_add+ and \verb+group_pow_mult+ specify the 
+      behavior of the multiplication and the exponentiation,  
+      \verb+log_pow+ partially specify the behavior of the logarithm operator.
+      The \verb|+| operator used in \verb+group_pow_add+ is the predefined 
+      additive operator over integer. Note that the \verb+*+ operator in 
+      the axiom \verb+group_pow_mult+ represent the multiplication over 
+      integer and not the multiplication law of the group 
+      (\easycrypt{} allows to overloading of operator). 
+      The last axiom expresses the fact that the group is a cyclic group of 
+      order \verb+q+, \verb+%+ stand for the modulus operator over integer.
+
+      To be able to perform the proof we also add axioms on the modulus operator:
+\begin{verbatim}
+axiom mod_add : 
+ forall (x:int, y:int). { (x%q + y)%q == (x + y)%q }
+
+axiom mod_small : 
+ forall (x:int). { 0 <= x } => { x < q } => { x%q == x}
+
+axiom mod_sub : 
+ forall (x:int, y:int). { (x%q - y)%q == (x - y)%q } 
+\end{verbatim}
+
+The IND-CPA semantic security is expressed as a game parameterized by an pair 
+of adversaries, let us declare this two adversaries:
+\begin{verbatim}
+adversary A1(pk:pkey)               : plaintext * plaintext {}
+adversary A2(pk:pkey, c:ciphertext) : bool {}
+\end{verbatim}
+The first one \verb+A1+ expect a public key \verb+pk+ and return a pair 
+of plaintext, the second one expect a public key and a cyphertext and return
+a boolean. The semi-bracket contains the declaration of the oracles that can
+be used by the adversaries, here there is no oracles.
+Note that the code those adversaries is unknown by \easycrypt,
+it can be any code\todo{rephrase this}.
+
+We can now define the game representing the IND-CPA semantic security of ElGamal:
+\begin{verbatim}
+game INDCPA = {
+  fun KG() : keys = {
+    var x : int = [0..q-1];
+    return (x, g^x);
+  }
+
+  fun Enc(pk:pkey, m:plaintext): ciphertext = {
+    var y : int = [0..q-1];
+    return (g^y, (pk^y) * m);
+  }
+
+  abs A1 = A1 {}
+  abs A2 = A2 {}
+  
+  fun Main() : bool = {
+    var sk : skey;
+    var pk : pkey;
+    var m0, m1, mb : plaintext;
+    var c: ciphertext;
+    var b, b' : bool;
+
+    (sk,pk) = KG();
+    (m0,m1) = A1(pk);
+    b = {0,1};
+    mb = b ? m0 : m1;
+    c = Enc(pk, mb);
+    b' = A2(pk, c);
+    return (b == b');
+  } 
+}      
+\end{verbatim}
+The game start by the declaration of two functions the key generation
+algorithm \verb+KG+ and the encryption algorithm \verb+Enc+. Then come
+the definition of the two adversary \verb+A1+ and \verb+A2+, they are
+defined to be equal to the abstract functions previously defined.
+The main function, at the end of the game, represent the IND-CPA experiment.
+First the key generation algorithm is used to generate the secret and public
+keys, then the public key is given to \verb+A1+ which generate two plaintext
+\verb+m0+ and \verb+m1+. The instruction \verb+b = {0,1}+ uniformly sample a
+boolean which is stored in \verb+b+. Depending on this bit \verb+b+
+either the plaintext \verb+m0+ or \verb+m1+ is encrypted with the
+public key \verb+pk+, generating the ciphertext \verb+c+. The public key and 
+ciphertext are then give back to the adversary \verb+A2+. The goal of the
+adversary is to discover which plaintext as been encrypted. It win if
+\verb+b+ is equal to \verb+b'+.
+
+The IND-CPA semantic security of ElGamal express that there exists a 
+adversary \verb+B+ build on top of \verb+A1+ and \verb+A2+ which as a higher 
+probability of breaking the Decisional Diffie Hellman problem (DDH) than
+\verb+A1+ and \verb+A2+ of winning the IND-CPA game. The DDH hypothesis 
+say that it is hard to distinguish ....\todo{finish this}.
+The first thing to do is to define the two games and the 
+adversary \verb+B+ involved in DDH problem:
+\begin{verbatim}
+
+game DDH0 = {
+  abs A1 = A1 {}
+  abs A2 = A2 {}
+  
+  fun B(gx:group, gy:group, gz:group) : bool = {
+    var m0, m1, mb : plaintext;
+    var c : ciphertext;
+    var b, b' : bool;
+ 
+    (m0, m1) = A1(gx);
+    b = {0,1};
+    mb = b ? m0 : m1;
+    c = (gy, gz * mb);
+    b' = A2(gx,c);
+    return (b == b');
+  }
+
+  fun Main() : bool = {
+    var x, y : int;
+    var d : bool;
+
+    x = [0..q-1];
+    y = [0..q-1];
+    d = B(g^x, g^y, g^(x*y));
+    return d;
+  }     
+}
+
+game DDH1 = DDH0 where 
+  Main = {
+    var x, y, z : int;
+    var d : bool;
+
+    x = [0..q-1];
+    y = [0..q-1];
+    z = [0..q-1];
+    d = B(g^x, g^y, g^z);
+    return d;
+  } 
+
+\end{verbatim}
+The main experiment in the game \verb+DDH0+ start by uniformly sample
+two values \verb+x+ and \verb+y+ between 0 and $q-1$ and then 
+send $g^x, g^y, g^{xy}$ to the adversary \verb+B+. The game \verb+DDH1+
+is defined to be equal to the game \verb+DDH0+ where only the main function
+changes: a new variable \verb+z+ is uniformly sample and $g^z$ is send
+to the adversary instead of $g^{xy}$. The goal of the adversary is to discover
+if its last argument correspond to $g^{xy}$ or $g^z$, i.e. if it play
+between \verb+DDH0+ or \verb+DDH1+.
+
+We can know start our proof:
+\begin{verbatim}
+prover alt-ergo
+
+equiv auto Fact1 : INDCPA.Main ~ DDH0.Main : {true} ==> ={res};;
+
+claim Pr1 : INDCPA.Main[res] == DDH0.Main[res] 
+using Fact1;;
+\end{verbatim}
+The first line select the prover which will be use, here \verb+alt-ergo+, the
+default one is \verb+simplify+. The second line is the main component of
+\easycrypt. We demonstrate using the probabilistic Relational Hoare Logic (pRHL)
+that the two functions \verb+INDCPA.Main+ and \verb+DDH0.Main+ are 
+indistinguishable if we observe only their results.
+This allows to prove the claim \verb+Pr1+ which state that the probability
+that \verb+res+ is true after running the two programs is equal.
+\todo{rewrite this ...}
+
+\begin{verbatim}
+game G1 = INDCPA where 
+  Main = {
+    var x, y, z : int;
+    var gx, gy, gz : group;
+    var d, b, b' : bool;
+    var m0, m1, mb : plaintext;
+    var c : ciphertext;
+ 
+    x = [0..(q - 1)];
+    y = [0..(q - 1)];
+    gx = g^x;
+    gy = g^y;
+    (m0, m1) = A1 (gx);
+    b = {0,1};
+    mb = b ? m0 : m1; 
+    z = [0..(q - 1)];
+    gz = g^z;
+    c = (gy, gz * mb);
+    b' = A2 (gx, c);
+    d = (b == b');
+    return d;
+  }
+
+equiv auto Fact2 : G1.Main ~ DDH1.Main : {true} ==> ={res};;
+ 
+claim Pr2 : G1.Main[res] == DDH1.Main[res] 
+using Fact2;;
+\end{verbatim}
+
+\begin{verbatim}
+game G2 = G1 where 
+  Main = {
+    var x, y, z : int;
+    var gx, gy, gz : group;
+    var d, b, b' : bool;
+    var m0, m1, mb : plaintext;
+    var c : ciphertext;
+ 
+    x = [0..(q - 1)];
+    y = [0..(q - 1)];
+    gx = g^x;
+    gy = g^y;
+    (m0, m1) = A1(gx);
+    z = [0..(q - 1)];
+    gz = g^z;
+    c = (gy, gz); 
+    b' = A2 (gx, c);
+    b = {0,1};
+    d = (b == b');
+    return d;
+  }
+
+equiv Fact3 : G1.Main ~ G2.Main : {true} ==> ={res} 
+ swap{2} [10-10] -4; auto;
+ rnd (z + log(b?m0:m1)) % q, (z - log(b?m0:m1)) % q; wp; rnd; 
+ auto; repeat rnd;
+ trivial;;
+save;;
+
+claim Pr3 : G1.Main[res] == G2.Main[res]
+using Fact3;;
+\end{verbatim}
+
+\begin{verbatim}
+claim Pr4 : G2.Main[res] == 1%r / 2%r
+compute;;
+
+claim Conclusion : 
+ | INDCPA.Main[res] - 1%r / 2%r | <= | DDH0.Main[res] - DDH1.Main[res] | 
+\end{verbatim}

@@ -1,0 +1,239 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE why3session SYSTEM "why3session.dtd">
+<why3session
+ name="programs/bresenham/why3session.xml">
+ <prover
+  id="alt-ergo"
+  name="Alt-Ergo"
+  version="0.93"/>
+ <prover
+  id="coq"
+  name="Coq"
+  version="8.3pl2"/>
+ <prover
+  id="cvc3"
+  name="CVC3"
+  version="2.2"/>
+ <prover
+  id="eprover"
+  name="Eprover"
+  version="1.4 Namring"/>
+ <prover
+  id="gappa"
+  name="Gappa"
+  version="0.15.1"/>
+ <prover
+  id="simplify"
+  name="Simplify"
+  version="1.5.4"/>
+ <prover
+  id="spass"
+  name="Spass"
+  version="3.7"/>
+ <prover
+  id="vampire"
+  name="Vampire"
+  version="0.6"/>
+ <prover
+  id="verit"
+  name="veriT"
+  version="dev"/>
+ <prover
+  id="yices"
+  name="Yices"
+  version="1.0.25"/>
+ <prover
+  id="z3"
+  name="Z3"
+  version="2.19"/>
+ <file
+  name="../bresenham.mlw"
+  verified="true"
+  expanded="true">
+  <theory
+   name="WP M"
+   verified="true"
+   expanded="true">
+   <goal
+    name="invariant_is_ok"
+    sum="86594dd0d50f484f3737ddf51df6b48e"
+    proved="true"
+    expanded="true"
+    shape="abestV0V1Iainvariant_V0V1V2F">
+    <proof
+     prover="coq"
+     timelimit="10"
+     edited="bresenham_WP_M_invariant_is_ok_1.v"
+     obsolete="false">
+     <result status="valid" time="1.22"/>
+    </proof>
+   </goal>
+   <goal
+    name="WP_parameter bresenham"
+    expl="parameter bresenham"
+    sum="f60a88f9babd662203811e119f193488"
+    proved="true"
+    expanded="true"
+    shape="iainfix <V0c0ainfix <ainfix -ainfix +ax2c1V4ainfix -ainfix +ax2c1V2Aainfix <=c0ainfix -ainfix +ax2c1V2Aainvariant_V4V1V3Aainfix <=V4ainfix +ax2c1Aainfix <=c0V4Iainfix =V4ainfix +V2c1FIainfix =V3ainfix +V0ainfix *c2ay2Fainfix <ainfix -ainfix +ax2c1V7ainfix -ainfix +ax2c1V2Aainfix <=c0ainfix -ainfix +ax2c1V2Aainvariant_V7V5V6Aainfix <=V7ainfix +ax2c1Aainfix <=c0V7Iainfix =V7ainfix +V2c1FIainfix =V6ainfix +V0ainfix *c2ainfix -ay2ax2FIainfix =V5ainfix +V1c1FAabestV2V1Iainfix <=V2ax2Iainvariant_V2V1V0Aainfix <=V2ainfix +ax2c1Aainfix <=c0V2FFFAainvariant_c0c0ainfix -ainfix *c2ay2ax2Aainfix <=c0ainfix +ax2c1Aainfix <=c0c0">
+    <transf
+     name="split_goal"
+     proved="true"
+     expanded="true">
+     <goal
+      name="WP_parameter bresenham.1"
+      expl="loop invariant init"
+      sum="b5a81c756dcc145ce2d22b88b12a50ba"
+      proved="true"
+      expanded="true"
+      shape="ainvariant_c0c0ainfix -ainfix *c2ay2ax2Aainfix <=c0ainfix +ax2c1Aainfix <=c0c0">
+      <proof
+       prover="cvc3"
+       timelimit="10"
+       edited=""
+       obsolete="false">
+       <result status="valid" time="0.00"/>
+      </proof>
+      <proof
+       prover="alt-ergo"
+       timelimit="10"
+       edited=""
+       obsolete="false">
+       <result status="valid" time="0.02"/>
+      </proof>
+      <proof
+       prover="z3"
+       timelimit="10"
+       edited=""
+       obsolete="false">
+       <result status="valid" time="0.01"/>
+      </proof>
+     </goal>
+     <goal
+      name="WP_parameter bresenham.2"
+      expl="assertion"
+      sum="0280733918becad4a00f65e5b573f8b7"
+      proved="true"
+      expanded="true"
+      shape="abestV2V1Iainfix <=V2ax2Iainvariant_V2V1V0Aainfix <=V2ainfix +ax2c1Aainfix <=c0V2FFF">
+      <proof
+       prover="cvc3"
+       timelimit="10"
+       edited=""
+       obsolete="false">
+       <result status="valid" time="0.00"/>
+      </proof>
+      <proof
+       prover="alt-ergo"
+       timelimit="10"
+       edited=""
+       obsolete="false">
+       <result status="valid" time="0.10"/>
+      </proof>
+     </goal>
+     <goal
+      name="WP_parameter bresenham.3"
+      expl="loop invariant preservation"
+      sum="9804176574e7b0b0562a2675bee121cf"
+      proved="true"
+      expanded="true"
+      shape="ainvariant_V4V1V3Aainfix <=V4ainfix +ax2c1Aainfix <=c0V4Iainfix =V4ainfix +V2c1FIainfix =V3ainfix +V0ainfix *c2ay2FIainfix <V0c0IabestV2V1Iainfix <=V2ax2Iainvariant_V2V1V0Aainfix <=V2ainfix +ax2c1Aainfix <=c0V2FFF">
+      <proof
+       prover="cvc3"
+       timelimit="10"
+       edited=""
+       obsolete="false">
+       <result status="valid" time="0.01"/>
+      </proof>
+      <proof
+       prover="z3"
+       timelimit="10"
+       edited=""
+       obsolete="false">
+       <result status="valid" time="0.01"/>
+      </proof>
+     </goal>
+     <goal
+      name="WP_parameter bresenham.4"
+      expl="loop variant decreases"
+      sum="19afbdf269f0d3861532dc1c0db1be4d"
+      proved="true"
+      expanded="true"
+      shape="ainfix <ainfix -ainfix +ax2c1V4ainfix -ainfix +ax2c1V2Aainfix <=c0ainfix -ainfix +ax2c1V2Iainvariant_V4V1V3Aainfix <=V4ainfix +ax2c1Aainfix <=c0V4Iainfix =V4ainfix +V2c1FIainfix =V3ainfix +V0ainfix *c2ay2FIainfix <V0c0IabestV2V1Iainfix <=V2ax2Iainvariant_V2V1V0Aainfix <=V2ainfix +ax2c1Aainfix <=c0V2FFF">
+      <proof
+       prover="cvc3"
+       timelimit="10"
+       edited=""
+       obsolete="false">
+       <result status="valid" time="0.00"/>
+      </proof>
+      <proof
+       prover="alt-ergo"
+       timelimit="10"
+       edited=""
+       obsolete="false">
+       <result status="valid" time="0.02"/>
+      </proof>
+      <proof
+       prover="z3"
+       timelimit="10"
+       edited=""
+       obsolete="false">
+       <result status="valid" time="0.01"/>
+      </proof>
+     </goal>
+     <goal
+      name="WP_parameter bresenham.5"
+      expl="loop invariant preservation"
+      sum="e2c7f84e17390a5914561f4260af95ce"
+      proved="true"
+      expanded="true"
+      shape="ainvariant_V5V3V4Aainfix <=V5ainfix +ax2c1Aainfix <=c0V5Iainfix =V5ainfix +V2c1FIainfix =V4ainfix +V0ainfix *c2ainfix -ay2ax2FIainfix =V3ainfix +V1c1FIainfix <V0c0NIabestV2V1Iainfix <=V2ax2Iainvariant_V2V1V0Aainfix <=V2ainfix +ax2c1Aainfix <=c0V2FFF">
+      <proof
+       prover="cvc3"
+       timelimit="10"
+       edited=""
+       obsolete="false">
+       <result status="valid" time="0.01"/>
+      </proof>
+      <proof
+       prover="z3"
+       timelimit="10"
+       edited=""
+       obsolete="false">
+       <result status="valid" time="0.01"/>
+      </proof>
+     </goal>
+     <goal
+      name="WP_parameter bresenham.6"
+      expl="loop variant decreases"
+      sum="023a9d00567ec555ea12e968d0d095e7"
+      proved="true"
+      expanded="true"
+      shape="ainfix <ainfix -ainfix +ax2c1V5ainfix -ainfix +ax2c1V2Aainfix <=c0ainfix -ainfix +ax2c1V2Iainvariant_V5V3V4Aainfix <=V5ainfix +ax2c1Aainfix <=c0V5Iainfix =V5ainfix +V2c1FIainfix =V4ainfix +V0ainfix *c2ainfix -ay2ax2FIainfix =V3ainfix +V1c1FIainfix <V0c0NIabestV2V1Iainfix <=V2ax2Iainvariant_V2V1V0Aainfix <=V2ainfix +ax2c1Aainfix <=c0V2FFF">
+      <proof
+       prover="cvc3"
+       timelimit="10"
+       edited=""
+       obsolete="false">
+       <result status="valid" time="0.01"/>
+      </proof>
+      <proof
+       prover="alt-ergo"
+       timelimit="10"
+       edited=""
+       obsolete="false">
+       <result status="valid" time="0.01"/>
+      </proof>
+      <proof
+       prover="z3"
+       timelimit="10"
+       edited=""
+       obsolete="false">
+       <result status="valid" time="0.01"/>
+      </proof>
+     </goal>
+    </transf>
+   </goal>
+  </theory>
+ </file>
+</why3session>

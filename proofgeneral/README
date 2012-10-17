@@ -1,0 +1,69 @@
+ProofGeneral mode for CertiCrypt
+
+1. REQUIREMENTS
+===============
+
+* Proof general >=  4.1
+
+  Available at http://proofgeneral.inf.ed.ac.uk/download
+
+* CertiCrypt
+
+
+2. MANUAL INSTALLATION
+======================
+
+Add the following line to <proof-general-home>/generic/proof-site.el
+in the definition of `proof-assistant-table-default':
+
+   (certicrypt "CertiCrypt" "ec" nil (".v" ".vo" ".glob" ".ml"))
+
+Copy the directory "certicrypt" and its contents to the directory
+where ProofGeneral was installed, typically
+
+   /usr/local/share/emacs/site-elisp/ProofGeneral/
+
+
+3. AUTOMATIC INSTALLATION
+=========================
+
+The provided Makefile will install everything in default
+locations. Simply type
+
+   make install
+
+or 
+
+   sudo make install
+
+as appropriate.
+
+
+4. CONFIGURING PROOFGENERAL
+===========================
+
+Set the path to the EasyCrypt executable and the prelude file in your
+Emacs configuration. This can be achieved either by modifying the
+variable certicrypt-prog-name inside Emacs:
+
+ Proof-General
+   -> Advanced 
+     -> Customize 
+       -> Certicrypt 
+         -> CertiCrypt prog name
+
+You should set its value to (modifying paths as appropriate):
+
+ "<path-to-easycrypt>/easycrypt -emacs -prelude <path-to-prelude>/easycrypt_base.ec"
+
+The prelude file "easycrypt-base.ec" can be found at "easycrypt/src/".
+
+Alternatively, you can modify your Emacs local configuration file
+(typically ~/.emacs):
+
+ (custom-set-variables
+ ...
+  '(certicrypt-prog-name 
+    "<path-to-easycrypt>/easycrypt -emacs
+        			   -prelude <path-to-prelude>/easycrypt_base.ec)
+ ...)

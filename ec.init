@@ -1,0 +1,7 @@
+(* This file is used to initialize the EasyCrypt toplevel. *)
+
+#rectypes;;
+#directory "src";;
+(* #install_printer EcMain.top_pp_unit;;*)
+open Ec.Api;;
+Format.printf "\t Easycrypt ocaml toplevel is now initialized.@.";;

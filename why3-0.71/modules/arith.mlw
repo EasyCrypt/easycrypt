@@ -1,0 +1,29 @@
+
+(* Arithmetic for programs *)
+
+module Int
+
+  use export int.Int
+  use export int.ComputerDivision
+
+  let (/) (x: int) (y:int) = { y <> 0 } div x y { result = div x y }
+
+end
+
+(* machine arithmetic (32-bit integers, etc.) will go here *)
+
+module Real
+
+  use import real.Real
+  use export real.RealInfix
+  use export real.FromInt
+
+  let (/.) (x: real) (y: real) = { y <> 0. } x / y { result = x / y }
+
+end
+
+(*
+Local Variables:
+compile-command: "unset LANG; make -C .. modules/arith"
+End:
+*)

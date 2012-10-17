@@ -1,0 +1,148 @@
+{1 EasyCrypt Tool}
+
+{2 Presentation}
+
+{2 How to use it }
+
+{3 The language}
+
+The language is composed of global elements :
+- type declaration or definition;
+- constant declaration or definition;
+- operator declaration;
+- program (ie. game);
+- propeties.
+
+One can also use [include] to use other files.
+
+{4 Game}
+
+A game is composed of :
+- variable declarations;
+- function definition (with body);
+- function declaration (no body).
+
+{3 Example}
+
+Some examples can be found in the
+{{:../../tests}[Tool/tests]} directory.
+Source files have a [.ec] extensions.
+
+To test the tool, just run [./easycrypt tests/test.ec] for instance.
+
+{3 Toplevel}
+
+The tool can also be used as a toplevel with the [-top] option :
+[./easycrypt -top]
+
+You can then enter any global element and end by ;;
+
+{2 Tool internal overview }
+
+The tool is composed of several {{:index_modules.html}modules}.
+If you have a SVG compatible browser (like a recent firefox),
+you can see their {{:modules.svg} dependence graph} and click on the nodes
+to go to their documentation.
+
+{3 Lexer/Parser}
+
+The lexer uses
+{{:http://plus.kaist.ac.kr/~shoh/ocaml/ocamllex-ocamlyacc/ocamllex-tutorial/}ocamllex}
+and is defined in {{:../../src/ecLexer.mll}ecLexer.mll}
+and the parser uses
+{{:http://plus.kaist.ac.kr/~shoh/ocaml/ocamllex-ocamlyacc/ocamlyacc-tutorial/}ocamlyacc}
+and is defined in  {{:../../src/ecParser.mly}ecLexer.mly}.
+
+{4 Include file}
+
+{4 Operator names}
+
+The main problem while defining the parser is the operators (re)definitions.
+Either traditional operators like '+', '&&', '<', ... as recognised at the
+lexer level, or the lexer has only one entry for all the operators names.
+
+The second solution makes it easier to write the parser, but is leave all the
+management of priority and associativity to the action part.
+
+So we chose rather the first solution that seems easier to manage.
+The main drawback is that the priority of predefined operators is fixed.
+We think that this is not a big problem since we usualy chose a symbol
+assuming that is has about the same behavior than the classical one.
+
+The priory of unknown operators is the hightest one meaning that the smallest
+expression is taken. For instance, parsing [ a @ b + c] gives [(a @ b) + c].
+Moreover, new operators are defined with the left associativity rule.
+
+{4 TODO}
+
+- Important: 
+  Deal with length spec of bitstring in the operator result (generate axioms)
+  
+- Important:
+  Accept user defined distribution 
+   (we assume that the distribution is uniform in a first time)
+
+- add user defined operators (not axiom). 
+- more types: option ?
+- add things to define distributions (for instance: ( c ||_p c') means
+value c with probability p, and c' with (1-p))
+- try to accept some of the keywords as identifiers; (WAIT)
+- add [define] for fun definitions with param outside games (WAIT);
+
+
+- Define all primitives in a file eascrypt.prelude 
+  It will become simpler to add operator, axiom ...
+  todo this we should allows the declaration of polymorphic type
+
+
+{3 Typing}
+
+The type checking is done in module {!module:EcTyping}.
+
+{4 TODO}
+
+- try to use the user's type names (for better warning messages)
+  i.e catch and raise exception in unification
+- Keep information of side variable to have a better pretty-printing
+- Be able to have operator on bitstring polymorphic in the length e.g. xor
+
+{3 Program transformation}
+
+{4 Inlining}
+use inlining + simpl simplications (no expression propagation) 
+    to define new games.
+
+{4 Move the random accesses}
+
+find the identity permutation
+
+{3 WP}
+
+We decided to have two WP computation:
+- the first one is a traditional one that compute the WP of a property
+on a function;
+- the second one is a relational WP that computes on two functions at the
+same time.
+Both are implemented in module {!module:EcWp}.
+
+{4 Simple WP}
+done
+{4 Relational WP}
+Scheme done.
+{5 TODO }
+Prove in Coq the rule for functions
+
+{3 Proba of an event }
+{4 TODO }
+Add the idea of Gille to compute the proba of a event in a function,
+based on WP, and test
+
+{3 WHY export }
+{4 TODO }
+Merge the functions of PpAst and Fol.
+Better printing of variables (use side), try to have unique name ... 
+
+{2 Index}
+
+{!indexlist}
+

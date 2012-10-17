@@ -1,0 +1,64 @@
+theory CosineSingle
+
+use import real.Real
+use import real.Abs
+use import real.Trigonometry
+use import floating_point.Rounding
+use import floating_point.Single
+
+(* approximation of cosine function by 1 - x^2 / 2 on interval [-1/32; 1/32] *)
+
+
+
+lemma MethodError: forall x:real. abs x <= 0x1p-5 ->
+  abs (1.0 - 0.5 * (x * x) - cos x) <= 0x1p-24
+(* this one is proved in Coq + interval tactics *)
+
+
+(* computation in single precision *)
+
+lemma TotalErrorFullyExpanded:
+  forall x:single. abs (value x) <= 0x1p-5 ->
+  (* total error as hypothesis, for Gappa *)
+  abs (1.0 - 0.5 * (value x * value x) - cos (value x)) <= 0x1p-24 ->
+  forall x2 x2o2 cos_x: real.
+  x2 = round NearestTiesToEven (value x * value x) ->
+  x2o2 = round NearestTiesToEven (0.5 * x2) ->
+  cos_x = round NearestTiesToEven (1.0 - x2o2) ->
+  abs (cos_x - cos (value x)) <= 0x1p-23
+(* fully expanded version, proved by gappa *)
+
+lemma TotalErrorExpanded:
+  forall x:single. abs (value x) <= 0x1p-5 ->
+  let x2 = round NearestTiesToEven (value x * value x) in
+  let x2o2 = round NearestTiesToEven (0.5 * x2) in
+  let cos_x = round NearestTiesToEven (1.0 - x2o2) in
+  abs (cos_x - cos (value x)) <= 0x1p-23
+(* same as above but with let, proved by SMT solvers *)
+
+(* the same as above, under the form of a logic function *)
+
+function round_single (m:mode) (x:real) : single
+
+axiom RoundSingle: forall m:mode, x:real [value (round_single m x)].
+  value (round_single m x) = round m x
+
+function cos_single (x:single) : single =
+  let x2 = round_single NearestTiesToEven (value x * value x) in
+  let x2o2 = round_single NearestTiesToEven (0.5 * value x2) in
+  round_single NearestTiesToEven (1.0 - value x2o2)
+
+lemma TotalError: forall x:single. abs (value x) <= 0x1p-5 ->
+  let cos_x = cos_single x in
+  abs (value cos_x - cos (value x)) <= 0x1p-23
+(* proved by SMT solvers from TotalErrorExpanded *)
+
+end
+
+(*
+Local Variables:
+compile-command: "../bin/why3ide.byte my_cosine.why"
+End:
+*)
+
+

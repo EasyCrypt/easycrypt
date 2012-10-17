@@ -1,0 +1,133 @@
+
+theory Assoc
+  type t
+  function op t t : t
+  axiom Assoc : forall x y z : t. op (op x y) z = op x (op y z)
+end
+
+theory Comm
+  type t
+  function op t t : t
+  axiom Comm : forall x y : t. op x y = op y x
+end
+
+theory AC
+  type t
+  function op t t : t
+  clone Assoc with type t = t, function op = op
+  clone Comm  with type t = t, function op = op
+  meta AC function op (*, prop Assoc.Assoc, prop Comm.Comm*)
+end
+
+theory Group
+  type t
+
+  function unit : t
+
+  function op t t : t
+  function inv t : t
+
+  axiom Unit_def : forall x:t. op x unit = x
+
+  clone Assoc with type t = t, function op = op
+
+  axiom Inv_def : forall x:t. op x (inv x) = unit
+
+(*
+  lemma Inv_unit : forall x y:t. op x (inv y) = unit -> x = y
+*)
+
+end
+
+theory CommutativeGroup
+  clone export Group
+  clone Comm with type t = t, function op = op
+  meta AC function op (*, prop Assoc.Assoc, prop Comm.Comm*)
+end
+
+theory Ring
+  type t
+  function zero : t
+  function (+) t t : t
+  function (-_) t : t
+  function (*) t t : t
+
+  clone CommutativeGroup with type t = t,
+                              function unit = zero,
+                              function op = (+),
+                              function inv = (-_)
+
+  clone Assoc with type t = t, function op = (*)
+
+  axiom Mul_distr: forall x y z : t. x * (y + z) = x * y + x * z
+
+  function (-) (x y : t) : t = x + -y
+end
+
+theory CommutativeRing
+  clone export Ring
+  clone Comm with type t = t, function op = (*)
+  meta AC function (*) (*, prop Assoc.Assoc, prop Comm.Comm*)
+end
+
+theory UnitaryCommutativeRing
+  clone export CommutativeRing
+  function one : t
+  axiom Unitary : forall x:t. one * x = x
+  axiom NonTrivialRing : zero <> one
+end
+
+theory OrderedUnitaryCommutativeRing
+  clone export UnitaryCommutativeRing
+  predicate (<=) t t
+  predicate (>=) (x y : t) = y <= x
+  clone export relations.TotalOrder with type t = t, predicate rel = (<=)
+
+  axiom CompatOrderAdd  :
+    forall x y z : t. x <= y -> x + z <= y + z
+  axiom CompatOrderMult :
+    forall x y z : t. x <= y -> zero <= z -> x * z <= y * z
+end
+
+theory Field
+  clone export UnitaryCommutativeRing
+  function inv t : t
+  axiom Inverse : forall x:t. x <> zero -> x * inv x = one
+  function (/) (x y : t) : t = x * inv y
+
+  lemma assoc_mul_div: forall x y z:t.
+    (* todo: discard the hypothesis ? *)
+     z <> zero -> (x*y)/z = x*(y/z)
+
+  lemma assoc_div_mul: forall x y z:t.
+    (* todo: discard the hypothesis ? *)
+     y <> zero /\ z <> zero -> (x/y)/z = x/(y*z)
+
+  lemma assoc_div_div: forall x y z:t.
+    (* todo: discard the hypothesis ? *)
+     y <> zero /\ z <> zero -> x/(y/z) = (x*z)/y
+
+end
+
+theory OrderedField
+  clone export Field
+
+  predicate (<=) t t
+  predicate (>=) (x y : t) = y <= x
+  clone export relations.TotalOrder with type t = t, predicate rel = (<=)
+
+  axiom CompatOrderAdd  : forall x y z : t. x <= y -> x + z <= y + z
+  axiom CompatOrderMult :
+    forall x y z : t. x <= y -> zero <= z -> x * z <= y * z
+end
+
+(* to be discussed: should we add the following lemmas, and where
+
+  lemma InvMult : forall x y : t. (-x) * y = - (x * y) = x * (-y)
+  lemma InvSquare : forall x : t. x * x = (-x) * (-x)
+  lemma ZeroMult : forall x : t. x * zero = zero = zero * x
+  lemma SquareNonNeg1 : forall x : t. x <= zero -> zero <= x * x
+  lemma SquareNonNeg : forall x : t. zero <= x * x
+  lemma ZeroLessOne : zero <= one
+*)
+

@@ -1,0 +1,53 @@
+(* 'Checking a large routine' Alan Mathison Turing, 1949
+
+   One of the earliest proof of program.
+   The routine computes n! using only additions, with two nested loops.
+*)
+
+module CheckingALargeRoutine
+
+  use import int.Fact
+  use import module ref.Ref
+
+  (* using 'while' loops, to keep close to Turing's flowchart *)
+  let routine (n: int) =
+    { n >= 0 }
+    let r = ref 0 in
+    let u = ref 1 in
+    while !r < n do
+      invariant { 0 <= !r <= n /\ !u = fact !r }
+      variant   { n - !r }
+      let s = ref 1 in
+      let v = !u in
+      while !s <= !r do
+        invariant { 1 <= !s <= !r + 1 /\ !u = !s * fact !r }
+        variant   { !r - !s }
+        u := !u + v;
+        s := !s + 1
+      done;
+      r := !r + 1
+    done;
+    !u
+    { result = fact n }
+
+  (* using 'for' loops, for clearer code and annotations *)
+  let routine2 (n: int) =
+    { n >= 0 }
+    let u = ref 1 in
+    for r = 0 to n-1 do invariant { !u = fact r }
+      let v = !u in
+      for s = 1 to r do invariant { !u = s * fact r }
+        u := !u + v
+      done
+    done;
+    !u
+    { result = fact n }
+
+end
+
+(*
+Local Variables:
+compile-command: "unset LANG; make -C ../.. examples/programs/checking_a_large_routine.gui"
+End:
+*)
+
