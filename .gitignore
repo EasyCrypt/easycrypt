@@ -21,3 +21,6 @@
 src/ec.mli
 
 _ignored
+
+*.automaton
+*.conflicts
