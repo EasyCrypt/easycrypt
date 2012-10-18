@@ -113,7 +113,7 @@ val start_igame : string -> pos -> unit
 val close_igame : unit -> unit
 val abort_igame : unit -> unit
 
-val start_game : string -> string -> pos -> unit
+val start_game : string -> string option -> pos -> unit
 val close_game : unit -> unit
 val abort_game : unit -> unit
 (*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*)
@@ -138,13 +138,13 @@ val find_op : ?prob:bool -> pos -> string -> type_exp list ->  oper * type_exp
 
 val find_adv : string -> pos -> adversary
 
-val find_igame : string -> game_interface_body
+val find_igame : string -> igame
 
 val find_game : string -> game
 
-val cur_igame : string -> game_interface_body
+val cur_igame : string -> igame
 
-val cur_game : string -> game
+val cur_game : string -> game * game list
 
 (** @raise Not_found when the function name is not in the game. *)
 val find_fct_game : string -> game -> fct
@@ -222,7 +222,7 @@ val find_and_show_axiom : string -> unit
 val find_and_show_pred  : string -> unit
 val find_and_show_type  : string -> unit
 val find_and_show_game  : string -> unit
-val find_and_show_fct   : string*string -> unit
+val find_and_show_fct   : (string list * string) -> unit
 
 val print_set_axiom : bool -> unit
 val print_all_axiom : unit -> unit 

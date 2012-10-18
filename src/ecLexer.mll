@@ -167,7 +167,7 @@
       "lemma",       LEMMA;
       "equiv",       EQUIV;
       "game",        GAME;
-      "claim",       PR;
+      "claim",       CLAIM;
       "as",          AS;
       "set",         SET; 
       "unset",       UNSET; 
@@ -186,7 +186,8 @@
       "include",     INCLUDE;
       "prover",      PROVER;
       "drop",        DROP;
-      "interface",   INTERFACE; ]
+      "interface",   INTERFACE;
+      "proba",       PR; ]
 
 (*Please DON'T delete the newline before this comment*)
 (* END *)
@@ -221,7 +222,7 @@ let prim_ident = '\'' ident
 let op_char_1 = ['=' '<' '>' '~']
 let op_char_2 = ['+' '-']
 let op_char_3 = ['*' '/' '%']
-let op_char_4 = ['!' '$' '&' '?' '@' '^' (*'.'*) ':' '|' '#']
+let op_char_4 = ['!' '$' '&' '?' '@' '^' ':' '|' '#']
 let op_char_34 = op_char_3 | op_char_4
 let op_char_234 = op_char_2 | op_char_34
 let op_char_1234 = op_char_1 | op_char_234
@@ -268,6 +269,7 @@ rule token = parse
   | ';'                       { SEMICOLON }
   | '.'                       { DOT }
   | ':'                       { COLON }
+  | ":>"                      { DCOLON }
   | "}^"                      { RKEY_HAT }
   | '?'                       { QUESTION }
   | '|'                       { PIPE }
@@ -280,15 +282,6 @@ rule token = parse
   | "="                       { EQ }
   | "<>"                      { NE }
   
-  | ident '.' ident    { 
-    let s = Lexing.lexeme lexbuf in
-    try 
-      let pos = String.index s '.' in
-      let s1 = String.sub s 0 pos in
-      let s2 = String.sub s (pos + 1) (String.length s - (pos + 1)) in
-      if String.length s1 = 0 || String.length s2 = 0 then raise Not_found
-      else QFNAME(s1,s2)
-    with _ -> bug "ecLexer.qualif_fct_name" }
   | op_char_1234* op_char_1 op_char_1234* as s
       { OP1 s }
   | op_char_234*  op_char_2 op_char_234*  as s

@@ -75,7 +75,7 @@ let p_string fmt name          = fprintf fmt "%a" pp_name name
 let p_command fmt name         = fprintf fmt "\\%s " name
 let p_int fmt d                = fprintf fmt "%d" d
 let p_iprim_ident s            = EPStr s 
-let p_fct_name (g,f)           = EPStr (g ^ "." ^ f) 
+let p_qname (np,x)             = EPStr (String.concat "." (np @ [x]))
 let p_p_var (_,s)              = [EPStr s]
 
 (** Set-up tags for the formatter *)
@@ -351,7 +351,7 @@ let rec p_base_expr pri e = match e with
     protect_on (pri > p) (
       (p_p_exp2 p1 e1) @ (make_op_ident op) @ (p_p_exp2 p2 e2))
   | Eat (p_exp , n)     -> (p_p_exp p_exp) @ (add_keys [EPInt n])
-  | Epr (q_name, p_exp) -> [p_fct_name q_name] @ (add_brackets (p_p_exp p_exp))
+  | Epr (q_name, p_exp) -> [p_qname q_name] @ (add_brackets (p_p_exp p_exp))
   | Elist p_exp_list    ->  add_brackets (p_p_exp_list p_exp_list) 
 
   (* For formula only *)
@@ -505,26 +505,27 @@ let p_ident_spec s =
   EPList (p_list ep_string (EPStr ",") s)
 
 
-let p_pg_elem = function
-  | PEvar (pvars,texp)   -> p_decl_stmt (pvars,texp,None);
+let rec p_pg_elem = function
+  | PEvar (pvars,texp)   -> p_decl_stmt (pvars,texp,None)
+  | PEsub (_pos, g) -> EPList (EPNewline :: (p_game g))
   | PEfun (fdecl, fdef)  -> 
     EPSeq [EPInstr [EPKw "fun"; EPList (p_fun_decl fdecl); EPStr "= {" ];
            p_fun_def_body fdef; EPStr "}"]
   | PEredef (n1, n2)     ->
-    EPInstr [EPKw "fun"; EPStr n1; EPStr "="; p_fct_name n2]
+    EPInstr [EPKw "fun"; EPStr n1; EPStr "="; p_qname n2]
   | PEabs (n1,n2,i_spec) ->
     EPInstr [ EPKw "abs"; EPStr n1; EPStr "=";  EPStr n2; 
               EPCmd "{" ;p_ident_spec i_spec; EPCmd "}"; EPStr ";"]
 
-let p_pos_pg_elem (_,elem) = p_pg_elem elem
+and p_pos_pg_elem (_,elem) = p_pg_elem elem
 
 (** Print a redefinition function *)
-let p_redef (name,body) =
+and p_redef (name,body) =
   EPSeq [ EPPack [ EPKw "and"; EPStr name; EPStr "={"];
           p_fun_def_body body; EPStr "}" ]
 
 (** Print the body of a game *)
-let p_game_body = function
+and p_game_body = function
   | PGdef elems ->
     EPIseq (p_list2 p_pos_pg_elem (EPEmpty)  elems)
 
@@ -538,13 +539,16 @@ let p_game_body = function
              EPList (p_list2 p_redef (EPEmpty) redef)]
 
 
-let aux_name = function
+and aux_name = function
   | PGdef _             -> EPEmpty
   | PGredef (name, _,_) -> EPStr name
 
-let p_game (name, iname, body) = 
-  [ EPInstr [EPKw "game"; EPStr name; EPStr "="; EPStr iname;
-             EPStr "="; aux_name body];
+and p_game (name, iname, body) = 
+  [ EPInstr (   [EPKw "game"; EPStr name]
+              @ (match iname with
+                  | None   -> []
+                  | Some x -> [EPStr ":"; EPStr x])
+              @ [EPStr "="; aux_name body] );
     p_game_body body]
 
 let p_p_fol = p_p_exp
@@ -620,7 +624,7 @@ let p_auto_eager = function
 
 let p_equiv (name, fname1,fname2, equiv_concl, opt)  = 
   EPList [ EPKw "equiv"; EPStr name;  EPStr ":";
-           p_fct_name fname1;  EPCmd "sim";  p_fct_name fname2;
+           p_qname fname1;  EPCmd "sim";  p_qname fname2;
            EPStr ":"; EPList (p_equiv_concl equiv_concl);
            (match opt with
              | None -> EPEmpty

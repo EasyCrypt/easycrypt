@@ -28,7 +28,6 @@ let exp_let     x e1 e2    = Ast.Elet   (x, e1, e2)
 
 %token <int> NUM
 %token <string> IDENT
-%token <string * string > QFNAME
 %token <string> PRIM_IDENT
 %token <string> STRING
 
@@ -45,10 +44,12 @@ let exp_let     x e1 e2    = Ast.Elet   (x, e1, e2)
 %token BACKSLASH
 %token BITSTR
 %token CHECKPROOF
+%token CLAIM
 %token CNST
 %token COLON
 %token COMMA
 %token COMPUTE
+%token DCOLON
 %token DOT
 %token DOTDOT
 %token DROP
@@ -183,10 +184,18 @@ let exp_let     x e1 e2    = Ast.Elet   (x, e1, e2)
 %%
 
 (* -------------------------------------------------------------------- *)
-%inline ident           : x=IDENT      { x };
-%inline number          : n=NUM        { n };
-%inline prim_ident      : x=PRIM_IDENT { x };
-%inline qualif_fct_name : x=QFNAME     { x };
+%inline ident      : x=IDENT               { x };
+%inline number     : n=NUM                 { n };
+%inline prim_ident : x=PRIM_IDENT          { x };
+
+namespace:
+| x=ident { [x] }
+| x=ident DCOLON np=namespace { x :: np }
+;
+
+qident:
+| np=namespace DOT x=ident { (np, x) }
+;
 
 znumber:
 | /*-*/ n=NUM {  n }
@@ -254,7 +263,7 @@ simpl_exp:
 | x=ident LPAREN es=p_exp_list0 RPAREN   { exp_app x es }
 | e=loc(simpl_exp) LKEY s=prog_num RKEY  { exp_at e s }
 | se=loc(simpl_exp) ROI                  { exp_itr se }
-| f=qualif_fct_name LBRACKET e=loc(exp) RBRACKET
+| LBRACKET PR f=qident COLON e=loc(exp) RBRACKET
                                          { exp_proba f e }
 | LPAREN e=loc(exp) COMMA es=p_exp_list1 RPAREN
                                          { exp_pair e es }
@@ -445,10 +454,13 @@ pg_elem:
 | v=var_decl
     {  PEvar v }
 
+| g=loc(pg_def)
+    { PEsub g }
+
 | FUN decl=fun_decl EQ body=fun_def_body
     { PEfun (decl, body) }
 
-| FUN x=ident EQ qf=qualif_fct_name
+| FUN x=ident EQ qf=qident
     { PEredef (x, qf) }
 
 | ABSTRACT x1=ident EQ x2=ident LKEY xs=ident_list0 RKEY
@@ -487,7 +499,8 @@ pg_body:
 ;
 
 pg_def:
-| GAME x=ident COLON i=ident EQ body=pg_body { (x, i, body) }
+| GAME x=ident EQ body=pg_body { (x, None, body) }
+| GAME x=ident COLON i=ident EQ body=pg_body { (x, Some i, body) }
 ;
 
 (* -------------------------------------------------------------------- *)
@@ -686,7 +699,7 @@ equiv_concl:
 
 equiv:
 | EQUIV x=ident
-    COLON f1=qualif_fct_name TILD f2=qualif_fct_name
+    COLON f1=qident TILD f2=qident
     COLON ec=equiv_concl at=auto_eager?
 
     { (x, f1, f2, ec, at) }
@@ -714,7 +727,7 @@ real_hint:
 ;
 
 claim:
-| PR x=ident COLON e=loc(exp) h=real_hint { (x, (e, h)) }
+| CLAIM x=ident COLON e=loc(exp) h=real_hint { (x, (e, h)) }
 ;
 
 (* -------------------------------------------------------------------- *)
@@ -914,16 +927,17 @@ check:
 ;
 
 print:
-| PRINT x=ident            { Pi_string x }
-| PRINT op=binop           { Pi_string op }
-| PRINT qf=qualif_fct_name { Pi_fct qf }
-| PRINT SET                { Pi_set_axiom true }
-| PRINT UNSET              { Pi_set_axiom false }
-| PRINT AXIOM              { Pi_all_axiom }
-| PRINT OP                 { Pi_all_op }
-| PRINT CNST               { Pi_all_cnst }
-| PRINT PRED               { Pi_all_pred }
-| PRINT TYPE               { Pi_all_type }
+| PRINT x=ident       { Pi_string x }
+| PRINT op=binop      { Pi_string op }
+| PRINT FUN LPAREN qf=qident RPAREN
+                      { Pi_fct qf }
+| PRINT SET           { Pi_set_axiom true }
+| PRINT UNSET         { Pi_set_axiom false }
+| PRINT AXIOM         { Pi_all_axiom }
+| PRINT OP            { Pi_all_op }
+| PRINT CNST          { Pi_all_cnst }
+| PRINT PRED          { Pi_all_pred }
+| PRINT TYPE          { Pi_all_type }
 
 setunset_all:
 | UNSET ALL { false }

@@ -6,14 +6,13 @@ type op_ident = string
 
 type p_var = pos * string
 
-type qualif_fct_name = string * string
-
+type qname = string list * string
 
 type base_expr =
   | Eident of string
   | Ebinop of op_ident * p_exp * p_exp (* Infix operators *)
   | Eat of p_exp * int
-  | Epr of qualif_fct_name * p_exp
+  | Epr of qname * p_exp
   | Elist of p_exp list
   (* For formula only *)
   | Eforall of param_list * trigger * p_exp
@@ -72,23 +71,24 @@ type ident_spec = string list
 
 type pg_elem =
   | PEvar of (p_var list * type_exp)
+  | PEsub of (pos * game)
   | PEfun of (fun_decl * fun_def_body)
-  | PEredef of string * qualif_fct_name
+  | PEredef of string * qname
   | PEabs of (string * string * ident_spec)
 
-type redef = string * fun_def_body
-
-type game_body =
+and game_body =
   | PGdef of (pos * pg_elem) list
   | PGredef of string * (p_var list * (p_var list * type_exp) list) * redef list
 
-type igame_body = (pos * fun_decl) list
+and redef = string * fun_def_body
 
-type game = string * string * game_body
+and game = string * string option * game_body
+
+type igame_body = (pos * fun_decl) list
 
 type igame = string * igame_body
 
-type proba = qualif_fct_name * exp
+type proba = qname * exp
 
 (** Fol *)
 type p_fol = p_exp
@@ -120,7 +120,7 @@ type auto_info = inv option * ident_spec
 type auto_eager = (auto_info, stmt) AstLogic.helper
       
 type equiv = 
-    string * qualif_fct_name * qualif_fct_name * equiv_concl * auto_eager option
+    string * qname * qname * equiv_concl * auto_eager option
 
 type pop_spec = 
     (p_var * type_exp) list *
@@ -138,7 +138,7 @@ type pop_aspec =
 
 type print_info = 
   | Pi_string of string
-  | Pi_fct of qualif_fct_name
+  | Pi_fct of qname
   | Pi_set_axiom of bool
   | Pi_all_axiom 
   | Pi_all_op 

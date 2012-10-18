@@ -379,18 +379,16 @@ let pp_ifct fmt ifct =
 let pp_igame fmt ig =
   Format.fprintf fmt "@[<v 2>game interface %s = {@\n%a\n}@\n"
     ig.gi_name
-    (pp_list ~sep:"" pp_ifct) ig.gi_functions
+    (pp_list ~sep:"" pp_ifct) ig.gi_sig.gi_functions
 
 let pp_game fmt g =
-  let iname =
-    match g.g_interface with
-      | GI_Named x     -> x
-      | GI_Resolved ig -> ig.gi_name
-  in
-    Format.fprintf fmt "@[<v 2>game %s : %s = {@\n%a%a@]@\n}@\n"
-      g.g_name iname
-      (pp_list ~sep:"" pp_gvar_decl) (List.map snd g.g_vars)
-      (pp_list ~sep:"" pp_fct) (List.map snd g.g_functions)
+  Format.fprintf fmt "@[<v 2>game %s%s = {@\n%a%a@]@\n}@\n"
+    g.g_name
+    (match g.g_subinterface with
+      | Some i -> Printf.sprintf " : %s" i
+      | None   -> "")
+    (pp_list ~sep:"" pp_gvar_decl) (List.map snd g.g_vars)
+    (pp_list ~sep:"" pp_fct) (List.map snd g.g_functions)
 
 (*
   let pp_equiv_kind fmt = function

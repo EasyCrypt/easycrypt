@@ -686,12 +686,35 @@ let mk_adv_body pos adv oracles =
 (*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*)
 (** {2 Annotations } *)
 
-let get_fun pos (gname, fname) =
-  try
-    let g = Global.find_game gname in
-    Global.find_fct_game fname g
-  with Not_found ->
-    pos_error pos "didn't find function %s in game %s" fname gname
+let get_fun pos (gnames, fname) =
+  let (_, game) =
+    match gnames with
+      | [] -> bug "unqualifed function name"
+      | top :: gnames ->
+        let top =
+          try  Global.find_game top
+          with Not_found ->
+            pos_error pos
+              "game lookup failed for `%s' at toplevel"
+              top
+        in
+          List.fold_left
+            (fun (ctxt, top) gname ->
+               try
+                 let g = List.find (fun g -> g.g_name = gname) top.g_subgames in
+                   (g :: ctxt, g)
+               with Not_found ->
+                 pos_error pos
+                   "game lookup failed for `%s' in context `%s'"
+                   gname
+                   (String.concat "." (List.rev_map (fun g -> g.g_name) ctxt)))
+            ([], top) gnames
+  in
+    try  Global.find_fct_game fname game
+    with Not_found ->
+      pos_error pos
+        "function lookup failed for `%s' in context `%s'"
+        fname (String.concat "." gnames)
 
 
 let rec mk_req_mem _pos lvenv venv1 venv2 names =

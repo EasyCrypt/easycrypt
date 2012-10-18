@@ -277,3 +277,11 @@ let rec uniq xs =
 let try_find p xs =
   try  Some (List.find p xs)
   with Not_found -> None
+
+module Options =
+struct
+  let bind (f : 'a -> 'b) (x : 'a option) =
+    match x with
+      | None   -> None
+      | Some x -> Some (f x)
+end

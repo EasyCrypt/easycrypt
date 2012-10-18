@@ -110,22 +110,25 @@ let process_adv pos adv =
 
 let ast_fct_tbl = Hashtbl.create 100
 
-let find_ast_fct pos name qualid =
+let find_ast_fct pos name ((scope, fname) as qualid) =
   try
     match Hashtbl.find ast_fct_tbl qualid with
       | AstYacc.PEfun((_,decl,t_res),f_body) ->
         AstYacc.PEfun(((pos,name),decl,t_res),f_body)
       | AstYacc.PEabs(_,nadv,oracles) ->
         AstYacc.PEabs(name,nadv,oracles)
+      | AstYacc.PEsub _ -> bug "get_ast_fct: PEsub"
       | AstYacc.PEvar _ -> bug "get_ast_fct: PEvar"
       | AstYacc.PEredef _ -> bug "get_ast_fct: PEredef"
   with _ ->
-    pos_error pos "Unknow function %s.%s" (fst qualid) (snd qualid)
+    pos_error pos "Unknown function: `%s'"
+      (String.concat "." (scope @ [fname]))
 
-let add_ast_fct fct pg_elem =
+let add_ast_fct fct scope pg_elem =
+  let scope = List.rev_map (fun g -> g.g_name) scope in
   let gname = fct.f_game.g_name in
   let fname = fct.f_name in
-  Hashtbl.add ast_fct_tbl (gname,fname) pg_elem
+  Hashtbl.add ast_fct_tbl (scope @ [gname], fname) pg_elem
 
 
 (** Program element *)
@@ -135,16 +138,18 @@ let rec process_pg_elem (pos, pg_elem) =
       let t = mk_type_exp pos t in
       let do_var (pos, name) = Global.add_global pos name t in
       List.iter do_var name_list
+    | AstYacc.PEsub (pos, g) -> process_game pos g
     | AstYacc.PEfun (f_decl, f_body) ->
-      let game = Global.cur_game " process_pg_elem" in
+      let (game, scope) = Global.cur_game " process_pg_elem" in
       let fpos, name, params, t_res, body =
         EcTyping.mk_fct game pos f_decl f_body in
       let fct = Global.add_fct fpos name params t_res body in
-      add_ast_fct fct pg_elem
+      add_ast_fct fct scope pg_elem
     | AstYacc.PEredef(name, qualid) ->
       let pg_elem = find_ast_fct pos name qualid in
       process_pg_elem (pos, pg_elem)
     | AstYacc.PEabs (name, nadv, oracles) ->
+      let (_game, scope) = Global.cur_game " process_pg_elem" in
       let adv = Global.find_adv nadv pos in
       let body = EcTyping.mk_adv_body pos adv oracles in
       let params = List.map
@@ -152,13 +157,64 @@ let rec process_pg_elem (pos, pg_elem) =
         adv.adv_param
       in
       let fct = Global.add_fct pos name params adv.adv_res body in
-      add_ast_fct fct pg_elem
+      add_ast_fct fct scope pg_elem
+
+(** Game *)
+and process_game pos (game_name, game_iname, game_body) =
+  Global.start_game game_name game_iname pos;
+  try
+    let interface =
+      EcUtil.Options.bind
+        (fun iname ->
+          try Global.find_igame iname
+          with Not_found -> pos_error pos "cannot find interface `%s'" iname)
+        game_iname in
+    let (game, _scope) = Global.cur_game "process_game" in
+      begin match game_body with
+        | AstYacc.PGdef pg_elem_list ->
+          List.iter (process_pg_elem) pg_elem_list
+        | AstYacc.PGredef (other_game, (remove, add), redef_list) ->
+          let old_g =
+            try Global.find_game other_game
+            with Not_found ->
+              pos_error pos "Couldn't find game '%s' to define '%s'"
+                other_game game_name in
+          let old_name = old_g.g_name in
+          let remove = List.map snd remove in
+          List.iter (fun (name, v) ->
+            if not (List.mem name remove) then
+              Global.add_global pos name v.v_type)
+            old_g.g_vars;
+          List.iter (fun (name_list, t) ->
+            process_pg_elem (pos, AstYacc.PEvar (name_list, t))) add;
+          let process_fct (name, _) =
+            let pg_elem =
+              try
+                let body = List.assoc name redef_list in
+                match find_ast_fct pos name ([old_name], name) with
+                  | AstYacc.PEfun(decl, _) -> AstYacc.PEfun(decl, body)
+                  | AstYacc.PEabs _ -> pos_error pos "Couldn't define adversary"
+                  | _ -> assert false
+              with Not_found ->
+                AstYacc.PEredef(name, ([old_name], name)) in
+            process_pg_elem (pos, pg_elem) in
+          List.iter process_fct old_g.g_functions
+      end;
+      begin
+        match interface with
+          | None -> ()
+          | Some interface ->
+            if not (EcTyping.interface_match game interface.gi_sig) then
+              pos_error pos "The game does not match its interface"
+      end;
+      Global.close_game ()
+  with e -> Global.abort_game (); raise e
 
 (** Program interface element *)
 let process_ipg_elem (_pos, ifct) =
   let igame = Global.cur_igame "process_ipg_elem" in
   let ifct  = EcTyping.mk_ifct ifct in
-    igame.gi_functions <- ifct :: igame.gi_functions
+    igame.gi_sig.gi_functions <- ifct :: igame.gi_sig.gi_functions
 
 (** Game interface *)
 let process_igame pos (ig_name, ig_body) =
@@ -169,51 +225,6 @@ let process_igame pos (ig_name, ig_body) =
   with e ->
     Global.abort_igame ();
     raise e
-
-(** Game *)
-let process_game pos (game_name, game_iname, game_body) =
-  Global.start_game game_name game_iname pos;
-  try
-    let interface =
-      try  Global.find_igame game_iname
-      with Not_found ->
-        pos_error pos "cannot find interface `%s'" game_iname
-    and game = Global.cur_game "process_game" in
-    begin match game_body with
-      | AstYacc.PGdef pg_elem_list ->
-        List.iter (process_pg_elem) pg_elem_list
-      | AstYacc.PGredef (other_game, (remove, add), redef_list) ->
-        let old_g =
-          try Global.find_game other_game
-          with Not_found ->
-            pos_error pos "Couldn't find game '%s' to define '%s'"
-              other_game game_name in
-        let old_name = old_g.g_name in
-        let remove = List.map snd remove in
-        List.iter (fun (name, v) ->
-          if not (List.mem name remove) then
-            Global.add_global pos name v.v_type)
-          old_g.g_vars;
-        List.iter (fun (name_list, t) ->
-          process_pg_elem (pos, AstYacc.PEvar (name_list, t))) add;
-        let process_fct (name, _) =
-          let pg_elem =
-            try
-              let body = List.assoc name redef_list in
-              match find_ast_fct pos name (old_name, name) with
-                | AstYacc.PEfun(decl, _) -> AstYacc.PEfun(decl, body)
-                | AstYacc.PEabs _ -> pos_error pos "Couldn't define adversary"
-                | _ -> assert false
-            with Not_found ->
-              AstYacc.PEredef(name, (old_name, name)) in
-          process_pg_elem (pos, pg_elem) in
-        List.iter process_fct old_g.g_functions
-    end;
-    if not (EcTyping.interface_match game interface) then
-      pos_error pos "The game does not match its interface";
-    game.g_interface <- GI_Resolved interface;
-    Global.close_game ()
-  with e -> Global.abort_game (); raise e
 
 (** Annotation : build it and call {!EcDeriv} *)
 let pp_cur_goal no_more =

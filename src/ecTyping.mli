@@ -68,7 +68,7 @@ val mk_axiom: AstYacc.p_fol -> Fol.pred
 
 val mk_equiv : 
     EcUtil.pos -> 
-      AstYacc.qualif_fct_name -> AstYacc.qualif_fct_name ->
+      AstYacc.qname -> AstYacc.qname ->
         AstYacc.equiv_concl -> AstLogic.equiv
 
 val mk_eager : Ast.fct -> Ast.fct -> AstYacc.stmt -> Ast.stmt * Ast.stmt
@@ -94,4 +94,4 @@ val mk_apredicate :
 val mkeq_globals : Ast.fct -> Ast.fct -> Fol.pred
 
 (* -------------------------------------------------------------------- *)
-val interface_match : Ast.game -> Ast.game_interface_body -> bool
+val interface_match : Ast.game -> Ast.igamesig -> bool

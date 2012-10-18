@@ -229,22 +229,24 @@ and fct_def = {
 and game = {
   g_name : string;
   g_pos : pos;
-  mutable g_interface  : game_interface;
+  mutable g_interface : igamesig;
+  mutable g_subinterface : string option;
   mutable g_vars : (string * var) list;
   mutable g_functions : (string * fct) list;
+  mutable g_subgames : game list;
 }
 and game_functor = {
   gf_pos : pos;
-  gf_iparams : (string * game_interface) list;
+  gf_iparams : (string * igame) list;
   gf_game : game;
 }
-and game_interface =
-  | GI_Named of string
-  | GI_Resolved of game_interface_body
-and game_interface_body = {
-  gi_name : string;
-  gi_pos : pos;
+and igamesig = {
   mutable gi_functions : ifct list;
+}
+and igame = {
+  gi_name : string;
+  gi_pos  : pos;
+  gi_sig  : igamesig;
 }
 and ifct = {
   if_pos    : pos;
@@ -256,9 +258,3 @@ and ifct = {
 (** {2 Proba } *)
 
 type real_exp = (var, fct * var_exp) v_exp
-
-
-
-
-
-

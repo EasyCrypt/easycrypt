@@ -227,20 +227,31 @@ let igame_tbl = init_register_hash ()
 
 (** The current game *)
 type scope =
-  | SC_Game  of game
-  | SC_IGame of game_interface_body
+  | SC_Game  of game * game list
+  | SC_IGame of igame
 
-let current_scope = ref (None : scope option)
+let scope : scope option ref = ref None
 
-let cur_game msg =
-  match !current_scope with
-    | Some (SC_Game g) -> g
-    | _ -> bug "No current game for %s" msg
+module Scope = struct
+  let game msg =
+    match !scope with
+      | Some (SC_Game (g, gs)) -> (g, gs)
+      | _ -> bug "No current game for `%s'" msg
 
-let cur_igame msg =
-  match !current_scope with
-    | Some (SC_IGame ig) -> ig
-    | _ -> bug "No current game interface of %s" msg
+  let games msg =
+    match !scope with
+      | Some (SC_Game (g, gs)) -> g :: gs
+      | None                   -> []
+      | Some (SC_IGame _)      -> bug "No stacked games for `%s'" msg
+
+  let igame msg =
+    match !scope with
+      | Some (SC_IGame ig) -> ig
+      | _ -> bug "No current game interface of `%s'" msg
+end
+
+let cur_game  msg = Scope.game  msg
+let cur_igame msg = Scope.igame msg
 
 (*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*)
 (*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*)
@@ -283,7 +294,6 @@ let change_withproof () =
 let primitive_types = 
   [ "unit", Tunit;  "int", Tint; "bool",Tbool; "real", Treal]
 
-
 let check_not_type name pos =
   check_not_in_tbl "type" type_tbl name pos;
   check_not_in_list "type" primitive_types name pos
@@ -297,6 +307,12 @@ let check_not_operator name pos =
 
 let check_not_adv name pos =
   check_not_in_tbl "adversary" adv_tbl name pos
+
+let check_not_subgame_in_game game name pos =
+  let ex =
+    List.exists (fun g -> g.g_name = name) game.g_subgames
+  in
+    if ex then pos_error pos "subgame `%s' already exists" name
 
 (*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*)
 (** {2 Variable environment } *)
@@ -444,7 +460,7 @@ let fold_game f c = Hashtbl.fold f game_tbl c
 let find_fct_game fct game = List.assoc fct game.g_functions
 
 (** @raise Not_found when the function name is not registered. *)
-let find_fct fctname = find_fct_game fctname (cur_game "find_fct")
+let find_fct fctname = find_fct_game fctname (fst (Scope.game "find_fct"))
 
 
 
@@ -576,7 +592,7 @@ let unset_axiom l =
   List.iter (fun (s,(r,_,_)) -> if List.mem s l then r := false) !axiom_list
 
 let add_global pos name t =
-  let game = cur_game "add_global" in
+  let (game, _) = Scope.game "add_global" in
   check_not_operator name pos;
   check_not_in_list "function" game.g_functions name pos;
   check_not_in_list "global" game.g_vars name pos;
@@ -586,7 +602,7 @@ let add_global pos name t =
 
 
 let add_fct pos name params t_res body =
-  let game = cur_game "add_fct" in
+  let (game, _) = Scope.game "add_fct" in
   check_not_operator name pos;
   check_not_in_list "function" game.g_functions name pos;
   check_not_in_list "global" game.g_vars name pos;
@@ -602,64 +618,76 @@ let add_fct pos name params t_res body =
   fct
 
 let start_igame name pos =
-  if !current_scope <> None then
+  if !scope <> None then
     bug "already in a opened scope";
   check_not_in_tbl "igame" igame_tbl name pos;
   let ig =
-    { gi_name      = name;
-      gi_pos       = pos ;
-      gi_functions = []  ; }
+    let isig = { gi_functions = [] } in
+      { gi_name      = name;
+        gi_pos       = pos ;
+        gi_sig       = isig; }
   in
     debug db_add_loc "[global start game interface: %s@." name;
     Hashtbl.add igame_tbl name ig;
-    current_scope := Some (SC_IGame ig)
+    scope := Some (SC_IGame ig)
 
 let close_igame () =
-  let igame = cur_igame "close_igame" in
-    igame.gi_functions <- List.rev (igame.gi_functions);
+  let igame = Scope.igame "close_igame" in
+    igame.gi_sig.gi_functions <- List.rev (igame.gi_sig.gi_functions);
     debug db_glob "[global] end game interface: %s@." igame.gi_name;
     debug db_glob "%a@." PpAst.pp_igame igame;
-    current_scope := None
+    scope := None
 
 let abort_igame () =
   try
-    let igame = cur_igame "abort_igame" in
+    let igame = Scope.igame "abort_igame" in
       debug db_glob "[global] abort game interface: %s@." igame.gi_name;
       Hashtbl.remove igame_tbl igame.gi_name;
-      current_scope := None
+      scope := None
   with _ -> ()
 
-let start_game name interface pos =
-  if !current_scope <> None then
-    bug "already in a opened scope";
-  check_not_in_tbl "game" game_tbl name pos;
-  let g =
-    let i = GI_Named interface in
-      { g_name      = name;
-        g_pos       = pos ;
-        g_interface = i   ;
-        g_vars      = []  ;
-        g_functions = []  ;
-      }
-  in
-    debug db_add_loc "[global] start game: %s@." name;
-    Hashtbl.add game_tbl name g;
-    current_scope := Some (SC_Game g)
+let start_game name signame pos =
+  let games = Scope.games "start_game" in
+    begin
+      match games with
+        | []     -> check_not_in_tbl "game" game_tbl name pos
+        | g :: _ -> check_not_subgame_in_game g name pos
+    end;
+    let g =
+      let gi = { gi_functions = [] } in
+        { g_name         = name   ;
+          g_pos          = pos    ;
+          g_interface    = gi     ;
+          g_vars         = []     ;
+          g_functions    = []     ;
+          g_subgames     = []     ;
+          g_subinterface = signame;
+        }
+    in
+      debug db_add_loc "[global] start game: %s@." name;
+      scope := Some (SC_Game (g, games))
 
 let close_game () =
-  let game = cur_game "close_game" in
+  let (game, supscope) = Scope.game "close_game" in
   game.g_vars <- List.rev (game.g_vars);
   game.g_functions <- List.rev (game.g_functions);
   debug db_glob "[global] end game: %s@." game.g_name;
   debug db_glob "%a@." PpAst.pp_game game;
-  current_scope := None
+  match supscope with
+    | [] ->
+        Hashtbl.add game_tbl game.g_name game;
+        scope := None
+    | sg :: sgs ->
+        sg.g_subgames <- sg.g_subgames @ [game];
+        scope := Some (SC_Game (sg, sgs))
 
 let abort_game () =
   try
-    let game = cur_game "close_game" in
-    debug db_glob "[global] abort game: %s@." game.g_name;
-    Hashtbl.remove game_tbl game.g_name;
-    current_scope := None
+    let (game, supscope) = Scope.game "close_game" in
+      debug db_glob "[global] abort game: %s@." game.g_name;
+      match supscope with
+        | []        -> scope := None
+        | sg :: sgs -> scope := Some (SC_Game (sg, sgs))
   with _ -> ()
 
 (*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*)
@@ -1001,14 +1029,37 @@ let find_and_show_adv name =
       Format.printf "%a" PpAst.pp_adv_decl a
   with Not_found -> ()
 
-let find_and_show_fct (gname,fname) =
-  let g = 
-    try find_game gname 
-    with Not_found -> user_error "unknown game %s" gname in
-  let f = 
-    try find_fct_game fname g 
-    with Not_found -> user_error "unknown function %s in game %s" fname gname in
-  Format.printf "%a" PpAst.pp_fct f
+let find_and_show_fct (gnames, fname) =
+  let (_, game) =
+    match gnames with
+      | [] -> bug "unqualifed function name"
+      | top :: gnames ->
+        let top =
+          try  find_game top
+          with Not_found ->
+            user_error
+              "game lookup failed for `%s' at toplevel"
+              top
+        in
+          List.fold_left
+            (fun (ctxt, top) gname ->
+               try
+                 let g = List.find (fun g -> g.g_name = gname) top.g_subgames in
+                   (g :: ctxt, g)
+               with Not_found ->
+                 user_error
+                   "game lookup failed for `%s' in context `%s'"
+                   gname
+                   (String.concat "." (List.rev_map (fun g -> g.g_name) ctxt)))
+            ([], top) gnames in
+  let f =
+    try  find_fct_game fname game
+    with Not_found ->
+      user_error
+        "function lookup failed for `%s' in context `%s'"
+        fname (String.concat "." gnames)
+  in
+    Format.printf "%a" PpAst.pp_fct f
 
 let print_set_axiom b =
   let l = List.filter (fun (_,(r,_,_)) -> !r = b) !axiom_list in
