@@ -1,4 +1,4 @@
-WARN_OPT= -w +a-e-9 
+WARN_OPT= -w +a-e-9 -warn-error +8
 OCAMLFLAGS = -I $(EP_TOOLDIR) -I $(SRCDIR) -I +why3 $(WARN_OPT) -g -dtypes -rectypes 
 
 
@@ -12,10 +12,10 @@ OCAMLFLAGS = -I $(EP_TOOLDIR) -I $(SRCDIR) -I +why3 $(WARN_OPT) -g -dtypes -rect
 	$(OCAMLLEX) $<
 
 %.mli : %.mly
-	$(MENHIR) $<
+	$(MENHIR) --explain --dump --trace $<
 
 %.ml : %.mly
-	$(MENHIR) $<
+	$(MENHIR) --explain --dump --trace $<
 
 
 
