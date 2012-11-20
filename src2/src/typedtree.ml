@@ -202,11 +202,23 @@ module Env = struct
   type env = unit
 
   let bind (_ : symbol * ty) (e : env) = (failwith "" : env)
+
+  let bindall (_ : (symbol * ty) list) (e : env) = (failwith "" : env)
 end
 
 type epolicy = {
   epl_probabilistic : bool;
 }
+
+(* -------------------------------------------------------------------- *)
+module Unify : sig
+  val unify : ty -> ty -> bool
+end = struct
+  let unify _ _ = false
+end
+
+(* -------------------------------------------------------------------- *)
+let mktyvar () = 0                      (* FIXME *)
 
 (* -------------------------------------------------------------------- *)
 let transexp (scope : Scope.scope) =
@@ -265,11 +277,11 @@ let transexp (scope : Scope.scope) =
     | PErnd re ->
       if not policy.epl_probabilistic then
         tyerror ProbaExpressionForbidden;
-      let re, ty = transrexp env policy in
+      let re, ty = transrexp env policy re in
         (Ernd re, ty)
 
-  and transrexp (env : env) (policy : policy) = function
-    | PRbool -> (Rbool, Tbool)
+  and transrexp (env : Env.env) (policy : epolicy) = function
+    | PRbool -> (Rbool, tbool ())
 
 (*
     | PRinter (e1, e2) ->
