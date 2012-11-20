@@ -1,9 +1,9 @@
 (* -------------------------------------------------------------------- *)
 open Utils
 
-type symbol  = string                deriving(Show)
-type qsymbol = symbol list * symbol  deriving(Show)
-type side    = [ `Left | `Right ]    deriving(Show)
+type symbol  = string                (* deriving(Show) *)
+type qsymbol = symbol list * symbol  (* deriving(Show) *)
+type side    = [ `Left | `Right ]    (* deriving(Show) *)
 
 let qsymb_of_symb (x : symbol) : qsymbol = ([], x)
 
@@ -42,17 +42,17 @@ and lpattern =
   | LPSymbol of symbol
   | LPTuple  of symbol list
 
-      deriving(Show)
+      (* deriving(Show) *)
 
 type lvalue =
   | LVSymbol of qsymbol
   | LVTuple  of qsymbol list
   | LVMap    of qsymbol * expr
-      deriving(Show)
+      (* deriving(Show) *)
 
 type rvalue =
   [`Expr of expr | `Call of qsymbol * expr list]
-      deriving(Show)
+      (* deriving(Show) *)
 
 type instr =
   | Sasgn   of lvalue * rvalue
@@ -97,7 +97,7 @@ and interface = {
   i_name      : symbol;
   i_signature : signature;
 }
-    deriving(Show)
+    (* deriving(Show) *)
 
 (* -------------------------------------------------------------------- *)
 type formula = int
@@ -125,7 +125,7 @@ type equiv = {
 
 (* -------------------------------------------------------------------- *)
 type cnst_decl = (symbol list * tyexpr) * expr option
-    deriving(Show)
+    (* deriving(Show) *)
 
 (* -------------------------------------------------------------------- *)
 type hint =
@@ -138,10 +138,10 @@ type hint =
   | Hauto
   | Hfailure of int * expr * expr * (symbol * expr) list
 
-      deriving(Show)
+      (* deriving(Show) *)
 
 type claim = symbol * (expr * hint)
-    deriving(Show)
+    (* deriving(Show) *)
 
 (* -------------------------------------------------------------------- *)
 type global =
@@ -150,6 +150,6 @@ type global =
   | Gcnst      of cnst_decl
   | Gclaim     of claim
   | Gtype      of (qsymbol * tyexpr option)
-      deriving (Show)
+      (* deriving (Show) *) 
 
 type prog = global list
