@@ -1,3 +1,5 @@
+# -*- Makefile -*-
+
 SRC_DIR=$(TOOLDIR)/src
 SRCDIR=$(TOOLDIR)/src
 NAME=easycrypt
@@ -30,14 +32,16 @@ src: $(TOP)
 	@echo " Finished."
 	@echo "****************************************************************"
 
-PACK_SRC=ecUtil uID ecWhy3 ecTerm ppAst ecParser ecLexer unification \
-	fol ppLogic ppLatex global \
-	whyRun whyCmds funLogic ecTyping \
-	ecInline ecDerandom ecWp ecSwap ecEager ecDeriv ecProba \
-	ecStrategy ecCommand apiUtil api
+#PACK_SRC=ecUtil uID ecWhy3 ecScope ecTerm ppAst ecParser ecLexer unification \
+#	fol ppLogic ppLatex global \
+#	whyRun whyCmds funLogic ecTyping \
+#	ecInline ecDerandom ecWp ecSwap ecEager ecDeriv ecProba \
+#	ecStrategy ecCommand apiUtil api
+
+PACK_SRC=
 
 PACK_ML=$(PACK_SRC:%=$(SRCDIR)/%.ml)
-PACK_HEAD=apiTypes ast astYacc astLogic
+PACK_HEAD=ast astYacc astLogic
 PACK_CMI=$(PACK_HEAD:%=$(SRCDIR)/%.cmi)
 PACK_CMOS=$(PACK_ML:%.ml=%.cmo)
 PACK_SIG=$(SRCDIR)/ec.cmi
@@ -56,19 +60,18 @@ GENERATED= $(SRCDIR)/ecLexer.ml $(SRCDIR)/ecParser.ml $(SRCDIR)/ecParser.mli
 
 $(SRCDIR)/ec.cmo : $(PACK_CMOS) $(PACK_SIG) $(PACK_CMI)
 	$(OCAMLC) $(OCAMLFLAGS) -pack -o $@ $(PACK_CMI) $(PACK_CMOS)
- 
 
 GENERATED+= $(SRCDIR)/ec.mli $(SRCDIR)/ec.cmi $(SRCDIR)/ec.cmo 
- 
-$(SRCDIR)/ec.mli : $(SRCDIR)/api.cmo
-	@echo "Generating " $@ "..."
-	@echo "(* Generated file: do not modify! *)" > $@
-	@echo "module ApiTypes : sig" >> $@
-	@cat $(SRCDIR)/apiTypes.mli  >> $@
-	@echo "end" >> $@
-	@echo "module Api : sig" >> $@
-	$(OCAMLC) $(OCAMLFLAGS) -i -c $(SRCDIR)/api.ml >> $@
-	@echo "end" >> $@
+
+#$(SRCDIR)/ec.mli : $(SRCDIR)/api.cmo
+#	@echo "Generating " $@ "..."
+#	@echo "(* Generated file: do not modify! *)" > $@
+#	@echo "module ApiTypes : sig" >> $@
+#	@cat $(SRCDIR)/apiTypes.mli  >> $@
+#	@echo "end" >> $@
+#	@echo "module Api : sig" >> $@
+#	$(OCAMLC) $(OCAMLFLAGS) -i -c $(SRCDIR)/api.ml >> $@
+#	@echo "end" >> $@
 
 $(TOP) : $(TOP_CMOS)
 	$(OCAMLMKTOP) -g -o $@ -I $(OCAMLGRAPHLIB) -I $(WHY3LIB) $(SRC_LIBS) $(TOP_CMOS)

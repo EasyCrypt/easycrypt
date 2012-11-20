@@ -5,6 +5,21 @@
 open EcUtil
 open Ast
 
+module PreGame = struct
+  type pgelem = 
+    | `Var of var
+    | `Fun of fct
+
+  type pregame = {
+    pg_ctxt     : pgelem Context.t;
+    pg_subgames : game Context.t; 
+  }
+
+  let empty = {
+    pg_ctxt     = Context.empty ();
+    pg_subgames = Context.empty ();
+  }
+end
 
 (** Types *)
 let mk_type_exp = EcTyping.mk_type_exp

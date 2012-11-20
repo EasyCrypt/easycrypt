@@ -18,7 +18,7 @@ let set_prover_option names =
   debug db_glob "current prover%s %a@." s 
     (pp_list ~sep:", " (fun fmt s -> Format.fprintf fmt "%s" s)) names
 
-let _ = Global.add_list_register current_provers
+(*let _ = Global.add_list_register current_provers*)
 
 open Ast
 open EcWhy3
@@ -55,9 +55,9 @@ let add_defs task =
 let add_axioms task =
   let task = ref task in
   let add (_,(r,_,(pr,t))) = 
-    if !r then 
+    if r then 
       task := Why3.Task.add_prop_decl !task Why3.Decl.Paxiom pr t in
-  Global.iter_axioms add;
+  Global.Axioms.iter add;
   !task
  
 let add_tuple task = 
@@ -113,7 +113,7 @@ let check_why3 ?timeout ?(pp_failure=true) ?(goal_name="why_goal") p =
   let task = Why3.Task.add_prop_decl task Why3.Decl.Pgoal pr t in
   let timeout = 
     match timeout with
-    | None -> Global.get_timeout()
+    | None -> Global.Timeout.get ()
     | Some t -> t in
   EcWhy3.para_call !current_provers timeout pp_failure goal_name task 
 
@@ -185,7 +185,7 @@ let check_pr name pr_list rcmp =
       Task.add_prop_decl task Decl.Paxiom pr (mk_cmp [] [] e)) task pr_list in
   let pr = Decl.create_prsymbol (Ident.id_fresh name) in
   let task = Task.add_prop_decl task Decl.Pgoal pr (mk_cmp [] [] rcmp) in
-  EcWhy3.para_call !current_provers (Global.get_timeout()) true name task
+  EcWhy3.para_call !current_provers (Global.Timeout.get ()) true name task
 
 let my_check_computed_pr_cond name cond bound concl =
   let task = init_task () in
@@ -215,7 +215,7 @@ let my_check_computed_pr_cond name cond bound concl =
   let concl = Term.t_forall_close vs [] concl in 
   let pr = Decl.create_prsymbol (Ident.id_fresh name) in
   let task = Task.add_prop_decl task Decl.Pgoal pr concl in
-  EcWhy3.para_call !current_provers (Global.get_timeout()) true name task
+  EcWhy3.para_call !current_provers (Global.Timeout.get ()) true name task
 
 let check_computed_pr_cond name pr_list cond (bound, ep) le r =
   let task = init_task () in
@@ -258,7 +258,7 @@ let check_computed_pr_cond name pr_list cond (bound, ep) le r =
   let concl = Term.t_forall_close vs [] concl in 
   let pr = Decl.create_prsymbol (Ident.id_fresh name) in
   let task = Task.add_prop_decl task Decl.Pgoal pr concl in
-  EcWhy3.para_call !current_provers (Global.get_timeout()) true name task
+  EcWhy3.para_call !current_provers (Global.Timeout.get ()) true name task
 
 
 let check_computed_pr name pr_list  = check_computed_pr_cond name pr_list []
@@ -296,7 +296,7 @@ let implies_hyps hyps p =
 
 let absurd_hyps ?(goal_name="absurd_branches") hyps =
   let p = implies_hyps hyps Fol.Pfalse in
-  let timeout = max (Global.get_timeout() / 2) 1 in
+  let timeout = max (Global.Timeout.get () / 2) 1 in
   check_why3 ~timeout ~pp_failure:false ~goal_name p
 
 let check_split_opt stop_first ?(split_and=false) 

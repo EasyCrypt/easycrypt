@@ -124,42 +124,6 @@ let pos_error pos fmt =
             raise (PosError (pos,msg))
   in Format.kfprintf f Format.str_formatter fmt
 
-let rec pp_why3_ts fmt ts = 
-  let pp_opt fmt o = 
-    match o with 
-    | None -> Format.fprintf fmt "None"
-    | Some ty -> Why3.Pretty.print_ty fmt ty in
-  Format.fprintf fmt "%a(* = %a) (%a)"
-    Why3.Pretty.print_ts ts 
-    pp_opt ts.Why3.Ty.ts_def
-    (pp_list ~sep:"," Why3.Pretty.print_tv) ts.Why3.Ty.ts_args
-    
-let catch_exn = function
-  | NotImplementedYet msg ->
-    Format.printf "@{<error>Not Implemented Yet: %s@}@." msg
-  | EcError msg ->
-    Format.printf "@{<error>%s@}@." msg
-  | CannotApply (cmd, msg) ->
-    Format.printf "@{<error>Cannot apply '%s' %s@}@." cmd msg
-  | PosError (pos, msg) ->
-    Format.printf "@{<error>%a:@\n@[<hov 2>%s@]@}@." pp_pos pos msg
-  | LexicalError (pos, msg) ->
-    Format.printf "@{<error>%a:@\n@[<hov 2>Lexical error %s@]@}@." pp_pos pos msg
-  | ParseError (pos, msg) ->
-    Format.printf "@{<error>%a:@\n@[<hov 2>Syntax error %s@]@}@." pp_pos pos msg
-  | Bug msg ->
-    Format.printf "@{<error>This is a bug (please report): %s@}@." msg
- | Why3.Decl.UnknownIdent id -> 
-    Format.printf "@{<error> Why3.Decl.UnknowIdent %s@}@." 
-        id.Why3.Ident.id_string
-  | Why3.Decl.NonFoundedTypeDecl ts ->
-      Format.printf "@{<error> Why3.Decl.NonFoundedTypeDecl %a" 
-        pp_why3_ts ts
-  | e -> try Why3.Exn_printer.exn_printer Format.std_formatter e with _ ->
-    Format.printf "@{<error> Unexpected exception (please report): %s@}@."
-      (Printexc.to_string e)
-  
-
 let pos_of_lex_pos pos1 pos2 =
   let col p = p.Lexing.pos_cnum - p.Lexing.pos_bol in
   let line p = p.Lexing.pos_lnum in

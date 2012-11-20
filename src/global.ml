@@ -1,421 +1,197 @@
-(*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*)
-
+(* -------------------------------------------------------------------- *)
 open EcUtil
+open EcScope
 open Ast
 
-(*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*)
-(** {2 Global tables} *)
+module C = Context
 
-(** General structure for register a new global element than need 
- * to be save for the undo/restore mechanism *)
-type register = {
-  r_save : int -> unit;
-  r_restore : int -> unit;
-}
-
-type global_stack = {
-  mutable gs_init  : int; (*The number after load easycrypt_base*)
-  mutable gs_count : int;
-  mutable gs_reg   : register list;
-}
-
-let global_stack = {
-  gs_init = 0;
-  gs_count = 0;
-  gs_reg   = [];
-}
-
-(** All global variable that need to be save, must call 
- * to add_register for register *)
-let add_register s r =
-  global_stack.gs_reg <-{ r_save = s; r_restore = r} :: global_stack.gs_reg
-
-let save_init_global () = 
-  global_stack.gs_init <- global_stack.gs_count
-
-
-let save_global () =
-  let nc = global_stack.gs_count + 1 in 
-  List.iter (fun r -> r.r_save nc) global_stack.gs_reg;
-  global_stack.gs_count <- nc
-
-let restore_global  = function
-  (*  We assume that 0 is to recover the initial state,
-   * after to load easycrypt_base  *)
-  | 0 -> 
-    let k = global_stack.gs_init in
-      List.iter (fun r -> r.r_restore k)  global_stack.gs_reg; 
-      global_stack.gs_count <- k
-  | k ->
-    List.iter (fun r -> r.r_restore k)  global_stack.gs_reg; 
-    global_stack.gs_count <- k
-
-
-
-(*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*)
-(** Save and restore functions for list *)
-(*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*)
-
-let list_save href lref n =
-  if (!href = []) || not (!lref == snd(List.hd !href)) then
-    href := (n,!lref) :: !href 
-
-let rec list_restore href lref n = 
-  match !href  with
-  | [] -> lref := []
-  | (i,_)::l when (i > n) -> begin href := l;list_restore href lref n end
-  | (_,l)::_ -> lref := l
-
-
-(* Warning the list [lref] should not contain reference *)
-let add_list_register lref =
-  let href = ref [] in
-  add_register (list_save href lref) (list_restore href lref)
-
-let init_register_list () = 
-  let lref = ref [] in
-  add_list_register lref;
-  lref
-
-let hash_list_restore key tbl href lref n =
-   let old = !lref in
-   list_restore href lref n;
-   if not (old == !lref) then
-     begin
-       Hashtbl.clear tbl;
-       List.iter (fun e -> Hashtbl.add tbl (key e) e) !lref
-     end
-
-let add_hash_list_register key tbl lref =
-  let href = ref [] in
-  add_register (list_save href lref) (hash_list_restore key tbl href lref)
-
-let init_register_hash_list key  =
-  let tbl = Hashtbl.create 17 in
-  let lref = ref [] in
-  add_hash_list_register key tbl lref;
-  tbl, lref
-(* Is not working, because restore compare the list and not de hash*)
-(*let init_register_hash key =
-  fst (init_register_hash_list key)*)
-
-
-
-(*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*)
-(** Save and restore functions for hash *)
-(*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*)
-
-
-let hash_save href tbl n =
-(*TODO: Check if we really need to save *)
-  (*if not (!lref == snd(List.hd !href)) then*)
-    href := (n,(Hashtbl.copy tbl)) :: !href
-
-let rec hash_restore href tbl n = 
-  match !href  with
-    | [] -> Hashtbl.clear tbl 
-    | (i,_)::l when (i > n) -> begin href := l;hash_restore href tbl n end
-    | (_,l)::_ -> begin Hashtbl.clear tbl; Hashtbl.iter (Hashtbl.add tbl) l;end
-
-
-let init_register_hash () =
-  let tbl = Hashtbl.create 17 in
-  let href = ref [] in
-  add_register (hash_save href tbl) (hash_restore href tbl);
-  tbl
-
-(** List of global declaration to export *)
+(* -------------------------------------------------------------------- *)
 type why_export =
   | WE_type of Ast.tdef
   | WE_cnst of Ast.const_body
   | WE_op of Ast.oper_body
   | WE_pred of Fol.predicate
 
-let why_export = init_register_list ()
+let why_export = ref ([] : why_export list)
 
-  
+(* -------------------------------------------------------------------- *)
+module Axioms = struct
+  type data = bool * Fol.pred * Fol.why3_axiom
 
-(* TODO merge ***_tbl ***_list *)
-
-let type_tbl, type_list = init_register_hash_list (fun td -> td.t_name) 
-
-(** Table of constant *)
-
-let cnst_tbl, cnst_list = init_register_hash_list (fun cb -> cb.c_name) 
-
-(** Table of operators *)
-
-let op_tbl, op_list = init_register_hash_list (fun ob -> ob.op_name)
-
-(* Is not working, no one use pop_list *)
-(* let pop_tbl, pop_list = init_register_hash_list (fun ob -> ob.op_name) *)
-
-let pop_tbl = init_register_hash ()
-
-(* List of predicate *)
-
-let pred_list = ref []
-
-(*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*)
-(** Save and restore functions for pred list.
- * We need to save the value, instead of the reference.  
- * Would be great if we have a generic function for save/restore that before 
- * push the structure in the list, apply a function like 'getValue' for 
- * remove reference .... *)
-(*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*)
-let _ = 
-  let h = ref [] in
-
-  let save n = 
-    h := (n,List.map (fun p -> p, Fol.opacity p) !pred_list) :: !h in
-
-  let rec restore n =
-    match !h  with
-      | [] -> pred_list := []
-      | (i,_)::l when (i > n) -> begin h := l;restore n end
-      | (_,l)::_ ->
-       pred_list := List.map (fun (p,b) -> Fol.set_opacity b p;p) l in
-
-  add_register save restore
-
-(* List of axioms *)
-
-let axiom_list = ref []
-
-(*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*)
-(** Save and restore functions for axiom_list.
- * See comments below 'pred_list'*)
-(*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*)
-let axiom_h = ref []
-
-let _ = 
-
-  let save n = 
-    axiom_h := (n,List.map (fun (s,(r,ax, w)) -> (s,(!r,ax,w))) !axiom_list) 
-         :: !axiom_h in
-
-  let rec restore n =
-    match !axiom_h  with
-      | [] -> axiom_list := []
-      | (i,_)::l when (i > n) -> begin axiom_h := l;restore n end
-      | (_,l)::_ ->
-        axiom_list   :=  List.map (fun (s,(b,ax,w)) -> (s,(ref b, ax,w))) l in
-  add_register save restore
-
-
-let init_axiom_list () =
-  List.assoc (global_stack.gs_init) !axiom_h
-
-(** Table of adversaries *)
-
-let adv_tbl = init_register_hash () (*(fun a -> a.adv_name)*)
-
-(* List of probabilitic operators specifications *)
-
-let pop_specs = init_register_list ()
-let predefined_pop_specs = []
-
-let pop_aspecs = init_register_list ()
-let predefined_pop_aspecs = [] 
-(* let pop_wpspecs = init_register_list () *)
-(* let predefined_pop_wpspecs = [] *)
-
-(** Table of games and their interfaces *)
-
-let game_tbl = init_register_hash () (*(fun g -> g.g_name)*)
-let igame_tbl = init_register_hash ()
-
-(** The current game *)
-type scope =
-  | SC_Game  of game * game list
-  | SC_IGame of igame
-
-let scope : scope option ref = ref None
-
-module Scope = struct
-  let game msg =
-    match !scope with
-      | Some (SC_Game (g, gs)) -> (g, gs)
-      | _ -> bug "No current game for `%s'" msg
-
-  let games msg =
-    match !scope with
-      | Some (SC_Game (g, gs)) -> g :: gs
-      | None                   -> []
-      | Some (SC_IGame _)      -> bug "No stacked games for `%s'" msg
-
-  let igame msg =
-    match !scope with
-      | Some (SC_IGame ig) -> ig
-      | _ -> bug "No current game interface of `%s'" msg
+  let iter (_f : string * data -> unit) =
+    ()                                  (* FIXME *)
 end
 
-let cur_game  msg = Scope.game  msg
-let cur_igame msg = Scope.igame msg
+(* -------------------------------------------------------------------- *)
+type eobj = [
+| `Theory     of theory
+| `Operator   of oper_body
+| `Interface  of igame
+| `Module     of game
+| `ModuleDecl of string * igame
+]
+
+let eobj_name = function
+  | `Theory     t      -> t.th_name
+  | `Operator   o      -> o.op_name
+  | `Interface  i      -> i.gi_name
+  | `ModuleDecl (n, _) -> n
+  | `Module     m      -> m.g_name
+
+type pretheory_item = [theory_item | `Axiom of Fol.pred]
+
+type pretheory = theory_item   C.context
+type pregame   = game_item     C.context
+type preigame  = igamesig_item C.context
+
+module PreGame = struct
+  let empty : pregame = C.empty ()
+end
+
+module PreInterface = struct
+  let empty : preigame = C.empty ()
+end
+
+type preobj = [
+| `Theory    of pretheory
+| `Module    of pregame
+| `Interface of preigame
+]
+
+type scope = (string * preobj) list
+
+module Typing = struct
+  let game (_scope : scope) ((_name, _m) : string * pregame) =
+    (assert false : game)
+end
+
+module TopLevel = struct
+  type top = ((string * preobj) list) ref
+
+  let top : top = ref [ ("<top>", `Theory (C.empty ())) ]
+
+  let name_clash_error scope leaf name =
+    let path = List.map eobj_name (scope @ [leaf]) in
+      user_error "cannot refined symbol `%s' in scope `%s'"
+        name (String.concat "~>" path)
+
+  let invalid_scope () = failwith "invalid-scope" (* FIXME *)
+
+  let top_scope () =
+    List.hd !top                        (* FIXME *)
+
+  let extend (o : string * preobj) =
+    top := o :: !top
+
+  let bind (o : eobj) =
+    match !top with
+      | [] -> assert false
+      | (n, s) :: scope ->
+        let s =
+          match s, o with
+            | `Module s, (`Module    m as o) -> `Module (C.bind m.g_name  o s)
+            | `Theory s, (`Module    m as o) -> `Theory (C.bind m.g_name  o s)
+            | `Theory s, (`Interface i as o) -> `Theory (C.bind i.gi_name o s)
+            | _        , _                   -> invalid_scope ()
+        in
+          top := (n, s) :: scope
+
+  let open_game (name : string) =
+    match snd (top_scope ()) with
+      | `Interface _ -> invalid_scope ()
+      | `Theory    _
+      | `Module    _ -> extend (name, `Module PreGame.empty)
+
+  let abort_game () =
+    match !top with
+      | (_, `Module _) :: scope -> top := scope
+      | _ -> invalid_scope ()
+
+  let close_game () =
+    match !top with
+      | (name, `Module m) :: scope ->
+          let m = Typing.game scope (name, m) in
+            bind (`Module m)
+      | _ -> invalid_scope ()
+
+  let open_igame (name : string) =
+    match snd (top_scope ()) with
+      | `Interface _
+      | `Module    _ -> invalid_scope ()
+      | `Theory    _ -> extend (name, `Interface PreInterface.empty)
+
+  let abort_igame () =
+    match !top with
+      | (_, `Interface _) :: scope -> top := scope
+      | _ -> invalid_scope ()
+end
+
+(** List of global declaration to export *)
+let pred_list  = ref []                 (* Predicates list *)
+let axiom_list = ref []                 (* Axioms     list *)
+let axiom_h    = ref []
 
 (*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*)
 (*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*)
 (*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*)
 (* Global state *)
 
-(* TODO : move timeout in whyCmd *)
-type state = {
-  mutable withproof : bool;
-  mutable timeout   : int;
-}
+module type IFlag = sig
+  type flag
 
-let state = {
-  withproof = true;
-  timeout = 3;
-}
+  val get : unit -> flag
+  val set : flag -> unit
+end
 
-let set_timeout n =
-  state.timeout <- n
+module Timeout : IFlag with type flag = int = struct
+  type flag = int
 
-let get_timeout () =
-  state.timeout
+  let timeout = ref 3
 
-let get_num_instr () = global_stack.gs_count
+  let get = fun () -> !timeout
+  let set = fun v  -> timeout := v
+end
 
-let withproof () = state.withproof
+module WithProof : IFlag with type flag = bool = struct
+  type flag = bool
 
-let set_withproof b =
-  state.withproof <- b
+  let withproof = ref true
 
+  let get = fun () -> !withproof
+  let set = fun v  -> withproof := v
+end
+
+(*
 let change_withproof () =
   state.withproof <- not state.withproof;
   warning "Proof mode is now %s"
     (if state.withproof then "ON" else "OFF")
-
+*)
 
 (*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*)
 (** {2 Checking not defined string } *)
 
-let primitive_types = 
-  [ "unit", Tunit;  "int", Tint; "bool",Tbool; "real", Treal]
+let primitive_types = [
+  "unit", Tunit;
+  "int" , Tint ;
+  "bool", Tbool;
+  "real", Treal;
+]
 
-let check_not_type name pos =
-  check_not_in_tbl "type" type_tbl name pos;
-  check_not_in_list "type" primitive_types name pos
+let check_not_in_ctxt txt ctxt name pos =
+  if C.exists name ctxt then
+    pos_error pos
+      "cannot redefine '%s'@, this name has already been defined as a '%s'@."
+      name txt
 
-let check_not_constant name pos =
-  check_not_in_tbl "constant" cnst_tbl name pos
-
-let check_not_operator name pos =
-  check_not_in_tbl "prob operator" pop_tbl name pos;
-  check_not_in_tbl "operator" op_tbl name pos
-
-let check_not_adv name pos =
-  check_not_in_tbl "adversary" adv_tbl name pos
-
-let check_not_subgame_in_game game name pos =
-  let ex =
-    List.exists (fun g -> g.g_name = name) game.g_subgames
-  in
-    if ex then pos_error pos "subgame `%s' already exists" name
-
-(*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*)
-(** {2 Variable environment } *)
-
-type venv = (string * var) list
-type lvenv = (string * Fol.lvar) list
-
-let add_venv_var venv name v = (name, v)::venv
-
-let empty_venv () = []
-let empty_lvenv () = []
-
-let add_lvar lvenv name ty =
-  let lv = Fol.logic_lvar name ty in
-  let lvenv = add_venv_var lvenv name lv in
-  lvenv, lv
-
-let iter_lvenv f env = List.iter (fun (s, v) -> f s v) env
-
-let game_venv game = game.g_vars
-
-let fun_pre_venv fct =
-  let venv = game_venv fct.f_game in
-  List.fold_left (fun venv v -> add_venv_var venv v.v_name v) venv fct.f_param
-
-let fun_post_venv fct =
-  let venv = game_venv fct.f_game in
-  let vres = fct.f_res in
-  add_venv_var venv vres.v_name vres
-
-let fun_local_venv f =
-  let venv = fun_pre_venv f in
-  let fd = EcTerm.fct_def f in
-  List.fold_left (fun venv v -> add_venv_var venv v.v_name v) venv fd.f_local
-
-let find_var venv s = List.assoc s venv
-
-let find_lvar lvenv s = List.assoc s lvenv
-
-let check_var venv name pos =
-  (* check_not_constant name pos; (\* TODO: WHY? *\) *)
-  check_not_in_list "variable" venv name pos
-
-let add_var venv pos name t =
-  check_var venv name pos;
-  let v = EcTerm.mk_local name t pos in
-  let venv = add_venv_var venv name v in
-  venv, v
-
-let find_cst name = Hashtbl.find cnst_tbl name 
-
-let fresh_var venv name t =
-  let rec aux i =
-    let s = Format.sprintf "%s_%i" name i in
-    try let _ = find_var venv s in aux (i+1) 
-    with _ -> 
-      try let _ = find_cst s in aux (i+1)
-      with _ -> add_var venv dummy_pos s t in
-  try let _ = find_var venv name in aux 0
-  with _ ->
-    try let _ = find_cst name in aux 0
-    with _ -> add_var venv dummy_pos name t
-
-let iter_venv f env = List.iter (fun (s, v) -> f s v) env
-
-let eq_env env1 env2 =
-  try
-    let in_env env s _v = ignore (find_var env s) in
-    iter_venv (in_env env1) env2; iter_venv (in_env env2) env1; true
-  with Not_found -> false
-
-let lvenv_of_venv venv side =
-  List.map (fun (name, v) -> (name, Fol.lvar_of_var v side)) venv
 (*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*)
 (** {2 Findind things }
     * All these functions [find_xxx] can raise not found *)
 
-let find_adv name pos =
-  try Hashtbl.find adv_tbl name
-  with _ -> pos_error pos "unknown adversary %s@." name
-
-let iter_adv f = Hashtbl.iter f adv_tbl
-let fold_adv f c = Hashtbl.fold f adv_tbl c
-
-
 let find_primitive_type name =
   List.assoc name primitive_types
 
-let find_type name pos =
-  try Hashtbl.find type_tbl name
-  with _ -> pos_error pos "unknown type %s@." name
-
-let iter_types f = List.iter f (List.rev !type_list)
-let fold_types f acc = List.fold_left f acc !type_list
-let iter_cnst f = List.iter f (List.rev !cnst_list)
-let fold_cnst f acc = List.fold_left f acc !cnst_list
-let iter_ops f = List.iter f (List.rev !op_list)
-let fold_ops f acc = List.fold_left f acc !op_list
-let iter_axioms f = List.iter f (List.rev !axiom_list)
-
-let find_predicate name = 
-  List.find (fun pr -> name = Fol.predicate_name pr) !pred_list
-
+(*
 (** Notice that we can have several operators with the same name,
     * but with different types.
     * @raise OpNotFound when this name is not defined for these types.
@@ -447,23 +223,7 @@ let find_op ?(prob=false) pos name type_args : oper * type_exp =
           | e -> bug "Global.find_op: unexpected exception %s" (Printexc.to_string e)
       end
   in find ops
-
-(* Finding games and functions *)
-let find_igame name = Hashtbl.find igame_tbl name
-
-let find_game gname = Hashtbl.find game_tbl gname
-
-let iter_game f = Hashtbl.iter f game_tbl
-let fold_game f c = Hashtbl.fold f game_tbl c
-
-(** @raise Not_found when the function name is not in the game. *)
-let find_fct_game fct game = List.assoc fct game.g_functions
-
-(** @raise Not_found when the function name is not registered. *)
-let find_fct fctname = find_fct_game fctname (fst (Scope.game "find_fct"))
-
-
-
+*)
 
 (*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*)
 (** {2 Add things in tables}
@@ -471,25 +231,8 @@ let find_fct fctname = find_fct_game fctname (fst (Scope.game "find_fct"))
     * in the environment, and raise PosError if not.
 *)
 
-let add_type tdef =
-  let name = tdef.t_name in
-  let pos = tdef.t_pos in
-  check_not_type name pos;
-  debug db_glob "add %a" PpAst.pp_type_def tdef;
-  Hashtbl.add type_tbl name tdef;
-  type_list := tdef :: !type_list;
-  why_export := WE_type tdef :: !why_export
-
-let add_cnst c =
-  let name, pos = c.c_name, c.c_pos in
-  check_not_constant name pos;
-  debug db_glob "add %a" PpAst.pp_cnst_def c;
-  Hashtbl.add cnst_tbl name c;
-  cnst_list := c :: !cnst_list;
-  why_export := WE_cnst c ::!why_export
-
-
 (** @raise PosError if name is already defined with the same type. *)
+(*
 let add_op ?(prob=false) op =
   (* Sanity check *)
   let check_is_closed t = 
@@ -528,15 +271,6 @@ let add_op ?(prob=false) op =
     Hashtbl.add tbl name op;
     op_list := op :: !op_list;
     why_export := WE_op op :: !why_export
-
-
-
-let add_adv adv =
-  let name, pos = adv.adv_name, adv.adv_pos in
-  check_not_operator name pos;
-  check_not_adv name pos;
-  debug db_glob "add adversary : %a" PpAst.pp_adv_decl adv;
-  Hashtbl.add adv_tbl name adv
 
 let add_axiom axiom s p =
   let why3 = Fol.mk_axiom s p in
@@ -584,115 +318,17 @@ let set_all_axiom b =
   let l = init_axiom_list () in
   List.iter (fun (s,(r,_,_)) -> if not (List.mem_assoc s l) then r := b) !axiom_list 
 
-
 let set_axiom l =
   List.iter (fun (s,(r,_,_)) -> if List.mem s l then r := true) !axiom_list
 
 let unset_axiom l =
   List.iter (fun (s,(r,_,_)) -> if List.mem s l then r := false) !axiom_list
-
-let add_global pos name t =
-  let (game, _) = Scope.game "add_global" in
-  check_not_operator name pos;
-  check_not_in_list "function" game.g_functions name pos;
-  check_not_in_list "global" game.g_vars name pos;
-  let v = EcTerm.mk_global name t pos in
-  game.g_vars <- (name,v) :: game.g_vars
-
-
-
-let add_fct pos name params t_res body =
-  let (game, _) = Scope.game "add_fct" in
-  check_not_operator name pos;
-  check_not_in_list "function" game.g_functions name pos;
-  check_not_in_list "global" game.g_vars name pos;
-  let res = EcTerm.mk_local "res" t_res pos in
-  let fct = { f_name = name; f_game = game;
-              f_pos = pos; f_param = params;
-              f_body = body; f_res = res;
-              f_modify = EcTerm.Vset.elements (EcTerm.global_modified body);
-              f_read = EcTerm.Vset.elements (EcTerm.global_read body)
-            } in
-  debug db_add_loc "add function : %s@." fct.f_name;
-  game.g_functions <- (name, fct) :: game.g_functions;
-  fct
-
-let start_igame name pos =
-  if !scope <> None then
-    bug "already in a opened scope";
-  check_not_in_tbl "igame" igame_tbl name pos;
-  let ig =
-    let isig = { gi_functions = [] } in
-      { gi_name      = name;
-        gi_pos       = pos ;
-        gi_sig       = isig; }
-  in
-    debug db_add_loc "[global start game interface: %s@." name;
-    Hashtbl.add igame_tbl name ig;
-    scope := Some (SC_IGame ig)
-
-let close_igame () =
-  let igame = Scope.igame "close_igame" in
-    igame.gi_sig.gi_functions <- List.rev (igame.gi_sig.gi_functions);
-    debug db_glob "[global] end game interface: %s@." igame.gi_name;
-    debug db_glob "%a@." PpAst.pp_igame igame;
-    scope := None
-
-let abort_igame () =
-  try
-    let igame = Scope.igame "abort_igame" in
-      debug db_glob "[global] abort game interface: %s@." igame.gi_name;
-      Hashtbl.remove igame_tbl igame.gi_name;
-      scope := None
-  with _ -> ()
-
-let start_game name signame pos =
-  let games = Scope.games "start_game" in
-    begin
-      match games with
-        | []     -> check_not_in_tbl "game" game_tbl name pos
-        | g :: _ -> check_not_subgame_in_game g name pos
-    end;
-    let g =
-      let gi = { gi_functions = [] } in
-        { g_name         = name   ;
-          g_pos          = pos    ;
-          g_interface    = gi     ;
-          g_vars         = []     ;
-          g_functions    = []     ;
-          g_subgames     = []     ;
-          g_subinterface = signame;
-        }
-    in
-      debug db_add_loc "[global] start game: %s@." name;
-      scope := Some (SC_Game (g, games))
-
-let close_game () =
-  let (game, supscope) = Scope.game "close_game" in
-  game.g_vars <- List.rev (game.g_vars);
-  game.g_functions <- List.rev (game.g_functions);
-  debug db_glob "[global] end game: %s@." game.g_name;
-  debug db_glob "%a@." PpAst.pp_game game;
-  match supscope with
-    | [] ->
-        Hashtbl.add game_tbl game.g_name game;
-        scope := None
-    | sg :: sgs ->
-        sg.g_subgames <- sg.g_subgames @ [game];
-        scope := Some (SC_Game (sg, sgs))
-
-let abort_game () =
-  try
-    let (game, supscope) = Scope.game "close_game" in
-      debug db_glob "[global] abort game: %s@." game.g_name;
-      match supscope with
-        | []        -> scope := None
-        | sg :: sgs -> scope := Some (SC_Game (sg, sgs))
-  with _ -> ()
+*)
 
 (*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*)
 (** {2 Initialisation} *)
 
+(*
 let t_bool_binop = ([Tbool; Tbool], Tbool)
 let t_int_binop = ([Tint; Tint], Tint)
 let t_real_binop = ([Treal; Treal], Treal)
@@ -867,8 +503,29 @@ let init () =
 
 
 let _ = init ()
+*)
 
 (* All this function needs initialisation *)
+
+let bool_not = assert false
+let bool_and = assert false
+
+let op_int_le  = assert false            (* FIXME *)
+let op_int_lt  = assert false
+let op_int_add = assert false
+let op_int_sub = assert false
+let op_int_mul = assert false
+let op_int_pow = assert false
+
+let op_fst         = assert false
+let op_snd         = assert false
+let op_upd_map     = assert false
+let op_get_map     = assert false
+let op_length_list = assert false
+let op_in_list     = assert false
+
+(*
+
 let bool_not =
   fst (find_op dummy_pos (get_tk_name TK_NOT) [Tbool])
 
@@ -919,8 +576,9 @@ let op_int_add =
 
 let op_int_sub =
   fst (find_op dummy_pos  (get_tk_name TK_MINUS) (fst t_int_binop))
+*)
 
-
+  (*
 let op_fst t =
   fst (find_op dummy_pos "fst" [t])
 
@@ -1152,3 +810,4 @@ let add_bitstring c =
         (Fol.peq (mk_xor tx tx) zero) in
     let pname =  "xor_"^name^"_cancel" in    
     add_axiom false pname p
+*)

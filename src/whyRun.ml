@@ -113,7 +113,7 @@ let command pg args =
 *)
 let prove _batch file prover =
   let whydp = "why-dp" in
-  let whydp_args = ["-timeout "^(string_of_int (Global.get_timeout()))] in
+  let whydp_args = ["-timeout "^(string_of_int (Global.Timeout.get ()))] in
   let whydp_args = whydp_args @ (why_dp_prover_option prover) in
   let whydp_args = whydp_args @ [file] in
   let _ = command whydp whydp_args in

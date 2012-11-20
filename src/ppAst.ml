@@ -3,6 +3,11 @@
 open EcUtil
 open Ast
 
+module C = EcScope.Context
+
+let pp_ctxt ?pre ?sep ?suf pp f c =
+  pp_list ?pre ?sep ?suf (fun fmt (_, x) -> pp fmt x) f (C.tolist c)
+
 let pp_const fmt v = Format.fprintf fmt "%s" v.c_name
 
 let pp_uid_var fmt v = Format.fprintf fmt "%s_%a" v.v_name UID.pp_var v.v_id
@@ -376,19 +381,26 @@ let pp_ifct fmt ifct =
       (pp_list ~sep:", " pp_param) ifct.if_params
       pp_type_exp ifct.if_type
 
+let pp_igame_elt fmt = function
+  | `FunctionDecl ifct -> pp_ifct fmt ifct
+
 let pp_igame fmt ig =
   Format.fprintf fmt "@[<v 2>game interface %s = {@\n%a\n}@\n"
     ig.gi_name
-    (pp_list ~sep:"" pp_ifct) ig.gi_sig.gi_functions
+    (pp_ctxt ~sep:"" pp_igame_elt) ig.gi_sig.gi_context
 
-let pp_game fmt g =
-  Format.fprintf fmt "@[<v 2>game %s%s = {@\n%a%a@]@\n}@\n"
+let rec pp_game_elt fmt = function
+  | `Module   m -> pp_game      fmt m
+  | `Function f -> pp_fct       fmt f
+  | `Variable v -> pp_gvar_decl fmt v
+
+and pp_game fmt g =
+  Format.fprintf fmt "@[<v 2>game %s%s = {@\n%a@]@\n}@\n"
     g.g_name
     (match g.g_subinterface with
       | Some i -> Printf.sprintf " : %s" i
       | None   -> "")
-    (pp_list ~sep:"" pp_gvar_decl) (List.map snd g.g_vars)
-    (pp_list ~sep:"" pp_fct) (List.map snd g.g_functions)
+    (pp_ctxt ~sep:"\n" pp_game_elt) g.g_context
 
 (*
   let pp_equiv_kind fmt = function

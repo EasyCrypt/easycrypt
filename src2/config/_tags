@@ -1,0 +1,8 @@
+true  : use_menhir
+true  : debug
+<src> : include
+
+<src/*.ml>            : pkg_menhirLib
+<src/parsetree.ml>    : deriving, pkg_deriving
+<src/ec.ml>           : deriving, pkg_deriving
+<src/*.{native,byte}> : pkg_deriving

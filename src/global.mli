@@ -13,6 +13,14 @@ type why_export =
 
 val why_export : why_export list ref
 
+(* -------------------------------------------------------------------- *)
+module Axioms : sig
+  type data = bool * Fol.pred * Fol.why3_axiom
+
+  val iter: (string * data -> unit) -> unit
+end
+
+(*
 (** General structure for register a new global element that need 
  * to be save for the undo/restore mechanism *)
 type register = {
@@ -34,9 +42,19 @@ val restore_global : int -> unit
 val add_list_register : 'a list ref -> unit
 
 val cnst_list : const_body list ref
+*)
 
-val set_timeout : int -> unit
-val get_timeout : unit -> int
+module type IFlag = sig
+  type flag
+
+  val get : unit -> flag
+  val set : flag -> unit
+end
+
+module Timeout   : IFlag with type flag = int
+module WithProof : IFlag with type flag = bool
+
+(*
 val withproof : unit -> bool
 val set_withproof : bool -> unit
 val change_withproof : unit -> unit
@@ -174,6 +192,7 @@ val iter_axioms :
 
 (*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*)
 (** {2 Predefined operators} *)
+*)
 
 val op_int_le : oper
 val op_int_lt : oper
@@ -185,13 +204,14 @@ val op_int_pow : oper
 val bool_and : oper
 val bool_not : oper
 
-val op_fst : type_exp -> oper
-val op_snd : type_exp -> oper
-val op_upd_map : type_exp -> oper
-val op_get_map : type_exp -> oper
+val op_fst         : type_exp -> oper
+val op_snd         : type_exp -> oper
+val op_upd_map     : type_exp -> oper
+val op_get_map     : type_exp -> oper
 val op_length_list : type_exp -> oper
-val op_in_list : type_exp -> oper 
+val op_in_list     : type_exp -> oper 
 
+(*
 
 val op_real_of_int : oper
 val op_real_of_bool : oper
@@ -234,3 +254,4 @@ val print_all_type  : unit -> unit
 
 (** Bitstring *)
 val add_bitstring : Ast.cst_exp -> unit
+*)

@@ -1,0 +1,79 @@
+-*- outline -*-
+
+* Langage
+
+** Core language
+
+  - pWhile t.q. défini actuellement
+  - que deviennent les opérateurs probabilistes ?
+  - let-rec dans les opérateurs ?
+  - traitement explicite des fonctions pures ?
+    * peut-être utilisé
+        et comme opérateur
+        et comme procédure compatible avec la sémantique de l'opérateur
+
+** Typage
+
+  - types simples
+  - polymorphisme tel qu'il est
+  - ordre supérieur sur opérateur
+    * lambda dans les expressions ?
+      que dire des λ-expr. probabilistes ?
+  - type de données (à préciser)
+  - type classes, ou certaines instances (t.q. "le type habité")
+  - suppression des types dépendants
+    * remplacés par les types de raffinement
+        fonction F : A → B, forall x:A, φ(x) → ψ(f(x))
+
+  - logique de Hoare pour les procédures
+  - langage d'assertion plus riche ?
+
+  - complexité via typage ?
+
+** Modules
+
+  - paramétrage des modules par des valeurs
+    * induction sur ces valeurs
+
+  - théorie
+    * types (abstraits, alias)
+    * (p-)opérateurs + interprétations (axiomes)
+    * interfaces (+ foncteurs d'interfaces)
+    * modules + sous-modules + contraintes d'implémenter un certain
+      nombre d'interfaces.
+    * clone de modules + clones partiels.
+
+** Claims
+
+  - Actuellement, un claim Q(Pr[G.f : P(x1, ..., xn)]) est
+    traduit par Q(x) ou x est une variable representant
+    la classe d'equivalence de Pr[G.f : P(x1, ..., xn)]
+    pour une relation ~ t.q.
+
+      Pr[...] ~ Pr[...] => |Pr[...]| = |Pr[...]|
+
+    Actuellement, ~ est l'égalité syntaxique (non modulo α-equivalent)
+
+    Une extension possible à la quantification universelle
+    par des jeux est de transformer x est x : Mod x ... x Mod -> T
+    t.q. on prouve
+
+      ∀ G1, ..., Gn : Mod, Z(G1, ..., Gn) -> Q(x(G1, ..., Gn))
+
+    où Z(G1, ..., Gn) capture les contraintes de sous-typage au
+    niveau des interfaces de modules.
+
+  - Dans le cas où l'on doive accéder à la mémoire (pour exprimer
+    des conditions sur les variables), on peut étendre la solution
+    précédente en faisant prendre une mémoire aux opérateurs
+    d'abstraction des probabilités.
+
+** Moteur de preuve
+
+  - pouvoir mettre en équivalence des instructions directement
+    sans devoir passer explicitement par un jeu.
+
+** API
+
+  - bibliothèque standard
+    * seq, map, matrix, arrays, bitstring

@@ -717,8 +717,6 @@ let fct_adv f =
     | FctAdv(a,fcts) -> (a,fcts)
     | _  -> raise (DefinedFct f)
 
-let fct_global_vars f = List.map snd f.f_game.g_vars
-
 (* Modified global variables *)
 
 let modified_lasgn = function

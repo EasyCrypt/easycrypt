@@ -150,8 +150,6 @@ val fct_def : fct -> fct_def
 (** @raise DefinedFct when [is_defined_fct]. *)
 val fct_adv : fct -> adversary * fct list
 
-val fct_global_vars : fct -> var list
-
 val global_modified : fct_body -> Vset.t
 val global_read : fct_body -> Vset.t
 
