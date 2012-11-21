@@ -89,14 +89,15 @@ end
 module UnionFind : sig
   type t
 
-  val empty : unit -> t
-  val find  : int -> t -> t
-  val union : int -> int -> t -> t
+  val create : unit -> t
+  val find   : t -> int -> int
+  val union  : t -> int -> int -> unit
 end = struct
-  type t = (int ref * int) PTree.t
+  type m = (int ref * int) PTree.t
+  type t = m ref
 
-  let empty () =
-    PTree.empty
+  let create () =
+    ref PTree.empty
 
   let xfind =
     let rec find i ri rs m =
@@ -106,24 +107,24 @@ end = struct
                           then (i, ri, rs)
                           else find !r rk (r :: rs) m
     in
-      fun (i : int) (m : t) ->
+      fun (m : m) (i : int) ->
         let (i, ri, rs) = find i 0 [] m in
           List.iter (fun r -> r := i) rs; (i, ri)
 
-  let find (i : int) (m : t) =
-    fst (xfind i m)
+  let find (m : t) (i : int)=
+    fst (xfind !m i)
 
-  let union (i : int) (j : int) (m : t) =
-    let i, ri = xfind i m in
-    let j, rj = xfind j m in
+  let union (m : t) (i : int) (j : int) =
+    let i, ri = xfind !m i in
+    let j, rj = xfind !m j in
       if i <> j then begin
         if ri < rj then
-          PTree.insert i (ref j, ri) m
+          m := PTree.insert i (ref j, ri) !m
         else if ri > rj then
-          PTree.insert j (ref i, rj) m
+          m := PTree.insert j (ref i, rj) !m
         else begin
-          let m = PTree.insert j (ref j, rj+1) in
-            PTree.insert i (ref j, ri) m
+          m := PTree.insert j (ref j, rj+1) !m;
+          m := PTree.insert i (ref j, ri  ) !m
         end
       end
 end

@@ -24,4 +24,12 @@ module List = struct
       | x :: xs -> if x = v then Some i else index (i+1) xs
     in
       index 0 xs
+
+  let all2 (f : 'a -> 'b -> bool) xs ys =
+    let rec all2 = function
+      | ([]     , []     ) -> true
+      | (x :: xs, y :: ys) -> (f x y) && (all2 (xs, ys))
+      | (_      , _      ) -> false
+    in
+      all2 (xs, ys)
 end
