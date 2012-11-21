@@ -12,5 +12,3 @@ type form =
   | PFlet    of lpattern * form * form
   | PFforall of params_decl * form
   | PFexists of params_decl * form
-
- 

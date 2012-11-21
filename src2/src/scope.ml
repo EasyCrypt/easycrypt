@@ -86,8 +86,85 @@ module Context = struct
 end
 
 (* -------------------------------------------------------------------- *)
-type scope =  unit
+type module_expr = {
+  me_name      : symbol;
+  me_body      : module_expr_body;
+  me_interface : interface_body;
+}
 
+and module_expr_body =
+  | ME_Ident       of Path.path
+  | ME_Application of Path.path * Path.path list
+  | ME_Structure   of (symbol * interface) list
+
+and interface = module_
+
+  m_name : Path.path;
+  m_body : module_body;
+}
+
+and module_de
+
+and interface_ = {
+  i_name : Path.path;
+  i_body : interface_body;
+}
+
+and module_body = module_item list;
+
+type pretheory = pretheory_item list
+
+and premodule = {
+  pm_name : symbol;
+  pm_args : (symbol * interface_body) list;
+  pm_body : premodule_item list;
+}
+
+and preinterface = {
+  pm_name : symbol;
+  pm_body : preinterface_item list;
+}
+
+and pretheory_item = [
+  | `Operator   of operator
+  | `Axiom      of axiom
+  | `Interface  of interface
+  | `Module     of module_
+  | `ModuleDecl of module_decl
+]
+
+and premodule_item = [
+  | `Module   of module_
+  | `Variable of variable
+  | `Function of function_
+]
+
+and preinterface_item = [
+  | `FunctionDecl of function_decl
+  | `VariableDecl of variable_decl
+]
+
+type preobj = [
+  | `Operator     of operator
+  | `Axiom        of axiom
+  | `Interface    of interface
+  | `Module       of module_
+  | `ModuleDecl   of module_decl
+  | `FunctionDecl of function_decl
+  | `VariableDecl of variable_decl
+]
+
+type scope = {
+  sc_scope : pretheory;
+  sc_focus : Path.path;
+}
+
+let resolve (po : preobj) (p : Path.t) =
+
+(* -------------------------------------------------------------------- *)
+
+
+(* -------------------------------------------------------------------- *)
 let resolve (scope : scope) (path: qsymbol) = None
 
 module Op = struct

@@ -23,7 +23,7 @@ end
 (* -------------------------------------------------------------------- *)
 type scope
 
-val resolve : scope -> qsymbol ->  Path.path option
+val resolve : scope -> qsymbol -> Path.path option
 
 module Op : sig
   type op = {
