@@ -2,10 +2,11 @@
 open Symbols
 open Parsetree
 
-type params_decl = (symbol * tyexpr) list
+(* -------------------------------------------------------------------- *)
+type params_decl = (symbol * pty) list
 
 type form = 
-  | PFexpr   of expr
+  | PFexpr   of pexpr
   | PFapp    of qsymbol * form list
   | PFif     of form * form * form
   | PFlet    of lpattern * form * form

@@ -1,6 +1,7 @@
 %{
   open Parsetree
   open Lparsetree
+
   let error pos msg = failwith msg
 
   let pos_of_lex_pos _ _ = ()
@@ -11,6 +12,13 @@
     m_body         = body;
   }
 
+  let penil  ()   = PEapp (Path.toqsymbol Eccorelib.nil , [])
+  let pecons e es = PEapp (Path.toqsymbol Eccorelib.cons, [e; es])
+
+  let rec pelist es =
+    match es with
+      | []      -> penil ()
+      | e :: es -> pecons e (pelist es)
 %}
 
 %token <int> NUM
@@ -252,7 +260,7 @@ simpl_exp:
 | x=ident LKEY s=prog_num RKEY           { PErelvar (x, s) }
 | LPAREN es=exp_list2 RPAREN             { PEtuple es }
 | LPAREN e=exp RPAREN                    { e }
-| LBRACKET es=p_exp_sm_list0 RBRACKET    { PElist es }
+| LBRACKET es=p_exp_sm_list0 RBRACKET    { pelist es }
 ;
 
 exp:
@@ -340,10 +348,10 @@ form:
 (* Type expressions                                                     *)
 
 simpl_type_exp:
-| x=ident                   { Pnamed x }
+| x=qident                  { Pnamed x }
 | x=prim_ident              { Pvar x }
-| tya=type_args x=ident     { Papp (x, tya) }
-| BITSTR LKEY e=exp RKEY    { Pbitstring e }
+| tya=type_args x=qident    { Papp (x, tya) }
+| BITSTR                    { Pbitstring }
 | LPAREN ty=type_exp RPAREN { ty }
 ;
 

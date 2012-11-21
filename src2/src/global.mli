@@ -5,7 +5,7 @@ open Parsetree
 (* -------------------------------------------------------------------- *)
 module Module : sig
   type eobj = [
-    | `PEVar of (symbol list * tyexpr)
+    | `PEVar of (symbol list * pty)
     | `PEFun of (function_decl * function_body)
   ]
 

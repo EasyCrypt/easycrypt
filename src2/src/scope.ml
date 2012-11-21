@@ -1,24 +1,8 @@
 (* -------------------------------------------------------------------- *)
-module type IContext = sig
-  type symbol = string
-
-  type 'a context
-
-  exception DuplicatedNameInContext of string
-  exception UnboundName of string
-
-  val empty   : unit -> 'a context
-  val bind    : symbol -> 'a -> 'a context -> 'a context
-  val rebind  : symbol -> 'a -> 'a context -> 'a context
-  val exists  : symbol -> 'a context -> bool
-  val lookup  : symbol -> 'a context -> 'a option
-  val iter    : (symbol -> 'a -> unit) -> 'a context -> unit
-  val fold    : ('b -> symbol -> 'a -> 'b) -> 'b -> 'a context -> 'b
-  val tolist  : 'a context -> (symbol * 'a) list
-end
+open Symbols
 
 (* -------------------------------------------------------------------- *)
-module Context : IContext = struct
+module Context = struct
   module SM = Maps.StringMap
 
   module V : sig
@@ -99,4 +83,23 @@ module Context : IContext = struct
 
   let tolist (m : 'a context) =
     V.tolist m.ct_order
+end
+
+(* -------------------------------------------------------------------- *)
+type scope =  unit
+
+let resolve (scope : scope) (path: qsymbol) = None
+
+module Op = struct
+  type op = {
+    op_path : Path.path;
+    op_sig  : Types.ty list * Types.ty;
+  }
+
+  let resolve (scope : scope) (path : qsymbol) (sg : Types.ty list) =
+    None
+end
+
+module Ty = struct
+  let resolve (scope : scope) (path : qsymbol) = None
 end

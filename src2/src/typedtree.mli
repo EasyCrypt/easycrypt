@@ -1,34 +1,50 @@
 (* -------------------------------------------------------------------- *)
 open Symbols
+open Utils
 open Parsetree
+open Types
 
-type tybase = Tunit | Tbool | Tint | Treal
-
-type ty =
-  | Tbase   of tybase
-  | Tvar    of UidGen.uid
-  | Tunivar of UidGen.uid
-  | Trel    of int
-  | Ttuple  of ty list
-  | Tconstr of Path.path * ty list
-
+(* -------------------------------------------------------------------- *)
 type local = symbol * int
 
-type tyexp =
+type tyexpr =
   | Eunit                                   (* unit literal      *)
   | Ebool   of bool                         (* bool literal      *)
   | Eint    of int                          (* int. literal      *)
   | Elocal  of local * ty                   (* local variable    *)
   | Eident  of Path.path * ty               (* symbol            *)
-  | Eapp    of Path.path * tyexp list       (* op. application   *)
-  | Elet    of lpattern * tyexp * tyexp     (* let binding       *)
-  | Etuple  of tyexp list                   (* tuple constructor *)
-  | Eif     of tyexp * tyexp * tyexp        (* _ ? _ : _         *)
-  | Ernd    of tyrexp                       (* random expression *)
+  | Eapp    of Path.path * tyexpr list      (* op. application   *)
+  | Elet    of lpattern * tyexpr * tyexpr   (* let binding       *)
+  | Etuple  of tyexpr list                  (* tuple constructor *)
+  | Eif     of tyexpr * tyexpr * tyexpr     (* _ ? _ : _         *)
+  | Ernd    of tyrexpr                      (* random expression *)
 
-and tyrexp =
+and tyrexpr =
   | Rbool                                   (* flip               *)
-  | Rinter    of tyexp * tyexp              (* interval sampling  *)
-  | Rbitstr   of tyexp                      (* bitstring sampling *)
-  | Rexcepted of tyrexp * tyexp             (* restriction        *)
-  | Rapp      of Path.path * tyexp list     (* p-op. application  *)
+  | Rinter    of tyexpr * tyexpr            (* interval sampling  *)
+  | Rbitstr   of tyexpr                     (* bitstring sampling *)
+  | Rexcepted of tyrexpr * tyexpr           (* restriction        *)
+  | Rapp      of Path.path * tyexpr list    (* p-op. application  *)
+
+(* -------------------------------------------------------------------- *)
+type typolicy =
+  | TyDecl  of symbol list
+  | TyAnnot of UidGen.uidmap
+
+val transty : Scope.scope -> typolicy -> pty -> ty
+
+(* -------------------------------------------------------------------- *)
+module Env : sig
+  type env
+
+  val empty   : env
+  val bind    : symbol * ty -> env -> env
+  val bindall : (symbol * ty) list -> env -> env
+end
+  
+(* -------------------------------------------------------------------- *)
+type epolicy = {
+  epl_prob : bool;
+}
+
+val transexp : Scope.scope -> Env.env -> epolicy -> pexpr -> tyexpr * ty

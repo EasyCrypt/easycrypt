@@ -6,36 +6,35 @@ type side    = [ `Left | `Right ]    (* deriving(Show) *)
 
 let qsymb_of_symb (x : symbol) : qsymbol = ([], x)
 
-type tyexpr =
+type pty =
   | Punit
   | Pbool
   | Pint
   | Preal
-  | Pbitstring of expr
-  | Ptuple     of tyexpr list
-  | Pnamed     of symbol
+  | Pbitstring
+  | Ptuple     of pty list
+  | Pnamed     of qsymbol
   | Pvar       of symbol
-  | Papp       of symbol * tyexpr list
+  | Papp       of qsymbol * pty list
 
-and expr =
+and pexpr =
   | PEunit                                (* unit literal      *)
   | PEbool   of bool                      (* bool literal      *)
   | PEint    of int                       (* int. literal      *)
-  | PElist   of expr list                 (* list literal      *)
   | PEident  of qsymbol                   (* symbol            *)
   | PErelvar of symbol * side             (* rel. variable     *)
-  | PEapp    of qsymbol * expr list       (* op. application   *)
-  | PElet    of lpattern * expr * expr    (* let binding       *)
-  | PEtuple  of expr list                 (* tuple constructor *)
-  | PEif     of expr * expr * expr        (* _ ? _ : _         *)
-  | PErnd    of rexpr                     (* random expression *)
+  | PEapp    of qsymbol * pexpr list      (* op. application   *)
+  | PElet    of lpattern * pexpr * pexpr  (* let binding       *)
+  | PEtuple  of pexpr list                (* tuple constructor *)
+  | PEif     of pexpr * pexpr * pexpr     (* _ ? _ : _         *)
+  | PErnd    of prexpr                    (* random expression *)
 
-and rexpr =
+and prexpr =
   | PRbool                                (* flip               *)
-  | PRinter    of expr * expr             (* interval sampling  *)
-  | PRbitstr   of expr                    (* bitstring sampling *)
-  | PRexcepted of rexpr * expr            (* restriction        *)
-  | PRapp      of symbol * expr list      (* p-op. application  *)
+  | PRinter    of pexpr * pexpr           (* interval sampling  *)
+  | PRbitstr   of pexpr                   (* bitstring sampling *)
+  | PRexcepted of prexpr * pexpr          (* restriction        *)
+  | PRapp      of symbol * pexpr list     (* p-op. application  *)
 
 and lpattern =
   | LPSymbol of symbol
@@ -46,36 +45,36 @@ and lpattern =
 type lvalue =
   | LVSymbol of qsymbol
   | LVTuple  of qsymbol list
-  | LVMap    of qsymbol * expr
+  | LVMap    of qsymbol * pexpr
       (* deriving(Show) *)
 
 type rvalue =
-  [`Expr of expr | `Call of qsymbol * expr list]
+  [`Expr of pexpr | `Call of qsymbol * pexpr list]
       (* deriving(Show) *)
 
 type instr =
   | Sasgn   of lvalue * rvalue
-  | Scall   of qsymbol * expr list
-  | Sif     of expr * stmt * stmt
-  | Swhile  of expr * stmt
-  | Sassert of expr
+  | Scall   of qsymbol * pexpr list
+  | Sif     of pexpr * stmt * stmt
+  | Swhile  of pexpr * stmt
+  | Sassert of pexpr
 
 and stmt = instr list
 
 and function_decl = {
   fd_name     : symbol;
-  fd_tyargs   : (symbol * tyexpr) list;
-  fd_tyresult : tyexpr;
+  fd_tyargs   : (symbol * pty) list;
+  fd_tyresult : pty;
 }
 
 and function_body = {
-  fb_locals : (symbol list * tyexpr * expr option) list;
+  fb_locals : (symbol list * pty * pexpr option) list;
   fb_body   : stmt;
-  fb_return : expr option;
+  fb_return : pexpr option;
 }
 
 and module_item =
-  | PEVar   of (symbol list * tyexpr)
+  | PEVar   of (symbol list * pty)
   | PEFun   of (function_decl * function_body)
   | PERedef of (symbol * qsymbol)
   | PEMod   of module_
@@ -107,7 +106,7 @@ type ident_spec = symbol list
 type inv = (formula, (formula * formula) * formula option) AstLogic.g_inv
 
 type equiv_concl = 
-  | Aequiv_spec of (formula * formula) * (expr * expr) option
+  | Aequiv_spec of (formula * formula) * (pexpr * pexpr) option
   | Aequiv_inv  of inv
 
 type auto_info = inv option * ident_spec
@@ -123,7 +122,7 @@ type equiv = {
 }
 
 (* -------------------------------------------------------------------- *)
-type cnst_decl = (symbol list * tyexpr) * expr option
+type cnst_decl = (symbol list * pty) * pexpr option
     (* deriving(Show) *)
 
 (* -------------------------------------------------------------------- *)
@@ -135,11 +134,11 @@ type hint =
   | Hsame
   | Hsplit
   | Hauto
-  | Hfailure of int * expr * expr * (symbol * expr) list
+  | Hfailure of int * pexpr * pexpr * (symbol * pexpr) list
 
       (* deriving(Show) *)
 
-type claim = symbol * (expr * hint)
+type claim = symbol * (pexpr * hint)
     (* deriving(Show) *)
 
 (* -------------------------------------------------------------------- *)
@@ -148,7 +147,7 @@ type global =
   | Ginterface of interface
   | Gcnst      of cnst_decl
   | Gclaim     of claim
-  | Gtype      of (qsymbol * tyexpr option)
+  | Gtype      of (qsymbol * pty option)
       (* deriving (Show) *) 
 
 type prog = global list

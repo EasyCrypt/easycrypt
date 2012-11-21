@@ -1,93 +1,36 @@
 (* -------------------------------------------------------------------- *)
-open Symbols
 open Utils
+open Symbols
 open Parsetree
+open Types
 
 (* -------------------------------------------------------------------- *)
-type tybase = Tunit | Tbool | Tint | Treal
-
-type ty =
-  | Tbase   of tybase
-  | Tvar    of UidGen.uid
-  | Tunivar of UidGen.uid
-  | Trel    of int
-  | Ttuple  of ty list
-  | Tconstr of Path.path * ty list
-
 type local = symbol * int
 
-type tyexp =
+type tyexpr =
   | Eunit                                   (* unit literal      *)
   | Ebool   of bool                         (* bool literal      *)
   | Eint    of int                          (* int. literal      *)
   | Elocal  of local * ty                   (* local variable    *)
   | Eident  of Path.path * ty               (* symbol            *)
-  | Eapp    of Path.path * tyexp list       (* op. application   *)
-  | Elet    of lpattern * tyexp * tyexp     (* let binding       *)
-  | Etuple  of tyexp list                   (* tuple constructor *)
-  | Eif     of tyexp * tyexp * tyexp        (* _ ? _ : _         *)
-  | Ernd    of tyrexp                       (* random expression *)
+  | Eapp    of Path.path * tyexpr list      (* op. application   *)
+  | Elet    of lpattern * tyexpr * tyexpr   (* let binding       *)
+  | Etuple  of tyexpr list                  (* tuple constructor *)
+  | Eif     of tyexpr * tyexpr * tyexpr     (* _ ? _ : _         *)
+  | Ernd    of tyrexpr                      (* random expression *)
 
-and tyrexp =
+and tyrexpr =
   | Rbool                                   (* flip               *)
-  | Rinter    of tyexp * tyexp              (* interval sampling  *)
-  | Rbitstr   of tyexp                      (* bitstring sampling *)
-  | Rexcepted of tyrexp * tyexp             (* restriction        *)
-  | Rapp      of Path.path * tyexp list     (* p-op. application  *)
-
-(* -------------------------------------------------------------------- *)
-let tunit () = Tbase Tunit
-let tbool () = Tbase Tbool
-let tint  () = Tbase Tint
-
-module StdPath : sig
-  val nil  : Path.path
-  val cons : Path.path
-end = struct
-  let nil  = Path.create "<top>.nil"
-  let cons = Path.create "<top>.cons"
-end
-
-let mknil  ()   = Eapp (StdPath.nil , [     ])
-let mkcons x xs = Eapp (StdPath.cons, [x; xs])
-
-(* -------------------------------------------------------------------- *)
-module Scope : sig
-  type scope
-
-  val resolve : scope -> symbol -> (int * Path.path) option
-
-  module Op : sig
-    type op = {
-      op_path : Path.path;
-      op_probabilistic : bool;
-    }
-
-    val find   : scope -> qsymbol -> op option
-    val select : op -> ty list -> op option
-  end
-end = struct
-  type scope = unit
-
-  let resolve _ _ = assert false
-
-  module Op = struct
-    type op = {
-      op_path : Path.path;
-      op_probabilistic : bool;
-    }
-
-    let find (scope : scope) (name : qsymbol) = None
-
-    let select (op : op) (esig : ty list) = None
-  end
-end
+  | Rinter    of tyexpr * tyexpr            (* interval sampling  *)
+  | Rbitstr   of tyexpr                     (* bitstring sampling *)
+  | Rexcepted of tyrexpr * tyexpr           (* restriction        *)
+  | Rapp      of Path.path * tyexpr list    (* p-op. application  *)
 
 (* -------------------------------------------------------------------- *)
 type tyerror =
-  | UnknownTypeName          of symbol
-  | UnknownOperator          of qsymbol
-  | InvalidNumberOfTypeArgs  of symbol * int * int
+  | UnknownTypeName          of qsymbol
+  | UnknownOperatorForSig    of qsymbol * ty list
+  | InvalidNumberOfTypeArgs  of qsymbol * int * int
   | UnboundTypeParameter     of symbol
   | OpNotOverloadedForSig    of Scope.Op.op * ty list
   | UnexpectedType           of ty * ty
@@ -99,10 +42,9 @@ exception TyError of tyerror
 let tyerror x = raise (TyError x)
 
 (* -------------------------------------------------------------------- *)
-type typolicy = [
-  | `TyDecl  of symbol list
-  | `TyAnnot of UidGen.uidmap
-]
+type typolicy =
+  | TyDecl  of symbol list
+  | TyAnnot of UidGen.uidmap
 
 let transty (scope : Scope.scope) (policy : typolicy) =
   let rec transty = function
@@ -111,11 +53,10 @@ let transty (scope : Scope.scope) (policy : typolicy) =
     | Pbool        -> Tbase Tbool
     | Pint         -> Tbase Tint
     | Preal        -> Tbase Treal
-    | Pbitstring _ -> assert false        (* FIXME *)
     | Ptuple tys   -> Ttuple (List.map transty tys)
 
     | Pnamed name -> begin
-      match Scope.resolve scope name with (* FIXME *)
+      match Scope.Ty.resolve scope name with (* FIXME *)
         | None -> tyerror (UnknownTypeName name)
         | Some (i, p) ->
           if i <> 0 then
@@ -124,7 +65,7 @@ let transty (scope : Scope.scope) (policy : typolicy) =
     end
 
     | Papp (name, tyargs) -> begin
-      match Scope.resolve scope name with
+      match Scope.Ty.resolve scope name with
         | None -> tyerror (UnknownTypeName name)
         | Some (i, p) ->
           let nargs = List.length tyargs in
@@ -136,20 +77,22 @@ let transty (scope : Scope.scope) (policy : typolicy) =
 
     | Pvar a -> begin
       match policy with
-        | `TyDecl tyvars -> begin
+        | TyDecl tyvars -> begin
           match List.index a tyvars with
             | None   -> tyerror (UnboundTypeParameter a)
             | Some i -> Trel i
         end
 
-        | `TyAnnot uidmap -> Tvar (UidGen.forsym uidmap a)
+        | TyAnnot uidmap -> Tvar (UidGen.forsym uidmap a)
     end
   in
     fun ty -> transty ty
 
 (* -------------------------------------------------------------------- *)
 module Env = struct
-  type env = unit
+  type env = (symbol * ty) list
+
+  let empty = []
 
   let bind (_ : symbol * ty) (e : env) = (failwith "" : env)
 
@@ -157,53 +100,8 @@ module Env = struct
 end
 
 type epolicy = {
-  epl_probabilistic : bool;
+  epl_prob : bool;
 }
-
-(* -------------------------------------------------------------------- *)
-module Unify : sig
-  val unify : ty -> ty -> bool
-end = struct
-  open Maps
-  open Utils
-
-  let unify (t1 : ty) (t2 : ty) =
-    let uf = UnionFind.create () in
-    let tf = ref PTree.empty in
-
-    let rec unify t1 t2 =
-      match t1, t2 with
-        | Tbase   t1      , Tbase   t2       -> t1 = t2
-        | Tvar    a1      , Tvar    a2       -> a1 = a2
-        | Ttuple  t1      , Ttuple  t2       -> List.all2 unify t1 t2
-        | Tconstr (c1, p1), Tconstr (c2, p2) -> (c1 = c2) && (List.all2 unify p1 p2)
-        | Trel    r1      , Trel    r2       -> assert false
-
-        | Tunivar r1, Tunivar r2 -> begin
-          let r1 = UnionFind.find uf r1 in
-          let r2 = UnionFind.find uf r2 in
-            if   r1 = r2
-            then true
-            else
-              match PTree.lookup r1 !tf, PTree.lookup r2 !tf with
-                | None   , None   -> UnionFind.union uf r1 r2; true
-                | Some t , None
-                | None   , Some t ->
-                    tf := PTree.insert r1 t !tf;
-                    tf := PTree.insert r2 t !tf;
-                    true
-                | Some t1, Some t2 ->
-                    unify t1 t2
-        end
-
-        | _, _ -> false
-
-    in
-      unify t1 t2
-end
-
-(* -------------------------------------------------------------------- *)
-let mktyvar () = 0                      (* FIXME *)
 
 (* -------------------------------------------------------------------- *)
 let transexp (scope : Scope.scope) =
@@ -213,20 +111,12 @@ let transexp (scope : Scope.scope) =
     | PEint  i -> (Eint  i, tint  ())
 
     | PEapp (name, es) -> begin
-      match Scope.Op.find scope name with
-        | None    -> tyerror (UnknownOperator name)
-        | Some op ->
-          if op.Scope.Op.op_probabilistic && not (policy.epl_probabilistic) then
-            tyerror ProbaExpressionForbidden;
-          let es   = List.map (transexp env policy) es in
-          let esig = snd (List.split es) in
-            match Scope.Op.select op esig with
-              | None      -> tyerror (OpNotOverloadedForSig (op, esig))
-              | Some _idx -> begin
-                match op.Scope.Op.op_probabilistic with
-                  | true  -> (Ernd (Rapp (op.Scope.Op.op_path, List.map fst es)), tunit ()) (* FIXME *)
-                  | false -> (Eapp (op.Scope.Op.op_path, List.map fst es), tunit ()) (* FIXME *)
-              end
+      let es   = List.map (transexp env policy) es in
+      let esig = snd (List.split es) in
+
+        match Scope.Op.resolve scope name esig with
+          | None    -> tyerror (UnknownOperatorForSig (name, esig))
+          | Some op -> (Eapp (op.Scope.Op.op_path, List.map fst es), tunit ()) (* FIXME *)
     end
 
     | PElet (p, e1, e2) -> begin
@@ -235,7 +125,7 @@ let transexp (scope : Scope.scope) =
         match p with
           | LPSymbol x  -> transexp (Env.bind (x, ty1) env) policy e2
           | LPTuple  xs ->
-            let tyvars = List.map (fun _ -> Tvar (mktyvar ())) xs in
+            let tyvars = List.map (fun _ -> mkunivar ()) xs in
               if not (Unify.unify (Ttuple tyvars) ty1) then
                 tyerror (UnexpectedType (Ttuple tyvars, ty1));
               transexp (Env.bindall (List.combine xs tyvars) env) policy e2
@@ -260,7 +150,7 @@ let transexp (scope : Scope.scope) =
           (Eif (c, e1, e2), ty1)
 
     | PErnd re ->
-      if not policy.epl_probabilistic then
+      if not policy.epl_prob then
         tyerror ProbaExpressionForbidden;
       let re, ty = transrexp env policy re in
         (Ernd re, ty)
@@ -281,4 +171,5 @@ let transexp (scope : Scope.scope) =
   | PRapp      of symbol * expr list      (* p-op. application  *)
 *)
   in
-    ()
+    transexp
+
