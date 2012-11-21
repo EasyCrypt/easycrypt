@@ -1,8 +1,7 @@
 (* -------------------------------------------------------------------- *)
+open Symbols
 open Utils
 
-type symbol  = string                (* deriving(Show) *)
-type qsymbol = symbol list * symbol  (* deriving(Show) *)
 type side    = [ `Left | `Right ]    (* deriving(Show) *)
 
 let qsymb_of_symb (x : symbol) : qsymbol = ([], x)

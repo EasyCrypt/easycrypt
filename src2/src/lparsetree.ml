@@ -1,4 +1,5 @@
-open Utils
+(* -------------------------------------------------------------------- *)
+open Symbols
 open Parsetree
 
 type params_decl = (symbol * tyexpr) list

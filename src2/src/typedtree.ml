@@ -1,61 +1,7 @@
 (* -------------------------------------------------------------------- *)
+open Symbols
 open Utils
 open Parsetree
-
-module UidGen : sig
-  type uid = int
-  type uidmap
-
-  val create : unit -> uidmap
-  val lookup : uidmap -> symbol -> uid option
-  val forsym : uidmap -> symbol -> uid
-end = struct
-  type uid = int
-
-  type uidmap = {
-    (*---*) um_tbl : (symbol, uid) Hashtbl.t;
-    mutable um_uid : int;
-  }
-
-  let create () =
-    { um_tbl = Hashtbl.create 0;
-      um_uid = 0; }
-
-  let lookup (um : uidmap) (x : symbol) =
-    try  Some (Hashtbl.find um.um_tbl x)
-    with Not_found -> None
-
-  let forsym (um : uidmap) (x : symbol) =
-    match lookup um x with
-      | Some uid -> uid
-      | None ->
-        let uid = um.um_uid in
-          um.um_uid <- um.um_uid + 1;
-          Hashtbl.add um.um_tbl x uid;
-          uid
-end
-
-(* -------------------------------------------------------------------- *)
-module Path = struct
-  type path =
-    | Pident of symbol
-    | Pqname of symbol * path
-
-  let rec create (path : string) =
-    match try_nf (fun () -> String.index path '.') with
-      | None   -> Pident path
-      | Some i ->
-        let qname = String.sub path 0 i in
-        let path  = String.sub path i (String.length path - i) in
-          Pqname (qname, create path)
-
-  let toqsymbol =
-    let rec toqsymbol scope = function
-      | Pident x       -> (List.rev scope, x)
-      | Pqname (nm, p) -> toqsymbol (nm :: scope) p
-    in
-      fun (p : path) -> toqsymbol [] p
-end
 
 (* -------------------------------------------------------------------- *)
 type tybase = Tunit | Tbool | Tint | Treal
@@ -68,9 +14,7 @@ type ty =
   | Ttuple  of ty list
   | Tconstr of Path.path * ty list
 
-type side = Left | Right
-
-type local = symbol
+type local = symbol * int
 
 type tyexp =
   | Eunit                                   (* unit literal      *)
@@ -78,13 +22,11 @@ type tyexp =
   | Eint    of int                          (* int. literal      *)
   | Elocal  of local * ty                   (* local variable    *)
   | Eident  of Path.path * ty               (* symbol            *)
-  | Eside   of Path.path * ty * side        (* sided symbol      *)
   | Eapp    of Path.path * tyexp list       (* op. application   *)
   | Elet    of lpattern * tyexp * tyexp     (* let binding       *)
   | Etuple  of tyexp list                   (* tuple constructor *)
   | Eif     of tyexp * tyexp * tyexp        (* _ ? _ : _         *)
   | Ernd    of tyrexp                       (* random expression *)
-                                            
 
 and tyrexp =
   | Rbool                                   (* flip               *)
