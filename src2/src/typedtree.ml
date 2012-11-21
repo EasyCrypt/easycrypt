@@ -68,17 +68,23 @@ type ty =
   | Ttuple  of ty list
   | Tconstr of Path.path * ty list
 
+type side = Left | Right
+
+type local = symbol
+
 type tyexp =
   | Eunit                                   (* unit literal      *)
   | Ebool   of bool                         (* bool literal      *)
   | Eint    of int                          (* int. literal      *)
+  | Elocal  of local * ty                   (* local variable    *)
   | Eident  of Path.path * ty               (* symbol            *)
-  | Eapp    of Path.path * tyexp list       (* rel. variable     *)
-  | Elet    of lpattern * tyexp * tyexp     (* op. application   *)
-  | Etuple  of tyexp list                   (* let binding       *)
-  | Eif     of tyexp * tyexp * tyexp        (* tuple constructor *)
-  | Ernd    of tyrexp                       (* _ ? _ : _         *)
-                                            (* random expression *)
+  | Eside   of Path.path * ty * side        (* sided symbol      *)
+  | Eapp    of Path.path * tyexp list       (* op. application   *)
+  | Elet    of lpattern * tyexp * tyexp     (* let binding       *)
+  | Etuple  of tyexp list                   (* tuple constructor *)
+  | Eif     of tyexp * tyexp * tyexp        (* _ ? _ : _         *)
+  | Ernd    of tyrexp                       (* random expression *)
+                                            
 
 and tyrexp =
   | Rbool                                   (* flip               *)
@@ -144,6 +150,7 @@ type tyerror =
   | OpNotOverloadedForSig    of Scope.Op.op * ty list
   | UnexpectedType           of ty * ty
   | ProbaExpressionForbidden
+  | PatternForbiden
 
 exception TyError of tyerror
 

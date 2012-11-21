@@ -1,6 +1,6 @@
 %{
   open Parsetree
-
+  open Lparsetree
   let error pos msg = failwith msg
 
   let pos_of_lex_pos _ _ = ()
@@ -281,6 +281,8 @@ exp:
 | re=rnd_exp  { PErnd re }
 ;
 
+
+
 (* -------------------------------------------------------------------- *)
 rnd_exp:
 | LKEY n1=number COMMA n2=number RKEY
@@ -312,6 +314,27 @@ rnd_exp:
 %inline triggers:
 | LBRACKET aout=plist1(trigger, PIPE) RBRACKET { aout }
 ;
+
+(* -------------------------------------------------------------------- *)
+(* Formulas                                                             *)
+form:
+| NOT   e=form              { PFapp (qsymb_of_symb "!", [e]) }
+| e1=form    IMPL  e2=form  { PFapp (qsymb_of_symb "=>" , [e1; e2]) }
+| e1=form    IFF   e2=form  { PFapp (qsymb_of_symb "<=>", [e1; e2]) }
+| e1=form    OR    e2=form  { PFapp (qsymb_of_symb "||" , [e1; e2]) }
+| e1=form    AND   e2=form  { PFapp (qsymb_of_symb "&&" , [e1; e2]) }
+| e1=form    EQ    e2=form  { PFapp (qsymb_of_symb "="  , [e1; e2]) }
+| e1=form    NE    e2=form  { PFapp (qsymb_of_symb "<>" , [e1; e2]) }
+| IF c=form  THEN  e1=form ELSE e2=form             
+                            { PFif (c, e1, e2) }
+| LET p=lpattern EQ e1=form IN e2=form 
+                            { PFlet (p, e1, e2) }
+| e=simpl_exp               { PFexpr e }
+| FORALL pd=param_decl COMMA e=form { PFforall(pd, e) }
+| EXIST  pd=param_decl COMMA e=form { PFexists(pd,e) }
+;
+
+
 
 (* -------------------------------------------------------------------- *)
 (* Type expressions                                                     *)
