@@ -14,3 +14,4 @@ val forsym : uidmap -> symbol -> uid
 
 val uid_equal : uid -> uid -> bool
 module Muid : Map.S with type key = uid
+module Suid : Set.S with type elt = uid

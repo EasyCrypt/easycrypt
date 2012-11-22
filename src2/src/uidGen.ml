@@ -31,3 +31,4 @@ let forsym (um : uidmap) (x : symbol) =
 
 let uid_equal x y = x == y
 module Muid = Map.Make (struct type t = uid let compare x y = x - y end)
+module Suid = Set.Make (struct type t = uid let compare x y = x - y end)

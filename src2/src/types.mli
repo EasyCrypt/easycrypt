@@ -28,7 +28,7 @@ val map : (ty -> ty) -> ty -> ty
 (* [sub_exists f t] true if one of the strict-subterm of [t] valid [f] *)
 val sub_exists : (ty -> bool) -> ty -> bool
 
-val occur : UidGen.uid -> ty -> bool
+val occur_uni : UidGen.uid -> ty -> bool
 
 (* -------------------------------------------------------------------- *)
 exception UnBoundRel of int

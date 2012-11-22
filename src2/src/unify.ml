@@ -5,7 +5,7 @@ open Types
 exception TypeVarCycle of uid * ty
 
 let check_cycle u t =
-  if occur u t then raise (TypeVarCycle(u, t))
+  if occur_uni u t then raise (TypeVarCycle(u, t))
 
 exception CanNotUnify of ty * ty
 
@@ -29,7 +29,7 @@ let unify env =
     check_cycle u t; 
     let rec subst = function
       | Tunivar u' when uid_equal u u' -> t 
-      | t' -> map subst t' in
+      | t' -> Types.map subst t' in
     Muid.add u t (Muid.map subst s) in
   let rec aux s t1 t2 = 
     let t1, t2 = repr s t1, repr s t2 in
