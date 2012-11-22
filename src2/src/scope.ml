@@ -1,5 +1,6 @@
 (* -------------------------------------------------------------------- *)
 open Symbols
+open Types
 
 (* -------------------------------------------------------------------- *)
 module Context = struct
@@ -86,32 +87,86 @@ module Context = struct
 end
 
 (* -------------------------------------------------------------------- *)
+type modifier = [ `Use | `Read | `Write ]
+
 type module_expr = {
   me_name      : symbol;
-  me_body      : module_expr_body;
-  me_interface : interface_body;
+  me_body      : module_body;
+  me_interface : interface_sig;
 }
 
-and module_expr_body =
+and module_body =
   | ME_Ident       of Path.path
   | ME_Application of Path.path * Path.path list
-  | ME_Structure   of (symbol * interface) list
+  | ME_Structure   of module_structure
+  | ME_Decl        of module_decl
 
-and interface = module_
-
-  m_name : Path.path;
-  m_body : module_body;
+and module_structure = {
+  ms_params : (symbol * interface_body);
+  ms_body   : module_item list;
 }
 
-and module_de
+and module_item = [
+  | `Variable of variable
+  | `Function of function_
+]
 
-and interface_ = {
-  i_name : Path.path;
-  i_body : interface_body;
+and module_decl = {
+  md_iname     : Path.path;
+  md_interface : interface_sig;
 }
 
-and module_body = module_item list;
+and interface_expr = {
+  ie_name : symbol;
+  ie_body : interface_body;
+}
 
+and interface_body = interface_sig
+
+and interface_sig = {
+  is_body : interface_item list;
+}
+
+and interface_item = [
+  | `VariableDecl of variable_decl
+  | `FunctionDecl of function_decl
+]
+
+and function_ = {
+  f_sig  : function_decl;
+  f_body : unit;                        (* FIXME *)
+}
+
+and function_decl = {
+  fd_name      : symbol;
+  fd_params    : (symbol * Types.ty) list;
+  fd_locals    : (symbol * Types.ty) list;
+  fd_modifiers : (Path.path * modifier) list
+}
+
+and variable = {
+  v_name : symbol;
+  v_type : Types.ty;
+  v_init : tyexpr;
+}
+
+and variable_decl = {
+  vd_name : symbol;
+  vd_type : Types.ty;
+}
+
+type operator = {
+  op_name     : symbol;
+  op_typarams : int;
+  op_sig      : Types.ty list * Types.ty;
+}
+
+type axiom = {
+  ax_name : symbol;
+  ax_spec : unit;                       (* formula *)
+}
+
+(* -------------------------------------------------------------------- *)
 type pretheory = pretheory_item list
 
 and premodule = {
@@ -121,20 +176,20 @@ and premodule = {
 }
 
 and preinterface = {
-  pm_name : symbol;
-  pm_body : preinterface_item list;
+  pi_name : symbol;
+  pi_body : preinterface_item list;
 }
 
 and pretheory_item = [
   | `Operator   of operator
   | `Axiom      of axiom
-  | `Interface  of interface
-  | `Module     of module_
+  | `Interface  of interface_expr
+  | `Module     of module_expr
   | `ModuleDecl of module_decl
 ]
 
 and premodule_item = [
-  | `Module   of module_
+  | `Module   of module_expr
   | `Variable of variable
   | `Function of function_
 ]
@@ -147,8 +202,8 @@ and preinterface_item = [
 type preobj = [
   | `Operator     of operator
   | `Axiom        of axiom
-  | `Interface    of interface
-  | `Module       of module_
+  | `Interface    of interface_expr
+  | `Module       of module_expr
   | `ModuleDecl   of module_decl
   | `FunctionDecl of function_decl
   | `VariableDecl of variable_decl
@@ -158,11 +213,6 @@ type scope = {
   sc_scope : pretheory;
   sc_focus : Path.path;
 }
-
-let resolve (po : preobj) (p : Path.t) =
-
-(* -------------------------------------------------------------------- *)
-
 
 (* -------------------------------------------------------------------- *)
 let resolve (scope : scope) (path: qsymbol) = None
