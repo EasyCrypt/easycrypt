@@ -21,3 +21,5 @@ let toqsymbol =
     | Pqname (nm, p) -> toqsymbol (nm :: scope) p
   in
     fun (p : path) -> toqsymbol [] p
+
+let path_equal = (=)

@@ -2,4 +2,5 @@
 open Types
 
 (* -------------------------------------------------------------------- *)
-val unify : ty -> ty -> bool
+(* TODO: change 'a this scope *)
+val unify : 'a -> ty UidGen.Muid.t -> ty -> ty -> ty UidGen.Muid.t

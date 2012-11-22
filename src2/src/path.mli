@@ -7,3 +7,5 @@ type path =
 
 val create    : string -> path
 val toqsymbol : path -> qsymbol
+
+val path_equal : path -> path -> bool

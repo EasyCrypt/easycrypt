@@ -1,9 +1,11 @@
 (* -------------------------------------------------------------------- *)
 open Symbols
 open Parsetree
-
+open UidGen
 (* -------------------------------------------------------------------- *)
 type tybase = Tunit | Tbool | Tint | Treal
+
+val tyb_equal : tybase -> tybase -> bool
 
 type ty =
   | Tbase   of tybase
@@ -20,6 +22,33 @@ val tint  : unit -> ty
 
 val mkunivar : unit -> ty
 
+(* -------------------------------------------------------------------- *)
+(* [map f t] applies [f] on strict-subterm of [t] (not recursive) *)
+val map : (ty -> ty) -> ty -> ty
+(* [sub_exists f t] true if one of the strict-subterm of [t] valid [f] *)
+val sub_exists : (ty -> bool) -> ty -> bool
+
+val occur : UidGen.uid -> ty -> bool
+
+(* -------------------------------------------------------------------- *)
+exception UnBoundRel of int
+exception UnBoundUni of UidGen.uid
+exception UnBoundVar of UidGen.uid
+
+val subst_rel : ty array -> ty -> ty
+val subst_uni : ty Muid.t -> ty -> ty
+val subst_var : ty Muid.t -> ty -> ty
+
+
+
+
+
+
+
+
+
+
+(** TODO move this *)
 (* -------------------------------------------------------------------- *)
 type local = symbol * int
 

@@ -28,3 +28,6 @@ let forsym (um : uidmap) (x : symbol) =
         um.um_uid <- um.um_uid + 1;
         Hashtbl.add um.um_tbl x uid;
         uid
+
+let uid_equal x y = x == y
+module Muid = Map.Make (struct type t = uid let compare x y = x - y end)
