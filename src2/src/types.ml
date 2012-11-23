@@ -2,7 +2,6 @@
 open Utils
 open Symbols
 open Path
-open Parsetree
 open UidGen
 (* -------------------------------------------------------------------- *)
 type tybase = Tunit | Tbool | Tint | Treal
@@ -140,7 +139,7 @@ type clone_info = {
   }
 
 
-let clone_ty cl ty = 
+let clone_ty cl = 
   let rec aux = function
     | Tbase _ | Trel _ as t -> t
     | Tvar _ | Tunivar _ -> assert false 
@@ -155,6 +154,10 @@ let clone_ty cl ty =
             let p = Path.subst_path cl.cl_path p in
             Tconstr(p,lty) in
   aux
+
+
+
+
 
             
             
@@ -187,6 +190,10 @@ let clone_ty cl ty =
 (* -------------------------------------------------------------------- *)
 type local = symbol * int
 
+type lpattern =
+  | LSymbol of local
+  | LTuple  of local list
+
 type tyexpr =
   | Eunit                                   (* unit literal      *)
   | Ebool   of bool                         (* bool literal      *)
@@ -200,8 +207,8 @@ type tyexpr =
   | Ernd    of tyrexpr                      (* random expression *)
 
 and tyrexpr =
-  | Rbool                                   (* flip               *)
-  | Rinter    of tyexpr * tyexpr            (* interval sampling  *)
-  | Rbitstr   of tyexpr                     (* bitstring sampling *)
-  | Rexcepted of tyrexpr * tyexpr           (* restriction        *)
-  | Rapp      of Path.path * tyexpr list    (* p-op. application  *)
+  | Rbool                                    (* flip               *)
+  | Rinter    of tyexpr * tyexpr             (* interval sampling  *)
+  | Rbitstr   of tyexpr                      (* bitstring sampling *)
+  | Rexcepted of tyrexpr * tyexpr            (* restriction        *)
+  | Rapp      of Path.path * tyexpr list (* p-op. application  *)

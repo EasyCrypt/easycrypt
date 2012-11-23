@@ -3,6 +3,7 @@ open Symbols
 open Utils
 open Parsetree
 open Types
+open Typesexpr
 open Typesmod
 
 (* -------------------------------------------------------------------- *)

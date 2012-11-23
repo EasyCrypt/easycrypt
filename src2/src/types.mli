@@ -16,6 +16,8 @@ type ty =
   | Ttuple  of ty Parray.t 
   | Tconstr of Path.path * ty Parray.t 
 
+type ty_decl = int * ty
+
 (* -------------------------------------------------------------------- *)
 val tunit : unit -> ty
 val tbool : unit -> ty
@@ -42,6 +44,14 @@ val full_inst_var : ty Muid.t -> ty -> ty
 val full_inst     : ty Muid.t * ty Muid.t -> ty -> ty
 val inst_uni : ty Muid.t -> ty -> ty
 
+(* -------------------------------------------------------------------- *)
+
+type clone_info = {
+    cl_path : Path.subst_path;
+    cl_ty : ty_decl Path.Mp.t;
+  }
+
+val clone_ty : clone_info -> ty -> ty
 
 
 
@@ -52,9 +62,14 @@ val inst_uni : ty Muid.t -> ty -> ty
 
 
 
-(** TODO move this *)
+
+
 (* -------------------------------------------------------------------- *)
 type local = symbol * int
+
+type lpattern =
+  | LSymbol of local
+  | LTuple  of local list 
 
 type tyexpr =
   | Eunit                                   (* unit literal      *)
@@ -69,8 +84,8 @@ type tyexpr =
   | Ernd    of tyrexpr                      (* random expression *)
 
 and tyrexpr =
-  | Rbool                                   (* flip               *)
-  | Rinter    of tyexpr * tyexpr            (* interval sampling  *)
-  | Rbitstr   of tyexpr                     (* bitstring sampling *)
-  | Rexcepted of tyrexpr * tyexpr           (* restriction        *)
-  | Rapp      of Path.path * tyexpr list    (* p-op. application  *)
+  | Rbool                                    (* flip               *)
+  | Rinter    of tyexpr * tyexpr             (* interval sampling  *)
+  | Rbitstr   of tyexpr                      (* bitstring sampling *)
+  | Rexcepted of tyrexpr * tyexpr            (* restriction        *)
+  | Rapp      of Path.path * tyexpr list (* p-op. application  *)
