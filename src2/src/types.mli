@@ -9,9 +9,9 @@ val tyb_equal : tybase -> tybase -> bool
 
 type ty =
   | Tbase   of tybase
-  | Tvar    of UidGen.uid
+  | Tvar    of string * UidGen.uid
   | Tunivar of UidGen.uid
-  | Trel    of int
+  | Trel    of string * int
   | Ttuple  of ty list
   | Tconstr of Path.path * ty list
 

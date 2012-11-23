@@ -9,12 +9,11 @@ let tyb_equal : tybase -> tybase -> bool = (==)
 
 type ty =
   | Tbase   of tybase
-  | Tvar    of UidGen.uid
+  | Tvar    of string * UidGen.uid
   | Tunivar of UidGen.uid
-  | Trel    of int
+  | Trel    of string * int
   | Ttuple  of ty list
   | Tconstr of Path.path * ty list
-
 
 (* -------------------------------------------------------------------- *)
 let tunit () = Tbase Tunit
@@ -22,7 +21,7 @@ let tbool () = Tbase Tbool
 let tint  () = Tbase Tint
 
 (* -------------------------------------------------------------------- *)
-let mkunivar () = Tvar (UidGen.unique ())
+let mkunivar () = Tunivar (UidGen.unique ())
 
 let map f t = 
   match t with 
@@ -50,7 +49,7 @@ let full_get_rel s i = try s.(i) with _ -> raise (UnBoundRel i)
 let full_inst_rel s =
   let rec subst t = 
     match t with
-    | Trel i -> full_get_rel s i 
+    | Trel(_, i) -> full_get_rel s i 
     | _ -> map subst t in
   subst 
 
@@ -79,14 +78,14 @@ let full_get_var s id =
 let full_inst_var s = 
   let rec subst t = 
     match t with
-    | Tvar id -> full_get_var s id
+    | Tvar(_, id) -> full_get_var s id
     | _ -> map subst t in
   subst 
 
 let full_inst (su,sv) = 
   let rec subst t = 
     match t with
-    | Tvar id -> full_get_var sv id
+    | Tvar(_, id) -> full_get_var sv id
     | Tunivar id -> full_get_uni su id
     | _ -> map subst t in
   subst
@@ -105,15 +104,15 @@ let close su lty t =
   let rec gen ((su, sv) as s) t =
     match t with
     | Tbase _ -> s, t 
-    | Tvar v -> 
+    | Tvar(n, v) -> 
         (try s, Muid.find v sv with _ ->
           let r = fresh_rel () in
-          let t = Trel r in
+          let t = Trel(n, r) in
           (su, Muid.add v t sv), t)
     | Tunivar u ->
         (try s, Muid.find u su with _ ->
           let r = fresh_rel () in
-          let t = Trel r in
+          let t = Trel("'a", r) in
           (Muid.add u t su, sv), t)
     | Trel _ -> assert false
     | Ttuple lty -> let s,lty = gens s lty in s, Ttuple(lty)

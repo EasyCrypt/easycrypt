@@ -41,7 +41,7 @@ let unify env =
         else bind s u1 t2
     | Tunivar id, t | t, Tunivar id -> bind s id t 
     | Tbase b1, Tbase b2 when tyb_equal b1 b2 -> s
-    | Tvar v1, Tvar v2 when uid_equal v1 v2 -> s
+    | Tvar(_, v1), Tvar(_, v2) when uid_equal v1 v2 -> s
     | Ttuple lt1, Ttuple lt2 ->
         if List.length lt1 <> List.length lt2 then 
           raise (CanNotUnify(t1,t2))
