@@ -6,11 +6,12 @@
 
   let pos_of_lex_pos _ _ = ()
 
-  let mk_mod ?isig name body = {
-    m_name         = name;
-    m_subinterface = isig;
-    m_body         = body;
+  let mk_mod ?modtype params body = Pm_struct {
+    ps_params    = params;
+    ps_signature = modtype;
+    ps_body      = body;
   }
+
 
   let penil  ()   = PEapp (Path.toqsymbol Eccorelib.nil , [])
   let pecons e es = PEapp (Path.toqsymbol Eccorelib.cons, [e; es])
@@ -487,32 +488,29 @@ ret_stmt:
 
 fun_def_body:
 | LKEY decl=loc_decl* s=stmt rs=ret_stmt RKEY
-    { { fb_locals = decl;
-        fb_body   = s   ;
-        fb_return = rs  ; }
+    { { pfb_locals = decl;
+        pfb_body   = s   ;
+        pfb_return = rs  ; }
     }
 ;
 
 fun_decl:
 | x=ident pd=param_decl COLON ty=type_exp
-    { { fd_name     = x ;
-        fd_tyargs   = pd;
-        fd_tyresult = ty; }
+    { { pfd_name     = x ;
+        pfd_tyargs   = pd;
+        pfd_tyresult = ty; }
     }
 ;
 
 mod_item:
 | v=var_decl
-    { PEVar v }
+    { Pst_var v }
 
 | m=mod_def
-    { PEMod m }
+    { let x, m = m in Pst_mod (x, m) }
 
 | FUN decl=fun_decl EQ body=fun_def_body
-    { PEFun (decl, body) }
-
-| FUN x=ident EQ qf=qident
-    { PERedef (x, qf) }
+    { Pst_fun (decl, body) }
 ;
 
 (* -------------------------------------------------------------------- *)
@@ -523,8 +521,11 @@ mod_body:
 ;
 
 mod_def:
-| MODULE x=ident EQ body=mod_body { mk_mod x body }
-| MODULE x=ident COLON i=ident EQ body=mod_body { mk_mod ~isig:i x body }
+| MODULE x=ident EQ body=mod_body
+    { (x, mk_mod [] body) }
+
+| MODULE x=ident COLON i=qident EQ body=mod_body
+    { (x, mk_mod ~modtype:(Pty_ident i) [] body) }
 ;
 
 (* -------------------------------------------------------------------- *)
@@ -534,16 +535,14 @@ sig_elem:
 | FUN decl=fun_decl { `FunctionDecl decl }
 ;
 
-sig_body:
-| x=sig_elem* { { s_context = x } }
-;
-
 sig_def:
-| MODULE INTERFACE x=ident EQ LKEY body=sig_body RKEY {
-    { i_name      = x;
-      i_signature = body; }
+| MODULE INTERFACE x=ident EQ i=sig_body {
+    (x, i)
   }
 ;
+
+sig_body:                               (* FIXME *)
+| x=qident { Pty_ident x }
 
 (* -------------------------------------------------------------------- *)
 (* Types declarations / definitions                                     *)

@@ -1,5 +1,7 @@
 (* -------------------------------------------------------------------- *)
+open Utils
 open Symbols
+open Path
 open Types
 
 (* -------------------------------------------------------------------- *)
@@ -90,16 +92,17 @@ end
 type modifier = [ `Use | `Read | `Write ]
 
 type module_expr = {
-  me_name      : symbol;
-  me_body      : module_body;
-  me_interface : interface_sig;
+  me_name       : symbol;
+  me_body       : module_body;
+  me_components : module_components;
+  me_interface  : interface_sig;
 }
 
 and module_body =
   | ME_Ident       of Path.path
   | ME_Application of Path.path * Path.path list
   | ME_Structure   of module_structure
-  | ME_Decl        of module_decl
+  | ME_Decl        of Path.path
 
 and module_structure = {
   ms_params : (symbol * interface_body);
@@ -107,21 +110,24 @@ and module_structure = {
 }
 
 and module_item = [
+  | `Module   of module_expr
   | `Variable of variable
   | `Function of function_
 ]
 
-and module_decl = {
-  md_iname     : Path.path;
-  md_interface : interface_sig;
-}
+and module_components = module_components_item list
+
+and module_components_item = module_item
 
 and interface_expr = {
   ie_name : symbol;
   ie_body : interface_body;
 }
 
-and interface_body = interface_sig
+and interface_body =
+  | MI_Ident       of Path.path
+  | MI_Application of Path.path * Path.path list
+  | MI_Sig         of interface_sig
 
 and interface_sig = {
   is_body : interface_item list;
@@ -133,14 +139,14 @@ and interface_item = [
 ]
 
 and function_ = {
-  f_sig  : function_decl;
-  f_body : unit;                        (* FIXME *)
+  f_sig    : function_decl;
+  f_locals : (symbol * Types.ty) list;
+  f_body   : unit;                      (* FIXME *)
 }
 
 and function_decl = {
   fd_name      : symbol;
   fd_params    : (symbol * Types.ty) list;
-  fd_locals    : (symbol * Types.ty) list;
   fd_modifiers : (Path.path * modifier) list
 }
 
@@ -167,17 +173,9 @@ type axiom = {
 }
 
 (* -------------------------------------------------------------------- *)
-type pretheory = pretheory_item list
-
-and premodule = {
-  pm_name : symbol;
-  pm_args : (symbol * interface_body) list;
-  pm_body : premodule_item list;
-}
-
-and preinterface = {
-  pi_name : symbol;
-  pi_body : preinterface_item list;
+type pretheory = {
+  pt_name : symbol;
+  pt_body : pretheory_item list;
 }
 
 and pretheory_item = [
@@ -185,34 +183,40 @@ and pretheory_item = [
   | `Axiom      of axiom
   | `Interface  of interface_expr
   | `Module     of module_expr
-  | `ModuleDecl of module_decl
 ]
 
-and premodule_item = [
-  | `Module   of module_expr
-  | `Variable of variable
-  | `Function of function_
-]
+type scope = pretheory
 
-and preinterface_item = [
-  | `FunctionDecl of function_decl
-  | `VariableDecl of variable_decl
-]
+(* -------------------------------------------------------------------- *)
+let mc_find1_module (name : symbol) (m : module_components) =
+  List.pick
+    (function
+      | `Module me when me.me_name = name -> Some me
+      | _ -> None)
+    m
 
-type preobj = [
-  | `Operator     of operator
-  | `Axiom        of axiom
-  | `Interface    of interface_expr
-  | `Module       of module_expr
-  | `ModuleDecl   of module_decl
-  | `FunctionDecl of function_decl
-  | `VariableDecl of variable_decl
-]
+let rec mc_find_module (p : Path.path) (m : module_components) =
+  match p with
+    | Pident x -> mc_find1_module x m
+    | Pqname (x, p) ->
+        obind
+          (mc_find1_module x m) 
+          (fun me -> mc_find_module p me.me_components)
 
-type scope = {
-  sc_scope : pretheory;
-  sc_focus : Path.path;
-}
+let find1_module (name : symbol) (scope : scope) =
+  List.pick
+    (function
+      | `Module me when me.me_name = name -> Some me
+      | _ -> None)
+    scope.pt_body
+
+let rec find_module (p : path) (scope : scope) =
+  match p with
+    | Pident x -> find1_module x scope
+    | Pqname (x, p) ->
+        obind
+          (find1_module x scope)
+          (fun me -> mc_find_module p me.me_components)
 
 (* -------------------------------------------------------------------- *)
 let resolve (scope : scope) (path: qsymbol) = None
@@ -223,10 +227,30 @@ module Op = struct
     op_sig  : Types.ty list * Types.ty;
   }
 
-  let resolve (scope : scope) (path : qsymbol) (sg : Types.ty list) =
-    None
+  let resolve (scope : scope) (path : qsymbol) (_sg : Types.ty list) = (* FIXME *)
+    assert false
+(*
+    match path with
+      | Pident x ->
+          List.filter
+            (function `Operator o when o.op_name = x -> true | _ -> false)
+            scope.pt_body
+      | Pqname (_, _) ->
+          []
+*)
 end
 
 module Ty = struct
-  let resolve (scope : scope) (path : qsymbol) = None
+  let resolve (scope : scope) (path : qsymbol) =
+    assert false
+
+(*
+    match path with
+      | Pident x ->
+          List.findopt
+            (function `Type t when t.t_name = x -> true | _ -> false)
+            scope.pt_body
+      | Pqname (_, _) ->
+          None
+*)
 end

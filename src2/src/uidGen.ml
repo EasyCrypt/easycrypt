@@ -29,6 +29,8 @@ let forsym (um : uidmap) (x : symbol) =
         Hashtbl.add um.um_tbl x uid;
         uid
 
+(* -------------------------------------------------------------------- *)
 let uid_equal x y = x == y
-module Muid = Map.Make (struct type t = uid let compare x y = x - y end)
-module Suid = Set.Make (struct type t = uid let compare x y = x - y end)
+
+module Muid = Map.Make (struct type t = uid let compare x y = y - x end)
+module Suid = Set.Make (struct type t = uid let compare x y = y - x end)

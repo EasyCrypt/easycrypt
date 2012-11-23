@@ -3,6 +3,7 @@ open Utils
 open Symbols
 open Parsetree
 open Types
+open Typesmod
 
 (* -------------------------------------------------------------------- *)
 type tyerror =
@@ -31,7 +32,7 @@ let transty (scope : Scope.scope) (policy : typolicy) =
     | Pbool        -> Tbase Tbool
     | Pint         -> Tbase Tint
     | Preal        -> Tbase Treal
-    | Ptuple tys   -> Ttuple (List.map transty tys)
+    | Ptuple tys   -> Ttuple (Parray.fmap transty tys)
 
     | Pnamed name -> begin
       match Scope.Ty.resolve scope name with (* FIXME *)
@@ -39,7 +40,7 @@ let transty (scope : Scope.scope) (policy : typolicy) =
         | Some (i, p) ->
           if i <> 0 then
             tyerror (InvalidNumberOfTypeArgs (name, 0, i));
-          Tconstr (p, [])
+          Tconstr (p, Parray.empty)
     end
 
     | Papp (name, tyargs) -> begin
@@ -49,7 +50,7 @@ let transty (scope : Scope.scope) (policy : typolicy) =
           let nargs = List.length tyargs in
             if i <> List.length tyargs then
               tyerror (InvalidNumberOfTypeArgs (name, i, nargs));
-            let tyargs = List.map transty tyargs in
+            let tyargs = Parray.fmap transty tyargs in
               Tconstr (p, tyargs)
     end
 
@@ -58,31 +59,28 @@ let transty (scope : Scope.scope) (policy : typolicy) =
         | TyDecl tyvars -> begin
           match List.index a tyvars with
             | None   -> tyerror (UnboundTypeParameter a)
-            | Some i -> Trel i
+            | Some i -> Trel (a, i)
         end
 
-        | TyAnnot uidmap -> Tvar (UidGen.forsym uidmap a)
+        | TyAnnot uidmap -> Tvar (a, (UidGen.forsym uidmap a))
     end
   in
     fun ty -> transty ty
 
 (* -------------------------------------------------------------------- *)
-module Env = struct
-  type env = (symbol * ty) list
-
-  let empty = []
-
-  let bind (_ : symbol * ty) (e : env) = (failwith "" : env)
-
-  let bindall (_ : (symbol * ty) list) (e : env) = (failwith "" : env)
-end
-
 type epolicy = {
   epl_prob : bool;
 }
 
 (* -------------------------------------------------------------------- *)
 let transexp (scope : Scope.scope) =
+  let uidmap = ref UidGen.Muid.empty in
+
+  let unify ty1 ty2 =
+    try  uidmap := (Unify.unify scope !uidmap ty1 ty2); true
+    with Unify.CanNotUnify _ -> false
+  in
+
   let rec transexp (env : Env.env) (policy : epolicy) = function
     | PEunit   -> (Eunit  , tunit ())
     | PEbool b -> (Ebool b, tbool ())
@@ -101,29 +99,31 @@ let transexp (scope : Scope.scope) =
       let e1, ty1 = transexp env policy e1 in
       let e2, ty2 =
         match p with
-          | LPSymbol x  -> transexp (Env.bind (x, ty1) env) policy e2
+          | LPSymbol x  -> transexp (Env.bind_value x ty1 env) policy e2
           | LPTuple  xs ->
-            let tyvars = List.map (fun _ -> mkunivar ()) xs in
-              if not (Unify.unify (Ttuple tyvars) ty1) then
+            let tyvars = Parray.fmap (fun _ -> mkunivar ()) xs in
+              if not (unify (Ttuple tyvars) ty1) then
                 tyerror (UnexpectedType (Ttuple tyvars, ty1));
-              transexp (Env.bindall (List.combine xs tyvars) env) policy e2
+              transexp
+                (Env.bind_values (List.combine xs (Parray.to_list tyvars)) env)
+                policy e2
       in
         (Elet (p, e1, e2), ty2)
     end
 
     | PEtuple es ->
       let es, tys =
-        List.split (List.map (transexp env policy) es)
+        Parray.split (Parray.fmap (transexp env policy) es)
       in
-        (Etuple es, Ttuple tys)
+        (Etuple (Parray.to_list es), Ttuple tys)
 
     | PEif (c, e1, e2) ->
       let c, tyc = transexp env policy c in
-        if not (Unify.unify tyc (tbool ())) then
+        if not (unify tyc (tbool ())) then
           tyerror (UnexpectedType (tyc, (tbool ())));
         let e1, ty1 = transexp env policy e1 in
         let e2, ty2 = transexp env policy e2 in
-          if not (Unify.unify ty1 ty2) then
+          if not (unify ty1 ty2) then
             tyerror (UnexpectedType (ty1, ty2));
           (Eif (c, e1, e2), ty1)
 
@@ -136,18 +136,59 @@ let transexp (scope : Scope.scope) =
   and transrexp (env : Env.env) (policy : epolicy) = function
     | PRbool -> (Rbool, tbool ())
 
-(*
+    | _ -> assert false                 (* FIXME *)
+
+  (*
     | PRinter (e1, e2) ->
-      let e1, ty1 = transexp e1 in
-      let e2, ty2 = transexp e2 in
-        
+    let e1, ty1 = transexp e1 in
+    let e2, ty2 = transexp e2 in
+    
 
-                               (* flip               *)
-  | PRinter    of expr * expr             (* interval sampling  *)
-  | PRbitstr   of expr                    (* bitstring sampling *)
-  | PRexcepted of rexpr * expr            (* restriction        *)
-  | PRapp      of symbol * expr list      (* p-op. application  *)
-*)
+  (* flip               *)
+    | PRinter    of expr * expr             (* interval sampling  *)
+    | PRbitstr   of expr                    (* bitstring sampling *)
+    | PRexcepted of rexpr * expr            (* restriction        *)
+    | PRapp      of symbol * expr list      (* p-op. application  *)
+  *)
   in
-    transexp
+    transexp                            (* FIXME: close type *)
 
+(* -------------------------------------------------------------------- *)
+exception DuplicatedSigItemName   of psignature
+exception DuplicatedArgumentsName of pfunction_decl
+
+let name_of_sigitem = function
+  | `VariableDecl v -> v.pvd_name
+  | `FunctionDecl f -> f.pfd_name
+
+let transsig (scope : Scope.scope) (env : Env.env) (is : psignature) =
+  let transsig1 = function
+    | `VariableDecl x ->
+        let name  = x.pvd_name in
+        let type_ = transty scope (TyDecl []) x.pvd_type in
+          Tys_variable (name, type_)
+
+    | `FunctionDecl f ->
+        let name   = f.pfd_name in
+        let tyargs =
+          List.map                      (* FIXME: continuation *)
+            (fun (x, ty) -> (x, transty scope (TyDecl []) ty))
+            f.pfd_tyargs in
+        let resty  = transty scope (TyDecl []) f.pfd_tyresult in
+
+          if not (List.uniq (List.map fst f.pfd_tyargs)) then
+            raise (DuplicatedArgumentsName f);
+          Tys_function
+            { fs_name = name;
+              fs_sig  = (tyargs, resty);
+              fs_uses = []; }
+
+  in
+
+  let items = List.map transsig1 is in
+  let names = List.map name_of_sigitem is in
+
+    if not (List.uniq names) then
+      raise (DuplicatedSigItemName is)
+    else
+      items

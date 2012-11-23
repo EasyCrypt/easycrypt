@@ -52,6 +52,7 @@ type rvalue =
   [`Expr of pexpr | `Call of qsymbol * pexpr list]
       (* deriving(Show) *)
 
+(* -------------------------------------------------------------------- *)
 type instr =
   | Sasgn   of lvalue * rvalue
   | Scall   of qsymbol * pexpr list
@@ -61,41 +62,57 @@ type instr =
 
 and stmt = instr list
 
-and function_decl = {
-  fd_name     : symbol;
-  fd_tyargs   : (symbol * pty) list;
-  fd_tyresult : pty;
+(* -------------------------------------------------------------------- *)
+type pmodule_type =
+  | Pty_ident of qsymbol
+  | Pty_app   of pmodule_type * pmodule_type
+  | Pty_func  of (symbol * psignature) * pmodule_type
+  | Pty_sig   of psignature
+
+and psignature = psignature_item list
+
+and psignature_item = [
+  | `VariableDecl of pvariable_decl
+  | `FunctionDecl of pfunction_decl
+]
+
+and pvariable_decl = {
+  pvd_name : symbol;
+  pvd_type : pty;
 }
 
-and function_body = {
-  fb_locals : (symbol list * pty * pexpr option) list;
-  fb_body   : stmt;
-  fb_return : pexpr option;
+and pfunction_decl = {
+  pfd_name     : symbol;
+  pfd_tyargs   : (symbol * pty) list;
+  pfd_tyresult : pty;
 }
 
-and module_item =
-  | PEVar   of (symbol list * pty)
-  | PEFun   of (function_decl * function_body)
-  | PERedef of (symbol * qsymbol)
-  | PEMod   of module_
+(* -------------------------------------------------------------------- *)
+and pmodule_expr =
+  | Pm_ident  of qsymbol * qsymbol list
+  | Pm_struct of pstructure
 
-and module_ = {
-  m_name         : symbol;
-  m_subinterface : symbol option;
-  m_body         : module_item list;
+and pstructure = {
+  ps_params    : (symbol * pmodule_type) list;
+  ps_signature : pmodule_type option;
+  ps_body      : pstructure_item list;
 }
 
-and signature_item = [ `FunctionDecl of function_decl ]
+and pstructure_item =
+  | Pst_mod of symbol * pmodule_expr
+  | Pst_var of (symbol list * pty)
+  | Pst_fun of (pfunction_decl * pfunction_body)
 
-and signature = {
-  s_context : signature_item list;
+and pfunction_body = {
+  pfb_locals : (symbol list * pty * pexpr option) list;
+  pfb_body   : stmt;
+  pfb_return : pexpr option;
 }
 
-and interface = {
-  i_name      : symbol;
-  i_signature : signature;
-}
-    (* deriving(Show) *)
+(* -------------------------------------------------------------------- *)
+type ptheory_item =
+  | Pth_module  of symbol * pmodule_expr
+  | Pth_modtype of symbol * pmodule_type
 
 (* -------------------------------------------------------------------- *)
 type formula = int
@@ -143,8 +160,8 @@ type claim = symbol * (pexpr * hint)
 
 (* -------------------------------------------------------------------- *)
 type global =
-  | Gmodule    of module_
-  | Ginterface of interface
+  | Gmodule    of (symbol * pmodule_expr)
+  | Ginterface of (symbol * pmodule_type)
   | Gcnst      of cnst_decl
   | Gclaim     of claim
   | Gtype      of (qsymbol * pty option)
