@@ -45,29 +45,51 @@ exception UnBoundRel of int
 exception UnBoundUni of UidGen.uid
 exception UnBoundVar of UidGen.uid
 
-let subst_rel s =
-  let get i = try s.(i) with _ -> raise (UnBoundRel i) in
+let full_get_rel s i = try s.(i) with _ -> raise (UnBoundRel i) 
+
+let full_inst_rel s =
   let rec subst t = 
     match t with
-    | Trel i -> get i 
+    | Trel i -> full_get_rel s i 
     | _ -> map subst t in
   subst 
 
-let subst_uni s = 
-  let get id = try Muid.find id s with _ -> raise (UnBoundUni id) in
+let full_get_uni s id = 
+  try Muid.find id s with _ -> raise (UnBoundUni id) 
+
+let get_uni s id t = try Muid.find id s with _ -> t 
+
+let full_inst_uni s = 
   let rec subst t = 
     match t with
-    | Tunivar id -> get id
+    | Tunivar id -> full_get_uni s id
     | _ -> map subst t in
   subst 
 
-let subst_var s = 
-  let get id = try Muid.find id s with _ -> raise (UnBoundVar id) in
+let inst_uni s = 
   let rec subst t = 
     match t with
-    | Tvar id -> get id
+    | Tunivar id -> get_uni s id t
     | _ -> map subst t in
   subst 
+
+let full_get_var s id = 
+  try Muid.find id s with _ -> raise (UnBoundVar id) 
+
+let full_inst_var s = 
+  let rec subst t = 
+    match t with
+    | Tvar id -> full_get_var s id
+    | _ -> map subst t in
+  subst 
+
+let full_inst (su,sv) = 
+  let rec subst t = 
+    match t with
+    | Tvar id -> full_get_var sv id
+    | Tunivar id -> full_get_uni su id
+    | _ -> map subst t in
+  subst
 
 let occur_uni u = 
   let rec aux t = 
@@ -76,9 +98,10 @@ let occur_uni u =
     | _ -> sub_exists aux t in
   aux
 
-let close s lty t =
+let close su lty t =
   let count = ref (-1) in
   let fresh_rel () = incr count;!count in
+  let lty, t = List.map (inst_uni su) lty, inst_uni su t in
   let rec gen ((su, sv) as s) t =
     match t with
     | Tbase _ -> s, t 
@@ -100,8 +123,14 @@ let close s lty t =
       List.fold_left 
         (fun (s,r) t -> let s,t = gen s t in s, (t::r)) (s,[]) lt in
     s, List.rev r in
-  let s, lt = gens (s,Muid.empty) lty in
+  let s, lt = gens (Muid.empty,Muid.empty) lty in
   let s, t = gen s t in
+  let merge _ u1 u2 = 
+    match u1, u2 with
+    | Some u1, None -> Some (full_inst s u1)
+    | None, Some _ -> u2 
+    | _, _ -> assert false in
+  let s = Muid.merge merge su (fst s), snd s in
   s, lt, t 
 
 

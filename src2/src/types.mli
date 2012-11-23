@@ -35,9 +35,12 @@ exception UnBoundRel of int
 exception UnBoundUni of UidGen.uid
 exception UnBoundVar of UidGen.uid
 
-val subst_rel : ty array -> ty -> ty
-val subst_uni : ty Muid.t -> ty -> ty
-val subst_var : ty Muid.t -> ty -> ty
+val full_inst_rel : ty array -> ty -> ty
+val full_inst_uni : ty Muid.t -> ty -> ty
+val full_inst_var : ty Muid.t -> ty -> ty
+val full_inst     : ty Muid.t * ty Muid.t -> ty -> ty
+val inst_uni : ty Muid.t -> ty -> ty
+
 
 
 
