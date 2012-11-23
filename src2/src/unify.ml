@@ -1,4 +1,5 @@
 (* -------------------------------------------------------------------- *)
+open Utils
 open UidGen
 open Types
 
@@ -15,8 +16,7 @@ let is_def_type env p = assert false
 
 let unfold_type env p lt =
   let n,t = get_type env p in
-  let lt = Array.of_list lt in
-  assert (n = Array.length lt);
+  assert (n = Parray.length lt);
   full_inst_rel lt t 
 
 let unify env = 
@@ -43,13 +43,13 @@ let unify env =
     | Tbase b1, Tbase b2 when tyb_equal b1 b2 -> s
     | Tvar(_, v1), Tvar(_, v2) when uid_equal v1 v2 -> s
     | Ttuple lt1, Ttuple lt2 ->
-        if List.length lt1 <> List.length lt2 then 
+        if Parray.length lt1 <> Parray.length lt2 then 
           raise (CanNotUnify(t1,t2))
-        else List.fold_left2 aux s lt1 lt2
+        else Parray.fold_left2 aux s lt1 lt2
     | Tconstr(p1, lt1), Tconstr(p2,lt2) when Path.path_equal p1 p2 ->
-        if List.length lt1 <> List.length lt2 then
+        if Parray.length lt1 <> Parray.length lt2 then
           raise (CanNotUnify(t1,t2))
-        else List.fold_left2 aux s lt1 lt2
+        else Parray.fold_left2 aux s lt1 lt2
     | Tconstr(p, lt), t when is_def_type env p ->
         aux s (unfold_type env p lt) t
     | t, Tconstr(p, lt) when is_def_type env p ->

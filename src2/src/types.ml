@@ -1,5 +1,7 @@
 (* -------------------------------------------------------------------- *)
+open Utils
 open Symbols
+open Path
 open Parsetree
 open UidGen
 (* -------------------------------------------------------------------- *)
@@ -12,9 +14,10 @@ type ty =
   | Tvar    of string * UidGen.uid
   | Tunivar of UidGen.uid
   | Trel    of string * int
-  | Ttuple  of ty list
-  | Tconstr of Path.path * ty list
+  | Ttuple  of ty Parray.t 
+  | Tconstr of Path.path * ty Parray.t
 
+type ty_decl = int * ty
 (* -------------------------------------------------------------------- *)
 let tunit () = Tbase Tunit
 let tbool () = Tbase Tbool
@@ -26,25 +29,25 @@ let mkunivar () = Tunivar (UidGen.unique ())
 let map f t = 
   match t with 
   | Tbase _ | Tvar _ | Tunivar _ | Trel _ -> t
-  | Ttuple lty -> Ttuple (List.map f lty)
-  | Tconstr(p, lty) -> Tconstr(p, List.map f lty)
+  | Ttuple lty -> Ttuple (Parray.map f lty)
+  | Tconstr(p, lty) -> Tconstr(p, Parray.map f lty)
 
 let fold f s = function
   | Tbase _ | Tvar _ | Tunivar _ | Trel _ -> s
-  | Ttuple lty -> List.fold_left f s lty
-  | Tconstr(_, lty) -> List.fold_left f s lty
+  | Ttuple lty -> Parray.fold_left f s lty
+  | Tconstr(_, lty) -> Parray.fold_left f s lty
 
 let sub_exists f t =
   match t with
   | Tbase _ | Tvar _ | Tunivar _ | Trel _ -> false
-  | Ttuple lty -> List.exists f lty
-  | Tconstr (p, lty) -> List.exists f lty
+  | Ttuple lty -> Parray.exists f lty
+  | Tconstr (p, lty) -> Parray.exists f lty
 
 exception UnBoundRel of int
 exception UnBoundUni of UidGen.uid
 exception UnBoundVar of UidGen.uid
 
-let full_get_rel s i = try s.(i) with _ -> raise (UnBoundRel i) 
+let full_get_rel s i = try Parray.get s i with _ -> raise (UnBoundRel i) 
 
 let full_inst_rel s =
   let rec subst t = 
@@ -100,7 +103,7 @@ let occur_uni u =
 let close su lty t =
   let count = ref (-1) in
   let fresh_rel () = incr count;!count in
-  let lty, t = List.map (inst_uni su) lty, inst_uni su t in
+  let lty, t = Parray.map (inst_uni su) lty, inst_uni su t in
   let rec gen ((su, sv) as s) t =
     match t with
     | Tbase _ -> s, t 
@@ -118,10 +121,9 @@ let close su lty t =
     | Ttuple lty -> let s,lty = gens s lty in s, Ttuple(lty)
     | Tconstr(p, lty) -> let s,lty = gens s lty in s, Tconstr(p, lty)
   and gens s lt = 
-    let s,r = 
-      List.fold_left 
-        (fun (s,r) t -> let s,t = gen s t in s, (t::r)) (s,[]) lt in
-    s, List.rev r in
+    let s = ref s in
+    let lt = Parray.map (fun t -> let s',t = gen !s t in s := s'; t) lt in
+    !s, lt in
   let s, lt = gens (Muid.empty,Muid.empty) lty in
   let s, t = gen s t in
   let merge _ u1 u2 = 
@@ -132,6 +134,34 @@ let close su lty t =
   let s = Muid.merge merge su (fst s), snd s in
   s, lt, t 
 
+type clone_info = {
+    cl_path : Path.subst_path;
+    cl_ty : ty_decl Mp.t;
+  }
+
+
+let clone_ty cl ty = 
+  let rec aux = function
+    | Tbase _ | Trel _ as t -> t
+    | Tvar _ | Tunivar _ -> assert false 
+    | Ttuple lty -> Ttuple (Parray.map aux lty)
+    | Tconstr(p,lty) ->
+        let lty = Parray.map aux lty in
+        match try Some (Mp.find p cl.cl_ty) with _ -> None with
+        | Some (n,tdef) ->
+            assert (n = Parray.length lty);
+            full_inst_rel lty tdef 
+        | None -> 
+            let p = Path.subst_path cl.cl_path p in
+            Tconstr(p,lty) in
+  aux
+
+            
+            
+          
+       
+  
+  
 
   
 

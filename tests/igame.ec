@@ -36,6 +36,7 @@ game G : I = {
   }
 }.
 
+print G.
 equiv E : G:>G'.bar ~ G:>G'.bar : (true) by auto.
 
 print G.

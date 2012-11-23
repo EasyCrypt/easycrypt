@@ -1,4 +1,5 @@
 (* -------------------------------------------------------------------- *)
+open Utils
 open Symbols
 open Parsetree
 open UidGen
@@ -12,8 +13,8 @@ type ty =
   | Tvar    of string * UidGen.uid
   | Tunivar of UidGen.uid
   | Trel    of string * int
-  | Ttuple  of ty list
-  | Tconstr of Path.path * ty list
+  | Ttuple  of ty Parray.t 
+  | Tconstr of Path.path * ty Parray.t 
 
 (* -------------------------------------------------------------------- *)
 val tunit : unit -> ty
@@ -35,7 +36,7 @@ exception UnBoundRel of int
 exception UnBoundUni of UidGen.uid
 exception UnBoundVar of UidGen.uid
 
-val full_inst_rel : ty array -> ty -> ty
+val full_inst_rel : ty Parray.t -> ty -> ty
 val full_inst_uni : ty Muid.t -> ty -> ty
 val full_inst_var : ty Muid.t -> ty -> ty
 val full_inst     : ty Muid.t * ty Muid.t -> ty -> ty
