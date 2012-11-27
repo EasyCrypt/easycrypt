@@ -17,6 +17,8 @@ val bindall : (symbol * ebinding) list -> env -> env
 val bind_value  : symbol -> Types.ty -> env -> env
 val bind_values : (symbol * Types.ty) list -> env -> env
 
+val bind_module  : symbol -> tymod -> env -> env
+val bind_modules : (symbol * tymod) list -> env -> env
+
 val lookup_value  : qsymbol -> env -> (Path.path * Types.ty) option
 val lookup_module : qsymbol -> env -> (Path.path * Typesmod.module_expr) option
-

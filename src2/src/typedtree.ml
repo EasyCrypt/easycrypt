@@ -102,12 +102,10 @@ let transexp (scope : Scope.scope) =
         match p with
           | LPSymbol x  -> transexp (Env.bind_value x ty1 env) policy e2
           | LPTuple  xs ->
-            let tyvars = Parray.fmap (fun _ -> mkunivar ()) xs in
-              if not (unify (Ttuple tyvars) ty1) then
-                tyerror (UnexpectedType (Ttuple tyvars, ty1));
-              transexp
-                (Env.bind_values (List.combine xs (Parray.to_list tyvars)) env)
-                policy e2
+            let tyvars = List.map (fun _ -> mkunivar ()) xs in
+              if not (unify (Ttuple (Parray.of_list tyvars)) ty1) then
+                tyerror (UnexpectedType (Ttuple (Parray.of_list tyvars), ty1));
+              transexp (Env.bind_values (List.combine xs tyvars) env) policy e2
       in
         (Elet (p, e1, e2), ty2)
     end
