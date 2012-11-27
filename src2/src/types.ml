@@ -4,7 +4,7 @@ open Symbols
 open Path
 open UidGen
 (* -------------------------------------------------------------------- *)
-type tybase = Tunit | Tbool | Tint | Treal
+type tybase = Tunit | Tbool | Tint | Treal | Tbitstring
 
 let tyb_equal : tybase -> tybase -> bool = (==)
 
@@ -17,10 +17,18 @@ type ty =
   | Tconstr of Path.path * ty Parray.t
 
 type ty_decl = int * ty
+
 (* -------------------------------------------------------------------- *)
-let tunit () = Tbase Tunit
-let tbool () = Tbase Tbool
-let tint  () = Tbase Tint
+let tunit      () = Tbase Tunit
+let tbool      () = Tbase Tbool
+let tint       () = Tbase Tint
+let tbitstring () = Tbase Tbitstring
+
+let tlist ty =
+  Tconstr (Eccorelib.list, Parray.of_array [| ty |])
+
+let tmap domty codomty =
+  Tconstr (Eccorelib.map, Parray.of_array [| domty; codomty |])
 
 (* -------------------------------------------------------------------- *)
 let mkunivar () = Tunivar (UidGen.unique ())
@@ -133,73 +141,18 @@ let close su lty t =
   let s = Muid.merge merge su (fst s), snd s in
   s, lt, t 
 
-type clone_info = {
-    cl_path : Path.subst_path;
-    cl_ty : ty_decl Mp.t;
-  }
-
-
-let clone_ty cl = 
-  let rec aux = function
-    | Tbase _ | Trel _ as t -> t
-    | Tvar _ | Tunivar _ -> assert false 
-    | Ttuple lty -> Ttuple (Parray.map aux lty)
-    | Tconstr(p,lty) ->
-        let lty = Parray.map aux lty in
-        match try Some (Mp.find p cl.cl_ty) with _ -> None with
-        | Some (n,tdef) ->
-            assert (n = Parray.length lty);
-            full_inst_rel lty tdef 
-        | None -> 
-            let p = Path.subst_path cl.cl_path p in
-            Tconstr(p,lty) in
-  aux
-
-
-
-
-
-            
-            
-          
-       
-  
-  
-
-  
-
-
-        
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 (* -------------------------------------------------------------------- *)
-type local = symbol * int
-
 type lpattern =
-  | LSymbol of local
-  | LTuple  of local list
+  | LSymbol of Ident.t
+  | LTuple  of Ident.t list
 
 type tyexpr =
   | Eunit                                   (* unit literal      *)
   | Ebool   of bool                         (* bool literal      *)
   | Eint    of int                          (* int. literal      *)
-  | Elocal  of local * ty                   (* local variable    *)
-  | Eident  of Path.path * ty               (* symbol            *)
+  | Elocal  of Ident.t * ty                 (* local variable    *)
+  | Evar    of Path.path * ty               (* module variable   *)
   | Eapp    of Path.path * tyexpr list      (* op. application   *)
   | Elet    of lpattern * tyexpr * tyexpr   (* let binding       *)
   | Etuple  of tyexpr list                  (* tuple constructor *)
@@ -211,4 +164,4 @@ and tyrexpr =
   | Rinter    of tyexpr * tyexpr             (* interval sampling  *)
   | Rbitstr   of tyexpr                      (* bitstring sampling *)
   | Rexcepted of tyrexpr * tyexpr            (* restriction        *)
-  | Rapp      of Path.path * tyexpr list (* p-op. application  *)
+  | Rapp      of Path.path * tyexpr list     (* p-op. application  *)

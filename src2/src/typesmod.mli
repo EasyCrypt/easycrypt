@@ -1,4 +1,5 @@
 (* -------------------------------------------------------------------- *)
+open Utils
 open Symbols
 
 (* -------------------------------------------------------------------- *)
@@ -6,7 +7,7 @@ type modifier = [ `Use | `Read | `Write ]
 
 type tymod =
   | Tym_sig     of tysig
-  | Tym_functor of (symbol * tymod) * tymod
+  | Tym_functor of (Ident.t * tymod) list * tymod
 
 and tysig = tysig_item list
 
@@ -16,15 +17,15 @@ and tysig_item =
 
 and funsig = {
   fs_name : symbol;
-  fs_sig  : (symbol * Types.ty) list * Types.ty;
+  fs_sig  : (Ident.t * Types.ty) list * Types.ty;
   fs_uses : (Path.path * modifier) list;
 }
 
 (* -------------------------------------------------------------------- *)
 type module_expr = {
-  me_name       : symbol;
+  me_name       : Ident.t;
   me_body       : module_body;
-  me_components : module_components;
+  me_components : module_components Lazy.t;
   me_sig        : tymod
 }
 
@@ -35,7 +36,7 @@ and module_body =
   | ME_Decl        of Path.path
 
 and module_structure = {
-  ms_params : (symbol * tymod);
+  ms_params : (Ident.t * tymod) list;
   ms_body   : module_item list;
 }
 
@@ -51,14 +52,28 @@ and module_components_item = module_item
 
 and function_ = {
   f_sig    : funsig;
-  f_locals : (symbol * Types.ty) list;
+  f_locals : (Ident.t * Types.ty) list;
   f_body   : unit;                      (* FIXME *)
 }
 
 and variable = {
-  v_name : symbol;
+  v_name : Ident.t;
   v_type : Types.ty;
 }
+
+and stmt = instr list
+
+and instr =
+  | Sasgn   of lvalue * Path.path * Types.tyexpr list
+  | Scall   of lvalue option * Path.path * Types.tyexpr list
+  | Sif     of Types.tyexpr * stmt * stmt
+  | Swhile  of Types.tyexpr * stmt
+  | Sassert of Types.tyexpr
+
+and lvalue =
+  | LvVar   of (Path.path * Types.ty)
+  | LvTuple of (Path.path * Types.ty) Parray.t
+  | LvMap   of Path.path * Types.tyexpr * Types.ty
 
 (* -------------------------------------------------------------------- *)
 type operator = {

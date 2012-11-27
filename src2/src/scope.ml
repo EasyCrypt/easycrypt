@@ -189,34 +189,46 @@ type scope = pretheory
 
 (* -------------------------------------------------------------------- *)
 let mc_find1_module (name : symbol) (m : module_components) =
+  assert false
+(*
   List.pick
     (function
       | `Module me when me.me_name = name -> Some me
       | _ -> None)
     m
+*)
 
 let rec mc_find_module (p : Path.path) (m : module_components) =
+  assert false
+(*
   match p with
     | Pident x -> mc_find1_module x m
     | Pqname (x, p) ->
         obind
           (mc_find1_module x m) 
           (fun me -> mc_find_module p me.me_components)
+*)
 
 let find1_module (name : symbol) (scope : scope) =
+  assert false
+(*
   List.pick
     (function
       | `Module me when me.me_name = name -> Some me
       | _ -> None)
     scope.pt_body
+*)
 
 let rec find_module (p : path) (scope : scope) =
+  assert false
+(*
   match p with
     | Pident x -> find1_module x scope
     | Pqname (x, p) ->
         obind
           (find1_module x scope)
           (fun me -> mc_find_module p me.me_components)
+*)
 
 (* -------------------------------------------------------------------- *)
 let resolve (scope : scope) (path: qsymbol) = None

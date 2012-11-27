@@ -258,7 +258,6 @@ simpl_exp:
 | se=simpl_exp LBRACKET e1=exp LEFTARROW e2=exp RBRACKET
                                          { PEapp (qsymb_of_symb "<set>", [se; e1; e2]) }
 | x=ident LPAREN es=exp_list0 RPAREN     { PEapp (qsymb_of_symb x, es) }
-| x=ident LKEY s=prog_num RKEY           { PErelvar (x, s) }
 | LPAREN es=exp_list2 RPAREN             { PEtuple es }
 | LPAREN e=exp RPAREN                    { e }
 | LBRACKET es=p_exp_sm_list0 RBRACKET    { pelist es }
@@ -426,9 +425,9 @@ param_decl:
 (* Statements                                                           *)
 
 lvalue:
-| x=qident                              { LVSymbol x      }
-| LPAREN p=plist2(qident, COMMA) RPAREN { LVTuple  p      }
-| x=qident LBRACKET e=exp RBRACKET      { LVMap    (x, e) }
+| x=qident                              { PLvSymbol x      }
+| LPAREN p=plist2(qident, COMMA) RPAREN { PLvTuple  p      }
+| x=qident LBRACKET e=exp RBRACKET      { PLvMap    (x, e) }
 ;
 
 rvalue:
@@ -438,20 +437,20 @@ rvalue:
 
 base_instr:
 | f=qident LPAREN es=exp_list0 RPAREN
-    { Scall (f, es) }
+    { PScall (f, es) }
 
 | x=lvalue EQ e=rvalue
-    { Sasgn (x, e) }
+    { PSasgn (x, e) }
 
 | ASSERT LPAREN c=exp RPAREN 
-     { Sassert c }
+     { PSassert c }
 ;
 
 instr:
 | bi=base_instr SEMICOLON                       { bi }
-| IF LPAREN c=exp RPAREN b1=block ELSE b2=block { Sif (c, b1, b2) }
-| IF LPAREN c=exp RPAREN b =block               { Sif (c, b , []) }
-| WHILE LPAREN c=exp RPAREN b=block             { Swhile (c, b) }
+| IF LPAREN c=exp RPAREN b1=block ELSE b2=block { PSif (c, b1, b2) }
+| IF LPAREN c=exp RPAREN b =block               { PSif (c, b , []) }
+| WHILE LPAREN c=exp RPAREN b=block             { PSwhile (c, b) }
 ;
 
 block:

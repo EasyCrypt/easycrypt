@@ -12,6 +12,7 @@ type pty =
   | Pint
   | Preal
   | Pbitstring
+  | Punivar
   | Ptuple     of pty list
   | Pnamed     of qsymbol
   | Pvar       of symbol
@@ -22,7 +23,6 @@ and pexpr =
   | PEbool   of bool                      (* bool literal      *)
   | PEint    of int                       (* int. literal      *)
   | PEident  of qsymbol                   (* symbol            *)
-  | PErelvar of symbol * side             (* rel. variable     *)
   | PEapp    of qsymbol * pexpr list      (* op. application   *)
   | PElet    of lpattern * pexpr * pexpr  (* let binding       *)
   | PEtuple  of pexpr list                (* tuple constructor *)
@@ -34,7 +34,7 @@ and prexpr =
   | PRinter    of pexpr * pexpr           (* interval sampling  *)
   | PRbitstr   of pexpr                   (* bitstring sampling *)
   | PRexcepted of prexpr * pexpr          (* restriction        *)
-  | PRapp      of symbol * pexpr list     (* p-op. application  *)
+  | PRapp      of qsymbol * pexpr list    (* p-op. application  *)
 
 and lpattern =
   | LPSymbol of symbol
@@ -42,25 +42,25 @@ and lpattern =
 
       (* deriving(Show) *)
 
-type lvalue =
-  | LVSymbol of qsymbol
-  | LVTuple  of qsymbol list
-  | LVMap    of qsymbol * pexpr
+type plvalue =
+  | PLvSymbol of qsymbol
+  | PLvTuple  of qsymbol list
+  | PLvMap    of qsymbol * pexpr
       (* deriving(Show) *)
 
-type rvalue =
+type prvalue =
   [`Expr of pexpr | `Call of qsymbol * pexpr list]
       (* deriving(Show) *)
 
 (* -------------------------------------------------------------------- *)
-type instr =
-  | Sasgn   of lvalue * rvalue
-  | Scall   of qsymbol * pexpr list
-  | Sif     of pexpr * stmt * stmt
-  | Swhile  of pexpr * stmt
-  | Sassert of pexpr
+type pinstr =
+  | PSasgn   of plvalue * prvalue
+  | PScall   of qsymbol * pexpr list
+  | PSif     of pexpr * pstmt * pstmt
+  | PSwhile  of pexpr * pstmt
+  | PSassert of pexpr
 
-and stmt = instr list
+and pstmt = pinstr list
 
 (* -------------------------------------------------------------------- *)
 type pmodule_type =
@@ -99,13 +99,13 @@ and pstructure = {
 }
 
 and pstructure_item =
-  | Pst_mod of symbol * pmodule_expr
+  | Pst_mod of (symbol * pmodule_expr)
   | Pst_var of (symbol list * pty)
   | Pst_fun of (pfunction_decl * pfunction_body)
 
 and pfunction_body = {
   pfb_locals : (symbol list * pty * pexpr option) list;
-  pfb_body   : stmt;
+  pfb_body   : pstmt;
   pfb_return : pexpr option;
 }
 
@@ -128,7 +128,7 @@ type equiv_concl =
 
 type auto_info = inv option * ident_spec
 
-type auto_eager = (auto_info, stmt) AstLogic.helper
+type auto_eager = (auto_info, pstmt) AstLogic.helper
       
 type equiv = {
   eq_name  : symbol           ;

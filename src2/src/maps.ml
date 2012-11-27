@@ -1,4 +1,29 @@
 (* -------------------------------------------------------------------- *)
+open Utils
+
+(* -------------------------------------------------------------------- *)
+module Map = struct
+  module type OrderedType = Map.OrderedType
+
+  module type S = sig
+    include Map.S
+
+    val update  : ('a option -> 'a) -> key -> 'a t -> 'a t
+    val tryfind : key -> 'a t -> 'a option
+  end
+
+  module Make(O : OrderedType) : S with type key = O.t = struct
+    include Map.Make(O)
+
+    let tryfind (k : key) (m : 'a t) : 'a option =
+      try_nf (fun () -> find k m)
+
+    let update f (k : key) (m : 'a t) =
+      add k (f (tryfind k m)) m
+  end
+end
+
+(* -------------------------------------------------------------------- *)
 module StringOrdered = struct
   type t = string
 
@@ -7,6 +32,16 @@ end
 
 module StringSet = Set.Make(StringOrdered)
 module StringMap = Map.Make(StringOrdered)
+
+(* -------------------------------------------------------------------- *)
+module IntOrdered = struct
+  type t = int
+
+  let compare = (Pervasives.compare : t -> t -> int)
+end
+
+module IntSet = Set.Make(IntOrdered)
+module IntMap = Map.Make(IntOrdered)
 
 (* -------------------------------------------------------------------- *)
 module PTree : sig

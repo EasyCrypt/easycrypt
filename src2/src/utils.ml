@@ -6,16 +6,44 @@ let tryexn (ignoreexn : exn -> bool) (f : unit -> 'a) =
 let try_nf (f : unit -> 'a) =
   tryexn (function Not_found -> true | _ -> false) f
 
+let (^~) f = fun x y -> f y x
+
+(* -------------------------------------------------------------------- *)
+let proj3_1 (x, _, _) = x
+let proj3_2 (_, x, _) = x
+let proj3_3 (_, _, x) = x
+
 (* -------------------------------------------------------------------- *)
 let obind (x : 'a option) (f : 'a -> 'b option) =
   match x with None -> None | Some x -> f x
+
+let omap (x : 'a option) (f : 'a -> 'b) =
+  match x with None -> None | Some x -> Some (f x)
+
+let odfl (d : 'a) (x : 'a option) =
+  match x with None -> d | Some x -> x
+
+(* -------------------------------------------------------------------- *)
+let fstmap f (x, y) = (f x, y)
+let sndmap f (x, y) = (f, f y)
 
 (* -------------------------------------------------------------------- *)
 module List = struct
   include List
 
+  let isempty xs = (=) [] xs
+
   let ohead (xs : 'a list) =
     match xs with [] -> None | x :: _ -> Some x
+
+  let rec pmap (f : 'a -> 'b option) (xs : 'a list) =
+    match xs with
+    | []      -> []
+    | x :: xs -> begin
+        match f x with
+        | None   -> pmap f xs
+        | Some x -> x :: (pmap f xs)
+    end
 
   let findopt (f : 'a -> bool) (xs : 'a list) =
     try  Some (List.find f xs)
@@ -49,6 +77,9 @@ module List = struct
     match xs with
       | []      -> true
       | x :: xs -> (not (List.mem x xs)) && (uniq xs)
+
+  let tryassoc (x : 'a) (xs : ('a * 'b) list) =
+    try_nf (fun () -> List.assoc x xs)
 end
 
 (* -------------------------------------------------------------------- *)

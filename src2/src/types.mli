@@ -4,7 +4,7 @@ open Symbols
 open Parsetree
 open UidGen
 (* -------------------------------------------------------------------- *)
-type tybase = Tunit | Tbool | Tint | Treal
+type tybase = Tunit | Tbool | Tint | Treal | Tbitstring
 
 val tyb_equal : tybase -> tybase -> bool
 
@@ -19,9 +19,12 @@ type ty =
 type ty_decl = int * ty
 
 (* -------------------------------------------------------------------- *)
-val tunit : unit -> ty
-val tbool : unit -> ty
-val tint  : unit -> ty
+val tunit      : unit -> ty
+val tbool      : unit -> ty
+val tint       : unit -> ty
+val tbitstring : unit -> ty
+val tlist      : ty   -> ty
+val tmap       : ty   -> ty -> ty
 
 val mkunivar : unit -> ty
 
@@ -45,38 +48,16 @@ val full_inst     : ty Muid.t * ty Muid.t -> ty -> ty
 val inst_uni : ty Muid.t -> ty -> ty
 
 (* -------------------------------------------------------------------- *)
-
-type clone_info = {
-    cl_path : Path.subst_path;
-    cl_ty : ty_decl Path.Mp.t;
-  }
-
-val clone_ty : clone_info -> ty -> ty
-
-
-
-
-
-
-
-
-
-
-
-
-(* -------------------------------------------------------------------- *)
-type local = symbol * int
-
 type lpattern =
-  | LSymbol of local
-  | LTuple  of local list 
+  | LSymbol of Ident.t
+  | LTuple  of Ident.t list
 
 type tyexpr =
   | Eunit                                   (* unit literal      *)
   | Ebool   of bool                         (* bool literal      *)
   | Eint    of int                          (* int. literal      *)
-  | Elocal  of local * ty                   (* local variable    *)
-  | Eident  of Path.path * ty               (* symbol            *)
+  | Elocal  of Ident.t * ty                 (* local variable    *)
+  | Evar    of Path.path * ty               (* module variable   *)
   | Eapp    of Path.path * tyexpr list      (* op. application   *)
   | Elet    of lpattern * tyexpr * tyexpr   (* let binding       *)
   | Etuple  of tyexpr list                  (* tuple constructor *)
@@ -88,4 +69,4 @@ and tyrexpr =
   | Rinter    of tyexpr * tyexpr             (* interval sampling  *)
   | Rbitstr   of tyexpr                      (* bitstring sampling *)
   | Rexcepted of tyrexpr * tyexpr            (* restriction        *)
-  | Rapp      of Path.path * tyexpr list (* p-op. application  *)
+  | Rapp      of Path.path * tyexpr list     (* p-op. application  *)

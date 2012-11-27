@@ -46,7 +46,7 @@ let unify env =
         if Parray.length lt1 <> Parray.length lt2 then 
           raise (CanNotUnify(t1,t2))
         else Parray.fold_left2 aux s lt1 lt2
-    | Tconstr(p1, lt1), Tconstr(p2,lt2) when Path.path_equal p1 p2 ->
+    | Tconstr(p1, lt1), Tconstr(p2,lt2) when Path.equal p1 p2 ->
         if Parray.length lt1 <> Parray.length lt2 then
           raise (CanNotUnify(t1,t2))
         else Parray.fold_left2 aux s lt1 lt2
