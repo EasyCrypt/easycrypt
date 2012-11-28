@@ -93,12 +93,16 @@
 
     "admit"       , ADMIT      ;        (* KW: dangerous *)
 
-    "type"        , TYPE       ;        (* KW: global *)
-    "cnst"        , CNST       ;        (* KW: global *)
-    "module"      , MODULE     ;        (* KW: global *)
+    "axiom"       , AXIOM      ;        (* KW: global *)
     "claim"       , CLAIM      ;        (* KW: global *)
+    "cnst"        , CNST       ;        (* KW: global *)
     "drop"        , DROP       ;        (* KW: global *)
-    "interface"   , INTERFACE  ;        (* KW: global *)
+    "end"         , END        ;        (* KW: global *)
+    "module"      , MODULE     ;        (* KW: global *)
+    "op"          , OP         ;        (* KW: global *)
+    "pop"         , POP        ;        (* KW: global *)
+    "theory"      , THEORY     ;        (* KW: global *)
+    "type"        , TYPE       ;        (* KW: global *)
   ]
 
   let keywords = Hashtbl.create 97

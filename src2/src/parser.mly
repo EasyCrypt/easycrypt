@@ -1,10 +1,11 @@
 %{
   open Parsetree
-  open Lparsetree
 
-  let error pos msg = failwith msg
-
-  let pos_of_lex_pos _ _ = ()
+  let error pos msg =
+    let msg =
+      Printf.sprintf "%s: %s" (Location.tostring pos) msg
+    in
+      failwith msg
 
   let mk_mod ?modtype params body = Pm_struct {
     ps_params    = params;
@@ -18,11 +19,7 @@
   let penil  ()   = PEapp (Path.toqsymbol Eccorelib.nil , [])
   let pecons e es = PEapp (Path.toqsymbol Eccorelib.cons, [e; es])
 
-(*
-  let rec pelist es =
-    match es with
-      | []      -> penil ()
-      | e :: es -> pecons e (pelist es)*)
+  let pelist (es : pexpr    list) : pexpr_r    = assert false
 %}
 
 %token <int> NUM
@@ -39,7 +36,7 @@
 // %token AS
 // %token ASPEC
 %token ASSERT
-// %token AXIOM
+%token AXIOM
 %token BACKSLASH
 %token BITSTR
 // %token CHECKPROOF
@@ -53,6 +50,7 @@
 %token DOTDOT
 %token DROP
 %token ELSE
+%token END
 %token EOF
 %token EQ
 // %token EQEQLBRACKET
@@ -66,7 +64,7 @@
 %token IMPL
 %token IN
 // %token INCLUDE
-%token INTERFACE
+// %token INTERFACE
 // %token KW_AND
 %token LBRACKET
 %token LEFTARROW
@@ -79,10 +77,10 @@
 %token MODULE
 %token NE
 %token NOT
-// %token OP
+%token OP
 %token OR
 %token PIPE
-// %token POP
+%token POP
 // %token PR
 // %token PRED
 // %token PROVER
@@ -101,6 +99,7 @@
 %token SPLIT
 %token STAR
 %token THEN
+%token THEORY
 // %token TILD
 %token TRUE
 %token TYPE
@@ -187,14 +186,9 @@
 %inline number     : n=NUM                 { n };
 %inline prim_ident : x=PRIM_IDENT          { x };
 
-namespace:
-| x=ident { [x] }
-| x=ident DCOLON np=namespace { x :: np }
-;
-
 qident:
-| np=namespace DOT x=ident { (np, x) }
-;
+| x=ident DCOLON qx=qident { (x :: fst qx, snd qx) }
+| x=ident                  { ([]         , x     ) }
 
 znumber:
 | /*-*/ n=NUM {  n }
@@ -229,7 +223,7 @@ prog_num:
       | 1 -> `Left
       | 2 -> `Right
       | _ -> error
-               (pos_of_lex_pos $startpos(n) $endpos(n))
+               (Location.make $startpos(n) $endpos(n))
                "variable side must be 1 or 2"
   }
 ;
@@ -245,7 +239,7 @@ op_ident:
 ;
 
 (* -------------------------------------------------------------------- *)
-(* Expressions: program expression, logical formula and real expression *)
+(* Expressions: program expression, real expression                     *)
 
 lpattern:
 | x=ident { LPSymbol x }
@@ -264,7 +258,7 @@ sexp:
 | x=ident LPAREN es=exp_list0 RPAREN     { PEapp (qsymb_of_symb x, es) }
 | LPAREN es=exp_list2 RPAREN             { PEtuple es }
 | LPAREN e=exp RPAREN                    { e }
-(*| LBRACKET es=p_exp_sm_list0 RBRACKET    { pelist es }*)
+| LBRACKET es=p_exp_sm_list0 RBRACKET    { pelist es }
 ;
 
 exp:
@@ -301,79 +295,29 @@ rnd_exp:
 | LKEY n1=number COMMA n2=number RKEY
     { if   n1 = 0 && n2 = 1
       then PRbool
-      else error (pos_of_lex_pos $startpos $endpos) "malformed bool random" }
+      else error (Location.make $startpos $endpos) "malformed bool random" }
 
 | LKEY n1=number COMMA n2=number RKEY_HAT e=loc(exp)
     { if   n1 = 0 && n2 = 1
       then PRbitstr e
-      else error (pos_of_lex_pos $startpos $endpos) "malformed random bitstring" }
+      else error (Location.make $startpos $endpos) "malformed random bitstring" }
 
 | LBRACKET e1=loc(exp) DOTDOT e2=loc(exp) RBRACKET
     { PRinter (e1, e2) }
 
 | LPAREN re=loc(rnd_exp) BACKSLASH e=loc(exp) RPAREN
     { PRexcepted (re, e) }
+
+| x=ident LPAREN es=exp_list0 RPAREN
+    { PRapp (qsymb_of_symb x, es) }
 ;
 
 (* -------------------------------------------------------------------- *)
-%inline p_exp_sm_list0: aout=plist0(exp, SEMICOLON) { aout }
+%inline p_exp_sm_list0: aout=plist0(loc(exp), SEMICOLON) { aout }
 
 %inline exp_list0: aout=plist0(loc(exp), COMMA) { aout }
 %inline exp_list1: aout=plist1(loc(exp), COMMA) { aout }
 %inline exp_list2: aout=plist2(loc(exp), COMMA) { aout }
-
-%inline trigger: aout=plist1(exp, COMMA) { aout }
-
-%inline triggers:
-| LBRACKET aout=plist1(trigger, PIPE) RBRACKET { aout }
-;
-
-(* -------------------------------------------------------------------- *)
-(* Formulas                                                             *)
-
-simpl_form:
-| TRUE                                   { PFbool true  }
-| FALSE                                  { PFbool false }
-| n=number                               { PFint n }
-| x=ident                                { PFident ([], x) }
-| se=simpl_form LBRACKET e=form RBRACKET { PFapp (qsymb_of_symb "<get>", [se; e]) }
-| se=simpl_form LBRACKET e1=form LEFTARROW e2=form RBRACKET
-                                         { PFapp (qsymb_of_symb "<set>", [se; e1; e2]) }
-| x=ident LPAREN es=exp_list0 RPAREN     { PFapp (qsymb_of_symb x, es) }
-| x=simpl_form LKEY s=prog_num RKEY      { PFside (x, s) }
-| LPAREN es=form_list2 RPAREN             { PFtuple es }
-| LPAREN e=form RPAREN                   { e }
-| LBRACKET es=p_form_sm_list0 RBRACKET   { pflist es }
-                          
-form:
-| NOT   e=form                      { PFnot e }
-| MINUS e=form %prec prec_prefix_op { PFapp (qsymb_of_symb "-", [e]) }
-| e1=form    IMPL  e2=form  { PFbinop (e1, PPimp, e2) }
-| e1=form    IFF   e2=form  { PFbinop (e1, PPiff, e2) }
-| e1=form    OR    e2=form  { PFbinop (e1, PPor, e2)  }
-| e1=form    AND   e2=form  { PFbinop (e1, PPand, e2) }
-| e1=form    EQ    e2=form  { PFapp (qsymb_of_symb "="  , [e1; e2]) }
-| e1=form    NE    e2=form  { PFnot (PFapp (qsymb_of_symb "=" , [e1; e2])) }
-| e1=form op=OP1   e2=form  { PFapp (qsymb_of_symb op   , [e1; e2]) }
-| e1=form op=OP2   e2=form  { PFapp (qsymb_of_symb op   , [e1; e2]) }
-| e1=form    MINUS e2=form  { PFapp (qsymb_of_symb "-"  , [e1; e2]) }
-| e1=form op=OP3   e2=form  { PFapp (qsymb_of_symb op   , [e1; e2]) }
-| e1=form    STAR  e2=form  { PFapp (qsymb_of_symb "*"  , [e1; e2]) }
-| e1=form op=OP4   e2=form  { PFapp (qsymb_of_symb op   , [e1; e2]) }
-
-| c=form QUESTION e1=form COLON e2=form %prec OP2 { PFif (c, e1, e2) }
-| IF c=form THEN e1=form ELSE e2=form             { PFif (c, e1, e2) }
-
-| LET p=lpattern EQ e1=form IN e2=form { PFlet (p, e1, e2) }
-| LET p=lpattern EQ e1=form IN e2=form 
-                            { PFlet (p, e1, e2) }
-| e=simpl_form               { PFform e }
-| FORALL pd=param_decl COMMA e=form { PFforall(pd, e) }
-| EXIST  pd=param_decl COMMA e=form { PFexists(pd,e) }
-;
-
-%inline p_form_sm_list0: aout=plist0(form, SEMICOLON) { aout }
-%inline form_list2: aout=plist2(form, COMMA) { aout }
 
 (* -------------------------------------------------------------------- *)
 (* Type expressions                                                     *)
@@ -500,9 +444,10 @@ fun_def_body:
 
 fun_decl:
 | x=ident pd=param_decl COLON ty=loc(type_exp)
-    { { pfd_name     = x ;
-        pfd_tyargs   = pd;
-        pfd_tyresult = ty; }
+    { { pfd_name     = x   ;
+        pfd_tyargs   = pd  ;
+        pfd_tyresult = ty  ;
+        pfd_uses     = None; }
     }
 ;
 
@@ -515,38 +460,90 @@ mod_item:
 
 | FUN decl=fun_decl EQ body=fun_def_body
     { Pst_fun (decl, body) }
+
+| FUN x=ident EQ f=qident
+    { Pst_alias (x, f) }
 ;
 
 (* -------------------------------------------------------------------- *)
 (* Modules                                                              *)
 
 mod_body:
-| LKEY mod_item* RKEY { $2 }
+| LKEY stt=mod_item* RKEY { stt }
 ;
 
 mod_def:
 | MODULE x=ident EQ body=mod_body
     { (x, mk_mod [] body) }
 
-| MODULE x=ident COLON i=qident EQ body=mod_body
-    { (x, mk_mod ~modtype:(Pty_ident i) [] body) }
+| MODULE x=ident EQ m=qident
+    { (x, Pm_ident (m, [])) }
+
+| MODULE x=ident EQ m=qident LPAREN a=plist1(qident, COMMA) RPAREN
+    { (x, Pm_ident (m, a)) }
+
+| MODULE x=ident LPAREN a=plist1(sig_arg, COMMA) RPAREN EQ body=mod_body
+    { (x, mk_mod a body) }
 ;
 
 (* -------------------------------------------------------------------- *)
 (* Modules interfaces                                                   *)
 
-sig_elem:
-| FUN decl=fun_decl { `FunctionDecl decl }
-;
-
 sig_def:
-| MODULE INTERFACE x=ident EQ i=sig_body {
-    (x, i)
-  }
+| MODULE TYPE x=ident EQ i=sig_body
+    { (x, i) }
+
+| MODULE TYPE x=ident LPAREN a=plist1(sig_arg, COMMA) RPAREN EQ i=signature
+    { (x, Pty_func (a, i)) }
 ;
 
-sig_body:                               (* FIXME *)
-| x=qident { Pty_ident x }
+sig_arg:
+| x=ident COLON i=qident { (x, i) }
+;
+
+sig_body:
+| x=qident
+    { Pty_ident x }
+
+| x=qident LPAREN a=plist1(qident, COMMA) RPAREN
+    { Pty_app (x, a) }
+
+| x=signature
+   { Pty_sig x }
+;
+
+signature:
+| LKEY x=signature_item* RKEY { x }
+;
+
+signature_item:
+| VAR decl=ivar_decl
+    { `VariableDecl decl }
+
+| FUN decl=ifun_decl
+    { `FunctionDecl decl }
+;
+
+ifun_decl:
+| x=ident pd=param_decl COLON ty=loc(type_exp)
+    { { pfd_name     = x   ;
+        pfd_tyargs   = pd  ;
+        pfd_tyresult = ty  ;
+        pfd_uses     = None; }
+    }
+
+| x=ident pd=param_decl COLON ty=loc(type_exp) LKEY us=qident* RKEY
+    { { pfd_name     = x      ;
+        pfd_tyargs   = pd     ;
+        pfd_tyresult = ty     ;
+        pfd_uses     = Some us; }
+    }
+;
+
+ivar_decl:
+| x=ident COLON ty=loc(type_exp)
+    { { pvd_name = x; pvd_type = ty } }
+;
 
 (* -------------------------------------------------------------------- *)
 (* Types declarations / definitions                                     *)
@@ -567,15 +564,39 @@ type_decl_or_def:
 ;
 
 (* -------------------------------------------------------------------- *)
-(* Constant declarations / definitions                                  *)
+(* Operator definitions                                                 *)
 
-cnst_decl:
-| CNST xs=ident_list1 COLON ty=loc(type_exp) { (xs, ty) }
+op_tydom:
+| LPAREN RPAREN                                  { [  ] }
+| ty=loc(type_exp)                               { [ty] }
+| LPAREN tys=plist2(loc(type_exp), COMMA) RPAREN { tys  }
 ;
 
-cnst_decl_or_def:
-| cn=cnst_decl               { (cn, None  ) }
-| cn=cnst_decl EQ e=loc(exp) { (cn, Some e) }
+op_sig:
+| dom=op_tydom ARROW codom=loc(type_exp) { (Some dom, codom) }
+;
+
+operator:
+| OP x=ident COLON sty=op_sig {
+    { po_name  = x      ;
+      po_dom   = fst sty;
+      po_codom = snd sty;
+      po_prob  = false  ; }
+  }
+
+| POP x=ident COLON sty=op_sig {
+    { po_name  = x      ;
+      po_dom   = fst sty;
+      po_codom = snd sty;
+      po_prob  = true   ; }
+  }
+
+| CNST x=ident COLON ty=loc(type_exp) {
+    { po_name  = x    ;
+      po_dom   = None ;
+      po_codom = ty   ;
+      po_prob  = false; }
+  }
 ;
 
 (* -------------------------------------------------------------------- *)
@@ -606,11 +627,21 @@ claim:
 (* -------------------------------------------------------------------- *)
 (* Global entries                                                       *)
 
+theory_open:
+| THEORY x=ident { x }
+;
+
+theory_close:
+| END x=ident { x }
+;
+
 global_:
+| theory_open      { GthOpen    $1 }
+| theory_close     { GthClose   $1 }
 | mod_def          { Gmodule    $1 }
 | sig_def          { Ginterface $1 }
 | type_decl_or_def { Gtype      $1 }
-| cnst_decl_or_def { Gcnst      $1 }
+| operator         { Goperator  $1 }
 | claim            { Gclaim     $1 }
 ;
 
@@ -626,7 +657,7 @@ global:
 prog:
 | g=global { ([g], false) }
 | stop     { ([ ], true ) }
-| error    { error (pos_of_lex_pos $startpos $endpos) "" }
+| error    { error (Location.make $startpos $endpos) "Parsing error" }
 ;
 
 (* -------------------------------------------------------------------- *)

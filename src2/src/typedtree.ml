@@ -295,7 +295,7 @@ and transstruct scope (env : Env.env) (x : Ident.t) (st : pstructure) =
   (* Check parameters types *)
   let stparams =
     List.map
-      (fun (a, aty) -> (Ident.create a, transtymod scope env aty))
+      (fun (a, aty) -> (Ident.create a, transtymod scope env (Pty_ident aty)))
       st.ps_params in
 
   (* Check structure items, extending environment initially with

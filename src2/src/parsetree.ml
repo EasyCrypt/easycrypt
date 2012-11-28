@@ -2,10 +2,10 @@
 open Symbols
 open Utils
 
-type side = [ `Left | `Right ]
-
+(* -------------------------------------------------------------------- *)
 let qsymb_of_symb (x : symbol) : qsymbol = ([], x)
 
+(* -------------------------------------------------------------------- *)
 module Location = struct
   open Lexing
 
@@ -22,12 +22,21 @@ module Location = struct
       { loc_fname = p1.pos_fname;
         loc_start = mkpos p1    ;
         loc_end   = mkpos p2    ; }
+
+  let tostring (p : t) =
+    Printf.sprintf "%s:%d.%d-%d.%d"
+      p.loc_fname
+      (fst p.loc_start) (snd p.loc_start)
+      (fst p.loc_end  ) (snd p.loc_end  )
 end
 
 type 'a located = {
   pl_loc  : Location.t;
   pl_desc : 'a;
 }
+
+(* -------------------------------------------------------------------- *)
+type side = [ `Left | `Right ]
 
 type pty    = pty_r    located          (* located type              *)
 and  pexpr  = pexpr_r  located          (* located expression        *)
@@ -88,8 +97,8 @@ and pstmt = pinstr list
 (* -------------------------------------------------------------------- *)
 type pmodule_type =
   | Pty_ident of qsymbol
-  | Pty_app   of pmodule_type * pmodule_type
-  | Pty_func  of (symbol * psignature) * pmodule_type
+  | Pty_app   of qsymbol * qsymbol list
+  | Pty_func  of (symbol * qsymbol) list * psignature
   | Pty_sig   of psignature
 
 and psignature = psignature_item list
@@ -108,6 +117,7 @@ and pfunction_decl = {
   pfd_name     : symbol;
   pfd_tyargs   : (symbol * pty) list;
   pfd_tyresult : pty;
+  pfd_uses     : (qsymbol list) option;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -116,15 +126,16 @@ and pmodule_expr =
   | Pm_struct of pstructure
 
 and pstructure = {
-  ps_params    : (symbol * pmodule_type) list;
+  ps_params    : (symbol * qsymbol) list;
   ps_signature : pmodule_type option;
   ps_body      : pstructure_item list;
 }
 
 and pstructure_item =
-  | Pst_mod of (symbol * pmodule_expr)
-  | Pst_var of (symbol list * pty)
-  | Pst_fun of (pfunction_decl * pfunction_body)
+  | Pst_mod   of (symbol * pmodule_expr)
+  | Pst_var   of (symbol list * pty)
+  | Pst_fun   of (pfunction_decl * pfunction_body)
+  | Pst_alias of (symbol * qsymbol)
 
 and pfunction_body = {
   pfb_locals : (symbol list * pty * pexpr option) list;
@@ -133,20 +144,39 @@ and pfunction_body = {
 }
 
 (* -------------------------------------------------------------------- *)
-type ptheory_item =
-  | Pth_module  of symbol * pmodule_expr
-  | Pth_modtype of symbol * pmodule_type
+type poperator = {
+  po_name  : symbol;
+  po_dom   : (pty list) option;
+  po_codom : pty;
+  po_prob  : bool;
+}
 
 (* -------------------------------------------------------------------- *)
-type formula = int
+type ptylocals = (symbol * pty) list
+
+type pbinop =
+  | PPand
+  | PPor
+  | PPimp
+  | PPiff
+
+type pformula = pformula_r located
+
+and pformula_r = unit
+
+(* -------------------------------------------------------------------- *)
+type paxiom = {
+  pa_name    : symbol;
+  pa_formula : pformula;
+}
 
 (* -------------------------------------------------------------------- *)
 type ident_spec = symbol list
 
-type inv = (formula, (formula * formula) * formula option) AstLogic.g_inv
+type inv = (pformula, (pformula * pformula) * pformula option) AstLogic.g_inv
 
-type equiv_concl = 
-  | Aequiv_spec of (formula * formula) * (pexpr * pexpr) option
+type equiv_concl =
+  | Aequiv_spec of (pformula * pformula) * (pexpr * pexpr) option
   | Aequiv_inv  of inv
 
 type auto_info = inv option * ident_spec
@@ -181,8 +211,11 @@ type claim = symbol * (pexpr * hint)
 type global =
   | Gmodule    of (symbol * pmodule_expr)
   | Ginterface of (symbol * pmodule_type)
-  | Gcnst      of cnst_decl
+  | Goperator  of poperator
+  | Gaxiom     of paxiom
   | Gclaim     of claim
   | Gtype      of (qsymbol * pty option)
+  | GthOpen    of symbol
+  | GthClose   of symbol
 
 type prog = global list
