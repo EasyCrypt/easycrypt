@@ -12,14 +12,17 @@
     ps_body      = body;
   }
 
+  let peget e1 e2    = PEapp (Path.toqsymbol Eccorelib.get, [e1; e2])
+  let peset e1 e2 e3 = PEapp (Path.toqsymbol Eccorelib.set, [e1; e2; e3])
 
   let penil  ()   = PEapp (Path.toqsymbol Eccorelib.nil , [])
   let pecons e es = PEapp (Path.toqsymbol Eccorelib.cons, [e; es])
 
+(*
   let rec pelist es =
     match es with
       | []      -> penil ()
-      | e :: es -> pecons e (pelist es)
+      | e :: es -> pecons e (pelist es)*)
 %}
 
 %token <int> NUM
@@ -28,18 +31,18 @@
 %token <string> STRING
 
 (* Tokens + keywords *)
-%token ABSTRACT
+// %token ABSTRACT
 %token ADMIT
-%token ADVERSARY
+// %token ADVERSARY
 %token AND
 %token ARROW
-%token AS
-%token ASPEC
+// %token AS
+// %token ASPEC
 %token ASSERT
-%token AXIOM
+// %token AXIOM
 %token BACKSLASH
 %token BITSTR
-%token CHECKPROOF
+// %token CHECKPROOF
 %token CLAIM
 %token CNST
 %token COLON
@@ -52,8 +55,8 @@
 %token ELSE
 %token EOF
 %token EQ
-%token EQEQLBRACKET
-%token EQUIV
+// %token EQEQLBRACKET
+// %token EQUIV
 %token EXIST
 %token FALSE
 %token FORALL
@@ -62,96 +65,96 @@
 %token IFF
 %token IMPL
 %token IN
-%token INCLUDE
+// %token INCLUDE
 %token INTERFACE
-%token KW_AND
+// %token KW_AND
 %token LBRACKET
 %token LEFTARROW
-%token LEMMA
+// %token LEMMA
 %token LET
 %token LKEY
-%token LLIMP
+// %token LLIMP
 %token LPAREN
 %token MINUS
 %token MODULE
 %token NE
 %token NOT
-%token OP
+// %token OP
 %token OR
 %token PIPE
-%token POP
-%token PR
-%token PRED
-%token PROVER
+// %token POP
+// %token PR
+// %token PRED
+// %token PROVER
 %token QUESTION
 %token RBRACKET
-%token RBRACKETLLIMP
-%token REMOVE
+// %token RBRACKETLLIMP
+// %token REMOVE
 %token RETURN
 %token RKEY
 %token RKEY_HAT
-%token ROI
+// %token ROI
 %token RPAREN
 %token SAME
 %token SEMICOLON
-%token SET
+// %token SET
 %token SPLIT
 %token STAR
 %token THEN
-%token TILD
+// %token TILD
 %token TRUE
 %token TYPE
-%token UNSET
-%token UPTO
+// %token UNSET
+// %token UPTO
 %token USING
 %token VAR
-%token WHERE
+// %token WHERE
 %token WHILE
-%token WITH
+// %token WITH
 
 (* Tactics *)
-%token ABORT
-%token ALL
-%token APP
-%token APPLY
-%token APRHL
-%token ASSIGN
-%token AT
+// %token ABORT
+// %token ALL
+// %token APP
+// %token APPLY
+// %token APRHL
+// %token ASSIGN
+// %token AT
 %token AUTO
-%token AUTOSYNC
-%token BACKWARDS
-%token BY
-%token CALL
-%token CASE
-%token CHECK
-%token CONDF
-%token CONDT
-%token DERANDOMIZE
-%token EAGER
-%token EQOBSIN
-%token FORWARDS
-%token IDTAC
-%token IFNEG
-%token IFSYNC
-%token INLINE
-%token LAST
-%token OPAQUE
-%token PRHL
-%token PRINT
-%token RANDOM
-%token SAVE
-%token SIMPL
-%token SP
-%token SPLITWHILE
-%token SWAP
-%token TIMEOUT
-%token TRANSPARENT
-%token TRIVIAL
-%token TRY
-%token UNDO
-%token UNFOLD
-%token UNROLL
-%token WP
+// %token AUTOSYNC
+// %token BACKWARDS
+// %token BY
+// %token CALL
+// %token CASE
+// %token CHECK
+// %token CONDF
+// %token CONDT
+// %token DERANDOMIZE
+// %token EAGER
+// %token EQOBSIN
+// %token FORWARDS
+// %token IDTAC
+// %token IFNEG
+// %token IFSYNC
+// %token INLINE
+// %token LAST
+// %token OPAQUE
+// %token PRHL
+// %token PRINT
+// %token RANDOM
+// %token SAVE
+// %token SIMPL
+// %token SP
+// %token SPLITWHILE
+// %token SWAP
+// %token TIMEOUT
+// %token TRANSPARENT
+// %token TRIVIAL
+// %token TRY
+// %token UNDO
+// %token UNFOLD
+// %token UNROLL
+// %token WP
 
 %token <string> OP1 OP2 OP3 OP4
 
@@ -249,47 +252,49 @@ lpattern:
 | LPAREN p=plist2(ident, COMMA) RPAREN { LPTuple p }
 ;
 
-simpl_exp:
+sexp:
 | TRUE                                   { PEbool true  }
 | FALSE                                  { PEbool false }
 | n=number                               { PEint n }
 | x=ident                                { PEident ([], x) }
-| se=simpl_exp LBRACKET e=exp RBRACKET   { PEapp (qsymb_of_symb "<get>", [se; e]) }
-| se=simpl_exp LBRACKET e1=exp LEFTARROW e2=exp RBRACKET
-                                         { PEapp (qsymb_of_symb "<set>", [se; e1; e2]) }
+| se=loc(sexp) LBRACKET e=loc(exp) RBRACKET
+                                         { peget se e }
+| se=loc(sexp) LBRACKET e1=loc(exp) LEFTARROW e2=loc(exp) RBRACKET
+                                         { peset se e1 e2 }
 | x=ident LPAREN es=exp_list0 RPAREN     { PEapp (qsymb_of_symb x, es) }
 | LPAREN es=exp_list2 RPAREN             { PEtuple es }
 | LPAREN e=exp RPAREN                    { e }
-| LBRACKET es=p_exp_sm_list0 RBRACKET    { pelist es }
+(*| LBRACKET es=p_exp_sm_list0 RBRACKET    { pelist es }*)
 ;
 
 exp:
-| NOT   e=exp                      { PEapp (qsymb_of_symb "!", [e]) }
-| MINUS e=exp %prec prec_prefix_op { PEapp (qsymb_of_symb "-", [e]) }
+| NOT   e=loc(exp)                      { PEapp (qsymb_of_symb "!", [e]) }
+| MINUS e=loc(exp) %prec prec_prefix_op { PEapp (qsymb_of_symb "-", [e]) }
 
-| e1=exp    IMPL  e2=exp  { PEapp (qsymb_of_symb "=>" , [e1; e2]) }
-| e1=exp    IFF   e2=exp  { PEapp (qsymb_of_symb "<=>", [e1; e2]) }
-| e1=exp    OR    e2=exp  { PEapp (qsymb_of_symb "||" , [e1; e2]) }
-| e1=exp    AND   e2=exp  { PEapp (qsymb_of_symb "&&" , [e1; e2]) }
-| e1=exp    EQ    e2=exp  { PEapp (qsymb_of_symb "="  , [e1; e2]) }
-| e1=exp    NE    e2=exp  { PEapp (qsymb_of_symb "<>" , [e1; e2]) }
-| e1=exp op=OP1   e2=exp  { PEapp (qsymb_of_symb op   , [e1; e2]) }
-| e1=exp op=OP2   e2=exp  { PEapp (qsymb_of_symb op   , [e1; e2]) }
-| e1=exp    MINUS e2=exp  { PEapp (qsymb_of_symb "-"  , [e1; e2]) }
-| e1=exp op=OP3   e2=exp  { PEapp (qsymb_of_symb op   , [e1; e2]) }
-| e1=exp    STAR  e2=exp  { PEapp (qsymb_of_symb "*"  , [e1; e2]) }
-| e1=exp op=OP4   e2=exp  { PEapp (qsymb_of_symb op   , [e1; e2]) }
+| e1=loc(exp)    IMPL  e2=loc(exp)  { PEapp (qsymb_of_symb "=>" , [e1; e2]) }
+| e1=loc(exp)    IFF   e2=loc(exp)  { PEapp (qsymb_of_symb "<=>", [e1; e2]) }
+| e1=loc(exp)    OR    e2=loc(exp)  { PEapp (qsymb_of_symb "||" , [e1; e2]) }
+| e1=loc(exp)    AND   e2=loc(exp)  { PEapp (qsymb_of_symb "&&" , [e1; e2]) }
+| e1=loc(exp)    EQ    e2=loc(exp)  { PEapp (qsymb_of_symb "="  , [e1; e2]) }
+| e1=loc(exp)    NE    e2=loc(exp)  { PEapp (qsymb_of_symb "<>" , [e1; e2]) }
+| e1=loc(exp) op=OP1   e2=loc(exp)  { PEapp (qsymb_of_symb op   , [e1; e2]) }
+| e1=loc(exp) op=OP2   e2=loc(exp)  { PEapp (qsymb_of_symb op   , [e1; e2]) }
+| e1=loc(exp)    MINUS e2=loc(exp)  { PEapp (qsymb_of_symb "-"  , [e1; e2]) }
+| e1=loc(exp) op=OP3   e2=loc(exp)  { PEapp (qsymb_of_symb op   , [e1; e2]) }
+| e1=loc(exp)    STAR  e2=loc(exp)  { PEapp (qsymb_of_symb "*"  , [e1; e2]) }
+| e1=loc(exp) op=OP4   e2=loc(exp)  { PEapp (qsymb_of_symb op   , [e1; e2]) }
 
-| c=exp QUESTION e1=exp COLON e2=exp %prec OP2 { PEif (c, e1, e2) }
-| IF c=exp THEN e1=exp ELSE e2=exp             { PEif (c, e1, e2) }
+| c=loc(exp) QUESTION e1=loc(exp) COLON e2=loc(exp) %prec OP2
+| IF c=loc(exp) THEN e1=loc(exp) ELSE e2=loc(exp)
+   { PEif (c, e1, e2) }
 
-| LET p=lpattern EQ e1=exp IN e2=exp { PElet (p, e1, e2) }
+| LET p=lpattern EQ e1=loc(exp) IN e2=loc(exp)
+   { PElet (p, e1, e2) }
 
-| e=simpl_exp { e }
-| re=rnd_exp  { PErnd re }
+| e=sexp { e }
+
+| re=loc(rnd_exp) { PErnd re }
 ;
-
-
 
 (* -------------------------------------------------------------------- *)
 rnd_exp:
@@ -298,24 +303,24 @@ rnd_exp:
       then PRbool
       else error (pos_of_lex_pos $startpos $endpos) "malformed bool random" }
 
-| LKEY n1=number COMMA n2=number RKEY_HAT e=exp
+| LKEY n1=number COMMA n2=number RKEY_HAT e=loc(exp)
     { if   n1 = 0 && n2 = 1
       then PRbitstr e
       else error (pos_of_lex_pos $startpos $endpos) "malformed random bitstring" }
 
-| LBRACKET e1=exp DOTDOT e2=exp RBRACKET
+| LBRACKET e1=loc(exp) DOTDOT e2=loc(exp) RBRACKET
     { PRinter (e1, e2) }
 
-| LPAREN re=rnd_exp BACKSLASH e=exp RPAREN
+| LPAREN re=loc(rnd_exp) BACKSLASH e=loc(exp) RPAREN
     { PRexcepted (re, e) }
 ;
 
 (* -------------------------------------------------------------------- *)
 %inline p_exp_sm_list0: aout=plist0(exp, SEMICOLON) { aout }
 
-%inline exp_list0: aout=plist0(exp, COMMA) { aout }
-%inline exp_list1: aout=plist1(exp, COMMA) { aout }
-%inline exp_list2: aout=plist2(exp, COMMA) { aout }
+%inline exp_list0: aout=plist0(loc(exp), COMMA) { aout }
+%inline exp_list1: aout=plist1(loc(exp), COMMA) { aout }
+%inline exp_list2: aout=plist2(loc(exp), COMMA) { aout }
 
 %inline trigger: aout=plist1(exp, COMMA) { aout }
 
@@ -325,7 +330,7 @@ rnd_exp:
 
 (* -------------------------------------------------------------------- *)
 (* Formulas                                                             *)
-(* Pas de regle pour unit *)
+
 simpl_form:
 | TRUE                                   { PFbool true  }
 | FALSE                                  { PFbool false }
@@ -370,40 +375,37 @@ form:
 %inline p_form_sm_list0: aout=plist0(form, SEMICOLON) { aout }
 %inline form_list2: aout=plist2(form, COMMA) { aout }
 
-
-
-
 (* -------------------------------------------------------------------- *)
 (* Type expressions                                                     *)
 
 simpl_type_exp:
-| x=qident                  { Pnamed x }
-| x=prim_ident              { Pvar x }
-| tya=type_args x=qident    { Papp (x, tya) }
-| BITSTR                    { Pbitstring }
-| LPAREN ty=type_exp RPAREN { ty }
+| x=qident                    { PTnamed x      }
+| x=prim_ident                { PTvar x        }
+| tya=type_args x=qident      { PTapp (x, tya) }
+| BITSTR                      { PTbitstring    }
+| LPAREN ty=type_exp RPAREN   { ty             }
 ;
 
 type_args:
-| ty=simpl_type_exp                          { [ty] }
-| LPAREN tys=plist2(type_exp, COMMA) RPAREN  { tys  }
+| ty=loc(simpl_type_exp)                          { [ty] }
+| LPAREN tys=plist2(loc(type_exp), COMMA) RPAREN  { tys  }
 ;
 
 type_exp:
-| ty=simpl_type_exp               { ty }
-| ty=plist2(simpl_type_exp, STAR) { Ptuple ty }
+| ty=simpl_type_exp                    { ty }
+| ty=plist2(loc(simpl_type_exp), STAR) { PTtuple ty }
 ;
 
 type_exp_dom:
-| LPAREN RPAREN                             { [  ] }
-| ty=type_exp                               { [ty] }
-| LPAREN tys=plist2(type_exp, COMMA) RPAREN { tys  }
+| LPAREN RPAREN                                  { [  ] }
+| ty=loc(type_exp)                               { [ty] }
+| LPAREN tys=plist2(loc(type_exp), COMMA) RPAREN { tys  }
 ;
 
 type_exp_pred_dom:
-| LPAREN RPAREN                             { [  ] }
-| ty=type_exp                               { [ty] }
-| LPAREN tys=plist2(type_exp, COMMA) RPAREN { tys  }
+| LPAREN RPAREN                                  { [  ] }
+| ty=loc(type_exp)                               { [ty] }
+| LPAREN tys=plist2(loc(type_exp), COMMA) RPAREN { tys  }
 ;
 
 fun_type:
@@ -414,7 +416,7 @@ fun_type:
 (* Parameter declarations                                              *)
 
 typed_vars:
-| xs=ident_list1 COLON ty=type_exp { List.map (fun v -> (v, ty)) xs }
+| xs=ident_list1 COLON ty=loc(type_exp) { List.map (fun v -> (v, ty)) xs }
 ;
 
 param_decl:
@@ -427,11 +429,11 @@ param_decl:
 lvalue:
 | x=qident                              { PLvSymbol x      }
 | LPAREN p=plist2(qident, COMMA) RPAREN { PLvTuple  p      }
-| x=qident LBRACKET e=exp RBRACKET      { PLvMap    (x, e) }
+| x=qident LBRACKET e=loc(exp) RBRACKET { PLvMap    (x, e) }
 ;
 
 rvalue:
-| e=exp                               { `Expr e }
+| e=loc(exp)                          { `Expr e }
 | x=qident LPAREN es=exp_list0 RPAREN { `Call (x, es) }
 ;
 
@@ -442,15 +444,15 @@ base_instr:
 | x=lvalue EQ e=rvalue
     { PSasgn (x, e) }
 
-| ASSERT LPAREN c=exp RPAREN 
+| ASSERT LPAREN c=loc(exp) RPAREN 
      { PSassert c }
 ;
 
 instr:
-| bi=base_instr SEMICOLON                       { bi }
-| IF LPAREN c=exp RPAREN b1=block ELSE b2=block { PSif (c, b1, b2) }
-| IF LPAREN c=exp RPAREN b =block               { PSif (c, b , []) }
-| WHILE LPAREN c=exp RPAREN b=block             { PSwhile (c, b) }
+| bi=base_instr SEMICOLON                            { bi }
+| IF LPAREN c=loc(exp) RPAREN b1=block ELSE b2=block { PSif (c, b1, b2) }
+| IF LPAREN c=loc(exp) RPAREN b =block               { PSif (c, b , []) }
+| WHILE LPAREN c=loc(exp) RPAREN b=block             { PSwhile (c, b) }
 ;
 
 block:
@@ -464,7 +466,7 @@ stmt: aout=instr* { aout }
 (* Functions                                                            *)
 
 var_decl:
-| VAR xs=ident_list1 COLON ty=type_exp { (xs, ty) }
+| VAR xs=ident_list1 COLON ty=loc(type_exp) { (xs, ty) }
 ;
 
 var_decl_list:
@@ -476,13 +478,16 @@ var_decl_list:
 (* Module definition                                                    *)
 
 loc_decl:
-| VAR xs=ident_list1 COLON ty=type_exp          SEMICOLON { (xs, ty, None  ) }
-| VAR xs=ident_list1 COLON ty=type_exp EQ e=exp SEMICOLON { (xs, ty, Some e) }
+| VAR xs=ident_list1 COLON ty=loc(type_exp) SEMICOLON
+     { (xs, ty, None  ) }
+
+| VAR xs=ident_list1 COLON ty=loc(type_exp) EQ e=loc(exp) SEMICOLON
+     { (xs, ty, Some e) }
 ;
 
 ret_stmt:
-| RETURN e=exp SEMICOLON { Some e }
-| empty                  { None }
+| RETURN e=loc(exp) SEMICOLON { Some e }
+| empty                       { None }
 ;
 
 fun_def_body:
@@ -494,7 +499,7 @@ fun_def_body:
 ;
 
 fun_decl:
-| x=ident pd=param_decl COLON ty=type_exp
+| x=ident pd=param_decl COLON ty=loc(type_exp)
     { { pfd_name     = x ;
         pfd_tyargs   = pd;
         pfd_tyresult = ty; }
@@ -557,36 +562,36 @@ type_decl:
 ;
 
 type_decl_or_def:
-| type_decl { ($1,None) }
-| type_decl EQ type_exp { ($1, Some $3) }
+| td=type_decl { (td, None) }
+| td=type_decl EQ te=loc(type_exp) { (td, Some te) }
 ;
 
 (* -------------------------------------------------------------------- *)
 (* Constant declarations / definitions                                  *)
 
 cnst_decl:
-| CNST xs=ident_list1 COLON ty=type_exp { (xs, ty) }
+| CNST xs=ident_list1 COLON ty=loc(type_exp) { (xs, ty) }
 ;
 
 cnst_decl_or_def:
-| cn=cnst_decl          { (cn, None  ) }
-| cn=cnst_decl EQ e=exp { (cn, Some e) }
+| cn=cnst_decl               { (cn, None  ) }
+| cn=cnst_decl EQ e=loc(exp) { (cn, Some e) }
 ;
 
 (* -------------------------------------------------------------------- *)
 (* Global entries                                                       *)
 
 %inline ident_exp:
-| x=ident COMMA e=exp { (x, e) }
+| x=ident COMMA e=loc(exp) { (x, e) }
 ;
 
 real_hint:
 | USING x=ident { Husing x }
 | ADMIT         { Hadmit }
 | COMPUTE       { Hcompute }
-| COMPUTE n=NUM e1=exp COMMA e2=exp 
+| COMPUTE n=NUM e1=loc(exp) COMMA e2=loc(exp)
                 { Hfailure (n, e1, e2, []) }
-| COMPUTE n=NUM e1=exp COMMA e2=exp COLON l=plist1(ident_exp, COLON) 
+| COMPUTE n=NUM e1=loc(exp) COMMA e2=loc(exp) COLON l=plist1(ident_exp, COLON)
                 { Hfailure (n, e1, e2, l) }
 | SPLIT         { Hsplit }
 | SAME          { Hsame }
@@ -595,7 +600,7 @@ real_hint:
 ;
 
 claim:
-| CLAIM x=ident COLON e=exp h=real_hint { (x, (e, h)) }
+| CLAIM x=ident COLON e=loc(exp) h=real_hint { (x, (e, h)) }
 ;
 
 (* -------------------------------------------------------------------- *)
@@ -639,4 +644,13 @@ prog:
 
 %inline empty:
 | /**/ { () }
+;
+
+(* -------------------------------------------------------------------- *)
+%inline loc(X):
+| x=X {
+    { pl_desc = x;
+      pl_loc  = Location.make $startpos $endpos;
+    }
+  }
 ;

@@ -2,23 +2,50 @@
 open Symbols
 open Utils
 
-type side    = [ `Left | `Right ]    (* deriving(Show) *)
+type side = [ `Left | `Right ]
 
 let qsymb_of_symb (x : symbol) : qsymbol = ([], x)
 
-type pty =
-  | Punit
-  | Pbool
-  | Pint
-  | Preal
-  | Pbitstring
-  | Punivar
-  | Ptuple     of pty list
-  | Pnamed     of qsymbol
-  | Pvar       of symbol
-  | Papp       of qsymbol * pty list
+module Location = struct
+  open Lexing
 
-and pexpr =
+  type t = {
+    loc_fname : string;
+    loc_start : int * int;
+    loc_end   : int * int;
+  }
+
+  let make (p1 : position) (p2 : position) =
+    let mkpos (p : position) =
+      (p.pos_lnum, p.pos_cnum - p.pos_bol)
+    in
+      { loc_fname = p1.pos_fname;
+        loc_start = mkpos p1    ;
+        loc_end   = mkpos p2    ; }
+end
+
+type 'a located = {
+  pl_loc  : Location.t;
+  pl_desc : 'a;
+}
+
+type pty    = pty_r    located          (* located type              *)
+and  pexpr  = pexpr_r  located          (* located expression        *)
+and  prexpr = prexpr_r located          (* located random expression *)
+
+and pty_r =
+  | PTunit
+  | PTbool
+  | PTint
+  | PTreal
+  | PTbitstring
+  | PTunivar
+  | PTtuple     of pty list
+  | PTnamed     of qsymbol
+  | PTvar       of symbol
+  | PTapp       of qsymbol * pty list
+
+and pexpr_r =
   | PEunit                                (* unit literal      *)
   | PEbool   of bool                      (* bool literal      *)
   | PEint    of int                       (* int. literal      *)
@@ -29,7 +56,7 @@ and pexpr =
   | PEif     of pexpr * pexpr * pexpr     (* _ ? _ : _         *)
   | PErnd    of prexpr                    (* random expression *)
 
-and prexpr =
+and prexpr_r =
   | PRbool                                (* flip               *)
   | PRinter    of pexpr * pexpr           (* interval sampling  *)
   | PRbitstr   of pexpr                   (* bitstring sampling *)
@@ -40,17 +67,13 @@ and lpattern =
   | LPSymbol of symbol
   | LPTuple  of symbol list
 
-      (* deriving(Show) *)
-
 type plvalue =
   | PLvSymbol of qsymbol
   | PLvTuple  of qsymbol list
   | PLvMap    of qsymbol * pexpr
-      (* deriving(Show) *)
 
 type prvalue =
   [`Expr of pexpr | `Call of qsymbol * pexpr list]
-      (* deriving(Show) *)
 
 (* -------------------------------------------------------------------- *)
 type pinstr =
@@ -140,7 +163,6 @@ type equiv = {
 
 (* -------------------------------------------------------------------- *)
 type cnst_decl = (symbol list * pty) * pexpr option
-    (* deriving(Show) *)
 
 (* -------------------------------------------------------------------- *)
 type hint =
@@ -153,10 +175,7 @@ type hint =
   | Hauto
   | Hfailure of int * pexpr * pexpr * (symbol * pexpr) list
 
-      (* deriving(Show) *)
-
 type claim = symbol * (pexpr * hint)
-    (* deriving(Show) *)
 
 (* -------------------------------------------------------------------- *)
 type global =
@@ -165,6 +184,5 @@ type global =
   | Gcnst      of cnst_decl
   | Gclaim     of claim
   | Gtype      of (qsymbol * pty option)
-      (* deriving (Show) *) 
 
 type prog = global list

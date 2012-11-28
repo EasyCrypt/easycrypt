@@ -35,17 +35,18 @@ type typolicy =
   | TyAnnot of UidGen.uidmap
 
 let transty (scope : Scope.scope) (policy : typolicy) =
-  let rec transty = function
+  let rec transty ty =
+    match ty.pl_desc with
       (* Base types *)
-    | Punit        -> Tbase Tunit
-    | Pbool        -> Tbase Tbool
-    | Pint         -> Tbase Tint
-    | Preal        -> Tbase Treal
-    | Pbitstring   -> Tbase Tbitstring
-    | Punivar      -> Types.mkunivar ()
-    | Ptuple tys   -> Ttuple (Parray.fmap transty tys)
+    | PTunit        -> Tbase Tunit
+    | PTbool        -> Tbase Tbool
+    | PTint         -> Tbase Tint
+    | PTreal        -> Tbase Treal
+    | PTbitstring   -> Tbase Tbitstring
+    | PTunivar      -> Types.mkunivar ()
+    | PTtuple tys   -> Ttuple (Parray.fmap transty tys)
 
-    | Pnamed name -> begin
+    | PTnamed name -> begin
       match Scope.Ty.resolve scope name with (* FIXME *)
         | None -> tyerror (UnknownTypeName name)
         | Some (i, p) ->
@@ -54,7 +55,7 @@ let transty (scope : Scope.scope) (policy : typolicy) =
           Tconstr (p, Parray.empty)
     end
 
-    | Papp (name, tyargs) -> begin
+    | PTapp (name, tyargs) -> begin
       match Scope.Ty.resolve scope name with
         | None -> tyerror (UnknownTypeName name)
         | Some (i, p) ->
@@ -65,7 +66,7 @@ let transty (scope : Scope.scope) (policy : typolicy) =
               Tconstr (p, tyargs)
     end
 
-    | Pvar a -> begin
+    | PTvar a -> begin
       match policy with
         | TyDecl tyvars -> begin
           match List.index a tyvars with
@@ -115,7 +116,8 @@ let transexp (scope : Scope.scope) =
     with Unify.CanNotUnify _ -> false
   in
 
-  let rec transexp (env : Env.env) (policy : epolicy) = function
+  let rec transexp (env : Env.env) (policy : epolicy) (e : pexpr) =
+    match e.pl_desc with
     | PEunit   -> (Eunit  , tunit ())
     | PEbool b -> (Ebool b, tbool ())
     | PEint  i -> (Eint  i, tint  ())
@@ -167,7 +169,8 @@ let transexp (scope : Scope.scope) =
       let re, ty = transrexp env policy re in
         (Ernd re, ty)
 
-  and transrexp (env : Env.env) (policy : epolicy) = function
+  and transrexp (env : Env.env) (policy : epolicy) (e : prexpr) =
+    match e.pl_desc with
     | PRbool -> (Rbool, tbool ())
 
     | PRbitstr e ->

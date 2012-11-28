@@ -67,144 +67,47 @@
     | 't' -> '\t'
     | c -> c
 
-(* BEGIN *)
-(* To make easier add tokens in EasyCrypt and in the
- * EasyCrypt mode in Proof General, please follow this
- * comments :
-         * Only use comments in one like style (*like this*)
-         * Don't delete newline before and after a new definition
-         * Don't change this names:
-                 * keywords_expr_prog
-                 * keywords_tac
-                 * keywords_dangerous
-                 * keywords_global
- * If we follow this rule when something change the makefile
- * will update the file 'certicrypt-keywords.el'.
- *)
+  let _keywords = [                      (* see [keywords.py] *)
 
-(*Please DON'T delete the newline after this comment*)
+    "forall"      , FORALL     ;        (* KW: prog *)
+    "exists"      , EXIST      ;        (* KW: prog *)
+    "let"         , LET        ;        (* KW: prog *)
+    "in"          , IN         ;        (* KW: prog *)
+    "true"        , TRUE       ;        (* KW: prog *)
+    "false"       , FALSE      ;        (* KW: prog *)
 
-  let keywords_expr_prog = 
-   [ (* expression *)
-     "forall", FORALL;
-     "exists", EXIST;
-     "let",    LET;
-     "in",     IN;
-     "true",   TRUE;
-     "false",  FALSE; 
-     (* program *)
-     "bitstring" , BITSTR; 
-     "var",    VAR;
-     "fun",    FUN;
-     "abs",    ABSTRACT;
-     "remove", REMOVE;
-     "where",  WHERE; 
-     "and",    KW_AND;
-     "if",     IF;
-     "then",   THEN;
-     "else",   ELSE;
-     "while",  WHILE; 
-     "assert", ASSERT;
-     "return", RETURN ]
+    "bitstring"   , BITSTR     ;        (* KW: prog *)
+    "var"         , VAR        ;        (* KW: prog *)
+    "fun"         , FUN        ;        (* KW: prog *)
+    "if"          , IF         ;        (* KW: prog *)
+    "then"        , THEN       ;        (* KW: prog *)
+    "else"        , ELSE       ;        (* KW: prog *)
+    "while"       , WHILE      ;        (* KW: prog *)
+    "assert"      , ASSERT     ;        (* KW: prog *)
+    "return"      , RETURN     ;        (* KW: prog *)
 
-(*Please DON'T delete the newline before and after this comment*)
+    "using"       , USING      ;        (* KW: tactic *)
+    "compute"     , COMPUTE    ;        (* KW: tactic *)
+    "same"        , SAME       ;        (* KW: tactic *)
+    "split"       , SPLIT      ;        (* KW: tactic *)
 
-  let keywords_tac = 
-   [ "using",       USING;
-     "with",        WITH;
-     "upto",        UPTO;
-     "eager",       EAGER;
-     "compute",     COMPUTE;
-     "same",        SAME;
-     "split",       SPLIT;
-     "at",          AT; 
-     "last",        LAST; 
-     "idtac",       IDTAC;
-     "call",        CALL;
-     "inline",      INLINE;
-     "asgn",        ASSIGN;
-     "sp",          SP; 
-     "wp",          WP; 
-     "swap",        SWAP; 
-     "rnd",         RANDOM;
-     "trivial",     TRIVIAL;
-     "simpl",       SIMPL;
-     "auto",        AUTO;
-     "autosync",    AUTOSYNC;
-     "eqobs_in",    EQOBSIN;
-     "try",         TRY;
-     "app",         APP;
-     "derandomize", DERANDOMIZE;
-     "case",        CASE;
-     "condt",       CONDT; 
-     "condf",       CONDF;
-     "ifsync",      IFSYNC;
-     "ifneg",	      IFNEG;
-     "unfold",      UNFOLD;
-     "unroll",      UNROLL;
-     "splitw",      SPLITWHILE;
-     "apply",       APPLY;
-     "pRHL",        PRHL;
-     "apRHL",       APRHL ]
+    "admit"       , ADMIT      ;        (* KW: dangerous *)
 
-(*Please DON'T delete the newline before and after this comment*)
+    "type"        , TYPE       ;        (* KW: global *)
+    "cnst"        , CNST       ;        (* KW: global *)
+    "module"      , MODULE     ;        (* KW: global *)
+    "claim"       , CLAIM      ;        (* KW: global *)
+    "drop"        , DROP       ;        (* KW: global *)
+    "interface"   , INTERFACE  ;        (* KW: global *)
+  ]
 
-  let keywords_dangerous =
-    [ "admit",      ADMIT ]
-
-(*Please DON'T delete the newline before and after this comment*)
-
-  let keywords_global = 
-    [ "type",        TYPE; 
-      "cnst",        CNST;
-      "op",          OP;
-      "pop",         POP;
-      "aspec",       ASPEC;
-      "adversary",   ADVERSARY;
-      "axiom",       AXIOM;
-      "pred",        PRED;
-      "lemma",       LEMMA;
-      "equiv",       EQUIV;
-      "module",      MODULE;
-      "claim",       CLAIM;
-      "as",          AS;
-      "set",         SET; 
-      "unset",       UNSET; 
-      "transparent", TRANSPARENT;
-      "opaque",      OPAQUE;
-      "checkproof",  CHECKPROOF;
-      "undo",        UNDO;
-      "timeout",     TIMEOUT;
-      "check",       CHECK;
-      "print",       PRINT;
-      "all",         ALL;
-      "by",          BY;
-      "proof",       IDTAC;  
-      "save",        SAVE;
-      "abort",       ABORT;
-      "include",     INCLUDE;
-      "prover",      PROVER;
-      "drop",        DROP;
-      "interface",   INTERFACE;
-      "proba",       PR; ]
-
-(*Please DON'T delete the newline before this comment*)
-(* END *)
-
-  let keywords = Hashtbl.create 97 
+  let keywords = Hashtbl.create 97
 
   let _ =
-    let on_kw = List.iter (fun (x,y) -> Hashtbl.add keywords x y) in
-    on_kw keywords_expr_prog;
-    on_kw keywords_tac;
-    on_kw keywords_dangerous;
-    on_kw keywords_global
-
+    List.iter
+      (fun (x, y) -> Hashtbl.add keywords x y)
+      _keywords
 }
-  
-
-
-
 
 let blank = [' ' '\t' '\r' ]
 let newline = '\n'
@@ -231,18 +134,11 @@ let op_char_1234 = op_char_1 | op_char_234
 rule token = parse
   | newline                   { newline lexbuf; token lexbuf }
   | blank+                    { token lexbuf }     (* skip blanks *)
-  | ident as id               { 
+  | ident as id               {
     try Hashtbl.find keywords id with Not_found -> IDENT id }
-  | "(*"                      { comment_start_loc lexbuf; 
+  | "(*"                      { comment_start_loc lexbuf;
                                 comment lexbuf; token lexbuf }
   | number                    { NUM(int_of_string(Lexing.lexeme lexbuf)) }
-  | "==>"                     { LLIMP }
-
-  | "==["                     { EQEQLBRACKET }
-  | "]==>"                    { RBRACKETLLIMP }
-
-  | ">>"                     { FORWARDS  }
-  | "<<"                     { BACKWARDS }
 
   (* bool operation *)
   | '!'                       { NOT }
@@ -251,7 +147,7 @@ rule token = parse
   | "=>"                      { IMPL }
   | "<=>"                     { IFF }
 
-      
+
   (* string symbols *)
   | "<-"                      { LEFTARROW }
   | "->"                      { ARROW  }
@@ -273,14 +169,13 @@ rule token = parse
   | '?'                       { QUESTION }
   | '|'                       { PIPE }
   | '\\'                      { BACKSLASH }
-  | "%r"                      { ROI }
   | "*"                       { STAR }
   | "-"                       { MINUS }
-  | "~"                       { TILD }
+
   (* comparison *)
   | "="                       { EQ }
   | "<>"                      { NE }
-  
+
   | op_char_1234* op_char_1 op_char_1234* as s
       { OP1 s }
   | op_char_234*  op_char_2 op_char_234*  as s
@@ -314,7 +209,7 @@ and string = parse
   | _ as c        { Buffer.add_char string_buf c; string lexbuf }
 
 
-{ 
+{
 
 open EcUtil
 
@@ -326,7 +221,7 @@ let check_exn e = match e with
 | _ -> raise e
 
 
-let read lexbuf = 
+let read lexbuf =
   (* OCAMLRUNPARAM='p' ocamlyacc -v src/ecParser.mly *)
   let _ = Parsing.set_trace false in
     try
