@@ -22,6 +22,7 @@ and mcomponents = {
   mc_functions  : (Path.path * Typesmod.funsig)    Ident.Map.t;
   mc_modules    : (Path.path * Typesmod.tymod)     Ident.Map.t;
   mc_typedecls  : (Path.path * Typesmod.tydecl)    Ident.Map.t;
+  mc_operators  : (Path.path * Typesmod.operator)  Ident.Map.t;
   mc_components : (Path.path * mcomponents Lazy.t) Ident.Map.t;
 }
 
@@ -32,6 +33,7 @@ let empty =
     mc_functions  = Ident.Map.empty;
     mc_modules    = Ident.Map.empty;
     mc_typedecls  = Ident.Map.empty;
+    mc_operators  = Ident.Map.empty;
     mc_components = Ident.Map.empty;
   }
 
@@ -78,6 +80,10 @@ module MC = struct
     { mc with
         mc_typedecls = Ident.Map.add x (in_scope scope x, tydecl) mc.mc_typedecls; }
 
+  let bind_op (scope, x) tydecl env mc =
+    { mc with
+        mc_operators = Ident.Map.add x (in_scope scope x, tydecl) mc.mc_operators; }
+
   let lookup_mc1 (name : symbol) (mc : mcomponents) =
     Ident.Map.byname name mc.mc_components
 
@@ -92,6 +98,9 @@ module MC = struct
 
   let lookup_typedecl1 (name : symbol) (mc : mcomponents) =
     Ident.Map.byname name mc.mc_typedecls
+
+  let lookup_op1 (name : symbol) (mc : mcomponents) =
+    Ident.Map.byname name mc.mc_operators
 
   let rec lookup_mc (qn : symbols) (mc : mcomponents) =
     match qn with
@@ -213,13 +222,21 @@ module Op = struct
   type t = operator
 
   let bind x operator env =
-    assert false
+    bind MC.bind_op x operator env
 
   let bindall ops env =
-    assert false
+    List.fold_left
+      (fun env (x, tydecl) -> bind x tydecl env)
+      env ops
 
-  let lookup x env =
-    assert false
+  let lookup ((scope, id) : qsymbol) (env : env) =
+    match
+      obind
+        (MC.lookup_mc scope env.env_root)
+        (MC.lookup_op1 id)
+    with
+    | None   -> raise LookupFailure
+    | Some x -> x
 
   let trylookup x env = try_lf (fun () -> lookup x env)
 end

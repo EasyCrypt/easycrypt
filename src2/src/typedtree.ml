@@ -49,20 +49,21 @@ let transty (env : Env.env) (policy : typolicy) =
     | PTnamed name -> begin
       match Env.Ty.trylookup name env with
         | None -> tyerror (UnknownTypeName name)
-        | Some (p, tydecl) -> assert false (* FIXME *)
+        | Some (p, tydecl) ->
+          if tydecl.tyd_params <> 0 then
+            tyerror (InvalidNumberOfTypeArgs (name, tydecl.tyd_params, 0));
+          Tconstr (p, Parray.empty)
     end
 
     | PTapp (name, tyargs) -> begin
       match Env.Ty.trylookup name env with
         | None -> tyerror (UnknownTypeName name)
-        | Some (p, tydecl) -> assert false (* FIXME *)
-(*
+        | Some (p, tydecl) ->
           let nargs = List.length tyargs in
-            if i <> List.length tyargs then
-              tyerror (InvalidNumberOfTypeArgs (name, i, nargs));
+            if nargs <> tydecl.tyd_params then
+              tyerror (InvalidNumberOfTypeArgs (name, tydecl.tyd_params, nargs));
             let tyargs = Parray.fmap transty tyargs in
               Tconstr (p, tyargs)
-*)
     end
 
     | PTvar a -> begin

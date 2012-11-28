@@ -90,7 +90,7 @@ end
 (* -------------------------------------------------------------------- *)
 type scope = {
   sc_name      : string;
-  sc_types     : unit Context.context;
+  sc_types     : Typesmod.tydecl   Context.context;
   sc_operators : Typesmod.operator Context.context;
   sc_env       : Env.env;
 }
@@ -126,8 +126,10 @@ module Op = struct
   let operror (error : operror) =
     raise (OpError error)
 
-  let transform (scope : scope) f =
-    { scope with sc_operators = f scope.sc_operators }
+  let transform (scope : scope) f e =
+    { scope with
+        sc_operators = f scope.sc_operators;
+        sc_env       = e scope.sc_env      ; }
 
   let add (scope : scope) (op : poperator) =
     if not (List.uniq op.po_tyvars) then
@@ -146,14 +148,28 @@ module Op = struct
     }
 
     in
-      transform scope (fun ctxt -> Context.bind op.po_name tyop ctxt)
+      transform scope
+        (fun ctxt -> Context.bind op.po_name tyop ctxt)
+        (fun env  -> Env.Op.bind (Ident.create op.po_name) tyop env)
 end
 
 (* -------------------------------------------------------------------- *)
 module Ty = struct
-  let transform (scope : scope) f =
-    { scope with sc_types = f scope.sc_types }
+  open Parsetree
+  open Types
+  open Typesmod
+
+  let transform (scope : scope) f e =
+    { scope with
+        sc_types = f scope.sc_types;
+        sc_env   = e scope.sc_env  ; }
 
   let add (scope : scope) (name : symbol) =
-    transform scope (fun ctxt -> Context.bind name () ctxt)
+    let tydecl = {
+      tyd_params = 0   ;
+      tyd_type   = None;
+    } in
+      transform scope
+        (fun ctxt -> Context.bind name tydecl ctxt)
+        (fun env  -> Env.Ty.bind (Ident.create name) tydecl env)
 end

@@ -89,4 +89,7 @@ type operator = {
 }
 
 (* -------------------------------------------------------------------- *)
-type tydecl = unit
+type tydecl = {
+  tyd_params : int;
+  tyd_type   : Types.ty option;
+}
