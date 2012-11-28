@@ -3,7 +3,7 @@
 # --------------------------------------------------------------------
 CONFIG           = _tags myocamlbuild.ml
 OCAMLBUILD_BIN   = ocamlbuild
-OCAMLBUILD_EXTRA = -no-hygiene -classic-display -menhir "menhir --trace"
+OCAMLBUILD_EXTRA = -no-hygiene -classic-display
 
 # In Emacs, use classic display to enable error jumping.
 ifeq ($(shell echo $$TERM), dumb)

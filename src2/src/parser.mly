@@ -578,24 +578,35 @@ op_sig:
 
 operator:
 | OP x=ident COLON sty=op_sig {
-    { po_name  = x      ;
-      po_dom   = fst sty;
-      po_codom = snd sty;
-      po_prob  = false  ; }
+    { po_name   = x      ;
+      po_tyvars = []     ;
+      po_dom    = fst sty;
+      po_codom  = snd sty;
+      po_prob   = false  ; }
+  }
+
+| OP x=ident LBRACKET tyvars=prim_ident+ RBRACKET COLON sty=op_sig {
+    { po_name   = x      ;
+      po_tyvars = tyvars ;
+      po_dom    = fst sty;
+      po_codom  = snd sty;
+      po_prob   = false  ; }
   }
 
 | POP x=ident COLON sty=op_sig {
-    { po_name  = x      ;
-      po_dom   = fst sty;
-      po_codom = snd sty;
-      po_prob  = true   ; }
+    { po_name   = x      ;
+      po_tyvars = []     ;
+      po_dom    = fst sty;
+      po_codom  = snd sty;
+      po_prob   = true   ; }
   }
 
 | CNST x=ident COLON ty=loc(type_exp) {
-    { po_name  = x    ;
-      po_dom   = None ;
-      po_codom = ty   ;
-      po_prob  = false; }
+    { po_name   = x    ;
+      po_tyvars = []   ;
+      po_dom    = None ;
+      po_codom  = ty   ;
+      po_prob   = false; }
   }
 ;
 

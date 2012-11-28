@@ -2,7 +2,6 @@
 open Utils
 open Symbols
 open Path
-open Types
 
 (* -------------------------------------------------------------------- *)
 module Context = struct
@@ -89,180 +88,72 @@ module Context = struct
 end
 
 (* -------------------------------------------------------------------- *)
-type modifier = [ `Use | `Read | `Write ]
-
-type module_expr = {
-  me_name       : symbol;
-  me_body       : module_body;
-  me_components : module_components;
-  me_interface  : interface_sig;
-}
-
-and module_body =
-  | ME_Ident       of Path.path
-  | ME_Application of Path.path * Path.path list
-  | ME_Structure   of module_structure
-  | ME_Decl        of Path.path
-
-and module_structure = {
-  ms_params : (symbol * interface_body);
-  ms_body   : module_item list;
-}
-
-and module_item = [
-  | `Module   of module_expr
-  | `Variable of variable
-  | `Function of function_
-]
-
-and module_components = module_components_item list
-
-and module_components_item = module_item
-
-and interface_expr = {
-  ie_name : symbol;
-  ie_body : interface_body;
-}
-
-and interface_body =
-  | MI_Ident       of Path.path
-  | MI_Application of Path.path * Path.path list
-  | MI_Sig         of interface_sig
-
-and interface_sig = {
-  is_body : interface_item list;
-}
-
-and interface_item = [
-  | `VariableDecl of variable_decl
-  | `FunctionDecl of function_decl
-]
-
-and function_ = {
-  f_sig    : function_decl;
-  f_locals : (symbol * Types.ty) list;
-  f_body   : unit;                      (* FIXME *)
-}
-
-and function_decl = {
-  fd_name      : symbol;
-  fd_params    : (symbol * Types.ty) list;
-  fd_modifiers : (Path.path * modifier) list
-}
-
-and variable = {
-  v_name : symbol;
-  v_type : Types.ty;
-  v_init : tyexpr;
-}
-
-and variable_decl = {
-  vd_name : symbol;
-  vd_type : Types.ty;
-}
-
-type operator = {
-  op_name     : symbol;
-  op_typarams : int;
-  op_sig      : Types.ty list * Types.ty;
-}
-
-type axiom = {
-  ax_name : symbol;
-  ax_spec : unit;                       (* formula *)
+type scope = {
+  sc_name      : string;
+  sc_types     : unit Context.context;
+  sc_operators : Typesmod.operator Context.context;
+  sc_env       : Env.env;
 }
 
 (* -------------------------------------------------------------------- *)
-type pretheory = {
-  pt_name : symbol;
-  pt_body : pretheory_item list;
+let initial (name : symbol) = {
+  sc_name      = name;
+  sc_types     = Context.empty ();
+  sc_operators = Context.empty ();
+  sc_env       = Env.empty;
 }
 
-and pretheory_item = [
-  | `Operator   of operator
-  | `Axiom      of axiom
-  | `Interface  of interface_expr
-  | `Module     of module_expr
-]
-
-type scope = pretheory
+(* -------------------------------------------------------------------- *)
+let name (scope : scope) =
+  scope.sc_name
 
 (* -------------------------------------------------------------------- *)
-let mc_find1_module (name : symbol) (m : module_components) =
-  assert false
-(*
-  List.pick
-    (function
-      | `Module me when me.me_name = name -> Some me
-      | _ -> None)
-    m
-*)
-
-let rec mc_find_module (p : Path.path) (m : module_components) =
-  assert false
-(*
-  match p with
-    | Pident x -> mc_find1_module x m
-    | Pqname (x, p) ->
-        obind
-          (mc_find1_module x m) 
-          (fun me -> mc_find_module p me.me_components)
-*)
-
-let find1_module (name : symbol) (scope : scope) =
-  assert false
-(*
-  List.pick
-    (function
-      | `Module me when me.me_name = name -> Some me
-      | _ -> None)
-    scope.pt_body
-*)
-
-let rec find_module (p : path) (scope : scope) =
-  assert false
-(*
-  match p with
-    | Pident x -> find1_module x scope
-    | Pqname (x, p) ->
-        obind
-          (find1_module x scope)
-          (fun me -> mc_find_module p me.me_components)
-*)
+let env (scope : scope) = scope.sc_env
 
 (* -------------------------------------------------------------------- *)
-let resolve (scope : scope) (path: qsymbol) = None
-
 module Op = struct
-  type op = {
-    op_path : Path.path;
-    op_sig  : Types.ty list * Types.ty;
-  }
+  open Parsetree
+  open Types
+  open Typesmod
 
-  let resolve (scope : scope) (path : qsymbol) (_sg : Types.ty list) = (* FIXME *)
-    assert false
-(*
-    match path with
-      | Pident x ->
-          List.filter
-            (function `Operator o when o.op_name = x -> true | _ -> false)
-            scope.pt_body
-      | Pqname (_, _) ->
-          []
-*)
+  module TT = Typedtree
+
+  type operror =
+  | OpE_DuplicatedTypeVariable
+
+  exception OpError of operror
+
+  let operror (error : operror) =
+    raise (OpError error)
+
+  let transform (scope : scope) f =
+    { scope with sc_operators = f scope.sc_operators }
+
+  let add (scope : scope) (op : poperator) =
+    if not (List.uniq op.po_tyvars) then
+      operror OpE_DuplicatedTypeVariable;
+
+    let policy  = TT.TyDecl op.po_tyvars in
+    let transty = TT.transty scope.sc_env policy in
+
+    let dom    = List.map transty (odfl [] op.po_dom) in
+    let codom  = transty op.po_codom in
+
+    let tyop = {
+      op_sig  = (dom, codom);
+      op_ctnt = (op.po_dom = None);
+      op_prob = op.po_prob;
+    }
+
+    in
+      transform scope (fun ctxt -> Context.bind op.po_name tyop ctxt)
 end
 
+(* -------------------------------------------------------------------- *)
 module Ty = struct
-  let resolve (scope : scope) (path : qsymbol) =
-    assert false
+  let transform (scope : scope) f =
+    { scope with sc_types = f scope.sc_types }
 
-(*
-    match path with
-      | Pident x ->
-          List.findopt
-            (function `Type t when t.t_name = x -> true | _ -> false)
-            scope.pt_body
-      | Pqname (_, _) ->
-          None
-*)
+  let add (scope : scope) (name : symbol) =
+    transform scope (fun ctxt -> Context.bind name () ctxt)
 end

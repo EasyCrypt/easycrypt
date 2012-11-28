@@ -145,10 +145,11 @@ and pfunction_body = {
 
 (* -------------------------------------------------------------------- *)
 type poperator = {
-  po_name  : symbol;
-  po_dom   : (pty list) option;
-  po_codom : pty;
-  po_prob  : bool;
+  po_name   : symbol;
+  po_tyvars : symbol list;
+  po_dom    : (pty list) option;
+  po_codom  : pty;
+  po_prob   : bool;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -214,7 +215,7 @@ type global =
   | Goperator  of poperator
   | Gaxiom     of paxiom
   | Gclaim     of claim
-  | Gtype      of (qsymbol * pty option)
+  | Gtype      of ((symbol list * symbol) * pty option)
   | GthOpen    of symbol
   | GthClose   of symbol
 

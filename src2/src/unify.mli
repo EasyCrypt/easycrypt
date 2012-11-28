@@ -2,8 +2,6 @@
 open Types
 
 (* -------------------------------------------------------------------- *)
-(* TODO: change 'a this scope *)
+exception UnificationFailure of ty * ty
 
-exception CanNotUnify of ty * ty
-
-val unify : 'a -> ty UidGen.Muid.t -> ty -> ty -> ty UidGen.Muid.t
+val unify : Env.env -> ty UidGen.Muid.t -> ty -> ty -> ty UidGen.Muid.t

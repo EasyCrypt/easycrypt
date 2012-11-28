@@ -76,13 +76,17 @@ and lvalue =
   | LvMap   of Path.path * Types.tyexpr * Types.ty
 
 (* -------------------------------------------------------------------- *)
-type operator = {
-  op_name     : symbol;
-  op_typarams : int;
-  op_sig      : Types.ty list * Types.ty;
-}
-
 type axiom = {
   ax_name : symbol;
   ax_spec : unit;                       (* formula *)
 }
+
+(* -------------------------------------------------------------------- *)
+type operator = {
+  op_sig  : Types.ty list * Types.ty;
+  op_ctnt : bool;
+  op_prob : bool;
+}
+
+(* -------------------------------------------------------------------- *)
+type tydecl = unit

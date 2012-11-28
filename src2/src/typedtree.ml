@@ -15,7 +15,7 @@ type tyerror =
   | InvalidNumberOfTypeArgs  of qsymbol * int * int
   | ApplInvalidArity
   | UnboundTypeParameter     of symbol
-  | OpNotOverloadedForSig    of Scope.Op.op * ty list
+  | OpNotOverloadedForSig    of qsymbol * ty list
   | UnexpectedType           of ty * ty
   | NonLinearPattern         of lpattern
   | DuplicatedLocals
@@ -34,7 +34,7 @@ type typolicy =
   | TyDecl  of symbol list
   | TyAnnot of UidGen.uidmap
 
-let transty (scope : Scope.scope) (policy : typolicy) =
+let transty (env : Env.env) (policy : typolicy) =
   let rec transty ty =
     match ty.pl_desc with
       (* Base types *)
@@ -47,23 +47,22 @@ let transty (scope : Scope.scope) (policy : typolicy) =
     | PTtuple tys   -> Ttuple (Parray.fmap transty tys)
 
     | PTnamed name -> begin
-      match Scope.Ty.resolve scope name with (* FIXME *)
+      match Env.Ty.trylookup name env with
         | None -> tyerror (UnknownTypeName name)
-        | Some (i, p) ->
-          if i <> 0 then
-            tyerror (InvalidNumberOfTypeArgs (name, 0, i));
-          Tconstr (p, Parray.empty)
+        | Some (p, tydecl) -> assert false (* FIXME *)
     end
 
     | PTapp (name, tyargs) -> begin
-      match Scope.Ty.resolve scope name with
+      match Env.Ty.trylookup name env with
         | None -> tyerror (UnknownTypeName name)
-        | Some (i, p) ->
+        | Some (p, tydecl) -> assert false (* FIXME *)
+(*
           let nargs = List.length tyargs in
             if i <> List.length tyargs then
               tyerror (InvalidNumberOfTypeArgs (name, i, nargs));
             let tyargs = Parray.fmap transty tyargs in
               Tconstr (p, tyargs)
+*)
     end
 
     | PTvar a -> begin
@@ -94,7 +93,7 @@ let transpattern (env : Env.env) (p : Parsetree.lpattern) =
   | LPSymbol x ->
       let ty = mkunivar () in
       let x  = Ident.create x in
-        (Env.bind_variable x ty env, LSymbol x, ty)
+        (Env.Var.bind x ty env, LSymbol x, ty)
 
   | LPTuple xs ->
       if not (List.uniq xs) then
@@ -103,17 +102,17 @@ let transpattern (env : Env.env) (p : Parsetree.lpattern) =
       let xs     = List.map Ident.create xs in
       let subtys = List.map (fun _ -> mkunivar ()) xs in
 
-        (Env.bind_variables (List.combine xs subtys) env,
+        (Env.Var.bindall (List.combine xs subtys) env,
          LTuple xs,
          Ttuple (Parray.of_list subtys))
 
 (* -------------------------------------------------------------------- *)
-let transexp (scope : Scope.scope) =
+let transexp (env : Env.env) (policy : epolicy) (e : pexpr) =
   let uidmap = ref UidGen.Muid.empty in
 
-  let unify ty1 ty2 =
-    try  uidmap := (Unify.unify scope !uidmap ty1 ty2); true
-    with Unify.CanNotUnify _ -> false
+  let unify env ty1 ty2 =
+    try  uidmap := (Unify.unify env !uidmap ty1 ty2); true
+    with Unify.UnificationFailure _ -> false
   in
 
   let rec transexp (env : Env.env) (policy : epolicy) (e : pexpr) =
@@ -124,7 +123,7 @@ let transexp (scope : Scope.scope) =
 
     | PEident x ->                      (* constants ? *)
       let xpath, ty =
-        try  Env.lookup_variable x env
+        try  Env.Var.lookup x env
         with Env.LookupFailure -> tyerror (UnknownVariable x)
       in
         (Evar (xpath, ty), ty)      (* FIXME: no need to freshen type ? *)
@@ -133,9 +132,9 @@ let transexp (scope : Scope.scope) =
       let es   = List.map (transexp env policy) es in
       let esig = snd (List.split es) in
 
-        match Scope.Op.resolve scope name esig with
-          | None    -> tyerror (UnknownOperatorForSig (name, esig))
-          | Some op -> (Eapp (op.Scope.Op.op_path, List.map fst es), tunit ()) (* FIXME *)
+        match Env.Op.trylookup name env with
+          | None        -> tyerror (UnknownOperatorForSig (name, esig))
+          | Some (p, _) -> (Eapp (p, List.map fst es), tunit ()) (* FIXME *)
     end
 
     | PElet (p, e1, e2) ->
@@ -143,7 +142,7 @@ let transexp (scope : Scope.scope) =
       let e1, ty1 = transexp  env policy e1 in
       let e2, ty2 = transexp penv policy e2 in
 
-        if not (unify pty ty1) then
+        if not (unify env pty ty1) then
             tyerror (UnexpectedType (pty, ty1));
         (Elet (p, e1, e2), ty2)
 
@@ -155,11 +154,11 @@ let transexp (scope : Scope.scope) =
 
     | PEif (c, e1, e2) ->
       let c, tyc = transexp env policy c in
-        if not (unify tyc (tbool ())) then
+        if not (unify env tyc (tbool ())) then
           tyerror (UnexpectedType (tyc, (tbool ())));
         let e1, ty1 = transexp env policy e1 in
         let e2, ty2 = transexp env policy e2 in
-          if not (unify ty1 ty2) then
+          if not (unify env ty1 ty2) then
             tyerror (UnexpectedType (ty1, ty2));
           (Eif (c, e1, e2), ty1)
 
@@ -175,21 +174,21 @@ let transexp (scope : Scope.scope) =
 
     | PRbitstr e ->
         let e, ety = transexp env policy e in
-          if not (unify ety (tint ())) then
+          if not (unify env ety (tint ())) then
             tyerror (UnexpectedType (ety, (tint ())));
           (Rbitstr e, tbitstring ())
 
     | PRexcepted (re, e) ->
         let re, rety = transrexp env policy re in
         let  e,  ety = transexp  env policy  e in
-          if not (unify ety (tlist rety)) then
+          if not (unify env ety (tlist rety)) then
             tyerror (UnexpectedType (ety, (tlist rety)));
           (Rexcepted (re, e), rety)
 
     | PRinter (re1, re2) ->
         let re1, rty1 = transexp env policy re1 in
         let re2, rty2 = transexp env policy re2 in
-          if not (unify rty1 rty2) then
+          if not (unify env rty1 rty2) then
             tyerror (UnexpectedType (rty1, rty2));
           (Rinter (re1, re2), rty1)
 
@@ -200,7 +199,7 @@ let transexp (scope : Scope.scope) =
           assert false
 
   in
-    transexp                            (* FIXME: close type *)
+    transexp env policy e               (* FIXME: close type *)
 
 (* -------------------------------------------------------------------- *)
 exception DuplicatedSigItemName   of psignature
@@ -210,20 +209,20 @@ let name_of_sigitem = function
   | `VariableDecl v -> v.pvd_name
   | `FunctionDecl f -> f.pfd_name
 
-let transsig (scope : Scope.scope) (env : Env.env) (is : psignature) =
+let transsig (env : Env.env) (is : psignature) =
   let transsig1 = function
     | `VariableDecl x ->
         let name  = x.pvd_name in
-        let type_ = transty scope (TyDecl []) x.pvd_type in
+        let type_ = transty env (TyDecl []) x.pvd_type in
           Tys_variable (name, type_)
 
     | `FunctionDecl f ->
         let name   = f.pfd_name in
         let tyargs =
           List.map                      (* FIXME: continuation *)
-            (fun (x, ty) -> (Ident.create x, transty scope (TyDecl []) ty))
+            (fun (x, ty) -> (Ident.create x, transty env (TyDecl []) ty))
             f.pfd_tyargs in
-        let resty  = transty scope (TyDecl []) f.pfd_tyresult in
+        let resty  = transty env (TyDecl []) f.pfd_tyresult in
 
           if not (List.uniq (List.map fst f.pfd_tyargs)) then
             raise (DuplicatedArgumentsName f);
@@ -242,7 +241,7 @@ let transsig (scope : Scope.scope) (env : Env.env) (is : psignature) =
     else
       items
 
-and transtymod (scope : Scope.scope) (env : Env.env) (tymod : pmodule_type) =
+and transtymod (env : Env.env) (tymod : pmodule_type) =
   assert false                          (* FIXME *)
 
 (* -------------------------------------------------------------------- *)
@@ -253,8 +252,8 @@ let tymod_included (src : tymod) (dst : tymod) =
 let rec transmod scope (env : Env.env) (x : Ident.t) (m : pmodule_expr) =
   match m with
   | Pm_ident (m, args) -> begin
-      let m    = Env.lookup_module m env in
-      let args = List.map (Env.lookup_module^~ env) args in
+      let m    = Env.Mod.lookup m env in
+      let args = List.map (Env.Mod.lookup^~ env) args in
 
         match snd m with
         | Tym_sig _ ->
@@ -295,7 +294,7 @@ and transstruct scope (env : Env.env) (x : Ident.t) (st : pstructure) =
   (* Check parameters types *)
   let stparams =
     List.map
-      (fun (a, aty) -> (Ident.create a, transtymod scope env (Pty_ident aty)))
+      (fun (a, aty) -> (Ident.create a, transtymod env (Pty_ident aty)))
       st.ps_params in
 
   (* Check structure items, extending environment initially with
@@ -313,7 +312,7 @@ and transstruct scope (env : Env.env) (x : Ident.t) (st : pstructure) =
           let newitems = transstruct1 scope env item in
             (Env.bindall (List.map tydecl1 newitems) env,
              List.rev_append acc newitems))
-        (Env.bind_modules stparams env, [])
+        (Env.Mod.bindall stparams env, [])
         st.ps_body
   in
 
@@ -396,7 +395,7 @@ and transstruct1 scope (env : Env.env) (st : pstructure_item) =
               let er =
                 omap er
                   (fun e ->
-                    let e, ety = transexp scope env epolicy e in
+                    let e, ety = transexp env epolicy e in
                       uidmap := Unify.unify scope !uidmap ty ety; e)
               in
                 (x, ty, er))
@@ -410,24 +409,24 @@ and transstruct1 scope (env : Env.env) (st : pstructure_item) =
             env
         in
 
-        let _body = transstmt uidmap scope newenv body.pfb_body in
+        let _body = transstmt uidmap newenv body.pfb_body in
           assert false                  (* FIXME *)
 
 (* -------------------------------------------------------------------- *)
-and transstmt uidmap (scope : Scope.scope) (env : Env.env) (stmt : pstmt) =
-  List.map (transinstr uidmap scope env) stmt
+and transstmt uidmap (env : Env.env) (stmt : pstmt) =
+  List.map (transinstr uidmap env) stmt
 
 (* -------------------------------------------------------------------- *)
-and transinstr uidmap (scope : Scope.scope) (env : Env.env) (i : pinstr) =
+and transinstr uidmap (env : Env.env) (i : pinstr) =
   match i with
   | PSasgn (lvalue, rvalue) -> begin
-      let lvalue, lty = translvalue uidmap scope env lvalue in
+      let lvalue, lty = translvalue uidmap env lvalue in
         assert false
   end
 
   | PScall (name, args) ->
     let fpath, fsig =
-      try  Env.lookup_function name env
+      try  Env.Fun.lookup name env
       with Env.LookupFailure -> tyerror (UnknownFunction name)
     in
       if List.length args <> List.length (fst fsig.fs_sig) then
@@ -436,47 +435,47 @@ and transinstr uidmap (scope : Scope.scope) (env : Env.env) (i : pinstr) =
       let args =
         List.map2
           (fun a (_, ty) ->
-            let a, aty = transexp scope env epolicy a in
-              uidmap := Unify.unify scope !uidmap aty ty; a)
+            let a, aty = transexp env epolicy a in
+              uidmap := Unify.unify env !uidmap aty ty; a)
           args (fst fsig.fs_sig)
       in
-        uidmap := Unify.unify scope !uidmap (snd fsig.fs_sig) (tunit ());
+        uidmap := Unify.unify env !uidmap (snd fsig.fs_sig) (tunit ());
         Scall (None, fpath, args)
 
   | PSif (e, s1, s2) ->
-      let e, ety = transexp scope env epolicy e in
-      let s1 = transstmt uidmap scope env s1 in
-      let s2 = transstmt uidmap scope env s2 in
+      let e, ety = transexp env epolicy e in
+      let s1 = transstmt uidmap env s1 in
+      let s2 = transstmt uidmap env s2 in
   
-        uidmap := Unify.unify scope !uidmap ety (tbool ());
+        uidmap := Unify.unify env !uidmap ety (tbool ());
         Sif (e, s1, s2)
 
   | PSwhile (e, body) ->
-      let e, ety = transexp scope env epolicy e in
-      let body = transstmt uidmap scope env body in
+      let e, ety = transexp env epolicy e in
+      let body = transstmt uidmap env body in
 
-        uidmap := Unify.unify scope !uidmap ety (tbool ());
+        uidmap := Unify.unify env !uidmap ety (tbool ());
         Swhile (e, body)
 
   | PSassert e ->
-     let e, ety = transexp scope env epolicy e in
+     let e, ety = transexp env epolicy e in
 
-       uidmap := Unify.unify scope !uidmap ety (tbool ());
+       uidmap := Unify.unify env !uidmap ety (tbool ());
        Sassert e
 
 (* -------------------------------------------------------------------- *)
-and translvalue uidmap (scope : Scope.scope) (env : Env.env) lvalue =
+and translvalue uidmap (env : Env.env) lvalue =
   match lvalue with
   | PLvSymbol x ->
       let xpath, xty =
-        try  Env.lookup_variable x env
+        try  Env.Var.lookup x env
         with Env.LookupFailure -> tyerror (UnknownVariable x)
       in
         (LvVar (xpath, xty), xty)
 
   | PLvTuple xs -> begin
       let trans1 x =
-        try  Env.lookup_variable x env
+        try  Env.Var.lookup x env
         with Env.LookupFailure -> tyerror (UnknownVariable x)
       in
     
@@ -489,10 +488,10 @@ and translvalue uidmap (scope : Scope.scope) (env : Env.env) lvalue =
   | PLvMap (x, e) ->
       let codomty = mkunivar () in
       let xpath, xty =
-        try  Env.lookup_variable x env
+        try  Env.Var.lookup x env
         with Env.LookupFailure -> tyerror (UnknownVariable x)
-      and e, ety = transexp scope env epolicy e in
+      and e, ety = transexp env epolicy e in
 
-        uidmap := Unify.unify scope !uidmap xty (tmap ety codomty);
+        uidmap := Unify.unify env !uidmap xty (tmap ety codomty);
         (LvMap (xpath, e, codomty), codomty)
 

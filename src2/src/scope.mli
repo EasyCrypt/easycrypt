@@ -1,5 +1,6 @@
 (* -------------------------------------------------------------------- *)
 open Symbols
+open Parsetree
 
 (* -------------------------------------------------------------------- *)
 module Context : sig
@@ -23,17 +24,28 @@ end
 (* -------------------------------------------------------------------- *)
 type scope
 
-val resolve : scope -> qsymbol -> Path.path option
+val initial : symbol -> scope
+val name    : scope -> symbol
+val env     : scope -> Env.env
 
 module Op : sig
-  type op = {
-    op_path : Path.path;
-    op_sig  : Types.ty list * Types.ty;
-  }
+  (* Possible exceptions when checking/adding an operator *)
+  type operror =
+  | OpE_DuplicatedTypeVariable
 
-  val resolve : scope -> qsymbol -> Types.ty list -> op option
+  exception OpError of operror
+
+  val operror : operror -> 'a
+
+  (* [add scope op] type-checks the given *parsed* operator [op] in
+   * scope [scope], and add it to it. Raises [DuplicatedNameInContext]
+   * if a type with given name already exists. *)
+  val add : scope -> poperator -> scope
 end
 
 module Ty : sig
-  val resolve : scope -> qsymbol -> (int * Path.path) option
+  (* [add scope t] adds an abstract type with name [t] to scope
+   * [scope]. Raises [DuplicatedNameInContext] if a type with
+   * given name already exists. *)
+  val add : scope -> symbol -> scope
 end
