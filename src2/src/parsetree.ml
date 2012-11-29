@@ -23,6 +23,11 @@ module Location = struct
         loc_start = mkpos p1    ;
         loc_end   = mkpos p2    ; }
 
+  let of_lexbuf (lb : lexbuf) =
+    let p1 = Lexing.lexeme_start_p lb in
+    let p2 = Lexing.lexeme_end_p lb in
+      make p1 p2
+
   let tostring (p : t) =
     Printf.sprintf "%s:%d.%d-%d.%d"
       p.loc_fname

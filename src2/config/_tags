@@ -5,4 +5,4 @@ true  : debug
 <src/*.ml>            : pkg_menhirLib
 <src/parsetree.ml>    : deriving, pkg_deriving
 <src/ec.ml>           : deriving, pkg_deriving
-<src/*.{native,byte}> : use_str, pkg_deriving
+<src/*.{native,byte}> : pkg_menhirLib, pkg_deriving
