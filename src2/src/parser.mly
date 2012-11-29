@@ -320,6 +320,53 @@ rnd_exp:
 %inline exp_list2: aout=plist2(loc(exp), COMMA) { aout }
 
 (* -------------------------------------------------------------------- *)
+(* Formulas                                                             *)
+
+simpl_form:
+| TRUE                                   { PFbool true  }
+| FALSE                                  { PFbool false }
+| n=number                               { PFint n }
+| x=ident                                { PFident ([], x) }
+| se=simpl_form LBRACKET e=form RBRACKET { PFapp (qsymb_of_symb "<get>", [se; e]) }
+| se=simpl_form LBRACKET e1=form LEFTARROW e2=form RBRACKET
+                                         { PFapp (qsymb_of_symb "<set>", [se; e1; e2]) }
+| x=ident LPAREN es=exp_list0 RPAREN     { PFapp (qsymb_of_symb x, es) }
+| x=simpl_form LKEY s=prog_num RKEY      { PFside (x, s) }
+| LPAREN es=form_list2 RPAREN             { PFtuple es }
+| LPAREN e=form RPAREN                   { e }
+| LBRACKET es=p_form_sm_list0 RBRACKET   { pflist es }
+                          
+form:
+| NOT   e=form                      { PFnot e }
+| MINUS e=form %prec prec_prefix_op { PFapp (qsymb_of_symb "-", [e]) }
+| e1=form    IMPL  e2=form  { PFbinop (e1, PPimp, e2) }
+| e1=form    IFF   e2=form  { PFbinop (e1, PPiff, e2) }
+| e1=form    OR    e2=form  { PFbinop (e1, PPor, e2)  }
+| e1=form    AND   e2=form  { PFbinop (e1, PPand, e2) }
+| e1=form    EQ    e2=form  { PFapp (qsymb_of_symb "="  , [e1; e2]) }
+| e1=form    NE    e2=form  { PFnot (PFapp (qsymb_of_symb "=" , [e1; e2])) }
+| e1=form op=OP1   e2=form  { PFapp (qsymb_of_symb op   , [e1; e2]) }
+| e1=form op=OP2   e2=form  { PFapp (qsymb_of_symb op   , [e1; e2]) }
+| e1=form    MINUS e2=form  { PFapp (qsymb_of_symb "-"  , [e1; e2]) }
+| e1=form op=OP3   e2=form  { PFapp (qsymb_of_symb op   , [e1; e2]) }
+| e1=form    STAR  e2=form  { PFapp (qsymb_of_symb "*"  , [e1; e2]) }
+| e1=form op=OP4   e2=form  { PFapp (qsymb_of_symb op   , [e1; e2]) }
+
+| c=form QUESTION e1=form COLON e2=form %prec OP2 { PFif (c, e1, e2) }
+| IF c=form THEN e1=form ELSE e2=form             { PFif (c, e1, e2) }
+
+| LET p=lpattern EQ e1=form IN e2=form { PFlet (p, e1, e2) }
+| LET p=lpattern EQ e1=form IN e2=form 
+                            { PFlet (p, e1, e2) }
+| e=simpl_form               { PFform e }
+| FORALL pd=param_decl COMMA e=form { PFforall(pd, e) }
+| EXIST  pd=param_decl COMMA e=form { PFexists(pd,e) }
+;
+
+%inline p_form_sm_list0: aout=plist0(form, SEMICOLON) { aout }
+%inline form_list2: aout=plist2(form, COMMA) { aout }
+
+(* -------------------------------------------------------------------- *)
 (* Type expressions                                                     *)
 
 simpl_type_exp:
