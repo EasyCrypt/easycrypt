@@ -90,17 +90,11 @@ end
 (* -------------------------------------------------------------------- *)
 type scope = {
   sc_name      : string;
-  sc_types     : Typesmod.tydecl   Context.context;
-  sc_operators : Typesmod.operator Context.context;
+  sc_types     : Typesmod.tydecl      Context.context;
+  sc_operators : Typesmod.operator    Context.context;
+  sc_modules   : Typesmod.module_expr Context.context;
+  sc_modtypes  : Typesmod.tymod       Context.context;
   sc_env       : Env.env;
-}
-
-(* -------------------------------------------------------------------- *)
-let initial (name : symbol) = {
-  sc_name      = name;
-  sc_types     = Context.empty ();
-  sc_operators = Context.empty ();
-  sc_env       = Env.empty;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -173,3 +167,55 @@ module Ty = struct
         (fun ctxt -> Context.bind name tydecl ctxt)
         (fun env  -> Env.Ty.bind (Ident.create name) tydecl env)
 end
+
+(* -------------------------------------------------------------------- *)
+module Mod = struct
+  open Parsetree
+  open Types
+  open Typesmod
+
+  let transform (scope : scope) f e =
+    { scope with
+        sc_modules = f scope.sc_modules;
+        sc_env     = e scope.sc_env    ; }
+
+  let add (scope : scope) (name : symbol) (m : pmodule_expr) =
+    let name = Ident.create name in
+    let m    = Typedtree.transmod scope.sc_env name m in
+      transform scope
+        (fun ctxt -> Context.bind (Ident.name name) m ctxt)
+        (fun env  -> Env.Mod.bind name m.me_sig env)
+end
+
+(* -------------------------------------------------------------------- *)
+module ModType = struct
+  open Parsetree
+  open Types
+  open Typesmod
+
+  let transform (scope : scope) f e =
+    { scope with
+        sc_modtypes = f scope.sc_modtypes;
+        sc_env      = e scope.sc_env     ; }
+
+  let add (scope : scope) (name : symbol) (i : pmodule_type) =
+    let tymod = Typedtree.transtymod scope.sc_env i in
+      transform scope
+        (fun ctxt -> Context.bind name tymod ctxt)
+        (fun env  -> Env.ModTy.bind (Ident.create name) tymod env)
+end
+
+(* -------------------------------------------------------------------- *)
+let initial (name : symbol) =
+  let scope = {
+    sc_name      = name;
+    sc_types     = Context.empty ();
+    sc_operators = Context.empty ();
+    sc_modtypes  = Context.empty ();
+    sc_modules   = Context.empty ();
+    sc_env       = Env.empty;
+  }
+  in
+  let scope = Ty.add scope "int"  in
+  let scope = Ty.add scope "bool" in
+    scope

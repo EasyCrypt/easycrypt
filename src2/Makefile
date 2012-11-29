@@ -17,7 +17,7 @@ OCAMLBUILD := $(OCAMLBUILD_BIN) $(OCAMLBUILD_EXTRA)
 all: build
 
 build: tags
-	$(OCAMLBUILD) src/ec.native
+	$(OCAMLBUILD) src/ec.byte
 
 clean:
 	$(OCAMLBUILD) -clean

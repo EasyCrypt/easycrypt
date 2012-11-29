@@ -21,11 +21,12 @@ module type S = sig
 end
 
 (* -------------------------------------------------------------------- *)
-module Var : S with type t = Types.ty
-module Fun : S with type t = funsig
-module Mod : S with type t = tymod
-module Ty  : S with type t = tydecl
-module Op  : S with type t = operator
+module Var   : S with type t = Types.ty
+module Fun   : S with type t = funsig
+module Ty    : S with type t = tydecl
+module Op    : S with type t = operator
+module Mod   : S with type t = tymod
+module ModTy : S with type t = tymod
 
 (* -------------------------------------------------------------------- *)
 type ebinding = [

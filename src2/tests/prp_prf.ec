@@ -1,4 +1,6 @@
 theory PRP_PRF.
+  type ('a, 'b) map.
+
   type from.
   type to.
   pop sample : () -> to.

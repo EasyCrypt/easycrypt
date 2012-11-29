@@ -9,11 +9,11 @@ let process_type (scope : Scope.scope) ((args, x), ty) =
 
 (* -------------------------------------------------------------------- *)
 let process_module (scope : Scope.scope) ((x, m) : _ * pmodule_expr) =
-  scope
+  Scope.Mod.add scope x m
 
 (* -------------------------------------------------------------------- *)
-let process_interface (scope : Scope.scope) _ =
-  scope
+let process_interface (scope : Scope.scope) ((x, i) : _ * pmodule_type) =
+  Scope.ModType.add scope x i
 
 (* -------------------------------------------------------------------- *)
 let process_operator (scope : Scope.scope) (op : poperator) =
@@ -39,7 +39,7 @@ let process (g : global) =
   match g with
   | GthOpen name -> begin
       match !scope with
-      | Some _ -> failwith "already in a opened theory"
+      | Some _ -> failwith "already in an opened theory"
       | None   -> scope := Some (Scope.initial name)
   end
 

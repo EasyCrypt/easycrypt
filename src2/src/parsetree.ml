@@ -96,7 +96,6 @@ and pstmt = pinstr list
 
 (* -------------------------------------------------------------------- *)
 type pmodule_type =
-  | Pty_ident of qsymbol
   | Pty_app   of qsymbol * qsymbol list
   | Pty_func  of (symbol * qsymbol) list * psignature
   | Pty_sig   of psignature
@@ -154,12 +153,6 @@ type poperator = {
 
 (* -------------------------------------------------------------------- *)
 type ptylocals = (symbol * pty) list
-
-type pbinop =
-  | PPand
-  | PPor
-  | PPimp
-  | PPiff
 
 type pformula = pformula_r located
 

@@ -210,7 +210,7 @@ let name_of_sigitem = function
   | `VariableDecl v -> v.pvd_name
   | `FunctionDecl f -> f.pfd_name
 
-let transsig (env : Env.env) (is : psignature) =
+let rec transsig (env : Env.env) (is : psignature) =
   let transsig1 = function
     | `VariableDecl x ->
         let name  = x.pvd_name in
@@ -243,14 +243,31 @@ let transsig (env : Env.env) (is : psignature) =
       items
 
 and transtymod (env : Env.env) (tymod : pmodule_type) =
-  assert false                          (* FIXME *)
+  match tymod with
+  | Pty_app _ -> assert false
+
+  | Pty_func (args, i) ->
+      if not (List.uniq (List.map fst args)) then
+        tyerror DuplicatedLocals;
+
+      let args =
+        List.map
+          (fun (x, iname) ->
+              (Ident.create x, snd (Env.ModTy.lookup iname env)))
+          args
+      in
+        Tym_functor (args, transsig (Env.ModTy.bindall args env) i)
+
+  | Pty_sig i ->
+      let i = transsig env i in
+        Tym_sig i
 
 (* -------------------------------------------------------------------- *)
 let tymod_included (src : tymod) (dst : tymod) =
   false                                 (* FIXME *)
 
 (* -------------------------------------------------------------------- *)
-let rec transmod scope (env : Env.env) (x : Ident.t) (m : pmodule_expr) =
+let rec transmod (env : Env.env) (x : Ident.t) (m : pmodule_expr) =
   match m with
   | Pm_ident (m, args) -> begin
       let m    = Env.Mod.lookup m env in
@@ -279,7 +296,7 @@ let rec transmod scope (env : Env.env) (x : Ident.t) (m : pmodule_expr) =
                    (List.map2
                       (fun aname arg -> `Module (aname, fst arg))
                       anames args))
-                tyres
+                (Tym_sig tyres)
             in
               { me_name       = x;
                 me_body       = ME_Application (fst m, List.map fst args);
@@ -288,15 +305,16 @@ let rec transmod scope (env : Env.env) (x : Ident.t) (m : pmodule_expr) =
   end
 
   | Pm_struct st ->
-      transstruct scope env x st
+      transstruct env x st
 
 (* -------------------------------------------------------------------- *)
-and transstruct scope (env : Env.env) (x : Ident.t) (st : pstructure) =
+and transstruct (env : Env.env) (x : Ident.t) (st : pstructure) =
   (* Check parameters types *)
   let stparams =
-    List.map
-      (fun (a, aty) -> (Ident.create a, transtymod env (Pty_ident aty)))
-      st.ps_params in
+    List.map                          (* FIXME: exn *)
+      (fun (a, aty) -> (Ident.create a, snd (Env.ModTy.lookup aty env)))
+      st.ps_params
+  in
 
   (* Check structure items, extending environment initially with
    * structure arguments, and then with previously checked items.
@@ -310,7 +328,7 @@ and transstruct scope (env : Env.env) (x : Ident.t) (st : pstructure) =
     in
       List.fold_left
         (fun (env, acc) item ->
-          let newitems = transstruct1 scope env item in
+          let newitems = transstruct1 env item in
             (Env.bindall (List.map tydecl1 newitems) env,
              List.rev_append acc newitems))
         (Env.Mod.bindall stparams env, [])
@@ -329,7 +347,7 @@ and transstruct scope (env : Env.env) (x : Ident.t) (st : pstructure) =
 
       match List.isempty stparams with
       | true  -> Tym_sig sigitems
-      | false -> Tym_functor (stparams, Tym_sig sigitems)
+      | false -> Tym_functor (stparams, sigitems)
       
   in
     { me_name       = x;
@@ -339,14 +357,14 @@ and transstruct scope (env : Env.env) (x : Ident.t) (st : pstructure) =
       me_sig        = tymod; }
 
 (* -------------------------------------------------------------------- *)
-and transstruct1 scope (env : Env.env) (st : pstructure_item) =
+and transstruct1 (env : Env.env) (st : pstructure_item) =
   match st with
   | Pst_mod (m, me) ->
       let m = Ident.create m in
-        [(m, `Module (transmod scope env m me))]
+        [(m, `Module (transmod env m me))]
 
   | Pst_var (xs, ty) ->
-      let ty = transty scope (TyDecl []) ty in
+      let ty = transty env (TyDecl []) ty in
         List.map
           (fun x ->
             let x = Ident.create x in
@@ -379,9 +397,9 @@ and transstruct1 scope (env : Env.env) (st : pstructure_item) =
           List.map
             (fun (x, ty, e) ->
               let x    = Ident.create x in
-              let ty   = transty scope (TyDecl []) ty in
+              let ty   = transty env (TyDecl []) ty in
               let tvar = mkunivar () in
-                uidmap := Unify.unify scope !uidmap tvar ty;
+                uidmap := Unify.unify env !uidmap tvar ty;
                 (x, tvar, e))
             locals
         in
@@ -397,7 +415,7 @@ and transstruct1 scope (env : Env.env) (st : pstructure_item) =
                 omap er
                   (fun e ->
                     let e, ety = transexp env epolicy e in
-                      uidmap := Unify.unify scope !uidmap ty ety; e)
+                      uidmap := Unify.unify env !uidmap ty ety; e)
               in
                 (x, ty, er))
             locals
@@ -495,4 +513,3 @@ and translvalue uidmap (env : Env.env) lvalue =
 
         uidmap := Unify.unify env !uidmap xty (tmap ety codomty);
         (LvMap (xpath, e, codomty), codomty)
-

@@ -502,9 +502,6 @@ sig_arg:
 ;
 
 sig_body:
-| x=qident
-    { Pty_ident x }
-
 | x=qident LPAREN a=plist1(qident, COMMA) RPAREN
     { Pty_app (x, a) }
 

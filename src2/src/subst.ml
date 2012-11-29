@@ -51,7 +51,7 @@ let rec intymod (s : subst) (tymod : tymod) =
     let fresh = List.map  (fun (x, _) -> Ident.fresh x) args in
     let news  = List.map2 (fun y (x, _) -> `Module (x, Path.Pident y)) fresh args
     and args  = List.map2 (fun x (_, a) -> (x, intymod s a)) fresh args in
-    let tyres = intymod (extend s news) tyres in
+    let tyres = intysig (extend s news) tyres in
       Tym_functor (args, tyres)
 
 and intysig (s : subst) (tysig : tysig) =

@@ -21,6 +21,7 @@ and mcomponents = {
   mc_variables  : (Path.path * Types.ty)           Ident.Map.t;
   mc_functions  : (Path.path * Typesmod.funsig)    Ident.Map.t;
   mc_modules    : (Path.path * Typesmod.tymod)     Ident.Map.t;
+  mc_modtypes   : (Path.path * Typesmod.tymod)     Ident.Map.t;
   mc_typedecls  : (Path.path * Typesmod.tydecl)    Ident.Map.t;
   mc_operators  : (Path.path * Typesmod.operator)  Ident.Map.t;
   mc_components : (Path.path * mcomponents Lazy.t) Ident.Map.t;
@@ -32,6 +33,7 @@ let empty =
     mc_variables  = Ident.Map.empty;
     mc_functions  = Ident.Map.empty;
     mc_modules    = Ident.Map.empty;
+    mc_modtypes   = Ident.Map.empty;
     mc_typedecls  = Ident.Map.empty;
     mc_operators  = Ident.Map.empty;
     mc_components = Ident.Map.empty;
@@ -59,48 +61,57 @@ end
 
 (* -------------------------------------------------------------------- *)
 module MC = struct
+  module IM = Ident.Map
+
   let mc_of_module (_env : env) (_ : tymod) =
     lazy (failwith "")
 
   let bind_variable (scope, x) ty _env mc =
     { mc with
-        mc_variables = Ident.Map.add x (in_scope scope x, ty) mc.mc_variables; }
+        mc_variables = IM.add x (in_scope scope x, ty) mc.mc_variables; }
 
   let bind_function (scope, x) fsig _env mc =
     { mc with
-        mc_functions = Ident.Map.add x (in_scope scope x, fsig) mc.mc_functions; }
+        mc_functions = IM.add x (in_scope scope x, fsig) mc.mc_functions; }
 
   let bind_module (scope, x) tymod env mc =
     let comps = mc_of_module env tymod in
       { mc with
-          mc_modules    = Ident.Map.add x (in_scope scope x, tymod) mc.mc_modules;
-          mc_components = Ident.Map.add x (in_scope scope x, comps) mc.mc_components; }
+          mc_modules    = IM.add x (in_scope scope x, tymod) mc.mc_modules;
+          mc_components = IM.add x (in_scope scope x, comps) mc.mc_components; }
+
+  let bind_modtype (scope, x) tymod env mc =
+    { mc with
+        mc_modtypes = IM.add x (in_scope scope x, tymod) mc.mc_modtypes; }
 
   let bind_typedecl (scope, x) tydecl env mc =
     { mc with
-        mc_typedecls = Ident.Map.add x (in_scope scope x, tydecl) mc.mc_typedecls; }
+        mc_typedecls = IM.add x (in_scope scope x, tydecl) mc.mc_typedecls; }
 
   let bind_op (scope, x) tydecl env mc =
     { mc with
-        mc_operators = Ident.Map.add x (in_scope scope x, tydecl) mc.mc_operators; }
+        mc_operators = IM.add x (in_scope scope x, tydecl) mc.mc_operators; }
 
   let lookup_mc1 (name : symbol) (mc : mcomponents) =
-    Ident.Map.byname name mc.mc_components
+    IM.byname name mc.mc_components
 
   let lookup_variable1 (name : symbol) (mc : mcomponents) =
-    Ident.Map.byname name mc.mc_variables
+    IM.byname name mc.mc_variables
 
   let lookup_function1 (name : symbol) (mc : mcomponents) =
-    Ident.Map.byname name mc.mc_functions
+    IM.byname name mc.mc_functions
 
   let lookup_module1 (name : symbol) (mc : mcomponents) =
-    Ident.Map.byname name mc.mc_modules
+    IM.byname name mc.mc_modules
+
+  let lookup_modtype1 (name : symbol) (mc : mcomponents) =
+    IM.byname name mc.mc_modtypes
 
   let lookup_typedecl1 (name : symbol) (mc : mcomponents) =
-    Ident.Map.byname name mc.mc_typedecls
+    IM.byname name mc.mc_typedecls
 
   let lookup_op1 (name : symbol) (mc : mcomponents) =
-    Ident.Map.byname name mc.mc_operators
+    IM.byname name mc.mc_operators
 
   let rec lookup_mc (qn : symbols) (mc : mcomponents) =
     match qn with
@@ -170,30 +181,6 @@ module Fun = struct
 end
 
 (* -------------------------------------------------------------------- *)
-module Mod = struct
-  type t = tymod
-
-  let bind x tymod env =
-    bind MC.bind_module x tymod env
-
-  let bindall xtys env =
-    List.fold_left
-      (fun env (x, tymod) -> bind x tymod env)
-      env xtys
-
-  let lookup ((scope, id) : qsymbol) (env : env) =
-    match
-      obind
-        (MC.lookup_mc scope env.env_root)
-        (MC.lookup_module1 id)
-    with
-    | None   -> raise LookupFailure
-    | Some x -> x
-
-  let trylookup x env = try_lf (fun () -> lookup x env)
-end
-
-(* -------------------------------------------------------------------- *)
 module Ty = struct
   type t = tydecl
 
@@ -234,6 +221,55 @@ module Op = struct
       obind
         (MC.lookup_mc scope env.env_root)
         (MC.lookup_op1 id)
+    with
+    | None   -> raise LookupFailure
+    | Some x -> x
+
+  let trylookup x env = try_lf (fun () -> lookup x env)
+end
+
+
+(* -------------------------------------------------------------------- *)
+module Mod = struct
+  type t = tymod
+
+  let bind x tymod env =
+    bind MC.bind_module x tymod env
+
+  let bindall xtys env =
+    List.fold_left
+      (fun env (x, tymod) -> bind x tymod env)
+      env xtys
+
+  let lookup ((scope, id) : qsymbol) (env : env) =
+    match
+      obind
+        (MC.lookup_mc scope env.env_root)
+        (MC.lookup_module1 id)
+    with
+    | None   -> raise LookupFailure
+    | Some x -> x
+
+  let trylookup x env = try_lf (fun () -> lookup x env)
+end
+
+(* -------------------------------------------------------------------- *)
+module ModTy = struct
+  type t = tymod
+
+  let bind x tymod env =
+    bind MC.bind_modtype x tymod env
+
+  let bindall xtys env =
+    List.fold_left
+      (fun env (x, tymod) -> bind x tymod env)
+      env xtys
+
+  let lookup ((scope, id) : qsymbol) (env : env) =
+    match
+      obind
+        (MC.lookup_mc scope env.env_root)
+        (MC.lookup_modtype1 id)
     with
     | None   -> raise LookupFailure
     | Some x -> x

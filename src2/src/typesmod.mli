@@ -7,7 +7,7 @@ type modifier = [ `Use | `Read | `Write ]
 
 type tymod =
   | Tym_sig     of tysig
-  | Tym_functor of (Ident.t * tymod) list * tymod
+  | Tym_functor of (Ident.t * tymod) list * tysig
 
 and tysig = tysig_item list
 

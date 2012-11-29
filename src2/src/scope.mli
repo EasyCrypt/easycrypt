@@ -49,3 +49,19 @@ module Ty : sig
    * given name already exists. *)
   val add : scope -> symbol -> scope
 end
+
+module Mod : sig
+  (* [add scope x m] chekc the module [n] and add it to the scope
+   * [scope] with name [x]. Can raise any exception triggereg b the
+   * type-checker or [DuplicatedNameInContext] in case a module with
+   * name [x] already exists *)
+  val add : scope -> symbol -> pmodule_expr -> scope
+end
+
+module ModType : sig
+  (* [add scope x i] checks the module type [i] and add it to the
+   * scope [scope] with name [x]. Can raise any exception triggered by
+   * the type-checker or [DuplicatedNameInContext] in case a module
+   * type with name [x] already exists *)
+  val add : scope -> symbol -> pmodule_type -> scope
+end
