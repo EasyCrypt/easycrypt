@@ -2,7 +2,7 @@
 open Symbols
 
 (* -------------------------------------------------------------------- *)
-type t
+type t = symbol * int
 
 val create : symbol -> t
 val fresh  : t -> t

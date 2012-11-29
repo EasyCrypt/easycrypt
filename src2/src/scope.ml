@@ -136,9 +136,10 @@ module Op = struct
     let codom  = transty op.po_codom in
 
     let tyop = {
-      op_sig  = (dom, codom);
-      op_ctnt = (op.po_dom = None);
-      op_prob = op.po_prob;
+      op_params = List.length op.po_tyvars;
+      op_sig    = (dom, codom);
+      op_ctnt   = (op.po_dom = None);
+      op_prob   = op.po_prob;
     }
 
     in
@@ -152,20 +153,35 @@ module Ty = struct
   open Parsetree
   open Types
   open Typesmod
+  open Typedtree
 
   let transform (scope : scope) f e =
     { scope with
         sc_types = f scope.sc_types;
         sc_env   = e scope.sc_env  ; }
 
-  let add (scope : scope) (name : symbol) =
+  let bind (scope : scope) name tydecl =
+    transform scope
+      (fun ctxt -> Context.bind name tydecl ctxt)
+      (fun env  -> Env.Ty.bind (Ident.create name) tydecl env)
+
+  let alias (scope : scope) ~tyargs name ty = (* FIXME: tyargs *)
+    let tydecl = {tyd_params = 0; tyd_type = Some ty } in
+      bind scope name tydecl
+
+  let add (scope : scope) (args, name) = (* FIXME: args names duplicates *)
     let tydecl = {
-      tyd_params = 0   ;
+      tyd_params = List.length args;
       tyd_type   = None;
     } in
-      transform scope
-        (fun ctxt -> Context.bind name tydecl ctxt)
-        (fun env  -> Env.Ty.bind (Ident.create name) tydecl env)
+      bind scope name tydecl
+
+  let define (scope : scope) (args, name) body = (* FIXME: args names duplicates *)
+    let tydecl = {
+      tyd_params = List.length args;
+      tyd_type   = Some (transty scope.sc_env (TyDecl args) body);
+    } in
+      bind scope name tydecl
 end
 
 (* -------------------------------------------------------------------- *)
@@ -216,6 +232,10 @@ let initial (name : symbol) =
     sc_env       = Env.empty;
   }
   in
-  let scope = Ty.add scope "int"  in
-  let scope = Ty.add scope "bool" in
+
+  let scope = Ty.alias scope ~tyargs:0 "unit" (Types.tunit ()) in
+  let scope = Ty.alias scope ~tyargs:0 "bool" (Types.tbool ()) in
+  let scope = Ty.alias scope ~tyargs:0 "int"  (Types.tint  ()) in
+(*  let scope = Ty.alias scope ~tyargs:2 "map"  (Types.tmap  ()) in*)
+
     scope

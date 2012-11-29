@@ -13,6 +13,12 @@
     ps_body      = body;
   }
 
+  let mk_tydecl (tyvars, name) body = {
+    pty_name   = name;
+    pty_tyvars = tyvars;
+    pty_body   = body;
+  }
+
   let peget e1 e2    = PEapp (Path.toqsymbol Eccorelib.get, [e1; e2])
   let peset e1 e2 e3 = PEapp (Path.toqsymbol Eccorelib.set, [e1; e2; e3])
 
@@ -231,12 +237,6 @@ prog_num:
 side:
 | prog_num { if $1 = 1 then ApiTypes.Left else ApiTypes.Right }
 | empty { ApiTypes.Both }
-
-
-op_ident:
-| x=IDENT { (false, x) }
-| LBRACKET op=binop RBRACKET { (true, op) }
-;
 
 (* -------------------------------------------------------------------- *)
 (* Expressions: program expression, real expression                     *)
@@ -603,8 +603,8 @@ type_decl:
 ;
 
 type_decl_or_def:
-| td=type_decl { (td, None) }
-| td=type_decl EQ te=loc(type_exp) { (td, Some te) }
+| td=type_decl { mk_tydecl td None }
+| td=type_decl EQ te=loc(type_exp) { mk_tydecl td (Some te) }
 ;
 
 (* -------------------------------------------------------------------- *)
@@ -620,8 +620,13 @@ op_sig:
 | dom=op_tydom ARROW codom=loc(type_exp) { (Some dom, codom) }
 ;
 
+op_ident:
+| x=ident { x }
+| LBRACKET x=binop RBRACKET { x }
+;
+
 operator:
-| OP x=ident COLON sty=op_sig {
+| OP x=op_ident COLON sty=op_sig {
     { po_name   = x      ;
       po_tyvars = []     ;
       po_dom    = fst sty;
@@ -629,7 +634,7 @@ operator:
       po_prob   = false  ; }
   }
 
-| OP x=ident LBRACKET tyvars=prim_ident+ RBRACKET COLON sty=op_sig {
+| OP x=op_ident LBRACKET tyvars=prim_ident+ RBRACKET COLON sty=op_sig {
     { po_name   = x      ;
       po_tyvars = tyvars ;
       po_dom    = fst sty;

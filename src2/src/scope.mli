@@ -47,12 +47,18 @@ module Ty : sig
   (* [add scope t] adds an abstract type with name [t] to scope
    * [scope]. Raises [DuplicatedNameInContext] if a type with
    * given name already exists. *)
-  val add : scope -> symbol -> scope
+  val add : scope -> (symbol list * symbol) -> scope
+
+  (* [define scope t body] adds a defined type with name [t] and body
+   * [body] to scope [scope]. Can raise any exception triggered by the
+   * type-checker or [DuplicatedNameInContext] in case a type with name
+   * [t] already exists *)
+  val define : scope -> (symbol list * symbol) -> pty -> scope
 end
 
 module Mod : sig
   (* [add scope x m] chekc the module [n] and add it to the scope
-   * [scope] with name [x]. Can raise any exception triggereg b the
+   * [scope] with name [x]. Can raise any exception triggered by the
    * type-checker or [DuplicatedNameInContext] in case a module with
    * name [x] already exists *)
   val add : scope -> symbol -> pmodule_expr -> scope

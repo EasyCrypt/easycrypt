@@ -152,6 +152,13 @@ type poperator = {
 }
 
 (* -------------------------------------------------------------------- *)
+type ptydecl = {
+  pty_name   : symbol;
+  pty_tyvars : symbol list;
+  pty_body   : pty option;
+}
+
+(* -------------------------------------------------------------------- *)
 type ptylocals = (symbol * pty) list
 
 type pformula = pformula_r located
@@ -208,7 +215,7 @@ type global =
   | Goperator  of poperator
   | Gaxiom     of paxiom
   | Gclaim     of claim
-  | Gtype      of ((symbol list * symbol) * pty option)
+  | Gtype      of ptydecl
   | GthOpen    of symbol
   | GthClose   of symbol
 

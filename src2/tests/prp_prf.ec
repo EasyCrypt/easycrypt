@@ -1,12 +1,18 @@
 theory PRP_PRF.
-  type ('a, 'b) map.
+  op dom['a 'b] : ('a, 'b) map -> 'a list.
+  op in_dom['a 'b] : ('a, ('a, 'b) map) -> bool.
+  op not : bool -> bool.
+  op length['a] : 'a list -> int.
+  op [<] : (int, int) -> bool.
+  op [&&] : (bool, bool) -> bool.
+  op mem['a] : ('a, 'a list) -> bool.
 
   type from.
   type to.
   pop sample : () -> to.
   (* we need a way to express the probabilty of each elements of sample *)
-  cnst qF : int.
-(*  axiom qF_pos : 0 < q.  *)
+  cnst q : int.
+(*  axiom q_pos : 0 < q.  *)
 
   module type I = {
     fun F (x:from) : to 
@@ -22,7 +28,7 @@ theory PRP_PRF.
 
     fun F (x:from) : to = {
       var t : to;
-      if (!in_dom(x,m) && length(dom(m)) < q) {
+      if (not(in_dom(x,m)) && (length(dom(m)) < q)) {
         t = sample();
         if (mem(t,dom(m))) t = sample(); (* \ dom(m)); parse error *)
         m[x] = t;

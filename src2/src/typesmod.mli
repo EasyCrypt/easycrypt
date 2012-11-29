@@ -64,7 +64,7 @@ and variable = {
 and stmt = instr list
 
 and instr =
-  | Sasgn   of lvalue * Path.path * Types.tyexpr list
+  | Sasgn   of lvalue * Types.tyexpr
   | Scall   of lvalue option * Path.path * Types.tyexpr list
   | Sif     of Types.tyexpr * stmt * stmt
   | Swhile  of Types.tyexpr * stmt
@@ -83,9 +83,10 @@ type axiom = {
 
 (* -------------------------------------------------------------------- *)
 type operator = {
-  op_sig  : Types.ty list * Types.ty;
-  op_ctnt : bool;
-  op_prob : bool;
+  op_params : int;
+  op_sig    : Types.ty list * Types.ty;
+  op_ctnt   : bool;
+  op_prob   : bool;
 }
 
 (* -------------------------------------------------------------------- *)

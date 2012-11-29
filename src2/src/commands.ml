@@ -2,10 +2,11 @@
 open Parsetree
 
 (* -------------------------------------------------------------------- *)
-let process_type (scope : Scope.scope) ((args, x), ty) =
-  match args, ty with
-  | [], None   -> Scope.Ty.add scope x
-  | _ , _      -> assert false
+let process_type (scope : Scope.scope) (tyd : ptydecl) =
+  let tyname = (tyd.pty_tyvars, tyd.pty_name) in
+    match tyd.pty_body with
+    | None    -> Scope.Ty.add    scope tyname
+    | Some bd -> Scope.Ty.define scope tyname bd
 
 (* -------------------------------------------------------------------- *)
 let process_module (scope : Scope.scope) ((x, m) : _ * pmodule_expr) =

@@ -23,8 +23,9 @@ val tunit      : unit -> ty
 val tbool      : unit -> ty
 val tint       : unit -> ty
 val tbitstring : unit -> ty
-val tlist      : ty   -> ty
-val tmap       : ty   -> ty -> ty
+
+val tlist : ty -> ty
+val tmap  : ty -> ty -> ty
 
 val mkunivar : unit -> ty
 

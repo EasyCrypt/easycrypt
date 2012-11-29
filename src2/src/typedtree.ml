@@ -122,20 +122,34 @@ let transexp (env : Env.env) (policy : epolicy) (e : pexpr) =
     | PEbool b -> (Ebool b, tbool ())
     | PEint  i -> (Eint  i, tint  ())
 
-    | PEident x ->                      (* constants ? *)
-      let xpath, ty =
-        try  Env.Var.lookup x env
-        with Env.LookupFailure -> tyerror (UnknownVariable x)
-      in
-        (Evar (xpath, ty), ty)      (* FIXME: no need to freshen type ? *)
+    | PEident x -> begin
+      match Env.Ident.trylookup x env with
+      | None -> tyerror (UnknownVariable x)
+      | Some (xpath, ty, kind) ->
+        let e =
+          match kind with
+          | `Var  -> Evar (xpath, ty)
+          | `Ctnt -> Eapp (xpath, [])
+        in
+          (e, ty)               (* FIXME: no need to freshen type ? *)
+    end
 
     | PEapp (name, es) -> begin
       let es   = List.map (transexp env policy) es in
       let esig = snd (List.split es) in
-
         match Env.Op.trylookup name env with
-          | None        -> tyerror (UnknownOperatorForSig (name, esig))
-          | Some (p, _) -> (Eapp (p, List.map fst es), tunit ()) (* FIXME *)
+          | None -> tyerror (UnknownOperatorForSig (name, esig))
+          | Some (p, op) ->
+            let dom, codom =
+              let optyvars =
+                Parray.init op.op_params (fun _ -> mkunivar ())
+              in
+                (List.map (Types.full_inst_rel optyvars) (fst op.op_sig),
+                 Types.full_inst_rel optyvars (snd op.op_sig))
+            in
+              if not (List.all2 (unify env) esig dom) then
+                tyerror ApplInvalidArity; (* FIXME *)
+              (Eapp (p, List.map fst es), codom)
     end
 
     | PElet (p, e1, e2) ->
@@ -440,7 +454,15 @@ and transinstr uidmap (env : Env.env) (i : pinstr) =
   match i with
   | PSasgn (lvalue, rvalue) -> begin
       let lvalue, lty = translvalue uidmap env lvalue in
-        assert false
+      let stmt, ety =
+        match rvalue with
+        | `Expr e ->
+            let (e, ety) = transexp env epolicy e in (* FIXME: policy *)
+              (Sasgn (lvalue, e), ety)
+        | _ -> assert false
+      in
+        uidmap := Unify.unify env !uidmap lty ety;
+        stmt
   end
 
   | PScall (name, args) ->

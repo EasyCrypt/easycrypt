@@ -58,6 +58,15 @@ module List = struct
           | Some _ as r -> r
       end
 
+  let rec fpick (xs : (unit -> 'a option) list) =
+    match xs with
+    | []      -> None
+    | x :: xs -> begin
+        match x () with
+        | None   -> fpick xs
+        | Some v -> Some v
+    end
+
   let index (v : 'a) (xs : 'a list) : int option =
     let rec index (i : int) = function
       | [] -> None

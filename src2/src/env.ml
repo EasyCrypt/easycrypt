@@ -202,6 +202,19 @@ module Ty = struct
     | Some x -> x
 
   let trylookup x env = try_lf (fun () -> lookup x env)
+
+  let defined (name : Path.path) (env : env) = (* FIXME: lookup for paths *)
+    match trylookup (Path.toqsymbol name) env with
+    | None -> false
+    | Some (_, tydecl) -> tydecl.tyd_type <> None
+
+  let unfold (name : Path.path) (args : Types.ty Parray.t) (env : env) =
+    match trylookup (Path.toqsymbol name) env with (* FIXME: lookup for paths *)
+    | None
+    | Some (_, { tyd_type = None }) -> assert false
+    | Some (_, ({ tyd_type = Some body } as tyd)) ->
+        assert (tyd.tyd_params = Parray.length args);
+        Types.full_inst_rel args body
 end
 
 (* -------------------------------------------------------------------- *)
@@ -292,3 +305,25 @@ let bind1 ((x, eb) : Ident.t * ebinding) (env : env) =
 
 let bindall (items : (Ident.t * ebinding) list) (env : env) =
   List.fold_left ((^~) bind1) env items
+
+(* -------------------------------------------------------------------- *)
+module Ident = struct
+  let trylookup (name : qsymbol) (env : env) =
+    let for_var () =
+      match Var.trylookup name env with
+      | None -> None
+      | Some (p, ty) -> Some (p, ty, (`Var :> [`Var | `Ctnt]))
+
+    and for_op () =
+      match Op.trylookup name env with
+      | None -> None
+      | Some (_, op) when not op.op_ctnt -> None
+      | Some (p, op) -> Some (p, snd op.op_sig, (`Ctnt :> [`Var | `Ctnt]))
+    in
+      List.fpick [for_var; for_op]
+
+  let lookup (name : qsymbol) (env : env) =
+    match trylookup name env with
+    | None   -> raise LookupFailure
+    | Some x -> x
+end

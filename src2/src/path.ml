@@ -11,11 +11,11 @@ let equal : path -> path -> bool = (=)
 
 (* -------------------------------------------------------------------- *)
 let rec create (path : string) =
-  match try_nf (fun () -> String.index path '.') with
+  match try_nf (fun () -> String.rindex path '.') with
     | None   -> Pident (Ident.create path)
     | Some i ->
-      let path = String.sub path 0 i in
-      let name = String.sub path i (String.length path - i) in
+      let path = String.sub path 0 i
+      and name = String.sub path (i+1) (String.length path - (i+1)) in
         Pqname (create path, Ident.create name)
 
 (* -------------------------------------------------------------------- *)

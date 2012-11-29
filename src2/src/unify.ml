@@ -10,15 +10,6 @@ let check_cycle u t =
 
 exception UnificationFailure of ty * ty
 
-(** TODO implement this once scope are done *)
-let get_type env p = assert false
-let is_def_type env p = assert false
-
-let unfold_type env p lt =
-  let n,t = get_type env p in
-  assert (n = Parray.length lt);
-  full_inst_rel lt t 
-
 let unify env = 
   let repr s t = 
     match t with
@@ -42,17 +33,20 @@ let unify env =
     | Tunivar id, t | t, Tunivar id -> bind s id t 
     | Tbase b1, Tbase b2 when tyb_equal b1 b2 -> s
     | Tvar(_, v1), Tvar(_, v2) when uid_equal v1 v2 -> s
+
     | Ttuple lt1, Ttuple lt2 ->
         if Parray.length lt1 <> Parray.length lt2 then 
           raise (UnificationFailure(t1,t2))
         else Parray.fold_left2 aux s lt1 lt2
-    | Tconstr(p1, lt1), Tconstr(p2,lt2) when Path.equal p1 p2 ->
+
+    | Tconstr(p1, lt1), Tconstr(p2, lt2) when Path.equal p1 p2 ->
         if Parray.length lt1 <> Parray.length lt2 then
           raise (UnificationFailure(t1,t2))
         else Parray.fold_left2 aux s lt1 lt2
-    | Tconstr(p, lt), t when is_def_type env p ->
-        aux s (unfold_type env p lt) t
-    | t, Tconstr(p, lt) when is_def_type env p ->
-        aux s t (unfold_type env p lt)
-    | _, _ -> raise (UnificationFailure(t1,t2)) in
+
+    | Tconstr(p, lt), t
+    | t, Tconstr(p, lt) when Env.Ty.defined p env ->
+        aux s t (Env.Ty.unfold p lt env)
+
+    | _, _ -> raise (UnificationFailure(t1, t2)) in
   aux

@@ -4,6 +4,6 @@ let cons = Path.create "<top>.cons"
 let list = Path.create "<top>.list"
 
 (* -------------------------------------------------------------------- *)
-let get = Path.create "<top>.get"
-let set = Path.create "<top>.set"
-let map = Path.create "<top>.map"
+let get = Path.create "get"             (* FIXME *)
+let set = Path.create "set"
+let map = Path.create "map"
