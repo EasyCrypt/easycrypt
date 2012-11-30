@@ -123,7 +123,7 @@ let transexp (env : EcEnv.env) (policy : epolicy) (e : pexpr) =
     | PEint  i -> (Eint  i, tint  ())
 
     | PEident x -> begin
-      match EcEnv.EcIdent.trylookup x env with
+      match EcEnv.Ident.trylookup x env with
       | None -> tyerror (UnknownVariable x)
       | Some (xpath, ty, kind) ->
         let e =

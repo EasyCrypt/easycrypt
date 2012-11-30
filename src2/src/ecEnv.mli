@@ -47,7 +47,7 @@ module Ty : sig
 end
 
 (* -------------------------------------------------------------------- *)
-module EcIdent : sig
+module Ident : sig
   val lookup    : qsymbol -> env -> (EcPath.path * EcTypes.ty * [`Var | `Ctnt])
   val trylookup : qsymbol -> env -> (EcPath.path * EcTypes.ty * [`Var | `Ctnt]) option
 end

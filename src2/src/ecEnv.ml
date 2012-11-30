@@ -307,7 +307,7 @@ let bindall (items : (EcIdent.t * ebinding) list) (env : env) =
   List.fold_left ((^~) bind1) env items
 
 (* -------------------------------------------------------------------- *)
-module EcIdent = struct
+module Ident = struct
   let trylookup (name : qsymbol) (env : env) =
     let for_var () =
       match Var.trylookup name env with

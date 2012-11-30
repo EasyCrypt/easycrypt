@@ -30,7 +30,7 @@ type module_expr = {
 }
 
 and module_body =
-  | ME_EcIdent       of EcPath.path
+  | ME_Ident       of EcPath.path
   | ME_Application of EcPath.path * EcPath.path list
   | ME_Structure   of module_structure
   | ME_Decl        of EcPath.path
