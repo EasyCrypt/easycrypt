@@ -45,7 +45,7 @@ let process (g : global) =
   end
 
   | GthClose name -> begin
-    if EcScope.name (get_scope ()) <> name then
+    if EcIdent.name (EcScope.name (get_scope ())) <> name then
       failwith "invalid theory name";
     scope := None
   end

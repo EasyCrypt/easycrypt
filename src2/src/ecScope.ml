@@ -2,6 +2,9 @@
 open EcUtils
 open EcSymbols
 open EcPath
+open EcParsetree
+open EcTypes
+open EcTypesmod
 
 (* -------------------------------------------------------------------- *)
 module Context = struct
@@ -88,13 +91,23 @@ module Context = struct
 end
 
 (* -------------------------------------------------------------------- *)
+type action =
+  | Ac_type     of (EcIdent.t * EcTypesmod.tydecl)
+  | Ac_operator of (EcIdent.t * EcTypesmod.operator)
+  | Ac_modtype  of (EcIdent.t * EcTypesmod.tymod)
+  | Ac_module   of EcTypesmod.module_expr
+  | Ac_theory   of (EcIdent.t * EcTypesmod.theory)
+
 type scope = {
-  sc_name      : string;
+  sc_name      : EcIdent.t;
   sc_types     : EcTypesmod.tydecl      Context.context;
   sc_operators : EcTypesmod.operator    Context.context;
   sc_modules   : EcTypesmod.module_expr Context.context;
   sc_modtypes  : EcTypesmod.tymod       Context.context;
+  sc_theories  : EcTypesmod.theory      Context.context;
+  sc_history   : action list;
   sc_env       : EcEnv.env;
+  sc_top       : scope option;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -105,11 +118,59 @@ let name (scope : scope) =
 let env (scope : scope) = scope.sc_env
 
 (* -------------------------------------------------------------------- *)
-module Op = struct
-  open EcParsetree
-  open EcTypes
-  open EcTypesmod
+let subscope (scope : scope option) (name : symbol) =
+  let env =
+    match scope with
+    | None       -> EcEnv.empty
+    | Some scope -> scope.sc_env
+  in
+  let (name, env) = EcEnv.enter name env in
 
+  { sc_name      = name;
+    sc_types     = Context.empty ();
+    sc_operators = Context.empty ();
+    sc_modtypes  = Context.empty ();
+    sc_modules   = Context.empty ();
+    sc_theories  = Context.empty ();
+    sc_history   = [];
+    sc_env       = env;
+    sc_top       = scope; }
+
+(* -------------------------------------------------------------------- *)
+let bind (scope : scope) (action : action) =
+  match action with
+  | Ac_type (x, tydecl) ->
+      { scope with
+          sc_types   = Context.bind (EcIdent.name x) tydecl scope.sc_types;
+          sc_history = action :: scope.sc_history;
+          sc_env     = EcEnv.Ty.bind x tydecl scope.sc_env }
+
+  | Ac_operator (x, op) ->
+      { scope with
+          sc_operators = Context.bind (EcIdent.name x) op scope.sc_operators;
+          sc_history   = action :: scope.sc_history;
+          sc_env       = EcEnv.Op.bind x op scope.sc_env }
+
+  | Ac_modtype (x, tymod) ->
+      { scope with
+          sc_modtypes = Context.bind (EcIdent.name x) tymod scope.sc_modtypes;
+          sc_history  = action :: scope.sc_history;
+          sc_env      = EcEnv.ModTy.bind x tymod scope.sc_env }
+
+  | Ac_module m ->
+      { scope with
+          sc_modules = Context.bind (EcIdent.name m.me_name) m scope.sc_modules;
+          sc_history = action :: scope.sc_history;
+          sc_env     = EcEnv.Mod.bind m.me_name m.me_sig scope.sc_env }
+
+  | Ac_theory (x, th) ->
+      { scope with
+          sc_theories = Context.bind (EcIdent.name x) th scope.sc_theories;
+          sc_history  = action :: scope.sc_history;
+          sc_env      = EcEnv.Theory.bind x th scope.sc_env }
+
+(* -------------------------------------------------------------------- *)
+module Op = struct
   module TT = EcTypedtree
 
   type operror =
@@ -119,11 +180,6 @@ module Op = struct
 
   let operror (error : operror) =
     raise (OpError error)
-
-  let transform (scope : scope) f e =
-    { scope with
-        sc_operators = f scope.sc_operators;
-        sc_env       = e scope.sc_env      ; }
 
   let add (scope : scope) (op : poperator) =
     if not (List.uniq op.po_tyvars) then
@@ -143,53 +199,37 @@ module Op = struct
     }
 
     in
-      transform scope
-        (fun ctxt -> Context.bind op.po_name tyop ctxt)
-        (fun env  -> EcEnv.Op.bind (EcIdent.create op.po_name) tyop env)
+      bind scope (Ac_operator (EcIdent.create op.po_name, tyop))
 end
 
 (* -------------------------------------------------------------------- *)
 module Ty = struct
-  open EcParsetree
-  open EcTypes
-  open EcTypesmod
   open EcTypedtree
 
-  let transform (scope : scope) f e =
-    { scope with
-        sc_types = f scope.sc_types;
-        sc_env   = e scope.sc_env  ; }
-
   let bind (scope : scope) name tydecl =
-    transform scope
-      (fun ctxt -> Context.bind name tydecl ctxt)
-      (fun env  -> EcEnv.Ty.bind (EcIdent.create name) tydecl env)
+    bind scope (Ac_type (name, tydecl))
 
   let alias (scope : scope) ~tyargs name ty = (* FIXME: tyargs *)
     let tydecl = {tyd_params = 0; tyd_type = Some ty } in
-      bind scope name tydecl
+      bind scope (EcIdent.create name) tydecl
 
   let add (scope : scope) (args, name) = (* FIXME: args names duplicates *)
     let tydecl = {
       tyd_params = List.length args;
       tyd_type   = None;
     } in
-      bind scope name tydecl
+      bind scope (EcIdent.create name) tydecl
 
   let define (scope : scope) (args, name) body = (* FIXME: args names duplicates *)
     let tydecl = {
       tyd_params = List.length args;
       tyd_type   = Some (transty scope.sc_env (TyDecl args) body);
     } in
-      bind scope name tydecl
+      bind scope (EcIdent.create name) tydecl
 end
 
 (* -------------------------------------------------------------------- *)
 module Mod = struct
-  open EcParsetree
-  open EcTypes
-  open EcTypesmod
-
   let transform (scope : scope) f e =
     { scope with
         sc_modules = f scope.sc_modules;
@@ -205,10 +245,6 @@ end
 
 (* -------------------------------------------------------------------- *)
 module ModType = struct
-  open EcParsetree
-  open EcTypes
-  open EcTypesmod
-
   let transform (scope : scope) f e =
     { scope with
         sc_modtypes = f scope.sc_modtypes;
@@ -222,16 +258,21 @@ module ModType = struct
 end
 
 (* -------------------------------------------------------------------- *)
+module Theory = struct
+  exception TopScope
+
+  let enter (scope : scope) (name : symbol) =
+    subscope (Some scope) name
+
+  let exit (scope : scope) =
+    match scope.sc_top with
+    | None     -> raise TopScope
+    | Some sup -> (sup, scope.sc_name)
+end
+
+(* -------------------------------------------------------------------- *)
 let initial (name : symbol) =
-  let scope = {
-    sc_name      = name;
-    sc_types     = Context.empty ();
-    sc_operators = Context.empty ();
-    sc_modtypes  = Context.empty ();
-    sc_modules   = Context.empty ();
-    sc_env       = EcEnv.empty;
-  }
-  in
+  let scope = subscope None name in
 
   let scope = Ty.alias scope ~tyargs:0 "unit" (EcTypes.tunit ()) in
   let scope = Ty.alias scope ~tyargs:0 "bool" (EcTypes.tbool ()) in

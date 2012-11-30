@@ -24,7 +24,8 @@ and mcomponents = {
   mc_modtypes   : (EcPath.path * EcTypesmod.tymod)     EcIdent.Map.t;
   mc_typedecls  : (EcPath.path * EcTypesmod.tydecl)    EcIdent.Map.t;
   mc_operators  : (EcPath.path * EcTypesmod.operator)  EcIdent.Map.t;
-  mc_components : (EcPath.path * mcomponents Lazy.t) EcIdent.Map.t;
+  mc_theories   : (EcPath.path * EcTypesmod.theory)    EcIdent.Map.t;
+  mc_components : (EcPath.path * mcomponents Lazy.t)   EcIdent.Map.t;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -36,12 +37,26 @@ let empty =
     mc_modtypes   = EcIdent.Map.empty;
     mc_typedecls  = EcIdent.Map.empty;
     mc_operators  = EcIdent.Map.empty;
+    mc_theories   = EcIdent.Map.empty;
     mc_components = EcIdent.Map.empty;
   }
 
   in
     { env_scope = None;
       env_root  = emcomponents; }
+
+(* -------------------------------------------------------------------- *)
+let root (env : env) = env.env_scope
+
+(* -------------------------------------------------------------------- *)
+let enter (name : symbol) (env : env) =
+  let name = EcIdent.create name in
+  let path =
+    match env.env_scope with
+    | None   -> EcPath.Pident name
+    | Some p -> EcPath.Pqname (p, name)
+  in
+    (name, { env with env_scope = Some path })
 
 (* -------------------------------------------------------------------- *)
 exception LookupFailure
@@ -92,6 +107,10 @@ module MC = struct
     { mc with
         mc_operators = IM.add x (in_scope scope x, tydecl) mc.mc_operators; }
 
+  let bind_theory (scope, x) th env mc =
+    { mc with
+        mc_theories = IM.add x (in_scope scope x, th) mc.mc_theories; }
+
   let lookup_mc1 (name : symbol) (mc : mcomponents) =
     IM.byname name mc.mc_components
 
@@ -112,6 +131,9 @@ module MC = struct
 
   let lookup_op1 (name : symbol) (mc : mcomponents) =
     IM.byname name mc.mc_operators
+
+  let lookup_theory1 (name : symbol) (mc : mcomponents) =
+    IM.byname name mc.mc_theories
 
   let rec lookup_mc (qn : symbols) (mc : mcomponents) =
     match qn with
@@ -291,17 +313,49 @@ module ModTy = struct
 end
 
 (* -------------------------------------------------------------------- *)
+module Theory = struct
+  type t = theory
+
+  let bind x th env =
+    bind MC.bind_theory x th env
+
+  let bindall xtys env =
+    List.fold_left
+      (fun env (x, tymod) -> bind x tymod env)
+      env xtys
+
+  let lookup ((scope, id) : qsymbol) (env : env) =
+    match
+      obind
+        (MC.lookup_mc scope env.env_root)
+        (MC.lookup_theory1 id)
+    with
+    | None   -> raise LookupFailure
+    | Some x -> x
+
+  let trylookup x env = try_lf (fun () -> lookup x env)
+end
+
+(* -------------------------------------------------------------------- *)
 type ebinding = [
   | `Variable  of EcTypes.ty
   | `Function  of funsig
+  | `Operator  of operator
   | `Module    of tymod
+  | `ModType   of tymod
+  | `TypeDecl  of tydecl
+  | `Theory    of theory
 ]
 
 let bind1 ((x, eb) : EcIdent.t * ebinding) (env : env) =
   match eb with
-  | `Variable ty -> Var.bind x ty env
-  | `Function f  -> Fun.bind x f  env
-  | `Module   m  -> Mod.bind x m  env
+  | `Variable ty -> Var   .bind x ty env
+  | `Function f  -> Fun   .bind x f  env
+  | `Operator o  -> Op    .bind x o  env
+  | `Module   m  -> Mod   .bind x m  env
+  | `ModType  i  -> ModTy .bind x i  env
+  | `TypeDecl t  -> Ty    .bind x t  env
+  | `Theory   t  -> Theory.bind x t  env
 
 let bindall (items : (EcIdent.t * ebinding) list) (env : env) =
   List.fold_left ((^~) bind1) env items

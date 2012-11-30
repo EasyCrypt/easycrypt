@@ -15,11 +15,17 @@ exception LookupFailure
 type ebinding = [
   | `Variable  of EcTypes.ty
   | `Function  of funsig
+  | `Operator  of operator
   | `Module    of tymod
+  | `ModType   of tymod
+  | `TypeDecl  of tydecl
+  | `Theory    of theory
 ]
 
 val bind1   : EcIdent.t * ebinding -> env -> env
 val bindall : (EcIdent.t * ebinding) list -> env -> env
+val root    : env -> EcPath.path option
+val enter   : symbol -> env -> EcIdent.t * env
 
 (* -------------------------------------------------------------------- *)
 module type S = sig
@@ -32,11 +38,12 @@ module type S = sig
 end
 
 (* -------------------------------------------------------------------- *)
-module Var   : S with type t = EcTypes.ty
-module Fun   : S with type t = funsig
-module Op    : S with type t = operator
-module Mod   : S with type t = tymod
-module ModTy : S with type t = tymod
+module Var    : S with type t = EcTypes.ty
+module Fun    : S with type t = funsig
+module Op     : S with type t = operator
+module Mod    : S with type t = tymod
+module ModTy  : S with type t = tymod
+module Theory : S with type t = theory
 
 (* -------------------------------------------------------------------- *)
 module Ty : sig

@@ -94,3 +94,12 @@ type tydecl = {
   tyd_params : int;
   tyd_type   : EcTypes.ty option;
 }
+
+(* -------------------------------------------------------------------- *)
+type theory = theory_item list
+
+and theory_item =
+  | Th_type     of EcIdent.t * tydecl
+  | Th_operator of EcIdent.t * operator
+  | Th_modtype  of EcIdent.t * tymod
+  | Th_module   of module_expr

@@ -25,7 +25,7 @@ end
 type scope
 
 val initial : symbol -> scope
-val name    : scope -> symbol
+val name    : scope -> EcIdent.t
 val env     : scope -> EcEnv.env
 
 module Op : sig
@@ -70,4 +70,16 @@ module ModType : sig
    * the type-checker or [DuplicatedNameInContext] in case a module
    * type with name [x] already exists *)
   val add : scope -> symbol -> pmodule_type -> scope
+end
+
+module Theory : sig
+  exception TopScope
+
+  (* [enter scope name] start a (sub-)theory in scope [scope] with
+   * name [name]. *)
+  val enter : scope -> symbol -> scope
+
+  (* [exit scope] close and finalize the top-most theory and returns
+   * its name. Raises [TopScope] if [scope] has not super scope. *)
+  val exit  : scope -> scope * EcIdent.t
 end
