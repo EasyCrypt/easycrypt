@@ -13,8 +13,11 @@
 .ocamlinit
 .depend
 
-*Lexer.ml*
-*Parser.ml*
+*Lexer.ml
+*Lexer.mli
+
+*Parser.ml
+*Parser.mli
 
 /easycrypt.top
 
