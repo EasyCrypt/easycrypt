@@ -3,7 +3,7 @@
 # --------------------------------------------------------------------
 CONFIG           = _tags myocamlbuild.ml
 OCAMLBUILD_BIN   = ocamlbuild
-OCAMLBUILD_EXTRA = -no-hygiene -classic-display -menhir "menhir --trace"
+OCAMLBUILD_EXTRA = -classic-display -menhir "menhir --trace"
 
 # In Emacs, use classic display to enable error jumping.
 ifeq ($(shell echo $$TERM), dumb)
@@ -12,12 +12,17 @@ endif
 OCAMLBUILD := $(OCAMLBUILD_BIN) $(OCAMLBUILD_EXTRA)
 
 # --------------------------------------------------------------------
-.PHONY: all build clean tags tests
+.PHONY: all build byte native clean tags tests
 
 all: build
 
-build: tags
+build: byte
+
+byte: tags
 	$(OCAMLBUILD) src/ec.byte
+
+native: tags
+	$(OCAMLBUILD) src/ec.native
 
 clean:
 	$(OCAMLBUILD) -clean
