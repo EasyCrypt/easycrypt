@@ -24,6 +24,8 @@ type tyerror =
   | ModApplToNonFunctor
   | ModApplInvalidArity
   | ModApplInvalidArgInterface
+  | PropExpected of pformula
+  | TermExpected of pformula
 
 exception TyError of tyerror
 
@@ -89,23 +91,26 @@ let epolicy = { epl_prob = false; }
 (* -------------------------------------------------------------------- *)
 exception NonLinearPattern of EcParsetree.lpattern
 
-let transpattern (env : EcEnv.env) (p : EcParsetree.lpattern) =
+let transpattern1 (env : EcEnv.env) (p : EcParsetree.lpattern) = 
   match p with
   | LPSymbol x ->
       let ty = mkunivar () in
       let x  = EcIdent.create x in
-        (EcEnv.Var.bind x ty env, LSymbol x, ty)
+      (LSymbol x, ty)
 
   | LPTuple xs ->
-      if not (List.uniq xs) then
-        raise (NonLinearPattern p);
-
+      if not (List.uniq xs) then raise (NonLinearPattern p);
       let xs     = List.map EcIdent.create xs in
       let subtys = List.map (fun _ -> mkunivar ()) xs in
+      (LTuple xs, Ttuple (Parray.of_list subtys))
 
-        (EcEnv.Var.bindall (List.combine xs subtys) env,
-         LTuple xs,
-         Ttuple (Parray.of_list subtys))
+let transpattern (env : EcEnv.env) (p : EcParsetree.lpattern) =
+  match transpattern1 env p with
+  | LSymbol x as p, ty ->
+      (EcEnv.Var.bind x ty env, p, ty)
+  | LTuple xs as p, (Ttuple lty as ty) ->
+      (EcEnv.Var.bindall (List.combine xs (Parray.to_list lty)) env, p, ty)
+  | _ -> assert false
 
 (* -------------------------------------------------------------------- *)
 let transexp (env : EcEnv.env) (policy : epolicy) (e : pexpr) =
@@ -535,3 +540,247 @@ and translvalue uidmap (env : EcEnv.env) lvalue =
 
         uidmap := EcUnify.unify env !uidmap xty (tmap ety codomty);
         (LvMap (xpath, e, codomty), codomty)
+
+
+(* -------------------------------------------------------------------- *)
+(** Translation of formula *)
+
+open EcFol
+
+type var_kind = 
+  | Llocal of EcIdent.t * ty
+  | Lprog  of EcPath.path * ty * Side.t
+  | Lctnt  of EcPath.path * ty
+
+type op_kind = 
+  | Lop of EcPath.path * operator
+(*    | Lpred of EcPath.path * *)
+module Fenv = struct
+
+  type fenv = {
+      fe_locals : (EcIdent.t * ty) EcIdent.Map.t; 
+      fe_envs : EcEnv.env EcMaps.IntMap.t;
+      fe_cur : int
+    }
+
+  let mono_fenv env = {
+    fe_locals = EcIdent.Map.empty;
+    fe_envs = EcMaps.IntMap.add 0 env EcMaps.IntMap.empty;
+    fe_cur = 0;
+  }
+
+  let mono fenv = 
+    try EcMaps.IntMap.find 0 fenv.fe_envs
+    with _ -> assert false 
+
+  let bind_local fenv x ty =
+   { fenv with 
+     fe_locals = EcIdent.Map.add x (x,ty) fenv.fe_locals }
+
+  let bind_locals = List.fold_left2 bind_local 
+
+  let current_env fenv = 
+    try EcMaps.IntMap.find fenv.fe_cur fenv.fe_envs 
+    with _ -> assert false (* FIXME *)
+
+  let set_side fenv side = 
+    if EcMaps.IntMap.mem side fenv.fe_envs then
+      { fenv with fe_cur = side }
+    else assert false (* FIXME *)
+
+ 
+  module Ident = struct
+    let trylookup_env fenv qs = 
+      let env = current_env fenv in
+      match EcEnv.Ident.trylookup qs env with
+      | None -> None
+      | Some (xpath, ty, `Var) -> Some (Lprog(xpath,ty,fenv.fe_cur))
+      | Some (xpath, ty, `Ctnt) -> Some (Lctnt(xpath,ty)) 
+
+    let trylookup_logical fenv s =
+      match EcIdent.Map.byname s fenv.fe_locals with
+      | None -> None
+      | Some(x,ty) -> Some(Llocal(x,ty))
+      
+    let trylookup fenv (ls,s as qs) = 
+      if ls = [] then
+        match trylookup_logical fenv s with
+        | Some _ as r -> r
+        | None -> trylookup_env fenv qs
+      else trylookup_env fenv qs
+    
+  end  
+
+  module Op = struct
+    let trylookup_op fenv qs = 
+      match EcEnv.Op.trylookup qs (mono fenv)with
+      | None -> None
+      | Some(p,op) -> 
+          if op.op_prob then None
+          else Some(Lop(p,op))
+
+    let trylookup fenv qs = 
+      trylookup_op fenv qs 
+    
+  end
+    
+
+end
+      
+let transbop = function
+  | PPand -> Land
+  | PPor -> Lor
+  | PPimp -> Limp
+  | PPiff -> Liff 
+
+let transl fenv decl = 
+  let transl1 (fenv,ld) (x,pty) =
+    let ty = transty (Fenv.mono fenv) (TyDecl []) pty (* FIXME *) in
+    let x = EcIdent.create x in
+    Fenv.bind_local fenv x ty, (x,ty)::ld in
+  let transl fenv decl = List.fold_left transl1 (fenv,[]) decl in
+  let fenv, ld = transl fenv decl in
+  fenv, List.rev ld
+
+let transfpattern fenv (p : EcParsetree.lpattern) =
+  match transpattern1 (Fenv.mono fenv) p with
+  | LSymbol x, ty ->
+      (Fenv.bind_local fenv x ty, LFPSymbol(x,ty), ty)
+  | LTuple xs, (Ttuple lty as ty) ->
+      let lty = Parray.to_list lty in 
+      let pxs = List.map2 (fun x ty -> x,ty) xs lty in
+      (Fenv.bind_locals fenv xs lty, LFPTuple pxs, ty)
+  | _ -> assert false
+
+
+
+let transformula fenv f = 
+  let uidmap = ref EcUidgen.Muid.empty in
+
+  let unify fenv ty1 ty2 =
+    try uidmap := (EcUnify.unify (Fenv.mono fenv) !uidmap ty1 ty2); true
+    with EcUnify.UnificationFailure _ -> false
+  in
+  let fofbool fenv f ty = 
+      if unify fenv ty (tbool ()) then fofbool f 
+      else tyerror (UnexpectedType (ty, tbool())) in
+  let rec transf fenv f = 
+    match f.pl_desc with
+    | PFunit | PFint _ | PFtuple _ -> tyerror (PropExpected f)
+    | PFbool b -> EcFol.fofbool (fbool b) 
+    | PFident x -> 
+        begin match Fenv.Ident.trylookup fenv x with
+        | None ->  tyerror (UnknownVariable x)
+        | Some(Llocal(x,ty)) -> fofbool fenv (flocal x ty) ty
+        | Some(Lprog(x,ty,s)) -> fofbool fenv (fpvar x ty s) ty
+        | Some(Lctnt(x,ty)) -> fofbool fenv (fapp x [] (Some ty)) ty
+(*        | Some(Lpred(x)) -> fapp x [] None *)
+        end
+    | PFside(f,side) ->
+        let fenv = Fenv.set_side fenv side in
+        transf fenv f
+    | PFnot f -> fnot (transf fenv f)
+    | PFbinop(f1,op, f2) ->
+        fbinop (transf fenv f1) (transbop op) (transf fenv f2)
+    | PFapp(qs,es) ->
+        let es   = List.map (transe fenv) es in
+        let esig = snd (List.split es) in
+        (* Ce code va pas il faut que les lookup depende de esig *)
+        begin match Fenv.Op.trylookup fenv qs with
+        | None -> tyerror (UnknownOperatorForSig (qs, esig))
+        | Some (Lop(p,op)) ->
+            let dom, codom =
+              let optyvars =
+                Parray.init op.op_params (fun _ -> mkunivar ())
+              in
+                (List.map (EcTypes.full_inst_rel optyvars) (fst op.op_sig),
+                 EcTypes.full_inst_rel optyvars (snd op.op_sig))
+            in
+            if not (List.all2 (unify fenv) esig dom) then
+              tyerror ApplInvalidArity; (* FIXME *)
+            fofbool fenv (fapp p (List.map fst es) (Some codom)) codom
+        end
+    | PFif(f1,f2,f3) ->
+        let f1 = transf fenv f1 in
+        let f2 = transf fenv f2 in
+        let f3 = transf fenv f3 in
+        fif f1 f2 f3
+    | PFlet(lp,e1,f2) ->
+        let (penv, p, pty) = transfpattern fenv lp in
+        let e1, ty1 = transe fenv e1 in
+        if not (unify fenv pty ty1) then
+          tyerror (UnexpectedType (pty, ty1));
+        let f2 = transf penv f2 in
+        flet p e1 f2 
+    | PFforall(xs,f) ->
+        let fenv, xs = transl fenv xs in
+        let f = transf fenv f in
+        fforall xs f
+    | PFexists(xs,f) ->
+        let fenv, xs = transl fenv xs in
+        let f = transf fenv f in
+        fexists xs f
+  and transe fenv e =
+    match f.pl_desc with
+    | PFunit -> Funit  , tunit ()
+    | PFint i -> Fint i, tint ()
+    | PFtuple es -> 
+        let ets = List.map (transe fenv) es in
+        let es,ts = List.split ets in
+        Ftuple es, Ttuple (Parray.of_list ts)
+    | PFbool b -> fbool b, tbool()
+    | PFident x -> 
+        begin match Fenv.Ident.trylookup fenv x with
+        | None ->  tyerror (UnknownVariable x)
+        | Some(Llocal(x,ty)) -> flocal x ty, ty
+        | Some(Lprog(x,ty,s)) -> fpvar x ty s, ty
+        | Some(Lctnt(x,ty)) -> fapp x [] (Some ty), ty (* FIXME *)
+(*        | Some(Lpred(x)) -> fapp x [] None *)
+        end
+    | PFside(f,side) ->
+        let fenv = Fenv.set_side fenv side in
+        transe fenv f
+    | PFnot f -> (* FIXME *)
+        let e,ty = transe fenv f in
+        let tbool = tbool () in
+        if not (unify fenv ty tbool) then
+          tyerror (UnexpectedType (ty, tbool));
+        let op = assert false in (*FIXME get the not on bool *)
+        fapp op [e] (Some tbool), tbool
+    | PFbinop(f1,op,f2) -> (* FIXME *)
+        assert false 
+    | PFapp(qs,es) ->
+        let es   = List.map (transe fenv) es in
+        let esig = snd (List.split es) in
+        (* Ce code va pas il faut que les lookup depende de esig *)
+        begin match Fenv.Op.trylookup fenv qs with
+        | None -> tyerror (UnknownOperatorForSig (qs, esig))
+        | Some (Lop(p,op)) ->
+            let dom, codom =
+              let optyvars =
+                Parray.init op.op_params (fun _ -> mkunivar ())
+              in
+                (List.map (EcTypes.full_inst_rel optyvars) (fst op.op_sig),
+                 EcTypes.full_inst_rel optyvars (snd op.op_sig))
+            in
+            if not (List.all2 (unify fenv) esig dom) then
+              tyerror ApplInvalidArity; (* FIXME *)
+            fapp p (List.map fst es) (Some codom), codom
+        end
+    | PFif(f1,f2,f3) ->
+        let f1 = transf fenv f1 in
+        let f2,ty2 = transe fenv f2 in
+        let f3,ty3 = transe fenv f3 in
+        if not (unify fenv ty2 ty3) then
+          tyerror (UnexpectedType (ty2,ty3));
+        fif f1 f2 f3, ty2
+    | PFlet(lp,e1,f2) ->
+        let (penv, p, pty) = transfpattern fenv lp in
+        let e1, ty1 = transe fenv e1 in
+        if not (unify fenv pty ty1) then
+          tyerror (UnexpectedType (pty, ty1));
+        let e2, ty2 = transe penv f2 in
+        flet p e1 e2, ty2 
+    | PFforall _ | PFexists _ -> tyerror (TermExpected f) in
+  transf fenv f (* FIXME close type *)
+

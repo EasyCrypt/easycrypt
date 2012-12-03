@@ -26,6 +26,7 @@
   let pecons e es = PEapp (EcPath.toqsymbol EcCoreLib.cons, [e; es])
 
   let pelist (es : pexpr    list) : pexpr_r    = assert false
+  let pflist (es : pformula    list)  : pformula_r    = assert false
 %}
 
 %token <int> NUM
@@ -43,6 +44,7 @@
 // %token ASPEC
 %token ASSERT
 %token AXIOM
+%token LEMMA
 %token BACKSLASH
 %token BITSTR
 // %token CHECKPROOF
@@ -224,13 +226,11 @@ znumber:
 
 (* -------------------------------------------------------------------- *)
 prog_num:
-| LKEY n=number RKEY {
-    match n with
-      | 1 -> `Left
-      | 2 -> `Right
-      | _ -> error
-               (Location.make $startpos(n) $endpos(n))
-               "variable side must be 1 or 2"
+| LKEY n=number RKEY { 
+  if n > 0 then n else 
+  error
+    (Location.make $startpos(n) $endpos(n))
+    "variable side must be greater than 0"
   }
 ;
 
@@ -322,49 +322,50 @@ rnd_exp:
 (* -------------------------------------------------------------------- *)
 (* Formulas                                                             *)
 
-simpl_form:
+sform:
 | TRUE                                   { PFbool true  }
 | FALSE                                  { PFbool false }
 | n=number                               { PFint n }
 | x=ident                                { PFident ([], x) }
-| se=simpl_form LBRACKET e=form RBRACKET { PFapp (qsymb_of_symb "<get>", [se; e]) }
-| se=simpl_form LBRACKET e1=form LEFTARROW e2=form RBRACKET
+| se=loc(sform) LBRACKET e=loc(form) RBRACKET { PFapp (qsymb_of_symb "<get>", [se; e]) }
+| se=loc(sform) LBRACKET e1=loc(form) LEFTARROW e2=loc(form) RBRACKET
                                          { PFapp (qsymb_of_symb "<set>", [se; e1; e2]) }
-| x=ident LPAREN es=exp_list0 RPAREN     { PFapp (qsymb_of_symb x, es) }
-| x=simpl_form LKEY s=prog_num RKEY      { PFside (x, s) }
-| LPAREN es=form_list2 RPAREN             { PFtuple es }
+| x=ident LPAREN es=form_list0 RPAREN     { PFapp (qsymb_of_symb x, es) }
+| x=loc(sform) LKEY s=prog_num RKEY      { PFside (x, s) }
+| LPAREN es=form_list2 RPAREN            { PFtuple es }
 | LPAREN e=form RPAREN                   { e }
 | LBRACKET es=p_form_sm_list0 RBRACKET   { pflist es }
                           
 form:
-| NOT   e=form                      { PFnot e }
-| MINUS e=form %prec prec_prefix_op { PFapp (qsymb_of_symb "-", [e]) }
-| e1=form    IMPL  e2=form  { PFbinop (e1, PPimp, e2) }
-| e1=form    IFF   e2=form  { PFbinop (e1, PPiff, e2) }
-| e1=form    OR    e2=form  { PFbinop (e1, PPor, e2)  }
-| e1=form    AND   e2=form  { PFbinop (e1, PPand, e2) }
-| e1=form    EQ    e2=form  { PFapp (qsymb_of_symb "="  , [e1; e2]) }
-| e1=form    NE    e2=form  { PFnot (PFapp (qsymb_of_symb "=" , [e1; e2])) }
-| e1=form op=OP1   e2=form  { PFapp (qsymb_of_symb op   , [e1; e2]) }
-| e1=form op=OP2   e2=form  { PFapp (qsymb_of_symb op   , [e1; e2]) }
-| e1=form    MINUS e2=form  { PFapp (qsymb_of_symb "-"  , [e1; e2]) }
-| e1=form op=OP3   e2=form  { PFapp (qsymb_of_symb op   , [e1; e2]) }
-| e1=form    STAR  e2=form  { PFapp (qsymb_of_symb "*"  , [e1; e2]) }
-| e1=form op=OP4   e2=form  { PFapp (qsymb_of_symb op   , [e1; e2]) }
+| NOT   e=loc(form)                      { PFnot e }
+| MINUS e=loc(form) %prec prec_prefix_op { PFapp (qsymb_of_symb "-", [e]) }
+| e1=loc(form)    IMPL  e2=loc(form)  { PFbinop (e1, PPimp, e2) }
+| e1=loc(form)    IFF   e2=loc(form)  { PFbinop (e1, PPiff, e2) }
+| e1=loc(form)    OR    e2=loc(form)  { PFbinop (e1, PPor, e2)  }
+| e1=loc(form)    AND   e2=loc(form)  { PFbinop (e1, PPand, e2) }
+| e1=loc(form)    EQ    e2=loc(form)  { PFapp (qsymb_of_symb "="  , [e1; e2]) }
+| e1=loc(form)    NE    e2=loc(form)  { PFapp (qsymb_of_symb "<>" , [e1; e2]) }
+| e1=loc(form) op=OP1   e2=loc(form)  { PFapp (qsymb_of_symb op   , [e1; e2]) }
+| e1=loc(form) op=OP2   e2=loc(form)  { PFapp (qsymb_of_symb op   , [e1; e2]) }
+| e1=loc(form)    MINUS e2=loc(form)  { PFapp (qsymb_of_symb "-"  , [e1; e2]) }
+| e1=loc(form) op=OP3   e2=loc(form)  { PFapp (qsymb_of_symb op   , [e1; e2]) }
+| e1=loc(form)    STAR  e2=loc(form)  { PFapp (qsymb_of_symb "*"  , [e1; e2]) }
+| e1=loc(form) op=OP4   e2=loc(form)  { PFapp (qsymb_of_symb op   , [e1; e2]) }
 
-| c=form QUESTION e1=form COLON e2=form %prec OP2 { PFif (c, e1, e2) }
-| IF c=form THEN e1=form ELSE e2=form             { PFif (c, e1, e2) }
+| c=loc(form) QUESTION e1=loc(form) COLON e2=loc(form) %prec OP2 { PFif (c, e1, e2) }
+| IF c=loc(form) THEN e1=loc(form) ELSE e2=loc(form)             { PFif (c, e1, e2) }
 
-| LET p=lpattern EQ e1=form IN e2=form { PFlet (p, e1, e2) }
-| LET p=lpattern EQ e1=form IN e2=form 
+| LET p=lpattern EQ e1=loc(form) IN e2=loc(form) { PFlet (p, e1, e2) }
+| LET p=lpattern EQ e1=loc(form) IN e2=loc(form) 
                             { PFlet (p, e1, e2) }
-| e=simpl_form               { PFform e }
-| FORALL pd=param_decl COMMA e=form { PFforall(pd, e) }
-| EXIST  pd=param_decl COMMA e=form { PFexists(pd,e) }
+| e=sform              { e }
+| FORALL pd=param_decl COMMA e=loc(form) { PFforall(pd, e) }
+| EXIST  pd=param_decl COMMA e=loc(form) { PFexists(pd,e) }
 ;
 
-%inline p_form_sm_list0: aout=plist0(form, SEMICOLON) { aout }
-%inline form_list2: aout=plist2(form, COMMA) { aout }
+%inline p_form_sm_list0: aout=plist0(loc(form), SEMICOLON) { aout }
+%inline form_list0: aout=plist0(loc(form), COMMA) { aout }
+%inline form_list2: aout=plist2(loc(form), COMMA) { aout }
 
 (* -------------------------------------------------------------------- *)
 (* Type expressions                                                     *)
@@ -684,6 +685,14 @@ claim:
 | CLAIM x=ident COLON e=loc(exp) h=real_hint { (x, (e, h)) }
 ;
 
+axiom_kind:
+| AXIOM { PAxiom }
+| LEMMA { PLemma }
+
+axiom:
+| k=axiom_kind x=ident COLON e=loc(form) { 
+      { pa_name = x; pa_formula = e; pa_kind = k } }
+;
 (* -------------------------------------------------------------------- *)
 (* Global entries                                                       *)
 
@@ -702,6 +711,7 @@ global_:
 | sig_def          { Ginterface $1 }
 | type_decl_or_def { Gtype      $1 }
 | operator         { Goperator  $1 }
+| axiom            { Gaxiom     $1 }
 | claim            { Gclaim     $1 }
 ;
 

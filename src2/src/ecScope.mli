@@ -43,6 +43,14 @@ module Op : sig
   val add : scope -> poperator -> scope
 end
 
+module Ax : sig
+
+  (* [add scope op] type-checks the given *parsed* operator [op] in
+   * scope [scope], and add it to it. Raises [DuplicatedNameInContext]
+   * if an axiom with given name already exists. *)
+  val add : scope -> paxiom -> scope
+end
+
 module Ty : sig
   (* [add scope t] adds an abstract type with name [t] to scope
    * [scope]. Raises [DuplicatedNameInContext] if a type with

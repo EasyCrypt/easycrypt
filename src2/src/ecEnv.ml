@@ -24,6 +24,7 @@ and mcomponents = {
   mc_modtypes   : (EcPath.path * EcTypesmod.tymod)     EcIdent.Map.t;
   mc_typedecls  : (EcPath.path * EcTypesmod.tydecl)    EcIdent.Map.t;
   mc_operators  : (EcPath.path * EcTypesmod.operator)  EcIdent.Map.t;
+  mc_axioms     : (EcPath.path * EcTypesmod.axiom)     EcIdent.Map.t;
   mc_theories   : (EcPath.path * EcTypesmod.theory)    EcIdent.Map.t;
   mc_components : (EcPath.path * mcomponents Lazy.t)   EcIdent.Map.t;
 }
@@ -37,6 +38,7 @@ let empty =
     mc_modtypes   = EcIdent.Map.empty;
     mc_typedecls  = EcIdent.Map.empty;
     mc_operators  = EcIdent.Map.empty;
+    mc_axioms     = EcIdent.Map.empty;
     mc_theories   = EcIdent.Map.empty;
     mc_components = EcIdent.Map.empty;
   }
@@ -107,6 +109,10 @@ module MC = struct
     { mc with
         mc_operators = IM.add x (in_scope scope x, tydecl) mc.mc_operators; }
 
+  let bind_ax (scope, x) opdecl env mc =
+    { mc with
+        mc_axioms = IM.add x (in_scope scope x, opdecl) mc.mc_axioms; }
+
   let bind_theory (scope, x) th env mc =
     { mc with
         mc_theories = IM.add x (in_scope scope x, th) mc.mc_theories; }
@@ -131,6 +137,9 @@ module MC = struct
 
   let lookup_op1 (name : symbol) (mc : mcomponents) =
     IM.byname name mc.mc_operators
+
+  let lookup_ax1 (name : symbol) (mc : mcomponents) =
+    IM.byname name mc.mc_axioms
 
   let lookup_theory1 (name : symbol) (mc : mcomponents) =
     IM.byname name mc.mc_theories
@@ -262,6 +271,32 @@ module Op = struct
 
   let trylookup x env = try_lf (fun () -> lookup x env)
 end
+
+(* -------------------------------------------------------------------- *)
+module Ax = struct
+  type t = axiom
+
+  let bind x axiom env =
+    bind MC.bind_ax x axiom env
+
+  let bindall axs env =
+    List.fold_left
+      (fun env (x, ax) -> bind x ax env)
+      env axs
+
+  let lookup ((scope, id) : qsymbol) (env : env) =
+    match
+      obind
+        (MC.lookup_mc scope env.env_root)
+        (MC.lookup_ax1 id)
+    with
+    | None   -> raise LookupFailure
+    | Some x -> x
+
+  let trylookup x env = try_lf (fun () -> lookup x env)
+end
+
+
 
 
 (* -------------------------------------------------------------------- *)

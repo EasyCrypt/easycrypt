@@ -41,7 +41,7 @@ type 'a located = {
 }
 
 (* -------------------------------------------------------------------- *)
-type side = [ `Left | `Right ]
+type side = int
 
 type pty    = pty_r    located          (* located type              *)
 and  pexpr  = pexpr_r  located          (* located expression        *)
@@ -166,14 +166,35 @@ type ptydecl = {
 (* -------------------------------------------------------------------- *)
 type ptylocals = (symbol * pty) list
 
+type pbinop =
+  | PPand
+  | PPor
+  | PPimp
+  | PPiff
+
 type pformula = pformula_r located
 
-and pformula_r = unit
+and pformula_r = 
+  | PFunit                                (* unit literal      *)
+  | PFbool   of bool                      (* bool literal      *)
+  | PFint    of int                       (* int. literal      *)
+  | PFtuple  of pformula list                (* tuple *)
+  | PFident  of qsymbol                   (* symbol            *)
+  | PFside   of pformula * side         
+  | PFnot    of pformula 
+  | PFbinop  of pformula * pbinop * pformula
+  | PFapp    of qsymbol * pformula list
+  | PFif     of pformula * pformula * pformula
+  | PFlet    of lpattern * pformula * pformula
+  | PFforall of ptylocals * pformula
+  | PFexists of ptylocals * pformula
 
+type paxiom_kind = PAxiom | PLemma
 (* -------------------------------------------------------------------- *)
 type paxiom = {
   pa_name    : symbol;
   pa_formula : pformula;
+  pa_kind : paxiom_kind;
 }
 
 (* -------------------------------------------------------------------- *)

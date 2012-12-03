@@ -41,6 +41,7 @@ end
 module Var    : S with type t = EcTypes.ty
 module Fun    : S with type t = funsig
 module Op     : S with type t = operator
+module Ax     : S with type t = axiom
 module Mod    : S with type t = tymod
 module ModTy  : S with type t = tymod
 module Theory : S with type t = theory

@@ -65,8 +65,8 @@ end.
     
 
 theory CPA_ROM1.
-  use import PKE_ROM.
-  use RO.
+  clone export PKE_ROM.
+  clone RO.
  
   module type IAdv (O:RO.ROA) = {
     fun A1 (pk:pkey) : message * message {O.HA}
@@ -118,6 +118,7 @@ theory CPA_ROM1.
     }
   }.
 
+  (* The key word cnst can be change *)
   cnst AdvCpa = | CPA.Main[res] - 1%r/2%r|. 
 
 end.

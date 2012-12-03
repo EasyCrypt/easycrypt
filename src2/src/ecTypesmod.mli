@@ -76,9 +76,11 @@ and lvalue =
   | LvMap   of EcPath.path * EcTypes.tyexpr * EcTypes.ty
 
 (* -------------------------------------------------------------------- *)
+type axiom_kind = Axiom | Lemma
+
 type axiom = {
-  ax_name : symbol;
-  ax_spec : unit;                       (* formula *)
+  ax_spec : EcFol.form;                       (* formula *)
+  ax_kind : axiom_kind
 }
 
 (* -------------------------------------------------------------------- *)

@@ -97,11 +97,13 @@ type action =
   | Ac_modtype  of (EcIdent.t * EcTypesmod.tymod)
   | Ac_module   of EcTypesmod.module_expr
   | Ac_theory   of (EcIdent.t * EcTypesmod.theory)
+  | Ac_axiom    of (EcIdent.t * EcTypesmod.axiom)
 
 type scope = {
   sc_name      : EcIdent.t;
   sc_types     : EcTypesmod.tydecl      Context.context;
   sc_operators : EcTypesmod.operator    Context.context;
+  sc_axioms    : EcTypesmod.axiom       Context.context;
   sc_modules   : EcTypesmod.module_expr Context.context;
   sc_modtypes  : EcTypesmod.tymod       Context.context;
   sc_theories  : EcTypesmod.theory      Context.context;
@@ -129,6 +131,7 @@ let subscope (scope : scope option) (name : symbol) =
   { sc_name      = name;
     sc_types     = Context.empty ();
     sc_operators = Context.empty ();
+    sc_axioms    = Context.empty ();
     sc_modtypes  = Context.empty ();
     sc_modules   = Context.empty ();
     sc_theories  = Context.empty ();
@@ -150,6 +153,12 @@ let bind (scope : scope) (action : action) =
           sc_operators = Context.bind (EcIdent.name x) op scope.sc_operators;
           sc_history   = action :: scope.sc_history;
           sc_env       = EcEnv.Op.bind x op scope.sc_env }
+
+  | Ac_axiom (x, ax) ->
+      { scope with
+          sc_axioms = Context.bind (EcIdent.name x) ax scope.sc_axioms;
+          sc_history   = action :: scope.sc_history;
+          sc_env       = EcEnv.Ax.bind x ax scope.sc_env }
 
   | Ac_modtype (x, tymod) ->
       { scope with
@@ -200,6 +209,33 @@ module Op = struct
 
     in
       bind scope (Ac_operator (EcIdent.create op.po_name, tyop))
+end
+
+module Ax = struct
+  open EcParsetree
+  open EcTypes
+  open EcTypesmod
+
+  module TT = EcTypedtree
+
+  let transform (scope : scope) f e =
+    { scope with
+        sc_axioms = f scope.sc_axioms;
+        sc_env     = e scope.sc_env }
+
+  let transform_kind = function
+    | PAxiom -> Axiom
+    | PLemma -> Lemma 
+
+  let add (scope : scope) (ax : paxiom) =
+    let form = TT.transformula (TT.Fenv.mono_fenv scope.sc_env) ax.pa_formula in
+    let axd = { 
+      ax_spec = form;
+      ax_kind = transform_kind ax.pa_kind
+    } in
+    transform scope
+      (Context.bind ax.pa_name axd)
+      (EcEnv.Ax.bind (EcIdent.create ax.pa_name) axd)
 end
 
 (* -------------------------------------------------------------------- *)

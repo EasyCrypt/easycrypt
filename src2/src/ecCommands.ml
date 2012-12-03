@@ -21,8 +21,8 @@ let process_operator (scope : EcScope.scope) (op : poperator) =
   EcScope.Op.add scope op
 
 (* -------------------------------------------------------------------- *)
-let process_axiom (scope : EcScope.scope) _ =
-  scope
+let process_axiom (scope : EcScope.scope) (ax : paxiom) =
+  EcScope.Ax.add scope ax
 
 (* -------------------------------------------------------------------- *)
 let process_claim (scope : EcScope.scope) _ =

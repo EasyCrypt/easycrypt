@@ -41,6 +41,7 @@
     "admit"       , ADMIT      ;        (* KW: dangerous *)
 
     "axiom"       , AXIOM      ;        (* KW: global *)
+    "lemma"       , LEMMA      ;        (* KW: global *)
     "claim"       , CLAIM      ;        (* KW: global *)
     "cnst"        , CNST       ;        (* KW: global *)
     "drop"        , DROP       ;        (* KW: global *)
