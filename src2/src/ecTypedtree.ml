@@ -653,6 +653,8 @@ let transfpattern fenv (p : EcParsetree.lpattern) =
   | _ -> assert false
 
 
+let rec inst_uni_form m f =
+  EcFol.map (inst_uni m) (inst_uni_form m) f
 
 let transformula fenv f = 
   let uidmap = ref EcUidgen.Muid.empty in
@@ -782,5 +784,6 @@ let transformula fenv f =
         let e2, ty2 = transe penv f2 in
         flet p e1 e2, ty2 
     | PFforall _ | PFexists _ -> tyerror (TermExpected f) in
-  transf fenv f (* FIXME close type *)
+  let f = transf fenv f in
+  inst_uni_form !uidmap f 
 
