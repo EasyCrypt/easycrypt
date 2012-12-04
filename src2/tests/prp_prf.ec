@@ -1,4 +1,7 @@
 theory PRP_PRF.
+  type 'a list.
+  type ('a, 'b) map.
+
   op dom['a 'b] : ('a, 'b) map -> 'a list.
   op in_dom['a 'b] : ('a, ('a, 'b) map) -> bool.
   op not : bool -> bool.

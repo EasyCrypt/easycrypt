@@ -46,7 +46,7 @@ let select_op ~proba env name ue psig =
     let dom    = List.map (EcTypes.full_inst_rel tyvars) (fst op.op_sig)
     and codom  = EcTypes.full_inst_rel tyvars (snd op.op_sig) in
 
-    let opsig = Ttuple (Parray.of_list (fst op.op_sig)) in
+    let opsig = Ttuple (Parray.of_list dom) in
 
       try
         EcUnify.unify env subue opsig (Ttuple (Parray.of_list psig));
