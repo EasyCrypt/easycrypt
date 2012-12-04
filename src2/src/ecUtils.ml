@@ -28,6 +28,25 @@ let fstmap f (x, y) = (f x, y)
 let sndmap f (x, y) = (f, f y)
 
 (* -------------------------------------------------------------------- *)
+module Counter : sig
+  type t
+
+  val create : unit -> t
+  val next   : t -> int
+end = struct
+  type t = {
+    mutable state : int;
+  }
+
+  let create () = { state = 0; }
+
+  let next (state : t) =
+    let aout = state.state in
+      state.state <- state.state + 1;
+      aout
+end    
+
+(* -------------------------------------------------------------------- *)
 module Disposable : sig
   type 'a t
 
@@ -141,6 +160,7 @@ module Parray : sig
   val fold_right : ('b -> 'a -> 'a) -> 'b t -> 'a -> 'a
   val fold_left2 : ('a -> 'b -> 'c -> 'a) -> 'a -> 'b t -> 'c t -> 'a
   val iter : ('a -> unit) -> 'a t -> unit 
+  val iter2 : ('a -> 'b -> unit) -> 'a t -> 'b t -> unit
   val split : ('a * 'b) t -> ('a t * 'b t)
   val exists : ('a -> bool) -> 'a t -> bool
   val for_all : ('a -> bool) -> 'a t -> bool
@@ -167,6 +187,11 @@ end = struct
       if i < Array.length t1 then f a t1.(i) t2.(i) 
       else a in
     aux 0 a t1 t2
+
+  let iter2 (f : 'a -> 'b -> unit) a1 a2 =
+    for i = 0 to (min (length a1) (length a2)) - 1 do
+      f a1.(i) a2.(i)
+    done
 
   let exists f t =
     let rec aux i t = 

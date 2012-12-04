@@ -43,4 +43,7 @@ module Map = struct
     match SymMap.tryfind x m with
     | None | Some []     -> None
     | Some ((_, v) :: _) -> Some v
+
+  let allbyname (x : symbol) (m : 'a t) =
+    List.map snd (odfl [] (SymMap.tryfind x m))
 end

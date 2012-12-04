@@ -27,8 +27,8 @@ type parser_t =
 
 (* -------------------------------------------------------------------- *)
 type ecreader_r = {
-  ecr_lexbuf   : Lexing.lexbuf;
-  ecr_parser   : parser_t;
+  ecr_lexbuf : Lexing.lexbuf;
+  ecr_parser : parser_t;
 }
 
 type ecreader = ecreader_r Disposable.t
@@ -72,4 +72,3 @@ let finalize (ecreader : ecreader) =
 let parse (ecreader : ecreader) =
   let ecreader = Disposable.get ecreader in
     ecreader.ecr_parser (fun () -> lexer ecreader.ecr_lexbuf)
-  

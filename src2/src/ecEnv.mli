@@ -40,11 +40,17 @@ end
 (* -------------------------------------------------------------------- *)
 module Var    : S with type t = EcTypes.ty
 module Fun    : S with type t = funsig
-module Op     : S with type t = operator
 module Ax     : S with type t = axiom
 module Mod    : S with type t = tymod
 module ModTy  : S with type t = tymod
 module Theory : S with type t = theory
+
+(* -------------------------------------------------------------------- *)
+module Op : sig
+  include S with type t = operator
+
+  val all : qsymbol -> env -> (EcPath.path * t) list
+end
 
 (* -------------------------------------------------------------------- *)
 module Ty : sig
@@ -56,6 +62,8 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Ident : sig
-  val lookup    : qsymbol -> env -> (EcPath.path * EcTypes.ty * [`Var | `Ctnt])
-  val trylookup : qsymbol -> env -> (EcPath.path * EcTypes.ty * [`Var | `Ctnt]) option
+  type idlookup_t = [`Var | `Ctnt of operator]
+
+  val lookup    : qsymbol -> env -> (EcPath.path * EcTypes.ty * idlookup_t)
+  val trylookup : qsymbol -> env -> (EcPath.path * EcTypes.ty * idlookup_t) option
 end

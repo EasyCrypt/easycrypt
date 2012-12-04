@@ -10,9 +10,8 @@ let tyb_equal : tybase -> tybase -> bool = (==)
 
 type ty =
   | Tbase   of tybase
-  | Tvar    of string * EcUidgen.uid
   | Tunivar of EcUidgen.uid
-  | Trel    of string * int
+  | Trel    of int
   | Ttuple  of ty Parray.t 
   | Tconstr of EcPath.path * ty Parray.t
 
@@ -35,21 +34,39 @@ let mkunivar () = Tunivar (EcUidgen.unique ())
 
 let map f t = 
   match t with 
-  | Tbase _ | Tvar _ | Tunivar _ | Trel _ -> t
+  | Tbase _ | Tunivar _ | Trel _ -> t
   | Ttuple lty -> Ttuple (Parray.map f lty)
   | Tconstr(p, lty) -> Tconstr(p, Parray.map f lty)
 
 let fold f s = function
-  | Tbase _ | Tvar _ | Tunivar _ | Trel _ -> s
+  | Tbase _ | Tunivar _ | Trel _ -> s
   | Ttuple lty -> Parray.fold_left f s lty
   | Tconstr(_, lty) -> Parray.fold_left f s lty
 
 let sub_exists f t =
   match t with
-  | Tbase _ | Tvar _ | Tunivar _ | Trel _ -> false
+  | Tbase _ | Tunivar _ | Trel _ -> false
   | Ttuple lty -> Parray.exists f lty
   | Tconstr (p, lty) -> Parray.exists f lty
 
+(* -------------------------------------------------------------------- *)
+module Subst = struct
+  let uni1 ((id, t) : uid * ty) =
+    let rec uni1 = function
+      | Tunivar id' when uid_equal id id' -> t
+      | u -> map uni1 u
+    in
+      fun u -> uni1 u
+
+  let uni (uidmap : ty EcUidgen.Muid.t) =
+    let rec uni = function
+      | (Tunivar id) as t -> odfl t (EcUidgen.Muid.tryfind id uidmap)
+      | t -> map uni t
+    in
+      fun t -> uni t
+end
+
+(* -------------------------------------------------------------------- *)
 exception UnBoundRel of int
 exception UnBoundUni of EcUidgen.uid
 exception UnBoundVar of EcUidgen.uid
@@ -59,14 +76,12 @@ let full_get_rel s i = try Parray.get s i with _ -> raise (UnBoundRel i)
 let full_inst_rel s =
   let rec subst t = 
     match t with
-    | Trel(_, i) -> full_get_rel s i 
+    | Trel i -> full_get_rel s i 
     | _ -> map subst t in
   subst 
 
 let full_get_uni s id = 
   try Muid.find id s with _ -> raise (UnBoundUni id) 
-
-let get_uni s id t = try Muid.find id s with _ -> t 
 
 let full_inst_uni s = 
   let rec subst t = 
@@ -75,31 +90,6 @@ let full_inst_uni s =
     | _ -> map subst t in
   subst 
 
-let inst_uni s = 
-  let rec subst t = 
-    match t with
-    | Tunivar id -> get_uni s id t
-    | _ -> map subst t in
-  subst 
-
-let full_get_var s id = 
-  try Muid.find id s with _ -> raise (UnBoundVar id) 
-
-let full_inst_var s = 
-  let rec subst t = 
-    match t with
-    | Tvar(_, id) -> full_get_var s id
-    | _ -> map subst t in
-  subst 
-
-let full_inst (su,sv) = 
-  let rec subst t = 
-    match t with
-    | Tvar(_, id) -> full_get_var sv id
-    | Tunivar id -> full_get_uni su id
-    | _ -> map subst t in
-  subst
-
 let occur_uni u = 
   let rec aux t = 
     match t with
@@ -107,20 +97,22 @@ let occur_uni u =
     | _ -> sub_exists aux t in
   aux
 
+(* -------------------------------------------------------------------- *)
+let freshen (n : int) (ty : ty) =
+  let vars = Parray.init n (fun _ -> mkunivar ()) in
+    full_inst_rel vars ty
+
+(* -------------------------------------------------------------------- *)
+(* FIXME: does not compile anymore
 let close su lty t =
   let count = ref (-1) in
   let fresh_rel () = incr count;!count in
-  let lty, t = Parray.map (inst_uni su) lty, inst_uni su t in
-  let rec gen ((su, sv) as s) t =
+  let lty, t = (Parray.map (Subst.uni su) lty, Subst.uni su t) in
+  let rec gen sv t =
     match t with
-    | Tbase _ -> s, t 
-    | Tvar(n, v) -> 
-        (try s, Muid.find v sv with _ ->
-          let r = fresh_rel () in
-          let t = Trel(n, r) in
-          (su, Muid.add v t sv), t)
+    | Tbase _ -> sv, t 
     | Tunivar u ->
-        (try s, Muid.find u su with _ ->
+        (try sv, Muid.find u su with _ ->
           let r = fresh_rel () in
           let t = Trel("'a", r) in
           (Muid.add u t su, sv), t)
@@ -140,7 +132,7 @@ let close su lty t =
     | _, _ -> assert false in
   let s = Muid.merge merge su (fst s), snd s in
   s, lt, t 
-
+*)
 
 (* -------------------------------------------------------------------- *)
 type lpattern =
@@ -151,9 +143,9 @@ type tyexpr =
   | Eunit                                   (* unit literal      *)
   | Ebool   of bool                         (* bool literal      *)
   | Eint    of int                          (* int. literal      *)
-  | Elocal  of EcIdent.t * ty                 (* local variable    *)
-  | Evar    of EcPath.path * ty               (* module variable   *)
-  | Eapp    of EcPath.path * tyexpr list      (* op. application   *)
+  | Elocal  of EcIdent.t * ty               (* local variable    *)
+  | Evar    of EcPath.path * ty             (* module variable   *)
+  | Eapp    of EcPath.path * tyexpr list    (* op. application   *)
   | Elet    of lpattern * tyexpr * tyexpr   (* let binding       *)
   | Etuple  of tyexpr list                  (* tuple constructor *)
   | Eif     of tyexpr * tyexpr * tyexpr     (* _ ? _ : _         *)
@@ -164,4 +156,4 @@ and tyrexpr =
   | Rinter    of tyexpr * tyexpr             (* interval sampling  *)
   | Rbitstr   of tyexpr                      (* bitstring sampling *)
   | Rexcepted of tyrexpr * tyexpr            (* restriction        *)
-  | Rapp      of EcPath.path * tyexpr list     (* p-op. application  *)
+  | Rapp      of EcPath.path * tyexpr list   (* p-op. application  *)

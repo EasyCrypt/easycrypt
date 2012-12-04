@@ -19,7 +19,7 @@ let specs () =
   let options = ref initial in
   let specs   =
     let add_idir  idir  = options := add_idir !options idir in
-      [ "I", Arg.String add_idir, "Add <dir> to the list of include directories" ]
+      [ "-I", Arg.String add_idir, "Add <dir> to the list of include directories" ]
   and set_input input =
     options := { !options with o_input = Some input }
   in

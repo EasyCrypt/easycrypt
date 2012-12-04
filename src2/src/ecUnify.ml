@@ -1,52 +1,71 @@
 (* -------------------------------------------------------------------- *)
+open EcMaps
 open EcUtils
 open EcUidgen
 open EcTypes
 
+(* -------------------------------------------------------------------- *)
 exception TypeVarCycle of uid * ty
-
-let check_cycle u t =
-  if occur_uni u t then raise (TypeVarCycle(u, t))
-
 exception UnificationFailure of ty * ty
 
-let unify env = 
-  let repr s t = 
+type unienv = (ty EcUidgen.Muid.t) ref
+
+module UniEnv = struct
+  let create () =
+    ref (EcUidgen.Muid.empty : ty EcUidgen.Muid.t)
+
+  let copy (ue : unienv) =
+    ref !ue
+
+  let restore ~(dst:unienv) ~(src:unienv) =
+    dst := !src
+
+  let asmap (ue : unienv) =
+    !ue
+
+  let repr (ue : unienv) (t : ty) : ty = 
     match t with
-    | Tunivar id -> (try Muid.find id s with _ -> t)
-    | _ -> t in
-  let bind s u t = 
-    assert (not (Muid.mem u s));
-    check_cycle u t; 
-    let rec subst = function
-      | Tunivar u' when uid_equal u u' -> t 
-      | t' -> EcTypes.map subst t' in
-    Muid.add u t (Muid.map subst s) in
-  let rec aux s t1 t2 = 
-    let t1, t2 = repr s t1, repr s t2 in
-    match t1, t2 with
+    | Tunivar id -> odfl t (Muid.tryfind id !ue)
+    | _ -> t
+
+  let bind (ue : unienv) id t = 
+    match t with
+    | Tunivar id' when uid_equal id id' -> ()
+    | _ -> begin
+      if (Muid.mem id !ue) || (occur_uni id t) then
+        raise (TypeVarCycle (id, t));
+      ue := Muid.add id t (Muid.map (EcTypes.Subst.uni1 (id, t)) !ue)
+    end
+end
+
+(* -------------------------------------------------------------------- *)
+let unify (env : EcEnv.env) (ue : unienv) =
+  let rec unify (t1 : ty) (t2 : ty) = 
+    match UniEnv.repr ue t1, UniEnv.repr ue t2 with
     | Trel _, _ -> assert false
     | _, Trel _ -> assert false
-    | Tunivar u1, Tunivar u2 -> 
-        if uid_equal u1 u2 then s 
-        else bind s u1 t2
-    | Tunivar id, t | t, Tunivar id -> bind s id t 
-    | Tbase b1, Tbase b2 when tyb_equal b1 b2 -> s
-    | Tvar(_, v1), Tvar(_, v2) when uid_equal v1 v2 -> s
+
+    | Tunivar id, t | t, Tunivar id -> UniEnv.bind ue id t
+
+    | Tbase b1, Tbase b2 when tyb_equal b1 b2 -> ()
 
     | Ttuple lt1, Ttuple lt2 ->
         if Parray.length lt1 <> Parray.length lt2 then 
-          raise (UnificationFailure(t1,t2))
-        else Parray.fold_left2 aux s lt1 lt2
+          raise (UnificationFailure (t1, t2));
+        Parray.iter2 unify lt1 lt2
 
     | Tconstr(p1, lt1), Tconstr(p2, lt2) when EcPath.equal p1 p2 ->
         if Parray.length lt1 <> Parray.length lt2 then
-          raise (UnificationFailure(t1,t2))
-        else Parray.fold_left2 aux s lt1 lt2
+          raise (UnificationFailure (t1, t2));
+        Parray.iter2 unify lt1 lt2
 
-    | Tconstr(p, lt), t
+    | Tconstr(p, lt), t when EcEnv.Ty.defined p env ->
+        unify (EcEnv.Ty.unfold p lt env) t
+
     | t, Tconstr(p, lt) when EcEnv.Ty.defined p env ->
-        aux s t (EcEnv.Ty.unfold p lt env)
+        unify t (EcEnv.Ty.unfold p lt env)
 
-    | _, _ -> raise (UnificationFailure(t1, t2)) in
-  aux
+    | _, _ -> raise (UnificationFailure(t1, t2))
+
+  in
+    unify

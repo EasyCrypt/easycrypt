@@ -15,6 +15,12 @@ module Location = struct
     loc_end   : int * int;
   }
 
+  let dummy = {
+    loc_fname = "";
+    loc_start = (-1, -1);
+    loc_end   = (-1, -1);
+  }
+
   let make (p1 : position) (p2 : position) =
     let mkpos (p : position) =
       (p.pos_lnum, p.pos_cnum - p.pos_bol)
@@ -242,7 +248,10 @@ type global =
   | Gaxiom     of paxiom
   | Gclaim     of claim
   | Gtype      of ptydecl
+
   | GthOpen    of symbol
   | GthClose   of symbol
+  | GthRequire of symbol
+  | GthImport  of qsymbol
 
 type prog = global list

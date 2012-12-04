@@ -120,6 +120,9 @@ let name (scope : scope) =
 let env (scope : scope) = scope.sc_env
 
 (* -------------------------------------------------------------------- *)
+let attop (scope : scope) = scope.sc_top = None
+
+(* -------------------------------------------------------------------- *)
 let subscope (scope : scope option) (name : symbol) =
   let env =
     match scope with
@@ -297,13 +300,28 @@ end
 module Theory = struct
   exception TopScope
 
+  let theory_of_history =
+    let theory_item_of_action = function
+      | Ac_type     (x, tydecl) -> Th_type     (x, tydecl)
+      | Ac_operator (x, op)     -> Th_operator (x, op)
+      | Ac_modtype  (x, tymod)  -> Th_modtype  (x, tymod)
+      | Ac_module   m           -> Th_module   m
+      | Ac_theory   (x, th)     -> Th_theory   (x, th)
+    in
+      fun history -> List.map theory_item_of_action history
+
   let enter (scope : scope) (name : symbol) =
     subscope (Some scope) name
 
   let exit (scope : scope) =
     match scope.sc_top with
     | None     -> raise TopScope
-    | Some sup -> (sup, scope.sc_name)
+    | Some sup ->
+      let theory = theory_of_history scope.sc_history in
+        (scope.sc_name, bind sup (Ac_theory (scope.sc_name, theory)))
+
+  let import (scope : scope) (_name : qsymbol) =
+    scope
 end
 
 (* -------------------------------------------------------------------- *)

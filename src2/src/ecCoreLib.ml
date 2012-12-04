@@ -1,7 +1,10 @@
 (* -------------------------------------------------------------------- *)
-let nil  = EcPath.create "<top>.nil"
-let cons = EcPath.create "<top>.cons"
-let list = EcPath.create "<top>.list"
+let top = "<top>"
+
+(* -------------------------------------------------------------------- *)
+let nil  = EcPath.create (Printf.sprintf "%s.nil"  top)
+let cons = EcPath.create (Printf.sprintf "%s.cons" top)
+let list = EcPath.create (Printf.sprintf "%s.list" top)
 
 (* -------------------------------------------------------------------- *)
 let get = EcPath.create "get"             (* FIXME *)

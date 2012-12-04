@@ -1,4 +1,6 @@
 (* -------------------------------------------------------------------- *)
+open EcUtils
+open EcMaps
 open EcSymbols
 
 (* -------------------------------------------------------------------- *)
@@ -34,3 +36,38 @@ let uid_equal x y = x == y
 
 module Muid = Map.Make (struct type t = uid let compare x y = y - x end)
 module Suid = Set.Make (struct type t = uid let compare x y = y - x end)
+
+(* -------------------------------------------------------------------- *)
+module NameGen = struct
+  type t = {
+    (*---*) ng_counter : Counter.t;
+    mutable ng_map     : string Muid.t;
+  }
+
+  let names = "abcdefghijklmnopqrstuvwxyz"
+
+  let ofint (i : int) =
+    let rec ofint i acc =
+      let acc =
+        Printf.sprintf "%s%c" acc names.[i mod (String.length names)]
+      in
+        if   i >= String.length names
+        then ofint (i / (String.length names)) acc
+        else acc
+    in
+      if i < 0 then
+        invalid_arg "EcUidgen.ofint [i < 0]";
+      ofint i ""
+
+  let create () = {
+    ng_counter = Counter.create ();
+    ng_map     = Muid.empty;
+  }
+
+  let get (map : t) (id : uid) =
+    try  Muid.find id map.ng_map
+    with Not_found ->
+      let s = ofint (Counter.next map.ng_counter) in
+        map.ng_map <- Muid.add id s map.ng_map;
+        s
+end

@@ -1,5 +1,9 @@
 (* -------------------------------------------------------------------- *)
 open EcParsetree
+open EcTypedtree
+
+(* -------------------------------------------------------------------- *)
+exception Interrupted
 
 (* -------------------------------------------------------------------- *)
 let process_type (scope : EcScope.scope) (tyd : ptydecl) =
@@ -29,30 +33,47 @@ let process_claim (scope : EcScope.scope) _ =
   scope
 
 (* -------------------------------------------------------------------- *)
-let scope = ref None
+let process_th_open (scope : EcScope.scope) name =
+  EcScope.Theory.enter scope name
 
-let get_scope () =
-  match !scope with
-  | None       -> failwith "not in a theory"
-  | Some scope -> scope
+(* -------------------------------------------------------------------- *)
+let process_th_close (scope : EcScope.scope) name =
+  if EcIdent.name (EcScope.name scope) <> name then
+    failwith "invalid theory name";     (* FIXME *)
+  snd (EcScope.Theory.exit scope)
+
+(* -------------------------------------------------------------------- *)
+let process_th_require (scope : EcScope.scope) name =
+  scope
+
+(* -------------------------------------------------------------------- *)
+let process_th_import (scope : EcScope.scope) name =
+  EcScope.Theory.import scope name
+
+(* -------------------------------------------------------------------- *)
+let scope = ref (EcScope.initial EcCoreLib.top)
 
 let process (g : global) =
   match g with
-  | GthOpen name -> begin
-      match !scope with
-      | Some _ -> failwith "already in an opened theory"
-      | None   -> scope := Some (EcScope.initial name)
-  end
+  | Gtype      t    -> scope := (process_type       !scope t)
+  | Gmodule    m    -> scope := (process_module     !scope m)
+  | Ginterface i    -> scope := (process_interface  !scope i)
+  | Goperator  o    -> scope := (process_operator   !scope o)
+  | Gaxiom     a    -> scope := (process_axiom      !scope a)
+  | Gclaim     c    -> scope := (process_claim      !scope c)
+  | GthOpen    name -> scope := (process_th_open    !scope name)
+  | GthClose   name -> scope := (process_th_close   !scope name)
+  | GthRequire name -> scope := (process_th_require !scope name)
+  | GthImport  name -> scope := (process_th_import  !scope name)
 
-  | GthClose name -> begin
-    if EcIdent.name (EcScope.name (get_scope ())) <> name then
-      failwith "invalid theory name";
-    scope := None
+let process (g : global) =
+  try
+    process g
+  with
+  | TyError (loc, exn) -> begin
+      EcPrinting.err
+        (EcPrinting.pp_located loc EcPrinting.pp_typerror)
+        exn;
+      raise Interrupted
   end
-
-  | Gtype      t -> scope := Some (process_type      (get_scope ()) t)
-  | Gmodule    m -> scope := Some (process_module    (get_scope ()) m)
-  | Ginterface i -> scope := Some (process_interface (get_scope ()) i)
-  | Goperator  o -> scope := Some (process_operator  (get_scope ()) o)
-  | Gaxiom     a -> scope := Some (process_axiom     (get_scope ()) a)
-  | Gclaim     c -> scope := Some (process_claim     (get_scope ()) c)
+    

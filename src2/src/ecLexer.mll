@@ -46,9 +46,11 @@
     "cnst"        , CNST       ;        (* KW: global *)
     "drop"        , DROP       ;        (* KW: global *)
     "end"         , END        ;        (* KW: global *)
+    "import"      , IMPORT     ;        (* KW: global *)
     "module"      , MODULE     ;        (* KW: global *)
     "op"          , OP         ;        (* KW: global *)
     "pop"         , POP        ;        (* KW: global *)
+    "require"     , REQUIRE    ;        (* KW: global *)
     "theory"      , THEORY     ;        (* KW: global *)
     "type"        , TYPE       ;        (* KW: global *)
   ]

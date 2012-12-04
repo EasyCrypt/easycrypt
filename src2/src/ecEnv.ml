@@ -138,6 +138,9 @@ module MC = struct
   let lookup_op1 (name : symbol) (mc : mcomponents) =
     IM.byname name mc.mc_operators
 
+  let lookup_all_op1 (name : symbol) (mc : mcomponents) =
+    IM.allbyname name mc.mc_operators
+
   let lookup_ax1 (name : symbol) (mc : mcomponents) =
     IM.byname name mc.mc_axioms
 
@@ -270,6 +273,12 @@ module Op = struct
     | Some x -> x
 
   let trylookup x env = try_lf (fun () -> lookup x env)
+
+  let all ((scope, id) : qsymbol) env =
+    odfl []
+      (omap
+         (MC.lookup_mc scope env.env_root)
+         (MC.lookup_all_op1 id))
 end
 
 (* -------------------------------------------------------------------- *)
@@ -397,17 +406,19 @@ let bindall (items : (EcIdent.t * ebinding) list) (env : env) =
 
 (* -------------------------------------------------------------------- *)
 module Ident = struct
+  type idlookup_t = [`Var | `Ctnt of operator]
+
   let trylookup (name : qsymbol) (env : env) =
     let for_var () =
       match Var.trylookup name env with
       | None -> None
-      | Some (p, ty) -> Some (p, ty, (`Var :> [`Var | `Ctnt]))
+      | Some (p, ty) -> Some (p, ty, (`Var :> idlookup_t))
 
     and for_op () =
       match Op.trylookup name env with
       | None -> None
       | Some (_, op) when not op.op_ctnt -> None
-      | Some (p, op) -> Some (p, snd op.op_sig, (`Ctnt :> [`Var | `Ctnt]))
+      | Some (p, op) -> Some (p, snd op.op_sig, (`Ctnt op :> idlookup_t))
     in
       List.fpick [for_var; for_op]
 

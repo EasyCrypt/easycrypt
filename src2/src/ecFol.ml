@@ -96,7 +96,6 @@ let fquant q b f = Fquant(q,b,f)
 let fexists b f = Fquant(Lexists, b, f)   
 let fforall b f = Fquant(Lforall, b, f)   
 
-
 let map gt g f = 
   match f with
   | Ftrue -> Ftrue
@@ -120,4 +119,8 @@ let map gt g f =
       fapp p (List.map g es) (obind oty (fun ty -> Some (gt ty)))
   | Ftuple es -> Ftuple (List.map g es)
 
-
+(* -------------------------------------------------------------------- *)
+module Subst = struct
+  let rec uni uidmap formula =
+    map (EcTypes.Subst.uni uidmap) (uni uidmap) formula
+end

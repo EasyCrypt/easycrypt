@@ -27,6 +27,7 @@ type scope
 val initial : symbol -> scope
 val name    : scope -> EcIdent.t
 val env     : scope -> EcEnv.env
+val attop   : scope -> bool
 
 module Op : sig
   (* Possible exceptions when checking/adding an operator *)
@@ -89,5 +90,10 @@ module Theory : sig
 
   (* [exit scope] close and finalize the top-most theory and returns
    * its name. Raises [TopScope] if [scope] has not super scope. *)
-  val exit  : scope -> scope * EcIdent.t
+  val exit  : scope -> EcIdent.t * scope
+
+  (* [import scope name] find and import theory [name] in scope
+   * [scope]. Raise [LookupFailure] if theory [name] cannot be
+   * found. *)
+  val import : scope -> qsymbol -> scope
 end

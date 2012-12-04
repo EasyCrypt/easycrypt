@@ -18,8 +18,9 @@ module Map : sig
 
   type 'a t
 
-  val empty   : 'a t
-  val add     : key -> 'a -> 'a t -> 'a t
-  val byname  : symbol -> 'a t -> 'a option
-  val byident : key -> 'a t -> 'a option
+  val empty     : 'a t
+  val add       : key -> 'a -> 'a t -> 'a t
+  val allbyname : symbol -> 'a t -> 'a list
+  val byname    : symbol -> 'a t -> 'a option
+  val byident   : key -> 'a t -> 'a option
 end
