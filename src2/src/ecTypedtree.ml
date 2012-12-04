@@ -37,7 +37,7 @@ let tyerror loc x = raise (TyError (loc, x))
 (* -------------------------------------------------------------------- *)
 let select_op ~proba env name ue psig =
   let ops = EcEnv.Op.all name env in
-  let ops = List.filter (fun (_, op) -> op.op_prob = proba) ops in
+  let ops = List.filter (fun (_, op) -> op.op_prob || not proba) ops in
   let ops = List.filter (fun (_, op) -> not op.op_ctnt) ops in
 
   let select (path, op) =
@@ -47,7 +47,6 @@ let select_op ~proba env name ue psig =
     and codom  = EcTypes.full_inst_rel tyvars (snd op.op_sig) in
 
     let opsig = Ttuple (Parray.of_list dom) in
-
       try
         EcUnify.unify env subue opsig (Ttuple (Parray.of_list psig));
         Some (path, op, codom, subue)
@@ -415,7 +414,7 @@ and transstruct1 (env : EcEnv.env) (st : pstructure_item) =
               (x, `Variable { v_name = x; v_type = ty; }))
           xs
 
-  | Pst_fun (decl, body) ->
+  | Pst_fun (decl, body) -> begin
       (* Collect all local variables (arguments + locals) *)
       let locals =                      (* enforce arguments first *)
             (List.map (fun (x, ty) -> (x, ty, None)) decl.pfd_tyargs)
@@ -447,7 +446,6 @@ and transstruct1 (env : EcEnv.env) (st : pstructure_item) =
             locals
         in
 
-
         (* Check variable assignments (expressions), unify their types
          * with variables related types.
          *)
@@ -471,12 +469,40 @@ and transstruct1 (env : EcEnv.env) (st : pstructure_item) =
             env
         in
 
-        let _body = transstmt ue newenv body.pfb_body in
-          assert false                  (* FIXME *)
+        let _stmt = transstmt ue newenv body.pfb_body in (* FIXME: to be used *)
+
+        let re, rty =
+          match body.pfb_return with
+          | None    -> (None, tunit ())
+          | Some re ->
+              let re, ty = transexp newenv epolicy ue re in
+                (Some re, ty)
+        in
+          (* FIXME: unify result type *)
+
+        let fun_ = {
+          f_sig = {
+            fs_name = decl.pfd_name;
+            fs_sig  = (List.map
+                         (fun (x, ty, _) -> (x, ty))
+                         (List.take (List.length decl.pfd_tyargs) locals),
+                       rty);
+            fs_uses = [];                 (* FIXME *)
+          };
+
+          f_locals = [];                (* FIXME *)
+          f_body   = ();
+        }
+
+        in
+          [(EcIdent.create decl.pfd_name, `Function fun_)]
+  end
+
+  | Pst_alias _ -> assert false
 
 (* -------------------------------------------------------------------- *)
-and transstmt uidmap (env : EcEnv.env) (stmt : pstmt) =
-  List.map (transinstr uidmap env) stmt
+and transstmt ue (env : EcEnv.env) (stmt : pstmt) =
+  List.map (transinstr ue env) stmt
 
 (* -------------------------------------------------------------------- *)
 and transinstr ue (env : EcEnv.env) (i : pinstr) =

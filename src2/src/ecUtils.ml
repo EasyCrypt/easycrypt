@@ -141,6 +141,14 @@ module List = struct
 
   let tryassoc (x : 'a) (xs : ('a * 'b) list) =
     try_nf (fun () -> List.assoc x xs)
+
+  let take (n : int) (xs : 'a list) =
+    let rec take n xs acc =
+      match n, xs with
+      | 0, _ | _, [] -> List.rev acc
+      | _, x :: xs -> take (n-1) xs (x :: acc)
+    in
+      take n xs []
 end
 
 (* -------------------------------------------------------------------- *)

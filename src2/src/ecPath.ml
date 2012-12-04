@@ -33,4 +33,9 @@ let toqsymbol (p : path) =
       (List.map EcIdent.name scope, EcIdent.name x)
 
 (* -------------------------------------------------------------------- *)
+let basename = function
+  | Pident x -> x
+  | Pqname (_, x) -> x
+
+(* -------------------------------------------------------------------- *)
 module Mp = Map.Make (struct type t = path let compare = compare end)

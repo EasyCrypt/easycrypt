@@ -248,7 +248,7 @@ module Ty = struct
   let bind (scope : scope) name tydecl =
     bind scope (Ac_type (name, tydecl))
 
-  let alias (scope : scope) ~tyargs name ty = (* FIXME: tyargs *)
+  let alias (scope : scope) name ty =
     let tydecl = {tyd_params = 0; tyd_type = Some ty } in
       bind scope (EcIdent.create name) tydecl
 
@@ -328,9 +328,8 @@ end
 let initial (name : symbol) =
   let scope = subscope None name in
 
-  let scope = Ty.alias scope ~tyargs:0 "unit" (EcTypes.tunit ()) in
-  let scope = Ty.alias scope ~tyargs:0 "bool" (EcTypes.tbool ()) in
-  let scope = Ty.alias scope ~tyargs:0 "int"  (EcTypes.tint  ()) in
-(*  let scope = Ty.alias scope ~tyargs:2 "map"  (EcTypes.tmap  ()) in*)
+  let scope = Ty.alias scope "unit" (EcTypes.tunit ()) in
+  let scope = Ty.alias scope "bool" (EcTypes.tbool ()) in
+  let scope = Ty.alias scope "int"  (EcTypes.tint  ()) in
 
     scope

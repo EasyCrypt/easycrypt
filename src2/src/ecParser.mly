@@ -19,8 +19,8 @@
     pty_body   = body;
   }
 
-  let peget e1 e2    = PEapp (EcPath.toqsymbol EcCoreLib.get, [e1; e2])
-  let peset e1 e2 e3 = PEapp (EcPath.toqsymbol EcCoreLib.set, [e1; e2; e3])
+  let peget e1 e2    = PEapp (([], "get"), [e1; e2])
+  let peset e1 e2 e3 = PEapp (([], "set"), [e1; e2; e3])
 
   let penil  ()   = PEapp (EcPath.toqsymbol EcCoreLib.nil , [])
   let pecons e es = PEapp (EcPath.toqsymbol EcCoreLib.cons, [e; es])

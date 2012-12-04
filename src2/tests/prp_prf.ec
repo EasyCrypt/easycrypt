@@ -3,12 +3,15 @@ theory PRP_PRF.
   type ('a, 'b) map.
 
   op dom['a 'b] : ('a, 'b) map -> 'a list.
+  op codom['a 'b] : ('a, 'b) map -> 'b list.
   op in_dom['a 'b] : ('a, ('a, 'b) map) -> bool.
   op not : bool -> bool.
   op length['a] : 'a list -> int.
   op [<] : (int, int) -> bool.
   op [&&] : (bool, bool) -> bool.
   op mem['a] : ('a, 'a list) -> bool.
+  op get['a 'b] : (('a, 'b) map, 'a) -> 'b.
+  op set['a 'b] : (('a, 'b) map, 'a, 'b) -> ('a, 'b) map.
 
   type from.
   type to.
@@ -31,12 +34,13 @@ theory PRP_PRF.
 
     fun F (x:from) : to = {
       var t : to;
+
       if (not(in_dom(x,m)) && (length(dom(m)) < q)) {
         t = sample();
-        if (mem(t,dom(m))) t = sample(); (* \ dom(m)); parse error *)
-        m[x] = t;
+        if (mem(t,codom(m))) t = sample(); (* \ dom(m)); parse error *)
+        m = set(m, x, t); (* m[x] = t; *)
       }
-      return m[x];
+      return get(m, x); (* m[x]; *)
     }
 
     module PA = { fun F = F }

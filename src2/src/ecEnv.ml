@@ -237,13 +237,18 @@ module Ty = struct
 
   let trylookup x env = try_lf (fun () -> lookup x env)
 
-  let defined (name : EcPath.path) (env : env) = (* FIXME: lookup for paths *)
-    match trylookup (EcPath.toqsymbol name) env with
+  let defined (name : EcPath.path) (env : env) =
+    let name = EcPath.basename name in
+
+    (* FIXME: refactor *)
+    match EcIdent.Map.byident name env.env_root.mc_typedecls with
     | None -> false
     | Some (_, tydecl) -> tydecl.tyd_type <> None
 
   let unfold (name : EcPath.path) (args : EcTypes.ty Parray.t) (env : env) =
-    match trylookup (EcPath.toqsymbol name) env with (* FIXME: lookup for paths *)
+    let name = EcPath.basename name in
+
+    match EcIdent.Map.byident name env.env_root.mc_typedecls with
     | None
     | Some (_, { tyd_type = None }) -> assert false
     | Some (_, ({ tyd_type = Some body } as tyd)) ->

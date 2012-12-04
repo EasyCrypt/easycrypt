@@ -11,6 +11,7 @@ val equal : path -> path -> bool
 (* -------------------------------------------------------------------- *)
 val create    : string -> path
 val toqsymbol : path -> qsymbol
+val basename  : path -> EcIdent.t
 
 (* -------------------------------------------------------------------- *)
 module Mp : Map.S with type key = path
