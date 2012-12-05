@@ -93,3 +93,5 @@ let pp_type ?(vmap : _ option) =
   in
     pp_type uidmap false
 
+let pp_dom fmt = 
+  Format.fprintf fmt "(%a)" (pp_list ~sep:(~$", ") pp_type) 

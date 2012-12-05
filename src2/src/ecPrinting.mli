@@ -20,4 +20,5 @@ val pp_qsymbol :  Format.formatter -> qsymbol -> unit
 (* -------------------------------------------------------------------- *)
 (* AST Pretty-Printing                                                  *)
 val pp_type : ?vmap:NameGen.t -> Format.formatter -> ty -> unit
+val pp_dom : Format.formatter -> ty list -> unit
 

@@ -670,6 +670,14 @@ operator:
       po_body = None   ;
       po_prob   = false; }
   }
+| CNST x=ident tyvars=tyvars_decl COLON ty=loc(type_exp) EQ e=loc(exp) {
+    { po_name   = x     ;
+      po_tyvars = tyvars;
+      po_dom = None     ;
+      po_codom = ty     ;
+      po_body = Some([], e) ;
+      po_prob   = false ; }
+  }
 ;
 
 predicate:
