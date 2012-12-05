@@ -91,6 +91,11 @@ type operator = {
   op_prob   : bool;
 }
 
+type predicate = {
+  pred_params : int;
+  pred_sig    : EcTypes.ty list;
+  pred_def    : (EcIdent.t list * EcFol.form) option
+}
 (* -------------------------------------------------------------------- *)
 type tydecl = {
   tyd_params : int;
@@ -98,11 +103,14 @@ type tydecl = {
 }
 
 (* -------------------------------------------------------------------- *)
+(* FIXME : Seems to be never used *)
 type theory = theory_item list
 
 and theory_item =
   | Th_type     of (EcIdent.t * tydecl)
   | Th_operator of (EcIdent.t * operator)
+  | Th_predicate of (EcIdent.t * predicate)
+  | Th_axiom    of (EcIdent.t * axiom)
   | Th_modtype  of (EcIdent.t * tymod)
   | Th_module   of module_expr
   | Th_theory   of (EcIdent.t * theory)

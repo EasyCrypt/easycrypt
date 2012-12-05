@@ -44,6 +44,13 @@ module Op : sig
   val add : scope -> poperator -> scope
 end
 
+module Pred : sig
+  (* [add scope op] type-checks the given *parsed* operator [op] in
+   * scope [scope], and add it to it. Raises [DuplicatedNameInContext]
+   * if a type with given name already exists. *)
+  val add : scope -> ppredicate -> scope
+end
+
 module Ax : sig
 
   (* [add scope op] type-checks the given *parsed* operator [op] in

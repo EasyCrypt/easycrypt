@@ -50,6 +50,7 @@
     "module"      , MODULE     ;        (* KW: global *)
     "op"          , OP         ;        (* KW: global *)
     "pop"         , POP        ;        (* KW: global *)
+    "pred"        , PRED       ;        (* KW: global *)
     "require"     , REQUIRE    ;        (* KW: global *)
     "theory"      , THEORY     ;        (* KW: global *)
     "type"        , TYPE       ;        (* KW: global *)

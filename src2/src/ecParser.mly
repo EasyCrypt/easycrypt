@@ -91,7 +91,7 @@
 %token PIPE
 %token POP
 // %token PR
-// %token PRED
+%token PRED
 // %token PROVER
 %token QUESTION
 %token RBRACKET
@@ -252,7 +252,7 @@ sexp:
 | TRUE                                   { PEbool true  }
 | FALSE                                  { PEbool false }
 | n=number                               { PEint n }
-| x=ident                                { PEident ([], x) }
+| x=qident                                { PEident x }
 | se=loc(sexp) LBRACKET e=loc(exp) RBRACKET
                                          { peget se e }
 | se=loc(sexp) LBRACKET e1=loc(exp) LEFTARROW e2=loc(exp) RBRACKET
@@ -310,8 +310,8 @@ rnd_exp:
 | LPAREN re=loc(rnd_exp) BACKSLASH e=loc(exp) RPAREN
     { PRexcepted (re, e) }
 
-| x=ident LPAREN es=exp_list0 RPAREN
-    { PRapp (qsymb_of_symb x, es) }
+| x=qident LPAREN es=exp_list0 RPAREN
+    { PRapp (x, es) }
 ;
 
 (* -------------------------------------------------------------------- *)
@@ -328,11 +328,11 @@ sform:
 | TRUE                                   { PFbool true  }
 | FALSE                                  { PFbool false }
 | n=number                               { PFint n }
-| x=ident                                { PFident ([], x) }
+| x=qident                                { PFident x }
 | se=loc(sform) LBRACKET e=loc(form) RBRACKET { PFapp (qsymb_of_symb "<get>", [se; e]) }
 | se=loc(sform) LBRACKET e1=loc(form) LEFTARROW e2=loc(form) RBRACKET
                                          { PFapp (qsymb_of_symb "<set>", [se; e1; e2]) }
-| x=ident LPAREN es=form_list0 RPAREN     { PFapp (qsymb_of_symb x, es) }
+| x=qident LPAREN es=form_list0 RPAREN     { PFapp (x, es) }
 | x=loc(sform) LKEY s=prog_num RKEY      { PFside (x, s) }
 | LPAREN es=form_list2 RPAREN            { PFtuple es }
 | LPAREN e=form RPAREN                   { e }
@@ -628,16 +628,12 @@ op_ident:
 | LBRACKET x=binop RBRACKET { x }
 ;
 
+tyvars_decl:
+| LBRACKET tyvars=prim_ident+ RBRACKET { tyvars }
+| empty { [] }
+    
 operator:
-| OP x=op_ident COLON sty=op_sig {
-    { po_name   = x      ;
-      po_tyvars = []     ;
-      po_dom    = fst sty;
-      po_codom  = snd sty;
-      po_prob   = false  ; }
-  }
-
-| OP x=op_ident LBRACKET tyvars=prim_ident+ RBRACKET COLON sty=op_sig {
+| OP x=op_ident tyvars=tyvars_decl COLON sty=op_sig {
     { po_name   = x      ;
       po_tyvars = tyvars ;
       po_dom    = fst sty;
@@ -659,6 +655,29 @@ operator:
       po_dom    = None ;
       po_codom  = ty   ;
       po_prob   = false; }
+  }
+;
+
+predicate:
+| PRED x = op_ident { 
+  { pp_name = x;
+    pp_tyvars = [];
+    pp_def = AbstrDef (Some []) }
+  }
+| PRED x = op_ident EQ f=loc(form) {
+  { pp_name = x;
+    pp_tyvars = [];
+    pp_def = ConcrDef([], f) }
+  }
+| PRED x = op_ident tyvars=tyvars_decl COLON sty = op_tydom { 
+  { pp_name = x;
+    pp_tyvars = tyvars;
+    pp_def = AbstrDef(Some sty) }
+  } 
+| PRED x = op_ident tyvars=tyvars_decl params=param_decl EQ f=loc(form) { 
+  { pp_name = x;
+    pp_tyvars = tyvars;
+    pp_def = ConcrDef(params, f) }
   }
 ;
 
@@ -715,6 +734,7 @@ global_:
 | sig_def          { Ginterface $1 }
 | type_decl_or_def { Gtype      $1 }
 | operator         { Goperator  $1 }
+| predicate        { Gpredicate $1 }
 | axiom            { Gaxiom     $1 }
 | claim            { Gclaim     $1 }
 ;

@@ -25,6 +25,10 @@ let process_operator (scope : EcScope.scope) (op : poperator) =
   EcScope.Op.add scope op
 
 (* -------------------------------------------------------------------- *)
+let process_predicate (scope : EcScope.scope) (p : ppredicate) =
+  EcScope.Pred.add scope p
+
+(* -------------------------------------------------------------------- *)
 let process_axiom (scope : EcScope.scope) (ax : paxiom) =
   EcScope.Ax.add scope ax
 
@@ -59,6 +63,7 @@ let process (g : global) =
   | Gmodule    m    -> scope := (process_module     !scope m)
   | Ginterface i    -> scope := (process_interface  !scope i)
   | Goperator  o    -> scope := (process_operator   !scope o)
+  | Gpredicate p    -> scope := (process_predicate  !scope p)
   | Gaxiom     a    -> scope := (process_axiom      !scope a)
   | Gclaim     c    -> scope := (process_claim      !scope c)
   | GthOpen    name -> scope := (process_th_open    !scope name)
@@ -72,8 +77,8 @@ let process (g : global) =
   with
   | TyError (loc, exn) -> begin
       EcPrinting.err
-        (EcPrinting.pp_located loc EcPrinting.pp_typerror)
+        (EcPrinting.pp_located loc EcPexception.pp_typerror)
         exn;
       raise Interrupted
   end
-    
+

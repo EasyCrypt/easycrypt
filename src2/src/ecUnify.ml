@@ -40,6 +40,7 @@ end
 
 (* -------------------------------------------------------------------- *)
 let unify (env : EcEnv.env) (ue : unienv) =
+  let vmap = EcUidgen.NameGen.create() in
   let rec unify (t1 : ty) (t2 : ty) = 
     match UniEnv.repr ue t1, UniEnv.repr ue t2 with
     | Trel _, _ -> assert false

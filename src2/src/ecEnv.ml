@@ -24,6 +24,7 @@ and mcomponents = {
   mc_modtypes   : (EcPath.path * EcTypesmod.tymod)     EcIdent.Map.t;
   mc_typedecls  : (EcPath.path * EcTypesmod.tydecl)    EcIdent.Map.t;
   mc_operators  : (EcPath.path * EcTypesmod.operator)  EcIdent.Map.t;
+  mc_predicates : (EcPath.path * EcTypesmod.predicate) EcIdent.Map.t;
   mc_axioms     : (EcPath.path * EcTypesmod.axiom)     EcIdent.Map.t;
   mc_theories   : (EcPath.path * EcTypesmod.theory)    EcIdent.Map.t;
   mc_components : (EcPath.path * mcomponents Lazy.t)   EcIdent.Map.t;
@@ -38,6 +39,7 @@ let empty =
     mc_modtypes   = EcIdent.Map.empty;
     mc_typedecls  = EcIdent.Map.empty;
     mc_operators  = EcIdent.Map.empty;
+    mc_predicates = EcIdent.Map.empty;
     mc_axioms     = EcIdent.Map.empty;
     mc_theories   = EcIdent.Map.empty;
     mc_components = EcIdent.Map.empty;
@@ -109,6 +111,10 @@ module MC = struct
     { mc with
         mc_operators = IM.add x (in_scope scope x, tydecl) mc.mc_operators; }
 
+  let bind_pred (scope, x) tydecl env mc =
+    { mc with
+        mc_predicates = IM.add x (in_scope scope x, tydecl) mc.mc_predicates; }
+
   let bind_ax (scope, x) opdecl env mc =
     { mc with
         mc_axioms = IM.add x (in_scope scope x, opdecl) mc.mc_axioms; }
@@ -140,6 +146,9 @@ module MC = struct
 
   let lookup_all_op1 (name : symbol) (mc : mcomponents) =
     IM.allbyname name mc.mc_operators
+
+  let lookup_pred1 (name : symbol) (mc : mcomponents) =
+    IM.byname name mc.mc_predicates
 
   let lookup_ax1 (name : symbol) (mc : mcomponents) =
     IM.byname name mc.mc_axioms
@@ -242,7 +251,7 @@ module Ty = struct
 
     (* FIXME: refactor *)
     match EcIdent.Map.byident name env.env_root.mc_typedecls with
-    | None -> false
+    | None -> Format.printf "LA1@.";false
     | Some (_, tydecl) -> tydecl.tyd_type <> None
 
   let unfold (name : EcPath.path) (args : EcTypes.ty Parray.t) (env : env) =
@@ -284,6 +293,29 @@ module Op = struct
       (omap
          (MC.lookup_mc scope env.env_root)
          (MC.lookup_all_op1 id))
+end
+
+module Pred = struct
+  type t = predicate
+
+  let bind x pred env =
+    bind MC.bind_pred x pred env
+
+  let bindall preds env =
+    List.fold_left
+      (fun env (x, tydecl) -> bind x tydecl env)
+      env preds
+
+  let lookup ((scope, id) : qsymbol) (env : env) =
+    match
+      obind
+        (MC.lookup_mc scope env.env_root)
+        (MC.lookup_pred1 id)
+    with
+    | None   -> raise LookupFailure
+    | Some x -> x
+
+  let trylookup x env = try_lf (fun () -> lookup x env)
 end
 
 (* -------------------------------------------------------------------- *)

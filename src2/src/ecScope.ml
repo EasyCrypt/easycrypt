@@ -94,22 +94,25 @@ end
 type action =
   | Ac_type     of (EcIdent.t * EcTypesmod.tydecl)
   | Ac_operator of (EcIdent.t * EcTypesmod.operator)
+  | Ac_predicate of (EcIdent.t * EcTypesmod.predicate)
+  | Ac_axiom    of (EcIdent.t * EcTypesmod.axiom)
   | Ac_modtype  of (EcIdent.t * EcTypesmod.tymod)
   | Ac_module   of EcTypesmod.module_expr
   | Ac_theory   of (EcIdent.t * EcTypesmod.theory)
-  | Ac_axiom    of (EcIdent.t * EcTypesmod.axiom)
+
 
 type scope = {
-  sc_name      : EcIdent.t;
-  sc_types     : EcTypesmod.tydecl      Context.context;
-  sc_operators : EcTypesmod.operator    Context.context;
-  sc_axioms    : EcTypesmod.axiom       Context.context;
-  sc_modules   : EcTypesmod.module_expr Context.context;
-  sc_modtypes  : EcTypesmod.tymod       Context.context;
-  sc_theories  : EcTypesmod.theory      Context.context;
-  sc_history   : action list;
-  sc_env       : EcEnv.env;
-  sc_top       : scope option;
+  sc_name       : EcIdent.t;
+  sc_types      : EcTypesmod.tydecl      Context.context;
+  sc_operators  : EcTypesmod.operator    Context.context;
+  sc_predicates : EcTypesmod.predicate   Context.context;
+  sc_axioms     : EcTypesmod.axiom       Context.context;
+  sc_modules    : EcTypesmod.module_expr Context.context;
+  sc_modtypes   : EcTypesmod.tymod       Context.context;
+  sc_theories   : EcTypesmod.theory      Context.context;
+  sc_history    : action list;
+  sc_env        : EcEnv.env;
+  sc_top        : scope option;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -131,16 +134,17 @@ let subscope (scope : scope option) (name : symbol) =
   in
   let (name, env) = EcEnv.enter name env in
 
-  { sc_name      = name;
-    sc_types     = Context.empty ();
-    sc_operators = Context.empty ();
-    sc_axioms    = Context.empty ();
-    sc_modtypes  = Context.empty ();
-    sc_modules   = Context.empty ();
-    sc_theories  = Context.empty ();
-    sc_history   = [];
-    sc_env       = env;
-    sc_top       = scope; }
+  { sc_name       = name;
+    sc_types      = Context.empty ();
+    sc_operators  = Context.empty ();
+    sc_predicates = Context.empty ();
+    sc_axioms     = Context.empty ();
+    sc_modtypes   = Context.empty ();
+    sc_modules    = Context.empty ();
+    sc_theories   = Context.empty ();
+    sc_history    = [];
+    sc_env        = env;
+    sc_top        = scope; }
 
 (* -------------------------------------------------------------------- *)
 let bind (scope : scope) (action : action) =
@@ -156,6 +160,13 @@ let bind (scope : scope) (action : action) =
           sc_operators = Context.bind (EcIdent.name x) op scope.sc_operators;
           sc_history   = action :: scope.sc_history;
           sc_env       = EcEnv.Op.bind x op scope.sc_env }
+
+  | Ac_predicate (x, p) ->
+      { scope with
+          sc_predicates = Context.bind (EcIdent.name x) p scope.sc_predicates;
+          sc_history    = action :: scope.sc_history;
+          sc_env        = EcEnv.Pred.bind x p scope.sc_env }
+
 
   | Ac_axiom (x, ax) ->
       { scope with
@@ -202,7 +213,7 @@ module Op = struct
 
     let dom    = List.map transty (odfl [] op.po_dom) in
     let codom  = transty op.po_codom in
-
+    (* FIXME : check close dom codom *)
     let tyop = {
       op_params = List.length op.po_tyvars;
       op_sig    = (dom, codom);
@@ -214,6 +225,37 @@ module Op = struct
       bind scope (Ac_operator (EcIdent.create op.po_name, tyop))
 end
 
+module Pred = struct
+  module TT = EcTypedtree
+
+  let add (scope : scope) (p : ppredicate) =
+    if not (List.uniq p.pp_tyvars) then
+      Op.operror Op.OpE_DuplicatedTypeVariable;
+    match p.pp_def with
+    | AbstrDef None -> assert false 
+    | AbstrDef (Some dom) ->
+        let policy  = TT.TyDecl p.pp_tyvars in
+        let transty = TT.transty scope.sc_env policy in
+        let dom    = List.map transty dom in
+        (* FIXME : check closed *)
+        let typ = {
+          pred_params = List.length p.pp_tyvars;
+          pred_sig    = dom;
+          pred_def = None 
+        } in
+        bind scope (Ac_predicate (EcIdent.create p.pp_name, typ))
+    | ConcrDef(params, def) ->
+        assert false
+(*
+        let policy = TT.TyDecl p.pp_tyvars in (* FIXME : Pierre-Yves *)
+        let 
+        let transty = TT.transty scope.sc_env policy in
+        
+        let  *)
+
+   
+
+end
 module Ax = struct
   open EcParsetree
   open EcTypes
@@ -331,5 +373,4 @@ let initial (name : symbol) =
   let scope = Ty.alias scope "unit" (EcTypes.tunit ()) in
   let scope = Ty.alias scope "bool" (EcTypes.tbool ()) in
   let scope = Ty.alias scope "int"  (EcTypes.tint  ()) in
-
-    scope
+  scope

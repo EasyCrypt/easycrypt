@@ -195,12 +195,25 @@ and pformula_r =
   | PFforall of ptylocals * pformula
   | PFexists of ptylocals * pformula
 
-type paxiom_kind = PAxiom | PLemma
+
 (* -------------------------------------------------------------------- *)
+type paxiom_kind = PAxiom | PLemma
+
 type paxiom = {
   pa_name    : symbol;
   pa_formula : pformula;
   pa_kind : paxiom_kind;
+}
+
+(* -------------------------------------------------------------------- *)
+type 'a abstr_def = 
+  | AbstrDef of pty list option
+  | ConcrDef of ptylocals * 'a 
+
+type ppredicate = {
+  pp_name   : symbol;
+  pp_tyvars : symbol list;
+  pp_def    : pformula abstr_def;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -245,6 +258,7 @@ type global =
   | Gmodule    of (symbol * pmodule_expr)
   | Ginterface of (symbol * pmodule_type)
   | Goperator  of poperator
+  | Gpredicate of ppredicate
   | Gaxiom     of paxiom
   | Gclaim     of claim
   | Gtype      of ptydecl

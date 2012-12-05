@@ -2,7 +2,6 @@
 open EcUtils
 open EcTypes
 open EcParsetree
-open EcTypedtree
 
 module NameGen = EcUidgen.NameGen
 
@@ -47,12 +46,12 @@ let pp_list
 (* -------------------------------------------------------------------- *)
 let rec pp_qsymbol fmt = function
   | ([]    , x) -> Format.fprintf fmt "%s" x
-  | (n :: p, x) -> Format.fprintf fmt "%s.%a" n pp_qsymbol (p, x)
+  | (n :: p, x) -> Format.fprintf fmt "%s:>%a" n pp_qsymbol (p, x)
 
 (* -------------------------------------------------------------------- *)
 let rec pp_path fmt = function
   | EcPath.Pident x      -> Format.fprintf fmt "%s" (EcIdent.name x)
-  | EcPath.Pqname (p, x) -> Format.fprintf fmt "%a.%s" pp_path p (EcIdent.name x)
+  | EcPath.Pqname (p, x) -> Format.fprintf fmt "%a:>%s" pp_path p (EcIdent.name x)
 
 (* -------------------------------------------------------------------- *)
 let pp_type (uidmap : NameGen.t) =
@@ -94,62 +93,3 @@ let pp_type ?(vmap : _ option) =
   in
     pp_type uidmap false
 
-(* -------------------------------------------------------------------- *)
-let pp_typerror =
-  let pp fmt = function
-    | UnknownVariable name
-        -> Format.fprintf fmt "Unknown variable: %a" pp_qsymbol name
-  
-    | UnknownFunction name
-        -> Format.fprintf fmt "Unknown function: %a" pp_qsymbol name
-  
-    | UnknownTypeName name
-        -> Format.fprintf fmt "Unknown type name: %a" pp_qsymbol name
-  
-    | UnknownOperatorForSig (name, _)
-        -> Format.fprintf fmt "Cannot find operator %a" pp_qsymbol name (* FIXME *)
-  
-    | InvalidNumberOfTypeArgs (_, _, _)
-        -> Format.fprintf fmt "Wrong number of type parameters"
-  
-    | ApplInvalidArity
-        -> Format.fprintf fmt "Wrong number of module parameters"
-  
-    | UnboundTypeParameter name
-        -> Format.fprintf fmt "Unbound type parameter: %s" name
-  
-    | OpNotOverloadedForSig (name, _)   (* FIXME / DUPLICATED *)
-        -> Format.fprintf fmt "Cannot find operator %a" pp_qsymbol name
-  
-    | UnexpectedType (ty1, ty2)
-        -> Format.fprintf fmt ""
-  
-    | NonLinearPattern _
-        -> Format.fprintf fmt "Non-linear pattern"
-  
-    | DuplicatedLocals
-        -> Format.fprintf fmt "DuplicatedLocals"
-  
-    | ProbaExpressionForbidden
-        -> Format.fprintf fmt "ProbaExpressionForbidden"
-  
-    | PatternForbiden
-        -> Format.fprintf fmt "PatternForbiden"
-  
-    | ModApplToNonFunctor
-        -> Format.fprintf fmt "ModApplToNonFunctor"
-  
-    | ModApplInvalidArity
-        -> Format.fprintf fmt "ModApplInvalidArity"
-  
-    | ModApplInvalidArgInterface
-        -> Format.fprintf fmt "ModApplInvalidArgInterface"
-  
-    | PropExpected pf
-        -> Format.fprintf fmt "PropExpected"
-  
-    | TermExpected pf
-        -> Format.fprintf fmt "TermExpected"
-  in
-    fun fmt exn ->
-      Format.fprintf fmt "%a\n%!" pp exn

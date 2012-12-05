@@ -74,7 +74,9 @@ type form =
   | Flocal  of EcIdent.t * ty                    (* Local variable      *)
   | Fpvar   of EcPath.path * ty * Side.t         (* sided symbol        *)
   | Fapp    of EcPath.path * form list * ty option (* op/pred application *)
-  | Ftuple  of form list                         (* tuple constructor   *)
+  | Ftuple  of form list                         (* tuple constructor     *)
+  | Fofbool of form                              (* Cast an bool to prop  *)
+
 
 let ftrue = Ftrue
 let ffalse = Ffalse
@@ -87,7 +89,7 @@ let fofbool f =
   match f with
   | Fbool b -> 
       if b then ftrue else ffalse 
-  | _ -> assert false (* FIXME *)
+  | _ -> Fofbool f 
 
 let fapp x args oty = Fapp(x,args,oty)
 let fif f1 f2 f3 = Fif(f1,f2,f3)
@@ -118,6 +120,7 @@ let map gt g f =
   | Fapp(p,es, oty) ->
       fapp p (List.map g es) (obind oty (fun ty -> Some (gt ty)))
   | Ftuple es -> Ftuple (List.map g es)
+  | Fofbool e -> Fofbool (g e)
 
 (* -------------------------------------------------------------------- *)
 module Subst = struct

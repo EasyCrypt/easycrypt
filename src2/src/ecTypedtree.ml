@@ -39,7 +39,6 @@ let select_op ~proba env name ue psig =
   let ops = EcEnv.Op.all name env in
   let ops = List.filter (fun (_, op) -> op.op_prob || not proba) ops in
   let ops = List.filter (fun (_, op) -> not op.op_ctnt) ops in
-
   let select (path, op) =
     let subue  = EcUnify.UniEnv.copy ue in
     let tyvars = Parray.init op.op_params (fun _ -> mkunivar ()) in
@@ -703,7 +702,7 @@ let transfpattern fenv (p : EcParsetree.lpattern) =
   | _ -> assert false
 
 
-let transformula fenv f = 
+let transformula fenv = 
   let ue = EcUnify.UniEnv.create () in
 
   let unify env ty1 ty2 =
@@ -737,19 +736,13 @@ let transformula fenv f =
         let es   = List.map (transe fenv) es in
         let esig = snd (List.split es) in
         (* Ce code va pas il faut que les lookup depende de esig *)
-        begin match Fenv.Op.trylookup fenv qs with
-        | None -> tyerror dloc (UnknownOperatorForSig (qs, esig))
-        | Some (Lop(p,op)) ->
-            let dom, codom =
-              let optyvars =
-                Parray.init op.op_params (fun _ -> mkunivar ())
-              in
-                (List.map (EcTypes.full_inst_rel optyvars) (fst op.op_sig),
-                 EcTypes.full_inst_rel optyvars (snd op.op_sig))
-            in
-            if not (List.all2 (unify fenv) esig dom) then
-              tyerror dloc ApplInvalidArity; (* FIXME *)
-            fofbool fenv (fapp p (List.map fst es) (Some codom)) codom
+        let ops  = select_op false (Fenv.mono fenv) qs ue esig in
+        begin match ops with
+        | [] | _ :: _ :: _ ->        (* FIXME: better error message *)
+            tyerror f.pl_loc (UnknownOperatorForSig (qs, esig))
+        | [(xpath, op, codom, subue)] ->
+            EcUnify.UniEnv.restore ~src:subue ~dst:ue;
+            fofbool fenv (fapp xpath (List.map fst es) (Some codom)) codom
         end
     | PFif(f1,f2,f3) ->
         let f1 = transf fenv f1 in
@@ -763,16 +756,16 @@ let transformula fenv f =
           tyerror dloc (UnexpectedType (pty, ty1));
         let f2 = transf penv f2 in
         flet p e1 f2 
-    | PFforall(xs,f) ->
+    | PFforall(xs,f1) ->
         let fenv, xs = transl fenv xs in
-        let f = transf fenv f in
+        let f = transf fenv f1 in
         fforall xs f
-    | PFexists(xs,f) ->
+    | PFexists(xs,f1) ->
         let fenv, xs = transl fenv xs in
-        let f = transf fenv f in
+        let f = transf fenv f1 in
         fexists xs f
   and transe fenv e =
-    match f.pl_desc with
+    match e.pl_desc with
     | PFunit -> Funit  , tunit ()
     | PFint i -> Fint i, tint ()
     | PFtuple es -> 
@@ -803,35 +796,29 @@ let transformula fenv f =
     | PFapp(qs,es) ->
         let es   = List.map (transe fenv) es in
         let esig = snd (List.split es) in
-        (* Ce code va pas il faut que les lookup depende de esig *)
-        begin match Fenv.Op.trylookup fenv qs with
-        | None -> tyerror dloc (UnknownOperatorForSig (qs, esig))
-        | Some (Lop(p,op)) ->
-            let dom, codom =
-              let optyvars =
-                Parray.init op.op_params (fun _ -> mkunivar ())
-              in
-                (List.map (EcTypes.full_inst_rel optyvars) (fst op.op_sig),
-                 EcTypes.full_inst_rel optyvars (snd op.op_sig))
-            in
-            if not (List.all2 (unify fenv) esig dom) then
-              tyerror dloc ApplInvalidArity; (* FIXME *)
-            fapp p (List.map fst es) (Some codom), codom
+        let ops  = select_op false (Fenv.mono fenv) qs ue esig in
+        begin match ops with
+        | [] | _ :: _ :: _ ->        (* FIXME: better error message *)
+            tyerror e.pl_loc (UnknownOperatorForSig (qs, esig))
+        | [(xpath, op, codom, subue)] ->
+            EcUnify.UniEnv.restore ~src:subue ~dst:ue;
+            fapp xpath (List.map fst es) (Some codom), codom
         end
     | PFif(f1,f2,f3) ->
         let f1 = transf fenv f1 in
         let f2,ty2 = transe fenv f2 in
         let f3,ty3 = transe fenv f3 in
         if not (unify fenv ty2 ty3) then
-          tyerror dloc (UnexpectedType (ty2,ty3));
+          tyerror e.pl_loc (UnexpectedType (ty2,ty3));
         fif f1 f2 f3, ty2
     | PFlet(lp,e1,f2) ->
         let (penv, p, pty) = transfpattern fenv lp in
         let e1, ty1 = transe fenv e1 in
         if not (unify fenv pty ty1) then
-          tyerror dloc (UnexpectedType (pty, ty1));
+          tyerror e.pl_loc (UnexpectedType (pty, ty1));
         let e2, ty2 = transe penv f2 in
         flet p e1 e2, ty2 
-    | PFforall _ | PFexists _ -> tyerror dloc (TermExpected f) in
-  let f = transf fenv f in
+    | PFforall _ | PFexists _ -> tyerror e.pl_loc (TermExpected e) in
+  fun f ->
+    let f = transf fenv f in
     EcFol.Subst.uni (EcUnify.UniEnv.asmap ue) f

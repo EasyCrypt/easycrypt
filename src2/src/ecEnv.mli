@@ -40,6 +40,7 @@ end
 (* -------------------------------------------------------------------- *)
 module Var    : S with type t = EcTypes.ty
 module Fun    : S with type t = funsig
+module Pred   : S with type t = predicate
 module Ax     : S with type t = axiom
 module Mod    : S with type t = tymod
 module ModTy  : S with type t = tymod
