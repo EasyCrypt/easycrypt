@@ -92,13 +92,13 @@ end
 
 (* -------------------------------------------------------------------- *)
 type action =
-  | Ac_type     of (EcIdent.t * EcTypesmod.tydecl)
-  | Ac_operator of (EcIdent.t * EcTypesmod.operator)
+  | Ac_type      of (EcIdent.t * EcTypesmod.tydecl)
+  | Ac_operator  of (EcIdent.t * EcTypesmod.operator)
   | Ac_predicate of (EcIdent.t * EcTypesmod.predicate)
-  | Ac_axiom    of (EcIdent.t * EcTypesmod.axiom)
-  | Ac_modtype  of (EcIdent.t * EcTypesmod.tymod)
-  | Ac_module   of EcTypesmod.module_expr
-  | Ac_theory   of (EcIdent.t * EcTypesmod.theory)
+  | Ac_axiom     of (EcIdent.t * EcTypesmod.axiom)
+  | Ac_modtype   of (EcIdent.t * EcTypesmod.tymod)
+  | Ac_module    of EcTypesmod.module_expr
+  | Ac_theory    of (EcIdent.t * EcTypesmod.theory)
 
 
 type scope = {
@@ -225,6 +225,7 @@ module Op = struct
       bind scope (Ac_operator (EcIdent.create op.po_name, tyop))
 end
 
+(* -------------------------------------------------------------------- *)
 module Pred = struct
   module TT = EcTypedtree
 
@@ -252,10 +253,9 @@ module Pred = struct
         let transty = TT.transty scope.sc_env policy in
         
         let  *)
-
-   
-
 end
+
+(* -------------------------------------------------------------------- *)
 module Ax = struct
   open EcParsetree
   open EcTypes
@@ -363,7 +363,7 @@ module Theory = struct
         (scope.sc_name, bind sup (Ac_theory (scope.sc_name, theory)))
 
   let import (scope : scope) (_name : qsymbol) =
-    scope
+    scope                               (* FIXME *)
 end
 
 (* -------------------------------------------------------------------- *)
@@ -373,4 +373,5 @@ let initial (name : symbol) =
   let scope = Ty.alias scope "unit" (EcTypes.tunit ()) in
   let scope = Ty.alias scope "bool" (EcTypes.tbool ()) in
   let scope = Ty.alias scope "int"  (EcTypes.tint  ()) in
-  scope
+
+    scope

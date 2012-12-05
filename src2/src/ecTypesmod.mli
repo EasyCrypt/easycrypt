@@ -107,10 +107,10 @@ type tydecl = {
 type theory = theory_item list
 
 and theory_item =
-  | Th_type     of (EcIdent.t * tydecl)
-  | Th_operator of (EcIdent.t * operator)
+  | Th_type      of (EcIdent.t * tydecl)
+  | Th_operator  of (EcIdent.t * operator)
   | Th_predicate of (EcIdent.t * predicate)
-  | Th_axiom    of (EcIdent.t * axiom)
-  | Th_modtype  of (EcIdent.t * tymod)
-  | Th_module   of module_expr
-  | Th_theory   of (EcIdent.t * theory)
+  | Th_axiom     of (EcIdent.t * axiom)
+  | Th_modtype   of (EcIdent.t * tymod)
+  | Th_module    of module_expr
+  | Th_theory    of (EcIdent.t * theory)
