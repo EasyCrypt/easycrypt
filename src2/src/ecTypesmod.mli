@@ -87,6 +87,7 @@ type axiom = {
 type operator = {
   op_params : int;
   op_sig    : EcTypes.ty list * EcTypes.ty;
+  op_body   : (EcIdent.t list * EcTypes.tyexpr) option; 
   op_ctnt   : bool;
   op_prob   : bool;
 }

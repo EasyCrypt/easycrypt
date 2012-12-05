@@ -81,3 +81,11 @@ and tyrexpr =
   | Rbitstr   of tyexpr                      (* bitstring sampling *)
   | Rexcepted of tyrexpr * tyexpr            (* restriction        *)
   | Rapp      of EcPath.path * tyexpr list     (* p-op. application  *)
+
+val e_map : (ty -> ty) -> (tyexpr -> tyexpr) -> (tyrexpr -> tyrexpr) ->
+            tyexpr -> tyexpr
+val re_map :  (tyexpr -> tyexpr) -> (tyrexpr -> tyrexpr) ->
+            tyrexpr -> tyrexpr
+module Esubst : sig
+  val uni : ty Muid.t -> tyexpr -> tyexpr 
+end

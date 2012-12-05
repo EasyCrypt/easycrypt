@@ -40,11 +40,10 @@ end
 
 (* -------------------------------------------------------------------- *)
 let unify (env : EcEnv.env) (ue : unienv) =
-  let vmap = EcUidgen.NameGen.create() in
   let rec unify (t1 : ty) (t2 : ty) = 
     match UniEnv.repr ue t1, UniEnv.repr ue t2 with
-    | Trel _, _ -> assert false
-    | _, Trel _ -> assert false
+    | Trel i1, Trel i2 -> 
+        if i1 <> i2 then raise (UnificationFailure (t1, t2))
 
     | Tunivar id, t | t, Tunivar id -> UniEnv.bind ue id t
 

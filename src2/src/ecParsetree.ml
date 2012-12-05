@@ -54,11 +54,6 @@ and  pexpr  = pexpr_r  located          (* located expression        *)
 and  prexpr = prexpr_r located          (* located random expression *)
 
 and pty_r =
-  | PTunit
-  | PTbool
-  | PTint
-  | PTreal
-  | PTbitstring
   | PTunivar
   | PTtuple     of pty list
   | PTnamed     of qsymbol
@@ -154,11 +149,13 @@ and pfunction_body = {
 }
 
 (* -------------------------------------------------------------------- *)
+
 type poperator = {
   po_name   : symbol;
   po_tyvars : symbol list;
-  po_dom    : (pty list) option;
-  po_codom  : pty;
+  po_dom : pty list option;
+  po_codom : pty;  
+  po_body   : (symbol list * pexpr) option;
   po_prob   : bool;
 }
 

@@ -36,6 +36,7 @@
 
 (* Tokens + keywords *)
 // %token ABSTRACT
+%token UNDERSCORE
 %token ADMIT
 // %token ADVERSARY
 %token AND
@@ -373,10 +374,10 @@ form:
 (* Type expressions                                                     *)
 
 simpl_type_exp:
+| UNDERSCORE                  { PTunivar       }
 | x=qident                    { PTnamed x      }
 | x=prim_ident                { PTvar x        }
 | tya=type_args x=qident      { PTapp (x, tya) }
-| BITSTR                      { PTbitstring    }
 | LPAREN ty=type_exp RPAREN   { ty             }
 ;
 
@@ -638,22 +639,35 @@ operator:
       po_tyvars = tyvars ;
       po_dom    = fst sty;
       po_codom  = snd sty;
+      po_body   = None   ;
+      po_prob   = false  ; }
+  }
+
+| OP x=op_ident tyvars=tyvars_decl p=param_decl COLON codom=loc(type_exp)
+    EQ b=loc(exp) {
+    { po_name   = x      ;
+      po_tyvars = tyvars ;
+      po_dom    = Some(List.map snd p);
+      po_codom  = codom  ;
+      po_body   = Some(List.map fst p, b);
       po_prob   = false  ; }
   }
 
 | POP x=ident COLON sty=op_sig {
     { po_name   = x      ;
       po_tyvars = []     ;
-      po_dom    = fst sty;
-      po_codom  = snd sty;
+      po_dom = fst sty   ;
+      po_codom = snd sty ;
+      po_body  = None    ;
       po_prob   = true   ; }
   }
 
 | CNST x=ident COLON ty=loc(type_exp) {
     { po_name   = x    ;
       po_tyvars = []   ;
-      po_dom    = None ;
-      po_codom  = ty   ;
+      po_dom = None    ;
+      po_codom = ty    ;
+      po_body = None   ;
       po_prob   = false; }
   }
 ;

@@ -44,7 +44,6 @@ let select_op ~proba env name ue psig =
     let tyvars = Parray.init op.op_params (fun _ -> mkunivar ()) in
     let dom    = List.map (EcTypes.full_inst_rel tyvars) (fst op.op_sig)
     and codom  = EcTypes.full_inst_rel tyvars (snd op.op_sig) in
-
     let opsig = Ttuple (Parray.of_list dom) in
       try
         EcUnify.unify env subue opsig (Ttuple (Parray.of_list psig));
@@ -66,11 +65,6 @@ let transty (env : EcEnv.env) (policy : typolicy) =
 
     match ty.pl_desc with
       (* Base types *)
-    | PTunit        -> Tbase Tunit
-    | PTbool        -> Tbase Tbool
-    | PTint         -> Tbase Tint
-    | PTreal        -> Tbase Treal
-    | PTbitstring   -> Tbase Tbitstring
     | PTunivar      -> EcTypes.mkunivar ()
     | PTtuple tys   -> Ttuple (Parray.fmap transty tys)
 
@@ -178,13 +172,13 @@ let transexp (env : EcEnv.env) (policy : epolicy) (ue : EcUnify.unienv) e =
             (Eapp (xpath, List.map fst es), codom)
     end
 
-    | PElet (p, e1, e2) ->
+    | PElet (p, pe1, pe2) ->
       let (penv, p, pty) = transpattern env p in
-      let e1, ty1 = transexp  env policy e1 in
-      let e2, ty2 = transexp penv policy e2 in
+      let e1, ty1 = transexp  env policy pe1 in
+      let e2, ty2 = transexp penv policy pe2 in
 
         if not (unify env pty ty1) then
-            tyerror loc (UnexpectedType (pty, ty1));
+            tyerror pe1.pl_loc (UnexpectedType (pty, ty1));
         (Elet (p, e1, e2), ty2)
 
     | PEtuple es ->
@@ -193,14 +187,14 @@ let transexp (env : EcEnv.env) (policy : epolicy) (ue : EcUnify.unienv) e =
       in
         (Etuple (Parray.to_list es), Ttuple tys)
 
-    | PEif (c, e1, e2) ->
-      let c, tyc = transexp env policy c in
+    | PEif (pc, pe1, pe2) ->
+      let c, tyc = transexp env policy pc in
         if not (unify env tyc (tbool ())) then
-          tyerror loc (UnexpectedType (tyc, (tbool ())));
-        let e1, ty1 = transexp env policy e1 in
-        let e2, ty2 = transexp env policy e2 in
+          tyerror pc.pl_loc (UnexpectedType (tyc, (tbool ())));
+        let e1, ty1 = transexp env policy pe1 in
+        let e2, ty2 = transexp env policy pe2 in
           if not (unify env ty1 ty2) then
-            tyerror loc (UnexpectedType (ty1, ty2));
+            tyerror pe2.pl_loc (UnexpectedType (ty2, ty1));
           (Eif (c, e1, e2), ty1)
 
     | PErnd re ->
@@ -231,19 +225,27 @@ let transexp (env : EcEnv.env) (policy : epolicy) (ue : EcUnify.unienv) e =
     | PRinter (re1, re2) ->
         let re1, rty1 = transexp env policy re1 in
         let re2, rty2 = transexp env policy re2 in
-          if not (unify env rty1 rty2) then
-            tyerror loc (UnexpectedType (rty1, rty2));
-          (Rinter (re1, re2), rty1)
+        (* FIXME : should be int *)
+        if not (unify env rty1 rty2) then
+          tyerror loc (UnexpectedType (rty1, rty2));
+        (Rinter (re1, re2), rty1)
 
     | PRapp (name, args) ->
         let _args, _asig =              (* FIXME *)
           List.split (List.map (transexp env epolicy) args)
         in
-          assert false
+        assert false
 
   in
     transexp env policy e               (* FIXME: close type *)
 
+let transexpcast (env : EcEnv.env) (policy : epolicy) (ue : EcUnify.unienv) t e =
+  let e',t' = transexp env policy ue e in
+  let _ = 
+    try EcUnify.unify env ue t t'
+    with _ -> tyerror e.pl_loc (UnexpectedType (t', t)) in
+  e'
+  
 (* -------------------------------------------------------------------- *)
 exception DuplicatedSigItemName   of psignature
 exception DuplicatedArgumentsName of pfunction_decl
@@ -822,3 +824,5 @@ let transformula fenv =
   fun f ->
     let f = transf fenv f in
     EcFol.Subst.uni (EcUnify.UniEnv.asmap ue) f
+
+

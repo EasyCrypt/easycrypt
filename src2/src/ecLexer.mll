@@ -70,7 +70,8 @@ let letter  = ['a'-'z' 'A'-'Z']
 let digit   = ['0'-'9']
 let number  = digit+
 
-let ident      = (letter | '_') (letter | digit | '_' | '\'')*
+let ident      = (letter (letter | digit | '_' | '\'')*)
+                 | ('_' (letter | digit | '_' | '\'')+)
 let prim_ident = '\'' ident
 
 let op_char_1    = ['=' '<' '>' '~']
@@ -104,6 +105,7 @@ rule main = parse
   | ".."                      { DOTDOT }
 
   (* char symbols *)
+  | '_'                       { UNDERSCORE }
   | '('                       { LPAREN }
   | ')'                       { RPAREN }
   | '{'                       { LKEY }

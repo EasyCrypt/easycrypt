@@ -213,10 +213,25 @@ module Op = struct
 
     let dom    = List.map transty (odfl [] op.po_dom) in
     let codom  = transty op.po_codom in
+    let policy = { TT.epl_prob = op.po_prob } in
+    let body, ue =
+      let ue = EcUnify.UniEnv.create () in
+      let body = 
+        match op.po_body with
+        | None -> None
+        | Some(xs,body) ->
+            let xs = List.map EcIdent.create xs in
+            let env = EcEnv.Var.bindall (List.combine xs dom) scope.sc_env in
+            let body = TT.transexpcast env policy ue codom body in
+            Some(xs, Esubst.uni (EcUnify.UniEnv.asmap ue) body) in
+      body, ue in
+    let uni = Subst.uni (EcUnify.UniEnv.asmap ue) in 
+    let dom, codom = List.map uni dom, uni codom in
     (* FIXME : check close dom codom *)
     let tyop = {
       op_params = List.length op.po_tyvars;
       op_sig    = (dom, codom);
+      op_body   = None;
       op_ctnt   = (op.po_dom = None);
       op_prob   = op.po_prob;
     }

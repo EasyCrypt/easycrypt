@@ -150,10 +150,40 @@ type tyexpr =
   | Etuple  of tyexpr list                  (* tuple constructor *)
   | Eif     of tyexpr * tyexpr * tyexpr     (* _ ? _ : _         *)
   | Ernd    of tyrexpr                      (* random expression *)
-
+(* FIXME : flatten this *)
 and tyrexpr =
   | Rbool                                    (* flip               *)
   | Rinter    of tyexpr * tyexpr             (* interval sampling  *)
   | Rbitstr   of tyexpr                      (* bitstring sampling *)
   | Rexcepted of tyrexpr * tyexpr            (* restriction        *)
   | Rapp      of EcPath.path * tyexpr list   (* p-op. application  *)
+
+let e_map ft fe fr e = 
+  match e with 
+  | Eunit | Ebool _  | Eint _ -> e 
+  | Elocal (id, ty) -> Elocal(id,ft ty)
+  | Evar(id,ty) -> Evar(id,ft ty)
+  | Eapp(p,args) -> Eapp(p, List.map fe args)
+  | Elet(lp,e1,e2) -> Elet(lp, fe e1, fe e2)
+  | Etuple le -> Etuple(List.map fe le)
+  | Eif(e1,e2,e3) -> Eif(fe e1, fe e2, fe e3)
+  | Ernd r -> Ernd(fr r)
+
+let re_map fe fr = function
+  | Rbool -> Rbool
+  | Rinter(e1,e2) -> Rinter(fe e1, fe e2)
+  | Rbitstr e -> Rbitstr(fe e)
+  | Rexcepted(e1,e2) -> Rexcepted(fr e1, fe e2)
+  | Rapp(p, args) -> Rapp(p, List.map fe args)
+
+module Esubst = struct 
+  let uni (uidmap : ty EcUidgen.Muid.t) =
+    let tuni = Subst.uni uidmap in
+    let rec aux e = e_map tuni aux raux e 
+    and raux r = re_map aux raux r in
+    aux
+end
+
+
+
+

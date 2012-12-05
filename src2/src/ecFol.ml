@@ -124,6 +124,8 @@ let map gt g f =
 
 (* -------------------------------------------------------------------- *)
 module Subst = struct
-  let rec uni uidmap formula =
-    map (EcTypes.Subst.uni uidmap) (uni uidmap) formula
+  let uni uidmap = 
+    let rec aux formula =
+      map (EcTypes.Subst.uni uidmap) aux formula in
+    aux
 end

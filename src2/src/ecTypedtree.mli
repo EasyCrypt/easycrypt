@@ -66,7 +66,8 @@ type epolicy = {
  * [policy], and unification map [ue].
 *)
 val transexp : EcEnv.env -> epolicy -> EcUnify.unienv -> pexpr -> tyexpr * ty
-
+val transexpcast :
+    EcEnv.env -> epolicy -> EcUnify.unienv -> ty -> pexpr -> tyexpr
 (* -------------------------------------------------------------------- *)
 module Fenv : sig 
   type fenv
