@@ -662,9 +662,9 @@ operator:
       po_prob   = true   ; }
   }
 
-| CNST x=ident COLON ty=loc(type_exp) {
+| CNST x=ident tyvars=tyvars_decl COLON ty=loc(type_exp) {
     { po_name   = x    ;
-      po_tyvars = []   ;
+      po_tyvars = tyvars   ;
       po_dom = None    ;
       po_codom = ty    ;
       po_body = None   ;
