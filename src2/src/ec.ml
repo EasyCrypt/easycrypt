@@ -11,7 +11,7 @@ let _ =
     | Some f -> EcIo.from_file f
   in
     while true do
-      match EcIo.parse iparser with
-        | prog, false -> List.iter EcCommands.process prog
-        | _   , true  -> exit 0
+      let commands, terminate = EcIo.parse iparser in
+        List.iter EcCommands.process commands;
+        if terminate then exit 0;
     done

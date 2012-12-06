@@ -1,15 +1,16 @@
+require list.
+
 theory PRP_PRF.
-  type 'a list.
+  import list.
+
   type ('a, 'b) map.
 
   op dom['a 'b] : ('a, 'b) map -> 'a list.
   op codom['a 'b] : ('a, 'b) map -> 'b list.
   op in_dom['a 'b] : ('a, ('a, 'b) map) -> bool.
   op not : bool -> bool.
-  op length['a] : 'a list -> int.
   op [<] : (int, int) -> bool.
   op [&&] : (bool, bool) -> bool.
-  op mem['a] : ('a, 'a list) -> bool.
   op get['a 'b] : (('a, 'b) map, 'a) -> 'b.
   op set['a 'b] : (('a, 'b) map, 'a, 'b) -> ('a, 'b) map.
 

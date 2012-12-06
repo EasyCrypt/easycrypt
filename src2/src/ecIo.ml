@@ -72,3 +72,13 @@ let finalize (ecreader : ecreader) =
 let parse (ecreader : ecreader) =
   let ecreader = Disposable.get ecreader in
     ecreader.ecr_parser (fun () -> lexer ecreader.ecr_lexbuf)
+
+(* -------------------------------------------------------------------- *)
+let parseall (ecreader : ecreader) =
+  let rec aux acc =
+    let commands, terminate = parse ecreader in
+    let acc = List.rev_append commands acc in
+      if terminate then List.rev acc else aux acc
+  in
+    aux []
+

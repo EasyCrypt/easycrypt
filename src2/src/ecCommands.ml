@@ -6,74 +6,85 @@ open EcTypedtree
 exception Interrupted
 
 (* -------------------------------------------------------------------- *)
-let process_type (scope : EcScope.scope) (tyd : ptydecl) =
+let rec process_type (scope : EcScope.scope) (tyd : ptydecl) =
   let tyname = (tyd.pty_tyvars, tyd.pty_name) in
     match tyd.pty_body with
     | None    -> EcScope.Ty.add    scope tyname
     | Some bd -> EcScope.Ty.define scope tyname bd
 
 (* -------------------------------------------------------------------- *)
-let process_module (scope : EcScope.scope) ((x, m) : _ * pmodule_expr) =
+and process_module (scope : EcScope.scope) ((x, m) : _ * pmodule_expr) =
   EcScope.Mod.add scope x m
 
 (* -------------------------------------------------------------------- *)
-let process_interface (scope : EcScope.scope) ((x, i) : _ * pmodule_type) =
+and process_interface (scope : EcScope.scope) ((x, i) : _ * pmodule_type) =
   EcScope.ModType.add scope x i
 
 (* -------------------------------------------------------------------- *)
-let process_operator (scope : EcScope.scope) (op : poperator) =
+and process_operator (scope : EcScope.scope) (op : poperator) =
   EcScope.Op.add scope op
 
 (* -------------------------------------------------------------------- *)
-let process_predicate (scope : EcScope.scope) (p : ppredicate) =
+and process_predicate (scope : EcScope.scope) (p : ppredicate) =
   EcScope.Pred.add scope p
 
 (* -------------------------------------------------------------------- *)
-let process_axiom (scope : EcScope.scope) (ax : paxiom) =
+and process_axiom (scope : EcScope.scope) (ax : paxiom) =
   EcScope.Ax.add scope ax
 
 (* -------------------------------------------------------------------- *)
-let process_claim (scope : EcScope.scope) _ =
+and process_claim (scope : EcScope.scope) _ =
   scope
 
 (* -------------------------------------------------------------------- *)
-let process_th_open (scope : EcScope.scope) name =
+and process_th_open (scope : EcScope.scope) name =
   EcScope.Theory.enter scope name
 
 (* -------------------------------------------------------------------- *)
-let process_th_close (scope : EcScope.scope) name =
+and process_th_close (scope : EcScope.scope) name =
   if EcIdent.name (EcScope.name scope) <> name then
     failwith "invalid theory name";     (* FIXME *)
   snd (EcScope.Theory.exit scope)
 
 (* -------------------------------------------------------------------- *)
-let process_th_require (scope : EcScope.scope) name =
-  scope
+and process_th_require (scope : EcScope.scope) name =
+  (* FIXME: hackish / use libdir *)
+  let commands = EcIo.parseall (EcIo.from_file ("tests/" ^ name ^ ".ec")) in
+  let scope =
+    List.fold_left
+      process (EcScope.Theory.enter scope name) commands
+  in
+    snd (EcScope.Theory.exit scope)
 
 (* -------------------------------------------------------------------- *)
-let process_th_import (scope : EcScope.scope) name =
+and process_th_import (scope : EcScope.scope) name =
   EcScope.Theory.import scope name
+
+(* -------------------------------------------------------------------- *)
+and process (scope : EcScope.scope) (g : global) =
+  match g with
+  | Gtype      t    -> process_type       scope t
+  | Gmodule    m    -> process_module     scope m
+  | Ginterface i    -> process_interface  scope i
+  | Goperator  o    -> process_operator   scope o
+  | Gpredicate p    -> process_predicate  scope p
+  | Gaxiom     a    -> process_axiom      scope a
+  | Gclaim     c    -> process_claim      scope c
+  | GthOpen    name -> process_th_open    scope name
+  | GthClose   name -> process_th_close   scope name
+  | GthRequire name -> process_th_require scope name
+  | GthImport  name -> process_th_import  scope name
 
 (* -------------------------------------------------------------------- *)
 let scope = ref (EcScope.initial EcCoreLib.top)
 
 let process (g : global) =
-  match g with
-  | Gtype      t    -> scope := (process_type       !scope t)
-  | Gmodule    m    -> scope := (process_module     !scope m)
-  | Ginterface i    -> scope := (process_interface  !scope i)
-  | Goperator  o    -> scope := (process_operator   !scope o)
-  | Gpredicate p    -> scope := (process_predicate  !scope p)
-  | Gaxiom     a    -> scope := (process_axiom      !scope a)
-  | Gclaim     c    -> scope := (process_claim      !scope c)
-  | GthOpen    name -> scope := (process_th_open    !scope name)
-  | GthClose   name -> scope := (process_th_close   !scope name)
-  | GthRequire name -> scope := (process_th_require !scope name)
-  | GthImport  name -> scope := (process_th_import  !scope name)
+    scope := process !scope g
 
+(*
 let process (g : global) =
   try
-    process g
+    scope := process !scope g
   with
   | TyError (loc, exn) -> begin
       EcPrinting.err
@@ -81,3 +92,4 @@ let process (g : global) =
         exn;
       raise Interrupted
   end
+*)
