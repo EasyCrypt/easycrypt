@@ -30,14 +30,6 @@ val env     : scope -> EcEnv.env
 val attop   : scope -> bool
 
 module Op : sig
-  (* Possible exceptions when checking/adding an operator *)
-  type operror =
-  | OpE_DuplicatedTypeVariable
-
-  exception OpError of operror
-
-  val operror : operror -> 'a
-
   (* [add scope op] type-checks the given *parsed* operator [op] in
    * scope [scope], and add it to it. Raises [DuplicatedNameInContext]
    * if a type with given name already exists. *)

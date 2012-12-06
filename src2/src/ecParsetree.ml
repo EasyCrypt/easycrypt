@@ -152,7 +152,7 @@ and pfunction_body = {
 
 type poperator = {
   po_name   : symbol;
-  po_tyvars : symbol list;
+  po_tyvars : symbol list option;
   po_dom : pty list option;
   po_codom : pty;  
   po_body   : (symbol list * pexpr) option;
@@ -209,7 +209,7 @@ type 'a abstr_def =
 
 type ppredicate = {
   pp_name   : symbol;
-  pp_tyvars : symbol list;
+  pp_tyvars : symbol list option;
   pp_def    : pformula abstr_def;
 }
 

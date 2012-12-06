@@ -3,6 +3,7 @@ open EcUtils
 open EcSymbols
 open EcParsetree
 open EcUidgen
+open EcIdent
 
 (* -------------------------------------------------------------------- *)
 type tybase = Tunit | Tbool | Tint | Treal | Tbitstring
@@ -12,11 +13,14 @@ val tyb_equal : tybase -> tybase -> bool
 type ty =
   | Tbase   of tybase
   | Tunivar of EcUidgen.uid
-  | Trel    of int
-  | Ttuple  of ty Parray.t 
-  | Tconstr of EcPath.path * ty Parray.t 
+  | Tvar    of EcIdent.t 
+  | Ttuple  of ty list
+  | Tconstr of EcPath.path * ty list
 
-type ty_decl = int * ty
+type dom = ty list
+type tysig = dom * ty 
+
+type ty_decl = { td_params : EcIdent.t list; td_body : ty; }
 
 (* -------------------------------------------------------------------- *)
 val tunit      : unit -> ty
@@ -31,10 +35,12 @@ val mkunivar : unit -> ty
 
 (* -------------------------------------------------------------------- *)
   
-(* [freshen n ty] replaces the [n] first rel. variables by fresh
+(* [freshen n ty] replaces the [n] type variables by fresh
  * unification variables
  *)
-val freshen : int -> ty -> ty
+val freshen : EcIdent.t list -> ty -> ty
+val freshendom : EcIdent.t list -> dom -> dom
+val freshensig : EcIdent.t list -> tysig -> tysig
 
 (* -------------------------------------------------------------------- *)
 module Subst : sig
@@ -51,12 +57,12 @@ val sub_exists : (ty -> bool) -> ty -> bool
 val occur_uni : EcUidgen.uid -> ty -> bool
 
 (* -------------------------------------------------------------------- *)
-exception UnBoundRel of int
 exception UnBoundUni of EcUidgen.uid
-exception UnBoundVar of EcUidgen.uid
+exception UnBoundVar of EcIdent.t 
 
-val full_inst_rel : ty Parray.t -> ty -> ty
 val full_inst_uni : ty Muid.t -> ty -> ty
+val inst_var : ty EcIdent.Mid.t -> ty -> ty
+val init_substvar : EcIdent.t list -> ty list -> ty EcIdent.Mid.t
 
 (* -------------------------------------------------------------------- *)
 type lpattern =

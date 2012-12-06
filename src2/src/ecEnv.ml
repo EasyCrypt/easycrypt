@@ -347,15 +347,14 @@ module Ty = struct
     | None -> false
     | Some (_, tydecl) -> tydecl.tyd_type <> None
 
-  let unfold (name : EcPath.path) (args : EcTypes.ty Parray.t) (env : env) =
+  let unfold (name : EcPath.path) (args : EcTypes.ty list) (env : env) =
     let name = EcPath.basename name in
 
     match EcIdent.Map.byident name env.env_root.mc_typedecls with
     | None
     | Some (_, { tyd_type = None }) -> assert false
     | Some (_, ({ tyd_type = Some body } as tyd)) ->
-        assert (tyd.tyd_params = Parray.length args);
-        EcTypes.full_inst_rel args body
+        EcTypes.inst_var (EcTypes.init_substvar tyd.tyd_params args) body
 end
 
 (* -------------------------------------------------------------------- *)

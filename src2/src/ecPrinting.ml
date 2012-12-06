@@ -65,10 +65,10 @@ let pp_type (uidmap : NameGen.t) =
     | Ttuple tys ->
         let pp = if btuple then pp_paren else pp_id in
           pp (pp_list ~sep:(~$"*") (pp_type true))
-            fmt (Parray.to_list tys)
+            fmt tys
 
     | Tconstr (name, tyargs) -> begin
-        match Parray.to_list tyargs with
+        match tyargs with
         | []     -> Format.fprintf fmt "%a" pp_path name
         | [t]    -> Format.fprintf fmt "%a %a" (pp_type true) t pp_path name
         | tyargs -> Format.fprintf fmt "(%a) %a"
@@ -76,11 +76,11 @@ let pp_type (uidmap : NameGen.t) =
                       pp_path name
     end
 
-    | Trel i ->
-        Format.fprintf fmt "@%d" i
+    | Tvar id -> (* FIXME *)
+        Format.fprintf fmt "%s" (EcIdent.name id)
 
     | Tunivar id ->
-        Format.fprintf fmt "'%s" (NameGen.get uidmap id)
+        Format.fprintf fmt "#%s" (NameGen.get uidmap id)
 
   in
     pp_type

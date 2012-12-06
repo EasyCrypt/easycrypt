@@ -24,3 +24,7 @@ module Map : sig
   val byname    : symbol -> 'a t -> 'a option
   val byident   : key -> 'a t -> 'a option
 end
+
+module Mid : EcMaps.Map.S with type key = t
+module Sid : Set.S with type elt = t
+module Hid : Hashtbl.S with type key = t

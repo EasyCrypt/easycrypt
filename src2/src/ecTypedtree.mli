@@ -29,23 +29,19 @@ type tyerror =
 exception TyError of Location.t * tyerror
 
 (* -------------------------------------------------------------------- *)
-type typolicy =
-    (* For type definitions bodies / operators type signatures
-     * - no [Punivar] allowed
-     * - each [Pvar] must appear in the constructor symbols list
-     *   (assumed to contain no duplicated). [Pvar x] is replaced
-     *   by [Trel i] where [i] is the index of [x] in the symbols list.
-     *)
-  | TyDecl of symbol list
+module TyPolicy : sig 
+  type t
+  val decl  : t -> EcIdent.t list
+  val relax : t -> t 
+  val empty : t 
+  val init  : string list option -> t
+end
 
-    (* Type annotation for function parameters / result type.
-     * - no [Pvar] allowed (all types are monomorphic)
-     * - [Punivar] allowed (for partial type annotations, e.g. (int * _))
-     *   Each [Punivar] leads to the creation of a fresh [Tunivar].
-     *)
-  | TyAnnot
+(* -------------------------------------------------------------------- *)
 
-val transty : EcEnv.env -> typolicy -> pty -> ty
+val transty : EcEnv.env -> TyPolicy.t -> pty -> ty * TyPolicy.t
+val transtys : EcEnv.env -> TyPolicy.t -> pty list -> ty list * TyPolicy.t
+val transty_notv : EcEnv.env -> pty -> ty 
 
 (* -------------------------------------------------------------------- *)
 val select_op :
@@ -80,4 +76,4 @@ val transtymod : EcEnv.env -> pmodule_type -> tymod
 val transmod   : EcEnv.env -> EcIdent.t -> pmodule_expr -> module_expr
 
 (* -------------------------------------------------------------------- *)
-val transformula : Fenv.fenv -> pformula -> EcFol.form
+val transformula : Fenv.fenv -> TyPolicy.t -> pformula -> EcFol.form

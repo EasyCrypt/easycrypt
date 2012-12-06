@@ -42,7 +42,8 @@ end
 let unify (env : EcEnv.env) (ue : unienv) =
   let rec unify (t1 : ty) (t2 : ty) = 
     match UniEnv.repr ue t1, UniEnv.repr ue t2 with
-    | Trel i1, Trel i2 -> 
+    | Tvar i1, Tvar i2 -> 
+        (* FIXME use equal *)
         if i1 <> i2 then raise (UnificationFailure (t1, t2))
 
     | Tunivar id, t | t, Tunivar id -> UniEnv.bind ue id t
@@ -50,14 +51,14 @@ let unify (env : EcEnv.env) (ue : unienv) =
     | Tbase b1, Tbase b2 when tyb_equal b1 b2 -> ()
 
     | Ttuple lt1, Ttuple lt2 ->
-        if Parray.length lt1 <> Parray.length lt2 then 
+        if List.length lt1 <> List.length lt2 then 
           raise (UnificationFailure (t1, t2));
-        Parray.iter2 unify lt1 lt2
+        List.iter2 unify lt1 lt2
 
     | Tconstr(p1, lt1), Tconstr(p2, lt2) when EcPath.equal p1 p2 ->
-        if Parray.length lt1 <> Parray.length lt2 then
+        if List.length lt1 <> List.length lt2 then
           raise (UnificationFailure (t1, t2));
-        Parray.iter2 unify lt1 lt2
+        List.iter2 unify lt1 lt2
 
     | Tconstr(p, lt), t when EcEnv.Ty.defined p env ->
         unify (EcEnv.Ty.unfold p lt env) t

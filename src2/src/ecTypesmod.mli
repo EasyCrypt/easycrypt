@@ -72,7 +72,7 @@ and instr =
 
 and lvalue =
   | LvVar   of (EcPath.path * EcTypes.ty)
-  | LvTuple of (EcPath.path * EcTypes.ty) Parray.t
+  | LvTuple of (EcPath.path * EcTypes.ty) list
   | LvMap   of EcPath.path * EcTypes.tyexpr * EcTypes.ty
 
 (* -------------------------------------------------------------------- *)
@@ -85,7 +85,7 @@ type axiom = {
 
 (* -------------------------------------------------------------------- *)
 type operator = {
-  op_params : int;
+  op_params : EcIdent.t list; (* type parameters *)
   op_sig    : EcTypes.ty list * EcTypes.ty;
   op_body   : (EcIdent.t list * EcTypes.tyexpr) option; 
   op_ctnt   : bool;
@@ -93,13 +93,13 @@ type operator = {
 }
 
 type predicate = {
-  pred_params : int;
+  pred_params : EcIdent.t list; (* type parameters *)
   pred_sig    : EcTypes.ty list;
   pred_def    : (EcIdent.t list * EcFol.form) option
 }
 (* -------------------------------------------------------------------- *)
 type tydecl = {
-  tyd_params : int;
+  tyd_params : EcIdent.t list;
   tyd_type   : EcTypes.ty option;
 }
 

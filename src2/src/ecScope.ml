@@ -196,23 +196,10 @@ let bind (scope : scope) (action : action) =
 module Op = struct
   module TT = EcTypedtree
 
-  type operror =
-  | OpE_DuplicatedTypeVariable
-
-  exception OpError of operror
-
-  let operror (error : operror) =
-    raise (OpError error)
-
   let add (scope : scope) (op : poperator) =
-    if not (List.uniq op.po_tyvars) then
-      operror OpE_DuplicatedTypeVariable;
-
-    let policy  = TT.TyDecl op.po_tyvars in
-    let transty = TT.transty scope.sc_env policy in
-
-    let dom    = List.map transty (odfl [] op.po_dom) in
-    let codom  = transty op.po_codom in
+    let tp  = TT.TyPolicy.init op.po_tyvars in
+    let dom,   tp  = TT.transtys scope.sc_env tp (odfl [] op.po_dom) in
+    let codom, tp  = TT.transty  scope.sc_env tp op.po_codom in
     let policy = { TT.epl_prob = op.po_prob } in
     let body, ue =
       let ue = EcUnify.UniEnv.create () in
@@ -227,9 +214,8 @@ module Op = struct
       body, ue in
     let uni = Subst.uni (EcUnify.UniEnv.asmap ue) in 
     let dom, codom = List.map uni dom, uni codom in
-    (* FIXME : check close dom codom *)
     let tyop = {
-      op_params = List.length op.po_tyvars;
+      op_params = TT.TyPolicy.decl tp;
       op_sig    = (dom, codom);
       op_body   = None;
       op_ctnt   = (op.po_dom = None);
@@ -245,29 +231,21 @@ module Pred = struct
   module TT = EcTypedtree
 
   let add (scope : scope) (p : ppredicate) =
-    if not (List.uniq p.pp_tyvars) then
-      Op.operror Op.OpE_DuplicatedTypeVariable;
+    let tp = TT.TyPolicy.init p.pp_tyvars in
     match p.pp_def with
     | AbstrDef None -> assert false 
     | AbstrDef (Some dom) ->
-        let policy  = TT.TyDecl p.pp_tyvars in
-        let transty = TT.transty scope.sc_env policy in
-        let dom    = List.map transty dom in
-        (* FIXME : check closed *)
+        let dom, tp    = TT.transtys scope.sc_env tp dom in
         let typ = {
-          pred_params = List.length p.pp_tyvars;
+          pred_params = TT.TyPolicy.decl tp;
           pred_sig    = dom;
-          pred_def = None 
+          pred_def    = None 
         } in
         bind scope (Ac_predicate (EcIdent.create p.pp_name, typ))
     | ConcrDef(params, def) ->
-        assert false
-(*
-        let policy = TT.TyDecl p.pp_tyvars in (* FIXME : Pierre-Yves *)
-        let 
-        let transty = TT.transty scope.sc_env policy in
-        
-        let  *)
+        let _dom, _tp = TT.transtys scope.sc_env tp (List.map snd params) in
+        let _tp = TT.TyPolicy.relax tp in
+        assert false 
 end
 
 (* -------------------------------------------------------------------- *)
@@ -288,7 +266,9 @@ module Ax = struct
     | PLemma -> Lemma 
 
   let add (scope : scope) (ax : paxiom) =
-    let form = TT.transformula (TT.Fenv.mono_fenv scope.sc_env) ax.pa_formula in
+    let form = 
+      TT.transformula (TT.Fenv.mono_fenv scope.sc_env) 
+        TT.TyPolicy.empty ax.pa_formula in
     let axd = { 
       ax_spec = form;
       ax_kind = transform_kind ax.pa_kind
@@ -306,22 +286,26 @@ module Ty = struct
     bind scope (Ac_type (name, tydecl))
 
   let alias (scope : scope) name ty =
-    let tydecl = {tyd_params = 0; tyd_type = Some ty } in
+    (* FIXME : check that ty is closed, or close it *)
+    let tydecl = {tyd_params = []; tyd_type = Some ty } in
       bind scope (EcIdent.create name) tydecl
 
-  let add (scope : scope) (args, name) = (* FIXME: args names duplicates *)
+  let add (scope : scope) (args, name) = 
+    let tp = TyPolicy.init (Some args) in
     let tydecl = {
-      tyd_params = List.length args;
+      tyd_params = TyPolicy.decl tp;
       tyd_type   = None;
     } in
-      bind scope (EcIdent.create name) tydecl
+    bind scope (EcIdent.create name) tydecl
 
-  let define (scope : scope) (args, name) body = (* FIXME: args names duplicates *)
+  let define (scope : scope) (args, name) body = 
+    let tp = TyPolicy.init (Some args) in
+    let body, tp = transty scope.sc_env tp body in
     let tydecl = {
-      tyd_params = List.length args;
-      tyd_type   = Some (transty scope.sc_env (TyDecl args) body);
+      tyd_params = TyPolicy.decl tp;
+      tyd_type   = Some body;
     } in
-      bind scope (EcIdent.create name) tydecl
+    bind scope (EcIdent.create name) tydecl
 end
 
 (* -------------------------------------------------------------------- *)
@@ -359,11 +343,13 @@ module Theory = struct
 
   let theory_of_history =
     let theory_item_of_action = function
-      | Ac_type     (x, tydecl) -> Th_type     (x, tydecl)
-      | Ac_operator (x, op)     -> Th_operator (x, op)
-      | Ac_modtype  (x, tymod)  -> Th_modtype  (x, tymod)
-      | Ac_module   m           -> Th_module   m
-      | Ac_theory   (x, th)     -> Th_theory   (x, th)
+      | Ac_type      (x, tydecl) -> Th_type      (x, tydecl)
+      | Ac_operator  (x, op)     -> Th_operator  (x, op)
+      | Ac_predicate (x, pred)   -> Th_predicate (x,pred)
+      | Ac_axiom     (x,ax)      -> Th_axiom     (x,ax)
+      | Ac_modtype   (x, tymod)  -> Th_modtype   (x, tymod)
+      | Ac_module    m           -> Th_module    m
+      | Ac_theory    (x, th)     -> Th_theory    (x, th)
     in
       fun history -> List.map theory_item_of_action history
 

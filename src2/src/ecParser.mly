@@ -630,8 +630,8 @@ op_ident:
 ;
 
 tyvars_decl:
-| LBRACKET tyvars=prim_ident+ RBRACKET { tyvars }
-| empty { [] }
+| LBRACKET tyvars=prim_ident* RBRACKET { Some tyvars }
+| empty { None }
     
 operator:
 | OP x=op_ident tyvars=tyvars_decl COLON sty=op_sig {
@@ -653,9 +653,9 @@ operator:
       po_prob   = false  ; }
   }
 
-| POP x=ident COLON sty=op_sig {
+| POP x=ident tyvars=tyvars_decl COLON sty=op_sig {
     { po_name   = x      ;
-      po_tyvars = []     ;
+      po_tyvars = tyvars ;
       po_dom = fst sty   ;
       po_codom = snd sty ;
       po_body  = None    ;
@@ -683,12 +683,12 @@ operator:
 predicate:
 | PRED x = op_ident { 
   { pp_name = x;
-    pp_tyvars = [];
+    pp_tyvars = None;
     pp_def = AbstrDef (Some []) }
   }
 | PRED x = op_ident EQ f=loc(form) {
   { pp_name = x;
-    pp_tyvars = [];
+    pp_tyvars = None;
     pp_def = ConcrDef([], f) }
   }
 | PRED x = op_ident tyvars=tyvars_decl COLON sty = op_tydom { 

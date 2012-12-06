@@ -16,7 +16,7 @@ let pp_typerror =
         -> Format.fprintf fmt "Unknown type name: %a" pp_qsymbol name
   
     | UnknownOperatorForSig (name, tys)
-        -> Format.fprintf fmt "Cannot find operator %a with signate %a" 
+        -> Format.fprintf fmt "Cannot find operator %a with signature %a" 
             pp_qsymbol name
             pp_dom tys
   

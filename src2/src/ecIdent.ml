@@ -47,3 +47,8 @@ module Map = struct
   let allbyname (x : symbol) (m : 'a t) =
     List.map snd (odfl [] (SymMap.tryfind x m))
 end
+
+module SMid = EcMaps.StructMake(struct type t = ident let tag = snd end)
+module Mid = SMid.M
+module Sid = SMid.S
+module Hid = SMid.H

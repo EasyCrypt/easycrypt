@@ -1,6 +1,7 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open EcSymbols
+open EcIdent
 open EcPath
 open EcUidgen
 (* -------------------------------------------------------------------- *)
@@ -11,11 +12,17 @@ let tyb_equal : tybase -> tybase -> bool = (==)
 type ty =
   | Tbase   of tybase
   | Tunivar of EcUidgen.uid
-  | Trel    of int
-  | Ttuple  of ty Parray.t 
-  | Tconstr of EcPath.path * ty Parray.t
+  | Tvar    of EcIdent.t
+  | Ttuple  of ty list
+  | Tconstr of EcPath.path * ty list 
 
-type ty_decl = int * ty
+type dom = ty list
+type tysig = dom * ty 
+
+type ty_decl = {
+    td_params : EcIdent.t list;
+    td_body   : ty
+  }
 
 (* -------------------------------------------------------------------- *)
 let tunit      () = Tbase Tunit
@@ -23,31 +30,33 @@ let tbool      () = Tbase Tbool
 let tint       () = Tbase Tint
 let tbitstring () = Tbase Tbitstring
 
+let tbitstring () = Tbase Tbitstring
+
 let tlist ty =
-  Tconstr (EcCoreLib.list, Parray.of_array [| ty |])
+  Tconstr (EcCoreLib.list, [ ty ])
 
 let tmap domty codomty =
-  Tconstr (EcCoreLib.map, Parray.of_array [| domty; codomty |])
+  Tconstr (EcCoreLib.map, [ domty; codomty ])
 
 (* -------------------------------------------------------------------- *)
 let mkunivar () = Tunivar (EcUidgen.unique ())
 
 let map f t = 
   match t with 
-  | Tbase _ | Tunivar _ | Trel _ -> t
-  | Ttuple lty -> Ttuple (Parray.map f lty)
-  | Tconstr(p, lty) -> Tconstr(p, Parray.map f lty)
+  | Tbase _ | Tunivar _ | Tvar _ -> t
+  | Ttuple lty -> Ttuple (List.map f lty)
+  | Tconstr(p, lty) -> Tconstr(p, List.map f lty)
 
 let fold f s = function
-  | Tbase _ | Tunivar _ | Trel _ -> s
-  | Ttuple lty -> Parray.fold_left f s lty
-  | Tconstr(_, lty) -> Parray.fold_left f s lty
+  | Tbase _ | Tunivar _ | Tvar _ -> s
+  | Ttuple lty -> List.fold_left f s lty
+  | Tconstr(_, lty) -> List.fold_left f s lty
 
 let sub_exists f t =
   match t with
-  | Tbase _ | Tunivar _ | Trel _ -> false
-  | Ttuple lty -> Parray.exists f lty
-  | Tconstr (p, lty) -> Parray.exists f lty
+  | Tbase _ | Tunivar _ | Tvar _ -> false
+  | Ttuple lty -> List.exists f lty
+  | Tconstr (p, lty) -> List.exists f lty
 
 (* -------------------------------------------------------------------- *)
 module Subst = struct
@@ -67,18 +76,8 @@ module Subst = struct
 end
 
 (* -------------------------------------------------------------------- *)
-exception UnBoundRel of int
 exception UnBoundUni of EcUidgen.uid
-exception UnBoundVar of EcUidgen.uid
-
-let full_get_rel s i = try Parray.get s i with _ -> raise (UnBoundRel i) 
-
-let full_inst_rel s =
-  let rec subst t = 
-    match t with
-    | Trel i -> full_get_rel s i 
-    | _ -> map subst t in
-  subst 
+exception UnBoundVar of EcIdent.t
 
 let full_get_uni s id = 
   try Muid.find id s with _ -> raise (UnBoundUni id) 
@@ -90,6 +89,17 @@ let full_inst_uni s =
     | _ -> map subst t in
   subst 
 
+let inst_var s = 
+  let rec subst t = 
+    match t with 
+    | Tvar id -> Mid.get t id s 
+    | _ -> map subst t in
+  subst
+
+let init_substvar lv lt = 
+  assert (List.length lv = List.length lt);
+  List.fold_left2 (fun s v t -> Mid.add v t s) Mid.empty lv lt
+
 let occur_uni u = 
   let rec aux t = 
     match t with
@@ -98,41 +108,22 @@ let occur_uni u =
   aux
 
 (* -------------------------------------------------------------------- *)
-let freshen (n : int) (ty : ty) =
-  let vars = Parray.init n (fun _ -> mkunivar ()) in
-    full_inst_rel vars ty
+let init_unit params = 
+    List.fold_left (fun s v -> Mid.add v (mkunivar ()) s) Mid.empty params 
 
-(* -------------------------------------------------------------------- *)
-(* FIXME: does not compile anymore
-let close su lty t =
-  let count = ref (-1) in
-  let fresh_rel () = incr count;!count in
-  let lty, t = (Parray.map (Subst.uni su) lty, Subst.uni su t) in
-  let rec gen sv t =
-    match t with
-    | Tbase _ -> sv, t 
-    | Tunivar u ->
-        (try sv, Muid.find u su with _ ->
-          let r = fresh_rel () in
-          let t = Trel("'a", r) in
-          (Muid.add u t su, sv), t)
-    | Trel _ -> assert false
-    | Ttuple lty -> let s,lty = gens s lty in s, Ttuple(lty)
-    | Tconstr(p, lty) -> let s,lty = gens s lty in s, Tconstr(p, lty)
-  and gens s lt = 
-    let s = ref s in
-    let lt = Parray.map (fun t -> let s',t = gen !s t in s := s'; t) lt in
-    !s, lt in
-  let s, lt = gens (Muid.empty,Muid.empty) lty in
-  let s, t = gen s t in
-  let merge _ u1 u2 = 
-    match u1, u2 with
-    | Some u1, None -> Some (full_inst s u1)
-    | None, Some _ -> u2 
-    | _, _ -> assert false in
-  let s = Muid.merge merge su (fst s), snd s in
-  s, lt, t 
-*)
+let freshen (params : EcIdent.t list) (ty : ty) =
+  let vars = init_unit params in
+  inst_var vars ty 
+
+
+let freshendom params dom = 
+  let vars = init_unit params in
+  List.map (inst_var vars) dom
+
+let freshensig params (dom,codom) = 
+  let vars = init_unit params in
+  List.map (inst_var vars) dom, inst_var vars codom
+
 
 (* -------------------------------------------------------------------- *)
 type lpattern =

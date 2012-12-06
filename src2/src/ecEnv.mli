@@ -64,7 +64,7 @@ module Ty : sig
   include S with type t = tydecl
 
   val defined : EcPath.path -> env -> bool
-  val unfold  : EcPath.path -> EcTypes.ty Parray.t -> env -> EcTypes.ty
+  val unfold  : EcPath.path -> EcTypes.ty list -> env -> EcTypes.ty
 end
 
 (* -------------------------------------------------------------------- *)
