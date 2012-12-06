@@ -14,6 +14,9 @@ let proj3_2 (_, x, _) = x
 let proj3_3 (_, _, x) = x
 
 (* -------------------------------------------------------------------- *)
+let oiter (x : 'a option) (f : 'a -> unit) =
+  match x with None -> () | Some x -> f x
+
 let obind (x : 'a option) (f : 'a -> 'b option) =
   match x with None -> None | Some x -> f x
 

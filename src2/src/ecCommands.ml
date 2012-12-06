@@ -3,6 +3,13 @@ open EcParsetree
 open EcTypedtree
 
 (* -------------------------------------------------------------------- *)
+let loader = EcLoader.create ()
+
+(* -------------------------------------------------------------------- *)
+let addidir (idir : string) =
+  EcLoader.addidir idir loader
+
+(* -------------------------------------------------------------------- *)
 exception Interrupted
 
 (* -------------------------------------------------------------------- *)
@@ -48,13 +55,16 @@ and process_th_close (scope : EcScope.scope) name =
 
 (* -------------------------------------------------------------------- *)
 and process_th_require (scope : EcScope.scope) name =
-  (* FIXME: hackish / use libdir *)
-  let commands = EcIo.parseall (EcIo.from_file ("tests/" ^ name ^ ".ec")) in
-  let scope =
-    List.fold_left
-      process (EcScope.Theory.enter scope name) commands
-  in
-    snd (EcScope.Theory.exit scope)
+  match EcLoader.locate name loader with
+  | None -> failwith ("Cannot locate: " ^ name)
+  | Some filename ->
+    (* FIXME: hackish *)
+    let commands = EcIo.parseall (EcIo.from_file filename) in
+    let scope =
+      List.fold_left
+        process (EcScope.Theory.enter scope name) commands
+    in
+      snd (EcScope.Theory.exit scope)
 
 (* -------------------------------------------------------------------- *)
 and process_th_import (scope : EcScope.scope) name =
@@ -78,13 +88,14 @@ and process (scope : EcScope.scope) (g : global) =
 (* -------------------------------------------------------------------- *)
 let scope = ref (EcScope.initial EcCoreLib.top)
 
+(* -------------------------------------------------------------------- *)
 let process (g : global) =
     scope := process !scope g
 
-(*
+(* -------------------------------------------------------------------- *)
 let process (g : global) =
   try
-    scope := process !scope g
+    process g
   with
   | TyError (loc, exn) -> begin
       EcPrinting.err
@@ -92,4 +103,3 @@ let process (g : global) =
         exn;
       raise Interrupted
   end
-*)

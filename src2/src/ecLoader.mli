@@ -1,6 +1,7 @@
 (* -------------------------------------------------------------------- *)
-exception Interrupted
+type ecloader
 
 (* -------------------------------------------------------------------- *)
-val addidir : string -> unit
-val process : EcParsetree.global -> unit
+val create  : unit -> ecloader
+val addidir : string -> ecloader -> unit
+val locate  : string -> ecloader -> string option
