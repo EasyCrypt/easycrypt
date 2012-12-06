@@ -19,7 +19,7 @@ type tyerror =
   | ApplInvalidArity
   | UnboundTypeParameter     of symbol
   | OpNotOverloadedForSig    of qsymbol * ty list
-  | UnexpectedType           of ty * ty
+  | UnexpectedType           of ty * ty * ty * ty
   | NonLinearPattern         of lpattern
   | DuplicatedLocals
   | ProbaExpressionForbidden
@@ -171,12 +171,15 @@ let transpattern (env : EcEnv.env) (p : EcParsetree.lpattern) =
   | _ -> assert false
 
 (* -------------------------------------------------------------------- *)
-let transexp (env : EcEnv.env) (policy : epolicy) (ue : EcUnify.unienv) e =
-  let unify env ty1 ty2 =
-    try  (EcUnify.unify env ue ty1 ty2); true
-    with EcUnify.UnificationFailure _ -> false
-  in
+let unify_error env ue loc ty1 ty2 = 
+  try EcUnify.unify env ue ty1 ty2 
+  with EcUnify.UnificationFailure(t1,t2) ->
+    let inst_uni = EcTypes.inst_uni (EcUnify.UniEnv.asmap ue) in
+    tyerror loc (UnexpectedType (inst_uni ty1, inst_uni ty2, 
+                                 inst_uni t1, inst_uni t2)) 
 
+let transexp (env : EcEnv.env) (policy : epolicy) (ue : EcUnify.unienv) e =
+  
   let rec transexp (env : EcEnv.env) (policy : epolicy) (e : pexpr) =
     let loc = e.pl_loc in
 
@@ -202,6 +205,7 @@ let transexp (env : EcEnv.env) (policy : epolicy) (ue : EcUnify.unienv) e =
 
         match ops with
         | [] | _ :: _ :: _ ->        (* FIXME: better error message *)
+            let esig = inst_uni_dom (EcUnify.UniEnv.asmap ue) esig in
             tyerror loc (UnknownOperatorForSig (name, esig))
 
         | [(xpath, op, codom, subue)] ->
@@ -213,10 +217,9 @@ let transexp (env : EcEnv.env) (policy : epolicy) (ue : EcUnify.unienv) e =
       let (penv, p, pty) = transpattern env p in
       let e1, ty1 = transexp  env policy pe1 in
       let e2, ty2 = transexp penv policy pe2 in
-
-        if not (unify env pty ty1) then
-            tyerror pe1.pl_loc (UnexpectedType (pty, ty1));
-        (Elet (p, e1, e2), ty2)
+      (* FIXME loc should be p *)
+      unify_error env ue loc pty ty1;
+      Elet (p, e1, e2), ty2
 
     | PEtuple es ->
         let tes = List.map (transexp env policy) es in
@@ -225,45 +228,39 @@ let transexp (env : EcEnv.env) (policy : epolicy) (ue : EcUnify.unienv) e =
 
     | PEif (pc, pe1, pe2) ->
       let c, tyc = transexp env policy pc in
-        if not (unify env tyc (tbool ())) then
-          tyerror pc.pl_loc (UnexpectedType (tyc, (tbool ())));
-        let e1, ty1 = transexp env policy pe1 in
-        let e2, ty2 = transexp env policy pe2 in
-          if not (unify env ty1 ty2) then
-            tyerror pe2.pl_loc (UnexpectedType (ty2, ty1));
-          (Eif (c, e1, e2), ty1)
+      unify_error env ue pc.pl_loc tyc (tbool());
+      let e1, ty1 = transexp env policy pe1 in
+      let e2, ty2 = transexp env policy pe2 in
+      unify_error env ue pe2.pl_loc ty2 ty1;
+      Eif (c, e1, e2), ty1
 
     | PErnd re ->
       if not policy.epl_prob then
         tyerror loc ProbaExpressionForbidden;
       let re, ty = transrexp env policy re in
-        (Ernd re, ty)
+      (Ernd re, ty)
 
   and transrexp (env : EcEnv.env) (policy : epolicy) (e : prexpr) =
-    let loc = e.pl_loc in
-
     match e.pl_desc with
     | PRbool -> (Rbool, tbool ())
 
-    | PRbitstr e ->
-        let e, ety = transexp env policy e in
-          if not (unify env ety (tint ())) then
-            tyerror loc (UnexpectedType (ety, (tint ())));
-          (Rbitstr e, tbitstring ())
+    | PRbitstr pe ->
+        let e, ety = transexp env policy pe in
+        unify_error env ue pe.pl_loc ety (tint ());
+        (Rbitstr e, tbitstring ())
 
-    | PRexcepted (re, e) ->
+    | PRexcepted (re, pe) ->
         let re, rety = transrexp env policy re in
-        let  e,  ety = transexp  env policy  e in
-          if not (unify env ety (tlist rety)) then
-            tyerror loc (UnexpectedType (ety, (tlist rety)));
-          (Rexcepted (re, e), rety)
-    | PRinter (re1, re2) ->
-        let re1, rty1 = transexp env policy re1 in
-        let re2, rty2 = transexp env policy re2 in
-        (* FIXME : should be int *)
-        if not (unify env rty1 rty2) then
-          tyerror loc (UnexpectedType (rty1, rty2));
-        (Rinter (re1, re2), rty1)
+        let  e,  ety = transexp  env policy  pe in
+        unify_error env ue pe.pl_loc ety (tlist rety);
+        (Rexcepted (re, e), rety)
+    | PRinter (pe1, pe2) ->
+        let e1, ty1 = transexp env policy pe1 in
+        let e2, ty2 = transexp env policy pe2 in
+        let tint = tint () in
+        unify_error env ue pe1.pl_loc ty1 tint;
+        unify_error env ue pe2.pl_loc ty2 tint;
+        (Rinter (e1, e2), tint)
 
     | PRapp (name, args) ->
         let _args, _asig =              (* FIXME *)
@@ -276,10 +273,9 @@ let transexp (env : EcEnv.env) (policy : epolicy) (ue : EcUnify.unienv) e =
 
 let transexpcast (env : EcEnv.env) (policy : epolicy) (ue : EcUnify.unienv) t e =
   let e',t' = transexp env policy ue e in
-  let _ = 
-    try EcUnify.unify env ue t t'
-    with _ -> tyerror e.pl_loc (UnexpectedType (t', t)) in
-  e'
+  try EcUnify.unify env ue t' t; e'
+  with EcUnify.UnificationFailure(t1,t2) ->
+    tyerror e.pl_loc (UnexpectedType (t',t, t1, t2))
   
 (* -------------------------------------------------------------------- *)
 exception DuplicatedSigItemName   of psignature
@@ -741,14 +737,9 @@ let transfpattern fenv (p : EcParsetree.lpattern) =
 let transformula fenv tp f = 
   let ue = EcUnify.UniEnv.create () in
 
-  let unify env ty1 ty2 =
-    try  (EcUnify.unify (Fenv.mono env) ue ty1 ty2); true
-    with EcUnify.UnificationFailure _ -> false
-  in
-
-  let fofbool fenv f ty = 
-    if unify fenv ty (tbool ()) then fofbool f 
-    else tyerror dloc (UnexpectedType (ty, tbool())) in
+  let fofbool fenv loc f ty = 
+    unify_error (Fenv.mono fenv) ue loc ty (tbool ());
+    fofbool f in
 
   let rec transf fenv tp f = 
     match f.pl_desc with
@@ -757,9 +748,9 @@ let transformula fenv tp f =
     | PFident x -> 
         begin match Fenv.Ident.trylookup fenv x with
         | None ->  tyerror dloc (UnknownVariable x)
-        | Some(Llocal(x,ty)) -> fofbool fenv (flocal x ty) ty
-        | Some(Lprog(x,ty,s)) -> fofbool fenv (fpvar x ty s) ty
-        | Some(Lctnt(x,ty)) -> fofbool fenv (fapp x [] (Some ty)) ty
+        | Some(Llocal(x,ty)) -> fofbool fenv f.pl_loc (flocal x ty) ty
+        | Some(Lprog(x,ty,s)) -> fofbool fenv f.pl_loc (fpvar x ty s) ty
+        | Some(Lctnt(x,ty)) -> fofbool fenv f.pl_loc (fapp x [] (Some ty)) ty
 (*        | Some(Lpred(x)) -> fapp x [] None *)
         end
     | PFside(f,side) ->
@@ -777,7 +768,8 @@ let transformula fenv tp f =
             tyerror f.pl_loc (UnknownOperatorForSig (qs, esig))
         | [(xpath, op, codom, subue)] ->
             EcUnify.UniEnv.restore ~src:subue ~dst:ue;
-            fofbool fenv (fapp xpath (List.map fst es) (Some codom)) codom
+            fofbool fenv f.pl_loc (fapp xpath (List.map fst es) (Some codom))
+              codom
         end
     | PFif(f1,f2,f3) ->
         let f1 = transf fenv tp f1 in
@@ -787,8 +779,8 @@ let transformula fenv tp f =
     | PFlet(lp,e1,f2) ->
         let (penv, p, pty) = transfpattern fenv lp in
         let e1, ty1 = transe fenv tp e1 in
-        if not (unify fenv pty ty1) then
-          tyerror dloc (UnexpectedType (pty, ty1));
+        (* FIXME loc should be p *)
+        unify_error (Fenv.mono fenv) ue f.pl_loc pty ty1;
         let f2 = transf penv tp f2 in
         flet p e1 f2 
     | PFforall(xs,f1) ->
@@ -822,8 +814,7 @@ let transformula fenv tp f =
     | PFnot f -> (* FIXME *)
         let e,ty = transe fenv tp f in
         let tbool = tbool () in
-        if not (unify fenv ty tbool) then
-          tyerror dloc (UnexpectedType (ty, tbool));
+        unify_error (Fenv.mono fenv) ue f.pl_loc ty tbool;
         let op = assert false in (*FIXME get the not on bool *)
         fapp op [e] (Some tbool), tbool
     | PFbinop(f1,op,f2) -> (* FIXME *)
@@ -839,19 +830,18 @@ let transformula fenv tp f =
             EcUnify.UniEnv.restore ~src:subue ~dst:ue;
             fapp xpath (List.map fst es) (Some codom), codom
         end
-    | PFif(f1,f2,f3) ->
-        (* FIXME *)
+    | PFif(f1,f2,pf3) ->
+        (* FIXME f1 ?? *)
         let f1 = transf fenv tp f1 in
         let f2,ty2 = transe fenv tp f2 in
-        let f3,ty3 = transe fenv tp f3 in
-        if not (unify fenv ty2 ty3) then
-          tyerror e.pl_loc (UnexpectedType (ty2,ty3));
+        let f3,ty3 = transe fenv tp pf3 in
+        unify_error (Fenv.mono fenv) ue pf3.pl_loc ty3 ty2;
         fif f1 f2 f3, ty2
     | PFlet(lp,e1,f2) ->
         let (penv, p, pty) = transfpattern fenv lp in
         let e1, ty1 = transe fenv tp e1 in
-        if not (unify fenv pty ty1) then
-          tyerror e.pl_loc (UnexpectedType (pty, ty1));
+        (*FIXME *)
+        unify_error (Fenv.mono fenv) ue f.pl_loc pty ty1;
         let e2, ty2 = transe penv tp f2 in
         flet p e1 e2, ty2 
     | PFforall _ | PFexists _ -> tyerror e.pl_loc (TermExpected e) in

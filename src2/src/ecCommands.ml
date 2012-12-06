@@ -88,6 +88,7 @@ and process (scope : EcScope.scope) (g : global) =
 (* -------------------------------------------------------------------- *)
 let scope = ref (EcScope.initial EcCoreLib.top)
 
+
 (* -------------------------------------------------------------------- *)
 let process (g : global) =
     scope := process !scope g

@@ -61,6 +61,8 @@ exception UnBoundUni of EcUidgen.uid
 exception UnBoundVar of EcIdent.t 
 
 val full_inst_uni : ty Muid.t -> ty -> ty
+val inst_uni : ty Muid.t -> ty -> ty
+val inst_uni_dom : ty Muid.t -> dom -> dom
 val inst_var : ty EcIdent.Mid.t -> ty -> ty
 val init_substvar : EcIdent.t list -> ty list -> ty EcIdent.Mid.t
 

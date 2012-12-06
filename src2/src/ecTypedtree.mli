@@ -15,7 +15,7 @@ type tyerror =
   | ApplInvalidArity
   | UnboundTypeParameter     of symbol
   | OpNotOverloadedForSig    of qsymbol * ty list
-  | UnexpectedType           of ty * ty
+  | UnexpectedType           of ty * ty * ty * ty
   | NonLinearPattern         of lpattern
   | DuplicatedLocals
   | ProbaExpressionForbidden

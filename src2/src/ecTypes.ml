@@ -89,6 +89,15 @@ let full_inst_uni s =
     | _ -> map subst t in
   subst 
 
+let inst_uni s = 
+  let rec subst t = 
+    match t with
+    | Tunivar id -> Muid.get t id s 
+    | _ -> map subst t in
+  subst 
+
+let inst_uni_dom s = List.map (inst_uni s)
+    
 let inst_var s = 
   let rec subst t = 
     match t with 

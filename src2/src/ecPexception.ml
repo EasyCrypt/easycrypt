@@ -34,8 +34,11 @@ let pp_typerror =
     | OpNotOverloadedForSig (name, _)   (* FIXME / DUPLICATED *)
         -> Format.fprintf fmt "Cannot find operator %a" pp_qsymbol name
   
-    | UnexpectedType (ty1, ty2)
-        -> Format.fprintf fmt ""
+    | UnexpectedType (ty1, ty2, t1, t2)
+        ->
+          let pp_type = pp_type ~vmap:(EcUidgen.NameGen.create()) in
+          Format.fprintf fmt "@[the expression has type %a@\nit is expected to have type %a.@\n Can not unify %a and %a@]"
+            pp_type ty1 pp_type ty2 pp_type t1 pp_type t2
   
     | NonLinearPattern _
         -> Format.fprintf fmt "Non-linear pattern"
