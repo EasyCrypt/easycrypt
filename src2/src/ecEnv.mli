@@ -44,7 +44,13 @@ module Pred   : S with type t = predicate
 module Ax     : S with type t = axiom
 module Mod    : S with type t = tymod
 module ModTy  : S with type t = tymod
-module Theory : S with type t = theory
+
+(* -------------------------------------------------------------------- *)
+module Theory : sig
+  include S with type t = theory
+
+  val import : qsymbol -> env -> env
+end
 
 (* -------------------------------------------------------------------- *)
 module Op : sig

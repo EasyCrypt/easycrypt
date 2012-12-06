@@ -1,6 +1,6 @@
 directory _build/src src
 
 set program ec.byte
-set arguments tests/prp_prf.ec
+set arguments tests/axioms.ec
 
 run

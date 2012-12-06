@@ -377,8 +377,9 @@ module Theory = struct
       let theory = theory_of_history scope.sc_history in
         (scope.sc_name, bind sup (Ac_theory (scope.sc_name, theory)))
 
-  let import (scope : scope) (_name : qsymbol) =
-    scope                               (* FIXME *)
+  let import (scope : scope) (name : qsymbol) =
+    { scope with
+        sc_env = EcEnv.Theory.import name scope.sc_env }
 end
 
 (* -------------------------------------------------------------------- *)

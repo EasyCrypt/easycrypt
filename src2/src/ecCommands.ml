@@ -81,4 +81,3 @@ let process (g : global) =
         exn;
       raise Interrupted
   end
-

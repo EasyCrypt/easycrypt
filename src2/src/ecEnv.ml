@@ -28,7 +28,19 @@ and mcomponents = {
   mc_axioms     : (EcPath.path * EcTypesmod.axiom)     EcIdent.Map.t;
   mc_theories   : (EcPath.path * EcTypesmod.theory)    EcIdent.Map.t;
   mc_components : (EcPath.path * mcomponents Lazy.t)   EcIdent.Map.t;
+  mc_history    : (EcPath.path * mchistory) list;
 }
+
+and mchistory =
+| MC_Variable  of EcTypes.ty
+| MC_Function  of EcTypesmod.funsig
+| MC_Module    of EcTypesmod.tymod
+| MC_Modtype   of EcTypesmod.tymod
+| MC_Typedecl  of EcTypesmod.tydecl
+| MC_Operator  of EcTypesmod.operator
+| MC_Predicate of EcTypesmod.predicate
+| MC_Axiom     of EcTypesmod.axiom
+| MC_Theory    of EcTypesmod.theory
 
 (* -------------------------------------------------------------------- *)
 let emcomponents = {
@@ -42,6 +54,7 @@ let emcomponents = {
   mc_axioms     = EcIdent.Map.empty;
   mc_theories   = EcIdent.Map.empty;
   mc_components = EcIdent.Map.empty;
+  mc_history    = [];
 }
 
 let empty =
@@ -81,6 +94,9 @@ end
 module MC = struct
   module IM = EcIdent.Map
 
+  let mc_history mitem mc =
+    { mc with mc_history = mitem :: mc.mc_history }
+
   let rec mc_of_module (_env : env) (_ : tymod) =
     lazy (failwith "")
 
@@ -100,44 +116,65 @@ module MC = struct
       fun scope env th -> lazy (mc_of_theory scope env th)
 
   and bind_variable (scope, x) ty _env mc =
-    { mc with
-        mc_variables = IM.add x (in_scope scope x, ty) mc.mc_variables; }
+    let path = in_scope scope x in
+      mc_history (path, MC_Variable ty)
+        { mc with
+            mc_variables = IM.add x (path, ty) mc.mc_variables; }
 
   and bind_function (scope, x) fsig _env mc =
-    { mc with
-        mc_functions = IM.add x (in_scope scope x, fsig) mc.mc_functions; }
+    let path = in_scope scope x in
+      mc_history (path, MC_Function fsig)
+        { mc with
+            mc_functions = IM.add x (path, fsig) mc.mc_functions; }
 
   and bind_module (scope, x) tymod env mc =
     let comps = mc_of_module env tymod in
-      { mc with
-          mc_modules    = IM.add x (in_scope scope x, tymod) mc.mc_modules;
-          mc_components = IM.add x (in_scope scope x, comps) mc.mc_components; }
+    let path  = in_scope scope x in
+      mc_history (path, MC_Module tymod)
+        { mc with
+            mc_modules    = IM.add x (path, tymod) mc.mc_modules;
+            mc_components = IM.add x (path, comps) mc.mc_components; }
 
   and bind_modtype (scope, x) tymod env mc =
-    { mc with
-        mc_modtypes = IM.add x (in_scope scope x, tymod) mc.mc_modtypes; }
+    let path = in_scope scope x in
+      mc_history (path, MC_Modtype tymod)
+        { mc with
+            mc_modtypes = IM.add x (path, tymod) mc.mc_modtypes; }
 
   and bind_typedecl (scope, x) tydecl env mc =
-    { mc with
-        mc_typedecls = IM.add x (in_scope scope x, tydecl) mc.mc_typedecls; }
+    let path = in_scope scope x in
+      mc_history (path, MC_Typedecl tydecl)
+        { mc with
+            mc_typedecls = IM.add x (path, tydecl) mc.mc_typedecls; }
 
-  and bind_op (scope, x) tydecl env mc =
-    { mc with
-        mc_operators = IM.add x (in_scope scope x, tydecl) mc.mc_operators; }
+  and bind_op (scope, x) op env mc =
+    let path = in_scope scope x in
+      mc_history (path, MC_Operator op)
+        { mc with
+            mc_operators = IM.add x (path, op) mc.mc_operators; }
 
-  and bind_pred (scope, x) tydecl env mc =
-    { mc with
-        mc_predicates = IM.add x (in_scope scope x, tydecl) mc.mc_predicates; }
+  and bind_pred (scope, x) pred env mc =
+    let path = in_scope scope x in
+      mc_history (path, MC_Predicate pred)
+        { mc with
+            mc_predicates = IM.add x (path, pred) mc.mc_predicates; }
 
-  and bind_ax (scope, x) opdecl env mc =
-    { mc with
-        mc_axioms = IM.add x (in_scope scope x, opdecl) mc.mc_axioms; }
+  and bind_ax (scope, x) ax env mc =
+    let path = in_scope scope x in
+      mc_history (path, MC_Axiom ax)
+        { mc with
+            mc_axioms  = IM.add x (path, ax) mc.mc_axioms; }
 
   and bind_theory (scope, x) th env mc =
     let comps = mc_of_theory scope env th in
-      { mc with
-          mc_theories   = IM.add x (in_scope scope x, th) mc.mc_theories;
-          mc_components = IM.add x (in_scope scope x, comps) mc.mc_components; }
+    let path  = in_scope scope x in
+      mc_history (path, MC_Theory th)
+        { mc with
+            mc_theories   = IM.add x (path, th) mc.mc_theories;
+            mc_components = IM.add x (path, comps) mc.mc_components; }
+
+  let bind_mcitem (path, mitem) mc =
+    mc                                  (* FIXME *)
 
   let lookup_mc1 (name : symbol) (mc : mcomponents) =
     IM.byname name mc.mc_components
@@ -428,6 +465,19 @@ module Theory = struct
     | Some x -> x
 
   let trylookup x env = try_lf (fun () -> lookup x env)
+
+  let import ((scope, id) : qsymbol) (env : env) =
+    match EcIdent.Map.byident
+             (EcPath.basename (fst (lookup (scope, id) env)))
+             env.env_root.mc_components
+    with
+    | None    -> raise LookupFailure
+    | Some mc ->
+        let mc = Lazy.force (snd mc) in
+          { env with
+              env_root =
+                List.fold_left
+                  ((^~) MC.bind_mcitem) env.env_root mc.mc_history }
 end
 
 (* -------------------------------------------------------------------- *)
