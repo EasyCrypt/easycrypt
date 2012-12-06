@@ -7,11 +7,6 @@ open EcTypesmod
 (* -------------------------------------------------------------------- *)
 type scope = EcPath.path option
 
-let in_scope (s : scope) (x : EcIdent.t) =
-  match s with
-  | None   -> Pident x
-  | Some s -> Pqname (s, x)
-
 type env = {
   env_scope : EcPath.path option;
   env_root  : mcomponents;
@@ -163,49 +158,49 @@ module MC = struct
       fun scope env th -> lazy (mc_of_theory scope env th)
 
   and bind_variable (scope, x) ty _env mc =
-    let path = in_scope scope x in
+    let path = EcPath.extend scope x in
       mc_history (path, MC_Variable ty)
         (mc_bind_variable path ty mc)
 
   and bind_function (scope, x) fsig _env mc =
-    let path = in_scope scope x in
+    let path = EcPath.extend scope x in
       mc_history (path, MC_Function fsig)
         (mc_bind_function path fsig mc)
 
   and bind_module (scope, x) tymod env mc =
     let comps = mc_of_module env tymod in
-    let path  = in_scope scope x in
+    let path  = EcPath.extend scope x in
       mc_history (path, MC_Module (tymod, comps))
         (mc_bind_module path tymod comps mc)
 
   and bind_modtype (scope, x) tymod env mc =
-    let path = in_scope scope x in
+    let path = EcPath.extend scope x in
       mc_history (path, MC_Modtype tymod)
         (mc_bind_modtype path tymod mc)
 
   and bind_typedecl (scope, x) tydecl env mc =
-    let path = in_scope scope x in
+    let path = EcPath.extend scope x in
       mc_history (path, MC_Typedecl tydecl)
         (mc_bind_typedecl path tydecl mc)
 
   and bind_op (scope, x) op env mc =
-    let path = in_scope scope x in
+    let path = EcPath.extend scope x in
       mc_history (path, MC_Operator op)
         (mc_bind_op path op mc)
 
   and bind_pred (scope, x) pred env mc =
-    let path = in_scope scope x in
+    let path = EcPath.extend scope x in
       mc_history (path, MC_Predicate pred)
         (mc_bind_pred path pred mc)
 
   and bind_ax (scope, x) ax env mc =
-    let path = in_scope scope x in
+    let path = EcPath.extend scope x in
       mc_history (path, MC_Axiom ax)
         (mc_bind_ax path ax mc)
 
   and bind_theory (scope, x) th env mc =
-    let comps = mc_of_theory scope env th in
-    let path  = in_scope scope x in
+    let comps = mc_of_theory (Some (EcPath.extend scope x)) env th in
+    let path  = EcPath.extend scope x in
       mc_history (path, MC_Theory (th, comps))
         (mc_bind_theory path th comps mc)
 
@@ -349,7 +344,7 @@ module Ty = struct
 
     (* FIXME: refactor *)
     match EcIdent.Map.byident name env.env_root.mc_typedecls with
-    | None -> Format.printf "LA1@.";false
+    | None -> false
     | Some (_, tydecl) -> tydecl.tyd_type <> None
 
   let unfold (name : EcPath.path) (args : EcTypes.ty Parray.t) (env : env) =
@@ -393,6 +388,7 @@ module Op = struct
          (MC.lookup_all_op1 id))
 end
 
+(* -------------------------------------------------------------------- *)
 module Pred = struct
   type t = predicate
 

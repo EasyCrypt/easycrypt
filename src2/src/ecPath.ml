@@ -38,4 +38,10 @@ let basename = function
   | Pqname (_, x) -> x
 
 (* -------------------------------------------------------------------- *)
+let extend (p : path option) (x : EcIdent.t) =
+  match p with
+  | None   -> Pident x
+  | Some p -> Pqname (p, x)
+
+(* -------------------------------------------------------------------- *)
 module Mp = Map.Make (struct type t = path let compare = compare end)

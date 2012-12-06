@@ -2,9 +2,9 @@
 let top = "<top>"
 
 (* -------------------------------------------------------------------- *)
-let nil  = EcPath.create (Printf.sprintf "%s.nil"  top)
-let cons = EcPath.create (Printf.sprintf "%s.cons" top)
-let list = EcPath.create (Printf.sprintf "%s.list" top)
+let nil  = EcPath.create (Printf.sprintf "%s.list.nil"  top)
+let cons = EcPath.create (Printf.sprintf "%s.list.cons" top)
+let list = EcPath.create (Printf.sprintf "%s.list.list" top)
 
 (* -------------------------------------------------------------------- *)
 let get = EcPath.create "get"             (* FIXME *)
