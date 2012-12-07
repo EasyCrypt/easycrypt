@@ -251,6 +251,14 @@ type hint =
 type claim = symbol * (pexpr * hint)
 
 (* -------------------------------------------------------------------- *)
+type pprint = 
+  | Pr_ty of qsymbol
+  | Pr_op of qsymbol
+  | Pr_th of qsymbol
+  | Pr_pr of qsymbol
+  | Pr_ax of qsymbol
+
+(* -------------------------------------------------------------------- *)
 type global =
   | Gmodule    of (symbol * pmodule_expr)
   | Ginterface of (symbol * pmodule_type)
@@ -259,7 +267,7 @@ type global =
   | Gaxiom     of paxiom
   | Gclaim     of claim
   | Gtype      of ptydecl
-
+  | Gprint     of pprint
   | GthOpen    of symbol
   | GthClose   of symbol
   | GthRequire of symbol

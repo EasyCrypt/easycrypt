@@ -150,7 +150,7 @@
 // %token LAST
 // %token OPAQUE
 // %token PRHL
-// %token PRINT
+%token PRINT
 // %token RANDOM
 // %token SAVE
 // %token SIMPL
@@ -745,6 +745,15 @@ theory_require : REQUIRE x=ident { x }
 theory_import  : IMPORT  x=qident { x }
 
 (* -------------------------------------------------------------------- *)
+(** Printing                                                            *)
+print:
+| TYPE   qs=qident { Pr_ty qs }
+| OP     qs=qident { Pr_op qs }
+| THEORY qs=qident { Pr_th qs }
+| PRED   qs=qident { Pr_pr qs } 
+| AXIOM  qs=qident { Pr_ax qs }
+;
+(* -------------------------------------------------------------------- *)
 (* Global entries                                                       *)
 
 global_:
@@ -759,6 +768,7 @@ global_:
 | predicate        { Gpredicate $1 }
 | axiom            { Gaxiom     $1 }
 | claim            { Gclaim     $1 }
+| PRINT p=print    { Gprint     p  }
 ;
 
 stop:

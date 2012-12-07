@@ -12,6 +12,23 @@ let addidir (idir : string) =
 (* -------------------------------------------------------------------- *)
 exception Interrupted
 
+let process_print scope p = 
+  let env = EcScope.env scope in
+  match p with 
+  | Pr_ty qs -> 
+      (try 
+        let ptd = EcEnv.Ty.lookup qs env in
+        Format.printf "%a@." EcPexception.pp_tydecl ptd
+      with _ -> assert false (* FIXME *))
+  | Pr_op qs ->
+      (try 
+        let ptd = EcEnv.Op.lookup qs env in
+        Format.printf "%a@." EcPexception.pp_opdecl ptd
+      with _ -> assert false (* FIXME *))
+  | Pr_th qs -> assert false
+  | Pr_pr qs -> assert false
+  | Pr_ax qs -> assert false
+
 (* -------------------------------------------------------------------- *)
 let rec process_type (scope : EcScope.scope) (tyd : ptydecl) =
   let tyname = (tyd.pty_tyvars, tyd.pty_name) in
@@ -84,7 +101,7 @@ and process (scope : EcScope.scope) (g : global) =
   | GthClose   name -> process_th_close   scope name
   | GthRequire name -> process_th_require scope name
   | GthImport  name -> process_th_import  scope name
-
+  | Gprint     p    -> process_print      scope p;scope
 (* -------------------------------------------------------------------- *)
 let scope = ref (EcScope.initial EcCoreLib.top)
 

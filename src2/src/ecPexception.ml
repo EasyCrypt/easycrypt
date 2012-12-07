@@ -2,7 +2,55 @@ open EcUtils
 open EcTypes
 open EcParsetree
 open EcTypedtree
+open EcTypesmod
 open EcPrinting
+
+let pp_ident fmt id = 
+  Format.fprintf fmt "%s" (EcIdent.name id)  (* FIXME *)
+
+let pp_tydecl fmt (p,td) =
+  let vmap = EcUidgen.NameGen.create () in
+  let pp_params fmt = function
+    | [] -> ()
+    | [id] -> pp_ident fmt id
+    | lid -> Format.fprintf fmt "(%a)" (pp_list ~sep:(", ") pp_ident) lid  in
+  let pp_body fmt = function
+    | None -> ()
+    | Some ty -> Format.fprintf fmt " = %a" (pp_type ~vmap) ty in 
+  Format.fprintf fmt "type %a%a%a." 
+    pp_params td.tyd_params pp_path p pp_body td.tyd_type
+
+let pp_optyparams fmt lid = 
+  Format.fprintf fmt "[%a]" (pp_list ~sep:(", ") pp_ident) lid
+  
+let pp_opdecl fmt (p,d) =
+  let str_kind op =
+    if op.op_ctnt then "cnst" 
+    else if op.op_prob then "pop" else "op" in
+  let vmap = EcUidgen.NameGen.create () in
+  let pp_type = pp_type ~vmap in
+  let pp_tparams fmt = function
+    | [] -> Format.fprintf fmt "()"
+    | [t] -> pp_type fmt t
+    | lt -> Format.fprintf fmt "(%a)" (pp_list ~sep:(", ") pp_type) lt in
+  let pp_decl fmt d =
+  (*  match body with
+    | None -> *) (* FIXME *)
+        if d.op_ctnt then 
+          Format.fprintf fmt ": %a" pp_type (snd d.op_sig)
+        else 
+          Format.fprintf fmt ": %a -> %a" 
+            pp_tparams (fst d.op_sig) pp_type (snd d.op_sig)
+(*    | Some (id,e) ->
+        if d.op_ctnt then
+          Format.fprintf fmt ": %a = %a" pp_type (snd d.op_sig)
+            pp
+        Format.fprintf fmt
+           *) in
+  Format.fprintf fmt "%s %a%a %a."
+      (str_kind d) pp_optyparams d.op_params pp_path p
+      pp_decl d
+  
 (* -------------------------------------------------------------------- *)
 let pp_typerror =
   let pp fmt = function

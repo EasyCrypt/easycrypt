@@ -54,6 +54,7 @@
     "require"     , REQUIRE    ;        (* KW: global *)
     "theory"      , THEORY     ;        (* KW: global *)
     "type"        , TYPE       ;        (* KW: global *)
+    "print"       , PRINT      ;        (* KW: global *)
   ]
 
   let keywords = Hashtbl.create 97
