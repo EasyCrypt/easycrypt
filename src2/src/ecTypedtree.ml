@@ -752,8 +752,7 @@ let transfpattern fenv (p : EcParsetree.lpattern) =
   | _ -> assert false
 
 
-let transformula fenv tp f = 
-  let ue = EcUnify.UniEnv.create () in
+let transformula fenv tp ue f = 
 
   let fofbool fenv loc f ty = 
     unify_error (Fenv.mono fenv) ue loc ty (tbool ());
@@ -868,6 +867,6 @@ let transformula fenv tp f =
         flet p e1 e2, ty2 
     | PFforall _ | PFexists _ -> tyerror e.pl_loc (TermExpected e) in
   let f = transf fenv tp f in
-  EcFol.Subst.uni (EcUnify.UniEnv.asmap ue) f
+  EcFol.Subst.uni (EcUnify.UniEnv.asmap ue) f, ue
 
 

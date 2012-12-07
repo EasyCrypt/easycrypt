@@ -219,19 +219,17 @@ module Pred = struct
     let tp  = TT.TyPolicy.init op.pp_tyvars in
     let dom,   tp  = TT.transtys scope.sc_env tp (odfl [] op.pp_dom) in
     let body, ue =
-      let ue = EcUnify.UniEnv.create () in
-      let body = 
+      let body, ue = 
+        let ue = EcUnify.UniEnv.create () in
         match op.pp_body with
-        | None -> None
+        | None -> None, ue
         | Some(xs,body) ->
-            assert false;
-(*            let xs = List.map EcIdent.create xs in
+            let xs = List.map EcIdent.create xs in
             (* FIXME *)
             let env = EcEnv.Var.bindall (List.combine xs dom) scope.sc_env in
             let env = TT.Fenv.mono_fenv env in
-            let body = TT.transformula env ue body in
-            (* FIXME *)
-            (* Some(xs, Fsubst.uni (EcUnify.UniEnv.asmap ue) body)*)*) in
+            let body,ue = TT.transformula env tp ue body in
+            Some(xs, body), ue in
       body, ue in
     let uni = Subst.uni (EcUnify.UniEnv.asmap ue) in 
     let dom = List.map uni dom in
@@ -260,9 +258,9 @@ module Ax = struct
     | PLemma -> Lemma 
 
   let add (scope : scope) (ax : paxiom) =
-    let form = 
+    let form, _ = 
       TT.transformula (TT.Fenv.mono_fenv scope.sc_env) 
-        TT.TyPolicy.empty ax.pa_formula in
+        TT.TyPolicy.empty (EcUnify.UniEnv.create()) ax.pa_formula in
     let axd = { 
       ax_spec = form;
       ax_kind = transform_kind ax.pa_kind

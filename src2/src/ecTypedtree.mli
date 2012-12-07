@@ -69,7 +69,8 @@ module Fenv : sig
   type fenv
   val mono_fenv : EcEnv.env -> fenv
 end
-val transformula : Fenv.fenv -> TyPolicy.t -> pformula -> EcFol.form
+val transformula : Fenv.fenv -> TyPolicy.t -> EcUnify.unienv -> 
+  pformula -> EcFol.form * EcUnify.unienv
 
 (* -------------------------------------------------------------------- *)
 val transsig   : EcEnv.env -> psignature -> tysig
