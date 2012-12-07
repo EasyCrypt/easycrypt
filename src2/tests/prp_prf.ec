@@ -2,6 +2,7 @@ require list.
 
 theory PRP_PRF.
   import list.
+  print op length.
 
   type ('a, 'b) map.
 

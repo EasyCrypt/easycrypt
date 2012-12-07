@@ -124,7 +124,6 @@ let freshen (params : EcIdent.t list) (ty : ty) =
   let vars = init_unit params in
   inst_var vars ty 
 
-
 let freshendom params dom = 
   let vars = init_unit params in
   List.map (inst_var vars) dom
