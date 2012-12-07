@@ -225,9 +225,8 @@ module Pred = struct
         | None -> None, ue
         | Some(xs,body) ->
             let xs = List.map EcIdent.create xs in
-            (* FIXME *)
-            let env = EcEnv.Var.bindall (List.combine xs dom) scope.sc_env in
-            let env = TT.Fenv.mono_fenv env in
+            let env = TT.Fenv.mono_fenv scope.sc_env in
+            let env = TT.Fenv.bind_locals env xs dom in 
             let body,ue = TT.transformula env tp ue body in
             Some(xs, body), ue in
       body, ue in

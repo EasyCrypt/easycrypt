@@ -68,6 +68,7 @@ val transexpcast :
 module Fenv : sig 
   type fenv
   val mono_fenv : EcEnv.env -> fenv
+  val bind_locals : fenv -> EcIdent.t list -> ty list -> fenv
 end
 val transformula : Fenv.fenv -> TyPolicy.t -> EcUnify.unienv -> 
   pformula -> EcFol.form * EcUnify.unienv
