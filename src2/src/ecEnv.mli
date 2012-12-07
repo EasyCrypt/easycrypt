@@ -1,6 +1,7 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open EcSymbols
+open EcDecl
 open EcTypesmod
 
 (* -------------------------------------------------------------------- *)
@@ -40,7 +41,6 @@ end
 (* -------------------------------------------------------------------- *)
 module Var    : S with type t = EcTypes.ty
 module Fun    : S with type t = funsig
-module Pred   : S with type t = predicate
 module Ax     : S with type t = axiom
 module Mod    : S with type t = tymod
 module ModTy  : S with type t = tymod
@@ -71,6 +71,8 @@ end
 module Ident : sig
   type idlookup_t = [`Var | `Ctnt of operator]
 
-  val lookup    : qsymbol -> env -> (EcPath.path * EcTypes.ty * idlookup_t)
-  val trylookup : qsymbol -> env -> (EcPath.path * EcTypes.ty * idlookup_t) option
+  val lookup    : 
+      qsymbol -> env -> (EcPath.path * EcTypes.ty option * idlookup_t)
+  val trylookup : 
+      qsymbol -> env -> (EcPath.path * EcTypes.ty option * idlookup_t) option
 end

@@ -2,6 +2,7 @@ open EcUtils
 open EcTypes
 open EcParsetree
 open EcTypedtree
+open EcDecl
 open EcTypesmod
 open EcPrinting
 
@@ -23,7 +24,9 @@ let pp_tydecl fmt (p,td) =
 let pp_optyparams fmt lid = 
   Format.fprintf fmt "[%a]" (pp_list ~sep:(", ") pp_ident) lid
   
-let pp_opdecl fmt (p,d) =
+let pp_opdecl fmt (p,d) = ()
+(* FIXME *)
+(*
   let str_kind op =
     if op.op_ctnt then "cnst" 
     else if op.op_prob then "pop" else "op" in
@@ -50,6 +53,7 @@ let pp_opdecl fmt (p,d) =
   Format.fprintf fmt "%s %a%a %a."
       (str_kind d) pp_optyparams d.op_params pp_path p
       pp_decl d
+*)
   
 (* -------------------------------------------------------------------- *)
 let pp_typerror =

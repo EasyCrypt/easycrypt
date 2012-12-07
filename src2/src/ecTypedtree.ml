@@ -3,7 +3,7 @@ open EcUtils
 open EcSymbols
 open EcParsetree
 open EcTypes
-open EcTypesexpr
+open EcDecl
 open EcTypesmod
 
 (* -------------------------------------------------------------------- *)
@@ -38,15 +38,17 @@ let tyerror loc x = raise (TyError (loc, x))
 let select_op ~proba env name ue psig =
   let ops = EcEnv.Op.all name env in
   let ops = List.filter (fun (_, op) -> op.op_prob || not proba) ops in
-  let ops = List.filter (fun (_, op) -> not op.op_ctnt) ops in
+  let ops = List.filter (fun (_, op) -> not (op_ctnt op)) ops in
   let select (path, op) =
-    let subue  = EcUnify.UniEnv.copy ue in
-    let dom,codom = EcTypes.freshensig op.op_params op.op_sig in
-    let opsig = Ttuple dom in
-    try
-      EcUnify.unify env subue opsig (Ttuple psig);
-      Some (path, op, codom, subue)
-    with EcUnify.UnificationFailure _ -> None in
+    if op_pr op then None 
+    else
+      let subue  = EcUnify.UniEnv.copy ue in
+      let dom,codom = EcTypes.freshensig op.op_params (op_sig op) in
+      let opsig = Ttuple dom in
+      try
+        EcUnify.unify env subue opsig (Ttuple psig);
+        Some (path, op, codom, subue)
+      with EcUnify.UnificationFailure _ -> None in
   List.pmap select ops
 
 (* -------------------------------------------------------------------- *)
@@ -188,15 +190,15 @@ let transexp (env : EcEnv.env) (policy : epolicy) (ue : EcUnify.unienv) e =
     | PEbool b -> (Ebool b, tbool ())
     | PEint  i -> (Eint  i, tint  ())
 
-    | PEident x -> begin
-      match EcEnv.Ident.trylookup x env with
-      | None -> tyerror loc (UnknownVariable x)
-      | Some (xpath, ty, kind) -> begin
-          match kind with
-          | `Var     -> (Evar (xpath, ty), ty)
-          | `Ctnt op -> (Eapp (xpath, []), EcTypes.freshen op.op_params ty)
-      end
-    end
+    | PEident x -> 
+        begin match EcEnv.Ident.trylookup x env with
+        | Some (xpath, Some ty, kind) -> 
+            begin match kind with
+            | `Var     -> (Evar (xpath, ty), ty)
+            | `Ctnt op -> (Eapp (xpath, []), EcTypes.freshen op.op_params ty)
+            end
+        | _ -> tyerror loc (UnknownVariable x)
+        end
 
     | PEapp (name, es) -> begin
       let es   = List.map (transexp env policy) es in
@@ -672,13 +674,14 @@ module Fenv = struct
 
  
   module Ident = struct
-    let trylookup_env fenv qs = 
+    let trylookup_env fenv qs = assert false (* FIXME *)
+(*
       let env = current_env fenv in
       match EcEnv.Ident.trylookup qs env with
       | None -> None
       | Some (xpath, ty, `Var    ) -> Some (Lprog (xpath, ty, fenv.fe_cur))
       | Some (xpath, ty, `Ctnt op) -> Some (Lctnt (xpath, EcTypes.freshen op.op_params ty))
-
+*)
     let trylookup_logical fenv s =
       match EcIdent.Map.byname s fenv.fe_locals with
       | None -> None

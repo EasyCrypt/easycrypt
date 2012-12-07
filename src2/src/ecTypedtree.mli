@@ -2,7 +2,7 @@
 open EcSymbols
 open EcParsetree
 open EcTypes
-open EcTypesexpr
+open EcDecl
 open EcTypesmod
 
 (* -------------------------------------------------------------------- *)

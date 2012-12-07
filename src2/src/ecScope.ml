@@ -92,10 +92,9 @@ end
 
 (* -------------------------------------------------------------------- *)
 type action =
-  | Ac_type      of (EcIdent.t * EcTypesmod.tydecl)
-  | Ac_operator  of (EcIdent.t * EcTypesmod.operator)
-  | Ac_predicate of (EcIdent.t * EcTypesmod.predicate)
-  | Ac_axiom     of (EcIdent.t * EcTypesmod.axiom)
+  | Ac_type      of (EcIdent.t * EcDecl.tydecl)
+  | Ac_operator  of (EcIdent.t * EcDecl.operator)
+  | Ac_axiom     of (EcIdent.t * EcDecl.axiom)
   | Ac_modtype   of (EcIdent.t * EcTypesmod.tymod)
   | Ac_module    of EcTypesmod.module_expr
   | Ac_theory    of (EcIdent.t * EcTypesmod.theory)
@@ -103,10 +102,9 @@ type action =
 
 type scope = {
   sc_name       : EcIdent.t;
-  sc_types      : EcTypesmod.tydecl      Context.context;
-  sc_operators  : EcTypesmod.operator    Context.context;
-  sc_predicates : EcTypesmod.predicate   Context.context;
-  sc_axioms     : EcTypesmod.axiom       Context.context;
+  sc_types      : EcDecl.tydecl          Context.context;
+  sc_operators  : EcDecl.operator        Context.context;
+  sc_axioms     : EcDecl.axiom           Context.context;
   sc_modules    : EcTypesmod.module_expr Context.context;
   sc_modtypes   : EcTypesmod.tymod       Context.context;
   sc_theories   : EcTypesmod.theory      Context.context;
@@ -137,7 +135,6 @@ let subscope (scope : scope option) (name : symbol) =
   { sc_name       = name;
     sc_types      = Context.empty ();
     sc_operators  = Context.empty ();
-    sc_predicates = Context.empty ();
     sc_axioms     = Context.empty ();
     sc_modtypes   = Context.empty ();
     sc_modules    = Context.empty ();
@@ -160,13 +157,6 @@ let bind (scope : scope) (action : action) =
           sc_operators = Context.bind (EcIdent.name x) op scope.sc_operators;
           sc_history   = action :: scope.sc_history;
           sc_env       = EcEnv.Op.bind x op scope.sc_env }
-
-  | Ac_predicate (x, p) ->
-      { scope with
-          sc_predicates = Context.bind (EcIdent.name x) p scope.sc_predicates;
-          sc_history    = action :: scope.sc_history;
-          sc_env        = EcEnv.Pred.bind x p scope.sc_env }
-
 
   | Ac_axiom (x, ax) ->
       { scope with
@@ -214,23 +204,19 @@ module Op = struct
       body, ue in
     let uni = Subst.uni (EcUnify.UniEnv.asmap ue) in 
     let dom, codom = List.map uni dom, uni codom in
-    let tyop = {
-      op_params = TT.TyPolicy.decl tp;
-      op_sig    = (dom, codom);
-      op_body   = None;
-      op_ctnt   = (op.po_dom = None);
-      op_prob   = op.po_prob;
-    }
-
-    in
-      bind scope (Ac_operator (EcIdent.create op.po_name, tyop))
+    let dom = if op.po_dom = None then None else Some dom in
+    let tyop =
+      EcDecl.mk_op (TT.TyPolicy.decl tp) dom codom
+        body op.po_prob in
+    bind scope (Ac_operator (EcIdent.create op.po_name, tyop))
 end
 
 (* -------------------------------------------------------------------- *)
 module Pred = struct
   module TT = EcTypedtree
 
-  let add (scope : scope) (p : ppredicate) =
+  let add (scope : scope) (p : ppredicate) = assert false 
+(*
     let tp = TT.TyPolicy.init p.pp_tyvars in
     match p.pp_def with
     | AbstrDef None -> assert false 
@@ -246,13 +232,14 @@ module Pred = struct
         let _dom, _tp = TT.transtys scope.sc_env tp (List.map snd params) in
         let _tp = TT.TyPolicy.relax tp in
         assert false 
+*)
 end
 
 (* -------------------------------------------------------------------- *)
 module Ax = struct
   open EcParsetree
   open EcTypes
-  open EcTypesmod
+  open EcDecl
 
   module TT = EcTypedtree
 
@@ -280,6 +267,7 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Ty = struct
+  open EcDecl
   open EcTypedtree
 
   let bind (scope : scope) name tydecl =
@@ -345,7 +333,6 @@ module Theory = struct
     let theory_item_of_action = function
       | Ac_type      (x, tydecl) -> Th_type      (x, tydecl)
       | Ac_operator  (x, op)     -> Th_operator  (x, op)
-      | Ac_predicate (x, pred)   -> Th_predicate (x,pred)
       | Ac_axiom     (x,ax)      -> Th_axiom     (x,ax)
       | Ac_modtype   (x, tymod)  -> Th_modtype   (x, tymod)
       | Ac_module    m           -> Th_module    m

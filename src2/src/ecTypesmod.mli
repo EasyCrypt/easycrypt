@@ -1,7 +1,7 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open EcSymbols
-
+open EcDecl
 (* -------------------------------------------------------------------- *)
 type modifier = [ `Use | `Read | `Write ]
 
@@ -76,41 +76,12 @@ and lvalue =
   | LvMap   of EcPath.path * EcTypes.tyexpr * EcTypes.ty
 
 (* -------------------------------------------------------------------- *)
-type axiom_kind = Axiom | Lemma
 
-type axiom = {
-  ax_spec : EcFol.form;                       (* formula *)
-  ax_kind : axiom_kind
-}
-
-(* -------------------------------------------------------------------- *)
-type operator = {
-  op_params : EcIdent.t list; (* type parameters *)
-  op_sig    : EcTypes.ty list * EcTypes.ty;
-  op_body   : (EcIdent.t list * EcTypes.tyexpr) option; 
-  op_ctnt   : bool;
-  op_prob   : bool;
-}
-
-type predicate = {
-  pred_params : EcIdent.t list; (* type parameters *)
-  pred_sig    : EcTypes.ty list;
-  pred_def    : (EcIdent.t list * EcFol.form) option
-}
-(* -------------------------------------------------------------------- *)
-type tydecl = {
-  tyd_params : EcIdent.t list;
-  tyd_type   : EcTypes.ty option;
-}
-
-(* -------------------------------------------------------------------- *)
-(* FIXME : Seems to be never used *)
 type theory = theory_item list
 
 and theory_item =
   | Th_type      of (EcIdent.t * tydecl)
   | Th_operator  of (EcIdent.t * operator)
-  | Th_predicate of (EcIdent.t * predicate)
   | Th_axiom     of (EcIdent.t * axiom)
   | Th_modtype   of (EcIdent.t * tymod)
   | Th_module    of module_expr

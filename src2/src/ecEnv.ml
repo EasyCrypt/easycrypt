@@ -2,6 +2,7 @@
 open EcUtils
 open EcSymbols
 open EcPath
+open EcDecl
 open EcTypesmod
 
 (* -------------------------------------------------------------------- *)
@@ -17,10 +18,9 @@ and mcomponents = {
   mc_functions  : (EcPath.path * EcTypesmod.funsig)    EcIdent.Map.t;
   mc_modules    : (EcPath.path * EcTypesmod.tymod)     EcIdent.Map.t;
   mc_modtypes   : (EcPath.path * EcTypesmod.tymod)     EcIdent.Map.t;
-  mc_typedecls  : (EcPath.path * EcTypesmod.tydecl)    EcIdent.Map.t;
-  mc_operators  : (EcPath.path * EcTypesmod.operator)  EcIdent.Map.t;
-  mc_predicates : (EcPath.path * EcTypesmod.predicate) EcIdent.Map.t;
-  mc_axioms     : (EcPath.path * EcTypesmod.axiom)     EcIdent.Map.t;
+  mc_typedecls  : (EcPath.path * EcDecl.tydecl)        EcIdent.Map.t;
+  mc_operators  : (EcPath.path * EcDecl.operator)      EcIdent.Map.t;
+  mc_axioms     : (EcPath.path * EcDecl.axiom)         EcIdent.Map.t;
   mc_theories   : (EcPath.path * EcTypesmod.theory)    EcIdent.Map.t;
   mc_components : (EcPath.path * mcomponents Lazy.t)   EcIdent.Map.t;
   mc_history    : (EcPath.path * mchistory) list;
@@ -31,10 +31,9 @@ and mchistory =
 | MC_Function  of EcTypesmod.funsig
 | MC_Module    of EcTypesmod.tymod * (mcomponents Lazy.t)
 | MC_Modtype   of EcTypesmod.tymod
-| MC_Typedecl  of EcTypesmod.tydecl
-| MC_Operator  of EcTypesmod.operator
-| MC_Predicate of EcTypesmod.predicate
-| MC_Axiom     of EcTypesmod.axiom
+| MC_Typedecl  of EcDecl.tydecl
+| MC_Operator  of EcDecl.operator
+| MC_Axiom     of EcDecl.axiom
 | MC_Theory    of EcTypesmod.theory * (mcomponents Lazy.t)
 
 (* -------------------------------------------------------------------- *)
@@ -45,7 +44,6 @@ let emcomponents = {
   mc_modtypes   = EcIdent.Map.empty;
   mc_typedecls  = EcIdent.Map.empty;
   mc_operators  = EcIdent.Map.empty;
-  mc_predicates = EcIdent.Map.empty;
   mc_axioms     = EcIdent.Map.empty;
   mc_theories   = EcIdent.Map.empty;
   mc_components = EcIdent.Map.empty;
@@ -123,11 +121,6 @@ module MC = struct
       { mc with
           mc_operators = IM.add x (path, op) mc.mc_operators; }
 
-  and mc_bind_pred path pred mc =
-    let x = EcPath.basename path in
-      { mc with
-          mc_predicates = IM.add x (path, pred) mc.mc_predicates; }
-
   and mc_bind_ax path ax mc =
     let x = EcPath.basename path in
       { mc with
@@ -147,7 +140,6 @@ module MC = struct
       let mc_of_theory_item mc = function
         | Th_type      (x, tydecl) -> bind_typedecl (scope, x) tydecl env mc
         | Th_operator  (x, op)     -> bind_op       (scope, x) op env mc
-        | Th_predicate (x, p)      -> bind_pred     (scope, x) p env mc
         | Th_axiom     (x, a)      -> bind_ax       (scope, x) a env mc
         | Th_modtype   (x, tymod)  -> bind_modtype  (scope, x) tymod env mc
         | Th_module    m           -> bind_module   (scope, m.me_name) m.me_sig env mc
@@ -188,11 +180,6 @@ module MC = struct
       mc_history (path, MC_Operator op)
         (mc_bind_op path op mc)
 
-  and bind_pred (scope, x) pred env mc =
-    let path = EcPath.extend scope x in
-      mc_history (path, MC_Predicate pred)
-        (mc_bind_pred path pred mc)
-
   and bind_ax (scope, x) ax env mc =
     let path = EcPath.extend scope x in
       mc_history (path, MC_Axiom ax)
@@ -212,7 +199,6 @@ module MC = struct
       | MC_Modtype   tymod       -> mc_bind_modtype path tymod mc
       | MC_Typedecl  tydecl      -> mc_bind_typedecl path tydecl mc
       | MC_Operator  op          -> mc_bind_op path op mc
-      | MC_Predicate pred        -> mc_bind_pred path pred mc
       | MC_Axiom     ax          -> mc_bind_ax path ax mc
       | MC_Theory    (th, submc) -> mc_bind_theory path th submc mc
 
@@ -239,9 +225,6 @@ module MC = struct
 
   let lookup_all_op1 (name : symbol) (mc : mcomponents) =
     IM.allbyname name mc.mc_operators
-
-  let lookup_pred1 (name : symbol) (mc : mcomponents) =
-    IM.byname name mc.mc_predicates
 
   let lookup_ax1 (name : symbol) (mc : mcomponents) =
     IM.byname name mc.mc_axioms
@@ -318,6 +301,7 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Ty = struct
+
   type t = tydecl
 
   let bind x tydecl env =
@@ -388,7 +372,7 @@ module Op = struct
 end
 
 (* -------------------------------------------------------------------- *)
-module Pred = struct
+(*module Pred = struct
   type t = predicate
 
   let bind x pred env =
@@ -409,7 +393,7 @@ module Pred = struct
     | Some x -> x
 
   let trylookup x env = try_lf (fun () -> lookup x env)
-end
+end*)
 
 (* -------------------------------------------------------------------- *)
 module Ax = struct
@@ -552,13 +536,13 @@ module Ident = struct
     let for_var () =
       match Var.trylookup name env with
       | None -> None
-      | Some (p, ty) -> Some (p, ty, (`Var :> idlookup_t))
+      | Some (p, ty) -> Some (p, Some ty, (`Var :> idlookup_t))
 
     and for_op () =
       match Op.trylookup name env with
       | None -> None
-      | Some (_, op) when not op.op_ctnt -> None
-      | Some (p, op) -> Some (p, snd op.op_sig, (`Ctnt op :> idlookup_t))
+      | Some (_, op) when not (op_ctnt op) -> None
+      | Some (p, op) -> Some (p, op.op_codom, (`Ctnt op :> idlookup_t))
     in
       List.fpick [for_var; for_op]
 
