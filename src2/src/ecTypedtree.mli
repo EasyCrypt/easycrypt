@@ -69,6 +69,7 @@ module Fenv : sig
   type fenv
   val mono_fenv : EcEnv.env -> fenv
 end
+val transformula : Fenv.fenv -> TyPolicy.t -> pformula -> EcFol.form
 
 (* -------------------------------------------------------------------- *)
 val transsig   : EcEnv.env -> psignature -> tysig
@@ -76,4 +77,4 @@ val transtymod : EcEnv.env -> pmodule_type -> tymod
 val transmod   : EcEnv.env -> EcIdent.t -> pmodule_expr -> module_expr
 
 (* -------------------------------------------------------------------- *)
-val transformula : Fenv.fenv -> TyPolicy.t -> pformula -> EcFol.form
+

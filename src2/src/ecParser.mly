@@ -684,22 +684,27 @@ predicate:
 | PRED x = op_ident { 
   { pp_name = x;
     pp_tyvars = None;
-    pp_def = AbstrDef (Some []) }
+    pp_dom = None;
+    pp_body = None; }
   }
 | PRED x = op_ident EQ f=loc(form) {
   { pp_name = x;
     pp_tyvars = None;
-    pp_def = ConcrDef([], f) }
+    pp_dom = None;
+    pp_body = Some([], f) }
   }
 | PRED x = op_ident tyvars=tyvars_decl COLON sty = op_tydom { 
   { pp_name = x;
     pp_tyvars = tyvars;
-    pp_def = AbstrDef(Some sty) }
+    pp_dom = Some sty;
+    pp_body = None;
+  }
   } 
 | PRED x = op_ident tyvars=tyvars_decl params=param_decl EQ f=loc(form) { 
   { pp_name = x;
     pp_tyvars = tyvars;
-    pp_def = ConcrDef(params, f) }
+    pp_dom = Some(List.map snd params);
+    pp_body =Some(List.map fst params, f) }
   }
 ;
 

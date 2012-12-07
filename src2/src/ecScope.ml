@@ -215,24 +215,31 @@ end
 module Pred = struct
   module TT = EcTypedtree
 
-  let add (scope : scope) (p : ppredicate) = assert false 
-(*
-    let tp = TT.TyPolicy.init p.pp_tyvars in
-    match p.pp_def with
-    | AbstrDef None -> assert false 
-    | AbstrDef (Some dom) ->
-        let dom, tp    = TT.transtys scope.sc_env tp dom in
-        let typ = {
-          pred_params = TT.TyPolicy.decl tp;
-          pred_sig    = dom;
-          pred_def    = None 
-        } in
-        bind scope (Ac_predicate (EcIdent.create p.pp_name, typ))
-    | ConcrDef(params, def) ->
-        let _dom, _tp = TT.transtys scope.sc_env tp (List.map snd params) in
-        let _tp = TT.TyPolicy.relax tp in
-        assert false 
-*)
+  let add (scope : scope) (op : ppredicate) =
+    let tp  = TT.TyPolicy.init op.pp_tyvars in
+    let dom,   tp  = TT.transtys scope.sc_env tp (odfl [] op.pp_dom) in
+    let body, ue =
+      let ue = EcUnify.UniEnv.create () in
+      let body = 
+        match op.pp_body with
+        | None -> None
+        | Some(xs,body) ->
+            assert false;
+(*            let xs = List.map EcIdent.create xs in
+            (* FIXME *)
+            let env = EcEnv.Var.bindall (List.combine xs dom) scope.sc_env in
+            let env = TT.Fenv.mono_fenv env in
+            let body = TT.transformula env ue body in
+            (* FIXME *)
+            (* Some(xs, Fsubst.uni (EcUnify.UniEnv.asmap ue) body)*)*) in
+      body, ue in
+    let uni = Subst.uni (EcUnify.UniEnv.asmap ue) in 
+    let dom = List.map uni dom in
+    let dom = if op.pp_dom = None then None else Some dom in
+    let tyop =
+      EcDecl.mk_pred (TT.TyPolicy.decl tp) dom body in
+    bind scope (Ac_operator (EcIdent.create op.pp_name, tyop))
+
 end
 
 (* -------------------------------------------------------------------- *)

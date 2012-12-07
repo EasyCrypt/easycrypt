@@ -210,8 +210,10 @@ type 'a abstr_def =
 type ppredicate = {
   pp_name   : symbol;
   pp_tyvars : symbol list option;
-  pp_def    : pformula abstr_def;
+  pp_dom    : pty list option;
+  pp_body   : (symbol list * pformula) option;
 }
+
 
 (* -------------------------------------------------------------------- *)
 type ident_spec = symbol list
