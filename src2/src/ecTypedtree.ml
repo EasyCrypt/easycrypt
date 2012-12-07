@@ -51,6 +51,20 @@ let select_op ~proba env name ue psig =
       with EcUnify.UnificationFailure _ -> None in
   List.pmap select ops
 
+let select_pred env name ue psig =
+  let ops = EcEnv.Op.all name env in
+  let ops = List.filter (fun (_, op) -> not op.op_prob) ops in
+  let ops = List.filter (fun (_, op) -> not (op_ctnt op)) ops in
+  let select (path, op) =
+    let subue  = EcUnify.UniEnv.copy ue in
+    let dom = EcTypes.freshendom op.op_params (op_dom op) in
+    let opsig = Ttuple dom in
+    try
+      EcUnify.unify env subue opsig (Ttuple psig);
+      Some (path, op, op.op_codom, subue)
+    with EcUnify.UnificationFailure _ -> None in
+  List.pmap select ops
+
 (* -------------------------------------------------------------------- *)
 
 module TyPolicy = struct
@@ -633,7 +647,7 @@ open EcFol
 type var_kind = 
   | Llocal of EcIdent.t * ty
   | Lprog  of EcPath.path * ty * Side.t
-  | Lctnt  of EcPath.path * ty
+  | Lctnt  of EcPath.path * ty option
 
 type op_kind = 
   | Lop of EcPath.path * operator
@@ -674,14 +688,15 @@ module Fenv = struct
 
  
   module Ident = struct
-    let trylookup_env fenv qs = assert false (* FIXME *)
-(*
+    let trylookup_env fenv qs = 
       let env = current_env fenv in
       match EcEnv.Ident.trylookup qs env with
       | None -> None
-      | Some (xpath, ty, `Var    ) -> Some (Lprog (xpath, ty, fenv.fe_cur))
-      | Some (xpath, ty, `Ctnt op) -> Some (Lctnt (xpath, EcTypes.freshen op.op_params ty))
-*)
+      | Some (xpath, Some ty, `Var    ) -> Some (Lprog (xpath, ty, fenv.fe_cur))
+      | Some (xpath, None, `Var    ) -> assert false 
+      | Some (xpath, ty, `Ctnt op) -> 
+          Some (Lctnt (xpath, omap ty (EcTypes.freshen op.op_params)))
+
     let trylookup_logical fenv s =
       match EcIdent.Map.byname s fenv.fe_locals with
       | None -> None
@@ -753,8 +768,9 @@ let transformula fenv tp f =
         | None ->  tyerror dloc (UnknownVariable x)
         | Some(Llocal(x,ty)) -> fofbool fenv f.pl_loc (flocal x ty) ty
         | Some(Lprog(x,ty,s)) -> fofbool fenv f.pl_loc (fpvar x ty s) ty
-        | Some(Lctnt(x,ty)) -> fofbool fenv f.pl_loc (fapp x [] (Some ty)) ty
-(*        | Some(Lpred(x)) -> fapp x [] None *)
+        | Some(Lctnt(x,Some ty)) -> 
+            fofbool fenv f.pl_loc (fapp x [] (Some ty)) ty
+        | Some(Lctnt(x,None)) ->fapp x [] None
         end
     | PFside(f,side) ->
         let fenv = Fenv.set_side fenv side in
@@ -765,14 +781,17 @@ let transformula fenv tp f =
     | PFapp(qs,es) ->
         let es   = List.map (transe fenv tp) es in
         let esig = snd (List.split es) in
-        let ops  = select_op false (Fenv.mono fenv) qs ue esig in
+        let ops  = select_pred (Fenv.mono fenv) qs ue esig in
         begin match ops with
         | [] | _ :: _ :: _ ->        (* FIXME: better error message *)
             tyerror f.pl_loc (UnknownOperatorForSig (qs, esig))
-        | [(xpath, op, codom, subue)] ->
+        | [(xpath, op, Some codom, subue)] ->
             EcUnify.UniEnv.restore ~src:subue ~dst:ue;
             fofbool fenv f.pl_loc (fapp xpath (List.map fst es) (Some codom))
               codom
+        | [(xpath, op, None, subue)] ->
+            EcUnify.UniEnv.restore ~src:subue ~dst:ue;
+            fapp xpath (List.map fst es) None
         end
     | PFif(f1,f2,f3) ->
         let f1 = transf fenv tp f1 in
@@ -808,8 +827,8 @@ let transformula fenv tp f =
         | None ->  tyerror dloc (UnknownVariable x)
         | Some(Llocal(x,ty)) -> flocal x ty, ty
         | Some(Lprog(x,ty,s)) -> fpvar x ty s, ty
-        | Some(Lctnt(x,ty)) -> fapp x [] (Some ty), ty (* FIXME *)
-(*        | Some(Lpred(x)) -> fapp x [] None *)
+        | Some(Lctnt(x,Some ty)) -> fapp x [] (Some ty), ty 
+        | Some(Lctnt(x,None)) -> tyerror e.pl_loc (TermExpected e) 
         end
     | PFside(f,side) ->
         let fenv = Fenv.set_side fenv side in
