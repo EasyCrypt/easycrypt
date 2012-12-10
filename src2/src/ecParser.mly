@@ -7,6 +7,14 @@
     in
       failwith msg
 
+  let mk_lced loc v = { pl_loc = loc; pl_desc = v; }
+
+  let pqsymb_of_psymb (x : psymbol) : pqsymbol =
+    mk_lced x.pl_loc ([], x.pl_desc)
+
+  let pqsymb_of_symb loc x : pqsymbol =
+    mk_lced loc ([], x)
+
   let mk_mod ?modtype params body = Pm_struct {
     ps_params    = params;
     ps_signature = modtype;
@@ -19,14 +27,14 @@
     pty_body   = body;
   }
 
-  let peget e1 e2    = PEapp (([], "get"), [e1; e2])
-  let peset e1 e2 e3 = PEapp (([], "set"), [e1; e2; e3])
+  let peget loc e1 e2    = PEapp (pqsymb_of_symb loc "get", [e1; e2])
+  let peset loc e1 e2 e3 = PEapp (pqsymb_of_symb loc "set", [e1; e2; e3])
 
-  let penil  ()   = PEapp (EcPath.toqsymbol EcCoreLib.nil , [])
-  let pecons e es = PEapp (EcPath.toqsymbol EcCoreLib.cons, [e; es])
+  let pfget loc e1 e2    = PFapp (pqsymb_of_symb loc "get", [e1; e2])
+  let pfset loc e1 e2 e3 = PFapp (pqsymb_of_symb loc "set", [e1; e2; e3])
 
   let pelist (es : pexpr    list) : pexpr_r    = assert false
-  let pflist (es : pformula    list)  : pformula_r    = assert false
+  let pflist (es : pformula list) : pformula_r = assert false
 %}
 
 %token <int> NUM
@@ -193,13 +201,18 @@
 %%
 
 (* -------------------------------------------------------------------- *)
-%inline ident      : x=IDENT               { x };
-%inline number     : n=NUM                 { n };
-%inline prim_ident : x=PRIM_IDENT          { x };
+%inline ident      : x=loc(IDENT)      { x };
+%inline number     : n=NUM             { n };
+%inline prim_ident : x=loc(PRIM_IDENT) { x };
+
+qident_:
+| x=IDENT DCOLON qx=qident_ { (x :: fst qx, snd qx) }
+| x=IDENT { ([], x) }
+;
 
 qident:
-| x=ident DCOLON qx=qident { (x :: fst qx, snd qx) }
-| x=ident                  { ([]         , x     ) }
+| x=loc(qident_) { x }
+;
 
 (* -------------------------------------------------------------------- *)
 %inline ident_list1: aout=plist1(ident, COMMA) { aout };
@@ -238,38 +251,60 @@ lpattern:
 ;
 
 sexp:
-| TRUE                                   { PEbool true  }
-| FALSE                                  { PEbool false }
-| n=number                               { PEint n }
-| x=qident                                { PEident x }
+| TRUE
+    { PEbool true  }
+
+| FALSE
+    { PEbool false }
+
+| n=number
+   { PEint n }
+
+| x=qident
+   { PEident x }
+
 | se=loc(sexp) LBRACKET e=loc(exp) RBRACKET
-                                         { peget se e }
+   { peget (Location.make $startpos $endpos) se e }
+
 | se=loc(sexp) LBRACKET e1=loc(exp) LEFTARROW e2=loc(exp) RBRACKET
-                                         { peset se e1 e2 }
-| x=ident LPAREN es=exp_list0 RPAREN     { PEapp (qsymb_of_symb x, es) }
-| LPAREN es=exp_list2 RPAREN             { PEtuple es }
-| LPAREN e=exp RPAREN                    { e }
-| LBRACKET es=p_exp_sm_list0 RBRACKET    { pelist es }
+   { peset (Location.make $startpos $endpos) se e1 e2 }
+
+| x=ident LPAREN es=exp_list0 RPAREN
+   { PEapp (pqsymb_of_psymb x, es) }
+
+| LPAREN es=exp_list2 RPAREN
+   { PEtuple es }
+
+| LPAREN e=exp RPAREN
+   { e }
+
+| LBRACKET es=p_exp_sm_list0 RBRACKET
+   { pelist es }
 ;
 
 exp:
 | e=sexp { e }
 
-| NOT   e=loc(exp)                      { PEapp (qsymb_of_symb "!", [e]) }
-| MINUS e=loc(exp) %prec prec_prefix_op { PEapp (qsymb_of_symb "-", [e]) }
+| op=loc(NOT) e=loc(exp)
+   { PEapp (pqsymb_of_symb op.pl_loc "!", [e]) }
 
-| e1=loc(exp)    IMPL  e2=loc(exp)  { PEapp (qsymb_of_symb "=>" , [e1; e2]) }
-| e1=loc(exp)    IFF   e2=loc(exp)  { PEapp (qsymb_of_symb "<=>", [e1; e2]) }
-| e1=loc(exp)    OR    e2=loc(exp)  { PEapp (qsymb_of_symb "||" , [e1; e2]) }
-| e1=loc(exp)    AND   e2=loc(exp)  { PEapp (qsymb_of_symb "&&" , [e1; e2]) }
-| e1=loc(exp)    EQ    e2=loc(exp)  { PEapp (qsymb_of_symb "="  , [e1; e2]) }
-| e1=loc(exp)    NE    e2=loc(exp)  { PEapp (qsymb_of_symb "<>" , [e1; e2]) }
-| e1=loc(exp) op=OP1   e2=loc(exp)  { PEapp (qsymb_of_symb op   , [e1; e2]) }
-| e1=loc(exp) op=OP2   e2=loc(exp)  { PEapp (qsymb_of_symb op   , [e1; e2]) }
-| e1=loc(exp)    MINUS e2=loc(exp)  { PEapp (qsymb_of_symb "-"  , [e1; e2]) }
-| e1=loc(exp) op=OP3   e2=loc(exp)  { PEapp (qsymb_of_symb op   , [e1; e2]) }
-| e1=loc(exp)    STAR  e2=loc(exp)  { PEapp (qsymb_of_symb "*"  , [e1; e2]) }
-| e1=loc(exp) op=OP4   e2=loc(exp)  { PEapp (qsymb_of_symb op   , [e1; e2]) }
+| op=loc(MINUS) e=loc(exp) %prec prec_prefix_op
+   { PEapp (pqsymb_of_symb op.pl_loc "-", [e]) }
+
+| e1=loc(exp) op=loc(OP1) e2=loc(exp)  { PEapp (pqsymb_of_psymb op, [e1; e2]) }
+| e1=loc(exp) op=loc(OP2) e2=loc(exp)  { PEapp (pqsymb_of_psymb op, [e1; e2]) }
+| e1=loc(exp) op=loc(OP3) e2=loc(exp)  { PEapp (pqsymb_of_psymb op, [e1; e2]) }
+| e1=loc(exp) op=loc(OP4) e2=loc(exp)  { PEapp (pqsymb_of_psymb op, [e1; e2]) }
+
+
+| e1=loc(exp) op=loc(IMPL ) e2=loc(exp)  { PEapp (pqsymb_of_symb op.pl_loc "=>" , [e1; e2]) }
+| e1=loc(exp) op=loc(IFF  ) e2=loc(exp)  { PEapp (pqsymb_of_symb op.pl_loc "<=>", [e1; e2]) }
+| e1=loc(exp) op=loc(OR   ) e2=loc(exp)  { PEapp (pqsymb_of_symb op.pl_loc "||" , [e1; e2]) }
+| e1=loc(exp) op=loc(AND  ) e2=loc(exp)  { PEapp (pqsymb_of_symb op.pl_loc "&&" , [e1; e2]) }
+| e1=loc(exp) op=loc(EQ   ) e2=loc(exp)  { PEapp (pqsymb_of_symb op.pl_loc "="  , [e1; e2]) }
+| e1=loc(exp) op=loc(NE   ) e2=loc(exp)  { PEapp (pqsymb_of_symb op.pl_loc "<>" , [e1; e2]) }
+| e1=loc(exp) op=loc(MINUS) e2=loc(exp)  { PEapp (pqsymb_of_symb op.pl_loc "-"  , [e1; e2]) }
+| e1=loc(exp) op=loc(STAR ) e2=loc(exp)  { PEapp (pqsymb_of_symb op.pl_loc "*"  , [e1; e2]) }
 
 | c=loc(exp) QUESTION e1=loc(exp) COLON e2=loc(exp) %prec OP2
 | IF c=loc(exp) THEN e1=loc(exp) ELSE e2=loc(exp)
@@ -306,37 +341,62 @@ exp:
 (* Formulas                                                             *)
 
 sform:
-| TRUE                                   { PFbool true  }
-| FALSE                                  { PFbool false }
-| n=number                               { PFint n }
-| x=qident                               { PFident x }
+| TRUE
+    { PFbool true  }
+
+| FALSE
+    { PFbool false }
+
+| n=number
+   { PFint n }
+
+| x=qident
+   { PFident x }
+
 | se=loc(sform) LBRACKET e=loc(form) RBRACKET
-                                         { PFapp (qsymb_of_symb "<get>", [se; e]) }
+   { pfget (Location.make $startpos $endpos) se e }
+
 | se=loc(sform) LBRACKET e1=loc(form) LEFTARROW e2=loc(form) RBRACKET
-                                         { PFapp (qsymb_of_symb "<set>", [se; e1; e2]) }
-| x=qident LPAREN es=form_list0 RPAREN   { PFapp (x, es) }
-| x=loc(sform) LKEY s=prog_num RKEY      { PFside (x, s) }
-| LPAREN es=form_list2 RPAREN            { PFtuple es }
-| LPAREN e=form RPAREN                   { e }
-| LBRACKET es=p_form_sm_list0 RBRACKET   { pflist es }
+   { pfset (Location.make $startpos $endpos) se e1 e2 }
+
+| x=qident LPAREN es=form_list0 RPAREN
+   { PFapp (x, es) }
+
+| x=loc(sform) LKEY s=prog_num RKEY
+   { PFside (x, s) }
+
+| LPAREN es=form_list2 RPAREN
+   { PFtuple es }
+
+| LPAREN e=form RPAREN
+   { e }
+
+| LBRACKET es=p_form_sm_list0 RBRACKET
+   { pflist es }
                           
 form:
 | e=sform { e }
 
-| NOT   e=loc(form)                      { PFnot e }
-| MINUS e=loc(form) %prec prec_prefix_op { PFapp (qsymb_of_symb "-", [e]) }
-| e1=loc(form)    IMPL  e2=loc(form)  { PFbinop (e1, PPimp, e2) }
-| e1=loc(form)    IFF   e2=loc(form)  { PFbinop (e1, PPiff, e2) }
-| e1=loc(form)    OR    e2=loc(form)  { PFbinop (e1, PPor, e2)  }
-| e1=loc(form)    AND   e2=loc(form)  { PFbinop (e1, PPand, e2) }
-| e1=loc(form)    EQ    e2=loc(form)  { PFapp (qsymb_of_symb "="  , [e1; e2]) }
-| e1=loc(form)    NE    e2=loc(form)  { PFapp (qsymb_of_symb "<>" , [e1; e2]) }
-| e1=loc(form) op=OP1   e2=loc(form)  { PFapp (qsymb_of_symb op   , [e1; e2]) }
-| e1=loc(form) op=OP2   e2=loc(form)  { PFapp (qsymb_of_symb op   , [e1; e2]) }
-| e1=loc(form)    MINUS e2=loc(form)  { PFapp (qsymb_of_symb "-"  , [e1; e2]) }
-| e1=loc(form) op=OP3   e2=loc(form)  { PFapp (qsymb_of_symb op   , [e1; e2]) }
-| e1=loc(form)    STAR  e2=loc(form)  { PFapp (qsymb_of_symb "*"  , [e1; e2]) }
-| e1=loc(form) op=OP4   e2=loc(form)  { PFapp (qsymb_of_symb op   , [e1; e2]) }
+| NOT e=loc(form)
+   { PFnot e }
+
+| op=loc(MINUS) e=loc(form) %prec prec_prefix_op
+   { PFapp (pqsymb_of_symb op.pl_loc "-", [e]) }
+
+| e1=loc(form)    loc(IMPL ) e2=loc(form)  { PFbinop (e1, PPimp, e2) }
+| e1=loc(form)    loc(IFF  ) e2=loc(form)  { PFbinop (e1, PPiff, e2) }
+| e1=loc(form)    loc(OR   ) e2=loc(form)  { PFbinop (e1, PPor, e2)  }
+| e1=loc(form)    loc(AND  ) e2=loc(form)  { PFbinop (e1, PPand, e2) }
+
+| e1=loc(form) op=loc(OP1  ) e2=loc(form)  { PFapp (pqsymb_of_psymb op, [e1; e2]) }
+| e1=loc(form) op=loc(OP2  ) e2=loc(form)  { PFapp (pqsymb_of_psymb op, [e1; e2]) }
+| e1=loc(form) op=loc(OP3  ) e2=loc(form)  { PFapp (pqsymb_of_psymb op, [e1; e2]) }
+| e1=loc(form) op=loc(OP4  ) e2=loc(form)  { PFapp (pqsymb_of_psymb op, [e1; e2]) }
+
+| e1=loc(form) op=loc(EQ   ) e2=loc(form)  { PFapp (pqsymb_of_symb op.pl_loc "=" , [e1; e2]) }
+| e1=loc(form) op=loc(NE   ) e2=loc(form)  { PFapp (pqsymb_of_symb op.pl_loc "<>", [e1; e2]) }
+| e1=loc(form) op=loc(MINUS) e2=loc(form)  { PFapp (pqsymb_of_symb op.pl_loc "-" , [e1; e2]) }
+| e1=loc(form) op=loc(STAR ) e2=loc(form)  { PFapp (pqsymb_of_symb op.pl_loc "*" , [e1; e2]) }
 
 | c=loc(form) QUESTION e1=loc(form) COLON e2=loc(form) %prec OP2 { PFif (c, e1, e2) }
 | IF c=loc(form) THEN e1=loc(form) ELSE e2=loc(form)             { PFif (c, e1, e2) }
@@ -546,7 +606,7 @@ ivar_decl:
 ;
 
 (* -------------------------------------------------------------------- *)
-(* EcTypes declarations / definitions                                     *)
+(* EcTypes declarations / definitions                                   *)
 
 poly_type_decl:
 | empty                              { []  }
@@ -578,7 +638,7 @@ op_sig:
 
 op_ident:
 | x=ident { x }
-| LBRACKET x=binop RBRACKET { x }
+| LBRACKET x=loc(binop) RBRACKET { x }
 ;
 
 tyvars_decl:

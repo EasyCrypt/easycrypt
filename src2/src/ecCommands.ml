@@ -15,14 +15,14 @@ exception Interrupted
 let process_print scope p = 
   let env = EcScope.env scope in
   match p with 
-  | Pr_ty qs -> 
+  | Pr_ty qs ->
       (try 
-        let ptd = EcEnv.Ty.lookup qs env in
+        let ptd = EcEnv.Ty.lookup qs.pl_desc env in
         Format.printf "%a@." EcPexception.pp_tydecl ptd
       with _ -> assert false (* FIXME *))
   | Pr_op qs ->
       (try 
-        let ptd = EcEnv.Op.lookup qs env in
+        let ptd = EcEnv.Op.lookup qs.pl_desc env in
         Format.printf "%a@." EcPexception.pp_opdecl ptd
       with _ -> assert false (* FIXME *))
   | Pr_th qs -> assert false
@@ -38,11 +38,11 @@ let rec process_type (scope : EcScope.scope) (tyd : ptydecl) =
 
 (* -------------------------------------------------------------------- *)
 and process_module (scope : EcScope.scope) ((x, m) : _ * pmodule_expr) =
-  EcScope.Mod.add scope x m
+  EcScope.Mod.add scope x.pl_desc m
 
 (* -------------------------------------------------------------------- *)
 and process_interface (scope : EcScope.scope) ((x, i) : _ * pmodule_type) =
-  EcScope.ModType.add scope x i
+  EcScope.ModType.add scope x.pl_desc i
 
 (* -------------------------------------------------------------------- *)
 and process_operator (scope : EcScope.scope) (op : poperator) =
@@ -97,14 +97,14 @@ and process (scope : EcScope.scope) (g : global) =
   | Gpredicate p    -> process_predicate  scope p
   | Gaxiom     a    -> process_axiom      scope a
   | Gclaim     c    -> process_claim      scope c
-  | GthOpen    name -> process_th_open    scope name
-  | GthClose   name -> process_th_close   scope name
-  | GthRequire name -> process_th_require scope name
-  | GthImport  name -> process_th_import  scope name
-  | Gprint     p    -> process_print      scope p;scope
+  | GthOpen    name -> process_th_open    scope name.pl_desc
+  | GthClose   name -> process_th_close   scope name.pl_desc
+  | GthRequire name -> process_th_require scope name.pl_desc
+  | GthImport  name -> process_th_import  scope name.pl_desc
+  | Gprint     p    -> process_print      scope p; scope
+
 (* -------------------------------------------------------------------- *)
 let scope = ref (EcScope.initial EcCoreLib.top)
-
 
 (* -------------------------------------------------------------------- *)
 let process (g : global) =

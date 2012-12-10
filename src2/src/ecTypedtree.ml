@@ -66,7 +66,6 @@ let select_pred env name ue psig =
   List.pmap select ops
 
 (* -------------------------------------------------------------------- *)
-
 module TyPolicy = struct
   module Mstr = EcMaps.StringMap
       
@@ -92,7 +91,7 @@ module TyPolicy = struct
 
   let get loc s tp = 
     try Mstr.find s tp.typ_map, tp
-    with _ -> 
+    with _ ->
       if tp.typ_strict then tyerror loc (UnboundTypeParameter s);
       let id = EcIdent.create s in
       let tp = { tp with 
@@ -118,26 +117,29 @@ module TyPolicy = struct
 end
 
 (* -------------------------------------------------------------------- *)
-
 let rec transty (env : EcEnv.env) tv ty =
   match ty.pl_desc with
-  | PTunivar      -> EcTypes.mkunivar (), tv
+  | PTunivar -> EcTypes.mkunivar (), tv
+
   | PTvar s ->
-      let v,tv = TyPolicy.get ty.pl_loc s tv in
-      Tvar v, tv
+      let v, tv = TyPolicy.get ty.pl_loc s.pl_desc tv in
+        Tvar v, tv
+
   | PTtuple tys   -> 
-        let tys, tv = transtys env tv tys in 
+      let tys, tv = transtys env tv tys in 
         Ttuple tys, tv
-  | PTnamed name -> 
+
+  | PTnamed { pl_desc = name } -> 
       begin match EcEnv.Ty.trylookup name env with
       | None -> tyerror ty.pl_loc (UnknownTypeName name)
       | Some (p, tydecl) ->
           if tydecl.tyd_params <> [] then
-            tyerror ty.pl_loc (InvalidNumberOfTypeArgs 
-                           (name, List.length tydecl.tyd_params, 0));
+            tyerror ty.pl_loc
+              (InvalidNumberOfTypeArgs (name, List.length tydecl.tyd_params, 0));
           Tconstr (p, []), tv 
       end
-  | PTapp (name, tyargs) -> 
+
+  | PTapp ({ pl_desc = name }, tyargs) -> 
       begin match EcEnv.Ty.trylookup name env with
       | None -> tyerror ty.pl_loc (UnknownTypeName name)
       | Some (p, tydecl) ->
@@ -148,13 +150,18 @@ let rec transty (env : EcEnv.env) tv ty =
           let tyargs, tv = transtys env tv tyargs in 
           Tconstr (p, tyargs), tv
       end
+
 and transtys (env : EcEnv.env) tv tys = 
   let rtys, tv = 
-    List.fold_left (fun (r,tv) ty -> 
-      let ty, tv = transty env tv ty in ty::r, tv) ([],tv) tys in
-  List.rev rtys, tv
+    List.fold_left (fun (r, tv) ty -> 
+      let ty, tv = transty env tv ty in ty::r, tv) ([], tv) tys
+  in
+    List.rev rtys, tv
 
-let transty_notv env ty = fst (transty env TyPolicy.notv ty)
+(* -------------------------------------------------------------------- *)
+let transty_notv env ty =
+  fst (transty env TyPolicy.notv ty)
+
 (* -------------------------------------------------------------------- *)
 type epolicy = {
   epl_prob : bool;
@@ -167,16 +174,19 @@ exception NonLinearPattern of EcParsetree.lpattern
 
 let transpattern1 (env : EcEnv.env) (p : EcParsetree.lpattern) = 
   match p with
-  | LPSymbol x ->
+  | LPSymbol { pl_desc = x } ->
       let ty = mkunivar () in
       let x  = EcIdent.create x in
-      LSymbol x, ty
+        (LSymbol x, ty)
 
   | LPTuple xs ->
-      if not (List.uniq xs) then raise (NonLinearPattern p);
-      let xs     = List.map EcIdent.create xs in
-      let subtys = List.map (fun _ -> mkunivar ()) xs in
-      LTuple xs, Ttuple subtys
+      let xs = unlocs xs in
+        if not (List.uniq xs) then
+          raise (NonLinearPattern p)
+        else
+          let xs     = List.map EcIdent.create xs in
+          let subtys = List.map (fun _ -> mkunivar ()) xs in
+            (LTuple xs, Ttuple subtys)
 
 let transpattern (env : EcEnv.env) (p : EcParsetree.lpattern) =
   match transpattern1 env p with
@@ -204,7 +214,7 @@ let transexp (env : EcEnv.env) (policy : epolicy) (ue : EcUnify.unienv) e =
     | PEbool b -> (Ebool b, tbool ())
     | PEint  i -> (Eint  i, tint  ())
 
-    | PEident x -> 
+    | PEident { pl_desc = x } -> 
         begin match EcEnv.Ident.trylookup x env with
         | Some (xpath, Some ty, kind) -> 
             begin match kind with
@@ -214,7 +224,7 @@ let transexp (env : EcEnv.env) (policy : epolicy) (ue : EcUnify.unienv) e =
         | _ -> tyerror loc (UnknownVariable x)
         end
 
-    | PEapp (name, es) -> begin
+    | PEapp ({ pl_desc = name }, es) -> begin
       let es   = List.map (transexp env policy) es in
       let esig = snd (List.split es) in
       let ops  = select_op false env name ue esig in
@@ -291,24 +301,24 @@ let name_of_sigitem = function
 let rec transsig (env : EcEnv.env) (is : psignature) =
   let transsig1 = function
     | `VariableDecl x ->
-        let name  = x.pvd_name in
+        let name  = x.pvd_name.pl_desc in
         let type_ = transty_notv env x.pvd_type in
-        Tys_variable (name, type_)
+          Tys_variable (name, type_)
 
     | `FunctionDecl f ->
         let name   = f.pfd_name in
         let tyargs =
           List.map                      (* FIXME: continuation *)
-            (fun (x, ty) -> (EcIdent.create x, 
-                             transty_notv env ty))
-            f.pfd_tyargs in
+            (fun (x, ty) -> (EcIdent.create x.pl_desc, transty_notv env ty))
+            f.pfd_tyargs
+        in
         let resty  = transty_notv env f.pfd_tyresult in
-        if not (List.uniq (List.map fst f.pfd_tyargs)) then
-          raise (DuplicatedArgumentsName f);
-        Tys_function
-          { fs_name = name;
-            fs_sig  = (tyargs, resty);
-            fs_uses = []; }
+          if not (List.uniq (List.map fst f.pfd_tyargs)) then
+            raise (DuplicatedArgumentsName f);
+          Tys_function
+            { fs_name = name.pl_desc;
+              fs_sig  = (tyargs, resty);
+              fs_uses = []; }
 
   in
 
@@ -331,7 +341,8 @@ and transtymod (env : EcEnv.env) (tymod : pmodule_type) =
       let args =
         List.map
           (fun (x, iname) ->
-              (EcIdent.create x, snd (EcEnv.ModTy.lookup iname env)))
+              (EcIdent.create x.pl_desc,
+               snd (EcEnv.ModTy.lookup (unloc iname) env)))
           args
       in
         Tym_functor (args, transsig (EcEnv.ModTy.bindall args env) i)
@@ -347,9 +358,9 @@ let tymod_included (src : tymod) (dst : tymod) =
 (* -------------------------------------------------------------------- *)
 let rec transmod (env : EcEnv.env) (x : EcIdent.t) (m : pmodule_expr) =
   match m with
-  | Pm_ident (m, args) -> begin
+  | Pm_ident ({ pl_desc = m }, args) -> begin
       let m    = EcEnv.Mod.lookup m env in
-      let args = List.map (EcEnv.Mod.lookup^~ env) args in
+      let args = List.map (EcEnv.Mod.lookup^~ env) (unlocs args) in
 
         match snd m with
         | Tym_sig _ ->
@@ -390,7 +401,8 @@ and transstruct (env : EcEnv.env) (x : EcIdent.t) (st : pstructure) =
   (* Check parameters types *)
   let stparams =
     List.map                          (* FIXME: exn *)
-      (fun (a, aty) -> (EcIdent.create a, snd (EcEnv.ModTy.lookup aty env)))
+      (fun (a, aty) -> (EcIdent.create a.pl_desc,
+                        snd (EcEnv.ModTy.lookup aty.pl_desc env)))
       st.ps_params
   in
 
@@ -437,14 +449,14 @@ and transstruct (env : EcEnv.env) (x : EcIdent.t) (st : pstructure) =
 (* -------------------------------------------------------------------- *)
 and transstruct1 (env : EcEnv.env) (st : pstructure_item) =
   match st with
-  | Pst_mod (m, me) ->
+  | Pst_mod ({ pl_desc = m }, me) ->
       let m = EcIdent.create m in
         [(m, `Module (transmod env m me))]
 
   | Pst_var (xs, ty) ->
       let ty,_ = transty env TyPolicy.notv ty in
         List.map
-          (fun x ->
+          (fun { pl_desc = x } ->
             let x = EcIdent.create x in
               (x, `Variable { v_name = x; v_type = ty; }))
           xs
@@ -473,7 +485,7 @@ and transstruct1 (env : EcEnv.env) (st : pstructure_item) =
          *)
         let locals =
           List.map
-            (fun (x, ty, e) ->
+            (fun ({ pl_desc = x }, ty, e) ->
               let x    = EcIdent.create x in
               let ty, _  = transty env TyPolicy.notv ty in
               let tvar = mkunivar () in
@@ -517,7 +529,7 @@ and transstruct1 (env : EcEnv.env) (st : pstructure_item) =
 
         let fun_ = {
           f_sig = {
-            fs_name = decl.pfd_name;
+            fs_name = decl.pfd_name.pl_desc;
             fs_sig  = (List.map
                          (fun (x, ty, _) -> (x, ty))
                          (List.take (List.length decl.pfd_tyargs) locals),
@@ -530,7 +542,7 @@ and transstruct1 (env : EcEnv.env) (st : pstructure_item) =
         }
 
         in
-          [(EcIdent.create decl.pfd_name, `Function fun_)]
+          [(EcIdent.create decl.pfd_name.pl_desc, `Function fun_)]
   end
 
   | Pst_alias _ -> assert false
@@ -563,7 +575,7 @@ and transinstr ue (env : EcEnv.env) (i : pinstr) =
   | PSasgn (lvalue, rvalue) -> begin
       let rvalue_as_fun () =
         match rvalue.pl_desc with
-        | PEapp (name, args) when  EcEnv.Fun.exists name env ->
+        | PEapp ({ pl_desc = name }, args) when  EcEnv.Fun.exists name env ->
             let (fpath, args, rty) = transcall name args in
               Some (`Call (fpath, args), rty)
         | _ -> None
@@ -582,7 +594,7 @@ and transinstr ue (env : EcEnv.env) (i : pinstr) =
         | `Expr e -> Sasgn (lvalue, e)
     end
 
-  | PScall (name, args) ->
+  | PScall ({ pl_desc = name }, args) ->
       let (fpath, args, rty) = transcall name args in
         EcUnify.unify env ue (tunit ()) rty;
         Scall (None, fpath, args)
@@ -611,7 +623,7 @@ and transinstr ue (env : EcEnv.env) (i : pinstr) =
 (* -------------------------------------------------------------------- *)
 and translvalue ue (env : EcEnv.env) lvalue =
   match lvalue with
-  | PLvSymbol x ->
+  | PLvSymbol { pl_desc = x } ->
       let xpath, xty =
         try  EcEnv.Var.lookup x env
         with EcEnv.LookupFailure -> tyerror dloc (UnknownVariable x)
@@ -619,7 +631,7 @@ and translvalue ue (env : EcEnv.env) lvalue =
         (LvVar (xpath, xty), xty)
 
   | PLvTuple xs -> begin
-      let trans1 x =
+      let trans1 { pl_desc = x } =
         try  EcEnv.Var.lookup x env
         with EcEnv.LookupFailure -> tyerror dloc (UnknownVariable x)
       in
@@ -630,7 +642,7 @@ and translvalue ue (env : EcEnv.env) lvalue =
       (LvTuple xs, ty)
   end
 
-  | PLvMap (x, e) ->
+  | PLvMap ({ pl_desc = x }, e) ->
       let codomty = mkunivar () in
       let xpath, xty =
         try  EcEnv.Var.lookup x env
@@ -735,7 +747,7 @@ let transbop = function
   | PPiff -> Liff 
 
 let transl fenv tp decl = 
-  let transl1 (fenv,ld,tp) (x,pty) =
+  let transl1 (fenv,ld,tp) ({ pl_desc = x },pty) =
     let ty,tp = transty (Fenv.mono fenv) tp pty in
     let x = EcIdent.create x in
     Fenv.bind_local fenv x ty, (x,ty)::ld, tp in
@@ -763,7 +775,7 @@ let transformula fenv tp ue f =
     match f.pl_desc with
     | PFunit | PFint _ | PFtuple _ -> tyerror dloc (PropExpected f)
     | PFbool b -> EcFol.fofbool (fbool b) 
-    | PFident x -> 
+    | PFident { pl_desc = x } -> 
         begin match Fenv.Ident.trylookup fenv x with
         | None ->  tyerror dloc (UnknownVariable x)
         | Some(Llocal(x,ty)) -> fofbool fenv f.pl_loc (flocal x ty) ty
@@ -778,7 +790,7 @@ let transformula fenv tp ue f =
     | PFnot f -> fnot (transf fenv tp f)
     | PFbinop(f1,op, f2) ->
         fbinop (transf fenv tp f1) (transbop op) (transf fenv tp f2)
-    | PFapp(qs,es) ->
+    | PFapp({ pl_desc = qs }, es) ->
         let es   = List.map (transe fenv tp) es in
         let esig = snd (List.split es) in
         let ops  = select_pred (Fenv.mono fenv) qs ue esig in
@@ -805,11 +817,11 @@ let transformula fenv tp ue f =
         unify_error (Fenv.mono fenv) ue f.pl_loc pty ty1;
         let f2 = transf penv tp f2 in
         flet p e1 f2 
-    | PFforall(xs,f1) ->
+    | PFforall(xs, f1) ->
         let fenv, xs, tp = transl fenv tp xs in
         let f = transf fenv tp f1 in
         fforall xs f
-    | PFexists(xs,f1) ->
+    | PFexists(xs, f1) ->
         let fenv, xs, tp = transl fenv tp xs in
         let f = transf fenv tp f1 in
         fexists xs f
@@ -822,7 +834,7 @@ let transformula fenv tp ue f =
         let es,ts = List.split ets in
         Ftuple es, Ttuple ts
     | PFbool b -> fbool b, tbool()
-    | PFident x -> 
+    | PFident { pl_desc = x } -> 
         begin match Fenv.Ident.trylookup fenv x with
         | None ->  tyerror dloc (UnknownVariable x)
         | Some(Llocal(x,ty)) -> flocal x ty, ty
@@ -841,7 +853,7 @@ let transformula fenv tp ue f =
         fapp op [e] (Some tbool), tbool
     | PFbinop(f1,op,f2) -> (* FIXME *)
         assert false 
-    | PFapp(qs,es) ->
+    | PFapp({ pl_desc = qs }, es) ->
         let es   = List.map (transe fenv tp) es in
         let esig = snd (List.split es) in
         let ops  = select_op false (Fenv.mono fenv) qs ue esig in

@@ -41,13 +41,20 @@ module Location = struct
       (fst p.loc_end  ) (snd p.loc_end  )
 end
 
+(* -------------------------------------------------------------------- *)
 type 'a located = {
   pl_loc  : Location.t;
   pl_desc : 'a;
 }
 
+let unloc  x = x.pl_desc
+let unlocs x = List.map unloc x
+
 (* -------------------------------------------------------------------- *)
 type side = int
+
+type psymbol  = symbol  located         (* located symbol  *)
+ and pqsymbol = qsymbol located         (* located qsymbol *)
 
 type pty    = pty_r    located          (* located type              *)
 and  pexpr  = pexpr_r  located          (* located expression        *)
@@ -55,9 +62,9 @@ and  pexpr  = pexpr_r  located          (* located expression        *)
 and pty_r =
   | PTunivar
   | PTtuple     of pty list
-  | PTnamed     of qsymbol
-  | PTvar       of symbol
-  | PTapp       of qsymbol * pty list
+  | PTnamed     of pqsymbol
+  | PTvar       of psymbol
+  | PTapp       of pqsymbol * pty list
 
 and pexpr_r =
   | PEunit                                  (* unit literal       *)
@@ -67,25 +74,25 @@ and pexpr_r =
   | PEbitstr   of pexpr                     (* bitstring sampling *)
   | PEexcepted of pexpr * pexpr             (* restriction        *)
   | PEint      of int                       (* int. literal       *)
-  | PEident    of qsymbol                   (* symbol             *)
-  | PEapp      of qsymbol * pexpr list      (* op. application    *)
+  | PEident    of pqsymbol                  (* symbol             *)
+  | PEapp      of pqsymbol * pexpr list     (* op. application    *)
   | PElet      of lpattern * pexpr * pexpr  (* let binding        *)
   | PEtuple    of pexpr list                (* tuple constructor  *)
   | PEif       of pexpr * pexpr * pexpr     (* _ ? _ : _          *)
 
 and lpattern =
-  | LPSymbol of symbol
-  | LPTuple  of symbol list
+  | LPSymbol of psymbol
+  | LPTuple  of psymbol list
 
 type plvalue =
-  | PLvSymbol of qsymbol
-  | PLvTuple  of qsymbol list
-  | PLvMap    of qsymbol * pexpr
+  | PLvSymbol of pqsymbol
+  | PLvTuple  of pqsymbol list
+  | PLvMap    of pqsymbol * pexpr
 
 (* -------------------------------------------------------------------- *)
 type pinstr =
   | PSasgn   of plvalue * pexpr
-  | PScall   of qsymbol * pexpr list
+  | PScall   of pqsymbol * pexpr list
   | PSif     of pexpr * pstmt * pstmt
   | PSwhile  of pexpr * pstmt
   | PSassert of pexpr
@@ -94,8 +101,8 @@ and pstmt = pinstr list
 
 (* -------------------------------------------------------------------- *)
 type pmodule_type =
-  | Pty_app   of qsymbol * qsymbol list
-  | Pty_func  of (symbol * qsymbol) list * psignature
+  | Pty_app   of pqsymbol * pqsymbol list
+  | Pty_func  of (psymbol * pqsymbol) list * psignature
   | Pty_sig   of psignature
 
 and psignature = psignature_item list
@@ -106,60 +113,59 @@ and psignature_item = [
 ]
 
 and pvariable_decl = {
-  pvd_name : symbol;
+  pvd_name : psymbol;
   pvd_type : pty;
 }
 
 and pfunction_decl = {
-  pfd_name     : symbol;
-  pfd_tyargs   : (symbol * pty) list;
+  pfd_name     : psymbol;
+  pfd_tyargs   : (psymbol * pty) list;
   pfd_tyresult : pty;
-  pfd_uses     : (qsymbol list) option;
+  pfd_uses     : (pqsymbol list) option;
 }
 
 (* -------------------------------------------------------------------- *)
 and pmodule_expr =
-  | Pm_ident  of qsymbol * qsymbol list
+  | Pm_ident  of pqsymbol * pqsymbol list
   | Pm_struct of pstructure
 
 and pstructure = {
-  ps_params    : (symbol * qsymbol) list;
+  ps_params    : (psymbol * pqsymbol) list;
   ps_signature : pmodule_type option;
   ps_body      : pstructure_item list;
 }
 
 and pstructure_item =
-  | Pst_mod   of (symbol * pmodule_expr)
-  | Pst_var   of (symbol list * pty)
+  | Pst_mod   of (psymbol * pmodule_expr)
+  | Pst_var   of (psymbol list * pty)
   | Pst_fun   of (pfunction_decl * pfunction_body)
-  | Pst_alias of (symbol * qsymbol)
+  | Pst_alias of (psymbol * pqsymbol)
 
 and pfunction_body = {
-  pfb_locals : (symbol list * pty * pexpr option) list;
+  pfb_locals : (psymbol list * pty * pexpr option) list;
   pfb_body   : pstmt;
   pfb_return : pexpr option;
 }
 
 (* -------------------------------------------------------------------- *)
-
 type poperator = {
-  po_name   : symbol;
-  po_tyvars : symbol list option;
+  po_name   : psymbol;
+  po_tyvars : psymbol list option;
   po_dom : pty list option;
   po_codom : pty;  
-  po_body   : (symbol list * pexpr) option;
+  po_body   : (psymbol list * pexpr) option;
   po_prob   : bool;
 }
 
 (* -------------------------------------------------------------------- *)
 type ptydecl = {
-  pty_name   : symbol;
-  pty_tyvars : symbol list;
+  pty_name   : psymbol;
+  pty_tyvars : psymbol list;
   pty_body   : pty option;
 }
 
 (* -------------------------------------------------------------------- *)
-type ptylocals = (symbol * pty) list
+type ptylocals = (psymbol * pty) list
 
 type pbinop =
   | PPand
@@ -174,11 +180,11 @@ and pformula_r =
   | PFbool   of bool                      (* bool literal      *)
   | PFint    of int                       (* int. literal      *)
   | PFtuple  of pformula list             (* tuple             *)
-  | PFident  of qsymbol                   (* symbol            *)
+  | PFident  of pqsymbol                  (* symbol            *)
   | PFside   of pformula * side         
   | PFnot    of pformula 
   | PFbinop  of pformula * pbinop * pformula
-  | PFapp    of qsymbol * pformula list
+  | PFapp    of pqsymbol * pformula list
   | PFif     of pformula * pformula * pformula
   | PFlet    of lpattern * pformula * pformula
   | PFforall of ptylocals * pformula
@@ -189,7 +195,7 @@ and pformula_r =
 type paxiom_kind = PAxiom | PLemma
 
 type paxiom = {
-  pa_name    : symbol;
+  pa_name    : psymbol;
   pa_formula : pformula;
   pa_kind : paxiom_kind;
 }
@@ -200,15 +206,15 @@ type 'a abstr_def =
   | ConcrDef of ptylocals * 'a 
 
 type ppredicate = {
-  pp_name   : symbol;
-  pp_tyvars : symbol list option;
+  pp_name   : psymbol;
+  pp_tyvars : psymbol list option;
   pp_dom    : pty list option;
-  pp_body   : (symbol list * pformula) option;
+  pp_body   : (psymbol list * pformula) option;
 }
 
 
 (* -------------------------------------------------------------------- *)
-type ident_spec = symbol list
+type ident_spec = psymbol list
 
 type inv = (pformula, (pformula * pformula) * pformula option) EcAstlogic.g_inv
 
@@ -221,50 +227,50 @@ type auto_info = inv option * ident_spec
 type auto_eager = (auto_info, pstmt) EcAstlogic.helper
       
 type equiv = {
-  eq_name  : symbol           ;
-  eq_left  : qsymbol          ;
-  eq_right : qsymbol          ;
+  eq_name  : psymbol          ;
+  eq_left  : pqsymbol         ;
+  eq_right : pqsymbol         ;
   eq_concl : equiv_concl      ;
   eq_auto  : auto_eager option;
 }
 
 (* -------------------------------------------------------------------- *)
-type cnst_decl = (symbol list * pty) * pexpr option
+type cnst_decl = (psymbol list * pty) * pexpr option
 
 (* -------------------------------------------------------------------- *)
 type hint =
-  | Husing of symbol
+  | Husing of psymbol
   | Hadmit
   | Hcompute
   | Hnone
   | Hsame
   | Hsplit
   | Hauto
-  | Hfailure of int * pexpr * pexpr * (symbol * pexpr) list
+  | Hfailure of int * pexpr * pexpr * (psymbol * pexpr) list
 
-type claim = symbol * (pexpr * hint)
+type claim = psymbol * (pexpr * hint)
 
 (* -------------------------------------------------------------------- *)
 type pprint = 
-  | Pr_ty of qsymbol
-  | Pr_op of qsymbol
-  | Pr_th of qsymbol
-  | Pr_pr of qsymbol
-  | Pr_ax of qsymbol
+  | Pr_ty of pqsymbol
+  | Pr_op of pqsymbol
+  | Pr_th of pqsymbol
+  | Pr_pr of pqsymbol
+  | Pr_ax of pqsymbol
 
 (* -------------------------------------------------------------------- *)
 type global =
-  | Gmodule    of (symbol * pmodule_expr)
-  | Ginterface of (symbol * pmodule_type)
+  | Gmodule    of (psymbol * pmodule_expr)
+  | Ginterface of (psymbol * pmodule_type)
   | Goperator  of poperator
   | Gpredicate of ppredicate
   | Gaxiom     of paxiom
   | Gclaim     of claim
   | Gtype      of ptydecl
   | Gprint     of pprint
-  | GthOpen    of symbol
-  | GthClose   of symbol
-  | GthRequire of symbol
-  | GthImport  of qsymbol
+  | GthOpen    of psymbol
+  | GthClose   of psymbol
+  | GthRequire of psymbol
+  | GthImport  of pqsymbol
 
 type prog = global list
