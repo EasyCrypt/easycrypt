@@ -26,6 +26,9 @@ let omap (x : 'a option) (f : 'a -> 'b) =
 let odfl (d : 'a) (x : 'a option) =
   match x with None -> d | Some x -> x
 
+let oget (x : 'a option) =
+  match x with None -> assert false | Some x -> x
+
 (* -------------------------------------------------------------------- *)
 let fstmap f (x, y) = (f x, y)
 let sndmap f (x, y) = (f, f y)

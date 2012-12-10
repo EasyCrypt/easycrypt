@@ -47,7 +47,7 @@
 %token AXIOM
 %token LEMMA
 %token BACKSLASH
-%token BITSTR
+// %token BITSTR
 // %token CHECKPROOF
 %token CLAIM
 %token CNST
@@ -89,7 +89,7 @@
 %token NOT
 %token OP
 %token OR
-%token PIPE
+// %token PIPE
 %token POP
 // %token PR
 %token PRED
@@ -201,18 +201,10 @@ qident:
 | x=ident DCOLON qx=qident { (x :: fst qx, snd qx) }
 | x=ident                  { ([]         , x     ) }
 
-znumber:
-| /*-*/ n=NUM {  n }
-| MINUS n=NUM { -n }
-;
-
 (* -------------------------------------------------------------------- *)
 %inline ident_list1: aout=plist1(ident, COMMA) { aout };
-%inline ident_list0: aout=plist0(ident, COMMA) { aout };
 
 %inline prim_ident_list1: aout=plist1(prim_ident, COMMA) { aout };
-
-%inline number_list1: aout=plist1(number, COMMA) { aout };
 
 (* -------------------------------------------------------------------- *)
 %inline binop:
@@ -236,10 +228,6 @@ prog_num:
     "variable side must be greater than 0"
   }
 ;
-
-side:
-| prog_num { if $1 = 1 then ApiEcTypes.Left else ApiEcTypes.Right }
-| empty { ApiEcTypes.Both }
 
 (* -------------------------------------------------------------------- *)
 (* Expressions: program expression, real expression                     *)
@@ -265,6 +253,8 @@ sexp:
 ;
 
 exp:
+| e=sexp { e }
+
 | NOT   e=loc(exp)                      { PEapp (qsymb_of_symb "!", [e]) }
 | MINUS e=loc(exp) %prec prec_prefix_op { PEapp (qsymb_of_symb "-", [e]) }
 
@@ -288,38 +278,28 @@ exp:
 | LET p=lpattern EQ e1=loc(exp) IN e2=loc(exp)
    { PElet (p, e1, e2) }
 
-| e=sexp { e }
-
-| re=loc(rnd_exp) { PErnd re }
-;
-
-(* -------------------------------------------------------------------- *)
-rnd_exp:
 | LKEY n1=number COMMA n2=number RKEY
     { if   n1 = 0 && n2 = 1
-      then PRbool
+      then PEflip
       else error (Location.make $startpos $endpos) "malformed bool random" }
 
 | LKEY n1=number COMMA n2=number RKEY_HAT e=loc(exp)
     { if   n1 = 0 && n2 = 1
-      then PRbitstr e
+      then PEbitstr e
       else error (Location.make $startpos $endpos) "malformed random bitstring" }
 
 | LBRACKET e1=loc(exp) DOTDOT e2=loc(exp) RBRACKET
-    { PRinter (e1, e2) }
+    { PEinter (e1, e2) }
 
-| LPAREN re=loc(rnd_exp) BACKSLASH e=loc(exp) RPAREN
-    { PRexcepted (re, e) }
-
-| x=qident LPAREN es=exp_list0 RPAREN
-    { PRapp (x, es) }
+| LPAREN re=loc(exp) BACKSLASH e=loc(exp) RPAREN
+    { PEexcepted (re, e) }
 ;
 
 (* -------------------------------------------------------------------- *)
 %inline p_exp_sm_list0: aout=plist0(loc(exp), SEMICOLON) { aout }
 
 %inline exp_list0: aout=plist0(loc(exp), COMMA) { aout }
-%inline exp_list1: aout=plist1(loc(exp), COMMA) { aout }
+// %inline exp_list1: aout=plist1(loc(exp), COMMA) { aout }
 %inline exp_list2: aout=plist2(loc(exp), COMMA) { aout }
 
 (* -------------------------------------------------------------------- *)
@@ -329,17 +309,20 @@ sform:
 | TRUE                                   { PFbool true  }
 | FALSE                                  { PFbool false }
 | n=number                               { PFint n }
-| x=qident                                { PFident x }
-| se=loc(sform) LBRACKET e=loc(form) RBRACKET { PFapp (qsymb_of_symb "<get>", [se; e]) }
+| x=qident                               { PFident x }
+| se=loc(sform) LBRACKET e=loc(form) RBRACKET
+                                         { PFapp (qsymb_of_symb "<get>", [se; e]) }
 | se=loc(sform) LBRACKET e1=loc(form) LEFTARROW e2=loc(form) RBRACKET
                                          { PFapp (qsymb_of_symb "<set>", [se; e1; e2]) }
-| x=qident LPAREN es=form_list0 RPAREN     { PFapp (x, es) }
+| x=qident LPAREN es=form_list0 RPAREN   { PFapp (x, es) }
 | x=loc(sform) LKEY s=prog_num RKEY      { PFside (x, s) }
 | LPAREN es=form_list2 RPAREN            { PFtuple es }
 | LPAREN e=form RPAREN                   { e }
 | LBRACKET es=p_form_sm_list0 RBRACKET   { pflist es }
                           
 form:
+| e=sform { e }
+
 | NOT   e=loc(form)                      { PFnot e }
 | MINUS e=loc(form) %prec prec_prefix_op { PFapp (qsymb_of_symb "-", [e]) }
 | e1=loc(form)    IMPL  e2=loc(form)  { PFbinop (e1, PPimp, e2) }
@@ -359,9 +342,7 @@ form:
 | IF c=loc(form) THEN e1=loc(form) ELSE e2=loc(form)             { PFif (c, e1, e2) }
 
 | LET p=lpattern EQ e1=loc(form) IN e2=loc(form) { PFlet (p, e1, e2) }
-| LET p=lpattern EQ e1=loc(form) IN e2=loc(form) 
-                            { PFlet (p, e1, e2) }
-| e=sform              { e }
+
 | FORALL pd=param_decl COMMA e=loc(form) { PFforall(pd, e) }
 | EXIST  pd=param_decl COMMA e=loc(form) { PFexists(pd,e) }
 ;
@@ -391,22 +372,6 @@ type_exp:
 | ty=plist2(loc(simpl_type_exp), STAR) { PTtuple ty }
 ;
 
-type_exp_dom:
-| LPAREN RPAREN                                  { [  ] }
-| ty=loc(type_exp)                               { [ty] }
-| LPAREN tys=plist2(loc(type_exp), COMMA) RPAREN { tys  }
-;
-
-type_exp_pred_dom:
-| LPAREN RPAREN                                  { [  ] }
-| ty=loc(type_exp)                               { [ty] }
-| LPAREN tys=plist2(loc(type_exp), COMMA) RPAREN { tys  }
-;
-
-fun_type:
-| dom=type_exp_pred_dom ARROW codom=type_exp { (dom, codom) }
-;
-
 (* -------------------------------------------------------------------- *)
 (* Parameter declarations                                              *)
 
@@ -427,16 +392,11 @@ lvalue:
 | x=qident LBRACKET e=loc(exp) RBRACKET { PLvMap    (x, e) }
 ;
 
-rvalue:
-| e=loc(exp)                          { `Expr e }
-| x=qident LPAREN es=exp_list0 RPAREN { `Call (x, es) }
-;
-
 base_instr:
 | f=qident LPAREN es=exp_list0 RPAREN
     { PScall (f, es) }
 
-| x=lvalue EQ e=rvalue
+| x=lvalue EQ e=loc(exp)
     { PSasgn (x, e) }
 
 | ASSERT LPAREN c=loc(exp) RPAREN 
@@ -458,19 +418,11 @@ block:
 stmt: aout=instr* { aout }
 
 (* -------------------------------------------------------------------- *)
-(* Functions                                                            *)
+(* Module definition                                                    *)
 
 var_decl:
 | VAR xs=ident_list1 COLON ty=loc(type_exp) { (xs, ty) }
 ;
-
-var_decl_list:
-| var_decl { [$1] }
-| var_decl var_decl_list { $1::$2 }
-;
-
-(* -------------------------------------------------------------------- *)
-(* Module definition                                                    *)
 
 loc_decl:
 | VAR xs=ident_list1 COLON ty=loc(type_exp) SEMICOLON

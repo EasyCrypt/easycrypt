@@ -81,6 +81,7 @@ module type S = sig
   val bindall   : (EcIdent.t * t) list -> env -> env
   val lookup    : qsymbol -> env -> EcPath.path * t
   val trylookup : qsymbol -> env -> (EcPath.path * t) option
+  val exists    : qsymbol -> env -> bool
 end
 
 (* -------------------------------------------------------------------- *)
@@ -273,6 +274,8 @@ module Var = struct
     | Some x -> x
 
   let trylookup x env = try_lf (fun () -> lookup x env)
+
+  let exists x env = (trylookup x env <> None)
 end
 
 (* -------------------------------------------------------------------- *)
@@ -297,11 +300,12 @@ module Fun = struct
     | Some x -> x
 
   let trylookup x env = try_lf (fun () -> lookup x env)
+
+  let exists x env = (trylookup x env <> None)
 end
 
 (* -------------------------------------------------------------------- *)
 module Ty = struct
-
   type t = tydecl
 
   let bind x tydecl env =
@@ -339,6 +343,8 @@ module Ty = struct
     | Some (_, { tyd_type = None }) -> assert false
     | Some (_, ({ tyd_type = Some body } as tyd)) ->
         EcTypes.inst_var (EcTypes.init_substvar tyd.tyd_params args) body
+
+  let exists x env = (trylookup x env <> None)
 end
 
 (* -------------------------------------------------------------------- *)
@@ -369,6 +375,8 @@ module Op = struct
       (omap
          (MC.lookup_mc scope env.env_root)
          (MC.lookup_all_op1 id))
+
+  let exists x env = (trylookup x env <> None)
 end
 
 (* -------------------------------------------------------------------- *)
@@ -417,6 +425,8 @@ module Ax = struct
     | Some x -> x
 
   let trylookup x env = try_lf (fun () -> lookup x env)
+
+  let exists x env = (trylookup x env <> None)
 end
 
 (* -------------------------------------------------------------------- *)
@@ -441,6 +451,8 @@ module Mod = struct
     | Some x -> x
 
   let trylookup x env = try_lf (fun () -> lookup x env)
+
+  let exists x env = (trylookup x env <> None)
 end
 
 (* -------------------------------------------------------------------- *)
@@ -465,6 +477,8 @@ module ModTy = struct
     | Some x -> x
 
   let trylookup x env = try_lf (fun () -> lookup x env)
+
+  let exists x env = (trylookup x env <> None)
 end
 
 (* -------------------------------------------------------------------- *)
@@ -489,6 +503,8 @@ module Theory = struct
     | Some x -> x
 
   let trylookup x env = try_lf (fun () -> lookup x env)
+
+  let exists x env = (trylookup x env <> None)
 
   let import ((scope, id) : qsymbol) (env : env) =
     match EcIdent.Map.byident

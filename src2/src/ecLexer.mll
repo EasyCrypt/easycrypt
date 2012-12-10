@@ -23,7 +23,6 @@
     "true"        , TRUE       ;        (* KW: prog *)
     "false"       , FALSE      ;        (* KW: prog *)
 
-    "bitstring"   , BITSTR     ;        (* KW: prog *)
     "var"         , VAR        ;        (* KW: prog *)
     "fun"         , FUN        ;        (* KW: prog *)
     "if"          , IF         ;        (* KW: prog *)
@@ -120,7 +119,6 @@ rule main = parse
   | ":>"                      { DCOLON }
   | "}^"                      { RKEY_HAT }
   | '?'                       { QUESTION }
-  | '|'                       { PIPE }
   | '\\'                      { BACKSLASH }
   | "*"                       { STAR }
   | "-"                       { MINUS }

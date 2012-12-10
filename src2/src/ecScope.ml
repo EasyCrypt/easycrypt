@@ -118,10 +118,12 @@ let name (scope : scope) =
   scope.sc_name
 
 (* -------------------------------------------------------------------- *)
-let env (scope : scope) = scope.sc_env
+let env (scope : scope) =
+  scope.sc_env
 
 (* -------------------------------------------------------------------- *)
-let attop (scope : scope) = scope.sc_top = None
+let attop (scope : scope) =
+  scope.sc_top = None
 
 (* -------------------------------------------------------------------- *)
 let subscope (scope : scope option) (name : symbol) =
@@ -250,7 +252,7 @@ module Ax = struct
   let transform (scope : scope) f e =
     { scope with
         sc_axioms = f scope.sc_axioms;
-        sc_env     = e scope.sc_env }
+        sc_env    = e scope.sc_env }
 
   let transform_kind = function
     | PAxiom -> Axiom
@@ -263,10 +265,11 @@ module Ax = struct
     let axd = { 
       ax_spec = form;
       ax_kind = transform_kind ax.pa_kind
-    } in
-    transform scope
-      (Context.bind ax.pa_name axd)
-      (EcEnv.Ax.bind (EcIdent.create ax.pa_name) axd)
+    }
+    in
+      transform scope
+        (Context.bind ax.pa_name axd)
+        (EcEnv.Ax.bind (EcIdent.create ax.pa_name) axd)
 end
 
 (* -------------------------------------------------------------------- *)

@@ -36,6 +36,7 @@ module type S = sig
   val bindall   : (EcIdent.t * t) list -> env -> env
   val lookup    : qsymbol -> env -> EcPath.path * t
   val trylookup : qsymbol -> env -> (EcPath.path * t) option
+  val exists    : qsymbol -> env -> bool
 end
 
 (* -------------------------------------------------------------------- *)

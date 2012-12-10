@@ -188,14 +188,14 @@ let transpattern (env : EcEnv.env) (p : EcParsetree.lpattern) =
 
 (* -------------------------------------------------------------------- *)
 let unify_error env ue loc ty1 ty2 = 
-  try EcUnify.unify env ue ty1 ty2 
+  try  EcUnify.unify env ue ty1 ty2 
   with EcUnify.UnificationFailure(t1,t2) ->
     let inst_uni = EcTypes.inst_uni (EcUnify.UniEnv.asmap ue) in
-    tyerror loc (UnexpectedType (inst_uni ty1, inst_uni ty2, 
-                                 inst_uni t1, inst_uni t2)) 
+      tyerror loc (UnexpectedType (inst_uni ty1, inst_uni ty2, 
+                                   inst_uni t1 , inst_uni t2 ))
 
 let transexp (env : EcEnv.env) (policy : epolicy) (ue : EcUnify.unienv) e =
-  
+
   let rec transexp (env : EcEnv.env) (policy : epolicy) (e : pexpr) =
     let loc = e.pl_loc in
 
@@ -240,49 +240,36 @@ let transexp (env : EcEnv.env) (policy : epolicy) (ue : EcUnify.unienv) e =
     | PEtuple es ->
         let tes = List.map (transexp env policy) es in
         let es, tys = List.split tes in
-        Etuple es, Ttuple tys
+          Etuple es, Ttuple tys
 
     | PEif (pc, pe1, pe2) ->
       let c, tyc = transexp env policy pc in
-      unify_error env ue pc.pl_loc tyc (tbool());
       let e1, ty1 = transexp env policy pe1 in
       let e2, ty2 = transexp env policy pe2 in
-      unify_error env ue pe2.pl_loc ty2 ty1;
-      Eif (c, e1, e2), ty1
+        unify_error env ue pc.pl_loc tyc (tbool());
+        unify_error env ue pe2.pl_loc ty2 ty1;
+        Eif (c, e1, e2), ty1
 
-    | PErnd re ->
-      if not policy.epl_prob then
-        tyerror loc ProbaExpressionForbidden;
-      let re, ty = transrexp env policy re in
-      (Ernd re, ty)
+    | PEflip -> (Eflip, tbool ())
 
-  and transrexp (env : EcEnv.env) (policy : epolicy) (e : prexpr) =
-    match e.pl_desc with
-    | PRbool -> (Rbool, tbool ())
-
-    | PRbitstr pe ->
+    | PEbitstr pe ->
         let e, ety = transexp env policy pe in
-        unify_error env ue pe.pl_loc ety (tint ());
-        (Rbitstr e, tbitstring ())
+          unify_error env ue pe.pl_loc ety (tint ());
+          (Ebitstr e, tbitstring ())
 
-    | PRexcepted (re, pe) ->
-        let re, rety = transrexp env policy re in
-        let  e,  ety = transexp  env policy  pe in
-        unify_error env ue pe.pl_loc ety (tlist rety);
-        (Rexcepted (re, e), rety)
-    | PRinter (pe1, pe2) ->
+    | PEexcepted (re, pe) ->
+        let re, rety = transexp env policy re in
+        let  e,  ety = transexp env policy pe in
+          unify_error env ue pe.pl_loc ety (tlist rety);
+          (Eexcepted (re, e), rety)
+
+    | PEinter (pe1, pe2) ->
         let e1, ty1 = transexp env policy pe1 in
         let e2, ty2 = transexp env policy pe2 in
         let tint = tint () in
-        unify_error env ue pe1.pl_loc ty1 tint;
-        unify_error env ue pe2.pl_loc ty2 tint;
-        (Rinter (e1, e2), tint)
-
-    | PRapp (name, args) ->
-        let _args, _asig =              (* FIXME *)
-          List.split (List.map (transexp env epolicy) args)
-        in
-        assert false
+          unify_error env ue pe1.pl_loc ty1 tint;
+          unify_error env ue pe2.pl_loc ty2 tint;
+          (Einter (e1, e2), tint)
 
   in
     transexp env policy e               (* FIXME: close type *)
@@ -554,28 +541,14 @@ and transstmt ue (env : EcEnv.env) (stmt : pstmt) =
 
 (* -------------------------------------------------------------------- *)
 and transinstr ue (env : EcEnv.env) (i : pinstr) =
-  match i with
-  | PSasgn (lvalue, rvalue) -> begin
-      let lvalue, lty = translvalue ue env lvalue in
-      let stmt, ety =
-        match rvalue with
-        | `Expr e ->
-            let (e, ety) = transexp env epolicy ue e in (* FIXME: policy *)
-              (Sasgn (lvalue, e), ety)
-        | _ -> assert false
-      in
-        EcUnify.unify env ue lty ety;
-        stmt
-  end
-
-  | PScall (name, args) ->
+  let transcall name args =
     let fpath, fsig =
       try  EcEnv.Fun.lookup name env
       with EcEnv.LookupFailure -> tyerror dloc (UnknownFunction name)
     in
       if List.length args <> List.length (fst fsig.fs_sig) then
         tyerror dloc ApplInvalidArity;
-
+  
       let args =
         List.map2
           (fun a (_, ty) ->
@@ -583,7 +556,35 @@ and transinstr ue (env : EcEnv.env) (i : pinstr) =
               EcUnify.unify env ue aty ty; a)
           args (fst fsig.fs_sig)
       in
-        EcUnify.unify env ue (snd fsig.fs_sig) (tunit ());
+        (fpath, args, snd fsig.fs_sig)
+  in
+
+  match i with
+  | PSasgn (lvalue, rvalue) -> begin
+      let rvalue_as_fun () =
+        match rvalue.pl_desc with
+        | PEapp (name, args) when  EcEnv.Fun.exists name env ->
+            let (fpath, args, rty) = transcall name args in
+              Some (`Call (fpath, args), rty)
+        | _ -> None
+
+      and rvalue_as_expr () =
+        let e, ty = transexp env epolicy ue rvalue in
+          Some (`Expr e, ty)
+      in
+
+      let lvalue, lty = translvalue ue env lvalue in
+      let rvalue, rty = oget (List.fpick [rvalue_as_fun; rvalue_as_expr]) in
+
+        EcUnify.unify env ue lty rty;
+        match rvalue with
+        | `Call (fpath, args) -> Scall (Some lvalue, fpath, args)
+        | `Expr e -> Sasgn (lvalue, e)
+    end
+
+  | PScall (name, args) ->
+      let (fpath, args, rty) = transcall name args in
+        EcUnify.unify env ue (tunit ()) rty;
         Scall (None, fpath, args)
 
   | PSif (e, s1, s2) ->

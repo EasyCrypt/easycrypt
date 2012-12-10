@@ -72,28 +72,24 @@ type lpattern =
   | LTuple  of EcIdent.t list
 
 type tyexpr =
-  | Eunit                                   (* unit literal      *)
-  | Ebool   of bool                         (* bool literal      *)
-  | Eint    of int                          (* int. literal      *)
-  | Elocal  of EcIdent.t * ty                 (* local variable    *)
-  | Evar    of EcPath.path * ty               (* module variable   *)
-  | Eapp    of EcPath.path * tyexpr list      (* op. application   *)
-  | Elet    of lpattern * tyexpr * tyexpr   (* let binding       *)
-  | Etuple  of tyexpr list                  (* tuple constructor *)
-  | Eif     of tyexpr * tyexpr * tyexpr     (* _ ? _ : _         *)
-  | Ernd    of tyrexpr                      (* random expression *)
+  | Eunit                                    (* unit literal       *)
+  | Ebool     of bool                        (* bool literal       *)
+  | Eint      of int                         (* int. literal       *)
+  | Eflip                                    (* flip               *)
+  | Einter    of tyexpr * tyexpr             (* interval sampling  *)
+  | Ebitstr   of tyexpr                      (* bitstring sampling *)
+  | Eexcepted of tyexpr * tyexpr             (* restriction        *)
+  | Elocal    of EcIdent.t * ty              (* local variable     *)
+  | Evar      of EcPath.path * ty            (* module variable    *)
+  | Eapp      of EcPath.path * tyexpr list   (* op. application    *)
+  | Elet      of lpattern * tyexpr * tyexpr  (* let binding        *)
+  | Etuple    of tyexpr list                 (* tuple constructor  *)
+  | Eif       of tyexpr * tyexpr * tyexpr    (* _ ? _ : _          *)
 
-and tyrexpr =
-  | Rbool                                    (* flip               *)
-  | Rinter    of tyexpr * tyexpr             (* interval sampling  *)
-  | Rbitstr   of tyexpr                      (* bitstring sampling *)
-  | Rexcepted of tyrexpr * tyexpr            (* restriction        *)
-  | Rapp      of EcPath.path * tyexpr list     (* p-op. application  *)
+(* -------------------------------------------------------------------- *)
+val e_map : (ty -> ty) -> (tyexpr -> tyexpr) -> tyexpr -> tyexpr
 
-val e_map : (ty -> ty) -> (tyexpr -> tyexpr) -> (tyrexpr -> tyrexpr) ->
-            tyexpr -> tyexpr
-val re_map :  (tyexpr -> tyexpr) -> (tyrexpr -> tyrexpr) ->
-            tyrexpr -> tyrexpr
+(* -------------------------------------------------------------------- *)
 module Esubst : sig
   val uni : ty Muid.t -> tyexpr -> tyexpr 
 end

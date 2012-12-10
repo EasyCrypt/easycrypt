@@ -51,7 +51,6 @@ type side = int
 
 type pty    = pty_r    located          (* located type              *)
 and  pexpr  = pexpr_r  located          (* located expression        *)
-and  prexpr = prexpr_r located          (* located random expression *)
 
 and pty_r =
   | PTunivar
@@ -61,22 +60,18 @@ and pty_r =
   | PTapp       of qsymbol * pty list
 
 and pexpr_r =
-  | PEunit                                (* unit literal      *)
-  | PEbool   of bool                      (* bool literal      *)
-  | PEint    of int                       (* int. literal      *)
-  | PEident  of qsymbol                   (* symbol            *)
-  | PEapp    of qsymbol * pexpr list      (* op. application   *)
-  | PElet    of lpattern * pexpr * pexpr  (* let binding       *)
-  | PEtuple  of pexpr list                (* tuple constructor *)
-  | PEif     of pexpr * pexpr * pexpr     (* _ ? _ : _         *)
-  | PErnd    of prexpr                    (* random expression *)
-
-and prexpr_r =
-  | PRbool                                (* flip               *)
-  | PRinter    of pexpr * pexpr           (* interval sampling  *)
-  | PRbitstr   of pexpr                   (* bitstring sampling *)
-  | PRexcepted of prexpr * pexpr          (* restriction        *)
-  | PRapp      of qsymbol * pexpr list    (* p-op. application  *)
+  | PEunit                                  (* unit literal       *)
+  | PEbool     of bool                      (* bool literal       *)
+  | PEflip                                  (* flip               *)
+  | PEinter    of pexpr * pexpr             (* interval sampling  *)
+  | PEbitstr   of pexpr                     (* bitstring sampling *)
+  | PEexcepted of pexpr * pexpr             (* restriction        *)
+  | PEint      of int                       (* int. literal       *)
+  | PEident    of qsymbol                   (* symbol             *)
+  | PEapp      of qsymbol * pexpr list      (* op. application    *)
+  | PElet      of lpattern * pexpr * pexpr  (* let binding        *)
+  | PEtuple    of pexpr list                (* tuple constructor  *)
+  | PEif       of pexpr * pexpr * pexpr     (* _ ? _ : _          *)
 
 and lpattern =
   | LPSymbol of symbol
@@ -87,12 +82,9 @@ type plvalue =
   | PLvTuple  of qsymbol list
   | PLvMap    of qsymbol * pexpr
 
-type prvalue =
-  [`Expr of pexpr | `Call of qsymbol * pexpr list]
-
 (* -------------------------------------------------------------------- *)
 type pinstr =
-  | PSasgn   of plvalue * prvalue
+  | PSasgn   of plvalue * pexpr
   | PScall   of qsymbol * pexpr list
   | PSif     of pexpr * pstmt * pstmt
   | PSwhile  of pexpr * pstmt
@@ -181,7 +173,7 @@ and pformula_r =
   | PFunit                                (* unit literal      *)
   | PFbool   of bool                      (* bool literal      *)
   | PFint    of int                       (* int. literal      *)
-  | PFtuple  of pformula list                (* tuple *)
+  | PFtuple  of pformula list             (* tuple             *)
   | PFident  of qsymbol                   (* symbol            *)
   | PFside   of pformula * side         
   | PFnot    of pformula 

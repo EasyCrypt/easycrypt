@@ -138,51 +138,39 @@ type lpattern =
   | LSymbol of EcIdent.t
   | LTuple  of EcIdent.t list
 
+
 type tyexpr =
-  | Eunit                                   (* unit literal      *)
-  | Ebool   of bool                         (* bool literal      *)
-  | Eint    of int                          (* int. literal      *)
-  | Elocal  of EcIdent.t * ty               (* local variable    *)
-  | Evar    of EcPath.path * ty             (* module variable   *)
-  | Eapp    of EcPath.path * tyexpr list    (* op. application   *)
-  | Elet    of lpattern * tyexpr * tyexpr   (* let binding       *)
-  | Etuple  of tyexpr list                  (* tuple constructor *)
-  | Eif     of tyexpr * tyexpr * tyexpr     (* _ ? _ : _         *)
-  | Ernd    of tyrexpr                      (* random expression *)
-(* FIXME : flatten this *)
-and tyrexpr =
-  | Rbool                                    (* flip               *)
-  | Rinter    of tyexpr * tyexpr             (* interval sampling  *)
-  | Rbitstr   of tyexpr                      (* bitstring sampling *)
-  | Rexcepted of tyrexpr * tyexpr            (* restriction        *)
-  | Rapp      of EcPath.path * tyexpr list   (* p-op. application  *)
+  | Eunit                                    (* unit literal       *)
+  | Ebool     of bool                        (* bool literal       *)
+  | Eint      of int                         (* int. literal       *)
+  | Eflip                                    (* flip               *)
+  | Einter    of tyexpr * tyexpr             (* interval sampling  *)
+  | Ebitstr   of tyexpr                      (* bitstring sampling *)
+  | Eexcepted of tyexpr * tyexpr             (* restriction        *)
+  | Elocal    of EcIdent.t * ty              (* local variable     *)
+  | Evar      of EcPath.path * ty            (* module variable    *)
+  | Eapp      of EcPath.path * tyexpr list   (* op. application    *)
+  | Elet      of lpattern * tyexpr * tyexpr  (* let binding        *)
+  | Etuple    of tyexpr list                 (* tuple constructor  *)
+  | Eif       of tyexpr * tyexpr * tyexpr    (* _ ? _ : _          *)
 
-let e_map ft fe fr e = 
+(* -------------------------------------------------------------------- *)
+let e_map ft fe e = 
   match e with 
-  | Eunit | Ebool _  | Eint _ -> e 
-  | Elocal (id, ty) -> Elocal(id,ft ty)
-  | Evar(id,ty) -> Evar(id,ft ty)
-  | Eapp(p,args) -> Eapp(p, List.map fe args)
-  | Elet(lp,e1,e2) -> Elet(lp, fe e1, fe e2)
-  | Etuple le -> Etuple(List.map fe le)
-  | Eif(e1,e2,e3) -> Eif(fe e1, fe e2, fe e3)
-  | Ernd r -> Ernd(fr r)
+  | Eunit | Ebool _ | Eint _ | Eflip -> e 
+  | Elocal (id, ty)    -> Elocal (id, ft ty)
+  | Evar (id, ty)      -> Evar (id, ft ty)
+  | Eapp (p, args)     -> Eapp (p, List.map fe args)
+  | Elet (lp, e1, e2)  -> Elet (lp, fe e1, fe e2)
+  | Etuple le          -> Etuple (List.map fe le)
+  | Eif (e1, e2, e3)   -> Eif (fe e1, fe e2, fe e3)
+  | Einter (e1,e2)     -> Einter (fe e1, fe e2)
+  | Ebitstr e          -> Ebitstr (fe e)
+  | Eexcepted (e1, e2) -> Eexcepted (fe e1, fe e2)
 
-let re_map fe fr = function
-  | Rbool -> Rbool
-  | Rinter(e1,e2) -> Rinter(fe e1, fe e2)
-  | Rbitstr e -> Rbitstr(fe e)
-  | Rexcepted(e1,e2) -> Rexcepted(fr e1, fe e2)
-  | Rapp(p, args) -> Rapp(p, List.map fe args)
-
+(* -------------------------------------------------------------------- *)
 module Esubst = struct 
   let uni (uidmap : ty EcUidgen.Muid.t) =
-    let tuni = Subst.uni uidmap in
-    let rec aux e = e_map tuni aux raux e 
-    and raux r = re_map aux raux r in
-    aux
+    let rec aux e = e_map (Subst.uni uidmap) aux e in
+      aux
 end
-
-
-
-
