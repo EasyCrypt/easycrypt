@@ -37,8 +37,10 @@
   let pflist (es : pformula list) : pformula_r = assert false
 %}
 
+%token <EcSymbols.symbol>  IDENT
+%token <EcSymbols.qsymbol> QIDENT
+
 %token <int> NUM
-%token <string> IDENT
 %token <string> PRIM_IDENT
 %token <string> STRING
 
@@ -62,7 +64,6 @@
 %token COLON
 %token COMMA
 %token COMPUTE
-%token DCOLON
 %token DOT
 %token DOTDOT
 %token DROP
@@ -205,13 +206,9 @@
 %inline number     : n=NUM             { n };
 %inline prim_ident : x=loc(PRIM_IDENT) { x };
 
-qident_:
-| x=IDENT DCOLON qx=qident_ { (x :: fst qx, snd qx) }
-| x=IDENT { ([], x) }
-;
-
 qident:
-| x=loc(qident_) { x }
+| x=loc(IDENT)  { pqsymb_of_psymb x }
+| x=loc(QIDENT) { x }
 ;
 
 (* -------------------------------------------------------------------- *)

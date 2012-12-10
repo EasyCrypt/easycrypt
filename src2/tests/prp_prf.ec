@@ -27,7 +27,7 @@ theory PRP_PRF.
   }.
 
   module type Adv (O:I) = {
-    fun A () : bool { D:>F }
+    fun A () : bool { D.F }
   }.
 
   (* Better here to do a declare module *)

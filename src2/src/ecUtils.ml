@@ -220,4 +220,23 @@ end = struct
     aux 0 t 
 end
 
+(* -------------------------------------------------------------------- *)
+module String = struct
+  include String
 
+  let slice ?first ?last (s : string) =
+    let first = odfl 0 first in
+    let last  = odfl (String.length s) last in
+      String.sub s first (last - first)
+
+  let split (c : char) (s : string) =
+    let rec split s acc =
+      match try_nf (fun () -> rindex s c) with
+      | None   -> acc
+      | Some i ->
+          split
+            (slice ~first:0 ~last:(i-1) s)
+            ((slice ~first:(i+1) s) :: acc)
+    in
+      split s []
+end

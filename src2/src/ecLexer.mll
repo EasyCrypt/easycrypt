@@ -1,4 +1,5 @@
 {
+  open EcUtils
   open EcParser
 
   module L = EcParsetree.Location
@@ -70,8 +71,10 @@ let letter  = ['a'-'z' 'A'-'Z']
 let digit   = ['0'-'9']
 let number  = digit+
 
-let ident      = (letter (letter | digit | '_' | '\'')*)
-                 | ('_' (letter | digit | '_' | '\'')+)
+let ichar  = (letter | digit | '_' | '\'')
+let ident  = (letter ichar*) | ('_' ichar+)
+let qident = (ident '.')+ ident
+
 let prim_ident = '\'' ident
 
 let op_char_1    = ['=' '<' '>' '~']
@@ -91,6 +94,11 @@ rule main = parse
   | number                    { NUM (int_of_string (Lexing.lexeme lexbuf)) }
   | "(*"                      { comment lexbuf; main lexbuf }
   | "\""                      { STRING (Buffer.contents (string (Buffer.create 0) lexbuf)) }
+
+  | qident as id {
+      let path = List.rev (String.split '.' id) in
+        QIDENT (List.rev (List.tl path), List.hd path)
+  }
 
   (* boolean operators *)
   | '!'                       { NOT }
@@ -116,7 +124,6 @@ rule main = parse
   | ';'                       { SEMICOLON }
   | '.'                       { DOT }
   | ':'                       { COLON }
-  | ":>"                      { DCOLON }
   | "}^"                      { RKEY_HAT }
   | '?'                       { QUESTION }
   | '\\'                      { BACKSLASH }
