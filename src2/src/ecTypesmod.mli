@@ -76,7 +76,6 @@ and lvalue =
   | LvMap   of EcPath.path * EcTypes.tyexpr * EcTypes.ty
 
 (* -------------------------------------------------------------------- *)
-
 type theory = theory_item list
 
 and theory_item =

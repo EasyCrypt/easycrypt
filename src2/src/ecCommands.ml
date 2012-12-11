@@ -18,12 +18,12 @@ let process_print scope p =
   | Pr_ty qs ->
       (try 
         let ptd = EcEnv.Ty.lookup qs.pl_desc env in
-        Format.printf "%a@." EcPexception.pp_tydecl ptd
+        Format.printf "%a@." EcPrinting.pp_tydecl ptd
       with _ -> assert false (* FIXME *))
   | Pr_op qs ->
       (try 
         let ptd = EcEnv.Op.lookup qs.pl_desc env in
-        Format.printf "%a@." EcPexception.pp_opdecl ptd
+        Format.printf "%a@." EcPrinting.pp_opdecl ptd
       with _ -> assert false (* FIXME *))
   | Pr_th qs -> assert false
   | Pr_pr qs -> assert false
