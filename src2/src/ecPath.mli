@@ -13,6 +13,6 @@ val create    : string -> path
 val toqsymbol : path -> qsymbol
 val basename  : path -> EcIdent.t
 val extend    : path option -> EcIdent.t -> path
-
+val tolist    : path -> EcIdent.t list 
 (* -------------------------------------------------------------------- *)
 module Mp : Map.S with type key = path

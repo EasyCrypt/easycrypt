@@ -98,6 +98,7 @@ type action =
   | Ac_modtype   of (EcIdent.t * EcTypesmod.tymod)
   | Ac_module    of EcTypesmod.module_expr
   | Ac_theory    of (EcIdent.t * EcTypesmod.theory)
+  | Ac_use       of EcPath.path
 
 
 type scope = {
@@ -183,6 +184,10 @@ let bind (scope : scope) (action : action) =
           sc_theories = Context.bind (EcIdent.name x) th scope.sc_theories;
           sc_history  = action :: scope.sc_history;
           sc_env      = EcEnv.Theory.bind x th scope.sc_env }
+  | Ac_use p ->
+      { scope with
+        sc_history = action :: scope.sc_history;
+        sc_env     = EcEnv.Theory.use p scope.sc_env }
 
 (* -------------------------------------------------------------------- *)
 module Op = struct
@@ -344,6 +349,7 @@ module Theory = struct
       | Ac_modtype   (x, tymod)  -> Th_modtype   (x, tymod)
       | Ac_module    m           -> Th_module    m
       | Ac_theory    (x, th)     -> Th_theory    (x, th)
+      | Ac_use       p           -> Th_use       p
     in
       fun history -> List.map theory_item_of_action history
 
@@ -360,6 +366,12 @@ module Theory = struct
   let import (scope : scope) (name : qsymbol) =
     { scope with
         sc_env = EcEnv.Theory.import name scope.sc_env }
+
+  let use (scope : scope) name = 
+    let path, env = EcEnv.Theory.use_qs name scope.sc_env in
+    { scope with
+      sc_env = env;
+      sc_history = Ac_use path :: scope.sc_history }
 end
 
 (* -------------------------------------------------------------------- *)

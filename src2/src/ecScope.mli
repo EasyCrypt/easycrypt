@@ -95,4 +95,5 @@ module Theory : sig
    * [scope]. Raise [LookupFailure] if theory [name] cannot be
    * found. *)
   val import : scope -> qsymbol -> scope
+  val use    : scope -> qsymbol -> scope
 end

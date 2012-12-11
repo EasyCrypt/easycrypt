@@ -52,6 +52,7 @@
     "pop"         , POP        ;        (* KW: global *)
     "pred"        , PRED       ;        (* KW: global *)
     "require"     , REQUIRE    ;        (* KW: global *)
+    "use"         , USE        ;        (* KW: global *)
     "theory"      , THEORY     ;        (* KW: global *)
     "type"        , TYPE       ;        (* KW: global *)
     "print"       , PRINT      ;        (* KW: global *)

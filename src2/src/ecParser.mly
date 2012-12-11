@@ -109,6 +109,7 @@
 // %token REMOVE
 %token RETURN
 %token REQUIRE
+%token USE
 %token RKEY
 %token RKEY_HAT
 // %token ROI
@@ -757,7 +758,7 @@ theory_open    : THEORY  x=ident { x }
 theory_close   : END     x=ident { x }
 theory_require : REQUIRE x=ident { x }
 theory_import  : IMPORT  x=qident { x }
-
+theory_use     : USE     x=qident { x }
 (* -------------------------------------------------------------------- *)
 (** Printing                                                            *)
 print:
@@ -775,6 +776,7 @@ global_:
 | theory_close     { GthClose   $1 }
 | theory_require   { GthRequire $1 }
 | theory_import    { GthImport  $1 }
+| theory_use       { GthUse     $1 }
 | mod_def          { Gmodule    $1 }
 | sig_def          { Ginterface $1 }
 | type_decl_or_def { Gtype      $1 }

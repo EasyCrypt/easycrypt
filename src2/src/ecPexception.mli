@@ -4,3 +4,6 @@ open EcTypedtree
 (* -------------------------------------------------------------------- *)
 val pp_typerror : Format.formatter -> tyerror -> unit
 
+(* -------------------------------------------------------------------- *)
+val pp_exn : Format.formatter -> exn -> unit
+

@@ -32,10 +32,12 @@ val enter   : symbol -> env -> EcIdent.t * env
 module type S = sig
   type t
 
-  val bind      : EcIdent.t -> t -> env -> env
-  val bindall   : (EcIdent.t * t) list -> env -> env
-  val lookup    : qsymbol -> env -> EcPath.path * t
-  val trylookup : qsymbol -> env -> (EcPath.path * t) option
+  val bind        : EcIdent.t -> t -> env -> env
+  val bindall     : (EcIdent.t * t) list -> env -> env
+  val lookup_p    : EcPath.path -> env -> t        (* full path *)
+  val trylookup_p : EcPath.path -> env -> t option (* full path *)
+  val lookup      : qsymbol -> env -> EcPath.path * t
+  val trylookup   : qsymbol -> env -> (EcPath.path * t) option
   val exists    : qsymbol -> env -> bool
 end
 
@@ -50,6 +52,8 @@ module ModTy  : S with type t = tymod
 module Theory : sig
   include S with type t = theory
 
+  val use    : EcPath.path -> env -> env
+  val use_qs : qsymbol -> env -> EcPath.path * env
   val import : qsymbol -> env -> env
 end
 
@@ -77,3 +81,6 @@ module Ident : sig
   val trylookup : 
       qsymbol -> env -> (EcPath.path * EcTypes.ty option * idlookup_t) option
 end
+
+
+exception UnknownPath of EcPath.path

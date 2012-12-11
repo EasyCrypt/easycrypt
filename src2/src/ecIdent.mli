@@ -23,6 +23,7 @@ module Map : sig
   val allbyname : symbol -> 'a t -> 'a list
   val byname    : symbol -> 'a t -> 'a option
   val byident   : key -> 'a t -> 'a option
+  val merge     : 'a t -> 'a t -> 'a t
 end
 
 module Mid : EcMaps.Map.S with type key = t

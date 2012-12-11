@@ -46,6 +46,13 @@ module Map = struct
 
   let allbyname (x : symbol) (m : 'a t) =
     List.map snd (odfl [] (SymMap.tryfind x m))
+
+  let merge m1 m2 = 
+    SymMap.merge 
+      (fun _ o1 o2 -> 
+        match o1 with None -> o2 | Some l1 -> Some ((odfl [] o2) @ l1))
+      m1 m2
+
 end
 
 module SMid = EcMaps.StructMake(struct type t = ident let tag = snd end)

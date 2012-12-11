@@ -9,8 +9,9 @@ open EcTypesmod
 type scope = EcPath.path option
 
 type env = {
-  env_scope : EcPath.path option;
-  env_root  : mcomponents;
+  env_scope  : EcPath.path option;
+  mc_used_th : EcIdent.Sid.t;
+  env_root   : mcomponents;
 }
 
 and mcomponents = {
@@ -34,7 +35,9 @@ and mchistory =
 | MC_Typedecl  of EcDecl.tydecl
 | MC_Operator  of EcDecl.operator
 | MC_Axiom     of EcDecl.axiom
-| MC_Theory    of EcTypesmod.theory * (mcomponents Lazy.t)
+| MC_Theory    of EcTypesmod.theory 
+| MC_use       of EcPath.path        (* full path *)
+| MC_import    of EcPath.path        (* full path *)
 
 (* -------------------------------------------------------------------- *)
 let emcomponents = {
@@ -52,11 +55,35 @@ let emcomponents = {
 
 let empty =
   { env_scope = None;
+    mc_used_th    = EcIdent.Sid.empty;
     env_root  = emcomponents; }
+
+
 
 (* -------------------------------------------------------------------- *)
 let root (env : env) = env.env_scope
 
+exception UnknownPath of EcPath.path
+
+module IM = EcIdent.Map
+
+let lookup_p on p env = 
+  let rec aux mc p l = 
+    match l with
+    | [] -> assert false
+    | [x] -> 
+        begin match IM.byident x (on mc) with
+        | None -> raise (UnknownPath (EcPath.extend p x))
+        | Some (_,v) -> v
+        end
+    | x::l -> 
+        let p' = EcPath.extend p x in
+        match IM.byident x mc.mc_components with
+        | None -> 
+            Format.printf "ICI2@\n";
+            raise (UnknownPath p')
+        | Some (_, mc') -> aux (Lazy.force mc') (Some p') l in
+  aux env.env_root None (EcPath.tolist p)
 (* -------------------------------------------------------------------- *)
 let enter (name : symbol) (env : env) =
   let name = EcIdent.create name in
@@ -77,16 +104,18 @@ let try_lf (f : unit -> 'a) =
 module type S = sig
   type t
 
-  val bind      : EcIdent.t -> t -> env -> env
-  val bindall   : (EcIdent.t * t) list -> env -> env
-  val lookup    : qsymbol -> env -> EcPath.path * t
-  val trylookup : qsymbol -> env -> (EcPath.path * t) option
+  val bind        : EcIdent.t -> t -> env -> env
+  val bindall     : (EcIdent.t * t) list -> env -> env
+  val lookup_p    : EcPath.path -> env -> t        (* full path *)
+  val trylookup_p : EcPath.path -> env -> t option (* full path *)
+  val lookup      : qsymbol -> env -> EcPath.path * t
+  val trylookup   : qsymbol -> env -> (EcPath.path * t) option
   val exists    : qsymbol -> env -> bool
 end
 
 (* -------------------------------------------------------------------- *)
+
 module MC = struct
-  module IM = EcIdent.Map
 
   let mc_history mitem mc =
     { mc with mc_history = mitem :: mc.mc_history }
@@ -96,112 +125,129 @@ module MC = struct
       { mc with
           mc_variables = IM.add x (path, ty) mc.mc_variables; }
 
-  and mc_bind_function path fsig mc =
+  let mc_bind_function path fsig mc =
     let x = EcPath.basename path in
       { mc with
           mc_functions = IM.add x (path, fsig) mc.mc_functions; }
 
-  and mc_bind_module path tymod comps mc =
+  let mc_bind_module path tymod comps mc =
     let x = EcPath.basename path in
       { mc with
           mc_modules    = IM.add x (path, tymod) mc.mc_modules;
           mc_components = IM.add x (path, comps) mc.mc_components; }
 
-  and mc_bind_modtype path tymod mc =
+  let mc_bind_modtype path tymod mc =
     let x = EcPath.basename path in
       { mc with
           mc_modtypes = IM.add x (path, tymod) mc.mc_modtypes; }
 
-  and mc_bind_typedecl path tydecl mc =
+  let mc_bind_typedecl path tydecl mc =
     let x = EcPath.basename path in
       { mc with
           mc_typedecls = IM.add x (path, tydecl) mc.mc_typedecls; }
 
-  and mc_bind_op path op mc =
+  let mc_bind_op path op mc =
     let x = EcPath.basename path in
       { mc with
           mc_operators = IM.add x (path, op) mc.mc_operators; }
 
-  and mc_bind_ax path ax mc =
+  let mc_bind_ax path ax mc =
     let x = EcPath.basename path in
       { mc with
-          mc_axioms  = IM.add x (path, ax) mc.mc_axioms; }
+        mc_axioms  = IM.add x (path, ax) mc.mc_axioms; }
 
-  and mc_bind_theory path th comps mc =
+  let mc_bind_theory path th mc =
     let x = EcPath.basename path in
       { mc with
-          mc_theories   = IM.add x (path, th) mc.mc_theories;
-          mc_components = IM.add x (path, comps) mc.mc_components; }
+        mc_theories   = IM.add x (path, th) mc.mc_theories; }
 
+  let mc_bind_component env path mc = 
+    let rec add mc p l mcl =
+      match l with
+      | [] -> assert false
+      | [x] -> 
+          let p = EcPath.extend p x in
+          { mc with mc_components = IM.add x (p,mcl) mc.mc_components }
+      | x::l ->
+          let p' = EcPath.extend p x in
+          match IM.byident x mc.mc_components with
+          | None ->  raise (UnknownPath p')
+          | Some(pp,mc') ->
+              let mc' = add (Lazy.force mc') (Some p') l mcl in
+              { mc with 
+                mc_components = IM.add (*FIXME:rebind?*) x (pp,lazy mc') mc.mc_components } in
+    { env with 
+      env_root = add env.env_root None (EcPath.tolist path) mc;
+      mc_used_th = EcIdent.Sid.add (EcPath.basename path) env.mc_used_th
+    }
+    
   let rec mc_of_module (_env : env) (_ : tymod) =
     lazy (failwith "")
 
-  and mc_of_theory =
-    let mc_of_theory scope (env : env) (th : theory) =
-      let mc_of_theory_item mc = function
-        | Th_type      (x, tydecl) -> bind_typedecl (scope, x) tydecl env mc
-        | Th_operator  (x, op)     -> bind_op       (scope, x) op env mc
-        | Th_axiom     (x, a)      -> bind_ax       (scope, x) a env mc
-        | Th_modtype   (x, tymod)  -> bind_modtype  (scope, x) tymod env mc
-        | Th_module    m           -> bind_module   (scope, m.me_name) m.me_sig env mc
-        | Th_theory    (x, th)     -> bind_theory   (scope, x) th env mc
-      in
-        List.fold_left mc_of_theory_item emcomponents th
-    in
-      fun scope env th -> lazy (mc_of_theory scope env th)
+  let lookup_mc_p = lookup_p (fun mc -> mc.mc_components) 
+ 
+  let rec mc_of_theory (env : env) path th =
+    List.fold_left (mc_of_theory_item (Some path)) (env, emcomponents) th
+  and mc_of_theory_item path (env,mc) = function 
+    | Th_type (id,td) -> env, mc_bind_typedecl (EcPath.extend path id) td mc
+    | Th_operator(id,op) -> env, mc_bind_op (EcPath.extend path id) op mc
+    | Th_axiom(id,ax) -> env, mc_bind_ax (EcPath.extend path id) ax mc
+    | Th_modtype(id,tm) -> env, mc_bind_modtype (EcPath.extend path id) tm mc
+    | Th_module _ -> assert false (* FIXME *)
+    | Th_theory(id,th) -> env, mc_bind_theory (EcPath.extend path id) th mc
+    | Th_export p      -> assert false (* FIXME *)
+    | Th_use    p      -> mc_use env p, mc
+  and mc_use_th env (path,th) = 
+    let base = EcPath.basename path in
+    if EcIdent.Sid.mem base env.mc_used_th then env
+    else 
+      let env, mc = mc_of_theory env path th in
+      (* FIXME *)
+      mc_bind_component env (EcPath.Pident base)  (lazy mc)
+  and mc_use env path = 
+    let th = lookup_p (fun mc -> mc.mc_theories) path env in 
+    mc_use_th env (path, th)
 
-  and bind_variable (scope, x) ty _env mc =
+  let bind_variable (scope, x) ty _env mc =
     let path = EcPath.extend scope x in
       mc_history (path, MC_Variable ty)
         (mc_bind_variable path ty mc)
 
-  and bind_function (scope, x) fsig _env mc =
+  let bind_function (scope, x) fsig _env mc =
     let path = EcPath.extend scope x in
       mc_history (path, MC_Function fsig)
         (mc_bind_function path fsig mc)
 
-  and bind_module (scope, x) tymod env mc =
+  let bind_module (scope, x) tymod env mc =
     let comps = mc_of_module env tymod in
     let path  = EcPath.extend scope x in
       mc_history (path, MC_Module (tymod, comps))
         (mc_bind_module path tymod comps mc)
 
-  and bind_modtype (scope, x) tymod env mc =
+  let bind_modtype (scope, x) tymod _env mc =
     let path = EcPath.extend scope x in
       mc_history (path, MC_Modtype tymod)
         (mc_bind_modtype path tymod mc)
 
-  and bind_typedecl (scope, x) tydecl env mc =
+  let bind_typedecl (scope, x) tydecl _env mc =
     let path = EcPath.extend scope x in
       mc_history (path, MC_Typedecl tydecl)
         (mc_bind_typedecl path tydecl mc)
 
-  and bind_op (scope, x) op env mc =
+  let bind_op (scope, x) op _env mc =
     let path = EcPath.extend scope x in
       mc_history (path, MC_Operator op)
         (mc_bind_op path op mc)
 
-  and bind_ax (scope, x) ax env mc =
+  let bind_ax (scope, x) ax _env mc =
     let path = EcPath.extend scope x in
       mc_history (path, MC_Axiom ax)
         (mc_bind_ax path ax mc)
 
-  and bind_theory (scope, x) th env mc =
-    let comps = mc_of_theory (Some (EcPath.extend scope x)) env th in
+  let bind_theory (scope, x) th _env mc =
     let path  = EcPath.extend scope x in
-      mc_history (path, MC_Theory (th, comps))
-        (mc_bind_theory path th comps mc)
-
-  let bind_mcitem (path, mitem) mc =
-      match mitem with
-      | MC_Variable  ty          -> mc_bind_variable path ty mc
-      | MC_Function  fsig        -> mc_bind_function path fsig mc
-      | MC_Module    (m, submc)  -> mc_bind_module path m submc mc
-      | MC_Modtype   tymod       -> mc_bind_modtype path tymod mc
-      | MC_Typedecl  tydecl      -> mc_bind_typedecl path tydecl mc
-      | MC_Operator  op          -> mc_bind_op path op mc
-      | MC_Axiom     ax          -> mc_bind_ax path ax mc
-      | MC_Theory    (th, submc) -> mc_bind_theory path th submc mc
+    mc_history (path, MC_Theory th)
+      (mc_bind_theory path th mc)
 
   let lookup_mc1 (name : symbol) (mc : mcomponents) =
     IM.byname name mc.mc_components
@@ -240,6 +286,10 @@ module MC = struct
         obind
           (lookup_mc1 name mc)
           (fun (_, mc) -> lookup_mc qn (Lazy.force mc))
+
+
+
+
 end
 
 (* -------------------------------------------------------------------- *)
@@ -263,6 +313,12 @@ module Var = struct
     List.fold_left
       (fun env (x, ty) -> bind x ty env)
       env xtys
+
+  let lookup_p = 
+    lookup_p (fun mc -> mc.mc_variables)
+
+  let trylookup_p p mc = 
+    try Some (lookup_p p mc) with _ -> None
 
   let lookup ((scope, id) : qsymbol) (env : env) =
     match
@@ -290,6 +346,12 @@ module Fun = struct
       (fun env (x, ty) -> bind x ty env)
       env xtys
 
+  let lookup_p = 
+    lookup_p (fun mc -> mc.mc_functions)
+
+  let trylookup_p p mc = 
+    try Some (lookup_p p mc) with _ -> None
+
   let lookup ((scope, id) : qsymbol) (env : env) =
     match
       obind
@@ -316,6 +378,12 @@ module Ty = struct
       (fun env (x, tydecl) -> bind x tydecl env)
       env xtys
 
+  let lookup_p = 
+    lookup_p (fun mc -> mc.mc_typedecls)
+
+  let trylookup_p p mc = 
+    try Some (lookup_p p mc) with _ -> None
+
   let lookup ((scope, id) : qsymbol) (env : env) =
     match
       obind
@@ -331,17 +399,15 @@ module Ty = struct
     let name = EcPath.basename name in
 
     (* FIXME: refactor *)
-    match EcIdent.Map.byident name env.env_root.mc_typedecls with
+    match IM.byident name env.env_root.mc_typedecls with
     | None -> false
     | Some (_, tydecl) -> tydecl.tyd_type <> None
 
   let unfold (name : EcPath.path) (args : EcTypes.ty list) (env : env) =
-    let name = EcPath.basename name in
-
-    match EcIdent.Map.byident name env.env_root.mc_typedecls with
+    match trylookup_p name env with
     | None
-    | Some (_, { tyd_type = None }) -> assert false
-    | Some (_, ({ tyd_type = Some body } as tyd)) ->
+    | Some { tyd_type = None } -> assert false
+    | Some ({ tyd_type = Some body } as tyd) ->
         EcTypes.inst_var (EcTypes.init_substvar tyd.tyd_params args) body
 
   let exists x env = (trylookup x env <> None)
@@ -358,6 +424,12 @@ module Op = struct
     List.fold_left
       (fun env (x, tydecl) -> bind x tydecl env)
       env ops
+
+  let lookup_p = 
+    lookup_p (fun mc -> mc.mc_operators)
+
+  let trylookup_p p mc = 
+    try Some (lookup_p p mc) with _ -> None
 
   let lookup ((scope, id) : qsymbol) (env : env) =
     match
@@ -380,28 +452,7 @@ module Op = struct
 end
 
 (* -------------------------------------------------------------------- *)
-(*module Pred = struct
-  type t = predicate
 
-  let bind x pred env =
-    bind MC.bind_pred x pred env
-
-  let bindall preds env =
-    List.fold_left
-      (fun env (x, tydecl) -> bind x tydecl env)
-      env preds
-
-  let lookup ((scope, id) : qsymbol) (env : env) =
-    match
-      obind
-        (MC.lookup_mc scope env.env_root)
-        (MC.lookup_pred1 id)
-    with
-    | None   -> raise LookupFailure
-    | Some x -> x
-
-  let trylookup x env = try_lf (fun () -> lookup x env)
-end*)
 
 (* -------------------------------------------------------------------- *)
 module Ax = struct
@@ -414,6 +465,12 @@ module Ax = struct
     List.fold_left
       (fun env (x, ax) -> bind x ax env)
       env axs
+
+  let lookup_p = 
+    lookup_p (fun mc -> mc.mc_axioms)
+
+  let trylookup_p p mc = 
+    try Some (lookup_p p mc) with _ -> None
 
   let lookup ((scope, id) : qsymbol) (env : env) =
     match
@@ -441,6 +498,13 @@ module Mod = struct
       (fun env (x, tymod) -> bind x tymod env)
       env xtys
 
+  let lookup_p = 
+    lookup_p (fun mc -> mc.mc_modules)
+
+  let trylookup_p p mc = 
+    try Some (lookup_p p mc) with _ -> None
+
+
   let lookup ((scope, id) : qsymbol) (env : env) =
     match
       obind
@@ -466,6 +530,12 @@ module ModTy = struct
     List.fold_left
       (fun env (x, tymod) -> bind x tymod env)
       env xtys
+
+  let lookup_p = 
+    lookup_p (fun mc -> mc.mc_modtypes)
+
+  let trylookup_p p mc = 
+    try Some (lookup_p p mc) with _ -> None
 
   let lookup ((scope, id) : qsymbol) (env : env) =
     match
@@ -493,6 +563,12 @@ module Theory = struct
       (fun env (x, tymod) -> bind x tymod env)
       env xtys
 
+  let lookup_p = 
+    lookup_p (fun mc -> mc.mc_theories)
+
+  let trylookup_p p mc = 
+    try Some (lookup_p p mc) with _ -> None
+
   let lookup ((scope, id) : qsymbol) (env : env) =
     match
       obind
@@ -504,20 +580,33 @@ module Theory = struct
 
   let trylookup x env = try_lf (fun () -> lookup x env)
 
+  let use path env = MC.mc_use env path
+
+  let use_qs qs env = 
+    let (path, _ as pth) = lookup qs env in
+    path, MC.mc_use_th env pth
+
+  (* FIXME *)
+  let import (qs : qsymbol) (env : env) =
+    let path, _ = lookup qs env in
+    let mc1 = env.env_root in
+    let mc2 = Lazy.force (MC.lookup_mc_p 
+                            (EcPath.Pident (EcPath.basename path)) env) in
+    let mc = 
+      { mc_variables  = IM.merge mc1.mc_variables mc2.mc_variables;
+        mc_functions  = IM.merge mc1.mc_functions mc2.mc_functions;
+        mc_modules    = IM.merge mc1.mc_modules mc2.mc_modules;
+        mc_modtypes   = IM.merge mc1.mc_modtypes mc2.mc_modtypes;
+        mc_typedecls  = IM.merge mc1.mc_typedecls mc2.mc_typedecls;
+        mc_operators  = IM.merge mc1.mc_operators mc2.mc_operators;
+        mc_axioms     = IM.merge mc1.mc_axioms mc2.mc_axioms;
+        mc_theories   = IM.merge mc1.mc_theories mc2.mc_theories;
+        mc_components = IM.merge mc1.mc_components mc2.mc_components;
+        mc_history    = (path, MC_import path) :: mc1.mc_history } in
+    { env with env_root = mc }
+
   let exists x env = (trylookup x env <> None)
 
-  let import ((scope, id) : qsymbol) (env : env) =
-    match EcIdent.Map.byident
-             (EcPath.basename (fst (lookup (scope, id) env)))
-             env.env_root.mc_components
-    with
-    | None    -> raise LookupFailure
-    | Some mc ->
-        let mc = Lazy.force (snd mc) in
-          { env with
-              env_root =
-                List.fold_left
-                  ((^~) MC.bind_mcitem) env.env_root mc.mc_history }
 end
 
 (* -------------------------------------------------------------------- *)

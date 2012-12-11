@@ -19,17 +19,18 @@ let rec create (path : string) =
         Pqname (create path, EcIdent.create name)
 
 (* -------------------------------------------------------------------- *)
-let rec tolist (p : path) =
-  match p with
-  | Pident x      -> [x]
-  | Pqname (p, x) -> x :: (tolist p)
+let tolist =
+  let rec aux l = function
+    | Pident x      -> x :: l
+    | Pqname (p, x) -> aux (x :: l) p in
+  aux []
 
 (* -------------------------------------------------------------------- *)
 let toqsymbol (p : path) =
   match p with
   | Pident x      -> ([], EcIdent.name x)
   | Pqname (p, x) ->
-    let scope = List.rev (tolist p) in
+    let scope = tolist p in
       (List.map EcIdent.name scope, EcIdent.name x)
 
 (* -------------------------------------------------------------------- *)

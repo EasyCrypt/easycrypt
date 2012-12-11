@@ -74,3 +74,10 @@ let pp_typerror =
   in
     fun fmt exn ->
       Format.fprintf fmt "%a\n%!" pp exn
+
+
+let pp_exn fmt exn =
+  match exn with
+  | EcEnv.UnknownPath p ->
+      Format.fprintf fmt "UnknownPath%a@." EcPrinting.pp_path p
+  | _ -> ()
