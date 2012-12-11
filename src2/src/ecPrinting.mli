@@ -34,7 +34,7 @@ val pp_qsymbol :  Format.formatter -> qsymbol -> unit
 (* AST Pretty-Printing                                                  *)
 
 val pp_type : ?vmap:NameGen.t -> Format.formatter -> ty -> unit
-val pp_dom : Format.formatter -> ty list -> unit
+val pp_dom  : Format.formatter -> ty list -> unit
 
-val pp_tydecl : Format.formatter -> (path * tydecl) -> unit
+val pp_tydecl : EcEnv.env -> Format.formatter -> (path * tydecl) -> unit
 val pp_opdecl : Format.formatter -> (path * operator) -> unit

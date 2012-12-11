@@ -29,6 +29,8 @@ val root    : env -> EcPath.path option
 val enter   : symbol -> env -> EcIdent.t * env
 
 (* -------------------------------------------------------------------- *)
+exception UnknownPath of EcPath.path
+
 module type S = sig
   type t
 
@@ -38,7 +40,7 @@ module type S = sig
   val trylookup_p : EcPath.path -> env -> t option (* full path *)
   val lookup      : qsymbol -> env -> EcPath.path * t
   val trylookup   : qsymbol -> env -> (EcPath.path * t) option
-  val exists    : qsymbol -> env -> bool
+  val exists      : qsymbol -> env -> bool
 end
 
 (* -------------------------------------------------------------------- *)
@@ -81,6 +83,3 @@ module Ident : sig
   val trylookup : 
       qsymbol -> env -> (EcPath.path * EcTypes.ty option * idlookup_t) option
 end
-
-
-exception UnknownPath of EcPath.path

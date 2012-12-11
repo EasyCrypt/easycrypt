@@ -36,8 +36,8 @@ and mchistory =
 | MC_Operator  of EcDecl.operator
 | MC_Axiom     of EcDecl.axiom
 | MC_Theory    of EcTypesmod.theory 
-| MC_use       of EcPath.path        (* full path *)
-| MC_import    of EcPath.path        (* full path *)
+| MC_Use       of EcPath.path        (* full path *)
+| MC_Import    of EcPath.path        (* full path *)
 
 (* -------------------------------------------------------------------- *)
 let emcomponents = {
@@ -57,8 +57,6 @@ let empty =
   { env_scope = None;
     mc_used_th    = EcIdent.Sid.empty;
     env_root  = emcomponents; }
-
-
 
 (* -------------------------------------------------------------------- *)
 let root (env : env) = env.env_scope
@@ -84,6 +82,7 @@ let lookup_p on p env =
             raise (UnknownPath p')
         | Some (_, mc') -> aux (Lazy.force mc') (Some p') l in
   aux env.env_root None (EcPath.tolist p)
+
 (* -------------------------------------------------------------------- *)
 let enter (name : symbol) (env : env) =
   let name = EcIdent.create name in
@@ -114,9 +113,7 @@ module type S = sig
 end
 
 (* -------------------------------------------------------------------- *)
-
 module MC = struct
-
   let mc_history mitem mc =
     { mc with mc_history = mitem :: mc.mc_history }
 
@@ -452,9 +449,6 @@ module Op = struct
 end
 
 (* -------------------------------------------------------------------- *)
-
-
-(* -------------------------------------------------------------------- *)
 module Ax = struct
   type t = axiom
 
@@ -602,7 +596,7 @@ module Theory = struct
         mc_axioms     = IM.merge mc1.mc_axioms mc2.mc_axioms;
         mc_theories   = IM.merge mc1.mc_theories mc2.mc_theories;
         mc_components = IM.merge mc1.mc_components mc2.mc_components;
-        mc_history    = (path, MC_import path) :: mc1.mc_history } in
+        mc_history    = (path, MC_Import path) :: mc1.mc_history } in
     { env with env_root = mc }
 
   let exists x env = (trylookup x env <> None)

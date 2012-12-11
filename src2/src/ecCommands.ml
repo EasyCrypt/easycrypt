@@ -18,7 +18,7 @@ let process_print scope p =
   | Pr_ty qs ->
       (try 
         let ptd = EcEnv.Ty.lookup qs.pl_desc env in
-        Format.printf "%a@." EcPrinting.pp_tydecl ptd
+        Format.printf "%a@." (EcPrinting.pp_tydecl env) ptd
       with _ -> assert false (* FIXME *))
   | Pr_op qs ->
       (try 

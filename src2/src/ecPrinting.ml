@@ -26,6 +26,18 @@ let pp_id pp_elt fmt x =
 let pp_paren pp_elt fmt x =
   Format.fprintf fmt "(%a)" pp_elt x
 
+(* --------------------------------------------------------------------  *)
+let pp_opt_pre  () = format_of_string ""
+let pp_opt_post () = format_of_string ""
+
+let pp_option
+    ?(pre=pp_opt_pre ())
+    ?(post=pp_opt_post ()) pp_elt fmt x =
+
+  oiter x
+    (fun x ->
+      Format.fprintf fmt "%(%)%a%(%)" pre pp_elt x post)
+
 (* -------------------------------------------------------------------- *)
 let pp_list_pre  () = format_of_string "@["
 let pp_list_post () = format_of_string "@]"
@@ -54,6 +66,14 @@ let rec pp_qsymbol fmt = function
 let rec pp_path fmt = function
   | EcPath.Pident x      -> Format.fprintf fmt "%s" (EcIdent.name x)
   | EcPath.Pqname (p, x) -> Format.fprintf fmt "%a:>%s" pp_path p (EcIdent.name x)
+
+(* -------------------------------------------------------------------- *)
+let pp_ident fmt id = 
+  Format.fprintf fmt "%s" (EcIdent.name id)
+
+(* -------------------------------------------------------------------- *)
+let pp_path_in_env _env fmt id =       (* FIXME *)
+  Format.fprintf fmt "%s" (EcIdent.name id)
 
 (* -------------------------------------------------------------------- *)
 let pp_type (uidmap : NameGen.t) =
@@ -87,6 +107,7 @@ let pp_type (uidmap : NameGen.t) =
   in
     pp_type
 
+(* -------------------------------------------------------------------- *)
 let pp_type ?(vmap : _ option) =
   let uidmap =
     match vmap with
@@ -95,56 +116,61 @@ let pp_type ?(vmap : _ option) =
   in
     pp_type uidmap false
 
-let pp_dom fmt = 
-  Format.fprintf fmt "(%a)" (pp_list ~sep:(~$", ") pp_type) 
-
-
-let pp_ident fmt id = 
-  Format.fprintf fmt "%s" (EcIdent.name id)  (* FIXME *)
-
-let pp_tydecl fmt (p,td) =
+(* -------------------------------------------------------------------- *)
+let pp_tydecl env fmt (p, td) =
   let vmap = EcUidgen.NameGen.create () in
+
   let pp_params fmt = function
-    | [] -> ()
+    | []   -> ()
     | [id] -> pp_ident fmt id
-    | lid -> Format.fprintf fmt "(%a)" (pp_list ~sep:(", ") pp_ident) lid  in
-  let pp_body fmt = function
-    | None -> ()
-    | Some ty -> Format.fprintf fmt " = %a" (pp_type ~vmap) ty in 
-  Format.fprintf fmt "type %a%a%a." 
-    pp_params td.tyd_params pp_path p pp_body td.tyd_type
+    | lid  -> Format.fprintf fmt "(%a)" (pp_list ~sep:(", ") pp_ident) lid  in
 
+  let pp_body fmt ty =
+    pp_option ~pre:" = " (pp_type ~vmap) fmt ty in
+
+  Format.fprintf fmt "type %a%a%a."
+    pp_params td.tyd_params pp_ident (EcPath.basename p) pp_body td.tyd_type
+
+(* -------------------------------------------------------------------- *)
 let pp_optyparams fmt lid = 
-  Format.fprintf fmt "[%a]" (pp_list ~sep:(", ") pp_ident) lid
-  
-let pp_opdecl fmt (p,d) = ()
-(* FIXME *)
-(*
-  let str_kind op =
-    if op.op_ctnt then "cnst" 
-    else if op.op_prob then "pop" else "op" in
-  let vmap = EcUidgen.NameGen.create () in
-  let pp_type = pp_type ~vmap in
-  let pp_tparams fmt = function
-    | [] -> Format.fprintf fmt "()"
+  match lid with
+  | [] -> ()
+  | _  -> Format.fprintf fmt "[%a]" (pp_list ~sep:(", ") pp_ident) lid
+
+(* -------------------------------------------------------------------- *)
+let pp_dom fmt =
+  let vmap = NameGen.create () in
+    function
+    | []  -> Format.fprintf fmt "()"
     | [t] -> pp_type fmt t
-    | lt -> Format.fprintf fmt "(%a)" (pp_list ~sep:(", ") pp_type) lt in
-  let pp_decl fmt d =
-  (*  match body with
-    | None -> *) (* FIXME *)
+    | lt  -> Format.fprintf fmt "(%a)" (pp_list ~sep:(", ") (pp_type ~vmap)) lt
+
+(* -------------------------------------------------------------------- *)
+let pp_opdecl fmt (p, d) =
+  let vmap = EcUidgen.NameGen.create () in
+
+  let str_kind op =
+    let x = if (op_ctnt op) then "cnst" else "op" in
+    let x = if op.op_prob then "p"^x else x in
+      x
+  in
+
+  let pp_decl fmt d = ()
+(*
+    match d.op_body with
+    | None ->
         if d.op_ctnt then 
-          Format.fprintf fmt ": %a" pp_type (snd d.op_sig)
+          Format.fprintf fmt ": %a" (pp_type ~vmap) (snd d.op_sig)
         else 
           Format.fprintf fmt ": %a -> %a" 
-            pp_tparams (fst d.op_sig) pp_type (snd d.op_sig)
-(*    | Some (id,e) ->
-        if d.op_ctnt then
-          Format.fprintf fmt ": %a = %a" pp_type (snd d.op_sig)
-            pp
-        Format.fprintf fmt
-           *) in
-  Format.fprintf fmt "%s %a%a %a."
+            pp_tparams (fst d.op_sig) (pp_type ~vmap) (snd d.op_sig)
+    | Some (id,e) ->
+      if d.op_ctnt then
+        Format.fprintf fmt ": %a = %a" (pp_type ~vmap) (snd d.op_sig) pp
+      else
+        assert false
+*)
+  in
+    Format.fprintf fmt "%s %a%a %a."
       (str_kind d) pp_optyparams d.op_params pp_path p
       pp_decl d
-*)
-  
