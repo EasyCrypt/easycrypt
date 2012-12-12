@@ -5,6 +5,7 @@ open EcIdent
 open EcPath
 open EcTypes
 open EcDecl
+open EcFol
 
 let config : Whyconf.config = Whyconf.read_config None
 
@@ -16,14 +17,14 @@ type env = {
     logic_task : Task.task;
     env_ty : Ty.tysymbol Mp.t;
     env_op : Term.lsymbol Mp.t;
-    env_pr : Decl.prsymbol Mp.t;
+    env_ax : Decl.prsymbol Mp.t;
   }
 
 let empty = {
   logic_task = None;
   env_ty     = Mp.empty;
   env_op     = Mp.empty;
-  env_pr     = Mp.empty;
+  env_ax     = Mp.empty;
 }
 
 let preid id = 
@@ -123,6 +124,11 @@ let destr_ty_tuple t =
 let trans_op env p = 
   try Mp.find p env.env_op with _ -> assert false
 
+let form_of_bool e = 
+  if Term.t_equal e Term.t_bool_true then Term.t_true
+  else if Term.t_equal e Term.t_bool_false then Term.t_false 
+  else Term.t_equ e Term.t_bool_true
+  
 let rec trans_expr env tvm vm e =
   match e with
   | Eunit  -> Term.t_tuple [] 
@@ -136,7 +142,7 @@ let rec trans_expr env tvm vm e =
         (* FIXME should be assert false *)
   | Eapp(p,args) -> 
       let p = trans_op env p in
-      let args = List.map (trans_expr env tvm vm) args in
+      let args = List.map (trans_expr env tvm vm) args in (* FIXME tvm *)
       Term.t_app_infer p args (* FIXME : use t_app *)
   | Elet(lp,e1,e2) ->
       (* FIXME type *)
@@ -163,26 +169,98 @@ let rec trans_expr env tvm vm e =
       let e1 = trans_expr env tvm vm e1 in
       let e2 = trans_expr env tvm vm e2 in
       let e3 = trans_expr env tvm vm e3 in
-      Term.t_if (Term.t_equ e1 Term.t_bool_true) e2 e3
+      Term.t_if (form_of_bool e1) e2 e3
 
+let trans_bop op t1 t2 = (* FIXME once asym Land and Lor *)
+  match op with
+  | Land -> Term.t_and t1 t2
+  | Lor  -> Term.t_or t1 t2 
+  | Limp -> Term.t_implies t1 t2 
+  | Liff -> Term.t_iff t1 t2 
+  
+let trans_quant = function
+  | Lforall -> Term.Tforall
+  | Lexists -> Term.Texists
+
+let trans_oty env tvm oty =
+  match oty with
+  | None -> None, tvm 
+  | Some t -> let t,tvm = trans_ty env tvm t in Some t, tvm 
+
+let rec trans_form env tvm lm pvm f =
+  match f with
+  | Ftrue -> Term.t_true
+  | Ffalse -> Term.t_false
+  | Fnot f -> 
+      Term.t_not (trans_form env tvm lm pvm f)
+  | Fbinop(f1,op,f2) ->
+      let f1 = trans_form env tvm lm pvm f1 in
+      let f2 = trans_form env tvm lm pvm f2 in
+      trans_bop op f1 f2 
+  | Fquant(q,b,f) ->
+      let ids, tys = List.split b in
+      let tys, tvm = trans_tys env tvm tys in
+      let vs, lm = VM.add_ids ids tys lm in
+      let f = trans_form env tvm lm pvm f in
+      Term.t_quant_close (trans_quant q) vs [] f
+  | Fif(f1,f2,f3) ->
+      let f1 = trans_form env tvm lm pvm f1 in
+      let f2 = trans_form env tvm lm pvm f2 in
+      let f3 = trans_form env tvm lm pvm f3 in
+      Term.t_if f1 f2 f3
+  | Flet(lp,f1,f2) ->
+      let f1 = trans_form env tvm lm pvm f1 in
+      begin match lp with
+      | LFPSymbol(id, ty) -> 
+          let id, lm = VM.add_id id (Term.t_type f1) lm in
+          let f2 = trans_form env tvm lm pvm f2 in
+          Term.t_let f1 (Term.t_close_bound id f2)
+      | LFPTuple ids ->
+          let t1 = Term.t_type f1 in
+          let ids, lm = VM.add_ids (List.map fst ids) (destr_ty_tuple t1) lm in
+          let pat = 
+            Term.pat_app (Term.fs_tuple (List.length ids)) 
+              (List.map Term.pat_var ids) t1 in
+          let f2 = trans_form env tvm lm pvm f2 in
+          let br = Term.t_close_branch pat f2 in
+          Term.t_case f1 [br] 
+      end
+  | Funit -> Term.t_tuple [] 
+  | Fbool b -> if b then Term.t_bool_true else Term.t_bool_false
+  | Fint n ->
+      let n = Term.ConstInt(Term.IConstDecimal (string_of_int n)) in
+      Term.t_const n 
+  | Flocal(id, _) -> Term.t_var (VM.get_id id lm)
+  | Fpvar _ -> assert false (* FIXME *)
+  | Fapp(p,args, oty) ->
+      let oty,tvm = trans_oty env tvm oty in
+      let p = trans_op env p in
+      let args = List.map (trans_form env tvm lm pvm) args in (* FIXME tvm *)
+      Term.t_app p args oty (* FIXME : use t_app *)
+  | Ftuple args ->
+      let args = List.map (trans_form env tvm lm pvm) args in (* FIXME tvm *)
+      Term.t_tuple args
+  | Fofbool f -> 
+      let f = trans_form env tvm lm pvm f in
+      form_of_bool f 
 
 let trans_op_body env tvm ls = function
   | None -> Decl.create_param_decl ls 
   | Some (OB_op(ids,body)) ->
-      let ids, vm = VM.add_ids ids ls.Term.ls_args Mid.empty in
-      let e = trans_expr env tvm vm body in
+      let ids, lm = VM.add_ids ids ls.Term.ls_args Mid.empty in
+      let e = trans_expr env tvm lm body in
       Decl.create_logic_decl [Decl.make_ls_defn ls ids e]
-  | Some(OB_pr(_ids,_bodys)) -> assert false
-
+  | Some(OB_pr(ids,body)) ->
+      let ids, lm = VM.add_ids ids ls.Term.ls_args Mid.empty in
+      let e = trans_form env tvm lm () body in (* FIXME () *)
+      Decl.create_logic_decl [Decl.make_ls_defn ls ids e]
+  
 let trans_op env path op = 
   assert (not op.op_prob);
   let _, tvm = trans_typarams Mid.empty op.op_params in
   let pid = preid (EcPath.basename path) in
   let dom, tvm = odfl ([],tvm) (omap op.op_dom (trans_tys env tvm)) in
-  let codom, tvm = 
-    match op.op_codom with
-    | None -> None, tvm 
-    | Some t -> let t,tvm = trans_ty env tvm t in Some t, tvm in
+  let codom, tvm = trans_oty env tvm op.op_codom in
   let ls = Term.create_lsymbol pid dom codom in
   ls, trans_op_body env tvm ls op.op_body 
 
@@ -196,7 +274,14 @@ let add_op env path op =
     }
 
 let add_ax env path ax =
-  assert false 
+  let pr = Decl.create_prsymbol (preid (EcPath.basename path)) in
+  let f = trans_form env Mid.empty Mid.empty () ax.ax_spec in
+  let decl = Decl.create_prop_decl Decl.Paxiom pr f in
+  { env with
+    env_ax = Mp.add path pr env.env_ax;
+    logic_task = Task.add_decl env.logic_task decl
+  }
+
 
 
 
