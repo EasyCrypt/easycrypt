@@ -60,12 +60,12 @@ let pp_list
 (* -------------------------------------------------------------------- *)
 let rec pp_qsymbol fmt = function
   | ([]    , x) -> Format.fprintf fmt "%s" x
-  | (n :: p, x) -> Format.fprintf fmt "%s:>%a" n pp_qsymbol (p, x)
+  | (n :: p, x) -> Format.fprintf fmt "%s.%a" n pp_qsymbol (p, x)
 
 (* -------------------------------------------------------------------- *)
 let rec pp_path fmt = function
   | EcPath.Pident x      -> Format.fprintf fmt "%s" (EcIdent.name x)
-  | EcPath.Pqname (p, x) -> Format.fprintf fmt "%a:>%s" pp_path p (EcIdent.name x)
+  | EcPath.Pqname (p, x) -> Format.fprintf fmt "%a.%s" pp_path p (EcIdent.name x)
 
 (* -------------------------------------------------------------------- *)
 let pp_ident fmt id = 

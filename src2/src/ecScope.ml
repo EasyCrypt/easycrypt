@@ -184,10 +184,11 @@ let bind (scope : scope) (action : action) =
           sc_theories = Context.bind (EcIdent.name x) th scope.sc_theories;
           sc_history  = action :: scope.sc_history;
           sc_env      = EcEnv.Theory.bind x th scope.sc_env }
+
   | Ac_use p ->
       { scope with
-        sc_history = action :: scope.sc_history;
-        sc_env     = EcEnv.Theory.use p scope.sc_env }
+          sc_history = action :: scope.sc_history;
+          sc_env     = EcEnv.Theory.use_by_path p scope.sc_env }
 
 (* -------------------------------------------------------------------- *)
 module Op = struct
@@ -368,10 +369,10 @@ module Theory = struct
         sc_env = EcEnv.Theory.import name scope.sc_env }
 
   let use (scope : scope) name = 
-    let path, env = EcEnv.Theory.use_qs name scope.sc_env in
+    let path, env = EcEnv.Theory.use name scope.sc_env in
     { scope with
-      sc_env = env;
-      sc_history = Ac_use path :: scope.sc_history }
+        sc_env = env;
+        sc_history = Ac_use path :: scope.sc_history }
 end
 
 (* -------------------------------------------------------------------- *)

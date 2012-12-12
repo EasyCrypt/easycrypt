@@ -235,10 +235,10 @@ module String = struct
   let split (c : char) (s : string) =
     let rec split s acc =
       match try_nf (fun () -> rindex s c) with
-      | None   -> acc
+      | None   -> if (s = "") then acc else (s :: acc)
       | Some i ->
           split
-            (slice ~first:0 ~last:(i-1) s)
+            (slice ~first:0 ~last:i s)
             ((slice ~first:(i+1) s) :: acc)
     in
       split s []

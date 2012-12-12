@@ -556,7 +556,7 @@ and transinstr ue (env : EcEnv.env) (i : pinstr) =
   let transcall name args =
     let fpath, fsig =
       try  EcEnv.Fun.lookup name env
-      with EcEnv.LookupFailure -> tyerror dloc (UnknownFunction name)
+      with EcEnv.LookupFailure _ -> tyerror dloc (UnknownFunction name)
     in
       if List.length args <> List.length (fst fsig.fs_sig) then
         tyerror dloc ApplInvalidArity;
@@ -626,14 +626,14 @@ and translvalue ue (env : EcEnv.env) lvalue =
   | PLvSymbol { pl_desc = x } ->
       let xpath, xty =
         try  EcEnv.Var.lookup x env
-        with EcEnv.LookupFailure -> tyerror dloc (UnknownVariable x)
+        with EcEnv.LookupFailure _ -> tyerror dloc (UnknownVariable x)
       in
         (LvVar (xpath, xty), xty)
 
   | PLvTuple xs -> begin
       let trans1 { pl_desc = x } =
         try  EcEnv.Var.lookup x env
-        with EcEnv.LookupFailure -> tyerror dloc (UnknownVariable x)
+        with EcEnv.LookupFailure _ -> tyerror dloc (UnknownVariable x)
       in
     
       let xs = List.map trans1 xs in
@@ -646,7 +646,7 @@ and translvalue ue (env : EcEnv.env) lvalue =
       let codomty = mkunivar () in
       let xpath, xty =
         try  EcEnv.Var.lookup x env
-        with EcEnv.LookupFailure -> tyerror dloc (UnknownVariable x)
+        with EcEnv.LookupFailure _ -> tyerror dloc (UnknownVariable x)
       and e, ety = transexp env epolicy ue e in
 
         EcUnify.unify env ue xty (tmap ety codomty);

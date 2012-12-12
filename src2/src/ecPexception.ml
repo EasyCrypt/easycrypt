@@ -75,9 +75,15 @@ let pp_typerror =
     fun fmt exn ->
       Format.fprintf fmt "%a\n%!" pp exn
 
-
+(* -------------------------------------------------------------------- *)
 let pp_exn fmt exn =
   match exn with
-  | EcEnv.UnknownPath p ->
-      Format.fprintf fmt "UnknownPath%a@." EcPrinting.pp_path p
+  | EcEnv.LookupFailure (`Path p) ->
+      Format.fprintf fmt "cannot find path: %a@."
+        EcPrinting.pp_path p
+
+  | EcEnv.LookupFailure (`QSymbol qname) ->
+      Format.fprintf fmt "cannot find symbol: %a@."
+        EcPrinting.pp_qsymbol qname
+
   | _ -> ()

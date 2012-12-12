@@ -10,7 +10,7 @@ type env
 val empty : env
 
 (* -------------------------------------------------------------------- *)
-exception LookupFailure
+exception LookupFailure of [`Path of EcPath.path | `QSymbol of qsymbol]
 
 (* -------------------------------------------------------------------- *)
 type ebinding = [
@@ -29,18 +29,16 @@ val root    : env -> EcPath.path option
 val enter   : symbol -> env -> EcIdent.t * env
 
 (* -------------------------------------------------------------------- *)
-exception UnknownPath of EcPath.path
-
 module type S = sig
   type t
 
-  val bind        : EcIdent.t -> t -> env -> env
-  val bindall     : (EcIdent.t * t) list -> env -> env
-  val lookup_p    : EcPath.path -> env -> t        (* full path *)
-  val trylookup_p : EcPath.path -> env -> t option (* full path *)
-  val lookup      : qsymbol -> env -> EcPath.path * t
-  val trylookup   : qsymbol -> env -> (EcPath.path * t) option
-  val exists      : qsymbol -> env -> bool
+  val bind              : EcIdent.t -> t -> env -> env
+  val bindall           : (EcIdent.t * t) list -> env -> env
+  val lookup_by_path    : EcPath.path -> env -> t        (* full path *)
+  val trylookup_by_path : EcPath.path -> env -> t option (* full path *)
+  val lookup            : qsymbol -> env -> EcPath.path * t
+  val trylookup         : qsymbol -> env -> (EcPath.path * t) option
+  val exists            : qsymbol -> env -> bool
 end
 
 (* -------------------------------------------------------------------- *)
@@ -54,8 +52,9 @@ module ModTy  : S with type t = tymod
 module Theory : sig
   include S with type t = theory
 
-  val use    : EcPath.path -> env -> env
-  val use_qs : qsymbol -> env -> EcPath.path * env
+  val use         : qsymbol -> env -> EcPath.path * env
+  val use_by_path : EcPath.path -> env -> env
+
   val import : qsymbol -> env -> env
 end
 

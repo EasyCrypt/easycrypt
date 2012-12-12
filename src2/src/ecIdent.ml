@@ -47,12 +47,24 @@ module Map = struct
   let allbyname (x : symbol) (m : 'a t) =
     List.map snd (odfl [] (SymMap.tryfind x m))
 
-  let merge m1 m2 = 
-    SymMap.merge 
-      (fun _ o1 o2 -> 
-        match o1 with None -> o2 | Some l1 -> Some ((odfl [] o2) @ l1))
-      m1 m2
+  let update ((n, i) : key) (f : 'a -> 'a) (m : 'a t) =
+    let rec update1 (xs : (int * 'a) list) =
+      match xs with
+      | [] -> []
+      | (i', v) :: xs when i = i' -> (i', f v) :: xs
+      | x :: xs -> x :: (update1 xs)
+    in
+      if SymMap.mem n m then
+        SymMap.update
+          (function None -> [] | Some xs -> update1 xs) n m
+      else
+        m
 
+   let merge m1 m2 = 
+     SymMap.merge 
+       (fun _ o1 o2 -> 
+         match o1 with None -> o2 | Some l1 -> Some ((odfl [] o2) @ l1))
+       m1 m2
 end
 
 module SMid = EcMaps.StructMake(struct type t = ident let tag = snd end)
