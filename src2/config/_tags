@@ -2,7 +2,7 @@ true  : use_menhir
 true  : debug
 <src> : include
 
-<src/*.ml>            : pkg_menhirLib
-<src/parsetree.ml>    : deriving, pkg_deriving
-<src/ec.ml>           : deriving, pkg_deriving
-<src/*.{native,byte}> : pkg_menhirLib, pkg_deriving
+<src/*.mli> : pkg_menhirLib, pkg_why3
+<src/*.ml>  : pkg_menhirLib, pkg_why3
+
+<src/*.{native,byte}> : pkg_menhirLib, pkg_why3
