@@ -13,14 +13,14 @@ type op_body = (locals * EcTypes.tyexpr) option
 type pr_body = (locals * EcFol.form) option
 
 type operator_body = 
-  | OB_op of (EcIdent.t list * EcTypes.tyexpr) option
-  | OB_pr of (EcIdent.t list * EcFol.form) option
+  | OB_op of EcIdent.t list * EcTypes.tyexpr 
+  | OB_pr of EcIdent.t list * EcFol.form 
 
 type operator = {
   op_params : EcIdent.t list;     (* type parameters *)
   op_dom    : EcTypes.dom option; (* None means constant *)
   op_codom  : EcTypes.ty option;  (* None means predicate *)
-  op_body   : operator_body;
+  op_body   : operator_body option;
   op_prob   : bool;
 }
 
@@ -39,18 +39,26 @@ let op_sig op =
 
   
 let mk_pred typ dom body = 
+  let body = 
+    match body with
+    | None -> None
+    | Some(ids,f) -> Some(OB_pr(ids,f)) in
   { op_params = typ;
     op_dom    = dom;
     op_codom  = None;
-    op_body   = OB_pr body;
+    op_body   = body;
     op_prob   = false;
   }
 
 let mk_op typ dom codom body prob = 
+  let body = 
+    match body with
+    | None -> None
+    | Some(ids,e) -> Some(OB_op(ids,e)) in
   { op_params = typ;
     op_dom    = dom;
     op_codom  = Some codom;
-    op_body   = OB_op body;
+    op_body   = body;
     op_prob   = prob;
   }
 

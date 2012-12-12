@@ -4,6 +4,7 @@ open EcSymbols
 open EcPath
 open EcDecl
 open EcTypesmod
+open EcWhy3
 
 module IM = EcIdent.Map
 
