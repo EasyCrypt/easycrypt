@@ -90,7 +90,7 @@ module MC = struct
     let rec lookup1 (env : env) (mc : mcomponents) (x : EcIdent.t) =
       match IM.byident x mc.mc_components with
       | None   -> None
-      | Some _ -> omap (Mid.tryfind x env.env_comps) snd
+      | Some _ -> omap (Mid.find_opt x env.env_comps) snd
     in
   
     let rec lookup env mc = function
@@ -123,7 +123,7 @@ module MC = struct
       | None -> None
       | Some (x, _) ->
           obind
-            (Mid.tryfind x env.env_comps)
+            (Mid.find_opt x env.env_comps)
             (fun (_, mc) -> lookup_mc env qn mc)
     end
 
@@ -209,28 +209,25 @@ module MC = struct
     let path   = EcPath.Pqname (env.env_scope, name) in
     let xcomps = EcPath.basename env.env_scope in
 
-      { env with
-          env_root  = binder path obj env.env_root;
-          env_comps = snd (
-              Mid.update
-                (snd_map (binder path obj))
-                xcomps env.env_comps);
-      }
+    { env with
+      env_root  = binder path obj env.env_root;
+      env_comps = 
+      Mid.change (fun o -> omap o (snd_map (binder path obj)))
+        xcomps env.env_comps ; }
+
 
   (* -------------------------------------------------------------------- *)
   let bind_mc env name comps =
     let path = EcPath.Pqname (env.env_scope, name) in
     let env  =
       { env with
-          env_root  = mc_bind_comp path env.env_root;
-          env_comps = snd (
-              Mid.update
-                (snd_map (mc_bind_comp path))
-                name env.env_comps);
-      }
+        env_root  = mc_bind_comp path env.env_root;
+        env_comps = 
+        Mid.change (fun o -> omap o  (snd_map (mc_bind_comp path)))
+          name env.env_comps; }
     in
-      { env with                        (* FIXME: dup *)
-          env_comps = Mid.add name (path, comps) env.env_comps }
+    { env with                        (* FIXME: dup *)
+      env_comps = Mid.add name (path, comps) env.env_comps }
 
   (* ------------------------------------------------------------------ *)
   let bind_variable x ty env =

@@ -157,8 +157,14 @@ module List = struct
       | []      -> true
       | x :: xs -> (not (List.mem x xs)) && (uniq xs)
 
+  let assoc_eq eq (x : 'a) (xs : ('a * 'b) list) =
+    snd (List.find (fun (x',_) -> eq x x') xs) 
+
+  let tryassoc_eq eq x xs = 
+    try_nf (fun () -> assoc_eq eq x xs)
+
   let tryassoc (x : 'a) (xs : ('a * 'b) list) =
-    try_nf (fun () -> List.assoc x xs)
+    tryassoc_eq (=) x xs
 
   let take (n : int) (xs : 'a list) =
     let rec take n xs acc =

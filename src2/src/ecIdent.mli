@@ -2,18 +2,21 @@
 open EcSymbols
 
 (* -------------------------------------------------------------------- *)
-type t = symbol * int
-
+type t  
 val create : symbol -> t
-val mk     : symbol -> EcUidgen.uid -> t
 val fresh  : t -> t
 val name   : t -> symbol
-val stamp  : t -> EcUidgen.uid
 
 val pp_ident : t EcFormat.pp
 
 (* -------------------------------------------------------------------- *)
-module RawMap : EcMaps.Map.S with type key = t
+module Mid : sig 
+  include Why3.Stdlib.Map.S with type key = t
+  val pp : key EcFormat.pp -> 'a EcFormat.pp -> ('a t) EcFormat.pp
+end
+module Sid : Mid.Set with type elt = t
+module Hid : Why3.Stdlib.XHashtbl.S with type key = t
+
 
 (* -------------------------------------------------------------------- *)
 module Map : sig
@@ -32,6 +35,3 @@ module Map : sig
 end
 
 (* -------------------------------------------------------------------- *)
-module Mid : EcMaps.Map.S with type key = t
-module Sid : Set.S with type elt = t
-module Hid : Hashtbl.S with type key = t

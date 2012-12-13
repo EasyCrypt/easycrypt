@@ -4,67 +4,82 @@ open EcUtils
 open EcMaps
 
 (* -------------------------------------------------------------------- *)
-type ident = symbol * EcUidgen.uid
+type ident = { 
+    id_symb : symbol;
+    id_tag  : int;
+  }
+
+let name x = x.id_symb
+let id_equal : ident -> ident -> bool = (==)
+let id_compare i1 i2 = i2.id_tag - i1.id_tag 
+let id_hash id = id.id_tag 
+
+module MSH = Why3.Stdlib.MakeMSH (struct type t = ident let tag = id_hash end)
+
+module Mid = struct 
+  include MSH.M 
+
+  let pp pp_key pp_value fmt m =
+    let pp fmt (k, v) =
+      Format.fprintf fmt "%a = %a" pp_key k pp_value v in
+    if is_empty m then Format.fprintf fmt "{}"
+    else 
+      let pp =
+        let first = ref true in
+        fun k v ->
+          if not !first then Format.fprintf fmt "@,%a" pp (k, v)
+          else begin
+            Format.fprintf fmt "%a" pp (k, v);
+            first := false
+          end
+      in
+      Format.fprintf fmt "{@,@[<v 2>  %a@]@,}" (fun fmt -> iter pp) m
+end
+
+module Sid = MSH.S
+module Hid = MSH.H
+
 type t     = ident
 
-let create (x : symbol) =
-  (x, EcUidgen.unique ())
+let create (x : symbol) = 
+  { id_symb = x;
+    id_tag  = EcUidgen.unique () }
 
-let mk (x : symbol) (i : EcUidgen.uid) =
-  (x, i)
-
-let fresh ((x, _) : t) =
-  (x, EcUidgen.unique ())
-
-let name ((x, _) : t) =
-  x
-
-let stamp ((_, i) : t) =
-  i
-
-let pp_ident fmt ((x, i) : t) =
-  Format.fprintf fmt "%s/%d" x i
-
-(* -------------------------------------------------------------------- *)
-module RawMap = Map.Make(struct
-  type t = ident
-  let  compare = (Pervasives.compare : t -> t -> int)
-end)
+let fresh (id : t) = create (name id)
 
 (* -------------------------------------------------------------------- *)
 module Map = struct
   type key  = t
-  type 'a t = ((int * 'a) list) SymMap.t
+  type 'a t = ((key * 'a) list) SymMap.t
 
   let empty : 'a t =
     SymMap.empty
 
-  let add ((x, i) : key) (v : 'a) (m : 'a t) =
-    SymMap.setdfl (fun p -> (i, v) :: (odfl [] p)) x m
+  let add (id : key) (v : 'a) (m : 'a t) =
+    SymMap.setdfl (fun p -> (id, v) :: (odfl [] p)) (name id) m
 
-  let byident ((x, i) : key) (m : 'a t) =
-    obind (SymMap.tryfind x m) (List.tryassoc i)
+  let byident (id : key) (m : 'a t) =
+    obind (SymMap.tryfind (name id) m) (List.tryassoc_eq id_equal id)
 
   let byname (x : symbol) (m : 'a t) =
     match SymMap.tryfind x m with
     | None | Some []     -> None
-    | Some ((i, v) :: _) -> Some (mk x i, v)
+    | Some (idv :: _) -> Some idv 
 
   let allbyname (x : symbol) (m : 'a t) =
-    List.map (fst_map (mk x)) (odfl [] (SymMap.tryfind x m))
+    odfl [] (SymMap.tryfind x m)
 
-  let update ((n, i) : key) (f : 'a -> 'a) (m : 'a t) =
-    let rec update1 (xs : (int * 'a) list) =
+  let update (id : key) (f : 'a -> 'a) (m : 'a t) =
+    let rec update1 (xs : (key * 'a) list) =
       match xs with
       | [] -> []
-      | (i', v) :: xs when i = i' -> (i', f v) :: xs
+      | (id', v) :: xs when id_equal id id' -> (id', f v) :: xs
       | x :: xs -> x :: (update1 xs)
     in
-      if SymMap.mem n m then
-        SymMap.setdfl
-          (function None -> [] | Some xs -> update1 xs) n m
-      else
-        m
+    let n = name id in
+    if SymMap.mem n m then
+      SymMap.setdfl (function None -> [] | Some xs -> update1 xs) n m
+    else m
 
    let merge m1 m2 = 
      SymMap.merge 
@@ -87,15 +102,11 @@ module Map = struct
      in
 
      let pp fmt bindings =
+       let pp_tag fmt id = pp_int fmt id.id_tag in 
        pp_list ~pre:"[" ~pst:"]"
-         (pp_pair pp_int pp_value) fmt bindings
+         (pp_pair pp_tag pp_value) fmt bindings
      in
        SymMap.pp pp_key pp fmt m
 end
 
-(* -------------------------------------------------------------------- *)
-module SMid = EcMaps.StructMake(struct type t = ident let tag = snd end)
-
-module Mid = SMid.M
-module Sid = SMid.S
-module Hid = SMid.H
+let pp_ident fmt id = Format.fprintf fmt "%s" (name id)

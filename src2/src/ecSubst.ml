@@ -5,7 +5,7 @@ open EcTypesmod
 
 (* -------------------------------------------------------------------- *)
 type subst = {
-  sb_modules : EcPath.path EcIdent.RawMap.t;
+  sb_modules : EcPath.path EcIdent.Mid.t;
 }
 
 type subst1 = [
@@ -16,14 +16,14 @@ type mode = PModule
 
 (* -------------------------------------------------------------------- *)
 let identity = {
-  sb_modules = EcIdent.RawMap.empty;
+  sb_modules = EcIdent.Mid.empty;
 }
 
 (* -------------------------------------------------------------------- *)
 let bind1 (s : subst) = function
   | `Module (x, p) ->
-      { s with
-          sb_modules = EcIdent.RawMap.add x p s.sb_modules }
+      {(* s with *)
+          sb_modules = EcIdent.Mid.add x p s.sb_modules }
 
 let extend (s : subst) (bindings : subst1 list) =
   List.fold_left bind1 s bindings
@@ -36,7 +36,7 @@ let rec inpath (mode : mode) (s : subst) (p : EcPath.path) =
   match p with
   | EcPath.Pident x -> begin
       match mode with
-      | PModule -> odfl p (EcIdent.RawMap.tryfind x s.sb_modules)
+      | PModule -> odfl p (EcIdent.Mid.find_opt x s.sb_modules)
   end
 
   | EcPath.Pqname (p, x) -> EcPath.Pqname (inpath mode s p, x)

@@ -101,7 +101,7 @@ let inst_uni_dom s = List.map (inst_uni s)
 let inst_var s = 
   let rec subst t = 
     match t with 
-    | Tvar id -> Mid.get t id s 
+    | Tvar id -> Mid.find_def t id s 
     | _ -> map subst t in
   subst
 
