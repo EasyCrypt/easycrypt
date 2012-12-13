@@ -8,10 +8,19 @@ let try_nf (f : unit -> 'a) =
 
 let (^~) f = fun x y -> f y x
 
+let (-|) (f : 'a -> 'b) (g : 'c -> 'a) =
+  fun x -> f (g x)
+
 (* -------------------------------------------------------------------- *)
 let proj3_1 (x, _, _) = x
 let proj3_2 (_, x, _) = x
 let proj3_3 (_, _, x) = x
+
+let fst_map (f : 'a -> 'c) ((x, y) : 'a * 'b) =
+  (f x, y)
+
+let snd_map (f : 'b -> 'c) ((x, y) : 'a * 'b) =
+  (x, f y)
 
 (* -------------------------------------------------------------------- *)
 let oiter (x : 'a option) (f : 'a -> unit) =

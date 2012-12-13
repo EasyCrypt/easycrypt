@@ -713,7 +713,7 @@ module Fenv = struct
     let trylookup_logical fenv s =
       match EcIdent.Map.byname s fenv.fe_locals with
       | None -> None
-      | Some(x,ty) -> Some(Llocal(x,ty))
+      | Some (x, ty) -> Some (Llocal (x, snd ty))
       
     let trylookup fenv (ls,s as qs) = 
       if ls = [] then

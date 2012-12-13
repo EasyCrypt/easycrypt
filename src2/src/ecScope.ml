@@ -98,8 +98,6 @@ type action =
   | Ac_modtype   of (EcIdent.t * EcTypesmod.tymod)
   | Ac_module    of EcTypesmod.module_expr
   | Ac_theory    of (EcIdent.t * EcTypesmod.theory)
-  | Ac_use       of EcPath.path
-
 
 type scope = {
   sc_name       : EcIdent.t;
@@ -127,13 +125,8 @@ let attop (scope : scope) =
   scope.sc_top = None
 
 (* -------------------------------------------------------------------- *)
-let subscope (scope : scope option) (name : symbol) =
-  let env =
-    match scope with
-    | None       -> EcEnv.empty
-    | Some scope -> scope.sc_env
-  in
-  let (name, env) = EcEnv.enter name env in
+let subscope (scope : scope) (name : symbol) =
+  let (name, env) = EcEnv.enter name scope.sc_env in
 
   { sc_name       = name;
     sc_types      = Context.empty ();
@@ -144,7 +137,7 @@ let subscope (scope : scope option) (name : symbol) =
     sc_theories   = Context.empty ();
     sc_history    = [];
     sc_env        = env;
-    sc_top        = scope; }
+    sc_top        = Some scope; }
 
 (* -------------------------------------------------------------------- *)
 let bind (scope : scope) (action : action) =
@@ -184,11 +177,6 @@ let bind (scope : scope) (action : action) =
           sc_theories = Context.bind (EcIdent.name x) th scope.sc_theories;
           sc_history  = action :: scope.sc_history;
           sc_env      = EcEnv.Theory.bind x th scope.sc_env }
-
-  | Ac_use p ->
-      { scope with
-          sc_history = action :: scope.sc_history;
-          sc_env     = EcEnv.Theory.use_by_path p scope.sc_env }
 
 (* -------------------------------------------------------------------- *)
 module Op = struct
@@ -350,12 +338,11 @@ module Theory = struct
       | Ac_modtype   (x, tymod)  -> Th_modtype   (x, tymod)
       | Ac_module    m           -> Th_module    m
       | Ac_theory    (x, th)     -> Th_theory    (x, th)
-      | Ac_use       p           -> Th_use       p
     in
       fun history -> List.map theory_item_of_action history
 
   let enter (scope : scope) (name : symbol) =
-    subscope (Some scope) name
+    subscope scope name
 
   let exit (scope : scope) =
     match scope.sc_top with
@@ -367,17 +354,23 @@ module Theory = struct
   let import (scope : scope) (name : qsymbol) =
     { scope with
         sc_env = EcEnv.Theory.import name scope.sc_env }
-
-  let use (scope : scope) name = 
-    let path, env = EcEnv.Theory.use name scope.sc_env in
-    { scope with
-        sc_env = env;
-        sc_history = Ac_use path :: scope.sc_history }
 end
 
 (* -------------------------------------------------------------------- *)
 let initial (name : symbol) =
-  let scope = subscope None name in
+  let scope =
+    let name, env = EcEnv.empty name in
+      { sc_name       = name;
+        sc_types      = Context.empty ();
+        sc_operators  = Context.empty ();
+        sc_axioms     = Context.empty ();
+        sc_modtypes   = Context.empty ();
+        sc_modules    = Context.empty ();
+        sc_theories   = Context.empty ();
+        sc_history    = [];
+        sc_env        = env;
+        sc_top        = None; }
+  in
 
   let scope = Ty.alias scope "unit" (EcTypes.tunit ()) in
   let scope = Ty.alias scope "bool" (EcTypes.tbool ()) in

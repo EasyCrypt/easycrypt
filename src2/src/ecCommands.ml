@@ -88,10 +88,6 @@ and process_th_import (scope : EcScope.scope) name =
   EcScope.Theory.import scope name
 
 (* -------------------------------------------------------------------- *)
-and process_th_use (scope : EcScope.scope) name =
-  EcScope.Theory.use scope name
-
-(* -------------------------------------------------------------------- *)
 and process (scope : EcScope.scope) (g : global) =
   match g with
   | Gtype      t    -> process_type       scope t
@@ -105,7 +101,6 @@ and process (scope : EcScope.scope) (g : global) =
   | GthClose   name -> process_th_close   scope name.pl_desc
   | GthRequire name -> process_th_require scope name.pl_desc
   | GthImport  name -> process_th_import  scope name.pl_desc
-  | GthUse     name -> process_th_use     scope name.pl_desc 
   | Gprint     p    -> process_print      scope p; scope
 
 
@@ -114,7 +109,8 @@ let scope = ref (EcScope.initial EcCoreLib.top)
 
 (* -------------------------------------------------------------------- *)
 let process (g : global) =
-    scope := process !scope g
+  scope := process !scope g;
+  EcFormat.pp_err EcPrinting.pp_env (EcScope.env !scope)
 
 (* -------------------------------------------------------------------- *)
 let process (g : global) =
@@ -122,8 +118,8 @@ let process (g : global) =
     process g
   with
   | TyError (loc, exn) -> 
-      EcPrinting.err
+      EcFormat.pp_err
         (EcPrinting.pp_located loc EcPexception.pp_typerror)
         exn;
       raise Interrupted
-  | e -> EcPrinting.err EcPexception.pp_exn e; raise e
+  | e -> EcFormat.pp_err EcPexception.pp_exn e; raise e

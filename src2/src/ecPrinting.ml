@@ -1,61 +1,23 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
+open EcFormat
 open EcTypes
 open EcTypesmod
 open EcDecl
 open EcParsetree
+open EcEnv
 
 module NameGen = EcUidgen.NameGen
+
+module IM  = EcIdent.Map
+module Mid = EcIdent.Mid
 
 (* -------------------------------------------------------------------- *)
 let (~$) = format_of_string
 
 (* -------------------------------------------------------------------- *)
-let err pp_elt x =
-  Format.fprintf Format.err_formatter "%a" pp_elt x
-
-(* -------------------------------------------------------------------- *)
 let pp_located loc pp_elt fmt x =
   Format.fprintf fmt "%s: %a" (Location.tostring loc) pp_elt x
-
-(* -------------------------------------------------------------------- *)
-let pp_id pp_elt fmt x =
-  Format.fprintf fmt "%a" pp_elt x
-
-(* -------------------------------------------------------------------- *)
-let pp_paren pp_elt fmt x =
-  Format.fprintf fmt "(%a)" pp_elt x
-
-(* --------------------------------------------------------------------  *)
-let pp_opt_pre  () = format_of_string ""
-let pp_opt_post () = format_of_string ""
-
-let pp_option
-    ?(pre=pp_opt_pre ())
-    ?(post=pp_opt_post ()) pp_elt fmt x =
-
-  oiter x
-    (fun x ->
-      Format.fprintf fmt "%(%)%a%(%)" pre pp_elt x post)
-
-(* -------------------------------------------------------------------- *)
-let pp_list_pre  () = format_of_string "@["
-let pp_list_post () = format_of_string "@]"
-let pp_list_sep  () = format_of_string ""
-
-let pp_list
-    ?(pre=pp_list_pre ())
-    ?(sep=pp_list_sep ())
-    ?(post=pp_list_post ()) pp_elt =
-
-  let rec pp_list fmt = function
-    | []      -> ()
-    | x :: xs -> Format.fprintf fmt "%(%)%a%a" sep pp_elt x pp_list xs
-  in
-    fun fmt xs ->
-      match xs with
-      | []      -> ()
-      | x :: xs -> Format.fprintf fmt "%(%)%a%a%(%)" pre pp_elt x pp_list xs post
 
 (* -------------------------------------------------------------------- *)
 let rec pp_qsymbol fmt = function
@@ -147,7 +109,7 @@ let pp_dom fmt =
 
 (* -------------------------------------------------------------------- *)
 let pp_opdecl fmt (p, d) =
-  let vmap = EcUidgen.NameGen.create () in
+  let _vmap = EcUidgen.NameGen.create () in
 
   let str_kind op =
     let x = if (op_ctnt op) then "cnst" else "op" in
@@ -174,3 +136,26 @@ let pp_opdecl fmt (p, d) =
     Format.fprintf fmt "%s %a%a %a."
       (str_kind d) pp_optyparams d.op_params pp_path p
       pp_decl d
+
+(* -------------------------------------------------------------------- *)
+let rec pp_env fmt (env : EcEnv.env) =
+  let env = EcEnv.preenv env in
+  let pp_premc fmt mc =
+    Format.fprintf fmt "@,@[<v 4>  { %a@]}" pp_premc mc
+  in
+    Format.fprintf fmt "scope = %a@." pp_path env.env_scope;
+    Format.fprintf fmt "root  = %a@." pp_premc env.env_root;
+    Format.fprintf fmt "comps = %a@."
+      (Mid.pp EcIdent.pp_ident (pp_pair pp_path pp_premc))
+      env.EcEnv.env_comps
+
+and pp_premc fmt (mc : EcEnv.premc) =
+  Format.fprintf fmt "variables  = %a@," (IM.pp ~align:true (pp_pair pp_path pp_void)) mc.mc_variables ;
+  Format.fprintf fmt "functions  = %a@," (IM.pp ~align:true (pp_pair pp_path pp_void)) mc.mc_functions ;
+  Format.fprintf fmt "modules    = %a@," (IM.pp ~align:true (pp_pair pp_path pp_void)) mc.mc_modules   ;
+  Format.fprintf fmt "modtypes   = %a@," (IM.pp ~align:true (pp_pair pp_path pp_void)) mc.mc_modtypes  ;
+  Format.fprintf fmt "typedecls  = %a@," (IM.pp ~align:true (pp_pair pp_path pp_void)) mc.mc_typedecls ;
+  Format.fprintf fmt "operators  = %a@," (IM.pp ~align:true (pp_pair pp_path pp_void)) mc.mc_operators ;
+  Format.fprintf fmt "axioms     = %a@," (IM.pp ~align:true (pp_pair pp_path pp_void)) mc.mc_axioms    ;
+  Format.fprintf fmt "theories   = %a@," (IM.pp ~align:true (pp_pair pp_path pp_void)) mc.mc_theories  ;
+  Format.fprintf fmt "components = %a@," (IM.pp ~align:true pp_unit)                   mc.mc_components;

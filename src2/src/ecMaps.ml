@@ -8,10 +8,12 @@ module Map = struct
   module type S = sig
     include Map.S
 
-    val update  : ('a option -> 'a) -> key -> 'a t -> 'a t
+    val setdfl  : ('a option -> 'a) -> key -> 'a t -> 'a t
+    val update  : ('a -> 'a) -> key -> 'a t -> bool * 'a t
     val tryfind : key -> 'a t -> 'a option
     val get     : 'a -> key -> 'a t -> 'a 
     val get_upd : (key -> 'a) -> key -> 'a t -> 'a * 'a t
+    val pp      : key EcFormat.pp -> 'a EcFormat.pp -> ('a t) EcFormat.pp
   end
 
   module Make(O : OrderedType) : S with type key = O.t = struct
@@ -20,8 +22,13 @@ module Map = struct
     let tryfind (k : key) (m : 'a t) : 'a option =
       try_nf (fun () -> find k m)
 
-    let update f (k : key) (m : 'a t) =
+    let setdfl f (k : key) (m : 'a t) =
       add k (f (tryfind k m)) m
+
+    let update f (k : key) (m : 'a t) =
+      match tryfind k m with
+      | None   -> (false, m)
+      | Some v -> (true , add k (f v) m)
 
     let get def k m = 
       try find k m with Not_found -> def
@@ -33,6 +40,26 @@ module Map = struct
         let m = add k r m in
         r, m
 
+    let pp pp_key pp_value fmt m =
+      let pp fmt (k, v) =
+        Format.fprintf fmt "%a = %a" pp_key k pp_value v
+      in
+        if is_empty m then
+          Format.fprintf fmt "{}"
+        else begin
+          let pp =
+            let first = ref true in
+              fun k v ->
+                if not !first then
+                  Format.fprintf fmt "@,%a" pp (k, v)
+                else begin
+                  Format.fprintf fmt "%a" pp (k, v);
+                  first := false
+                end
+          in
+            Format.fprintf fmt "{@,@[<v 2>  %a@]@,}"
+              (fun fmt -> iter pp) m
+        end
   end
 end
 
@@ -178,7 +205,6 @@ end = struct
 end
 
 (* -------------------------------------------------------------------- *)
-
 module type Tagged = sig
   type t
   val tag : t -> int

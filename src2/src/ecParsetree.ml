@@ -271,7 +271,6 @@ type global =
   | GthOpen    of psymbol
   | GthClose   of psymbol
   | GthRequire of psymbol
-  | GthUse     of pqsymbol
   | GthImport  of pqsymbol
 
 type prog = global list

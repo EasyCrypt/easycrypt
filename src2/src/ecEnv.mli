@@ -5,9 +5,29 @@ open EcDecl
 open EcTypesmod
 
 (* -------------------------------------------------------------------- *)
-type env
+type preenv = {
+  env_scope  : EcPath.path;
+  env_root   : premc;
+  env_comps  : (EcPath.path * premc) EcIdent.Mid.t
+}
 
-val empty : env
+and premc = {
+  mc_variables  : (EcPath.path * EcTypes.ty)        EcIdent.Map.t;
+  mc_functions  : (EcPath.path * EcTypesmod.funsig) EcIdent.Map.t;
+  mc_modules    : (EcPath.path * EcTypesmod.tymod)  EcIdent.Map.t;
+  mc_modtypes   : (EcPath.path * EcTypesmod.tymod)  EcIdent.Map.t;
+  mc_typedecls  : (EcPath.path * EcDecl.tydecl)     EcIdent.Map.t;
+  mc_operators  : (EcPath.path * EcDecl.operator)   EcIdent.Map.t;
+  mc_axioms     : (EcPath.path * EcDecl.axiom)      EcIdent.Map.t;
+  mc_theories   : (EcPath.path * EcTypesmod.theory) EcIdent.Map.t;
+  mc_components : unit EcIdent.Map.t;
+}
+
+(* -------------------------------------------------------------------- *)
+type env = private preenv
+
+val empty  : symbol -> EcIdent.t * env
+val preenv : env -> preenv
 
 (* -------------------------------------------------------------------- *)
 exception LookupFailure of [`Path of EcPath.path | `QSymbol of qsymbol]
@@ -25,7 +45,7 @@ type ebinding = [
 
 val bind1   : EcIdent.t * ebinding -> env -> env
 val bindall : (EcIdent.t * ebinding) list -> env -> env
-val root    : env -> EcPath.path option
+val root    : env -> EcPath.path
 val enter   : symbol -> env -> EcIdent.t * env
 
 (* -------------------------------------------------------------------- *)
@@ -51,9 +71,6 @@ module ModTy  : S with type t = tymod
 (* -------------------------------------------------------------------- *)
 module Theory : sig
   include S with type t = theory
-
-  val use         : qsymbol -> env -> EcPath.path * env
-  val use_by_path : EcPath.path -> env -> env
 
   val import : qsymbol -> env -> env
 end

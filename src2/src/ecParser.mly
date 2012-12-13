@@ -267,8 +267,8 @@ sexp:
 | se=loc(sexp) LBRACKET e1=loc(exp) LEFTARROW e2=loc(exp) RBRACKET
    { peset (Location.make $startpos $endpos) se e1 e2 }
 
-| x=ident LPAREN es=exp_list0 RPAREN
-   { PEapp (pqsymb_of_psymb x, es) }
+| x=qident LPAREN es=exp_list0 RPAREN
+   { PEapp (x, es) }
 
 | LPAREN es=exp_list2 RPAREN
    { PEtuple es }
@@ -776,7 +776,6 @@ global_:
 | theory_close     { GthClose   $1 }
 | theory_require   { GthRequire $1 }
 | theory_import    { GthImport  $1 }
-| theory_use       { GthUse     $1 }
 | mod_def          { Gmodule    $1 }
 | sig_def          { Ginterface $1 }
 | type_decl_or_def { Gtype      $1 }
