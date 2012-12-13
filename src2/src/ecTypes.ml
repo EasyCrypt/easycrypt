@@ -138,35 +138,39 @@ type lpattern =
   | LSymbol of EcIdent.t
   | LTuple  of EcIdent.t list
 
-
 type tyexpr =
-  | Eunit                                    (* unit literal       *)
-  | Ebool     of bool                        (* bool literal       *)
-  | Eint      of int                         (* int. literal       *)
-  | Eflip                                    (* flip               *)
-  | Einter    of tyexpr * tyexpr             (* interval sampling  *)
-  | Ebitstr   of tyexpr                      (* bitstring sampling *)
-  | Eexcepted of tyexpr * tyexpr             (* restriction        *)
-  | Elocal    of EcIdent.t * ty              (* local variable     *)
-  | Evar      of EcPath.path * ty            (* module variable    *)
-  | Eapp      of EcPath.path * tyexpr list   (* op. application    *)
-  | Elet      of lpattern * tyexpr * tyexpr  (* let binding        *)
-  | Etuple    of tyexpr list                 (* tuple constructor  *)
-  | Eif       of tyexpr * tyexpr * tyexpr    (* _ ? _ : _          *)
+  | Eunit                                         (* unit literal       *)
+  | Ebool     of bool                             (* bool literal       *)
+  | Eint      of int                              (* int. literal       *)
+  | Eflip                                         (* flip               *)
+  | Einter    of tyexpr * tyexpr                  (* interval sampling  *)
+  | Ebitstr   of tyexpr                           (* bitstring sampling *)
+  | Eexcepted of tyexpr * tyexpr                  (* restriction        *)
+  | Elocal    of EcIdent.t * ty                   (* local variable     *)
+  | Evar      of EcPath.path * ty                 (* module variable    *)
+  | Eapp      of EcPath.path * tyexpr list * ty   (* op. application    *)
+  | Elet      of lpattern * tyexpr * tyexpr       (* let binding        *)
+  | Etuple    of tyexpr list                      (* tuple constructor  *)
+  | Eif       of tyexpr * tyexpr * tyexpr         (* _ ? _ : _          *)
 
 (* -------------------------------------------------------------------- *)
+
+let ids_of_lpattern = function
+  | LSymbol id -> [id] 
+  | LTuple ids -> ids
+
 let e_map ft fe e = 
   match e with 
   | Eunit | Ebool _ | Eint _ | Eflip -> e 
-  | Elocal (id, ty)    -> Elocal (id, ft ty)
-  | Evar (id, ty)      -> Evar (id, ft ty)
-  | Eapp (p, args)     -> Eapp (p, List.map fe args)
-  | Elet (lp, e1, e2)  -> Elet (lp, fe e1, fe e2)
-  | Etuple le          -> Etuple (List.map fe le)
-  | Eif (e1, e2, e3)   -> Eif (fe e1, fe e2, fe e3)
-  | Einter (e1,e2)     -> Einter (fe e1, fe e2)
-  | Ebitstr e          -> Ebitstr (fe e)
-  | Eexcepted (e1, e2) -> Eexcepted (fe e1, fe e2)
+  | Elocal (id, ty)       -> Elocal (id, ft ty)
+  | Evar (id, ty)         -> Evar (id, ft ty)
+  | Eapp (p, args, ty)    -> Eapp (p, List.map fe args, ft ty)
+  | Elet (lp, e1, e2)     -> Elet (lp, fe e1, fe e2)
+  | Etuple le             -> Etuple (List.map fe le)
+  | Eif (e1, e2, e3)      -> Eif (fe e1, fe e2, fe e3)
+  | Einter (e1,e2)        -> Einter (fe e1, fe e2)
+  | Ebitstr e             -> Ebitstr (fe e)
+  | Eexcepted (e1, e2)    -> Eexcepted (fe e1, fe e2)
 
 (* -------------------------------------------------------------------- *)
 module Esubst = struct 
@@ -174,3 +178,4 @@ module Esubst = struct
     let rec aux e = e_map (Subst.uni uidmap) aux e in
       aux
 end
+

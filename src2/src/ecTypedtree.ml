@@ -219,7 +219,9 @@ let transexp (env : EcEnv.env) (policy : epolicy) (ue : EcUnify.unienv) e =
         | Some (xpath, Some ty, kind) -> 
             begin match kind with
             | `Var     -> (Evar (xpath, ty), ty)
-            | `Ctnt op -> (Eapp (xpath, []), EcTypes.freshen op.op_params ty)
+            | `Ctnt op -> 
+                let ty = EcTypes.freshen op.op_params ty in
+                (Eapp (xpath, [], ty), ty)
             end
         | _ -> tyerror loc (UnknownVariable x)
         end
@@ -236,7 +238,7 @@ let transexp (env : EcEnv.env) (policy : epolicy) (ue : EcUnify.unienv) e =
 
         | [(xpath, op, codom, subue)] ->
             EcUnify.UniEnv.restore ~src:subue ~dst:ue;
-            (Eapp (xpath, List.map fst es), codom)
+            (Eapp (xpath, List.map fst es, codom), codom)
     end
 
     | PElet (p, pe1, pe2) ->
@@ -758,128 +760,75 @@ let transl fenv tp decl =
 let transfpattern fenv (p : EcParsetree.lpattern) =
   match transpattern1 (Fenv.mono fenv) p with
   | LSymbol x, ty ->
-      (Fenv.bind_local fenv x ty, LFPSymbol(x,ty), ty)
+      (Fenv.bind_local fenv x ty, LSymbol x, ty)
   | LTuple xs, (Ttuple lty as ty) ->
-      let pxs = List.map2 (fun x ty -> x,ty) xs lty in
-      (Fenv.bind_locals fenv xs lty, LFPTuple pxs, ty)
+      (Fenv.bind_locals fenv xs lty, LTuple xs, ty)
   | _ -> assert false
 
 
-let transformula fenv tp ue f = 
-
-  let fofbool fenv loc f ty = 
-    unify_error (Fenv.mono fenv) ue loc ty (tbool ());
-    fofbool f in
+let transformula fenv tp ue pf = 
 
   let rec transf fenv tp f = 
     match f.pl_desc with
-    | PFunit | PFint _ | PFtuple _ -> tyerror dloc (PropExpected f)
-    | PFbool b -> EcFol.fofbool (fbool b) 
+    | PFunit -> f_unit
+    | PFbool b -> f_bool b
+    | PFint n -> f_int n
+    | PFtuple args -> f_tuple (List.map (transf fenv tp) args)
     | PFident { pl_desc = x } -> 
         begin match Fenv.Ident.trylookup fenv x with
         | None ->  tyerror dloc (UnknownVariable x)
-        | Some(Llocal(x,ty)) -> fofbool fenv f.pl_loc (flocal x ty) ty
-        | Some(Lprog(x,ty,s)) -> fofbool fenv f.pl_loc (fpvar x ty s) ty
-        | Some(Lctnt(x,Some ty)) -> 
-            fofbool fenv f.pl_loc (fapp x [] (Some ty)) ty
-        | Some(Lctnt(x,None)) ->fapp x [] None
+        | Some(Llocal(x,ty)) -> f_local x ty
+        | Some(Lprog(x,ty,s)) -> f_pvar x ty s
+        | Some(Lctnt(x,oty)) -> f_app x [] oty
         end
     | PFside(f,side) ->
         let fenv = Fenv.set_side fenv side in
         transf fenv tp f
-    | PFnot f -> fnot (transf fenv tp f)
-    | PFbinop(f1,op, f2) ->
-        fbinop (transf fenv tp f1) (transbop op) (transf fenv tp f2)
-    | PFapp({ pl_desc = qs }, es) ->
-        let es   = List.map (transe fenv tp) es in
-        let esig = snd (List.split es) in
+    | PFnot pf -> 
+        let f = transf fenv tp pf in
+        unify_error (Fenv.mono fenv) ue pf.pl_loc f.f_ty (tbool());
+        f_not f
+    | PFbinop(pf1,op,pf2) ->
+        let f1 = transf fenv tp pf1 in
+        unify_error (Fenv.mono fenv) ue pf1.pl_loc f1.f_ty (tbool());
+        let f2 = transf fenv tp pf2 in
+        unify_error (Fenv.mono fenv) ue pf2.pl_loc f2.f_ty (tbool());
+        f_binop f1 (transbop op) f2
+    | PFapp({ pl_desc = qs; pl_loc = loc }, es) ->
+        let es   = List.map (transf fenv tp) es in
+        let esig = List.map EcFol.ty es in 
         let ops  = select_pred (Fenv.mono fenv) qs ue esig in
         begin match ops with
         | [] | _ :: _ :: _ ->        (* FIXME: better error message *)
-            tyerror f.pl_loc (UnknownOperatorForSig (qs, esig))
-        | [(xpath, op, Some codom, subue)] ->
+            tyerror loc (UnknownOperatorForSig (qs, esig))
+        | [(xpath, op, oty, subue)] ->
             EcUnify.UniEnv.restore ~src:subue ~dst:ue;
-            fofbool fenv f.pl_loc (fapp xpath (List.map fst es) (Some codom))
-              codom
-        | [(xpath, op, None, subue)] ->
-            EcUnify.UniEnv.restore ~src:subue ~dst:ue;
-            fapp xpath (List.map fst es) None
+            f_app xpath es oty
         end
-    | PFif(f1,f2,f3) ->
-        let f1 = transf fenv tp f1 in
+    | PFif(pf1,f2,f3) ->
+        let f1 = transf fenv tp pf1 in
+        unify_error (Fenv.mono fenv) ue pf1.pl_loc f1.f_ty (tbool());
         let f2 = transf fenv tp f2 in
         let f3 = transf fenv tp f3 in
-        fif f1 f2 f3
-    | PFlet(lp,e1,f2) ->
+        f_if f1 f2 f3
+    | PFlet(lp,pf1,f2) ->
         let (penv, p, pty) = transfpattern fenv lp in
-        let e1, ty1 = transe fenv tp e1 in
-        (* FIXME loc should be p *)
-        unify_error (Fenv.mono fenv) ue f.pl_loc pty ty1;
+        let f1 = transf fenv tp pf1 in
+        unify_error (Fenv.mono fenv) ue pf1.pl_loc f1.f_ty pty;
         let f2 = transf penv tp f2 in
-        flet p e1 f2 
-    | PFforall(xs, f1) ->
+        f_let p f1 f2 
+    | PFforall(xs, pf) ->
         let fenv, xs, tp = transl fenv tp xs in
-        let f = transf fenv tp f1 in
-        fforall xs f
+        let f = transf fenv tp pf in
+        unify_error (Fenv.mono fenv) ue pf.pl_loc f.f_ty (tbool());
+        f_forall xs f
     | PFexists(xs, f1) ->
         let fenv, xs, tp = transl fenv tp xs in
-        let f = transf fenv tp f1 in
-        fexists xs f
-  and transe fenv tp e =
-    match e.pl_desc with
-    | PFunit -> Funit  , tunit ()
-    | PFint i -> Fint i, tint ()
-    | PFtuple es -> 
-        let ets = List.map (transe fenv tp) es in
-        let es,ts = List.split ets in
-        Ftuple es, Ttuple ts
-    | PFbool b -> fbool b, tbool()
-    | PFident { pl_desc = x } -> 
-        begin match Fenv.Ident.trylookup fenv x with
-        | None ->  tyerror dloc (UnknownVariable x)
-        | Some(Llocal(x,ty)) -> flocal x ty, ty
-        | Some(Lprog(x,ty,s)) -> fpvar x ty s, ty
-        | Some(Lctnt(x,Some ty)) -> fapp x [] (Some ty), ty 
-        | Some(Lctnt(x,None)) -> tyerror e.pl_loc (TermExpected e) 
-        end
-    | PFside(f,side) ->
-        let fenv = Fenv.set_side fenv side in
-        transe fenv tp f
-    | PFnot f -> (* FIXME *)
-        let e,ty = transe fenv tp f in
-        let tbool = tbool () in
-        unify_error (Fenv.mono fenv) ue f.pl_loc ty tbool;
-        let op = assert false in (*FIXME get the not on bool *)
-        fapp op [e] (Some tbool), tbool
-    | PFbinop(f1,op,f2) -> (* FIXME *)
-        assert false 
-    | PFapp({ pl_desc = qs }, es) ->
-        let es   = List.map (transe fenv tp) es in
-        let esig = snd (List.split es) in
-        let ops  = select_op false (Fenv.mono fenv) qs ue esig in
-        begin match ops with
-        | [] | _ :: _ :: _ ->        (* FIXME: better error message *)
-            tyerror e.pl_loc (UnknownOperatorForSig (qs, esig))
-        | [(xpath, op, codom, subue)] ->
-            EcUnify.UniEnv.restore ~src:subue ~dst:ue;
-            fapp xpath (List.map fst es) (Some codom), codom
-        end
-    | PFif(f1,f2,pf3) ->
-        (* FIXME f1 ?? *)
-        let f1 = transf fenv tp f1 in
-        let f2,ty2 = transe fenv tp f2 in
-        let f3,ty3 = transe fenv tp pf3 in
-        unify_error (Fenv.mono fenv) ue pf3.pl_loc ty3 ty2;
-        fif f1 f2 f3, ty2
-    | PFlet(lp,e1,f2) ->
-        let (penv, p, pty) = transfpattern fenv lp in
-        let e1, ty1 = transe fenv tp e1 in
-        (*FIXME *)
-        unify_error (Fenv.mono fenv) ue f.pl_loc pty ty1;
-        let e2, ty2 = transe penv tp f2 in
-        flet p e1 e2, ty2 
-    | PFforall _ | PFexists _ -> tyerror e.pl_loc (TermExpected e) in
-  let f = transf fenv tp f in
+        let f = transf fenv tp pf in
+        unify_error (Fenv.mono fenv) ue pf.pl_loc f.f_ty (tbool());
+        f_exists xs f in
+  let f = transf fenv tp pf in
+  unify_error (Fenv.mono fenv) ue pf.pl_loc f.f_ty (tbool());
   EcFol.Subst.uni (EcUnify.UniEnv.asmap ue) f, ue
 
 

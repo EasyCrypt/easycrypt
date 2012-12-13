@@ -72,23 +72,23 @@ type lpattern =
   | LTuple  of EcIdent.t list
 
 type tyexpr =
-  | Eunit                                    (* unit literal       *)
-  | Ebool     of bool                        (* bool literal       *)
-  | Eint      of int                         (* int. literal       *)
-  | Eflip                                    (* flip               *)
-  | Einter    of tyexpr * tyexpr             (* interval sampling  *)
-  | Ebitstr   of tyexpr                      (* bitstring sampling *)
-  | Eexcepted of tyexpr * tyexpr             (* restriction        *)
-  | Elocal    of EcIdent.t * ty              (* local variable     *)
-  | Evar      of EcPath.path * ty            (* module variable    *)
-  | Eapp      of EcPath.path * tyexpr list   (* op. application    *)
-  | Elet      of lpattern * tyexpr * tyexpr  (* let binding        *)
-  | Etuple    of tyexpr list                 (* tuple constructor  *)
-  | Eif       of tyexpr * tyexpr * tyexpr    (* _ ? _ : _          *)
+  | Eunit                                         (* unit literal       *)
+  | Ebool     of bool                             (* bool literal       *)
+  | Eint      of int                              (* int. literal       *)
+  | Eflip                                         (* flip               *)
+  | Einter    of tyexpr * tyexpr                  (* interval sampling  *)
+  | Ebitstr   of tyexpr                           (* bitstring sampling *)
+  | Eexcepted of tyexpr * tyexpr                  (* restriction        *)
+  | Elocal    of EcIdent.t * ty                   (* local variable     *)
+  | Evar      of EcPath.path * ty                 (* module variable    *)
+  | Eapp      of EcPath.path * tyexpr list * ty   (* op. application    *)
+  | Elet      of lpattern * tyexpr * tyexpr       (* let binding        *)
+  | Etuple    of tyexpr list                      (* tuple constructor  *)
+  | Eif       of tyexpr * tyexpr * tyexpr         (* _ ? _ : _          *)
 
 (* -------------------------------------------------------------------- *)
 val e_map : (ty -> ty) -> (tyexpr -> tyexpr) -> tyexpr -> tyexpr
-
+val ids_of_lpattern : lpattern -> EcIdent.t list
 (* -------------------------------------------------------------------- *)
 module Esubst : sig
   val uni : ty Muid.t -> tyexpr -> tyexpr 
