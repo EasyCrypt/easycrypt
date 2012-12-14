@@ -253,11 +253,6 @@ module Ax = struct
 
   module TT = EcTypedtree
 
-  let transform (scope : scope) f e =
-    { scope with
-        sc_axioms = f scope.sc_axioms;
-        sc_env    = e scope.sc_env }
-
   let transform_kind = function
     | PAxiom -> Axiom
     | PLemma -> Lemma 
@@ -271,9 +266,7 @@ module Ax = struct
       ax_kind = transform_kind ax.pa_kind
     }
     in
-      transform scope
-        (Context.bind (unloc ax.pa_name) axd)
-        (EcEnv.Ax.bind (EcIdent.create (unloc ax.pa_name)) axd)
+      doaction scope (Ac_axiom (EcIdent.create (unloc ax.pa_name), axd))
 end
 
 (* -------------------------------------------------------------------- *)
@@ -309,31 +302,17 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Mod = struct
-  let transform (scope : scope) f e =
-    { scope with
-        sc_modules = f scope.sc_modules;
-        sc_env     = e scope.sc_env    ; }
-
   let add (scope : scope) (name : symbol) (m : pmodule_expr) =
     let name = EcIdent.create name in
     let m    = EcTypedtree.transmod scope.sc_env name m in
-      transform scope
-        (fun ctxt -> Context.bind (EcIdent.name name) m ctxt)
-        (fun env  -> EcEnv.Mod.bind name m.me_sig env)
+      doaction scope (Ac_module m)
 end
 
 (* -------------------------------------------------------------------- *)
 module ModType = struct
-  let transform (scope : scope) f e =
-    { scope with
-        sc_modtypes = f scope.sc_modtypes;
-        sc_env      = e scope.sc_env     ; }
-
   let add (scope : scope) (name : symbol) (i : pmodule_type) =
     let tymod = EcTypedtree.transtymod scope.sc_env i in
-      transform scope
-        (fun ctxt -> Context.bind name tymod ctxt)
-        (fun env  -> EcEnv.ModTy.bind (EcIdent.create name) tymod env)
+      doaction scope (Ac_modtype (EcIdent.create name, tymod))
 end
 
 (* -------------------------------------------------------------------- *)
