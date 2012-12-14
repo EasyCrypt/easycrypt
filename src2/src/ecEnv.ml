@@ -55,12 +55,30 @@ let emcomponents = {
   mc_components = EcIdent.Map.empty;
 }
 
-let empty name =
+(* -------------------------------------------------------------------- *)
+let enter (name : symbol) (env : env) =
   let name = EcIdent.create name in
-  let env  =
-    { env_scope = Pident name ;
-      env_root  = emcomponents;
-      env_comps = Mid.empty   ; }
+  let path = EcPath.Pqname (env.env_scope, name) in
+
+  let env =
+    { env_scope = path;
+      env_root  = begin
+        let comps = env.env_root.mc_components in
+        let comps = IM.add name () comps in
+          { env.env_root with mc_components = comps }
+      end;
+      env_comps = Mid.add name (path, emcomponents) env.env_comps }
+  in
+    (name, env)
+
+(* -------------------------------------------------------------------- *)
+let empty name =
+  let name  = EcIdent.create name in
+  let env   =
+    { env_scope = Pident name;
+      env_root  = { emcomponents with
+                      mc_components = IM.add name () IM.empty };
+      env_comps = Mid.add name (Pident name, emcomponents) Mid.empty }
   in
     (name, env)
 
@@ -260,22 +278,6 @@ module MC = struct
     let env = bind_mc env x comps in
       env
 end
-
-(* -------------------------------------------------------------------- *)
-let enter (name : symbol) (env : env) =
-  let name = EcIdent.create name in
-  let path = EcPath.Pqname (env.env_scope, name) in
-
-  let env =
-    { env_scope = path;
-      env_root  = begin
-        let comps = env.env_root.mc_components in
-        let comps = IM.add name () comps in
-          { env.env_root with mc_components = comps }
-      end;
-      env_comps = Mid.add name (path, emcomponents) env.env_comps }
-  in
-    (name, env)
 
 (* -------------------------------------------------------------------- *)
 module type Projector = sig
