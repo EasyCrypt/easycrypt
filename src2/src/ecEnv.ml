@@ -215,6 +215,7 @@ module MC = struct
     | Th_modtype  (id, tm) -> env, mc_bind_modtype (EcPath.Pqname (path, id)) tm mc
     | Th_module   m        -> env, mc_bind_module (EcPath.Pqname (path, m.me_name)) m.me_sig mc
     | Th_theory   (id, th) -> env, mc_bind_theory (EcPath.Pqname (path, id)) th mc
+    | Th_export   _        -> env, mc
 
   let mc_of_theory (env : env) (name : EcIdent.t) (theory : theory) =
     List.fold_left
@@ -414,19 +415,24 @@ module Theory = struct
 
   include BaseS(P)
 
-  let import (qs : qsymbol) (env : env) =
-    let thpath, th = lookup qs env in
-    let xpath x = EcPath.Pqname (thpath, x) in
+  let import (path : EcPath.path) (env : env) =
+    let rec import (env : env) (th : theory) =
+      let xpath x = EcPath.Pqname (path, x) in
+        let rec import_th_item (env : env) = function
+          | Th_type      (x, ty) -> MC.import env MC.mc_bind_typedecl (xpath x) ty
+          | Th_operator  (x, op) -> MC.import env MC.mc_bind_op (xpath x) op
+          | Th_axiom     (x, ax) -> MC.import env MC.mc_bind_ax (xpath x) ax
+          | Th_modtype   (x, ty) -> MC.import env MC.mc_bind_modtype (xpath x) ty
+          | Th_module    m       -> MC.import env MC.mc_bind_module (xpath m.me_name) m.me_sig
+          | Th_theory    (x, th) -> MC.import env MC.mc_bind_theory (xpath x) th
+          | Th_export    p       -> import env (lookup_by_path p env)
+        in
+          List.fold_left import_th_item env th
+    in
+      import env (lookup_by_path path env)
 
-      let import_th_item (env : env) = function
-        | Th_type      (x, ty) -> MC.import env MC.mc_bind_typedecl (xpath x) ty
-        | Th_operator  (x, op) -> MC.import env MC.mc_bind_op (xpath x) op
-        | Th_axiom     (x, ax) -> MC.import env MC.mc_bind_ax (xpath x) ax
-        | Th_modtype   (x, ty) -> MC.import env MC.mc_bind_modtype (xpath x) ty
-        | Th_module    m       -> MC.import env MC.mc_bind_module (xpath m.me_name) m.me_sig
-        | Th_theory    (x, th) -> MC.import env MC.mc_bind_theory (xpath x) th
-      in
-        List.fold_left import_th_item env (snd (lookup qs env))
+  let export (path : EcPath.path) (env : env) =
+    import path env
 end
 
 (* -------------------------------------------------------------------- *)

@@ -88,6 +88,10 @@ and process_th_import (scope : EcScope.scope) name =
   EcScope.Theory.import scope name
 
 (* -------------------------------------------------------------------- *)
+and process_th_export (scope : EcScope.scope) name =
+  EcScope.Theory.export scope name
+
+(* -------------------------------------------------------------------- *)
 and process (scope : EcScope.scope) (g : global) =
   match g with
   | Gtype      t    -> process_type       scope t
@@ -101,6 +105,7 @@ and process (scope : EcScope.scope) (g : global) =
   | GthClose   name -> process_th_close   scope name.pl_desc
   | GthRequire name -> process_th_require scope name.pl_desc
   | GthImport  name -> process_th_import  scope name.pl_desc
+  | GthExport  name -> process_th_export  scope name.pl_desc
   | Gprint     p    -> process_print      scope p; scope
 
 

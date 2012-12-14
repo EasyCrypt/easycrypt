@@ -95,4 +95,9 @@ module Theory : sig
    * [scope]. Raise [LookupFailure] if theory [name] cannot be
    * found. *)
   val import : scope -> qsymbol -> scope
+
+  (* [export scope name] marks the theory [name] to by exported
+   *  by current theory in scope [scope]. Raise [LookupFailure] if
+   *  theory [theory] cannot be found. *)
+  val export : scope -> qsymbol -> scope
 end

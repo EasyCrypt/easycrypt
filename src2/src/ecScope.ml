@@ -98,6 +98,8 @@ type action =
   | Ac_modtype   of (EcIdent.t * EcTypesmod.tymod)
   | Ac_module    of EcTypesmod.module_expr
   | Ac_theory    of (EcIdent.t * EcTypesmod.theory)
+  | Ac_import    of EcPath.path
+  | Ac_export    of EcPath.path
 
 type scope = {
   sc_name       : EcIdent.t;
@@ -140,7 +142,7 @@ let subscope (scope : scope) (name : symbol) =
     sc_top        = Some scope; }
 
 (* -------------------------------------------------------------------- *)
-let bind (scope : scope) (action : action) =
+let doaction (scope : scope) (action : action) =
   match action with
   | Ac_type (x, tydecl) ->
       { scope with
@@ -178,6 +180,15 @@ let bind (scope : scope) (action : action) =
           sc_history  = action :: scope.sc_history;
           sc_env      = EcEnv.Theory.bind x th scope.sc_env }
 
+  | Ac_import p ->
+      { scope with
+          sc_history = action :: scope.sc_history;
+          sc_env     = EcEnv.Theory.import p scope.sc_env }
+
+  | Ac_export p ->
+      { scope with
+          sc_history = action :: scope.sc_history; }
+
 (* -------------------------------------------------------------------- *)
 module Op = struct
   module TT = EcTypedtree
@@ -204,7 +215,7 @@ module Op = struct
     let tyop =
       EcDecl.mk_op (TT.TyPolicy.decl tp) dom codom
         body op.po_prob in
-    bind scope (Ac_operator (EcIdent.create (unloc op.po_name), tyop))
+    doaction scope (Ac_operator (EcIdent.create (unloc op.po_name), tyop))
 end
 
 (* -------------------------------------------------------------------- *)
@@ -231,8 +242,7 @@ module Pred = struct
     let dom = if op.pp_dom = None then None else Some dom in
     let tyop =
       EcDecl.mk_pred (TT.TyPolicy.decl tp) dom body in
-    bind scope (Ac_operator (EcIdent.create (unloc op.pp_name), tyop))
-
+    doaction scope (Ac_operator (EcIdent.create (unloc op.pp_name), tyop))
 end
 
 (* -------------------------------------------------------------------- *)
@@ -272,7 +282,7 @@ module Ty = struct
   open EcTypedtree
 
   let bind (scope : scope) name tydecl =
-    bind scope (Ac_type (name, tydecl))
+    doaction scope (Ac_type (name, tydecl))
 
   let alias (scope : scope) name ty =
     (* FIXME : check that ty is closed, or close it *)
@@ -332,14 +342,16 @@ module Theory = struct
 
   let theory_of_history =
     let theory_item_of_action = function
-      | Ac_type      (x, tydecl) -> Th_type      (x, tydecl)
-      | Ac_operator  (x, op)     -> Th_operator  (x, op)
-      | Ac_axiom     (x,ax)      -> Th_axiom     (x,ax)
-      | Ac_modtype   (x, tymod)  -> Th_modtype   (x, tymod)
-      | Ac_module    m           -> Th_module    m
-      | Ac_theory    (x, th)     -> Th_theory    (x, th)
+      | Ac_type      (x, tydecl) -> Some (Th_type      (x, tydecl))
+      | Ac_operator  (x, op)     -> Some (Th_operator  (x, op))
+      | Ac_axiom     (x,ax)      -> Some (Th_axiom     (x,ax))
+      | Ac_modtype   (x, tymod)  -> Some (Th_modtype   (x, tymod))
+      | Ac_module    m           -> Some (Th_module    m)
+      | Ac_theory    (x, th)     -> Some (Th_theory    (x, th))
+      | Ac_export    x           -> Some (Th_export    x)
+      | Ac_import    _           -> None
     in
-      fun history -> List.map theory_item_of_action history
+      fun history -> List.pmap theory_item_of_action history
 
   let enter (scope : scope) (name : symbol) =
     subscope scope name
@@ -349,11 +361,15 @@ module Theory = struct
     | None     -> raise TopScope
     | Some sup ->
       let theory = theory_of_history scope.sc_history in
-        (scope.sc_name, bind sup (Ac_theory (scope.sc_name, theory)))
+        (scope.sc_name, doaction sup (Ac_theory (scope.sc_name, theory)))
 
   let import (scope : scope) (name : qsymbol) =
-    { scope with
-        sc_env = EcEnv.Theory.import name scope.sc_env }
+    let path = fst (EcEnv.Theory.lookup name scope.sc_env) in
+      doaction scope (Ac_import path)
+
+  let export (scope : scope) (name : qsymbol) =
+    let path = fst (EcEnv.Theory.lookup name scope.sc_env) in
+      doaction scope (Ac_export path)
 end
 
 (* -------------------------------------------------------------------- *)

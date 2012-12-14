@@ -85,3 +85,5 @@ and theory_item =
   | Th_modtype   of (EcIdent.t * tymod)
   | Th_module    of module_expr
   | Th_theory    of (EcIdent.t * theory)
+  | Th_export    of EcPath.path
+

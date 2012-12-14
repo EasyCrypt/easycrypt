@@ -74,6 +74,7 @@
 // %token EQEQLBRACKET
 // %token EQUIV
 %token EXIST
+%token EXPORT
 %token FALSE
 %token FORALL
 %token FUN
@@ -109,7 +110,7 @@
 // %token REMOVE
 %token RETURN
 %token REQUIRE
-%token USE
+// %token USE
 %token RKEY
 %token RKEY_HAT
 // %token ROI
@@ -752,13 +753,14 @@ axiom:
       { pa_name = x; pa_formula = e; pa_kind = k } }
 ;
 (* -------------------------------------------------------------------- *)
-(* Theory dynamic manipulation                                          *)
+(* Theory interactive manipulation                                      *)
 
-theory_open    : THEORY  x=ident { x }
-theory_close   : END     x=ident { x }
-theory_require : REQUIRE x=ident { x }
+theory_open    : THEORY  x=ident  { x }
+theory_close   : END     x=ident  { x }
+theory_require : REQUIRE x=ident  { x }
 theory_import  : IMPORT  x=qident { x }
-theory_use     : USE     x=qident { x }
+theory_export  : EXPORT  x=qident { x }
+
 (* -------------------------------------------------------------------- *)
 (** Printing                                                            *)
 print:
@@ -776,6 +778,7 @@ global_:
 | theory_close     { GthClose   $1 }
 | theory_require   { GthRequire $1 }
 | theory_import    { GthImport  $1 }
+| theory_export    { GthExport  $1 }
 | mod_def          { Gmodule    $1 }
 | sig_def          { Ginterface $1 }
 | type_decl_or_def { Gtype      $1 }

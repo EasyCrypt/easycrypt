@@ -72,7 +72,8 @@ module ModTy  : S with type t = tymod
 module Theory : sig
   include S with type t = theory
 
-  val import : qsymbol -> env -> env
+  val import : EcPath.path -> env -> env
+  val export : EcPath.path -> env -> env
 end
 
 (* -------------------------------------------------------------------- *)
