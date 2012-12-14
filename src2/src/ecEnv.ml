@@ -225,14 +225,20 @@ module MC = struct
   (* ------------------------------------------------------------------ *)
   let bind env binder name obj =
     let path   = EcPath.Pqname (env.env_scope, name) in
-    let xcomps = EcPath.basename env.env_scope in
+    let comps  =
+      Mid.change
+        (fun o -> omap o (snd_map (binder path obj)))
+        (EcPath.basename env.env_scope)
+        env.env_comps
+    in
+      { env with
+          env_root  = binder path obj env.env_root;
+          env_comps = comps; }
 
+  (* -------------------------------------------------------------------- *)
+  let import env binder path obj =
     { env with
-      env_root  = binder path obj env.env_root;
-      env_comps = 
-      Mid.change (fun o -> omap o (snd_map (binder path obj)))
-        xcomps env.env_comps ; }
-
+        env_root = binder path obj env.env_root; }
 
   (* -------------------------------------------------------------------- *)
   let bind_mc env name comps =
@@ -241,11 +247,11 @@ module MC = struct
       { env with
         env_root  = mc_bind_comp path env.env_root;
         env_comps = 
-        Mid.change (fun o -> omap o  (snd_map (mc_bind_comp path)))
-          name env.env_comps; }
+          Mid.change (fun o -> omap o (snd_map (mc_bind_comp path)))
+            name env.env_comps; }
     in
     { env with                        (* FIXME: dup *)
-      env_comps = Mid.add name (path, comps) env.env_comps }
+        env_comps = Mid.add name (path, comps) env.env_comps }
 
   (* ------------------------------------------------------------------ *)
   let bind_variable x ty env =
@@ -399,34 +405,28 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Theory = struct
-  include BaseS(struct
+  module P = struct
     type t = theory
 
     let project mc = mc.mc_theories
     let bind = MC.bind_theory
-  end)
+  end
 
-  (* FIXME *)
+  include BaseS(P)
+
   let import (qs : qsymbol) (env : env) =
-    env
-(*
-    let path, _ = lookup qs env in
-    let mc1 = env.env_root in
-    let mc2 = Lazy.force (MC.lookup_by_path (fun mc -> mc.mc_components)
-                            (EcPath.Pident (EcPath.basename path)) env) in
-    let mc = 
-      { mc_variables  = IM.merge mc1.mc_variables mc2.mc_variables;
-        mc_functions  = IM.merge mc1.mc_functions mc2.mc_functions;
-        mc_modules    = IM.merge mc1.mc_modules mc2.mc_modules;
-        mc_modtypes   = IM.merge mc1.mc_modtypes mc2.mc_modtypes;
-        mc_typedecls  = IM.merge mc1.mc_typedecls mc2.mc_typedecls;
-        mc_operators  = IM.merge mc1.mc_operators mc2.mc_operators;
-        mc_axioms     = IM.merge mc1.mc_axioms mc2.mc_axioms;
-        mc_theories   = IM.merge mc1.mc_theories mc2.mc_theories;
-        mc_components = IM.merge mc1.mc_components mc2.mc_components;
-        mc_history    = (path, MC_Import path) :: mc1.mc_history } in
-    { env with env_root = mc }
-*)
+    let thpath, th = lookup qs env in
+    let xpath x = EcPath.Pqname (thpath, x) in
+
+      let import_th_item (env : env) = function
+        | Th_type      (x, ty) -> MC.import env MC.mc_bind_typedecl (xpath x) ty
+        | Th_operator  (x, op) -> MC.import env MC.mc_bind_op (xpath x) op
+        | Th_axiom     (x, ax) -> MC.import env MC.mc_bind_ax (xpath x) ax
+        | Th_modtype   (x, ty) -> MC.import env MC.mc_bind_modtype (xpath x) ty
+        | Th_module    m       -> MC.import env MC.mc_bind_module (xpath m.me_name) m.me_sig
+        | Th_theory    (x, th) -> MC.import env MC.mc_bind_theory (xpath x) th
+      in
+        List.fold_left import_th_item env (snd (lookup qs env))
 end
 
 (* -------------------------------------------------------------------- *)
