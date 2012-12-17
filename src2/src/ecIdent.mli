@@ -7,7 +7,9 @@ val create : symbol -> t
 val fresh  : t -> t
 val name   : t -> symbol
 
-val pp_ident : t EcFormat.pp
+val id_equal : t -> t -> bool
+val id_compare : t -> t -> int 
+val id_hash : t -> int
 
 (* -------------------------------------------------------------------- *)
 module Mid : sig 
@@ -35,3 +37,5 @@ module Map : sig
 end
 
 (* -------------------------------------------------------------------- *)
+
+val pp_ident : t EcFormat.pp

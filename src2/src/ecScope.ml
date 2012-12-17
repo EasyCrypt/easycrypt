@@ -97,7 +97,7 @@ type action =
   | Ac_axiom     of (EcIdent.t * EcDecl.axiom)
   | Ac_modtype   of (EcIdent.t * EcTypesmod.tymod)
   | Ac_module    of EcTypesmod.module_expr
-  | Ac_theory    of (EcIdent.t * EcTypesmod.theory)
+  | Ac_theory    of (EcIdent.t * EcEnv.comp_th)
   | Ac_import    of EcPath.path
   | Ac_export    of EcPath.path
 
@@ -109,7 +109,7 @@ type scope = {
   sc_modules    : EcTypesmod.module_expr Context.context;
   sc_modtypes   : EcTypesmod.tymod       Context.context;
   sc_theories   : EcTypesmod.theory      Context.context;
-  sc_history    : action list;
+(*  sc_history    : action list; *)
   sc_env        : EcEnv.env;
   sc_top        : scope option;
 }
@@ -127,67 +127,55 @@ let attop (scope : scope) =
   scope.sc_top = None
 
 (* -------------------------------------------------------------------- *)
-let subscope (scope : scope) (name : symbol) =
-  let (name, env) = EcEnv.enter name scope.sc_env in
-
-  { sc_name       = name;
-    sc_types      = Context.empty ();
-    sc_operators  = Context.empty ();
-    sc_axioms     = Context.empty ();
-    sc_modtypes   = Context.empty ();
-    sc_modules    = Context.empty ();
-    sc_theories   = Context.empty ();
-    sc_history    = [];
-    sc_env        = env;
-    sc_top        = Some scope; }
-
-(* -------------------------------------------------------------------- *)
 let doaction (scope : scope) (action : action) =
   match action with
   | Ac_type (x, tydecl) ->
       { scope with
           sc_types   = Context.bind (EcIdent.name x) tydecl scope.sc_types;
-          sc_history = action :: scope.sc_history;
+(*          sc_history = action :: scope.sc_history; *)
           sc_env     = EcEnv.Ty.bind x tydecl scope.sc_env }
 
   | Ac_operator (x, op) ->
       { scope with
           sc_operators = Context.bind (EcIdent.name x) op scope.sc_operators;
-          sc_history   = action :: scope.sc_history;
+(*          sc_history   = action :: scope.sc_history; *)
           sc_env       = EcEnv.Op.bind x op scope.sc_env }
 
   | Ac_axiom (x, ax) ->
       { scope with
           sc_axioms = Context.bind (EcIdent.name x) ax scope.sc_axioms;
-          sc_history   = action :: scope.sc_history;
+(*          sc_history   = action :: scope.sc_history; *)
           sc_env       = EcEnv.Ax.bind x ax scope.sc_env }
 
   | Ac_modtype (x, tymod) ->
       { scope with
           sc_modtypes = Context.bind (EcIdent.name x) tymod scope.sc_modtypes;
-          sc_history  = action :: scope.sc_history;
+(*          sc_history  = action :: scope.sc_history; *)
           sc_env      = EcEnv.ModTy.bind x tymod scope.sc_env }
 
   | Ac_module m ->
       { scope with
           sc_modules = Context.bind (EcIdent.name m.me_name) m scope.sc_modules;
-          sc_history = action :: scope.sc_history;
-          sc_env     = EcEnv.Mod.bind m.me_name m.me_sig scope.sc_env }
+(*          sc_history = action :: scope.sc_history; *)
+          sc_env     = EcEnv.Mod.bind m.me_name m scope.sc_env }
 
-  | Ac_theory (x, th) ->
+  | Ac_theory (x, cth) ->
+      let th = EcEnv.comp_theory cth in
       { scope with
           sc_theories = Context.bind (EcIdent.name x) th scope.sc_theories;
-          sc_history  = action :: scope.sc_history;
-          sc_env      = EcEnv.Theory.bind x th scope.sc_env }
+(*          sc_history  = action :: scope.sc_history; *)
+          sc_env      = EcEnv.Theory.bind x cth scope.sc_env }
 
   | Ac_import p ->
       { scope with
-          sc_history = action :: scope.sc_history;
+(*          sc_history = action :: scope.sc_history; *)
           sc_env     = EcEnv.Theory.import p scope.sc_env }
 
   | Ac_export p ->
       { scope with
-          sc_history = action :: scope.sc_history; }
+(*          sc_history = action :: scope.sc_history; *) 
+        sc_env     = EcEnv.Theory.export p scope.sc_env
+      }
 
 (* -------------------------------------------------------------------- *)
 module Op = struct
@@ -319,56 +307,51 @@ end
 module Theory = struct
   exception TopScope
 
-  let theory_of_history =
-    let theory_item_of_action = function
-      | Ac_type      (x, tydecl) -> Some (Th_type      (x, tydecl))
-      | Ac_operator  (x, op)     -> Some (Th_operator  (x, op))
-      | Ac_axiom     (x,ax)      -> Some (Th_axiom     (x,ax))
-      | Ac_modtype   (x, tymod)  -> Some (Th_modtype   (x, tymod))
-      | Ac_module    m           -> Some (Th_module    m)
-      | Ac_theory    (x, th)     -> Some (Th_theory    (x, th))
-      | Ac_export    x           -> Some (Th_export    x)
-      | Ac_import    _           -> None
-    in
-      fun history -> List.pmap theory_item_of_action history
-
   let enter (scope : scope) (name : symbol) =
-    subscope scope name
+    let (name, env) = EcEnv.Theory.enter name scope.sc_env in
+    { sc_name       = name;
+      sc_types      = Context.empty ();
+      sc_operators  = Context.empty ();
+      sc_axioms     = Context.empty ();
+      sc_modtypes   = Context.empty ();
+      sc_modules    = Context.empty ();
+      sc_theories   = Context.empty ();
+      (* sc_history    = []; *)
+      sc_env        = env;
+      sc_top        = Some scope; }
 
   let exit (scope : scope) =
     match scope.sc_top with
     | None     -> raise TopScope
     | Some sup ->
-      let theory = theory_of_history scope.sc_history in
-        (scope.sc_name, doaction sup (Ac_theory (scope.sc_name, theory)))
+        let cth = EcEnv.Theory.close scope.sc_env in
+        (scope.sc_name, doaction sup (Ac_theory (scope.sc_name, cth)))
 
   let import (scope : scope) (name : qsymbol) =
     let path = fst (EcEnv.Theory.lookup name scope.sc_env) in
-      doaction scope (Ac_import path)
+    doaction scope (Ac_import path)
 
   let export (scope : scope) (name : qsymbol) =
     let path = fst (EcEnv.Theory.lookup name scope.sc_env) in
-      doaction scope (Ac_export path)
+    doaction scope (Ac_export path)
 end
 
 (* -------------------------------------------------------------------- *)
-let initial (name : symbol) =
+let initial (_name : symbol) =
   let scope =
-    let name, env = EcEnv.empty name in
-      { sc_name       = name;
-        sc_types      = Context.empty ();
-        sc_operators  = Context.empty ();
-        sc_axioms     = Context.empty ();
-        sc_modtypes   = Context.empty ();
-        sc_modules    = Context.empty ();
-        sc_theories   = Context.empty ();
-        sc_history    = [];
-        sc_env        = env;
-        sc_top        = None; }
+    let env = EcEnv.initial in
+    let name = EcPath.basename env.EcEnv.env_scope in
+    { sc_name       = name;
+      sc_types      = Context.empty ();
+      sc_operators  = Context.empty ();
+      sc_axioms     = Context.empty ();
+      sc_modtypes   = Context.empty ();
+      sc_modules    = Context.empty ();
+      sc_theories   = Context.empty ();
+(*      sc_history    = []; *)
+      sc_env        = env;
+      sc_top        = None; }
   in
 
-  let scope = Ty.alias scope "unit" (EcTypes.tunit ()) in
-  let scope = Ty.alias scope "bool" (EcTypes.tbool ()) in
-  let scope = Ty.alias scope "int"  (EcTypes.tint  ()) in
-
-    scope
+  let scope = Ty.alias scope "unit'" (EcTypes.tunit ()) in
+  scope

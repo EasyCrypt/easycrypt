@@ -101,6 +101,11 @@ end
 module List = struct
   include List
 
+  let ocons o l = 
+    match o with
+    | None -> l
+    | Some e -> e :: l
+
   let isempty xs = (=) [] xs
 
   let ohead (xs : 'a list) =
@@ -173,6 +178,7 @@ module List = struct
       | _, x :: xs -> take (n-1) xs (x :: acc)
     in
       take n xs []
+
 end
 
 (* -------------------------------------------------------------------- *)

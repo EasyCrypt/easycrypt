@@ -423,7 +423,7 @@ and transstruct (env : EcEnv.env) (x : EcIdent.t) (st : pstructure) =
           let newitems = transstruct1 env item in
             (EcEnv.bindall (List.map tydecl1 newitems) env,
              List.rev_append acc newitems))
-        (EcEnv.Mod.bindall stparams env, [])
+        (EcEnv.Mod.bindall_s stparams env, [])
         st.ps_body
   in
 

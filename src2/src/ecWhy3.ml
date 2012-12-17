@@ -31,15 +31,146 @@ let empty = {
   env_w3     = Ident.Mid.empty;
 }
 
+type rebinding_w3 = {
+    rb_th   : Theory.theory;
+    rb_ty   : Ty.tysymbol Mp.t;
+    rb_op   : Term.lsymbol Mp.t;
+    rb_ax   : Decl.prsymbol Mp.t;
+    rb_w3   : EcPath.path Ident.Mid.t;
+  }
+
+type rebinding_item = 
+  | RBuse of rebinding_w3
+  | RBty  of EcPath.path * Ty.tysymbol * Decl.decl
+  | RBop  of EcPath.path * Term.lsymbol * Decl.decl
+  | RBax  of EcPath.path * Decl.prsymbol * Decl.decl
+
+type rebinding = rebinding_item list
+
+let merge check k o1 o2 = 
+  match o1, o2 with
+  | None, _ -> o2
+  | Some _, None -> o1
+  | Some e1, Some e2 -> check k e1 e2; o1
+
+exception MergeW3Ty of EcPath.path * Ty.tysymbol * Ty.tysymbol
+exception MergeW3Op of EcPath.path * Term.lsymbol * Term.lsymbol
+exception MergeW3Ax of EcPath.path * Decl.prsymbol * Decl.prsymbol
+exception MergeW3Id of Ident.ident * EcPath.path * EcPath.path
+
+let merge_ty = 
+  let check p t1 t2 = 
+    if not (Ty.ts_equal t1 t2) then raise (MergeW3Ty(p,t1,t2)) in
+  Mp.merge (merge check)
+
+let merge_op =
+  let check p t1 t2 = 
+    if not (Term.ls_equal t1 t2) then raise (MergeW3Op(p,t1,t2)) in
+  Mp.merge (merge check)
+
+let merge_ax = 
+  let check p t1 t2 = 
+    if not (Decl.pr_equal t1 t2) then raise (MergeW3Ax(p,t1,t2)) in
+  Mp.merge (merge check)
+
+let merge_id = 
+  let check p t1 t2 = 
+    if not (EcPath.p_equal t1 t2) then raise (MergeW3Id(p,t1,t2)) in
+  Ident.Mid.merge (merge check)
+
+let add_decl_with_tuples task d =
+  let ids = Ident.Mid.set_diff d.Decl.d_syms (Task.task_known task) in
+  let add id s = match Ty.is_ts_tuple_id id with
+    | Some n -> Stdlib.Sint.add n s
+    | None -> s in
+  let ixs = Ident.Sid.fold add ids Stdlib.Sint.empty in
+  let add n task = Task.use_export task (Theory.tuple_theory n) in
+  Task.add_decl (Stdlib.Sint.fold add ixs task) d
+
+let add_ts env path ts decl =
+  if Mp.mem path env.env_ty then 
+    (assert (Ty.ts_equal ts (Mp.find path env.env_ty)); env)
+  else 
+    { env with 
+      env_ty = Mp.add path ts env.env_ty;
+      logic_task = add_decl_with_tuples env.logic_task decl }
+
+let add_ls env path ls decl =
+  if Mp.mem path env.env_op then 
+    (assert (Term.ls_equal ls (Mp.find path env.env_op)); env)
+  else 
+    { env with 
+      env_op = Mp.add path ls env.env_op;
+      logic_task = add_decl_with_tuples env.logic_task decl }
+
+let add_pr env path pr decl =
+  if Mp.mem path env.env_ax then 
+    (assert (Decl.pr_equal pr (Mp.find path env.env_ax)); env)
+  else 
+    { env with 
+      env_ax = Mp.add path pr env.env_ax;
+      logic_task = add_decl_with_tuples env.logic_task decl }
+
+let rebind_item env = function
+  | RBuse w3 ->
+      { logic_task = Task.use_export env.logic_task w3.rb_th;
+        env_ty = merge_ty env.env_ty w3.rb_ty;
+        env_op = merge_op env.env_op w3.rb_op;
+        env_ax = merge_ax env.env_ax w3.rb_ax;
+        env_w3 = merge_id env.env_w3 w3.rb_w3;
+      }
+  | RBty(p,ts,decl) -> add_ts env p ts decl
+  | RBop(p,ls,decl) -> add_ls env p ls decl
+  | RBax(p,pr,decl) -> add_pr env p pr decl
+
+let rebind = List.fold_left rebind_item
 
 (*------------------------------------------------------------------*)
 (** Import why3 theory                                              *)
 (*------------------------------------------------------------------*)
 
+type renaming_kind =
+  | RDts 
+  | RDls
 
+type renaming_decl = (string list * renaming_kind * EcIdent.t) list
 
 let w3_id_string id = id.Ident.id_string
 
+module Renaming = struct 
+
+  type renaming = {
+      r_ts : EcIdent.t Ty.Mts.t;
+      r_ls : EcIdent.t Term.Mls.t
+    }
+
+  let init rd th = 
+    let ns = th.Theory.th_export in
+    let rec aux ts ls rd = 
+      match rd with
+      | [] -> { r_ts = ts; r_ls = ls }
+      | (p,RDts,id) :: rd ->
+          let ts = Ty.Mts.add (Theory.ns_find_ts ns p) id ts in
+          aux ts ls rd
+      | (p,RDls,id) :: rd ->
+          let ls = Term.Mls.add (Theory.ns_find_ls ns p) id ls in
+          aux ts ls rd in
+    aux Ty.Mts.empty Term.Mls.empty rd
+
+  let get_ts rn ts = 
+    try Ty.Mts.find ts rn.r_ts 
+    with _ -> 
+      let id = ts.Ty.ts_name in
+      EcIdent.create (w3_id_string id)
+
+  let get_ls rn ls = 
+    try Term.Mls.find ls rn.r_ls 
+    with _ ->
+      let id = ls.Term.ls_name in
+      EcIdent.create (w3_id_string id)
+
+end
+      
 module Wtvm = 
   struct
     type t = EcIdent.t Ty.Mtv.t ref 
@@ -77,18 +208,16 @@ let add_w3_ty env p ty =
     env_ty = Mp.add p ty env.env_ty;
     env_w3 = Ident.Mid.add (ty.Ty.ts_name) p env.env_w3 }
 
-let import_w3_tydef path (env,ld) ty =
-  let id = ty.Ty.ts_name in
-  if exists_w3 env id then env, ld
-  else 
-    let tvm = Wtvm.create () in
-    let params = List.map (Wtvm.get tvm) ty.Ty.ts_args in
-    let def = omap ty.Ty.ts_def (import_w3_ty env tvm) in
-    let eid = EcIdent.create (w3_id_string id) in
-    let td = { tyd_params = params; tyd_type = def } in
-    let p = EcPath.extend (Some path) eid in
-    let env = add_w3_ty env p ty in
-    env, Th_type (eid,td) :: ld
+let import_w3_tydef rn path (env,rb,ld) ty =
+  let tvm = Wtvm.create () in
+  let params = List.map (Wtvm.get tvm) ty.Ty.ts_args in
+  let def = omap ty.Ty.ts_def (import_w3_ty env tvm) in
+  let eid = Renaming.get_ts rn ty in
+  let td = { tyd_params = params; tyd_type = def } in
+  let p = EcPath.extend (Some path) eid in
+  let env = add_w3_ty env p ty in
+  let rb  = add_w3_ty env p ty in
+  env, rb, Th_type (eid,td) :: ld
 
 let force_bool env codom = 
   match codom with
@@ -100,92 +229,67 @@ let add_w3_ls env p ls =
     env_op = Mp.add p ls env.env_op;
     env_w3 = Ident.Mid.add (ls.Term.ls_name) p env.env_w3 }
 
-let import_w3_ls path (env,ld) ls = 
-  let id = ls.Term.ls_name in
-  if exists_w3 env id then env, ld 
-  else
-    let tvm = Wtvm.create () in
-    let dom = List.map (import_w3_ty env tvm) ls.Term.ls_args in
-    let codom = omap ls.Term.ls_value (import_w3_ty env tvm) in
-    let params = Ty.Stv.elements (Term.ls_ty_freevars ls) in
-    let params = List.map (Wtvm.get tvm) params in
-    let eid = EcIdent.create (w3_id_string id) in
-    let op = { op_params = params;
-               op_dom = if dom = [] then None else Some dom;
-               op_codom = Some (force_bool env codom);
-               op_body = None;
-               op_prob = false } in
-    let p = EcPath.extend (Some path) eid in
-    let env = add_w3_ls env p ls in
-    env, Th_operator (eid,op) :: ld
+let import_w3_ls rn path (env,rb,ld) ls = 
+  let tvm = Wtvm.create () in
+  let dom = List.map (import_w3_ty env tvm) ls.Term.ls_args in
+  let codom = omap ls.Term.ls_value (import_w3_ty env tvm) in
+  let params = Ty.Stv.elements (Term.ls_ty_freevars ls) in
+  let params = List.map (Wtvm.get tvm) params in
+  let eid = Renaming.get_ls rn ls in
+  let op = { op_params = params;
+             op_dom = if dom = [] then None else Some dom;
+             op_codom = Some (force_bool env codom);
+             op_body = None;
+             op_prob = false } in
+  let p = EcPath.extend (Some path) eid in
+  let env = add_w3_ls env p ls in
+  let rb  = add_w3_ls env p ls in
+  env, rb, Th_operator (eid,op) :: ld
     
-let import_w3_constructor path envld (ls, pls) = 
-  let envld = import_w3_ls path envld ls in
+let import_w3_constructor rn path envld (ls, pls) = 
+  let envld = import_w3_ls rn path envld ls in
   List.fold_left (fun envld ols -> 
     match ols with
-    | Some ls -> import_w3_ls path envld ls
+    | Some ls -> import_w3_ls rn path envld ls
     | None -> envld) envld pls
     
-let import_w3_constructors path = 
-  List.fold_left (import_w3_constructor path) 
+let import_w3_constructors rn path = 
+  List.fold_left (import_w3_constructor rn path) 
 
-let import_decl path envld d = 
+let import_decl rn path envld d = 
   match d.Decl.d_node with
-  | Decl.Dtype ty -> import_w3_tydef path envld ty 
+  | Decl.Dtype ty -> import_w3_tydef rn path envld ty 
   | Decl.Ddata ddl ->
       let lty, lc = List.split ddl in
-      let envld = List.fold_left (import_w3_tydef path) envld lty in
-      List.fold_left (import_w3_constructors path) envld lc 
-  | Decl.Dparam ls -> import_w3_ls path envld ls
+      let envld = List.fold_left (import_w3_tydef rn path) envld lty in
+      List.fold_left (import_w3_constructors rn path) envld lc 
+  | Decl.Dparam ls -> import_w3_ls rn path envld ls
   | Decl.Dlogic lls ->
       let lls = List.map fst lls in 
-      List.fold_left (import_w3_ls path) envld lls
+      List.fold_left (import_w3_ls rn path) envld lls
   | Decl.Dind _  -> envld  (* FIXME *)
   | Decl.Dprop _ -> envld  (* FIXME *)
 
-let import_w3 env path th = 
+let import_w3 env path th rd =
+  let rn = Renaming.init rd th in
   let task = Task.use_export None th in
   let ths = Ident.Mid.remove th.Theory.th_name (Task.used_theories task) in
   let others = Task.used_symbols ths in
   let decls = Task.local_decls task others in
-  let env,ld = List.fold_left (import_decl path) (env,[]) decls in
-  let ld = List.rev ld in 
-  let env = { env with 
-              logic_task = Task.use_export env.logic_task th } in
-  let pp_d d = 
-    match d with
-    | Th_type (id, _)     -> Format.printf "type %s@." (EcIdent.name id)
-    | Th_operator (id, _) -> Format.printf "op %s@."   (EcIdent.name id)
-    | _                   -> Format.printf "????@." in
-  List.iter pp_d ld;
-  ld, env
-
-let import_w3_th env path dir s = 
-  let th = Env.find_theory w3_env dir s in
-  import_w3 env path th 
-
-(*
-let _ = 
-  let path = EcPath.Pident (EcIdent.create "Top") in
-  let _, env = import_w3 empty path Theory.bool_theory in
-  let _, env = import_w3 env path Theory.builtin_theory in
-  let _ = import_w3_th env path ["int"] "Int" in
-  ()
-*)
+  let env,rb, ld = List.fold_left (import_decl rn path) (env,empty, []) decls in
+  let rb = 
+    { rb_th   = th;
+      rb_ty   = rb.env_ty;
+      rb_op   = rb.env_op;
+      rb_ax   = rb.env_ax;
+      rb_w3   = rb.env_w3;
+    } in
+  List.rev ld, RBuse rb
 
 (*------------------------------------------------------------------*)
 (* exporting to why3                                                *)
 (*------------------------------------------------------------------*)
 
-
-let add_decl_with_tuples task d =
-  let ids = Ident.Mid.set_diff d.Decl.d_syms (Task.task_known task) in
-  let add id s = match Ty.is_ts_tuple_id id with
-    | Some n -> Stdlib.Sint.add n s
-    | None -> s in
-  let ixs = Ident.Sid.fold add ids Stdlib.Sint.empty in
-  let add n task = Task.use_export task (Theory.tuple_theory n) in
-  Task.add_decl (Stdlib.Sint.fold add ixs task) d
 
 let preid id = 
   Ident.id_fresh (EcIdent.name id)
@@ -261,14 +365,6 @@ let trans_tydecl env path td =
   let tparams = trans_typarams vm td.tyd_params in
   let body = omap td.tyd_type (trans_ty env vm) in
   Ty.create_tysymbol pid tparams body 
-
-let add_ty env path td =
-  assert (not (Mp.mem path env.env_ty));
-  let ty = trans_tydecl env path td in
-  let decl = Decl.create_ty_decl ty in
-  { env with 
-    env_ty = Mp.add path ty env.env_ty;
-    logic_task = add_decl_with_tuples env.logic_task decl }
 
 (*------------------------- Expressions-------------------------------------*)
 
@@ -493,28 +589,26 @@ let trans_op env path op =
   let ls = Term.create_lsymbol pid dom codom in
   ls, trans_op_body env vm ls op.op_body 
 
-
-
-
-
+let add_ty env path td =
+  let ts = trans_tydecl env path td in
+  let decl = Decl.create_ty_decl ts in
+  add_ts env path ts decl, RBty(path,ts,decl) 
 
 let add_op env path op =
-  if op.op_prob then env 
+  if op.op_prob then env, None
   else
     let ls, decl = trans_op env path op in
-    { env with
-      env_op = Mp.add path ls env.env_op;
-      logic_task = add_decl_with_tuples env.logic_task decl
-    }
+    add_ls env path ls decl, Some (RBop(path,ls,decl))
 
 let add_ax env path ax =
   let pr = Decl.create_prsymbol (preid_p path) in
   let vm = empty_vmap () in 
   let f = trans_form env vm ax.ax_spec in
   let decl = Decl.create_prop_decl Decl.Paxiom pr f in
-  { env with
-    env_ax = Mp.add path pr env.env_ax;
-    logic_task = add_decl_with_tuples env.logic_task decl }
+  add_pr env path pr decl, RBax(path,pr,decl)
+
+let get_w3_th = Env.find_theory w3_env
+
 
 
 

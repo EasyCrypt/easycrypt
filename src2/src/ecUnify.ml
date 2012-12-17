@@ -55,7 +55,7 @@ let unify (env : EcEnv.env) (ue : unienv) =
           raise (UnificationFailure (t1, t2));
         List.iter2 unify lt1 lt2
 
-    | Tconstr(p1, lt1), Tconstr(p2, lt2) when EcPath.equal p1 p2 ->
+    | Tconstr(p1, lt1), Tconstr(p2, lt2) when EcPath.p_equal p1 p2 ->
         if List.length lt1 <> List.length lt2 then
           raise (UnificationFailure (t1, t2));
         List.iter2 unify lt1 lt2

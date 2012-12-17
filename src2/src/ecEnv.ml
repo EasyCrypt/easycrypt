@@ -21,10 +21,21 @@ let try_lf (f : unit -> 'a) =
   try Some (f ()) with LookupFailure _ -> None
 
 (* -------------------------------------------------------------------- *)
+
+type comp_th = 
+  { cth_path : EcPath.path;
+    cth_w3   : EcWhy3.rebinding;
+    cth_item : theory } 
+
+let comp_theory th = th.cth_item
+
 type preenv = {
   env_scope  : EcPath.path;
   env_root   : premc;
-  env_comps  : (EcPath.path * premc) Mid.t
+  env_comps  : (EcPath.path * premc) Mid.t;
+  env_w3     : EcWhy3.env;
+  env_rb     : EcWhy3.rebinding; (* in reverse order *)
+  env_item   : theory_item list (* in reverse order *)
 }
 
 and premc = {
@@ -56,31 +67,23 @@ let emcomponents = {
 }
 
 (* -------------------------------------------------------------------- *)
+let enter_id name env = 
+  let path = EcPath.extend (Some env.env_scope) name in
+  { env_scope = path;
+    env_root  = begin
+      let comps = env.env_root.mc_components in
+      let comps = IM.add name () comps in
+      { env.env_root with mc_components = comps }
+    end;
+    env_comps = Mid.add name (path, emcomponents) env.env_comps;
+    env_w3  = env.env_w3;
+    env_rb  = [];
+    env_item = [];
+  }
+
 let enter (name : symbol) (env : env) =
   let name = EcIdent.create name in
-  let path = EcPath.Pqname (env.env_scope, name) in
-
-  let env =
-    { env_scope = path;
-      env_root  = begin
-        let comps = env.env_root.mc_components in
-        let comps = IM.add name () comps in
-          { env.env_root with mc_components = comps }
-      end;
-      env_comps = Mid.add name (path, emcomponents) env.env_comps }
-  in
-    (name, env)
-
-(* -------------------------------------------------------------------- *)
-let empty name =
-  let name  = EcIdent.create name in
-  let env   =
-    { env_scope = Pident name;
-      env_root  = { emcomponents with
-                      mc_components = IM.add name () IM.empty };
-      env_comps = Mid.add name (Pident name, emcomponents) Mid.empty }
-  in
-    (name, env)
+  (name, enter_id name env)
 
 (* -------------------------------------------------------------------- *)
 let preenv (env : preenv) : env = env
@@ -359,8 +362,17 @@ module Ty = struct
     type t = tydecl
 
     let project mc = mc.mc_typedecls
-    let bind = MC.bind_typedecl
+    let bind id t env = 
+      let env = MC.bind_typedecl id t env in
+      let w3, r = 
+        EcWhy3.add_ty env.env_w3 (EcPath.extend (Some env.env_scope) id) t in
+      { env with
+        env_w3 = w3;
+        env_rb = r::env.env_rb;
+        env_item = Th_type(id,t) :: env.env_item }
   end)
+
+  let rebind = MC.bind_typedecl
 
   let defined (name : EcPath.path) (env : env) =
     match trylookup_by_path name env with
@@ -380,8 +392,16 @@ module Op = struct
     type t = operator
 
     let project mc = mc.mc_operators
-    let bind = MC.bind_op
+    let bind id op env = 
+      let env = MC.bind_op id op env in
+      let w3, r = 
+        EcWhy3.add_op env.env_w3 (EcPath.extend (Some env.env_scope) id) op in
+      { env with
+        env_w3 = w3;
+        env_rb = List.ocons r env.env_rb;
+        env_item = Th_operator(id,op) :: env.env_item }
   end)
+  let rebind = MC.bind_op
 
   let all (qname : qsymbol) (env : env) =
     MC.lookupall (fun mc -> mc.mc_operators) qname env
@@ -393,18 +413,66 @@ module Ax = struct
     type t = axiom
 
     let project mc = mc.mc_axioms
-    let bind = MC.bind_ax
+    let bind id ax env = 
+      let env = MC.bind_ax id ax env in
+      let w3, r = 
+        EcWhy3.add_ax env.env_w3 (EcPath.extend (Some env.env_scope) id) ax in
+      { env with
+        env_w3 = w3;
+        env_rb = r :: env.env_rb;
+        env_item = Th_axiom(id,ax) :: env.env_item }
+
   end)
 end
 
 (* -------------------------------------------------------------------- *)
 module Mod = struct
+  (* FIXME *)
+  type t = module_expr
+
+  let project mc = mc.mc_modules
+
+  let bind_s = MC.bind_module
+
+  let bindall_s xtys env =
+    List.fold_left
+      (fun env (x, ty) -> bind_s x ty env)
+      env xtys
+    
+  let bind id m env = 
+    assert (EcIdent.id_equal id m.me_name);
+    let env = MC.bind_module id m.me_sig env in
+    { env with
+      env_item = Th_module m :: env.env_item }
+      
+  let bindall xtys env =
+    List.fold_left
+      (fun env (x, ty) -> bind x ty env)
+      env xtys
+
+  let lookup_by_path = 
+    MC.lookup_by_path project
+
+  let lookup =
+    MC.lookup project
+
+  let trylookup_by_path path env = 
+    try_lf (fun () -> lookup_by_path path env)
+
+  let trylookup x env =
+    try_lf (fun () -> lookup x env)
+
+  let exists x env = (trylookup x env <> None)  
+
+(*        
   include BaseS(struct
     type t = tymod
 
     let project mc = mc.mc_modules
-    let bind = MC.bind_module
+    
+     
   end)
+*)
 end
 
 (* -------------------------------------------------------------------- *)
@@ -413,66 +481,83 @@ module ModTy = struct
     type t = tymod
 
     let project mc = mc.mc_modtypes
-    let bind = MC.bind_modtype
+    let bind id mt env = 
+      let env = MC.bind_modtype id mt env in
+      { env with
+        env_item = Th_modtype(id,mt) :: env.env_item }
   end)
 end
 
 (* -------------------------------------------------------------------- *)
 module Theory = struct
-  module P = struct
-    type t = theory
+  type t = comp_th 
 
-    let project mc = mc.mc_theories
-    let bind = MC.bind_theory
-  end
+  let project mc = mc.mc_theories
+  
+  let bind id cth env = 
+    assert (EcPath.p_equal 
+              (EcPath.extend (Some env.env_scope) id) 
+              cth.cth_path);
+    let env = MC.bind_theory id cth.cth_item env in
+    { env with
+      env_w3 = EcWhy3.rebind env.env_w3 cth.cth_w3;
+      env_rb = List.rev_append cth.cth_w3 env.env_rb;
+      env_item = 
+      Th_theory (EcPath.basename cth.cth_path, cth.cth_item) :: env.env_item
+    }
 
-  include BaseS(P)
+  let bindall xtys env =
+    List.fold_left
+      (fun env (x, ty) -> bind x ty env)
+      env xtys
+      
+  let lookup_by_path = 
+    MC.lookup_by_path project
+      
+  let lookup =
+    MC.lookup project
+      
+  let trylookup_by_path path env = 
+    try_lf (fun () -> lookup_by_path path env)
+      
+  let trylookup x env =
+    try_lf (fun () -> lookup x env)
+
+  let exists x env = (trylookup x env <> None)
 
   let import (path : EcPath.path) (env : env) =
     let rec import (env : env) (th : theory) =
       let xpath x = EcPath.Pqname (path, x) in
-        let rec import_th_item (env : env) = function
-          | Th_type      (x, ty) -> MC.import env MC.mc_bind_typedecl (xpath x) ty
-          | Th_operator  (x, op) -> MC.import env MC.mc_bind_op (xpath x) op
-          | Th_axiom     (x, ax) -> MC.import env MC.mc_bind_ax (xpath x) ax
-          | Th_modtype   (x, ty) -> MC.import env MC.mc_bind_modtype (xpath x) ty
-          | Th_module    m       -> MC.import env MC.mc_bind_module (xpath m.me_name) m.me_sig
-          | Th_export    p       -> import env (lookup_by_path p env)
-          | Th_theory    (x, th) ->
+      let rec import_th_item (env : env) = function
+        | Th_type      (x, ty) -> MC.import env MC.mc_bind_typedecl (xpath x) ty
+        | Th_operator  (x, op) -> MC.import env MC.mc_bind_op (xpath x) op
+        | Th_axiom     (x, ax) -> MC.import env MC.mc_bind_ax (xpath x) ax
+        | Th_modtype   (x, ty) -> MC.import env MC.mc_bind_modtype (xpath x) ty
+        | Th_module    m       -> 
+            MC.import env MC.mc_bind_module (xpath m.me_name) m.me_sig
+        | Th_export    p       -> import env (lookup_by_path p env)
+        | Th_theory    (x, th) ->
             let env = MC.import env MC.mc_bind_theory (xpath x) th in
               { env with env_root = MC.mc_bind_comp (xpath x) env.env_root }
-        in
-          List.fold_left import_th_item env th
+
+      in
+      List.fold_left import_th_item env th
     in
-      import env (lookup_by_path path env)
+    import env (lookup_by_path path env)
 
   let export (path : EcPath.path) (env : env) =
-    import path env
+(*    let env = import path env in *)
+    { env with
+      env_item = Th_export path :: env.env_item }
+      
+  let enter_id = enter_id 
+  let enter = enter
+  let close env = 
+    { cth_path = env.env_scope;
+      cth_w3   = List.rev env.env_rb;
+      cth_item = List.rev env.env_item }
+    
 end
-
-(* -------------------------------------------------------------------- *)
-type ebinding = [
-  | `Variable  of EcTypes.ty
-  | `Function  of funsig
-  | `Operator  of operator
-  | `Module    of tymod
-  | `ModType   of tymod
-  | `TypeDecl  of tydecl
-  | `Theory    of theory
-]
-
-let bind1 ((x, eb) : EcIdent.t * ebinding) (env : env) =
-  match eb with
-  | `Variable ty -> Var   .bind x ty env
-  | `Function f  -> Fun   .bind x f  env
-  | `Operator o  -> Op    .bind x o  env
-  | `Module   m  -> Mod   .bind x m  env
-  | `ModType  i  -> ModTy .bind x i  env
-  | `TypeDecl t  -> Ty    .bind x t  env
-  | `Theory   t  -> Theory.bind x t  env
-
-let bindall (items : (EcIdent.t * ebinding) list) (env : env) =
-  List.fold_left ((^~) bind1) env items
 
 (* -------------------------------------------------------------------- *)
 module Ident = struct
@@ -497,3 +582,82 @@ module Ident = struct
     | None   -> raise (LookupFailure (`QSymbol name))
     | Some x -> x
 end
+
+
+(* -------------------------------------------------------------------- *)
+let empty =
+  let path = EcPath.p_top in
+  let name  = EcPath.basename path in
+  let env   =
+    { env_scope = path;
+      env_root  = { emcomponents with
+                      mc_components = IM.add name () IM.empty };
+      env_comps = Mid.add name (path, emcomponents) Mid.empty;
+      env_w3    = EcWhy3.empty;
+      env_rb    = [];
+      env_item  = [];
+    } in 
+  env
+
+
+let import_w3 env th rd = 
+  let lth, rbi = EcWhy3.import_w3 env.env_w3 env.env_scope th rd in
+  let env = { env with env_w3 = EcWhy3.rebind env.env_w3 [rbi];
+              env_rb = rbi :: env.env_rb;
+              env_item = List.rev_append lth env.env_item
+            } in
+  let add env = function
+    | Th_type (id,ty) -> Ty.rebind id ty env
+    | Th_operator   (id,op) -> Op.rebind id op env 
+    | _ -> assert false in
+  List.fold_left add env lth 
+
+let import_w3_dir env dir name rd =
+  let th = EcWhy3.get_w3_th dir name in
+  import_w3 env th rd 
+  
+  
+let initial = 
+  let env0 = empty in
+  let env = Theory.enter_id EcPath.id_pervasive env0 in
+  let bool_rn = [
+    ["bool"] , EcWhy3.RDts, EcPath.basename EcPath.p_bool;
+    ["True"] , EcWhy3.RDls, EcPath.basename EcPath.p_true;
+    ["False"], EcWhy3.RDls, EcPath.basename EcPath.p_false ] in
+  let env = import_w3 env Why3.Theory.bool_theory bool_rn in
+  let opb_rn = [
+    ["andb"] , EcWhy3.RDls, EcPath.basename EcPath.p_and;
+    ["orb"]  , EcWhy3.RDls, EcPath.basename EcPath.p_or;
+    ["implb"], EcWhy3.RDls, EcPath.basename EcPath.p_imp;
+    ["notb"] , EcWhy3.RDls, EcPath.basename EcPath.p_not ] in 
+  let env = import_w3_dir env ["bool"] "Bool" opb_rn in
+  let builtin_rn = [
+    ["int"] , EcWhy3.RDts, EcPath.basename EcPath.p_int;
+    ["real"], EcWhy3.RDts, EcPath.basename EcPath.p_real ] in
+  let env = import_w3 env Why3.Theory.builtin_theory builtin_rn in
+  let cth = Theory.close env in
+  let env1 = Theory.bind EcPath.id_pervasive cth env0 in
+  let env1 = Theory.import EcPath.p_pervasive env1 in
+  env1
+
+let p_eq = fst (Op.lookup ([], "infix =") initial) 
+  
+
+(* -------------------------------------------------------------------- *)
+type ebinding = [
+  | `Variable  of EcTypes.ty
+  | `Function  of funsig
+  | `Module    of tymod
+  | `ModType   of tymod
+]
+
+let bind1 ((x, eb) : EcIdent.t * ebinding) (env : env) =
+  match eb with
+  | `Variable ty -> Var   .bind x ty env
+  | `Function f  -> Fun   .bind x f  env
+  | `Module   m  -> Mod   .bind_s x m  env
+  | `ModType  i  -> ModTy .bind x i  env
+
+let bindall (items : (EcIdent.t * ebinding) list) (env : env) =
+  List.fold_left ((^~) bind1) env items  
+  
