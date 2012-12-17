@@ -73,7 +73,8 @@ and instr =
 and lvalue =
   | LvVar   of (EcPath.path * EcTypes.ty)
   | LvTuple of (EcPath.path * EcTypes.ty) list
-  | LvMap   of EcPath.path * EcTypes.tyexpr * EcTypes.ty
+  | LvMap   of EcPath.path * EcPath.path * EcTypes.tyexpr * EcTypes.ty
+               (* op, map, where, type updated value *)
 
 (* -------------------------------------------------------------------- *)
 type theory = theory_item list

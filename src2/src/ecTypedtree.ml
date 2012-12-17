@@ -641,15 +641,22 @@ and translvalue ue (env : EcEnv.env) lvalue =
       (LvTuple xs, ty)
   end
 
-  | PLvMap ({ pl_desc = x }, e) ->
+  | PLvMap ({ pl_desc = x; pl_loc = loc }, e) ->
       let codomty = mkunivar () in
       let xpath, xty =
         try  EcEnv.Var.lookup x env
         with EcEnv.LookupFailure _ -> tyerror dloc (UnknownVariable x)
       and e, ety = transexp env epolicy ue e in
-
-        EcUnify.unify env ue xty (tmap ety codomty);
-        (LvMap (xpath, e, codomty), codomty)
+      let name =  ([],"set") in
+      let esig = [xty; ety; codomty] in
+      let ops = select_op false env name ue esig in
+      match ops with
+      | [] | _ :: _ :: _ ->        (* FIXME: better error message *)
+          let esig = inst_uni_dom (EcUnify.UniEnv.asmap ue) esig in
+          tyerror loc (UnknownOperatorForSig (name, esig))
+      | [(opath, _, codom, subue)] ->
+          EcUnify.UniEnv.restore ~src:subue ~dst:ue;
+          (LvMap (opath, xpath, e, codomty), codomty)            
 
 (* -------------------------------------------------------------------- *)
 (** Translation of formula *)

@@ -25,7 +25,6 @@ val tint       : ty
 val tbitstring : ty
 
 val tlist      : ty -> ty
-val tmap       : ty -> ty -> ty
 
 val mkunivar : unit -> ty
 

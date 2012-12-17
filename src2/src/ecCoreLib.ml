@@ -1,3 +1,8 @@
+let s_get  = "get"
+let s_set  = "set"
+let s_nil  = "[]"
+let s_cons = "::"
+
 (* -------------------------------------------------------------------- *)
 let id_top       = EcIdent.create "<top>"
 let id_pervasive = EcIdent.create "Pervasive"

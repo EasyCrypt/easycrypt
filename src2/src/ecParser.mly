@@ -27,14 +27,33 @@
     pty_body   = body;
   }
 
-  let peget loc e1 e2    = PEapp (pqsymb_of_symb loc "get", [e1; e2])
-  let peset loc e1 e2 e3 = PEapp (pqsymb_of_symb loc "set", [e1; e2; e3])
+  let peget loc e1 e2    = PEapp (pqsymb_of_symb loc EcCoreLib.s_get, [e1; e2])
+  let peset loc e1 e2 e3 = PEapp (pqsymb_of_symb loc EcCoreLib.s_set,
+                                  [e1; e2; e3])
 
-  let pfget loc e1 e2    = PFapp (pqsymb_of_symb loc "get", [e1; e2])
-  let pfset loc e1 e2 e3 = PFapp (pqsymb_of_symb loc "set", [e1; e2; e3])
+  let pfget loc e1 e2    = PFapp (pqsymb_of_symb loc EcCoreLib.s_get, [e1; e2])
+  let pfset loc e1 e2 e3 = PFapp (pqsymb_of_symb loc EcCoreLib.s_get, [e1; e2; e3])
 
-  let pelist (es : pexpr    list) : pexpr_r    = assert false
-  let pflist (es : pformula list) : pformula_r = assert false
+  let mk_loc loc e = 
+    { pl_desc = e;  pl_loc  = loc;}
+
+  let pe_nil loc = 
+    mk_loc loc (PEident (pqsymb_of_symb loc EcCoreLib.s_nil))
+
+  let pe_cons loc e1 e2 = 
+    mk_loc loc (PEapp (pqsymb_of_symb loc EcCoreLib.s_cons, [e1; e2]))
+      
+  let pelist loc (es : pexpr    list) : pexpr    = 
+    List.fold_right (fun e1 e2 -> pe_cons loc e1 e2) es (pe_nil loc)
+
+  let pfe_nil loc = 
+    mk_loc loc (PFident (pqsymb_of_symb loc EcCoreLib.s_nil))
+
+  let pfe_cons loc e1 e2 = 
+    mk_loc loc (PFapp (pqsymb_of_symb loc EcCoreLib.s_cons, [e1; e2]))
+
+  let pflist loc (es : pformula list) : pformula = 
+    List.fold_right (fun e1 e2 -> pfe_cons loc e1 e2) es (pfe_nil loc)
 %}
 
 %token <EcSymbols.symbol>  IDENT
@@ -269,8 +288,8 @@ sexp:
 | LPAREN e=exp RPAREN
    { e }
 
-| LBRACKET es=p_exp_sm_list0 RBRACKET
-   { pelist es }
+| LBRACKET es=loc(p_exp_sm_list0) RBRACKET
+   { (pelist es.pl_loc es.pl_desc).pl_desc }
 ;
 
 exp:
@@ -356,8 +375,8 @@ sform:
 | LPAREN e=form RPAREN
    { e }
 
-| LBRACKET es=p_form_sm_list0 RBRACKET
-   { pflist es }
+| LBRACKET es=loc(p_form_sm_list0) RBRACKET
+   { (pflist es.pl_loc es.pl_desc).pl_desc }
                           
 form:
 | e=sform { e }
