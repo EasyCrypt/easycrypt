@@ -55,7 +55,8 @@ let unify (env : EcEnv.env) (ue : unienv) =
     match UniEnv.repr ue t1, UniEnv.repr ue t2 with
     | Tvar i1, Tvar i2 -> 
         (* FIXME use equal *)
-        if i1 <> i2 then raise (UnificationFailure (t1, t2))
+        if not (EcIdent.id_equal i1 i2) then 
+          raise (UnificationFailure (t1, t2))
 
     | Tunivar id, t | t, Tunivar id -> UniEnv.bind ue id t
 

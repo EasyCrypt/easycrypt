@@ -544,7 +544,7 @@ module Theory = struct
 
   (* ------------------------------------------------------------------ *)
   let import (path : EcPath.path) (env : env) =
-    let rec import (env : env) (th : theory) =
+    let rec import (env : env) path (th : theory) =
       let xpath x = EcPath.Pqname (path, x) in
       let rec import_th_item (env : env) = function
         | Th_type (x, ty) ->
@@ -563,7 +563,7 @@ module Theory = struct
             MC.import env MC.mc_bind_module (xpath m.me_name) m.me_sig
 
         | Th_export p ->
-            import env (lookup_by_path p env)
+            import env p (lookup_by_path p env)
 
         | Th_theory (x, th) ->
             let env = MC.import env MC.mc_bind_theory (xpath x) th in
@@ -572,7 +572,7 @@ module Theory = struct
         List.fold_left import_th_item env th
 
     in
-      import env (lookup_by_path path env)
+      import env path (lookup_by_path path env)
 
   (* ------------------------------------------------------------------ *)
   let export (path : EcPath.path) (env : env) =

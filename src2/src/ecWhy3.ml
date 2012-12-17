@@ -478,7 +478,8 @@ let trans_op env p args ty =
   | OK_iff  , [e1;e2] -> Term.t_iff (force_prop e1) (force_prop e2)
   | OK_eq   , [e1;e2] -> Term.t_equ (force_bool e1) (force_bool e2)
   | OK_other, _ ->
-      let p = try Mp.find p env.env_op with _ -> assert false in
+      let p = try Mp.find p env.env_op with _ -> 
+        (Format.printf "can not find %s@." (EcPath.tostring p);assert false) in
       t_app p (List.map force_bool args) ty
   | _       , _ -> assert false
       
@@ -501,7 +502,8 @@ let rec trans_expr env vm e =
   | Elocal(id,_) -> Term.t_var (trans_lv vm id) 
   | Evar(p,ty) -> 
       (* FIXME should assert false *)
-      Term.t_app_infer (trans_pv env vm (p,ty) 0) [] 
+      Term.t_var (trans_lv vm (EcPath.basename p)) 
+      (* Term.t_app_infer (trans_pv env vm (p,ty) 0) [] *)
   | Eapp(p,args,ty) ->
       let ty = trans_ty env vm ty in
       let args = List.map (trans_expr env vm) args in 
