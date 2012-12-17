@@ -55,6 +55,11 @@ let basename = function
   | Pqname (_, x) -> x
 
 (* -------------------------------------------------------------------- *)
+let rec rootname = function
+  | Pident x -> x
+  | Pqname (p, _) -> rootname p
+
+(* -------------------------------------------------------------------- *)
 let extend (p : path option) (x : EcIdent.t) =
   match p with
   | None   -> Pident x
@@ -64,7 +69,6 @@ let extend (p : path option) (x : EcIdent.t) =
 module Mp = Map.Make (struct type t = path let compare = p_compare end)
 
 (* -------------------------------------------------------------------- *)
-
 let id_top       = EcIdent.create "Top"
 let id_pervasive = EcIdent.create "Pervasive"
 let id_int       = EcIdent.create "int"

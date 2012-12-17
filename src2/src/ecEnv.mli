@@ -10,8 +10,8 @@ type preenv = private {
   env_root   : premc;
   env_comps  : (EcPath.path * premc) EcIdent.Mid.t;
   env_w3     : EcWhy3.env;
-  env_rb     : EcWhy3.rebinding; (* in reverse order *)
-  env_item   : theory_item list (* in reverse order *)
+  env_rb     : EcWhy3.rebinding;        (* in reverse order *)
+  env_item   : theory_item list         (* in reverse order *)
 }
 
 and premc = private {
@@ -29,16 +29,12 @@ and premc = private {
 (* -------------------------------------------------------------------- *)
 type env = preenv
 
-val preenv : env -> preenv
-
+val preenv  : env -> preenv
 val initial : env
-
+val root    : env -> EcPath.path
 
 (* -------------------------------------------------------------------- *)
 exception LookupFailure of [`Path of EcPath.path | `QSymbol of qsymbol]
-
-val root    : env -> EcPath.path
-val enter   : symbol -> env -> EcIdent.t * env
 
 (* -------------------------------------------------------------------- *)
 module type S = sig
@@ -54,11 +50,15 @@ module type S = sig
 end
 
 (* -------------------------------------------------------------------- *)
-module Var    : S with type t = EcTypes.ty
-module Fun    : S with type t = funsig
-module Ax     : S with type t = axiom
-module Mod    : sig 
+module Var   : S with type t = EcTypes.ty
+module Fun   : S with type t = funsig
+module Ax    : S with type t = axiom
+module ModTy : S with type t = tymod
+
+(* -------------------------------------------------------------------- *)
+module Mod : sig
   type t = module_expr
+
   val bind_s : EcIdent.t -> tymod -> env -> env
   val bindall_s : (EcIdent.t * tymod) list -> env -> env
   val bind : EcIdent.t -> t -> env -> env
@@ -66,18 +66,18 @@ module Mod    : sig
   val lookup_by_path : EcPath.path -> env -> tymod
   val lookup : EcSymbols.qsymbol -> env -> EcPath.path * EcTypesmod.tymod
   val trylookup_by_path : EcPath.path -> env -> EcTypesmod.tymod option
-  val trylookup :
-      EcSymbols.qsymbol -> env -> (EcPath.path * EcTypesmod.tymod) option
+  val trylookup : EcSymbols.qsymbol -> env -> (EcPath.path * EcTypesmod.tymod) option
   val exists : EcSymbols.qsymbol -> env -> bool
 end
 
-module ModTy  : S with type t = tymod
-
 (* -------------------------------------------------------------------- *)
 type comp_th
-val comp_theory : comp_th -> theory
+
+val theory_of_comp_th : comp_th -> theory
+
 module Theory : sig
   type t = comp_th
+
   val bind : EcIdent.t -> t -> env -> env
   val bindall : (EcIdent.t * t) list -> env -> env
   val lookup_by_path : EcPath.path -> env -> theory
@@ -87,10 +87,10 @@ module Theory : sig
   val exists : EcSymbols.qsymbol -> env -> bool
   val import : EcPath.path -> env -> env
   val export : EcPath.path -> env -> env
+  val require : EcIdent.t -> theory -> env -> env
   val enter : EcSymbols.symbol -> env -> EcIdent.t * env
   val close : env -> comp_th
 end
-
 
 (* -------------------------------------------------------------------- *)
 module Op : sig

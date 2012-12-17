@@ -1,10 +1,13 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
+open EcMaps
 open EcSymbols
 open EcPath
 open EcParsetree
 open EcTypes
 open EcTypesmod
+
+module IM = EcIdent.Map
 
 (* -------------------------------------------------------------------- *)
 module Context = struct
@@ -27,7 +30,7 @@ module Context = struct
     type 'a t = ('a data) ref
 
     let normalize =
-      let normalize (v : 'a data) ={
+      let normalize (v : 'a data) = {
         v_front = List.rev_append (List.rev v.v_front) v.v_back;
         v_back  = [];
       } in
@@ -91,16 +94,6 @@ module Context = struct
 end
 
 (* -------------------------------------------------------------------- *)
-type action =
-  | Ac_type      of (EcIdent.t * EcDecl.tydecl)
-  | Ac_operator  of (EcIdent.t * EcDecl.operator)
-  | Ac_axiom     of (EcIdent.t * EcDecl.axiom)
-  | Ac_modtype   of (EcIdent.t * EcTypesmod.tymod)
-  | Ac_module    of EcTypesmod.module_expr
-  | Ac_theory    of (EcIdent.t * EcEnv.comp_th)
-  | Ac_import    of EcPath.path
-  | Ac_export    of EcPath.path
-
 type scope = {
   sc_name       : EcIdent.t;
   sc_types      : EcDecl.tydecl          Context.context;
@@ -109,14 +102,38 @@ type scope = {
   sc_modules    : EcTypesmod.module_expr Context.context;
   sc_modtypes   : EcTypesmod.tymod       Context.context;
   sc_theories   : EcTypesmod.theory      Context.context;
-(*  sc_history    : action list; *)
   sc_env        : EcEnv.env;
   sc_top        : scope option;
+  sc_initial    : scope option;
+  sc_required   : EcTypesmod.theory IM.t;
 }
+
+(* -------------------------------------------------------------------- *)
+let empty =
+  let scope =
+    let env  = EcEnv.initial in
+    let name = EcPath.basename env.EcEnv.env_scope in
+      { sc_name       = name;
+        sc_types      = Context.empty ();
+        sc_operators  = Context.empty ();
+        sc_axioms     = Context.empty ();
+        sc_modtypes   = Context.empty ();
+        sc_modules    = Context.empty ();
+        sc_theories   = Context.empty ();
+        sc_env        = env;
+        sc_top        = None;
+        sc_required   = IM.empty;
+        sc_initial    = None; }
+  in
+    { scope with sc_initial = Some scope }
 
 (* -------------------------------------------------------------------- *)
 let name (scope : scope) =
   scope.sc_name
+
+(* -------------------------------------------------------------------- *)
+let path (scope : scope) =
+  EcEnv.root scope.sc_env
 
 (* -------------------------------------------------------------------- *)
 let env (scope : scope) =
@@ -127,62 +144,41 @@ let attop (scope : scope) =
   scope.sc_top = None
 
 (* -------------------------------------------------------------------- *)
-let doaction (scope : scope) (action : action) =
-  match action with
-  | Ac_type (x, tydecl) ->
-      { scope with
-          sc_types   = Context.bind (EcIdent.name x) tydecl scope.sc_types;
-(*          sc_history = action :: scope.sc_history; *)
-          sc_env     = EcEnv.Ty.bind x tydecl scope.sc_env }
+let root (scope : scope) =
+  match scope.sc_initial with
+  | None -> assert false
+  | Some scope -> scope
 
-  | Ac_operator (x, op) ->
-      { scope with
-          sc_operators = Context.bind (EcIdent.name x) op scope.sc_operators;
-(*          sc_history   = action :: scope.sc_history; *)
-          sc_env       = EcEnv.Op.bind x op scope.sc_env }
+(* -------------------------------------------------------------------- *)
+let subscope (scope : scope) (name : symbol) =
+  let (name, env) = EcEnv.Theory.enter name scope.sc_env in
 
-  | Ac_axiom (x, ax) ->
-      { scope with
-          sc_axioms = Context.bind (EcIdent.name x) ax scope.sc_axioms;
-(*          sc_history   = action :: scope.sc_history; *)
-          sc_env       = EcEnv.Ax.bind x ax scope.sc_env }
-
-  | Ac_modtype (x, tymod) ->
-      { scope with
-          sc_modtypes = Context.bind (EcIdent.name x) tymod scope.sc_modtypes;
-(*          sc_history  = action :: scope.sc_history; *)
-          sc_env      = EcEnv.ModTy.bind x tymod scope.sc_env }
-
-  | Ac_module m ->
-      { scope with
-          sc_modules = Context.bind (EcIdent.name m.me_name) m scope.sc_modules;
-(*          sc_history = action :: scope.sc_history; *)
-          sc_env     = EcEnv.Mod.bind m.me_name m scope.sc_env }
-
-  | Ac_theory (x, cth) ->
-      let th = EcEnv.comp_theory cth in
-      { scope with
-          sc_theories = Context.bind (EcIdent.name x) th scope.sc_theories;
-(*          sc_history  = action :: scope.sc_history; *)
-          sc_env      = EcEnv.Theory.bind x cth scope.sc_env }
-
-  | Ac_import p ->
-      { scope with
-(*          sc_history = action :: scope.sc_history; *)
-          sc_env     = EcEnv.Theory.import p scope.sc_env }
-
-  | Ac_export p ->
-      { scope with
-(*          sc_history = action :: scope.sc_history; *) 
-        sc_env     = EcEnv.Theory.export p scope.sc_env
-      }
+  { sc_name       = name;
+    sc_types      = Context.empty ();
+    sc_operators  = Context.empty ();
+    sc_axioms     = Context.empty ();
+    sc_modtypes   = Context.empty ();
+    sc_modules    = Context.empty ();
+    sc_theories   = Context.empty ();
+    sc_env        = env;
+    sc_top        = Some scope;
+    sc_initial    = scope.sc_initial;
+    sc_required   = IM.empty; }
 
 (* -------------------------------------------------------------------- *)
 module Op = struct
+  open EcTypes
+  open EcDecl
+
   module TT = EcTypedtree
 
+  let bind (scope : scope) ((x, op) : _ * operator) =
+    { scope with
+        sc_operators = Context.bind (EcIdent.name x) op scope.sc_operators;
+        sc_env       = EcEnv.Op.bind x op scope.sc_env; }
+
   let add (scope : scope) (op : poperator) =
-    let tp  = TT.TyPolicy.init (omap op.po_tyvars unlocs) in
+    let tp = TT.TyPolicy.init (omap op.po_tyvars unlocs) in
     let dom,   tp  = TT.transtys scope.sc_env tp (odfl [] op.po_dom) in
     let codom, tp  = TT.transty  scope.sc_env tp op.po_codom in
     let policy = { TT.epl_prob = op.po_prob } in
@@ -202,8 +198,9 @@ module Op = struct
     let dom = if op.po_dom = None then None else Some dom in
     let tyop =
       EcDecl.mk_op (TT.TyPolicy.decl tp) dom codom
-        body op.po_prob in
-    doaction scope (Ac_operator (EcIdent.create (unloc op.po_name), tyop))
+        body op.po_prob
+    in
+      bind scope (EcIdent.create (unloc op.po_name), tyop)
 end
 
 (* -------------------------------------------------------------------- *)
@@ -229,8 +226,9 @@ module Pred = struct
     let dom = List.map uni dom in
     let dom = if op.pp_dom = None then None else Some dom in
     let tyop =
-      EcDecl.mk_pred (TT.TyPolicy.decl tp) dom body in
-    doaction scope (Ac_operator (EcIdent.create (unloc op.pp_name), tyop))
+      EcDecl.mk_pred (TT.TyPolicy.decl tp) dom body
+    in
+      Op.bind scope (EcIdent.create (unloc op.pp_name), tyop)
 end
 
 (* -------------------------------------------------------------------- *)
@@ -245,16 +243,22 @@ module Ax = struct
     | PAxiom -> Axiom
     | PLemma -> Lemma 
 
+  let bind (scope : scope) ((x, ax) : _ * axiom) =
+    { scope with
+        sc_axioms = Context.bind (EcIdent.name x) ax scope.sc_axioms;
+        sc_env    = EcEnv.Ax.bind x ax scope.sc_env; }
+
   let add (scope : scope) (ax : paxiom) =
     let form, _ = 
       TT.transformula (TT.Fenv.mono_fenv scope.sc_env) 
-        TT.TyPolicy.empty (EcUnify.UniEnv.create()) ax.pa_formula in
-    let axd = { 
-      ax_spec = form;
-      ax_kind = transform_kind ax.pa_kind
-    }
+        TT.TyPolicy.empty (EcUnify.UniEnv.create()) ax.pa_formula
     in
-      doaction scope (Ac_axiom (EcIdent.create (unloc ax.pa_name), axd))
+
+    let axd = { ax_spec = form;
+                ax_kind = transform_kind ax.pa_kind }
+    in
+      
+      bind scope (EcIdent.create (unloc ax.pa_name), axd)
 end
 
 (* -------------------------------------------------------------------- *)
@@ -262,13 +266,15 @@ module Ty = struct
   open EcDecl
   open EcTypedtree
 
-  let bind (scope : scope) name tydecl =
-    doaction scope (Ac_type (name, tydecl))
+  let bind (scope : scope) ((x, tydecl) : _ * tydecl) =
+    { scope with
+        sc_types = Context.bind (EcIdent.name x) tydecl scope.sc_types;
+        sc_env   = EcEnv.Ty.bind x tydecl scope.sc_env; }
 
   let alias (scope : scope) name ty =
     (* FIXME : check that ty is closed, or close it *)
     let tydecl = {tyd_params = []; tyd_type = Some ty } in
-      bind scope (EcIdent.create name) tydecl
+      bind scope (EcIdent.create name, tydecl)
 
   let add (scope : scope) (args, name) = 
     let tp = TyPolicy.init (Some (unlocs args)) in
@@ -276,7 +282,7 @@ module Ty = struct
       tyd_params = TyPolicy.decl tp;
       tyd_type   = None;
     } in
-    bind scope (EcIdent.create (unloc name)) tydecl
+      bind scope (EcIdent.create (unloc name), tydecl)
 
   let define (scope : scope) (args, name) body = 
     let tp = TyPolicy.init (Some (unlocs args)) in
@@ -285,73 +291,95 @@ module Ty = struct
       tyd_params = TyPolicy.decl tp;
       tyd_type   = Some body;
     } in
-    bind scope (EcIdent.create (unloc name)) tydecl
+      bind scope (EcIdent.create (unloc name), tydecl)
 end
 
 (* -------------------------------------------------------------------- *)
 module Mod = struct
+  let bind (scope : scope) (m : module_expr) =
+    { scope with
+        sc_modules = Context.bind (EcIdent.name m.me_name) m scope.sc_modules;
+        sc_env     = EcEnv.Mod.bind m.me_name m scope.sc_env; }
+
   let add (scope : scope) (name : symbol) (m : pmodule_expr) =
     let name = EcIdent.create name in
     let m    = EcTypedtree.transmod scope.sc_env name m in
-      doaction scope (Ac_module m)
+      bind scope m
 end
 
 (* -------------------------------------------------------------------- *)
 module ModType = struct
+  let bind (scope : scope) ((x, tymod) : _ * tymod) =
+    { scope with
+        sc_modtypes = Context.bind (EcIdent.name x) tymod scope.sc_modtypes;
+        sc_env      = EcEnv.ModTy.bind x tymod scope.sc_env; }
+
   let add (scope : scope) (name : symbol) (i : pmodule_type) =
     let tymod = EcTypedtree.transtymod scope.sc_env i in
-      doaction scope (Ac_modtype (EcIdent.create name, tymod))
+      bind scope (EcIdent.create name, tymod)
 end
 
 (* -------------------------------------------------------------------- *)
 module Theory = struct
   exception TopScope
 
+  let bind (scope : scope) ((x, cth) : _ * EcEnv.comp_th) =
+    let theory = EcEnv.theory_of_comp_th cth in
+      { scope with
+          sc_theories = Context.bind (EcIdent.name x) theory scope.sc_theories;
+          sc_env      = EcEnv.Theory.bind x cth scope.sc_env; }
+
+  let loaded (scope : scope) (name : symbol) =
+    IM.byname name scope.sc_required <> None
+
   let enter (scope : scope) (name : symbol) =
     let (name, env) = EcEnv.Theory.enter name scope.sc_env in
-    { sc_name       = name;
-      sc_types      = Context.empty ();
-      sc_operators  = Context.empty ();
-      sc_axioms     = Context.empty ();
-      sc_modtypes   = Context.empty ();
-      sc_modules    = Context.empty ();
-      sc_theories   = Context.empty ();
-      (* sc_history    = []; *)
-      sc_env        = env;
-      sc_top        = Some scope; }
+      { sc_name       = name;
+        sc_types      = Context.empty ();
+        sc_operators  = Context.empty ();
+        sc_axioms     = Context.empty ();
+        sc_modtypes   = Context.empty ();
+        sc_modules    = Context.empty ();
+        sc_theories   = Context.empty ();
+        sc_env        = env;
+        sc_top        = Some scope;
+        sc_initial    = scope.sc_initial;
+        sc_required   = scope.sc_required; }
 
   let exit (scope : scope) =
     match scope.sc_top with
     | None     -> raise TopScope
     | Some sup ->
         let cth = EcEnv.Theory.close scope.sc_env in
-        (scope.sc_name, doaction sup (Ac_theory (scope.sc_name, cth)))
+          (scope.sc_name, bind sup (scope.sc_name, cth))
 
   let import (scope : scope) (name : qsymbol) =
     let path = fst (EcEnv.Theory.lookup name scope.sc_env) in
-    doaction scope (Ac_import path)
+      { scope with
+          sc_env = EcEnv.Theory.import path scope.sc_env }
 
   let export (scope : scope) (name : qsymbol) =
     let path = fst (EcEnv.Theory.lookup name scope.sc_env) in
-    doaction scope (Ac_export path)
+      { scope with
+          sc_env = EcEnv.Theory.export path scope.sc_env }
+
+  let require (scope : scope) (name : symbol) loader =
+    if loaded scope name then
+      scope
+    else begin
+      let imported = enter (root scope) name in
+      let thname   = imported.sc_name in
+      let imported = loader imported in
+
+        if imported.sc_name <> thname then
+          failwith "end-of-theory in required library";
+
+      let imported = snd (exit imported) in
+      let path     = EcPath.Pqname (path imported, thname) in
+      let theory   = EcEnv.Theory.lookup_by_path path imported.sc_env in
+
+        { scope with
+            sc_env      = EcEnv.Theory.require thname theory scope.sc_env;
+            sc_required = IM.add thname theory scope.sc_required; }
+    end
 end
-
-(* -------------------------------------------------------------------- *)
-let initial (_name : symbol) =
-  let scope =
-    let env = EcEnv.initial in
-    let name = EcPath.basename env.EcEnv.env_scope in
-    { sc_name       = name;
-      sc_types      = Context.empty ();
-      sc_operators  = Context.empty ();
-      sc_axioms     = Context.empty ();
-      sc_modtypes   = Context.empty ();
-      sc_modules    = Context.empty ();
-      sc_theories   = Context.empty ();
-(*      sc_history    = []; *)
-      sc_env        = env;
-      sc_top        = None; }
-  in
-
-  let scope = Ty.alias scope "unit'" (EcTypes.tunit ()) in
-  scope

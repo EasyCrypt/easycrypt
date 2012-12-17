@@ -24,10 +24,12 @@ end
 (* -------------------------------------------------------------------- *)
 type scope
 
-val initial : symbol -> scope
-val name    : scope -> EcIdent.t
-val env     : scope -> EcEnv.env
-val attop   : scope -> bool
+val empty : scope
+val root  : scope -> scope
+val path  : scope -> EcPath.path
+val name  : scope -> EcIdent.t
+val env   : scope -> EcEnv.env
+val attop : scope -> bool
 
 module Op : sig
   (* [add scope op] type-checks the given *parsed* operator [op] in
@@ -65,7 +67,7 @@ module Ty : sig
 end
 
 module Mod : sig
-  (* [add scope x m] chekc the module [n] and add it to the scope
+  (* [add scope x m] check the module [n] and add it to the scope
    * [scope] with name [x]. Can raise any exception triggered by the
    * type-checker or [DuplicatedNameInContext] in case a module with
    * name [x] already exists *)
@@ -83,7 +85,9 @@ end
 module Theory : sig
   exception TopScope
 
-  (* [enter scope name] start a (sub-)theory in scope [scope] with
+  val loaded : scope -> string -> bool
+
+  (* [enter scope name] start a theory in scope [scope] with
    * name [name]. *)
   val enter : scope -> symbol -> scope
 
@@ -100,4 +104,10 @@ module Theory : sig
    *  by current theory in scope [scope]. Raise [LookupFailure] if
    *  theory [theory] cannot be found. *)
   val export : scope -> qsymbol -> scope
+
+  (* [require scope name loader] requires theory [name] using
+   * loader [loader] in scope [scope]. [loader] is called on
+   * the initial scope and is in charge of processing the required
+   * theory. *)
+  val require : scope -> symbol -> (scope -> scope) -> scope
 end

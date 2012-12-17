@@ -75,13 +75,12 @@ and process_th_require (scope : EcScope.scope) name =
   match EcLoader.locate name loader with
   | None -> failwith ("Cannot locate: " ^ name)
   | Some filename ->
-    (* FIXME: hackish *)
-    let commands = EcIo.parseall (EcIo.from_file filename) in
-    let scope =
-      List.fold_left
-        process (EcScope.Theory.enter scope name) commands
-    in
-      snd (EcScope.Theory.exit scope)
+      let loader iscope =
+        EcFormat.pp_err EcPrinting.pp_env (EcScope.env iscope);
+        let commands = EcIo.parseall (EcIo.from_file filename) in
+          List.fold_left process iscope commands
+      in
+        EcScope.Theory.require scope name loader
 
 (* -------------------------------------------------------------------- *)
 and process_th_import (scope : EcScope.scope) name =
@@ -93,31 +92,34 @@ and process_th_export (scope : EcScope.scope) name =
 
 (* -------------------------------------------------------------------- *)
 and process (scope : EcScope.scope) (g : global) =
-  match g with
-  | Gtype      t    -> process_type       scope t
-  | Gmodule    m    -> process_module     scope m
-  | Ginterface i    -> process_interface  scope i
-  | Goperator  o    -> process_operator   scope o
-  | Gpredicate p    -> process_predicate  scope p
-  | Gaxiom     a    -> process_axiom      scope a
-  | Gclaim     c    -> process_claim      scope c
-  | GthOpen    name -> process_th_open    scope name.pl_desc
-  | GthClose   name -> process_th_close   scope name.pl_desc
-  | GthRequire name -> process_th_require scope name.pl_desc
-  | GthImport  name -> process_th_import  scope name.pl_desc
-  | GthExport  name -> process_th_export  scope name.pl_desc
-  | Gprint     p    -> process_print      scope p; scope
-
+  let scope =
+    match g with
+    | Gtype      t    -> process_type       scope t
+    | Gmodule    m    -> process_module     scope m
+    | Ginterface i    -> process_interface  scope i
+    | Goperator  o    -> process_operator   scope o
+    | Gpredicate p    -> process_predicate  scope p
+    | Gaxiom     a    -> process_axiom      scope a
+    | Gclaim     c    -> process_claim      scope c
+    | GthOpen    name -> process_th_open    scope name.pl_desc
+    | GthClose   name -> process_th_close   scope name.pl_desc
+    | GthRequire name -> process_th_require scope name.pl_desc
+    | GthImport  name -> process_th_import  scope name.pl_desc
+    | GthExport  name -> process_th_export  scope name.pl_desc
+    | Gprint     p    -> process_print      scope p; scope
+  in
+    EcFormat.pp_err EcPrinting.pp_env (EcScope.env scope);
+    scope
 
 (* -------------------------------------------------------------------- *)
-let scope = ref (EcScope.initial EcCoreLib.top)
+let scope = ref EcScope.empty
 
 (* -------------------------------------------------------------------- *)
 let process (g : global) =
-  scope := process !scope g;
-  EcFormat.pp_err EcPrinting.pp_env (EcScope.env !scope)
+  scope := process !scope g
 
 (* -------------------------------------------------------------------- *)
+(*
 let process (g : global) =
   try
     process g
@@ -128,3 +130,4 @@ let process (g : global) =
         exn;
       raise Interrupted
   | e -> EcFormat.pp_err EcPexception.pp_exn e; raise e
+*)

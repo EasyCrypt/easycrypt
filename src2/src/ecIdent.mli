@@ -2,7 +2,13 @@
 open EcSymbols
 
 (* -------------------------------------------------------------------- *)
-type t  
+type ident = { 
+  id_symb : symbol;
+  id_tag  : int;
+}
+
+type t = ident
+
 val create : symbol -> t
 val fresh  : t -> t
 val name   : t -> symbol

@@ -5,9 +5,9 @@ open EcMaps
 
 (* -------------------------------------------------------------------- *)
 type ident = { 
-    id_symb : symbol;
-    id_tag  : int;
-  }
+  id_symb : symbol;
+  id_tag  : int;
+}
 
 let name x = x.id_symb
 let id_equal : ident -> ident -> bool = (==)
