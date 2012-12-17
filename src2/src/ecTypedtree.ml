@@ -67,7 +67,7 @@ let select_pred env name ue psig =
 
 (* -------------------------------------------------------------------- *)
 module TyPolicy = struct
-  module Mstr = EcMaps.StringMap
+  module Mstr = EcMaps.Mstr
       
   type t = {
       typ_decl   : EcIdent.t list; (* in reverse order *)
@@ -676,18 +676,18 @@ module Fenv = struct
 
   type fenv = {
       fe_locals : (EcIdent.t * ty) EcIdent.Map.t; 
-      fe_envs : EcEnv.env EcMaps.IntMap.t;
+      fe_envs : EcEnv.env EcMaps.Mint.t;
       fe_cur : int
     }
 
   let mono_fenv env = {
     fe_locals = EcIdent.Map.empty;
-    fe_envs = EcMaps.IntMap.add 0 env EcMaps.IntMap.empty;
+    fe_envs = EcMaps.Mint.add 0 env EcMaps.Mint.empty;
     fe_cur = 0;
   }
 
   let mono fenv = 
-    try EcMaps.IntMap.find 0 fenv.fe_envs
+    try EcMaps.Mint.find 0 fenv.fe_envs
     with _ -> assert false 
 
   let bind_local fenv x ty =
@@ -697,11 +697,11 @@ module Fenv = struct
   let bind_locals = List.fold_left2 bind_local 
 
   let current_env fenv = 
-    try EcMaps.IntMap.find fenv.fe_cur fenv.fe_envs 
+    try EcMaps.Mint.find fenv.fe_cur fenv.fe_envs 
     with _ -> assert false (* FIXME *)
 
   let set_side fenv side = 
-    if EcMaps.IntMap.mem side fenv.fe_envs then
+    if EcMaps.Mint.mem side fenv.fe_envs then
       { fenv with fe_cur = side }
     else assert false (* FIXME *)
 

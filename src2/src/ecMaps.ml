@@ -3,42 +3,31 @@ open EcUtils
 
 (* -------------------------------------------------------------------- *)
 module Map = struct
-  module type OrderedType = Map.OrderedType
+  module type OrderedType = Why3.Stdlib.Map.OrderedType
 
   module type S = sig
-    include Map.S
+    include Why3.Stdlib.Map.S
 
-    val setdfl  : ('a option -> 'a) -> key -> 'a t -> 'a t
-    val update  : ('a -> 'a) -> key -> 'a t -> bool * 'a t
-    val tryfind : key -> 'a t -> 'a option
-    val get     : 'a -> key -> 'a t -> 'a 
-    val get_upd : (key -> 'a) -> key -> 'a t -> 'a * 'a t
-    val pp      : key EcFormat.pp -> 'a EcFormat.pp -> ('a t) EcFormat.pp
+    val update : ('a -> 'a) -> key -> 'a t -> 'a t
+    val to_stream : 'a t -> (key * 'a) Stream.t
+    val pp : key EcFormat.pp -> 'a EcFormat.pp -> ('a t) EcFormat.pp
   end
 
   module Make(O : OrderedType) : S with type key = O.t = struct
-    include Map.Make(O)
-
-    let tryfind (k : key) (m : 'a t) : 'a option =
-      try_nf (fun () -> find k m)
-
-    let setdfl f (k : key) (m : 'a t) =
-      add k (f (tryfind k m)) m
+    include Why3.Stdlib.Map.Make(O)
 
     let update f (k : key) (m : 'a t) =
-      match tryfind k m with
-      | None   -> (false, m)
-      | Some v -> (true , add k (f v) m)
+      change (omap^~ f) k m
 
-    let get def k m = 
-      try find k m with Not_found -> def
-
-    let get_upd f k m =
-      try find k m, m 
-      with Not_found ->
-        let r = f k in
-        let m = add k r m in
-        r, m
+    let to_stream (m : 'a t) =
+      let next =
+        let enum = ref (start_enum m) in
+          fun (_ : int) ->
+            let aout = val_enum !enum in
+              enum := next_enum !enum;
+              aout
+      in
+        Stream.from next
 
     let pp pp_key pp_value fmt m =
       let pp fmt (k, v) =
@@ -64,24 +53,30 @@ module Map = struct
 end
 
 (* -------------------------------------------------------------------- *)
-module StringOrdered = struct
-  type t = string
-
-  let compare = (Pervasives.compare : t -> t -> int)
+module MakeMSH (X : Why3.Stdlib.TaggedType) : sig
+  module M : Map.S with type key = X.t
+  module S : M.Set
+  module H : Why3.Exthtbl.Hashtbl.S with type key = X.t
+end = struct
+  module T = Why3.Stdlib.OrderedHashed(X)
+  module M = Map.Make(T)
+  module S = M.Set
+  module H = Why3.Exthtbl.Hashtbl.Make(T)
 end
-
-module StringSet = Set.Make(StringOrdered)
-module StringMap = Map.Make(StringOrdered)
 
 (* -------------------------------------------------------------------- *)
-module IntOrdered = struct
+module Int = struct
   type t = int
-
   let compare = (Pervasives.compare : t -> t -> int)
+  let equal (x : t) (y : t) = (x = y)
 end
 
-module IntSet = Set.Make(IntOrdered)
-module IntMap = Map.Make(IntOrdered)
+module Mint = Map.Make(Int)
+module Sint = Mint.Set
+
+(* -------------------------------------------------------------------- *)
+module Mstr = Map.Make(String)
+module Sstr = Mstr.Set
 
 (* -------------------------------------------------------------------- *)
 module PTree : sig

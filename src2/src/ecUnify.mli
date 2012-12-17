@@ -14,6 +14,7 @@ module UniEnv : sig
   val asmap   : unienv -> ty Muid.t
   val bind    : unienv -> uid -> ty -> unit
   val repr    : unienv -> ty -> ty
+  val dump    : EcDebug.ppdebug -> unienv -> unit
 end
 
 val unify : EcEnv.env -> unienv -> ty -> ty -> unit

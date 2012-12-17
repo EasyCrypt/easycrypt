@@ -264,3 +264,12 @@ module String = struct
     in
       split s []
 end
+
+(* -------------------------------------------------------------------- *)
+module Stream = struct
+  include Stream
+
+  let next_opt (stream : 'a Stream.t) =
+    try  Some (Stream.next stream)
+    with Stream.Failure -> None
+end

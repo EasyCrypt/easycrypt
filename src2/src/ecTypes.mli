@@ -6,7 +6,6 @@ open EcUidgen
 open EcIdent
 
 (* -------------------------------------------------------------------- *)
-
 type ty =
   | Tunivar of EcUidgen.uid
   | Tvar    of EcIdent.t 
@@ -19,13 +18,16 @@ type tysig = dom * ty
 type ty_decl = { td_params : EcIdent.t list; td_body : ty; }
 
 (* -------------------------------------------------------------------- *)
+val ty_dump : EcDebug.ppdebug -> ty -> unit
+
+(* -------------------------------------------------------------------- *)
 val tunit      : ty
 val tbool      : ty
 val tint       : ty
 val tbitstring : ty
-
 val tlist      : ty -> ty
 
+(* -------------------------------------------------------------------- *)
 val mkunivar : unit -> ty
 
 (* -------------------------------------------------------------------- *)

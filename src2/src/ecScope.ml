@@ -11,7 +11,7 @@ module IM = EcIdent.Map
 
 (* -------------------------------------------------------------------- *)
 module Context = struct
-  module SM = EcMaps.StringMap
+  module SM = EcMaps.Mstr
 
   module V : sig
     type 'a t
@@ -193,7 +193,10 @@ module Op = struct
             let body = TT.transexpcast env policy ue codom body in
             Some(xs, Esubst.uni (EcUnify.UniEnv.asmap ue) body) in
       body, ue in
-    let uni = Subst.uni (EcUnify.UniEnv.asmap ue) in 
+    let uni = Subst.uni (EcUnify.UniEnv.asmap ue) in
+
+      EcUnify.UniEnv.dump EcDebug.initial ue;
+
     let dom, codom = List.map uni dom, uni codom in
     let dom = if op.po_dom = None then None else Some dom in
     let tyop =

@@ -23,12 +23,21 @@ module UniEnv = struct
   let asmap (ue : unienv) =
     !ue
 
+  let dump pp (ue : unienv) =
+    let pp_binding pp (a, ty) =
+      EcDebug.onhlist pp (string_of_int a)
+        (EcTypes.ty_dump) [ty]
+    in
+      EcDebug.onhseq
+        pp "Unification Environment" pp_binding
+        (EcUidgen.Muid.to_stream !ue)
+
   let repr (ue : unienv) (t : ty) : ty = 
     match t with
-    | Tunivar id -> odfl t (Muid.tryfind id !ue)
+    | Tunivar id -> odfl t (Muid.find_opt id !ue)
     | _ -> t
 
-  let bind (ue : unienv) id t = 
+  let bind (ue : unienv) id t =
     match t with
     | Tunivar id' when uid_equal id id' -> ()
     | _ -> begin

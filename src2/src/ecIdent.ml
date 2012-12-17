@@ -9,14 +9,19 @@ type ident = {
   id_tag  : int;
 }
 
+(* -------------------------------------------------------------------- *)
 let name x = x.id_symb
+let tag  x = x.id_tag
+
+(* -------------------------------------------------------------------- *)
 let id_equal : ident -> ident -> bool = (==)
 let id_compare i1 i2 = i2.id_tag - i1.id_tag 
 let id_hash id = id.id_tag 
 
-module MSH = Why3.Stdlib.MakeMSH (struct type t = ident let tag = id_hash end)
+module MSH = EcMaps.MakeMSH (struct type t = ident let tag = id_hash end)
 
-module Mid = struct 
+(* -------------------------------------------------------------------- *)
+module Mid = struct
   include MSH.M 
 
   let pp pp_key pp_value fmt m =
@@ -36,16 +41,21 @@ module Mid = struct
       Format.fprintf fmt "{@,@[<v 2>  %a@]@,}" (fun fmt -> iter pp) m
 end
 
+(* -------------------------------------------------------------------- *)
 module Sid = MSH.S
 module Hid = MSH.H
 
-type t     = ident
+(* -------------------------------------------------------------------- *)
+type t = ident
 
 let create (x : symbol) = 
   { id_symb = x;
     id_tag  = EcUidgen.unique () }
 
 let fresh (id : t) = create (name id)
+
+let tostring (id : t) =
+  Printf.sprintf "%s/%d" id.id_symb id.id_tag
 
 (* -------------------------------------------------------------------- *)
 module Map = struct
@@ -56,18 +66,18 @@ module Map = struct
     SymMap.empty
 
   let add (id : key) (v : 'a) (m : 'a t) =
-    SymMap.setdfl (fun p -> (id, v) :: (odfl [] p)) (name id) m
+    SymMap.change (fun p -> Some ((id, v) :: (odfl [] p))) (name id) m
 
   let byident (id : key) (m : 'a t) =
-    obind (SymMap.tryfind (name id) m) (List.tryassoc_eq id_equal id)
+    obind (SymMap.find_opt (name id) m) (List.tryassoc_eq id_equal id)
 
   let byname (x : symbol) (m : 'a t) =
-    match SymMap.tryfind x m with
+    match SymMap.find_opt x m with
     | None | Some []     -> None
     | Some (idv :: _) -> Some idv 
 
   let allbyname (x : symbol) (m : 'a t) =
-    odfl [] (SymMap.tryfind x m)
+    odfl [] (SymMap.find_opt x m)
 
   let update (id : key) (f : 'a -> 'a) (m : 'a t) =
     let rec update1 (xs : (key * 'a) list) =
@@ -76,10 +86,9 @@ module Map = struct
       | (id', v) :: xs when id_equal id id' -> (id', f v) :: xs
       | x :: xs -> x :: (update1 xs)
     in
-    let n = name id in
-    if SymMap.mem n m then
-      SymMap.setdfl (function None -> [] | Some xs -> update1 xs) n m
-    else m
+      SymMap.change
+        (omap^~ (fun xs -> update1 xs))
+        (name id) m
 
    let merge m1 m2 = 
      SymMap.merge 
@@ -109,4 +118,5 @@ module Map = struct
        SymMap.pp pp_key pp fmt m
 end
 
+(* -------------------------------------------------------------------- *)
 let pp_ident fmt id = Format.fprintf fmt "%s" (name id)

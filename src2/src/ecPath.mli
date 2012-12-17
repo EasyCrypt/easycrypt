@@ -16,6 +16,7 @@ val basename  : path -> EcIdent.t
 val rootname  : path -> EcIdent.t
 val extend    : path option -> EcIdent.t -> path
 val tolist    : path -> EcIdent.t list 
+val tostring  : path -> string
 
 (* -------------------------------------------------------------------- *)
 module Mp : Map.S with type key = path

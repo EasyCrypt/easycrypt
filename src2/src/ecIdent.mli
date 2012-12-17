@@ -2,17 +2,20 @@
 open EcSymbols
 
 (* -------------------------------------------------------------------- *)
-type ident = { 
+type ident = private {
   id_symb : symbol;
   id_tag  : int;
 }
 
 type t = ident
 
-val create : symbol -> t
-val fresh  : t -> t
-val name   : t -> symbol
+val create   : symbol -> t
+val fresh    : t -> t
+val name     : t -> symbol
+val tag      : t -> int
+val tostring : t -> string
 
+(* -------------------------------------------------------------------- *)
 val id_equal : t -> t -> bool
 val id_compare : t -> t -> int 
 val id_hash : t -> int
@@ -43,5 +46,4 @@ module Map : sig
 end
 
 (* -------------------------------------------------------------------- *)
-
 val pp_ident : t EcFormat.pp

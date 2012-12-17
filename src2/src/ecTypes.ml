@@ -16,9 +16,27 @@ type dom = ty list
 type tysig = dom * ty 
 
 type ty_decl = {
-    td_params : EcIdent.t list;
-    td_body   : ty
-  }
+  td_params : EcIdent.t list;
+  td_body   : ty
+}
+
+(* -------------------------------------------------------------------- *)
+let ty_dump pp =
+  let rec ty_dump pp = function
+    | Tunivar i ->
+        EcDebug.single pp ~extra:(string_of_int i) "Tunivar"
+
+    | Tvar a ->
+        EcDebug.single pp ~extra:(EcIdent.tostring a) "Tvar"
+
+    | Ttuple tys ->
+        EcDebug.onhlist pp "Ttuple" ty_dump tys
+
+    | Tconstr (p, tys) ->
+        let strp = EcPath.tostring p in
+          EcDebug.onhlist pp ~extra:strp "Tconstr" ty_dump tys
+  in
+    fun ty -> ty_dump pp ty
 
 (* -------------------------------------------------------------------- *)
 let tunit      = Tconstr(EcCoreLib.p_unit, [])
@@ -63,7 +81,7 @@ module Subst = struct
 
   let uni (uidmap : ty EcUidgen.Muid.t) =
     let rec uni = function
-      | (Tunivar id) as t -> odfl t (EcUidgen.Muid.tryfind id uidmap)
+      | (Tunivar id) as t -> odfl t (EcUidgen.Muid.find_opt id uidmap)
       | t -> map uni t
     in
       fun t -> uni t
@@ -86,7 +104,7 @@ let full_inst_uni s =
 let inst_uni s = 
   let rec subst t = 
     match t with
-    | Tunivar id -> Muid.get t id s 
+    | Tunivar id -> odfl t (Muid.find_opt id s )
     | _ -> map subst t in
   subst 
 
@@ -170,4 +188,3 @@ module Esubst = struct
     let rec aux e = e_map (Subst.uni uidmap) aux e in
       aux
 end
-
