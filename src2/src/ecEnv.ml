@@ -208,21 +208,6 @@ module MC = struct
   let rec mc_of_module (_env : env) (_ : tymod) =
     emcomponents                        (* FIXME *)
 
-  let mc_of_theory_item path (env, mc) = function 
-    | Th_type     (id, td) -> env, mc_bind_typedecl (EcPath.Pqname (path, id)) td mc
-    | Th_operator (id, op) -> env, mc_bind_op (EcPath.Pqname (path, id)) op mc
-    | Th_axiom    (id, ax) -> env, mc_bind_ax (EcPath.Pqname (path, id)) ax mc
-    | Th_modtype  (id, tm) -> env, mc_bind_modtype (EcPath.Pqname (path, id)) tm mc
-    | Th_module   m        -> env, mc_bind_module (EcPath.Pqname (path, m.me_name)) m.me_sig mc
-    | Th_theory   (id, th) -> env, mc_bind_theory (EcPath.Pqname (path, id)) th mc
-    | Th_export   _        -> env, mc
-
-  let mc_of_theory (env : env) (name : EcIdent.t) (theory : theory) =
-    List.fold_left
-      (mc_of_theory_item (EcPath.Pqname (env.env_scope, name)))
-      (env, emcomponents)
-      theory
-
   (* ------------------------------------------------------------------ *)
   let bind env binder name obj =
     let path   = EcPath.Pqname (env.env_scope, name) in
@@ -255,35 +240,63 @@ module MC = struct
         env_comps = Mid.add name (path, comps) env.env_comps }
 
   (* ------------------------------------------------------------------ *)
-  let bind_variable x ty env =
+  let rec bind_variable x ty env =
     bind env mc_bind_variable x ty
 
-  let bind_function x fsig env =
+  and bind_function x fsig env =
     bind env mc_bind_function x fsig
 
-  let bind_module x tymod env =
+  and bind_module x tymod env =
     let comps = mc_of_module env tymod in
     let env   = bind env mc_bind_module x tymod in
     let env   = bind_mc env x comps in
       env
 
-  let bind_modtype x tymod env =
+  and bind_modtype x tymod env =
     bind env mc_bind_modtype x tymod
 
-  let bind_typedecl x tydecl env =
+  and bind_typedecl x tydecl env =
     bind env mc_bind_typedecl x tydecl
 
-  let bind_op x op env =
+  and bind_op x op env =
     bind env mc_bind_op x op
 
-  let bind_ax x ax env =
+  and bind_ax x ax env =
     bind env mc_bind_ax x ax
 
-  let bind_theory x th env =
+  and bind_theory x th env =
     let env, comps = mc_of_theory env x th in
     let env = bind env mc_bind_theory x th in
     let env = bind_mc env x comps in
       env
+
+  and mc_of_theory =
+    let rec mc_of_theory_item path (env, mc) = function 
+      | Th_type     (id, td) -> env, mc_bind_typedecl (EcPath.Pqname (path, id)) td mc
+      | Th_operator (id, op) -> env, mc_bind_op (EcPath.Pqname (path, id)) op mc
+      | Th_axiom    (id, ax) -> env, mc_bind_ax (EcPath.Pqname (path, id)) ax mc
+      | Th_modtype  (id, tm) -> env, mc_bind_modtype (EcPath.Pqname (path, id)) tm mc
+      | Th_module   m        -> env, mc_bind_module (EcPath.Pqname (path, m.me_name)) m.me_sig mc
+      | Th_export   _        -> env, mc
+      | Th_theory   (id, th) ->
+          let env, submc =
+            List.fold_left
+              (mc_of_theory_item (EcPath.Pqname (path, id)))
+              (env, emcomponents) th
+          and subpath = EcPath.Pqname (path, id) in
+  
+          let env =
+            let comps = env.env_comps in
+            let comps = Mid.add id (subpath, submc) comps in
+              { env with env_comps = comps }
+          in
+            (env, mc_bind_comp subpath (mc_bind_theory subpath th mc))
+    in
+      fun (env : env) (name : EcIdent.t) (theory : theory) ->
+        List.fold_left
+          (mc_of_theory_item (EcPath.Pqname (env.env_scope, name)))
+          (env, emcomponents)
+          theory
 end
 
 (* -------------------------------------------------------------------- *)
