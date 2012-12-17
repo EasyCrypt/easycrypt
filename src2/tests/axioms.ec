@@ -19,6 +19,6 @@ axiom toto : forall (x:int), eq1 ( plus1(x,x), 0).
 end ARITH.
 
 theory TEST3.
-  axiom toto : forall (x:int), ARITH:>eq1 ( ARITH:>plus1(x,x), 0). 
+  axiom toto : forall (x:int), ARITH.eq1 ( ARITH.plus1(x,x), 0). 
 end TEST3.  
 

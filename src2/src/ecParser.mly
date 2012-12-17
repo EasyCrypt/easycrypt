@@ -75,7 +75,6 @@
 // %token EQUIV
 %token EXIST
 %token EXPORT
-%token FALSE
 %token FORALL
 %token FUN
 %token IF
@@ -123,7 +122,6 @@
 %token THEN
 %token THEORY
 // %token TILD
-%token TRUE
 %token TYPE
 // %token UNSET
 // %token UPTO
@@ -250,12 +248,6 @@ lpattern:
 ;
 
 sexp:
-| TRUE
-    { PEbool true  }
-
-| FALSE
-    { PEbool false }
-
 | n=number
    { PEint n }
 
@@ -340,12 +332,6 @@ exp:
 (* Formulas                                                             *)
 
 sform:
-| TRUE
-    { PFbool true  }
-
-| FALSE
-    { PFbool false }
-
 | n=number
    { PFint n }
 
@@ -376,24 +362,21 @@ sform:
 form:
 | e=sform { e }
 
-| NOT e=loc(form)
-   { PFnot e }
+| op=loc(NOT) e=loc(form) { PFapp (pqsymb_of_symb op.pl_loc "!", [e]) }
 
 | op=loc(MINUS) e=loc(form) %prec prec_prefix_op
    { PFapp (pqsymb_of_symb op.pl_loc "-", [e]) }
-
-| e1=loc(form)    loc(IMPL ) e2=loc(form)  { PFbinop (e1, PPimp, e2) }
-| e1=loc(form)    loc(IFF  ) e2=loc(form)  { PFbinop (e1, PPiff, e2) }
-| e1=loc(form)    loc(OR   ) e2=loc(form)  { PFbinop (e1, PPor, e2)  }
-| e1=loc(form)    loc(AND  ) e2=loc(form)  { PFbinop (e1, PPand, e2) }
-
 | e1=loc(form) op=loc(OP1  ) e2=loc(form)  { PFapp (pqsymb_of_psymb op, [e1; e2]) }
 | e1=loc(form) op=loc(OP2  ) e2=loc(form)  { PFapp (pqsymb_of_psymb op, [e1; e2]) }
 | e1=loc(form) op=loc(OP3  ) e2=loc(form)  { PFapp (pqsymb_of_psymb op, [e1; e2]) }
 | e1=loc(form) op=loc(OP4  ) e2=loc(form)  { PFapp (pqsymb_of_psymb op, [e1; e2]) }
+| e1=loc(form) op=loc(IMPL ) e2=loc(form)  { PFapp (pqsymb_of_symb op.pl_loc "=>" , [e1; e2]) }
+| e1=loc(form) op=loc(IFF  ) e2=loc(form)  { PFapp (pqsymb_of_symb op.pl_loc "<=>", [e1; e2]) }
+| e1=loc(form) op=loc(OR   ) e2=loc(form)  { PFapp (pqsymb_of_symb op.pl_loc "||" , [e1; e2]) }
+| e1=loc(form) op=loc(AND  ) e2=loc(form)  { PFapp (pqsymb_of_symb op.pl_loc "&&" , [e1; e2]) }
+| e1=loc(form) op=loc(EQ   ) e2=loc(form)  { PFapp (pqsymb_of_symb op.pl_loc "="  , [e1; e2]) }
+| e1=loc(form) op=loc(NE   ) e2=loc(form)  { PFapp (pqsymb_of_symb op.pl_loc "<>" , [e1; e2]) }
 
-| e1=loc(form) op=loc(EQ   ) e2=loc(form)  { PFapp (pqsymb_of_symb op.pl_loc "=" , [e1; e2]) }
-| e1=loc(form) op=loc(NE   ) e2=loc(form)  { PFapp (pqsymb_of_symb op.pl_loc "<>", [e1; e2]) }
 | e1=loc(form) op=loc(MINUS) e2=loc(form)  { PFapp (pqsymb_of_symb op.pl_loc "-" , [e1; e2]) }
 | e1=loc(form) op=loc(STAR ) e2=loc(form)  { PFapp (pqsymb_of_symb op.pl_loc "*" , [e1; e2]) }
 

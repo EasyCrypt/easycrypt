@@ -5,12 +5,8 @@ open EcIdent
 open EcPath
 open EcUidgen
 (* -------------------------------------------------------------------- *)
-type tybase = Tunit | Tbool | Tint | Treal | Tbitstring
-
-let tyb_equal : tybase -> tybase -> bool = (==)
 
 type ty =
-  | Tbase   of tybase
   | Tunivar of EcUidgen.uid
   | Tvar    of EcIdent.t
   | Ttuple  of ty list
@@ -25,36 +21,34 @@ type ty_decl = {
   }
 
 (* -------------------------------------------------------------------- *)
-let tunit      () = Tbase Tunit
-let tbool      () = Tbase Tbool
-let tint       () = Tbase Tint
-let tbitstring () = Tbase Tbitstring
-
-let tbitstring () = Tbase Tbitstring
+let tunit      = Tconstr(EcCoreLib.p_unit, [])
+let tbool      = Tconstr(EcCoreLib.p_bool, [])
+let tint       = Tconstr(EcCoreLib.p_int , [])
+let tbitstring = Tconstr(EcCoreLib.p_bitstring, [])
 
 let tlist ty =
-  Tconstr (EcCoreLib.list, [ ty ])
+  Tconstr (EcCoreLib.p_list, [ ty ])
 
 let tmap domty codomty =
-  Tconstr (EcCoreLib.map, [ domty; codomty ])
+  Tconstr (EcCoreLib.p_map, [ domty; codomty ])
 
 (* -------------------------------------------------------------------- *)
 let mkunivar () = Tunivar (EcUidgen.unique ())
 
 let map f t = 
   match t with 
-  | Tbase _ | Tunivar _ | Tvar _ -> t
+  | Tunivar _ | Tvar _ -> t
   | Ttuple lty -> Ttuple (List.map f lty)
   | Tconstr(p, lty) -> Tconstr(p, List.map f lty)
 
 let fold f s = function
-  | Tbase _ | Tunivar _ | Tvar _ -> s
+  | Tunivar _ | Tvar _ -> s
   | Ttuple lty -> List.fold_left f s lty
   | Tconstr(_, lty) -> List.fold_left f s lty
 
 let sub_exists f t =
   match t with
-  | Tbase _ | Tunivar _ | Tvar _ -> false
+  | Tunivar _ | Tvar _ -> false
   | Ttuple lty -> List.exists f lty
   | Tconstr (p, lty) -> List.exists f lty
 
@@ -139,8 +133,6 @@ type lpattern =
   | LTuple  of EcIdent.t list
 
 type tyexpr =
-  | Eunit                                         (* unit literal       *)
-  | Ebool     of bool                             (* bool literal       *)
   | Eint      of int                              (* int. literal       *)
   | Eflip                                         (* flip               *)
   | Einter    of tyexpr * tyexpr                  (* interval sampling  *)
@@ -161,7 +153,7 @@ let ids_of_lpattern = function
 
 let e_map ft fe e = 
   match e with 
-  | Eunit | Ebool _ | Eint _ | Eflip -> e 
+  | Eint _ | Eflip -> e 
   | Elocal (id, ty)       -> Elocal (id, ft ty)
   | Evar (id, ty)         -> Evar (id, ft ty)
   | Eapp (p, args, ty)    -> Eapp (p, List.map fe args, ft ty)

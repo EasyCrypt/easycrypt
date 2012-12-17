@@ -48,8 +48,6 @@ let unify (env : EcEnv.env) (ue : unienv) =
 
     | Tunivar id, t | t, Tunivar id -> UniEnv.bind ue id t
 
-    | Tbase b1, Tbase b2 when tyb_equal b1 b2 -> ()
-
     | Ttuple lt1, Ttuple lt2 ->
         if List.length lt1 <> List.length lt2 then 
           raise (UnificationFailure (t1, t2));

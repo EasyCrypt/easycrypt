@@ -67,8 +67,6 @@ and pty_r =
   | PTapp       of pqsymbol * pty list
 
 and pexpr_r =
-  | PEunit                                  (* unit literal       *)
-  | PEbool     of bool                      (* bool literal       *)
   | PEflip                                  (* flip               *)
   | PEinter    of pexpr * pexpr             (* interval sampling  *)
   | PEbitstr   of pexpr                     (* bitstring sampling *)
@@ -167,23 +165,13 @@ type ptydecl = {
 (* -------------------------------------------------------------------- *)
 type ptylocals = (psymbol * pty) list
 
-type pbinop =
-  | PPand
-  | PPor
-  | PPimp
-  | PPiff
-
 type pformula = pformula_r located
 
 and pformula_r = 
-  | PFunit                                (* unit literal      *)
-  | PFbool   of bool                      (* bool literal      *)
   | PFint    of int                       (* int. literal      *)
   | PFtuple  of pformula list             (* tuple             *)
   | PFident  of pqsymbol                  (* symbol            *)
   | PFside   of pformula * side         
-  | PFnot    of pformula 
-  | PFbinop  of pformula * pbinop * pformula
   | PFapp    of pqsymbol * pformula list
   | PFif     of pformula * pformula * pformula
   | PFlet    of lpattern * pformula * pformula

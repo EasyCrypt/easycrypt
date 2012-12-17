@@ -68,8 +68,8 @@ let emcomponents = {
 
 (* -------------------------------------------------------------------- *)
 let empty =
-  let path = EcPath.Pident EcPath.id_top
-  and name = EcPath.id_top in
+  let path = EcPath.Pident EcCoreLib.id_top
+  and name = EcCoreLib.id_top in
   let env  =
     { env_scope = path;
       env_root  = { emcomponents with mc_components = IM.add name () IM.empty };
@@ -635,6 +635,7 @@ module Ident = struct
 end
 
 (* -------------------------------------------------------------------- *)
+
 let import_w3 env th rd = 
   let lth, rbi = EcWhy3.import_w3 env.env_w3 env.env_scope th rd in
   let env = { env with env_w3 = EcWhy3.rebind env.env_w3 [rbi];
@@ -654,28 +655,34 @@ let import_w3_dir env dir name rd =
 (* -------------------------------------------------------------------- *)
 let initial = 
   let env0 = empty in
-  let env = enter_id EcPath.id_pervasive env0 in
+  let env = enter_id EcCoreLib.id_pervasive env0 in
   let bool_rn = [
-    ["bool"] , EcWhy3.RDts, EcPath.basename EcPath.p_bool;
-    ["True"] , EcWhy3.RDls, EcPath.basename EcPath.p_true;
-    ["False"], EcWhy3.RDls, EcPath.basename EcPath.p_false ] in
+    ["bool"] , EcWhy3.RDts, EcPath.basename EcCoreLib.p_bool;
+    ["True"] , EcWhy3.RDls, EcPath.basename EcCoreLib.p_true;
+    ["False"], EcWhy3.RDls, EcPath.basename EcCoreLib.p_false ] in
   let env = import_w3 env Why3.Theory.bool_theory bool_rn in
   let opb_rn = [
-    ["andb"] , EcWhy3.RDls, EcPath.basename EcPath.p_and;
-    ["orb"]  , EcWhy3.RDls, EcPath.basename EcPath.p_or;
-    ["implb"], EcWhy3.RDls, EcPath.basename EcPath.p_imp;
-    ["notb"] , EcWhy3.RDls, EcPath.basename EcPath.p_not ] in 
+    ["andb"] , EcWhy3.RDls, EcPath.basename EcCoreLib.p_and;
+    ["orb"]  , EcWhy3.RDls, EcPath.basename EcCoreLib.p_or;
+    ["implb"], EcWhy3.RDls, EcPath.basename EcCoreLib.p_imp;
+    ["notb"] , EcWhy3.RDls, EcPath.basename EcCoreLib.p_not ] in 
   let env = import_w3_dir env ["bool"] "Bool" opb_rn in
+  let env = Op.bind (EcPath.basename EcCoreLib.p_iff)
+      { op_params = [];
+        op_dom    = Some [EcTypes.tbool;EcTypes.tbool];
+        op_codom  = Some EcTypes.tbool;
+        op_body   = None;
+        op_prob   = false } env in
   let builtin_rn = [
-    ["int"] , EcWhy3.RDts, EcPath.basename EcPath.p_int;
-    ["real"], EcWhy3.RDts, EcPath.basename EcPath.p_real ] in
+    ["int"] , EcWhy3.RDts, EcPath.basename EcCoreLib.p_int;
+    ["real"], EcWhy3.RDts, EcPath.basename EcCoreLib.p_real;
+    ["infix ="], EcWhy3.RDls, EcPath.basename EcCoreLib.p_eq 
+  ] in
   let env = import_w3 env Why3.Theory.builtin_theory builtin_rn in
   let cth = Theory.close env in
-  let env1 = Theory.bind EcPath.id_pervasive cth env0 in
-  let env1 = Theory.import EcPath.p_pervasive env1 in
+  let env1 = Theory.bind EcCoreLib.id_pervasive cth env0 in
+  let env1 = Theory.import EcCoreLib.p_pervasive env1 in
   env1
-
-let p_eq = fst (Op.lookup ([], "infix =") initial) 
 
 (* -------------------------------------------------------------------- *)
 type ebinding = [

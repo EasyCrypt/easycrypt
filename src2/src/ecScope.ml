@@ -370,7 +370,6 @@ module Theory = struct
       let imported = enter (root scope) name in
       let thname   = imported.sc_name in
       let imported = loader imported in
-
         if imported.sc_name <> thname then
           failwith "end-of-theory in required library";
 
@@ -383,3 +382,4 @@ module Theory = struct
             sc_required = IM.add thname theory scope.sc_required; }
     end
 end
+

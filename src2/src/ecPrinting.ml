@@ -40,12 +40,6 @@ let pp_path_in_env _env fmt id =       (* FIXME *)
 (* -------------------------------------------------------------------- *)
 let pp_type (uidmap : NameGen.t) =
   let rec pp_type btuple fmt = function
-    | Tbase Tunit      -> Format.fprintf fmt "unit"
-    | Tbase Tbool      -> Format.fprintf fmt "bool"
-    | Tbase Tint       -> Format.fprintf fmt "int"
-    | Tbase Treal      -> Format.fprintf fmt "real"
-    | Tbase Tbitstring -> Format.fprintf fmt "bitstring"
-
     | Ttuple tys ->
         let pp = if btuple then pp_paren else pp_id in
           pp (pp_list ~sep:(~$"*") (pp_type true))

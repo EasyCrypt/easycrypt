@@ -6,12 +6,8 @@ open EcUidgen
 open EcIdent
 
 (* -------------------------------------------------------------------- *)
-type tybase = Tunit | Tbool | Tint | Treal | Tbitstring
-
-val tyb_equal : tybase -> tybase -> bool
 
 type ty =
-  | Tbase   of tybase
   | Tunivar of EcUidgen.uid
   | Tvar    of EcIdent.t 
   | Ttuple  of ty list
@@ -23,13 +19,13 @@ type tysig = dom * ty
 type ty_decl = { td_params : EcIdent.t list; td_body : ty; }
 
 (* -------------------------------------------------------------------- *)
-val tunit      : unit -> ty
-val tbool      : unit -> ty
-val tint       : unit -> ty
-val tbitstring : unit -> ty
+val tunit      : ty
+val tbool      : ty
+val tint       : ty
+val tbitstring : ty
 
-val tlist : ty -> ty
-val tmap  : ty -> ty -> ty
+val tlist      : ty -> ty
+val tmap       : ty -> ty -> ty
 
 val mkunivar : unit -> ty
 
@@ -72,8 +68,6 @@ type lpattern =
   | LTuple  of EcIdent.t list
 
 type tyexpr =
-  | Eunit                                         (* unit literal       *)
-  | Ebool     of bool                             (* bool literal       *)
   | Eint      of int                              (* int. literal       *)
   | Eflip                                         (* flip               *)
   | Einter    of tyexpr * tyexpr                  (* interval sampling  *)

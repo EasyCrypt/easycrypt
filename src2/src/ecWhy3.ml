@@ -163,11 +163,23 @@ module Renaming = struct
       let id = ts.Ty.ts_name in
       EcIdent.create (w3_id_string id)
 
+  let remove_infix s =
+    let len = String.length s in
+    if len < 7 then s else
+    let inf = String.sub s 0 6 in
+    if inf = "infix "  then String.sub s 6 (len - 6) else
+    let prf = String.sub s 0 7 in
+    if prf = "prefix " then String.sub s 7 (len - 7) else
+    if s = "mixfix []" then "get" else
+    if s = "mixfix [<-]" then "set" else 
+    s
+    
   let get_ls rn ls = 
     try Term.Mls.find ls rn.r_ls 
     with _ ->
       let id = ls.Term.ls_name in
-      EcIdent.create (w3_id_string id)
+      let s  = remove_infix (w3_id_string id) in
+      EcIdent.create s
 
 end
       
@@ -329,20 +341,12 @@ let trans_tv vm tv =
 
 (* ------------------------ Types -----------------------------------------*)
 
-let trans_tybase = function
-  | Tunit      -> Ty.ty_tuple []
-  | Tbool      -> Ty.ty_bool
-  | Tint       -> Ty.ty_int
-  | Treal      -> Ty.ty_real
-  | Tbitstring -> assert false
-
 let trans_pty env p = 
   try Mp.find p env.env_ty 
   with _ -> assert false
 
 let rec trans_ty env vm ty = 
   match ty with
-  | Tbase tb -> trans_tybase tb
   | Tunivar _ -> assert false
   | Tvar id -> Ty.ty_var (trans_tv vm id)
   | Ttuple tys -> Ty.ty_tuple (trans_tys env vm tys)
@@ -439,8 +443,47 @@ let bool_of_prop t =
   | _ -> 
       Term.t_if t Term.t_bool_true Term.t_bool_false 
 
-let trans_op env p = 
-  try Mp.find p env.env_op with _ -> assert false
+let force_bool t = 
+  if t.Term.t_ty = None then bool_of_prop t
+  else t
+
+type op_kind = 
+  | OK_true
+  | OK_false
+  | OK_not
+  | OK_and
+  | OK_or
+  | OK_imp
+  | OK_iff
+  | OK_eq
+  | OK_other 
+
+let op_kind = 
+  let l = [EcCoreLib.p_true, OK_true; EcCoreLib.p_false, OK_false;
+           EcCoreLib.p_not, OK_not; 
+           EcCoreLib.p_and, OK_and; EcCoreLib.p_or, OK_or; 
+           EcCoreLib.p_imp, OK_imp; EcCoreLib.p_iff, OK_iff;
+           EcCoreLib.p_eq, OK_eq] in
+  let m = List.fold_left (fun m (p,k) -> Mp.add p k m) Mp.empty l in
+  fun p -> try Mp.find p m with _ -> OK_other
+
+let trans_op env p args ty = 
+  match op_kind p, args with
+  | OK_true , []      -> Term.t_true
+  | OK_false, []      -> Term.t_false
+  | OK_not  , [e]     -> Term.t_not (force_prop e)
+  | OK_and  , [e1;e2] -> Term.t_and (force_prop e1) (force_prop e2)
+  | OK_or   , [e1;e2] -> Term.t_or  (force_prop e1) (force_prop e2)
+  | OK_imp  , [e1;e2] -> Term.t_implies (force_prop e1) (force_prop e2)
+  | OK_iff  , [e1;e2] -> Term.t_iff (force_prop e1) (force_prop e2)
+  | OK_eq   , [e1;e2] -> Term.t_equ (force_bool e1) (force_bool e2)
+  | OK_other, _ ->
+      let p = try Mp.find p env.env_op with _ -> assert false in
+      t_app p (List.map force_bool args) ty
+  | _       , _ -> assert false
+      
+
+
 
 exception RandExpr
 
@@ -451,8 +494,6 @@ let destr_ty_tuple t =
 
 let rec trans_expr env vm e =
   match e with
-  | Eunit  -> Term.t_tuple [] 
-  | Ebool b -> if b then Term.t_true else Term.t_false 
   | Eint n -> 
       let n = Term.ConstInt(Term.IConstDecimal (string_of_int n)) in
       Term.t_const n 
@@ -461,11 +502,10 @@ let rec trans_expr env vm e =
   | Evar(p,ty) -> 
       (* FIXME should assert false *)
       Term.t_app_infer (trans_pv env vm (p,ty) 0) [] 
-  | Eapp(p,args, ty) -> 
-      let p = trans_op env p in
+  | Eapp(p,args,ty) ->
       let ty = trans_ty env vm ty in
-      let args = List.map (trans_expr_b env vm) args in 
-      t_app p args ty
+      let args = List.map (trans_expr env vm) args in 
+      trans_op env p args ty 
   | Elet(lp,e1,e2) ->
       let e1 = trans_expr_b env vm e1 in
       begin match lp with
@@ -492,32 +532,14 @@ let rec trans_expr env vm e =
       let e3 = trans_expr env vm e3 in
       Term.t_if (force_prop e1) e2 e3 
 
-and trans_expr_b env vm e = 
-  let t = trans_expr env vm e in
-  if t.Term.t_ty = None then bool_of_prop t else t
+and trans_expr_b env vm e = force_bool (trans_expr env vm e)
 
-let trans_bop op t1 t2 = (* FIXME once asym Land and Lor *)
-  let t1 = force_prop t1 in
-  let t2 = force_prop t2 in
-  match op with
-  | Land -> Term.t_and_simp t1 t2
-  | Lor  -> Term.t_or_simp t1 t2 
-  | Limp -> Term.t_implies_simp t1 t2 
-  | Liff -> Term.t_iff_simp t1 t2 
-  
 let trans_quant = function
   | Lforall -> Term.Tforall
   | Lexists -> Term.Texists
 
 let rec trans_form env vm f =
   match f.f_node with
-  | Ftrue  -> Term.t_true
-  | Ffalse -> Term.t_false
-  | Fnot f -> Term.t_not_simp (trans_form env vm f)
-  | Fbinop(f1,op,f2) ->
-      let f1 = trans_form env vm f1 in
-      let f2 = trans_form env vm f2 in
-      trans_bop op f1 f2 
   | Fquant(q,b,f) ->
       let ids, tys = List.split b in
       let tys = trans_tys env vm tys in
@@ -546,7 +568,6 @@ let rec trans_form env vm f =
           let br = Term.t_close_branch pat f2 in
           Term.t_case f1 [br] 
       end
-  | Funit -> Term.t_tuple [] 
   | Fint n ->
       let n = Term.ConstInt(Term.IConstDecimal (string_of_int n)) in
       Term.t_const n 
@@ -554,16 +575,13 @@ let rec trans_form env vm f =
   | Fpvar(p,ty,s) ->  Term.t_app_infer (trans_pv env vm (p,ty) s) [] 
   | Fapp(p,args) ->
       let ty = trans_ty env vm f.f_ty in
-      let p = trans_op env p in
-      let args = List.map (trans_form_b env vm) args in 
-      t_app p args ty 
+      let args = List.map (trans_form env vm) args in 
+      trans_op env p args ty
   | Ftuple args ->
       let args = List.map (trans_form_b env vm) args in
       Term.t_tuple args
 
-and trans_form_b env vm f = 
-  let t = trans_form env vm f in
-  if t.Term.t_ty = None then bool_of_prop t else t
+and trans_form_b env vm f = force_bool (trans_form env vm f)
 
 let trans_op_body env vm ls = function
   | None -> Decl.create_param_decl ls 

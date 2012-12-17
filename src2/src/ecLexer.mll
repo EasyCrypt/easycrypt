@@ -21,9 +21,6 @@
     "exists"      , EXIST      ;        (* KW: prog *)
     "let"         , LET        ;        (* KW: prog *)
     "in"          , IN         ;        (* KW: prog *)
-    "true"        , TRUE       ;        (* KW: prog *)
-    "false"       , FALSE      ;        (* KW: prog *)
-
     "var"         , VAR        ;        (* KW: prog *)
     "fun"         , FUN        ;        (* KW: prog *)
     "if"          , IF         ;        (* KW: prog *)

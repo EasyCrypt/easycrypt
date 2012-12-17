@@ -1,13 +1,30 @@
-(* -------------------------------------------------------------------- *)
-val top : EcSymbols.symbol
+(* --------------------------------------------------------------------- *)
+(*           predefined path                                             *)
+(* ----------------------------------------------------------------------*)
+open EcPath
+val id_top       : EcIdent.t
+val p_top        : path
+val id_pervasive : EcIdent.t
+val p_pervasive  : path
+val p_unit       : path
+val p_bool       : path
+val p_int        : path
+val p_real       : path
+val p_bitstring  : path
+val p_list       : path
+val p_map        : path    
 
-(* -------------------------------------------------------------------- *)
-val nil  : EcPath.path
-val cons : EcPath.path
-val list : EcPath.path
 
-(* -------------------------------------------------------------------- *)
-val get : EcPath.path
-val set : EcPath.path
-val map : EcPath.path
+
+val p_true       : path
+val p_false      : path
+
+val p_not        : path
+val p_and        : path
+val p_or         : path
+val p_imp        : path
+val p_iff        : path
+val p_eq         : path
+
+
 

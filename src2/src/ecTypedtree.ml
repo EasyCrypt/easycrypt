@@ -210,9 +210,7 @@ let transexp (env : EcEnv.env) (policy : epolicy) (ue : EcUnify.unienv) e =
     let loc = e.pl_loc in
 
     match e.pl_desc with
-    | PEunit   -> (Eunit  , tunit ())
-    | PEbool b -> (Ebool b, tbool ())
-    | PEint  i -> (Eint  i, tint  ())
+    | PEint  i -> (Eint  i, tint)
 
     | PEident { pl_desc = x } -> 
         begin match EcEnv.Ident.trylookup x env with
@@ -258,16 +256,16 @@ let transexp (env : EcEnv.env) (policy : epolicy) (ue : EcUnify.unienv) e =
       let c, tyc = transexp env policy pc in
       let e1, ty1 = transexp env policy pe1 in
       let e2, ty2 = transexp env policy pe2 in
-        unify_error env ue pc.pl_loc tyc (tbool());
+        unify_error env ue pc.pl_loc tyc tbool;
         unify_error env ue pe2.pl_loc ty2 ty1;
         Eif (c, e1, e2), ty1
 
-    | PEflip -> (Eflip, tbool ())
+    | PEflip -> (Eflip, tbool)
 
     | PEbitstr pe ->
         let e, ety = transexp env policy pe in
-          unify_error env ue pe.pl_loc ety (tint ());
-          (Ebitstr e, tbitstring ())
+          unify_error env ue pe.pl_loc ety tint;
+          (Ebitstr e, tbitstring)
 
     | PEexcepted (re, pe) ->
         let re, rety = transexp env policy re in
@@ -278,10 +276,9 @@ let transexp (env : EcEnv.env) (policy : epolicy) (ue : EcUnify.unienv) e =
     | PEinter (pe1, pe2) ->
         let e1, ty1 = transexp env policy pe1 in
         let e2, ty2 = transexp env policy pe2 in
-        let tint = tint () in
-          unify_error env ue pe1.pl_loc ty1 tint;
-          unify_error env ue pe2.pl_loc ty2 tint;
-          (Einter (e1, e2), tint)
+        unify_error env ue pe1.pl_loc ty1 tint;
+        unify_error env ue pe2.pl_loc ty2 tint;
+        (Einter (e1, e2), tint)
 
   in
     transexp env policy e               (* FIXME: close type *)
@@ -522,7 +519,7 @@ and transstruct1 (env : EcEnv.env) (st : pstructure_item) =
 
         let re, rty =
           match body.pfb_return with
-          | None    -> (None, tunit ())
+          | None    -> (None, tunit)
           | Some re ->
               let re, ty = transexp newenv epolicy ue re in
                 (Some re, ty)
@@ -598,7 +595,7 @@ and transinstr ue (env : EcEnv.env) (i : pinstr) =
 
   | PScall ({ pl_desc = name }, args) ->
       let (fpath, args, rty) = transcall name args in
-        EcUnify.unify env ue (tunit ()) rty;
+        EcUnify.unify env ue tunit rty;
         Scall (None, fpath, args)
 
   | PSif (e, s1, s2) ->
@@ -606,20 +603,20 @@ and transinstr ue (env : EcEnv.env) (i : pinstr) =
       let s1 = transstmt ue env s1 in
       let s2 = transstmt ue env s2 in
   
-        EcUnify.unify env ue ety (tbool ());
+        EcUnify.unify env ue ety tbool;
         Sif (e, s1, s2)
 
   | PSwhile (e, body) ->
       let e, ety = transexp env epolicy ue e in
       let body = transstmt ue env body in
 
-        EcUnify.unify env ue ety (tbool ());
+        EcUnify.unify env ue ety tbool;
         Swhile (e, body)
 
   | PSassert e ->
      let e, ety = transexp env epolicy ue e in
 
-       EcUnify.unify env ue ety (tbool ());
+       EcUnify.unify env ue ety tbool;
        Sassert e
 
 (* -------------------------------------------------------------------- *)
@@ -742,12 +739,6 @@ module Fenv = struct
 
 end
       
-let transbop = function
-  | PPand -> Land
-  | PPor -> Lor
-  | PPimp -> Limp
-  | PPiff -> Liff 
-
 let transl fenv tp decl = 
   let transl1 (fenv,ld,tp) ({ pl_desc = x },pty) =
     let ty,tp = transty (Fenv.mono fenv) tp pty in
@@ -770,8 +761,6 @@ let transformula fenv tp ue pf =
 
   let rec transf fenv tp f = 
     match f.pl_desc with
-    | PFunit -> f_unit
-    | PFbool b -> f_bool b
     | PFint n -> f_int n
     | PFtuple args -> f_tuple (List.map (transf fenv tp) args)
     | PFident { pl_desc = x } -> 
@@ -784,16 +773,6 @@ let transformula fenv tp ue pf =
     | PFside(f,side) ->
         let fenv = Fenv.set_side fenv side in
         transf fenv tp f
-    | PFnot pf -> 
-        let f = transf fenv tp pf in
-        unify_error (Fenv.mono fenv) ue pf.pl_loc f.f_ty (tbool());
-        f_not f
-    | PFbinop(pf1,op,pf2) ->
-        let f1 = transf fenv tp pf1 in
-        unify_error (Fenv.mono fenv) ue pf1.pl_loc f1.f_ty (tbool());
-        let f2 = transf fenv tp pf2 in
-        unify_error (Fenv.mono fenv) ue pf2.pl_loc f2.f_ty (tbool());
-        f_binop f1 (transbop op) f2
     | PFapp({ pl_desc = qs; pl_loc = loc }, es) ->
         let es   = List.map (transf fenv tp) es in
         let esig = List.map EcFol.ty es in 
@@ -807,7 +786,7 @@ let transformula fenv tp ue pf =
         end
     | PFif(pf1,f2,f3) ->
         let f1 = transf fenv tp pf1 in
-        unify_error (Fenv.mono fenv) ue pf1.pl_loc f1.f_ty (tbool());
+        unify_error (Fenv.mono fenv) ue pf1.pl_loc f1.f_ty tbool;
         let f2 = transf fenv tp f2 in
         let f3 = transf fenv tp f3 in
         f_if f1 f2 f3
@@ -820,15 +799,15 @@ let transformula fenv tp ue pf =
     | PFforall(xs, pf) ->
         let fenv, xs, tp = transl fenv tp xs in
         let f = transf fenv tp pf in
-        unify_error (Fenv.mono fenv) ue pf.pl_loc f.f_ty (tbool());
+        unify_error (Fenv.mono fenv) ue pf.pl_loc f.f_ty tbool;
         f_forall xs f
     | PFexists(xs, f1) ->
         let fenv, xs, tp = transl fenv tp xs in
         let f = transf fenv tp pf in
-        unify_error (Fenv.mono fenv) ue pf.pl_loc f.f_ty (tbool());
+        unify_error (Fenv.mono fenv) ue pf.pl_loc f.f_ty tbool;
         f_exists xs f in
   let f = transf fenv tp pf in
-  unify_error (Fenv.mono fenv) ue pf.pl_loc f.f_ty (tbool());
+  unify_error (Fenv.mono fenv) ue pf.pl_loc f.f_ty tbool;
   EcFol.Subst.uni (EcUnify.UniEnv.asmap ue) f, ue
 
 
