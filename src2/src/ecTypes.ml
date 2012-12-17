@@ -160,8 +160,13 @@ type tyexpr =
   | Etuple    of tyexpr list                      (* tuple constructor  *)
   | Eif       of tyexpr * tyexpr * tyexpr         (* _ ? _ : _          *)
 
-(* -------------------------------------------------------------------- *)
+let mk_var local p ty =
+  if local then
+    Elocal (EcPath.basename p, ty)
+   else
+    Evar (p, ty)
 
+(* -------------------------------------------------------------------- *)
 let ids_of_lpattern = function
   | LSymbol id -> [id] 
   | LTuple ids -> ids

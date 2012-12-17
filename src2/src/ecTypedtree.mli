@@ -38,7 +38,6 @@ module TyPolicy : sig
 end
 
 (* -------------------------------------------------------------------- *)
-
 val transty : EcEnv.env -> TyPolicy.t -> pty -> ty * TyPolicy.t
 val transtys : EcEnv.env -> TyPolicy.t -> pty list -> ty list * TyPolicy.t
 val transty_notv : EcEnv.env -> pty -> ty 
@@ -64,6 +63,7 @@ type epolicy = {
 val transexp : EcEnv.env -> epolicy -> EcUnify.unienv -> pexpr -> tyexpr * ty
 val transexpcast :
     EcEnv.env -> epolicy -> EcUnify.unienv -> ty -> pexpr -> tyexpr
+
 (* -------------------------------------------------------------------- *)
 module Fenv : sig 
   type fenv

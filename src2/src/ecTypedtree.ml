@@ -191,9 +191,9 @@ let transpattern1 (env : EcEnv.env) (p : EcParsetree.lpattern) =
 let transpattern (env : EcEnv.env) (p : EcParsetree.lpattern) =
   match transpattern1 env p with
   | LSymbol x as p, ty ->
-      EcEnv.Var.bind x ty env, p, ty
+      EcEnv.Var.bind x ty ~local:true env, p, ty
   | LTuple xs as p, (Ttuple lty as ty) ->
-      EcEnv.Var.bindall (List.combine xs lty) env, p, ty
+      EcEnv.Var.bindall (List.combine xs lty) ~local:true env, p, ty
   | _ -> assert false
 
 (* -------------------------------------------------------------------- *)
@@ -216,10 +216,10 @@ let transexp (env : EcEnv.env) (policy : epolicy) (ue : EcUnify.unienv) e =
         begin match EcEnv.Ident.trylookup x env with
         | Some (xpath, Some ty, kind) -> 
             begin match kind with
-            | `Var     -> (Evar (xpath, ty), ty)
-            | `Ctnt op -> 
+            | `Var local -> (mk_var local xpath ty, ty)
+            | `Ctnt op   -> 
                 let ty = EcTypes.freshen op.op_params ty in
-                (Eapp (xpath, [], ty), ty)
+                  (Eapp (xpath, [], ty), ty)
             end
         | _ -> tyerror loc (UnknownVariable x)
         end
@@ -412,7 +412,7 @@ and transstruct (env : EcEnv.env) (x : EcIdent.t) (st : pstructure) =
     let tydecl1 ((x, obj) : EcIdent.t * _) =
       match obj with
       | `Module   m -> (x, `Module   m.me_sig)
-      | `Variable v -> (x, `Variable v.v_type)
+      | `Variable v -> (x, `Variable (false, v.v_type))
       | `Function f -> (x, `Function f.f_sig)
     in
       List.fold_left
@@ -511,7 +511,7 @@ and transstruct1 (env : EcEnv.env) (st : pstructure_item) =
         (* Translate function body. *)
         let newenv =
           EcEnv.bindall
-            (List.map (fun (x, ty, _) -> (x, `Variable ty)) locals)
+            (List.map (fun (x, ty, _) -> (x, `Variable (true, ty))) locals)
             env
         in
 
@@ -623,7 +623,7 @@ and transinstr ue (env : EcEnv.env) (i : pinstr) =
 and translvalue ue (env : EcEnv.env) lvalue =
   match lvalue with
   | PLvSymbol { pl_desc = x } ->
-      let xpath, xty =
+      let xpath, { EcEnv.vb_type = xty } =
         try  EcEnv.Var.lookup x env
         with EcEnv.LookupFailure _ -> tyerror dloc (UnknownVariable x)
       in
@@ -631,7 +631,9 @@ and translvalue ue (env : EcEnv.env) lvalue =
 
   | PLvTuple xs -> begin
       let trans1 { pl_desc = x } =
-        try  EcEnv.Var.lookup x env
+        try
+          let (xpath, { EcEnv.vb_type = xty}) = EcEnv.Var.lookup x env in
+            (xpath, xty)
         with EcEnv.LookupFailure _ -> tyerror dloc (UnknownVariable x)
       in
     
@@ -643,7 +645,7 @@ and translvalue ue (env : EcEnv.env) lvalue =
 
   | PLvMap ({ pl_desc = x; pl_loc = loc }, e) ->
       let codomty = mkunivar () in
-      let xpath, xty =
+      let xpath, { EcEnv.vb_type = xty } =
         try  EcEnv.Var.lookup x env
         with EcEnv.LookupFailure _ -> tyerror dloc (UnknownVariable x)
       and e, ety = transexp env epolicy ue e in
@@ -705,15 +707,14 @@ module Fenv = struct
       { fenv with fe_cur = side }
     else assert false (* FIXME *)
 
- 
   module Ident = struct
     let trylookup_env fenv qs = 
       let env = current_env fenv in
       match EcEnv.Ident.trylookup qs env with
       | None -> None
-      | Some (xpath, Some ty, `Var    ) -> Some (Lprog (xpath, ty, fenv.fe_cur))
-      | Some (xpath, None, `Var    ) -> assert false 
-      | Some (xpath, ty, `Ctnt op) -> 
+      | Some (xpath, Some ty, `Var  _ ) -> Some (Lprog (xpath, ty, fenv.fe_cur))
+      | Some (xpath, None   , `Var  _ ) -> assert false 
+      | Some (xpath, ty     , `Ctnt op) -> 
           Some (Lctnt (xpath, omap ty (EcTypes.freshen op.op_params)))
 
     let trylookup_logical fenv s =

@@ -81,9 +81,12 @@ type tyexpr =
   | Etuple    of tyexpr list                      (* tuple constructor  *)
   | Eif       of tyexpr * tyexpr * tyexpr         (* _ ? _ : _          *)
 
+val mk_var : bool -> EcPath.path -> ty -> tyexpr
+
 (* -------------------------------------------------------------------- *)
 val e_map : (ty -> ty) -> (tyexpr -> tyexpr) -> tyexpr -> tyexpr
 val ids_of_lpattern : lpattern -> EcIdent.t list
+
 (* -------------------------------------------------------------------- *)
 module Esubst : sig
   val uni : ty Muid.t -> tyexpr -> tyexpr 

@@ -39,7 +39,7 @@ type preenv = {
 }
 
 and premc = {
-  mc_variables  : (EcPath.path * EcTypes.ty)        IM.t;
+  mc_variables  : (EcPath.path * varbind)           IM.t;
   mc_functions  : (EcPath.path * EcTypesmod.funsig) IM.t;
   mc_modules    : (EcPath.path * EcTypesmod.tymod)  IM.t;
   mc_modtypes   : (EcPath.path * EcTypesmod.tymod)  IM.t;
@@ -48,6 +48,11 @@ and premc = {
   mc_axioms     : (EcPath.path * EcDecl.axiom)      IM.t;
   mc_theories   : (EcPath.path * EcTypesmod.theory) IM.t;
   mc_components : unit IM.t;
+}
+
+and varbind = {
+  vb_type  : EcTypes.ty;
+  vb_local : bool;
 }
 
 type env = preenv
@@ -353,11 +358,20 @@ end
 (* -------------------------------------------------------------------- *)
 module Var = struct
   include BaseS(struct
-    type t = EcTypes.ty
+    type t = varbind
 
     let project mc = mc.mc_variables
     let bind = MC.bind_variable
   end)
+
+  let bind (x : EcIdent.t) (ty : EcTypes.ty) ?(local = false) (env : env) =
+    let vb = { vb_type = ty; vb_local = local } in
+      bind x vb env
+
+  let bindall xtys ?(local = false) (env : env) =
+    List.fold_left
+      (fun env (x, ty) -> bind x ty ~local env)
+      env xtys
 end
 
 (* -------------------------------------------------------------------- *)
@@ -612,13 +626,14 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Ident = struct
-  type idlookup_t = [`Var | `Ctnt of operator]
+  type idlookup_t = [`Var of bool | `Ctnt of operator]
 
   let trylookup (name : qsymbol) (env : env) =
     let for_var () =
       match Var.trylookup name env with
       | None -> None
-      | Some (p, ty) -> Some (p, Some ty, (`Var :> idlookup_t))
+      | Some (p, x) ->
+          Some (p, Some x.vb_type, (`Var x.vb_local :> idlookup_t))
 
     and for_op () =
       match Op.trylookup name env with
@@ -692,7 +707,7 @@ let initial =
 
 (* -------------------------------------------------------------------- *)
 type ebinding = [
-  | `Variable  of EcTypes.ty
+  | `Variable  of bool * EcTypes.ty
   | `Function  of funsig
   | `Module    of tymod
   | `ModType   of tymod
@@ -700,10 +715,10 @@ type ebinding = [
 
 let bind1 ((x, eb) : EcIdent.t * ebinding) (env : env) =
   match eb with
-  | `Variable ty -> Var   .bind x ty env
-  | `Function f  -> Fun   .bind x f  env
-  | `Module   m  -> Mod   .bind_s x m  env
-  | `ModType  i  -> ModTy .bind x i  env
+  | `Variable v -> Var   .bind   x (snd v) ~local:(fst v) env
+  | `Function f -> Fun   .bind   x f env
+  | `Module   m -> Mod   .bind_s x m env
+  | `ModType  i -> ModTy .bind   x i env
 
 let bindall (items : (EcIdent.t * ebinding) list) (env : env) =
   List.fold_left ((^~) bind1) env items  

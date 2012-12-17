@@ -15,7 +15,7 @@ type preenv = private {
 }
 
 and premc = private {
-  mc_variables  : (EcPath.path * EcTypes.ty)        EcIdent.Map.t;
+  mc_variables  : (EcPath.path * varbind)           EcIdent.Map.t;
   mc_functions  : (EcPath.path * EcTypesmod.funsig) EcIdent.Map.t;
   mc_modules    : (EcPath.path * EcTypesmod.tymod)  EcIdent.Map.t;
   mc_modtypes   : (EcPath.path * EcTypesmod.tymod)  EcIdent.Map.t;
@@ -24,6 +24,11 @@ and premc = private {
   mc_axioms     : (EcPath.path * EcDecl.axiom)      EcIdent.Map.t;
   mc_theories   : (EcPath.path * EcTypesmod.theory) EcIdent.Map.t;
   mc_components : unit EcIdent.Map.t;
+}
+
+and varbind = {
+  vb_type  : EcTypes.ty;
+  vb_local : bool;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -50,10 +55,17 @@ module type S = sig
 end
 
 (* -------------------------------------------------------------------- *)
-module Var   : S with type t = EcTypes.ty
 module Fun   : S with type t = funsig
 module Ax    : S with type t = axiom
 module ModTy : S with type t = tymod
+
+(* -------------------------------------------------------------------- *)
+module Var : sig
+  include S with type t = varbind
+
+  val bind : EcIdent.t -> EcTypes.ty -> ?local:bool -> env -> env
+  val bindall : (EcIdent.t * EcTypes.ty) list -> ?local:bool -> env -> env
+end
 
 (* -------------------------------------------------------------------- *)
 module Mod : sig
@@ -109,7 +121,7 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Ident : sig
-  type idlookup_t = [`Var | `Ctnt of operator]
+  type idlookup_t = [`Var of bool | `Ctnt of operator]
 
   val lookup    : 
       qsymbol -> env -> (EcPath.path * EcTypes.ty option * idlookup_t)
@@ -119,7 +131,7 @@ end
 
 (* -------------------------------------------------------------------- *)
 type ebinding = [
-  | `Variable  of EcTypes.ty
+  | `Variable  of bool * EcTypes.ty
   | `Function  of funsig
   | `Module    of tymod
   | `ModType   of tymod

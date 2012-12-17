@@ -169,6 +169,7 @@ let subscope (scope : scope) (name : symbol) =
 module Op = struct
   open EcTypes
   open EcDecl
+  open EcEnv
 
   module TT = EcTypedtree
 
@@ -189,9 +190,11 @@ module Op = struct
         | None -> None
         | Some(xs, body) ->
             let xs = List.map EcIdent.create (unlocs xs) in
-            let env = EcEnv.Var.bindall (List.combine xs dom) scope.sc_env in
+            let env =
+              EcEnv.Var.bindall ~local:true (List.combine xs dom) scope.sc_env
+            in
             let body = TT.transexpcast env policy ue codom body in
-            Some(xs, Esubst.uni (EcUnify.UniEnv.asmap ue) body) in
+              Some (xs, Esubst.uni (EcUnify.UniEnv.asmap ue) body) in
       body, ue in
     let uni = Subst.uni (EcUnify.UniEnv.asmap ue) in
 
