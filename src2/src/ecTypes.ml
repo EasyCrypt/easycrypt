@@ -47,9 +47,6 @@ let tbitstring = Tconstr(EcCoreLib.p_bitstring, [])
 let tlist ty =
   Tconstr (EcCoreLib.p_list, [ ty ])
 
-let tmap domty codomty =
-  Tconstr (EcCoreLib.p_map, [ domty; codomty ])
-
 (* -------------------------------------------------------------------- *)
 let mkunivar () = Tunivar (EcUidgen.unique ())
 

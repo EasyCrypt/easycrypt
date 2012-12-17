@@ -674,11 +674,17 @@ let initial =
         op_body   = None;
         op_prob   = false } env in
   let builtin_rn = [
-    ["int"] , EcWhy3.RDts, EcPath.basename EcCoreLib.p_int;
-    ["real"], EcWhy3.RDts, EcPath.basename EcCoreLib.p_real;
+    ["int"]    , EcWhy3.RDts, EcPath.basename EcCoreLib.p_int;
+    ["real"]   , EcWhy3.RDts, EcPath.basename EcCoreLib.p_real;
     ["infix ="], EcWhy3.RDls, EcPath.basename EcCoreLib.p_eq 
   ] in
   let env = import_w3 env Why3.Theory.builtin_theory builtin_rn in
+  let list_rn = [
+    ["list"], EcWhy3.RDts, EcPath.basename EcCoreLib.p_list;
+    ["Nil"] , EcWhy3.RDls, EcPath.basename EcCoreLib.p_nil;
+    ["Cons"], EcWhy3.RDls, EcPath.basename EcCoreLib.p_cons;
+  ] in
+  let env = import_w3_dir env ["list"] "List" list_rn in
   let cth = Theory.close env in
   let env1 = Theory.bind EcCoreLib.id_pervasive cth env0 in
   let env1 = Theory.import EcCoreLib.p_pervasive env1 in

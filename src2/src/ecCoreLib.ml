@@ -12,7 +12,8 @@ let id_int       = EcIdent.create "int"
 let id_real      = EcIdent.create "real"
 let id_bitstring = EcIdent.create "bitstring"
 let id_list      = EcIdent.create "list"
-let id_map       = EcIdent.create "map"
+let id_nil       = EcIdent.create "[]"
+let id_cons     = EcIdent.create "::"
 
 let id_true      = EcIdent.create "true"
 let id_false     = EcIdent.create "false"
@@ -33,7 +34,8 @@ let p_int        = pervasive id_int
 let p_real       = pervasive id_real
 let p_bitstring  = pervasive id_bitstring
 let p_list       = pervasive id_list
-let p_map        = pervasive id_map
+let p_nil        = pervasive id_nil
+let p_cons       = pervasive id_cons
 
 let p_true       = pervasive id_true
 let p_false      = pervasive id_false
