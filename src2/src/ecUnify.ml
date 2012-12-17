@@ -43,7 +43,9 @@ module UniEnv = struct
     | _ -> begin
       if (Muid.mem id !ue) || (occur_uni id t) then
         raise (TypeVarCycle (id, t));
-      ue := Muid.add id t (Muid.map (EcTypes.Subst.uni1 (id, t)) !ue)
+      ue :=
+        Muid.add id (EcTypes.Subst.uni !ue t)
+        (Muid.map (EcTypes.Subst.uni1 (id, t)) !ue)
     end
 end
 
