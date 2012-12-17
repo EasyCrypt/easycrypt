@@ -119,7 +119,6 @@ let process (g : global) =
   scope := process !scope g
 
 (* -------------------------------------------------------------------- *)
-(*
 let process (g : global) =
   try
     process g
@@ -130,4 +129,3 @@ let process (g : global) =
         exn;
       raise Interrupted
   | e -> EcFormat.pp_err EcPexception.pp_exn e; raise e
-*)

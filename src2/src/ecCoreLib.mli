@@ -25,8 +25,6 @@ val p_list       : path
 val p_nil        : path
 val p_cons       : path
 
-
-
 val p_true       : path
 val p_false      : path
 
@@ -36,6 +34,3 @@ val p_or         : path
 val p_imp        : path
 val p_iff        : path
 val p_eq         : path
-
-
-
