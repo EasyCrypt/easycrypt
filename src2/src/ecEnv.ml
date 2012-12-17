@@ -437,8 +437,10 @@ module Theory = struct
           | Th_axiom     (x, ax) -> MC.import env MC.mc_bind_ax (xpath x) ax
           | Th_modtype   (x, ty) -> MC.import env MC.mc_bind_modtype (xpath x) ty
           | Th_module    m       -> MC.import env MC.mc_bind_module (xpath m.me_name) m.me_sig
-          | Th_theory    (x, th) -> MC.import env MC.mc_bind_theory (xpath x) th
           | Th_export    p       -> import env (lookup_by_path p env)
+          | Th_theory    (x, th) ->
+            let env = MC.import env MC.mc_bind_theory (xpath x) th in
+              { env with env_root = MC.mc_bind_comp (xpath x) env.env_root }
         in
           List.fold_left import_th_item env th
     in
