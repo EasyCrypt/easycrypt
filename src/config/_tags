@@ -1,0 +1,8 @@
+true  : use_menhir
+true  : debug
+<src> : include
+
+<src/*.mli> : pkg_menhirLib, pkg_why3
+<src/*.ml>  : pkg_menhirLib, pkg_why3
+
+<src/*.{native,byte}> : pkg_menhirLib, pkg_why3
