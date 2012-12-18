@@ -1,3 +1,3 @@
 #! /bin/bash
 
-(echo "source debug.cmd"; cat) | ocamldebug "$@" __ignore__
+(echo "source scripts/debug.cmd"; cat) | ocamldebug "$@" __ignore__
