@@ -1,0 +1,22 @@
+* Pierre-Yves
+
+- finir le "require"
+- finir le dump (expr, environment, formules)
+- reprendre la partie module -> finir la partie typage
+
+* Benjamin
+
+- vérifier l'envoi vers Why3
+- étendre le parser pour faire les import why3 interactivement
+
+* TODO
+
+- pretty-printing de l'AST typé
+- noeud de meta-info dans les AST typés
+- chemins privés (attendre la fin des modules)
+- hash-consing
+- réfléchir sur le pb d'instanciation de modules
+  (=> hypothèses sur adversaire - e.g. pour up-to-bad)
+- arbre de preuve + contexte dynamique de preuve
+- batterie de tests
+- mot-clef "use"
