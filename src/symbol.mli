@@ -1,1 +1,0 @@
-type symbol = private string
