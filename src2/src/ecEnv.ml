@@ -620,15 +620,10 @@ module Theory = struct
     let comps = Mid.add rootnm (EcPath.Pident rootnm, topmc) comps in
     let comps = Mid.add x (thpath, thmc) comps in
 
-    let itheory =
-      Th_theory (EcPath.basename cth.cth_path, cth.cth_item)
-    in
-      { env with
-          env_root  = root;
-          env_comps = comps;
-          env_w3    = EcWhy3.rebind env.env_w3 cth.cth_w3;
-          env_rb    = List.rev_append cth.cth_w3 env.env_rb;
-          env_item  = env.env_item; }
+    { env with
+        env_root  = root;
+        env_comps = comps;
+        env_w3    = EcWhy3.rebind env.env_w3 cth.cth_w3; }
 end
 
 (* -------------------------------------------------------------------- *)
