@@ -1,7 +1,0 @@
-theory BuiltIn
-  meta "select_inst" "goal"
-  meta "select_lskept" "none"
-  meta "select_lsinst" "goal"
-  meta "select_kept" "none"
-end
-
