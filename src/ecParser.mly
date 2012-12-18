@@ -70,7 +70,7 @@
 // %token ADVERSARY
 %token AND
 %token ARROW
-// %token AS
+%token AS
 // %token ASPEC
 %token ASSERT
 %token AXIOM
@@ -193,6 +193,7 @@
 // %token UNFOLD
 // %token UNROLL
 // %token WP
+%token WHY3
 
 %token <string> OP1 OP2 OP3 OP4
 
@@ -774,6 +775,18 @@ print:
 ;
 (* -------------------------------------------------------------------- *)
 (* Global entries                                                       *)
+%inline string_list: l=plist0(STRING,COMMA) { l };
+
+renaming:
+| TYPE l=string_list AS s=STRING { l, RNty, s }
+| OP   l=string_list AS s=STRING { l, RNop, s }
+| AXIOM l=string_list AS s=STRING {l, RNpr, s }
+;
+ 
+theory_w3:
+| IMPORT WHY3 path=string_list th=STRING r=plist0(renaming,SEMICOLON)
+    { path,th,r }
+;
 
 global_:
 | theory_open      { GthOpen    $1 }
@@ -781,6 +794,7 @@ global_:
 | theory_require   { GthRequire $1 }
 | theory_import    { GthImport  $1 }
 | theory_export    { GthExport  $1 }
+| theory_w3        { GthW3      $1 }
 | mod_def          { Gmodule    $1 }
 | sig_def          { Ginterface $1 }
 | type_decl_or_def { Gtype      $1 }

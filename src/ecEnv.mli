@@ -139,3 +139,6 @@ type ebinding = [
 
 val bind1   : EcIdent.t * ebinding -> env -> env
 val bindall : (EcIdent.t * ebinding) list -> env -> env
+
+val import_w3_dir : env -> string list -> string -> 
+                    EcWhy3.renaming_decl -> env * EcTypesmod.theory

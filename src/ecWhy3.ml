@@ -134,6 +134,7 @@ let rebind = List.fold_left rebind_item
 type renaming_kind =
   | RDts 
   | RDls
+  | RDpr
 
 type renaming_decl = (string list * renaming_kind * EcIdent.t) list
 

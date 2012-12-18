@@ -434,4 +434,29 @@ module Theory = struct
                               ld_required = reqs; }
             }
       end
+
+  let import_w3 scope dir file renaming = 
+    let mk_renaming (l,k,s) = 
+      let k = 
+        match k with 
+        | RNty -> EcWhy3.RDts 
+        | RNop -> EcWhy3.RDls 
+        | RNpr -> EcWhy3.RDpr in
+      let s = EcIdent.create s in
+      (l,k,s) in
+    let renaming = List.map mk_renaming renaming in
+    let env, lth = EcEnv.import_w3_dir scope.sc_env dir file renaming in
+    let bind id = Context.bind (EcIdent.name id) in
+    let add scope = function
+      | Th_type     (id,ty) ->
+          { scope with sc_types = bind id ty scope.sc_types }
+      | Th_operator (id,op) ->
+          { scope with sc_operators = bind id op scope.sc_operators }
+      | Th_axiom    (id,ax) -> 
+          { scope with sc_axioms = bind id ax scope.sc_axioms } 
+      | _ -> assert false in
+    List.fold_left add { scope with sc_env = env } lth
+        
+
+    
 end

@@ -109,4 +109,7 @@ module Theory : sig
    * the initial scope and is in charge of processing the required
    * theory. *)
   val require : scope -> symbol -> (scope -> scope) -> scope
+
+  val import_w3 : scope -> string list -> string -> w3_renaming list -> scope
+
 end

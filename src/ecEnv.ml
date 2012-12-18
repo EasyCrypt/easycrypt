@@ -662,7 +662,8 @@ let import_w3 env th rd =
     | Th_type (id,ty) -> Ty.rebind id ty env
     | Th_operator (id,op) -> Op.rebind id op env
     | _ -> assert false in
-  List.fold_left add env lth 
+  let env = List.fold_left add env lth in
+  env, lth 
 
 let import_w3_dir env dir name rd =
   let th = EcWhy3.get_w3_th dir name in
@@ -677,19 +678,19 @@ let initial =
     ["real"]   , EcWhy3.RDts, EcPath.basename EcCoreLib.p_real;
     ["infix ="], EcWhy3.RDls, EcPath.basename EcCoreLib.p_eq 
   ] in
-  let env = import_w3 env Why3.Theory.builtin_theory builtin_rn in
+  let env, _ = import_w3 env Why3.Theory.builtin_theory builtin_rn in
 
   let bool_rn = [
     ["bool"] , EcWhy3.RDts, EcPath.basename EcCoreLib.p_bool;
     ["True"] , EcWhy3.RDls, EcPath.basename EcCoreLib.p_true;
     ["False"], EcWhy3.RDls, EcPath.basename EcCoreLib.p_false ] in
-  let env = import_w3 env Why3.Theory.bool_theory bool_rn in
+  let env, _ = import_w3 env Why3.Theory.bool_theory bool_rn in
   let opb_rn = [
     ["andb"] , EcWhy3.RDls, EcPath.basename EcCoreLib.p_and;
     ["orb"]  , EcWhy3.RDls, EcPath.basename EcCoreLib.p_or;
     ["implb"], EcWhy3.RDls, EcPath.basename EcCoreLib.p_imp;
     ["notb"] , EcWhy3.RDls, EcPath.basename EcCoreLib.p_not ] in 
-  let env = import_w3_dir env ["bool"] "Bool" opb_rn in
+  let env,_ = import_w3_dir env ["bool"] "Bool" opb_rn in
   let env = Op.bind (EcPath.basename EcCoreLib.p_iff)
       { op_params = [];
         op_dom    = Some [EcTypes.tbool;EcTypes.tbool];
@@ -701,7 +702,7 @@ let initial =
     ["Nil"] , EcWhy3.RDls, EcPath.basename EcCoreLib.p_nil;
     ["Cons"], EcWhy3.RDls, EcPath.basename EcCoreLib.p_cons;
   ] in
-  let env = import_w3_dir env ["list"] "List" list_rn in
+  let env,_ = import_w3_dir env ["list"] "List" list_rn in
   let cth = Theory.close env in
   let env1 = Theory.bind EcCoreLib.id_pervasive cth env0 in
   let env1 = Theory.import EcCoreLib.p_pervasive env1 in
@@ -724,3 +725,4 @@ let bind1 ((x, eb) : EcIdent.t * ebinding) (env : env) =
 
 let bindall (items : (EcIdent.t * ebinding) list) (env : env) =
   List.fold_left ((^~) bind1) env items  
+

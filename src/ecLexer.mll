@@ -53,6 +53,8 @@
     "theory"      , THEORY     ;        (* KW: global *)
     "type"        , TYPE       ;        (* KW: global *)
     "print"       , PRINT      ;        (* KW: global *)
+    "why3"        , WHY3       ;        (* KW: global *)  
+    "as"          , AS         ;        (* KW: global *)  
   ]
 
   let keywords = Hashtbl.create 97

@@ -12,6 +12,7 @@ val rebind : env -> rebinding -> env
 type renaming_kind =
   | RDts 
   | RDls
+  | RDpr
 
 type renaming_decl = (string list * renaming_kind * EcIdent.t) list
 
