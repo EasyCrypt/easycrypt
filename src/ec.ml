@@ -3,6 +3,10 @@ open EcUtils
 open EcOptions
 open EcPrinting
 
+let _ = 
+  EcPexception.set_default Why3.Exn_printer.exn_printer 
+
+
 (* -------------------------------------------------------------------- *)
 let _ =
   let options = EcOptions.parse () in
