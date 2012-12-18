@@ -6,37 +6,35 @@ true : debug
 <src> : include
 
 # --------------------------------------------------------------------
-<deriving/syntax> : include
-
-<deriving/syntax/pa_deriving.ml> : use_camlp4
-<deriving/syntax/pa_deriving.ml> : syntax_camlp4o, pkg_camlp4.extend, pkg_camlp4.quotations.o
-
-# --------------------------------------------------------------------
-<deriving/syntax/classes> : include
-
-<deriving/syntax/classes/*.{ml,mli}> : use_camlp4
-<deriving/syntax/classes/*.{ml,mli}> : syntax_camlp4o, pkg_camlp4.quotations.o
-
-# --------------------------------------------------------------------
-<deriving/syntax/common> : include
-
-<deriving/syntax/common/*.{ml,mli}> : use_camlp4
-<deriving/syntax/common/*.cmx>      : for-pack(Pa_deriving_common)
-
-<deriving/syntax/common/type.ml>   : syntax_camlp4o, pkg_camlp4.quotations.r
-<deriving/syntax/common/base.ml>   : syntax_camlp4o, pkg_camlp4.quotations.o
-<deriving/syntax/common/extend.ml> : syntax_camlp4o, pkg_camlp4.quotations.o
-<deriving/syntax/common/extend.ml> : pkg_camlp4.extend
-
-# --------------------------------------------------------------------
-<deriving/lib> : include
-
-<deriving/lib/*.{ml,mli}> : use_camlp4, camlp4o, deriving
+# <deriving/syntax> : include
+# 
+# <deriving/syntax/pa_deriving.ml> : use_camlp4
+# <deriving/syntax/pa_deriving.ml> : syntax_camlp4o, pkg_camlp4.extend, pkg_camlp4.quotations.o
+# 
+# # --------------------------------------------------------------------
+# <deriving/syntax/classes> : include
+# 
+# <deriving/syntax/classes/*.{ml,mli}> : use_camlp4
+# <deriving/syntax/classes/*.{ml,mli}> : syntax_camlp4o, pkg_camlp4.quotations.o
+# 
+# # --------------------------------------------------------------------
+# <deriving/syntax/common> : include
+# 
+# <deriving/syntax/common/*.{ml,mli}> : use_camlp4
+# <deriving/syntax/common/*.cmx>      : for-pack(Pa_deriving_common)
+# 
+# <deriving/syntax/common/type.ml>   : syntax_camlp4o, pkg_camlp4.quotations.r
+# <deriving/syntax/common/base.ml>   : syntax_camlp4o, pkg_camlp4.quotations.o
+# <deriving/syntax/common/extend.ml> : syntax_camlp4o, pkg_camlp4.quotations.o
+# <deriving/syntax/common/extend.ml> : pkg_camlp4.extend
+# 
+# # --------------------------------------------------------------------
+# <deriving/lib> : include
+# 
+# <deriving/lib/*.{ml,mli}> : use_camlp4, camlp4o, deriving
 
 # --------------------------------------------------------------------
 <src/*.mli> : pkg_menhirLib, pkg_why3
 <src/*.ml>  : pkg_menhirLib, pkg_why3
 
-<src/ecTypes.ml> : camlp5o, use_ocamlgen
-
-<src/*.{native,byte}> : pkg_menhirLib, pkg_why3, use_ocamlgen
+<src/*.{native,byte}> : pkg_menhirLib, pkg_why3

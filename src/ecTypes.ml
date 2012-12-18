@@ -4,8 +4,8 @@ open EcSymbols
 open EcIdent
 open EcPath
 open EcUidgen
-(* -------------------------------------------------------------------- *)
 
+(* -------------------------------------------------------------------- *)
 type ty =
   | Tunivar of EcUidgen.uid
   | Tvar    of EcIdent.t
