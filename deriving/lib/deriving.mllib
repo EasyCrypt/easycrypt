@@ -1,0 +1,12 @@
+Deriving_Bounded
+Deriving_Dump
+Deriving_dynmap
+Deriving_Enum
+Deriving_Eq
+Deriving_Functor
+Deriving_interned
+Deriving_monad
+Deriving_num
+Deriving_Pickle
+Deriving_Show
+Deriving_Typeable

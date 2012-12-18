@@ -1,0 +1,10 @@
+Pa_deriving
+Pa_deriving_common
+Bounded_class
+Dump_class
+Enum_class
+Eq_class
+Functor_class
+Pickle_class
+Show_class
+Typeable_class

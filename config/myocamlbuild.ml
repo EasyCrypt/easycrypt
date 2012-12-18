@@ -8,6 +8,8 @@ let find_packages () =
     Lexing.from_string &
       run_and_read "ocamlfind list | cut -d' ' -f1"
 
+let find_syntaxes () = ["camlp4o"; "camlp4r"]
+
 let ocamlfind = fun command -> S[A"ocamlfind"; command]
 
 let internal_libraries = fun libraries ->
@@ -32,8 +34,17 @@ let _ = dispatch begin function
          flag ["ocaml"; "link";     "pkg_"^pkg] & S[A"-package"; A pkg];
        end (find_packages ());
 
-       (* Preprocessing *)
-       flag ["ocaml"; "pp"; "deriving"] (A"deriving");
+       (* syntax_* switches *)
+       List.iter begin fun syntax ->
+         flag ["ocaml"; "compile";  "syntax_"^syntax] & S[A"-syntax"; A syntax];
+         flag ["ocaml"; "ocamldep"; "syntax_"^syntax] & S[A"-syntax"; A syntax];
+         flag ["ocaml"; "doc";      "syntax_"^syntax] & S[A"-syntax"; A syntax];
+         flag ["ocaml"; "infer_interface"; "syntax_"^syntax] & S[A"-syntax"; A syntax];
+       end (find_syntaxes ());
+
+       (* deriving *)
+       flag ["ocaml"; "pp"      ; "deriving"] (A"deriving/syntax/pa_deriving.cma");
+       dep  ["ocaml"; "ocamldep"; "deriving"] ["deriving/syntax/pa_deriving.cma"];
 
        (* Threads swicthes *)
        flag ["ocaml"; "pkg_threads"; "compile"] (S[A "-thread"]);

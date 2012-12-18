@@ -1,0 +1,2 @@
+let name = "%%NAME%%"
+let version = "%%VERSION%%"
