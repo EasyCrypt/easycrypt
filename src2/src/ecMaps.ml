@@ -200,6 +200,7 @@ end = struct
 end
 
 (* -------------------------------------------------------------------- *)
+(* FIXME USE the code of why3 *)
 module type Tagged = sig
   type t
   val tag : t -> int

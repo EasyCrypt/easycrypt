@@ -677,6 +677,13 @@ let import_w3_dir env dir name rd =
 let initial = 
   let env0 = empty in
   let env = enter_id EcCoreLib.id_pervasive env0 in
+  let builtin_rn = [
+    ["int"]    , EcWhy3.RDts, EcPath.basename EcCoreLib.p_int;
+    ["real"]   , EcWhy3.RDts, EcPath.basename EcCoreLib.p_real;
+    ["infix ="], EcWhy3.RDls, EcPath.basename EcCoreLib.p_eq 
+  ] in
+  let env = import_w3 env Why3.Theory.builtin_theory builtin_rn in
+
   let bool_rn = [
     ["bool"] , EcWhy3.RDts, EcPath.basename EcCoreLib.p_bool;
     ["True"] , EcWhy3.RDls, EcPath.basename EcCoreLib.p_true;
@@ -694,13 +701,7 @@ let initial =
         op_codom  = Some EcTypes.tbool;
         op_body   = None;
         op_prob   = false } env in
-  let builtin_rn = [
-    ["int"]    , EcWhy3.RDts, EcPath.basename EcCoreLib.p_int;
-    ["real"]   , EcWhy3.RDts, EcPath.basename EcCoreLib.p_real;
-    ["infix ="], EcWhy3.RDls, EcPath.basename EcCoreLib.p_eq 
-  ] in
-  let env = import_w3 env Why3.Theory.builtin_theory builtin_rn in
-  let list_rn = [
+   let list_rn = [
     ["list"], EcWhy3.RDts, EcPath.basename EcCoreLib.p_list;
     ["Nil"] , EcWhy3.RDls, EcPath.basename EcCoreLib.p_nil;
     ["Cons"], EcWhy3.RDls, EcPath.basename EcCoreLib.p_cons;

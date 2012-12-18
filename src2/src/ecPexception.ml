@@ -86,4 +86,5 @@ let pp_exn fmt exn =
       Format.fprintf fmt "cannot find symbol: %a@."
         EcPrinting.pp_qsymbol qname
 
-  | _ -> ()
+  | _ -> try Why3.Exn_printer.exn_printer fmt exn with _ -> ()
+

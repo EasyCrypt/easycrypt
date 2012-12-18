@@ -13,6 +13,8 @@ let config : Whyconf.config = Whyconf.read_config None
 let main : Whyconf.main = Whyconf.get_main config
 
 let w3_env : Env.env = Env.create_env (Whyconf.loadpath main)
+
+let get_w3_th = Env.find_theory w3_env
     
 type env = {
     logic_task : Task.task;
@@ -233,7 +235,7 @@ let import_w3_tydef rn path (env,rb,ld) ty =
 
 let force_bool env codom = 
   match codom with
-  | None ->  Tconstr(path_of_id env Ty.ts_bool.Ty.ts_name, [])
+  | None ->  EcTypes.tbool
   | Some t -> t 
 
 let add_w3_ls env p ls = 
@@ -500,10 +502,7 @@ let rec trans_expr env vm e =
       Term.t_const n 
   | Eflip | Einter _ | Ebitstr _ | Eexcepted _ -> raise RandExpr
   | Elocal(id,_) -> Term.t_var (trans_lv vm id) 
-  | Evar(p,ty) -> 
-      (* FIXME should assert false *)
-      Term.t_var (trans_lv vm (EcPath.basename p)) 
-      (* Term.t_app_infer (trans_pv env vm (p,ty) 0) [] *)
+  | Evar(p,ty) -> assert false 
   | Eapp(p,args,ty) ->
       let ty = trans_ty env vm ty in
       let args = List.map (trans_expr env vm) args in 
@@ -620,14 +619,55 @@ let add_op env path op =
     let ls, decl = trans_op env path op in
     add_ls env path ls decl, Some (RBop(path,ls,decl))
 
+let check_empty vm = 
+  let check_empty m = assert (Mid.is_empty m) in 
+  Array.iter check_empty vm.accu.pvm
+
+(**** Calling prover *)
+let provers = Whyconf.get_provers config
+
+let provers_list = 
+  Whyconf.Mprover.fold (fun p config l ->
+    (p.Whyconf.prover_name, config, Driver.load_driver w3_env config.Whyconf.driver []) :: l) provers []
+
+let get_prover name =
+  try 
+    List.find (fun (s,_,_) -> s = name) provers_list 
+  with _ -> assert false (* FIXME error message *)
+
+let call_prover_task prover timelimit task =
+  let (_, pr, dr)  = get_prover prover in
+  let res = 
+    Call_provers.wait_on_call
+      (Driver.prove_task ~command:pr.Whyconf.command ~timelimit
+         dr task ()) () in
+  Format.printf "call prover res = %a@." Call_provers.print_prover_result res;
+  res.Call_provers.pr_answer = Call_provers.Valid
+
+let check_w3_formula task prover timelimit f = 
+  let pr   = Decl.create_prsymbol (Ident.id_fresh "goal") in
+  let task = Task.add_prop_decl task Decl.Pgoal pr f in
+  Format.printf "task = %a@." Pretty.print_task task;
+  call_prover_task prover timelimit task
+  
+exception CanNotProve of axiom
+
 let add_ax env path ax =
   let pr = Decl.create_prsymbol (preid_p path) in
-  let vm = empty_vmap () in 
+  let vm = empty_vmap () in
   let f = trans_form env vm ax.ax_spec in
+  check_empty vm;
+  if ax.ax_kind = Lemma && 
+    not (check_w3_formula env.logic_task "Alt-Ergo" 10 f) then
+    raise (CanNotProve ax);
   let decl = Decl.create_prop_decl Decl.Paxiom pr f in
   add_pr env path pr decl, RBax(path,pr,decl)
 
-let get_w3_th = Env.find_theory w3_env
+
+
+ 
+  
+
 
 
 
