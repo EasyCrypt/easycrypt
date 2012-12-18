@@ -99,7 +99,7 @@ module Theory : sig
   val exists : EcSymbols.qsymbol -> env -> bool
   val import : EcPath.path -> env -> env
   val export : EcPath.path -> env -> env
-  val require : EcIdent.t -> theory -> env -> env
+  val require : EcIdent.t -> comp_th -> env -> env
   val enter : EcSymbols.symbol -> env -> EcIdent.t * env
   val close : env -> comp_th
 end

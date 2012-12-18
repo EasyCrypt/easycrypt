@@ -73,7 +73,7 @@ and process_th_close (scope : EcScope.scope) name =
 (* -------------------------------------------------------------------- *)
 and process_th_require (scope : EcScope.scope) name =
   match EcLoader.locate name loader with
-  | None -> failwith ("Cannot locate: " ^ name)
+  | None -> failwith ("cannot locate: " ^ name)
   | Some filename ->
       let loader iscope =
         EcFormat.pp_err EcPrinting.pp_env (EcScope.env iscope);
@@ -129,3 +129,4 @@ let process (g : global) =
         exn;
       raise Interrupted
   | e -> EcFormat.pp_err EcPexception.pp_exn e; raise e
+

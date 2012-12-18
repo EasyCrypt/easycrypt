@@ -25,7 +25,6 @@ end
 type scope
 
 val empty : scope
-val root  : scope -> scope
 val path  : scope -> EcPath.path
 val name  : scope -> EcIdent.t
 val env   : scope -> EcEnv.env

@@ -1,6 +1,5 @@
 * Pierre-Yves
 
-- finir le "require"
 - finir le dump (expr, environment, formules)
 - reprendre la partie module -> finir la partie typage
 

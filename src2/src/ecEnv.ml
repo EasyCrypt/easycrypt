@@ -469,7 +469,7 @@ module Mod = struct
     List.fold_left
       (fun env (x, ty) -> bind_s x ty env)
       env xtys
-    
+
   let bind id m env = 
     assert (EcIdent.id_equal id m.me_name);
     let env = MC.bind_module id m.me_sig env in
@@ -511,7 +511,7 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Theory = struct
-  type t = comp_th 
+  type t = comp_th
 
   (* ------------------------------------------------------------------ *)
   let enter = enter
@@ -600,15 +600,15 @@ module Theory = struct
       cth_item = List.rev env.env_item }
 
   (* ------------------------------------------------------------------ *)
-  let require x th env =
+  let require x cth env =
     let rootnm    = EcPath.rootname env.env_scope in
     let thpath    = EcPath.Pqname (EcPath.Pident rootnm, x) in
-    let env, thmc = MC.mc_of_theory env (EcPath.Pident rootnm) x th in
+    let env, thmc = MC.mc_of_theory env (EcPath.Pident rootnm) x cth.cth_item in
 
     let topmc = snd (Mid.find rootnm env.env_comps) in
     let topmc = {
       topmc with
-        mc_theories   = IM.add x (thpath, th) topmc.mc_theories;
+        mc_theories   = IM.add x (thpath, cth.cth_item) topmc.mc_theories;
         mc_components = IM.add x () topmc.mc_components; }
     in
 
@@ -621,7 +621,15 @@ module Theory = struct
     let comps = Mid.add rootnm (EcPath.Pident rootnm, topmc) comps in
     let comps = Mid.add x (thpath, thmc) comps in
 
-      { env with env_root  = root; env_comps = comps; }
+    let itheory =
+      Th_theory (EcPath.basename cth.cth_path, cth.cth_item)
+    in
+      { env with
+          env_root  = root;
+          env_comps = comps;
+          env_w3    = EcWhy3.rebind env.env_w3 cth.cth_w3;
+          env_rb    = List.rev_append cth.cth_w3 env.env_rb;
+          env_item  = itheory :: env.env_item; }
 end
 
 (* -------------------------------------------------------------------- *)
@@ -650,7 +658,6 @@ module Ident = struct
 end
 
 (* -------------------------------------------------------------------- *)
-
 let import_w3 env th rd = 
   let lth, rbi = EcWhy3.import_w3 env.env_w3 env.env_scope th rd in
   let env = { env with env_w3 = EcWhy3.rebind env.env_w3 [rbi];
@@ -659,7 +666,7 @@ let import_w3 env th rd =
             } in
   let add env = function
     | Th_type (id,ty) -> Ty.rebind id ty env
-    | Th_operator   (id,op) -> Op.rebind id op env 
+    | Th_operator (id,op) -> Op.rebind id op env
     | _ -> assert false in
   List.fold_left add env lth 
 

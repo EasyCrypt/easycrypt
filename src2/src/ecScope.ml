@@ -94,6 +94,11 @@ module Context = struct
 end
 
 (* -------------------------------------------------------------------- *)
+type loader = {
+  ld_loaded   : EcEnv.comp_th IM.t;
+  ld_required : EcIdent.t list;
+}
+
 type scope = {
   sc_name       : EcIdent.t;
   sc_types      : EcDecl.tydecl          Context.context;
@@ -104,30 +109,24 @@ type scope = {
   sc_theories   : EcTypesmod.theory      Context.context;
   sc_env        : EcEnv.env;
   sc_top        : scope option;
-  sc_initial    : scope option;
-  sc_loaded     : EcTypesmod.theory IM.t;
-  sc_required   : EcIdent.t list;       (* In reversed order *)
+  sc_loader     : loader;
 }
 
 (* -------------------------------------------------------------------- *)
 let empty =
-  let scope =
-    let env  = EcEnv.initial in
-    let name = EcPath.basename env.EcEnv.env_scope in
-      { sc_name       = name;
-        sc_types      = Context.empty ();
-        sc_operators  = Context.empty ();
-        sc_axioms     = Context.empty ();
-        sc_modtypes   = Context.empty ();
-        sc_modules    = Context.empty ();
-        sc_theories   = Context.empty ();
-        sc_env        = env;
-        sc_top        = None;
-        sc_loaded     = IM.empty;
-        sc_initial    = None;
-        sc_required   = []; }
-  in
-    { scope with sc_initial = Some scope }
+  let env    = EcEnv.initial
+  and loader = { ld_loaded = IM.empty; ld_required = []; } in
+
+    { sc_name       = EcPath.basename env.EcEnv.env_scope;
+      sc_types      = Context.empty ();
+      sc_operators  = Context.empty ();
+      sc_axioms     = Context.empty ();
+      sc_modtypes   = Context.empty ();
+      sc_modules    = Context.empty ();
+      sc_theories   = Context.empty ();
+      sc_env        = EcEnv.initial;
+      sc_top        = None;
+      sc_loader     = loader; }
 
 (* -------------------------------------------------------------------- *)
 let name (scope : scope) =
@@ -146,12 +145,13 @@ let attop (scope : scope) =
   scope.sc_top = None
 
 (* -------------------------------------------------------------------- *)
-let root (scope : scope) =
-  match scope.sc_initial with
-  | None -> assert false
-  | Some initial ->
-      { initial with
-          sc_required = scope.sc_required; }
+let for_loading (scope : scope) =
+  let loader = {
+    ld_loaded   = scope.sc_loader.ld_loaded;
+    ld_required = [];
+  }
+  in
+    { empty with sc_loader = loader }
 
 (* -------------------------------------------------------------------- *)
 let subscope (scope : scope) (name : symbol) =
@@ -166,9 +166,8 @@ let subscope (scope : scope) (name : symbol) =
     sc_theories   = Context.empty ();
     sc_env        = env;
     sc_top        = Some scope;
-    sc_initial    = scope.sc_initial;
-    sc_loaded     = IM.empty;
-    sc_required   = []; }
+    sc_loader     = { scope.sc_loader with ld_required = []; }
+  }
 
 (* -------------------------------------------------------------------- *)
 module Op = struct
@@ -341,32 +340,49 @@ module Theory = struct
           sc_env      = EcEnv.Theory.bind x cth scope.sc_env; }
 
   let loaded (scope : scope) (name : symbol) =
-    IM.byname name scope.sc_loaded <> None
+    IM.byname name scope.sc_loader.ld_loaded <> None
 
   let required (scope : scope) (name : symbol) =
-    List.exists (fun x -> EcIdent.name x = name) scope.sc_required
+    List.exists
+      (fun x -> EcIdent.name x = name)
+      scope.sc_loader.ld_required
 
   let enter (scope : scope) (name : symbol) =
-    let (name, env) = EcEnv.Theory.enter name scope.sc_env in
-      { sc_name       = name;
-        sc_types      = Context.empty ();
-        sc_operators  = Context.empty ();
-        sc_axioms     = Context.empty ();
-        sc_modtypes   = Context.empty ();
-        sc_modules    = Context.empty ();
-        sc_theories   = Context.empty ();
-        sc_env        = env;
-        sc_top        = Some scope;
-        sc_initial    = scope.sc_initial;
-        sc_loaded     = scope.sc_loaded;
-        sc_required   = []; }
+    subscope scope name
 
-  let exit (scope : scope) =
+  let exit_r (scope : scope) =
     match scope.sc_top with
     | None     -> raise TopScope
     | Some sup ->
-        let cth = EcEnv.Theory.close scope.sc_env in
-          (scope.sc_name, bind sup (scope.sc_name, cth))
+        let cth    = EcEnv.Theory.close scope.sc_env in
+        let loaded = scope.sc_loader.ld_loaded in
+        let sup    =
+          let env, reqs =
+            List.fold_right
+              (fun rname (env, reqs) ->
+                if not (required sup (EcIdent.name rname)) then
+                  match IM.byident rname loaded with
+                  | None     -> assert false
+                  | Some rth ->
+                      let env  = EcEnv.Theory.require rname rth env
+                      and reqs = rname :: reqs in
+                        (env, reqs)
+                else
+                  (env, reqs))
+              scope.sc_loader.ld_required
+              (sup.sc_env, sup.sc_loader.ld_required)
+          in
+            { sup with
+                sc_env    = env;
+                sc_loader = { ld_loaded   = loaded;
+                              ld_required = reqs; }
+            }
+        in
+          (cth, scope.sc_name, bind sup (scope.sc_name, cth))
+
+  let exit (scope : scope) =
+    let (_, name, scope) = exit_r scope in
+      (name, scope)
 
   let import (scope : scope) (name : qsymbol) =
     let path = fst (EcEnv.Theory.lookup name scope.sc_env) in
@@ -382,47 +398,39 @@ module Theory = struct
     if required scope name then
       scope
     else
-      let (scope, _path, _theory) =
-        match IM.byname name scope.sc_loaded with
-        | Some (name, theory) ->
-            (scope, EcPath.Pqname (EcCoreLib.p_top, name), theory)
+      match IM.byname name scope.sc_loader.ld_loaded with
+      | Some (name, theory) -> scope
 
-        | None -> begin
-            let imported = enter (root scope) name in
-            let thname   = imported.sc_name in
-            let imported = loader imported in
-      
-              if imported.sc_name <> thname then
-                failwith "end-of-file while processing external theory";
-      
-            let imported = snd (exit imported) in
-            let path     = EcPath.Pqname (path imported, thname) in
-            let theory   = EcEnv.Theory.lookup_by_path path imported.sc_env in
-            let loaded   = IM.add thname theory imported.sc_loaded  in
+      | None -> begin
+          let imported = enter (for_loading scope) name in
+          let thname   = imported.sc_name in
+          let imported = loader imported in
+    
+            if imported.sc_name <> thname then
+              failwith "end-of-file while processing external theory";
+    
+          let ctheory, _, imported = exit_r imported in
+          let loaded = IM.add thname ctheory imported.sc_loader.ld_loaded in
 
-            let scope =
-              let env, reqs =
-                List.fold_right
-                  (fun rname (env, reqs) ->
-                    if not (required scope (EcIdent.name rname)) then
-                      match IM.byident rname loaded with
-                      | None     -> assert false
-                      | Some rth ->
-                          let env = EcEnv.Theory.require rname rth env
-                          and reqs = rname :: reqs in
-                            (env, reqs)
-                    else
-                      (env, reqs))
-                  (thname :: imported.sc_required)
-                  (scope.sc_env, scope.sc_required)
-              in
-                { scope with
-                    sc_env      = env   ;
-                    sc_loaded   = loaded;
-                    sc_required = reqs  ; }
-            in
-              (scope, path, theory)
-        end
-      in
-        scope
+          let env, reqs =
+            List.fold_right
+              (fun rname (env, reqs) ->
+                if not (required scope (EcIdent.name rname)) then
+                  match IM.byident rname loaded with
+                  | None     -> assert false
+                  | Some rth ->
+                      let env  = EcEnv.Theory.require rname rth env
+                      and reqs = rname :: reqs in
+                        (env, reqs)
+                else
+                  (env, reqs))
+              (thname :: imported.sc_loader.ld_required)
+              (scope.sc_env, scope.sc_loader.ld_required)
+          in
+            { scope with
+                sc_env    = env;
+                sc_loader = { ld_loaded   = loaded;
+                              ld_required = reqs; }
+            }
+      end
 end

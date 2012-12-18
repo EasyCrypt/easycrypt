@@ -741,10 +741,7 @@ module Fenv = struct
 
     let trylookup fenv qs = 
       trylookup_op fenv qs 
-    
   end
-    
-
 end
       
 let transl fenv tp decl = 
@@ -817,5 +814,3 @@ let transformula fenv tp ue pf =
   let f = transf fenv tp pf in
   unify_error (Fenv.mono fenv) ue pf.pl_loc f.f_ty tbool;
   EcFol.Subst.uni (EcUnify.UniEnv.asmap ue) f, ue
-
-

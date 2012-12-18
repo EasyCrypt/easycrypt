@@ -20,5 +20,3 @@ val tostring  : path -> string
 
 (* -------------------------------------------------------------------- *)
 module Mp : Map.S with type key = path
-
-
