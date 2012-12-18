@@ -378,6 +378,7 @@ module Theory = struct
                               ld_required = reqs; }
             }
         in
+          EcFormat.pp_err EcPrinting.pp_env scope.sc_env;
           (cth, scope.sc_name, bind sup (scope.sc_name, cth))
 
   let exit (scope : scope) =
@@ -405,10 +406,10 @@ module Theory = struct
           let imported = enter (for_loading scope) name in
           let thname   = imported.sc_name in
           let imported = loader imported in
-    
+ 
             if imported.sc_name <> thname then
               failwith "end-of-file while processing external theory";
-    
+ 
           let ctheory, _, imported = exit_r imported in
           let loaded = IM.add thname ctheory imported.sc_loader.ld_loaded in
 

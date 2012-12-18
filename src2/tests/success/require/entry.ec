@@ -8,7 +8,7 @@ theory T.
   end U.
 end T.
 
-import lib.T1.
+import lib.T2.
 
 type u = T.U.V.t.
 

@@ -133,8 +133,7 @@ module MC = struct
   
       match obj with
       | None        -> raise (LookupFailure (`Path path))
-      | Some (p, x) ->
-          assert (p = path); x
+      | Some (p, x) -> assert (p = path); x
 
   (* ------------------------------------------------------------------ *)
   let rec lookup_mc (env : env) (qn : symbols) (mc : mcomponents) =
@@ -629,7 +628,7 @@ module Theory = struct
           env_comps = comps;
           env_w3    = EcWhy3.rebind env.env_w3 cth.cth_w3;
           env_rb    = List.rev_append cth.cth_w3 env.env_rb;
-          env_item  = itheory :: env.env_item; }
+          env_item  = env.env_item; }
 end
 
 (* -------------------------------------------------------------------- *)
