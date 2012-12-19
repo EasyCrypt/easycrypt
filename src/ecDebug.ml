@@ -5,7 +5,7 @@ open EcUtils
 type ppdebug = {
   ppindent : (bool * int option) list;
   ppstream : out_channel;
-  ppmode   : [`ATree];
+  ppmode   : [`ATree | `Xml];
 }
 
 (* -------------------------------------------------------------------- *)
@@ -68,9 +68,45 @@ module ATree = struct
 end
 
 (* -------------------------------------------------------------------- *)
+module Xml = struct
+  let escape s =
+    let buf = Buffer.create (String.length s) in
+      String.iter
+        (function
+         | '"'  -> Buffer.add_string buf "&quot;"
+         | '\'' -> Buffer.add_string buf "&apos;"
+         | '<'  -> Buffer.add_string buf "&lt;"
+         | '>'  -> Buffer.add_string buf "&gt;"
+         | '&'  -> Buffer.add_string buf "&amp;"
+         | c    -> Buffer.add_char buf c)
+        s;
+      Buffer.contents buf
+
+  (* ------------------------------------------------------------------ *)
+  let onseq (pp : ppdebug) ?(enum = false) ?extra (txt : string) seq =
+    let rec aux first =
+      let next = Stream.next_opt seq in
+      let enum = if enum then Some ((Stream.count seq) - 1) else None in
+      let pp   = ppup pp ?enum (next = None) in
+        first pp; oiter next aux
+    in
+  
+    let txt =
+      match extra with
+      | None -> txt
+      | Some extra -> Printf.sprintf "%s (%s)" txt extra
+    and indent = 2 * (List.length pp.ppindent) in
+      Printf.fprintf pp.ppstream
+        "%.*s<node data=\"%s\">\n%!" indent "" (escape txt);
+      oiter (Stream.next_opt seq) aux;
+      Printf.fprintf pp.ppstream "%.*s</node>\n%!" indent "";
+end
+
+(* -------------------------------------------------------------------- *)
 let onseq (pp : ppdebug) ?(enum = false) ?extra (txt : string) seq =
   match pp.ppmode with
   | `ATree -> ATree.onseq pp ~enum ?extra txt seq
+  | `Xml   -> Xml  .onseq pp ~enum ?extra txt seq
 
 (* -------------------------------------------------------------------- *)
 let onhseq (pp : ppdebug) ?enum ?extra (txt : string) cb seq =
