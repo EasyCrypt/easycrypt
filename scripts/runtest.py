@@ -102,6 +102,10 @@ def _main():
 
     logging.info("# of failed scripts: %d" % (len(errors,)))
     if errors:
+        logging.info("--- BEGIN FAILING SCRIPTS ---")
+        for filename in errors:
+            logging.info(filename)
+        logging.info("--- END FAILING SCRIPTS ---")
         logging.critical("some tests did NOT pass")
 
     exit (2 if errors else 0)
