@@ -42,41 +42,32 @@ let tostring (id : t) =
 (* -------------------------------------------------------------------- *)
 module Map = struct
   type key  = t
-  type 'a t = ((key * 'a) list) SymMap.t
+  type 'a t = ((key * 'a) list) Msym.t
 
   let empty : 'a t =
-    SymMap.empty
+    Msym.empty
 
   let add (id : key) (v : 'a) (m : 'a t) =
-    SymMap.change (fun p -> Some ((id, v) :: (odfl [] p))) (name id) m
+    Msym.change
+      (fun p ->
+        let xs =
+          List.filter
+            (fun (id', _) -> not (id_equal id id'))
+            (odfl [] p)
+        in
+          Some ((id, v) :: xs))
+      (name id) m
 
   let byident (id : key) (m : 'a t) =
-    obind (SymMap.find_opt (name id) m) (List.tryassoc_eq id_equal id)
+    obind (Msym.find_opt (name id) m) (List.tryassoc_eq id_equal id)
 
   let byname (x : symbol) (m : 'a t) =
-    match SymMap.find_opt x m with
-    | None | Some []     -> None
+    match Msym.find_opt x m with
+    | None | Some []  -> None
     | Some (idv :: _) -> Some idv 
 
   let allbyname (x : symbol) (m : 'a t) =
-    odfl [] (SymMap.find_opt x m)
-
-  let update (id : key) (f : 'a -> 'a) (m : 'a t) =
-    let rec update1 (xs : (key * 'a) list) =
-      match xs with
-      | [] -> []
-      | (id', v) :: xs when id_equal id id' -> (id', f v) :: xs
-      | x :: xs -> x :: (update1 xs)
-    in
-      SymMap.change
-        (omap^~ (fun xs -> update1 xs))
-        (name id) m
-
-   let merge m1 m2 = 
-     SymMap.merge 
-       (fun _ o1 o2 -> 
-         match o1 with None -> o2 | Some l1 -> Some ((odfl [] o2) @ l1))
-       m1 m2
+    odfl [] (Msym.find_opt x m)
 
    let dump ~name valuepp pp (m : 'a t) =
      let keyprinter k v =
@@ -94,7 +85,7 @@ module Map = struct
                 EcDebug.onhlist pp (tostring x) valuepp [v])
              xs
      in
-       SymMap.dump ~name keyprinter valuepp pp m
+       Msym.dump ~name keyprinter valuepp pp m
 end
 
 (* -------------------------------------------------------------------- *)

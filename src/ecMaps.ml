@@ -184,31 +184,3 @@ end = struct
         end
       end
 end
-
-(* -------------------------------------------------------------------- *)
-(* FIXME USE the code of why3 *)
-module type Tagged = sig
-  type t
-  val tag : t -> int
-end
-
-module type OrderedHash = sig
-  type t
-  val hash : t -> int
-  val equal : t -> t -> bool
-  val compare : t -> t -> int
-end
-
-module OrderedHash (X : Tagged) = struct 
-  type t = X.t
-  let hash = X.tag
-  let equal t1 t2 = X.tag t1 == X.tag t2 
-  let compare t1 t2 = X.tag t1 - X.tag t2
-end
-
-module StructMake (X : Tagged) = struct
-  module T = OrderedHash(X)
-  module M = Map.Make(T)
-  module S = Set.Make(T)
-  module H = Hashtbl.Make(T)
-end
