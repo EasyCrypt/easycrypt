@@ -589,8 +589,9 @@ module Theory = struct
 
   (* ------------------------------------------------------------------ *)
   let export (path : EcPath.path) (env : env) =
-    { env with
-        env_item = Th_export path :: env.env_item }
+    let env = import path env in
+      { env with
+          env_item = Th_export path :: env.env_item }
 
   (* ------------------------------------------------------------------ *)
   let close env = 
