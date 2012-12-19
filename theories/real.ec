@@ -21,7 +21,7 @@ export Abs.
 theory Triangle.
 
   lemma triangular_inequality : forall (x:_,y:_,z:_),
-     __abs(x-y) <= __abs(x-z) + __abs(y-z).
+     | x-y | <= | x-z |  + | y-z |.
 
 end Triangle.
 

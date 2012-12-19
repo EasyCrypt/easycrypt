@@ -6,6 +6,7 @@
 
 * Benjamin
 
+- faire passer tests/success/0008_operdef.ec
 - étendre le parser pour faire les import why3 interactivement:
   verifier que si un theorie est utilis'ee par why3 elle est bind'ee dans 
   ecEnv ...
