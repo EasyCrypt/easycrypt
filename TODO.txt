@@ -15,9 +15,7 @@
   il faudra faire rapidement aussi un group.ec, cyclic_group.ec ... 
   Je pense que le type bitstring.ec n'est pas pour l'instant link'e dans
   initial, il faut le rajouter.
-- dump de why3.
-- gerer les tests avec xxxx_name.ec 
-
+- dump de ecWhy3.
 
 * TODO
 

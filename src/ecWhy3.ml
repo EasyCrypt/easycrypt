@@ -693,6 +693,10 @@ let trans_quant = function
   | Lforall -> Term.Tforall
   | Lexists -> Term.Texists
 
+let merge_branches lb = 
+  if List.exists (fun b -> b.Term.t_ty = None) lb then List.map force_prop lb
+  else lb
+
 let rec trans_form env vm f =
   match f.f_node with
   | Fquant(q,b,f) ->
@@ -705,6 +709,10 @@ let rec trans_form env vm f =
       let f1 = trans_form env vm f1 in
       let f2 = trans_form env vm f2 in
       let f3 = trans_form env vm f3 in
+      let f2,f3 = 
+        match merge_branches [f2;f3] with
+        | [f2;f3] -> f2, f3
+        | _ -> assert false in
       Term.t_if_simp (force_prop f1) f2 f3
   | Flet(lp,f1,f2) ->
       let f1 = trans_form_b env vm f1 in
@@ -800,8 +808,9 @@ let call_prover_task prover timelimit task =
 
 let check_w3_formula task prover timelimit f = 
   let pr   = Decl.create_prsymbol (Ident.id_fresh "goal") in
-  let task = Task.add_prop_decl task Decl.Pgoal pr f in
-(*  Format.printf "task = %a@." Pretty.print_task task; *)
+  let decl = Decl.create_prop_decl Decl.Pgoal pr f in
+  let task = add_decl_with_tuples task decl in
+(*  Format.printf "task = %a@." Pretty.print_task task;  *)
   call_prover_task prover timelimit task
   
 exception CanNotProve of axiom
