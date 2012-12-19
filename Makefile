@@ -11,8 +11,10 @@ ifeq ($(shell echo $$TERM), dumb)
 endif
 OCAMLBUILD := $(OCAMLBUILD_BIN) $(OCAMLBUILD_EXTRA)
 
+OCAMLFIND_COMMANDS="ocamlc=ocamlc.opt ocamlopt=ocamlopt.opt"
+
 # --------------------------------------------------------------------
-.PHONY: all build byte native clean tags tests
+.PHONY: all build byte native check clean tags
 
 all: build
 
@@ -23,6 +25,12 @@ byte: tags
 
 native: tags
 	$(OCAMLBUILD) src/ec.native
+
+check: byte
+	./scripts/runtest.py     \
+	  --bin=./ec.byte        \
+	  --ok-dir=tests/success \
+	  --ko-dir=tests/fail
 
 clean:
 	$(OCAMLBUILD) -clean
