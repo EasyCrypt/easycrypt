@@ -1,6 +1,8 @@
 * Pierre-Yves
 
 - reprendre la partie module -> finir la partie typage
+- pretty-printing de l'AST typé
+- noeud de meta-info dans les AST typés
 
 * Benjamin
 
@@ -20,8 +22,6 @@
 * TODO
 
 - require : do not check
-- pretty-printing de l'AST typé
-- noeud de meta-info dans les AST typés
 - chemins privés (attendre la fin des modules)
 - hash-consing
 - réfléchir sur le pb d'instanciation de modules
