@@ -21,24 +21,6 @@ type ty_decl = {
 }
 
 (* -------------------------------------------------------------------- *)
-let ty_dump pp =
-  let rec ty_dump pp = function
-    | Tunivar i ->
-        EcDebug.single pp ~extra:(string_of_int i) "Tunivar"
-
-    | Tvar a ->
-        EcDebug.single pp ~extra:(EcIdent.tostring a) "Tvar"
-
-    | Ttuple tys ->
-        EcDebug.onhlist pp "Ttuple" ty_dump tys
-
-    | Tconstr (p, tys) ->
-        let strp = EcPath.tostring p in
-          EcDebug.onhlist pp ~extra:strp "Tconstr" ty_dump tys
-  in
-    fun ty -> ty_dump pp ty
-
-(* -------------------------------------------------------------------- *)
 let tunit      = Tconstr(EcCoreLib.p_unit, [])
 let tbool      = Tconstr(EcCoreLib.p_bool, [])
 let tint       = Tconstr(EcCoreLib.p_int , [])
@@ -180,7 +162,7 @@ let e_map ft fe e =
   | Elet (lp, e1, e2)     -> Elet (lp, fe e1, fe e2)
   | Etuple le             -> Etuple (List.map fe le)
   | Eif (e1, e2, e3)      -> Eif (fe e1, fe e2, fe e3)
-  | Einter (e1,e2)        -> Einter (fe e1, fe e2)
+  | Einter (e1, e2)       -> Einter (fe e1, fe e2)
   | Ebitstr e             -> Ebitstr (fe e)
   | Eexcepted (e1, e2)    -> Eexcepted (fe e1, fe e2)
 
@@ -189,4 +171,72 @@ module Esubst = struct
   let uni (uidmap : ty EcUidgen.Muid.t) =
     let rec aux e = e_map (Subst.uni uidmap) aux e in
       aux
+end
+
+(* -------------------------------------------------------------------- *)
+module Dump = struct
+  let ty_dump pp =
+    let rec ty_dump pp = function
+      | Tunivar i ->
+          EcDebug.single pp ~extra:(string_of_int i) "Tunivar"
+  
+      | Tvar a ->
+          EcDebug.single pp ~extra:(EcIdent.tostring a) "Tvar"
+  
+      | Ttuple tys ->
+          EcDebug.onhlist pp "Ttuple" ty_dump tys
+  
+      | Tconstr (p, tys) ->
+          let strp = EcPath.tostring p in
+            EcDebug.onhlist pp ~extra:strp "Tconstr" ty_dump tys
+    in
+      fun ty -> ty_dump pp ty
+
+  let ex_dump pp =
+    let rec ex_dump pp = function
+      | Eint i ->
+          EcDebug.single pp ~extra:(string_of_int i) "Eint"
+
+      | Eflip ->
+          EcDebug.single pp "Eflip"
+
+      | Einter (e1, e2) ->
+          EcDebug.onhlist pp "Einter" ex_dump [e1; e2]
+        
+      | Ebitstr e ->
+          EcDebug.onhlist pp "Ebitstr" ex_dump [e]
+
+      | Eexcepted (e1, e2) ->
+          EcDebug.onhlist pp "Eexcepted" ex_dump [e1; e2]
+
+      | Elocal (x, ty) ->
+          EcDebug.onhlist pp
+            "Elocal" ~extra:(EcIdent.tostring x)
+            ty_dump [ty]
+        
+      | Evar (x, ty) ->
+          EcDebug.onhlist pp
+            "Evar" ~extra:(EcPath.tostring x)
+            ty_dump [ty]
+
+      | Eapp (p, args, ty) ->
+          let aprinter pp =
+            EcDebug.onhlist pp ~enum:true "Arguments" ex_dump args
+          and tprinter pp =
+            EcDebug.onhlist pp "Type" ty_dump [ty]
+          in
+            EcDebug.onseq pp "Eapp" ~extra:(EcPath.tostring p)
+              (Stream.of_list [tprinter; aprinter])
+
+      | Elet (p, e1, e2) ->
+          let printers = [ex_dump^~ e1; ex_dump^~ e2] in
+            EcDebug.onseq pp "Elet" (Stream.of_list printers)
+        
+      | Etuple es ->
+          EcDebug.onhlist pp ~enum:true "Etuple" ex_dump es
+        
+      | Eif (c, e1, e2) ->
+          EcDebug.onhlist pp "Eif" ex_dump [c; e1; e2]
+    in
+      fun e -> ex_dump pp e
 end

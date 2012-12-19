@@ -18,9 +18,6 @@ type tysig = dom * ty
 type ty_decl = { td_params : EcIdent.t list; td_body : ty; }
 
 (* -------------------------------------------------------------------- *)
-val ty_dump : EcDebug.ppdebug -> ty -> unit
-
-(* -------------------------------------------------------------------- *)
 val tunit      : ty
 val tbool      : ty
 val tint       : ty
@@ -90,4 +87,10 @@ val ids_of_lpattern : lpattern -> EcIdent.t list
 (* -------------------------------------------------------------------- *)
 module Esubst : sig
   val uni : ty Muid.t -> tyexpr -> tyexpr 
+end
+
+(* -------------------------------------------------------------------- *)
+module Dump : sig
+  val ty_dump : EcDebug.ppdebug -> ty -> unit
+  val ex_dump : EcDebug.ppdebug -> tyexpr -> unit
 end

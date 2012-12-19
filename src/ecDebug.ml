@@ -5,10 +5,14 @@ open EcUtils
 type ppdebug = {
   ppindent : bool list;
   ppstream : out_channel;
+  ppenum   : int option;
 }
 
 (* -------------------------------------------------------------------- *)
-let ppup pp b = { pp with ppindent = b :: pp.ppindent }
+let ppup pp ?enum b =
+  { ppindent = b :: pp.ppindent;
+    ppstream = pp.ppstream     ;
+    ppenum   = enum            ; }
 
 (* -------------------------------------------------------------------- *)
 let ppindent bs =
@@ -22,14 +26,16 @@ let ppindent bs =
 
 (* -------------------------------------------------------------------- *)
 let initial =
-  { ppindent = [];
-    ppstream = stderr; }
+  { ppindent = []    ;
+    ppstream = stderr;
+    ppenum   = None  ; }
 
 (* -------------------------------------------------------------------- *)
-let onseq (pp : ppdebug) ?extra (txt : string) seq =
+let onseq (pp : ppdebug) ?(enum = false) ?extra (txt : string) seq =
   let rec aux first =
     let next = Stream.next_opt seq in
-    let pp   = ppup pp (next = None) in
+    let enum = if enum then Some (Stream.count seq) else None in
+    let pp   = ppup pp ?enum (next = None) in
       first pp; oiter next aux
   in
 
@@ -44,17 +50,17 @@ let onseq (pp : ppdebug) ?extra (txt : string) seq =
     oiter (Stream.next_opt seq) aux
 
 (* -------------------------------------------------------------------- *)
-let onhseq (pp : ppdebug) ?extra (txt : string) cb seq =
+let onhseq (pp : ppdebug) ?enum ?extra (txt : string) cb seq =
   let next (i : int) =
     match Stream.next_opt seq with
     | None   -> None
     | Some x -> Some (cb^~ x)
   in
-    onseq pp ?extra txt (Stream.from next)
+    onseq pp ?enum ?extra txt (Stream.from next)
 
 (* -------------------------------------------------------------------- *)
-let onhlist (pp : ppdebug) ?extra (txt : string) cb xs =
-  onhseq pp ?extra txt cb (Stream.of_list xs)
+let onhlist (pp : ppdebug) ?enum ?extra (txt : string) cb xs =
+  onhseq pp ?enum ?extra txt cb (Stream.of_list xs)
 
 (* -------------------------------------------------------------------- *)
 let single (pp : ppdebug) ?extra (txt : string) =

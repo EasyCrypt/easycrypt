@@ -90,8 +90,10 @@ and process_th_import (scope : EcScope.scope) name =
 and process_th_export (scope : EcScope.scope) name =
   EcScope.Theory.export scope name
 
+(* -------------------------------------------------------------------- *)
 and process_w3_import (scope : EcScope.scope) (p, f, r) =
   EcScope.Theory.import_w3 scope p f r
+
 (* -------------------------------------------------------------------- *)
 and process (scope : EcScope.scope) (g : global) =
   let scope =
@@ -122,7 +124,6 @@ let process (g : global) =
   scope := process !scope g
 
 (* -------------------------------------------------------------------- *)
-
 let process (g : global) =
   try
     process g
@@ -133,4 +134,3 @@ let process (g : global) =
         exn;
       raise Interrupted
   | e -> EcFormat.pp_err EcPexception.exn_printer e; raise e
-

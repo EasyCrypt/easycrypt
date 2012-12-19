@@ -26,7 +26,7 @@ module UniEnv = struct
   let dump pp (ue : unienv) =
     let pp_binding pp (a, ty) =
       EcDebug.onhlist pp (string_of_int a)
-        (EcTypes.ty_dump) [ty]
+        (EcTypes.Dump.ty_dump) [ty]
     in
       EcDebug.onhseq
         pp "Unification Environment" pp_binding

@@ -45,9 +45,9 @@ let tolist =
 let rec tostring p =
   match p with
   | Pident x ->
-      EcIdent.tostring x
+      Printf.sprintf "[%s]" (EcIdent.tostring x)
   | Pqname (p, x) ->
-      Printf.sprintf "%s.%s" (tostring p) (EcIdent.tostring x)
+      Printf.sprintf "%s.%s" (tostring p) (tostring (Pident x))
 
 (* -------------------------------------------------------------------- *)
 let toqsymbol (p : path) =

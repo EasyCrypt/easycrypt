@@ -198,6 +198,7 @@ module Op = struct
               EcEnv.Var.bindall ~local:true (List.combine xs dom) scope.sc_env
             in
             let body = TT.transexpcast env policy ue codom body in
+              EcTypes.Dump.ex_dump EcDebug.initial body;
               Some (xs, Esubst.uni (EcUnify.UniEnv.asmap ue) body) in
       body, ue in
     let uni = Subst.uni (EcUnify.UniEnv.asmap ue) in
@@ -456,7 +457,4 @@ module Theory = struct
           { scope with sc_axioms = bind id ax scope.sc_axioms } 
       | _ -> assert false in
     List.fold_left add { scope with sc_env = env } lth
-        
-
-    
 end
