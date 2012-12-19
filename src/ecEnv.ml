@@ -727,3 +727,30 @@ let bind1 ((x, eb) : EcIdent.t * ebinding) (env : env) =
 let bindall (items : (EcIdent.t * ebinding) list) (env : env) =
   List.fold_left ((^~) bind1) env items  
 
+(* -------------------------------------------------------------------- *)
+let rec dump ?(name = "Environment") pp (env : env) =
+    EcDebug.onseq pp name ~extra:(EcPath.tostring env.env_scope)
+      (Stream.of_list [
+        (fun pp -> dump_premc ~name:"Root" pp env.env_root);
+        (fun pp ->
+           Mid.dump ~name:"Components"
+             (fun k (p, _) ->
+                Printf.sprintf "%s (%s)"
+                  (EcIdent.tostring k) (EcPath.tostring p))
+             (fun pp (_, (_, mc)) ->
+                dump_premc ~name:"Component" pp mc)
+             pp env.env_comps)
+      ])
+
+and dump_premc ~name pp mc =
+  EcDebug.onseq pp name
+    (Stream.of_list [
+       (fun pp -> IM.dump "Variables"  (fun _ _ -> ()) pp mc.mc_variables );
+       (fun pp -> IM.dump "Functions"  (fun _ _ -> ()) pp mc.mc_functions );
+       (fun pp -> IM.dump "Modules"    (fun _ _ -> ()) pp mc.mc_modules   );
+       (fun pp -> IM.dump "Modtypes"   (fun _ _ -> ()) pp mc.mc_typedecls );
+       (fun pp -> IM.dump "Typedecls"  (fun _ _ -> ()) pp mc.mc_operators );
+       (fun pp -> IM.dump "Operators"  (fun _ _ -> ()) pp mc.mc_axioms    );
+       (fun pp -> IM.dump "Theories"   (fun _ _ -> ()) pp mc.mc_theories  );
+       (fun pp -> IM.dump "Components" (fun _ _ -> ()) pp mc.mc_components);
+    ])

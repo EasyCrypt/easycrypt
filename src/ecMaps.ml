@@ -8,16 +8,17 @@ module Map = struct
   module type S = sig
     include Why3.Stdlib.Map.S
 
-    val update : ('a -> 'a) -> key -> 'a t -> 'a t
     val to_stream : 'a t -> (key * 'a) Stream.t
-    val pp : key EcFormat.pp -> 'a EcFormat.pp -> ('a t) EcFormat.pp
+
+    val dump :
+         name:string
+      -> (key -> 'a -> string)                   (* key printer *)
+      -> (EcDebug.ppdebug -> (key * 'a) -> unit) (* value printer *)
+      -> EcDebug.ppdebug -> 'a t -> unit
   end
 
   module Make(O : OrderedType) : S with type key = O.t = struct
     include Why3.Stdlib.Map.Make(O)
-
-    let update f (k : key) (m : 'a t) =
-      change (omap^~ f) k m
 
     let to_stream (m : 'a t) =
       let next =
@@ -29,26 +30,11 @@ module Map = struct
       in
         Stream.from next
 
-    let pp pp_key pp_value fmt m =
-      let pp fmt (k, v) =
-        Format.fprintf fmt "%a = %a" pp_key k pp_value v
+    let dump ~name keyprinter valuepp pp (m : 'a t) =
+      let ppkv pp (k, v) =
+        EcDebug.onhlist pp (keyprinter k v) valuepp [(k, v)]
       in
-        if is_empty m then
-          Format.fprintf fmt "{}"
-        else begin
-          let pp =
-            let first = ref true in
-              fun k v ->
-                if not !first then
-                  Format.fprintf fmt "@,%a" pp (k, v)
-                else begin
-                  Format.fprintf fmt "%a" pp (k, v);
-                  first := false
-                end
-          in
-            Format.fprintf fmt "{@,@[<v 2>  %a@]@,}"
-              (fun fmt -> iter pp) m
-        end
+        EcDebug.onhseq pp name ppkv (to_stream m)
   end
 end
 

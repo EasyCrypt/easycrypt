@@ -39,6 +39,9 @@ val initial : env
 val root    : env -> EcPath.path
 
 (* -------------------------------------------------------------------- *)
+val dump : ?name:string -> EcDebug.ppdebug -> env -> unit
+
+(* -------------------------------------------------------------------- *)
 exception LookupFailure of [`Path of EcPath.path | `QSymbol of qsymbol]
 
 (* -------------------------------------------------------------------- *)

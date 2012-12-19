@@ -1,4 +1,5 @@
 (* -------------------------------------------------------------------- *)
+open EcMaps
 open EcSymbols
 
 (* -------------------------------------------------------------------- *)
@@ -21,13 +22,8 @@ val id_compare : t -> t -> int
 val id_hash : t -> int
 
 (* -------------------------------------------------------------------- *)
-module Mid : sig 
-  include Why3.Stdlib.Map.S with type key = t
-  val pp : key EcFormat.pp -> 'a EcFormat.pp -> ('a t) EcFormat.pp
-end
+module Mid : Map.S with type key = t
 module Sid : Mid.Set with type elt = t
-module Hid : Why3.Stdlib.XHashtbl.S with type key = t
-
 
 (* -------------------------------------------------------------------- *)
 module Map : sig
@@ -42,7 +38,11 @@ module Map : sig
   val byident   : key -> 'a t -> 'a option
   val update    : key -> ('a -> 'a) -> 'a t -> 'a t
   val merge     : 'a t -> 'a t -> 'a t
-  val pp        : ?align:bool -> 'a EcFormat.pp -> ('a t) EcFormat.pp
+
+  val dump :
+       name:string
+    -> (EcDebug.ppdebug -> 'a -> unit)
+    -> EcDebug.ppdebug -> 'a t -> unit
 end
 
 (* -------------------------------------------------------------------- *)

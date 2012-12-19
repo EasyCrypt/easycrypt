@@ -11,8 +11,6 @@ ifeq ($(shell echo $$TERM), dumb)
 endif
 OCAMLBUILD := $(OCAMLBUILD_BIN) $(OCAMLBUILD_EXTRA)
 
-OCAMLFIND_COMMANDS="ocamlc=ocamlc.opt ocamlopt=ocamlopt.opt"
-
 # --------------------------------------------------------------------
 .PHONY: all build byte native check clean tags
 

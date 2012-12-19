@@ -18,32 +18,14 @@ let id_equal : ident -> ident -> bool = (==)
 let id_compare i1 i2 = i2.id_tag - i1.id_tag 
 let id_hash id = id.id_tag 
 
-module MSH = EcMaps.MakeMSH (struct type t = ident let tag = id_hash end)
-
 (* -------------------------------------------------------------------- *)
-module Mid = struct
-  include MSH.M 
-
-  let pp pp_key pp_value fmt m =
-    let pp fmt (k, v) =
-      Format.fprintf fmt "%a = %a" pp_key k pp_value v in
-    if is_empty m then Format.fprintf fmt "{}"
-    else 
-      let pp =
-        let first = ref true in
-        fun k v ->
-          if not !first then Format.fprintf fmt "@,%a" pp (k, v)
-          else begin
-            Format.fprintf fmt "%a" pp (k, v);
-            first := false
-          end
-      in
-      Format.fprintf fmt "{@,@[<v 2>  %a@]@,}" (fun fmt -> iter pp) m
+module IdComparable = struct
+  type t = ident
+  let compare = id_compare
 end
 
-(* -------------------------------------------------------------------- *)
-module Sid = MSH.S
-module Hid = MSH.H
+module Mid = Map.Make(IdComparable)
+module Sid = Mid.Set
 
 (* -------------------------------------------------------------------- *)
 type t = ident
@@ -96,26 +78,23 @@ module Map = struct
          match o1 with None -> o2 | Some l1 -> Some ((odfl [] o2) @ l1))
        m1 m2
 
-   open EcFormat
+   let dump ~name valuepp pp (m : 'a t) =
+     let keyprinter k v =
+       match v with
+       | [] -> Printf.sprintf "%s (empty)" k
+       | _  -> k
 
-   let pp ?(align = false) pp_value fmt (m : 'a t) =
-     let pp_key =
-       match align with
-       | false -> pp_string
-       | true  -> begin
-         let i =
-           SymMap.fold (fun x _ j -> max (String.length x) j) m 0
-         in
-           fun fmt s -> Format.fprintf fmt "%.*s" i s
-       end
+     and valuepp pp (_, xs) =
+       match xs with
+       | [] -> ()
+       | _  ->
+           EcDebug.onhlist pp
+             (Printf.sprintf "%d binding(s)" (List.length xs))
+             (fun pp (x, v) ->
+                EcDebug.onhlist pp (tostring x) valuepp [v])
+             xs
      in
-
-     let pp fmt bindings =
-       let pp_tag fmt id = pp_int fmt id.id_tag in 
-       pp_list ~pre:"[" ~pst:"]"
-         (pp_pair pp_tag pp_value) fmt bindings
-     in
-       SymMap.pp pp_key pp fmt m
+       SymMap.dump ~name keyprinter valuepp pp m
 end
 
 (* -------------------------------------------------------------------- *)

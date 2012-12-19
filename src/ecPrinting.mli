@@ -24,6 +24,3 @@ val pp_dom  : (ty list) pp
 val pp_tydecl : EcEnv.env -> (path * tydecl) pp
 val pp_opdecl : (path * operator) pp
 
-(* -------------------------------------------------------------------- *)
-(* Environment pretty-printing                                          *)
-val pp_env : EcEnv.env pp

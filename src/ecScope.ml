@@ -198,12 +198,9 @@ module Op = struct
               EcEnv.Var.bindall ~local:true (List.combine xs dom) scope.sc_env
             in
             let body = TT.transexpcast env policy ue codom body in
-              EcTypes.Dump.ex_dump EcDebug.initial body;
               Some (xs, Esubst.uni (EcUnify.UniEnv.asmap ue) body) in
       body, ue in
     let uni = Subst.uni (EcUnify.UniEnv.asmap ue) in
-
-      EcUnify.UniEnv.dump EcDebug.initial ue;
 
     let dom, codom = List.map uni dom, uni codom in
     let dom = if op.po_dom = None then None else Some dom in
@@ -379,7 +376,6 @@ module Theory = struct
                               ld_required = reqs; }
             }
         in
-          EcFormat.pp_err EcPrinting.pp_env scope.sc_env;
           (cth, scope.sc_name, bind sup (scope.sc_name, cth))
 
   let exit (scope : scope) =

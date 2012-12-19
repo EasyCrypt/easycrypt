@@ -76,7 +76,6 @@ and process_th_require (scope : EcScope.scope) name =
   | None -> failwith ("cannot locate: " ^ name)
   | Some filename ->
       let loader iscope =
-        EcFormat.pp_err EcPrinting.pp_env (EcScope.env iscope);
         let commands = EcIo.parseall (EcIo.from_file filename) in
           List.fold_left process iscope commands
       in
@@ -113,7 +112,7 @@ and process (scope : EcScope.scope) (g : global) =
     | GthW3      a    -> process_w3_import  scope a
     | Gprint     p    -> process_print      scope p; scope
   in
-    EcFormat.pp_err EcPrinting.pp_env (EcScope.env scope);
+    EcEnv.dump EcDebug.initial (EcScope.env scope);
     scope
 
 (* -------------------------------------------------------------------- *)
