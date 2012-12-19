@@ -748,9 +748,10 @@ and dump_premc ~name pp mc =
        (fun pp -> IM.dump "Variables"  (fun _ _ -> ()) pp mc.mc_variables );
        (fun pp -> IM.dump "Functions"  (fun _ _ -> ()) pp mc.mc_functions );
        (fun pp -> IM.dump "Modules"    (fun _ _ -> ()) pp mc.mc_modules   );
-       (fun pp -> IM.dump "Modtypes"   (fun _ _ -> ()) pp mc.mc_typedecls );
-       (fun pp -> IM.dump "Typedecls"  (fun _ _ -> ()) pp mc.mc_operators );
-       (fun pp -> IM.dump "Operators"  (fun _ _ -> ()) pp mc.mc_axioms    );
+       (fun pp -> IM.dump "Modtypes"   (fun _ _ -> ()) pp mc.mc_modtypes  );
+       (fun pp -> IM.dump "Typedecls"  (fun _ _ -> ()) pp mc.mc_typedecls );
+       (fun pp -> IM.dump "Operators"  (fun _ _ -> ()) pp mc.mc_operators );
+       (fun pp -> IM.dump "Axioms"     (fun _ _ -> ()) pp mc.mc_axioms    );
        (fun pp -> IM.dump "Theories"   (fun _ _ -> ()) pp mc.mc_theories  );
        (fun pp -> IM.dump "Components" (fun _ _ -> ()) pp mc.mc_components);
     ])
