@@ -262,7 +262,7 @@ module Ax = struct
         TT.TyPolicy.empty (EcUnify.UniEnv.create()) ax.pa_formula
     in
 
-    let axd = { ax_spec = form;
+    let axd = { ax_spec = Some form;
                 ax_kind = transform_kind ax.pa_kind }
     in
       
@@ -451,6 +451,8 @@ module Theory = struct
           { scope with sc_operators = bind id op scope.sc_operators }
       | Th_axiom    (id,ax) -> 
           { scope with sc_axioms = bind id ax scope.sc_axioms } 
+      | Th_theory   (id,th) ->
+          { scope with sc_theories = bind id th scope.sc_theories }
       | _ -> assert false in
     List.fold_left add { scope with sc_env = env } lth
 end

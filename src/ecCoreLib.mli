@@ -1,10 +1,13 @@
 (* --------------------------------------------------------------------- *)
 (*           predefined string                                           *)
 (* ----------------------------------------------------------------------*)
+(* Symbol with specific parsing *)
 val s_get  : string
 val s_set  : string
 val s_nil  : string
 val s_cons : string
+val s_opp  : string
+val s_abs  : string
 
 
 (* --------------------------------------------------------------------- *)

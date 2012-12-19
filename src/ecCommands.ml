@@ -112,7 +112,7 @@ and process (scope : EcScope.scope) (g : global) =
     | GthW3      a    -> process_w3_import  scope a
     | Gprint     p    -> process_print      scope p; scope
   in
-    EcEnv.dump EcDebug.initial (EcScope.env scope);
+    EcEnv.dump EcDebug.initial (EcScope.env scope); 
     scope
 
 (* -------------------------------------------------------------------- *)

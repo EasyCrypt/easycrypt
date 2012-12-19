@@ -66,6 +66,6 @@ let mk_op typ dom codom body prob =
 type axiom_kind = Axiom | Lemma
 
 type axiom = {
-  ax_spec : EcFol.form;                       (* formula *)
+  ax_spec : EcFol.form option; (* formula *) (* None means that we can not build its value from why3 *)
   ax_kind : axiom_kind
 }

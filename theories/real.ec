@@ -1,9 +1,12 @@
+require int.
+
 import why3 "real" "Real"
-  op "prefix -" as "opp".
+  op "prefix -" as "__opp".
   
 theory Rdot.
+  (* Fixme rebing to the normal  one *)
   import why3 "real" "RealInfix"
-    op "prefix -." as "opp".
+    op "prefix -." as "__opp".
 end Rdot.
 
 theory Abs.
@@ -13,8 +16,6 @@ theory Abs.
   (* unset triangular_inequality *)
 
 end Abs.
-(* Ca c'est chiant de devoir faire des import et des exports *)
-import Abs.
 export Abs.
 
 theory Triangle.
@@ -29,7 +30,6 @@ theory FromInt.
    import why3 "real" "FromInt".
 
 end FromInt.
-import FromInt.
 export FromInt.
 
 theory PowerInt.
@@ -37,7 +37,6 @@ theory PowerInt.
      op "power" as "^".
      
 end PowerInt.
-import PowerInt.
 export PowerInt.
 
 

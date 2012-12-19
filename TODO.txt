@@ -7,18 +7,19 @@
 - vérifier l'envoi vers Why3:
    faire des bateries de test.
 - étendre le parser pour faire les import why3 interactivement:
-  En bonne voie:
-    - Les premiers tests dans int.ec montre des petits bug ou des trucs
-      chiants qu'il faut resoudre.
-- faire un fichier real.ec, option.ec, list.ec, fmap.ec, map.ec, 
-  bitstring.ec,
+  verifier que si un theorie est utilis'ee par why3 elle est bind'ee dans 
+  ecEnv ...
+- faire un fichier fmap.ec, map.ec, bitstring.ec,
   il faudra faire rapidement aussi un group.ec, cyclic_group.ec ... 
   Je pense que le type bitstring.ec n'est pas pour l'instant link'e dans
   initial, il faut le rajouter.
 - dump de why3.
+- gerer les tests avec xxxx_name.ec 
+
 
 * TODO
 
+- require : do not check
 - pretty-printing de l'AST typé
 - noeud de meta-info dans les AST typés
 - chemins privés (attendre la fin des modules)

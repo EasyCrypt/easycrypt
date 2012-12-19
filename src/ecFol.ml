@@ -54,7 +54,6 @@ let fv_node = function
   | Fapp(_,args) | Ftuple args ->
       List.fold_left (fun s f -> Sid.union s (fv f)) Sid.empty args
   
-
 let mk_form node ty = 
   { f_node = node;
     f_ty   = ty;

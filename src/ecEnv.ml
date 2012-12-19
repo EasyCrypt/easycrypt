@@ -433,6 +433,13 @@ module Op = struct
 
   let rebind = MC.bind_op
 
+  (* Do not use only for the && || ... *)
+  let bind_logical id op env = 
+    let env = MC.bind_op id op env in
+    { env with
+      env_item = Th_operator(id,op) :: env.env_item }
+    
+
   let all (qname : qsymbol) (env : env) =
     MC.lookupall (fun mc -> mc.mc_operators) qname env
 end
@@ -453,6 +460,8 @@ module Ax = struct
         env_item = Th_axiom(id,ax) :: env.env_item }
 
   end)
+  let rebind = MC.bind_ax
+    
 end
 
 (* -------------------------------------------------------------------- *)
@@ -530,6 +539,8 @@ module Theory = struct
             env_rb   = List.rev_append cth.cth_w3 env.env_rb;
             env_item = theory :: env.env_item; }
 
+  let rebind = MC.bind_theory
+    
   (* ------------------------------------------------------------------ *)
   let bindall xtys env =
     List.fold_left
@@ -662,6 +673,8 @@ let import_w3 env th rd =
   let add env = function
     | Th_type (id,ty) -> Ty.rebind id ty env
     | Th_operator (id,op) -> Op.rebind id op env
+    | Th_axiom(id,ax) -> Ax.rebind id ax env
+    | Th_theory(id,th) -> Theory.rebind id th env
     | _ -> assert false in
   let env = List.fold_left add env lth in
   env, lth 
@@ -686,19 +699,17 @@ let initial =
     ["True"] , EcWhy3.RDls, EcPath.basename EcCoreLib.p_true;
     ["False"], EcWhy3.RDls, EcPath.basename EcCoreLib.p_false ] in
   let env, _ = import_w3 env Why3.Theory.bool_theory bool_rn in
-  let opb_rn = [
-    ["andb"] , EcWhy3.RDls, EcPath.basename EcCoreLib.p_and;
-    ["orb"]  , EcWhy3.RDls, EcPath.basename EcCoreLib.p_or;
-    ["implb"], EcWhy3.RDls, EcPath.basename EcCoreLib.p_imp;
-    ["notb"] , EcWhy3.RDls, EcPath.basename EcCoreLib.p_not ] in 
-  let env,_ = import_w3_dir env ["bool"] "Bool" opb_rn in
-  let env = Op.bind (EcPath.basename EcCoreLib.p_iff)
+  let add_bool sign env path = 
+    Op.bind_logical (EcPath.basename path)
       { op_params = [];
-        op_dom    = Some [EcTypes.tbool;EcTypes.tbool];
+        op_dom    = Some sign;
         op_codom  = Some EcTypes.tbool;
         op_body   = None;
         op_prob   = false } env in
-   let list_rn = [
+  let env = add_bool [EcTypes.tbool] env EcCoreLib.p_not in
+  let env = List.fold_left (add_bool [EcTypes.tbool;EcTypes.tbool]) env
+      [EcCoreLib.p_and; EcCoreLib.p_or; EcCoreLib.p_imp; EcCoreLib.p_iff] in
+  let list_rn = [
     ["list"], EcWhy3.RDts, EcPath.basename EcCoreLib.p_list;
     ["Nil"] , EcWhy3.RDls, EcPath.basename EcCoreLib.p_nil;
     ["Cons"], EcWhy3.RDls, EcPath.basename EcCoreLib.p_cons;

@@ -300,7 +300,7 @@ exp:
    { PEapp (pqsymb_of_symb op.pl_loc "!", [e]) }
 
 | op=loc(MINUS) e=loc(exp) %prec prec_prefix_op
-   { PEapp (pqsymb_of_symb op.pl_loc "-", [e]) }
+   { PEapp (pqsymb_of_symb op.pl_loc EcCoreLib.s_opp, [e]) }
 
 | e1=loc(exp) op=loc(OP1) e2=loc(exp)  { PEapp (pqsymb_of_psymb op, [e1; e2]) }
 | e1=loc(exp) op=loc(OP2) e2=loc(exp)  { PEapp (pqsymb_of_psymb op, [e1; e2]) }

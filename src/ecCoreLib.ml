@@ -1,7 +1,10 @@
-let s_get  = "get"
-let s_set  = "set"
-let s_nil  = "[]"
-let s_cons = "::"
+let s_get  = "__get"
+let s_set  = "__set"
+let s_nil  = "__nil"
+let s_cons = "__cons"
+let s_abs  = "__abs"
+let s_opp  = "__opp"
+
 
 (* -------------------------------------------------------------------- *)
 let id_top       = EcIdent.create "<top>"
@@ -12,8 +15,8 @@ let id_int       = EcIdent.create "int"
 let id_real      = EcIdent.create "real"
 let id_bitstring = EcIdent.create "bitstring"
 let id_list      = EcIdent.create "list"
-let id_nil       = EcIdent.create "[]"
-let id_cons     = EcIdent.create "::"
+let id_nil       = EcIdent.create s_nil
+let id_cons      = EcIdent.create "::"
 
 let id_true      = EcIdent.create "true"
 let id_false     = EcIdent.create "false"
