@@ -27,7 +27,7 @@ theory EuclDiv.
     op "mod" as "%".
 
 end EuclDiv.
-import Abs.
+import EuclDiv.
 export EuclDiv.
 
 (* Not sure we should use this one *)
