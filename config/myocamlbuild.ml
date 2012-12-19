@@ -42,10 +42,6 @@ let _ = dispatch begin function
          flag ["ocaml"; "infer_interface"; "syntax_"^syntax] & S[A"-syntax"; A syntax];
        end (find_syntaxes ());
 
-       (* deriving *)
-       flag ["ocaml"; "pp"      ; "deriving"] (A"deriving/syntax/pa_deriving.cma");
-       dep  ["ocaml"; "ocamldep"; "deriving"] ["deriving/syntax/pa_deriving.cma"];
-
        (* Threads swicthes *)
        flag ["ocaml"; "pkg_threads"; "compile"] (S[A "-thread"]);
        flag ["ocaml"; "pkg_threads"; "link"] (S[A "-thread"]);

@@ -30,3 +30,4 @@
 - batterie de tests
 - mot-clef "use"
 - raffinements
+- import ocaml batteries
