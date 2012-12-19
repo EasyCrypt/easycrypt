@@ -117,7 +117,7 @@
 %token NOT
 %token OP
 %token OR
-// %token PIPE
+%token PIPE
 %token POP
 // %token PR
 %token PRED
@@ -291,6 +291,8 @@ sexp:
 
 | LBRACKET es=loc(p_exp_sm_list0) RBRACKET
    { (pelist es.pl_loc es.pl_desc).pl_desc }
+| PIPE e =loc(exp) PIPE 
+    { PEapp (pqsymb_of_symb e.pl_loc EcCoreLib.s_abs, [e]) }
 ;
 
 exp:
@@ -378,6 +380,9 @@ sform:
 
 | LBRACKET es=loc(p_form_sm_list0) RBRACKET
    { (pflist es.pl_loc es.pl_desc).pl_desc }
+
+| PIPE e =loc(form) PIPE 
+    { PFapp (pqsymb_of_symb e.pl_loc EcCoreLib.s_abs, [e]) }
                           
 form:
 | e=sform { e }
@@ -775,7 +780,7 @@ print:
 ;
 (* -------------------------------------------------------------------- *)
 (* Global entries                                                       *)
-%inline string_list: l=plist0(STRING,COMMA) { l };
+%inline string_list: l=plist1(STRING,empty) { l };
 
 renaming:
 | TYPE l=string_list AS s=STRING { l, RNty, s }
@@ -784,8 +789,12 @@ renaming:
 ;
  
 theory_w3:
-| IMPORT WHY3 path=string_list th=STRING r=plist0(renaming,SEMICOLON)
-    { path,th,r }
+| IMPORT WHY3 path=string_list r=plist0(renaming,SEMICOLON)
+    { 
+      let l = List.rev path in
+      let th = List.hd l in
+      let path = List.rev (List.tl l) in
+      path,th,r }
 ;
 
 global_:

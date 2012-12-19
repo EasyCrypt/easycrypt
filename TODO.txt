@@ -6,16 +6,19 @@
 
 * Benjamin
 
-- vérifier l'envoi vers Why3:
-   faire des bateries de test.
 - étendre le parser pour faire les import why3 interactivement:
   verifier que si un theorie est utilis'ee par why3 elle est bind'ee dans 
   ecEnv ...
 - faire un fichier fmap.ec, map.ec, bitstring.ec,
   il faudra faire rapidement aussi un group.ec, cyclic_group.ec ... 
-  Je pense que le type bitstring.ec n'est pas pour l'instant link'e dans
+
+- Je pense que le type bitstring.ec n'est pas pour l'instant link'e dans
   initial, il faut le rajouter.
-- dump de ecWhy3.
+
+- dump de ecWhy3, ecFol
+
+- Ajouter le and, or asym 
+
 
 * TODO
 
@@ -26,6 +29,6 @@
   (=> hypothèses sur adversaire - e.g. pour up-to-bad)
 - arbre de preuve + contexte dynamique de preuve
 - batterie de tests
-- mot-clef "use"
+- mot-clef "use" + nettoyage de task
 - raffinements
 - import ocaml batteries

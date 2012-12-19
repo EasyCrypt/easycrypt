@@ -11,8 +11,8 @@ end Rdot.
 
 theory Abs.
 
-  import why3 "real" "Abs".
-     (* FIXME NOTATION FOR ABS *)
+  import why3 "real" "Abs"
+    op "abs" as "__abs".
   (* unset triangular_inequality *)
 
 end Abs.
@@ -21,7 +21,7 @@ export Abs.
 theory Triangle.
 
   lemma triangular_inequality : forall (x:_,y:_,z:_),
-     abs(x-y) <= abs(x-z) + abs(y-z).
+     __abs(x-y) <= __abs(x-z) + __abs(y-z).
 
 end Triangle.
 

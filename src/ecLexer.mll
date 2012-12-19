@@ -129,7 +129,7 @@ rule main = parse
   | '\\'                      { BACKSLASH }
   | "*"                       { STAR }
   | "-"                       { MINUS }
-
+  | "|"                       { PIPE }
   (* comparison *)
   | "="                       { EQ }
   | "<>"                      { NE }

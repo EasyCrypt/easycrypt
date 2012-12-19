@@ -6,15 +6,15 @@ import why3 "int" "Int"
 
 theory Abs.
 
-  import why3 "int" "Abs".
-     (* FIXME NOTATION FOR ABS *)
+  import why3 "int" "Abs"
+    op "abs" as "__abs".
+
 end Abs.
 export Abs.
 
 theory Triangle.
   lemma triangle_inequality : forall (x:int,y:_,z:_),
-
-     abs(x-y) <= abs(x-z) + abs(y-z).
+     | x - y | <= | x - z | + | y - z |.
 
 end Triangle.
 
