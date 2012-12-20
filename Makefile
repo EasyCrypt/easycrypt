@@ -13,6 +13,7 @@ OCAMLBUILD := $(OCAMLBUILD_BIN) $(OCAMLBUILD_EXTRA)
 
 # --------------------------------------------------------------------
 .PHONY: all build byte native check clean tags
+.PHONY: %.ml
 
 all: build
 
@@ -37,3 +38,7 @@ clean:
 
 tags:
 	set -e; for i in $(CONFIG); do [ -e "$$i" ] || ln -s config/"$$i" $$i; done
+
+# --------------------------------------------------------------------
+%.ml:
+	$(OCAMLBUILD) src/$*.cmo
