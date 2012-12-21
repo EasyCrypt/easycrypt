@@ -87,9 +87,11 @@ let pp_typerror =
     | NonLinearPattern _
         -> Format.fprintf fmt "Non-linear pattern"
   
-    | DuplicatedLocals
+    | DuplicatedLocals None
         -> Format.fprintf fmt "DuplicatedLocals"
-  
+    | DuplicatedLocals (Some s)
+        -> Format.fprintf fmt "A symbol %s already declared at %s"
+            s.pl_desc (Location.tostring s.pl_loc)
     | ProbaExpressionForbidden
         -> Format.fprintf fmt "ProbaExpressionForbidden"
   
@@ -104,12 +106,17 @@ let pp_typerror =
   
     | ModApplInvalidArgInterface
         -> Format.fprintf fmt "ModApplInvalidArgInterface"
-  
-    | PropExpected pf
-        -> Format.fprintf fmt "PropExpected"
-  
-    | TermExpected pf
-        -> Format.fprintf fmt "TermExpected"
+    | TypeVariableNotAllowed 
+        -> Format.fprintf fmt "Type variable not allowed"
+    | UnificationVariableNotAllowed 
+        -> Format.fprintf fmt "unification variable not allowed"
+    | RandomExprNotAllowed 
+        -> Format.fprintf fmt "random expression not allowed"
+    | UnNamedTypeVariable 
+        -> Format.fprintf fmt "unnamed type variable"
+    | UnusedTypeVariable 
+        -> Format.fprintf fmt "unused type variable"
+        
   in
     fun fmt exn ->
       Format.fprintf fmt "%a\n%!" pp exn

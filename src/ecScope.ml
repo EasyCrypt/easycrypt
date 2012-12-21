@@ -170,6 +170,36 @@ let subscope (scope : scope) (name : symbol) =
   }
 
 (* -------------------------------------------------------------------- *)
+
+let init_ue_op o =
+  let ue = EcUnify.UniEnv.create () in
+  let tp, tparams = 
+    match o with
+    | None -> EcTypedtree.tp_relax, None 
+    | Some ls ->
+        let mk s = 
+          try 
+            let _ = EcUnify.UniEnv.get_var ~strict:true ue s.pl_desc in
+            EcTypedtree.tyerror s.pl_loc (EcTypedtree.DuplicatedLocals None)
+          with Not_found ->
+            EcUnify.UniEnv.get_var ~strict:false ue s.pl_desc in
+        EcTypedtree.tp_strict, Some (List.map mk ls) in
+  ue,tp,tparams
+
+let build_tparams loc tparams sign = 
+  let fv = Tvar.fv_sig sign in
+  if EcIdent.Sid.exists (fun id -> EcIdent.name id = "") fv then
+    EcTypedtree.tyerror loc (EcTypedtree.UnNamedTypeVariable);
+  match tparams with
+  | None -> EcIdent.Sid.elements fv
+  | Some l ->
+      let fv' = 
+        List.fold_left (fun s id -> EcIdent.Sid.add id s) EcIdent.Sid.empty l in
+      if EcIdent.Sid.equal fv fv' then l
+      else
+        (assert (EcIdent.Sid.subset fv fv');
+         EcTypedtree.tyerror loc (EcTypedtree.UnusedTypeVariable))
+    
 module Op = struct
   open EcTypes
   open EcDecl
@@ -183,32 +213,27 @@ module Op = struct
         sc_env       = EcEnv.Op.bind x op scope.sc_env; }
 
   let add (scope : scope) (op : poperator) =
-    let tp = TT.TyPolicy.init (omap op.po_tyvars unlocs) in
-    let dom,   tp  = TT.transtys scope.sc_env tp (odfl [] op.po_dom) in
-    let codom, tp  = TT.transty  scope.sc_env tp op.po_codom in
+    let ue, tp, tparams = init_ue_op op.po_tyvars in
+    let dom  = TT.transtys tp scope.sc_env ue (odfl [] op.po_dom) in
+    let codom  = TT.transty tp scope.sc_env ue op.po_codom in
     let policy = { TT.epl_prob = op.po_prob } in
-    let body, ue =
-      let ue = EcUnify.UniEnv.create () in
-      let body = 
-        match op.po_body with
-        | None -> None
-        | Some(xs, body) ->
-            let xs = List.map EcIdent.create (unlocs xs) in
-            let env =
-              EcEnv.Var.bindall ~local:true (List.combine xs dom) scope.sc_env
-            in
-            let body = TT.transexpcast env policy ue codom body in
-              Some (xs, Esubst.uni (EcUnify.UniEnv.asmap ue) body) in
-      body, ue in
-    let uni = Subst.uni (EcUnify.UniEnv.asmap ue) in
-
-    let dom, codom = List.map uni dom, uni codom in
+    let body =
+      match op.po_body with
+      | None -> None
+      | Some(xs, body) ->
+          let xs = List.map EcIdent.create (unlocs xs) in
+          let env =
+            EcEnv.Var.bindall ~local:true (List.combine xs dom) scope.sc_env
+          in
+          let body = TT.transexpcast env policy ue codom body in
+          Some (xs, body) in
+    let uni = Tuni.subst (EcUnify.UniEnv.close ue) in
+    let body = omap body (fun (ids,body) -> ids, Esubst.mapty uni body) in
+    let (dom,codom as sign) = List.map uni dom, uni codom in
+    let tparams = build_tparams op.po_name.pl_loc tparams sign in
     let dom = if op.po_dom = None then None else Some dom in
-    let tyop =
-      EcDecl.mk_op (TT.TyPolicy.decl tp) dom codom
-        body op.po_prob
-    in
-      bind scope (EcIdent.create (unloc op.po_name), tyop)
+    let tyop = EcDecl.mk_op tparams dom codom body op.po_prob in
+    bind scope (EcIdent.create (unloc op.po_name), tyop)
 end
 
 (* -------------------------------------------------------------------- *)
@@ -216,27 +241,25 @@ module Pred = struct
   module TT = EcTypedtree
 
   let add (scope : scope) (op : ppredicate) =
-    let tp  = TT.TyPolicy.init (omap op.pp_tyvars unlocs) in
-    let dom,   tp  = TT.transtys scope.sc_env tp (odfl [] op.pp_dom) in
-    let body, ue =
-      let body, ue = 
-        let ue = EcUnify.UniEnv.create () in
-        match op.pp_body with
-        | None -> None, ue
-        | Some(xs,body) ->
-            let xs = List.map EcIdent.create (unlocs xs) in
-            let env = TT.Fenv.mono_fenv scope.sc_env in
-            let env = TT.Fenv.bind_locals env xs dom in 
-            let body,ue = TT.transformula env tp ue body in
-            Some(xs, body), ue in
-      body, ue in
-    let uni = Subst.uni (EcUnify.UniEnv.asmap ue) in 
+    let ue, tp, tparams = init_ue_op op.pp_tyvars in
+    let dom  = TT.transtys tp scope.sc_env ue (odfl [] op.pp_dom) in
+    let body =
+      match op.pp_body with
+      | None -> None
+      | Some(xs, body) ->
+          let xs = List.map EcIdent.create (unlocs xs) in
+          let env = TT.Fenv.mono_fenv scope.sc_env in
+          let env = TT.Fenv.bind_locals env xs dom in 
+          let body = TT.transformula env ue body in
+          Some(xs, body) in
+    let uni = Tuni.subst (EcUnify.UniEnv.close ue) in
+    let body = omap body (fun (ids,body) -> ids, EcFol.Fsubst.mapty uni body) in
     let dom = List.map uni dom in
+    let tparams = build_tparams op.pp_name.pl_loc tparams (dom,tbool) in
     let dom = if op.pp_dom = None then None else Some dom in
-    let tyop =
-      EcDecl.mk_pred (TT.TyPolicy.decl tp) dom body
-    in
-      Op.bind scope (EcIdent.create (unloc op.pp_name), tyop)
+    let tyop = EcDecl.mk_pred tparams dom body in
+    Op.bind scope (EcIdent.create (unloc op.pp_name), tyop)
+
 end
 
 (* -------------------------------------------------------------------- *)
@@ -257,15 +280,12 @@ module Ax = struct
         sc_env    = EcEnv.Ax.bind x ax scope.sc_env; }
 
   let add (scope : scope) (ax : paxiom) =
-    let form, _ = 
-      TT.transformula (TT.Fenv.mono_fenv scope.sc_env) 
-        TT.TyPolicy.empty (EcUnify.UniEnv.create()) ax.pa_formula
-    in
-
+    let ue = EcUnify.UniEnv.create() in
+    let form = 
+      TT.transformula (TT.Fenv.mono_fenv scope.sc_env) ue ax.pa_formula in
+    let form = EcFol.Fsubst.mapty (Tuni.subst (EcUnify.UniEnv.close ue)) form in
     let axd = { ax_spec = Some form;
-                ax_kind = transform_kind ax.pa_kind }
-    in
-      
+                ax_kind = transform_kind ax.pa_kind } in
       bind scope (EcIdent.create (unloc ax.pa_name), axd)
 end
 
@@ -285,21 +305,21 @@ module Ty = struct
       bind scope (EcIdent.create name, tydecl)
 
   let add (scope : scope) (args, name) = 
-    let tp = TyPolicy.init (Some (unlocs args)) in
+    let _, _, tparams = init_ue_op (Some args) in
     let tydecl = {
-      tyd_params = TyPolicy.decl tp;
+      tyd_params = oget tparams;
       tyd_type   = None;
     } in
-      bind scope (EcIdent.create (unloc name), tydecl)
+    bind scope (EcIdent.create (unloc name), tydecl)
 
   let define (scope : scope) (args, name) body = 
-    let tp = TyPolicy.init (Some (unlocs args)) in
-    let body, tp = transty scope.sc_env tp body in
+    let ue, _, tparams = init_ue_op (Some args) in
+    let body = transty tp_tydecl scope.sc_env ue body in
     let tydecl = {
-      tyd_params = TyPolicy.decl tp;
+      tyd_params = oget tparams;
       tyd_type   = Some body;
     } in
-      bind scope (EcIdent.create (unloc name), tydecl)
+    bind scope (EcIdent.create (unloc name), tydecl)
 end
 
 (* -------------------------------------------------------------------- *)

@@ -106,9 +106,11 @@ let map gt g f =
   | Ftuple es -> f_tuple (List.map g es) 
 
 (* -------------------------------------------------------------------- *)
-module Subst = struct
-  let uni uidmap = 
-    let rec aux formula =
-      map (EcTypes.Subst.uni uidmap) aux formula in
-    aux
+module Fsubst = struct
+  let mapty onty = 
+    let rec aux f = map onty aux f in
+    aux 
+
+  let uni uidmap = mapty (Tuni.subst uidmap)
+
 end

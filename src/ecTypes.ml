@@ -15,11 +15,6 @@ type ty =
 type dom = ty list
 type tysig = dom * ty 
 
-type ty_decl = {
-  td_params : EcIdent.t list;
-  td_body   : ty
-}
-
 (* -------------------------------------------------------------------- *)
 let tunit      = Tconstr(EcCoreLib.p_unit, [])
 let tbool      = Tconstr(EcCoreLib.p_bool, [])
@@ -30,7 +25,6 @@ let tlist ty =
   Tconstr (EcCoreLib.p_list, [ ty ])
 
 (* -------------------------------------------------------------------- *)
-let mkunivar () = Tunivar (EcUidgen.unique ())
 
 let map f t = 
   match t with 
@@ -50,79 +44,71 @@ let sub_exists f t =
   | Tconstr (p, lty) -> List.exists f lty
 
 (* -------------------------------------------------------------------- *)
-module Subst = struct
-  let uni1 ((id, t) : uid * ty) =
-    let rec uni1 = function
-      | Tunivar id' when uid_equal id id' -> t
-      | u -> map uni1 u
-    in
-      fun u -> uni1 u
 
-  let uni (uidmap : ty EcUidgen.Muid.t) =
-    let rec uni = function
-      | (Tunivar id) as t -> odfl t (EcUidgen.Muid.find_opt id uidmap)
-      | t -> map uni t
-    in
-      fun t -> uni t
+module Tuni = struct
+  let subst1 ((id, t) : uid * ty) =
+    let rec aux = function
+      | Tunivar id' when uid_equal id id' -> t
+      | u -> map aux u in
+    aux
+
+  let subst (uidmap : ty Muid.t) =
+    let rec aux = function
+      | (Tunivar id) as t -> odfl t (Muid.find_opt id uidmap)
+      | t -> map aux t in
+    aux 
+
+  let subst_dom uidmap = List.map (subst uidmap)
+
+  let occur u = 
+    let rec aux t = 
+      match t with
+      | Tunivar u' -> uid_equal u u'
+      | _ -> sub_exists aux t in
+    aux
+
+  let rec fv_rec fv t = 
+    match t with
+    | Tunivar id -> Suid.add id fv 
+    | _ -> fold fv_rec fv t 
+
+  let fv = fv_rec Suid.empty
+
+  let fv_sig (dom, codom) = 
+    List.fold_left fv_rec (fv codom) dom
+
+
 end
 
-(* -------------------------------------------------------------------- *)
-exception UnBoundUni of EcUidgen.uid
-exception UnBoundVar of EcIdent.t
+module Tvar = struct 
+  let subst1 (id,t) = 
+    let rec aux = function
+      | Tvar id' when id_equal id id' -> t
+      | u -> map aux u in
+    aux
 
-let full_get_uni s id = 
-  try Muid.find id s with _ -> raise (UnBoundUni id) 
+  let subst (s : ty Mid.t) =
+    let rec aux = function
+      | (Tvar id) as t -> odfl t (Mid.find_opt id s)
+      | t -> map aux t in
+    aux 
 
-let full_inst_uni s = 
-  let rec subst t = 
+  let init lv lt = 
+    assert (List.length lv = List.length lt);
+    List.fold_left2 (fun s v t -> Mid.add v t s) Mid.empty lv lt
+
+  let rec fv_rec fv t = 
     match t with
-    | Tunivar id -> full_get_uni s id
-    | _ -> map subst t in
-  subst 
+    | Tvar id -> Sid.add id fv 
+    | _ -> fold fv_rec fv t 
 
-let inst_uni s = 
-  let rec subst t = 
-    match t with
-    | Tunivar id -> odfl t (Muid.find_opt id s )
-    | _ -> map subst t in
-  subst 
+  let fv = fv_rec Sid.empty
 
-let inst_uni_dom s = List.map (inst_uni s)
-    
-let inst_var s = 
-  let rec subst t = 
-    match t with 
-    | Tvar id -> Mid.find_def t id s 
-    | _ -> map subst t in
-  subst
+  let fv_sig (dom, codom) = 
+    List.fold_left fv_rec (fv codom) dom
 
-let init_substvar lv lt = 
-  assert (List.length lv = List.length lt);
-  List.fold_left2 (fun s v t -> Mid.add v t s) Mid.empty lv lt
-
-let occur_uni u = 
-  let rec aux t = 
-    match t with
-    | Tunivar u' -> uid_equal u u'
-    | _ -> sub_exists aux t in
-  aux
-
-(* -------------------------------------------------------------------- *)
-let init_unit params = 
-    List.fold_left (fun s v -> Mid.add v (mkunivar ()) s) Mid.empty params 
-
-let freshen (params : EcIdent.t list) (ty : ty) =
-  let vars = init_unit params in
-  inst_var vars ty 
-
-let freshendom params dom = 
-  let vars = init_unit params in
-  List.map (inst_var vars) dom
-
-let freshensig params (dom,codom) = 
-  let vars = init_unit params in
-  List.map (inst_var vars) dom, inst_var vars codom
-
+end
+ 
 
 (* -------------------------------------------------------------------- *)
 type lpattern =
@@ -168,9 +154,13 @@ let e_map ft fe e =
 
 (* -------------------------------------------------------------------- *)
 module Esubst = struct 
-  let uni (uidmap : ty EcUidgen.Muid.t) =
-    let rec aux e = e_map (Subst.uni uidmap) aux e in
-      aux
+
+  let mapty onty = 
+    let rec aux e = e_map onty aux e in
+    aux 
+
+  let uni (uidmap : ty Muid.t) = mapty (Tuni.subst uidmap)
+
 end
 
 (* -------------------------------------------------------------------- *)

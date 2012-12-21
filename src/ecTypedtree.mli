@@ -17,34 +17,37 @@ type tyerror =
   | OpNotOverloadedForSig    of qsymbol * ty list
   | UnexpectedType           of ty * ty * ty * ty
   | NonLinearPattern         of lpattern
-  | DuplicatedLocals
+  | DuplicatedLocals         of psymbol option
   | ProbaExpressionForbidden
   | PatternForbiden
   | ModApplToNonFunctor
   | ModApplInvalidArity
   | ModApplInvalidArgInterface
-  | PropExpected of pformula
-  | TermExpected of pformula
+  | UnificationVariableNotAllowed
+  | TypeVariableNotAllowed
+  | RandomExprNotAllowed
+  | UnNamedTypeVariable
+  | UnusedTypeVariable
 
 exception TyError of Location.t * tyerror
 
+val tyerror : Location.t -> tyerror -> 'a
 (* -------------------------------------------------------------------- *)
-module TyPolicy : sig 
-  type t
-  val decl  : t -> EcIdent.t list
-  val relax : t -> t 
-  val empty : t 
-  val init  : string list option -> t
-end
+
+type typolicy
+val tp_tydecl : typolicy
+val tp_relax  : typolicy
+val tp_strict : typolicy
 
 (* -------------------------------------------------------------------- *)
-val transty : EcEnv.env -> TyPolicy.t -> pty -> ty * TyPolicy.t
-val transtys : EcEnv.env -> TyPolicy.t -> pty list -> ty list * TyPolicy.t
-val transty_notv : EcEnv.env -> pty -> ty 
+val transty : typolicy -> EcEnv.env -> EcUnify.unienv -> pty -> ty 
+val transtys :  
+    typolicy -> EcEnv.env -> EcUnify.unienv -> pty list -> ty list
+
 
 (* -------------------------------------------------------------------- *)
 val select_op :
-     proba:bool
+     bool
   -> EcEnv.env
   -> qsymbol
   -> EcUnify.unienv
@@ -70,8 +73,8 @@ module Fenv : sig
   val mono_fenv : EcEnv.env -> fenv
   val bind_locals : fenv -> EcIdent.t list -> ty list -> fenv
 end
-val transformula : Fenv.fenv -> TyPolicy.t -> EcUnify.unienv -> 
-  pformula -> EcFol.form * EcUnify.unienv
+val transformula : Fenv.fenv -> EcUnify.unienv -> 
+  pformula -> EcFol.form 
 
 (* -------------------------------------------------------------------- *)
 val transsig   : EcEnv.env -> psignature -> tysig

@@ -15,8 +15,6 @@ type ty =
 type dom = ty list
 type tysig = dom * ty 
 
-type ty_decl = { td_params : EcIdent.t list; td_body : ty; }
-
 (* -------------------------------------------------------------------- *)
 val tunit      : ty
 val tbool      : ty
@@ -25,21 +23,22 @@ val tbitstring : ty
 val tlist      : ty -> ty
 
 (* -------------------------------------------------------------------- *)
-val mkunivar : unit -> ty
 
-(* -------------------------------------------------------------------- *)
-  
-(* [freshen n ty] replaces the [n] type variables by fresh
- * unification variables
- *)
-val freshen : EcIdent.t list -> ty -> ty
-val freshendom : EcIdent.t list -> dom -> dom
-val freshensig : EcIdent.t list -> tysig -> tysig
+module Tuni : sig
+  val subst1    : (uid * ty) -> ty -> ty
+  val subst     : ty Muid.t -> ty -> ty
+  val subst_dom : ty Muid.t -> dom -> dom
+  val occur     : uid -> ty -> bool
+  val fv        : ty -> Suid.t
+  val fv_sig    : tysig -> Suid.t
+end
 
-(* -------------------------------------------------------------------- *)
-module Subst : sig
-  val uni1 : (uid * ty) -> ty -> ty
-  val uni  : ty Muid.t -> ty -> ty
+module Tvar : sig
+  val subst1  : (EcIdent.t * ty) -> ty -> ty
+  val subst   : ty Mid.t -> ty -> ty
+  val init    : EcIdent.t list -> ty list -> ty Mid.t
+  val fv      : ty -> Sid.t
+  val fv_sig  : tysig -> Sid.t
 end
 
 (* -------------------------------------------------------------------- *)
@@ -48,17 +47,9 @@ val map : (ty -> ty) -> ty -> ty
 (* [sub_exists f t] true if one of the strict-subterm of [t] valid [f] *)
 val sub_exists : (ty -> bool) -> ty -> bool
 
-val occur_uni : EcUidgen.uid -> ty -> bool
-
 (* -------------------------------------------------------------------- *)
-exception UnBoundUni of EcUidgen.uid
-exception UnBoundVar of EcIdent.t 
 
-val full_inst_uni : ty Muid.t -> ty -> ty
-val inst_uni : ty Muid.t -> ty -> ty
-val inst_uni_dom : ty Muid.t -> dom -> dom
-val inst_var : ty EcIdent.Mid.t -> ty -> ty
-val init_substvar : EcIdent.t list -> ty list -> ty EcIdent.Mid.t
+
 
 (* -------------------------------------------------------------------- *)
 type lpattern =
@@ -86,7 +77,10 @@ val ids_of_lpattern : lpattern -> EcIdent.t list
 
 (* -------------------------------------------------------------------- *)
 module Esubst : sig
+  val mapty : (ty -> ty) -> tyexpr -> tyexpr
+
   val uni : ty Muid.t -> tyexpr -> tyexpr 
+
 end
 
 (* -------------------------------------------------------------------- *)

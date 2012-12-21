@@ -409,7 +409,7 @@ module Ty = struct
   let unfold (name : EcPath.path) (args : EcTypes.ty list) (env : env) =
     match trylookup_by_path name env with
     | Some ({ tyd_type = Some body} as tyd) ->
-        EcTypes.inst_var (EcTypes.init_substvar tyd.tyd_params args) body
+        EcTypes.Tvar.subst (EcTypes.Tvar.init tyd.tyd_params args) body
     | _ -> raise (LookupFailure (`Path name))
 end
 
