@@ -33,7 +33,7 @@ and f_node =
   | Flet   of lpattern * form * form
   | Fint    of int                               (* int. literal        *)
   | Flocal  of EcIdent.t                         (* Local variable      *)
-  | Fpvar   of EcPath.path * ty * Side.t         (* sided symbol        *)
+  | Fpvar   of EcTypes.prog_var * ty * Side.t    (* sided symbol        *)
   | Fapp    of EcPath.path * form list           (* op/pred application *)
   | Ftuple  of form list                         (* tuple constructor     *)
 

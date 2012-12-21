@@ -536,6 +536,7 @@ let check_side accu side =
 
 let trans_pv env vm (p,ty) side =
   (* FIXME ensure that ty is closed *)
+  let p = p.pv_name in
   let accu = vm.accu in
   check_side accu side;
   let pvm = accu.pvm.(side) in

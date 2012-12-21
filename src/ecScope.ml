@@ -223,7 +223,7 @@ module Op = struct
       | Some(xs, body) ->
           let xs = List.map EcIdent.create (unlocs xs) in
           let env =
-            EcEnv.Var.bindall ~local:true (List.combine xs dom) scope.sc_env
+            EcEnv.Var.bindall (List.combine xs dom) None scope.sc_env
           in
           let body = TT.transexpcast env policy ue codom body in
           Some (xs, body) in

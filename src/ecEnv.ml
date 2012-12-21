@@ -29,6 +29,12 @@ type comp_th =
 let theory_of_comp_th th = th.cth_item
 
 (* -------------------------------------------------------------------- *)
+
+type varbind = {
+  vb_type  : EcTypes.ty;
+  vb_kind  : EcTypes.pvar_kind option;
+}
+
 type preenv = {
   env_scope  : EcPath.path;
   env_root   : premc;
@@ -50,10 +56,6 @@ and premc = {
   mc_components : unit IM.t;
 }
 
-and varbind = {
-  vb_type  : EcTypes.ty;
-  vb_local : bool;
-}
 
 type env = preenv
 type mcomponents = premc
@@ -363,13 +365,13 @@ module Var = struct
     let bind = MC.bind_variable
   end)
 
-  let bind (x : EcIdent.t) (ty : EcTypes.ty) ?(local = false) (env : env) =
-    let vb = { vb_type = ty; vb_local = local } in
+  let bind (x : EcIdent.t) (ty : EcTypes.ty) kind (env : env) =
+    let vb = { vb_type = ty; vb_kind = kind } in
       bind x vb env
 
-  let bindall xtys ?(local = false) (env : env) =
+  let bindall xtys kind (env : env) =
     List.fold_left
-      (fun env (x, ty) -> bind x ty ~local env)
+      (fun env (x, ty) -> bind x ty kind env)
       env xtys
 end
 
@@ -640,20 +642,28 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Ident = struct
-  type idlookup_t = [`Var of bool | `Ctnt of operator]
+
+  type idlookup_t = 
+    [ `Local of EcIdent.t
+    | `Pvar of EcTypes.prog_var 
+    | `Ctnt of EcPath.path * operator ]
 
   let trylookup (name : qsymbol) (env : env) =
     let for_var () =
       match Var.trylookup name env with
       | None -> None
       | Some (p, x) ->
-          Some (p, Some x.vb_type, (`Var x.vb_local :> idlookup_t))
+          let idl = 
+            match x.vb_kind with
+            | None -> `Local (EcPath.basename p) 
+            | Some k -> `Pvar { EcTypes.pv_name = p; EcTypes.pv_kind = k } in
+          Some (Some x.vb_type, (idl :> idlookup_t))
 
     and for_op () =
       match Op.trylookup name env with
       | None -> None
       | Some (_, op) when not (op_ctnt op) -> None
-      | Some (p, op) -> Some (p, op.op_codom, (`Ctnt op :> idlookup_t))
+      | Some (p, op) -> Some (op.op_codom, (`Ctnt(p, op) :> idlookup_t))
     in
       List.fpick [for_var; for_op]
 
@@ -722,7 +732,7 @@ let initial =
 
 (* -------------------------------------------------------------------- *)
 type ebinding = [
-  | `Variable  of bool * EcTypes.ty
+  | `Variable  of EcTypes.pvar_kind option * EcTypes.ty
   | `Function  of funsig
   | `Module    of tymod
   | `ModType   of tymod
@@ -730,7 +740,7 @@ type ebinding = [
 
 let bind1 ((x, eb) : EcIdent.t * ebinding) (env : env) =
   match eb with
-  | `Variable v -> Var   .bind   x (snd v) ~local:(fst v) env
+  | `Variable v -> Var   .bind   x (snd v) (fst v) env
   | `Function f -> Fun   .bind   x f env
   | `Module   m -> Mod   .bind_s x m env
   | `ModType  i -> ModTy .bind   x i env

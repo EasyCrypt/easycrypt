@@ -56,20 +56,27 @@ type lpattern =
   | LSymbol of EcIdent.t
   | LTuple  of EcIdent.t list
 
+type pvar_kind = 
+  | PVglob
+  | PVloc 
+
+type prog_var = 
+    { pv_name : EcPath.path;
+      pv_kind : pvar_kind }
+
 type tyexpr =
   | Eint      of int                              (* int. literal       *)
   | Eflip                                         (* flip               *)
   | Einter    of tyexpr * tyexpr                  (* interval sampling  *)
   | Ebitstr   of tyexpr                           (* bitstring sampling *)
   | Eexcepted of tyexpr * tyexpr                  (* restriction        *)
-  | Elocal    of EcIdent.t * ty                   (* local variable     *)
-  | Evar      of EcPath.path * ty                 (* module variable    *)
+  | Elocal    of EcIdent.t * ty         (* local variable binded by let *)
+  | Evar      of prog_var  * ty                   (* module variable    *)
+                               
   | Eapp      of EcPath.path * tyexpr list * ty   (* op. application    *)
   | Elet      of lpattern * tyexpr * tyexpr       (* let binding        *)
   | Etuple    of tyexpr list                      (* tuple constructor  *)
   | Eif       of tyexpr * tyexpr * tyexpr         (* _ ? _ : _          *)
-
-val mk_var : bool -> EcPath.path -> ty -> tyexpr
 
 (* -------------------------------------------------------------------- *)
 val e_map : (ty -> ty) -> (tyexpr -> tyexpr) -> tyexpr -> tyexpr

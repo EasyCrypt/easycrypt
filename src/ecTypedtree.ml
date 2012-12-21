@@ -185,9 +185,9 @@ let transpattern1 (env : EcEnv.env) ue (p : EcParsetree.lpattern) =
 let transpattern (env : EcEnv.env) ue (p : EcParsetree.lpattern) =
   match transpattern1 env ue p with
   | LSymbol x as p, ty ->
-      EcEnv.Var.bind x ty ~local:true env, p, ty
+      EcEnv.Var.bind x ty None env, p, ty
   | LTuple xs as p, (Ttuple lty as ty) ->
-      EcEnv.Var.bindall (List.combine xs lty) ~local:true env, p, ty
+      EcEnv.Var.bindall (List.combine xs lty) None env, p, ty
   | _ -> assert false
 
 (* -------------------------------------------------------------------- *)
@@ -208,13 +208,14 @@ let transexp (env : EcEnv.env) (policy : epolicy) (ue : EcUnify.unienv) e =
 
     | PEident { pl_desc = x } -> 
         begin match EcEnv.Ident.trylookup x env with
-        | Some (xpath, Some ty, kind) -> 
+        | Some (Some ty, kind) -> 
             begin match kind with
-            | `Var local -> (mk_var local xpath ty, ty)
-            | `Ctnt op   -> 
+            | `Pvar  x -> Evar(x,ty), ty
+            | `Local x -> Elocal(x,ty), ty
+            | `Ctnt(p, op) ->
                 let newue, ty = UE.freshen ue op.op_params ty in
                 UE.restore ue newue;
-                (Eapp (xpath, [], ty), ty)
+                (Eapp (p, [], ty), ty)
             end
         | _ -> tyerror loc (UnknownVariable x)
         end
@@ -433,7 +434,7 @@ and transstruct (env : EcEnv.env) (x : EcIdent.t) (st : pstructure) =
     let tydecl1 ((x, obj) : EcIdent.t * _) =
       match obj with
       | `Module   m -> (x, `Module   m.me_sig)
-      | `Variable v -> (x, `Variable (false, v.v_type))
+      | `Variable v -> (x, `Variable (Some EcTypes.PVglob, v.v_type))
       | `Function f -> (x, `Function f.f_sig)
     in
       List.fold_left
@@ -494,11 +495,12 @@ and transstruct1 (env : EcEnv.env) (st : pstructure_item) =
       (* First we add the parameters *)
       let add_param (s,ty) = add_local s, transty tp_uni env ue ty in
       let params = List.map add_param decl.pfd_tyargs in
-      let params_ = List.map (fun (id,ty) -> id, `Variable (true, ty)) params in
+      let params_ = 
+        List.map (fun (id,ty) -> id, `Variable (Some PVloc, ty)) params in
       let env = EcEnv.bindall params_ env in
       let init = ref [] in
       let locals = ref [] in
-      let add_local ty s = add_local s, `Variable (true, ty) in
+      let add_local ty s = add_local s, `Variable (Some PVloc, ty) in
       let add_locals env (ss,ty, e) = 
         let ty = transty tp_uni env ue ty in
         let locs = List.map (add_local ty) ss in
@@ -669,7 +671,7 @@ open EcFol
 
 type var_kind = 
   | Llocal of EcIdent.t * ty
-  | Lprog  of EcPath.path * ty * Side.t
+  | Lprog  of EcTypes.prog_var * ty * Side.t
   | Lctnt  of EcPath.path * ty option
 
 type op_kind = 
@@ -712,15 +714,16 @@ module Fenv = struct
   module Ident = struct
     let trylookup_env fenv ue qs = 
       let env = current_env fenv in
-      match EcEnv.Ident.trylookup qs env with
+      match EcEnv.Ident.trylookup qs env with 
       | None -> None
-      | Some (xpath, Some ty, `Var  _ ) -> Some (Lprog (xpath, ty, fenv.fe_cur))
-      | Some (xpath, None   , `Var  _ ) -> assert false 
-      | Some (xpath, ty     , `Ctnt op) ->
+      | Some(_, `Local _) -> assert false
+      | Some(Some ty, `Pvar x) ->  Some (Lprog (x, ty, fenv.fe_cur))
+      | Some(None, `Pvar  _ ) -> assert false 
+      | Some (ty, `Ctnt(p, op)) ->
           let freshen ty = 
             let newue, ty = UE.freshen ue op.op_params ty in
             UE.restore ue newue; ty in
-          Some (Lctnt (xpath, omap ty freshen))
+          Some (Lctnt (p, omap ty freshen))
 
     let trylookup_logical fenv s =
       match EcIdent.Map.byname s fenv.fe_locals with

@@ -111,6 +111,14 @@ end
  
 
 (* -------------------------------------------------------------------- *)
+type pvar_kind = 
+  | PVglob
+  | PVloc 
+
+type prog_var = 
+    { pv_name : EcPath.path;
+      pv_kind : pvar_kind }
+
 type lpattern =
   | LSymbol of EcIdent.t
   | LTuple  of EcIdent.t list
@@ -122,17 +130,11 @@ type tyexpr =
   | Ebitstr   of tyexpr                           (* bitstring sampling *)
   | Eexcepted of tyexpr * tyexpr                  (* restriction        *)
   | Elocal    of EcIdent.t * ty                   (* local variable     *)
-  | Evar      of EcPath.path * ty                 (* module variable    *)
+  | Evar      of prog_var * ty                 (* module variable    *)
   | Eapp      of EcPath.path * tyexpr list * ty   (* op. application    *)
   | Elet      of lpattern * tyexpr * tyexpr       (* let binding        *)
   | Etuple    of tyexpr list                      (* tuple constructor  *)
   | Eif       of tyexpr * tyexpr * tyexpr         (* _ ? _ : _          *)
-
-let mk_var local p ty =
-  if local then
-    Elocal (EcPath.basename p, ty)
-   else
-    Evar (p, ty)
 
 (* -------------------------------------------------------------------- *)
 let ids_of_lpattern = function
@@ -206,7 +208,7 @@ module Dump = struct
         
       | Evar (x, ty) ->
           EcDebug.onhlist pp
-            "Evar" ~extra:(EcPath.tostring x)
+            "Evar" ~extra:(EcPath.tostring x.pv_name)
             ty_dump [ty]
 
       | Eapp (p, args, ty) ->
