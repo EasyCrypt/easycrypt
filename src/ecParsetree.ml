@@ -165,6 +165,10 @@ type ptydecl = {
 (* -------------------------------------------------------------------- *)
 type ptylocals = (psymbol * pty) list
 
+type pfct_game = pqsymbol
+
+type ptyped_mem = int * pfct_game 
+
 type pformula = pformula_r located
 
 and pformula_r = 
@@ -177,6 +181,10 @@ and pformula_r =
   | PFlet    of lpattern * pformula * pformula
   | PFforall of ptylocals * pformula
   | PFexists of ptylocals * pformula
+  (* for claim *)
+  | PFforallm of ptyped_mem list * pformula
+  | PFexistsm of ptyped_mem list * pformula
+  | PFprob    of pfct_game * int * pformula
 
 
 (* -------------------------------------------------------------------- *)

@@ -10,7 +10,7 @@ theory RO.
     fun HA (x:from) : to 
   }
 
-  module type RO = { 
+  module type RO extend ROA = { 
     var m : (from,to) map
       
     fun H(x:from) : to 
@@ -19,7 +19,7 @@ theory RO.
     fun init () : unit 
   }
 
-  module RO = {
+  module RO : RO = {
     var m : (from,to) map
       
     fun H(x:from) : to = {
@@ -77,7 +77,6 @@ theory CPA_ROM1.
   declare module Adv:IAdv.
 
   module CPA = {
-    use RO.RO
     module PKE = PKE(RO.RO)
     module A = Adv(RO.RO)
     fun Main() : bool = {
@@ -98,7 +97,6 @@ theory CPA_ROM1.
   }.
 
   module CPA'(PKE:ePKE, Adv:IAdv) = {
-    use RO.RO
     module PKE = PKE(RO.RO)
     module A = Adv(RO.RO)
     fun Main() : bool = {

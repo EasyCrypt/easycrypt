@@ -6,7 +6,8 @@
 
 * Benjamin
 
-- faire passer tests/success/0008_operdef.ec
+- Verifier le typage de l'application dans formula i.e: pred / operator
+
 - étendre le parser pour faire les import why3 interactivement:
   verifier que si un theorie est utilis'ee par why3 elle est bind'ee dans 
   ecEnv ...

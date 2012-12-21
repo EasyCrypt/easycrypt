@@ -801,7 +801,12 @@ let transformula fenv ue pf =
         let fenv, xs = transl tp_relax fenv ue xs in
         let f = transf fenv pf in
         unify_error (Fenv.mono fenv) ue pf.pl_loc f.f_ty tbool;
-        f_exists xs f in
+        f_exists xs f
+    (* FIXME *) 
+    | PFprob _ -> f_int 0 
+    | PFforallm _ -> f_true 
+    | PFexistsm _ -> f_true 
+  in
   let f = transf fenv pf in
   unify_error (Fenv.mono fenv) ue pf.pl_loc f.f_ty tbool;
   f 

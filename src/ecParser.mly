@@ -149,6 +149,7 @@
 // %token WHERE
 %token WHILE
 // %token WITH
+%token PR
 
 (* Tactics *)
 // %token ABORT
@@ -383,6 +384,8 @@ sform:
 
 | PIPE e =loc(form) PIPE 
     { PFapp (pqsymb_of_symb e.pl_loc EcCoreLib.s_abs, [e]) }
+| PR LBRACKET x=fct_game pn=prog_num COLON f=loc(form) RBRACKET 
+    { PFprob(x,pn,f) }
                           
 form:
 | e=sform { e }
@@ -411,13 +414,25 @@ form:
 | LET p=lpattern EQ e1=loc(form) IN e2=loc(form) { PFlet (p, e1, e2) }
 
 | FORALL pd=param_decl COMMA e=loc(form) { PFforall(pd, e) }
-| EXIST  pd=param_decl COMMA e=loc(form) { PFexists(pd,e) }
+| FORALL pd=mem_decl   COMMA e=loc(form) { PFforallm(pd, e) }
+| EXIST  pd=param_decl COMMA e=loc(form) { PFexists(pd, e) }
+| EXIST  pd=mem_decl   COMMA e=loc(form) { PFexistsm(pd, e) }
 ;
 
 %inline p_form_sm_list0: aout=plist0(loc(form), SEMICOLON) { aout }
 %inline form_list0: aout=plist0(loc(form), COMMA) { aout }
 %inline form_list2: aout=plist2(loc(form), COMMA) { aout }
 
+fct_game: (* Extend with functor application ... *)
+| x=qident { x }
+;
+
+typed_mem:
+| pn=prog_num COLON fg=fct_game { pn,fg }
+;
+mem_decl:
+| LPAREN aout=plist1(typed_mem, COMMA) RPAREN { aout }
+;
 (* -------------------------------------------------------------------- *)
 (* Type expressions                                                     *)
 
@@ -769,6 +784,25 @@ theory_require : REQUIRE x=ident  { x }
 theory_import  : IMPORT  x=qident { x }
 theory_export  : EXPORT  x=qident { x }
 
+theory_w3:
+| IMPORT WHY3 path=string_list r=plist0(renaming,SEMICOLON)
+    { 
+      let l = List.rev path in
+      let th = List.hd l in
+      let path = List.rev (List.tl l) in
+      path,th,r }
+;
+
+renaming:
+| TYPE l=string_list AS s=STRING { l, RNty, s }
+| OP   l=string_list AS s=STRING { l, RNop, s }
+| AXIOM l=string_list AS s=STRING {l, RNpr, s }
+;
+
+%inline string_list: l=plist1(STRING,empty) { l };
+
+
+
 (* -------------------------------------------------------------------- *)
 (** Printing                                                            *)
 print:
@@ -780,22 +814,6 @@ print:
 ;
 (* -------------------------------------------------------------------- *)
 (* Global entries                                                       *)
-%inline string_list: l=plist1(STRING,empty) { l };
-
-renaming:
-| TYPE l=string_list AS s=STRING { l, RNty, s }
-| OP   l=string_list AS s=STRING { l, RNop, s }
-| AXIOM l=string_list AS s=STRING {l, RNpr, s }
-;
- 
-theory_w3:
-| IMPORT WHY3 path=string_list r=plist0(renaming,SEMICOLON)
-    { 
-      let l = List.rev path in
-      let th = List.hd l in
-      let path = List.rev (List.tl l) in
-      path,th,r }
-;
 
 global_:
 | theory_open      { GthOpen    $1 }
