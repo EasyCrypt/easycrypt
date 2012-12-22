@@ -29,4 +29,3 @@ val add_op :
 val add_ax : env -> EcPath.path -> EcDecl.axiom -> env * rebinding_item
 
 val get_w3_th : string list -> string -> Why3.Theory.theory
-  

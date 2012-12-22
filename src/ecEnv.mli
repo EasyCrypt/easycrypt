@@ -16,18 +16,18 @@ type preenv = private {
   env_comps  : (EcPath.path * premc) EcIdent.Mid.t;
   env_w3     : EcWhy3.env;
   env_rb     : EcWhy3.rebinding;        (* in reverse order *)
-  env_item   : theory_item list         (* in reverse order *)
+  env_item   : ctheory_item list        (* in reverse order *)
 }
 
 and premc = private {
-  mc_variables  : (EcPath.path * varbind)           EcIdent.Map.t;
-  mc_functions  : (EcPath.path * EcTypesmod.funsig) EcIdent.Map.t;
-  mc_modules    : (EcPath.path * EcTypesmod.tymod)  EcIdent.Map.t;
-  mc_modtypes   : (EcPath.path * EcTypesmod.tymod)  EcIdent.Map.t;
-  mc_typedecls  : (EcPath.path * EcDecl.tydecl)     EcIdent.Map.t;
-  mc_operators  : (EcPath.path * EcDecl.operator)   EcIdent.Map.t;
-  mc_axioms     : (EcPath.path * EcDecl.axiom)      EcIdent.Map.t;
-  mc_theories   : (EcPath.path * EcTypesmod.theory) EcIdent.Map.t;
+  mc_variables  : (EcPath.path * varbind)            EcIdent.Map.t;
+  mc_functions  : (EcPath.path * EcTypesmod.funsig)  EcIdent.Map.t;
+  mc_modules    : (EcPath.path * EcTypesmod.tymod)   EcIdent.Map.t;
+  mc_modtypes   : (EcPath.path * EcTypesmod.tymod)   EcIdent.Map.t;
+  mc_typedecls  : (EcPath.path * EcDecl.tydecl)      EcIdent.Map.t;
+  mc_operators  : (EcPath.path * EcDecl.operator)    EcIdent.Map.t;
+  mc_axioms     : (EcPath.path * EcDecl.axiom)       EcIdent.Map.t;
+  mc_theories   : (EcPath.path * EcTypesmod.ctheory) EcIdent.Map.t;
   mc_components : unit EcIdent.Map.t;
 }
 
@@ -89,25 +89,25 @@ module Mod : sig
 end
 
 (* -------------------------------------------------------------------- *)
-type comp_th
+type ctheory_w3
 
-val theory_of_comp_th : comp_th -> theory
+val ctheory_of_ctheory_w3 : ctheory_w3 -> ctheory
 
 module Theory : sig
-  type t = comp_th
+  type t = ctheory_w3
 
   val bind : EcIdent.t -> t -> env -> env
   val bindall : (EcIdent.t * t) list -> env -> env
-  val lookup_by_path : EcPath.path -> env -> theory
-  val lookup : EcSymbols.qsymbol -> env -> EcPath.path * theory
-  val trylookup_by_path : EcPath.path -> env -> theory option
-  val trylookup : EcSymbols.qsymbol -> env -> (EcPath.path * theory) option
+  val lookup_by_path : EcPath.path -> env -> ctheory
+  val lookup : EcSymbols.qsymbol -> env -> EcPath.path * ctheory
+  val trylookup_by_path : EcPath.path -> env -> ctheory option
+  val trylookup : EcSymbols.qsymbol -> env -> (EcPath.path * ctheory) option
   val exists : EcSymbols.qsymbol -> env -> bool
   val import : EcPath.path -> env -> env
   val export : EcPath.path -> env -> env
-  val require : EcIdent.t -> comp_th -> env -> env
+  val require : EcIdent.t -> ctheory_w3 -> env -> env
   val enter : EcSymbols.symbol -> env -> EcIdent.t * env
-  val close : env -> comp_th
+  val close : env -> ctheory_w3
 end
 
 (* -------------------------------------------------------------------- *)
@@ -149,5 +149,7 @@ type ebinding = [
 val bind1   : EcIdent.t * ebinding -> env -> env
 val bindall : (EcIdent.t * ebinding) list -> env -> env
 
-val import_w3_dir : env -> string list -> string -> 
-                    EcWhy3.renaming_decl -> env * EcTypesmod.theory
+val import_w3_dir :
+     env -> string list -> string
+  -> EcWhy3.renaming_decl
+  -> env * EcTypesmod.ctheory_item list

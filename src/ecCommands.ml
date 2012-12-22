@@ -90,6 +90,10 @@ and process_th_export (scope : EcScope.scope) name =
   EcScope.Theory.export scope name
 
 (* -------------------------------------------------------------------- *)
+and process_th_clone (scope : EcScope.scope) thcl =
+  EcScope.Theory.clone scope thcl
+
+(* -------------------------------------------------------------------- *)
 and process_w3_import (scope : EcScope.scope) (p, f, r) =
   EcScope.Theory.import_w3 scope p f r
 
@@ -109,6 +113,7 @@ and process (scope : EcScope.scope) (g : global) =
     | GthRequire name -> process_th_require scope name.pl_desc
     | GthImport  name -> process_th_import  scope name.pl_desc
     | GthExport  name -> process_th_export  scope name.pl_desc
+    | GthClone   thcl -> process_th_clone   scope thcl
     | GthW3      a    -> process_w3_import  scope a
     | Gprint     p    -> process_print      scope p; scope
   in

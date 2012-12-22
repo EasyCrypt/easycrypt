@@ -56,6 +56,7 @@
     "why3"        , WHY3       ;        (* KW: global *)  
     "as"          , AS         ;        (* KW: global *)  
     "Pr"          , PR         ;        (* KW: global *)  
+    "clone"       , CLONE      ;        (* KW: global *)
   ]
 
   let keywords = Hashtbl.create 97

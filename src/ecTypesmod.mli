@@ -89,3 +89,23 @@ and theory_item =
   | Th_theory    of (EcIdent.t * theory)
   | Th_export    of EcPath.path
 
+(* -------------------------------------------------------------------- *)
+type ctheory = {
+  cth_desc   : ctheory_desc;
+  cth_struct : ctheory_struct;
+}
+
+and ctheory_desc =
+  | CTh_struct of ctheory_struct
+  | CTh_clone  of EcPath.path
+
+and ctheory_struct = ctheory_item list
+
+and ctheory_item =
+  | CTh_type      of (EcIdent.t * tydecl)
+  | CTh_operator  of (EcIdent.t * operator)
+  | CTh_axiom     of (EcIdent.t * axiom)
+  | CTh_modtype   of (EcIdent.t * tymod)
+  | CTh_module    of module_expr
+  | CTh_theory    of (EcIdent.t * ctheory)
+  | CTh_export    of EcPath.path

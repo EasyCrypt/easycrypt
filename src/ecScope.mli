@@ -110,6 +110,12 @@ module Theory : sig
    * theory. *)
   val require : scope -> symbol -> (scope -> scope) -> scope
 
-  val import_w3 : scope -> string list -> string -> w3_renaming list -> scope
+  (* [clone scope (src, dst)] finds and clones theory [src] in
+   * scope [scope]. Cloned theory name is [dst] if not None. If
+   * [dst] is None, the basename of [src] is used as the cloned
+   * theory name. *)
+  val clone : scope -> theory_cloning -> scope
 
+  (* FIXME: DOC *)
+  val import_w3 : scope -> string list -> string -> w3_renaming list -> scope
 end

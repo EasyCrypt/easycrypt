@@ -95,7 +95,7 @@ end
 
 (* -------------------------------------------------------------------- *)
 type loader = {
-  ld_loaded   : EcEnv.comp_th IM.t;
+  ld_loaded   : EcEnv.ctheory_w3 IM.t;
   ld_required : EcIdent.t list;
 }
 
@@ -106,7 +106,7 @@ type scope = {
   sc_axioms     : EcDecl.axiom           Context.context;
   sc_modules    : EcTypesmod.module_expr Context.context;
   sc_modtypes   : EcTypesmod.tymod       Context.context;
-  sc_theories   : EcTypesmod.theory      Context.context;
+  sc_theories   : EcTypesmod.ctheory     Context.context;
   sc_env        : EcEnv.env;
   sc_top        : scope option;
   sc_loader     : loader;
@@ -170,7 +170,6 @@ let subscope (scope : scope) (name : symbol) =
   }
 
 (* -------------------------------------------------------------------- *)
-
 let init_ue_op o =
   let ue = EcUnify.UniEnv.create () in
   let tp, tparams = 
@@ -351,23 +350,28 @@ end
 module Theory = struct
   exception TopScope
 
-  let bind (scope : scope) ((x, cth) : _ * EcEnv.comp_th) =
-    let theory = EcEnv.theory_of_comp_th cth in
+  (* ------------------------------------------------------------------ *)
+  let bind (scope : scope) ((x, cth) : _ * EcEnv.ctheory_w3) =
+    let theory = EcEnv.ctheory_of_ctheory_w3 cth in
       { scope with
           sc_theories = Context.bind (EcIdent.name x) theory scope.sc_theories;
           sc_env      = EcEnv.Theory.bind x cth scope.sc_env; }
 
+  (* ------------------------------------------------------------------ *)
   let loaded (scope : scope) (name : symbol) =
     IM.byname name scope.sc_loader.ld_loaded <> None
 
+  (* ------------------------------------------------------------------ *)
   let required (scope : scope) (name : symbol) =
     List.exists
       (fun x -> EcIdent.name x = name)
       scope.sc_loader.ld_required
 
+  (* ------------------------------------------------------------------ *)
   let enter (scope : scope) (name : symbol) =
     subscope scope name
 
+  (* ------------------------------------------------------------------ *)
   let exit_r (scope : scope) =
     match scope.sc_top with
     | None     -> raise TopScope
@@ -398,20 +402,24 @@ module Theory = struct
         in
           (cth, scope.sc_name, bind sup (scope.sc_name, cth))
 
+  (* ------------------------------------------------------------------ *)
   let exit (scope : scope) =
     let (_, name, scope) = exit_r scope in
       (name, scope)
 
+  (* ------------------------------------------------------------------ *)
   let import (scope : scope) (name : qsymbol) =
     let path = fst (EcEnv.Theory.lookup name scope.sc_env) in
       { scope with
           sc_env = EcEnv.Theory.import path scope.sc_env }
 
+  (* ------------------------------------------------------------------ *)
   let export (scope : scope) (name : qsymbol) =
     let path = fst (EcEnv.Theory.lookup name scope.sc_env) in
       { scope with
           sc_env = EcEnv.Theory.export path scope.sc_env }
 
+  (* ------------------------------------------------------------------ *)
   let require (scope : scope) (name : symbol) loader =
     if required scope name then
       scope
@@ -452,6 +460,11 @@ module Theory = struct
             }
       end
 
+  (* ------------------------------------------------------------------ *)
+  let clone (scope : scope) (thcl : theory_cloning) =
+    scope
+
+  (* ------------------------------------------------------------------ *)
   let import_w3 scope dir file renaming = 
     let mk_renaming (l,k,s) = 
       let k = 
@@ -465,13 +478,13 @@ module Theory = struct
     let env, lth = EcEnv.import_w3_dir scope.sc_env dir file renaming in
     let bind id = Context.bind (EcIdent.name id) in
     let add scope = function
-      | Th_type     (id,ty) ->
+      | CTh_type     (id,ty) ->
           { scope with sc_types = bind id ty scope.sc_types }
-      | Th_operator (id,op) ->
+      | CTh_operator (id,op) ->
           { scope with sc_operators = bind id op scope.sc_operators }
-      | Th_axiom    (id,ax) -> 
+      | CTh_axiom    (id,ax) -> 
           { scope with sc_axioms = bind id ax scope.sc_axioms } 
-      | Th_theory   (id,th) ->
+      | CTh_theory   (id,th) ->
           { scope with sc_theories = bind id th scope.sc_theories }
       | _ -> assert false in
     List.fold_left add { scope with sc_env = env } lth

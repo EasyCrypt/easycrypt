@@ -264,6 +264,9 @@ type w3_renaming =
     string list * renaming_kind * string 
     
 (* -------------------------------------------------------------------- *)
+type theory_cloning = pqsymbol * (psymbol option)
+
+(* -------------------------------------------------------------------- *)
 type global =
   | Gmodule    of (psymbol * pmodule_expr)
   | Ginterface of (psymbol * pmodule_type)
@@ -278,5 +281,7 @@ type global =
   | GthRequire of psymbol
   | GthImport  of pqsymbol
   | GthExport  of pqsymbol
+  | GthClone   of theory_cloning
   | GthW3      of (string list * string * w3_renaming list)
+
 type prog = global list

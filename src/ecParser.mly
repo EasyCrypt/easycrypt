@@ -79,6 +79,7 @@
 // %token BITSTR
 // %token CHECKPROOF
 %token CLAIM
+%token CLONE
 %token CNST
 %token COLON
 %token COMMA
@@ -775,6 +776,7 @@ axiom:
 | k=axiom_kind x=ident COLON e=loc(form) { 
       { pa_name = x; pa_formula = e; pa_kind = k } }
 ;
+
 (* -------------------------------------------------------------------- *)
 (* Theory interactive manipulation                                      *)
 
@@ -801,10 +803,16 @@ renaming:
 
 %inline string_list: l=plist1(STRING,empty) { l };
 
+(* -------------------------------------------------------------------- *)
+(* Theory cloning                                                       *)
 
+theory_clone:
+| CLONE x=qident { (x, None) }
+| CLONE x=qident AS y=ident { (x, Some y) }
+;
 
 (* -------------------------------------------------------------------- *)
-(** Printing                                                            *)
+(* Printing                                                             *)
 print:
 | TYPE   qs=qident { Pr_ty qs }
 | OP     qs=qident { Pr_op qs }
@@ -812,6 +820,7 @@ print:
 | PRED   qs=qident { Pr_pr qs } 
 | AXIOM  qs=qident { Pr_ax qs }
 ;
+
 (* -------------------------------------------------------------------- *)
 (* Global entries                                                       *)
 
@@ -821,6 +830,7 @@ global_:
 | theory_require   { GthRequire $1 }
 | theory_import    { GthImport  $1 }
 | theory_export    { GthExport  $1 }
+| theory_clone     { GthClone   $1 }
 | theory_w3        { GthW3      $1 }
 | mod_def          { Gmodule    $1 }
 | sig_def          { Ginterface $1 }
