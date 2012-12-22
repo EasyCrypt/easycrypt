@@ -133,9 +133,11 @@ module Ident : sig
     | `Ctnt of EcPath.path * operator ]
 
   val lookup    : 
-      qsymbol -> env -> (EcTypes.ty option * idlookup_t)
+      ?prob:bool -> ?pred:bool ->
+      qsymbol -> env -> (EcTypes.ty * idlookup_t)
   val trylookup : 
-      qsymbol -> env -> (EcTypes.ty option * idlookup_t) option
+      ?prob:bool -> ?pred:bool ->
+      qsymbol -> env -> (EcTypes.ty * idlookup_t) option
 end
 
 (* -------------------------------------------------------------------- *)

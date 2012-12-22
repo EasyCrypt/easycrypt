@@ -670,27 +670,27 @@ module Ident = struct
     | `Pvar of EcTypes.prog_var 
     | `Ctnt of EcPath.path * operator ]
 
-  let trylookup (name : qsymbol) (env : env) =
+  let trylookup ?(prob=false) ?(pred=false) (name : qsymbol) (env : env) =
     let for_var () =
       match Var.trylookup name env with
       | None -> None
       | Some (p, x) ->
           let idl = 
             match x.vb_kind with
-            | None -> `Local (EcPath.basename p) 
+            | None   -> `Local (EcPath.basename p) 
             | Some k -> `Pvar { EcTypes.pv_name = p; EcTypes.pv_kind = k } in
-          Some (Some x.vb_type, (idl :> idlookup_t))
+          Some (x.vb_type, (idl :> idlookup_t))
 
     and for_op () =
       match Op.trylookup name env with
-      | None -> None
-      | Some (_, op) when not (op_ctnt op) -> None
-      | Some (p, op) -> Some (op.op_codom, (`Ctnt(p, op) :> idlookup_t))
-    in
-      List.fpick [for_var; for_op]
+      | Some (p, op) when op.op_dom = [] && 
+          (is_oper op || (prob && is_prob op) || (pred && is_pred op)) ->
+          Some (op.op_codom, (`Ctnt(p, op) :> idlookup_t))
+      | _ -> None in
+    List.fpick [for_var; for_op]
 
-  let lookup (name : qsymbol) (env : env) =
-    match trylookup name env with
+  let lookup ?(prob=false) ?(pred=false) (name : qsymbol) (env : env) =
+    match trylookup ~prob ~pred name env with
     | None   -> raise (LookupFailure (`QSymbol name))
     | Some x -> x
 end
@@ -742,12 +742,8 @@ let initial =
     ["False"], EcWhy3.RDls, EcPath.basename EcCoreLib.p_false ] in
   let env, _ = import_w3 env Why3.Theory.bool_theory bool_rn in
   let add_bool sign env path = 
-    Op.bind_logical (EcPath.basename path)
-      { op_params = [];
-        op_dom    = Some sign;
-        op_codom  = Some EcTypes.tbool;
-        op_body   = None;
-        op_prob   = false } env in
+    Op.bind_logical (EcPath.basename path) 
+      (mk_op [] sign EcTypes.tbool None false) env in
   let env = add_bool [EcTypes.tbool] env EcCoreLib.p_not in
   let env = List.fold_left (add_bool [EcTypes.tbool;EcTypes.tbool]) env
       [EcCoreLib.p_and; EcCoreLib.p_or; EcCoreLib.p_imp; EcCoreLib.p_iff] in

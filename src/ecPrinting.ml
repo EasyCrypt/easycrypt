@@ -106,27 +106,11 @@ let pp_opdecl fmt (p, d) =
   let _vmap = EcUidgen.NameGen.create () in
 
   let str_kind op =
-    let x = if (op_ctnt op) then "cnst" else "op" in
-    let x = if op.op_prob then "p"^x else x in
-      x
-  in
+    if is_pred op then "pred" else
+    if is_prob op then "pop" else
+    if is_ctnt op then "cnst" else "op" in
 
-  let pp_decl fmt d = ()
-(*
-    match d.op_body with
-    | None ->
-        if d.op_ctnt then 
-          Format.fprintf fmt ": %a" (pp_type ~vmap) (snd d.op_sig)
-        else 
-          Format.fprintf fmt ": %a -> %a" 
-            pp_tparams (fst d.op_sig) (pp_type ~vmap) (snd d.op_sig)
-    | Some (id,e) ->
-      if d.op_ctnt then
-        Format.fprintf fmt ": %a = %a" (pp_type ~vmap) (snd d.op_sig) pp
-      else
-        assert false
-*)
-  in
-    Format.fprintf fmt "%s %a%a %a."
-      (str_kind d) pp_optyparams d.op_params pp_path p
-      pp_decl d
+  let pp_decl fmt d = () in
+  Format.fprintf fmt "%s %a%a %a."
+    (str_kind d) pp_optyparams d.op_params pp_path p
+    pp_decl d

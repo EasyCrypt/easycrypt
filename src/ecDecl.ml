@@ -9,58 +9,59 @@ type tydecl = {
 
 (* -------------------------------------------------------------------- *)
 type locals = EcIdent.t list 
-type op_body = (locals * EcTypes.tyexpr) option
-type pr_body = (locals * EcFol.form) option
 
-type operator_body = 
-  | OB_op of EcIdent.t list * EcTypes.tyexpr 
-  | OB_pr of EcIdent.t list * EcFol.form 
+type ('b,'info) operator_info = {
+    op_def : (locals * 'b) option;
+    op_info : 'info (* extra information used for pop *)
+  }
+
+type operator_kind = 
+  | OB_oper of (EcTypes.tyexpr, unit) operator_info
+  | OB_pred of (EcFol.form    , unit) operator_info
+  | OB_prob of (EcTypes.tyexpr, unit) operator_info
 
 type operator = {
   op_params : EcIdent.t list;     (* type parameters *)
-  op_dom    : EcTypes.dom option; (* None means constant *)
-  op_codom  : EcTypes.ty option;  (* None means predicate *)
-  op_body   : operator_body option;
-  op_prob   : bool;
+  op_dom    : EcTypes.dom;        
+  op_codom  : EcTypes.ty;         
+  op_kind   : operator_kind;
 }
 
-let op_ctnt op = op.op_dom = None
-let op_pr op = op.op_codom = None
-let op_dom op = odfl [] op.op_dom
-let op_codom op = 
-  match op.op_codom with
-  | None -> assert false
-  | Some ty -> ty
+let op_sig op = op.op_dom, op.op_codom
 
-let op_sig op = 
-  assert (not (op_pr op));
-  op_dom op, op_codom op
+let is_oper op = 
+  match op.op_kind with
+  | OB_oper _ -> true
+  | _ -> false
 
+let is_ctnt op = is_oper op && op.op_dom = []
 
-  
-let mk_pred typ dom body = 
-  let body = 
-    match body with
-    | None -> None
-    | Some(ids,f) -> Some(OB_pr(ids,f)) in
-  { op_params = typ;
+let is_pred op = 
+  match op.op_kind with
+  | OB_pred _ -> true
+  | _ -> false
+ 
+let is_prob op = 
+  match op.op_kind with
+  | OB_prob _ -> true
+  | _         -> false  
+
+let gen_op tparams dom codom kind = 
+  { op_params = tparams;
     op_dom    = dom;
-    op_codom  = None;
-    op_body   = body;
-    op_prob   = false;
+    op_codom  = codom;
+    op_kind   = kind;
   }
 
-let mk_op typ dom codom body prob = 
-  let body = 
-    match body with
-    | None -> None
-    | Some(ids,e) -> Some(OB_op(ids,e)) in
-  { op_params = typ;
-    op_dom    = dom;
-    op_codom  = Some codom;
-    op_body   = body;
-    op_prob   = prob;
-  }
+let mk_pred tparams dom body = 
+  let kind = OB_pred({op_def = body; op_info = () }) in
+  gen_op tparams dom EcTypes.tbool kind
+
+let mk_op tparams dom codom body prob = 
+  let kind = 
+    if prob then OB_prob({op_def = body; op_info = ()})
+    else OB_oper({op_def = body;op_info = ()}) in
+  gen_op tparams dom codom kind
 
 (* -------------------------------------------------------------------- *)
 type axiom_kind = Axiom | Lemma

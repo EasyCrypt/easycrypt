@@ -230,7 +230,6 @@ module Op = struct
     let body = omap body (fun (ids,body) -> ids, Esubst.mapty uni body) in
     let (dom,codom as sign) = List.map uni dom, uni codom in
     let tparams = build_tparams op.po_name.pl_loc tparams sign in
-    let dom = if op.po_dom = None then None else Some dom in
     let tyop = EcDecl.mk_op tparams dom codom body op.po_prob in
     bind scope (EcIdent.create (unloc op.po_name), tyop)
 end
@@ -255,7 +254,6 @@ module Pred = struct
     let body = omap body (fun (ids,body) -> ids, EcFol.Fsubst.mapty uni body) in
     let dom = List.map uni dom in
     let tparams = build_tparams op.pp_name.pl_loc tparams (dom,tbool) in
-    let dom = if op.pp_dom = None then None else Some dom in
     let tyop = EcDecl.mk_pred tparams dom body in
     Op.bind scope (EcIdent.create (unloc op.pp_name), tyop)
 

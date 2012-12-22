@@ -291,7 +291,7 @@ let import_w3_term env tvm =
                 try Ident.Mid.find f.Term.ls_name env.env_w3 
                 with _ -> raise (UnboundLS f) in
               let ty = import_ty t.Term.t_ty in
-              f_app_t f args ty
+              f_app f args ty
         | Term.Tif(t1,t2,t3) ->
           let f1 = import vm t1 in
           let f2 = import vm t2 in
@@ -341,11 +341,7 @@ let import_w3_ls rn path (env,rb,z) ls =
   let params = Ty.Stv.elements (Term.ls_ty_freevars ls) in
   let params = List.map (Wtvm.get tvm) params in
   let eid = Renaming.get_ls rn ls in
-  let op = { op_params = params;
-             op_dom = if dom = [] then None else Some dom;
-             op_codom = Some (force_bool env codom);
-             op_body = None;
-             op_prob = false } in
+  let op = mk_op params dom (force_bool env codom) None false in
   let p = EcPath.extend (Some path) eid in
   let env = add_w3_ls env p ls in
   let rb  = add_w3_ls env p ls in
@@ -748,28 +744,29 @@ let rec trans_form env vm f =
 and trans_form_b env vm f = force_bool (trans_form env vm f)
 
 let trans_op_body env vm ls = function
-  | None -> Decl.create_param_decl ls 
-  | Some (OB_op(ids,body)) ->
+  | OB_prob _ -> assert false 
+  | OB_oper { op_def = None } 
+  | OB_pred { op_def = None } ->  Decl.create_param_decl ls
+  | OB_oper { op_def = Some (ids,body) } ->
       let ids, vm = add_ids vm ids ls.Term.ls_args in
       let e = trans_expr env vm body in
-      let e = 
-        if ls.Term.ls_value = None then force_prop e else e in
+      let e = if ls.Term.ls_value = None then force_prop e else e in
       Decl.create_logic_decl [Decl.make_ls_defn ls ids e]
-  | Some(OB_pr(ids,body)) ->
+  | OB_pred { op_def = Some(ids,body) } ->
       let ids,vm = add_ids vm ids ls.Term.ls_args in
       let e = force_prop (trans_form env vm body) in 
       Decl.create_logic_decl [Decl.make_ls_defn ls ids e]
 
 let trans_op env path op = 
-  assert (not op.op_prob);
+  assert (not (is_prob op));
   let vm = empty_vmap () in
   let _ = trans_typarams vm op.op_params in
   let pid = preid_p path in
-  let dom = odfl [] (omap op.op_dom (trans_tys env vm)) in
-  let codom = trans_oty env vm op.op_codom in
-  let codom = if Ty.oty_equal codom (Some Ty.ty_bool) then None else codom in
+  let dom = trans_tys env vm op.op_dom in
+  let codom = trans_ty env vm op.op_codom in
+  let codom = if Ty.ty_equal codom Ty.ty_bool then None else Some codom in
   let ls = Term.create_lsymbol pid dom codom in
-  ls, trans_op_body env vm ls op.op_body 
+  ls, trans_op_body env vm ls op.op_kind 
 
 let add_ty env path td =
   let ts = trans_tydecl env path td in
@@ -777,7 +774,7 @@ let add_ty env path td =
   add_ts env path ts decl, RBty(path,ts,decl) 
 
 let add_op env path op =
-  if op.op_prob then env, None
+  if is_prob op then env, None
   else
     let ls, decl = trans_op env path op in
     add_ls env path ls decl, Some (RBop(path,ls,decl))

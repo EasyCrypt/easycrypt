@@ -43,33 +43,32 @@ module UE = EcUnify.UniEnv
 
 let select_op proba env name ue psig =
   let ops = EcEnv.Op.all name env in
-  let ops = List.filter (fun (_, op) -> op.op_prob || not proba) ops in
-  let ops = List.filter (fun (_, op) -> not (op_ctnt op)) ops in
-  let select (path, op) =
-    if op_pr op then None 
-    else
+  let len = List.length psig in
+  let select (path, op) = 
+    if is_pred op || (is_prob op && not proba) then None
+    else if List.length op.op_dom <> len then None
+    else 
       let subue, (dom,codom) = UE.freshensig ue op.op_params (op_sig op) in
-      let opsig = Ttuple dom in
       try
-        EcUnify.unify env subue opsig (Ttuple psig);
+        EcUnify.unify env subue (Ttuple dom) (Ttuple psig);
         Some (path, op, codom, subue)
       with EcUnify.UnificationFailure _ -> None in
   List.pmap select ops
 
-(* FIXME *)
 let select_pred env name ue psig =
   let ops = EcEnv.Op.all name env in
-  let ops = List.filter (fun (_, op) -> not op.op_prob) ops in
-  let ops = List.filter (fun (_, op) -> not (op_ctnt op)) ops in
-  let select (path, op) =
-    let subue, dom = UE.freshendom ue op.op_params (op_dom op) in
-    let opsig = Ttuple dom in
-    try
-      EcUnify.unify env subue opsig (Ttuple psig);
-      Some (path, op, op.op_codom, subue)
-    with EcUnify.UnificationFailure _ -> None in
+  let len = List.length psig in
+  let select (path, op) = 
+    if is_prob op then None 
+    else if List.length op.op_dom <> len then None
+    else 
+      let subue, (dom,codom) = UE.freshensig ue op.op_params (op_sig op) in
+      try
+        EcUnify.unify env subue (Ttuple dom) (Ttuple psig);
+        Some (path, op, codom, subue)
+      with EcUnify.UnificationFailure _ -> None in
   List.pmap select ops
-
+ 
 type typolicy = {
     tp_uni         : bool;   (* "_" allowed                         *)
     tp_tvar        : bool;   (* type variable allowed               *)
@@ -207,8 +206,8 @@ let transexp (env : EcEnv.env) (policy : epolicy) (ue : EcUnify.unienv) e =
     | PEint  i -> (Eint  i, tint)
 
     | PEident { pl_desc = x } -> 
-        begin match EcEnv.Ident.trylookup x env with
-        | Some (Some ty, kind) -> 
+        begin match EcEnv.Ident.trylookup ~prob:policy.epl_prob x env with
+        | Some (ty, kind) -> 
             begin match kind with
             | `Pvar  x -> Evar(x,ty), ty
             | `Local x -> Elocal(x,ty), ty
@@ -672,7 +671,7 @@ open EcFol
 type var_kind = 
   | Llocal of EcIdent.t * ty
   | Lprog  of EcTypes.prog_var * ty * Side.t
-  | Lctnt  of EcPath.path * ty option
+  | Lctnt  of EcPath.path * ty 
 
 type op_kind = 
   | Lop of EcPath.path * operator
@@ -714,16 +713,14 @@ module Fenv = struct
   module Ident = struct
     let trylookup_env fenv ue qs = 
       let env = current_env fenv in
-      match EcEnv.Ident.trylookup qs env with 
+      match EcEnv.Ident.trylookup ~pred:true qs env with 
       | None -> None
       | Some(_, `Local _) -> assert false
-      | Some(Some ty, `Pvar x) ->  Some (Lprog (x, ty, fenv.fe_cur))
-      | Some(None, `Pvar  _ ) -> assert false 
+      | Some(ty, `Pvar x) ->  Some (Lprog (x, ty, fenv.fe_cur))
       | Some (ty, `Ctnt(p, op)) ->
-          let freshen ty = 
-            let newue, ty = UE.freshen ue op.op_params ty in
-            UE.restore ue newue; ty in
-          Some (Lctnt (p, omap ty freshen))
+          let newue, ty = UE.freshen ue op.op_params ty in
+          UE.restore ue newue;
+          Some (Lctnt (p, ty))
 
     let trylookup_logical fenv s =
       match EcIdent.Map.byname s fenv.fe_locals with
@@ -767,7 +764,7 @@ let transformula fenv ue pf =
         | None ->  tyerror dloc (UnknownVariable x)
         | Some(Llocal(x,ty)) -> f_local x ty
         | Some(Lprog(x,ty,s)) -> f_pvar x ty s
-        | Some(Lctnt(x,oty)) -> f_app x [] oty
+        | Some(Lctnt(x,ty)) -> f_app x [] ty
         end
     | PFside(f,side) ->
         let fenv = Fenv.set_side fenv side in

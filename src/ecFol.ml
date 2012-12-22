@@ -63,21 +63,19 @@ let ty_bool = tbool
 let ty_int = tint 
 let ty_unit = tunit
 
-let f_app_t x args ty = 
+let f_app x args ty = 
   mk_form (Fapp(x,args)) ty
 
-let f_app x args oty = f_app_t x args (odfl ty_bool oty) 
-
-let f_true = f_app_t EcCoreLib.p_true [] ty_bool
-let f_false = f_app_t EcCoreLib.p_false [] ty_bool
+let f_true = f_app EcCoreLib.p_true [] ty_bool
+let f_false = f_app EcCoreLib.p_false [] ty_bool
 let f_bool b = if b then f_true else f_false
 let f_int n = mk_form (Fint n) ty_int
 
-let f_not f = f_app_t EcCoreLib.p_not [f] ty_bool
-let f_and f1 f2 = f_app_t EcCoreLib.p_and [f1;f2] ty_bool
-let f_or  f1 f2 = f_app_t EcCoreLib.p_or [f1;f2] ty_bool
-let f_imp f1 f2 = f_app_t EcCoreLib.p_imp [f1;f2] ty_bool
-let f_iff f1 f2 = f_app_t EcCoreLib.p_iff [f1;f2] ty_bool
+let f_not f = f_app EcCoreLib.p_not [f] ty_bool
+let f_and f1 f2 = f_app EcCoreLib.p_and [f1;f2] ty_bool
+let f_or  f1 f2 = f_app EcCoreLib.p_or [f1;f2] ty_bool
+let f_imp f1 f2 = f_app EcCoreLib.p_imp [f1;f2] ty_bool
+let f_iff f1 f2 = f_app EcCoreLib.p_iff [f1;f2] ty_bool
 
 let f_local x ty = mk_form (Flocal x) ty
 let f_pvar x ty s = mk_form (Fpvar(x,ty,s)) ty
@@ -102,7 +100,7 @@ let map gt g f =
   | Fint i -> f_int i 
   | Flocal id -> f_local id (gt f.f_ty)
   | Fpvar(id,ty,s) -> f_pvar id (gt ty) s
-  | Fapp(p,es) -> f_app p (List.map g es) (Some (gt f.f_ty))
+  | Fapp(p,es) -> f_app p (List.map g es) (gt f.f_ty)
   | Ftuple es -> f_tuple (List.map g es) 
 
 (* -------------------------------------------------------------------- *)
