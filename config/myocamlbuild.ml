@@ -17,14 +17,16 @@ let internal_libraries = fun libraries ->
 
 let _ = dispatch begin function
    | Before_options ->
-       Options.ocamlc     := ocamlfind & A"ocamlc";
-       Options.ocamlopt   := ocamlfind & A"ocamlopt";
-       Options.ocamldep   := ocamlfind & A"ocamldep";
-       Options.ocamldoc   := ocamlfind & A"ocamldoc";
-       Options.ocamlmktop := ocamlfind & A"ocamlmktop"
+       Options.ocamlc     := ocamlfind & S[A"ocamlc"  ; A"-rectypes"];
+       Options.ocamlopt   := ocamlfind & S[A"ocamlopt"; A"-rectypes"];
+       Options.ocamldep   := ocamlfind & A"ocamldep"  ;
+       Options.ocamldoc   := ocamlfind & A"ocamldoc"  ;
+       Options.ocamlmktop := ocamlfind & A"ocamlmktop";
 
    | After_rules ->
        flag ["ocaml"; "link"] & A"-linkpkg";
+
+       flag ["ocaml"; "parser"; "menhir"] & A"--explain";
 
        (* pkg_* switches *)
        List.iter begin fun pkg ->
@@ -42,7 +44,7 @@ let _ = dispatch begin function
          flag ["ocaml"; "infer_interface"; "syntax_"^syntax] & S[A"-syntax"; A syntax];
        end (find_syntaxes ());
 
-       (* Threads swicthes *)
+       (* Threads switches *)
        flag ["ocaml"; "pkg_threads"; "compile"] (S[A "-thread"]);
        flag ["ocaml"; "pkg_threads"; "link"] (S[A "-thread"]);
 

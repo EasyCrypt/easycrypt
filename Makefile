@@ -3,11 +3,11 @@
 # --------------------------------------------------------------------
 CONFIG           = _tags myocamlbuild.ml
 OCAMLBUILD_BIN   = ocamlbuild
-OCAMLBUILD_EXTRA = -classic-display -menhir "menhir --explain"
+OCAMLBUILD_EXTRA = -classic-display
 
 # In Emacs, use classic display to enable error jumping.
 ifeq ($(shell echo $$TERM), dumb)
- OCAMLBUILD_EXTRA += -cflag "-dtypes" -tag debug -classic-display
+ OCAMLBUILD_EXTRA += -classic-display
 endif
 OCAMLBUILD := $(OCAMLBUILD_BIN) $(OCAMLBUILD_EXTRA)
 
