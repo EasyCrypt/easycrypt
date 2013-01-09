@@ -423,7 +423,7 @@ module Theory = struct
       scope
     else
       match IM.byname name scope.sc_loader.ld_loaded with
-      | Some (name, theory) -> scope
+      | Some _ -> scope
 
       | None -> begin
           let imported = enter (for_loading scope) name in
@@ -459,8 +459,8 @@ module Theory = struct
       end
 
   (* ------------------------------------------------------------------ *)
-  let clone (scope : scope) (thcl : theory_cloning) =
-    scope
+  let clone (scope : scope) (_thcl : theory_cloning) =
+    scope                               (* FIXME *)
 
   (* ------------------------------------------------------------------ *)
   let import_w3 scope dir file renaming = 

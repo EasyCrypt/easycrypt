@@ -41,7 +41,7 @@ let sub_exists f t =
   match t with
   | Tunivar _ | Tvar _ -> false
   | Ttuple lty -> List.exists f lty
-  | Tconstr (p, lty) -> List.exists f lty
+  | Tconstr (_, lty) -> List.exists f lty
 
 (* -------------------------------------------------------------------- *)
 
@@ -220,7 +220,7 @@ module Dump = struct
             EcDebug.onseq pp "Eapp" ~extra:(EcPath.tostring p)
               (Stream.of_list [tprinter; aprinter])
 
-      | Elet (p, e1, e2) ->
+      | Elet (_p, e1, e2) ->            (* FIXME *)
           let printers = [ex_dump^~ e1; ex_dump^~ e2] in
             EcDebug.onseq pp "Elet" (Stream.of_list printers)
         

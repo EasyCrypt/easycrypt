@@ -110,7 +110,7 @@ let onseq (pp : ppdebug) ?(enum = false) ?extra (txt : string) seq =
 
 (* -------------------------------------------------------------------- *)
 let onhseq (pp : ppdebug) ?enum ?extra (txt : string) cb seq =
-  let next (i : int) =
+  let next (_i : int) =
     match Stream.next_opt seq with
     | None   -> None
     | Some x -> Some (cb^~ x)

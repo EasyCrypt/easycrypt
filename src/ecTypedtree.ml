@@ -166,7 +166,7 @@ let ep_prob = { epl_prob = true}
 (* -------------------------------------------------------------------- *)
 exception NonLinearPattern of EcParsetree.lpattern
 
-let transpattern1 (env : EcEnv.env) ue (p : EcParsetree.lpattern) = 
+let transpattern1 _env ue (p : EcParsetree.lpattern) = 
   match p with
   | LPSymbol { pl_desc = x } ->
       let ty = UE.fresh_uid ue in
@@ -181,7 +181,7 @@ let transpattern1 (env : EcEnv.env) ue (p : EcParsetree.lpattern) =
         let subtys = List.map (fun _ -> UE.fresh_uid ue) xs in
         (LTuple xs, Ttuple subtys)
 
-let transpattern (env : EcEnv.env) ue (p : EcParsetree.lpattern) =
+let transpattern env ue (p : EcParsetree.lpattern) =
   match transpattern1 env ue p with
   | LSymbol x as p, ty ->
       EcEnv.Var.bind x ty None env, p, ty
@@ -229,7 +229,7 @@ let transexp (env : EcEnv.env) (policy : epolicy) (ue : EcUnify.unienv) e =
             let esig = Tuni.subst_dom (EcUnify.UniEnv.asmap ue) esig in
             tyerror loc (UnknownOperatorForSig (name, esig))
 
-        | [(xpath, op, codom, subue)] ->
+        | [(xpath, _, codom, subue)] ->
             EcUnify.UniEnv.restore ~src:subue ~dst:ue;
             (Eapp (xpath, List.map fst es, codom), codom)
     end
@@ -372,7 +372,7 @@ and transtymod (env : EcEnv.env) (tymod : pmodule_type) =
         Tym_sig i
 
 (* -------------------------------------------------------------------- *)
-let tymod_included (src : tymod) (dst : tymod) =
+let tymod_included (_src : tymod) (_dst : tymod) =
   false                                 (* FIXME *)
 
 (* -------------------------------------------------------------------- *)
@@ -659,7 +659,7 @@ and translvalue ue (env : EcEnv.env) lvalue =
       | [] | _ :: _ :: _ ->        (* FIXME: better error message *)
           let esig = Tuni.subst_dom (EcUnify.UniEnv.asmap ue) esig in
           tyerror loc (UnknownOperatorForSig (name, esig))
-      | [(opath, _, codom, subue)] ->
+      | [(opath, _, _, subue)] ->
           EcUnify.UniEnv.restore ~src:subue ~dst:ue;
           (LvMap (opath, xpath, e, codomty), codomty)            
 
@@ -776,7 +776,7 @@ let transformula fenv ue pf =
         begin match ops with
         | [] | _ :: _ :: _ ->        (* FIXME: better error message *)
             tyerror loc (UnknownOperatorForSig (qs, esig))
-        | [(xpath, op, oty, subue)] ->
+        | [(xpath, _, oty, subue)] ->
             EcUnify.UniEnv.restore ~src:subue ~dst:ue;
             f_app xpath es oty
         end
@@ -799,7 +799,7 @@ let transformula fenv ue pf =
         f_forall xs f
     | PFexists(xs, f1) ->
         let fenv, xs = transl tp_relax fenv ue xs in
-        let f = transf fenv pf in
+        let f = transf fenv f1 in
         unify_error (Fenv.mono fenv) ue pf.pl_loc f.f_ty tbool;
         f_exists xs f
     (* FIXME *) 

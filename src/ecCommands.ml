@@ -25,9 +25,9 @@ let process_print scope p =
         let ptd = EcEnv.Op.lookup qs.pl_desc env in
         Format.printf "%a@." EcPrinting.pp_opdecl ptd
       with _ -> assert false (* FIXME *))
-  | Pr_th qs -> assert false
-  | Pr_pr qs -> assert false
-  | Pr_ax qs -> assert false
+  | Pr_th _qs -> assert false           (* FIXME *)
+  | Pr_pr _qs -> assert false           (* FIXME *)
+  | Pr_ax _qs -> assert false           (* FIXME *)
 
 (* -------------------------------------------------------------------- *)
 let rec process_type (scope : EcScope.scope) (tyd : ptydecl) =

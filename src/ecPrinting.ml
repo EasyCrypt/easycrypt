@@ -73,7 +73,7 @@ let pp_type ?(vmap : _ option) =
     pp_type uidmap false
 
 (* -------------------------------------------------------------------- *)
-let pp_tydecl env fmt (p, td) =
+let pp_tydecl _env fmt (p, td) =
   let vmap = EcUidgen.NameGen.create () in
 
   let pp_params fmt = function
@@ -110,7 +110,7 @@ let pp_opdecl fmt (p, d) =
     if is_prob op then "pop" else
     if is_ctnt op then "cnst" else "op" in
 
-  let pp_decl fmt d = () in
+  let pp_decl _fmt _d = () in           (* FIXME *)
   Format.fprintf fmt "%s %a%a %a."
     (str_kind d) pp_optyparams d.op_params pp_path p
     pp_decl d
