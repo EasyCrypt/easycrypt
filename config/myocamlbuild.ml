@@ -34,7 +34,7 @@ let _ = dispatch begin function
            in
              S[A"-w"; A(Printf.sprintf "%s%d" mode wid)]
          in
-           for i = 0 to 29 do
+           for i = 1 to 29 do
              flag ["ocaml"; "compile"; Printf.sprintf "warn_+%d" i] & (wflag `Enable  i);
              flag ["ocaml"; "compile"; Printf.sprintf "warn_-%d" i] & (wflag `Disable i);
              flag ["ocaml"; "compile"; Printf.sprintf "warn_@%d" i] & (wflag `Mark    i)
