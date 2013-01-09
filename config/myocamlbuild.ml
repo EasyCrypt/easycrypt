@@ -24,9 +24,28 @@ let _ = dispatch begin function
        Options.ocamlmktop := ocamlfind & A"ocamlmktop";
 
    | After_rules ->
+       (* Numerical warnings *)
+       begin
+         let wflag mode wid =
+           let mode = match mode with
+             | `Enable  -> "+"
+             | `Disable -> "-"
+             | `Mark    -> "@"
+           in
+             S[A"-w"; A(Printf.sprintf "%s%d" mode wid)]
+         in
+           for i = 0 to 29 do
+             flag ["ocaml"; "compile"; Printf.sprintf "warn_+%d" i] & (wflag `Enable  i);
+             flag ["ocaml"; "compile"; Printf.sprintf "warn_-%d" i] & (wflag `Disable i);
+             flag ["ocaml"; "compile"; Printf.sprintf "warn_@%d" i] & (wflag `Mark    i)
+           done
+       end;
+
+       (* ocaml / link / ocamlfind *)
        flag ["ocaml"; "link"] & A"-linkpkg";
 
-       flag ["ocaml"; "parser"; "menhir"] & A"--explain";
+       (* menhir & --explain *)
+       flag ["ocaml"; "parser"; "menhir"; "menhir_explain"] & A"--explain";
 
        (* pkg_* switches *)
        List.iter begin fun pkg ->

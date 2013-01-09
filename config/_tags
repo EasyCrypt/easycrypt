@@ -1,7 +1,7 @@
 # --------------------------------------------------------------------
-true : use_menhir
+true : use_menhir, menhir_explain
 true : debug
-true : warn_Y, warn_Z
+true : warn_Z, warn_Y, warn_+28
 
 # --------------------------------------------------------------------
 <src> : include
