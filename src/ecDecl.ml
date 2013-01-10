@@ -5,7 +5,7 @@ type ty_params = EcIdent.t list
 type tydecl = {
   tyd_params : ty_params;
   tyd_type   : EcTypes.ty option;
-  }
+}
 
 (* -------------------------------------------------------------------- *)
 type locals = EcIdent.t list 

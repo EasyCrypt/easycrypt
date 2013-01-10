@@ -1,75 +1,329 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
-open EcMaps
+open EcTypes
+open EcDecl
+open EcFol
 open EcTypesmod
 
 (* -------------------------------------------------------------------- *)
-type subst = {
-  sb_modules : EcPath.path EcIdent.Mid.t;
-}
-
 type subst1 = [
-  | `Module of EcIdent.t * EcPath.path
+  | `Path  of EcPath.path
+  | `Local of EcIdent.t
 ]
 
-type mode = PModule
+type subst = subst1 EcIdent.Mid.t
+
+exception SubstNameClash of EcIdent.t
+exception InconsistentSubst
 
 (* -------------------------------------------------------------------- *)
-let identity = {
-  sb_modules = EcIdent.Mid.empty;
-}
+let empty : subst = EcIdent.Mid.empty
+
+let add (s : subst) (x : EcIdent.t) (s1 : subst1) : subst =
+  let merger = function
+    | None   -> Some s1
+    | Some _ -> raise (SubstNameClash x)
+  in
+    EcIdent.Mid.change merger x s
+
+let add_locals (s : subst) (locals : (EcIdent.t * EcIdent.t) list) : subst =
+  List.fold_left (fun s (x, x') -> add s x (`Local x')) s locals
+
+let create (sb1 : (EcIdent.t * subst1) list) : subst =
+  List.fold_left (fun s (x, s1) -> add s x s1) empty sb1
+
+let compose (s1 : subst) (s2 : subst) : subst =
+  EcIdent.Mid.union
+    (fun x _ _ -> raise (SubstNameClash x))
+    s1 s2
 
 (* -------------------------------------------------------------------- *)
-let bind1 (s : subst) = function
-  | `Module (x, p) ->
-      {(* s with *)
-          sb_modules = EcIdent.Mid.add x p s.sb_modules }
+let subst_path (s : subst) (p : EcPath.path) =
+  match EcIdent.Mid.find_opt (EcPath.basename p) s with
+  | None           -> p
+  | Some (`Path p) -> p
+  | Some _         -> raise InconsistentSubst
 
-let extend (s : subst) (bindings : subst1 list) =
-  List.fold_left bind1 s bindings
-
-let create (bindings : subst1 list) =
-  extend identity bindings
+let subst_local (s : subst) (x : EcIdent.t) =
+  match EcIdent.Mid.find_opt x s with
+  | None            -> x
+  | Some (`Local x) -> x
+  | Some _          -> raise InconsistentSubst
 
 (* -------------------------------------------------------------------- *)
-let rec inpath (mode : mode) (s : subst) (p : EcPath.path) =
+let rec subst_ty (s : subst) (ty : ty) =
+  match ty with
+  | Tunivar _ -> assert false
+
+  | Tvar x -> Tvar (subst_local s x)
+
+  | Ttuple tys ->
+      let tys = List.map (subst_ty s) tys in
+        Ttuple tys
+
+  | Tconstr (p, tys) ->
+      let p   = subst_path s p in
+      let tys = List.map (subst_ty s) tys in
+        Tconstr (p, tys)
+
+(* -------------------------------------------------------------------- *)
+let subst_lpattern (s : subst) (p : lpattern) =
   match p with
-  | EcPath.Pident x -> begin
-      match mode with
-      | PModule -> odfl p (EcIdent.Mid.find_opt x s.sb_modules)
-  end
+  | LSymbol x ->
+      let x' = EcIdent.fresh x in
+        (add s x (`Local x'), LSymbol x')
 
-  | EcPath.Pqname (p, x) -> EcPath.Pqname (inpath mode s p, x)
+  | LTuple xs ->
+      let xs' = List.map EcIdent.fresh xs in
+      let s'  = add_locals s (List.combine xs xs') in
+        (s', LTuple xs')
 
 (* -------------------------------------------------------------------- *)
-let rec intymod (s : subst) (tymod : tymod) =
-  match tymod with
-  | Tym_sig tysig ->
-      Tym_sig (intysig s tysig)
+let rec subst_tyexpr (s : subst) (e : tyexpr) =
+  match e with
+  | Eint _ -> e
+  | Eflip  -> e
 
-  | Tym_functor (args, tyres) ->
-    let fresh = List.map  (fun (x, _) -> EcIdent.fresh x) args in
-    let news  = List.map2 (fun y (x, _) -> `Module (x, EcPath.Pident y)) fresh args
-    and args  = List.map2 (fun x (_, a) -> (x, intymod s a)) fresh args in
-    let tyres = intysig (extend s news) tyres in
-      Tym_functor (args, tyres)
+  | Einter (e1, e2) ->
+      let e1 = subst_tyexpr s e1 in
+      let e2 = subst_tyexpr s e2 in
+        Einter (e1, e2)
 
-and intysig (s : subst) (tysig : tysig) =
-  List.map (intysig1 s) tysig
+  | Ebitstr e ->
+      let e = subst_tyexpr s e in
+        Ebitstr e
 
-and intysig1 (s : subst) (item : tysig_item) =
+  | Eexcepted (e1, e2) ->
+      let e1 = subst_tyexpr s e1 in
+      let e2 = subst_tyexpr s e2 in
+        Eexcepted (e1, e2)
+
+  | Elocal (x, ty) ->
+      let x  = subst_local s x in
+      let ty = subst_ty s ty in
+        Elocal (x, ty)
+
+  | Evar (x, ty) ->
+      let x  = { x with pv_name = subst_path s x.pv_name } in
+      let ty = subst_ty s ty in
+        Evar (x, ty)
+
+  | Eapp (p, es, ty) ->
+      let p   = subst_path s p in
+      let tys = List.map (subst_tyexpr s) es in
+      let ty  = subst_ty s ty in
+        Eapp (p, tys, ty)
+
+  | Elet (p, e1, e2) ->
+      let (sbody, p) = subst_lpattern s p in
+      let e1 = subst_tyexpr s     e1 in
+      let e2 = subst_tyexpr sbody e2 in
+        Elet (p, e1, e2)
+
+  | Etuple es ->
+      let es = List.map (subst_tyexpr s) es in
+        Etuple es
+
+  | Eif (c, e1, e2) ->
+      let c  = subst_tyexpr s c in
+      let e1 = subst_tyexpr s e1 in
+      let e2 = subst_tyexpr s e2 in
+        Eif (c, e1, e2)
+
+(* -------------------------------------------------------------------- *)
+let rec subst_form (s : subst) (f : form) =
+  let f_node = subst_form_node s f.f_node
+  and f_ty   = subst_ty s f.f_ty
+  and f_fv   = EcIdent.Mid.fold
+                 EcIdent.Mid.add f.f_fv EcIdent.Mid.empty
+  in
+
+    { f_node = f_node; f_ty = f_ty; f_fv = f_fv }
+
+and subst_form_node (s : subst) (f : f_node) =
+  match f with
+  | Fint _ -> f
+
+  | Fquant (mode, bindings, f) ->
+      let newbindings =
+        List.map
+          (fun (x, ty) -> (EcIdent.fresh x, subst_ty s ty))
+          bindings in
+
+      let sbody =
+        add_locals s
+          (List.combine
+             (List.map (EcIdent.fresh -| fst) bindings   )
+             (List.map (EcIdent.fresh -| fst) newbindings))
+      in
+
+        Fquant (mode, newbindings, subst_form sbody f)
+
+  | Flet (p, f1, f2) ->
+      let (sbody, p) = subst_lpattern s p in
+      let f1 = subst_form s     f1 in
+      let f2 = subst_form sbody f2 in
+        Flet (p, f1, f2)
+
+  | Fif (c, f1, f2) ->
+      let c  = subst_form s c  in
+      let f1 = subst_form s f1 in
+      let f2 = subst_form s f2 in
+        Fif (c, f1, f2)
+
+  | Flocal x ->
+      Flocal (subst_local s x)
+
+  | Fpvar (x, ty, side) ->
+      let x  = { x with pv_name = subst_path s x.pv_name } in
+      let ty = subst_ty s ty in
+        Fpvar (x, ty, side)
+
+  | Fapp (p, fs) ->
+      let p  = subst_path s p in
+      let fs = List.map (subst_form s) fs in
+        Fapp (p, fs)
+
+  | Ftuple fs ->
+      Ftuple (List.map (subst_form s) fs)
+
+(* -------------------------------------------------------------------- *)
+let subst_tydecl (s : subst) (tyd : tydecl) =
+  let params = List.map EcIdent.fresh tyd.tyd_params in
+    match tyd.tyd_type with
+    | None    -> { tyd_params = params; tyd_type = None; }
+    | Some ty ->
+        let s = add_locals s (List.combine tyd.tyd_params params) in
+          { tyd_params = params;
+            tyd_type   = Some (subst_ty s ty); }
+
+(* -------------------------------------------------------------------- *)
+let subst_op_kind (s : subst) (kind : operator_kind) =
+  let locals =
+    match kind with
+    | OB_oper i -> odfl [] (omap i.op_def fst)
+    | OB_pred i -> odfl [] (omap i.op_def fst)
+    | OB_prob i -> odfl [] (omap i.op_def fst) in
+
+  let newlocals = List.map EcIdent.fresh locals in
+  let sdef = add_locals s (List.combine locals newlocals) in
+
+    match kind with
+    | OB_oper i ->
+      let def = omap i.op_def
+        (fun (_, e) -> (newlocals, subst_tyexpr sdef e))
+      in
+        OB_oper { op_def = def; op_info = (); }
+
+    | OB_pred i ->
+      let def = omap i.op_def
+        (fun (_, e) -> (newlocals, subst_form sdef e))
+      in
+        OB_pred { op_def = def; op_info = (); }
+
+    | OB_prob i ->
+      let def = omap i.op_def
+        (fun (_, e) -> (newlocals, subst_tyexpr sdef e))
+      in
+        OB_prob { op_def = def; op_info = (); }
+
+(* -------------------------------------------------------------------- *)
+let subst_op (s : subst) (op : operator) =
+  let params = List.map EcIdent.fresh op.op_params in
+  let sty    = add_locals s (List.combine op.op_params params) in
+  let dom    = List.map (subst_ty sty) op.op_dom in
+  let codom  = subst_ty sty op.op_codom in
+  let kind   = subst_op_kind s op.op_kind in
+
+    { op_params = params;
+      op_dom    = dom   ;
+      op_codom  = codom ;
+      op_kind   = kind  ; }
+
+(* -------------------------------------------------------------------- *)
+let subst_tysig_item (s : subst) (item : tysig_item) =
   match item with
-  | Tys_variable (x, ty) -> Tys_variable (x, ty)
-  | Tys_function fsig    -> Tys_function (infunsig s fsig)
+  | Tys_variable (x, ty) ->
+      let ty' = subst_ty s ty in
+        Tys_variable (x, ty')
 
-and infunsig (s : subst) (fsig : funsig) = {
-  fs_name = fsig.fs_name;
-  fs_sig  = fsig.fs_sig;
-  fs_uses = List.map (fun (p, m) -> (inpath PModule s p, m)) fsig.fs_uses;
-}
+  | Tys_function funsig ->
+      let args' = List.map
+                    (fun (x, ty) -> (EcIdent.fresh x, subst_ty s ty))
+                    (fst funsig.fs_sig) in
+      let res'  = subst_ty s (snd funsig.fs_sig) in
+      let uses' = funsig.fs_uses in
+
+        Tys_function
+          { fs_name = funsig.fs_name;
+            fs_sig  = (args', res') ;
+            fs_uses = uses'         }
 
 (* -------------------------------------------------------------------- *)
-module ModType = struct
-  let apply (s : subst) (tymod : tymod) =
-    intymod s tymod
-end
+let subst_tysig (s : subst) (tysig : tysig) =
+  List.map (subst_tysig_item s) tysig
+
+(* -------------------------------------------------------------------- *)
+let rec subst_modtype (s : subst) (tymod : tymod) =
+  match tymod with
+  | Tym_sig tysig -> Tym_sig (subst_tysig s tysig)
+
+  | Tym_functor (params, tysig) ->
+    let newparams =
+      List.map
+        (fun (a, aty) ->
+          (EcIdent.fresh a, subst_modtype s aty))
+        params in
+
+    let ssig = add_locals s
+      (List.combine (List.map fst params) (List.map fst newparams))
+    in
+      Tym_functor (newparams, subst_tysig ssig tysig)
+
+(* -------------------------------------------------------------------- *)
+let rec subst_theory_item (s : subst) (scope : EcPath.path) (item : theory_item) =
+  match item with
+  | Th_type (x, tydecl) ->
+      let x' = EcIdent.fresh x in
+      let s' = add s x (`Path (EcPath.Pqname (scope, x'))) in
+        (s', Th_type (x', subst_tydecl s' tydecl))
+
+  | Th_operator (x, op) ->
+      let x' = EcIdent.fresh x in
+      let s' = add s x (`Path (EcPath.Pqname (scope, x'))) in
+        (s', Th_operator (x', subst_op s op))
+
+  | Th_axiom (x, ax) ->
+      let x'  = EcIdent.fresh x in
+      let s'  = add s x (`Path (EcPath.Pqname (scope, x'))) in
+      let ax' = {
+        ax_spec = omap ax.ax_spec (subst_form s);
+        ax_kind = ax.ax_kind;
+      } in
+        (s', Th_axiom (x', ax'))
+
+  | Th_modtype (x, tymod) ->
+      let x' = EcIdent.fresh x in
+      let s' = add s x (`Path (EcPath.Pqname (scope, x'))) in
+        (s', Th_modtype (x', subst_modtype s tymod))
+
+  | Th_module _ -> assert false
+
+  | Th_theory (x, th) ->
+      let x'  = EcIdent.fresh x in
+      let s'  = add s x (`Path (EcPath.Pqname (scope, x'))) in
+      let th' = subst_theory s (EcPath.Pqname (scope, x')) th in
+        (s', Th_theory (x', th'))
+
+  | Th_export p -> (s, Th_export (subst_path s p))
+
+(* -------------------------------------------------------------------- *)
+and subst_theory (s : subst) (scope : EcPath.path) (items : theory) =
+  let _, items =
+    List.fold_left
+      (fun (s, acc) item ->
+        let (s, item) = subst_theory_item s scope item in
+          (s, item :: acc))
+      (s, []) items
+  in
+    List.rev items

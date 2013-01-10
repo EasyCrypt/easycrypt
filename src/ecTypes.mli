@@ -12,7 +12,7 @@ type ty =
   | Ttuple  of ty list
   | Tconstr of EcPath.path * ty list
 
-type dom = ty list
+type dom   = ty list
 type tysig = dom * ty 
 
 (* -------------------------------------------------------------------- *)
@@ -23,7 +23,6 @@ val tbitstring : ty
 val tlist      : ty -> ty
 
 (* -------------------------------------------------------------------- *)
-
 module Tuni : sig
   val subst1    : (uid * ty) -> ty -> ty
   val subst     : ty Muid.t -> ty -> ty
@@ -46,10 +45,6 @@ end
 val map : (ty -> ty) -> ty -> ty
 (* [sub_exists f t] true if one of the strict-subterm of [t] valid [f] *)
 val sub_exists : (ty -> bool) -> ty -> bool
-
-(* -------------------------------------------------------------------- *)
-
-
 
 (* -------------------------------------------------------------------- *)
 type lpattern =

@@ -400,10 +400,10 @@ let rec transmod (env : EcEnv.env) (x : EcIdent.t) (m : pmodule_expr) =
 
             (* EcSubstitute args. in result type *)
             let tyres =
-              EcSubst.ModType.apply
+              EcSubst.subst_modtype
                 (EcSubst.create
                    (List.map2
-                      (fun aname arg -> `Module (aname, fst arg))
+                      (fun aname arg -> (aname, `Path (fst arg)))
                       anames args))
                 (Tym_sig tyres)
             in
