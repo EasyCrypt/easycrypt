@@ -4,7 +4,7 @@ true : debug
 true : warn_Z, warn_Y, warn_+28
 
 # --------------------------------------------------------------------
-<src> : include
+<src> or <pprint> : include
 
 # --------------------------------------------------------------------
 <src/*.{ml,mli}> : pkg_menhirLib, pkg_why3
