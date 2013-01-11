@@ -179,6 +179,30 @@ module List = struct
     in
       take n xs []
 
+  let map_fold (f : 'a -> 'b -> 'a * 'c) (b0 : 'a) (xs : 'b list) =
+    let b, ys =
+      List.fold_left
+        (fun (b, ys) x ->
+          let (b, y) = f b x in (b, y :: ys))
+        (b0, []) xs
+    in
+      (b, List.rev ys)
+
+  let map_combine
+      (f1  : 'a -> 'c) (f2  : 'b -> 'd)
+      (xs1 : 'a list ) (xs2 : 'b list )
+  =
+    let rec doit xs1 xs2 =
+      match xs1, xs2 with
+      | ([], []) -> []
+      | (x1 :: xs1, x2 :: xs2) ->
+        let y1, y2 = f1 x1, f2 x2 in
+        let ys = doit xs1 xs2 in
+          (y1, y2) :: ys
+      | (_, _) -> invalid_arg "List.map_combine"
+
+  in
+      doit xs1 xs2
 end
 
 (* -------------------------------------------------------------------- *)

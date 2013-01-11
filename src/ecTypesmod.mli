@@ -54,7 +54,7 @@ and function_ = {
   f_sig    : funsig;
   f_locals : (EcIdent.t * EcTypes.ty) list;
   f_body   : stmt;                      (* FIXME *)
-  f_ret  : EcTypes.tyexpr option; 
+  f_ret    : EcTypes.tyexpr option;
 }
 
 and variable = {

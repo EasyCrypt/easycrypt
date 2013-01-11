@@ -281,6 +281,166 @@ let rec subst_modtype (s : subst) (tymod : tymod) =
       Tym_functor (newparams, subst_tysig ssig tysig)
 
 (* -------------------------------------------------------------------- *)
+let rec subst_stmt (s : subst) (stmt : stmt) =
+  List.map (subst_instr s) stmt
+
+(* -------------------------------------------------------------------- *)
+and subst_instr (s : subst) (instr : instr) =
+  match instr with
+  | Sasgn (lv, e) ->
+      let lv = subst_lvalue s lv in
+      let e  = subst_tyexpr s e  in
+        Sasgn (lv, e)
+
+  | Scall (lv, p, es) ->
+      let lv = omap lv (subst_lvalue s) in
+      let p  = subst_path s p in
+      let es = List.map (subst_tyexpr s) es in
+        Scall (lv, p, es)
+
+  | Sif (e, s1, s2) ->
+      let e  = subst_tyexpr s e  in
+      let s1 = subst_stmt   s s1 in
+      let s2 = subst_stmt   s s2 in
+        Sif (e, s1, s2)
+
+  | Swhile (e, st) ->
+      let e  = subst_tyexpr s e  in
+      let st = subst_stmt   s st in
+        Swhile (e, st)
+
+  | Sassert e ->
+      Sassert (subst_tyexpr s e)
+
+(* -------------------------------------------------------------------- *)
+and subst_lvalue (s : subst) (lvalue : lvalue) =
+  match lvalue with
+  | LvVar (p, ty) ->
+      let p  = subst_path s p  in
+      let ty = subst_ty   s ty in
+        LvVar (p, ty)
+
+  | LvTuple ptys ->
+      let ptys = List.map
+        (fun (p, ty) ->
+          let p  = subst_path s p  in
+          let ty = subst_ty   s ty in
+            (p, ty))
+        ptys
+      in
+        LvTuple ptys
+
+  | LvMap (p1, p2, e, ty) ->
+      let p1 = subst_path   s p1 in
+      let p2 = subst_path   s p2 in
+      let e  = subst_tyexpr s e  in
+      let ty = subst_ty     s ty in
+        LvMap (p1, p2, e, ty)
+
+(* -------------------------------------------------------------------- *)
+let subst_variable (s : subst) (x : variable) =
+  { v_name = EcIdent.fresh x.v_name;
+    v_type = subst_ty s x.v_type; }
+
+(* -------------------------------------------------------------------- *)
+let subst_function (s : subst) (f : function_) =
+  let args'   = List.map
+                  (fun (x, ty) -> (EcIdent.fresh x, subst_ty s ty))
+                  (fst f.f_sig.fs_sig) in
+  let res'    = subst_ty s (snd f.f_sig.fs_sig) in
+  let uses'   = f.f_sig.fs_uses in
+  let locals' = List.map
+                  (fun (x, ty) -> (EcIdent.fresh x, subst_ty s ty))
+                  f.f_locals in
+
+  let sbody = s in
+  let sbody = add_locals sbody
+                (List.map_combine fst fst (fst f.f_sig.fs_sig) args') in
+  let sbody = add_locals sbody
+                (List.map_combine fst fst f.f_locals locals') in
+
+  let body' = subst_stmt sbody f.f_body in
+  let ret'  = omap f.f_ret (subst_tyexpr sbody) in
+
+    { f_sig = { fs_name = f.f_sig.fs_name;
+                fs_sig  = (args', res')  ;
+                fs_uses = uses'          ; };
+
+      f_locals = locals';
+      f_body   = body'  ;
+      f_ret    = ret'   ;
+    }
+
+(* -------------------------------------------------------------------- *)
+let rec subst_module_item (s : subst) (scope : EcPath.path) (item : module_item) =
+  match item with
+  | `Module m ->
+      let m'     = subst_module s scope m in
+      let scope' = EcPath.Pqname (scope, m'.me_name) in
+      let s'     = add s m.me_name (`Path scope') in
+
+        (s', `Module m')
+
+  | `Variable x ->
+      let x'     = subst_variable s x in
+      let scope' = EcPath.Pqname (scope, x'.v_name) in
+      let s'     = add s x.v_name (`Path scope') in
+
+        (s', `Variable x')
+
+  | `Function f ->
+      (s, `Function (subst_function s f)) (* FIXME *)
+
+(* -------------------------------------------------------------------- *)
+and subst_module_items (s : subst) (scope : EcPath.path) (items : module_item list) =
+  let _, items =
+    List.map_fold
+      (fun (s : subst) item ->
+        subst_module_item s scope item)
+      s items
+  in
+    items
+
+(* -------------------------------------------------------------------- *)
+and subst_module_struct (s : subst) (scope : EcPath.path) (bstruct : module_structure) =
+  let sbody, newparams =
+    List.map_fold
+      (fun (s : subst) (a, aty) ->
+        let a' = EcIdent.fresh a in
+          (add s a (`Local a'), (a', subst_modtype s aty)))
+      s bstruct.ms_params
+  in
+    { ms_params = newparams;
+      ms_body   = subst_module_items sbody scope bstruct.ms_body; }
+
+(* -------------------------------------------------------------------- *)
+and subst_module_body (s : subst) (scope : EcPath.path) (body : module_body) =
+  match body with
+  | ME_Ident p -> ME_Ident (subst_path s p)
+
+  | ME_Application (p, args) ->
+      ME_Application (subst_path s p, List.map (subst_path s) args)
+
+  | ME_Structure bstruct ->
+      ME_Structure (subst_module_struct s scope bstruct)
+
+  | ME_Decl p ->
+      ME_Decl (subst_path s p)
+
+(* -------------------------------------------------------------------- *)
+and subst_module (s : subst) (scope : EcPath.path) (m : module_expr) =
+  let name'  = EcIdent.fresh m.me_name in
+  let scope' = EcPath.Pqname (scope, name') in
+  let sbody  = add s m.me_name (`Path scope') in
+  let body'  = subst_module_body sbody scope' m.me_body in
+  let tysig' = subst_modtype s m.me_sig in
+
+    { me_name       = name';
+      me_body       = body';
+      me_components = lazy (assert false);
+      me_sig        = tysig'; }
+
+(* -------------------------------------------------------------------- *)
 let rec subst_theory_item (s : subst) (scope : EcPath.path) (item : theory_item) =
   match item with
   | Th_type (x, tydecl) ->
@@ -307,7 +467,10 @@ let rec subst_theory_item (s : subst) (scope : EcPath.path) (item : theory_item)
       let s' = add s x (`Path (EcPath.Pqname (scope, x'))) in
         (s', Th_modtype (x', subst_modtype s tymod))
 
-  | Th_module _ -> assert false
+  | Th_module m ->
+      let m' = subst_module s scope m in
+      let s' = add s m.me_name (`Path (EcPath.Pqname (scope, m'.me_name))) in
+        (s', Th_module m')
 
   | Th_theory (x, th) ->
       let x'  = EcIdent.fresh x in
