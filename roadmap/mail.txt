@@ -1,0 +1,21 @@
+The introduction of the new instantiation system has been the
+opportunity to rethink EasyCrypt.
+
+Here is our roadmap for this new version of EasyCrypt.
+
+ 1. February 1st.
+
+  We plan to release a version of EasyCrypt with all the features
+  dedicated to write theories / modules / games and their
+  specifications, i.e.
+
+  * The new modules / theories system with all the cloning /
+    instantiation mechanisms.
+  * The ability to express claims / equivs.
+
+ 2. March 15th.
+
+  This release focuses on plugging in back the proof system for claims
+  / equivs along with the development of a standard library (lists,
+  maps, bitstrings, ...) From that release, it should be possible to
+  port your developments done on the current release of EasyCrypt.
