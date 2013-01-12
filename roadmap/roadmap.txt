@@ -1,0 +1,77 @@
+-*- outline -*-
+
+* Roadmap
+
+** version 0.α
+
+ - Deadline: 01 Feb. 2013
+
+ - TODO:
+   1. Theories && modules systems completed
+   2. Being able to state claims
+
+ - Release:
+   1. ProofGeneral
+   2. Packaging why3 + standard provers + EasyCrypt
+
+** version 0.β
+
+  - Deadline: 15 Mar. 2013
+
+  - TODO:
+    1. Being able to prove claims
+    2. Being able to state and prove equivs
+       (see `Tactics' section)
+    3. eq-deno (basic link between equivs and claims)
+    4. Libaries (list, map, bitstrings, groups, ...)
+       - Graphs library (ask MPI ?)
+       - Modular arithmetic
+    5. Game libraries (e.g. Random Oracle)
+
+** version 0.δ
+
+  - Deadline: TBA
+
+  - TODO:
+    1. Computational probs.
+
+* Documentation
+
+  - Deadline: 15 May 2013
+
+* Examples
+
+  - Porting old examples (Q3/Q4 2013)
+
+* Wish list
+
+  - Hint DB (-> 0.β ?)
+  - Loop optimization
+  - Good handling of prob. operators
+  - Good handling of abstract/prob. specs.
+  - Complexity
+  - Differential privacy
+  - Code generation (speak with MINHO university)
+
+* Tactics
+
+** Core tactics:
+
+ - if, if-sync, assign, while, let
+ - Strongest Post-condition
+ - Weakest Pre-condition
+ - Swap
+ - Random
+ - Call
+ - Call one-sided
+ - Inline
+
+** Tactics
+
+ - Transitivity
+
+** Meta tactics
+
+ - Optimistic sampling
+ - Dead code
+ - Up-to-bad random-oracle
