@@ -1,21 +1,46 @@
-The introduction of the new instantiation system has been the
-opportunity to rethink EasyCrypt.
-
-Here is our roadmap for this new version of EasyCrypt.
+The introduction of the new modules system has been the opportunity to
+redesign the implementation of EasyCrypt. This process has started 3
+months ago and we are now able to give a coarse roadmap:
 
  1. February 1st.
 
   We plan to release a version of EasyCrypt with all the features
-  dedicated to write theories / modules / games and their
+  dedicated to writing theories / modules / games and their
   specifications, i.e.
 
   * The new modules / theories system with all the cloning /
     instantiation mechanisms.
   * The ability to express claims / equivs.
 
+  From this date, we expect users to test the new modules system and
+  to report their ``feelings'' about it. This will be the right point
+  for users to influence the modules system by reporting, e.g., what
+  could be improved and what features the modules system is missing.
+
+  In parallel, we will continue to work on the second release.
+
  2. March 15th.
 
   This release focuses on plugging in back the proof system for claims
   / equivs along with the development of a standard library (lists,
-  maps, bitstrings, ...) From that release, it should be possible to
-  port your developments done on the current release of EasyCrypt.
+  maps, bitstrings, modular arithmetic...). The goal is to (at least)
+  port back the previous EasyCrypt proof language to the new modules
+  system.
+
+  From that release, it should be possible to port your developments
+  done on the current release of EasyCrypt.
+
+ 3. Documentation (starting from March 15th)
+
+  Starting from the second release, we plan to sync-up the EasyCrypt
+  documentation and to write a fresh tutorial. We expect to have a
+  preliminary version of the documentation the 15th of May.
+
+ 4. Examples database
+
+  We plan to port the current database of working examples. ETA is
+  Q3/Q4.
+
+ 5. Development tools
+
+  We will sync-up the ProofGeneral plugin.
