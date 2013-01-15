@@ -1,3 +1,5 @@
+open Pprint
+
 (* -------------------------------------------------------------------- *)
 let tryexn (ignoreexn : exn -> bool) (f : unit -> 'a) =
   try  Some (f ())

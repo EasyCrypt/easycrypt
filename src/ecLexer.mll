@@ -140,6 +140,7 @@ rule main = parse
   | "*"                       { STAR }
   | "-"                       { MINUS }
   | "|"                       { PIPE }
+
   (* comparison *)
   | "="                       { EQ }
   | "<>"                      { NE }

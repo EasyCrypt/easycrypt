@@ -12,6 +12,373 @@ module NameGen = EcUidgen.NameGen
 module IM  = EcIdent.Map
 module Mid = EcIdent.Mid
 
+(** {2 PP-style printers} *)
+
+(* -------------------------------------------------------------------- *)
+type 'a pr = 'a -> Pprint.document
+
+module Pp = Pprint
+
+open Pp.Operators
+
+let clearbreak =
+  Pp.ifflat Pp.space (Pp.hardline ^^ Pp.hardline)
+
+(* -------------------------------------------------------------------- *)
+let tk_axiom  = !^ "axiom"
+let tk_as     = !^ "as"
+let tk_clone  = !^ "clone"
+let tk_else   = !^ "else"
+let tk_end    = !^ "end"
+let tk_export = !^ "export"
+let tk_flip   = !^ "{0,1}"
+let tk_if     = !^ "if"
+let tk_in     = !^ "in"
+let tk_lemma  = !^ "lemma"
+let tk_let    = !^ "let"
+let tk_module = !^ "module"
+let tk_op     = !^ "op"
+let tk_pop    = !^ "pop"
+let tk_pred   = !^ "pred"
+let tk_theory = !^ "theory"
+let tk_then   = !^ "then"
+let tk_type   = !^ "type"
+
+let tk_arrow  = !^ "->"
+let tk_dotdot = !^ ".."
+
+(* -------------------------------------------------------------------- *)
+let pr_list_map fmap sep docs =
+  let sep = Pp.softbreak ^^ !^sep in
+    Pp.group2 (Pp.fold1 (fun x y -> x ^^ sep ^^ y) (List.map fmap docs))
+
+(* -------------------------------------------------------------------- *)
+let pr_list sep docs =
+  pr_list_map (fun (x : Pp.document) -> x) sep docs
+
+(* -------------------------------------------------------------------- *)
+let pr_ident (x : EcIdent.t) =
+  !^ (EcIdent.tostring x)
+
+(* -------------------------------------------------------------------- *)
+let pr_path (p : EcPath.path) =
+  !^ (EcIdent.tostring (EcPath.basename p))
+
+(* -------------------------------------------------------------------- *)
+let pr_tvar (id : EcIdent.t) =
+  !^ (EcIdent.tostring id)
+
+(* -------------------------------------------------------------------- *)
+let pr_tunivar (uidmap : NameGen.t) (id : EcUidgen.uid) =
+  !^ (Printf.sprintf "#%s" (NameGen.get uidmap id))
+
+(* -------------------------------------------------------------------- *)
+let pr_tuple docs =
+  match docs with
+  | []    -> Pp.empty
+  | [doc] -> doc
+  | _     -> Pp.parens (pr_list "," docs)
+
+(* -------------------------------------------------------------------- *)
+let pr_type (uidmap : NameGen.t) (ty : ty) =
+  let rec pr_type btuple = function
+    | Tvar    id -> pr_tvar id
+    | Tunivar id -> pr_tunivar uidmap id
+
+    | Ttuple tys ->
+        let doc = pr_list_map (pr_type true) "* " tys in (* FIXME "*" *)
+          if btuple then Pp.parens doc else doc
+
+    | Tconstr (name, tyargs) -> begin
+        match tyargs with
+        | [] -> pr_path name
+        | _  -> (pr_tuple (List.map (pr_type false) tyargs))
+                ^//^ (pr_path name)
+    end
+  in
+    pr_type false ty
+
+(* -------------------------------------------------------------------- *)
+let pr_type ?(vmap : _ option) (ty : ty) =
+  let uidmap =
+    match vmap with
+    | None        -> NameGen.create ()
+    | Some uidmap -> uidmap
+  in
+    pr_type uidmap ty
+
+(* -------------------------------------------------------------------- *)
+let lex_single_token name =
+
+  (* Not the fastest solution from the west, but certainly the more
+   * robust. TODO: clean-up the operators lexing stuff... *)
+
+  try
+    let lexbuf = Lexing.from_string name in
+    let token  = EcLexer.main lexbuf in
+  
+      match EcLexer.main lexbuf with
+      | EcParser.EOF -> Some token
+      | _            -> None
+
+  with EcLexer.LexicalError _ -> None
+
+let priority_of_binop_name name =
+  let module EP = EcParser in
+
+    match lex_single_token name with
+    | None       -> None
+    | Some token -> begin
+        match token with
+        | EP.IMPL | EP.IFF         -> Some (0, `Right)
+        | EP.OR                    -> Some (1, `Right)
+        | EP.AND                   -> Some (2, `Right)
+        | EP.EQ | EP.NE | EP.OP1 _ -> Some (3, `Left )
+        | EP.OP2 _ | EP.MINUS      -> Some (4, `Left )
+        | EP.OP3 _ | EP.STAR       -> Some (5, `Left )
+        | EP.OP4 _                 -> Some (6, `Left )
+
+        | _ -> None
+      end
+
+let is_uniop name =
+  let module EP = EcParser in
+
+    match lex_single_token name with
+    | None       -> false
+    | Some token -> List.mem token [EP.MINUS; EP.NOT]
+
+let is_binop name =
+  (priority_of_binop_name name) <> None
+
+let e_prio_uni   =  5000
+let e_prio_excpt = 10000
+let e_prio_letin = 10002
+let e_prio_if3   = 10005
+let e_prio_max   = Pervasives.max_int
+
+(* -------------------------------------------------------------------- *)
+let pr_indent (doc : Pp.document) =
+  Pp.ifflat doc (Pp.indent 2 doc)
+
+(* -------------------------------------------------------------------- *)
+let pr_hang (doc : Pp.document) =
+  Pp.hang 2 doc
+
+(* -------------------------------------------------------------------- *)
+let pr_seq (doc : Pp.document list) =
+  Pp.fold1 (^//^) doc
+
+(* -------------------------------------------------------------------- *)
+let pr_expr (e : tyexpr) =
+  let rec pr_expr (prio : int) (e : tyexpr) =
+    let maybe_parens myprio doc =
+      if myprio < prio then Pp.parens doc else doc
+    in
+      match e with
+      | Evar (x, _) ->
+          pr_path x.pv_name
+
+      | Elocal (x, _) ->
+          pr_ident x
+
+      | Eint i ->
+          Pp.ML.int i
+    
+      | Eflip ->
+          tk_flip
+    
+      | Eexcepted (e1, e2) ->
+          let d1 = pr_expr (e_prio_excpt + 1) e1 in
+          let d2 = pr_expr (e_prio_excpt + 0) e2 in
+            Pp.parens (pr_seq [d1; Pp.backslash; d2])
+
+      | Ebitstr e ->
+          let d = pr_expr e_prio_max e in
+            pr_seq [tk_flip; Pp.caret; d]
+
+      | Einter (e1, e2) ->
+          let d1 = pr_expr (-1) e1 in
+          let d2 = pr_expr (-1) e2 in
+            Pp.braces (pr_hang (pr_seq [d1; tk_dotdot; d2]))
+  
+      | Eif (c, e1, e2) ->
+          let dc  = pr_expr (e_prio_if3 + 1) c  in
+          let d1  = pr_expr (e_prio_if3 + 1) e1 in
+          let d2  = pr_expr (e_prio_if3 + 0) e2 in
+          let doc = pr_seq [dc; Pp.qmark; d1; Pp.colon; d2] in
+            maybe_parens e_prio_if3 doc
+
+      | Etuple es ->
+          let docs = List.map (pr_expr (-1)) es in
+            Pp.parens (pr_list ", " docs)
+
+      | Eapp (op, es, _) -> begin
+          let opname = EcIdent.name (EcPath.basename op) in
+
+          let pr_as_std_op () =
+            match es with
+            | [] -> pr_path op
+            | _  ->
+                let docs = List.map (pr_expr (-1)) es in
+                  (pr_path op) ^^ pr_seq [Pp.parens (pr_list "," docs)]
+
+          and try_pr_as_uniop () =
+            match es with
+            | [e] -> begin
+                match is_uniop opname with
+                | false -> None
+                | true  ->
+                    let doc = !^opname ^^ (pr_expr (e_prio_uni+1) e) in
+                      Some (maybe_parens e_prio_uni doc)
+              end
+
+            | _ -> None
+
+          and try_pr_as_binop () =
+            match es with
+            | [e1; e2] -> begin
+                match priority_of_binop_name opname with
+                | None -> None
+                | Some (opprio, opassoc) ->
+                    let (il, ir) =
+                      match opassoc with
+                      | `Left  -> (1, 0)
+                      | `Right -> (0, 1)
+                    in
+
+                    let d1  = pr_expr (opprio + il) e1 in
+                    let d2  = pr_expr (opprio + ir) e2 in
+                    let doc = pr_seq [d1; !^ opname; d2] in
+                      Some (maybe_parens opprio doc)
+              end
+
+            | _ -> None
+          in
+            ofdfl pr_as_std_op
+              (List.fpick [try_pr_as_uniop; try_pr_as_binop])
+        end
+
+      | Elet (pt, e1, e2) ->
+          let dpt =
+            match pt with
+            | LSymbol x  -> pr_ident x
+            | LTuple  xs -> pr_tuple (List.map pr_ident xs)
+          in
+
+          let d1  = pr_expr (-1) e1 in  (* FIXME: prio *)
+          let d2  = pr_expr (-1) e2 in
+          let doc = pr_seq [tk_let; dpt; Pp.equals; d1; tk_in; d2] in
+
+            maybe_parens e_prio_letin doc
+
+  in
+    pr_expr (-1) e
+
+(* -------------------------------------------------------------------- *)
+let pr_dotted (doc : Pp.document) = doc ^^ Pp.dot
+
+(* -------------------------------------------------------------------- *)
+let pr_block ~prfx ~pofx (docs : Pp.document list) =
+  let docs = List.map pr_indent docs in
+  let docs = Pp.fold1 (fun d1 d2 -> d1 ^^ clearbreak ^^ d2) docs in
+    prfx ^^ Pp.break1 ^^ docs ^^ Pp.break1 ^^ pofx
+
+(* -------------------------------------------------------------------- *)
+let pr_typedecl ((x, tyd) : EcIdent.t * tydecl) =
+  let doc = tk_type ^//^ (pr_ident x) in
+  let doc =
+    match tyd.tyd_type with
+    | None    -> doc
+    | Some ty -> doc ^//^ Pp.equals ^//^ (pr_type ty)
+  in
+    pr_dotted (Pp.nest 2 doc)
+
+(* -------------------------------------------------------------------- *)
+let pr_dom dom =
+  match List.map pr_type dom with
+  | []  -> Pp.parens Pp.empty
+  | dom -> pr_tuple dom
+
+(* -------------------------------------------------------------------- *)
+let pr_sig (dom, codom) =
+  (pr_dom dom) ^//^ tk_arrow ^//^ (pr_type codom)
+
+(* -------------------------------------------------------------------- *)
+let pr_opdecl ((x, op) : EcIdent.t * operator) =
+  let opsig = (op.op_dom, op.op_codom) in
+
+  let doc =
+    match op.op_kind with
+    | OB_oper i -> begin
+      match i.op_def with
+      | None -> pr_seq [tk_op; pr_ident x; Pp.colon; pr_sig opsig]
+      | Some (_, e) -> pr_expr e
+  
+    end
+  
+    | OB_pred i -> begin
+      match i.op_def with
+      | None   -> pr_seq [tk_pred; pr_ident x; Pp.colon; pr_dom op.op_dom]
+      | Some _ -> assert false
+    end
+  
+    | OB_prob _ -> assert false         (* FIXME: no parsing rule *)
+  in
+    pr_dotted doc
+
+(* -------------------------------------------------------------------- *)
+let pr_axiom ((_x, ax) : EcIdent.t * axiom) =
+  let tk =
+    match ax.ax_kind with
+    | Axiom   -> tk_axiom
+    | Lemma _ -> tk_lemma
+  in
+    tk                                  (* Fails in ecWhy3 *)
+
+(* -------------------------------------------------------------------- *)
+let pr_modtype ((x, _tymod) : EcIdent.t * tymod) =
+  pr_dotted (pr_seq [tk_module; tk_type; pr_ident x; Pp.equals])
+
+(* -------------------------------------------------------------------- *)
+let pr_module (m : module_expr) =
+  pr_dotted (pr_seq [tk_module; pr_ident m.me_name; Pp.equals])
+
+(* -------------------------------------------------------------------- *)
+let pr_export (p : EcPath.path) =
+  pr_dotted (tk_export ^//^ (pr_path p))
+
+(* -------------------------------------------------------------------- *)
+let rec pr_ctheory_item (item : ctheory_item) =
+  match item with
+  | CTh_type     (x, ty) -> pr_typedecl (x, ty)
+  | CTh_operator (x, op) -> pr_opdecl   (x, op)
+  | CTh_axiom    (x, ax) -> pr_axiom    (x, ax)
+  | CTh_modtype  (x, ty) -> pr_modtype  (x, ty)
+  | CTh_module   m       -> pr_module   m
+  | CTh_theory   (x, th) -> pr_theory   (x, th)
+  | CTh_export   p       -> pr_export   p
+
+(* -------------------------------------------------------------------- *)
+and pr_theory ((name, ctheory) : EcIdent.t * ctheory) =
+  match ctheory.cth_desc with
+  | CTh_clone p ->
+      tk_clone ^//^ (pr_path p) ^//^ tk_as ^//^ (pr_ident name)
+
+  | CTh_struct cstruct ->
+      let pr_cstruct = List.map pr_ctheory_item cstruct in
+        pr_block
+          ~prfx:(pr_dotted (tk_theory ^//^ (pr_ident name)))
+          ~pofx:(pr_dotted (tk_end    ^//^ (pr_ident name)))
+          pr_cstruct
+
+(* -------------------------------------------------------------------- *)
+let pretty (doc : Pp.document) =
+  Format.fprintf Format.err_formatter "%a@?"
+    (Pp.Formatter.pretty 0.8 78) doc
+
+(** {1 PP-style printers} *)
+
 (* -------------------------------------------------------------------- *)
 let (~$) = format_of_string
 
@@ -30,87 +397,16 @@ let rec pp_path fmt = function
   | EcPath.Pqname (p, x) -> Format.fprintf fmt "%a.%s" pp_path p (EcIdent.name x)
 
 (* -------------------------------------------------------------------- *)
-let pp_ident fmt id = 
-  Format.fprintf fmt "%s" (EcIdent.name id)
+let pp_of_pr (pr : 'a pr) (fmt : Format.formatter) (x : 'a) =
+  Format.fprintf fmt "%a" (Pp.Formatter.pretty 0.8 78) (pr x)
 
 (* -------------------------------------------------------------------- *)
-let pp_path_in_env _env fmt id =       (* FIXME *)
-  Format.fprintf fmt "%s" (EcIdent.name id)
-
-(* -------------------------------------------------------------------- *)
-let pp_type (uidmap : NameGen.t) =
-  let rec pp_type btuple fmt = function
-    | Ttuple tys ->
-        let pp = if btuple then pp_paren else pp_id in
-          pp (pp_list ~sep:(~$"*") (pp_type true))
-            fmt tys
-
-    | Tconstr (name, tyargs) -> begin
-        match tyargs with
-        | []     -> Format.fprintf fmt "%a" pp_path name
-        | [t]    -> Format.fprintf fmt "%a %a" (pp_type true) t pp_path name
-        | tyargs -> Format.fprintf fmt "(%a) %a"
-                      (pp_list ~sep:(~$", ") (pp_type false)) tyargs
-                      pp_path name
-    end
-
-    | Tvar id -> (* FIXME *)
-        Format.fprintf fmt "%s" (EcIdent.name id)
-
-    | Tunivar id ->
-        Format.fprintf fmt "#%s" (NameGen.get uidmap id)
-
-  in
-    pp_type
-
-(* -------------------------------------------------------------------- *)
-let pp_type ?(vmap : _ option) =
-  let uidmap =
-    match vmap with
-    | None        -> NameGen.create ()
-    | Some uidmap -> uidmap
-  in
-    pp_type uidmap false
-
-(* -------------------------------------------------------------------- *)
-let pp_tydecl _env fmt (p, td) =
-  let vmap = EcUidgen.NameGen.create () in
-
-  let pp_params fmt = function
-    | []   -> ()
-    | [id] -> pp_ident fmt id
-    | lid  -> Format.fprintf fmt "(%a)" (pp_list ~sep:(", ") pp_ident) lid  in
-
-  let pp_body fmt ty =
-    pp_option ~pre:" = " (pp_type ~vmap) fmt ty in
-
-  Format.fprintf fmt "type %a%a%a."
-    pp_params td.tyd_params pp_ident (EcPath.basename p) pp_body td.tyd_type
-
-(* -------------------------------------------------------------------- *)
-let pp_optyparams fmt lid = 
-  match lid with
-  | [] -> ()
-  | _  -> Format.fprintf fmt "[%a]" (pp_list ~sep:(", ") pp_ident) lid
-
-(* -------------------------------------------------------------------- *)
-let pp_dom fmt =
-  let vmap = NameGen.create () in
-    function
-    | []  -> Format.fprintf fmt "()"
-    | [t] -> pp_type fmt t
-    | lt  -> Format.fprintf fmt "(%a)" (pp_list ~sep:(", ") (pp_type ~vmap)) lt
-
-(* -------------------------------------------------------------------- *)
-let pp_opdecl fmt (p, d) =
-  let _vmap = EcUidgen.NameGen.create () in
-
-  let str_kind op =
-    if is_pred op then "pred" else
-    if is_prob op then "pop" else
-    if is_ctnt op then "cnst" else "op" in
-
-  let pp_decl _fmt _d = () in           (* FIXME *)
-  Format.fprintf fmt "%s %a%a %a."
-    (str_kind d) pp_optyparams d.op_params pp_path p
-    pp_decl d
+let pp_type     = fun ?vmap -> pp_of_pr (pr_type ?vmap)
+let pp_dom      = pp_of_pr pr_dom
+let pp_typedecl = pp_of_pr pr_typedecl
+let pp_opdecl   = pp_of_pr pr_opdecl
+let pp_axiom    = pp_of_pr pr_axiom
+let pp_modtype  = pp_of_pr pr_modtype
+let pp_module   = pp_of_pr pr_module
+let pp_export   = pp_of_pr pr_export
+let pp_theory   = pp_of_pr pr_theory

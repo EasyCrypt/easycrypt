@@ -29,8 +29,8 @@ check: byte
 	./scripts/runtest.py     \
 	  --bin=./ec.byte        \
 	  --ok-dir=tests/success \
-	  --ko-dir=tests/fail    \
-          --ok-dir=theories
+	  --ok-dir=theories      \
+	  --ko-dir=tests/fail
 
 clean:
 	$(OCAMLBUILD) -clean

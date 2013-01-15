@@ -1,6 +1,7 @@
 (* -------------------------------------------------------------------- *)
 open EcParsetree
 open EcTypedtree
+open Pprint.Operators
 
 (* -------------------------------------------------------------------- *)
 let loader = EcLoader.create ()
@@ -14,20 +15,24 @@ exception Interrupted
 
 let process_print scope p = 
   let env = EcScope.env scope in
-  match p with 
-  | Pr_ty qs ->
-      (try 
-        let ptd = EcEnv.Ty.lookup qs.pl_desc env in
-        Format.printf "%a@." (EcPrinting.pp_tydecl env) ptd
-      with _ -> assert false (* FIXME *))
-  | Pr_op qs ->
-      (try 
-        let ptd = EcEnv.Op.lookup qs.pl_desc env in
-        Format.printf "%a@." EcPrinting.pp_opdecl ptd
-      with _ -> assert false (* FIXME *))
-  | Pr_th _qs -> assert false           (* FIXME *)
-  | Pr_pr _qs -> assert false           (* FIXME *)
-  | Pr_ax _qs -> assert false           (* FIXME *)
+  let doc =
+    match p with 
+    | Pr_ty qs ->
+        let (x, ty) = EcEnv.Ty.lookup qs.pl_desc env in
+          EcPrinting.pr_typedecl (EcPath.basename x, ty)
+
+    | Pr_op qs ->
+        let (x, op) = EcEnv.Op.lookup qs.pl_desc env in
+          EcPrinting.pr_opdecl (EcPath.basename x, op)
+
+    | Pr_th qs ->
+        let (p, th) = EcEnv.Theory.lookup qs.pl_desc env in
+          EcPrinting.pr_theory (EcPath.basename p, th)
+
+    | _ -> assert false
+
+  in
+    EcPrinting.pretty (doc ^^ Pprint.hardline)
 
 (* -------------------------------------------------------------------- *)
 let rec process_type (scope : EcScope.scope) (tyd : ptydecl) =
@@ -124,7 +129,7 @@ and process (scope : EcScope.scope) (g : global) =
     | Gtactics   t    -> process_tactics    scope t
     | Gsave           -> process_save       scope 
   in
-    EcEnv.dump EcDebug.initial (EcScope.env scope); 
+(*    EcEnv.dump EcDebug.initial (EcScope.env scope); *)
     scope
 
 (* -------------------------------------------------------------------- *)

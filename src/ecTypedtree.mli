@@ -32,8 +32,8 @@ type tyerror =
 exception TyError of Location.t * tyerror
 
 val tyerror : Location.t -> tyerror -> 'a
-(* -------------------------------------------------------------------- *)
 
+(* -------------------------------------------------------------------- *)
 type typolicy
 val tp_tydecl : typolicy
 val tp_relax  : typolicy

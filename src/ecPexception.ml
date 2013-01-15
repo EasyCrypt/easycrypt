@@ -39,13 +39,6 @@ let exn_printer fmt exn =
 
 (* End cut and paste WHY3 *)
 
-
-
-
-
-
-
-
 (* -------------------------------------------------------------------- *)
 let pp_typerror =
   let pp fmt = function

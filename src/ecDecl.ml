@@ -23,7 +23,7 @@ type operator_kind =
 type operator = {
   op_params : EcIdent.t list;     (* type parameters *)
   op_dom    : EcTypes.dom;        
-  op_codom  : EcTypes.ty;         
+  op_codom  : EcTypes.ty;
   op_kind   : operator_kind;
 }
 
