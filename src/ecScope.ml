@@ -99,6 +99,14 @@ type loader = {
   ld_required : EcIdent.t list;
 }
 
+type proof_uc_kind = 
+  | PUCK_logic of EcLogic.judgment_uc 
+
+type proof_uc = {
+    puc_name : string;
+    puc_kind : proof_uc_kind;
+  }
+
 type scope = {
   sc_name       : EcIdent.t;
   sc_types      : EcDecl.tydecl          Context.context;
@@ -110,6 +118,7 @@ type scope = {
   sc_env        : EcEnv.env;
   sc_top        : scope option;
   sc_loader     : loader;
+  sc_pr_uc      : proof_uc list; 
 }
 
 (* -------------------------------------------------------------------- *)
@@ -126,7 +135,8 @@ let empty =
       sc_theories   = Context.empty ();
       sc_env        = EcEnv.initial;
       sc_top        = None;
-      sc_loader     = loader; }
+      sc_loader     = loader;
+      sc_pr_uc      = []; }
 
 (* -------------------------------------------------------------------- *)
 let name (scope : scope) =
@@ -166,39 +176,24 @@ let subscope (scope : scope) (name : symbol) =
     sc_theories   = Context.empty ();
     sc_env        = env;
     sc_top        = Some scope;
-    sc_loader     = { scope.sc_loader with ld_required = []; }
+    sc_loader     = { scope.sc_loader with ld_required = []; };
+    sc_pr_uc    = [];
   }
 
 (* -------------------------------------------------------------------- *)
-let init_ue_op o =
-  let ue = EcUnify.UniEnv.create () in
-  let tp, tparams = 
-    match o with
-    | None -> EcTypedtree.tp_relax, None 
-    | Some ls ->
-        let mk s = 
-          try 
-            let _ = EcUnify.UniEnv.get_var ~strict:true ue s.pl_desc in
-            EcTypedtree.tyerror s.pl_loc (EcTypedtree.DuplicatedLocals None)
-          with Not_found ->
-            EcUnify.UniEnv.get_var ~strict:false ue s.pl_desc in
-        EcTypedtree.tp_strict, Some (List.map mk ls) in
-  ue,tp,tparams
 
-let build_tparams loc tparams sign = 
-  let fv = Tvar.fv_sig sign in
-  if EcIdent.Sid.exists (fun id -> EcIdent.name id = "") fv then
-    EcTypedtree.tyerror loc (EcTypedtree.UnNamedTypeVariable);
-  match tparams with
-  | None -> EcIdent.Sid.elements fv
-  | Some l ->
-      let fv' = 
-        List.fold_left (fun s id -> EcIdent.Sid.add id s) EcIdent.Sid.empty l in
-      if EcIdent.Sid.equal fv fv' then l
-      else
-        (assert (EcIdent.Sid.subset fv fv');
-         EcTypedtree.tyerror loc (EcTypedtree.UnusedTypeVariable))
-    
+let init_unienv tparams = 
+  let build tparams = 
+    let l = ref [] in
+    let check ps = 
+      let s = unloc ps in
+      if List.mem s !l then 
+        EcTypedtree.tyerror ps.pl_loc (EcTypedtree.DuplicatedLocals (Some ps)) 
+      else (l:= s::!l;EcIdent.create s) in
+    List.map check tparams in
+  let tparams = omap tparams build in 
+  EcUnify.UniEnv.create tparams
+
 module Op = struct
   open EcTypes
   open EcDecl
@@ -212,7 +207,8 @@ module Op = struct
         sc_env       = EcEnv.Op.bind x op scope.sc_env; }
 
   let add (scope : scope) (op : poperator) =
-    let ue, tp, tparams = init_ue_op op.po_tyvars in
+    let ue = init_unienv op.po_tyvars in
+    let tp =  TT.tp_relax in
     let dom  = TT.transtys tp scope.sc_env ue (odfl [] op.po_dom) in
     let codom  = TT.transty tp scope.sc_env ue op.po_codom in
     let policy = { TT.epl_prob = op.po_prob } in
@@ -228,8 +224,8 @@ module Op = struct
           Some (xs, body) in
     let uni = Tuni.subst (EcUnify.UniEnv.close ue) in
     let body = omap body (fun (ids,body) -> ids, Esubst.mapty uni body) in
-    let (dom,codom as sign) = List.map uni dom, uni codom in
-    let tparams = build_tparams op.po_name.pl_loc tparams sign in
+    let (dom,codom) = List.map uni dom, uni codom in
+    let tparams = EcUnify.UniEnv.tparams ue in 
     let tyop = EcDecl.mk_op tparams dom codom body op.po_prob in
     bind scope (EcIdent.create (unloc op.po_name), tyop)
 end
@@ -239,7 +235,8 @@ module Pred = struct
   module TT = EcTypedtree
 
   let add (scope : scope) (op : ppredicate) =
-    let ue, tp, tparams = init_ue_op op.pp_tyvars in
+    let ue = init_unienv op.pp_tyvars in
+    let tp =  TT.tp_relax in 
     let dom  = TT.transtys tp scope.sc_env ue (odfl [] op.pp_dom) in
     let body =
       match op.pp_body with
@@ -253,38 +250,13 @@ module Pred = struct
     let uni = Tuni.subst (EcUnify.UniEnv.close ue) in
     let body = omap body (fun (ids,body) -> ids, EcFol.Fsubst.mapty uni body) in
     let dom = List.map uni dom in
-    let tparams = build_tparams op.pp_name.pl_loc tparams (dom,tbool) in
+    let tparams = EcUnify.UniEnv.tparams ue in
     let tyop = EcDecl.mk_pred tparams dom body in
     Op.bind scope (EcIdent.create (unloc op.pp_name), tyop)
 
 end
 
 (* -------------------------------------------------------------------- *)
-module Ax = struct
-  open EcParsetree
-  open EcTypes
-  open EcDecl
-
-  module TT = EcTypedtree
-
-  let transform_kind = function
-    | PAxiom -> Axiom
-    | PLemma -> Lemma 
-
-  let bind (scope : scope) ((x, ax) : _ * axiom) =
-    { scope with
-        sc_axioms = Context.bind (EcIdent.name x) ax scope.sc_axioms;
-        sc_env    = EcEnv.Ax.bind x ax scope.sc_env; }
-
-  let add (scope : scope) (ax : paxiom) =
-    let ue = EcUnify.UniEnv.create() in
-    let form = 
-      TT.transformula (TT.Fenv.mono_fenv scope.sc_env) ue ax.pa_formula in
-    let form = EcFol.Fsubst.mapty (Tuni.subst (EcUnify.UniEnv.close ue)) form in
-    let axd = { ax_spec = Some form;
-                ax_kind = transform_kind ax.pa_kind } in
-      bind scope (EcIdent.create (unloc ax.pa_name), axd)
-end
 
 (* -------------------------------------------------------------------- *)
 module Ty = struct
@@ -302,18 +274,18 @@ module Ty = struct
       bind scope (EcIdent.create name, tydecl)
 
   let add (scope : scope) (args, name) = 
-    let _, _, tparams = init_ue_op (Some args) in
+    let ue = init_unienv (Some args) in
     let tydecl = {
-      tyd_params = oget tparams;
+      tyd_params = EcUnify.UniEnv.tparams ue;
       tyd_type   = None;
     } in
     bind scope (EcIdent.create (unloc name), tydecl)
 
   let define (scope : scope) (args, name) body = 
-    let ue, _, tparams = init_ue_op (Some args) in
+    let ue = init_unienv (Some args) in
     let body = transty tp_tydecl scope.sc_env ue body in
     let tydecl = {
-      tyd_params = oget tparams;
+      tyd_params = EcUnify.UniEnv.tparams ue;
       tyd_type   = Some body;
     } in
     bind scope (EcIdent.create (unloc name), tydecl)
@@ -486,4 +458,224 @@ module Theory = struct
           { scope with sc_theories = bind id th scope.sc_theories }
       | _ -> assert false in
     List.fold_left add { scope with sc_env = env } lth
+end
+
+module Tactic = struct
+
+  open EcFol
+  open EcLogic
+  module TT = EcTypedtree
+
+  let process_tyargs env hyps args = 
+    let ue = EcUnify.UniEnv.create (Some hyps.h_tvar) in
+    List.map (TT.transty TT.tp_tydecl env ue) args 
+
+  let process_instanciate env hyps (pq,tyargs) = 
+    let p = 
+      try fst (EcEnv.Ax.lookup (unloc pq) env)
+      with _ -> assert false (* FIXME error message *) in
+    let args = process_tyargs env hyps tyargs in
+    p,args 
+    
+  let process_global env arg g = 
+    let hyps = get_hyps g in
+    let p, tyargs = process_instanciate env hyps arg in
+    t_glob env p tyargs g 
+
+  let process_assumption env (pq,args) g = 
+    let hyps,concl = get_goal g in
+    match pq with
+    | None -> 
+        assert (args = []); (* FIXME error message *)
+        let h  = 
+          try find_in_hyps env concl hyps 
+          with _ -> assert false in
+        t_hyp env h g
+    | Some pq ->
+        match unloc pq, args with
+        | ([],ps), [] when LDecl.has_hyp ps hyps ->
+            t_hyp env (fst (LDecl.lookup_hyp ps hyps)) g
+        | _, _ -> process_global env (pq,args) g
+
+  let check_name hyps pi = 
+    let s = odfl "_" (unloc pi) in
+    let id = EcIdent.create s in
+    try LDecl.check_id id hyps; id
+    with _ -> assert false (* FIXME error message *)
+
+  let process_intro pi g = 
+    let hyps,concl = get_goal g in
+    let id = check_name hyps pi in
+    if is_forall concl then t_forall_intro id g
+    else if is_imp concl then t_imp_intro id g
+    else assert false (* FIXME error message *)
+
+  let process_intros pis = t_lseq (List.map process_intro pis)
+
+  let process_formula env g pf =
+    let hyps = get_hyps g in
+    let ue = EcUnify.UniEnv.create (Some hyps.h_tvar) in
+    let ff = TT.transformula (TT.Fenv.fenv_hyps env hyps) ue pf in
+    EcFol.Fsubst.mapty (Tuni.subst (EcUnify.UniEnv.close ue)) ff
+
+  let process_exists1 env pf g =  
+    let f = process_formula env g pf in
+    t_exists_intro env f g 
+
+  let process_exists env pfs = t_lseq (List.map (process_exists1 env) pfs)
+
+  let process_elim env f ot g =
+    (* FIXME error message *)
+    match ot with
+    | None -> t_imp_elim f g
+    | Some pf ->
+       let ft = process_formula env g pf in
+       t_forall_elim env f ft g
+
+  let process_intro_elim env ot g =
+    let id = EcIdent.create "_" in
+    let ff = fst(destr_imp (get_concl g)) in
+    t_seq_subgoal (t_seq (t_imp_intro id) (process_elim env ff ot))
+      [ t_hyp env id;
+        t_clear id] g
+
+  let rec process_intro_elims env ots g = 
+    match ots with
+    | [] -> t_id g
+    | ot::ots -> 
+        t_on_last (process_intro_elim env ot g)
+          (process_intro_elims env ots) 
+    
+  let process_elim_kind env g k = 
+    let hyps = get_hyps g in
+    match k with
+    | ElimHyp (pq,args) ->
+        begin match unloc pq, args with 
+        | ([],ps), [] when LDecl.has_hyp ps hyps ->
+            let id,ff = LDecl.lookup_hyp ps hyps in
+            t_hyp env id, ff
+        | _, _ -> 
+            let p,args = process_instanciate env hyps (pq,args) in
+            let ff = EcEnv.Ax.instanciate p args env in
+            t_glob env p args, ff
+        end
+    | ElimForm pf ->
+        let ff = process_formula env g pf in
+        t_id, ff
+
+  let process_elims env pe g =       
+    let tac, ff = process_elim_kind env g pe.elim_kind in
+    if is_and ff then t_on_first (t_and_elim ff g) tac
+    else if is_or ff then t_on_first (t_or_elim ff g) tac
+    else if is_exists ff then t_on_first (t_exists_elim ff g) tac 
+    else if is_forall ff || is_imp ff then
+      begin match pe.elim_args with
+      | [] -> assert false (* FIXME error message *)
+      | ot::ots -> 
+          t_seq_subgoal (process_elim env ff ot)
+             [tac;process_intro_elims env ots] g
+      end
+    else assert false (* FIXME error message *)
+
+  let rec process_logic_tacs env (tacs:ptactics) (gs:goals) : goals = 
+    match tacs with
+    | [] -> gs
+    | {pl_desc = Psubgoal tacs1} :: tacs2 ->  
+        let gs = t_subgoal (List.map (process_logic_tac env) tacs1) gs in
+        process_logic_tacs env tacs2 gs
+    | tac1 :: tacs2 ->
+        let gs = t_on_goals (process_logic_tac env tac1) gs in
+        process_logic_tacs env tacs2 gs 
+        
+  and process_logic_tac env (tac:ptactic) (g:goal) : goals = 
+    match unloc tac with
+    | Pidtac         -> t_id g 
+    | Passumption pq -> process_assumption env pq g 
+    | Ptrivial       -> t_trivial env g
+    | Pintro pi      -> process_intros pi g
+    | Psplit         -> t_and_intro g
+    | Pexists fs     -> process_exists env fs g
+    | Pleft          -> t_or_intro true g
+    | Pright         -> t_or_intro false g
+    | Pelim pe       -> process_elims env pe g
+    | Pseq tacs      -> 
+        let (juc,n) = g in
+        process_logic_tacs env tacs (juc,[n])
+    | Psubgoal _     -> assert false 
+
+  let process_logic env juc tacs = 
+    let (juc,n) = get_first_goal juc in
+    fst (process_logic_tacs env tacs (juc,[n]))
+    
+  let process scope tac =
+    match scope.sc_pr_uc with
+    | [] -> assert false (* FIXME error message *)
+    | puc :: pucs ->
+        match puc.puc_kind with
+        | PUCK_logic juc -> 
+            let juc = process_logic scope.sc_env juc tac in
+            { scope with 
+              sc_pr_uc = { puc with puc_kind = PUCK_logic juc } :: pucs }
+
+
+    
+end 
+
+module Ax = struct
+  open EcParsetree
+  open EcTypes
+  open EcDecl
+
+  module TT = EcTypedtree
+
+  let bind (scope : scope) ((x, ax) : _ * axiom) =
+    { scope with
+        sc_axioms = Context.bind (EcIdent.name x) ax scope.sc_axioms;
+        sc_env    = EcEnv.Ax.bind x ax scope.sc_env; }
+
+  let start_lemma scope name tparams concl = 
+    let hyps = { EcFol.h_tvar = tparams;
+                 EcFol.h_local = []; } in
+    let puc = {
+      puc_name = name ;
+      puc_kind = PUCK_logic (EcLogic.open_juc hyps concl) } in
+    { scope with 
+      sc_pr_uc = puc :: scope.sc_pr_uc }
+    
+
+  let save scope = 
+    match scope.sc_pr_uc with
+    | [] -> assert false (* FIXME error message *)
+    |  { puc_name = name; puc_kind = PUCK_logic juc } :: pucs ->
+        let pr = EcLogic.close_juc juc in
+        let hyps,concl = pr.EcBaseLogic.j_decl in
+        let tparams = hyps.EcFol.h_tvar in
+        assert (hyps.EcFol.h_local = []);
+        let axd = { ax_params = tparams;
+                    ax_spec = Some concl;
+                    ax_kind = Lemma (Some pr) } in
+        let scope = { scope with sc_pr_uc = pucs } in
+        bind scope (EcIdent.create name, axd)
+          
+  let add (scope : scope) (ax : paxiom) =
+    let ue = EcUnify.UniEnv.create None in
+    let concl = 
+      TT.transformula (TT.Fenv.mono_fenv scope.sc_env) ue ax.pa_formula in
+    let concl = 
+      EcFol.Fsubst.mapty (Tuni.subst (EcUnify.UniEnv.close ue)) concl in
+    let tparams = EcUnify.UniEnv.tparams ue in 
+    match ax.pa_kind with
+    | PAxiom -> 
+        let axd = { ax_params = tparams;
+                    ax_spec = Some concl;
+                    ax_kind = Axiom } in
+        bind scope (EcIdent.create (unloc ax.pa_name), axd)
+    | PILemma -> start_lemma scope (unloc ax.pa_name) tparams concl 
+    | PLemma -> 
+        let scope = start_lemma scope (unloc ax.pa_name) tparams concl in
+        let scope = 
+          Tactic.process scope
+            [{ pl_loc = Location.dummy; pl_desc = Ptrivial }] in
+        save scope
+        
 end

@@ -197,14 +197,20 @@ end
       
 module Wtvm = 
   struct
+
     type t = EcIdent.t Ty.Mtv.t ref 
+
     let create () = ref Ty.Mtv.empty 
+
     let get tvm tv = 
       try Ty.Mtv.find tv !tvm 
       with _ ->
         let id = EcIdent.create (w3_id_string tv.Ty.tv_name) in
         tvm := Ty.Mtv.add tv id !tvm;
         id
+
+    let tparams tvm = Ty.Mtv.values !tvm 
+      
   end
       
 exception UnknownWhy3Ident of Ident.ident 
@@ -238,7 +244,7 @@ type zipper_elem =
 
 and zipper = zipper_elem list 
 
-let import_w3_tydef rn path (env,rb,z) ty =
+let import_w3_tydef rn path (env,_rb,z) ty =
   let tvm = Wtvm.create () in
   let params = List.map (Wtvm.get tvm) ty.Ty.ts_args in
   let def = omap ty.Ty.ts_def (import_w3_ty env tvm) in
@@ -249,7 +255,7 @@ let import_w3_tydef rn path (env,rb,z) ty =
   let rb  = add_w3_ty env p ty in
   env, rb, Zdecl(Th_type (eid,td)) :: z
 
-let force_bool env codom = 
+let force_bool codom = 
   match codom with
   | None ->  EcTypes.tbool
   | Some t -> t 
@@ -334,14 +340,14 @@ let add_w3_ls env p ls =
     env_op = Mp.add p ls env.env_op;
     env_w3 = Ident.Mid.add (ls.Term.ls_name) p env.env_w3 }
 
-let import_w3_ls rn path (env,rb,z) ls = 
+let import_w3_ls rn path (env,_rb,z) ls = 
   let tvm = Wtvm.create () in
   let dom = List.map (import_w3_ty env tvm) ls.Term.ls_args in
   let codom = omap ls.Term.ls_value (import_w3_ty env tvm) in
   let params = Ty.Stv.elements (Term.ls_ty_freevars ls) in
   let params = List.map (Wtvm.get tvm) params in
   let eid = Renaming.get_ls rn ls in
-  let op = mk_op params dom (force_bool env codom) None false in
+  let op = mk_op params dom (force_bool codom) None false in
   let p = EcPath.extend (Some path) eid in
   let env = add_w3_ls env p ls in
   let rb  = add_w3_ls env p ls in
@@ -362,16 +368,20 @@ let add_w3_pr env p pr =
     env_ax = Mp.add p pr env.env_ax;
     env_w3 = Ident.Mid.add (pr.Decl.pr_name) p env.env_w3 }
 
-let import_w3_pr rn path (env,rb, z as envld) k pr t =
+let import_w3_pr rn path (env,_rb, z as envld) k pr t =
   match k with
   | Decl.Plemma | Decl.Paxiom ->
       let eid = Renaming.get_pr rn pr in
-      let _, _, import = import_w3_term env (Wtvm.create()) in
+      let tvm = Wtvm.create () in
+      let _, _, import = import_w3_term env tvm in
       let spec = 
         try Some (import Term.Mvs.empty t);
         with CanNotTranslate -> None in
-      let ax = { ax_spec = spec;
-                 ax_kind = if k = Decl.Plemma then Lemma else Axiom } in
+      let ax = { 
+        ax_params = Wtvm.tparams tvm; (* FIXME assert unicity of string *)
+        ax_spec = spec;
+        ax_kind = if k = Decl.Plemma then assert false (*FIXME Lemma *)
+        else Axiom } in
       let p = EcPath.extend (Some path) eid in
       let env = add_w3_pr env p pr in
       let rb  = add_w3_pr env p pr in
@@ -404,7 +414,7 @@ let import_decls rn path env decls =
     | s::ls, Zenter id:: z, EcPath.Pqname(p,id') ->
         assert (s=EcIdent.name id && EcIdent.id_equal id id');
         close [] ls p (Zdecl (Th_theory (id, accu)) :: z)
-    | s::ls, Zenter id:: z, _ -> assert false
+    | _s::_ls, Zenter _id:: _z, _ -> assert false
     | _, Zdecl d::z, _ -> close (d::accu) ls path z
     | _, [], _ -> assert false in
   let open_ ls path z = 
@@ -440,7 +450,7 @@ let import_w3 env path th rd =
   let ths = Ident.Mid.remove th.Theory.th_name (Task.used_theories task) in
   let others = Task.used_symbols ths in
   let decls = Task.local_decls task others in
-  let env,rb, ld =  import_decls rn path env decls in
+  let _env,rb, ld =  import_decls rn path env decls in
   let rb = 
     { rb_th   = th;
       rb_ty   = rb.env_ty;
@@ -468,13 +478,13 @@ let create_tvsymbol id =
   Ty.create_tvsymbol (preid id)
 
 type accum = {
-    mutable tvm  : Ty.tvsymbol Mid.t;          
+    mutable tvm  : Ty.ty Mid.t;          
     mutable pvm  : Term.lsymbol Mid.t array;
   }
 
 type vmap = {
     accu : accum;
-    lvm  : Term.vsymbol Mid.t;
+    lvm  : Term.term Mid.t;
   }
 
 let empty_vmap () =
@@ -486,7 +496,7 @@ let trans_tv vm tv =
   let tvm = accu.tvm in
   try Mid.find tv tvm 
   with _ ->
-    let wtv = create_tvsymbol tv in
+    let wtv = Ty.ty_var (create_tvsymbol tv) in
     let tvm = Mid.add tv wtv tvm in
     accu.tvm <- tvm;
     wtv
@@ -500,7 +510,7 @@ let trans_pty env p =
 let rec trans_ty env vm ty = 
   match ty with
   | Tunivar _ -> assert false
-  | Tvar id -> Ty.ty_var (trans_tv vm id)
+  | Tvar id -> trans_tv vm id
   | Ttuple tys -> Ty.ty_tuple (trans_tys env vm tys)
   | Tconstr(p,tys) ->
       let id = trans_pty env p in
@@ -513,8 +523,13 @@ let trans_oty env vm oty =
   | None -> None 
   | Some t -> Some (trans_ty env vm t)
 
-let trans_typarams vm tparams = List.map (trans_tv vm) tparams 
-
+let trans_typarams vm tparams = 
+  let get_tv ty = 
+    match ty.Ty.ty_node with
+    | Ty.Tyvar tv -> tv 
+    | _ -> assert false in
+  List.map (fun tv -> get_tv (trans_tv vm tv)) tparams 
+  
 let trans_tydecl env path td =
   let pid = preid_p path in
   let vm = empty_vmap () in
@@ -555,7 +570,7 @@ let add_id vm id ty =
   assert (not (Mid.mem id vm.lvm));
   let wid = create_vsymbol id ty in
   let vm = { vm with
-             lvm = Mid.add id wid vm.lvm } in
+             lvm = Mid.add id (Term.t_var wid) vm.lvm } in
   wid, vm
 
 let add_ids vm ids lty = 
@@ -652,8 +667,8 @@ let rec trans_expr env vm e =
       let n = Term.ConstInt(Term.IConstDecimal (string_of_int n)) in
       Term.t_const n 
   | Eflip | Einter _ | Ebitstr _ | Eexcepted _ -> raise RandExpr
-  | Elocal(id,_) -> Term.t_var (trans_lv vm id) 
-  | Evar(p,ty) -> assert false 
+  | Elocal(id,_) -> trans_lv vm id
+  | Evar(_p,_ty) -> assert false 
   | Eapp(p,args,ty) ->
       let ty = trans_ty env vm ty in
       let args = List.map (trans_expr env vm) args in 
@@ -731,7 +746,7 @@ let rec trans_form env vm f =
   | Fint n ->
       let n = Term.ConstInt(Term.IConstDecimal (string_of_int n)) in
       Term.t_const n 
-  | Flocal id -> Term.t_var (trans_lv vm id) 
+  | Flocal id -> trans_lv vm id
   | Fpvar(p,ty,s) ->  Term.t_app_infer (trans_pv env vm (p,ty) s) [] 
   | Fapp(p,args) ->
       let ty = trans_ty env vm f.f_ty in
@@ -821,11 +836,58 @@ let add_ax env path ax =
   | Some f ->
       let f = trans_form env vm f in
       check_empty vm;
-      if ax.ax_kind = Lemma && 
+(*      if ax.ax_kind = Lemma && 
         not (check_w3_formula env.logic_task "Alt-Ergo" 10 f) then
-        raise (CanNotProve ax);
+        raise (CanNotProve ax); *)
       let decl = Decl.create_prop_decl Decl.Paxiom pr f in
       add_pr env path pr decl, RBax(path,pr,decl)
+
+let close_task task vm tdecls hyps = 
+  let task = 
+    Array.fold_left 
+      (fun task m ->
+        Mid.fold (fun _ ls task->
+          add_decl_with_tuples task (Decl.create_param_decl ls)) m task)
+      task vm.accu.pvm in
+  let task = List.fold_left add_decl_with_tuples task tdecls in
+  List.fold_left add_decl_with_tuples task hyps 
+
+let check_goal env (hyps, concl) = 
+  let vm = ref (empty_vmap ()) in
+  let accu = !vm.accu in
+  let trans_tv id = 
+    let ts = Ty.create_tysymbol (preid id) [] None in
+    let decl = Decl.create_ty_decl ts in
+    accu.tvm <- Mid.add id (Ty.ty_app ts []) accu.tvm;
+    decl in
+  let tdecls = List.map trans_tv hyps.h_tvar in
+  let trans_hyp (id,ld) =
+    match ld with
+    | LD_var (ty,body) -> 
+        let codom = trans_ty env !vm ty in
+        let pid = preid id in
+        let ls = Term.create_lsymbol pid [] (Some codom) in
+        let decl = match body with
+        | None -> Decl.create_param_decl ls
+        | Some e -> 
+            let e = trans_form env !vm e in 
+            Decl.create_logic_decl [Decl.make_ls_defn ls [] e] in
+        vm := { !vm with lvm = Mid.add id (t_app ls [] codom) !vm.lvm };
+        decl
+    | LD_hyp f -> 
+        let f = trans_form env !vm f in
+        let pr = Decl.create_prsymbol (preid id) in
+        Decl.create_prop_decl Decl.Paxiom pr f in
+  let hyps = List.map trans_hyp (List.rev hyps.h_local) in
+  let concl = trans_form env !vm concl in
+  let task = close_task env.logic_task !vm tdecls hyps in
+  check_w3_formula task "Alt-Ergo" 10 concl
+
+    
+  
+
+  
+  
 
 
 

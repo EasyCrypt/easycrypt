@@ -54,6 +54,9 @@
 
   let pflist loc (es : pformula list) : pformula = 
     List.fold_right (fun e1 e2 -> pfe_cons loc e1 e2) es (pfe_nil loc)
+
+  let mk_axiom p k = 
+    { pa_name = fst p; pa_formula = snd p; pa_kind = k }
 %}
 
 %token <EcSymbols.symbol>  IDENT
@@ -75,6 +78,7 @@
 %token ASSERT
 %token AXIOM
 %token LEMMA
+%token PROOF
 %token BACKSLASH
 // %token BITSTR
 // %token CHECKPROOF
@@ -137,7 +141,6 @@
 %token SAME
 %token SEMICOLON
 // %token SET
-%token SPLIT
 %token STAR
 %token THEN
 %token THEORY
@@ -173,7 +176,14 @@
 // %token EAGER
 // %token EQOBSIN
 // %token FORWARDS
-// %token IDTAC
+%token IDTAC
+%token RIGHT
+%token LEFT
+%token TRIVIAL
+%token INTROS
+%token ASSUMPTION
+%token SPLIT
+%token ELIM
 // %token IFNEG
 // %token IFSYNC
 // %token INLINE
@@ -182,14 +192,13 @@
 // %token PRHL
 %token PRINT
 // %token RANDOM
-// %token SAVE
+%token SAVE
 // %token SIMPL
 // %token SP
 // %token SPLITWHILE
 // %token SWAP
 // %token TIMEOUT
 // %token TRANSPARENT
-// %token TRIVIAL
 // %token TRY
 // %token UNDO
 // %token UNFOLD
@@ -768,13 +777,12 @@ claim:
 | CLAIM x=ident COLON e=loc(exp) h=real_hint { (x, (e, h)) }
 ;
 
-axiom_kind:
-| AXIOM { PAxiom }
-| LEMMA { PLemma }
+%inline axiom_decl: x=ident COLON e=loc(form) { x,e };
 
 axiom:
-| k=axiom_kind x=ident COLON e=loc(form) { 
-      { pa_name = x; pa_formula = e; pa_kind = k } }
+| AXIOM p=axiom_decl       { mk_axiom p PAxiom  } 
+| LEMMA p=axiom_decl       { mk_axiom p PLemma  }
+| LEMMA p=axiom_decl PROOF { mk_axiom p PILemma } 
 ;
 
 (* -------------------------------------------------------------------- *)
@@ -802,6 +810,69 @@ renaming:
 ;
 
 %inline string_list: l=plist1(STRING,empty) { l };
+
+(* -------------------------------------------------------------------- *)
+(* tactic                                                               *)
+
+
+assumption_args:
+| empty                  { None   ,[] }
+| p=qident               { Some p, [] }
+| tys=type_args p=qident { Some p, tys }
+;
+
+underscore_or_ident:
+| UNDERSCORE { None }
+| s=IDENT   { Some s }
+;
+
+intro_args: l=plist1(loc(underscore_or_ident),empty) { l };
+
+exists_args: l=plist1(loc(form), COMMA) { l };
+
+underscore_or_form:
+| UNDERSCORE   { None }
+| f=loc(sform)  { Some f }
+;
+
+elim_kind:
+| p=qident                          { ElimHyp(p,[])  }
+| tys = type_args p=qident          { ElimHyp(p,tys) }
+| DOTDOT LPAREN f=loc(form) RPAREN  { ElimForm f }
+;
+elim_args:
+| empty { [] }
+| LPAREN l=plist1(underscore_or_form, COMMA) RPAREN { l }
+;
+
+tactic:
+| IDTAC                        { Pidtac }
+| ASSUMPTION a=assumption_args { Passumption a } 
+| TRIVIAL                      { Ptrivial }
+| INTROS a=intro_args          { Pintro a }
+| SPLIT                        { Psplit }
+| EXIST  a=exists_args         { Pexists a }
+| LEFT                         { Pleft }
+| RIGHT                        { Pright }
+| ELIM k=elim_kind a=elim_args { Pelim { elim_kind = k; elim_args = a } } 
+| LPAREN s=tactics RPAREN      { Pseq s } 
+;
+tactics:
+| t=loc(tactic)                        { [t] }
+| t=loc(tactic) SEMICOLON ts=tactics2  { t::ts }
+;
+
+tactics0:
+(* | empty           { Pidtac } *)
+| ts=tactics      { Pseq ts } 
+;
+%inline tactics2: ts=plist1(tactic2, SEMICOLON) { ts };
+tsubgoal: LBRACKET ts=plist0(loc(tactics0),PIPE) RBRACKET { Psubgoal ts };
+tactic2: 
+| ts=loc(tsubgoal) { ts }
+| t=loc(tactic)    { t } 
+;
+
 
 (* -------------------------------------------------------------------- *)
 (* Theory cloning                                                       *)
@@ -839,6 +910,8 @@ global_:
 | predicate        { Gpredicate $1 }
 | axiom            { Gaxiom     $1 }
 | claim            { Gclaim     $1 }
+| tactics          { Gtactics   $1 }
+| SAVE             { Gsave         }
 | PRINT p=print    { Gprint     p  }
 ;
 

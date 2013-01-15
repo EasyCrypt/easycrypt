@@ -61,7 +61,12 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Fun   : S with type t = funsig
-module Ax    : S with type t = axiom
+
+module Ax    : sig 
+  include S with type t = axiom
+  val instanciate : EcPath.path -> EcTypes.ty list -> env -> EcFol.form
+end
+
 module ModTy : S with type t = tymod
 
 (* -------------------------------------------------------------------- *)
@@ -126,6 +131,7 @@ module Ty : sig
 end
 
 (* -------------------------------------------------------------------- *)
+
 module Ident : sig
   type idlookup_t = 
     [ `Local of EcIdent.t
@@ -155,3 +161,14 @@ val import_w3_dir :
      env -> string list -> string
   -> EcWhy3.renaming_decl
   -> env * EcTypesmod.ctheory_item list
+
+(* -------------------------------------------------------------------- *)
+
+val equal_type        : env -> EcTypes.ty -> EcTypes.ty -> bool
+val check_type        : env -> EcTypes.ty -> EcTypes.ty -> unit
+val check_alpha_equal : env -> EcFol.form -> EcFol.form -> unit
+val is_alpha_equal    : env -> EcFol.form -> EcFol.form -> bool
+
+val check_goal        : env -> EcFol.l_decl -> bool
+
+

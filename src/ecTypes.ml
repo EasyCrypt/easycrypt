@@ -137,6 +137,11 @@ type tyexpr =
   | Eif       of tyexpr * tyexpr * tyexpr         (* _ ? _ : _          *)
 
 (* -------------------------------------------------------------------- *)
+
+let pv_equal v1 v2 = 
+  EcPath.p_equal v1.pv_name v2.pv_name && v1.pv_kind = v2.pv_kind 
+
+(* -------------------------------------------------------------------- *)
 let ids_of_lpattern = function
   | LSymbol id -> [id] 
   | LTuple ids -> ids

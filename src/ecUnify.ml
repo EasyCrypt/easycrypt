@@ -8,24 +8,51 @@ open EcTypes
 (* -------------------------------------------------------------------- *)
 exception TypeVarCycle of uid * ty
 exception UnificationFailure of ty * ty
+exception UninstanciateUni of uid
+exception DuplicateTvar of EcSymbols.symbol
 
 type unienv = 
     { mutable unival  : ty Muid.t;
       mutable unidecl : Suid.t;
-      mutable varval  : EcIdent.t Mstr.t
+      mutable varval  : EcIdent.t Mstr.t;
+      mutable vardecl : EcIdent.t list;
+      mutable strict  : bool;
     } 
         
 module UniEnv = struct
-  let create () =
+
+  let empty () = 
     { unival  = Muid.empty;
       unidecl = Suid.empty;
       varval  = Mstr.empty;
+      vardecl = [];
+      strict  = false;
     }
 
+  let get_var ue s = 
+    try Mstr.find s ue.varval 
+    with _ ->
+      if ue.strict then raise Not_found;
+      let id = EcIdent.create s in
+      ue.varval <- Mstr.add s id ue.varval;
+      ue.vardecl <- id :: ue.vardecl;
+      id
+
+  let create vd =
+    let ue = empty () in
+    let add id =
+      ue.varval <- Mstr.add (EcIdent.name id) id ue.varval;
+      ue.vardecl <- id :: ue.vardecl in
+    match vd with
+    | None -> ue
+    | Some l -> List.iter add l; ue.strict <- true; ue
+        
   let copy (ue : unienv) =
     { unival  = ue.unival;
       unidecl = ue.unidecl;
-      varval  = ue.varval
+      varval  = ue.varval;
+      vardecl = ue.vardecl;
+      strict  = ue.strict;
     }
 
   let fresh_uid ue = 
@@ -33,13 +60,6 @@ module UniEnv = struct
     ue.unidecl <- Suid.add uid ue.unidecl;
     Tunivar uid
 
-  let get_var ?(strict=false) ue s = 
-    try Mstr.find s ue.varval 
-    with _ ->
-      if strict then raise Not_found;
-      let id = EcIdent.create s in
-      ue.varval <- Mstr.add s id ue.varval;
-      id
 
   let init_freshen ue params = 
     let ue = copy ue in
@@ -47,7 +67,6 @@ module UniEnv = struct
       List.fold_left (fun s v -> Mid.add v (fresh_uid ue) s) Mid.empty params in
     ue, Tvar.subst s
     
-
   let freshen ue params ty = 
     let ue, subst = init_freshen ue params in
     ue, subst ty
@@ -91,18 +110,13 @@ module UniEnv = struct
 
   let close (ue:unienv) =
     let diff = Muid.diff (fun _ _ _ -> None) ue.unidecl ue.unival in
-    let s = Suid.fold (fun uid s ->
-      Muid.add uid (Tvar (EcIdent.create "")) s) diff Muid.empty in
-    let subst = Tuni.subst s in
-    let m = Muid.map subst ue.unival in
-    let merge _ v1 v2 = 
-      match v1, v2 with
-      | None, _ -> v2
-      | _, None -> v1
-      | _, _    -> assert false in 
-    Muid.merge merge m s 
+    if not (Muid.is_empty diff) then 
+      raise (UninstanciateUni (fst (Muid.choose diff)));
+    ue.unival
 
   let asmap ue = ue.unival
+
+  let tparams ue = List.rev ue.vardecl
 
 end
 

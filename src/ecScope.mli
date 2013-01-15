@@ -49,7 +49,8 @@ module Ax : sig
   (* [add scope op] type-checks the given *parsed* operator [op] in
    * scope [scope], and add it to it. Raises [DuplicatedNameInContext]
    * if an axiom with given name already exists. *)
-  val add : scope -> paxiom -> scope
+  val add  : scope -> paxiom -> scope
+  val save : scope -> scope
 end
 
 module Ty : sig
@@ -118,4 +119,8 @@ module Theory : sig
 
   (* FIXME: DOC *)
   val import_w3 : scope -> string list -> string -> w3_renaming list -> scope
+end
+
+module Tactic : sig
+  val process : scope -> ptactics -> scope
 end

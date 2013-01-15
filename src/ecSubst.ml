@@ -233,12 +233,24 @@ let subst_op (s : subst) (op : operator) =
   let sty    = add_locals s (List.combine op.op_params params) in
   let dom    = List.map (subst_ty sty) op.op_dom in
   let codom  = subst_ty sty op.op_codom in
-  let kind   = subst_op_kind s op.op_kind in
+  let kind   = subst_op_kind sty op.op_kind in
 
     { op_params = params;
       op_dom    = dom   ;
       op_codom  = codom ;
       op_kind   = kind  ; }
+
+let subst_ax (s : subst) (ax : axiom) =
+  let params = List.map EcIdent.fresh ax.ax_params in
+  let sty    = add_locals s (List.combine ax.ax_params params) in
+  let spec   = omap ax.ax_spec (subst_form sty) in 
+  let kind = 
+    match ax.ax_kind with
+    | Axiom -> Axiom
+    | Lemma _ -> Lemma None in
+  { ax_params = params;
+    ax_spec   = spec  ;
+    ax_kind   = kind  ; }
 
 (* -------------------------------------------------------------------- *)
 let subst_tysig_item (s : subst) (item : tysig_item) =
@@ -456,11 +468,7 @@ let rec subst_theory_item (s : subst) (scope : EcPath.path) (item : theory_item)
   | Th_axiom (x, ax) ->
       let x'  = EcIdent.fresh x in
       let s'  = add s x (`Path (EcPath.Pqname (scope, x'))) in
-      let ax' = {
-        ax_spec = omap ax.ax_spec (subst_form s);
-        ax_kind = ax.ax_kind;
-      } in
-        (s', Th_axiom (x', ax'))
+      (s', Th_axiom (x', subst_ax s ax))
 
   | Th_modtype (x, tymod) ->
       let x' = EcIdent.fresh x in

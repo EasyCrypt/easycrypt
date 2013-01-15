@@ -72,40 +72,30 @@ let select_pred env name ue psig =
 type typolicy = {
     tp_uni         : bool;   (* "_" allowed                         *)
     tp_tvar        : bool;   (* type variable allowed               *)
-    tp_tvar_strict : bool;   (* only declared type variable allowed *)
   }
 
 (* for type declaration *)
 let tp_tydecl = {
   tp_uni         = false;
   tp_tvar        = true;
-  tp_tvar_strict = true;
 }
 
 (* used for operators, formulas and predicate *)
 let tp_relax = {
   tp_uni         = true;
   tp_tvar        = true;
-  tp_tvar_strict = false;
 }
 
-let tp_strict = { 
-  tp_uni         = true;
-  tp_tvar        = true;
-  tp_tvar_strict = true;
-}
 (* used for global variables, signature of function in module type *)
 let tp_nothing = {
   tp_uni         = false;
   tp_tvar        = false;
-  tp_tvar_strict = true;
 }
 
 (* used for declaration of parameters and local variables in function *)
 let tp_uni = {
   tp_uni         = true;
   tp_tvar        = false;
-  tp_tvar_strict = true;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -117,8 +107,7 @@ let rec transty tp (env : EcEnv.env) ue ty =
 
    | PTvar s ->
        if tp.tp_tvar then 
-         let strict = tp.tp_tvar_strict in
-         try Tvar (UE.get_var ~strict ue s.pl_desc)
+         try Tvar (UE.get_var ue s.pl_desc)
          with _ -> tyerror s.pl_loc (UnboundTypeParameter s.pl_desc)
        else tyerror s.pl_loc TypeVariableNotAllowed;
 
@@ -151,7 +140,7 @@ and transtys tp (env : EcEnv.env) ue tys =
   List.map (transty tp env ue) tys
 
 let transty_nothing = 
-  let ue = UE.create () in
+  let ue = UE.create (Some []) in
   fun env ty -> transty tp_nothing env ue ty
 
 (* -------------------------------------------------------------------- *)
@@ -483,7 +472,7 @@ and transstruct1 (env : EcEnv.env) (st : pstructure_item) =
 
   | Pst_fun (decl, body) -> begin
       let fid = EcIdent.create decl.pfd_name.pl_desc in
-      let ue = UE.create () in
+      let ue = UE.create (Some []) in
       let known_ids = ref Mstr.empty in
       let add_local s = 
         match Mstr.find_opt s.pl_desc !known_ids with
@@ -700,6 +689,15 @@ module Fenv = struct
      fe_locals = EcIdent.Map.add x (x,ty) fenv.fe_locals }
 
   let bind_locals = List.fold_left2 bind_local 
+
+  let fenv_hyps env hyps = 
+    let fenv = mono_fenv env in
+    let locals = 
+      List.prmap (fun (id,k) -> 
+        match k with EcFol.LD_var(ty,_) -> Some (id,ty) | _ -> None) 
+        hyps.h_local in
+    let lid,lty = List.split locals in
+    bind_locals fenv lid lty 
 
   let current_env fenv = 
     try EcMaps.Mint.find fenv.fe_cur fenv.fe_envs 

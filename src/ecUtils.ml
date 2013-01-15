@@ -114,11 +114,14 @@ module List = struct
   let rec pmap (f : 'a -> 'b option) (xs : 'a list) =
     match xs with
     | []      -> []
-    | x :: xs -> begin
-        match f x with
-        | None   -> pmap f xs
-        | Some x -> x :: (pmap f xs)
-    end
+    | x :: xs -> ocons (f x) (pmap f xs)
+
+  let prmap f l = 
+    let rec aux r l = 
+      match l with 
+      | [] -> r
+      | x::l -> aux (ocons (f x) r) l in
+    aux [] l
 
   let findopt (f : 'a -> bool) (xs : 'a list) =
     try  Some (List.find f xs)
@@ -179,6 +182,21 @@ module List = struct
     in
       take n xs []
 
+  let split_n n l = 
+    let rec aux r n l = 
+      match n, l with
+      | _, [] -> raise Not_found 
+      | 0, x::l -> r, x, l
+      | _, x::l -> aux (x::r) (n-1) l in
+    aux [] n l 
+
+  let find_split f l = 
+    let rec aux r l = 
+      match l with 
+      | [] -> raise Not_found
+      | x::l -> if f x then r, x, l else aux (x::r) l in
+    aux [] l
+ 
   let map_fold (f : 'a -> 'b -> 'a * 'c) (b0 : 'a) (xs : 'b list) =
     let b, ys =
       List.fold_left
@@ -203,6 +221,7 @@ module List = struct
 
   in
       doit xs1 xs2
+
 end
 
 (* -------------------------------------------------------------------- *)

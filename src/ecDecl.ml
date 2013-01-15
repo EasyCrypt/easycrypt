@@ -64,9 +64,12 @@ let mk_op tparams dom codom body prob =
   gen_op tparams dom codom kind
 
 (* -------------------------------------------------------------------- *)
-type axiom_kind = Axiom | Lemma
+type axiom_kind = 
+  | Axiom 
+  | Lemma of EcFol.judgment option (* None means cloned lemma *)
 
 type axiom = {
+  ax_params : EcIdent.t list;  (* type parameters *)
   ax_spec : EcFol.form option; (* formula *) (* None means that we can not build its value from why3 *)
   ax_kind : axiom_kind
 }

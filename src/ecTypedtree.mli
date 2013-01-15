@@ -37,7 +37,6 @@ val tyerror : Location.t -> tyerror -> 'a
 type typolicy
 val tp_tydecl : typolicy
 val tp_relax  : typolicy
-val tp_strict : typolicy
 
 (* -------------------------------------------------------------------- *)
 val transty : typolicy -> EcEnv.env -> EcUnify.unienv -> pty -> ty 
@@ -72,6 +71,7 @@ module Fenv : sig
   type fenv
   val mono_fenv : EcEnv.env -> fenv
   val bind_locals : fenv -> EcIdent.t list -> ty list -> fenv
+  val fenv_hyps : EcEnv.env -> EcFol.hyps -> fenv
 end
 val transformula : Fenv.fenv -> EcUnify.unienv -> 
   pformula -> EcFol.form 

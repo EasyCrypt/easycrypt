@@ -97,6 +97,11 @@ and process_th_clone (scope : EcScope.scope) thcl =
 and process_w3_import (scope : EcScope.scope) (p, f, r) =
   EcScope.Theory.import_w3 scope p f r
 
+and process_tactics (scope : EcScope.scope) t = 
+  EcScope.Tactic.process scope t 
+
+and process_save (scope : EcScope.scope) =
+  EcScope.Ax.save scope
 (* -------------------------------------------------------------------- *)
 and process (scope : EcScope.scope) (g : global) =
   let scope =
@@ -116,6 +121,8 @@ and process (scope : EcScope.scope) (g : global) =
     | GthClone   thcl -> process_th_clone   scope thcl
     | GthW3      a    -> process_w3_import  scope a
     | Gprint     p    -> process_print      scope p; scope
+    | Gtactics   t    -> process_tactics    scope t
+    | Gsave           -> process_save       scope 
   in
     EcEnv.dump EcDebug.initial (EcScope.env scope); 
     scope

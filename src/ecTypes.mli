@@ -74,6 +74,8 @@ type tyexpr =
   | Eif       of tyexpr * tyexpr * tyexpr         (* _ ? _ : _          *)
 
 (* -------------------------------------------------------------------- *)
+val pv_equal : prog_var -> prog_var -> bool 
+(* -------------------------------------------------------------------- *)
 val e_map : (ty -> ty) -> (tyexpr -> tyexpr) -> tyexpr -> tyexpr
 val ids_of_lpattern : lpattern -> EcIdent.t list
 

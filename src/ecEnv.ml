@@ -2,6 +2,8 @@
 open EcUtils
 open EcSymbols
 open EcPath
+open EcTypes
+open EcFol
 open EcDecl
 open EcTypesmod
 open EcWhy3
@@ -469,6 +471,14 @@ module Ax = struct
 
   end)
   let rebind = MC.bind_ax
+
+  let instanciate p tys env = 
+    match trylookup_by_path p env with
+    | Some ({ ax_spec = Some f} as ax) ->
+        Fsubst.subst_tvar (EcTypes.Tvar.init ax.ax_params tys) f
+    | _ -> raise (LookupFailure (`Path p))
+
+
     
 end
 
@@ -804,3 +814,80 @@ and dump_premc ~name pp mc =
        (fun pp -> IM.dump "Theories"   (fun _ _ -> ()) pp mc.mc_theories  );
        (fun pp -> IM.dump "Components" (fun _ _ -> ()) pp mc.mc_components);
     ])
+
+
+  (* -------------------------------------------------------------------- *)     
+
+let rec equal_type env t1 t2 = 
+  match t1, t2 with
+  | Tunivar _, _ -> assert false
+  | _, Tunivar _ -> assert false
+  | Tvar i1, Tvar i2 -> i1 = i2
+  | Ttuple lt1, Ttuple lt2 ->
+      List.for_all2 (equal_type env) lt1 lt2
+  | Tconstr(p1,lt1), Tconstr(p2,lt2) when EcPath.p_equal p1 p2 ->
+      begin
+        List.for_all2 (equal_type env) lt1 lt2 || 
+        if Ty.defined p1 env then 
+          equal_type env (Ty.unfold p1 lt1 env) t2
+        else 
+          (Ty.defined p2 env && equal_type env t1 (Ty.unfold p2 lt2 env))
+      end
+  | Tconstr(p1,lt1), _ when Ty.defined p1 env ->
+      equal_type env (Ty.unfold p1 lt1 env) t2
+  | _, Tconstr(p2,lt2) when Ty.defined p2 env ->
+      equal_type env t1 (Ty.unfold p2 lt2 env)
+  | _, _ -> false
+
+exception IncompatibleType of ty * ty
+
+exception IncompatibleForm of form * form * form * form
+  
+let check_type env t1 t2 = 
+  if not (equal_type env t1 t2) then raise (IncompatibleType(t1,t2))
+
+(* TODO : can be good to also add unfolding of globals and locals *)
+let check_alpha_equal env f1 f2 = 
+  let error f1' f2' = raise (IncompatibleForm(f1,f2,f1',f2')) in
+  let find alpha id = try Mid.find id alpha with _ -> id in
+  let check_lpattern f1 f2 alpha lp1 lp2 = 
+    match lp1, lp2 with
+    | LSymbol id1, LSymbol id2 -> Mid.add id1 id2 alpha
+    | LTuple lid1, LTuple lid2 when List.length lid1 = List.length lid2 ->
+        List.fold_left2 (fun alpha id1 id2 -> Mid.add id1 id2 alpha) 
+          alpha lid1 lid2
+    | _, _ -> error f1 f2 in
+  let check_binding f1 f2 alpha bd1 bd2 =
+    let check_one alpha (x1,ty1) (x2,ty2) = 
+      if equal_type env ty1 ty2 then Mid.add x1 x2 alpha 
+      else error f1 f2 in
+    List.fold_left2 check_one alpha bd1 bd2 in 
+  let rec aux alpha f1 f2 = 
+    match f1.f_node, f2.f_node with
+    | Fquant(q1,bd1,f1'), Fquant(q2,bd2,f2') when 
+        q1 = q2 && List.length bd1 = List.length bd2 ->
+          let alpha = check_binding f1 f2 alpha bd1 bd2  in
+          aux alpha f1' f2'
+    | Fif(a1,b1,c1), Fif(a2,b2,c2) ->
+        aux alpha a1 a2; aux alpha b1 b2; aux alpha c1 c2
+    | Flet(p1,f1',g1), Flet(p2,f2',g2) ->
+        aux alpha f1' f2';
+        let alpha = check_lpattern f1 f2 alpha p1 p2 in
+        aux alpha g1 g2
+    | Fint i1, Fint i2 when i1 = i2 -> ()
+    | Flocal id1, Flocal id2 when EcIdent.id_equal (find alpha id1) id2 -> ()
+    | Fpvar(p1,_,s1), Fpvar(p2,_,s2) when pv_equal p1 p2 && s1 = s2 -> ()
+    | Fapp(p1,args1), Fapp(p2,args2) when EcPath.p_equal p1 p2 ->
+        List.iter2 (aux alpha) args1 args2
+    | Ftuple args1, Ftuple args2 when List.length args1 = List.length args2 ->
+        List.iter2 (aux alpha) args1 args2 
+    | _, _ -> error f1 f2 in
+  aux Mid.empty f1 f2
+
+let is_alpha_equal env f1 f2 = 
+  try check_alpha_equal env f1 f2; true
+  with _ -> false
+
+let check_goal env ld = EcWhy3.check_goal env.env_w3 ld
+
+

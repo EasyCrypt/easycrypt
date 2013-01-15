@@ -55,6 +55,7 @@ type side = int
 
 type psymbol  = symbol  located         (* located symbol  *)
  and pqsymbol = qsymbol located         (* located qsymbol *)
+type posymbol = symbol option located
 
 type pty    = pty_r    located          (* located type              *)
 and  pexpr  = pexpr_r  located          (* located expression        *)
@@ -188,7 +189,7 @@ and pformula_r =
 
 
 (* -------------------------------------------------------------------- *)
-type paxiom_kind = PAxiom | PLemma
+type paxiom_kind = PAxiom | PLemma | PILemma
 
 type paxiom = {
   pa_name    : psymbol;
@@ -208,6 +209,32 @@ type ppredicate = {
   pp_body   : (psymbol list * pformula) option;
 }
 
+
+(* -------------------------------------------------------------------- *)
+type elim_kind = 
+  | ElimHyp  of pqsymbol * pty list
+  | ElimForm of pformula
+
+type pelim = 
+  { elim_kind : elim_kind;
+    elim_args : pformula option list }
+
+type ptactic = ptactic_r located
+
+and ptactic_r = 
+  | Pidtac
+  | Passumption of (pqsymbol option * pty list)
+  | Ptrivial
+  | Pintro      of posymbol list  (* imp_I, forall_I *)
+  | Psplit                       (* and_I *)
+  | Pexists     of pformula list (* exists_I *)
+  | Pleft                        (* or_I left *)
+  | Pright                       (* or_I right *)
+  | Pelim       of pelim   
+  | Psubgoal    of ptactics
+  | Pseq        of ptactics
+
+and ptactics = ptactic list        
 
 (* -------------------------------------------------------------------- *)
 type ident_spec = psymbol list
@@ -283,5 +310,7 @@ type global =
   | GthExport  of pqsymbol
   | GthClone   of theory_cloning
   | GthW3      of (string list * string * w3_renaming list)
+  | Gtactics   of ptactics
+  | Gsave      
 
 type prog = global list

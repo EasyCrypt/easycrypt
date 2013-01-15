@@ -3,16 +3,19 @@ open EcUidgen
 open EcTypes
 
 (* -------------------------------------------------------------------- *)
+exception TypeVarCycle of uid * ty
 exception UnificationFailure of ty * ty
+exception DuplicateTvar of EcSymbols.symbol
+exception UninstanciateUni of uid
 
 type unienv
 
 module UniEnv : sig
-  val create     : unit -> unienv
+  val create     : EcIdent.t list option -> unienv
   val copy       : unienv -> unienv                 (* constant time *)
   val restore    : dst:unienv -> src:unienv -> unit (* constant time *)
   val fresh_uid  : unienv -> ty
-  val get_var    : ?strict:bool -> unienv -> string -> EcIdent.t 
+  val get_var    : unienv -> string -> EcIdent.t 
   val bind       : unienv -> uid -> ty -> unit
   val repr       : unienv -> ty -> ty
   val dump       : EcDebug.ppdebug -> unienv -> unit
@@ -21,6 +24,7 @@ module UniEnv : sig
   val freshensig : unienv -> EcIdent.t list -> tysig -> unienv * tysig
   val close      : unienv -> ty Muid.t
   val asmap      : unienv -> ty Muid.t
+  val tparams    : unienv -> EcIdent.t list
 end
 
 val unify : EcEnv.env -> unienv -> ty -> ty -> unit
