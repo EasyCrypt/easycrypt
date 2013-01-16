@@ -224,11 +224,13 @@ let rec import_w3_ty env tvm ty =
   | Ty.Tyvar v -> Tvar (Wtvm.get tvm v)
   | Ty.Tyapp(t, args) ->
       let args = List.map (import_w3_ty env tvm) args in
-      if Ty.is_ts_tuple t then Ttuple args
-      else
+      try 
         let id = t.Ty.ts_name in
         let path = path_of_id env id in
         Tconstr(path,args)
+      with e ->
+        if Ty.is_ts_tuple t then Ttuple args
+        else raise e
   
 let exists_w3 env id = 
   Ident.Mid.mem id env.env_w3 

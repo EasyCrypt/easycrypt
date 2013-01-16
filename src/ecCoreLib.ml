@@ -10,6 +10,7 @@ let s_opp  = "__opp"
 let id_top       = EcIdent.create "<top>"
 let id_pervasive = EcIdent.create "Pervasive"
 let id_unit      = EcIdent.create "unit"
+let id_tt        = EcIdent.create "tt"
 let id_bool      = EcIdent.create "bool"
 let id_int       = EcIdent.create "int"
 let id_real      = EcIdent.create "real"
@@ -32,6 +33,7 @@ let p_pervasive  = EcPath.extend (Some p_top) id_pervasive
 let pervasive id = EcPath.extend (Some p_pervasive) id
 
 let p_unit       = pervasive id_unit
+let p_tt         = pervasive id_tt
 let p_bool       = pervasive id_bool
 let p_int        = pervasive id_int
 let p_real       = pervasive id_real

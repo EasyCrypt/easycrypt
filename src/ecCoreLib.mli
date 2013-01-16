@@ -24,6 +24,7 @@ val p_int        : path
 val p_real       : path
 val p_bitstring  : path
 
+val p_tt         : path
 val p_list       : path
 val p_nil        : path
 val p_cons       : path

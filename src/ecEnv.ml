@@ -737,9 +737,12 @@ let initial =
   let env0 = empty in
   let env = enter_id EcCoreLib.id_pervasive env0 in
   let unit_rn = 
-    let ts = Why3.Ty.ts_tuple 0 in
-    [ [ts.Why3.Ty.ts_name.Why3.Ident.id_string], 
-      EcWhy3.RDts, EcPath.basename EcCoreLib.p_unit;
+    let tunit = Why3.Ty.ts_tuple 0 in
+    let nunit = tunit.Why3.Ty.ts_name.Why3.Ident.id_string in
+    let tt = Why3.Term.fs_tuple 0 in
+    let ntt = tt.Why3.Term.ls_name.Why3.Ident.id_string in
+    [ [nunit],EcWhy3.RDts, EcPath.basename EcCoreLib.p_unit;
+      [ntt], EcWhy3.RDls, EcPath.basename EcCoreLib.p_tt
     ]  in
   let env, _ = import_w3 env (Why3.Theory.tuple_theory 0) unit_rn in
   let builtin_rn = [
