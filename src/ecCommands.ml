@@ -129,7 +129,7 @@ and process (scope : EcScope.scope) (g : global) =
     | Gtactics   t    -> process_tactics    scope t
     | Gsave           -> process_save       scope 
   in
-(*    EcEnv.dump EcDebug.initial (EcScope.env scope); *)
+    EcEnv.dump EcDebug.initial (EcScope.env scope); 
     scope
 
 (* -------------------------------------------------------------------- *)

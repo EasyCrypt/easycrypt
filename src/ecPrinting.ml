@@ -2,6 +2,7 @@
 open EcUtils
 open EcFormat
 open EcTypes
+open EcFol
 open EcTypesmod
 open EcDecl
 open EcParsetree
@@ -37,6 +38,7 @@ let tk_in     = !^ "in"
 let tk_lemma  = !^ "lemma"
 let tk_let    = !^ "let"
 let tk_module = !^ "module"
+let tk_cnst   = !^ "cnst"
 let tk_op     = !^ "op"
 let tk_pop    = !^ "pop"
 let tk_pred   = !^ "pred"
@@ -157,6 +159,9 @@ let e_prio_letin = 10002
 let e_prio_if3   = 10005
 let e_prio_max   = Pervasives.max_int
 
+let maybe_parens prio myprio doc =
+  if myprio < prio then Pp.parens doc else doc
+
 (* -------------------------------------------------------------------- *)
 let pr_indent (doc : Pp.document) =
   Pp.ifflat doc (Pp.indent 2 doc)
@@ -170,11 +175,14 @@ let pr_seq (doc : Pp.document list) =
   Pp.fold1 (^//^) doc
 
 (* -------------------------------------------------------------------- *)
+let pr_vardecl (x,ty) =
+  pr_seq [pr_ident x; Pp.colon; pr_type ty] (* FIXME varmap *)
+
+let pr_vardecls d = Pp.parens (pr_seq (List.map pr_vardecl d))
+(* -------------------------------------------------------------------- *)
+
 let pr_expr (e : tyexpr) =
   let rec pr_expr (prio : int) (e : tyexpr) =
-    let maybe_parens myprio doc =
-      if myprio < prio then Pp.parens doc else doc
-    in
       match e with
       | Evar (x, _) ->
           pr_path x.pv_name
@@ -207,7 +215,7 @@ let pr_expr (e : tyexpr) =
           let d1  = pr_expr (e_prio_if3 + 1) e1 in
           let d2  = pr_expr (e_prio_if3 + 0) e2 in
           let doc = pr_seq [dc; Pp.qmark; d1; Pp.colon; d2] in
-            maybe_parens e_prio_if3 doc
+            maybe_parens prio e_prio_if3 doc
 
       | Etuple es ->
           let docs = List.map (pr_expr (-1)) es in
@@ -230,7 +238,7 @@ let pr_expr (e : tyexpr) =
                 | false -> None
                 | true  ->
                     let doc = !^opname ^^ (pr_expr (e_prio_uni+1) e) in
-                      Some (maybe_parens e_prio_uni doc)
+                      Some (maybe_parens prio e_prio_uni doc)
               end
 
             | _ -> None
@@ -250,7 +258,7 @@ let pr_expr (e : tyexpr) =
                     let d1  = pr_expr (opprio + il) e1 in
                     let d2  = pr_expr (opprio + ir) e2 in
                     let doc = pr_seq [d1; !^ opname; d2] in
-                      Some (maybe_parens opprio doc)
+                      Some (maybe_parens prio opprio doc)
               end
 
             | _ -> None
@@ -270,10 +278,26 @@ let pr_expr (e : tyexpr) =
           let d2  = pr_expr (-1) e2 in
           let doc = pr_seq [tk_let; dpt; Pp.equals; d1; tk_in; d2] in
 
-            maybe_parens e_prio_letin doc
+            maybe_parens prio e_prio_letin doc
 
   in
     pr_expr (-1) e
+(*
+let pr_form (f : form) =
+  let rec pr_form (prio : int) (f:form) =
+    match f.f_node with
+    | Fquant(q,bd,f) ->
+        pr_seq [tk_quant q; Pp.parans
+ | Fif    of form * form * form
+  | Flet   of lpattern * form * form
+  | Fint    of int                               (* int. literal        *)
+  | Flocal  of EcIdent.t                         (* Local variable      *)
+  | Fpvar   of EcTypes.prog_var * ty * Side.t    (* sided symbol        *)
+  | Fapp    of EcPath.path * form list           (* op/pred application *)
+  | Ftuple  of form list                         (* tuple constructor   *)
+*)
+    
+    
 
 (* -------------------------------------------------------------------- *)
 let pr_dotted (doc : Pp.document) = doc ^^ Pp.dot
@@ -305,27 +329,34 @@ let pr_sig (dom, codom) =
   (pr_dom dom) ^//^ tk_arrow ^//^ (pr_type codom)
 
 (* -------------------------------------------------------------------- *)
+let pr_tyvarsdecl ids = 
+  if ids = [] then Pp.empty else Pp.brackets (pr_seq (List.map pr_tvar ids))
+  
 let pr_opdecl ((x, op) : EcIdent.t * operator) =
-  let opsig = (op.op_dom, op.op_codom) in
-
-  let doc =
+  let dop, ddecl = 
     match op.op_kind with
-    | OB_oper i -> begin
-      match i.op_def with
-      | None -> pr_seq [tk_op; pr_ident x; Pp.colon; pr_sig opsig]
-      | Some (_, e) -> pr_expr e
-  
-    end
-  
-    | OB_pred i -> begin
-      match i.op_def with
-      | None   -> pr_seq [tk_pred; pr_ident x; Pp.colon; pr_dom op.op_dom]
-      | Some _ -> assert false
-    end
-  
-    | OB_prob _ -> assert false         (* FIXME: no parsing rule *)
-  in
-    pr_dotted doc
+    | OB_oper i -> 
+        let dop = if op.op_dom = [] then tk_cnst else tk_op in
+        let ddecl = 
+          match i.op_def with
+          | None -> pr_seq [Pp.colon; pr_sig (op_sig op)]
+          | Some (ids, e) -> 
+              let vardecls = List.combine ids op.op_dom in
+              pr_seq [pr_vardecls vardecls; Pp.colon; pr_type op.op_codom;
+                      Pp.equals; pr_expr e] in
+        dop, ddecl
+    | OB_pred i -> 
+        let ddecl = 
+          match i.op_def with
+          | None -> pr_seq [Pp.colon; pr_dom op.op_dom]
+          | Some (ids,_f) -> 
+              let vardecls = List.combine ids op.op_dom in
+              pr_seq [pr_vardecls vardecls; Pp.equals (* FIXME pp_form f *)]
+        in
+        tk_pred, ddecl
+    | OB_prob _ -> assert false         (* FIXME: no parsing rule *) in
+  let doc = pr_seq [dop; pr_ident x; pr_tyvarsdecl op.op_params; ddecl] in
+  pr_dotted doc
 
 (* -------------------------------------------------------------------- *)
 let pr_axiom ((_x, ax) : EcIdent.t * axiom) =

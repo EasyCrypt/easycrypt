@@ -423,9 +423,9 @@ form:
 
 | LET p=lpattern EQ e1=loc(form) IN e2=loc(form) { PFlet (p, e1, e2) }
 
-| FORALL pd=param_decl COMMA e=loc(form) { PFforall(pd, e) }
+| FORALL pd=param_decl1 COMMA e=loc(form) { PFforall(pd, e) }
 | FORALL pd=mem_decl   COMMA e=loc(form) { PFforallm(pd, e) }
-| EXIST  pd=param_decl COMMA e=loc(form) { PFexists(pd, e) }
+| EXIST  pd=param_decl1 COMMA e=loc(form) { PFexists(pd, e) }
 | EXIST  pd=mem_decl   COMMA e=loc(form) { PFexistsm(pd, e) }
 ;
 
@@ -474,6 +474,11 @@ typed_vars:
 param_decl:
 | LPAREN aout=plist0(typed_vars, COMMA) RPAREN { List.flatten aout }
 ;
+
+param_decl1:
+| LPAREN aout=plist1(typed_vars, COMMA) RPAREN { List.flatten aout }
+;
+
 
 (* -------------------------------------------------------------------- *)
 (* Statements                                                           *)
@@ -687,7 +692,7 @@ operator:
       po_prob   = false  ; }
   }
 
-| OP x=op_ident tyvars=tyvars_decl p=param_decl COLON codom=loc(type_exp)
+| OP x=op_ident tyvars=tyvars_decl p=param_decl1 COLON codom=loc(type_exp)
     EQ b=loc(exp) {
     { po_name   = x      ;
       po_tyvars = tyvars ;
@@ -744,7 +749,7 @@ predicate:
     pp_body = None;
   }
   } 
-| PRED x = op_ident tyvars=tyvars_decl params=param_decl EQ f=loc(form) { 
+| PRED x = op_ident tyvars=tyvars_decl params=param_decl1 EQ f=loc(form) { 
   { pp_name = x;
     pp_tyvars = tyvars;
     pp_dom = Some(List.map snd params);
@@ -838,7 +843,7 @@ underscore_or_form:
 elim_kind:
 | p=qident                          { ElimHyp(p,[])  }
 | tys = type_args p=qident          { ElimHyp(p,tys) }
-| DOTDOT LPAREN f=loc(form) RPAREN  { ElimForm f }
+| COLON LPAREN f=loc(form) RPAREN  { ElimForm f }
 ;
 elim_args:
 | empty { [] }
