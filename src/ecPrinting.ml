@@ -34,6 +34,8 @@ let tk_end    = !^ "end"
 let tk_export = !^ "export"
 let tk_flip   = !^ "{0,1}"
 let tk_if     = !^ "if"
+let tk_then   = !^ "then"
+let tk_else   = !^ "else"
 let tk_in     = !^ "in"
 let tk_lemma  = !^ "lemma"
 let tk_let    = !^ "let"
@@ -43,11 +45,18 @@ let tk_op     = !^ "op"
 let tk_pop    = !^ "pop"
 let tk_pred   = !^ "pred"
 let tk_theory = !^ "theory"
-let tk_then   = !^ "then"
+
 let tk_type   = !^ "type"
 
 let tk_arrow  = !^ "->"
 let tk_dotdot = !^ ".."
+
+let tk_forall = !^ "forall"
+let tk_exists = !^ "exists"
+
+let tk_quant = function
+  | Lforall -> tk_forall
+  | Lexists -> tk_exists
 
 (* -------------------------------------------------------------------- *)
 let pr_list_map fmap sep docs =
@@ -110,54 +119,59 @@ let pr_type ?(vmap : _ option) (ty : ty) =
     pr_type uidmap ty
 
 (* -------------------------------------------------------------------- *)
+let e_prio_base   = 0
+let e_prio_impl   = 1
+let e_prio_or     = 2
+let e_prio_and    = 3
+let e_prio_not    = 4
+let e_prio_op1    = 5
+let e_prio_op2    = 6
+let e_prio_op3    = 7
+let e_prio_op4    = 8
+let e_prio_uminus = 9
+
+let e_prio_uni   =  5000
+let e_prio_excpt = 10000
+let e_prio_if3   = 10005
+
+let e_prio_letin = e_prio_base
+let e_prio_if    = e_prio_base
+
+let e_prio_max   = Pervasives.max_int
+
+module EP = EcParser 
+
 let lex_single_token name =
 
   (* Not the fastest solution from the west, but certainly the more
    * robust. TODO: clean-up the operators lexing stuff... *)
-
   try
     let lexbuf = Lexing.from_string name in
     let token  = EcLexer.main lexbuf in
-  
       match EcLexer.main lexbuf with
-      | EcParser.EOF -> Some token
+      | EP.EOF -> Some token
       | _            -> None
-
   with EcLexer.LexicalError _ -> None
 
 let priority_of_binop_name name =
-  let module EP = EcParser in
-
-    match lex_single_token name with
-    | None       -> None
-    | Some token -> begin
-        match token with
-        | EP.IMPL | EP.IFF         -> Some (0, `Right)
-        | EP.OR                    -> Some (1, `Right)
-        | EP.AND                   -> Some (2, `Right)
-        | EP.EQ | EP.NE | EP.OP1 _ -> Some (3, `Left )
-        | EP.OP2 _ | EP.MINUS      -> Some (4, `Left )
-        | EP.OP3 _ | EP.STAR       -> Some (5, `Left )
-        | EP.OP4 _                 -> Some (6, `Left )
-
-        | _ -> None
-      end
+  match lex_single_token name with
+  | Some (EP.IMPL | EP.IFF)         -> Some (e_prio_impl, `Right)
+  | Some EP.OR                      -> Some (e_prio_or, `Right)
+  | Some EP.AND                     -> Some (e_prio_and, `Right)
+  | Some (EP.EQ | EP.NE | EP.OP1 _) -> Some (e_prio_op1, `Left )
+  | Some (EP.OP2 _ | EP.MINUS)      -> Some (e_prio_op2, `Left )
+  | Some (EP.OP3 _ | EP.STAR)       -> Some (e_prio_op3, `Left )
+  | Some (EP.OP4 _)                 -> Some (e_prio_op4, `Left )
+  | _ -> None
 
 let is_uniop name =
-  let module EP = EcParser in
-
-    match lex_single_token name with
-    | None       -> false
-    | Some token -> List.mem token [EP.MINUS; EP.NOT]
-
+  match lex_single_token name with
+  | Some EP.MINUS -> Some e_prio_uminus 
+  | Some EP.NOT   -> Some e_prio_not 
+  | _             -> None 
+        
 let is_binop name =
   (priority_of_binop_name name) <> None
-
-let e_prio_uni   =  5000
-let e_prio_excpt = 10000
-let e_prio_letin = 10002
-let e_prio_if3   = 10005
-let e_prio_max   = Pervasives.max_int
 
 let maybe_parens prio myprio doc =
   if myprio < prio then Pp.parens doc else doc
@@ -178,9 +192,84 @@ let pr_seq (doc : Pp.document list) =
 let pr_vardecl (x,ty) =
   pr_seq [pr_ident x; Pp.colon; pr_type ty] (* FIXME varmap *)
 
-let pr_vardecls d = Pp.parens (pr_seq (List.map pr_vardecl d))
+let pr_vardecls d = Pp.parens (pr_list ", " (List.map pr_vardecl d))
 (* -------------------------------------------------------------------- *)
 
+let pr_if3 pr_sub prio b e1 e2 = 
+  let dc  = pr_sub (e_prio_if3 + 1) b  in 
+  let d1  = pr_sub e_prio_base e1 in
+  let d2  = pr_sub (e_prio_if3 + 0) e2 in
+  let doc = pr_seq [dc; Pp.qmark; d1; Pp.colon; d2] in
+  maybe_parens prio e_prio_if3 doc
+
+let pr_if pr_sub prio b e1 e2 = 
+  let dc  = pr_sub e_prio_base b  in
+  let d1  = pr_sub e_prio_base e1 in
+  let d2  = pr_sub e_prio_base e2 in
+  let doc = pr_seq [tk_if; dc; tk_then; d1; tk_else; d2] in
+  maybe_parens prio e_prio_if doc
+
+let pr_let pr_sub prio pt e1 e2 =
+  let dpt =
+    match pt with
+    | LSymbol x  -> pr_ident x
+    | LTuple  xs -> pr_tuple (List.map pr_ident xs)
+  in
+  let d1  = pr_sub e_prio_base e1 in  (* FIXME: prio *)
+  let d2  = pr_sub e_prio_base e2 in
+  let doc = pr_seq [tk_let; dpt; Pp.equals; d1; tk_in; d2] in
+  maybe_parens prio e_prio_letin doc
+
+let pr_tuple_expr pr_sub es = 
+  let docs = List.map (pr_sub (-1)) es in
+  Pp.parens (pr_list ", " docs)
+
+let pr_app pr_sub prio op es = 
+  let opname = EcIdent.name (EcPath.basename op) in
+
+  let pr_as_std_op () =
+    match es with
+    | [] -> pr_path op
+    | _  ->
+        let docs = List.map (pr_sub (-1)) es in
+        (pr_path op) ^^ pr_seq [Pp.parens (pr_list "," docs)]
+                          
+  and try_pr_as_uniop () =
+    match es with
+    | [e] -> 
+        begin match is_uniop opname with
+        | None -> None
+        | Some(e_prio_uni)  ->
+            let doc = !^opname ^^ (pr_sub e_prio_uni e) in 
+            Some (maybe_parens prio e_prio_uni doc)
+        end
+
+    | _ -> None
+
+  and try_pr_as_binop () =
+    match es with
+    | [e1; e2] -> 
+        begin match priority_of_binop_name opname with
+        | None -> None
+        | Some (opprio, opassoc) ->
+            let (il, ir) =
+              match opassoc with
+              | `Left  -> (0, 1)
+              | `Right -> (1, 0)
+            in
+            
+            let d1  = pr_sub (opprio + il) e1 in
+            let d2  = pr_sub (opprio + ir) e2 in
+            let doc = pr_seq [d1; !^ opname; d2] in
+            Some (maybe_parens prio opprio doc)
+        end
+          
+    | _ -> None
+  in
+  ofdfl pr_as_std_op
+    (List.fpick [try_pr_as_uniop; try_pr_as_binop])
+
+  
 let pr_expr (e : tyexpr) =
   let rec pr_expr (prio : int) (e : tyexpr) =
       match e with
@@ -210,92 +299,33 @@ let pr_expr (e : tyexpr) =
           let d2 = pr_expr (-1) e2 in
             Pp.braces (pr_hang (pr_seq [d1; tk_dotdot; d2]))
   
-      | Eif (c, e1, e2) ->
-          let dc  = pr_expr (e_prio_if3 + 1) c  in
-          let d1  = pr_expr (e_prio_if3 + 1) e1 in
-          let d2  = pr_expr (e_prio_if3 + 0) e2 in
-          let doc = pr_seq [dc; Pp.qmark; d1; Pp.colon; d2] in
-            maybe_parens prio e_prio_if3 doc
+      | Eif (c, e1, e2) -> pr_if pr_expr prio c e1 e2 
 
-      | Etuple es ->
-          let docs = List.map (pr_expr (-1)) es in
-            Pp.parens (pr_list ", " docs)
+      | Etuple es -> pr_tuple_expr pr_expr es 
 
-      | Eapp (op, es, _) -> begin
-          let opname = EcIdent.name (EcPath.basename op) in
+      | Eapp (op, es, _) -> pr_app pr_expr prio op es 
 
-          let pr_as_std_op () =
-            match es with
-            | [] -> pr_path op
-            | _  ->
-                let docs = List.map (pr_expr (-1)) es in
-                  (pr_path op) ^^ pr_seq [Pp.parens (pr_list "," docs)]
-
-          and try_pr_as_uniop () =
-            match es with
-            | [e] -> begin
-                match is_uniop opname with
-                | false -> None
-                | true  ->
-                    let doc = !^opname ^^ (pr_expr (e_prio_uni+1) e) in
-                      Some (maybe_parens prio e_prio_uni doc)
-              end
-
-            | _ -> None
-
-          and try_pr_as_binop () =
-            match es with
-            | [e1; e2] -> begin
-                match priority_of_binop_name opname with
-                | None -> None
-                | Some (opprio, opassoc) ->
-                    let (il, ir) =
-                      match opassoc with
-                      | `Left  -> (1, 0)
-                      | `Right -> (0, 1)
-                    in
-
-                    let d1  = pr_expr (opprio + il) e1 in
-                    let d2  = pr_expr (opprio + ir) e2 in
-                    let doc = pr_seq [d1; !^ opname; d2] in
-                      Some (maybe_parens prio opprio doc)
-              end
-
-            | _ -> None
-          in
-            ofdfl pr_as_std_op
-              (List.fpick [try_pr_as_uniop; try_pr_as_binop])
-        end
-
-      | Elet (pt, e1, e2) ->
-          let dpt =
-            match pt with
-            | LSymbol x  -> pr_ident x
-            | LTuple  xs -> pr_tuple (List.map pr_ident xs)
-          in
-
-          let d1  = pr_expr (-1) e1 in  (* FIXME: prio *)
-          let d2  = pr_expr (-1) e2 in
-          let doc = pr_seq [tk_let; dpt; Pp.equals; d1; tk_in; d2] in
-
-            maybe_parens prio e_prio_letin doc
-
+      | Elet (pt, e1, e2) -> pr_let pr_expr prio pt e1 e2
+ 
   in
     pr_expr (-1) e
-(*
+
 let pr_form (f : form) =
   let rec pr_form (prio : int) (f:form) =
     match f.f_node with
     | Fquant(q,bd,f) ->
-        pr_seq [tk_quant q; Pp.parans
- | Fif    of form * form * form
-  | Flet   of lpattern * form * form
-  | Fint    of int                               (* int. literal        *)
-  | Flocal  of EcIdent.t                         (* Local variable      *)
-  | Fpvar   of EcTypes.prog_var * ty * Side.t    (* sided symbol        *)
-  | Fapp    of EcPath.path * form list           (* op/pred application *)
-  | Ftuple  of form list                         (* tuple constructor   *)
-*)
+        pr_seq [tk_quant q; pr_vardecls bd; Pp.comma; pr_form prio f ]
+    | Fif(b,f1,f2) -> pr_if pr_form prio b f1 f2
+    | Flet(lp,f1,f2) -> pr_let pr_form prio lp f1 f2    
+    | Fint n -> Pp.ML.int n
+    | Flocal id -> pr_ident id
+    | Fpvar (x,_,i) -> 
+        pr_seq [pr_path x.pv_name; Pp.braces(Pp.ML.int i)]
+    | Fapp(p,args) -> pr_app pr_form prio p args
+    | Ftuple args -> pr_tuple_expr pr_form args in
+   pr_form (-1) f
+  
+
     
     
 

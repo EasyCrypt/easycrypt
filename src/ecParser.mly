@@ -97,8 +97,8 @@
 %token EQ
 // %token EQEQLBRACKET
 // %token EQUIV
-%token EXIST
 %token EXPORT
+%token EXIST
 %token FORALL
 %token FUN
 %token IF
