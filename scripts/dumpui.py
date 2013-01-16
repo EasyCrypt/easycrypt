@@ -113,7 +113,9 @@ class NodeTreeModel(QtCore.QAbstractItemModel):
 class MainWindow(QtGui.QMainWindow):
     def __init__(self):
         QtGui.QMainWindow.__init__(self)
-        uic.loadUi('resources/dump.ui', self)
+        uifile = 'resources/dump.ui'
+        uifile = os.path.join(os.path.dirname(__file__), uifile)
+        uic.loadUi(uifile, self)
 
     @QtCore.pyqtSlot(name = 'on_action_Quit_triggered')
     def quit(self):

@@ -59,7 +59,6 @@ and premc = {
   mc_components : unit IM.t;
 }
 
-
 (* -------------------------------------------------------------------- *)
 type env = preenv
 type mcomponents = premc
@@ -477,9 +476,6 @@ module Ax = struct
     | Some ({ ax_spec = Some f} as ax) ->
         Fsubst.subst_tvar (EcTypes.Tvar.init ax.ax_params tys) f
     | _ -> raise (LookupFailure (`Path p))
-
-
-    
 end
 
 (* -------------------------------------------------------------------- *)
@@ -659,7 +655,8 @@ module Theory = struct
 
     let root = {
       env.env_root with
-        mc_components = IM.add x () env.env_root.mc_components }
+        mc_theories   = IM.add x (thpath, cth.cth3_theory) topmc.mc_theories;
+        mc_components = IM.add x () env.env_root.mc_components; }
     in
 
     let comps = env.env_comps in
