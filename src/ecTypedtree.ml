@@ -373,10 +373,16 @@ let rec transmod (env : EcEnv.env) (x : EcIdent.t) (m : pmodule_expr) =
 
         match snd m with
         | Tym_sig _ ->
-            tyerror dloc ModApplToNonFunctor
+            if args <> [] then
+              tyerror dloc ModApplToNonFunctor;
+
+            { me_name       = x;
+              me_body       = ME_Ident (fst m);
+              me_components = lazy (assert false); (* FIXME *)
+              me_sig        = snd m; }
 
         | Tym_functor (iargs, tyres) ->
-          let (anames, atymods) = List.split iargs in
+            let (anames, atymods) = List.split iargs in
 
             (* Check module application *)
             if List.length iargs <> List.length args then
