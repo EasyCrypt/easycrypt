@@ -31,8 +31,6 @@ and premc = private {
   mc_components : unit EcIdent.Map.t;
 }
 
-
-
 (* -------------------------------------------------------------------- *)
 type env = preenv
 
@@ -71,11 +69,26 @@ module ModTy : S with type t = tymod
 
 (* -------------------------------------------------------------------- *)
 module Var : sig
-  include S with type t = varbind
+  type t = varbind
 
-  val bind : EcIdent.t -> EcTypes.ty -> EcTypes.pvar_kind option -> env -> env
-  val bindall : (EcIdent.t * EcTypes.ty) list -> EcTypes.pvar_kind option
-    -> env -> env
+  val lookup_by_path    : EcPath.path -> env -> t        (* full path *)
+  val trylookup_by_path : EcPath.path -> env -> t option (* full path *)
+  val lookup            : qsymbol -> env -> EcPath.path * t
+  val trylookup         : qsymbol -> env -> (EcPath.path * t) option
+  val exists            : qsymbol -> env -> bool
+
+  val bind :
+       EcIdent.t
+    -> EcTypes.ty
+    -> EcTypes.pvar_kind option
+    -> env
+    -> env
+
+  val bindall :
+       (EcIdent.t * EcTypes.ty) list
+    -> EcTypes.pvar_kind option
+    -> env
+    -> env
 end
 
 (* -------------------------------------------------------------------- *)
