@@ -736,14 +736,19 @@ let import_w3_dir env dir name rd =
 let initial = 
   let env0 = empty in
   let env = enter_id EcCoreLib.id_pervasive env0 in
+  let unit_rn = 
+    let ts = Why3.Ty.ts_tuple 0 in
+    [ [ts.Why3.Ty.ts_name.Why3.Ident.id_string], 
+      EcWhy3.RDts, EcPath.basename EcCoreLib.p_unit;
+    ]  in
+  let env, _ = import_w3 env (Why3.Theory.tuple_theory 0) unit_rn in
   let builtin_rn = [
     ["int"]    , EcWhy3.RDts, EcPath.basename EcCoreLib.p_int;
     ["real"]   , EcWhy3.RDts, EcPath.basename EcCoreLib.p_real;
     ["infix ="], EcWhy3.RDls, EcPath.basename EcCoreLib.p_eq 
   ] in
   let env, _ = import_w3 env Why3.Theory.builtin_theory builtin_rn in
-
-  let bool_rn = [
+   let bool_rn = [
     ["bool"] , EcWhy3.RDts, EcPath.basename EcCoreLib.p_bool;
     ["True"] , EcWhy3.RDls, EcPath.basename EcCoreLib.p_true;
     ["False"], EcWhy3.RDls, EcPath.basename EcCoreLib.p_false ] in
