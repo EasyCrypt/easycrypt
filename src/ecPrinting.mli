@@ -23,6 +23,7 @@ val pr_modtype  : (EcIdent.t * tymod   ) pr
 val pr_module   : module_expr pr
 val pr_export   : EcPath.path pr
 val pr_theory   : (EcIdent.t * ctheory) pr
+val pr_expr     : tyexpr pr
 
 (* -------------------------------------------------------------------- *)
 val pp_located : Location.t -> 'a pp -> 'a pp
@@ -42,3 +43,4 @@ val pp_modtype  : (EcIdent.t * tymod   ) pp
 val pp_module   : module_expr pp
 val pp_export   : EcPath.path pp
 val pp_theory   : (EcIdent.t * ctheory) pp
+val pp_expr     : tyexpr pp

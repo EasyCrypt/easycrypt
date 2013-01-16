@@ -10,3 +10,6 @@ val from_string  : string -> ecreader
 val finalize : ecreader -> unit
 val parse    : ecreader -> EcParsetree.prog * bool
 val parseall : ecreader -> EcParsetree.prog
+
+(* -------------------------------------------------------------------- *)
+val lex_single_token : string -> EcParser.token option

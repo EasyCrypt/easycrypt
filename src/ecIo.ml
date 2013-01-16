@@ -82,3 +82,13 @@ let parseall (ecreader : ecreader) =
   in
     aux []
 
+(* -------------------------------------------------------------------- *)
+let lex_single_token name =
+  try
+    let lexbuf = Lexing.from_string name in
+    let token  = EcLexer.main lexbuf in
+      match EcLexer.main lexbuf with
+      | EcParser.EOF -> Some token
+      | _ -> None
+
+  with EcLexer.LexicalError _ -> None
