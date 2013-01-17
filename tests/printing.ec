@@ -17,6 +17,8 @@ theory T.
 
   op eqxx : int -> bool.
 
+  op foo : 'a -> 'a.
+
   op myrop1 (x : int) : int * int =
     (let y = x in if eqxx(y) then y else y, 0).
 

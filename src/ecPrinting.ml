@@ -499,13 +499,25 @@ struct
     pr_dotted doc
 
   (* ------------------------------------------------------------------ *)
-  let pr_axiom (_tenv : t) ((_x, ax) : EcIdent.t * axiom) =
-    let tk =
+  let pr_axiom (tenv : t) ((x, ax) : EcIdent.t * axiom) =
+    let tk =                            (* FIXME: var bindings *)
       match ax.ax_kind with
       | Axiom   -> tk_axiom
       | Lemma _ -> tk_lemma
+
+    and pr_name =
+      match ax.ax_params with
+      | [] -> pr_ident tenv x
+      | _  ->    (pr_ident tenv x)
+              ^^ (Pp.angles (pr_list_map (pr_ident tenv) "," ax.ax_params))
+
+    and spec =
+      match ax.ax_spec with
+      | None   -> !^"<why3-imported>"
+      | Some f -> pr_form tenv f
     in
-      tk                                  (* Fails in ecWhy3 *)
+
+      pr_seq [tk; pr_name; Pp.colon; spec]
 
   (* ------------------------------------------------------------------ *)
   let pr_modtype (tenv : t) ((x, _tymod) : EcIdent.t * tymod) =
