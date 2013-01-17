@@ -92,7 +92,7 @@ and lpattern =
 type plvalue =
   | PLvSymbol of pqsymbol
   | PLvTuple  of pqsymbol list
-  | PLvMap    of pqsymbol * pexpr
+  | PLvMap    of pqsymbol * tvar_inst * pexpr
 
 (* -------------------------------------------------------------------- *)
 type pinstr =
@@ -218,7 +218,7 @@ type ppredicate = {
 
 (* -------------------------------------------------------------------- *)
 type elim_kind = 
-  | ElimHyp  of pqsymbol * pty list
+  | ElimHyp  of pqsymbol * tvar_inst
   | ElimForm of pformula
 
 type pelim = 
@@ -229,7 +229,7 @@ type ptactic = ptactic_r located
 
 and ptactic_r = 
   | Pidtac
-  | Passumption of (pqsymbol option * pty list)
+  | Passumption of (pqsymbol option * tvar_inst)
   | Ptrivial
   | Pintro      of posymbol list  (* imp_I, forall_I *)
   | Psplit                       (* and_I *)

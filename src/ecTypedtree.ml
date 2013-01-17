@@ -660,15 +660,16 @@ and translvalue ue (env : EcEnv.env) lvalue =
       (LvTuple xs, ty)
   end
 
-  | PLvMap ({ pl_desc = x; pl_loc = loc }, e) ->
+  | PLvMap ({ pl_desc = x; pl_loc = loc }, tvi, e) ->
+      let tvi = transtvi env ue tvi in  
       let codomty = UE.fresh_uid ue in
       let xpath, { EcEnv.vb_type = xty } =
         try  EcEnv.Var.lookup x env
         with EcEnv.LookupFailure _ -> tyerror dloc (UnknownVariable x)
       and e, ety = transexp env ep_det ue e in
-      let name =  ([],"set") in
+      let name =  ([],EcCoreLib.s_set) in
       let esig = [xty; ety; codomty] in
-      let ops = select_op false env name ue None esig in
+      let ops = select_op false env name ue tvi esig in
       match ops with
       | [] | _ :: _ :: _ ->        (* FIXME: better error message *)
           let esig = Tuni.subst_dom (EcUnify.UniEnv.asmap ue) esig in

@@ -463,37 +463,52 @@ module Tactic = struct
   open EcFol
   open EcLogic
   module TT = EcTypedtree
+  module UE = EcUnify.UniEnv
 
-  let process_tyargs env hyps args = 
+  let process_tyargs env hyps tvi = 
     let ue = EcUnify.UniEnv.create (Some hyps.h_tvar) in
-    List.map (TT.transty TT.tp_tydecl env ue) args 
+    TT.transtvi env ue tvi 
 
-  let process_instanciate env hyps (pq,tyargs) = 
-    let p = 
-      try fst (EcEnv.Ax.lookup (unloc pq) env)
+  let process_instanciate env hyps (pq,tvi) = 
+    let p,ax = 
+      try EcEnv.Ax.lookup (unloc pq) env
       with _ -> assert false (* FIXME error message *) in
-    let args = process_tyargs env hyps tyargs in
+    let args = process_tyargs env hyps tvi in
+    let args = 
+      match ax.EcDecl.ax_params, args with
+      | [], None -> []
+      | [], Some _ -> assert false (* FIXME error message *)
+      | ltv, Some (UE.TVIunamed l) ->
+          assert (List.length ltv = List.length l);  (* FIXME error message *)
+          l 
+      | ltv, Some (UE.TVInamed l) ->
+          let get id = 
+            try List.assoc (EcIdent.name id) l with _ -> assert false 
+             (* FIXME error message *) in
+          List.map get ltv 
+      | _, None -> assert false (* FIXME error message *) in
     p,args 
     
-  let process_global env arg g = 
+  let process_global env tvi g = 
     let hyps = get_hyps g in
-    let p, tyargs = process_instanciate env hyps arg in
+    let p, tyargs = process_instanciate env hyps tvi in
     t_glob env p tyargs g 
 
-  let process_assumption env (pq,args) g = 
+  let process_assumption env (pq,tvi) g = 
     let hyps,concl = get_goal g in
     match pq with
     | None -> 
-        assert (args = []); (* FIXME error message *)
+        assert (tvi = None); (* FIXME error message *)
         let h  = 
           try find_in_hyps env concl hyps 
           with _ -> assert false in
         t_hyp env h g
     | Some pq ->
-        match unloc pq, args with
-        | ([],ps), [] when LDecl.has_hyp ps hyps ->
+        match unloc pq with
+        | ([],ps) when LDecl.has_hyp ps hyps ->
+            assert (tvi = None); (* FIXME error message *)
             t_hyp env (fst (LDecl.lookup_hyp ps hyps)) g
-        | _, _ -> process_global env (pq,args) g
+        | _ -> process_global env (pq,tvi) g
 
   let check_name hyps pi = 
     let s = odfl "_" (unloc pi) in
@@ -547,13 +562,14 @@ module Tactic = struct
   let process_elim_kind env g k = 
     let hyps = get_hyps g in
     match k with
-    | ElimHyp (pq,args) ->
-        begin match unloc pq, args with 
-        | ([],ps), [] when LDecl.has_hyp ps hyps ->
+    | ElimHyp (pq,tvi) ->
+        begin match unloc pq with 
+        | ([],ps) when LDecl.has_hyp ps hyps ->
+            (* FIXME warning if tvi is not None *)
             let id,ff = LDecl.lookup_hyp ps hyps in
             t_hyp env id, ff
-        | _, _ -> 
-            let p,args = process_instanciate env hyps (pq,args) in
+        | _ -> 
+            let p,args = process_instanciate env hyps (pq,tvi) in
             let ff = EcEnv.Ax.instanciate p args env in
             t_glob env p args, ff
         end

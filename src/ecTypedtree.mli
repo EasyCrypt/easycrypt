@@ -43,6 +43,8 @@ val transty : typolicy -> EcEnv.env -> EcUnify.unienv -> pty -> ty
 val transtys :  
     typolicy -> EcEnv.env -> EcUnify.unienv -> pty list -> ty list
 
+val transtvi : EcEnv.env -> EcUnify.unienv -> tvar_inst -> EcUnify.UniEnv.tvi
+
 
 (* -------------------------------------------------------------------- *)
 type epolicy = {

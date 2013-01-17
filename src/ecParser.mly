@@ -301,10 +301,10 @@ sexp:
 | x=qident ti=tvars_app 
    { PEident (x,ti) }
 
-| se=loc(sexp) LBRACKET e=loc(exp) RBRACKET ti=tvars_app 
+| se=loc(sexp) LBRACKET ti=tvars_app e=loc(exp) RBRACKET
    { peget (Location.make $startpos $endpos) ti se e }
 
-| se=loc(sexp) LBRACKET e1=loc(exp) LEFTARROW e2=loc(exp) RBRACKET ti=tvars_app 
+| se=loc(sexp) LBRACKET ti=tvars_app e1=loc(exp) LEFTARROW e2=loc(exp) RBRACKET  
    { peset (Location.make $startpos $endpos) ti se e1 e2 }
 
 | x=qident ti=tvars_app LPAREN es=exp_list0 RPAREN
@@ -330,7 +330,7 @@ op1:
 exp:
 | e=sexp { e }
 
-| op=loc(NOT) ti=tvars_app e=loc(exp) %prec NOT
+| op=loc(NOT) ti=tvars_app e=loc(exp) (* %prec NOT *)
    { PEapp (pqsymb_of_symb op.pl_loc "!", ti, [e]) }
 
 | op=loc(MINUS) ti=tvars_app e=loc(exp) %prec prec_prefix_op
@@ -339,37 +339,37 @@ exp:
 | e1=loc(exp) op=loc(op1) ti=tvars_app e2=loc(exp) %prec OP1
     { PEapp (pqsymb_of_psymb op, ti, [e1; e2]) }
 
-| e1=loc(exp) op=loc(OP2) ti=tvars_app e2=loc(exp) %prec OP2 
+| e1=loc(exp) op=loc(OP2) ti=tvars_app e2=loc(exp) 
     { PEapp (pqsymb_of_psymb op, ti, [e1; e2]) }
 
-| e1=loc(exp) op=loc(OP3) ti=tvars_app e2=loc(exp) %prec OP3 
+| e1=loc(exp) op=loc(OP3) ti=tvars_app e2=loc(exp) 
     { PEapp (pqsymb_of_psymb op, ti, [e1; e2]) }
 
-| e1=loc(exp) op=loc(OP4) ti=tvars_app e2=loc(exp) %prec OP4 
+| e1=loc(exp) op=loc(OP4) ti=tvars_app e2=loc(exp) 
     { PEapp (pqsymb_of_psymb op, ti, [e1; e2]) }
 
-| e1=loc(exp) op=loc(IMPL) ti=tvars_app e2=loc(exp) %prec IMPL 
+| e1=loc(exp) op=loc(IMPL) ti=tvars_app e2=loc(exp)
     { PEapp (pqsymb_of_symb op.pl_loc "=>" , ti, [e1; e2]) }
 
-| e1=loc(exp) op=loc(IFF) ti=tvars_app e2=loc(exp)  %prec IFF
+| e1=loc(exp) op=loc(IFF) ti=tvars_app e2=loc(exp) 
     { PEapp (pqsymb_of_symb op.pl_loc "<=>", ti, [e1; e2]) }
 
-| e1=loc(exp) op=loc(OR) ti=tvars_app e2=loc(exp)  %prec OR
+| e1=loc(exp) op=loc(OR) ti=tvars_app e2=loc(exp)  
     { PEapp (pqsymb_of_symb op.pl_loc "||" , ti, [e1; e2]) }
 
-| e1=loc(exp) op=loc(AND) ti=tvars_app e2=loc(exp) %prec AND
+| e1=loc(exp) op=loc(AND) ti=tvars_app e2=loc(exp) 
     { PEapp (pqsymb_of_symb op.pl_loc "&&" , ti, [e1; e2]) }
 
-| e1=loc(exp) op=loc(EQ) ti=tvars_app e2=loc(exp)  %prec EQ
+| e1=loc(exp) op=loc(EQ) ti=tvars_app e2=loc(exp)  
     { PEapp (pqsymb_of_symb op.pl_loc "="  , ti, [e1; e2]) }
 
-| e1=loc(exp) op=loc(NE) ti=tvars_app e2=loc(exp)  %prec NE
+| e1=loc(exp) op=loc(NE) ti=tvars_app e2=loc(exp)  
     { PEapp (pqsymb_of_symb op.pl_loc "<>" , ti, [e1; e2]) }
 
-| e1=loc(exp) op=loc(MINUS) ti=tvars_app e2=loc(exp)  %prec MINUS
+| e1=loc(exp) op=loc(MINUS) ti=tvars_app e2=loc(exp) 
     { PEapp (pqsymb_of_symb op.pl_loc "-"  , ti, [e1; e2]) }
 
-| e1=loc(exp) op=loc(STAR) ti=tvars_app e2=loc(exp)  %prec STAR
+| e1=loc(exp) op=loc(STAR) ti=tvars_app e2=loc(exp)  
     { PEapp (pqsymb_of_symb op.pl_loc "*"  , ti, [e1; e2]) }
 
 | c=loc(exp) QUESTION e1=loc(exp) COLON e2=loc(exp) %prec OP2
@@ -446,7 +446,7 @@ form:
 
 | op=loc(MINUS) e=loc(form) %prec prec_prefix_op
    { PFapp (pqsymb_of_symb op.pl_loc "-", [e]) }
-| e1=loc(form) op=loc(op1) e2=loc(form)  { PFapp (pqsymb_of_psymb op, [e1; e2]) }
+| e1=loc(form) op=loc(op1) e2=loc(form)  { PFapp (pqsymb_of_psymb op, [e1; e2]) } %prec OP1
 | e1=loc(form) op=loc(OP2) e2=loc(form)  { PFapp (pqsymb_of_psymb op, [e1; e2]) }
 | e1=loc(form) op=loc(OP3) e2=loc(form)  { PFapp (pqsymb_of_psymb op, [e1; e2]) }
 | e1=loc(form) op=loc(OP4) e2=loc(form)  { PFapp (pqsymb_of_psymb op, [e1; e2]) }
@@ -526,9 +526,9 @@ param_decl1:
 (* Statements                                                           *)
 
 lvalue:
-| x=qident                              { PLvSymbol x      }
-| LPAREN p=plist2(qident, COMMA) RPAREN { PLvTuple  p      }
-| x=qident LBRACKET e=loc(exp) RBRACKET { PLvMap    (x, e) }
+| x=qident                                           { PLvSymbol x      }
+| LPAREN p=plist2(qident, COMMA) RPAREN              { PLvTuple p       }
+| x=qident LBRACKET ti=tvars_app e=loc(exp) RBRACKET { PLvMap(x, ti, e) }
 ;
 
 base_instr:
@@ -863,9 +863,8 @@ renaming:
 
 
 assumption_args:
-| empty                  { None   ,[] }
-| p=qident               { Some p, [] }
-| tys=type_args p=qident { Some p, tys }
+| empty                  { None  , None }
+| p=qident tvi=tvars_app { Some p, tvi }
 ;
 
 underscore_or_ident:
@@ -883,9 +882,8 @@ underscore_or_form:
 ;
 
 elim_kind:
-| p=qident                          { ElimHyp(p,[])  }
-| tys = type_args p=qident          { ElimHyp(p,tys) }
-| COLON LPAREN f=loc(form) RPAREN  { ElimForm f }
+| p=qident tvi=tvars_app            { ElimHyp(p,tvi)  }
+| COLON LPAREN f=loc(form) RPAREN   { ElimForm f }
 ;
 elim_args:
 | empty { [] }
