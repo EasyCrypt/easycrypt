@@ -1,6 +1,7 @@
 (* -------------------------------------------------------------------- *)
 open EcParsetree
 open EcTypedtree
+open EcPrinting
 open Pprint.Operators
 
 (* -------------------------------------------------------------------- *)
@@ -19,15 +20,15 @@ let process_print scope p =
     match p with 
     | Pr_ty qs ->
         let (x, ty) = EcEnv.Ty.lookup qs.pl_desc env in
-          EcPrinting.pr_typedecl (EcPath.basename x, ty)
+          EcRawPP.pr_typedecl (EcPath.basename x, ty)
 
     | Pr_op qs ->
         let (x, op) = EcEnv.Op.lookup qs.pl_desc env in
-          EcPrinting.pr_opdecl (EcPath.basename x, op)
+          EcRawPP.pr_opdecl (EcPath.basename x, op)
 
     | Pr_th qs ->
         let (p, th) = EcEnv.Theory.lookup qs.pl_desc env in
-          EcPrinting.pr_theory (EcPath.basename p, th)
+          EcRawPP.pr_theory (EcPath.basename p, th)
 
     | _ -> assert false
 
@@ -102,11 +103,14 @@ and process_th_clone (scope : EcScope.scope) thcl =
 and process_w3_import (scope : EcScope.scope) (p, f, r) =
   EcScope.Theory.import_w3 scope p f r
 
+(* -------------------------------------------------------------------- *)
 and process_tactics (scope : EcScope.scope) t = 
   EcScope.Tactic.process scope t 
 
+(* -------------------------------------------------------------------- *)
 and process_save (scope : EcScope.scope) =
   EcScope.Ax.save scope
+
 (* -------------------------------------------------------------------- *)
 and process (scope : EcScope.scope) (g : global) =
   let scope =
@@ -129,7 +133,7 @@ and process (scope : EcScope.scope) (g : global) =
     | Gtactics   t    -> process_tactics    scope t
     | Gsave           -> process_save       scope 
   in
-    EcEnv.dump EcDebug.initial (EcScope.env scope); 
+(*    EcEnv.dump EcDebug.initial (EcScope.env scope); *)
     scope
 
 (* -------------------------------------------------------------------- *)

@@ -5,7 +5,7 @@ open EcParsetree
 open EcTypedtree
 open EcDecl
 open EcTypesmod
-open EcPrinting
+open EcPrinting.EcRawPP
 
 (* CUT AND PASTE FROM WHY3 util/exn_printer.ml *)
 type exn_printer = Format.formatter -> exn -> unit
@@ -126,11 +126,11 @@ let pp_exn fmt exn =
   match exn with
   | EcEnv.LookupFailure (`Path p) ->
       Format.fprintf fmt "cannot find path: %a@."
-        EcPrinting.pp_path p
+        pp_path p
 
   | EcEnv.LookupFailure (`QSymbol qname) ->
       Format.fprintf fmt "cannot find symbol: %a@."
-        EcPrinting.pp_qsymbol qname
+        pp_qsymbol qname
   | _ -> raise exn 
 
 let _ = register pp_exn
