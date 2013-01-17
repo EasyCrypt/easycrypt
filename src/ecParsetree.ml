@@ -49,7 +49,8 @@ type 'a located = {
 
 let unloc  x = x.pl_desc
 let unlocs x = List.map unloc x
-
+let dummyloc x = { pl_loc = Location.dummy; pl_desc = x }
+let dummy_pqs_of_ps s = dummyloc (qsymb_of_symb (unloc s))
 (* -------------------------------------------------------------------- *)
 type side = int
 
@@ -181,9 +182,9 @@ type pformula = pformula_r located
 and pformula_r = 
   | PFint    of int                       (* int. literal      *)
   | PFtuple  of pformula list             (* tuple             *)
-  | PFident  of pqsymbol                  (* symbol            *)
+  | PFident  of pqsymbol * tvar_inst      (* symbol            *)
   | PFside   of pformula * side         
-  | PFapp    of pqsymbol * pformula list
+  | PFapp    of pqsymbol * tvar_inst * pformula list
   | PFif     of pformula * pformula * pformula
   | PFlet    of lpattern * pformula * pformula
   | PFforall of ptylocals * pformula

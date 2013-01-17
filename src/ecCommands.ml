@@ -14,33 +14,41 @@ let addidir (idir : string) =
 (* -------------------------------------------------------------------- *)
 exception Interrupted
 
-let process_print scope p = 
+let process_pr scope p = 
   let env = EcScope.env scope in
-  let doc =
-    match p with 
-    | Pr_ty qs ->
-        let (x, ty) = EcEnv.Ty.lookup qs.pl_desc env in
-          EcRawPP.pr_typedecl (EcPath.basename x, ty)
+  match p with 
+  | Pr_ty qs ->
+      let (x, ty) = EcEnv.Ty.lookup qs.pl_desc env in
+      EcRawPP.pr_typedecl (EcPath.basename x, ty)
+        
+  | Pr_op qs ->
+      let (x, op) = EcEnv.Op.lookup qs.pl_desc env in
+      EcRawPP.pr_opdecl (EcPath.basename x, op)
+        
+  | Pr_th qs ->
+      let (p, th) = EcEnv.Theory.lookup qs.pl_desc env in
+      EcRawPP.pr_theory (EcPath.basename p, th)
+        
+  | _ -> assert false
 
-    | Pr_op qs ->
-        let (x, op) = EcEnv.Op.lookup qs.pl_desc env in
-          EcRawPP.pr_opdecl (EcPath.basename x, op)
+let process_print scope p = 
+  let doc = process_pr scope p in
+  EcPrinting.pretty (doc ^^ Pprint.hardline)
 
-    | Pr_th qs ->
-        let (p, th) = EcEnv.Theory.lookup qs.pl_desc env in
-          EcRawPP.pr_theory (EcPath.basename p, th)
-
-    | _ -> assert false
-
-  in
-    EcPrinting.pretty (doc ^^ Pprint.hardline)
+let out_added scope p = 
+  let doc = process_pr scope p in
+  EcPrinting.pretty (!^"add " ^^ doc ^^ Pprint.hardline)
 
 (* -------------------------------------------------------------------- *)
 let rec process_type (scope : EcScope.scope) (tyd : ptydecl) =
   let tyname = (tyd.pty_tyvars, tyd.pty_name) in
+  let scope = 
     match tyd.pty_body with
     | None    -> EcScope.Ty.add    scope tyname
-    | Some bd -> EcScope.Ty.define scope tyname bd
+    | Some bd -> EcScope.Ty.define scope tyname bd in
+  out_added scope (Pr_ty (dummy_pqs_of_ps tyd.pty_name));
+  scope
+  
 
 (* -------------------------------------------------------------------- *)
 and process_module (scope : EcScope.scope) ((x, m) : _ * pmodule_expr) =
@@ -52,7 +60,10 @@ and process_interface (scope : EcScope.scope) ((x, i) : _ * pmodule_type) =
 
 (* -------------------------------------------------------------------- *)
 and process_operator (scope : EcScope.scope) (op : poperator) =
-  EcScope.Op.add scope op
+  let scope = EcScope.Op.add scope op in
+  out_added scope (Pr_op (dummy_pqs_of_ps op.po_name));
+  scope
+  
 
 (* -------------------------------------------------------------------- *)
 and process_predicate (scope : EcScope.scope) (p : ppredicate) =

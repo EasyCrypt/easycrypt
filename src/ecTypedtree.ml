@@ -735,6 +735,7 @@ module Fenv = struct
     else assert false (* FIXME *)
 
   module Ident = struct
+         
     let trylookup_env fenv ue qs = 
       let env = current_env fenv in
       let filter op = not (is_prob op) in
@@ -784,7 +785,7 @@ let transformula fenv ue pf =
     match f.pl_desc with
     | PFint n -> f_int n
     | PFtuple args -> f_tuple (List.map (transf fenv) args)
-    | PFident { pl_desc = x } -> 
+    | PFident ({ pl_desc = x }, _tvi) -> (* FIXME tvi *)
         begin match Fenv.Ident.trylookup fenv ue x with
         | None ->  tyerror dloc (UnknownVariable x)
         | Some(Llocal(x,ty)) -> f_local x ty
@@ -794,10 +795,11 @@ let transformula fenv ue pf =
     | PFside(f,side) ->
         let fenv = Fenv.set_side fenv side in
         transf fenv f
-    | PFapp({ pl_desc = qs; pl_loc = loc }, es) ->
+    | PFapp({ pl_desc = qs; pl_loc = loc }, tvi, es) ->
+        let tvi = transtvi (Fenv.mono fenv) ue tvi in  
         let es   = List.map (transf fenv) es in
         let esig = List.map EcFol.ty es in 
-        let ops  = select_pred (Fenv.mono fenv) qs ue None esig in
+        let ops  = select_pred (Fenv.mono fenv) qs ue tvi esig in
         begin match ops with
         | [] | _ :: _ :: _ ->        (* FIXME: better error message *)
             tyerror loc (UnknownOperatorForSig (qs, esig))

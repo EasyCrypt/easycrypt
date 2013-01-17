@@ -32,8 +32,10 @@
   let peset loc ti e1 e2 e3 = 
     PEapp (pqsymb_of_symb loc EcCoreLib.s_set, ti, [e1; e2; e3])
 
-  let pfget loc e1 e2    = PFapp (pqsymb_of_symb loc EcCoreLib.s_get, [e1; e2])
-  let pfset loc e1 e2 e3 = PFapp (pqsymb_of_symb loc EcCoreLib.s_get, [e1; e2; e3])
+  let pfget loc ti e1 e2    = 
+    PFapp (pqsymb_of_symb loc EcCoreLib.s_get, ti, [e1; e2])
+  let pfset loc ti e1 e2 e3 = 
+    PFapp (pqsymb_of_symb loc EcCoreLib.s_get, ti, [e1; e2; e3])
 
   let mk_loc loc e = 
     { pl_desc = e;  pl_loc  = loc;}
@@ -41,20 +43,20 @@
   let pe_nil loc ti = 
     mk_loc loc (PEident (pqsymb_of_symb loc EcCoreLib.s_nil, ti))
 
-  let pe_cons loc e1 e2 = 
-    mk_loc loc (PEapp (pqsymb_of_symb loc EcCoreLib.s_cons, None, [e1; e2]))
+  let pe_cons loc ti e1 e2 = 
+    mk_loc loc (PEapp (pqsymb_of_symb loc EcCoreLib.s_cons, ti, [e1; e2]))
       
   let pelist loc ti (es : pexpr    list) : pexpr    = 
-    List.fold_right (fun e1 e2 -> pe_cons loc e1 e2) es (pe_nil loc ti)
+    List.fold_right (fun e1 e2 -> pe_cons loc ti e1 e2) es (pe_nil loc ti)
 
-  let pfe_nil loc = 
-    mk_loc loc (PFident (pqsymb_of_symb loc EcCoreLib.s_nil))
+  let pfe_nil loc ti = 
+    mk_loc loc (PFident (pqsymb_of_symb loc EcCoreLib.s_nil, ti))
 
-  let pfe_cons loc e1 e2 = 
-    mk_loc loc (PFapp (pqsymb_of_symb loc EcCoreLib.s_cons, [e1; e2]))
+  let pfe_cons loc ti e1 e2 = 
+    mk_loc loc (PFapp (pqsymb_of_symb loc EcCoreLib.s_cons, ti, [e1; e2]))
 
-  let pflist loc (es : pformula list) : pformula = 
-    List.fold_right (fun e1 e2 -> pfe_cons loc e1 e2) es (pfe_nil loc)
+  let pflist loc ti (es : pformula list) : pformula = 
+    List.fold_right (fun e1 e2 -> pfe_cons loc ti e1 e2) es (pfe_nil loc ti)
 
   let mk_axiom p k = 
     { pa_name = fst p; pa_formula = snd p; pa_kind = k }
@@ -318,8 +320,8 @@ sexp:
 
 | LBRACKET ti=tvars_app es=loc(p_exp_sm_list0) RBRACKET  
    { (pelist es.pl_loc ti es.pl_desc).pl_desc }
-| PIPE e =loc(exp) PIPE 
-    { PEapp (pqsymb_of_symb e.pl_loc EcCoreLib.s_abs, None, [e]) }
+| PIPE ti=tvars_app e =loc(exp) PIPE 
+    { PEapp (pqsymb_of_symb e.pl_loc EcCoreLib.s_abs, ti, [e]) }
 ;
 
 op1:
@@ -410,17 +412,17 @@ sform:
 | n=number
    { PFint n }
 
-| x=qident
-   { PFident x }
+| x=qident ti=tvars_app
+   { PFident (x,ti) }
 
-| se=loc(sform) LBRACKET e=loc(form) RBRACKET
-   { pfget (Location.make $startpos $endpos) se e }
+| se=loc(sform) LBRACKET ti=tvars_app e=loc(form) RBRACKET
+   { pfget (Location.make $startpos $endpos) ti se e }
 
-| se=loc(sform) LBRACKET e1=loc(form) LEFTARROW e2=loc(form) RBRACKET
-   { pfset (Location.make $startpos $endpos) se e1 e2 }
+| se=loc(sform) LBRACKET ti=tvars_app e1=loc(form) LEFTARROW e2=loc(form) RBRACKET
+   { pfset (Location.make $startpos $endpos) ti se e1 e2 }
 
-| x=qident LPAREN es=form_list0 RPAREN
-   { PFapp (x, es) }
+| x=qident ti=tvars_app LPAREN es=form_list0 RPAREN
+   { PFapp (x, ti, es) }
 
 | x=loc(sform) LKEY s=prog_num RKEY
    { PFside (x, s) }
@@ -431,34 +433,47 @@ sform:
 | LPAREN e=form RPAREN
    { e }
 
-| LBRACKET es=loc(p_form_sm_list0) RBRACKET
-   { (pflist es.pl_loc es.pl_desc).pl_desc }
+| LBRACKET ti=tvars_app es=loc(p_form_sm_list0) RBRACKET
+   { (pflist es.pl_loc ti es.pl_desc).pl_desc }
 
-| PIPE e =loc(form) PIPE 
-    { PFapp (pqsymb_of_symb e.pl_loc EcCoreLib.s_abs, [e]) }
+| PIPE ti=tvars_app e =loc(form) PIPE 
+    { PFapp (pqsymb_of_symb e.pl_loc EcCoreLib.s_abs, ti, [e]) }
 | PR LBRACKET x=fct_game pn=prog_num COLON f=loc(form) RBRACKET 
     { PFprob(x,pn,f) }
                           
 form:
 | e=sform { e }
 
-| op=loc(NOT) e=loc(form) { PFapp (pqsymb_of_symb op.pl_loc "!", [e]) }
+| op=loc(NOT) ti=tvars_app e=loc(form) 
+    { PFapp (pqsymb_of_symb op.pl_loc "!", ti, [e]) }
 
-| op=loc(MINUS) e=loc(form) %prec prec_prefix_op
-   { PFapp (pqsymb_of_symb op.pl_loc "-", [e]) }
-| e1=loc(form) op=loc(op1) e2=loc(form)  { PFapp (pqsymb_of_psymb op, [e1; e2]) } %prec OP1
-| e1=loc(form) op=loc(OP2) e2=loc(form)  { PFapp (pqsymb_of_psymb op, [e1; e2]) }
-| e1=loc(form) op=loc(OP3) e2=loc(form)  { PFapp (pqsymb_of_psymb op, [e1; e2]) }
-| e1=loc(form) op=loc(OP4) e2=loc(form)  { PFapp (pqsymb_of_psymb op, [e1; e2]) }
-| e1=loc(form) op=loc(IMPL) e2=loc(form)  { PFapp (pqsymb_of_symb op.pl_loc "=>" , [e1; e2]) }
-| e1=loc(form) op=loc(IFF) e2=loc(form)  { PFapp (pqsymb_of_symb op.pl_loc "<=>", [e1; e2]) }
-| e1=loc(form) op=loc(OR) e2=loc(form)  { PFapp (pqsymb_of_symb op.pl_loc "||" , [e1; e2]) }
-| e1=loc(form) op=loc(AND) e2=loc(form)  { PFapp (pqsymb_of_symb op.pl_loc "&&" , [e1; e2]) }
-| e1=loc(form) op=loc(EQ   ) e2=loc(form)  { PFapp (pqsymb_of_symb op.pl_loc "="  , [e1; e2]) }
-| e1=loc(form) op=loc(NE   ) e2=loc(form)  { PFapp (pqsymb_of_symb op.pl_loc "<>" , [e1; e2]) }
+| op=loc(MINUS) ti=tvars_app e=loc(form) %prec prec_prefix_op
+   { PFapp (pqsymb_of_symb op.pl_loc "-", ti, [e]) }
+| e1=loc(form) op=loc(op1) ti=tvars_app e2=loc(form) %prec OP1 
+    { PFapp (pqsymb_of_psymb op, ti, [e1; e2]) } 
+| e1=loc(form) op=loc(OP2) ti=tvars_app e2=loc(form)  
+    { PFapp (pqsymb_of_psymb op, ti, [e1; e2]) }
+| e1=loc(form) op=loc(OP3) ti=tvars_app e2=loc(form)  
+    { PFapp (pqsymb_of_psymb op, ti, [e1; e2]) }
+| e1=loc(form) op=loc(OP4) ti=tvars_app e2=loc(form)  
+    { PFapp (pqsymb_of_psymb op, ti, [e1; e2]) }
+| e1=loc(form) op=loc(IMPL) ti=tvars_app e2=loc(form)  
+    { PFapp (pqsymb_of_symb op.pl_loc "=>" , ti, [e1; e2]) }
+| e1=loc(form) op=loc(IFF) ti=tvars_app e2=loc(form)  
+    { PFapp (pqsymb_of_symb op.pl_loc "<=>", ti, [e1; e2]) }
+| e1=loc(form) op=loc(OR) ti=tvars_app e2=loc(form)  
+    { PFapp (pqsymb_of_symb op.pl_loc "||" , ti, [e1; e2]) }
+| e1=loc(form) op=loc(AND) ti=tvars_app e2=loc(form)  
+    { PFapp (pqsymb_of_symb op.pl_loc "&&" , ti, [e1; e2]) }
+| e1=loc(form) op=loc(EQ   ) ti=tvars_app e2=loc(form)  
+    { PFapp (pqsymb_of_symb op.pl_loc "="  , ti, [e1; e2]) }
+| e1=loc(form) op=loc(NE   ) ti=tvars_app e2=loc(form) 
+    { PFapp (pqsymb_of_symb op.pl_loc "<>" , ti, [e1; e2]) }
 
-| e1=loc(form) op=loc(MINUS) e2=loc(form)  { PFapp (pqsymb_of_symb op.pl_loc "-" , [e1; e2]) }
-| e1=loc(form) op=loc(STAR ) e2=loc(form)  { PFapp (pqsymb_of_symb op.pl_loc "*" , [e1; e2]) }
+| e1=loc(form) op=loc(MINUS) ti=tvars_app e2=loc(form)  
+    { PFapp (pqsymb_of_symb op.pl_loc "-" , ti, [e1; e2]) }
+| e1=loc(form) op=loc(STAR ) ti=tvars_app e2=loc(form)  
+    { PFapp (pqsymb_of_symb op.pl_loc "*" , ti, [e1; e2]) }
 
 | c=loc(form) QUESTION e1=loc(form) COLON e2=loc(form) %prec OP2 { PFif (c, e1, e2) }
 | IF c=loc(form) THEN e1=loc(form) ELSE e2=loc(form)             { PFif (c, e1, e2) }
