@@ -134,10 +134,8 @@ let rec subst_tyexpr (s : subst) (e : tyexpr) =
 let rec subst_form (s : subst) (f : form) =
   let f_node = subst_form_node s f.f_node
   and f_ty   = subst_ty s f.f_ty
-  and f_fv   = EcIdent.Mid.fold
-                 EcIdent.Mid.add f.f_fv EcIdent.Mid.empty
+  and f_fv   = EcIdent.Mid.empty        (* FIXME *)
   in
-
     { f_node = f_node; f_ty = f_ty; f_fv = f_fv }
 
 and subst_form_node (s : subst) (f : f_node) =
@@ -240,17 +238,21 @@ let subst_op (s : subst) (op : operator) =
       op_codom  = codom ;
       op_kind   = kind  ; }
 
+(* -------------------------------------------------------------------- *)
 let subst_ax (s : subst) (ax : axiom) =
   let params = List.map EcIdent.fresh ax.ax_params in
   let sty    = add_locals s (List.combine ax.ax_params params) in
   let spec   = omap ax.ax_spec (subst_form sty) in 
-  let kind = 
+  let kind   = 
+
     match ax.ax_kind with
-    | Axiom -> Axiom
-    | Lemma _ -> Lemma None in
-  { ax_params = params;
-    ax_spec   = spec  ;
-    ax_kind   = kind  ; }
+    | Axiom   -> Axiom
+    | Lemma _ -> Lemma None
+
+  in
+    { ax_params = params;
+      ax_spec   = spec  ;
+      ax_kind   = kind  ; }
 
 (* -------------------------------------------------------------------- *)
 let subst_tysig_item (s : subst) (item : tysig_item) =
