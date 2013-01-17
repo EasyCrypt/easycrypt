@@ -130,6 +130,8 @@ rule main = parse
   | '}'                       { RKEY }
   | '['                       { LBRACKET }
   | ']'                       { RBRACKET }
+  | "<:"                      { LTCOLON }
+  | ">"                       { GT }                      
   | ','                       { COMMA }
   | ';'                       { SEMICOLON }
   | '.'                       { DOT }

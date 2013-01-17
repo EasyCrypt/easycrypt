@@ -1,7 +1,7 @@
 let s_get  = "__get"
 let s_set  = "__set"
 let s_nil  = "__nil"
-let s_cons = "__cons"
+let s_cons = "::"
 let s_abs  = "__abs"
 let s_opp  = "__opp"
 

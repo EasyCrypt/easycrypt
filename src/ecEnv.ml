@@ -447,9 +447,9 @@ module Op = struct
       { env with
           env_item = CTh_operator(id, op) :: env.env_item }
     
-
-  let all (qname : qsymbol) (env : env) =
-    MC.lookupall (fun mc -> mc.mc_operators) qname env
+  let all filter (qname : qsymbol) (env : env) =
+    List.filter (fun (_,op) -> filter op)
+      (MC.lookupall (fun mc -> mc.mc_operators) qname env)
 end
 
 (* -------------------------------------------------------------------- *)
@@ -677,29 +677,24 @@ module Ident = struct
     | `Pvar of EcTypes.prog_var 
     | `Ctnt of EcPath.path * operator ]
 
-  let trylookup ?(prob=false) ?(pred=false) (name : qsymbol) (env : env) =
-    let for_var () =
-      match Var.trylookup name env with
-      | None -> None
-      | Some (p, x) ->
-          let idl = 
-            match x.vb_kind with
-            | None   -> `Local (EcPath.basename p) 
-            | Some k -> `Pvar { EcTypes.pv_name = p; EcTypes.pv_kind = k } in
-          Some (x.vb_type, (idl :> idlookup_t))
+  let trylookup filter_op (name : qsymbol) (env : env) =
+    match Var.trylookup name env with
+    | Some (p, x) ->
+        let idl = 
+          match x.vb_kind with
+          | None   -> `Local (EcPath.basename p) 
+          | Some k -> `Pvar { EcTypes.pv_name = p; EcTypes.pv_kind = k } in
+        [ x.vb_type, (idl :> idlookup_t) ]
+    | None ->
+        let filter_op op = op.op_dom = [] && filter_op op in
+        let all = Op.all filter_op name env in
+        List.map (fun p -> (snd p).op_codom, (`Ctnt p :> idlookup_t) ) all
 
-    and for_op () =
-      match Op.trylookup name env with
-      | Some (p, op) when op.op_dom = [] && 
-          (is_oper op || (prob && is_prob op) || (pred && is_pred op)) ->
-          Some (op.op_codom, (`Ctnt(p, op) :> idlookup_t))
-      | _ -> None in
-    List.fpick [for_var; for_op]
+  let lookup filter_op (name : qsymbol) (env : env) =
+    match trylookup filter_op name env with
+    | [x] -> x
+    | _ -> raise (LookupFailure (`QSymbol name))
 
-  let lookup ?(prob=false) ?(pred=false) (name : qsymbol) (env : env) =
-    match trylookup ~prob ~pred name env with
-    | None   -> raise (LookupFailure (`QSymbol name))
-    | Some x -> x
 end
 
 (* -------------------------------------------------------------------- *)

@@ -45,15 +45,6 @@ val transtys :
 
 
 (* -------------------------------------------------------------------- *)
-val select_op :
-     bool
-  -> EcEnv.env
-  -> qsymbol
-  -> EcUnify.unienv
-  -> ty list
-  -> (EcPath.path * operator * ty * EcUnify.unienv) list
-
-(* -------------------------------------------------------------------- *)
 type epolicy = {
   epl_prob : bool;
 }

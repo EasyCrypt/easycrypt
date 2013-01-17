@@ -18,8 +18,14 @@ type unienv =
       mutable vardecl : EcIdent.t list;
       mutable strict  : bool;
     } 
-        
+
 module UniEnv = struct
+  
+  type tvar_inst_kind = 
+    | TVIunamed of ty list
+    | TVInamed  of (EcSymbols.symbol * ty) list
+
+  type tvi = tvar_inst_kind option
 
   let empty () = 
     { unival  = Muid.empty;
@@ -61,22 +67,31 @@ module UniEnv = struct
     Tunivar uid
 
 
-  let init_freshen ue params = 
+  let init_freshen ue params tvi = 
     let ue = copy ue in
     let s = 
-      List.fold_left (fun s v -> Mid.add v (fresh_uid ue) s) Mid.empty params in
+      match tvi with
+      | None -> 
+          List.fold_left (fun s v -> Mid.add v (fresh_uid ue) s) 
+            Mid.empty params 
+      | Some (TVIunamed lt) ->
+          List.fold_left2 (fun s v t -> Mid.add v t s) Mid.empty params lt
+      | Some(TVInamed l) ->
+          List.fold_left (fun s v ->
+            let t = try List.assoc (EcIdent.name v) l with _ -> fresh_uid ue in
+            Mid.add v t s) Mid.empty params in
     ue, Tvar.subst s
     
-  let freshen ue params ty = 
-    let ue, subst = init_freshen ue params in
+  let freshen ue params tvi ty = 
+    let ue, subst = init_freshen ue params tvi in
     ue, subst ty
 
-  let freshendom ue params dom = 
-    let ue, subst = init_freshen ue params in
+  let freshendom ue params tvi dom = 
+    let ue, subst = init_freshen ue params tvi in
     ue, List.map subst dom
 
-  let freshensig ue params (dom, codom) = 
-    let ue, subst = init_freshen ue params in
+  let freshensig ue params tvi (dom, codom) = 
+    let ue, subst = init_freshen ue params tvi in
     ue, (List.map subst dom, subst codom)
 
   let restore ~(dst:unienv) ~(src:unienv) =

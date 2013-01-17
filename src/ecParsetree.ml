@@ -58,8 +58,6 @@ type psymbol  = symbol  located         (* located symbol  *)
 type posymbol = symbol option located
 
 type pty    = pty_r    located          (* located type              *)
-and  pexpr  = pexpr_r  located          (* located expression        *)
-
 and pty_r =
   | PTunivar
   | PTtuple     of pty list
@@ -67,17 +65,25 @@ and pty_r =
   | PTvar       of psymbol
   | PTapp       of pqsymbol * pty list
 
+type tvar_inst_kind = 
+  | TVIunamed of pty list
+  | TVInamed  of (psymbol * pty) list
+
+type tvar_inst = tvar_inst_kind option
+    
+
+type pexpr  = pexpr_r  located          (* located expression        *)
 and pexpr_r =
-  | PEflip                                  (* flip               *)
-  | PEinter    of pexpr * pexpr             (* interval sampling  *)
-  | PEbitstr   of pexpr                     (* bitstring sampling *)
-  | PEexcepted of pexpr * pexpr             (* restriction        *)
-  | PEint      of int                       (* int. literal       *)
-  | PEident    of pqsymbol                  (* symbol             *)
-  | PEapp      of pqsymbol * pexpr list     (* op. application    *)
-  | PElet      of lpattern * pexpr * pexpr  (* let binding        *)
-  | PEtuple    of pexpr list                (* tuple constructor  *)
-  | PEif       of pexpr * pexpr * pexpr     (* _ ? _ : _          *)
+  | PEflip                                          (* flip               *)
+  | PEinter    of pexpr * pexpr                     (* interval sampling  *)
+  | PEbitstr   of pexpr                             (* bitstring sampling *)
+  | PEexcepted of pexpr * pexpr                     (* restriction        *)
+  | PEint      of int                               (* int. literal       *)
+  | PEident    of pqsymbol * tvar_inst              (* symbol             *)
+  | PEapp      of pqsymbol * tvar_inst * pexpr list (* op. application    *)
+  | PElet      of lpattern * pexpr * pexpr          (* let binding        *)
+  | PEtuple    of pexpr list                        (* tuple constructor  *)
+  | PEif       of pexpr * pexpr * pexpr             (* _ ? _ : _          *)
 
 and lpattern =
   | LPSymbol of psymbol

@@ -1,0 +1,1 @@
+op foo (x:int, l:int list) : int list = x :: <:int,int> l.

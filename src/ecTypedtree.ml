@@ -41,33 +41,36 @@ let tyerror loc x = raise (TyError (loc, x))
 (* -------------------------------------------------------------------- *)
 module UE = EcUnify.UniEnv
 
-let select_op proba env name ue psig =
-  let ops = EcEnv.Op.all name env in
-  let len = List.length psig in
+let filter_tvi = function 
+  | None -> fun _ -> true
+  | Some (UE.TVIunamed l) -> 
+      let len = List.length l in
+      fun op -> List.length op.op_params = len
+  | Some (UE.TVInamed ls) -> fun op ->
+      List.for_all 
+        (fun (s,_) -> 
+          List.exists (fun id -> EcIdent.name id = s) op.op_params) ls
+
+let gen_select_op prob pred tvi env name ue psig = 
+  let fti = filter_tvi tvi in 
+  let nargs = List.length psig in
+  let fop op =
+    (prob || not (is_prob op)) && 
+    (pred || not (is_pred op)) && 
+    List.length op.op_dom = nargs &&
+    fti op in
+  let ops = EcEnv.Op.all fop name env in
   let select (path, op) = 
-    if is_pred op || (is_prob op && not proba) then None
-    else if List.length op.op_dom <> len then None
-    else 
-      let subue, (dom,codom) = UE.freshensig ue op.op_params (op_sig op) in
-      try
-        EcUnify.unify env subue (Ttuple dom) (Ttuple psig);
-        Some (path, op, codom, subue)
-      with EcUnify.UnificationFailure _ -> None in
+    let subue, (dom,codom) = UE.freshensig ue op.op_params tvi (op_sig op) in
+    EcUnify.unify env subue (Ttuple dom) (Ttuple psig);
+    Some (path, op, codom, subue) in
   List.pmap select ops
 
-let select_pred env name ue psig =
-  let ops = EcEnv.Op.all name env in
-  let len = List.length psig in
-  let select (path, op) = 
-    if is_prob op then None 
-    else if List.length op.op_dom <> len then None
-    else 
-      let subue, (dom,codom) = UE.freshensig ue op.op_params (op_sig op) in
-      try
-        EcUnify.unify env subue (Ttuple dom) (Ttuple psig);
-        Some (path, op, codom, subue)
-      with EcUnify.UnificationFailure _ -> None in
-  List.pmap select ops
+let select_op proba env name ue tvi psig =
+  gen_select_op proba false tvi env name ue psig 
+
+let select_pred env name ue tvi psig =
+  gen_select_op false true tvi env name ue psig
  
 type typolicy = {
     tp_uni         : bool;   (* "_" allowed                         *)
@@ -186,6 +189,21 @@ let unify_error env ue loc ty1 ty2 =
     tyerror loc (UnexpectedType (inst_uni ty1, inst_uni ty2, 
                                  inst_uni t1 , inst_uni t2 ))
 
+let transtvi env ue tvi = 
+  match tvi with
+  | None -> None
+  | Some (TVIunamed lt) ->
+      Some (UE.TVIunamed (List.map (transty tp_relax env ue) lt))
+  | Some (TVInamed lst) ->
+      let add l (s,t) = 
+        try
+          let s' = fst (List.find (fun (s',_) -> unloc s = unloc s') l) in
+          tyerror s.pl_loc (DuplicatedLocals (Some s'))
+        with Not_found ->
+          (s, transty tp_relax env ue t) :: l in
+      let lst = List.fold_left add [] lst in
+      Some (UE.TVInamed (List.rev_map (fun (s,t) -> unloc s, t) lst))
+  
 let transexp (env : EcEnv.env) (policy : epolicy) (ue : EcUnify.unienv) e =
 
   let rec transexp (env : EcEnv.env) (policy : epolicy) (e : pexpr) =
@@ -194,25 +212,26 @@ let transexp (env : EcEnv.env) (policy : epolicy) (ue : EcUnify.unienv) e =
     match e.pl_desc with
     | PEint  i -> (Eint  i, tint)
 
-    | PEident { pl_desc = x } -> 
-        begin match EcEnv.Ident.trylookup ~prob:policy.epl_prob x env with
-        | Some (ty, kind) -> 
-            begin match kind with
-            | `Pvar  x -> Evar(x,ty), ty
-            | `Local x -> Elocal(x,ty), ty
-            | `Ctnt(p, op) ->
-                let newue, ty = UE.freshen ue op.op_params ty in
-                UE.restore ue newue;
-                (Eapp (p, [], ty), ty)
-            end
-        | _ -> tyerror loc (UnknownVariable x)
+    | PEident ({ pl_desc = x}, tvi) -> 
+        let tvi = transtvi env ue tvi in
+        let filter = 
+          let f = filter_tvi tvi in
+          fun op -> (policy.epl_prob || not (is_prob op)) && f op in
+        begin match EcEnv.Ident.trylookup filter x env with
+        | [ty, `Pvar  x] -> Evar(x,ty), ty
+        | [ty, `Local x] -> Elocal(x,ty), ty
+        | [ty, `Ctnt(p, op)] ->
+            let newue, ty = UE.freshen ue op.op_params tvi ty in
+            UE.restore ue newue;
+            (Eapp (p, [], ty), ty)
+        | _ -> tyerror loc (UnknownVariable x) (* FIXME error message *)
         end
 
-    | PEapp ({ pl_desc = name }, es) -> begin
+    | PEapp ({ pl_desc = name }, tvi, es) -> begin
+      let tvi = transtvi env ue tvi in  
       let es   = List.map (transexp env policy) es in
       let esig = snd (List.split es) in
-      let ops  = select_op policy.epl_prob env name ue esig in
-
+      let ops  = select_op policy.epl_prob env name ue tvi esig in
         match ops with
         | [] | _ :: _ :: _ ->        (* FIXME: better error message *)
             let esig = Tuni.subst_dom (EcUnify.UniEnv.asmap ue) esig in
@@ -571,7 +590,7 @@ and transinstr ue (env : EcEnv.env) (i : pinstr) =
   | PSasgn (lvalue, rvalue) -> begin
       let rvalue_as_fun () =
         match rvalue.pl_desc with
-        | PEapp ({ pl_desc = name }, args) when  EcEnv.Fun.exists name env ->
+        | PEapp ({ pl_desc = name }, None, args) when  EcEnv.Fun.exists name env ->
             let (fpath, args, rty) = transcall name args in
               Some (`Call (fpath, args), rty)
         | _ -> None
@@ -649,7 +668,7 @@ and translvalue ue (env : EcEnv.env) lvalue =
       and e, ety = transexp env ep_det ue e in
       let name =  ([],"set") in
       let esig = [xty; ety; codomty] in
-      let ops = select_op false env name ue esig in
+      let ops = select_op false env name ue None esig in
       match ops with
       | [] | _ :: _ :: _ ->        (* FIXME: better error message *)
           let esig = Tuni.subst_dom (EcUnify.UniEnv.asmap ue) esig in
@@ -717,14 +736,15 @@ module Fenv = struct
   module Ident = struct
     let trylookup_env fenv ue qs = 
       let env = current_env fenv in
-      match EcEnv.Ident.trylookup ~pred:true qs env with 
-      | None -> None
-      | Some(_, `Local _) -> assert false
-      | Some(ty, `Pvar x) ->  Some (Lprog (x, ty, fenv.fe_cur))
-      | Some (ty, `Ctnt(p, op)) ->
-          let newue, ty = UE.freshen ue op.op_params ty in
+      let filter op = not (is_prob op) in
+      match EcEnv.Ident.trylookup filter qs env with 
+      | [_, `Local _] -> assert false
+      | [ty, `Pvar x] ->  Some (Lprog (x, ty, fenv.fe_cur))
+      | [ty, `Ctnt(p, op)] ->
+          let newue, ty = UE.freshen ue op.op_params None ty in
           UE.restore ue newue;
           Some (Lctnt (p, ty))
+      | _ -> None 
 
     let trylookup_logical fenv s =
       match EcIdent.Map.byname s fenv.fe_locals with
@@ -776,7 +796,7 @@ let transformula fenv ue pf =
     | PFapp({ pl_desc = qs; pl_loc = loc }, es) ->
         let es   = List.map (transf fenv) es in
         let esig = List.map EcFol.ty es in 
-        let ops  = select_pred (Fenv.mono fenv) qs ue esig in
+        let ops  = select_pred (Fenv.mono fenv) qs ue None esig in
         begin match ops with
         | [] | _ :: _ :: _ ->        (* FIXME: better error message *)
             tyerror loc (UnknownOperatorForSig (qs, esig))

@@ -205,7 +205,10 @@ module Wtvm =
     let get tvm tv = 
       try Ty.Mtv.find tv !tvm 
       with _ ->
-        let id = EcIdent.create (w3_id_string tv.Ty.tv_name) in
+        let s = w3_id_string tv.Ty.tv_name in
+        assert (String.length s <> 0);
+        let s = if s.[0] = '\'' then s else String.concat "" ["\'"; s] in
+        let id = EcIdent.create s in
         tvm := Ty.Mtv.add tv id !tvm;
         id
 

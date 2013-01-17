@@ -132,7 +132,7 @@ end
 module Op : sig
   include S with type t = operator
 
-  val all : qsymbol -> env -> (EcPath.path * t) list
+  val all : (operator -> bool) -> qsymbol -> env -> (EcPath.path * t) list
 end
 
 (* -------------------------------------------------------------------- *)
@@ -152,11 +152,11 @@ module Ident : sig
     | `Ctnt of EcPath.path * operator ]
 
   val lookup    : 
-      ?prob:bool -> ?pred:bool ->
-      qsymbol -> env -> (EcTypes.ty * idlookup_t)
+      (operator -> bool) -> qsymbol -> env -> (EcTypes.ty * idlookup_t) 
+
   val trylookup : 
-      ?prob:bool -> ?pred:bool ->
-      qsymbol -> env -> (EcTypes.ty * idlookup_t) option
+      (operator -> bool) -> qsymbol -> env -> (EcTypes.ty * idlookup_t) list
+
 end
 
 (* -------------------------------------------------------------------- *)

@@ -441,7 +441,10 @@ struct
 
   (* ------------------------------------------------------------------ *)
   let pr_typedecl (tenv : t) ((x, tyd) : EcIdent.t * tydecl) =
-    let doc = tk_type ^//^ (pr_ident tenv x) in
+    let dparams =  
+      if tyd.tyd_params = [] then Pp.empty 
+      else Pp.parens (pr_list_map (pr_tvar tenv) ", " tyd.tyd_params) in
+    let doc = tk_type ^//^ dparams ^^ (pr_ident tenv x) in 
     let doc =
       match tyd.tyd_type with
       | None    -> doc
