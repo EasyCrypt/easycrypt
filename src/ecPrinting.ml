@@ -237,7 +237,7 @@ struct
   let e_bin_prio_op3    = (50, `Infix `Left)  (* FIXME: really ? *)
   let e_bin_prio_op4    = (60, `Infix `Left)  (* FIXME: really ? *)
 
-  let e_uni_prio_not    = 500
+  let e_uni_prio_not    =  26
   let e_uni_prio_uminus = 500
 
   let e_prio_excpt = (1000, `Infix `NonAssoc)
@@ -359,7 +359,7 @@ struct
   (* ------------------------------------------------------------------ *)
   let pr_expr (tenv : t) (e : tyexpr) =
     let rec pr_expr (tenv : t) outer (e : tyexpr) =
-        match e with
+        match e.tye_desc with
         | Evar (x, _) ->
             pr_path tenv x.pv_name
 
@@ -384,7 +384,7 @@ struct
         | Einter (e1, e2) ->
             let d1 = pr_expr tenv (min_op_prec, `NonAssoc) e1 in
             let d2 = pr_expr tenv (min_op_prec, `NonAssoc) e2 in
-              Pp.braces (pr_hang (pr_seq [d1; tk_dotdot; d2]))
+              Pp.brackets (pr_hang (pr_seq [d1; tk_dotdot; d2]))
 
         | Eif (c, e1, e2) ->
             pr_if tenv pr_expr outer c e1 e2
@@ -454,13 +454,13 @@ struct
 
   (* ------------------------------------------------------------------ *)
   let pr_dom (tenv : t) dom =
-    match List.map (pr_type tenv) dom with
-    | []  -> Pp.parens Pp.empty
-    | dom -> pr_tuple dom
+    pr_tuple (List.map (pr_type tenv) dom)
 
   (* ------------------------------------------------------------------ *)
   let pr_sig (tenv : t) (dom, codom) =
-    (pr_dom tenv dom) ^//^ tk_arrow ^//^ (pr_type tenv codom)
+    match dom with
+    | [] -> pr_type tenv codom
+    | _  -> (pr_dom tenv dom) ^//^ tk_arrow ^//^ (pr_type tenv codom)
 
   (* ------------------------------------------------------------------ *)
   let pr_tyvarsdecl (tenv : t) ids =
