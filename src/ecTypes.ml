@@ -25,12 +25,11 @@ let tlist ty =
   Tconstr (EcCoreLib.p_list, [ ty ])
 
 (* -------------------------------------------------------------------- *)
-
 let map f t = 
   match t with 
   | Tunivar _ | Tvar _ -> t
   | Ttuple lty -> Ttuple (List.map f lty)
-  | Tconstr(p, lty) -> Tconstr(p, List.map f lty)
+  | Tconstr(p, lty) -> Tconstr (p, List.map f lty)
 
 let fold f s = function
   | Tunivar _ | Tvar _ -> s
@@ -44,7 +43,6 @@ let sub_exists f t =
   | Tconstr (_, lty) -> List.exists f lty
 
 (* -------------------------------------------------------------------- *)
-
 module Tuni = struct
   let subst1 ((id, t) : uid * ty) =
     let rec aux = function
@@ -76,8 +74,6 @@ module Tuni = struct
 
   let fv_sig (dom, codom) = 
     List.fold_left fv_rec (fv codom) dom
-
-
 end
 
 module Tvar = struct 
@@ -108,7 +104,6 @@ module Tvar = struct
     List.fold_left fv_rec (fv codom) dom
 
 end
- 
 
 (* -------------------------------------------------------------------- *)
 type pvar_kind = 
@@ -123,21 +118,43 @@ type lpattern =
   | LSymbol of EcIdent.t
   | LTuple  of EcIdent.t list
 
-type tyexpr =
+type tyexpr = {
+  tye_desc : tyexpr_r;
+  tye_meta : tyexpr_meta option;
+}
+
+and tyexpr_r =
   | Eint      of int                              (* int. literal       *)
   | Eflip                                         (* flip               *)
   | Einter    of tyexpr * tyexpr                  (* interval sampling  *)
   | Ebitstr   of tyexpr                           (* bitstring sampling *)
   | Eexcepted of tyexpr * tyexpr                  (* restriction        *)
-  | Elocal    of EcIdent.t * ty                   (* local variable     *)
-  | Evar      of prog_var * ty                 (* module variable    *)
+  | Elocal    of EcIdent.t * ty                   (* let-variables      *)
+  | Evar      of prog_var * ty                    (* module variable    *)
   | Eapp      of EcPath.path * tyexpr list * ty   (* op. application    *)
   | Elet      of lpattern * tyexpr * tyexpr       (* let binding        *)
   | Etuple    of tyexpr list                      (* tuple constructor  *)
   | Eif       of tyexpr * tyexpr * tyexpr         (* _ ? _ : _          *)
 
-(* -------------------------------------------------------------------- *)
+and tyexpr_meta = unit
 
+(* -------------------------------------------------------------------- *)
+let e_tyexpr (e : tyexpr_r) =
+  { tye_desc = e; tye_meta = None; }
+
+let e_int      = fun i         -> e_tyexpr (Eint i)
+let e_flip     = fun ()        -> e_tyexpr (Eflip)
+let e_inter    = fun e1 e2     -> e_tyexpr (Einter (e1, e2))
+let e_bitstr   = fun e         -> e_tyexpr (Ebitstr e)
+let e_excepted = fun e1 e2     -> e_tyexpr (Eexcepted (e1, e2))
+let e_local    = fun x ty      -> e_tyexpr (Elocal (x, ty))
+let e_var      = fun x ty      -> e_tyexpr (Evar (x, ty))
+let e_app      = fun x args ty -> e_tyexpr (Eapp (x, args, ty))
+let e_let      = fun pt e1 e2  -> e_tyexpr (Elet (pt, e1, e2))
+let e_tuple    = fun es        -> e_tyexpr (Etuple es)
+let e_if       = fun c e1 e2   -> e_tyexpr (Eif (c, e1, e2))
+
+(* -------------------------------------------------------------------- *)
 let pv_equal v1 v2 = 
   EcPath.p_equal v1.pv_name v2.pv_name && v1.pv_kind = v2.pv_kind 
 
@@ -146,9 +163,14 @@ let ids_of_lpattern = function
   | LSymbol id -> [id] 
   | LTuple ids -> ids
 
-let e_map ft fe e = 
+let rec e_map ft fmeta fe e =
+  { tye_desc = e_map_r ft fe e.tye_desc;
+    tye_meta = fmeta e.tye_meta; }
+
+and e_map_r ft fe e =
   match e with 
-  | Eint _ | Eflip -> e 
+  | Eint _                -> e
+  | Eflip                 -> e
   | Elocal (id, ty)       -> Elocal (id, ft ty)
   | Evar (id, ty)         -> Evar (id, ft ty)
   | Eapp (p, args, ty)    -> Eapp (p, List.map fe args, ft ty)
@@ -161,13 +183,11 @@ let e_map ft fe e =
 
 (* -------------------------------------------------------------------- *)
 module Esubst = struct 
-
   let mapty onty = 
-    let rec aux e = e_map onty aux e in
-    aux 
+    let rec aux e = e_map onty (fun x -> x) aux e in
+      aux 
 
   let uni (uidmap : ty Muid.t) = mapty (Tuni.subst uidmap)
-
 end
 
 (* -------------------------------------------------------------------- *)
@@ -190,7 +210,8 @@ module Dump = struct
       fun ty -> ty_dump pp ty
 
   let ex_dump pp =
-    let rec ex_dump pp = function
+    let rec ex_dump pp e =
+      match e.tye_desc with
       | Eint i ->
           EcDebug.single pp ~extra:(string_of_int i) "Eint"
 

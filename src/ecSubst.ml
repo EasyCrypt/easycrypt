@@ -80,55 +80,58 @@ let subst_lpattern (s : subst) (p : lpattern) =
 
 (* -------------------------------------------------------------------- *)
 let rec subst_tyexpr (s : subst) (e : tyexpr) =
-  match e with
-  | Eint _ -> e
-  | Eflip  -> e
+  match e.tye_desc with
+  | Eint i ->
+      e_int i
+
+  | Eflip  ->
+      e_flip ()
 
   | Einter (e1, e2) ->
       let e1 = subst_tyexpr s e1 in
       let e2 = subst_tyexpr s e2 in
-        Einter (e1, e2)
+        e_inter e1 e2
 
   | Ebitstr e ->
       let e = subst_tyexpr s e in
-        Ebitstr e
+        e_bitstr e
 
   | Eexcepted (e1, e2) ->
       let e1 = subst_tyexpr s e1 in
       let e2 = subst_tyexpr s e2 in
-        Eexcepted (e1, e2)
+        e_excepted e1 e2
 
   | Elocal (x, ty) ->
       let x  = subst_local s x in
       let ty = subst_ty s ty in
-        Elocal (x, ty)
+        e_local x ty
 
   | Evar (x, ty) ->
       let x  = { x with pv_name = subst_path s x.pv_name } in
       let ty = subst_ty s ty in
-        Evar (x, ty)
+        e_var x ty
 
   | Eapp (p, es, ty) ->
       let p   = subst_path s p in
       let tys = List.map (subst_tyexpr s) es in
       let ty  = subst_ty s ty in
-        Eapp (p, tys, ty)
+        e_app p tys ty
 
   | Elet (p, e1, e2) ->
       let (sbody, p) = subst_lpattern s p in
       let e1 = subst_tyexpr s     e1 in
       let e2 = subst_tyexpr sbody e2 in
-        Elet (p, e1, e2)
+        e_let p e1 e2
 
   | Etuple es ->
       let es = List.map (subst_tyexpr s) es in
-        Etuple es
+        e_tuple es
 
   | Eif (c, e1, e2) ->
       let c  = subst_tyexpr s c in
       let e1 = subst_tyexpr s e1 in
       let e2 = subst_tyexpr s e2 in
-        Eif (c, e1, e2)
+        e_if c e1 e2
 
 (* -------------------------------------------------------------------- *)
 let rec subst_form (s : subst) (f : form) =

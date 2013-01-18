@@ -667,7 +667,7 @@ let destr_ty_tuple t =
   | _ -> assert false 
 
 let rec trans_expr env vm e =
-  match e with
+  match e.tye_desc with
   | Eint n -> 
       let n = Term.ConstInt(Term.IConstDecimal (string_of_int n)) in
       Term.t_const n 

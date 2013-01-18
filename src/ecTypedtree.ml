@@ -210,7 +210,7 @@ let transexp (env : EcEnv.env) (policy : epolicy) (ue : EcUnify.unienv) e =
     let loc = e.pl_loc in
 
     match e.pl_desc with
-    | PEint  i -> (Eint  i, tint)
+    | PEint i -> (e_int i, tint)
 
     | PEident ({ pl_desc = x}, tvi) -> 
         let tvi = transtvi env ue tvi in
@@ -218,12 +218,12 @@ let transexp (env : EcEnv.env) (policy : epolicy) (ue : EcUnify.unienv) e =
           let f = filter_tvi tvi in
           fun op -> (policy.epl_prob || not (is_prob op)) && f op in
         begin match EcEnv.Ident.trylookup filter x env with
-        | [ty, `Pvar  x] -> Evar(x,ty), ty
-        | [ty, `Local x] -> Elocal(x,ty), ty
+        | [ty, `Pvar  x] -> (e_var x ty, ty)
+        | [ty, `Local x] -> (e_local x ty, ty)
         | [ty, `Ctnt(p, op)] ->
             let newue, ty = UE.freshen ue op.op_params tvi ty in
             UE.restore ue newue;
-            (Eapp (p, [], ty), ty)
+            (e_app p [] ty, ty)
         | _ -> tyerror loc (UnknownVariable x) (* FIXME error message *)
         end
 
@@ -239,7 +239,7 @@ let transexp (env : EcEnv.env) (policy : epolicy) (ue : EcUnify.unienv) e =
 
         | [(xpath, _, codom, subue)] ->
             EcUnify.UniEnv.restore ~src:subue ~dst:ue;
-            (Eapp (xpath, List.map fst es, codom), codom)
+            (e_app xpath (List.map fst es) codom, codom)
     end
 
     | PElet (p, pe1, pe2) ->
@@ -248,12 +248,12 @@ let transexp (env : EcEnv.env) (policy : epolicy) (ue : EcUnify.unienv) e =
       let e2, ty2 = transexp penv policy pe2 in
       (* FIXME loc should be p *)
       unify_error env ue loc pty ty1;
-      Elet (p, e1, e2), ty2
+      (e_let p e1 e2, ty2)
 
     | PEtuple es ->
         let tes = List.map (transexp env policy) es in
         let es, tys = List.split tes in
-          Etuple es, Ttuple tys
+          (e_tuple es, Ttuple tys)
 
     | PEif (pc, pe1, pe2) ->
       let c, tyc = transexp env policy pc in
@@ -261,25 +261,25 @@ let transexp (env : EcEnv.env) (policy : epolicy) (ue : EcUnify.unienv) e =
       let e2, ty2 = transexp env policy pe2 in
         unify_error env ue pc.pl_loc tyc tbool;
         unify_error env ue pe2.pl_loc ty2 ty1;
-        Eif (c, e1, e2), ty1
+        (e_if c e1 e2, ty1)
 
     | PEflip -> 
         if not policy.epl_prob then tyerror e.pl_loc RandomExprNotAllowed;
-        (Eflip, tbool)
+        (e_flip (), tbool)
 
 
     | PEbitstr pe ->
         if not policy.epl_prob then tyerror e.pl_loc RandomExprNotAllowed;
         let e, ety = transexp env policy pe in
         unify_error env ue pe.pl_loc ety tint;
-        (Ebitstr e, tbitstring)
+        (e_bitstr e, tbitstring)
 
     | PEexcepted (re, pe) ->
         if not policy.epl_prob then tyerror e.pl_loc RandomExprNotAllowed;
         let re, rety = transexp env policy re in
         let  e,  ety = transexp env policy pe in
         unify_error env ue pe.pl_loc ety (tlist rety);
-        (Eexcepted (re, e), rety)
+        (e_excepted re e, rety)
 
     | PEinter (pe1, pe2) ->
         if not policy.epl_prob then tyerror e.pl_loc RandomExprNotAllowed;
@@ -287,7 +287,7 @@ let transexp (env : EcEnv.env) (policy : epolicy) (ue : EcUnify.unienv) e =
         let e2, ty2 = transexp env policy pe2 in
         unify_error env ue pe1.pl_loc ty1 tint;
         unify_error env ue pe2.pl_loc ty2 tint;
-        (Einter (e1, e2), tint)
+        (e_inter e1 e2, tint)
 
   in
     transexp env policy e

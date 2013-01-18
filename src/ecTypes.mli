@@ -53,30 +53,56 @@ type lpattern =
 
 type pvar_kind = 
   | PVglob
-  | PVloc 
+  | PVloc
 
-type prog_var = 
-    { pv_name : EcPath.path;
-      pv_kind : pvar_kind }
+type prog_var = {
+  pv_name : EcPath.path;
+  pv_kind : pvar_kind;
+}
 
-type tyexpr =
+type tyexpr = {
+  tye_desc : tyexpr_r;
+  tye_meta : tyexpr_meta option;
+}
+
+and tyexpr_r = private
   | Eint      of int                              (* int. literal       *)
   | Eflip                                         (* flip               *)
   | Einter    of tyexpr * tyexpr                  (* interval sampling  *)
   | Ebitstr   of tyexpr                           (* bitstring sampling *)
   | Eexcepted of tyexpr * tyexpr                  (* restriction        *)
-  | Elocal    of EcIdent.t * ty         (* local variable binded by let *)
-  | Evar      of prog_var  * ty                   (* module variable    *)
-                               
+  | Elocal    of EcIdent.t * ty                   (* let-variables      *)
+  | Evar      of prog_var * ty                    (* module variable    *)
   | Eapp      of EcPath.path * tyexpr list * ty   (* op. application    *)
   | Elet      of lpattern * tyexpr * tyexpr       (* let binding        *)
   | Etuple    of tyexpr list                      (* tuple constructor  *)
   | Eif       of tyexpr * tyexpr * tyexpr         (* _ ? _ : _          *)
 
+and tyexpr_meta = unit
+
+val e_int      : int -> tyexpr
+val e_flip     : unit -> tyexpr
+val e_inter    : tyexpr -> tyexpr -> tyexpr
+val e_bitstr   : tyexpr -> tyexpr
+val e_excepted : tyexpr -> tyexpr -> tyexpr
+val e_local    : EcIdent.t -> ty -> tyexpr
+val e_var      : prog_var -> ty -> tyexpr
+val e_app      : EcPath.path -> tyexpr list -> ty -> tyexpr
+val e_let      : lpattern -> tyexpr -> tyexpr -> tyexpr
+val e_tuple    : tyexpr list -> tyexpr
+val e_if       : tyexpr -> tyexpr -> tyexpr -> tyexpr
+
 (* -------------------------------------------------------------------- *)
 val pv_equal : prog_var -> prog_var -> bool 
+
 (* -------------------------------------------------------------------- *)
-val e_map : (ty -> ty) -> (tyexpr -> tyexpr) -> tyexpr -> tyexpr
+val e_map :
+     (ty                 -> ty                ) (* 1-subtype op.      *)
+  -> (tyexpr_meta option -> tyexpr_meta option) (* top-level meta op. *)
+  -> (tyexpr             -> tyexpr            ) (* 1-subexpr op.      *)
+  -> tyexpr
+  -> tyexpr
+
 val ids_of_lpattern : lpattern -> EcIdent.t list
 
 (* -------------------------------------------------------------------- *)
