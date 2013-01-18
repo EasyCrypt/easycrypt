@@ -28,8 +28,9 @@ let process_pr scope p =
   | Pr_th qs ->
       let (p, th) = EcEnv.Theory.lookup qs.pl_desc env in
       EcRawPP.pr_theory (EcPath.basename p, th)
-        
-  | _ -> assert false
+  | Pr_ax qs ->
+      let (p, ax) = EcEnv.Ax.lookup qs.pl_desc env in
+      EcRawPP.pr_axiom (EcPath.basename p, ax)
 
 let process_print scope p = 
   let doc = process_pr scope p in

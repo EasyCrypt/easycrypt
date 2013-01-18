@@ -69,23 +69,25 @@ module Map = struct
   let allbyname (x : symbol) (m : 'a t) =
     odfl [] (Msym.find_opt x m)
 
-   let dump ~name valuepp pp (m : 'a t) =
-     let keyprinter k v =
-       match v with
-       | [] -> Printf.sprintf "%s (empty)" k
-       | _  -> k
+  let dump ~name valuepp pp (m : 'a t) =
+    let keyprinter k v =
+      match v with
+      | [] -> Printf.sprintf "%s (empty)" k
+      | _  -> k
+            
+    and valuepp pp (_, xs) =
+      match xs with
+      | [] -> ()
+      | _  ->
+          EcDebug.onhlist pp
+            (Printf.sprintf "%d binding(s)" (List.length xs))
+            (fun pp (x, v) ->
+              EcDebug.onhlist pp (tostring x) valuepp [v])
+            xs
+    in
+    Msym.dump ~name keyprinter valuepp pp m
 
-     and valuepp pp (_, xs) =
-       match xs with
-       | [] -> ()
-       | _  ->
-           EcDebug.onhlist pp
-             (Printf.sprintf "%d binding(s)" (List.length xs))
-             (fun pp (x, v) ->
-                EcDebug.onhlist pp (tostring x) valuepp [v])
-             xs
-     in
-       Msym.dump ~name keyprinter valuepp pp m
+  let fold = Msym.fold
 end
 
 (* -------------------------------------------------------------------- *)

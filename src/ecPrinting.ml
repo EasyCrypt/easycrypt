@@ -747,22 +747,21 @@ module GenIEnv : IIdentPrinter = struct
       tenv_locs  : string EcIdent.Mid.t 
     }
 
-  let init (env, lenv) =
-    let exc = Sstr.empty in
-(* FIXME EcIdent.Map.fold ... *)
-(*      List.fold_left 
-        (fun exc env ->
-          let mv = (preenv env).env_root.mc_variables in
-          EcIdent.Map.fold (fun id _ exc -> Sstr.add (EcIdent.name id) exc) mv exc)
-        Sstr.empty (env::lenv) in *)
-    let side = List.fold_lefti (fun i s env -> Mint.add i env s) Mint.empty lenv in
-    { tenv_logic = env;
-      tenv_side  = side;
-      tenv_exc   = exc;
-      tenv_locs  = EcIdent.Mid.empty 
-    }
+   let init (env, lenv) =
+     let exc = 
+       List.fold_left 
+         (fun exc env ->
+           let mv = (preenv env).env_root.mc_variables in
+           EcIdent.Map.fold (fun s _ exc -> Sstr.add s exc) mv exc)
+         Sstr.empty (env::lenv) in 
+     let side = List.fold_lefti (fun i s env -> Mint.add i env s) Mint.empty lenv in
+     { tenv_logic = env;
+       tenv_side  = side;
+       tenv_exc   = exc;
+       tenv_locs  = EcIdent.Mid.empty 
+     }
 
- let add_local t id = 
+  let add_local t id = 
     let s = EcIdent.name id in
     let s = 
       if Sstr.mem s t.tenv_exc then s 
