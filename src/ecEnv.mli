@@ -53,8 +53,10 @@ module type S = sig
   val lookup_by_path    : EcPath.path -> env -> t        (* full path *)
   val trylookup_by_path : EcPath.path -> env -> t option (* full path *)
   val lookup            : qsymbol -> env -> EcPath.path * t
+  val lookup_path       : qsymbol -> env -> EcPath.path
   val trylookup         : qsymbol -> env -> (EcPath.path * t) option
   val exists            : qsymbol -> env -> bool
+  val add               : EcPath.path -> env -> env
 end
 
 (* -------------------------------------------------------------------- *)
@@ -74,8 +76,10 @@ module Var : sig
   val lookup_by_path    : EcPath.path -> env -> t        (* full path *)
   val trylookup_by_path : EcPath.path -> env -> t option (* full path *)
   val lookup            : qsymbol -> env -> EcPath.path * t
+  val lookup_path       : qsymbol -> env -> EcPath.path
   val trylookup         : qsymbol -> env -> (EcPath.path * t) option
   val exists            : qsymbol -> env -> bool
+  val add               : EcPath.path -> env -> env
 
   val bind :
        EcIdent.t
@@ -89,6 +93,7 @@ module Var : sig
     -> EcTypes.pvar_kind option
     -> env
     -> env
+
 end
 
 (* -------------------------------------------------------------------- *)
@@ -100,10 +105,12 @@ module Mod : sig
   val bind : EcIdent.t -> t -> env -> env
   val bindall : (EcIdent.t * t) list -> env -> env
   val lookup_by_path : EcPath.path -> env -> tymod
-  val lookup : EcSymbols.qsymbol -> env -> EcPath.path * EcTypesmod.tymod
+  val lookup : qsymbol -> env -> EcPath.path * EcTypesmod.tymod
+  val lookup_path : qsymbol -> env -> EcPath.path
   val trylookup_by_path : EcPath.path -> env -> EcTypesmod.tymod option
-  val trylookup : EcSymbols.qsymbol -> env -> (EcPath.path * EcTypesmod.tymod) option
-  val exists : EcSymbols.qsymbol -> env -> bool
+  val trylookup : qsymbol -> env -> (EcPath.path * EcTypesmod.tymod) option
+  val exists : qsymbol -> env -> bool
+  val add    : EcPath.path -> env -> env
 end
 
 (* -------------------------------------------------------------------- *)
@@ -117,7 +124,8 @@ module Theory : sig
   val bind : EcIdent.t -> t -> env -> env
   val bindall : (EcIdent.t * t) list -> env -> env
   val lookup_by_path : EcPath.path -> env -> ctheory
-  val lookup : EcSymbols.qsymbol -> env -> EcPath.path * ctheory
+  val lookup : qsymbol -> env -> EcPath.path * ctheory
+  val lookup_path : qsymbol -> env -> EcPath.path 
   val trylookup_by_path : EcPath.path -> env -> ctheory option
   val trylookup : EcSymbols.qsymbol -> env -> (EcPath.path * ctheory) option
   val exists : EcSymbols.qsymbol -> env -> bool
@@ -126,6 +134,7 @@ module Theory : sig
   val require : EcIdent.t -> ctheory_w3 -> env -> env
   val enter : EcSymbols.symbol -> env -> EcIdent.t * env
   val close : env -> ctheory_w3
+  val add    : EcPath.path -> env -> env
 end
 
 (* -------------------------------------------------------------------- *)

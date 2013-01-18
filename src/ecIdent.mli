@@ -36,6 +36,7 @@ module Map : sig
   val allbyname : symbol -> 'a t -> (key * 'a) list
   val byname    : symbol -> 'a t -> (key * 'a) option
   val byident   : key -> 'a t -> 'a option
+(*  val fold      : (key -> 'a -> 'b -> 'b) -> 'a t -> 'b -> 'b  *)
 
   val dump :
        name:string

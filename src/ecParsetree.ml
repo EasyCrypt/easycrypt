@@ -233,10 +233,10 @@ and ptactic_r =
   | Passumption of (pqsymbol option * tvar_inst)
   | Ptrivial
   | Pintro      of posymbol list  (* imp_I, forall_I *)
-  | Psplit                       (* and_I *)
-  | Pexists     of pformula list (* exists_I *)
-  | Pleft                        (* or_I left *)
-  | Pright                       (* or_I right *)
+  | Psplit                        (* and_I *)
+  | Pexists     of pformula list  (* exists_I *)
+  | Pleft                         (* or_I left *)
+  | Pright                        (* or_I right *)
   | Pelim       of pelim   
   | Psubgoal    of ptactics
   | Pseq        of ptactics

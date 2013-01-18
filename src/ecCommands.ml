@@ -21,7 +21,7 @@ let process_pr scope p =
       let (x, ty) = EcEnv.Ty.lookup qs.pl_desc env in
       EcRawPP.pr_typedecl (EcPath.basename x, ty)
         
-  | Pr_op qs ->
+  | Pr_op qs | Pr_pr qs ->
       let (x, op) = EcEnv.Op.lookup qs.pl_desc env in
       EcRawPP.pr_opdecl (EcPath.basename x, op)
         
@@ -67,11 +67,15 @@ and process_operator (scope : EcScope.scope) (op : poperator) =
 
 (* -------------------------------------------------------------------- *)
 and process_predicate (scope : EcScope.scope) (p : ppredicate) =
-  EcScope.Pred.add scope p
+  let scope = EcScope.Pred.add scope p in
+  out_added scope (Pr_pr (dummy_pqs_of_ps p.pp_name));
+  scope
 
 (* -------------------------------------------------------------------- *)
 and process_axiom (scope : EcScope.scope) (ax : paxiom) =
-  EcScope.Ax.add scope ax
+  let scope = EcScope.Ax.add scope ax in
+  out_added scope (Pr_ax (dummy_pqs_of_ps ax.pa_name));
+  scope
 
 (* -------------------------------------------------------------------- *)
 and process_claim (scope : EcScope.scope) _ =

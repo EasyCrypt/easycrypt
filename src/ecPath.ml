@@ -75,6 +75,12 @@ let extend (p : path option) (x : EcIdent.t) =
   | Some p -> Pqname (p, x)
 
 (* -------------------------------------------------------------------- *)
+let rec concat p1 p2 = 
+  match p2 with
+  | Pident x -> Pqname(p1, x)
+  | Pqname (p2,x) -> Pqname(concat p1 p2, x)
+
+(* -------------------------------------------------------------------- *)
 module Mp = Map.Make (struct type t = path let compare = p_compare end)
 
 (* -------------------------------------------------------------------- *)

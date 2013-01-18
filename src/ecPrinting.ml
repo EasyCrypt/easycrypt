@@ -737,3 +737,107 @@ module EcRawPP = struct
     | EcPath.Pident x      -> Format.fprintf fmt "%s" (EcIdent.name x)
     | EcPath.Pqname (p, x) -> Format.fprintf fmt "%a.%s" pp_path p (EcIdent.name x)
 end
+
+module GenIEnv : IIdentPrinter1 = struct
+  open EcMaps
+  type t = { 
+      tenv_logic : env;
+      tenv_side  : env Mint.t;
+      tenv_exc   : Sstr.t;
+      tenv_locs  : string EcIdent.Mid.t 
+    }
+
+  let init (env, lenv) =
+    let exc = Sstr.empty in
+(* FIXME EcIdent.Map.fold ... *)
+(*      List.fold_left 
+        (fun exc env ->
+          let mv = (preenv env).env_root.mc_variables in
+          EcIdent.Map.fold (fun id _ exc -> Sstr.add (EcIdent.name id) exc) mv exc)
+        Sstr.empty (env::lenv) in *)
+    let side = List.fold_lefti (fun i s env -> Mint.add i env s) Mint.empty lenv in
+    { tenv_logic = env;
+      tenv_side  = side;
+      tenv_exc   = exc;
+      tenv_locs  = EcIdent.Mid.empty 
+    }
+
+ let add_local t id = 
+    let s = EcIdent.name id in
+    let s = 
+      if Sstr.mem s t.tenv_exc then s 
+      else
+        let rec aux n = 
+          let s = Printf.sprintf "%s%i" s n in
+          if Sstr.mem s t.tenv_exc then aux (n+1) else s in
+        aux 0 in
+    { t with tenv_exc = Sstr.add s t.tenv_exc;
+      tenv_locs = EcIdent.Mid.add id s t.tenv_locs 
+    }
+
+  let no_locals t = EcIdent.Mid.is_empty t.tenv_locs
+
+  let add fadd t p =
+    assert (no_locals t);
+    { t with tenv_logic = fadd p t.tenv_logic;
+      tenv_exc = Sstr.add (EcIdent.name (EcPath.basename p)) t.tenv_exc;
+    }
+    
+  let add_pvar  = add Var.add
+  let add_fun   = add Fun.add
+  let add_mod   = add Mod.add
+  let add_modty = add ModTy.add
+  let add_ty    = add Ty.add
+  let add_op    = add Op.add
+  let add_ax    = add Ax.add
+  let add_th    = add Theory.add
+
+  let shorten_path lookup p env = 
+    let rec aux par rs s = 
+      try
+        let qs = List.rev rs in 
+        let p' = lookup (qs,s) env in
+        if not (EcPath.p_equal p p') then raise Not_found; 
+        (qs,s)
+      with _ -> 
+        match par with 
+        | [] -> assert false
+        | s'::par -> aux par (s'::rs) s in
+    let qs, s = EcPath.toqsymbol p in
+    aux (List.rev qs) [] s 
+    
+  let tv_symb _t tv = EcIdent.name tv
+
+  let ty_symb t p = 
+    shorten_path Ty.lookup_path p t.tenv_logic
+
+  let local_symb t id = EcIdent.Mid.find id t.tenv_locs
+
+  let pv_symb t p o =
+    let env = 
+      match o with
+      | None -> t.tenv_logic 
+      | Some i ->try Mint.find i t.tenv_side with _ -> assert false in
+    shorten_path Var.lookup_path p env 
+
+  let fun_symb t p = 
+    shorten_path Fun.lookup_path p t.tenv_logic
+
+  let mod_symb t p = 
+    shorten_path Mod.lookup_path p t.tenv_logic
+
+  let modty_symb t p = 
+    shorten_path ModTy.lookup_path p t.tenv_logic
+
+  let op_symb t p = 
+    shorten_path Op.lookup_path p t.tenv_logic 
+
+  let ax_symb t p = 
+    shorten_path Ax.lookup_path p t.tenv_logic 
+
+  let th_symb t p = 
+    shorten_path Theory.lookup_path p t.tenv_logic 
+
+end
+      
+

@@ -21,9 +21,19 @@
 
 - Ajouter le and, or asym 
 
+* Parsing:
+- Nom long pour les operateurs infix, 
+- Rajouter les operateurs prefix comme dans why3?
+- Gerer les <> (le parsing marche mais rien n'est fait apres)
+
+* Pretty:
+- Affichage des noms long ou cours, ty instance
+- Gestion des notations speciales :
+  __get, __set, list ....
+
+
 
 * TODO
-
 - require : do not check
 - chemins privés (attendre la fin des modules)
 - hash-consing

@@ -224,6 +224,11 @@ module List = struct
   in
       doit xs1 xs2
 
+  let fold_lefti f a l = 
+    let i = ref (-1) in
+    let f a e =  incr i; f !i a e in
+    List.fold_left f a l
+    
 end
 
 (* -------------------------------------------------------------------- *)

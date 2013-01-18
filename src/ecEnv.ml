@@ -106,8 +106,10 @@ module type S = sig
   val lookup_by_path    : EcPath.path -> env -> t        (* full path *)
   val trylookup_by_path : EcPath.path -> env -> t option (* full path *)
   val lookup            : qsymbol -> env -> EcPath.path * t
+  val lookup_path       : qsymbol -> env -> EcPath.path 
   val trylookup         : qsymbol -> env -> (EcPath.path * t) option
   val exists            : qsymbol -> env -> bool
+  val add               : path    -> env -> env
 end
 
 (* -------------------------------------------------------------------- *)
@@ -331,6 +333,7 @@ module type Projector = sig
 
   val project : mcomponents -> (EcPath.path * t) EcIdent.Map.t
   val bind    : EcIdent.t -> t -> env -> env
+  val rebind  : EcPath.path -> t -> premc -> premc
 end
 
 (* -------------------------------------------------------------------- *)
@@ -350,6 +353,8 @@ module BaseS(P : Projector) : S with type t = P.t = struct
   let lookup =
     MC.lookup P.project
 
+  let lookup_path qs env = fst (lookup qs env)
+
   let trylookup_by_path path env = 
     try_lf (fun () -> lookup_by_path path env)
 
@@ -357,6 +362,11 @@ module BaseS(P : Projector) : S with type t = P.t = struct
     try_lf (fun () -> lookup x env)
 
   let exists x env = (trylookup x env <> None)
+
+  let add p env = 
+    let t = lookup_by_path p env in 
+    MC.import env P.rebind p t 
+    
 end
 
 (* -------------------------------------------------------------------- *)
@@ -366,6 +376,7 @@ module Var = struct
 
     let project mc = mc.mc_variables
     let bind = MC.bind_variable
+    let rebind = MC.mc_bind_variable 
   end)
 
   let bind (x : EcIdent.t) (ty : EcTypes.ty) kind (env : env) =
@@ -385,6 +396,7 @@ module Fun = struct
 
     let project mc = mc.mc_functions
     let bind = MC.bind_function
+    let rebind = MC.mc_bind_function
   end)
 end
 
@@ -405,6 +417,8 @@ module Ty = struct
             env_w3   = w3;
             env_rb   = r::env.env_rb;
             env_item = CTh_type(id, t) :: env.env_item }
+
+    let rebind = MC.mc_bind_typedecl
   end)
 
   let rebind = MC.bind_typedecl
@@ -437,6 +451,8 @@ module Op = struct
             env_w3   = w3;
             env_rb   = List.ocons r env.env_rb;
             env_item = CTh_operator(id, op) :: env.env_item }
+
+    let rebind = MC.mc_bind_op
   end)
 
   let rebind = MC.bind_op
@@ -467,6 +483,7 @@ module Ax = struct
             env_w3   = w3;
             env_rb   = r :: env.env_rb;
             env_item = CTh_axiom(id, ax) :: env.env_item }
+    let rebind = MC.mc_bind_ax
 
   end)
   let rebind = MC.bind_ax
@@ -509,6 +526,8 @@ module Mod = struct
   let lookup =
     MC.lookup project
 
+  let lookup_path qs env = fst (lookup qs env)
+
   let trylookup_by_path path env = 
     try_lf (fun () -> lookup_by_path path env)
 
@@ -516,6 +535,11 @@ module Mod = struct
     try_lf (fun () -> lookup x env)
 
   let exists x env = (trylookup x env <> None)  
+
+  let add p env = 
+    let t = lookup_by_path p env in 
+    MC.import env MC.mc_bind_module p t 
+
 end
 
 (* -------------------------------------------------------------------- *)
@@ -528,6 +552,7 @@ module ModTy = struct
       let env = MC.bind_modtype id mt env in
         { env with
             env_item = CTh_modtype(id, mt) :: env.env_item }
+    let rebind = MC.mc_bind_modtype
   end)
 end
 
@@ -577,6 +602,8 @@ module Theory = struct
   (* ------------------------------------------------------------------ *)
   let lookup =
     MC.lookup (fun mc -> mc.mc_theories)
+ 
+  let lookup_path qs env = fst (lookup qs env)
       
   (* ------------------------------------------------------------------ *)
   let trylookup_by_path path env = 
@@ -667,6 +694,10 @@ module Theory = struct
         env_root  = root;
         env_comps = comps;
         env_w3    = EcWhy3.rebind env.env_w3 cth.cth3_rebind; }
+
+  let add p env = 
+    let th = lookup_by_path p env in
+    MC.import env MC.mc_bind_theory p th
 end
 
 (* -------------------------------------------------------------------- *)
@@ -746,7 +777,7 @@ let initial =
     ["infix ="], EcWhy3.RDls, EcPath.basename EcCoreLib.p_eq 
   ] in
   let env, _ = import_w3 env Why3.Theory.builtin_theory builtin_rn in
-   let bool_rn = [
+  let bool_rn = [
     ["bool"] , EcWhy3.RDts, EcPath.basename EcCoreLib.p_bool;
     ["True"] , EcWhy3.RDls, EcPath.basename EcCoreLib.p_true;
     ["False"], EcWhy3.RDls, EcPath.basename EcCoreLib.p_false ] in
