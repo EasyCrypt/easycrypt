@@ -71,8 +71,6 @@ let pp_of_pr (pr : 'a pr) (fmt : Format.formatter) (x : 'a) =
 module type IPrettyPrinter = sig
   type t                                (* ident-2-path *)
 
-  val short_ident : t -> EcIdent.t -> EcPath.path
-
   (* ------------------------------------------------------------------ *)
   val pr_type     : t -> ?vmap:NameGen.t -> ty pr
   val pr_dom      : t -> EcTypes.dom pr
@@ -99,10 +97,31 @@ module type IPrettyPrinter = sig
 end
 
 (* -------------------------------------------------------------------- *)
+
+(* -------------------------------------------------------------------- *)
 module type IIdentPrinter = sig
   type t
 
-  val short_ident : t -> EcIdent.t -> EcPath.path
+  val add_ty    : t -> EcPath.path -> t
+  val add_local : t -> EcIdent.t -> t
+  val add_pvar  : t -> EcPath.path -> t
+  val add_fun   : t -> EcPath.path -> t
+  val add_mod   : t -> EcPath.path -> t
+  val add_modty : t -> EcPath.path -> t
+  val add_op    : t -> EcPath.path -> t
+  val add_ax    : t -> EcPath.path -> t
+  val add_th    : t -> EcPath.path -> t
+
+  val tv_symb    : t -> EcIdent.t   -> EcSymbols.symbol
+  val ty_symb    : t -> EcPath.path -> EcSymbols.qsymbol
+  val local_symb : t -> EcIdent.t   -> EcSymbols.symbol
+  val pv_symb    : t -> EcPath.path -> int option -> EcSymbols.qsymbol
+  val fun_symb   : t -> EcPath.path -> EcSymbols.qsymbol
+  val mod_symb   : t -> EcPath.path -> EcSymbols.qsymbol
+  val modty_symb : t -> EcPath.path -> EcSymbols.qsymbol
+  val op_symb    : t -> EcPath.path -> EcSymbols.qsymbol
+  val ax_symb    : t -> EcPath.path -> EcSymbols.qsymbol
+  val th_symb    : t -> EcPath.path -> EcSymbols.qsymbol
 end
 
 (* -------------------------------------------------------------------- *)
@@ -145,9 +164,6 @@ struct
 
   (* ------------------------------------------------------------------ *)
   type t = M.t
-
-  (* ------------------------------------------------------------------ *)
-  let short_ident = M.short_ident
 
   (* ------------------------------------------------------------------ *)
   let pr_ident (_tenv : t) (x : EcIdent.t) =
@@ -441,10 +457,10 @@ struct
 
   (* ------------------------------------------------------------------ *)
   let pr_typedecl (tenv : t) ((x, tyd) : EcIdent.t * tydecl) =
-    let dparams =  
-      if tyd.tyd_params = [] then Pp.empty 
+    let dparams =
+      if tyd.tyd_params = [] then Pp.empty
       else Pp.parens (pr_list_map (pr_tvar tenv) ", " tyd.tyd_params) in
-    let doc = tk_type ^//^ dparams ^^ (pr_ident tenv x) in 
+    let doc = tk_type ^//^ dparams ^^ (pr_ident tenv x) in
     let doc =
       match tyd.tyd_type with
       | None    -> doc
@@ -655,17 +671,41 @@ struct
 end
 
 (* -------------------------------------------------------------------- *)
-module RawIndentPrinter : IIdentPrinter with type t = unit =
+module RawIdentPrinter : IIdentPrinter with type t = unit =
 struct
   type t = unit
 
-  let short_ident (_ : t) (x : EcIdent.t) =
-    EcPath.Pident x
+  let add_ty    = fun (_ : t) (_ : EcPath.path) -> ()
+  let add_local = fun (_ : t) (_ : EcIdent.t  ) -> ()
+  let add_pvar  = fun (_ : t) (_ : EcPath.path) -> ()
+  let add_fun   = fun (_ : t) (_ : EcPath.path) -> ()
+  let add_mod   = fun (_ : t) (_ : EcPath.path) -> ()
+  let add_modty = fun (_ : t) (_ : EcPath.path) -> ()
+  let add_op    = fun (_ : t) (_ : EcPath.path) -> ()
+  let add_ax    = fun (_ : t) (_ : EcPath.path) -> ()
+  let add_th    = fun (_ : t) (_ : EcPath.path) -> ()
+
+  let symb_of_ident (x : EcIdent.t) =
+    ([], EcIdent.tostring x)
+
+  let symb_of_path (p : EcPath.path) =
+    ([], EcIdent.tostring (EcPath.basename p))
+
+  let tv_symb    = fun (_ : t) (x : EcIdent.t  )   -> EcIdent.tostring x
+  let ty_symb    = fun (_ : t) (p : EcPath.path)   -> symb_of_path p
+  let local_symb = fun (_ : t) (x : EcIdent.t  )   -> EcIdent.tostring x
+  let pv_symb    = fun (_ : t) (p : EcPath.path) _ -> symb_of_path p
+  let fun_symb   = fun (_ : t) (p : EcPath.path)   -> symb_of_path p
+  let mod_symb   = fun (_ : t) (p : EcPath.path)   -> symb_of_path p
+  let modty_symb = fun (_ : t) (p : EcPath.path)   -> symb_of_path p
+  let op_symb    = fun (_ : t) (p : EcPath.path)   -> symb_of_path p
+  let ax_symb    = fun (_ : t) (p : EcPath.path)   -> symb_of_path p
+  let th_symb    = fun (_ : t) (p : EcPath.path)   -> symb_of_path p
 end
 
 (* -------------------------------------------------------------------- *)
 module EcRawPP = struct
-  module BPP = EcPP(RawIndentPrinter)
+  module BPP = EcPP(RawIdentPrinter)
 
   let pr_type     = BPP.pr_type     ()
   let pr_dom      = BPP.pr_dom      ()

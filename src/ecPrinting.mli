@@ -19,8 +19,6 @@ val pp_of_pr   : 'a pr -> 'a pp
 module type IPrettyPrinter = sig
   type t                                (* ident-2-path *)
 
-  val short_ident : t -> EcIdent.t -> EcPath.path
-
   (* ------------------------------------------------------------------ *)
   val pr_type     : t -> ?vmap:NameGen.t -> ty pr
   val pr_dom      : t -> EcTypes.dom pr
@@ -50,7 +48,26 @@ end
 module type IIdentPrinter = sig
   type t
 
-  val short_ident : t -> EcIdent.t -> EcPath.path
+  val add_ty    : t -> EcPath.path -> t 
+  val add_local : t -> EcIdent.t -> t
+  val add_pvar  : t -> EcPath.path -> t 
+  val add_fun   : t -> EcPath.path -> t 
+  val add_mod   : t -> EcPath.path -> t 
+  val add_modty : t -> EcPath.path -> t 
+  val add_op    : t -> EcPath.path -> t 
+  val add_ax    : t -> EcPath.path -> t 
+  val add_th    : t -> EcPath.path -> t 
+
+  val tv_symb    : t -> EcIdent.t   -> EcSymbols.symbol
+  val ty_symb    : t -> EcPath.path -> EcSymbols.qsymbol
+  val local_symb : t -> EcIdent.t   -> EcSymbols.symbol
+  val pv_symb    : t -> EcPath.path -> int option -> EcSymbols.qsymbol
+  val fun_symb   : t -> EcPath.path -> EcSymbols.qsymbol
+  val mod_symb   : t -> EcPath.path -> EcSymbols.qsymbol
+  val modty_symb : t -> EcPath.path -> EcSymbols.qsymbol
+  val op_symb    : t -> EcPath.path -> EcSymbols.qsymbol
+  val ax_symb    : t -> EcPath.path -> EcSymbols.qsymbol
+  val th_symb    : t -> EcPath.path -> EcSymbols.qsymbol
 end
 
 (* -------------------------------------------------------------------- *)

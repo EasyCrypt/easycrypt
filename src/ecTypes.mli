@@ -110,7 +110,6 @@ module Esubst : sig
   val mapty : (ty -> ty) -> tyexpr -> tyexpr
 
   val uni : ty Muid.t -> tyexpr -> tyexpr 
-
 end
 
 (* -------------------------------------------------------------------- *)
