@@ -738,7 +738,7 @@ module EcRawPP = struct
     | EcPath.Pqname (p, x) -> Format.fprintf fmt "%a.%s" pp_path p (EcIdent.name x)
 end
 
-module GenIEnv : IIdentPrinter1 = struct
+module GenIEnv : IIdentPrinter = struct
   open EcMaps
   type t = { 
       tenv_logic : env;
