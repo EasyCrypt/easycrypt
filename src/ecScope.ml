@@ -299,7 +299,7 @@ module Mod = struct
   let add (scope : scope) (name : symbol) (m : pmodule_expr) =
     let name = EcIdent.create name in
     let m    = EcTypedtree.transmod scope.sc_env name m in
-      bind scope m
+    bind scope m
 end
 
 (* -------------------------------------------------------------------- *)
@@ -373,7 +373,7 @@ module Theory = struct
   (* ------------------------------------------------------------------ *)
   let exit (scope : scope) =
     let (_, name, scope) = exit_r scope in
-      (name, scope)
+    (name, scope)
 
   (* ------------------------------------------------------------------ *)
   let import (scope : scope) (name : qsymbol) =
@@ -669,7 +669,7 @@ module Ax = struct
                     ax_spec = Some concl;
                     ax_kind = Lemma (Some pr) } in
         let scope = { scope with sc_pr_uc = pucs } in
-        bind scope (EcIdent.create name, axd)
+        name, bind scope (EcIdent.create name, axd)
           
   let add (scope : scope) (ax : paxiom) =
     let ue = EcUnify.UniEnv.create None in
@@ -683,13 +683,14 @@ module Ax = struct
         let axd = { ax_params = tparams;
                     ax_spec = Some concl;
                     ax_kind = Axiom } in
-        bind scope (EcIdent.create (unloc ax.pa_name), axd)
-    | PILemma -> start_lemma scope (unloc ax.pa_name) tparams concl 
+        Some (unloc ax.pa_name), bind scope (EcIdent.create (unloc ax.pa_name), axd)
+    | PILemma -> None, start_lemma scope (unloc ax.pa_name) tparams concl 
     | PLemma -> 
         let scope = start_lemma scope (unloc ax.pa_name) tparams concl in
         let scope = 
           Tactic.process scope
             [{ pl_loc = Location.dummy; pl_desc = Ptrivial }] in
-        save scope
+        let name, scope = save scope in
+        Some name, scope
         
 end

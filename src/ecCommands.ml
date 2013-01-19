@@ -50,7 +50,6 @@ let rec process_type (scope : EcScope.scope) (tyd : ptydecl) =
   out_added scope (Pr_ty (dummy_pqs_of_ps tyd.pty_name));
   scope
   
-
 (* -------------------------------------------------------------------- *)
 and process_module (scope : EcScope.scope) ((x, m) : _ * pmodule_expr) =
   EcScope.Mod.add scope x.pl_desc m
@@ -74,8 +73,11 @@ and process_predicate (scope : EcScope.scope) (p : ppredicate) =
 
 (* -------------------------------------------------------------------- *)
 and process_axiom (scope : EcScope.scope) (ax : paxiom) =
-  let scope = EcScope.Ax.add scope ax in
-  out_added scope (Pr_ax (dummy_pqs_of_ps ax.pa_name));
+  let name, scope = EcScope.Ax.add scope ax in
+  begin match name with
+  | None -> ()
+  | Some name -> out_added scope (Pr_ax (dummy_pqs_of_ps (dummyloc name)))
+  end;
   scope
 
 (* -------------------------------------------------------------------- *)
@@ -125,7 +127,9 @@ and process_tactics (scope : EcScope.scope) t =
 
 (* -------------------------------------------------------------------- *)
 and process_save (scope : EcScope.scope) =
-  EcScope.Ax.save scope
+  let name, scope = EcScope.Ax.save scope in
+  out_added scope (Pr_ax (dummy_pqs_of_ps (dummyloc name)));
+  scope
 
 (* -------------------------------------------------------------------- *)
 and process (scope : EcScope.scope) (g : global) =
