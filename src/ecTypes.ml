@@ -136,7 +136,10 @@ and tyexpr_r =
   | Etuple    of tyexpr list                      (* tuple constructor  *)
   | Eif       of tyexpr * tyexpr * tyexpr         (* _ ? _ : _          *)
 
-and tyexpr_meta = unit
+and tyexpr_meta = {
+  tym_type : ty;
+  tym_prob : bool;
+}
 
 (* -------------------------------------------------------------------- *)
 let e_tyexpr (e : tyexpr_r) =

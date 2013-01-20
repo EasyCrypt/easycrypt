@@ -65,7 +65,7 @@ type tyexpr = {
   tye_meta : tyexpr_meta option;
 }
 
-and tyexpr_r = private
+and tyexpr_r =
   | Eint      of int                              (* int. literal       *)
   | Eflip                                         (* flip               *)
   | Einter    of tyexpr * tyexpr                  (* interval sampling  *)
@@ -78,7 +78,10 @@ and tyexpr_r = private
   | Etuple    of tyexpr list                      (* tuple constructor  *)
   | Eif       of tyexpr * tyexpr * tyexpr         (* _ ? _ : _          *)
 
-and tyexpr_meta = unit
+and tyexpr_meta = {
+  tym_type : ty;
+  tym_prob : bool;
+}
 
 val e_int      : int -> tyexpr
 val e_flip     : unit -> tyexpr

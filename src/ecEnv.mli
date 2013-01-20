@@ -185,7 +185,6 @@ val import_w3_dir :
   -> env * EcTypesmod.ctheory_item list
 
 (* -------------------------------------------------------------------- *)
-
 val equal_type        : env -> EcTypes.ty -> EcTypes.ty -> bool
 val check_type        : env -> EcTypes.ty -> EcTypes.ty -> unit
 val check_alpha_equal : env -> EcFol.form -> EcFol.form -> unit
@@ -193,4 +192,16 @@ val is_alpha_equal    : env -> EcFol.form -> EcFol.form -> bool
 
 val check_goal        : env -> EcFol.l_decl -> bool
 
+(* -------------------------------------------------------------------- *)
+type c_tyexpr = private EcTypes.tyexpr
 
+val ce_local  : env -> EcIdent.t -> c_tyexpr
+val ce_var    : env -> EcTypes.prog_var -> c_tyexpr
+val ce_int    : env -> int -> c_tyexpr
+val ce_flip   : env -> c_tyexpr
+val ce_bitstr : env -> c_tyexpr -> c_tyexpr
+val ce_inter  : env -> c_tyexpr -> c_tyexpr -> c_tyexpr
+val ce_tuple  : env -> c_tyexpr list -> c_tyexpr
+val ce_let    : env -> EcTypes.lpattern -> c_tyexpr -> c_tyexpr -> c_tyexpr
+val ce_if     : env -> c_tyexpr -> c_tyexpr -> c_tyexpr -> c_tyexpr
+val ce_app    : env -> EcPath.path -> c_tyexpr list -> EcTypes.ty -> c_tyexpr

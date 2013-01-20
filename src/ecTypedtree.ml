@@ -549,10 +549,12 @@ and transstruct1 (env : EcEnv.env) (st : pstructure_item) =
       let stmt = stmt_mapty subst_uni stmt in
       let re = omap re (Esubst.mapty subst_uni) in
       let fun_ = 
-        { f_sig = { fs_name = decl.pfd_name.pl_desc;
-                    fs_sig  = params, rty;
-                    fs_uses = [];   (* FIXME *)
-                  };
+        { f_name   = fid;
+          f_sig    = {
+            fs_name = decl.pfd_name.pl_desc;
+            fs_sig  = params, rty;
+            fs_uses = [];   (* FIXME *)
+          };
           f_locals = locals;
           f_body   = stmt;
           f_ret    = re

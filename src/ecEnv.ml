@@ -846,9 +846,7 @@ and dump_premc ~name pp mc =
        (fun pp -> IM.dump "Components" (fun _ _ -> ()) pp mc.mc_components);
     ])
 
-
-  (* -------------------------------------------------------------------- *)     
-
+(* -------------------------------------------------------------------- *)     
 let rec equal_type env t1 t2 = 
   match t1, t2 with
   | Tunivar _, _ -> assert false
@@ -921,4 +919,58 @@ let is_alpha_equal env f1 f2 =
 
 let check_goal env ld = EcWhy3.check_goal env.env_w3 ld
 
+(** {2 Type safe soft constructors} *)
+
+type c_tyexpr = tyexpr
+
+let ce_type (e : tyexpr) =
+  (oget e.tye_meta).tym_type
+
+let ce_meta ty e : c_tyexpr =
+  { tye_meta = Some { tym_type = ty; tym_prob = false };
+    tye_desc = e; }
+
+let ce_local (env : env) (x : EcIdent.t) =
+  let xpath = EcPath.Pqname (env.env_scope, x) in
+  let xty   = Var.lookup_by_path xpath env in
+
+    if xty.vb_kind <> None then
+      assert false;
+    ce_meta xty.vb_type (Elocal (x, xty.vb_type))
+
+let ce_var (env : env) (p : prog_var) =
+  let xty = Var.lookup_by_path p.pv_name env in
+
+    if xty.vb_kind = None then
+      assert false;
+    ce_meta xty.vb_type (Evar (p, xty.vb_type))
+
+let ce_int (_env : env) (i : int) =
+  ce_meta tint (Eint i)
+
+let ce_flip (_env : env) =
+  ce_meta tbool Eflip
+
+let ce_bitstr (_env : env) e =
+  ce_meta tbitstring (Ebitstr e)
+
+let ce_inter (env : env) e1 e2 =
+  check_type env (ce_type e1) (ce_type e2);
+  ce_meta (ce_type e1) (Einter (e1, e2))
+
+let ce_tuple (_env : env) es =
+  ce_meta
+    (Ttuple (List.map ce_type es))
+    (Etuple es)
+
+let ce_let (_env : env) p e1 e2 =
+  ce_meta (ce_type e2) (Elet (p, e1, e2))
+
+let ce_if (env : env) c e1 e2 =
+  check_type env (ce_type c) tbool;
+  check_type env (ce_type e1) (ce_type e2);
+  ce_meta (ce_type e1) (Eif (c, e1, e2))
+
+let ce_app (env : env) p e ty =
+  assert false                          (* FIXME *)
 

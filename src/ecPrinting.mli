@@ -21,27 +21,27 @@ module type IPrettyPrinter = sig
 
   (* ------------------------------------------------------------------ *)
   val pr_type     : t -> ?vmap:NameGen.t -> ty pr
-  val pr_dom      : t -> EcTypes.dom pr
-  val pr_typedecl : t -> (EcIdent.t * tydecl  ) pr
-  val pr_opdecl   : t -> (EcIdent.t * operator) pr
-  val pr_axiom    : t -> (EcIdent.t * axiom   ) pr
-  val pr_modtype  : t -> (EcIdent.t * tymod   ) pr
-  val pr_module   : t -> module_expr pr
-  val pr_export   : t -> EcPath.path pr
-  val pr_theory   : t -> (EcIdent.t * ctheory) pr
   val pr_expr     : t -> tyexpr pr
+  val pr_dom      : t -> EcTypes.dom pr
+  val pr_typedecl : t -> (EcPath.path * tydecl     ) pr
+  val pr_opdecl   : t -> (EcPath.path * operator   ) pr
+  val pr_axiom    : t -> (EcPath.path * axiom      ) pr
+  val pr_modtype  : t -> (EcPath.path * tymod      ) pr
+  val pr_module   : t -> (EcPath.path * module_expr) pr
+  val pr_theory   : t -> (EcPath.path * ctheory    ) pr
+  val pr_export   : t -> EcPath.path pr
   
   (* ------------------------------------------------------------------ *)
   val pp_type     : t -> ?vmap:NameGen.t -> ty pp
-  val pp_dom      : t -> EcTypes.dom pp
-  val pp_typedecl : t -> (EcIdent.t * tydecl  ) pp
-  val pp_opdecl   : t -> (EcIdent.t * operator) pp
-  val pp_axiom    : t -> (EcIdent.t * axiom   ) pp
-  val pp_modtype  : t -> (EcIdent.t * tymod   ) pp
-  val pp_module   : t -> module_expr pp
-  val pp_export   : t -> EcPath.path pp
-  val pp_theory   : t -> (EcIdent.t * ctheory) pp
   val pp_expr     : t -> tyexpr pp
+  val pp_dom      : t -> EcTypes.dom pp
+  val pp_typedecl : t -> (EcPath.path * tydecl     ) pp
+  val pp_opdecl   : t -> (EcPath.path * operator   ) pp
+  val pp_axiom    : t -> (EcPath.path * axiom      ) pp
+  val pp_modtype  : t -> (EcPath.path * tymod      ) pp
+  val pp_module   : t -> (EcPath.path * module_expr) pp
+  val pp_theory   : t -> (EcPath.path * ctheory    ) pp
+  val pp_export   : t -> EcPath.path pp
 end
 
 (* -------------------------------------------------------------------- *)

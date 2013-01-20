@@ -379,9 +379,10 @@ let subst_function (s : subst) (f : function_) =
   let body' = subst_stmt sbody f.f_body in
   let ret'  = omap f.f_ret (subst_tyexpr sbody) in
 
-    { f_sig = { fs_name = f.f_sig.fs_name;
-                fs_sig  = (args', res')  ;
-                fs_uses = uses'          ; };
+    { f_name = EcIdent.fresh f.f_name;
+      f_sig  = { fs_name = f.f_sig.fs_name;
+                 fs_sig  = (args', res')  ;
+                 fs_uses = uses'          ; };
 
       f_locals = locals';
       f_body   = body'  ;
@@ -406,7 +407,10 @@ let rec subst_module_item (s : subst) (scope : EcPath.path) (item : module_item)
         (s', `Variable x')
 
   | `Function f ->
-      (s, `Function (subst_function s f)) (* FIXME *)
+      let f'     = subst_function s f in
+      let scope' = EcPath.Pqname (scope, f'.f_name) in
+      let s'     = add s f'.f_name (`Path scope') in
+        (s', `Function f')
 
 (* -------------------------------------------------------------------- *)
 and subst_module_items (s : subst) (scope : EcPath.path) (items : module_item list) =

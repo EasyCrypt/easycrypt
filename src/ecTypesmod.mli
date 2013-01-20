@@ -51,6 +51,7 @@ and module_components = module_components_item list
 and module_components_item = module_item
 
 and function_ = {
+  f_name   : EcIdent.t;
   f_sig    : funsig;
   f_locals : (EcIdent.t * EcTypes.ty) list;
   f_body   : stmt;
