@@ -596,7 +596,14 @@ struct
     in
 
     let dlocals = List.map (fun (x, ty) -> pr_local tenv x ty) f.f_locals
-    and dbody   = List.map (pr_instr tenv) f.f_body in
+
+    and dbody =
+      let bodytenv =
+        List.fold_left M.add_local tenv
+          (List.map fst ((fst f.f_sig.fs_sig) @ f.f_locals))
+      in
+        List.map (pr_instr tenv) f.f_body
+    in
 
       (pr_seq [prelude; Pp.equals]) ^/^ (pr_mblocks [dlocals; dbody])
 
@@ -845,8 +852,10 @@ module EcRawPP = struct
     | EcPath.Pqname (p, x) -> Format.fprintf fmt "%a.%s" pp_path p (EcIdent.name x)
 end
 
+(* -------------------------------------------------------------------- *)
 module GenIEnv : IIdentPrinter = struct
   open EcMaps
+
   type t = { 
       tenv_logic : env;
       tenv_side  : env Mint.t;
@@ -943,7 +952,4 @@ module GenIEnv : IIdentPrinter = struct
 
   let th_symb t p = 
     shorten_path Theory.lookup_path p t.tenv_logic 
-
 end
-      
-
