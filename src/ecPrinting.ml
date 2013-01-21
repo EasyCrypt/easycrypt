@@ -536,14 +536,34 @@ struct
     pr_seq [pr_ident tenv x; Pp.colon; pr_type tenv ty] ^^ Pp.semi
 
   (* ------------------------------------------------------------------ *)
+  let pr_lvalue (tenv : t) (lv : lvalue) =
+    match lv with
+    | LvVar (p, _) ->
+        pr_pv_symb tenv p None
+
+    | LvTuple ps ->
+        let docs = List.map (((pr_pv_symb tenv)^~ None) -| fst) ps in
+          Pp.parens (pr_list "," docs)
+
+    | LvMap _ ->
+        assert false                    (* FIXME: Don't understand args *)
+
+  (* ------------------------------------------------------------------ *)
   let pr_instr (tenv : t) (i : instr) =
     let doc =
       match i with
-      | Sasgn (LvVar (x, _), e) ->
-          pr_seq [pr_path tenv x; Pp.equals; pr_expr tenv e]
+      | Sasgn (lv, e) ->
+          pr_seq [pr_lvalue tenv lv; Pp.equals; pr_expr tenv e]
 
-      | Scall (None, p, args) ->
-          (pr_path tenv p) ^^ (Pp.parens (pr_list_map (pr_expr tenv) "," args))
+      | Scall (lv, p, args) -> begin
+          let doc =
+               (pr_fun_name tenv p)
+            ^^ Pp.parens (pr_list_map (pr_expr tenv) "," args)
+          in
+            match lv with
+            | None    -> doc
+            | Some lv -> pr_seq [pr_lvalue tenv lv; Pp.equals; doc]
+      end
 
       | Sassert e ->
           pr_seq [tk_assert; Pp.parens (pr_expr tenv e)]
@@ -553,8 +573,6 @@ struct
 
       | Swhile (e, _body) ->
           pr_seq [tk_while; Pp.parens (pr_expr tenv e)]
-
-      | _ -> assert false
 
     in
       doc ^^ Pp.semi
@@ -602,7 +620,7 @@ struct
         List.fold_left M.add_local tenv
           (List.map fst ((fst f.f_sig.fs_sig) @ f.f_locals))
       in
-        List.map (pr_instr tenv) f.f_body
+        List.map (pr_instr bodytenv) f.f_body
     in
 
       (pr_seq [prelude; Pp.equals]) ^/^ (pr_mblocks [dlocals; dbody])
