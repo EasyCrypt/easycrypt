@@ -5,6 +5,8 @@ open EcDecl
 open EcFol
 open EcTypesmod
 
+module Sp = EcPath.Sp
+
 (* -------------------------------------------------------------------- *)
 type subst1 = [
   | `Path  of EcPath.path
@@ -282,20 +284,23 @@ let subst_tysig (s : subst) (tysig : tysig) =
 
 (* -------------------------------------------------------------------- *)
 let rec subst_modtype (s : subst) (tymod : tymod) =
-  match tymod with
-  | Tym_sig tysig -> Tym_sig (subst_tysig s tysig)
-
-  | Tym_functor (params, tysig) ->
     let newparams =
       List.map
         (fun (a, aty) ->
           (EcIdent.fresh a, subst_modtype s aty))
-        params in
+        tymod.tym_params in
 
     let ssig = add_locals s
-      (List.combine (List.map fst params) (List.map fst newparams))
+      (List.combine
+         (List.map fst tymod.tym_params)
+         (List.map fst newparams))
     in
-      Tym_functor (newparams, subst_tysig ssig tysig)
+      { tym_params = newparams;
+        tym_sig    = subst_tysig ssig tymod.tym_sig;
+        tym_mforb  = 
+          Sp.fold
+            (fun p mf -> Sp.add (subst_path s p) mf)
+            tymod.tym_mforb Sp.empty; }
 
 (* -------------------------------------------------------------------- *)
 let rec subst_stmt (s : subst) (stmt : stmt) =

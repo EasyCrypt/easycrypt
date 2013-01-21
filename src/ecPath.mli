@@ -20,5 +20,7 @@ val concat    : path -> path -> path
 val tolist    : path -> EcIdent.t list 
 val tostring  : path -> string
 
+
 (* -------------------------------------------------------------------- *)
 module Mp : Map.S with type key = path
+module Sp : Mp.Set with type elt = path

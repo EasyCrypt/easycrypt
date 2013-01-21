@@ -41,8 +41,10 @@ module Tvar : sig
 end
 
 (* -------------------------------------------------------------------- *)
-(* [map f t] applies [f] on strict-subterm of [t] (not recursive) *)
+
+(* [map f t] applies [f] on strict subterms of [t] (not recursive) *)
 val map : (ty -> ty) -> ty -> ty
+
 (* [sub_exists f t] true if one of the strict-subterm of [t] valid [f] *)
 val sub_exists : (ty -> bool) -> ty -> bool
 
@@ -106,6 +108,9 @@ val e_map :
   -> (tyexpr             -> tyexpr            ) (* 1-subexpr op.      *)
   -> tyexpr
   -> tyexpr
+
+val e_fold :
+  ('state -> tyexpr -> 'state) -> 'state -> tyexpr -> 'state
 
 val ids_of_lpattern : lpattern -> EcIdent.t list
 

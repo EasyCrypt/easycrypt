@@ -73,3 +73,6 @@ val transformula : Fenv.fenv -> EcUnify.unienv ->
 val transsig   : EcEnv.env -> psignature -> tysig
 val transtymod : EcEnv.env -> pmodule_type -> tymod
 val transmod   : EcEnv.env -> EcIdent.t -> pmodule_expr -> module_expr
+
+(* -------------------------------------------------------------------- *)
+val inuse : tyexpr -> EcPath.Sp.t

@@ -6,6 +6,9 @@ open EcParsetree
 open EcTypes
 open EcDecl
 open EcTypesmod
+open EcFol
+
+module Sp = EcPath.Sp
 
 (* -------------------------------------------------------------------- *)
 let dloc = Location.dummy               (* FIXME: TO BE REMOVED *)
@@ -151,9 +154,8 @@ type epolicy = {
   epl_prob : bool;
 }
 
-let ep_det = { epl_prob = false; }
-
-let ep_prob = { epl_prob = true}
+let ep_det  = { epl_prob = false; }
+let ep_prob = { epl_prob = true ; }
 
 (* -------------------------------------------------------------------- *)
 exception NonLinearPattern of EcParsetree.lpattern
@@ -373,11 +375,14 @@ and transtymod (env : EcEnv.env) (tymod : pmodule_type) =
                snd (EcEnv.ModTy.lookup (unloc iname) env)))
           args
       in
-        Tym_functor (args, transsig (EcEnv.ModTy.bindall args env) i)
+        { tym_params = args;
+          tym_sig    = transsig (EcEnv.ModTy.bindall args env) i;
+          tym_mforb  = Sp.empty; }
 
   | Pty_sig i ->
-      let i = transsig env i in
-        Tym_sig i
+      { tym_params = [];
+        tym_sig    = transsig env i;
+        tym_mforb  = Sp.empty; }
 
 (* -------------------------------------------------------------------- *)
 let tymod_included (_src : tymod) (_dst : tymod) =
@@ -387,24 +392,24 @@ let tymod_included (_src : tymod) (_dst : tymod) =
 let rec transmod (env : EcEnv.env) (x : EcIdent.t) (m : pmodule_expr) =
   match m with
   | Pm_ident ({ pl_desc = m }, args) -> begin
-      let m    = EcEnv.Mod.lookup m env in
+      let (mname, mty) = EcEnv.Mod.lookup m env in
       let args = List.map (EcEnv.Mod.lookup^~ env) (unlocs args) in
 
-        match snd m with
-        | Tym_sig _ ->
+        match mty.tym_params with
+        | [] ->
             if args <> [] then
               tyerror dloc ModApplToNonFunctor;
 
             { me_name       = x;
-              me_body       = ME_Ident (fst m);
+              me_body       = ME_Ident mname;
               me_components = lazy (assert false); (* FIXME *)
-              me_sig        = snd m; }
+              me_sig        = mty; }
 
-        | Tym_functor (iargs, tyres) ->
-            let (anames, atymods) = List.split iargs in
+        | _ ->
+            let (anames, atymods) = List.split mty.tym_params in
 
             (* Check module application *)
-            if List.length iargs <> List.length args then
+            if List.length mty.tym_params <> List.length args then
               tyerror dloc ModApplInvalidArity;
             List.iter2
               (fun iarg arg ->
@@ -419,10 +424,12 @@ let rec transmod (env : EcEnv.env) (x : EcIdent.t) (m : pmodule_expr) =
                    (List.map2
                       (fun aname arg -> (aname, `Path (fst arg)))
                       anames args))
-                (Tym_sig tyres)
+                { tym_params = [];
+                  tym_sig    = mty.tym_sig;
+                  tym_mforb  = Sp.empty; }
             in
               { me_name       = x;
-                me_body       = ME_Application (fst m, List.map fst args);
+                me_body       = ME_Application (mname, List.map fst args);
                 me_components = lazy (assert false); (* FIXME *)
                 me_sig        = tyres; }
   end
@@ -468,10 +475,9 @@ and transstruct (env : EcEnv.env) (x : EcIdent.t) (st : pstructure) =
     in
 
     let sigitems = List.pmap tymod1 (List.map snd items) in
-
-      match List.isempty stparams with
-      | true  -> Tym_sig sigitems
-      | false -> Tym_functor (stparams, sigitems)
+      { tym_params = stparams;
+        tym_sig    = sigitems;
+        tym_mforb  = Sp.empty; }
       
   in
     { me_name       = x;
@@ -683,8 +689,6 @@ and translvalue ue (env : EcEnv.env) lvalue =
 (* -------------------------------------------------------------------- *)
 (** Translation of formula *)
 
-open EcFol
-
 type var_kind = 
   | Llocal of EcIdent.t * ty
   | Lprog  of EcTypes.prog_var * ty * Side.t
@@ -840,3 +844,15 @@ let transformula fenv ue pf =
   unify_error (Fenv.mono fenv) ue pf.pl_loc f.f_ty tbool;
   f 
 
+(* -------------------------------------------------------------------- *)
+let inuse =
+  let rec inuse (map : Sp.t) (e : tyexpr) =
+    match e.tye_desc with
+    | Evar (p, _) -> begin
+        match p.pv_kind with
+        | PVglob -> Sp.add p.pv_name map
+        | _      -> map
+      end
+    | _ -> e_fold inuse map e
+  in
+    fun e -> inuse Sp.empty e

@@ -2,12 +2,15 @@
 open EcUtils
 open EcSymbols
 open EcDecl
+
 (* -------------------------------------------------------------------- *)
 type modifier = [ `Use | `Read | `Write ]
 
-type tymod =
-  | Tym_sig     of tysig
-  | Tym_functor of (EcIdent.t * tymod) list * tysig
+type tymod = {
+  tym_params : (EcIdent.t * tymod) list;
+  tym_sig    : tysig;
+  tym_mforb  : EcPath.Sp.t;
+}
 
 and tysig = tysig_item list
 
@@ -26,7 +29,7 @@ type module_expr = {
   me_name       : EcIdent.t;
   me_body       : module_body;
   me_components : module_components Lazy.t;
-  me_sig        : tymod
+  me_sig        : tymod;
 }
 
 and module_body =

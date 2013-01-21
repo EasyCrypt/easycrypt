@@ -80,7 +80,12 @@ let rec concat p1 p2 =
   | Pident x -> Pqname(p1, x)
   | Pqname (p2,x) -> Pqname(concat p1 p2, x)
 
-(* -------------------------------------------------------------------- *)
-module Mp = Map.Make (struct type t = path let compare = p_compare end)
 
 (* -------------------------------------------------------------------- *)
+module PathComparable = struct
+  type t = path
+  let compare = p_compare
+end
+
+module Mp = Map.Make(PathComparable)
+module Sp = Mp.Set

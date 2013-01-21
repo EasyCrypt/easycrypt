@@ -971,6 +971,6 @@ let ce_if (env : env) c e1 e2 =
   check_type env (ce_type e1) (ce_type e2);
   ce_meta (ce_type e1) (Eif (c, e1, e2))
 
-let ce_app (env : env) p e ty =
+let ce_app (_env : env) _p _e _ty =
   assert false                          (* FIXME *)
 

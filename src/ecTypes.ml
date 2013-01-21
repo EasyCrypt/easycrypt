@@ -184,6 +184,23 @@ and e_map_r ft fe e =
   | Ebitstr e             -> Ebitstr (fe e)
   | Eexcepted (e1, e2)    -> Eexcepted (fe e1, fe e2)
 
+let rec e_fold fe state e =
+  e_fold_r fe state e.tye_desc
+
+and e_fold_r fe state e =
+  match e with
+  | Eint _                -> state
+  | Eflip                 -> state
+  | Elocal _              -> state
+  | Evar _                -> state
+  | Eapp (_, args, _)     -> List.fold_left fe state args
+  | Elet (_, e1, e2)      -> List.fold_left fe state [e1; e2]
+  | Etuple es             -> List.fold_left fe state es
+  | Eif (e1, e2, e3)      -> List.fold_left fe state [e1; e2; e3]
+  | Einter (e1, e2)       -> List.fold_left fe state [e1; e2]
+  | Ebitstr e             -> fe state e
+  | Eexcepted (e1, e2)    -> List.fold_left fe state [e1; e2]
+
 (* -------------------------------------------------------------------- *)
 module Esubst = struct 
   let mapty onty = 
