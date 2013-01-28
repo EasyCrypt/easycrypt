@@ -94,10 +94,6 @@ module Context = struct
 end
 
 (* -------------------------------------------------------------------- *)
-type loader = {
-  ld_loaded   : EcEnv.ctheory_w3 IM.t;
-  ld_required : EcIdent.t list;
-}
 
 type proof_uc_kind = 
   | PUCK_logic of EcLogic.judgment_uc 
@@ -117,14 +113,14 @@ type scope = {
   sc_theories   : EcTypesmod.ctheory     Context.context;
   sc_env        : EcEnv.env;
   sc_top        : scope option;
-  sc_loader     : loader;
+  sc_loaded     : (EcEnv.ctheory_w3 * EcIdent.t list) IM.t;
+  sc_required   : EcIdent.t list;
   sc_pr_uc      : proof_uc list; 
 }
 
 (* -------------------------------------------------------------------- *)
 let empty =
-  let env    = EcEnv.initial
-  and loader = { ld_loaded = IM.empty; ld_required = []; } in
+  let env    = EcEnv.initial in
 
     { sc_name       = EcPath.basename env.EcEnv.env_scope;
       sc_types      = Context.empty ();
@@ -135,7 +131,8 @@ let empty =
       sc_theories   = Context.empty ();
       sc_env        = EcEnv.initial;
       sc_top        = None;
-      sc_loader     = loader;
+      sc_loaded     = IM.empty;
+      sc_required   = [];
       sc_pr_uc      = []; }
 
 (* -------------------------------------------------------------------- *)
@@ -156,12 +153,7 @@ let attop (scope : scope) =
 
 (* -------------------------------------------------------------------- *)
 let for_loading (scope : scope) =
-  let loader = {
-    ld_loaded   = scope.sc_loader.ld_loaded;
-    ld_required = [];
-  }
-  in
-    { empty with sc_loader = loader }
+  { empty with sc_loaded = scope.sc_loaded; }
 
 (* -------------------------------------------------------------------- *)
 let subscope (scope : scope) (name : symbol) =
@@ -176,8 +168,9 @@ let subscope (scope : scope) (name : symbol) =
     sc_theories   = Context.empty ();
     sc_env        = env;
     sc_top        = Some scope;
-    sc_loader     = { scope.sc_loader with ld_required = []; };
-    sc_pr_uc    = [];
+    sc_loaded     = scope.sc_loaded;
+    sc_required   = [];
+    sc_pr_uc      = [];
   }
 
 (* -------------------------------------------------------------------- *)
@@ -326,107 +319,91 @@ module Theory = struct
           sc_env      = EcEnv.Theory.bind x cth scope.sc_env; }
 
   (* ------------------------------------------------------------------ *)
-  let loaded (scope : scope) (name : symbol) =
-    IM.byname name scope.sc_loader.ld_loaded <> None
-
-  (* ------------------------------------------------------------------ *)
+  
   let required (scope : scope) (name : symbol) =
-    List.exists
-      (fun x -> EcIdent.name x = name)
-      scope.sc_loader.ld_required
+    List.exists (fun x -> EcIdent.name x = name) scope.sc_required
 
   (* ------------------------------------------------------------------ *)
   let enter (scope : scope) (name : symbol) =
     subscope scope name
 
   (* ------------------------------------------------------------------ *)
+
+   let rec require_loaded id scope = 
+     if required scope (EcIdent.name id) then scope
+     else 
+       match IM.byident id scope.sc_loaded with
+       | Some (rth,ids) -> 
+           let scope = List.fold_right require_loaded ids scope in
+           let env  = EcEnv.Theory.require id rth scope.sc_env in
+           { scope with 
+             sc_env = env;
+             sc_required = id :: scope.sc_required } 
+       | None -> assert false 
+             
   let exit_r (scope : scope) =
     match scope.sc_top with
     | None     -> raise TopScope
     | Some sup ->
         let cth    = EcEnv.Theory.close scope.sc_env in
-        let loaded = scope.sc_loader.ld_loaded in
-        let sup    =
-          let env, reqs =
-            List.fold_right
-              (fun rname (env, reqs) ->
-                if not (required sup (EcIdent.name rname)) then
-                  match IM.byident rname loaded with
-                  | None     -> assert false
-                  | Some rth ->
-                      let env  = EcEnv.Theory.require rname rth env
-                      and reqs = rname :: reqs in
-                        (env, reqs)
-                else
-                  (env, reqs))
-              scope.sc_loader.ld_required
-              (sup.sc_env, sup.sc_loader.ld_required)
-          in
-            { sup with
-                sc_env    = env;
-                sc_loader = { ld_loaded   = loaded;
-                              ld_required = reqs; }
-            }
-        in
-          (cth, scope.sc_name, bind sup (scope.sc_name, cth))
+        let loaded = scope.sc_loaded in
+        let required = scope.sc_required in 
+        let sup = { sup with
+                    sc_loaded = loaded } in
+        ((cth,required), scope.sc_name, sup) 
 
   (* ------------------------------------------------------------------ *)
   let exit (scope : scope) =
-    let (_, name, scope) = exit_r scope in
-    (name, scope)
+    let ((cth,required), name, scope) = exit_r scope in
+    let scope = List.fold_right require_loaded required scope in
+    (name, bind scope (name, cth))
 
   (* ------------------------------------------------------------------ *)
   let import (scope : scope) (name : qsymbol) =
     let path = fst (EcEnv.Theory.lookup name scope.sc_env) in
-      { scope with
-          sc_env = EcEnv.Theory.import path scope.sc_env }
+    { scope with
+      sc_env = EcEnv.Theory.import path scope.sc_env }
 
   (* ------------------------------------------------------------------ *)
   let export (scope : scope) (name : qsymbol) =
     let path = fst (EcEnv.Theory.lookup name scope.sc_env) in
-      { scope with
-          sc_env = EcEnv.Theory.export path scope.sc_env }
+    { scope with
+      sc_env = EcEnv.Theory.export path scope.sc_env }
 
   (* ------------------------------------------------------------------ *)
-  let require (scope : scope) (name : symbol) loader =
-    if required scope name then
-      scope
-    else
-      match IM.byname name scope.sc_loader.ld_loaded with
-      | Some _ -> scope
 
-      | None -> begin
+  let check_end_required scope thname = 
+    if scope.sc_name <> thname then
+      begin 
+        let msg = 
+          Printf.sprintf 
+            "end-of-file while processing external theory %s %s"
+            (EcIdent.name scope.sc_name) (EcIdent.name thname) in
+        failwith msg
+      end;
+    if scope.sc_pr_uc <> [] then
+      let msg = 
+        Printf.sprintf 
+          "end-of-file while processing proof %s" (EcIdent.name scope.sc_name) in
+      failwith msg
+  
+  let require (scope : scope) (name : symbol) loader =
+    if required scope name then scope
+    else
+      match IM.byname name scope.sc_loaded with
+      | Some (id,_) -> require_loaded id scope 
+
+      | None -> 
           let imported = enter (for_loading scope) name in
           let thname   = imported.sc_name in
           let imported = loader imported in
- 
-            if imported.sc_name <> thname then
-              failwith "end-of-file while processing external theory";
- 
-          let ctheory, _, imported = exit_r imported in
-          let loaded = IM.add thname ctheory imported.sc_loader.ld_loaded in
-
-          let env, reqs =
-            List.fold_right
-              (fun rname (env, reqs) ->
-                if not (required scope (EcIdent.name rname)) then
-                  match IM.byident rname loaded with
-                  | None     -> assert false
-                  | Some rth ->
-                      let env  = EcEnv.Theory.require rname rth env
-                      and reqs = rname :: reqs in
-                        (env, reqs)
-                else
-                  (env, reqs))
-              (thname :: imported.sc_loader.ld_required)
-              (scope.sc_env, scope.sc_loader.ld_required)
-          in
+          check_end_required imported thname;
+          let cthr, name, imported = exit_r imported in 
+          let scope = 
             { scope with
-                sc_env    = env;
-                sc_loader = { ld_loaded   = loaded;
-                              ld_required = reqs; }
-            }
-      end
+              sc_loaded = IM.add name cthr imported.sc_loaded; } in
+          require_loaded name scope 
+
 
   (* ------------------------------------------------------------------ *)
   let clone (scope : scope) (_thcl : theory_cloning) =
@@ -618,8 +595,8 @@ module Tactic = struct
     | Psubgoal _     -> assert false 
 
   let process_logic env juc tacs = 
-    let (juc,n) = get_first_goal juc in
-    fst (process_logic_tacs env tacs (juc,[n]))
+    let (juc,n) = get_first_goal juc in (* FIXME error message *)
+    upd_done (fst (process_logic_tacs env tacs (juc,[n])))
     
   let process scope tac =
     match scope.sc_pr_uc with
@@ -631,7 +608,16 @@ module Tactic = struct
             { scope with 
               sc_pr_uc = { puc with puc_kind = PUCK_logic juc } :: pucs }
 
-
+  let out_goal scope = 
+    match scope.sc_pr_uc with
+    | [] -> Pprint.empty
+    | puc :: _ ->
+        match puc.puc_kind with
+        | PUCK_logic juc ->
+            try 
+              let g = get_goal (get_first_goal juc) in
+              EcPrinting.EcPP.pr_lgoal (EcPrinting.EcPP.mono scope.sc_env) g
+            with EcBaseLogic.NotAnOpenGoal _ -> Pprint.text "No more goals"
     
 end 
 

@@ -44,3 +44,42 @@
 - mot-clef "use" + nettoyage de task
 - raffinements
 - import ocaml batteries
+
+
+Discution : 
+  Nomage des variables (path) :
+    Variables de programe : 
+      Globals            :  th_path :: mod_path :: var_id
+      Parameters, Locals :  th_path :: mod_path :: fun_id :: var_id
+
+    Locals (let, forall, exists) : var_id.
+
+  EcEnv doit assurer pas de clach de noms long :
+    Variables de programe :
+       pas deux variables avec le meme qsymbol 
+    Locals : pas de contrainte sur le symbol (seulement des idents different)
+
+    Operateurs : pas deux operateurs avec la meme arite 
+                            (on peut etre moin restrictif, type non unifiable)
+                 avec le meme qsymbol.
+    Type : pas deux type avec le meme qsymbol.
+
+    Module :  pas deux type avec le meme qsymbol
+      Question : c'est quoi le path d'un parametre de module :
+             F (A:T) = { }
+             path de F :: A_id
+           
+    Module type :  pas deux type avec le meme qsymbol
+
+    On doit pas avoir de theory et de module avec la meme qsymbol ? 
+       theory T.
+        theory M.
+           cnst x : int.
+        end M.
+        module M = {
+           var x : int.
+        }.
+       end T.  
+
+
+

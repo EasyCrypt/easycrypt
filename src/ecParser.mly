@@ -448,7 +448,7 @@ form:
     { PFapp (pqsymb_of_symb op.pl_loc "!", ti, [e]) }
 
 | op=loc(MINUS) ti=tvars_app e=loc(form) %prec prec_prefix_op
-   { PFapp (pqsymb_of_symb op.pl_loc "-", ti, [e]) }
+   { PFapp (pqsymb_of_symb op.pl_loc EcCoreLib.s_opp, ti, [e]) }
 | e1=loc(form) op=loc(op1) ti=tvars_app e2=loc(form) %prec OP1 
     { PFapp (pqsymb_of_psymb op, ti, [e1; e2]) } 
 | e1=loc(form) op=loc(OP2) ti=tvars_app e2=loc(form)  

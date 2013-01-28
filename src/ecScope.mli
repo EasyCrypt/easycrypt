@@ -85,8 +85,6 @@ end
 module Theory : sig
   exception TopScope
 
-  val loaded : scope -> string -> bool
-
   (* [enter scope name] start a theory in scope [scope] with
    * name [name]. *)
   val enter : scope -> symbol -> scope
@@ -123,4 +121,5 @@ end
 
 module Tactic : sig
   val process : scope -> ptactics -> scope
+  val out_goal : scope -> Pprint.document
 end

@@ -65,8 +65,10 @@ let gen_select_op prob pred tvi env name ue psig =
   let ops = EcEnv.Op.all fop name env in
   let select (path, op) = 
     let subue, (dom,codom) = UE.freshensig ue op.op_params tvi (op_sig op) in
-    EcUnify.unify env subue (Ttuple dom) (Ttuple psig);
-    Some (path, op, codom, subue) in
+    try 
+      EcUnify.unify env subue (Ttuple dom) (Ttuple psig);
+      Some (path, op, codom, subue)
+    with _ -> None in
   List.pmap select ops
 
 let select_op proba env name ue tvi psig =

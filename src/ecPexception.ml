@@ -5,7 +5,7 @@ open EcParsetree
 open EcTypedtree
 open EcDecl
 open EcTypesmod
-open EcPrinting.EcRawPP
+open EcPrinting.EcDebugPP (* FIXME : EcPP *)
 
 (* CUT AND PASTE FROM WHY3 util/exn_printer.ml *)
 type exn_printer = Format.formatter -> exn -> unit
@@ -124,6 +124,10 @@ let _ = register (fun fmt exn ->
 
 let pp_exn fmt exn =
   match exn with
+  | EcUnify.UnificationFailure(ty1,ty2) -> 
+      let vmap = EcUidgen.NameGen.create () in
+      Format.fprintf fmt "Unification Failure %a and %a"
+        (pp_type ~vmap) ty1 (pp_type ~vmap) ty2
   | EcEnv.LookupFailure (`Path p) ->
       Format.fprintf fmt "cannot find path: %a@."
         pp_path p

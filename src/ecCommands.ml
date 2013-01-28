@@ -19,18 +19,18 @@ let process_pr scope p =
   match p with 
   | Pr_ty qs ->
       let (x, ty) = EcEnv.Ty.lookup qs.pl_desc env in
-      EcRawPP.pr_typedecl (EcPath.basename x, ty)
+      EcPP.pr_typedecl (EcPP.mono env) (x, ty)
         
   | Pr_op qs | Pr_pr qs ->
       let (x, op) = EcEnv.Op.lookup qs.pl_desc env in
-      EcRawPP.pr_opdecl (EcPath.basename x, op)
+      EcPP.pr_opdecl (EcPP.mono env) (x, op)
         
   | Pr_th qs ->
       let (p, th) = EcEnv.Theory.lookup qs.pl_desc env in
-      EcRawPP.pr_theory (EcPath.basename p, th)
+      EcPP.pr_theory (EcPP.mono env) (p, th)
   | Pr_ax qs ->
       let (p, ax) = EcEnv.Ax.lookup qs.pl_desc env in
-      EcRawPP.pr_axiom (EcPath.basename p, ax)
+      EcPP.pr_axiom (EcPP.mono env) (p, ax)
 
 let process_print scope p = 
   let doc = process_pr scope p in
@@ -40,6 +40,9 @@ let out_added scope p =
   let doc = process_pr scope p in
   EcPrinting.pretty (!^"add " ^^ doc ^^ Pprint.hardline)
 
+let print_next scope = 
+  EcPrinting.pretty (EcScope.Tactic.out_goal scope);
+  EcPrinting.pretty (Pprint.empty ^/^ !^">") 
 (* -------------------------------------------------------------------- *)
 let rec process_type (scope : EcScope.scope) (tyd : ptydecl) =
   let tyname = (tyd.pty_tyvars, tyd.pty_name) in
@@ -153,8 +156,9 @@ and process (scope : EcScope.scope) (g : global) =
     | Gtactics   t    -> process_tactics    scope t
     | Gsave           -> process_save       scope 
   in
-(*    EcEnv.dump EcDebug.initial (EcScope.env scope); *)
-    scope
+  print_next scope;
+(*   EcEnv.dump EcDebug.initial (EcScope.env scope);  *)
+  scope
 
 (* -------------------------------------------------------------------- *)
 let scope = ref EcScope.empty

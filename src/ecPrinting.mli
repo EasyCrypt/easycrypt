@@ -18,7 +18,8 @@ val pp_of_pr   : 'a pr -> 'a pp
 (* -------------------------------------------------------------------- *)
 module type IPrettyPrinter = sig
   type t                                (* ident-2-path *)
-
+  val init : EcEnv.env * EcEnv.env list -> t
+  val mono : EcEnv.env -> t
   (* ------------------------------------------------------------------ *)
   val pr_type     : t -> ?vmap:NameGen.t -> ty pr
   val pr_expr     : t -> tyexpr pr
@@ -30,7 +31,7 @@ module type IPrettyPrinter = sig
   val pr_module   : t -> (EcPath.path * module_expr) pr
   val pr_theory   : t -> (EcPath.path * ctheory    ) pr
   val pr_export   : t -> EcPath.path pr
-  
+  val pr_lgoal    : t -> (EcFol.hyps * EcFol.form) pr
   (* ------------------------------------------------------------------ *)
   val pp_type     : t -> ?vmap:NameGen.t -> ty pp
   val pp_expr     : t -> tyexpr pp
@@ -42,11 +43,13 @@ module type IPrettyPrinter = sig
   val pp_module   : t -> (EcPath.path * module_expr) pp
   val pp_theory   : t -> (EcPath.path * ctheory    ) pp
   val pp_export   : t -> EcPath.path pp
+  val pp_lgoal    : t -> (EcFol.hyps * EcFol.form) pp
 end
 
 (* -------------------------------------------------------------------- *)
 module type IIdentPrinter = sig
   type t
+  val init : (EcEnv.env * EcEnv.env list) -> t 
 
   val add_ty    : t -> EcPath.path -> t 
   val add_local : t -> EcIdent.t -> t
@@ -57,6 +60,8 @@ module type IIdentPrinter = sig
   val add_op    : t -> EcPath.path -> t 
   val add_ax    : t -> EcPath.path -> t 
   val add_th    : t -> EcPath.path -> t 
+
+  val string_of_ident : EcIdent.t -> string
 
   val tv_symb    : t -> EcIdent.t   -> EcSymbols.symbol
   val ty_symb    : t -> EcPath.path -> EcSymbols.qsymbol
@@ -71,11 +76,11 @@ module type IIdentPrinter = sig
 end
 
 (* -------------------------------------------------------------------- *)
-module EcPP : functor (M : IIdentPrinter) ->
-  IPrettyPrinter with type t = M.t
+module MakePP : functor (M : IIdentPrinter) -> IPrettyPrinter
 
+module EcPP      : IPrettyPrinter
 (* -------------------------------------------------------------------- *)
-module EcRawPP : sig
+module EcDebugPP : sig
   (* ------------------------------------------------------------------ *)
   val pr_type     : ?vmap:NameGen.t -> ty pr
   val pr_dom      : EcTypes.dom pr
@@ -87,7 +92,7 @@ module EcRawPP : sig
   val pr_export   : EcPath.path pr
   val pr_theory   : (EcIdent.t * ctheory) pr
   val pr_expr     : tyexpr pr
-  
+  val pr_lgoal    : (EcFol.hyps * EcFol.form) pr
   (* ------------------------------------------------------------------ *)
   val pp_type     : ?vmap:NameGen.t -> ty pp
   val pp_dom      : EcTypes.dom pp
@@ -99,7 +104,9 @@ module EcRawPP : sig
   val pp_export   : EcPath.path pp
   val pp_theory   : (EcIdent.t * ctheory) pp
   val pp_expr     : tyexpr pp
+  val pp_lgoal    : (EcFol.hyps * EcFol.form) pp
 
   val pp_path    : EcPath.path pp
   val pp_qsymbol : qsymbol pp
+
 end

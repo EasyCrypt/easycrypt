@@ -40,7 +40,7 @@
     "left"        , LEFT       ;        (* KW: tactic *)
     "right"       , RIGHT      ;        (* KW: tactic *)
     "elim"        , ELIM       ;        (* KW: tactic *)
-
+    "trivial"     , TRIVIAL    ;        (* KW: tactic *)
     "admit"       , ADMIT      ;        (* KW: dangerous *)
 
     "axiom"       , AXIOM      ;        (* KW: global *)

@@ -71,6 +71,8 @@ let pp_of_pr (pr : 'a pr) (fmt : Format.formatter) (x : 'a) =
 (* -------------------------------------------------------------------- *)
 module type IPrettyPrinter = sig
   type t                                (* ident-2-path *)
+  val init : EcEnv.env * EcEnv.env list -> t
+  val mono : EcEnv.env -> t
 
   (* ------------------------------------------------------------------ *)
   val pr_type     : t -> ?vmap:NameGen.t -> ty pr
@@ -83,7 +85,8 @@ module type IPrettyPrinter = sig
   val pr_module   : t -> (EcPath.path * module_expr) pr
   val pr_theory   : t -> (EcPath.path * ctheory    ) pr
   val pr_export   : t -> EcPath.path pr
-  
+  val pr_lgoal    : t -> (EcFol.hyps * EcFol.form) pr
+
   (* ------------------------------------------------------------------ *)
   val pp_type     : t -> ?vmap:NameGen.t -> ty pp
   val pp_expr     : t -> tyexpr pp
@@ -95,11 +98,13 @@ module type IPrettyPrinter = sig
   val pp_module   : t -> (EcPath.path * module_expr) pp
   val pp_theory   : t -> (EcPath.path * ctheory    ) pp
   val pp_export   : t -> EcPath.path pp
+  val pp_lgoal    : t -> (EcFol.hyps * EcFol.form) pp
 end
 
 (* -------------------------------------------------------------------- *)
 module type IIdentPrinter = sig
   type t
+  val init : (EcEnv.env * EcEnv.env list) -> t 
 
   val add_ty    : t -> EcPath.path -> t
   val add_local : t -> EcIdent.t -> t
@@ -110,6 +115,8 @@ module type IIdentPrinter = sig
   val add_op    : t -> EcPath.path -> t
   val add_ax    : t -> EcPath.path -> t
   val add_th    : t -> EcPath.path -> t
+
+  val string_of_ident : EcIdent.t -> string
 
   val tv_symb    : t -> EcIdent.t   -> EcSymbols.symbol
   val ty_symb    : t -> EcPath.path -> EcSymbols.qsymbol
@@ -124,6 +131,9 @@ module type IIdentPrinter = sig
 end
 
 (* -------------------------------------------------------------------- *)
+let tk_tvars  = !^ "type variables"
+let tk_goalline = 
+!^ "-------------------------------------------------------------------" 
 let tk_as     = !^ "as"
 let tk_assert = !^ "assert"
 let tk_axiom  = !^ "axiom"
@@ -155,7 +165,7 @@ let tk_arrow  = !^ "->"
 let tk_dotdot = !^ ".."
 
 (* -------------------------------------------------------------------- *)
-module EcPP(M : IIdentPrinter) :
+module MakePP(M : IIdentPrinter) :
   IPrettyPrinter with type t = M.t
 =
 struct
@@ -163,13 +173,16 @@ struct
 
   (* ------------------------------------------------------------------ *)
   type t = M.t
-
+  let init = M.init
+  let mono env = M.init(env,[])
   (* ------------------------------------------------------------------ *)
   let pr_symbol (x : symbol) = !^x
 
   (* ------------------------------------------------------------------ *)
   let pr_qsymbol ((p, x) : qsymbol) =
     !^ (String.concat "." (p @ [x]))
+
+  let pr_ident _ id = !^ (M.string_of_ident id)
 
   (* ------------------------------------------------------------------ *)
   let pr_tv_symb (tenv : t) (x : EcIdent.t) =
@@ -212,14 +225,6 @@ struct
     pr_qsymbol (M.th_symb tenv p)
 
   (* ------------------------------------------------------------------ *)
-  let pr_ident (_tenv : t) (x : EcIdent.t) =
-    !^ (EcIdent.tostring x)
-
-  (* ------------------------------------------------------------------ *)
-  let pr_path (_tenv : t) (p : EcPath.path) =
-    !^ (EcIdent.tostring (EcPath.basename p))
-
-  (* ------------------------------------------------------------------ *)
   let pr_tvar (tenv : t) (id : EcIdent.t) =
     pr_symbol (M.tv_symb tenv id)
 
@@ -245,14 +250,14 @@ struct
 
       | Ttuple tys ->
           let doc = pr_list_map (pr_type true) "* " tys in (* FIXME "*" *)
-            if btuple then Pp.parens doc else doc
+          if btuple then Pp.parens doc else doc
 
-      | Tconstr (name, tyargs) -> begin
+      | Tconstr (name, tyargs) -> 
+          let nd = pr_ty_symb tenv name in
           match tyargs with
-          | [] -> pr_path tenv name
-          | _  -> (pr_tuple (List.map (pr_type false) tyargs))
-                  ^//^ (pr_path tenv name)
-      end
+          | [] -> nd
+          | [ty] -> pr_type true ty ^//^ nd
+          | _  -> (pr_tuple (List.map (pr_type false) tyargs)) ^//^ nd
     in
       pr_type false ty
 
@@ -338,11 +343,13 @@ struct
 
   (* ------------------------------------------------------------------ *)
   let pr_vardecl (tenv : t) (x, ty) =
-    pr_seq [pr_ident tenv x; Pp.colon; pr_type tenv ty]
+    let tenv1 = M.add_local tenv x in
+    tenv1, pr_seq [pr_local_symb tenv1 x; Pp.colon; pr_type tenv ty]
 
   (* ------------------------------------------------------------------ *)
   let pr_vardecls (tenv : t) d =
-    Pp.parens (pr_list ", " (List.map (pr_vardecl tenv) d))
+    let tenv, ds = List.map_fold pr_vardecl tenv d in
+    tenv, Pp.parens (pr_list ", " ds)
 
   (* ------------------------------------------------------------------ *)
   let pr_if3 (tenv : t) pr_sub outer b e1 e2 =
@@ -362,33 +369,29 @@ struct
 
   (* ------------------------------------------------------------------ *)
   let pr_let (tenv : t) pr_sub outer pt e1 e2 =
-    let subtenv =
-      List.fold_left M.add_local tenv (ids_of_lpattern pt)
-    in
+    let ids = ids_of_lpattern pt in
+    let subtenv = List.fold_left M.add_local tenv ids in
 
-    let dpt =
-      match pt with
-      | LSymbol x  -> pr_ident tenv x
-      | LTuple  xs -> pr_tuple (List.map (pr_ident tenv) xs)
-    in
+    let dpt = pr_tuple (List.map (pr_local_symb subtenv) ids) in
 
     let d1  = pr_sub tenv (e_bin_prio_letin, `NonAssoc) e1 in
     let d2  = pr_sub subtenv (e_bin_prio_letin, `NonAssoc) e2 in
     let doc = pr_seq [tk_let; dpt; Pp.equals; d1; tk_in; d2] in
-      bracket outer e_bin_prio_letin doc
+    bracket outer e_bin_prio_letin doc
 
   (* ------------------------------------------------------------------ *)
   let pr_tuple_expr (tenv : t) pr_sub es =
     let docs = List.map (pr_sub tenv (min_op_prec, `NonAssoc)) es in
-      Pp.parens (pr_list ", " docs)
+    Pp.parens (pr_list ", " docs)
 
   (* ------------------------------------------------------------------ *)
   let pr_app (tenv : t) pr_sub outer op es =
+     (* FIXME : special notations, list ... *) 
     let opname = EcIdent.name (EcPath.basename op) in
 
     let pr_as_std_op () =
       match es with
-      | [] -> pr_path tenv op
+      | [] -> pr_op_name tenv op
       | _  ->
           let docs =
             List.map (pr_sub tenv (min_op_prec, `NonAssoc)) es
@@ -489,16 +492,13 @@ struct
           pr_local_symb tenv id
 
       | Fpvar (x, _, i) ->
-          pr_seq [pr_path tenv x.pv_name; Pp.braces (Pp.ML.int i)]
+          pr_seq [pr_pv_symb tenv x.pv_name (Some i); Pp.braces (Pp.ML.int i)]
 
       | Fquant (q, bd, f) ->
-          let subtenv =
-            List.fold_left M.add_local tenv (List.map fst bd)
-          in
-            pr_seq [tk_quant q;
-                    pr_vardecls tenv bd;
-                    Pp.comma;
-                    pr_form subtenv outer f]
+          let subtenv, dd = pr_vardecls tenv bd in 
+          pr_seq [tk_quant q;
+                  dd^^Pp.comma;
+                  pr_form subtenv outer f]
 
       | Fif (b, f1, f2) ->
           pr_if tenv pr_form outer b f1 f2
@@ -532,8 +532,9 @@ struct
       Pp.brackets (pr_seq (List.map (pr_tvar tenv) ids))
 
   (* ------------------------------------------------------------------ *)
-  let pr_local (tenv : t) (x : EcIdent.t) (ty : ty) =
-    pr_seq [pr_ident tenv x; Pp.colon; pr_type tenv ty] ^^ Pp.semi
+  let pr_local (_tenv : t) (_x : EcIdent.t) (_ty : ty) =
+    assert false (* FIXME *)
+(*    pr_seq [pr_ident tenv x; Pp.colon; pr_type tenv ty] ^^ Pp.semi *)
 
   (* ------------------------------------------------------------------ *)
   let pr_lvalue (tenv : t) (lv : lvalue) =
@@ -641,7 +642,7 @@ struct
             pr_seq [prelude; Pp.equals; dbody]
 
       | ME_Decl p ->
-          pr_seq [prelude; Pp.colon; pr_path tenv p]
+          pr_seq [prelude; Pp.colon; pr_mod_name tenv p]
 
       | ME_Structure mstruct ->
           let _, bodydoc =
@@ -682,11 +683,12 @@ struct
             | None -> pr_seq [Pp.colon; pr_sig tenv (op_sig op)]
             | Some (ids, e) ->
                 let vardecls = List.combine ids op.op_dom in
-                pr_seq [pr_vardecls tenv vardecls;
+                let subtenv, dd = pr_vardecls tenv vardecls in
+                pr_seq [dd;
                         Pp.colon;
                         pr_type tenv op.op_codom;
                         Pp.equals;
-                        pr_expr tenv e]
+                        pr_expr subtenv e]
           in
             (dop, ddecl)
 
@@ -694,9 +696,10 @@ struct
           let ddecl =
             match i.op_def with
             | None -> pr_seq [Pp.colon; pr_dom tenv op.op_dom]
-            | Some (ids,_f) ->
+            | Some (ids,f) ->
                 let vardecls = List.combine ids op.op_dom in
-                pr_seq [pr_vardecls tenv vardecls; Pp.equals (* FIXME pp_form f *)]
+                let subtenv, dd = pr_vardecls tenv vardecls in
+                pr_seq [dd; Pp.equals; pr_form subtenv f]
           in
           tk_pred, ddecl
 
@@ -729,7 +732,7 @@ struct
       | Some f -> pr_form tenv f
     in
 
-      pr_seq [tk; pr_name; Pp.colon; spec]
+      pr_dotted (pr_seq [tk; pr_name; Pp.colon; spec])
 
   (* ------------------------------------------------------------------ *)
   let pr_modtype (tenv : t) ((x, _tymod) : EcPath.path * tymod) =
@@ -776,7 +779,7 @@ struct
   and pr_theory (tenv : t) ((name, ctheory) : EcPath.path * ctheory) =
     match ctheory.cth_desc with
     | CTh_clone p ->
-        pr_seq [tk_clone; pr_path tenv p; tk_as;
+        pr_seq [tk_clone; pr_th_name tenv p; tk_as;
                   pr_ident tenv (EcPath.basename name)]
 
     | CTh_struct cstruct ->
@@ -789,6 +792,21 @@ struct
             ~pofx:(pr_dotted (tk_end    ^//^ (pr_ident tenv basename)))
             pr_cstruct
 
+  let pr_hyp (t,d) (id,k) = 
+    let dk = 
+      match k with
+      | LD_var (ty, _body) -> pr_type t ty (* FIXME body *)
+      | LD_hyp f           -> pr_form t f in
+    let dh = pr_ident t id ^^ (!^ " : ") ^//^ dk in
+    (M.add_local t id, d^/^dh)   
+
+  let pr_lgoal t (hyps,concl) = 
+    let doc = 
+      tk_tvars ^^ (!^ " : ") ^//^ pr_list_map (pr_tvar t) ", " hyps.h_tvar in
+    let (t,doc) = List.fold_left pr_hyp (t,doc) (List.rev hyps.h_local) in
+    let doc = doc ^/^ tk_goalline in
+    doc ^/^ pr_form t concl ^^ clearbreak
+
   (* ------------------------------------------------------------------ *)
   let pp_type     = fun t ?vmap -> pp_of_pr (pr_type t ?vmap)
   let pp_dom      = fun t -> pp_of_pr (pr_dom t)
@@ -800,12 +818,14 @@ struct
   let pp_export   = fun t -> pp_of_pr (pr_export t)
   let pp_theory   = fun t -> pp_of_pr (pr_theory t)
   let pp_expr     = fun t -> pp_of_pr (pr_expr t)
+  let pp_lgoal    = fun t -> pp_of_pr (pr_lgoal t)
 end
 
 (* -------------------------------------------------------------------- *)
 module RawIdentPrinter : IIdentPrinter with type t = unit =
 struct
   type t = unit
+  let init _ = ()
 
   let add_ty    = fun (_ : t) (_ : EcPath.path) -> ()
   let add_local = fun (_ : t) (_ : EcIdent.t  ) -> ()
@@ -823,6 +843,8 @@ struct
   let symb_of_path (p : EcPath.path) =
     ([], EcIdent.tostring (EcPath.basename p))
 
+  let string_of_ident = EcIdent.tostring 
+
   let tv_symb    = fun (_ : t) (x : EcIdent.t  )   -> EcIdent.tostring x
   let ty_symb    = fun (_ : t) (p : EcPath.path)   -> symb_of_path p
   let local_symb = fun (_ : t) (x : EcIdent.t  )   -> EcIdent.tostring x
@@ -835,43 +857,45 @@ struct
   let th_symb    = fun (_ : t) (p : EcPath.path)   -> symb_of_path p
 end
 
-(* -------------------------------------------------------------------- *)
-module EcRawPP = struct
-  module BPP = EcPP(RawIdentPrinter)
+module LongRawIdentPrinter : IIdentPrinter with type t = unit =
+struct
+  type t = unit
+  let init _ = ()
 
-  let pr_type     = BPP.pr_type ()
-  let pr_expr     = BPP.pr_expr ()
-  let pr_dom      = BPP.pr_dom  ()
-  let pr_typedecl = fun (x, v) -> BPP.pr_typedecl () (EcPath.Pident x, v)
-  let pr_opdecl   = fun (x, v) -> BPP.pr_opdecl   () (EcPath.Pident x, v)
-  let pr_axiom    = fun (x, v) -> BPP.pr_axiom    () (EcPath.Pident x, v)
-  let pr_modtype  = fun (x, v) -> BPP.pr_modtype  () (EcPath.Pident x, v)
-  let pr_module   = fun     v  -> BPP.pr_module   () (EcPath.Pident v.me_name, v)
-  let pr_export   = BPP.pr_export ()
-  let pr_theory   = fun (x, v) -> BPP.pr_theory   () (EcPath.Pident x, v)
+  let add_ty    = fun (_ : t) (_ : EcPath.path) -> ()
+  let add_local = fun (_ : t) (_ : EcIdent.t  ) -> ()
+  let add_pvar  = fun (_ : t) (_ : EcPath.path) -> ()
+  let add_fun   = fun (_ : t) (_ : EcPath.path) -> ()
+  let add_mod   = fun (_ : t) (_ : EcPath.path) -> ()
+  let add_modty = fun (_ : t) (_ : EcPath.path) -> ()
+  let add_op    = fun (_ : t) (_ : EcPath.path) -> ()
+  let add_ax    = fun (_ : t) (_ : EcPath.path) -> ()
+  let add_th    = fun (_ : t) (_ : EcPath.path) -> ()
 
-  let pp_type     = BPP.pp_type ()
-  let pp_expr     = BPP.pp_expr ()
-  let pp_dom      = BPP.pp_dom  ()
-  let pp_typedecl = fun fmt (x, v) -> BPP.pp_typedecl () fmt (EcPath.Pident x, v)
-  let pp_opdecl   = fun fmt (x, v) -> BPP.pp_opdecl   () fmt (EcPath.Pident x, v)
-  let pp_axiom    = fun fmt (x, v) -> BPP.pp_axiom    () fmt (EcPath.Pident x, v)
-  let pp_modtype  = fun fmt (x, v) -> BPP.pp_modtype  () fmt (EcPath.Pident x, v)
-  let pp_module   = fun fmt     v  -> BPP.pp_module   () fmt (EcPath.Pident v.me_name, v)
-  let pp_export   = BPP.pp_export ()
-  let pp_theory   = fun fmt (x, v) -> BPP.pp_theory   () fmt (EcPath.Pident x, v)
+  let symb_of_ident (x : EcIdent.t) =
+    ([], EcIdent.tostring x)
 
-  let rec pp_qsymbol fmt = function
-    | ([]    , x) -> Format.fprintf fmt "%s" x
-    | (n :: p, x) -> Format.fprintf fmt "%s.%a" n pp_qsymbol (p, x)
+  let symb_of_path (p : EcPath.path) =
+    match List.rev (EcPath.tolist p) with
+    | id :: l -> 
+        List.rev_map EcIdent.tostring l, EcIdent.tostring id
+    | [] -> assert false
 
-  let rec pp_path fmt = function
-    | EcPath.Pident x      -> Format.fprintf fmt "%s" (EcIdent.name x)
-    | EcPath.Pqname (p, x) -> Format.fprintf fmt "%a.%s" pp_path p (EcIdent.name x)
+  let string_of_ident = EcIdent.tostring 
+
+  let tv_symb    = fun (_ : t) (x : EcIdent.t  )   -> EcIdent.tostring x
+  let ty_symb    = fun (_ : t) (p : EcPath.path)   -> symb_of_path p
+  let local_symb = fun (_ : t) (x : EcIdent.t  )   -> EcIdent.tostring x
+  let pv_symb    = fun (_ : t) (p : EcPath.path) _ -> symb_of_path p
+  let fun_symb   = fun (_ : t) (p : EcPath.path)   -> symb_of_path p
+  let mod_symb   = fun (_ : t) (p : EcPath.path)   -> symb_of_path p
+  let modty_symb = fun (_ : t) (p : EcPath.path)   -> symb_of_path p
+  let op_symb    = fun (_ : t) (p : EcPath.path)   -> symb_of_path p
+  let ax_symb    = fun (_ : t) (p : EcPath.path)   -> symb_of_path p
+  let th_symb    = fun (_ : t) (p : EcPath.path)   -> symb_of_path p
 end
-
 (* -------------------------------------------------------------------- *)
-module GenIEnv : IIdentPrinter = struct
+module ShortIdentPrinter : IIdentPrinter = struct
   open EcMaps
 
   type t = { 
@@ -898,7 +922,7 @@ module GenIEnv : IIdentPrinter = struct
   let add_local t id = 
     let s = EcIdent.name id in
     let s = 
-      if Sstr.mem s t.tenv_exc then s 
+      if not (Sstr.mem s t.tenv_exc) then s 
       else
         let rec aux n = 
           let s = Printf.sprintf "%s%i" s n in
@@ -925,7 +949,17 @@ module GenIEnv : IIdentPrinter = struct
   let add_ax    = add Ax.add
   let add_th    = add Theory.add
 
+(*  let print_path p = 
+    let l = EcPath.tolist p in
+    let rec aux l = 
+      match l with
+      | [] -> assert false
+      | [id] -> Format.printf "%s" (EcIdent.name id)
+      | id::l -> Format.printf "%s." (EcIdent.name id); aux l in
+    aux l; Format.printf "@." *)
+    
   let shorten_path lookup p env = 
+(*    Format.printf "shorthen_path "; print_path p; *)
     let rec aux par rs s = 
       try
         let qs = List.rev rs in 
@@ -934,7 +968,7 @@ module GenIEnv : IIdentPrinter = struct
         (qs,s)
       with _ -> 
         match par with 
-        | [] -> assert false
+        | [] -> (List.rev rs, s) (* assert false *) (* FIXME *)
         | s'::par -> aux par (s'::rs) s in
     let qs, s = EcPath.toqsymbol p in
     aux (List.rev qs) [] s 
@@ -950,7 +984,9 @@ module GenIEnv : IIdentPrinter = struct
     let env = 
       match o with
       | None -> t.tenv_logic 
-      | Some i ->try Mint.find i t.tenv_side with _ -> assert false in
+      | Some i ->
+          try Mint.find i t.tenv_side 
+          with _ -> t.tenv_logic (* FIXME *) in
     shorten_path Var.lookup_path p env 
 
   let fun_symb t p = 
@@ -970,4 +1006,48 @@ module GenIEnv : IIdentPrinter = struct
 
   let th_symb t p = 
     shorten_path Theory.lookup_path p t.tenv_logic 
+
+  let string_of_ident id = EcIdent.name id
+end
+
+module EcShortPP   = MakePP(ShortIdentPrinter)
+module EcRawPP     = MakePP(RawIdentPrinter) 
+module EcLongRawPP = MakePP(LongRawIdentPrinter) 
+module EcPP        = EcShortPP
+
+(* -------------------------------------------------------------------- *)
+module EcDebugPP = struct
+  module BPP = EcRawPP
+
+  let pr_type     = BPP.pr_type ()
+  let pr_expr     = BPP.pr_expr ()
+  let pr_dom      = BPP.pr_dom  ()
+  let pr_typedecl = fun (x, v) -> BPP.pr_typedecl () (EcPath.Pident x, v)
+  let pr_opdecl   = fun (x, v) -> BPP.pr_opdecl   () (EcPath.Pident x, v)
+  let pr_axiom    = fun (x, v) -> BPP.pr_axiom    () (EcPath.Pident x, v)
+  let pr_modtype  = fun (x, v) -> BPP.pr_modtype  () (EcPath.Pident x, v)
+  let pr_module   = fun     v  -> BPP.pr_module   () (EcPath.Pident v.me_name, v)
+  let pr_export   = BPP.pr_export ()
+  let pr_theory   = fun (x, v) -> BPP.pr_theory   () (EcPath.Pident x, v)
+  let pr_lgoal    = BPP.pr_lgoal    ()
+
+  let pp_type     = BPP.pp_type ()
+  let pp_expr     = BPP.pp_expr ()
+  let pp_dom      = BPP.pp_dom  ()
+  let pp_typedecl = fun fmt (x, v) -> BPP.pp_typedecl () fmt (EcPath.Pident x, v)
+  let pp_opdecl   = fun fmt (x, v) -> BPP.pp_opdecl   () fmt (EcPath.Pident x, v)
+  let pp_axiom    = fun fmt (x, v) -> BPP.pp_axiom    () fmt (EcPath.Pident x, v)
+  let pp_modtype  = fun fmt (x, v) -> BPP.pp_modtype  () fmt (EcPath.Pident x, v)
+  let pp_module   = fun fmt     v  -> BPP.pp_module   () fmt (EcPath.Pident v.me_name, v)
+  let pp_export   = BPP.pp_export ()
+  let pp_theory   = fun fmt (x, v) -> BPP.pp_theory   () fmt (EcPath.Pident x, v)
+  let pp_lgoal    = BPP.pp_lgoal    ()
+
+  let rec pp_qsymbol fmt = function
+    | ([]    , x) -> Format.fprintf fmt "%s" x
+    | (n :: p, x) -> Format.fprintf fmt "%s.%a" n pp_qsymbol (p, x)
+
+  let rec pp_path fmt = function
+    | EcPath.Pident x      -> Format.fprintf fmt "%s" (EcIdent.name x)
+    | EcPath.Pqname (p, x) -> Format.fprintf fmt "%a.%s" pp_path p (EcIdent.name x)
 end

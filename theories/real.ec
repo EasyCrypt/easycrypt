@@ -40,4 +40,6 @@ end PowerInt.
 export PowerInt.
 
 
+op exp : real -> real.
+(* TODO : add axioms*)
 

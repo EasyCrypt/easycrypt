@@ -26,8 +26,8 @@ type ('rn,'rd) pre_judgment = {
   }
 
 type ('rn, 'rd) judgment_uc = {
-    juc_count : int;
-    juc_map   : ('rn,'rd) pre_judgment Mint.t;
+    juc_count  : int;
+    juc_map    : ('rn,'rd) pre_judgment Mint.t;
   }
 
 type ('rn,'rd) goal  = ('rn,'rd) judgment_uc * int
@@ -89,7 +89,7 @@ module Tactic =
       upd juc 0
 
     let get_first_goal juc = 
-      let juc = upd_done juc in
+(*      let juc = upd_done juc in *)
       let rec aux n = 
         let pj = get_goal (juc, n) in
         match pj.pj_rule with
