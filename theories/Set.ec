@@ -1,8 +1,5 @@
-require int.
-import int. 
-
-require Fun.
-import Fun.
+require import int.
+require import Fun.
 
 type 'a t.
 

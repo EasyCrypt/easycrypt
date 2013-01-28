@@ -98,15 +98,19 @@ and process_th_close (scope : EcScope.scope) name =
   snd (EcScope.Theory.exit scope)
 
 (* -------------------------------------------------------------------- *)
-and process_th_require (scope : EcScope.scope) name =
+and process_th_require (scope : EcScope.scope) (x,io) = 
+  let name = x.pl_desc in
   match EcLoader.locate name loader with
   | None -> failwith ("cannot locate: " ^ name)
   | Some filename ->
       let loader iscope =
         let commands = EcIo.parseall (EcIo.from_file filename) in
-          List.fold_left process iscope commands
-      in
-        EcScope.Theory.require scope name loader
+          List.fold_left process iscope commands in 
+      let scope = EcScope.Theory.require scope name loader in
+      match io with
+      | None -> scope
+      | Some true -> process_th_export scope ([],name)
+      | Some false -> process_th_import scope ([],name)
 
 (* -------------------------------------------------------------------- *)
 and process_th_import (scope : EcScope.scope) name =
@@ -147,7 +151,7 @@ and process (scope : EcScope.scope) (g : global) =
     | Gclaim     c    -> process_claim      scope c
     | GthOpen    name -> process_th_open    scope name.pl_desc
     | GthClose   name -> process_th_close   scope name.pl_desc
-    | GthRequire name -> process_th_require scope name.pl_desc
+    | GthRequire name -> process_th_require scope name
     | GthImport  name -> process_th_import  scope name.pl_desc
     | GthExport  name -> process_th_export  scope name.pl_desc
     | GthClone   thcl -> process_th_clone   scope thcl

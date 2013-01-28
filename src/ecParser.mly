@@ -852,7 +852,13 @@ axiom:
 
 theory_open    : THEORY  x=ident  { x }
 theory_close   : END     x=ident  { x }
-theory_require : REQUIRE x=ident  { x }
+
+theory_require : 
+| REQUIRE x=ident  { x, None }
+| REQUIRE IMPORT x=ident  { x, Some false }
+| REQUIRE EXPORT x=ident  { x, Some true }
+;
+
 theory_import  : IMPORT  x=qident { x }
 theory_export  : EXPORT  x=qident { x }
 

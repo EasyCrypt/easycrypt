@@ -312,7 +312,7 @@ type global =
   | Gprint     of pprint
   | GthOpen    of psymbol
   | GthClose   of psymbol
-  | GthRequire of psymbol
+  | GthRequire of (psymbol * bool option) (* true = export, false = import *)
   | GthImport  of pqsymbol
   | GthExport  of pqsymbol
   | GthClone   of theory_cloning

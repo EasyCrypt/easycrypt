@@ -1,12 +1,9 @@
-require pair.
-import pair.
-require int.
-import int. 
-require Fun. 
-import Fun.
-require Set.
-require real. 
-import real. 
+require import pair.
+require import int.
+require import Fun. 
+require        Set.
+require import real. 
+
 
 
 op caract (p:'a Pred, x : 'a) : real = 
