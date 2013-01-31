@@ -10,6 +10,8 @@ type tyerror =
   | UnknownVariable          of qsymbol
   | UnknownFunction          of qsymbol
   | UnknownTypeName          of qsymbol
+  | UnknownTyModName         of qsymbol
+  | UnknownModName           of qsymbol
   | UnknownOperatorForSig    of qsymbol * ty list
   | InvalidNumberOfTypeArgs  of qsymbol * int * int
   | ApplInvalidArity
@@ -68,6 +70,11 @@ val transform    : Fenv.fenv -> EcUnify.unienv -> pformula -> ty -> EcFol.form
 val transsig   : EcEnv.env -> psignature -> tysig
 val transtymod : EcEnv.env -> pmodule_type -> tymod
 val transmod   : EcEnv.env -> EcIdent.t -> pmodule_expr -> module_expr
+val transintf  : EcEnv.env -> pmodule_intf -> tymod
+
+(* -------------------------------------------------------------------- *)
+val check_tymod_sub : EcEnv.env -> tymod -> tymod -> unit
+val check_tymod_eq  : EcEnv.env -> tymod -> tymod -> unit
 
 (* -------------------------------------------------------------------- *)
 val e_inuse : tyexpr -> EcPath.Sp.t

@@ -136,6 +136,8 @@ and pmodule_expr =
   | Pm_ident  of pqsymbol * pqsymbol list
   | Pm_struct of pstructure
 
+and pmodule_intf = pqsymbol * pmodule_intf list
+
 and pstructure = {
   ps_params    : (psymbol * pqsymbol) list;
   ps_signature : pmodule_type option;
@@ -143,7 +145,7 @@ and pstructure = {
 }
 
 and pstructure_item =
-  | Pst_mod   of (psymbol * pmodule_expr)
+  | Pst_mod   of (psymbol * pmodule_expr * pmodule_intf option)
   | Pst_var   of (psymbol list * pty)
   | Pst_fun   of (pfunction_decl * pfunction_body)
   | Pst_alias of (psymbol * pqsymbol)
@@ -215,7 +217,6 @@ type ppredicate = {
   pp_dom    : pty list option;
   pp_body   : (psymbol list * pformula) option;
 }
-
 
 (* -------------------------------------------------------------------- *)
 type elim_kind = 
@@ -311,7 +312,7 @@ and theory_override =
 
 (* -------------------------------------------------------------------- *)
 type global =
-  | Gmodule    of (psymbol * pmodule_expr)
+  | Gmodule    of (psymbol * pmodule_expr * pmodule_intf option)
   | Ginterface of (psymbol * pmodule_type)
   | Goperator  of poperator
   | Gpredicate of ppredicate

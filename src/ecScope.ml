@@ -288,10 +288,12 @@ module Mod = struct
         sc_modules = Context.bind (EcIdent.name m.me_name) m scope.sc_modules;
         sc_env     = EcEnv.Mod.bind m.me_name m scope.sc_env; }
 
-  let add (scope : scope) (name : symbol) (m : pmodule_expr) =
+  let add (scope : scope) (name : symbol) m mi =
     let name = EcIdent.create name in
     let m    = EcTypedtree.transmod scope.sc_env name m in
-    bind scope m
+    let mi   = omap mi (EcTypedtree.transintf scope.sc_env) in
+      oiter mi (EcTypedtree.check_tymod_sub scope.sc_env m.me_sig);
+      bind scope m
 end
 
 (* -------------------------------------------------------------------- *)

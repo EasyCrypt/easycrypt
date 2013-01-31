@@ -89,7 +89,6 @@ module Var : sig
     -> EcTypes.pvar_kind option
     -> env
     -> env
-
   val bindall :
        (EcIdent.t * EcTypes.ty) list
     -> EcTypes.pvar_kind option

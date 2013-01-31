@@ -612,7 +612,7 @@ mod_item:
     { Pst_var v }
 
 | m=mod_def
-    { let x, m = m in Pst_mod (x, m) }
+    { let (x, m, i) = m in Pst_mod (x, m, i) }
 
 | FUN decl=fun_decl EQ body=fun_def_body
     { Pst_fun (decl, body) }
@@ -629,17 +629,26 @@ mod_body:
 ;
 
 mod_def:
-| MODULE x=ident EQ body=mod_body
-    { (x, mk_mod [] body) }
+| MODULE x=ident t=mod_ty? EQ body=mod_body
+    { (x, mk_mod [] body, t) }
 
-| MODULE x=ident EQ m=qident
-    { (x, Pm_ident (m, [])) }
+| MODULE x=ident t=mod_ty? EQ m=qident
+    { (x, Pm_ident (m, []), t) }
 
-| MODULE x=ident EQ m=qident LPAREN a=plist1(qident, COMMA) RPAREN
-    { (x, Pm_ident (m, a)) }
+| MODULE x=ident t=mod_ty? EQ m=qident LPAREN a=plist1(qident, COMMA) RPAREN
+    { (x, Pm_ident (m, a), t) }
 
-| MODULE x=ident LPAREN a=plist1(sig_arg, COMMA) RPAREN EQ body=mod_body
-    { (x, mk_mod a body) }
+| MODULE x=ident LPAREN a=plist1(sig_arg, COMMA) RPAREN t=mod_ty? EQ body=mod_body
+    { (x, mk_mod a body, t) }
+;
+
+mod_ty:
+| COLON t=mod_intf { t }
+;
+
+mod_intf:
+| x=qident { (x, []) }
+| x=qident LPAREN args=plist1(mod_intf, COMMA) RPAREN { (x, args) }
 ;
 
 (* -------------------------------------------------------------------- *)

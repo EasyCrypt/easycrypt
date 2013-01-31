@@ -21,6 +21,8 @@ type tyerror =
   | UnknownVariable          of qsymbol
   | UnknownFunction          of qsymbol
   | UnknownTypeName          of qsymbol
+  | UnknownTyModName         of qsymbol
+  | UnknownModName           of qsymbol
   | UnknownOperatorForSig    of qsymbol * ty list
   | InvalidNumberOfTypeArgs  of qsymbol * int * int
   | ApplInvalidArity
@@ -670,6 +672,33 @@ let rec transmod (env : EcEnv.env) (x : EcIdent.t) (m : pmodule_expr) =
       transstruct env x st
 
 (* -------------------------------------------------------------------- *)
+and transintf (env : EcEnv.env) ((iname, iargs) : pmodule_intf) : tymod =
+  let rec transintf_r ((mname, margs) : pmodule_intf) : tymod =
+    match EcEnv.Mod.trylookup (unloc mname) env with
+    | None -> tyerror mname.pl_loc (UnknownModName (unloc mname))
+    | Some (_, i) ->  begin
+        if List.length i.tym_params <> List.length margs then
+          tyerror dloc ModApplInvalidArity;
+        List.iter2
+          (fun marg (_, mtymod) ->
+            check_tymod_sub env (transintf_r marg) mtymod)
+          margs i.tym_params;
+        i                             (* FIXME: subst *)
+      end
+  in
+    match EcEnv.ModTy.trylookup (unloc iname) env with
+    | None -> tyerror iname.pl_loc (UnknownTyModName (unloc iname))
+    | Some (_, i) -> begin
+        if List.length i.tym_params <> List.length iargs then
+          tyerror dloc ModApplInvalidArity;
+        List.iter2
+          (fun iarg (_, mtymod) ->
+            check_tymod_sub env (transintf_r iarg) mtymod)
+          iargs i.tym_params;
+        i                               (* FIXME: subst *)
+    end
+
+(* -------------------------------------------------------------------- *)
 and transstruct (env : EcEnv.env) (x : EcIdent.t) (st : pstructure) =
   (* Check parameters types *)
   let stparams =
@@ -701,7 +730,7 @@ and transstruct (env : EcEnv.env) (x : EcIdent.t) (st : pstructure) =
   (* Generate structure signature *)
   let tymod =
     let tymod1 = function
-      | MI_Module   _ -> None
+      | MI_Module   _ -> None           (* FIXME: what ? *)
       | MI_Variable v -> Some (Tys_variable (EcIdent.name v.v_name, v.v_type))
       | MI_Function f -> Some (Tys_function f.f_sig) 
     in
@@ -721,9 +750,12 @@ and transstruct (env : EcEnv.env) (x : EcIdent.t) (st : pstructure) =
 (* -------------------------------------------------------------------- *)
 and transstruct1 (env : EcEnv.env) (st : pstructure_item) =
   match st with
-  | Pst_mod ({ pl_desc = m }, me) ->
-      let m = EcIdent.create m in
-        [(m, MI_Module (transmod env m me))]
+  | Pst_mod ({ pl_desc = m }, me, mi) ->
+      let m  = EcIdent.create m in
+      let me = transmod env m me in
+      let mi = omap mi (transintf env) in
+        oiter mi (fun mi -> check_tymod_sub env me.me_sig mi);
+        [(m, MI_Module me)]
 
   | Pst_var (xs, ty) ->
       let ty = transty_nothing env ty in
