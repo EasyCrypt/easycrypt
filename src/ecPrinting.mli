@@ -23,6 +23,7 @@ module type IPrettyPrinter = sig
   (* ------------------------------------------------------------------ *)
   val pr_type     : t -> ?vmap:NameGen.t -> ty pr
   val pr_expr     : t -> tyexpr pr
+  val pr_form     : t -> EcFol.form pr
   val pr_dom      : t -> EcTypes.dom pr
   val pr_typedecl : t -> (EcPath.path * tydecl     ) pr
   val pr_opdecl   : t -> (EcPath.path * operator   ) pr
@@ -35,6 +36,7 @@ module type IPrettyPrinter = sig
   (* ------------------------------------------------------------------ *)
   val pp_type     : t -> ?vmap:NameGen.t -> ty pp
   val pp_expr     : t -> tyexpr pp
+  val pp_form     : t -> EcFol.form pp
   val pp_dom      : t -> EcTypes.dom pp
   val pp_typedecl : t -> (EcPath.path * tydecl     ) pp
   val pp_opdecl   : t -> (EcPath.path * operator   ) pp
@@ -92,6 +94,7 @@ module EcDebugPP : sig
   val pr_export   : EcPath.path pr
   val pr_theory   : (EcIdent.t * ctheory) pr
   val pr_expr     : tyexpr pr
+  val pr_form     : EcFol.form pr
   val pr_lgoal    : (EcFol.hyps * EcFol.form) pr
   (* ------------------------------------------------------------------ *)
   val pp_type     : ?vmap:NameGen.t -> ty pp
@@ -104,6 +107,7 @@ module EcDebugPP : sig
   val pp_export   : EcPath.path pp
   val pp_theory   : (EcIdent.t * ctheory) pp
   val pp_expr     : tyexpr pp
+  val pp_form     : EcFol.form pp
   val pp_lgoal    : (EcFol.hyps * EcFol.form) pp
 
   val pp_path    : EcPath.path pp

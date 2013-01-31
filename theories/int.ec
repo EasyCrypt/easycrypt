@@ -1,8 +1,7 @@
 import why3 "int" "Int" 
   (* Il y a un bug dans ecScope il refuse d'avoir deux operateurs avec des 
      types different et la meme syntaxe *)
-  op "prefix -" as "__opp".
-
+  op "prefix -" as "-!".
 
 theory Abs.
 
@@ -35,6 +34,7 @@ end Power.
 export Power.
 
 (* lemma test : forall (x:int), 0 <= x => 1 <= 2^x. *)
+
 
 
 

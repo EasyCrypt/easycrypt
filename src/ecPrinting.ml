@@ -77,6 +77,7 @@ module type IPrettyPrinter = sig
   (* ------------------------------------------------------------------ *)
   val pr_type     : t -> ?vmap:NameGen.t -> ty pr
   val pr_expr     : t -> tyexpr pr
+  val pr_form     : t -> EcFol.form pr
   val pr_dom      : t -> EcTypes.dom pr
   val pr_typedecl : t -> (EcPath.path * tydecl     ) pr
   val pr_opdecl   : t -> (EcPath.path * operator   ) pr
@@ -90,6 +91,7 @@ module type IPrettyPrinter = sig
   (* ------------------------------------------------------------------ *)
   val pp_type     : t -> ?vmap:NameGen.t -> ty pp
   val pp_expr     : t -> tyexpr pp
+  val pp_form     : t -> EcFol.form pp
   val pp_dom      : t -> EcTypes.dom pp
   val pp_typedecl : t -> (EcPath.path * tydecl     ) pp
   val pp_opdecl   : t -> (EcPath.path * operator   ) pp
@@ -250,15 +252,20 @@ struct
           pr_tunivar uidmap id
 
       | Ttuple tys ->
-          let doc = pr_list_map (pr_type true) "* " tys in (* FIXME "*" *)
+          let doc = pr_list_map (pr_type true) " * " tys in (* FIXME "*" *)
           if btuple then Pp.parens doc else doc
 
       | Tconstr (name, tyargs) -> 
           let nd = pr_ty_symb tenv name in
-          match tyargs with
+          begin match tyargs with
           | [] -> nd
           | [ty] -> pr_type true ty ^//^ nd
           | _  -> (pr_tuple (List.map (pr_type false) tyargs)) ^//^ nd
+          end
+      | Tfun(t1,t2) ->
+          let doc = 
+            pr_type true t1 ^^ !^" ->" ^//^ pr_type false t2 in (* FIXME prio *)
+          if btuple then Pp.parens doc else doc
     in
       pr_type false ty
 
@@ -322,9 +329,9 @@ struct
     | Some EP.AND   -> Some e_bin_prio_and
     | Some EP.EQ    -> Some e_bin_prio_eq
     | Some EP.NE    -> Some e_bin_prio_eq
+    | Some EP.GT    -> Some e_bin_prio_op1
     | Some EP.OP1 _ -> Some e_bin_prio_op1
     | Some EP.OP2 _ -> Some e_bin_prio_op2
-    | Some EP.MINUS -> Some e_bin_prio_op3
     | Some EP.OP3 _ -> Some e_bin_prio_op3
     | Some EP.STAR  -> Some e_bin_prio_op3
     | Some EP.OP4 _ -> Some e_bin_prio_op4
@@ -334,9 +341,17 @@ struct
   (* ------------------------------------------------------------------ *)
   let priority_of_uniop name =
     match EcIo.lex_single_token name with
-    | Some EP.MINUS -> Some e_uni_prio_uminus
     | Some EP.NOT   -> Some e_uni_prio_not
-    | _  -> None
+    | Some EP.EQ    -> Some e_uni_prio_uminus
+    | Some EP.AND   -> Some e_uni_prio_uminus  
+    | Some EP.OR    -> Some e_uni_prio_uminus  
+    | Some EP.STAR  -> Some e_uni_prio_uminus  
+    | Some EP.GT    -> Some e_uni_prio_uminus  
+    | Some EP.OP1 _ -> Some e_uni_prio_uminus 
+    | Some EP.OP2 _ -> Some e_uni_prio_uminus
+    | Some EP.OP3 _ -> Some e_uni_prio_uminus
+    | Some EP.OP4 _ -> Some e_uni_prio_uminus
+    | _             -> None
 
   (* ------------------------------------------------------------------ *)
   let is_binop name =
@@ -387,7 +402,7 @@ struct
 
   (* ------------------------------------------------------------------ *)
   let pr_app (tenv : t) pr_sub outer op es =
-     (* FIXME : special notations, list ... *) 
+     (* FIXME : special notations, list ..., sampling {0,1} [k1..k2] .... *) 
     let opname = EcIdent.name (EcPath.basename op) in
 
     let pr_as_std_op () =
@@ -436,31 +451,17 @@ struct
   let pr_expr (tenv : t) (e : tyexpr) =
     let rec pr_expr (tenv : t) outer (e : tyexpr) =
         match e.tye_desc with
-        | Evar (x, _) ->
+        | Evar x ->
             pr_pv_symb tenv x.pv_name None
 
-        | Elocal (x, _) ->
+        | Elocal x ->
             pr_local_symb tenv x
+
+        | Eop(op,_tys) -> (* FIXME infix, prefix, ty_inst *)
+            pr_op_name tenv op
 
         | Eint i ->
             Pp.ML.int i
-
-        | Eflip ->
-            tk_flip
-
-        | Eexcepted (e1, e2) ->
-            let d1 = pr_expr tenv (e_prio_excpt, `Left ) e1 in
-            let d2 = pr_expr tenv (e_prio_excpt, `Right) e2 in
-              Pp.parens (pr_seq [d1; Pp.backslash; d2])
-
-        | Ebitstr e ->
-            let d = pr_expr tenv (min_op_prec, `NonAssoc) e in
-              pr_seq [tk_flip; Pp.caret; Pp.parens d]
-
-        | Einter (e1, e2) ->
-            let d1 = pr_expr tenv (min_op_prec, `NonAssoc) e1 in
-            let d2 = pr_expr tenv (min_op_prec, `NonAssoc) e2 in
-              Pp.brackets (pr_hang (pr_seq [d1; tk_dotdot; d2]))
 
         | Eif (c, e1, e2) ->
             pr_if tenv pr_expr outer c e1 e2
@@ -468,8 +469,13 @@ struct
         | Etuple es ->
             pr_tuple_expr tenv pr_expr es
 
-        | Eapp (op, es, _) ->
-            pr_app tenv pr_expr outer op es
+        | Eapp({tye_desc = Eop(op,_) }, args) -> 
+            pr_app tenv pr_expr outer op args
+
+        | Eapp (e, args) -> 
+            let docs = List.map (pr_expr tenv (min_op_prec, `NonAssoc)) args in
+            (pr_expr tenv (max_op_prec, `NonAssoc) e) ^^ 
+            pr_seq [Pp.parens (pr_list "," docs)]
 
         | Elet (pt, e1, e2) ->
             pr_let tenv pr_expr outer pt e1 e2
@@ -507,8 +513,16 @@ struct
       | Flet (lp, f1, f2) ->
           pr_let tenv pr_form outer lp f1 f2
 
-      | Fapp (p, args) ->
+      | Fop(op,_tys) -> (* FIXME infix, prefix, ty_inst *)
+            pr_op_name tenv op
+
+      | Fapp ({f_node = Fop(p,_)}, args) ->
           pr_app tenv pr_form outer p args
+
+      | Fapp (e,args) ->
+          let docs = List.map (pr_form tenv (min_op_prec, `NonAssoc)) args in
+          (pr_form tenv (max_op_prec, `NonAssoc) e) ^^ 
+          pr_seq [Pp.parens (pr_list "," docs)]
 
       | Ftuple args ->
           pr_tuple_expr tenv pr_form args
@@ -541,14 +555,15 @@ struct
   let pr_lvalue (tenv : t) (lv : lvalue) =
     match lv with
     | LvVar (p, _) ->
-        pr_pv_symb tenv p None
+        pr_pv_symb tenv p.pv_name None
 
     | LvTuple ps ->
-        let docs = List.map (((pr_pv_symb tenv)^~ None) -| fst) ps in
-          Pp.parens (pr_list "," docs)
+        let pr (p,_) = pr_pv_symb tenv p.pv_name None in
+        let docs = List.map pr ps in
+        Pp.parens (pr_list "," docs)
 
-    | LvMap _ ->
-        assert false                    (* FIXME: Don't understand args *)
+    | LvMap (_,x,e,_) ->
+        pr_pv_symb tenv x.pv_name None ^^ !^"[" ^^ pr_expr tenv e ^^ !^"]"
 
   (* ------------------------------------------------------------------ *)
   let pr_instr (tenv : t) (i : instr) =
@@ -556,6 +571,8 @@ struct
       match i with
       | Sasgn (lv, e) ->
           pr_seq [pr_lvalue tenv lv; Pp.equals; pr_expr tenv e]
+      | Srnd (lv, e) ->
+          pr_seq [pr_lvalue tenv lv; Pp.equals; Pp.dollar; pr_expr tenv e]
 
       | Scall (lv, p, args) -> begin
           let doc =
@@ -680,7 +697,7 @@ struct
       | OB_oper i ->
           let dop = if op.op_dom = [] then tk_cnst else tk_op in
           let ddecl =
-            match i.op_def with
+            match i with
             | None -> pr_seq [Pp.colon; pr_sig tenv (op_sig op)]
             | Some (ids, e) ->
                 let vardecls = List.combine ids op.op_dom in
@@ -695,16 +712,14 @@ struct
 
       | OB_pred i ->
           let ddecl =
-            match i.op_def with
+            match i with
             | None -> pr_seq [Pp.colon; pr_dom tenv op.op_dom]
             | Some (ids,f) ->
                 let vardecls = List.combine ids op.op_dom in
                 let subtenv, dd = pr_vardecls tenv vardecls in
                 pr_seq [dd; Pp.equals; pr_form subtenv f]
           in
-          tk_pred, ddecl
-
-      | OB_prob _ -> assert false         (* FIXME: no parsing rule *) in
+          tk_pred, ddecl in
 
     let doc =
       pr_seq [dop; pr_ident tenv basename;
@@ -849,6 +864,7 @@ struct
   let pp_export   = fun t -> pp_of_pr (pr_export t)
   let pp_theory   = fun t -> pp_of_pr (pr_theory t)
   let pp_expr     = fun t -> pp_of_pr (pr_expr t)
+  let pp_form     = fun t -> pp_of_pr (pr_form t)
   let pp_lgoal    = fun t -> pp_of_pr (pr_lgoal t)
 end
 
@@ -1052,6 +1068,7 @@ module EcDebugPP = struct
 
   let pr_type     = BPP.pr_type ()
   let pr_expr     = BPP.pr_expr ()
+  let pr_form     = BPP.pr_form ()
   let pr_dom      = BPP.pr_dom  ()
   let pr_typedecl = fun (x, v) -> BPP.pr_typedecl () (EcPath.Pident x, v)
   let pr_opdecl   = fun (x, v) -> BPP.pr_opdecl   () (EcPath.Pident x, v)
@@ -1064,6 +1081,7 @@ module EcDebugPP = struct
 
   let pp_type     = BPP.pp_type ()
   let pp_expr     = BPP.pp_expr ()
+  let pp_form     = BPP.pp_form ()
   let pp_dom      = BPP.pp_dom  ()
   let pp_typedecl = fun fmt (x, v) -> BPP.pp_typedecl () fmt (EcPath.Pident x, v)
   let pp_opdecl   = fun fmt (x, v) -> BPP.pp_opdecl   () fmt (EcPath.Pident x, v)

@@ -32,17 +32,18 @@ and f_node =
   | Fquant of quantif * binding * form
   | Fif    of form * form * form
   | Flet   of lpattern * form * form
-  | Fint    of int                               (* int. literal        *)
-  | Flocal  of EcIdent.t                         (* Local variable      *)
-  | Fpvar   of EcTypes.prog_var * ty * Side.t    (* sided symbol        *)
-  | Fapp    of EcPath.path * form list           (* op/pred application *)
+  | Fint    of int                               (* int. literal              *)
+  | Flocal  of EcIdent.t                         (* Local variable            *)
+  | Fpvar   of EcTypes.prog_var * ty * Side.t    (* sided symbol              *)
+  | Fop     of EcPath.path * ty list             (* Op/pred application to ty *)
+  | Fapp    of form * form list                  (* application *)
   | Ftuple  of form list                         (* tuple constructor   *)
 
 let fv f = f.f_fv 
 let ty f = f.f_ty
 
 let fv_node = function
-  | Fint _ | Fpvar _ -> Sid.empty
+  | Fint _ | Fpvar _ | Fop _ -> Sid.empty
   | Flocal id -> Sid.singleton id
   | Fquant(_,b,f) -> 
       List.fold_left (fun s (id,_) -> Sid.remove id s) (fv f) b 
@@ -52,7 +53,9 @@ let fv_node = function
       let fv2 = 
         List.fold_left (fun s id -> Sid.remove id s) (fv f2) (ids_of_lpattern lp) in
       Sid.union (fv f1) fv2
-  | Fapp(_,args) | Ftuple args ->
+  | Fapp(f,args) ->
+      List.fold_left (fun s f -> Sid.union s (fv f)) (fv f) args
+  | Ftuple args ->
       List.fold_left (fun s f -> Sid.union s (fv f)) Sid.empty args
   
 let mk_form node ty = 
@@ -64,21 +67,39 @@ let ty_bool = tbool
 let ty_int = tint 
 let ty_unit = tunit
 
-let f_app x args ty = 
-  mk_form (Fapp(x,args)) ty
+let f_op x tys ty = 
+  mk_form (Fop(x,tys)) ty
 
-let f_true = f_app EcCoreLib.p_true [] ty_bool
-let f_false = f_app EcCoreLib.p_false [] ty_bool
+let f_app f args ty = 
+  match f.f_node with
+  | Fapp(f',args') -> mk_form (Fapp(f', args'@args)) ty
+  | _ -> mk_form (Fapp(f,args)) ty
+
+let f_true = f_op EcCoreLib.p_true [] ty_bool
+let f_false = f_op EcCoreLib.p_false [] ty_bool
 let f_bool b = if b then f_true else f_false
 let f_int n = mk_form (Fint n) ty_int
 
-let f_not f = f_app EcCoreLib.p_not [f] ty_bool
-let f_and f1 f2 = f_app EcCoreLib.p_and [f1;f2] ty_bool
-let f_or  f1 f2 = f_app EcCoreLib.p_or [f1;f2] ty_bool
-let f_imp f1 f2 = f_app EcCoreLib.p_imp [f1;f2] ty_bool
-let f_iff f1 f2 = f_app EcCoreLib.p_iff [f1;f2] ty_bool
+let ty_fbool1 = Tfun(ty_bool,ty_bool)
+let ty_fbool2 = Tfun(ty_bool,ty_fbool1) 
 
-let f_eq f1 f2 = f_app EcCoreLib.p_eq [f1;f2] ty_bool
+let fop_not = f_op EcCoreLib.p_not [] ty_fbool1
+let f_not f = f_app fop_not [f] ty_bool
+
+let fop_and = f_op EcCoreLib.p_and [] ty_fbool2
+let f_and f1 f2 = f_app fop_and [f1;f2] ty_bool
+
+let fop_or = f_op EcCoreLib.p_or [] ty_fbool2
+let f_or  f1 f2 = f_app fop_or [f1;f2] ty_bool
+
+let fop_imp = f_op EcCoreLib.p_imp [] ty_fbool2
+let f_imp f1 f2 = f_app fop_imp [f1;f2] ty_bool
+
+let fop_iff = f_op EcCoreLib.p_iff [] ty_fbool2
+let f_iff f1 f2 = f_app fop_iff [f1;f2] ty_bool
+
+let fop_eq ty = f_op EcCoreLib.p_eq [ty] (Tfun(ty, Tfun(ty, ty_bool)))
+let f_eq f1 f2 = f_app (fop_eq f1.f_ty) [f1;f2] ty_bool
 
 let f_local x ty = mk_form (Flocal x) ty
 let f_pvar x ty s = mk_form (Fpvar(x,ty,s)) ty
@@ -110,17 +131,20 @@ let destr_error e = raise (DestrError e)
 
 let destr_and f = 
   match f.f_node with
-  | Fapp(p,[f1;f2]) when EcPath.p_equal p EcCoreLib.p_and -> f1,f2
+  | Fapp({f_node = Fop(p,_)},[f1;f2]) when EcPath.p_equal p EcCoreLib.p_and -> 
+      f1,f2
   | _ -> destr_error Destr_and 
 
 let destr_or f = 
   match f.f_node with
-  | Fapp(p,[f1;f2]) when EcPath.p_equal p EcCoreLib.p_or -> f1,f2
+  | Fapp({f_node = Fop(p,_)},[f1;f2]) when EcPath.p_equal p EcCoreLib.p_or -> 
+      f1,f2
   | _ -> destr_error Destr_or 
 
 let destr_imp f = 
   match f.f_node with
-  | Fapp(p,[f1;f2]) when EcPath.p_equal p EcCoreLib.p_imp -> f1,f2
+  | Fapp({f_node = Fop(p,_)},[f1;f2]) when EcPath.p_equal p EcCoreLib.p_imp -> 
+      f1,f2
   | _ -> destr_error Destr_imp 
 
 let destr_forall1 f = 
@@ -137,17 +161,17 @@ let destr_exists1 f =
 
 let is_and f = 
   match f.f_node with
-  | Fapp(p,_) when EcPath.p_equal p EcCoreLib.p_and -> true
+  | Fapp({f_node = Fop(p,_)},_) when EcPath.p_equal p EcCoreLib.p_and -> true
   | _ -> false 
 
 let is_or f = 
   match f.f_node with
-  | Fapp(p,_) when EcPath.p_equal p EcCoreLib.p_or -> true
+  | Fapp({f_node = Fop(p,_)},_) when EcPath.p_equal p EcCoreLib.p_or -> true
   | _ -> false 
 
 let is_imp f = 
   match f.f_node with
-  | Fapp(p,_) when EcPath.p_equal p EcCoreLib.p_imp -> true
+  | Fapp({f_node = Fop(p,_)},_) when EcPath.p_equal p EcCoreLib.p_imp -> true
   | _ -> false
 
 let is_forall f = 
@@ -171,7 +195,8 @@ let map gt g f =
   | Fint i -> f_int i 
   | Flocal id -> f_local id (gt f.f_ty)
   | Fpvar(id,ty,s) -> f_pvar id (gt ty) s
-  | Fapp(p,es) -> f_app p (List.map g es) (gt f.f_ty)
+  | Fop(p,tys) -> f_op p (List.map gt tys) (gt f.f_ty)
+  | Fapp(e, es) -> f_app (g e) (List.map g es) (gt f.f_ty)
   | Ftuple es -> f_tuple (List.map g es) 
 
 (* -------------------------------------------------------------------- *)

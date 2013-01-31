@@ -1,3 +1,5 @@
+require import list.
+
 theory Fmap.
   import why3 "map" "Map"
     op "mixfix []" as "__get";
@@ -10,7 +12,7 @@ theory Fmap.
 
   (* Add axiom ... *)
   theory DomAxiom.
-    axiom dom_empty : forall (x:a'), 
+    axiom dom_empty : forall (dft:'b), dom(empty <:'a='a>(dft)) = [].
   end DomAxiom.
 
 end Fmap.

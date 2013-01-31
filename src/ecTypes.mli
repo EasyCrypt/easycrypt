@@ -11,7 +11,7 @@ type ty =
   | Tvar    of EcIdent.t 
   | Ttuple  of ty list
   | Tconstr of EcPath.path * ty list
-
+  | Tfun    of ty * ty
 type dom   = ty list
 type tysig = dom * ty 
 
@@ -19,8 +19,8 @@ type tysig = dom * ty
 val tunit      : ty
 val tbool      : ty
 val tint       : ty
-val tbitstring : ty
-val tlist      : ty -> ty
+val tdistr     : ty -> ty
+val toarrow    : dom -> ty -> ty
 
 (* -------------------------------------------------------------------- *)
 module Tuni : sig
@@ -69,34 +69,29 @@ type tyexpr = {
 
 and tyexpr_r =
   | Eint      of int                              (* int. literal       *)
-  | Eflip                                         (* flip               *)
-  | Einter    of tyexpr * tyexpr                  (* interval sampling  *)
-  | Ebitstr   of tyexpr                           (* bitstring sampling *)
-  | Eexcepted of tyexpr * tyexpr                  (* restriction        *)
-  | Elocal    of EcIdent.t * ty                   (* let-variables      *)
-  | Evar      of prog_var * ty                    (* module variable    *)
-  | Eapp      of EcPath.path * tyexpr list * ty   (* op. application    *)
+  | Elocal    of EcIdent.t                        (* let-variables      *)
+  | Evar      of prog_var                         (* module variable    *)
+  | Eop       of EcPath.path * ty list            (* op apply to type args *)
+  | Eapp      of tyexpr * tyexpr list             (* op. application    *)
   | Elet      of lpattern * tyexpr * tyexpr       (* let binding        *)
   | Etuple    of tyexpr list                      (* tuple constructor  *)
   | Eif       of tyexpr * tyexpr * tyexpr         (* _ ? _ : _          *)
 
 and tyexpr_meta = {
   tym_type : ty;
-  tym_prob : bool;
 }
 
 val e_int      : int -> tyexpr
-val e_flip     : unit -> tyexpr
-val e_inter    : tyexpr -> tyexpr -> tyexpr
-val e_bitstr   : tyexpr -> tyexpr
-val e_excepted : tyexpr -> tyexpr -> tyexpr
-val e_local    : EcIdent.t -> ty -> tyexpr
-val e_var      : prog_var -> ty -> tyexpr
-val e_app      : EcPath.path -> tyexpr list -> ty -> tyexpr
+
+val e_local    : EcIdent.t -> tyexpr
+val e_var      : prog_var -> tyexpr
+val e_op       : EcPath.path -> ty list -> tyexpr
+val e_app      : tyexpr -> tyexpr list -> tyexpr
 val e_let      : lpattern -> tyexpr -> tyexpr -> tyexpr
 val e_tuple    : tyexpr list -> tyexpr
 val e_if       : tyexpr -> tyexpr -> tyexpr -> tyexpr
 
+val e_ty       : tyexpr -> ty
 
 (* -------------------------------------------------------------------- *)
 val pv_equal : prog_var -> prog_var -> bool 

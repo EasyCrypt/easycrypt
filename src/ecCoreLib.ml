@@ -1,9 +1,17 @@
+(* -------------------------------------------------------------------- *)
 let s_get  = "__get"
 let s_set  = "__set"
 let s_nil  = "__nil"
 let s_cons = "::"
 let s_abs  = "__abs"
-let s_opp  = "__opp"
+
+
+(* -------------------------------------------------------------------- *)
+
+let s_dbool      = ["distr";"Dbool"     ], "dbool"
+let s_dbitstring = ["distr";"Dbitstring"], "dbitstring"
+let s_dinter     = ["distr";"Dinter"    ], "dinter"
+let s_dexcepted  = ["distr";"Dexcepted" ], "dexcepted"
 
 
 (* -------------------------------------------------------------------- *)
@@ -14,10 +22,7 @@ let id_tt        = EcIdent.create "tt"
 let id_bool      = EcIdent.create "bool"
 let id_int       = EcIdent.create "int"
 let id_real      = EcIdent.create "real"
-let id_bitstring = EcIdent.create "bitstring"
-let id_list      = EcIdent.create "list"
-let id_nil       = EcIdent.create s_nil
-let id_cons      = EcIdent.create "::"
+let id_distr     = EcIdent.create "distr"
 
 let id_true      = EcIdent.create "true"
 let id_false     = EcIdent.create "false"
@@ -37,10 +42,7 @@ let p_tt         = pervasive id_tt
 let p_bool       = pervasive id_bool
 let p_int        = pervasive id_int
 let p_real       = pervasive id_real
-let p_bitstring  = pervasive id_bitstring
-let p_list       = pervasive id_list
-let p_nil        = pervasive id_nil
-let p_cons       = pervasive id_cons
+let p_distr      = pervasive id_distr
 
 let p_true       = pervasive id_true
 let p_false      = pervasive id_false

@@ -35,7 +35,7 @@
   let pfget loc ti e1 e2    = 
     PFapp (pqsymb_of_symb loc EcCoreLib.s_get, ti, [e1; e2])
   let pfset loc ti e1 e2 e3 = 
-    PFapp (pqsymb_of_symb loc EcCoreLib.s_get, ti, [e1; e2; e3])
+    PFapp (pqsymb_of_symb loc EcCoreLib.s_set, ti, [e1; e2; e3])
 
   let mk_loc loc e = 
     { pl_desc = e;  pl_loc  = loc;}
@@ -70,6 +70,7 @@
 %token <string> STRING
 
 (* Tokens + keywords *)
+%token SAMPLE
 // %token ABSTRACT
 %token UNDERSCORE
 %token ADMIT
@@ -119,14 +120,12 @@
 %token LKEY
 // %token LLIMP
 %token LPAREN
-%token MINUS
 %token MODULE
 %token NE
 %token NOT
 %token OP
 %token OR
 %token PIPE
-%token POP
 // %token PR
 %token PRED
 // %token PROVER
@@ -162,7 +161,6 @@
 // %token ABORT
 // %token ALL
 // %token APP
-// %token APPLY
 // %token APRHL
 // %token ASSIGN
 // %token AT
@@ -187,6 +185,7 @@
 %token ASSUMPTION
 %token SPLIT
 %token ELIM
+%token APPLY
 // %token IFNEG
 // %token IFSYNC
 // %token INLINE
@@ -223,7 +222,8 @@
 %left EQ NE OP1 GT
 
 %right QUESTION
-%left OP2 MINUS
+%left OP2 
+%right ARROW
 %left OP3 STAR
 %left OP4 
 
@@ -254,7 +254,6 @@ qident:
 (* -------------------------------------------------------------------- *)
 %inline binop:
 | EQ      { "="  }
-| MINUS   { "-"  }
 | AND     { "&&" }
 | OR      { "||" }
 | STAR    { "*"  }
@@ -264,6 +263,7 @@ qident:
 | x=OP3   { x    }
 | x=OP4   { x    }
 ;
+
 
 (* -------------------------------------------------------------------- *)
 prog_num:
@@ -335,8 +335,8 @@ exp:
 | op=loc(NOT) ti=tvars_app e=loc(exp) (* %prec NOT *)
    { PEapp (pqsymb_of_symb op.pl_loc "!", ti, [e]) }
 
-| op=loc(MINUS) ti=tvars_app e=loc(exp) %prec prec_prefix_op
-   { PEapp (pqsymb_of_symb op.pl_loc EcCoreLib.s_opp, ti, [e]) }
+| op=loc(binop) ti=tvars_app e=loc(exp) %prec prec_prefix_op
+   { PEapp (pqsymb_of_psymb op, ti, [e]) }
 
 | e1=loc(exp) op=loc(op1) ti=tvars_app e2=loc(exp) %prec OP1
     { PEapp (pqsymb_of_psymb op, ti, [e1; e2]) }
@@ -368,9 +368,6 @@ exp:
 | e1=loc(exp) op=loc(NE) ti=tvars_app e2=loc(exp)  
     { PEapp (pqsymb_of_symb op.pl_loc "<>" , ti, [e1; e2]) }
 
-| e1=loc(exp) op=loc(MINUS) ti=tvars_app e2=loc(exp) 
-    { PEapp (pqsymb_of_symb op.pl_loc "-"  , ti, [e1; e2]) }
-
 | e1=loc(exp) op=loc(STAR) ti=tvars_app e2=loc(exp)  
     { PEapp (pqsymb_of_symb op.pl_loc "*"  , ti, [e1; e2]) }
 
@@ -380,22 +377,22 @@ exp:
 
 | LET p=lpattern EQ e1=loc(exp) IN e2=loc(exp)
    { PElet (p, e1, e2) }
-
-| LKEY n1=number COMMA n2=number RKEY
+(* Distribution *)
+| LKEY n1=number op=loc(COMMA) n2=number RKEY
     { if   n1 = 0 && n2 = 1
-      then PEflip
+      then PEident (mk_lced op.pl_loc EcCoreLib.s_dbool, None)
       else error (Location.make $startpos $endpos) "malformed bool random" }
 
-| LKEY n1=number COMMA n2=number RKEY_HAT e=loc(exp)
+| LKEY n1=number op=loc(COMMA) n2=number RKEY_HAT e=loc(exp)
     { if   n1 = 0 && n2 = 1
-      then PEbitstr e
+      then PEapp (mk_lced op.pl_loc EcCoreLib.s_dbitstring, None, [e])
       else error (Location.make $startpos $endpos) "malformed random bitstring" }
 
-| LBRACKET e1=loc(exp) DOTDOT e2=loc(exp) RBRACKET
-    { PEinter (e1, e2) }
+| LBRACKET e1=loc(exp) op=loc(DOTDOT) e2=loc(exp) RBRACKET
+    { PEapp(mk_lced op.pl_loc EcCoreLib.s_dinter, None, [e1; e2]) }
 
-| LPAREN re=loc(exp) BACKSLASH e=loc(exp) RPAREN
-    { PEexcepted (re, e) }
+| LPAREN re=loc(exp) op=loc(BACKSLASH) e=loc(exp) RPAREN
+    { PEapp (mk_lced op.pl_loc EcCoreLib.s_dexcepted, None, [re; e]) }
 ;
 
 (* -------------------------------------------------------------------- *)
@@ -447,8 +444,8 @@ form:
 | op=loc(NOT) ti=tvars_app e=loc(form) 
     { PFapp (pqsymb_of_symb op.pl_loc "!", ti, [e]) }
 
-| op=loc(MINUS) ti=tvars_app e=loc(form) %prec prec_prefix_op
-   { PFapp (pqsymb_of_symb op.pl_loc EcCoreLib.s_opp, ti, [e]) }
+| op=loc(binop) ti=tvars_app e=loc(form) %prec prec_prefix_op
+   { PFapp (pqsymb_of_psymb op, ti, [e]) }
 | e1=loc(form) op=loc(op1) ti=tvars_app e2=loc(form) %prec OP1 
     { PFapp (pqsymb_of_psymb op, ti, [e1; e2]) } 
 | e1=loc(form) op=loc(OP2) ti=tvars_app e2=loc(form)  
@@ -470,8 +467,6 @@ form:
 | e1=loc(form) op=loc(NE   ) ti=tvars_app e2=loc(form) 
     { PFapp (pqsymb_of_symb op.pl_loc "<>" , ti, [e1; e2]) }
 
-| e1=loc(form) op=loc(MINUS) ti=tvars_app e2=loc(form)  
-    { PFapp (pqsymb_of_symb op.pl_loc "-" , ti, [e1; e2]) }
 | e1=loc(form) op=loc(STAR ) ti=tvars_app e2=loc(form)  
     { PFapp (pqsymb_of_symb op.pl_loc "*" , ti, [e1; e2]) }
 
@@ -517,8 +512,9 @@ type_args:
 ;
 
 type_exp:
-| ty=simpl_type_exp                    { ty }
-| ty=plist2(loc(simpl_type_exp), STAR) { PTtuple ty }
+| ty=simpl_type_exp                              { ty }
+| ty=plist2(loc(simpl_type_exp), STAR)           { PTtuple ty }
+| ty1=loc(type_exp) ARROW ty2=loc(type_exp)      { PTfun(ty1,ty2) }
 ;
 
 (* -------------------------------------------------------------------- *)
@@ -552,6 +548,9 @@ base_instr:
 
 | x=lvalue EQ e=loc(exp)
     { PSasgn (x, e) }
+
+| x=lvalue EQ SAMPLE e=loc(exp)
+    { PSrnd(x,e) }
 
 | ASSERT LPAREN c=loc(exp) RPAREN 
      { PSassert c }
@@ -722,7 +721,7 @@ type_decl_or_def:
 
 op_tydom:
 | LPAREN RPAREN                                  { [  ] }
-| ty=loc(type_exp)                               { [ty] }
+| ty=loc(simpl_type_exp)                          { [ty] }
 | LPAREN tys=plist2(loc(type_exp), COMMA) RPAREN { tys  }
 ;
 
@@ -745,8 +744,7 @@ operator:
       po_tyvars = tyvars ;
       po_dom    = fst sty;
       po_codom  = snd sty;
-      po_body   = None   ;
-      po_prob   = false  ; }
+      po_body   = None   ; }
   }
 
 | OP x=op_ident tyvars=tyvars_decl p=param_decl1 COLON codom=loc(type_exp)
@@ -755,17 +753,7 @@ operator:
       po_tyvars = tyvars ;
       po_dom    = Some(List.map snd p);
       po_codom  = codom  ;
-      po_body   = Some(List.map fst p, b);
-      po_prob   = false  ; }
-  }
-
-| POP x=ident tyvars=tyvars_decl COLON sty=op_sig {
-    { po_name   = x      ;
-      po_tyvars = tyvars ;
-      po_dom = fst sty   ;
-      po_codom = snd sty ;
-      po_body  = None    ;
-      po_prob   = true   ; }
+      po_body   = Some(List.map fst p, b); }
   }
 
 | CNST x=ident tyvars=tyvars_decl COLON ty=loc(type_exp) {
@@ -773,16 +761,14 @@ operator:
       po_tyvars = tyvars   ;
       po_dom = None    ;
       po_codom = ty    ;
-      po_body = None   ;
-      po_prob   = false; }
+      po_body = None   ; }
   }
 | CNST x=ident tyvars=tyvars_decl COLON ty=loc(type_exp) EQ e=loc(exp) {
     { po_name   = x     ;
       po_tyvars = tyvars;
       po_dom = None     ;
       po_codom = ty     ;
-      po_body = Some([], e) ;
-      po_prob   = false ; }
+      po_body = Some([], e) ; }
   }
 ;
 
@@ -910,17 +896,22 @@ elim_args:
 | LPAREN l=plist1(underscore_or_form, COMMA) RPAREN { l }
 ;
 
+elim: 
+| k=elim_kind a=elim_args  { { elim_kind = k; elim_args = a } } 
+;
+
 tactic:
-| IDTAC                        { Pidtac }
-| ASSUMPTION a=assumption_args { Passumption a } 
-| TRIVIAL                      { Ptrivial }
-| INTROS a=intro_args          { Pintro a }
-| SPLIT                        { Psplit }
-| EXIST  a=exists_args         { Pexists a }
-| LEFT                         { Pleft }
-| RIGHT                        { Pright }
-| ELIM k=elim_kind a=elim_args { Pelim { elim_kind = k; elim_args = a } } 
-| LPAREN s=tactics RPAREN      { Pseq s } 
+| IDTAC                         { Pidtac }
+| ASSUMPTION a=assumption_args  { Passumption a } 
+| TRIVIAL                       { Ptrivial }
+| INTROS a=intro_args           { Pintro a }
+| SPLIT                         { Psplit }
+| EXIST  a=exists_args          { Pexists a }
+| LEFT                          { Pleft }
+| RIGHT                         { Pright }
+| ELIM e=elim                   { Pelim e }
+| APPLY e=elim                  { Papply e }
+| LPAREN s=tactics RPAREN       { Pseq s } 
 ;
 
 tactics:

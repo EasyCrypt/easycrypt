@@ -6,8 +6,15 @@ val s_get  : string
 val s_set  : string
 val s_nil  : string
 val s_cons : string
-val s_opp  : string
 val s_abs  : string
+
+(* qsymbol *)
+val s_dexcepted  : string list * string
+val s_dbool      : string list * string
+val s_dbitstring : string list * string
+val s_dinter     : string list * string
+
+
 
 
 (* --------------------------------------------------------------------- *)
@@ -22,13 +29,9 @@ val p_unit       : path
 val p_bool       : path
 val p_int        : path
 val p_real       : path
-val p_bitstring  : path
+val p_distr      : path 
 
 val p_tt         : path
-val p_list       : path
-val p_nil        : path
-val p_cons       : path
-
 val p_true       : path
 val p_false      : path
 

@@ -10,8 +10,9 @@ type ty =
   | Tunivar of EcUidgen.uid
   | Tvar    of EcIdent.t
   | Ttuple  of ty list
-  | Tconstr of EcPath.path * ty list 
-
+  | Tconstr of EcPath.path * ty list
+  | Tfun    of ty * ty
+ 
 type dom = ty list
 type tysig = dom * ty 
 
@@ -19,10 +20,10 @@ type tysig = dom * ty
 let tunit      = Tconstr(EcCoreLib.p_unit, [])
 let tbool      = Tconstr(EcCoreLib.p_bool, [])
 let tint       = Tconstr(EcCoreLib.p_int , [])
-let tbitstring = Tconstr(EcCoreLib.p_bitstring, [])
-
-let tlist ty =
-  Tconstr (EcCoreLib.p_list, [ ty ])
+let tdistr  ty = Tconstr(EcCoreLib.p_distr, [ty])
+ 
+let toarrow dom ty = 
+  List.fold_right (fun t1 t2 -> Tfun(t1,t2)) dom ty
 
 (* -------------------------------------------------------------------- *)
 let map f t = 
@@ -30,18 +31,21 @@ let map f t =
   | Tunivar _ | Tvar _ -> t
   | Ttuple lty -> Ttuple (List.map f lty)
   | Tconstr(p, lty) -> Tconstr (p, List.map f lty)
+  | Tfun(t1,t2)     -> Tfun(f t1, f t2)
 
 let fold f s = function
   | Tunivar _ | Tvar _ -> s
   | Ttuple lty -> List.fold_left f s lty
   | Tconstr(_, lty) -> List.fold_left f s lty
+  | Tfun(t1,t2) -> f (f s t1) t2
 
 let sub_exists f t =
   match t with
   | Tunivar _ | Tvar _ -> false
   | Ttuple lty -> List.exists f lty
   | Tconstr (_, lty) -> List.exists f lty
-
+  | Tfun (t1,t2) -> f t1 || f t2
+  
 (* -------------------------------------------------------------------- *)
 module Tuni = struct
   let subst1 ((id, t) : uid * ty) =
@@ -125,37 +129,35 @@ type tyexpr = {
 
 and tyexpr_r =
   | Eint      of int                              (* int. literal       *)
-  | Eflip                                         (* flip               *)
-  | Einter    of tyexpr * tyexpr                  (* interval sampling  *)
-  | Ebitstr   of tyexpr                           (* bitstring sampling *)
-  | Eexcepted of tyexpr * tyexpr                  (* restriction        *)
-  | Elocal    of EcIdent.t * ty                   (* let-variables      *)
-  | Evar      of prog_var * ty                    (* module variable    *)
-  | Eapp      of EcPath.path * tyexpr list * ty   (* op. application    *)
+  | Elocal    of EcIdent.t                        (* let-variables      *)
+  | Evar      of prog_var                         (* module variable    *)
+  | Eop       of EcPath.path * ty list            (* op apply to type args *)
+  | Eapp      of tyexpr * tyexpr list             (* op. application    *)
   | Elet      of lpattern * tyexpr * tyexpr       (* let binding        *)
   | Etuple    of tyexpr list                      (* tuple constructor  *)
   | Eif       of tyexpr * tyexpr * tyexpr         (* _ ? _ : _          *)
 
 and tyexpr_meta = {
   tym_type : ty;
-  tym_prob : bool;
 }
 
+let e_ty e = (oget e.tye_meta).tym_type
 (* -------------------------------------------------------------------- *)
 let e_tyexpr (e : tyexpr_r) =
   { tye_desc = e; tye_meta = None; }
 
-let e_int      = fun i         -> e_tyexpr (Eint i)
-let e_flip     = fun ()        -> e_tyexpr (Eflip)
-let e_inter    = fun e1 e2     -> e_tyexpr (Einter (e1, e2))
-let e_bitstr   = fun e         -> e_tyexpr (Ebitstr e)
-let e_excepted = fun e1 e2     -> e_tyexpr (Eexcepted (e1, e2))
-let e_local    = fun x ty      -> e_tyexpr (Elocal (x, ty))
-let e_var      = fun x ty      -> e_tyexpr (Evar (x, ty))
-let e_app      = fun x args ty -> e_tyexpr (Eapp (x, args, ty))
-let e_let      = fun pt e1 e2  -> e_tyexpr (Elet (pt, e1, e2))
-let e_tuple    = fun es        -> e_tyexpr (Etuple es)
-let e_if       = fun c e1 e2   -> e_tyexpr (Eif (c, e1, e2))
+let e_int      = fun i        -> e_tyexpr (Eint i)
+let e_local    = fun x        -> e_tyexpr (Elocal x)
+let e_var      = fun x        -> e_tyexpr (Evar x)
+let e_op       = fun x targs  -> e_tyexpr (Eop (x, targs))
+let e_app x args = 
+  match x.tye_desc with
+  | Eapp(x', args') -> e_tyexpr (Eapp (x', (args'@args)))
+  | _ -> e_tyexpr (Eapp (x, args))
+
+let e_let      = fun pt e1 e2 -> e_tyexpr (Elet (pt, e1, e2))
+let e_tuple    = fun es       -> e_tyexpr (Etuple es)
+let e_if       = fun c e1 e2  -> e_tyexpr (Eif (c, e1, e2))
 
 (* -------------------------------------------------------------------- *)
 let pv_equal v1 v2 = 
@@ -166,23 +168,21 @@ let ids_of_lpattern = function
   | LSymbol id -> [id] 
   | LTuple ids -> ids
 
-let rec e_map ft fmeta fe e =
-  { tye_desc = e_map_r ft fe e.tye_desc;
+let rec e_map fty fmeta fe e =
+  { tye_desc = e_map_r fty fe e.tye_desc;
     tye_meta = fmeta e.tye_meta; }
 
-and e_map_r ft fe e =
+and e_map_r fty fe e =
   match e with 
   | Eint _                -> e
-  | Eflip                 -> e
-  | Elocal (id, ty)       -> Elocal (id, ft ty)
-  | Evar (id, ty)         -> Evar (id, ft ty)
-  | Eapp (p, args, ty)    -> Eapp (p, List.map fe args, ft ty)
+  | Elocal id             -> Elocal id
+  | Evar id               -> Evar id
+  | Eop (p, tys)          -> Eop(p, List.map fty tys)
+  | Eapp (e, args)        -> Eapp(fe e, List.map fe args)
   | Elet (lp, e1, e2)     -> Elet (lp, fe e1, fe e2)
   | Etuple le             -> Etuple (List.map fe le)
   | Eif (e1, e2, e3)      -> Eif (fe e1, fe e2, fe e3)
-  | Einter (e1, e2)       -> Einter (fe e1, fe e2)
-  | Ebitstr e             -> Ebitstr (fe e)
-  | Eexcepted (e1, e2)    -> Eexcepted (fe e1, fe e2)
+
 
 let rec e_fold fe state e =
   e_fold_r fe state e.tye_desc
@@ -190,22 +190,21 @@ let rec e_fold fe state e =
 and e_fold_r fe state e =
   match e with
   | Eint _                -> state
-  | Eflip                 -> state
   | Elocal _              -> state
   | Evar _                -> state
-  | Eapp (_, args, _)     -> List.fold_left fe state args
+  | Eop _                 -> state
+  | Eapp (e, args)        -> List.fold_left fe (fe state e) args
   | Elet (_, e1, e2)      -> List.fold_left fe state [e1; e2]
   | Etuple es             -> List.fold_left fe state es
   | Eif (e1, e2, e3)      -> List.fold_left fe state [e1; e2; e3]
-  | Einter (e1, e2)       -> List.fold_left fe state [e1; e2]
-  | Ebitstr e             -> fe state e
-  | Eexcepted (e1, e2)    -> List.fold_left fe state [e1; e2]
+
 
 (* -------------------------------------------------------------------- *)
 module Esubst = struct 
   let mapty onty = 
-    let rec aux e = e_map onty (fun x -> x) aux e in
-      aux 
+    let onmeta _ = None in
+    let rec aux e = e_map onty onmeta aux e in
+    aux 
 
   let uni (uidmap : ty Muid.t) = mapty (Tuni.subst uidmap)
 end
@@ -226,6 +225,8 @@ module Dump = struct
       | Tconstr (p, tys) ->
           let strp = EcPath.tostring p in
             EcDebug.onhlist pp ~extra:strp "Tconstr" ty_dump tys
+      | Tfun (t1, t2) ->
+          EcDebug.onhlist pp "Tfun" ty_dump [t1;t2]
     in
       fun ty -> ty_dump pp ty
 
@@ -235,36 +236,21 @@ module Dump = struct
       | Eint i ->
           EcDebug.single pp ~extra:(string_of_int i) "Eint"
 
-      | Eflip ->
-          EcDebug.single pp "Eflip"
-
-      | Einter (e1, e2) ->
-          EcDebug.onhlist pp "Einter" ex_dump [e1; e2]
-        
-      | Ebitstr e ->
-          EcDebug.onhlist pp "Ebitstr" ex_dump [e]
-
-      | Eexcepted (e1, e2) ->
-          EcDebug.onhlist pp "Eexcepted" ex_dump [e1; e2]
-
-      | Elocal (x, ty) ->
+      | Elocal x ->
           EcDebug.onhlist pp
             "Elocal" ~extra:(EcIdent.tostring x)
-            ty_dump [ty]
+            ty_dump []
         
-      | Evar (x, ty) ->
+      | Evar x ->
           EcDebug.onhlist pp
             "Evar" ~extra:(EcPath.tostring x.pv_name)
-            ty_dump [ty]
-
-      | Eapp (p, args, ty) ->
-          let aprinter pp =
-            EcDebug.onhlist pp ~enum:true "Arguments" ex_dump args
-          and tprinter pp =
-            EcDebug.onhlist pp "Type" ty_dump [ty]
-          in
-            EcDebug.onseq pp "Eapp" ~extra:(EcPath.tostring p)
-              (Stream.of_list [tprinter; aprinter])
+            ty_dump []
+      | Eop (x, tys) ->
+          EcDebug.onhlist pp "Eop" ~extra:(EcPath.tostring x)
+            ty_dump tys
+          
+      | Eapp (e, args) -> 
+          EcDebug.onhlist pp "Eapp" ex_dump (e::args)
 
       | Elet (_p, e1, e2) ->            (* FIXME *)
           let printers = [ex_dump^~ e1; ex_dump^~ e2] in

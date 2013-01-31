@@ -44,7 +44,44 @@ type tac_error =
 
 exception TacError of tac_error
 
-let tacerror e= raise (TacError e)
+
+module PE = EcPrinting.EcDebugPP (* FIXME *)
+
+let pp_tac_error fmt = function
+  | UnknownAx p ->
+      Format.fprintf fmt "Unknown axiom/lemma %a" PE.pp_path p
+  | NotAHypothesis id -> 
+      Format.fprintf fmt "Unknown hypothesis %s" (EcIdent.name id)
+  | ExclMidle f ->
+      Format.fprintf fmt "Can not applies excluded midle on %a" PE.pp_form f
+  | And_I f ->
+      Format.fprintf fmt "Can not applies and intro on %a" PE.pp_form f
+  | Or_I f ->
+      Format.fprintf fmt "Can not applies or intro on %a" PE.pp_form f
+  | Imp_I f ->
+      Format.fprintf fmt "Can not applies implies intro on %a" PE.pp_form f
+  | Forall_I f ->
+      Format.fprintf fmt "Can not applies forall intro on %a" PE.pp_form f
+  | Exists_I f ->
+      Format.fprintf fmt "Can not applies exists intro on %a" PE.pp_form f
+  | Imp_E f ->
+      Format.fprintf fmt "Can not applies implies elim on %a" PE.pp_form f  
+  | Forall_E f ->
+      Format.fprintf fmt "Can not applies forall elim on %a" PE.pp_form f
+  | Exists_E f ->
+      Format.fprintf fmt "Can not applies exists elim on %a" PE.pp_form f
+  | DupIdInCtxt id -> 
+      Format.fprintf fmt "Duplicate name in context %s" (EcIdent.name id)
+
+  | CanNotProve g -> 
+      Format.fprintf fmt "Can not prove %a" PE.pp_lgoal g
+
+let _ = EcPexception.register (fun fmt exn ->
+  match exn with
+  | TacError e -> pp_tac_error fmt e 
+  | _ -> raise exn)
+      
+let tacerror e = raise (TacError e)
 
 let t_admit g = 
   let rule = { pr_name = RN_admit; pr_hyps = [] } in
@@ -88,7 +125,7 @@ let t_clear id (juc,n as g) =
   
 let get_equality f = 
   match f.f_node with
-  | Fapp(op,[f1;f2]) when 
+  | Fapp({f_node = Fop(op,_)},[f1;f2]) when 
       EcPath.p_equal op EcCoreLib.p_eq || EcPath.p_equal op EcCoreLib.p_iff ->
       f1, f2
   | _ -> assert false (* FIXME error message *)

@@ -108,12 +108,17 @@ end
 module List = struct
   include List
 
+  let hd2 l = 
+    match l with
+    | a::b::_ -> a,b
+    | _ -> assert false
+
   let ocons o l = 
     match o with
     | None -> l
     | Some e -> e :: l
 
-  let isempty xs = (=) [] xs
+  let isempty xs = xs == []
 
   let ohead (xs : 'a list) =
     match xs with [] -> None | x :: _ -> Some x
@@ -181,13 +186,15 @@ module List = struct
   let tryassoc (x : 'a) (xs : ('a * 'b) list) =
     tryassoc_eq (=) x xs
 
-  let take (n : int) (xs : 'a list) =
+  let take_n (n : int) (xs : 'a list) =
     let rec take n xs acc =
       match n, xs with
-      | 0, _ | _, [] -> List.rev acc
+      | 0, _ | _, [] -> List.rev acc, xs
       | _, x :: xs -> take (n-1) xs (x :: acc)
     in
-      take n xs []
+    take n xs []
+
+  let take (n : int) (xs : 'a list) = fst (take_n n xs)
 
   let split_n n l = 
     let rec aux r n l = 

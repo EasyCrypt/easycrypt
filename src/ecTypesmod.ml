@@ -114,16 +114,22 @@ and stmt = instr list
 
 and instr =
   | Sasgn   of lvalue * EcTypes.tyexpr
+  | Srnd    of lvalue * EcTypes.tyexpr
   | Scall   of lvalue option * EcPath.path * EcTypes.tyexpr list
   | Sif     of EcTypes.tyexpr * stmt * stmt
   | Swhile  of EcTypes.tyexpr * stmt
   | Sassert of EcTypes.tyexpr
 
 and lvalue =
-  | LvVar   of (EcPath.path * EcTypes.ty)
-  | LvTuple of (EcPath.path * EcTypes.ty) list
-  | LvMap   of EcPath.path * EcPath.path * EcTypes.tyexpr * EcTypes.ty
-               (* op, map, where, type updated value *)
+  | LvVar   of (EcTypes.prog_var * EcTypes.ty)
+  | LvTuple of (EcTypes.prog_var * EcTypes.ty) list
+  | LvMap   of (EcPath.path * EcTypes.ty list) * 
+               EcTypes.prog_var * EcTypes.tyexpr * EcTypes.ty
+ (* LvMap(op, m, x, ty)
+    - op is the set operator
+    - m is the map to be updated 
+    - x is the position to update
+    - ty is the type of the value associated to x *)
 
 (* -------------------------------------------------------------------- *)
 type theory = theory_item list

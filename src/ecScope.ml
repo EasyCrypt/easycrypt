@@ -204,7 +204,6 @@ module Op = struct
     let tp =  TT.tp_relax in
     let dom  = TT.transtys tp scope.sc_env ue (odfl [] op.po_dom) in
     let codom  = TT.transty tp scope.sc_env ue op.po_codom in
-    let policy = { TT.epl_prob = op.po_prob } in
     let body =
       match op.po_body with
       | None -> None
@@ -213,13 +212,13 @@ module Op = struct
           let env =
             EcEnv.Var.bindall (List.combine xs dom) None scope.sc_env
           in
-          let body = TT.transexpcast env policy ue codom body in
+          let body = TT.transexpcast env ue codom body in
           Some (xs, body) in
     let uni = Tuni.subst (EcUnify.UniEnv.close ue) in
     let body = omap body (fun (ids,body) -> ids, Esubst.mapty uni body) in
     let (dom,codom) = List.map uni dom, uni codom in
     let tparams = EcUnify.UniEnv.tparams ue in 
-    let tyop = EcDecl.mk_op tparams dom codom body op.po_prob in
+    let tyop = EcDecl.mk_op tparams dom codom body in
     bind scope (EcIdent.create (unloc op.po_name), tyop)
 end
 
@@ -502,11 +501,14 @@ module Tactic = struct
 
   let process_intros pis = t_lseq (List.map process_intro pis)
 
-  let process_formula env g pf =
+  let process_form env g pf ty =
     let hyps = get_hyps g in
     let ue = EcUnify.UniEnv.create (Some hyps.h_tvar) in
-    let ff = TT.transformula (TT.Fenv.fenv_hyps env hyps) ue pf in
+    let ff = TT.transform (TT.Fenv.fenv_hyps env hyps) ue pf ty in
     EcFol.Fsubst.mapty (Tuni.subst (EcUnify.UniEnv.close ue)) ff
+
+  let process_formula env g pf = 
+    process_form env g pf tbool
 
   let process_exists1 env pf g =  
     let f = process_formula env g pf in
@@ -519,15 +521,18 @@ module Tactic = struct
     match ot with
     | None -> t_imp_elim f g
     | Some pf ->
-       let ft = process_formula env g pf in
-       t_forall_elim env f ft g
+        let _,ty,_ = EcFol.destr_forall1 f in
+        let ft = process_form env g pf ty in
+        t_forall_elim env f ft g
 
   let process_intro_elim env ot g =
     let id = EcIdent.create "_" in
     let ff = fst(destr_imp (get_concl g)) in
-    t_seq_subgoal (t_seq (t_imp_intro id) (process_elim env ff ot))
-      [ t_hyp env id;
-        t_clear id] g
+    let seq = 
+      if ot = None then [t_hyp env id; t_clear id; t_clear id]
+      else [t_hyp env id; t_clear id] in
+    t_seq (t_imp_intro id)
+      (t_seq_subgoal (process_elim env ff ot) seq) g
 
   let rec process_intro_elims env ots g = 
     match ots with
@@ -552,21 +557,29 @@ module Tactic = struct
         end
     | ElimForm pf ->
         let ff = process_formula env g pf in
-        t_id, ff
+        t_id, ff 
 
-  let process_elims env pe g =       
+  let process_elims only_app env pe g =       
     let tac, ff = process_elim_kind env g pe.elim_kind in
-    if is_and ff then t_on_first (t_and_elim ff g) tac
-    else if is_or ff then t_on_first (t_or_elim ff g) tac
-    else if is_exists ff then t_on_first (t_exists_elim ff g) tac 
-    else if is_forall ff || is_imp ff then
+    if is_forall ff || is_imp ff then
       begin match pe.elim_args with
       | [] -> assert false (* FIXME error message *)
       | ot::ots -> 
-          t_seq_subgoal (process_elim env ff ot)
-             [tac;process_intro_elims env ots] g
+          let seq = 
+            if ot = None then [tac;t_id; process_intro_elims env ots]
+            else [tac; process_intro_elims env ots] in
+          t_seq_subgoal (process_elim env ff ot) seq g
       end
+    else if only_app then assert false (* FIXME error message *)
+    else if is_and ff then t_on_first (t_and_elim ff g) tac
+    else if is_or ff then t_on_first (t_or_elim ff g) tac
+    else if is_exists ff then t_on_first (t_exists_elim ff g) tac 
     else assert false (* FIXME error message *)
+
+  let process_apply env pe g= 
+    let id = EcIdent.create "_" in
+    t_on_last (process_elims true env pe g) 
+      (t_seq (t_imp_intro id) (t_hyp env id))
 
   let rec process_logic_tacs env (tacs:ptactics) (gs:goals) : goals = 
     match tacs with
@@ -588,7 +601,8 @@ module Tactic = struct
     | Pexists fs     -> process_exists env fs g
     | Pleft          -> t_or_intro true g
     | Pright         -> t_or_intro false g
-    | Pelim pe       -> process_elims env pe g
+    | Pelim pe       -> process_elims false env pe g
+    | Papply pe      -> process_apply env pe g
     | Pseq tacs      -> 
         let (juc,n) = g in
         process_logic_tacs env tacs (juc,[n])

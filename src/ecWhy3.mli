@@ -24,7 +24,7 @@ val import_w3 :
 val add_ty : env -> EcPath.path -> EcDecl.tydecl -> env * rebinding_item
 
 val add_op : 
-    env -> EcPath.path -> EcDecl.operator -> env * rebinding_item option
+    env -> EcPath.path -> EcDecl.operator -> env * rebinding_item
 
 val add_ax : env -> EcPath.path -> EcDecl.axiom -> env * rebinding_item
 

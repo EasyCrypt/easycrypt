@@ -1,15 +1,12 @@
 require import pair.
 require import int.
-require import Fun. 
+require import bitstring.
+require import Fun.
 require        Set.
 require import real. 
 
-
-
 op caract (p:'a Pred, x : 'a) : real = 
-   if p @ x then FromInt.from_int(1) else FromInt.from_int(0).
-
-type 'a distr.
+   if p(x) then FromInt.from_int(1) else FromInt.from_int(0).
 
 op mu : ('a distr, 'a Pred) -> real.
 
@@ -17,7 +14,7 @@ axiom mu_bounded :
   forall (d: 'a distr, P:'a Pred), 
   FromInt.from_int(0) <= mu(d,P) && mu(d,P) <= FromInt.from_int(1).
 
-axiom mu_false : forall (d: 'a distr), mu(d,Pfalse) = FromInt.from_int(0).
+(* axiom mu_false : forall (d: 'a distr), mu(d,Pfalse) = FromInt.from_int(0). *)
 
 axiom mu_incl : forall (P1:_, P2:'a Pred, d:'a distr),
    Pincl(P1, P2) => mu(d,P1) <= mu(d,P2).
@@ -41,11 +38,11 @@ theory Dunit.
      in_supp(x1, dunit(x2)) <=> x1 = x2.
 
   axiom mu_def_in : forall (x:'a, P:'a Pred),
-     P @ x =>
+     P(x) =>
      mu (dunit(x),P) = FromInt.from_int(1).
   
   axiom mu_def_notin : forall (x:'a, P: 'a Pred), 
-     !(P @ x) =>
+     !P(x) =>
      mu (dunit(x),P) = FromInt.from_int(0).
 
 end Dunit.
@@ -77,7 +74,7 @@ theory Dbool.
        (FromInt.from_int(1)/FromInt.from_int(2)) * caract(P,true) 
      + (FromInt.from_int(1)/FromInt.from_int(2)) * caract(P,false).
   
-  lemma mu_x_def : forall (b:bool), mu_x (dbool, b) = 
+  axiom mu_x_def : forall (b:bool), mu_x (dbool, b) = 
     FromInt.from_int(1)/FromInt.from_int(2).
 
   lemma mu_weight : mu_weight(dbool) = FromInt.from_int(1).
@@ -107,18 +104,19 @@ theory Dinter.
 
 end Dinter.
 
-(*
 theory Dbitstring.
-  op dbitstring : int -> bitstring.
+
+  op dbitstring : int -> bitstring distr.
   
   axiom supp_def : forall ( k:int, s:bitstring),
-      in_supp(s,dbitstring(k)) <=> Bitstr.length(s) = k.
+      in_supp(s,dbitstring(k)) <=> length(s) = k.
 
-  axiom mu_def_in : forall (k:int, s:bitstring),
-    Bitstr.length(s) = k => mu(dbitstring(k), s) = FromInt.from_int(1)/2^k.
+  axiom mu_x_def_in : forall (k:int, s:bitstring),
+    length(s) = k => 
+    mu_x(dbitstring(k), s) = FromInt.from_int(1)/FromInt.from_int(2^k).
 
-  axiom mu_def_other : forall (k:int, s:bitstring),
-    Bitstr.length(s) <> k => mu(dbitstring(k), s) = FromInt.from_int(0).
+  axiom mu_x_def_other : forall (k:int, s:bitstring),
+    !(length(s) = k) => mu_x(dbitstring(k), s) = FromInt.from_int(0).
 
   axiom mu_weight_pos : forall (k:int), 0 <= k =>
     mu_weight(dbitstring(k)) = FromInt.from_int(1).
@@ -127,14 +125,17 @@ theory Dbitstring.
     mu_weight(dbitstring(k)) = FromInt.from_int(0).
 
 end Dbitstring.
-*)
+
 theory Dprod.
   op dprod : ('a distr, 'b distr) -> ('a * 'b) distr.
   
-  axiom supp_def : forall (d1 : 'a distr,d2 : 'b distr, p:_), 
+(* FIXME : axiom supp_def : forall (d1:'a distr, d2:'b distr, p: _), 
+      in_supp(p,dprod(d1,d2)) <=> in_supp(fst(p),d1) && in_supp(snd(p), d2).
+*)
+  axiom supp_def : forall (d1:'a distr, d2:'b distr, p: 'a * 'b), 
       in_supp(p,dprod(d1,d2)) <=> in_supp(fst(p),d1) && in_supp(snd(p), d2).
 
-  axiom mu_x_def : forall (d1 : 'a distr,d2 : 'b distr, p:_), 
+  axiom mu_x_def : forall (d1 : 'a distr,d2 : 'b distr, p:'a * 'b), 
       mu_x(dprod(d1,d2), p) = mu_x(d1,fst(p)) * mu_x(d2,snd(p)).
 
   axiom mu_weight : forall (d1 : 'a distr,d2 : 'b distr), 
@@ -196,7 +197,7 @@ theory Dlap.
     mu_x(dlap(mean,scale),x) = 
       (FromInt.from_int(1)/(FromInt.from_int(2)*scale))
     * 
-      exp(-(| FromInt.from_int(x) - FromInt.from_int(mean) |)) / scale. 
+      real.exp( -! (| FromInt.from_int(x) - FromInt.from_int(mean) |)) / scale. 
 
   axiom mu_weight : forall  (mean:_, scale:_), 
     FromInt.from_int(0) <= scale =>

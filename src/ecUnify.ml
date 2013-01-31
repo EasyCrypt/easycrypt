@@ -82,17 +82,20 @@ module UniEnv = struct
             Mid.add v t s) Mid.empty params in
     ue, Tvar.subst s
     
+  let subst_tv subst params = 
+    List.map (fun tv -> subst (Tvar tv)) params
+
   let freshen ue params tvi ty = 
     let ue, subst = init_freshen ue params tvi in
-    ue, subst ty
+    ue, subst ty, subst_tv subst params
 
   let freshendom ue params tvi dom = 
     let ue, subst = init_freshen ue params tvi in
-    ue, List.map subst dom
+    ue, List.map subst dom, subst_tv subst params
 
   let freshensig ue params tvi (dom, codom) = 
     let ue, subst = init_freshen ue params tvi in
-    ue, (List.map subst dom, subst codom)
+    ue, (List.map subst dom, subst codom), subst_tv subst params
 
   let restore ~(dst:unienv) ~(src:unienv) =
     dst.unival <- src.unival;
@@ -151,6 +154,9 @@ let unify (env : EcEnv.env) (ue : unienv) =
           raise (UnificationFailure (t1, t2));
         List.iter2 unify lt1 lt2
 
+    | Tfun(t1,t2), Tfun(t1',t2') ->
+        unify t1 t1'; unify t2 t2'
+
     | Tconstr(p1, lt1), Tconstr(p2, lt2) when EcPath.p_equal p1 p2 ->
         if List.length lt1 <> List.length lt2 then
           raise (UnificationFailure (t1, t2));
@@ -161,6 +167,7 @@ let unify (env : EcEnv.env) (ue : unienv) =
 
     | t, Tconstr(p, lt) when EcEnv.Ty.defined p env ->
         unify t (EcEnv.Ty.unfold p lt env)
+    
 
     | _, _ -> raise (UnificationFailure(t1, t2))
 

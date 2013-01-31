@@ -10,15 +10,11 @@ type tydecl = {
 (* -------------------------------------------------------------------- *)
 type locals = EcIdent.t list 
 
-type ('b,'info) operator_info = {
-    op_def : (locals * 'b) option;
-    op_info : 'info (* extra information used for pop *)
-  }
+type 'b operator_info = (locals * 'b) option
 
 type operator_kind = 
-  | OB_oper of (EcTypes.tyexpr, unit) operator_info
-  | OB_pred of (EcFol.form    , unit) operator_info
-  | OB_prob of (EcTypes.tyexpr, unit) operator_info
+  | OB_oper of EcTypes.tyexpr operator_info
+  | OB_pred of EcFol.form operator_info
 
 type operator = {
   op_params : EcIdent.t list;     (* type parameters *)
@@ -41,11 +37,6 @@ let is_pred op =
   | OB_pred _ -> true
   | _ -> false
  
-let is_prob op = 
-  match op.op_kind with
-  | OB_prob _ -> true
-  | _         -> false  
-
 let gen_op tparams dom codom kind = 
   { op_params = tparams;
     op_dom    = dom;
@@ -54,13 +45,11 @@ let gen_op tparams dom codom kind =
   }
 
 let mk_pred tparams dom body = 
-  let kind = OB_pred({op_def = body; op_info = () }) in
+  let kind = OB_pred body in
   gen_op tparams dom EcTypes.tbool kind
 
-let mk_op tparams dom codom body prob = 
-  let kind = 
-    if prob then OB_prob({op_def = body; op_info = ()})
-    else OB_oper({op_def = body;op_info = ()}) in
+let mk_op tparams dom codom body = 
+  let kind = OB_oper body in
   gen_op tparams dom codom kind
 
 (* -------------------------------------------------------------------- *)

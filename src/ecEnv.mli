@@ -71,6 +71,7 @@ module ModTy : S with type t = tymod
 
 (* -------------------------------------------------------------------- *)
 module Var : sig
+
   type t = varbind
 
   val lookup_by_path    : EcPath.path -> env -> t        (* full path *)
@@ -78,6 +79,7 @@ module Var : sig
   val lookup            : qsymbol -> env -> EcPath.path * t
   val lookup_path       : qsymbol -> env -> EcPath.path
   val trylookup         : qsymbol -> env -> (EcPath.path * t) option
+  val trylookup_pv      : qsymbol -> env -> (EcTypes.prog_var * EcTypes.ty) option
   val exists            : qsymbol -> env -> bool
   val add               : EcPath.path -> env -> env
 
@@ -93,6 +95,11 @@ module Var : sig
     -> EcTypes.pvar_kind option
     -> env
     -> env
+
+  val trylookup_local : symbol -> env -> (EcIdent.t * EcTypes.ty) option 
+
+  val all_pv       : 
+      qsymbol -> env -> (EcTypes.prog_var * EcTypes.ty) list
 
 end
 
@@ -187,6 +194,8 @@ val import_w3_dir :
 (* -------------------------------------------------------------------- *)
 val equal_type        : env -> EcTypes.ty -> EcTypes.ty -> bool
 val check_type        : env -> EcTypes.ty -> EcTypes.ty -> unit
+val destr_tfun        : env -> EcTypes.ty -> EcTypes.ty * EcTypes.ty
+val ty_fun_app        : env -> EcTypes.ty -> EcTypes.ty list -> EcTypes.ty
 val check_alpha_equal : env -> EcFol.form -> EcFol.form -> unit
 val is_alpha_equal    : env -> EcFol.form -> EcFol.form -> bool
 
@@ -198,9 +207,9 @@ type c_tyexpr = private EcTypes.tyexpr
 val ce_local  : env -> EcIdent.t -> c_tyexpr
 val ce_var    : env -> EcTypes.prog_var -> c_tyexpr
 val ce_int    : env -> int -> c_tyexpr
-val ce_flip   : env -> c_tyexpr
+(*val ce_flip   : env -> c_tyexpr
 val ce_bitstr : env -> c_tyexpr -> c_tyexpr
-val ce_inter  : env -> c_tyexpr -> c_tyexpr -> c_tyexpr
+val ce_inter  : env -> c_tyexpr -> c_tyexpr -> c_tyexpr *)
 val ce_tuple  : env -> c_tyexpr list -> c_tyexpr
 val ce_let    : env -> EcTypes.lpattern -> c_tyexpr -> c_tyexpr -> c_tyexpr
 val ce_if     : env -> c_tyexpr -> c_tyexpr -> c_tyexpr -> c_tyexpr

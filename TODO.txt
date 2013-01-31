@@ -23,8 +23,8 @@
 
 * Parsing:
 - Nom long pour les operateurs infix, 
-- Rajouter les operateurs prefix comme dans why3?
 - Gerer les <> (le parsing marche mais rien n'est fait apres)
+- Notation pour %r.
 
 * Pretty:
 - Affichage des noms long ou cours, ty instance
@@ -83,3 +83,6 @@ Discution :
 
 
 
+*** Note de discussion
+
+i_inuse : LvMap `Read ok mais aussi `Write

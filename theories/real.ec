@@ -1,13 +1,7 @@
 require int.
 
 import why3 "real" "Real"
-  op "prefix -" as "__opp".
-  
-theory Rdot.
-  (* Fixme rebing to the normal  one *)
-  import why3 "real" "RealInfix"
-    op "prefix -." as "__opp".
-end Rdot.
+  op "prefix -" as "-!".
 
 theory Abs.
 

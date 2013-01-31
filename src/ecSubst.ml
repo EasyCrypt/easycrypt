@@ -67,6 +67,7 @@ let rec subst_ty (s : subst) (ty : ty) =
       let p   = subst_path s p in
       let tys = List.map (subst_ty s) tys in
         Tconstr (p, tys)
+  | Tfun (t1,t2) -> Tfun(subst_ty s t1, subst_ty s t2)
 
 (* -------------------------------------------------------------------- *)
 let subst_lpattern (s : subst) (p : lpattern) =
@@ -81,43 +82,27 @@ let subst_lpattern (s : subst) (p : lpattern) =
         (s', LTuple xs')
 
 (* -------------------------------------------------------------------- *)
+
+let subst_pv s x =
+  { x with pv_name = subst_path s x.pv_name } 
+  
 let rec subst_tyexpr (s : subst) (e : tyexpr) =
   match e.tye_desc with
   | Eint i ->
       e_int i
 
-  | Eflip  ->
-      e_flip ()
-
-  | Einter (e1, e2) ->
-      let e1 = subst_tyexpr s e1 in
-      let e2 = subst_tyexpr s e2 in
-        e_inter e1 e2
-
-  | Ebitstr e ->
-      let e = subst_tyexpr s e in
-        e_bitstr e
-
-  | Eexcepted (e1, e2) ->
-      let e1 = subst_tyexpr s e1 in
-      let e2 = subst_tyexpr s e2 in
-        e_excepted e1 e2
-
-  | Elocal (x, ty) ->
+  | Elocal x ->
       let x  = subst_local s x in
-      let ty = subst_ty s ty in
-        e_local x ty
+      e_local x
 
-  | Evar (x, ty) ->
-      let x  = { x with pv_name = subst_path s x.pv_name } in
-      let ty = subst_ty s ty in
-        e_var x ty
+  | Evar x ->
+      e_var (subst_pv s x)
 
-  | Eapp (p, es, ty) ->
-      let p   = subst_path s p in
-      let tys = List.map (subst_tyexpr s) es in
-      let ty  = subst_ty s ty in
-        e_app p tys ty
+  | Eop(p, tys) ->
+      e_op (subst_path s p) (List.map (subst_ty s) tys)
+
+  | Eapp (e, es) ->
+      e_app (subst_tyexpr s e) (List.map (subst_tyexpr s) es)
 
   | Elet (p, e1, e2) ->
       let (sbody, p) = subst_lpattern s p in
@@ -182,10 +167,12 @@ and subst_form_node (s : subst) (f : f_node) =
       let ty = subst_ty s ty in
         Fpvar (x, ty, side)
 
-  | Fapp (p, fs) ->
-      let p  = subst_path s p in
+  | Fop(p,tys) -> Fop(subst_path s p, List.map (subst_ty s) tys)
+
+  | Fapp (f, fs) ->
+      let f = subst_form s f in
       let fs = List.map (subst_form s) fs in
-        Fapp (p, fs)
+      Fapp (f, fs)
 
   | Ftuple fs ->
       Ftuple (List.map (subst_form s) fs)
@@ -204,31 +191,20 @@ let subst_tydecl (s : subst) (tyd : tydecl) =
 let subst_op_kind (s : subst) (kind : operator_kind) =
   let locals =
     match kind with
-    | OB_oper i -> odfl [] (omap i.op_def fst)
-    | OB_pred i -> odfl [] (omap i.op_def fst)
-    | OB_prob i -> odfl [] (omap i.op_def fst) in
+    | OB_oper i -> odfl [] (omap i fst)
+    | OB_pred i -> odfl [] (omap i fst) in
 
   let newlocals = List.map EcIdent.fresh locals in
   let sdef = add_locals s (List.combine locals newlocals) in
 
     match kind with
     | OB_oper i ->
-      let def = omap i.op_def
-        (fun (_, e) -> (newlocals, subst_tyexpr sdef e))
-      in
-        OB_oper { op_def = def; op_info = (); }
+      let def = omap i (fun (_, e) -> (newlocals, subst_tyexpr sdef e)) in
+      OB_oper def
 
     | OB_pred i ->
-      let def = omap i.op_def
-        (fun (_, e) -> (newlocals, subst_form sdef e))
-      in
-        OB_pred { op_def = def; op_info = (); }
-
-    | OB_prob i ->
-      let def = omap i.op_def
-        (fun (_, e) -> (newlocals, subst_tyexpr sdef e))
-      in
-        OB_prob { op_def = def; op_info = (); }
+      let def = omap i (fun (_, e) -> (newlocals, subst_form sdef e)) in
+      OB_pred def
 
 (* -------------------------------------------------------------------- *)
 let subst_op (s : subst) (op : operator) =
@@ -312,7 +288,11 @@ and subst_instr (s : subst) (instr : instr) =
   | Sasgn (lv, e) ->
       let lv = subst_lvalue s lv in
       let e  = subst_tyexpr s e  in
-        Sasgn (lv, e)
+      Sasgn (lv, e)
+  | Srnd (lv, e) ->
+      let lv = subst_lvalue s lv in
+      let e  = subst_tyexpr s e  in
+      Srnd (lv, e)
 
   | Scall (lv, p, es) ->
       let lv = omap lv (subst_lvalue s) in
@@ -338,26 +318,19 @@ and subst_instr (s : subst) (instr : instr) =
 and subst_lvalue (s : subst) (lvalue : lvalue) =
   match lvalue with
   | LvVar (p, ty) ->
-      let p  = subst_path s p  in
-      let ty = subst_ty   s ty in
-        LvVar (p, ty)
+      LvVar (subst_pv s p, subst_ty s ty)
 
   | LvTuple ptys ->
-      let ptys = List.map
-        (fun (p, ty) ->
-          let p  = subst_path s p  in
-          let ty = subst_ty   s ty in
-            (p, ty))
-        ptys
-      in
-        LvTuple ptys
+      let ptys = List.map (fun (p, ty) -> subst_pv s p, subst_ty s ty) ptys in
+      LvTuple ptys
 
-  | LvMap (p1, p2, e, ty) ->
+  | LvMap ((p1,tys), p2, e, ty) ->
       let p1 = subst_path   s p1 in
-      let p2 = subst_path   s p2 in
+      let tys = List.map (subst_ty s) tys in
+      let p2 = subst_pv     s p2 in
       let e  = subst_tyexpr s e  in
       let ty = subst_ty     s ty in
-        LvMap (p1, p2, e, ty)
+      LvMap ((p1,tys), p2, e, ty)
 
 (* -------------------------------------------------------------------- *)
 let subst_variable (s : subst) (x : variable) =

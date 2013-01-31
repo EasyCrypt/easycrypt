@@ -387,6 +387,26 @@ module Var = struct
     List.fold_left
       (fun env (x, ty) -> bind x ty kind env)
       env xtys
+
+  let trylookup_local s env = 
+    match trylookup ([],s) env with
+    | Some(p,k) when k.vb_kind = None -> (Some (EcPath.basename p, k.vb_type))
+    | _ -> None 
+
+  let trylookup_pv qs env = 
+    match trylookup qs env with
+    | Some(p,{vb_kind = Some k; vb_type = ty}) ->
+        Some ({pv_name = p; pv_kind = k}, ty)
+    | _ -> None 
+  
+  let all_pv qname env = 
+    let test (p,k) = 
+      match k.vb_kind with
+      | None -> None
+      | Some k' -> Some ({ pv_name = p; pv_kind = k'}, k.vb_type) in
+    List.pmap test 
+      (MC.lookupall (fun mc -> mc.mc_variables) qname env)
+
 end
 
 (* -------------------------------------------------------------------- *)
@@ -449,7 +469,7 @@ module Op = struct
       in
         { env with
             env_w3   = w3;
-            env_rb   = List.ocons r env.env_rb;
+            env_rb   = r :: env.env_rb;
             env_item = CTh_operator(id, op) :: env.env_item }
 
     let rebind = MC.mc_bind_op
@@ -717,9 +737,11 @@ module Ident = struct
           | Some k -> `Pvar { EcTypes.pv_name = p; EcTypes.pv_kind = k } in
         [ x.vb_type, (idl :> idlookup_t) ]
     | None ->
-        let filter_op op = op.op_dom = [] && filter_op op in
         let all = Op.all filter_op name env in
-        List.map (fun p -> (snd p).op_codom, (`Ctnt p :> idlookup_t) ) all
+        List.map (fun p -> 
+          let op = snd p in 
+          let ty = EcTypes.toarrow op.op_dom op.op_codom in
+          ty, (`Ctnt p :> idlookup_t) ) all
 
   let lookup filter_op (name : qsymbol) (env : env) =
     match trylookup filter_op name env with
@@ -784,16 +806,12 @@ let initial =
   let env, _ = import_w3 env Why3.Theory.bool_theory bool_rn in
   let add_bool sign env path = 
     Op.bind_logical (EcPath.basename path) 
-      (mk_op [] sign EcTypes.tbool None false) env in
+      (mk_op [] sign EcTypes.tbool None) env in
   let env = add_bool [EcTypes.tbool] env EcCoreLib.p_not in
   let env = List.fold_left (add_bool [EcTypes.tbool;EcTypes.tbool]) env
       [EcCoreLib.p_and; EcCoreLib.p_or; EcCoreLib.p_imp; EcCoreLib.p_iff] in
-  let list_rn = [
-    ["list"], EcWhy3.RDts, EcPath.basename EcCoreLib.p_list;
-    ["Nil"] , EcWhy3.RDls, EcPath.basename EcCoreLib.p_nil;
-    ["Cons"], EcWhy3.RDls, EcPath.basename EcCoreLib.p_cons;
-  ] in
-  let env,_ = import_w3_dir env ["list"] "List" list_rn in
+  let tdistr = { tyd_params = [ EcIdent.create "'a" ]; tyd_type = None } in
+  let env = Ty.bind (EcPath.basename EcCoreLib.p_distr) tdistr env in 
   let cth = Theory.close env in
   let env1 = Theory.bind EcCoreLib.id_pervasive cth env0 in
   let env1 = Theory.import EcCoreLib.p_pervasive env1 in
@@ -849,19 +867,17 @@ and dump_premc ~name pp mc =
 (* -------------------------------------------------------------------- *)     
 let rec equal_type env t1 t2 = 
   match t1, t2 with
-  | Tunivar _, _ -> assert false
-  | _, Tunivar _ -> assert false
+  | Tunivar uid1, Tunivar uid2 -> EcUidgen.uid_equal uid1 uid2
+      
   | Tvar i1, Tvar i2 -> i1 = i2
   | Ttuple lt1, Ttuple lt2 ->
       List.for_all2 (equal_type env) lt1 lt2
+  | Tfun(t1,t2), Tfun(t1',t2') ->
+      equal_type env t1 t1' && equal_type env t2 t2'
   | Tconstr(p1,lt1), Tconstr(p2,lt2) when EcPath.p_equal p1 p2 ->
-      begin
-        List.for_all2 (equal_type env) lt1 lt2 || 
-        if Ty.defined p1 env then 
-          equal_type env (Ty.unfold p1 lt1 env) t2
-        else 
-          (Ty.defined p2 env && equal_type env t1 (Ty.unfold p2 lt2 env))
-      end
+      List.for_all2 (equal_type env) lt1 lt2 || 
+      (Ty.defined p1 env &&
+       equal_type env (Ty.unfold p1 lt1 env) (Ty.unfold p2 lt2 env))
   | Tconstr(p1,lt1), _ when Ty.defined p1 env ->
       equal_type env (Ty.unfold p1 lt1 env) t2
   | _, Tconstr(p2,lt2) when Ty.defined p2 env ->
@@ -874,6 +890,21 @@ exception IncompatibleForm of form * form * form * form
   
 let check_type env t1 t2 = 
   if not (equal_type env t1 t2) then raise (IncompatibleType(t1,t2))
+
+let rec destr_tfun env tf = 
+  match tf with
+  | Tfun(ty1,ty2) -> ty1, ty2
+  | Tconstr(p,tys) when Ty.defined p env ->
+      destr_tfun env (Ty.unfold p tys env) 
+  | _ -> assert false (* FIXME error message *)
+
+let rec ty_fun_app env tf targs = 
+  match targs with
+  | [] -> tf
+  | t1 :: targs ->
+      let dom,codom = destr_tfun env tf in
+      check_type env dom t1;
+      ty_fun_app env codom targs
 
 (* TODO : can be good to also add unfolding of globals and locals *)
 let check_alpha_equal env f1 f2 = 
@@ -906,7 +937,9 @@ let check_alpha_equal env f1 f2 =
     | Fint i1, Fint i2 when i1 = i2 -> ()
     | Flocal id1, Flocal id2 when EcIdent.id_equal (find alpha id1) id2 -> ()
     | Fpvar(p1,_,s1), Fpvar(p2,_,s2) when pv_equal p1 p2 && s1 = s2 -> ()
-    | Fapp(p1,args1), Fapp(p2,args2) when EcPath.p_equal p1 p2 ->
+    | Fop(p1, _), Fop(p2, _) when EcPath.p_equal p1 p2 -> () 
+    | Fapp(f1,args1), Fapp(f2,args2) ->
+        aux alpha f1 f2;
         List.iter2 (aux alpha) args1 args2
     | Ftuple args1, Ftuple args2 when List.length args1 = List.length args2 ->
         List.iter2 (aux alpha) args1 args2 
@@ -927,28 +960,26 @@ let ce_type (e : tyexpr) =
   (oget e.tye_meta).tym_type
 
 let ce_meta ty e : c_tyexpr =
-  { tye_meta = Some { tym_type = ty; tym_prob = false };
+  { tye_meta = Some { tym_type = ty };
     tye_desc = e; }
 
 let ce_local (env : env) (x : EcIdent.t) =
+  (* Je pense que c'est pas une bonne idee d'avoir ce path on devrait avoir
+     Pident x, j'aime pas que le path depend du scope *)
   let xpath = EcPath.Pqname (env.env_scope, x) in
   let xty   = Var.lookup_by_path xpath env in
-
-    if xty.vb_kind <> None then
-      assert false;
-    ce_meta xty.vb_type (Elocal (x, xty.vb_type))
+  if xty.vb_kind <> None then assert false;
+  ce_meta xty.vb_type (Elocal x)
 
 let ce_var (env : env) (p : prog_var) =
   let xty = Var.lookup_by_path p.pv_name env in
-
-    if xty.vb_kind = None then
-      assert false;
-    ce_meta xty.vb_type (Evar (p, xty.vb_type))
+  if xty.vb_kind = None then assert false;
+  ce_meta xty.vb_type (Evar p)
 
 let ce_int (_env : env) (i : int) =
   ce_meta tint (Eint i)
 
-let ce_flip (_env : env) =
+(*let ce_flip (_env : env) =
   ce_meta tbool Eflip
 
 let ce_bitstr (_env : env) e =
@@ -956,7 +987,7 @@ let ce_bitstr (_env : env) e =
 
 let ce_inter (env : env) e1 e2 =
   check_type env (ce_type e1) (ce_type e2);
-  ce_meta (ce_type e1) (Einter (e1, e2))
+  ce_meta (ce_type e1) (Einter (e1, e2)) *)
 
 let ce_tuple (_env : env) es =
   ce_meta

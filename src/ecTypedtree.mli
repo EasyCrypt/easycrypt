@@ -47,17 +47,12 @@ val transtvi : EcEnv.env -> EcUnify.unienv -> tvar_inst -> EcUnify.UniEnv.tvi
 
 
 (* -------------------------------------------------------------------- *)
-type epolicy = {
-  epl_prob : bool;
-}
 
-(* [transexp env policy ue pe] translates the *parsed* expression [pe]
- * to a *typed* expression, under environment [env], using policy
- * [policy], and unification map [ue].
+(* [transexp env ue pe] translates the *parsed* expression [pe]
+ * to a *typed* expression, under environment [env], using unification map [ue].
 *)
-val transexp : EcEnv.env -> epolicy -> EcUnify.unienv -> pexpr -> tyexpr * ty
-val transexpcast :
-    EcEnv.env -> epolicy -> EcUnify.unienv -> ty -> pexpr -> tyexpr
+val transexp : EcEnv.env -> EcUnify.unienv -> pexpr -> tyexpr * ty
+val transexpcast : EcEnv.env -> EcUnify.unienv -> ty -> pexpr -> tyexpr
 
 (* -------------------------------------------------------------------- *)
 module Fenv : sig 
@@ -66,9 +61,9 @@ module Fenv : sig
   val bind_locals : fenv -> EcIdent.t list -> ty list -> fenv
   val fenv_hyps : EcEnv.env -> EcFol.hyps -> fenv
 end
-val transformula : Fenv.fenv -> EcUnify.unienv -> 
-  pformula -> EcFol.form 
 
+val transformula : Fenv.fenv -> EcUnify.unienv -> pformula -> EcFol.form 
+val transform    : Fenv.fenv -> EcUnify.unienv -> pformula -> ty -> EcFol.form 
 (* -------------------------------------------------------------------- *)
 val transsig   : EcEnv.env -> psignature -> tysig
 val transtymod : EcEnv.env -> pmodule_type -> tymod

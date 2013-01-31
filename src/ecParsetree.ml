@@ -67,6 +67,7 @@ and pty_r =
   | PTnamed     of pqsymbol
   | PTvar       of psymbol
   | PTapp       of pqsymbol * pty list
+  | PTfun       of pty * pty
 
 type tvar_inst_kind = 
   | TVIunamed of pty list
@@ -78,10 +79,6 @@ type tvar_inst = tvar_inst_kind option
 type pexpr  = pexpr_r  located          (* located expression *)
 
 and pexpr_r =
-  | PEflip                                          (* flip               *)
-  | PEinter    of pexpr * pexpr                     (* interval sampling  *)
-  | PEbitstr   of pexpr                             (* bitstring sampling *)
-  | PEexcepted of pexpr * pexpr                     (* restriction        *)
   | PEint      of int                               (* int. literal       *)
   | PEident    of pqsymbol * tvar_inst              (* symbol             *)
   | PEapp      of pqsymbol * tvar_inst * pexpr list (* op. application    *)
@@ -101,6 +98,7 @@ type plvalue =
 (* -------------------------------------------------------------------- *)
 type pinstr =
   | PSasgn   of plvalue * pexpr
+  | PSrnd    of plvalue * pexpr
   | PScall   of pqsymbol * pexpr list
   | PSif     of pexpr * pstmt * pstmt
   | PSwhile  of pexpr * pstmt
@@ -163,7 +161,6 @@ type poperator = {
   po_dom : pty list option;
   po_codom : pty;  
   po_body   : (psymbol list * pexpr) option;
-  po_prob   : bool;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -241,6 +238,7 @@ and ptactic_r =
   | Pleft                         (* or_I left *)
   | Pright                        (* or_I right *)
   | Pelim       of pelim   
+  | Papply      of pelim
   | Psubgoal    of ptactics
   | Pseq        of ptactics
 

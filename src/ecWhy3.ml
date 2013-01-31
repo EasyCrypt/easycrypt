@@ -19,41 +19,134 @@ let get_w3_th = Env.find_theory w3_env
 type env = {
     logic_task : Task.task;
     env_ty : Ty.tysymbol Mp.t;
-    env_op : Term.lsymbol Mp.t;
+    env_op : (Term.lsymbol * Term.lsymbol * Ty.tvsymbol list) Mp.t;
     env_ax : Decl.prsymbol Mp.t;
-    env_w3 : EcPath.path Ident.Mid.t;
+    env_w3 : (EcPath.path * Ty.tvsymbol list) Ident.Mid.t;
   }
 
+let w3_ls_true = Term.fs_bool_true
+let w3_ls_false = Term.fs_bool_false
+
+let w3_ls_not, decl_not, spec_not = 
+  let ls = 
+    Term.create_fsymbol (Ident.id_fresh "Not") [] 
+      (Ty.ty_func Ty.ty_bool Ty.ty_bool) in
+  let decl = Decl.create_param_decl ls in
+  let preid = Ident.id_fresh "b" in
+  let id = Term.create_vsymbol preid Ty.ty_bool in
+  let b = Term.t_var id in
+  let f_app = Term.t_func_app (Term.t_app_infer ls []) b in
+  let form = 
+    Term.t_forall_close [id] [] 
+      (Term.t_iff (Term.t_equ f_app Term.t_bool_true) 
+         (Term.t_not (Term.t_equ b Term.t_bool_true))) in
+  let pr = Decl.create_prsymbol (Ident.id_fresh "Not_spec") in
+  let decl_spec = Decl.create_prop_decl Decl.Paxiom pr form in
+  ls, decl, decl_spec 
+
+let mk_w3_opp2 s mk = 
+  let ls = 
+    Term.create_fsymbol (Ident.id_fresh s) [] 
+     (Ty.ty_func Ty.ty_bool (Ty.ty_func Ty.ty_bool Ty.ty_bool)) in
+  let decl = Decl.create_param_decl ls in
+  let preid = Ident.id_fresh "b" in
+  let id1 = Term.create_vsymbol preid Ty.ty_bool in
+  let id2 = Term.create_vsymbol preid Ty.ty_bool in
+  let b1 = Term.t_var id1 in
+  let b2 = Term.t_var id2 in
+  let f_app = 
+    Term.t_func_app (Term.t_func_app (Term.t_app_infer ls []) b1) b2 in
+  let form = 
+    Term.t_forall_close [id1;id2] [] 
+      (Term.t_iff (Term.t_equ f_app Term.t_bool_true) 
+         (mk (Term.t_equ b1 Term.t_bool_true) 
+            (Term.t_equ b2 Term.t_bool_true))) in
+  let pr = Decl.create_prsymbol (Ident.id_fresh (s^"_spec")) in
+  let decl_spec = Decl.create_prop_decl Decl.Paxiom pr form in
+  ls, decl, decl_spec 
+
+let w3_ls_and, decl_and, spec_and = mk_w3_opp2 "AND" Term.t_and 
+let w3_ls_or, decl_or, spec_or = mk_w3_opp2 "OR" Term.t_or
+let w3_ls_imp, decl_imp, spec_imp = mk_w3_opp2 "IMP" Term.t_implies
+let w3_ls_iff, decl_iff, spec_iff = mk_w3_opp2 "IFF" Term.t_iff
+
+let w3_ls_eq, decl_eq, spec_eq = 
+  let a  = Ty.create_tvsymbol (Ident.id_fresh "'a") in
+  let ta = Ty.ty_var a in
+  let ty = (Ty.ty_func ta (Ty.ty_func ta Ty.ty_bool)) in
+  let ls = Term.create_fsymbol (Ident.id_fresh "EQ") [] ty in
+  let decl = Decl.create_param_decl ls in
+  let preid = Ident.id_fresh "x" in
+  let id1 = Term.create_vsymbol preid ta in
+  let id2 = Term.create_vsymbol preid ta in
+  let b1 = Term.t_var id1 in
+  let b2 = Term.t_var id2 in
+  let f_app = 
+    Term.t_func_app (Term.t_func_app (Term.fs_app ls [] ty) b1) b2 in
+  let form = 
+    Term.t_forall_close [id1;id2] [] 
+      (Term.t_iff (Term.t_equ f_app Term.t_bool_true) 
+         (Term.t_equ b1 b2)) in
+  let pr = Decl.create_prsymbol (Ident.id_fresh ("EQ_spec")) in
+  let decl_spec = Decl.create_prop_decl Decl.Paxiom pr form in
+  ls, decl, decl_spec 
+
+let initial_task = 
+  let task = 
+    List.fold_left Task.use_export None 
+      [Theory.builtin_theory;Theory.bool_theory;Theory.highord_theory] in
+  List.fold_left Task.add_decl task
+    [decl_not; spec_not;
+     decl_and; spec_and;
+     decl_or; spec_or;
+     decl_imp; spec_imp;
+     decl_iff; spec_iff;
+     decl_eq; spec_eq ]
 
 let empty = {
-  logic_task = None;
-  env_ty     = Mp.empty;
-  env_op     = Mp.empty;
-  env_ax     = Mp.empty;
-  env_w3     = Ident.Mid.empty;
-}
+    logic_task = initial_task; 
+    env_ty     = Mp.empty;
+    env_op     = Mp.empty;
+    env_ax     = Mp.empty;
+    env_w3     = Ident.Mid.empty;
+  } 
 
+type highorder_decl = (Term.lsymbol * Decl.decl * Decl.decl) option
+    
 type rebinding_w3 = {
     rb_th   : Theory.theory;
+    rb_decl : Decl.decl list; 
     rb_ty   : Ty.tysymbol Mp.t;
-    rb_op   : Term.lsymbol Mp.t;
+    rb_op   : (Term.lsymbol * Term.lsymbol * Ty.tvsymbol list) Mp.t;
     rb_ax   : Decl.prsymbol Mp.t;
-    rb_w3   : EcPath.path Ident.Mid.t;
+    rb_w3   : (EcPath.path * Ty.tvsymbol list) Ident.Mid.t;
   }
 
+let rb_empty th = {
+    rb_th     = th;
+    rb_decl   = [];
+    rb_ty     = Mp.empty;
+    rb_op     = Mp.empty;
+    rb_ax     = Mp.empty;
+    rb_w3     = Ident.Mid.empty;
+  } 
+
 type rebinding_item = 
-  | RBuse of rebinding_w3
+  | RBuse of rebinding_w3 
   | RBty  of EcPath.path * Ty.tysymbol * Decl.decl
-  | RBop  of EcPath.path * Term.lsymbol * Decl.decl
+  | RBop  of EcPath.path * (Term.lsymbol * Ty.tvsymbol list) * Decl.decl *
+                highorder_decl 
   | RBax  of EcPath.path * Decl.prsymbol * Decl.decl
 
 type rebinding = rebinding_item list
 
 let merge check k o1 o2 = 
   match o1, o2 with
-  | None, _ -> o2
-  | Some _, None -> o1
   | Some e1, Some e2 -> check k e1 e2; o1
+  | _, None -> o1
+  | None, _ -> o2
+
+
 
 exception MergeW3Ty of EcPath.path * Ty.tysymbol * Ty.tysymbol
 exception MergeW3Op of EcPath.path * Term.lsymbol * Term.lsymbol
@@ -66,7 +159,7 @@ let merge_ty =
   Mp.merge (merge check)
 
 let merge_op =
-  let check p t1 t2 = 
+  let check p (t1,_,_) (t2,_,_) = 
     if not (Term.ls_equal t1 t2) then raise (MergeW3Op(p,t1,t2)) in
   Mp.merge (merge check)
 
@@ -76,7 +169,7 @@ let merge_ax =
   Mp.merge (merge check)
 
 let merge_id = 
-  let check p t1 t2 = 
+  let check p (t1,_) (t2,_) = 
     if not (EcPath.p_equal t1 t2) then raise (MergeW3Id(p,t1,t2)) in
   Ident.Mid.merge (merge check)
 
@@ -97,14 +190,43 @@ let add_ts env path ts decl =
       env_ty = Mp.add path ts env.env_ty;
       logic_task = add_decl_with_tuples env.logic_task decl }
 
-let add_ls env path ls decl =
-  if Mp.mem path env.env_op then 
-    (assert (Term.ls_equal ls (Mp.find path env.env_op)); env)
-  else 
-    { env with 
-      env_op = Mp.add path ls env.env_op;
-      logic_task = add_decl_with_tuples env.logic_task decl }
-
+let add_ls env path ls tparams decl odecl =
+  let ls', add' =
+    match odecl with
+    | None -> ls, fun t -> t
+    | Some(ls', decl', decl_s) -> 
+        ls', fun t ->
+          let t = add_decl_with_tuples t decl' in
+          add_decl_with_tuples t decl_s in
+  { env with 
+    env_op = Mp.add path (ls,ls',tparams) env.env_op;
+    logic_task = add' (add_decl_with_tuples env.logic_task decl) }
+    
+let mk_highorder_func ls =
+  let targs = ls.Term.ls_args in
+  let tres = ls.Term.ls_value in
+  if targs = [] then None 
+  else
+    let pid = Ident.id_clone ls.Term.ls_name in
+    let codom = (odfl Ty.ty_bool tres) in
+    let ty = List.fold_right Ty.ty_func ls.Term.ls_args codom in
+    let ls' = Term.create_fsymbol pid [] ty in
+    let decl' = Decl.create_param_decl ls' in
+    let pr = Decl.create_prsymbol pid in
+    let preid = Ident.id_fresh "x" in
+    let params = List.map (Term.create_vsymbol preid) targs in
+    let args = List.map Term.t_var params in
+    let f_app' = 
+      List.fold_left Term.t_func_app (Term.fs_app ls' [] ty) args in
+    let f_app = Term.t_app ls args tres in
+    let spec =
+      match tres with
+      | None -> Term.t_iff (Term.t_equ f_app' Term.t_bool_true) f_app
+      | Some _ -> Term.t_equ f_app' f_app in
+    let spec = Term.t_forall_close params [] spec in
+    let decl_s = Decl.create_prop_decl Decl.Paxiom pr spec in
+    Some(ls',decl',decl_s)
+    
 let add_pr env path pr decl =
   if Mp.mem path env.env_ax then 
     (assert (Decl.pr_equal pr (Mp.find path env.env_ax)); env)
@@ -115,14 +237,16 @@ let add_pr env path pr decl =
 
 let rebind_item env = function
   | RBuse w3 ->
-      { logic_task = Task.use_export env.logic_task w3.rb_th;
+      let task = Task.use_export env.logic_task w3.rb_th in
+      let task = List.fold_left Task.add_decl task w3.rb_decl in
+      { logic_task = task;
         env_ty = merge_ty env.env_ty w3.rb_ty;
         env_op = merge_op env.env_op w3.rb_op;
         env_ax = merge_ax env.env_ax w3.rb_ax;
         env_w3 = merge_id env.env_w3 w3.rb_w3;
       }
   | RBty(p,ts,decl) -> add_ts env p ts decl
-  | RBop(p,ls,decl) -> add_ls env p ls decl
+  | RBop(p,(ls,tvs),decl,odecl) -> add_ls env p ls tvs decl odecl
   | RBax(p,pr,decl) -> add_pr env p pr decl
 
 let rebind = List.fold_left rebind_item
@@ -228,11 +352,16 @@ let rec import_w3_ty env tvm ty =
   | Ty.Tyapp(t, args) ->
       let args = List.map (import_w3_ty env tvm) args in
       try 
-        let id = t.Ty.ts_name in
-        let path = path_of_id env id in
+        let path,_ = path_of_id env t.Ty.ts_name in
         Tconstr(path,args)
       with e ->
         if Ty.is_ts_tuple t then Ttuple args
+        else if Ty.ts_equal t Ty.ts_func then 
+          let t1,t2 = List.hd2 args in
+          Tfun(t1,t2)
+        else if Ty.ts_equal t Ty.ts_pred then
+          let t1,t2 = List.hd args, tbool in
+          Tfun(t1,t2)
         else raise e
   
 let exists_w3 env id = 
@@ -241,7 +370,12 @@ let exists_w3 env id =
 let add_w3_ty env p ty = 
   { env with 
     env_ty = Mp.add p ty env.env_ty;
-    env_w3 = Ident.Mid.add (ty.Ty.ts_name) p env.env_w3 }
+    env_w3 = Ident.Mid.add (ty.Ty.ts_name) (p,[]) env.env_w3 }
+
+let rbadd_w3_ty rb p ty = 
+  { rb with
+    rb_ty = Mp.add p ty rb.rb_ty;
+    rb_w3 = Ident.Mid.add (ty.Ty.ts_name) (p,[]) rb.rb_w3 } 
 
 type zipper_elem =
   | Zenter of EcIdent.t 
@@ -249,7 +383,7 @@ type zipper_elem =
 
 and zipper = zipper_elem list 
 
-let import_w3_tydef rn path (env,_rb,z) ty =
+let import_w3_tydef rn path (env,rb,z) ty =
   let tvm = Wtvm.create () in
   let params = List.map (Wtvm.get tvm) ty.Ty.ts_args in
   let def = omap ty.Ty.ts_def (import_w3_ty env tvm) in
@@ -257,7 +391,7 @@ let import_w3_tydef rn path (env,_rb,z) ty =
   let td = { tyd_params = params; tyd_type = def } in
   let p = EcPath.extend (Some path) eid in
   let env = add_w3_ty env p ty in
-  let rb  = add_w3_ty env p ty in
+  let rb  = rbadd_w3_ty rb p ty in 
   env, rb, Zdecl(Th_type (eid,td)) :: z
 
 let force_bool codom = 
@@ -294,15 +428,30 @@ let import_w3_term env tvm =
         match t.Term.t_node with
         | Term.Tvar v -> f_local (Term.Mvs.find v vm) (import_ty t.Term.t_ty)
         | Term.Tconst _ -> raise CanNotTranslate (* FIXME *)
-        | Term.Tapp(f,args) ->
-            let args = List.map (import vm) args in
-            if Term.is_fs_tuple f then f_tuple args
-            else 
-              let f = 
+        | Term.Tapp(f,wargs) ->
+            let args = List.map (import vm) wargs in
+            let import_ty = import_w3_ty env tvm in
+            let wty = t.Term.t_ty in
+            let codom = odfl tbool (omap wty import_ty) in
+            begin try 
+              let p,tvs = 
                 try Ident.Mid.find f.Term.ls_name env.env_w3 
                 with _ -> raise (UnboundLS f) in
-              let ty = import_ty t.Term.t_ty in
-              f_app f args ty
+              let s = Term.ls_app_inst f wargs wty in
+              let tys = List.map (fun vs -> import_ty (Ty.Mtv.find vs s)) tvs in
+              let dom = List.map EcFol.ty args in
+              let op = f_op p tys (toarrow dom codom) in
+              f_app op args codom
+            with UnboundLS f as e ->
+              if Term.is_fs_tuple f then f_tuple args
+              else 
+                if (Term.ls_equal f Term.fs_func_app || 
+                    Term.ls_equal f Term.ps_pred_app) then
+                  let a1,a2 = List.hd2 args in
+                  f_app a1 [a2] codom
+                else raise e 
+            end
+             
         | Term.Tif(t1,t2,t3) ->
           let f1 = import vm t1 in
           let f2 = import vm t2 in
@@ -340,22 +489,35 @@ let import_w3_term env tvm =
       f*) in
   import_ty, add_locals, import 
 
-let add_w3_ls env p ls = 
+let add_w3_ls env p ls wparams odecl = 
+  let ls' = match odecl with None -> ls | Some (ls',_,_) -> ls' in
   { env with 
-    env_op = Mp.add p ls env.env_op;
-    env_w3 = Ident.Mid.add (ls.Term.ls_name) p env.env_w3 }
+    env_op = Mp.add p (ls,ls',wparams) env.env_op; 
+    env_w3 = Ident.Mid.add ls.Term.ls_name (p,wparams) env.env_w3 }
 
-let import_w3_ls rn path (env,_rb,z) ls = 
+let rbadd_w3_ls rb p ls wparams odecl = 
+  let ls',rb_decl = 
+    match odecl with 
+    | None -> ls, rb.rb_decl
+    | Some (ls',d',ds) -> ls', ds::d'::rb.rb_decl in
+  { rb with 
+    rb_op = Mp.add p (ls,ls',wparams) rb.rb_op; 
+    rb_w3 = Ident.Mid.add ls.Term.ls_name (p,wparams) rb.rb_w3;
+    rb_decl = rb_decl;
+  }
+
+let import_w3_ls rn path (env,rb,z) ls = 
   let tvm = Wtvm.create () in
   let dom = List.map (import_w3_ty env tvm) ls.Term.ls_args in
   let codom = omap ls.Term.ls_value (import_w3_ty env tvm) in
-  let params = Ty.Stv.elements (Term.ls_ty_freevars ls) in
-  let params = List.map (Wtvm.get tvm) params in
+  let wparams = Ty.Stv.elements (Term.ls_ty_freevars ls) in
+  let params = List.map (Wtvm.get tvm) wparams in
   let eid = Renaming.get_ls rn ls in
-  let op = mk_op params dom (force_bool codom) None false in
+  let op = mk_op params dom (force_bool codom) None in
   let p = EcPath.extend (Some path) eid in
-  let env = add_w3_ls env p ls in
-  let rb  = add_w3_ls env p ls in
+  let odecl = mk_highorder_func ls in
+  let env = add_w3_ls env p ls wparams odecl in 
+  let rb  = rbadd_w3_ls rb p ls wparams odecl in 
   env, rb, Zdecl (Th_operator (eid,op)) :: z
     
 let import_w3_constructor rn path envld (ls, pls) = 
@@ -371,9 +533,14 @@ let import_w3_constructors rn path =
 let add_w3_pr env p pr = 
   { env with 
     env_ax = Mp.add p pr env.env_ax;
-    env_w3 = Ident.Mid.add (pr.Decl.pr_name) p env.env_w3 }
+    env_w3 = Ident.Mid.add (pr.Decl.pr_name) (p,[]) env.env_w3 }
 
-let import_w3_pr rn path (env,_rb, z as envld) k pr t =
+let rbadd_w3_pr rb p pr = 
+  { rb with 
+    rb_ax = Mp.add p pr rb.rb_ax;
+    rb_w3 = Ident.Mid.add (pr.Decl.pr_name) (p,[]) rb.rb_w3 }
+
+let import_w3_pr rn path (env,rb,z as envld) k pr t =
   match k with
   | Decl.Plemma | Decl.Paxiom ->
       let eid = Renaming.get_pr rn pr in
@@ -389,7 +556,7 @@ let import_w3_pr rn path (env,_rb, z as envld) k pr t =
         else Axiom } in
       let p = EcPath.extend (Some path) eid in
       let env = add_w3_pr env p pr in
-      let rb  = add_w3_pr env p pr in
+      let rb  = rbadd_w3_pr rb p pr in 
       env, rb, Zdecl(Th_axiom (eid,ax)) :: z
   | Decl.Pgoal | Decl.Pskip -> envld
 
@@ -408,7 +575,7 @@ let import_decl rn path envld d =
   | Decl.Dind _  -> envld  (* FIXME *)
   | Decl.Dprop (k,pr,t) -> import_w3_pr rn path envld k pr t 
 
-let import_decls rn path env decls =
+let import_decls rn path env rb decls =
   let rec diff ls ls' = 
     match ls, ls' with
     | s::ls, s'::ls' when s = s' -> diff ls ls'
@@ -447,22 +614,17 @@ let import_decls rn path env decls =
           List.rev_map (function Zdecl d -> d | _ -> assert false) z in
         let _, z = close [] ls path z in
         (env,rb,final_close z) in
-  aux [] path (env,empty, []) decls
+  aux [] path (env,rb,[]) decls
 
 let import_w3 env path th rd =
+  let rb = rb_empty th in
   let rn = Renaming.init rd th in
   let task = Task.use_export None th in
   let ths = Ident.Mid.remove th.Theory.th_name (Task.used_theories task) in
   let others = Task.used_symbols ths in
   let decls = Task.local_decls task others in
-  let _env,rb, ld =  import_decls rn path env decls in
-  let rb = 
-    { rb_th   = th;
-      rb_ty   = rb.env_ty;
-      rb_op   = rb.env_op;
-      rb_ax   = rb.env_ax;
-      rb_w3   = rb.env_w3;
-    } in
+  let _env,rb,ld = import_decls rn path env rb decls in
+  let rb = { rb with rb_decl = List.rev rb.rb_decl } in
   ld, RBuse rb
 
 (*------------------------------------------------------------------*)
@@ -520,6 +682,7 @@ let rec trans_ty env vm ty =
   | Tconstr(p,tys) ->
       let id = trans_pty env p in
       Ty.ty_app id (trans_tys env vm tys)
+  | Tfun(t1,t2) -> Ty.ty_func (trans_ty env vm t1) (trans_ty env vm t2)
 
 and trans_tys env vm tys = List.map (trans_ty env vm) tys
 
@@ -640,24 +803,80 @@ let op_kind =
   let m = List.fold_left (fun m (p,k) -> Mp.add p k m) Mp.empty l in
   fun p -> try Mp.find p m with _ -> OK_other
 
-let trans_op env p args ty = 
-  match op_kind p, args with
-  | OK_true , []      -> Term.t_true
-  | OK_false, []      -> Term.t_false
-  | OK_not  , [e]     -> Term.t_not (force_prop e)
-  | OK_and  , [e1;e2] -> Term.t_and (force_prop e1) (force_prop e2)
-  | OK_or   , [e1;e2] -> Term.t_or  (force_prop e1) (force_prop e2)
-  | OK_imp  , [e1;e2] -> Term.t_implies (force_prop e1) (force_prop e2)
-  | OK_iff  , [e1;e2] -> Term.t_iff (force_prop e1) (force_prop e2)
-  | OK_eq   , [e1;e2] -> Term.t_equ (force_bool e1) (force_bool e2)
-  | OK_other, _ ->
-      let p = try Mp.find p env.env_op with _ -> 
-        (Format.printf "can not find %s@." (EcPath.tostring p);assert false) in
-      t_app p (List.map force_bool args) ty
-  | _       , _ -> assert false
-      
+let mk_not args  =
+  match args with
+  | [e] -> Term.t_not e
+  | _ -> assert false
 
+let mk_pred2 f l = 
+  match l with
+  | [e1;e2] -> f e1 e2
+  | _ -> assert false
 
+let mk_and = mk_pred2 Term.t_and
+let mk_or  = mk_pred2 Term.t_or
+let mk_imp = mk_pred2 Term.t_implies
+let mk_iff = mk_pred2 Term.t_iff
+let mk_eq  = mk_pred2 Term.t_equ
+  
+let trans_op env vm p tys =
+  match op_kind p with
+  | OK_true  -> ([],None), w3_ls_true, fun _ -> Term.t_true
+  | OK_false -> ([],None), w3_ls_false, fun _ -> Term.t_false
+  | OK_not   -> ([None],None), w3_ls_not, mk_not
+  | OK_and   -> ([None;None],None), w3_ls_and, mk_and
+  | OK_or    -> ([None;None],None), w3_ls_or, mk_or
+  | OK_imp   -> ([None;None],None), w3_ls_imp, mk_imp
+  | OK_iff   -> ([None;None],None), w3_ls_iff, mk_iff
+  | OK_eq    -> 
+      let ty = trans_ty env vm (List.hd tys) in
+      ([Some ty;Some ty],None), w3_ls_eq, mk_eq
+  | OK_other ->
+      let ls,ls', tvs = 
+        try Mp.find p env.env_op 
+        with _ -> 
+          Format.printf "can not find %s@." (EcPath.tostring p);
+          assert false in (* FIXME error message *)
+      let mtv = 
+        List.fold_left2 (fun mtv tv ty ->
+          Ty.Mtv.add tv (trans_ty env vm ty) mtv) Ty.Mtv.empty
+          tvs tys in
+      let targs = List.map (fun t -> Some (Ty.ty_inst mtv t)) ls.Term.ls_args in
+      let tres  = omap ls.Term.ls_value (Ty.ty_inst mtv) in
+      let mk args = Term.t_app ls args tres in
+      (targs,tres), ls', mk
+ 
+let apply_highorder f args = 
+  List.fold_left (fun f a -> Term.t_func_app f (force_bool a)) f args
+
+let cast_arg a ty = 
+  match a.Term.t_ty, ty with
+  | None, None -> a
+  | None, Some _ -> force_bool a
+  | Some _, None -> force_prop a
+  | Some _,Some _ -> a
+
+let cast_app mk args targs = mk (List.map2 cast_arg args targs)
+ 
+let rec highorder_type targs tres = 
+  match targs with
+  | [] -> odfl Ty.ty_bool tres
+  | a::targs -> Ty.ty_func a (highorder_type targs tres)
+  
+let trans_app env vm p tys args = 
+  let (targs,tres), ls', mk = trans_op env vm p tys in
+  let arity = List.length targs in
+  let nargs = List.length args in
+(* Format.printf "trans_app %s arity = %i nargs = %i@." (EcPath.tostring p)
+    arity nargs; *)
+  if arity = nargs then cast_app mk args targs
+  else if arity < nargs then
+    let args1,args2 = List.take_n arity args in
+    apply_highorder (cast_app mk args1 targs) args2
+  else (* arity > nargs *)
+    let targs = List.map (odfl Ty.ty_bool) targs in
+    let fty = highorder_type targs tres in
+    apply_highorder (Term.fs_app ls' [] fty) args 
 
 exception RandExpr
 
@@ -671,13 +890,15 @@ let rec trans_expr env vm e =
   | Eint n -> 
       let n = Term.ConstInt(Term.IConstDecimal (string_of_int n)) in
       Term.t_const n 
-  | Eflip | Einter _ | Ebitstr _ | Eexcepted _ -> raise RandExpr
-  | Elocal(id,_) -> trans_lv vm id
-  | Evar(_p,_ty) -> assert false 
-  | Eapp(p,args,ty) ->
-      let ty = trans_ty env vm ty in
-      let args = List.map (trans_expr env vm) args in 
-      trans_op env p args ty 
+  | Elocal id -> trans_lv vm id
+  | Evar _p -> assert false 
+  | Eop(p,tys) -> trans_app env vm p tys [] 
+  | Eapp({tye_desc = Eop(p,tys) },args) ->
+      let args = List.map (trans_expr env vm) args in
+      trans_app env vm p tys args
+  | Eapp(e,args) ->
+      let args = List.map (trans_expr env vm) args in
+      apply_highorder (trans_expr env vm e) args
   | Elet(lp,e1,e2) ->
       let e1 = trans_expr_b env vm e1 in
       begin match lp with
@@ -721,7 +942,7 @@ let rec trans_form env vm f =
       let tys = trans_tys env vm tys in
       let vs, vm = add_ids vm ids tys in
       let f = trans_form env vm f in
-      Term.t_quant_close (trans_quant q) vs [] f
+      Term.t_quant_close (trans_quant q) vs [] (force_prop f)
   | Fif(f1,f2,f3) ->
       let f1 = trans_form env vm f1 in
       let f2 = trans_form env vm f2 in
@@ -753,40 +974,44 @@ let rec trans_form env vm f =
       Term.t_const n 
   | Flocal id -> trans_lv vm id
   | Fpvar(p,ty,s) ->  Term.t_app_infer (trans_pv env vm (p,ty) s) [] 
-  | Fapp(p,args) ->
-      let ty = trans_ty env vm f.f_ty in
-      let args = List.map (trans_form env vm) args in 
-      trans_op env p args ty
+
+  | Fop(p,tys) -> trans_app env vm p tys [] 
+
+  | Fapp({f_node = Fop(p,tys) },args) ->
+      let args = List.map (trans_form env vm) args in
+      trans_app env vm p tys args
+
+  | Fapp(e,args) ->
+      let args = List.map (trans_form env vm) args in
+      apply_highorder (trans_form env vm e) args
+
   | Ftuple args ->
       let args = List.map (trans_form_b env vm) args in
       Term.t_tuple args
 
 and trans_form_b env vm f = force_bool (trans_form env vm f)
 
-let trans_op_body env vm ls = function
-  | OB_prob _ -> assert false 
-  | OB_oper { op_def = None } 
-  | OB_pred { op_def = None } ->  Decl.create_param_decl ls
-  | OB_oper { op_def = Some (ids,body) } ->
+let trans_oper_body env vm ls = function
+  | OB_oper None | OB_pred None -> Decl.create_param_decl ls
+  | OB_oper (Some (ids,body)) ->
       let ids, vm = add_ids vm ids ls.Term.ls_args in
       let e = trans_expr env vm body in
       let e = if ls.Term.ls_value = None then force_prop e else e in
       Decl.create_logic_decl [Decl.make_ls_defn ls ids e]
-  | OB_pred { op_def = Some(ids,body) } ->
+  | OB_pred (Some(ids,body) ) ->
       let ids,vm = add_ids vm ids ls.Term.ls_args in
       let e = force_prop (trans_form env vm body) in 
       Decl.create_logic_decl [Decl.make_ls_defn ls ids e]
 
-let trans_op env path op = 
-  assert (not (is_prob op));
+let trans_oper env path op = 
   let vm = empty_vmap () in
-  let _ = trans_typarams vm op.op_params in
+  let wparams = trans_typarams vm op.op_params in
   let pid = preid_p path in
   let dom = trans_tys env vm op.op_dom in
   let codom = trans_ty env vm op.op_codom in
   let codom = if Ty.ty_equal codom Ty.ty_bool then None else Some codom in
   let ls = Term.create_lsymbol pid dom codom in
-  ls, trans_op_body env vm ls op.op_kind 
+  ls, wparams, trans_oper_body env vm ls op.op_kind 
 
 let add_ty env path td =
   let ts = trans_tydecl env path td in
@@ -794,14 +1019,24 @@ let add_ty env path td =
   add_ts env path ts decl, RBty(path,ts,decl) 
 
 let add_op env path op =
-  if is_prob op then env, None
-  else
-    let ls, decl = trans_op env path op in
-    add_ls env path ls decl, Some (RBop(path,ls,decl))
+  let ls, wparams, decl = trans_oper env path op in
+  let odecl = mk_highorder_func ls in
+  add_ls env path ls wparams decl odecl, RBop(path,(ls,wparams),decl,odecl)
 
 let check_empty vm = 
   let check_empty m = assert (Mid.is_empty m) in 
   Array.iter check_empty vm.accu.pvm
+
+let add_ax env path ax =
+  let pr = Decl.create_prsymbol (preid_p path) in
+  let vm = empty_vmap () in
+  match ax.ax_spec with
+  | None -> assert false
+  | Some f ->
+      let f = trans_form env vm f in
+      check_empty vm;
+      let decl = Decl.create_prop_decl Decl.Paxiom pr f in
+      add_pr env path pr decl, RBax(path,pr,decl)
 
 (**** Calling prover *)
 let provers = Whyconf.get_provers config
@@ -816,36 +1051,30 @@ let get_prover name =
   with _ -> assert false (* FIXME error message *)
 
 let call_prover_task prover timelimit task =
-  let (_, pr, dr)  = get_prover prover in
-  let res = 
-    Call_provers.wait_on_call
-      (Driver.prove_task ~command:pr.Whyconf.command ~timelimit
-         dr task ()) () in
+   let (_, pr, dr)  = get_prover prover in
+   let toto = 
+     Driver.prove_task ~command:pr.Whyconf.command ~timelimit dr task () in
+   let res = 
+     Call_provers.wait_on_call toto () in
 (*  Format.printf "call prover res = %a@." Call_provers.print_prover_result res; *)
-  res.Call_provers.pr_answer = Call_provers.Valid
+   let result = res.Call_provers.pr_answer = Call_provers.Valid in
+   if not result then begin
+(*     Call_provers.print_prover_result Format.std_formatter res; *)
+     Driver.print_task dr Format.std_formatter task
+   end; 
+   result
+
 
 let check_w3_formula task prover timelimit f = 
   let pr   = Decl.create_prsymbol (Ident.id_fresh "goal") in
   let decl = Decl.create_prop_decl Decl.Pgoal pr f in
   let task = add_decl_with_tuples task decl in
-(*  Format.printf "task = %a@." Pretty.print_task task;  *)
+(*  let task = List.hd (Trans.apply_transform "lift_epsilon" w3_env task) in *)
+  Format.printf "task = %a@." Pretty.print_task task;  
   call_prover_task prover timelimit task
   
 exception CanNotProve of axiom
 
-let add_ax env path ax =
-  let pr = Decl.create_prsymbol (preid_p path) in
-  let vm = empty_vmap () in
-  match ax.ax_spec with
-  | None -> assert false
-  | Some f ->
-      let f = trans_form env vm f in
-      check_empty vm;
-(*      if ax.ax_kind = Lemma && 
-        not (check_w3_formula env.logic_task "Alt-Ergo" 10 f) then
-        raise (CanNotProve ax); *)
-      let decl = Decl.create_prop_decl Decl.Paxiom pr f in
-      add_pr env path pr decl, RBax(path,pr,decl)
 
 let close_task task vm tdecls hyps = 
   let task = 
@@ -886,7 +1115,7 @@ let check_goal env (hyps, concl) =
   let hyps = List.map trans_hyp (List.rev hyps.h_local) in
   let concl = trans_form env !vm concl in
   let task = close_task env.logic_task !vm tdecls hyps in
-  check_w3_formula task "Alt-Ergo" 10 concl
+  check_w3_formula task "Alt-Ergo" 3 concl
 
     
   

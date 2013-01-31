@@ -14,7 +14,10 @@ op union  : ('a t, 'a t) -> 'a t.
 op inter  : ('a t, 'a t) -> 'a t.
 
 op is_empty : 'a t -> bool.
+
 op mem      : ('a, 'a t) -> bool.
+op Pmem (X:'a t, x:'a) : bool = mem(x,X).
+
 op card     : 'a t -> int.
 
 axiom card_pos : forall (X:'a t), 0 <= card(X). 
@@ -48,13 +51,9 @@ axiom add_card : forall (x:'a, X:'a t),
 op filter : ('a Pred, 'a t) -> 'a t.
 
 axiom filter_mem : forall (P:'a Pred, X:'a t, x:'a),
-   mem(x,filter(P,X)) <=> (mem(x,X) && (P @ x)).
+   mem(x,filter(P,X)) <=> (mem(x,X) && P(x)).
 
 axiom filter_card : forall (P:'a Pred, X : 'a t), 
    card(filter(P,X)) = card(X) - card(filter(Pnot(P), X)). 
 
-op Pmem : ('a t) -> 'a Pred.
-
-axiom Pmem_def : forall (X:'a t, x:'a),
-  Pmem(X) @ x <=> mem(x,X).
 

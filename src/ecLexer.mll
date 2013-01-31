@@ -40,6 +40,7 @@
     "left"        , LEFT       ;        (* KW: tactic *)
     "right"       , RIGHT      ;        (* KW: tactic *)
     "elim"        , ELIM       ;        (* KW: tactic *)
+    "apply"       , APPLY      ;        (* KW: tactic *)
     "trivial"     , TRIVIAL    ;        (* KW: tactic *)
     "admit"       , ADMIT      ;        (* KW: dangerous *)
 
@@ -55,7 +56,6 @@
     "export"      , EXPORT     ;        (* KW: global *)
     "module"      , MODULE     ;        (* KW: global *)
     "op"          , OP         ;        (* KW: global *)
-    "pop"         , POP        ;        (* KW: global *)
     "pred"        , PRED       ;        (* KW: global *)
     "require"     , REQUIRE    ;        (* KW: global *)
     "theory"      , THEORY     ;        (* KW: global *)
@@ -141,7 +141,7 @@ rule main = parse
   | '?'                       { QUESTION }
   | '\\'                      { BACKSLASH }
   | "*"                       { STAR }
-  | "-"                       { MINUS }
+  | "$"                       { SAMPLE }
   | "|"                       { PIPE }
 
   (* comparison *)
