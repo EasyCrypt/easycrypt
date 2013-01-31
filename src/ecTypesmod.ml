@@ -4,8 +4,48 @@ open EcSymbols
 open EcDecl
 
 (* -------------------------------------------------------------------- *)
-type modifier = [ `Use | `Read | `Write ]
+module UM : sig
+  type flag  = [`Call | `Read | `Write]
+  type flags
 
+  val empty     : flags
+  val singleton : flag -> flags
+  val add       : flags -> flag -> flags
+  val have      : flags -> flag -> bool
+  val equal     : flags -> flags -> bool
+  val included  : flags -> flags -> bool
+end = struct
+  (* TODO: to be rewritten using -pxp OCaml 4.0 feature *)
+
+  type flag  = [`Call | `Read | `Write]
+  type flags = UseFlags of int
+
+  let iflag = function (* (Obj.magic x : int) *)
+    | `Call  -> 0
+    | `Read  -> 1
+    | `Write -> 2
+
+  let empty = UseFlags 0
+
+  let add (UseFlags f : flags) (e : flag) =
+    UseFlags (f lor (1 lsl (iflag e)))
+
+  let have (UseFlags f : flags) (e : flag) =
+    (f land (1 lsl (iflag e))) != 0
+
+  let singleton (e : flag) =
+    add empty e
+
+  let equal (UseFlags fin) (UseFlags fout) =
+    fin == fout
+
+  let included (UseFlags fin) (UseFlags fout) =
+    (lnot fin) land fout == 0
+end
+
+type use_flags = UM.flags
+
+(* -------------------------------------------------------------------- *)
 type tymod = {
   tym_params : (EcIdent.t * tymod) list;
   tym_sig    : tysig;
@@ -15,21 +55,21 @@ type tymod = {
 and tysig = tysig_item list
 
 and tysig_item =
-  | Tys_variable of symbol * EcTypes.ty
+  | Tys_variable of (symbol * EcTypes.ty)
   | Tys_function of funsig
 
 and funsig = {
   fs_name : symbol;
   fs_sig  : (EcIdent.t * EcTypes.ty) list * EcTypes.ty;
-  fs_uses : (EcPath.path * modifier) list;
+  fs_uses : use_flags EcPath.Mp.t;
 }
 
 (* -------------------------------------------------------------------- *)
 type module_expr = {
-  me_name       : EcIdent.t;
-  me_body       : module_body;
-  me_components : module_components Lazy.t;
-  me_sig        : tymod;
+  me_name : EcIdent.t;
+  me_body : module_body;
+  me_meta : module_meta option;
+  me_sig  : tymod;
 }
 
 and module_body =
@@ -43,15 +83,19 @@ and module_structure = {
   ms_body   : module_item list;
 }
 
-and module_item = [
-  | `Module   of module_expr
-  | `Variable of variable
-  | `Function of function_
-]
+and module_item =
+  | MI_Module   of module_expr
+  | MI_Variable of variable
+  | MI_Function of function_
 
 and module_components = module_components_item list
 
 and module_components_item = module_item
+
+and module_meta = {
+  mm_components : module_components option;
+  mm_uses       : EcPath.Sp.t;
+}
 
 and function_ = {
   f_name   : EcIdent.t;
@@ -101,7 +145,7 @@ type ctheory = {
 
 and ctheory_desc =
   | CTh_struct of ctheory_struct
-  | CTh_clone  of EcPath.path
+  | CTh_clone  of ctheory_clone
 
 and ctheory_struct = ctheory_item list
 
@@ -113,3 +157,12 @@ and ctheory_item =
   | CTh_module    of module_expr
   | CTh_theory    of (EcIdent.t * ctheory)
   | CTh_export    of EcPath.path
+
+and ctheory_clone = {
+  cthc_base : EcPath.path;
+  cthc_ext  : (EcIdent.t * ctheory_override) list;
+}
+
+and ctheory_override =
+| CTHO_Type   of EcTypes.ty
+| CTHO_Module of EcPath.path * (EcPath.path list)

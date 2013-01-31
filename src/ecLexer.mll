@@ -65,6 +65,7 @@
     "as"          , AS         ;        (* KW: global *)  
     "Pr"          , PR         ;        (* KW: global *)  
     "clone"       , CLONE      ;        (* KW: global *)
+    "with"        , WITH       ;        (* KW: global *)
   ]
 
   let keywords = Hashtbl.create 97

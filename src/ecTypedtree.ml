@@ -9,6 +9,7 @@ open EcTypesmod
 open EcFol
 
 module Sp = EcPath.Sp
+module Mp = EcPath.Mp
 
 (* -------------------------------------------------------------------- *)
 let dloc = Location.dummy               (* FIXME: TO BE REMOVED *)
@@ -40,6 +41,82 @@ type tyerror =
 exception TyError of Location.t * tyerror
 
 let tyerror loc x = raise (TyError (loc, x))
+
+(* -------------------------------------------------------------------- *)
+let e_inuse =
+  let rec inuse (map : Sp.t) (e : tyexpr) =
+    match e.tye_desc with
+    | Evar (p, _) -> begin
+        match p.pv_kind with
+        | PVglob -> Sp.add p.pv_name map
+        | _      -> map
+      end
+    | _ -> e_fold inuse map e
+  in
+    fun e -> inuse Sp.empty e
+  
+(* -------------------------------------------------------------------- *)
+let (i_inuse, s_inuse) =
+  let addflag p e map =
+     Mp.change
+       (fun flags -> Some (UM.add (odfl UM.empty flags) e))
+       p map
+  in
+
+  let rec lv_inuse (map : use_flags Mp.t) (lv : lvalue) =
+    match lv with
+    | LvVar (p, _) ->
+        addflag p `Write map
+
+    | LvTuple ps ->
+        List.fold_left
+          (fun map (p, _) -> addflag p `Write map)
+          map ps
+
+    | LvMap (_, p, e, _) ->
+        (* Maps are not modified in place but feed to a mutator
+           operator that returns the augmented map, keeping the previous
+           one untouched. Hence the [`Read] flag. *)
+      let map = addflag p `Read map in
+      let map = se_inuse map e in
+        map
+
+  and i_inuse (map : use_flags Mp.t) (i : instr) =
+    match i with
+    | Sasgn (lv, e) ->
+      let map = lv_inuse map lv in
+      let map = se_inuse map e in
+        map
+
+    | Scall (lv, p, es) -> begin
+      let map = List.fold_left se_inuse map es in
+      let map = addflag p `Call map in
+      let map = ofold lv ((^~) lv_inuse) map in
+        map
+    end
+
+    | Sif (e, s1, s2) ->
+      let map = se_inuse map e in
+      let map = s_inuse map s1 in
+      let map = s_inuse map s2 in
+        map
+
+    | Swhile (e, s) ->
+      let map = se_inuse map e in
+      let map = s_inuse map s in
+        map
+
+    | Sassert e ->
+      se_inuse map e
+
+  and s_inuse (map : use_flags Mp.t) (s : stmt) =
+    List.fold_left i_inuse map s
+
+  and se_inuse (map : use_flags Mp.t) (e : tyexpr) =
+    Sp.fold (fun p map -> addflag p `Read map) (e_inuse e) map
+
+  in
+    (i_inuse Mp.empty, s_inuse Mp.empty)
 
 (* -------------------------------------------------------------------- *)
 module UE = EcUnify.UniEnv
@@ -350,7 +427,7 @@ let rec transsig (env : EcEnv.env) (is : psignature) =
           Tys_function
             { fs_name = name.pl_desc;
               fs_sig  = (tyargs, resty);
-              fs_uses = []; }
+              fs_uses = Mp.empty; }
 
   in
 
@@ -387,8 +464,135 @@ and transtymod (env : EcEnv.env) (tymod : pmodule_type) =
         tym_mforb  = Sp.empty; }
 
 (* -------------------------------------------------------------------- *)
-let tymod_included (_src : tymod) (_dst : tymod) =
-  false                                 (* FIXME *)
+type tymod_cnv_failure =
+| E_TyModCnv_ParamCountMismatch
+| E_TyModCnv_ParamTypeMismatch of (EcIdent.t * tymod_cnv_failure)
+| E_TyModCnv_MissingComp       of symbol
+| E_TyModCnv_MismatchVarType   of symbol
+| E_TyModCnv_MismatchFunSig    of symbol
+
+exception TymodCnvFailure of tymod_cnv_failure
+
+let tymod_cnv_failure e =
+  raise (TymodCnvFailure e)
+
+let tysig_item_name = function
+  | Tys_variable (x, _) -> x
+  | Tys_function f      -> f.fs_name
+
+let tysig_item_kind = function
+  | Tys_variable _ -> `Variable
+  | Tys_function _ -> `Function
+
+let rec check_tymod_cnv mode (env : EcEnv.env) (tin : tymod) (tout : tymod) =
+  (* Check parameters for compatibility. Parameters names may be
+   * different, hence, substitute in [tin.tym_params] types the names
+   * of [tout.tym_params] *)
+  
+  if List.length tin.tym_params <> List.length tout.tym_params then
+    tymod_cnv_failure E_TyModCnv_ParamCountMismatch;
+
+  let bsubst =
+    List.fold_left2
+      (fun subst (xin, tyin) (xout, tyout) ->
+        let tyin = EcSubst.subst_modtype subst tyin in
+          begin
+            try check_tymod_cnv `Eq env tyin tyout
+            with
+            | TymodCnvFailure e ->
+                tymod_cnv_failure (E_TyModCnv_ParamTypeMismatch (xin, e))
+          end;
+          EcSubst.add subst xout (`Local xin))
+      EcSubst.empty tin.tym_params tout.tym_params
+  in
+    (* Check for body inclusion (w.r.t the parameters names substitution).
+     * This includes:
+     * - Variables / functions inclusion with equal signatures +
+     *   included use modifiers.
+     * - Inclusion of forbidden names set *)
+
+  let tin = EcSubst.subst_modtype bsubst tin in
+
+  let check_item_compatible =
+    let check_var_compatible (xin, tyin) (xout, tyout) =
+      assert (xin = xout);
+      if not (EcEnv.equal_type env tyin tyout) then
+        tymod_cnv_failure (E_TyModCnv_MismatchVarType xin)
+
+    and check_fun_compatible fin fout =
+      assert (fin.fs_name = fout.fs_name);
+      (* We currently reject function with compatible signatures but
+       * for the arguments names. We plan to leviate this restriction
+       * later on, but note that this may require to alpha-convert when
+       * instnatiating an abstract module by a implementation. *)
+
+      let arg_compatible (aname1, aty1) (aname2, aty2) =
+           (EcIdent.name aname1) = (EcIdent.name aname2)
+        && EcEnv.equal_type env aty1 aty2
+      in
+
+      let (iargs, oargs) = (fst fin.fs_sig, fst fin.fs_sig) in
+      let (ires , ores ) = (snd fin.fs_sig, snd fin.fs_sig) in
+
+        if List.length iargs <> List.length oargs then
+          tymod_cnv_failure (E_TyModCnv_MismatchFunSig fin.fs_name);
+        if not (List.for_all2 arg_compatible iargs oargs) then
+          tymod_cnv_failure (E_TyModCnv_MismatchFunSig fin.fs_name);
+        if not (EcEnv.equal_type env ires ores) then
+          tymod_cnv_failure (E_TyModCnv_MismatchFunSig fin.fs_name);
+
+        let flcmp =
+          match mode with
+          | `Sub -> Mp.submap (fun _ flin flout -> UM.included flin flout)
+          | `Eq  -> Mp.equal  (fun flin flout -> UM.equal flin flout)
+        in
+          if not (flcmp fin.fs_uses fout.fs_uses) then
+            tymod_cnv_failure (E_TyModCnv_MismatchFunSig fin.fs_name);
+
+    in
+      fun i_item o_item ->
+        match i_item, o_item with
+        | Tys_variable xin, Tys_variable xout -> check_var_compatible xin xout
+        | Tys_function fin, Tys_function fout -> check_fun_compatible fin fout
+        | _               , _                 -> assert false
+  in
+
+  let check_for_item (i_item : tysig_item) =
+    let i_name = tysig_item_name i_item
+    and i_kind = tysig_item_kind i_item in
+
+    let o_item =
+      List.findopt
+        (fun o_item ->
+             (tysig_item_name o_item) = i_name
+          && (tysig_item_kind o_item) = i_kind)
+        tout.tym_sig
+    in
+      match o_item with
+      | None -> tymod_cnv_failure (E_TyModCnv_MissingComp i_name)
+      | Some o_item -> check_item_compatible i_item o_item
+  in
+    List.iter check_for_item tin.tym_sig;
+
+    if mode = `Eq then begin
+      List.iter
+        (fun o_item ->
+          let o_name = tysig_item_name o_item
+          and o_kind = tysig_item_kind o_item in
+          let b =
+            List.exists
+              (fun i_item ->
+                   (tysig_item_name i_item) = o_name
+                && (tysig_item_kind i_item) = o_kind)
+              tin.tym_sig
+          in
+            if not b then
+              tymod_cnv_failure (E_TyModCnv_MissingComp o_name))
+        tout.tym_sig
+    end
+
+let check_tymod_sub = check_tymod_cnv `Sub
+and check_tymod_eq  = check_tymod_cnv `Eq
 
 (* -------------------------------------------------------------------- *)
 let rec transmod (env : EcEnv.env) (x : EcIdent.t) (m : pmodule_expr) =
@@ -402,10 +606,10 @@ let rec transmod (env : EcEnv.env) (x : EcIdent.t) (m : pmodule_expr) =
             if args <> [] then
               tyerror dloc ModApplToNonFunctor;
 
-            { me_name       = x;
-              me_body       = ME_Ident mname;
-              me_components = lazy (assert false); (* FIXME *)
-              me_sig        = mty; }
+            { me_name = x;
+              me_body = ME_Ident mname;
+              me_meta = None;     (* FIXME *)
+              me_sig  = mty; }
 
         | _ ->
             let (anames, atymods) = List.split mty.tym_params in
@@ -415,8 +619,9 @@ let rec transmod (env : EcEnv.env) (x : EcIdent.t) (m : pmodule_expr) =
               tyerror dloc ModApplInvalidArity;
             List.iter2
               (fun iarg arg ->
-                 if not (tymod_included arg iarg) then
-                   tyerror dloc ModApplInvalidArgInterface)
+                try check_tymod_sub env arg iarg
+                with TymodCnvFailure _ ->
+                  tyerror dloc ModApplInvalidArgInterface)
               atymods (List.map snd args);
 
             (* EcSubstitute args. in result type *)
@@ -430,10 +635,10 @@ let rec transmod (env : EcEnv.env) (x : EcIdent.t) (m : pmodule_expr) =
                   tym_sig    = mty.tym_sig;
                   tym_mforb  = Sp.empty; }
             in
-              { me_name       = x;
-                me_body       = ME_Application (mname, List.map fst args);
-                me_components = lazy (assert false); (* FIXME *)
-                me_sig        = tyres; }
+              { me_name = x;
+                me_body = ME_Application (mname, List.map fst args);
+                me_meta = None;
+                me_sig  = tyres; }
   end
 
   | Pm_struct st ->
@@ -455,9 +660,9 @@ and transstruct (env : EcEnv.env) (x : EcIdent.t) (st : pstructure) =
   let _, items =
     let tydecl1 ((x, obj) : EcIdent.t * _) =
       match obj with
-      | `Module   m -> (x, `Module   m.me_sig)
-      | `Variable v -> (x, `Variable (Some EcTypes.PVglob, v.v_type))
-      | `Function f -> (x, `Function f.f_sig)
+      | MI_Module   m -> (x, `Module   m.me_sig)
+      | MI_Variable v -> (x, `Variable (Some EcTypes.PVglob, v.v_type))
+      | MI_Function f -> (x, `Function f.f_sig)
     in
       List.fold_left
         (fun (env, acc) item ->
@@ -471,9 +676,9 @@ and transstruct (env : EcEnv.env) (x : EcIdent.t) (st : pstructure) =
   (* Generate structure signature *)
   let tymod =
     let tymod1 = function
-      | `Module   _ -> None
-      | `Variable v -> Some (Tys_variable (EcIdent.name v.v_name, v.v_type))
-      | `Function f -> Some (Tys_function f.f_sig) 
+      | MI_Module   _ -> None
+      | MI_Variable v -> Some (Tys_variable (EcIdent.name v.v_name, v.v_type))
+      | MI_Function f -> Some (Tys_function f.f_sig) 
     in
 
     let sigitems = List.pmap tymod1 (List.map snd items) in
@@ -482,25 +687,25 @@ and transstruct (env : EcEnv.env) (x : EcIdent.t) (st : pstructure) =
         tym_mforb  = Sp.empty; }
       
   in
-    { me_name       = x;
-      me_body       = ME_Structure { ms_params = stparams;
-                                     ms_body   = List.map snd items; };
-      me_components = lazy (assert false); (* FIXME *)
-      me_sig        = tymod; }
+    { me_name = x;
+      me_body = ME_Structure { ms_params = stparams;
+                               ms_body   = List.map snd items; };
+      me_meta = None;
+      me_sig  = tymod; }
 
 (* -------------------------------------------------------------------- *)
 and transstruct1 (env : EcEnv.env) (st : pstructure_item) =
   match st with
   | Pst_mod ({ pl_desc = m }, me) ->
       let m = EcIdent.create m in
-        [(m, `Module (transmod env m me))]
+        [(m, MI_Module (transmod env m me))]
 
   | Pst_var (xs, ty) ->
       let ty = transty_nothing env ty in
         List.map
           (fun { pl_desc = x } ->
             let x = EcIdent.create x in
-              (x, `Variable { v_name = x; v_type = ty; }))
+              (x, MI_Variable { v_name = x; v_type = ty; }))
           xs
 
   | Pst_fun (decl, body) -> begin
@@ -561,13 +766,13 @@ and transstruct1 (env : EcEnv.env) (st : pstructure_item) =
           f_sig    = {
             fs_name = decl.pfd_name.pl_desc;
             fs_sig  = params, rty;
-            fs_uses = [];   (* FIXME *)
+            fs_uses = Mp.empty;   (* FIXME *)
           };
           f_locals = locals;
           f_body   = stmt;
           f_ret    = re
         } in 
-      [(fid, `Function fun_)]
+      [(fid, MI_Function fun_)]
   end
 
   | Pst_alias _ -> assert false
@@ -668,7 +873,7 @@ and translvalue ue (env : EcEnv.env) lvalue =
       let ty = Ttuple (List.map snd xs) in
 
       (LvTuple xs, ty)
-  end
+    end
 
   | PLvMap ({ pl_desc = x; pl_loc = loc }, tvi, e) ->
       let tvi = transtvi env ue tvi in  
@@ -690,7 +895,6 @@ and translvalue ue (env : EcEnv.env) lvalue =
 
 (* -------------------------------------------------------------------- *)
 (** Translation of formula *)
-
 type var_kind = 
   | Llocal of EcIdent.t * ty
   | Lprog  of EcTypes.prog_var * ty * Side.t
@@ -845,16 +1049,3 @@ let transformula fenv ue pf =
   let f = transf fenv pf in
   unify_error (Fenv.mono fenv) ue pf.pl_loc f.f_ty tbool;
   f 
-
-(* -------------------------------------------------------------------- *)
-let inuse =
-  let rec inuse (map : Sp.t) (e : tyexpr) =
-    match e.tye_desc with
-    | Evar (p, _) -> begin
-        match p.pv_kind with
-        | PVglob -> Sp.add p.pv_name map
-        | _      -> map
-      end
-    | _ -> e_fold inuse map e
-  in
-    fun e -> inuse Sp.empty e

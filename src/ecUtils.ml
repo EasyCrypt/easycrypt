@@ -31,6 +31,11 @@ let oiter (x : 'a option) (f : 'a -> unit) =
 let obind (x : 'a option) (f : 'a -> 'b option) =
   match x with None -> None | Some x -> f x
 
+let ofold (x : 'a option) (f : 'a -> 'b -> 'b) (v : 'b) =
+  match x with
+  | None   -> v
+  | Some x -> f x v
+
 let omap (x : 'a option) (f : 'a -> 'b) =
   match x with None -> None | Some x -> Some (f x)
 

@@ -160,6 +160,7 @@ let tk_theory = !^ "theory"
 let tk_type   = !^ "type"
 let tk_var    = !^ "var"
 let tk_while  = !^ "while"
+let tk_with   = !^ "with"
 
 let tk_arrow  = !^ "->"
 let tk_dotdot = !^ ".."
@@ -583,15 +584,15 @@ struct
     let xpath x = EcPath.Pqname (scope, x) in
 
       match item with
-      | `Variable v ->
+      | MI_Variable v ->
           let doc = pr_modvar tenv (xpath v.v_name, v) in
             (M.add_pvar tenv (xpath v.v_name), doc)
 
-      | `Function f ->
+      | MI_Function f ->
           let doc = pr_modfun tenv (xpath f.f_name, f) in
             (M.add_fun tenv (xpath f.f_name), doc)
 
-      | `Module me ->
+      | MI_Module me ->
           let doc = pr_module tenv (xpath me.me_name, me) in
             (M.add_mod tenv (xpath me.me_name), doc)
 
@@ -777,20 +778,50 @@ struct
 
   (* ------------------------------------------------------------------ *)
   and pr_theory (tenv : t) ((name, ctheory) : EcPath.path * ctheory) =
-    match ctheory.cth_desc with
-    | CTh_clone p ->
-        pr_seq [tk_clone; pr_th_name tenv p; tk_as;
-                  pr_ident tenv (EcPath.basename name)]
+    let pr_ext ((x, e) : EcIdent.t * ctheory_override) =
+      match e with
+      | CTHO_Type ty ->
+          pr_seq [tk_type; pr_ident tenv x; Pp.equals; pr_type tenv ty]
 
-    | CTh_struct cstruct ->
-        let basename = EcPath.basename name in
-        let _, pr_cstruct =
-          List.map_fold (pr_ctheory_item name) tenv cstruct
-        in
-          pr_block
-            ~prfx:(pr_dotted (tk_theory ^//^ (pr_ident tenv basename)))
-            ~pofx:(pr_dotted (tk_end    ^//^ (pr_ident tenv basename)))
-            pr_cstruct
+      | CTHO_Module (mp, margs) -> begin
+          let doc =
+              match margs with
+              | [] -> pr_th_name tenv mp
+              | _  -> pr_seq [
+                  pr_th_name tenv mp;
+                  Pp.parens (pr_list_map (pr_th_name tenv) "," margs)]
+          in
+            pr_seq [tk_module; pr_ident tenv x; Pp.equals; doc]
+      end
+    in
+      match ctheory.cth_desc with
+      | CTh_clone p ->
+          let doc = [tk_clone; pr_th_name tenv p.cthc_base] in
+          let doc =
+            let name1 = EcIdent.name (EcPath.basename name)
+            and name2 = EcIdent.name (EcPath.basename p.cthc_base) in
+              match name1 = name2 with
+              | true  -> doc
+              | false -> doc @ [tk_as; pr_ident tenv (EcPath.basename name)] in
+          let doc =
+            match p.cthc_ext with
+            | [] -> doc
+            | _  ->
+              let pext = List.map pr_ext p.cthc_ext in
+              let pext = [tk_with; (pr_list ", " pext)] in
+                doc @ pext
+          in
+            pr_seq doc
+  
+      | CTh_struct cstruct ->
+          let basename = EcPath.basename name in
+          let _, pr_cstruct =
+            List.map_fold (pr_ctheory_item name) tenv cstruct
+          in
+            pr_block
+              ~prfx:(pr_dotted (tk_theory ^//^ (pr_ident tenv basename)))
+              ~pofx:(pr_dotted (tk_end    ^//^ (pr_ident tenv basename)))
+              pr_cstruct
 
   let pr_hyp (t,d) (id,k) = 
     let dk = 

@@ -155,7 +155,7 @@
 %token VAR
 // %token WHERE
 %token WHILE
-// %token WITH
+%token WITH
 %token PR
 
 (* Tactics *)
@@ -882,7 +882,6 @@ renaming:
 (* -------------------------------------------------------------------- *)
 (* tactic                                                               *)
 
-
 assumption_args:
 | empty                  { None  , None }
 | p=qident tvi=tvars_app { Some p, tvi }
@@ -923,29 +922,52 @@ tactic:
 | ELIM k=elim_kind a=elim_args { Pelim { elim_kind = k; elim_args = a } } 
 | LPAREN s=tactics RPAREN      { Pseq s } 
 ;
+
 tactics:
 | t=loc(tactic)                        { [t] }
 | t=loc(tactic) SEMICOLON ts=tactics2  { t::ts }
 ;
 
 tactics0:
-(* | empty           { Pidtac } *)
-| ts=tactics      { Pseq ts } 
+| ts=tactics { Pseq ts } 
 ;
+
 %inline tactics2: ts=plist1(tactic2, SEMICOLON) { ts };
 tsubgoal: LBRACKET ts=plist0(loc(tactics0),PIPE) RBRACKET { Psubgoal ts };
+
 tactic2: 
 | ts=loc(tsubgoal) { ts }
 | t=loc(tactic)    { t } 
 ;
 
-
 (* -------------------------------------------------------------------- *)
 (* Theory cloning                                                       *)
 
 theory_clone:
-| CLONE x=qident { (x, None) }
-| CLONE x=qident AS y=ident { (x, Some y) }
+| CLONE x=qident cw=clone_with?
+   { { pthc_base = x;
+       pthc_name = None;
+       pthc_ext  = EcUtils.odfl [] cw; } }
+
+| CLONE x=qident AS y=ident cw=clone_with?
+   { { pthc_base = x;
+       pthc_name = Some y;
+       pthc_ext  = EcUtils.odfl [] cw; } }
+;
+
+clone_with:
+| WITH x=plist1(clone_override, COMMA) { x }
+;
+
+clone_override:
+| TYPE x=ident EQ t=loc(type_exp)
+   { (x, PTHO_Type t) }
+
+| MODULE x=ident EQ m=qident
+   { (x, PTHO_Module (m, [])) }
+
+| MODULE x=ident EQ m=qident LPAREN args=qident+ RPAREN
+  { (x, PTHO_Module (m, args)) }
 ;
 
 (* -------------------------------------------------------------------- *)

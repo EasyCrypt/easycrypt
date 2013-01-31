@@ -397,25 +397,25 @@ let subst_function (s : subst) (f : function_) =
 (* -------------------------------------------------------------------- *)
 let rec subst_module_item (s : subst) (scope : EcPath.path) (item : module_item) =
   match item with
-  | `Module m ->
+  | MI_Module m ->
       let m'     = subst_module s scope m in
       let scope' = EcPath.Pqname (scope, m'.me_name) in
       let s'     = add s m.me_name (`Path scope') in
 
-        (s', `Module m')
+        (s', MI_Module m')
 
-  | `Variable x ->
+  | MI_Variable x ->
       let x'     = subst_variable s x in
       let scope' = EcPath.Pqname (scope, x'.v_name) in
       let s'     = add s x.v_name (`Path scope') in
 
-        (s', `Variable x')
+        (s', MI_Variable x')
 
-  | `Function f ->
+  | MI_Function f ->
       let f'     = subst_function s f in
       let scope' = EcPath.Pqname (scope, f'.f_name) in
       let s'     = add s f'.f_name (`Path scope') in
-        (s', `Function f')
+        (s', MI_Function f')
 
 (* -------------------------------------------------------------------- *)
 and subst_module_items (s : subst) (scope : EcPath.path) (items : module_item list) =
@@ -461,10 +461,10 @@ and subst_module (s : subst) (scope : EcPath.path) (m : module_expr) =
   let body'  = subst_module_body sbody scope' m.me_body in
   let tysig' = subst_modtype s m.me_sig in
 
-    { me_name       = name';
-      me_body       = body';
-      me_components = lazy (assert false);
-      me_sig        = tysig'; }
+    { me_name = name' ;
+      me_body = body' ;
+      me_meta = None  ;           (* FIXME *)
+      me_sig  = tysig'; }
 
 (* -------------------------------------------------------------------- *)
 let rec subst_theory_item (s : subst) (scope : EcPath.path) (item : theory_item) =

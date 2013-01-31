@@ -51,6 +51,7 @@ let unloc  x = x.pl_desc
 let unlocs x = List.map unloc x
 let dummyloc x = { pl_loc = Location.dummy; pl_desc = x }
 let dummy_pqs_of_ps s = dummyloc (qsymb_of_symb (unloc s))
+
 (* -------------------------------------------------------------------- *)
 type side = int
 
@@ -58,7 +59,8 @@ type psymbol  = symbol  located         (* located symbol  *)
  and pqsymbol = qsymbol located         (* located qsymbol *)
 type posymbol = symbol option located
 
-type pty    = pty_r    located          (* located type              *)
+type pty = pty_r    located             (* located type *)
+
 and pty_r =
   | PTunivar
   | PTtuple     of pty list
@@ -73,7 +75,8 @@ type tvar_inst_kind =
 type tvar_inst = tvar_inst_kind option
     
 
-type pexpr  = pexpr_r  located          (* located expression        *)
+type pexpr  = pexpr_r  located          (* located expression *)
+
 and pexpr_r =
   | PEflip                                          (* flip               *)
   | PEinter    of pexpr * pexpr                     (* interval sampling  *)
@@ -298,7 +301,15 @@ type w3_renaming =
     string list * renaming_kind * string 
     
 (* -------------------------------------------------------------------- *)
-type theory_cloning = pqsymbol * (psymbol option)
+type theory_cloning = {
+  pthc_base : pqsymbol;
+  pthc_name : psymbol option;
+  pthc_ext  : (psymbol * theory_override) list;
+}
+
+and theory_override =
+| PTHO_Type   of pty
+| PTHO_Module of pqsymbol * (pqsymbol list)
 
 (* -------------------------------------------------------------------- *)
 type global =

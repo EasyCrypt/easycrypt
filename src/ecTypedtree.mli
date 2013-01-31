@@ -75,4 +75,6 @@ val transtymod : EcEnv.env -> pmodule_type -> tymod
 val transmod   : EcEnv.env -> EcIdent.t -> pmodule_expr -> module_expr
 
 (* -------------------------------------------------------------------- *)
-val inuse : tyexpr -> EcPath.Sp.t
+val e_inuse : tyexpr -> EcPath.Sp.t
+val i_inuse : instr  -> use_flags EcPath.Mp.t
+val s_inuse : stmt   -> use_flags EcPath.Mp.t
