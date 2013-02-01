@@ -12,7 +12,7 @@ let s_dbool      = ["distr";"Dbool"     ], "dbool"
 let s_dbitstring = ["distr";"Dbitstring"], "dbitstring"
 let s_dinter     = ["distr";"Dinter"    ], "dinter"
 let s_dexcepted  = ["distr";"Dexcepted" ], "dexcepted"
-
+let s_from_int   = ["real"; "FromInt"], "from_int"
 
 (* -------------------------------------------------------------------- *)
 let id_top       = EcIdent.create "<top>"

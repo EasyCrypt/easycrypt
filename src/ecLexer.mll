@@ -124,6 +124,7 @@ rule main = parse
   | ".."                      { DOTDOT }
   | ".["                      { DLBRACKET }
   | ":="                      { CEQ }
+  | "%r"                      { FROM_INT }
   (* char symbols *)
   | '_'                       { UNDERSCORE }
   | '('                       { LPAREN }

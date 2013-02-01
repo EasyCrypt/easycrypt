@@ -134,6 +134,7 @@
 // %token LLIMP
 %token LPAREN
 %token MODULE
+%token FROM_INT
 %token NE
 %token NOT
 %token OP
@@ -318,6 +319,10 @@ sexp:
 | x=qident ti=tvars_app?
    { PEident (x,ti) }
 
+| se=loc(sexp) op=loc(FROM_INT)
+   { let id = PEident(mk_loc op.pl_loc EcCoreLib.s_from_int, None) in
+     PEapp (mk_loc op.pl_loc id, [se]) }
+
 | se=loc(sexp) DLBRACKET ti=tvars_app? e=loc(exp) RBRACKET
    { peget (Location.make $startpos $endpos) ti se e }
 
@@ -432,6 +437,10 @@ sform:
 
 | x=qident ti=tvars_app?
    { PFident (x,ti) }
+
+| se=loc(sform) op=loc(FROM_INT)
+   { let id = PFident(mk_loc op.pl_loc EcCoreLib.s_from_int, None) in
+     PFapp (mk_loc op.pl_loc id, [se]) }
 
 | se=loc(sform) DLBRACKET ti=tvars_app? e=loc(form) RBRACKET
    { pfget (Location.make $startpos $endpos) ti se e }

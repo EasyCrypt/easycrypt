@@ -13,7 +13,7 @@ val s_dexcepted  : string list * string
 val s_dbool      : string list * string
 val s_dbitstring : string list * string
 val s_dinter     : string list * string
-
+val s_from_int   : string list * string
 
 
 
