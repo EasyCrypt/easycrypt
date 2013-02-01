@@ -18,6 +18,8 @@ CHECK = \
 	  --ok-dir=theories      \
 	  --ko-dir=tests/fail
 
+XUNITOUT ?= xunit.xml
+
 # --------------------------------------------------------------------
 .PHONY: all build byte native check check-xunit clean tags
 .PHONY: %.ml
@@ -36,7 +38,7 @@ check: byte
 	$(CHECK)
 
 check-xunit:
-	$(CHECK) --xunit=xunit.xml
+	$(CHECK) --xunit="$(XUNITOUT)"
 
 clean:
 	$(OCAMLBUILD) -clean
