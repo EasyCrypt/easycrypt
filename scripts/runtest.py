@@ -84,7 +84,7 @@ def _xunit_dump(config, results):
         for result in group:
             rnode = E.testcase(
                 name      = "/%s" % (result.config.filename,),
-                classname = "/,
+                classname = "/",
                 time      = "%.3f" % (result.time,))
             if not result.success:
                 rnode.append(E.failure( \
