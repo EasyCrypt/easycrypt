@@ -123,6 +123,7 @@ rule main = parse
   | "->"                      { ARROW  }
   | ".."                      { DOTDOT }
   | ".["                      { DLBRACKET }
+  | ":="                      { CEQ }
   (* char symbols *)
   | '_'                       { UNDERSCORE }
   | '('                       { LPAREN }

@@ -99,7 +99,7 @@ type plvalue =
 type pinstr =
   | PSasgn   of plvalue * pexpr
   | PSrnd    of plvalue * pexpr
-  | PScall   of pqsymbol * pexpr list
+  | PScall   of plvalue option * pqsymbol * pexpr list
   | PSif     of pexpr * pstmt * pstmt
   | PSwhile  of pexpr * pstmt
   | PSassert of pexpr

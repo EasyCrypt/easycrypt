@@ -867,37 +867,28 @@ and transinstr ue (env : EcEnv.env) (i : pinstr) =
   in
 
   match i with
-  | PSasgn (lvalue, rvalue) -> begin
-      let rvalue_as_fun () =
-        match rvalue.pl_desc with
-        | PEapp ({pl_desc = PEident({ pl_desc = name }, None)}, args) when  EcEnv.Fun.exists name env ->
-            let (fpath, args, rty) = transcall name args in
-              Some (`Call (fpath, args), rty)
-        | _ -> None
-
-      and rvalue_as_expr () =
-        let e, ty = transexp env ue rvalue in
-          Some (`Expr e, ty)
-      in
-
+  | PSasgn (lvalue, rvalue) -> 
       let lvalue, lty = translvalue ue env lvalue in
-      let rvalue, rty = oget (List.fpick [rvalue_as_fun; rvalue_as_expr]) in
+      let rvalue, rty = transexp env ue rvalue in
+      EcUnify.unify env ue lty rty;
+      Sasgn (lvalue, rvalue)
 
-        EcUnify.unify env ue lty rty;
-        match rvalue with
-        | `Call (fpath, args) -> Scall (Some lvalue, fpath, args)
-        | `Expr e -> Sasgn (lvalue, e)
-    end
   | PSrnd(lvalue, rvalue) -> 
       let lvalue, lty = translvalue ue env lvalue in
       let rvalue, rty = transexp env ue rvalue in
       EcUnify.unify env ue (tdistr lty) rty;
       Srnd(lvalue,rvalue)
 
-  | PScall ({ pl_desc = name }, args) ->
+  | PScall (None, { pl_desc = name }, args) ->
       let (fpath, args, rty) = transcall name args in
-        EcUnify.unify env ue tunit rty;
-        Scall (None, fpath, args)
+      EcUnify.unify env ue tunit rty;
+      Scall (None, fpath, args)
+
+  | PScall (Some lvalue, { pl_desc = name }, args) ->
+      let lvalue, lty = translvalue ue env lvalue in
+      let (fpath, args, rty) = transcall name args in
+      EcUnify.unify env ue lty rty;
+      Scall (Some lvalue, fpath, args)
 
   | PSif (e, s1, s2) ->
       let e, ety = transexp env ue e in

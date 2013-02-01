@@ -110,6 +110,7 @@
 %token END
 %token EOF
 %token EQ
+%token CEQ
 // %token EQEQLBRACKET
 // %token EQUIV
 %token EXPORT
@@ -329,11 +330,11 @@ sexp:
 | LPAREN e=exp RPAREN
    { e }
 
-| PIPE ti=tvars_app? e=loc(exp) PIPE 
-    { peapp_symb e.pl_loc EcCoreLib.s_abs ti [e] }
-
 | LBRACKET ti=tvars_app? es=loc(p_exp_sm_list0) RBRACKET  
    { (pelist es.pl_loc ti es.pl_desc).pl_desc }
+
+| PIPE ti=tvars_app? e=loc(exp) PIPE 
+    { peapp_symb e.pl_loc EcCoreLib.s_abs ti [e] }
 ;
 
 op1:
@@ -346,7 +347,7 @@ exp:
 
 | e=loc(sexp) args=sexp_list1 { PEapp (e, args) }
 
-| op=loc(NOT) ti=tvars_app? e=loc(exp) (* %prec NOT *)
+| op=loc(NOT) ti=tvars_app? e=loc(exp)
    { peapp_symb op.pl_loc "!" ti [e] }
 
 | op=loc(binop) ti=tvars_app? e=loc(exp) %prec prec_prefix_op
@@ -450,11 +451,12 @@ sform:
 | LBRACKET ti=tvars_app? es=loc(p_form_sm_list0) RBRACKET
    { (pflist es.pl_loc ti es.pl_desc).pl_desc }
 
-| PIPE ti=tvars_app? e =loc(form) PIPE 
-    { pfapp_symb e.pl_loc EcCoreLib.s_abs ti [e] }
-
 | PR LBRACKET x=fct_game pn=prog_num COLON f=loc(form) RBRACKET 
     { PFprob(x,pn,f) }
+
+| PIPE ti=tvars_app? e =loc(form) PIPE 
+    { pfapp_symb e.pl_loc EcCoreLib.s_abs ti [e] }
+;
                           
 form:
 | e=sform { e } %prec above_OP
@@ -574,14 +576,17 @@ lvalue:
 ;
 
 base_instr:
-| f=qident LPAREN es=exp_list0 RPAREN
-    { PScall (f, es) }
 
 | x=lvalue EQ e=loc(exp)
     { PSasgn (x, e) }
 
 | x=lvalue EQ SAMPLE e=loc(exp)
     { PSrnd(x,e) }
+| x=lvalue CEQ f=qident LPAREN es=exp_list0 RPAREN 
+    { PScall (Some x, f, es) } 
+
+| f=qident LPAREN es=exp_list0 RPAREN
+    { PScall (None, f, es) }
 
 | ASSERT LPAREN c=loc(exp) RPAREN 
      { PSassert c }
