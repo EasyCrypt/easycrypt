@@ -233,7 +233,7 @@ struct
 
   (* ------------------------------------------------------------------ *)
   let pr_tunivar (uidmap : NameGen.t) (id : EcUidgen.uid) =
-    !^ (Printf.sprintf "#%s(*%i*)" (NameGen.get uidmap id) id) 
+    !^ (Printf.sprintf "#%s" (NameGen.get uidmap id)) 
 
   (* ------------------------------------------------------------------ *)
   let pr_tuple docs =
@@ -401,7 +401,7 @@ struct
     Pp.parens (pr_list ", " docs)
 
   (* ------------------------------------------------------------------ *)
-  let pr_app (tenv : t) pr_sub outer op tys es =
+  let pr_app (tenv : t) pr_sub outer op _tys es =
      (* FIXME : special notations, list ..., sampling {0,1} [k1..k2] .... *) 
     let opname = EcIdent.name (EcPath.basename op) in
 
@@ -410,9 +410,9 @@ struct
       | [] -> pr_op_name tenv op
       | _  ->
           let docs = List.map (pr_sub tenv (min_op_prec, `NonAssoc)) es in
-          let dtys = List.map (fun ty -> pr_type tenv ty) tys in
+(*          let dtys = List.map (fun ty -> pr_type tenv ty) tys in *)
           (pr_op_name tenv op) ^^
-          !^"<:" ^^ pr_list "," dtys ^^ !^">" ^^
+(*          !^"<:" ^^ pr_list "," dtys ^^ !^">" ^^ *)
           pr_seq [Pp.parens (pr_list "," docs)]
 
     and try_pr_as_uniop () =
