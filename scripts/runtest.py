@@ -2,6 +2,12 @@
 
 # --------------------------------------------------------------------
 import sys, os, errno, shutil, itertools, logging, subprocess as sp
+import time, datetime, socket
+
+# --------------------------------------------------------------------
+class Object(object):
+    def __init__(self, **kw):
+        self.__dict__.update(kw)
 
 # --------------------------------------------------------------------
 def _options():
@@ -28,6 +34,13 @@ def _options():
         default = [],
         help    = 'path to directory containing *invalid* EasyCrypt scripts (cumulative)')
 
+    parser.add_option(
+        '', '--xunit',
+        action  = 'store',
+        default = None,
+        metavar = 'FILE',
+        help    = 'dump result to FILE using xUnit format')
+
 #    parser.add_option(
 #        '', '--log',
 #        help    = 'path to directory containing tests logs (must NOT exist)',
@@ -42,6 +55,52 @@ def _options():
         parser.error('no path to directory containing EasyCrypt scripts given')
 
     return options
+
+# --------------------------------------------------------------------
+def _xunit_dump(config, results):
+    import lxml, lxml.builder; E = lxml.builder.ElementMaker()
+
+    totaltime = sum([x.time for x in results])
+    grouped   = dict()
+
+    for result in results:
+        grouped.setdefault(result.config.group, []).append(result)
+
+    root = E.testsuites()
+    for gname, group in grouped.iteritems():
+        ok = [x for x in group if     x.success]
+        ko = [x for x in group if not x.success]
+
+        node = E.testsuite(name      = gname,
+                           hostname  = config.hostname,
+                           timestamp = config.timestamp.isoformat(),
+                           tests     = str(len(group)),
+                           errors    = "0",
+                           failures  = str(len(ko)),
+                           time      = "%.3f" % totaltime)
+
+        node.append(E.properties())
+
+        for result in group:
+            rnode = E.testcase(
+                name      = os.path.basename(result.config.filename),
+                classname = os.path.dirname (result.config.filename),
+                time      = "%.3f" % (result.time,))
+            if not result.success:
+                rnode.append(E.failure( \
+                        message = 'invalid-exit-status',
+                        type    = 'should-pass: %r' % (result.config.isvalid,)))
+            node.append(rnode)
+
+        node.append(E("system-out"))
+        node.append(E("system-err"))
+
+        root.append(node)
+
+    return lxml.etree.tostring(root,
+                               pretty_print    = True   ,
+                               xml_declaration = True   ,
+                               encoding        = 'utf-8')
 
 # --------------------------------------------------------------------
 def _main():
@@ -72,7 +131,13 @@ def _main():
             logging.warning("cannot scan `%s': %s" % (dirname, e))
         scripts = sorted([x for x in scripts if x.endswith('.ec')])
         logging.debug("%.4d script(s) found in `%s'" % (len(scripts), dirname))
-        return [(isvalid, os.path.join(dirname, x)) for x in scripts]
+
+        def config(filename):
+            return Object(isvalid  = isvalid,
+                          group    = dirname,
+                          filename = os.path.join(dirname, x))
+
+        return [config(x) for x in scripts]
 
     def gatherall():
         oks = map(lambda x : gather(x, True ), options.ok_dir)
@@ -84,29 +149,42 @@ def _main():
     logging.debug("%.4d script(s) in total" % (len(allscripts,)))
 
     # --------------------------------------------------------------------
-    errors = []
+    mainconfig = Object()
+    result = []
 
-    for isvalid, filename in allscripts:
-        logging.info("running ec on `%s' [valid: %s]" % (filename, isvalid))
+    mainconfig.hostname  = socket.gethostname()
+    mainconfig.timestamp = datetime.datetime.utcnow()
+
+    for config in allscripts:
+        logging.info("running ec on `%s' [valid: %s]" % \
+                         (config.filename, config.isvalid))
+        timestamp1 = time.time()
         try:
-            status = sp.call([options.bin, filename],
+            status = sp.call([options.bin, config.filename],
                              stdout = open(os.devnull, 'wb'),
                              stderr = sp.STDOUT)
         except OSError, e:
             logging.error("cannot run `%s': %s" % (options.bin, e))
             exit (1)
-        success = (bool(status) != isvalid)
-        logging.info("result for `%s': success: %s" % (filename, success))
-        if not success:
-            errors.append(filename)
+        timestamp2 = time.time()
+        success = (bool(status) != config.isvalid)
+        logging.info("result for `%s': success: %s" % (config.filename, success))
+        result.append(Object(success = success,
+                             config  = config ,
+                             time    = timestamp2 - timestamp1))
+
+    errors = [x for x in result if not x.success]
 
     logging.info("# of failed scripts: %d" % (len(errors,)))
     if errors:
         logging.info("--- BEGIN FAILING SCRIPTS ---")
-        for filename in errors:
-            logging.info(filename)
+        for error in errors:
+            logging.info(error.config.filename)
         logging.info("--- END FAILING SCRIPTS ---")
         logging.critical("some tests did NOT pass")
+
+    if options.xunit is not None:
+        open(options.xunit, 'wb').write(_xunit_dump(mainconfig, result))
 
     exit (2 if errors else 0)
 

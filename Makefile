@@ -11,8 +11,15 @@ ifeq ($(shell echo $$TERM), dumb)
 endif
 OCAMLBUILD := $(OCAMLBUILD_BIN) $(OCAMLBUILD_EXTRA)
 
+CHECK = \
+	./scripts/runtest.py     \
+	  --bin=./ec.byte        \
+	  --ok-dir=tests/success \
+	  --ok-dir=theories      \
+	  --ko-dir=tests/fail
+
 # --------------------------------------------------------------------
-.PHONY: all build byte native check clean tags
+.PHONY: all build byte native check check-xunit clean tags
 .PHONY: %.ml
 
 all: build
@@ -26,11 +33,10 @@ native: tags
 	$(OCAMLBUILD) src/ec.native
 
 check: byte
-	./scripts/runtest.py     \
-	  --bin=./ec.byte        \
-	  --ok-dir=tests/success \
-	  --ok-dir=theories      \
-	  --ko-dir=tests/fail
+	$(CHECK)
+
+check-xunit:
+	$(CHECK) --xunit=xunit.xml
 
 clean:
 	$(OCAMLBUILD) -clean
