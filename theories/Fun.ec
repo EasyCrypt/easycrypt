@@ -22,8 +22,7 @@ axiom Ptrue_def  : forall (x:'a), Ptrue(x).
 
 axiom Pfalse_def : forall (x:'a), ! Pfalse(x). 
 
-(* FIXME : can not be proved *)
-axiom  Pnot_def   : forall (P:'a Pred, x:'a), (!Pnot(P, x)) <=> (!P(x)). 
+axiom Pnot_def   : forall (P:'a Pred, x:'a), (Pnot(P, x)) <=> (!P(x)). 
 
 axiom Pand_def   : forall (P1:_, P2:_, x:'a), 
   Pand(P1,P2,x) <=> (P1(x) && P2(x)).
