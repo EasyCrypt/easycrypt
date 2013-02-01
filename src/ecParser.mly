@@ -231,7 +231,6 @@
 %right AND
 
 %nonassoc NOT
-(* %nonassoc PIPE *)
 %left EQ NE OP1 GT
 
 %right QUESTION
@@ -243,10 +242,11 @@
 %nonassoc prec_prefix_op
 %nonassoc RKEY_HAT
 
+%nonassoc prec_apply
+%nonassoc PIPE
+
 %type <EcParsetree.global> global
 %type <EcParsetree.prog * bool> prog
-
-(* %nonassoc prec_apply *)
 
 %start prog global
 %%
@@ -302,8 +302,7 @@ tvars_instance_kind:
 ;
 
 %inline tvars_app:
-| LTCOLON k=tvars_instance_kind GT { Some k }
-| empty                            { None }
+| LTCOLON k=tvars_instance_kind GT { k }
 ;
 
 lpattern:
@@ -315,13 +314,13 @@ sexp:
 | n=number
    { PEint n }
 
-| x=qident ti=tvars_app 
+| x=qident ti=tvars_app?
    { PEident (x,ti) }
 
-| se=loc(sexp) DLBRACKET ti=tvars_app e=loc(exp) RBRACKET
+| se=loc(sexp) DLBRACKET ti=tvars_app? e=loc(exp) RBRACKET
    { peget (Location.make $startpos $endpos) ti se e }
 
-| se=loc(sexp) DLBRACKET ti=tvars_app e1=loc(exp) LEFTARROW e2=loc(exp) RBRACKET  
+| se=loc(sexp) DLBRACKET ti=tvars_app? e1=loc(exp) LEFTARROW e2=loc(exp) RBRACKET  
    { peset (Location.make $startpos $endpos) ti se e1 e2 }
 
 | LPAREN es=exp_list2 RPAREN
@@ -330,10 +329,10 @@ sexp:
 | LPAREN e=exp RPAREN
    { e }
 
-| PIPE ti=tvars_app e =loc(exp) PIPE 
+| PIPE ti=tvars_app? e=loc(exp) PIPE 
     { peapp_symb e.pl_loc EcCoreLib.s_abs ti [e] }
 
-| LBRACKET ti=tvars_app es=loc(p_exp_sm_list0) RBRACKET  
+| LBRACKET ti=tvars_app? es=loc(p_exp_sm_list0) RBRACKET  
    { (pelist es.pl_loc ti es.pl_desc).pl_desc }
 ;
 
@@ -343,48 +342,48 @@ op1:
 ;
 
 exp:
-| e=sexp { e }
+| e=sexp { e }  %prec prec_apply
 
-| e=loc(sexp) args=sexp_list1 { PEapp (e, args) } 
+| e=loc(sexp) args=sexp_list1 { PEapp (e, args) }
 
-| op=loc(NOT) ti=tvars_app e=loc(exp) (* %prec NOT *)
+| op=loc(NOT) ti=tvars_app? e=loc(exp) (* %prec NOT *)
    { peapp_symb op.pl_loc "!" ti [e] }
 
-| op=loc(binop) ti=tvars_app e=loc(exp) %prec prec_prefix_op
+| op=loc(binop) ti=tvars_app? e=loc(exp) %prec prec_prefix_op
    { peapp_symb op.pl_loc op.pl_desc ti [e] }
 
-| e1=loc(exp) op=loc(op1) ti=tvars_app e2=loc(exp) %prec OP1
+| e1=loc(exp) op=loc(op1) ti=tvars_app? e2=loc(exp) %prec OP1
     { peapp_symb op.pl_loc op.pl_desc ti [e1; e2] }
 
-| e1=loc(exp) op=loc(OP2) ti=tvars_app e2=loc(exp) 
+| e1=loc(exp) op=loc(OP2) ti=tvars_app? e2=loc(exp) 
     { peapp_symb op.pl_loc op.pl_desc ti [e1; e2] }
 
-| e1=loc(exp) op=loc(OP3) ti=tvars_app e2=loc(exp) 
+| e1=loc(exp) op=loc(OP3) ti=tvars_app? e2=loc(exp) 
     { peapp_symb op.pl_loc op.pl_desc ti [e1; e2] }
 
-| e1=loc(exp) op=loc(OP4) ti=tvars_app e2=loc(exp) 
+| e1=loc(exp) op=loc(OP4) ti=tvars_app? e2=loc(exp) 
     { peapp_symb op.pl_loc op.pl_desc ti [e1; e2] }
 
-| e1=loc(exp) op=loc(IMPL) ti=tvars_app e2=loc(exp)
+| e1=loc(exp) op=loc(IMPL) ti=tvars_app? e2=loc(exp)
     { peapp_symb op.pl_loc "=>" ti [e1; e2] }
 
-| e1=loc(exp) op=loc(IFF) ti=tvars_app e2=loc(exp) 
+| e1=loc(exp) op=loc(IFF) ti=tvars_app? e2=loc(exp) 
     { peapp_symb op.pl_loc "<=>" ti [e1; e2] }
 
-| e1=loc(exp) op=loc(OR) ti=tvars_app e2=loc(exp)  
+| e1=loc(exp) op=loc(OR) ti=tvars_app? e2=loc(exp)  
     { peapp_symb op.pl_loc "||" ti [e1; e2] }
 
-| e1=loc(exp) op=loc(AND) ti=tvars_app e2=loc(exp) 
+| e1=loc(exp) op=loc(AND) ti=tvars_app? e2=loc(exp) 
     { peapp_symb op.pl_loc "&&" ti [e1; e2] }
 
-| e1=loc(exp) op=loc(EQ) ti=tvars_app e2=loc(exp)  
+| e1=loc(exp) op=loc(EQ) ti=tvars_app? e2=loc(exp)  
     { peapp_symb op.pl_loc "=" ti [e1; e2] }
 
-| e1=loc(exp) op=loc(NE) ti=tvars_app e2=loc(exp) 
+| e1=loc(exp) op=loc(NE) ti=tvars_app? e2=loc(exp) 
     { peapp_symb op.pl_loc "!" None 
       [ mk_loc op.pl_loc (peapp_symb op.pl_loc "=" ti [e1; e2])] }
 
-| e1=loc(exp) op=loc(STAR) ti=tvars_app e2=loc(exp)  
+| e1=loc(exp) op=loc(STAR) ti=tvars_app? e2=loc(exp)  
     { peapp_symb op.pl_loc "*" ti [e1; e2] }
 
 | c=loc(exp) QUESTION e1=loc(exp) COLON e2=loc(exp) %prec OP2
@@ -393,6 +392,7 @@ exp:
 
 | LET p=lpattern EQ e1=loc(exp) IN e2=loc(exp)
    { PElet (p, e1, e2) }
+
 (* Distribution *)
 | LKEY n1=number op=loc(COMMA) n2=number RKEY
     { if   n1 = 0 && n2 = 1
@@ -429,13 +429,13 @@ sform:
 | n=number
    { PFint n }
 
-| x=qident ti=tvars_app
+| x=qident ti=tvars_app?
    { PFident (x,ti) }
 
-| se=loc(sform) DLBRACKET ti=tvars_app e=loc(form) RBRACKET
+| se=loc(sform) DLBRACKET ti=tvars_app? e=loc(form) RBRACKET
    { pfget (Location.make $startpos $endpos) ti se e }
 
-| se=loc(sform) DLBRACKET ti=tvars_app e1=loc(form) LEFTARROW e2=loc(form) RBRACKET
+| se=loc(sform) DLBRACKET ti=tvars_app? e1=loc(form) LEFTARROW e2=loc(form) RBRACKET
    { pfset (Location.make $startpos $endpos) ti se e1 e2 }
 
 | x=loc(sform) LKEY s=prog_num RKEY
@@ -447,10 +447,10 @@ sform:
 | LPAREN e=form RPAREN
    { e }
 
-| LBRACKET ti=tvars_app es=loc(p_form_sm_list0) RBRACKET
+| LBRACKET ti=tvars_app? es=loc(p_form_sm_list0) RBRACKET
    { (pflist es.pl_loc ti es.pl_desc).pl_desc }
 
-| PIPE ti=tvars_app e =loc(form) PIPE 
+| PIPE ti=tvars_app? e =loc(form) PIPE 
     { pfapp_symb e.pl_loc EcCoreLib.s_abs ti [e] }
 
 | PR LBRACKET x=fct_game pn=prog_num COLON f=loc(form) RBRACKET 
@@ -461,33 +461,44 @@ form:
 
 | e=loc(sform) args=sform_list1 { PFapp (e, args) } 
 
-| op=loc(NOT) ti=tvars_app e=loc(form) 
+| op=loc(NOT) ti=tvars_app? e=loc(form) 
     { pfapp_symb  op.pl_loc "!" ti [e] }
 
-| op=loc(binop) ti=tvars_app e=loc(form) %prec prec_prefix_op
+| op=loc(binop) ti=tvars_app? e=loc(form) %prec prec_prefix_op
    { pfapp_symb op.pl_loc op.pl_desc ti [e] }
-| e1=loc(form) op=loc(op1) ti=tvars_app e2=loc(form) %prec OP1 
+
+| e1=loc(form) op=loc(op1) ti=tvars_app? e2=loc(form) %prec OP1 
     { pfapp_symb op.pl_loc op.pl_desc ti [e1; e2] } 
-| e1=loc(form) op=loc(OP2) ti=tvars_app e2=loc(form)  
+
+| e1=loc(form) op=loc(OP2) ti=tvars_app? e2=loc(form)  
     { pfapp_symb op.pl_loc op.pl_desc ti [e1; e2] }
-| e1=loc(form) op=loc(OP3) ti=tvars_app e2=loc(form)  
+
+| e1=loc(form) op=loc(OP3) ti=tvars_app? e2=loc(form)  
     { pfapp_symb op.pl_loc op.pl_desc ti [e1; e2] }
-| e1=loc(form) op=loc(OP4) ti=tvars_app e2=loc(form)  
+
+| e1=loc(form) op=loc(OP4) ti=tvars_app? e2=loc(form)  
     { pfapp_symb op.pl_loc op.pl_desc ti [e1; e2] }
-| e1=loc(form) op=loc(IMPL) ti=tvars_app e2=loc(form)  
+
+| e1=loc(form) op=loc(IMPL) ti=tvars_app? e2=loc(form)  
     { pfapp_symb op.pl_loc "=>" ti [e1; e2] }
-| e1=loc(form) op=loc(IFF) ti=tvars_app e2=loc(form)  
+
+| e1=loc(form) op=loc(IFF) ti=tvars_app? e2=loc(form)  
     { pfapp_symb op.pl_loc "<=>" ti [e1; e2] }
-| e1=loc(form) op=loc(OR) ti=tvars_app e2=loc(form)  
+
+| e1=loc(form) op=loc(OR) ti=tvars_app? e2=loc(form)  
     { pfapp_symb op.pl_loc "||" ti [e1; e2] }
-| e1=loc(form) op=loc(AND) ti=tvars_app e2=loc(form)  
+
+| e1=loc(form) op=loc(AND) ti=tvars_app? e2=loc(form)  
     { pfapp_symb op.pl_loc "&&" ti [e1; e2] }
-| e1=loc(form) op=loc(EQ   ) ti=tvars_app e2=loc(form)  
+
+| e1=loc(form) op=loc(EQ   ) ti=tvars_app? e2=loc(form)  
     { pfapp_symb op.pl_loc "=" ti [e1; e2] }
-| e1=loc(form) op=loc(NE   ) ti=tvars_app e2=loc(form) 
+
+| e1=loc(form) op=loc(NE   ) ti=tvars_app? e2=loc(form) 
     { pfapp_symb op.pl_loc "!" None 
       [ mk_loc op.pl_loc (pfapp_symb op.pl_loc "=" ti [e1; e2])] }
-| e1=loc(form) op=loc(STAR ) ti=tvars_app e2=loc(form)  
+
+| e1=loc(form) op=loc(STAR ) ti=tvars_app? e2=loc(form)  
     { pfapp_symb op.pl_loc "*" ti [e1; e2] }
 
 | c=loc(form) QUESTION e1=loc(form) COLON e2=loc(form) %prec OP2 { PFif (c, e1, e2) }
@@ -559,7 +570,7 @@ param_decl1:
 lvalue:
 | x=qident                                           { PLvSymbol x      }
 | LPAREN p=plist2(qident, COMMA) RPAREN              { PLvTuple p       }
-| x=qident LBRACKET ti=tvars_app e=loc(exp) RBRACKET { PLvMap(x, ti, e) }
+| x=qident LBRACKET ti=tvars_app? e=loc(exp) RBRACKET { PLvMap(x, ti, e) }
 ;
 
 base_instr:
@@ -898,8 +909,8 @@ renaming:
 (* tactic                                                               *)
 
 assumption_args:
-| empty                  { None  , None }
-| p=qident tvi=tvars_app { Some p, tvi }
+| empty                   { None  , None }
+| p=qident tvi=tvars_app? { Some p, tvi }
 ;
 
 underscore_or_ident:
@@ -917,7 +928,7 @@ underscore_or_form:
 ;
 
 elim_kind:
-| p=qident tvi=tvars_app            { ElimHyp(p,tvi)  }
+| p=qident tvi=tvars_app?           { ElimHyp(p,tvi)  }
 | COLON LPAREN f=loc(form) RPAREN   { ElimForm f }
 ;
 elim_args:
@@ -953,7 +964,7 @@ tactics0:
 ;
 
 %inline tactics2: ts=plist1(tactic2, SEMICOLON) { ts };
-tsubgoal: LBRACKET ts=plist0(loc(tactics0),PIPE) RBRACKET { Psubgoal ts };
+tsubgoal: LBRACKET ts=plist0(loc(tactics0), PIPE) RBRACKET { Psubgoal ts };
 
 tactic2: 
 | ts=loc(tsubgoal) { ts }
