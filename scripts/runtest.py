@@ -84,11 +84,13 @@ def _xunit_dump(config, results):
         for result in group:
             rnode = E.testcase(
                 name      = "/%s" % (result.config.filename,),
-                classname = "/",
+                classname = "",
                 time      = "%.3f" % (result.time,))
             if not result.success:
                 rnode.append(E.failure( \
-                        message = 'invalid-exit-status',
+                        message = \
+                            'invalid-exit-status (should-pass: %r)' % \
+                                (result.config.isvalid,),
                         type    = 'should-pass: %r' % (result.config.isvalid,)))
             node.append(rnode)
 
