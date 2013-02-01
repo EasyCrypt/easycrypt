@@ -231,6 +231,7 @@
 %right AND
 
 %nonassoc NOT
+%nonassoc PIPE
 %left EQ NE OP1 GT
 
 %right QUESTION
@@ -242,8 +243,7 @@
 %nonassoc prec_prefix_op
 %nonassoc RKEY_HAT
 
-%nonassoc prec_apply
-%nonassoc PIPE
+%nonassoc above_OP
 
 %type <EcParsetree.global> global
 %type <EcParsetree.prog * bool> prog
@@ -337,12 +337,12 @@ sexp:
 ;
 
 op1:
-| OP1      { $1 }
-| GT       { ">" }
+| OP1 { $1  }
+| GT  { ">" }
 ;
 
 exp:
-| e=sexp { e }  %prec prec_apply
+| e=sexp { e }  %prec above_OP
 
 | e=loc(sexp) args=sexp_list1 { PEapp (e, args) }
 
@@ -457,7 +457,7 @@ sform:
     { PFprob(x,pn,f) }
                           
 form:
-| e=sform { e }
+| e=sform { e } %prec above_OP
 
 | e=loc(sform) args=sform_list1 { PFapp (e, args) } 
 
