@@ -949,14 +949,6 @@ and translvalue ue (env : EcEnv.env) lvalue =
 
 (* -------------------------------------------------------------------- *)
 (** Translation of formula *)
-type var_kind = 
-  | Llocal of EcIdent.t * ty
-  | Lprog  of EcTypes.prog_var * ty * Side.t
-  | Lctnt  of EcPath.path * ty list * ty 
-
-type op_kind = 
-  | Lop of EcPath.path * operator
-(*    | Lpred of EcPath.path * *)
 
 module Fenv = struct
 
@@ -1097,6 +1089,24 @@ let transform fenv ue pf tt =
     | PFprob _ -> f_int 0 
     | PFforallm _ -> f_true 
     | PFexistsm _ -> f_true 
+(*  and transf fenv pf =
+    let f = transf1 fenv pf in
+    let env = EcPrinting.EcPP.init (Fenv.mono fenv,[]) in
+    let subst_ty = Tuni.subst (UE.asmap ue) in
+    let hyps = { EcFol.h_tvar = [];
+                 EcFol.h_local = 
+                 EcIdent.Map.fold (fun _ idd l ->
+                   List.fold_left (fun l (_,(id,ty)) -> 
+                   (id, EcFol.LD_var(subst_ty ty,None))::l) l idd) fenv.Fenv.fe_locals [] } in
+    let g = hyps, (EcFol.Fsubst.mapty  subst_ty f) in
+    Format.printf "transf -> %a : %a@." (EcPrinting.EcPP.pp_lgoal env) g
+       (fun ty -> EcPrinting.EcPP.pp_type env ty) (subst_ty f.f_ty);
+    Format.printf "map = @.";
+    EcUidgen.Muid.iter (fun uid ty ->
+      Format.printf "%i -> %a@." uid 
+        (fun ty -> EcPrinting.EcPP.pp_type env ty) ty) (UE.asmap ue);
+
+    f *)
   in
   let f = transf fenv pf in
   unify_error (Fenv.mono fenv) ue pf.pl_loc f.f_ty tt;

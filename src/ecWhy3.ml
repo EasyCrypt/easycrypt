@@ -838,9 +838,12 @@ let trans_op env vm p tys =
           Format.printf "can not find %s@." (EcPath.tostring p);
           assert false in (* FIXME error message *)
       let mtv = 
-        List.fold_left2 (fun mtv tv ty ->
-          Ty.Mtv.add tv (trans_ty env vm ty) mtv) Ty.Mtv.empty
-          tvs tys in
+        try 
+          List.fold_left2 (fun mtv tv ty ->
+            Ty.Mtv.add tv (trans_ty env vm ty) mtv) Ty.Mtv.empty
+            tvs tys 
+        with e -> Format.printf "ICI %s@." (EcPath.tostring p); raise e
+      in
       let targs = List.map (fun t -> Some (Ty.ty_inst mtv t)) ls.Term.ls_args in
       let tres  = omap ls.Term.ls_value (Ty.ty_inst mtv) in
       let mk args = Term.t_app ls args tres in

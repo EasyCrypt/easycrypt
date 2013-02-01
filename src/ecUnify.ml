@@ -110,20 +110,22 @@ module UniEnv = struct
         pp "Unification Environment" pp_binding
         (EcUidgen.Muid.to_stream ue.unival)
 
-  let repr (ue : unienv) (t : ty) : ty = 
+  let rec repr (ue : unienv) (t : ty) : ty = 
     match t with
     | Tunivar id -> odfl t (Muid.find_opt id ue.unival)
     | _ -> t
 
   let bind (ue : unienv) id t =
+    assert (Suid.mem id ue.unidecl);
     match t with
     | Tunivar id' when uid_equal id id' -> ()
     | _ ->
         let uv = ue.unival in 
-        if (Muid.mem id uv) || (Tuni.occur id t) then
-          raise (TypeVarCycle (id, t));
+        assert (not (Muid.mem id uv));
+        let t = Tuni.subst uv t in
+        if Tuni.occur id t then raise (TypeVarCycle (id, t));
         ue.unival <- 
-          Muid.add id (Tuni.subst uv t)
+          Muid.add id t
             (Muid.map (Tuni.subst1 (id, t)) uv)
 
   let close (ue:unienv) =

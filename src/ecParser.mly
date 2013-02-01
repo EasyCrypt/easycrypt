@@ -219,6 +219,7 @@
 %right AND
 
 %nonassoc NOT
+(* %nonassoc PIPE *)
 %left EQ NE OP1 GT
 
 %right QUESTION
@@ -232,6 +233,8 @@
 
 %type <EcParsetree.global> global
 %type <EcParsetree.prog * bool> prog
+
+(* %nonassoc prec_apply *)
 
 %start prog global
 %%
@@ -310,7 +313,7 @@ sexp:
    { peset (Location.make $startpos $endpos) ti se e1 e2 }
 
 | x=qident ti=tvars_app LPAREN es=exp_list0 RPAREN
-   { PEapp (x, ti, es) }
+   { PEapp (x, ti, es) } 
 
 | LPAREN es=exp_list2 RPAREN
    { PEtuple es }
@@ -318,10 +321,11 @@ sexp:
 | LPAREN e=exp RPAREN
    { e }
 
-| LBRACKET ti=tvars_app es=loc(p_exp_sm_list0) RBRACKET  
-   { (pelist es.pl_loc ti es.pl_desc).pl_desc }
 | PIPE ti=tvars_app e =loc(exp) PIPE 
     { PEapp (pqsymb_of_symb e.pl_loc EcCoreLib.s_abs, ti, [e]) }
+
+| LBRACKET ti=tvars_app es=loc(p_exp_sm_list0) RBRACKET  
+   { (pelist es.pl_loc ti es.pl_desc).pl_desc }
 ;
 
 op1:
@@ -331,6 +335,8 @@ op1:
 
 exp:
 | e=sexp { e }
+
+(*| e=sexp args=sexp_list1 %prec prec_apply { assert false }*)
 
 | op=loc(NOT) ti=tvars_app e=loc(exp) (* %prec NOT *)
    { PEapp (pqsymb_of_symb op.pl_loc "!", ti, [e]) }
@@ -400,6 +406,7 @@ exp:
 
 %inline exp_list0: aout=plist0(loc(exp), COMMA) { aout }
 // %inline exp_list1: aout=plist1(loc(exp), COMMA) { aout }
+// %inline sexp_list1: aout=plist1(loc(sexp), empty) { aout }
 %inline exp_list2: aout=plist2(loc(exp), COMMA) { aout }
 
 (* -------------------------------------------------------------------- *)

@@ -233,7 +233,7 @@ struct
 
   (* ------------------------------------------------------------------ *)
   let pr_tunivar (uidmap : NameGen.t) (id : EcUidgen.uid) =
-    !^ (Printf.sprintf "#%s" (NameGen.get uidmap id))
+    !^ (Printf.sprintf "#%s(*%i*)" (NameGen.get uidmap id) id) 
 
   (* ------------------------------------------------------------------ *)
   let pr_tuple docs =
@@ -401,7 +401,7 @@ struct
     Pp.parens (pr_list ", " docs)
 
   (* ------------------------------------------------------------------ *)
-  let pr_app (tenv : t) pr_sub outer op es =
+  let pr_app (tenv : t) pr_sub outer op tys es =
      (* FIXME : special notations, list ..., sampling {0,1} [k1..k2] .... *) 
     let opname = EcIdent.name (EcPath.basename op) in
 
@@ -409,10 +409,11 @@ struct
       match es with
       | [] -> pr_op_name tenv op
       | _  ->
-          let docs =
-            List.map (pr_sub tenv (min_op_prec, `NonAssoc)) es
-          in
-            (pr_op_name tenv op) ^^ pr_seq [Pp.parens (pr_list "," docs)]
+          let docs = List.map (pr_sub tenv (min_op_prec, `NonAssoc)) es in
+          let dtys = List.map (fun ty -> pr_type tenv ty) tys in
+          (pr_op_name tenv op) ^^
+          !^"<:" ^^ pr_list "," dtys ^^ !^">" ^^
+          pr_seq [Pp.parens (pr_list "," docs)]
 
     and try_pr_as_uniop () =
       match es with
@@ -469,8 +470,8 @@ struct
         | Etuple es ->
             pr_tuple_expr tenv pr_expr es
 
-        | Eapp({tye_desc = Eop(op,_) }, args) -> 
-            pr_app tenv pr_expr outer op args
+        | Eapp({tye_desc = Eop(op,tys) }, args) -> 
+            pr_app tenv pr_expr outer op tys args
 
         | Eapp (e, args) -> 
             let docs = List.map (pr_expr tenv (min_op_prec, `NonAssoc)) args in
@@ -516,8 +517,8 @@ struct
       | Fop(op,_tys) -> (* FIXME infix, prefix, ty_inst *)
             pr_op_name tenv op
 
-      | Fapp ({f_node = Fop(p,_)}, args) ->
-          pr_app tenv pr_form outer p args
+      | Fapp ({f_node = Fop(p,tys)}, args) ->
+          pr_app tenv pr_form outer p tys args
 
       | Fapp (e,args) ->
           let docs = List.map (pr_form tenv (min_op_prec, `NonAssoc)) args in
