@@ -1073,7 +1073,7 @@ let check_w3_formula task prover timelimit f =
   let decl = Decl.create_prop_decl Decl.Pgoal pr f in
   let task = add_decl_with_tuples task decl in
 (*  let task = List.hd (Trans.apply_transform "lift_epsilon" w3_env task) in *)
-  Format.printf "task = %a@." Pretty.print_task task;  
+(*  Format.printf "task = %a@." Pretty.print_task task;  *)
   call_prover_task prover timelimit task
   
 exception CanNotProve of axiom

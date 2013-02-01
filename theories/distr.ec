@@ -26,25 +26,45 @@ op mu_weight (d : 'a distr) : real =
 op mu_x (d:'a distr, x:'a) : real = 
   mu d (Peq x).
 
-pred in_supp : ('a, 'a distr).
+(** TODO : We need a way to automatically rewrite supp_def lemmas *)
 
-axiom mu_supp : forall (d:'a distr, x:'a), 
-   in_supp x d <=> !(mu_x d x = FromInt.from_int(0)).
+op in_supp (x:'a, d:'a distr) : bool = 
+   mu_x d x <> FromInt.from_int(0).
 
+lemma mu_weight_0 : forall (d:'a distr),
+   mu_weight d = FromInt.from_int(0) <=>
+   forall (P:'a Pred), mu d P = FromInt.from_int(0).
+
+
+(** FIXME/ TODO 
+ * Try to express the "mu" axioms in term of mu as much as possible.
+ * Then use it to prove lemma on mu_x
+ * i.e as in Dunit
+*)
 theory Dunit.
 
   op dunit : 'a -> 'a distr.
 
-  axiom supp_def :  forall (x1:'a, x2:_), 
-     in_supp x1 (dunit x2) <=> x1 = x2.
-
   axiom mu_def_in : forall (x:'a, P:'a Pred),
      P x =>
      mu (dunit x) P = FromInt.from_int(1).
-  
+
   axiom mu_def_notin : forall (x:'a, P: 'a Pred), 
      !P x =>
      mu (dunit x) P = FromInt.from_int(0).
+
+  lemma mu_x_def_eq : forall (x:'a),
+     mu_x (dunit x) x = FromInt.from_int(1).
+
+  lemma mu_x_def_diff : forall (x:'a, y:'a),
+     x <> y =>
+     mu_x (dunit x) y = FromInt.from_int(0).
+
+  lemma supp_def :  forall (x1:'a, x2:_), 
+     in_supp x1 (dunit x2) <=> x1 = x2.
+
+  lemma mu_weight : forall (x:'a),
+     mu_weight (dunit x) = FromInt.from_int(1).
 
 end Dunit.
 
@@ -161,9 +181,13 @@ theory Drestr.
   axiom supp_def : forall (d:'a distr, X:'a Set.t, x:'a), 
      in_supp x (drestr d X) <=> in_supp x d && !Set.mem x X.
   
-  axiom mu_x_def : forall (d:'a distr, X:'a Set.t, x:'a), 
+  axiom mu_x_def_notin : forall (d:'a distr, X:'a Set.t, x:'a), 
     in_supp x d => !Set.mem x X =>
     mu_x (drestr d X) x = mu_x d x.
+
+  axiom mu_x_def_in : forall (d:'a distr, X:'a Set.t, x:'a), 
+    in_supp x d => Set.mem x X =>
+    mu_x (drestr d X) x = FromInt.from_int(0).
 
   axiom mu_weight : forall (d:'a distr, X:'a Set.t), 
     mu_weight(drestr d X) = mu_weight(d) - mu d (Set.Pmem X).
@@ -195,11 +219,22 @@ theory Dscale.
 
 end Dscale.
 
+theory Dexcepted.
+
+  op dexcepted (d:'a distr, X:'a Set.t) : 'a distr =
+    Dscale.dscale (Drestr.drestr d X). 
+
+  lemma supp_def : forall (d:'a distr, X:'a Set.t, x:'a),
+     in_supp x (dexcepted d X) <=> in_supp x d && !Set.mem x X.
+
+(* TODO : Complete the lemmas *)
+
+end Dexcepted.
+
 theory Dlap.
 
   op dlap : (int,real) -> int distr.
 
-  (* TODO : add exp in real *)
   axiom in_supp : forall (mean:_, scale:_, x:_), 
     FromInt.from_int(0) <= scale => 
     in_supp x (dlap mean scale).
@@ -210,7 +245,7 @@ theory Dlap.
     mu_x (dlap mean scale) x = 
       (FromInt.from_int(1) / (FromInt.from_int(2)*scale))
     * 
-      real.exp(-!(| FromInt.from_int(x) - FromInt.from_int(mean)|)) / scale. 
+      real.exp( -! (| FromInt.from_int(x) - FromInt.from_int(mean)|)) / scale. 
 *)
   axiom mu_weight : forall  (mean:_, scale:_), 
     FromInt.from_int(0) <= scale =>
