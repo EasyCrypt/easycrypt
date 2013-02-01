@@ -122,7 +122,7 @@ rule main = parse
   | "<-"                      { LEFTARROW }
   | "->"                      { ARROW  }
   | ".."                      { DOTDOT }
-
+  | ".["                      { DLBRACKET }
   (* char symbols *)
   | '_'                       { UNDERSCORE }
   | '('                       { LPAREN }

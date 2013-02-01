@@ -323,8 +323,8 @@ let rec destr_tfun env ue tf =
   match tf with
   | Tunivar _ ->
       let tf' = UE.repr ue tf in
-      assert (not (tf == tf'));
-      destr_tfun env ue tf'
+      assert (not (tf == tf')); (* FIXME error message *)
+      destr_tfun env ue tf' 
   | Tfun(ty1,ty2) -> ty1, ty2
   | Tconstr(p,tys) when EcEnv.Ty.defined p env ->
       destr_tfun env ue (EcEnv.Ty.unfold p tys env) 
@@ -359,21 +359,28 @@ let transexp (env : EcEnv.env) (ue : EcUnify.unienv) e =
             op, ty
         end
 
-    | PEapp ({ pl_desc = name }, tvi, es) -> begin
-      let tvi = transtvi env ue tvi in  
-      let es   = List.map (transexp env) es in
-      let esig = snd (List.split es) in
-      let ops  = select_op env name ue tvi esig in
-        match ops with
+    | PEapp ({pl_desc = PEident({ pl_desc = name; pl_loc = loc }, tvi)}, es) ->
+        let tvi = transtvi env ue tvi in  
+        let es   = List.map (transexp env) es in
+        let esig = snd (List.split es) in
+        let ops  = select_op env name ue tvi esig in
+        begin match ops with
         | [] | _ :: _ :: _ ->        (* FIXME: better error message *)
             let esig = Tuni.subst_dom (EcUnify.UniEnv.asmap ue) esig in
             tyerror loc (UnknownOperatorForSig (name, esig))
-
+              
         | [op, ty, subue] ->
             EcUnify.UniEnv.restore ~src:subue ~dst:ue;
             let codom = ty_fun_app env ue ty esig in
             (e_app op (List.map fst es), codom)
-    end
+        end
+
+    | PEapp(pe,pes) ->
+        let e,ty = transexp env pe in
+        let es = List.map (transexp env) pes in
+        let esig = snd (List.split es) in
+        let codom = ty_fun_app env ue ty esig in
+        (e_app e (List.map fst es), codom)
 
     | PElet (p, pe1, pe2) ->
       let (penv, p, pty) = transpattern env ue p in
@@ -863,7 +870,7 @@ and transinstr ue (env : EcEnv.env) (i : pinstr) =
   | PSasgn (lvalue, rvalue) -> begin
       let rvalue_as_fun () =
         match rvalue.pl_desc with
-        | PEapp ({ pl_desc = name }, None, args) when  EcEnv.Fun.exists name env ->
+        | PEapp ({pl_desc = PEident({ pl_desc = name }, None)}, args) when  EcEnv.Fun.exists name env ->
             let (fpath, args, rty) = transcall name args in
               Some (`Call (fpath, args), rty)
         | _ -> None
@@ -1047,7 +1054,7 @@ let transform fenv ue pf tt =
     | PFside(f,side) ->
         let fenv = Fenv.set_side fenv side in
         transf fenv f
-    | PFapp({ pl_desc = name; pl_loc = loc }, tvi, es) ->
+    | PFapp({pl_desc = PFident({ pl_desc = name; pl_loc = loc }, tvi)}, es) ->
         let tvi = transtvi (Fenv.mono fenv) ue tvi in  
         let es   = List.map (transf fenv) es in
         let esig = List.map EcFol.ty es in 
@@ -1062,6 +1069,13 @@ let transform fenv ue pf tt =
             let codom = ty_fun_app (Fenv.mono fenv) ue op.f_ty esig in
             f_app op es codom
         end
+
+    | PFapp(e, es) ->
+        let es   = List.map (transf fenv) es in
+        let esig = List.map EcFol.ty es in 
+        let op  = transf fenv e in
+        let codom = ty_fun_app (Fenv.mono fenv) ue op.f_ty esig in
+        f_app op es codom
 
     | PFif(pf1,f2,f3) ->
         let f1 = transf fenv pf1 in

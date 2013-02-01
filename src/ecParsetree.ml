@@ -81,7 +81,7 @@ type pexpr  = pexpr_r  located          (* located expression *)
 and pexpr_r =
   | PEint      of int                               (* int. literal       *)
   | PEident    of pqsymbol * tvar_inst              (* symbol             *)
-  | PEapp      of pqsymbol * tvar_inst * pexpr list (* op. application    *)
+  | PEapp      of pexpr * pexpr list                (* op. application    *)
   | PElet      of lpattern * pexpr * pexpr          (* let binding        *)
   | PEtuple    of pexpr list                        (* tuple constructor  *)
   | PEif       of pexpr * pexpr * pexpr             (* _ ? _ : _          *)
@@ -186,7 +186,7 @@ and pformula_r =
   | PFtuple  of pformula list             (* tuple             *)
   | PFident  of pqsymbol * tvar_inst      (* symbol            *)
   | PFside   of pformula * side         
-  | PFapp    of pqsymbol * tvar_inst * pformula list
+  | PFapp    of pformula * pformula list
   | PFif     of pformula * pformula * pformula
   | PFlet    of lpattern * pformula * pformula
   | PFforall of ptylocals * pformula
