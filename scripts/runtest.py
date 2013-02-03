@@ -84,11 +84,12 @@ def _xunit_dump(config, results):
         for result in group:
             name = os.path.basename(result.config.filename)
             name = os.path.splitext(name)[0]
-            classname = os.path.dirname(result.config.filename)
-            classname = '.'.join(classname.split(os.path.sep))
 
-            if classname == [] or classname[0] != 'tests':
+            classname = os.path.dirname(result.config.filename)
+            classname = classname.split(os.path.sep)
+            if classname == [] or not classname[0] != 'tests':
                 classname.insert(0, 'tests')
+            classname = '.'.join(classname)
 
             rnode = E.testcase(
                 name      = name,
