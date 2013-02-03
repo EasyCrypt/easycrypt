@@ -47,12 +47,7 @@ val transtys :
 
 val transtvi : EcEnv.env -> EcUnify.unienv -> tvar_inst -> EcUnify.UniEnv.tvi
 
-
 (* -------------------------------------------------------------------- *)
-
-(* [transexp env ue pe] translates the *parsed* expression [pe]
- * to a *typed* expression, under environment [env], using unification map [ue].
-*)
 val transexp : EcEnv.env -> EcUnify.unienv -> pexpr -> tyexpr * ty
 val transexpcast : EcEnv.env -> EcUnify.unienv -> ty -> pexpr -> tyexpr
 
@@ -67,14 +62,13 @@ end
 val transformula : Fenv.fenv -> EcUnify.unienv -> pformula -> EcFol.form 
 val transform    : Fenv.fenv -> EcUnify.unienv -> pformula -> ty -> EcFol.form 
 (* -------------------------------------------------------------------- *)
-val transsig   : EcEnv.env -> psignature -> tysig
-val transtymod : EcEnv.env -> pmodule_type -> tymod
-val transmod   : EcEnv.env -> EcIdent.t -> pmodule_expr -> module_expr
-val transintf  : EcEnv.env -> pmodule_intf -> tymod
+val transmodsig  : EcEnv.env -> pmodule_sig -> module_sig
+val transmodtype : EcEnv.env -> pmodule_type -> module_type
+val transmod     : EcEnv.env -> EcIdent.t -> pmodule_expr -> module_expr
 
 (* -------------------------------------------------------------------- *)
-val check_tymod_sub : EcEnv.env -> tymod -> tymod -> unit
-val check_tymod_eq  : EcEnv.env -> tymod -> tymod -> unit
+val check_tymod_sub : EcEnv.env -> module_sig_comps -> module_sig_comps -> unit
+val check_tymod_eq  : EcEnv.env -> module_sig_comps -> module_sig_comps -> unit
 
 (* -------------------------------------------------------------------- *)
 val e_inuse : tyexpr -> EcPath.Sp.t

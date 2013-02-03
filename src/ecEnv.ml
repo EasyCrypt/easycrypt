@@ -32,7 +32,6 @@ let ctheory_of_ctheory_w3 (cth : ctheory_w3) =
   cth.cth3_theory
 
 (* -------------------------------------------------------------------- *)
-
 type varbind = {
   vb_type  : EcTypes.ty;
   vb_kind  : EcTypes.pvar_kind option;
@@ -48,14 +47,14 @@ type preenv = {
 }
 
 and premc = {
-  mc_variables  : (EcPath.path * varbind)           IM.t;
-  mc_functions  : (EcPath.path * EcTypesmod.funsig) IM.t;
-  mc_modules    : (EcPath.path * EcTypesmod.tymod)  IM.t;
-  mc_modtypes   : (EcPath.path * EcTypesmod.tymod)  IM.t;
-  mc_typedecls  : (EcPath.path * EcDecl.tydecl)     IM.t;
-  mc_operators  : (EcPath.path * EcDecl.operator)   IM.t;
-  mc_axioms     : (EcPath.path * EcDecl.axiom)      IM.t;
-  mc_theories   : (EcPath.path * ctheory)           IM.t;
+  mc_variables  : (EcPath.path * varbind)                IM.t;
+  mc_functions  : (EcPath.path * EcTypesmod.funsig)      IM.t;
+  mc_modules    : (EcPath.path * EcTypesmod.module_expr) IM.t;
+  mc_modtypes   : (EcPath.path * EcTypesmod.module_sig)  IM.t;
+  mc_typedecls  : (EcPath.path * EcDecl.tydecl)          IM.t;
+  mc_operators  : (EcPath.path * EcDecl.operator)        IM.t;
+  mc_axioms     : (EcPath.path * EcDecl.axiom)           IM.t;
+  mc_theories   : (EcPath.path * ctheory)                IM.t;
   mc_components : unit IM.t;
 }
 
@@ -181,10 +180,10 @@ module MC = struct
       { mc with
           mc_functions = IM.add x (path, fsig) mc.mc_functions; }
 
-  let mc_bind_module path tymod mc =
+  let mc_bind_module path me mc =
     let x = EcPath.basename path in
       { mc with
-          mc_modules = IM.add x (path, tymod) mc.mc_modules; }
+          mc_modules = IM.add x (path, me) mc.mc_modules; }
 
   let mc_bind_modtype path tymod mc =
     let x = EcPath.basename path in
@@ -215,7 +214,7 @@ module MC = struct
     let x = EcPath.basename path in
       { mc with mc_components = IM.add x () mc.mc_components }
 
-  let rec mc_of_module (_env : env) (_ : tymod) =
+  let rec mc_of_module (_env : env) (_ : module_expr) =
     emcomponents                        (* FIXME *)
 
   (* ------------------------------------------------------------------ *)
@@ -258,9 +257,9 @@ module MC = struct
   and bind_function x fsig env =
     bind env mc_bind_function x fsig
 
-  and bind_module x tymod env =
-    let comps = mc_of_module env tymod in
-    let env   = bind env mc_bind_module x tymod in
+  and bind_module x me env =
+    let comps = mc_of_module env me in
+    let env   = bind env mc_bind_module x me in
     let env   = bind_mc env x comps in
       env
 
@@ -288,7 +287,7 @@ module MC = struct
       | CTh_operator (id, op)  -> env, mc_bind_op (EcPath.Pqname (path, id)) op mc
       | CTh_axiom    (id, ax)  -> env, mc_bind_ax (EcPath.Pqname (path, id)) ax mc
       | CTh_modtype  (id, tm)  -> env, mc_bind_modtype (EcPath.Pqname (path, id)) tm mc
-      | CTh_module   m         -> env, mc_bind_module (EcPath.Pqname (path, m.me_name)) m.me_sig mc
+      | CTh_module   m         -> env, mc_bind_module (EcPath.Pqname (path, m.me_name)) m mc
       | CTh_export   _         -> env, mc
       | CTh_theory   (id, cth) ->
           let env, submc =
@@ -517,7 +516,6 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Mod = struct
-  (* FIXME *)
   type t = module_expr
 
   let project mc = mc.mc_modules
@@ -531,7 +529,7 @@ module Mod = struct
 
   let bind id m env = 
     assert (EcIdent.id_equal id m.me_name);
-    let env = MC.bind_module id m.me_sig env in
+    let env = MC.bind_module id m env in
       { env with
           env_item = CTh_module m :: env.env_item }
       
@@ -565,7 +563,7 @@ end
 (* -------------------------------------------------------------------- *)
 module ModTy = struct
   include BaseS(struct
-    type t = tymod
+    type t = module_sig
 
     let project mc = mc.mc_modtypes
     let bind id mt env = 
@@ -654,7 +652,7 @@ module Theory = struct
             MC.import env MC.mc_bind_modtype (xpath x) ty
 
         | CTh_module m -> 
-            MC.import env MC.mc_bind_module (xpath m.me_name) m.me_sig
+            MC.import env MC.mc_bind_module (xpath m.me_name) m
 
         | CTh_export p ->
             import env p (lookup_by_path p env)
@@ -821,16 +819,16 @@ let initial =
 type ebinding = [
   | `Variable  of EcTypes.pvar_kind option * EcTypes.ty
   | `Function  of funsig
-  | `Module    of tymod
-  | `ModType   of tymod
+  | `Module    of module_expr
+  | `ModType   of module_sig
 ]
 
 let bind1 ((x, eb) : EcIdent.t * ebinding) (env : env) =
   match eb with
-  | `Variable v -> Var   .bind   x (snd v) (fst v) env
-  | `Function f -> Fun   .bind   x f env
-  | `Module   m -> Mod   .bind_s x m env
-  | `ModType  i -> ModTy .bind   x i env
+  | `Variable v -> Var   .bind x (snd v) (fst v) env
+  | `Function f -> Fun   .bind x f env
+  | `Module   m -> Mod   .bind x m env
+  | `ModType  i -> ModTy .bind x i env
 
 let bindall (items : (EcIdent.t * ebinding) list) (env : env) =
   List.fold_left ((^~) bind1) env items  
@@ -964,30 +962,20 @@ let ce_meta ty e : c_tyexpr =
     tye_desc = e; }
 
 let ce_local (env : env) (x : EcIdent.t) =
-  (* Je pense que c'est pas une bonne idee d'avoir ce path on devrait avoir
-     Pident x, j'aime pas que le path depend du scope *)
+  (* Je pense que c'est pas une bonne idee d'avoir ce path on devrait
+     avoir Pident x, je n'aime pas que le path depend du scope *)
   let xpath = EcPath.Pqname (env.env_scope, x) in
   let xty   = Var.lookup_by_path xpath env in
-  if xty.vb_kind <> None then assert false;
-  ce_meta xty.vb_type (Elocal x)
+    if xty.vb_kind <> None then assert false;
+    ce_meta xty.vb_type (Elocal x)
 
 let ce_var (env : env) (p : prog_var) =
   let xty = Var.lookup_by_path p.pv_name env in
-  if xty.vb_kind = None then assert false;
-  ce_meta xty.vb_type (Evar p)
+    if xty.vb_kind = None then assert false;
+    ce_meta xty.vb_type (Evar p)
 
 let ce_int (_env : env) (i : int) =
   ce_meta tint (Eint i)
-
-(*let ce_flip (_env : env) =
-  ce_meta tbool Eflip
-
-let ce_bitstr (_env : env) e =
-  ce_meta tbitstring (Ebitstr e)
-
-let ce_inter (env : env) e1 e2 =
-  check_type env (ce_type e1) (ce_type e2);
-  ce_meta (ce_type e1) (Einter (e1, e2)) *)
 
 let ce_tuple (_env : env) es =
   ce_meta
@@ -1004,4 +992,3 @@ let ce_if (env : env) c e1 e2 =
 
 let ce_app (_env : env) _p _e _ty =
   assert false                          (* FIXME *)
-

@@ -82,7 +82,7 @@ module type IPrettyPrinter = sig
   val pr_typedecl : t -> (EcPath.path * tydecl     ) pr
   val pr_opdecl   : t -> (EcPath.path * operator   ) pr
   val pr_axiom    : t -> (EcPath.path * axiom      ) pr
-  val pr_modtype  : t -> (EcPath.path * tymod      ) pr
+  val pr_modsig   : t -> (EcPath.path * module_sig ) pr
   val pr_module   : t -> (EcPath.path * module_expr) pr
   val pr_theory   : t -> (EcPath.path * ctheory    ) pr
   val pr_export   : t -> EcPath.path pr
@@ -96,7 +96,7 @@ module type IPrettyPrinter = sig
   val pp_typedecl : t -> (EcPath.path * tydecl     ) pp
   val pp_opdecl   : t -> (EcPath.path * operator   ) pp
   val pp_axiom    : t -> (EcPath.path * axiom      ) pp
-  val pp_modtype  : t -> (EcPath.path * tymod      ) pp
+  val pp_modsig   : t -> (EcPath.path * module_sig ) pp
   val pp_module   : t -> (EcPath.path * module_expr) pp
   val pp_theory   : t -> (EcPath.path * ctheory    ) pp
   val pp_export   : t -> EcPath.path pp
@@ -707,8 +707,8 @@ struct
           let dbody = (pr_mod_name tenv p) ^^ dargs in
             pr_seq [prelude; Pp.equals; dbody]
 
-      | ME_Decl p ->
-          pr_seq [prelude; Pp.colon; pr_mod_name tenv p]
+      | ME_Decl modty ->
+          assert false                  (* FIXME *)
 
       | ME_Structure mstruct ->
           let _, bodydoc =
@@ -799,7 +799,7 @@ struct
       pr_dotted (pr_seq [tk; pr_name; Pp.colon; spec])
 
   (* ------------------------------------------------------------------ *)
-  let pr_modtype (tenv : t) ((x, _tymod) : EcPath.path * tymod) =
+  let pr_modsig (tenv : t) ((x, _tymod) : EcPath.path * module_sig) =
     let basename = EcPath.basename x in
       pr_dotted (pr_seq [tk_module; tk_type; pr_ident tenv basename; Pp.equals])
 
@@ -825,7 +825,7 @@ struct
           (M.add_ax tenv (xpath x), doc)
 
     | CTh_modtype (x, ty) ->
-        let doc = pr_modtype tenv (xpath x, ty) in
+        let doc = pr_modsig tenv (xpath x, ty) in
           (M.add_modty tenv (xpath x), doc)
 
     | CTh_module m ->
@@ -907,7 +907,7 @@ struct
   let pp_typedecl = fun t -> pp_of_pr (pr_typedecl t)
   let pp_opdecl   = fun t -> pp_of_pr (pr_opdecl t)
   let pp_axiom    = fun t -> pp_of_pr (pr_axiom t)
-  let pp_modtype  = fun t -> pp_of_pr (pr_modtype t)
+  let pp_modsig   = fun t -> pp_of_pr (pr_modsig t)
   let pp_module   = fun t -> pp_of_pr (pr_module t)
   let pp_export   = fun t -> pp_of_pr (pr_export t)
   let pp_theory   = fun t -> pp_of_pr (pr_theory t)
@@ -1119,7 +1119,7 @@ module EcDebugPP = struct
   let pr_typedecl = fun (x, v) -> BPP.pr_typedecl () (EcPath.Pident x, v)
   let pr_opdecl   = fun (x, v) -> BPP.pr_opdecl   () (EcPath.Pident x, v)
   let pr_axiom    = fun (x, v) -> BPP.pr_axiom    () (EcPath.Pident x, v)
-  let pr_modtype  = fun (x, v) -> BPP.pr_modtype  () (EcPath.Pident x, v)
+  let pr_modsig   = fun (x, v) -> BPP.pr_modsig   () (EcPath.Pident x, v)
   let pr_module   = fun     v  -> BPP.pr_module   () (EcPath.Pident v.me_name, v)
   let pr_export   = BPP.pr_export ()
   let pr_theory   = fun (x, v) -> BPP.pr_theory   () (EcPath.Pident x, v)
@@ -1132,7 +1132,7 @@ module EcDebugPP = struct
   let pp_typedecl = fun fmt (x, v) -> BPP.pp_typedecl () fmt (EcPath.Pident x, v)
   let pp_opdecl   = fun fmt (x, v) -> BPP.pp_opdecl   () fmt (EcPath.Pident x, v)
   let pp_axiom    = fun fmt (x, v) -> BPP.pp_axiom    () fmt (EcPath.Pident x, v)
-  let pp_modtype  = fun fmt (x, v) -> BPP.pp_modtype  () fmt (EcPath.Pident x, v)
+  let pp_modsig   = fun fmt (x, v) -> BPP.pp_modsig   () fmt (EcPath.Pident x, v)
   let pp_module   = fun fmt     v  -> BPP.pp_module   () fmt (EcPath.Pident v.me_name, v)
   let pp_export   = BPP.pp_export ()
   let pp_theory   = fun fmt (x, v) -> BPP.pp_theory   () fmt (EcPath.Pident x, v)

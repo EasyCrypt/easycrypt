@@ -8,6 +8,8 @@ type path =
   | Pident of EcIdent.t
   | Pqname of path * EcIdent.t
 
+type xpath = path * xpath list
+
 let rec p_equal p1 p2 = 
   p1 == p2 || match p1, p2 with
   | Pident id1, Pident id2 -> EcIdent.id_equal id1 id2
@@ -24,6 +26,12 @@ let rec p_compare p1 p2 =
       let cmp = EcIdent.id_compare id1 id2 in
       if cmp = 0 then p_compare p1 p2 else cmp
   | _, Pident _ -> 1
+
+(* -------------------------------------------------------------------- *)
+let rec p_equal_complex ((p1, args1) : xpath) ((p2, args2) : xpath) =
+     (p_equal p1 p2)
+  && (List.length args1 = List.length args2)
+  && (List.for_all2 p_equal_complex args1 args2)
 
 (* -------------------------------------------------------------------- *)
 (* TODO : Remove this function *)

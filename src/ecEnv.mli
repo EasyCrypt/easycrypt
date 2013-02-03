@@ -20,14 +20,14 @@ type preenv = private {
 }
 
 and premc = private {
-  mc_variables  : (EcPath.path * varbind)            EcIdent.Map.t;
-  mc_functions  : (EcPath.path * EcTypesmod.funsig)  EcIdent.Map.t;
-  mc_modules    : (EcPath.path * EcTypesmod.tymod)   EcIdent.Map.t;
-  mc_modtypes   : (EcPath.path * EcTypesmod.tymod)   EcIdent.Map.t;
-  mc_typedecls  : (EcPath.path * EcDecl.tydecl)      EcIdent.Map.t;
-  mc_operators  : (EcPath.path * EcDecl.operator)    EcIdent.Map.t;
-  mc_axioms     : (EcPath.path * EcDecl.axiom)       EcIdent.Map.t;
-  mc_theories   : (EcPath.path * EcTypesmod.ctheory) EcIdent.Map.t;
+  mc_variables  : (EcPath.path * varbind)                EcIdent.Map.t;
+  mc_functions  : (EcPath.path * EcTypesmod.funsig)      EcIdent.Map.t;
+  mc_modules    : (EcPath.path * EcTypesmod.module_expr) EcIdent.Map.t;
+  mc_modtypes   : (EcPath.path * EcTypesmod.module_sig)  EcIdent.Map.t;
+  mc_typedecls  : (EcPath.path * EcDecl.tydecl)          EcIdent.Map.t;
+  mc_operators  : (EcPath.path * EcDecl.operator)        EcIdent.Map.t;
+  mc_axioms     : (EcPath.path * EcDecl.axiom)           EcIdent.Map.t;
+  mc_theories   : (EcPath.path * EcTypesmod.ctheory)     EcIdent.Map.t;
   mc_components : unit EcIdent.Map.t;
 }
 
@@ -60,14 +60,14 @@ module type S = sig
 end
 
 (* -------------------------------------------------------------------- *)
-module Fun   : S with type t = funsig
+module Fun : S with type t = funsig
 
-module Ax    : sig 
+module Ax : sig 
   include S with type t = axiom
   val instanciate : EcPath.path -> EcTypes.ty list -> env -> EcFol.form
 end
 
-module ModTy : S with type t = tymod
+module ModTy : S with type t = module_sig
 
 (* -------------------------------------------------------------------- *)
 module Var : sig
@@ -106,17 +106,17 @@ end
 module Mod : sig
   type t = module_expr
 
-  val bind_s : EcIdent.t -> tymod -> env -> env
-  val bindall_s : (EcIdent.t * tymod) list -> env -> env
+  val bind_s : EcIdent.t -> t -> env -> env
+  val bindall_s : (EcIdent.t * t) list -> env -> env
   val bind : EcIdent.t -> t -> env -> env
   val bindall : (EcIdent.t * t) list -> env -> env
-  val lookup_by_path : EcPath.path -> env -> tymod
-  val lookup : qsymbol -> env -> EcPath.path * EcTypesmod.tymod
+  val lookup_by_path : EcPath.path -> env -> t
+  val lookup : qsymbol -> env -> EcPath.path * t
   val lookup_path : qsymbol -> env -> EcPath.path
-  val trylookup_by_path : EcPath.path -> env -> EcTypesmod.tymod option
-  val trylookup : qsymbol -> env -> (EcPath.path * EcTypesmod.tymod) option
+  val trylookup_by_path : EcPath.path -> env -> t option
+  val trylookup : qsymbol -> env -> (EcPath.path * t) option
   val exists : qsymbol -> env -> bool
-  val add    : EcPath.path -> env -> env
+  val add : EcPath.path -> env -> env
 end
 
 (* -------------------------------------------------------------------- *)
@@ -140,7 +140,7 @@ module Theory : sig
   val require : EcIdent.t -> ctheory_w3 -> env -> env
   val enter : EcSymbols.symbol -> env -> EcIdent.t * env
   val close : env -> ctheory_w3
-  val add    : EcPath.path -> env -> env
+  val add : EcPath.path -> env -> env
 end
 
 (* -------------------------------------------------------------------- *)
@@ -178,8 +178,8 @@ end
 type ebinding = [
   | `Variable  of EcTypes.pvar_kind option * EcTypes.ty
   | `Function  of funsig
-  | `Module    of tymod
-  | `ModType   of tymod
+  | `Module    of module_expr
+  | `ModType   of module_sig
 ]
 
 val bind1   : EcIdent.t * ebinding -> env -> env
@@ -206,9 +206,6 @@ type c_tyexpr = private EcTypes.tyexpr
 val ce_local  : env -> EcIdent.t -> c_tyexpr
 val ce_var    : env -> EcTypes.prog_var -> c_tyexpr
 val ce_int    : env -> int -> c_tyexpr
-(*val ce_flip   : env -> c_tyexpr
-val ce_bitstr : env -> c_tyexpr -> c_tyexpr
-val ce_inter  : env -> c_tyexpr -> c_tyexpr -> c_tyexpr *)
 val ce_tuple  : env -> c_tyexpr list -> c_tyexpr
 val ce_let    : env -> EcTypes.lpattern -> c_tyexpr -> c_tyexpr -> c_tyexpr
 val ce_if     : env -> c_tyexpr -> c_tyexpr -> c_tyexpr -> c_tyexpr

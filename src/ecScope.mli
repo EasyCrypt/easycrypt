@@ -72,7 +72,7 @@ module Mod : sig
    * exception triggered by the type-checker or
    * [DuplicatedNameInContext] in case a module with name [x] already
    * exists *)
-  val add : scope -> symbol -> pmodule_expr -> pmodule_intf option -> scope
+  val add : scope -> symbol -> pmodule_expr -> pmodule_type option -> scope
 end
 
 module ModType : sig
@@ -80,7 +80,7 @@ module ModType : sig
    * scope [scope] with name [x]. Can raise any exception triggered by
    * the type-checker or [DuplicatedNameInContext] in case a module
    * type with name [x] already exists *)
-  val add : scope -> symbol -> pmodule_type -> scope
+  val add : scope -> symbol -> pmodule_sig -> scope
 end
 
 module Theory : sig

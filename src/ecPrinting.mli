@@ -20,6 +20,7 @@ module type IPrettyPrinter = sig
   type t                                (* ident-2-path *)
   val init : EcEnv.env * EcEnv.env list -> t
   val mono : EcEnv.env -> t
+
   (* ------------------------------------------------------------------ *)
   val pr_type     : t -> ?vmap:NameGen.t -> ty pr
   val pr_expr     : t -> tyexpr pr
@@ -28,11 +29,12 @@ module type IPrettyPrinter = sig
   val pr_typedecl : t -> (EcPath.path * tydecl     ) pr
   val pr_opdecl   : t -> (EcPath.path * operator   ) pr
   val pr_axiom    : t -> (EcPath.path * axiom      ) pr
-  val pr_modtype  : t -> (EcPath.path * tymod      ) pr
+  val pr_modsig   : t -> (EcPath.path * module_sig ) pr
   val pr_module   : t -> (EcPath.path * module_expr) pr
   val pr_theory   : t -> (EcPath.path * ctheory    ) pr
   val pr_export   : t -> EcPath.path pr
   val pr_lgoal    : t -> (EcFol.hyps * EcFol.form) pr
+
   (* ------------------------------------------------------------------ *)
   val pp_type     : t -> ?vmap:NameGen.t -> ty pp
   val pp_expr     : t -> tyexpr pp
@@ -41,7 +43,7 @@ module type IPrettyPrinter = sig
   val pp_typedecl : t -> (EcPath.path * tydecl     ) pp
   val pp_opdecl   : t -> (EcPath.path * operator   ) pp
   val pp_axiom    : t -> (EcPath.path * axiom      ) pp
-  val pp_modtype  : t -> (EcPath.path * tymod      ) pp
+  val pp_modsig   : t -> (EcPath.path * module_sig ) pp
   val pp_module   : t -> (EcPath.path * module_expr) pp
   val pp_theory   : t -> (EcPath.path * ctheory    ) pp
   val pp_export   : t -> EcPath.path pp
@@ -80,30 +82,32 @@ end
 
 (* -------------------------------------------------------------------- *)
 module MakePP : functor (M : IIdentPrinter) -> IPrettyPrinter
+module EcPP   : IPrettyPrinter
 
-module EcPP      : IPrettyPrinter
 (* -------------------------------------------------------------------- *)
 module EcDebugPP : sig
+
   (* ------------------------------------------------------------------ *)
   val pr_type     : ?vmap:NameGen.t -> ty pr
   val pr_dom      : EcTypes.dom pr
-  val pr_typedecl : (EcIdent.t * tydecl  ) pr
-  val pr_opdecl   : (EcIdent.t * operator) pr
-  val pr_axiom    : (EcIdent.t * axiom   ) pr
-  val pr_modtype  : (EcIdent.t * tymod   ) pr
+  val pr_typedecl : (EcIdent.t * tydecl     ) pr
+  val pr_opdecl   : (EcIdent.t * operator   ) pr
+  val pr_axiom    : (EcIdent.t * axiom      ) pr
+  val pr_modsig   : (EcIdent.t * module_sig ) pr
   val pr_module   : module_expr pr
   val pr_export   : EcPath.path pr
   val pr_theory   : (EcIdent.t * ctheory) pr
   val pr_expr     : tyexpr pr
   val pr_form     : EcFol.form pr
   val pr_lgoal    : (EcFol.hyps * EcFol.form) pr
+
   (* ------------------------------------------------------------------ *)
   val pp_type     : ?vmap:NameGen.t -> ty pp
   val pp_dom      : EcTypes.dom pp
-  val pp_typedecl : (EcIdent.t * tydecl  ) pp
-  val pp_opdecl   : (EcIdent.t * operator) pp
-  val pp_axiom    : (EcIdent.t * axiom   ) pp
-  val pp_modtype  : (EcIdent.t * tymod   ) pp
+  val pp_typedecl : (EcIdent.t * tydecl     ) pp
+  val pp_opdecl   : (EcIdent.t * operator   ) pp
+  val pp_axiom    : (EcIdent.t * axiom      ) pp
+  val pp_modsig   : (EcIdent.t * module_sig ) pp
   val pp_module   : module_expr pp
   val pp_export   : EcPath.path pp
   val pp_theory   : (EcIdent.t * ctheory) pp

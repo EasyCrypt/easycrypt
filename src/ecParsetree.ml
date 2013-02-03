@@ -107,14 +107,20 @@ type pinstr =
 and pstmt = pinstr list
 
 (* -------------------------------------------------------------------- *)
-type pmodule_type =
-  | Pty_app   of pqsymbol * pqsymbol list
-  | Pty_func  of (psymbol * pqsymbol) list * psignature
-  | Pty_sig   of psignature
+type pmodule_sig =
+| Pmty_alias  of pmodule_type
+| Pmty_struct of pmodule_sig_struct
 
-and psignature = psignature_item list
+and pmodule_type = pqsymbol * pqsymbol list
 
-and psignature_item = [
+and pmodule_sig_struct = {
+  pmsig_params : (psymbol * pmodule_type) list;
+  pmsig_body   : pmodule_sig_struct_body;
+}
+
+and pmodule_sig_struct_body = pmodule_sig_item list
+
+and pmodule_sig_item = [
   | `VariableDecl of pvariable_decl
   | `FunctionDecl of pfunction_decl
 ]
@@ -136,16 +142,14 @@ and pmodule_expr =
   | Pm_ident  of pqsymbol * pqsymbol list
   | Pm_struct of pstructure
 
-and pmodule_intf = pqsymbol * pmodule_intf list
-
 and pstructure = {
-  ps_params    : (psymbol * pqsymbol) list;
+  ps_params    : (psymbol * pmodule_type) list;
   ps_signature : pmodule_type option;
   ps_body      : pstructure_item list;
 }
 
 and pstructure_item =
-  | Pst_mod   of (psymbol * pmodule_expr * pmodule_intf option)
+  | Pst_mod   of (psymbol * pmodule_expr * pmodule_type option)
   | Pst_var   of (psymbol list * pty)
   | Pst_fun   of (pfunction_decl * pfunction_body)
   | Pst_alias of (psymbol * pqsymbol)
@@ -160,8 +164,8 @@ and pfunction_body = {
 type poperator = {
   po_name   : psymbol;
   po_tyvars : psymbol list option;
-  po_dom : pty list option;
-  po_codom : pty;  
+  po_dom    : pty list option;
+  po_codom  : pty;  
   po_body   : (psymbol list * pexpr) option;
 }
 
@@ -312,8 +316,8 @@ and theory_override =
 
 (* -------------------------------------------------------------------- *)
 type global =
-  | Gmodule    of (psymbol * pmodule_expr * pmodule_intf option)
-  | Ginterface of (psymbol * pmodule_type)
+  | Gmodule    of (psymbol * pmodule_expr * pmodule_type option)
+  | Ginterface of (psymbol * pmodule_sig)
   | Goperator  of poperator
   | Gpredicate of ppredicate
   | Gaxiom     of paxiom

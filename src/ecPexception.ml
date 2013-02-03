@@ -50,7 +50,13 @@ let pp_typerror =
   
     | UnknownTypeName name
         -> Format.fprintf fmt "Unknown type name: %a" pp_qsymbol name
+
+    | UnknownModName name
+        -> Format.fprintf fmt "Unknown module name: %a" pp_qsymbol name
   
+    | UnknownTyModName name
+        -> Format.fprintf fmt "Unknown module type name: %a" pp_qsymbol name
+
     | UnknownOperatorForSig (name, tys)
         -> Format.fprintf fmt "Cannot find operator %a with signature %a" 
             pp_qsymbol name
@@ -82,6 +88,7 @@ let pp_typerror =
   
     | DuplicatedLocals None
         -> Format.fprintf fmt "DuplicatedLocals"
+
     | DuplicatedLocals (Some s)
         -> Format.fprintf fmt "A symbol %s already declared at %s"
             s.pl_desc (Location.tostring s.pl_loc)
@@ -99,14 +106,19 @@ let pp_typerror =
   
     | ModApplInvalidArgInterface
         -> Format.fprintf fmt "ModApplInvalidArgInterface"
+
     | TypeVariableNotAllowed 
         -> Format.fprintf fmt "Type variable not allowed"
+
     | UnificationVariableNotAllowed 
         -> Format.fprintf fmt "unification variable not allowed"
+
     | RandomExprNotAllowed 
         -> Format.fprintf fmt "random expression not allowed"
+
     | UnNamedTypeVariable 
         -> Format.fprintf fmt "unnamed type variable"
+
     | UnusedTypeVariable 
         -> Format.fprintf fmt "unused type variable"
         

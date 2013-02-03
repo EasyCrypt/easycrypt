@@ -109,7 +109,7 @@ type scope = {
   sc_operators  : EcDecl.operator        Context.context;
   sc_axioms     : EcDecl.axiom           Context.context;
   sc_modules    : EcTypesmod.module_expr Context.context;
-  sc_modtypes   : EcTypesmod.tymod       Context.context;
+  sc_modtypes   : EcTypesmod.module_sig  Context.context;
   sc_theories   : EcTypesmod.ctheory     Context.context;
   sc_env        : EcEnv.env;
   sc_top        : scope option;
@@ -288,24 +288,22 @@ module Mod = struct
         sc_modules = Context.bind (EcIdent.name m.me_name) m scope.sc_modules;
         sc_env     = EcEnv.Mod.bind m.me_name m scope.sc_env; }
 
-  let add (scope : scope) (name : symbol) m mi =
+  let add (scope : scope) (name : symbol) m _mi =
     let name = EcIdent.create name in
-    let m    = EcTypedtree.transmod scope.sc_env name m in
-    let mi   = omap mi (EcTypedtree.transintf scope.sc_env) in
-      oiter mi (EcTypedtree.check_tymod_sub scope.sc_env m.me_sig);
+    let m    = EcTypedtree.transmod scope.sc_env name m in (* FIXME: check sig *)
       bind scope m
 end
 
 (* -------------------------------------------------------------------- *)
 module ModType = struct
-  let bind (scope : scope) ((x, tymod) : _ * tymod) =
+  let bind (scope : scope) ((x, tysig) : _ * module_sig) =
     { scope with
-        sc_modtypes = Context.bind (EcIdent.name x) tymod scope.sc_modtypes;
-        sc_env      = EcEnv.ModTy.bind x tymod scope.sc_env; }
+        sc_modtypes = Context.bind (EcIdent.name x) tysig scope.sc_modtypes;
+        sc_env = EcEnv.ModTy.bind x tysig scope.sc_env; }
 
-  let add (scope : scope) (name : symbol) (i : pmodule_type) =
-    let tymod = EcTypedtree.transtymod scope.sc_env i in
-      bind scope (EcIdent.create name, tymod)
+  let add (scope : scope) (name : symbol) (i : pmodule_sig) =
+    let tysig = EcTypedtree.transmodsig scope.sc_env i in
+      bind scope (EcIdent.create name, tysig)
 end
 
 (* -------------------------------------------------------------------- *)

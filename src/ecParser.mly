@@ -685,7 +685,7 @@ mod_def:
 | MODULE x=ident t=mod_ty? EQ m=qident LPAREN a=plist1(qident, COMMA) RPAREN
     { (x, Pm_ident (m, a), t) }
 
-| MODULE x=ident LPAREN a=plist1(sig_arg, COMMA) RPAREN t=mod_ty? EQ body=mod_body
+| MODULE x=ident LPAREN a=plist1(sig_param, COMMA) RPAREN t=mod_ty? EQ body=mod_body
     { (x, mk_mod a body, t) }
 ;
 
@@ -695,34 +695,41 @@ mod_ty:
 
 mod_intf:
 | x=qident { (x, []) }
-| x=qident LPAREN args=plist1(mod_intf, COMMA) RPAREN { (x, args) }
+| x=qident LPAREN args=plist1(qident, COMMA) RPAREN { (x, args) }
 ;
 
 (* -------------------------------------------------------------------- *)
 (* Modules interfaces                                                   *)
 
 sig_def:
-| MODULE TYPE x=ident EQ i=sig_body
-    { (x, i) }
+| MODULE TYPE x=ident args=sig_params? EQ i=sig_struct_body
+    { (x, Pmty_struct { pmsig_params = EcUtils.odfl [] args;
+                        pmsig_body   = i; }) }
 
-| MODULE TYPE x=ident LPAREN a=plist1(sig_arg, COMMA) RPAREN EQ i=signature
-    { (x, Pty_func (a, i)) }
+| MODULE TYPE x=ident EQ i=sig_type
+    { (x, Pmty_alias i) }
 ;
 
-sig_arg:
-| x=ident COLON i=qident { (x, i) }
+sig_struct_body:
+| LKEY ty=signature_item* RKEY
+    { ty }
 ;
 
-sig_body:
-| x=qident LPAREN a=plist1(qident, COMMA) RPAREN
-    { Pty_app (x, a) }
+sig_type:
+| x=qident
+    { (x, []) }
 
-| x=signature
-   { Pty_sig x }
+| x=qident LPAREN args=plist1(qident, COMMA) RPAREN
+    { (x, args) }
 ;
 
-signature:
-| LKEY x=signature_item* RKEY { x }
+sig_params:
+| LPAREN params=plist1(sig_param, COMMA) RPAREN
+    { params }
+;
+
+sig_param:
+| x=ident COLON i=mod_intf { (x, i) }
 ;
 
 signature_item:

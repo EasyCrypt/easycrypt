@@ -46,15 +46,32 @@ end
 type use_flags = UM.flags
 
 (* -------------------------------------------------------------------- *)
-type tymod = {
-  tym_params : (EcIdent.t * tymod) list;
-  tym_sig    : tysig;
-  tym_mforb  : EcPath.Sp.t;
+type module_sig = {
+  tyms_desc  : module_sig_desc;
+  tyms_comps : module_sig_comps;
 }
 
-and tysig = tysig_item list
+and module_type = {
+  tymt_desc  : module_type_desc;
+  tymt_comps : module_sig_comps;
+}
 
-and tysig_item =
+and module_sig_comps = {
+  tymc_params : (EcIdent.t * module_type) list;
+  tymc_body   : module_sig_body;
+  tymc_mforb  : EcPath.Sp.t;
+}
+
+and module_sig_desc =
+  | Mty_app of EcPath.path * EcPath.path list
+  | Mty_sig of (EcIdent.t * module_type) list * module_sig_body
+
+and module_type_desc =
+  EcPath.path * EcPath.path list
+
+and module_sig_body = module_sig_body_item list
+
+and module_sig_body_item =
   | Tys_variable of (symbol * EcTypes.ty)
   | Tys_function of funsig
 
@@ -66,20 +83,21 @@ and funsig = {
 
 (* -------------------------------------------------------------------- *)
 type module_expr = {
-  me_name : EcIdent.t;
-  me_body : module_body;
-  me_meta : module_meta option;
-  me_sig  : tymod;
+  me_name  : EcIdent.t;
+  me_body  : module_body;
+  me_meta  : module_meta option;
+  me_sig   : module_sig;
+  me_types : module_type list;
 }
 
 and module_body =
   | ME_Ident       of EcPath.path
   | ME_Application of EcPath.path * EcPath.path list
   | ME_Structure   of module_structure
-  | ME_Decl        of EcPath.path
+  | ME_Decl        of module_type
 
 and module_structure = {
-  ms_params : (EcIdent.t * tymod) list;
+  ms_params : (EcIdent.t * module_type) list;
   ms_body   : module_item list;
 }
 
@@ -88,13 +106,13 @@ and module_item =
   | MI_Variable of variable
   | MI_Function of function_
 
-and module_components = module_components_item list
+and module_comps = module_comps_item list
 
-and module_components_item = module_item
+and module_comps_item = module_item
 
 and module_meta = {
-  mm_components : module_components option;
-  mm_uses       : EcPath.Sp.t;
+  mm_comps : module_comps option;
+  mm_uses  : EcPath.Sp.t;
 }
 
 and function_ = {
@@ -126,10 +144,11 @@ and lvalue =
   | LvMap   of (EcPath.path * EcTypes.ty list) * 
                EcTypes.prog_var * EcTypes.tyexpr * EcTypes.ty
  (* LvMap(op, m, x, ty)
-    - op is the set operator
-    - m is the map to be updated 
-    - x is the position to update
-    - ty is the type of the value associated to x *)
+  * - op is the set operator
+  * - m  is the map to be updated 
+  * - x  is the index to update
+  * - ty is the type of the value associated to x
+  *)
 
 (* -------------------------------------------------------------------- *)
 type theory = theory_item list
@@ -138,7 +157,7 @@ and theory_item =
   | Th_type      of (EcIdent.t * tydecl)
   | Th_operator  of (EcIdent.t * operator)
   | Th_axiom     of (EcIdent.t * axiom)
-  | Th_modtype   of (EcIdent.t * tymod)
+  | Th_modtype   of (EcIdent.t * module_sig)
   | Th_module    of module_expr
   | Th_theory    of (EcIdent.t * theory)
   | Th_export    of EcPath.path
@@ -159,7 +178,7 @@ and ctheory_item =
   | CTh_type      of (EcIdent.t * tydecl)
   | CTh_operator  of (EcIdent.t * operator)
   | CTh_axiom     of (EcIdent.t * axiom)
-  | CTh_modtype   of (EcIdent.t * tymod)
+  | CTh_modtype   of (EcIdent.t * module_sig)
   | CTh_module    of module_expr
   | CTh_theory    of (EcIdent.t * ctheory)
   | CTh_export    of EcPath.path

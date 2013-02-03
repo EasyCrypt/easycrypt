@@ -236,7 +236,7 @@ let subst_ax (s : subst) (ax : axiom) =
       ax_kind   = kind  ; }
 
 (* -------------------------------------------------------------------- *)
-let subst_tysig_item (s : subst) (item : tysig_item) =
+let rec subst_modsig_body_item (s : subst) (item : module_sig_body_item) =
   match item with
   | Tys_variable (x, ty) ->
       let ty' = subst_ty s ty in
@@ -255,28 +255,42 @@ let subst_tysig_item (s : subst) (item : tysig_item) =
             fs_uses = uses'         }
 
 (* -------------------------------------------------------------------- *)
-let subst_tysig (s : subst) (tysig : tysig) =
-  List.map (subst_tysig_item s) tysig
+and subst_modsig_body (s : subst) (sbody : module_sig_body) =
+  List.map (subst_modsig_body_item s) sbody
 
 (* -------------------------------------------------------------------- *)
-let rec subst_modtype (s : subst) (tymod : tymod) =
-    let newparams =
-      List.map
-        (fun (a, aty) ->
-          (EcIdent.fresh a, subst_modtype s aty))
-        tymod.tym_params in
+and subst_modsig (s : subst) (sig_ : module_sig) =
+  { tyms_desc  = subst_modsig_desc  s sig_.tyms_desc;
+    tyms_comps = subst_modsig_comps s sig_.tyms_comps; }
 
-    let ssig = add_locals s
-      (List.combine
-         (List.map fst tymod.tym_params)
-         (List.map fst newparams))
-    in
-      { tym_params = newparams;
-        tym_sig    = subst_tysig ssig tymod.tym_sig;
-        tym_mforb  = 
-          Sp.fold
-            (fun p mf -> Sp.add (subst_path s p) mf)
-            tymod.tym_mforb Sp.empty; }
+(* -------------------------------------------------------------------- *)
+and subst_modsig_desc (s : subst) (desc : module_sig_desc) =
+  match desc with
+  | Mty_app (name, args) ->
+      let name = subst_path s name in
+      let args = List.map (subst_path s) args in
+        Mty_app (name, args)
+
+  | Mty_sig (params, body) ->
+      Mty_sig (params, subst_modsig_body s body)
+
+(* -------------------------------------------------------------------- *)
+and subst_modsig_comps (s : subst) (comps : module_sig_comps) =
+  { tymc_params = comps.tymc_params;
+    tymc_body   = subst_modsig_body s comps.tymc_body;
+    tymc_mforb  = 
+      Sp.fold
+        (fun p mf -> Sp.add (subst_path s p) mf)
+        comps.tymc_mforb Sp.empty; }
+
+(* -------------------------------------------------------------------- *)
+and subst_modtype (s : subst) (tymod : module_type) =
+  { tymt_desc  = subst_modtype_desc s tymod.tymt_desc;
+    tymt_comps = subst_modsig_comps s tymod.tymt_comps; }
+
+(* -------------------------------------------------------------------- *)
+and subst_modtype_desc (s : subst) ((name, args) : module_type_desc) =
+  (subst_path s name, List.map (subst_path s) args)
 
 (* -------------------------------------------------------------------- *)
 let rec subst_stmt (s : subst) (stmt : stmt) =
@@ -424,7 +438,7 @@ and subst_module_body (s : subst) (scope : EcPath.path) (body : module_body) =
       ME_Structure (subst_module_struct s scope bstruct)
 
   | ME_Decl p ->
-      ME_Decl (subst_path s p)
+      ME_Decl (subst_modtype s p)
 
 (* -------------------------------------------------------------------- *)
 and subst_module (s : subst) (scope : EcPath.path) (m : module_expr) =
@@ -432,12 +446,14 @@ and subst_module (s : subst) (scope : EcPath.path) (m : module_expr) =
   let scope' = EcPath.Pqname (scope, name') in
   let sbody  = add s m.me_name (`Path scope') in
   let body'  = subst_module_body sbody scope' m.me_body in
-  let tysig' = subst_modtype s m.me_sig in
+  let tysig' = subst_modsig s m.me_sig in
+  let types' = List.map (subst_modtype s) m.me_types in
 
-    { me_name = name' ;
-      me_body = body' ;
-      me_meta = None  ;           (* FIXME *)
-      me_sig  = tysig'; }
+    { me_name  = name' ;
+      me_body  = body' ;
+      me_meta  = None  ;           (* FIXME *)
+      me_sig   = tysig';
+      me_types = types'; }
 
 (* -------------------------------------------------------------------- *)
 let rec subst_theory_item (s : subst) (scope : EcPath.path) (item : theory_item) =
@@ -460,7 +476,7 @@ let rec subst_theory_item (s : subst) (scope : EcPath.path) (item : theory_item)
   | Th_modtype (x, tymod) ->
       let x' = EcIdent.fresh x in
       let s' = add s x (`Path (EcPath.Pqname (scope, x'))) in
-        (s', Th_modtype (x', subst_modtype s tymod))
+        (s', Th_modtype (x', subst_modsig s tymod))
 
   | Th_module m ->
       let m' = subst_module s scope m in

@@ -7,8 +7,12 @@ type path =
   | Pident of EcIdent.t
   | Pqname of path * EcIdent.t
 
+type xpath = path * xpath list
+
 val p_equal : path -> path -> bool
 val p_compare : path -> path -> int
+
+val p_equal_complex : xpath -> xpath -> bool
 
 (* -------------------------------------------------------------------- *)
 val create    : string -> path
