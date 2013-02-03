@@ -688,28 +688,42 @@ mod_item:
 (* Modules                                                              *)
 
 mod_body:
-| LKEY stt=mod_item* RKEY { stt }
+| m=qident
+    { `App (m, []) }
+
+| m=qident LPAREN a=plist1(qident, COMMA) RPAREN
+    { `App (m, a) }
+
+| LKEY stt=mod_item* RKEY
+    { `Struct stt }
 ;
 
 mod_def:
-| MODULE x=ident t=mod_ty? EQ body=mod_body
-    { (x, mk_mod ?modtypes:t [] body) }
+| MODULE x=ident p=mod_params? t=mod_ty? EQ body=mod_body
+    { let p = EcUtils.odfl [] p in
+        match body with
+        | `App (m, args) ->
+             if p <> [] then
+               error (Location.make $startpos $endpos)
+                 "cannot parameterized module aliase";
+             if t <> None then
+               error (Location.make $startpos $endpos)
+                 "cannot bind module type to module aliase";
+             (x, Pm_ident (m, args))
 
-| MODULE x=ident LPAREN a=plist1(sig_param, COMMA) RPAREN t=mod_ty? EQ body=mod_body
-    { (x, mk_mod ?modtypes:t a body) }
+        | `Struct st ->
+             (x, mk_mod ?modtypes:t p st) }
+;
 
-| MODULE x=ident EQ m=qident
-    { (x, Pm_ident (m, [])) }
-
-| MODULE x=ident EQ m=qident LPAREN a=plist1(qident, COMMA) RPAREN
-    { (x, Pm_ident (m, a)) }
+mod_params:
+| LPAREN a=plist1(sig_param, COMMA) RPAREN  { a }
 ;
 
 mod_ty:
-| COLON t=plist1(mod_intf, COMMA) { t }
+| COLON t=plist1(mod_type, COMMA) { t }
 ;
 
-mod_intf:
+mod_type:
 | x=qident { (x, []) }
 | x=qident LPAREN args=plist1(qident, COMMA) RPAREN { (x, args) }
 ;
@@ -757,7 +771,7 @@ sig_params:
 ;
 
 sig_param:
-| x=ident COLON i=mod_intf { (x, i) }
+| x=ident COLON i=mod_type { (x, i) }
 ;
 
 signature_item:
