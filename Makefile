@@ -12,12 +12,12 @@ endif
 OCAMLBUILD := $(OCAMLBUILD_BIN) $(OCAMLBUILD_EXTRA)
 
 CHECK = \
-	./scripts/runtest.py         \
-	  --bin=./ec.byte            \
-	  --ok-dir=tests/success     \
-	  --ok-dir=theories          \
-	  --ko-dir=tests/fail        \
-	  --ok-dir=tests/modules     \
+	./scripts/runtest.py             \
+	  --bin=./ec.byte                \
+	  --ok-dir=theories              \
+	  --ok-dir=tests/typing/success  \
+	  --ko-dir=tests/typing/fail     \
+	  --ok-dir=tests/modules/success \
 	  --ko-dir=tests/modules/fail
 
 XUNITOUT ?= xunit.xml
