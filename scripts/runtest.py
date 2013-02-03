@@ -82,16 +82,21 @@ def _xunit_dump(config, results):
         node.append(E.properties())
 
         for result in group:
+            name = os.path.basename(result.config.filename)
+            name = os.path.splitext(name)[0]
+            classname = os.path.dirname(result.config.filename)
+            classname = '.'.join(classname.split(os.path.sep))
+
             rnode = E.testcase(
-                name      = "/%s" % (result.config.filename,),
-                classname = "",
+                name      = name,
+                classname = classname,
                 time      = "%.3f" % (result.time,))
             if not result.success:
                 rnode.append(E.failure( \
                         message = \
                             'invalid-exit-status (should-pass: %r)' % \
                                 (result.config.isvalid,),
-                        type    = 'should-pass: %r' % (result.config.isvalid,)))
+                        type = 'should-pass: %r' % (result.config.isvalid,)))
             node.append(rnode)
 
         node.append(E("system-out"))
@@ -137,7 +142,7 @@ def _main():
         def config(filename):
             return Object(isvalid  = isvalid,
                           group    = dirname,
-                          filename = os.path.join(dirname, x))
+                          filename = os.path.normpath(os.path.join(dirname, x)))
 
         return [config(x) for x in scripts]
 
