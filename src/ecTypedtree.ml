@@ -633,7 +633,7 @@ let rec check_tymod_cnv mode (env : EcEnv.env) tin tout =
       (* We currently reject function with compatible signatures but
        * for the arguments names. We plan to leviate this restriction
        * later on, but note that this may require to alpha-convert when
-       * instnatiating an abstract module by a implementation. *)
+       * instantiating an abstract module with an implementation. *)
 
       let arg_compatible (aname1, aty1) (aname2, aty2) =
            (EcIdent.name aname1) = (EcIdent.name aname2)
@@ -666,38 +666,38 @@ let rec check_tymod_cnv mode (env : EcEnv.env) tin tout =
         | _               , _                 -> assert false
   in
 
-  let check_for_item (i_item : module_sig_body_item) =
-    let i_name = tysig_item_name i_item
-    and i_kind = tysig_item_kind i_item in
+  let check_for_item (o_item : module_sig_body_item) =
+    let o_name = tysig_item_name o_item
+    and o_kind = tysig_item_kind o_item in
 
-    let o_item =
+    let i_item =
       List.findopt
-        (fun o_item ->
-             (tysig_item_name o_item) = i_name
-          && (tysig_item_kind o_item) = i_kind)
-        tout
+        (fun i_item ->
+             (tysig_item_name i_item) = o_name
+          && (tysig_item_kind i_item) = o_kind)
+        tin
     in
-      match o_item with
-      | None -> tymod_cnv_failure (E_TyModCnv_MissingComp i_name)
-      | Some o_item -> check_item_compatible i_item o_item
+      match i_item with
+      | None -> tymod_cnv_failure (E_TyModCnv_MissingComp o_name)
+      | Some i_item -> check_item_compatible i_item o_item
   in
-    List.iter check_for_item tin;
+    List.iter check_for_item tout;
 
     if mode = `Eq then begin
       List.iter
-        (fun o_item ->
-          let o_name = tysig_item_name o_item
-          and o_kind = tysig_item_kind o_item in
+        (fun i_item ->
+          let i_name = tysig_item_name i_item
+          and i_kind = tysig_item_kind i_item in
           let b =
             List.exists
-              (fun i_item ->
-                   (tysig_item_name i_item) = o_name
-                && (tysig_item_kind i_item) = o_kind)
-              tin
+              (fun o_item ->
+                   (tysig_item_name o_item) = i_name
+                && (tysig_item_kind o_item) = i_kind)
+              tout
           in
             if not b then
-              tymod_cnv_failure (E_TyModCnv_MissingComp o_name))
-        tout
+              tymod_cnv_failure (E_TyModCnv_MissingComp i_name))
+        tin
     end
 
 let check_tymod_sub = check_tymod_cnv `Sub
