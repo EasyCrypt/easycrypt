@@ -420,7 +420,7 @@ struct
     pr_op_name_qs (M.op_symb tenv p tvi esig)
 
   let pr_app get_ty (tenv : t) pr_sub outer op tvi es =
-     (* FIXME : special notations, list ..., sampling {0,1} [k1..k2] ....
+     (* FIXME : special notations list,  sampling {0,1} {0,1}^k [k1..k2] ....
      *)
 
     let esig = try Some (List.map get_ty es) with _ -> None in
