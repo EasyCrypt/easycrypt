@@ -148,6 +148,7 @@ let tk_end    = !^ "end"
 let tk_exists = !^ "exists"
 let tk_export = !^ "export"
 let tk_flip   = !^ "{0,1}"
+let tk_from_int = !^ "%r"
 let tk_forall = !^ "forall"
 let tk_fun    = !^ "fun"
 let tk_if     = !^ "if"
@@ -429,7 +430,7 @@ struct
     
     let pr_as_std_op () =
       let docs,prio = 
-        (* FIXME *)
+        (* FIXME, priority *)
         if qs = [] then
           match opname, es with
           | "__nil", [] -> [tk_lbracket ^^ tk_rbracket], max_op_prec
@@ -458,7 +459,6 @@ struct
           pr_op_name_qs (qs,opname) :: 
           List.map (pr_sub tenv (appprio, `Right)) es, appprio in
       bracket outer prio (pr_seq docs) in
-
 
     let try_pr_as_uniop () =
       if qs = [] then
@@ -490,10 +490,26 @@ struct
             end
         | _ -> None
       else None
+          
+    and try_pr_special () = 
+      let qs = EcPath.toqsymbol op in
+      match es with
+      | [] when qs = EcCoreLib.s_dbool -> Some tk_flip
+      | [e] when qs = EcCoreLib.s_dbitstring ->
+          Some (tk_flip ^^ !^"^" ^^ pr_sub tenv (max_op_prec, `NonAssoc) e)
+      | [e] when qs = EcCoreLib.s_from_int ->
+          Some ( pr_sub tenv (max_op_prec, `NonAssoc) e ^^ tk_from_int)
+      | [e1;e2] when qs = EcCoreLib.s_dinter ->
+          Some (tk_lbracket ^^ 
+                pr_sub tenv (min_op_prec, `NonAssoc) e1 ^^
+                tk_dotdot ^^
+                pr_sub tenv (min_op_prec, `NonAssoc) e2 ^^
+                tk_rbracket)
+      | _ -> None
 
     in
       ofdfl pr_as_std_op
-        (List.fpick [try_pr_as_uniop; try_pr_as_binop])
+        (List.fpick [try_pr_special;try_pr_as_uniop; try_pr_as_binop])
 
   (* ------------------------------------------------------------------ *)
   let pr_expr (tenv : t) (e : tyexpr) =

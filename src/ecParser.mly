@@ -335,6 +335,9 @@ sexp:
 | se=loc(sexp) DLBRACKET ti=tvars_app? e1=loc(exp) LEFTARROW e2=loc(exp) RBRACKET  
    { peset (Location.make $startpos $endpos) ti se e1 e2 }
 
+| PIPE ti=tvars_app? e=loc(exp) PIPE 
+    { peapp_symb e.pl_loc EcCoreLib.s_abs ti [e] }
+
 | LPAREN es=exp_list2 RPAREN
    { PEtuple es }
 
@@ -342,10 +345,15 @@ sexp:
    { e }
 
 | LBRACKET ti=tvars_app? es=loc(p_exp_sm_list0) RBRACKET  
-   { (pelist es.pl_loc ti es.pl_desc).pl_desc }
+   { unloc (pelist es.pl_loc ti es.pl_desc) } 
 
-| PIPE ti=tvars_app? e=loc(exp) PIPE 
-    { peapp_symb e.pl_loc EcCoreLib.s_abs ti [e] }
+| LBRACKET e1=loc(exp) op=loc(DOTDOT) e2=loc(exp) RBRACKET
+    { let id = PEident(mk_loc op.pl_loc EcCoreLib.s_dinter, None) in
+      PEapp(mk_loc op.pl_loc id, [e1; e2]) } 
+| LKEY n1=number op=loc(COMMA) n2=number RKEY
+    { if   n1 = 0 && n2 = 1
+      then PEident (mk_loc op.pl_loc EcCoreLib.s_dbool, None)
+      else error (Location.make $startpos $endpos) "malformed bool random" }
 ;
 
 op1:
@@ -362,7 +370,7 @@ exp:
    { peapp_symb op.pl_loc "!" ti [e] }
 
 | op=loc(binop) ti=tvars_app? e=loc(exp) %prec prec_prefix_op
-   { peapp_symb op.pl_loc op.pl_desc ti [e] }
+   { peapp_symb op.pl_loc op.pl_desc ti [e] } 
 
 | e1=loc(exp) op=loc(op1) ti=tvars_app? e2=loc(exp) %prec OP1
     { peapp_symb op.pl_loc op.pl_desc ti [e1; e2] }
@@ -395,7 +403,7 @@ exp:
     { peapp_symb op.pl_loc "!" None 
       [ mk_loc op.pl_loc (peapp_symb op.pl_loc "=" ti [e1; e2])] }
 
-| e1=loc(exp) op=loc(STAR) ti=tvars_app? e2=loc(exp)  
+| e1=loc(exp) op=loc(STAR) ti=tvars_app?  e2=loc(exp)  
     { peapp_symb op.pl_loc "*" ti [e1; e2] }
 
 | c=loc(exp) QUESTION e1=loc(exp) COLON e2=loc(exp) %prec OP2
@@ -404,22 +412,14 @@ exp:
 
 | LET p=lpattern EQ e1=loc(exp) IN e2=loc(exp)
    { PElet (p, e1, e2) }
-
 (* Distribution *)
-| LKEY n1=number op=loc(COMMA) n2=number RKEY
-    { if   n1 = 0 && n2 = 1
-      then PEident (mk_loc op.pl_loc EcCoreLib.s_dbool, None)
-      else error (Location.make $startpos $endpos) "malformed bool random" }
-
-| LKEY n1=number op=loc(COMMA) n2=number RKEY_HAT e=loc(exp)
+| LKEY n1=number op=loc(COMMA) n2=number RKEY_HAT e=loc(sexp)
     { if   n1 = 0 && n2 = 1 then 
         let id = PEident(mk_loc op.pl_loc EcCoreLib.s_dbitstring, None) in
         PEapp (mk_loc op.pl_loc id, [e])
       else error (Location.make $startpos $endpos) "malformed random bitstring" }
 
-| LBRACKET e1=loc(exp) op=loc(DOTDOT) e2=loc(exp) RBRACKET
-    { let id = PEident(mk_loc op.pl_loc EcCoreLib.s_dinter, None) in
-      PEapp(mk_loc op.pl_loc id, [e1; e2]) }
+
 ;
 
 (* -------------------------------------------------------------------- *)
@@ -467,6 +467,16 @@ sform:
 
 | PIPE ti=tvars_app? e =loc(form) PIPE 
     { pfapp_symb e.pl_loc EcCoreLib.s_abs ti [e] }
+
+| LKEY n1=number op=loc(COMMA) n2=number RKEY
+    { if   n1 = 0 && n2 = 1
+      then PFident (mk_loc op.pl_loc EcCoreLib.s_dbool, None)
+      else error (Location.make $startpos $endpos) "malformed bool random" }
+
+| LBRACKET e1=loc(form) op=loc(DOTDOT) e2=loc(form) RBRACKET
+    { let id = PFident(mk_loc op.pl_loc EcCoreLib.s_dinter, None) in
+      PFapp(mk_loc op.pl_loc id, [e1; e2]) } 
+
 ;
                           
 form:
@@ -478,7 +488,7 @@ form:
     { pfapp_symb  op.pl_loc "!" ti [e] }
 
 | op=loc(binop) ti=tvars_app? e=loc(form) %prec prec_prefix_op
-   { pfapp_symb op.pl_loc op.pl_desc ti [e] }
+   { pfapp_symb op.pl_loc op.pl_desc ti [e] } 
 
 | e1=loc(form) op=loc(op1) ti=tvars_app? e2=loc(form) %prec OP1 
     { pfapp_symb op.pl_loc op.pl_desc ti [e1; e2] } 
@@ -523,6 +533,12 @@ form:
 | FORALL pd=mem_decl   COMMA e=loc(form) { PFforallm(pd, e) }
 | EXIST  pd=param_decl1 COMMA e=loc(form) { PFexists(pd, e) }
 | EXIST  pd=mem_decl   COMMA e=loc(form) { PFexistsm(pd, e) }
+(* Distribution *)
+| LKEY n1=number op=loc(COMMA) n2=number RKEY_HAT e=loc(sform)
+    { if   n1 = 0 && n2 = 1 then 
+        let id = PFident(mk_loc op.pl_loc EcCoreLib.s_dbitstring, None) in
+        PFapp (mk_loc op.pl_loc id, [e])
+      else error (Location.make $startpos $endpos) "malformed random bitstring" }
 ;
 
 %inline p_form_sm_list0: aout=plist0(loc(form), SEMICOLON) { aout }

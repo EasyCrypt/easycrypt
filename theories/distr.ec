@@ -215,11 +215,11 @@ end Dscale.
 
 theory Dexcepted.
 
-  op dexcepted (d:'a distr, X:'a Set.t) : 'a distr =
+  op [\] (d:'a distr, X:'a Set.t) : 'a distr =
     Dscale.dscale (Drestr.drestr d X). 
 
   lemma supp_def : forall (d:'a distr, X:'a Set.t, x:'a),
-     in_supp x (dexcepted d X) <=> in_supp x d && !Set.mem x X.
+     in_supp x (d \ X) <=> in_supp x d && !Set.mem x X.
 
 (* TODO : Complete the lemmas *)
 
