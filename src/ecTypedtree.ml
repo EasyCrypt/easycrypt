@@ -1,5 +1,3 @@
-
-
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open EcMaps
@@ -434,8 +432,9 @@ let module_sig_of_module_type (tymod : module_type) =
 let module_expr_of_module_type (name : EcIdent.t) (tymod : module_type) =
   { me_name  = name;
     me_body  = ME_Decl tymod;
-    me_meta  = None;
     me_sig   = module_sig_of_module_type tymod;
+    me_comps = [];                      (* FIXME *)
+    me_uses  = Sp.empty;                (* FIXME *)
     me_types = [tymod]; }
 
 (* -------------------------------------------------------------------- *)
@@ -518,9 +517,11 @@ and transmodtype (env : EcEnv.env) ((m, args) : pmodule_type) =
   let iargs   = m.tyms_comps.tymc_params in
   let args    = List.map (lookup_module env) args in
 
+    (* - Check module type application
+     * - Construct parameters substitution *)
     if List.length args <> List.length iargs then
       tyerror dloc ModApplInvalidArity;
-    let subst =
+    let bsubst =
       List.fold_left2
         (fun subst (mx, m) (ix, i) ->
           let mtypes = List.map (fun m -> m.tymt_desc) m.me_types in
@@ -529,9 +530,14 @@ and transmodtype (env : EcEnv.env) ((m, args) : pmodule_type) =
             EcSubst.add subst ix (`Path mx))
         EcSubst.empty args iargs
     in
+
+    (* Substitute parameters in module type components *)
+    let body = m.tyms_comps.tymc_body in
+    let body = EcSubst.subst_modsig_body bsubst body in
+
       { tymt_desc  = (pm, List.map fst args);
         tymt_comps = { tymc_params = [];
-                       tymc_body   = assert false;  (* FIXME *)
+                       tymc_body   = body;
                        tymc_mforb  = Sp.empty; }; } (* FIXME *) 
 
 (* -------------------------------------------------------------------- *)
@@ -699,6 +705,8 @@ and check_tymod_eq  = check_tymod_cnv `Eq
 
 (* -------------------------------------------------------------------- *)
 let rec transmod (env : EcEnv.env) (x : EcIdent.t) (m : pmodule_expr) =
+  let scope = EcPath.Pqname (EcEnv.root env, x) in
+
   match m with
   | Pm_ident ({ pl_desc = m }, args) -> begin
       let (mname, mty) = EcEnv.Mod.lookup m env in
@@ -711,9 +719,10 @@ let rec transmod (env : EcEnv.env) (x : EcIdent.t) (m : pmodule_expr) =
 
             { me_name  = x;
               me_body  = ME_Ident mname;
-              me_meta  = None;          (* FIXME *)
               me_sig   = mty.me_sig;
-              me_types = []; }          (* FIXME *)
+              me_comps = mty.me_comps;
+              me_uses  = mty.me_uses;
+              me_types = mty.me_types; }
 
         | _ ->
             let atymods = mty.me_sig.tyms_comps.tymc_params in
@@ -733,16 +742,28 @@ let rec transmod (env : EcEnv.env) (x : EcIdent.t) (m : pmodule_expr) =
                 EcSubst.empty args atymods
             in
 
+            (* Apply associated module types with given parameters *)
+            let me_types =
+              let me_type tymod =
+                let (tymod_name, tymod_args) = tymod.tymt_desc in
+                  assert (tymod_args = []);
+                  { tymt_desc  = (tymod_name, List.map fst args);
+                    tymt_comps = EcSubst.subst_modsig_comps bsubst tymod.tymt_comps; }
+              in
+                List.map me_type mty.me_types
+            in
+
             (* EcSubstitute args. in result type *)
               { me_name  = x;
                 me_body  = ME_Application (mname, List.map fst args);
-                me_meta  = None;        (* FIXME *)
+                me_comps = EcSubst.subst_module_comps bsubst scope mty.me_comps;
+                me_uses  = Sp.empty;    (* FIXME *)
                 me_sig   = {
                   tyms_desc  = Mty_app (mname, List.map fst args);
                   tyms_comps = EcSubst.subst_modsig_comps bsubst
                                  mty.me_sig.tyms_comps;
                 };
-                me_types = []; }        (* FIXME *)
+                me_types = me_types; }
   end
 
   | Pm_struct st ->
@@ -800,12 +821,22 @@ and transstruct (env : EcEnv.env) (x : EcIdent.t) (st : pstructure) =
           tymc_mforb  = Sp.empty; };    (* FIXME *)
       }
   in
+
+  (* Check that generated signature is structurally included in
+   * associated type mode. *)
+  let types = List.map (transmodtype env) st.ps_signature in
+    List.iter
+      (check_tymod_sub env tymod.tyms_comps)
+      (List.map (fun x -> x.tymt_comps) types);
+
+  (* Construct structure representation *)
     { me_name  = x;
       me_body  = ME_Structure { ms_params = stparams;
                                 ms_body   = List.map snd items; };
-      me_meta  = None;
+      me_comps = [];                    (* FIXME *)
+      me_uses  = Sp.empty;              (* FIXME *)
       me_sig   = tymod;
-      me_types = []; }                  (* FIXME *)
+      me_types = types; }
 
 (* -------------------------------------------------------------------- *)
 and transstruct1 (env : EcEnv.env) (st : pstructure_item) =

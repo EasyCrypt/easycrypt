@@ -441,19 +441,25 @@ and subst_module_body (s : subst) (scope : EcPath.path) (body : module_body) =
       ME_Decl (subst_modtype s p)
 
 (* -------------------------------------------------------------------- *)
+and subst_module_comps (_s : subst) (_scope : EcPath.path) (_comps : module_comps) =
+  []                                    (* FIXME *)
+
+(* -------------------------------------------------------------------- *)
 and subst_module (s : subst) (scope : EcPath.path) (m : module_expr) =
   let name'  = EcIdent.fresh m.me_name in
   let scope' = EcPath.Pqname (scope, name') in
   let sbody  = add s m.me_name (`Path scope') in
   let body'  = subst_module_body sbody scope' m.me_body in
+  let comps' = subst_module_comps sbody scope' m.me_comps in
   let tysig' = subst_modsig s m.me_sig in
   let types' = List.map (subst_modtype s) m.me_types in
 
-    { me_name  = name' ;
-      me_body  = body' ;
-      me_meta  = None  ;           (* FIXME *)
-      me_sig   = tysig';
-      me_types = types'; }
+    { me_name  = name'   ;
+      me_body  = body'   ;
+      me_comps = comps'  ;
+      me_uses  = Sp.empty;              (* FIXME *)
+      me_sig   = tysig'  ;
+      me_types = types'  ; }
 
 (* -------------------------------------------------------------------- *)
 let rec subst_theory_item (s : subst) (scope : EcPath.path) (item : theory_item) =

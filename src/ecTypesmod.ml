@@ -85,8 +85,9 @@ and funsig = {
 type module_expr = {
   me_name  : EcIdent.t;
   me_body  : module_body;
-  me_meta  : module_meta option;
   me_sig   : module_sig;
+  me_comps : module_comps;
+  me_uses  : EcPath.Sp.t;
   me_types : module_type list;
 }
 
@@ -109,11 +110,6 @@ and module_item =
 and module_comps = module_comps_item list
 
 and module_comps_item = module_item
-
-and module_meta = {
-  mm_comps : module_comps option;
-  mm_uses  : EcPath.Sp.t;
-}
 
 and function_ = {
   f_name   : EcIdent.t;

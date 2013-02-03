@@ -40,3 +40,5 @@ val subst_modsig_body  : subst -> module_sig_body -> module_sig_body
 
 val subst_modtype : subst -> module_type -> module_type
 val subst_modtype_desc : subst -> module_type_desc -> module_type_desc
+
+val subst_module_comps : subst -> EcPath.path -> module_comps -> module_comps

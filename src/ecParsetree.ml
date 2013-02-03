@@ -143,8 +143,8 @@ and pmodule_expr =
 
 and pstructure = {
   ps_params    : (psymbol * pmodule_type) list;
-  ps_signature : pmodule_type list;
   ps_body      : pstructure_item list;
+  ps_signature : pmodule_type list;
 }
 
 and pstructure_item =
