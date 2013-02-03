@@ -87,7 +87,8 @@ def _xunit_dump(config, results):
 
             classname = os.path.dirname(result.config.filename)
             classname = classname.split(os.path.sep)
-            if classname == [] or not classname[0] != 'tests':
+            print classname
+            if classname == [] or classname[0] != 'tests':
                 classname.insert(0, 'tests')
             classname = '.'.join(classname)
 
