@@ -74,6 +74,11 @@
     List.iter
       (fun (x, y) -> Hashtbl.add keywords x y)
       _keywords
+  let remove_bracket s = 
+    let len = String.length s in
+    if len > 2 && s.[0] = '[' then String.sub s 1 (String.length s - 2)
+    else s
+
 }
 
 let blank   = [' ' '\t' '\r']
@@ -84,17 +89,33 @@ let number  = digit+
 
 let ichar  = (letter | digit | '_' | '\'')
 let ident  = (letter ichar*) | ('_' ichar+)
-let qident = (ident '.')+ ident
 
 let prim_ident = '\'' ident
 
 let op_char_1    = ['=' '<' '>' '~']
 let op_char_2    = ['+' '-']
-let op_char_3    = ['*' '/' '%']
+let op_char_3    = ['*' '/' '%' '\\']
 let op_char_4    = ['!' '$' '&' '?' '@' '^' ':' '|' '#']
 let op_char_34   = op_char_3 | op_char_4
 let op_char_234  = op_char_2 | op_char_34
 let op_char_1234 = op_char_1 | op_char_234
+
+let op1 = op_char_1234* op_char_1 op_char_1234*
+let op2 = op_char_234*  op_char_2 op_char_234*  
+let op3 = op_char_34*   op_char_3 op_char_34* 
+let op4 = op_char_4+ 
+
+let binop = 
+  op1 | op2 | op3 | op4 | '!' | "&&" | "||" | "=>" | "<=>" | '>' | "=" 
+
+let pbinop = '[' binop ']'
+
+let qident = (ident '.')+ ident 
+
+let qident_binop = (ident '.')+ pbinop
+
+
+
 
 (* -------------------------------------------------------------------- *)
 rule main = parse
@@ -108,8 +129,18 @@ rule main = parse
 
   | qident as id {
       let path = List.rev (String.split '.' id) in
-        QIDENT (List.rev (List.tl path), List.hd path)
-  }
+      let qs = List.rev (List.tl path) in
+      let s = List.hd path in
+      QIDENT (qs, s)
+    }
+  | qident_binop as id { 
+      let path = List.rev (String.split '.' id) in
+      let qs = List.rev (List.tl path) in
+      let s = List.hd path in
+      let s = remove_bracket s in
+      QPBINOP (qs, s)
+}
+  | pbinop as s { PBINOP (remove_bracket s) }
 
   (* boolean operators *)
   | '!'                       { NOT }
@@ -141,7 +172,6 @@ rule main = parse
   | ':'                       { COLON }
   | "}^"                      { RKEY_HAT }
   | '?'                       { QUESTION }
-  | '\\'                      { BACKSLASH }
   | "*"                       { STAR }
   | "$"                       { SAMPLE }
   | "|"                       { PIPE }
@@ -150,14 +180,10 @@ rule main = parse
   | "="                       { EQ }
   | "<>"                      { NE }
 
-  | op_char_1234* op_char_1 op_char_1234* as s
-      { OP1 s }
-  | op_char_234*  op_char_2 op_char_234*  as s
-      { OP2 s }
-  | op_char_34*   op_char_3 op_char_34*  as s
-      { OP3 s }
-  | op_char_4+ as s
-      { OP4 s }
+  | op1 as s                  { OP1 s }
+  | op2  as s                 { OP2 s }
+  | op3  as s                 { OP3 s }
+  | op4 as s                  { OP4 s }
 
   | eof { EOF }
 

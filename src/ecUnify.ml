@@ -175,3 +175,36 @@ let unify (env : EcEnv.env) (ue : unienv) =
 
   in
     unify
+
+(* -------------------------------------------------------------------- *)
+
+let filter_tvi = function 
+  | None -> fun _ -> true
+  | Some (UniEnv.TVIunamed l) -> 
+      let len = List.length l in
+      fun op -> List.length op.EcDecl.op_params = len
+  | Some (UniEnv.TVInamed ls) -> fun op ->
+      List.for_all 
+        (fun (s,_) -> 
+          List.exists (fun id -> EcIdent.name id = s) op.EcDecl.op_params) ls
+
+let tfun_expected ue psig = 
+  let tres = UniEnv.fresh_uid ue in
+  EcTypes.toarrow psig tres
+
+let select_op pred tvi env name ue psig = 
+  let fti = filter_tvi tvi in 
+  let fop op =
+    (pred || not (EcDecl.is_pred op)) && 
+    fti op in
+  let ops = EcEnv.Op.all fop name env in
+  let select (path, op) = 
+    let subue,(dom,codom),tys = 
+      UniEnv.freshensig ue op.EcDecl.op_params tvi (EcDecl.op_sig op) in
+    try 
+      let top = EcTypes.toarrow dom codom in
+      let texpected = tfun_expected subue psig in
+      unify env subue top texpected; 
+      Some ((path,tys), top, subue) 
+    with _ -> None in
+  List.pmap select ops

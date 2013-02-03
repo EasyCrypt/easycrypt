@@ -74,7 +74,9 @@
 %}
 
 %token <EcSymbols.symbol>  IDENT
+%token <EcSymbols.symbol>  PBINOP
 %token <EcSymbols.qsymbol> QIDENT
+%token <EcSymbols.qsymbol> QPBINOP
 
 %token <int> NUM
 %token <string> PRIM_IDENT
@@ -94,7 +96,6 @@
 %token AXIOM
 %token LEMMA
 %token PROOF
-%token BACKSLASH
 // %token BITSTR
 // %token CHECKPROOF
 %token CLAIM
@@ -263,6 +264,11 @@ qident:
 | x=loc(QIDENT) { x }
 ;
 
+qident_pbinop:
+| x=qident       { x }
+| x=loc(PBINOP)  { pqsymb_of_psymb x }
+| x=loc(QPBINOP) { x }
+
 (* -------------------------------------------------------------------- *)
 %inline ident_list1: aout=plist1(ident, COMMA) { aout };
 
@@ -316,7 +322,7 @@ sexp:
 | n=number
    { PEint n }
 
-| x=qident ti=tvars_app?
+| x=qident_pbinop ti=tvars_app?
    { PEident (x,ti) }
 
 | se=loc(sexp) op=loc(FROM_INT)
@@ -414,10 +420,6 @@ exp:
 | LBRACKET e1=loc(exp) op=loc(DOTDOT) e2=loc(exp) RBRACKET
     { let id = PEident(mk_loc op.pl_loc EcCoreLib.s_dinter, None) in
       PEapp(mk_loc op.pl_loc id, [e1; e2]) }
-
-| LPAREN re=loc(exp) op=loc(BACKSLASH) e=loc(exp) RPAREN
-    { let id = PEident(mk_loc op.pl_loc EcCoreLib.s_dexcepted,None) in
-      PEapp (mk_loc op.pl_loc id, [re; e]) }
 ;
 
 (* -------------------------------------------------------------------- *)
@@ -435,7 +437,7 @@ sform:
 | n=number
    { PFint n }
 
-| x=qident ti=tvars_app?
+| x=qident_pbinop ti=tvars_app?
    { PFident (x,ti) }
 
 | se=loc(sform) op=loc(FROM_INT)
@@ -785,7 +787,7 @@ op_sig:
 
 op_ident:
 | x=ident { x }
-| LBRACKET x=loc(binop) RBRACKET { x }
+| x=loc(PBINOP) { x }
 ;
 
 tyvars_decl:

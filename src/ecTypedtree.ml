@@ -129,16 +129,6 @@ let (i_inuse, s_inuse) =
 (* -------------------------------------------------------------------- *)
 module UE = EcUnify.UniEnv
 
-let filter_tvi = function 
-  | None -> fun _ -> true
-  | Some (UE.TVIunamed l) -> 
-      let len = List.length l in
-      fun op -> List.length op.op_params = len
-  | Some (UE.TVInamed ls) -> fun op ->
-      List.for_all 
-        (fun (s,_) -> 
-          List.exists (fun id -> EcIdent.name id = s) op.op_params) ls
-
 (* Politique de nomage :
    les variables locales masquent les autres noms cours.
 *)
@@ -147,10 +137,6 @@ let select_local env (qs,s) =
   if qs = [] then EcEnv.Var.trylookup_local s env 
   else None 
 
-let tfun_expected ue psig = 
-  let tres = UE.fresh_uid ue in
-  EcTypes.toarrow psig tres
-
 let select_pv env name ue tvi psig = 
   if tvi <> None then [] 
   else
@@ -158,27 +144,11 @@ let select_pv env name ue tvi psig =
     let select (pv,ty) = 
       try 
         let subue = UE.copy ue in
-        let texpected = tfun_expected subue psig in
+        let texpected = EcUnify.tfun_expected subue psig in
         EcUnify.unify env subue ty texpected;
         Some (pv, ty, subue)
       with _ -> None in
     List.pmap select pvs
-
-let select_op1 pred tvi env name ue psig = 
-  let fti = filter_tvi tvi in 
-  let fop op =
-    (pred || not (is_pred op)) && 
-    fti op in
-  let ops = EcEnv.Op.all fop name env in
-  let select (path, op) = 
-    let subue,(dom,codom),tys = UE.freshensig ue op.op_params tvi (op_sig op) in
-    try 
-      let top = EcTypes.toarrow dom codom in
-      let texpected = tfun_expected subue psig in
-      EcUnify.unify env subue top texpected; 
-      Some ((path,tys), top, subue) 
-    with _ -> None in
-  List.pmap select ops
 
 let gen_select_op pred tvi env name ue psig =
   match select_local env name with
@@ -187,7 +157,7 @@ let gen_select_op pred tvi env name ue psig =
       [ (e_local id, ty, ue) ]
   | None ->
       let pvs = select_pv env name ue tvi psig in
-      let ops = select_op1 pred tvi env name ue psig in
+      let ops = EcUnify.select_op pred tvi env name ue psig in
       List.map (fun (pv,ty,ue) -> e_var pv, ty, ue) pvs @ 
       List.map (fun ((op,tys), ty,ue) -> e_op op tys, ty, ue) ops
 
@@ -1004,7 +974,7 @@ module Fenv = struct
         [ (f_local id ty, ue) ]
     | None ->
         let pvs = select_pv (current_env fenv) name ue tvi psig in
-        let ops = select_op1 true tvi (mono fenv) name ue psig in
+        let ops = EcUnify.select_op true tvi (mono fenv) name ue psig in
         let side = fenv.fe_cur in
         List.map (fun (pv,ty,ue) -> f_pvar pv ty side, ue) pvs @ 
         List.map (fun ((op,tys), ty,ue) -> f_op op tys ty, ue) ops

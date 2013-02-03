@@ -34,3 +34,14 @@ module UniEnv : sig
 end
 
 val unify : EcEnv.env -> unienv -> ty -> ty -> unit
+
+val filter_tvi : UniEnv.tvi -> EcDecl.operator -> bool
+
+val tfun_expected : unienv -> EcTypes.dom -> EcTypes.ty
+
+val select_op : 
+           (* pred allowed *) bool ->
+           UniEnv.tvi -> EcEnv.env ->
+           EcSymbols.qsymbol -> unienv -> dom ->
+           ((EcPath.path * ty list) * ty * unienv) list
+

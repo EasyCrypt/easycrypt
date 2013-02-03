@@ -127,7 +127,8 @@ module type IIdentPrinter = sig
   val fun_symb   : t -> EcPath.path -> EcSymbols.qsymbol
   val mod_symb   : t -> EcPath.path -> EcSymbols.qsymbol
   val modty_symb : t -> EcPath.path -> EcSymbols.qsymbol
-  val op_symb    : t -> EcPath.path -> EcSymbols.qsymbol
+  val op_symb    : 
+      t -> EcPath.path -> ty list -> ty list option -> EcSymbols.qsymbol
   val ax_symb    : t -> EcPath.path -> EcSymbols.qsymbol
   val th_symb    : t -> EcPath.path -> EcSymbols.qsymbol
 end
@@ -155,7 +156,6 @@ let tk_lemma  = !^ "lemma"
 let tk_let    = !^ "let"
 let tk_module = !^ "module"
 let tk_op     = !^ "op"
-let tk_pop    = !^ "pop"
 let tk_pred   = !^ "pred"
 let tk_then   = !^ "then"
 let tk_theory = !^ "theory"
@@ -165,7 +165,12 @@ let tk_while  = !^ "while"
 let tk_with   = !^ "with"
 
 let tk_arrow  = !^ "->"
+let tk_larrow  = !^ "<-"
 let tk_dotdot = !^ ".."
+let tk_pipe   = !^ "|"
+let tk_dlbracket = !^ ".["
+let tk_lbracket = !^ "["
+let tk_rbracket = !^ "]"
 
 (* -------------------------------------------------------------------- *)
 module MakePP(M : IIdentPrinter) :
@@ -216,10 +221,6 @@ struct
     pr_qsymbol (M.modty_symb tenv p)
 
   (* ------------------------------------------------------------------ *)
-  let pr_op_name (tenv : t) (p : EcPath.path) =
-    pr_qsymbol (M.op_symb tenv p)
-
-  (* ------------------------------------------------------------------ *)
   let pr_ax_name (tenv : t) (p : EcPath.path) =
     pr_qsymbol (M.ax_symb tenv p)
 
@@ -264,7 +265,7 @@ struct
           end
       | Tfun(t1,t2) ->
           let doc = 
-            pr_type true t1 ^^ !^" ->" ^//^ pr_type false t2 in (* FIXME prio *)
+            pr_type true t1 ^^ tk_arrow ^//^ pr_type false t2 in (* FIXME prio *)
           if btuple then Pp.parens doc else doc
     in
       pr_type false ty
@@ -314,13 +315,18 @@ struct
 
   let e_uni_prio_not    =  26
   let e_uni_prio_uminus = 500
-
-  let e_prio_excpt = (1000, `Infix `NonAssoc)
+  let appprio           = (10000, `Infix `NonAssoc) (* ??? FIXME *)
+  let e_get_prio        = (20000, `Infix `Left)     (* ??? FIXME *)
 
   let min_op_prec = (-1     , `Infix `NonAssoc)
   let max_op_prec = (max_int, `Infix `NonAssoc)
 
   (* ------------------------------------------------------------------ *)
+  let is_ident_symbol name = 
+    match EcIo.lex_single_token name with
+    | Some EP.IDENT _ -> true
+    | _ -> false
+
   let priority_of_binop_name name =
     match EcIo.lex_single_token name with
     | Some EP.IMPL  -> Some e_bin_prio_impl
@@ -401,48 +407,89 @@ struct
     Pp.parens (pr_list ", " docs)
 
   (* ------------------------------------------------------------------ *)
-  let pr_app (tenv : t) pr_sub outer op _tys es =
-     (* FIXME : special notations, list ..., sampling {0,1} [k1..k2] .... *) 
-    let opname = EcIdent.name (EcPath.basename op) in
 
+  let pr_op_name_qs (qs,s) =
+    if is_ident_symbol s then pr_qsymbol (qs,s)
+    else match List.rev qs with
+    | [] -> !^"[" ^^ !^s ^^ !^"]"
+    | s'::tl ->
+        let qs' = List.rev tl in
+        pr_qsymbol (qs',s') ^^ !^".[" ^^ !^ s ^^ !^"]"
+
+  let pr_op_name (tenv : t) (p : EcPath.path) tvi esig =
+    pr_op_name_qs (M.op_symb tenv p tvi esig)
+
+  let pr_app get_ty (tenv : t) pr_sub outer op tvi es =
+     (* FIXME : special notations, list ..., sampling {0,1} [k1..k2] ....
+     *)
+
+    let esig = try Some (List.map get_ty es) with _ -> None in
+
+    let qs,opname = M.op_symb tenv op tvi esig in
+    
     let pr_as_std_op () =
-      match es with
-      | [] -> pr_op_name tenv op
-      | _  ->
-          let docs = List.map (pr_sub tenv (min_op_prec, `NonAssoc)) es in
-(*          let dtys = List.map (fun ty -> pr_type tenv ty) tys in *)
-          (pr_op_name tenv op) ^^
-(*          !^"<:" ^^ pr_list "," dtys ^^ !^">" ^^ *)
-          pr_seq [Pp.parens (pr_list "," docs)]
+      let docs,prio = 
+        (* FIXME *)
+        if qs = [] then
+          match opname, es with
+          | "__nil", [] -> [tk_lbracket ^^ tk_rbracket], max_op_prec
+          | "__abs", [e] -> 
+              [ tk_pipe; pr_sub tenv  (min_op_prec, `NonAssoc) e; tk_pipe ],
+              appprio 
+          | "__get", [e1;e2] ->
+             [ pr_sub tenv (e_get_prio, `Left) e1 ^^
+               tk_dlbracket ^^
+               pr_sub tenv (min_op_prec, `NonAssoc) e2 ^^
+               tk_rbracket ], 
+              e_get_prio
+          | "__set", [e1;e2;e3] ->
+              [ pr_sub tenv (e_get_prio, `Left) e1 ^^
+                tk_dlbracket ^^
+                pr_sub tenv (min_op_prec, `NonAssoc) e2;
+                tk_larrow;
+                pr_sub tenv (min_op_prec, `NonAssoc) e3 ^^
+                tk_rbracket ], 
+              e_get_prio
+          | _ ->
+              pr_op_name_qs (qs,opname) :: 
+              List.map (pr_sub tenv (appprio, `Right)) es, 
+              appprio
+        else 
+          pr_op_name_qs (qs,opname) :: 
+          List.map (pr_sub tenv (appprio, `Right)) es, appprio in
+      bracket outer prio (pr_seq docs) in
 
-    and try_pr_as_uniop () =
-      match es with
-      | [e] ->
-          begin match priority_of_uniop opname with
-          | None -> None
-          | Some opprio  ->
-              let opprio = (opprio, `Prefix) in
-              let doc =
-                (pr_op_name tenv op) ^^ (pr_sub tenv (opprio, `NonAssoc) e)
-              in
+
+    let try_pr_as_uniop () =
+      if qs = [] then
+        match es with
+        | [e] ->
+            begin match priority_of_uniop opname with
+            | None -> None
+            | Some opprio  ->
+                let opprio = (opprio, `Prefix) in
+                let doc =
+                  !^ opname ^^ (pr_sub tenv (opprio, `NonAssoc) e)
+                in
                 Some (bracket outer opprio doc)
-          end
-
-      | _ -> None
+            end
+        | _ -> None
+      else None
 
     and try_pr_as_binop () =
-      match es with
-      | [e1; e2] ->
-          begin match priority_of_binop_name opname with
-          | None -> None
-          | Some opprio ->
-              let d1  = pr_sub tenv (opprio, `Left ) e1 in
-              let d2  = pr_sub tenv (opprio, `Right) e2 in
-              let doc = pr_seq [d1; pr_op_name tenv op; d2] in
+      if qs = [] then
+        match es with
+        | [e1; e2] ->
+            begin match priority_of_binop_name opname with
+            | None -> None
+            | Some opprio ->
+                let d1  = pr_sub tenv (opprio, `Left ) e1 in
+                let d2  = pr_sub tenv (opprio, `Right) e2 in
+                let doc = pr_seq [d1; !^ opname ; d2] in
                 Some (bracket outer opprio doc)
-          end
-
-      | _ -> None
+            end
+        | _ -> None
+      else None
 
     in
       ofdfl pr_as_std_op
@@ -458,8 +505,8 @@ struct
         | Elocal x ->
             pr_local_symb tenv x
 
-        | Eop(op,_tys) -> (* FIXME infix, prefix, ty_inst *)
-            pr_op_name tenv op
+        | Eop(op,tys) -> (* FIXME infix, prefix, ty_inst *)
+            pr_op_name tenv op tys (Some [])
 
         | Eint i ->
             Pp.ML.int i
@@ -471,7 +518,7 @@ struct
             pr_tuple_expr tenv pr_expr es
 
         | Eapp({tye_desc = Eop(op,tys) }, args) -> 
-            pr_app tenv pr_expr outer op tys args
+            pr_app e_ty tenv pr_expr outer op tys args
 
         | Eapp (e, args) -> 
             let docs = List.map (pr_expr tenv (min_op_prec, `NonAssoc)) args in
@@ -514,11 +561,11 @@ struct
       | Flet (lp, f1, f2) ->
           pr_let tenv pr_form outer lp f1 f2
 
-      | Fop(op,_tys) -> (* FIXME infix, prefix, ty_inst *)
-            pr_op_name tenv op
+      | Fop(op,tvi) -> (* FIXME infix, prefix, ty_inst *)
+            pr_op_name tenv op tvi (Some [])
 
       | Fapp ({f_node = Fop(p,tys)}, args) ->
-          pr_app tenv pr_form outer p tys args
+          pr_app EcFol.ty tenv pr_form outer p tys args
 
       | Fapp (e,args) ->
           let docs = List.map (pr_form tenv (min_op_prec, `NonAssoc)) args in
@@ -900,7 +947,7 @@ struct
   let fun_symb   = fun (_ : t) (p : EcPath.path)   -> symb_of_path p
   let mod_symb   = fun (_ : t) (p : EcPath.path)   -> symb_of_path p
   let modty_symb = fun (_ : t) (p : EcPath.path)   -> symb_of_path p
-  let op_symb    = fun (_ : t) (p : EcPath.path)   -> symb_of_path p
+  let op_symb    = fun (_ : t) (p : EcPath.path) _ _  -> symb_of_path p
   let ax_symb    = fun (_ : t) (p : EcPath.path)   -> symb_of_path p
   let th_symb    = fun (_ : t) (p : EcPath.path)   -> symb_of_path p
 end
@@ -938,7 +985,7 @@ struct
   let fun_symb   = fun (_ : t) (p : EcPath.path)   -> symb_of_path p
   let mod_symb   = fun (_ : t) (p : EcPath.path)   -> symb_of_path p
   let modty_symb = fun (_ : t) (p : EcPath.path)   -> symb_of_path p
-  let op_symb    = fun (_ : t) (p : EcPath.path)   -> symb_of_path p
+  let op_symb    = fun (_ : t) (p : EcPath.path) _ _ -> symb_of_path p
   let ax_symb    = fun (_ : t) (p : EcPath.path)   -> symb_of_path p
   let th_symb    = fun (_ : t) (p : EcPath.path)   -> symb_of_path p
 end
@@ -997,27 +1044,16 @@ module ShortIdentPrinter : IIdentPrinter = struct
   let add_ax    = add Ax.add
   let add_th    = add Theory.add
 
-(*  let print_path p = 
-    let l = EcPath.tolist p in
-    let rec aux l = 
-      match l with
-      | [] -> assert false
-      | [id] -> Format.printf "%s" (EcIdent.name id)
-      | id::l -> Format.printf "%s." (EcIdent.name id); aux l in
-    aux l; Format.printf "@." *)
-    
   let shorten_path lookup p env = 
-(*    Format.printf "shorthen_path "; print_path p; *)
-    let rec aux par rs s = 
+    let rec aux par qs s = 
       try
-        let qs = List.rev rs in 
         let p' = lookup (qs,s) env in
         if not (EcPath.p_equal p p') then raise Not_found; 
         (qs,s)
       with _ -> 
         match par with 
-        | [] -> (List.rev rs, s) (* assert false *) (* FIXME *)
-        | s'::par -> aux par (s'::rs) s in
+        | [] -> assert false
+        | s'::par -> aux par (s'::qs) s in
     let qs, s = EcPath.toqsymbol p in
     aux (List.rev qs) [] s 
     
@@ -1046,8 +1082,17 @@ module ShortIdentPrinter : IIdentPrinter = struct
   let modty_symb t p = 
     shorten_path ModTy.lookup_path p t.tenv_logic
 
-  let op_symb t p = 
-    shorten_path Op.lookup_path p t.tenv_logic 
+  let op_symb t p _tvi psig = 
+    let lookup = 
+      match psig with 
+      | None -> Op.lookup_path 
+      | Some psig -> 
+          fun qs env ->
+            let ue = EcUnify.UniEnv.create None in
+            match EcUnify.select_op true None env qs ue psig with
+            | [ (p,_), _, _ ] -> p
+            | _ -> raise Not_found in
+    shorten_path lookup p t.tenv_logic 
 
   let ax_symb t p = 
     shorten_path Ax.lookup_path p t.tenv_logic 
