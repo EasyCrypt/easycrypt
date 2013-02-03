@@ -3,7 +3,7 @@ module M1 = {
 }.
 
 module M2 = {
-  fun upd_x (y:int) : unit = {
+  fun update_M1_x (y:int) : unit = {
     M1.x = y;
   }
 }.

@@ -214,8 +214,28 @@ module MC = struct
     let x = EcPath.basename path in
       { mc with mc_components = IM.add x () mc.mc_components }
 
-  let rec mc_of_module (_env : env) (_ : module_expr) =
-    emcomponents                        (* FIXME *)
+  let mc_of_module (env : env) (me : module_expr) =
+    let xpath =
+      let scope = EcPath.Pqname (env.env_scope, me.me_name) in
+        fun x -> EcPath.Pqname (scope, x)
+    in
+
+    let mc1_of_module (mc : premc) = function
+      | MI_Module _me ->
+          mc                            (* FIXME *)
+
+      | MI_Variable v ->
+          let vty = {
+            vb_type = v.v_type;
+            vb_kind = Some PVglob;
+          }
+          in
+            mc_bind_variable (xpath v.v_name) vty mc
+
+      | MI_Function _f ->
+          mc                            (* FIXME *)
+    in
+      List.fold_left mc1_of_module emcomponents me.me_comps
 
   (* ------------------------------------------------------------------ *)
   let bind env binder name obj =

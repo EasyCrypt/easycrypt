@@ -833,7 +833,7 @@ and transstruct (env : EcEnv.env) (x : EcIdent.t) (st : pstructure) =
     { me_name  = x;
       me_body  = ME_Structure { ms_params = stparams;
                                 ms_body   = List.map snd items; };
-      me_comps = [];                    (* FIXME *)
+      me_comps = List.map snd items;
       me_uses  = Sp.empty;              (* FIXME *)
       me_sig   = tymod;
       me_types = types; }
