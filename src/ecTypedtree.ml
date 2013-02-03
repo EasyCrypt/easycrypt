@@ -810,9 +810,9 @@ and transstruct (env : EcEnv.env) (x : EcIdent.t) (st : pstructure) =
 (* -------------------------------------------------------------------- *)
 and transstruct1 (env : EcEnv.env) (st : pstructure_item) =
   match st with
-  | Pst_mod ({ pl_desc = m }, me, _mi) ->
+  | Pst_mod ({ pl_desc = m }, me) ->
       let m  = EcIdent.create m in
-      let me = transmod env m me in     (* FIXME: module interface *)
+      let me = transmod env m me in
         [(m, MI_Module me)]
 
   | Pst_var (xs, ty) ->

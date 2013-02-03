@@ -74,9 +74,8 @@ type tvar_inst_kind =
   | TVInamed  of (psymbol * pty) list
 
 type tvar_inst = tvar_inst_kind option
-    
 
-type pexpr  = pexpr_r  located          (* located expression *)
+type pexpr  = pexpr_r located  (* located expression *)
 
 and pexpr_r =
   | PEint      of int                               (* int. literal       *)
@@ -144,12 +143,12 @@ and pmodule_expr =
 
 and pstructure = {
   ps_params    : (psymbol * pmodule_type) list;
-  ps_signature : pmodule_type option;
+  ps_signature : pmodule_type list;
   ps_body      : pstructure_item list;
 }
 
 and pstructure_item =
-  | Pst_mod   of (psymbol * pmodule_expr * pmodule_type option)
+  | Pst_mod   of (psymbol * pmodule_expr)
   | Pst_var   of (psymbol list * pty)
   | Pst_fun   of (pfunction_decl * pfunction_body)
   | Pst_alias of (psymbol * pqsymbol)
@@ -316,7 +315,7 @@ and theory_override =
 
 (* -------------------------------------------------------------------- *)
 type global =
-  | Gmodule    of (psymbol * pmodule_expr * pmodule_type option)
+  | Gmodule    of (psymbol * pmodule_expr)
   | Ginterface of (psymbol * pmodule_sig)
   | Goperator  of poperator
   | Gpredicate of ppredicate

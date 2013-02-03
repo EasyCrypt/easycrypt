@@ -44,8 +44,9 @@ let _ = dispatch begin function
        (* ocaml / link / ocamlfind *)
        flag ["ocaml"; "link"] & A"-linkpkg";
 
-       (* menhir & --explain *)
+       (* menhir & --explain/--trace *)
        flag ["ocaml"; "parser"; "menhir"; "menhir_explain"] & A"--explain";
+       flag ["ocaml"; "parser"; "menhir"; "menhir_trace"  ] & A"--trace";
 
        (* pkg_* switches *)
        List.iter begin fun pkg ->

@@ -15,9 +15,9 @@
   let pqsymb_of_symb loc x : pqsymbol =
     mk_loc loc ([], x)
 
-  let mk_mod ?modtype params body = Pm_struct {
+  let mk_mod ?(modtypes = []) params body = Pm_struct {
     ps_params    = params;
-    ps_signature = modtype;
+    ps_signature = modtypes;
     ps_body      = body;
   }
 
@@ -675,7 +675,7 @@ mod_item:
     { Pst_var v }
 
 | m=mod_def
-    { let (x, m, i) = m in Pst_mod (x, m, i) }
+    { let (x, m) = m in Pst_mod (x, m) }
 
 | FUN decl=fun_decl EQ body=fun_def_body
     { Pst_fun (decl, body) }
@@ -693,20 +693,20 @@ mod_body:
 
 mod_def:
 | MODULE x=ident t=mod_ty? EQ body=mod_body
-    { (x, mk_mod [] body, t) }
-
-| MODULE x=ident t=mod_ty? EQ m=qident
-    { (x, Pm_ident (m, []), t) }
-
-| MODULE x=ident t=mod_ty? EQ m=qident LPAREN a=plist1(qident, COMMA) RPAREN
-    { (x, Pm_ident (m, a), t) }
+    { (x, mk_mod ?modtypes:t [] body) }
 
 | MODULE x=ident LPAREN a=plist1(sig_param, COMMA) RPAREN t=mod_ty? EQ body=mod_body
-    { (x, mk_mod a body, t) }
+    { (x, mk_mod ?modtypes:t a body) }
+
+| MODULE x=ident EQ m=qident
+    { (x, Pm_ident (m, [])) }
+
+| MODULE x=ident EQ m=qident LPAREN a=plist1(qident, COMMA) RPAREN
+    { (x, Pm_ident (m, a)) }
 ;
 
 mod_ty:
-| COLON t=mod_intf { t }
+| COLON t=plist1(mod_intf, COMMA) { t }
 ;
 
 mod_intf:
@@ -718,12 +718,24 @@ mod_intf:
 (* Modules interfaces                                                   *)
 
 sig_def:
-| MODULE TYPE x=ident args=sig_params? EQ i=sig_struct_body
-    { (x, Pmty_struct { pmsig_params = EcUtils.odfl [] args;
-                        pmsig_body   = i; }) }
+| MODULE TYPE x=ident args=sig_params? EQ i=sig_body
+    {
+      let args = EcUtils.odfl [] args in
+        match i with
+        | `Alias  i ->
+            if args <> [] then
+              error (Location.make $startpos $endpos) 
+                "cannot parameterized module type aliase";
+            (x, Pmty_alias i)
+        | `Struct i ->
+            (x, Pmty_struct { pmsig_params = args;
+                              pmsig_body   = i; })
+    }
+;
 
-| MODULE TYPE x=ident EQ i=sig_type
-    { (x, Pmty_alias i) }
+sig_body:
+| body=sig_struct_body { `Struct body }
+| alias=sig_type { `Alias alias}
 ;
 
 sig_struct_body:

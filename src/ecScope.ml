@@ -288,9 +288,9 @@ module Mod = struct
         sc_modules = Context.bind (EcIdent.name m.me_name) m scope.sc_modules;
         sc_env     = EcEnv.Mod.bind m.me_name m scope.sc_env; }
 
-  let add (scope : scope) (name : symbol) m _mi =
+  let add (scope : scope) (name : symbol) m =
     let name = EcIdent.create name in
-    let m    = EcTypedtree.transmod scope.sc_env name m in (* FIXME: check sig *)
+    let m = EcTypedtree.transmod scope.sc_env name m in
       bind scope m
 end
 

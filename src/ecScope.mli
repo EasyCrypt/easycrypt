@@ -67,12 +67,11 @@ module Ty : sig
 end
 
 module Mod : sig
-  (* [add scope x m i] check the module [m] with optional interface
-   * [i] and add it to the scope [scope] with name [x]. Can raise any
-   * exception triggered by the type-checker or
-   * [DuplicatedNameInContext] in case a module with name [x] already
-   * exists *)
-  val add : scope -> symbol -> pmodule_expr -> pmodule_type option -> scope
+  (* [add scope x m i] check the module [m] and add it to the scope
+   * [scope] with name [x]. Can raise any exception triggered by the
+   * type-checker or [DuplicatedNameInContext] in case a module with
+   * name [x] already exists *)
+  val add : scope -> symbol -> pmodule_expr -> scope
 end
 
 module ModType : sig

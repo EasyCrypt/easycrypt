@@ -56,8 +56,8 @@ let rec process_type (scope : EcScope.scope) (tyd : ptydecl) =
     scope
   
 (* -------------------------------------------------------------------- *)
-and process_module (scope : EcScope.scope) (x, m, i) =
-  EcScope.Mod.add scope x.pl_desc m i
+and process_module (scope : EcScope.scope) (x, m) =
+  EcScope.Mod.add scope x.pl_desc m
 
 (* -------------------------------------------------------------------- *)
 and process_interface (scope : EcScope.scope) (x, i) =
