@@ -1,0 +1,38 @@
+Makefile
+MANIFEST
+
+# ocamlbuild configuration
+config/_tags
+config/myocamlbuild.ml
+
+# pprint library
+pprint/*.ml
+pprint/*.mli
+pprint/README
+pprint/LICENSE
+
+# proofgeneral
+proofgeneral/Makefile
+proofgeneral/proofsite.patch
+proofgeneral/easycrypt/*.el
+
+# EasyCrypt sources
+src/*.ml
+src/*.mli
+src/*.mly
+src/*.mll
+
+# EasyCrypt theories
+theories/*.ec
+
+# EasyCrypt tests files
+tests/*.ec
+tests/typing/success/*.ec
+tests/typing/fail/*.ec
+tests/modules/success/*.ec
+tests/nodules/fail/*.ec
+
+# Build scripts
+scripts/runtest.py
+scripts/distribution.py
+scripts/keywords.py

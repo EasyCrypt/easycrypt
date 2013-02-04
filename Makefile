@@ -21,9 +21,11 @@ CHECK = \
 	  --ko-dir=tests/modules/fail
 
 XUNITOUT ?= xunit.xml
+VERSION  ?= $(shell date '+%F')
+DISTDIR   = easycrypt-$(VERSION)
 
 # --------------------------------------------------------------------
-.PHONY: all build byte native check check-xunit clean tags
+.PHONY: all build byte native check check-xunit clean tags dist
 .PHONY: %.ml
 
 all: build
@@ -48,6 +50,12 @@ clean:
 
 tags:
 	set -e; for i in $(CONFIG); do [ -e "$$i" ] || ln -s config/"$$i" $$i; done
+
+dist:
+	if [ -e $(DISTDIR) ]; then rm -rf $(DISTDIR); fi
+	./scripts/distribution.py $(DISTDIR) MANIFEST
+	BZIP2=-9 tar -cjf $(DISTDIR).tar.bz2 --owner=0 --group=0 $(DISTDIR)
+	rm -rf $(DISTDIR)
 
 # --------------------------------------------------------------------
 %.ml:
