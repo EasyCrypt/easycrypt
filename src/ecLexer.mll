@@ -114,18 +114,15 @@ let qident = (ident '.')+ ident
 
 let qident_binop = (ident '.')+ pbinop
 
-
-
-
 (* -------------------------------------------------------------------- *)
 rule main = parse
-  | newline                   { Lexing.new_line lexbuf; main lexbuf }
-  | blank+                    { main lexbuf }
-  | ident as id               { try Hashtbl.find keywords id with Not_found -> IDENT id }
-  | prim_ident                { PRIM_IDENT (Lexing.lexeme lexbuf)}
-  | number                    { NUM (int_of_string (Lexing.lexeme lexbuf)) }
-  | "(*"                      { comment lexbuf; main lexbuf }
-  | "\""                      { STRING (Buffer.contents (string (Buffer.create 0) lexbuf)) }
+  | newline      { Lexing.new_line lexbuf; main lexbuf }
+  | blank+       { main lexbuf }
+  | ident as id  { try Hashtbl.find keywords id with Not_found -> IDENT id }
+  | prim_ident   { PRIM_IDENT (Lexing.lexeme lexbuf)}
+  | number       { NUM (int_of_string (Lexing.lexeme lexbuf)) }
+  | "(*"         { comment lexbuf; main lexbuf }
+  | "\""         { STRING (Buffer.contents (string (Buffer.create 0) lexbuf)) }
 
   | qident as id {
       let path = List.rev (String.split '.' id) in
@@ -133,13 +130,15 @@ rule main = parse
       let s = List.hd path in
       QIDENT (qs, s)
     }
+
   | qident_binop as id { 
       let path = List.rev (String.split '.' id) in
       let qs = List.rev (List.tl path) in
       let s = List.hd path in
       let s = remove_bracket s in
       QPBINOP (qs, s)
-}
+    }
+
   | pbinop as s { PBINOP (remove_bracket s) }
 
   (* boolean operators *)
