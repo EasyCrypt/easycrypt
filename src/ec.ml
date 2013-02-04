@@ -8,16 +8,19 @@ let _ =
   EcPexception.set_default Why3.Exn_printer.exn_printer 
 
 (* -------------------------------------------------------------------- *)
-module Emacs : sig
+module type InteractiveIO = sig
   val prompt  : int -> unit
   val success : EcCommands.info list -> unit
   val error   : exn -> unit
-end = struct
+end
+
+(* -------------------------------------------------------------------- *)
+module Emacs : InteractiveIO = struct
   let prompt (uuid : int) =
     Printf.printf "[%d]>\n%!" uuid
 
   let success (_ : EcCommands.info list) =
-    ()
+    Printf.printf "FIXME: (success) Reassociate B's printing functions\n%!"
 
   let error (e : exn) =
     match e with
@@ -30,8 +33,24 @@ end = struct
       EcFormat.pp_err EcPexception.exn_printer e;
 end
 
-let if_emacs (doit : unit -> unit) =
-  if !options.o_emacs then doit ()
+(* -------------------------------------------------------------------- *)
+module CLI : InteractiveIO = struct
+  let prompt (_ : int) =
+    Printf.printf "> %!"
+
+  let success (_ : EcCommands.info list) =
+    Printf.printf "FIXME: (success) Reassociate B's printing functions\n%!"
+
+  let error (e : exn) =
+    match e with
+    | EcTypedtree.TyError (loc, exn) ->
+        EcFormat.pp_err
+          (EcPrinting.pp_located loc EcPexception.pp_typerror)
+          exn;
+
+    | e ->
+      EcFormat.pp_err EcPexception.exn_printer e;
+end
 
 (* -------------------------------------------------------------------- *)
 let _ =
@@ -42,13 +61,21 @@ let _ =
       EcCommands.addidir (Filename.dirname input));
   List.iter EcCommands.addidir !options.o_idirs;
 
+  let io =
+    match !options.o_emacs with
+    | false -> (module CLI   : InteractiveIO)
+    | true  -> (module Emacs : InteractiveIO)
+  in
+
+  let module IO = (val io : InteractiveIO) in
+
   let iparser =
     match !EcOptions.options.o_input with
     | None   -> EcIo.from_channel ~name:"<stdin>" stdin
     | Some f -> EcIo.from_file f
   in
     while true do
-      if_emacs (fun () -> Emacs.prompt (EcCommands.uuid ()));
+      IO.prompt (EcCommands.uuid ());
       try
         match EcIo.parse iparser with
         | EcParsetree.P_Prog (commands, terminate) ->
@@ -56,12 +83,12 @@ let _ =
               List.flatten (List.map EcCommands.process commands)
             in
               if terminate then exit 0;
-              if_emacs (fun () -> Emacs.success infos)
+              IO.success infos
 
         | EcParsetree.P_Undo i ->
             EcCommands.undo i
       with e ->
-        if_emacs (fun () -> Emacs.error e)
+        IO.error e
     done
 
 (*
