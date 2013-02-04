@@ -22,7 +22,7 @@ let parserfun = fun () ->
     MenhirLib.Convert.Simplified.traditional2revised EcParser.prog
 
 type parser_t =
-  (EcParser.token * Lexing.position * Lexing.position, EcParsetree.prog * bool)
+  (EcParser.token * Lexing.position * Lexing.position, EcParsetree.prog)
     MenhirLib.Convert.revised
 
 (* -------------------------------------------------------------------- *)
@@ -76,9 +76,12 @@ let parse (ecreader : ecreader) =
 (* -------------------------------------------------------------------- *)
 let parseall (ecreader : ecreader) =
   let rec aux acc =
-    let commands, terminate = parse ecreader in
-    let acc = List.rev_append commands acc in
-      if terminate then List.rev acc else aux acc
+    match parse ecreader with
+    | EcParsetree.P_Prog (commands, terminate) ->
+        let acc = List.rev_append commands acc in
+          if terminate then List.rev acc else aux acc
+    | EcParsetree.P_Undo _ ->
+        assert false                    (* FIXME *)
   in
     aux []
 

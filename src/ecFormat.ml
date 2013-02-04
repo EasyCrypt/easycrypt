@@ -7,7 +7,7 @@ type 'a pp = formatter -> 'a -> unit
 
 (* -------------------------------------------------------------------- *)
 let pp_err pp_elt x =
-  Format.fprintf Format.err_formatter "@[%a@]@." pp_elt x
+  Format.fprintf Format.err_formatter "@[[error]%a@]@." pp_elt x
 
 (* -------------------------------------------------------------------- *)
 let pp_void (fmt : formatter) (_ : 'a) =

@@ -217,7 +217,7 @@
 // %token TIMEOUT
 // %token TRANSPARENT
 // %token TRY
-// %token UNDO
+%token UNDO
 // %token UNFOLD
 // %token UNROLL
 // %token WP
@@ -249,7 +249,7 @@
 %nonassoc above_OP
 
 %type <EcParsetree.global> global
-%type <EcParsetree.prog * bool> prog
+%type <EcParsetree.prog> prog
 
 %start prog global
 %%
@@ -1109,9 +1109,14 @@ global:
 ;
 
 prog:
-| g=global { ([g], false) }
-| stop     { ([ ], true ) }
-| error    { error (Location.make $startpos $endpos) "Parsing error" }
+| g=global { P_Prog ([g], false) }
+| stop     { P_Prog ([ ], true ) }
+
+| UNDO d=number DOT
+   { P_Undo d }
+
+| error
+   { error (Location.make $startpos $endpos) "Parsing error" }
 ;
 
 (* -------------------------------------------------------------------- *)

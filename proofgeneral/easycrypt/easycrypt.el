@@ -41,7 +41,6 @@
   ;; For undo
   (setq  proof-find-and-forget-fn              'easycrypt-find-and-forget
          proof-completed-proof-behaviour       nil)
-         ;proof-kill-goal-command               "abort;;")
 
   (set (make-local-variable 'comment-quote-nested) nil)
 
@@ -85,26 +84,23 @@
   (setq  proof-script-font-lock-keywords
          easycrypt-font-lock-keywords))
 
-
 (defun easycrypt-shell-config ()
   "Configure Proof General shell for EasyCrypt."
   (easycrypt-init-output-syntax-table)
   (setq  proof-shell-auto-terminate-commands     easycrypt-terminal-string)
   (setq  proof-shell-eager-annotation-start      "^\\[info\\]")
   (setq  proof-shell-strip-crs-from-input        nil)
-  (setq  proof-shell-annotated-prompt-regexp     "^\\[[0-9]+|[0-9]+|[TF]|[0-9]+|[0-9]+\\]>")
+  (setq  proof-shell-annotated-prompt-regexp     "^\\[[0-9]+\\]>")
   (setq  proof-shell-clear-goals-regexp
          easycrypt-shell-proof-completed-regexp)
   (setq  proof-shell-proof-completed-regexp 
          easycrypt-shell-proof-completed-regexp)
   (setq  proof-shell-error-regexp  easycrypt-error-regexp)
   (setq  proof-shell-truncate-before-error nil)
-  (setq  proof-shell-quit-cmd                    "Drop;; \n quit();;")
   (setq  proof-shell-start-goals-regexp          "^Current")
   (setq  proof-shell-end-goals-regexp nil)  ; up to next prompt
   (setq  proof-shell-font-lock-keywords 
          easycrypt-font-lock-keywords))
-
 
 ;;
 ;; ======== Defining the derived modes ========

@@ -1,0 +1,10 @@
+--- proof-site.el.orig	2013-02-04 18:15:23.106938670 +0100
++++ proof-site.el	2013-02-04 16:26:28.343173288 +0100
+@@ -36,6 +36,7 @@
+     '((isar "Isabelle" "thy")
+       (coq "Coq" "v" nil (".vo" ".glob"))
+       (phox "PhoX" "phx")
++      (easycrypt "EasyCrypt" "ec")
+ 
+       ;; Obscure/conflict with other useful modes:
+ 

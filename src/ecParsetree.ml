@@ -331,6 +331,8 @@ type global =
   | GthClone   of theory_cloning
   | GthW3      of (string list * string * w3_renaming list)
   | Gtactics   of ptactics
-  | Gsave      
+  | Gsave
 
-type prog = global list
+type prog =
+  | P_Prog of global list * bool
+  | P_Undo of int
