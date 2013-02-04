@@ -31,18 +31,24 @@
   <script src="codemirror/lib/codemirror.js" type="text/javascript"></script>
   <script src="codemirror/mode/easycrypt/easycrypt.js" type="text/javascript"></script>
   <script src="codemirror/addon/edit/matchbrackets.js" type="text/javascript"></script>
+  <script src="codemirror/addon/edit/foldcode.js" type="text/javascript"></script>
 
-  <script type="text/javascript">
+ <script type="text/javascript">
   $(document).ready(function() {
+    var foldFunc = CodeMirror.newFoldFunction(CodeMirror.braceRangeFinder);
     var options = {
-               mode: "easycrypt",
+               mode: "text/x-easycrypt",
         lineNumbers: true,
          indentUnit: 4,
             tabMode: "shift",
       matchBrackets: true,
+       lineWrapping: true,
+          extraKeys: {"Ctrl-Q": function(cm){foldFunc(cm, cm.getCursor().line);}}
     };
-    CodeMirror.fromTextArea($("#code")[0], options);
+    window.editor = CodeMirror.fromTextArea($("#code")[0], options);
     $("#code").focus();
+    editor.on("gutterClick", foldFunc);
+  foldFunc(editor, 9);
   });
   </script>
 </head>
@@ -51,9 +57,20 @@
 
   <div id="contents">
     <textarea id="code" name="code">
-theory T.
-  type t = int.
-end T.</textarea>
+theory group. 
+  type t.
+  op neutral : t.
+  op law(x:t, y:t):t.
+  
+  axiom NeutralLeft:
+	forall (n:t), law(x,neutral) = x. {
+        (*....*)
+        (*...(*...*)...*)
+        (*...(*..(*..*)..*)...*)
+    }
+  module m. 
+end group.</textarea>
   </div>
+
 </body>
 </html>
