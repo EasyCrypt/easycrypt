@@ -2,11 +2,9 @@
 type options = {
   o_input : string option;
   o_idirs : string list;
+  o_emacs : bool;
 }
 
 (* -------------------------------------------------------------------- *)
-val initial  : options
-val add_idir : options -> string -> options
-
-(* -------------------------------------------------------------------- *)
-val parse : unit -> options
+val parse   : unit -> options
+val options : options ref

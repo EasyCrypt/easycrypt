@@ -2,30 +2,34 @@
 type options = {
   o_input : string option;
   o_idirs : string list;
+  o_emacs : bool;
 }
 
 (* -------------------------------------------------------------------- *)
-let initial = {
+let options = ref {
   o_input = None;
   o_idirs = [];
+  o_emacs = false;
 }
-
-(* -------------------------------------------------------------------- *)
-let add_idir (options : options) (idir : string) =
-  { options with o_idirs = idir :: options.o_idirs }
 
 (* -------------------------------------------------------------------- *)
 let specs () =
-  let options = ref initial in
-  let specs   =
-    let add_idir  idir  = options := add_idir !options idir in
-      [ "-I", Arg.String add_idir, "Add <dir> to the list of include directories" ]
-  and set_input input =
-    options := { !options with o_input = Some input }
-  in
+  let idirs = ref []
+  and input = ref None
+  and emacs = ref false in
 
+  let add_idir  x = idirs := x :: !idirs
+  and set_input x = input := Some x in
+
+  let specs =
+      [ "-I"    , Arg.String add_idir, "Add <dir> to the list of include directories";
+        "-emacs", Arg.Set    emacs   , "Output format set to <emacs>"; ]
+  in
     fun () ->
-      Arg.parse specs set_input ""; !options
+      Arg.parse specs set_input "";
+      { o_input = !input;
+        o_idirs = List.rev !idirs;
+        o_emacs = !emacs; }
 
 (* -------------------------------------------------------------------- *)
 let parse = specs ()
