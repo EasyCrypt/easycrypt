@@ -25,7 +25,7 @@ VERSION  ?= $(shell date '+%F')
 DISTDIR   = easycrypt-$(VERSION)
 
 # --------------------------------------------------------------------
-.PHONY: all build byte native check check-xunit clean tags dist
+.PHONY: all build byte native check check-xunit clean tags dist dist-check
 .PHONY: %.ml
 
 all: build
@@ -55,6 +55,12 @@ dist:
 	if [ -e $(DISTDIR) ]; then rm -rf $(DISTDIR); fi
 	./scripts/distribution.py $(DISTDIR) MANIFEST
 	BZIP2=-9 tar -cjf $(DISTDIR).tar.bz2 --owner=0 --group=0 $(DISTDIR)
+	rm -rf $(DISTDIR)
+
+dist-check: dist
+	tar -xof $(DISTDIR).tar.bz2
+	$(MAKE) -C $(DISTDIR)
+	$(MAKE) -C $(DISTDIR) dist
 	rm -rf $(DISTDIR)
 
 # --------------------------------------------------------------------
