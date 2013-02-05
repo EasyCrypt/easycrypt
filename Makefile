@@ -58,7 +58,7 @@ uninstall:
 	-@rmdir $(DESTDIR)$(PREFIX)/lib/easycrypt/theories
 	-@rmdir $(DESTDIR)$(PREFIX)/lib/easycrypt
 
-check: byte
+check: ec.native
 	$(CHECK)
 
 check-xunit: ec.native
