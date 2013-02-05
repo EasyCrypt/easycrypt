@@ -8,13 +8,59 @@ open EcDecl
 open EcFol
 open EcTypesmod
 
-let config : Whyconf.config = Whyconf.read_config None
+module Config : sig
+  type prover =
+    string * Why3.Whyconf.config_prover * Why3.Driver.driver
 
-let main : Whyconf.main = Whyconf.get_main config
+  val load    : string option -> unit
+  val config  : unit -> Whyconf.config
+  val main    : unit -> Whyconf.main
+  val w3_env  : unit -> Env.env
+  val provers : unit -> prover list
+end = struct
+  type prover =
+    string * Why3.Whyconf.config_prover * Why3.Driver.driver
 
-let w3_env : Env.env = Env.create_env (Whyconf.loadpath main)
+  let theconfig  : (Whyconf.config option) ref = ref None
+  let themain    : (Whyconf.main   option) ref = ref None
+  let thew3_env  : (Env.env        option) ref = ref None
+  let theprovers : (_              list  ) ref = ref []
 
-let get_w3_th = Env.find_theory w3_env
+  let load why3config =
+    if !theconfig = None then begin
+      let config  = Whyconf.read_config why3config in
+      let main    = Whyconf.get_main config in
+      let w3_env  = Env.create_env (Whyconf.loadpath main) in
+      let provers =
+        Whyconf.Mprover.fold
+          (fun p config l ->
+            (p.Whyconf.prover_name, config,
+             Driver.load_driver w3_env config.Whyconf.driver []) :: l)
+          (Whyconf.get_provers config) []
+      in
+        theconfig  := Some config;
+        themain    := Some main;
+        thew3_env  := Some w3_env;
+        theprovers := provers
+    end
+
+  let config () =
+    load None; EcUtils.oget !theconfig
+
+  let main () =
+    load None; EcUtils.oget !themain
+
+  let w3_env () =
+    load None; EcUtils.oget !thew3_env
+
+  let provers () =
+    load None; !theprovers
+end
+
+let initialize why3config = Config.load why3config
+
+let get_w3_th dirname name =
+  Env.find_theory (Config.w3_env ()) dirname name
     
 type env = {
     logic_task : Task.task;
@@ -1042,15 +1088,9 @@ let add_ax env path ax =
       add_pr env path pr decl, RBax(path,pr,decl)
 
 (**** Calling prover *)
-let provers = Whyconf.get_provers config
-
-let provers_list = 
-  Whyconf.Mprover.fold (fun p config l ->
-    (p.Whyconf.prover_name, config, Driver.load_driver w3_env config.Whyconf.driver []) :: l) provers []
-
 let get_prover name =
   try 
-    List.find (fun (s,_,_) -> s = name) provers_list 
+    List.find (fun (s,_,_) -> s = name) (Config.provers ())
   with _ -> assert false (* FIXME error message *)
 
 let call_prover_task prover timelimit task =

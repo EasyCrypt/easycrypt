@@ -56,6 +56,10 @@ end
 let _ =
   options := EcOptions.parse ();
 
+  (* Initialize why3 engine *)
+  EcWhy3.initialize !options.o_why3;
+
+  (* Initialize load path *)
   begin
     let theories =
       let myname = Filename.basename Sys.executable_name
@@ -78,6 +82,7 @@ let _ =
       EcCommands.addidir (Filename.dirname input));
   List.iter EcCommands.addidir !options.o_idirs;
 
+  (* Initialize I/O UI interaction module *)
   let io =
     match !options.o_emacs with
     | false -> (module CLI   : InteractiveIO)
@@ -86,6 +91,7 @@ let _ =
 
   let module IO = (val io : InteractiveIO) in
 
+  (* Interaction loop *)
   let iparser =
     match !EcOptions.options.o_input with
     | None   -> EcIo.from_channel ~name:"<stdin>" stdin

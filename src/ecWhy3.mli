@@ -1,6 +1,7 @@
 type env
 
-val empty  : env
+val initialize : string option -> unit
+val empty : env
 
 type rebinding_item
 type rebinding = rebinding_item list
