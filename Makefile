@@ -23,7 +23,7 @@ CHECKARGS ?=
 
 CHECK = \
 	./scripts/runtest.py             \
-	  --bin=./ec.byte                \
+	  --bin=./ec.native              \
 	  --bin-args="$(CHECKARGS)"      \
 	  --ok-dir=theories              \
 	  --ok-dir=tests/typing/success  \
@@ -61,7 +61,7 @@ uninstall:
 check: byte
 	$(CHECK)
 
-check-xunit:
+check-xunit: ec.native
 	$(CHECK) --xunit="$(XUNITOUT)"
 
 clean:
