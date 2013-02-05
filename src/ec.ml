@@ -56,6 +56,23 @@ end
 let _ =
   options := EcOptions.parse ();
 
+  begin
+    let theories =
+      let myname = Filename.basename Sys.executable_name
+      and mydir  = Filename.dirname  Sys.executable_name in
+        match myname with
+        | "ec.native"
+        | "ec.byte" ->
+            Filename.concat mydir "theories"
+
+        | _ ->
+            List.fold_left
+              Filename.concat mydir
+              [Filename.parent_dir_name; "lib"; "easycrypt"; "theories"]
+    in
+      EcCommands.addidir theories
+  end;
+
   oiter !options.o_input
     (fun input ->
       EcCommands.addidir (Filename.dirname input));
