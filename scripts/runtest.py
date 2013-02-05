@@ -178,7 +178,7 @@ def _main():
             logging.error("cannot run `%s': %s" % (options.bin, e))
             exit (1)
         timestamp2 = time.time()
-        success = (bool(status) != config.isvalid)
+        success = (bool(status) != bool(config.isvalid))
         logging.info("result for `%s': success: %s" % (config.filename, success))
         result.append(Object(success = success,
                              config  = config ,

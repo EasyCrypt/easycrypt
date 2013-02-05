@@ -1,10 +1,10 @@
 type t.
 
-module I = {
+module type I = {
   var x : t
 }.
 
-module J = {
+module type J = {
   var y : t
 }.
 

@@ -105,7 +105,9 @@ let _ =
         | EcParsetree.P_Undo i ->
             EcCommands.undo i
       with e ->
-        IO.error e
+        IO.error e;
+        if not !EcOptions.options.o_emacs then
+          exit 1
     done
 
 (*
