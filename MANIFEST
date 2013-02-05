@@ -1,5 +1,6 @@
 Makefile
 MANIFEST
+README
 
 # ocamlbuild configuration
 config/_tags

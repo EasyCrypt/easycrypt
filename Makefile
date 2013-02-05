@@ -20,23 +20,39 @@ CHECK = \
 	  --ok-dir=tests/modules/success \
 	  --ko-dir=tests/modules/fail
 
+DESTDIR  ?=
+PREFIX   ?= /usr/local
 XUNITOUT ?= xunit.xml
 VERSION  ?= $(shell date '+%F')
 DISTDIR   = easycrypt-$(VERSION)
+THEORIES  = $(wildcard theories/*.ec)
 
 # --------------------------------------------------------------------
-.PHONY: all build byte native check check-xunit clean tags dist distcheck
+.PHONY: all build byte native check check-xunit tags
+.PHONY: clean install uninstall dist distcheck
 .PHONY: %.ml
 
 all: build
 
-build: byte
+build: native
 
 byte: tags
 	$(OCAMLBUILD) src/ec.byte
 
 native: tags
 	$(OCAMLBUILD) src/ec.native
+
+install: ec.native
+	install -m 0755 -d $(DESTDIR)$(PREFIX)/bin
+	install -m 0755 -T ec.native $(DESTDIR)$(PREFIX)/bin/easycrypt
+	install -m 0755 -d $(DESTDIR)$(PREFIX)/lib/easycrypt/theories
+	install -m 0644 -t $(DESTDIR)$(PREFIX)/lib/easycrypt/theories $(THEORIES)
+
+uninstall:
+	rm -f $(DESTDIR)$(PREFIX)/bin/easycrypt
+	rm -f $(patsubst %,$(DESTDIR)$(PREFIX)/lib/easycrypt/%,$(THEORIES))
+	-@rmdir $(DESTDIR)$(PREFIX)/lib/easycrypt/theories
+	-@rmdir $(DESTDIR)$(PREFIX)/lib/easycrypt
 
 check: byte
 	$(CHECK)

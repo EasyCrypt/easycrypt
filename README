@@ -1,0 +1,63 @@
+* REQUIREMENTS
+====================================================================
+
+ * OCaml (>= 3.12)
+
+   Available at http://caml.inria.fr/
+
+ * Why3  (>= 0.80)
+
+   Available at http://why3.lri.fr/
+
+   Why3 must be installed with a set a provers.
+   See [http://why3.lri.fr/#provers]
+
+ * GNU Emacs (>= 0.23)
+
+   Available at http://www.gnu.org/software/emacs/
+
+* ProofGeneral 4.2
+
+  Available at http://proofgeneral.inf.ed.ac.uk/
+
+* COMPILATION
+====================================================================
+
+The shell commands
+
+  make
+  make install
+
+should build and install easycrypt.
+
+It is possible to change the installation prefix by setting the
+environment variable PREFIX:
+
+  make PREFIX=/my/prefix install
+
+* INSTALLING THE PROOFGENERAL FRONT-END
+====================================================================
+
+Add the following entry to <proof-general-home>/generic/proof-site.el
+in the definition of `proof-assistant-table-default':
+
+  (easycrypt "EasyCrypt" "ec")
+
+If you have not done so, add the following line to your Emacs
+configuration file (typically ~/.emacs):
+
+  (load-file "<proof-general-home>/generic/proof-site.el")
+
+If the EasyCrypt executable is not in your $PATH, set the path to the
+EasyCrypt executable by modifying the variable certicrypt-prog-name
+inside Emacs:
+
+  Proof-General
+    -> Advanced 
+      -> Customize 
+        -> EasyCrypt
+          -> EasyCrypt prog name
+
+setting its value to:
+
+  "<path-to-easycrypt>/easycrypt -emacs"
