@@ -25,7 +25,7 @@ VERSION  ?= $(shell date '+%F')
 DISTDIR   = easycrypt-$(VERSION)
 
 # --------------------------------------------------------------------
-.PHONY: all build byte native check check-xunit clean tags dist dist-check
+.PHONY: all build byte native check check-xunit clean tags dist distcheck
 .PHONY: %.ml
 
 all: build
@@ -57,11 +57,19 @@ dist:
 	BZIP2=-9 tar -cjf $(DISTDIR).tar.bz2 --owner=0 --group=0 $(DISTDIR)
 	rm -rf $(DISTDIR)
 
-dist-check: dist
+distcheck: dist
 	tar -xof $(DISTDIR).tar.bz2
-	$(MAKE) -C $(DISTDIR)
-	$(MAKE) -C $(DISTDIR) dist
+	set -x; \
+	     $(MAKE) -C $(DISTDIR) \
+	  && $(MAKE) -C $(DISTDIR) dist \
+	  && mkdir $(DISTDIR)/dist1 $(DISTDIR)/dist2 \
+	  && ( cd $(DISTDIR)/dist1 && tar -xof ../$(DISTDIR).tar.bz2 ) \
+	  && ( cd $(DISTDIR)/dist2 && tar -xof ../../$(DISTDIR).tar.bz2 ) \
+	  && diff -rq $(DISTDIR)/dist1 $(DISTDIR)/dist2 \
+	  || exit 1
 	rm -rf $(DISTDIR)
+	@echo "$(DISTDIR) is ready for distribution" | \
+	  sed -e 1h -e 1s/./=/g -e 1p -e 1x -e '$$p' -e '$$x'
 
 # --------------------------------------------------------------------
 %.ml:
