@@ -11,21 +11,25 @@ ifeq ($(shell echo $$TERM), dumb)
 endif
 OCAMLBUILD := $(OCAMLBUILD_BIN) $(OCAMLBUILD_EXTRA)
 
+DESTDIR  ?=
+PREFIX   ?= /usr/local
+VERSION  ?= $(shell date '+%F')
+DISTDIR   = easycrypt-$(VERSION)
+THEORIES  = $(wildcard theories/*.ec)
+
+# --------------------------------------------------------------------
+XUNITOUT  ?= xunit.xml
+CHECKARGS ?=
+
 CHECK = \
 	./scripts/runtest.py             \
 	  --bin=./ec.byte                \
+	  --bin-args="$(CHECKARGS)"      \
 	  --ok-dir=theories              \
 	  --ok-dir=tests/typing/success  \
 	  --ko-dir=tests/typing/fail     \
 	  --ok-dir=tests/modules/success \
 	  --ko-dir=tests/modules/fail
-
-DESTDIR  ?=
-PREFIX   ?= /usr/local
-XUNITOUT ?= xunit.xml
-VERSION  ?= $(shell date '+%F')
-DISTDIR   = easycrypt-$(VERSION)
-THEORIES  = $(wildcard theories/*.ec)
 
 # --------------------------------------------------------------------
 .PHONY: all build byte native check check-xunit tags

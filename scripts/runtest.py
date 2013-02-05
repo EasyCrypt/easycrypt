@@ -21,6 +21,13 @@ def _options():
         default = 'ec.byte')
 
     parser.add_option(
+        '', '--bin-args',
+        action  = 'append',
+        metavar = 'ARGS',
+        default = [],
+        help    = 'append ARGS to EasyCrypt command (cumulative)')
+
+    parser.add_option(
         '', '--ok-dir',
         action  = 'append',
         metavar = 'LOG',
@@ -41,11 +48,6 @@ def _options():
         metavar = 'FILE',
         help    = 'dump result to FILE using xUnit format')
 
-#    parser.add_option(
-#        '', '--log',
-#        help    = 'path to directory containing tests logs (must NOT exist)',
-#        default = '_log')
-
     (options, args) = parser.parse_args()
 
     if len(args) != 0:
@@ -53,6 +55,9 @@ def _options():
 
     if not options.ko_dir and not options.ok_dir:
         parser.error('no path to directory containing EasyCrypt scripts given')
+
+    options.bin_args = \
+        list(itertools.chain(*[x.split() for x in options.bin_args]))
 
     return options
 
@@ -114,6 +119,29 @@ def _xunit_dump(config, results):
                                encoding        = 'utf-8')
 
 # --------------------------------------------------------------------
+def _run_test(config, options):
+    logging.info("running ec on `%s' [valid: %s]" % \
+                     (config.filename, config.isvalid))
+
+    timestamp = time.time()
+    try:
+        command = [options.bin] + options.bin_args + [config.filename]
+        with open(os.devnull, 'wb') as fnull:
+            status = sp.call \
+                (command, stdout = fnull, stderr = sp.STDOUT)
+    except OSError, e:
+        logging.error("cannot run `%s': %s" % (options.bin, e))
+        exit (1)
+    timestamp = time.time() - timestamp
+    success   = (bool(status) != bool(config.isvalid))
+
+    logging.info("result for `%s': success: %s" % (config.filename, success))
+
+    return Object(success = success  ,
+                  config  = config   ,
+                  time    = timestamp)
+
+# --------------------------------------------------------------------
 def _main():
     # ------------------------------------------------------------------
     options = _options()
@@ -122,16 +150,6 @@ def _main():
         stream = sys.stderr,
         level  = logging.DEBUG,
         format = '%(asctime)-15s - %(levelname)s - %(message)s')
-
-    # ------------------------------------------------------------------
-#    try:
-#        os.mkdir(options.log)
-#    except OSError, e:
-#        if e.errno == errno.EEXIST:
-#            logging.fatal("log directory `%s' exists" % (options.log,))
-#        else:
-#            logging.fatal("cannot create log directory: %s" % (e,))
-#        exit (1)
 
     # ------------------------------------------------------------------
     def gather(dirname, isvalid):
@@ -167,22 +185,7 @@ def _main():
     mainconfig.timestamp = datetime.datetime.utcnow()
 
     for config in allscripts:
-        logging.info("running ec on `%s' [valid: %s]" % \
-                         (config.filename, config.isvalid))
-        timestamp1 = time.time()
-        try:
-            status = sp.call([options.bin, config.filename],
-                             stdout = open(os.devnull, 'wb'),
-                             stderr = sp.STDOUT)
-        except OSError, e:
-            logging.error("cannot run `%s': %s" % (options.bin, e))
-            exit (1)
-        timestamp2 = time.time()
-        success = (bool(status) != bool(config.isvalid))
-        logging.info("result for `%s': success: %s" % (config.filename, success))
-        result.append(Object(success = success,
-                             config  = config ,
-                             time    = timestamp2 - timestamp1))
+        result.append(_run_test(config, options))
 
     errors = [x for x in result if not x.success]
 
