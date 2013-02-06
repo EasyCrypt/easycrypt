@@ -117,6 +117,7 @@ type scope = {
   sc_required   : EcIdent.t list;
   sc_pr_uc      : proof_uc list; 
   sc_pi         : EcWhy3.prover_infos;
+  sc_check      : bool;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -136,6 +137,7 @@ let empty =
       sc_required   = [];
       sc_pr_uc      = [];
       sc_pi         = EcWhy3.dft_prover_infos;
+      sc_check      = true;
     }
 
 (* -------------------------------------------------------------------- *)
@@ -156,7 +158,9 @@ let attop (scope : scope) =
 
 (* -------------------------------------------------------------------- *)
 let for_loading (scope : scope) =
-  { empty with sc_loaded = scope.sc_loaded; }
+  { empty with sc_loaded = scope.sc_loaded;
+    sc_check = false
+  }
 
 (* -------------------------------------------------------------------- *)
 let subscope (scope : scope) (name : symbol) =
@@ -175,6 +179,7 @@ let subscope (scope : scope) (name : symbol) =
     sc_required   = [];
     sc_pr_uc      = [];
     sc_pi         = scope.sc_pi;
+    sc_check      = scope.sc_check;
   }
 
 (* -------------------------------------------------------------------- *)
@@ -653,14 +658,16 @@ module Tactic = struct
     upd_done (fst (process_logic_tacs scope env tacs (juc,[n])))
     
   let process scope tac =
-    match scope.sc_pr_uc with
-    | [] -> assert false (* FIXME error message *)
-    | puc :: pucs ->
-        match puc.puc_kind with
-        | PUCK_logic juc -> 
-            let juc = process_logic scope scope.sc_env juc tac in
-            { scope with 
-              sc_pr_uc = { puc with puc_kind = PUCK_logic juc } :: pucs }
+    if scope.sc_check then 
+      match scope.sc_pr_uc with
+      | [] -> assert false (* FIXME error message *)
+      | puc :: pucs ->
+          match puc.puc_kind with
+          | PUCK_logic juc -> 
+              let juc = process_logic scope scope.sc_env juc tac in
+              { scope with 
+                sc_pr_uc = { puc with puc_kind = PUCK_logic juc } :: pucs }
+    else scope
 
   let out_goal scope = 
     match scope.sc_pr_uc with
@@ -698,19 +705,21 @@ module Ax = struct
     
 
   let save scope = 
-    match scope.sc_pr_uc with
-    | [] -> assert false (* FIXME error message *)
-    |  { puc_name = name; puc_kind = PUCK_logic juc } :: pucs ->
-        let pr = EcLogic.close_juc juc in
-        let hyps,concl = pr.EcBaseLogic.j_decl in
-        let tparams = hyps.EcFol.h_tvar in
-        assert (hyps.EcFol.h_local = []);
-        let axd = { ax_params = tparams;
-                    ax_spec = Some concl;
-                    ax_kind = Lemma (Some pr) } in
-        let scope = { scope with sc_pr_uc = pucs } in
-        name, bind scope (EcIdent.create name, axd)
-          
+    if scope.sc_check then
+      match scope.sc_pr_uc with
+      | [] -> assert false (* FIXME error message *)
+      |  { puc_name = name; puc_kind = PUCK_logic juc } :: pucs ->
+          let pr = EcLogic.close_juc juc in
+          let hyps,concl = pr.EcBaseLogic.j_decl in
+          let tparams = hyps.EcFol.h_tvar in
+          assert (hyps.EcFol.h_local = []);
+          let axd = { ax_params = tparams;
+                      ax_spec = Some concl;
+                      ax_kind = Lemma (Some pr) } in
+          let scope = { scope with sc_pr_uc = pucs } in
+          Some name, bind scope (EcIdent.create name, axd)
+    else None, scope
+
   let add (scope : scope) (ax : paxiom) =
     let ue = EcUnify.UniEnv.create None in
     let concl = 
@@ -719,19 +728,21 @@ module Ax = struct
       EcFol.Fsubst.mapty (Tuni.subst (EcUnify.UniEnv.close ue)) concl in
     let tparams = EcUnify.UniEnv.tparams ue in 
     match ax.pa_kind with
-    | PAxiom -> 
-        let axd = { ax_params = tparams;
-                    ax_spec = Some concl;
-                    ax_kind = Axiom } in
-        Some (unloc ax.pa_name), bind scope (EcIdent.create (unloc ax.pa_name), axd)
-    | PILemma -> None, start_lemma scope (unloc ax.pa_name) tparams concl 
-    | PLemma -> 
+    | PILemma when scope.sc_check -> 
+        None, start_lemma scope (unloc ax.pa_name) tparams concl 
+    | PLemma when scope.sc_check -> 
         let scope = start_lemma scope (unloc ax.pa_name) tparams concl in
         let scope = 
           Tactic.process scope
             [{ pl_loc = Location.dummy; pl_desc = Ptrivial (None,None) }] in
         let name, scope = save scope in
-        Some name, scope
-        
+        name, scope
+
+    | _ -> 
+        let axd = { ax_params = tparams;
+                    ax_spec = Some concl;
+                    ax_kind = Axiom } in
+        Some (unloc ax.pa_name), bind scope (EcIdent.create (unloc ax.pa_name), axd)
+          
 end
 

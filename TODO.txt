@@ -6,32 +6,16 @@
 
 * Benjamin
 
-- Verifier le typage de l'application dans formula i.e: pred / operator
-
-- étendre le parser pour faire les import why3 interactivement:
-  verifier que si un theorie est utilis'ee par why3 elle est bind'ee dans 
+- verifier que si un theorie est utilis'ee par why3 elle est bind'ee dans 
   ecEnv ...
-- faire un fichier fmap.ec, map.ec, bitstring.ec,
-  il faudra faire rapidement aussi un group.ec, cyclic_group.ec ... 
-
-- Je pense que le type bitstring.ec n'est pas pour l'instant link'e dans
-  initial, il faut le rajouter.
-
-- dump de ecWhy3, ecFol
 
 - Ajouter le and, or asym 
 
 * Parsing:
 - Nom long pour les operateurs infix, 
-- Gerer les <> (le parsing marche mais rien n'est fait apres)
-- Notation pour %r.
 
 * Pretty:
 - Affichage des noms long ou cours, ty instance
-- Gestion des notations speciales :
-  __get, __set, list ....
-
-
 
 * TODO
 - require : do not check

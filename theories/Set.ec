@@ -76,5 +76,4 @@ axiom filter_Peq_card_in : forall (x:'a, X:'a t),
    mem x X =>
    card (filter (Peq x) X) = 1.
      
-  
 

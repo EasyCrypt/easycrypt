@@ -89,6 +89,8 @@ and lpattern =
   | LPSymbol of psymbol
   | LPTuple  of psymbol list
 
+type ptylocals = (psymbol * pty) list
+
 type plvalue =
   | PLvSymbol of pqsymbol
   | PLvTuple  of pqsymbol list
@@ -131,7 +133,7 @@ and pvariable_decl = {
 
 and pfunction_decl = {
   pfd_name     : psymbol;
-  pfd_tyargs   : (psymbol * pty) list;
+  pfd_tyargs   : ptylocals;
   pfd_tyresult : pty;
   pfd_uses     : (pqsymbol list) option;
 }
@@ -176,7 +178,6 @@ type ptydecl = {
 }
 
 (* -------------------------------------------------------------------- *)
-type ptylocals = (psymbol * pty) list
 
 type pfct_game = pqsymbol
 

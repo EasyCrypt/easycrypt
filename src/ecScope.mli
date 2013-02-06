@@ -50,7 +50,7 @@ module Ax : sig
    * scope [scope], and add it to it. Raises [DuplicatedNameInContext]
    * if an axiom with given name already exists. *)
   val add  : scope -> paxiom -> string option * scope
-  val save : scope -> string * scope
+  val save : scope -> string option * scope
 end
 
 module Ty : sig
