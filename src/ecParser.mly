@@ -347,8 +347,8 @@ sexp:
 | LBRACKET ti=tvars_app? es=loc(p_exp_sm_list0) RBRACKET  
    { unloc (pelist es.pl_loc ti es.pl_desc) } 
 
-| LBRACKET e1=loc(exp) op=loc(DOTDOT) e2=loc(exp) RBRACKET
-    { let id = PEident(mk_loc op.pl_loc EcCoreLib.s_dinter, None) in
+| LBRACKET ti=tvars_app? e1=loc(exp) op=loc(DOTDOT) e2=loc(exp) RBRACKET
+    { let id = PEident(mk_loc op.pl_loc EcCoreLib.s_dinter, ti) in
       PEapp(mk_loc op.pl_loc id, [e1; e2]) } 
 | LKEY n1=number op=loc(COMMA) n2=number RKEY
     { if   n1 = 0 && n2 = 1
@@ -473,8 +473,8 @@ sform:
       then PFident (mk_loc op.pl_loc EcCoreLib.s_dbool, None)
       else error (Location.make $startpos $endpos) "malformed bool random" }
 
-| LBRACKET e1=loc(form) op=loc(DOTDOT) e2=loc(form) RBRACKET
-    { let id = PFident(mk_loc op.pl_loc EcCoreLib.s_dinter, None) in
+| LBRACKET ti=tvars_app? e1=loc(form) op=loc(DOTDOT) e2=loc(form) RBRACKET
+    { let id = PFident(mk_loc op.pl_loc EcCoreLib.s_dinter, ti) in
       PFapp(mk_loc op.pl_loc id, [e1; e2]) } 
 
 ;
@@ -1008,7 +1008,7 @@ elim:
 tactic:
 | IDTAC                         { Pidtac }
 | ASSUMPTION a=assumption_args  { Passumption a } 
-| TRIVIAL                       { Ptrivial }
+| TRIVIAL pi=prover_info        { Ptrivial pi }
 | INTROS a=intro_args           { Pintro a }
 | SPLIT                         { Psplit }
 | EXIST a=exists_args           { Pexists a }
@@ -1076,9 +1076,13 @@ print:
 | AXIOM  qs=qident { Pr_ax qs }
 ;
 
-prover_info: 
-|  PROVER t=NUM? pl=plist1(loc(STRING), COMMA)? { (t,pl) }
-|  TIMEOUT t=NUM { (Some t, None) }
+prover_info:
+  t=NUM? pl=plist1(loc(STRING), empty)? { (t,pl) }
+;
+
+gprover_info: 
+|  PROVER x=prover_info { x }
+|  TIMEOUT t=NUM        { (Some t, None) }
 ;
 (* -------------------------------------------------------------------- *)
 (* Global entries                                                       *)
@@ -1099,7 +1103,7 @@ global_:
 | axiom            { Gaxiom     $1 }
 | claim            { Gclaim     $1 }
 | tactics          { Gtactics   $1 }
-| prover_info      { Gprover_info $1 }
+| gprover_info      { Gprover_info $1 }
 | SAVE             { Gsave         }
 | PRINT p=print    { Gprint     p  }
 ;

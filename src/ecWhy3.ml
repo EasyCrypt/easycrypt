@@ -1105,7 +1105,7 @@ let w_call_prover_task prover timelimit task =
 
 let call_prover_task provers timelimit task =
   let check prover =
-    (* Format.printf "try with %s@." prover; *)
+    Format.printf "try with %s@." prover; 
     let res = w_call_prover_task prover timelimit task in
     res.Call_provers.pr_answer = Call_provers.Valid in    
   List.exists check provers

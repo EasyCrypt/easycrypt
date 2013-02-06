@@ -222,6 +222,10 @@ type ppredicate = {
 }
 
 (* -------------------------------------------------------------------- *)
+(* -------------------------------------------------------------------- *)
+type pprover_infos = 
+  int option * string located list option
+
 type elim_kind = 
   | ElimHyp  of pqsymbol * tvar_inst
   | ElimForm of pformula
@@ -235,7 +239,7 @@ type ptactic = ptactic_r located
 and ptactic_r = 
   | Pidtac
   | Passumption of (pqsymbol option * tvar_inst)
-  | Ptrivial
+  | Ptrivial    of pprover_infos
   | Pintro      of posymbol list  (* imp_I, forall_I *)
   | Psplit                        (* and_I *)
   | Pexists     of pformula list  (* exists_I *)
@@ -313,9 +317,6 @@ and theory_override =
 | PTHO_Type   of pty
 | PTHO_Module of pqsymbol * (pqsymbol list)
 
-(* -------------------------------------------------------------------- *)
-type pprover_infos = 
-  int option * string located list option
 (* -------------------------------------------------------------------- *)
 type global =
   | Gmodule      of (psymbol * pmodule_expr)

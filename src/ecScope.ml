@@ -438,6 +438,38 @@ module Theory = struct
     List.fold_left add { scope with sc_env = env } lth
 end
 
+module Prover = struct
+
+  exception Unknown_prover of Location.t * string 
+
+  let pp_error fmt exn = 
+    match exn with
+    | Unknown_prover(loc,s) ->
+        let pp fmt s = Format.fprintf fmt "Unknown prover %s" s in
+        EcPrinting.pp_located loc pp fmt s
+    | _ -> raise exn
+
+  let _ = EcPexception.register pp_error 
+      
+  let check_prover_name name = 
+    let s = unloc name in
+    if not (EcWhy3.check_prover_name s) then 
+      raise (Unknown_prover (name.pl_loc, s)); 
+    s
+
+  let mk_prover_info scope (time, ns) =
+    let ns = omap ns (List.map check_prover_name) in 
+    let time = odfl scope.sc_pi.EcWhy3.prover_timelimit time in
+    let time = if time < 1 then 1 else time in
+    { EcWhy3.prover_names = odfl scope.sc_pi.EcWhy3.prover_names ns;
+      EcWhy3.prover_timelimit = time } 
+    
+
+  let process scope pi = 
+    { scope with sc_pi = mk_prover_info scope pi }
+
+end
+
 module Tactic = struct
 
   open EcFol
@@ -585,21 +617,25 @@ module Tactic = struct
     t_on_last (process_elims true env pe g) 
       (t_seq (t_imp_intro id) (t_hyp env id))
 
-  let rec process_logic_tacs pi env (tacs:ptactics) (gs:goals) : goals = 
+  let process_trivial scope pi env g =
+    let pi = Prover.mk_prover_info scope pi in
+    t_trivial pi env g
+
+  let rec process_logic_tacs scope env (tacs:ptactics) (gs:goals) : goals = 
     match tacs with
     | [] -> gs
     | {pl_desc = Psubgoal tacs1} :: tacs2 ->  
-        let gs = t_subgoal (List.map (process_logic_tac pi env) tacs1) gs in
-        process_logic_tacs pi env tacs2 gs
+        let gs = t_subgoal (List.map (process_logic_tac scope env) tacs1) gs in
+        process_logic_tacs scope env tacs2 gs
     | tac1 :: tacs2 ->
-        let gs = t_on_goals (process_logic_tac pi env tac1) gs in
-        process_logic_tacs pi env tacs2 gs 
+        let gs = t_on_goals (process_logic_tac scope env tac1) gs in
+        process_logic_tacs scope env tacs2 gs 
         
-  and process_logic_tac pi env (tac:ptactic) (g:goal) : goals = 
+  and process_logic_tac scope env (tac:ptactic) (g:goal) : goals = 
     match unloc tac with
     | Pidtac         -> t_id g 
     | Passumption pq -> process_assumption env pq g 
-    | Ptrivial       -> t_trivial pi env g
+    | Ptrivial pi    -> process_trivial scope pi env g
     | Pintro pi      -> process_intros pi g
     | Psplit         -> t_and_intro g
     | Pexists fs     -> process_exists env fs g
@@ -609,12 +645,12 @@ module Tactic = struct
     | Papply pe      -> process_apply env pe g
     | Pseq tacs      -> 
         let (juc,n) = g in
-        process_logic_tacs pi env tacs (juc,[n])
+        process_logic_tacs scope env tacs (juc,[n])
     | Psubgoal _     -> assert false 
 
-  let process_logic pi env juc tacs = 
+  let process_logic scope env juc tacs = 
     let (juc,n) = get_first_goal juc in (* FIXME error message *)
-    upd_done (fst (process_logic_tacs pi env tacs (juc,[n])))
+    upd_done (fst (process_logic_tacs scope env tacs (juc,[n])))
     
   let process scope tac =
     match scope.sc_pr_uc with
@@ -622,7 +658,7 @@ module Tactic = struct
     | puc :: pucs ->
         match puc.puc_kind with
         | PUCK_logic juc -> 
-            let juc = process_logic scope.sc_pi scope.sc_env juc tac in
+            let juc = process_logic scope scope.sc_env juc tac in
             { scope with 
               sc_pr_uc = { puc with puc_kind = PUCK_logic juc } :: pucs }
 
@@ -693,36 +729,9 @@ module Ax = struct
         let scope = start_lemma scope (unloc ax.pa_name) tparams concl in
         let scope = 
           Tactic.process scope
-            [{ pl_loc = Location.dummy; pl_desc = Ptrivial }] in
+            [{ pl_loc = Location.dummy; pl_desc = Ptrivial (None,None) }] in
         let name, scope = save scope in
         Some name, scope
         
 end
 
-module Prover = struct
-
-  exception Unknown_prover of Location.t * string 
-
-  let pp_error fmt exn = 
-    match exn with
-    | Unknown_prover(loc,s) ->
-        let pp fmt s = Format.fprintf fmt "Unknown prover %s" s in
-        EcPrinting.pp_located loc pp fmt s
-    | _ -> raise exn
-
-  let _ = EcPexception.register pp_error 
-      
-  let check_prover_name name = 
-    let s = unloc name in
-    if not (EcWhy3.check_prover_name s) then 
-      raise (Unknown_prover (name.pl_loc, s)); 
-    s
-
-  let process scope (time, ns) = 
-    let ns = omap ns (List.map check_prover_name) in 
-    let pi = { 
-      EcWhy3.prover_names = odfl scope.sc_pi.EcWhy3.prover_names ns;
-      EcWhy3.prover_timelimit = odfl scope.sc_pi.EcWhy3.prover_timelimit time; } in
-    { scope with sc_pi = pi }
-
-end
