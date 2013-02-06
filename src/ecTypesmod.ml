@@ -114,6 +114,10 @@ and module_comps_item = module_item
 and function_ = {
   f_name   : EcIdent.t;
   f_sig    : funsig;
+  f_def    : function_def option;
+}
+
+and function_def = {
   f_locals : (EcIdent.t * EcTypes.ty) list;
   f_body   : stmt;
   f_ret    : EcTypes.tyexpr option;

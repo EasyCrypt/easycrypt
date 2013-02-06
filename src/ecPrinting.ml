@@ -696,17 +696,21 @@ struct
       pr_seq [tk_fun; !^fname ^^ dparams; Pp.colon; pr_type tenv fres]
     in
 
-    let dlocals = List.map (fun (x, ty) -> pr_local tenv x ty) f.f_locals
+      match f.f_def with
+      | None ->
+          prelude
 
-    and dbody =
-      let bodytenv =
-        List.fold_left M.add_local tenv
-          (List.map fst ((fst f.f_sig.fs_sig) @ f.f_locals))
-      in
-        List.map (pr_instr bodytenv) f.f_body
-    in
+      | Some def ->
+          let dlocals = List.map (fun (x, ty) -> pr_local tenv x ty) def.f_locals
 
-      (pr_seq [prelude; Pp.equals]) ^/^ (pr_mblocks [dlocals; dbody])
+          and dbody =
+            let bodytenv =
+              List.fold_left M.add_local tenv
+                (List.map fst ((fst f.f_sig.fs_sig) @ def.f_locals))
+            in
+              List.map (pr_instr bodytenv) def.f_body
+          in
+            (pr_seq [prelude; Pp.equals]) ^/^ (pr_mblocks [dlocals; dbody])
 
   (* ------------------------------------------------------------------ *)
   and pr_module (tenv : t) ((p, m) : EcPath.path * module_expr) =
@@ -723,7 +727,7 @@ struct
           let dbody = (pr_mod_name tenv p) ^^ dargs in
             pr_seq [prelude; Pp.equals; dbody]
 
-      | ME_Decl modty ->
+      | ME_Decl _modty ->
           assert false                  (* FIXME *)
 
       | ME_Structure mstruct ->

@@ -429,13 +429,34 @@ let module_sig_of_module_type (tymod : module_type) =
       tyms_comps = tymod.tymt_comps; }
 
 (* -------------------------------------------------------------------- *)
+let module_comps_of_module_sig_comps (comps : module_sig_comps) =
+  let onitem = function
+    | Tys_variable (x, ty) ->
+        MI_Variable {
+          v_name = EcIdent.create x;
+          v_type = ty;
+        }
+
+    | Tys_function funsig ->
+        MI_Function { 
+          f_name = EcIdent.create funsig.fs_name;
+          f_sig  = funsig;
+          f_def  = None;
+        }
+  in
+    List.map onitem comps.tymc_body
+
+(* -------------------------------------------------------------------- *)
 let module_expr_of_module_type (name : EcIdent.t) (tymod : module_type) =
-  { me_name  = name;
-    me_body  = ME_Decl tymod;
-    me_sig   = module_sig_of_module_type tymod;
-    me_comps = [];                      (* FIXME *)
-    me_uses  = Sp.empty;                (* FIXME *)
-    me_types = [tymod]; }
+  let tysig   = module_sig_of_module_type tymod in
+  let tycomps = module_comps_of_module_sig_comps tymod.tymt_comps in
+
+    { me_name  = name;
+      me_body  = ME_Decl tymod;
+      me_sig   = tysig;
+      me_comps = tycomps;
+      me_uses  = Sp.empty;                (* FIXME *)
+      me_types = [tymod]; }
 
 (* -------------------------------------------------------------------- *)
 let unfold1_mod_type_name (env : EcEnv.env) (name : EcPath.path) =
@@ -782,8 +803,8 @@ and transstruct (env : EcEnv.env) (x : EcIdent.t) (st : pstructure) =
   (* Check structure items, extending environment initially with
    * structure arguments, and then with previously checked items.
    *)
-  let _, items =
-    let tydecl1 ((x, obj) : EcIdent.t * _) =
+  let (_, items) =
+    let tydecl1 (x, obj) =
       match obj with
       | MI_Module   m -> (x, `Module   m)
       | MI_Variable v -> (x, `Variable (Some EcTypes.PVglob, v.v_type))
@@ -915,9 +936,11 @@ and transstruct1 (env : EcEnv.env) (st : pstructure_item) =
             fs_sig  = params, rty;
             fs_uses = Mp.empty;   (* FIXME *)
           };
-          f_locals = locals;
-          f_body   = stmt;
-          f_ret    = re
+          f_def = Some {
+            f_locals = locals;
+            f_body   = stmt;
+            f_ret    = re;
+          };
         } in 
       [(fid, MI_Function fun_)]
   end

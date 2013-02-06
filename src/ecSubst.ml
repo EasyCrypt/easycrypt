@@ -352,31 +352,41 @@ let subst_variable (s : subst) (x : variable) =
     v_type = subst_ty s x.v_type; }
 
 (* -------------------------------------------------------------------- *)
-let subst_function (s : subst) (f : function_) =
+let rec subst_function (s : subst) (f : function_) =
   let args'   = List.map
                   (fun (x, ty) -> (EcIdent.fresh x, subst_ty s ty))
                   (fst f.f_sig.fs_sig) in
   let res'    = subst_ty s (snd f.f_sig.fs_sig) in
   let uses'   = f.f_sig.fs_uses in
-  let locals' = List.map
-                  (fun (x, ty) -> (EcIdent.fresh x, subst_ty s ty))
-                  f.f_locals in
-
-  let sbody = s in
-  let sbody = add_locals sbody
-                (List.map_combine fst fst (fst f.f_sig.fs_sig) args') in
-  let sbody = add_locals sbody
-                (List.map_combine fst fst f.f_locals locals') in
-
-  let body' = subst_stmt sbody f.f_body in
-  let ret'  = omap f.f_ret (subst_tyexpr sbody) in
+  let def'    =
+    let sbody =
+      add_locals s
+        (List.map_combine fst fst (fst f.f_sig.fs_sig) args')
+    in
+      omap f.f_def (subst_function_def sbody)
+  in
 
     { f_name = EcIdent.fresh f.f_name;
       f_sig  = { fs_name = f.f_sig.fs_name;
                  fs_sig  = (args', res')  ;
                  fs_uses = uses'          ; };
+      f_def  = def' }
 
-      f_locals = locals';
+(* -------------------------------------------------------------------- *)
+and subst_function_def (s : subst) (def : function_def) =
+  let locals' =
+    List.map
+      (fun (x, ty) -> (EcIdent.fresh x, subst_ty s ty))
+      def.f_locals in
+
+  let sbody =
+    add_locals s
+      (List.map_combine fst fst def.f_locals locals') in
+
+  let body' = subst_stmt sbody def.f_body in
+  let ret'  = omap def.f_ret (subst_tyexpr sbody) in
+
+    { f_locals = locals';
       f_body   = body'  ;
       f_ret    = ret'   ;
     }
