@@ -15,12 +15,33 @@ module type InteractiveIO = sig
 end
 
 (* -------------------------------------------------------------------- *)
+module IntCommand : sig
+  val prinfo : out_channel -> EcCommands.info -> unit
+end = struct
+  open EcCommands
+
+  let prinfo (stream : out_channel) (info : EcCommands.info) =
+    match info with
+    | GI_AddedType name ->
+        Printf.fprintf stream "added type %s.\n%!" name
+
+    | GI_AddedAxiom name ->
+        Printf.fprintf stream "added axiom %s.\n%!" name
+
+    | GI_AddedOperator name ->
+        Printf.fprintf stream "added operator %s.\n%!" name
+
+    | GI_AddedPredicate name ->
+        Printf.fprintf stream "added predicated %s.\n%!" name
+end
+
+(* -------------------------------------------------------------------- *)
 module Emacs : InteractiveIO = struct
   let prompt (uuid : int) =
     Printf.printf "[%d]>\n%!" uuid
 
-  let success (_ : EcCommands.info list) =
-    Printf.printf "FIXME: (success) Reassociate B's printing functions\n%!"
+  let success (infos : EcCommands.info list) =
+    List.iter (IntCommand.prinfo stdout) infos
 
   let error (e : exn) =
     match e with
@@ -38,8 +59,8 @@ module CLI : InteractiveIO = struct
   let prompt (_ : int) =
     Printf.printf "> %!"
 
-  let success (_ : EcCommands.info list) =
-    Printf.printf "FIXME: (success) Reassociate B's printing functions\n%!"
+  let success (infos : EcCommands.info list) =
+    List.iter (IntCommand.prinfo stdout) infos
 
   let error (e : exn) =
     match e with
@@ -49,7 +70,7 @@ module CLI : InteractiveIO = struct
           exn;
 
     | e ->
-      EcFormat.pp_err EcPexception.exn_printer e;
+        EcFormat.pp_err EcPexception.exn_printer e;
 end
 
 (* -------------------------------------------------------------------- *)
@@ -115,44 +136,3 @@ let _ =
         if not !EcOptions.options.o_emacs then
           exit 1
     done
-
-(*
-(* -------------------------------------------------------------------- *)
-exception Interrupted
-
-let out_added scope p = 
-  let doc = process_pr scope p in
-  EcPrinting.pretty (!^"add " ^^ doc ^^ Pprint.hardline)
-
-let print_next scope = 
-  EcPrinting.pretty (EcScope.Tactic.out_goal scope);
-  EcPrinting.pretty (Pprint.empty ^/^ !^">") 
-
-
-(* -------------------------------------------------------------------- *)
-let process (g : global) =
-  try
-    process g
-  with
-*)
-
-(*
-    out_added scope (Pr_ty (dummy_pqs_of_ps tyd.pty_name));
-
-  out_added scope (Pr_op (dummy_pqs_of_ps op.po_name));
-
-  out_added scope (Pr_pr (dummy_pqs_of_ps p.pp_name));
-
-  out_added scope (Pr_ax (dummy_pqs_of_ps (dummyloc name)));
-
-
-
-    oiter name
-      (fun name -> 
-  begin match name with
-  | None -> ()
-  | Some name -> out_added scope (Pr_ax (dummy_pqs_of_ps (dummyloc name)))
-  end;
-  scope
-
-*)
