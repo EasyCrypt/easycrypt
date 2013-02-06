@@ -123,3 +123,7 @@ module Tactic : sig
   val process : scope -> ptactics -> scope
   val out_goal : scope -> Pprint.document
 end
+
+module Prover : sig 
+  val process : scope -> pprover_infos -> scope
+end

@@ -29,6 +29,17 @@ val add_op :
 
 val add_ax : env -> EcPath.path -> EcDecl.axiom -> env * rebinding_item
 
-val check_goal : env -> EcFol.l_decl -> bool
+
 
 val get_w3_th : string list -> string -> Why3.Theory.theory
+
+(*****************************************************************************)
+type prover_infos = 
+  { prover_names : string list;
+    prover_timelimit : int; }    
+
+val dft_prover_infos : prover_infos
+
+val check_prover_name : string -> bool
+
+val check_goal : env -> prover_infos -> EcFol.l_decl -> bool

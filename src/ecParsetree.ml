@@ -314,23 +314,27 @@ and theory_override =
 | PTHO_Module of pqsymbol * (pqsymbol list)
 
 (* -------------------------------------------------------------------- *)
+type pprover_infos = 
+  int option * string located list option
+(* -------------------------------------------------------------------- *)
 type global =
-  | Gmodule    of (psymbol * pmodule_expr)
-  | Ginterface of (psymbol * pmodule_sig)
-  | Goperator  of poperator
-  | Gpredicate of ppredicate
-  | Gaxiom     of paxiom
-  | Gclaim     of claim
-  | Gtype      of ptydecl
-  | Gprint     of pprint
-  | GthOpen    of psymbol
-  | GthClose   of psymbol
-  | GthRequire of (psymbol * bool option) (* true = export, false = import *)
-  | GthImport  of pqsymbol
-  | GthExport  of pqsymbol
-  | GthClone   of theory_cloning
-  | GthW3      of (string list * string * w3_renaming list)
-  | Gtactics   of ptactics
+  | Gmodule      of (psymbol * pmodule_expr)
+  | Ginterface   of (psymbol * pmodule_sig)
+  | Goperator    of poperator
+  | Gpredicate   of ppredicate
+  | Gaxiom       of paxiom
+  | Gclaim       of claim
+  | Gtype        of ptydecl
+  | Gprint       of pprint
+  | GthOpen      of psymbol
+  | GthClose     of psymbol
+  | GthRequire   of (psymbol * bool option) (* true = export, false = import *)
+  | GthImport    of pqsymbol
+  | GthExport    of pqsymbol
+  | GthClone     of theory_cloning
+  | GthW3        of (string list * string * w3_renaming list)
+  | Gtactics     of ptactics
+  | Gprover_info of pprover_infos
   | Gsave
 
 type prog =

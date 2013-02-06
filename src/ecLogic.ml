@@ -108,9 +108,9 @@ let t_exc_midle env g =
   let rule = { pr_name = RN_exc_midle; pr_hyps = [] } in
   upd_rule_done g rule 
 
-let t_trivial env g = 
+let t_trivial pi env g = 
   let l_decl = get_goal g in
-  if check_goal env l_decl then
+  if check_goal env pi l_decl then
     let rule = { pr_name = RN_prover (); pr_hyps = [] } in
     upd_rule_done g rule
   else tacerror (CanNotProve l_decl)

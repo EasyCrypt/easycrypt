@@ -143,7 +143,8 @@
 %token PIPE
 // %token PR
 %token PRED
-// %token PROVER
+%token PROVER
+%token TIMEOUT
 %token QUESTION
 %token RBRACKET
 // %token RBRACKETLLIMP
@@ -214,7 +215,6 @@
 // %token SP
 // %token SPLITWHILE
 // %token SWAP
-// %token TIMEOUT
 // %token TRANSPARENT
 // %token TRY
 %token UNDO
@@ -1076,6 +1076,10 @@ print:
 | AXIOM  qs=qident { Pr_ax qs }
 ;
 
+prover_info: 
+|  PROVER t=NUM? pl=plist1(loc(STRING), COMMA)? { (t,pl) }
+|  TIMEOUT t=NUM { (Some t, None) }
+;
 (* -------------------------------------------------------------------- *)
 (* Global entries                                                       *)
 
@@ -1095,6 +1099,7 @@ global_:
 | axiom            { Gaxiom     $1 }
 | claim            { Gclaim     $1 }
 | tactics          { Gtactics   $1 }
+| prover_info      { Gprover_info $1 }
 | SAVE             { Gsave         }
 | PRINT p=print    { Gprint     p  }
 ;

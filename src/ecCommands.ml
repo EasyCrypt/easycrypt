@@ -135,6 +135,12 @@ and process_save (scope : EcScope.scope) =
     (scope, [GI_AddedAxiom name])
 
 (* -------------------------------------------------------------------- *)
+and process_prover_info scope pi = 
+  let scope = EcScope.Prover.process scope pi in
+    (scope, [])
+
+
+(* -------------------------------------------------------------------- *)
 and process (scope : EcScope.scope) (g : global) =
   let (scope, infos) =
     match g with
@@ -154,6 +160,7 @@ and process (scope : EcScope.scope) (g : global) =
     | GthW3      a    -> process_w3_import  scope a
     | Gprint     p    -> process_print      scope p; (scope, [])
     | Gtactics   t    -> process_tactics    scope t
+    | Gprover_info pi -> process_prover_info scope pi
     | Gsave           -> process_save       scope 
   in
     (scope, infos)

@@ -1088,17 +1088,28 @@ let add_ax env path ax =
       add_pr env path pr decl, RBax(path,pr,decl)
 
 (**** Calling prover *)
-let get_prover name =
-  try 
-    List.find (fun (s,_,_) -> s = name) (Config.provers ())
-  with _ -> assert false (* FIXME error message *)
+exception UnknownProver of string
 
-let call_prover_task prover timelimit task =
+
+let get_prover name =
+  List.find (fun (s,_,_) -> s = name) (Config.provers ())
+
+let check_prover_name name = 
+  try ignore(get_prover name); true with _ -> false 
+
+let w_call_prover_task prover timelimit task = 
    let (_, pr, dr)  = get_prover prover in
-   let toto = 
+   let prover_call = 
      Driver.prove_task ~command:pr.Whyconf.command ~timelimit dr task () in
-   let res = 
-     Call_provers.wait_on_call toto () in
+   Call_provers.wait_on_call prover_call () 
+
+let call_prover_task provers timelimit task =
+  let check prover =
+    (* Format.printf "try with %s@." prover; *)
+    let res = w_call_prover_task prover timelimit task in
+    res.Call_provers.pr_answer = Call_provers.Valid in    
+  List.exists check provers
+(*
 (*  Format.printf "call prover res = %a@." Call_provers.print_prover_result res; *)
    let result = res.Call_provers.pr_answer = Call_provers.Valid in
    if not result then begin
@@ -1106,15 +1117,15 @@ let call_prover_task prover timelimit task =
      Driver.print_task dr Format.std_formatter task
    end; 
    result
+*)
 
-
-let check_w3_formula task prover timelimit f = 
+let check_w3_formula task provers timelimit f = 
   let pr   = Decl.create_prsymbol (Ident.id_fresh "goal") in
   let decl = Decl.create_prop_decl Decl.Pgoal pr f in
   let task = add_decl_with_tuples task decl in
 (*  let task = List.hd (Trans.apply_transform "lift_epsilon" w3_env task) in *)
 (*  Format.printf "task = %a@." Pretty.print_task task;  *)
-  call_prover_task prover timelimit task
+  call_prover_task provers timelimit task
   
 exception CanNotProve of axiom
 
@@ -1129,7 +1140,15 @@ let close_task task vm tdecls hyps =
   let task = List.fold_left add_decl_with_tuples task tdecls in
   List.fold_left add_decl_with_tuples task hyps 
 
-let check_goal env (hyps, concl) = 
+type prover_infos = 
+  { prover_names : string list;
+    prover_timelimit : int; }    
+
+let dft_prover_infos = 
+  { prover_names = ["Alt-Ergo"];
+    prover_timelimit = 3; }
+
+let check_goal env pi (hyps, concl) = 
   let vm = ref (empty_vmap ()) in
   let accu = !vm.accu in
   let trans_tv id = 
@@ -1158,7 +1177,8 @@ let check_goal env (hyps, concl) =
   let hyps = List.map trans_hyp (List.rev hyps.h_local) in
   let concl = trans_form env !vm concl in
   let task = close_task env.logic_task !vm tdecls hyps in
-  check_w3_formula task "Alt-Ergo" 3 concl
+  let provers = pi.prover_names in
+  check_w3_formula task provers pi.prover_timelimit concl
 
     
   

@@ -198,7 +198,7 @@ val ty_fun_app        : env -> EcTypes.ty -> EcTypes.ty list -> EcTypes.ty
 val check_alpha_equal : env -> EcFol.form -> EcFol.form -> unit
 val is_alpha_equal    : env -> EcFol.form -> EcFol.form -> bool
 
-val check_goal        : env -> EcFol.l_decl -> bool
+val check_goal        : env -> EcWhy3.prover_infos -> EcFol.l_decl -> bool
 
 (* -------------------------------------------------------------------- *)
 type c_tyexpr = private EcTypes.tyexpr

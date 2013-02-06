@@ -116,6 +116,7 @@ type scope = {
   sc_loaded     : (EcEnv.ctheory_w3 * EcIdent.t list) IM.t;
   sc_required   : EcIdent.t list;
   sc_pr_uc      : proof_uc list; 
+  sc_pi         : EcWhy3.prover_infos;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -133,7 +134,9 @@ let empty =
       sc_top        = None;
       sc_loaded     = IM.empty;
       sc_required   = [];
-      sc_pr_uc      = []; }
+      sc_pr_uc      = [];
+      sc_pi         = EcWhy3.dft_prover_infos;
+    }
 
 (* -------------------------------------------------------------------- *)
 let name (scope : scope) =
@@ -171,6 +174,7 @@ let subscope (scope : scope) (name : symbol) =
     sc_loaded     = scope.sc_loaded;
     sc_required   = [];
     sc_pr_uc      = [];
+    sc_pi         = scope.sc_pi;
   }
 
 (* -------------------------------------------------------------------- *)
@@ -581,21 +585,21 @@ module Tactic = struct
     t_on_last (process_elims true env pe g) 
       (t_seq (t_imp_intro id) (t_hyp env id))
 
-  let rec process_logic_tacs env (tacs:ptactics) (gs:goals) : goals = 
+  let rec process_logic_tacs pi env (tacs:ptactics) (gs:goals) : goals = 
     match tacs with
     | [] -> gs
     | {pl_desc = Psubgoal tacs1} :: tacs2 ->  
-        let gs = t_subgoal (List.map (process_logic_tac env) tacs1) gs in
-        process_logic_tacs env tacs2 gs
+        let gs = t_subgoal (List.map (process_logic_tac pi env) tacs1) gs in
+        process_logic_tacs pi env tacs2 gs
     | tac1 :: tacs2 ->
-        let gs = t_on_goals (process_logic_tac env tac1) gs in
-        process_logic_tacs env tacs2 gs 
+        let gs = t_on_goals (process_logic_tac pi env tac1) gs in
+        process_logic_tacs pi env tacs2 gs 
         
-  and process_logic_tac env (tac:ptactic) (g:goal) : goals = 
+  and process_logic_tac pi env (tac:ptactic) (g:goal) : goals = 
     match unloc tac with
     | Pidtac         -> t_id g 
     | Passumption pq -> process_assumption env pq g 
-    | Ptrivial       -> t_trivial env g
+    | Ptrivial       -> t_trivial pi env g
     | Pintro pi      -> process_intros pi g
     | Psplit         -> t_and_intro g
     | Pexists fs     -> process_exists env fs g
@@ -605,12 +609,12 @@ module Tactic = struct
     | Papply pe      -> process_apply env pe g
     | Pseq tacs      -> 
         let (juc,n) = g in
-        process_logic_tacs env tacs (juc,[n])
+        process_logic_tacs pi env tacs (juc,[n])
     | Psubgoal _     -> assert false 
 
-  let process_logic env juc tacs = 
+  let process_logic pi env juc tacs = 
     let (juc,n) = get_first_goal juc in (* FIXME error message *)
-    upd_done (fst (process_logic_tacs env tacs (juc,[n])))
+    upd_done (fst (process_logic_tacs pi env tacs (juc,[n])))
     
   let process scope tac =
     match scope.sc_pr_uc with
@@ -618,7 +622,7 @@ module Tactic = struct
     | puc :: pucs ->
         match puc.puc_kind with
         | PUCK_logic juc -> 
-            let juc = process_logic scope.sc_env juc tac in
+            let juc = process_logic scope.sc_pi scope.sc_env juc tac in
             { scope with 
               sc_pr_uc = { puc with puc_kind = PUCK_logic juc } :: pucs }
 
@@ -693,4 +697,32 @@ module Ax = struct
         let name, scope = save scope in
         Some name, scope
         
+end
+
+module Prover = struct
+
+  exception Unknown_prover of Location.t * string 
+
+  let pp_error fmt exn = 
+    match exn with
+    | Unknown_prover(loc,s) ->
+        let pp fmt s = Format.fprintf fmt "Unknown prover %s" s in
+        EcPrinting.pp_located loc pp fmt s
+    | _ -> raise exn
+
+  let _ = EcPexception.register pp_error 
+      
+  let check_prover_name name = 
+    let s = unloc name in
+    if not (EcWhy3.check_prover_name s) then 
+      raise (Unknown_prover (name.pl_loc, s)); 
+    s
+
+  let process scope (time, ns) = 
+    let ns = omap ns (List.map check_prover_name) in 
+    let pi = { 
+      EcWhy3.prover_names = odfl scope.sc_pi.EcWhy3.prover_names ns;
+      EcWhy3.prover_timelimit = odfl scope.sc_pi.EcWhy3.prover_timelimit time; } in
+    { scope with sc_pi = pi }
+
 end

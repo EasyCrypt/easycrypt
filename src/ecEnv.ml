@@ -968,7 +968,7 @@ let is_alpha_equal env f1 f2 =
   try check_alpha_equal env f1 f2; true
   with _ -> false
 
-let check_goal env ld = EcWhy3.check_goal env.env_w3 ld
+let check_goal env pi ld = EcWhy3.check_goal env.env_w3 pi ld
 
 (** {2 Type safe soft constructors} *)
 
