@@ -244,7 +244,6 @@
 %left OP4 
 
 %nonassoc prec_prefix_op
-%nonassoc RKEY_HAT
 
 %nonassoc above_OP
 
@@ -270,7 +269,8 @@ qident_pbinop:
 | x=loc(QPBINOP) { x }
 
 (* -------------------------------------------------------------------- *)
-%inline ident_list1: aout=plist1(ident, COMMA) { aout };
+%inline ident_list1c: aout=plist1(ident, COMMA) { aout };
+%inline ident_list1: aout=plist1(ident, empty) { aout };
 
 %inline prim_ident_list1: aout=plist1(prim_ident, COMMA) { aout };
 
@@ -582,6 +582,8 @@ type_exp:
 
 typed_vars:
 | xs=ident_list1 COLON ty=loc(type_exp) { List.map (fun v -> (v, ty)) xs }
+| xs=ident_list1                        
+    { List.map (fun v -> (v, mk_loc v.pl_loc PTunivar)) xs }
 ;
 
 param_decl:
@@ -599,7 +601,7 @@ param_decl1:
 lvalue:
 | x=qident                                           { PLvSymbol x      }
 | LPAREN p=plist2(qident, COMMA) RPAREN              { PLvTuple p       }
-| x=qident LBRACKET ti=tvars_app? e=loc(exp) RBRACKET { PLvMap(x, ti, e) }
+| x=qident DLBRACKET ti=tvars_app? e=loc(exp) RBRACKET { PLvMap(x, ti, e) }
 ;
 
 base_instr:
@@ -637,14 +639,14 @@ stmt: aout=instr* { aout }
 (* Module definition                                                    *)
 
 var_decl:
-| VAR xs=ident_list1 COLON ty=loc(type_exp) { (xs, ty) }
+| VAR xs=ident_list1c COLON ty=loc(type_exp) { (xs, ty) }
 ;
 
 loc_decl:
-| VAR xs=ident_list1 COLON ty=loc(type_exp) SEMICOLON
+| VAR xs=ident_list1c COLON ty=loc(type_exp) SEMICOLON
      { (xs, ty, None  ) }
 
-| VAR xs=ident_list1 COLON ty=loc(type_exp) EQ e=loc(exp) SEMICOLON
+| VAR xs=ident_list1c COLON ty=loc(type_exp) EQ e=loc(exp) SEMICOLON
      { (xs, ty, Some e) }
 ;
 
