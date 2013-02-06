@@ -23,17 +23,21 @@
     max-width: 64.3em;
     margin: 3em auto;
     padding: 0 1em;
+    //position: absolute;
+    //left: 40px;
   }
+  
   </style>
 
-  <script src="jquery/jquery.js"></script>
+  <script src="jquery/jquery.js" type="text/javascript"></script>
+  <script src="extracLine.js" type="text/javascript"></script>
 
-  <script src="codemirror/lib/codemirror.js"></script>
-  <script src="codemirror/mode/easycrypt/easycrypt.js"></script>
-  <script src="codemirror/addon/edit/matchbrackets.js"></script>
-  <script src="codemirror/addon/edit/foldcode.js"></script>
+  <script src="codemirror/lib/codemirror.js" type="text/javascript"></script>
+  <script src="codemirror/mode/easycrypt/easycrypt.js" type="text/javascript"></script>
+  <script src="codemirror/addon/edit/matchbrackets.js" type="text/javascript"></script>
+  <script src="codemirror/addon/edit/foldcode.js" type="text/javascript"></script>
 
- <script>
+ <script type="text/javascript">
   $(document).ready(function() {
     var foldFunc = CodeMirror.newFoldFunction(CodeMirror.braceRangeFinder);
     var options = {
@@ -48,13 +52,18 @@
     window.editor = CodeMirror.fromTextArea($("#code")[0], options);
     $("#code").focus();
     editor.on("gutterClick", foldFunc);
-  foldFunc(editor, 9);
+    foldFunc(editor, 0);
+//    write();
   });
+
   </script>
+
 </head>
 <body>
-  <h1>EasyCrypt editor</h1>
-
+<table>
+  <tr>
+    <td>
+        <h1>EasyCrypt editor</h1>
   <div id="contents">
     <textarea id="code" name="code">
 theory group. 
@@ -71,6 +80,46 @@ theory group.
   module m. 
 end group.</textarea>
   </div>
+  <button id="myBtn">Send line</button>   
+  </td>
+  <td>
+      <h1>Feedback</h1>
+  <div id="feed">
+    <textarea id="feedback" name="feedback" rows= "25" cols="50" font="Arial"  readonly>
+    </textarea>
+  </div> 
+  </td>
+  </tr>
+</table>
 
+  <!-- PARSER FOR LINES ENDING WITH A DOT -->
+<script>
+  function write() {
+/*    var n = editor.lineCount();
+    for(var i=0; i < n; i++) {
+      var line = editor.getLine(i);
+      var counter = line.length-1;
+      var lastC = line[counter];
+      // to delete spaces at the end of the line, if there are.   
+      while(lastC == ' ') {
+        counter--;
+        lastC = line[counter];
+      }    
+      if(lastC == '.')
+         document.getElementById("demo").innerHTML += line; 
+    }*/
+  
+  }
+</script>  
+  <!-- to select the content of the line where the cursor is -->
+<script>
+  document.getElementById("myBtn").onclick = function(){line()};
+  function line()
+  {
+    var cursor = editor.getCursor();
+    document.getElementById("feedback").innerHTML = "line sent: " +
+(cursor.line+1) + " " + editor.getLine(cursor.line);
+  }
+</script>
 </body>
 </html>
