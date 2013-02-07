@@ -12,7 +12,7 @@ module Sp = EcPath.Sp
 module Mp = EcPath.Mp
 
 (* -------------------------------------------------------------------- *)
-let dloc = Location.dummy               (* FIXME: TO BE REMOVED *)
+let dloc = EcLocation.dummy               (* FIXME: TO BE REMOVED *)
 
 (* -------------------------------------------------------------------- *)
 type tyerror =
@@ -40,9 +40,97 @@ type tyerror =
   | UnNamedTypeVariable
   | UnusedTypeVariable
 
-exception TyError of Location.t * tyerror
+exception TyError of tyerror
 
-let tyerror loc x = raise (TyError (loc, x))
+module PE = EcPrinting.EcDebugPP (* FIXME *)
+
+let pp_typerror fmt = function
+    | UnknownVariable name
+        -> Format.fprintf fmt "Unknown variable: %a" pp_qsymbol name
+  
+    | UnknownFunction name
+        -> Format.fprintf fmt "Unknown function: %a" pp_qsymbol name
+  
+    | UnknownTypeName name
+        -> Format.fprintf fmt "Unknown type name: %a" pp_qsymbol name
+
+    | UnknownModName name
+        -> Format.fprintf fmt "Unknown module name: %a" pp_qsymbol name
+  
+    | UnknownTyModName name
+        -> Format.fprintf fmt "Unknown module type name: %a" pp_qsymbol name
+
+    | UnknownOperatorForSig (name, tys)
+        -> Format.fprintf fmt "Cannot find operator %a with signature %a" 
+            pp_qsymbol name
+            PE.pp_dom tys
+  
+    | InvalidNumberOfTypeArgs (name, n, i)
+        -> Format.fprintf fmt 
+            "The type %a is applied to %i paramaters while %i is excepted"
+            pp_qsymbol name i n
+  
+    | ApplInvalidArity
+        -> Format.fprintf fmt "Wrong number of arguments"
+  
+    | UnboundTypeParameter name
+        -> Format.fprintf fmt "Unbound type parameter: %s" name
+  
+    | OpNotOverloadedForSig (name, _)   (* FIXME / DUPLICATED *)
+        -> Format.fprintf fmt "Cannot find operator %a" pp_qsymbol name
+  
+    | UnexpectedType (ty1, ty2, t1, t2)
+        ->
+          let pp_type = PE.pp_type ~vmap:(EcUidgen.NameGen.create()) in
+            Format.fprintf fmt "@[the expression has type %a@\n" pp_type ty1;
+            Format.fprintf fmt "It is expected to have type %a.@\n" pp_type ty2;
+            Format.fprintf fmt "Can not unify %a and %a@]" pp_type t1 pp_type t2
+  
+    | NonLinearPattern _
+        -> Format.fprintf fmt "Non-linear pattern"
+  
+    | DuplicatedLocals None
+        -> Format.fprintf fmt "DuplicatedLocals"
+
+    | DuplicatedLocals (Some s)
+        -> Format.fprintf fmt "A symbol %s already declared at %s"
+            s.pl_desc (EcLocation.tostring s.pl_loc)
+    | ProbaExpressionForbidden
+        -> Format.fprintf fmt "ProbaExpressionForbidden"
+  
+    | PatternForbiden
+        -> Format.fprintf fmt "PatternForbiden"
+  
+    | ModApplToNonFunctor
+        -> Format.fprintf fmt "ModApplToNonFunctor"
+  
+    | ModApplInvalidArity
+        -> Format.fprintf fmt "Wrong number of module parameters"
+  
+    | ModApplInvalidArgInterface
+        -> Format.fprintf fmt "ModApplInvalidArgInterface"
+
+    | TypeVariableNotAllowed 
+        -> Format.fprintf fmt "Type variable not allowed"
+
+    | UnificationVariableNotAllowed 
+        -> Format.fprintf fmt "unification variable not allowed"
+
+    | RandomExprNotAllowed 
+        -> Format.fprintf fmt "random expression not allowed"
+
+    | UnNamedTypeVariable 
+        -> Format.fprintf fmt "unnamed type variable"
+
+    | UnusedTypeVariable 
+        -> Format.fprintf fmt "unused type variable" 
+  
+let _ = EcPexception.register (fun fmt exn -> 
+  match exn with
+  | TyError e -> Format.fprintf fmt "%a" pp_typerror e
+  | _ -> raise exn)
+
+let tyerror loc x = EcLocation.locate_error loc (TyError x)
 
 (* -------------------------------------------------------------------- *)
 let e_inuse =

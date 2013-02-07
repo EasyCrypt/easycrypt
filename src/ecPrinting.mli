@@ -12,7 +12,6 @@ open EcTypesmod
 type 'a pr = 'a -> Pprint.document
 
 val pretty     : Pprint.document -> unit
-val pp_located : Location.t -> 'a pp -> 'a pp
 val pp_of_pr   : 'a pr -> 'a pp
 
 (* -------------------------------------------------------------------- *)
@@ -116,6 +115,5 @@ module EcDebugPP : sig
   val pp_lgoal    : (EcFol.hyps * EcFol.form) pp
 
   val pp_path    : EcPath.path pp
-  val pp_qsymbol : qsymbol pp
 
 end

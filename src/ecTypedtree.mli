@@ -31,9 +31,9 @@ type tyerror =
   | UnNamedTypeVariable
   | UnusedTypeVariable
 
-exception TyError of Location.t * tyerror
+exception TyError of tyerror
 
-val tyerror : Location.t -> tyerror -> 'a
+val tyerror : EcLocation.t -> tyerror -> 'a
 
 (* -------------------------------------------------------------------- *)
 type typolicy

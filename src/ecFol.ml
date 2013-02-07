@@ -303,6 +303,31 @@ module LDecl = struct
 
   exception Ldecl_error of error
 
+  let pp_error fmt = function
+    | UnknownSymbol  s  -> 
+        Format.fprintf fmt "Unknown symbol %s" s
+    | UnknownIdent   id -> 
+        Format.fprintf fmt "Unknown ident  %s, please report" 
+          (EcIdent.tostring id)
+    | NotAVariable   id ->
+        Format.fprintf fmt "The symbol %s is not a variable" (EcIdent.name id)
+    | NotAHypothesis id ->
+        Format.fprintf fmt "The symbol %s is not a hypothesis" (EcIdent.name id)
+    | CanNotClear (id1,id2) ->
+        Format.fprintf fmt "Can not clear %s it is used in %s"
+          (EcIdent.name id1) (EcIdent.name id2)
+    | DuplicateIdent id ->
+        Format.fprintf fmt "Duplicate ident %s, please report" 
+          (EcIdent.tostring id)
+    | DuplicateSymbol s ->
+        Format.fprintf fmt 
+          "An hypothesis or a variable named %s already exists" s
+
+  let _ = EcPexception.register (fun fmt exn ->
+    match exn with
+    | Ldecl_error e -> pp_error fmt e 
+    | _ -> raise exn)
+
   let error e = raise (Ldecl_error e)
 
   let lookup s hyps = 
@@ -355,7 +380,7 @@ module LDecl = struct
   let clear id hyps = 
     let r,(_,ld), l = 
       try List.find_split (fun (id',_) -> EcIdent.id_equal id id') hyps.h_local
-      with _ -> assert false (* FIXME error message *) in
+      with _ ->  error (UnknownIdent id) in
     let check_hyp id = function 
       | (id', LD_var (_, Some f)) when Sid.mem id f.f_fv ->
           error (CanNotClear(id,id'))

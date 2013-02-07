@@ -2,9 +2,18 @@
   open EcUtils
   open EcParser
 
-  module L = EcParsetree.Location
+  module L = EcLocation
 
   exception LexicalError of L.t option * string
+
+  let pp_error fmt = function
+    | LexicalError(Some loc, s) ->
+        L.pp_located loc (fun fmt -> Format.fprintf fmt "%s") fmt s
+    | LexicalError(None, s) ->
+        Format.fprintf fmt "%s" s
+    | e -> raise e
+
+  let _ = EcPexception.register pp_error
 
   let lex_error lexbuf msg =
     raise (LexicalError (Some (L.of_lexbuf lexbuf), msg))
@@ -14,6 +23,8 @@
 
   let unterminated_string () =
     raise (LexicalError (None, "unterminated string"))
+
+
 
   let _keywords = [                      (* see [keywords.py] *)
 

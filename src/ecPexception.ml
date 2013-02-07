@@ -1,13 +1,7 @@
 (* -------------------------------------------------------------------- *)
-open EcUtils
-open EcTypes
-open EcParsetree
-open EcTypedtree
-open EcDecl
-open EcTypesmod
-open EcPrinting.EcDebugPP (* FIXME : EcPP *)
 
-(* CUT AND PASTE FROM WHY3 util/exn_printer.ml *)
+(* cut and paste from WHY3 *)
+
 type exn_printer = Format.formatter -> exn -> unit
 
 let exn_printers =
@@ -17,7 +11,7 @@ let register exn_printer = Stack.push exn_printer exn_printers
 
 let default = 
   let all_exn_printer fmt exn =
-    Format.fprintf fmt "anomaly: %s" (Printexc.to_string exn) in
+    Format.fprintf fmt "anomaly: %s, please report" (Printexc.to_string exn) in
   ref all_exn_printer 
 
 let set_default exn_pr = 
@@ -28,7 +22,7 @@ exception Exit_loop
 let exn_printer fmt exn =
   let test f =
     try
-      Format.fprintf fmt "@[%a@]" f exn;
+      Format.fprintf fmt "@[%a@]@." f exn;
       raise Exit_loop
     with
       | Exit_loop -> raise Exit_loop
@@ -40,7 +34,7 @@ let exn_printer fmt exn =
 (* End cut and paste WHY3 *)
 
 (* -------------------------------------------------------------------- *)
-let pp_typerror =
+(*let pp_typerror =
   let pp fmt = function
     | UnknownVariable name
         -> Format.fprintf fmt "Unknown variable: %a" pp_qsymbol name
@@ -150,7 +144,7 @@ let pp_exn fmt exn =
   | _ -> raise exn 
 
 let _ = register pp_exn
-
+*)
 
 
 

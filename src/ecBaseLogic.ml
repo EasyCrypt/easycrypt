@@ -1,3 +1,4 @@
+open EcLocation
 open EcUtils
 open EcMaps
 
@@ -5,6 +6,23 @@ exception UnknownSubgoal of int
 exception NotAnOpenGoal of int option
 exception InvalidNumberOfTactic of int * int
 
+let pp_error fmt = function
+  | UnknownSubgoal i ->
+      Format.fprintf fmt "Unknown subgoal %i, please report" i
+  | NotAnOpenGoal (Some i) ->
+      Format.fprintf fmt "Not a open goal %i, please report" i
+  | InvalidNumberOfTactic(i1,i2) -> 
+      Format.fprintf fmt 
+        "Invalid number of tactic, %i tactics expected, %i given" i1 i2 
+  | e -> raise e
+
+let _ = EcPexception.register pp_error
+
+  
+        
+        
+      
+      
 type ('rn,'rd) rule = {
     r_name : 'rn;
     r_hyps : ('rn,'rd) judgment list;
@@ -89,7 +107,6 @@ module Tactic =
       upd juc 0
 
     let get_first_goal juc = 
-(*      let juc = upd_done juc in *)
       let rec aux n = 
         let pj = get_goal (juc, n) in
         match pj.pj_rule with

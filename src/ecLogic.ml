@@ -28,19 +28,20 @@ let get_hyps g = fst (get_goal g)
 let get_concl g = snd (get_goal g)
 
 type tac_error =
-  | UnknownAx      of EcPath.path 
-  | NotAHypothesis of EcIdent.t 
-  | ExclMidle      of form
-  | And_I          of form
-  | Or_I           of form
-  | Imp_I          of form
-  | Forall_I       of form
-  | Exists_I       of form
-  | Imp_E          of form
-  | Forall_E       of form
-  | Exists_E       of form
-  | DupIdInCtxt    of EcIdent.t 
-  | CanNotProve    of l_decl
+  | UnknownAx             of EcPath.path 
+  | NotAHypothesis        of EcIdent.t 
+  | ExclMidle             of form
+  | And_I                 of form
+  | Or_I                  of form
+  | Imp_I                 of form
+  | Forall_I              of form
+  | Exists_I              of form
+  | Imp_E                 of form
+  | Forall_E              of form
+  | Exists_E              of form
+  | DupIdInCtxt           of EcIdent.t 
+  | CanNotProve           of l_decl
+  | InvalNumOfTactic      of int * int
 
 exception TacError of tac_error
 
@@ -72,9 +73,10 @@ let pp_tac_error fmt = function
       Format.fprintf fmt "Can not applies exists elim on %a" PE.pp_form f
   | DupIdInCtxt id -> 
       Format.fprintf fmt "Duplicate name in context %s" (EcIdent.name id)
-
   | CanNotProve g -> 
       Format.fprintf fmt "Can not prove %a" PE.pp_lgoal g
+  | InvalNumOfTactic (i1,i2) ->
+      Format.fprintf fmt "Invalid number of tactics: %i given, %i excepted" i2 i1
 
 let _ = EcPexception.register (fun fmt exn ->
   match exn with
@@ -83,6 +85,10 @@ let _ = EcPexception.register (fun fmt exn ->
       
 let tacerror e = raise (TacError e)
 
+let t_subgoal lt gs = 
+  try t_subgoal lt gs 
+  with InvalidNumberOfTactic (i1,i2) -> tacerror (InvalNumOfTactic (i1,i2))
+    
 let t_admit g = 
   let rule = { pr_name = RN_admit; pr_hyps = [] } in
   upd_rule_done g rule 

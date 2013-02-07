@@ -44,14 +44,8 @@ module Emacs : InteractiveIO = struct
     List.iter (IntCommand.prinfo stdout) infos
 
   let error (e : exn) =
-    match e with
-    | EcTypedtree.TyError (loc, exn) ->
-        EcFormat.pp_err
-          (EcPrinting.pp_located loc EcPexception.pp_typerror)
-          exn;
+    EcFormat.pp_err EcPexception.exn_printer e
 
-    | e ->
-      EcFormat.pp_err EcPexception.exn_printer e;
 end
 
 (* -------------------------------------------------------------------- *)
@@ -63,14 +57,7 @@ module CLI : InteractiveIO = struct
     List.iter (IntCommand.prinfo stdout) infos
 
   let error (e : exn) =
-    match e with
-    | EcTypedtree.TyError (loc, exn) ->
-        EcFormat.pp_err
-          (EcPrinting.pp_located loc EcPexception.pp_typerror)
-          exn;
-
-    | e ->
-        EcFormat.pp_err EcPexception.exn_printer e;
+    EcFormat.pp_err EcPexception.exn_printer e
 end
 
 (* -------------------------------------------------------------------- *)

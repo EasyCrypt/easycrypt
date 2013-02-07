@@ -551,13 +551,12 @@ end
 
 module Prover = struct
 
-  exception Unknown_prover of Location.t * string 
+  exception Unknown_prover of string 
 
   let pp_error fmt exn = 
     match exn with
-    | Unknown_prover(loc,s) ->
-        let pp fmt s = Format.fprintf fmt "Unknown prover %s" s in
-        EcPrinting.pp_located loc pp fmt s
+    | Unknown_prover s ->
+        Format.fprintf fmt "Unknown prover %s" s 
     | _ -> raise exn
 
   let _ = EcPexception.register pp_error 
@@ -565,7 +564,7 @@ module Prover = struct
   let check_prover_name name = 
     let s = unloc name in
     if not (EcWhy3.check_prover_name s) then 
-      raise (Unknown_prover (name.pl_loc, s)); 
+      EcLocation.locate_error name.pl_loc (Unknown_prover s); 
     s
 
   let mk_prover_info scope (time, ns) =
@@ -598,40 +597,77 @@ module Tactic = struct
   module TT = EcTypedtree
   module UE = EcUnify.UniEnv
 
+  type tac_error = 
+    | UnknownAxiom of qsymbol
+    | BadTyinstance 
+    | NothingToIntro
+    | FormulaExcepted 
+    | ElimDoNotWhatToDo 
+    | NoCurrentGoal
+
+  exception TacError of tac_error
+
+  let pp_tac_error fmt = 
+    function 
+      | UnknownAxiom qs -> 
+          Format.fprintf fmt "Unknown axioms or hypothesisvariable: %a" 
+           pp_qsymbol qs
+      | BadTyinstance -> 
+          Format.fprintf fmt "Invalid type instance"
+      | NothingToIntro ->
+          Format.fprintf fmt "Nothing to introduce"
+      | FormulaExcepted ->
+          Format.fprintf fmt "formula excepted"
+      | ElimDoNotWhatToDo ->
+          Format.fprintf fmt "Elim : do not known what to do"
+      | NoCurrentGoal ->
+          Format.fprintf fmt "No current goal"
+
+  let _ = EcPexception.register (fun fmt exn ->
+    match exn with
+    | TacError e -> pp_tac_error fmt e 
+    | _ -> raise exn)
+
+  let error loc e = EcLocation.locate_error loc (TacError e)
+
+  let set_loc loc tac g = 
+    try tac g 
+    with e -> EcLocation.locate_error loc e 
+    
   let process_tyargs env hyps tvi = 
     let ue = EcUnify.UniEnv.create (Some hyps.h_tvar) in
     TT.transtvi env ue tvi 
 
-  let process_instanciate env hyps (pq,tvi) = 
+  let process_instanciate env hyps ({pl_desc = pq; pl_loc = loc} ,tvi) = 
     let p,ax = 
-      try EcEnv.Ax.lookup (unloc pq) env
-      with _ -> assert false (* FIXME error message *) in
+      try EcEnv.Ax.lookup pq env
+      with _ -> error loc (UnknownAxiom pq) in
     let args = process_tyargs env hyps tvi in
     let args = 
       match ax.EcDecl.ax_params, args with
       | [], None -> []
-      | [], Some _ -> assert false (* FIXME error message *)
+      | [], Some _ -> error loc BadTyinstance
       | ltv, Some (UE.TVIunamed l) ->
-          assert (List.length ltv = List.length l);  (* FIXME error message *)
+          if not (List.length ltv = List.length l) then error loc BadTyinstance;
           l 
       | ltv, Some (UE.TVInamed l) ->
           let get id = 
-            try List.assoc (EcIdent.name id) l with _ -> assert false 
-             (* FIXME error message *) in
+            try List.assoc (EcIdent.name id) l 
+            with _ -> error loc BadTyinstance in
           List.map get ltv 
-      | _, None -> assert false (* FIXME error message *) in
+      | _, None -> error loc BadTyinstance in
     p,args 
     
-  let process_global env tvi g = 
+  let process_global loc env tvi g = 
     let hyps = get_hyps g in
     let p, tyargs = process_instanciate env hyps tvi in
-    t_glob env p tyargs g 
+    set_loc loc t_glob env p tyargs g 
 
-  let process_assumption env (pq,tvi) g = 
+  let process_assumption loc env (pq,tvi) g = 
     let hyps,concl = get_goal g in
     match pq with
     | None -> 
-        assert (tvi = None); (* FIXME error message *)
+        if (tvi <> None) then error loc BadTyinstance; 
         let h  = 
           try find_in_hyps env concl hyps 
           with _ -> assert false in
@@ -639,22 +675,25 @@ module Tactic = struct
     | Some pq ->
         match unloc pq with
         | ([],ps) when LDecl.has_hyp ps hyps ->
-            assert (tvi = None); (* FIXME error message *)
-            t_hyp env (fst (LDecl.lookup_hyp ps hyps)) g
-        | _ -> process_global env (pq,tvi) g
+            if (tvi <> None) then error pq.pl_loc BadTyinstance; 
+            set_loc loc (t_hyp env (fst (LDecl.lookup_hyp ps hyps))) g
+        | _ -> process_global loc env (pq,tvi) g
 
   let check_name hyps pi = 
     let s = odfl "_" (unloc pi) in
     let id = EcIdent.create s in
-    try LDecl.check_id id hyps; id
-    with _ -> assert false (* FIXME error message *)
+    try 
+      LDecl.check_id id hyps; id
+    with e -> EcLocation.locate_error pi.pl_loc e
 
   let process_intro pi g = 
     let hyps,concl = get_goal g in
-    let id = check_name hyps pi in
-    if is_forall concl then t_forall_intro id g
-    else if is_imp concl then t_imp_intro id g
-    else assert false (* FIXME error message *)
+    try 
+      let id = check_name hyps pi in
+      if is_forall concl then t_forall_intro id g
+      else if is_imp concl then t_imp_intro id g
+      else error pi.pl_loc NothingToIntro
+    with e -> EcLocation.locate_error pi.pl_loc e
 
   let process_intros pis = t_lseq (List.map process_intro pis)
 
@@ -674,7 +713,6 @@ module Tactic = struct
   let process_exists env pfs = t_lseq (List.map (process_exists1 env) pfs)
 
   let process_elim env f ot g =
-    (* FIXME error message *)
     match ot with
     | None -> t_imp_elim f g
     | Some pf ->
@@ -716,26 +754,26 @@ module Tactic = struct
         let ff = process_formula env g pf in
         t_id, ff 
 
-  let process_elims only_app env pe g =       
+  let process_elims loc only_app env pe g =       
     let tac, ff = process_elim_kind env g pe.elim_kind in
     if is_forall ff || is_imp ff then
       begin match pe.elim_args with
-      | [] -> assert false (* FIXME error message *)
+      | [] -> error loc FormulaExcepted 
       | ot::ots -> 
           let seq = 
             if ot = None then [tac;t_id; process_intro_elims env ots]
             else [tac; process_intro_elims env ots] in
           t_seq_subgoal (process_elim env ff ot) seq g
       end
-    else if only_app then assert false (* FIXME error message *)
+    else if only_app then error loc ElimDoNotWhatToDo (* FIXME *)
     else if is_and ff then t_on_first (t_and_elim ff g) tac
     else if is_or ff then t_on_first (t_or_elim ff g) tac
     else if is_exists ff then t_on_first (t_exists_elim ff g) tac 
-    else assert false (* FIXME error message *)
+    else  error loc ElimDoNotWhatToDo
 
-  let process_apply env pe g= 
+  let process_apply loc env pe g = 
     let id = EcIdent.create "_" in
-    t_on_last (process_elims true env pe g) 
+    t_on_last (process_elims loc true env pe g) 
       (t_seq (t_imp_intro id) (t_hyp env id))
 
   let process_trivial scope pi env g =
@@ -745,42 +783,49 @@ module Tactic = struct
   let rec process_logic_tacs scope env (tacs:ptactics) (gs:goals) : goals = 
     match tacs with
     | [] -> gs
-    | {pl_desc = Psubgoal tacs1} :: tacs2 ->  
-        let gs = t_subgoal (List.map (process_logic_tac scope env) tacs1) gs in
+    | {pl_desc = Psubgoal tacs1; pl_loc = loc } :: tacs2 ->  
+        let gs = 
+          set_loc loc 
+            (t_subgoal (List.map (process_logic_tac scope env) tacs1)) gs in
         process_logic_tacs scope env tacs2 gs
     | tac1 :: tacs2 ->
         let gs = t_on_goals (process_logic_tac scope env tac1) gs in
         process_logic_tacs scope env tacs2 gs 
         
   and process_logic_tac scope env (tac:ptactic) (g:goal) : goals = 
-    match unloc tac with
-    | Pidtac         -> t_id g 
-    | Passumption pq -> process_assumption env pq g 
-    | Ptrivial pi    -> process_trivial scope pi env g
-    | Pintro pi      -> process_intros pi g
-    | Psplit         -> t_and_intro g
-    | Pexists fs     -> process_exists env fs g
-    | Pleft          -> t_or_intro true g
-    | Pright         -> t_or_intro false g
-    | Pelim pe       -> process_elims false env pe g
-    | Papply pe      -> process_apply env pe g
-    | Pseq tacs      -> 
-        let (juc,n) = g in
-        process_logic_tacs scope env tacs (juc,[n])
-    | Psubgoal _     -> assert false 
+    let loc = tac.pl_loc in
+    let tac = 
+      match unloc tac with
+      | Pidtac         -> t_id 
+      | Passumption pq -> process_assumption loc env pq
+      | Ptrivial pi    -> process_trivial scope pi env 
+      | Pintro pi      -> process_intros pi 
+      | Psplit         -> t_and_intro 
+      | Pexists fs     -> process_exists env fs
+      | Pleft          -> t_or_intro true
+      | Pright         -> t_or_intro false
+      | Pelim pe       -> process_elims loc false env pe
+      | Papply pe      -> process_apply loc env pe
+      | Pseq tacs      -> 
+          fun (juc,n) -> process_logic_tacs scope env tacs (juc,[n])
+      | Psubgoal _     -> assert false in
+    set_loc loc tac g
 
-  let process_logic scope env juc tacs = 
-    let (juc,n) = get_first_goal juc in (* FIXME error message *)
+  let process_logic scope env juc loc tacs = 
+    let (juc,n) = 
+      try get_first_goal juc 
+      with _ -> error loc NoCurrentGoal in
     upd_done (fst (process_logic_tacs scope env tacs (juc,[n])))
     
   let process scope tac =
-    if Check_mode.check scope.sc_options then 
+    if Check_mode.check scope.sc_options then
+      let loc = match tac with | [] -> assert false | t::_ -> t.pl_loc in  
       match scope.sc_pr_uc with
-      | [] -> assert false (* FIXME error message *)
+      | [] -> error loc NoCurrentGoal
       | puc :: pucs ->
           match puc.puc_kind with
           | PUCK_logic juc -> 
-              let juc = process_logic scope scope.sc_env juc tac in
+              let juc = process_logic scope scope.sc_env juc loc tac in
               { scope with 
                 sc_pr_uc = { puc with puc_kind = PUCK_logic juc } :: pucs }
     else scope
@@ -820,10 +865,10 @@ module Ax = struct
       sc_pr_uc = puc :: scope.sc_pr_uc }
     
 
-  let save scope = 
+  let save scope loc = 
     if Check_mode.check scope.sc_options then
       match scope.sc_pr_uc with
-      | [] -> assert false (* FIXME error message *)
+      | [] -> Tactic.error loc Tactic.NoCurrentGoal
       |  { puc_name = name; puc_kind = PUCK_logic juc } :: pucs ->
           let pr = EcLogic.close_juc juc in
           let hyps,concl = pr.EcBaseLogic.j_decl in
@@ -844,6 +889,7 @@ module Ax = struct
       EcFol.Fsubst.mapty (Tuni.subst (EcUnify.UniEnv.close ue)) concl in
     let tparams = EcUnify.UniEnv.tparams ue in 
     let check = Check_mode.check scope.sc_options in
+    let loc = ax.pa_name.pl_loc in
     match ax.pa_kind with
     | PILemma when check -> 
         None, start_lemma scope (unloc ax.pa_name) tparams concl 
@@ -851,8 +897,8 @@ module Ax = struct
         let scope = start_lemma scope (unloc ax.pa_name) tparams concl in
         let scope = 
           Tactic.process scope
-            [{ pl_loc = Location.dummy; pl_desc = Ptrivial (None,None) }] in
-        let name, scope = save scope in
+            [{ pl_loc = loc; pl_desc = Ptrivial (None,None) }] in
+        let name, scope = save scope loc in
         name, scope
     | _ -> 
         let axd = { ax_params = tparams;

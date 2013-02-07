@@ -13,3 +13,8 @@ val equal : symbol -> symbol -> bool
 (* -------------------------------------------------------------------- *)
 module Msym : Map.S with type key = symbol
 module Ssym : Msym.Set
+
+val pp_symbol  : symbol EcFormat.pp
+val pp_qsymbol : qsymbol EcFormat.pp
+
+

@@ -914,7 +914,7 @@ let rec destr_tfun env tf =
   | Tfun(ty1,ty2) -> ty1, ty2
   | Tconstr(p,tys) when Ty.defined p env ->
       destr_tfun env (Ty.unfold p tys env) 
-  | _ -> assert false (* FIXME error message *)
+  | _ -> assert false 
 
 let rec ty_fun_app env tf targs = 
   match targs with

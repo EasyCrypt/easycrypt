@@ -61,10 +61,6 @@ let pretty (doc : Pp.document) =
     (Pp.Formatter.pretty 0.8 78) doc
 
 (* -------------------------------------------------------------------- *)
-let pp_located loc pp_elt fmt x =
-  Format.fprintf fmt "%s: %a" (Location.tostring loc) pp_elt x
-
-(* -------------------------------------------------------------------- *)
 let pp_of_pr (pr : 'a pr) (fmt : Format.formatter) (x : 'a) =
   Format.fprintf fmt "%a" (Pp.Formatter.pretty 0.8 78) (pr x)
 
@@ -1157,10 +1153,6 @@ module EcDebugPP = struct
   let pp_export   = BPP.pp_export ()
   let pp_theory   = fun fmt (x, v) -> BPP.pp_theory   () fmt (EcPath.Pident x, v)
   let pp_lgoal    = BPP.pp_lgoal    ()
-
-  let rec pp_qsymbol fmt = function
-    | ([]    , x) -> Format.fprintf fmt "%s" x
-    | (n :: p, x) -> Format.fprintf fmt "%s.%a" n pp_qsymbol (p, x)
 
   let rec pp_path fmt = function
     | EcPath.Pident x      -> Format.fprintf fmt "%s" (EcIdent.name x)

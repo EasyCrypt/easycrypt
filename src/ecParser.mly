@@ -3,7 +3,7 @@
 
   let error pos msg =
     let msg =
-      Printf.sprintf "%s: %s" (Location.tostring pos) msg
+      Printf.sprintf "%s: %s" (EcLocation.tostring pos) msg
     in
       failwith msg
 
@@ -292,7 +292,7 @@ prog_num:
 | LKEY n=number RKEY { 
   if n > 0 then n else 
   error
-    (Location.make $startpos(n) $endpos(n))
+    (EcLocation.make $startpos(n) $endpos(n))
     "variable side must be greater than 0"
   }
 ;
@@ -329,10 +329,10 @@ sexp:
      PEapp (mk_loc op.pl_loc id, [se]) }
 
 | se=loc(sexp) DLBRACKET ti=tvars_app? e=loc(exp) RBRACKET
-   { peget (Location.make $startpos $endpos) ti se e }
+   { peget (EcLocation.make $startpos $endpos) ti se e }
 
 | se=loc(sexp) DLBRACKET ti=tvars_app? e1=loc(exp) LEFTARROW e2=loc(exp) RBRACKET  
-   { peset (Location.make $startpos $endpos) ti se e1 e2 }
+   { peset (EcLocation.make $startpos $endpos) ti se e1 e2 }
 
 | PIPE ti=tvars_app? e=loc(exp) PIPE 
     { peapp_symb e.pl_loc EcCoreLib.s_abs ti [e] }
@@ -352,7 +352,7 @@ sexp:
 | LKEY n1=number op=loc(COMMA) n2=number RKEY
     { if   n1 = 0 && n2 = 1
       then PEident (mk_loc op.pl_loc EcCoreLib.s_dbool, None)
-      else error (Location.make $startpos $endpos) "malformed bool random" }
+      else error (EcLocation.make $startpos $endpos) "malformed bool random" }
 ;
 
 op1:
@@ -416,7 +416,7 @@ exp:
     { if   n1 = 0 && n2 = 1 then 
         let id = PEident(mk_loc op.pl_loc EcCoreLib.s_dbitstring, None) in
         PEapp (mk_loc op.pl_loc id, [e])
-      else error (Location.make $startpos $endpos) "malformed random bitstring" }
+      else error (EcLocation.make $startpos $endpos) "malformed random bitstring" }
 
 
 ;
@@ -444,10 +444,10 @@ sform:
      PFapp (mk_loc op.pl_loc id, [se]) }
 
 | se=loc(sform) DLBRACKET ti=tvars_app? e=loc(form) RBRACKET
-   { pfget (Location.make $startpos $endpos) ti se e }
+   { pfget (EcLocation.make $startpos $endpos) ti se e }
 
 | se=loc(sform) DLBRACKET ti=tvars_app? e1=loc(form) LEFTARROW e2=loc(form) RBRACKET
-   { pfset (Location.make $startpos $endpos) ti se e1 e2 }
+   { pfset (EcLocation.make $startpos $endpos) ti se e1 e2 }
 
 | x=loc(sform) LKEY s=prog_num RKEY
    { PFside (x, s) }
@@ -470,7 +470,7 @@ sform:
 | LKEY n1=number op=loc(COMMA) n2=number RKEY
     { if   n1 = 0 && n2 = 1
       then PFident (mk_loc op.pl_loc EcCoreLib.s_dbool, None)
-      else error (Location.make $startpos $endpos) "malformed bool random" }
+      else error (EcLocation.make $startpos $endpos) "malformed bool random" }
 
 | LBRACKET ti=tvars_app? e1=loc(form) op=loc(DOTDOT) e2=loc(form) RBRACKET
     { let id = PFident(mk_loc op.pl_loc EcCoreLib.s_dinter, ti) in
@@ -537,7 +537,7 @@ form:
     { if   n1 = 0 && n2 = 1 then 
         let id = PFident(mk_loc op.pl_loc EcCoreLib.s_dbitstring, None) in
         PFapp (mk_loc op.pl_loc id, [e])
-      else error (Location.make $startpos $endpos) "malformed random bitstring" }
+      else error (EcLocation.make $startpos $endpos) "malformed random bitstring" }
 ;
 
 %inline p_form_sm_list0: aout=plist0(loc(form), SEMICOLON) { aout }
@@ -705,10 +705,10 @@ mod_def:
         match body with
         | `App (m, args) ->
              if p <> [] then
-               error (Location.make $startpos $endpos)
+               error (EcLocation.make $startpos $endpos)
                  "cannot parameterized module aliase";
              if t <> None then
-               error (Location.make $startpos $endpos)
+               error (EcLocation.make $startpos $endpos)
                  "cannot bind module type to module aliase";
              (x, Pm_ident (m, args))
 
@@ -739,7 +739,7 @@ sig_def:
         match i with
         | `Alias  i ->
             if args <> [] then
-              error (Location.make $startpos $endpos) 
+              error (EcLocation.make $startpos $endpos) 
                 "cannot parameterized module type aliase";
             (x, Pmty_alias i)
         | `Struct i ->
@@ -1091,7 +1091,7 @@ checkproof:
   if s = "on" then true 
   else if s = "off" then false 
   else error
-      (Location.make $startpos(s) $endpos(s))
+      (EcLocation.make $startpos(s) $endpos(s))
       "argument of check proof should be on or of"
 }
 (* -------------------------------------------------------------------- *)
@@ -1115,7 +1115,7 @@ global_:
 | tactics          { Gtactics   $1 }
 | gprover_info     { Gprover_info $1 }
 | checkproof       { Gcheckproof $1 }
-| SAVE             { Gsave         }
+| x=loc(SAVE)      { Gsave x.pl_loc }
 | PRINT p=print    { Gprint     p  }
 ;
 
@@ -1136,7 +1136,7 @@ prog:
    { P_Undo d }
 
 | error
-   { error (Location.make $startpos $endpos) "Parsing error" }
+   { error (EcLocation.make $startpos $endpos) "Parsing error" }
 ;
 
 (* -------------------------------------------------------------------- *)
@@ -1160,7 +1160,7 @@ prog:
 %inline loc(X):
 | x=X {
     { pl_desc = x;
-      pl_loc  = Location.make $startpos $endpos;
+      pl_loc  = EcLocation.make $startpos $endpos;
     }
   }
 ;

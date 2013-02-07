@@ -130,8 +130,8 @@ and process_tactics (scope : EcScope.scope) t =
   (EcScope.Tactic.process scope t, [])
 
 (* -------------------------------------------------------------------- *)
-and process_save (scope : EcScope.scope) =
-  let name, scope = EcScope.Ax.save scope in
+and process_save (scope : EcScope.scope) loc =
+  let name, scope = EcScope.Ax.save scope loc in
   let gi = EcUtils.odfl [] (EcUtils.omap name (fun n -> [GI_AddedAxiom n])) in
     (scope, gi)
 
@@ -166,7 +166,7 @@ and process (scope : EcScope.scope) (g : global) =
     | Gtactics   t    -> process_tactics    scope t
     | Gprover_info pi -> process_proverinfo scope pi
     | Gcheckproof b   -> process_checkproof scope b
-    | Gsave           -> process_save       scope 
+    | Gsave      loc  -> process_save       scope loc
   in
     (scope, infos)
 
