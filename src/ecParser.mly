@@ -96,8 +96,7 @@
 %token AXIOM
 %token LEMMA
 %token PROOF
-// %token BITSTR
-// %token CHECKPROOF
+%token CHECKPROOF
 %token CLAIM
 %token CLONE
 %token CNST
@@ -1083,9 +1082,18 @@ prover_info:
 ;
 
 gprover_info: 
-|  PROVER x=prover_info { x }
-|  TIMEOUT t=NUM        { (Some t, None) }
+| PROVER x=prover_info { x }
+| TIMEOUT t=NUM        { (Some t, None) }
 ;
+
+checkproof:
+| CHECKPROOF s=IDENT {
+  if s = "on" then true 
+  else if s = "off" then false 
+  else error
+      (Location.make $startpos(s) $endpos(s))
+      "argument of check proof should be on or of"
+}
 (* -------------------------------------------------------------------- *)
 (* Global entries                                                       *)
 
@@ -1105,7 +1113,8 @@ global_:
 | axiom            { Gaxiom     $1 }
 | claim            { Gclaim     $1 }
 | tactics          { Gtactics   $1 }
-| gprover_info      { Gprover_info $1 }
+| gprover_info     { Gprover_info $1 }
+| checkproof       { Gcheckproof $1 }
 | SAVE             { Gsave         }
 | PRINT p=print    { Gprint     p  }
 ;

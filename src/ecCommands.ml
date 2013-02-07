@@ -136,11 +136,14 @@ and process_save (scope : EcScope.scope) =
     (scope, gi)
 
 (* -------------------------------------------------------------------- *)
-and process_prover_info scope pi = 
+and process_proverinfo scope pi = 
   let scope = EcScope.Prover.process scope pi in
-    (scope, [])
+  (scope, [])
 
-
+(* -------------------------------------------------------------------- *)
+and process_checkproof scope b = 
+  let scope = EcScope.Prover.check_proof scope b in
+  (scope, [])
 (* -------------------------------------------------------------------- *)
 and process (scope : EcScope.scope) (g : global) =
   let (scope, infos) =
@@ -161,7 +164,8 @@ and process (scope : EcScope.scope) (g : global) =
     | GthW3      a    -> process_w3_import  scope a
     | Gprint     p    -> process_print      scope p; (scope, [])
     | Gtactics   t    -> process_tactics    scope t
-    | Gprover_info pi -> process_prover_info scope pi
+    | Gprover_info pi -> process_proverinfo scope pi
+    | Gcheckproof b   -> process_checkproof scope b
     | Gsave           -> process_save       scope 
   in
     (scope, infos)
@@ -173,6 +177,11 @@ and process_internal (scope : EcScope.scope) (g : global) =
 (* -------------------------------------------------------------------- *)
 let context = ref (0, EcScope.empty, [])
 
+let full_check b = 
+  if b then 
+    let (idx,scope,l) = !context in
+    assert (idx = 0 && l = []);
+    context := (idx, EcScope.Prover.full_check scope, l)
 (* -------------------------------------------------------------------- *)
 let uuid () : int =
   let (idx, _, _) = !context in idx
@@ -191,3 +200,7 @@ let process (g : global) =
   let (newscope, infos) = process scope g in
     context := (idx+1, newscope, scope :: stack);
     infos
+
+(* -------------------------------------------------------------------- *)
+
+

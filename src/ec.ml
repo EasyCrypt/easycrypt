@@ -77,8 +77,12 @@ end
 let _ =
   options := EcOptions.parse ();
 
+
   (* Initialize why3 engine *)
   EcWhy3.initialize !options.o_why3;
+
+  (* Initialize the proof mode *)
+  EcCommands.full_check !options.o_full_check;
 
   (* Initialize load path *)
   begin

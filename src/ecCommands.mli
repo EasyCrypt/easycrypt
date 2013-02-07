@@ -9,7 +9,10 @@ type info =
 | GI_AddedPredicate of symbol
 
 (* -------------------------------------------------------------------- *)
-val addidir : string -> unit
+val addidir    : string -> unit
+val full_check : bool -> unit
+
 val process : EcParsetree.global -> info list
+
 val undo    : int -> unit
 val uuid    : unit -> int

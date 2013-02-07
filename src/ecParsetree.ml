@@ -337,6 +337,7 @@ type global =
   | GthW3        of (string list * string * w3_renaming list)
   | Gtactics     of ptactics
   | Gprover_info of pprover_infos
+  | Gcheckproof  of bool
   | Gsave
 
 type prog =

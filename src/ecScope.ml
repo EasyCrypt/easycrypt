@@ -93,6 +93,29 @@ module Context = struct
     V.tolist m.ct_order
 end
 
+module Check_mode = struct 
+  type t = 
+    | Full_check       (* Disable : checkproof off, i.e. check every think *)
+    | Check of bool    (* true check proofs,  false do not check *)
+
+  let default = Check true
+
+  let check = function
+    | Full_check -> true
+    | Check b    -> b
+
+  let for_loading = function 
+    | Full_check -> Full_check 
+    | Check _ -> Check false
+
+  let for_subscope c = c
+
+  let check_proof b = function
+    | Full_check -> Full_check
+    | Check _ -> Check b
+
+end
+    
 (* -------------------------------------------------------------------- *)
 
 type proof_uc_kind = 
@@ -103,6 +126,7 @@ type proof_uc = {
     puc_kind : proof_uc_kind;
   }
 
+  
 type scope = {
   sc_name       : EcIdent.t;
   sc_types      : EcDecl.tydecl          Context.context;
@@ -117,7 +141,7 @@ type scope = {
   sc_required   : EcIdent.t list;
   sc_pr_uc      : proof_uc list; 
   sc_pi         : EcWhy3.prover_infos;
-  sc_check      : bool;
+  sc_check      : Check_mode.t ;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -137,7 +161,7 @@ let empty =
       sc_required   = [];
       sc_pr_uc      = [];
       sc_pi         = EcWhy3.dft_prover_infos;
-      sc_check      = true;
+      sc_check      = Check_mode.default;
     }
 
 (* -------------------------------------------------------------------- *)
@@ -159,7 +183,7 @@ let attop (scope : scope) =
 (* -------------------------------------------------------------------- *)
 let for_loading (scope : scope) =
   { empty with sc_loaded = scope.sc_loaded;
-    sc_check = false
+    sc_check = Check_mode.for_loading scope.sc_check
   }
 
 (* -------------------------------------------------------------------- *)
@@ -179,7 +203,7 @@ let subscope (scope : scope) (name : symbol) =
     sc_required   = [];
     sc_pr_uc      = [];
     sc_pi         = scope.sc_pi;
-    sc_check      = scope.sc_check;
+    sc_check      = Check_mode.for_subscope scope.sc_check;
   }
 
 (* -------------------------------------------------------------------- *)
@@ -473,6 +497,14 @@ module Prover = struct
   let process scope pi = 
     { scope with sc_pi = mk_prover_info scope pi }
 
+  let full_check scope = 
+    { scope with 
+      sc_check = Check_mode.Full_check } 
+
+  let check_proof scope b = 
+    { scope with
+      sc_check = Check_mode.check_proof b scope.sc_check}
+
 end
 
 module Tactic = struct
@@ -658,7 +690,7 @@ module Tactic = struct
     upd_done (fst (process_logic_tacs scope env tacs (juc,[n])))
     
   let process scope tac =
-    if scope.sc_check then 
+    if Check_mode.check scope.sc_check then 
       match scope.sc_pr_uc with
       | [] -> assert false (* FIXME error message *)
       | puc :: pucs ->
@@ -705,7 +737,7 @@ module Ax = struct
     
 
   let save scope = 
-    if scope.sc_check then
+    if Check_mode.check scope.sc_check then
       match scope.sc_pr_uc with
       | [] -> assert false (* FIXME error message *)
       |  { puc_name = name; puc_kind = PUCK_logic juc } :: pucs ->
@@ -727,17 +759,17 @@ module Ax = struct
     let concl = 
       EcFol.Fsubst.mapty (Tuni.subst (EcUnify.UniEnv.close ue)) concl in
     let tparams = EcUnify.UniEnv.tparams ue in 
+    let check = Check_mode.check scope.sc_check in
     match ax.pa_kind with
-    | PILemma when scope.sc_check -> 
+    | PILemma when check -> 
         None, start_lemma scope (unloc ax.pa_name) tparams concl 
-    | PLemma when scope.sc_check -> 
+    | PLemma when check -> 
         let scope = start_lemma scope (unloc ax.pa_name) tparams concl in
         let scope = 
           Tactic.process scope
             [{ pl_loc = Location.dummy; pl_desc = Ptrivial (None,None) }] in
         let name, scope = save scope in
         name, scope
-
     | _ -> 
         let axd = { ax_params = tparams;
                     ax_spec = Some concl;

@@ -120,10 +120,13 @@ module Theory : sig
 end
 
 module Tactic : sig
-  val process : scope -> ptactics -> scope
+  val process  : scope -> ptactics -> scope
   val out_goal : scope -> Pprint.document
+
 end
 
 module Prover : sig 
   val process : scope -> pprover_infos -> scope
+  val full_check  : scope -> scope
+  val check_proof : scope -> bool -> scope
 end

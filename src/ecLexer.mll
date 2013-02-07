@@ -67,6 +67,7 @@
     "clone"       , CLONE      ;        (* KW: global *)
     "with"        , WITH       ;        (* KW: global *)
     "prover"      , PROVER     ;        (* KW: global *)
+    "checkproof"  , CHECKPROOF ;        (* KW: global *)
     "timeout"     , TIMEOUT    ;        (* KW: global *)
 
     "undo"        , UNDO       ;        (* KW: internal *)
