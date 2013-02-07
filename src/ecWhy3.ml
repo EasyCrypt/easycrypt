@@ -1180,7 +1180,36 @@ let check_goal env pi (hyps, concl) =
   let provers = pi.prover_names in
   check_w3_formula task provers pi.prover_timelimit concl
 
+
+let many run args = 
+  let mstatus = Mutex.create () in
+  let mwait   = Mutex.create () in
+  let cond    = Condition.create () in
+  let nargs   = List.length args in
+  let status  = ref false in
+  let nret    = ref 0 in
+  let prover_calls = List.map run args in 
+  let kill pc = 
+    let pid = Call_provers.prover_call_pid pc in
+    try Unix.kill pid 9 with _ -> () in
+  let kill_all () = List.iter kill prover_calls in 
+  let wait prover_call = 
+    let res = Call_provers.wait_on_call prover_call () in
+    Mutex.lock mstatus;
+    incr nret;
+    if res.Call_provers.pr_answer = Call_provers.Valid && !status then
+      (status := true; kill_all ());
+    Mutex.unlock mstatus;
+    Condition.signal cond
+  in
+  let _ = List.map (fun cp -> Thread.create wait cp) prover_calls in
+  Mutex.lock mwait;
+  while !nret <> nargs do Condition.wait cond mwait done;
+  !status
+
     
+    
+  
   
 
   

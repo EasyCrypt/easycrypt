@@ -20,7 +20,7 @@ end = struct
   type flag  = [`Call | `Read | `Write]
   type flags = UseFlags of int
 
-  let iflag = function (* (Obj.magic x : int) *)
+  let iflag = function 
     | `Call  -> 0
     | `Read  -> 1
     | `Write -> 2
