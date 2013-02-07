@@ -1180,53 +1180,62 @@ let check_goal env pi (hyps, concl) =
   let provers = pi.prover_names in
   check_w3_formula task provers pi.prover_timelimit concl
 
+(* -------------------------------------------------------------------- *)
+let restartable_syscall (call : unit -> 'a) : 'a =
+  let output = ref None in
+    while !output = None do
+      try  output := Some (call ())
+      with
+      | Unix.Unix_error (errno, _, _) when errno = Unix.EINTR -> ()
+    done;
+    EcUtils.oget !output
 
-let many run args = 
-  let mstatus = Mutex.create () in
-  let mwait   = Mutex.create () in
-  let cond    = Condition.create () in
-  let nargs   = List.length args in
-  let status  = ref false in
-  let nret    = ref 0 in
-  let prover_calls = List.map run args in 
-  let kill pc = 
-    let pid = Call_provers.prover_call_pid pc in
-    try Unix.kill pid 9 with _ -> () in
-  let kill_all () = List.iter kill prover_calls in 
-  let wait prover_call = 
-    let res = Call_provers.wait_on_call prover_call () in
-    Mutex.lock mstatus;
-    incr nret;
-    if res.Call_provers.pr_answer = Call_provers.Valid && !status then
-      (status := true; kill_all ());
-    Mutex.unlock mstatus;
-    Condition.signal cond
-  in
-  let _ = List.map (fun cp -> Thread.create wait cp) prover_calls in
-  Mutex.lock mwait;
-  while !nret <> nargs do Condition.wait cond mwait done;
-  !status
+let many run args =
+  let module CP = Call_provers in
 
-    
-    
-  
-  
+  let pcs    = Array.create (List.length args) None in
+  let status = ref None in
 
-  
-  
+  (* Run all processes, ignoring prover failing to start *)
+  List.iteri
+    (fun i arg ->
+       try pcs.(i) <- Some (run arg)
+       with _ -> ())
+    args;
 
+  (* Wait for the first prover giving a definitive answer *)
+  EcUtils.try_finally
+    (fun () ->
+      let alives = ref (-1) in
+        while !alives <> 0 && !status = None do
+          let pid, st = restartable_syscall Unix.wait in
+            alives := 0;
+            for i = 0 to (Array.length pcs) - 1 do
+              match pcs.(i) with
+              | None    -> ()
+              | Some pc ->
+                  pcs.(i) <- None;            (* DO IT FIRST *)
+                  if CP.prover_call_pid pc = pid then begin
+                    match (CP.post_wait_call pc st ()).CP.pr_answer with
+                    | CP.Valid   -> status := Some true
+                    | CP.Invalid -> status := Some false
+                    | _          -> ()
+                  end else
+                    alives := 1 + !alives
+            done
+        done;
+        !status)
 
-
- 
-  
-
-
-
-
-
-
-
-
-
-
-
+    (* Clean-up: hard kill + wait for remaining provers *)
+    (fun () ->
+       for i = 0 to (Array.length pcs) - 1 do
+         match pcs.(i) with
+         | None    -> ()
+         | Some pc ->
+             let pid = CP.prover_call_pid pc in
+               pcs.(i) <- None;
+               try
+                 Unix.kill pid 9;
+                 ignore (restartable_syscall (fun () -> Unix.waitpid [] pid))
+               with Unix.Unix_error _ -> ()
+       done)

@@ -8,6 +8,13 @@ let tryexn (ignoreexn : exn -> bool) (f : unit -> 'a) =
 let try_nf (f : unit -> 'a) =
   tryexn (function Not_found -> true | _ -> false) f
 
+let try_finally (body : unit -> 'a) (cleanup : unit -> unit) =
+  let aout =
+    try  body ()
+    with e -> cleanup (); raise e
+  in
+    cleanup (); aout
+
 let (^~) f = fun x y -> f y x
 
 let (-|) (f : 'a -> 'b) (g : 'c -> 'a) =
@@ -125,6 +132,13 @@ module List = struct
 
   let ohead (xs : 'a list) =
     match xs with [] -> None | x :: _ -> Some x
+
+  let iteri f xs =
+    let rec doit i = function
+      | []      -> ()
+      | x :: xs -> f i x; doit (i + 1) xs
+    in
+      doit 0 xs
 
   let rec pmap (f : 'a -> 'b option) (xs : 'a list) =
     match xs with
