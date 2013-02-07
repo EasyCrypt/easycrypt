@@ -93,29 +93,114 @@ module Context = struct
     V.tolist m.ct_order
 end
 
+type action = { 
+    for_loading  : exn -> exn;
+(*    for_subscope : exn -> exn; *)
+  } 
+
+module type IOptions = sig
+  type option 
+
+  val register          : action -> exn -> option
+  val register_identity : exn -> option
+
+  type options 
+
+  val init  : unit -> options
+  val get   : options -> option -> exn
+  val set   : options -> option -> exn -> options
+  val for_loading  : options -> options
+  val for_subscope : options -> options
+
+end
+
+module Options : IOptions = struct
+  type option = int
+       
+  type options = (action * exn) Mint.t
+
+  let known_options : options ref = ref Mint.empty
+
+  let identity = {
+    for_loading  = (fun x -> x);
+  (*  for_subscope = fun x -> x; *)
+  }
+
+  let count = ref 0 
+  let initialized = ref false 
+
+  let register action exn =
+    if !initialized then assert false;
+    let opt = !count in
+    incr count;
+    known_options := Mint.add opt (action,exn) !known_options;
+    opt 
+
+  let register_identity = register identity
+
+  let init () = 
+    initialized := true;
+    !known_options
+
+  let get options opt = 
+    snd (Mint.find opt options) 
+      
+  let set options opt exn = 
+    Mint.change (function None -> assert false | Some(act,_) -> Some (act, exn))
+      opt options
+
+  let for_loading options = 
+    Mint.map (fun (act, exn) -> act, act.for_loading exn) options
+
+  let for_subscope options = options
+
+end 
+
 module Check_mode = struct 
-  type t = 
-    | Full_check       (* Disable : checkproof off, i.e. check every think *)
-    | Check of bool    (* true check proofs,  false do not check *)
+  
+  exception Full_check (* Disable : checkproof off, i.e. check every think *)
+  exception Check of bool  (* true check proofs,  false do not check *)
+      
+  let for_loading = function 
+    | Check _ -> Check false
+    | exn     -> exn 
 
   let default = Check true
 
-  let check = function
-    | Full_check -> true
-    | Check b    -> b
+  let mode = Options.register { for_loading = for_loading } default  
 
-  let for_loading = function 
-    | Full_check -> Full_check 
-    | Check _ -> Check false
+  let check options = 
+    match Options.get options mode with
+    | Check b -> b
+    | _       -> true
 
-  let for_subscope c = c
+  let check_proof options b = 
+    match Options.get options mode with
+    | Check b' when b <> b' -> 
+        Options.set options mode (Check b')
+    | _ -> options 
 
-  let check_proof b = function
-    | Full_check -> Full_check
-    | Check _ -> Check b
+  let full_check options = 
+    Options.set options mode Full_check
 
 end
-    
+
+module Prover_info = struct
+
+  exception PI of EcWhy3.prover_infos
+
+  let npi = Options.register_identity (PI EcWhy3.dft_prover_infos)
+
+  let set options pi = 
+    Options.set options npi (PI pi)
+
+  let get options = 
+    match Options.get options npi with
+    | PI pi -> pi
+    | _     -> assert false
+
+end
+      
 (* -------------------------------------------------------------------- *)
 
 type proof_uc_kind = 
@@ -140,8 +225,7 @@ type scope = {
   sc_loaded     : (EcEnv.ctheory_w3 * EcIdent.t list) IM.t;
   sc_required   : EcIdent.t list;
   sc_pr_uc      : proof_uc list; 
-  sc_pi         : EcWhy3.prover_infos;
-  sc_check      : Check_mode.t ;
+  sc_options    : Options.options;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -160,8 +244,7 @@ let empty =
       sc_loaded     = IM.empty;
       sc_required   = [];
       sc_pr_uc      = [];
-      sc_pi         = EcWhy3.dft_prover_infos;
-      sc_check      = Check_mode.default;
+      sc_options    = Options.init ();
     }
 
 (* -------------------------------------------------------------------- *)
@@ -183,7 +266,7 @@ let attop (scope : scope) =
 (* -------------------------------------------------------------------- *)
 let for_loading (scope : scope) =
   { empty with sc_loaded = scope.sc_loaded;
-    sc_check = Check_mode.for_loading scope.sc_check
+    sc_options = Options.for_loading scope.sc_options;
   }
 
 (* -------------------------------------------------------------------- *)
@@ -202,8 +285,7 @@ let subscope (scope : scope) (name : symbol) =
     sc_loaded     = scope.sc_loaded;
     sc_required   = [];
     sc_pr_uc      = [];
-    sc_pi         = scope.sc_pi;
-    sc_check      = Check_mode.for_subscope scope.sc_check;
+    sc_options    = Options.for_subscope scope.sc_options;
   }
 
 (* -------------------------------------------------------------------- *)
@@ -488,22 +570,24 @@ module Prover = struct
 
   let mk_prover_info scope (time, ns) =
     let ns = omap ns (List.map check_prover_name) in 
-    let time = odfl scope.sc_pi.EcWhy3.prover_timelimit time in
+    let dft = Prover_info.get scope.sc_options in
+    let time = odfl dft.EcWhy3.prover_timelimit time in
     let time = if time < 1 then 1 else time in
-    { EcWhy3.prover_names = odfl scope.sc_pi.EcWhy3.prover_names ns;
+    { EcWhy3.prover_names = odfl dft.EcWhy3.prover_names ns;
       EcWhy3.prover_timelimit = time } 
     
 
   let process scope pi = 
-    { scope with sc_pi = mk_prover_info scope pi }
+    let pi = mk_prover_info scope pi in
+    { scope with sc_options = Prover_info.set scope.sc_options pi }
 
   let full_check scope = 
     { scope with 
-      sc_check = Check_mode.Full_check } 
+      sc_options = Check_mode.full_check scope.sc_options } 
 
   let check_proof scope b = 
     { scope with
-      sc_check = Check_mode.check_proof b scope.sc_check}
+      sc_options = Check_mode.check_proof scope.sc_options b}
 
 end
 
@@ -690,7 +774,7 @@ module Tactic = struct
     upd_done (fst (process_logic_tacs scope env tacs (juc,[n])))
     
   let process scope tac =
-    if Check_mode.check scope.sc_check then 
+    if Check_mode.check scope.sc_options then 
       match scope.sc_pr_uc with
       | [] -> assert false (* FIXME error message *)
       | puc :: pucs ->
@@ -737,7 +821,7 @@ module Ax = struct
     
 
   let save scope = 
-    if Check_mode.check scope.sc_check then
+    if Check_mode.check scope.sc_options then
       match scope.sc_pr_uc with
       | [] -> assert false (* FIXME error message *)
       |  { puc_name = name; puc_kind = PUCK_logic juc } :: pucs ->
@@ -759,7 +843,7 @@ module Ax = struct
     let concl = 
       EcFol.Fsubst.mapty (Tuni.subst (EcUnify.UniEnv.close ue)) concl in
     let tparams = EcUnify.UniEnv.tparams ue in 
-    let check = Check_mode.check scope.sc_check in
+    let check = Check_mode.check scope.sc_options in
     match ax.pa_kind with
     | PILemma when check -> 
         None, start_lemma scope (unloc ax.pa_name) tparams concl 
