@@ -1116,9 +1116,17 @@ let restartable_syscall (call : unit -> 'a) : 'a =
 
 let para_call provers timelimit task = 
   let module CP = Call_provers in
+
   let run prover = 
     let (_, pr, dr)  = get_prover prover in
-     Driver.prove_task ~command:pr.Whyconf.command ~timelimit dr task () in
+    let pc =
+      Driver.prove_task ~command:pr.Whyconf.command ~timelimit
+        dr task ()
+    in
+      ExtUnix.All.setpgid (CP.prover_call_pid pc) 0;
+      pc
+  in
+
   let pcs    = Array.create (List.length provers) None in
   let status = ref None in
 
@@ -1143,7 +1151,7 @@ let para_call provers timelimit task =
               if CP.prover_call_pid pc = pid then begin
                 pcs.(i) <- None;            (* DO IT FIRST *)
                 let ans = (CP.post_wait_call pc st ()).CP.pr_answer in
-                Format.printf "prover %s return %a@."
+                Format.printf "prover `%s' return %a@."
                   prover CP.print_prover_answer ans;
                 match ans with
                 | CP.Valid   -> status := Some true
@@ -1163,15 +1171,16 @@ let para_call provers timelimit task =
             let pid = CP.prover_call_pid pc in
             pcs.(i) <- None;
             try
-              Format.printf "try to kill %s@." prover;
-              Unix.kill pid 9;
+              Format.printf
+                "Killing (SIGTERM) prover `%s' (pid = %d)@."
+                prover pid;
+              Unix.kill (-pid) 15;      (* kill process group *)
               let _, st = 
-                restartable_syscall (fun () -> Unix.waitpid [] pid) in
-              ignore (CP.post_wait_call pc st ());
-              Format.printf "%s killed@." prover
+                restartable_syscall (fun () -> Unix.waitpid [] pid)
+              in
+                ignore (CP.post_wait_call pc st ());
             with Unix.Unix_error _ -> ()
       done)
-  
 
 let call_prover_task provers timelimit task =
   para_call provers timelimit task = Some true
