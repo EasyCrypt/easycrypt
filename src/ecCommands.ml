@@ -178,10 +178,13 @@ and process_internal (scope : EcScope.scope) (g : global) =
 let context = ref (0, EcScope.empty, [])
 
 let full_check b = 
-  if b then 
-    let (idx,scope,l) = !context in
-    assert (idx = 0 && l = []);
-    context := (idx, EcScope.Prover.full_check scope, l)
+  let (idx,scope,l) = !context in
+  assert (idx = 0 && l = []);  
+  let scope = EcScope.Prover.set_default scope in
+  let scope = 
+    if b then EcScope.Prover.full_check scope 
+    else scope in
+  context := (idx, scope, l)
 (* -------------------------------------------------------------------- *)
 let uuid () : int =
   let (idx, _, _) = !context in idx

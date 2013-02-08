@@ -567,18 +567,35 @@ module Prover = struct
       EcLocation.locate_error name.pl_loc (Unknown_prover s); 
     s
 
-  let mk_prover_info scope (time, ns) =
-    let ns = omap ns (List.map check_prover_name) in 
+  let mk_prover_info scope time ns = 
     let dft = Prover_info.get scope.sc_options in
     let time = odfl dft.EcWhy3.prover_timelimit time in
     let time = if time < 1 then 1 else time in
-    { EcWhy3.prover_names = odfl dft.EcWhy3.prover_names ns;
+    let provers = odfl dft.EcWhy3.prover_names ns in
+    assert (provers <> []); (* FIXME ERROR message *)
+    { EcWhy3.prover_names = provers;
       EcWhy3.prover_timelimit = time } 
-    
+
+  let set_prover_info scope time ns = 
+    let pi = mk_prover_info scope time ns in
+    { scope with sc_options = Prover_info.set scope.sc_options pi }
+
+  let set_all scope = 
+    let provers = EcWhy3.known_provers () in
+    set_prover_info scope None (Some provers)
+
+  let set_default scope = 
+    let provers = List.filter EcWhy3.check_prover_name ["Alt-Ergo";"Z3"] in
+    let time = 3 in
+    set_prover_info scope (Some time) (Some provers)
 
   let process scope pi = 
-    let pi = mk_prover_info scope pi in
-    { scope with sc_options = Prover_info.set scope.sc_options pi }
+    let ns = omap (snd pi) (List.map check_prover_name) in 
+    set_prover_info scope (fst pi) ns
+
+  let mk_prover_info scope pi =
+    let ns = omap (snd pi) (List.map check_prover_name) in 
+    mk_prover_info scope (fst pi) ns
 
   let full_check scope = 
     { scope with 

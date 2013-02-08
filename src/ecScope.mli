@@ -126,7 +126,9 @@ module Tactic : sig
 end
 
 module Prover : sig 
-  val process : scope -> pprover_infos -> scope
+  val process     : scope -> pprover_infos -> scope
+  val set_all     : scope -> scope 
+  val set_default : scope -> scope
   val full_check  : scope -> scope
   val check_proof : scope -> bool -> scope
 end

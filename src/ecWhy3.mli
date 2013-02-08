@@ -1,6 +1,8 @@
 type env
 
 val initialize : string option -> unit
+(* To be called after initialize *)
+val known_provers : unit -> string list
 val empty : env
 
 type rebinding_item
