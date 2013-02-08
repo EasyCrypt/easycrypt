@@ -585,9 +585,11 @@ module Prover = struct
     set_prover_info scope None (Some provers)
 
   let set_default scope = 
+(*
     let provers = List.filter EcWhy3.check_prover_name ["Alt-Ergo";"Z3"] in
     let time = 3 in
-    set_prover_info scope (Some time) (Some provers)
+    set_prover_info scope (Some time) (Some provers) *)
+    set_all scope
 
   let process scope pi = 
     let ns = omap (snd pi) (List.map check_prover_name) in 
