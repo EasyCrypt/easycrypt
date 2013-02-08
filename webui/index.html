@@ -60,7 +60,7 @@
 
 </head>
 <body>
-<table>
+<table width ="100%">
   <tr>
     <td>
         <h1>EasyCrypt editor</h1>
@@ -80,45 +80,50 @@ theory group.
   module m. 
 end group.</textarea>
   </div>
-  <button id="myBtn">Send line</button>   
+  <br>
+  <br>
+  <button id="next">Next line</button>  <button id="prev">Previous line</button>      
   </td>
   <td>
-      <h1>Feedback</h1>
-  <div id="feed">
-    <textarea id="feedback" name="feedback" rows= "25" cols="50" font="Arial"  readonly>
-    </textarea>
-  </div> 
+      <h1 align="center">Feedback</h1>
+  <div id="feed" align="center">
+    <textarea id="feedback" name="feedback" rows= "25" cols="50" font="Arial"  readonly></textarea>
+  </div>
+   <br>
+  <br>
   </td>
   </tr>
 </table>
-
-  <!-- PARSER FOR LINES ENDING WITH A DOT -->
+ 
+  <!-- pars the lines from the first to go on or come back -->
 <script>
-  function write() {
-/*    var n = editor.lineCount();
-    for(var i=0; i < n; i++) {
-      var line = editor.getLine(i);
-      var counter = line.length-1;
-      var lastC = line[counter];
-      // to delete spaces at the end of the line, if there are.   
-      while(lastC == ' ') {
-        counter--;
-        lastC = line[counter];
-      }    
-      if(lastC == '.')
-         document.getElementById("demo").innerHTML += line; 
-    }*/
-  
-  }
-</script>  
-  <!-- to select the content of the line where the cursor is -->
-<script>
-  document.getElementById("myBtn").onclick = function(){line()};
-  function line()
+  document.getElementById("next").onclick = function(){nextLine()};
+  var i = -1;
+<!-- function to go ahead -->
+  function nextLine()
   {
-    var cursor = editor.getCursor();
-    document.getElementById("feedback").innerHTML = "line sent: " +
-(cursor.line+1) + " " + editor.getLine(cursor.line);
+    var numLine = editor.lineCount(); //number of lines inside the editor
+    if (i < numLine-1)
+    {
+      i++;
+      var line = editor.getLine(i);
+      document.getElementById("feedback").style.color = "blue";
+      document.getElementById("feedback").innerHTML += "LINE SENT: " +
+(i+1) + " " + line + "\n";
+    }
+  }
+  document.getElementById("prev").onclick = function(){prevLine()};
+<!-- function to go back -->
+  function prevLine()
+  {
+    if (i > 0)
+    {
+    i--;
+    var line = editor.getLine(i);
+      document.getElementById("feedback").style.color = "blue";
+      document.getElementById("feedback").innerHTML += "LINE SENT: " +
+(i+1) + " " + line + "\n";
+    } 
   }
 </script>
 </body>
