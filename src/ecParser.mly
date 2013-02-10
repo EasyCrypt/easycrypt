@@ -1078,12 +1078,15 @@ print:
 ;
 
 prover_info:
-  t=NUM? pl=plist1(loc(STRING), empty)? { (t,pl) }
-;
+| max=NUM t=NUM? pl=plist1(loc(STRING), empty)? 
+    { { pprov_max = Some max; pprov_time = t; pprov_names = pl } }
+| t=NUM? pl=plist1(loc(STRING), empty)?  
+    { { pprov_max = None; pprov_time = t; pprov_names = pl } }
 
 gprover_info: 
 | PROVER x=prover_info { x }
-| TIMEOUT t=NUM        { (Some t, None) }
+| TIMEOUT t=NUM        
+    { { pprov_max = None; pprov_time = Some t; pprov_names = None } }
 ;
 
 checkproof:

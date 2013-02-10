@@ -37,7 +37,8 @@ val get_w3_th : string list -> string -> Why3.Theory.theory
 
 (*****************************************************************************)
 type prover_infos = 
-  { prover_names : string list;
+  { prover_max_run   : int;
+    prover_names     : string array;
     prover_timelimit : int; }    
 
 val dft_prover_infos : prover_infos

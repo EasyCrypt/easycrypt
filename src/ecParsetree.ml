@@ -190,8 +190,17 @@ type ppredicate = {
 
 (* -------------------------------------------------------------------- *)
 (* -------------------------------------------------------------------- *)
-type pprover_infos = 
-  int option * string located list option
+type pprover_infos = {
+    pprov_max : int option;
+    pprov_time : int option;
+    pprov_names : string located list option
+  }
+
+let empty_pprover = {
+  pprov_max   = None;
+  pprov_time  = None;
+  pprov_names = None;
+}
 
 type elim_kind = 
   | ElimHyp  of pqsymbol * tvar_inst

@@ -177,10 +177,10 @@ and process_internal (scope : EcScope.scope) (g : global) =
 (* -------------------------------------------------------------------- *)
 let context = ref (0, EcScope.empty, [])
 
-let full_check b = 
+let full_check b max_provers = 
   let (idx,scope,l) = !context in
   assert (idx = 0 && l = []);  
-  let scope = EcScope.Prover.set_default scope in
+  let scope = EcScope.Prover.set_default scope max_provers in
   let scope = 
     if b then EcScope.Prover.full_check scope 
     else scope in

@@ -1114,6 +1114,88 @@ let restartable_syscall (call : unit -> 'a) : 'a =
     done;
     EcUtils.oget !output
 
+let para_call max_provers provers timelimit task = 
+  let module CP = Call_provers in
+
+  let pcs    = Array.create max_provers None in
+
+  (* Run process, ignoring prover failing to start *)
+  let run i prover = 
+    try 
+      let (_, pr, dr)  = get_prover prover in
+(*      Format.printf "Start prover %s@." prover; *)
+      let pc =
+        Driver.prove_task ~command:pr.Whyconf.command ~timelimit dr task () in
+      ExtUnix.All.setpgid (CP.prover_call_pid pc) 0;
+      pcs.(i) <- Some(prover, pc);
+(*      Format.printf "Prover %s started and set at %i@." prover i *)
+    with _ -> ()
+  in
+
+  (* Start the provers, at most max_provers run in the same time *)
+  let nb_provers = Array.length provers in
+  let min = if max_provers < nb_provers then max_provers else nb_provers in
+  for i = 0 to min - 1 do run i provers.(i) done; 
+  (* Other provers are set in a queue *)
+  let pqueue = Queue.create () in
+  for i = min to nb_provers - 1 do Queue.add provers.(i) pqueue done;
+  
+  (* Wait for the first prover giving a definitive answer *)    
+  let status = ref None in
+  Format.printf "Try finaly@.";
+  EcUtils.try_finally
+    (fun () ->
+      let alives = ref (-1) in
+      while !alives <> 0 && !status = None do
+        let pid, st = restartable_syscall Unix.wait in
+        alives := 0;
+        for i = 0 to (Array.length pcs) - 1 do
+          match pcs.(i) with
+          | None    -> ()
+          | Some (prover, pc) ->
+              if CP.prover_call_pid pc = pid then begin
+                pcs.(i) <- None;            (* DO IT FIRST *)
+                let ans = (CP.post_wait_call pc st ()).CP.pr_answer in
+                Format.printf "prover `%s' return %a@."
+                  prover CP.print_prover_answer ans;
+                match ans with
+                | CP.Valid   -> status := Some true
+                | CP.Invalid -> status := Some false
+                | _          -> 
+                    if not (Queue.is_empty pqueue) then 
+                      run i (Queue.take pqueue)
+              end;
+              if pcs.(i) <> None then incr alives
+        done
+      done;
+      !status)
+
+    (* Clean-up: hard kill + wait for remaining provers *)
+    (fun () ->
+      for i = 0 to (Array.length pcs) - 1 do
+        match pcs.(i) with
+        | None    -> ()
+        | Some (prover,pc) ->
+            let pid = CP.prover_call_pid pc in
+            pcs.(i) <- None;
+            begin try
+              Format.printf
+                "Killing (SIGTERM) prover `%s' (pid = %d)@."
+                prover pid;
+              Unix.kill (-pid) 15;      (* kill process group *)
+            with Unix.Unix_error _ -> ()
+            end;
+(*            Format.printf "prover %s finished@." prover; *)
+            let _, st = 
+              restartable_syscall (fun () -> Unix.waitpid [] pid)
+            in
+            ignore (CP.post_wait_call pc st ());
+      done)
+
+
+
+
+(*
 let para_call provers timelimit task = 
   let module CP = Call_provers in
 
@@ -1181,18 +1263,28 @@ let para_call provers timelimit task =
                 ignore (CP.post_wait_call pc st ());
             with Unix.Unix_error _ -> ()
       done)
+*)
+type prover_infos = 
+  { prover_max_run   : int;
+    prover_names     : string array;
+    prover_timelimit : int; }    
 
-let call_prover_task provers timelimit task =
-  para_call provers timelimit task = Some true
+let dft_prover_infos = 
+  { prover_max_run   = 7;       
+    prover_names     = [||];
+    prover_timelimit = 3; }
 
-let check_w3_formula task provers timelimit f = 
+let call_prover_task pi task =
+  para_call pi.prover_max_run pi.prover_names pi.prover_timelimit task = 
+  Some true
+
+let check_w3_formula pi task f = 
   let pr   = Decl.create_prsymbol (Ident.id_fresh "goal") in
   let decl = Decl.create_prop_decl Decl.Pgoal pr f in
   let task = add_decl_with_tuples task decl in
-  call_prover_task provers timelimit task
+  call_prover_task pi task
   
 exception CanNotProve of axiom
-
 
 let close_task task vm tdecls hyps = 
   let task = 
@@ -1203,14 +1295,6 @@ let close_task task vm tdecls hyps =
       task vm.accu.pvm in
   let task = List.fold_left add_decl_with_tuples task tdecls in
   List.fold_left add_decl_with_tuples task hyps 
-
-type prover_infos = 
-  { prover_names : string list;
-    prover_timelimit : int; }    
-
-let dft_prover_infos = 
-  { prover_names = [];
-    prover_timelimit = 3; }
 
 let check_goal env pi (hyps, concl) = 
   let vm = ref (empty_vmap ()) in
@@ -1241,7 +1325,6 @@ let check_goal env pi (hyps, concl) =
   let hyps = List.map trans_hyp (List.rev hyps.h_local) in
   let concl = trans_form env !vm concl in
   let task = close_task env.logic_task !vm tdecls hyps in
-  let provers = pi.prover_names in
-  check_w3_formula task provers pi.prover_timelimit concl
+  check_w3_formula pi task concl
 
 

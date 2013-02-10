@@ -567,37 +567,46 @@ module Prover = struct
       EcLocation.locate_error name.pl_loc (Unknown_prover s); 
     s
 
-  let mk_prover_info scope time ns = 
+  let mk_prover_info scope max time ns = 
     let dft = Prover_info.get scope.sc_options in
     let time = odfl dft.EcWhy3.prover_timelimit time in
     let time = if time < 1 then 1 else time in
     let provers = odfl dft.EcWhy3.prover_names ns in
-    assert (provers <> []); (* FIXME ERROR message *)
-    { EcWhy3.prover_names = provers;
+    let max     = odfl dft.EcWhy3.prover_max_run max in
+    { EcWhy3.prover_max_run   = max;
+      EcWhy3.prover_names     = provers;
       EcWhy3.prover_timelimit = time } 
 
-  let set_prover_info scope time ns = 
-    let pi = mk_prover_info scope time ns in
+  let set_prover_info scope max time ns = 
+    let pi = mk_prover_info scope max time ns in
     { scope with sc_options = Prover_info.set scope.sc_options pi }
 
   let set_all scope = 
-    let provers = EcWhy3.known_provers () in
-    set_prover_info scope None (Some provers)
+    let provers = Array.of_list (EcWhy3.known_provers ()) in
+    set_prover_info scope None None (Some provers)
 
-  let set_default scope = 
-(*
-    let provers = List.filter EcWhy3.check_prover_name ["Alt-Ergo";"Z3"] in
+  let set_default scope max = 
+    let provers = List.filter EcWhy3.check_prover_name ["Alt-Ergo";"Z3";"Vampire";"Eprover";"CVC3";"Yices"] in
+    let provers = Array.of_list provers in
     let time = 3 in
-    set_prover_info scope (Some time) (Some provers) *)
-    set_all scope
+    set_prover_info scope (Some max) (Some time) (Some provers) 
+(*    set_all scope*)
 
   let process scope pi = 
-    let ns = omap (snd pi) (List.map check_prover_name) in 
-    set_prover_info scope (fst pi) ns
+    let max  = pi.pprov_max in
+    let time = pi.pprov_time in
+    let ns   = pi.pprov_names in 
+    let ns   = omap ns (List.map check_prover_name) in 
+    let ns   = omap ns Array.of_list in
+    set_prover_info scope max time ns
 
   let mk_prover_info scope pi =
-    let ns = omap (snd pi) (List.map check_prover_name) in 
-    mk_prover_info scope (fst pi) ns
+    let max  = pi.pprov_max in
+    let time = pi.pprov_time in
+    let ns   = pi.pprov_names in 
+    let ns   = omap ns (List.map check_prover_name) in 
+    let ns   = omap ns Array.of_list in
+    mk_prover_info scope max time ns
 
   let full_check scope = 
     { scope with 
@@ -916,7 +925,7 @@ module Ax = struct
         let scope = start_lemma scope (unloc ax.pa_name) tparams concl in
         let scope = 
           Tactic.process scope
-            [{ pl_loc = loc; pl_desc = Ptrivial (None,None) }] in
+            [{ pl_loc = loc; pl_desc = Ptrivial empty_pprover }] in
         let name, scope = save scope loc in
         name, scope
     | _ -> 

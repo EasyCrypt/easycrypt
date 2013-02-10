@@ -5,7 +5,9 @@ type options = {
   o_emacs      : bool;
   o_why3       : string option;
   o_full_check : bool;
+  o_max_prover : int;
 }
+
 
 (* -------------------------------------------------------------------- *)
 val parse   : unit -> options

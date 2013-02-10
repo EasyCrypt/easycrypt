@@ -5,6 +5,7 @@ type options = {
   o_emacs      : bool;
   o_why3       : string option;
   o_full_check : bool;
+  o_max_prover : int;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -14,6 +15,7 @@ let options = ref {
   o_emacs      = false;
   o_why3       = None;
   o_full_check = false;
+  o_max_prover = 4;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -22,17 +24,19 @@ let specs () =
   and input = ref None
   and emacs = ref false
   and why3  = ref None 
-  and full_check = ref false in
-
+  and full_check = ref false 
+  and max_provers = ref 4 in 
   let add_idir  x = idirs := x :: !idirs
   and set_why3  x = why3  := Some x
-  and set_input x = input := Some x in
+  and set_input x = input := Some x 
+  and set_max   x = max_provers := x in
 
   let specs =
       [ "-I"    , Arg.String add_idir, "Add <dir> to the list of include directories";
         "-emacs", Arg.Set    emacs   , "Output format set to <emacs>";
         "-why3" , Arg.String set_why3, "Load why3 configuration from given files";
-        "-full_check", Arg.Set full_check, "Check every loaded file, disable checkproof off"
+        "-full_check", Arg.Set full_check, "Check every loaded file, disable checkproof off";
+        "max_provers", Arg.Int set_max, "Maximun number of prover running in the same time"  
       ]
   in
     fun () ->
@@ -42,6 +46,7 @@ let specs () =
         o_emacs      = !emacs;
         o_why3       = !why3;
         o_full_check = !full_check;
+        o_max_prover = !max_provers
       }
 
 (* -------------------------------------------------------------------- *)

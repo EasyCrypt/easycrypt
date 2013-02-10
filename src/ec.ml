@@ -68,7 +68,7 @@ let _ =
   (* Initialize why3 engine *)
   EcWhy3.initialize !options.o_why3;
   (* Initialize the proof mode *)
-  EcCommands.full_check !options.o_full_check;
+  EcCommands.full_check !options.o_full_check !options.o_max_prover;
 
   (* Initialize load path *)
   begin
