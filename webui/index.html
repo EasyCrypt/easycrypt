@@ -24,7 +24,8 @@
     margin: 3em auto;
     padding: 0 1em;
     //position: absolute;
-    //left: 40px;
+    //top:144px;
+    //left: 125px;
   }
 
   //#box {}
@@ -52,7 +53,10 @@
           extraKeys: {"Ctrl-Q": function(cm){foldFunc(cm, cm.getCursor().line);}}
     };
     window.editor = CodeMirror.fromTextArea($("#code")[0], options);
-   // $("#code").focus();
+    window.editor.onKeyEvent(function(event) {
+      alert(event);
+    });
+// $("#code").focus();
     editor.on("gutterClick", foldFunc);
     foldFunc(editor, 0);
   });
@@ -130,11 +134,19 @@ end group.</textarea>
 $(document).ready(function()
   {
   $("#next").click(function(){
-    $("#box").animate({height:"36px"});
+    $("#box").show();
+    $("#box").animate({height:'+=1em'});
+  });
+});
+$(document).ready(function()
+  {
+  $("#prev").click(function(){
+    $("#box").animate({height:'-=1em'});
   });
 });
 </script>
 <div id="box"
-  style="background:#98bf21;height:18px;width:390px;margin:6px;opacity:0.7;position:absolute;top:148px;left:45px"></div>
+  style="background:#98bf21;width:390px;margin:6px;opacity:0.7;position:absolute;top:146px;left:125px;z-index:2;display:none;"></div>
+
 </body>
 </html>
