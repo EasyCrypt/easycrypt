@@ -14,7 +14,15 @@
   .CodeMirror {
        border-top: 1px solid black;
     border-bottom: 1px solid black;
-      line-height: 1.3em;
+      line-height: 1.1em;
+  }
+
+  .ec-read-only {
+    background-color: #ccc;
+  }
+
+  #feedback {
+    color: blue;
   }
 
   body {
@@ -29,7 +37,7 @@
   }
 
   //#box {}
-  
+
   </style>
 
   <script src="jquery/jquery.js" type="text/javascript"></script>
@@ -50,17 +58,57 @@
             tabMode: "shift",
       matchBrackets: true,
        lineWrapping: true,
-          extraKeys: {"Ctrl-Q": function(cm){foldFunc(cm, cm.getCursor().line);}}
+          extraKeys: {"Ctrl-Q": function(cm){foldFunc(cm, cm.getCursor().line);}},
     };
+
     window.editor = CodeMirror.fromTextArea($("#code")[0], options);
-    window.editor.onKeyEvent(function(event) {
-      alert(event);
-    });
-// $("#code").focus();
+
+    var ro_mark = null;
+
+    function clear_ro_mark() {
+      if (!ro_mark)
+        return ;
+      ro_mark.clear();
+      ro_mark = null;
+    }
+
+    function set_read_only(end) {
+      var opts = {
+        className: 'ec-read-only',
+         readOnly: true,
+      };
+
+      clear_ro_mark();
+      ro_mark = window.editor.markText({ line: 0, ch: 0 }, end, opts);
+    }
+
     editor.on("gutterClick", foldFunc);
     foldFunc(editor, 0);
-  });
 
+    var i = -1;
+
+    $("#next").click(function nextLine(editor) {
+      var numLine = window.editor.lineCount(); //number of lines inside the editor
+      if (i < numLine-1) {
+        i++;
+        var line = window.editor.getLine(i);
+        $("#feedback").append("LINE SENT: " + (i+1) + " " + line + "\n");
+      }
+      set_read_only({ line: i+1, ch: 0 });
+    });
+
+    $("#prev").click(function prevLine(editor) {
+      if (i >= 0)
+      {
+        i--;
+        var line = window.editor.getLine(i);
+        $("#feedback").append("LINE SENT: " + (i+1) + " " + line + "\n");
+        set_read_only({ line: i+1, ch: 0 });
+      }
+    });
+
+    $("#prev").onclick = function(){prevLine()};
+  });
   </script>
 
 </head>
@@ -71,23 +119,23 @@
         <h1>EasyCrypt editor</h1>
   <div id="contents">
     <textarea id="code" name="code">
-theory group. 
+theory group.
   type t.
   op neutral : t.
   op law(x:t, y:t):t.
-  
+
   axiom NeutralLeft:
 	forall (n:t), law(x,neutral) = x. {
         (*....*)
         (*...(*...*)...*)
         (*...(*..(*..*)..*)...*)
     }
-  module m. 
+  module m.
 end group.</textarea>
   </div>
   <br>
   <br>
-  <button id="next">Next line</button>  <button id="prev">Previous line</button>      
+  <button id="next">Next line</button>  <button id="prev">Previous line</button>
   </td>
   <td>
       <h1 align="center">Feedback</h1>
@@ -99,54 +147,6 @@ end group.</textarea>
   </td>
   </tr>
 </table>
- 
-  <!-- pars the lines from the first to go on or come back -->
-<script>
-  document.getElementById("next").onclick = function(){nextLine()};
-  var i = -1;
-<!-- function to go ahead -->
-  function nextLine()
-  {
-    var numLine = editor.lineCount(); //number of lines inside the editor
-    if (i < numLine-1)
-    {
-      i++;
-      var line = editor.getLine(i);
-      document.getElementById("feedback").style.color = "blue";
-      document.getElementById("feedback").innerHTML += "LINE SENT: " +
-(i+1) + " " + line + "\n";
-    }
-  }
-  document.getElementById("prev").onclick = function(){prevLine()};
-<!-- function to go back -->
-  function prevLine()
-  {
-    if (i > 0)
-    {
-    i--;
-    var line = editor.getLine(i);
-      document.getElementById("feedback").style.color = "blue";
-      document.getElementById("feedback").innerHTML += "LINE SENT: " +
-(i+1) + " " + line + "\n";
-    } 
-  }
-<!-- animation of the box -->
-$(document).ready(function()
-  {
-  $("#next").click(function(){
-    $("#box").show();
-    $("#box").animate({height:'+=1em'});
-  });
-});
-$(document).ready(function()
-  {
-  $("#prev").click(function(){
-    $("#box").animate({height:'-=1em'});
-  });
-});
-</script>
-<div id="box"
-  style="background:#98bf21;width:390px;margin:6px;opacity:0.7;position:absolute;top:146px;left:125px;z-index:2;display:none;"></div>
 
 </body>
 </html>
