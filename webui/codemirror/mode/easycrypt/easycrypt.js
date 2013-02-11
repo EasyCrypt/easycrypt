@@ -9,8 +9,8 @@ CodeMirror.defineMode("easycrypt", function(config, parserConfig) {
       hooks = parserConfig.hooks || {},
       multiLineStrings = parserConfig.multiLineStrings;
   var isOperatorChar = /[+\-*&%=<>!?|\/]/;
-  var isIdent = /[ /;
   var ident  = "(?:[a-zA-Z][a-zA-Z0-9_']*|_[a-zA-Z0-9_']+)";
+  var qident = $.format('(?:{0}\\.)*(?:{0})', ident);
   var curPunc;
 
   function tokenBase(stream, state) {
@@ -19,16 +19,16 @@ CodeMirror.defineMode("easycrypt", function(config, parserConfig) {
       var result = hooks[ch](stream, state);
       if (result !== false) return result;
     }
-    if (ch == '"' || ch == "'") {
+    if (ch == '"') {
       state.tokenize = tokenString(ch);
       return state.tokenize(stream, state);
     }
     if (/[\[\]{},;\:\.]/.test(ch)) {
       curPunc = ch;
-      return null;
+      return "punctuation";
     }
     if (/\d/.test(ch)) {
-      stream.eatWhile(/[\w\.]/);
+      stream.eatWhile(/\d/);
       return "number";
     }
     if (ch == "(") {
@@ -41,18 +41,31 @@ CodeMirror.defineMode("easycrypt", function(config, parserConfig) {
       stream.eatWhile(isOperatorChar);
       return "operator";
     }
-    stream.eatWhile(/[\w\$_]/);
-    var cur = stream.current();
-    if (keywords.propertyIsEnumerable(cur)) {
-      if (blockKeywords.propertyIsEnumerable(cur)) curPunc = "newstatement";
-      return "keyword";
+
+    if (ch == '_')
+    	return "anontype";
+
+    if (/\w/.test(ch)) {
+    	stream.eatWhile(/\w/);    	
+        var cur = stream.current();
+        if (keywords.propertyIsEnumerable(cur)) {
+            if (blockKeywords.propertyIsEnumerable(cur)) curPunc = "newstatement";
+            return "keyword";
+       }
+       if (builtin.propertyIsEnumerable(cur)) {
+    	   if (blockKeywords.propertyIsEnumerable(cur)) curPunc = "newstatement";
+           return "builtin";
+       }
+       if (atoms.propertyIsEnumerable(cur)) return "atom";
     }
-    if (builtin.propertyIsEnumerable(cur)) {
-      if (blockKeywords.propertyIsEnumerable(cur)) curPunc = "newstatement";
-      return "builtin";
-    }
-    if (atoms.propertyIsEnumerable(cur)) return "atom";
-    return "variable";
+
+    stream.backUp(stream.current().length);
+
+    if (stream.match(RegExp("^" + qident)))
+    	return "variable";
+
+    stream.next();
+    return "unknown";
   }
 
   function tokenString(quote) {
