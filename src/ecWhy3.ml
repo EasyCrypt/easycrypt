@@ -31,6 +31,10 @@ end = struct
     if !theconfig = None then begin
       let config  = Whyconf.read_config why3config in
       let main    = Whyconf.get_main config in
+      Whyconf.load_plugins main;
+      Format.printf "List of driver = ";
+      List.iter (Format.printf "%s, ") (Whyconf.plugins main);
+      Format.printf "@.";
       let w3_env  = Env.create_env (Whyconf.loadpath main) in
       let provers =
         Whyconf.Mprover.fold
@@ -1129,7 +1133,10 @@ let para_call max_provers provers timelimit task =
       ExtUnix.All.setpgid (CP.prover_call_pid pc) 0;
       pcs.(i) <- Some(prover, pc);
 (*      Format.printf "Prover %s started and set at %i@." prover i *)
-    with _ -> ()
+    with e -> 
+      Format.printf "Error when starting %s: %a" prover 
+        EcPexception.exn_printer e;
+      ()
   in
 
   (* Start the provers, at most max_provers run in the same time *)
