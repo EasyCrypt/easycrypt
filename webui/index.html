@@ -41,6 +41,7 @@
   </style>
 
   <script src="jquery/jquery.js" type="text/javascript"></script>
+  <script src="jquery/jquery-format.js" type="text/javascript"></script>
   <script src="extracLine.js" type="text/javascript"></script>
 
   <script src="codemirror/lib/codemirror.js" type="text/javascript"></script>
@@ -49,6 +50,11 @@
   <script src="codemirror/addon/edit/foldcode.js" type="text/javascript"></script>
 
  <script type="text/javascript">
+  var ident  = "(?:[a-zA-Z][a-zA-Z0-9_']*|_[a-zA-Z0-9_']+)";
+  var qident = $.format('(?:{0}\\.)*(?:{0})', ident);
+
+  alert('B.A0  hihi'.match(RegExp("^" + qident)));
+
   $(document).ready(function() {
     var foldFunc = CodeMirror.newFoldFunction(CodeMirror.braceRangeFinder);
     var options = {
