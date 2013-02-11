@@ -36,7 +36,9 @@ val p_false      : path
 
 val p_not        : path
 val p_and        : path
+val p_anda       : path
 val p_or         : path
+val p_ora        : path
 val p_imp        : path
 val p_iff        : path
 val p_eq         : path

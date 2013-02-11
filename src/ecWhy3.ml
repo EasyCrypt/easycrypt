@@ -122,8 +122,10 @@ let mk_w3_opp2 s mk =
   let decl_spec = Decl.create_prop_decl Decl.Paxiom pr form in
   ls, decl, decl_spec 
 
-let w3_ls_and, decl_and, spec_and = mk_w3_opp2 "AND" Term.t_and 
+let w3_ls_and, decl_and, spec_and = mk_w3_opp2 "AND" Term.t_and
+let w3_ls_anda, decl_anda, spec_anda = mk_w3_opp2 "ANDA" Term.t_and_asym  
 let w3_ls_or, decl_or, spec_or = mk_w3_opp2 "OR" Term.t_or
+let w3_ls_ora, decl_ora, spec_ora = mk_w3_opp2 "OR" Term.t_or_asym
 let w3_ls_imp, decl_imp, spec_imp = mk_w3_opp2 "IMP" Term.t_implies
 let w3_ls_iff, decl_iff, spec_iff = mk_w3_opp2 "IFF" Term.t_iff
 
@@ -155,7 +157,9 @@ let initial_task =
   List.fold_left Task.add_decl task
     [decl_not; spec_not;
      decl_and; spec_and;
+     decl_anda; spec_anda;
      decl_or; spec_or;
+     decl_ora; spec_ora;
      decl_imp; spec_imp;
      decl_iff; spec_iff;
      decl_eq; spec_eq ]
@@ -463,6 +467,9 @@ let import_w3_quant = function
   | Term.Tforall -> Lforall
   | Term.Texists -> Lexists
 
+let is_asym t = 
+  Ident.Slab.mem Term.asym_label t.Term.t_label
+  
 let import_w3_term env tvm =
   let memo = Ty.Hty.memo 37 (import_w3_ty env tvm) in
   let import_ty ty = 
@@ -532,8 +539,10 @@ let import_w3_term env tvm =
             let f2 = import vm t2 in
             (* FIXME : and asym ... *)
             begin match op with
-            | Term.Tand     -> f_and f1 f2
-            | Term.Tor      -> f_or  f1 f2
+            | Term.Tand     -> 
+                if is_asym t1 then f_anda f1 f2 else f_and f1 f2
+            | Term.Tor      -> 
+                if is_asym t1 then f_ora f1 f2 else f_or f1 f2
             | Term.Timplies -> f_imp f1 f2
             | Term.Tiff     -> f_iff f1 f2
             end

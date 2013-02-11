@@ -827,7 +827,9 @@ let initial =
       (mk_op [] sign EcTypes.tbool None) env in
   let env = add_bool [EcTypes.tbool] env EcCoreLib.p_not in
   let env = List.fold_left (add_bool [EcTypes.tbool;EcTypes.tbool]) env
-      [EcCoreLib.p_and; EcCoreLib.p_or; EcCoreLib.p_imp; EcCoreLib.p_iff] in
+      [EcCoreLib.p_and;EcCoreLib.p_anda; 
+       EcCoreLib.p_or;EcCoreLib.p_ora;
+       EcCoreLib.p_imp; EcCoreLib.p_iff] in
   let tdistr = { tyd_params = [ EcIdent.create "'a" ]; tyd_type = None } in
   let env = Ty.bind (EcPath.basename EcCoreLib.p_distr) tdistr env in 
   let cth = Theory.close env in

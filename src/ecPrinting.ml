@@ -328,8 +328,8 @@ struct
     match EcIo.lex_single_token name with
     | Some EP.IMPL  -> Some e_bin_prio_impl
     | Some EP.IFF   -> Some e_bin_prio_impl
-    | Some EP.OR    -> Some e_bin_prio_or
-    | Some EP.AND   -> Some e_bin_prio_and
+    | Some(EP.OR _) -> Some e_bin_prio_or
+    | Some(EP.AND _)-> Some e_bin_prio_and
     | Some EP.EQ    -> Some e_bin_prio_eq
     | Some EP.NE    -> Some e_bin_prio_eq
     | Some EP.GT    -> Some e_bin_prio_op1
@@ -346,8 +346,8 @@ struct
     match EcIo.lex_single_token name with
     | Some EP.NOT   -> Some e_uni_prio_not
     | Some EP.EQ    -> Some e_uni_prio_uminus
-    | Some EP.AND   -> Some e_uni_prio_uminus  
-    | Some EP.OR    -> Some e_uni_prio_uminus  
+    | Some(EP.AND _)-> Some e_uni_prio_uminus  
+    | Some(EP.OR _) -> Some e_uni_prio_uminus  
     | Some EP.STAR  -> Some e_uni_prio_uminus  
     | Some EP.GT    -> Some e_uni_prio_uminus  
     | Some EP.OP1 _ -> Some e_uni_prio_uminus 

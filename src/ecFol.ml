@@ -89,8 +89,14 @@ let f_not f = f_app fop_not [f] ty_bool
 let fop_and = f_op EcCoreLib.p_and [] ty_fbool2
 let f_and f1 f2 = f_app fop_and [f1;f2] ty_bool
 
+let fop_anda = f_op EcCoreLib.p_anda [] ty_fbool2
+let f_anda f1 f2 = f_app fop_anda [f1;f2] ty_bool
+
 let fop_or = f_op EcCoreLib.p_or [] ty_fbool2
 let f_or  f1 f2 = f_app fop_or [f1;f2] ty_bool
+
+let fop_ora = f_op EcCoreLib.p_ora [] ty_fbool2
+let f_ora  f1 f2 = f_app fop_ora [f1;f2] ty_bool
 
 let fop_imp = f_op EcCoreLib.p_imp [] ty_fbool2
 let f_imp f1 f2 = f_app fop_imp [f1;f2] ty_bool
@@ -131,13 +137,17 @@ let destr_error e = raise (DestrError e)
 
 let destr_and f = 
   match f.f_node with
-  | Fapp({f_node = Fop(p,_)},[f1;f2]) when EcPath.p_equal p EcCoreLib.p_and -> 
+  | Fapp({f_node = Fop(p,_)},[f1;f2]) when 
+      EcPath.p_equal p EcCoreLib.p_and || 
+      EcPath.p_equal p EcCoreLib.p_anda -> 
       f1,f2
   | _ -> destr_error Destr_and 
 
 let destr_or f = 
   match f.f_node with
-  | Fapp({f_node = Fop(p,_)},[f1;f2]) when EcPath.p_equal p EcCoreLib.p_or -> 
+  | Fapp({f_node = Fop(p,_)},[f1;f2]) when 
+      EcPath.p_equal p EcCoreLib.p_or || 
+      EcPath.p_equal p EcCoreLib.p_ora -> 
       f1,f2
   | _ -> destr_error Destr_or 
 

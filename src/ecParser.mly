@@ -71,6 +71,10 @@
 
   let mk_axiom p k = 
     { pa_name = fst p; pa_formula = snd p; pa_kind = k }
+
+  let str_and b = if b then "&&" else "/\\"
+  let str_or b  = if b then "||" else "\\/"
+
 %}
 
 %token <EcSymbols.symbol>  IDENT
@@ -88,7 +92,6 @@
 %token UNDERSCORE
 %token ADMIT
 // %token ADVERSARY
-%token AND
 %token ARROW
 %token AS
 // %token ASPEC
@@ -138,7 +141,8 @@
 %token NE
 %token NOT
 %token OP
-%token OR
+%token <bool> AND (* true asym : &&, false sym : /\ *)
+%token <bool> OR  (* true asym : ||, false sym : \/ *)
 %token PIPE
 // %token PR
 %token PRED
@@ -229,8 +233,8 @@
 
 %nonassoc IN
 %right IMPL IFF
-%right OR
-%right AND
+%right OR 
+%right AND 
 
 %nonassoc NOT
 %nonassoc PIPE
@@ -276,8 +280,8 @@ qident_pbinop:
 (* -------------------------------------------------------------------- *)
 %inline binop:
 | EQ      { "="  }
-| AND     { "&&" }
-| OR      { "||" }
+| x=AND   { str_and x }
+| x=OR    { str_or x  }
 | STAR    { "*"  }
 | GT      { ">"  }
 | x=OP1   { x    }
@@ -390,10 +394,10 @@ exp:
     { peapp_symb op.pl_loc "<=>" ti [e1; e2] }
 
 | e1=loc(exp) op=loc(OR) ti=tvars_app? e2=loc(exp)  
-    { peapp_symb op.pl_loc "||" ti [e1; e2] }
+    { peapp_symb op.pl_loc (str_or op.pl_desc) ti [e1; e2] }
 
 | e1=loc(exp) op=loc(AND) ti=tvars_app? e2=loc(exp) 
-    { peapp_symb op.pl_loc "&&" ti [e1; e2] }
+    { peapp_symb op.pl_loc (str_and op.pl_desc) ti [e1; e2] }
 
 | e1=loc(exp) op=loc(EQ) ti=tvars_app? e2=loc(exp)  
     { peapp_symb op.pl_loc "=" ti [e1; e2] }
@@ -508,10 +512,10 @@ form:
     { pfapp_symb op.pl_loc "<=>" ti [e1; e2] }
 
 | e1=loc(form) op=loc(OR) ti=tvars_app? e2=loc(form)  
-    { pfapp_symb op.pl_loc "||" ti [e1; e2] }
+    { pfapp_symb op.pl_loc (str_or op.pl_desc) ti [e1; e2] }
 
 | e1=loc(form) op=loc(AND) ti=tvars_app? e2=loc(form)  
-    { pfapp_symb op.pl_loc "&&" ti [e1; e2] }
+    { pfapp_symb op.pl_loc (str_and op.pl_desc) ti [e1; e2] }
 
 | e1=loc(form) op=loc(EQ   ) ti=tvars_app? e2=loc(form)  
     { pfapp_symb op.pl_loc "=" ti [e1; e2] }

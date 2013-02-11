@@ -122,7 +122,7 @@ let op3 = op_char_34*   op_char_3 op_char_34*
 let op4 = op_char_4+ 
 
 let binop = 
-  op1 | op2 | op3 | op4 | '!' | "&&" | "||" | "=>" | "<=>" | '>' | "=" 
+  op1 | op2 | op3 | op4 | '!' | "&&" | "/\\" | "||" | "\\/" | "=>" | "<=>" | '>' | "=" 
 
 let pbinop = '[' binop ']'
 
@@ -159,8 +159,10 @@ rule main = parse
 
   (* boolean operators *)
   | '!'                       { NOT }
-  | "&&"                      { AND }
-  | "||"                      { OR }
+  | "&&"                      { AND true}
+  | "/\\"                     { AND false}
+  | "||"                      { OR true}
+  | "\\/"                     { OR false}
   | "=>"                      { IMPL }
   | "<=>"                     { IFF }
 
