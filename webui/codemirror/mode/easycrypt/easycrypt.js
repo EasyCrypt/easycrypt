@@ -9,7 +9,8 @@ CodeMirror.defineMode("easycrypt", function(config, parserConfig) {
       hooks = parserConfig.hooks || {},
       multiLineStrings = parserConfig.multiLineStrings;
   var isOperatorChar = /[+\-*&%=<>!?|\/]/;
-
+  var isIdent = /[ /;
+  var ident  = "(?:[a-zA-Z][a-zA-Z0-9_']*|_[a-zA-Z0-9_']+)";
   var curPunc;
 
   function tokenBase(stream, state) {
@@ -150,7 +151,11 @@ CodeMirror.defineMode("easycrypt", function(config, parserConfig) {
     for (var i = 0; i < words.length; ++i) obj[words[i]] = true;
     return obj;
   }
-  var cKeywords = "require import export theory type op module lemma axiom var fun if then else while return let in end forall";
+  var cKeywords = "forall exists let in var fun if then else while assert return using"
+	  			+ " compute same idtac assumption intros split left right elim apply trivial"
+	  			+ " admit axiom lemma proof save claim cnst drop end import export module"
+	  			+ " op pred require theory type print why3 as Pr clone with prover checkproof timeout undo";        
+
 
 /*  function cppHook(stream, state) {
     if (!state.startOfLine) return false;
