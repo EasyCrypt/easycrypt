@@ -853,8 +853,8 @@ type op_kind =
   | OK_true
   | OK_false
   | OK_not
-  | OK_and
-  | OK_or
+  | OK_and   of bool
+  | OK_or    of bool
   | OK_imp
   | OK_iff
   | OK_eq
@@ -863,7 +863,8 @@ type op_kind =
 let op_kind = 
   let l = [EcCoreLib.p_true, OK_true; EcCoreLib.p_false, OK_false;
            EcCoreLib.p_not, OK_not; 
-           EcCoreLib.p_and, OK_and; EcCoreLib.p_or, OK_or; 
+           EcCoreLib.p_anda, OK_and true; EcCoreLib.p_and, OK_and false; 
+           EcCoreLib.p_ora,  OK_or true;  EcCoreLib.p_or,  OK_or  false; 
            EcCoreLib.p_imp, OK_imp; EcCoreLib.p_iff, OK_iff;
            EcCoreLib.p_eq, OK_eq] in
   let m = List.fold_left (fun m (p,k) -> Mp.add p k m) Mp.empty l in
@@ -879,7 +880,9 @@ let mk_pred2 f l =
   | [e1;e2] -> f e1 e2
   | _ -> assert false
 
+let mk_anda = mk_pred2 Term.t_and_asym
 let mk_and = mk_pred2 Term.t_and
+let mk_ora  = mk_pred2 Term.t_or_asym
 let mk_or  = mk_pred2 Term.t_or
 let mk_imp = mk_pred2 Term.t_implies
 let mk_iff = mk_pred2 Term.t_iff
@@ -890,8 +893,10 @@ let trans_op env vm p tys =
   | OK_true  -> ([],None), w3_ls_true, fun _ -> Term.t_true
   | OK_false -> ([],None), w3_ls_false, fun _ -> Term.t_false
   | OK_not   -> ([None],None), w3_ls_not, mk_not
-  | OK_and   -> ([None;None],None), w3_ls_and, mk_and
-  | OK_or    -> ([None;None],None), w3_ls_or, mk_or
+  | OK_and true  -> ([None;None],None), w3_ls_anda, mk_anda
+  | OK_and false -> ([None;None],None), w3_ls_and, mk_and
+  | OK_or  true  -> ([None;None],None), w3_ls_ora, mk_ora
+  | OK_or  false -> ([None;None],None), w3_ls_or, mk_or
   | OK_imp   -> ([None;None],None), w3_ls_imp, mk_imp
   | OK_iff   -> ([None;None],None), w3_ls_iff, mk_iff
   | OK_eq    -> 
