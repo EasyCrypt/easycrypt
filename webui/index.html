@@ -31,19 +31,11 @@
     max-width: 64.3em;
     margin: 3em auto;
     padding: 0 1em;
-    //position: absolute;
-    //top:144px;
-    //left: 125px;
   }
-
-  //#box {}
-
   </style>
 
   <script src="jquery/jquery.js" type="text/javascript"></script>
   <script src="jquery/jquery-format.js" type="text/javascript"></script>
-  <script src="extracLine.js" type="text/javascript"></script>
-
   <script src="codemirror/lib/codemirror.js" type="text/javascript"></script>
   <script src="codemirror/mode/easycrypt/easycrypt.js" type="text/javascript"></script>
   <script src="codemirror/addon/edit/matchbrackets.js" type="text/javascript"></script>
@@ -53,7 +45,6 @@
   var ident  = "(?:[a-zA-Z][a-zA-Z0-9_']*|_[a-zA-Z0-9_']+)";
   var qident = $.format('(?:{0}\\.)*(?:{0})', ident);
 
-  alert('B.A0  hihi'.match(RegExp("^" + qident)));
 
   $(document).ready(function() {
     var foldFunc = CodeMirror.newFoldFunction(CodeMirror.braceRangeFinder);
@@ -78,7 +69,7 @@
       ro_mark = null;
     }
 
-    function set_read_only(end) {
+    function set_read_only(end) { 
       var opts = {
         className: 'ec-read-only',
          readOnly: true,
@@ -91,6 +82,11 @@
     editor.on("gutterClick", foldFunc);
     foldFunc(editor, 0);
 
+    $("#test").click(function() {
+      var o = window.editor.getTokenAt({ line: 3, ch: 10});
+      alert(o.start + " " + o.end + " " + o.string + " " + o.type);
+    });
+
     var i = -1;
 
     $("#next").click(function nextLine(editor) {
@@ -98,7 +94,8 @@
       if (i < numLine-1) {
         i++;
         var line = window.editor.getLine(i);
-        $("#feedback").append("LINE SENT: " + (i+1) + " " + line + "\n");
+        //var statement = findStatement(line);
+        $("#feedback").append("STATEMENT SENT: " + (i+1) + " " + line + "\n");
       }
       set_read_only({ line: i+1, ch: 0 });
     });
@@ -114,6 +111,15 @@
     });
 
     $("#prev").onclick = function(){prevLine()};
+    
+    function findStatement(line) {
+    	var counter = line.length-1;
+        for (var c = 0; c < counter; c++ ) {
+        	if (line[c] == '.' && line[c+1] == ' ')
+        		return line.substr(0,c);
+        }
+    }
+    
   });
   </script>
 
@@ -127,6 +133,9 @@
     <textarea id="code" name="code">
 theory group.
   type t.
+  
+  op x = M.x.
+  
   op neutral : t.
   op law(x:t, y:t):t.
 
@@ -141,7 +150,9 @@ end group.</textarea>
   </div>
   <br>
   <br>
-  <button id="next">Next line</button>  <button id="prev">Previous line</button>
+  <button id="next">Next line</button>
+  <button id="prev">Previous line</button>
+  <button id="test">Test</button>
   </td>
   <td>
       <h1 align="center">Feedback</h1>
