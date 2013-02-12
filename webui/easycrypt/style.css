@@ -1,0 +1,21 @@
+.CodeMirror {
+     border-top: 1px solid black;
+  border-bottom: 1px solid black;
+    line-height: 1.1em;
+}
+
+.ec-read-only {
+  background-color: #ccc;
+}
+
+#feedback {
+  color: blue;
+}
+
+body {
+  font-family: Droid Sans, Arial, sans-serif;
+  line-height: 1.5;
+  max-width: 64.3em;
+  margin: 3em auto;
+  padding: 0 1em;
+}
