@@ -1,4 +1,6 @@
 (* -------------------------------------------------------------------- *)
+open EcSymbols
+open EcPath
 open EcTypesmod
 open EcTypes
 open EcTypesmod
@@ -8,21 +10,16 @@ open EcFol
 (* -------------------------------------------------------------------- *)
 type subst
 
-type subst1 = [
-  | `Path  of EcPath.path
-  | `Local of EcIdent.t
-]
-
 exception SubstNameClash of EcIdent.t
 exception InconsistentSubst
 
-val empty   : subst
-val add     : subst -> EcIdent.t -> subst1 -> subst
-val create  : (EcIdent.t * subst1) list -> subst
-val compose : subst -> subst -> subst
+val empty      : subst
+val add_module : subst -> EcIdent.t -> cref -> subst
 
 (* -------------------------------------------------------------------- *)
 val subst_path  : subst -> EcPath.path -> EcPath.path
+val subst_epath : subst -> EcPath.epath -> EcPath.epath
+val subst_cref  : subst -> EcPath.cref -> EcPath.cref
 val subst_local : subst -> EcIdent.t -> EcIdent.t
 
 (* -------------------------------------------------------------------- *)

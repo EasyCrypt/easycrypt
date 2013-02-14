@@ -7,97 +7,14 @@ open EcParsetree
 open EcTypes
 open EcTypesmod
 
-module IM = EcIdent.Map
+module MSym = EcSymbols.Msym
 
 (* -------------------------------------------------------------------- *)
-module Context = struct
-  module SM = EcMaps.Mstr
-
-  module V : sig
-    type 'a t
-
-    val empty  : unit -> 'a t
-    val push   : 'a -> 'a t -> 'a t
-    val iter   : ('a -> unit) -> 'a t -> unit
-    val fold   : ('b -> 'a -> 'b) -> 'b -> 'a t -> 'b
-    val tolist : 'a t -> 'a list
-  end = struct
-    type 'a data = {
-      v_front : 'a list;
-      v_back  : 'a list;
-    }
-
-    type 'a t = ('a data) ref
-
-    let normalize =
-      let normalize (v : 'a data) = {
-        v_front = List.rev_append (List.rev v.v_front) v.v_back;
-        v_back  = [];
-      } in
-        fun v ->
-          if !v.v_back <> [] then v := normalize !v; !v
-
-    let empty () =
-      ref { v_front = []; v_back = []; }
-
-    let push (x : 'a) (v : 'a t) =
-      ref { v_front = !v.v_front; v_back = x :: !v.v_back }
-
-    let iter (f : 'a -> unit) (v : 'a t) =
-      List.iter f (normalize v).v_front
-
-    let fold (f : 'b -> 'a -> 'b) (state : 'b) (v : 'a t) =
-      List.fold_left f state (normalize v).v_front
-
-    let tolist (v : 'a t) = (normalize v).v_front
-  end
-
-  type symbol = string
-
-  type 'a context = {
-    ct_map   : 'a SM.t;
-    ct_order : (string * 'a) V.t;
-  }
-
-  exception DuplicatedNameInContext of string
-  exception UnboundName of string
-
-  let empty () = { ct_map = SM.empty; ct_order = V.empty (); }
-
-  let bind (x : symbol) (v : 'a) (m : 'a context) =
-    if SM.mem x m.ct_map then
-      raise (DuplicatedNameInContext x);
-    { ct_map   = SM.add x v m.ct_map;
-      ct_order = V.push (x, v) m.ct_order; }
-
-  let rebind (x : symbol) (v : 'a) (m : 'a context) =
-    if not (SM.mem x m.ct_map) then
-      raise (UnboundName x);
-    { ct_map   = SM.add x v m.ct_map;
-      ct_order = m.ct_order; }
-
-  let exists (x : symbol) (m : 'a context) =
-    SM.mem x m.ct_map
-
-  let lookup (x : symbol) (m : 'a context) =
-    try  Some (SM.find x m.ct_map)
-    with Not_found -> None
-
-  let iter (f : symbol -> 'a -> unit) (m : 'a context) =
-    V.iter (fun (x, v) -> f x v) m.ct_order
-
-  let fold (f : 'b -> symbol -> 'a -> 'b) (state : 'b) (m : 'a context) =
-    V.fold (fun st (x, v) -> f st x v) state m.ct_order
-
-  let tolist (m : 'a context) =
-    V.tolist m.ct_order
-end
-
 type action = { 
-    for_loading  : exn -> exn;
-(*    for_subscope : exn -> exn; *)
-  } 
+  for_loading  : exn -> exn;
+} 
 
+(* -------------------------------------------------------------------- *)
 module type IOptions = sig
   type option 
 
@@ -111,9 +28,9 @@ module type IOptions = sig
   val set   : options -> option -> exn -> options
   val for_loading  : options -> options
   val for_subscope : options -> options
-
 end
 
+(* -------------------------------------------------------------------- *)
 module Options : IOptions = struct
   type option = int
        
@@ -123,7 +40,6 @@ module Options : IOptions = struct
 
   let identity = {
     for_loading  = (fun x -> x);
-  (*  for_subscope = fun x -> x; *)
   }
 
   let count = ref 0 
@@ -156,10 +72,10 @@ module Options : IOptions = struct
 
 end 
 
-module Check_mode = struct 
-  
-  exception Full_check (* Disable : checkproof off, i.e. check every think *)
-  exception Check of bool  (* true check proofs,  false do not check *)
+(* -------------------------------------------------------------------- *)
+module Check_mode = struct   
+  exception Full_check    (* Disable: checkproof off, i.e. check every think *)
+  exception Check of bool (* true check proofs, false do not check *)
       
   let for_loading = function 
     | Check _ -> Check false
@@ -182,11 +98,10 @@ module Check_mode = struct
 
   let full_check options = 
     Options.set options mode Full_check
-
 end
 
+(* -------------------------------------------------------------------- *)
 module Prover_info = struct
-
   exception PI of EcWhy3.prover_infos
 
   let npi = Options.register_identity (PI EcWhy3.dft_prover_infos)
@@ -198,50 +113,35 @@ module Prover_info = struct
     match Options.get options npi with
     | PI pi -> pi
     | _     -> assert false
-
 end
       
 (* -------------------------------------------------------------------- *)
-
 type proof_uc_kind = 
-  | PUCK_logic of EcLogic.judgment_uc 
+| PUCK_logic of EcLogic.judgment_uc 
 
 type proof_uc = {
-    puc_name : string;
-    puc_kind : proof_uc_kind;
-  }
-
+  puc_name : string;
+  puc_kind : proof_uc_kind;
+}
   
+(* -------------------------------------------------------------------- *)
 type scope = {
-  sc_name       : EcIdent.t;
-  sc_types      : EcDecl.tydecl          Context.context;
-  sc_operators  : EcDecl.operator        Context.context;
-  sc_axioms     : EcDecl.axiom           Context.context;
-  sc_modules    : EcTypesmod.module_expr Context.context;
-  sc_modtypes   : EcTypesmod.module_sig  Context.context;
-  sc_theories   : EcTypesmod.ctheory     Context.context;
+  sc_name       : symbol;
   sc_env        : EcEnv.env;
   sc_top        : scope option;
-  sc_loaded     : (EcEnv.ctheory_w3 * EcIdent.t list) IM.t;
-  sc_required   : EcIdent.t list;
+  sc_loaded     : (EcEnv.ctheory_w3 * symbol list) Msym.t;
+  sc_required   : symbol list;
   sc_pr_uc      : proof_uc list; 
   sc_options    : Options.options;
 }
 
 (* -------------------------------------------------------------------- *)
 let empty =
-  let env    = EcEnv.initial in
-
+  let env = EcEnv.initial in
     { sc_name       = EcPath.basename env.EcEnv.env_scope;
-      sc_types      = Context.empty ();
-      sc_operators  = Context.empty ();
-      sc_axioms     = Context.empty ();
-      sc_modtypes   = Context.empty ();
-      sc_modules    = Context.empty ();
-      sc_theories   = Context.empty ();
       sc_env        = EcEnv.initial;
       sc_top        = None;
-      sc_loaded     = IM.empty;
+      sc_loaded     = Msym.empty;
       sc_required   = [];
       sc_pr_uc      = [];
       sc_options    = Options.init ();
@@ -265,21 +165,15 @@ let attop (scope : scope) =
 
 (* -------------------------------------------------------------------- *)
 let for_loading (scope : scope) =
-  { empty with sc_loaded = scope.sc_loaded;
-    sc_options = Options.for_loading scope.sc_options;
-  }
+  { empty with
+      sc_loaded  = scope.sc_loaded;
+      sc_options = Options.for_loading scope.sc_options; }
 
 (* -------------------------------------------------------------------- *)
 let subscope (scope : scope) (name : symbol) =
-  let (name, env) = EcEnv.Theory.enter name scope.sc_env in
+  let env = EcEnv.Theory.enter name scope.sc_env in
 
   { sc_name       = name;
-    sc_types      = Context.empty ();
-    sc_operators  = Context.empty ();
-    sc_axioms     = Context.empty ();
-    sc_modtypes   = Context.empty ();
-    sc_modules    = Context.empty ();
-    sc_theories   = Context.empty ();
     sc_env        = env;
     sc_top        = Some scope;
     sc_loaded     = scope.sc_loaded;
@@ -289,7 +183,6 @@ let subscope (scope : scope) (name : symbol) =
   }
 
 (* -------------------------------------------------------------------- *)
-
 let init_unienv tparams = 
   let build tparams = 
     let l = ref [] in
@@ -311,8 +204,7 @@ module Op = struct
 
   let bind (scope : scope) ((x, op) : _ * operator) =
     { scope with
-        sc_operators = Context.bind (EcIdent.name x) op scope.sc_operators;
-        sc_env       = EcEnv.Op.bind x op scope.sc_env; }
+        sc_env = EcEnv.Op.bind x op scope.sc_env; }
 
   let add (scope : scope) (op : poperator) =
     let ue = init_unienv op.po_tyvars in
@@ -325,7 +217,7 @@ module Op = struct
       | Some(xs, body) ->
           let xs = List.map EcIdent.create (unlocs xs) in
           let env =
-            EcEnv.Var.bindall (List.combine xs dom) None scope.sc_env
+            EcEnv.Var.bind_locals (List.combine xs dom) scope.sc_env
           in
           let body = TT.transexpcast env ue codom body in
           Some (xs, body) in
@@ -334,7 +226,7 @@ module Op = struct
     let (dom,codom) = List.map uni dom, uni codom in
     let tparams = EcUnify.UniEnv.tparams ue in 
     let tyop = EcDecl.mk_op tparams dom codom body in
-    bind scope (EcIdent.create (unloc op.po_name), tyop)
+      bind scope (unloc op.po_name, tyop)
 end
 
 (* -------------------------------------------------------------------- *)
@@ -359,7 +251,7 @@ module Pred = struct
     let dom = List.map uni dom in
     let tparams = EcUnify.UniEnv.tparams ue in
     let tyop = EcDecl.mk_pred tparams dom body in
-    Op.bind scope (EcIdent.create (unloc op.pp_name), tyop)
+      Op.bind scope (unloc op.pp_name, tyop)
 
 end
 
@@ -370,13 +262,12 @@ module Ty = struct
 
   let bind (scope : scope) ((x, tydecl) : _ * tydecl) =
     { scope with
-        sc_types = Context.bind (EcIdent.name x) tydecl scope.sc_types;
-        sc_env   = EcEnv.Ty.bind x tydecl scope.sc_env; }
+        sc_env = EcEnv.Ty.bind x tydecl scope.sc_env; }
 
   let alias (scope : scope) name ty =
     (* FIXME : check that ty is closed, or close it *)
     let tydecl = {tyd_params = []; tyd_type = Some ty } in
-      bind scope (EcIdent.create name, tydecl)
+      bind scope (name, tydecl)
 
   let add (scope : scope) (args, name) = 
     let ue = init_unienv (Some args) in
@@ -384,7 +275,7 @@ module Ty = struct
       tyd_params = EcUnify.UniEnv.tparams ue;
       tyd_type   = None;
     } in
-    bind scope (EcIdent.create (unloc name), tydecl)
+      bind scope (unloc name, tydecl)
 
   let define (scope : scope) (args, name) body = 
     let ue = init_unienv (Some args) in
@@ -393,18 +284,16 @@ module Ty = struct
       tyd_params = EcUnify.UniEnv.tparams ue;
       tyd_type   = Some body;
     } in
-    bind scope (EcIdent.create (unloc name), tydecl)
+      bind scope (unloc name, tydecl)
 end
 
 (* -------------------------------------------------------------------- *)
 module Mod = struct
   let bind (scope : scope) (m : module_expr) =
     { scope with
-        sc_modules = Context.bind (EcIdent.name m.me_name) m scope.sc_modules;
-        sc_env     = EcEnv.Mod.bind m.me_name m scope.sc_env; }
+        sc_env = EcEnv.Mod.bind m.me_name m scope.sc_env; }
 
   let add (scope : scope) (name : symbol) m =
-    let name = EcIdent.create name in
     let m = EcTypedtree.transmod scope.sc_env name m in
       bind scope m
 end
@@ -413,12 +302,11 @@ end
 module ModType = struct
   let bind (scope : scope) ((x, tysig) : _ * module_sig) =
     { scope with
-        sc_modtypes = Context.bind (EcIdent.name x) tysig scope.sc_modtypes;
         sc_env = EcEnv.ModTy.bind x tysig scope.sc_env; }
 
   let add (scope : scope) (name : symbol) (i : pmodule_sig) =
     let tysig = EcTypedtree.transmodsig scope.sc_env i in
-      bind scope (EcIdent.create name, tysig)
+      bind scope (name, tysig)
 end
 
 (* -------------------------------------------------------------------- *)
@@ -427,34 +315,33 @@ module Theory = struct
 
   (* ------------------------------------------------------------------ *)
   let bind (scope : scope) ((x, cth) : _ * EcEnv.ctheory_w3) =
-    let theory = EcEnv.ctheory_of_ctheory_w3 cth in
-      { scope with
-          sc_theories = Context.bind (EcIdent.name x) theory scope.sc_theories;
-          sc_env      = EcEnv.Theory.bind x cth scope.sc_env; }
+    { scope with
+        sc_env = EcEnv.Theory.bind x cth scope.sc_env; }
 
   (* ------------------------------------------------------------------ *)
-  
   let required (scope : scope) (name : symbol) =
-    List.exists (fun x -> EcIdent.name x = name) scope.sc_required
+    List.exists (fun x -> x = name) scope.sc_required
 
   (* ------------------------------------------------------------------ *)
   let enter (scope : scope) (name : symbol) =
     subscope scope name
 
   (* ------------------------------------------------------------------ *)
+  let rec require_loaded id scope = 
+    if required scope id then
+      scope
+    else 
+      match Msym.find_opt id scope.sc_loaded with
+      | Some (rth, ids) -> 
+          let scope = List.fold_right require_loaded ids scope in
+          let env   = EcEnv.Theory.require id rth scope.sc_env in
+            { scope with 
+              sc_env = env;
+              sc_required = id :: scope.sc_required; }
 
-   let rec require_loaded id scope = 
-     if required scope (EcIdent.name id) then scope
-     else 
-       match IM.byident id scope.sc_loaded with
-       | Some (rth,ids) -> 
-           let scope = List.fold_right require_loaded ids scope in
-           let env  = EcEnv.Theory.require id rth scope.sc_env in
-           { scope with 
-             sc_env = env;
-             sc_required = id :: scope.sc_required } 
-       | None -> assert false 
-             
+      | None -> assert false 
+
+  (* -------------------------------------------------------------------- *)             
   let exit_r (scope : scope) =
     match scope.sc_top with
     | None     -> raise TopScope
@@ -485,27 +372,28 @@ module Theory = struct
       sc_env = EcEnv.Theory.export path scope.sc_env }
 
   (* ------------------------------------------------------------------ *)
-
   let check_end_required scope thname = 
     if scope.sc_name <> thname then
       begin 
         let msg = 
           Printf.sprintf 
             "end-of-file while processing external theory %s %s"
-            (EcIdent.name scope.sc_name) (EcIdent.name thname) in
+            scope.sc_name thname in
         failwith msg
       end;
     if scope.sc_pr_uc <> [] then
       let msg = 
         Printf.sprintf 
-          "end-of-file while processing proof %s" (EcIdent.name scope.sc_name) in
-      failwith msg
+          "end-of-file while processing proof %s" scope.sc_name
+      in
+        failwith msg
   
   let require (scope : scope) (name : symbol) loader =
-    if required scope name then scope
+    if required scope name then
+      scope
     else
-      match IM.byname name scope.sc_loaded with
-      | Some (id,_) -> require_loaded id scope 
+      match Msym.find_opt name scope.sc_loaded with
+      | Some _ -> require_loaded name scope 
 
       | None -> 
           let imported = enter (for_loading scope) name in
@@ -515,9 +403,9 @@ module Theory = struct
           let cthr, name, imported = exit_r imported in 
           let scope = 
             { scope with
-              sc_loaded = IM.add name cthr imported.sc_loaded; } in
-          require_loaded name scope 
-
+                sc_loaded = Msym.add name cthr imported.sc_loaded; }
+          in
+            require_loaded name scope 
 
   (* ------------------------------------------------------------------ *)
   let clone (scope : scope) (_thcl : theory_cloning) =
@@ -530,27 +418,18 @@ module Theory = struct
         match k with 
         | RNty -> EcWhy3.RDts 
         | RNop -> EcWhy3.RDls 
-        | RNpr -> EcWhy3.RDpr in
-      let s = EcIdent.create s in
-      (l,k,s) in
+        | RNpr -> EcWhy3.RDpr
+      in
+        (l, k, s)
+    in
+
     let renaming = List.map mk_renaming renaming in
-    let env, lth = EcEnv.import_w3_dir scope.sc_env dir file renaming in
-    let bind id = Context.bind (EcIdent.name id) in
-    let add scope = function
-      | CTh_type     (id,ty) ->
-          { scope with sc_types = bind id ty scope.sc_types }
-      | CTh_operator (id,op) ->
-          { scope with sc_operators = bind id op scope.sc_operators }
-      | CTh_axiom    (id,ax) -> 
-          { scope with sc_axioms = bind id ax scope.sc_axioms } 
-      | CTh_theory   (id,th) ->
-          { scope with sc_theories = bind id th scope.sc_theories }
-      | _ -> assert false in
-    List.fold_left add { scope with sc_env = env } lth
+    let env      = fst (EcEnv.import_w3_dir scope.sc_env dir file renaming) in
+      { scope with sc_env = env }
 end
 
+(* -------------------------------------------------------------------- *)
 module Prover = struct
-
   exception Unknown_prover of string 
 
   let pp_error fmt exn = 
@@ -871,6 +750,7 @@ module Tactic = struct
     
 end 
 
+(* -------------------------------------------------------------------- *)
 module Ax = struct
   open EcParsetree
   open EcTypes
@@ -880,8 +760,7 @@ module Ax = struct
 
   let bind (scope : scope) ((x, ax) : _ * axiom) =
     { scope with
-        sc_axioms = Context.bind (EcIdent.name x) ax scope.sc_axioms;
-        sc_env    = EcEnv.Ax.bind x ax scope.sc_env; }
+        sc_env  = EcEnv.Ax.bind x ax scope.sc_env; }
 
   let start_lemma scope name tparams concl = 
     let hyps = { EcFol.h_tvar = tparams;
@@ -891,7 +770,6 @@ module Ax = struct
       puc_kind = PUCK_logic (EcLogic.open_juc hyps concl) } in
     { scope with 
       sc_pr_uc = puc :: scope.sc_pr_uc }
-    
 
   let save scope loc = 
     if Check_mode.check scope.sc_options then
@@ -906,7 +784,7 @@ module Ax = struct
                       ax_spec = Some concl;
                       ax_kind = Lemma (Some pr) } in
           let scope = { scope with sc_pr_uc = pucs } in
-          Some name, bind scope (EcIdent.create name, axd)
+          Some name, bind scope (name, axd)
     else None, scope
 
   let add (scope : scope) (ax : paxiom) =
@@ -932,7 +810,6 @@ module Ax = struct
         let axd = { ax_params = tparams;
                     ax_spec = Some concl;
                     ax_kind = Axiom } in
-        Some (unloc ax.pa_name), bind scope (EcIdent.create (unloc ax.pa_name), axd)
+        Some (unloc ax.pa_name), bind scope (unloc ax.pa_name, axd)
           
 end
-

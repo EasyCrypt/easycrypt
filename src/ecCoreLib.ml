@@ -5,34 +5,32 @@ let s_nil  = "__nil"
 let s_cons = "::"
 let s_abs  = "__abs"
 
+(* -------------------------------------------------------------------- *)
+let s_dbool      = (["<top>"; "distr"; "Dbool"     ], "dbool")
+let s_dbitstring = (["<top>"; "distr"; "Dbitstring"], "dbitstring")
+let s_dinter     = (["<top>"; "distr"; "Dinter"    ], "dinter")
+let s_from_int   = (["<top>"; "real" ; "FromInt"   ], "from_int")
 
 (* -------------------------------------------------------------------- *)
+let id_top       = "<top>"
+let id_pervasive = "Pervasive"
+let id_unit      = "unit"
+let id_tt        = "tt"
+let id_bool      = "bool"
+let id_int       = "int"
+let id_real      = "real"
+let id_distr     = "distr"
 
-let s_dbool      = ["<top>";"distr";"Dbool"     ], "dbool"
-let s_dbitstring = ["<top>";"distr";"Dbitstring"], "dbitstring"
-let s_dinter     = ["<top>";"distr";"Dinter"    ], "dinter"
-let s_from_int   = ["<top>";"real"; "FromInt"], "from_int"
-
-(* -------------------------------------------------------------------- *)
-let id_top       = EcIdent.create "<top>"
-let id_pervasive = EcIdent.create "Pervasive"
-let id_unit      = EcIdent.create "unit"
-let id_tt        = EcIdent.create "tt"
-let id_bool      = EcIdent.create "bool"
-let id_int       = EcIdent.create "int"
-let id_real      = EcIdent.create "real"
-let id_distr     = EcIdent.create "distr"
-
-let id_true      = EcIdent.create "true"
-let id_false     = EcIdent.create "false"
-let id_not       = EcIdent.create "!"
-let id_and       = EcIdent.create "/\\"
-let id_anda      = EcIdent.create "&&"
-let id_ora       = EcIdent.create "||"
-let id_or        = EcIdent.create "\\/"
-let id_imp       = EcIdent.create "=>"
-let id_iff       = EcIdent.create "<=>"
-let id_eq        = EcIdent.create "="
+let id_true      = "true"
+let id_false     = "false"
+let id_not       = "!"
+let id_and       = "/\\"
+let id_anda      = "&&"
+let id_ora       = "||"
+let id_or        = "\\/"
+let id_imp       = "=>"
+let id_iff       = "<=>"
+let id_eq        = "="
 
 let p_top        = EcPath.extend None id_top
 let p_pervasive  = EcPath.extend (Some p_top) id_pervasive

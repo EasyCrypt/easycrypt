@@ -63,11 +63,11 @@ and module_sig_comps = {
 }
 
 and module_sig_desc =
-  | Mty_app of EcPath.path * EcPath.path list
+  | Mty_app of EcPath.cref * EcPath.cref list
   | Mty_sig of (EcIdent.t * module_type) list * module_sig_body
 
 and module_type_desc =
-  EcPath.path * EcPath.path list
+  EcPath.cref * EcPath.cref list
 
 and module_sig_body = module_sig_body_item list
 
@@ -77,13 +77,13 @@ and module_sig_body_item =
 
 and funsig = {
   fs_name : symbol;
-  fs_sig  : (EcIdent.t * EcTypes.ty) list * EcTypes.ty;
+  fs_sig  : (symbol * EcTypes.ty) list * EcTypes.ty;
   fs_uses : use_flags EcPath.Mp.t;
 }
 
 (* -------------------------------------------------------------------- *)
 type module_expr = {
-  me_name  : EcIdent.t;
+  me_name  : symbol;
   me_body  : module_body;
   me_sig   : module_sig;
   me_comps : module_comps;
@@ -92,8 +92,8 @@ type module_expr = {
 }
 
 and module_body =
-  | ME_Ident       of EcPath.path
-  | ME_Application of EcPath.path * EcPath.path list
+  | ME_Ident       of EcPath.cref
+  | ME_Application of EcPath.cref * EcPath.cref list
   | ME_Structure   of module_structure
   | ME_Decl        of module_type
 
@@ -112,19 +112,19 @@ and module_comps = module_comps_item list
 and module_comps_item = module_item
 
 and function_ = {
-  f_name   : EcIdent.t;
+  f_name   : symbol;
   f_sig    : funsig;
   f_def    : function_def option;
 }
 
 and function_def = {
-  f_locals : (EcIdent.t * EcTypes.ty) list;
+  f_locals : (symbol * EcTypes.ty) list;
   f_body   : stmt;
   f_ret    : EcTypes.tyexpr option;
 }
 
 and variable = {
-  v_name : EcIdent.t;
+  v_name : symbol;
   v_type : EcTypes.ty;
 }
 
@@ -133,7 +133,7 @@ and stmt = instr list
 and instr =
   | Sasgn   of lvalue * EcTypes.tyexpr
   | Srnd    of lvalue * EcTypes.tyexpr
-  | Scall   of lvalue option * EcPath.path * EcTypes.tyexpr list
+  | Scall   of lvalue option * EcPath.epath * EcTypes.tyexpr list
   | Sif     of EcTypes.tyexpr * stmt * stmt
   | Swhile  of EcTypes.tyexpr * stmt
   | Sassert of EcTypes.tyexpr
@@ -154,12 +154,12 @@ and lvalue =
 type theory = theory_item list
 
 and theory_item =
-  | Th_type      of (EcIdent.t * tydecl)
-  | Th_operator  of (EcIdent.t * operator)
-  | Th_axiom     of (EcIdent.t * axiom)
-  | Th_modtype   of (EcIdent.t * module_sig)
+  | Th_type      of (symbol * tydecl)
+  | Th_operator  of (symbol * operator)
+  | Th_axiom     of (symbol * axiom)
+  | Th_modtype   of (symbol * module_sig)
   | Th_module    of module_expr
-  | Th_theory    of (EcIdent.t * theory)
+  | Th_theory    of (symbol * theory)
   | Th_export    of EcPath.path
 
 (* -------------------------------------------------------------------- *)
@@ -175,12 +175,12 @@ and ctheory_desc =
 and ctheory_struct = ctheory_item list
 
 and ctheory_item =
-  | CTh_type      of (EcIdent.t * tydecl)
-  | CTh_operator  of (EcIdent.t * operator)
-  | CTh_axiom     of (EcIdent.t * axiom)
-  | CTh_modtype   of (EcIdent.t * module_sig)
+  | CTh_type      of (symbol * tydecl)
+  | CTh_operator  of (symbol * operator)
+  | CTh_axiom     of (symbol * axiom)
+  | CTh_modtype   of (symbol * module_sig)
   | CTh_module    of module_expr
-  | CTh_theory    of (EcIdent.t * ctheory)
+  | CTh_theory    of (symbol * ctheory)
   | CTh_export    of EcPath.path
 
 and ctheory_clone = {

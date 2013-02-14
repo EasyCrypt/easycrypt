@@ -32,6 +32,53 @@ let snd_map (f : 'b -> 'c) ((x, y) : 'a * 'b) =
   (x, f y)
 
 (* -------------------------------------------------------------------- *)
+module type IFlag = sig
+  type flag
+
+  val toint : flag -> int               (* \in {0..31} *)
+end
+
+module type IFlags = sig
+  type flag
+  type t
+
+  val null      : t
+  val singleton : flag -> t
+  val fromlist  : flag list -> t
+  val add       : flag -> t -> t
+  val have      : flag -> t -> bool
+  val included  : t -> t -> bool
+  val equal     : t -> t -> bool
+end
+
+module Flags(X : IFlag) : IFlags
+  with type flag = X.flag
+= struct
+  type flag = X.flag
+  type t    = Flags of int
+
+  let null = Flags 0
+
+  let add (e : flag) (Flags f : t) =
+    Flags (f lor (1 lsl (X.toint e)))
+
+  let singleton (e : flag) =
+    add e null
+
+  let fromlist (es : flag list) =
+    List.fold_left ((^~) add) null es
+
+  let have (e : flag) (Flags f : t) =
+    (f land (1 lsl (X.toint e))) != 0
+
+  let included (Flags fin) (Flags fout) =
+    (lnot fin) land fout == 0
+
+  let equal (Flags fin) (Flags fout) =
+    fin == fout
+end
+
+(* -------------------------------------------------------------------- *)
 let oiter (x : 'a option) (f : 'a -> unit) =
   match x with None -> () | Some x -> f x
 

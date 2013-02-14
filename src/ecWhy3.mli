@@ -1,3 +1,6 @@
+(* -------------------------------------------------------------------- *)
+open EcSymbols
+
 type env
 
 val initialize : string option -> unit
@@ -17,7 +20,7 @@ type renaming_kind =
   | RDls
   | RDpr
 
-type renaming_decl = (string list * renaming_kind * EcIdent.t) list
+type renaming_decl = (string list * renaming_kind * symbol) list
 
 val import_w3 : 
     env -> EcPath.path -> 
@@ -30,8 +33,6 @@ val add_op :
     env -> EcPath.path -> EcDecl.operator -> env * rebinding_item
 
 val add_ax : env -> EcPath.path -> EcDecl.axiom -> env * rebinding_item
-
-
 
 val get_w3_th : string list -> string -> Why3.Theory.theory
 

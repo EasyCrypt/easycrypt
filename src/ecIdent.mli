@@ -26,23 +26,4 @@ module Mid : Map.S with type key = t
 module Sid : Mid.Set with type elt = t
 
 (* -------------------------------------------------------------------- *)
-module Map : sig
-  type key = t
-
-  type 'a t
-
-  val empty     : 'a t
-  val add       : key -> 'a -> 'a t -> 'a t
-  val allbyname : symbol -> 'a t -> (key * 'a) list
-  val byname    : symbol -> 'a t -> (key * 'a) option
-  val byident   : key -> 'a t -> 'a option
-  val fold      : (symbol -> (key * 'a) list -> 'b -> 'b) -> 'a t -> 'b -> 'b  
-
-  val dump :
-       name:string
-    -> (EcDebug.ppdebug -> 'a -> unit)
-    -> EcDebug.ppdebug -> 'a t -> unit
-end
-
-(* -------------------------------------------------------------------- *)
 val pp_ident : t EcFormat.pp

@@ -1,4 +1,4 @@
-(** ----------------------------------------------------------------------*)
+(* ----------------------------------------------------------------------*)
 open Why3
 open EcUtils
 open EcIdent
@@ -8,6 +8,10 @@ open EcDecl
 open EcFol
 open EcTypesmod
 
+module Mp   = EcPath.Mp
+module Msym = EcSymbols.Msym
+
+(* ----------------------------------------------------------------------*)
 module Config : sig
   type prover =
     string * Why3.Whyconf.config_prover * Why3.Driver.driver
@@ -315,22 +319,20 @@ let rebind = List.fold_left rebind_item
 (*------------------------------------------------------------------*)
 (** Import why3 theory                                              *)
 (*------------------------------------------------------------------*)
-
 type renaming_kind =
   | RDts 
   | RDls
   | RDpr
 
-type renaming_decl = (string list * renaming_kind * EcIdent.t) list
+type renaming_decl = (string list * renaming_kind * EcSymbols.symbol) list
 
 let w3_id_string id = id.Ident.id_string
 
 module Renaming = struct 
-
   type renaming = {
-      r_ts : EcIdent.t Ty.Mts.t;
-      r_ls : EcIdent.t Term.Mls.t;
-      r_pr : EcIdent.t Decl.Mpr.t
+      r_ts : EcSymbols.symbol Ty.Mts.t;
+      r_ls : EcSymbols.symbol Term.Mls.t;
+      r_pr : EcSymbols.symbol Decl.Mpr.t
     }
 
   let init rd th = 
@@ -353,7 +355,7 @@ module Renaming = struct
     try Ty.Mts.find ts rn.r_ts 
     with _ -> 
       let id = ts.Ty.ts_name in
-      EcIdent.create (w3_id_string id)
+        w3_id_string id
 
   let remove_infix s =
     let len = String.length s in
@@ -371,13 +373,13 @@ module Renaming = struct
     with _ ->
       let id = ls.Term.ls_name in
       let s  = remove_infix (w3_id_string id) in
-      EcIdent.create s
+        s
 
   let get_pr rn pr = 
     try Decl.Mpr.find pr rn.r_pr 
     with _ ->
       let id = pr.Decl.pr_name in
-      EcIdent.create (w3_id_string id)
+        w3_id_string id
 end
       
 module Wtvm = 
@@ -439,8 +441,8 @@ let rbadd_w3_ty rb p ty =
     rb_w3 = Ident.Mid.add (ty.Ty.ts_name) (p,[]) rb.rb_w3 } 
 
 type zipper_elem =
-  | Zenter of EcIdent.t 
-  | Zdecl  of theory_item 
+  | Zenter of EcSymbols.symbol
+  | Zdecl  of theory_item
 
 and zipper = zipper_elem list 
 
@@ -453,7 +455,7 @@ let import_w3_tydef rn path (env,rb,z) ty =
   let p = EcPath.extend (Some path) eid in
   let env = add_w3_ty env p ty in
   let rb  = rbadd_w3_ty rb p ty in 
-  env, rb, Zdecl(Th_type (eid,td)) :: z
+    (env, rb, Zdecl (Th_type (eid, td)) :: z)
 
 let force_bool codom = 
   match codom with
@@ -650,15 +652,16 @@ let import_decls rn path env rb decls =
     match ls, z, path with
     | [], _, _ -> path, z 
     | s::ls, Zenter id:: z, EcPath.Pqname(p,id') ->
-        assert (s=EcIdent.name id && EcIdent.id_equal id id');
+        assert (s = id && EcSymbols.equal id id');
         close [] ls p (Zdecl (Th_theory (id, accu)) :: z)
     | _s::_ls, Zenter _id:: _z, _ -> assert false
     | _, Zdecl d::z, _ -> close (d::accu) ls path z
     | _, [], _ -> assert false in
   let open_ ls path z = 
     List.fold_left (fun (path, z) s -> 
-      let id = EcIdent.create s in
-      EcPath.extend (Some path) id, Zenter id :: z) (path,z) ls in
+      EcPath.extend (Some path) s, (Zenter s) :: z) (path, z) ls
+  in
+    
   let close_open ls ls' path z = 
     let ls, ls' = diff ls ls' in
     let path, z = close [] ls path z in
@@ -696,8 +699,6 @@ let import_w3 env path th rd =
 (*------------------------------------------------------------------*)
 (* exporting to why3                                                *)
 (*------------------------------------------------------------------*)
-
-
 let preid id = 
   Ident.id_fresh (EcIdent.name id)
 
@@ -711,8 +712,8 @@ let create_tvsymbol id =
   Ty.create_tvsymbol (preid id)
 
 type accum = {
-    mutable tvm  : Ty.ty Mid.t;          
-    mutable pvm  : Term.lsymbol Mid.t array;
+    mutable tvm  : Ty.ty Mid.t;
+    mutable pvm  : Term.lsymbol Mp.t array;
   }
 
 type vmap = {
@@ -721,8 +722,11 @@ type vmap = {
   }
 
 let empty_vmap () =
-  { accu = { tvm = Mid.empty; pvm = Array.make 3 Mid.empty };
-    lvm  = Mid.empty } 
+  { accu = {
+      tvm = Mid.empty;
+      pvm = Array.make 3 Mp.empty;
+    };
+    lvm  = Mid.empty; }
       
 let trans_tv vm tv = 
   let accu = vm.accu in
@@ -772,27 +776,28 @@ let trans_tydecl env path td =
   Ty.create_tysymbol pid tparams body 
 
 (*------------------------- Expressions-------------------------------------*)
-
 let check_side accu side = 
   if Array.length accu.pvm <= side then
-    let pvm = Array.make (side + 1) Mid.empty in
+    let pvm = Array.make (side + 1) Mp.empty in
     Array.iteri (fun i m -> pvm.(i) <- m) accu.pvm;
     accu.pvm <- pvm
 
-let trans_pv env vm (p,ty) side =
-  (* FIXME ensure that ty is closed *)
+let trans_pv env vm (p, ty) side =
+  (* FIXME: ensure that ty is closed *)
   let p = p.pv_name in
   let accu = vm.accu in
   check_side accu side;
   let pvm = accu.pvm.(side) in
-  let id = EcPath.basename p in
-  try Mid.find id pvm 
-  with _ ->
-    let wid = Ident.id_fresh (str_p p ^ string_of_int side) in
-    let ty = trans_ty env vm ty in
-    let ls = Term.create_lsymbol wid [] (Some ty) in
-    accu.pvm.(side) <- Mid.add id ls pvm;
-    ls
+    match p with
+    | EcPath.EModule _ -> assert false
+    | EcPath.EPath p ->
+        try Mp.find p pvm 
+        with _ ->
+          let wid = Ident.id_fresh (str_p p ^ string_of_int side) in
+          let ty = trans_ty env vm ty in
+          let ls = Term.create_lsymbol wid [] (Some ty) in
+          accu.pvm.(side) <- Mp.add p ls pvm;
+          ls
 
 let trans_lv vm lv = 
   try Mid.find lv vm.lvm 
@@ -1098,7 +1103,7 @@ let add_op env path op =
   add_ls env path ls wparams decl odecl, RBop(path,(ls,wparams),decl,odecl)
 
 let check_empty vm = 
-  let check_empty m = assert (Mid.is_empty m) in 
+  let check_empty m = assert (Mp.is_empty m) in 
   Array.iter check_empty vm.accu.pvm
 
 let add_ax env path ax =
@@ -1311,7 +1316,7 @@ let close_task task vm tdecls hyps =
   let task = 
     Array.fold_left 
       (fun task m ->
-        Mid.fold (fun _ ls task->
+        Mp.fold (fun _ ls task->
           add_decl_with_tuples task (Decl.create_param_decl ls)) m task)
       task vm.accu.pvm in
   let task = List.fold_left add_decl_with_tuples task tdecls in

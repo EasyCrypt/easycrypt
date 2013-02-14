@@ -64,13 +64,13 @@ val transform    : Fenv.fenv -> EcUnify.unienv -> pformula -> ty -> EcFol.form
 (* -------------------------------------------------------------------- *)
 val transmodsig  : EcEnv.env -> pmodule_sig -> module_sig
 val transmodtype : EcEnv.env -> pmodule_type -> module_type
-val transmod     : EcEnv.env -> EcIdent.t -> pmodule_expr -> module_expr
+val transmod     : EcEnv.env -> symbol -> pmodule_expr -> module_expr
 
 (* -------------------------------------------------------------------- *)
 val check_tymod_sub : EcEnv.env -> module_sig_comps -> module_sig_comps -> unit
 val check_tymod_eq  : EcEnv.env -> module_sig_comps -> module_sig_comps -> unit
 
 (* -------------------------------------------------------------------- *)
-val e_inuse : tyexpr -> EcPath.Sp.t
-val i_inuse : instr  -> use_flags EcPath.Mp.t
-val s_inuse : stmt   -> use_flags EcPath.Mp.t
+val e_inuse : tyexpr -> EcPath.Sep.t
+val i_inuse : instr  -> use_flags EcPath.Mep.t
+val s_inuse : stmt   -> use_flags EcPath.Mep.t

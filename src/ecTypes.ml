@@ -114,9 +114,10 @@ type pvar_kind =
   | PVglob
   | PVloc 
 
-type prog_var = 
-    { pv_name : EcPath.path;
-      pv_kind : pvar_kind }
+type prog_var = {
+  pv_name : EcPath.epath;
+  pv_kind : pvar_kind;
+}
 
 type lpattern =
   | LSymbol of EcIdent.t
@@ -128,14 +129,14 @@ type tyexpr = {
 }
 
 and tyexpr_r =
-  | Eint      of int                              (* int. literal       *)
-  | Elocal    of EcIdent.t                        (* let-variables      *)
-  | Evar      of prog_var                         (* module variable    *)
+  | Eint      of int                              (* int. literal          *)
+  | Elocal    of EcIdent.t                        (* let-variables         *)
+  | Evar      of prog_var                         (* module variable       *)
   | Eop       of EcPath.path * ty list            (* op apply to type args *)
-  | Eapp      of tyexpr * tyexpr list             (* op. application    *)
-  | Elet      of lpattern * tyexpr * tyexpr       (* let binding        *)
-  | Etuple    of tyexpr list                      (* tuple constructor  *)
-  | Eif       of tyexpr * tyexpr * tyexpr         (* _ ? _ : _          *)
+  | Eapp      of tyexpr * tyexpr list             (* op. application       *)
+  | Elet      of lpattern * tyexpr * tyexpr       (* let binding           *)
+  | Etuple    of tyexpr list                      (* tuple constructor     *)
+  | Eif       of tyexpr * tyexpr * tyexpr         (* _ ? _ : _             *)
 
 and tyexpr_meta = {
   tym_type : ty;
@@ -161,7 +162,7 @@ let e_if       = fun c e1 e2  -> e_tyexpr (Eif (c, e1, e2))
 
 (* -------------------------------------------------------------------- *)
 let pv_equal v1 v2 = 
-  EcPath.p_equal v1.pv_name v2.pv_name && v1.pv_kind = v2.pv_kind 
+  EcPath.ep_equal v1.pv_name v2.pv_name && v1.pv_kind = v2.pv_kind 
 
 (* -------------------------------------------------------------------- *)
 let ids_of_lpattern = function
@@ -243,8 +244,9 @@ module Dump = struct
         
       | Evar x ->
           EcDebug.onhlist pp
-            "Evar" ~extra:(EcPath.tostring x.pv_name)
+            "Evar" ~extra:(EcPath.ep_tostring x.pv_name)
             ty_dump []
+
       | Eop (x, tys) ->
           EcDebug.onhlist pp "Eop" ~extra:(EcPath.tostring x)
             ty_dump tys

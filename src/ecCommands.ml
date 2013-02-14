@@ -88,7 +88,7 @@ and process_th_open (scope : EcScope.scope) name =
 
 (* -------------------------------------------------------------------- *)
 and process_th_close (scope : EcScope.scope) name =
-  if EcIdent.name (EcScope.name scope) <> name then
+  if (EcScope.name scope) <> name then
     failwith "invalid theory name";     (* FIXME *)
   (snd (EcScope.Theory.exit scope), [])
 

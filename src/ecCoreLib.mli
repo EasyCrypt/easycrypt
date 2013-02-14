@@ -1,6 +1,9 @@
 (* --------------------------------------------------------------------- *)
-(*           predefined string                                           *)
+(*           predefined notations                                        *)
 (* ----------------------------------------------------------------------*)
+open EcSymbols
+open EcPath
+
 (* Symbol with specific parsing *)
 val s_get  : string
 val s_set  : string
@@ -9,21 +12,20 @@ val s_cons : string
 val s_abs  : string
 
 (* qsymbol *)
-val s_dbool      : string list * string
-val s_dbitstring : string list * string
-val s_dinter     : string list * string
-val s_from_int   : string list * string
-
-
+val s_dbool      : qsymbol
+val s_dbitstring : qsymbol
+val s_dinter     : qsymbol
+val s_from_int   : qsymbol
 
 (* --------------------------------------------------------------------- *)
 (*           predefined path                                             *)
 (* ----------------------------------------------------------------------*)
-open EcPath
-val id_top       : EcIdent.t
-val p_top        : path
-val id_pervasive : EcIdent.t
-val p_pervasive  : path
+val id_top       : symbol
+val id_pervasive : symbol
+
+val p_top       : path
+val p_pervasive : path
+
 val p_unit       : path
 val p_bool       : path
 val p_int        : path
