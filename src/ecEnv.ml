@@ -1090,36 +1090,6 @@ module Theory = struct
       MC.import Px.for_theory env path obj
 end
 
-(*
-(* -------------------------------------------------------------------- *)
-module Ident = struct
-  type idlookup_t = 
-    [ `Local of EcIdent.t
-    | `Pvar of EcTypes.prog_var 
-    | `Ctnt of EcPath.path * operator ]
-
-  let trylookup filter_op (name : qsymbol) (env : env) =
-    match Var.trylookup name env with
-    | Some (p, x) ->
-        let idl = 
-          match x.vb_kind with
-          | None   -> `Local (EcPath.basename p) 
-          | Some k -> `Pvar { EcTypes.pv_name = p; EcTypes.pv_kind = k } in
-        [ x.vb_type, (idl :> idlookup_t) ]
-    | None ->
-        let all = Op.all filter_op name env in
-        List.map (fun p -> 
-          let op = snd p in 
-          let ty = EcTypes.toarrow op.op_dom op.op_codom in
-          ty, (`Ctnt p :> idlookup_t) ) all
-
-  let lookup filter_op (name : qsymbol) (env : env) =
-    match trylookup filter_op name env with
-    | [x] -> x
-    | _ -> raise (LookupFailure (`QSymbol name))
-end
-*)
-
 (* -------------------------------------------------------------------- *)
 let import_w3 env th rd = 
   let lth, rbi = EcWhy3.import_w3 env.env_w3 env.env_scope th rd in

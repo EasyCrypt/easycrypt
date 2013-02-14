@@ -279,23 +279,6 @@ module Ty : sig
   val unfold  : EcPath.path -> EcTypes.ty list -> env -> EcTypes.ty
 end
 
-(*
-(* -------------------------------------------------------------------- *)
-module Ident : sig
-  type idlookup_t = 
-    [ `Local of EcIdent.t
-    | `Pvar of EcTypes.prog_var 
-    | `Ctnt of EcPath.path * operator ]
-
-  val lookup    : 
-      (operator -> bool) -> qsymbol -> env -> (EcTypes.ty * idlookup_t) 
-
-  val trylookup : 
-      (operator -> bool) -> qsymbol -> env -> (EcTypes.ty * idlookup_t) list
-
-end
-*)
-
 (* -------------------------------------------------------------------- *)
 type ebinding = [
   | `Variable  of EcTypes.pvar_kind * EcTypes.ty
