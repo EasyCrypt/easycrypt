@@ -395,7 +395,10 @@ module MC = struct
 
   let _params_of_epath (env : env) (epath : epath) =
     match epath with
-    | EPath   p -> snd (oget (lookup_mc_by_path env p))
+    | EPath p ->
+        let prefix = oget (EcPath.prefix p) in
+          snd (oget (lookup_mc_by_path env prefix))
+
     | EModule _ -> []
 
   let lookup px ((qn, x) : qsymbol) (env : env) =
@@ -405,8 +408,11 @@ module MC = struct
 
     | Some mc -> begin
         match mc_lookup1 px x mc with
-        | None -> raise (LookupFailure (`QSymbol (qn, x)))
-        | Some (p, obj) -> (p, suspend obj (_params_of_epath env p))
+        | None ->
+            raise (LookupFailure (`QSymbol (qn, x)))
+
+        | Some (p, obj) ->
+            (p, suspend obj (_params_of_epath env p))
       end
 
   let lookupall px ((qn, x) : qsymbol) (env : env) =
@@ -536,10 +542,10 @@ module MC = struct
   and bind_typedecl x tydecl env =
     bind Px.for_typedecl env x tydecl
 
-  and bind_op x op env =
+  and bind_operator x op env =
     bind Px.for_operator env x op
 
-  and bind_ax x ax env =
+  and bind_axiom x ax env =
     bind Px.for_axiom env x ax
 
   and bind_theory x cth env =
@@ -657,7 +663,7 @@ module Var = struct
 
   let bind name pvkind ty env =
     let vb = { vb_type = ty; vb_kind = Some pvkind; } in
-      MC.bind Px.for_variable env name vb
+      MC.bind_variable name vb env
 
   let bindall bindings pvkind env =
     List.fold_left
@@ -706,7 +712,7 @@ module Fun = struct
     fst (lookup name env)
 
   let bind name fun_ env =
-    MC.bind Px.for_function env name fun_
+    MC.bind_function name fun_ env
 
   let add (path : EcPath.path) (env : env) =
     (* FIXME: we can have a suspended function ! *)
@@ -742,10 +748,10 @@ module Ty = struct
       MC.import Px.for_typedecl env path obj
 
   let bind name ty env =
-    MC.bind Px.for_typedecl env name ty
+    MC.bind_typedecl name ty env
 
   let rebind name ty env =
-    bind name ty env
+    MC.bind_typedecl name ty env
 
   let defined (name : EcPath.path) (env : env) =
     match by_path_opt name env with
@@ -787,7 +793,7 @@ module Op = struct
       MC.import Px.for_operator env path obj
 
   let bind name op env =
-    let env = MC.bind Px.for_operator env name op in
+    let env = MC.bind_operator name op env in
     let (w3, rb) =
         EcWhy3.add_op env.env_w3
           (EcPath.extend (Some env.env_scope) name) op
@@ -799,12 +805,12 @@ module Op = struct
 
   (* This version does not create a Why3 binding. *)
   let bind_logical name op env = 
-    let env = MC.bind Px.for_operator env name op in
+    let env = MC.bind_operator name op env in
       { env with
           env_item = CTh_operator (name, op) :: env.env_item }
 
   let rebind name op env =
-    MC.bind Px.for_operator env name op
+    MC.bind_operator name op env
 
   let all filter (qname : qsymbol) (env : env) =
     let ops = MC.lookupall MC.Px.for_operator qname env in
@@ -844,7 +850,7 @@ module Ax = struct
       MC.import Px.for_axiom env path obj
 
   let bind name ax env = 
-    let env = MC.bind Px.for_axiom env name ax in
+    let env = MC.bind_axiom name ax env in
     let (w3, rb) = 
       EcWhy3.add_ax env.env_w3
         (EcPath.extend (Some env.env_scope) name) ax
@@ -855,7 +861,7 @@ module Ax = struct
           env_item = CTh_axiom (name, ax) :: env.env_item }
 
   let rebind name ax env =
-    MC.bind Px.for_axiom env name ax
+    MC.bind_axiom name ax env
 
   let by_path (p : EcPath.path) (env : env) =
     check_not_suspended
@@ -895,7 +901,7 @@ module Mod = struct
 
   let bind name me env =
     assert (me.me_name = name);
-    MC.bind Px.for_module env name me
+    MC.bind_module name me env
 
   let bind_local name me env =
     let path = CRefMid name in
@@ -939,7 +945,7 @@ module ModTy = struct
     fst (lookup name env)
 
   let bind name modty env =
-    MC.bind Px.for_modtype env name modty
+    MC.bind_modtype name modty env
 
   let add (path : EcPath.path) (env : env) =
     let obj = by_path path env in 
@@ -990,7 +996,7 @@ module Theory = struct
 
   (* ------------------------------------------------------------------ *)
   let bind id cth env =
-    let env = MC.bind Px.for_theory env id cth.cth3_theory in
+    let env = MC.bind_theory id cth.cth3_theory env in
       { env with
           env_w3   = EcWhy3.rebind env.env_w3 cth.cth3_rebind;
           env_rb   = List.rev_append cth.cth3_rebind env.env_rb;
@@ -998,7 +1004,7 @@ module Theory = struct
 
   (* ------------------------------------------------------------------ *)
   let rebind name cth env =
-    MC.bind Px.for_theory env name cth
+    MC.bind_theory name cth env
 
   (* ------------------------------------------------------------------ *)
   let import (path : EcPath.path) (env : env) =
@@ -1176,6 +1182,7 @@ let bind1 ((x, eb) : symbol * ebinding) (env : env) =
 let bindall (items : (symbol * ebinding) list) (env : env) =
   List.fold_left ((^~) bind1) env items  
 
+
 (* -------------------------------------------------------------------- *)
 let rec dump ?(name = "Environment") pp (env : env) =
     EcDebug.onseq pp name ~extra:(EcPath.tostring env.env_scope)
@@ -1190,20 +1197,21 @@ let rec dump ?(name = "Environment") pp (env : env) =
       ])
 
 and dump_premc ~name pp mc =
-  let ppkey x _ = x
+  let ppkey1 _ (p, _) = EcPath.tostring p
+  and ppkey2 _ p      = EcPath.tostring p
   and ppval _ _ = () in
 
   EcDebug.onseq pp name
     (Stream.of_list [
-       (fun pp -> Msym.dump ~name:"Variables"  ppkey ppval pp mc.mc_variables );
-       (fun pp -> Msym.dump ~name:"Functions"  ppkey ppval pp mc.mc_functions );
-       (fun pp -> Msym.dump ~name:"Modules"    ppkey ppval pp mc.mc_modules   );
-       (fun pp -> Msym.dump ~name:"Modtypes"   ppkey ppval pp mc.mc_modtypes  );
-       (fun pp -> Msym.dump ~name:"Typedecls"  ppkey ppval pp mc.mc_typedecls );
-       (fun pp -> Msym.dump ~name:"Operators"  ppkey ppval pp mc.mc_operators );
-       (fun pp -> Msym.dump ~name:"Axioms"     ppkey ppval pp mc.mc_axioms    );
-       (fun pp -> Msym.dump ~name:"Theories"   ppkey ppval pp mc.mc_theories  );
-       (fun pp -> Msym.dump ~name:"Components" ppkey ppval pp mc.mc_components);
+       (fun pp -> Msym.dump ~name:"Variables"  ppkey1 ppval pp mc.mc_variables );
+       (fun pp -> Msym.dump ~name:"Functions"  ppkey1 ppval pp mc.mc_functions );
+       (fun pp -> Msym.dump ~name:"Modules"    ppkey1 ppval pp mc.mc_modules   );
+       (fun pp -> Msym.dump ~name:"Modtypes"   ppkey1 ppval pp mc.mc_modtypes  );
+       (fun pp -> Msym.dump ~name:"Typedecls"  ppkey1 ppval pp mc.mc_typedecls );
+       (fun pp -> Msym.dump ~name:"Operators"  ppkey1 ppval pp mc.mc_operators );
+       (fun pp -> Msym.dump ~name:"Axioms"     ppkey1 ppval pp mc.mc_axioms    );
+       (fun pp -> Msym.dump ~name:"Theories"   ppkey1 ppval pp mc.mc_theories  );
+       (fun pp -> Msym.dump ~name:"Components" ppkey2 ppval pp mc.mc_components);
     ])
 
 and dump_amc ~name pp mc =
