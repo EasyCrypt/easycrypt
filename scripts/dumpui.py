@@ -60,7 +60,11 @@ def trees():
     for line in sys.stdin:
         contents += line
         if line.rstrip('\r\n') == '</node>':
-            trees.append(gettree(contents))
+            try:
+                trees.append(gettree(contents))
+            except xml.XMLSyntaxError, e:
+                print >>sys.stderr, e
+                break
             contents = ''
     return trees
 
