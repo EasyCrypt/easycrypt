@@ -100,10 +100,10 @@ and premc = private {
   mc_components : path                            Msym.t;
 }
 
-(* A for [premc], but allows names to be bound several time, and maps
- * objects to [epath] instead of [path]. This structure serves as
- * the components description of the current active scope. It includes
- * all the objects imported via the [import] command. *)
+(* As for [premc], but allows names to be bound several time, and maps
+ * objects to [epath] instead of [path]. This structure serves as the
+ * components description of the current active scope. It includes all
+ * the objects imported via the [import] command. *)
 
 and activemc = {
   amc_variables  : (epath * varbind)                MMsym.t;
@@ -125,7 +125,7 @@ val root    : env -> EcPath.path
 val initial : env
 
 (* -------------------------------------------------------------------- *)
-(* val dump : ?name:string -> EcDebug.ppdebug -> env -> unit *)
+val dump : ?name:string -> EcDebug.ppdebug -> env -> unit
 
 (* -------------------------------------------------------------------- *)
 exception LookupFailure of [`Path of epath | `QSymbol of qsymbol]

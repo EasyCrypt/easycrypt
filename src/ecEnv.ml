@@ -398,7 +398,6 @@ module MC = struct
     | EPath   p -> snd (oget (lookup_mc_by_path env p))
     | EModule _ -> []
 
-
   let lookup px ((qn, x) : qsymbol) (env : env) =
     match lookup_mc qn env with
     | None ->
@@ -1177,36 +1176,49 @@ let bind1 ((x, eb) : symbol * ebinding) (env : env) =
 let bindall (items : (symbol * ebinding) list) (env : env) =
   List.fold_left ((^~) bind1) env items  
 
-(*
 (* -------------------------------------------------------------------- *)
 let rec dump ?(name = "Environment") pp (env : env) =
     EcDebug.onseq pp name ~extra:(EcPath.tostring env.env_scope)
       (Stream.of_list [
-        (fun pp -> dump_premc ~name:"Root" pp env.env_root);
+        (fun pp -> dump_amc ~name:"Root" pp env.env_current);
         (fun pp ->
-           Mid.dump ~name:"Components"
-             (fun k (p, _) ->
-                Printf.sprintf "%s (%s)"
-                  (EcIdent.tostring k) (EcPath.tostring p))
-             (fun pp (_, (_, mc)) ->
+           Mp.dump ~name:"Components"
+             (fun k _ -> EcPath.tostring k)
+             (fun pp (_, mc) ->
                 dump_premc ~name:"Component" pp mc)
              pp env.env_comps)
       ])
 
 and dump_premc ~name pp mc =
+  let ppkey x _ = x
+  and ppval _ _ = () in
+
   EcDebug.onseq pp name
     (Stream.of_list [
-       (fun pp -> IM.dump "Variables"  (fun _ _ -> ()) pp mc.mc_variables );
-       (fun pp -> IM.dump "Functions"  (fun _ _ -> ()) pp mc.mc_functions );
-       (fun pp -> IM.dump "Modules"    (fun _ _ -> ()) pp mc.mc_modules   );
-       (fun pp -> IM.dump "Modtypes"   (fun _ _ -> ()) pp mc.mc_modtypes  );
-       (fun pp -> IM.dump "Typedecls"  (fun _ _ -> ()) pp mc.mc_typedecls );
-       (fun pp -> IM.dump "Operators"  (fun _ _ -> ()) pp mc.mc_operators );
-       (fun pp -> IM.dump "Axioms"     (fun _ _ -> ()) pp mc.mc_axioms    );
-       (fun pp -> IM.dump "Theories"   (fun _ _ -> ()) pp mc.mc_theories  );
-       (fun pp -> IM.dump "Components" (fun _ _ -> ()) pp mc.mc_components);
+       (fun pp -> Msym.dump ~name:"Variables"  ppkey ppval pp mc.mc_variables );
+       (fun pp -> Msym.dump ~name:"Functions"  ppkey ppval pp mc.mc_functions );
+       (fun pp -> Msym.dump ~name:"Modules"    ppkey ppval pp mc.mc_modules   );
+       (fun pp -> Msym.dump ~name:"Modtypes"   ppkey ppval pp mc.mc_modtypes  );
+       (fun pp -> Msym.dump ~name:"Typedecls"  ppkey ppval pp mc.mc_typedecls );
+       (fun pp -> Msym.dump ~name:"Operators"  ppkey ppval pp mc.mc_operators );
+       (fun pp -> Msym.dump ~name:"Axioms"     ppkey ppval pp mc.mc_axioms    );
+       (fun pp -> Msym.dump ~name:"Theories"   ppkey ppval pp mc.mc_theories  );
+       (fun pp -> Msym.dump ~name:"Components" ppkey ppval pp mc.mc_components);
     ])
-*)
+
+and dump_amc ~name pp mc =
+  EcDebug.onseq pp name
+    (Stream.of_list [
+       (fun pp -> MMsym.dump "Variables"  (fun _ _ -> ()) pp mc.amc_variables );
+       (fun pp -> MMsym.dump "Functions"  (fun _ _ -> ()) pp mc.amc_functions );
+       (fun pp -> MMsym.dump "Modules"    (fun _ _ -> ()) pp mc.amc_modules   );
+       (fun pp -> MMsym.dump "Modtypes"   (fun _ _ -> ()) pp mc.amc_modtypes  );
+       (fun pp -> MMsym.dump "Typedecls"  (fun _ _ -> ()) pp mc.amc_typedecls );
+       (fun pp -> MMsym.dump "Operators"  (fun _ _ -> ()) pp mc.amc_operators );
+       (fun pp -> MMsym.dump "Axioms"     (fun _ _ -> ()) pp mc.amc_axioms    );
+       (fun pp -> MMsym.dump "Theories"   (fun _ _ -> ()) pp mc.amc_theories  );
+       (fun pp -> MMsym.dump "Components" (fun _ _ -> ()) pp mc.amc_components);
+    ])
 
 (* -------------------------------------------------------------------- *)     
 exception IncompatibleType of ty * ty

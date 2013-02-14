@@ -27,6 +27,13 @@ module MMsym : sig
   val last   : symbol -> 'a t -> 'a option
   val all    : symbol -> 'a t -> 'a list
   val fold   : (symbol -> 'a list -> 'b -> 'b) -> 'a t -> 'b -> 'b
+
+  val dump :
+       name:string
+    -> (EcDebug.ppdebug -> 'a -> unit)
+    -> EcDebug.ppdebug
+    -> 'a t
+    -> unit
 end = struct
   type 'a t = ('a list) Msym.t
 
@@ -46,6 +53,24 @@ end = struct
     EcUtils.odfl [] (Msym.find_opt x m)
 
   let fold f m x = Msym.fold f m x
+
+  let dump ~name valuepp pp (m : 'a t) =
+    let keyprinter k v =
+      match v with
+      | [] -> Printf.sprintf "%s (empty)" k
+      | _  -> k
+            
+    and valuepp pp (x, vs) =
+      match vs with
+      | [] -> ()
+      | _  ->
+          EcDebug.onhlist pp
+            (Printf.sprintf "%d binding(s)" (List.length vs))
+            (fun pp v ->
+              EcDebug.onhlist pp x valuepp [v])
+            vs
+    in
+      Msym.dump ~name keyprinter valuepp pp m
 end
 
 (* -------------------------------------------------------------------- *)

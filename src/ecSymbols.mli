@@ -23,6 +23,13 @@ module MMsym : sig
   val last   : symbol -> 'a t -> 'a option
   val all    : symbol -> 'a t -> 'a list
   val fold   : (symbol -> 'a list -> 'b -> 'b) -> 'a t -> 'b -> 'b
+
+  val dump :
+       name:string
+    -> (EcDebug.ppdebug -> 'a -> unit)
+    -> EcDebug.ppdebug
+    -> 'a t
+    -> unit
 end
 
 (* -------------------------------------------------------------------- *)
