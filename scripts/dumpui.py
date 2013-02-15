@@ -120,18 +120,22 @@ class MainWindow(QtGui.QMainWindow):
         uifile = 'resources/dump.ui'
         uifile = os.path.join(os.path.dirname(__file__), uifile)
         uic.loadUi(uifile, self)
+        self._models = []
 
     @QtCore.pyqtSlot(name = 'on_action_Quit_triggered')
     def quit(self):
         self.close()
 
+    @QtCore.pyqtSlot(name = 'on_dumpsList_itemSelectionChanged')
+    def _display_current_dump(self):
+        index = self.dumpsList.selectedIndexes()[0].row()
+        model = self._models[index]
+        self.dumpView.setModel(model)
+        self.dumpView.expand(model.index(0, 0, QtCore.QModelIndex()))
+
     def add_tree(self, tree):
-        view = QtGui.QTreeView(self)
-        view.setAlternatingRowColors(True)
-        view.setModel(NodeTreeModel(tree, view))
-        view.header().hide()
-        view.expand(view.model().index(0, 0, QtCore.QModelIndex()))
-        self.tabs.addTab(view, "Dump %.2d" % (1+self.tabs.count(),))
+        self._models.append(NodeTreeModel(tree, self))
+        self.dumpsList.addItem('Dump %.2d' % (len(self._models)))
 
 # --------------------------------------------------------------------
 def _main():
