@@ -4,6 +4,9 @@ open EcSymbols
 open EcDecl
 
 (* -------------------------------------------------------------------- *)
+module Sp = EcPath.Sp
+
+(* -------------------------------------------------------------------- *)
 module UM : sig
   type flag  = [`Call | `Read | `Write]
   type flags
@@ -191,3 +194,39 @@ and ctheory_clone = {
 and ctheory_override =
 | CTHO_Type   of EcTypes.ty
 | CTHO_Module of EcPath.path * (EcPath.path list)
+
+(* -------------------------------------------------------------------- *)
+let module_sig_of_module_type (tymod : module_type) =
+  let (p, args) = tymod.tymt_desc in
+    { tyms_desc  = Mty_app (p, args);
+      tyms_comps = tymod.tymt_comps; }
+
+(* -------------------------------------------------------------------- *)
+let module_comps_of_module_sig_comps (comps : module_sig_comps) =
+  let onitem = function
+    | Tys_variable (x, ty) ->
+        MI_Variable {
+          v_name = x;
+          v_type = ty;
+        }
+
+    | Tys_function funsig ->
+        MI_Function { 
+          f_name = funsig.fs_name;
+          f_sig  = funsig;
+          f_def  = None;
+        }
+  in
+    List.map onitem comps.tymc_body
+
+(* -------------------------------------------------------------------- *)
+let module_expr_of_module_type (name : EcIdent.t) (tymod : module_type) =
+  let tysig   = module_sig_of_module_type tymod in
+  let tycomps = module_comps_of_module_sig_comps tymod.tymt_comps in
+
+    { me_name  = EcIdent.name name;
+      me_body  = ME_Decl tymod;
+      me_sig   = tysig;
+      me_comps = tycomps;
+      me_uses  = Sp.empty;                (* FIXME *)
+      me_types = [tymod]; }

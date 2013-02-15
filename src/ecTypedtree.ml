@@ -518,42 +518,6 @@ let lookup_module_sig (env : EcEnv.env) (name : pqsymbol) =
   | Some x -> x
 
 (* -------------------------------------------------------------------- *)
-let module_sig_of_module_type (tymod : module_type) =
-  let (p, args) = tymod.tymt_desc in
-    { tyms_desc  = Mty_app (p, args);
-      tyms_comps = tymod.tymt_comps; }
-
-(* -------------------------------------------------------------------- *)
-let module_comps_of_module_sig_comps (comps : module_sig_comps) =
-  let onitem = function
-    | Tys_variable (x, ty) ->
-        MI_Variable {
-          v_name = x;
-          v_type = ty;
-        }
-
-    | Tys_function funsig ->
-        MI_Function { 
-          f_name = funsig.fs_name;
-          f_sig  = funsig;
-          f_def  = None;
-        }
-  in
-    List.map onitem comps.tymc_body
-
-(* -------------------------------------------------------------------- *)
-let module_expr_of_module_type (name : EcIdent.t) (tymod : module_type) =
-  let tysig   = module_sig_of_module_type tymod in
-  let tycomps = module_comps_of_module_sig_comps tymod.tymt_comps in
-
-    { me_name  = EcIdent.name name;
-      me_body  = ME_Decl tymod;
-      me_sig   = tysig;
-      me_comps = tycomps;
-      me_uses  = Sp.empty;                (* FIXME *)
-      me_types = [tymod]; }
-
-(* -------------------------------------------------------------------- *)
 let unfold1_mod_type_name (env : EcEnv.env) (name : EcPath.cref) =
   match name with
   | EcPath.CRefMid _ -> (name, [])

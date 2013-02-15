@@ -88,16 +88,16 @@ type preenv = private {
  * associated container (module).
  *)
 and premc = private {
-  mc_parameters : (EcIdent.t * module_type)       list;
-  mc_variables  : (path * varbind)                Msym.t;
-  mc_functions  : (path * EcTypesmod.funsig)      Msym.t;
-  mc_modules    : (path * EcTypesmod.module_expr) Msym.t;
-  mc_modtypes   : (path * EcTypesmod.module_sig)  Msym.t;
-  mc_typedecls  : (path * EcDecl.tydecl)          Msym.t;
-  mc_operators  : (path * EcDecl.operator)        Msym.t;
-  mc_axioms     : (path * EcDecl.axiom)           Msym.t;
-  mc_theories   : (path * EcTypesmod.ctheory)     Msym.t;
-  mc_components : path                            Msym.t;
+  mc_parameters : (EcIdent.t * module_type)        list;
+  mc_variables  : (epath * varbind)                Msym.t;
+  mc_functions  : (epath * EcTypesmod.funsig)      Msym.t;
+  mc_modules    : ( cref * EcTypesmod.module_expr) Msym.t;
+  mc_modtypes   : ( path * EcTypesmod.module_sig)  Msym.t;
+  mc_typedecls  : ( path * EcDecl.tydecl)          Msym.t;
+  mc_operators  : ( path * EcDecl.operator)        Msym.t;
+  mc_axioms     : ( path * EcDecl.axiom)           Msym.t;
+  mc_theories   : ( path * EcTypesmod.ctheory)     Msym.t;
+  mc_components : path                             Msym.t;
 }
 
 (* As for [premc], but allows names to be bound several time, and maps

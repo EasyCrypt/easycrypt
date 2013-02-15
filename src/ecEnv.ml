@@ -101,14 +101,14 @@ type preenv = {
 
 and premc = {
   mc_parameters : (EcIdent.t * module_type)       list;
-  mc_variables  : (path * varbind)                Msym.t;
-  mc_functions  : (path * EcTypesmod.funsig)      Msym.t;
-  mc_modules    : (path * EcTypesmod.module_expr) Msym.t;
-  mc_modtypes   : (path * EcTypesmod.module_sig)  Msym.t;
-  mc_typedecls  : (path * EcDecl.tydecl)          Msym.t;
-  mc_operators  : (path * EcDecl.operator)        Msym.t;
-  mc_axioms     : (path * EcDecl.axiom)           Msym.t;
-  mc_theories   : (path * EcTypesmod.ctheory)     Msym.t;
+  mc_variables  : (epath * varbind)                Msym.t;
+  mc_functions  : (epath * EcTypesmod.funsig)      Msym.t;
+  mc_modules    : ( cref * EcTypesmod.module_expr) Msym.t;
+  mc_modtypes   : ( path * EcTypesmod.module_sig)  Msym.t;
+  mc_typedecls  : ( path * EcDecl.tydecl)          Msym.t;
+  mc_operators  : ( path * EcDecl.operator)        Msym.t;
+  mc_axioms     : ( path * EcDecl.axiom)           Msym.t;
+  mc_theories   : ( path * EcTypesmod.ctheory)     Msym.t;
   mc_components : path                            Msym.t;
 }
 
@@ -199,6 +199,64 @@ let preenv (env : preenv) : env = env
 let root (env : env) = env.env_scope
 
 (* -------------------------------------------------------------------- *)
+module Dump = struct
+  let rec dump ?(name = "Environment") pp (env : env) =
+      EcDebug.onseq pp name ~extra:(EcPath.tostring env.env_scope)
+        (Stream.of_list [
+          (fun pp -> dump_amc ~name:"Root" pp env.env_current);
+          (fun pp ->
+             Mp.dump ~name:"Components"
+               (fun k _ -> EcPath.tostring k)
+               (fun pp (_, mc) ->
+                  dump_premc ~name:"Component" pp mc)
+               pp env.env_comps);
+          (fun pp ->
+             Mid.dump ~name:"B-Components"
+               (fun k _ -> EcIdent.tostring k)
+               (fun pp (_, mc) ->
+                  dump_premc ~name:"B-Component" pp mc)
+               pp env.env_bcomps)
+        ])
+  
+  and dump_premc ~name pp mc =
+    let ppkey_path  _ (p, _) = EcPath.tostring      p
+    and ppkey_epath _ (p, _) = EcPath.ep_tostring   p
+    and ppkey_cref  _ (p, _) = EcPath.cref_tostring p
+    and ppkey_comps _ p      = EcPath.tostring      p
+
+    and ppval _ _ = () in
+  
+    EcDebug.onseq pp name
+      (Stream.of_list [
+         (fun pp -> Msym.dump ~name:"Variables"  ppkey_epath ppval pp mc.mc_variables );
+         (fun pp -> Msym.dump ~name:"Functions"  ppkey_epath ppval pp mc.mc_functions );
+         (fun pp -> Msym.dump ~name:"Modules"    ppkey_cref  ppval pp mc.mc_modules   );
+         (fun pp -> Msym.dump ~name:"Modtypes"   ppkey_path  ppval pp mc.mc_modtypes  );
+         (fun pp -> Msym.dump ~name:"Typedecls"  ppkey_path  ppval pp mc.mc_typedecls );
+         (fun pp -> Msym.dump ~name:"Operators"  ppkey_path  ppval pp mc.mc_operators );
+         (fun pp -> Msym.dump ~name:"Axioms"     ppkey_path  ppval pp mc.mc_axioms    );
+         (fun pp -> Msym.dump ~name:"Theories"   ppkey_path  ppval pp mc.mc_theories  );
+         (fun pp -> Msym.dump ~name:"Components" ppkey_comps ppval pp mc.mc_components);
+      ])
+  
+  and dump_amc ~name pp mc =
+    EcDebug.onseq pp name
+      (Stream.of_list [
+         (fun pp -> MMsym.dump "Variables"  (fun _ _ -> ()) pp mc.amc_variables );
+         (fun pp -> MMsym.dump "Functions"  (fun _ _ -> ()) pp mc.amc_functions );
+         (fun pp -> MMsym.dump "Modules"    (fun _ _ -> ()) pp mc.amc_modules   );
+         (fun pp -> MMsym.dump "Modtypes"   (fun _ _ -> ()) pp mc.amc_modtypes  );
+         (fun pp -> MMsym.dump "Typedecls"  (fun _ _ -> ()) pp mc.amc_typedecls );
+         (fun pp -> MMsym.dump "Operators"  (fun _ _ -> ()) pp mc.amc_operators );
+         (fun pp -> MMsym.dump "Axioms"     (fun _ _ -> ()) pp mc.amc_axioms    );
+         (fun pp -> MMsym.dump "Theories"   (fun _ _ -> ()) pp mc.amc_theories  );
+         (fun pp -> MMsym.dump "Components" (fun _ _ -> ()) pp mc.amc_components);
+      ])
+end
+
+let dump = Dump.dump
+
+(* -------------------------------------------------------------------- *)
 module MC = struct
   let top_path = EcPath.Pident EcCoreLib.id_top
 
@@ -250,8 +308,8 @@ module MC = struct
   module Px = struct
     type ('p, 'a) projector = {
       (* Selecting / updating in a [premc] *)
-      px_premc   : premc -> (path * 'a) Msym.t;
-      px_topremc : (path * 'a) Msym.t -> premc -> premc;
+      px_premc   : premc -> ('p * 'a) Msym.t;
+      px_topremc : ('p * 'a) Msym.t -> premc -> premc;
 
       (* Selecting / updating in a [activemc] *)
       px_actmc   : activemc -> ('p * 'a) MMsym.t;
@@ -372,7 +430,7 @@ module MC = struct
     | PreMc mc ->
         omap
           (Msym.find_opt x (px.Px.px_premc mc))
-          (fun (p, obj) -> (EPath p, obj))
+          (fun (p, obj) -> (px.Px.px_aptx p, obj))
 
     | ActMc mc ->
         omap
@@ -386,7 +444,7 @@ module MC = struct
     | PreMc mc ->
         otolist (omap
           (Msym.find_opt x (px.Px.px_premc mc))
-          (fun (p, obj) -> (EPath p, obj)))
+          (fun (p, obj) -> (px.Px.px_aptx p, obj)))
 
     | ActMc mc ->
         List.map
@@ -429,21 +487,24 @@ module MC = struct
 
   (* Binding of an object in a [premc]. Fails if a binding already
    * exists for the given name and name. *)
-  let mc_bind px path obj mc =
-    let x   = EcPath.basename path in
-    let map = px.Px.px_premc mc in
-      match Msym.find_opt x map with
-      | Some _ -> raise (DuplicatedBinding x)
-      | None   -> px.Px.px_topremc (Msym.add x (path, obj) map) mc
 
-  let mc_bind_variable = mc_bind Px.for_variable
-  let mc_bind_function = mc_bind Px.for_function
-  let mc_bind_module   = mc_bind Px.for_module
-  let mc_bind_modtype  = mc_bind Px.for_modtype
-  let mc_bind_typedecl = mc_bind Px.for_typedecl
-  let mc_bind_operator = mc_bind Px.for_operator
-  let mc_bind_axiom    = mc_bind Px.for_axiom
-  let mc_bind_theory   = mc_bind Px.for_theory
+  let mc_bind_raw px name path obj mc =
+    let map = px.Px.px_premc mc in
+      match Msym.find_opt name map with
+      | Some _ -> raise (DuplicatedBinding name)
+      | None   -> px.Px.px_topremc (Msym.add name (path, obj) map) mc
+
+  let mc_bind px path obj mc =
+    mc_bind_raw px (EcPath.basename path) (px.Px.px_patx path) obj mc
+
+  let mc_bind_variable path obj mc = mc_bind Px.for_variable path obj mc
+  let mc_bind_function path obj mc = mc_bind Px.for_function path obj mc
+  let mc_bind_module   path obj mc = mc_bind Px.for_module   path obj mc
+  let mc_bind_modtype  path obj mc = mc_bind Px.for_modtype  path obj mc
+  let mc_bind_typedecl path obj mc = mc_bind Px.for_typedecl path obj mc
+  let mc_bind_operator path obj mc = mc_bind Px.for_operator path obj mc
+  let mc_bind_axiom    path obj mc = mc_bind Px.for_axiom    path obj mc
+  let mc_bind_theory   path obj mc = mc_bind Px.for_theory   path obj mc
 
   let mc_bind_mc (path : EcPath.path) mc =
     let name = EcPath.basename path in
@@ -459,11 +520,14 @@ module MC = struct
     let obj = (path, obj) in
       px.Px.px_toactmc (MMsym.add x obj map) mc
 
-  let amc_bind_mc (path : EcPath.path) mc =
-    let name = EcPath.basename path in
+  let amc_bind_mc (path : EcPath.cref) mc =
+    let name =
+      match path with
+      | CRefPath path -> EcPath.basename path
+      | CRefMid  mid  -> EcIdent.name mid
+    in
       { mc with
-          amc_components =
-            MMsym.add name (CRefPath path) mc.amc_components; }
+          amc_components = MMsym.add name path mc.amc_components; }
 
   (* ------------------------------------------------------------------ *)
   let mc_of_module (env : env) (me : module_expr) =
@@ -490,6 +554,26 @@ module MC = struct
       List.fold_left mc1_of_module empty_premc me.me_comps
 
   (* ------------------------------------------------------------------ *)
+  let mc_of_module_param (mid : EcIdent.t) (me : module_expr) =
+    let xpath (x : symbol) = EcPath.EModule (mid, Some x) in
+
+    let mc1_of_module (mc : premc) = function
+      | MI_Module _ -> assert false
+
+      | MI_Variable v ->
+          let vty =
+            { vb_type = v.v_type;
+              vb_kind = Some PVglob; }
+          in
+            mc_bind_raw Px.for_variable v.v_name (xpath v.v_name) vty mc
+
+
+      | MI_Function f ->
+          mc_bind_raw Px.for_function f.f_name (xpath f.f_name) f.f_sig mc
+    in
+      List.fold_left mc1_of_module empty_premc me.me_comps
+
+  (* ------------------------------------------------------------------ *)
   let bind px env name obj =
     let path = EcPath.Pqname (env.env_scope, name) in
       { env with
@@ -508,7 +592,7 @@ module MC = struct
         raise (DuplicatedBinding name);
 
       { env with
-          env_current = amc_bind_mc path env.env_current;
+          env_current = amc_bind_mc (CRefPath path) env.env_current;
           env_comps =
             Mp.change
               (fun mc -> Some (mc_bind_mc path (oget mc)))
@@ -677,7 +761,7 @@ module Var = struct
       { env with
           env_current =
             MC.amc_bind Px.for_variable (EcIdent.name name) path
-              var env.env_current;  }
+              var env.env_current; }
 
   let bind_locals bindings env =
     List.fold_left
@@ -912,11 +996,19 @@ module Mod = struct
     MC.bind_module name me env
 
   let bind_local name me env =
-    let path = CRefMid name in
+    let path  = CRefMid name in
+    let comps = MC.mc_of_module_param name me  in
+    let env   =
       { env with
-          env_current =
-            MC.amc_bind Px.for_module (EcIdent.name name) path
-              me env.env_current;  }
+          env_current = (
+            let current = env.env_current in
+            let current = MC.amc_bind_mc path current in
+            let current = MC.amc_bind Px.for_module (EcIdent.name name) path me current in
+              current);
+          env_bcomps =
+            Mid.add name comps env.env_bcomps; }
+    in
+      Dump.dump EcDebug.initial env; env
 
   let bind_locals bindings env =
     List.fold_left
@@ -1040,7 +1132,7 @@ module Theory = struct
         | CTh_theory (x, th) ->
             let env = MC.import Px.for_theory env (xpath x) th in
               { env with env_current =
-                  MC.amc_bind_mc (xpath x) env.env_current }
+                  MC.amc_bind_mc (CRefPath (xpath x)) env.env_current }
       in
         List.fold_left import_cth_item env cth.cth_struct
 
@@ -1189,52 +1281,6 @@ let bind1 ((x, eb) : symbol * ebinding) (env : env) =
 
 let bindall (items : (symbol * ebinding) list) (env : env) =
   List.fold_left ((^~) bind1) env items  
-
-
-(* -------------------------------------------------------------------- *)
-let rec dump ?(name = "Environment") pp (env : env) =
-    EcDebug.onseq pp name ~extra:(EcPath.tostring env.env_scope)
-      (Stream.of_list [
-        (fun pp -> dump_amc ~name:"Root" pp env.env_current);
-        (fun pp ->
-           Mp.dump ~name:"Components"
-             (fun k _ -> EcPath.tostring k)
-             (fun pp (_, mc) ->
-                dump_premc ~name:"Component" pp mc)
-             pp env.env_comps)
-      ])
-
-and dump_premc ~name pp mc =
-  let ppkey1 _ (p, _) = EcPath.tostring p
-  and ppkey2 _ p      = EcPath.tostring p
-  and ppval _ _ = () in
-
-  EcDebug.onseq pp name
-    (Stream.of_list [
-       (fun pp -> Msym.dump ~name:"Variables"  ppkey1 ppval pp mc.mc_variables );
-       (fun pp -> Msym.dump ~name:"Functions"  ppkey1 ppval pp mc.mc_functions );
-       (fun pp -> Msym.dump ~name:"Modules"    ppkey1 ppval pp mc.mc_modules   );
-       (fun pp -> Msym.dump ~name:"Modtypes"   ppkey1 ppval pp mc.mc_modtypes  );
-       (fun pp -> Msym.dump ~name:"Typedecls"  ppkey1 ppval pp mc.mc_typedecls );
-       (fun pp -> Msym.dump ~name:"Operators"  ppkey1 ppval pp mc.mc_operators );
-       (fun pp -> Msym.dump ~name:"Axioms"     ppkey1 ppval pp mc.mc_axioms    );
-       (fun pp -> Msym.dump ~name:"Theories"   ppkey1 ppval pp mc.mc_theories  );
-       (fun pp -> Msym.dump ~name:"Components" ppkey2 ppval pp mc.mc_components);
-    ])
-
-and dump_amc ~name pp mc =
-  EcDebug.onseq pp name
-    (Stream.of_list [
-       (fun pp -> MMsym.dump "Variables"  (fun _ _ -> ()) pp mc.amc_variables );
-       (fun pp -> MMsym.dump "Functions"  (fun _ _ -> ()) pp mc.amc_functions );
-       (fun pp -> MMsym.dump "Modules"    (fun _ _ -> ()) pp mc.amc_modules   );
-       (fun pp -> MMsym.dump "Modtypes"   (fun _ _ -> ()) pp mc.amc_modtypes  );
-       (fun pp -> MMsym.dump "Typedecls"  (fun _ _ -> ()) pp mc.amc_typedecls );
-       (fun pp -> MMsym.dump "Operators"  (fun _ _ -> ()) pp mc.amc_operators );
-       (fun pp -> MMsym.dump "Axioms"     (fun _ _ -> ()) pp mc.amc_axioms    );
-       (fun pp -> MMsym.dump "Theories"   (fun _ _ -> ()) pp mc.amc_theories  );
-       (fun pp -> MMsym.dump "Components" (fun _ _ -> ()) pp mc.amc_components);
-    ])
 
 (* -------------------------------------------------------------------- *)     
 exception IncompatibleType of ty * ty

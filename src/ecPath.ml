@@ -68,7 +68,7 @@ let rec xcref_equal ((p1, args1) : xcref) ((p2, args2) : xcref) =
 let rec tostring p =
   match p with
   | Pident x ->
-      Printf.sprintf "[%s]" x
+      Printf.sprintf "%s" x
   | Pqname (p, x) ->
       Printf.sprintf "%s.%s" (tostring p) x
 
