@@ -363,7 +363,7 @@ module Theory = struct
   let import (scope : scope) (name : qsymbol) =
     let path = fst (EcEnv.Theory.lookup name scope.sc_env) in
     { scope with
-      sc_env = EcEnv.Theory.import path scope.sc_env }
+        sc_env = EcEnv.Theory.import path scope.sc_env }
 
   (* ------------------------------------------------------------------ *)
   let export (scope : scope) (name : qsymbol) =
@@ -387,7 +387,8 @@ module Theory = struct
           "end-of-file while processing proof %s" scope.sc_name
       in
         failwith msg
-  
+
+  (* -------------------------------------------------------------------- *)
   let require (scope : scope) (name : symbol) loader =
     if required scope name then
       scope

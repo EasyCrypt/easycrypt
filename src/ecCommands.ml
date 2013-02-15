@@ -144,6 +144,7 @@ and process_proverinfo scope pi =
 and process_checkproof scope b = 
   let scope = EcScope.Prover.check_proof scope b in
   (scope, [])
+
 (* -------------------------------------------------------------------- *)
 and process (scope : EcScope.scope) (g : global) =
   let (scope, infos) =
@@ -168,6 +169,7 @@ and process (scope : EcScope.scope) (g : global) =
     | Gcheckproof b   -> process_checkproof scope b
     | Gsave      loc  -> process_save       scope loc
   in
+(*    EcEnv.dump EcDebug.initial (EcScope.env scope); *)
     (scope, infos)
 
 (* -------------------------------------------------------------------- *)
@@ -185,6 +187,7 @@ let full_check b max_provers =
     if b then EcScope.Prover.full_check scope 
     else scope in
   context := (idx, scope, l)
+
 (* -------------------------------------------------------------------- *)
 let uuid () : int =
   let (idx, _, _) = !context in idx
@@ -203,7 +206,3 @@ let process (g : global) =
   let (newscope, infos) = process scope g in
     context := (idx+1, newscope, scope :: stack);
     infos
-
-(* -------------------------------------------------------------------- *)
-
-

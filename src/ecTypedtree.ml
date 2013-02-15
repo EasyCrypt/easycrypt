@@ -1062,7 +1062,7 @@ and transinstr ue (env : EcEnv.env) (i : pinstr) =
   let transcall name args =
     let fpath, fsig =
       try
-        (EcEnv.Fun.lookup name env)
+        EcEnv.Fun.lookup name env
       with EcEnv.LookupFailure _ ->
         tyerror dloc (UnknownFunction name)
     in

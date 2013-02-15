@@ -180,14 +180,16 @@ let empty =
   and name = EcCoreLib.id_top in
   let env  =
     { env_scope   = path;
-      env_current = empty_activemc;
+      env_current = { empty_activemc with
+                        amc_components =
+                          MMsym.add name (CRefPath path) MMsym.empty; };
       env_comps   = Mp.singleton (EcPath.Pident name) empty_premc;
       env_bcomps  = Mid.empty;
       env_w3      = EcWhy3.empty;
       env_rb      = [];
       env_item    = [];
     }
-  in 
+  in
     env
 
 (* -------------------------------------------------------------------- *)
@@ -212,7 +214,8 @@ module MC = struct
       | Some prefix -> omap (lookup_mc_by_path env prefix) snd)
     in
       match Mp.find_opt p env.env_comps with
-      | None    -> None
+      | None -> None
+
       | Some mc ->
           let params =
             if   mc.mc_parameters = []
@@ -242,6 +245,7 @@ module MC = struct
           | None        -> raise (LookupFailure (`Path (EPath path)))
           | Some (_, x) -> suspend x params
       end
+
   (* ------------------------------------------------------------------ *)
   module Px = struct
     type ('p, 'a) projector = {
