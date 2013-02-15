@@ -418,14 +418,10 @@ module MC = struct
   let lookupall px ((qn, x) : qsymbol) (env : env) =
     match lookup_mc qn env with
     | None -> raise (LookupFailure (`QSymbol (qn, x)))
-    | Some mc -> begin
-        match mc_lookupall px x mc with
-        | []   -> raise (LookupFailure (`QSymbol (qn, x)))
-        | objs ->
-            List.map
-              (fun (p, obj) -> (p, suspend obj (_params_of_epath env p)))
-              objs
-      end
+    | Some mc ->
+        List.map
+          (fun (p, obj) -> (p, suspend obj (_params_of_epath env p)))
+          (mc_lookupall px x mc)
 
   (* Binding of an object in a [premc]. Fails if a binding already
    * exists for the given name and name. *)
@@ -748,7 +744,15 @@ module Ty = struct
       MC.import Px.for_typedecl env path obj
 
   let bind name ty env =
-    MC.bind_typedecl name ty env
+    let env = MC.bind_typedecl name ty env in
+    let (w3, rb) =
+        EcWhy3.add_ty env.env_w3
+          (EcPath.extend (Some env.env_scope) name) ty
+    in
+      { env with
+          env_w3   = w3;
+          env_rb   = rb :: env.env_rb;
+          env_item = CTh_type (name, ty) :: env.env_item; }
 
   let rebind name ty env =
     MC.bind_typedecl name ty env
