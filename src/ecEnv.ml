@@ -1061,7 +1061,7 @@ module Theory = struct
 
   (* ------------------------------------------------------------------ *)
   let require x cth env =
-    let rootnm = env.env_scope in
+    let rootnm = EcCoreLib.p_top in
     let thpath = EcPath.Pqname (rootnm, x) in
 
     let env, thmc =
