@@ -5,6 +5,10 @@ import sys, os, re, itertools as it, subprocess as sp
 import glob, fnmatch
 
 # --------------------------------------------------------------------
+MYROOT  = os.path.dirname(__file__)
+INSTALL = os.path.join(MYROOT, 'install-sh')
+
+# --------------------------------------------------------------------
 def _error(message):
     print >>sys.stderr, "%s: %s" % (sys.argv[0], message)
     exit(1)
@@ -17,7 +21,7 @@ def _exec(command):
 # --------------------------------------------------------------------
 def install_dir(distdir, x):
     fulldir = os.path.join(distdir, x)
-    command = ['install', '-m', '0755', '-d', fulldir]
+    command = [INSTALL, '-m', '0755', '-d', fulldir]
 
     _exec(command)
 
@@ -27,8 +31,8 @@ def install_files(distdir, x, files):
     filesR   = [os.path.join(x, f) for (f, b) in files if not b]
     filesX   = [os.path.join(x, f) for (f, b) in files if     b]
 
-    command1 = ['install', '-m', '0755', '-t', fulldir] + filesX
-    command2 = ['install', '-m', '0644', '-t', fulldir] + filesR
+    command1 = [INSTALL, '-m', '0755', '-t', fulldir] + filesX
+    command2 = [INSTALL, '-m', '0644', '-t', fulldir] + filesR
 
     if filesX: _exec(command1)
     if filesR: _exec(command2)

@@ -18,6 +18,7 @@ DISTDIR   = easycrypt-$(VERSION)
 THEORIES  = $(wildcard theories/*.ec)
 
 # --------------------------------------------------------------------
+INSTALL   ?= scripts/install-sh
 XUNITOUT  ?= xunit.xml
 CHECKARGS ?=
 
@@ -47,10 +48,10 @@ native: tags
 	$(OCAMLBUILD) src/ec.native
 
 install: ec.native
-	install -m 0755 -d $(DESTDIR)$(PREFIX)/bin
-	install -m 0755 -T ec.native $(DESTDIR)$(PREFIX)/bin/easycrypt
-	install -m 0755 -d $(DESTDIR)$(PREFIX)/lib/easycrypt/theories
-	install -m 0644 -t $(DESTDIR)$(PREFIX)/lib/easycrypt/theories $(THEORIES)
+	$(INSTALL) -m 0755 -d $(DESTDIR)$(PREFIX)/bin
+	$(INSTALL) -m 0755 -T ec.native $(DESTDIR)$(PREFIX)/bin/easycrypt
+	$(INSTALL) -m 0755 -d $(DESTDIR)$(PREFIX)/lib/easycrypt/theories
+	$(INSTALL) -m 0644 -t $(DESTDIR)$(PREFIX)/lib/easycrypt/theories $(THEORIES)
 
 uninstall:
 	rm -f $(DESTDIR)$(PREFIX)/bin/easycrypt

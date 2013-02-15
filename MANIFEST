@@ -30,6 +30,7 @@ theories/*.ec
 find:tests:*.ec
 
 # Build scripts
+scripts/install-sh
 scripts/runtest.py
 scripts/distribution.py
 scripts/keywords.py
