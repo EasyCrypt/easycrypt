@@ -473,19 +473,19 @@ module MC = struct
     in
 
     let mc1_of_module (mc : premc) = function
-      | MI_Module _me ->
-          mc                            (* FIXME *)
+      | MI_Module me ->
+          mc_bind_module (xpath me.me_name) me mc
 
       | MI_Variable v ->
-          let vty = {
-            vb_type = v.v_type;
-            vb_kind = Some PVglob;
-          }
+          let vty =
+            { vb_type = v.v_type;
+              vb_kind = Some PVglob; }
           in
             mc_bind_variable (xpath v.v_name) vty mc
 
-      | MI_Function _f ->
-          mc                            (* FIXME *)
+      | MI_Function f ->
+          mc_bind_function (xpath f.f_name) f.f_sig mc
+
     in
       List.fold_left mc1_of_module empty_premc me.me_comps
 
