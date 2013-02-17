@@ -60,3 +60,16 @@ module Sp : Mp.Set with type elt = path
 
 module Mep : Map.S   with type key = epath
 module Sep : Mep.Set with type elt = epath
+
+(* -------------------------------------------------------------------- *)
+module Msubp : sig
+  (* Maps implementation with [path] as keys. When asking the value of
+   * a [path], retrieve the longest prefix of [path] that has been
+   * associated to a value, and return this one. *)
+
+  type +'a t
+
+  val empty : 'a t
+  val add   : path -> 'a -> 'a t -> 'a t
+  val find  : path -> 'a t -> 'a option
+end
