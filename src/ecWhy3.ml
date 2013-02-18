@@ -1150,7 +1150,9 @@ let para_call max_provers provers timelimit task =
 (*      Format.printf "Start prover %s@." prover; *)
       let pc =
         Driver.prove_task ~command:pr.Whyconf.command ~timelimit dr task () in
-      ExtUnix.All.setpgid (CP.prover_call_pid pc) 0;
+      try
+        ExtUnix.All.setpgid (CP.prover_call_pid pc) 0
+      with Unix.Unix_error _ -> ();
       pcs.(i) <- Some(prover, pc);
 (*      Format.printf "Prover %s started and set at %i@." prover i *)
     with e -> 
