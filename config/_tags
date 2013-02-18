@@ -7,5 +7,5 @@ true : warn_Z, warn_Y, warn_+28
 <src> or <pprint> : include
 
 # --------------------------------------------------------------------
-<src/*.{ml,mli}> : pkg_menhirLib, pkg_why3, pkg_extunix
-<src/*.{native,byte}> : pkg_menhirLib, pkg_why3, pkg_extunix
+<src/*.{ml,mli}> : package(menhirLib), package(why3), package(extunix)
+<src/*.{native,byte}> : package(menhirLib), package(why3), package(extunix)

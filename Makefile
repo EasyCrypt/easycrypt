@@ -2,7 +2,7 @@
 
 # --------------------------------------------------------------------
 CONFIG           = _tags myocamlbuild.ml
-OCAMLBUILD_BIN   = ocamlbuild
+OCAMLBUILD_BIN   = ocamlbuild -use-ocamlfind
 OCAMLBUILD_EXTRA = -classic-display
 
 # In Emacs, use classic display to enable error jumping.
