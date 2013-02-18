@@ -64,7 +64,7 @@ module UniEnv = struct
   let fresh_uid ue = 
     let uid = EcUidgen.unique () in
     ue.unidecl <- Suid.add uid ue.unidecl;
-    Tunivar uid
+    tuni uid
 
 
   let init_freshen ue params tvi = 
@@ -83,7 +83,7 @@ module UniEnv = struct
     ue, Tvar.subst s
     
   let subst_tv subst params = 
-    List.map (fun tv -> subst (Tvar tv)) params
+    List.map (fun tv -> subst (tvar tv)) params
 
   let freshen ue params tvi ty = 
     let ue, subst = init_freshen ue params tvi in
@@ -111,13 +111,13 @@ module UniEnv = struct
         (EcUidgen.Muid.to_stream ue.unival)
 
   let rec repr (ue : unienv) (t : ty) : ty = 
-    match t with
+    match t.ty_node with
     | Tunivar id -> odfl t (Muid.find_opt id ue.unival)
     | _ -> t
 
   let bind (ue : unienv) id t =
     assert (Suid.mem id ue.unidecl);
-    match t with
+    match t.ty_node with
     | Tunivar id' when uid_equal id id' -> ()
     | _ ->
         let uv = ue.unival in 
@@ -143,13 +143,15 @@ end
 (* -------------------------------------------------------------------- *)
 let unify (env : EcEnv.env) (ue : unienv) =
   let rec unify (t1 : ty) (t2 : ty) = 
-    match UniEnv.repr ue t1, UniEnv.repr ue t2 with
+    let r1, r2 = UniEnv.repr ue t1, UniEnv.repr ue t2 in 
+    match r1.ty_node, r2.ty_node with
     | Tvar i1, Tvar i2 -> 
         (* FIXME use equal *)
         if not (EcIdent.id_equal i1 i2) then 
           raise (UnificationFailure (t1, t2))
 
-    | Tunivar id, t | t, Tunivar id -> UniEnv.bind ue id t
+    | Tunivar id, _ -> UniEnv.bind ue id r2
+    | _, Tunivar id -> UniEnv.bind ue id r1
 
     | Ttuple lt1, Ttuple lt2 ->
         if List.length lt1 <> List.length lt2 then 
@@ -164,11 +166,11 @@ let unify (env : EcEnv.env) (ue : unienv) =
           raise (UnificationFailure (t1, t2));
         List.iter2 unify lt1 lt2
 
-    | Tconstr(p, lt), t when EcEnv.Ty.defined p env ->
-        unify (EcEnv.Ty.unfold p lt env) t
+    | Tconstr(p, lt), _ when EcEnv.Ty.defined p env ->
+        unify (EcEnv.Ty.unfold p lt env) r2
 
-    | t, Tconstr(p, lt) when EcEnv.Ty.defined p env ->
-        unify t (EcEnv.Ty.unfold p lt env)
+    | _, Tconstr(p, lt) when EcEnv.Ty.defined p env ->
+        unify r1 (EcEnv.Ty.unfold p lt env)
     
 
     | _, _ -> raise (UnificationFailure(t1, t2))

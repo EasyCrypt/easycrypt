@@ -14,7 +14,11 @@ open EcSymbols
  *   the same name but must have different UID.
  *)
 
-type path = 
+type path = private {
+    p_node : path_node;
+    p_tag  : int
+  }
+and path_node = private
   | Pident of symbol
   | Pqname of path * symbol
 
@@ -29,6 +33,9 @@ type cref =
 type xcref = cref * xcref list
 
 (* -------------------------------------------------------------------- *)
+val pident    : symbol -> path
+val pqname    : path * symbol -> path
+
 val p_equal   : path -> path -> bool
 val p_compare : path -> path -> int
 

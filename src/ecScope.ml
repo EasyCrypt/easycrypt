@@ -466,7 +466,7 @@ module Prover = struct
     set_prover_info scope None None (Some provers)
 
   let set_default scope max = 
-    let provers = List.filter EcWhy3.check_prover_name ["Alt-Ergo";"Z3";"Vampire";"Eprover";"CVC3";"Yices"] in
+    let provers = List.filter EcWhy3.check_prover_name ["Alt-Ergo";"Z3";"Vampire";"Eprover";"Yices"] in
     let provers = Array.of_list provers in
     let time = 3 in
     set_prover_info scope (Some max) (Some time) (Some provers) 

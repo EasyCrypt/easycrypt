@@ -176,14 +176,14 @@ and empty_activemc = {
 
 (* -------------------------------------------------------------------- *)
 let empty =
-  let path = EcPath.Pident EcCoreLib.id_top
+  let path = EcPath.pident EcCoreLib.id_top
   and name = EcCoreLib.id_top in
   let env  =
     { env_scope   = path;
       env_current = { empty_activemc with
                         amc_components =
                           MMsym.add name (CRefPath path) MMsym.empty; };
-      env_comps   = Mp.singleton (EcPath.Pident name) empty_premc;
+      env_comps   = Mp.singleton (EcPath.pident name) empty_premc;
       env_bcomps  = Mid.empty;
       env_w3      = EcWhy3.empty;
       env_rb      = [];
@@ -258,7 +258,7 @@ let dump = Dump.dump
 
 (* -------------------------------------------------------------------- *)
 module MC = struct
-  let top_path = EcPath.Pident EcCoreLib.id_top
+  let top_path = EcPath.pident EcCoreLib.id_top
 
   (* ------------------------------------------------------------------ *)
 
@@ -399,7 +399,7 @@ module MC = struct
 
   let path_of_qn (top : EcPath.path) (qn : symbol list) =
     List.fold_left
-      (fun p x -> EcPath.Pqname (p, x)) top qn
+      (fun p x -> EcPath.pqname (p, x)) top qn
       
   let lookup_mc (qn : symbol list) (env : env) =
     match qn with
@@ -532,8 +532,8 @@ module MC = struct
   (* ------------------------------------------------------------------ *)
   let mc_of_module (env : env) (me : module_expr) =
     let xpath =
-      let scope = EcPath.Pqname (env.env_scope, me.me_name) in
-        fun x -> EcPath.Pqname (scope, x)
+      let scope = EcPath.pqname (env.env_scope, me.me_name) in
+        fun x -> EcPath.pqname (scope, x)
     in
 
     let mc1_of_module (mc : premc) = function
@@ -575,7 +575,7 @@ module MC = struct
 
   (* ------------------------------------------------------------------ *)
   let bind px env name obj =
-    let path = EcPath.Pqname (env.env_scope, name) in
+    let path = EcPath.pqname (env.env_scope, name) in
       { env with
           env_current =
             amc_bind px name (px.Px.px_patx path) obj env.env_current;
@@ -586,7 +586,7 @@ module MC = struct
 
   (* -------------------------------------------------------------------- *)
   let bind_mc env name comps =
-    let path = EcPath.Pqname (env.env_scope, name) in
+    let path = EcPath.pqname (env.env_scope, name) in
 
       if Mp.find_opt path env.env_comps <> None then
         raise (DuplicatedBinding name);
@@ -640,18 +640,18 @@ module MC = struct
 
   and mc_of_ctheory =
     let rec mc_of_ctheory_struct path (env, mc) = function 
-      | CTh_type     (x, td)  -> env, mc_bind_typedecl (EcPath.Pqname (path, x)) td mc
-      | CTh_operator (x, op)  -> env, mc_bind_operator (EcPath.Pqname (path, x)) op mc
-      | CTh_axiom    (x, ax)  -> env, mc_bind_axiom    (EcPath.Pqname (path, x)) ax mc
-      | CTh_modtype  (x, tm)  -> env, mc_bind_modtype  (EcPath.Pqname (path, x)) tm mc
-      | CTh_module   m        -> env, mc_bind_module   (EcPath.Pqname (path, m.me_name)) m mc
+      | CTh_type     (x, td)  -> env, mc_bind_typedecl (EcPath.pqname (path, x)) td mc
+      | CTh_operator (x, op)  -> env, mc_bind_operator (EcPath.pqname (path, x)) op mc
+      | CTh_axiom    (x, ax)  -> env, mc_bind_axiom    (EcPath.pqname (path, x)) ax mc
+      | CTh_modtype  (x, tm)  -> env, mc_bind_modtype  (EcPath.pqname (path, x)) tm mc
+      | CTh_module   m        -> env, mc_bind_module   (EcPath.pqname (path, m.me_name)) m mc
       | CTh_export   _        -> env, mc
       | CTh_theory   (x, cth) ->
           let env, submc =
             List.fold_left
-              (mc_of_ctheory_struct (EcPath.Pqname (path, x)))
+              (mc_of_ctheory_struct (EcPath.pqname (path, x)))
               (env, empty_premc) cth.cth_struct
-          and subpath = EcPath.Pqname (path, x) in
+          and subpath = EcPath.pqname (path, x) in
   
           let env =
             let comps = env.env_comps in
@@ -662,14 +662,14 @@ module MC = struct
     in
       fun (env : env) (path : EcPath.path) (x : symbol) (cth : ctheory) ->
         List.fold_left
-          (mc_of_ctheory_struct (EcPath.Pqname (path, x)))
+          (mc_of_ctheory_struct (EcPath.pqname (path, x)))
           (env, empty_premc)
           cth.cth_struct
 end
 
 (* -------------------------------------------------------------------- *)
 let enter (name : symbol) (env : env) =
-  let path = EcPath.Pqname (env.env_scope, name) in
+  let path = EcPath.pqname (env.env_scope, name) in
   let env  = MC.bind_mc env name empty_premc in
     { env with
         env_scope = path;
@@ -1109,7 +1109,7 @@ module Theory = struct
   (* ------------------------------------------------------------------ *)
   let import (path : EcPath.path) (env : env) =
     let rec import (env : env) path (cth : ctheory) =
-      let xpath x = EcPath.Pqname (path, x) in
+      let xpath x = EcPath.pqname (path, x) in
       let rec import_cth_item (env : env) = function
         | CTh_type (x, ty) ->
             MC.import Px.for_typedecl env (xpath x) ty
@@ -1158,7 +1158,7 @@ module Theory = struct
   (* ------------------------------------------------------------------ *)
   let require x cth env =
     let rootnm = EcCoreLib.p_top in
-    let thpath = EcPath.Pqname (rootnm, x) in
+    let thpath = EcPath.pqname (rootnm, x) in
 
     let env, thmc =
       MC.mc_of_ctheory env rootnm x cth.cth3_theory
@@ -1287,7 +1287,7 @@ exception IncompatibleType of ty * ty
 exception IncompatibleForm of form * form * form * form
 
 let rec equal_type env t1 t2 = 
-  match t1, t2 with
+  match t1.ty_node, t2.ty_node with
   | Tunivar uid1, Tunivar uid2 -> EcUidgen.uid_equal uid1 uid2
       
   | Tvar i1, Tvar i2 -> i1 = i2
@@ -1310,7 +1310,7 @@ let check_type env t1 t2 =
   if not (equal_type env t1 t2) then raise (IncompatibleType(t1,t2))
 
 let rec destr_tfun env tf = 
-  match tf with
+  match tf.ty_node with
   | Tfun(ty1,ty2) -> ty1, ty2
   | Tconstr(p,tys) when Ty.defined p env ->
       destr_tfun env (Ty.unfold p tys env) 

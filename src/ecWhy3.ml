@@ -411,20 +411,20 @@ let path_of_id env id =
 
 let rec import_w3_ty env tvm ty = 
   match ty.Ty.ty_node with
-  | Ty.Tyvar v -> Tvar (Wtvm.get tvm v)
+  | Ty.Tyvar v -> tvar (Wtvm.get tvm v)
   | Ty.Tyapp(t, args) ->
       let args = List.map (import_w3_ty env tvm) args in
       try 
         let path,_ = path_of_id env t.Ty.ts_name in
-        Tconstr(path,args)
+        tconstr path args
       with e ->
-        if Ty.is_ts_tuple t then Ttuple args
+        if Ty.is_ts_tuple t then ttuple args
         else if Ty.ts_equal t Ty.ts_func then 
           let t1,t2 = List.hd2 args in
-          Tfun(t1,t2)
+          tfun t1 t2
         else if Ty.ts_equal t Ty.ts_pred then
           let t1,t2 = List.hd args, tbool in
-          Tfun(t1,t2)
+          tfun t1 t2
         else raise e
   
 let exists_w3 env id = 
@@ -649,7 +649,7 @@ let import_decls rn path env rb decls =
     | s::ls, s'::ls' when s = s' -> diff ls ls'
     | _, _ -> List.rev ls, ls' in
   let rec close accu ls path z = 
-    match ls, z, path with
+    match ls, z, path.EcPath.p_node with
     | [], _, _ -> path, z 
     | s::ls, Zenter id:: z, EcPath.Pqname(p,id') ->
         assert (s = id && EcSymbols.equal id id');
@@ -745,7 +745,7 @@ let trans_pty env p =
   with _ -> assert false
 
 let rec trans_ty env vm ty = 
-  match ty with
+  match ty.ty_node with
   | Tunivar _ -> assert false
   | Tvar id -> trans_tv vm id
   | Ttuple tys -> Ty.ty_tuple (trans_tys env vm tys)

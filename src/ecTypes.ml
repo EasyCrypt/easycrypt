@@ -6,41 +6,95 @@ open EcPath
 open EcUidgen
 
 (* -------------------------------------------------------------------- *)
-type ty =
+
+type ty = {
+    ty_node : ty_node;
+    ty_tag  : int;
+  }
+and ty_node =
   | Tunivar of EcUidgen.uid
-  | Tvar    of EcIdent.t
+  | Tvar    of EcIdent.t 
   | Ttuple  of ty list
   | Tconstr of EcPath.path * ty list
   | Tfun    of ty * ty
- 
+
 type dom = ty list
 type tysig = dom * ty 
 
+let ty_equal : ty -> ty -> bool = (==)
+let ty_hash ty = ty.ty_tag
+
+module Hsty = Why3.Hashcons.Make (struct
+  type t = ty
+
+  let equal ty1 ty2 =
+    match ty1.ty_node, ty2.ty_node with
+    | Tunivar u1      , Tunivar u2       -> 
+        uid_equal u1 u2
+    | Tvar v1         , Tvar v2          -> 
+        id_equal v1 v2
+    | Ttuple lt1      , Ttuple lt2       -> 
+        List.all2 ty_equal lt1 lt2
+    | Tconstr (p1,lt1), Tconstr (p2,lt2) -> 
+        EcPath.p_equal p1 p2 && List.all2 ty_equal lt1 lt2
+    | Tfun(d1,c1)     , Tfun(d2,c2)      -> 
+        ty_equal d1 d2 && ty_equal c1 c2
+    | _               , _                -> false
+      
+  let hash ty = 
+    match ty.ty_node with 
+    | Tunivar u      -> 
+        u
+    | Tvar    id     -> 
+        EcIdent.tag id
+    | Ttuple  tl     -> 
+        Why3.Hashcons.combine_list ty_hash 0 tl
+    | Tconstr (p,tl) -> 
+        Why3.Hashcons.combine_list ty_hash p.p_tag tl
+    | Tfun    (t1,t2) ->
+        Why3.Hashcons.combine (ty_hash t1) (ty_hash t2)
+          
+  let tag n ty = { ty with ty_tag = n }
+      
+end)
+
+let mk_ty node =  Hsty.hashcons { ty_node = node; ty_tag = -1 }
+
 (* -------------------------------------------------------------------- *)
-let tunit      = Tconstr(EcCoreLib.p_unit, [])
-let tbool      = Tconstr(EcCoreLib.p_bool, [])
-let tint       = Tconstr(EcCoreLib.p_int , [])
-let tdistr  ty = Tconstr(EcCoreLib.p_distr, [ty])
+let tuni uid = mk_ty (Tunivar uid)
+
+let tvar id = mk_ty (Tvar id)
+
+let ttuple lt    = mk_ty (Ttuple lt)
+let tconstr p lt = mk_ty (Tconstr(p,lt))
+let tfun t1 t2   = mk_ty (Tfun(t1,t2)) 
+
+(* -------------------------------------------------------------------- *)
+let tunit      = tconstr EcCoreLib.p_unit  []
+let tbool      = tconstr EcCoreLib.p_bool  []
+let tint       = tconstr EcCoreLib.p_int   []
+let tdistr  ty = tconstr EcCoreLib.p_distr [ty]
  
 let toarrow dom ty = 
-  List.fold_right (fun t1 t2 -> Tfun(t1,t2)) dom ty
+  List.fold_right tfun dom ty
 
 (* -------------------------------------------------------------------- *)
 let map f t = 
-  match t with 
+  match t.ty_node with 
   | Tunivar _ | Tvar _ -> t
-  | Ttuple lty -> Ttuple (List.map f lty)
-  | Tconstr(p, lty) -> Tconstr (p, List.map f lty)
-  | Tfun(t1,t2)     -> Tfun(f t1, f t2)
+  | Ttuple lty -> ttuple (List.map f lty)
+  | Tconstr(p, lty) -> tconstr p (List.map f lty)
+  | Tfun(t1,t2)     -> tfun (f t1) (f t2)
 
-let fold f s = function
+let fold f s ty = 
+  match ty.ty_node with 
   | Tunivar _ | Tvar _ -> s
   | Ttuple lty -> List.fold_left f s lty
   | Tconstr(_, lty) -> List.fold_left f s lty
   | Tfun(t1,t2) -> f (f s t1) t2
 
 let sub_exists f t =
-  match t with
+  match t.ty_node with
   | Tunivar _ | Tvar _ -> false
   | Ttuple lty -> List.exists f lty
   | Tconstr (_, lty) -> List.exists f lty
@@ -49,28 +103,30 @@ let sub_exists f t =
 (* -------------------------------------------------------------------- *)
 module Tuni = struct
   let subst1 ((id, t) : uid * ty) =
-    let rec aux = function
+    let rec aux ty = 
+      match ty.ty_node with 
       | Tunivar id' when uid_equal id id' -> t
-      | u -> map aux u in
+      | _ -> map aux ty in
     aux
 
   let subst (uidmap : ty Muid.t) =
-    let rec aux = function
-      | (Tunivar id) as t -> odfl t (Muid.find_opt id uidmap)
-      | t -> map aux t in
+    let rec aux ty = 
+      match ty.ty_node with 
+      | Tunivar id -> odfl ty (Muid.find_opt id uidmap)
+      | _ -> map aux ty in
     aux 
 
   let subst_dom uidmap = List.map (subst uidmap)
 
   let occur u = 
     let rec aux t = 
-      match t with
+      match t.ty_node with
       | Tunivar u' -> uid_equal u u'
       | _ -> sub_exists aux t in
     aux
 
   let rec fv_rec fv t = 
-    match t with
+    match t.ty_node with
     | Tunivar id -> Suid.add id fv 
     | _ -> fold fv_rec fv t 
 
@@ -82,15 +138,17 @@ end
 
 module Tvar = struct 
   let subst1 (id,t) = 
-    let rec aux = function
+    let rec aux ty = 
+      match ty.ty_node with 
       | Tvar id' when id_equal id id' -> t
-      | u -> map aux u in
+      | _ -> map aux ty in
     aux
 
   let subst (s : ty Mid.t) =
-    let rec aux = function
-      | (Tvar id) as t -> odfl t (Mid.find_opt id s)
-      | t -> map aux t in
+    let rec aux t = 
+      match t.ty_node with 
+      | Tvar id -> odfl t (Mid.find_opt id s)
+      | _ -> map aux t in
     aux 
 
   let init lv lt = 
@@ -98,7 +156,7 @@ module Tvar = struct
     List.fold_left2 (fun s v t -> Mid.add v t s) Mid.empty lv lt
 
   let rec fv_rec fv t = 
-    match t with
+    match t.ty_node with
     | Tvar id -> Sid.add id fv 
     | _ -> fold fv_rec fv t 
 
@@ -213,7 +271,8 @@ end
 (* -------------------------------------------------------------------- *)
 module Dump = struct
   let ty_dump pp =
-    let rec ty_dump pp = function
+    let rec ty_dump pp ty = 
+      match ty.ty_node with 
       | Tunivar i ->
           EcDebug.single pp ~extra:(string_of_int i) "Tunivar"
   

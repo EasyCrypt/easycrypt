@@ -80,8 +80,8 @@ let f_false = f_op EcCoreLib.p_false [] ty_bool
 let f_bool b = if b then f_true else f_false
 let f_int n = mk_form (Fint n) ty_int
 
-let ty_fbool1 = Tfun(ty_bool,ty_bool)
-let ty_fbool2 = Tfun(ty_bool,ty_fbool1) 
+let ty_fbool1 = tfun ty_bool ty_bool
+let ty_fbool2 = tfun ty_bool ty_fbool1 
 
 let fop_not = f_op EcCoreLib.p_not [] ty_fbool1
 let f_not f = f_app fop_not [f] ty_bool
@@ -104,14 +104,14 @@ let f_imp f1 f2 = f_app fop_imp [f1;f2] ty_bool
 let fop_iff = f_op EcCoreLib.p_iff [] ty_fbool2
 let f_iff f1 f2 = f_app fop_iff [f1;f2] ty_bool
 
-let fop_eq ty = f_op EcCoreLib.p_eq [ty] (Tfun(ty, Tfun(ty, ty_bool)))
+let fop_eq ty = f_op EcCoreLib.p_eq [ty] (tfun ty (tfun ty ty_bool))
 let f_eq f1 f2 = f_app (fop_eq f1.f_ty) [f1;f2] ty_bool
 
 let f_local x ty = mk_form (Flocal x) ty
 let f_pvar x ty s = mk_form (Fpvar(x,ty,s)) ty
 
 let f_tuple args = 
-  mk_form (Ftuple args) (Ttuple (List.map ty args))
+  mk_form (Ftuple args) (ttuple (List.map ty args))
 
 let f_if f1 f2 f3 = mk_form (Fif(f1,f2,f3)) f2.f_ty 
 

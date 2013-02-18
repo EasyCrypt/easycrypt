@@ -1,4 +1,5 @@
 (* -------------------------------------------------------------------- *)
+open EcMaps
 open EcUtils
 open EcSymbols
 open EcParsetree
@@ -6,12 +7,23 @@ open EcUidgen
 open EcIdent
 
 (* -------------------------------------------------------------------- *)
-type ty =
+type ty = private {
+    ty_node : ty_node;
+    ty_tag  : int 
+  }
+and ty_node =
   | Tunivar of EcUidgen.uid
   | Tvar    of EcIdent.t 
   | Ttuple  of ty list
   | Tconstr of EcPath.path * ty list
   | Tfun    of ty * ty
+
+val tuni   : EcUidgen.uid -> ty
+val tvar   : EcIdent.t -> ty
+val ttuple  : ty list -> ty
+val tconstr : EcPath.path -> ty list -> ty
+val tfun    : ty -> ty -> ty
+
 type dom   = ty list
 type tysig = dom * ty 
 

@@ -57,7 +57,7 @@ let subst_epath (s : subst) (p : EcPath.epath) =
       | Some (EcPath.CRefPath mp) -> begin
           match x with
           | None   -> EcPath.EPath mp
-          | Some x -> EcPath.EPath (EcPath.Pqname (mp, x))
+          | Some x -> EcPath.EPath (EcPath.pqname (mp, x))
         end
       | Some (EcPath.CRefMid mid) -> EcPath.EModule (mid, x)
     end
@@ -73,20 +73,21 @@ let subst_cref (s : subst) (p : EcPath.cref) =
 
 (* -------------------------------------------------------------------- *)
 let rec subst_ty (s : subst) (ty : ty) =
-  match ty with
+  match ty.ty_node with
   | Tunivar _ -> assert false
 
-  | Tvar x -> Tvar (subst_local s x)
+  | Tvar x -> tvar (subst_local s x)
 
   | Ttuple tys ->
       let tys = List.map (subst_ty s) tys in
-        Ttuple tys
+      ttuple tys
 
   | Tconstr (p, tys) ->
       let p   = subst_path s p in
       let tys = List.map (subst_ty s) tys in
-        Tconstr (p, tys)
-  | Tfun (t1,t2) -> Tfun(subst_ty s t1, subst_ty s t2)
+      tconstr p tys
+
+  | Tfun (t1,t2) -> tfun (subst_ty s t1) (subst_ty s t2)
 
 (* -------------------------------------------------------------------- *)
 let subst_lpattern (s : subst) (p : lpattern) =
@@ -451,7 +452,7 @@ and subst_module_comps (_s : subst) (_scope : EcPath.path) (_comps : module_comp
 
 (* -------------------------------------------------------------------- *)
 and subst_module (s : subst) (scope : EcPath.path) (m : module_expr) =
-  let scope' = EcPath.Pqname (scope, m.me_name) in
+  let scope' = EcPath.pqname (scope, m.me_name) in
   let body'  = subst_module_body s scope' m.me_body in
   let comps' = subst_module_comps s scope' m.me_comps in
   let tysig' = subst_modsig s m.me_sig in
@@ -483,7 +484,7 @@ let rec subst_theory_item (s : subst) (scope : EcPath.path) (item : theory_item)
       (s, Th_module (subst_module s scope m))
 
   | Th_theory (x, th) ->
-      let th' = subst_theory s (EcPath.Pqname (scope, x)) th in
+      let th' = subst_theory s (EcPath.pqname (scope, x)) th in
         (s, Th_theory (x, th'))
 
   | Th_export p -> (s, Th_export (subst_path s p))

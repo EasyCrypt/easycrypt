@@ -241,7 +241,8 @@ struct
 
   (* ------------------------------------------------------------------ *)
   let pr_type (tenv : t) (uidmap : NameGen.t) (ty : ty) =
-    let rec pr_type btuple = function
+    let rec pr_type btuple ty = 
+      match ty.ty_node with 
       | Tvar id ->
           pr_tvar tenv id
 
@@ -657,7 +658,7 @@ struct
 
   (* ------------------------------------------------------------------ *)
   let rec pr_module_item (scope : EcPath.path) (tenv : t) (item : module_item) =
-    let xpath x = EcPath.Pqname (scope, x) in
+    let xpath x = EcPath.pqname (scope, x) in
 
       match item with
       | MI_Variable v ->
@@ -829,7 +830,7 @@ struct
 
   (* ------------------------------------------------------------------ *)
   let rec pr_ctheory_item (scope : EcPath.path) (tenv : t) (item : ctheory_item) =
-    let xpath x = EcPath.Pqname (scope, x) in
+    let xpath x = EcPath.pqname (scope, x) in
 
     match item with
     | CTh_type (x, ty) ->
@@ -1191,29 +1192,30 @@ module EcDebugPP = struct
   let pr_expr     = BPP.pr_expr ()
   let pr_form     = BPP.pr_form ()
   let pr_dom      = BPP.pr_dom  ()
-  let pr_typedecl = fun (x, v) -> BPP.pr_typedecl () (EcPath.Pident x, v)
-  let pr_opdecl   = fun (x, v) -> BPP.pr_opdecl   () (EcPath.Pident x, v)
-  let pr_axiom    = fun (x, v) -> BPP.pr_axiom    () (EcPath.Pident x, v)
-  let pr_modsig   = fun (x, v) -> BPP.pr_modsig   () (EcPath.Pident x, v)
-  let pr_module   = fun     v  -> BPP.pr_module   () (EcPath.Pident v.me_name, v)
+  let pr_typedecl = fun (x, v) -> BPP.pr_typedecl () (EcPath.pident x, v)
+  let pr_opdecl   = fun (x, v) -> BPP.pr_opdecl   () (EcPath.pident x, v)
+  let pr_axiom    = fun (x, v) -> BPP.pr_axiom    () (EcPath.pident x, v)
+  let pr_modsig   = fun (x, v) -> BPP.pr_modsig   () (EcPath.pident x, v)
+  let pr_module   = fun     v  -> BPP.pr_module   () (EcPath.pident v.me_name, v)
   let pr_export   = BPP.pr_export ()
-  let pr_theory   = fun (x, v) -> BPP.pr_theory   () (EcPath.Pident x, v)
+  let pr_theory   = fun (x, v) -> BPP.pr_theory   () (EcPath.pident x, v)
   let pr_lgoal    = BPP.pr_lgoal    ()
 
   let pp_type     = BPP.pp_type ()
   let pp_expr     = BPP.pp_expr ()
   let pp_form     = BPP.pp_form ()
   let pp_dom      = BPP.pp_dom  ()
-  let pp_typedecl = fun fmt (x, v) -> BPP.pp_typedecl () fmt (EcPath.Pident x, v)
-  let pp_opdecl   = fun fmt (x, v) -> BPP.pp_opdecl   () fmt (EcPath.Pident x, v)
-  let pp_axiom    = fun fmt (x, v) -> BPP.pp_axiom    () fmt (EcPath.Pident x, v)
-  let pp_modsig   = fun fmt (x, v) -> BPP.pp_modsig   () fmt (EcPath.Pident x, v)
-  let pp_module   = fun fmt     v  -> BPP.pp_module   () fmt (EcPath.Pident v.me_name, v)
+  let pp_typedecl = fun fmt (x, v) -> BPP.pp_typedecl () fmt (EcPath.pident x, v)
+  let pp_opdecl   = fun fmt (x, v) -> BPP.pp_opdecl   () fmt (EcPath.pident x, v)
+  let pp_axiom    = fun fmt (x, v) -> BPP.pp_axiom    () fmt (EcPath.pident x, v)
+  let pp_modsig   = fun fmt (x, v) -> BPP.pp_modsig   () fmt (EcPath.pident x, v)
+  let pp_module   = fun fmt     v  -> BPP.pp_module   () fmt (EcPath.pident v.me_name, v)
   let pp_export   = BPP.pp_export ()
-  let pp_theory   = fun fmt (x, v) -> BPP.pp_theory   () fmt (EcPath.Pident x, v)
+  let pp_theory   = fun fmt (x, v) -> BPP.pp_theory   () fmt (EcPath.pident x, v)
   let pp_lgoal    = BPP.pp_lgoal    ()
 
-  let rec pp_path fmt = function
+  let rec pp_path fmt p = 
+    match p.EcPath.p_node with 
     | EcPath.Pident x      -> Format.fprintf fmt "%s" x
     | EcPath.Pqname (p, x) -> Format.fprintf fmt "%a.%s" pp_path p x
 end

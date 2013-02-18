@@ -4,7 +4,11 @@ open EcMaps
 open EcSymbols
 
 (* -------------------------------------------------------------------- *)
-type path =
+type path = {
+    p_node : path_node;
+    p_tag  : int
+  }
+and path_node = 
   | Pident of symbol
   | Pqname of path * symbol
 
@@ -19,27 +23,45 @@ type cref =
 type xcref = cref * xcref list
 
 (* -------------------------------------------------------------------- *)
-let p_equal =
-  let rec p_equal (p1 : path) (p2 : path) =
+
+let p_equal : path -> path -> bool = (==)
+let p_hash p = p.p_tag
+
+module Hspath = Why3.Hashcons.Make (struct 
+  type t = path
+
+  let equal_node p1 p2 = 
     match p1, p2 with
     | Pident id1, Pident id2 -> EcSymbols.equal id1 id2
     | Pqname (p1, id1), Pqname(p2, id2) -> 
         EcSymbols.equal id1 id2 && p_equal p1 p2
-    | _, _ -> false
-  in
-    fun p1 p2 -> p1 == p2 || p_equal p1 p2
+    | _ -> false
 
-let p_compare p1 p2 =
-  let rec p_compare (p1 : path) (p2 : path) =
-    match p1, p2 with
-    | Pident id1, Pident id2 -> EcSymbols.compare id1 id2
-    | Pident _, _ -> -1
-    | _, Pident _ -> 1
-    | Pqname(p1, id1), Pqname(p2,id2) ->
-        let cmp = EcSymbols.compare id1 id2 in
-          if cmp = 0 then p_compare p1 p2 else cmp
-  in
-    if p1 == p2 then 0 else p_compare p1 p2
+  let equal p1 p2 = equal_node p1.p_node p2.p_node
+
+  let hash p = 
+    match p.p_node with
+    | Pident id -> Hashtbl.hash id
+    | Pqname (p,id) -> Why3.Hashcons.combine p.p_tag (Hashtbl.hash id)
+          
+  let tag n p = { p with p_tag = n }
+
+end)
+
+module Path = MakeMSH (struct
+  type t = path
+  let tag = p_hash
+end)
+
+module Sp = Path.S
+module Mp = Path.M
+module Hp = Path.H
+
+let p_compare p1 p2 = p_hash p1 - p_hash p2
+
+let mk_path node = Hspath.hashcons { p_node = node; p_tag = -1 }
+let pident id = mk_path (Pident id)
+let pqname (p,id) = mk_path (Pqname(p,id))
 
 (* -------------------------------------------------------------------- *)
 let ep_equal (p1 : epath) (p2 : epath) =
@@ -66,7 +88,7 @@ let rec xcref_equal ((p1, args1) : xcref) ((p2, args2) : xcref) =
 
 (* -------------------------------------------------------------------- *)
 let rec tostring p =
-  match p with
+  match p.p_node with
   | Pident x ->
       Printf.sprintf "%s" x
   | Pqname (p, x) ->
@@ -94,60 +116,55 @@ let cref_tostring = function
 (* -------------------------------------------------------------------- *)
 let rec create (path : string) =
   match try_nf (fun () -> String.rindex path '.') with
-  | None   -> Pident path
+  | None   -> pident path
   | Some i ->
       let path = String.sub path 0 i
       and name = String.sub path (i+1) (String.length path - (i+1)) in
-        Pqname (create path, name)
+        pqname (create path, name)
 
 (* -------------------------------------------------------------------- *)
 let tolist =
-  let rec aux l = function
+  let rec aux l p = 
+    match p.p_node with 
     | Pident x      -> x :: l
     | Pqname (p, x) -> aux (x :: l) p in
   aux []
 
 (* -------------------------------------------------------------------- *)
 let toqsymbol (p : path) =
-  match p with
+  match p.p_node with
   | Pident x      -> ([], x)
   | Pqname (p, x) -> (tolist p, x)
 
 (* -------------------------------------------------------------------- *)
-let basename = function
+let basename p = 
+  match p.p_node with 
   | Pident x -> x
   | Pqname (_, x) -> x
 
 (* -------------------------------------------------------------------- *)
-let prefix = function
+let prefix p = 
+  match p.p_node with 
   | Pident _ -> None
   | Pqname (p, _) -> Some p
 
 (* -------------------------------------------------------------------- *)
-let rec rootname = function
+let rec rootname p = 
+  match p.p_node with 
   | Pident x -> x
   | Pqname (p, _) -> rootname p
 
 (* -------------------------------------------------------------------- *)
 let extend (p : path option) (x : symbol) =
   match p with
-  | None   -> Pident x
-  | Some p -> Pqname (p, x)
+  | None   -> pident x
+  | Some p -> pqname (p, x)
 
 (* -------------------------------------------------------------------- *)
 let rec concat p1 p2 = 
-  match p2 with
-  | Pident x -> Pqname(p1, x)
-  | Pqname (p2,x) -> Pqname(concat p1 p2, x)
-
-(* -------------------------------------------------------------------- *)
-module PathComparable = struct
-  type t = path
-  let compare = p_compare
-end
-
-module Mp = Map.Make(PathComparable)
-module Sp = Mp.Set
+  match p2.p_node with
+  | Pident x -> pqname(p1, x)
+  | Pqname (p2,x) -> pqname(concat p1 p2, x)
 
 (* -------------------------------------------------------------------- *)
 module EPathComparable = struct
@@ -175,7 +192,7 @@ module Msubp = struct
   }
 
   let rec update up (path : path) (m : 'a t) =
-    match path with
+    match path.p_node with
     | Pident x -> up x m
     | Pqname (path, x) ->
         let up supx supm =
@@ -211,7 +228,7 @@ module Msubp = struct
     in
 
     let rec find (path : path) (sm : 'a submaps) =
-      match path with
+      match path.p_node with
       | Pident x      -> find1 x sm
       | Pqname (p, x) -> find1 x (find p sm)
     in

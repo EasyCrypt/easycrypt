@@ -293,12 +293,12 @@ let rec transty tp (env : EcEnv.env) ue ty =
 
    | PTvar s ->
        if tp.tp_tvar then 
-         try Tvar (UE.get_var ue s.pl_desc)
+         try tvar (UE.get_var ue s.pl_desc)
          with _ -> tyerror s.pl_loc (UnboundTypeParameter s.pl_desc)
        else tyerror s.pl_loc TypeVariableNotAllowed;
 
   | PTtuple tys   -> 
-      Ttuple (transtys tp env ue tys)
+      ttuple (transtys tp env ue tys)
 
   | PTnamed { pl_desc = name } -> 
       begin match EcEnv.Ty.lookup_opt name env with
@@ -307,10 +307,10 @@ let rec transty tp (env : EcEnv.env) ue ty =
           if tydecl.tyd_params <> [] then
             tyerror ty.pl_loc
               (InvalidNumberOfTypeArgs(name,List.length tydecl.tyd_params, 0));
-          Tconstr (p, [])
+          tconstr p []
       end
   | PTfun(ty1,ty2) ->
-      Tfun(transty tp env ue ty1, transty tp env ue ty2) 
+      tfun (transty tp env ue ty1) (transty tp env ue ty2) 
         
   | PTapp ({ pl_desc = name }, tyargs) -> 
       begin match EcEnv.Ty.lookup_opt name env with
@@ -321,7 +321,7 @@ let rec transty tp (env : EcEnv.env) ue ty =
           if nargs <> expected then
             tyerror ty.pl_loc (InvalidNumberOfTypeArgs (name, expected, nargs));
           let tyargs = transtys tp env ue tyargs in 
-          Tconstr (p, tyargs)
+          tconstr p tyargs
       end
 
 and transtys tp (env : EcEnv.env) ue tys = 
@@ -347,14 +347,14 @@ let transpattern1 _env ue (p : EcParsetree.lpattern) =
       else
         let xs     = List.map EcIdent.create xs in
         let subtys = List.map (fun _ -> UE.fresh_uid ue) xs in
-        (LTuple xs, Ttuple subtys)
+        (LTuple xs, ttuple subtys)
 
 let transpattern env ue (p : EcParsetree.lpattern) =
   match transpattern1 env ue p with
   | LSymbol x as p, ty ->
       EcEnv.Var.bind_local x ty env, p, ty
 
-  | LTuple xs as p, (Ttuple lty as ty) ->
+  | LTuple xs as p, ({ty_node = Ttuple lty} as ty) ->
       EcEnv.Var.bind_locals (List.combine xs lty) env, p, ty
 
   | _ -> assert false
@@ -383,7 +383,7 @@ let transtvi env ue tvi =
       Some (UE.TVInamed (List.rev_map (fun (s,t) -> unloc s, t) lst))
   
 let rec destr_tfun env ue tf = 
-  match tf with
+  match tf.ty_node with
   | Tunivar _ ->
       let tf' = UE.repr ue tf in
       assert (not (tf == tf')); (* FIXME error message *)
@@ -456,7 +456,7 @@ let transexp (env : EcEnv.env) (ue : EcUnify.unienv) e =
     | PEtuple es ->
         let tes = List.map (transexp env) es in
         let es, tys = List.split tes in
-          (e_tuple es, Ttuple tys)
+          (e_tuple es, ttuple tys)
 
     | PEif (pc, pe1, pe2) ->
       let c, tyc = transexp env pc in
@@ -796,7 +796,7 @@ and check_tymod_eq  = check_tymod_cnv `Eq
 
 (* -------------------------------------------------------------------- *)
 let rec transmod (env : EcEnv.env) (x : symbol) (m : pmodule_expr) =
-  let scope = EcPath.Pqname (EcEnv.root env, x) in
+  let scope = EcPath.pqname (EcEnv.root env, x) in
 
   match m with
   | Pm_ident ({ pl_desc = m }, args) -> begin
@@ -1103,7 +1103,7 @@ and translvalue ue (env : EcEnv.env) lvalue =
 
   | PLvTuple xs -> 
       let xs = List.map (trans_pv env) xs in
-      let ty = Ttuple (List.map snd xs) in
+      let ty = ttuple (List.map snd xs) in
       (LvTuple xs, ty)
 
   | PLvMap (x, tvi, e) ->
@@ -1200,7 +1200,7 @@ let transfpattern fenv ue (p : EcParsetree.lpattern) =
   match transpattern1 (Fenv.mono fenv) ue p with
   | LSymbol x, ty ->
       (Fenv.bind_local fenv x ty, LSymbol x, ty)
-  | LTuple xs, (Ttuple lty as ty) ->
+  | LTuple xs, ({ty_node = Ttuple lty } as ty) ->
       (Fenv.bind_locals fenv xs lty, LTuple xs, ty)
   | _ -> assert false
 
