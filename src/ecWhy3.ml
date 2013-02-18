@@ -1052,7 +1052,8 @@ let rec trans_form env vm f =
       let n = Term.ConstInt(Term.IConstDecimal (string_of_int n)) in
       Term.t_const n 
   | Flocal id -> trans_lv vm id
-  | Fpvar(p,ty,s) ->  Term.t_app_infer (trans_pv env vm (p,ty) s) [] 
+
+  | Fpvar(p,s) ->  Term.t_app_infer (trans_pv env vm (p,f.f_ty) s) [] 
 
   | Fop(p,tys) -> trans_app env vm p tys [] 
 

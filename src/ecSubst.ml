@@ -143,9 +143,7 @@ let rec subst_tyexpr (s : subst) (e : tyexpr) =
 let rec subst_form (s : subst) (f : form) =
   let f_node = subst_form_node s f.f_node
   and f_ty   = subst_ty s f.f_ty
-  and f_fv   = EcIdent.Mid.empty        (* FIXME *)
-  in
-    { f_node = f_node; f_ty = f_ty; f_fv = f_fv }
+  in mk_form f_node f_ty
 
 and subst_form_node (s : subst) (f : f_node) =
   match f with
@@ -181,10 +179,9 @@ and subst_form_node (s : subst) (f : f_node) =
   | Flocal x ->
       Flocal (subst_local s x)
 
-  | Fpvar (x, ty, side) ->
+  | Fpvar (x, side) ->
       let x  = { x with pv_name = subst_epath s x.pv_name } in
-      let ty = subst_ty s ty in
-        Fpvar (x, ty, side)
+      Fpvar (x, side)
 
   | Fop(p,tys) -> Fop(subst_path s p, List.map (subst_ty s) tys)
 

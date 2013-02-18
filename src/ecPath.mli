@@ -38,9 +38,11 @@ val pqname    : path * symbol -> path
 
 val p_equal   : path -> path -> bool
 val p_compare : path -> path -> int
+val p_hash    : path -> int
 
 val ep_equal   : epath -> epath -> bool
 val ep_compare : epath -> epath -> int
+val ep_hash    : epath -> int
 
 val cref_equal  : cref -> cref -> bool
 val xcref_equal : xcref -> xcref -> bool

@@ -177,9 +177,31 @@ type prog_var = {
   pv_kind : pvar_kind;
 }
 
+let pv_equal v1 v2 = 
+  EcPath.ep_equal v1.pv_name v2.pv_name && v1.pv_kind = v2.pv_kind 
+
+let pv_hash v = 
+  Why3.Hashcons.combine (EcPath.ep_hash v.pv_name)
+    (if v.pv_kind = PVglob then 1 else 0)
+
+  
+(* -------------------------------------------------------------------- *)
+
 type lpattern =
   | LSymbol of EcIdent.t
   | LTuple  of EcIdent.t list
+
+let lp_equal p1 p2 = 
+  match p1, p2 with
+  | LSymbol x1, LSymbol x2 -> EcIdent.id_equal x1 x2
+  | LTuple lx1, LTuple lx2 -> List.all2 EcIdent.id_equal lx1 lx2
+  | _ -> false
+
+let lp_hash = function
+  | LSymbol x -> EcIdent.tag x
+  | LTuple lx -> Why3.Hashcons.combine_list EcIdent.tag 0 lx
+
+(* -------------------------------------------------------------------- *)
 
 type tyexpr = {
   tye_desc : tyexpr_r;
@@ -218,9 +240,6 @@ let e_let      = fun pt e1 e2 -> e_tyexpr (Elet (pt, e1, e2))
 let e_tuple    = fun es       -> e_tyexpr (Etuple es)
 let e_if       = fun c e1 e2  -> e_tyexpr (Eif (c, e1, e2))
 
-(* -------------------------------------------------------------------- *)
-let pv_equal v1 v2 = 
-  EcPath.ep_equal v1.pv_name v2.pv_name && v1.pv_kind = v2.pv_kind 
 
 (* -------------------------------------------------------------------- *)
 let ids_of_lpattern = function

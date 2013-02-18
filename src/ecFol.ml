@@ -16,17 +16,23 @@ module Side : sig
   (* For relational formula *)
   val left : t
   val right : t 
+  val s_equal : t -> t -> bool
+  val s_hash  : t -> int
 end = struct
   type t = int 
   let mono = 0
   let left = 1
   let right = 2
+  let s_equal : t -> t -> bool = (==)
+  let s_hash x = x
 end
 
 type form = { 
     f_node : f_node;
-    f_ty   : ty;
-    f_fv   : Sid.t }
+    f_ty   : ty; 
+    f_fv   : EcIdent.Sid.t;
+    f_tag  : int;
+  }
 
 and f_node = 
   | Fquant of quantif * binding * form
@@ -34,7 +40,7 @@ and f_node =
   | Flet   of lpattern * form * form
   | Fint    of int                               (* int. literal              *)
   | Flocal  of EcIdent.t                         (* Local variable            *)
-  | Fpvar   of EcTypes.prog_var * ty * Side.t    (* sided symbol              *)
+  | Fpvar   of EcTypes.prog_var * Side.t    (* sided symbol              *)
   | Fop     of EcPath.path * ty list             (* Op/pred application to ty *)
   | Fapp    of form * form list                  (* application *)
   | Ftuple  of form list                         (* tuple constructor   *)
@@ -56,12 +62,73 @@ let fv_node = function
   | Fapp(f,args) ->
       List.fold_left (fun s f -> Sid.union s (fv f)) (fv f) args
   | Ftuple args ->
-      List.fold_left (fun s f -> Sid.union s (fv f)) Sid.empty args
+      List.fold_left (fun s f -> Sid.union s (fv f)) Sid.empty args 
   
-let mk_form node ty = 
-  { f_node = node;
-    f_ty   = ty;
-    f_fv  = fv_node node }
+let f_equal : form -> form -> bool = (==)
+let f_hash f = f.f_tag 
+
+let q_equal : quantif -> quantif -> bool = (==)
+let q_hash = function
+  | Lforall -> 0
+  | Lexists -> 1
+
+let b_equal =
+  let b1_equal (x1,ty1) (x2,ty2) = 
+    EcIdent.id_equal x1 x2 && EcTypes.ty_equal ty1 ty2 in
+  List.all2 b1_equal 
+    
+let b_hash = 
+  let b1_hash h (x,ty) = 
+    Why3.Hashcons.combine2 (EcIdent.tag x) (ty_hash ty) h in
+  List.fold_left b1_hash
+
+module Hsform = Why3.Hashcons.Make (struct
+  type t = form
+
+  let equal f1 f2 =
+    match f1.f_node, f2.f_node with
+    | Fquant(q1,b1,f1), Fquant(q2,b2,f2) ->
+        q_equal q1 q2 && b_equal b1 b2 && f_equal f1 f2 
+    | Fif(b1,t1,f1), Fif(b2,t2,f2) ->
+        f_equal b1 b2 && f_equal t1 t2 && f_equal f1 f2
+    | Flet(lp1,e1,f1), Flet(lp2,e2,f2) ->
+        lp_equal lp1 lp2 && f_equal e1 e2 && f_equal f1 f2
+    | Fint i1, Fint i2 -> i1 = i2
+    | Flocal id1, Flocal id2 -> EcIdent.id_equal id1 id2
+    | Fpvar(pv1,s1), Fpvar(pv2,s2) -> 
+        Side.s_equal s1 s2 && EcTypes.pv_equal pv1 pv2
+    | Fop(p1,lty1), Fop(p2,lty2) ->
+        EcPath.p_equal p1 p2 && List.all2 ty_equal lty1 lty2
+    | Fapp(f1,args1), Fapp(f2,args2) ->
+        f_equal f1 f2 && List.all2 f_equal args1 args2
+    | Ftuple args1, Ftuple args2 ->
+        List.all2 f_equal args1 args2
+    | _ -> false
+
+  let hash f = 
+    match f.f_node with 
+    | Fquant(q,b,f) ->
+        Why3.Hashcons.combine f.f_tag (b_hash (q_hash q) b)
+    | Fif(b,t,f) ->
+        Why3.Hashcons.combine2 (f_hash b) (f_hash t) (f_hash f)
+    | Flet(lp,e,f) ->
+        Why3.Hashcons.combine2 (lp_hash lp) (f_hash e) (f_hash f)
+    | Fint i    -> i
+    | Flocal id -> EcIdent.tag id 
+    | Fpvar(pv,s) -> Why3.Hashcons.combine (EcTypes.pv_hash pv) (Side.s_hash s)
+    | Fop(p,lty) -> 
+        Why3.Hashcons.combine_list ty_hash (EcPath.p_hash p) lty
+    | Fapp(f,args) ->
+        Why3.Hashcons.combine_list f_hash (f_hash f) args
+    | Ftuple args ->
+        Why3.Hashcons.combine_list f_hash 0 args
+          
+  let tag n f = { f with f_tag = n }
+      
+end)
+
+let mk_form node ty =  Hsform.hashcons 
+    { f_node = node; f_ty = ty; f_fv = fv_node node; f_tag = -1 }
 
 let ty_bool = tbool
 let ty_int = tint 
@@ -108,7 +175,7 @@ let fop_eq ty = f_op EcCoreLib.p_eq [ty] (tfun ty (tfun ty ty_bool))
 let f_eq f1 f2 = f_app (fop_eq f1.f_ty) [f1;f2] ty_bool
 
 let f_local x ty = mk_form (Flocal x) ty
-let f_pvar x ty s = mk_form (Fpvar(x,ty,s)) ty
+let f_pvar x ty s = mk_form (Fpvar(x,s)) ty
 
 let f_tuple args = 
   mk_form (Ftuple args) (ttuple (List.map ty args))
@@ -204,7 +271,7 @@ let map gt g f =
   | Flet(lp,f1,f2) -> f_let lp (g f1) (g f2)
   | Fint i -> f_int i 
   | Flocal id -> f_local id (gt f.f_ty)
-  | Fpvar(id,ty,s) -> f_pvar id (gt ty) s
+  | Fpvar(id,s) -> f_pvar id (gt f.f_ty) s
   | Fop(p,tys) -> f_op p (List.map gt tys) (gt f.f_ty)
   | Fapp(e, es) -> f_app (g e) (List.map g es) (gt f.f_ty)
   | Ftuple es -> f_tuple (List.map g es) 

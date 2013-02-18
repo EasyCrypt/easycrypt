@@ -1354,7 +1354,7 @@ let check_alpha_equal env f1 f2 =
         aux alpha g1 g2
     | Fint i1, Fint i2 when i1 = i2 -> ()
     | Flocal id1, Flocal id2 when EcIdent.id_equal (find alpha id1) id2 -> ()
-    | Fpvar(p1,_,s1), Fpvar(p2,_,s2) when pv_equal p1 p2 && s1 = s2 -> ()
+    | Fpvar(p1,s1), Fpvar(p2,s2) when pv_equal p1 p2 && s1 = s2 -> ()
     | Fop(p1, _), Fop(p2, _) when EcPath.p_equal p1 p2 -> () 
     | Fapp(f1,args1), Fapp(f2,args2) ->
         aux alpha f1 f2;

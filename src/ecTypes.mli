@@ -18,6 +18,9 @@ and ty_node =
   | Tconstr of EcPath.path * ty list
   | Tfun    of ty * ty
 
+val ty_equal : ty -> ty -> bool
+val ty_hash  : ty -> int 
+
 val tuni   : EcUidgen.uid -> ty
 val tvar   : EcIdent.t -> ty
 val ttuple  : ty list -> ty
@@ -65,6 +68,9 @@ type lpattern =
   | LSymbol of EcIdent.t
   | LTuple  of EcIdent.t list
 
+val lp_equal : lpattern -> lpattern -> bool
+val lp_hash  : lpattern -> int 
+(* -------------------------------------------------------------------- *)
 type pvar_kind = 
   | PVglob
   | PVloc
@@ -73,6 +79,11 @@ type prog_var = {
   pv_name : EcPath.epath;
   pv_kind : pvar_kind;
 }
+
+val pv_equal : prog_var -> prog_var -> bool 
+val pv_hash  : prog_var -> int
+
+(* -------------------------------------------------------------------- *)
 
 type tyexpr = {
   tye_desc : tyexpr_r;
@@ -104,7 +115,7 @@ val e_if       : tyexpr -> tyexpr -> tyexpr -> tyexpr
 val e_ty       : tyexpr -> ty
 
 (* -------------------------------------------------------------------- *)
-val pv_equal : prog_var -> prog_var -> bool 
+
 
 (* -------------------------------------------------------------------- *)
 val e_map :

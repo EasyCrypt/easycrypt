@@ -73,6 +73,11 @@ let ep_equal (p1 : epath) (p2 : epath) =
 let ep_compare p1 p2 =
   if p1 == p2 then 0 else Pervasives.compare p1 p2
 
+let ep_hash = function
+  | EPath p -> p_hash p
+  | EModule(i,_) -> EcIdent.tag i
+
+
 (* -------------------------------------------------------------------- *)
 let cref_equal (p1 : cref) (p2 : cref) =
   match p1, p2 with

@@ -558,7 +558,7 @@ struct
       | Flocal id ->
           pr_local_symb tenv id
 
-      | Fpvar (x, _, i) ->
+      | Fpvar (x, i) ->
           pr_seq [pr_pv_symb tenv x.pv_name (Some i); Pp.braces (Pp.ML.int i)]
 
       | Fquant (q, bd, f) ->
