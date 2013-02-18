@@ -40,11 +40,49 @@ and f_node =
   | Flet   of lpattern * form * form
   | Fint    of int                               (* int. literal              *)
   | Flocal  of EcIdent.t                         (* Local variable            *)
-  | Fpvar   of EcTypes.prog_var * Side.t    (* sided symbol              *)
+  | Fpvar   of EcTypes.prog_var * Side.t         (* sided symbol              *)
   | Fop     of EcPath.path * ty list             (* Op/pred application to ty *)
   | Fapp    of form * form list                  (* application *)
   | Ftuple  of form list                         (* tuple constructor   *)
 
+(*
+type gty = 
+  | GTty of EcTypes.ty
+  | GTmem 
+  | GTinter of mod_interf 
+
+type binding = (EcIdent.t * gty) list
+
+and f_node = 
+  | Fquant of quantif * binding * form
+  | Fif    of form * form * form
+  | Flet   of lpattern * form * form
+  | Fint    of int                               (* int. literal              *)
+  | Flocal  of EcIdent.t                         (* Local variable            *)
+  | Fop     of EcPath.path * ty list             (* Op/pred application to ty *)
+  | Fapp    of form * form list                  (* application *)
+  | Ftuple  of form list                         (* tuple constructor   *)
+
+  (* Extra construction *)
+  | Fpvar   of EcTypes.prog_var * mem (* mem can be EcIdent.t *)
+  | FhoareF of (mem * form) * mod_app_fun * (mem * form)
+  | FhoareS of form * stmt * form 
+  | FequivF of mod_app_fun * mod_app_fun * form * form 
+  | FequivS of stmt * stmt * form * form
+    (* Fpr(m,F,args,P) = Pr[m, F(args) : P] () *)
+  | Fpr     of mem * mod_app_fun * form list * form 
+ 
+*)
+
+(*spec : var decl 
+       equivS *)
+
+
+
+
+
+
+ 
 let fv f = f.f_fv 
 let ty f = f.f_ty
 
@@ -63,7 +101,7 @@ let fv_node = function
       List.fold_left (fun s f -> Sid.union s (fv f)) (fv f) args
   | Ftuple args ->
       List.fold_left (fun s f -> Sid.union s (fv f)) Sid.empty args 
-  
+ 
 let f_equal : form -> form -> bool = (==)
 let f_hash f = f.f_tag 
 

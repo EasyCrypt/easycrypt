@@ -64,7 +64,7 @@ lemma length_non_neg: forall (xs : 'a list), P_length_non_neg(xs)
 proof.
 intros xs.
 apply list_ind<:'a>((P_length_non_neg),_,xs).
-split.
+trivial.
 
 save.
 

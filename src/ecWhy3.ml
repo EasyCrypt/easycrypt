@@ -1150,11 +1150,13 @@ let para_call max_provers provers timelimit task =
 (*      Format.printf "Start prover %s@." prover; *)
       let pc =
         Driver.prove_task ~command:pr.Whyconf.command ~timelimit dr task () in
-      try
-        ExtUnix.All.setpgid (CP.prover_call_pid pc) 0
-      with Unix.Unix_error _ -> ();
+      begin
+        try
+          ExtUnix.All.setpgid (CP.prover_call_pid pc) 0
+        with Unix.Unix_error _ -> ()
+      end;
       pcs.(i) <- Some(prover, pc);
-(*      Format.printf "Prover %s started and set at %i@." prover i *)
+      Format.printf "Prover %s started and set at %i@." prover i
     with e -> 
       Format.printf "Error when starting %s: %a" prover 
         EcPexception.exn_printer e;
@@ -1185,7 +1187,7 @@ let para_call max_provers provers timelimit task =
               if CP.prover_call_pid pc = pid then begin
                 pcs.(i) <- None;            (* DO IT FIRST *)
                 let ans = (CP.post_wait_call pc st ()).CP.pr_answer in
-                Format.printf "prover `%s' return %a@."
+                Format.eprintf "prover `%s' return %a@."
                   prover CP.print_prover_answer ans;
                 match ans with
                 | CP.Valid   -> status := Some true
@@ -1224,75 +1226,7 @@ let para_call max_provers provers timelimit task =
 
 
 
-(*
-let para_call provers timelimit task = 
-  let module CP = Call_provers in
 
-  let run prover = 
-    let (_, pr, dr)  = get_prover prover in
-    let pc =
-      Driver.prove_task ~command:pr.Whyconf.command ~timelimit
-        dr task ()
-    in
-      ExtUnix.All.setpgid (CP.prover_call_pid pc) 0;
-      pc
-  in
-
-  let pcs    = Array.create (List.length provers) None in
-  let status = ref None in
-
-  (* Run all processes, ignoring prover failing to start *)
-  List.iteri
-    (fun i prover ->
-       try pcs.(i) <- Some (prover, run prover)
-       with _ -> ())
-    provers;
-
-  (* Wait for the first prover giving a definitive answer *)
-  EcUtils.try_finally
-    (fun () ->
-      let alives = ref (-1) in
-      while !alives <> 0 && !status = None do
-        let pid, st = restartable_syscall Unix.wait in
-        alives := 0;
-        for i = 0 to (Array.length pcs) - 1 do
-          match pcs.(i) with
-          | None    -> ()
-          | Some (prover, pc) ->
-              if CP.prover_call_pid pc = pid then begin
-                pcs.(i) <- None;            (* DO IT FIRST *)
-                let ans = (CP.post_wait_call pc st ()).CP.pr_answer in
-                Format.printf "prover `%s' return %a@."
-                  prover CP.print_prover_answer ans;
-                match ans with
-                | CP.Valid   -> status := Some true
-                | CP.Invalid -> status := Some false
-                | _          -> ()
-              end else alives := 1 + !alives
-        done
-      done;
-      !status)
-
-    (* Clean-up: hard kill + wait for remaining provers *)
-    (fun () ->
-      for i = 0 to (Array.length pcs) - 1 do
-        match pcs.(i) with
-        | None    -> ()
-        | Some (prover,pc) ->
-            let pid = CP.prover_call_pid pc in
-            pcs.(i) <- None;
-            try
-              Format.printf
-                "Killing (SIGTERM) prover `%s' (pid = %d)@."
-                prover pid;
-              Unix.kill (-pid) 15;      (* kill process group *)
-              let _, st = 
-                restartable_syscall (fun () -> Unix.waitpid [] pid)
-              in
-                ignore (CP.post_wait_call pc st ());
-            with Unix.Unix_error _ -> ()
-      done)
-*)
 type prover_infos = 
   { prover_max_run   : int;
     prover_names     : string array;

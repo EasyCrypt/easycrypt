@@ -14,8 +14,8 @@ install: $(PGROOT)
 	  exit 1; \
 	fi
 	( cd $(PGROOT)/generic && patch -p0 -t ) < proof-site.patch
-	install -d $(PGROOT)/easycrypt
-	install -t $(PGROOT)/easycrypt easycrypt/*.el
+	../scripts/install-sh -d $(PGROOT)/easycrypt
+	../scripts/install-sh -t $(PGROOT)/easycrypt easycrypt/*.el
 
 uninstall: $(PGROOT)/easycrypt
 	( cd $(PGROOT)/generic && patch -p0 -tR ) < proof-site.patch
