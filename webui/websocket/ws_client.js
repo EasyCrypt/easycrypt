@@ -28,13 +28,14 @@
 
         // Display messages received from the server
         socket.onmessage = function(event) {
-        /*	try{
+        	try{
         		var json = JSON.parse(event.data);
         	} catch (e) {
-        		console.log('This doesn\'t look like a valid JSON: ', event.data);
+        		console.log('This doesn\'t look like a valid JSON: ', event);
         		return;
-        		}*/
-          message.textContent = "Server Says: " + event.data;
+        		}
+         if (json.type == "message") 		
+	          message.textContent = "Server Says: " + json.data;
         };
 
         // Display any errors that occur

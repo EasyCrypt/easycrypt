@@ -41,13 +41,14 @@ wsServer.on('request', function(request) {
     // we need to know client index to remove them on 'close' event
     var index = clients.push(connection) - 1;
     console.log((new Date()) + ' Connection accepted.');
-    connection.send(' Connection accepted.'); 
+    connection.send(JSON.stringify({type : "message", data: ' Connection accepted.'})); 
 
     connection.on('message', function(message) {
         if (message.type === 'utf8') {
         	// broadcast message to all connected clients
+        	var json = JSON.stringify({ "type" : "message", "mode" : "forward", "data" : message.utf8Data });
                 for (var i=0; i < clients.length; i++) {
-                    clients[i].sendUTF(message.utf8Data);
+                    clients[i].sendUTF(json);
                 }
             console.log('Received Message: ' + message.utf8Data);
             //connection.sendUTF(message.utf8Data); 
