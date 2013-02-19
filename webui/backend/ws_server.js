@@ -50,14 +50,14 @@ wsServer.on('request', function(request) {
     		console.log('This doesn\'t look like a valid JSON: ', message);
     		return;
     		}
-        if (json.mode == 'forward') {
+        if (json.mode == "forward") {
         	// broadcast message to all connected clients
                 for (var i=0; i < clients.length; i++) {
                     clients[i].send(message.utf8Data);
                 }
             console.log('Received Message: ' + json.data); 
         }
-        else if (json.mode == 'undo') {
+        else if (json.mode == "undo") {
         	for (var i=0; i < clients.length; i++) {
                 clients[i].send("Undo operation - OK");
             }
