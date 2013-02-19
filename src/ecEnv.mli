@@ -20,6 +20,8 @@ type 'a suspension = {
   sp_params : (EcIdent.t * module_type) list list;
 }
 
+val is_suspended : 'a suspension -> bool
+
 (* -------------------------------------------------------------------- *)
 
 (* Describe the kind of objects that can be bound in an environment.
@@ -191,7 +193,7 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Mod : sig
-  type t = module_expr suspension
+  type t = module_expr
 
   val by_path     : EcPath.path -> env -> t
   val by_path_opt : EcPath.path -> env -> t option

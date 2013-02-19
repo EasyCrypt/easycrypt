@@ -37,8 +37,11 @@ let suspend (x : 'a) params =
 
 let sp_target { sp_target = x } = x
 
+let is_suspended (x : 'a suspension) =
+  not (List.for_all (fun ps -> ps <> []) x.sp_params)
+
 let check_not_suspended (x : 'a suspension) =
-  if x.sp_params <> [] then
+  if is_suspended x then
     raise IsSuspended;
   x.sp_target
 
@@ -100,7 +103,7 @@ type preenv = {
 }
 
 and premc = {
-  mc_parameters : (EcIdent.t * module_type)       list;
+  mc_parameters : (EcIdent.t * module_type)        list;
   mc_variables  : (epath * varbind)                Msym.t;
   mc_functions  : (epath * EcTypesmod.function_)   Msym.t;
   mc_modules    : ( cref * EcTypesmod.module_expr) Msym.t;
@@ -275,12 +278,7 @@ module MC = struct
       | None -> None
 
       | Some mc ->
-          let params =
-            if   mc.mc_parameters = []
-            then params
-            else mc.mc_parameters :: params
-          in
-            Some (mc, params)
+          Some (mc, mc.mc_parameters :: params)
 
   (* Direct lookup of the components of a module parameters
    * via its unique identifier *)
@@ -781,7 +779,7 @@ module Fun = struct
 
   let by_path (p : EcPath.path) (env : env) =
     let obj = MC.lookup_by_path Px.for_function.Px.px_premc p env in
-      if obj.sp_params <> [] then
+      if is_suspended obj then
         raise (LookupFailure (`Path (EPath p)));
       obj.sp_target
 
@@ -790,7 +788,7 @@ module Fun = struct
 
   let lookup name (env : env) =
     let (p, x) = MC.lookup Px.for_function name env in
-      if x.sp_params <> [] then
+      if is_suspended x then
         raise (LookupFailure (`QSymbol name));
       (p, x.sp_target)
 
@@ -975,19 +973,24 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Mod = struct
-  type t = module_expr suspension
+  type t = module_expr
 
   module Px = MC.Px
 
   let by_path (p : EcPath.path) (env : env) =
-    MC.lookup_by_path Px.for_module.Px.px_premc p env
+    let obj = MC.lookup_by_path Px.for_module.Px.px_premc p env in
+      if is_suspended obj then
+        raise (LookupFailure (`Path (EPath p)));
+      obj.sp_target
 
   let by_path_opt (p : EcPath.path) (env : env) =
     try_lf (fun () -> by_path p env)
 
   let lookup name (env : env) =
     let (p, x) = MC.lookup Px.for_module name env in
-      (cref_of_epath p, x)
+      if is_suspended x then
+        raise (LookupFailure (`QSymbol name));
+      (cref_of_epath p, x.sp_target)
 
   let lookup_opt name env =
     try_lf (fun () -> lookup name env)
@@ -1007,7 +1010,9 @@ module Mod = struct
           env_current = (
             let current = env.env_current in
             let current = MC.amc_bind_mc path current in
-            let current = MC.amc_bind Px.for_module (EcIdent.name name) path me current in
+            let current = MC.amc_bind Px.for_module
+                            (EcIdent.name name) path me current
+            in
               current);
           env_bcomps =
             Mid.add name comps env.env_bcomps; }
@@ -1020,9 +1025,8 @@ module Mod = struct
       env bindings
 
   let add (path : EcPath.path) (env : env) =
-    (* FIXME: we can have a suspended function ! *)
     let obj = by_path path env in 
-      MC.import Px.for_module env path obj.sp_target
+      MC.import Px.for_module env path obj
 end
 
 (* -------------------------------------------------------------------- *)

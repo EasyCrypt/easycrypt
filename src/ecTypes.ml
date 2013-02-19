@@ -6,11 +6,11 @@ open EcPath
 open EcUidgen
 
 (* -------------------------------------------------------------------- *)
-
 type ty = {
-    ty_node : ty_node;
-    ty_tag  : int;
-  }
+  ty_node : ty_node;
+  ty_tag  : int;
+}
+
 and ty_node =
   | Tunivar of EcUidgen.uid
   | Tvar    of EcIdent.t 

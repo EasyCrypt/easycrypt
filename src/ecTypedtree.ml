@@ -539,8 +539,7 @@ let unfold1_mod_name (env : EcEnv.env) (name : EcPath.cref) =
       match EcEnv.Mod.by_path_opt p env with
       | None   -> (name, [])
       | Some m -> begin
-          assert (m.EcEnv.sp_params = []);  (* FIXME *)
-          match m.EcEnv.sp_target.me_body with
+          match m.me_body with
           | ME_Ident       p         -> (p, [])
           | ME_Application (p, args) -> (p, args)
           | ME_Decl _                -> (name, [])
@@ -613,9 +612,7 @@ and transmodtype (env : EcEnv.env) ((m, args) : pmodule_type) =
       List.fold_left2
         (fun subst (mx, m) (ix, i) ->
           let mtypes =
-            List.map
-              (fun m -> m.tymt_desc)
-              m.EcEnv.sp_target.me_types (* FIXME: sp_target ? *)
+            List.map (fun m -> m.tymt_desc) m.me_types
           in
             if not (has_mod_type env mtypes i.tymt_desc) then
               tyerror dloc ModApplInvalidArgInterface;
@@ -801,9 +798,7 @@ let rec transmod (env : EcEnv.env) (x : symbol) (m : pmodule_expr) =
   match m with
   | Pm_ident ({ pl_desc = m }, args) -> begin
       let (mname, mty) = EcEnv.Mod.lookup m env in
-      let mty = mty.EcEnv.sp_target in        (* FIXME *)
       let args = List.map (EcEnv.Mod.lookup^~ env) (unlocs args) in
-      let args = List.map (fun (p, x) -> (p, x.EcEnv.sp_target)) args in (* FIXME *)
 
         match mty.me_sig.tyms_comps.tymc_params with
         | [] ->

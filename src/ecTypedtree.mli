@@ -60,7 +60,8 @@ module Fenv : sig
 end
 
 val transformula : Fenv.fenv -> EcUnify.unienv -> pformula -> EcFol.form 
-val transform    : Fenv.fenv -> EcUnify.unienv -> pformula -> ty -> EcFol.form 
+val transform    : Fenv.fenv -> EcUnify.unienv -> pformula -> ty -> EcFol.form
+
 (* -------------------------------------------------------------------- *)
 val transmodsig  : EcEnv.env -> pmodule_sig -> module_sig
 val transmodtype : EcEnv.env -> pmodule_type -> module_type

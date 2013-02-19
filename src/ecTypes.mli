@@ -84,7 +84,6 @@ val pv_equal : prog_var -> prog_var -> bool
 val pv_hash  : prog_var -> int
 
 (* -------------------------------------------------------------------- *)
-
 type tyexpr = {
   tye_desc : tyexpr_r;
   tye_meta : tyexpr_meta option;
@@ -113,9 +112,6 @@ val e_let      : lpattern -> tyexpr -> tyexpr -> tyexpr
 val e_tuple    : tyexpr list -> tyexpr
 val e_if       : tyexpr -> tyexpr -> tyexpr -> tyexpr
 val e_ty       : tyexpr -> ty
-
-(* -------------------------------------------------------------------- *)
-
 
 (* -------------------------------------------------------------------- *)
 val e_map :
