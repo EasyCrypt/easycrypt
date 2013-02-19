@@ -102,7 +102,7 @@ type preenv = {
 and premc = {
   mc_parameters : (EcIdent.t * module_type)       list;
   mc_variables  : (epath * varbind)                Msym.t;
-  mc_functions  : (epath * EcTypesmod.funsig)      Msym.t;
+  mc_functions  : (epath * EcTypesmod.function_)   Msym.t;
   mc_modules    : ( cref * EcTypesmod.module_expr) Msym.t;
   mc_modtypes   : ( path * EcTypesmod.module_sig)  Msym.t;
   mc_typedecls  : ( path * EcDecl.tydecl)          Msym.t;
@@ -114,7 +114,7 @@ and premc = {
 
 and activemc = {
   amc_variables  : (epath * varbind)                MMsym.t;
-  amc_functions  : (epath * EcTypesmod.funsig)      MMsym.t;
+  amc_functions  : (epath * EcTypesmod.function_)   MMsym.t;
   amc_modules    : ( cref * EcTypesmod.module_expr) MMsym.t;
   amc_modtypes   : ( path * EcTypesmod.module_sig)  MMsym.t;
   amc_typedecls  : ( path * EcDecl.tydecl)          MMsym.t;
@@ -330,7 +330,7 @@ module MC = struct
       px_patx    = (fun (p :  path) -> EPath p);
     }
 
-    let for_function : (epath, EcTypesmod.funsig) projector = {
+    let for_function : (epath, EcTypesmod.function_) projector = {
       px_premc   = (fun mc -> mc.mc_functions);
       px_topremc = (fun m mc -> { mc with mc_functions = m });
       px_actmc   = (fun mc -> mc.amc_functions);
@@ -548,7 +548,7 @@ module MC = struct
             mc_bind_variable (xpath v.v_name) vty mc
 
       | MI_Function f ->
-          mc_bind_function (xpath f.f_name) f.f_sig mc
+          mc_bind_function (xpath f.f_name) f mc
 
     in
       List.fold_left mc1_of_module empty_premc me.me_comps
@@ -569,7 +569,7 @@ module MC = struct
 
 
       | MI_Function f ->
-          mc_bind_raw Px.for_function f.f_name (xpath f.f_name) f.f_sig mc
+          mc_bind_raw Px.for_function f.f_name (xpath f.f_name) f mc
     in
       List.fold_left mc1_of_module empty_premc me.me_comps
 
@@ -777,17 +777,22 @@ end
 module Fun = struct
   module Px = MC.Px
 
-  type t = EcTypesmod.funsig suspension
+  type t = EcTypesmod.function_
 
   let by_path (p : EcPath.path) (env : env) =
-    MC.lookup_by_path Px.for_function.Px.px_premc p env
+    let obj = MC.lookup_by_path Px.for_function.Px.px_premc p env in
+      if obj.sp_params <> [] then
+        raise (LookupFailure (`Path (EPath p)));
+      obj.sp_target
 
   let by_path_opt (p : EcPath.path) (env : env) =
     try_lf (fun () -> by_path p env)
 
   let lookup name (env : env) =
     let (p, x) = MC.lookup Px.for_function name env in
-      (p, x)
+      if x.sp_params <> [] then
+        raise (LookupFailure (`QSymbol name));
+      (p, x.sp_target)
 
   let lookup_opt name env =
     try_lf (fun () -> lookup name env)
@@ -799,9 +804,8 @@ module Fun = struct
     MC.bind_function name fun_ env
 
   let add (path : EcPath.path) (env : env) =
-    (* FIXME: we can have a suspended function ! *)
     let obj = by_path path env in 
-      MC.import Px.for_function env path obj.sp_target
+      MC.import Px.for_function env path obj
 end
 
 (* -------------------------------------------------------------------- *)
@@ -1267,7 +1271,7 @@ let initial =
 (* -------------------------------------------------------------------- *)
 type ebinding = [
   | `Variable  of EcTypes.pvar_kind * EcTypes.ty
-  | `Function  of funsig
+  | `Function  of function_
   | `Module    of module_expr
   | `ModType   of module_sig
 ]

@@ -1144,7 +1144,7 @@ let para_call max_provers provers timelimit task =
   let pcs    = Array.create max_provers None in
 
   (* Run process, ignoring prover failing to start *)
-  let run i prover = 
+  let run i prover =
     try 
       let (_, pr, dr)  = get_prover prover in
 (*      Format.printf "Start prover %s@." prover; *)
@@ -1173,7 +1173,6 @@ let para_call max_provers provers timelimit task =
   
   (* Wait for the first prover giving a definitive answer *)    
   let status = ref None in
-  Format.printf "Try finaly@.";
   EcUtils.try_finally
     (fun () ->
       let alives = ref (-1) in
@@ -1182,7 +1181,7 @@ let para_call max_provers provers timelimit task =
         alives := 0;
         for i = 0 to (Array.length pcs) - 1 do
           match pcs.(i) with
-          | None    -> ()
+          | None -> ()
           | Some (prover, pc) ->
               if CP.prover_call_pid pc = pid then begin
                 pcs.(i) <- None;            (* DO IT FIRST *)
@@ -1217,7 +1216,7 @@ let para_call max_provers provers timelimit task =
             with Unix.Unix_error _ -> ()
             end;
 (*            Format.printf "prover %s finished@." prover; *)
-            let _, st = 
+            let _, st =
               restartable_syscall (fun () -> Unix.waitpid [] pid)
             in
             ignore (CP.post_wait_call pc st ());

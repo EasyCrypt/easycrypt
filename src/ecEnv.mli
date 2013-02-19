@@ -90,7 +90,7 @@ type preenv = private {
 and premc = private {
   mc_parameters : (EcIdent.t * module_type)        list;
   mc_variables  : (epath * varbind)                Msym.t;
-  mc_functions  : (epath * EcTypesmod.funsig)      Msym.t;
+  mc_functions  : (epath * EcTypesmod.function_)   Msym.t;
   mc_modules    : ( cref * EcTypesmod.module_expr) Msym.t;
   mc_modtypes   : ( path * EcTypesmod.module_sig)  Msym.t;
   mc_typedecls  : ( path * EcDecl.tydecl)          Msym.t;
@@ -107,7 +107,7 @@ and premc = private {
 
 and activemc = {
   amc_variables  : (epath * varbind)                MMsym.t;
-  amc_functions  : (epath * EcTypesmod.funsig)      MMsym.t;
+  amc_functions  : (epath * EcTypesmod.function_)   MMsym.t;
   amc_modules    : ( cref * EcTypesmod.module_expr) MMsym.t;
   amc_modtypes   : ( path * EcTypesmod.module_sig)  MMsym.t;
   amc_typedecls  : ( path * EcDecl.tydecl)          MMsym.t;
@@ -132,7 +132,7 @@ exception LookupFailure of [`Path of epath | `QSymbol of qsymbol]
 
 (* -------------------------------------------------------------------- *)
 module Fun : sig
-  type t = funsig suspension
+  type t = function_
 
   val by_path     : EcPath.path -> env -> t
   val by_path_opt : EcPath.path -> env -> t option
@@ -282,7 +282,7 @@ end
 (* -------------------------------------------------------------------- *)
 type ebinding = [
   | `Variable  of EcTypes.pvar_kind * EcTypes.ty
-  | `Function  of funsig
+  | `Function  of function_
   | `Module    of module_expr
   | `ModType   of module_sig
 ]

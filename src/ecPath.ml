@@ -8,6 +8,7 @@ type path = {
     p_node : path_node;
     p_tag  : int
   }
+
 and path_node = 
   | Pident of symbol
   | Pqname of path * symbol
@@ -23,7 +24,6 @@ type cref =
 type xcref = cref * xcref list
 
 (* -------------------------------------------------------------------- *)
-
 let p_equal : path -> path -> bool = (==)
 let p_hash p = p.p_tag
 
@@ -49,7 +49,7 @@ module Hspath = Why3.Hashcons.Make (struct
 end)
 
 module Path = MakeMSH (struct
-  type t = path
+  type t  = path
   let tag = p_hash
 end)
 
@@ -59,9 +59,11 @@ module Hp = Path.H
 
 let p_compare p1 p2 = p_hash p1 - p_hash p2
 
-let mk_path node = Hspath.hashcons { p_node = node; p_tag = -1 }
-let pident id = mk_path (Pident id)
-let pqname (p,id) = mk_path (Pqname(p,id))
+let mk_path node =
+  Hspath.hashcons { p_node = node; p_tag = -1; }
+
+let pident id      = mk_path (Pident id)
+let pqname (p, id) = mk_path (Pqname(p,id))
 
 (* -------------------------------------------------------------------- *)
 let ep_equal (p1 : epath) (p2 : epath) =
@@ -76,7 +78,6 @@ let ep_compare p1 p2 =
 let ep_hash = function
   | EPath p -> p_hash p
   | EModule(i,_) -> EcIdent.tag i
-
 
 (* -------------------------------------------------------------------- *)
 let cref_equal (p1 : cref) (p2 : cref) =

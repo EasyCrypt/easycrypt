@@ -3,6 +3,7 @@
 - reprendre la partie module -> finir la partie typage
 - pretty-printing de l'AST typé
 - noeud de meta-info dans les AST typés
+- local predicates / operators
 
 * Benjamin
 

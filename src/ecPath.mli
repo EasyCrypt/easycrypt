@@ -18,6 +18,7 @@ type path = private {
     p_node : path_node;
     p_tag  : int
   }
+
 and path_node = private
   | Pident of symbol
   | Pqname of path * symbol

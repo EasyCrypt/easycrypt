@@ -8,13 +8,20 @@ open EcDecl
 open EcFol
 
 (* -------------------------------------------------------------------- *)
-type subst
+type subst_name_clash = [
+  | `Ident of EcIdent.t
+  | `Path  of EcPath.path
+]
 
-exception SubstNameClash of EcIdent.t
+exception SubstNameClash of subst_name_clash
 exception InconsistentSubst
+
+(* -------------------------------------------------------------------- *)
+type subst
 
 val empty      : subst
 val add_module : subst -> EcIdent.t -> cref -> subst
+val add_path   : subst -> path -> path -> subst
 
 (* -------------------------------------------------------------------- *)
 val subst_path  : subst -> EcPath.path -> EcPath.path

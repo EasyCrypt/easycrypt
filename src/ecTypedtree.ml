@@ -880,7 +880,7 @@ and transstruct (env : EcEnv.env) (x : symbol) (st : pstructure) =
       match obj with
       | MI_Module   m -> (x, `Module   m)
       | MI_Variable v -> (x, `Variable (EcTypes.PVglob, v.v_type))
-      | MI_Function f -> (x, `Function f.f_sig)
+      | MI_Function f -> (x, `Function f)
     in
 
     let env = 
@@ -1024,15 +1024,14 @@ and transstmt ue (env : EcEnv.env) (stmt : pstmt) =
 (* -------------------------------------------------------------------- *)
 and transinstr ue (env : EcEnv.env) (i : pinstr) =
   let transcall name args =
-    let fpath, fsig =
+    let fpath, fdef =
       try
         EcEnv.Fun.lookup name env
       with EcEnv.LookupFailure _ ->
         tyerror dloc (UnknownFunction name)
-    in
-    let fsig = fsig.EcEnv.sp_target in
 
-      if List.length args <> List.length (fst fsig.fs_sig) then
+    in
+      if List.length args <> List.length (fst fdef.f_sig.fs_sig) then
         tyerror dloc ApplInvalidArity;
   
       let args =
@@ -1040,9 +1039,9 @@ and transinstr ue (env : EcEnv.env) (i : pinstr) =
           (fun a (_, ty) ->
             let a, aty = transexp env ue a in
               EcUnify.unify env ue aty ty; a)
-          args (fst fsig.fs_sig)
+          args (fst fdef.f_sig.fs_sig)
       in
-        (fpath, args, snd fsig.fs_sig)
+        (fpath, args, snd fdef.f_sig.fs_sig)
   in
 
   match i with

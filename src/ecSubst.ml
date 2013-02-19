@@ -5,35 +5,48 @@ open EcDecl
 open EcFol
 open EcTypesmod
 
-module Sp  = EcPath.Sp
-module Mid = EcIdent.Mid
+module Sp    = EcPath.Sp
+module Msubp = EcPath.Msubp
+module Mid   = EcIdent.Mid
+
+(* -------------------------------------------------------------------- *)
+type subst_name_clash = [
+  | `Ident of EcIdent.t
+  | `Path  of EcPath.path
+]
+
+exception SubstNameClash of subst_name_clash
+exception InconsistentSubst
 
 (* -------------------------------------------------------------------- *)
 type subst = {
   sb_locals  : EcIdent.t   Mid.t;
   sb_modules : EcPath.cref Mid.t;
+  sb_paths   : EcPath.path Msubp.t;
 }
-
-exception SubstNameClash of EcIdent.t
-exception InconsistentSubst
 
 (* -------------------------------------------------------------------- *)
 let empty : subst = {
   sb_locals  = Mid.empty;
   sb_modules = Mid.empty;
+  sb_paths   = Msubp.empty;
 }
 
 let add_module (s : subst) (x : EcIdent.t) (m : EcPath.cref) =
   let merger = function
     | None   -> Some m
-    | Some _ -> raise (SubstNameClash x)
+    | Some _ -> raise (SubstNameClash (`Ident x))
   in
     { s with sb_modules = Mid.change merger x s.sb_modules }
+
+let add_path (s : subst) (from_ : EcPath.path) (to_ : EcPath.path) =
+  (* FIXME: check that path is not already bound. *)
+  { s with sb_paths = Msubp.add from_ to_ s.sb_paths; }
 
 let add_local (s : subst) (x : EcIdent.t) (x' : EcIdent.t) =
   let merger = function
     | None   -> Some x'
-    | Some _ ->raise (SubstNameClash x)
+    | Some _ ->raise (SubstNameClash (`Ident x))
   in
     { s with sb_locals = Mid.change merger x s.sb_locals }
 
