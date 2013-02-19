@@ -1,0 +1,127 @@
+Dear Cathy,
+
+here is an update regarding the forthcoming EasyCrypt releases and
+some tentative plans for 2013. We will be very happy to receive your
+feedback on any of these points. 
+
+Moreover, we would like to check with you about the possibility of
+holding an EasyCrypt school this summer. The exact format would need
+to be decided but the idea would be to put the emphasis on working
+with EasyCrypt (our very preliminary thoughts would be <= 2 hours
+presentation + ~ 4 hours lab per day for 3 days). If you believe that
+the event is of interest, we would need to agree on a date (possibly
+mid-June to mid-July) and place (most likely East Coast) in the next
+few weeks.
+
+For your convenience, I also append an update of an earlier message on
+EasyCrypt assurance.
+
+
+Best
+
+Gilles
+
+================================================================
+
+ ** version 0.β
+
+- Deadline: March 15, 2013 (code), May 15, 2013 (documentation)
+
+- New features: 
+
+* module system
+
+* quantified non-relational (Hoare triples, generalizing claims) and
+  relational judgments
+
+* higher-order expressions
+
+* library of probabilities and distributions
+
+* basic libraries (int, real, lists, sets, maps, arrays, bitstrings...)
+* interactive theorem proving
+
+Tactics for reasoning about Hoare triples will be available, as well
+as all tactics from EasyCrypt v0.2 will be supported, to the exception
+of eager, auto, and eqobs_in, and ifsync that will be reintroduced in
+the 0.δ version.
+
+
+ ** version  0.δ
+
+- Deadline: June 15, 2013 (code), July 15, 2013 (documentation)
+
+- New features:
+
+* support for datatypes, recursive definitions, and proofs by
+  induction
+
+* new implementations of eager, auto, and eqobs_in
+
+* libraries of cryptographic definitions (for instance a library to
+* reason about random oracles)
+
+
+
+** others
+
+FYI, here is a list of topics on which we are currently working. We
+plan to integrate some of these developments in forthcoming releases,
+after the summer.
+
+- transformation tactics: we plan to implement tactics that take a
+  module and output a transformed module and a relational proof of
+  correctness for the transformations. Several such tactics were
+  implemented in CertiCrypt (for instance dead code or constant
+  propagation), and lead to compact proofs.
+
+
+- certifying back-end: we plan to implement a minimal Coq backend
+  dedicated to the certification of EasyCrypt execution traces. This
+  backend should be much more lightweight than certification through
+  CertiCrypt, which was not designed as a proof checker for EasyCrypt.
+
+
+- automation via symbolic methods: we plan to use symbolic methods
+  (esp. deducibility relations, in the line of our work on synthesis)
+  to automate the following steps: reductions, applications of rnd
+  tactic, computation of probabilities. An example of a useful tactic
+  based on symbolic methods would be a tactic byddh.
+
+
+- refinements: we are planning to study the possibility of adding some
+  basic form of refinement types, for instance for expressing that an
+  integer is positive. 
+
+- loop optimizations: we have agreed in a previous meeting to provide
+  support for loop transformations. It will be done some time this year.
+
+
+==================================================================
+Plans for EasyCrypt assurance
+
+
+- A continuous integration server has been set up and is used in
+  production. We are also enforcing a "unit testing" policy for the
+  new implementation, and are planning to use some code coverage tool
+  for OCaml for ensuring that the unit tests suite covers the whole
+  application.
+
+- The proof engine has been redesigned to isolate a small trusted
+  kernel that belongs to the TCB. The kernel implements the basic
+  rules of the logic and provides an API that other commands from the
+  proof engine must use to process proof goals. Hence, bugs in the
+  high level proof engine will be caught by the trusted core. The
+  documentation will make clear which tactics are in the trusted part,
+  and which are not.
+
+- SMT solvers are in the TCB---from the beginning, we decided to
+  assume correctness of the solvers. One reason for not addressing
+  this issue is that the SMT community is working actively on the
+  topic. In particular, some SMT solvers are already certified
+  (e.g. Alt-Ergo), or can generate proof witnesses (e.g. z3). For the
+  ones in the latter category, we could run their dedicated witness
+  checker automatically (in that case, only their proof checkers are
+  in the TCB).
+
+
