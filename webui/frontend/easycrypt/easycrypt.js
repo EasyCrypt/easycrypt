@@ -20,7 +20,8 @@ function EasyCryptEditor(name) {
     this.init      = 0;
     this.romark    = null;
     this.editor    = null;
-
+    this.socket    = null;
+    
     this.createWidget();
 }
 
@@ -29,7 +30,13 @@ function EasyCryptEditor(name) {
 EasyCryptEditor.prototype.createWidget = function() {
     if (this.editor)
         return ;
-
+    
+    var url = "ws://localhost:8080";
+    this.socket = new WebSocket(url, "echo-protocol");
+    this.socket.onopen = this.onopen.bind(this);
+    this.socket.onerror = this.onerror.bind(this);
+    this.socket.onmessage = this.onmessage.bind(this);
+    
     var foldFunc = CodeMirror.newFoldFunction(CodeMirror.braceRangeFinder);
 
     var options = {
@@ -49,6 +56,30 @@ EasyCryptEditor.prototype.createWidget = function() {
     this.widgets.test.click(this._on_test.bind(this));
     this.widgets.next.click(this._on_next.bind(this));
     this.widgets.prev.click(this._on_prev.bind(this));
+}
+
+//---------------------------------------------------------------------
+EasyCryptEditor.prototype.onopen = function(event){
+		this.widgets.feedback
+			.append("Connected\n");
+	}
+
+EasyCryptEditor.prototype.onerror = function(event){
+	this.widgets.feedback
+		.append("Error" + event);
+}
+
+EasyCryptEditor.prototype.onmessage = function(event){
+	//this.widgets.feedback
+	//.append(event.data + "\n");
+	try{
+		var json = JSON.parse(event.data);
+	} catch (e) {
+		console.log('This doesn\'t look like a valid JSON: ', event);
+		return;
+		}
+	this.widgets.feedback
+		.append(json.data);
 }
 
 // --------------------------------------------------------------------
@@ -74,18 +105,7 @@ EasyCryptEditor.prototype.setROMark = function(end) {
 // --------------------------------------------------------------------
 // Buttons callbacks
 EasyCryptEditor.prototype._on_test = function() {
-	var myWebSocket = new WebSocket("ws://echo.websocket.org");
-	var message = "what do you want to send";
-	myWebSocket.onopen = function(evt) { 
-		alert("Connection is opening...");
-		alert("SENT : " + message);
-		myWebSocket.send(message);
-	};
-	myWebSocket.onclose = function(evt) { alert("Connection is closed"); };
-	myWebSocket.onmessage = function(evt) { 
-		alert("SERVER: " + evt.data);
-		myWebSocket.close();
-		};
+	
 }
 
 EasyCryptEditor.prototype._on_next = function() {
@@ -93,11 +113,13 @@ EasyCryptEditor.prototype._on_next = function() {
 	end  = this.findStatement(prev);
 
 	if (end) {
-		this.widgets.feedback
+		/*this.widgets.feedback
 			.append($.format("STATEMENT SENT: {0} {1}\n",
-					         end.line+1, end.contents));
+					         end.line+1, end.contents));*/
 		this.endofsent.push(end);
 		this.setROMark(end);
+		var json = JSON.stringify({ mode : "forward", data : end.contents});
+		this.socket.send(json);
 	}
 }
 
@@ -113,6 +135,8 @@ EasyCryptEditor.prototype._on_prev = function() {
 	this.widgets.feedback
     	.append($.format("LINE SENT: {0} {1}\n",
     					 posend.line+1, posend.contents));
+	var json = JSON.stringify({ mode : "undo", data : posend.contents});
+	this.socket.send(json);
 }
 
 // --------------------------------------------------------------------

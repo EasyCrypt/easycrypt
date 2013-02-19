@@ -13,7 +13,8 @@ from pyramid.view import view_config
 # --------------------------------------------------------------------
 @view_config(route_name = 'root', renderer = 'json')
 def root(request):
-    return dict(backend = 'easycrypt')
+    return dict(backend = 'easycrypt',
+                foo = [10, "foo"])
 
 # --------------------------------------------------------------------
 def _routing(config):
