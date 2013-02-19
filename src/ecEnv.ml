@@ -1027,6 +1027,28 @@ module Mod = struct
   let add (path : EcPath.path) (env : env) =
     let obj = by_path path env in 
       MC.import Px.for_module env path obj
+  
+  let unfold1_mod_name (env : env) (name : EcPath.cref) =
+    match name with
+    | EcPath.CRefMid  _ -> (name, [])
+    | EcPath.CRefPath p -> begin
+        match by_path_opt p env with
+        | None   -> (name, [])
+        | Some m -> begin
+            match m.me_body with
+            | ME_Ident       p         -> (p, [])
+            | ME_Application (p, args) -> (p, args)
+            | ME_Decl _                -> (name, [])
+            | ME_Structure _           -> (name, [])
+          end
+      end
+  
+  let rec unfold_mod (env : env) (name, args) =
+    let (name', args') = unfold1_mod_name env name in
+      if EcPath.cref_equal name name' then
+        (name', List.map (fun x -> unfold_mod env (x, [])) (args' @ args))
+      else
+        unfold_mod env (name', args' @ args)
 end
 
 (* -------------------------------------------------------------------- *)
@@ -1058,6 +1080,34 @@ module ModTy = struct
   let add (path : EcPath.path) (env : env) =
     let obj = by_path path env in 
       MC.import Px.for_modtype env path obj
+
+  let unfold1_mod_type_name (env : env) (name : EcPath.cref) =
+    match name with
+    | EcPath.CRefMid _ -> (name, [])
+    | EcPath.CRefPath name -> begin
+        match by_path_opt name env with
+        | None   -> (EcPath.CRefPath name, [])
+        | Some i -> begin
+            match i.tyms_desc with
+            | Mty_app (p, args) -> (p, args)
+            | Mty_sig _ -> (EcPath.CRefPath name, [])
+          end
+      end
+
+  let rec unfold_mod_type (env : env) ((name, args) : module_type_desc) =
+    let (name', args') = unfold1_mod_type_name env name in
+      if EcPath.cref_equal name name' then
+        (name', List.map (fun x -> Mod.unfold_mod env (x, [])) (args' @ args))
+      else
+        unfold_mod_type env (name', args' @ args)
+
+  let mod_type_equiv (env : env) i1 i2 =
+    let (name1, args1) = unfold_mod_type env i1
+    and (name2, args2) = unfold_mod_type env i2 in
+      EcPath.xcref_equal (name1, args1) (name2, args2)
+  
+  let has_mod_type (env : env) is i2 =
+    List.exists ((mod_type_equiv env)^~ i2) is
 end
 
 (* -------------------------------------------------------------------- *)

@@ -401,10 +401,7 @@ let rec ty_fun_app env ue tf targs =
       (try EcUnify.unify env ue t1 dom with _ -> assert false);
       ty_fun_app env ue codom targs
 
-  
-  
 let transexp (env : EcEnv.env) (ue : EcUnify.unienv) e =
-
   let rec transexp (env : EcEnv.env) (e : pexpr) =
     let loc = e.pl_loc in
 
@@ -518,60 +515,6 @@ let lookup_module_sig (env : EcEnv.env) (name : pqsymbol) =
   | Some x -> x
 
 (* -------------------------------------------------------------------- *)
-let unfold1_mod_type_name (env : EcEnv.env) (name : EcPath.cref) =
-  match name with
-  | EcPath.CRefMid _ -> (name, [])
-  | EcPath.CRefPath name -> begin
-      match EcEnv.ModTy.by_path_opt name env with
-      | None   -> (EcPath.CRefPath name, [])
-      | Some i -> begin
-          match i.tyms_desc with
-          | Mty_app (p, args) -> (p, args)
-          | Mty_sig _ -> (EcPath.CRefPath name, [])
-        end
-    end
-
-(* -------------------------------------------------------------------- *)
-let unfold1_mod_name (env : EcEnv.env) (name : EcPath.cref) =
-  match name with
-  | EcPath.CRefMid  _ -> (name, [])
-  | EcPath.CRefPath p -> begin
-      match EcEnv.Mod.by_path_opt p env with
-      | None   -> (name, [])
-      | Some m -> begin
-          match m.me_body with
-          | ME_Ident       p         -> (p, [])
-          | ME_Application (p, args) -> (p, args)
-          | ME_Decl _                -> (name, [])
-          | ME_Structure _           -> (name, [])
-        end
-    end
-
-(* -------------------------------------------------------------------- *)
-let rec unfold_mod_type (env : EcEnv.env) ((name, args) : module_type_desc) =
-  let (name', args') = unfold1_mod_type_name env name in
-    if EcPath.cref_equal name name' then
-      (name', List.map (fun x -> unfold_mod env (x, [])) (args' @ args))
-    else
-      unfold_mod_type env (name', args' @ args)
-
-and unfold_mod (env : EcEnv.env) (name, args) =
-  let (name', args') = unfold1_mod_name env name in
-    if EcPath.cref_equal name name' then
-      (name', List.map (fun x -> unfold_mod env (x, [])) (args' @ args))
-    else
-      unfold_mod env (name', args' @ args)
-
-(* -------------------------------------------------------------------- *)
-let mod_type_equiv (env : EcEnv.env) i1 i2 =
-  let (name1, args1) = unfold_mod_type env i1
-  and (name2, args2) = unfold_mod_type env i2 in
-    EcPath.xcref_equal (name1, args1) (name2, args2)
-
-let has_mod_type (env : EcEnv.env) is i2 =
-  List.exists ((mod_type_equiv env)^~ i2) is
-
-(* -------------------------------------------------------------------- *)
 let rec transmodsig (env : EcEnv.env) (sig_ : pmodule_sig) =
   match sig_ with
   | Pmty_alias mtype -> 
@@ -614,7 +557,7 @@ and transmodtype (env : EcEnv.env) ((m, args) : pmodule_type) =
           let mtypes =
             List.map (fun m -> m.tymt_desc) m.me_types
           in
-            if not (has_mod_type env mtypes i.tymt_desc) then
+            if not (EcEnv.ModTy.has_mod_type env mtypes i.tymt_desc) then
               tyerror dloc ModApplInvalidArgInterface;
             EcSubst.add_module subst ix mx)
         EcSubst.empty args iargs
@@ -696,7 +639,7 @@ let rec check_tymod_cnv mode (env : EcEnv.env) tin tout =
       (fun subst (xin, { tymt_desc = tyin }) (xout, { tymt_desc = tyout }) ->
         let tyin = EcSubst.subst_modtype_desc subst tyin in
           begin
-            if not (mod_type_equiv env tyin tyout) then
+            if not (EcEnv.ModTy.mod_type_equiv env tyin tyout) then
               tymod_cnv_failure (E_TyModCnv_ParamTypeMismatch xin)
           end;
           EcSubst.add_module subst xout (EcPath.CRefMid xin))
@@ -824,7 +767,7 @@ let rec transmod (env : EcEnv.env) (x : symbol) (m : pmodule_expr) =
                 (fun subst (xarg, arg) (xty, tymod) ->
                    let tymod = EcSubst.subst_modtype subst tymod in
                    let argtypes = List.map (fun x -> x.tymt_desc) arg.me_types in
-                     if not (has_mod_type env argtypes tymod.tymt_desc) then
+                     if not (EcEnv.ModTy.has_mod_type env argtypes tymod.tymt_desc) then
                        tymod_cnv_failure (E_TyModCnv_ParamTypeMismatch xty);
                      EcSubst.add_module subst xty xarg)
                 EcSubst.empty args atymods

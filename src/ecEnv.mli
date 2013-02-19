@@ -207,6 +207,8 @@ module Mod : sig
 
   val add  : EcPath.path -> env -> env
   val bind : symbol -> module_expr -> env -> env
+
+  val unfold_mod : env -> (cref * cref list) -> xcref
 end
 
 (* -------------------------------------------------------------------- *)
@@ -221,6 +223,10 @@ module ModTy : sig
 
   val add  : EcPath.path -> env -> env
   val bind : symbol -> t -> env -> env
+
+  val unfold_mod_type : env -> module_type_desc -> xcref
+  val mod_type_equiv  : env -> module_type_desc -> module_type_desc -> bool
+  val has_mod_type    : env -> module_type_desc list -> module_type_desc -> bool
 end
 
 (* -------------------------------------------------------------------- *)
