@@ -132,9 +132,9 @@ EasyCryptEditor.prototype._on_prev = function() {
 
 	this.setROMark(posstart);
 
-	this.widgets.feedback
+	/*this.widgets.feedback
     	.append($.format("LINE SENT: {0} {1}\n",
-    					 posend.line+1, posend.contents));
+    					 posend.line+1, posend.contents));*/
 	var json = JSON.stringify({ mode : "undo", data : posend.contents});
 	this.socket.send(json);
 }
