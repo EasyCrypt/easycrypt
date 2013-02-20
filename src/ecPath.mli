@@ -25,6 +25,8 @@ module Sp : Mp.Set with type elt = path
 val p_tostring  : path -> string
 val p_tolist    : path -> symbol list
 val p_toqsymbol : path -> qsymbol
+val p_prefix    : path -> path option
+val p_basename  : path -> symbol
 
 (* -------------------------------------------------------------------- *)
 type mcpath = private {

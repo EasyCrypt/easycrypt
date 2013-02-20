@@ -80,6 +80,16 @@ let p_toqsymbol (p : path) =
   | Pident x      -> ([], x)
   | Pqname (p, x) -> (p_tolist p, x)
 
+let p_prefix (p : path) =
+  match p.p_node with 
+  | Pident _ -> None
+  | Pqname (p, _) -> Some p
+
+let p_basename (p : path) =
+  match p.p_node with
+  | Pident x      -> x
+  | Pqname (_, x) -> x
+
 (* -------------------------------------------------------------------- *)
 type mcpath = {
   mcp_node : mcpath_desc;
