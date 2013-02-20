@@ -29,6 +29,35 @@ function originIsAllowed(origin) {
   return true;
 }
 
+function analyzeS(statement) {
+	  // function to analyze the statement sent by the user
+	try{
+		var json = JSON.parse(statement);
+	} catch (e) {
+		console.log('This doesn\'t look like a valid JSON: ', json);
+		return;
+		}
+	//NOW just to try the error
+	if (json.data.match("axiom") == "axiom") {
+		var error = JSON.stringify({     mode : "error",
+										 line : json.id_line,
+									    start : "15", 
+									      end : "18",
+									  message : "We have an error!"});
+		// broadcast message to all connected clients
+        for (var i=0; i < clients.length; i++) {
+            clients[i].send(error);
+        }
+	}
+	else {
+		// broadcast message to all connected clients
+        for (var i=0; i < clients.length; i++) {
+            clients[i].send(statement);
+        }
+	}
+	
+	}
+
 wsServer.on('request', function(request) {
     if (!originIsAllowed(request.origin)) {
       // Make sure we only accept requests from an allowed origin
@@ -40,26 +69,24 @@ wsServer.on('request', function(request) {
     var connection = request.accept('echo-protocol', request.origin);
     // we need to know client index to remove them on 'close' event
     var index = clients.push(connection) - 1;
-    console.log((new Date()) + ' Connection accepted.');
-    //connection.send(JSON.stringify({type : "message", data: " Connection accepted."})); 
+    console.log((new Date()) + ' Connection accepted.'); 
 
+    
     connection.on('message', function(message) {
     	try{
     		var json = JSON.parse(message.utf8Data);
     	} catch (e) {
-    		console.log('This doesn\'t look like a valid JSON: ', message);
+    		console.log('This doesn\'t look like a valid JSON: ', json);
     		return;
     		}
         if (json.mode == "forward") {
-        	// broadcast message to all connected clients
-                for (var i=0; i < clients.length; i++) {
-                    clients[i].send(message.utf8Data);
-                }
-            console.log('Received Message: ' + json.data); 
+        	analyzeS(message.utf8Data);
+        	console.log('Received Message: ' + json.data);
         }
+        	
         else if (json.mode == "undo") {
         	for (var i=0; i < clients.length; i++) {
-                clients[i].send("Undo operation - OK");
+                clients[i].send(JSON.stringify({ mode : "undo", data: "Undo operation - OK"}));
             }
             console.log('Undo operation');
         }
