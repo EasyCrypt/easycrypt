@@ -108,6 +108,11 @@ let rec epath_of_mpath (p : EcPath.mpath) =
       | EIdent _ -> assert false
     end
 
+let epath_of_xpath p =
+  let p = p.EcPath.xp_node in
+    epath_of_mpath
+      (EcPath.mcdot (p.EcPath.xp_context, (p.EcPath.xp_symbol, [])))
+
 let path_of_epath = function
   | EPath p -> p
   | EIdent _ -> assert false
@@ -343,6 +348,7 @@ module MC = struct
 
       px_basename : 'p -> symbol;
       px_topath   : xpath -> 'p;
+      px_toepath  : 'p -> epath;
     }
 
     (* ---------------------------------------------------------------- *)
@@ -352,7 +358,8 @@ module MC = struct
       px_actmc   = (fun mc -> mc.amc_variables);
       px_toactmc = (fun m mc -> { mc with amc_variables = m });
       px_basename = EcPath.xp_basename;
-      px_topath   = fun x -> x;
+      px_topath   = (fun x -> x);
+      px_toepath  = epath_of_xpath;
     }
 
     let for_function : (xpath, EcTypesmod.function_) projector = {
@@ -361,7 +368,8 @@ module MC = struct
       px_actmc   = (fun mc -> mc.amc_functions);
       px_toactmc = (fun m mc -> { mc with amc_functions = m });
       px_basename = EcPath.xp_basename;
-      px_topath   = fun x -> x;
+      px_topath   = (fun x -> x);
+      px_toepath  = epath_of_xpath;
     }
 
     let for_module : (xpath, EcTypesmod.module_expr) projector = {
@@ -370,7 +378,8 @@ module MC = struct
       px_actmc   = (fun mc -> mc.amc_modules);
       px_toactmc = (fun m mc -> { mc with amc_modules = m });
       px_basename = EcPath.xp_basename;
-      px_topath   = fun x -> x;
+      px_topath   = (fun x -> x);
+      px_toepath  = epath_of_xpath;
     }
 
     let for_modtype : (path, EcTypesmod.module_sig) projector = {
@@ -380,6 +389,7 @@ module MC = struct
       px_toactmc = (fun m mc -> { mc with amc_modtypes = m });
       px_basename = EcPath.p_basename;
       px_topath   = path_of_xpath;
+      px_toepath  = fun x -> EPath x;
     }
 
     let for_typedecl : (path, EcDecl.tydecl) projector = {
@@ -389,6 +399,7 @@ module MC = struct
       px_toactmc = (fun m mc -> { mc with amc_typedecls = m });
       px_basename = EcPath.p_basename;
       px_topath   = path_of_xpath;
+      px_toepath  = fun x -> EPath x;
     }
 
     let for_operator : (path, EcDecl.operator) projector = {
@@ -398,6 +409,7 @@ module MC = struct
       px_toactmc = (fun m mc -> { mc with amc_operators = m });
       px_basename = EcPath.p_basename;
       px_topath   = path_of_xpath;
+      px_toepath  = fun x -> EPath x;
     }
 
     let for_axiom : (path, EcDecl.axiom) projector = {
@@ -407,6 +419,7 @@ module MC = struct
       px_toactmc = (fun m mc -> { mc with amc_axioms = m });
       px_basename = EcPath.p_basename;
       px_topath   = path_of_xpath;
+      px_toepath  = fun x -> EPath x;
     }
 
     let for_theory : (path, EcTypesmod.ctheory) projector = {
@@ -416,6 +429,7 @@ module MC = struct
       px_toactmc = (fun m mc -> { mc with amc_theories = m });
       px_basename = EcPath.p_basename;
       px_topath   = path_of_xpath;
+      px_toepath  = fun x -> EPath x;
     }
   end
 
@@ -499,7 +513,7 @@ module MC = struct
             raise (LookupFailure (`QSymbol (qn, x)))
 
         | Some (p, obj) ->
-            (p, suspend obj (_params_of_epath env p))
+            (p, suspend obj (_params_of_epath env (px.Px.px_toepath p)))
       end
 
   let lookupall px ((qn, x) : qsymbol) (env : env) =
@@ -507,7 +521,7 @@ module MC = struct
     | None -> raise (LookupFailure (`QSymbol (qn, x)))
     | Some mc ->
         List.map
-          (fun (p, obj) -> (p, suspend obj (_params_of_epath env p)))
+          (fun (p, obj) -> (p, suspend obj (_params_of_epath env (px.Px.px_toepath p))))
           (mc_lookupall px x mc)
 
   (* Binding of an object in a [premc]. Fails if a binding already
