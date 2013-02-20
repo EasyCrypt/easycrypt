@@ -57,6 +57,7 @@ val mcdot : mpath * mcsymbol -> mpath
 module Mmp : Map.S   with type key = mpath
 module Smp : Mmp.Set with type elt = mpath
 
+val mp_basename : mpath -> symbol
 val mp_tostring : mpath -> string
 
 val mpath_of_path : path -> mpath

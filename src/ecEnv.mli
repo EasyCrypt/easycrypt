@@ -150,7 +150,7 @@ module Fun : sig
   val lookup_opt  : qsymbol -> env -> (xpath * t) option
   val lookup_path : qsymbol -> env -> xpath
 
-  val add : EcPath.xpath -> env -> env
+(*  val add : EcPath.xpath -> env -> env *)
 end
 
 (* -------------------------------------------------------------------- *)
@@ -168,7 +168,6 @@ module Var : sig
   val lookup_local     : symbol -> env -> (EcIdent.t * EcTypes.ty)
   val lookup_local_opt : symbol -> env -> (EcIdent.t * EcTypes.ty) option
 
-  val lookup_progvars    : qsymbol -> env -> (prog_var * EcTypes.ty) list
   val lookup_progvar     : qsymbol -> env -> (prog_var * EcTypes.ty)
   val lookup_progvar_opt : qsymbol -> env -> (prog_var * EcTypes.ty) option
 
@@ -180,7 +179,7 @@ module Var : sig
   val bind    : symbol -> pvar_kind -> EcTypes.ty -> env -> env
   val bindall : (symbol * EcTypes.ty) list -> pvar_kind -> env -> env
 
-  val add : EcPath.path -> env -> env
+(*  val add : EcPath.path -> env -> env *)
 end
 
 (* -------------------------------------------------------------------- *)

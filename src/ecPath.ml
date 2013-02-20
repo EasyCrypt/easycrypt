@@ -267,9 +267,11 @@ let xpath ctxt id = mk_xpath {
   xp_symbol  = id;
 }
 
+let mpath_of_xpath x = x.xp_node.xp_context
+
 let xp_tostring (p : xpath) =
   let p = p.xp_node in
     Printf.sprintf "%s.%s"
       (mp_tostring p.xp_context) p.xp_symbol
 
-let xp_basename x = x. xp_node.xp_symbol
+let xp_basename x = x.xp_node.xp_symbol
