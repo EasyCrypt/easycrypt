@@ -61,6 +61,25 @@ let mk_path node =
 let pident id      = mk_path (Pident id)
 let pqname (p, id) = mk_path (Pqname(p,id))
 
+let rec p_tostring (p : path) =
+  match p.p_node with
+  | Pident x ->
+      Printf.sprintf "%s" x
+  | Pqname (p, x) ->
+      Printf.sprintf "%s.%s" (p_tostring p) x
+
+let p_tolist =
+  let rec aux l p = 
+    match p.p_node with 
+    | Pident x      -> x :: l
+    | Pqname (p, x) -> aux (x :: l) p in
+  aux []
+
+let p_toqsymbol (p : path) =
+  match p.p_node with
+  | Pident x      -> ([], x)
+  | Pqname (p, x) -> (p_tolist p, x)
+
 (* -------------------------------------------------------------------- *)
 type mcpath = {
   mcp_node : mcpath_desc;
@@ -129,6 +148,25 @@ let mk_mcpath node =
 let mctop id      = mk_mcpath (MCtop id)
 let mcdot (p, id) = mk_mcpath (MCDot (p, id))
 
+let rec mcpath_of_path (p : path) =
+  match p.p_node with
+  | Pident x      -> mctop (x, [])
+  | Pqname (p, x) -> mcdot (mcpath_of_path p, (x, []))
+
+let rec mcp_tostring (p : mcpath) =
+  match p.mcp_node with
+  | MCtop id ->
+      mcsymbol_tostring id
+
+  | MCDot (p, id) ->
+      Printf.sprintf "%s.%s" (mcp_tostring p) (mcsymbol_tostring id)
+
+and mcsymbol_tostring (id, args) =
+    match args with
+    | [] -> id
+    | _  -> Printf.sprintf "%s(%s)" id
+              (String.concat ", " (List.map mcp_tostring args))
+
 (* -------------------------------------------------------------------- *)
 type mpath = {
   mp_node : mpath_desc;
@@ -186,6 +224,14 @@ let mk_mpath node =
 let mpident id = mk_mpath (MCIdent id)
 let mppath  p  = mk_mpath (MCPath p)
 
+let mpath_of_path (p : path) =
+  mppath (mcpath_of_path p)
+
+let mp_tostring (p : mpath) =
+  match p.mp_node with
+  | MCIdent id -> EcIdent.tostring id
+  | MCPath  p  -> mcp_tostring p
+
 (* -------------------------------------------------------------------- *)
 type xpath = {
   xp_node : xpath_desc;
@@ -237,3 +283,8 @@ let xpath ctxt id = mk_xpath {
   xp_context = ctxt;
   xp_symbol  = id;
 }
+
+let xp_tostring (p : xpath) =
+  let p = p.xp_node in
+    Printf.sprintf "%s.%s"
+      (mcp_tostring p.xp_context) p.xp_symbol

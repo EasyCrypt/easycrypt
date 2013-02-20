@@ -22,6 +22,10 @@ val pqname : path * symbol -> path
 module Mp : Map.S  with type key = path
 module Sp : Mp.Set with type elt = path
 
+val p_tostring  : path -> string
+val p_tolist    : path -> symbol list
+val p_toqsymbol : path -> qsymbol
+
 (* -------------------------------------------------------------------- *)
 type mcpath = private {
   mcp_node : mcpath_desc;
@@ -44,6 +48,10 @@ val mcdot : mcpath * mcsymbol -> mcpath
 module Mmcp : Map.S    with type key = mcpath
 module Smcp : Mmcp.Set with type elt = mcpath
 
+val mcpath_of_path : path -> mcpath
+
+val mcp_tostring : mcpath -> string
+
 (* -------------------------------------------------------------------- *)
 type mpath = private {
   mp_node : mpath_desc;
@@ -64,6 +72,10 @@ val mppath  : mcpath -> mpath
 module Mmp : Map.S   with type key = mpath
 module Smp : Mmp.Set with type elt = mpath
 
+val mp_tostring : mpath -> string
+
+val mpath_of_path : path -> mpath
+
 (* -------------------------------------------------------------------- *)
 type xpath = private {
   xp_node : xpath_desc;
@@ -83,3 +95,5 @@ val xpath : mcpath -> symbol -> xpath
 
 module Mxp : Map.S   with type key = xpath
 module Sxp : Mxp.Set with type elt = xpath
+
+val xp_tostring : xpath -> string
