@@ -7,6 +7,8 @@ type qsymbol = (* private *) symbol list * symbol
 
 type symbols = symbol list
 
+type qsymbol_app = (symbol * qsymbol_app list) list
+
 (* -------------------------------------------------------------------- *)
 val equal : symbol -> symbol -> bool
 val compare : symbol -> symbol -> int

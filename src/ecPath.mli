@@ -19,6 +19,7 @@ val p_hash    : path -> int
 val pident : symbol -> path
 val pqname : path * symbol -> path
 
+
 module Mp : Map.S  with type key = path
 module Sp : Mp.Set with type elt = path
 
@@ -27,7 +28,7 @@ val p_tolist    : path -> symbol list
 val p_toqsymbol : path -> qsymbol
 val p_prefix    : path -> path option
 val p_basename  : path -> symbol
-
+val p_extend    : path option -> symbol -> path 
 (* -------------------------------------------------------------------- *)
 type mpath = private {
   mp_node : mpath_desc;
@@ -57,7 +58,6 @@ module Mmp : Map.S   with type key = mpath
 module Smp : Mmp.Set with type elt = mpath
 
 val mp_tostring : mpath -> string
-val mp_basename : mpath -> symbol
 
 val mpath_of_path : path -> mpath
 
@@ -77,6 +77,7 @@ val xp_compare : xpath -> xpath -> int
 val xp_hash    : xpath -> int
 
 val xpath : mpath -> symbol -> xpath
+val mpath_of_xpath : xpath -> mpath
 
 module Mxp : Map.S   with type key = xpath
 module Sxp : Mxp.Set with type elt = xpath

@@ -90,6 +90,11 @@ let p_basename (p : path) =
   | Pident x      -> x
   | Pqname (_, x) -> x
 
+let p_extend (p : path option) (x : symbol) =
+  match p with
+  | None   -> pident x
+  | Some p -> pqname (p, x)
+
 (* -------------------------------------------------------------------- *)
 type mpath = {
   mp_node : mpath_desc;
@@ -181,6 +186,7 @@ let mk_mpath node =
 
 let mctop id      = mk_mpath (MCtop id)
 let mcdot (p, id) = mk_mpath (MCDot (p, id))
+let mcident id    = mctop (TopIdent id, [])
 
 let rec mpath_of_path (p : path) =
   match p.p_node with
@@ -265,3 +271,5 @@ let xp_tostring (p : xpath) =
   let p = p.xp_node in
     Printf.sprintf "%s.%s"
       (mp_tostring p.xp_context) p.xp_symbol
+
+let xp_basename x = x. xp_node.xp_symbol

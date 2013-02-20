@@ -714,23 +714,43 @@ let enter (name : symbol) (env : env) =
         env_item  = []; }
 
 (* -------------------------------------------------------------------- *)
+
+let build_subst =
+  let add_mods = 
+    List.fold_left2 (fun s (id, _) m -> EcSubst.add_module s id m ) in
+  let rec aux s params mp = 
+    match params, mp.EcPath.mp_node with
+    | [params1], EcPath.MCtop(_, args) -> add_mods s params1 args
+    | params1::params, EcPath.MCDot(mp,(_,args)) ->
+        aux (add_mods s params1 args) params mp
+    | _ -> assert false in
+  aux EcSubst.empty
+
+let subst_suspension subst p sus = 
+  let s = build_subst sus.sp_params p in 
+  subst s sus.sp_target
+  
 module Var = struct
   module Px = MC.Px
 
   type t = varbind
 
-  let by_path (p : EcPath.path) (env : env) =
-    let x = MC.lookup_by_path Px.for_variable.Px.px_premc p env in
-      (* Variables do NOT depend on module parameters *)
-      x.sp_target
+  let subst_varbind s vb = 
+    { vb with vb_kind = omap vb.vb_kind (EcSubst.subst_pvar s) }
+    
+  let by_path (p : EcPath.xpath) (env : env) =
+    let path = path_of_xpath p in
+    let x = MC.lookup_by_path Px.for_variable.Px.px_premc path env in
+    subst_suspension subst_varbind (EcPath.mpath_of_xpath p) x 
 
-  let by_path_opt (p : EcPath.path) (env : env) =
+  let by_path_opt (p : EcPath.xpath) (env : env) =
     try_lf (fun () -> by_path p env)
 
   let lookup name (env : env) =
     let (p, x) = MC.lookup Px.for_variable name env in
-      (* Variables do NOT depend on module parameters *)
-      (cref_of_epath p, x.sp_target)
+    assert false
+(*
+      (cref_of_epath p, x.sp_target) *)
 
   let lookup_opt name env =
     try_lf (fun () -> lookup name env)

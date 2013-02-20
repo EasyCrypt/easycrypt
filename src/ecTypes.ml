@@ -173,12 +173,12 @@ type pvar_kind =
   | PVloc 
 
 type prog_var = {
-  pv_name : EcPath.bla;
+  pv_name : EcPath.xpath;
   pv_kind : pvar_kind;
 }
 
 let pv_equal v1 v2 = 
-  EcPath.bla_equal v1.pv_name v2.pv_name && v1.pv_kind = v2.pv_kind 
+  EcPath.xp_equal v1.pv_name v2.pv_name && v1.pv_kind = v2.pv_kind 
 
 let pv_hash _v = 1
 (*
@@ -216,9 +216,6 @@ and tyexpr_r =
   | Elet      of lpattern * tyexpr * tyexpr  (* let binding           *)
   | Etuple    of tyexpr list                 (* tuple constructor     *)
   | Eif       of tyexpr * tyexpr * tyexpr    (* _ ? _ : _             *)
-
-and path_params =
-  (module_app_path list) list
 
 and tyexpr_meta = {
   tym_type : ty;
@@ -306,7 +303,7 @@ module Dump = struct
           EcDebug.onhlist pp "Ttuple" ty_dump tys
   
       | Tconstr (p, tys) ->
-          let strp = EcPath.tostring p in
+          let strp = EcPath.p_tostring p in
             EcDebug.onhlist pp ~extra:strp "Tconstr" ty_dump tys
       | Tfun (t1, t2) ->
           EcDebug.onhlist pp "Tfun" ty_dump [t1;t2]
@@ -326,11 +323,11 @@ module Dump = struct
         
       | Evar x ->                       (* FIXME *)
           EcDebug.onhlist pp
-            "Evar" ~extra:(EcPath.ep_tostring (fst x.pv_name))
+            "Evar" ~extra:(EcPath.xp_tostring x.pv_name)
             ty_dump []
 
       | Eop (x, tys) ->
-          EcDebug.onhlist pp "Eop" ~extra:(EcPath.tostring x)
+          EcDebug.onhlist pp "Eop" ~extra:(EcPath.p_tostring x)
             ty_dump tys
           
       | Eapp (e, args) -> 

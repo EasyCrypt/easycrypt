@@ -10,6 +10,8 @@ type symbols = symbol list
 let equal : symbol -> symbol -> bool = (=)
 let compare : symbol -> symbol -> int = Pervasives.compare
 
+type qsymbol_app = (symbol * qsymbol_app list) list
+ 
 (* -------------------------------------------------------------------- *)
 module Msym = Map.Make(struct
   type t = symbol

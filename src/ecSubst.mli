@@ -23,11 +23,10 @@ val add_module : subst -> EcIdent.t -> mpath -> subst
 
 (* -------------------------------------------------------------------- *)
 val subst_path   : subst -> path   -> path
-val subst_mcpath : subst -> mcpath -> mcpath
 val subst_mpath  : subst -> mpath  -> mpath
 val subst_xpath  : subst -> xpath  -> xpath
 val subst_local  : subst -> EcIdent.t -> EcIdent.t
-
+val subst_pvar   : subst -> pvar_kind -> pvar_kind
 (* -------------------------------------------------------------------- *)
 val subst_ty     : subst -> ty -> ty
 val subst_tyexpr : subst -> tyexpr -> tyexpr
