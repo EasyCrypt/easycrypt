@@ -141,7 +141,7 @@ let tyerror loc x = EcLocation.locate_error loc (TyError x)
 let e_inuse =
   let rec inuse (map : Sep.t) (e : tyexpr) =
     match e.tye_desc with
-    | Evar p -> begin
+    | Evar (p, _) -> begin
         match p.pv_kind with
         | PVglob -> Sep.add p.pv_name map
         | _      -> map

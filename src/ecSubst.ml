@@ -84,6 +84,9 @@ let subst_cref (s : subst) (p : EcPath.cref) =
       | Some p -> p
     end
 
+let subst_module_app_path s (p, args) =
+  (subst_cref s p, List.map (subst_cref s) args)
+
 (* -------------------------------------------------------------------- *)
 let rec subst_ty (s : subst) (ty : ty) =
   match ty.ty_node with
@@ -127,8 +130,11 @@ let rec subst_tyexpr (s : subst) (e : tyexpr) =
       let x  = subst_local s x in
       e_local x
 
-  | Evar x ->
-      e_var (subst_pv s x)
+  | Evar (x, pms) ->
+      let pms =
+        List.map (List.map (subst_module_app_path s)) pms
+      in
+        e_var (subst_pv s x) pms
 
   | Eop(p, tys) ->
       e_op (subst_path s p) (List.map (subst_ty s) tys)

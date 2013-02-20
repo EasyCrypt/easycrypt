@@ -5,47 +5,42 @@ open EcSymbols
 
 (* -------------------------------------------------------------------- *)
 type path = {
-    p_node : path_node;
-    p_tag  : int
-  }
+  p_node : path_desc;
+  p_tag  : int
+}
 
-and path_node = 
-  | Pident of symbol
-  | Pqname of path * symbol
-
-type epath =
-| EPath   of path
-| EModule of EcIdent.t * symbol option
-
-type cref =
-| CRefPath of path                      (* Top-level component    *)
-| CRefMid  of EcIdent.t                 (* Bound module component *)
-
-type xcref = cref * xcref list
+and path_desc =
+| Pident of symbol
+| Pqname of path * symbol
 
 (* -------------------------------------------------------------------- *)
-let p_equal : path -> path -> bool = (==)
-let p_hash p = p.p_tag
+let p_equal (p : path) (q : path) = (p == q)
+let p_hash  (p : path) = p.p_tag
 
-module Hspath = Why3.Hashcons.Make (struct 
+module Hspath = Why3.Hashcons.Make(struct 
   type t = path
 
   let equal_node p1 p2 = 
     match p1, p2 with
-    | Pident id1, Pident id2 -> EcSymbols.equal id1 id2
+    | Pident id1, Pident id2 ->
+        EcSymbols.equal id1 id2
+
     | Pqname (p1, id1), Pqname(p2, id2) -> 
         EcSymbols.equal id1 id2 && p_equal p1 p2
-    | _ -> false
+
+    | _, _ -> false
 
   let equal p1 p2 = equal_node p1.p_node p2.p_node
 
   let hash p = 
     match p.p_node with
-    | Pident id -> Hashtbl.hash id
-    | Pqname (p,id) -> Why3.Hashcons.combine p.p_tag (Hashtbl.hash id)
+    | Pident id ->
+        Hashtbl.hash id
+
+    | Pqname (p, id) ->
+        Why3.Hashcons.combine p.p_tag (Hashtbl.hash id)
           
   let tag n p = { p with p_tag = n }
-
 end)
 
 module Path = MakeMSH (struct
@@ -57,7 +52,8 @@ module Sp = Path.S
 module Mp = Path.M
 module Hp = Path.H
 
-let p_compare p1 p2 = p_hash p1 - p_hash p2
+let p_compare (p1 : path) (p2 : path) =
+  p_hash p1 - p_hash p2
 
 let mk_path node =
   Hspath.hashcons { p_node = node; p_tag = -1; }
@@ -66,179 +62,178 @@ let pident id      = mk_path (Pident id)
 let pqname (p, id) = mk_path (Pqname(p,id))
 
 (* -------------------------------------------------------------------- *)
-let ep_equal (p1 : epath) (p2 : epath) =
-  match p1, p2 with
-  | EPath   p1      , EPath   p2       -> p_equal p1 p2
-  | EModule (m1, s1), EModule (m2, s2) -> (EcIdent.id_equal m1 m2) && (s1 = s2)
-  | _               , _                -> false
+type mcpath = {
+  mcp_node : mcpath_desc;
+  mcp_tag  : int;
+}
 
-let ep_compare p1 p2 =
-  if p1 == p2 then 0 else Pervasives.compare p1 p2
+and mcpath_desc =
+| MCtop of mcsymbol
+| MCDot of mcpath * mcsymbol
 
-let ep_hash = function
-  | EPath p -> p_hash p
-  | EModule(i,_) -> EcIdent.tag i
+and mcsymbol = symbol * mcpath list
 
-(* -------------------------------------------------------------------- *)
-let cref_equal (p1 : cref) (p2 : cref) =
-  match p1, p2 with
-  | CRefPath p1, CRefPath p2 -> p_equal p1 p2
-  | CRefMid  m1, CRefMid m2  -> EcIdent.id_equal m1 m2
-  | _          , _           -> false
+let mcp_equal (p : mcpath) (q : mcpath) = (p == q)
+let mcp_hash  (p : mcpath) = p.mcp_tag
 
-(* -------------------------------------------------------------------- *)
-let rec xcref_equal ((p1, args1) : xcref) ((p2, args2) : xcref) =
-     (cref_equal p1 p2)
-  && (List.length args1 = List.length args2)
-  && (List.for_all2 xcref_equal args1 args2)
+module Hsmcpath = Why3.Hashcons.Make(struct 
+  type t = mcpath
 
-(* -------------------------------------------------------------------- *)
-let rec tostring p =
-  match p.p_node with
-  | Pident x ->
-      Printf.sprintf "%s" x
-  | Pqname (p, x) ->
-      Printf.sprintf "%s.%s" (tostring p) x
+  let equal_mcsymbol (id1, l1) (id2, l2) =
+       EcSymbols.equal id1 id2
+    && (List.length l1 == List.length l2)
+    && List.for_all2 mcp_equal l1 l2
 
-(* -------------------------------------------------------------------- *)
-let ep_tostring = function
-  | EPath p ->
-      tostring p
+  let equal_node p1 p2 = 
+    match p1, p2 with
+    | MCtop id1, MCtop id2 ->
+        equal_mcsymbol id1 id2
 
-  | EModule (mid, None) ->
-      EcIdent.tostring mid
+    | MCDot (p1, id1), MCDot(p2, id2) ->
+        equal_mcsymbol id1 id2 && mcp_equal p1 p2
 
-  | EModule (mid, Some x) ->
-      Printf.sprintf "%s.%s" (EcIdent.tostring mid) x
+    | _, _ -> false
 
-(* -------------------------------------------------------------------- *)
-let cref_tostring = function
-  | CRefPath p ->
-      tostring p
+  let equal p1 p2 = equal_node p1.mcp_node p2.mcp_node
 
-  | CRefMid mid ->
-      EcIdent.tostring mid
+  let rec hash p = 
+    match p.mcp_node with
+    | MCtop id ->
+        hash_mcsymbol id
 
-(* -------------------------------------------------------------------- *)
-let rec create (path : string) =
-  match try_nf (fun () -> String.rindex path '.') with
-  | None   -> pident path
-  | Some i ->
-      let path = String.sub path 0 i
-      and name = String.sub path (i+1) (String.length path - (i+1)) in
-        pqname (create path, name)
+    | MCDot (p, id) ->
+        Why3.Hashcons.combine p.mcp_tag (hash_mcsymbol id)
 
-(* -------------------------------------------------------------------- *)
-let tolist =
-  let rec aux l p = 
-    match p.p_node with 
-    | Pident x      -> x :: l
-    | Pqname (p, x) -> aux (x :: l) p in
-  aux []
+  and hash_mcsymbol (id, p) =
+    Why3.Hashcons.combine_list
+      (fun p -> p.mcp_tag) (Hashtbl.hash id) p
+
+  let tag n p = { p with mcp_tag = n }
+end)
+
+module MCPath = MakeMSH (struct
+  type t  = mcpath
+  let tag = mcp_hash
+end)
+
+module Smcp = MCPath.S
+module Mmcp = MCPath.M
+module Hmcp = MCPath.H
+
+let mcp_compare (p1 : mcpath) (p2 : mcpath) =
+  mcp_hash p1 - mcp_hash p2
+
+let mk_mcpath node =
+  Hsmcpath.hashcons { mcp_node = node; mcp_tag = -1; }
+
+let mctop id      = mk_mcpath (MCtop id)
+let mcdot (p, id) = mk_mcpath (MCDot (p, id))
 
 (* -------------------------------------------------------------------- *)
-let toqsymbol (p : path) =
-  match p.p_node with
-  | Pident x      -> ([], x)
-  | Pqname (p, x) -> (tolist p, x)
+type mpath = {
+  mp_node : mpath_desc;
+  mp_tag  : int;
+}
+
+and mpath_desc =
+| MCIdent of EcIdent.t
+| MCPath  of mcpath
+
+let mp_equal (p : mpath) (q : mpath) = (p == q)
+let mp_hash  (p : mpath) = p.mp_tag
+
+module Hsmpath = Why3.Hashcons.Make(struct 
+  type t = mpath
+
+  let equal_node p1 p2 = 
+    match p1, p2 with
+    | MCIdent id1, MCIdent id2 ->
+        EcIdent.id_equal id1 id2
+
+    | MCPath p1, MCPath p2 ->
+        mcp_equal p1 p2
+
+    | _, _ -> false
+
+  let equal p1 p2 = equal_node p1.mp_node p2.mp_node
+
+  let hash p = 
+    match p.mp_node with
+    | MCIdent id ->
+        Hashtbl.hash id
+
+    | MCPath p ->
+       mcp_hash p
+          
+  let tag n p = { p with mp_tag = n }
+end)
+
+module MPath = MakeMSH (struct
+  type t  = mpath
+  let tag = mp_hash
+end)
+
+module Smp = MPath.S
+module Mmp = MPath.M
+module Hmp = MPath.H
+
+let mp_compare (p1 : mpath) (p2 : mpath) =
+  mp_hash p1 - mp_hash p2
+
+let mk_mpath node =
+  Hsmpath.hashcons { mp_node = node; mp_tag = -1; }
+
+let mpident id = mk_mpath (MCIdent id)
+let mppath  p  = mk_mpath (MCPath p)
 
 (* -------------------------------------------------------------------- *)
-let basename p = 
-  match p.p_node with 
-  | Pident x -> x
-  | Pqname (_, x) -> x
+type xpath = {
+  xp_node : xpath_desc;
+  xp_tag  : int;
+}
+
+and xpath_desc = {
+  xp_context : mcpath;
+  xp_symbol  : symbol;
+}
 
 (* -------------------------------------------------------------------- *)
-let prefix p = 
-  match p.p_node with 
-  | Pident _ -> None
-  | Pqname (p, _) -> Some p
+let xp_equal (p : xpath) (q : xpath) = (p == q)
+let xp_hash  (p : xpath) = p.xp_tag
 
-(* -------------------------------------------------------------------- *)
-let rec rootname p = 
-  match p.p_node with 
-  | Pident x -> x
-  | Pqname (p, _) -> rootname p
+module Hsxpath = Why3.Hashcons.Make(struct 
+  type t = xpath
 
-(* -------------------------------------------------------------------- *)
-let extend (p : path option) (x : symbol) =
-  match p with
-  | None   -> pident x
-  | Some p -> pqname (p, x)
+  let equal_node p1 p2 = 
+       EcSymbols.equal p1.xp_symbol p2.xp_symbol
+    && mcp_equal p1.xp_context p2.xp_context
 
-(* -------------------------------------------------------------------- *)
-let rec concat p1 p2 = 
-  match p2.p_node with
-  | Pident x -> pqname(p1, x)
-  | Pqname (p2,x) -> pqname(concat p1 p2, x)
+  let equal p1 p2 = equal_node p1.xp_node p2.xp_node
 
-(* -------------------------------------------------------------------- *)
-module EPathComparable = struct
-  type t = epath
-  let compare = ep_compare
-end
+  let hash p =
+    let p = p.xp_node in
+      Why3.Hashcons.combine
+        (mcp_hash p.xp_context) (Hashtbl.hash p.xp_symbol)
+          
+  let tag n p = { p with xp_tag = n }
+end)
 
-module Mep = Map.Make(EPathComparable)
-module Sep = Mep.Set
+module XPath = MakeMSH (struct
+  type t  = xpath
+  let tag = xp_hash
+end)
 
-(* -------------------------------------------------------------------- *)
-module Msubp = struct
-  type 'a t = ('a submaps) Msym.t
+module Sxp = XPath.S
+module Mxp = XPath.M
+module Hxp = XPath.H
 
-  and 'a submaps = {
-    mp_value   : 'a option;
-    mp_submaps : 'a t;
-  }
+let xp_compare (p1 : xpath) (p2 : xpath) =
+  xp_hash p1 - xp_hash p2
 
-  let empty : 'a t = Msym.empty
+let mk_xpath node =
+  Hsxpath.hashcons { xp_node = node; xp_tag = -1; }
 
-  let empty_sm : 'a submaps = {
-    mp_value   = None;
-    mp_submaps = empty;
-  }
-
-  let rec update up (path : path) (m : 'a t) =
-    match path.p_node with
-    | Pident x -> up x m
-    | Pqname (path, x) ->
-        let up supx supm =
-          let doupdate subxsm =
-            let supxsm = odfl empty_sm subxsm in
-              Some { supxsm with mp_submaps = up x supxsm.mp_submaps }
-          in
-            Msym.change doupdate supx supm
-        in
-          update up path m
-
-  let add (path : path) (v : 'a) (m : 'a t) =
-    let add1 (x : symbol) (v : 'a) (m : 'a t) =
-      let doupdate sm =
-        let sm = odfl empty_sm sm in
-          Some { sm with mp_value = Some v }
-      in
-        Msym.change doupdate x m
-    in
-      update (add1^~ v) path m
-
-  let find =
-    let find1 (x : symbol) (sm : 'a submaps) =
-      match Msym.find_opt x sm.mp_submaps with
-      | None -> { mp_value   = sm.mp_value;
-                  mp_submaps = empty; }
-
-      | Some subsm -> begin
-          match subsm.mp_value with
-          | None   -> { subsm with mp_value = sm.mp_value }
-          | Some _ -> subsm
-        end
-    in
-
-    let rec find (path : path) (sm : 'a submaps) =
-      match path.p_node with
-      | Pident x      -> find1 x sm
-      | Pqname (p, x) -> find1 x (find p sm)
-    in
-
-      fun (path : path) (m : 'a t) ->
-        (find path { mp_value = None; mp_submaps = m }).mp_value
-end
+let xpath ctxt id = mk_xpath {
+  xp_context = ctxt;
+  xp_symbol  = id;
+}

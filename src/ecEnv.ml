@@ -26,8 +26,11 @@ let ctheory_of_ctheory_w3 (cth : ctheory_w3) =
 (* -------------------------------------------------------------------- *)
 type 'a suspension = {
   sp_target : 'a;
-  sp_params : (EcIdent.t * module_type) list list;
+  sp_params : suspension_params;
 }
+
+and suspension_params =
+  (EcIdent.t * module_type) list list
 
 exception IsSuspended
 
@@ -727,7 +730,6 @@ module Var = struct
         (fun (p, x) -> (p, x.sp_target))
         (MC.lookupall Px.for_variable qname env)
     in
-
       List.pmap
         (fun (p, x) ->
            match x.vb_kind with

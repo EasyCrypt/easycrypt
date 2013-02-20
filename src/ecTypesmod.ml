@@ -66,11 +66,11 @@ and module_sig_comps = {
 }
 
 and module_sig_desc =
-  | Mty_app of EcPath.cref * EcPath.cref list
+  | Mty_app of EcPath.path * EcPath.mpath list
   | Mty_sig of (EcIdent.t * module_type) list * module_sig_body
 
 and module_type_desc =
-  EcPath.cref * EcPath.cref list
+  EcPath.path * EcPath.mpath list
 
 and module_sig_body = module_sig_body_item list
 
@@ -95,10 +95,9 @@ type module_expr = {
 }
 
 and module_body =
-  | ME_Ident       of EcPath.cref
-  | ME_Application of EcPath.cref * EcPath.cref list
-  | ME_Structure   of module_structure
-  | ME_Decl        of module_type
+  | ME_Alias     of EcPath.mpath
+  | ME_Structure of module_structure
+  | ME_Decl      of module_type
 
 and module_structure = {
   ms_params : (EcIdent.t * module_type) list;
@@ -136,7 +135,7 @@ and stmt = instr list
 and instr =
   | Sasgn   of lvalue * EcTypes.tyexpr
   | Srnd    of lvalue * EcTypes.tyexpr
-  | Scall   of lvalue option * EcPath.epath * EcTypes.tyexpr list
+  | Scall   of lvalue option * EcPath.xpath * EcTypes.tyexpr list
   | Sif     of EcTypes.tyexpr * stmt * stmt
   | Swhile  of EcTypes.tyexpr * stmt
   | Sassert of EcTypes.tyexpr

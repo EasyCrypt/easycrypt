@@ -173,20 +173,20 @@ type pvar_kind =
   | PVloc 
 
 type prog_var = {
-  pv_name : EcPath.epath;
+  pv_name : EcPath.bla;
   pv_kind : pvar_kind;
 }
 
 let pv_equal v1 v2 = 
-  EcPath.ep_equal v1.pv_name v2.pv_name && v1.pv_kind = v2.pv_kind 
+  EcPath.bla_equal v1.pv_name v2.pv_name && v1.pv_kind = v2.pv_kind 
 
-let pv_hash v = 
+let pv_hash _v = 1
+(*
   Why3.Hashcons.combine (EcPath.ep_hash v.pv_name)
     (if v.pv_kind = PVglob then 1 else 0)
-
+*)
   
 (* -------------------------------------------------------------------- *)
-
 type lpattern =
   | LSymbol of EcIdent.t
   | LTuple  of EcIdent.t list
@@ -202,28 +202,31 @@ let lp_hash = function
   | LTuple lx -> Why3.Hashcons.combine_list EcIdent.tag 0 lx
 
 (* -------------------------------------------------------------------- *)
-
 type tyexpr = {
   tye_desc : tyexpr_r;
   tye_meta : tyexpr_meta option;
 }
 
 and tyexpr_r =
-  | Eint      of int                              (* int. literal          *)
-  | Elocal    of EcIdent.t                        (* let-variables         *)
-  | Evar      of prog_var                         (* module variable       *)
-  | Eop       of EcPath.path * ty list            (* op apply to type args *)
-  | Eapp      of tyexpr * tyexpr list             (* op. application       *)
-  | Elet      of lpattern * tyexpr * tyexpr       (* let binding           *)
-  | Etuple    of tyexpr list                      (* tuple constructor     *)
-  | Eif       of tyexpr * tyexpr * tyexpr         (* _ ? _ : _             *)
+  | Eint      of int                         (* int. literal          *)
+  | Elocal    of EcIdent.t                   (* let-variables         *)
+  | Evar      of prog_var                    (* module variable       *)
+  | Eop       of EcPath.path * ty list       (* op apply to type args *)
+  | Eapp      of tyexpr * tyexpr list        (* op. application       *)
+  | Elet      of lpattern * tyexpr * tyexpr  (* let binding           *)
+  | Etuple    of tyexpr list                 (* tuple constructor     *)
+  | Eif       of tyexpr * tyexpr * tyexpr    (* _ ? _ : _             *)
+
+and path_params =
+  (module_app_path list) list
 
 and tyexpr_meta = {
   tym_type : ty;
 }
 
-let e_ty e = (oget e.tye_meta).tym_type
 (* -------------------------------------------------------------------- *)
+let e_ty e = (oget e.tye_meta).tym_type
+
 let e_tyexpr (e : tyexpr_r) =
   { tye_desc = e; tye_meta = None; }
 
@@ -231,6 +234,7 @@ let e_int      = fun i        -> e_tyexpr (Eint i)
 let e_local    = fun x        -> e_tyexpr (Elocal x)
 let e_var      = fun x        -> e_tyexpr (Evar x)
 let e_op       = fun x targs  -> e_tyexpr (Eop (x, targs))
+
 let e_app x args = 
   match x.tye_desc with
   | Eapp(x', args') -> e_tyexpr (Eapp (x', (args'@args)))
@@ -254,7 +258,7 @@ and e_map_r fty fe e =
   match e with 
   | Eint _                -> e
   | Elocal id             -> Elocal id
-  | Evar id               -> Evar id
+  | Evar _                -> e
   | Eop (p, tys)          -> Eop(p, List.map fty tys)
   | Eapp (e, args)        -> Eapp(fe e, List.map fe args)
   | Elet (lp, e1, e2)     -> Elet (lp, fe e1, fe e2)
@@ -320,9 +324,9 @@ module Dump = struct
             "Elocal" ~extra:(EcIdent.tostring x)
             ty_dump []
         
-      | Evar x ->
+      | Evar x ->                       (* FIXME *)
           EcDebug.onhlist pp
-            "Evar" ~extra:(EcPath.ep_tostring x.pv_name)
+            "Evar" ~extra:(EcPath.ep_tostring (fst x.pv_name))
             ty_dump []
 
       | Eop (x, tys) ->

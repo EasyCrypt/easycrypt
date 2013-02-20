@@ -17,8 +17,11 @@ open EcTypesmod
  *)
 type 'a suspension = {
   sp_target : 'a;
-  sp_params : (EcIdent.t * module_type) list list;
+  sp_params : suspension_params;
 }
+
+and suspension_params =
+  (EcIdent.t * module_type) list list
 
 val is_suspended : 'a suspension -> bool
 
@@ -91,9 +94,9 @@ type preenv = private {
  *)
 and premc = private {
   mc_parameters : (EcIdent.t * module_type)        list;
-  mc_variables  : (epath * varbind)                Msym.t;
-  mc_functions  : (epath * EcTypesmod.function_)   Msym.t;
-  mc_modules    : ( cref * EcTypesmod.module_expr) Msym.t;
+  mc_variables  : (xpath * varbind)                Msym.t;
+  mc_functions  : (xpath * EcTypesmod.function_)   Msym.t;
+  mc_modules    : (mpath * EcTypesmod.module_expr) Msym.t;
   mc_modtypes   : ( path * EcTypesmod.module_sig)  Msym.t;
   mc_typedecls  : ( path * EcDecl.tydecl)          Msym.t;
   mc_operators  : ( path * EcDecl.operator)        Msym.t;
@@ -108,15 +111,15 @@ and premc = private {
  * the objects imported via the [import] command. *)
 
 and activemc = {
-  amc_variables  : (epath * varbind)                MMsym.t;
-  amc_functions  : (epath * EcTypesmod.function_)   MMsym.t;
-  amc_modules    : ( cref * EcTypesmod.module_expr) MMsym.t;
+  amc_variables  : (xpath * varbind)                MMsym.t;
+  amc_functions  : (xpath * EcTypesmod.function_)   MMsym.t;
+  amc_modules    : (mpath * EcTypesmod.module_expr) MMsym.t;
   amc_modtypes   : ( path * EcTypesmod.module_sig)  MMsym.t;
   amc_typedecls  : ( path * EcDecl.tydecl)          MMsym.t;
   amc_operators  : ( path * EcDecl.operator)        MMsym.t;
   amc_axioms     : ( path * EcDecl.axiom)           MMsym.t;
   amc_theories   : ( path * EcTypesmod.ctheory)     MMsym.t;
-  amc_components : cref                             MMsym.t;
+  amc_components : path                             MMsym.t;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -130,30 +133,30 @@ val initial : env
 val dump : ?name:string -> EcDebug.ppdebug -> env -> unit
 
 (* -------------------------------------------------------------------- *)
-exception LookupFailure of [`Path of epath | `QSymbol of qsymbol]
+exception LookupFailure of [`Path of xpath | `QSymbol of qsymbol]
 
 (* -------------------------------------------------------------------- *)
 module Fun : sig
   type t = function_
 
-  val by_path     : EcPath.path -> env -> t
-  val by_path_opt : EcPath.path -> env -> t option
-  val lookup      : qsymbol -> env -> epath * t
-  val lookup_opt  : qsymbol -> env -> (epath * t) option
-  val lookup_path : qsymbol -> env -> epath
+  val by_path     : EcPath.xpath -> env -> t
+  val by_path_opt : EcPath.xpath -> env -> t option
+  val lookup      : qsymbol -> env -> xpath * t
+  val lookup_opt  : qsymbol -> env -> (xpath * t) option
+  val lookup_path : qsymbol -> env -> xpath
 
-  val add : EcPath.path -> env -> env
+  val add : EcPath.xpath -> env -> env
 end
 
 (* -------------------------------------------------------------------- *)
 module Var : sig
   type t = varbind
 
-  val by_path     : EcPath.path -> env -> t
-  val by_path_opt : EcPath.path -> env -> t option
-  val lookup      : qsymbol -> env -> cref * t
-  val lookup_opt  : qsymbol -> env -> (cref * t) option
-  val lookup_path : qsymbol -> env -> cref
+  val by_path     : EcPath.xpath -> env -> t
+  val by_path_opt : EcPath.xpath -> env -> t option
+  val lookup      : qsymbol -> env -> xpath * t
+  val lookup_opt  : qsymbol -> env -> (xpath * t) option
+  val lookup_path : qsymbol -> env -> xpath
 
   (* Lookup restricted to given kind of variables *)
   val lookup_locals    : symbol -> env -> (EcIdent.t * EcTypes.ty) list
@@ -195,11 +198,11 @@ end
 module Mod : sig
   type t = module_expr
 
-  val by_path     : EcPath.path -> env -> t
-  val by_path_opt : EcPath.path -> env -> t option
-  val lookup      : qsymbol -> env -> cref * t
-  val lookup_opt  : qsymbol -> env -> (cref * t) option
-  val lookup_path : qsymbol -> env -> cref
+  val by_path     : EcPath.mpath -> env -> t
+  val by_path_opt : EcPath.mpath -> env -> t option
+  val lookup      : qsymbol -> env -> mpath * t
+  val lookup_opt  : qsymbol -> env -> (mpath * t) option
+  val lookup_path : qsymbol -> env -> mpath
 
   (* Locals binding *)
   val bind_local  : EcIdent.t -> module_expr -> env -> env
@@ -207,8 +210,6 @@ module Mod : sig
 
   val add  : EcPath.path -> env -> env
   val bind : symbol -> module_expr -> env -> env
-
-  val unfold_mod : env -> (cref * cref list) -> xcref
 end
 
 (* -------------------------------------------------------------------- *)
@@ -223,10 +224,6 @@ module ModTy : sig
 
   val add  : EcPath.path -> env -> env
   val bind : symbol -> t -> env -> env
-
-  val unfold_mod_type : env -> module_type_desc -> xcref
-  val mod_type_equiv  : env -> module_type_desc -> module_type_desc -> bool
-  val has_mod_type    : env -> module_type_desc list -> module_type_desc -> bool
 end
 
 (* -------------------------------------------------------------------- *)

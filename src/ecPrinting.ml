@@ -511,7 +511,7 @@ struct
   let pr_expr (tenv : t) (e : tyexpr) =
     let rec pr_expr (tenv : t) outer (e : tyexpr) =
         match e.tye_desc with
-        | Evar x ->
+        | Evar (x, _) ->
             pr_pv_symb tenv x.pv_name None
 
         | Elocal x ->

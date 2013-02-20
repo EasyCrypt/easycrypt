@@ -782,7 +782,8 @@ let check_side accu side =
     Array.iteri (fun i m -> pvm.(i) <- m) accu.pvm;
     accu.pvm <- pvm
 
-let trans_pv env vm (p, ty) side =
+let trans_pv env vm (p, ty) side = assert false (* FIXME *)
+(*
   (* FIXME: ensure that ty is closed *)
   let p = p.pv_name in
   let accu = vm.accu in
@@ -798,6 +799,7 @@ let trans_pv env vm (p, ty) side =
           let ls = Term.create_lsymbol wid [] (Some ty) in
           accu.pvm.(side) <- Mp.add p ls pvm;
           ls
+*)
 
 let trans_lv vm lv = 
   try Mid.find lv vm.lvm 
@@ -970,7 +972,7 @@ let rec trans_expr env vm e =
       let n = Term.ConstInt(Term.IConstDecimal (string_of_int n)) in
       Term.t_const n 
   | Elocal id -> trans_lv vm id
-  | Evar _p -> assert false 
+  | Evar _ -> assert false 
   | Eop(p,tys) -> trans_app env vm p tys [] 
   | Eapp({tye_desc = Eop(p,tys) },args) ->
       let args = List.map (trans_expr env vm) args in
