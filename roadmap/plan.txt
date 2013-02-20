@@ -1,8 +1,9 @@
 Dear Cathy,
 
-here is an update regarding the forthcoming EasyCrypt releases and
-some tentative plans for 2013. We will be very happy to receive your
-feedback on any of these points. 
+the update regarding the forthcoming EasyCrypt releases and some
+tentative plans for 2013 is enclosed. We will be very happy to 
+receive your feedback on any of these points, and in particular
+to know whether it fits your own plans.
 
 Moreover, we would like to check with you about the possibility of
 holding an EasyCrypt school this summer. The exact format would need
@@ -13,7 +14,7 @@ the event is of interest, we would need to agree on a date (possibly
 mid-June to mid-July) and place (most likely East Coast) in the next
 few weeks.
 
-For your convenience, I also append an update of an earlier message on
+For your convenience, we also append an update of an earlier message on
 EasyCrypt assurance.
 
 
@@ -39,14 +40,17 @@ The EasyCrypt team
 * library of probabilities and distributions
 
 * basic libraries (int, real, lists, sets, maps, arrays, bitstrings...)
+
 * interactive theorem proving
 
 The beta version will be operational, but we expect that a few tactics
-from version v0.2. will not be implemented, and that proving claims may
-require more interaction than in version v0.2. However, the absence of
-tactics should not be blocking (for instance steps involving eager
-sampling can be admitted) and it should be possible to start porting
-existing proofs.
+from version v0.2. will not be implemented, and that proving claims
+may require more interaction than in version v0.2. However, the
+absence of tactics should not be blocking (for instance steps
+involving eager sampling can be admitted) and it should be possible to
+start porting existing proofs. As indicated in a previous mail, we
+plan to complete porting our examples for end of Q3, as writing the
+documentation is higher priority.
 
 
 
