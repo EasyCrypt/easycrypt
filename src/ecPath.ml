@@ -91,101 +91,21 @@ let p_basename (p : path) =
   | Pqname (_, x) -> x
 
 (* -------------------------------------------------------------------- *)
-type mcpath = {
-  mcp_node : mcpath_desc;
-  mcp_tag  : int;
-}
-
-and mcpath_desc =
-| MCtop of mcsymbol
-| MCDot of mcpath * mcsymbol
-
-and mcsymbol = symbol * mcpath list
-
-let mcp_equal (p : mcpath) (q : mcpath) = (p == q)
-let mcp_hash  (p : mcpath) = p.mcp_tag
-
-module Hsmcpath = Why3.Hashcons.Make(struct 
-  type t = mcpath
-
-  let equal_mcsymbol (id1, l1) (id2, l2) =
-       EcSymbols.equal id1 id2
-    && (List.length l1 == List.length l2)
-    && List.for_all2 mcp_equal l1 l2
-
-  let equal_node p1 p2 = 
-    match p1, p2 with
-    | MCtop id1, MCtop id2 ->
-        equal_mcsymbol id1 id2
-
-    | MCDot (p1, id1), MCDot(p2, id2) ->
-        equal_mcsymbol id1 id2 && mcp_equal p1 p2
-
-    | _, _ -> false
-
-  let equal p1 p2 = equal_node p1.mcp_node p2.mcp_node
-
-  let rec hash p = 
-    match p.mcp_node with
-    | MCtop id ->
-        hash_mcsymbol id
-
-    | MCDot (p, id) ->
-        Why3.Hashcons.combine p.mcp_tag (hash_mcsymbol id)
-
-  and hash_mcsymbol (id, p) =
-    Why3.Hashcons.combine_list
-      (fun p -> p.mcp_tag) (Hashtbl.hash id) p
-
-  let tag n p = { p with mcp_tag = n }
-end)
-
-module MCPath = MakeMSH (struct
-  type t  = mcpath
-  let tag = mcp_hash
-end)
-
-module Smcp = MCPath.S
-module Mmcp = MCPath.M
-module Hmcp = MCPath.H
-
-let mcp_compare (p1 : mcpath) (p2 : mcpath) =
-  mcp_hash p1 - mcp_hash p2
-
-let mk_mcpath node =
-  Hsmcpath.hashcons { mcp_node = node; mcp_tag = -1; }
-
-let mctop id      = mk_mcpath (MCtop id)
-let mcdot (p, id) = mk_mcpath (MCDot (p, id))
-
-let rec mcpath_of_path (p : path) =
-  match p.p_node with
-  | Pident x      -> mctop (x, [])
-  | Pqname (p, x) -> mcdot (mcpath_of_path p, (x, []))
-
-let rec mcp_tostring (p : mcpath) =
-  match p.mcp_node with
-  | MCtop id ->
-      mcsymbol_tostring id
-
-  | MCDot (p, id) ->
-      Printf.sprintf "%s.%s" (mcp_tostring p) (mcsymbol_tostring id)
-
-and mcsymbol_tostring (id, args) =
-    match args with
-    | [] -> id
-    | _  -> Printf.sprintf "%s(%s)" id
-              (String.concat ", " (List.map mcp_tostring args))
-
-(* -------------------------------------------------------------------- *)
 type mpath = {
   mp_node : mpath_desc;
   mp_tag  : int;
 }
 
 and mpath_desc =
-| MCIdent of EcIdent.t
-| MCPath  of mcpath
+| MCtop of topmcsymbol
+| MCDot of mpath * mcsymbol
+
+and mcsymbol    = symbol    * mpath list
+and topmcsymbol = topsymbol * mpath list
+
+and topsymbol =
+| TopIdent  of EcIdent.t
+| TopSymbol of symbol
 
 let mp_equal (p : mpath) (q : mpath) = (p == q)
 let mp_hash  (p : mpath) = p.mp_tag
@@ -193,26 +113,54 @@ let mp_hash  (p : mpath) = p.mp_tag
 module Hsmpath = Why3.Hashcons.Make(struct 
   type t = mpath
 
+  let rec equal_mcsymbol
+      ((id1, l1) : mcsymbol) ((id2, l2) : mcsymbol)
+    =
+       EcSymbols.equal id1 id2
+    && (List.length l1 == List.length l2)
+    && List.for_all2 mp_equal l1 l2
+
+  and equal_topmcsymbol
+      ((id1, l1) : topmcsymbol) ((id2, l2) : topmcsymbol)
+    =
+       equal_topsymbol id1 id2
+    && (List.length l1 == List.length l2)
+    && List.for_all2 mp_equal l1 l2
+
+  and equal_topsymbol id1 id2 =
+    match id1, id2 with
+    | TopIdent  id1, TopIdent  id2 -> EcIdent.id_equal id1 id2
+    | TopSymbol id1, TopSymbol id2 -> EcSymbols.equal id1 id2
+    | _            , _             -> false
+
   let equal_node p1 p2 = 
     match p1, p2 with
-    | MCIdent id1, MCIdent id2 ->
-        EcIdent.id_equal id1 id2
+    | MCtop id1, MCtop id2 ->
+        equal_topmcsymbol id1 id2
 
-    | MCPath p1, MCPath p2 ->
-        mcp_equal p1 p2
+    | MCDot (p1, id1), MCDot(p2, id2) ->
+        equal_mcsymbol id1 id2 && mp_equal p1 p2
 
     | _, _ -> false
 
   let equal p1 p2 = equal_node p1.mp_node p2.mp_node
 
-  let hash p = 
+  let rec hash p = 
     match p.mp_node with
-    | MCIdent id ->
-        Hashtbl.hash id
+    | MCtop id ->
+        hash_topmcsymbol id
 
-    | MCPath p ->
-       mcp_hash p
-          
+    | MCDot (p, id) ->
+        Why3.Hashcons.combine p.mp_tag (hash_mcsymbol id)
+
+  and hash_mcsymbol ((id, p) : mcsymbol) =
+    Why3.Hashcons.combine_list
+      (fun p -> p.mp_tag) (Hashtbl.hash id) p
+
+  and hash_topmcsymbol ((id, p) : topmcsymbol) =
+    Why3.Hashcons.combine_list
+      (fun p -> p.mp_tag) (Hashtbl.hash id) p
+
   let tag n p = { p with mp_tag = n }
 end)
 
@@ -231,16 +179,35 @@ let mp_compare (p1 : mpath) (p2 : mpath) =
 let mk_mpath node =
   Hsmpath.hashcons { mp_node = node; mp_tag = -1; }
 
-let mpident id = mk_mpath (MCIdent id)
-let mppath  p  = mk_mpath (MCPath p)
+let mctop id      = mk_mpath (MCtop id)
+let mcdot (p, id) = mk_mpath (MCDot (p, id))
 
-let mpath_of_path (p : path) =
-  mppath (mcpath_of_path p)
+let rec mpath_of_path (p : path) =
+  match p.p_node with
+  | Pident x      -> mctop (TopSymbol x, [])
+  | Pqname (p, x) -> mcdot (mpath_of_path p, (x, []))
 
-let mp_tostring (p : mpath) =
+let rec mp_tostring (p : mpath) =
   match p.mp_node with
-  | MCIdent id -> EcIdent.tostring id
-  | MCPath  p  -> mcp_tostring p
+  | MCtop id ->
+      topmcsymbol_tostring id
+
+  | MCDot (p, id) ->
+      Printf.sprintf "%s.%s" (mp_tostring p) (mcsymbol_tostring id)
+
+and mcsymbol_tostring (id, args) =
+  topmcsymbol_tostring (TopSymbol id, args)
+
+and topmcsymbol_tostring (id, args) =
+  let id =
+    match id with
+    | TopSymbol id -> id
+    | TopIdent  id -> EcIdent.tostring id
+  in
+    match args with
+    | [] -> id
+    | _  -> Printf.sprintf "%s(%s)" id
+              (String.concat ", " (List.map mp_tostring args))
 
 (* -------------------------------------------------------------------- *)
 type xpath = {
@@ -249,7 +216,7 @@ type xpath = {
 }
 
 and xpath_desc = {
-  xp_context : mcpath;
+  xp_context : mpath;
   xp_symbol  : symbol;
 }
 
@@ -262,14 +229,14 @@ module Hsxpath = Why3.Hashcons.Make(struct
 
   let equal_node p1 p2 = 
        EcSymbols.equal p1.xp_symbol p2.xp_symbol
-    && mcp_equal p1.xp_context p2.xp_context
+    && mp_equal p1.xp_context p2.xp_context
 
   let equal p1 p2 = equal_node p1.xp_node p2.xp_node
 
   let hash p =
     let p = p.xp_node in
       Why3.Hashcons.combine
-        (mcp_hash p.xp_context) (Hashtbl.hash p.xp_symbol)
+        (mp_hash p.xp_context) (Hashtbl.hash p.xp_symbol)
           
   let tag n p = { p with xp_tag = n }
 end)
@@ -297,4 +264,4 @@ let xpath ctxt id = mk_xpath {
 let xp_tostring (p : xpath) =
   let p = p.xp_node in
     Printf.sprintf "%s.%s"
-      (mcp_tostring p.xp_context) p.xp_symbol
+      (mp_tostring p.xp_context) p.xp_symbol

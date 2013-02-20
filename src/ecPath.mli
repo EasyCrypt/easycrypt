@@ -49,8 +49,8 @@ val mp_equal   : mpath -> mpath -> bool
 val mp_compare : mpath -> mpath -> int
 val mp_hash    : mpath -> int
 
-val mtop : mcsymbol -> mpath
-val mdot : mpath * mcsymbol -> mpath
+val mctop : topmcsymbol -> mpath
+val mcdot : mpath * mcsymbol -> mpath
 
 module Mmp : Map.S   with type key = mpath
 module Smp : Mmp.Set with type elt = mpath
