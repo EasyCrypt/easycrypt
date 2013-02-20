@@ -43,15 +43,13 @@ The EasyCrypt team
 
 * interactive theorem proving
 
-The beta version will be operational, but we expect that a few tactics
-from version v0.2. will not be implemented, and that proving claims
-may require more interaction than in version v0.2. However, the
-absence of tactics should not be blocking (for instance steps
-involving eager sampling can be admitted) and it should be possible to
-start porting existing proofs. As indicated in a previous mail, we
-plan to complete porting our examples for end of Q3, as writing the
-documentation is higher priority.
-
+The beta version should be operational, but we expect that a few
+tactics from version v0.2. will not be implemented, and that proving
+claims may require more interaction than in version v0.2. However, the
+absence of tactics should not be blocking (for instance we do not plan
+to implement eager sampling yet, but steps involving eager sampling
+can be admitted) and it should be possible to start porting existing
+proofs.
 
 
 
@@ -87,7 +85,8 @@ after the summer.
 - certifying back-end: we plan to implement a minimal Coq backend
   dedicated to the certification of EasyCrypt execution traces. This
   backend should be much more lightweight than certification through
-  CertiCrypt, which was not designed as a proof checker for EasyCrypt.
+  CertiCrypt, which was not designed as a proof checker for
+  EasyCrypt. An approximate ETA is end of Q3 2013.
 
 
 - automation via symbolic methods: we plan to use symbolic methods
@@ -137,3 +136,6 @@ Plans for EasyCrypt assurance
   mentionted in meetings and will be used to realize core libraries
   that are shipped with EasyCrypt. Note however that we will start
   working on realizing libraries after the summer.
+
+
+- A certifying back-end will be developed (see above).
