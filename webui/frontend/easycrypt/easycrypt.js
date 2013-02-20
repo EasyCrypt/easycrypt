@@ -53,7 +53,6 @@ EasyCryptEditor.prototype.createWidget = function() {
     this.editor.on("gutterClick", foldFunc);
     foldFunc(this.editor, 0);
 
-    this.widgets.test.click(this._on_test.bind(this));
     this.widgets.next.click(this._on_next.bind(this));
     this.widgets.prev.click(this._on_prev.bind(this));
 }
@@ -78,8 +77,23 @@ EasyCryptEditor.prototype.onmessage = function(event){
 		console.log('This doesn\'t look like a valid JSON: ', event);
 		return;
 		}
-	this.widgets.feedback
-		.append(json.data);
+	if (json.mode == "error"){
+		this.widgets.feedback
+			.append($.format("{0} at line {1}\n", 
+						json.message, json.line+1));
+		var pos = { line : json.line,
+				   start : json.start,
+				     end : json.end };
+		this.setROMark_error(pos);
+	}
+	else if (json.mode == "undo"){
+		this.widgets.feedback
+			.append(json.data + "\n");
+	}
+	else
+		this.widgets.feedback
+			.append($.format("STATEMENT SENT: {0} {1}\n",
+							json.id_line+1, json.data));
 }
 
 // --------------------------------------------------------------------
@@ -94,7 +108,7 @@ EasyCryptEditor.prototype.setROMark = function(end) {
     var opts = {
            className: this.name + '-read-only',
             readOnly: true,
-      inclusiveRight: false,
+      inclusiveRight: false, 
     };
 
     this.clearROMark();
@@ -102,11 +116,22 @@ EasyCryptEditor.prototype.setROMark = function(end) {
     	this.romark = this.editor.markText({ line: 0, ch: 0 }, end, opts);
 }
 
+EasyCryptEditor.prototype.setROMark_error = function(pos) {
+    var opts = {
+           className: this.name + '-read-only-error',
+            readOnly: true,
+      inclusiveRight: false, 
+    };
+
+    //this.clearROMark();
+    if (pos)
+    	this.romark = this.editor.markText({ line: pos.line, ch: pos.start }, 
+    									   { line: pos.line, ch: pos.end },
+    									   opts);
+}
+
 // --------------------------------------------------------------------
 // Buttons callbacks
-EasyCryptEditor.prototype._on_test = function() {
-	
-}
 
 EasyCryptEditor.prototype._on_next = function() {
 	prev = this.endofsent.peek() || {line: 0, ch: 1};
@@ -118,7 +143,9 @@ EasyCryptEditor.prototype._on_next = function() {
 					         end.line+1, end.contents));*/
 		this.endofsent.push(end);
 		this.setROMark(end);
-		var json = JSON.stringify({ mode : "forward", data : end.contents});
+		var json = JSON.stringify({ mode : "forward", 
+								 id_line : end.line,
+									data : end.contents});
 		this.socket.send(json);
 	}
 }
