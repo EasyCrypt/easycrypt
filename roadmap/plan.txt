@@ -19,7 +19,7 @@ EasyCrypt assurance.
 
 Best
 
-Gilles
+The EasyCrypt team
 
 ================================================================
 
@@ -41,10 +41,14 @@ Gilles
 * basic libraries (int, real, lists, sets, maps, arrays, bitstrings...)
 * interactive theorem proving
 
-Tactics for reasoning about Hoare triples will be available, as well
-as all tactics from EasyCrypt v0.2 will be supported, to the exception
-of eager, auto, and eqobs_in, and ifsync that will be reintroduced in
-the 0.δ version.
+The beta version will be operational, but we expect that a few tactics
+from version v0.2. will not be implemented, and that proving claims may
+require more interaction than in version v0.2. However, the absence of
+tactics should not be blocking (for instance steps involving eager
+sampling can be admitted) and it should be possible to start porting
+existing proofs.
+
+
 
 
  ** version  0.δ
@@ -59,7 +63,7 @@ the 0.δ version.
 * new implementations of eager, auto, and eqobs_in
 
 * libraries of cryptographic definitions (for instance a library to
-* reason about random oracles)
+   reason about random oracles)
 
 
 
@@ -125,3 +129,7 @@ Plans for EasyCrypt assurance
   in the TCB).
 
 
+- Theories can be realized using why3 and Coq. This possiblity was
+  mentionted in meetings and will be used to realize core libraries
+  that are shipped with EasyCrypt. Note however that we will start
+  working on realizing libraries after the summer.
