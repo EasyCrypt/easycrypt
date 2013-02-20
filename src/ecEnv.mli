@@ -133,7 +133,12 @@ val initial : env
 val dump : ?name:string -> EcDebug.ppdebug -> env -> unit
 
 (* -------------------------------------------------------------------- *)
-exception LookupFailure of [`Path of xpath | `QSymbol of qsymbol]
+type lookup_failure = [
+  | `Path    of path
+  | `QSymbol of qsymbol
+]
+
+exception LookupFailure of lookup_failure
 
 (* -------------------------------------------------------------------- *)
 module Fun : sig

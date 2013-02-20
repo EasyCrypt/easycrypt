@@ -49,6 +49,7 @@ val mp_equal   : mpath -> mpath -> bool
 val mp_compare : mpath -> mpath -> int
 val mp_hash    : mpath -> int
 
+val mcident : EcIdent.t -> mpath
 val mctop : topmcsymbol -> mpath
 val mcdot : mpath * mcsymbol -> mpath
 
@@ -56,6 +57,9 @@ module Mmp : Map.S   with type key = mpath
 module Smp : Mmp.Set with type elt = mpath
 
 val mp_tostring : mpath -> string
+val mp_basename : mpath -> symbol
+
+val mpath_of_path : path -> mpath
 
 (* -------------------------------------------------------------------- *)
 type xpath = private {
@@ -78,3 +82,4 @@ module Mxp : Map.S   with type key = xpath
 module Sxp : Mxp.Set with type elt = xpath
 
 val xp_tostring : xpath -> string
+val xp_basename : xpath -> symbol

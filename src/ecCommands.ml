@@ -4,7 +4,7 @@ open EcSymbols
 open EcParsetree
 open EcTypedtree
 open EcOptions
-open EcPrinting
+(* open EcPrinting *)
 open Pprint.Operators
 
 (* -------------------------------------------------------------------- *)
@@ -19,7 +19,10 @@ type info =
 let loader = EcLoader.create ()
 
 (* -------------------------------------------------------------------- *)
-let process_pr scope p = 
+let process_pr _scope _p = 
+  ()                                    (* FIXME: PP *)
+
+(*
   let env = EcScope.env scope in
   match p with 
   | Pr_ty qs ->
@@ -36,10 +39,12 @@ let process_pr scope p =
   | Pr_ax qs ->
       let (p, ax) = EcEnv.Ax.lookup qs.pl_desc env in
       EcPP.pr_axiom (EcPP.mono env) (p, ax)
+*)
 
 let process_print scope p = 
-  let doc = process_pr scope p in
-    EcPrinting.pretty (doc ^^ Pprint.hardline)
+  let _doc = process_pr scope p in
+    ()              (* FIXME: PP *)
+(*    EcPrinting.pretty (doc ^^ Pprint.hardline)*)
 
 (* -------------------------------------------------------------------- *)
 let addidir (idir : string) =

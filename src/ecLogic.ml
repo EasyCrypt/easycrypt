@@ -45,8 +45,7 @@ type tac_error =
 
 exception TacError of tac_error
 
-
-module PE = EcPrinting.EcDebugPP (* FIXME *)
+(* module PE = EcPrinting.EcDebugPP (* FIXME *) *)
 
 let pp_tac_error fmt = function
   | UnknownAx p ->

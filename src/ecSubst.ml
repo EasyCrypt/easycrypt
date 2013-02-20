@@ -5,14 +5,12 @@ open EcDecl
 open EcFol
 open EcTypesmod
 
-module Sp    = EcPath.Sp
-module Msubp = EcPath.Msubp
-module Mid   = EcIdent.Mid
+module Smp = EcPath.Smp
+module Mid = EcIdent.Mid
 
 (* -------------------------------------------------------------------- *)
 type subst_name_clash = [
   | `Ident of EcIdent.t
-  | `Path  of EcPath.path
 ]
 
 exception SubstNameClash of subst_name_clash
@@ -20,28 +18,22 @@ exception InconsistentSubst
 
 (* -------------------------------------------------------------------- *)
 type subst = {
-  sb_locals  : EcIdent.t   Mid.t;
-  sb_modules : EcPath.cref Mid.t;
-  sb_paths   : EcPath.path Msubp.t;
+  sb_locals  : EcIdent.t    Mid.t;
+  sb_modules : EcPath.mpath Mid.t;
 }
 
 (* -------------------------------------------------------------------- *)
 let empty : subst = {
   sb_locals  = Mid.empty;
   sb_modules = Mid.empty;
-  sb_paths   = Msubp.empty;
 }
 
-let add_module (s : subst) (x : EcIdent.t) (m : EcPath.cref) =
+let add_module (s : subst) (x : EcIdent.t) (m : EcPath.mpath) =
   let merger = function
     | None   -> Some m
     | Some _ -> raise (SubstNameClash (`Ident x))
   in
     { s with sb_modules = Mid.change merger x s.sb_modules }
-
-let add_path (s : subst) (from_ : EcPath.path) (to_ : EcPath.path) =
-  (* FIXME: check that path is not already bound. *)
-  { s with sb_paths = Msubp.add from_ to_ s.sb_paths; }
 
 let add_local (s : subst) (x : EcIdent.t) (x' : EcIdent.t) =
   let merger = function
@@ -57,35 +49,24 @@ let add_locals subst bindings =
 
 (* -------------------------------------------------------------------- *)
 let subst_path  (_s : subst) (p : EcPath.path) = p
-let subst_local (_s : subst) (x : EcIdent.t)   = x
 
-let subst_epath (s : subst) (p : EcPath.epath) =
-  match p with
-  | EcPath.EPath p ->
-      EcPath.EPath (subst_path s p)
+let rec subst_mcpath (s : subst) (p : EcPath.mcpath) =
+  match p.EcPath.p_node with
+  | EcPath.MCtop id ->
+      EcPath.mctop (subst_mcsymbol s id)
 
-  | EcPath.EModule (mid, x) -> begin
-      match Mid.find_opt mid s.sb_modules with
-      | None -> p
-      | Some (EcPath.CRefPath mp) -> begin
-          match x with
-          | None   -> EcPath.EPath mp
-          | Some x -> EcPath.EPath (EcPath.pqname (mp, x))
-        end
-      | Some (EcPath.CRefMid mid) -> EcPath.EModule (mid, x)
-    end
+  | EcPath.MCDot (p, id) ->
+      EcPath.mcdot (subst_mcpath s p, subst_mcsymbol id)
 
-let subst_cref (s : subst) (p : EcPath.cref) =
-  match p with
-  | EcPath.CRefPath p   -> EcPath.CRefPath (subst_path s p)
-  | EcPath.CRefMid  mid -> begin
-      match Mid.find_opt mid s.sb_modules with
-      | None   -> p
-      | Some p -> p
-    end
+and subst_mcsymbol (s : subst) ((x, args) : EcPath.mcsymbol) =
+  (x, List.map (subst_mcpath s) args)
 
-let subst_module_app_path s (p, args) =
-  (subst_cref s p, List.map (subst_cref s) args)
+let subst_mpath  : subst -> mpath  -> mpath
+
+let subst_xpath  : subst -> xpath  -> xpath
+
+let subst_local (s : subst) (x : EcIdent.t) =
+  EcUtils.odfl x (Mid.find_opt s.sb_locals x)
 
 (* -------------------------------------------------------------------- *)
 let rec subst_ty (s : subst) (ty : ty) =

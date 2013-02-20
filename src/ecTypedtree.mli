@@ -72,6 +72,6 @@ val check_tymod_sub : EcEnv.env -> module_sig_comps -> module_sig_comps -> unit
 val check_tymod_eq  : EcEnv.env -> module_sig_comps -> module_sig_comps -> unit
 
 (* -------------------------------------------------------------------- *)
-val e_inuse : tyexpr -> EcPath.Sep.t
-val i_inuse : instr  -> use_flags EcPath.Mep.t
-val s_inuse : stmt   -> use_flags EcPath.Mep.t
+val e_inuse : tyexpr -> EcPath.Sxp.t
+val i_inuse : instr  -> use_flags EcPath.Mxp.t
+val s_inuse : stmt   -> use_flags EcPath.Mxp.t

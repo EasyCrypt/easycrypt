@@ -47,7 +47,7 @@ type tyerror =
 
 exception TyError of tyerror
 
-module PE = EcPrinting.EcDebugPP (* FIXME *)
+(* module PE = EcPrinting.EcDebugPP (* FIXME *) *)
 
 let pp_typerror fmt = function
     | UnknownVariable name
@@ -66,9 +66,9 @@ let pp_typerror fmt = function
         -> Format.fprintf fmt "Unknown module type name: %a" pp_qsymbol name
 
     | UnknownOperatorForSig (name, tys)
-        -> Format.fprintf fmt "Cannot find operator %a with signature %a" 
+        -> Format.fprintf fmt "Cannot find operator %a with signature ??" (* FIXME *)
             pp_qsymbol name
-            PE.pp_dom tys
+            (* PE.pp_dom tys *)
   
     | InvalidNumberOfTypeArgs (name, n, i)
         -> Format.fprintf fmt 
@@ -86,10 +86,13 @@ let pp_typerror fmt = function
   
     | UnexpectedType (ty1, ty2, t1, t2)
         ->
+      (*
           let pp_type = PE.pp_type ~vmap:(EcUidgen.NameGen.create()) in
             Format.fprintf fmt "@[the expression has type %a@\n" pp_type ty1;
             Format.fprintf fmt "It is expected to have type %a.@\n" pp_type ty2;
             Format.fprintf fmt "Can not unify %a and %a@]" pp_type t1 pp_type t2
+        *)                              (* FIXME *)
+      Format.fprintf fmt "UnexpectedType"
   
     | NonLinearPattern _
         -> Format.fprintf fmt "Non-linear pattern"
