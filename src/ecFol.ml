@@ -71,6 +71,10 @@ and f_node =
   | FequivS of stmt * stmt * form * form
     (* Fpr(m,F,args,P) = Pr[m, F(args) : P] () *)
   | Fpr     of mem * mod_app_fun * form list * form 
+
+forall (A:I), {P} G(A).f {Q}
+forall (k:int) {G.x = k } c { Q} <= e
+ 
  
 *)
 
