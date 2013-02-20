@@ -35,7 +35,7 @@ type mpath = private {
 }
 
 and mpath_desc =
-| MCtop of topsymbol
+| MCtop of topmcsymbol
 | MCDot of mpath * mcsymbol
 
 and mcsymbol    = symbol    * mpath list
