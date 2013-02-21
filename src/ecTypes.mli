@@ -76,7 +76,7 @@ type pvar_kind =
   | PVloc
 
 type prog_var = {
-  pv_name : EcPath.xpath;
+  pv_name : EcPath.epath;
   pv_kind : pvar_kind;
 }
 
@@ -90,14 +90,14 @@ type tyexpr = {
 }
 
 and tyexpr_r =
-  | Eint      of int                         (* int. literal          *)
-  | Elocal    of EcIdent.t                   (* let-variables         *)
-  | Evar      of prog_var                    (* module variable       *)
-  | Eop       of EcPath.path * ty list       (* op apply to type args *)
-  | Eapp      of tyexpr * tyexpr list        (* op. application       *)
-  | Elet      of lpattern * tyexpr * tyexpr  (* let binding           *)
-  | Etuple    of tyexpr list                 (* tuple constructor     *)
-  | Eif       of tyexpr * tyexpr * tyexpr    (* _ ? _ : _             *)
+  | Eint      of int                              (* int. literal          *)
+  | Elocal    of EcIdent.t                        (* let-variables         *)
+  | Evar      of prog_var                         (* module variable       *)
+  | Eop       of EcPath.path * ty list            (* op apply to type args *)
+  | Eapp      of tyexpr * tyexpr list             (* op. application       *)
+  | Elet      of lpattern * tyexpr * tyexpr       (* let binding           *)
+  | Etuple    of tyexpr list                      (* tuple constructor     *)
+  | Eif       of tyexpr * tyexpr * tyexpr         (* _ ? _ : _             *)
 
 and tyexpr_meta = {
   tym_type : ty;

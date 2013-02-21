@@ -69,9 +69,9 @@ module type IIdentPrinter = sig
   val tv_symb    : t -> EcIdent.t   -> EcSymbols.symbol
   val ty_symb    : t -> EcPath.path -> EcSymbols.qsymbol
   val local_symb : t -> EcIdent.t   -> EcSymbols.symbol
-  val pv_symb    : t -> EcPath.xpath -> int option -> EcSymbols.qsymbol_app
-  val fun_symb   : t -> EcPath.xpath -> EcSymbols.qsymbol_app
-  val mod_symb   : t -> EcPath.mpath -> EcSymbols.qsymbol_app
+  val pv_symb    : t -> EcPath.epath -> int option -> EcSymbols.qsymbol
+  val fun_symb   : t -> EcPath.epath -> EcSymbols.qsymbol
+  val mod_symb   : t -> EcPath.cref -> EcSymbols.qsymbol
   val modty_symb : t -> EcPath.path -> EcSymbols.qsymbol
   val op_symb    : t -> EcPath.path -> EcTypes.ty list -> 
                     EcTypes.ty list option -> EcSymbols.qsymbol

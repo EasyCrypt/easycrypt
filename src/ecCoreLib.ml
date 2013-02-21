@@ -32,9 +32,9 @@ let id_imp       = "=>"
 let id_iff       = "<=>"
 let id_eq        = "="
 
-let p_top        = EcPath.p_extend None id_top
-let p_pervasive  = EcPath.p_extend (Some p_top) id_pervasive
-let pervasive id = EcPath.p_extend (Some p_pervasive) id
+let p_top        = EcPath.extend None id_top
+let p_pervasive  = EcPath.extend (Some p_top) id_pervasive
+let pervasive id = EcPath.extend (Some p_pervasive) id
 
 let p_unit       = pervasive id_unit
 let p_tt         = pervasive id_tt

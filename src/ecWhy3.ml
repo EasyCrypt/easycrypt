@@ -452,7 +452,7 @@ let import_w3_tydef rn path (env,rb,z) ty =
   let def = omap ty.Ty.ts_def (import_w3_ty env tvm) in
   let eid = Renaming.get_ts rn ty in
   let td = { tyd_params = params; tyd_type = def } in
-  let p = EcPath.p_extend (Some path) eid in
+  let p = EcPath.extend (Some path) eid in
   let env = add_w3_ty env p ty in
   let rb  = rbadd_w3_ty rb p ty in 
     (env, rb, Zdecl (Th_type (eid, td)) :: z)
@@ -582,7 +582,7 @@ let import_w3_ls rn path (env,rb,z) ls =
   let params = List.map (Wtvm.get tvm) wparams in
   let eid = Renaming.get_ls rn ls in
   let op = mk_op params dom (force_bool codom) None in
-  let p = EcPath.p_extend (Some path) eid in
+  let p = EcPath.extend (Some path) eid in
   let odecl = mk_highorder_func ls in
   let env = add_w3_ls env p ls wparams odecl in 
   let rb  = rbadd_w3_ls rb p ls wparams odecl in 
@@ -622,7 +622,7 @@ let import_w3_pr rn path (env,rb,z as envld) k pr t =
         ax_spec = spec;
         ax_kind = if k = Decl.Plemma then assert false (*FIXME Lemma *)
         else Axiom } in
-      let p = EcPath.p_extend (Some path) eid in
+      let p = EcPath.extend (Some path) eid in
       let env = add_w3_pr env p pr in
       let rb  = rbadd_w3_pr rb p pr in 
       env, rb, Zdecl(Th_axiom (eid,ax)) :: z
@@ -659,7 +659,7 @@ let import_decls rn path env rb decls =
     | _, [], _ -> assert false in
   let open_ ls path z = 
     List.fold_left (fun (path, z) s -> 
-      EcPath.p_extend (Some path) s, (Zenter s) :: z) (path, z) ls
+      EcPath.extend (Some path) s, (Zenter s) :: z) (path, z) ls
   in
     
   let close_open ls ls' path z = 
@@ -703,7 +703,7 @@ let preid id =
   Ident.id_fresh (EcIdent.name id)
 
 let str_p p = 
-  let ls,s = EcPath.p_toqsymbol p in
+  let ls,s = EcPath.toqsymbol p in
   List.fold_right (fun s1 s2 -> s1 ^ "_" ^ s2) ls s
   
 let preid_p p = Ident.id_fresh (str_p p)
@@ -782,8 +782,7 @@ let check_side accu side =
     Array.iteri (fun i m -> pvm.(i) <- m) accu.pvm;
     accu.pvm <- pvm
 
-let trans_pv _env _vm (_p, _ty) _side = assert false (* FIXME *)
-(*
+let trans_pv env vm (p, ty) side =
   (* FIXME: ensure that ty is closed *)
   let p = p.pv_name in
   let accu = vm.accu in
@@ -799,7 +798,6 @@ let trans_pv _env _vm (_p, _ty) _side = assert false (* FIXME *)
           let ls = Term.create_lsymbol wid [] (Some ty) in
           accu.pvm.(side) <- Mp.add p ls pvm;
           ls
-*)
 
 let trans_lv vm lv = 
   try Mid.find lv vm.lvm 
@@ -913,14 +911,14 @@ let trans_op env vm p tys =
       let ls,ls', tvs = 
         try Mp.find p env.env_op 
         with _ -> 
-          Format.printf "can not find %s@." (EcPath.p_tostring p);
+          Format.printf "can not find %s@." (EcPath.tostring p);
           assert false in (* FIXME error message *)
       let mtv = 
         try 
           List.fold_left2 (fun mtv tv ty ->
             Ty.Mtv.add tv (trans_ty env vm ty) mtv) Ty.Mtv.empty
             tvs tys 
-        with e -> Format.printf "ICI %s@." (EcPath.p_tostring p); raise e
+        with e -> Format.printf "ICI %s@." (EcPath.tostring p); raise e
       in
       let targs = List.map (fun t -> Some (Ty.ty_inst mtv t)) ls.Term.ls_args in
       let tres  = omap ls.Term.ls_value (Ty.ty_inst mtv) in
@@ -972,7 +970,7 @@ let rec trans_expr env vm e =
       let n = Term.ConstInt(Term.IConstDecimal (string_of_int n)) in
       Term.t_const n 
   | Elocal id -> trans_lv vm id
-  | Evar _ -> assert false 
+  | Evar _p -> assert false 
   | Eop(p,tys) -> trans_app env vm p tys [] 
   | Eapp({tye_desc = Eop(p,tys) },args) ->
       let args = List.map (trans_expr env vm) args in
@@ -1157,8 +1155,8 @@ let para_call max_provers provers timelimit task =
           ExtUnix.All.setpgid (CP.prover_call_pid pc) 0
         with Unix.Unix_error _ -> ()
       end;
-      pcs.(i) <- Some(prover, pc)
- (*  Format.printf "Prover %s started and set at %i@." prover i *)
+      pcs.(i) <- Some(prover, pc);
+      Format.printf "Prover %s started and set at %i@." prover i
     with e -> 
       Format.printf "Error when starting %s: %a" prover 
         EcPexception.exn_printer e;
@@ -1184,12 +1182,12 @@ let para_call max_provers provers timelimit task =
         for i = 0 to (Array.length pcs) - 1 do
           match pcs.(i) with
           | None -> ()
-          | Some (_prover, pc) ->
+          | Some (prover, pc) ->
               if CP.prover_call_pid pc = pid then begin
                 pcs.(i) <- None;            (* DO IT FIRST *)
                 let ans = (CP.post_wait_call pc st ()).CP.pr_answer in
-                (*Format.eprintf "prover `%s' return %a@."
-                  prover CP.print_prover_answer ans; *)
+                Format.eprintf "prover `%s' return %a@."
+                  prover CP.print_prover_answer ans;
                 match ans with
                 | CP.Valid   -> status := Some true
                 | CP.Invalid -> status := Some false
@@ -1207,13 +1205,13 @@ let para_call max_provers provers timelimit task =
       for i = 0 to (Array.length pcs) - 1 do
         match pcs.(i) with
         | None    -> ()
-        | Some (_prover,pc) ->
+        | Some (prover,pc) ->
             let pid = CP.prover_call_pid pc in
             pcs.(i) <- None;
             begin try
-(*              Format.printf
+              Format.printf
                 "Killing (SIGTERM) prover `%s' (pid = %d)@."
-                prover pid; *)
+                prover pid;
               Unix.kill (-pid) 15;      (* kill process group *)
             with Unix.Unix_error _ -> ()
             end;

@@ -1,10 +1,9 @@
 (* -------------------------------------------------------------------- *)
-open EcUtils
 open EcSymbols
 open EcParsetree
 open EcTypedtree
 open EcOptions
-(* open EcPrinting *)
+open EcPrinting
 open Pprint.Operators
 
 (* -------------------------------------------------------------------- *)
@@ -13,16 +12,12 @@ type info =
 | GI_AddedAxiom     of symbol
 | GI_AddedOperator  of symbol
 | GI_AddedPredicate of symbol
-| GI_Goal           of Pprint.document
 
 (* -------------------------------------------------------------------- *)
 let loader = EcLoader.create ()
 
 (* -------------------------------------------------------------------- *)
-let process_pr _scope _p = 
-  ()                                    (* FIXME: PP *)
-
-(*
+let process_pr scope p = 
   let env = EcScope.env scope in
   match p with 
   | Pr_ty qs ->
@@ -39,12 +34,10 @@ let process_pr _scope _p =
   | Pr_ax qs ->
       let (p, ax) = EcEnv.Ax.lookup qs.pl_desc env in
       EcPP.pr_axiom (EcPP.mono env) (p, ax)
-*)
 
 let process_print scope p = 
-  let _doc = process_pr scope p in
-    ()              (* FIXME: PP *)
-(*    EcPrinting.pretty (doc ^^ Pprint.hardline)*)
+  let doc = process_pr scope p in
+    EcPrinting.pretty (doc ^^ Pprint.hardline)
 
 (* -------------------------------------------------------------------- *)
 let addidir (idir : string) =
@@ -212,10 +205,4 @@ let process (g : global) =
   let (idx, scope, stack) = !context in
   let (newscope, infos) = process scope g in
     context := (idx+1, newscope, scope :: stack);
-  let infos = 
-    List.ocons (omap (EcScope.Tactic.out_goal newscope) (fun d -> GI_Goal d)) 
-      infos in
-  List.rev infos
-
-
-
+    infos

@@ -3,85 +3,83 @@ open EcMaps
 open EcSymbols
 
 (* -------------------------------------------------------------------- *)
-type path = private {
-  p_node : path_desc;
-  p_tag  : int
-}
+(* An epath is either
+ * - A [EPath EcPath.path] that denotes a full path from the <top> context.
+ *   For a given environment, it is ensured that such a path
+ *   denotes at most a single object. Environment also ensures that two
+ *   containers of different kind (e.g. theory/module) cannot be denoted
+ *   by the same path.
+ * - A [EModule EcIdent.t path] that denotes a (possibly empty) path prefixed
+ *   by a bound module parameter. Two different modules parameters can share
+ *   the same name but must have different UID.
+ *)
 
-and path_desc =
-| Pident of symbol
-| Pqname of path * symbol
+type path = private {
+    p_node : path_node;
+    p_tag  : int
+  }
+
+and path_node = private
+  | Pident of symbol
+  | Pqname of path * symbol
+
+type epath =
+| EPath   of path
+| EModule of EcIdent.t * symbol option
+
+type cref =
+| CRefPath of path                      (* Top-level component    *)
+| CRefMid  of EcIdent.t                 (* Bound module component *)
+
+type xcref = cref * xcref list
+
+(* -------------------------------------------------------------------- *)
+val pident    : symbol -> path
+val pqname    : path * symbol -> path
 
 val p_equal   : path -> path -> bool
 val p_compare : path -> path -> int
 val p_hash    : path -> int
 
-val pident : symbol -> path
-val pqname : path * symbol -> path
+val ep_equal   : epath -> epath -> bool
+val ep_compare : epath -> epath -> int
+val ep_hash    : epath -> int
+
+val cref_equal  : cref -> cref -> bool
+val xcref_equal : xcref -> xcref -> bool
 
 
+(* -------------------------------------------------------------------- *)
+val tostring      : path  -> string
+val ep_tostring   : epath -> string
+val cref_tostring : cref  -> string
+
+(* -------------------------------------------------------------------- *)
+val create    : string -> path
+val toqsymbol : path -> qsymbol
+val basename  : path -> symbol
+val prefix    : path -> path option
+val rootname  : path -> symbol
+val extend    : path option -> symbol -> path
+val concat    : path -> path -> path
+val tolist    : path -> symbol list 
+
+(* -------------------------------------------------------------------- *)
 module Mp : Map.S  with type key = path
 module Sp : Mp.Set with type elt = path
 
-val p_tostring  : path -> string
-val p_tolist    : path -> symbol list
-val p_toqsymbol : path -> qsymbol
-val p_prefix    : path -> path option
-val p_basename  : path -> symbol
-val p_extend    : path option -> symbol -> path 
-(* -------------------------------------------------------------------- *)
-type mpath = private {
-  mp_node : mpath_desc;
-  mp_tag  : int;
-}
-
-and mpath_desc =
-| MCtop of topmcsymbol
-| MCDot of mpath * mcsymbol
-
-and mcsymbol    = symbol    * mpath list
-and topmcsymbol = topsymbol * mpath list
-
-and topsymbol =
-| TopIdent  of EcIdent.t
-| TopSymbol of symbol
-
-val mp_equal   : mpath -> mpath -> bool
-val mp_compare : mpath -> mpath -> int
-val mp_hash    : mpath -> int
-
-val mcident : EcIdent.t -> mpath
-val mctop : topmcsymbol -> mpath
-val mcdot : mpath * mcsymbol -> mpath
-
-module Mmp : Map.S   with type key = mpath
-module Smp : Mmp.Set with type elt = mpath
-
-val mp_basename : mpath -> symbol
-val mp_tostring : mpath -> string
-
-val mpath_of_path : path -> mpath
+module Mep : Map.S   with type key = epath
+module Sep : Mep.Set with type elt = epath
 
 (* -------------------------------------------------------------------- *)
-type xpath = private {
-  xp_node : xpath_desc;
-  xp_tag  : int;
-}
+module Msubp : sig
+  (* Maps implementation with [path] as keys. When asking the value of
+   * a [path], retrieve the longest prefix of [path] that has been
+   * associated to a value, and return this one. *)
 
-and xpath_desc = {
-  xp_context : mpath;
-  xp_symbol  : symbol;
-}
+  type +'a t
 
-val xp_equal   : xpath -> xpath -> bool
-val xp_compare : xpath -> xpath -> int
-val xp_hash    : xpath -> int
-
-val xpath : mpath -> symbol -> xpath
-val mpath_of_xpath : xpath -> mpath
-
-module Mxp : Map.S   with type key = xpath
-module Sxp : Mxp.Set with type elt = xpath
-
-val xp_tostring : xpath -> string
-val xp_basename : xpath -> symbol
+  val empty : 'a t
+  val add   : path -> 'a -> 'a t -> 'a t
+  val find  : path -> 'a t -> 'a option
+end

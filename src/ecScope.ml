@@ -740,17 +740,14 @@ module Tactic = struct
 
   let out_goal scope = 
     match scope.sc_pr_uc with
-    | [] -> None 
+    | [] -> Pprint.empty
     | puc :: _ ->
         match puc.puc_kind with
         | PUCK_logic juc ->
-            let doc = 
-              try 
-                let g = get_goal (get_first_goal juc) in
-                EcPrinting.EcPP.pr_lgoal (EcPrinting.EcPP.mono scope.sc_env) g
-              with EcBaseLogic.NotAnOpenGoal _ -> 
-                Pprint.text "No more goals" in
-            Some doc
+            try 
+              let g = get_goal (get_first_goal juc) in
+              EcPrinting.EcPP.pr_lgoal (EcPrinting.EcPP.mono scope.sc_env) g
+            with EcBaseLogic.NotAnOpenGoal _ -> Pprint.text "No more goals"
     
 end 
 

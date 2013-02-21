@@ -102,7 +102,7 @@ end
 
 module Tactic : sig
   val process  : scope -> ptactics -> scope
-  val out_goal : scope -> Pprint.document option
+  val out_goal : scope -> Pprint.document
 
 end
 
