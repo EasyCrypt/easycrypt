@@ -23,3 +23,5 @@ body {
 .ec-read-only-error {
   background-color: red; 
 }
+
+button { cursor: pointer; }
