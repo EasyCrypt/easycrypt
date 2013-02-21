@@ -132,6 +132,7 @@ EasyCryptEditor.prototype.setROMark_error = function(pos) {
     var opts = {
            className: this.name + '-read-only-error',
       inclusiveRight: false, 
+       clearOnEnter : true,
     };
 
     if (pos)
