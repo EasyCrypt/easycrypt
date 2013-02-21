@@ -75,10 +75,9 @@ and pstmt = pinstr list
 
 (* -------------------------------------------------------------------- *)
 type pmodule_sig =
-| Pmty_alias  of pmodule_type
-| Pmty_struct of pmodule_sig_struct
+  | Pmty_struct of pmodule_sig_struct
 
-and pmodule_type = pqsymbol * pqsymbol list
+and pmodule_type = pqsymbol 
 
 and pmodule_sig_struct = {
   pmsig_params : (psymbol * pmodule_type) list;

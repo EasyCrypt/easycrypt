@@ -77,7 +77,7 @@ module type IPrettyPrinter = sig
   val pr_typedecl : t -> (EcPath.path * tydecl     ) pr
   val pr_opdecl   : t -> (EcPath.path * operator   ) pr
   val pr_axiom    : t -> (EcPath.path * axiom      ) pr
-  val pr_modsig   : t -> (EcPath.path * module_sig ) pr
+  val pr_modsig   : t -> (EcPath.path * module_type) pr
   val pr_module   : t -> (EcPath.path * module_expr) pr
   val pr_theory   : t -> (EcPath.path * ctheory    ) pr
   val pr_export   : t -> EcPath.path pr
@@ -91,7 +91,7 @@ module type IPrettyPrinter = sig
   val pp_typedecl : t -> (EcPath.path * tydecl     ) pp
   val pp_opdecl   : t -> (EcPath.path * operator   ) pp
   val pp_axiom    : t -> (EcPath.path * axiom      ) pp
-  val pp_modsig   : t -> (EcPath.path * module_sig ) pp
+  val pp_modsig   : t -> (EcPath.path * module_type) pp
   val pp_module   : t -> (EcPath.path * module_expr) pp
   val pp_theory   : t -> (EcPath.path * ctheory    ) pp
   val pp_export   : t -> EcPath.path pp
@@ -115,17 +115,17 @@ module type IIdentPrinter = sig
 
   val string_of_ident : EcIdent.t -> string
 
-  val tv_symb    : t -> EcIdent.t   -> EcSymbols.symbol
-  val ty_symb    : t -> EcPath.path -> EcSymbols.qsymbol
-  val local_symb : t -> EcIdent.t   -> EcSymbols.symbol
-  val pv_symb    : t -> EcPath.epath-> int option -> EcSymbols.qsymbol
-  val fun_symb   : t -> EcPath.epath-> EcSymbols.qsymbol
-  val mod_symb   : t -> EcPath.cref -> EcSymbols.qsymbol
-  val modty_symb : t -> EcPath.path -> EcSymbols.qsymbol
+  val tv_symb    : t -> EcIdent.t    -> EcSymbols.symbol
+  val ty_symb    : t -> EcPath.path  -> EcSymbols.qsymbol
+  val local_symb : t -> EcIdent.t    -> EcSymbols.symbol
+  val pv_symb    : t -> EcPath.mpath -> int option -> EcSymbols.qsymbol
+  val fun_symb   : t -> EcPath.mpath -> EcSymbols.qsymbol
+  val mod_symb   : t -> EcPath.mpath -> EcSymbols.qsymbol
+  val modty_symb : t -> EcPath.path  -> EcSymbols.qsymbol
   val op_symb    : 
       t -> EcPath.path -> ty list -> ty list option -> EcSymbols.qsymbol
-  val ax_symb    : t -> EcPath.path -> EcSymbols.qsymbol
-  val th_symb    : t -> EcPath.path -> EcSymbols.qsymbol
+  val ax_symb    : t -> EcPath.path  -> EcSymbols.qsymbol
+  val th_symb    : t -> EcPath.path  -> EcSymbols.qsymbol
 end
 
 (* -------------------------------------------------------------------- *)
@@ -201,15 +201,15 @@ struct
     pr_symbol (M.local_symb tenv x)
 
   (* ------------------------------------------------------------------ *)
-  let pr_pv_symb (tenv : t) (p : EcPath.epath) (io : int option) =
+  let pr_pv_symb (tenv : t) (p : EcPath.mpath) (io : int option) =
     pr_qsymbol (M.pv_symb tenv p io)
 
   (* ------------------------------------------------------------------ *)
-  let pr_fun_name (tenv : t) (p :EcPath.epath) =
+  let pr_fun_name (tenv : t) (p :EcPath.mpath) =
     pr_qsymbol (M.fun_symb tenv p)
 
   (* ------------------------------------------------------------------ *)
-  let pr_mod_name (tenv : t) (p : EcPath.cref) =
+  let pr_mod_name (tenv : t) (p : EcPath.mpath) =
     pr_qsymbol (M.mod_symb tenv p)
 
   (* ------------------------------------------------------------------ *)
@@ -720,13 +720,8 @@ struct
     let moddoc  =
 
       match m.me_body with
-      | ME_Ident x ->
-          pr_seq [prelude; Pp.equals; pr_mod_name tenv x]
-
-      | ME_Application (p, args) ->
-          let dargs = Pp.parens (pr_list_map (pr_mod_name tenv) "," args) in
-          let dbody = (pr_mod_name tenv p) ^^ dargs in
-            pr_seq [prelude; Pp.equals; dbody]
+      | ME_Alias m -> 
+          pr_seq [prelude; Pp.equals; !^ (EcPath.m_tostring m)]
 
       | ME_Decl _modty ->
           assert false                  (* FIXME *)
@@ -820,7 +815,7 @@ struct
       pr_dotted (pr_seq [tk; pr_name; Pp.colon; spec])
 
   (* ------------------------------------------------------------------ *)
-  let pr_modsig (_tenv : t) ((x, _tymod) : EcPath.path * module_sig) =
+  let pr_modsig (_tenv : t) ((x, _tymod) : EcPath.path * module_type) =
     let basename = EcPath.basename x in
       pr_dotted (pr_seq [tk_module; tk_type; pr_symbol basename; Pp.equals])
 
@@ -959,25 +954,16 @@ struct
   let symb_of_path (p : EcPath.path) =
     ([], EcPath.basename p)
 
-  let symb_of_epath (p : EcPath.epath) =
-    match p with
-    | EcPath.EPath p -> symb_of_path p
-    | EcPath.EModule (mid, None) -> ([], EcIdent.tostring mid)
-    | EcPath.EModule (_, Some x) -> ([], x)
-
-  let symb_of_cref (p : EcPath.cref) =
-    match p with
-    | EcPath.CRefPath p -> symb_of_path p
-    | EcPath.CRefMid  m -> ([], EcIdent.tostring m)
+  let symb_of_mpath (p : EcPath.mpath) = symb_of_path (EcPath.path_of_mpath p)
 
   let string_of_ident = EcIdent.tostring 
 
   let tv_symb    = fun (_ : t) (x : EcIdent.t  )      -> EcIdent.tostring x
   let ty_symb    = fun (_ : t) (p : EcPath.path)      -> symb_of_path p
   let local_symb = fun (_ : t) (x : EcIdent.t  )      -> EcIdent.tostring x
-  let pv_symb    = fun (_ : t) (p : EcPath.epath) _   -> symb_of_epath p
-  let fun_symb   = fun (_ : t) (p : EcPath.epath)     -> symb_of_epath p
-  let mod_symb   = fun (_ : t) (p : EcPath.cref)      -> symb_of_cref p
+  let pv_symb    = fun (_ : t) (p : EcPath.mpath) _   -> symb_of_mpath p
+  let fun_symb   = fun (_ : t) (p : EcPath.mpath)     -> symb_of_mpath p
+  let mod_symb   = fun (_ : t) (p : EcPath.mpath)     -> symb_of_mpath p
   let modty_symb = fun (_ : t) (p : EcPath.path)      -> symb_of_path p
   let op_symb    = fun (_ : t) (p : EcPath.path) _ _  -> symb_of_path p
   let ax_symb    = fun (_ : t) (p : EcPath.path)      -> symb_of_path p
@@ -985,7 +971,7 @@ struct
 end
 
 (* -------------------------------------------------------------------- *)
-module LongRawIdentPrinter : IIdentPrinter with type t = unit =
+(*module LongRawIdentPrinter : IIdentPrinter with type t = unit =
 struct
   type t = unit
   let init _ = ()
@@ -1032,9 +1018,9 @@ struct
   let ax_symb    = fun (_ : t) (p : EcPath.path)     -> symb_of_path p
   let th_symb    = fun (_ : t) (p : EcPath.path)     -> symb_of_path p
 end
-
+*)
 (* -------------------------------------------------------------------- *)
-module ShortIdentPrinter : IIdentPrinter = struct
+(*module ShortIdentPrinter : IIdentPrinter = struct
   open EcMaps
 
   type t = { 
@@ -1178,11 +1164,11 @@ module ShortIdentPrinter : IIdentPrinter = struct
 
   let string_of_ident id = EcIdent.name id
 end
-
-module EcShortPP   = MakePP(ShortIdentPrinter)
+*)
+(*module EcShortPP   = MakePP(ShortIdentPrinter) *)
 module EcRawPP     = MakePP(RawIdentPrinter) 
-module EcLongRawPP = MakePP(LongRawIdentPrinter) 
-module EcPP        = EcShortPP
+(*module EcLongRawPP = MakePP(LongRawIdentPrinter)  *)
+module EcPP        = (*EcShortPP*) EcRawPP
 
 (* -------------------------------------------------------------------- *)
 module EcDebugPP = struct
@@ -1192,30 +1178,31 @@ module EcDebugPP = struct
   let pr_expr     = BPP.pr_expr ()
   let pr_form     = BPP.pr_form ()
   let pr_dom      = BPP.pr_dom  ()
-  let pr_typedecl = fun (x, v) -> BPP.pr_typedecl () (EcPath.pident x, v)
-  let pr_opdecl   = fun (x, v) -> BPP.pr_opdecl   () (EcPath.pident x, v)
-  let pr_axiom    = fun (x, v) -> BPP.pr_axiom    () (EcPath.pident x, v)
-  let pr_modsig   = fun (x, v) -> BPP.pr_modsig   () (EcPath.pident x, v)
-  let pr_module   = fun     v  -> BPP.pr_module   () (EcPath.pident v.me_name, v)
+  let pr_typedecl = fun (x, v) -> BPP.pr_typedecl () (EcPath.psymbol x, v)
+  let pr_opdecl   = fun (x, v) -> BPP.pr_opdecl   () (EcPath.psymbol x, v)
+  let pr_axiom    = fun (x, v) -> BPP.pr_axiom    () (EcPath.psymbol x, v)
+  let pr_modsig   = fun (x, v) -> BPP.pr_modsig   () (EcPath.psymbol x, v)
+  let pr_module   = fun     v  -> BPP.pr_module   () (EcPath.psymbol v.me_name, v)
   let pr_export   = BPP.pr_export ()
-  let pr_theory   = fun (x, v) -> BPP.pr_theory   () (EcPath.pident x, v)
+  let pr_theory   = fun (x, v) -> BPP.pr_theory   () (EcPath.psymbol x, v)
   let pr_lgoal    = BPP.pr_lgoal    ()
 
   let pp_type     = BPP.pp_type ()
   let pp_expr     = BPP.pp_expr ()
   let pp_form     = BPP.pp_form ()
   let pp_dom      = BPP.pp_dom  ()
-  let pp_typedecl = fun fmt (x, v) -> BPP.pp_typedecl () fmt (EcPath.pident x, v)
-  let pp_opdecl   = fun fmt (x, v) -> BPP.pp_opdecl   () fmt (EcPath.pident x, v)
-  let pp_axiom    = fun fmt (x, v) -> BPP.pp_axiom    () fmt (EcPath.pident x, v)
-  let pp_modsig   = fun fmt (x, v) -> BPP.pp_modsig   () fmt (EcPath.pident x, v)
-  let pp_module   = fun fmt     v  -> BPP.pp_module   () fmt (EcPath.pident v.me_name, v)
+  let pp_typedecl = fun fmt (x, v) -> BPP.pp_typedecl () fmt (EcPath.psymbol x, v)
+  let pp_opdecl   = fun fmt (x, v) -> BPP.pp_opdecl   () fmt (EcPath.psymbol x, v)
+  let pp_axiom    = fun fmt (x, v) -> BPP.pp_axiom    () fmt (EcPath.psymbol x, v)
+  let pp_modsig   = fun fmt (x, v) -> BPP.pp_modsig   () fmt (EcPath.psymbol x, v)
+  let pp_module   = fun fmt     v  -> BPP.pp_module   () fmt (EcPath.psymbol v.me_name, v)
   let pp_export   = BPP.pp_export ()
-  let pp_theory   = fun fmt (x, v) -> BPP.pp_theory   () fmt (EcPath.pident x, v)
+  let pp_theory   = fun fmt (x, v) -> BPP.pp_theory   () fmt (EcPath.psymbol x, v)
   let pp_lgoal    = BPP.pp_lgoal    ()
 
   let rec pp_path fmt p = 
     match p.EcPath.p_node with 
-    | EcPath.Pident x      -> Format.fprintf fmt "%s" x
+    | EcPath.Pident x      -> Format.fprintf fmt "%s" (EcIdent.name x)
+    | EcPath.Psymbol x      -> Format.fprintf fmt "%s" x
     | EcPath.Pqname (p, x) -> Format.fprintf fmt "%a.%s" pp_path p x
 end

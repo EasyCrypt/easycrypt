@@ -49,28 +49,13 @@ end
 type use_flags = UM.flags
 
 (* -------------------------------------------------------------------- *)
-type module_sig = {
-  tyms_desc  : module_sig_desc;
-  tyms_comps : module_sig_comps;
+type mtype_name = EcPath.path 
+
+type module_type = {
+  mt_params : (EcIdent.t * mtype_name) list;
+  mt_body   : module_sig_body;
+  mt_mforb  : EcPath.Sp.t;
 }
-
-and module_type = {
-  tymt_desc  : module_type_desc;
-  tymt_comps : module_sig_comps;
-}
-
-and module_sig_comps = {
-  tymc_params : (EcIdent.t * module_type) list;
-  tymc_body   : module_sig_body;
-  tymc_mforb  : EcPath.Sp.t;
-}
-
-and module_sig_desc =
-  | Mty_app of EcPath.mpath
-  | Mty_sig of (EcIdent.t * module_type) list * module_sig_body
-
-and module_type_desc =
-  EcPath.mpath
 
 and module_sig_body = module_sig_body_item list
 
@@ -88,19 +73,19 @@ and funsig = {
 type module_expr = {
   me_name  : symbol;
   me_body  : module_body;
-  me_sig   : module_sig;
   me_comps : module_comps;
+  me_sig   : module_type;
   me_uses  : EcPath.Sp.t;
-  me_types : module_type list;
+  me_types : mtype_name list;
 }
 
 and module_body =
   | ME_Alias       of EcPath.mpath
   | ME_Structure   of module_structure
-  | ME_Decl        of module_type
+  | ME_Decl        of mtype_name
 
 and module_structure = {
-  ms_params : (EcIdent.t * module_type) list;
+  ms_params : (EcIdent.t * mtype_name) list;
   ms_body   : module_item list;
 }
 
@@ -159,7 +144,7 @@ and theory_item =
   | Th_type      of (symbol * tydecl)
   | Th_operator  of (symbol * operator)
   | Th_axiom     of (symbol * axiom)
-  | Th_modtype   of (symbol * module_sig)
+  | Th_modtype   of (symbol * module_type)
   | Th_module    of module_expr
   | Th_theory    of (symbol * theory)
   | Th_export    of EcPath.path
@@ -180,7 +165,7 @@ and ctheory_item =
   | CTh_type      of (symbol * tydecl)
   | CTh_operator  of (symbol * operator)
   | CTh_axiom     of (symbol * axiom)
-  | CTh_modtype   of (symbol * module_sig)
+  | CTh_modtype   of (symbol * module_type)
   | CTh_module    of module_expr
   | CTh_theory    of (symbol * ctheory)
   | CTh_export    of EcPath.path
@@ -195,12 +180,7 @@ and ctheory_override =
 | CTHO_Module of EcPath.path * (EcPath.path list)
 
 (* -------------------------------------------------------------------- *)
-let module_sig_of_module_type (tymod : module_type) =
-  { tyms_desc  = Mty_app tymod.tymt_desc;
-    tyms_comps = tymod.tymt_comps; }
-
-(* -------------------------------------------------------------------- *)
-let module_comps_of_module_sig_comps (comps : module_sig_comps) =
+let module_comps_of_module_sig_comps (comps : module_sig_body) =
   let onitem = function
     | Tys_variable (x, ty) ->
         MI_Variable {
@@ -215,16 +195,16 @@ let module_comps_of_module_sig_comps (comps : module_sig_comps) =
           f_def  = None;
         }
   in
-    List.map onitem comps.tymc_body
+    List.map onitem comps
 
 (* -------------------------------------------------------------------- *)
-let module_expr_of_module_type (name : EcIdent.t) (tymod : module_type) =
-  let tysig   = module_sig_of_module_type tymod in
-  let tycomps = module_comps_of_module_sig_comps tymod.tymt_comps in
+let module_expr_of_module_type (name : EcIdent.t) mp (tymod : module_type) =
+
+  let tycomps = module_comps_of_module_sig_comps tymod.mt_body in
 
     { me_name  = EcIdent.name name;
-      me_body  = ME_Decl tymod;
-      me_sig   = tysig;
+      me_body  = ME_Decl mp;
       me_comps = tycomps;
+      me_sig   = tymod;
       me_uses  = Sp.empty;                (* FIXME *)
-      me_types = [tymod]; }
+      me_types = [mp]; }

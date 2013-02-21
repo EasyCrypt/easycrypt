@@ -1,3 +1,6 @@
+Verifier les fonction add dans ecEnv.
+
+
 * Pierre-Yves
 
 - reprendre la partie module -> finir la partie typage

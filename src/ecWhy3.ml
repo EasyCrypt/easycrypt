@@ -782,8 +782,10 @@ let check_side accu side =
     Array.iteri (fun i m -> pvm.(i) <- m) accu.pvm;
     accu.pvm <- pvm
 
-let trans_pv env vm (p, ty) side =
-  (* FIXME: ensure that ty is closed *)
+let trans_pv _env _vm (_p, _ty) _side =
+  assert false
+
+(*  (* FIXME: ensure that ty is closed *)
   let p = p.pv_name in
   let accu = vm.accu in
   check_side accu side;
@@ -797,7 +799,7 @@ let trans_pv env vm (p, ty) side =
           let ty = trans_ty env vm ty in
           let ls = Term.create_lsymbol wid [] (Some ty) in
           accu.pvm.(side) <- Mp.add p ls pvm;
-          ls
+          ls *)
 
 let trans_lv vm lv = 
   try Mid.find lv vm.lvm 
@@ -1205,7 +1207,7 @@ let para_call max_provers provers timelimit task =
       for i = 0 to (Array.length pcs) - 1 do
         match pcs.(i) with
         | None    -> ()
-        | Some (prover,pc) ->
+        | Some (_prover,pc) ->
             let pid = CP.prover_call_pid pc in
             pcs.(i) <- None;
             begin try

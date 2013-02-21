@@ -729,8 +729,7 @@ mod_ty:
 ;
 
 mod_type:
-| x=qident { (x, []) }
-| x=qident LPAREN args=plist1(qident, COMMA) RPAREN { (x, args) }
+| x=qident { x }
 ;
 
 (* -------------------------------------------------------------------- *)
@@ -740,34 +739,18 @@ sig_def:
 | MODULE TYPE x=ident args=sig_params? EQ i=sig_body
     {
       let args = EcUtils.odfl [] args in
-        match i with
-        | `Alias  i ->
-            if args <> [] then
-              error (EcLocation.make $startpos $endpos) 
-                "cannot parameterized module type aliase";
-            (x, Pmty_alias i)
-        | `Struct i ->
-            (x, Pmty_struct { pmsig_params = args;
-                              pmsig_body   = i; })
+      (x, Pmty_struct { pmsig_params = args;
+                        pmsig_body   = i; })
     }
 ;
 
 sig_body:
-| body=sig_struct_body { `Struct body }
-| alias=sig_type { `Alias alias}
+| body=sig_struct_body { body }
 ;
 
 sig_struct_body:
 | LKEY ty=signature_item* RKEY
     { ty }
-;
-
-sig_type:
-| x=qident
-    { (x, []) }
-
-| x=qident LPAREN args=plist1(qident, COMMA) RPAREN
-    { (x, args) }
 ;
 
 sig_params:

@@ -13,8 +13,8 @@ module MMsym = EcSymbols.MMsym
 module Sp = EcPath.Sp
 module Mp = EcPath.Mp
 
-module Sep = EcPath.Sep
-module Mep = EcPath.Mep
+module Sm = EcPath.Sm
+module Mm = EcPath.Mm
 
 (* -------------------------------------------------------------------- *)
 let dloc = EcLocation.dummy               (* FIXME: TO BE REMOVED *)
@@ -139,26 +139,26 @@ let tyerror loc x = EcLocation.locate_error loc (TyError x)
 
 (* -------------------------------------------------------------------- *)
 let e_inuse =
-  let rec inuse (map : Sep.t) (e : tyexpr) =
+  let rec inuse (map : Sm.t) (e : tyexpr) =
     match e.tye_desc with
     | Evar p -> begin
         match p.pv_kind with
-        | PVglob -> Sep.add p.pv_name map
+        | PVglob -> Sm.add p.pv_name map
         | _      -> map
       end
     | _ -> e_fold inuse map e
   in
-    fun e -> inuse Sep.empty e
+    fun e -> inuse Sm.empty e
   
 (* -------------------------------------------------------------------- *)
 let (i_inuse, s_inuse) =
   let addflags p e map =
-     Mep.change
+     Mm.change
        (fun flags -> Some (List.fold_left UM.add (odfl UM.empty flags) e))
        p map
   in
 
-  let rec lv_inuse (map : use_flags Mep.t) (lv : lvalue) =
+  let rec lv_inuse (map : use_flags Mm.t) (lv : lvalue) =
     match lv with
     | LvVar (p,_) ->
         addflags p.pv_name [`Write] map
@@ -176,7 +176,7 @@ let (i_inuse, s_inuse) =
       let map = se_inuse map e in
         map
 
-  and i_inuse (map : use_flags Mep.t) (i : instr) =
+  and i_inuse (map : use_flags Mm.t) (i : instr) =
     match i with
     | Sasgn (lv, e) ->
       let map = lv_inuse map lv in
@@ -208,14 +208,14 @@ let (i_inuse, s_inuse) =
     | Sassert e ->
       se_inuse map e
 
-  and s_inuse (map : use_flags Mep.t) (s : stmt) =
+  and s_inuse (map : use_flags Mm.t) (s : stmt) =
     List.fold_left i_inuse map s
 
-  and se_inuse (map : use_flags Mep.t) (e : tyexpr) =
-    Sep.fold (fun p map -> addflags p [`Read] map) (e_inuse e) map
+  and se_inuse (map : use_flags Mm.t) (e : tyexpr) =
+    Sm.fold (fun p map -> addflags p [`Read] map) (e_inuse e) map
 
   in
-    (i_inuse Mep.empty, s_inuse Mep.empty)
+    (i_inuse Mm.empty, s_inuse Mm.empty)
 
 (* -------------------------------------------------------------------- *)
 module UE = EcUnify.UniEnv
@@ -231,15 +231,15 @@ let select_local env (qs,s) =
 let select_pv env name ue tvi psig = 
   if tvi <> None then [] 
   else
-    let pvs = EcEnv.Var.lookup_progvars name env in 
+    let pvs = EcEnv.Var.lookup_progvar name env in 
     let select (pv,ty) = 
       try 
         let subue = UE.copy ue in
         let texpected = EcUnify.tfun_expected subue psig in
         EcUnify.unify env subue ty texpected;
-        Some (pv, ty, subue)
-      with _ -> None in
-    List.pmap select pvs
+        [(pv, ty, subue)]
+      with _ -> [] in
+    select pvs
 
 let gen_select_op pred tvi env name ue psig =
   match select_local env name with
@@ -517,19 +517,15 @@ let lookup_module_sig (env : EcEnv.env) (name : pqsymbol) =
 (* -------------------------------------------------------------------- *)
 let rec transmodsig (env : EcEnv.env) (sig_ : pmodule_sig) =
   match sig_ with
-  | Pmty_alias mtype -> 
-      let mtype = transmodtype env mtype in
-        module_sig_of_module_type mtype
-
   | Pmty_struct istruct ->
-      let (env, params) =
-        List.map_fold
-          (fun env (aname, aty) ->
+      let params = 
+        List.map 
+          (fun (aname, aty) ->
               let aname = EcIdent.create (unloc aname) in
-              let aty   = transmodtype env aty in
+              let (p, aty) = lookup_module_sig transmodtype_name env aty in
               let mty   = module_expr_of_module_type aname aty in
                 (EcEnv.Mod.bind_local aname mty env, (aname, aty)))
-          env istruct.pmsig_params in
+          istruct.pmsig_params in
 
       let body  = transmodsig_body env istruct.pmsig_body in
       let comps = {

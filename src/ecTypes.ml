@@ -178,10 +178,10 @@ type prog_var = {
 }
 
 let pv_equal v1 v2 = 
-  EcPath.mp_equal v1.pv_name v2.pv_name && v1.pv_kind = v2.pv_kind 
+  EcPath.m_equal v1.pv_name v2.pv_name && v1.pv_kind = v2.pv_kind 
 
 let pv_hash v = 
-  Why3.Hashcons.combine (EcPath.mp_hash v.pv_name)
+  Why3.Hashcons.combine (EcPath.m_hash v.pv_name)
     (if v.pv_kind = PVglob then 1 else 0)
 
   
@@ -322,7 +322,7 @@ module Dump = struct
         
       | Evar x ->
           EcDebug.onhlist pp
-            "Evar" ~extra:(EcPath.mp_tostring x.pv_name)
+            "Evar" ~extra:(EcPath.m_tostring x.pv_name)
             ty_dump []
 
       | Eop (x, tys) ->

@@ -6,13 +6,11 @@ open EcFol
 open EcTypesmod
 
 module Sp    = EcPath.Sp
-module Msubp = EcPath.Msubp
 module Mid   = EcIdent.Mid
 
 (* -------------------------------------------------------------------- *)
 type subst_name_clash = [
   | `Ident of EcIdent.t
-  | `Path  of EcPath.path
 ]
 
 exception SubstNameClash of subst_name_clash
@@ -21,27 +19,21 @@ exception InconsistentSubst
 (* -------------------------------------------------------------------- *)
 type subst = {
   sb_locals  : EcIdent.t   Mid.t;
-  sb_modules : EcPath.cref Mid.t;
-  sb_paths   : EcPath.path Msubp.t;
+  sb_modules : EcPath.mpath Mid.t;
 }
 
 (* -------------------------------------------------------------------- *)
 let empty : subst = {
   sb_locals  = Mid.empty;
   sb_modules = Mid.empty;
-  sb_paths   = Msubp.empty;
 }
 
-let add_module (s : subst) (x : EcIdent.t) (m : EcPath.cref) =
+let add_module (s : subst) (x : EcIdent.t) (m : EcPath.mpath) =
   let merger = function
     | None   -> Some m
     | Some _ -> raise (SubstNameClash (`Ident x))
   in
     { s with sb_modules = Mid.change merger x s.sb_modules }
-
-let add_path (s : subst) (from_ : EcPath.path) (to_ : EcPath.path) =
-  (* FIXME: check that path is not already bound. *)
-  { s with sb_paths = Msubp.add from_ to_ s.sb_paths; }
 
 let add_local (s : subst) (x : EcIdent.t) (x' : EcIdent.t) =
   let merger = function
@@ -59,30 +51,20 @@ let add_locals subst bindings =
 let subst_path  (_s : subst) (p : EcPath.path) = p
 let subst_local (_s : subst) (x : EcIdent.t)   = x
 
-let subst_epath (s : subst) (p : EcPath.epath) =
-  match p with
-  | EcPath.EPath p ->
-      EcPath.EPath (subst_path s p)
-
-  | EcPath.EModule (mid, x) -> begin
-      match Mid.find_opt mid s.sb_modules with
-      | None -> p
-      | Some (EcPath.CRefPath mp) -> begin
-          match x with
-          | None   -> EcPath.EPath mp
-          | Some x -> EcPath.EPath (EcPath.pqname (mp, x))
-        end
-      | Some (EcPath.CRefMid mid) -> EcPath.EModule (mid, x)
-    end
-
-let subst_cref (s : subst) (p : EcPath.cref) =
-  match p with
-  | EcPath.CRefPath p   -> EcPath.CRefPath (subst_path s p)
-  | EcPath.CRefMid  mid -> begin
-      match Mid.find_opt mid s.sb_modules with
-      | None   -> p
-      | Some p -> p
-    end
+let rec subst_mpath (s : subst) (m : EcPath.mpath) = 
+  let p,args = m.EcPath.m_node in
+  let args = List.map (List.map (subst_mpath s)) args in
+  let rec aux p args = 
+    match p.EcPath.p_node, args with
+    | EcPath.Psymbol _, _ -> raise Not_found 
+    | EcPath.Pident id, [a] ->
+        let m = Mid.find id s.sb_modules in
+        assert (a = []); (* FIXME *)
+        m
+    | EcPath.Pqname(p,id), a::args ->
+        EcPath.mqname (aux p args) id a 
+    | _, _ -> assert false in
+  try aux p args with Not_found -> EcPath.mpath p args
 
 (* -------------------------------------------------------------------- *)
 let rec subst_ty (s : subst) (ty : ty) =
@@ -107,16 +89,16 @@ let subst_lpattern (s : subst) (p : lpattern) =
   match p with
   | LSymbol x ->
       let x' = EcIdent.fresh x in
-        (add_local s x x', LSymbol x')
+      (add_local s x x', LSymbol x')
 
   | LTuple xs ->
       let xs' = List.map EcIdent.fresh xs in
       let s'  = add_locals s (List.combine xs xs') in
-        (s', LTuple xs')
+      (s', LTuple xs')
 
 (* -------------------------------------------------------------------- *)
-let subst_pv s x =
-  { x with pv_name = subst_epath s x.pv_name } 
+let subst_pvar s x =
+  { x with pv_name = subst_mpath s x.pv_name } 
   
 let rec subst_tyexpr (s : subst) (e : tyexpr) =
   match e.tye_desc with
@@ -128,7 +110,7 @@ let rec subst_tyexpr (s : subst) (e : tyexpr) =
       e_local x
 
   | Evar x ->
-      e_var (subst_pv s x)
+      e_var (subst_pvar s x)
 
   | Eop(p, tys) ->
       e_op (subst_path s p) (List.map (subst_ty s) tys)
@@ -193,7 +175,7 @@ and subst_form_node (s : subst) (f : f_node) =
       Flocal (subst_local s x)
 
   | Fpvar (x, side) ->
-      let x  = { x with pv_name = subst_epath s x.pv_name } in
+      let x  = subst_pvar s x in
       Fpvar (x, side)
 
   | Fop(p,tys) -> Fop(subst_path s p, List.map (subst_ty s) tys)
@@ -288,38 +270,14 @@ and subst_modsig_body (s : subst) (sbody : module_sig_body) =
   List.map (subst_modsig_body_item s) sbody
 
 (* -------------------------------------------------------------------- *)
-and subst_modsig (s : subst) (sig_ : module_sig) =
-  { tyms_desc  = subst_modsig_desc  s sig_.tyms_desc;
-    tyms_comps = subst_modsig_comps s sig_.tyms_comps; }
-
-(* -------------------------------------------------------------------- *)
-and subst_modsig_desc (s : subst) (desc : module_sig_desc) =
-  match desc with
-  | Mty_app (name, args) ->
-      let name = subst_cref s name in
-      let args = List.map (subst_cref s) args in
-        Mty_app (name, args)
-
-  | Mty_sig (params, body) ->
-      Mty_sig (params, subst_modsig_body s body)
-
-(* -------------------------------------------------------------------- *)
-and subst_modsig_comps (s : subst) (comps : module_sig_comps) =
-  { tymc_params = comps.tymc_params;
-    tymc_body   = subst_modsig_body s comps.tymc_body;
-    tymc_mforb  = 
+and subst_modtype (s : subst) (comps : module_type) =
+  { mt_params = comps.mt_params;
+    mt_body   = subst_modsig_body s comps.mt_body;
+    mt_mforb  = 
       Sp.fold
         (fun p mf -> Sp.add (subst_path s p) mf)
-        comps.tymc_mforb Sp.empty; }
+        comps.mt_mforb Sp.empty; }
 
-(* -------------------------------------------------------------------- *)
-and subst_modtype (s : subst) (tymod : module_type) =
-  { tymt_desc  = subst_modtype_desc s tymod.tymt_desc;
-    tymt_comps = subst_modsig_comps s tymod.tymt_comps; }
-
-(* -------------------------------------------------------------------- *)
-and subst_modtype_desc (s : subst) ((name, args) : module_type_desc) =
-  (subst_cref s name, List.map (subst_cref s) args)
 
 (* -------------------------------------------------------------------- *)
 let rec subst_stmt (s : subst) (stmt : stmt) =
@@ -339,7 +297,7 @@ and subst_instr (s : subst) (instr : instr) =
 
   | Scall (lv, p, es) ->
       let lv = omap lv (subst_lvalue s) in
-      let p  = subst_epath s p in
+      let p  = subst_mpath s p in
       let es = List.map (subst_tyexpr s) es in
         Scall (lv, p, es)
 
@@ -361,16 +319,16 @@ and subst_instr (s : subst) (instr : instr) =
 and subst_lvalue (s : subst) (lvalue : lvalue) =
   match lvalue with
   | LvVar (p, ty) ->
-      LvVar (subst_pv s p, subst_ty s ty)
+      LvVar (subst_pvar s p, subst_ty s ty)
 
   | LvTuple ptys ->
-      let ptys = List.map (fun (p, ty) -> subst_pv s p, subst_ty s ty) ptys in
+      let ptys = List.map (fun (p, ty) -> subst_pvar s p, subst_ty s ty) ptys in
       LvTuple ptys
 
   | LvMap ((p1,tys), p2, e, ty) ->
       let p1 = subst_path   s p1 in
       let tys = List.map (subst_ty s) tys in
-      let p2 = subst_pv     s p2 in
+      let p2 = subst_pvar     s p2 in
       let e  = subst_tyexpr s e  in
       let ty = subst_ty     s ty in
       LvMap ((p1,tys), p2, e, ty)
@@ -403,10 +361,10 @@ and subst_function_def (s : subst) (def : function_def) =
     f_ret    = omap def.f_ret (subst_tyexpr s); }
 
 (* -------------------------------------------------------------------- *)
-let rec subst_module_item (s : subst) (scope : EcPath.path) (item : module_item) =
+let rec subst_module_item (s : subst) (item : module_item) =
   match item with
   | MI_Module m ->
-      let m' = subst_module s scope m in
+      let m' = subst_module s m in
 
         (s, MI_Module m')
 
@@ -421,62 +379,56 @@ let rec subst_module_item (s : subst) (scope : EcPath.path) (item : module_item)
         (s, MI_Function f')
 
 (* -------------------------------------------------------------------- *)
-and subst_module_items (s : subst) (scope : EcPath.path) (items : module_item list) =
+and subst_module_items (s : subst) (items : module_item list) =
   let _, items =
     List.map_fold
       (fun (s : subst) item ->
-        subst_module_item s scope item)
+        subst_module_item s item)
       s items
   in
     items
 
 (* -------------------------------------------------------------------- *)
-and subst_module_struct (s : subst) (scope : EcPath.path) (bstruct : module_structure) =
+and subst_module_struct (s : subst) (bstruct : module_structure) =
   let sbody, newparams =
     List.map_fold
       (fun (s : subst) (a, aty) ->
         let a' = EcIdent.fresh a in
-          (add_module s a (EcPath.CRefMid a'), (a', subst_modtype s aty)))
+          (add_module s a (EcPath.mident a'), (a', subst_path s aty)))
       s bstruct.ms_params
   in
     { ms_params = newparams;
-      ms_body   = subst_module_items sbody scope bstruct.ms_body; }
+      ms_body   = subst_module_items sbody bstruct.ms_body; }
 
 (* -------------------------------------------------------------------- *)
-and subst_module_body (s : subst) (scope : EcPath.path) (body : module_body) =
+and subst_module_body (s : subst) (body : module_body) =
   match body with
-  | ME_Ident p -> ME_Ident (subst_cref s p)
-
-  | ME_Application (p, args) ->
-      ME_Application (subst_cref s p, List.map (subst_cref s) args)
+  | ME_Alias m -> ME_Alias (subst_mpath s m)
 
   | ME_Structure bstruct ->
-      ME_Structure (subst_module_struct s scope bstruct)
+      ME_Structure (subst_module_struct s bstruct)
 
   | ME_Decl p ->
-      ME_Decl (subst_modtype s p)
+      ME_Decl (subst_path s p)
 
 (* -------------------------------------------------------------------- *)
-and subst_module_comps (_s : subst) (_scope : EcPath.path) (_comps : module_comps) =
+and subst_module_comps (_s : subst) (_comps : module_comps) =
   []                                    (* FIXME *)
 
 (* -------------------------------------------------------------------- *)
-and subst_module (s : subst) (scope : EcPath.path) (m : module_expr) =
-  let scope' = EcPath.pqname (scope, m.me_name) in
-  let body'  = subst_module_body s scope' m.me_body in
-  let comps' = subst_module_comps s scope' m.me_comps in
-  let tysig' = subst_modsig s m.me_sig in
-  let types' = List.map (subst_modtype s) m.me_types in
+and subst_module (s : subst) (m : module_expr) =
+  let body'  = subst_module_body s m.me_body in
+  let comps' = subst_module_comps s m.me_comps in
+  let types' = List.map (subst_path s) m.me_types in
 
     { m with
         me_body  = body'   ;
         me_comps = comps'  ;
         me_uses  = Sp.empty;              (* FIXME *)
-        me_sig   = tysig'  ;
         me_types = types'  ; }
 
 (* -------------------------------------------------------------------- *)
-let rec subst_theory_item (s : subst) (scope : EcPath.path) (item : theory_item) =
+let rec subst_theory_item (s : subst) (item : theory_item) =
   match item with
   | Th_type (x, tydecl) ->
       (s, Th_type (x, subst_tydecl s tydecl))
@@ -488,23 +440,23 @@ let rec subst_theory_item (s : subst) (scope : EcPath.path) (item : theory_item)
       (s, Th_axiom (x, subst_ax s ax))
 
   | Th_modtype (x, tymod) ->
-      (s, Th_modtype (x, subst_modsig s tymod))
+      (s, Th_modtype (x, subst_modtype s tymod))
 
   | Th_module m ->
-      (s, Th_module (subst_module s scope m))
+      (s, Th_module (subst_module s m))
 
   | Th_theory (x, th) ->
-      let th' = subst_theory s (EcPath.pqname (scope, x)) th in
+      let th' = subst_theory s th in
         (s, Th_theory (x, th'))
 
   | Th_export p -> (s, Th_export (subst_path s p))
 
 (* -------------------------------------------------------------------- *)
-and subst_theory (s : subst) (scope : EcPath.path) (items : theory) =
+and subst_theory (s : subst) (items : theory) =
   let _, items =
     List.fold_left
       (fun (s, acc) item ->
-        let (s, item) = subst_theory_item s scope item in
+        let (s, item) = subst_theory_item s item in
           (s, item :: acc))
       (s, []) items
   in

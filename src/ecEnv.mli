@@ -95,7 +95,7 @@ and premc = private {
   mc_variables  : (mpath * varbind)                Msym.t;
   mc_functions  : (mpath * EcTypesmod.function_)   Msym.t;
   mc_modules    : (mpath * EcTypesmod.module_expr) Msym.t;
-  mc_modtypes   : (mpath * EcTypesmod.module_sig)  Msym.t;
+  mc_modtypes   : (mpath * EcTypesmod.module_type) Msym.t;
   mc_typedecls  : (mpath * EcDecl.tydecl)          Msym.t;
   mc_operators  : (mpath * EcDecl.operator)        Msym.t;
   mc_axioms     : (mpath * EcDecl.axiom)           Msym.t;
@@ -112,7 +112,7 @@ and activemc = {
   amc_variables  : (mpath * varbind)                MMsym.t;
   amc_functions  : (mpath * EcTypesmod.function_)   MMsym.t;
   amc_modules    : (mpath * EcTypesmod.module_expr) MMsym.t;
-  amc_modtypes   : (mpath * EcTypesmod.module_sig)  MMsym.t;
+  amc_modtypes   : (mpath * EcTypesmod.module_type) MMsym.t;
   amc_typedecls  : (mpath * EcDecl.tydecl)          MMsym.t;
   amc_operators  : (mpath * EcDecl.operator)        MMsym.t;
   amc_axioms     : (mpath * EcDecl.axiom)           MMsym.t;
@@ -139,8 +139,8 @@ module Fun : sig
 
   val by_path     : EcPath.path -> env -> t suspension
   val by_path_opt : EcPath.path -> env -> (t suspension) option
-  val by_mpath    : EcPath.path -> env -> t
-  val by_mpath_opt: EcPath.path -> env -> t option
+  val by_mpath    : EcPath.mpath -> env -> t
+  val by_mpath_opt: EcPath.mpath -> env -> t option
   val lookup      : qsymbol -> env -> mpath * t
   val lookup_opt  : qsymbol -> env -> (mpath * t) option
   val lookup_path : qsymbol -> env -> mpath
@@ -205,8 +205,8 @@ module Mod : sig
   val lookup_path : qsymbol -> env -> mpath
 
   (* Locals binding *)
-  val bind_local  : EcIdent.t -> module_expr -> env -> env
-  val bind_locals : (EcIdent.t * module_expr) list -> env -> env
+(*  val bind_local  : EcIdent.t -> module_expr -> env -> env
+    val bind_locals : (EcIdent.t * module_expr) list -> env -> env *)
 
   val add  : EcPath.mpath -> env -> env
   val bind : symbol -> module_expr -> env -> env
@@ -214,7 +214,7 @@ end
 
 (* -------------------------------------------------------------------- *)
 module ModTy : sig
-  type t = module_sig
+  type t = module_type
 
   val by_path     : EcPath.path -> env -> t
   val by_path_opt : EcPath.path -> env -> t option
@@ -289,7 +289,7 @@ type ebinding = [
   | `Variable  of EcTypes.pvar_kind * EcTypes.ty
   | `Function  of function_
   | `Module    of module_expr
-  | `ModType   of module_sig
+  | `ModType   of module_type
 ]
 
 val bind1   : symbol * ebinding -> env -> env
