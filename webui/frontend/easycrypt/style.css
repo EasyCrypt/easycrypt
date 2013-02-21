@@ -5,7 +5,9 @@
 }
 
 .ec-read-only {
+	cursor : text;
   background-color: #ccc;
+  		   
 }
 
 #feedback {

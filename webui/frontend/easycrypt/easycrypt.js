@@ -120,7 +120,7 @@ EasyCryptEditor.prototype.setROMark = function(end) {
     var opts = {
            className: this.name + '-read-only',
             readOnly: true,
-      inclusiveRight: false, 
+      inclusiveRight: false,
     };
 
     this.clearROMark();

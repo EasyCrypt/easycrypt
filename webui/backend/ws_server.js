@@ -38,11 +38,11 @@ function analyzeS(statement) {
 		return;
 		}
 	//NOW just to try the error
-	if (json.data.match("axiom") == "axiom") {
+	if (json.end.contents.match("axim") == "axim") {
 		var error = JSON.stringify({     mode : "error",
-										 line : json.id_line,
-									    start : "15", 
-									      end : "18",
+										  end : json.end,
+									start_err : "2", 
+									  end_err : "6",
 									  message : "We have an error!"});
 		// broadcast message to all connected clients
         for (var i=0; i < clients.length; i++) {
@@ -81,7 +81,7 @@ wsServer.on('request', function(request) {
     		}
         if (json.mode == "forward") {
         	analyzeS(message.utf8Data);
-        	console.log('Received Message: ' + json.data);
+        	console.log('Received Message: ' + json.end.contents);
         }
         	
         else if (json.mode == "undo") {
