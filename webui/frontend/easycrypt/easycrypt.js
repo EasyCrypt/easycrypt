@@ -19,6 +19,7 @@ function EasyCryptEditor(name) {
     this.endofsent = [];
     this.init      = 0;
     this.romark    = null;
+    this.errmark   = null;	
     this.editor    = null;
     this.socket    = null;
     
@@ -80,20 +81,25 @@ EasyCryptEditor.prototype.onmessage = function(event){
 	if (json.mode == "error"){
 		this.widgets.feedback
 			.append($.format("{0} at line {1}\n", 
-						json.message, json.line+1));
-		var pos = { line : json.line,
-				   start : json.start,
-				     end : json.end };
+						json.message, json.end.line));
+		var pos = { line : json.end.line-1,
+				   start : json.start_err,
+				     end : json.end_err };
 		this.setROMark_error(pos);
+		this.endofsent.pop();
+		this.widgets.next.disabled = true;
 	}
 	else if (json.mode == "undo"){
 		this.widgets.feedback
 			.append(json.data + "\n");
 	}
-	else
+	else{
+		this.setROMark(end);
 		this.widgets.feedback
-			.append($.format("STATEMENT SENT: {0} {1}\n",
-							json.id_line+1, json.data));
+		.append($.format("STATEMENT SENT: {0} {1}\n",
+						json.end.line+1, json.end.contents));
+	}
+		
 }
 
 // --------------------------------------------------------------------
@@ -102,6 +108,12 @@ EasyCryptEditor.prototype.clearROMark = function() {
     if (this.romark)
       this.romark.clear();
     this.romark = null;
+}
+
+EasyCryptEditor.prototype.clearERRMark = function() {
+    if (this.errmark)
+      this.errmark.clear();
+    this.errmark = null;
 }
 
 EasyCryptEditor.prototype.setROMark = function(end) {
@@ -119,15 +131,13 @@ EasyCryptEditor.prototype.setROMark = function(end) {
 EasyCryptEditor.prototype.setROMark_error = function(pos) {
     var opts = {
            className: this.name + '-read-only-error',
-            readOnly: true,
       inclusiveRight: false, 
     };
 
-    //this.clearROMark();
     if (pos)
-    	this.romark = this.editor.markText({ line: pos.line, ch: pos.start }, 
-    									   { line: pos.line, ch: pos.end },
-    									   opts);
+    	this.errmark = this.editor.markText({ line: pos.line, ch: pos.start }, 
+    						 				{ line: pos.line, ch: pos.end },
+    						 				opts);
 }
 
 // --------------------------------------------------------------------
@@ -142,10 +152,11 @@ EasyCryptEditor.prototype._on_next = function() {
 			.append($.format("STATEMENT SENT: {0} {1}\n",
 					         end.line+1, end.contents));*/
 		this.endofsent.push(end);
-		this.setROMark(end);
-		var json = JSON.stringify({ mode : "forward", 
-								 id_line : end.line,
-									data : end.contents});
+		this.clearERRMark();
+		var json = JSON.stringify({ mode : "forward",
+									 end : end 
+								 /*id_line : end.line,
+									data : end.contents*/});
 		this.socket.send(json);
 	}
 }
