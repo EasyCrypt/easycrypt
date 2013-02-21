@@ -76,7 +76,7 @@ type pvar_kind =
   | PVloc
 
 type prog_var = {
-  pv_name : EcPath.epath;
+  pv_name : EcPath.mpath;
   pv_kind : pvar_kind;
 }
 

@@ -3,58 +3,45 @@ open EcMaps
 open EcSymbols
 
 (* -------------------------------------------------------------------- *)
-(* An epath is either
- * - A [EPath EcPath.path] that denotes a full path from the <top> context.
- *   For a given environment, it is ensured that such a path
- *   denotes at most a single object. Environment also ensures that two
- *   containers of different kind (e.g. theory/module) cannot be denoted
- *   by the same path.
- * - A [EModule EcIdent.t path] that denotes a (possibly empty) path prefixed
- *   by a bound module parameter. Two different modules parameters can share
- *   the same name but must have different UID.
- *)
-
 type path = private {
-    p_node : path_node;
-    p_tag  : int
-  }
+  p_node : path_node;
+  p_tag  : int
+}
 
-and path_node = private
-  | Pident of symbol
-  | Pqname of path * symbol
+and path_node =
+| Pident of symbol
+| Plocal of EcIdent.t
+| Pqname of path * symbol
 
-type epath =
-| EPath   of path
-| EModule of EcIdent.t * symbol option
-
-type cref =
-| CRefPath of path                      (* Top-level component    *)
-| CRefMid  of EcIdent.t                 (* Bound module component *)
-
-type xcref = cref * xcref list
+type mpath = private {
+  mp_node : path * mpath list list;
+  mp_tag  : int;
+}
 
 (* -------------------------------------------------------------------- *)
-val pident    : symbol -> path
+val psymbol   : symbol -> path
+val pident    : EcIdent.t -> path
 val pqname    : path * symbol -> path
 
 val p_equal   : path -> path -> bool
 val p_compare : path -> path -> int
 val p_hash    : path -> int
 
-val ep_equal   : epath -> epath -> bool
-val ep_compare : epath -> epath -> int
-val ep_hash    : epath -> int
+(* -------------------------------------------------------------------- *)
+val mpath   : path -> mpath list list -> mpath
+val mident  : EcIdent.t -> mpath
+val msymbol : symbol -> mpath
+val mqname  : mpath -> symbol -> mpath list -> mpath
 
-val cref_equal  : cref -> cref -> bool
-val xcref_equal : xcref -> xcref -> bool
+val mp_equal   : mpath -> mpath -> bool
+val mp_compare : mpath -> mpath -> int
+val mp_hash    : mpath -> int
 
+val path_of_mpath : mpath -> path
+val args_of_mpath : mpath -> mpath list list
 
 (* -------------------------------------------------------------------- *)
-val tostring      : path  -> string
-val ep_tostring   : epath -> string
-val cref_tostring : cref  -> string
-
-(* -------------------------------------------------------------------- *)
+val tostring  : path -> string
 val create    : string -> path
 val toqsymbol : path -> qsymbol
 val basename  : path -> symbol
@@ -65,21 +52,11 @@ val concat    : path -> path -> path
 val tolist    : path -> symbol list 
 
 (* -------------------------------------------------------------------- *)
+val mp_tostring : mpath -> string
+
+(* -------------------------------------------------------------------- *)
 module Mp : Map.S  with type key = path
 module Sp : Mp.Set with type elt = path
 
-module Mep : Map.S   with type key = epath
-module Sep : Mep.Set with type elt = epath
-
-(* -------------------------------------------------------------------- *)
-module Msubp : sig
-  (* Maps implementation with [path] as keys. When asking the value of
-   * a [path], retrieve the longest prefix of [path] that has been
-   * associated to a value, and return this one. *)
-
-  type +'a t
-
-  val empty : 'a t
-  val add   : path -> 'a -> 'a t -> 'a t
-  val find  : path -> 'a t -> 'a option
-end
+module Mmp : Map.S   with type key = mpath
+module Smp : Mmp.Set with type elt = mpath

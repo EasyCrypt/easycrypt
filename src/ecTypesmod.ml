@@ -66,11 +66,11 @@ and module_sig_comps = {
 }
 
 and module_sig_desc =
-  | Mty_app of EcPath.cref * EcPath.cref list
+  | Mty_app of EcPath.mpath
   | Mty_sig of (EcIdent.t * module_type) list * module_sig_body
 
 and module_type_desc =
-  EcPath.cref * EcPath.cref list
+  EcPath.mpath
 
 and module_sig_body = module_sig_body_item list
 
@@ -95,8 +95,7 @@ type module_expr = {
 }
 
 and module_body =
-  | ME_Ident       of EcPath.cref
-  | ME_Application of EcPath.cref * EcPath.cref list
+  | ME_Alias       of EcPath.mpath
   | ME_Structure   of module_structure
   | ME_Decl        of module_type
 
@@ -136,7 +135,7 @@ and stmt = instr list
 and instr =
   | Sasgn   of lvalue * EcTypes.tyexpr
   | Srnd    of lvalue * EcTypes.tyexpr
-  | Scall   of lvalue option * EcPath.epath * EcTypes.tyexpr list
+  | Scall   of lvalue option * EcPath.mpath * EcTypes.tyexpr list
   | Sif     of EcTypes.tyexpr * stmt * stmt
   | Swhile  of EcTypes.tyexpr * stmt
   | Sassert of EcTypes.tyexpr
@@ -197,9 +196,8 @@ and ctheory_override =
 
 (* -------------------------------------------------------------------- *)
 let module_sig_of_module_type (tymod : module_type) =
-  let (p, args) = tymod.tymt_desc in
-    { tyms_desc  = Mty_app (p, args);
-      tyms_comps = tymod.tymt_comps; }
+  { tyms_desc  = Mty_app tymod.tymt_desc;
+    tyms_comps = tymod.tymt_comps; }
 
 (* -------------------------------------------------------------------- *)
 let module_comps_of_module_sig_comps (comps : module_sig_comps) =

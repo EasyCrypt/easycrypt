@@ -10,7 +10,6 @@ open EcFol
 (* -------------------------------------------------------------------- *)
 type subst_name_clash = [
   | `Ident of EcIdent.t
-  | `Path  of EcPath.path
 ]
 
 exception SubstNameClash of subst_name_clash
@@ -20,16 +19,14 @@ exception InconsistentSubst
 type subst
 
 val empty      : subst
-val add_module : subst -> EcIdent.t -> cref -> subst
-val add_path   : subst -> path -> path -> subst
+val add_module : subst -> EcIdent.t -> mpath -> subst
 
 (* -------------------------------------------------------------------- *)
 val subst_path  : subst -> EcPath.path -> EcPath.path
-val subst_epath : subst -> EcPath.epath -> EcPath.epath
-val subst_cref  : subst -> EcPath.cref -> EcPath.cref
-val subst_local : subst -> EcIdent.t -> EcIdent.t
+val subst_mpath : subst -> EcPath.mpath -> EcPath.mpath
 
 (* -------------------------------------------------------------------- *)
+val subst_pvar : subst -> prog_var -> prog_var
 val subst_ty : subst -> ty -> ty
 val subst_tyexpr : subst -> tyexpr -> tyexpr
 val subst_form : subst -> form -> form
