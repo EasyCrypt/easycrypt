@@ -1155,8 +1155,8 @@ let para_call max_provers provers timelimit task =
           ExtUnix.All.setpgid (CP.prover_call_pid pc) 0
         with Unix.Unix_error _ -> ()
       end;
-      pcs.(i) <- Some(prover, pc);
-      Format.printf "Prover %s started and set at %i@." prover i
+      pcs.(i) <- Some(prover, pc)
+ (*  Format.printf "Prover %s started and set at %i@." prover i *)
     with e -> 
       Format.printf "Error when starting %s: %a" prover 
         EcPexception.exn_printer e;
@@ -1182,12 +1182,12 @@ let para_call max_provers provers timelimit task =
         for i = 0 to (Array.length pcs) - 1 do
           match pcs.(i) with
           | None -> ()
-          | Some (prover, pc) ->
+          | Some (_prover, pc) ->
               if CP.prover_call_pid pc = pid then begin
                 pcs.(i) <- None;            (* DO IT FIRST *)
                 let ans = (CP.post_wait_call pc st ()).CP.pr_answer in
-                Format.eprintf "prover `%s' return %a@."
-                  prover CP.print_prover_answer ans;
+                (*Format.eprintf "prover `%s' return %a@."
+                  prover CP.print_prover_answer ans; *)
                 match ans with
                 | CP.Valid   -> status := Some true
                 | CP.Invalid -> status := Some false
@@ -1209,9 +1209,9 @@ let para_call max_provers provers timelimit task =
             let pid = CP.prover_call_pid pc in
             pcs.(i) <- None;
             begin try
-              Format.printf
+(*              Format.printf
                 "Killing (SIGTERM) prover `%s' (pid = %d)@."
-                prover pid;
+                prover pid; *)
               Unix.kill (-pid) 15;      (* kill process group *)
             with Unix.Unix_error _ -> ()
             end;

@@ -1,4 +1,5 @@
 (* -------------------------------------------------------------------- *)
+open EcUtils
 open EcSymbols
 open EcParsetree
 open EcTypedtree
@@ -12,6 +13,7 @@ type info =
 | GI_AddedAxiom     of symbol
 | GI_AddedOperator  of symbol
 | GI_AddedPredicate of symbol
+| GI_Goal           of Pprint.document
 
 (* -------------------------------------------------------------------- *)
 let loader = EcLoader.create ()
@@ -205,4 +207,10 @@ let process (g : global) =
   let (idx, scope, stack) = !context in
   let (newscope, infos) = process scope g in
     context := (idx+1, newscope, scope :: stack);
-    infos
+  let infos = 
+    List.ocons (omap (EcScope.Tactic.out_goal newscope) (fun d -> GI_Goal d)) 
+      infos in
+  List.rev infos
+
+
+

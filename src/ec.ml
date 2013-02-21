@@ -33,6 +33,10 @@ end = struct
 
     | GI_AddedPredicate name ->
         Printf.fprintf stream "added predicated %s.\n%!" name
+
+    | GI_Goal doc -> 
+        Pprint.Channel.pretty 1. 90 stream (Pprint.(^^) doc Pprint.hardline)
+
 end
 
 (* -------------------------------------------------------------------- *)
