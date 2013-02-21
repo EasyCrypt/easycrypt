@@ -38,11 +38,10 @@ let suspend (x : 'a) params =
 let sp_target { sp_target = x } = x
 
 let is_suspended (x : 'a suspension) =
-  not (List.for_all (fun ps -> ps <> []) x.sp_params)
+  List.exists (fun ps -> ps <> []) x.sp_params
 
 let check_not_suspended (x : 'a suspension) =
-  if is_suspended x then
-    raise IsSuspended;
+  if is_suspended x then raise IsSuspended;
   x.sp_target
 
 (* -------------------------------------------------------------------- *)
