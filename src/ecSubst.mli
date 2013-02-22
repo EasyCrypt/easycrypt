@@ -22,6 +22,8 @@ val empty      : subst
 val add_module : subst -> EcIdent.t -> mpath -> subst
 
 (* -------------------------------------------------------------------- *)
+val is_empty   : subst -> bool
+(* -------------------------------------------------------------------- *)
 val subst_path  : subst -> EcPath.path -> EcPath.path
 val subst_mpath : subst -> EcPath.mpath -> EcPath.mpath
 

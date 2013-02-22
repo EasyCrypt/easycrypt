@@ -28,6 +28,9 @@ let empty : subst = {
   sb_modules = Mid.empty;
 }
 
+let is_empty s = 
+  Mid.is_empty s.sb_locals && Mid.is_empty s.sb_modules 
+
 let add_module (s : subst) (x : EcIdent.t) (m : EcPath.mpath) =
   let merger = function
     | None   -> Some m

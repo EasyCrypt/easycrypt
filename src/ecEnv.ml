@@ -52,7 +52,8 @@ let unsuspend f (x : 'a suspension) (args : mpath list list) =
            (fun s (x, _) a -> EcSubst.add_module s x a))
         EcSubst.empty x.sp_params args
     in
-      f s x.sp_target
+    if EcSubst.is_empty s then x.sp_target 
+    else f s x.sp_target
   with Invalid_argument "List.fold_left2" ->
     assert false
 
