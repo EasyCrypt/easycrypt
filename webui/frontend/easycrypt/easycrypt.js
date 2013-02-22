@@ -10,7 +10,7 @@ function EasyCryptEditor(name) {
     this.widgets = {
         prev    : $('#' + name + "-prev"),
         next    : $('#' + name + "-next"),
-        test    : $('#' + name + "-test"),
+        prevcur : $('#' + name + "-prevcur"),
         code    : $('#' + name + "-code"),
         feedback: $('#' + name + "-feedback"),        
     };
@@ -56,6 +56,7 @@ EasyCryptEditor.prototype.createWidget = function() {
 
     this.widgets.next.click(this._on_next.bind(this));
     this.widgets.prev.click(this._on_prev.bind(this));
+    this.widgets.prevcur.click(this._on_prevcur.bind(this));
 }
 
 //---------------------------------------------------------------------
@@ -177,6 +178,18 @@ EasyCryptEditor.prototype._on_prev = function() {
     					 posend.line+1, posend.contents));*/
 	var json = JSON.stringify({ mode : "undo", data : posend.contents});
 	this.socket.send(json);
+}
+
+EasyCryptEditor.prototype._on_prevcur = function() {
+	var cursor = this.editor.getCursor();
+    
+    var state = this.findStatement(cursor);
+    
+    this.clearROMark();
+    this.setROMark(state);
+    
+    alert(state.contents);
+    
 }
 
 // --------------------------------------------------------------------
