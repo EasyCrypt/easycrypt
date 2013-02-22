@@ -169,6 +169,7 @@ EasyCryptEditor.prototype._on_prev = function() {
 	var posend   = this.endofsent.pop();
 	var posstart = this.endofsent.peek();
 
+	this.clearERRMark();
 	this.setROMark(posstart);
 
 	/*this.widgets.feedback
