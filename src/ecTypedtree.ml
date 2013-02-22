@@ -231,15 +231,16 @@ let select_local env (qs,s) =
 let select_pv env name ue tvi psig = 
   if tvi <> None then [] 
   else
-    let pvs = EcEnv.Var.lookup_progvar name env in 
-    let select (pv,ty) = 
-      try 
+    try
+      let pvs = EcEnv.Var.lookup_progvar name env in 
+      let select (pv,ty) = 
         let subue = UE.copy ue in
         let texpected = EcUnify.tfun_expected subue psig in
         EcUnify.unify env subue ty texpected;
         [(pv, ty, subue)]
-      with _ -> [] in
-    select pvs
+      in
+        select pvs
+    with EcEnv.LookupFailure _ -> []
 
 let gen_select_op pred tvi env name ue psig =
   match select_local env name with
