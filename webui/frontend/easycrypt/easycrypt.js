@@ -66,7 +66,7 @@ EasyCryptEditor.prototype.onopen = function(event){
 
 EasyCryptEditor.prototype.onerror = function(event){
 	this.widgets.feedback
-		.append("Error" + event);
+		.append("Coonection not available." + event);
 }
 
 EasyCryptEditor.prototype.onmessage = function(event){
