@@ -4,10 +4,12 @@
     line-height: 1.07em;
 }
 
+.CodeMirror div.CodeMirror-cursor {
+  z-index: 1000;
+}
+
 .ec-read-only {
-	cursor : text;
   background-color: #ccc;
-  		   
 }
 
 #feedback {
