@@ -28,7 +28,7 @@ module type IPrettyPrinter = sig
   val pr_typedecl : t -> (EcPath.path * tydecl     ) pr
   val pr_opdecl   : t -> (EcPath.path * operator   ) pr
   val pr_axiom    : t -> (EcPath.path * axiom      ) pr
-  val pr_modsig   : t -> (EcPath.path * module_type) pr
+  val pr_modsig   : t -> (EcPath.path * module_sig)  pr
   val pr_module   : t -> (EcPath.path * module_expr) pr
   val pr_theory   : t -> (EcPath.path * ctheory    ) pr
   val pr_export   : t -> EcPath.path pr
@@ -42,7 +42,7 @@ module type IPrettyPrinter = sig
   val pp_typedecl : t -> (EcPath.path * tydecl     ) pp
   val pp_opdecl   : t -> (EcPath.path * operator   ) pp
   val pp_axiom    : t -> (EcPath.path * axiom      ) pp
-  val pp_modsig   : t -> (EcPath.path * module_type) pp
+  val pp_modsig   : t -> (EcPath.path * module_sig ) pp
   val pp_module   : t -> (EcPath.path * module_expr) pp
   val pp_theory   : t -> (EcPath.path * ctheory    ) pp
   val pp_export   : t -> EcPath.path pp
@@ -92,7 +92,7 @@ module EcDebugPP : sig
   val pr_typedecl : (symbol * tydecl     ) pr
   val pr_opdecl   : (symbol * operator   ) pr
   val pr_axiom    : (symbol * axiom      ) pr
-  val pr_modsig   : (symbol * module_type) pr
+  val pr_modsig   : (symbol * module_sig ) pr
   val pr_module   : module_expr pr
   val pr_export   : EcPath.path pr
   val pr_theory   : (symbol * ctheory) pr
@@ -106,7 +106,7 @@ module EcDebugPP : sig
   val pp_typedecl : (symbol * tydecl     ) pp
   val pp_opdecl   : (symbol * operator   ) pp
   val pp_axiom    : (symbol * axiom      ) pp
-  val pp_modsig   : (symbol * module_type) pp
+  val pp_modsig   : (symbol * module_sig ) pp
   val pp_module   : module_expr pp
   val pp_export   : EcPath.path pp
   val pp_theory   : (symbol * ctheory) pp

@@ -118,7 +118,7 @@ and premc = {
   mc_variables  : (mpath * varbind)                Msym.t;
   mc_functions  : (mpath * EcTypesmod.function_)   Msym.t;
   mc_modules    : (mpath * EcTypesmod.module_expr) Msym.t;
-  mc_modtypes   : (mpath * EcTypesmod.module_type) Msym.t;
+  mc_modtypes   : (mpath * EcTypesmod.module_sig)  Msym.t;
   mc_typedecls  : (mpath * EcDecl.tydecl)          Msym.t;
   mc_operators  : (mpath * EcDecl.operator)        Msym.t;
   mc_axioms     : (mpath * EcDecl.axiom)           Msym.t;
@@ -130,7 +130,7 @@ and activemc = {
   amc_variables  : (mpath * varbind)                MMsym.t;
   amc_functions  : (mpath * EcTypesmod.function_)   MMsym.t;
   amc_modules    : (mpath * EcTypesmod.module_expr) MMsym.t;
-  amc_modtypes   : (mpath * EcTypesmod.module_type) MMsym.t;
+  amc_modtypes   : (mpath * EcTypesmod.module_sig)  MMsym.t;
   amc_typedecls  : (mpath * EcDecl.tydecl)          MMsym.t;
   amc_operators  : (mpath * EcDecl.operator)        MMsym.t;
   amc_axioms     : (mpath * EcDecl.axiom)           MMsym.t;
@@ -321,7 +321,7 @@ module MC = struct
       px_toactmc = (fun m mc -> { mc with amc_modules = m });
     }
 
-    let for_modtype : EcTypesmod.module_type projector = {
+    let for_modtype : EcTypesmod.module_sig projector = {
       px_premc   = (fun mc -> mc.mc_modtypes);
       px_topremc = (fun m mc -> { mc with mc_modtypes = m });
       px_actmc   = (fun mc -> mc.amc_modtypes);
@@ -616,9 +616,13 @@ module MC = struct
 end
 
 (* -------------------------------------------------------------------- *)
-let enter (name : symbol) (env : env) =
-  let path = EcPath.mqname env.env_scope name [] in
-  let env  = MC.bind_mc env name empty_premc in
+let enter (name : symbol) params (env : env) =
+  assert (List.uniq params);
+
+  let params = List.map EcPath.mident params in
+  let path   = EcPath.mqname env.env_scope name params in
+  let env    = MC.bind_mc env name empty_premc in
+
     { env with
         env_scope = path;
         env_w3    = env.env_w3;
@@ -930,27 +934,33 @@ module Mod = struct
     assert (me.me_name = name);
     MC.bind_module name me env
 
- (* let bind_local name me env =
-    let path  = CRefMid name in
+  let bind_local name modty env =
+    let modsig =
+      check_not_suspended (MC.lookup_by_path Px.for_modtype.Px.px_premc modty env)
+    in
+
+    let me    = EcTypesmod.module_expr_of_module_sig name modty modsig in
+    let path  = EcPath.pident name in
     let comps = MC.mc_of_module_param name me  in
-    let env   =
+
+    let env =
       { env with
           env_current = (
             let current = env.env_current in
             let current = MC.amc_bind_mc path current in
             let current = MC.amc_bind Px.for_module
-                            (EcIdent.name name) path me current
+                            (EcIdent.name name) (EcPath.mident name)
+                            me current
             in
               current);
-          env_bcomps =
-            Mid.add name comps env.env_bcomps; }
+          env_comps = Mp.add path comps env.env_comps; }
     in
       Dump.dump EcDebug.initial env; env
 
   let bind_locals bindings env =
     List.fold_left
       (fun env (name, me) -> bind_local name me env)
-      env bindings *)
+      env bindings
 
   let add (path : EcPath.mpath) (env : env) =
     let obj = by_mpath path env in 
@@ -977,13 +987,17 @@ module Mod = struct
         (name', List.map (fun x -> unfold_mod env (x, [])) (args' @ args))
       else
         unfold_mod env (name', args' @ args) *)
+
+  let enter name params env =
+    let env = enter name (List.map fst params) env in
+      bind_locals params env
 end
 
 (* -------------------------------------------------------------------- *)
 module ModTy = struct
   module Px = MC.Px
 
-  type t = module_type
+  type t = module_sig
 
   let by_path (p : EcPath.path) (env : env) =
     check_not_suspended
@@ -1037,6 +1051,9 @@ module ModTy = struct
   let has_mod_type (env : env) is i2 =
     List.exists ((mod_type_equiv env)^~ i2) is *)
 
+  let has_mod_type (_ : env) (_ : module_type list) (_ : module_type) =
+    true
+
 end
 
 (* -------------------------------------------------------------------- *)
@@ -1061,7 +1078,8 @@ module Theory = struct
     | Th_export    name    -> CTh_export   name
 
   (* ------------------------------------------------------------------ *)
-  let enter = enter
+  let enter name env =
+    enter name [] env
 
   (* ------------------------------------------------------------------ *)
   let by_path (p : EcPath.path) (env : env) =
@@ -1219,7 +1237,7 @@ let import_w3_dir env dir name rd =
 (* -------------------------------------------------------------------- *)
 let initial = 
   let env0 = empty in
-  let env = enter EcCoreLib.id_pervasive env0 in
+  let env = enter EcCoreLib.id_pervasive [] env0 in
   let unit_rn = 
     let tunit = Why3.Ty.ts_tuple 0 in
     let nunit = tunit.Why3.Ty.ts_name.Why3.Ident.id_string in
@@ -1260,7 +1278,7 @@ type ebinding = [
   | `Variable  of EcTypes.pvar_kind * EcTypes.ty
   | `Function  of function_
   | `Module    of module_expr
-  | `ModType   of module_type
+  | `ModType   of module_sig
 ]
 
 let bind1 ((x, eb) : symbol * ebinding) (env : env) =

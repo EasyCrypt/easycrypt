@@ -509,21 +509,20 @@ let lookup_module (env : EcEnv.env) (name : pqsymbol) =
   | Some x -> x
 
 (* -------------------------------------------------------------------- *)
-let lookup_module_sig (env : EcEnv.env) (name : pqsymbol) =
+let lookup_module_type (env : EcEnv.env) (name : pqsymbol) =
   match EcEnv.ModTy.lookup_opt (unloc name) env with
   | None   -> tyerror name.pl_loc (UnknownTyModName (unloc name))
   | Some x -> x
 
+(*
 (* -------------------------------------------------------------------- *)
-let rec transmodsig (env : EcEnv.env) (sig_ : pmodule_sig) =
-  match sig_ with
-  | Pmty_struct istruct ->
+let rec transmodsig (env : EcEnv.env) (Pmty_struct sig_ : pmodule_sig) =
       let params = 
         List.map 
           (fun (aname, aty) ->
               let aname = EcIdent.create (unloc aname) in
               let (p, aty) = lookup_module_sig transmodtype_name env aty in
-              let mty   = module_expr_of_module_type aname aty in
+              let mty = module_expr_of_module_type aname aty in
                 (EcEnv.Mod.bind_local aname mty env, (aname, aty)))
           istruct.pmsig_params in
 
@@ -536,37 +535,27 @@ let rec transmodsig (env : EcEnv.env) (sig_ : pmodule_sig) =
 
         { tyms_desc  = Mty_sig (params, body);
           tyms_comps = comps; }
+*)
+
 
 (* -------------------------------------------------------------------- *)
-and transmodtype (env : EcEnv.env) ((m, args) : pmodule_type) =
-  let (pm, m) = lookup_module_sig env m in
-  let iargs   = m.tyms_comps.tymc_params in
-  let args    = List.map (lookup_module env) args in
+let transmodtype (env : EcEnv.env) (modty : pmodule_type) =
+  fst (lookup_module_type env modty)
 
-    (* - Check module type application
-     * - Construct parameters substitution *)
-    if List.length args <> List.length iargs then
-      tyerror dloc ModApplInvalidArity;
-    let bsubst =
-      List.fold_left2
-        (fun subst (mx, m) (ix, i) ->
-          let mtypes =
-            List.map (fun m -> m.tymt_desc) m.me_types
-          in
-            if not (EcEnv.ModTy.has_mod_type env mtypes i.tymt_desc) then
-              tyerror dloc ModApplInvalidArgInterface;
-            EcSubst.add_module subst ix mx)
-        EcSubst.empty args iargs
-    in
+(* -------------------------------------------------------------------- *)
+let rec transmodsig (env : EcEnv.env) (name : symbol) (modty : pmodule_sig) =
+  let Pmty_struct modty = modty in
 
-    (* Substitute parameters in module type components *)
-    let body = m.tyms_comps.tymc_body in
-    let body = EcSubst.subst_modsig_body bsubst body in
+  let margs =
+    List.map (fun (x, i) -> (EcIdent.create (unloc x), transmodtype env i))
+      modty.pmsig_params
+  in
 
-      { tymt_desc  = (EcPath.CRefPath pm, List.map fst args);
-        tymt_comps = { tymc_params = [];
-                       tymc_body   = body;
-                       tymc_mforb  = Sp.empty; }; } (* FIXME *) 
+  let env = EcEnv.Mod.enter name margs env in
+
+    { mt_params = margs;
+      mt_body   = transmodsig_body env modty.pmsig_body;
+      mt_mforb  = Sp.empty; }           (* FIXME *)
 
 (* -------------------------------------------------------------------- *)
 and transmodsig_body (env : EcEnv.env) (is : pmodule_sig_struct_body) =
@@ -602,6 +591,40 @@ and transmodsig_body (env : EcEnv.env) (is : pmodule_sig_struct_body) =
       items
 
 (* -------------------------------------------------------------------- *)
+(*
+type pmodule_sig =
+  | Pmty_struct of pmodule_sig_struct
+
+and pmodule_type = pqsymbol 
+
+and pmodule_sig_struct = {
+  pmsig_params : (psymbol * pmodule_type) list;
+  pmsig_body   : pmodule_sig_struct_body;
+}
+
+and pmodule_sig_struct_body = pmodule_sig_item list
+
+and pmodule_sig_item = [
+  | `VariableDecl of pvariable_decl
+  | `FunctionDecl of pfunction_decl
+]
+
+and pvariable_decl = {
+  pvd_name : psymbol;
+  pvd_type : pty;
+}
+
+and pfunction_decl = {
+  pfd_name     : psymbol;
+  pfd_tyargs   : ptylocals;
+  pfd_tyresult : pty;
+  pfd_uses     : (pqsymbol list) option;
+}
+*)
+
+
+
+(* -------------------------------------------------------------------- *)
 type tymod_cnv_failure =
 | E_TyModCnv_ParamCountMismatch
 | E_TyModCnv_ParamTypeMismatch of EcIdent.t
@@ -622,7 +645,10 @@ let tysig_item_kind = function
   | Tys_variable _ -> `Variable
   | Tys_function _ -> `Function
 
-let rec check_tymod_cnv mode (env : EcEnv.env) tin tout =
+let rec check_tymod_cnv _mode (_env : EcEnv.env) _tin _tout =
+  ()
+
+(*  
   (* Check parameters for compatibility. Parameters names may be
    * different, hence, substitute in [tin.tym_params] types the names
    * of [tout.tym_params] *)
@@ -726,71 +752,50 @@ let rec check_tymod_cnv mode (env : EcEnv.env) tin tout =
               tymod_cnv_failure (E_TyModCnv_MissingComp i_name))
         tin
     end
+*)
 
 let check_tymod_sub = check_tymod_cnv `Sub
 and check_tymod_eq  = check_tymod_cnv `Eq
 
 (* -------------------------------------------------------------------- *)
 let rec transmod (env : EcEnv.env) (x : symbol) (m : pmodule_expr) =
-  let scope = EcPath.pqname (EcEnv.root env, x) in
-
   match m with
   | Pm_ident ({ pl_desc = m }, args) -> begin
       let (mname, mty) = EcEnv.Mod.lookup m env in
       let args = List.map (EcEnv.Mod.lookup^~ env) (unlocs args) in
+      let atymods = mty.me_sig.mt_params in
 
-        match mty.me_sig.tyms_comps.tymc_params with
-        | [] ->
-            if args <> [] then
-              tyerror dloc ModApplToNonFunctor;
+      (* Check module application *)
+      if List.length atymods <> List.length args then
+        tyerror dloc ModApplInvalidArity;
 
-            { me_name  = x;
-              me_body  = ME_Ident mname;
-              me_sig   = mty.me_sig;
-              me_comps = mty.me_comps;
-              me_uses  = mty.me_uses;
-              me_types = mty.me_types; }
+      let bsubst =
+        List.fold_left2
+          (fun subst (xarg, arg) (xty, tymod) ->
+             let tymod = EcSubst.subst_modtype subst tymod in
+               if not (EcEnv.ModTy.has_mod_type env arg.me_types tymod) then
+                 tymod_cnv_failure (E_TyModCnv_ParamTypeMismatch xty);
+               EcSubst.add_module subst xty xarg)
+          EcSubst.empty args atymods
+      in
 
-        | _ ->
-            let atymods = mty.me_sig.tyms_comps.tymc_params in
+      let mty_path = EcPath.path_of_mpath mname
+      and mty_args = EcPath.args_of_mpath mname in
 
-            (* Check module application *)
-            if List.length atymods <> List.length args then
-              tyerror dloc ModApplInvalidArity;
+        assert (mty_args <> []);
+        assert (List.hd mty_args = []);
 
-            let bsubst =
-              List.fold_left2
-                (fun subst (xarg, arg) (xty, tymod) ->
-                   let tymod = EcSubst.subst_modtype subst tymod in
-                   let argtypes = List.map (fun x -> x.tymt_desc) arg.me_types in
-                     if not (EcEnv.ModTy.has_mod_type env argtypes tymod.tymt_desc) then
-                       tymod_cnv_failure (E_TyModCnv_ParamTypeMismatch xty);
-                     EcSubst.add_module subst xty xarg)
-                EcSubst.empty args atymods
-            in
-
-            (* Apply associated module types with given parameters *)
-            let me_types =
-              let me_type tymod =
-                let (tymod_name, tymod_args) = tymod.tymt_desc in
-                  assert (tymod_args = []);
-                  { tymt_desc  = (tymod_name, List.map fst args);
-                    tymt_comps = EcSubst.subst_modsig_comps bsubst tymod.tymt_comps; }
-              in
-                List.map me_type mty.me_types
-            in
-
-            (* EcSubstitute args. in result type *)
-              { me_name  = x;
-                me_body  = ME_Application (mname, List.map fst args);
-                me_comps = EcSubst.subst_module_comps bsubst scope mty.me_comps;
-                me_uses  = Sp.empty;    (* FIXME *)
-                me_sig   = {
-                  tyms_desc  = Mty_app (mname, List.map fst args);
-                  tyms_comps = EcSubst.subst_modsig_comps bsubst
-                                 mty.me_sig.tyms_comps;
-                };
-                me_types = me_types; }
+      (* EcSubstitute args. in result type *)
+        { me_name  = x;
+          me_body  = ME_Alias (EcPath.mpath mty_path (List.map fst args :: (List.tl mty_args)));
+          me_comps = EcSubst.subst_module_comps bsubst mty.me_comps;
+          me_sig   = {
+            mt_params = [];
+            mt_body   = EcSubst.subst_modsig_body bsubst mty.me_sig.mt_body;
+            mt_mforb  = Sp.empty;       (* FIXME *)
+          };
+          me_uses  = Sp.empty;          (* FIXME *)
+          me_types = if args = [] then mty.me_types else []; }
   end
 
   | Pm_struct st ->
@@ -817,13 +822,8 @@ and transstruct (env : EcEnv.env) (x : symbol) (st : pstructure) =
       | MI_Function f -> (x, `Function f)
     in
 
-    let env = 
-      EcEnv.Mod.bind_locals
-        (List.map
-           (fun (a, aty) -> (a, module_expr_of_module_type a aty))
-           stparams)
-        env
-    in
+    let env = EcEnv.Mod.enter x stparams env in
+
       List.fold_left
         (fun (env, acc) item ->
           let newitems = transstruct1 env item in
@@ -841,20 +841,15 @@ and transstruct (env : EcEnv.env) (x : symbol) (st : pstructure) =
     in
 
     let sigitems = List.pmap tymod1 (List.map snd items) in
-      { tyms_desc  = Mty_sig (stparams, sigitems);
-        tyms_comps = {
-          tymc_params = stparams;
-          tymc_body   = sigitems;
-          tymc_mforb  = Sp.empty; };    (* FIXME *)
-      }
+      { mt_params = stparams;
+        mt_body   = sigitems;
+        mt_mforb  = Sp.empty; };    (* FIXME *)
   in
 
   (* Check that generated signature is structurally included in
    * associated type mode. *)
   let types = List.map (transmodtype env) st.ps_signature in
-    List.iter
-      (check_tymod_sub env tymod.tyms_comps)
-      (List.map (fun x -> x.tymt_comps) types);
+    List.iter (check_tymod_sub env tymod) types;
 
   (* Construct structure representation *)
     { me_name  = x;

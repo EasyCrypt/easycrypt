@@ -270,14 +270,13 @@ and subst_modsig_body (s : subst) (sbody : module_sig_body) =
   List.map (subst_modsig_body_item s) sbody
 
 (* -------------------------------------------------------------------- *)
-and subst_modtype (s : subst) (comps : module_type) =
+and subst_modsig (s : subst) (comps : module_sig) =
   { mt_params = comps.mt_params;
     mt_body   = subst_modsig_body s comps.mt_body;
     mt_mforb  = 
       Sp.fold
         (fun p mf -> Sp.add (subst_path s p) mf)
         comps.mt_mforb Sp.empty; }
-
 
 (* -------------------------------------------------------------------- *)
 let rec subst_stmt (s : subst) (stmt : stmt) =
@@ -440,7 +439,7 @@ let rec subst_theory_item (s : subst) (item : theory_item) =
       (s, Th_axiom (x, subst_ax s ax))
 
   | Th_modtype (x, tymod) ->
-      (s, Th_modtype (x, subst_modtype s tymod))
+      (s, Th_modtype (x, subst_modsig s tymod))
 
   | Th_module m ->
       (s, Th_module (subst_module s m))
@@ -461,3 +460,7 @@ and subst_theory (s : subst) (items : theory) =
       (s, []) items
   in
     List.rev items
+
+(* -------------------------------------------------------------------- *)
+let subst_modtype (s : subst) (modty : module_type) =
+  subst_path s modty

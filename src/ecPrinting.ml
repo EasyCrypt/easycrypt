@@ -77,7 +77,7 @@ module type IPrettyPrinter = sig
   val pr_typedecl : t -> (EcPath.path * tydecl     ) pr
   val pr_opdecl   : t -> (EcPath.path * operator   ) pr
   val pr_axiom    : t -> (EcPath.path * axiom      ) pr
-  val pr_modsig   : t -> (EcPath.path * module_type) pr
+  val pr_modsig   : t -> (EcPath.path * module_sig ) pr
   val pr_module   : t -> (EcPath.path * module_expr) pr
   val pr_theory   : t -> (EcPath.path * ctheory    ) pr
   val pr_export   : t -> EcPath.path pr
@@ -91,7 +91,7 @@ module type IPrettyPrinter = sig
   val pp_typedecl : t -> (EcPath.path * tydecl     ) pp
   val pp_opdecl   : t -> (EcPath.path * operator   ) pp
   val pp_axiom    : t -> (EcPath.path * axiom      ) pp
-  val pp_modsig   : t -> (EcPath.path * module_type) pp
+  val pp_modsig   : t -> (EcPath.path * module_sig ) pp
   val pp_module   : t -> (EcPath.path * module_expr) pp
   val pp_theory   : t -> (EcPath.path * ctheory    ) pp
   val pp_export   : t -> EcPath.path pp
@@ -815,7 +815,7 @@ struct
       pr_dotted (pr_seq [tk; pr_name; Pp.colon; spec])
 
   (* ------------------------------------------------------------------ *)
-  let pr_modsig (_tenv : t) ((x, _tymod) : EcPath.path * module_type) =
+  let pr_modsig (_tenv : t) ((x, _tymod) : EcPath.path * module_sig) =
     let basename = EcPath.basename x in
       pr_dotted (pr_seq [tk_module; tk_type; pr_symbol basename; Pp.equals])
 

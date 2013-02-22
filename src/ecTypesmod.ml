@@ -49,10 +49,10 @@ end
 type use_flags = UM.flags
 
 (* -------------------------------------------------------------------- *)
-type mtype_name = EcPath.path 
+type module_type = EcPath.path 
 
-type module_type = {
-  mt_params : (EcIdent.t * mtype_name) list;
+type module_sig = {
+  mt_params : (EcIdent.t * module_type) list;
   mt_body   : module_sig_body;
   mt_mforb  : EcPath.Sp.t;
 }
@@ -74,18 +74,18 @@ type module_expr = {
   me_name  : symbol;
   me_body  : module_body;
   me_comps : module_comps;
-  me_sig   : module_type;
+  me_sig   : module_sig;
   me_uses  : EcPath.Sp.t;
-  me_types : mtype_name list;
+  me_types : module_type list;
 }
 
 and module_body =
   | ME_Alias       of EcPath.mpath
   | ME_Structure   of module_structure
-  | ME_Decl        of mtype_name
+  | ME_Decl        of module_type
 
 and module_structure = {
-  ms_params : (EcIdent.t * mtype_name) list;
+  ms_params : (EcIdent.t * module_type) list;
   ms_body   : module_item list;
 }
 
@@ -144,7 +144,7 @@ and theory_item =
   | Th_type      of (symbol * tydecl)
   | Th_operator  of (symbol * operator)
   | Th_axiom     of (symbol * axiom)
-  | Th_modtype   of (symbol * module_type)
+  | Th_modtype   of (symbol * module_sig)
   | Th_module    of module_expr
   | Th_theory    of (symbol * theory)
   | Th_export    of EcPath.path
@@ -165,7 +165,7 @@ and ctheory_item =
   | CTh_type      of (symbol * tydecl)
   | CTh_operator  of (symbol * operator)
   | CTh_axiom     of (symbol * axiom)
-  | CTh_modtype   of (symbol * module_type)
+  | CTh_modtype   of (symbol * module_sig)
   | CTh_module    of module_expr
   | CTh_theory    of (symbol * ctheory)
   | CTh_export    of EcPath.path
@@ -198,7 +198,7 @@ let module_comps_of_module_sig_comps (comps : module_sig_body) =
     List.map onitem comps
 
 (* -------------------------------------------------------------------- *)
-let module_expr_of_module_type (name : EcIdent.t) mp (tymod : module_type) =
+let module_expr_of_module_sig (name : EcIdent.t) mp (tymod : module_sig) =
 
   let tycomps = module_comps_of_module_sig_comps tymod.mt_body in
 

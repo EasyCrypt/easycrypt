@@ -35,12 +35,7 @@ val tolist    : path -> symbol list
 module Mp : Map.S  with type key = path
 module Sp : Mp.Set with type elt = path
 
-
-
-
-
 (* -------------------------------------------------------------------- *)
-
 type mpath = private {
   m_node : path * mpath list list;
   m_tag  : int;
@@ -61,6 +56,7 @@ val path_of_mpath : mpath -> path
 (* mpath_of_path : apply path to the list of empty list*)
 val mpath_of_path : path  -> mpath 
 val args_of_mpath : mpath -> mpath list list
+
 (* -------------------------------------------------------------------- *)
 (* For dump *)
 val m_tostring : mpath -> string

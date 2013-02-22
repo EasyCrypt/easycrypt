@@ -138,7 +138,7 @@ type scope = {
 (* -------------------------------------------------------------------- *)
 let empty =
   let env = EcEnv.initial in
-    { sc_name       = EcPath.basename env.EcEnv.env_scope;
+    { sc_name       = EcPath.basename (EcPath.path_of_mpath env.EcEnv.env_scope);
       sc_env        = EcEnv.initial;
       sc_top        = None;
       sc_loaded     = Msym.empty;
@@ -305,7 +305,7 @@ module ModType = struct
         sc_env = EcEnv.ModTy.bind x tysig scope.sc_env; }
 
   let add (scope : scope) (name : symbol) (i : pmodule_sig) =
-    let tysig = EcTypedtree.transmodsig scope.sc_env i in
+    let tysig = EcTypedtree.transmodsig scope.sc_env name i in
       bind scope (name, tysig)
 end
 
