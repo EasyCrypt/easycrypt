@@ -153,6 +153,7 @@ EasyCryptEditor.prototype._on_next = function() {
 		/*this.widgets.feedback
 			.append($.format("STATEMENT SENT: {0} {1}\n",
 					         end.line+1, end.contents));*/
+		//alert(end.contents + " " + end.line + " " + end.ch);
 		this.endofsent.push(end);
 		this.clearERRMark();
 		var json = JSON.stringify({ mode : "forward",
@@ -181,14 +182,21 @@ EasyCryptEditor.prototype._on_prev = function() {
 }
 
 EasyCryptEditor.prototype._on_prevcur = function() {
+	
 	var cursor = this.editor.getCursor();
-    
-    var state = this.findStatement(cursor);
-    
-    this.clearROMark();
-    this.setROMark(state);
-    
-    alert(state.contents);
+	var history = this.endofsent.peek();
+	
+	while (cursor.line < history.line) 
+			history = this.endofsent.pop();
+	while (cursor.line == this.endofsent.peek().line && cursor.ch < this.endofsent.peek().ch)
+		this.endofsent.pop();
+		
+	this.clearROMark();
+	this.setROMark(this.endofsent.peek());
+	
+	
+	//alert(history.contents + " " + history.line + " " + history.ch);
+	
     
 }
 
