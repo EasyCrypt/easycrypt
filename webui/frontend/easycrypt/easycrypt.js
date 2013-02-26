@@ -185,14 +185,22 @@ EasyCryptEditor.prototype._on_prevcur = function() {
 	
 	var cursor = this.editor.getCursor();
 	var history = this.endofsent.peek();
+	this.clearERRMark();
 	
 	while (cursor.line < history.line) 
 			history = this.endofsent.pop();
+	// for different statement on the same line
 	while (cursor.line == this.endofsent.peek().line && cursor.ch < this.endofsent.peek().ch)
 		this.endofsent.pop();
 		
 	this.clearROMark();
-	this.setROMark(this.endofsent.peek());
+	if (cursor.line == history.line)
+		this.setROMark(this.endofsent.peek());
+	else {
+		this.setROMark(history);
+		this.endofsent.push(history);
+	}
+		
 	
 	
 	//alert(history.contents + " " + history.line + " " + history.ch);
