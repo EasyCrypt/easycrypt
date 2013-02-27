@@ -32,6 +32,7 @@ Verifier les fonction add dans ecEnv.
 - mot-clef "use" + nettoyage de task
 - raffinements
 - import ocaml batteries
+- diff. for modules
 
 
 Discution : 
