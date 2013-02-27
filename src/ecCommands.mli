@@ -15,5 +15,5 @@ val full_check : bool -> int -> unit
 
 val process : EcParsetree.global -> info list 
 
-val undo    : int -> unit
+val undo    : int -> info list
 val uuid    : unit -> int

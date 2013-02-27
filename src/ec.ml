@@ -120,11 +120,12 @@ let _ =
             let infos =
               List.flatten (List.map EcCommands.process commands)
             in
-              if terminate then exit 0;
-              IO.success infos
+            if terminate then exit 0;
+            IO.success infos
 
         | EcParsetree.P_Undo i ->
-            EcCommands.undo i
+          let info =  EcCommands.undo i in
+          IO.success info
       with e ->
         IO.error e;
         if not !EcOptions.options.o_emacs then

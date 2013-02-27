@@ -164,6 +164,8 @@ and pformula_r =
   | PFforallm of ptyped_mem list * pformula
   | PFexistsm of ptyped_mem list * pformula
   | PFprob    of pfct_game * int * pformula
+  (* test *)
+  | PFhoare   of pformula * pfunction_body * pformula
 
 
 (* -------------------------------------------------------------------- *)
@@ -224,6 +226,10 @@ and ptactic_r =
   | Papply      of pelim
   | Psubgoal    of ptactics
   | Pseq        of ptactics
+  | PPhl        of phl_tactics
+
+and phl_tactics = 
+  | Papp        of (int * pformula)
 
 and ptactics = ptactic list        
 

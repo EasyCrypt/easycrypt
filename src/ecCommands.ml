@@ -171,8 +171,9 @@ and process (scope : EcScope.scope) (g : global) =
     | Gcheckproof b   -> process_checkproof scope b
     | Gsave      loc  -> process_save       scope loc
   in
-(*    EcEnv.dump EcDebug.initial (EcScope.env scope); *)
-    (scope, infos)
+  (* EcEnv.dump EcDebug.initial (EcScope.env scope); *)
+  (* EcPrinting.pretty (EcScope.Tactic.out_goal scope) ; *)
+  (scope, infos)
 
 (* -------------------------------------------------------------------- *)
 and process_internal (scope : EcScope.scope) (g : global) =
@@ -197,10 +198,15 @@ let uuid () : int =
 (* -------------------------------------------------------------------- *)
 let undo (olduuid : int) =
   if olduuid < (uuid ()) then
-    for i = (uuid ()) - 1 downto olduuid do
-      let (_, _scope, stack) = !context in
+    begin
+      for i = (uuid ()) - 1 downto olduuid do
+        let (_, _scope, stack) = !context in
         context := (i, List.hd stack, List.tl stack)
-    done
+      done;
+      let (_, scope, _) = !context in
+      List.ocons (omap (EcScope.Tactic.out_goal scope) (fun d -> GI_Goal d)) []
+    end
+  else []
 
 (* -------------------------------------------------------------------- *)
 let process (g : global) =

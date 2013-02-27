@@ -4,6 +4,7 @@ open EcTypes
 open EcDecl
 open EcFol
 open EcTypesmod
+open EcTypestheo
 
 module Sp    = EcPath.Sp
 module Mid   = EcIdent.Mid
@@ -137,117 +138,17 @@ let rec subst_tyexpr (s : subst) (e : tyexpr) =
       let e2 = subst_tyexpr s e2 in
         e_if c e1 e2
 
-(* -------------------------------------------------------------------- *)
-let rec subst_form (s : subst) (f : form) =
-  let f_node = subst_form_node s f.f_node
-  and f_ty   = subst_ty s f.f_ty
-  in mk_form f_node f_ty
 
-and subst_form_node (s : subst) (f : f_node) =
-  match f with
-  | Fint _ -> f
 
-  | Fquant (mode, bindings, f) ->
-      let newbindings =
-        List.map
-          (fun (x, ty) -> (EcIdent.fresh x, subst_ty s ty))
-          bindings in
 
-      let sbody =
-        add_locals s
-          (List.combine
-             (List.map (EcIdent.fresh -| fst) bindings   )
-             (List.map (EcIdent.fresh -| fst) newbindings))
-      in
 
-        Fquant (mode, newbindings, subst_form sbody f)
 
-  | Flet (p, f1, f2) ->
-      let (sbody, p) = subst_lpattern s p in
-      let f1 = subst_form s     f1 in
-      let f2 = subst_form sbody f2 in
-        Flet (p, f1, f2)
 
-  | Fif (c, f1, f2) ->
-      let c  = subst_form s c  in
-      let f1 = subst_form s f1 in
-      let f2 = subst_form s f2 in
-        Fif (c, f1, f2)
 
-  | Flocal x ->
-      Flocal (subst_local s x)
 
-  | Fpvar (x, side) ->
-      let x  = subst_pvar s x in
-      Fpvar (x, side)
 
-  | Fop(p,tys) -> Fop(subst_path s p, List.map (subst_ty s) tys)
+(* SUBSTITUTION OVER MODULES *)
 
-  | Fapp (f, fs) ->
-      let f = subst_form s f in
-      let fs = List.map (subst_form s) fs in
-      Fapp (f, fs)
-
-  | Ftuple fs ->
-      Ftuple (List.map (subst_form s) fs)
-
-(* -------------------------------------------------------------------- *)
-let subst_tydecl (s : subst) (tyd : tydecl) =
-  let params = List.map EcIdent.fresh tyd.tyd_params in
-    match tyd.tyd_type with
-    | None    -> { tyd_params = params; tyd_type = None; }
-    | Some ty ->
-        let s = add_locals s (List.combine tyd.tyd_params params) in
-          { tyd_params = params;
-            tyd_type   = Some (subst_ty s ty); }
-
-(* -------------------------------------------------------------------- *)
-let subst_op_kind (s : subst) (kind : operator_kind) =
-  let locals =
-    match kind with
-    | OB_oper i -> odfl [] (omap i fst)
-    | OB_pred i -> odfl [] (omap i fst) in
-
-  let newlocals = List.map EcIdent.fresh locals in
-  let sdef = add_locals s (List.combine locals newlocals) in
-
-    match kind with
-    | OB_oper i ->
-      let def = omap i (fun (_, e) -> (newlocals, subst_tyexpr sdef e)) in
-      OB_oper def
-
-    | OB_pred i ->
-      let def = omap i (fun (_, e) -> (newlocals, subst_form sdef e)) in
-      OB_pred def
-
-(* -------------------------------------------------------------------- *)
-let subst_op (s : subst) (op : operator) =
-  let params = List.map EcIdent.fresh op.op_params in
-  let sty    = add_locals s (List.combine op.op_params params) in
-  let dom    = List.map (subst_ty sty) op.op_dom in
-  let codom  = subst_ty sty op.op_codom in
-  let kind   = subst_op_kind sty op.op_kind in
-
-    { op_params = params;
-      op_dom    = dom   ;
-      op_codom  = codom ;
-      op_kind   = kind  ; }
-
-(* -------------------------------------------------------------------- *)
-let subst_ax (s : subst) (ax : axiom) =
-  let params = List.map EcIdent.fresh ax.ax_params in
-  let sty    = add_locals s (List.combine ax.ax_params params) in
-  let spec   = omap ax.ax_spec (subst_form sty) in 
-  let kind   = 
-
-    match ax.ax_kind with
-    | Axiom   -> Axiom
-    | Lemma _ -> Lemma None
-
-  in
-    { ax_params = params;
-      ax_spec   = spec  ;
-      ax_kind   = kind  ; }
 
 (* -------------------------------------------------------------------- *)
 let rec subst_modsig_body_item (s : subst) (item : module_sig_body_item) =
@@ -428,6 +329,145 @@ and subst_module (s : subst) (m : module_expr) =
         me_comps = comps'  ;
         me_uses  = Sp.empty;              (* FIXME *)
         me_types = types'  ; }
+
+
+
+
+
+
+
+
+
+
+
+
+
+(* SUBSTITUTION OVER FORMULAE *)
+
+
+(* -------------------------------------------------------------------- *)
+let rec subst_form (s : subst) (f : form) =
+  let f_node = subst_form_node s f.f_node
+  and f_ty   = subst_ty s f.f_ty
+  in mk_form f_node f_ty
+
+and subst_form_node (s : subst) (f : f_node) =
+  match f with
+  | Fint _ -> f
+
+  | Fquant (mode, bindings, f) ->
+      let newbindings =
+        List.map
+          (fun (x, ty) -> (EcIdent.fresh x, subst_ty s ty))
+          bindings in
+
+      let sbody =
+        add_locals s
+          (List.combine
+             (List.map (EcIdent.fresh -| fst) bindings   )
+             (List.map (EcIdent.fresh -| fst) newbindings))
+      in
+
+        Fquant (mode, newbindings, subst_form sbody f)
+
+  | Flet (p, f1, f2) ->
+      let (sbody, p) = subst_lpattern s p in
+      let f1 = subst_form s     f1 in
+      let f2 = subst_form sbody f2 in
+        Flet (p, f1, f2)
+
+  | Fif (c, f1, f2) ->
+      let c  = subst_form s c  in
+      let f1 = subst_form s f1 in
+      let f2 = subst_form s f2 in
+        Fif (c, f1, f2)
+
+  | Flocal x ->
+      Flocal (subst_local s x)
+
+  | Fpvar (x, side) ->
+      let x  = subst_pvar s x in
+      Fpvar (x, side)
+
+  | Fop(p,tys) -> Fop(subst_path s p, List.map (subst_ty s) tys)
+
+  | Fapp (f, fs) ->
+      let f = subst_form s f in
+      let fs = List.map (subst_form s) fs in
+      Fapp (f, fs)
+
+  | Ftuple fs ->
+      Ftuple (List.map (subst_form s) fs)
+
+  | Fhoare ( pre, body, post) ->
+    Fhoare (subst_form s pre, subst_function_def s body, subst_form s post)
+
+(* -------------------------------------------------------------------- *)
+let subst_tydecl (s : subst) (tyd : tydecl) =
+  let params = List.map EcIdent.fresh tyd.tyd_params in
+    match tyd.tyd_type with
+    | None    -> { tyd_params = params; tyd_type = None; }
+    | Some ty ->
+        let s = add_locals s (List.combine tyd.tyd_params params) in
+          { tyd_params = params;
+            tyd_type   = Some (subst_ty s ty); }
+
+(* -------------------------------------------------------------------- *)
+let subst_op_kind (s : subst) (kind : operator_kind) =
+  let locals =
+    match kind with
+    | OB_oper i -> odfl [] (omap i fst)
+    | OB_pred i -> odfl [] (omap i fst) in
+
+  let newlocals = List.map EcIdent.fresh locals in
+  let sdef = add_locals s (List.combine locals newlocals) in
+
+    match kind with
+    | OB_oper i ->
+      let def = omap i (fun (_, e) -> (newlocals, subst_tyexpr sdef e)) in
+      OB_oper def
+
+    | OB_pred i ->
+      let def = omap i (fun (_, e) -> (newlocals, subst_form sdef e)) in
+      OB_pred def
+
+(* -------------------------------------------------------------------- *)
+let subst_op (s : subst) (op : operator) =
+  let params = List.map EcIdent.fresh op.op_params in
+  let sty    = add_locals s (List.combine op.op_params params) in
+  let dom    = List.map (subst_ty sty) op.op_dom in
+  let codom  = subst_ty sty op.op_codom in
+  let kind   = subst_op_kind sty op.op_kind in
+
+    { op_params = params;
+      op_dom    = dom   ;
+      op_codom  = codom ;
+      op_kind   = kind  ; }
+
+(* -------------------------------------------------------------------- *)
+let subst_ax (s : subst) (ax : axiom) =
+  let params = List.map EcIdent.fresh ax.ax_params in
+  let sty    = add_locals s (List.combine ax.ax_params params) in
+  let spec   = omap ax.ax_spec (subst_form sty) in 
+  let kind   = 
+
+    match ax.ax_kind with
+    | Axiom   -> Axiom
+    | Lemma _ -> Lemma None
+
+  in
+    { ax_params = params;
+      ax_spec   = spec  ;
+      ax_kind   = kind  ; }
+
+
+
+
+
+
+
+
+(* SUBSTITUTION OVER THEORIES *)
 
 (* -------------------------------------------------------------------- *)
 let rec subst_theory_item (s : subst) (item : theory_item) =

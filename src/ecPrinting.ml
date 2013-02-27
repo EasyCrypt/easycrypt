@@ -5,6 +5,7 @@ open EcFormat
 open EcTypes
 open EcFol
 open EcTypesmod
+open EcTypestheo
 open EcDecl
 open EcParsetree
 open EcEnv
@@ -548,46 +549,22 @@ struct
     | Lforall -> tk_forall
     | Lexists -> tk_exists
 
+
+
+
+
+
+  (* MODULE PPRINTING *)
+
+
+
+
   (* ------------------------------------------------------------------ *)
-  let pr_form (tenv : t) (f : form) =
-    let rec pr_form (tenv : t) outer (f : form) =
-      match f.f_node with
-      | Fint n ->
-          Pp.ML.int n
+  let pr_local (tenv : t) (x : EcIdent.t) (ty : ty) =
+    (* assert false (\* FIXME *\) *)
+   pr_seq [!^"var"; pr_ident tenv x; Pp.colon; pr_type tenv ty] ^^ Pp.semi
 
-      | Flocal id ->
-          pr_local_symb tenv id
 
-      | Fpvar (x, i) ->
-          pr_seq [pr_pv_symb tenv x.pv_name (Some i); Pp.braces (Pp.ML.int i)]
-
-      | Fquant (q, bd, f) ->
-          let subtenv, dd = pr_vardecls tenv bd in 
-          pr_seq [tk_quant q;
-                  dd^^Pp.comma;
-                  pr_form subtenv outer f]
-
-      | Fif (b, f1, f2) ->
-          pr_if tenv pr_form outer b f1 f2
-
-      | Flet (lp, f1, f2) ->
-          pr_let tenv pr_form outer lp f1 f2
-
-      | Fop(op,tvi) -> (* FIXME infix, prefix, ty_inst *)
-            pr_op_name tenv op tvi (Some [])
-
-      | Fapp ({f_node = Fop(p,tys)}, args) ->
-          pr_app EcFol.ty tenv pr_form outer p tys args
-
-      | Fapp (e,args) ->
-          let docs = List.map (pr_form tenv (min_op_prec, `NonAssoc)) args in
-          (pr_form tenv (max_op_prec, `NonAssoc) e) ^^ 
-          pr_seq [Pp.parens (pr_list "," docs)]
-
-      | Ftuple args ->
-          pr_tuple_expr tenv pr_form args
-    in
-      pr_form tenv (min_op_prec, `NonAssoc) f
 
   (* ------------------------------------------------------------------ *)
   let pr_dom (tenv : t) dom =
@@ -606,10 +583,6 @@ struct
     else
       Pp.brackets (pr_seq (List.map (pr_tvar tenv) ids))
 
-  (* ------------------------------------------------------------------ *)
-  let pr_local (_env : t) (_x : EcIdent.t) (_ty : ty) =
-    assert false (* FIXME *)
-(*    pr_seq [pr_ident tenv x; Pp.colon; pr_type tenv ty] ^^ Pp.semi *)
 
   (* ------------------------------------------------------------------ *)
   let pr_lvalue (tenv : t) (lv : lvalue) =
@@ -751,6 +724,94 @@ struct
       | Some ty -> doc ^//^ Pp.equals ^//^ (pr_type tenv ty)
     in
       pr_dotted (Pp.nest 2 doc)
+
+
+
+
+
+
+
+
+
+  (* ------------------------------------------------------------------ *)
+  let pr_form (tenv : t) (f : form) =
+    let rec pr_form (tenv : t) outer (f : form) =
+      match f.f_node with
+      | Fint n ->
+          Pp.ML.int n
+
+      | Flocal id ->
+          pr_local_symb tenv id
+
+      | Fpvar (x, i) ->
+          pr_seq [pr_pv_symb tenv x.pv_name (Some i); Pp.braces (Pp.ML.int i)]
+
+      | Fquant (q, bd, f) ->
+          let subtenv, dd = pr_vardecls tenv bd in 
+          pr_seq [tk_quant q;
+                  dd^^Pp.comma;
+                  pr_form subtenv outer f]
+
+      | Fif (b, f1, f2) ->
+          pr_if tenv pr_form outer b f1 f2
+
+      | Flet (lp, f1, f2) ->
+          pr_let tenv pr_form outer lp f1 f2
+
+      | Fop(op,tvi) -> (* FIXME infix, prefix, ty_inst *)
+            pr_op_name tenv op tvi (Some [])
+
+      | Fapp ({f_node = Fop(p,tys)}, args) ->
+          pr_app EcFol.ty tenv pr_form outer p tys args
+
+      | Fapp (e,args) ->
+          let docs = List.map (pr_form tenv (min_op_prec, `NonAssoc)) args in
+          (pr_form tenv (max_op_prec, `NonAssoc) e) ^^ 
+          pr_seq [Pp.parens (pr_list "," docs)]
+
+      | Ftuple args ->
+          pr_tuple_expr tenv pr_form args
+            
+      | Fhoare(pre,def,post) -> 
+        (* copy pasted from pr_modfun, code repetition *)
+          let dlocals =
+            List.map
+              (fun (x, ty) -> pr_local tenv (EcIdent.create x) ty)
+              def.f_locals
+
+          and dbody =
+            let bodytenv =
+              List.fold_left
+                (fun tenv x -> M.add_local tenv (EcIdent.create x))
+                tenv
+                (List.map fst (def.f_locals))
+            in
+              List.map (pr_instr bodytenv) def.f_body
+          in
+        (* end of copy pasted *)
+
+        pr_seq [ Pp.braces (pr_form tenv outer pre);
+                 pr_mblocks [dlocals; dbody];
+                 Pp.braces (pr_form tenv outer post) ]
+
+    in
+      pr_form tenv (min_op_prec, `NonAssoc) f
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
   (* ------------------------------------------------------------------ *)
   let pr_opdecl (tenv : t) ((x, op) : EcPath.path * operator) =
@@ -915,7 +976,7 @@ struct
       tk_tvars ^^ (!^ " : ") ^//^ pr_list_map (pr_tvar t) ", " hyps.h_tvar in
     let (t,doc) = List.fold_left pr_hyp (t,doc) (List.rev hyps.h_local) in
     let doc = doc ^/^ tk_goalline in
-    doc ^/^ pr_form t concl ^^ clearbreak
+    (!^ "Current goal") ^@^ doc ^/^ pr_form t concl ^^ clearbreak
 
   (* ------------------------------------------------------------------ *)
   let pp_type     = fun t ?vmap -> pp_of_pr (pr_type t ?vmap)

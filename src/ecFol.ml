@@ -45,6 +45,8 @@ and f_node =
   | Fapp    of form * form list                  (* application *)
   | Ftuple  of form list                         (* tuple constructor   *)
 
+  | Fhoare of form * EcTypesmod.function_def * form
+
 (*
 type gty = 
   | GTty of EcTypes.ty
@@ -78,8 +80,7 @@ forall (k:int) {G.x = k } c { Q} <= e
  
 *)
 
-(*spec : var decl 
-       equivS *)
+(* spec : var decl equivS *)
 
 
 
@@ -105,7 +106,8 @@ let fv_node = function
       List.fold_left (fun s f -> Sid.union s (fv f)) (fv f) args
   | Ftuple args ->
       List.fold_left (fun s f -> Sid.union s (fv f)) Sid.empty args 
- 
+  | Fhoare (pre,_,post) -> Sid.union (fv pre) (fv post)
+
 let f_equal : form -> form -> bool = (==)
 let f_hash f = f.f_tag 
 
@@ -145,6 +147,7 @@ module Hsform = Why3.Hashcons.Make (struct
         f_equal f1 f2 && List.all2 f_equal args1 args2
     | Ftuple args1, Ftuple args2 ->
         List.all2 f_equal args1 args2
+    (* FIXME: no equality yet for stmts *)
     | _ -> false
 
   let hash f = 
@@ -164,7 +167,9 @@ module Hsform = Why3.Hashcons.Make (struct
         Why3.Hashcons.combine_list f_hash (f_hash f) args
     | Ftuple args ->
         Why3.Hashcons.combine_list f_hash 0 args
-          
+    | Fhoare(p,_,q) -> (* FIXME: no hashing for stmts! *)
+      Why3.Hashcons.combine (f_hash p) (f_hash q)
+
   let tag n f = { f with f_tag = n }
       
 end)
@@ -232,6 +237,9 @@ let f_quant q b f =
 
 let f_exists b f = f_quant Lexists b f 
 let f_forall b f = f_quant Lforall b f
+
+let f_hoare pre s post = mk_form (Fhoare(pre,s,post)) ty_bool
+
 
 type destr_error =
   | Destr_and
@@ -317,6 +325,8 @@ let map gt g f =
   | Fop(p,tys) -> f_op p (List.map gt tys) (gt f.f_ty)
   | Fapp(e, es) -> f_app (g e) (List.map g es) (gt f.f_ty)
   | Ftuple es -> f_tuple (List.map g es) 
+    
+  | Fhoare(p,s,q) -> f_hoare (g p) s (g q)
 
 (* -------------------------------------------------------------------- *)
 
@@ -405,6 +415,10 @@ type rule_name =
 
   | RN_exists_E 
     (* E;G |- exists x:t, P  E;G |- forall x:t, P => C   ===> E;G |- C *)
+
+
+  (* H rules *)
+  | RN_app of (int * form)
 
 type rule = (rule_name, l_decl) EcBaseLogic.rule
 type judgment = (rule_name, l_decl) EcBaseLogic.judgment

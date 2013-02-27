@@ -755,6 +755,14 @@ let rec check_tymod_cnv _mode (_env : EcEnv.env) _tin _tout =
     end
 *)
 
+let add_local known_ids s = 
+  match Mstr.find_opt s.pl_desc !known_ids with
+    | None -> 
+      known_ids := Mstr.add s.pl_desc s !known_ids;
+      s.pl_desc
+    | Some s' -> tyerror s.pl_loc (DuplicatedLocals (Some s')) 
+
+
 let check_tymod_sub = check_tymod_cnv `Sub
 and check_tymod_eq  = check_tymod_cnv `Eq
 
@@ -879,45 +887,23 @@ and transstruct1 (env : EcEnv.env) (st : pstructure_item) =
       let fid = decl.pfd_name.pl_desc in
       let ue = UE.create (Some []) in
       let known_ids = ref Mstr.empty in
-      let add_local s = 
-        match Mstr.find_opt s.pl_desc !known_ids with
-        | None -> 
-            known_ids := Mstr.add s.pl_desc s !known_ids;
-            s.pl_desc
-        | Some s' -> tyerror s.pl_loc (DuplicatedLocals (Some s')) in
+      (* let add_local s =  *)
+      (*   match Mstr.find_opt s.pl_desc !known_ids with *)
+      (*   | None ->  *)
+      (*       known_ids := Mstr.add s.pl_desc s !known_ids; *)
+      (*       s.pl_desc *)
+      (*   | Some s' -> tyerror s.pl_loc (DuplicatedLocals (Some s')) in *)
       (* First we add the parameters *)
-      let add_param (s,ty) = add_local s, transty tp_uni env ue ty in
+      let add_param (s,ty) = add_local known_ids s, transty tp_uni env ue ty in
       let params = List.map add_param decl.pfd_tyargs in
       let params_ = 
         List.map (fun (id,ty) -> (id, `Variable (PVloc, ty))) params in
       let env = EcEnv.bindall params_ env in
-      let init = ref [] in
-      let locals = ref [] in
-      let add_local ty s = (add_local s, `Variable (PVloc, ty)) in
-      let add_locals env (ss,ty, e) = 
-        let ty = transty tp_uni env ue ty in
-        let locs = List.map (add_local ty) ss in
-        let newenv = EcEnv.bindall locs env in
-        List.iter (fun (id, _) -> locals := (id,ty) :: !locals) locs;
-        oiter e (fun pe -> 
-          let e, ety = transexp env ue pe in
-          unify_error env ue pe.pl_loc ety ty;
-          List.iter (fun (id,_) ->
-            let p,_ = 
-              oget (EcEnv.Var.lookup_progvar_opt ([], id) newenv) in
-            init := Sasgn(LvVar(p,ty) , e) :: !init) locs);
-        newenv in
-      let env = List.fold_left add_locals env body.pfb_locals in
-      let stmt = transstmt ue env body.pfb_body in 
+
+
       let rty = transty tp_uni env ue decl.pfd_tyresult in
-      let re =
-        match body.pfb_return with
-        | None    -> 
-            (* FIXME error message or location *)
-            unify_error env ue decl.pfd_tyresult.pl_loc rty tunit; None
-        | Some pe ->
-            let re, ty = transexp env ue pe in
-            unify_error env ue pe.pl_loc ty rty; Some re in
+      let stmt, re, locals, _env = transbody known_ids ue env body rty in
+
       let subst_uni = Tuni.subst (UE.close ue) in
       let check_type ty = 
         let ty = subst_uni ty in
@@ -925,7 +911,7 @@ and transstruct1 (env : EcEnv.env) (st : pstructure_item) =
         ty in
       let check_decl (id,ty) = id, check_type ty in
       let params = List.map check_decl params in
-      let locals = List.rev_map check_decl !locals in
+      let locals = List.rev_map check_decl locals in
       let rty = check_type rty in
       let stmt = stmt_mapty subst_uni stmt in
       let re = omap re (Esubst.mapty subst_uni) in
@@ -946,6 +932,40 @@ and transstruct1 (env : EcEnv.env) (st : pstructure_item) =
   end
 
   | Pst_alias _ -> assert false
+
+and transbody known_ids ue env body rty = 
+  let init = ref [] in
+  let locals = ref [] in
+  let add_local ty s = (add_local known_ids s, `Variable (PVloc, ty)) in
+  let add_locals env (ss,ty, e) = 
+    let ty = transty tp_uni env ue ty in
+    let locs = List.map (add_local ty) ss in
+    let newenv = EcEnv.bindall locs env in
+    List.iter (fun (id, _) -> locals := (id,ty) :: !locals) locs;
+    oiter e (fun pe -> 
+      let e, ety = transexp env ue pe in
+      unify_error env ue pe.pl_loc ety ty;
+      List.iter (fun (id,_) ->
+        let p,_ = 
+          oget (EcEnv.Var.lookup_progvar_opt ([], id) newenv) in
+        init := Sasgn(LvVar(p,ty) , e) :: !init) locs);
+    newenv 
+  in
+  let env = List.fold_left add_locals env body.pfb_locals in
+  let stmt = transstmt ue env body.pfb_body in 
+  (* Cesar says: I guess "init" was missing, and the natural order is used *)
+  let stmt = (List.rev !init) @ stmt in 
+  let re =
+    match body.pfb_return with
+      | None    -> 
+        (* FIXME error message or location *)
+        unify_error env ue EcLocation.dummy rty tunit; None
+      | Some pe ->
+        let re, ty = transexp env ue pe in
+        unify_error env ue pe.pl_loc ty rty; Some re 
+  in
+  stmt, re, !locals, env
+
 
 (* -------------------------------------------------------------------- *)
 and transstmt ue (env : EcEnv.env) (stmt : pstmt) =
@@ -1054,6 +1074,7 @@ and translvalue ue (env : EcEnv.env) lvalue =
 (* -------------------------------------------------------------------- *)
 (** Translation of formula *)
 
+(* Cesar says: I don't understand this, you can only update fe_envs at 0 *)
 module Fenv = struct
 
   type fenv = {
@@ -1200,6 +1221,20 @@ let transform fenv ue pf tt =
     | PFprob _ -> f_int 0 
     | PFforallm _ -> f_true 
     | PFexistsm _ -> f_true 
+
+    (* test *)
+    | PFhoare (pre,body,post) ->
+      (* Cesar says: what should I assume about local variables in pre/post? *)
+      let known_ids = ref Mstr.empty in
+      let ue = UE.create (Some []) in (* I ignore this *)
+      let pre = transf fenv pre in
+      (* FIXME: assuming no return statement, bad error message *)
+      let stmt, _re, locals, env = transbody known_ids ue (Fenv.mono fenv) body tunit in
+      let fenv = Fenv.mono_fenv env in
+      let post = transf fenv post in
+      let f_def = {f_locals=locals; f_body=stmt; f_ret=None } in
+      f_hoare pre f_def post
+
 (*  and transf fenv pf =
     let f = transf1 fenv pf in
     let env = EcPrinting.EcPP.init (Fenv.mono fenv,[]) in

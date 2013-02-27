@@ -502,6 +502,8 @@ module Tactic = struct
 
   open EcFol
   open EcLogic
+  open EcPhl
+
   module TT = EcTypedtree
   module UE = EcUnify.UniEnv
 
@@ -699,7 +701,7 @@ module Tactic = struct
     | tac1 :: tacs2 ->
         let gs = t_on_goals (process_logic_tac scope env tac1) gs in
         process_logic_tacs scope env tacs2 gs 
-        
+
   and process_logic_tac scope env (tac:ptactic) (g:goal) : goals = 
     let loc = tac.pl_loc in
     let tac = 
@@ -714,6 +716,7 @@ module Tactic = struct
       | Pright         -> t_or_intro false
       | Pelim pe       -> process_elims loc false env pe
       | Papply pe      -> process_apply loc env pe
+      | PPhl tac       -> process_phl process_formula tac loc env 
       | Pseq tacs      -> 
           fun (juc,n) -> process_logic_tacs scope env tacs (juc,[n])
       | Psubgoal _     -> assert false in
@@ -724,7 +727,7 @@ module Tactic = struct
       try get_first_goal juc 
       with _ -> error loc NoCurrentGoal in
     upd_done (fst (process_logic_tacs scope env tacs (juc,[n])))
-    
+
   let process scope tac =
     if Check_mode.check scope.sc_options then
       let loc = match tac with | [] -> assert false | t::_ -> t.pl_loc in  
@@ -751,7 +754,7 @@ module Tactic = struct
               with EcBaseLogic.NotAnOpenGoal _ -> 
                 Pprint.text "No more goals" in
             Some doc
-    
+
 end 
 
 (* -------------------------------------------------------------------- *)

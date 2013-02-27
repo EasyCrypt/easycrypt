@@ -6,6 +6,7 @@ open EcTypes
 open EcDecl
 open EcFol
 open EcTypesmod
+open EcTypestheo
 
 (* -------------------------------------------------------------------- *)
 
@@ -25,7 +26,7 @@ val is_suspended : 'a suspension -> bool
 (* -------------------------------------------------------------------- *)
 
 (* Describe the kind of objects that can be bound in an environment.
- * We alse define define 2 classes of objects:
+ * We alse define 2 classes of objects:
  * - containers    : theory   / module
  * - module values : variable / function
  *)
@@ -77,14 +78,14 @@ type preenv = private {
   env_item   : ctheory_item list        (* in reverse order *)
 }
 
-(* A [premc] value described the components (i.e. resolved members)
+(* A [premc] value describes the components (i.e. resolved members)
  * of a container, i.e. its variables, functions, sub-theories, ...
  * We maintain an invariant that, for a given object kind, a name
  * cannot be bound twice.
  *
  * Sub-containers also contain an entry in the [mc_components] set.
  * This set only records the presence of a field with a container.
- * The contents (compoments) of the container must be looked up using
+ * The contents (components) of the container must be looked up using
  * the [env_comps] field of the associated environment.
  *
  * The field [mc_parameters] records the (module) parameter of the
@@ -99,11 +100,11 @@ and premc = private {
   mc_typedecls  : (mpath * EcDecl.tydecl)          Msym.t;
   mc_operators  : (mpath * EcDecl.operator)        Msym.t;
   mc_axioms     : (mpath * EcDecl.axiom)           Msym.t;
-  mc_theories   : (mpath * EcTypesmod.ctheory)     Msym.t;
+  mc_theories   : (mpath * ctheory)     Msym.t;
   mc_components : path                             Msym.t;
 }
 
-(* As for [premc], but allows names to be bound several time, and maps
+(* As [premc], but allows names to be bound several times, and maps
  * objects to [epath] instead of [path]. This structure serves as the
  * components description of the current active scope. It includes all
  * the objects imported via the [import] command. *)
@@ -116,7 +117,7 @@ and activemc = {
   amc_typedecls  : (mpath * EcDecl.tydecl)          MMsym.t;
   amc_operators  : (mpath * EcDecl.operator)        MMsym.t;
   amc_axioms     : (mpath * EcDecl.axiom)           MMsym.t;
-  amc_theories   : (mpath * EcTypesmod.ctheory)     MMsym.t;
+  amc_theories   : (mpath * ctheory)     MMsym.t;
   amc_components : path                             MMsym.t;
 }
 
@@ -302,7 +303,7 @@ val bindall : (symbol * ebinding) list -> env -> env
 val import_w3_dir :
      env -> string list -> string
   -> EcWhy3.renaming_decl
-  -> env * EcTypesmod.ctheory_item list
+  -> env * ctheory_item list
 
 (* -------------------------------------------------------------------- *)
 exception IncompatibleType of EcTypes.ty * EcTypes.ty

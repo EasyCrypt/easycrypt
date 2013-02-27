@@ -7,6 +7,7 @@ open EcTypes
 open EcDecl
 open EcFol
 open EcTypesmod
+open EcTypestheo
 
 module Mp   = EcPath.Mp
 module Msym = EcSymbols.Msym
@@ -1070,6 +1071,8 @@ let rec trans_form env vm f =
   | Ftuple args ->
       let args = List.map (trans_form_b env vm) args in
       Term.t_tuple args
+
+  | Fhoare _ -> assert false (* FIXME: only FOL should be trans_formed *)
 
 and trans_form_b env vm f = force_bool (trans_form env vm f)
 

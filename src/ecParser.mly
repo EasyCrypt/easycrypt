@@ -480,6 +480,11 @@ sform:
     { let id = PFident(mk_loc op.pl_loc EcCoreLib.s_dinter, ti) in
       PFapp(mk_loc op.pl_loc id, [e1; e2]) } 
 
+(* Test *)
+
+| LKEY pre=loc(sform) RKEY s=fun_def_body LKEY post=loc(sform) RKEY
+    { PFhoare (pre,s,post) }
+
 ;
                           
 form:

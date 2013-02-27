@@ -25,7 +25,7 @@ type renaming_decl = (string list * renaming_kind * symbol) list
 val import_w3 : 
     env -> EcPath.path -> 
       Why3.Theory.theory -> 
-        renaming_decl -> EcTypesmod.theory * rebinding_item 
+        renaming_decl -> EcTypestheo.theory * rebinding_item 
 
 val add_ty : env -> EcPath.path -> EcDecl.tydecl -> env * rebinding_item
 

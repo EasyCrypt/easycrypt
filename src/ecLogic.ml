@@ -12,16 +12,16 @@ type pre_rule = rule_name EcBaseLogic.pre_rule
 type pre_judgment = (rule_name, l_decl) EcBaseLogic.pre_judgment
 type judgment_uc = (rule_name, l_decl) EcBaseLogic.judgment_uc
 
-type goal = judgment_uc * int 
 type goals = judgment_uc * int list
+type goal = judgment_uc * int 
 
 type tactic = goal -> goals 
 
 include EcBaseLogic.Tactic
 
 let open_juc hyps concl : judgment_uc = fst (open_juc (hyps, concl))
-
 let close_juc juc = close_juc juc
+
 
 let get_goal g = (get_open_goal g).pj_decl      
 let get_hyps g = fst (get_goal g) 
@@ -54,23 +54,23 @@ let pp_tac_error fmt = function
   | NotAHypothesis id -> 
       Format.fprintf fmt "Unknown hypothesis %s" (EcIdent.name id)
   | ExclMidle f ->
-      Format.fprintf fmt "Can not applies excluded midle on %a" PE.pp_form f
+      Format.fprintf fmt "Cannot apply excluded middle on %a" PE.pp_form f
   | And_I f ->
-      Format.fprintf fmt "Can not applies and intro on %a" PE.pp_form f
+      Format.fprintf fmt "Cannot apply and intro on %a" PE.pp_form f
   | Or_I f ->
-      Format.fprintf fmt "Can not applies or intro on %a" PE.pp_form f
+      Format.fprintf fmt "Cannot apply or intro on %a" PE.pp_form f
   | Imp_I f ->
-      Format.fprintf fmt "Can not applies implies intro on %a" PE.pp_form f
+      Format.fprintf fmt "Cannot apply implies intro on %a" PE.pp_form f
   | Forall_I f ->
-      Format.fprintf fmt "Can not applies forall intro on %a" PE.pp_form f
+      Format.fprintf fmt "Cannot apply forall intro on %a" PE.pp_form f
   | Exists_I f ->
-      Format.fprintf fmt "Can not applies exists intro on %a" PE.pp_form f
+      Format.fprintf fmt "Cannot apply exists intro on %a" PE.pp_form f
   | Imp_E f ->
-      Format.fprintf fmt "Can not applies implies elim on %a" PE.pp_form f  
+      Format.fprintf fmt "Cannot apply implies elim on %a" PE.pp_form f  
   | Forall_E f ->
-      Format.fprintf fmt "Can not applies forall elim on %a" PE.pp_form f
+      Format.fprintf fmt "Cannot apply forall elim on %a" PE.pp_form f
   | Exists_E f ->
-      Format.fprintf fmt "Can not applies exists elim on %a" PE.pp_form f
+      Format.fprintf fmt "Cannot apply exists elim on %a" PE.pp_form f
   | DupIdInCtxt id -> 
       Format.fprintf fmt "Duplicate name in context %s" (EcIdent.name id)
   | CanNotProve g -> 

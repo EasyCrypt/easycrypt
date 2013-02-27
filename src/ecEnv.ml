@@ -6,6 +6,7 @@ open EcTypes
 open EcFol
 open EcDecl
 open EcTypesmod
+open EcTypestheo
 open EcWhy3
 
 (* -------------------------------------------------------------------- *)
@@ -123,7 +124,7 @@ and premc = {
   mc_typedecls  : (mpath * EcDecl.tydecl)          Msym.t;
   mc_operators  : (mpath * EcDecl.operator)        Msym.t;
   mc_axioms     : (mpath * EcDecl.axiom)           Msym.t;
-  mc_theories   : (mpath * EcTypesmod.ctheory)     Msym.t;
+  mc_theories   : (mpath * ctheory)     Msym.t;
   mc_components : path                             Msym.t;
 }
 
@@ -135,7 +136,7 @@ and activemc = {
   amc_typedecls  : (mpath * EcDecl.tydecl)          MMsym.t;
   amc_operators  : (mpath * EcDecl.operator)        MMsym.t;
   amc_axioms     : (mpath * EcDecl.axiom)           MMsym.t;
-  amc_theories   : (mpath * EcTypesmod.ctheory)     MMsym.t;
+  amc_theories   : (mpath * ctheory)     MMsym.t;
   amc_components : path                             MMsym.t;
 }
 
@@ -350,7 +351,7 @@ module MC = struct
       px_toactmc = (fun m mc -> { mc with amc_axioms = m });
     }
 
-    let for_theory : EcTypesmod.ctheory projector = {
+    let for_theory : ctheory projector = {
       px_premc   = (fun mc -> mc.mc_theories);
       px_topremc = (fun m mc -> { mc with mc_theories = m });
       px_actmc   = (fun mc -> mc.amc_theories);
@@ -940,7 +941,7 @@ module Mod = struct
       check_not_suspended (MC.lookup_by_path Px.for_modtype.Px.px_premc modty env)
     in
 
-    let me    = EcTypesmod.module_expr_of_module_sig name modty modsig in
+    let me    = module_expr_of_module_sig name modty modsig in
     let path  = EcPath.pident name in
     let comps = MC.mc_of_module_param name me  in
 
