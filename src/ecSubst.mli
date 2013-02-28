@@ -3,7 +3,7 @@ open EcSymbols
 open EcPath
 open EcTypesmod
 open EcTypes
-open EcTypestheo
+open EcTheory
 open EcDecl
 open EcFol
 

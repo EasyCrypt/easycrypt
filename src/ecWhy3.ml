@@ -7,7 +7,7 @@ open EcTypes
 open EcDecl
 open EcFol
 open EcTypesmod
-open EcTypestheo
+open EcTheory
 
 module Mp   = EcPath.Mp
 module Msym = EcSymbols.Msym

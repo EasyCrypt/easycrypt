@@ -6,7 +6,7 @@ open EcTypes
 open EcDecl
 open EcFol
 open EcTypesmod
-open EcTypestheo
+open EcTheory
 
 (* -------------------------------------------------------------------- *)
 

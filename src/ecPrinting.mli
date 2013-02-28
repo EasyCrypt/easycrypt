@@ -7,7 +7,7 @@ open EcParsetree
 open EcTypes
 open EcDecl
 open EcTypesmod
-open EcTypestheo
+open EcTheory
 
 (* -------------------------------------------------------------------- *)
 type 'a pr = 'a -> Pprint.document
