@@ -205,14 +205,12 @@ module Mod : sig
   val lookup_opt  : qsymbol -> env -> (mpath * t) option
   val lookup_path : qsymbol -> env -> mpath
 
-  (* Locals binding *)
-(*  val bind_local  : EcIdent.t -> module_expr -> env -> env
-    val bind_locals : (EcIdent.t * module_expr) list -> env -> env *)
-
   val add  : EcPath.mpath -> env -> env
   val bind : symbol -> module_expr -> env -> env
 
   val enter : symbol -> (EcIdent.t * module_type) list -> env -> env
+
+  val unfold_mod_path : env -> EcPath.mpath -> EcPath.mpath
 end
 
 (* -------------------------------------------------------------------- *)

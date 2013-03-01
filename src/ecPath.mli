@@ -15,7 +15,7 @@ open EcSymbols
  *
  * - [xpath] is the type of paths for concrete objects. It is defined as
  *   a [mpath] (the container path) and a [symbol] (the name of the
- *   object in the container).
+ *   object in the container). (FIXME: Currently unused)
  *)
 
 (* -------------------------------------------------------------------- *)
@@ -28,6 +28,8 @@ and path_node =
 | Psymbol of symbol
 | Pident  of EcIdent.t
 | Pqname  of path * symbol
+
+type proot = [ `Symbol of symbol | `Ident of EcIdent.t ]
 
 (* -------------------------------------------------------------------- *)
 val psymbol   : symbol -> path
@@ -66,6 +68,8 @@ val mqname  : mpath -> symbol -> mpath list -> mpath
 val m_equal   : mpath -> mpath -> bool
 val m_compare : mpath -> mpath -> int
 val m_hash    : mpath -> int
+
+val m_split : mpath -> (mpath * symbol * mpath list) option
 
 (* -------------------------------------------------------------------- *)
 type xpath = private {

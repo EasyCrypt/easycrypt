@@ -19,6 +19,8 @@ type mpath = {
   m_tag  : int;
 }
 
+type proot = [ `Symbol of symbol | `Ident of EcIdent.t ]
+
 (* -------------------------------------------------------------------- *)
 let p_equal   = ((==) : path -> path -> bool)
 let p_hash    = fun p -> p.p_tag
@@ -143,7 +145,7 @@ module Hm = MPath.H
 let mk_mpath node =
   Hsmpath.hashcons { m_node = node; m_tag = -1; }
 
-let mpath p args = mk_mpath (p,args)
+let mpath p args = mk_mpath (p, args)
 
 let mident  id = mk_mpath (pident  id, [[]])
 let msymbol id = mk_mpath (psymbol id, [[]])
@@ -151,6 +153,13 @@ let msymbol id = mk_mpath (psymbol id, [[]])
 let mqname m id a = 
   let (p, args) = m.m_node in
     mk_mpath (pqname (p, id), a::args) 
+
+let m_split { m_node = ({ p_node = p }, args) } =
+  match p, args with
+  | Pqname (prefix, x), a :: pfargs ->
+      Some (mpath prefix pfargs, x, a)
+
+  | _, _ -> None
 
 let path_of_mpath m = fst m.m_node
 let args_of_mpath m = snd m.m_node

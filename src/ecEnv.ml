@@ -965,30 +965,31 @@ module Mod = struct
       env bindings
 
   let add (path : EcPath.mpath) (env : env) =
-    let obj = by_mpath path env in 
-    MC.import Px.for_module env path obj
+    let obj = by_mpath path env in
+      MC.import Px.for_module env path obj
+
+  let rec unfold_mod_path (env : env) (p : EcPath.mpath) =
+    let unfold_mod_path_prefix (env : env) (p : EcPath.mpath) =
+      match EcPath.m_split p with
+      | None ->
+          p
+
+      | Some (prefix, x, args) ->
+          let prefix = unfold_mod_path env prefix in
+          let args   = List.map (unfold_mod_path env) args in
+            EcPath.mqname prefix x args
+    in
+      match by_mpath_opt p env with
+      | None -> unfold_mod_path_prefix env p
+
+      | Some me -> begin
+          match me.me_body with
+          | ME_Alias alias ->
+              unfold_mod_path env alias
   
-(*  let unfold1_mod_name (env : env) (name : EcPath.cref) =
-    match name with
-    | EcPath.CRefMid  _ -> (name, [])
-    | EcPath.CRefPath p -> begin
-        match by_path_opt p env with
-        | None   -> (name, [])
-        | Some m -> begin
-            match m.me_body with
-            | ME_Ident       p         -> (p, [])
-            | ME_Application (p, args) -> (p, args)
-            | ME_Decl _                -> (name, [])
-            | ME_Structure _           -> (name, [])
-          end
-      end
-  
-  let rec unfold_mod (env : env) (name, args) =
-    let (name', args') = unfold1_mod_name env name in
-      if EcPath.cref_equal name name' then
-        (name', List.map (fun x -> unfold_mod env (x, [])) (args' @ args))
-      else
-        unfold_mod env (name', args' @ args) *)
+          | _ ->
+              unfold_mod_path_prefix env p
+        end
 
   let enter name params env =
     let env = enter name (List.map fst params) env in
