@@ -138,18 +138,6 @@ let rec subst_tyexpr (s : subst) (e : tyexpr) =
       let e2 = subst_tyexpr s e2 in
         e_if c e1 e2
 
-
-
-
-
-
-
-
-
-
-(* SUBSTITUTION OVER MODULES *)
-
-
 (* -------------------------------------------------------------------- *)
 let rec subst_modsig_body_item (s : subst) (item : module_sig_body_item) =
   match item with
@@ -315,8 +303,8 @@ and subst_module_body (s : subst) (body : module_body) =
       ME_Decl (subst_path s p)
 
 (* -------------------------------------------------------------------- *)
-and subst_module_comps (_s : subst) (_comps : module_comps) =
-  []                                    (* FIXME *)
+and subst_module_comps (s : subst) (comps : module_comps) =
+  (subst_module_items s comps : module_comps)
 
 (* -------------------------------------------------------------------- *)
 and subst_module (s : subst) (m : module_expr) =

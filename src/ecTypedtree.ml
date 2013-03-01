@@ -788,15 +788,9 @@ let rec transmod (env : EcEnv.env) (x : symbol) (m : pmodule_expr) =
           EcSubst.empty args atymods
       in
 
-      let mty_path = EcPath.path_of_mpath mname
-      and mty_args = EcPath.args_of_mpath mname in
-
-        assert (mty_args <> []);
-        assert (List.hd mty_args = []);
-
       (* EcSubstitute args. in result type *)
         { me_name  = x;
-          me_body  = ME_Alias (EcPath.mpath mty_path (List.map fst args :: (List.tl mty_args)));
+          me_body  = ME_Alias (EcPath.m_apply mname (List.map fst args));
           me_comps = EcSubst.subst_module_comps bsubst mty.me_comps;
           me_sig   = {
             mt_params = [];

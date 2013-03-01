@@ -161,6 +161,11 @@ let m_split { m_node = ({ p_node = p }, args) } =
 
   | _, _ -> None
 
+let m_apply { m_node = (p, args) } newargs =
+  match args with
+  | [] -> assert false
+  | a :: args -> mpath p ((a @ newargs) :: args)
+
 let path_of_mpath m = fst m.m_node
 let args_of_mpath m = snd m.m_node
 

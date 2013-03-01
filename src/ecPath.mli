@@ -70,6 +70,7 @@ val m_compare : mpath -> mpath -> int
 val m_hash    : mpath -> int
 
 val m_split : mpath -> (mpath * symbol * mpath list) option
+val m_apply : mpath -> mpath list -> mpath
 
 (* -------------------------------------------------------------------- *)
 type xpath = private {
