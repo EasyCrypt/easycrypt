@@ -6,7 +6,7 @@ open EcUidgen
 open EcParsetree
 open EcTypes
 open EcDecl
-open EcTypesmod
+open EcModules
 open EcTheory
 
 (* -------------------------------------------------------------------- *)

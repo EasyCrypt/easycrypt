@@ -5,7 +5,7 @@ open EcSymbols
 open EcParsetree
 open EcTypes
 open EcDecl
-open EcTypesmod
+open EcModules
 open EcFol
 
 module MMsym = EcSymbols.MMsym

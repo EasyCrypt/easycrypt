@@ -5,7 +5,7 @@ open EcSymbols
 open EcTypes
 open EcDecl
 open EcFol
-open EcTypesmod
+open EcModules
 open EcTheory
 
 (* -------------------------------------------------------------------- *)
@@ -94,9 +94,9 @@ type preenv = private {
 and premc = private {
   mc_parameters : (EcIdent.t * module_type)        list;
   mc_variables  : (mpath * varbind)                Msym.t;
-  mc_functions  : (mpath * EcTypesmod.function_)   Msym.t;
-  mc_modules    : (mpath * EcTypesmod.module_expr) Msym.t;
-  mc_modtypes   : (mpath * EcTypesmod.module_sig)  Msym.t;
+  mc_functions  : (mpath * EcModules.function_)    Msym.t;
+  mc_modules    : (mpath * EcModules.module_expr)  Msym.t;
+  mc_modtypes   : (mpath * EcModules.module_sig)   Msym.t;
   mc_typedecls  : (mpath * EcDecl.tydecl)          Msym.t;
   mc_operators  : (mpath * EcDecl.operator)        Msym.t;
   mc_axioms     : (mpath * EcDecl.axiom)           Msym.t;
@@ -111,9 +111,9 @@ and premc = private {
 
 and activemc = {
   amc_variables  : (mpath * varbind)                MMsym.t;
-  amc_functions  : (mpath * EcTypesmod.function_)   MMsym.t;
-  amc_modules    : (mpath * EcTypesmod.module_expr) MMsym.t;
-  amc_modtypes   : (mpath * EcTypesmod.module_sig)  MMsym.t;
+  amc_functions  : (mpath * EcModules.function_)    MMsym.t;
+  amc_modules    : (mpath * EcModules.module_expr)  MMsym.t;
+  amc_modtypes   : (mpath * EcModules.module_sig)   MMsym.t;
   amc_typedecls  : (mpath * EcDecl.tydecl)          MMsym.t;
   amc_operators  : (mpath * EcDecl.operator)        MMsym.t;
   amc_axioms     : (mpath * EcDecl.axiom)           MMsym.t;

@@ -3,7 +3,7 @@ open EcUtils
 open EcSymbols
 open EcDecl
 
-open EcTypesmod
+open EcModules
 
 (* -------------------------------------------------------------------- *)
 type theory = theory_item list

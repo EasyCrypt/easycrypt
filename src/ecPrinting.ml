@@ -4,7 +4,7 @@ open EcUtils
 open EcFormat
 open EcTypes
 open EcFol
-open EcTypesmod
+open EcModules
 open EcTheory
 open EcDecl
 open EcParsetree

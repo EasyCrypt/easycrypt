@@ -3,7 +3,7 @@ open EcUtils
 open EcTypes
 open EcDecl
 open EcFol
-open EcTypesmod
+open EcModules
 open EcTheory
 
 module Sp    = EcPath.Sp

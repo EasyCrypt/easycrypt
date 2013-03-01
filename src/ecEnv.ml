@@ -5,7 +5,7 @@ open EcPath
 open EcTypes
 open EcFol
 open EcDecl
-open EcTypesmod
+open EcModules
 open EcTheory
 open EcWhy3
 
@@ -118,9 +118,9 @@ type preenv = {
 and premc = {
   mc_parameters : (EcIdent.t * module_type)        list;
   mc_variables  : (mpath * varbind)                Msym.t;
-  mc_functions  : (mpath * EcTypesmod.function_)   Msym.t;
-  mc_modules    : (mpath * EcTypesmod.module_expr) Msym.t;
-  mc_modtypes   : (mpath * EcTypesmod.module_sig)  Msym.t;
+  mc_functions  : (mpath * EcModules.function_)    Msym.t;
+  mc_modules    : (mpath * EcModules.module_expr)  Msym.t;
+  mc_modtypes   : (mpath * EcModules.module_sig)   Msym.t;
   mc_typedecls  : (mpath * EcDecl.tydecl)          Msym.t;
   mc_operators  : (mpath * EcDecl.operator)        Msym.t;
   mc_axioms     : (mpath * EcDecl.axiom)           Msym.t;
@@ -130,9 +130,9 @@ and premc = {
 
 and activemc = {
   amc_variables  : (mpath * varbind)                MMsym.t;
-  amc_functions  : (mpath * EcTypesmod.function_)   MMsym.t;
-  amc_modules    : (mpath * EcTypesmod.module_expr) MMsym.t;
-  amc_modtypes   : (mpath * EcTypesmod.module_sig)  MMsym.t;
+  amc_functions  : (mpath * EcModules.function_)    MMsym.t;
+  amc_modules    : (mpath * EcModules.module_expr)  MMsym.t;
+  amc_modtypes   : (mpath * EcModules.module_sig)   MMsym.t;
   amc_typedecls  : (mpath * EcDecl.tydecl)          MMsym.t;
   amc_operators  : (mpath * EcDecl.operator)        MMsym.t;
   amc_axioms     : (mpath * EcDecl.axiom)           MMsym.t;
@@ -309,21 +309,21 @@ module MC = struct
       px_toactmc = (fun m mc -> { mc with amc_variables = m });
     }
 
-    let for_function : EcTypesmod.function_ projector = {
+    let for_function : EcModules.function_ projector = {
       px_premc   = (fun mc -> mc.mc_functions);
       px_topremc = (fun m mc -> { mc with mc_functions = m });
       px_actmc   = (fun mc -> mc.amc_functions);
       px_toactmc = (fun m mc -> { mc with amc_functions = m });
     }
 
-    let for_module : EcTypesmod.module_expr projector = {
+    let for_module : EcModules.module_expr projector = {
       px_premc   = (fun mc -> mc.mc_modules);
       px_topremc = (fun m mc -> { mc with mc_modules = m });
       px_actmc   = (fun mc -> mc.amc_modules);
       px_toactmc = (fun m mc -> { mc with amc_modules = m });
     }
 
-    let for_modtype : EcTypesmod.module_sig projector = {
+    let for_modtype : EcModules.module_sig projector = {
       px_premc   = (fun mc -> mc.mc_modtypes);
       px_topremc = (fun m mc -> { mc with mc_modtypes = m });
       px_actmc   = (fun mc -> mc.amc_modtypes);
@@ -701,7 +701,7 @@ end
 module Fun = struct
   module Px = MC.Px
 
-  type t = EcTypesmod.function_
+  type t = EcModules.function_
 
   let by_path (p : EcPath.path) (env : env) =
     MC.lookup_by_path Px.for_function.Px.px_premc p env 

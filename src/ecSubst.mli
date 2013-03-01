@@ -1,7 +1,7 @@
 (* -------------------------------------------------------------------- *)
 open EcSymbols
 open EcPath
-open EcTypesmod
+open EcModules
 open EcTypes
 open EcTheory
 open EcDecl

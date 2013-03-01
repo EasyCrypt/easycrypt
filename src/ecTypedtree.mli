@@ -3,7 +3,7 @@ open EcSymbols
 open EcParsetree
 open EcTypes
 open EcDecl
-open EcTypesmod
+open EcModules
 
 (* -------------------------------------------------------------------- *)
 type tyerror =

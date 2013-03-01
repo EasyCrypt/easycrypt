@@ -45,7 +45,7 @@ and f_node =
   | Fapp    of form * form list                  (* application *)
   | Ftuple  of form list                         (* tuple constructor   *)
 
-  | Fhoare of form * EcTypesmod.function_def * form
+  | Fhoare of form * EcModules.function_def * form
 
 (*
 type gty = 
