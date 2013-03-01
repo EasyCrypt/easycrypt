@@ -64,7 +64,7 @@ val transform    : Fenv.fenv -> EcUnify.unienv -> pformula -> ty -> EcFol.form
 
 (* -------------------------------------------------------------------- *)
 val transmodsig  : EcEnv.env -> symbol -> pmodule_sig  -> module_sig
-val transmodtype : EcEnv.env -> pmodule_type -> module_type
+val transmodtype : EcEnv.env -> pmodule_type -> module_type * module_sig
 val transmod     : EcEnv.env -> symbol -> pmodule_expr -> module_expr
 
 (* -------------------------------------------------------------------- *)

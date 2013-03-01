@@ -226,6 +226,7 @@ module ModTy : sig
   val add  : EcPath.path -> env -> env
   val bind : symbol -> t -> env -> env
 
+  val mod_type_equiv : env -> module_type -> module_type -> bool
   val has_mod_type : env -> module_type list -> module_type -> bool
 end
 

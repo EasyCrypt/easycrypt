@@ -1026,37 +1026,11 @@ module ModTy = struct
     let obj = by_path path env in 
     MC.import Px.for_modtype env (EcPath.mpath_of_path path) obj
 
-(*  let unfold1_mod_type_name (env : env) (name : EcPath.cref) =
-    match name with
-    | EcPath.CRefMid _ -> (name, [])
-    | EcPath.CRefPath name -> begin
-        match by_path_opt name env with
-        | None   -> (EcPath.CRefPath name, [])
-        | Some i -> begin
-            match i.tyms_desc with
-            | Mty_app (p, args) -> (p, args)
-            | Mty_sig _ -> (EcPath.CRefPath name, [])
-          end
-      end
+  let mod_type_equiv (_ : env) (mty1 : module_type) (mty2 : module_type) =
+    EcPath.p_equal mty1 mty2
 
-  let rec unfold_mod_type (env : env) ((name, args) : module_type_desc) =
-    let (name', args') = unfold1_mod_type_name env name in
-      if EcPath.cref_equal name name' then
-        (name', List.map (fun x -> Mod.unfold_mod env (x, [])) (args' @ args))
-      else
-        unfold_mod_type env (name', args' @ args)
-
-  let mod_type_equiv (env : env) i1 i2 =
-    let (name1, args1) = unfold_mod_type env i1
-    and (name2, args2) = unfold_mod_type env i2 in
-      EcPath.xcref_equal (name1, args1) (name2, args2)
-  
-  let has_mod_type (env : env) is i2 =
-    List.exists ((mod_type_equiv env)^~ i2) is *)
-
-  let has_mod_type (_ : env) (_ : module_type list) (_ : module_type) =
-    true
-
+  let has_mod_type (env : env) (dst : module_type list) (src : module_type) =
+    List.exists (mod_type_equiv env src) dst
 end
 
 (* -------------------------------------------------------------------- *)

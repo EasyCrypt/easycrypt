@@ -515,40 +515,17 @@ let lookup_module_type (env : EcEnv.env) (name : pqsymbol) =
   | None   -> tyerror name.pl_loc (UnknownTyModName (unloc name))
   | Some x -> x
 
-(*
-(* -------------------------------------------------------------------- *)
-let rec transmodsig (env : EcEnv.env) (Pmty_struct sig_ : pmodule_sig) =
-      let params = 
-        List.map 
-          (fun (aname, aty) ->
-              let aname = EcIdent.create (unloc aname) in
-              let (p, aty) = lookup_module_sig transmodtype_name env aty in
-              let mty = module_expr_of_module_type aname aty in
-                (EcEnv.Mod.bind_local aname mty env, (aname, aty)))
-          istruct.pmsig_params in
-
-      let body  = transmodsig_body env istruct.pmsig_body in
-      let comps = {
-        tymc_params = params;
-        tymc_body   = body;
-        tymc_mforb  = Sp.empty;         (* FIXME *)
-      } in
-
-        { tyms_desc  = Mty_sig (params, body);
-          tyms_comps = comps; }
-*)
-
-
 (* -------------------------------------------------------------------- *)
 let transmodtype (env : EcEnv.env) (modty : pmodule_type) =
-  fst (lookup_module_type env modty)
+  lookup_module_type env modty
 
 (* -------------------------------------------------------------------- *)
 let rec transmodsig (env : EcEnv.env) (name : symbol) (modty : pmodule_sig) =
   let Pmty_struct modty = modty in
 
   let margs =
-    List.map (fun (x, i) -> (EcIdent.create (unloc x), transmodtype env i))
+    List.map (fun (x, i) ->
+      (EcIdent.create (unloc x), fst (transmodtype env i)))
       modty.pmsig_params
   in
 
@@ -646,27 +623,24 @@ let tysig_item_kind = function
   | Tys_variable _ -> `Variable
   | Tys_function _ -> `Function
 
-let rec check_tymod_cnv _mode (_env : EcEnv.env) _tin _tout =
-  ()
-
-(*  
+let rec check_tymod_cnv mode (env : EcEnv.env) tin tout =
   (* Check parameters for compatibility. Parameters names may be
    * different, hence, substitute in [tin.tym_params] types the names
    * of [tout.tym_params] *)
   
-  if List.length tin.tymc_params <> List.length tout.tymc_params then
+  if List.length tin.mt_params <> List.length tout.mt_params then
     tymod_cnv_failure E_TyModCnv_ParamCountMismatch;
 
   let bsubst =
     List.fold_left2
-      (fun subst (xin, { tymt_desc = tyin }) (xout, { tymt_desc = tyout }) ->
-        let tyin = EcSubst.subst_modtype_desc subst tyin in
+      (fun subst (xin, tyin) (xout, tyout) ->
+        let tyin = EcSubst.subst_modtype subst tyin in
           begin
             if not (EcEnv.ModTy.mod_type_equiv env tyin tyout) then
               tymod_cnv_failure (E_TyModCnv_ParamTypeMismatch xin)
           end;
-          EcSubst.add_module subst xout (EcPath.CRefMid xin))
-      EcSubst.empty tin.tymc_params tout.tymc_params
+          EcSubst.add_module subst xout (EcPath.mident xin))
+      EcSubst.empty tin.mt_params tout.mt_params
   in
     (* Check for body inclusion (w.r.t the parameters names substitution).
      * This includes:
@@ -674,8 +648,8 @@ let rec check_tymod_cnv _mode (_env : EcEnv.env) _tin _tout =
      *   included use modifiers.
      * - Inclusion of forbidden names set *)
 
-  let tin  = EcSubst.subst_modsig_body bsubst tin.tymc_body
-  and tout = tout.tymc_body in
+  let tin  = EcSubst.subst_modsig_body bsubst tin.mt_body
+  and tout = tout.mt_body in
 
   let check_item_compatible =
     let check_var_compatible (xin, tyin) (xout, tyout) =
@@ -753,8 +727,11 @@ let rec check_tymod_cnv _mode (_env : EcEnv.env) _tin _tout =
               tymod_cnv_failure (E_TyModCnv_MissingComp i_name))
         tin
     end
-*)
 
+let check_tymod_sub = check_tymod_cnv `Sub
+and check_tymod_eq  = check_tymod_cnv `Eq
+
+(* -------------------------------------------------------------------- *)
 let add_local known_ids s = 
   match Mstr.find_opt s.pl_desc !known_ids with
     | None -> 
@@ -762,11 +739,6 @@ let add_local known_ids s =
       s.pl_desc
     | Some s' -> tyerror s.pl_loc (DuplicatedLocals (Some s')) 
 
-
-let check_tymod_sub = check_tymod_cnv `Sub
-and check_tymod_eq  = check_tymod_cnv `Eq
-
-(* -------------------------------------------------------------------- *)
 let rec transmod (env : EcEnv.env) (x : symbol) (m : pmodule_expr) =
   match m with
   | Pm_ident ({ pl_desc = m }, args) -> begin
@@ -810,7 +782,7 @@ and transstruct (env : EcEnv.env) (x : symbol) (st : pstructure) =
   let stparams =
     List.map                          (* FIXME: exn *)
       (fun (a, aty) ->
-         (EcIdent.create a.pl_desc, transmodtype env aty))
+         (EcIdent.create a.pl_desc, fst (transmodtype env aty)))
       st.ps_params
   in
 
@@ -852,7 +824,7 @@ and transstruct (env : EcEnv.env) (x : symbol) (st : pstructure) =
   (* Check that generated signature is structurally included in
    * associated type mode. *)
   let types = List.map (transmodtype env) st.ps_signature in
-    List.iter (check_tymod_sub env tymod) types;
+    List.iter (check_tymod_sub env tymod) (List.map snd types);
 
   (* Construct structure representation *)
     { me_name  = x;
@@ -861,7 +833,7 @@ and transstruct (env : EcEnv.env) (x : symbol) (st : pstructure) =
       me_comps = List.map snd items;
       me_uses  = Sp.empty;              (* FIXME *)
       me_sig   = tymod;
-      me_types = types; }
+      me_types = List.map fst types; }
 
 (* -------------------------------------------------------------------- *)
 and transstruct1 (env : EcEnv.env) (st : pstructure_item) =

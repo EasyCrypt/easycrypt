@@ -49,7 +49,7 @@ end
 type use_flags = UM.flags
 
 (* -------------------------------------------------------------------- *)
-type module_type = EcPath.path 
+type module_type = EcPath.path
 
 type module_sig = {
   mt_params : (EcIdent.t * module_type) list;
