@@ -968,14 +968,14 @@ let destr_ty_tuple t =
   | _ -> assert false 
 
 let rec trans_expr env vm e =
-  match e.tye_desc with
+  match e.tye_node with
   | Eint n -> 
       let n = Term.ConstInt(Term.IConstDecimal (string_of_int n)) in
       Term.t_const n 
   | Elocal id -> trans_lv vm id
   | Evar _p -> assert false 
   | Eop(p,tys) -> trans_app env vm p tys [] 
-  | Eapp({tye_desc = Eop(p,tys) },args) ->
+  | Eapp({tye_node = Eop(p,tys) },args) ->
       let args = List.map (trans_expr env vm) args in
       trans_app env vm p tys args
   | Eapp(e,args) ->

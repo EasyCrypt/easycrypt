@@ -6,6 +6,9 @@ open EcDecl
 open EcModules
 
 (* -------------------------------------------------------------------- *)
+module Sp = EcPath.Sp
+
+(* -------------------------------------------------------------------- *)
 type theory = theory_item list
 
 and theory_item =

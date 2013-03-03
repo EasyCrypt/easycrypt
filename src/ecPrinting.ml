@@ -511,7 +511,7 @@ struct
   (* ------------------------------------------------------------------ *)
   let pr_expr (tenv : t) (e : tyexpr) =
     let rec pr_expr (tenv : t) outer (e : tyexpr) =
-        match e.tye_desc with
+        match e.tye_node with
         | Evar x ->
             pr_pv_symb tenv x.pv_name None
 
@@ -530,8 +530,8 @@ struct
         | Etuple es ->
             pr_tuple_expr tenv pr_expr es
 
-        | Eapp({tye_desc = Eop(op,tys) }, args) -> 
-            pr_app e_ty tenv pr_expr outer op tys args
+        | Eapp({tye_node = Eop(op, tys) }, args) -> 
+            pr_app (fun _ -> assert false) tenv pr_expr outer op tys args (* FIXME *)
 
         | Eapp (e, args) -> 
             let docs = List.map (pr_expr tenv (min_op_prec, `NonAssoc)) args in
@@ -601,7 +601,7 @@ struct
   (* ------------------------------------------------------------------ *)
   let pr_instr (tenv : t) (i : instr) =
     let doc =
-      match i with
+      match i.i_node with
       | Sasgn (lv, e) ->
           pr_seq [pr_lvalue tenv lv; Pp.equals; pr_expr tenv e]
       | Srnd (lv, e) ->
@@ -682,7 +682,7 @@ struct
                 tenv
                 (List.map fst ((fst f.f_sig.fs_sig) @ def.f_locals))
             in
-              List.map (pr_instr bodytenv) def.f_body
+              List.map (pr_instr bodytenv) def.f_body.s_node
           in
             (pr_seq [prelude; Pp.equals]) ^/^ (pr_mblocks [dlocals; dbody])
 
@@ -786,7 +786,7 @@ struct
                 tenv
                 (List.map fst (def.f_locals))
             in
-              List.map (pr_instr bodytenv) def.f_body
+              List.map (pr_instr bodytenv) def.f_body.s_node
           in
         (* end of copy pasted *)
 
@@ -796,22 +796,6 @@ struct
 
     in
       pr_form tenv (min_op_prec, `NonAssoc) f
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
   (* ------------------------------------------------------------------ *)
   let pr_opdecl (tenv : t) ((x, op) : EcPath.path * operator) =

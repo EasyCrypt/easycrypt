@@ -1,23 +1,162 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open EcSymbols
-(* open EcDecl *)
 
 (* -------------------------------------------------------------------- *)
 module Sp = EcPath.Sp
 
 (* -------------------------------------------------------------------- *)
-module UM : sig
-  type flag  = [`Call | `Read | `Write]
-  type flags
+type memory = Mem of EcIdent.t
 
-  val empty     : flags
-  val singleton : flag -> flags
-  val add       : flags -> flag -> flags
-  val have      : flags -> flag -> bool
-  val equal     : flags -> flags -> bool
-  val included  : flags -> flags -> bool
-end = struct
+(* -------------------------------------------------------------------- *)
+type lvalue =
+  | LvVar   of (EcTypes.prog_var * EcTypes.ty)
+  | LvTuple of (EcTypes.prog_var * EcTypes.ty) list
+  | LvMap   of (EcPath.path * EcTypes.ty list) * 
+                  EcTypes.prog_var * EcTypes.tyexpr * EcTypes.ty
+
+let lv_equal lv1 lv2 =
+  match lv1, lv2 with
+  | LvVar (pv1, ty1), LvVar (pv2, ty2) ->
+         (EcTypes.pv_equal pv1 pv2)
+      && (EcTypes.ty_equal ty1 ty2)
+
+  | LvTuple tu1, LvTuple tu2 ->
+      List.all2
+        (fun (pv1, ty1) (pv2, ty2) ->
+             (EcTypes.pv_equal pv1 pv2)
+          && (EcTypes.ty_equal ty1 ty2))
+        tu1 tu2
+
+  | LvMap ((p1, tys1), pv1, e1, ty1),
+    LvMap ((p2, tys2), pv2, e2, ty2) ->
+
+         (EcPath.p_equal   p1  p2 )
+      && (EcTypes.pv_equal pv1 pv2)
+      && (EcTypes.e_equal  e1  e2 )
+      && (EcTypes.ty_equal ty1 ty2)
+      && (List.all2 EcTypes.ty_equal tys1 tys2)
+
+  | _, _ -> false
+
+(* -------------------------------------------------------------------- *)
+type instr = {
+  i_node : instr_node;
+  i_tag  : int;
+}
+
+and instr_node =
+  | Sasgn   of lvalue * EcTypes.tyexpr
+  | Srnd    of lvalue * EcTypes.tyexpr
+  | Scall   of lvalue option * EcPath.mpath * EcTypes.tyexpr list
+  | Sif     of EcTypes.tyexpr * stmt * stmt
+  | Swhile  of EcTypes.tyexpr * stmt
+  | Sassert of EcTypes.tyexpr
+
+and stmt = {
+  s_node : instr list;
+  s_tag  : int;
+}
+
+(* -------------------------------------------------------------------- *)
+let i_equal   = ((==) : instr -> instr -> bool)
+let i_hash    = fun i -> i.i_tag
+let i_compare = fun i1 i2 -> i_hash i1 - i_hash i2
+
+let s_equal   = ((==) : stmt -> stmt -> bool)
+let s_hash    = fun s -> s.s_tag
+let s_compare = fun s1 s2 -> s_hash s1 - s_hash s2
+
+(* -------------------------------------------------------------------- *)
+module Hinstr = Why3.Hashcons.Make (struct 
+  type t = instr
+
+  let equal_node i1 i2 = 
+    match i1, i2 with
+    | Sasgn (lv1, e1), Sasgn (lv2, e2) ->
+        (lv_equal lv1 lv2) && (EcTypes.e_equal e1 e2)
+
+    | Srnd (lv1, e1), Srnd (lv2, e2) ->
+        (lv_equal lv1 lv2) && (EcTypes.e_equal e1 e2)
+
+    | Scall (lv1, m1, es1), Scall (lv2, m2, es2) ->
+           (EcUtils.opt_equal lv_equal lv1 lv2)
+        && (EcPath.m_equal m1 m2)
+        && (List.all2 EcTypes.e_equal es1 es2)
+
+    | Sif (c1, s1, r1), Sif (c2, s2, r2) ->
+           (EcTypes.e_equal c1 c2)
+        && (s_equal s1 s2)
+        && (s_equal r1 r2)
+
+    | Swhile (c1, s1), Swhile (c2, s2) ->
+           (EcTypes.e_equal c1 c2)
+        && (s_equal s1 s2)
+
+    | Sassert e1, Sassert e2 ->
+        (EcTypes.e_equal e1 e2)
+
+    | _, _ -> false
+
+  let equal i1 i2 = equal_node i1.i_node i2.i_node
+
+  let hash p = 
+    match p.i_node with
+    | Sasgn (lv, e) ->
+        Why3.Hashcons.combine
+          (Hashtbl.hash lv) (EcTypes.e_hash e)
+
+    | Srnd (lv, e) ->
+        Why3.Hashcons.combine
+          (Hashtbl.hash lv) (EcTypes.e_hash e)
+
+    | Scall (lv, m, tys) ->
+        Why3.Hashcons.combine_list EcTypes.e_hash
+          (Why3.Hashcons.combine
+             (Hashtbl.hash lv) (EcPath.m_hash m))
+          tys
+
+    | Sif (c, s1, s2) ->
+        Why3.Hashcons.combine2
+          (EcTypes.e_hash c) (s_hash s1) (s_hash s2)
+
+    | Swhile (c, s) ->
+        Why3.Hashcons.combine (EcTypes.e_hash c) (s_hash s)
+
+    | Sassert e -> EcTypes.e_hash e
+          
+  let tag n p = { p with i_tag = n }
+end)
+
+(* -------------------------------------------------------------------- *)
+module Hstmt = Why3.Hashcons.Make (struct 
+  type t = stmt
+
+  let equal_node s1 s2 =
+    List.all2 i_equal s1 s2
+
+  let equal s1 s2 = equal_node s1.s_node s2.s_node
+
+  let hash p =
+    Why3.Hashcons.combine_list i_hash 0 p.s_node
+          
+  let tag n p = { p with s_tag = n }
+end)
+
+(* -------------------------------------------------------------------- *)
+let mk_instr i = Hinstr.hashcons { i_node = i; i_tag = -1; }
+
+let asgn   (lv, e)      = mk_instr (Sasgn (lv, e))
+let rnd    (lv, e)      = mk_instr (Srnd (lv, e))
+let call   (lv, m, tys) = mk_instr (Scall (lv, m, tys))
+let if_    (c, s1, s2)  = mk_instr (Sif (c, s1, s2))
+let while_ (c, s)       = mk_instr (Swhile (c, s))
+let assert_ e           = mk_instr (Sassert e)
+
+let stmt s = Hstmt.hashcons { s_node = s; s_tag = -1 }
+
+(* -------------------------------------------------------------------- *)
+module UM = struct
   (* TODO: to be rewritten using -pxp OCaml 4.0 feature *)
 
   type flag  = [`Call | `Read | `Write]
@@ -114,25 +253,3 @@ and variable = {
   v_name : symbol;
   v_type : EcTypes.ty;
 }
-
-and stmt = instr list
-
-and instr =
-  | Sasgn   of lvalue * EcTypes.tyexpr
-  | Srnd    of lvalue * EcTypes.tyexpr
-  | Scall   of lvalue option * EcPath.mpath * EcTypes.tyexpr list
-  | Sif     of EcTypes.tyexpr * stmt * stmt
-  | Swhile  of EcTypes.tyexpr * stmt
-  | Sassert of EcTypes.tyexpr
-
-and lvalue =
-  | LvVar   of (EcTypes.prog_var * EcTypes.ty)
-  | LvTuple of (EcTypes.prog_var * EcTypes.ty) list
-  | LvMap   of (EcPath.path * EcTypes.ty list) * 
-               EcTypes.prog_var * EcTypes.tyexpr * EcTypes.ty
- (* LvMap(op, m, x, ty)
-  * - op is the set operator
-  * - m  is the map to be updated 
-  * - x  is the index to update
-  * - ty is the type of the value associated to x
-  *)

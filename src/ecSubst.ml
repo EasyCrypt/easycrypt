@@ -105,7 +105,7 @@ let subst_pvar s x =
   { x with pv_name = subst_mpath s x.pv_name } 
   
 let rec subst_tyexpr (s : subst) (e : tyexpr) =
-  match e.tye_desc with
+  match e.tye_node with
   | Eint i ->
       e_int i
 
@@ -172,39 +172,40 @@ and subst_modsig (s : subst) (comps : module_sig) =
 
 (* -------------------------------------------------------------------- *)
 let rec subst_stmt (s : subst) (stmt : stmt) =
-  List.map (subst_instr s) stmt
+  EcModules.stmt (List.map (subst_instr s) stmt.s_node)
 
 (* -------------------------------------------------------------------- *)
 and subst_instr (s : subst) (instr : instr) =
-  match instr with
+  match instr.i_node with
   | Sasgn (lv, e) ->
       let lv = subst_lvalue s lv in
       let e  = subst_tyexpr s e  in
-      Sasgn (lv, e)
+        asgn (lv, e)
+
   | Srnd (lv, e) ->
       let lv = subst_lvalue s lv in
       let e  = subst_tyexpr s e  in
-      Srnd (lv, e)
+        rnd (lv, e)
 
   | Scall (lv, p, es) ->
       let lv = omap lv (subst_lvalue s) in
       let p  = subst_mpath s p in
       let es = List.map (subst_tyexpr s) es in
-        Scall (lv, p, es)
+        call (lv, p, es)
 
   | Sif (e, s1, s2) ->
       let e  = subst_tyexpr s e  in
       let s1 = subst_stmt   s s1 in
       let s2 = subst_stmt   s s2 in
-        Sif (e, s1, s2)
+        if_ (e, s1, s2)
 
   | Swhile (e, st) ->
       let e  = subst_tyexpr s e  in
       let st = subst_stmt   s st in
-        Swhile (e, st)
+        while_ (e, st)
 
   | Sassert e ->
-      Sassert (subst_tyexpr s e)
+      assert_ (subst_tyexpr s e)
 
 (* -------------------------------------------------------------------- *)
 and subst_lvalue (s : subst) (lvalue : lvalue) =

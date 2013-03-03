@@ -184,9 +184,7 @@ let pv_hash v =
   Why3.Hashcons.combine (EcPath.m_hash v.pv_name)
     (if v.pv_kind = PVglob then 1 else 0)
 
-  
 (* -------------------------------------------------------------------- *)
-
 type lpattern =
   | LSymbol of EcIdent.t
   | LTuple  of EcIdent.t list
@@ -202,68 +200,119 @@ let lp_hash = function
   | LTuple lx -> Why3.Hashcons.combine_list EcIdent.tag 0 lx
 
 (* -------------------------------------------------------------------- *)
-
 type tyexpr = {
-  tye_desc : tyexpr_r;
-  tye_meta : tyexpr_meta option;
+  tye_node : tyexpr_node;
+  tye_tag  : int;
 }
 
-and tyexpr_r =
-  | Eint      of int                              (* int. literal          *)
-  | Elocal    of EcIdent.t                        (* let-variables         *)
-  | Evar      of prog_var                         (* module variable       *)
-  | Eop       of EcPath.path * ty list            (* op apply to type args *)
-  | Eapp      of tyexpr * tyexpr list             (* op. application       *)
-  | Elet      of lpattern * tyexpr * tyexpr       (* let binding           *)
-  | Etuple    of tyexpr list                      (* tuple constructor     *)
-  | Eif       of tyexpr * tyexpr * tyexpr         (* _ ? _ : _             *)
+and tyexpr_node =
+  | Eint   of int                        (* int. literal          *)
+  | Elocal of EcIdent.t                  (* let-variables         *)
+  | Evar   of prog_var                   (* module variable       *)
+  | Eop    of EcPath.path * ty list      (* op apply to type args *)
+  | Eapp   of tyexpr * tyexpr list       (* op. application       *)
+  | Elet   of lpattern * tyexpr * tyexpr (* let binding           *)
+  | Etuple of tyexpr list                (* tuple constructor     *)
+  | Eif    of tyexpr * tyexpr * tyexpr   (* _ ? _ : _             *)
 
-and tyexpr_meta = {
-  tym_type : ty;
-}
-
-let e_ty e = (oget e.tye_meta).tym_type
 (* -------------------------------------------------------------------- *)
-let e_tyexpr (e : tyexpr_r) =
-  { tye_desc = e; tye_meta = None; }
+let e_equal   = ((==) : tyexpr -> tyexpr -> bool)
+let e_hash    = fun e -> e.tye_tag
+let e_compare = fun e1 e2 -> e_hash e1 - e_hash e2
 
-let e_int      = fun i        -> e_tyexpr (Eint i)
-let e_local    = fun x        -> e_tyexpr (Elocal x)
-let e_var      = fun x        -> e_tyexpr (Evar x)
-let e_op       = fun x targs  -> e_tyexpr (Eop (x, targs))
+(* -------------------------------------------------------------------- *)
+module Hexpr = Why3.Hashcons.Make (struct 
+  type t = tyexpr
+
+  let equal_node e1 e2 =
+    match e1, e2 with
+    | Eint   i1, Eint   i2 -> i1 == i2
+    | Elocal x1, Elocal x2 -> EcIdent.id_equal x1 x2
+    | Evar   x1, Evar   x2 -> pv_equal x1 x2
+
+    | Eop (p1, tys1), Eop (p2, tys2) ->
+           (EcPath.p_equal p1 p2)
+        && (List.all2 ty_equal tys1 tys2)
+
+    | Eapp (e1, es1), Eapp (e2, es2) ->
+           (e_equal e1 e2)
+        && (List.all2 e_equal es1 es2)
+
+    | Elet (lp1, e1, f1), Elet (lp2, e2, f2) ->
+        (lp_equal lp1 lp2) && (e_equal e1 e2) && (e_equal f1 f2)
+
+    | Etuple es1, Etuple es2 ->
+        List.all2 e_equal es1 es2
+
+    | Eif (c1, e1, f1), Eif (c2, e2, f2) ->
+        (e_equal c1 c2) && (e_equal e1 e2) && (e_equal f1 f2)
+
+    | _, _ -> false
+
+  let equal e1 e2 = equal_node e1.tye_node e2.tye_node
+
+  let hash e = 
+    match e.tye_node with
+    | Eint   i -> Hashtbl.hash i
+    | Elocal x -> Hashtbl.hash x
+    | Evar   x -> pv_hash x
+
+    | Eop (p, tys) ->
+        Why3.Hashcons.combine_list ty_hash
+          (EcPath.p_hash p) tys
+
+    | Eapp (e, es) ->
+        Why3.Hashcons.combine_list e_hash (e_hash e) es
+
+    | Elet (p, e1, e2) ->
+        Why3.Hashcons.combine2
+          (lp_hash p) (e_hash e1) (e_hash e2)
+
+    | Etuple es ->
+        Why3.Hashcons.combine_list e_hash 0 es
+
+    | Eif (c, e1, e2) ->
+        Why3.Hashcons.combine2
+          (e_hash c) (e_hash e1) (e_hash e2)
+          
+  let tag n e = { e with tye_tag = n }
+end)
+
+(* -------------------------------------------------------------------- *)
+let mk_tyexpr e =
+  Hexpr.hashcons { tye_node = e; tye_tag = -1; }
+
+let e_int   = fun i        -> mk_tyexpr (Eint i)
+let e_local = fun x        -> mk_tyexpr (Elocal x)
+let e_var   = fun x        -> mk_tyexpr (Evar x)
+let e_op    = fun x targs  -> mk_tyexpr (Eop (x, targs))
+let e_let   = fun pt e1 e2 -> mk_tyexpr (Elet (pt, e1, e2))
+let e_tuple = fun es       -> mk_tyexpr (Etuple es)
+let e_if    = fun c e1 e2  -> mk_tyexpr (Eif (c, e1, e2))
+
 let e_app x args = 
-  match x.tye_desc with
-  | Eapp(x', args') -> e_tyexpr (Eapp (x', (args'@args)))
-  | _ -> e_tyexpr (Eapp (x, args))
-
-let e_let      = fun pt e1 e2 -> e_tyexpr (Elet (pt, e1, e2))
-let e_tuple    = fun es       -> e_tyexpr (Etuple es)
-let e_if       = fun c e1 e2  -> e_tyexpr (Eif (c, e1, e2))
-
+  match x.tye_node with
+  | Eapp(x', args') -> mk_tyexpr (Eapp (x', (args'@args)))
+  | _ -> mk_tyexpr (Eapp (x, args))
 
 (* -------------------------------------------------------------------- *)
 let ids_of_lpattern = function
   | LSymbol id -> [id] 
   | LTuple ids -> ids
 
-let rec e_map fty fmeta fe e =
-  { tye_desc = e_map_r fty fe e.tye_desc;
-    tye_meta = fmeta e.tye_meta; }
-
-and e_map_r fty fe e =
-  match e with 
-  | Eint _                -> e
-  | Elocal id             -> Elocal id
-  | Evar id               -> Evar id
-  | Eop (p, tys)          -> Eop(p, List.map fty tys)
-  | Eapp (e, args)        -> Eapp(fe e, List.map fe args)
-  | Elet (lp, e1, e2)     -> Elet (lp, fe e1, fe e2)
-  | Etuple le             -> Etuple (List.map fe le)
-  | Eif (e1, e2, e3)      -> Eif (fe e1, fe e2, fe e3)
-
+let e_map fty fe e =
+  match e.tye_node with 
+  | Eint _
+  | Elocal _
+  | Evar _                -> e
+  | Eop (p, tys)          -> e_op p (List.map fty tys)
+  | Eapp (e, args)        -> e_app (fe e) (List.map fe args)
+  | Elet (lp, e1, e2)     -> e_let lp (fe e1) (fe e2)
+  | Etuple le             -> e_tuple (List.map fe le)
+  | Eif (e1, e2, e3)      -> e_if (fe e1) (fe e2) (fe e3)
 
 let rec e_fold fe state e =
-  e_fold_r fe state e.tye_desc
+  e_fold_r fe state e.tye_node
 
 and e_fold_r fe state e =
   match e with
@@ -280,9 +329,8 @@ and e_fold_r fe state e =
 (* -------------------------------------------------------------------- *)
 module Esubst = struct 
   let mapty onty = 
-    let onmeta _ = None in
-    let rec aux e = e_map onty onmeta aux e in
-    aux 
+    let rec aux e = e_map onty aux e in
+      aux 
 
   let uni (uidmap : ty Muid.t) = mapty (Tuni.subst uidmap)
 end
@@ -311,7 +359,7 @@ module Dump = struct
 
   let ex_dump pp =
     let rec ex_dump pp e =
-      match e.tye_desc with
+      match e.tye_node with
       | Eint i ->
           EcDebug.single pp ~extra:(string_of_int i) "Eint"
 

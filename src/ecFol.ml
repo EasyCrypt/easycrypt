@@ -1,14 +1,11 @@
+(* -------------------------------------------------------------------- *)
 open EcUtils
 open EcMaps
 open EcIdent
 open EcTypes
+open EcModules
 
-type quantif = 
-  | Lforall
-  | Lexists
-
-type binding = (EcIdent.t * ty) list
-
+(* -------------------------------------------------------------------- *)
 module Side : sig
   type t = int
   (* For non relational formula *)
@@ -27,17 +24,29 @@ end = struct
   let s_hash x = x
 end
 
+(* -------------------------------------------------------------------- *)
+type gty =
+  | GTty    of EcTypes.ty
+  | GTmem   of memory
+  | GTmodty of module_type
+
+type quantif = 
+  | Lforall
+  | Lexists
+
+type binding = (EcIdent.t * ty) list
+
 type form = { 
-    f_node : f_node;
-    f_ty   : ty; 
-    f_fv   : EcIdent.Sid.t;
-    f_tag  : int;
-  }
+  f_node : f_node;
+  f_ty   : ty; 
+  f_fv   : EcIdent.Sid.t;
+  f_tag  : int;
+}
 
 and f_node = 
-  | Fquant of quantif * binding * form
-  | Fif    of form * form * form
-  | Flet   of lpattern * form * form
+  | Fquant  of quantif * binding * form
+  | Fif     of form * form * form
+  | Flet    of lpattern * form * form
   | Fint    of int                               (* int. literal              *)
   | Flocal  of EcIdent.t                         (* Local variable            *)
   | Fpvar   of EcTypes.prog_var * Side.t         (* sided symbol              *)
@@ -45,7 +54,7 @@ and f_node =
   | Fapp    of form * form list                  (* application *)
   | Ftuple  of form list                         (* tuple constructor   *)
 
-  | Fhoare of form * EcModules.function_def * form
+  | Fhoare  of form * EcModules.function_def * form
 
 (*
 type gty = 
@@ -81,12 +90,6 @@ forall (k:int) {G.x = k } c { Q} <= e
 *)
 
 (* spec : var decl equivS *)
-
-
-
-
-
-
  
 let fv f = f.f_fv 
 let ty f = f.f_ty
@@ -158,9 +161,10 @@ module Hsform = Why3.Hashcons.Make (struct
         Why3.Hashcons.combine2 (f_hash b) (f_hash t) (f_hash f)
     | Flet(lp,e,f) ->
         Why3.Hashcons.combine2 (lp_hash lp) (f_hash e) (f_hash f)
-    | Fint i    -> i
+    | Fint i -> i
     | Flocal id -> EcIdent.tag id 
-    | Fpvar(pv,s) -> Why3.Hashcons.combine (EcTypes.pv_hash pv) (Side.s_hash s)
+    | Fpvar(pv,s) ->
+        Why3.Hashcons.combine (EcTypes.pv_hash pv) (Side.s_hash s)
     | Fop(p,lty) -> 
         Why3.Hashcons.combine_list ty_hash (EcPath.p_hash p) lty
     | Fapp(f,args) ->
@@ -168,10 +172,9 @@ module Hsform = Why3.Hashcons.Make (struct
     | Ftuple args ->
         Why3.Hashcons.combine_list f_hash 0 args
     | Fhoare(p,_,q) -> (* FIXME: no hashing for stmts! *)
-      Why3.Hashcons.combine (f_hash p) (f_hash q)
+        Why3.Hashcons.combine (f_hash p) (f_hash q)
 
   let tag n f = { f with f_tag = n }
-      
 end)
 
 let mk_form node ty =  Hsform.hashcons 
@@ -312,7 +315,6 @@ let is_exists f =
   | _ -> false
   
 (* -------------------------------------------------------------------- *)
-
 let map gt g f = 
   match f.f_node with
   | Fquant(q,b,f) -> 
@@ -378,7 +380,6 @@ type rule_name =
   | RN_global of EcPath.path * ty list
     (* p: ['as], f in E  ==> E,G |- f{'as <- tys} *)
 
-
   | RN_exc_midle 
     (* E;G |- A \/ !A *)
 
@@ -424,7 +425,6 @@ type rule = (rule_name, l_decl) EcBaseLogic.rule
 type judgment = (rule_name, l_decl) EcBaseLogic.judgment
 
 module LDecl = struct
-
   type error = 
     | UnknownSymbol   of EcSymbols.symbol 
     | UnknownIdent    of EcIdent.t
@@ -508,7 +508,6 @@ module LDecl = struct
   let add_local id ld hyps = 
     check_id id hyps;
     { hyps with h_local = (id,ld)::hyps.h_local }
-
 
   let clear id hyps = 
     let r,(_,ld), l = 

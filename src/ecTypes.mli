@@ -70,8 +70,9 @@ type lpattern =
 
 val lp_equal : lpattern -> lpattern -> bool
 val lp_hash  : lpattern -> int 
+
 (* -------------------------------------------------------------------- *)
-type pvar_kind = 
+type pvar_kind =
   | PVglob
   | PVloc
 
@@ -84,25 +85,27 @@ val pv_equal : prog_var -> prog_var -> bool
 val pv_hash  : prog_var -> int
 
 (* -------------------------------------------------------------------- *)
-type tyexpr = {
-  tye_desc : tyexpr_r;
-  tye_meta : tyexpr_meta option;
+type tyexpr = private {
+  tye_node : tyexpr_node;
+  tye_tag  : int;
 }
 
-and tyexpr_r =
-  | Eint      of int                              (* int. literal          *)
-  | Elocal    of EcIdent.t                        (* let-variables         *)
-  | Evar      of prog_var                         (* module variable       *)
-  | Eop       of EcPath.path * ty list            (* op apply to type args *)
-  | Eapp      of tyexpr * tyexpr list             (* op. application       *)
-  | Elet      of lpattern * tyexpr * tyexpr       (* let binding           *)
-  | Etuple    of tyexpr list                      (* tuple constructor     *)
-  | Eif       of tyexpr * tyexpr * tyexpr         (* _ ? _ : _             *)
+and tyexpr_node =
+  | Eint      of int                         (* int. literal          *)
+  | Elocal    of EcIdent.t                   (* let-variables         *)
+  | Evar      of prog_var                    (* module variable       *)
+  | Eop       of EcPath.path * ty list       (* op apply to type args *)
+  | Eapp      of tyexpr * tyexpr list        (* op. application       *)
+  | Elet      of lpattern * tyexpr * tyexpr  (* let binding           *)
+  | Etuple    of tyexpr list                 (* tuple constructor     *)
+  | Eif       of tyexpr * tyexpr * tyexpr    (* _ ? _ : _             *)
 
-and tyexpr_meta = {
-  tym_type : ty;
-}
+(* -------------------------------------------------------------------- *)
+val e_equal   : tyexpr -> tyexpr -> bool
+val e_compare : tyexpr -> tyexpr -> int
+val e_hash    : tyexpr -> int
 
+(* -------------------------------------------------------------------- *)
 val e_int      : int -> tyexpr
 val e_local    : EcIdent.t -> tyexpr
 val e_var      : prog_var -> tyexpr
@@ -111,13 +114,11 @@ val e_app      : tyexpr -> tyexpr list -> tyexpr
 val e_let      : lpattern -> tyexpr -> tyexpr -> tyexpr
 val e_tuple    : tyexpr list -> tyexpr
 val e_if       : tyexpr -> tyexpr -> tyexpr -> tyexpr
-val e_ty       : tyexpr -> ty
 
 (* -------------------------------------------------------------------- *)
 val e_map :
-     (ty                 -> ty                ) (* 1-subtype op.      *)
-  -> (tyexpr_meta option -> tyexpr_meta option) (* top-level meta op. *)
-  -> (tyexpr             -> tyexpr            ) (* 1-subexpr op.      *)
+     (ty     -> ty    ) (* 1-subtype op. *)
+  -> (tyexpr -> tyexpr) (* 1-subexpr op. *)
   -> tyexpr
   -> tyexpr
 

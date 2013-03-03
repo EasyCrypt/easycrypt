@@ -140,7 +140,7 @@ let tyerror loc x = EcLocation.locate_error loc (TyError x)
 (* -------------------------------------------------------------------- *)
 let e_inuse =
   let rec inuse (map : Sm.t) (e : tyexpr) =
-    match e.tye_desc with
+    match e.tye_node with
     | Evar p -> begin
         match p.pv_kind with
         | PVglob -> Sm.add p.pv_name map
@@ -177,11 +177,12 @@ let (i_inuse, s_inuse) =
         map
 
   and i_inuse (map : use_flags Mm.t) (i : instr) =
-    match i with
+    match i.i_node with
     | Sasgn (lv, e) ->
       let map = lv_inuse map lv in
       let map = se_inuse map e in
         map
+
     | Srnd (lv, e) ->
       let map = lv_inuse map lv in
       let map = se_inuse map e in
@@ -209,7 +210,7 @@ let (i_inuse, s_inuse) =
       se_inuse map e
 
   and s_inuse (map : use_flags Mm.t) (s : stmt) =
-    List.fold_left i_inuse map s
+    List.fold_left i_inuse map s.s_node
 
   and se_inuse (map : use_flags Mm.t) (e : tyexpr) =
     Sm.fold (fun p map -> addflags p [`Read] map) (e_inuse e) map
@@ -481,18 +482,28 @@ let lvalue_mapty onty = function
   | LvMap(set,m,e,ty) -> 
       LvMap(set,m,Esubst.mapty onty e, onty ty)
 
-let rec stmt_mapty onty s = List.map (instr_mapty onty) s 
+let rec stmt_mapty onty s =
+  EcModules.stmt (List.map (instr_mapty onty) s.s_node)
 
-and instr_mapty onty = function
-  | Sasgn(x,e) -> Sasgn(lvalue_mapty onty x, Esubst.mapty onty e)
-  | Srnd(x,e) -> Sasgn(lvalue_mapty onty x, Esubst.mapty onty e)
-  | Scall(x,f,args) -> Scall(omap x (lvalue_mapty onty), f, 
-                             List.map (Esubst.mapty onty) args)
+and instr_mapty onty i =
+  match i.i_node with
+  | Sasgn(x,e) ->
+      asgn(lvalue_mapty onty x, Esubst.mapty onty e)
+
+  | Srnd(x,e) ->
+      rnd (lvalue_mapty onty x, Esubst.mapty onty e)
+
+  | Scall(x,f,args) ->
+      call (omap x (lvalue_mapty onty), f, 
+            List.map (Esubst.mapty onty) args)
+
   | Sif(e,s1,s2) -> 
-      Sif(Esubst.mapty onty e, stmt_mapty onty s1, stmt_mapty onty s2)
+      if_ (Esubst.mapty onty e, stmt_mapty onty s1, stmt_mapty onty s2)
+
   | Swhile(e,s) ->
-      Swhile(Esubst.mapty onty e, stmt_mapty onty s)
-  | Sassert e -> Sassert (Esubst.mapty onty e)
+      while_ (Esubst.mapty onty e, stmt_mapty onty s)
+
+  | Sassert e -> assert_ (Esubst.mapty onty e)
 
 (* -------------------------------------------------------------------- *)
 exception DuplicatedSigItemName
@@ -914,13 +925,13 @@ and transbody known_ids ue env body rty =
       List.iter (fun (id,_) ->
         let p,_ = 
           oget (EcEnv.Var.lookup_progvar_opt ([], id) newenv) in
-        init := Sasgn(LvVar(p,ty) , e) :: !init) locs);
+        init := asgn (LvVar(p,ty) , e) :: !init) locs);
     newenv 
   in
   let env = List.fold_left add_locals env body.pfb_locals in
   let stmt = transstmt ue env body.pfb_body in 
   (* Cesar says: I guess "init" was missing, and the natural order is used *)
-  let stmt = (List.rev !init) @ stmt in 
+  let stmt = EcModules.stmt ((List.rev !init) @ stmt.s_node) in
   let re =
     match body.pfb_return with
       | None    -> 
@@ -930,12 +941,11 @@ and transbody known_ids ue env body rty =
         let re, ty = transexp env ue pe in
         unify_error env ue pe.pl_loc ty rty; Some re 
   in
-  stmt, re, !locals, env
-
+    (stmt, re, !locals, env)
 
 (* -------------------------------------------------------------------- *)
 and transstmt ue (env : EcEnv.env) (stmt : pstmt) =
-  List.map (transinstr ue env) stmt
+  EcModules.stmt (List.map (transinstr ue env) stmt)
 
 (* -------------------------------------------------------------------- *)
 and transinstr ue (env : EcEnv.env) (i : pinstr) =
@@ -965,24 +975,24 @@ and transinstr ue (env : EcEnv.env) (i : pinstr) =
       let lvalue, lty = translvalue ue env lvalue in
       let rvalue, rty = transexp env ue rvalue in
       EcUnify.unify env ue lty rty;
-      Sasgn (lvalue, rvalue)
+      asgn (lvalue, rvalue)
 
   | PSrnd(lvalue, rvalue) -> 
       let lvalue, lty = translvalue ue env lvalue in
       let rvalue, rty = transexp env ue rvalue in
       EcUnify.unify env ue (tdistr lty) rty;
-      Srnd(lvalue, rvalue)
+      rnd(lvalue, rvalue)
 
   | PScall (None, { pl_desc = name }, args) ->
       let (fpath, args, rty) = transcall name args in
       EcUnify.unify env ue tunit rty;
-      Scall (None, fpath, args)
+      call (None, fpath, args)
 
   | PScall (Some lvalue, { pl_desc = name }, args) ->
       let lvalue, lty = translvalue ue env lvalue in
       let (fpath, args, rty) = transcall name args in
       EcUnify.unify env ue lty rty;
-      Scall (Some lvalue, fpath, args)
+      call (Some lvalue, fpath, args)
 
   | PSif (e, s1, s2) ->
       let e, ety = transexp env ue e in
@@ -990,19 +1000,19 @@ and transinstr ue (env : EcEnv.env) (i : pinstr) =
       let s2 = transstmt ue env s2 in
   
         EcUnify.unify env ue ety tbool;
-        Sif (e, s1, s2)
+        if_ (e, s1, s2)
 
   | PSwhile (e, body) ->
       let e, ety = transexp env ue e in
       let body = transstmt ue env body in
 
         EcUnify.unify env ue ety tbool;
-        Swhile (e, body)
+        while_ (e, body)
 
   | PSassert e ->
      let e, ety = transexp env ue e in 
        EcUnify.unify env ue ety tbool;
-       Sassert e
+       assert_ e
 
 (* -------------------------------------------------------------------- *)
 and trans_pv env { pl_desc = x; pl_loc = loc } = 
@@ -1030,7 +1040,7 @@ and translvalue ue (env : EcEnv.env) lvalue =
       let esig = [xty; ety; codomty] in
       let ops = select_op env name ue tvi esig in
       match ops with
-      | [ ({tye_desc = Eop (p,tys) }, _, subue)] ->
+      | [ ({tye_node = Eop (p,tys) }, _, subue)] ->
           EcUnify.UniEnv.restore ~src:subue ~dst:ue;
           (LvMap ((p,tys), pv, e, codomty), codomty) 
       | _ ->        (* FIXME: better error message *)

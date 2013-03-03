@@ -32,6 +32,13 @@ let snd_map (f : 'b -> 'c) ((x, y) : 'a * 'b) =
   (x, f y)
 
 (* -------------------------------------------------------------------- *)
+let opt_equal (f : 'a -> 'a -> bool) o1 o2 =
+  match o1, o2 with
+  | Some x1, Some x2 -> f x1 x2
+  | None   , None    -> true
+  | _      , _       -> false
+
+(* -------------------------------------------------------------------- *)
 module type IFlag = sig
   type flag
 
