@@ -87,12 +87,6 @@
     List.iter
       (fun (x, y) -> Hashtbl.add keywords x y)
       _keywords
-
-  let remove_bracket s = 
-    let len = String.length s in
-    if len > 2 && s.[0] = '[' then String.sub s 1 (String.length s - 2)
-    else s
-
 }
 
 let blank   = [' ' '\t' '\r']
@@ -120,13 +114,8 @@ let op3 = op_char_34*   op_char_3 op_char_34*
 let op4 = op_char_4+ 
 
 let binop = 
-  op1 | op2 | op3 | op4 | '!' | "&&" | "/\\" | "||" | "\\/" | "=>" | "<=>" | '>' | "=" 
-
-let pbinop = '[' binop ']'
-
-let qident = (ident '.')+ ident 
-
-let qident_binop = (ident '.')+ pbinop
+  op1 | op2 | op3 | op4 |
+  '!' | "&&" | "/\\" | "||" | "\\/" | "=>" | "<=>" | '>' | "="
 
 (* -------------------------------------------------------------------- *)
 rule main = parse
@@ -138,22 +127,7 @@ rule main = parse
   | "(*"         { comment lexbuf; main lexbuf }
   | "\""         { STRING (Buffer.contents (string (Buffer.create 0) lexbuf)) }
 
-  | qident as id {
-      let path = List.rev (String.split '.' id) in
-      let qs = List.rev (List.tl path) in
-      let s = List.hd path in
-      QIDENT (qs, s)
-    }
-
-  | qident_binop as id { 
-      let path = List.rev (String.split '.' id) in
-      let qs = List.rev (List.tl path) in
-      let s = List.hd path in
-      let s = remove_bracket s in
-      QPBINOP (qs, s)
-    }
-
-  | pbinop as s { PBINOP (remove_bracket s) }
+  | '[' (binop as s) ']' { PBINOP s }
 
   (* boolean operators *)
   | '!'                       { NOT }
@@ -171,7 +145,8 @@ rule main = parse
   | ".["                      { DLBRACKET }
   | ":="                      { CEQ }
   | "%r"                      { FROM_INT }
-  (* char symbols *)
+
+  (* punctuation *)
   | '_'                       { UNDERSCORE }
   | '('                       { LPAREN }
   | ')'                       { RPAREN }
@@ -183,7 +158,6 @@ rule main = parse
   | ">"                       { GT }                      
   | ','                       { COMMA }
   | ';'                       { SEMICOLON }
-  | '.'                       { DOT }
   | ':'                       { COLON }
   | "}^"                      { RKEY_HAT }
   | '?'                       { QUESTION }
@@ -199,6 +173,15 @@ rule main = parse
   | op2  as s                 { OP2 s }
   | op3  as s                 { OP3 s }
   | op4 as s                  { OP4 s }
+
+  (* end of sentence / stream *)
+  | '.' (eof | blank | newline as r) { 
+      if r = "\n" then
+        Lexing.new_line lexbuf;
+      FINAL
+    }
+
+  | "." { DOT }
 
   | eof { EOF }
 

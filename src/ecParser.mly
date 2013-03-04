@@ -8,7 +8,7 @@
       failwith msg
 
   let mk_loc loc e = { pl_desc = e;  pl_loc  = loc;}
-  
+
   let pqsymb_of_psymb (x : psymbol) : pqsymbol =
     mk_loc x.pl_loc ([], x.pl_desc)
 
@@ -79,8 +79,6 @@
 
 %token <EcSymbols.symbol>  IDENT
 %token <EcSymbols.symbol>  PBINOP
-%token <EcSymbols.qsymbol> QIDENT
-%token <EcSymbols.qsymbol> QPBINOP
 
 %token <int> NUM
 %token <string> PRIM_IDENT
@@ -118,6 +116,7 @@
 // %token EQUIV
 %token EXPORT
 %token EXIST
+%token FINAL
 %token FORALL
 %token FUN
 %token IF
@@ -262,14 +261,27 @@
 %inline prim_ident : x=loc(PRIM_IDENT) { x };
 
 qident:
-| x=loc(IDENT)  { pqsymb_of_psymb x }
-| x=loc(QIDENT) { x }
+| xs=plist1(IDENT, DOT) {
+    let xs = List.rev xs in
+      { pl_desc = (List.rev (List.tl xs), List.hd xs);
+        pl_loc  = EcLocation.make $startpos(xs) $endpos(xs);
+      }
+  }
 ;
 
 qident_pbinop:
-| x=qident       { x }
-| x=loc(PBINOP)  { pqsymb_of_psymb x }
-| x=loc(QPBINOP) { x }
+| x=qident
+   { x }
+
+| x=loc(PBINOP)
+    { pqsymb_of_psymb x }
+
+| xs=plist1(IDENT, DOT) DOT x=PBINOP {
+    { pl_desc = (xs, x);
+      pl_loc  = EcLocation.make $startpos(xs) $endpos(x);
+    }
+  }
+;
 
 (* -------------------------------------------------------------------- *)
 %inline ident_list1c: aout=plist1(ident, COMMA) { aout };
@@ -1124,7 +1136,7 @@ stop:
 ;
 
 global:
-| g=global_ DOT { g }
+| g=global_ FINAL { g }
 ;
 
 prog:
