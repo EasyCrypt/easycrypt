@@ -6,6 +6,7 @@ open EcTypes
 open EcModules
 
 (* -------------------------------------------------------------------- *)
+(* TODO remove Side *)
 module Side : sig
   type t = int
   (* For non relational formula *)
