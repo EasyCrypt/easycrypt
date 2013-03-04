@@ -115,6 +115,12 @@ let ofdfl (d : unit -> 'a) (x : 'a option) =
 let oget (x : 'a option) =
   match x with None -> assert false | Some x -> x
 
+let oall2 f x y = 
+  match x, y with
+  | Some x, Some y -> f x y
+  | None  , None   -> true
+  | _     , _      -> false 
+
 (* -------------------------------------------------------------------- *)
 let fstmap f (x, y) = (f x, y)
 let sndmap f (x, y) = (x, f y)
