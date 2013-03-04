@@ -4,6 +4,7 @@ open EcFormat
 open EcPath
 open EcUidgen
 open EcParsetree
+open EcMemory
 open EcTypes
 open EcDecl
 open EcModules

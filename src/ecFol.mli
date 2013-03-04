@@ -1,14 +1,16 @@
+(* -------------------------------------------------------------------- *)
 open EcIdent
 open EcTypes
 open EcModules
+open EcMemory
 
+(* -------------------------------------------------------------------- *)
 val mstd   : memory
 val mpre   : memory
 val mpost  : memory
 val mhr    : memory
 val mleft  : memory
 val mright : memory
-
 
 type gty =
   | GTty    of EcTypes.ty
@@ -49,8 +51,6 @@ and f_node =
 
   | Fpr     of memory * EcPath.mpath * form list * form
 
-and memenv = unit
-
 val f_equal : form -> form -> bool
 
 (* val fv : form -> EcIdent.Sid.t *)
@@ -59,7 +59,7 @@ val fv_node : f_node -> EcIdent.Sid.t
 val mk_form : f_node -> EcTypes.ty -> form
 
 val f_local : EcIdent.t -> EcTypes.ty -> form
-val f_pvar : EcTypes.prog_var -> EcTypes.ty -> EcModules.memory -> form
+val f_pvar : EcTypes.prog_var -> EcTypes.ty -> memory -> form
 
 val f_true : form
 val f_false : form

@@ -5,9 +5,6 @@ open EcPath
 open EcTypes
 
 (* -------------------------------------------------------------------- *)
-type memory = EcIdent.t
-
-(* -------------------------------------------------------------------- *)
 (* LvMap (op, m, x, ty)
  * - op is the map-set operator
  * - m  is the map to be updated 

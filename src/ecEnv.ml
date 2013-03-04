@@ -4,6 +4,7 @@ open EcSymbols
 open EcPath
 open EcTypes
 open EcFol
+open EcMemory
 open EcDecl
 open EcModules
 open EcTheory
@@ -106,13 +107,15 @@ type varbind = {
 }
 
 type preenv = {
-  env_scope  : EcPath.mpath;
-  env_current: activemc;
-  env_comps  : premc EcPath.Mp.t;
-  env_locals : (EcIdent.t * EcTypes.ty) MMsym.t;
-  env_w3     : EcWhy3.env;
-  env_rb     : EcWhy3.rebinding;        (* in reverse order *)
-  env_item   : ctheory_item list        (* in reverse order *)
+  env_scope    : EcPath.mpath;
+  env_current  : activemc;
+  env_comps    : premc EcPath.Mp.t;
+  env_locals   : (EcIdent.t * EcTypes.ty) MMsym.t;
+  env_memories : (EcMemory.memory * EcMemory.memenv) MMsym.t;
+  env_actmem   : EcMemory.memory option;
+  env_w3       : EcWhy3.env;
+  env_rb       : EcWhy3.rebinding;        (* in reverse order *)
+  env_item     : ctheory_item list        (* in reverse order *)
 }
 
 and premc = {
@@ -181,16 +184,18 @@ let empty =
   let path = EcPath.msymbol EcCoreLib.id_top
   and name = EcCoreLib.id_top in
   let env  =
-    { env_scope   = path;
-      env_current = { empty_activemc with
-                        amc_components = MMsym.add name
-                          (EcPath.path_of_mpath path)
-                          MMsym.empty; };
-      env_comps   = Mp.singleton (EcPath.psymbol name) empty_premc;
-      env_locals  = MMsym.empty;
-      env_w3      = EcWhy3.empty;
-      env_rb      = [];
-      env_item    = [];
+    { env_scope    = path;
+      env_current  = { empty_activemc with
+                         amc_components = MMsym.add name
+                           (EcPath.path_of_mpath path)
+                           MMsym.empty; };
+      env_comps    = Mp.singleton (EcPath.psymbol name) empty_premc;
+      env_locals   = MMsym.empty;
+      env_memories = MMsym.empty;
+      env_actmem   = None;
+      env_w3       = EcWhy3.empty;
+      env_rb       = [];
+      env_item     = [];
     }
   in
     env
@@ -631,6 +636,44 @@ let enter (name : symbol) params (env : env) =
         env_rb    = [];
         env_item  = []; }
 
+(* -------------------------------------------------------------------- *)
+type meerror =
+| UnknownMemory of [`Symbol of symbol | `Memory of memory]
+
+exception MEError of meerror
+
+(* -------------------------------------------------------------------- *)
+module Memory = struct
+  let byid (me : memory) (env : env) =
+    let memories = MMsym.all (EcIdent.name me) env.env_memories in
+    let memories = List.filter (fun (me', _) -> EcIdent.id_equal me me') memories in
+
+      match memories with
+      | []       -> None
+      | [(_, m)] -> Some m
+      | _        -> assert false
+
+  let lookup (me : symbol) (env : env) =
+    MMsym.last me env.env_memories
+
+  let set_active (me : memory) (env : env) =
+    match byid me env with
+    | None   -> raise (MEError (UnknownMemory (`Memory me)))
+    | Some _ -> { env with env_actmem = Some me }
+
+  let get_active (env : env) =
+    env.env_actmem
+
+  let current (env : env) =
+    match env.env_actmem with
+    | None    -> None
+    | Some me -> Some (me, oget (byid me env))
+
+  let push (name : symbol) (me : memenv) (env : env) =
+    let id   = EcIdent.create name in
+    let maps = MMsym.add name (id, me) env.env_memories in
+      (id, { env with env_memories = maps })
+end
 
 (* -------------------------------------------------------------------- *)
 module Var = struct

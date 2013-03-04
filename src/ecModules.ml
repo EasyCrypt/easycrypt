@@ -6,9 +6,6 @@ open EcSymbols
 module Sp = EcPath.Sp
 
 (* -------------------------------------------------------------------- *)
-type memory = EcIdent.t
-
-(* -------------------------------------------------------------------- *)
 type lvalue =
   | LvVar   of (EcTypes.prog_var * EcTypes.ty)
   | LvTuple of (EcTypes.prog_var * EcTypes.ty) list

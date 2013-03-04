@@ -1023,7 +1023,7 @@ module Fenv = struct
   type fenv = {
     fe_locals : (EcIdent.t * ty) MMsym.t; 
     fe_envs   : (EcIdent.t * EcEnv.env) MMsym.t;
-    fe_cur    : memory;
+    fe_cur    : EcMemory.memory;
   }
 
   let mono_fenv env =

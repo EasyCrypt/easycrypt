@@ -5,6 +5,8 @@ open EcIdent
 open EcTypes
 open EcModules
 
+type memory = EcMemory.memory
+
 (* -------------------------------------------------------------------- *)
 type gty =
   | GTty    of EcTypes.ty
@@ -16,7 +18,6 @@ type quantif =
   | Lexists
 
 type binding = (EcIdent.t * gty) list
-
 
 let mstd   = EcIdent.create "$std"
 let mpre   = EcIdent.create "$pre"
@@ -46,14 +47,13 @@ and f_node =
   | Fhoare  of form * EcModules.function_def * form
 
   | FhoareF of form * EcPath.mpath * form  (* $pre / $post *)
-  | FhoareS of memenv * form * stmt * form (* $hr  / $hr   *)
+  | FhoareS of EcMemory.memenv * form * stmt * form (* $hr / $hr *)
 
-  | FequivF of form * (EcPath.mpath * EcPath.mpath) * form  (* $left,$right / $left,$right *)
-  | FequivS of form * (memenv * stmt) EcUtils.double * form (* $left,$right / $left,$right *)
+    (* $left,$right / $left,$right *)
+  | FequivF of form * (EcPath.mpath * EcPath.mpath) * form
+  | FequivS of form * (EcMemory.memenv * stmt) EcUtils.double * form
 
   | Fpr     of memory * EcPath.mpath * form list * form
-
-and memenv = unit
 
 (* -------------------------------------------------------------------- *)
 let fv f = f.f_fv 

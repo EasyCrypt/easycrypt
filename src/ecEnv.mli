@@ -3,6 +3,7 @@ open EcUtils
 open EcPath
 open EcSymbols
 open EcTypes
+open EcMemory
 open EcDecl
 open EcFol
 open EcModules
@@ -73,6 +74,13 @@ type preenv = private {
   (* The set of local variables *)
   env_locals : (EcIdent.t * EcTypes.ty) MMsym.t;
 
+  (* The set of memories (i.e. sided program variables) *)
+  env_memories : (EcMemory.memory * EcMemory.memenv) MMsym.t;
+
+  (* The active memory *)
+  env_actmem : EcMemory.memory option;
+ 
+  (* Why3 environment && meta-data *)
   env_w3     : EcWhy3.env;
   env_rb     : EcWhy3.rebinding;        (* in reverse order *)
   env_item   : ctheory_item list        (* in reverse order *)
@@ -133,6 +141,22 @@ val dump : ?name:string -> EcDebug.ppdebug -> env -> unit
 
 (* -------------------------------------------------------------------- *)
 exception LookupFailure of [`Path of path | `QSymbol of qsymbol]
+
+(* -------------------------------------------------------------------- *)
+type meerror =
+| UnknownMemory of [`Symbol of symbol | `Memory of memory]
+
+exception MEError of meerror
+
+module Memory : sig
+  val set_active  : memory -> env -> env
+  val get_active  : env -> memory option
+
+  val byid    : memory -> env -> memenv option
+  val lookup  : symbol -> env -> (memory * memenv) option
+  val current : env -> (memory * memenv) option
+  val push    : symbol -> memenv -> env -> (EcIdent.t * env)
+end
 
 (* -------------------------------------------------------------------- *)
 module Fun : sig

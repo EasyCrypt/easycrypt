@@ -119,7 +119,7 @@ module type IIdentPrinter = sig
   val tv_symb    : t -> EcIdent.t    -> EcSymbols.symbol
   val ty_symb    : t -> EcPath.path  -> EcSymbols.qsymbol
   val local_symb : t -> EcIdent.t    -> EcSymbols.symbol
-  val pv_symb    : t -> EcPath.mpath -> memory option -> EcSymbols.qsymbol
+  val pv_symb    : t -> EcPath.mpath -> EcMemory.memory option -> EcSymbols.qsymbol
   val fun_symb   : t -> EcPath.mpath -> EcSymbols.qsymbol
   val mod_symb   : t -> EcPath.mpath -> EcSymbols.qsymbol
   val modty_symb : t -> EcPath.path  -> EcSymbols.qsymbol
@@ -205,7 +205,7 @@ struct
     pr_symbol (M.local_symb tenv x)
 
   (* ------------------------------------------------------------------ *)
-  let pr_pv_symb (tenv : t) (p : EcPath.mpath) (io : memory option) =
+  let pr_pv_symb (tenv : t) (p : EcPath.mpath) (io : EcMemory.memory option) =
     pr_qsymbol (M.pv_symb tenv p io)
 
   (* ------------------------------------------------------------------ *)
