@@ -100,7 +100,7 @@ and premc = private {
   mc_typedecls  : (mpath * EcDecl.tydecl)          Msym.t;
   mc_operators  : (mpath * EcDecl.operator)        Msym.t;
   mc_axioms     : (mpath * EcDecl.axiom)           Msym.t;
-  mc_theories   : (mpath * ctheory)     Msym.t;
+  mc_theories   : (mpath * ctheory)                Msym.t;
   mc_components : path                             Msym.t;
 }
 
@@ -117,7 +117,7 @@ and activemc = {
   amc_typedecls  : (mpath * EcDecl.tydecl)          MMsym.t;
   amc_operators  : (mpath * EcDecl.operator)        MMsym.t;
   amc_axioms     : (mpath * EcDecl.axiom)           MMsym.t;
-  amc_theories   : (mpath * ctheory)     MMsym.t;
+  amc_theories   : (mpath * ctheory)                MMsym.t;
   amc_components : path                             MMsym.t;
 }
 

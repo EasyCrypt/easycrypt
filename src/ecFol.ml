@@ -36,6 +36,13 @@ type quantif =
 
 type binding = (EcIdent.t * gty) list
 
+let mstd   = EcIdent.create "$std"
+let mpre   = EcIdent.create "$pre"
+let mpost  = EcIdent.create "$post"
+let mhr    = EcIdent.create "$hr"
+let mleft  = EcIdent.create "$left"
+let mright = EcIdent.create "$right"
+
 type form = { 
   f_node : f_node;
   f_ty   : ty; 
@@ -49,48 +56,23 @@ and f_node =
   | Flet    of lpattern * form * form
   | Fint    of int                               (* int. literal              *)
   | Flocal  of EcIdent.t                         (* Local variable            *)
-  | Fpvar   of EcTypes.prog_var * Side.t         (* sided symbol              *)
+  | Fpvar   of EcTypes.prog_var * memory         (* sided symbol              *)
   | Fop     of EcPath.path * ty list             (* Op/pred application to ty *)
   | Fapp    of form * form list                  (* application *)
   | Ftuple  of form list                         (* tuple constructor   *)
 
   | Fhoare  of form * EcModules.function_def * form
 
-(*
-type gty = 
-  | GTty of EcTypes.ty
-  | GTmem 
-  | GTinter of mod_interf 
+  | FhoareF of form * EcPath.mpath * form  (* $pre / $post *)
+  | FhoareS of memenv * form * stmt * form (* $hr  / $hr   *)
 
-type binding = (EcIdent.t * gty) list
+  | FequivF of form * (EcPath.mpath * EcPath.mpath) * form  (* $left,$right / $left,$right *)
+  | FequivS of form * (memenv * stmt) EcUtils.double * form (* $left,$right / $left,$right *)
 
-and f_node = 
-  | Fquant of quantif * binding * form
-  | Fif    of form * form * form
-  | Flet   of lpattern * form * form
-  | Fint    of int                               (* int. literal              *)
-  | Flocal  of EcIdent.t                         (* Local variable            *)
-  | Fop     of EcPath.path * ty list             (* Op/pred application to ty *)
-  | Fapp    of form * form list                  (* application *)
-  | Ftuple  of form list                         (* tuple constructor   *)
+  | Fpr     of memory * EcPath.mpath * form list * form
 
-  (* Extra construction *)
-  | Fpvar   of EcTypes.prog_var * mem (* mem can be EcIdent.t *)
-  | FhoareF of (mem * form) * mod_app_fun * (mem * form)
-  | FhoareS of form * stmt * form 
-  | FequivF of mod_app_fun * mod_app_fun * form * form 
-  | FequivS of stmt * stmt * form * form
-    (* Fpr(m,F,args,P) = Pr[m, F(args) : P] () *)
-  | Fpr     of mem * mod_app_fun * form list * form 
+and memenv = unit
 
-forall (A:I), {P} G(A).f {Q}
-forall (k:int) {G.x = k } c { Q} <= e
- 
- 
-*)
-
-(* spec : var decl equivS *)
- 
 (* -------------------------------------------------------------------- *)
 let fv f = f.f_fv 
 let ty f = f.f_ty
@@ -150,7 +132,7 @@ module Hsform = Why3.Hashcons.Make (struct
         EcIdent.id_equal id1 id2
 
     | Fpvar(pv1,s1), Fpvar(pv2,s2) -> 
-        Side.s_equal s1 s2 && EcTypes.pv_equal pv1 pv2
+        EcIdent.id_equal s1 s2 && EcTypes.pv_equal pv1 pv2
 
     | Fop(p1,lty1), Fop(p2,lty2) ->
         EcPath.p_equal p1 p2 && List.all2 ty_equal lty1 lty2
@@ -184,7 +166,7 @@ module Hsform = Why3.Hashcons.Make (struct
     | Flocal id -> EcIdent.tag id
 
     | Fpvar(pv, s) ->
-        Why3.Hashcons.combine (EcTypes.pv_hash pv) (Side.s_hash s)
+        Why3.Hashcons.combine (EcTypes.pv_hash pv) (EcIdent.id_hash s)
 
     | Fop(p, lty) -> 
         Why3.Hashcons.combine_list ty_hash (EcPath.p_hash p) lty

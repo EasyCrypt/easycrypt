@@ -6,8 +6,6 @@ open EcUtils
 let qsymb_of_symb (x : symbol) : qsymbol = ([], x)
 
 (* -------------------------------------------------------------------- *)
-
-(* -------------------------------------------------------------------- *)
 type 'a located = {
   pl_loc  : EcLocation.t;
   pl_desc : 'a;
@@ -19,13 +17,15 @@ let dummyloc x = { pl_loc = EcLocation.dummy; pl_desc = x }
 let dummy_pqs_of_ps s = dummyloc (qsymb_of_symb (unloc s))
 
 (* -------------------------------------------------------------------- *)
-type side = int
+type side = symbol
 
+type pmemory  = symbol  located         (* memory  symbol  *)
 type psymbol  = symbol  located         (* located symbol  *)
  and pqsymbol = qsymbol located         (* located qsymbol *)
+
 type posymbol = symbol option located
 
-type pty = pty_r    located             (* located type *)
+type pty = pty_r located                (* located type *)
 
 and pty_r =
   | PTunivar
@@ -143,10 +143,9 @@ type ptydecl = {
 }
 
 (* -------------------------------------------------------------------- *)
-
 type pfct_game = pqsymbol
 
-type ptyped_mem = int * pfct_game 
+type ptyped_mem = pmemory * pfct_game
 
 type pformula = pformula_r located
 
@@ -154,16 +153,18 @@ and pformula_r =
   | PFint    of int                       (* int. literal      *)
   | PFtuple  of pformula list             (* tuple             *)
   | PFident  of pqsymbol * tvar_inst      (* symbol            *)
-  | PFside   of pformula * side         
+  | PFside   of pformula * pmemory
   | PFapp    of pformula * pformula list
   | PFif     of pformula * pformula * pformula
   | PFlet    of lpattern * pformula * pformula
   | PFforall of ptylocals * pformula
   | PFexists of ptylocals * pformula
+
   (* for claim *)
   | PFforallm of ptyped_mem list * pformula
   | PFexistsm of ptyped_mem list * pformula
-  | PFprob    of pfct_game * int * pformula
+  | PFprob    of pfct_game * pmemory * pformula
+
   (* test *)
   | PFhoare   of pformula * pfunction_body * pformula
 

@@ -24,10 +24,7 @@
   let unterminated_string () =
     raise (LexicalError (None, "unterminated string"))
 
-
-
   let _keywords = [                      (* see [keywords.py] *)
-
     "forall"      , FORALL     ;        (* KW: prog *)
     "exists"      , EXIST      ;        (* KW: prog *)
     "let"         , LET        ;        (* KW: prog *)
@@ -90,6 +87,7 @@
     List.iter
       (fun (x, y) -> Hashtbl.add keywords x y)
       _keywords
+
   let remove_bracket s = 
     let len = String.length s in
     if len > 2 && s.[0] = '[' then String.sub s 1 (String.length s - 2)
@@ -159,10 +157,10 @@ rule main = parse
 
   (* boolean operators *)
   | '!'                       { NOT }
-  | "&&"                      { AND true}
-  | "/\\"                     { AND false}
-  | "||"                      { OR true}
-  | "\\/"                     { OR false}
+  | "&&"                      { AND true }
+  | "/\\"                     { AND false }
+  | "||"                      { OR true }
+  | "\\/"                     { OR false }
   | "=>"                      { IMPL }
   | "<=>"                     { IFF }
 

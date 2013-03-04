@@ -11,6 +11,7 @@ type tyerror =
   | UnknownFunction          of qsymbol
   | UnknownTypeName          of qsymbol
   | UnknownTyModName         of qsymbol
+  | UnknownMemory            of symbol
   | UnknownModName           of qsymbol
   | UnknownOperatorForSig    of qsymbol * ty list
   | InvalidNumberOfTypeArgs  of qsymbol * int * int

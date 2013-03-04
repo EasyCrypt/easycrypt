@@ -16,6 +16,8 @@ module Mp = EcPath.Mp
 module Sm = EcPath.Sm
 module Mm = EcPath.Mm
 
+module Mid = EcIdent.Mid
+
 (* -------------------------------------------------------------------- *)
 let dloc = EcLocation.dummy               (* FIXME: TO BE REMOVED *)
 
@@ -25,6 +27,7 @@ type tyerror =
   | UnknownFunction          of qsymbol
   | UnknownTypeName          of qsymbol
   | UnknownTyModName         of qsymbol
+  | UnknownMemory            of symbol
   | UnknownModName           of qsymbol
   | UnknownOperatorForSig    of qsymbol * ty list
   | InvalidNumberOfTypeArgs  of qsymbol * int * int
@@ -580,40 +583,6 @@ and transmodsig_body (env : EcEnv.env) (is : pmodule_sig_struct_body) =
       items
 
 (* -------------------------------------------------------------------- *)
-(*
-type pmodule_sig =
-  | Pmty_struct of pmodule_sig_struct
-
-and pmodule_type = pqsymbol 
-
-and pmodule_sig_struct = {
-  pmsig_params : (psymbol * pmodule_type) list;
-  pmsig_body   : pmodule_sig_struct_body;
-}
-
-and pmodule_sig_struct_body = pmodule_sig_item list
-
-and pmodule_sig_item = [
-  | `VariableDecl of pvariable_decl
-  | `FunctionDecl of pfunction_decl
-]
-
-and pvariable_decl = {
-  pvd_name : psymbol;
-  pvd_type : pty;
-}
-
-and pfunction_decl = {
-  pfd_name     : psymbol;
-  pfd_tyargs   : ptylocals;
-  pfd_tyresult : pty;
-  pfd_uses     : (pqsymbol list) option;
-}
-*)
-
-
-
-(* -------------------------------------------------------------------- *)
 type tymod_cnv_failure =
 | E_TyModCnv_ParamCountMismatch
 | E_TyModCnv_ParamTypeMismatch of EcIdent.t
@@ -1050,28 +1019,36 @@ and translvalue ue (env : EcEnv.env) lvalue =
 (* -------------------------------------------------------------------- *)
 (** Translation of formula *)
 
-(* Cesar says: I don't understand this, you can only update fe_envs at 0 *)
 module Fenv = struct
-
   type fenv = {
     fe_locals : (EcIdent.t * ty) MMsym.t; 
-    fe_envs : EcEnv.env EcMaps.Mint.t;
-    fe_cur : int
+    fe_envs   : (EcIdent.t * EcEnv.env) MMsym.t;
+    fe_cur    : memory;
   }
 
-  let mono_fenv env = {
-    fe_locals = MMsym.empty;
-    fe_envs = EcMaps.Mint.add 0 env EcMaps.Mint.empty;
-    fe_cur = 0;
-  }
+  let mono_fenv env =
+    let mstd = EcFol.mstd in
+      { fe_locals = MMsym.empty;
+        fe_envs   = MMsym.add (EcIdent.name mstd) (mstd, env) MMsym.empty;
+        fe_cur    = EcFol.mstd;
+      }
 
-  let mono fenv = 
-    try EcMaps.Mint.find 0 fenv.fe_envs
-    with _ -> assert false 
+  let byname (x : symbol) env =
+    MMsym.last x env.fe_envs
+
+  let byid (x : EcIdent.t) env =
+    let bindings = MMsym.all (EcIdent.name x) env.fe_envs in
+      match List.filter (fun (y, _) -> EcIdent.id_equal x y) bindings with
+      | []     -> None
+      | [data] -> Some (snd data)
+      | _      -> assert false
+
+  let mono fenv =
+    oget (byid EcFol.mstd fenv)
 
   let bind_local fenv x ty =
    { fenv with 
-     fe_locals = MMsym.add (EcIdent.name x) (x,ty) fenv.fe_locals }
+       fe_locals = MMsym.add (EcIdent.name x) (x, ty) fenv.fe_locals }
 
   let bind_locals = List.fold_left2 bind_local 
 
@@ -1085,13 +1062,11 @@ module Fenv = struct
     bind_locals fenv lid lty 
 
   let current_env fenv = 
-    try EcMaps.Mint.find fenv.fe_cur fenv.fe_envs 
-    with _ -> assert false (* FIXME *)
+    oget (byid fenv.fe_cur fenv)
 
   let set_side fenv side = 
-    if EcMaps.Mint.mem side fenv.fe_envs then
-      { fenv with fe_cur = side }
-    else assert false (* FIXME *)
+    assert (byid side fenv <> None);
+    { fenv with fe_cur = side }
 
   let select_logical fenv (qs,s) =
     if qs = [] then
@@ -1145,9 +1120,14 @@ let transform fenv ue pf tt =
             EcUnify.UniEnv.restore ~src:subue ~dst:ue;
             op
         end
-    | PFside(f,side) ->
-        let fenv = Fenv.set_side fenv side in
-        transf fenv f
+    | PFside(f,side) -> begin
+        match Fenv.byname (unloc side) fenv with
+        | None -> tyerror side.pl_loc (UnknownMemory (unloc side))
+        | Some (side, _) -> begin
+          let fenv = Fenv.set_side fenv side in
+            transf fenv f
+        end
+    end
     | PFapp({pl_desc = PFident({ pl_desc = name; pl_loc = loc }, tvi)}, es) ->
         let tvi = transtvi (Fenv.mono fenv) ue tvi in  
         let es   = List.map (transf fenv) es in
@@ -1177,17 +1157,20 @@ let transform fenv ue pf tt =
         let f2 = transf fenv f2 in
         let f3 = transf fenv f3 in
         f_if f1 f2 f3
+
     | PFlet(lp,pf1,f2) ->
         let (penv, p, pty) = transfpattern fenv ue lp in
         let f1 = transf fenv pf1 in
         unify_error (Fenv.mono fenv) ue pf1.pl_loc f1.f_ty pty;
         let f2 = transf penv f2 in
         f_let p f1 f2 
+
     | PFforall(xs, pf) ->
         let fenv, xs = transl tp_relax fenv ue xs in
         let f = transf fenv pf in
         unify_error (Fenv.mono fenv) ue pf.pl_loc f.f_ty tbool;
         f_forall (List.map (fun (x, ty) -> (x, GTty ty)) xs) f
+
     | PFexists(xs, f1) ->
         let fenv, xs = transl tp_relax fenv ue xs in
         let f = transf fenv f1 in

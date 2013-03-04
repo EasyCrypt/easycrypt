@@ -279,25 +279,27 @@ qident_pbinop:
 
 (* -------------------------------------------------------------------- *)
 %inline binop:
-| EQ      { "="  }
+| EQ      { "=" }
 | x=AND   { str_and x }
 | x=OR    { str_or x  }
-| STAR    { "*"  }
-| GT      { ">"  }
-| x=OP1   { x    }
-| x=OP2   { x    }
-| x=OP3   { x    }
-| x=OP4   { x    }
+| STAR    { "*" }
+| GT      { ">" }
+| x=OP1   { x   }
+| x=OP2   { x   }
+| x=OP3   { x   }
+| x=OP4   { x   }
 ;
-
 
 (* -------------------------------------------------------------------- *)
 prog_num:
-| LKEY n=number RKEY { 
-  if n > 0 then n else 
-  error
-    (EcLocation.make $startpos(n) $endpos(n))
-    "variable side must be greater than 0"
+| LKEY x=qident RKEY {
+    let (qn, id) = x.pl_desc in
+      if qn <> [] then
+        error
+          (EcLocation.make $startpos(x) $endpos(x))
+          "memory names cannot be qualified"
+      else
+        { x with pl_desc = id }
   }
 ;
 
@@ -537,10 +539,11 @@ form:
 
 | LET p=lpattern EQ e1=loc(form) IN e2=loc(form) { PFlet (p, e1, e2) }
 
-| FORALL pd=param_decl1 COMMA e=loc(form) { PFforall(pd, e) }
-| FORALL pd=mem_decl   COMMA e=loc(form) { PFforallm(pd, e) }
-| EXIST  pd=param_decl1 COMMA e=loc(form) { PFexists(pd, e) }
-| EXIST  pd=mem_decl   COMMA e=loc(form) { PFexistsm(pd, e) }
+| FORALL pd=param_decl1 COMMA e=loc(form) { PFforall  (pd, e) }
+| FORALL pd=mem_decl    COMMA e=loc(form) { PFforallm (pd, e) }
+| EXIST  pd=param_decl1 COMMA e=loc(form) { PFexists  (pd, e) }
+| EXIST  pd=mem_decl    COMMA e=loc(form) { PFexistsm (pd, e) }
+
 (* Distribution *)
 | LKEY n1=number op=loc(COMMA) n2=number RKEY_HAT e=loc(sform)
     { if   n1 = 0 && n2 = 1 then 
@@ -553,6 +556,7 @@ form:
 //%inline form_list0: aout=plist0(loc(form), COMMA) { aout }
 %inline form_list2: aout=plist2(loc(form), COMMA) { aout }
 %inline sform_list1: aout=plist1(loc(sform), empty) { aout }
+
 fct_game: (* Extend with functor application ... *)
 | x=qident { x }
 ;
