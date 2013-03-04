@@ -625,10 +625,15 @@ module Tactic = struct
   let process_elim env f ot g =
     match ot with
     | None -> t_imp_elim f g
-    | Some pf ->
-        let _,ty,_ = EcFol.destr_forall1 f in
-        let ft = process_form env g pf ty in
-        t_forall_elim env f ft g
+    | Some pf -> begin
+        let (_, ty, _) = EcFol.destr_forall1 f in
+          match ty with
+          | GTty ty -> begin
+              let ft = process_form env g pf ty in
+                t_forall_elim env f ft g
+          end
+          | _ -> assert false           (* FIXME *)
+      end
 
   let process_intro_elim env ot g =
     let id = EcIdent.create "_" in

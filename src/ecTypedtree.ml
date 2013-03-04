@@ -1187,12 +1187,13 @@ let transform fenv ue pf tt =
         let fenv, xs = transl tp_relax fenv ue xs in
         let f = transf fenv pf in
         unify_error (Fenv.mono fenv) ue pf.pl_loc f.f_ty tbool;
-        f_forall xs f
+        f_forall (List.map (fun (x, ty) -> (x, GTty ty)) xs) f
     | PFexists(xs, f1) ->
         let fenv, xs = transl tp_relax fenv ue xs in
         let f = transf fenv f1 in
         unify_error (Fenv.mono fenv) ue pf.pl_loc f.f_ty tbool;
-        f_exists xs f
+        f_exists (List.map (fun (x, ty) -> (x, GTty ty)) xs) f
+
     (* FIXME *) 
     | PFprob _ -> f_int 0 
     | PFforallm _ -> f_true 

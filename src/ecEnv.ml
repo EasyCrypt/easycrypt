@@ -1322,15 +1322,25 @@ let check_alpha_equal env f1 f2 =
           alpha lid1 lid2
     | _, _ -> error f1 f2 in
   let check_binding f1 f2 alpha bd1 bd2 =
-    let check_one alpha (x1,ty1) (x2,ty2) = 
-      if equal_type env ty1 ty2 then Mid.add x1 x2 alpha 
-      else error f1 f2 in
-    List.fold_left2 check_one alpha bd1 bd2 in 
+    let check_one alpha (x1,ty1) (x2,ty2) =
+      let tyok =
+        match ty1, ty2 with
+        | GTty    ty1, GTty ty2   -> equal_type env ty1 ty2
+        | GTmodty p1 , GTmodty p2 -> ModTy.mod_type_equiv env p1 p2
+        | GTmem      , GTmem      -> true
+        | _          , _          -> false
+      in
+        if   tyok
+        then Mid.add x1 x2 alpha
+        else error f1 f2
+    in
+      List.fold_left2 check_one alpha bd1 bd2 in
+
   let rec aux alpha f1 f2 = 
     match f1.f_node, f2.f_node with
     | Fquant(q1,bd1,f1'), Fquant(q2,bd2,f2') when 
         q1 = q2 && List.length bd1 = List.length bd2 ->
-          let alpha = check_binding f1 f2 alpha bd1 bd2  in
+          let alpha = check_binding f1 f2 alpha bd1 bd2 in
           aux alpha f1' f2'
     | Fif(a1,b1,c1), Fif(a2,b2,c2) ->
         aux alpha a1 a2; aux alpha b1 b2; aux alpha c1 c2
@@ -1346,9 +1356,18 @@ let check_alpha_equal env f1 f2 =
         aux alpha f1 f2;
         List.iter2 (aux alpha) args1 args2
     | Ftuple args1, Ftuple args2 when List.length args1 = List.length args2 ->
-        List.iter2 (aux alpha) args1 args2 
-    | _, _ -> error f1 f2 in
-  aux Mid.empty f1 f2
+        List.iter2 (aux alpha) args1 args2
+    | Fhoare (pre1, s1, post1), Fhoare (pre2, s2, post2) ->
+        aux alpha pre1  pre2 ;
+        aux alpha post1 post2;
+        fd_aux alpha s1 s2
+    | _, _ -> error f1 f2
+
+  and fd_aux _alpha _f1 _f2 =
+    ()                                  (* FIXME *)
+
+  in
+    aux Mid.empty f1 f2
 
 let is_alpha_equal env f1 f2 = 
   try check_alpha_equal env f1 f2; true

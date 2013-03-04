@@ -6,7 +6,7 @@ open EcSymbols
 module Sp = EcPath.Sp
 
 (* -------------------------------------------------------------------- *)
-type memory = Mem of EcIdent.t
+type memory = EcIdent.t
 
 (* -------------------------------------------------------------------- *)
 type lvalue =
@@ -253,3 +253,21 @@ and variable = {
   v_name : symbol;
   v_type : EcTypes.ty;
 }
+
+(* -------------------------------------------------------------------- *)
+let fd_equal f1 f2 =
+  let lc_equal (x1, ty1) (x2, ty2) =
+    (x1 = x2) && (EcTypes.ty_equal ty1 ty2)
+  in
+     (s_equal f1.f_body f2.f_body)
+  && (EcUtils.opt_equal EcTypes.e_equal f1.f_ret f2.f_ret)
+  && (List.all2 lc_equal f1.f_locals f2.f_locals)
+
+let fd_hash f =
+  let lc_hash (x, ty) =
+    Why3.Hashcons.combine (Hashtbl.hash x) (EcTypes.ty_hash ty)
+  in
+    Why3.Hashcons.combine2
+      (s_hash f.f_body)
+      (Why3.Hashcons.combine_option EcTypes.e_hash f.f_ret)
+      (Why3.Hashcons.combine_list lc_hash 0 f.f_locals)

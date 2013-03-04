@@ -535,6 +535,7 @@ let import_w3_term env tvm =
         | Term.Tquant(q,tq) ->
             let vs,_,t = Term.t_open_quant tq in 
             let ids, vm = add_locals vs vm in
+            let ids = List.map (fun (x, ty) -> (x, GTty ty)) ids in
             let f = import vm t in
             f_quant (import_w3_quant q) ids f
         | Term.Tbinop(op,t1,t2) ->
@@ -1017,11 +1018,19 @@ let merge_branches lb =
   if List.exists (fun b -> b.Term.t_ty = None) lb then List.map force_prop lb
   else lb
 
-let rec trans_form env vm f =
+let rec trans_gty env vm gty =
+  match gty with
+  | GTty ty -> trans_ty env vm ty
+  | _ -> assert false                   (* FIXME *)
+
+and trans_gtys env vm gtys =
+  List.map (trans_gty env vm) gtys
+
+and trans_form env vm f =
   match f.f_node with
   | Fquant(q,b,f) ->
       let ids, tys = List.split b in
-      let tys = trans_tys env vm tys in
+      let tys = trans_gtys env vm tys in
       let vs, vm = add_ids vm ids tys in
       let f = trans_form env vm f in
       Term.t_quant_close (trans_quant q) vs [] (force_prop f)
@@ -1288,10 +1297,13 @@ let check_goal env pi (hyps, concl) =
     | LD_hyp f -> 
         let f = trans_form env !vm f in
         let pr = Decl.create_prsymbol (preid id) in
-        Decl.create_prop_decl Decl.Paxiom pr f in
+        Decl.create_prop_decl Decl.Paxiom pr f
+
+    | LD_mem     -> assert false        (* FIXME *)
+    | LD_modty _ -> assert false        (* FIXME *)
+
+  in
   let hyps = List.map trans_hyp (List.rev hyps.h_local) in
   let concl = trans_form env !vm concl in
   let task = close_task env.logic_task !vm tdecls hyps in
   check_w3_formula pi task concl
-
-

@@ -319,22 +319,14 @@ and subst_module (s : subst) (m : module_expr) =
         me_uses  = Sp.empty;              (* FIXME *)
         me_types = types'  ; }
 
-
-
-
-
-
-
-
-
-
-
-
-
+(* -------------------------------------------------------------------- *)
 (* SUBSTITUTION OVER FORMULAE *)
 
+let subst_gty (s : subst) = function
+  | GTty    ty -> GTty (subst_ty s ty)
+  | GTmodty p  -> GTmodty (subst_path s p)
+  | GTmem      -> GTmem
 
-(* -------------------------------------------------------------------- *)
 let rec subst_form (s : subst) (f : form) =
   let f_node = subst_form_node s f.f_node
   and f_ty   = subst_ty s f.f_ty
@@ -347,7 +339,7 @@ and subst_form_node (s : subst) (f : f_node) =
   | Fquant (mode, bindings, f) ->
       let newbindings =
         List.map
-          (fun (x, ty) -> (EcIdent.fresh x, subst_ty s ty))
+          (fun (x, ty) -> (EcIdent.fresh x, subst_gty s ty))
           bindings in
 
       let sbody =

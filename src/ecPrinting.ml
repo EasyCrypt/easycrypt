@@ -151,6 +151,7 @@ let tk_if     = !^ "if"
 let tk_in     = !^ "in"
 let tk_lemma  = !^ "lemma"
 let tk_let    = !^ "let"
+let tk_memory = !^ "memory"
 let tk_module = !^ "module"
 let tk_op     = !^ "op"
 let tk_pred   = !^ "pred"
@@ -180,6 +181,7 @@ struct
   type t = M.t
   let init = M.init
   let mono env = M.init(env,[])
+
   (* ------------------------------------------------------------------ *)
   let pr_symbol (x : symbol) = !^x
 
@@ -187,6 +189,7 @@ struct
   let pr_qsymbol ((p, x) : qsymbol) =
     !^ (String.concat "." (p @ [x]))
 
+  (* ------------------------------------------------------------------ *)
   let pr_ident _ id = !^ (M.string_of_ident id)
 
   (* ------------------------------------------------------------------ *)
@@ -405,7 +408,6 @@ struct
     Pp.parens (pr_list ", " docs)
 
   (* ------------------------------------------------------------------ *)
-
   let pr_op_name_qs (qs,s) =
     if is_ident_symbol s then pr_qsymbol (qs,s)
     else match List.rev qs with
@@ -549,22 +551,12 @@ struct
     | Lforall -> tk_forall
     | Lexists -> tk_exists
 
-
-
-
-
-
   (* MODULE PPRINTING *)
-
-
-
 
   (* ------------------------------------------------------------------ *)
   let pr_local (tenv : t) (x : EcIdent.t) (ty : ty) =
     (* assert false (\* FIXME *\) *)
    pr_seq [!^"var"; pr_ident tenv x; Pp.colon; pr_type tenv ty] ^^ Pp.semi
-
-
 
   (* ------------------------------------------------------------------ *)
   let pr_dom (tenv : t) dom =
@@ -709,6 +701,10 @@ struct
       pr_dotted moddoc
 
   (* ------------------------------------------------------------------ *)
+  let pr_modtype (_tenv : t) (_ : module_type) =
+    Pp.empty                            (* FIXME *)
+
+  (* ------------------------------------------------------------------ *)
   let pr_typedecl (tenv : t) ((x, tyd) : EcPath.path * tydecl) =
     let basename = EcPath.basename x in
     let dparams =
@@ -725,13 +721,24 @@ struct
     in
       pr_dotted (Pp.nest 2 doc)
 
+  (* ------------------------------------------------------------------ *)
+  let pr_binding (tenv : t) (x, ty) =
+    match ty with
+    | GTty ty ->
+        pr_vardecl tenv (x, ty)
 
+    | GTmem ->
+        let tenv1 = M.add_local tenv x in
+          (tenv1, pr_seq [pr_local_symb tenv1 x; Pp.colon; tk_memory])
 
+    | GTmodty p ->
+        let tenv1 = M.add_local tenv x in
+          (tenv1, pr_seq [pr_local_symb tenv1 x; Pp.colon; pr_modtype tenv p])
 
-
-
-
-
+  (* ------------------------------------------------------------------ *)
+  let pr_bindings (tenv : t) (b : binding) =
+    let tenv, bs = List.map_fold pr_binding tenv b in
+      tenv, Pp.parens (pr_list ", " bs)
 
   (* ------------------------------------------------------------------ *)
   let pr_form (tenv : t) (f : form) =
@@ -747,7 +754,7 @@ struct
           pr_seq [pr_pv_symb tenv x.pv_name (Some i); Pp.braces (Pp.ML.int i)]
 
       | Fquant (q, bd, f) ->
-          let subtenv, dd = pr_vardecls tenv bd in 
+          let subtenv, dd = pr_bindings tenv bd in 
           pr_seq [tk_quant q;
                   dd^^Pp.comma;
                   pr_form subtenv outer f]
@@ -951,6 +958,8 @@ struct
     let dk = 
       match k with
       | LD_var (ty, _body) -> pr_type t ty (* FIXME body *)
+      | LD_mem             -> tk_memory
+      | LD_modty p         -> pr_modtype t p
       | LD_hyp f           -> pr_form t f in
     let dh = pr_ident t id ^^ (!^ " : ") ^//^ dk in
     (M.add_local t id, d^/^dh)   

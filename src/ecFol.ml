@@ -27,14 +27,14 @@ end
 (* -------------------------------------------------------------------- *)
 type gty =
   | GTty    of EcTypes.ty
-  | GTmem   of memory
   | GTmodty of module_type
+  | GTmem
 
 type quantif = 
   | Lforall
   | Lexists
 
-type binding = (EcIdent.t * ty) list
+type binding = (EcIdent.t * gty) list
 
 type form = { 
   f_node : f_node;
@@ -91,9 +91,118 @@ forall (k:int) {G.x = k } c { Q} <= e
 
 (* spec : var decl equivS *)
  
+(* -------------------------------------------------------------------- *)
 let fv f = f.f_fv 
 let ty f = f.f_ty
 
+(*-------------------------------------------------------------------- *)
+let f_equal : form -> form -> bool = (==)
+let f_hash f = f.f_tag 
+
+let qt_equal : quantif -> quantif -> bool = (==)
+let qt_hash = function
+  | Lforall -> 0
+  | Lexists -> 1
+
+let gty_equal ty1 ty2 =
+  match ty1, ty2 with
+  | GTty    ty1, GTty   ty2 -> EcTypes.ty_equal ty1 ty2
+  | GTmodty p1, GTmodty p2  -> EcPath.p_equal p1 p2
+  | GTmem     , GTmem       -> true
+  | _         , _           -> false
+
+let gty_hash = function
+  | GTty    ty -> Why3.Hashcons.combine (EcTypes.ty_hash ty) 0
+  | GTmodty p  -> Why3.Hashcons.combine (EcPath.p_hash   p ) 1
+  | GTmem      -> Hashtbl.hash GTmem
+
+let b_equal (b1 : binding) (b2 : binding) =
+  let b1_equal (x1, ty1) (x2, ty2) = 
+    EcIdent.id_equal x1 x2 && gty_equal ty1 ty2
+  in
+    List.all2 b1_equal b1 b2
+    
+let b_hash (bs : binding) =
+  let b1_hash (x, ty) = 
+    Why3.Hashcons.combine (EcIdent.tag x) (gty_hash ty)
+  in
+    Why3.Hashcons.combine_list b1_hash 0 bs
+
+(* -------------------------------------------------------------------- *)
+module Hsform = Why3.Hashcons.Make (struct
+  type t = form
+
+  let equal f1 f2 =
+    match f1.f_node, f2.f_node with
+    | Fquant(q1,b1,f1), Fquant(q2,b2,f2) ->
+        qt_equal q1 q2 && b_equal b1 b2 && f_equal f1 f2 
+
+    | Fif(b1,t1,f1), Fif(b2,t2,f2) ->
+        f_equal b1 b2 && f_equal t1 t2 && f_equal f1 f2
+
+    | Flet(lp1,e1,f1), Flet(lp2,e2,f2) ->
+        lp_equal lp1 lp2 && f_equal e1 e2 && f_equal f1 f2
+
+    | Fint i1, Fint i2 ->
+        i1 = i2
+
+    | Flocal id1, Flocal id2 ->
+        EcIdent.id_equal id1 id2
+
+    | Fpvar(pv1,s1), Fpvar(pv2,s2) -> 
+        Side.s_equal s1 s2 && EcTypes.pv_equal pv1 pv2
+
+    | Fop(p1,lty1), Fop(p2,lty2) ->
+        EcPath.p_equal p1 p2 && List.all2 ty_equal lty1 lty2
+
+    | Fapp(f1,args1), Fapp(f2,args2) ->
+        f_equal f1 f2 && List.all2 f_equal args1 args2
+
+    | Ftuple args1, Ftuple args2 ->
+        List.all2 f_equal args1 args2
+
+    | Fhoare (pre1, s1, post1), Fhoare (pre2, s2, post2) ->
+           f_equal pre1 pre2
+        && f_equal post1 post2
+        && EcModules.fd_equal s1 s2
+
+    | _, _ -> false
+
+  let hash f = 
+    match f.f_node with 
+    | Fquant(q, b, f) ->
+        Why3.Hashcons.combine2 (f_hash f) (b_hash b) (qt_hash q)
+
+    | Fif(b, t, f) ->
+        Why3.Hashcons.combine2 (f_hash b) (f_hash t) (f_hash f)
+
+    | Flet(lp, e, f) ->
+        Why3.Hashcons.combine2 (lp_hash lp) (f_hash e) (f_hash f)
+
+    | Fint i -> Hashtbl.hash i
+
+    | Flocal id -> EcIdent.tag id
+
+    | Fpvar(pv, s) ->
+        Why3.Hashcons.combine (EcTypes.pv_hash pv) (Side.s_hash s)
+
+    | Fop(p, lty) -> 
+        Why3.Hashcons.combine_list ty_hash (EcPath.p_hash p) lty
+
+    | Fapp(f, args) ->
+        Why3.Hashcons.combine_list f_hash (f_hash f) args
+
+    | Ftuple args ->
+        Why3.Hashcons.combine_list f_hash 0 args
+
+    | Fhoare(p, s, q) ->
+        Why3.Hashcons.combine2
+          (f_hash p) (f_hash q) (EcModules.fd_hash s)
+
+  let tag n f = { f with f_tag = n }
+end)
+
+(* -------------------------------------------------------------------- *)
 let fv_node = function
   | Fint _ | Fpvar _ | Fop _ -> Sid.empty
   | Flocal id -> Sid.singleton id
@@ -109,79 +218,18 @@ let fv_node = function
       List.fold_left (fun s f -> Sid.union s (fv f)) (fv f) args
   | Ftuple args ->
       List.fold_left (fun s f -> Sid.union s (fv f)) Sid.empty args 
-  | Fhoare (pre,_,post) -> Sid.union (fv pre) (fv post)
+  | Fhoare (pre,_,post) ->
+      Sid.union (fv pre) (fv post)
 
-let f_equal : form -> form -> bool = (==)
-let f_hash f = f.f_tag 
-
-let q_equal : quantif -> quantif -> bool = (==)
-let q_hash = function
-  | Lforall -> 0
-  | Lexists -> 1
-
-let b_equal =
-  let b1_equal (x1,ty1) (x2,ty2) = 
-    EcIdent.id_equal x1 x2 && EcTypes.ty_equal ty1 ty2 in
-  List.all2 b1_equal 
-    
-let b_hash = 
-  let b1_hash h (x,ty) = 
-    Why3.Hashcons.combine2 (EcIdent.tag x) (ty_hash ty) h in
-  List.fold_left b1_hash
-
-module Hsform = Why3.Hashcons.Make (struct
-  type t = form
-
-  let equal f1 f2 =
-    match f1.f_node, f2.f_node with
-    | Fquant(q1,b1,f1), Fquant(q2,b2,f2) ->
-        q_equal q1 q2 && b_equal b1 b2 && f_equal f1 f2 
-    | Fif(b1,t1,f1), Fif(b2,t2,f2) ->
-        f_equal b1 b2 && f_equal t1 t2 && f_equal f1 f2
-    | Flet(lp1,e1,f1), Flet(lp2,e2,f2) ->
-        lp_equal lp1 lp2 && f_equal e1 e2 && f_equal f1 f2
-    | Fint i1, Fint i2 -> i1 = i2
-    | Flocal id1, Flocal id2 -> EcIdent.id_equal id1 id2
-    | Fpvar(pv1,s1), Fpvar(pv2,s2) -> 
-        Side.s_equal s1 s2 && EcTypes.pv_equal pv1 pv2
-    | Fop(p1,lty1), Fop(p2,lty2) ->
-        EcPath.p_equal p1 p2 && List.all2 ty_equal lty1 lty2
-    | Fapp(f1,args1), Fapp(f2,args2) ->
-        f_equal f1 f2 && List.all2 f_equal args1 args2
-    | Ftuple args1, Ftuple args2 ->
-        List.all2 f_equal args1 args2
-    (* FIXME: no equality yet for stmts *)
-    | _ -> false
-
-  let hash f = 
-    match f.f_node with 
-    | Fquant(q,b,f) ->
-        Why3.Hashcons.combine f.f_tag (b_hash (q_hash q) b)
-    | Fif(b,t,f) ->
-        Why3.Hashcons.combine2 (f_hash b) (f_hash t) (f_hash f)
-    | Flet(lp,e,f) ->
-        Why3.Hashcons.combine2 (lp_hash lp) (f_hash e) (f_hash f)
-    | Fint i -> i
-    | Flocal id -> EcIdent.tag id 
-    | Fpvar(pv,s) ->
-        Why3.Hashcons.combine (EcTypes.pv_hash pv) (Side.s_hash s)
-    | Fop(p,lty) -> 
-        Why3.Hashcons.combine_list ty_hash (EcPath.p_hash p) lty
-    | Fapp(f,args) ->
-        Why3.Hashcons.combine_list f_hash (f_hash f) args
-    | Ftuple args ->
-        Why3.Hashcons.combine_list f_hash 0 args
-    | Fhoare(p,_,q) -> (* FIXME: no hashing for stmts! *)
-        Why3.Hashcons.combine (f_hash p) (f_hash q)
-
-  let tag n f = { f with f_tag = n }
-end)
-
+(* -------------------------------------------------------------------- *)
 let mk_form node ty =  Hsform.hashcons 
-    { f_node = node; f_ty = ty; f_fv = fv_node node; f_tag = -1 }
+    { f_node = node;
+      f_ty   = ty;
+      f_fv   = fv_node node;
+      f_tag = -1; }
 
 let ty_bool = tbool
-let ty_int = tint 
+let ty_int  = tint 
 let ty_unit = tunit
 
 let f_op x tys ty = 
@@ -243,7 +291,7 @@ let f_forall b f = f_quant Lforall b f
 
 let f_hoare pre s post = mk_form (Fhoare(pre,s,post)) ty_bool
 
-
+(* -------------------------------------------------------------------- *)
 type destr_error =
   | Destr_and
   | Destr_or
@@ -316,27 +364,28 @@ let is_exists f =
   
 (* -------------------------------------------------------------------- *)
 let map gt g f = 
-  match f.f_node with
-  | Fquant(q,b,f) -> 
-      f_quant q (List.map (fun (x,ty) -> x, gt ty) b) (g f)
-  | Fif(f1,f2,f3) -> f_if (g f1) (g f2) (g f3)
-  | Flet(lp,f1,f2) -> f_let lp (g f1) (g f2)
-  | Fint i -> f_int i 
-  | Flocal id -> f_local id (gt f.f_ty)
-  | Fpvar(id,s) -> f_pvar id (gt f.f_ty) s
-  | Fop(p,tys) -> f_op p (List.map gt tys) (gt f.f_ty)
-  | Fapp(e, es) -> f_app (g e) (List.map g es) (gt f.f_ty)
-  | Ftuple es -> f_tuple (List.map g es) 
-    
-  | Fhoare(p,s,q) -> f_hoare (g p) s (g q)
+  let map_gty = function
+    | GTty ty -> GTty (gt ty)
+    | _ as x  -> x
+  in
+    match f.f_node with
+    | Fquant(q,b,f) ->
+        f_quant q (List.map (fun (x,ty) -> x, map_gty ty) b) (g f)
+    | Fif(f1,f2,f3) -> f_if (g f1) (g f2) (g f3)
+    | Flet(lp,f1,f2) -> f_let lp (g f1) (g f2)
+    | Fint i -> f_int i 
+    | Flocal id -> f_local id (gt f.f_ty)
+    | Fpvar(id,s) -> f_pvar id (gt f.f_ty) s
+    | Fop(p,tys) -> f_op p (List.map gt tys) (gt f.f_ty)
+    | Fapp(e, es) -> f_app (g e) (List.map g es) (gt f.f_ty)
+    | Ftuple es -> f_tuple (List.map g es) 
+    | Fhoare(p,s,q) -> f_hoare (g p) s (g q)
 
 (* -------------------------------------------------------------------- *)
-
 module Fsubst = struct
-
   let mapty onty = 
     let rec aux f = map onty aux f in
-    aux 
+    aux
 
   let uni uidmap = mapty (Tuni.subst uidmap)
 
@@ -350,15 +399,16 @@ module Fsubst = struct
     aux
 
   let subst_tvar mtv = mapty (EcTypes.Tvar.subst mtv)
-
 end
 
 (* -------------------------------------------------------------------- *)
 (*    Basic construction for building the logic                         *)
 
 type local_kind =
-  | LD_var of ty * form option
-  | LD_hyp of form  (* of type bool *)
+  | LD_var   of ty * form option
+  | LD_mem
+  | LD_modty of EcModules.module_type
+  | LD_hyp   of form  (* of type bool *)
 
 type l_local = EcIdent.t * local_kind
 
@@ -375,8 +425,10 @@ type rule_name =
   | RN_admit
   | RN_clear of EcIdent.t 
   | RN_prover of prover_info 
+
   | RN_local  of EcIdent.t
     (* H:f in G    ===>  E,G |- f  *)
+
   | RN_global of EcPath.path * ty list
     (* p: ['as], f in E  ==> E,G |- f{'as <- tys} *)
 
@@ -417,7 +469,6 @@ type rule_name =
   | RN_exists_E 
     (* E;G |- exists x:t, P  E;G |- forall x:t, P => C   ===> E;G |- C *)
 
-
   (* H rules *)
   | RN_app of (int * form)
 
@@ -431,6 +482,8 @@ module LDecl = struct
     | NotAVariable    of EcIdent.t
     | NotAHypothesis  of EcIdent.t
     | CanNotClear     of EcIdent.t * EcIdent.t
+    | CannotClearMem
+    | CannotClearModTy
     | DuplicateIdent  of EcIdent.t
     | DuplicateSymbol of EcSymbols.symbol
 
@@ -447,8 +500,12 @@ module LDecl = struct
     | NotAHypothesis id ->
         Format.fprintf fmt "The symbol %s is not a hypothesis" (EcIdent.name id)
     | CanNotClear (id1,id2) ->
-        Format.fprintf fmt "Can not clear %s it is used in %s"
+        Format.fprintf fmt "Cannot clear %s it is used in %s"
           (EcIdent.name id1) (EcIdent.name id2)
+    | CannotClearMem ->
+        Format.fprintf fmt "Cannot clear memories"
+    | CannotClearModTy ->
+        Format.fprintf fmt "Cannot clear modules"
     | DuplicateIdent id ->
         Format.fprintf fmt "Duplicate ident %s, please report" 
           (EcIdent.tostring id)
@@ -520,9 +577,10 @@ module LDecl = struct
           error (CanNotClear(id,id'))
       | _ -> () in
     begin match ld with
-    | LD_var _ -> List.iter (check_hyp id) r 
-    | LD_hyp _ -> ()
+    | LD_var   _ -> List.iter (check_hyp id) r
+    | LD_mem     -> error CannotClearMem
+    | LD_modty _ -> error CannotClearModTy
+    | LD_hyp   _ -> ()
     end;
-    { hyps with h_local = List.rev_append r l }
-
+      { hyps with h_local = List.rev_append r l }
 end

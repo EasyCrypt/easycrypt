@@ -128,7 +128,7 @@ let t_clear id (juc,n as g) =
   let juc,n1 = new_goal juc (hyps,concl) in
   let rule = { pr_name = RN_clear id; pr_hyps = [n1] } in
   upd_rule (juc,n) rule
-  
+
 let get_equality f = 
   match f.f_node with
   | Fapp({f_node = Fop(op,_)},[f1;f2]) when 
@@ -168,21 +168,37 @@ let t_imp_intro id (juc,n as g) =
   let rule = { pr_name = RN_imp_I; pr_hyps = [n1] } in
   upd_rule (juc,n) rule
 
-let t_forall_intro id (juc,n as g) = 
+let t_forall_intro id (juc,n as g) =
   let hyps,concl = get_goal g in
   let id',ty,b = destr_forall1 concl in
-  let hyps = LDecl.add_local id (LD_var(ty,None)) hyps in
-  let juc, n1 = new_goal juc (hyps, Fsubst.subst_local id' (f_local id ty) b) in
+  let local =
+    match ty with
+    | GTty    ty -> LD_var (ty, None)
+    | GTmem      -> LD_mem
+    | GTmodty p  -> LD_modty p in
+  let hyps = LDecl.add_local id local hyps in
+  let b =
+    match ty with
+    | GTty ty -> Fsubst.subst_local id' (f_local id ty) b
+    | _       -> assert false
+  in
+  let juc, n1 = new_goal juc (hyps, b) in
   let rule = { pr_name = RN_forall_I; pr_hyps = [n1] } in
   upd_rule (juc,n) rule
 
 let t_exists_intro env t (juc,n as g) = 
   let hyps,concl = get_goal g in
   let id',ty,b = destr_exists1 concl in
-  check_type env t.f_ty ty;
-  let juc, n1 = new_goal juc (hyps, Fsubst.subst_local id' t b) in
-  let rule = { pr_name = RN_exists_I t; pr_hyps = [n1] } in
-  upd_rule (juc,n) rule
+
+    match ty with
+    | GTty ty -> begin
+        check_type env t.f_ty ty;
+        let juc, n1 = new_goal juc (hyps, Fsubst.subst_local id' t b) in
+        let rule = { pr_name = RN_exists_I t; pr_hyps = [n1] } in
+        upd_rule (juc,n) rule
+      end
+
+    | _ -> assert false                 (* FIXME *)
 
 let t_and_elim ff (juc,n as g) = 
   let hyps,concl = get_goal g in
@@ -214,12 +230,16 @@ let t_imp_elim ff (juc,n as g) =
 let t_forall_elim env ff t (juc,n as g) = 
   let hyps,concl = get_goal g in
   let x,ty,p = destr_forall1 ff in
-  check_type env t.f_ty ty;
-  let p = Fsubst.subst_local x t p in
-  let juc, n1 = new_goal juc (hyps, ff) in
-  let juc, n2 = new_goal juc (hyps, f_imp p concl) in
-  let rule = { pr_name = RN_forall_E t; pr_hyps = [n1;n2] } in
-  upd_rule (juc,n) rule 
+  match ty with
+  | GTty ty -> begin
+      check_type env t.f_ty ty;
+      let p = Fsubst.subst_local x t p in
+      let juc, n1 = new_goal juc (hyps, ff) in
+      let juc, n2 = new_goal juc (hyps, f_imp p concl) in
+      let rule = { pr_name = RN_forall_E t; pr_hyps = [n1;n2] } in
+      upd_rule (juc,n) rule 
+    end
+  | _ -> assert false                 (* FIXME *)
 
 let t_exists_elim ff (juc,n as g) = 
   let hyps,concl = get_goal g in
@@ -238,17 +258,3 @@ let find_in_hyps env f hyps =
       check_alpha_equal env f f'; true
     with _ -> false in
   fst (List.find test hyps.h_local)
-
-
-  
-  
-  
-
-  
-  
-
-
-
-
-
-

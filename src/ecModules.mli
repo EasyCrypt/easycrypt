@@ -5,7 +5,7 @@ open EcPath
 open EcTypes
 
 (* -------------------------------------------------------------------- *)
-type memory = Mem of EcIdent.t
+type memory = EcIdent.t
 
 (* -------------------------------------------------------------------- *)
 (* LvMap (op, m, x, ty)
@@ -140,3 +140,7 @@ and variable = {
   v_name : symbol;
   v_type : EcTypes.ty;
 }
+
+(* -------------------------------------------------------------------- *)
+val fd_equal : function_def -> function_def -> bool
+val fd_hash  : function_def -> int
