@@ -1528,6 +1528,46 @@ let is_alpha_equal env f1 f2 =
   try check_alpha_equal env f1 f2; true
   with _ -> false
 
+let norm_pvar env pv = 
+  let p = Mod.unfold_mod_path env pv.pv_name in
+  if m_equal p pv.pv_name then pv else { pv_name = p; pv_kind = pv.pv_kind }
+  
+let rec norm_form env f =
+  match f.f_node with
+  | Fquant(q,bd,f) ->
+      f_quant q bd (norm_form env f) 
 
+  | Fif(a,b,c) ->
+      f_if (norm_form env a) (norm_form env b) (norm_form env c)
+
+  | Flet(p,f,g) ->
+      f_let p (norm_form env f) (norm_form env g)
+
+  | Fint _ | Flocal _ | Fop _ -> f  
+
+  | Fpvar(p,m) -> f_pvar (norm_pvar env p) f.f_ty m
+
+  | Fapp(f,args) ->
+      f_app (norm_form env f) (List.map (norm_form env) args) f.f_ty 
+
+  | Ftuple args ->
+      f_tuple (List.map (norm_form env) args) 
+
+  | FhoareF(pre,p,post) ->
+      f_hoareF (norm_form env pre) 
+        (Mod.unfold_mod_path env p) (norm_form env post)
+
+  | FhoareS _ -> assert false (* FIXME ? Not implemented *)
+
+  | FequivF(pre,(l,r),post) ->
+      f_equivF (norm_form env pre) 
+        (Mod.unfold_mod_path env l) (Mod.unfold_mod_path env r)
+        (norm_form env post)
+
+  | FequivS _ -> assert false (* FIXME ? Not implemented *)
+
+  | Fpr(m,p,args,f) ->
+      f_pr m (Mod.unfold_mod_path env p) (List.map (norm_form env) args) 
+        (norm_form env f)
 
 let check_goal env pi ld = EcWhy3.check_goal env.env_w3 pi ld

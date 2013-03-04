@@ -76,7 +76,13 @@ val f_let : EcTypes.lpattern -> form -> form -> form
 val f_quant : quantif -> binding -> form -> form
 val f_exists : binding -> form -> form
 val f_forall : binding -> form -> form
+
+
+
 val f_hoare  : form -> EcModules.function_def -> form -> form 
+val f_hoareF  : form -> EcPath.mpath -> form -> form 
+val f_equivF  : form -> EcPath.mpath -> EcPath.mpath -> form -> form 
+val f_pr      : memory -> EcPath.mpath -> form list -> form -> form
 
 val fop_not : form
 val f_not : form -> form

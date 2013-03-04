@@ -195,6 +195,7 @@ let mk_form node ty =  Hsform.hashcons
 let ty_bool = tbool
 let ty_int  = tint 
 let ty_unit = tunit
+let ty_real = treal
 
 let f_op x tys ty = 
   mk_form (Fop(x,tys)) ty
@@ -254,6 +255,10 @@ let f_exists b f = f_quant Lexists b f
 let f_forall b f = f_quant Lforall b f
 
 let f_hoare pre s post = mk_form (Fhoare(pre,s,post)) ty_bool
+
+let f_hoareF pre f post = mk_form (FhoareF(pre,f,post)) ty_bool
+let f_equivF pre f1 f2 post = mk_form (FequivF(pre,(f1,f2),post)) ty_bool
+let f_pr m f args e = mk_form (Fpr(m,f,args,e)) ty_real
 
 (* -------------------------------------------------------------------- *)
 type destr_error =

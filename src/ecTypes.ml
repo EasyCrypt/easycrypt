@@ -74,6 +74,7 @@ let tunit      = tconstr EcCoreLib.p_unit  []
 let tbool      = tconstr EcCoreLib.p_bool  []
 let tint       = tconstr EcCoreLib.p_int   []
 let tdistr  ty = tconstr EcCoreLib.p_distr [ty]
+let treal      = tconstr EcCoreLib.p_real  []
  
 let toarrow dom ty = 
   List.fold_right tfun dom ty

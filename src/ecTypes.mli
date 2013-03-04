@@ -34,6 +34,7 @@ type tysig = dom * ty
 val tunit      : ty
 val tbool      : ty
 val tint       : ty
+val treal      : ty
 val tdistr     : ty -> ty
 val toarrow    : dom -> ty -> ty
 
