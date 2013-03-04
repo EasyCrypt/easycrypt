@@ -6,26 +6,6 @@ open EcTypes
 open EcModules
 
 (* -------------------------------------------------------------------- *)
-(* TODO remove Side *)
-module Side : sig
-  type t = int
-  (* For non relational formula *)
-  val mono : t 
-  (* For relational formula *)
-  val left : t
-  val right : t 
-  val s_equal : t -> t -> bool
-  val s_hash  : t -> int
-end = struct
-  type t = int 
-  let mono = 0
-  let left = 1
-  let right = 2
-  let s_equal : t -> t -> bool = (==)
-  let s_hash x = x
-end
-
-(* -------------------------------------------------------------------- *)
 type gty =
   | GTty    of EcTypes.ty
   | GTmodty of module_type
@@ -36,6 +16,7 @@ type quantif =
   | Lexists
 
 type binding = (EcIdent.t * gty) list
+
 
 let mstd   = EcIdent.create "$std"
 let mpre   = EcIdent.create "$pre"

@@ -21,14 +21,6 @@ type quantif =
 
 type binding =  (EcIdent.t * gty) list
 
-(* TODO : Remove side *)
-module Side : sig 
-   type t = int 
-   val mono : t 
-   val left : t 
-   val right : t 
-end
-
 type form = private { 
   f_node : f_node;
   f_ty   : ty; 
