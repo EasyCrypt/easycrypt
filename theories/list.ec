@@ -24,20 +24,28 @@ axiom tl_def : forall (x : 'a, xs : 'a list), tl(x::xs) = xs.
 lemma hd_tl_decomp : forall (xs : 'a list), xs <> [] =>
  hd(xs)::tl(xs) = xs.
 
-(* list induction *)
+(* list induction and recursion*)
 
 axiom list_ind : forall(P:('a list) Pred),
 (P([])) =>
 (forall (x :'a, xs : 'a list), P(xs) => P (x::xs)) =>
 (forall(ys:'a list), P(ys)).
 
+
+op foldr : 'b -> ('a -> 'b -> 'b) -> 'a list -> 'b.
+
+axiom foldr_def1 : forall (e : 'b, f : 'a -> 'b -> 'b),
+ foldr e f [] = e. 
+
+axiom foldr_def2 : forall (e : 'b, f : 'a -> 'b -> 'b, x : 'a, xs : 'a list),
+ foldr e f (x::xs) = f x (foldr e f xs). 
+
+
+
 (* membership test *)
-op elem : 'a -> 'a list -> bool.
-
-axiom elem_def1 : forall (x : 'a), !elem x [].
-axiom elem_def2 : forall (x, y : 'a, xs : 'a list), 
- elem y (x::xs) = (x = y || elem y xs).
-
+cnst e_elem : bool = false.
+op f_elem(x : 'a, y : 'a, b : bool)  : bool = x = y || b.
+op elem (x : 'a) :  'a list -> bool = foldr e_elem (f_elem x).
 
 lemma elem_eq : forall (x : 'a, xs : 'a list), elem x (x::xs).
 lemma elem_cons : forall (x, y: 'a, xs : 'a list), elem y xs => elem y (x::xs).
@@ -47,7 +55,9 @@ lemma elem_hd : forall (xs : 'a list), xs <> [] => elem (hd xs) xs.
 lemma not_elem_empty : forall (xs : 'a list), (forall(x :'a), !elem x xs) => xs = []. 
 
 (* length *)
-op length : 'a list -> int.
+
+op f_length(x : 'a, b : int)  : int = 1 + b.
+op length(xs : 'a list) : int = foldr 0 f_length xs.
 
 axiom length_def1 : length<:'a>([]) = 0.
 axiom length_def2 : forall (x : 'a, xs : 'a list), 
@@ -67,10 +77,11 @@ lemma length_non_neg: forall (xs : 'a list), 0 <= length(xs).
 lemma length_z_nil : forall(xs : 'a list), length(xs) = 0 => xs = [].
 
 (* append *)
-op [++] : ('a list, 'a list) -> 'a list.
 
-axiom app_def1 : forall (ys : 'a list), []++ys = ys.
-axiom app_def2 : forall (x : 'a, xs, ys : 'a list), (x::xs)++ys = x::(xs++ys).
+op [++](xs : 'a list, ys : 'a list) : 'a list = (foldr ys ([::])) xs.
+
+lemma app_def1 : forall (ys : 'a list), []++ys = ys.
+lemma app_def2 : forall (x : 'a, xs, ys : 'a list), (x::xs)++ys = x::(xs++ys).
 
 (* facts about append *)
 
@@ -145,13 +156,16 @@ lemma any_app : forall (p : 'a Pred,xs,ys : 'a list),
 any p (xs++ys) = (any p xs || any p ys).
 
 (* filter *)
-op filter : 'a Pred -> 'a list -> 'a list.
 
-axiom filter_def1 : forall (p : 'a Pred), 
+op f_filter(p : 'a Pred, x : 'a, r : 'a list) : 'a list = if (p x) then x::r else r.
+
+op filter(p : 'a Pred) : 'a list -> 'a list = foldr [] (f_filter p).
+
+lemma filter_def1 : forall (p : 'a Pred),
   filter p [] = [].
 
-axiom filter_def2 : forall (p : 'a Pred, x : 'a, xs : 'a list), 
-  filter p (x::xs) = let rest = filter p xs in 
+lemma filter_def2 : forall (p : 'a Pred, x : 'a, xs : 'a list),
+  filter p (x::xs) = let rest = filter p xs in
                      if p x then x::rest else rest.
 
 pred P_filter_elem (xs : 'a list) = forall (p : 'a Pred, x : 'a),
@@ -203,10 +217,12 @@ lemma filter_imp : forall(xs : 'a list, p q : 'a Pred),
 
 (* cnst f : 'a -> 'b. *)
 
-op map : ('a -> 'b) -> 'a list -> 'b list.
+op f_map(f : 'a -> 'b, x : 'a , xs : 'b list) : 'b list = f x :: xs.
 
-axiom map_def1 : forall(f : 'a -> 'b),map f [] = [].
-axiom map_def2 : forall(f : 'a -> 'b, x : 'a, xs : 'a list ), map f (x::xs) = (f x)::(map f xs).
+op map(f :'a -> 'b) : 'a list -> 'b list = foldr [] (f_map f).
+
+lemma map_def1 : forall(f : 'a -> 'b),map f [] = [].
+lemma map_def2 : forall(f : 'a -> 'b, x : 'a, xs : 'a list ), map f (x::xs) = (f x)::(map f xs).
 
 pred P_map_in(f : 'a -> 'b,xs : 'a list) = forall(x : 'a), elem x xs =>
  elem (f x) (map f xs).
@@ -280,3 +296,4 @@ save.
 
 lemma map_ext : forall (xs : 'a list, f: 'a -> 'b,g : 'a -> 'b),
 (forall (x : 'a), f x = g x) => map f xs = map g xs.
+
