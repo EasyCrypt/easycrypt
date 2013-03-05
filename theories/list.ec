@@ -207,3 +207,76 @@ op map : ('a -> 'b) -> 'a list -> 'b list.
 
 axiom map_def1 : forall(f : 'a -> 'b),map f [] = [].
 axiom map_def2 : forall(f : 'a -> 'b, x : 'a, xs : 'a list ), map f (x::xs) = (f x)::(map f xs).
+
+pred P_map_in(f : 'a -> 'b,xs : 'a list) = forall(x : 'a), elem x xs =>
+ elem (f x) (map f xs).
+
+lemma map_in_aux : forall (xs : 'a list,f : 'a -> 'b), (P_map_in f) xs 
+proof.
+intros xs f.
+apply list_ind<:'a>((P_map_in f),_,_,xs);trivial.
+save.
+
+lemma map_in : forall (xs : 'a list,x : 'a, f : 'a -> 'b), elem x xs =>
+ elem (f x) (map f xs).
+
+pred P_map_o (f : 'a -> 'b, g : 'b -> 'c, h : 'a -> 'c, xs : 'a list) =
+map g (map f xs) = map h xs.
+
+lemma map_o_aux : forall (xs : 'a list,f : 'a -> 'b, g : 'b -> 'c, h : 'a -> 'c),
+(forall (x : 'a), g (f x) = h x) => P_map_o f g h xs
+proof.
+intros xs f g h H.
+apply list_ind<:'a>((P_map_o f g h),_,_,xs);trivial.
+save.
+
+lemma map_o_aux2 : forall (xs : 'a list,f : 'a -> 'b, g : 'b -> 'c, h : 'a -> 'c), 
+P_map_o f g h xs =>
+map g (map f xs) = map h xs.
+
+lemma map_o : forall (xs : 'a list,f : 'a -> 'b, g : 'b -> 'c, h : 'a -> 'c), 
+(forall (x : 'a), g (f x) = h x) => map g (map f xs) = map h xs
+proof.
+intros xs f g h H.
+apply map_o_aux2<:'a,'b,'c>(xs,f,g,h,_).
+apply map_o_aux<:'a,'b,'c>(xs,f,g,h,_).
+trivial.
+save.
+
+pred P_map_length(f : 'a -> 'b, xs : 'a list) = 
+        length xs = length (map f xs).
+
+lemma map_length_aux : forall (xs : 'a list, f : 'a -> 'b), 
+  P_map_length f xs
+proof.
+intros xs f.
+apply list_ind<:'a>((P_map_length f),_,_,xs);trivial.
+save.
+
+lemma map_length : forall (xs : 'a list, f : 'a -> 'b), 
+ length xs = length (map f xs).
+
+pred P_map_app(f : 'a -> 'b,xs : 'a list) = 
+forall (ys : 'a list), map f (xs ++ ys) = map f xs ++ map f ys.
+
+lemma map_app_aux : forall (xs : 'a list, f : 'a -> 'b),
+P_map_app f xs
+proof.
+intros xs f.
+apply list_ind<:'a>((P_map_app f),_,_,xs);trivial.
+save.
+
+lemma map_app : forall (xs ys: 'a list, f : 'a -> 'b),
+map f (xs ++ ys) = map f xs ++ map f ys.
+
+pred P_map_ext(f,g : 'a -> 'b,xs: 'a list) = map f xs = map g xs.
+
+lemma map_ext_aux : forall (xs : 'a list, f : 'a -> 'b, g : 'a -> 'b),
+(forall (x : 'a), f x = g x)  => P_map_ext f g xs
+proof.
+intros xs f g H.
+apply list_ind<:'a>((P_map_ext f g),_,_,xs);trivial.
+save.
+
+lemma map_ext : forall (xs : 'a list, f: 'a -> 'b,g : 'a -> 'b),
+(forall (x : 'a), f x = g x) => map f xs = map g xs.
