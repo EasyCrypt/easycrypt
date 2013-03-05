@@ -37,9 +37,6 @@ end = struct
       let config  = Whyconf.read_config why3config in
       let main    = Whyconf.get_main config in
       Whyconf.load_plugins main;
-      Format.printf "List of driver = ";
-      List.iter (Format.printf "%s, ") (Whyconf.plugins main);
-      Format.printf "@.";
       let w3_env  = Env.create_env (Whyconf.loadpath main) in
       let provers =
         Whyconf.Mprover.fold
@@ -169,6 +166,65 @@ let initial_task =
      decl_iff; spec_iff;
      decl_eq; spec_eq ]
 
+let ts_mem = Ty.create_tysymbol (Ident.id_fresh "memory") [] None 
+let ty_mem = Ty.ty_app ts_mem []
+
+let ts_mod = Ty.create_tysymbol (Ident.id_fresh "module") [] None
+let ty_mod = Ty.ty_app ts_mod [] 
+
+let ts_mod_name = Ty.create_tysymbol (Ident.id_fresh "module_name") [] None
+let ty_mod_name = Ty.ty_app ts_mod_name []
+
+let ts_fun_name = 
+  let ta = Ty.create_tvsymbol (Ident.id_fresh "ta") 
+  and tr = Ty.create_tvsymbol (Ident.id_fresh "tr") in
+  Ty.create_tysymbol (Ident.id_fresh "fun_name") [ta;tr] None
+let ty_fun_name ta tr = Ty.ty_app ts_fun_name [Ty.ty_tuple ta; tr]
+
+let ts_var_name = 
+  let t = Ty.create_tvsymbol (Ident.id_fresh "t") in
+  Ty.create_tysymbol (Ident.id_fresh "var_name") [t] None
+let ty_var_name t = Ty.ty_app ts_var_name [t]
+
+let ty_event tr = Ty.ty_func ty_mem (Ty.ty_pred tr)
+
+let fs_getmod = 
+  Term.create_fsymbol (Ident.id_fresh "getmod") [ty_mod; ty_mod_name] ty_mod
+
+let get_mod m mn = Term.t_app_infer fs_getmod [m;mn] 
+
+let fs_getvar = 
+  let t = Ty.ty_var (Ty.create_tvsymbol (Ident.id_fresh "t")) in
+  let tv = ty_var_name t in
+  Term.create_fsymbol (Ident.id_fresh "getvar") [ty_mod; tv; ty_mem] t
+
+let getvar m v mem = Term.t_app_infer fs_getvar [m; v; mem]
+
+let fs_pr = 
+  let ta = Ty.ty_var (Ty.create_tvsymbol (Ident.id_fresh "ta"))
+  and tr = Ty.ty_var (Ty.create_tvsymbol (Ident.id_fresh "tr")) in
+  let tf = Ty.ty_app ts_fun_name [ta; tr] in
+  Term.create_fsymbol (Ident.id_fresh "proba") 
+      [ty_mod;tf;ty_mem;ta;ty_event tr] Ty.ty_real
+
+let getpr m fn mem args ev =
+  Term.t_app_infer fs_pr [m;fn;mem;Term.t_tuple args; ev]
+
+let add_decl_with_tuples task d =
+  let ids = Ident.Mid.set_diff d.Decl.d_syms (Task.task_known task) in
+  let add id s = match Ty.is_ts_tuple_id id with
+    | Some n -> Stdlib.Sint.add n s
+    | None -> s in
+  let ixs = Ident.Sid.fold add ids Stdlib.Sint.empty in
+  let add n task = Task.use_export task (Theory.tuple_theory n) in
+  Task.add_decl (Stdlib.Sint.fold add ixs task) d
+
+let initial_task = 
+  let ts = [ts_mem; ts_mod; ts_mod_name; ts_fun_name; ts_var_name] in
+  let fs = [fs_getmod; fs_getvar; fs_pr] in
+  let task = List.fold_left Task.add_ty_decl initial_task ts in
+  List.fold_left Task.add_param_decl task fs
+  
 let empty = {
     logic_task = initial_task; 
     env_ty     = Mp.empty;
@@ -238,15 +294,6 @@ let merge_id =
   let check p (t1,_) (t2,_) = 
     if not (EcPath.p_equal t1 t2) then raise (MergeW3Id(p,t1,t2)) in
   Ident.Mid.merge (merge check)
-
-let add_decl_with_tuples task d =
-  let ids = Ident.Mid.set_diff d.Decl.d_syms (Task.task_known task) in
-  let add id s = match Ty.is_ts_tuple_id id with
-    | Some n -> Stdlib.Sint.add n s
-    | None -> s in
-  let ixs = Ident.Sid.fold add ids Stdlib.Sint.empty in
-  let add n task = Task.use_export task (Theory.tuple_theory n) in
-  Task.add_decl (Stdlib.Sint.fold add ixs task) d
 
 let add_ts env path ts decl =
   if Mp.mem path env.env_ty then 
@@ -1119,7 +1166,6 @@ let add_op env path op =
   let odecl = mk_highorder_func ls in
   add_ls env path ls wparams decl odecl, RBop(path,(ls,wparams),decl,odecl)
 
-
 let check_empty vm = 
   let check_empty m = assert (Mp.is_empty m) in 
   Array.iter check_empty vm.accu.pvm
@@ -1135,7 +1181,9 @@ let add_ax env path ax =
       let decl = Decl.create_prop_decl Decl.Paxiom pr f in
       add_pr env path pr decl, RBax(path,pr,decl)
 
-
+(*let rec add_mod_exp env path me = *)
+  
+  
 
 (* -------------------------------------------------------------------- *)
 (* ---------------------- Calling prover ------------------------------ *)
