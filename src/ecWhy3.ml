@@ -1116,13 +1116,9 @@ let add_ty env path td =
 
 let add_op env path op =
   let ls, wparams, decl = trans_oper env path op in
-  Format.printf "ICI1@.";
   let odecl = mk_highorder_func ls in
-  Format.printf "ICI2@.";
-  let res = 
-    add_ls env path ls wparams decl odecl, RBop(path,(ls,wparams),decl,odecl) in
-  Format.printf "ICI3@.";
-  res
+  add_ls env path ls wparams decl odecl, RBop(path,(ls,wparams),decl,odecl)
+
 
 let check_empty vm = 
   let check_empty m = assert (Mp.is_empty m) in 
