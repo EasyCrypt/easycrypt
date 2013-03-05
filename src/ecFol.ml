@@ -53,7 +53,7 @@ and f_node =
   | FequivF of form * (EcPath.mpath * EcPath.mpath) * form
   | FequivS of form * (EcMemory.memenv * stmt) EcUtils.double * form
 
-  | Fpr     of memory * EcPath.mpath * form list * form
+  | Fpr     of memory * EcPath.mpath * form list * form (* $post *)
 
 (* -------------------------------------------------------------------- *)
 let fv f = f.f_fv 

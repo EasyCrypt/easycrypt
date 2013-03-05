@@ -19,6 +19,7 @@ open EcSymbols
  *)
 
 (* -------------------------------------------------------------------- *)
+
 type path = private {
   p_node : path_node;
   p_tag  : int
@@ -34,7 +35,7 @@ type proot = [ `Symbol of symbol | `Ident of EcIdent.t ]
 (* -------------------------------------------------------------------- *)
 val psymbol   : symbol -> path
 val pident    : EcIdent.t -> path
-val pqname    : path * symbol -> path
+val pqname    : path -> symbol -> path
 
 val p_equal   : path -> path -> bool
 val p_compare : path -> path -> int
@@ -54,22 +55,28 @@ module Mp : Map.S  with type key = path
 module Sp : Mp.Set with type elt = path
 
 (* -------------------------------------------------------------------- *)
+type path_kind =
+  | PKmodule
+  | PKother
+
 type mpath = private {
-  m_node : path * mpath list list;
-  m_tag  : int;
+    m_path : path;
+    m_kind : path_kind list; 
+    m_args : mpath list list;
+    m_tag  : int;
 }
 
 (* -------------------------------------------------------------------- *)
-val mpath   : path -> mpath list list -> mpath
+val mpath   : path -> path_kind list -> mpath list list -> mpath
 val mident  : EcIdent.t -> mpath
 val msymbol : symbol -> mpath
-val mqname  : mpath -> symbol -> mpath list -> mpath
+val mqname  : mpath -> path_kind -> symbol -> mpath list -> mpath
 
 val m_equal   : mpath -> mpath -> bool
 val m_compare : mpath -> mpath -> int
 val m_hash    : mpath -> int
 
-val m_split : mpath -> (mpath * symbol * mpath list) option
+val m_split : mpath -> (mpath * path_kind * symbol * mpath list) option
 val m_apply : mpath -> mpath list -> mpath
 
 (* -------------------------------------------------------------------- *)

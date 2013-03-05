@@ -1116,8 +1116,13 @@ let add_ty env path td =
 
 let add_op env path op =
   let ls, wparams, decl = trans_oper env path op in
+  Format.printf "ICI1@.";
   let odecl = mk_highorder_func ls in
-  add_ls env path ls wparams decl odecl, RBop(path,(ls,wparams),decl,odecl)
+  Format.printf "ICI2@.";
+  let res = 
+    add_ls env path ls wparams decl odecl, RBop(path,(ls,wparams),decl,odecl) in
+  Format.printf "ICI3@.";
+  res
 
 let check_empty vm = 
   let check_empty m = assert (Mp.is_empty m) in 
@@ -1134,9 +1139,15 @@ let add_ax env path ax =
       let decl = Decl.create_prop_decl Decl.Paxiom pr f in
       add_pr env path pr decl, RBax(path,pr,decl)
 
-(**** Calling prover *)
-exception UnknownProver of string
 
+
+(* -------------------------------------------------------------------- *)
+(* ---------------------- Calling prover ------------------------------ *)
+(* -------------------------------------------------------------------- *)
+
+
+
+exception UnknownProver of string
 
 let get_prover name =
   List.find (fun (s,_,_) -> s = name) (Config.provers ())

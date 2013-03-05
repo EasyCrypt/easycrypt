@@ -898,19 +898,18 @@ predicate:
     pp_dom = None;
     pp_body = None; }
   }
-| PRED x = op_ident EQ f=loc(form) {
-  { pp_name = x;
-    pp_tyvars = None;
-    pp_dom = None;
-    pp_body = Some([], f) }
-  }
 | PRED x = op_ident tyvars=tyvars_decl COLON sty = op_tydom { 
   { pp_name = x;
     pp_tyvars = tyvars;
     pp_dom = Some sty;
     pp_body = None;
+  } }
+| PRED x = op_ident tyvars=tyvars_decl EQ f=loc(form) {
+  { pp_name = x;
+    pp_tyvars = tyvars;
+    pp_dom = None;
+    pp_body = Some([], f) }
   }
-  } 
 | PRED x = op_ident tyvars=tyvars_decl params=param_decl1 EQ f=loc(form) { 
   { pp_name = x;
     pp_tyvars = tyvars;

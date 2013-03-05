@@ -624,7 +624,7 @@ struct
 
   (* ------------------------------------------------------------------ *)
   let rec pr_module_item (scope : EcPath.path) (tenv : t) (item : module_item) =
-    let xpath x = EcPath.pqname (scope, x) in
+    let xpath x = EcPath.pqname scope x in
 
       match item with
       | MI_Variable v ->
@@ -908,7 +908,7 @@ struct
 
   (* ------------------------------------------------------------------ *)
   let rec pr_ctheory_item (scope : EcPath.path) (tenv : t) (item : ctheory_item) =
-    let xpath x = EcPath.pqname (scope, x) in
+    let xpath x = EcPath.pqname scope x in
 
     match item with
     | CTh_type (x, ty) ->

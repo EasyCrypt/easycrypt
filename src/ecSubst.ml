@@ -56,19 +56,21 @@ let subst_path  (_s : subst) (p : EcPath.path) = p
 let subst_local (_s : subst) (x : EcIdent.t)   = x
 
 let rec subst_mpath (s : subst) (m : EcPath.mpath) = 
-  let p,args = m.EcPath.m_node in
+  let p    = m.EcPath.m_path 
+  and ks    = m.EcPath.m_kind 
+  and args = m.EcPath.m_args in
   let args = List.map (List.map (subst_mpath s)) args in
-  let rec aux p args = 
-    match p.EcPath.p_node, args with
-    | EcPath.Psymbol _, _ -> raise Not_found 
-    | EcPath.Pident id, [a] ->
+  let rec aux p ks args = 
+    match p.EcPath.p_node, ks, args with
+    | EcPath.Psymbol _, _, _ -> raise Not_found 
+    | EcPath.Pident id, [_], [a] ->
         let m = Mid.find id s.sb_modules in
         assert (a = []); (* FIXME *)
         m
-    | EcPath.Pqname(p,id), a::args ->
-        EcPath.mqname (aux p args) id a 
-    | _, _ -> assert false in
-  try aux p args with Not_found -> EcPath.mpath p args
+    | EcPath.Pqname(p, id), k::ks ,a::args ->
+        EcPath.mqname (aux p ks args) k id a 
+    | _, _, _ -> assert false in
+  try aux p ks args with Not_found -> EcPath.mpath p ks args
 
 (* -------------------------------------------------------------------- *)
 let rec subst_ty (s : subst) (ty : ty) =

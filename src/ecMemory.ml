@@ -36,6 +36,6 @@ let bind (x : symbol) (ty : EcTypes.ty) (me : memenv) =
 (* -------------------------------------------------------------------- *)
 let lookup (x : symbol) (me : memenv) =
   let tx (ty : EcTypes.ty) =
-    (ty, EcPath.mqname me.me_mpath x [])
+    (ty, EcPath.mqname me.me_mpath EcPath.PKother x [])
   in
     omap (Msym.find_opt x me.me_vars) tx
