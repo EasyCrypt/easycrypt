@@ -225,6 +225,11 @@
 // %token WP
 %token WHY3
 
+(* PHL Tactics *)
+%token APP
+%token WP
+%token SKIP
+
 %token <string> OP1 OP2 OP3 OP4
 %token LTCOLON GT
 
@@ -1026,6 +1031,11 @@ tactic:
 | ELIM e=elim                   { Pelim e }
 | APPLY e=elim                  { Papply e }
 | LPAREN s=tactics RPAREN       { Pseq s } 
+(* PHL tactics *)
+| APP n=number p=loc(sform)     { PPhl( Papp(n,p) ) }
+| WP  n=number                  { PPhl( Pwp n) }
+| SKIP                          { PPhl(Pskip) }
+| ADMIT                         { Padmit }
 ;
 
 tactics:
@@ -1143,7 +1153,7 @@ prog:
 | g=global { P_Prog ([g], false) }
 | stop     { P_Prog ([ ], true ) }
 
-| UNDO d=number DOT
+| UNDO d=number FINAL
    { P_Undo d }
 
 | error

@@ -1081,7 +1081,9 @@ and trans_form env vm f =
       let args = List.map (trans_form_b env vm) args in
       Term.t_tuple args
 
-  | Fhoare _ -> assert false (* FIXME: only FOL should be trans_formed *)
+
+  | Fhoare _ -> Term.t_true 
+    (* FIXME: this cannot be just translated to terms *)
 
 and trans_form_b env vm f = force_bool (trans_form env vm f)
 

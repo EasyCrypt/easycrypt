@@ -14,6 +14,9 @@ type memenv = {
   me_vars   : EcTypes.ty Msym.t;
 }
 
+let mem_equal = EcIdent.id_equal
+
+
 (* -------------------------------------------------------------------- *)
 let mpath    { me_mpath  = p } = p
 let memory   { me_memory = m } = m

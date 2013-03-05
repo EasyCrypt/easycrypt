@@ -82,7 +82,7 @@ module type IPrettyPrinter = sig
   val pr_module   : t -> (EcPath.path * module_expr) pr
   val pr_theory   : t -> (EcPath.path * ctheory    ) pr
   val pr_export   : t -> EcPath.path pr
-  val pr_lgoal    : t -> (EcFol.hyps * EcFol.form) pr
+  val pr_lgoal    : ?n:int -> t -> (EcFol.hyps * EcFol.form) pr
 
   (* ------------------------------------------------------------------ *)
   val pp_type     : t -> ?vmap:NameGen.t -> ty pp
@@ -97,6 +97,7 @@ module type IPrettyPrinter = sig
   val pp_theory   : t -> (EcPath.path * ctheory    ) pp
   val pp_export   : t -> EcPath.path pp
   val pp_lgoal    : t -> (EcFol.hyps * EcFol.form) pp
+  val pp_fct_def  : t -> EcModules.function_def pp
 end
 
 (* -------------------------------------------------------------------- *)
@@ -779,7 +780,7 @@ struct
       | Ftuple args ->
           pr_tuple_expr tenv pr_form args
             
-      | Fhoare(pre,def,post) -> 
+      | Fhoare(_,pre,def,post) -> 
         (* copy pasted from pr_modfun, code repetition *)
           let dlocals =
             List.map
@@ -803,6 +804,36 @@ struct
 
     in
       pr_form tenv (min_op_prec, `NonAssoc) f
+
+
+
+
+
+  let pr_fct_def tenv def = 
+    let dlocals =
+      List.map
+        (fun (x, ty) -> pr_local tenv (EcIdent.create x) ty)
+        def.f_locals
+    and dbody =
+      let bodytenv =
+        List.fold_left
+          (fun tenv x -> M.add_local tenv (EcIdent.create x))
+          tenv
+          (List.map fst (def.f_locals))
+      in
+      List.map (pr_instr bodytenv) def.f_body.s_node
+    in
+    pr_mblocks [dlocals; dbody]
+
+
+
+
+
+
+
+
+
+
 
   (* ------------------------------------------------------------------ *)
   let pr_opdecl (tenv : t) ((x, op) : EcPath.path * operator) =
@@ -964,12 +995,13 @@ struct
     let dh = pr_ident t id ^^ (!^ " : ") ^//^ dk in
     (M.add_local t id, d^/^dh)   
 
-  let pr_lgoal t (hyps,concl) = 
+  let pr_lgoal ?(n=0) t (hyps,concl) = 
     let doc = 
       tk_tvars ^^ (!^ " : ") ^//^ pr_list_map (pr_tvar t) ", " hyps.h_tvar in
     let (t,doc) = List.fold_left pr_hyp (t,doc) (List.rev hyps.h_local) in
     let doc = doc ^/^ tk_goalline in
-    (!^ "Current goal") ^@^ doc ^/^ pr_form t concl ^^ clearbreak
+    let rem = if n=0 then (!^ "") else (!^" (remaining ") ^^ (Pp.ML.int n) ^^ (!^")") in
+    (!^ "Current goal") ^^ rem  ^@^ doc ^/^ pr_form t concl ^^ clearbreak
 
   (* ------------------------------------------------------------------ *)
   let pp_type     = fun t ?vmap -> pp_of_pr (pr_type t ?vmap)
@@ -984,6 +1016,7 @@ struct
   let pp_expr     = fun t -> pp_of_pr (pr_expr t)
   let pp_form     = fun t -> pp_of_pr (pr_form t)
   let pp_lgoal    = fun t -> pp_of_pr (pr_lgoal t)
+  let pp_fct_def  = fun t -> pp_of_pr (pr_fct_def t)
 end
 
 (* -------------------------------------------------------------------- *)

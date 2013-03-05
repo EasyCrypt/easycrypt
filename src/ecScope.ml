@@ -695,6 +695,10 @@ module Tactic = struct
     let pi = Prover.mk_prover_info scope pi in
     t_trivial pi env g
 
+  let process_admit g =
+    let rule = { EcBaseLogic.pr_name = RN_prover (); pr_hyps = [] } in
+    upd_rule_done g rule
+
   let rec process_logic_tacs scope env (tacs:ptactics) (gs:goals) : goals = 
     match tacs with
     | [] -> gs
@@ -721,10 +725,13 @@ module Tactic = struct
       | Pright         -> t_or_intro false
       | Pelim pe       -> process_elims loc false env pe
       | Papply pe      -> process_apply loc env pe
-      | PPhl tac       -> process_phl process_formula tac loc env 
       | Pseq tacs      -> 
           fun (juc,n) -> process_logic_tacs scope env tacs (juc,[n])
-      | Psubgoal _     -> assert false in
+      | Psubgoal _     -> assert false 
+     
+      | Padmit         -> process_admit
+      | PPhl tac       -> process_phl process_formula tac loc env 
+    in
     set_loc loc tac g
 
   let process_logic scope env juc loc tacs = 
@@ -754,8 +761,9 @@ module Tactic = struct
         | PUCK_logic juc ->
             let doc = 
               try 
+                let n_subgoals = List.length (snd (find_all_goals juc)) in
                 let g = get_goal (get_first_goal juc) in
-                EcPrinting.EcPP.pr_lgoal (EcPrinting.EcPP.mono scope.sc_env) g
+                  (EcPrinting.EcPP.pr_lgoal ~n:n_subgoals (EcPrinting.EcPP.mono scope.sc_env) g)
               with EcBaseLogic.NotAnOpenGoal _ -> 
                 Pprint.text "No more goals" in
             Some doc
@@ -771,8 +779,11 @@ module Ax = struct
   module TT = EcTypedtree
 
   let bind (scope : scope) ((x, ax) : _ * axiom) =
+   let res = 
     { scope with
         sc_env  = EcEnv.Ax.bind x ax scope.sc_env; }
+      in
+   res
 
   let start_lemma scope name tparams concl = 
     let hyps = { EcFol.h_tvar = tparams;
@@ -787,7 +798,7 @@ module Ax = struct
     if Check_mode.check scope.sc_options then
       match scope.sc_pr_uc with
       | [] -> Tactic.error loc Tactic.NoCurrentGoal
-      |  { puc_name = name; puc_kind = PUCK_logic juc } :: pucs ->
+      | { puc_name = name; puc_kind = PUCK_logic juc } :: pucs ->
           let pr = EcLogic.close_juc juc in
           let hyps,concl = pr.EcBaseLogic.j_decl in
           let tparams = hyps.EcFol.h_tvar in

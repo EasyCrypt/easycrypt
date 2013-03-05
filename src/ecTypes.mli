@@ -83,11 +83,13 @@ type prog_var = {
 }
 
 val pv_equal : prog_var -> prog_var -> bool 
+val pv_compare : prog_var -> prog_var -> int
 val pv_hash  : prog_var -> int
 
 (* -------------------------------------------------------------------- *)
 type tyexpr = private {
   tye_node : tyexpr_node;
+  tye_type : ty;
   tye_tag  : int;
 }
 
@@ -101,6 +103,8 @@ and tyexpr_node =
   | Etuple    of tyexpr list                 (* tuple constructor     *)
   | Eif       of tyexpr * tyexpr * tyexpr    (* _ ? _ : _             *)
 
+val type_of_exp : tyexpr -> ty
+
 (* -------------------------------------------------------------------- *)
 val e_equal   : tyexpr -> tyexpr -> bool
 val e_compare : tyexpr -> tyexpr -> int
@@ -108,10 +112,10 @@ val e_hash    : tyexpr -> int
 
 (* -------------------------------------------------------------------- *)
 val e_int      : int -> tyexpr
-val e_local    : EcIdent.t -> tyexpr
-val e_var      : prog_var -> tyexpr
-val e_op       : EcPath.path -> ty list -> tyexpr
-val e_app      : tyexpr -> tyexpr list -> tyexpr
+val e_local    : EcIdent.t -> ty -> tyexpr
+val e_var      : prog_var -> ty -> tyexpr
+val e_op       : EcPath.path -> ty list -> ty -> tyexpr
+val e_app      : tyexpr -> tyexpr list -> ty -> tyexpr
 val e_let      : lpattern -> tyexpr -> tyexpr -> tyexpr
 val e_tuple    : tyexpr list -> tyexpr
 val e_if       : tyexpr -> tyexpr -> tyexpr -> tyexpr

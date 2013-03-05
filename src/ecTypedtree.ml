@@ -250,12 +250,12 @@ let gen_select_op pred tvi env name ue psig =
   match select_local env name with
   | Some(id, ty) -> 
       if tvi <> None then assert false; (* FIXME error message *)
-      [ (e_local id, ty, ue) ]
+      [ (e_local id ty, ty, ue) ]
   | None ->
       let pvs = select_pv env name ue tvi psig in
       let ops = EcUnify.select_op pred tvi env name ue psig in
-      List.map (fun (pv,ty,ue) -> e_var pv, ty, ue) pvs @ 
-      List.map (fun ((op,tys), ty,ue) -> e_op op tys, ty, ue) ops
+      List.map (fun (pv,ty,ue) -> e_var pv ty, ty, ue) pvs @ 
+      List.map (fun ((op,tys), ty,ue) -> e_op op tys ty, ty, ue) ops
 
 let select_op env name ue tvi psig =
   gen_select_op false tvi env name ue psig 
@@ -437,7 +437,7 @@ let transexp (env : EcEnv.env) (ue : EcUnify.unienv) e =
         | [op, ty, subue] ->
             EcUnify.UniEnv.restore ~src:subue ~dst:ue;
             let codom = ty_fun_app env ue ty esig in
-            (e_app op (List.map fst es), codom)
+            (e_app op (List.map fst es) codom, codom)
         end
 
     | PEapp(pe,pes) ->
@@ -445,7 +445,7 @@ let transexp (env : EcEnv.env) (ue : EcUnify.unienv) e =
         let es = List.map (transexp env) pes in
         let esig = snd (List.split es) in
         let codom = ty_fun_app env ue ty esig in
-        (e_app e (List.map fst es), codom)
+        (e_app e (List.map fst es) codom, codom)
 
     | PElet (p, pe1, pe2) ->
       let (penv, p, pty) = transpattern env ue p in
@@ -899,7 +899,6 @@ and transbody known_ids ue env body rty =
   in
   let env = List.fold_left add_locals env body.pfb_locals in
   let stmt = transstmt ue env body.pfb_body in 
-  (* Cesar says: I guess "init" was missing, and the natural order is used *)
   let stmt = EcModules.stmt ((List.rev !init) @ stmt.s_node) in
   let re =
     match body.pfb_return with
@@ -1047,7 +1046,7 @@ module Fenv = struct
     oget (byid EcFol.mstd fenv)
 
   let bind_local fenv x ty =
-   { fenv with 
+    { fenv with 
        fe_locals = MMsym.add (EcIdent.name x) (x, ty) fenv.fe_locals }
 
   let bind_locals = List.fold_left2 bind_local 
@@ -1187,13 +1186,15 @@ let transform fenv ue pf tt =
       (* Cesar says: what should I assume about local variables in pre/post? *)
       let known_ids = ref Mstr.empty in
       let ue = UE.create (Some []) in (* I ignore this *)
-      let pre = transf fenv pre in
       (* FIXME: assuming no return statement, bad error message *)
       let stmt, _re, locals, env = transbody known_ids ue (Fenv.mono fenv) body tunit in
-      let fenv = Fenv.mono_fenv env in
-      let post = transf fenv post in
-      let f_def = {f_locals=locals; f_body=stmt; f_ret=None } in
-      f_hoare pre f_def post
+      let fenv' = Fenv.mono_fenv env in
+      let fenv = {fenv' with Fenv.fe_locals=fenv.Fenv.fe_locals } in
+      let _pre = transf fenv pre in
+      let _post = transf fenv post in
+      let _f_def = {f_locals=locals; f_body=stmt; f_ret=None } in
+      (* f_hoare  pre f_def post *)
+      f_true (* missing memory *)      
 
 (*  and transf fenv pf =
     let f = transf1 fenv pf in
@@ -1217,6 +1218,28 @@ let transform fenv ue pf tt =
   let f = transf fenv pf in
   unify_error (Fenv.mono fenv) ue pf.pl_loc f.f_ty tt;
   f 
+
+
+
+
+ (* let add_locals env (s,ty) =  *)
+ 
+ (*    let newenv = EcEnv.bindall locs env in *)
+
+ (*    List.iter (fun (id, _) -> locals := (id,ty) :: !locals) locs; *)
+ (*    oiter e (fun pe ->  *)
+ (*      let e, ety = transexp env ue pe in *)
+ (*      unify_error env ue pe.pl_loc ety ty; *)
+ (*      List.iter (fun (id,_) -> *)
+ (*        let p,_ =  *)
+ (*          oget (EcEnv.Var.lookup_progvar_opt ([], id) newenv) in *)
+ (*        init := Sasgn(LvVar(p,ty) , e) :: !init) locs); *)
+ (*    newenv  *)
+ (*  in *)
+ (*  let env = List.fold_left add_locals env body.f_locals in *)
+
+
+
 
 let transformula fenv ue pf = 
   transform fenv ue pf tbool

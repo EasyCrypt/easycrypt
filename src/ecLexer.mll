@@ -52,6 +52,11 @@
     "trivial"     , TRIVIAL    ;        (* KW: tactic *)
     "admit"       , ADMIT      ;        (* KW: dangerous *)
 
+    (* PHL: tactics *)
+    "app"         , APP        ;        (* KW: tactic *)
+    "wp"          , WP         ;        (* KW: tactic *)
+    "skip"        , SKIP       ;        (* KW: tactic *)
+
     "axiom"       , AXIOM      ;        (* KW: global *)
     "lemma"       , LEMMA      ;        (* KW: global *)
     "proof"       , PROOF      ;        (* KW: global *)

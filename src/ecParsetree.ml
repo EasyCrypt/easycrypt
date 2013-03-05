@@ -193,10 +193,10 @@ type ppredicate = {
 (* -------------------------------------------------------------------- *)
 (* -------------------------------------------------------------------- *)
 type pprover_infos = {
-    pprov_max : int option;
-    pprov_time : int option;
-    pprov_names : string located list option
-  }
+  pprov_max : int option;
+  pprov_time : int option;
+  pprov_names : string located list option
+}
 
 let empty_pprover = {
   pprov_max   = None;
@@ -208,9 +208,10 @@ type elim_kind =
   | ElimHyp  of pqsymbol * tvar_inst
   | ElimForm of pformula
 
-type pelim = 
-  { elim_kind : elim_kind;
-    elim_args : pformula option list }
+type pelim = { 
+  elim_kind : elim_kind;
+  elim_args : pformula option list 
+}
 
 type ptactic = ptactic_r located
 
@@ -228,10 +229,12 @@ and ptactic_r =
   | Psubgoal    of ptactics
   | Pseq        of ptactics
   | PPhl        of phl_tactics
+  | Padmit
 
 and phl_tactics = 
   | Papp        of (int * pformula)
-
+  | Pwp         of int
+  | Pskip
 and ptactics = ptactic list        
 
 (* -------------------------------------------------------------------- *)

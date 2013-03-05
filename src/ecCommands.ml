@@ -135,7 +135,7 @@ and process_tactics (scope : EcScope.scope) t =
 and process_save (scope : EcScope.scope) loc =
   let name, scope = EcScope.Ax.save scope loc in
   let gi = EcUtils.odfl [] (EcUtils.omap name (fun n -> [GI_AddedAxiom n])) in
-    (scope, gi)
+  (scope, gi)
 
 (* -------------------------------------------------------------------- *)
 and process_proverinfo scope pi = 

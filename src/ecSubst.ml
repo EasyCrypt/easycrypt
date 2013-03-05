@@ -111,16 +111,16 @@ let rec subst_tyexpr (s : subst) (e : tyexpr) =
 
   | Elocal x ->
       let x  = subst_local s x in
-      e_local x
+      e_local x e.tye_type
 
   | Evar x ->
-      e_var (subst_pvar s x)
+      e_var (subst_pvar s x) e.tye_type
 
   | Eop(p, tys) ->
-      e_op (subst_path s p) (List.map (subst_ty s) tys)
+      e_op (subst_path s p) (List.map (subst_ty s) tys) e.tye_type
 
   | Eapp (e, es) ->
-      e_app (subst_tyexpr s e) (List.map (subst_tyexpr s) es)
+      e_app (subst_tyexpr s e) (List.map (subst_tyexpr s) es) e.tye_type
 
   | Elet (p, e1, e2) ->
       let (sbody, p) = subst_lpattern s p in
@@ -380,8 +380,8 @@ and subst_form_node (s : subst) (f : f_node) =
   | Ftuple fs ->
       Ftuple (List.map (subst_form s) fs)
 
-  | Fhoare ( pre, body, post) ->
-    Fhoare (subst_form s pre, subst_function_def s body, subst_form s post)
+  | Fhoare (mem, pre, body, post) ->
+    Fhoare (mem, subst_form s pre, subst_function_def s body, subst_form s post)
 
 (* -------------------------------------------------------------------- *)
 let subst_tydecl (s : subst) (tyd : tydecl) =

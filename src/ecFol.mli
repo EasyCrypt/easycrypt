@@ -41,7 +41,7 @@ and f_node =
   | Fapp    of form * form list                  (* application *)
   | Ftuple  of form list                         (* tuple constructor   *)
 
-  | Fhoare  of form * EcModules.function_def * form
+  | Fhoare  of memenv * form * EcModules.function_def * form
 
   | FhoareF of form * EcPath.mpath * form  (* $pre / $post *)
   | FhoareS of memenv * form * stmt * form (* $hr  / $hr   *)
@@ -79,7 +79,7 @@ val f_forall : binding -> form -> form
 
 
 
-val f_hoare  : form -> EcModules.function_def -> form -> form 
+val f_hoare   : memenv -> form -> EcModules.function_def -> form -> form 
 val f_hoareF  : form -> EcPath.mpath -> form -> form 
 val f_equivF  : form -> EcPath.mpath -> EcPath.mpath -> form -> form 
 val f_pr      : memory -> EcPath.mpath -> form list -> form -> form
@@ -175,6 +175,8 @@ type rule_name =
   | RN_forall_E of form
   | RN_exists_E
   | RN_app of (int * form)
+  | RN_wp of int
+  | RN_skip
 
 type rule = (rule_name, l_decl) EcBaseLogic.rule
 type judgment = (rule_name, l_decl) EcBaseLogic.judgment
@@ -212,3 +214,25 @@ module LDecl :
     val clear : EcIdent.t -> hyps -> hyps
   end
 
+
+module Lvar :
+  sig
+    type t
+    val mk_pvar :  EcTypes.prog_var -> EcMemory.memory -> t
+      
+  end
+
+
+module LVmap : Map.S with type key =  Lvar.t
+
+module Subst :
+  sig
+    type t
+    val single_subst :  Lvar.t -> form -> t
+    val subst_form :  t -> form -> form
+    val add_subst : LVmap.key -> form -> t -> t
+    val empty_subst : t
+  end
+
+
+val form_of_exp : EcMemory.memory -> EcTypes.tyexpr -> form

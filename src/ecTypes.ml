@@ -185,6 +185,10 @@ let pv_hash v =
   Why3.Hashcons.combine (EcPath.m_hash v.pv_name)
     (if v.pv_kind = PVglob then 1 else 0)
 
+let pv_compare v1 v2 = 
+  pv_hash v1 - pv_hash v2
+
+  
 (* -------------------------------------------------------------------- *)
 type lpattern =
   | LSymbol of EcIdent.t
@@ -203,6 +207,7 @@ let lp_hash = function
 (* -------------------------------------------------------------------- *)
 type tyexpr = {
   tye_node : tyexpr_node;
+  tye_type : ty;
   tye_tag  : int;
 }
 
@@ -215,6 +220,8 @@ and tyexpr_node =
   | Elet   of lpattern * tyexpr * tyexpr (* let binding           *)
   | Etuple of tyexpr list                (* tuple constructor     *)
   | Eif    of tyexpr * tyexpr * tyexpr   (* _ ? _ : _             *)
+
+let type_of_exp e = e.tye_type
 
 (* -------------------------------------------------------------------- *)
 let e_equal   = ((==) : tyexpr -> tyexpr -> bool)
@@ -280,16 +287,16 @@ module Hexpr = Why3.Hashcons.Make (struct
 end)
 
 (* -------------------------------------------------------------------- *)
-let mk_tyexpr e =
-  Hexpr.hashcons { tye_node = e; tye_tag = -1; }
+let mk_tyexpr e ty =
+  Hexpr.hashcons { tye_node = e; tye_tag = -1; tye_type=ty }
 
-let e_int   = fun i        -> mk_tyexpr (Eint i)
-let e_local = fun x        -> mk_tyexpr (Elocal x)
-let e_var   = fun x        -> mk_tyexpr (Evar x)
-let e_op    = fun x targs  -> mk_tyexpr (Eop (x, targs))
-let e_let   = fun pt e1 e2 -> mk_tyexpr (Elet (pt, e1, e2))
-let e_tuple = fun es       -> mk_tyexpr (Etuple es)
-let e_if    = fun c e1 e2  -> mk_tyexpr (Eif (c, e1, e2))
+let e_int   = fun i        -> mk_tyexpr (Eint i) tint
+let e_local = fun x ty     -> mk_tyexpr (Elocal x) ty
+let e_var   = fun x ty        -> mk_tyexpr (Evar x) ty
+let e_op    = fun x targs ty  -> mk_tyexpr (Eop (x, targs)) ty
+let e_let   = fun pt e1 e2 -> mk_tyexpr (Elet (pt, e1, e2)) (type_of_exp e2)
+let e_tuple = fun es      -> mk_tyexpr (Etuple es) (ttuple (List.map type_of_exp es))
+let e_if    = fun c e1 e2  -> mk_tyexpr (Eif (c, e1, e2)) (type_of_exp e2)
 
 let e_app x args = 
   match x.tye_node with
@@ -306,8 +313,8 @@ let e_map fty fe e =
   | Eint _
   | Elocal _
   | Evar _                -> e
-  | Eop (p, tys)          -> e_op p (List.map fty tys)
-  | Eapp (e, args)        -> e_app (fe e) (List.map fe args)
+  | Eop (p, tys)          -> e_op p (List.map fty tys) (type_of_exp e)
+  | Eapp (e', args)        -> e_app (fe e') (List.map fe args) (type_of_exp e)
   | Elet (lp, e1, e2)     -> e_let lp (fe e1) (fe e2)
   | Etuple le             -> e_tuple (List.map fe le)
   | Eif (e1, e2, e3)      -> e_if (fe e1) (fe e2) (fe e3)
