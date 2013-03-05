@@ -9,12 +9,14 @@ logger = logging.getLogger(__file__)
 
 # --------------------------------------------------------------------
 from pyramid.view import view_config
+#from pyramid.response import Response
 
 # --------------------------------------------------------------------
 @view_config(route_name = 'root', renderer = 'json')
 def root(request):
     return dict(backend = 'easycrypt',
                 foo = [10, "foo"])
+    # return Response('Hello %s!' % request.matchdict)
 
 # --------------------------------------------------------------------
 def _routing(config):
