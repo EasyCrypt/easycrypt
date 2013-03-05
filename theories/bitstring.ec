@@ -1,42 +1,37 @@
+require bool.
 require import int.
+require import array.
 
-type bitstring.
+type bitstring = bool array.
 
-op length : bitstring -> int.
+(* Xor *)
+op [^^](bs0:bitstring, bs1:bitstring): bitstring = Functional.map2 bool.xorb bs0 bs1.
 
-axiom length_pos : forall (s:bitstring), 0 <= length s.
+lemma xor_length: forall (bs0, bs1:bitstring),
+  length bs0 = length bs1 =>
+  length (bs0 ^^ bs1) = length bs0.
 
-op __get : (bitstring, int) -> bool.
-op __set : (bitstring, int, bool) -> bitstring.
+lemma xor_get: forall (bs0, bs1:bitstring, i:int),
+  length bs0 = length bs1 =>
+  0 <= i => i < length bs0 =>
+  (bs0 ^^ bs1).[i] = bool.xorb bs0.[i] bs1.[i].
 
-pred [==] (s1:bitstring, s2:bitstring) = 
-  length s1 = length s2 &&
-  forall (x:int), 0 <= x && x < length s1 => s1.[x] = s2.[x].
+(* Zero for bitstrings *)
+op zeros: int -> bitstring.
 
-axiom extentionality : forall (s1:bitstring, s2:bitstring),
-   s1 == s2 => s1 = s2.
-    
-axiom set_length : 
-  forall (s:bitstring, x:int, b:bool), length s.[x<-b] = length s.
+axiom zeros_length: forall (l:int),
+  0 <= l =>
+  length(zeros l) = l.
 
-axiom get_out : forall (s:bitstring, x:int),
-  x < 0 || length s <= x =>
-  s.[x] = false. 
+axiom zeros_get: forall (l, i:int),
+  0 <= l => 0 <= i => i < l =>
+  (zeros l).[i] = false.
 
-axiom get_set_same : forall (s:bitstring, x:int, b:bool),
-   0 <= x => x < length s =>
-   s.[x<-b].[x] = b.
-
-axiom get_set_diff : forall (s:bitstring, x:int, y:int, b:bool),
-   x <> y =>
-   s.[x<-b].[y] = s.[y].
-
-lemma set_outofbound : forall (s:bitstring, x:int, b:bool),
-   x < 0 || length s <= x =>
-   s.[x<-b] = s
+(* Lemmas *)
+lemma xor_nilpotent: forall (bs:bitstring),
+  bs ^^ bs = zeros (length bs)
 proof.
-  intros s x b H.
-  apply extentionality (s.[x<-b],s,_). 
+  intros bs.
+  apply extentionality<:bool> ((bs ^^ bs),(zeros (length bs)),_).
   trivial.
 save.
-

@@ -1,13 +1,27 @@
+(* A theory of polymorphic arrays.
+   All operators are only partially specified,
+   as we may choose to match them with different
+   programming language construct.
+   The user wanting to instantiate it with particular
+   implementation choices should clone it and add
+   axioms to further refine the operators. *)
+
 require import int.
 
-(* We first define the type, its destructors, and its equality *)
+(*********************************)
+(*             Core              *)
+(*********************************)
+(* A type *)
 type 'x array.
 
+(* Arrays have a non-negative length *)
 op length: 'x array -> int.
-  axiom length_pos: forall (xs:'x array), 0 <= length xs.
+axiom length_pos: forall (xs:'x array), 0 <= length xs.
 
+(* And a bunch of element *)
 op __get: ('x array,int) -> 'x.
 
+(* Equality is extentional *)
 pred [==] (xs0:'x array, xs1:'x array) =
   length xs0 = length xs1 /\
   forall (i:int), 0 <= i => i < length xs0 => xs0.[i] = xs1.[i].
@@ -15,13 +29,9 @@ pred [==] (xs0:'x array, xs1:'x array) =
 axiom extentionality: forall (xs0:'x array, xs1:'x array),
   xs0 == xs1 => xs0 = xs1.
 
-lemma eq_extent: forall (xs0, xs1:'x array),
-  length xs0 = length xs1 =>
-  (forall (i:int), 0 <= i => i < length xs0 => xs0.[i] = xs1.[i]) =>
-  xs0 = xs1.
-
-(* We define the rest (axiomatically, since we don't have proper induction/iteration in the term language) *)
-(* A functional theory of arrays: empty, cons, append and sub*)
+(*********************************)
+(*      Functional Operators     *)
+(*********************************)
 theory Functional.
   (* empty *)
   cnst empty: 'x array.
@@ -85,14 +95,26 @@ theory Functional.
     (sub xs s l).[i] = xs.[i + s].
 
   (* map *)
-  op map: ('x -> 'x) -> 'x array -> 'x array.
+  op map: ('x -> 'y) -> 'x array -> 'y array.
 
-  axiom map_length: forall (xs:'x array, f:'x -> 'x),
+  axiom map_length: forall (xs:'x array, f:'x -> 'y),
     length (map f xs) = length xs.
 
-  axiom map_get: forall (xs:'x array, f:'x -> 'x, i:int),
+  axiom map_get: forall (xs:'x array, f:'x -> 'y, i:int),
     0 <= i => i < length(xs) =>
     (map f xs).[i] = f (xs.[i]).
+
+  (* map2 *) (* Useful for bitwise operations *)
+  op map2: ('x -> 'y -> 'z) -> 'x array -> 'y array -> 'z array.
+
+  axiom map2_length: forall (xs:'x array, ys:'y array, f:'x -> 'y -> 'z),
+    length xs = length ys =>
+    length (map2 f xs ys) = length xs.
+
+  axiom map2_get: forall (xs:'x array, ys:'y array, f:'x -> 'y -> 'z, i:int),
+    length xs = length ys =>
+    0 <= i => i < length xs =>
+    (map2 f xs ys).[i] = f (xs.[i]) (ys.[i]).
 
   (* lemmas *)
   lemma sub_append_fst: forall (xs0, xs1:'x array),
@@ -112,6 +134,9 @@ theory Functional.
   save.
 end Functional.
 
+(*********************************)
+(*      Imperative Operators     *)
+(*********************************)
 theory Imperative.
   (* set: array * offset * value -> array *)
   op __set: ('x array,int,'x) -> 'x array.
@@ -143,6 +168,10 @@ theory Imperative.
     (dOff + l <= i => i < length dst => (write dst dOff src sOff l).[i] = dst.[i]).
 end Imperative.
 
+
+(*********************************)
+(*       Some Mixed Lemmas       *)
+(*********************************)
 theory Mixed.
   import Imperative.
   import Functional.
