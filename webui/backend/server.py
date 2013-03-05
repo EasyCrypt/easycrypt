@@ -3,6 +3,7 @@
 import os
 from gevent.pywsgi import WSGIServer
 import geventwebsocket
+import json
 
 class eServer(object):
 
@@ -11,7 +12,7 @@ class eServer(object):
         agent = "gevent-websocket/%s" % (geventwebsocket.__version__)
         print "Running %s from %s" % (agent, path)
         self.all_socks = []
-        self.s = WSGIServer(("", 8000), self.echo, handler_class=geventwebsocket.WebSocketHandler)
+        self.s = WSGIServer(("", 8080), self.echo, handler_class=geventwebsocket.WebSocketHandler)
         self.broken_socks = []
         self.s.serve_forever()
 
@@ -24,10 +25,15 @@ class eServer(object):
                 message = websocket.receive()
                 if message is None:
                     break
+                m = json.loads(message) 
                 self.sock_track(websocket)
                 for s in self.all_socks:
                     try:
-                        s.send(message)
+                        if  m['mode'] == 'undo' : 
+                            undo = json.dumps({'mode' : 'undo', 'data' : 'Undo operation - OK'})
+                            s.send(undo)
+                        elif m['mode'] == 'forward' :
+                            s.send(message)
                     except Exception:
                         print "broken sock"
                         self.broken_socks.append(s)
