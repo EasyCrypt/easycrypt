@@ -1,5 +1,6 @@
 require import pair.
 require import int.
+require import array.
 require import bitstring.
 require import Fun.
 require        Set.
@@ -136,7 +137,7 @@ end Dinter.
 theory Dbitstring.
 
   op dbitstring : int -> bitstring distr.
-  
+
   axiom supp_def : forall ( k:int, s:bitstring),
       in_supp s (dbitstring k) <=> length s = k.
 

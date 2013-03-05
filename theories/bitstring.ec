@@ -1,6 +1,6 @@
 require bool.
 require import int.
-require import array.
+require export array.
 
 type bitstring = bool array.
 
