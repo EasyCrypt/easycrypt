@@ -12,23 +12,23 @@ import why3 "list" "List"
 op hd : 'a list -> 'a.
 op tl : 'a list -> 'a list.
 
-op foldr : 'b -> ('a -> 'b -> 'b) -> 'a list -> 'b.
+op fold_right : ('a -> 'b -> 'b) -> 'b -> 'a list -> 'b.
 
 axiom hd_def : forall (x : 'a, xs : 'a list), hd(x::xs) = x.
 
 axiom tl_def : forall (x : 'a, xs : 'a list), tl(x::xs) = xs.
 
-(* list induction and recursion*)
+list induction and recursion
 axiom list_ind : forall(P:('a list) Pred),
 (P([])) =>
 (forall (x :'a, xs : 'a list), P(xs) => P (x::xs)) =>
 (forall(ys:'a list), P(ys)).
 
-axiom foldr_def1 : forall (e : 'b, f : 'a -> 'b -> 'b),
- foldr e f [] = e. 
+axiom fold_right_def1 : forall (e : 'b, f : 'a -> 'b -> 'b),
+ fold_right f  e [] = e.
 
-axiom foldr_def2 : forall (e : 'b, f : 'a -> 'b -> 'b, x : 'a, xs : 'a list),
- foldr e f (x::xs) = f x (foldr e f xs). 
+axiom fold_right_def2 : forall (e : 'b, f : 'a -> 'b -> 'b, x : 'a, xs : 'a list),
+ fold_right f e (x::xs) = f x (fold_right f e xs).
 
 (********** No more axioms **********)
 
@@ -42,26 +42,27 @@ lemma destruct_list : forall (xs : 'a list),
 lemma hd_tl_decomp : forall (xs : 'a list), xs <> [] =>
  hd(xs)::tl(xs) = xs.
 
-
 (* membership test *)
 
-(* local *) op f_elem(x : 'a, y : 'a, b : bool)  : bool = x = y || b.
-op elem (x : 'a) :  'a list -> bool = foldr false (f_elem x).
+(* local *) op f_mem(x : 'a, y : 'a, b : bool)  : bool = x = y || b.
+op mem (x : 'a) :  'a list -> bool = fold_right (f_mem x) false.
 
-lemma elem_eq : forall (x : 'a, xs : 'a list), elem x (x::xs).
-lemma elem_cons : forall (x, y: 'a, xs : 'a list), elem y xs => elem y (x::xs).
-lemma elem_not_nil : forall (y: 'a, xs : 'a list), elem y xs => xs <> [].
-lemma elem_hd : forall (xs : 'a list), xs <> [] => elem (hd xs) xs.
-lemma not_elem_empty : forall (xs : 'a list), (forall(x :'a), !elem x xs) => xs = []. 
+lemma mem_eq : forall (x : 'a, xs : 'a list), mem x (x::xs).
+lemma mem_cons : forall (x, y: 'a, xs : 'a list), mem y xs => mem y (x::xs).
+lemma mem_not_nil : forall (y: 'a, xs : 'a list), mem y xs => xs <> [].
+lemma mem_hd : forall (xs : 'a list), xs <> [] => mem (hd xs) xs.
+lemma not_mem_empty : forall (xs : 'a list), (forall(x :'a), !mem x xs) => xs = [].
 
 (* length *)
 
 (* local *) op f_length(x : 'a, b : int)  : int = 1 + b.
-op length(xs : 'a list) : int = foldr 0 f_length xs.
+op length_list (xs : 'a list) : int = fold_right f_length 0 xs.
 
 lemma length_def1 : length<:'a>([]) = 0.
 lemma length_def2 : forall (x : 'a, xs : 'a list), 
  length (x::xs) = 1 + length(xs).
+
+
 
 (* local *) pred P_length_non_neg(xs : 'a list)  =
  0 <= length(xs).
@@ -78,7 +79,7 @@ lemma length_z_nil : forall(xs : 'a list), length(xs) = 0 => xs = [].
 
 (* append *)
 
-op [++](xs : 'a list, ys : 'a list) : 'a list = (foldr ys ([::])) xs.
+op [++](xs : 'a list, ys : 'a list) : 'a list = (fold_right ([::]) ys ) xs.
 
 lemma app_def1 : forall (ys : 'a list), []++ys = ys.
 lemma app_def2 : forall (x : 'a, xs, ys : 'a list), (x::xs)++ys = x::(xs++ys).
@@ -123,28 +124,28 @@ lemma length_app_comm : forall (xs, ys : 'a list),
  length(xs++ys) =  length(ys++xs).
 
 
-(* local *) pred P_elem_app (xs : 'a list) = forall(ys : 'a list, y :'a), 
-(elem y xs  || elem y ys) =  elem y (xs++ys).
+(* local *) pred P_mem_app (xs : 'a list) = forall(ys : 'a list, y :'a), 
+(mem y xs  || mem y ys) =  mem y (xs++ys).
 
-(* local *) lemma elem_app_aux : forall (xs : 'a list), P_elem_app xs
+(* local *) lemma mem_app_aux : forall (xs : 'a list), P_mem_app xs
 proof.
 intros xs.
-apply list_ind<:'a>((P_elem_app),_,_,xs);trivial.
+apply list_ind<:'a>((P_mem_app),_,_,xs);trivial.
 save.
 
-lemma elem_app : forall (xs,ys : 'a list,y :'a), 
-   (elem y xs  || elem y ys)  =  elem y (xs++ys).
+lemma mem_app : forall (xs,ys : 'a list,y :'a), 
+   (mem y xs  || mem y ys)  =  mem y (xs++ys).
  
-lemma elem_app_comm : forall (xs,ys : 'a list,y :'a),
- elem y (xs++ys) = elem y (ys++xs).
+lemma mem_app_comm : forall (xs,ys : 'a list,y :'a),
+ mem y (xs++ys) = mem y (ys++xs).
 
 (* two liftings from a' pred  to ('a list) pred *)
 
 pred all (p : 'a Pred,xs : 'a list) =
- forall (x : 'a), elem x xs => p x.
+ forall (x : 'a), mem x xs => p x.
 
 pred any (p : 'a Pred,xs : 'a list) =
- exists (x : 'a), elem x xs && p x.
+ exists (x : 'a), mem x xs && p x.
 
 lemma all_empty : forall (p : 'a Pred), all p [].
 lemma any_empty : forall (p : 'a Pred), !any p [].
@@ -155,12 +156,33 @@ all p (xs++ys) = (all p xs && all p ys).
 lemma any_app : forall (p : 'a Pred,xs,ys : 'a list),
 any p (xs++ys) = (any p xs || any p ys).
 
+(* forallb *)
+
+(* local *) op f_forallb (p : 'a -> bool, x : 'a, r : bool) : bool = 
+(p x) && r.
+
+op forallb(p : 'a -> bool, xs : 'a list) : bool = 
+ fold_right (f_forallb p) true xs.
+
+(* local *) op f_existsb (p : 'a -> bool, x : 'a, r : bool) : bool = 
+(p x) || r.
+
+op existsb(p : 'a -> bool, xs : 'a list) : bool = 
+ fold_right (f_existsb p) false xs.
+
+lemma eq_forallb_all : forall (p : 'a -> bool, xs : 'a list),
+all p xs <=> forallb p xs.
+
+
+lemma eq_existsb_any : forall (p : 'a -> bool, xs : 'a list),
+any p xs <=> existsb p xs.
+
 (* filter *)
 
 (* local *)  op f_filter(p : 'a Pred, x : 'a, r : 'a list) : 'a list = 
  if (p x) then x::r else r.
 
-op filter(p : 'a Pred) : 'a list -> 'a list = foldr [] (f_filter p).
+op filter(p : 'a Pred) : 'a list -> 'a list = fold_right (f_filter p) [].
 
 lemma filter_def1 : forall (p : 'a Pred),
   filter p [] = [].
@@ -169,19 +191,19 @@ lemma filter_def2 : forall (p : 'a Pred, x : 'a, xs : 'a list),
   filter p (x::xs) = let rest = filter p xs in
                      if p x then x::rest else rest.
 
-(* local *) pred P_filter_elem (xs : 'a list) = forall (p : 'a Pred, x : 'a),
-elem x (filter p xs) = (elem x xs && p x).
+(* local *) pred P_filter_mem (xs : 'a list) = forall (p : 'a Pred, x : 'a),
+mem x (filter p xs) = (mem x xs && p x).
 
-(* local *) lemma filter_elem_aux : 
-forall (xs : 'a list), P_filter_elem xs
+(* local *) lemma filter_mem_aux : 
+forall (xs : 'a list), P_filter_mem xs
 proof.
 intros xs.
-apply list_ind<:'a>(P_filter_elem,_,_,xs);trivial.
+apply list_ind<:'a>(P_filter_mem,_,_,xs);trivial.
 save.
 
-lemma filter_elem : 
+lemma filter_mem : 
 forall (xs : 'a list, p : 'a Pred, x : 'a), 
-elem x (filter p xs) = (elem x xs && p x).
+mem x (filter p xs) = (mem x xs && p x).
 
 (* local *) pred P_filter_app(xs : 'a list) = 
  forall (ys : 'a list, p : 'a Pred),
@@ -214,20 +236,20 @@ all p (filter p xs).
 
 lemma filter_imp : forall(xs : 'a list, p q : 'a Pred),
 (forall (x : 'a), p x => q x) => 
- forall (x : 'a), elem x (filter p xs) => elem x (filter q xs).
+ forall (x : 'a), mem x (filter p xs) => mem x (filter q xs).
 
 
 (* list map *)
 (* local *) op f_map(f : 'a -> 'b, x : 'a , xs : 'b list) : 'b list = f x :: xs.
 
-op map(f :'a -> 'b) : 'a list -> 'b list = foldr [] (f_map f).
+op map(f :'a -> 'b) : 'a list -> 'b list = fold_right (f_map f) [].
 
 lemma map_def1 : forall(f : 'a -> 'b),map f [] = [].
 lemma map_def2 : forall(f : 'a -> 'b, x : 'a, xs : 'a list ), 
     map f (x::xs) = (f x)::(map f xs).
 
 (* local *)  pred P_map_in(f : 'a -> 'b,xs : 'a list) = 
- forall(x : 'a), elem x xs => elem (f x) (map f xs).
+ forall(x : 'a), mem x xs => mem (f x) (map f xs).
 
 (* local *) lemma map_in_aux : forall (xs : 'a list,f : 'a -> 'b), 
    (P_map_in f) xs 
@@ -236,8 +258,8 @@ intros xs f.
 apply list_ind<:'a>((P_map_in f),_,_,xs);trivial.
 save.
 
-lemma map_in : forall (xs : 'a list,x : 'a, f : 'a -> 'b), elem x xs =>
- elem (f x) (map f xs).
+lemma map_in : forall (xs : 'a list,x : 'a, f : 'a -> 'b), mem x xs =>
+ mem (f x) (map f xs).
 
 (* local *)  pred P_map_o (f : 'a -> 'b, g : 'b -> 'c, h : 'a -> 'c, 
  xs : 'a list) = map g (map f xs) = map h xs.
@@ -301,3 +323,13 @@ save.
 lemma map_ext : forall (xs : 'a list, f: 'a -> 'b,g : 'a -> 'b),
 (forall (x : 'a), f x = g x) => map f xs = map g xs.
 
+
+op f_nth (x : 'a, r : ('a -> int -> 'a), y : 'a, n : int) : 'a =
+if n = 0 then x else (r y (n - 1)).
+ 
+op e_nth (y : 'a, n : int) : 'a = y.
+ 
+op nth (xs : 'a list) : 'a -> int -> 'a = fold_right f_nth e_nth xs.
+
+lemma nth_in_or_dv : forall(xs : 'a list, dv : 'a, n : int),
+  mem (nth xs dv n) xs || nth xs dv n = dv.
