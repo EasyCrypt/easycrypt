@@ -27,6 +27,8 @@ val import_w3 :
       Why3.Theory.theory -> 
         renaming_decl -> EcTheory.theory * rebinding_item 
 
+val distr_theory : Why3.Theory.theory
+
 val add_ty : env -> EcPath.path -> EcDecl.tydecl -> env * rebinding_item
 
 val add_op : 

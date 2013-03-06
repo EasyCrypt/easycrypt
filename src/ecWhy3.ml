@@ -152,10 +152,27 @@ let w3_ls_eq, decl_eq, spec_eq =
   let decl_spec = Decl.create_prop_decl Decl.Paxiom pr form in
   ls, decl, decl_spec 
 
+let distr_theory = 
+  let th  = Theory.create_theory (Ident.id_fresh "Distr") in
+  let th  = Theory.use_export th Theory.bool_theory in
+  let th  = Theory.use_export th Theory.highord_theory in
+  let vta = Ty.create_tvsymbol (Ident.id_fresh "ta") in
+  let ta  = Ty.ty_var vta in 
+  let tdistr = Ty.create_tysymbol (Ident.id_fresh "distr") [vta] None in
+  let th  = Theory.add_ty_decl th tdistr in
+  let mu  = 
+    Term.create_fsymbol (Ident.id_fresh "mu") 
+      [Ty.ty_app tdistr [ta]; Ty.ty_func ta Ty.ty_bool] 
+      Ty.ty_real in
+  let th = Theory.add_param_decl th mu in
+  Theory.close_theory th 
+  
+
 let initial_task = 
   let task = 
     List.fold_left Task.use_export None 
-      [Theory.builtin_theory;Theory.bool_theory;Theory.highord_theory] in
+      [Theory.builtin_theory;Theory.bool_theory;Theory.highord_theory;
+       distr_theory] in
   List.fold_left Task.add_decl task
     [decl_not; spec_not;
      decl_and; spec_and;
@@ -207,8 +224,27 @@ let fs_pr =
   Term.create_fsymbol (Ident.id_fresh "proba") 
       [ty_mod;tf;ty_mem;ta;ty_event tr] Ty.ty_real
 
+(* Remark : we can maybe use the type distr *)
 let getpr m fn mem args ev =
   Term.t_app_infer fs_pr [m;fn;mem;Term.t_tuple args; ev]
+
+(*let ax_pr_bound = 
+  let ta = Ty.ty_var (Ty.create_tvsymbol (Ident.id_fresh "ta"))
+  and tr = Ty.ty_var (Ty.create_tvsymbol (Ident.id_fresh "tr")) in
+  let tf = Ty.ty_app ts_fun_name [ta; tr] in
+  let create s t = 
+    let vx = Term.create_vsymbol (Ident.id_fresh "m") ty_mem in
+    vx, Term.t_var vx in
+  let vm, m = create "m" ty_mod in
+  let vf, f = create "f" tf in
+  let vmem, mem = create "mem" ty_mem in
+  let va, a = create "arg" ta in
+  let ve, e = create "ev" (ty_event tr) in
+  let pr    = Term.t_app_infer fs_pr [m;f;mem;a;e] in
+  let zero  = Term.t_real_const (Term.RConstDecimal("0","0",None)) in
+  let one   = Term.t_real_const (Term.RConstDecimal("1","0",None)) in
+  *)
+
 
 let add_decl_with_tuples task d =
   let ids = Ident.Mid.set_diff d.Decl.d_syms (Task.task_known task) in
@@ -221,9 +257,13 @@ let add_decl_with_tuples task d =
 
 let initial_task = 
   let ts = [ts_mem; ts_mod; ts_mod_name; ts_fun_name; ts_var_name] in
+  let add_ty_decl task ts = 
+    add_decl_with_tuples task (Decl.create_ty_decl ts) in
   let fs = [fs_getmod; fs_getvar; fs_pr] in
-  let task = List.fold_left Task.add_ty_decl initial_task ts in
-  List.fold_left Task.add_param_decl task fs
+  let add_param_decl task fs =
+    add_decl_with_tuples task (Decl.create_param_decl fs) in
+  let task = List.fold_left add_ty_decl initial_task ts in
+  List.fold_left add_param_decl task fs
   
 let empty = {
     logic_task = initial_task; 
@@ -745,6 +785,8 @@ let import_w3 env path th rd =
   let rb = { rb with rb_decl = List.rev rb.rb_decl } in
   ld, RBuse rb
 
+
+  
 (*------------------------------------------------------------------*)
 (* exporting to why3                                                *)
 (*------------------------------------------------------------------*)

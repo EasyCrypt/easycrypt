@@ -1286,8 +1286,10 @@ let initial =
       [EcCoreLib.p_and;EcCoreLib.p_anda; 
        EcCoreLib.p_or;EcCoreLib.p_ora;
        EcCoreLib.p_imp; EcCoreLib.p_iff] in
-  let tdistr = { tyd_params = [ EcIdent.create "'a" ]; tyd_type = None } in
-  let env = Ty.bind (EcPath.basename EcCoreLib.p_distr) tdistr env in 
+ let distr_rn = [
+    ["distr"], EcWhy3.RDts, EcPath.basename EcCoreLib.p_distr;
+  ] in
+  let env, _ = import_w3 env EcWhy3.distr_theory distr_rn in
   let cth = Theory.close env in
   let env1 = Theory.bind EcCoreLib.id_pervasive cth env0 in
   let env1 = Theory.import EcCoreLib.p_pervasive env1 in

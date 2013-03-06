@@ -9,8 +9,6 @@ require import real.
 op caract (p:'a Pred, x : 'a) : real = 
    if p x then 1%r else 0%r.
 
-op mu : ('a distr, 'a Pred) -> real.
-
 axiom mu_bounded :
   forall (d: 'a distr, P:'a Pred), 
      0%r <= mu d P && mu d P <= 1%r .
