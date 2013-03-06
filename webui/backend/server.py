@@ -33,7 +33,7 @@ class eServer(object):
                             undo = json.dumps({'mode' : 'undo', 'data' : 'Undo operation - OK'})
                             s.send(undo)
                         elif m['mode'] == 'forward' :
-                            s.send(message)
+                            self.analyzer(s,message)
                     except Exception:
                         print "broken sock"
                         self.broken_socks.append(s)
@@ -64,5 +64,20 @@ class eServer(object):
         if s not in self.all_socks:
             self.all_socks.append(s)
             print self.all_socks
+            
+    def analyzer(self, s, message):
+        state = json.loads(message)
+        cont = state['end']['contents']
+        if cont.find("axim") != -1 :
+            error = json.dumps({     'mode' : 'error',
+                                     'end'  : state['end'],
+                                'start_err' : '2',
+                                  'end_err' : '6',
+                                  'message' : 'We have an error!' })
+            s.send(error)
+            print "We have the error %s" % error 
+        else:   
+            s.send(message)
+        
 
 s = eServer()
