@@ -1,6 +1,6 @@
 require import Fun.
 require import int.
-
+prover "Alt-Ergo" "Vampire" "Z3" "CVC3".
 (* constructors *)
 import why3 "list" "List"
    op "Nil" as "__nil";
@@ -18,7 +18,7 @@ axiom hd_def : forall (x : 'a, xs : 'a list), hd(x::xs) = x.
 
 axiom tl_def : forall (x : 'a, xs : 'a list), tl(x::xs) = xs.
 
-list induction and recursion
+(*list induction and recursion*)
 axiom list_ind : forall(P:('a list) Pred),
 (P([])) =>
 (forall (x :'a, xs : 'a list), P(xs) => P (x::xs)) =>
