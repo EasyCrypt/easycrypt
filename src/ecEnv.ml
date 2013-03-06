@@ -814,7 +814,7 @@ module Ty = struct
     in
       { env with
           env_w3   = w3;
-          env_rb   = rb :: env.env_rb;
+          env_rb   = rb @ env.env_rb;
           env_item = CTh_type (name, ty) :: env.env_item; }
 
   let rebind name ty env =
@@ -867,7 +867,7 @@ module Op = struct
     in
       { env with
           env_w3   = w3;
-          env_rb   = rb :: env.env_rb;
+          env_rb   = rb @ env.env_rb;
           env_item = CTh_operator(name, op) :: env.env_item; }
 
   (* This version does not create a Why3 binding. *)
@@ -924,7 +924,7 @@ module Ax = struct
     in
       { env with
           env_w3   = w3;
-          env_rb   = rb :: env.env_rb;
+          env_rb   = rb @ env.env_rb;
           env_item = CTh_axiom (name, ax) :: env.env_item }
 
   let rebind name ax env =

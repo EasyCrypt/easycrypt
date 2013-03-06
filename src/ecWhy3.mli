@@ -29,12 +29,12 @@ val import_w3 :
 
 val distr_theory : Why3.Theory.theory
 
-val add_ty : env -> EcPath.path -> EcDecl.tydecl -> env * rebinding_item
+val add_ty : env -> EcPath.path -> EcDecl.tydecl -> env * rebinding
 
 val add_op : 
-    env -> EcPath.path -> EcDecl.operator -> env * rebinding_item
+    env -> EcPath.path -> EcDecl.operator -> env * rebinding
 
-val add_ax : env -> EcPath.path -> EcDecl.axiom -> env * rebinding_item
+val add_ax : env -> EcPath.path -> EcDecl.axiom -> env * rebinding
 
 val get_w3_th : string list -> string -> Why3.Theory.theory
 

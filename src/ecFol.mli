@@ -49,7 +49,7 @@ and f_node =
   | FequivF of form * (EcPath.mpath * EcPath.mpath) * form  (* $left,$right / $left,$right *)
   | FequivS of form * (memenv * stmt) EcUtils.double * form (* $left,$right / $left,$right *)
 
-  | Fpr     of memory * EcPath.mpath * form list * form
+  | Fpr     of memory * EcPath.mpath * form list * form 
 
 val f_equal : form -> form -> bool
 
