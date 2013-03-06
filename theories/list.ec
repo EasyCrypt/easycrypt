@@ -56,9 +56,9 @@ lemma not_mem_empty : forall (xs : 'a list), (forall(x :'a), !mem x xs) => xs = 
 (* length *)
 
 (* local *) op f_length(x : 'a, b : int)  : int = 1 + b.
-op length_list (xs : 'a list) : int = fold_right f_length 0 xs.
+op length (xs : 'a list) : int = fold_right f_length 0 xs.
 
-lemma length_def1 : length<:'a>([]) = 0.
+lemma length_def1 : length<:'a> [] = 0.
 lemma length_def2 : forall (x : 'a, xs : 'a list), 
  length (x::xs) = 1 + length(xs).
 
