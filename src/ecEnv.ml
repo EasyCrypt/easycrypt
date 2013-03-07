@@ -478,8 +478,6 @@ module MC = struct
       { mc with
           amc_components = MMsym.add name path mc.amc_components; }
 
-  type foo = (EcSymbols.symbol * premc) * foo list
-
   (* ------------------------------------------------------------------ *)
   let mc_of_module (env : env) (me : module_expr) =
     let rec mc_of_module (scope : EcPath.mpath) (me : module_expr) =
@@ -511,7 +509,7 @@ module MC = struct
       in
         ((me.me_name, mc), List.prmap (fun x -> x) submcs)
     in
-      (mc_of_module env.env_scope me : foo)
+      mc_of_module env.env_scope me
 
   (* ------------------------------------------------------------------ *)
   let mc_of_module_param (mid : EcIdent.t) (me : module_expr) =
