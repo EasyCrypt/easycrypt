@@ -92,6 +92,7 @@
 // %token ADVERSARY
 %token ARROW
 %token AS
+%token AT
 // %token ASPEC
 %token ASSERT
 %token AXIOM
@@ -301,13 +302,6 @@ mident:
 | x=plist1(mident1, DOT) { (x : pmsymbol) }
 ;
 
-gamepath:
-| nm=mident DOT x=ident {
-    { pl_desc = (nm, x);
-      pl_loc  = EcLocation.make $startpos $endpos; }
-  }
-;
-
 (* -------------------------------------------------------------------- *)
 %inline ident_list1c: aout=plist1(ident, COMMA) { aout };
 %inline ident_list1: aout=plist1(ident, empty) { aout };
@@ -508,8 +502,17 @@ sform:
 | LBRACKET ti=tvars_app? es=loc(p_form_sm_list0) RBRACKET
    { (pflist es.pl_loc ti es.pl_desc).pl_desc }
 
-| PR LBRACKET x=gamepath pn=pside COLON f=loc(form) RBRACKET 
-    { PFprob(x,pn,f) }
+| PR LBRACKET
+    x=ident args=paren(plist1(loc(form), COMMA))
+    AT nm=mident COMMA pn=pside
+    COLON event=loc(form)
+  RBRACKET 
+
+    { let mp=
+        { pl_desc = (nm, x);
+          pl_loc  = EcLocation.make $startpos $endpos; }
+      in
+        PFprob(mp, args, pn, event) }
 
 | PIPE ti=tvars_app? e =loc(form) PIPE 
     { pfapp_symb e.pl_loc EcCoreLib.s_abs ti [e] }

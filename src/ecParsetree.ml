@@ -158,7 +158,7 @@ and pformula_r =
 
   (* for claims *)
   | PFhoareF of pformula * pgamepath * pformula
-  | PFprob   of pgamepath * pmemory * pformula
+  | PFprob   of pgamepath * (pformula list) * pmemory * pformula
 
   (* test *)
   | PFhoare   of pformula * pfunction_body * pformula

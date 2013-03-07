@@ -169,6 +169,7 @@ rule main = parse
   | "*"  { STAR }
   | "$"  { SAMPLE }
   | "|"  { PIPE }
+  | "@"  { AT }
 
   (* comparison *)
   | "="  { EQ }
