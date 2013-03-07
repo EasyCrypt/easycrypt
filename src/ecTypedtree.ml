@@ -1044,7 +1044,7 @@ let rec trans_msymbol (env : EcEnv.env) (msymb : pmsymbol) =
   let mod_expr   = mod_expr.EcEnv.sp_target
   and mod_params =
        mod_expr.EcEnv.sp_target.me_sig.mt_params
-    :: List.rev mod_expr.EcEnv.sp_params
+    :: mod_expr.EcEnv.sp_params
   and mod_args   =
        List.rev_append
          (List.map snd msymb)

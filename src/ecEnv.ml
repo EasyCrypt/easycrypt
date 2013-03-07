@@ -158,8 +158,8 @@ let actmc = fun (mc : activemc) -> ActMc mc
 type env = preenv
 
 (* -------------------------------------------------------------------- *)
-let empty_premc = {
-  mc_parameters = [];
+let empty_premc params = {
+  mc_parameters = params;
   mc_variables  = Msym.empty;
   mc_functions  = Msym.empty;
   mc_modules    = Msym.empty;
@@ -193,7 +193,7 @@ let empty =
                          amc_components = MMsym.add name
                            (EcPath.path_of_mpath path)
                            MMsym.empty; };
-      env_comps    = Mp.singleton (EcPath.psymbol name) empty_premc;
+      env_comps    = Mp.singleton (EcPath.psymbol name) (empty_premc []);
       env_locals   = MMsym.empty;
       env_memories = MMsym.empty;
       env_actmem   = None;
@@ -488,12 +488,13 @@ module MC = struct
       let params   = me.me_sig.mt_params in
       let params   = List.map (fun (x, _) -> EcPath.mident x) params in
       let subscope = EcPath.mqname scope EcPath.PKmodule me.me_name params in
-      let xpath = fun x -> EcPath.mqname scope EcPath.PKother x [] in
+      let xpath = fun x -> EcPath.mqname subscope EcPath.PKother x [] in
 
       let mc1_of_module (mc : premc) = function
       | MI_Module subme ->
           let (submc, subcomps) = mc_of_module subscope subme in
-            (mc_bind_module (xpath subme.me_name) subme mc,
+            (mc_bind_module (xpath subme.me_name) subme
+               (mc_bind_mc (EcPath.path_of_mpath (xpath subme.me_name)) mc),
              Some (submc, subcomps))
 
       | MI_Variable v ->
@@ -509,7 +510,9 @@ module MC = struct
       in
 
       let mc, submcs =
-        List.map_fold mc1_of_module empty_premc me.me_comps
+        List.map_fold mc1_of_module
+          (empty_premc me.me_sig.mt_params)
+          me.me_comps
       in
         ((me.me_name, mc), List.prmap (fun x -> x) submcs)
     in
@@ -535,7 +538,7 @@ module MC = struct
       | MI_Function f ->
           mc_bind_raw Px.for_function f.f_name (xpath f.f_name) f mc
     in
-      List.fold_left mc1_of_module empty_premc me.me_comps
+      List.fold_left mc1_of_module (empty_premc []) me.me_comps
 
   (* ------------------------------------------------------------------ *)
   let bind px env k name obj =
@@ -635,7 +638,7 @@ module MC = struct
           let env, submc =
             List.fold_left
               (mc_of_ctheory_struct subpath)
-              (env, empty_premc) cth.cth_struct
+              (env, empty_premc []) cth.cth_struct
           in
   
           let env =
@@ -650,7 +653,7 @@ module MC = struct
       fun (env : env) (path : EcPath.mpath) (x : symbol) (cth : ctheory) ->
         List.fold_left
           (mc_of_ctheory_struct (EcPath.mqname path EcPath.PKother x []))
-          (env, empty_premc)
+          (env, empty_premc [])
           cth.cth_struct
 end
 
@@ -660,7 +663,7 @@ let enter (name : symbol) (k : EcPath.path_kind) params (env : env) =
 
   let params = List.map EcPath.mident params in
   let path   = EcPath.mqname env.env_scope k name params in
-  let env    = MC.bind_mc env name empty_premc in
+  let env    = MC.bind_mc env name (empty_premc []) in
 
     { env with
         env_scope = path;
