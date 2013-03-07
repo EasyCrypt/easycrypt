@@ -75,21 +75,21 @@ theory Functional.
   (* append *)
   op [||]: ('x array,'x array) -> 'x array.
 
-  axiom append_length: forall (xs0, xs1:'x array),
+  axiom append_length: forall (xs0 xs1:'x array),
     length (xs0 || xs1) = length xs0  + length xs1.
 
-  axiom append_get: forall (xs0, xs1:'x array, i:int),
+  axiom append_get: forall (xs0 xs1:'x array) (i:int),
     (0 <= i => i < length xs0 => (xs0 || xs1).[i] = xs0.[i]) /\
     (length xs0 <= i => i < length (xs0 || xs1) => (xs0 || xs1).[i] = xs1.[i - length xs0]).
 
   (* sub *)
   op sub: 'x array -> int -> int -> 'x array.
 
-  axiom sub_length: forall (xs:'x array, s, l:int),
+  axiom sub_length: forall (xs:'x array) (s l:int),
     0 <= s => 0 <= l => s + l <= length xs =>
     length (sub xs s l) = l.
 
-  axiom sub_get: forall (xs:'x array, s, l, i:int),
+  axiom sub_get: forall (xs:'x array) (s l i:int),
     0 <= s => 0 <= l => s + l <= length xs =>
     0 <= i => i <= l =>
     (sub xs s l).[i] = xs.[i + s].
@@ -117,7 +117,7 @@ theory Functional.
     (map2 f xs ys).[i] = f (xs.[i]) (ys.[i]).
 
   (* lemmas *)
-  lemma sub_append_fst: forall (xs0, xs1:'x array),
+  lemma sub_append_fst: forall (xs0 xs1:'x array),
     sub (xs0 || xs1) 0 (length(xs0)) = xs0
   proof.
     intros xs0 xs1.
@@ -125,7 +125,7 @@ theory Functional.
     trivial.
   save.
 
-  lemma sub_append_snd: forall (xs0, xs1:'x array),
+  lemma sub_append_snd: forall (xs0 xs1:'x array),
     sub (xs0 || xs1) (length xs0) (length xs1) = xs1
   proof.
     intros xs0 xs1.
@@ -145,7 +145,7 @@ theory Imperative.
     0 <= i => i < length xs =>
     length (xs.[i <- x]) = length xs.
 
-  axiom set_get: forall (xs:'x array, i, j:int, x:'x),
+  axiom set_get: forall (xs:'x array) (i j:int) (x:'x),
     0 <= i => i < length xs =>
     0 <= j => j < length xs =>
     xs.[i <- x].[j] = (i = j) ? x : xs.[j].
@@ -153,13 +153,13 @@ theory Imperative.
   (* write: array -> offset -> array -> offset -> length -> array *)
   op write: 'x array -> int -> 'x array -> int -> int -> 'x array.
 
-  axiom write_length: forall (dst, src:'x array, dOff, sOff, l:int),
+  axiom write_length: forall (dst src:'x array) (dOff sOff l:int),
     0 <= dOff => 0 <= sOff => 0 <= l =>
     dOff + l <= length dst =>
     sOff + l <= length src =>
     length (write dst dOff src sOff l) = length dst.
 
-  axiom write_get: forall (dst, src:'x array, dOff, sOff, l, i:int),
+  axiom write_get: forall (dst src:'x array) (dOff sOff l i:int),
     0 <= dOff => 0 <= sOff => 0 <= l =>
     dOff + l <= length dst =>
     sOff + l <= length src =>
@@ -176,7 +176,7 @@ theory Mixed.
   import Imperative.
   import Functional.
 
-  lemma write_append: forall (dst, src:'x array),
+  lemma write_append: forall (dst src:'x array),
     length src <= length dst =>
     write dst 0 src 0 (length src) = (src || (sub dst (length src) (length dst - length src)))
   proof.

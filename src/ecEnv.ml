@@ -1007,7 +1007,7 @@ module Mod = struct
               current);
           env_comps = Mp.add path comps env.env_comps; }
     in
-      Dump.dump EcDebug.initial env; env
+      env
 
   let bind_locals bindings env =
     List.fold_left

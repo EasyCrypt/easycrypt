@@ -600,12 +600,19 @@ form:
 %inline form_list2: aout=plist2(loc(form), COMMA) { aout }
 %inline sform_list1: aout=plist1(loc(sform), empty) { aout }
 
+pgty_varty:
+| x=ident COLON ty=loc(type_exp) { (x, ty) }
+;
+
 pgtybinding1:
-| x=ident LTCOLON mi=qident
+| LPAREN x=ident LTCOLON mi=qident RPAREN
     { [(x, PGTY_ModTy mi)] }
 
-| xs=ident+ COLON t=loc(type_exp)
+| LPAREN xs=ident+ COLON t=loc(type_exp) RPAREN
     { List.map (fun x -> (x, PGTY_Type t)) xs }
+
+| LPAREN bds=plist1(pgty_varty, COMMA) RPAREN
+    { List.map (fun (x, ty) -> (x, PGTY_Type ty)) bds }
 
 | xs=ident+
     { List.map (fun x -> (x, PGTY_Type (mk_loc x.pl_loc PTunivar))) xs }
@@ -615,8 +622,7 @@ pgtybinding1:
 ;
 
 pgtybindings:
-| x=paren(plist1(pgtybinding1, COMMA)) 
-    { List.flatten x }
+| x=pgtybinding1+ { List.flatten x }
 ;
 
 (* -------------------------------------------------------------------- *)
