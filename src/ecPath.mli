@@ -49,6 +49,7 @@ val prefix    : path -> path option
 val rootname  : path -> symbol
 val extend    : path option -> symbol -> path
 val tolist    : path -> symbol list 
+val p_size    : path -> int
 
 (* -------------------------------------------------------------------- *)
 module Mp : Map.S  with type key = path

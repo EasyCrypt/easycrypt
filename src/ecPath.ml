@@ -4,7 +4,6 @@ open EcMaps
 open EcSymbols
 
 (* -------------------------------------------------------------------- *)
-
 type path = {
   p_node : path_node;
   p_tag  : int
@@ -115,6 +114,11 @@ let extend (p : path option) (x : symbol) =
   | None   -> psymbol x
   | Some p -> pqname p x
 
+let rec p_size p =
+  match p.p_node with
+  | Psymbol _     -> 1
+  | Pident  _     -> 1
+  | Pqname (p, _) -> 1 + (p_size p)
 
 (* -------------------------------------------------------------------- *)
 let m_equal   = ((==) : mpath -> mpath -> bool)

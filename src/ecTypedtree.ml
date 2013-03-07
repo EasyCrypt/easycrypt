@@ -1032,7 +1032,7 @@ let rec trans_msymbol (env : EcEnv.env) (msymb : pmsymbol) =
     | x :: qn ->
         { pl_desc = (List.rev_map unloc qn, unloc x);
           pl_loc  = x.pl_loc; }
-  and mod_args = List.rev_map snd msymb in
+  in
 
   let (mod_path, mod_expr) =
     match EcEnv.Mod.sp_lookup_opt mod_qname.pl_desc env with
@@ -1044,16 +1044,23 @@ let rec trans_msymbol (env : EcEnv.env) (msymb : pmsymbol) =
   let mod_expr   = mod_expr.EcEnv.sp_target
   and mod_params =
        mod_expr.EcEnv.sp_target.me_sig.mt_params
-    :: (List.tl (List.rev mod_expr.EcEnv.sp_params))
+    :: List.rev mod_expr.EcEnv.sp_params
+  and mod_args   =
+       List.rev_append
+         (List.map snd msymb)
+         (List.create
+            (EcPath.p_size (EcPath.path_of_mpath mod_path)
+               - List.length msymb)
+            [])
   in
 
   let mod_args =
     List.map
-      (fun (_, args) ->
+      (fun args ->
         List.map
           (fun { pl_desc = arg } -> trans_msymbol env arg)
           args)
-      msymb
+      mod_args
   in
     List.iter2
       (fun param arg ->

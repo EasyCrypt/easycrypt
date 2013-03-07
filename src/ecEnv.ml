@@ -413,7 +413,11 @@ module MC = struct
    * the compoment [env_current]. The object returned is suspended. *)
 
   let _params_of_path (env : env) (path : path) =
-      let prefix = oget (EcPath.prefix path) in
+    match path.EcPath.p_node with
+    | EcPath.Psymbol _ -> []
+    | EcPath.Pident  _ -> []
+
+    | EcPath.Pqname (prefix, _) ->
         snd (oget (lookup_mc_by_path env prefix))
 
   let lookup px ((qn, x) : qsymbol) (env : env) =

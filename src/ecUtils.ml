@@ -196,6 +196,12 @@ module List = struct
   let ohead (xs : 'a list) =
     match xs with [] -> None | x :: _ -> Some x
 
+  let create n x =
+    let rec aux n xs =
+      if n <= 0 then xs else aux (n-1) (x::xs)
+    in
+      aux n []
+
   let iteri f xs =
     let rec doit i = function
       | []      -> ()
