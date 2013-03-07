@@ -101,11 +101,11 @@ def _xunit_dump(config, results):
                 classname = classname,
                 time      = "%.3f" % (result.time,))
             if not result.success:
-                rnode.append(E.failure( \
+                rnode.append(E.failure(result.stderr, \
                         message = \
                             'invalid-exit-status (should-pass: %r)' % \
                                 (result.config.isvalid,),
-                        type = 'should-pass: %r' % (result.config.isvalid,)))
+                        type = 'should-pass: %r' % (result.config.isvalid,),))
             node.append(rnode)
 
         node.append(E("system-out"))
@@ -126,9 +126,14 @@ def _run_test(config, options):
     timestamp = time.time()
     try:
         command = [options.bin] + options.bin_args + [config.filename]
-        with open(os.devnull, 'wb') as fnull:
-            status = sp.call \
-                (command, stdout = fnull, stderr = sp.STDOUT)
+        process = sp.Popen(command, stdout = sp.PIPE, stderr = sp.PIPE)
+
+        try:
+            out, err = process.communicate()
+            status   = process.poll()
+        finally:
+            try   : sp.kill()
+            except: pass
     except OSError, e:
         logging.error("cannot run `%s': %s" % (options.bin, e))
         exit (1)
@@ -139,7 +144,8 @@ def _run_test(config, options):
 
     return Object(success = success  ,
                   config  = config   ,
-                  time    = timestamp)
+                  time    = timestamp,
+                  stderr  = err      )
 
 # --------------------------------------------------------------------
 def _main():
