@@ -3,7 +3,7 @@ require import int.
 require import bitstring.
 require import Fun.
 require        Set.
-require import real. 
+require import real.
 
 op caract (p:'a Pred, x : 'a) : real = 
    if p x then 1%r else 0%r.
@@ -143,7 +143,7 @@ theory Dbitstring.
     mu_x (dbitstring k) s = 1%r/(2^k)%r.
 
   axiom mu_x_def_other : forall (k:int, s:bitstring),
-    length(s) <> k => mu_x (dbitstring k) s = 0%r.
+    length s <> k => mu_x (dbitstring k) s = 0%r.
 
   axiom mu_weight_pos : forall (k:int), 0 <= k =>
     mu_weight(dbitstring k) = 1%r.
@@ -213,15 +213,17 @@ theory Dscale.
 end Dscale.
 
 theory Dexcepted.
-
   op [\] (d:'a distr, X:'a Set.t) : 'a distr =
     Dscale.dscale (Drestr.drestr d X). 
 
   lemma supp_def : forall (d:'a distr, X:'a Set.t, x:'a),
      in_supp x (d \ X) <=> in_supp x d && !Set.mem x X.
 
-(* TODO : Complete the lemmas *)
+  lemma mu_x_def: forall (d:'a distr, X:'a Set.t, x:'a),
+     mu_x (d \ X) x = (in_supp x (d \ X)) ? mu_x d x / (mu_weight d - mu d (Set.Pmem X)) : 0%r.
 
+  lemma mu_weight_def: forall (d:'a distr, X:'a Set.t),
+    mu_weight (d \ X) = (mu_weight d = mu d (Set.Pmem X)) ? 0%r : 1%r.
 end Dexcepted.
 
 theory Dlap.
@@ -259,7 +261,3 @@ y1 = $d1 ~ y2 = $d2 : P ==> Q.
          Q{y1{1} <- x1, y2{2} <- f(x1) }.
 
 *)
-
-
-
-
