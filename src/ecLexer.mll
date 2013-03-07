@@ -24,7 +24,7 @@
   let unterminated_string () =
     raise (LexicalError (None, "unterminated string"))
 
-  let _keywords = [                      (* see [keywords.py] *)
+  let _keywords = [                     (* see [keywords.py] *)
     "forall"      , FORALL     ;        (* KW: prog *)
     "exists"      , EXIST      ;        (* KW: prog *)
     "let"         , LET        ;        (* KW: prog *)
@@ -135,49 +135,49 @@ rule main = parse
   | '[' (binop as s) ']' { PBINOP s }
 
   (* boolean operators *)
-  | '!'                       { NOT }
-  | "&&"                      { AND true }
-  | "/\\"                     { AND false }
-  | "||"                      { OR true }
-  | "\\/"                     { OR false }
-  | "=>"                      { IMPL }
-  | "<=>"                     { IFF }
+  | '!'   { NOT }
+  | "&&"  { AND true }
+  | "/\\" { AND false }
+  | "||"  { OR true }
+  | "\\/" { OR false }
+  | "=>"  { IMPL }
+  | "<=>" { IFF }
 
   (* string symbols *)
-  | "<-"                      { LEFTARROW }
-  | "->"                      { ARROW  }
-  | ".."                      { DOTDOT }
-  | ".["                      { DLBRACKET }
-  | ":="                      { CEQ }
-  | "%r"                      { FROM_INT }
+  | "<-" { LEFTARROW }
+  | "->" { ARROW  }
+  | ".." { DOTDOT }
+  | ".[" { DLBRACKET }
+  | ":=" { CEQ }
+  | "%r" { FROM_INT }
 
   (* punctuation *)
-  | '_'                       { UNDERSCORE }
-  | '('                       { LPAREN }
-  | ')'                       { RPAREN }
-  | '{'                       { LKEY }
-  | '}'                       { RKEY }
-  | '['                       { LBRACKET }
-  | ']'                       { RBRACKET }
-  | "<:"                      { LTCOLON }
-  | ">"                       { GT }                      
-  | ','                       { COMMA }
-  | ';'                       { SEMICOLON }
-  | ':'                       { COLON }
-  | "}^"                      { RKEY_HAT }
-  | '?'                       { QUESTION }
-  | "*"                       { STAR }
-  | "$"                       { SAMPLE }
-  | "|"                       { PIPE }
+  | '_'  { UNDERSCORE }
+  | '('  { LPAREN }
+  | ')'  { RPAREN }
+  | '{'  { LKEY }
+  | '}'  { RKEY }
+  | '['  { LBRACKET }
+  | ']'  { RBRACKET }
+  | "<:" { LTCOLON }
+  | ">"  { GT }                      
+  | ','  { COMMA }
+  | ';'  { SEMICOLON }
+  | ':'  { COLON }
+  | "}^" { RKEY_HAT }
+  | '?'  { QUESTION }
+  | "*"  { STAR }
+  | "$"  { SAMPLE }
+  | "|"  { PIPE }
 
   (* comparison *)
-  | "="                       { EQ }
-  | "<>"                      { NE }
+  | "="  { EQ }
+  | "<>" { NE }
 
-  | op1 as s                  { OP1 s }
-  | op2  as s                 { OP2 s }
-  | op3  as s                 { OP3 s }
-  | op4 as s                  { OP4 s }
+  | op1 as s  { OP1 s }
+  | op2 as s  { OP2 s }
+  | op3 as s  { OP3 s }
+  | op4 as s  { OP4 s }
 
   (* end of sentence / stream *)
   | '.' (eof | blank | newline as r) { 

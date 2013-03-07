@@ -17,12 +17,9 @@ let dummyloc x = { pl_loc = EcLocation.dummy; pl_desc = x }
 let dummy_pqs_of_ps s = dummyloc (qsymb_of_symb (unloc s))
 
 (* -------------------------------------------------------------------- *)
-type side = symbol
-
-type pmemory  = symbol  located         (* memory  symbol  *)
-type psymbol  = symbol  located         (* located symbol  *)
- and pqsymbol = qsymbol located         (* located qsymbol *)
-
+type psymbol  = symbol  located
+type pqsymbol = qsymbol located
+type pmsymbol = (psymbol * (pmsymbol located) list) list
 type posymbol = symbol option located
 
 type pty = pty_r located                (* located type *)
@@ -143,31 +140,36 @@ type ptydecl = {
 }
 
 (* -------------------------------------------------------------------- *)
-type pfct_game = pqsymbol
+type pgamepath = (pmsymbol * psymbol) located
+type pmemory   = psymbol
 
-type ptyped_mem = pmemory * pfct_game
-
-type pformula = pformula_r located
+type pformula  = pformula_r located
 
 and pformula_r = 
-  | PFint    of int                       (* int. literal      *)
-  | PFtuple  of pformula list             (* tuple             *)
-  | PFident  of pqsymbol * tvar_inst      (* symbol            *)
-  | PFside   of pformula * pmemory
+  | PFint    of int
+  | PFtuple  of pformula list
+  | PFident  of pqsymbol * tvar_inst
+  | PFside   of pformula * psymbol
   | PFapp    of pformula * pformula list
   | PFif     of pformula * pformula * pformula
   | PFlet    of lpattern * pformula * pformula
-  | PFforall of ptylocals * pformula
-  | PFexists of ptylocals * pformula
+  | PFforall of pgtybindings * pformula
+  | PFexists of pgtybindings * pformula
 
-  (* for claim *)
-  | PFforallm of ptyped_mem list * pformula
-  | PFexistsm of ptyped_mem list * pformula
-  | PFprob    of pfct_game * pmemory * pformula
+  (* for claims *)
+  | PFhoareF of pformula * pgamepath * pformula
+  | PFprob   of pgamepath * pmemory * pformula
 
   (* test *)
   | PFhoare   of pformula * pfunction_body * pformula
 
+and pgtybinding  = psymbol * pgty
+and pgtybindings = pgtybinding list
+
+and pgty =
+| PGTY_Type  of pty
+| PGTY_ModTy of pqsymbol
+| PGTY_Mem
 
 (* -------------------------------------------------------------------- *)
 type paxiom_kind = PAxiom | PLemma | PILemma
@@ -190,7 +192,6 @@ type ppredicate = {
   pp_body   : (psymbol list * pformula) option;
 }
 
-(* -------------------------------------------------------------------- *)
 (* -------------------------------------------------------------------- *)
 type pprover_infos = {
   pprov_max : int option;

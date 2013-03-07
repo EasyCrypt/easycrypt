@@ -283,8 +283,28 @@ qident_pbinop:
 
 | xs=plist1(IDENT, DOT) DOT x=PBINOP {
     { pl_desc = (xs, x);
-      pl_loc  = EcLocation.make $startpos(xs) $endpos(x);
+      pl_loc  = EcLocation.make $startpos $endpos;
     }
+  }
+;
+
+(* -------------------------------------------------------------------- *)
+mident1:
+| x=ident
+    { (x, []) }
+
+| x=ident LPAREN args=plist1(loc(mident), COMMA) RPAREN
+    { (x, args) }
+;
+
+mident:
+| x=plist1(mident1, DOT) { (x : pmsymbol) }
+;
+
+gamepath:
+| nm=mident DOT x=ident {
+    { pl_desc = (nm, x);
+      pl_loc  = EcLocation.make $startpos $endpos; }
   }
 ;
 
@@ -308,7 +328,7 @@ qident_pbinop:
 ;
 
 (* -------------------------------------------------------------------- *)
-prog_num:
+pside:
 | LKEY x=qident RKEY {
     let (qn, id) = x.pl_desc in
       if qn <> [] then
@@ -317,6 +337,10 @@ prog_num:
           "memory names cannot be qualified"
       else
         { x with pl_desc = id }
+  }
+
+| LKEY x=loc(number) RKEY {
+    { x with pl_desc = string_of_int x.pl_desc }
   }
 ;
 
@@ -371,7 +395,8 @@ sexp:
 
 | LBRACKET ti=tvars_app? e1=loc(exp) op=loc(DOTDOT) e2=loc(exp) RBRACKET
     { let id = PEident(mk_loc op.pl_loc EcCoreLib.s_dinter, ti) in
-      PEapp(mk_loc op.pl_loc id, [e1; e2]) } 
+      PEapp(mk_loc op.pl_loc id, [e1; e2]) }
+
 | LKEY n1=number op=loc(COMMA) n2=number RKEY
     { if   n1 = 0 && n2 = 1
       then PEident (mk_loc op.pl_loc EcCoreLib.s_dbool, None)
@@ -434,14 +459,13 @@ exp:
 
 | LET p=lpattern EQ e1=loc(exp) IN e2=loc(exp)
    { PElet (p, e1, e2) }
+
 (* Distribution *)
 | LKEY n1=number op=loc(COMMA) n2=number RKEY_HAT e=loc(sexp)
     { if   n1 = 0 && n2 = 1 then 
         let id = PEident(mk_loc op.pl_loc EcCoreLib.s_dbitstring, None) in
         PEapp (mk_loc op.pl_loc id, [e])
       else error (EcLocation.make $startpos $endpos) "malformed random bitstring" }
-
-
 ;
 
 (* -------------------------------------------------------------------- *)
@@ -472,7 +496,7 @@ sform:
 | se=loc(sform) DLBRACKET ti=tvars_app? e1=loc(form) LEFTARROW e2=loc(form) RBRACKET
    { pfset (EcLocation.make $startpos $endpos) ti se e1 e2 }
 
-| x=loc(sform) LKEY s=prog_num RKEY
+| x=loc(sform) LKEY s=pside RKEY
    { PFside (x, s) }
 
 | LPAREN es=form_list2 RPAREN
@@ -484,7 +508,7 @@ sform:
 | LBRACKET ti=tvars_app? es=loc(p_form_sm_list0) RBRACKET
    { (pflist es.pl_loc ti es.pl_desc).pl_desc }
 
-| PR LBRACKET x=fct_game pn=prog_num COLON f=loc(form) RBRACKET 
+| PR LBRACKET x=gamepath pn=pside COLON f=loc(form) RBRACKET 
     { PFprob(x,pn,f) }
 
 | PIPE ti=tvars_app? e =loc(form) PIPE 
@@ -503,7 +527,6 @@ sform:
 
 | LKEY pre=loc(sform) RKEY s=fun_def_body LKEY post=loc(sform) RKEY
     { PFhoare (pre,s,post) }
-
 ;
                           
 form:
@@ -556,17 +579,20 @@ form:
 
 | LET p=lpattern EQ e1=loc(form) IN e2=loc(form) { PFlet (p, e1, e2) }
 
-| FORALL pd=param_decl1 COMMA e=loc(form) { PFforall  (pd, e) }
-| FORALL pd=mem_decl    COMMA e=loc(form) { PFforallm (pd, e) }
-| EXIST  pd=param_decl1 COMMA e=loc(form) { PFexists  (pd, e) }
-| EXIST  pd=mem_decl    COMMA e=loc(form) { PFexistsm (pd, e) }
+| FORALL pd=pgtybindings COMMA e=loc(form) { PFforall (pd, e) }
+| EXIST  pd=pgtybindings COMMA e=loc(form) { PFexists (pd, e) }
 
 (* Distribution *)
 | LKEY n1=number op=loc(COMMA) n2=number RKEY_HAT e=loc(sform)
-    { if   n1 = 0 && n2 = 1 then 
-        let id = PFident(mk_loc op.pl_loc EcCoreLib.s_dbitstring, None) in
-        PFapp (mk_loc op.pl_loc id, [e])
-      else error (EcLocation.make $startpos $endpos) "malformed random bitstring" }
+    { if n1 = 0 && n2 = 1 then 
+        let id =
+          PFident (mk_loc op.pl_loc EcCoreLib.s_dbitstring, None)
+        in
+          PFapp (mk_loc op.pl_loc id, [e])
+      else
+        error
+          (EcLocation.make $startpos $endpos)
+          "malformed random bitstring" }
 ;
 
 %inline p_form_sm_list0: aout=plist0(loc(form), SEMICOLON) { aout }
@@ -574,16 +600,25 @@ form:
 %inline form_list2: aout=plist2(loc(form), COMMA) { aout }
 %inline sform_list1: aout=plist1(loc(sform), empty) { aout }
 
-fct_game: (* Extend with functor application ... *)
-| x=qident { x }
+pgtybinding1:
+| x=ident LTCOLON mi=qident
+    { [(x, PGTY_ModTy mi)] }
+
+| xs=ident+ COLON t=loc(type_exp)
+    { List.map (fun x -> (x, PGTY_Type t)) xs }
+
+| xs=ident+
+    { List.map (fun x -> (x, PGTY_Type (mk_loc x.pl_loc PTunivar))) xs }
+
+| pn=pside
+    { [(pn, PGTY_Mem)] }
 ;
 
-typed_mem:
-| pn=prog_num COLON fg=fct_game { pn,fg }
+pgtybindings:
+| x=paren(plist1(pgtybinding1, COMMA)) 
+    { List.flatten x }
 ;
-mem_decl:
-| LPAREN aout=plist1(typed_mem, COMMA) RPAREN { aout }
-;
+
 (* -------------------------------------------------------------------- *)
 (* Type expressions                                                     *)
 
@@ -1183,4 +1218,8 @@ prog:
       pl_loc  = EcLocation.make $startpos $endpos;
     }
   }
+;
+
+%inline paren(X):
+| LPAREN x=X RPAREN { x }
 ;

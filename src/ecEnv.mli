@@ -233,6 +233,7 @@ module Mod : sig
   val bind : symbol -> module_expr -> env -> env
 
   val enter : symbol -> (EcIdent.t * module_type) list -> env -> env
+  val bind_local : EcIdent.t -> module_type -> env -> env
 
   val unfold_mod_path : env -> EcPath.mpath -> EcPath.mpath
 end

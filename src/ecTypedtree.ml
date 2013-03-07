@@ -68,6 +68,9 @@ let pp_typerror fmt = function
     | UnknownTyModName name
         -> Format.fprintf fmt "Unknown module type name: %a" pp_qsymbol name
 
+    | UnknownMemory name
+        -> Format.fprintf fmt "Unknown memory name: %a" pp_symbol name
+
     | UnknownOperatorForSig (name, tys)
         -> Format.fprintf fmt "Cannot find operator %a with signature %a" 
             pp_qsymbol name
@@ -1020,17 +1023,17 @@ and translvalue ue (env : EcEnv.env) lvalue =
 
 module Fenv = struct
   type fenv = {
-    fe_locals : (EcIdent.t * ty) MMsym.t; 
+    fe_locals : (EcIdent.t * ty) MMsym.t;
+    fe_core   : EcEnv.env;
     fe_envs   : (EcIdent.t * EcEnv.env) MMsym.t;
     fe_cur    : EcMemory.memory;
   }
 
   let mono_fenv env =
-    let mstd = EcFol.mstd in
-      { fe_locals = MMsym.empty;
-        fe_envs   = MMsym.add (EcIdent.name mstd) (mstd, env) MMsym.empty;
-        fe_cur    = EcFol.mstd;
-      }
+    { fe_locals = MMsym.empty;
+      fe_core   = env;
+      fe_envs   = MMsym.empty;
+      fe_cur    = EcFol.mstd; }
 
   let byname (x : symbol) env =
     MMsym.last x env.fe_envs
@@ -1042,14 +1045,21 @@ module Fenv = struct
       | [data] -> Some (snd data)
       | _      -> assert false
 
-  let mono fenv =
-    oget (byid EcFol.mstd fenv)
+  let mono fenv = fenv.fe_core
 
   let bind_local fenv x ty =
     { fenv with 
-       fe_locals = MMsym.add (EcIdent.name x) (x, ty) fenv.fe_locals }
+        fe_locals = MMsym.add (EcIdent.name x) (x, ty) fenv.fe_locals }
 
   let bind_locals = List.fold_left2 bind_local 
+
+  let bind_mem fenv m =
+    { fenv with
+        fe_envs = MMsym.add (EcIdent.name m) (m, mono fenv) fenv.fe_envs}
+
+  let bind_local_mod fenv x modty =
+    { fenv with
+        fe_core = EcEnv.Mod.bind_local x modty fenv.fe_core }
 
   let fenv_hyps env hyps = 
     let fenv = mono_fenv env in
@@ -1060,8 +1070,10 @@ module Fenv = struct
     let lid,lty = List.split locals in
     bind_locals fenv lid lty 
 
-  let current_env fenv = 
-    oget (byid fenv.fe_cur fenv)
+  let current_env fenv =
+    if   EcIdent.id_equal fenv.fe_cur EcFol.mstd
+    then fenv.fe_core
+    else oget (byid fenv.fe_cur fenv)
 
   let set_side fenv side = 
     assert (byid side fenv <> None);
@@ -1087,15 +1099,8 @@ module Fenv = struct
         List.map (fun ((op,tys), ty,ue) -> f_op op tys ty, ue) ops
 
 end
-      
-let transl tp fenv ue decl = 
-  let transl1 (fenv,ld) ({ pl_desc = x },pty) =
-    let ty = transty tp (Fenv.mono fenv) ue pty in
-    let x = EcIdent.create x in
-    Fenv.bind_local fenv x ty, (x,ty)::ld in
-  let fenv, ld = List.fold_left transl1 (fenv,[]) decl in
-  fenv, List.rev ld
 
+(* -------------------------------------------------------------------- *)
 let transfpattern fenv ue (p : EcParsetree.lpattern) =
   match transpattern1 (Fenv.mono fenv) ue p with
   | LSymbol x, ty ->
@@ -1104,6 +1109,7 @@ let transfpattern fenv ue (p : EcParsetree.lpattern) =
       (Fenv.bind_locals fenv xs lty, LTuple xs, ty)
   | _ -> assert false
 
+(* -------------------------------------------------------------------- *)
 let transform fenv ue pf tt =
   let rec transf fenv f = 
     match f.pl_desc with
@@ -1165,21 +1171,19 @@ let transform fenv ue pf tt =
         f_let p f1 f2 
 
     | PFforall(xs, pf) ->
-        let fenv, xs = transl tp_relax fenv ue xs in
+        let fenv, xs = trans_fbind fenv ue xs in
         let f = transf fenv pf in
         unify_error (Fenv.mono fenv) ue pf.pl_loc f.f_ty tbool;
-        f_forall (List.map (fun (x, ty) -> (x, GTty ty)) xs) f
+        f_forall xs f
 
     | PFexists(xs, f1) ->
-        let fenv, xs = transl tp_relax fenv ue xs in
+        let fenv, xs = trans_fbind fenv ue xs in
         let f = transf fenv f1 in
         unify_error (Fenv.mono fenv) ue pf.pl_loc f.f_ty tbool;
-        f_exists (List.map (fun (x, ty) -> (x, GTty ty)) xs) f
+        f_exists xs f
 
     (* FIXME *) 
-    | PFprob _ -> f_int 0 
-    | PFforallm _ -> f_true 
-    | PFexistsm _ -> f_true 
+    | PFprob _ -> f_int 0
 
     (* test *)
     | PFhoare (pre,body,post) ->
@@ -1196,50 +1200,27 @@ let transform fenv ue pf tt =
       (* f_hoare  pre f_def post *)
       f_true (* missing memory *)      
 
-(*  and transf fenv pf =
-    let f = transf1 fenv pf in
-    let env = EcPrinting.EcPP.init (Fenv.mono fenv,[]) in
-    let subst_ty = Tuni.subst (UE.asmap ue) in
-    let hyps = { EcFol.h_tvar = [];
-                 EcFol.h_local = 
-                 EcIdent.Map.fold (fun _ idd l ->
-                   List.fold_left (fun l (_,(id,ty)) -> 
-                   (id, EcFol.LD_var(subst_ty ty,None))::l) l idd) fenv.Fenv.fe_locals [] } in
-    let g = hyps, (EcFol.Fsubst.mapty  subst_ty f) in
-    Format.printf "transf -> %a : %a@." (EcPrinting.EcPP.pp_lgoal env) g
-       (fun ty -> EcPrinting.EcPP.pp_type env ty) (subst_ty f.f_ty);
-    Format.printf "map = @.";
-    EcUidgen.Muid.iter (fun uid ty ->
-      Format.printf "%i -> %a@." uid 
-        (fun ty -> EcPrinting.EcPP.pp_type env ty) ty) (UE.asmap ue);
-
-    f *)
+  and trans_fbind fenv ue decl = 
+    let trans1 fenv ({ pl_desc = x }, pgty) =
+      let x = EcIdent.create x in
+        match pgty with
+        | PGTY_Type ty -> 
+            let ty = transty tp_relax (Fenv.mono fenv) ue ty in
+              (Fenv.bind_local fenv x ty, (x, GTty ty))
+  
+        | PGTY_ModTy mi ->
+            let (mi, _) = transmodtype (Fenv.mono fenv) mi in
+              (Fenv.bind_local_mod fenv x mi, (x, GTmodty mi))
+  
+        | PGTY_Mem ->
+            (Fenv.bind_mem fenv x, (x, GTmem))
+    in
+      List.map_fold trans1 fenv decl
   in
+
   let f = transf fenv pf in
-  unify_error (Fenv.mono fenv) ue pf.pl_loc f.f_ty tt;
-  f 
-
-
-
-
- (* let add_locals env (s,ty) =  *)
- 
- (*    let newenv = EcEnv.bindall locs env in *)
-
- (*    List.iter (fun (id, _) -> locals := (id,ty) :: !locals) locs; *)
- (*    oiter e (fun pe ->  *)
- (*      let e, ety = transexp env ue pe in *)
- (*      unify_error env ue pe.pl_loc ety ty; *)
- (*      List.iter (fun (id,_) -> *)
- (*        let p,_ =  *)
- (*          oget (EcEnv.Var.lookup_progvar_opt ([], id) newenv) in *)
- (*        init := Sasgn(LvVar(p,ty) , e) :: !init) locs); *)
- (*    newenv  *)
- (*  in *)
- (*  let env = List.fold_left add_locals env body.f_locals in *)
-
-
-
-
+    unify_error (Fenv.mono fenv) ue pf.pl_loc f.f_ty tt; f
+      
+(* -------------------------------------------------------------------- *)
 let transformula fenv ue pf = 
   transform fenv ue pf tbool

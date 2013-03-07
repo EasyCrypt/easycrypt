@@ -2,10 +2,9 @@
 open EcMaps
 
 (* -------------------------------------------------------------------- *)
-type symbol  = (* private *) string
-type qsymbol = (* private *) symbol list * symbol
-
-type symbols = symbol list
+type symbol  = string
+type qsymbol = symbol list * symbol
+type msymbol = (symbol * msymbol) list
 
 let equal : symbol -> symbol -> bool = (=)
 let compare : symbol -> symbol -> int = Pervasives.compare

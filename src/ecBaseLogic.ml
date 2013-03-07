@@ -18,11 +18,6 @@ let pp_error fmt = function
 
 let _ = EcPexception.register pp_error
 
-  
-        
-        
-      
-      
 type ('rn,'rd) rule = {
     r_name : 'rn;
     r_hyps : ('rn,'rd) judgment list;

@@ -34,12 +34,12 @@ and f_node =
   | Fquant  of quantif * binding * form
   | Fif     of form * form * form
   | Flet    of lpattern * form * form
-  | Fint    of int                               (* int. literal              *)
-  | Flocal  of EcIdent.t                         (* Local variable            *)
-  | Fpvar   of EcTypes.prog_var * memory         (* sided symbol              *)
-  | Fop     of EcPath.path * ty list             (* Op/pred application to ty *)
-  | Fapp    of form * form list                  (* application *)
-  | Ftuple  of form list                         (* tuple constructor   *)
+  | Fint    of int
+  | Flocal  of EcIdent.t
+  | Fpvar   of EcTypes.prog_var * memory
+  | Fop     of EcPath.path * ty list
+  | Fapp    of form * form list
+  | Ftuple  of form list
 
   | Fhoare  of memenv * form * EcModules.function_def * form
 
@@ -53,6 +53,7 @@ and f_node =
 
 val f_equal : form -> form -> bool
 
+(* -------------------------------------------------------------------- *)
 (* val fv : form -> EcIdent.Sid.t *)
 val ty : form -> EcTypes.ty
 val fv_node : f_node -> EcIdent.Sid.t
@@ -76,8 +77,6 @@ val f_let : EcTypes.lpattern -> form -> form -> form
 val f_quant : quantif -> binding -> form -> form
 val f_exists : binding -> form -> form
 val f_forall : binding -> form -> form
-
-
 
 val f_hoare   : memenv -> form -> EcModules.function_def -> form -> form 
 val f_hoareF  : form -> EcPath.mpath -> form -> form 
@@ -110,6 +109,7 @@ val f_iff : form -> form -> form
 val fop_eq : EcTypes.ty -> form
 val f_eq : form -> form -> form
 
+(* -------------------------------------------------------------------- *)
 type destr_error =
     Destr_and
   | Destr_or
@@ -118,7 +118,6 @@ type destr_error =
   | Destr_exists
 
 exception DestrError of destr_error
-
 
 val destr_and : form -> form * form
 val destr_or : form -> form * form
@@ -133,6 +132,7 @@ val is_exists : form -> bool
 
 val map : (EcTypes.ty -> EcTypes.ty) -> (form -> form) -> form -> form
 
+(* -------------------------------------------------------------------- *)
 module Fsubst :
   sig
     val mapty : (EcTypes.ty -> EcTypes.ty) -> form -> form
@@ -180,61 +180,63 @@ type rule_name =
   | RN_wp of int
   | RN_skip
 
-type rule = (rule_name, l_decl) EcBaseLogic.rule
+type rule     = (rule_name, l_decl) EcBaseLogic.rule
 type judgment = (rule_name, l_decl) EcBaseLogic.judgment
 
+(* -------------------------------------------------------------------- *)
 module LDecl :
-  sig
-    type error =
-      | UnknownSymbol of EcSymbols.symbol
-      | UnknownIdent of EcIdent.t
-      | NotAVariable of EcIdent.t
-      | NotAHypothesis of EcIdent.t
-      | CanNotClear of EcIdent.t * EcIdent.t
-      | CannotClearMem
-      | CannotClearModTy
-      | DuplicateIdent of EcIdent.t
-      | DuplicateSymbol of EcSymbols.symbol
+sig
+  type error =
+    | UnknownSymbol of EcSymbols.symbol
+    | UnknownIdent of EcIdent.t
+    | NotAVariable of EcIdent.t
+    | NotAHypothesis of EcIdent.t
+    | CanNotClear of EcIdent.t * EcIdent.t
+    | CannotClearMem
+    | CannotClearModTy
+    | DuplicateIdent of EcIdent.t
+    | DuplicateSymbol of EcSymbols.symbol
 
-    exception Ldecl_error of error
+  exception Ldecl_error of error
 
-    val pp_error : Format.formatter -> error -> unit
-    val error : error -> 'a
-    val lookup : EcSymbols.symbol -> hyps -> l_local
-    val lookup_by_id : EcIdent.t -> hyps -> local_kind
-    val get_hyp : EcIdent.t * local_kind -> EcIdent.t * form
-    val get_var : EcIdent.t * local_kind -> EcIdent.t * EcTypes.ty
-    val lookup_hyp : EcSymbols.symbol -> hyps -> EcIdent.t * form
-    val has_hyp : EcSymbols.symbol -> hyps -> bool
-    val lookup_hyp_by_id : EcIdent.t -> hyps -> form
-    val lookup_var : EcSymbols.symbol -> hyps -> EcIdent.t * EcTypes.ty
-    val lookup_var_by_id : EcIdent.t -> hyps -> EcTypes.ty
-    val has_symbol : EcSymbols.symbol -> hyps -> bool
-    val has_ident : EcIdent.t -> hyps -> bool
-    val check_id : EcIdent.t -> hyps -> unit
-    val add_local : EcIdent.t -> local_kind -> hyps -> hyps
-    val clear : EcIdent.t -> hyps -> hyps
-  end
+  val pp_error : Format.formatter -> error -> unit
+  val error : error -> 'a
+  val lookup : EcSymbols.symbol -> hyps -> l_local
+  val lookup_by_id : EcIdent.t -> hyps -> local_kind
+  val get_hyp : EcIdent.t * local_kind -> EcIdent.t * form
+  val get_var : EcIdent.t * local_kind -> EcIdent.t * EcTypes.ty
+  val lookup_hyp : EcSymbols.symbol -> hyps -> EcIdent.t * form
+  val has_hyp : EcSymbols.symbol -> hyps -> bool
+  val lookup_hyp_by_id : EcIdent.t -> hyps -> form
+  val lookup_var : EcSymbols.symbol -> hyps -> EcIdent.t * EcTypes.ty
+  val lookup_var_by_id : EcIdent.t -> hyps -> EcTypes.ty
+  val has_symbol : EcSymbols.symbol -> hyps -> bool
+  val has_ident : EcIdent.t -> hyps -> bool
+  val check_id : EcIdent.t -> hyps -> unit
+  val add_local : EcIdent.t -> local_kind -> hyps -> hyps
+  val clear : EcIdent.t -> hyps -> hyps
+end
 
-
+(* -------------------------------------------------------------------- *)
 module Lvar :
-  sig
-    type t
-    val mk_pvar :  EcTypes.prog_var -> EcMemory.memory -> t
-      
-  end
+sig
+  type t
 
+  val mk_pvar :  EcTypes.prog_var -> EcMemory.memory -> t    
+end
 
+(* -------------------------------------------------------------------- *)
 module LVmap : Map.S with type key =  Lvar.t
 
+(* -------------------------------------------------------------------- *)
 module Subst :
-  sig
-    type t
-    val single_subst :  Lvar.t -> form -> t
-    val subst_form :  t -> form -> form
-    val add_subst : LVmap.key -> form -> t -> t
-    val empty_subst : t
-  end
+sig
+  type t
 
+  val single_subst :  Lvar.t -> form -> t
+  val subst_form :  t -> form -> form
+  val add_subst : LVmap.key -> form -> t -> t
+  val empty_subst : t
+end
 
 val form_of_exp : EcMemory.memory -> EcTypes.tyexpr -> form
