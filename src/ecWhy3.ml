@@ -1188,7 +1188,7 @@ let trans_form env vm f =
       let br = Term.t_close_branch pat body in
       Term.t_case (Term.t_var mr) [br]  in
     let decls  = Decl.create_param_decl lss in
-    let ldecl  = Decl.make_ls_defn ls params body in 
+    let ldecl  = Decl.make_ls_defn ls params (force_bool body) in 
     let decl   = Decl.create_logic_decl [ldecl] in
     let args   = List.map Term.t_var extra in
     let arg    = List.map Term.t_var params in

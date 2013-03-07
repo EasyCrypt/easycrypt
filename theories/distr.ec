@@ -1,6 +1,5 @@
 require import pair.
 require import int.
-require import array.
 require import bitstring.
 require import Fun.
 require        Set.
@@ -153,6 +152,7 @@ theory Dbitstring.
     mu_weight(dbitstring k) = 0%r.
 
 end Dbitstring.
+
 
 theory Dprod.
   op dprod : ('a distr, 'b distr) -> ('a * 'b) distr.

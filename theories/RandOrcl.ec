@@ -31,10 +31,10 @@ theory RndOrcl.
     var log : from Set.t
 
     fun AdvO(x:from) : to = {
-      var res : to = default;
+      var res1 : to = default;
       if (!Set.mem x log && Set.card log < max_call)
-        res := RO.O(x); 
-      return res;
+        res1 := RO.O(x); 
+      return res1;
     }
 
     fun init () : unit = {
