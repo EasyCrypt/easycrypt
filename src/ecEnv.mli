@@ -170,6 +170,9 @@ module Fun : sig
   val lookup_opt  : qsymbol -> env -> (mpath * t) option
   val lookup_path : qsymbol -> env -> mpath
 
+  val memenv     : hasres:bool -> memory -> EcPath.mpath -> env -> memenv
+  val memenv_opt : hasres:bool -> memory -> EcPath.mpath -> env -> memenv option
+
   val add : EcPath.mpath -> env -> env
 end
 

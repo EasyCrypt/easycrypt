@@ -777,6 +777,29 @@ module Fun = struct
   let add (path : EcPath.mpath) (env : env) =
     let obj = by_mpath path env in 
     MC.import Px.for_function env path obj
+
+  let memenv ~hasres me path env =
+    let fun_ = by_mpath path env in
+    let adds =
+      List.fold_left
+        (fun memenv (x, ty) -> EcMemory.bind x ty memenv)
+    in
+
+    let mem = EcMemory.empty me path in
+    let mem = adds mem (fst fun_.f_sig.fs_sig) in
+    let mem =
+      match fun_.f_def with
+      | None   -> mem
+      | Some d -> adds mem d.f_locals in
+    let mem =
+      if   hasres
+      then adds mem [("$res", (snd fun_.f_sig.fs_sig))] 
+      else mem
+    in
+      mem
+
+  let memenv_opt ~hasres me path env =
+    try_lf (fun () -> memenv ~hasres me path env)
 end
 
 (* -------------------------------------------------------------------- *)

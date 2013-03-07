@@ -26,6 +26,12 @@ let bindings { me_vars   = m } = m
 exception DuplicatedMemoryBinding of symbol
 
 (* -------------------------------------------------------------------- *)
+let empty (me : memory) (p : EcPath.mpath) =
+  { me_mpath  = p;
+    me_memory = me;
+    me_vars   = Msym.empty; }
+
+(* -------------------------------------------------------------------- *)
 let bind (x : symbol) (ty : EcTypes.ty) (me : memenv) =
   let merger = function
     | Some _ -> raise (DuplicatedMemoryBinding x)

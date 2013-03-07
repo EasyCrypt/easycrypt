@@ -18,5 +18,6 @@ val memory   : memenv -> memory
 val bindings : memenv -> EcTypes.ty Msym.t
 
 (* -------------------------------------------------------------------- *)
+val empty  : memory -> mpath -> memenv
 val bind   : symbol -> EcTypes.ty -> memenv -> memenv
 val lookup : symbol -> memenv -> (EcTypes.ty * mpath) option
