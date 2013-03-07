@@ -201,19 +201,20 @@ let rec m_tostring(m : mpath) =
       let args = List.map m_tostring a in
         Printf.sprintf "%s(%s)" id (String.concat ", " args)
   in
-  let rec aux p args = 
-    match p.p_node, args with
-    | Psymbol id , [a] -> app_tostring id a 
-    | Pident   id, [a] -> app_tostring (EcIdent.name id) a
+  let rec aux p ks args = 
+    match p.p_node, ks, args with
+    | Psymbol id , [_], [a] -> app_tostring id a 
+    | Pident   id, [_], [a] -> app_tostring (EcIdent.name id) a
 
-    | Pqname(p, id), a::args ->
-        let s1 = aux p args in
+    | Pqname(p, id), k::ks, a::args ->
+        let s1 = aux p ks args in
         let s2 = app_tostring id a in
-          Format.sprintf "%s.%s" s1 s2 
+        let s =  if k = PKmodule then "@" else "." in
+          Format.sprintf "%s%s%s" s1 s s2 
 
-    | _, _ -> assert false
+    | _, _, _ -> assert false
   in
-    aux p args
+    aux p m.m_kind args
 
 (* -------------------------------------------------------------------- *)
 type xpath = {

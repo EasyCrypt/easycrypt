@@ -488,13 +488,14 @@ module MC = struct
       let params   = me.me_sig.mt_params in
       let params   = List.map (fun (x, _) -> EcPath.mident x) params in
       let subscope = EcPath.mqname scope EcPath.PKmodule me.me_name params in
-      let xpath = fun x -> EcPath.mqname subscope EcPath.PKother x [] in
+      let xpath = fun k x -> EcPath.mqname subscope k x [] in
 
       let mc1_of_module (mc : premc) = function
       | MI_Module subme ->
+          let xpath = xpath EcPath.PKmodule subme.me_name in
           let (submc, subcomps) = mc_of_module subscope subme in
-            (mc_bind_module (xpath subme.me_name) subme
-               (mc_bind_mc (EcPath.path_of_mpath (xpath subme.me_name)) mc),
+            (mc_bind_module xpath subme
+               (mc_bind_mc (EcPath.path_of_mpath xpath) mc),
              Some (submc, subcomps))
 
       | MI_Variable v ->
@@ -502,10 +503,10 @@ module MC = struct
             { vb_type = v.v_type;
               vb_kind = PVglob; }
           in
-            (mc_bind_variable (xpath v.v_name) vty mc, None)
+            (mc_bind_variable (xpath EcPath.PKother v.v_name) vty mc, None)
 
       | MI_Function f ->
-          (mc_bind_function (xpath f.f_name) f mc, None)
+          (mc_bind_function (xpath EcPath.PKother f.f_name) f mc, None)
 
       in
 

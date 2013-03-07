@@ -1265,7 +1265,7 @@ let transform env ue pf tt =
     in
       match locals with
       | Some (id, ty) ->
-          if tvi <> None then assert false;
+          if tvi <> None then assert false; (*FIXME error message *)
           [ (f_local id ty, ue) ]
 
       | None -> begin
