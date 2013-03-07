@@ -24,17 +24,17 @@ axiom extentionality: forall (M0 M1:'a matrix),
 
 op new: (int * int) -> 'a matrix.
 
-axiom new_size: forall (m n),
+axiom new_size: forall m n,
   size (new<:'a> (m,n)) = (m,n).
 
 op __set: ('a matrix,(int * int),'a) -> 'a matrix.
 
-axiom set_size: forall (M: 'a matrix, i, j, a),
+axiom set_size: forall (M: 'a matrix) i j a,
   0 <= i => i < fst (size M) =>
   0 <= j => j < snd (size M) =>
   size (M.[(i,j) <- a]) = size M.
 
-axiom set_get: forall (M: 'a matrix, i, j, k, l, a),
+axiom set_get: forall (M:'a matrix) i j k l a,
   0 <= i => i < fst (size M) =>
   0 <= j => j < snd (size M) =>
   0 <= k => k < fst (size M) =>
