@@ -478,32 +478,40 @@ module MC = struct
       { mc with
           amc_components = MMsym.add name path mc.amc_components; }
 
+  type foo = (EcSymbols.symbol * premc) * foo list
+
   (* ------------------------------------------------------------------ *)
   let mc_of_module (env : env) (me : module_expr) =
-    let xpath =
-      let params = me.me_sig.mt_params in
-      let params = List.map (fun (x, _) -> EcPath.mident x) params in
-      let scope  = 
-        EcPath.mqname env.env_scope EcPath.PKmodule me.me_name params in
-        fun x -> EcPath.mqname scope EcPath.PKother x []
-    in
+    let rec mc_of_module (scope : EcPath.mpath) (me : module_expr) =
+      let params   = me.me_sig.mt_params in
+      let params   = List.map (fun (x, _) -> EcPath.mident x) params in
+      let subscope = EcPath.mqname scope EcPath.PKmodule me.me_name params in
+      let xpath = fun x -> EcPath.mqname scope EcPath.PKother x [] in
 
-    let mc1_of_module (mc : premc) = function
-      | MI_Module me ->
-          mc_bind_module (xpath me.me_name) me mc
+      let mc1_of_module (mc : premc) = function
+      | MI_Module subme ->
+          let (submc, subcomps) = mc_of_module subscope subme in
+            (mc_bind_module (xpath subme.me_name) subme mc,
+             Some (submc, subcomps))
 
       | MI_Variable v ->
           let vty =
             { vb_type = v.v_type;
               vb_kind = PVglob; }
           in
-            mc_bind_variable (xpath v.v_name) vty mc
+            (mc_bind_variable (xpath v.v_name) vty mc, None)
 
       | MI_Function f ->
-          mc_bind_function (xpath f.f_name) f mc
+          (mc_bind_function (xpath f.f_name) f mc, None)
 
+      in
+
+      let mc, submcs =
+        List.map_fold mc1_of_module empty_premc me.me_comps
+      in
+        ((me.me_name, mc), List.prmap (fun x -> x) submcs)
     in
-      List.fold_left mc1_of_module empty_premc me.me_comps
+      (mc_of_module env.env_scope me : foo)
 
   (* ------------------------------------------------------------------ *)
   let mc_of_module_param (mid : EcIdent.t) (me : module_expr) =
@@ -572,10 +580,27 @@ module MC = struct
     bind Px.for_function env EcPath.PKother x fsig
 
   and bind_module x me env =
-    let comps = mc_of_module env me in
-    let env   = bind Px.for_module env EcPath.PKmodule x me in
-    let env   = bind_mc env x comps in
-      env
+    let rec bind_submc env path ((name, mc), submcs) =
+      let path = EcPath.pqname path name in
+
+      if Mp.find_opt path env.env_comps <> None then
+        raise (DuplicatedBinding (EcPath.basename path));
+
+      bind_submcs
+        { env with env_comps = Mp.add path mc env.env_comps }
+        path submcs
+
+    and bind_submcs env path submcs =
+      List.fold_left (bind_submc^~ path) env submcs
+    in
+
+    let (_, mc), submcs = mc_of_module env me in
+    let env = bind Px.for_module env EcPath.PKmodule x me in
+    let env = bind_mc env me.me_name mc in
+
+      bind_submcs env
+        (EcPath.pqname (EcPath.path_of_mpath env.env_scope) me.me_name)
+        submcs
 
   and bind_modtype x tymod env =
     bind Px.for_modtype env EcPath.PKother x tymod
@@ -662,7 +687,6 @@ module Memory = struct
       match memories with
       | []     -> None
       | m :: _ -> Some m
-      | _      -> assert false
 
   let lookup (me : symbol) (env : env) =
     MMsym.last me env.env_memories

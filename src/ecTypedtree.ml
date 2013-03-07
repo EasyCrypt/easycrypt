@@ -1051,18 +1051,30 @@ let rec trans_msymbol (env : EcEnv.env) (msymb : pmsymbol) =
     List.map
       (fun (_, args) ->
         List.map
-          (fun { pl_desc = arg } -> trans_msymbol env msymb)
+          (fun { pl_desc = arg } -> trans_msymbol env arg)
           args)
       msymb
   in
-
     List.iter2
-      (fun param arg -> ())
+      (fun param arg ->
+         if List.length param <> List.length arg then
+           tyerror dloc ModApplInvalidArity;
+         List.iter2
+           (fun (_, p) (_, a) ->
+              if not (EcEnv.ModTy.has_mod_type env a p) then
+                tyerror dloc ModApplInvalidArgInterface)
+           param arg)
       mod_params mod_args;
-    EcPath.mpath
-      mod_path.EcPath.m_path
-      mod_path.EcPath.m_kind
-      mod_args
+
+    let aout =
+      EcPath.mpath
+        mod_path.EcPath.m_path
+        mod_path.EcPath.m_kind
+        (List.map (List.map fst) mod_args)
+    in
+      (aout, if   mod_expr.me_sig.mt_params = []
+             then mod_expr.me_types
+             else [])
 
 (* -------------------------------------------------------------------- *)
 let transfpattern env ue (p : EcParsetree.lpattern) =
@@ -1173,7 +1185,7 @@ let transform env ue pf tt =
             List.map2 doit1 args (fst fsig)
         in
 
-        let fpath = trans_msymbol env (fst (unloc gp)) in
+        let fpath = fst (trans_msymbol env (fst (unloc gp))) in
         let fpath = EcPath.mqname fpath EcPath.PKother funsymb [] in
 
         let memid =
