@@ -359,12 +359,13 @@ let mk_highorder_func ls =
   let tres = ls.Term.ls_value in
   if targs = [] then None 
   else
-    let pid = Ident.id_clone ls.Term.ls_name in
+    let pid = Ident.id_fresh (ls.Term.ls_name.Ident.id_string ^ "_ho") in
     let codom = (odfl Ty.ty_bool tres) in
     let ty = List.fold_right Ty.ty_func ls.Term.ls_args codom in
     let ls' = Term.create_fsymbol pid [] ty in
     let decl' = Decl.create_param_decl ls' in
-    let pr = Decl.create_prsymbol pid in
+    let pid_spec = Ident.id_fresh (ls.Term.ls_name.Ident.id_string ^ "_ho_spec") in
+    let pr = Decl.create_prsymbol pid_spec in
     let preid = Ident.id_fresh "x" in
     let params = List.map (Term.create_vsymbol preid) targs in
     let args = List.map Term.t_var params in
@@ -1332,6 +1333,7 @@ let para_call max_provers provers timelimit task =
 (*      Format.printf "Start prover %s@." prover; *)
       let pc =
         Driver.prove_task ~command:pr.Whyconf.command ~timelimit dr task () in
+
       begin
         try
           ExtUnix.All.setpgid (CP.prover_call_pid pc) 0

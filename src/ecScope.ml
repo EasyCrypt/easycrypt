@@ -451,9 +451,11 @@ module Prover = struct
     let time = odfl dft.EcWhy3.prover_timelimit time in
     let time = if time < 1 then 1 else time in
     let provers = odfl dft.EcWhy3.prover_names ns in
+    let provers = List.filter (fun s -> s <> "Yices") 
+        (Array.to_list provers) in
     let max     = odfl dft.EcWhy3.prover_max_run max in
     { EcWhy3.prover_max_run   = max;
-      EcWhy3.prover_names     = provers;
+      EcWhy3.prover_names     = Array.of_list provers;
       EcWhy3.prover_timelimit = time } 
 
   let set_prover_info scope max time ns = 
