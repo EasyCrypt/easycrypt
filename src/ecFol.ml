@@ -53,7 +53,7 @@ and f_node =
   | FequivF of form * (EcPath.mpath * EcPath.mpath) * form
   | FequivS of form * (EcMemory.memenv * stmt) EcUtils.double * form
 
-  | Fpr     of memory * EcPath.mpath * form list * form (* $post *)
+  | Fpr     of memory * EcPath.mpath * form list * (EcIdent.t * ty) * form (* $post *)
 
 (* -------------------------------------------------------------------- *)
 let fv f = f.f_fv 
@@ -260,7 +260,7 @@ let f_hoare mem pre s post = mk_form (Fhoare(mem,pre,s,post)) ty_bool
 
 let f_hoareF pre f post = mk_form (FhoareF(pre,f,post)) ty_bool
 let f_equivF pre f1 f2 post = mk_form (FequivF(pre,(f1,f2),post)) ty_bool
-let f_pr m f args e = mk_form (Fpr(m,f,args,e)) ty_real
+let f_pr m f args res e = mk_form (Fpr(m,f,args,res,e)) ty_real
 
 (* -------------------------------------------------------------------- *)
 type destr_error =

@@ -36,6 +36,9 @@ val add_op :
 
 val add_ax : env -> EcPath.path -> EcDecl.axiom -> env * rebinding
 
+val add_mod_exp : 
+    env -> EcPath.path -> EcModules.module_expr -> env * rebinding
+
 val get_w3_th : string list -> string -> Why3.Theory.theory
 
 (*****************************************************************************)

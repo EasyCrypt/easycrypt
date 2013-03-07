@@ -295,7 +295,7 @@ module Mod = struct
 
   let add (scope : scope) (name : symbol) m =
     let m = EcTypedtree.transmod scope.sc_env name m in
-      bind scope m
+    bind scope m
 end
 
 (* -------------------------------------------------------------------- *)

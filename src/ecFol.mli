@@ -49,7 +49,7 @@ and f_node =
   | FequivF of form * (EcPath.mpath * EcPath.mpath) * form  (* $left,$right / $left,$right *)
   | FequivS of form * (memenv * stmt) EcUtils.double * form (* $left,$right / $left,$right *)
 
-  | Fpr     of memory * EcPath.mpath * form list * form 
+  | Fpr     of memory * EcPath.mpath * form list * (EcIdent.t * ty) * form 
 
 val f_equal : form -> form -> bool
 
@@ -82,7 +82,9 @@ val f_forall : binding -> form -> form
 val f_hoare   : memenv -> form -> EcModules.function_def -> form -> form 
 val f_hoareF  : form -> EcPath.mpath -> form -> form 
 val f_equivF  : form -> EcPath.mpath -> EcPath.mpath -> form -> form 
-val f_pr      : memory -> EcPath.mpath -> form list -> form -> form
+val f_pr      : 
+    memory -> EcPath.mpath -> form list -> 
+      EcIdent.t * EcTypes.ty -> form -> form
 
 val fop_not : form
 val f_not : form -> form

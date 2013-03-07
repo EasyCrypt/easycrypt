@@ -810,7 +810,7 @@ module Ty = struct
     let env = MC.bind_typedecl name ty env in
     let (w3, rb) =
         EcWhy3.add_ty env.env_w3
-          (EcPath.extend (Some (EcPath.path_of_mpath env.env_scope)) name) ty
+          (EcPath.pqname (EcPath.path_of_mpath env.env_scope) name) ty
     in
       { env with
           env_w3   = w3;
@@ -977,7 +977,14 @@ module Mod = struct
 
   let bind name me env =
     assert (me.me_name = name);
-    MC.bind_module name me env
+    let env = MC.bind_module name me env in
+    let (w3, rb) =
+      EcWhy3.add_mod_exp env.env_w3
+          (EcPath.pqname (EcPath.path_of_mpath env.env_scope) name) me in
+    { env with
+      env_w3 = w3;
+      env_rb = rb @ env.env_rb;
+      env_item = CTh_module me :: env.env_item }
 
   let bind_local name modty env =
     let modsig =
@@ -1063,7 +1070,9 @@ module ModTy = struct
     fst (lookup name env)
 
   let bind name modty env =
-    MC.bind_modtype name modty env
+    let env = MC.bind_modtype name modty env in
+    { env with
+      env_item = CTh_modtype (name, modty) :: env.env_item }
 
   let add (path : EcPath.path) (env : env) =
     let obj = by_path path env in 
@@ -1514,12 +1523,16 @@ let check_alpha_equal env f1 f2 =
         aux alpha pre1  pre2;
         aux alpha post1 post2
 
-    | Fpr(m1,p1,args1,f1), Fpr(m2,p2,args2,f2) 
+    | Fpr(m1,p1,args1,res1,f1'), Fpr(m2,p2,args2,res2, f2') 
       when EcIdent.id_equal (find alpha m1) m2 &&
            m_equal_norm env p1 p2 &&  
            List.length args1 = List.length args2 ->
         List.iter2 (aux alpha) args1 args2;
-        aux alpha f1 f2
+        let (id1,ty1) = res1 in
+        let (id2,ty2) = res2 in
+        let alpha = 
+          check_binding f1 f2 alpha [id1,GTty ty1] [id2,GTty ty2] in
+        aux alpha f1' f2'
 
     | _, _ -> error f1 f2
 
@@ -1568,8 +1581,8 @@ let rec norm_form env f =
 
   | FequivS _ -> assert false (* FIXME ? Not implemented *)
 
-  | Fpr(m,p,args,f) ->
+  | Fpr(m,p,args,res,f) ->
       f_pr m (Mod.unfold_mod_path env p) (List.map (norm_form env) args) 
-        (norm_form env f)
+        res (norm_form env f)
 
 let check_goal env pi ld = EcWhy3.check_goal env.env_w3 pi ld

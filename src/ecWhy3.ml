@@ -292,6 +292,7 @@ type rebinding_item =
                 highorder_decl 
   | RBax  of EcPath.path * Decl.prsymbol * Decl.decl
   | RBpa  of EcPath.path * Term.lsymbol
+  | RBfun of Decl.decl * Decl.decl * Decl.decl
 
 type rebinding = rebinding_item list
 
@@ -401,6 +402,11 @@ let rebind_item env = function
   | RBop(p,(ls,tvs),decl,odecl) -> add_ls env p ls tvs decl odecl
   | RBax(p,pr,decl) -> add_pr env p pr decl
   | RBpa(p,ls)      -> add_param env p ls 
+  | RBfun(decl,decls,sdecl) ->
+      let task = 
+        List.fold_left add_decl_with_tuples 
+          env.logic_task [decl;decls;sdecl] in
+      { env with logic_task = task }
 
 let rebind = List.fold_left rebind_item
 
@@ -1139,15 +1145,67 @@ let trans_form env vm f =
           
     | Fpvar(pv,m) -> trans_pv !env vm pv m 
 
-    | Fpr(mem,mp,args,ev) -> 
+    | Fpr(mem,mp,args,res,ev) -> 
         let mem   = trans_lv vm mem in
         let mo, f = trans_fun !env vm mp in 
         let args  = List.map (trans_form_b vm) args in
-        let ev    = trans_ev vm ev in
+        let ev    = trans_ev vm res ev in
         getpr mo f mem args ev
 
   and trans_form_b vm f = force_bool (trans_form vm f)
-  and trans_ev _vm _ev = assert false in
+
+  and trans_ev vm (id,ty) ev = 
+    (* FIXME : We should be able to share equal definition *)
+    (* We assume that the memory is mpost *)
+    (* op : sev : fv -> (mem*ty |-> bool) 
+       op : fev fv (mr: mem * ty) : bool := 
+          let (m,r) = mr in
+          [ev]
+       forall fv (mr : mem*ty), 
+          sev fv @ mr = fev fv mr 
+    *)
+    let pids   = Ident.id_fresh "unamed_lambda_s" in
+    let pid    = Ident.id_fresh "unamed_lambda" in
+    let ty     = trans_ty !env vm ty in
+    let vs, vm = add_ids vm [EcFol.mpost;id] [ty_mem;ty] in
+    let body   = trans_form vm ev in
+    let fv     = 
+      List.fold_left (fun s x -> Term.Mvs.remove x s)
+        body.Term.t_vars vs in
+    let extra  = Term.Mvs.keys fv in
+    let tmr    = Ty.ty_tuple [ty_mem;ty] in
+    let mr     = Term.create_vsymbol (Ident.id_fresh "mr") tmr in 
+    let doms   = List.map (fun vs -> vs.Term.vs_ty) extra in
+    let codoms  = Ty.ty_func tmr Ty.ty_bool in
+    let params   = extra @ [mr] in
+    let dom    = List.map (fun vs -> vs.Term.vs_ty) params in
+    let lss    = Term.create_fsymbol pids doms codoms in
+    let ls     = Term.create_fsymbol pid dom Ty.ty_bool in
+    let body   = 
+      let pat = 
+        Term.pat_app (Term.fs_tuple 2) (List.map Term.pat_var vs) tmr in
+      let br = Term.t_close_branch pat body in
+      Term.t_case (Term.t_var mr) [br]  in
+    let decls  = Decl.create_param_decl lss in
+    let ldecl  = Decl.make_ls_defn ls params body in 
+    let decl   = Decl.create_logic_decl [ldecl] in
+    let args   = List.map Term.t_var extra in
+    let arg    = List.map Term.t_var params in
+    let lss_app = Term.t_app_infer lss args in
+    let app_s  = Term.t_func_app lss_app (Term.t_var mr) in
+    let app    = Term.t_app_infer ls arg in
+    let spec   = 
+      Term.t_forall_close params [] 
+        (Term.t_iff (force_prop app_s) (force_prop app)) in
+    let pr     = Decl.create_prsymbol pids in
+    let sdecl  = Decl.create_prop_decl Decl.Paxiom pr spec in
+    rb := RBfun(decl,decls,sdecl) :: !rb;
+    env := { !env with
+             logic_task = 
+             List.fold_left add_decl_with_tuples !env.logic_task 
+               [decl;decls;sdecl] };
+    lss_app in
+
   let f = trans_form vm f in
   !env, !rb, f
 
@@ -1197,7 +1255,44 @@ let add_ax env path ax =
       let decl = Decl.create_prop_decl Decl.Paxiom pr f in
       add_pr env path pr decl, RBax(path,pr,decl)::rb
 
-(*let rec add_mod_exp env path me = *)
+let add_mod_exp env path me = 
+  let is_alias = function ME_Alias _ -> true | _ -> false in
+  if is_alias me.me_body then env, []
+  else
+    let env = ref env in
+    let rb  = ref [] in
+    let add_pa path ty =
+      let ls = Term.create_fsymbol (preid_p path) [] ty in
+      env := add_param !env path ls;
+      rb := RBpa(path,ls)::!rb in
+    let rec add_comps path comps = List.iter (add_comp path) comps 
+    and add_comp path comp = 
+      match comp with
+      | MI_Module me  -> add_me path me 
+      | MI_Variable v ->
+          let ty = trans_ty !env empty_vmap v.v_type in
+          let path = EcPath.pqname path v.v_name in
+          add_pa path (ty_var_name ty)
+      | MI_Function f ->
+          let fsig = f.f_sig in
+          let ta = 
+            List.map (fun (_,ty) -> trans_ty !env empty_vmap ty) 
+              (fst fsig.fs_sig) in
+          let tr = trans_ty !env empty_vmap (snd fsig.fs_sig) in
+          let path = EcPath.pqname path fsig.fs_name in
+          add_pa path (ty_fun_name ta tr) 
+    and add_me path me =
+      if not (is_alias me.me_body) then
+        let path = EcPath.pqname path me.me_name in
+        add_pa path ty_mod_name;
+        add_comps path me.me_comps in
+    add_pa path ty_mod;
+    add_comps path me.me_comps;
+    !env, !rb
+  
+             
+  
+  
   
   
 
