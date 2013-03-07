@@ -242,8 +242,7 @@ module Pred = struct
       | None -> None
       | Some(xs, body) ->
           let xs = List.map EcIdent.create (unlocs xs) in
-          let env = TT.Fenv.mono_fenv scope.sc_env in
-          let env = TT.Fenv.bind_locals env xs dom in 
+          let env = EcEnv.Var.bind_locals (List.combine xs dom) scope.sc_env in
           let body = TT.transformula env ue body in
           Some(xs, body) in
     let uni = Tuni.subst (EcUnify.UniEnv.close ue) in
@@ -609,9 +608,20 @@ module Tactic = struct
 
   let process_form env g pf ty =
     let hyps = get_hyps g in
-    let ue = EcUnify.UniEnv.create (Some hyps.h_tvar) in
-    let ff = TT.transform (TT.Fenv.fenv_hyps env hyps) ue pf ty in
-    EcFol.Fsubst.mapty (Tuni.subst (EcUnify.UniEnv.close ue)) ff
+
+    let locals =
+      let doit1 (id, k) =
+        match k with
+        | EcFol.LD_var (ty, _) -> Some (id, ty)
+        | _ -> None
+      in
+        List.prmap doit1 hyps.h_local
+    in
+
+    let env = EcEnv.Var.bind_locals locals env in
+    let ue  = EcUnify.UniEnv.create (Some hyps.h_tvar) in
+    let ff  = TT.transform env ue pf ty in
+      EcFol.Fsubst.mapty (Tuni.subst (EcUnify.UniEnv.close ue)) ff
 
   let process_formula env g pf = 
     process_form env g pf tbool
@@ -812,8 +822,7 @@ module Ax = struct
 
   let add (scope : scope) (ax : paxiom) =
     let ue = EcUnify.UniEnv.create None in
-    let concl = 
-      TT.transformula (TT.Fenv.mono_fenv scope.sc_env) ue ax.pa_formula in
+    let concl = TT.transformula scope.sc_env ue ax.pa_formula in
     let concl = 
       EcFol.Fsubst.mapty (Tuni.subst (EcUnify.UniEnv.close ue)) concl in
     let tparams = EcUnify.UniEnv.tparams ue in 

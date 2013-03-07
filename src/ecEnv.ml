@@ -111,7 +111,7 @@ type preenv = {
   env_current  : activemc;
   env_comps    : premc EcPath.Mp.t;
   env_locals   : (EcIdent.t * EcTypes.ty) MMsym.t;
-  env_memories : (EcMemory.memory * EcMemory.memenv) MMsym.t;
+  env_memories : actmem MMsym.t;
   env_actmem   : EcMemory.memory option;
   env_w3       : EcWhy3.env;
   env_rb       : EcWhy3.rebinding;        (* in reverse order *)
@@ -146,6 +146,10 @@ and activemc = {
 and mc =
 | PreMc of premc
 | ActMc of activemc
+
+and actmem =
+| AMAbstract of EcIdent.t
+| AMConcrete of mpath * memenv
 
 let premc = fun (mc : premc   ) -> PreMc mc
 let actmc = fun (mc : activemc) -> ActMc mc
@@ -644,14 +648,21 @@ exception MEError of meerror
 
 (* -------------------------------------------------------------------- *)
 module Memory = struct
+  let actmem_name = function
+    | AMAbstract x -> x
+    | AMConcrete (_, m) -> EcMemory.memory m
+
   let byid (me : memory) (env : env) =
     let memories = MMsym.all (EcIdent.name me) env.env_memories in
-    let memories = List.filter (fun (me', _) -> EcIdent.id_equal me me') memories in
-
+    let memories =
+      List.filter
+        (fun me' -> EcIdent.id_equal me (actmem_name me'))
+        memories
+    in
       match memories with
-      | []       -> None
-      | [(_, m)] -> Some m
-      | _        -> assert false
+      | []  -> None
+      | [m] -> Some m
+      | _   -> assert false
 
   let lookup (me : symbol) (env : env) =
     MMsym.last me env.env_memories
@@ -669,10 +680,14 @@ module Memory = struct
     | None    -> None
     | Some me -> Some (me, oget (byid me env))
 
-  let push (name : symbol) (me : memenv) (env : env) =
-    let id   = EcIdent.create name in
-    let maps = MMsym.add name (id, me) env.env_memories in
-      (id, { env with env_memories = maps })
+  let push (me : actmem) (env : env) =
+    assert (byid (actmem_name me) env = None);
+
+    let id = actmem_name me in
+    let maps =
+      MMsym.add (EcIdent.name id) me env.env_memories
+    in
+      { env with env_memories = maps }
 end
 
 (* -------------------------------------------------------------------- *)
@@ -706,15 +721,40 @@ module Var = struct
   let lookup_local_opt name env =
     MMsym.last name env.env_locals
 
-  let lookup_progvar qname env =
-    let (p, x) = MC.lookup Px.for_variable qname env in
-      if is_suspended x then
-        raise (LookupFailure (`QSymbol qname));
-      let x = x.sp_target in
-        ({ pv_name = p; pv_kind = x.vb_kind }, x.vb_type)
+  let lookup_progvar ?side qname env =
+    let inmem side =
+      match fst qname with
+      | [] -> begin
+         match oget (Memory.byid side env) with
+         | AMAbstract _ -> None
+         | AMConcrete (mp, memenv) -> begin
+             match EcMemory.lookup (snd qname) memenv with
+             | None    -> None
+             | Some ty ->
+                 let pv =
+                   { pv_name = EcPath.mqname mp EcPath.PKother (snd qname) [];
+                     pv_kind = PVloc; }
+                 in
+                   Some (pv, ty)
+           end
+        end
 
-  let lookup_progvar_opt name env =
-    try_lf (fun () -> lookup_progvar name env)
+      | _ -> None
+    in
+
+      match obind side inmem with
+      | None -> begin
+          let (p, x) = MC.lookup Px.for_variable qname env in
+            if is_suspended x then
+              raise (LookupFailure (`QSymbol qname));
+            let x = x.sp_target in
+              ({ pv_name = p; pv_kind = x.vb_kind }, x.vb_type)
+        end
+
+      | Some (pv, ty) -> (pv, ty)
+
+  let lookup_progvar_opt ?side name env =
+    try_lf (fun () -> lookup_progvar ?side name env)
 
   let bind name pvkind ty env =
     let vb = { vb_type = ty; vb_kind = pvkind; } in
@@ -785,7 +825,7 @@ module Fun = struct
         (fun memenv (x, ty) -> EcMemory.bind x ty memenv)
     in
 
-    let mem = EcMemory.empty me path in
+    let mem = EcMemory.empty me in
     let mem = adds mem (fst fun_.f_sig.fs_sig) in
     let mem =
       match fun_.f_def with

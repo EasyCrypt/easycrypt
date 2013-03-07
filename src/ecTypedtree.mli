@@ -53,15 +53,8 @@ val transexp : EcEnv.env -> EcUnify.unienv -> pexpr -> tyexpr * ty
 val transexpcast : EcEnv.env -> EcUnify.unienv -> ty -> pexpr -> tyexpr
 
 (* -------------------------------------------------------------------- *)
-module Fenv : sig 
-  type fenv
-  val mono_fenv : EcEnv.env -> fenv
-  val bind_locals : fenv -> EcIdent.t list -> ty list -> fenv
-  val fenv_hyps : EcEnv.env -> EcFol.hyps -> fenv
-end
-
-val transformula : Fenv.fenv -> EcUnify.unienv -> pformula -> EcFol.form 
-val transform    : Fenv.fenv -> EcUnify.unienv -> pformula -> ty -> EcFol.form
+val transformula : EcEnv.env -> EcUnify.unienv -> pformula -> EcFol.form 
+val transform    : EcEnv.env -> EcUnify.unienv -> pformula -> ty -> EcFol.form
 
 (* -------------------------------------------------------------------- *)
 val transmodsig  : EcEnv.env -> symbol -> pmodule_sig  -> module_sig

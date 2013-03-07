@@ -33,7 +33,7 @@ type form = {
   f_tag  : int;
 }
 
-and f_node = 
+and f_node =
   | Fquant  of quantif * binding * form
   | Fif     of form * form * form
   | Flet    of lpattern * form * form
@@ -240,7 +240,7 @@ let fop_eq ty = f_op EcCoreLib.p_eq [ty] (tfun ty (tfun ty ty_bool))
 let f_eq f1 f2 = f_app (fop_eq f1.f_ty) [f1;f2] ty_bool
 
 let f_local x ty = mk_form (Flocal x) ty
-let f_pvar x ty s = mk_form (Fpvar(x,s)) ty
+let f_pvar x ty s = mk_form (Fpvar(x, s)) ty
 
 let f_tuple args = 
   mk_form (Ftuple args) (ttuple (List.map ty args))

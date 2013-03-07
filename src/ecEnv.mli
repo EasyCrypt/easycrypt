@@ -75,7 +75,7 @@ type preenv = private {
   env_locals : (EcIdent.t * EcTypes.ty) MMsym.t;
 
   (* The set of memories (i.e. sided program variables) *)
-  env_memories : (EcMemory.memory * EcMemory.memenv) MMsym.t;
+  env_memories : actmem MMsym.t;
 
   (* The active memory *)
   env_actmem : EcMemory.memory option;
@@ -129,6 +129,10 @@ and activemc = {
   amc_components : path                             MMsym.t;
 }
 
+and actmem =
+| AMAbstract of EcIdent.t
+| AMConcrete of mpath * memenv
+
 (* -------------------------------------------------------------------- *)
 type env = preenv
 
@@ -149,13 +153,15 @@ type meerror =
 exception MEError of meerror
 
 module Memory : sig
+  val actmem_name : actmem -> EcIdent.t
+
   val set_active  : memory -> env -> env
   val get_active  : env -> memory option
 
-  val byid    : memory -> env -> memenv option
-  val lookup  : symbol -> env -> (memory * memenv) option
-  val current : env -> (memory * memenv) option
-  val push    : symbol -> memenv -> env -> (EcIdent.t * env)
+  val byid    : memory -> env -> actmem option
+  val lookup  : symbol -> env -> actmem option
+  val current : env -> (memory * actmem) option
+  val push    : actmem -> env -> env
 end
 
 (* -------------------------------------------------------------------- *)
@@ -190,8 +196,8 @@ module Var : sig
   val lookup_local     : symbol -> env -> (EcIdent.t * EcTypes.ty)
   val lookup_local_opt : symbol -> env -> (EcIdent.t * EcTypes.ty) option
 
-  val lookup_progvar     : qsymbol -> env -> (prog_var * EcTypes.ty)
-  val lookup_progvar_opt : qsymbol -> env -> (prog_var * EcTypes.ty) option
+  val lookup_progvar     : ?side:memory -> qsymbol -> env -> (prog_var * EcTypes.ty)
+  val lookup_progvar_opt : ?side:memory -> qsymbol -> env -> (prog_var * EcTypes.ty) option
 
   (* Locals binding *)
   val bind_local  : EcIdent.t -> EcTypes.ty -> env -> env

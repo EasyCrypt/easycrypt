@@ -9,16 +9,13 @@ type memory = EcIdent.t
 
 (* -------------------------------------------------------------------- *)
 type memenv = {
-  me_mpath  : EcPath.mpath;
   me_memory : memory;
   me_vars   : EcTypes.ty Msym.t;
 }
 
 let mem_equal = EcIdent.id_equal
 
-
 (* -------------------------------------------------------------------- *)
-let mpath    { me_mpath  = p } = p
 let memory   { me_memory = m } = m
 let bindings { me_vars   = m } = m
 
@@ -26,9 +23,8 @@ let bindings { me_vars   = m } = m
 exception DuplicatedMemoryBinding of symbol
 
 (* -------------------------------------------------------------------- *)
-let empty (me : memory) (p : EcPath.mpath) =
-  { me_mpath  = p;
-    me_memory = me;
+let empty (me : memory) =
+  { me_memory = me;
     me_vars   = Msym.empty; }
 
 (* -------------------------------------------------------------------- *)
@@ -41,7 +37,4 @@ let bind (x : symbol) (ty : EcTypes.ty) (me : memenv) =
 
 (* -------------------------------------------------------------------- *)
 let lookup (x : symbol) (me : memenv) =
-  let tx (ty : EcTypes.ty) =
-    (ty, EcPath.mqname me.me_mpath EcPath.PKother x [])
-  in
-    omap (Msym.find_opt x me.me_vars) tx
+  Msym.find_opt x me.me_vars
