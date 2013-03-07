@@ -37,6 +37,7 @@
     "while"       , WHILE      ;        (* KW: prog *)
     "assert"      , ASSERT     ;        (* KW: prog *)
     "return"      , RETURN     ;        (* KW: prog *)
+    "res"         , RES        ;        (* KW: prog *)
 
     "using"       , USING      ;        (* KW: tactic *)
     "compute"     , COMPUTE    ;        (* KW: tactic *)

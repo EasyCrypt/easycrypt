@@ -9,4 +9,4 @@ module G = {
   }
 }.
 
-lemma L : forall {m}, Pr[f(0, 0) @ G, {m} : x = y] = c.
+lemma L : forall {m}, Pr[f(0, 0) @ G, {m} : x + y = res] = c.

@@ -152,6 +152,7 @@
 %token RBRACKET
 // %token RBRACKETLLIMP
 // %token REMOVE
+%token RES
 %token RETURN
 %token REQUIRE
 // %token USE
@@ -476,6 +477,9 @@ exp:
 sform:
 | n=number
    { PFint n }
+
+| x=loc(RES)
+   { PFident (mk_loc x.pl_loc ([], "$res"), None) }
 
 | x=qident_pbinop ti=tvars_app?
    { PFident (x,ti) }
