@@ -54,8 +54,8 @@ let unsuspend f (x : 'a suspension) (args : mpath list list) =
            (fun s (x, _) a -> EcSubst.add_module s x a))
         EcSubst.empty x.sp_params args
     in
-    if EcSubst.is_empty s then x.sp_target 
-    else f s x.sp_target
+      if EcSubst.is_empty s then x.sp_target else f s x.sp_target
+
   with Invalid_argument "List.fold_left2" ->
     assert false
 
@@ -688,6 +688,9 @@ module Memory = struct
       MMsym.add (EcIdent.name id) me env.env_memories
     in
       { env with env_memories = maps }
+
+  let push_concrete mpath memenv env =
+    push (AMConcrete (mpath, memenv)) env
 end
 
 (* -------------------------------------------------------------------- *)
@@ -808,6 +811,13 @@ module Fun = struct
   let lookup_opt name env =
     try_lf (fun () -> lookup name env)
 
+  let sp_lookup name (env : env) =
+    let (p, x) = MC.lookup Px.for_function name env in
+      (EcPath.path_of_mpath p, x)
+
+  let sp_lookup_opt name env =
+    try_lf (fun () -> sp_lookup name env)
+
   let lookup_path name env =
     fst (lookup name env)
 
@@ -819,7 +829,7 @@ module Fun = struct
     MC.import Px.for_function env path obj
 
   let memenv ~hasres me path env =
-    let fun_ = by_mpath path env in
+    let fun_ = (by_path path env).sp_target in
     let adds =
       List.fold_left
         (fun memenv (x, ty) -> EcMemory.bind x ty memenv)
@@ -1021,7 +1031,7 @@ module Mod = struct
 
   let by_mpath (p : EcPath.mpath) (env : env) =
     let x = by_path (EcPath.path_of_mpath p) env in
-    unsuspend EcSubst.subst_module x (EcPath.args_of_mpath p)
+      unsuspend EcSubst.subst_module x (EcPath.args_of_mpath p)
 
   let by_mpath_opt (p : EcPath.mpath) (env : env) =
     try_lf (fun () -> by_mpath p env)
@@ -1037,6 +1047,13 @@ module Mod = struct
 
   let lookup_path name env =
     fst (lookup name env)
+
+  let sp_lookup name (env : env) =
+    let (p, x) = MC.lookup Px.for_module name env in
+      (p, x)
+
+  let sp_lookup_opt name env =
+    try_lf (fun () -> sp_lookup name env)
 
   let bind name me env =
     assert (me.me_name = name);

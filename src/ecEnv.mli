@@ -162,6 +162,8 @@ module Memory : sig
   val lookup  : symbol -> env -> actmem option
   val current : env -> (memory * actmem) option
   val push    : actmem -> env -> env
+
+  val push_concrete : mpath -> memenv -> env -> env
 end
 
 (* -------------------------------------------------------------------- *)
@@ -176,8 +178,11 @@ module Fun : sig
   val lookup_opt  : qsymbol -> env -> (mpath * t) option
   val lookup_path : qsymbol -> env -> mpath
 
-  val memenv     : hasres:bool -> memory -> EcPath.mpath -> env -> memenv
-  val memenv_opt : hasres:bool -> memory -> EcPath.mpath -> env -> memenv option
+  val sp_lookup     : qsymbol -> env -> (path * t suspension)
+  val sp_lookup_opt : qsymbol -> env -> (path * t suspension) option
+
+  val memenv     : hasres:bool -> memory -> EcPath.path -> env -> memenv
+  val memenv_opt : hasres:bool -> memory -> EcPath.path -> env -> memenv option
 
   val add : EcPath.mpath -> env -> env
 end
@@ -237,6 +242,9 @@ module Mod : sig
   val lookup      : qsymbol -> env -> mpath * t
   val lookup_opt  : qsymbol -> env -> (mpath * t) option
   val lookup_path : qsymbol -> env -> mpath
+
+  val sp_lookup     : qsymbol -> env -> mpath * t suspension
+  val sp_lookup_opt : qsymbol -> env -> (mpath * t suspension) option
 
   val add  : EcPath.mpath -> env -> env
   val bind : symbol -> module_expr -> env -> env

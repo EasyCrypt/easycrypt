@@ -6,4 +6,5 @@ module G = {
   }
 }.
 
-lemma L : Pr[f(0, 0) @ G, {m} : x = y] = 0.
+lemma L : Pr[f(0, 0) @ G, {m} : x = y] = Pr[f(0, 0) @ G, {m} : x = y].
+

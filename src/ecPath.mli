@@ -56,14 +56,14 @@ module Sp : Mp.Set with type elt = path
 
 (* -------------------------------------------------------------------- *)
 type path_kind =
-  | PKmodule
-  | PKother
+| PKmodule
+| PKother
 
 type mpath = private {
-    m_path : path;
-    m_kind : path_kind list; 
-    m_args : mpath list list;
-    m_tag  : int;
+  m_path : path;
+  m_kind : path_kind list; 
+  m_args : mpath list list;
+  m_tag  : int;
 }
 
 (* -------------------------------------------------------------------- *)

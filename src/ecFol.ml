@@ -53,7 +53,7 @@ and f_node =
   | FequivF of form * (EcPath.mpath * EcPath.mpath) * form
   | FequivS of form * (EcMemory.memenv * stmt) EcUtils.double * form
 
-  | Fpr     of memory * EcPath.mpath * form list * (EcIdent.t * ty) * form (* $post *)
+  | Fpr of memory * EcPath.mpath * form list * (EcIdent.t * ty) * form
 
 (* -------------------------------------------------------------------- *)
 let fv f = f.f_fv 
@@ -125,15 +125,25 @@ module Hsform = Why3.Hashcons.Make (struct
     | Ftuple args1, Ftuple args2 ->
         List.all2 f_equal args1 args2
 
-    | Fhoare (mem1, pre1, s1, post1), Fhoare (mem2,pre2, s2, post2) ->
-      (* FIXME: mem1, mem2 *)
-        f_equal pre1 pre2
+    | Fhoare (mem1, pre1, s1, post1), Fhoare (mem2, pre2, s2, post2) ->
+           (* FIXME: mem1, mem2 *)
+           f_equal pre1 pre2
         && f_equal post1 post2
         && EcModules.fd_equal s1 s2
 
+    | Fpr (m1, mp1, args1, (x1, ty1), ev1),
+      Fpr (m2, mp2, args2, (x2, ty2), ev2) ->
+
+           EcIdent.id_equal m1  m2
+        && EcPath.m_equal   mp1 mp2
+        && EcIdent.id_equal x1  x2
+        && EcTypes.ty_equal ty1 ty2
+        && f_equal          ev1 ev2
+        && (List.all2 f_equal args1 args2)
+
     | _, _ -> false
 
-  let hash f = 
+  let hash f =
     match f.f_node with 
     | Fquant(q, b, f) ->
         Why3.Hashcons.combine2 (f_hash f) (b_hash b) (qt_hash q)
@@ -160,10 +170,20 @@ module Hsform = Why3.Hashcons.Make (struct
     | Ftuple args ->
         Why3.Hashcons.combine_list f_hash 0 args
 
-    | Fhoare(m, p, s, q) ->
+    | Fhoare (m, p, s, q) ->
       (* FIXME: m *)
         Why3.Hashcons.combine2
           (f_hash p) (f_hash q) (EcModules.fd_hash s)
+
+    | Fpr (m, mp, args, (x, ty), ev) ->
+        let id =
+          Why3.Hashcons.combine3
+            (EcPath.m_hash   mp)
+            (EcIdent.id_hash x )
+            (EcTypes.ty_hash ty)
+            (f_hash          ev)
+        in
+          Why3.Hashcons.combine_list f_hash id args
 
   let tag n f = { f with f_tag = n }
 end)
@@ -183,9 +203,13 @@ let fv_node = function
   | Fapp(f,args) ->
       List.fold_left (fun s f -> Sid.union s (fv f)) (fv f) args
   | Ftuple args ->
-      List.fold_left (fun s f -> Sid.union s (fv f)) Sid.empty args 
+      List.fold_left (fun s f -> Sid.union s (fv f)) Sid.empty args
   | Fhoare (_,pre,_,post) ->
       Sid.union (fv pre) (fv post)
+  | Fpr (_,_,args,_,event) ->
+      List.fold_left
+        (fun s f -> Sid.union s (fv f))
+        (fv event) args
 
 (* -------------------------------------------------------------------- *)
 let mk_form node ty =  Hsform.hashcons 
@@ -351,6 +375,7 @@ let map gt g f =
     | Fapp(e, es) -> f_app (g e) (List.map g es) (gt f.f_ty)
     | Ftuple es -> f_tuple (List.map g es)
     | Fhoare(m,p,s,q) -> f_hoare m (g p) s (g q)
+    | Fpr(m,mp,args,(x,ty),ev) -> f_pr m mp (List.map g args) (x, gt ty) (g ev)
 
 (* -------------------------------------------------------------------- *)
 module Fsubst = struct

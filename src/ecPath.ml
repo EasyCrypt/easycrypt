@@ -16,16 +16,15 @@ and path_node =
 | Pqname  of path * symbol
 
 type path_kind =
-  | PKmodule
-  | PKother
+| PKmodule
+| PKother
 
 type mpath = {
-    m_path : path;
-    m_kind : path_kind list; 
-    m_args : mpath list list;
-    m_tag  : int;
+  m_path : path;
+  m_kind : path_kind list; 
+  m_args : mpath list list;
+  m_tag  : int;
 }
-
 
 type proot = [ `Symbol of symbol | `Ident of EcIdent.t ]
 

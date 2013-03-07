@@ -1021,6 +1021,46 @@ and translvalue ue (env : EcEnv.env) lvalue =
           tyerror x.pl_loc (UnknownOperatorForSig (name, esig))
 
 (* -------------------------------------------------------------------- *)
+let rec trans_msymbol (env : EcEnv.env) (msymb : pmsymbol) =
+  let mod_qname =
+    match List.rev_map fst msymb with
+    | [] -> assert false
+    | x :: qn ->
+        { pl_desc = (List.rev_map unloc qn, unloc x);
+          pl_loc  = x.pl_loc; }
+  and mod_args = List.rev_map snd msymb in
+
+  let (mod_path, mod_expr) =
+    match EcEnv.Mod.sp_lookup_opt mod_qname.pl_desc env with
+    | None ->
+        tyerror mod_qname.pl_loc
+          (UnknownModName mod_qname.pl_desc)
+    | Some me -> me in
+
+  let mod_expr   = mod_expr.EcEnv.sp_target
+  and mod_params =
+       mod_expr.EcEnv.sp_target.me_sig.mt_params
+    :: (List.tl (List.rev mod_expr.EcEnv.sp_params))
+  in
+
+  let mod_args =
+    List.map
+      (fun (_, args) ->
+        List.map
+          (fun { pl_desc = arg } -> trans_msymbol env msymb)
+          args)
+      msymb
+  in
+
+    List.iter2
+      (fun param arg -> ())
+      mod_params mod_args;
+    EcPath.mpath
+      mod_path.EcPath.m_path
+      mod_path.EcPath.m_kind
+      mod_args
+
+(* -------------------------------------------------------------------- *)
 let transfpattern env ue (p : EcParsetree.lpattern) =
   match transpattern1 env ue p with
   | LSymbol x, ty ->
@@ -1108,8 +1148,46 @@ let transform env ue pf tt =
         unify_error env ue pf.pl_loc f.f_ty tbool;
         f_exists xs f
 
-    (* FIXME *) 
-    | PFprob _ -> f_int 0
+    | PFprob (gp, args, m, event) ->
+        let modsymb = List.map (unloc -| fst) (fst (unloc gp))
+        and funsymb = unloc (snd (unloc gp)) in
+        let _, fun_ =
+          match EcEnv.Fun.sp_lookup_opt (modsymb, funsymb) env with
+          | None -> tyerror gp.pl_loc (UnknownFunction (modsymb, funsymb))
+          | Some (p, me) -> (p, me) in
+        let fsig = fun_.EcEnv.sp_target.f_sig.fs_sig in
+
+        if List.length args <> List.length (fst fsig) then
+          tyerror f.pl_loc ApplInvalidArity;
+
+        let args =
+          let doit1 arg (_, aty) =
+            let aout = transf env arg in
+              unify_error env ue arg.pl_loc aout.f_ty aty;
+              aout
+          in
+            List.map2 doit1 args (fst fsig)
+        in
+
+        let fpath = trans_msymbol env (fst (unloc gp)) in
+        let fpath = EcPath.mqname fpath EcPath.PKother funsymb [] in
+
+        let memid  = EcIdent.create (unloc m) in
+        let memenv =
+          EcEnv.Fun.memenv ~hasres:true memid
+            (EcPath.path_of_mpath fpath) env
+        in
+
+        let event =
+          let env =
+            EcEnv.Memory.set_active memid
+              (EcEnv.Memory.push_concrete fpath memenv env)
+          in
+            transf env event
+        in
+
+        let resty = snd fun_.EcEnv.sp_target.f_sig.fs_sig in
+          f_pr memid fpath args (EcIdent.create "$res", resty) event
 
     (* test *)
     | PFhoare (pre,body,post) ->
