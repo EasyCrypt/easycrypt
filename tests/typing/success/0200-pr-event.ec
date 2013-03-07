@@ -1,4 +1,7 @@
 require import int.
+require import real.
+
+cnst c : real.
 
 module G = {
   fun f(x : int, y : int) : int = {
@@ -6,5 +9,4 @@ module G = {
   }
 }.
 
-lemma L : Pr[f(0, 0) @ G, {m} : x = y] = Pr[f(0, 0) @ G, {m} : x = y].
-
+lemma L : forall {m}, Pr[f(0, 0) @ G, {m} : x = y] = c.

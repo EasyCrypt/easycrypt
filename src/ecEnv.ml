@@ -660,9 +660,9 @@ module Memory = struct
         memories
     in
       match memories with
-      | []  -> None
-      | [m] -> Some m
-      | _   -> assert false
+      | []     -> None
+      | m :: _ -> Some m
+      | _      -> assert false
 
   let lookup (me : symbol) (env : env) =
     MMsym.last me env.env_memories
@@ -689,8 +689,18 @@ module Memory = struct
     in
       { env with env_memories = maps }
 
-  let push_concrete mpath memenv env =
-    push (AMConcrete (mpath, memenv)) env
+  let concretize mpath memenv env =
+    let id = EcMemory.memory memenv in
+
+    match byid id env with
+    | None ->  raise (MEError (UnknownMemory (`Memory id)))
+    | Some (AMConcrete _) -> failwith "memory-is-already-concrete"
+
+    | Some (AMAbstract _) ->
+        { env with
+            env_memories =
+              MMsym.add (EcIdent.name id) (AMConcrete (mpath, memenv))
+                env.env_memories }
 end
 
 (* -------------------------------------------------------------------- *)

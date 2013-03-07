@@ -163,7 +163,7 @@ module Memory : sig
   val current : env -> (memory * actmem) option
   val push    : actmem -> env -> env
 
-  val push_concrete : mpath -> memenv -> env -> env
+  val concretize : mpath -> memenv -> env -> env
 end
 
 (* -------------------------------------------------------------------- *)

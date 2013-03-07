@@ -28,6 +28,7 @@ type tyerror =
   | UnknownTypeName          of qsymbol
   | UnknownTyModName         of qsymbol
   | UnknownMemory            of symbol
+  | AbstractMemoryWanted     of symbol
   | UnknownModName           of qsymbol
   | UnknownOperatorForSig    of qsymbol * ty list
   | InvalidNumberOfTypeArgs  of qsymbol * int * int
@@ -70,6 +71,9 @@ let pp_typerror fmt = function
 
     | UnknownMemory name
         -> Format.fprintf fmt "Unknown memory name: %a" pp_symbol name
+
+    | AbstractMemoryWanted name
+        -> Format.fprintf fmt "This memory should be abstract: %a" pp_symbol name
 
     | UnknownOperatorForSig (name, tys)
         -> Format.fprintf fmt "Cannot find operator %a with signature %a" 
@@ -1172,7 +1176,18 @@ let transform env ue pf tt =
         let fpath = trans_msymbol env (fst (unloc gp)) in
         let fpath = EcPath.mqname fpath EcPath.PKother funsymb [] in
 
-        let memid  = EcIdent.create (unloc m) in
+        let memid =
+          match EcEnv.Memory.lookup (unloc m) env with
+          | None ->
+              tyerror m.pl_loc (UnknownMemory (unloc m))
+
+          | Some (EcEnv.AMConcrete _) ->
+              tyerror m.pl_loc (AbstractMemoryWanted (unloc m))
+
+          | Some (EcEnv.AMAbstract mid) ->
+              mid
+        in
+
         let memenv =
           EcEnv.Fun.memenv ~hasres:true memid
             (EcPath.path_of_mpath fpath) env
@@ -1181,7 +1196,7 @@ let transform env ue pf tt =
         let event =
           let env =
             EcEnv.Memory.set_active memid
-              (EcEnv.Memory.push_concrete fpath memenv env)
+              (EcEnv.Memory.concretize fpath memenv env)
           in
             transf env event
         in
