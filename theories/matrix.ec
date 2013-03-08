@@ -25,6 +25,7 @@ axiom extentionality: forall (M0 M1:'a matrix),
 op new: (int * int) -> 'a matrix.
 
 axiom new_size: forall m n,
+  0 <= m => 0 <= n =>
   size (new<:'a> (m,n)) = (m,n).
 
 op __set: ('a matrix,(int * int),'a) -> 'a matrix.
