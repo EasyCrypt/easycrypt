@@ -232,6 +232,7 @@ and ptactic_r =
   | Pseq        of ptactics
   | PPhl        of phl_tactics
   | Padmit
+  | Pcut        of (psymbol * pformula)
 
 and phl_tactics = 
   | Papp        of (int * pformula)

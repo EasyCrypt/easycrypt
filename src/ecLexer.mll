@@ -54,6 +54,7 @@
     "apply"       , APPLY      ;        (* KW: tactic *)
     "trivial"     , TRIVIAL    ;        (* KW: tactic *)
     "admit"       , ADMIT      ;        (* KW: dangerous *)
+    "cut"         , CUT      ;        (* KW: tactic *)
 
     (* PHL: tactics *)
     "app"         , APP        ;        (* KW: tactic *)

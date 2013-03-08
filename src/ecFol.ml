@@ -486,6 +486,8 @@ type rule_name =
   | RN_exists_E 
     (* E;G |- exists x:t, P  E;G |- forall x:t, P => C   ===> E;G |- C *)
 
+  | RN_cut of form
+
   (* H rules *)
   | RN_app of (int * form)
   | RN_wp of int

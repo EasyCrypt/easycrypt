@@ -89,6 +89,7 @@
 // %token ABSTRACT
 %token UNDERSCORE
 %token ADMIT
+%token CUT
 // %token ADVERSARY
 %token ARROW
 %token AS
@@ -1100,6 +1101,8 @@ tactic:
 | WP  n=number                  { PPhl( Pwp n) }
 | SKIP                          { PPhl(Pskip) }
 | ADMIT                         { Padmit }
+| CUT n=ident COLON p=loc(sform)
+                                { Pcut (n,p) }
 ;
 
 tactics:

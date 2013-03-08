@@ -711,6 +711,10 @@ module Tactic = struct
     let rule = { EcBaseLogic.pr_name = RN_prover (); pr_hyps = [] } in
     upd_rule_done g rule
 
+  let process_cut name env phi g = 
+    let phi = process_formula env g phi in
+    t_cut (unloc name) phi g
+
   let rec process_logic_tacs scope env (tacs:ptactics) (gs:goals) : goals = 
     match tacs with
     | [] -> gs
@@ -740,7 +744,8 @@ module Tactic = struct
       | Pseq tacs      -> 
           fun (juc,n) -> process_logic_tacs scope env tacs (juc,[n])
       | Psubgoal _     -> assert false 
-     
+
+      | Pcut (name,phi)-> process_cut name env phi
       | Padmit         -> process_admit
       | PPhl tac       -> process_phl process_formula tac loc env 
     in

@@ -176,6 +176,8 @@ type rule_name =
   | RN_imp_E
   | RN_forall_E of form
   | RN_exists_E
+  | RN_cut of form
+
   | RN_app of (int * form)
   | RN_wp of int
   | RN_skip

@@ -251,6 +251,14 @@ let t_exists_elim ff (juc,n as g) =
   let rule = { pr_name = RN_exists_E; pr_hyps = [n1;n2] } in
   upd_rule (juc,n) rule
 
+let t_cut name phi (juc,n as g) =
+  let hyps,concl = get_goal g in
+  let juc, n1 = new_goal juc (hyps, phi) in
+  let hyp = LD_hyp phi in
+  let juc, n2 = new_goal juc (LDecl.add_local (create name) hyp hyps, concl) in
+  let rule = { pr_name = RN_cut phi; pr_hyps = [n1;n2] } in
+  upd_rule (juc,n) rule
+
 let find_in_hyps env f hyps = 
   let test k = 
     try 
