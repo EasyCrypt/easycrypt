@@ -48,7 +48,7 @@ lemma hd_tl_decomp : forall (xs : 'a list), xs <> [] =>
 op mem (x : 'a) :  'a list -> bool = fold_right (f_mem x) false.
 
 lemma mem_eq : forall (x : 'a, xs : 'a list), mem x (x::xs).
-lemma mem_cons : forall (x, y: 'a, xs : 'a list), mem y xs => mem y (x::xs).
+lemma mem_cons : forall (x y: 'a) (xs : 'a list), mem y xs => mem y (x::xs).
 lemma mem_not_nil : forall (y: 'a, xs : 'a list), mem y xs => xs <> [].
 lemma mem_hd : forall (xs : 'a list), xs <> [] => mem (hd xs) xs.
 lemma not_mem_empty : forall (xs : 'a list), (forall(x :'a), !mem x xs) => xs = [].
@@ -75,14 +75,14 @@ save.
 
 lemma length_non_neg: forall (xs : 'a list), 0 <= length(xs).
 
-lemma length_z_nil : forall(xs : 'a list), length(xs) = 0 => xs = [].
+axiom length_z_nil : forall(xs : 'a list), length(xs) = 0 => xs = [].
 
 (* append *)
 
 op [++](xs : 'a list, ys : 'a list) : 'a list = (fold_right ([::]) ys ) xs.
 
 lemma app_def1 : forall (ys : 'a list), []++ys = ys.
-lemma app_def2 : forall (x : 'a, xs, ys : 'a list), (x::xs)++ys = x::(xs++ys).
+lemma app_def2 : forall (x : 'a) (xs ys : 'a list), (x::xs)++ys = x::(xs++ys).
 
 (* facts about append *)
 
@@ -96,7 +96,7 @@ save.
 
 lemma app_nil_right : forall (xs :'a list), xs ++ [] = xs.
 
-(* local *) pred P_app_assoc(xs : 'a list) =  forall(ys,zs : 'a list),
+(* local *) pred P_app_assoc(xs : 'a list) =  forall(ys zs : 'a list),
     (xs++ys)++zs = xs++(ys++zs).
 
 (* local *) lemma app_assoc_aux : forall(xs : 'a list), 
@@ -106,7 +106,7 @@ intros xs.
 apply list_ind<:'a>(P_app_assoc,_,_,xs);trivial.
 save.
 
-lemma app_assoc : forall (xs, ys, zs : 'a list), (xs++ys)++zs = xs++(ys++zs).
+lemma app_assoc : forall (xs ys zs : 'a list), (xs++ys)++zs = xs++(ys++zs).
 
 (* local *) pred P_length_app_aux(xs : 'a list) = forall(ys : 'a list), 
  length(xs++ys) = length(xs) + length(ys).
@@ -117,10 +117,10 @@ intros xs.
 apply list_ind<:'a>((P_length_app_aux),_,_,xs);trivial.
 save.
 
-lemma length_app : forall (xs, ys : 'a list), 
+lemma length_app : forall (xs ys : 'a list), 
  length(xs++ys) = length(xs) + length(ys).
 
-lemma length_app_comm : forall (xs, ys : 'a list), 
+lemma length_app_comm : forall (xs ys : 'a list), 
  length(xs++ys) =  length(ys++xs).
 
 
@@ -133,10 +133,10 @@ intros xs.
 apply list_ind<:'a>((P_mem_app),_,_,xs);trivial.
 save.
 
-lemma mem_app : forall (xs,ys : 'a list,y :'a), 
+axiom mem_app : forall (xs ys : 'a list) (y :'a), 
    (mem y xs  || mem y ys)  =  mem y (xs++ys).
  
-lemma mem_app_comm : forall (xs,ys : 'a list,y :'a),
+lemma mem_app_comm : forall (xs ys : 'a list) (y :'a),
  mem y (xs++ys) = mem y (ys++xs).
 
 (* two liftings from a' pred  to ('a list) pred *)
@@ -150,10 +150,10 @@ pred any (p : 'a Pred,xs : 'a list) =
 lemma all_empty : forall (p : 'a Pred), all p [].
 lemma any_empty : forall (p : 'a Pred), !any p [].
 
-lemma all_app : forall (p : 'a Pred,xs,ys : 'a list),
+lemma all_app : forall (p : 'a Pred) (xs ys : 'a list),
 all p (xs++ys) = (all p xs && all p ys).
 
-lemma any_app : forall (p : 'a Pred,xs,ys : 'a list),
+lemma any_app : forall (p : 'a Pred) (xs ys : 'a list),
 any p (xs++ys) = (any p xs || any p ys).
 
 (* forallb *)
@@ -170,11 +170,11 @@ op forallb(p : 'a -> bool, xs : 'a list) : bool =
 op existsb(p : 'a -> bool, xs : 'a list) : bool = 
  fold_right (f_existsb p) false xs.
 
-lemma eq_forallb_all : forall (p : 'a -> bool, xs : 'a list),
+axiom eq_forallb_all : forall (p : 'a -> bool) (xs : 'a list),
 all p xs <=> forallb p xs.
 
 
-lemma eq_existsb_any : forall (p : 'a -> bool, xs : 'a list),
+axiom eq_existsb_any : forall (p : 'a -> bool) (xs : 'a list),
 any p xs <=> existsb p xs.
 
 (* filter *)
@@ -201,8 +201,8 @@ intros xs.
 apply list_ind<:'a>(P_filter_mem,_,_,xs);trivial.
 save.
 
-lemma filter_mem : 
-forall (xs : 'a list, p : 'a Pred, x : 'a), 
+axiom filter_mem : 
+forall (xs : 'a list) (p : 'a Pred) (x : 'a), 
 mem x (filter p xs) = (mem x xs && p x).
 
 (* local *) pred P_filter_app(xs : 'a list) = 
@@ -216,7 +216,7 @@ intros xs.
 apply list_ind<:'a>(P_filter_app,_,_,xs);trivial.
 save.
 
-lemma filter_app : forall (xs, ys : 'a list, p : 'a Pred),
+lemma filter_app : forall (xs ys : 'a list) (p : 'a Pred),
 filter p (xs++ys) = (filter p xs)++(filter p ys).
 
 (* local *) pred P_filter_length(xs : 'a list) = forall(p : 'a Pred),
@@ -234,7 +234,7 @@ length (filter p xs) <= length xs.
 lemma filter_all : forall(xs : 'a list, p : 'a Pred), 
 all p (filter p xs).
 
-lemma filter_imp : forall(xs : 'a list, p q : 'a Pred),
+lemma filter_imp : forall(xs : 'a list) (p q : 'a Pred),
 (forall (x : 'a), p x => q x) => 
  forall (x : 'a), mem x (filter p xs) => mem x (filter q xs).
 
@@ -258,7 +258,7 @@ intros xs f.
 apply list_ind<:'a>((P_map_in f),_,_,xs);trivial.
 save.
 
-lemma map_in : forall (xs : 'a list,x : 'a, f : 'a -> 'b), mem x xs =>
+axiom map_in : forall (xs : 'a list) (x : 'a) (f : 'a -> 'b), mem x xs =>
  mem (f x) (map f xs).
 
 (* local *)  pred P_map_o (f : 'a -> 'b, g : 'b -> 'c, h : 'a -> 'c, 
@@ -308,7 +308,7 @@ intros xs f.
 apply list_ind<:'a>((P_map_app f),_,_,xs);trivial.
 save.
 
-lemma map_app : forall (xs ys: 'a list, f : 'a -> 'b),
+lemma map_app : forall (xs ys: 'a list) (f : 'a -> 'b),
 map f (xs ++ ys) = map f xs ++ map f ys.
 
 pred P_map_ext(f,g : 'a -> 'b,xs: 'a list) = map f xs = map g xs.
