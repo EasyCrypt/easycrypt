@@ -44,8 +44,6 @@ and f_node =
   | Fapp    of form * form list                  (* application *)
   | Ftuple  of form list                         (* tuple constructor   *)
 
-  | Fhoare  of EcMemory.memenv * form * EcModules.function_def * form
-
   | FhoareF of form * EcPath.mpath * form  (* $pre / $post *)
   | FhoareS of EcMemory.memenv * form * stmt * form (* $hr / $hr *)
 
@@ -141,11 +139,11 @@ module Hsform = Why3.Hashcons.Make (struct
         && f_equal          ev1 ev2
         && (List.all2 f_equal args1 args2)
 
-    | Fhoare (_mem1, pre1, s1, post1), Fhoare (_mem2, pre2, s2, post2) ->
+    | FhoareS (_mem1, pre1, s1, post1), FhoareS (_mem2, pre2, s2, post2) ->
            (* FIXME: mem1, mem2 *)
            f_equal pre1 pre2
         && f_equal post1 post2
-        && EcModules.fd_equal s1 s2
+        && EcModules.s_equal s1 s2
 
     | _, _ -> false
 
@@ -195,10 +193,10 @@ module Hsform = Why3.Hashcons.Make (struct
         in
           Why3.Hashcons.combine_list f_hash id args
 
-    | Fhoare (_m, p, s, q) ->
+    | FhoareS (_m, p, s, q) ->
       (* FIXME: m *)
         Why3.Hashcons.combine2
-          (f_hash p) (f_hash q) (EcModules.fd_hash s)
+          (f_hash p) (f_hash q) (EcModules.s_hash s)
 
   let tag n f = { f with f_tag = n }
 end)
@@ -227,7 +225,7 @@ let fv_node = function
       Sid.union (fv pre) (fv post)
   | FequivF (pre,_,post) ->
       Sid.union (fv pre) (fv post)
-  | Fhoare (_,pre,_,post) ->
+  | FhoareS (_,pre,_,post) ->
       Sid.union (fv pre) (fv post)
 
 (* -------------------------------------------------------------------- *)
@@ -299,11 +297,28 @@ let f_quant q b f =
 let f_exists b f = f_quant Lexists b f 
 let f_forall b f = f_quant Lforall b f
 
-let f_hoare mem pre s post = mk_form (Fhoare(mem,pre,s,post)) ty_bool
+let f_hoare mem pre s post = mk_form (FhoareS(mem,pre,s,post)) ty_bool
 
 let f_hoareF pre f post = mk_form (FhoareF(pre,f,post)) ty_bool
 let f_equivF pre f1 f2 post = mk_form (FequivF(pre,(f1,f2),post)) ty_bool
 let f_pr m f args res e = mk_form (Fpr(m,f,args,res,e)) ty_real
+
+
+
+let fop_int_leq = f_op EcCoreLib.p_leq [] (tfun tint (tfun tint ty_bool))
+let f_int_leq f1 f2 = 
+  if ty_equal f1.f_ty tint then 
+    f_app fop_int_leq [f1;f2] ty_bool
+  else 
+    assert false (* FIXME *)
+
+let fop_int_lt = f_op EcCoreLib.p_lt [] (tfun tint (tfun tint ty_bool))
+let f_int_lt f1 f2 = 
+  if ty_equal f1.f_ty tint then 
+    f_app fop_int_lt [f1;f2] ty_bool
+  else 
+    assert false (* FIXME *)
+
 
 (* -------------------------------------------------------------------- *)
 type destr_error =
@@ -396,7 +411,7 @@ let map gt g f =
     | FhoareF(pre,mp,post) -> f_hoareF (g pre) mp (g post)
     | FequivF(pre,(mp1,mp2),post) -> f_equivF (g pre) mp1 mp2 (g post)
     | Fpr(m,mp,args,(x,ty),ev) -> f_pr m mp (List.map g args) (x, gt ty) (g ev)
-    | Fhoare(m,p,s,q) -> f_hoare m (g p) s (g q)
+    | FhoareS _ -> assert false (* f_hoare m (g p) s (g q) *)
 
 (* -------------------------------------------------------------------- *)
 module Fsubst = struct
@@ -492,6 +507,7 @@ type rule_name =
   | RN_app of (int * form)
   | RN_wp of int
   | RN_skip
+  | RN_while of form * form * form
 
 type rule = (rule_name, l_decl) EcBaseLogic.rule
 type judgment = (rule_name, l_decl) EcBaseLogic.judgment
@@ -634,7 +650,7 @@ module Lvar = struct
 
 end
 
-module LVmap = Map.Make(Lvar)
+module LVmap = Map.Make(Lvar )
 
 
 
@@ -676,8 +692,8 @@ module Subst = struct
     let flvar_form = flvar_form f_pvar f_local in
     match fm.f_node with
     | Fint _ | Fop _ -> LVset.empty
-    | Fpvar (pv,mem) -> f_pvar pv mem
-    | Flocal id -> f_local id
+    | Fpvar (pv,mem) -> f_pvar pv mem 
+    | Flocal id -> f_local id 
     | Fquant(_,bds,f) -> 
       List.fold_left (fun s (id,_) -> LVset.remove (Lvar.mk_local id) s) (flvar_form f) bds
     | Fif(f1,f2,f3) -> 
@@ -693,15 +709,24 @@ module Subst = struct
       List.fold_left (fun s f -> LVset.union s (flvar_form f)) LVset.empty args 
     (* FIXME: ignoring program variables *)
     (* this pattern should never occur with a stratified formula-type *)
-    | Fhoare (_mem,pre,_,post) -> LVset.union (flvar_form pre) (flvar_form post)
-      
-  let fpvar_form = 
-    flvar_form (fun pv mem -> LVset.singleton (Lvar.mk_pvar pv mem)) (fun _ -> LVset.empty)
-  let flocal_form = flvar_form (fun _ _ -> LVset.empty) (fun id -> LVset.singleton (Lvar.mk_local id))
+    | FhoareS (_mem,pre,_,post) -> LVset.union (flvar_form pre) (flvar_form post)
 
-  let flvar_form = flvar_form (fun pv mem -> LVset.singleton (Lvar.mk_pvar pv mem))
+  let fpvar_form = flvar_form 
+    (fun pv mem -> LVset.singleton (Lvar.mk_pvar pv mem)) 
+    (fun _ -> LVset.empty)
+
+  let flocal_form = flvar_form 
+    (fun _ _ -> LVset.empty) 
     (fun id -> LVset.singleton (Lvar.mk_local id))
 
+  let flvar_form = flvar_form 
+    (fun pv mem -> LVset.singleton (Lvar.mk_pvar pv mem)) 
+    (fun id -> LVset.singleton (Lvar.mk_local id))
+
+
+
+
+      
   let rec subst_form subst fm = match fm.f_node with
     | Fquant (qt, bds, fm) ->
       let subst' =
@@ -734,7 +759,7 @@ module Subst = struct
 
     | Fop _ | Fint _ -> fm
 
-    | Fhoare _ -> assert false
+    | FhoareS _ -> assert false
 
   and alpha_renaming bds fm subst' =
     let fv_in_fm = flvar_form fm in
@@ -761,7 +786,44 @@ module Subst = struct
 
 end
 
+
 (* ENDOF SUBST_FORM *)
+
+module Pvar = struct
+  type t = EcTypes.prog_var * EcMemory.memory * ty
+
+  let mk_pvar pv mem ty = (pv,mem,ty)
+
+  let compare lv1 lv2 = compare lv1 lv2
+
+
+end
+
+module PVset = Set.Make(Pvar)
+
+
+
+
+
+
+let rec free_pvar  fm = 
+  match fm.f_node with
+    | Fint _ | Fop _ -> PVset.empty
+    | Fpvar (pv,mem) -> PVset.singleton (pv,mem,fm.f_ty) 
+    | Flocal _ -> PVset.empty
+    | Fquant(_,_,f) -> free_pvar f
+    | Fif(f1,f2,f3) -> 
+      PVset.union (free_pvar f1) (PVset.union (free_pvar f2) (free_pvar f3))
+    | Flet(_, f1, f2) ->
+      PVset.union (free_pvar f1) (free_pvar f2)
+    | Fapp(f,args) ->
+      List.fold_left (fun s f -> PVset.union s (free_pvar f)) (free_pvar f) args
+    | Ftuple args ->
+      List.fold_left (fun s f -> PVset.union s (free_pvar f)) PVset.empty args 
+    | FhoareS (_,pre,_,post) -> PVset.union (free_pvar pre) (free_pvar post)
+
+
+
 
 let rec form_of_exp mem (e: EcTypes.tyexpr) = 
   let ty = EcTypes.type_of_exp e in 
@@ -776,3 +838,37 @@ let rec form_of_exp mem (e: EcTypes.tyexpr) =
     | EcTypes.Etuple es -> f_tuple (List.map (form_of_exp mem) es)
     | EcTypes.Eif (e1,e2,e3) -> 
       f_if (form_of_exp mem e1) (form_of_exp mem e2) (form_of_exp mem e3)
+
+
+
+
+let let_form lvs e phi =
+  match e.f_node with 
+    | Ftuple es when List.length lvs = List.length es 
+                && List.for_all (fun (lv,_ty) -> not (LVset.mem lv (Subst.fpvar_form e))) lvs
+                ->
+      let f phi ((lv,_t),e) =
+        Subst.subst_form (Subst.single_subst lv e) phi
+      in
+      List.fold_left f phi (List.combine lvs es)
+    | _ -> 
+      let f (n,bds,phi) (lv,ty) =
+        match lv with
+          | Lvar.Fpvar (pv,mem) -> 
+            let local = EcIdent.create ("x"^(string_of_int n)) in
+            let phi = Subst.subst_form 
+              (Subst.single_subst (Lvar.mk_pvar pv mem) (f_local local ty)) phi in
+            (n+1,local::bds,phi)
+          | Lvar.Flocal _ -> assert false (* FIXME *)
+      in
+      let _,bds,phi = List.fold_left f (0,[],phi) lvs in
+      f_let (LTuple (List.rev bds)) e phi
+
+
+
+
+
+
+
+
+

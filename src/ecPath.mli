@@ -67,6 +67,9 @@ type mpath = private {
   m_tag  : int;
 }
 
+val name_path : path -> symbol (* ? *)
+val name_mpath : mpath -> symbol (* ? *)
+
 (* -------------------------------------------------------------------- *)
 val mpath   : path -> path_kind list -> mpath list list -> mpath
 val mident  : EcIdent.t -> mpath

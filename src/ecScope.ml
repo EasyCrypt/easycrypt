@@ -747,7 +747,7 @@ module Tactic = struct
 
       | Pcut (name,phi)-> process_cut name env phi
       | Padmit         -> process_admit
-      | PPhl tac       -> process_phl process_formula tac loc env 
+      | PPhl tac       -> process_phl (process_form env) tac loc
     in
     set_loc loc tac g
 

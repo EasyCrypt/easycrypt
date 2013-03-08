@@ -1257,22 +1257,16 @@ let transform env ue pf tt =
 
           f_equivF pre fpath1 fpath2 post
 
-    (* test *)
-    | PFhoare (pre,body,post) ->
-      (* Cesar says: what should I assume about local variables in pre/post? *)
-      let known_ids = ref Mstr.empty in
-      let ue = UE.create (Some []) in (* I ignore this *)
-      (* FIXME: assuming no return statement, bad error message *)
-      let stmt, _re, locals, env = transbody known_ids ue env body tunit in
-(*
-      let env' = Fenv.mono_env env in
-      let env = {env' with Fenv.fe_locals=env.Fenv.fe_locals } in
-*)
-      let _pre = transf env pre in
-      let _post = transf env post in
-      let _f_def = {f_locals=locals; f_body=stmt; f_ret=None } in
-      (* f_hoare  pre f_def post *)
-      f_true (* missing memory *)      
+    (* | PFhoare (pre,body,post) -> *)
+    (*   (\* Cesar says: what should I assume about local variables in pre/post? *\) *)
+    (*   let known_ids = ref Mstr.empty in *)
+    (*   let ue = UE.create (Some []) in (\* I ignore this *\) *)
+    (*   (\* FIXME: assuming no return statement, bad error message *\) *)
+    (*   let stmt, _re, _locals, env = transbody known_ids ue env body tunit in *)
+    (*   let pre = transf env pre in *)
+    (*   let post = transf env post in *)
+    (*   let dummy_memory = EcMemory.dummy_memenv in *)
+    (*   f_hoare dummy_memory pre stmt post *)
 
   and trans_fbind env ue decl = 
     let trans1 env ({ pl_desc = x }, pgty) =

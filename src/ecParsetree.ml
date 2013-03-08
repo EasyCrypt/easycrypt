@@ -161,8 +161,6 @@ and pformula_r =
   | PFequivF of pformula * (pgamepath * pgamepath) * pformula
   | PFprob   of pgamepath * (pformula list) * pmemory * pformula
 
-  (* test *)
-  | PFhoare   of pformula * pfunction_body * pformula
 
 and pgtybinding  = psymbol * pgty
 and pgtybindings = pgtybinding list
@@ -238,6 +236,7 @@ and phl_tactics =
   | Papp        of (int * pformula)
   | Pwp         of int
   | Pskip
+  | Pwhile      of (pformula * pformula * pformula)
 and ptactics = ptactic list        
 
 (* -------------------------------------------------------------------- *)

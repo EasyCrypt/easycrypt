@@ -44,3 +44,7 @@ val p_ora        : path
 val p_imp        : path
 val p_iff        : path
 val p_eq         : path
+
+val p_leq        : path
+val p_lt         : path
+

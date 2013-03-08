@@ -382,8 +382,8 @@ and subst_form_node (s : subst) (f : f_node) =
   | Ftuple fs ->
       Ftuple (List.map (subst_form s) fs)
 
-  | Fhoare (mem, pre, body, post) ->
-    Fhoare (mem, subst_form s pre, subst_function_def s body, subst_form s post)
+  | FhoareS _ -> assert false
+    (* FhoareS (mem, subst_form s pre, subst_function_def s body, subst_form s post) *)
 
 (* -------------------------------------------------------------------- *)
 let subst_tydecl (s : subst) (tyd : tydecl) =

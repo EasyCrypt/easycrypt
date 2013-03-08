@@ -41,8 +41,6 @@ and f_node =
   | Fapp    of form * form list
   | Ftuple  of form list
 
-  | Fhoare  of memenv * form * EcModules.function_def * form
-
   | FhoareF of form * EcPath.mpath * form  (* $pre / $post *)
   | FhoareS of memenv * form * stmt * form (* $hr  / $hr   *)
 
@@ -78,7 +76,7 @@ val f_quant : quantif -> binding -> form -> form
 val f_exists : binding -> form -> form
 val f_forall : binding -> form -> form
 
-val f_hoare   : memenv -> form -> EcModules.function_def -> form -> form 
+val f_hoare   : memenv -> form -> EcModules.stmt -> form -> form 
 val f_hoareF  : form -> EcPath.mpath -> form -> form 
 val f_equivF  : form -> EcPath.mpath -> EcPath.mpath -> form -> form 
 val f_pr      : 
@@ -108,6 +106,11 @@ val f_iff : form -> form -> form
 
 val fop_eq : EcTypes.ty -> form
 val f_eq : form -> form -> form
+
+val f_int_leq : form -> form -> form
+
+val f_int_lt  : form -> form -> form
+
 
 (* -------------------------------------------------------------------- *)
 type destr_error =
@@ -181,6 +184,7 @@ type rule_name =
   | RN_app of (int * form)
   | RN_wp of int
   | RN_skip
+  | RN_while of form * form * form
 
 type rule     = (rule_name, l_decl) EcBaseLogic.rule
 type judgment = (rule_name, l_decl) EcBaseLogic.judgment
@@ -229,16 +233,32 @@ end
 
 (* -------------------------------------------------------------------- *)
 module LVmap : Map.S with type key =  Lvar.t
+module LVset : 
+  sig
+    include Set.S with type elt =  Lvar.t
+    val pvars : t -> (EcTypes.prog_var * EcMemory.memory) list
+  end
 
 (* -------------------------------------------------------------------- *)
-module Subst :
-sig
-  type t
 
-  val single_subst :  Lvar.t -> form -> t
-  val subst_form :  t -> form -> form
-  val add_subst : LVmap.key -> form -> t -> t
-  val empty_subst : t
+module Pvar : sig 
+  type t = EcTypes.prog_var * EcMemory.memory * ty
 end
+module PVset : Set.S with type elt = Pvar.t
+
+module Subst :
+  sig
+    type t
+    val single_subst :  Lvar.t -> form -> t
+    val subst_form :  t -> form -> form
+    val add_subst : LVmap.key -> form -> t -> t
+    val empty_subst : t
+    val fpvar_form : form -> LVset.t
+  end
+
+
+val free_pvar : form -> PVset.t 
 
 val form_of_exp : EcMemory.memory -> EcTypes.tyexpr -> form
+
+val let_form : (Lvar.t*ty) list -> form -> form -> form 

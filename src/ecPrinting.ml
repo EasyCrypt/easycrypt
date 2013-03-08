@@ -780,26 +780,19 @@ struct
       | Ftuple args ->
           pr_tuple_expr tenv pr_form args
             
-      | Fhoare(_,pre,def,post) -> 
-        (* copy pasted from pr_modfun, code repetition *)
-          let dlocals =
-            List.map
-              (fun (x, ty) -> pr_local tenv (EcIdent.create x) ty)
-              def.f_locals
-
-          and dbody =
-            let bodytenv =
-              List.fold_left
-                (fun tenv x -> M.add_local tenv (EcIdent.create x))
-                tenv
-                (List.map fst (def.f_locals))
-            in
-              List.map (pr_instr bodytenv) def.f_body.s_node
+      | FhoareS(_,pre,stmt,post) -> 
+        let dbody =
+          let bodytenv = tenv
+            (* List.fold_left *)
+            (*   (fun tenv x -> M.add_local tenv (EcIdent.create x)) *)
+            (*   tenv *)
+            (*   (List.map fst (def.f_locals)) *)
           in
-        (* end of copy pasted *)
+          List.map (pr_instr bodytenv) stmt.s_node
+        in
 
         pr_seq [ Pp.braces (pr_form tenv outer pre);
-                 pr_mblocks [dlocals; dbody];
+                 pr_mblocks [dbody];
                  Pp.braces (pr_form tenv outer post) ]
 
     in

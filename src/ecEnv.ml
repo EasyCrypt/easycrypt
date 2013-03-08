@@ -1415,7 +1415,7 @@ let initial =
   let builtin_rn = [
     ["int"]    , EcWhy3.RDts, EcPath.basename EcCoreLib.p_int;
     ["real"]   , EcWhy3.RDts, EcPath.basename EcCoreLib.p_real;
-    ["infix ="], EcWhy3.RDls, EcPath.basename EcCoreLib.p_eq 
+    ["infix ="], EcWhy3.RDls, EcPath.basename EcCoreLib.p_eq
   ] in
   let env, _ = import_w3 env Why3.Theory.builtin_theory builtin_rn in
   let bool_rn = [
@@ -1708,7 +1708,7 @@ let rec norm_form env f =
       f_hoareF (norm_form env pre) 
         (Mod.unfold_mod_path env p) (norm_form env post)
 
-  | FhoareS _ -> assert false (* FIXME ? Not implemented *)
+  |  FhoareS _ -> assert false (* FIXME ? Not implemented *)
 
   | FequivF(pre,(l,r),post) ->
       f_equivF (norm_form env pre) 

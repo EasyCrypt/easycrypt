@@ -38,3 +38,12 @@ let bind (x : symbol) (ty : EcTypes.ty) (me : memenv) =
 (* -------------------------------------------------------------------- *)
 let lookup (x : symbol) (me : memenv) =
   Msym.find_opt x me.me_vars
+
+
+
+(* remove this *)
+let dummy_memenv = let mem_id = EcIdent.create "$std" in
+                   { me_memory = mem_id;
+                     me_vars   = Msym.empty; }
+
+

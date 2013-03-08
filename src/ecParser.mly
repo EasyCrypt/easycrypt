@@ -546,12 +546,7 @@ sform:
     { let id = PFident(mk_loc op.pl_loc EcCoreLib.s_dinter, ti) in
       PFapp(mk_loc op.pl_loc id, [e1; e2]) } 
 
-(* Test *)
 
-(*
-| LKEY pre=loc(sform) RKEY s=fun_def_body LKEY post=loc(sform) RKEY
-    { PFhoare (pre,s,post) }
-*)
 ;
                           
 form:
@@ -1099,7 +1094,10 @@ tactic:
 (* PHL tactics *)
 | APP n=number p=loc(sform)     { PPhl( Papp(n,p) ) }
 | WP  n=number                  { PPhl( Pwp n) }
+| WP                            { PPhl( Pwp 0) }
 | SKIP                          { PPhl(Pskip) }
+| WHILE inv=loc(sform) vrnt=loc(sform) bnd=loc(sform)
+                                { PPhl(Pwhile(inv,vrnt,bnd)) }
 | ADMIT                         { Padmit }
 | CUT n=ident COLON p=loc(sform)
                                 { Pcut (n,p) }

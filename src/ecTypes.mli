@@ -85,6 +85,7 @@ type prog_var = {
 val pv_equal : prog_var -> prog_var -> bool 
 val pv_compare : prog_var -> prog_var -> int
 val pv_hash  : prog_var -> int
+val is_loc : prog_var -> bool
 
 (* -------------------------------------------------------------------- *)
 type tyexpr = private {

@@ -19,4 +19,10 @@ val bindings : memenv -> EcTypes.ty Msym.t
 (* -------------------------------------------------------------------- *)
 val empty  : memory -> memenv
 val bind   : symbol -> EcTypes.ty -> memenv -> memenv
+
 val lookup : symbol -> memenv -> EcTypes.ty option
+
+
+(* until a constructor is defined *)
+val dummy_memenv : memenv
+

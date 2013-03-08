@@ -978,7 +978,7 @@ let trans_op env vm p tys =
       let ls,ls', tvs = 
         try Mp.find p env.env_op 
         with _ -> 
-          Format.printf "can not find %s@." (EcPath.tostring p);
+          Format.printf "cannot find %s@." (EcPath.tostring p);
           assert false in (* FIXME error message *)
       let mtv = 
         try 
@@ -1141,7 +1141,7 @@ let trans_form env vm f =
         let args = List.map (trans_form_b vm) args in
         Term.t_tuple args
 
-    | Fhoare _ | FhoareF _ | FhoareS _ | FequivF _  | FequivS _ -> 
+    | FhoareF _ | FhoareS _ | FequivF _  | FequivS _ -> 
         raise (CanNotTranslate f)
           
     | Fpvar(pv,m) -> trans_pv !env vm pv m 
@@ -1420,7 +1420,21 @@ let dft_prover_infos =
     prover_names     = [||];
     prover_timelimit = 3; }
 
+let nb_file = ref 0 
+
+let print_task goal_name task = 
+  incr nb_file;
+  let (_s,_pr,dr) = get_prover "Yices" in  
+  let fname = Filename.temp_file ("easycrypt_"^goal_name) ".why" in
+  let out = open_out fname in
+  let fmt = Format.formatter_of_out_channel out in
+  Driver.print_task dr fmt task;
+  close_out out;
+  fname
+
 let call_prover_task pi task =
+  let fname = print_task "goal_name" task in 
+  Format.printf "Proving %s: alt-ergo file %s" "goal_name" fname;
   para_call pi.prover_max_run pi.prover_names pi.prover_timelimit task = 
   Some true
 

@@ -27,6 +27,15 @@ type mpath = {
 
 type proot = [ `Symbol of symbol | `Ident of EcIdent.t ]
 
+
+let name_path path = match path.p_node with 
+  | Psymbol s -> s
+  | Pident id -> EcIdent.name id
+  | Pqname (_,s) -> s
+
+let name_mpath mpath = name_path mpath.m_path
+
+
 (* -------------------------------------------------------------------- *)
 let p_equal   = ((==) : path -> path -> bool)
 let p_hash    = fun p -> p.p_tag

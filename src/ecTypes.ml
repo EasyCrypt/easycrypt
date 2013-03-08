@@ -188,6 +188,7 @@ let pv_hash v =
 let pv_compare v1 v2 = 
   pv_hash v1 - pv_hash v2
 
+let is_loc v = match v.pv_kind with PVloc -> true | _ -> false
   
 (* -------------------------------------------------------------------- *)
 type lpattern =
