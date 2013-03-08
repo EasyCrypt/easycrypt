@@ -158,10 +158,11 @@ module Memory : sig
   val set_active  : memory -> env -> env
   val get_active  : env -> memory option
 
-  val byid    : memory -> env -> actmem option
-  val lookup  : symbol -> env -> actmem option
-  val current : env -> (memory * actmem) option
-  val push    : actmem -> env -> env
+  val byid     : memory -> env -> actmem option
+  val lookup   : symbol -> env -> actmem option
+  val current  : env -> (memory * actmem) option
+  val push     : actmem -> env -> env
+  val push_all : (mpath * memenv) list -> env -> env
 
   val concretize : mpath -> memenv -> env -> env
 end
@@ -183,6 +184,8 @@ module Fun : sig
 
   val memenv     : hasres:bool -> memory -> EcPath.path -> env -> memenv
   val memenv_opt : hasres:bool -> memory -> EcPath.path -> env -> memenv option
+
+  val enter : hasres:bool -> memory -> EcPath.mpath -> env -> (memenv * env)
 
   val add : EcPath.mpath -> env -> env
 end

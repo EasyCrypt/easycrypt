@@ -114,12 +114,13 @@
 %token EQ
 %token CEQ
 // %token EQEQLBRACKET
-// %token EQUIV
+%token EQUIV
 %token EXPORT
 %token EXIST
 %token FINAL
 %token FORALL
 %token FUN
+%token HOARE
 %token IF
 %token IFF
 %token IMPL
@@ -135,6 +136,7 @@
 %token LET
 %token LKEY
 // %token LLIMP
+%token LONGARROW
 %token LPAREN
 %token MODULE
 %token FROM_INT
@@ -166,7 +168,7 @@
 %token STAR
 %token THEN
 %token THEORY
-// %token TILD
+%token TILD
 %token TYPE
 // %token UNSET
 // %token UPTO
@@ -324,7 +326,7 @@ mident:
 
 (* -------------------------------------------------------------------- *)
 pside:
-| LKEY x=qident RKEY {
+| x=qident {
     let (qn, id) = x.pl_desc in
       if qn <> [] then
         error
@@ -334,8 +336,8 @@ pside:
         { x with pl_desc = id }
   }
 
-| LKEY x=loc(number) RKEY {
-    { x with pl_desc = string_of_int x.pl_desc }
+| x=loc(number) {
+    { x with pl_desc = Printf.sprintf "$%d" x.pl_desc }
   }
 ;
 
@@ -506,17 +508,30 @@ sform:
 | LBRACKET ti=tvars_app? es=loc(p_form_sm_list0) RBRACKET
    { (pflist es.pl_loc ti es.pl_desc).pl_desc }
 
+| HOARE LBRACKET
+    x=ident AT nm=mident COLON pre=loc(form) LONGARROW post=loc(form)
+  RBRACKET
+
+    { let mp = mk_loc (EcLocation.make $startpos(x) $endpos(nm)) (nm, x) in
+        PFhoareF (pre, mp, post) }
+
+| EQUIV LBRACKET 
+    x1=ident AT nm1=mident TILD x2=ident AT nm2=mident
+    COLON pre=loc(form) LONGARROW post=loc(form)
+  RBRACKET
+
+    { let mp1 = mk_loc (EcLocation.make $startpos(x1) $endpos(nm1)) (nm1, x1) in
+      let mp2 = mk_loc (EcLocation.make $startpos(x2) $endpos(nm2)) (nm2, x2) in
+        PFequivF (pre, (mp1, mp2), post) }
+
 | PR LBRACKET
     x=ident args=paren(plist1(loc(form), COMMA))
     AT nm=mident COMMA pn=pside
     COLON event=loc(form)
-  RBRACKET 
+  RBRACKET
 
-    { let mp=
-        { pl_desc = (nm, x);
-          pl_loc  = EcLocation.make $startpos $endpos; }
-      in
-        PFprob(mp, args, pn, event) }
+    { let mp= mk_loc (EcLocation.make $startpos(x) $endpos(nm)) (nm, x) in
+        PFprob (mp, args, pn, event) }
 
 | PIPE ti=tvars_app? e =loc(form) PIPE 
     { pfapp_symb e.pl_loc EcCoreLib.s_abs ti [e] }
@@ -532,8 +547,10 @@ sform:
 
 (* Test *)
 
+(*
 | LKEY pre=loc(sform) RKEY s=fun_def_body LKEY post=loc(sform) RKEY
     { PFhoare (pre,s,post) }
+*)
 ;
                           
 form:

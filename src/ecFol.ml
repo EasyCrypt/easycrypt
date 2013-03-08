@@ -23,8 +23,8 @@ let mstd   = EcIdent.create "$std"
 let mpre   = EcIdent.create "$pre"
 let mpost  = EcIdent.create "$post"
 let mhr    = EcIdent.create "$hr"
-let mleft  = EcIdent.create "$left"
-let mright = EcIdent.create "$right"
+let mleft  = EcIdent.create "$1"
+let mright = EcIdent.create "$2"
 
 type form = { 
   f_node : f_node;
@@ -125,11 +125,11 @@ module Hsform = Why3.Hashcons.Make (struct
     | Ftuple args1, Ftuple args2 ->
         List.all2 f_equal args1 args2
 
-    | Fhoare (mem1, pre1, s1, post1), Fhoare (mem2, pre2, s2, post2) ->
-           (* FIXME: mem1, mem2 *)
-           f_equal pre1 pre2
+    | FhoareF (pre1, mp1, post1),
+      FhoareF (pre2, mp2, post2) ->
+           EcPath.m_equal mp1 mp2
+        && f_equal pre1  pre2
         && f_equal post1 post2
-        && EcModules.fd_equal s1 s2
 
     | Fpr (m1, mp1, args1, (x1, ty1), ev1),
       Fpr (m2, mp2, args2, (x2, ty2), ev2) ->
@@ -140,6 +140,12 @@ module Hsform = Why3.Hashcons.Make (struct
         && EcTypes.ty_equal ty1 ty2
         && f_equal          ev1 ev2
         && (List.all2 f_equal args1 args2)
+
+    | Fhoare (_mem1, pre1, s1, post1), Fhoare (_mem2, pre2, s2, post2) ->
+           (* FIXME: mem1, mem2 *)
+           f_equal pre1 pre2
+        && f_equal post1 post2
+        && EcModules.fd_equal s1 s2
 
     | _, _ -> false
 
@@ -170,12 +176,16 @@ module Hsform = Why3.Hashcons.Make (struct
     | Ftuple args ->
         Why3.Hashcons.combine_list f_hash 0 args
 
-    | Fhoare (m, p, s, q) ->
-      (* FIXME: m *)
+    | FhoareF (pre, mp, post) ->
         Why3.Hashcons.combine2
-          (f_hash p) (f_hash q) (EcModules.fd_hash s)
+          (f_hash pre) (f_hash post) (EcPath.m_hash mp)
 
-    | Fpr (m, mp, args, (x, ty), ev) ->
+    | FequivF (pre, (mp1, mp2), post) ->
+        Why3.Hashcons.combine3
+          (f_hash pre) (f_hash post)
+          (EcPath.m_hash mp1) (EcPath.m_hash mp2)
+
+    | Fpr (_m, mp, args, (x, ty), ev) ->
         let id =
           Why3.Hashcons.combine3
             (EcPath.m_hash   mp)
@@ -184,6 +194,11 @@ module Hsform = Why3.Hashcons.Make (struct
             (f_hash          ev)
         in
           Why3.Hashcons.combine_list f_hash id args
+
+    | Fhoare (_m, p, s, q) ->
+      (* FIXME: m *)
+        Why3.Hashcons.combine2
+          (f_hash p) (f_hash q) (EcModules.fd_hash s)
 
   let tag n f = { f with f_tag = n }
 end)
@@ -204,12 +219,16 @@ let fv_node = function
       List.fold_left (fun s f -> Sid.union s (fv f)) (fv f) args
   | Ftuple args ->
       List.fold_left (fun s f -> Sid.union s (fv f)) Sid.empty args
-  | Fhoare (_,pre,_,post) ->
-      Sid.union (fv pre) (fv post)
   | Fpr (_,_,args,_,event) ->
       List.fold_left
         (fun s f -> Sid.union s (fv f))
         (fv event) args
+  | FhoareF (pre,_,post) ->
+      Sid.union (fv pre) (fv post)
+  | FequivF (pre,_,post) ->
+      Sid.union (fv pre) (fv post)
+  | Fhoare (_,pre,_,post) ->
+      Sid.union (fv pre) (fv post)
 
 (* -------------------------------------------------------------------- *)
 let mk_form node ty =  Hsform.hashcons 
@@ -374,8 +393,10 @@ let map gt g f =
     | Fop(p,tys) -> f_op p (List.map gt tys) (gt f.f_ty)
     | Fapp(e, es) -> f_app (g e) (List.map g es) (gt f.f_ty)
     | Ftuple es -> f_tuple (List.map g es)
-    | Fhoare(m,p,s,q) -> f_hoare m (g p) s (g q)
+    | FhoareF(pre,mp,post) -> f_hoareF (g pre) mp (g post)
+    | FequivF(pre,(mp1,mp2),post) -> f_equivF (g pre) mp1 mp2 (g post)
     | Fpr(m,mp,args,(x,ty),ev) -> f_pr m mp (List.map g args) (x, gt ty) (g ev)
+    | Fhoare(m,p,s,q) -> f_hoare m (g p) s (g q)
 
 (* -------------------------------------------------------------------- *)
 module Fsubst = struct
@@ -670,9 +691,7 @@ module Subst = struct
       List.fold_left (fun s f -> LVset.union s (flvar_form f)) LVset.empty args 
     (* FIXME: ignoring program variables *)
     (* this pattern should never occur with a stratified formula-type *)
-    | Fhoare (mem,pre,_,post) -> LVset.union (flvar_form pre) (flvar_form post)
-
-
+    | Fhoare (_mem,pre,_,post) -> LVset.union (flvar_form pre) (flvar_form post)
       
   let fpvar_form = 
     flvar_form (fun pv mem -> LVset.singleton (Lvar.mk_pvar pv mem)) (fun _ -> LVset.empty)
@@ -742,8 +761,6 @@ end
 
 (* ENDOF SUBST_FORM *)
 
-
-
 let rec form_of_exp mem (e: EcTypes.tyexpr) = 
   let ty = EcTypes.type_of_exp e in 
   match e.EcTypes.tye_node with
@@ -757,15 +774,3 @@ let rec form_of_exp mem (e: EcTypes.tyexpr) =
     | EcTypes.Etuple es -> f_tuple (List.map (form_of_exp mem) es)
     | EcTypes.Eif (e1,e2,e3) -> 
       f_if (form_of_exp mem e1) (form_of_exp mem e2) (form_of_exp mem e3)
-
-
-
-
-
-
-
-
-
-
-
-

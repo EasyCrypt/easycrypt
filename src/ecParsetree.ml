@@ -158,6 +158,7 @@ and pformula_r =
 
   (* for claims *)
   | PFhoareF of pformula * pgamepath * pformula
+  | PFequivF of pformula * (pgamepath * pgamepath) * pformula
   | PFprob   of pgamepath * (pformula list) * pmemory * pformula
 
   (* test *)

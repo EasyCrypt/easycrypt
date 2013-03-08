@@ -52,7 +52,7 @@ let unsuspend f (x : 'a suspension) (args : mpath list list) =
       List.fold_left2
         (List.fold_left2
            (fun s (x, _) a -> EcSubst.add_module s x a))
-        EcSubst.empty x.sp_params args
+        EcSubst.empty ([] :: x.sp_params) args
     in
       if EcSubst.is_empty s then x.sp_target else f s x.sp_target
 
@@ -719,6 +719,11 @@ module Memory = struct
     in
       { env with env_memories = maps }
 
+  let push_all memenvs env =
+    List.fold_left
+      (fun env (p, m) -> push (AMConcrete (p, m)) env)
+      env memenvs
+
   let concretize mpath memenv env =
     let id = EcMemory.memory memenv in
 
@@ -890,6 +895,17 @@ module Fun = struct
 
   let memenv_opt ~hasres me path env =
     try_lf (fun () -> memenv ~hasres me path env)
+
+  let enter ~hasres me path env =
+    let memenv =
+      memenv hasres me (EcPath.path_of_mpath path) env
+    in
+
+    let env =
+      Memory.set_active me 
+        (Memory.push (AMConcrete (path, memenv)) env)
+    in
+      (memenv, env)
 end
 
 (* -------------------------------------------------------------------- *)

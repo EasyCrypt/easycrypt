@@ -1084,6 +1084,21 @@ let rec trans_msymbol (env : EcEnv.env) (msymb : pmsymbol) =
              else [])
 
 (* -------------------------------------------------------------------- *)
+and trans_gamepath (env : EcEnv.env) gp =
+  let modsymb = List.map (unloc -| fst) (fst (unloc gp))
+  and funsymb = unloc (snd (unloc gp)) in
+  let _, _ =
+    match EcEnv.Fun.sp_lookup_opt (modsymb, funsymb) env with
+    | None -> tyerror gp.pl_loc (UnknownFunction (modsymb, funsymb))
+    | Some (p, me) -> (p, me)
+  in
+
+  let fpath = fst (trans_msymbol env (fst (unloc gp))) in
+  let fpath = EcPath.mqname fpath EcPath.PKother funsymb [] in
+
+    fpath
+
+(* -------------------------------------------------------------------- *)
 let transfpattern env ue (p : EcParsetree.lpattern) =
   match transpattern1 env ue p with
   | LSymbol x, ty ->
@@ -1172,13 +1187,9 @@ let transform env ue pf tt =
         f_exists xs f
 
     | PFprob (gp, args, m, event) ->
-        let modsymb = List.map (unloc -| fst) (fst (unloc gp))
-        and funsymb = unloc (snd (unloc gp)) in
-        let _, fun_ =
-          match EcEnv.Fun.sp_lookup_opt (modsymb, funsymb) env with
-          | None -> tyerror gp.pl_loc (UnknownFunction (modsymb, funsymb))
-          | Some (p, me) -> (p, me) in
-        let fsig = fun_.EcEnv.sp_target.f_sig.fs_sig in
+        let fpath = trans_gamepath env gp in
+        let fun_  = EcEnv.Fun.by_mpath fpath env in
+        let fsig  = fun_.f_sig.fs_sig in
 
         if List.length args <> List.length (fst fsig) then
           tyerror f.pl_loc ApplInvalidArity;
@@ -1192,9 +1203,6 @@ let transform env ue pf tt =
             List.map2 doit1 args (fst fsig)
         in
 
-        let fpath = fst (trans_msymbol env (fst (unloc gp))) in
-        let fpath = EcPath.mqname fpath EcPath.PKother funsymb [] in
-
         let memid =
           match EcEnv.Memory.lookup (unloc m) env with
           | None ->
@@ -1207,21 +1215,47 @@ let transform env ue pf tt =
               mid
         in
 
-        let memenv =
-          EcEnv.Fun.memenv ~hasres:true memid
-            (EcPath.path_of_mpath fpath) env
-        in
-
         let event =
-          let env =
-            EcEnv.Memory.set_active memid
-              (EcEnv.Memory.concretize fpath memenv env)
-          in
+          let (_, env) = EcEnv.Fun.enter true memid fpath env in
             transf env event
         in
 
-        let resty = snd fun_.EcEnv.sp_target.f_sig.fs_sig in
+        let resty = snd fun_.f_sig.fs_sig in
           f_pr memid fpath args (EcIdent.create "$res", resty) event
+
+    | PFhoareF (pre, gp, post) ->
+        let fpath = trans_gamepath env gp in
+
+        let pre =
+          let (_, env) = EcEnv.Fun.enter false EcFol.mpre fpath env in
+            transf env pre
+        and post =
+          let (_, env) = EcEnv.Fun.enter true EcFol.mpost fpath env in
+            transf env post
+        in
+
+          f_hoareF pre fpath post
+
+    | PFequivF (pre, (gp1, gp2), post) ->
+        let fpath1 = trans_gamepath env gp1 in
+        let fpath2 = trans_gamepath env gp2 in
+
+        let p1 = EcPath.path_of_mpath fpath1
+        and p2 = EcPath.path_of_mpath fpath2 in
+
+        let pre =
+          let mem1 = EcEnv.Fun.memenv false EcFol.mleft  p1 env in
+          let mem2 = EcEnv.Fun.memenv false EcFol.mright p2 env in
+          let env  = EcEnv.Memory.push_all [(fpath1, mem1); (fpath2, mem2)] env in
+            transf env pre in
+
+        let post =
+          let mem1 = EcEnv.Fun.memenv true EcFol.mleft  p1 env in
+          let mem2 = EcEnv.Fun.memenv true EcFol.mright p2 env in
+          let env  = EcEnv.Memory.push_all [(fpath1, mem1); (fpath2, mem2)] env in
+            transf env post in
+
+          f_equivF pre fpath1 fpath2 post
 
     (* test *)
     | PFhoare (pre,body,post) ->
@@ -1265,7 +1299,7 @@ let transform env ue pf tt =
     in
       match locals with
       | Some (id, ty) ->
-          if tvi <> None then assert false; (*FIXME error message *)
+          if tvi <> None then assert false;
           [ (f_local id ty, ue) ]
 
       | None -> begin

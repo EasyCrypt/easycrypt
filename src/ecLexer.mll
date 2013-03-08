@@ -38,6 +38,8 @@
     "assert"      , ASSERT     ;        (* KW: prog *)
     "return"      , RETURN     ;        (* KW: prog *)
     "res"         , RES        ;        (* KW: prog *)
+    "equiv"       , EQUIV      ;        (* KW: prog *)
+    "hoare"       , HOARE      ;        (* KW: prog *)
 
     "using"       , USING      ;        (* KW: tactic *)
     "compute"     , COMPUTE    ;        (* KW: tactic *)
@@ -106,7 +108,7 @@ let ident  = (letter ichar*) | ('_' ichar+)
 
 let prim_ident = '\'' ident
 
-let op_char_1    = ['=' '<' '>' '~']
+let op_char_1    = ['=' '<' '>']
 let op_char_2    = ['+' '-']
 let op_char_3    = ['*' '/' '%' '\\']
 let op_char_4    = ['!' '$' '&' '?' '@' '^' ':' '|' '#']
@@ -171,6 +173,9 @@ rule main = parse
   | "$"  { SAMPLE }
   | "|"  { PIPE }
   | "@"  { AT }
+  | "~"  { TILD }
+
+  | "==>" { LONGARROW }
 
   (* comparison *)
   | "="  { EQ }
