@@ -1420,21 +1420,8 @@ let dft_prover_infos =
     prover_names     = [||];
     prover_timelimit = 3; }
 
-let nb_file = ref 0 
-
-let print_task goal_name task = 
-  incr nb_file;
-  let (_s,_pr,dr) = get_prover "Yices" in  
-  let fname = Filename.temp_file ("easycrypt_"^goal_name) ".why" in
-  let out = open_out fname in
-  let fmt = Format.formatter_of_out_channel out in
-  Driver.print_task dr fmt task;
-  close_out out;
-  fname
 
 let call_prover_task pi task =
-  let fname = print_task "goal_name" task in 
-  Format.printf "Proving %s: alt-ergo file %s" "goal_name" fname;
   para_call pi.prover_max_run pi.prover_names pi.prover_timelimit task = 
   Some true
 
