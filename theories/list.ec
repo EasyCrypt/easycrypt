@@ -67,23 +67,23 @@ lemma length_def2 : forall (x : 'a, xs : 'a list),
 (* local *) pred P_length_non_neg(xs : 'a list)  =
  0 <= length(xs).
 
-(* local *) lemma length_non_neg_aux: forall (xs : 'a list), P_length_non_neg(xs)
+lemma length_non_neg: forall (xs : 'a list), 0 <= length(xs)
 proof.
  intros xs.
+ cut H : (P_length_non_neg(xs)).
  apply list_ind<:'a>((P_length_non_neg),_,_,xs);trivial.
+ trivial.
 save.
-
-lemma length_non_neg: forall (xs : 'a list), 0 <= length(xs).
 
 (* local *)pred P_length_z_nil(xs : 'a list) = length(xs) = 0 => xs = [].
 
-(* local *)lemma length_z_nil_aux : forall(xs : 'a list), P_length_z_nil(xs)
+lemma length_z_nil : forall(xs : 'a list), length(xs) = 0 => xs = []
 proof.
 intros xs.
+cut H : (P_length_z_nil(xs)).
 apply list_ind<:'a>(P_length_z_nil,_,_,xs);trivial.
+trivial.
 save.
-
-lemma length_z_nil : forall(xs : 'a list), length(xs) = 0 => xs = [].
 
 (* append *)
 
@@ -96,37 +96,37 @@ lemma app_def2 : forall (x : 'a) (xs ys : 'a list), (x::xs)++ys = x::(xs++ys).
 
 (* local *) op P_app_nil_right(xs : 'a list) : bool = xs ++ [] = xs.
 
-(* local *) lemma app_nil_right_aux : forall (xs :'a list), P_app_nil_right(xs)
+lemma app_nil_right : forall (xs :'a list), xs ++ [] = xs
 proof.
  intros xs.
+ cut H : (P_app_nil_right(xs)).
  apply list_ind<:'a>(P_app_nil_right,_,_,xs);trivial.
+ trivial.
 save.
-
-lemma app_nil_right : forall (xs :'a list), xs ++ [] = xs.
 
 (* local *) pred P_app_assoc(xs : 'a list) =  forall(ys zs : 'a list),
     (xs++ys)++zs = xs++(ys++zs).
 
-(* local *) lemma app_assoc_aux : forall(xs : 'a list), 
-P_app_assoc xs
+lemma app_assoc : forall(xs ys zs : 'a list),
+    (xs++ys)++zs = xs++(ys++zs) 
 proof.
 intros xs.
+cut H :(P_app_assoc xs).
 apply list_ind<:'a>(P_app_assoc,_,_,xs);trivial.
+trivial.
 save.
-
-lemma app_assoc : forall (xs ys zs : 'a list), (xs++ys)++zs = xs++(ys++zs).
 
 (* local *) pred P_length_app_aux(xs : 'a list) = forall(ys : 'a list), 
  length(xs++ys) = length(xs) + length(ys).
 
-(* local *) lemma length_app_aux : forall (xs : 'a list), P_length_app_aux(xs)
+lemma length_app : forall (xs ys: 'a list), 
+ length(xs++ys) = length(xs) + length(ys)
 proof.
 intros xs.
+cut H : ( P_length_app_aux(xs)).
 apply list_ind<:'a>((P_length_app_aux),_,_,xs);trivial.
+trivial.
 save.
-
-lemma length_app : forall (xs ys : 'a list), 
- length(xs++ys) = length(xs) + length(ys).
 
 lemma length_app_comm : forall (xs ys : 'a list), 
  length(xs++ys) =  length(ys++xs).
@@ -135,19 +135,15 @@ lemma length_app_comm : forall (xs ys : 'a list),
 (* local *) pred P_mem_app (xs : 'a list) = forall(ys : 'a list, y :'a), 
 (mem y xs  || mem y ys) =  mem y (xs++ys).
 
-(* local *) lemma mem_app_aux : forall (xs : 'a list), P_mem_app xs
+lemma mem_app : forall (xs ys : 'a list), forall(y : 'a), 
+(mem y xs  || mem y ys) =  mem y (xs++ys)
 proof.
 intros xs.
+cut H :(P_mem_app xs).
 apply list_ind<:'a>((P_mem_app),_,_,xs);trivial.
+trivial.
 save.
 
-lemma mem_app_aux2 : forall (xs,ys : 'a list,y :'a), 
-   P_mem_app xs =>
-   (mem y xs  || mem y ys)  =  mem y (xs++ys).
-
-lemma mem_app : forall (xs,ys : 'a list,y :'a), 
-   (mem y xs  || mem y ys)  =  mem y (xs++ys).
- 
 lemma mem_app_comm : forall (xs ys : 'a list) (y :'a),
  mem y (xs++ys) = mem y (ys++xs).
 
@@ -185,29 +181,26 @@ op existsb(p : 'a -> bool, xs : 'a list) : bool =
 (* local *) pred P_eq_forallb_all(p : 'a -> bool, xs : 'a list) =
 all p xs <=> forallb p xs.
 
-(* local *) lemma eq_forallb_all_aux : forall (p : 'a -> bool, xs : 'a list),
-P_eq_forallb_all p xs
+(* local *) lemma eq_forallb_all : forall (p : 'a -> bool, xs : 'a list),
+all p xs <=> forallb p xs
 proof.
 intros p xs.
+cut H: (P_eq_forallb_all p xs).
 apply list_ind<:'a>((P_eq_forallb_all p),_,_,xs);trivial.
+trivial.
 save.
-
-lemma eq_forallb_all : forall (p : 'a -> bool, xs : 'a list),
-all p xs <=> forallb p xs.
-
 
 (* local *) pred P_eq_existsb_any(p : 'a -> bool, xs : 'a list) =
 any p xs <=> existsb p xs.
 
-(* local *) lemma eq_existsb_any_aux : forall (p : 'a -> bool, xs : 'a list),
-P_eq_existsb_any p xs
+lemma eq_existsb_any : forall (p : 'a -> bool, xs : 'a list),
+any p xs <=> existsb p xs
 proof.
 intros p xs.
+cut H : (P_eq_existsb_any p xs).
 apply list_ind<:'a>((P_eq_existsb_any p),_,_,xs);trivial.
+trivial.
 save.
-
-lemma eq_existsb_any : forall (p : 'a -> bool, xs : 'a list),
-any p xs <=> existsb p xs.
 
 (* filter *)
 
@@ -226,47 +219,39 @@ lemma filter_def2 : forall (p : 'a Pred, x : 'a, xs : 'a list),
 (* local *) pred P_filter_mem (xs : 'a list) = forall (p : 'a Pred, x : 'a),
 mem x (filter p xs) = (mem x xs && p x).
 
-(* local *) lemma filter_mem_aux : 
-forall (xs : 'a list), P_filter_mem xs
+(* local *) lemma filter_mem : 
+forall (xs : 'a list,p : 'a Pred, x : 'a), mem x (filter p xs) = (mem x xs && p x)
 proof.
 intros xs.
+cut H : (P_filter_mem xs).
 apply list_ind<:'a>(P_filter_mem,_,_,xs);trivial.
+trivial.
 save.
-
-(* local *) lemma filter_mem_aux2 : 
-forall (xs : 'a list, p : 'a Pred, x : 'a), 
-P_filter_mem xs =>
-mem x (filter p xs) = (mem x xs && p x).
-
-lemma filter_mem : 
-forall (xs : 'a list, p : 'a Pred, x : 'a), 
-mem x (filter p xs) = (mem x xs && p x).
 
 (* local *) pred P_filter_app(xs : 'a list) = 
  forall (ys : 'a list, p : 'a Pred),
 filter p (xs++ys) = (filter p xs)++(filter p ys).
 
-(* local *) lemma filter_app_aux : forall (xs : 'a list),
- P_filter_app xs
+lemma filter_app : forall (xs : 'a list,ys: 'a list, p : 'a Pred),
+filter p (xs++ys) = (filter p xs)++(filter p ys)
 proof.
 intros xs.
+cut H : (P_filter_app xs).
 apply list_ind<:'a>(P_filter_app,_,_,xs);trivial.
+trivial.
 save.
-
-lemma filter_app : forall (xs ys : 'a list) (p : 'a Pred),
-filter p (xs++ys) = (filter p xs)++(filter p ys).
 
 (* local *) pred P_filter_length(xs : 'a list) = forall(p : 'a Pred),
 length (filter p xs) <= length xs.
 
-(* local *) lemma filter_length_aux : forall(xs : 'a list), P_filter_length xs
+lemma filter_length : forall(xs : 'a list, p : 'a Pred), 
+length (filter p xs) <= length xs
 proof.
 intros xs.
+cut H : (P_filter_length xs).
 apply list_ind<:'a>(P_filter_length,_,_,xs);trivial.
+trivial.
 save.
-
-lemma filter_length : forall(xs : 'a list, p : 'a Pred),
-length (filter p xs) <= length xs.
 
 lemma filter_all : forall(xs : 'a list, p : 'a Pred), 
 all p (filter p xs).
@@ -288,104 +273,82 @@ lemma map_def2 : forall(f : 'a -> 'b, x : 'a, xs : 'a list ),
 (* local *)  pred P_map_in(f : 'a -> 'b,xs : 'a list) = 
  forall(x : 'a), mem x xs => mem (f x) (map f xs).
 
-(* local *) lemma map_in_aux : forall (xs : 'a list,f : 'a -> 'b), 
-   (P_map_in f) xs 
+lemma map_in : forall (xs : 'a list,f : 'a -> 'b, x : 'a), 
+mem x xs => mem (f x) (map f xs)
 proof.
 intros xs f.
+cut H: (P_map_in f xs).
 apply list_ind<:'a>((P_map_in f),_,_,xs);trivial.
+trivial.
 save.
-
-(* local *) lemma map_in_aux2 : forall (xs : 'a list,x : 'a, f : 'a -> 'b),    
-(P_map_in f) xs => mem x xs =>
- mem (f x) (map f xs).
-
-lemma map_in : forall (xs : 'a list,x : 'a, f : 'a -> 'b),    
- mem x xs => mem (f x) (map f xs).
 
 
 (* local *)  pred P_map_o (f : 'a -> 'b, g : 'b -> 'c, h : 'a -> 'c, 
  xs : 'a list) = map g (map f xs) = map h xs.
 
-(* local *)  lemma map_o_aux : forall (xs : 'a list,f : 'a -> 'b, 
+lemma map_o : forall (xs : 'a list,f : 'a -> 'b, 
  g : 'b -> 'c, h : 'a -> 'c),
-(forall (x : 'a), g (f x) = h x) => P_map_o f g h xs
+(forall (x : 'a), g (f x) = h x) => 
+map g (map f xs) = map h xs
 proof.
 intros xs f g h H.
+cut H0 : (P_map_o f g h xs).
 apply list_ind<:'a>((P_map_o f g h),_,_,xs);trivial.
-save.
-
-(* local *)lemma map_o_aux2 : forall (xs : 'a list,f : 'a -> 'b, g : 'b -> 'c, h : 'a -> 'c), 
-P_map_o f g h xs =>
-map g (map f xs) = map h xs.
-
-lemma map_o : forall (xs : 'a list,f : 'a -> 'b, g : 'b -> 'c, h : 'a -> 'c), 
-(forall (x : 'a), g (f x) = h x) => map g (map f xs) = map h xs
-proof.
-intros xs f g h H.
-apply map_o_aux2<:'a,'b,'c>(xs,f,g,h,_).
-apply map_o_aux<:'a,'b,'c>(xs,f,g,h,_).
 trivial.
 save.
 
 (* local *) pred P_map_length(f : 'a -> 'b, xs : 'a list) = 
         length xs = length (map f xs).
 
-(* local *) lemma map_length_aux : forall (xs : 'a list, f : 'a -> 'b), 
-  P_map_length f xs
+lemma map_length : forall (xs : 'a list, f : 'a -> 'b), 
+length xs = length (map f xs)
 proof.
 intros xs f.
+cut H : (P_map_length f xs).
 apply list_ind<:'a>((P_map_length f),_,_,xs);trivial.
+trivial.
 save.
-
-lemma map_length : forall (xs : 'a list, f : 'a -> 'b), 
- length xs = length (map f xs).
 
 (* local *) pred P_map_app(f : 'a -> 'b,xs : 'a list) = 
 forall (ys : 'a list), map f (xs ++ ys) = map f xs ++ map f ys.
 
-(* local *)  lemma map_app_aux : forall (xs : 'a list, f : 'a -> 'b),
-P_map_app f xs
+lemma map_app : forall (xs : 'a list, ys : 'a list, f : 'a -> 'b),
+map f (xs ++ ys) = map f xs ++ map f ys
 proof.
-intros xs f.
+intros xs ys f.
+cut H :(P_map_app f xs).
 apply list_ind<:'a>((P_map_app f),_,_,xs);trivial.
+trivial.
 save.
-
-(* local *) lemma map_app_aux2 : forall (xs ys: 'a list, f : 'a -> 'b),
-P_map_app f xs =>
-map f (xs ++ ys) = map f xs ++ map f ys.
-
-lemma map_app : forall (xs ys: 'a list, f : 'a -> 'b),
-map f (xs ++ ys) = map f xs ++ map f ys.
 
 (* local *) pred P_map_ext(f,g : 'a -> 'b,xs: 'a list) = map f xs = map g xs.
 
-(* local *) lemma map_ext_aux : forall (xs : 'a list, f : 'a -> 'b, g : 'a -> 'b),
-(forall (x : 'a), f x = g x)  => P_map_ext f g xs
+lemma map_ext : forall (xs : 'a list, f : 'a -> 'b, g : 'a -> 'b),
+(forall (x : 'a), f x = g x)  => map f xs = map g xs
 proof.
 intros xs f g H.
+cut H0 : (P_map_ext f g xs).
 apply list_ind<:'a>((P_map_ext f g),_,_,xs);trivial.
+trivial.
 save.
 
-lemma map_ext : forall (xs : 'a list, f: 'a -> 'b,g : 'a -> 'b),
-(forall (x : 'a), f x = g x) => map f xs = map g xs.
-
-
-op f_nth (x : 'a, r : ('a -> int -> 'a), y : 'a, n : int) : 'a =
+(*local*) op f_nth (x : 'a, r : ('a -> int -> 'a), y : 'a, n : int) : 'a =
 if n = 0 then x else (r y (n - 1)).
  
-op e_nth (y : 'a, n : int) : 'a = y.
+(*local*) op e_nth (y : 'a, n : int) : 'a = y.
  
 op nth (xs : 'a list) : 'a -> int -> 'a = fold_right f_nth e_nth xs.
 
-pred P_nth_in_or_dv(xs : 'a list) = forall(xs : 'a list, dv : 'a, n : int),
-  mem (nth xs dv n) xs || (nth xs dv n = dv).
+(*local*) pred P_nth_in_or_dv(xs : 'a list) = forall(dv : 'a, n : int),
+ mem (nth xs dv n) xs || (nth xs dv n = dv).
 
-lemma nth_in_or_dv_aux : forall(xs : 'a list),
-P_nth_in_or_dv xs
+lemma nth_in_or_dv_aux : forall(xs : 'a list,dv : 'a, n : int),
+  mem (nth xs dv n) xs || nth xs dv n = dv
 proof.
 intros xs.
-apply list_ind<:'a>(P_nth_in_or_dv,_,_,xs).
+cut H : (P_nth_in_or_dv xs).
+apply list_ind<:'a>(P_nth_in_or_dv,_,_,xs);trivial.
 trivial.
+save.
 
-lemma nth_in_or_dv : forall(xs : 'a list, dv : 'a, n : int),
-  mem (nth xs dv n) xs || nth xs dv n = dv.
+
