@@ -24,11 +24,17 @@ op mu_x (d:'a distr, x:'a) : real =
   mu d (Peq x).
 
 (** TODO : We need a way to automatically rewrite supp_def lemmas *)
-(* Note: the following mu_weight_0 is on the edge of SMT's capabilities. Maybe an interactive proof is in order? *)
-timeout 8.
 
 op in_supp (x:'a, d:'a distr) : bool = 
    mu_x d x <> 0%r.
+
+lemma mu_weight_0_1 : forall (d:'a distr),
+   mu_weight d = 0%r =>
+   forall (P:'a Pred), mu d P = 0%r.
+
+lemma mu_weight_0_2 : forall (d:'a distr),
+    (forall (P:'a Pred), mu d P = 0%r) =>
+    mu_weight d = 0%r.
 
 lemma mu_weight_0 : forall (d:'a distr),
    mu_weight d = 0%r <=>
