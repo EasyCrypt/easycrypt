@@ -41,6 +41,7 @@ val p_equal   : path -> path -> bool
 val p_compare : path -> path -> int
 val p_hash    : path -> int
 val p_fv      : int EcIdent.Mid.t -> path -> int EcIdent.Mid.t
+
 (* -------------------------------------------------------------------- *)
 val tostring  : path -> string
 val toqsymbol : path -> qsymbol
@@ -122,6 +123,15 @@ module Mm : Map.S   with type key = mpath
 module Sm : Mm.Set with type elt = mpath
 
 (* -------------------------------------------------------------------- *)
+module Msubp : sig
+  (* Maps implementation with [path] as keys. When asking the value of
+   * a [path], retrieve the longest prefix of [path] that has been
+   * associated to a value, and return this one. It is an error to give
+   * paths prefixed by an [ident] to any of these functions. *)
 
+  type +'a t
 
-
+  val empty : 'a t
+  val add   : path -> 'a -> 'a t -> 'a t
+  val find  : path -> 'a t -> 'a option
+end
