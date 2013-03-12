@@ -637,7 +637,7 @@ pgtybinding1:
 | xs=ident+
     { List.map (fun x -> (x, PGTY_Type (mk_loc x.pl_loc PTunivar))) xs }
 
-| pn=pside
+| LKEY pn=pside RKEY
     { [(pn, PGTY_Mem)] }
 ;
 
