@@ -7,13 +7,17 @@ module Msym = EcSymbols.Msym
 (* -------------------------------------------------------------------- *)
 type memory = EcIdent.t
 
+let mem_equal = EcIdent.id_equal
 (* -------------------------------------------------------------------- *)
 type memenv = {
   me_memory : memory;
   me_vars   : EcTypes.ty Msym.t;
 }
 
-let mem_equal = EcIdent.id_equal
+let me_equal me1 me2 = 
+  EcIdent.id_equal me1.me_memory me2.me_memory &&
+  Msym.equal EcTypes.ty_equal me1.me_vars me2.me_vars
+
 
 (* -------------------------------------------------------------------- *)
 let memory   { me_memory = m } = m

@@ -393,7 +393,7 @@ struct
 
   (* ------------------------------------------------------------------ *)
   let pr_let (tenv : t) pr_sub outer pt e1 e2 =
-    let ids = ids_of_lpattern pt in
+    let ids = lp_ids pt in
     let subtenv = List.fold_left M.add_local tenv ids in
 
     let dpt = pr_tuple (List.map (pr_local_symb subtenv) ids) in
@@ -770,7 +770,7 @@ struct
             pr_op_name tenv op tvi (Some [])
 
       | Fapp ({f_node = Fop(p,tys)}, args) ->
-          pr_app EcFol.ty tenv pr_form outer p tys args
+          pr_app EcFol.f_ty tenv pr_form outer p tys args
 
       | Fapp (e,args) ->
           let docs = List.map (pr_form tenv (min_op_prec, `NonAssoc)) args in
@@ -779,6 +779,9 @@ struct
 
       | Ftuple args ->
           pr_tuple_expr tenv pr_form args
+
+      | FhoareF _ ->
+          assert false (* FIXME *)
             
       | FhoareS(_,pre,stmt,post) -> 
         let dbody =
@@ -794,6 +797,8 @@ struct
         pr_seq [ Pp.braces (pr_form tenv outer pre);
                  pr_mblocks [dbody];
                  Pp.braces (pr_form tenv outer post) ]
+
+      | FequivF _ | FequivS _ | Fpr _ -> assert false (* FIXME *)
 
     in
       pr_form tenv (min_op_prec, `NonAssoc) f

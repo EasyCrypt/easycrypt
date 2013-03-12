@@ -40,7 +40,7 @@ val pqname    : path -> symbol -> path
 val p_equal   : path -> path -> bool
 val p_compare : path -> path -> int
 val p_hash    : path -> int
-
+val p_fv      : int EcIdent.Mid.t -> path -> int EcIdent.Mid.t
 (* -------------------------------------------------------------------- *)
 val tostring  : path -> string
 val toqsymbol : path -> qsymbol
@@ -50,6 +50,7 @@ val rootname  : path -> symbol
 val extend    : path option -> symbol -> path
 val tolist    : path -> symbol list 
 val p_size    : path -> int
+val p_subst_ids : EcIdent.t EcIdent.Mid.t -> path -> path
 
 (* -------------------------------------------------------------------- *)
 module Mp : Map.S  with type key = path
@@ -83,6 +84,8 @@ val m_hash    : mpath -> int
 val m_split : mpath -> (mpath * path_kind * symbol * mpath list) option
 val m_apply : mpath -> mpath list -> mpath
 
+val m_fv    : int EcIdent.Mid.t -> mpath -> int EcIdent.Mid.t
+val m_subst_ids : EcIdent.t EcIdent.Mid.t -> mpath -> mpath
 (* -------------------------------------------------------------------- *)
 type xpath = private {
   xp_node : mpath * symbol;
@@ -117,3 +120,8 @@ val x_tostring : xpath -> string
 (* -------------------------------------------------------------------- *)
 module Mm : Map.S   with type key = mpath
 module Sm : Mm.Set with type elt = mpath
+
+(* -------------------------------------------------------------------- *)
+
+
+

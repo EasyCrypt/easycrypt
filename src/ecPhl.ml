@@ -32,7 +32,9 @@ let split_stmt n s = List.take_n n s
 
 exception No_wp
 
-let wp_assgn lv e post = 
+let wp_assgn _lv _e _post = 
+  assert false (* FIXME *)
+(*
   match lv with
   | EcModules.LvVar (v,_t) ->  (* of (EcTypes.prog_var * EcTypes.ty) *)
     EcFol.Subst.subst_form (EcFol.Subst.single_subst (Lvar.mk_pvar v EcFol.mstd)
@@ -40,7 +42,7 @@ let wp_assgn lv e post =
   | EcModules.LvTuple vs ->
     EcFol.let_form (List.map (fun (v,t) ->(Lvar.mk_pvar v mstd),t ) vs) (form_of_exp EcFol.mstd e) post
   | _ -> raise No_wp
-
+*)
 
 let rec wp_stmt (stmt: EcModules.instr list) post = 
   match stmt with
@@ -50,7 +52,8 @@ let rec wp_stmt (stmt: EcModules.instr list) post =
         let post = wp_instr i post in
         wp_stmt stmt' post
       with No_wp -> stmt, post
-and wp_instr i post =
+and wp_instr _i _post = assert false 
+(*
   match i.EcModules.i_node with
     | EcModules.Sasgn (lv,e) ->
       wp_assgn lv e post
@@ -62,6 +65,7 @@ and wp_instr i post =
         f_and (f_imp b post1) (f_imp (f_not b) post2)
       else raise No_wp
     | _ -> raise No_wp
+*)
 
 let wp stmt post = 
   let stmt,post = wp_stmt (List.rev stmt) post in
@@ -73,7 +77,8 @@ let wp stmt post =
 exception NotSkipStmt
 
 
-let quantify_pvars pvars phi =
+let quantify_pvars _pvars _phi = assert false 
+(*
   let f (pv,m,ty) (bds,phi) =
     if EcTypes.is_loc pv then
       let local = EcIdent.create (EcPath.name_mpath pv.EcTypes.pv_name) in
@@ -85,11 +90,13 @@ let quantify_pvars pvars phi =
   in
   let bds,phi = PVset.fold f pvars ([],phi) in
   f_forall bds phi
+*)
 
-let quantify_out_local_pvars phi =
+let quantify_out_local_pvars _phi = assert false 
+(*
   let free_pvars = EcFol.free_pvar phi in
   quantify_pvars free_pvars phi
-
+*)
 
 let skip_tac (juc,n as g) =
   let hyps,concl = get_goal g in
@@ -112,7 +119,7 @@ let wp_tac i _loc _env (juc,n as g) =
   let s_fix,s_wp = split_stmt i s.EcModules.s_node  in
   let s_wp,post = wp s_wp post in
   let s = EcModules.stmt (s_fix @ s_wp) in
-  let a = f_hoare mem pre s post  in
+  let a = f_hoareS mem pre s post  in
   let juc,n' = new_goal juc (hyps,a) in
   let rule = { pr_name = RN_wp i; pr_hyps = [n']} in
   upd_rule (juc,n) rule
@@ -122,8 +129,8 @@ let app_tac (i,phi) _loc _env (juc,n as g) =
   let hyps,concl = get_goal g in
   let mem,pre,s,post = destr_hl concl in
   let s1,s2 = split_stmt i s.EcModules.s_node  in
-  let a = f_hoare mem pre (EcModules.stmt s1) phi  in
-  let b = f_hoare mem phi (EcModules.stmt s2) post in
+  let a = f_hoareS mem pre (EcModules.stmt s1) phi  in
+  let b = f_hoareS mem phi (EcModules.stmt s2) post in
   let juc,n1 = new_goal juc (hyps,a) in
   let juc,n2 = new_goal juc (hyps,b) in
   let rule = { pr_name = RN_app (i,phi); pr_hyps = [n1;n2]} in
@@ -171,7 +178,8 @@ and modified_pvars stmt =
   List.fold_left (fun s i -> PVset'.union s (modified_pvars_i i)) 
     PVset'.empty stmt.EcModules.s_node
 
-let while_tac inv vrnt bnd (juc,n as g) =
+let while_tac _inv _vrnt _bnd (_juc,_n as _g) = assert false 
+(*
   let hyps,concl = get_goal g in
   let mem,pre,s,post = destr_hl concl in
   let rev_s = List.rev s.EcModules.s_node in
@@ -212,7 +220,7 @@ let while_tac inv vrnt bnd (juc,n as g) =
           let rule = { pr_name = RN_while(inv,vrnt,bnd); pr_hyps=[n1;n2;n3]} in
           upd_rule (juc,n) rule
         | _ -> cannot_apply "while_tac" ""
-
+*)
 
 
 let add_locals_env env locals =

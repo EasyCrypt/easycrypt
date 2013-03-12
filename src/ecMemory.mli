@@ -9,7 +9,7 @@ val mem_equal : memory -> memory -> bool
 
 (* -------------------------------------------------------------------- *)
 type memenv
-
+val me_equal : memenv -> memenv -> bool
 exception DuplicatedMemoryBinding of symbol
 
 (* -------------------------------------------------------------------- *)

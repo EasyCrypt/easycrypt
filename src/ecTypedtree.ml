@@ -1140,7 +1140,7 @@ let transform env ue pf tt =
     | PFapp ({pl_desc = PFident({ pl_desc = name; pl_loc = loc }, tvi)}, es) ->
         let tvi  = transtvi env ue tvi in  
         let es   = List.map (transf env) es in
-        let esig = List.map EcFol.ty es in 
+        let esig = List.map EcFol.f_ty es in 
         let ops  = select_sided_op env name ue tvi esig in
           begin match ops with
           | [] | _ :: _ :: _ ->        (* FIXME: better error message *)
@@ -1155,7 +1155,7 @@ let transform env ue pf tt =
 
     | PFapp (e, es) ->
         let es   = List.map (transf env) es in
-        let esig = List.map EcFol.ty es in 
+        let esig = List.map EcFol.f_ty es in 
         let op  = transf env e in
         let codom = ty_fun_app env ue op.f_ty esig in
         f_app op es codom
@@ -1220,8 +1220,8 @@ let transform env ue pf tt =
             transf env event
         in
 
-        let resty = snd fun_.f_sig.fs_sig in
-          f_pr memid fpath args (EcIdent.create "$res", resty) event
+        (*let resty = snd fun_.f_sig.fs_sig in *)
+          f_pr memid fpath args (*EcIdent.create "$res", resty*) event
 
     | PFhoareF (pre, gp, post) ->
         let fpath = trans_gamepath env gp in

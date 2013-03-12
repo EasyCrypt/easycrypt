@@ -106,6 +106,13 @@ let ofold (x : 'a option) (f : 'a -> 'b -> 'b) (v : 'b) =
 let omap (x : 'a option) (f : 'a -> 'b) =
   match x with None -> None | Some x -> Some (f x)
 
+let osmart_map (x : 'a option) (f : 'a -> 'b) =
+  match x with 
+  | None -> x 
+  | Some y -> 
+      let y' = f y in 
+      if y == y' then x else Some y'
+
 let odfl (d : 'a) (x : 'a option) =
   match x with None -> d | Some x -> x
 
@@ -326,7 +333,25 @@ module List = struct
     let i = ref (-1) in
     let f a e =  incr i; f !i a e in
     List.fold_left f a l
-    
+
+  let rec filter2 f la lb = 
+    match la, lb with
+    | [], [] -> [], []
+    | a::la, b::lb ->
+        let (la,lb as r) = filter2 f la lb in
+        if f a b then a::la, b::lb 
+        else r
+    | _, _ -> invalid_arg "List.filter2"
+
+  let rec smart_map f l = 
+    match l with
+    | [] -> l
+    | h::tl ->
+        let h' = f h in
+        let tl' = smart_map f tl in
+	if h'==h && tl'==tl then l else 
+        h'::tl'
+
 end
 
 (* -------------------------------------------------------------------- *)

@@ -129,6 +129,24 @@ let rec p_size p =
   | Pident  _     -> 1
   | Pqname (p, _) -> 1 + (p_size p)
 
+let rec p_fv fv p = 
+  match p.p_node with
+  | Psymbol _ -> fv 
+  | Pident id -> EcIdent.fv_add id fv
+  | Pqname(p,_) -> p_fv fv p
+
+let rec p_subst_ids s p =
+  match p.p_node with
+  | Psymbol _ -> p
+  | Pident id -> 
+      let id' = EcIdent.Mid.find_def id id s in
+      if id == id' then p else
+      pident id'
+  | Pqname(p1,id) ->
+      let p1' = p_subst_ids s p1 in
+      if p1 == p1' then p else
+      pqname p1' id 
+      
 (* -------------------------------------------------------------------- *)
 let m_equal   = ((==) : mpath -> mpath -> bool)
 let m_hash    = fun p -> p.m_tag
@@ -160,6 +178,9 @@ end)
 module Sm = MPath.S
 module Mm = MPath.M
 module Hm = MPath.H
+
+let rec m_fv fv mp = 
+  List.fold_left (List.fold_left m_fv) (p_fv fv (mp.m_path)) mp.m_args 
 
 (* -------------------------------------------------------------------- *)
 let mk_mpath p k args =
@@ -198,6 +219,12 @@ let mpath_of_path p =
         PKother::k,[]::args in
   let k, args = args p in
   mk_mpath p k args
+
+let rec m_subst_ids s mp = 
+  let p' = p_subst_ids s mp.m_path in
+  let args' = List.smart_map (List.smart_map (m_subst_ids s)) mp.m_args in
+  if mp.m_path == p' && mp.m_args == args' then mp
+  else { mp with m_path = p'; m_args = args' }
 
 (* -------------------------------------------------------------------- *)
 let rec m_tostring(m : mpath) = 

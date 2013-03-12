@@ -1,4 +1,5 @@
 (* -------------------------------------------------------------------- *)
+open EcMaps
 open EcIdent
 open EcTypes
 open EcModules
@@ -26,7 +27,7 @@ type binding =  (EcIdent.t * gty) list
 type form = private { 
   f_node : f_node;
   f_ty   : ty; 
-  f_fv   : EcIdent.Sid.t;
+  f_fv   : int Mid.t;
   f_tag  : int;
 }
 
@@ -47,14 +48,19 @@ and f_node =
   | FequivF of form * (EcPath.mpath * EcPath.mpath) * form  (* $left,$right / $left,$right *)
   | FequivS of form * (memenv * stmt) EcUtils.double * form (* $left,$right / $left,$right *)
 
-  | Fpr     of memory * EcPath.mpath * form list * (EcIdent.t * ty) * form 
-
-val f_equal : form -> form -> bool
+  | Fpr     of memory * EcPath.mpath * form list * form 
 
 (* -------------------------------------------------------------------- *)
-(* val fv : form -> EcIdent.Sid.t *)
-val ty : form -> EcTypes.ty
-val fv_node : f_node -> EcIdent.Sid.t
+val f_equal   : form -> form -> bool
+val f_compare : form -> form -> int
+val f_hash    : form -> int 
+val f_fv      : form -> int Mid.t 
+val f_ty      : form -> EcTypes.ty
+
+module Mf : Map.S with type key = form
+module Sf : Mf.Set with type elt = form 
+module Hf : EcMaps.Hashtbl with type key = form
+(* -------------------------------------------------------------------- *)
 val mk_form : f_node -> EcTypes.ty -> form
 
 val f_local : EcIdent.t -> EcTypes.ty -> form
@@ -76,12 +82,11 @@ val f_quant : quantif -> binding -> form -> form
 val f_exists : binding -> form -> form
 val f_forall : binding -> form -> form
 
-val f_hoare   : memenv -> form -> EcModules.stmt -> form -> form 
 val f_hoareF  : form -> EcPath.mpath -> form -> form 
+val f_hoareS   : memenv -> form -> EcModules.stmt -> form -> form 
 val f_equivF  : form -> EcPath.mpath -> EcPath.mpath -> form -> form 
-val f_pr      : 
-    memory -> EcPath.mpath -> form list -> 
-      EcIdent.t * EcTypes.ty -> form -> form
+val f_equivS  : form -> memenv -> EcModules.stmt -> memenv -> EcModules.stmt -> form -> form
+val f_pr      : memory -> EcPath.mpath -> form list -> form -> form
 
 val fop_not : form
 val f_not : form -> form
@@ -107,14 +112,31 @@ val f_iff : form -> form -> form
 val fop_eq : EcTypes.ty -> form
 val f_eq : form -> form -> form
 
-val f_int_leq : form -> form -> form
+val f_int_le : form -> form -> form
 
 val f_int_lt  : form -> form -> form
 
+(* -------------------------------------------------------------------- *)
+val f_if_simpl  : form -> form -> form -> form
+val f_let_simpl : EcTypes.lpattern -> form -> form -> form
+(*val f_quant_simpl : quantif -> binding -> form -> form
+  val f_exists_simpl : binding -> form -> form *)
+val f_forall_simpl  : binding -> form -> form
+
+val f_not_simpl  : form -> form
+val f_and_simpl  : form -> form -> form
+val f_anda_simpl : form -> form -> form
+val f_or_simpl   : form -> form -> form
+val f_ora_simpl  : form -> form -> form
+val f_imp_simpl  : form -> form -> form
+val f_iff_simpl  : form -> form -> form
+
+val f_eq_simpl     : form -> form -> form
 
 (* -------------------------------------------------------------------- *)
 type destr_error =
-    Destr_and
+  | Destr_not
+  | Destr_and
   | Destr_or
   | Destr_imp
   | Destr_forall
@@ -140,9 +162,12 @@ module Fsubst :
   sig
     val mapty : (EcTypes.ty -> EcTypes.ty) -> form -> form
     val uni : EcTypes.ty EcUidgen.Muid.t -> form -> form
-    val idty : 'a -> 'a
-    val subst_local : EcIdent.t -> form -> form -> form
     val subst_tvar : EcTypes.ty EcIdent.Mid.t -> form -> form
+
+    val subst_local : EcIdent.t -> form -> form -> form
+    val subst_locals : form EcIdent.Mid.t -> form -> form
+
+    val subst_ids : EcIdent.t EcIdent.Mid.t -> form -> form
   end
 
 type local_kind = 
@@ -223,42 +248,6 @@ sig
   val clear : EcIdent.t -> hyps -> hyps
 end
 
-(* -------------------------------------------------------------------- *)
-module Lvar :
-sig
-  type t
-
-  val mk_pvar :  EcTypes.prog_var -> EcMemory.memory -> t    
-end
-
-(* -------------------------------------------------------------------- *)
-module LVmap : Map.S with type key =  Lvar.t
-module LVset : 
-  sig
-    include Set.S with type elt =  Lvar.t
-    val pvars : t -> (EcTypes.prog_var * EcMemory.memory) list
-  end
-
-(* -------------------------------------------------------------------- *)
-
-module Pvar : sig 
-  type t = EcTypes.prog_var * EcMemory.memory * ty
-end
-module PVset : Set.S with type elt = Pvar.t
-
-module Subst :
-  sig
-    type t
-    val single_subst :  Lvar.t -> form -> t
-    val subst_form :  t -> form -> form
-    val add_subst : LVmap.key -> form -> t -> t
-    val empty_subst : t
-    val fpvar_form : form -> LVset.t
-  end
-
-
-val free_pvar : form -> PVset.t 
-
 val form_of_exp : EcMemory.memory -> EcTypes.tyexpr -> form
 
-val let_form : (Lvar.t*ty) list -> form -> form -> form 
+(* val let_form : (Lvar.t*ty) list -> form -> form -> form *)

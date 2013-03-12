@@ -71,6 +71,8 @@ type lpattern =
 
 val lp_equal : lpattern -> lpattern -> bool
 val lp_hash  : lpattern -> int 
+val lp_ids   : lpattern -> EcIdent.t list
+val lp_fv    : lpattern -> EcIdent.Sid.t
 
 (* -------------------------------------------------------------------- *)
 type pvar_kind =
@@ -82,15 +84,21 @@ type prog_var = {
   pv_kind : pvar_kind;
 }
 
-val pv_equal : prog_var -> prog_var -> bool 
+val pv_equal   : prog_var -> prog_var -> bool 
 val pv_compare : prog_var -> prog_var -> int
-val pv_hash  : prog_var -> int
-val is_loc : prog_var -> bool
+val pv_hash    : prog_var -> int
+val pv_fv      : prog_var -> int EcIdent.Mid.t
+val is_loc     : prog_var -> bool
+
+module PVsubst : sig
+  val subst_ids : EcIdent.t EcIdent.Mid.t -> prog_var -> prog_var
+end
 
 (* -------------------------------------------------------------------- *)
 type tyexpr = private {
   tye_node : tyexpr_node;
   tye_type : ty;
+  tye_fv   : int Mid.t;
   tye_tag  : int;
 }
 
@@ -110,6 +118,7 @@ val type_of_exp : tyexpr -> ty
 val e_equal   : tyexpr -> tyexpr -> bool
 val e_compare : tyexpr -> tyexpr -> int
 val e_hash    : tyexpr -> int
+val e_fv      : tyexpr -> int EcIdent.Mid.t
 
 (* -------------------------------------------------------------------- *)
 val e_int      : int -> tyexpr
@@ -131,13 +140,13 @@ val e_map :
 val e_fold :
   ('state -> tyexpr -> 'state) -> 'state -> tyexpr -> 'state
 
-val ids_of_lpattern : lpattern -> EcIdent.t list
-
 (* -------------------------------------------------------------------- *)
 module Esubst : sig
   val mapty : (ty -> ty) -> tyexpr -> tyexpr
 
   val uni : ty Muid.t -> tyexpr -> tyexpr 
+
+  val subst_ids : EcIdent.t Mid.t -> tyexpr -> tyexpr
 end
 
 (* -------------------------------------------------------------------- *)

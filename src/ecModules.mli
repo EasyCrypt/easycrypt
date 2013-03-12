@@ -21,6 +21,7 @@ val lv_equal : lvalue -> lvalue -> bool
 (* --------------------------------------------------------------------- *)
 type instr = private {
   i_node : instr_node;
+  i_fv   : int EcIdent.Mid.t;
   i_tag  : int;
 }
 
@@ -34,6 +35,7 @@ and instr_node =
 
 and stmt = private {
   s_node : instr list;
+  s_fv   : int EcIdent.Mid.t;
   s_tag  : int;
 }
 
@@ -41,11 +43,14 @@ and stmt = private {
 val i_equal   : instr -> instr -> bool
 val i_compare : instr -> instr -> int
 val i_hash    : instr -> int
+val i_fv      : instr -> int EcIdent.Mid.t
+val i_subst_ids : EcIdent.t EcIdent.Mid.t -> instr -> instr
 
 val s_equal   : stmt -> stmt -> bool
 val s_compare : stmt -> stmt -> int
 val s_hash    : stmt -> int
-
+val s_fv      : stmt -> int EcIdent.Mid.t
+val s_subst_ids : EcIdent.t EcIdent.Mid.t -> stmt -> stmt 
 (* -------------------------------------------------------------------- *)
 val asgn    : lvalue * tyexpr -> instr
 val rnd     : lvalue * tyexpr -> instr

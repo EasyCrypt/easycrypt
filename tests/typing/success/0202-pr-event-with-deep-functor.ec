@@ -28,3 +28,5 @@ module G(X : I) = {
 }.
 
 lemma L : forall {m}, Pr[f(0, 0) @ G(MI).Inner(MJ), {m} : x = y] = c.
+
+

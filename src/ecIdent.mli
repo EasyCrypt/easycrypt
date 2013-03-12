@@ -26,4 +26,10 @@ module Mid : Map.S with type key = t
 module Sid : Mid.Set with type elt = t
 
 (* -------------------------------------------------------------------- *)
+val fv_singleton : ident -> int Mid.t
+val fv_union     : int Mid.t -> int Mid.t -> int Mid.t
+val fv_diff      : int Mid.t -> 'a Mid.t -> int Mid.t 
+val fv_add       : ident -> int Mid.t -> int Mid.t 
+
+(* -------------------------------------------------------------------- *)
 val pp_ident : t EcFormat.pp

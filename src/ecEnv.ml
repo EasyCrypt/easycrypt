@@ -1659,15 +1659,15 @@ let check_alpha_equal env f1 f2 =
         aux alpha pre1  pre2;
         aux alpha post1 post2
 
-    | Fpr(m1,p1,args1,res1,f1'), Fpr(m2,p2,args2,res2, f2') 
+    | Fpr(m1,p1,args1,f1'), Fpr(m2,p2,args2,f2') 
       when EcIdent.id_equal (find alpha m1) m2 &&
            m_equal_norm env p1 p2 &&  
            List.length args1 = List.length args2 ->
         List.iter2 (aux alpha) args1 args2;
-        let (id1,ty1) = res1 in
+(*        let (id1,ty1) = res1 in
         let (id2,ty2) = res2 in
         let alpha = 
-          check_binding f1 f2 alpha [id1,GTty ty1] [id2,GTty ty2] in
+          check_binding f1 f2 alpha [id1,GTty ty1] [id2,GTty ty2] in *)
         aux alpha f1' f2'
 
     | _, _ -> error f1 f2
@@ -1717,8 +1717,8 @@ let rec norm_form env f =
 
   | FequivS _ -> assert false (* FIXME ? Not implemented *)
 
-  | Fpr(m,p,args,res,f) ->
+  | Fpr(m,p,args,f) ->
       f_pr m (Mod.unfold_mod_path env p) (List.map (norm_form env) args) 
-        res (norm_form env f)
+        (norm_form env f)
 
 let check_goal env pi ld = EcWhy3.check_goal env.env_w3 pi ld
