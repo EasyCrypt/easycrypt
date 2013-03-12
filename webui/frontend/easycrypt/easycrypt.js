@@ -79,32 +79,36 @@ EasyCryptEditor.prototype.onmessage = function(event){
 		console.log('This doesn\'t look like a valid JSON: ', event);
 		return;
 		}
-	if (json.mode == "error"){
-		this.widgets.feedback
-			.append($.format("{0} at line {1}\n", 
-						json.message, json.end.line));
+
+	if (json.status == "error") {
+        var end = this.endofsent.pop();
+
+		this.widgets.feedback.text($.format("> error: {0}\n", json.message));
+
+/*
 		var pos = { line : json.end.line-1,
 				   start : json.start_err,
 				     end : json.end_err };
 		this.setROMark_error(pos);
-		this.endofsent.pop();
-		this.widgets.next.disabled = true;
+*/
 	}
-	else if (json.mode == "undo"){
-		this.widgets.feedback
-			.append(json.data + "\n");
-	}
-	else{
+
+    else if (json.status == 'ok') {
+	    var end = this.endofsent.peek();
+
+        end.pundo = json.pundo;
 		this.setROMark(end);
-		this.widgets.feedback
-		.append($.format("STATEMENT SENT: {0} {1}\n",
-						json.end.line+1, json.end.contents));
+		this.widgets.feedback.text($.format("> {0}\n", json.message));
+    }
+
+	else if (json.status == "undo"){
+		this.widgets.feedback.text('')
 	}
-		
 }
 
 // --------------------------------------------------------------------
 // Read-only marker management
+
 EasyCryptEditor.prototype.clearROMark = function() {
     if (this.romark)
       this.romark.clear();
@@ -146,8 +150,8 @@ EasyCryptEditor.prototype.setROMark_error = function(pos) {
 // Buttons callbacks
 
 EasyCryptEditor.prototype._on_next = function() {
-	prev = this.endofsent.peek() || {line: 0, ch: 1};
-	end  = this.findStatement(prev);
+    var prev = this.endofsent.peek() || {line: 0, ch: 1};
+    var end  = this.findStatement(prev);
 
 	if (end) {
 		/*this.widgets.feedback
@@ -156,10 +160,8 @@ EasyCryptEditor.prototype._on_next = function() {
 		//alert(end.contents + " " + end.line + " " + end.ch);
 		this.endofsent.push(end);
 		this.clearERRMark();
-		var json = JSON.stringify({ mode : "forward",
-									 end : end 
-								 /*id_line : end.line,
-									data : end.contents*/});
+		var json = JSON.stringify({ mode     : "forward",
+									contents : end.contents });
 		this.socket.send(json);
 	}
 }
@@ -177,14 +179,14 @@ EasyCryptEditor.prototype._on_prev = function() {
 	/*this.widgets.feedback
     	.append($.format("LINE SENT: {0} {1}\n",
     					 posend.line+1, posend.contents));*/
-	var json = JSON.stringify({ mode : "undo", data : posend.contents});
+	var json = JSON.stringify({ mode : "undo", data : posend.pundo });
 	this.socket.send(json);
 }
 
 EasyCryptEditor.prototype._on_prevcur = function() {
-	
 	var cursor = this.editor.getCursor();
 	var history = this.endofsent.peek();
+
 	this.clearERRMark();
 	
 	while (cursor.line < history.line) 
@@ -200,12 +202,6 @@ EasyCryptEditor.prototype._on_prevcur = function() {
 		this.setROMark(history);
 		this.endofsent.push(history);
 	}
-		
-	
-	
-	//alert(history.contents + " " + history.line + " " + history.ch);
-	
-    
 }
 
 // --------------------------------------------------------------------

@@ -1,7 +1,8 @@
 #! /usr/bin/env python
 
 # --------------------------------------------------------------------l
-import sys, os, json, logging
+import sys, os, re, json, logging, gevent.subprocess as sp
+import cStringIO as sio
 import gevent, gevent.monkey, gevent.pywsgi as gwsgi
 
 from geventwebsocket.handler import WebSocketHandler
@@ -20,31 +21,93 @@ from pyramid.view import view_config
 class EasyCryptClient(object):
     def __init__(self, websocket):
         self.websocket = websocket
+        self.easycrypt = None
+        self.prompt    = None
 
-    def analyzer(self, message):
-        cont = message['end']['contents']
-        if cont.find("axim") != -1 :
-            error = json.dumps({     'mode' : 'error',
-                                     'end'  : message['end'],
-                                'start_err' : '2',
-                                  'end_err' : '6',
-                                  'message' : 'We have an error!' })
-            self.websocket.send(error)
+    def __read_prompt(self):
+        prompt = sio.StringIO()
+
+        while True:
+            content = self.easycrypt.stdout.readline().rstrip('\r\n')
+            match   = re.search(r'^\[(\d+)\]>$', content)
+
+            if match is None:
+                prompt.write('%s\r\n' % (content,))
+            else:
+                self.prompt = int(match.group(1))
+                return prompt.getvalue()
+
+    def __undo(self, id):
+        self.easycrypt.stdin.write('undo %d.\r\n' % (id,))
+        self.easycrypt.stdin.flush()
+
+        prompt  = self.__read_prompt()
+        message = dict(
+            pundo = self.prompt
+        )
+
+        self.websocket.send(json.dumps(message))
+
+    def __send(self, statement):
+        self.easycrypt.stdin.write(re.sub(r'\r?\n', ' ', statement) + '\r\n')
+        self.easycrypt.stdin.flush()
+
+    def __forward(self, contents):
+        self.__send(contents)
+
+        pundo  = self.prompt
+        prompt = self.__read_prompt()
+        match  = re.search('^\[error\](.*)', prompt, re.M | re.S)
+
+        if match is None:
+            message = dict(
+                status  = 'ok'  ,
+                message = prompt,
+                pundo   = pundo ,
+            )
         else:
-            self.websocket.send(json.dumps(message))
+            assert (pundo == self.prompt)
+            message = dict(
+                status    = 'error',
+                message   = match.group(1),
+                start_err = -1,
+                end_err   = -1,
+            )
 
-    def run(self):
+        self.websocket.send(json.dumps(message))
+
+    def __run(self):
         while True:
             message = self.websocket.receive()
             if message is None:
                 return
             message = json.loads(message)
 
-            if  message['mode'] == 'undo' :
-                undo = json.dumps({'mode' : 'undo', 'data' : 'Undo operation - OK'})
-                self.websocket.send(undo)
-            elif message['mode'] == 'forward' :
-                self.analyzer(message)
+            if  message['mode'] == 'undo':
+                self.__undo(int(message['data']))
+            elif message['mode'] == 'forward':
+                self.__forward(message['contents'])
+
+    def run(self):
+        assert (self.easycrypt == None)
+
+        self.easycrypt = \
+            sp.Popen(['easycrypt', '-emacs'],
+                     stdin  = sp.PIPE,
+                     stdout = sp.PIPE,
+                     stderr = sp.STDOUT)
+
+        try:
+            self.__read_prompt()
+            self.__run()
+        finally:
+            try:
+                self.easycrypt.kill()
+                self.easycrypt.wait()
+            except OSError:
+                pass
+            self.easycrypt = None
+            self.prompt    = None
 
 # --------------------------------------------------------------------
 @view_config(route_name = 'root', renderer = 'json')
