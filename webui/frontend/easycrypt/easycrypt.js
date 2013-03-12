@@ -32,8 +32,8 @@ EasyCryptEditor.prototype.createWidget = function() {
     if (this.editor)
         return ;
     
-    var url = "ws://localhost:8080";
-    this.socket = new WebSocket(url, "echo-protocol");
+    var url = "ws://localhost:8080/engine";
+    this.socket = new WebSocket(url, "easycrypt");
     this.socket.onopen = this.onopen.bind(this);
     this.socket.onerror = this.onerror.bind(this);
     this.socket.onmessage = this.onmessage.bind(this);
