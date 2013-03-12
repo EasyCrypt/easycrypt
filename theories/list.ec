@@ -1,6 +1,6 @@
 require import Fun.
 require import int.
-prover "Alt-Ergo" "Vampire" "Z3" "CVC3".
+
 (* constructors *)
 import why3 "list" "List"
    op "Nil" as "__nil";

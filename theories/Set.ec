@@ -1,8 +1,6 @@
 require import int.
 require import Fun.
 
- prover 1 10 "Alt-Ergo" "Vampire" "Z3" "CVC3".
-
 type 'a t.
 
 cnst empty : 'a t.
