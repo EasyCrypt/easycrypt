@@ -30,7 +30,15 @@ op in_supp (x:'a, d:'a distr) : bool =
 
 lemma mu_weight_0_1 : forall (d:'a distr),
    mu_weight d = 0%r =>
-   forall (P:'a Pred), mu d P = 0%r.
+   forall (P:'a Pred), mu d P = 0%r
+proof.
+ intros d H P.
+ cut H0: (mu d P <= mu d Ptrue).
+ apply mu_incl<:'a>(P, Ptrue, d, _).
+ trivial.
+ trivial.
+save.
+
 
 lemma mu_weight_0_2 : forall (d:'a distr),
     (forall (P:'a Pred), mu d P = 0%r) =>
