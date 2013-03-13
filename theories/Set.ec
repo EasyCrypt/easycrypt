@@ -33,6 +33,8 @@ axiom cadr2 : forall (S : 'a t, x : 'a), mem x S => card(S) = 1 + card(rm x S).
 pred [==] (X1:'a t, X2:'a t) = 
  forall (x:'a), mem x X1 <=> mem x X2.
 
+pred ext_eq (X1:'a t, X2:'a t) = X1 == X2. 
+
  (* extentional equality is an equivalence relation*)
 lemma eq_refl :
  forall (X:'a t), X == X.
