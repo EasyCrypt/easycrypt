@@ -48,7 +48,6 @@ and ctheory_clone = {
 
 and ctheory_override =
 | CTHO_Type   of EcTypes.ty
-| CTHO_Module of EcPath.path * (EcPath.path list)
 
 (* -------------------------------------------------------------------- *)
 let module_comps_of_module_sig_comps (comps : module_sig_body) =

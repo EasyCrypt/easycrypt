@@ -7,6 +7,7 @@ open EcModules
 open EcTheory
 
 module Sp    = EcPath.Sp
+module Mp    = EcPath.Mp
 module Mid   = EcIdent.Mid
 
 (* -------------------------------------------------------------------- *)
@@ -19,14 +20,16 @@ exception InconsistentSubst
 
 (* -------------------------------------------------------------------- *)
 type subst = {
-  sb_locals  : EcIdent.t   Mid.t;
+  sb_locals  : EcIdent.t    Mid.t;
   sb_modules : EcPath.mpath Mid.t;
+  sb_path    : EcPath.path  Mp.t;
 }
 
 (* -------------------------------------------------------------------- *)
 let empty : subst = {
   sb_locals  = Mid.empty;
   sb_modules = Mid.empty;
+  sb_path    = Mp.empty;
 }
 
 let is_empty s = 
@@ -46,31 +49,65 @@ let add_local (s : subst) (x : EcIdent.t) (x' : EcIdent.t) =
   in
     { s with sb_locals = Mid.change merger x s.sb_locals }
 
-let add_locals subst bindings =
+let add_locals (s : subst) bindings =
   List.fold_left
     (fun s (x, x') -> add_local s x x')
-    subst bindings
+    s bindings
+
+let add_path (s : subst) ~src ~dst =
+  assert (Mp.find_opt src s.sb_path = None);
+  { s with sb_path = Mp.add src dst s.sb_path }
 
 (* -------------------------------------------------------------------- *)
-let subst_path  (_s : subst) (p : EcPath.path) = p
-let subst_local (_s : subst) (x : EcIdent.t)   = x
+let subst_local (_s : subst) (x : EcIdent.t) = x
+
+let subst_path (s : subst) (p : EcPath.path) =
+  let rec subst_path (p : EcPath.path) =
+    match Mp.find_opt p s.sb_path with
+    | None -> begin
+        match p.EcPath.p_node with
+        | EcPath.Psymbol _ -> raise Not_found
+        | EcPath.Pident  _ -> raise Not_found
+  
+        | EcPath.Pqname (p, id) ->
+            EcPath.pqname (subst_path p) id
+    end
+
+    | Some p -> p
+  in
+    try  subst_path p
+    with Not_found -> p
 
 let rec subst_mpath (s : subst) (m : EcPath.mpath) = 
   let p    = m.EcPath.m_path 
-  and ks    = m.EcPath.m_kind 
+  and ks   = m.EcPath.m_kind 
   and args = m.EcPath.m_args in
   let args = List.map (List.map (subst_mpath s)) args in
-  let rec aux p ks args = 
-    match p.EcPath.p_node, ks, args with
-    | EcPath.Psymbol _, _, _ -> raise Not_found 
-    | EcPath.Pident id, [_], [a] ->
-        let m = Mid.find id s.sb_modules in
-        assert (a = []); (* FIXME *)
-        m
-    | EcPath.Pqname(p, id), k::ks ,a::args ->
-        EcPath.mqname (aux p ks args) k id a 
-    | _, _, _ -> assert false in
-  try aux p ks args with Not_found -> EcPath.mpath p ks args
+
+  let rec aux p ks args =
+    match Mp.find_opt p s.sb_path with
+    | None -> begin
+        match p.EcPath.p_node, ks, args with
+        | EcPath.Psymbol _, _, _ ->
+            raise Not_found
+    
+        | EcPath.Pident id, [_], [a] ->
+            assert (a = []);
+            Mid.find id s.sb_modules
+    
+        | EcPath.Pqname (p, id), k::ks, a::args ->
+            EcPath.mqname (aux p ks args) k id a
+    
+        | _, _, _ -> assert false
+    end
+
+    | Some p ->
+        assert (List.for_all (fun a -> a = []) args);
+        assert (List.for_all (fun k -> k = EcPath.PKother) ks);
+        EcPath.mpath_of_path p
+  in
+    try  aux p ks args
+    with Not_found -> EcPath.mpath p ks args
 
 (* -------------------------------------------------------------------- *)
 let rec subst_ty (s : subst) (ty : ty) =
@@ -220,12 +257,12 @@ and subst_lvalue (s : subst) (lvalue : lvalue) =
       LvTuple ptys
 
   | LvMap ((p1,tys), p2, e, ty) ->
-      let p1 = subst_path   s p1 in
+      let p1  = subst_path   s p1 in
       let tys = List.map (subst_ty s) tys in
-      let p2 = subst_pvar     s p2 in
-      let e  = subst_tyexpr s e  in
-      let ty = subst_ty     s ty in
-      LvMap ((p1,tys), p2, e, ty)
+      let p2  = subst_pvar     s p2 in
+      let e   = subst_tyexpr s e  in
+      let ty  = subst_ty     s ty in
+        LvMap ((p1,tys), p2, e, ty)
 
 (* -------------------------------------------------------------------- *)
 let subst_variable (s : subst) (x : variable) =
@@ -233,15 +270,14 @@ let subst_variable (s : subst) (x : variable) =
 
 (* -------------------------------------------------------------------- *)
 let rec subst_function (s : subst) (f : function_) =
-  let args'   = List.map
-                  (fun (x, ty) -> (x, subst_ty s ty))
-                  (fst f.f_sig.fs_sig) in
-  let res'    = subst_ty s (snd f.f_sig.fs_sig) in
-  let uses'   = f.f_sig.fs_uses in
-  let def'    = omap f.f_def (subst_function_def s)
+  let args' = List.map
+                (fun (x, ty) -> (x, subst_ty s ty))
+                (fst f.f_sig.fs_sig) in
+  let res'  = subst_ty s (snd f.f_sig.fs_sig) in
+  let uses' = f.f_sig.fs_uses in
+  let def'  = omap f.f_def (subst_function_def s)
       
   in
-
     { f_name = f.f_name;
       f_sig  = { fs_name = f.f_sig.fs_name;
                  fs_sig  = (args', res')  ;
@@ -320,6 +356,10 @@ and subst_module (s : subst) (m : module_expr) =
         me_comps = comps'  ;
         me_uses  = Sp.empty;              (* FIXME *)
         me_types = types'  ; }
+
+(* -------------------------------------------------------------------- *)
+and subst_modtype (s : subst) (modty : module_type) =
+  subst_path s modty
 
 (* -------------------------------------------------------------------- *)
 (* SUBSTITUTION OVER FORMULAE *)
@@ -443,16 +483,8 @@ let subst_ax (s : subst) (ax : axiom) =
       ax_spec   = spec  ;
       ax_kind   = kind  ; }
 
-
-
-
-
-
-
-
-(* SUBSTITUTION OVER THEORIES *)
-
 (* -------------------------------------------------------------------- *)
+(* SUBSTITUTION OVER THEORIES *)
 let rec subst_theory_item (s : subst) (item : theory_item) =
   match item with
   | Th_type (x, tydecl) ->
@@ -488,5 +520,57 @@ and subst_theory (s : subst) (items : theory) =
     List.rev items
 
 (* -------------------------------------------------------------------- *)
-let subst_modtype (s : subst) (modty : module_type) =
-  subst_path s modty
+and subst_ctheory_item (s : subst) (item : ctheory_item) =
+  match item with
+  | CTh_type (x, ty) ->
+      CTh_type (x, subst_tydecl s ty)
+
+  | CTh_operator (x, op) ->
+      CTh_operator (x, subst_op s op)
+
+  | CTh_axiom (x, ax) ->
+      CTh_axiom (x, subst_ax s ax)
+
+  | CTh_modtype (x, modty) ->
+      CTh_modtype (x, subst_modsig s modty)
+
+  | CTh_module me ->
+      CTh_module (subst_module s me)
+
+  | CTh_theory (x, cth) ->
+      CTh_theory (x, subst_ctheory s cth)
+
+  | CTh_export p ->
+      CTh_export (subst_path s p)
+
+(* -------------------------------------------------------------------- *)
+and subst_ctheory_struct (s : subst) (th : ctheory_struct) =
+  List.map (subst_ctheory_item s) th
+
+(* -------------------------------------------------------------------- *)
+and subst_ctheory_desc (s : subst) (th : ctheory_desc) =
+  match th with
+  | CTh_struct th -> CTh_struct (subst_ctheory_struct s th)
+  | CTh_clone  cl -> CTh_clone  (subst_ctheory_clone  s cl)
+
+(* -------------------------------------------------------------------- *)
+and subst_ctheory_clone (s : subst) (cl : ctheory_clone) =
+  { cthc_base = subst_path s cl.cthc_base;
+    cthc_ext  = subst_ctheory_clone_override s cl.cthc_ext; }
+
+(* -------------------------------------------------------------------- *)
+and subst_ctheory_clone_override (s : subst) overrides =
+  let do1 (x, override) =
+    let override =
+      match override with
+      | CTHO_Type ty -> CTHO_Type (subst_ty s ty)
+    in
+      (x, override)
+  in
+    List.map do1 overrides
+
+(* -------------------------------------------------------------------- *)
+and subst_ctheory (s : subst) (cth : ctheory) =
+  { cth_desc   = subst_ctheory_desc   s cth.cth_desc;
+    cth_struct = subst_ctheory_struct s cth.cth_struct; }
+

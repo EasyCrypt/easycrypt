@@ -289,8 +289,10 @@ module Theory : sig
   val lookup_opt  : qsymbol -> env -> (EcPath.path * t) option
   val lookup_path : qsymbol -> env -> EcPath.path
 
-  val add  : EcPath.path -> env -> env
-  val bind : symbol -> ctheory_w3 -> env -> env
+  val add : EcPath.path -> env -> env
+
+  val bind  : symbol -> ctheory_w3 -> env -> env
+  val bindx : symbol -> ctheory -> env -> env
 
   val require : symbol -> ctheory_w3 -> env -> env
   val import  : EcPath.path -> env -> env

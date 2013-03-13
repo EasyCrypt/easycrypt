@@ -881,14 +881,14 @@ ivar_decl:
 (* -------------------------------------------------------------------- *)
 (* EcTypes declarations / definitions                                   *)
 
-poly_type_decl:
+poly_typarams:
 | empty                              { []  }
 | x=prim_ident                       { [x] }
 | LPAREN xs=prim_ident_list1 RPAREN  { xs  }
 ;
 
 type_decl:
-| TYPE tydecl=poly_type_decl x=ident { (tydecl, x) }
+| TYPE tydecl=poly_typarams x=ident { (tydecl, x) }
 ;
 
 type_decl_or_def:
@@ -1140,14 +1140,11 @@ clone_with:
 ;
 
 clone_override:
-| TYPE x=ident EQ t=loc(type_exp)
-   { (x, PTHO_Type t) }
+| TYPE ps=poly_typarams x=ident EQ t=loc(type_exp)
+   { (x, PTHO_Type (ps, t)) }
 
-| MODULE x=ident EQ m=qident
-   { (x, PTHO_Module (m, [])) }
-
-| MODULE x=ident EQ m=qident LPAREN args=qident+ RPAREN
-  { (x, PTHO_Module (m, args)) }
+| CNST x=ident tyvars=tyvars_decl EQ e=loc(exp)
+   { (x, PTHO_Op (tyvars, e)) }
 ;
 
 (* -------------------------------------------------------------------- *)

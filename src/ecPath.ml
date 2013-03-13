@@ -81,28 +81,28 @@ let pqname  p id = mk_path (Pqname(p,id))
 (* -------------------------------------------------------------------- *)
 let rec tostring p =
   match p.p_node with
-  | Psymbol x     -> x
-  | Pident x      -> EcIdent.name x
+  | Psymbol x    -> x
+  | Pident x     -> EcIdent.name x
   | Pqname (p,x) -> Printf.sprintf "%s.%s" (tostring p) x
 
 let tolist =
   let rec aux l p = 
     match p.p_node with 
-    | Psymbol x        -> x :: l
-    | Pident x         -> EcIdent.name x :: l
+    | Psymbol x     -> x :: l
+    | Pident x      -> EcIdent.name x :: l
     | Pqname (p, x) -> aux (x :: l) p in
   aux []
 
 let toqsymbol (p : path) =
   match p.p_node with
-  | Psymbol x        -> ([], x)
-  | Pident x         -> ([], EcIdent.name x)
+  | Psymbol x     -> ([], x)
+  | Pident x      -> ([], EcIdent.name x)
   | Pqname (p, x) -> (tolist p, x)
 
 let basename p = 
   match p.p_node with 
-  | Psymbol x        -> x
-  | Pident  x        -> EcIdent.name x
+  | Psymbol x     -> x
+  | Pident  x     -> EcIdent.name x
   | Pqname (_, x) -> x
 
 let prefix p = 
@@ -204,8 +204,9 @@ let m_apply m newargs =
   | [] -> assert false
   | a :: args -> mpath m.m_path m.m_kind ((a @ newargs) :: args)
 
-let path_of_mpath m = m.m_path 
-let args_of_mpath m = m.m_args
+let path_of_mpath  m = m.m_path 
+let args_of_mpath  m = m.m_args
+let kinds_of_mpath m = m.m_kind
 
 let mpath_of_path p = 
   let rec args p = 

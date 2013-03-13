@@ -408,8 +408,26 @@ module Theory = struct
             require_loaded name scope 
 
   (* ------------------------------------------------------------------ *)
-  let clone (scope : scope) (_thcl : theory_cloning) =
-    scope                               (* FIXME *)
+  let clone (scope : scope) (thcl : theory_cloning) =
+    let cpath = scope.sc_env.EcEnv.env_scope in
+
+    if not (List.for_all ((=) EcPath.PKother) (EcPath.kinds_of_mpath cpath)) then
+      failwith "not-in-theory-scope"; (* FIXME *)
+
+    let name =
+      odfl
+        (EcPath.basename (EcPath.path_of_mpath cpath))
+        (omap (thcl.pthc_name) unloc)
+    in
+
+    let oldp, oth = EcEnv.Theory.lookup (unloc thcl.pthc_base) scope.sc_env in
+    let newp = EcPath.pqname (EcPath.path_of_mpath cpath) name in
+    let subst = EcSubst.add_path EcSubst.empty oldp newp in
+    let nth = EcSubst.subst_ctheory subst oth in
+
+      { scope with
+          sc_env =
+            EcEnv.Theory.bindx name nth scope.sc_env; }
 
   (* ------------------------------------------------------------------ *)
   let import_w3 scope dir file renaming = 

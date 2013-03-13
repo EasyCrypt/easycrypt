@@ -1273,6 +1273,35 @@ module Theory = struct
           env_item = (CTh_theory (id, cth.cth3_theory)) :: env.env_item; }
 
   (* ------------------------------------------------------------------ *)
+  let bindx name th env =
+    let rec compile1 path w3env item =
+      let xpath = fun x -> EcPath.pqname path x in
+        match item with
+        | CTh_type     (x, ty) -> EcWhy3.add_ty w3env (xpath x) ty
+        | CTh_operator (x, op) -> EcWhy3.add_op w3env (xpath x) op
+        | CTh_axiom    (x, ax) -> EcWhy3.add_ax w3env (xpath x) ax
+        | CTh_modtype  (_, _)  -> (w3env, [])
+        | CTh_module   me      -> EcWhy3.add_mod_exp w3env (xpath me.me_name) me
+        | CTh_export   _       -> (w3env, [])
+        | CTh_theory (x, th)   -> compile (xpath x) w3env th
+
+    and compile path w3env cth =
+      let (w3env, rb) =
+        List.map_fold (compile1 path) w3env cth.cth_struct
+      in
+        (w3env, List.flatten rb)
+    in
+
+    let cpath = EcPath.path_of_mpath env.env_scope in
+    let (w3env, rb) = compile (EcPath.pqname cpath name) env.env_w3 th in
+
+    let env = MC.bind_theory name th env in
+      { env with
+          env_w3   = w3env;
+          env_rb   = rb @ env.env_rb;
+          env_item = (CTh_theory (name, th)) :: env.env_item; }
+
+  (* ------------------------------------------------------------------ *)
   let rebind name cth env =
     MC.bind_theory name cth env
 
@@ -1350,8 +1379,7 @@ module Theory = struct
           MMsym.add x (mthpath, cth.cth3_theory)
             env.env_current.amc_theories;
         amc_components =
-          MMsym.add x thpath
-                     env.env_current.amc_components; }
+          MMsym.add x thpath env.env_current.amc_components; }
     in
 
     let comps = env.env_comps in
@@ -1363,6 +1391,7 @@ module Theory = struct
         env_comps   = comps;
         env_w3      = EcWhy3.rebind env.env_w3 cth.cth3_rebind; }
 
+  (* ------------------------------------------------------------------ *)
   let add (path : EcPath.path) (env : env) =
     let obj = by_path path env in 
       MC.import Px.for_theory env (EcPath.mpath_of_path path) obj

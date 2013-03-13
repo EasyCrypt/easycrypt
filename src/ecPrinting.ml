@@ -942,17 +942,6 @@ struct
       match e with
       | CTHO_Type ty ->
           pr_seq [tk_type; pr_ident tenv x; Pp.equals; pr_type tenv ty]
-
-      | CTHO_Module (mp, margs) -> begin
-          let doc =
-              match margs with
-              | [] -> pr_th_name tenv mp
-              | _  -> pr_seq [
-                  pr_th_name tenv mp;
-                  Pp.parens (pr_list_map (pr_th_name tenv) "," margs)]
-          in
-            pr_seq [tk_module; pr_ident tenv x; Pp.equals; doc]
-      end
     in
       match ctheory.cth_desc with
       | CTh_clone p ->

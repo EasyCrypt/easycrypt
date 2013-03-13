@@ -19,7 +19,6 @@ open EcSymbols
  *)
 
 (* -------------------------------------------------------------------- *)
-
 type path = private {
   p_node : path_node;
   p_tag  : int
@@ -87,6 +86,7 @@ val m_apply : mpath -> mpath list -> mpath
 
 val m_fv    : int EcIdent.Mid.t -> mpath -> int EcIdent.Mid.t
 val m_subst_ids : EcIdent.t EcIdent.Mid.t -> mpath -> mpath
+
 (* -------------------------------------------------------------------- *)
 type xpath = private {
   xp_node : mpath * symbol;
@@ -108,9 +108,10 @@ val x_hash    : xpath -> int
  * non-applied (i.e. applied to an empty list of arguments *)
 val mpath_of_path : path  -> mpath 
 
-(* Project a [mpath] to is associated [path] and [arguments] *)
-val path_of_mpath : mpath -> path
-val args_of_mpath : mpath -> mpath list list
+(* Project a [mpath] to is associated [path], [arguments] and [kinds] *)
+val path_of_mpath  : mpath -> path
+val args_of_mpath  : mpath -> mpath list list
+val kinds_of_mpath : mpath -> path_kind list
 
 (* -------------------------------------------------------------------- *)
 
