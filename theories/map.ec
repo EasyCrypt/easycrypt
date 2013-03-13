@@ -1,7 +1,7 @@
 require map_why.
 
 require import Fun.
-require import option.
+require export option.
 require Set.
 
 type ('a, 'b) map = ('a, 'b option) map_why.map.

@@ -12,15 +12,15 @@ theory RndOrcl.
   cnst dsample : to distr.
 
   module RO = { 
-    var m : (from, to) map
+    var m:(from,to) map
   
-    fun O (x:from) : to = {
+    fun O (x:from): to = {
       if (!in_dom x m) m.[x] = $dsample;
-      return m.[x];
+      return proj (m.[x]);
     }
 
     fun init () : unit = {
-      m = empty default;
+      m = empty;
     }
   }.
 
