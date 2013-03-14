@@ -1,26 +1,11 @@
-theory T.
-  theory Sub.
-    type t.
-
-    cnst myop : t -> bool.
-
-    axiom A : forall t, myop t.
-  end Sub.
-end T.
-
-clone T.Sub as U.
-
-type t = U.t.
-
-
 require bool.
 require bitstring.
 require import int.
 
-cnst length: int.
-axiom length_pos: 0 <= length.
+cnst k: int.
+axiom k_pos: 0 <= k.
 
-clone bitstring.
-type word = bitstring.bitstring.
+clone bitstring as word.
+type word = word.bitstring.
 
-axiom fixed_length: forall (w:word), length w = length.
+axiom fixed_length: forall (w:bitstring), word.length w = k.
