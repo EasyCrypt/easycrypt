@@ -1,5 +1,5 @@
-require import int.
-require import map.
+require import Int.
+require import Map.
 
 theory RndOrcl.
 

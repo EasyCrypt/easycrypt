@@ -1,4 +1,4 @@
-require int.
+require Int.
 
 import why3 "real" "Real"
   op "prefix -" as "-!".

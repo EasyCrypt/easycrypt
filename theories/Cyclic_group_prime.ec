@@ -1,5 +1,5 @@
 (* cyclic groups of prime order *)
-require import prime_field.
+require import Prime_field.
 
 type group.
 cnst g : group. (* the generator *)

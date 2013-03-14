@@ -1,15 +1,15 @@
-require map_why.
+require Map_why.
 
 require import Fun.
-require export option.
-require Set.
+require export Option.
+require        Set.
 
-type ('a, 'b) map = ('a, 'b option) map_why.map.
+type ('a, 'b) map = ('a, 'b option) Map_why.map.
 
  (* empty map, get and set *)
-cnst empty : ('a,'b) map = map_why.const None.
-op __get(m : ('a,'b) map, x : 'a) : 'b option = map_why.__get m x.
-op __set(m : ('a,'b) map, x : 'a, y : 'b) : ('a,'b) map = map_why.__set m x (Some y).
+cnst empty : ('a,'b) map = Map_why.const None.
+op __get(m : ('a,'b) map, x : 'a) : 'b option = Map_why.__get m x.
+op __set(m : ('a,'b) map, x : 'a, y : 'b) : ('a,'b) map = Map_why.__set m x (Some y).
 
  (* basic facts *)
 lemma get_upd_eq : forall (m : ('a,'b) map,x : 'a, y: 'a, v : 'b),
@@ -267,7 +267,7 @@ find P m = None => !P(x,y) =>  find P m.[x<-y] = None.
 
 (* remove operator *)
 op rm (x: 'a,m :('a,'b) map) : ('a,'b) map =
- map_why.__set m x None.
+ Map_why.__set m x None.
 
 (* facts about remove *)
 lemma rm_not_in_dom : forall(m :('a,'b) map, x: 'a), !in_dom x (rm x m).

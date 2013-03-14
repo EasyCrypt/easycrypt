@@ -1,4 +1,4 @@
-require import int.
+require import Int.
 require import Fun.
 
 type 'a t.

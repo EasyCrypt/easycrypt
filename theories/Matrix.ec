@@ -1,5 +1,5 @@
-require import pair.
-require import int.
+require import Pair.
+require import Int.
 
 (* Type declaration and core definitions *)
 (* We could use the type of arrays, but would then require a validity condition *)
@@ -115,52 +115,52 @@ trivial.
 save.
 
 (* Interactions with arrays *)
-require array.
+require        Array.
 
 (* Casting a one-row matrix to array *)
-op to_array: 'a matrix -> 'a array.array.
+op to_array: 'a matrix -> 'a Array.array.
 
 axiom to_array_length: forall (M:'a matrix),
   fst (size M) = 1 =>
-  array.length (to_array M) = snd (size M).
+  Array.length (to_array M) = snd (size M).
 
 axiom to_array_get: forall (M:'a matrix) i,
   fst (size M) = 1 =>
   0 <= i => i < snd (size M) =>
-  array.__get (to_array M) i = M.[(i,0)].
+  Array.__get (to_array M) i = M.[(i,0)].
 
 (* Extracting a row *)
-op row: ('a matrix,int) -> 'a array.array.
+op row: ('a matrix,int) -> 'a Array.array.
 
 axiom row_length: forall (M:'a matrix) j,
   0 <= j => j < snd (size M) =>
-  array.length (row M j) = fst (size M).
+  Array.length (row M j) = fst (size M).
 
 axiom row_get: forall (M:'a matrix) j i,
   0 <= j => j < snd (size M) =>
   0 <= i => i < fst (size M) =>
-  array.__get (row M j) i = M.[(i,j)].
+  Array.__get (row M j) i = M.[(i,j)].
 
 (* Extracting a column *)
-op column: ('a matrix,int) -> 'a array.array.
+op column: ('a matrix,int) -> 'a Array.array.
 
 axiom column_length: forall (M:'a matrix) i,
   0 <= i => i < fst (size M) =>
-  array.length (column M i) = snd (size M).
+  Array.length (column M i) = snd (size M).
 
 axiom column_get: forall (M:'a matrix) i j,
   0 <= i => i < fst (size M) =>
   0 <= j => j < snd (size M) =>
-  array.__get (column M i) j = M.[(i,j)].
+  Array.__get (column M i) j = M.[(i,j)].
 
 lemma column_transpose_row: forall (M:'a matrix) i,
   0 <= i => i < snd (size M) =>
   row M i = column (transpose M) i
 proof.
 intros M i i_0 i_bound.
-apply array.extentionality<:'a> ((row M i),(column (transpose M) i),_).
-  cut ext_eq: (array.length (row M i) = fst (size M) /\
-               array.length (column (transpose M) i) = fst (size M) /\
+apply Array.extentionality<:'a> ((row M i),(column (transpose M) i),_).
+  cut ext_eq: (Array.length (row M i) = fst (size M) /\
+               Array.length (column (transpose M) i) = fst (size M) /\
                forall j, 0 <= j => j < fst (size M) =>
-                 array.__get (row M i) j = array.__get (column (transpose M) i) j);trivial.
+                 Array.__get (row M i) j = Array.__get (column (transpose M) i) j);trivial.
 save.

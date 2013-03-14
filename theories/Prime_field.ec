@@ -1,6 +1,6 @@
 (* prime fields GF(q) for q prime *)
 
-require import int.
+require import Int.
 
 (* the order of field is a prime q *)
 cnst q : int.

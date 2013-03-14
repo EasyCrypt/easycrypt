@@ -1,6 +1,6 @@
-require import pair.
-require import int.
-require import bitstring.
+require import Pair.
+require import Int.
+require import Bitstring.
 require import Fun.
 require        Set.
 require import real.

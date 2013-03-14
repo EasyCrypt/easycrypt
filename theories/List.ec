@@ -1,4 +1,4 @@
-require import int.
+require import Int.
 require import Fun.
 
 (** Type Definition is imported from Why3 *)
