@@ -333,3 +333,4 @@ lemma eq_except_eq :
    m1.[x] = Some z =>
    m1 = m2.[x <- z].
 
+(* Disjoint union of maps *)
