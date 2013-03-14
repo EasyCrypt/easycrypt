@@ -32,6 +32,12 @@ CHECK = \
 	  --ok-dir=tests/modules/success \
 	  --ko-dir=tests/modules/fail
 
+CHECKLIBS = \
+	./scripts/runtest.py        \
+	  --bin=./ec.native         \
+	  --bin-args="$(CHECKARGS)" \
+	  --ok-dir=theories
+
 # --------------------------------------------------------------------
 .PHONY: all build byte native check check-xunit tags
 .PHONY: clean install uninstall dist distcheck
@@ -61,6 +67,9 @@ uninstall:
 
 check: ec.native
 	$(CHECK)
+
+checklibs: ec.native
+	$(CHECKLIBS)
 
 check-xunit: ec.native
 	$(CHECK) --xunit="$(XUNITOUT)"
