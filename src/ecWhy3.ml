@@ -1466,7 +1466,7 @@ let check_goal env pi (hyps, concl) =
           let nenv, _, f = trans_form !env !vm f in
           env := nenv;
           let pr = Decl.create_prsymbol (preid id) in
-          Decl.create_prop_decl Decl.Paxiom pr f
+          Decl.create_prop_decl Decl.Paxiom pr (force_prop f)
       | LD_mem     -> 
           let ls = Term.create_fsymbol (preid id) [] ty_mem in
           let decl = Decl.create_param_decl ls in
@@ -1486,4 +1486,4 @@ let check_goal env pi (hyps, concl) =
   List.iter trans_tv hyps.h_tvar;
   List.iter trans_hyp (List.rev hyps.h_local);
   let env, _, concl = trans_form !env !vm concl in
-  check_w3_formula pi env.logic_task concl
+  check_w3_formula pi env.logic_task (force_prop concl)
