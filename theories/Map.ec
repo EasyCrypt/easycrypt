@@ -78,9 +78,6 @@ proof.
  trivial.
 save.
 
-  (* lemma dom_eq : forall (x1 : 'a, x2 : 'a, m : ('a,'b) map), *)
-  (* in_dom x1 m => !in_dom x2 m => x1 <> x2. *)
-
 lemma in_dom_in_rng : 
  forall (m:('a,'b) map, x:'a),
 in_dom x m => in_rng (proj m.[x]) m
@@ -246,24 +243,31 @@ lemma find_none_upd1 :
  forall(P : ('a * 'b) Pred,m : ('a, 'b) map, x : 'a, y : 'b),
 find P m = None => !P(x,y) =>  find P m.[x<-y] = None.
 
-(* lemma find_none_upd2 :  *)
-(*  forall(P : ('a * 'b) Pred,m : ('a, 'b) map, x : 'a, y : 'b), *)
-(* find P m = None => P(x,y) =>  find P m.[x<-y] = Some x *)
-(* proof.  *)
-(* intros P m x y H H1. *)
-(* cut Hnone : (forall (x' : 'a), in_dom x' m => P(x',proj(m.[x']))). *)
-(* intros x' Hxindom. *)
-(* trivial. *)
-(* apply find_none1<:'a,'b>(P,m,_,x',_). *)
-(* assumption. *)
-(* assumption. *)
-(* cut Hsuff:  *)
-(*  (exists (x' : 'a),  (in_dom x' m.[x<-y]) && P(x',proj m.[x<-y].[x'])). *)
-(* cut Hsuff: *)
-(*   (in_dom x m.[x<-y] && P(x,y)). *)
-(* split. *)
-(* apply upd_in_dom_eq<:'a,'b>(m,x,x,y,_). *)
-(* trivial. *)
+lemma find_none_upd2 :
+ forall(P : ('a * 'b) Pred,m : ('a, 'b) map, x : 'a, y : 'b),
+find P m = None => P(x,y) = true  =>  find P m.[x<-y] = Some x
+proof.
+intros P m x y H H1.
+cut Hnone : (forall (x' : 'a), in_dom x' m => !P(x',proj m.[x'])).
+intros x' Hxindom.
+trivial.
+cut Hsuff:
+ (exists (x' : 'a), find P m.[x<-y] = Some x').
+trivial.
+elim Hsuff.
+intros x' Hfind.
+cut Hindom : (in_dom x' m.[x<-y]). 
+trivial. 
+cut HP : (P(x',proj m.[x<-y].[x']) = true).
+trivial.
+cut Hor: (x = x' || (x<>x' && in_dom x' m)).
+trivial.
+elim Hor;intros Heq.
+trivial.
+cut Habs: (P(x',proj (m.[x])) = true).
+trivial.
+trivial.
+save.
 
 (* remove operator *)
 op rm (x: 'a,m :('a,'b) map) : ('a,'b) map =
@@ -283,8 +287,49 @@ lemma rm_val : forall(x y : 'a)(m : ('a,'b) map),
   in_dom y m =>
   m.[y] = (rm x m).[y].
 
-(* lemma rm_find : forall(P : ('a * 'b) Pred, m : ('a,'b) map)(x y : 'a), *)
-(* find P m = Some y => *)
-(* x <> y => *)
-(* find P (rm x m) <> None. *)
+lemma rm_find : forall(P : ('a * 'b) Pred, m : ('a,'b) map)(x y : 'a),
+find P m = Some y =>
+ x <> y =>
+ find P (rm x m) <> None
+proof.
+ intros P m x y Hfind Hneq.
+ cut H: (in_dom y m && P(y,proj(m.[y])) = true).
+ trivial.
+ cut H' : (in_dom y (rm x m) && P(y,proj((rm x m).[y])) = true).
+ trivial.
+ trivial.
+save.
+
+(* extensional equality *)
+pred [==] (m1 m2 : ('a,'b) map) = 
+  (forall (x : 'a), in_dom x m1 <=> in_dom x m2) &&
+  (forall (x : 'a), in_dom x m1 => m1.[x] = m2.[x]).
+
+axiom extensionality : forall (m1 m2 : ('a,'b) map),
+ m1 == m2 => m1 = m2.
+
+(* equal except *)
+pred eq_except(m1 m2 : ('a,'b) map, x : 'a) =
+rm x m1 = rm x m2.
+
+lemma eqe_update_diff :
+  forall(m1 m2 : ('a, 'b) map)(x1 x2: 'a)( y : 'b),
+    eq_except m1 m2 x1 => 
+    eq_except m1.[x2 <- y] m2.[x2 <- y]  x1.
+
+lemma eqe_update_same_L :
+ forall(m1 m2 : ('a, 'b) map)(x : 'a, y : 'b),
+    eq_except m1 m2 x => eq_except m1.[x<-y] m2 x.
+
+lemma eqe_update_same_R :
+ forall(m1 m2 : ('a, 'b) map)(x : 'a, y : 'b),
+    eq_except m1 m2 x => eq_except m1 m2.[x<-y] x.
+
+
+lemma eq_except_eq : 
+   forall (m1 m2:('a,'b)map)(x:'a, z:'b),
+   eq_except m1 m2 x =>
+   in_dom x m1 =>
+   m1.[x] = Some z =>
+   m1 = m2.[x <- z].
 
