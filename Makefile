@@ -36,7 +36,8 @@ CHECKLIBS = \
 	./scripts/runtest.py        \
 	  --bin=./ec.native         \
 	  --bin-args="$(CHECKARGS)" \
-	  --ok-dir=theories
+	  --ok-dir=theories         \
+	  --xunit=libresults.xml
 
 # --------------------------------------------------------------------
 .PHONY: all build byte native check check-xunit tags
