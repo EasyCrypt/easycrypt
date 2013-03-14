@@ -60,7 +60,7 @@ lemma sub_anti_sym :
 lemma sub_trans :
  forall (X Y Z:'a t), X <= Y => Y <= Z => X <= Z.
 
-axiom extentionnality : 
+axiom extentionality : 
  forall (X1:'a t, X2:'a t),
 X1 = X2 <=> X1 == X2.
 
@@ -308,9 +308,8 @@ save.
 lemma inter_add : forall(X:'a t, Y:'a t, x: 'a),
 add x (inter X Y) = inter (add x X) (add x Y)
 proof.
- intros X Y x.
- cut H: (add x (inter X Y) == inter (add x X) (add x Y)).
- trivial.
+ intros X Y x;cut ext_eq: (add x (inter X Y) == inter (add x X) (add x Y)).
+   cut H: (forall y, mem y (add x (inter X Y)) = mem y (inter (add x X) (add x Y)));trivial.
  trivial.
 save.
 

@@ -153,12 +153,14 @@ axiom column_get: forall (M:'a matrix) i j,
   0 <= j => j < snd (size M) =>
   array.__get (column M i) j = M.[(i,j)].
 
-(* Checking lemma *)
 lemma column_transpose_row: forall (M:'a matrix) i,
   0 <= i => i < snd (size M) =>
   row M i = column (transpose M) i
 proof.
 intros M i i_0 i_bound.
 apply array.extentionality<:'a> ((row M i),(column (transpose M) i),_).
-trivial.
+  cut ext_eq: (array.length (row M i) = fst (size M) /\
+               array.length (column (transpose M) i) = fst (size M) /\
+               forall j, 0 <= j => j < fst (size M) =>
+                 array.__get (row M i) j = array.__get (column (transpose M) i) j);trivial.
 save.

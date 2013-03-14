@@ -232,8 +232,14 @@ theory Dexcepted.
     Dscale.dscale (Drestr.drestr d X). 
 
   lemma supp_def : forall (d:'a distr, X:'a Set.t, x:'a),
-     in_supp x (d \ X) <=> in_supp x d && !Set.mem x X.
-
+     (in_supp x (d \ X) => (in_supp x d /\ !Set.mem x X)) /\
+     ((in_supp x d /\ !Set.mem x X) => in_supp x (d \ X))
+  proof.
+  intros d X x;split.
+    intros in_supp;split;trivial.
+    intros in_supp_nmem;trivial.
+  save.
+    
   lemma mu_x_def: forall (d:'a distr, X:'a Set.t, x:'a),
      mu_x (d \ X) x = (in_supp x (d \ X)) ? mu_x d x / (mu_weight d - mu d (Set.Pmem X)) : 0%r.
 
