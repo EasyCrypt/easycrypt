@@ -1,4 +1,5 @@
 (* -------------------------------------------------------------------- *)
+open EcDebug
 open EcMaps
 open EcIdent
 open EcTypes
@@ -60,6 +61,10 @@ val f_ty      : form -> EcTypes.ty
 module Mf : Map.S with type key = form
 module Sf : Mf.Set with type elt = form 
 module Hf : EcMaps.Hashtbl with type key = form
+
+(* -------------------------------------------------------------------- *)
+val f_dump : form -> dnode
+
 (* -------------------------------------------------------------------- *)
 val mk_form : f_node -> EcTypes.ty -> form
 

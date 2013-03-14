@@ -8,6 +8,7 @@ module Msym = EcSymbols.Msym
 type memory = EcIdent.t
 
 let mem_equal = EcIdent.id_equal
+
 (* -------------------------------------------------------------------- *)
 type memenv = {
   me_memory : memory;
@@ -17,7 +18,6 @@ type memenv = {
 let me_equal me1 me2 = 
   EcIdent.id_equal me1.me_memory me2.me_memory &&
   Msym.equal EcTypes.ty_equal me1.me_vars me2.me_vars
-
 
 (* -------------------------------------------------------------------- *)
 let memory   { me_memory = m } = m
@@ -42,8 +42,6 @@ let bind (x : symbol) (ty : EcTypes.ty) (me : memenv) =
 (* -------------------------------------------------------------------- *)
 let lookup (x : symbol) (me : memenv) =
   Msym.find_opt x me.me_vars
-
-
 
 (* remove this *)
 let dummy_memenv = let mem_id = EcIdent.create "$std" in

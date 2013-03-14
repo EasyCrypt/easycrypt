@@ -1,4 +1,5 @@
 (* -------------------------------------------------------------------- *)
+open EcDebug
 open EcUtils
 open EcMaps
 open EcIdent
@@ -102,8 +103,8 @@ let b_hash (bs : binding) =
 module Hsform = Why3.Hashcons.Make (struct
   type t = form
 
-  let equal f1 f2 =
-    match f1.f_node, f2.f_node with
+  let equal_node f1 f2 =
+    match f1, f2 with
     | Fquant(q1,b1,f1), Fquant(q2,b2,f2) ->
         qt_equal q1 q2 && b_equal b1 b2 && f_equal f1 f2 
 
@@ -164,6 +165,10 @@ module Hsform = Why3.Hashcons.Make (struct
         && (List.all2 f_equal args1 args2)
 
     | _, _ -> false
+
+  let equal f1 f2 =
+       ty_equal f1.f_ty f2.f_ty
+    && equal_node f1.f_node f2.f_node
 
   let hash f =
     match f.f_node with 
@@ -259,7 +264,72 @@ module Hsform = Why3.Hashcons.Make (struct
 end)
 
 (* -------------------------------------------------------------------- *)
+let rec lp_dump (lp : lpattern) =
+  match lp with
+  | LSymbol x ->
+      dleaf "LSymbol (%s)" (EcIdent.tostring x)
 
+  | LTuple xs ->
+      let xs = List.map EcIdent.tostring xs in
+        dleaf "LTuple (%s)" (String.concat ", " xs)
+
+let string_of_quantif = function
+  | Lforall -> "Lforall"
+  | Lexists -> "Lexists"
+
+let gty_dump (gty : gty) =
+  match gty with
+  | GTty    t -> dnode "GTty" [ty_dump t]
+  | GTmodty _ -> dleaf "GTmodty"
+  | GTmem     -> dleaf "GTmem"
+
+let bd_dump (x, gty) =
+  dnode
+    (Printf.sprintf "binding (%s)" (EcIdent.tostring x))
+    [gty_dump gty]
+
+let rec f_dump (f : form) : dnode =
+  let node =
+    match f.f_node with
+    | Fquant (q, b, f) ->
+        dnode
+          (Printf.sprintf "Fquant (%s)" (string_of_quantif q))
+          (List.flatten [List.map bd_dump b; [f_dump f]])
+  
+    | Flocal x ->
+        dleaf "Flocal (%s)" (EcIdent.tostring x)
+  
+    | Fint i ->
+        dleaf "Fint (%d)"  i
+  
+    | Fpvar (x, m) ->
+        dleaf "Fpvar (%s, %s)" (string_of_pvar x) (EcIdent.tostring m)
+  
+    | Fif (c, f1, f2) ->
+        dnode "Fif" (List.map f_dump [c; f1; f2])
+  
+    | Flet (p, f1, f2) ->
+        dnode "Flet" [lp_dump p; f_dump f1; f_dump f2]
+  
+    | Fapp (f, fs) ->
+        dnode "Fapp" [f_dump f; dnode "arguments" (List.map f_dump fs)]
+  
+    | Fop (p, tys) ->
+        dnode
+          (Printf.sprintf "Fop (%s)" (EcPath.tostring p))
+          [dnode "type-arguments" (List.map ty_dump tys)]
+  
+    | Ftuple fs ->
+        dnode "Ftuple" (List.map f_dump fs)
+  
+    | FhoareF _ -> dleaf "FhoareF"
+    | FhoareS _ -> dleaf "FhoareS"
+    | FequivF _ -> dleaf "FequivF"
+    | FequivS _ -> dleaf "FequivS"
+    | Fpr     _ -> dleaf "Fpr"
+  in
+    (* dnode "Form" [ty_dump f.f_ty; node] *)
+    node
 
 (* -------------------------------------------------------------------- *)
 let mk_form node ty =  Hsform.hashcons 
@@ -448,15 +518,14 @@ let is_exists f =
   | _ -> false
   
 (* -------------------------------------------------------------------- *)
-(* -------------------------------------------------------------------- *)
-let map gt g f = 
+let map gt g f =
     (* FIXME : gt should by apply on stmt ? *)
     match f.f_node with
     | Fquant(q,b,f1) ->
         let map_gty (x,ty as b1) = 
-          let ty' = 
-            match ty with 
-            | GTty ty1 -> 
+          let ty' =
+            match ty with
+            | GTty ty1 ->
                 let ty1' = gt ty1 in
                 if ty1 == ty1' then ty else GTty ty1'
             | _ -> ty in
@@ -464,61 +533,73 @@ let map gt g f =
         let b' = List.smart_map map_gty b in
         let f1' = g f1 in
         if b == b' && f1 == f1' then f else f_quant q b' f1'
-    | Fif(f1,f2,f3) -> 
+
+    | Fif(f1,f2,f3) ->
         let f1' = g f1 in
         let f2' = g f2 in
         let f3' = g f3 in
         if f1 == f1' && f2 == f2' && f3 == f3' then f else
         f_if f1' f2' f3'
-    | Flet(lp,f1,f2) -> 
+
+    | Flet(lp,f1,f2) ->
         let f1' = g f1 in
         let f2' = g f2 in
         if f1 == f1' && f2 == f2' then f else
         f_let lp f1' f2'
+
     | Fint _ -> f 
+
     | Flocal id ->
         let ty' = gt f.f_ty in
-        if f.f_ty == ty' then f else 
-        f_local id (gt f.f_ty)
+          if f.f_ty == ty' then f else f_local id ty'
+
     | Fpvar(id,s) -> 
         let ty' = gt f.f_ty in
         if f.f_ty == ty' then f else 
         f_pvar id ty' s
+
     | Fop(p,tys) -> 
         let tys' = List.smart_map gt tys in
         let ty' = gt f.f_ty in
         if f.f_ty == ty' && tys == tys' then f else
         f_op p tys' ty'
+
     | Fapp(e, es) ->
         let e' = g e in
         let es' = List.smart_map g es in
         let ty' = gt f.f_ty in
         if f.f_ty == ty' && e == e' && es == es' then f else
         f_app e' es' ty'
+
     | Ftuple es -> 
         let es' = List.smart_map g es in
         if es == es' then f else 
         f_tuple es'
+
     | FhoareF(pre,mp,post) -> 
         let pre' = g pre in
         let post' = g post in
         if pre == pre' && post == post' then f else 
         f_hoareF pre' mp post'
+
     | FhoareS(m,pre,s,post) ->
         let pre' = g pre in
         let post' = g post in
         if pre == pre' && post == post' then f else 
         f_hoareS m pre' s post'
+
     | FequivF(pre,(mp1,mp2),post) -> 
         let pre' = g pre in
         let post' = g post in
         if pre == pre' && post == post' then f else 
         f_equivF pre' mp1 mp2 post'
+
     | FequivS(pre,((ml,sl),(mr,sr)),post) ->
         let pre' = g pre in
         let post' = g post in
         if pre == pre' && post == post' then f else 
         f_equivS pre' ml sl mr sr post'
+
     | Fpr(m,mp,args,ev) -> 
         let args' = List.smart_map g args in
         let ev' = g ev in
@@ -589,8 +670,7 @@ module Fsubst = struct
           (* FIXME me1/2 : should we perform subst in path ? *)
           if pre == pre' && st1 == st1' && st2 == st2' && post == post' then f 
           else f_equivS pre me1 st1' me2 st2' post'
-      | _ -> map (fun ty -> ty) aux f )
-
+      | _ -> map (fun ty -> ty) aux f)
 end
 
 

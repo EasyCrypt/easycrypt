@@ -2,6 +2,15 @@
 open EcUtils
 
 (* -------------------------------------------------------------------- *)
+type dnode = [`Node of string * dnode list]
+
+let dnode (s : string) (c : dnode list) = `Node (s, c)
+
+
+let dleaf x =
+  Printf.ksprintf (fun s -> `Node (s, [])) x
+
+(* -------------------------------------------------------------------- *)
 type ppdebug = {
   ppindent : (bool * int option) list;
   ppstream : out_channel;
@@ -124,3 +133,8 @@ let onhlist (pp : ppdebug) ?enum ?extra (txt : string) cb xs =
 (* -------------------------------------------------------------------- *)
 let single (pp : ppdebug) ?extra (txt : string) =
   onseq pp ?extra txt (Stream.of_list [])
+
+(* -------------------------------------------------------------------- *)
+let rec ondnode (pp : ppdebug) (node : dnode) =
+  let `Node (txt, ns) = node in
+    onhseq pp txt ondnode (Stream.of_list ns)

@@ -1,4 +1,5 @@
 (* -------------------------------------------------------------------- *)
+open EcDebug
 open EcUtils
 open EcSymbols
 open EcIdent
@@ -87,6 +88,30 @@ let treal      = tconstr EcCoreLib.p_real  []
  
 let toarrow dom ty = 
   List.fold_right tfun dom ty
+
+(* -------------------------------------------------------------------- *)
+let rec ty_dump (ty : ty) =
+  match ty.ty_node with
+  | Tunivar i ->
+      dleaf "Tunivar (%d)" i
+
+  | Tvar x ->
+      dleaf "Tvar (%s)" (EcIdent.tostring x)
+
+  | Ttuple ts ->
+      dnode "Ttuple" (List.map ty_dump ts)
+
+  | Tconstr (p, ts) ->
+      dnode
+        (Printf.sprintf "Tconstr (%s)" (EcPath.tostring p))
+        (List.map ty_dump ts)
+
+  | Tfun (ty1, ty2) ->
+      dnode "Tfun" [ty_dump ty1; ty_dump ty2]
+
+(* -------------------------------------------------------------------- *)
+let dom_dump (dom : dom) =
+  dnode "domain" (List.map ty_dump dom)
 
 (* -------------------------------------------------------------------- *)
 let map f t = 
@@ -198,6 +223,15 @@ let pv_compare v1 v2 =
 
 let is_loc v = match v.pv_kind with PVloc -> true | _ -> false
   
+let string_of_pvar_kind = function
+  | PVglob -> "PVglob"
+  | PVloc  -> "PVloc"
+
+let string_of_pvar (p : prog_var) =
+  Printf.sprintf "%s[%s]"
+    (EcPath.m_tostring p.pv_name)
+    (string_of_pvar_kind p.pv_kind)
+
 module PVsubst = struct 
   let subst_ids s pv = 
     let mp' = EcPath.m_subst_ids s pv.pv_name in
@@ -400,6 +434,12 @@ module MSHe = EcMaps.MakeMSH(struct type t = tyexpr let tag e = e.tye_tag end)
 module Me = MSHe.M  
 module Se = MSHe.S
 module He = MSHe.H  
+
+(* -------------------------------------------------------------------- *)
+let rec expr_dump (e : tyexpr) =
+  match e.tye_node with
+  | _ -> dleaf "expression"
+
 (* -------------------------------------------------------------------- *)
 module Esubst = struct 
   let mapty onty = He.memo_rec 107 (e_map onty)

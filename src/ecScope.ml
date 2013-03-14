@@ -850,9 +850,10 @@ module Ax = struct
     let concl = TT.transformula scope.sc_env ue ax.pa_formula in
     let concl = 
       EcFol.Fsubst.mapty (Tuni.subst (EcUnify.UniEnv.close ue)) concl in
-    let tparams = EcUnify.UniEnv.tparams ue in 
+    let tparams = EcUnify.UniEnv.tparams ue in
     let check = Check_mode.check scope.sc_options in
     let loc = ax.pa_name.pl_loc in
+
     match ax.pa_kind with
     | PILemma when check -> 
         None, start_lemma scope (unloc ax.pa_name) tparams concl 
@@ -868,5 +869,4 @@ module Ax = struct
                     ax_spec = Some concl;
                     ax_kind = Axiom } in
         Some (unloc ax.pa_name), bind scope (unloc ax.pa_name, axd)
-          
 end

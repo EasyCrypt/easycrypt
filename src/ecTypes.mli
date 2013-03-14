@@ -1,4 +1,5 @@
 (* -------------------------------------------------------------------- *)
+open EcDebug
 open EcMaps
 open EcUtils
 open EcSymbols
@@ -8,9 +9,10 @@ open EcIdent
 
 (* -------------------------------------------------------------------- *)
 type ty = private {
-    ty_node : ty_node;
-    ty_tag  : int 
-  }
+  ty_node : ty_node;
+  ty_tag  : int 
+}
+
 and ty_node =
   | Tunivar of EcUidgen.uid
   | Tvar    of EcIdent.t 
@@ -37,6 +39,10 @@ val tint       : ty
 val treal      : ty
 val tdistr     : ty -> ty
 val toarrow    : dom -> ty -> ty
+
+(* -------------------------------------------------------------------- *)
+val ty_dump  : ty -> EcDebug.dnode
+val dom_dump : dom -> EcDebug.dnode
 
 (* -------------------------------------------------------------------- *)
 module Tuni : sig
@@ -90,6 +96,8 @@ val pv_hash    : prog_var -> int
 val pv_fv      : prog_var -> int EcIdent.Mid.t
 val is_loc     : prog_var -> bool
 
+val string_of_pvar : prog_var -> string
+
 module PVsubst : sig
   val subst_ids : EcIdent.t EcIdent.Mid.t -> prog_var -> prog_var
 end
@@ -113,6 +121,7 @@ and tyexpr_node =
   | Eif       of tyexpr * tyexpr * tyexpr    (* _ ? _ : _             *)
 
 val type_of_exp : tyexpr -> ty
+val expr_dump   : tyexpr -> dnode
 
 (* -------------------------------------------------------------------- *)
 val e_equal   : tyexpr -> tyexpr -> bool

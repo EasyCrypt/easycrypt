@@ -59,7 +59,8 @@ let add_path (s : subst) ~src ~dst =
   { s with sb_path = Mp.add src dst s.sb_path }
 
 (* -------------------------------------------------------------------- *)
-let subst_local (_s : subst) (x : EcIdent.t) = x
+let subst_local (s : subst) (x : EcIdent.t) =
+  odfl x (Mid.find_opt x s.sb_locals)
 
 let subst_path (s : subst) (p : EcPath.path) =
   let rec subst_path (p : EcPath.path) =
@@ -149,8 +150,8 @@ let rec subst_tyexpr (s : subst) (e : tyexpr) =
       e_int i
 
   | Elocal x ->
-      let x  = subst_local s x in
-      e_local x e.tye_type
+      let x = subst_local s x in
+        e_local x (subst_ty s e.tye_type)
 
   | Evar x ->
       e_var (subst_pvar s x) e.tye_type
@@ -386,9 +387,7 @@ and subst_form_node (s : subst) (f : f_node) =
 
       let sbody =
         add_locals s
-          (List.combine
-             (List.map (EcIdent.fresh -| fst) bindings   )
-             (List.map (EcIdent.fresh -| fst) newbindings))
+          (List.combine (List.map fst bindings) (List.map fst newbindings))
       in
 
         Fquant (mode, newbindings, subst_form sbody f)
