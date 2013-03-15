@@ -53,8 +53,8 @@ lemma mu_weight_0 : forall (d:'a distr),
  * Then use it to prove lemma on mu_x
  * i.e as in Dunit
 *)
+(* Uniform distribution on a (countable) type *)
 theory Dunit.
-
   op dunit : 'a -> 'a distr.
 
   axiom mu_def_in : forall (x:'a, P:'a Pred),
@@ -77,11 +77,10 @@ theory Dunit.
 
   lemma mu_weight : forall (x:'a),
      mu_weight (dunit x) = 1%r.
-
 end Dunit.
 
+(* Uniform distribution on a (finite) set *)
 theory Duni.
-
   op duni : 'a Set.t -> 'a distr.
 
   axiom supp_def : forall (x:'a, X:_), in_supp x (duni X) <=> Set.mem x X.
@@ -104,9 +103,9 @@ theory Duni.
   axiom mu_weight : forall (X:'a Set.t), 
      !Set.is_empty X =>
      mu_weight (duni X) = 1%r.
-
 end Duni.
 
+(* Uniform distribution on booleans *)
 theory Dbool.
   cnst dbool : bool distr.
 
@@ -120,34 +119,32 @@ theory Dbool.
   axiom mu_x_def : forall (b:bool), mu_x dbool b = 1%r/2%r.
 
   lemma mu_weight : mu_weight dbool = 1%r.
-
 end Dbool.
 
+(* Uniform distribution on (closed) integer intervals *)
 theory Dinter.
-
   op dinter : (int,int) -> int distr.
 
-  axiom supp_def : forall (i:int,j:int,x:int), 
+  axiom supp_def : forall (i:int,j:int,x:int),
     in_supp x (dinter i j) <=>
-     i <= x && x <= j. 
+     i <= x && x <= j.
 
   axiom mu_x_def_in : forall (i:_,j:_,x:int),
      i <= x => x <= j =>
-     mu_x (dinter i j) x = 1%r / (i - j + 1)%r. 
+     mu_x (dinter i j) x = 1%r / (i - j + 1)%r.
 
   axiom mu_x_def_other : forall (i:_,j:_,x:int),
     x < i || j < x =>  mu_x (dinter i j) x = 0%r.
 
-  axiom mu_weight_le : forall (i:int,j:int), i <= j => 
-     mu_weight(dinter i j) = 1%r.  
+  axiom mu_weight_le : forall (i:int,j:int), i <= j =>
+     mu_weight(dinter i j) = 1%r.
  
   axiom mu_weight_gt : forall (i:int,j:int), j < i =>
-    mu_weight(dinter i j) = 0%r.   
-
+    mu_weight(dinter i j) = 0%r.
 end Dinter.
 
+(* Uniform distribution on fixed-length bitstrings *)
 theory Dbitstring.
-
   op dbitstring : int -> bitstring distr.
 
   axiom supp_def : forall ( k:int, s:bitstring),
@@ -165,10 +162,9 @@ theory Dbitstring.
 
   axiom mu_weight_neg : forall (k:int), k < 0 =>
     mu_weight(dbitstring k) = 0%r.
-
 end Dbitstring.
 
-
+(* Product distribution *)
 theory Dprod.
   op dprod : ('a distr, 'b distr) -> ('a * 'b) distr.
   
@@ -180,9 +176,9 @@ theory Dprod.
 
   axiom mu_weight : forall (d1:'a distr, d2:'b distr), 
      mu_weight (dprod d1 d2) = mu_weight d1 * mu_weight d2.
-
 end Dprod.
 
+(* Restriction of a distribution (sub-distribution) *)
 theory Drestr.
   op drestr : ('a distr, 'a Set.t) -> 'a distr.
  
@@ -199,11 +195,10 @@ theory Drestr.
 
   axiom mu_weight : forall (d:'a distr, X:'a Set.t), 
     mu_weight(drestr d X) = mu_weight(d) - mu d (Set.Pmem X).
-
 end Drestr.
 
+(* Normalization of a sub-distribution *)
 theory Dscale.
-
   op dscale : 'a distr -> 'a distr.
 
   axiom supp_def : forall (d:'a distr, x:'a),
@@ -224,9 +219,9 @@ theory Dscale.
   axiom mu_weight_1 : forall (d:'a distr),
     mu_weight d <> 0%r => 
     mu_weight (dscale d) = 1%r.
-
 end Dscale.
 
+(* Restriction of a distribution (distribution) *)
 theory Dexcepted.
   op [\] (d:'a distr, X:'a Set.t) : 'a distr =
     Dscale.dscale (Drestr.drestr d X). 
@@ -247,8 +242,8 @@ theory Dexcepted.
     mu_weight (d \ X) = (mu_weight d = mu d (Set.Pmem X)) ? 0%r : 1%r.
 end Dexcepted.
 
+(* Laplacian *)
 theory Dlap.
-
   op dlap : (int,real) -> int distr.
 
   axiom in_supp : forall (mean:_, scale:_, x:_), 
@@ -265,7 +260,6 @@ theory Dlap.
   axiom mu_weight : forall  (mean:_, scale:_), 
     0%r <= scale =>
     mu_weight (dlap mean scale) = 1%r.
-
 end Dlap.
 
 (* x = $dlap(x1,s)   ~ x = $dlap(0,s) + x1 : ={x1,s} ==> ={x}. *)

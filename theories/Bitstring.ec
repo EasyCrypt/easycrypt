@@ -1,9 +1,11 @@
 require        Bool.
 require import Int.
+require        Array.
 
 (* clone Array as Bits.
 export Bits. *)
-require export Array.
+(*export Array.*)
+export Array.
 type bitstring = bool array.
 
 (* Xor *)
