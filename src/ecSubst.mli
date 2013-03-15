@@ -26,16 +26,6 @@ val add_module : subst -> EcIdent.t -> mpath -> subst
 val add_path   : subst -> src:path -> dst:path -> subst
 
 (* -------------------------------------------------------------------- *)
-val subst_path  : subst -> EcPath.path -> EcPath.path
-val subst_mpath : subst -> EcPath.mpath -> EcPath.mpath
-
-(* -------------------------------------------------------------------- *)
-val subst_pvar    : subst -> prog_var -> prog_var
-val subst_ty      : subst -> ty -> ty
-val subst_tyexpr  : subst -> tyexpr -> tyexpr
-val subst_form    : subst -> form -> form
-val subst_tydecl  : subst -> tydecl -> tydecl
-val subst_op      : subst -> operator -> operator
 val subst_theory  : subst -> theory -> theory
 val subst_ctheory : subst -> ctheory -> ctheory
 

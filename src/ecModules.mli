@@ -14,7 +14,7 @@ type lvalue =
   | LvVar   of (EcTypes.prog_var * EcTypes.ty)
   | LvTuple of (EcTypes.prog_var * EcTypes.ty) list
   | LvMap   of (EcPath.path * EcTypes.ty list) * 
-                  EcTypes.prog_var * EcTypes.tyexpr * EcTypes.ty
+                  EcTypes.prog_var * EcTypes.expr * EcTypes.ty
 
 val lv_equal : lvalue -> lvalue -> bool
 
@@ -26,12 +26,12 @@ type instr = private {
 }
 
 and instr_node =
-  | Sasgn   of lvalue * EcTypes.tyexpr
-  | Srnd    of lvalue * EcTypes.tyexpr
-  | Scall   of lvalue option * EcPath.mpath * EcTypes.tyexpr list
-  | Sif     of EcTypes.tyexpr * stmt * stmt
-  | Swhile  of EcTypes.tyexpr * stmt
-  | Sassert of EcTypes.tyexpr
+  | Sasgn   of lvalue * EcTypes.expr
+  | Srnd    of lvalue * EcTypes.expr
+  | Scall   of lvalue option * EcPath.mpath * EcTypes.expr list
+  | Sif     of EcTypes.expr * stmt * stmt
+  | Swhile  of EcTypes.expr * stmt
+  | Sassert of EcTypes.expr
 
 and stmt = private {
   s_node : instr list;
@@ -44,20 +44,19 @@ val i_equal   : instr -> instr -> bool
 val i_compare : instr -> instr -> int
 val i_hash    : instr -> int
 val i_fv      : instr -> int EcIdent.Mid.t
-val i_subst_ids : EcIdent.t EcIdent.Mid.t -> instr -> instr
 
 val s_equal   : stmt -> stmt -> bool
 val s_compare : stmt -> stmt -> int
 val s_hash    : stmt -> int
 val s_fv      : stmt -> int EcIdent.Mid.t
-val s_subst_ids : EcIdent.t EcIdent.Mid.t -> stmt -> stmt 
+val s_subst   : e_subst -> stmt -> stmt 
 (* -------------------------------------------------------------------- *)
-val asgn    : lvalue * tyexpr -> instr
-val rnd     : lvalue * tyexpr -> instr
-val call    : lvalue option * mpath * tyexpr list -> instr
-val if_     : tyexpr * stmt * stmt -> instr
-val while_  : tyexpr * stmt -> instr
-val assert_ : tyexpr -> instr
+val i_asgn    : lvalue * expr -> instr
+val i_rnd     : lvalue * expr -> instr
+val i_call    : lvalue option * mpath * expr list -> instr
+val i_if      : expr * stmt * stmt -> instr
+val i_while   : expr * stmt -> instr
+val i_assert  : expr -> instr
 
 val stmt : instr list -> stmt
 
@@ -77,6 +76,11 @@ end
 type use_flags = UM.flags
 
 (* -------------------------------------------------------------------- *)
+type variable = {
+  v_name : symbol;
+  v_type : EcTypes.ty;
+}
+
 type module_type = EcPath.path
 
 type module_sig = {
@@ -88,12 +92,12 @@ type module_sig = {
 and module_sig_body = module_sig_body_item list
 
 and module_sig_body_item =
-  | Tys_variable of (symbol * EcTypes.ty)
+  | Tys_variable of variable
   | Tys_function of funsig
 
 and funsig = {
   fs_name : symbol;
-  fs_sig  : (symbol * EcTypes.ty) list * EcTypes.ty;
+  fs_sig  : variable list * EcTypes.ty;
   fs_uses : use_flags EcPath.Mp.t;
 }
 
@@ -133,15 +137,12 @@ and function_ = {
 }
 
 and function_def = {
-  f_locals : (symbol * EcTypes.ty) list;
+  f_locals : variable list;
   f_body   : stmt;
-  f_ret    : EcTypes.tyexpr option;
+  f_ret    : EcTypes.expr option;
 }
 
-and variable = {
-  v_name : symbol;
-  v_type : EcTypes.ty;
-}
+
 
 (* -------------------------------------------------------------------- *)
 val fd_equal : function_def -> function_def -> bool

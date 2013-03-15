@@ -114,21 +114,30 @@ let dom_dump (dom : dom) =
   dnode "domain" (List.map ty_dump dom)
 
 (* -------------------------------------------------------------------- *)
-let map f t = 
+let ty_map f t = 
   match t.ty_node with 
   | Tunivar _ | Tvar _ -> t
-  | Ttuple lty -> ttuple (List.map f lty)
-  | Tconstr(p, lty) -> tconstr p (List.map f lty)
-  | Tfun(t1,t2)     -> tfun (f t1) (f t2)
+  | Ttuple lty -> 
+      let lty' = List.smart_map f lty in
+      if lty == lty' then t else
+      ttuple lty'
+  | Tconstr(p, lty) -> 
+      let lty' = List.smart_map f lty in
+      if lty == lty' then t else
+      tconstr p lty'
+  | Tfun(t1,t2) -> 
+      let t1' = f t1 and t2' = f t2 in
+      if t1 == t1' && t2 == t2' then t else
+      tfun t1' t2'
 
-let fold f s ty = 
+let ty_fold f s ty = 
   match ty.ty_node with 
   | Tunivar _ | Tvar _ -> s
   | Ttuple lty -> List.fold_left f s lty
   | Tconstr(_, lty) -> List.fold_left f s lty
   | Tfun(t1,t2) -> f (f s t1) t2
 
-let sub_exists f t =
+let ty_sub_exists f t =
   match t.ty_node with
   | Tunivar _ | Tvar _ -> false
   | Ttuple lty -> List.exists f lty
@@ -136,19 +145,43 @@ let sub_exists f t =
   | Tfun (t1,t2) -> f t1 || f t2
   
 (* -------------------------------------------------------------------- *)
+type ty_subst = {
+    ts_p : EcPath.path -> EcPath.path;
+    ts_u : ty Muid.t;
+    ts_v : ty Mid.t;
+  }
+
+let ty_subst_id = 
+  { ts_p = identity;
+    ts_u = Muid.empty;
+    ts_v = Mid.empty }
+
+let ty_subst s =
+  Hty.memo_rec 107 (fun aux ty ->
+    match ty.ty_node with 
+    | Tunivar id -> 
+        odfl ty (Muid.find_opt id s.ts_u) 
+    | Tvar id    -> odfl ty (Mid.find_opt  id s.ts_v)
+    | Ttuple lty -> 
+      let lty' = List.smart_map aux lty in
+      if lty == lty' then ty else
+      ttuple lty'
+    | Tconstr(p, lty) -> 
+        let lty' = List.smart_map aux lty in
+        let p' = s.ts_p p in
+        if p == p' && lty == lty' then ty else
+        tconstr p' lty'
+    | Tfun(t1,t2) -> 
+        let t1' = aux t1 and t2' = aux t2 in
+        if t1 == t1' && t2 == t2' then ty else
+        tfun t1' t2')
+
 module Tuni = struct
   let subst1 ((id, t) : uid * ty) =
-    let rec aux ty = 
-      match ty.ty_node with 
-      | Tunivar id' when uid_equal id id' -> t
-      | _ -> map aux ty in
-    aux
+    ty_subst { ty_subst_id with ts_u = Muid.singleton id t }
         
   let subst (uidmap : ty Muid.t) =
-    Hty.memo_rec 107 (fun aux ty ->
-      match ty.ty_node with 
-      | Tunivar id -> odfl ty (Muid.find_opt id uidmap)
-      | _ -> map aux ty)
+    ty_subst { ty_subst_id with ts_u = uidmap } 
 
   let subst_dom uidmap = List.map (subst uidmap)
 
@@ -156,13 +189,13 @@ module Tuni = struct
     let rec aux t = 
       match t.ty_node with
       | Tunivar u' -> uid_equal u u'
-      | _ -> sub_exists aux t in
+      | _ -> ty_sub_exists aux t in
     aux
 
   let rec fv_rec fv t = 
     match t.ty_node with
     | Tunivar id -> Suid.add id fv 
-    | _ -> fold fv_rec fv t 
+    | _ -> ty_fold fv_rec fv t 
 
   let fv = fv_rec Suid.empty
 
@@ -172,18 +205,10 @@ end
 
 module Tvar = struct 
   let subst1 (id,t) = 
-    let rec aux ty = 
-      match ty.ty_node with 
-      | Tvar id' when id_equal id id' -> t
-      | _ -> map aux ty in
-    aux
+    ty_subst { ty_subst_id with ts_v = Mid.singleton id t }
 
   let subst (s : ty Mid.t) =
-    let rec aux t = 
-      match t.ty_node with 
-      | Tvar id -> odfl t (Mid.find_opt id s)
-      | _ -> map aux t in
-    aux 
+    ty_subst { ty_subst_id with ts_v = s }
 
   let init lv lt = 
     assert (List.length lv = List.length lt);
@@ -192,7 +217,7 @@ module Tvar = struct
   let rec fv_rec fv t = 
     match t.ty_node with
     | Tvar id -> Sid.add id fv 
-    | _ -> fold fv_rec fv t 
+    | _ -> ty_fold fv_rec fv t 
 
   let fv = fv_rec Sid.empty
 
@@ -219,10 +244,16 @@ let pv_hash v =
     (if v.pv_kind = PVglob then 1 else 0)
 
 let pv_compare v1 v2 = 
-  pv_hash v1 - pv_hash v2
+  let r = EcPath.m_compare v1.pv_name v2.pv_name in
+  if r = 0 then Pervasives.compare v1.pv_kind v2.pv_kind
+  else r 
 
 let is_loc v = match v.pv_kind with PVloc -> true | _ -> false
   
+let pv_subst m_subst pv = 
+  let mp' = m_subst pv.pv_name in
+  if pv.pv_name == mp' then pv else { pv with pv_name = mp'}
+
 let string_of_pvar_kind = function
   | PVglob -> "PVglob"
   | PVloc  -> "PVloc"
@@ -232,57 +263,59 @@ let string_of_pvar (p : prog_var) =
     (EcPath.m_tostring p.pv_name)
     (string_of_pvar_kind p.pv_kind)
 
-module PVsubst = struct 
-  let subst_ids s pv = 
-    let mp' = EcPath.m_subst_ids s pv.pv_name in
-    if pv.pv_name == mp' then pv else { pv with pv_name = mp'}
-end
-
 (* -------------------------------------------------------------------- *)
 type lpattern =
-  | LSymbol of EcIdent.t
-  | LTuple  of EcIdent.t list
+  | LSymbol of (EcIdent.t * ty)
+  | LTuple  of (EcIdent.t * ty) list
+
+let idty_equal (x1,t1) (x2,t2) = 
+  EcIdent.id_equal x1 x2 && ty_equal t1 t2
 
 let lp_equal p1 p2 = 
   match p1, p2 with
-  | LSymbol x1, LSymbol x2 -> EcIdent.id_equal x1 x2
-  | LTuple lx1, LTuple lx2 -> List.all2 EcIdent.id_equal lx1 lx2
+  | LSymbol xt1, LSymbol xt2 -> idty_equal xt1 xt2 
+  | LTuple lx1, LTuple lx2 -> List.all2 idty_equal lx1 lx2
   | _ -> false
 
+let idty_hash (x,t) = Why3.Hashcons.combine (EcIdent.id_hash x) (ty_hash t) 
+
 let lp_hash = function
-  | LSymbol x -> EcIdent.tag x
-  | LTuple lx -> Why3.Hashcons.combine_list EcIdent.tag 0 lx
+  | LSymbol x -> idty_hash x
+  | LTuple lx -> Why3.Hashcons.combine_list idty_hash 0 lx
 
 (* -------------------------------------------------------------------- *)
-type tyexpr = {
-  tye_node : tyexpr_node;
-  tye_type : ty;
-  tye_fv   : int Mid.t;
-  tye_tag  : int;
+type expr = {
+  e_node : expr_node;
+  e_ty   : ty;
+  e_fv   : int Mid.t; 
+  e_tag  : int;
 }
 
-and tyexpr_node =
+and expr_node =
   | Eint   of int                        (* int. literal          *)
   | Elocal of EcIdent.t                  (* let-variables         *)
   | Evar   of prog_var                   (* module variable       *)
   | Eop    of EcPath.path * ty list      (* op apply to type args *)
-  | Eapp   of tyexpr * tyexpr list       (* op. application       *)
-  | Elet   of lpattern * tyexpr * tyexpr (* let binding           *)
-  | Etuple of tyexpr list                (* tuple constructor     *)
-  | Eif    of tyexpr * tyexpr * tyexpr   (* _ ? _ : _             *)
+  | Eapp   of expr * expr list       (* op. application       *)
+  | Elet   of lpattern * expr * expr (* let binding           *)
+  | Etuple of expr list                (* tuple constructor     *)
+  | Eif    of expr * expr * expr   (* _ ? _ : _             *)
 
-let type_of_exp e = e.tye_type
+
 
 (* -------------------------------------------------------------------- *)
-let e_equal   = ((==) : tyexpr -> tyexpr -> bool)
-let e_hash    = fun e -> e.tye_tag
+let e_equal   = ((==) : expr -> expr -> bool)
+let e_hash    = fun e -> e.e_tag
 let e_compare = fun e1 e2 -> e_hash e1 - e_hash e2
-let e_fv e    = e.tye_fv 
+let e_fv e    = e.e_fv 
+let e_ty e = e.e_ty
 
 (* -------------------------------------------------------------------- *)
+
 let lp_fv = function
-  | LSymbol id -> Sid.singleton id
-  | LTuple ids -> Sid.of_list ids
+  | LSymbol (id,_) -> Sid.singleton id
+  | LTuple ids -> 
+      List.fold_left (fun s (id,_) -> Sid.add id s) Sid.empty ids
 
 let pv_fv pv = EcPath.m_fv Mid.empty pv.pv_name
 
@@ -301,7 +334,7 @@ let fv_node = function
 
 (* -------------------------------------------------------------------- *)
 module Hexpr = Why3.Hashcons.Make (struct 
-  type t = tyexpr
+  type t = expr
 
   let equal_node e1 e2 =
     match e1, e2 with
@@ -329,11 +362,11 @@ module Hexpr = Why3.Hashcons.Make (struct
     | _, _ -> false
 
   let equal e1 e2 = 
-    equal_node e1.tye_node e2.tye_node && 
-    ty_equal e1.tye_type e2.tye_type 
+    equal_node e1.e_node e2.e_node && 
+    ty_equal e1.e_ty e2.e_ty 
 
   let hash e = 
-    match e.tye_node with
+    match e.e_node with
     | Eint   i -> Hashtbl.hash i
     | Elocal x -> Hashtbl.hash x
     | Evar   x -> pv_hash x
@@ -356,49 +389,47 @@ module Hexpr = Why3.Hashcons.Make (struct
         Why3.Hashcons.combine2
           (e_hash c) (e_hash e1) (e_hash e2)
           
-  let tag n e = { e with tye_tag = n;
-                  tye_fv = fv_node e.tye_node }
+  let tag n e = { e with e_tag = n;
+                  e_fv = fv_node e.e_node }
 end)
 
 (* -------------------------------------------------------------------- *)
-let mk_tyexpr e ty =
-  Hexpr.hashcons 
-    { tye_node = e; tye_tag = -1; tye_fv = fv_node e; 
-      tye_type= ty }
+let mk_expr e ty =
+  Hexpr.hashcons { e_node = e; e_tag = -1; e_fv = fv_node e; e_ty = ty }
 
-let e_int   = fun i        -> mk_tyexpr (Eint i) tint
-let e_local = fun x ty     -> mk_tyexpr (Elocal x) ty
-let e_var   = fun x ty        -> mk_tyexpr (Evar x) ty
-let e_op    = fun x targs ty  -> mk_tyexpr (Eop (x, targs)) ty
-let e_let   = fun pt e1 e2 -> mk_tyexpr (Elet (pt, e1, e2)) (type_of_exp e2)
-let e_tuple = fun es      -> mk_tyexpr (Etuple es) (ttuple (List.map type_of_exp es))
-let e_if    = fun c e1 e2  -> mk_tyexpr (Eif (c, e1, e2)) (type_of_exp e2)
+let e_int   i       = mk_expr (Eint i) tint
+let e_local x ty    = mk_expr (Elocal x) ty
+let e_var   x ty    = mk_expr (Evar x) ty
+let e_op x targs ty = mk_expr (Eop (x, targs)) ty
+let e_let pt e1 e2  = mk_expr (Elet (pt, e1, e2)) e2.e_ty
+let e_tuple es      = mk_expr (Etuple es) (ttuple (List.map e_ty es))
+let e_if   c e1 e2  = mk_expr (Eif (c, e1, e2)) e2.e_ty
 
 let e_app x args = 
-  match x.tye_node with
-  | Eapp(x', args') -> mk_tyexpr (Eapp (x', (args'@args)))
-  | _ -> mk_tyexpr (Eapp (x, args))
+  match x.e_node with
+  | Eapp(x', args') -> mk_expr (Eapp (x', (args'@args)))
+  | _ -> mk_expr (Eapp (x, args))
 
 (* -------------------------------------------------------------------- *)
 let lp_ids = function
-  | LSymbol id -> [id] 
-  | LTuple ids -> ids
+  | LSymbol (id,_) -> [id] 
+  | LTuple ids -> List.map fst ids
 
 let e_map fty fe e =
-  match e.tye_node with 
+  match e.e_node with 
   | Eint _
   | Elocal _
   | Evar _                -> e
   | Eop (p, tys)          -> 
       let tys' = List.smart_map fty tys in
-      let ty'  = fty e.tye_type in
-      if tys == tys' && e.tye_type == ty' then e else
+      let ty'  = fty e.e_ty in
+      if tys == tys' && e.e_ty == ty' then e else
       e_op p tys' ty'
   | Eapp (e1, args)       -> 
       let e1' = fe e1 in
       let args' = List.smart_map fe args in
-      let ty'  = fty e.tye_type in
-      if e1 == e1' && args == args' && e.tye_type = ty' then e else 
+      let ty'  = fty e.e_ty in
+      if e1 == e1' && args == args' && e.e_ty = ty' then e else 
       e_app e1' args' ty'
   | Elet (lp, e1, e2)     -> 
       let e1' = fe e1 in
@@ -417,10 +448,7 @@ let e_map fty fe e =
       e_if e1' e2' e3' 
 
 let rec e_fold fe state e =
-  e_fold_r fe state e.tye_node
-
-and e_fold_r fe state e =
-  match e with
+  match e.e_node with
   | Eint _                -> state
   | Elocal _              -> state
   | Evar _                -> state
@@ -430,36 +458,86 @@ and e_fold_r fe state e =
   | Etuple es             -> List.fold_left fe state es
   | Eif (e1, e2, e3)      -> List.fold_left fe state [e1; e2; e3]
 
-module MSHe = EcMaps.MakeMSH(struct type t = tyexpr let tag e = e.tye_tag end)
+module MSHe = EcMaps.MakeMSH(struct type t = expr let tag e = e.e_tag end)
 module Me = MSHe.M  
 module Se = MSHe.S
 module He = MSHe.H  
 
 (* -------------------------------------------------------------------- *)
-let rec expr_dump (e : tyexpr) =
-  match e.tye_node with
+let rec expr_dump (e : expr) =
+  match e.e_node with
   | _ -> dleaf "expression"
 
 (* -------------------------------------------------------------------- *)
-module Esubst = struct 
-  let mapty onty = He.memo_rec 107 (e_map onty)
 
-  let uni (uidmap : ty Muid.t) = mapty (Tuni.subst uidmap)
+type e_subst = { 
+    es_p   : EcPath.path -> EcPath.path;
+    es_ty  : ty -> ty;
+    es_mp  : EcPath.mpath -> EcPath.mpath; 
+    es_loc : expr Mid.t;
+  }
 
-  let subst_ids s =
-    He.memo_rec 107 (fun aux e ->
-      match e.tye_node with
-      | Elocal id -> 
-          let id' = Mid.find_def id id s in
-          if id == id' then e else
-          e_local id' e.tye_type
-      | Evar pv ->
-          let pv' = PVsubst.subst_ids s pv in
-          if pv == pv' then e else
-          e_var pv' e.tye_type 
-      | _ -> e_map (fun ty -> ty) aux e)
-                       
-end
+let e_subst_id = { 
+    es_p   = identity;
+    es_ty  = identity;
+    es_mp  = identity;
+    es_loc = Mid.empty;
+ }
+
+let e_subst_init on_path on_ty on_mpath = {
+    es_p   = on_path;
+    es_ty  = on_ty;
+    es_mp  = EcPath.Hm.memo 107 (EcPath.m_subst on_path on_mpath);
+    es_loc = Mid.empty;
+}
+      
+let add_local s (x,t) = 
+  let x' = EcIdent.fresh x in
+  let t' = s.es_ty t in
+  let merger o = assert (o = None); Some (e_local x' t') in
+  { s with es_loc = Mid.change merger x s.es_loc }, (x',t')
+
+let add_locals = List.map_fold add_local 
+
+let subst_lpattern (s: e_subst) (lp:lpattern) = 
+  match lp with
+  | LSymbol x ->
+      let s, x' = add_local s x in
+      s , LSymbol x'
+  | LTuple xs ->
+      let s',xs'  = add_locals s xs in
+      s', LTuple xs'
+
+let rec e_subst (s: e_subst) e =
+  match e.e_node with
+  | Elocal id -> 
+      (try Mid.find id s.es_loc with _ -> 
+        (* FIXME : this can be dangerous, maybe use a flag *)
+        let ty' = s.es_ty e.e_ty in
+        if e.e_ty == ty' then e else e_local id ty')
+  | Evar pv -> 
+      let pv' = pv_subst s.es_mp pv in
+      let ty' = s.es_ty e.e_ty in
+      if pv == pv' && e.e_ty == ty' then e 
+      else e_var pv' ty'
+  | Eop(p,tys) ->
+      let p'   = s.es_p p in
+      let tys' = List.smart_map s.es_ty tys in
+      let ty'  = s.es_ty e.e_ty in
+      if p == p' && tys == tys' && e.e_ty == ty' then e else
+      e_op p' tys' ty'
+  | Elet(lp,e1,e2) -> 
+      let e1 = e_subst s e1 in
+      let s,lp = subst_lpattern s lp in
+      let e2 = e_subst s e2 in
+      e_let lp e1 e2
+  | _ -> e_map s.es_ty (e_subst s) e
+    
+let e_mapty onty = 
+  e_subst { e_subst_id with es_ty = onty; }
+
+let e_uni (uidmap : ty Muid.t) = e_mapty (Tuni.subst uidmap)
+
 
 (* -------------------------------------------------------------------- *)
 module Dump = struct
@@ -485,7 +563,7 @@ module Dump = struct
 
   let ex_dump pp =
     let rec ex_dump pp e =
-      match e.tye_node with
+      match e.e_node with
       | Eint i ->
           EcDebug.single pp ~extra:(string_of_int i) "Eint"
 

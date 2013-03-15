@@ -1,10 +1,10 @@
 
 open EcUtils
-
+open EcTypes
 open EcFol
 open EcBaseLogic
 open EcLogic
-open EcParsetree
+open EcModules
 
 exception CannotApply of string * string
 
@@ -25,54 +25,136 @@ let destr_hl f =
 let split_stmt n s = List.take_n n s
 
 
+(* -------------------------------------------------------------------- *)
+(* -------------------------  Substitution  --------------------------- *)
+(* -------------------------------------------------------------------- *)
+
+module PVM = struct
+    
+  module M = EcMaps.Map.Make(struct
+    type t = prog_var * EcMemory.memory
+    let compare (p1,m1) (p2,m2) = 
+      let r = EcIdent.id_compare m1 m2 in
+      if r = 0 then pv_compare p1 p2 
+      else r
+  end)
+
+  type subst = form M.t
+
+  let empty = M.empty 
+
+  let pvm env pv m = EcEnv.norm_pvar env pv, m
+
+  let add env pv m f s = M.add (pvm env pv m) f s 
+
+  let add_none env pv m f s =
+    M.change (fun o -> if o = None then Some f else o) (pvm env pv m) s
+
+  let merge (s1:subst) (s2:subst) =
+    M.merge (fun _ o1 o2 -> if o2 = None then o1 else o2) s1 s2
+
+  let find env pv m s =
+    M.find (pvm env pv m) s
+
+  let subst env (s:subst) = 
+    Hf.memo_rec 107 (fun aux f ->
+      match f.f_node with
+      | Fpvar(pv,m) -> 
+          (try find env pv m s with Not_found -> f)
+      | FhoareF _ | FhoareS _ | FequivF _ | FequivS _ | Fpr _ -> assert false
+      | _ -> EcFol.f_map (fun ty -> ty) aux f)
+
+end
+
+(* -------------------------------------------------------------------- *)
+(* -------------------------------  Wp -------------------------------- *)
+(* -------------------------------------------------------------------- *)
 
 
 
-(* WP *)
+let id_of_pv pv = 
+  EcIdent.create (EcPath.basename pv.pv_name.EcPath.m_path) 
+
+let lv_subst env m lv f =
+  match lv with
+  | LvVar(pv,t) ->
+      let id = id_of_pv pv in 
+      let s = PVM.add env pv m (f_local id t) PVM.empty in
+      (LSymbol (id,t), f), s
+  | LvTuple vs ->
+      let add (pv,t) (ids,s) = 
+        let id = id_of_pv pv in
+        let s = PVM.add_none env pv m (f_local id t) s in
+        ((id,t)::ids, s) in
+      let ids,s = List.fold_right add vs ([],PVM.empty) in
+      (LTuple ids, f), s
+  | LvMap((p,tys),pv,e,ty) ->
+      let id = id_of_pv pv in 
+      let s = PVM.add env pv m (f_local id ty) PVM.empty in
+      let set = f_op p tys ty in
+      let f = f_app set [f_pvar pv ty m; form_of_expr m e; f] ty in
+      (LSymbol (id,ty), f), s
+      
+let wp_asgn_aux env m lv e (_let,s,f) =
+  let lpe, se = lv_subst env m lv (form_of_expr m e) in
+  let subst = PVM.subst env se in
+  let _let = List.map (fun (lp,f) -> lp, subst f) _let in
+  let s = PVM.merge se s in
+  (lpe::_let, s,f)
+
+exception HLerror
+
+let mk_let env (_let,s,f) = 
+  f_lets_simpl _let (PVM.subst env s f)
+  
+let wp_asgn1 env m s post =
+  let r = List.rev s.s_node in
+  match r with
+  | {i_node = Sasgn(lv,e) } :: r' -> 
+      let letsf = wp_asgn_aux env m lv e ([],PVM.empty,post) in
+      EcModules.stmt (List.rev r'), mk_let env letsf
+  | _ -> raise HLerror
+
+let wp_asgn env m s post = 
+  let r = List.rev s.s_node in
+  let rec aux r letsf = 
+    match r with 
+    | [] -> [], letsf 
+    | { i_node = Sasgn (lv,e) } :: r -> aux r (wp_asgn_aux env m lv e letsf) 
+    | _ -> r, letsf in
+  let (r',letsf) = aux r ([],PVM.empty, post) in
+  if r == r' then s, post
+  else 
+    EcModules.stmt (List.rev r'), mk_let env letsf
 
 exception No_wp
 
-let wp_assgn _lv _e _post = 
-  assert false (* FIXME *)
-(*
-  match lv with
-  | EcModules.LvVar (v,_t) ->  (* of (EcTypes.prog_var * EcTypes.ty) *)
-    EcFol.Subst.subst_form (EcFol.Subst.single_subst (Lvar.mk_pvar v EcFol.mstd)
-                              (form_of_exp EcFol.mstd e)) post
-  | EcModules.LvTuple vs ->
-    EcFol.let_form (List.map (fun (v,t) ->(Lvar.mk_pvar v mstd),t ) vs) (form_of_exp EcFol.mstd e) post
-  | _ -> raise No_wp
-*)
-
-let rec wp_stmt (stmt: EcModules.instr list) post = 
+let rec wp_stmt env m (stmt: EcModules.instr list) letsf = 
   match stmt with
-    | [] -> stmt, post
-    | i :: stmt' -> 
+  | [] -> stmt, letsf
+  | i :: stmt' -> 
       try 
-        let post = wp_instr i post in
-        wp_stmt stmt' post
-      with No_wp -> stmt, post
-and wp_instr _i _post = assert false 
-(*
-  match i.EcModules.i_node with
-    | EcModules.Sasgn (lv,e) ->
-      wp_assgn lv e post
-    | EcModules.Sif (e,s1,s2) -> 
-      let s1,post1 = wp_stmt s1.EcModules.s_node post in
-      let s2,post2 = wp_stmt s2.EcModules.s_node post in
-      if s1=[] && s2=[] then
-        let b = form_of_exp EcFol.mstd e in
-        f_and (f_imp b post1) (f_imp (f_not b) post2)
+        let letsf = wp_instr env m i letsf in
+        wp_stmt env m stmt' letsf
+      with No_wp -> stmt, letsf
+and wp_instr env m i letsf = 
+  match i.i_node with
+  | Sasgn (lv,e) ->
+      wp_asgn_aux env m lv e letsf
+  | Sif (e,s1,s2) -> 
+      let r1,letsf1 = wp_stmt env m (List.rev s1.s_node) letsf in
+      let r2,letsf2 = wp_stmt env m (List.rev s2.s_node) letsf in
+      if r1=[] && r2=[] then
+        let post1 = mk_let env letsf1 in 
+        let post2 = mk_let env letsf2 in
+        let post  = f_if (form_of_expr m e) post1 post2 in
+        [], PVM.empty, post
       else raise No_wp
-    | _ -> raise No_wp
-*)
+  | _ -> raise No_wp
 
-let wp stmt post = 
-  let stmt,post = wp_stmt (List.rev stmt) post in
-  List.rev stmt, post
-
-(* ENDOF WP *)
-
+let wp env m s post = 
+  let r,letsf = wp_stmt env m (List.rev s.s_node) ([],PVM.empty,post) in
+  List.rev r, mk_let env letsf 
 
 exception NotSkipStmt
 
@@ -113,7 +195,9 @@ let skip_tac (juc,n as g) =
 
 
 
-let wp_tac i _loc _env (juc,n as g) =
+let wp_tac _i _loc _env (_juc,_n as _g) =
+  assert false
+(*
   let hyps,concl = get_goal g in
   let mem,pre,s,post = destr_hl concl in
   let s_fix,s_wp = split_stmt i s.EcModules.s_node  in
@@ -123,7 +207,7 @@ let wp_tac i _loc _env (juc,n as g) =
   let juc,n' = new_goal juc (hyps,a) in
   let rule = { pr_name = RN_wp i; pr_hyps = [n']} in
   upd_rule (juc,n) rule
-
+*)
 
 let app_tac (i,phi) _loc _env (juc,n as g) =
   let hyps,concl = get_goal g in
@@ -229,7 +313,8 @@ let add_locals_env env locals =
   EcEnv.bindall locals env
 
 
-let process_phl process_form tac loc (_juc,_n as g) = 
+let process_phl _process_form _tac _loc (_juc,_n as _g) = assert false
+(*
   let _hyps,concl = get_goal g in
   let env,_pre,_s,_post = destr_hl concl in
   (* let env = add_locals_env env body.EcModules.f_locals in (\* FIXME: after I have memenv *\) *)
@@ -249,3 +334,4 @@ let process_phl process_form tac loc (_juc,_n as g) =
 
 
 
+*)

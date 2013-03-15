@@ -46,7 +46,10 @@ and ctheory_clone = {
 and ctheory_override =
 | CTHO_Type   of EcTypes.ty
 
+
+(* -------------------------------------------------------------------- *)
 val cth_dump : ctheory -> dnode
+
 
 (* -------------------------------------------------------------------- *)
 val module_comps_of_module_sig_comps :

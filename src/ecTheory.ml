@@ -112,11 +112,8 @@ and cthi_dump (item : ctheory_item) =
 (* -------------------------------------------------------------------- *)
 let module_comps_of_module_sig_comps (comps : module_sig_body) =
   let onitem = function
-    | Tys_variable (x, ty) ->
-        MI_Variable {
-          v_name = x;
-          v_type = ty;
-        }
+    | Tys_variable vd ->
+        MI_Variable vd
 
     | Tys_function funsig ->
         MI_Function { 

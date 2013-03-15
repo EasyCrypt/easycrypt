@@ -38,21 +38,13 @@ module Map = struct
   end
 end
 
-module type Hashtbl = sig
-  include Why3.Exthtbl.Hashtbl.S
-  val memo_rec : int -> ((key -> 'a) -> key -> 'a) -> key -> 'a   
-end
+module EHashtbl = struct
+  module type S = sig
+    include Why3.Exthtbl.Hashtbl.S
+    val memo_rec : int -> ((key -> 'a) -> key -> 'a) -> key -> 'a   
+  end
 
-(* -------------------------------------------------------------------- *)
-module MakeMSH (X : Why3.Stdlib.TaggedType) : sig
-  module M : Map.S with type key = X.t
-  module S : M.Set
-  module H : Hashtbl with type key = X.t
-end = struct
-  module T = Why3.Stdlib.OrderedHashed(X)
-  module M = Map.Make(T)
-  module S = M.Set
-  module H = struct 
+  module Make(T:Why3.Stdlib.OrderedHashedType) = struct
     include Why3.Exthtbl.Hashtbl.Make(T)
     let memo_rec size f = 
       let h = create size in
@@ -60,6 +52,18 @@ end = struct
         try find h x with Not_found -> let r = f aux x in add h x r; r in
       aux
   end
+end
+
+(* -------------------------------------------------------------------- *)
+module MakeMSH (X : Why3.Stdlib.TaggedType) : sig
+  module M : Map.S with type key = X.t
+  module S : M.Set
+  module H : EHashtbl.S with type key = X.t
+end = struct
+  module T = Why3.Stdlib.OrderedHashed(X)
+  module M = Map.Make(T)
+  module S = M.Set
+  module H = EHashtbl.Make(T)
 end
 
 (* -------------------------------------------------------------------- *)

@@ -50,8 +50,8 @@ val transtys :
 val transtvi : EcEnv.env -> EcUnify.unienv -> tvar_inst -> EcUnify.UniEnv.tvi
 
 (* -------------------------------------------------------------------- *)
-val transexp : EcEnv.env -> EcUnify.unienv -> pexpr -> tyexpr * ty
-val transexpcast : EcEnv.env -> EcUnify.unienv -> ty -> pexpr -> tyexpr
+val transexp : EcEnv.env -> EcUnify.unienv -> pexpr -> expr * ty
+val transexpcast : EcEnv.env -> EcUnify.unienv -> ty -> pexpr -> expr
 
 (* -------------------------------------------------------------------- *)
 val transformula : EcEnv.env -> EcUnify.unienv -> pformula -> EcFol.form 
@@ -67,6 +67,6 @@ val check_tymod_sub : EcEnv.env -> module_sig -> module_sig -> unit
 val check_tymod_eq  : EcEnv.env -> module_sig -> module_sig -> unit
 
 (* -------------------------------------------------------------------- *)
-val e_inuse : tyexpr -> EcPath.Sm.t
+val e_inuse : expr -> EcPath.Sm.t
 val i_inuse : instr  -> use_flags EcPath.Mm.t
 val s_inuse : stmt   -> use_flags EcPath.Mm.t

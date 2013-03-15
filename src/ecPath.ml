@@ -133,18 +133,6 @@ let rec p_fv fv p =
   | Pident id -> EcIdent.fv_add id fv
   | Pqname(p,_) -> p_fv fv p
 
-let rec p_subst_ids s p =
-  match p.p_node with
-  | Psymbol _ -> p
-  | Pident id -> 
-      let id' = EcIdent.Mid.find_def id id s in
-      if id == id' then p else
-      pident id'
-  | Pqname(p1,id) ->
-      let p1' = p_subst_ids s p1 in
-      if p1 == p1' then p else
-      pqname p1' id 
-      
 (* -------------------------------------------------------------------- *)
 let m_equal   = ((==) : mpath -> mpath -> bool)
 let m_hash    = fun p -> p.m_tag
@@ -218,12 +206,6 @@ let mpath_of_path p =
         PKother::k,[]::args in
   let k, args = args p in
   mk_mpath p k args
-
-let rec m_subst_ids s mp = 
-  let p' = p_subst_ids s mp.m_path in
-  let args' = List.smart_map (List.smart_map (m_subst_ids s)) mp.m_args in
-  if mp.m_path == p' && mp.m_args == args' then mp
-  else { mp with m_path = p'; m_args = args' }
 
 (* -------------------------------------------------------------------- *)
 let rec m_tostring(m : mpath) = 
@@ -364,3 +346,34 @@ module Msubp = struct
       fun (path : path) (m : 'a t) ->
         (find path { mp_value = None; mp_submaps = m }).mp_value
 end
+
+let p_subst (s : path Mp.t) =
+  Hp.memo_rec 107 (fun aux p ->
+    try Mp.find p s
+    with Not_found ->
+      match p.p_node with
+      | Psymbol _ | Pident _ -> p
+      | Pqname(p1,id) -> 
+          let p1' = aux p1 in
+          if p1 == p1' then p else
+          pqname p1 id)
+
+let rec m_subst (sp : path -> path) (sm: mpath EcIdent.Mid.t) m =
+  let p    = m.m_path 
+  and ks   = m.m_kind 
+  and args = m.m_args in
+  let args = List.map (List.map (m_subst sp sm)) args in
+
+  let rec aux p ks args =
+    match p.p_node, ks, args with
+    | Psymbol _, _, _ -> raise Not_found
+    | Pident id, [_], [a] ->
+        let mp = EcIdent.Mid.find id sm in
+        m_apply mp a
+    | Pqname(p,id), k::ks, a::args ->
+        mqname (aux p ks args) k id a 
+    | _, _, _ -> assert false in
+  try aux p ks args
+  with Not_found -> mpath (sp p) ks args
+
+

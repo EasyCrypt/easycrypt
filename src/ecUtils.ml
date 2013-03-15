@@ -15,6 +15,8 @@ let try_finally (body : unit -> 'a) (cleanup : unit -> unit) =
   in
     cleanup (); aout
 
+let identity x = x 
+
 let (^~) f = fun x y -> f y x
 
 let (-|) (f : 'a -> 'b) (g : 'c -> 'a) =

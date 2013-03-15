@@ -231,7 +231,7 @@ module Ax : sig
   val add  : EcPath.path -> env -> env
   val bind : symbol -> axiom -> env -> env
 
-  val instanciate : EcPath.path -> EcTypes.ty list -> env -> EcFol.form
+  val instanciate : EcPath.path -> EcTypes.ty list -> env -> EcFol.form 
 end
 
 (* -------------------------------------------------------------------- *)
@@ -362,3 +362,5 @@ val ty_fun_app        : env -> EcTypes.ty -> EcTypes.ty list -> EcTypes.ty
 val check_alpha_equal : env -> EcFol.form -> EcFol.form -> unit
 val is_alpha_equal    : env -> EcFol.form -> EcFol.form -> bool
 val check_goal        : env -> EcWhy3.prover_infos -> EcFol.l_decl -> bool
+
+val norm_pvar         : env -> prog_var -> prog_var

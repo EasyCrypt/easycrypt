@@ -1,3 +1,28 @@
+
+lemma and_intro  : forall (a b:bool), a => b => a /\ b.
+lemma and_elim   : forall (a b c:bool), (a /\ b) => (a => b => c) => c.
+
+lemma anda_intro : forall (a b:bool), a => (a => b) => a && b.
+lemma anda_elim  : forall (a b c:bool), (a && b) => (a => b => c) => c.
+
+lemma or_intro_l : forall (a b:bool), a => a \/ b. 
+lemma or_intro_r : forall (a b:bool), b => a \/ b. 
+lemma or_elim    : forall (a b c : bool), (a \/ b) => (a => c) => (b => c) => c.
+
+lemma ora_intro_l : forall (a b:bool), a => a || b. 
+lemma ora_intro_r : forall (a b:bool), (!a => b) => a || b. 
+lemma ora_elim    : forall (a b c : bool), (a || b) => 
+                         (a => c) => (!a => b => c) => c.
+
+
+lemma foo : forall (a b:bool), a => b => (a /\ b) \/ b
+proof.
+ intros a b Ha Hb.
+ apply or_introl ( (a /\ b) ,b,_).
+ apply and_intro (a,b,_,_);assumption.
+save.
+
+
 require import int.
 lemma toto : forall (x:int), x = x
 proof.

@@ -116,12 +116,10 @@ module Prover_info = struct
 end
       
 (* -------------------------------------------------------------------- *)
-type proof_uc_kind = 
-| PUCK_logic of EcLogic.judgment_uc 
 
 type proof_uc = {
   puc_name : string;
-  puc_kind : proof_uc_kind;
+  puc_jdg :  EcLogic.judgment_uc;
 }
   
 (* -------------------------------------------------------------------- *)
@@ -222,7 +220,7 @@ module Op = struct
           let body = TT.transexpcast env ue codom body in
           Some (xs, body) in
     let uni = Tuni.subst (EcUnify.UniEnv.close ue) in
-    let body = omap body (fun (ids,body) -> ids, Esubst.mapty uni body) in
+    let body = omap body (fun (ids,body) -> ids, e_mapty uni body) in
     let (dom,codom) = List.map uni dom, uni codom in
     let tparams = EcUnify.UniEnv.tparams ue in 
     let tyop = EcDecl.mk_op tparams dom codom body in
@@ -781,27 +779,24 @@ module Tactic = struct
       match scope.sc_pr_uc with
       | [] -> error loc NoCurrentGoal
       | puc :: pucs ->
-          match puc.puc_kind with
-          | PUCK_logic juc -> 
-              let juc = process_logic scope scope.sc_env juc loc tac in
-              { scope with 
-                sc_pr_uc = { puc with puc_kind = PUCK_logic juc } :: pucs }
+          let juc = process_logic scope scope.sc_env puc.puc_jdg loc tac in
+          { scope with 
+            sc_pr_uc = { puc with puc_jdg = juc } :: pucs }
     else scope
 
   let out_goal scope = 
     match scope.sc_pr_uc with
     | [] -> None 
     | puc :: _ ->
-        match puc.puc_kind with
-        | PUCK_logic juc ->
-            let doc = 
-              try 
-                let n_subgoals = List.length (snd (find_all_goals juc)) in
-                let g = get_goal (get_first_goal juc) in
-                  (EcPrinting.EcPP.pr_lgoal ~n:n_subgoals (EcPrinting.EcPP.mono scope.sc_env) g)
-              with EcBaseLogic.NotAnOpenGoal _ -> 
-                Pprint.text "No more goals" in
-            Some doc
+        let juc = puc.puc_jdg in
+        let doc = 
+          try 
+            let n_subgoals = List.length (snd (find_all_goals juc)) in
+            let g = get_goal (get_first_goal juc) in
+            (EcPrinting.EcPP.pr_lgoal ~n:n_subgoals (EcPrinting.EcPP.mono scope.sc_env) g)
+          with EcBaseLogic.NotAnOpenGoal _ -> 
+            Pprint.text "No more goals" in
+        Some doc
 
 end 
 
@@ -825,7 +820,7 @@ module Ax = struct
                  EcFol.h_local = []; } in
     let puc = {
       puc_name = name ;
-      puc_kind = PUCK_logic (EcLogic.open_juc hyps concl) } in
+      puc_jdg = EcLogic.open_juc hyps concl } in
     { scope with 
       sc_pr_uc = puc :: scope.sc_pr_uc }
 
@@ -833,7 +828,7 @@ module Ax = struct
     if Check_mode.check scope.sc_options then
       match scope.sc_pr_uc with
       | [] -> Tactic.error loc Tactic.NoCurrentGoal
-      | { puc_name = name; puc_kind = PUCK_logic juc } :: pucs ->
+      | { puc_name = name; puc_jdg = juc } :: pucs ->
           let pr = EcLogic.close_juc juc in
           let hyps,concl = pr.EcBaseLogic.j_decl in
           let tparams = hyps.EcFol.h_tvar in
@@ -849,7 +844,7 @@ module Ax = struct
     let ue = EcUnify.UniEnv.create None in
     let concl = TT.transformula scope.sc_env ue ax.pa_formula in
     let concl = 
-      EcFol.Fsubst.mapty (Tuni.subst (EcUnify.UniEnv.close ue)) concl in
+      EcFol.Fsubst.uni (EcUnify.UniEnv.close ue) concl in
     let tparams = EcUnify.UniEnv.tparams ue in
     let check = Check_mode.check scope.sc_options in
     let loc = ax.pa_name.pl_loc in

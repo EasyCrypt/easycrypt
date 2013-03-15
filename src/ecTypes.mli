@@ -45,6 +45,15 @@ val ty_dump  : ty -> EcDebug.dnode
 val dom_dump : dom -> EcDebug.dnode
 
 (* -------------------------------------------------------------------- *)
+type ty_subst = {
+    ts_p : EcPath.path -> EcPath.path;
+    ts_u : ty Muid.t;
+    ts_v : ty Mid.t;
+  }
+
+val ty_subst_id : ty_subst
+val ty_subst : ty_subst -> ty -> ty
+
 module Tuni : sig
   val subst1    : (uid * ty) -> ty -> ty
   val subst     : ty Muid.t -> ty -> ty
@@ -65,15 +74,15 @@ end
 (* -------------------------------------------------------------------- *)
 
 (* [map f t] applies [f] on strict subterms of [t] (not recursive) *)
-val map : (ty -> ty) -> ty -> ty
+val ty_map : (ty -> ty) -> ty -> ty
 
 (* [sub_exists f t] true if one of the strict-subterm of [t] valid [f] *)
-val sub_exists : (ty -> bool) -> ty -> bool
+val ty_sub_exists : (ty -> bool) -> ty -> bool
 
 (* -------------------------------------------------------------------- *)
 type lpattern =
-  | LSymbol of EcIdent.t
-  | LTuple  of EcIdent.t list
+  | LSymbol of (EcIdent.t*ty)
+  | LTuple  of (EcIdent.t*ty) list
 
 val lp_equal : lpattern -> lpattern -> bool
 val lp_hash  : lpattern -> int 
@@ -98,68 +107,78 @@ val is_loc     : prog_var -> bool
 
 val string_of_pvar : prog_var -> string
 
-module PVsubst : sig
-  val subst_ids : EcIdent.t EcIdent.Mid.t -> prog_var -> prog_var
-end
+val pv_subst : (EcPath.mpath -> EcPath.mpath) -> prog_var -> prog_var 
 
 (* -------------------------------------------------------------------- *)
-type tyexpr = private {
-  tye_node : tyexpr_node;
-  tye_type : ty;
-  tye_fv   : int Mid.t;
-  tye_tag  : int;
+type expr = private {
+  e_node : expr_node;
+  e_ty   : ty;
+  e_fv   : int Mid.t;    (* module idents, locals *)
+  e_tag  : int;
 }
 
-and tyexpr_node =
-  | Eint      of int                         (* int. literal          *)
-  | Elocal    of EcIdent.t                   (* let-variables         *)
-  | Evar      of prog_var                    (* module variable       *)
-  | Eop       of EcPath.path * ty list       (* op apply to type args *)
-  | Eapp      of tyexpr * tyexpr list        (* op. application       *)
-  | Elet      of lpattern * tyexpr * tyexpr  (* let binding           *)
-  | Etuple    of tyexpr list                 (* tuple constructor     *)
-  | Eif       of tyexpr * tyexpr * tyexpr    (* _ ? _ : _             *)
+and expr_node =
+  | Eint   of int                        (* int. literal          *)
+  | Elocal of EcIdent.t                  (* let-variables         *)
+  | Evar   of prog_var                   (* module variable       *)
+  | Eop    of EcPath.path * ty list      (* op apply to type args *)
+  | Eapp   of expr * expr list           (* op. application       *)
+  | Elet   of lpattern * expr * expr     (* let binding           *)
+  | Etuple of expr list                  (* tuple constructor     *)
+  | Eif    of expr * expr * expr         (* _ ? _ : _             *)
 
-val type_of_exp : tyexpr -> ty
-val expr_dump   : tyexpr -> dnode
-
-(* -------------------------------------------------------------------- *)
-val e_equal   : tyexpr -> tyexpr -> bool
-val e_compare : tyexpr -> tyexpr -> int
-val e_hash    : tyexpr -> int
-val e_fv      : tyexpr -> int EcIdent.Mid.t
+val expr_dump   : expr -> dnode
 
 (* -------------------------------------------------------------------- *)
-val e_int      : int -> tyexpr
-val e_local    : EcIdent.t -> ty -> tyexpr
-val e_var      : prog_var -> ty -> tyexpr
-val e_op       : EcPath.path -> ty list -> ty -> tyexpr
-val e_app      : tyexpr -> tyexpr list -> ty -> tyexpr
-val e_let      : lpattern -> tyexpr -> tyexpr -> tyexpr
-val e_tuple    : tyexpr list -> tyexpr
-val e_if       : tyexpr -> tyexpr -> tyexpr -> tyexpr
+val e_equal   : expr -> expr -> bool
+val e_compare : expr -> expr -> int
+val e_hash    : expr -> int
+val e_fv      : expr -> int EcIdent.Mid.t
+val e_ty      : expr -> ty
+(* -------------------------------------------------------------------- *)
+val e_int      : int -> expr
+val e_local    : EcIdent.t -> ty -> expr
+val e_var      : prog_var -> ty -> expr
+val e_op       : EcPath.path -> ty list -> ty -> expr
+val e_app      : expr -> expr list -> ty -> expr
+val e_let      : lpattern -> expr -> expr -> expr
+val e_tuple    : expr list -> expr
+val e_if       : expr -> expr -> expr -> expr
 
 (* -------------------------------------------------------------------- *)
 val e_map :
      (ty     -> ty    ) (* 1-subtype op. *)
-  -> (tyexpr -> tyexpr) (* 1-subexpr op. *)
-  -> tyexpr
-  -> tyexpr
+  -> (expr -> expr) (* 1-subexpr op. *)
+  -> expr
+  -> expr
 
 val e_fold :
-  ('state -> tyexpr -> 'state) -> 'state -> tyexpr -> 'state
+  ('state -> expr -> 'state) -> 'state -> expr -> 'state
 
 (* -------------------------------------------------------------------- *)
-module Esubst : sig
-  val mapty : (ty -> ty) -> tyexpr -> tyexpr
 
-  val uni : ty Muid.t -> tyexpr -> tyexpr 
+type e_subst = { 
+    es_p   : EcPath.path -> EcPath.path;
+    es_ty  : ty -> ty;
+    es_mp  : EcPath.mpath -> EcPath.mpath; 
+    es_loc : expr Mid.t;
+  }
 
-  val subst_ids : EcIdent.t Mid.t -> tyexpr -> tyexpr
-end
+val e_subst_id   : e_subst
+
+val e_subst_init : 
+    (EcPath.path -> EcPath.path) ->
+      (ty -> ty) -> EcPath.mpath EcIdent.Mid.t -> e_subst
+
+val add_locals   : e_subst -> 
+  (EcIdent.t * ty) list -> e_subst * (EcIdent.t * ty) list
+
+val e_subst : e_subst -> expr -> expr
+val e_mapty : (ty -> ty) -> expr -> expr 
+val e_uni   : ty Muid.t -> expr -> expr
 
 (* -------------------------------------------------------------------- *)
 module Dump : sig
   val ty_dump : EcDebug.ppdebug -> ty -> unit
-  val ex_dump : EcDebug.ppdebug -> tyexpr -> unit
+  val ex_dump : EcDebug.ppdebug -> expr -> unit
 end

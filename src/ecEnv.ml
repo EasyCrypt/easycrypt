@@ -877,7 +877,7 @@ module Fun = struct
     let fun_ = (by_path path env).sp_target in
     let adds =
       List.fold_left
-        (fun memenv (x, ty) -> EcMemory.bind x ty memenv)
+        (fun memenv vd -> EcMemory.bind vd.v_name vd.v_type memenv)
     in
 
     let mem = EcMemory.empty me in
@@ -888,7 +888,7 @@ module Fun = struct
       | Some d -> adds mem d.f_locals in
     let mem =
       if   hasres
-      then adds mem [("$res", (snd fun_.f_sig.fs_sig))] 
+      then adds mem [{v_name = "$res"; v_type = snd fun_.f_sig.fs_sig}] 
       else mem
     in
       mem
@@ -1070,7 +1070,7 @@ module Ax = struct
     match by_path_opt p env with
     | Some ({ ax_spec = Some f } as ax) ->
         Fsubst.subst_tvar (EcTypes.Tvar.init ax.ax_params tys) f
-    | _ -> raise (LookupFailure (`Path p))
+    | _ -> raise (LookupFailure (`Path p)) 
 end
 
 (* -------------------------------------------------------------------- *)
@@ -1545,13 +1545,13 @@ let e_equal_norm env e1 e2 =
   let find alpha id = try Mid.find id alpha with _ -> id in
   let check_lpattern alpha lp1 lp2 = 
     match lp1, lp2 with
-    | LSymbol id1, LSymbol id2 -> Mid.add id1 id2 alpha
+    | LSymbol (id1,_), LSymbol (id2,_) -> Mid.add id1 id2 alpha
     | LTuple lid1, LTuple lid2 when List.length lid1 = List.length lid2 ->
-        List.fold_left2 (fun alpha id1 id2 -> Mid.add id1 id2 alpha) 
+        List.fold_left2 (fun alpha (id1,_) (id2,_) -> Mid.add id1 id2 alpha) 
           alpha lid1 lid2
     | _, _ -> raise Not_found in
   let rec aux alpha e1 e2 = 
-    match e1.tye_node, e2.tye_node with
+    match e1.e_node, e2.e_node with
     | Eint   i1, Eint   i2 -> i1 = i2
     | Elocal id1, Elocal id2 -> EcIdent.id_equal (find alpha id1) id2
     | Evar   p1, Evar   p2 -> pv_equal_norm env p1 p2
@@ -1605,17 +1605,15 @@ and i_equal_norm env i1 i2 =
   | Sassert a1, Sassert a2 ->
       e_equal_norm env a1 a2 
   | _, _ -> false
-        
-  
   
 let check_alpha_equal env f1 f2 = 
   let error f1' f2' = raise (IncompatibleForm(f1,f2,f1',f2')) in
   let find alpha id = try Mid.find id alpha with _ -> id in
   let check_lpattern f1 f2 alpha lp1 lp2 = 
     match lp1, lp2 with
-    | LSymbol id1, LSymbol id2 -> Mid.add id1 id2 alpha
+    | LSymbol (id1,_), LSymbol (id2,_) -> Mid.add id1 id2 alpha
     | LTuple lid1, LTuple lid2 when List.length lid1 = List.length lid2 ->
-        List.fold_left2 (fun alpha id1 id2 -> Mid.add id1 id2 alpha) 
+        List.fold_left2 (fun alpha (id1,_) (id2,_) -> Mid.add id1 id2 alpha) 
           alpha lid1 lid2
     | _, _ -> error f1 f2 in
   let check_binding f1 f2 alpha bd1 bd2 =
@@ -1750,4 +1748,6 @@ let rec norm_form env f =
       f_pr m (Mod.unfold_mod_path env p) (List.map (norm_form env) args) 
         (norm_form env f)
 
-let check_goal env pi ld = EcWhy3.check_goal env.env_w3 pi ld
+let check_goal env pi ld = 
+  (* FIXME normalize the goal before sending to why3 *)
+  EcWhy3.check_goal env.env_w3 pi ld

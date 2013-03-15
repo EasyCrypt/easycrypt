@@ -72,7 +72,7 @@ module type IPrettyPrinter = sig
 
   (* ------------------------------------------------------------------ *)
   val pr_type     : t -> ?vmap:NameGen.t -> ty pr
-  val pr_expr     : t -> tyexpr pr
+  val pr_expr     : t -> expr pr
   val pr_form     : t -> EcFol.form pr
   val pr_dom      : t -> EcTypes.dom pr
   val pr_typedecl : t -> (EcPath.path * tydecl     ) pr
@@ -86,7 +86,7 @@ module type IPrettyPrinter = sig
 
   (* ------------------------------------------------------------------ *)
   val pp_type     : t -> ?vmap:NameGen.t -> ty pp
-  val pp_expr     : t -> tyexpr pp
+  val pp_expr     : t -> expr pp
   val pp_form     : t -> EcFol.form pp
   val pp_dom      : t -> EcTypes.dom pp
   val pp_typedecl : t -> (EcPath.path * tydecl     ) pp
@@ -512,9 +512,9 @@ struct
         (List.fpick [try_pr_special;try_pr_as_uniop; try_pr_as_binop])
 
   (* ------------------------------------------------------------------ *)
-  let pr_expr (tenv : t) (e : tyexpr) =
-    let rec pr_expr (tenv : t) outer (e : tyexpr) =
-        match e.tye_node with
+  let pr_expr (tenv : t) (e : expr) =
+    let rec pr_expr (tenv : t) outer (e : expr) =
+        match e.e_node with
         | Evar x ->
             pr_pv_symb tenv x.pv_name None
 
@@ -533,7 +533,7 @@ struct
         | Etuple es ->
             pr_tuple_expr tenv pr_expr es
 
-        | Eapp({tye_node = Eop(op, tys) }, args) -> 
+        | Eapp({e_node = Eop(op, tys) }, args) -> 
             pr_app (fun _ -> assert false) tenv pr_expr outer op tys args (* FIXME *)
 
         | Eapp (e, args) -> 
@@ -650,7 +650,7 @@ struct
 
     let dparams =
       List.map
-        (fun (x, ty) -> pr_seq [pr_symbol x; Pp.colon; pr_type tenv ty])
+        (fun vd -> pr_seq [pr_symbol vd.v_name; Pp.colon; pr_type tenv vd.v_type])
         fparams in
     let dparams = Pp.parens (pr_list "," dparams) in
 
@@ -665,15 +665,15 @@ struct
       | Some def ->
           let dlocals =
             List.map
-              (fun (x, ty) -> pr_local tenv (EcIdent.create x) ty)
+              (fun vd -> pr_local tenv (EcIdent.create vd.v_name) vd.v_type)
               def.f_locals
 
           and dbody =
             let bodytenv =
               List.fold_left
-                (fun tenv x -> M.add_local tenv (EcIdent.create x))
+                (fun tenv x -> M.add_local tenv (EcIdent.create x.v_name))
                 tenv
-                (List.map fst ((fst f.f_sig.fs_sig) @ def.f_locals))
+                ((fst f.f_sig.fs_sig) @ def.f_locals)
             in
               List.map (pr_instr bodytenv) def.f_body.s_node
           in
@@ -810,14 +810,14 @@ struct
   let pr_fct_def tenv def = 
     let dlocals =
       List.map
-        (fun (x, ty) -> pr_local tenv (EcIdent.create x) ty)
+        (fun x -> pr_local tenv (EcIdent.create x.v_name) x.v_type)
         def.f_locals
     and dbody =
       let bodytenv =
         List.fold_left
-          (fun tenv x -> M.add_local tenv (EcIdent.create x))
+          (fun tenv x -> M.add_local tenv (EcIdent.create x.v_name))
           tenv
-          (List.map fst (def.f_locals))
+          def.f_locals
       in
       List.map (pr_instr bodytenv) def.f_body.s_node
     in

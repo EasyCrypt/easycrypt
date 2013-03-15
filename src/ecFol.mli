@@ -60,7 +60,7 @@ val f_ty      : form -> EcTypes.ty
 
 module Mf : Map.S with type key = form
 module Sf : Mf.Set with type elt = form 
-module Hf : EcMaps.Hashtbl with type key = form
+module Hf : EHashtbl.S with type key = form
 
 (* -------------------------------------------------------------------- *)
 val f_dump : form -> dnode
@@ -124,6 +124,8 @@ val f_int_lt  : form -> form -> form
 (* -------------------------------------------------------------------- *)
 val f_if_simpl  : form -> form -> form -> form
 val f_let_simpl : EcTypes.lpattern -> form -> form -> form
+val f_lets_simpl : (EcTypes.lpattern * form) list -> form -> form
+
 (*val f_quant_simpl : quantif -> binding -> form -> form
   val f_exists_simpl : binding -> form -> form *)
 val f_forall_simpl  : binding -> form -> form
@@ -160,19 +162,37 @@ val is_imp : form -> bool
 val is_forall : form -> bool
 val is_exists : form -> bool
 
-val map : (EcTypes.ty -> EcTypes.ty) -> (form -> form) -> form -> form
+val f_map : (EcTypes.ty -> EcTypes.ty) -> (form -> form) -> form -> form
 
 (* -------------------------------------------------------------------- *)
+type f_subst = { 
+    fs_p   : EcPath.path -> EcPath.path;
+    fs_ty  : ty -> ty;
+    fs_mp  : EcPath.mpath Mid.t;
+    fs_loc : form Mid.t;
+    fs_mem : EcIdent.t Mid.t;
+  }
+
+val f_subst_id : f_subst
+
+val add_locals : f_subst -> (EcIdent.t * EcTypes.ty) list -> 
+  f_subst * (EcIdent.t * EcTypes.ty) list
+
+val bind_local : f_subst -> EcIdent.t -> form -> f_subst
+val bind_mem   : f_subst -> EcIdent.t -> EcIdent.t -> f_subst
+val bind_mod   : f_subst -> EcIdent.t -> EcPath.mpath -> f_subst
+   
+val f_subst : f_subst -> form -> form 
+
 module Fsubst :
   sig
     val mapty : (EcTypes.ty -> EcTypes.ty) -> form -> form
     val uni : EcTypes.ty EcUidgen.Muid.t -> form -> form
     val subst_tvar : EcTypes.ty EcIdent.Mid.t -> form -> form
 
-    val subst_local : EcIdent.t -> form -> form -> form
-    val subst_locals : form EcIdent.Mid.t -> form -> form
+(*    val subst_local : EcIdent.t -> form -> form -> form
+    val subst_locals : form EcIdent.Mid.t -> form -> form *)
 
-    val subst_ids : EcIdent.t EcIdent.Mid.t -> form -> form
   end
 
 type local_kind = 
@@ -253,6 +273,6 @@ sig
   val clear : EcIdent.t -> hyps -> hyps
 end
 
-val form_of_exp : EcMemory.memory -> EcTypes.tyexpr -> form
+val form_of_expr : EcMemory.memory -> EcTypes.expr -> form
 
 (* val let_form : (Lvar.t*ty) list -> form -> form -> form *)

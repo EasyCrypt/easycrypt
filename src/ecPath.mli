@@ -50,7 +50,6 @@ val rootname  : path -> symbol
 val extend    : path option -> symbol -> path
 val tolist    : path -> symbol list 
 val p_size    : path -> int
-val p_subst_ids : EcIdent.t EcIdent.Mid.t -> path -> path
 
 (* -------------------------------------------------------------------- *)
 module Mp : Map.S  with type key = path
@@ -85,7 +84,6 @@ val m_split : mpath -> (mpath * path_kind * symbol * mpath list) option
 val m_apply : mpath -> mpath list -> mpath
 
 val m_fv    : int EcIdent.Mid.t -> mpath -> int EcIdent.Mid.t
-val m_subst_ids : EcIdent.t EcIdent.Mid.t -> mpath -> mpath
 
 (* -------------------------------------------------------------------- *)
 type xpath = private {
@@ -122,6 +120,11 @@ val x_tostring : xpath -> string
 (* -------------------------------------------------------------------- *)
 module Mm : Map.S   with type key = mpath
 module Sm : Mm.Set with type elt = mpath
+module Hm : EcMaps.EHashtbl.S with type key = mpath
+
+(* -------------------------------------------------------------------- *)
+val p_subst : path Mp.t -> path -> path
+val m_subst : (path -> path) -> mpath EcIdent.Mid.t -> mpath -> mpath
 
 (* -------------------------------------------------------------------- *)
 module Msubp : sig

@@ -10,7 +10,7 @@ type lvalue =
   | LvVar   of (EcTypes.prog_var * EcTypes.ty)
   | LvTuple of (EcTypes.prog_var * EcTypes.ty) list
   | LvMap   of (EcPath.path * EcTypes.ty list) * 
-                  EcTypes.prog_var * EcTypes.tyexpr * EcTypes.ty
+                  EcTypes.prog_var * EcTypes.expr * EcTypes.ty
 
 let lv_equal lv1 lv2 =
   match lv1, lv2 with
@@ -51,12 +51,12 @@ type instr = {
 }
 
 and instr_node =
-  | Sasgn   of lvalue * EcTypes.tyexpr
-  | Srnd    of lvalue * EcTypes.tyexpr
-  | Scall   of lvalue option * EcPath.mpath * EcTypes.tyexpr list
-  | Sif     of EcTypes.tyexpr * stmt * stmt
-  | Swhile  of EcTypes.tyexpr * stmt
-  | Sassert of EcTypes.tyexpr
+  | Sasgn   of lvalue * EcTypes.expr
+  | Srnd    of lvalue * EcTypes.expr
+  | Scall   of lvalue option * EcPath.mpath * EcTypes.expr list
+  | Sif     of EcTypes.expr * stmt * stmt
+  | Swhile  of EcTypes.expr * stmt
+  | Sassert of EcTypes.expr
 
 and stmt = {
   s_node : instr list;
@@ -177,12 +177,12 @@ end)
 let mk_instr i = 
   Hinstr.hashcons { i_node = i; i_tag = -1; i_fv = EcIdent.Mid.empty }
 
-let asgn   (lv, e)      = mk_instr (Sasgn (lv, e))
-let rnd    (lv, e)      = mk_instr (Srnd (lv, e))
-let call   (lv, m, tys) = mk_instr (Scall (lv, m, tys))
-let if_    (c, s1, s2)  = mk_instr (Sif (c, s1, s2))
-let while_ (c, s)       = mk_instr (Swhile (c, s))
-let assert_ e           = mk_instr (Sassert e)
+let i_asgn   (lv, e)      = mk_instr (Sasgn (lv, e))
+let i_rnd    (lv, e)      = mk_instr (Srnd (lv, e))
+let i_call   (lv, m, tys) = mk_instr (Scall (lv, m, tys))
+let i_if     (c, s1, s2)  = mk_instr (Sif (c, s1, s2))
+let i_while  (c, s)       = mk_instr (Swhile (c, s))
+let i_assert e            = mk_instr (Sassert e)
 
 let stmt s = 
   Hstmt.hashcons { s_node = s; s_tag = -1; s_fv = EcIdent.Mid.empty}
@@ -190,61 +190,76 @@ let stmt s =
 module MSHi = EcMaps.MakeMSH(struct type t = instr let tag i = i.i_tag end)
 module Hi = MSHi.H
 
-let i_subst_ids s = 
-  let e_subst = EcTypes.Esubst.subst_ids s in
+let s_subst (s: EcTypes.e_subst) = 
+
+  let e_subst = EcTypes.e_subst s in
+
+  let pvt_subst (pv,ty as p) = 
+    let pv' = EcTypes.pv_subst s.EcTypes.es_mp pv in
+    let ty' = s.EcTypes.es_ty ty in
+    if pv == pv' && ty == ty' then p else 
+    (pv',ty') in
+    
   let lv_subst lv = 
     match lv with 
-    | LvVar(pv,ty) ->
-        let pv' = EcTypes.PVsubst.subst_ids s pv in
-        if pv == pv' then lv else LvVar(pv',ty)
+    | LvVar pvt ->
+        let pvt' = pvt_subst pvt in
+        if pvt == pvt' then lv else
+        LvVar pvt
     | LvTuple pvs ->
-        let pvs' = List.smart_map (fun (pv,ty as lv) ->
-          let pv' = EcTypes.PVsubst.subst_ids s pv in
-          if pv == pv' then lv else (pv',ty)) pvs in
+        let pvs' = List.smart_map pvt_subst pvs in
         if pvs == pvs' then lv else LvTuple pvs'
-    | LvMap(p, pv, e, ty) ->
-        let pv' = EcTypes.PVsubst.subst_ids s pv in
-        let e'  = e_subst e in
-        if pv == pv' && e == e' then lv else LvMap(p,pv',e',ty) in
-  Hi.memo_rec 107 (fun aux i ->
+    | LvMap((p,tys), pv, e, ty) ->
+        let p'   = s.EcTypes.es_p p in
+        let tys' = List.smart_map s.EcTypes.es_ty tys in
+        let pv'  = EcTypes.pv_subst s.EcTypes.es_mp pv in
+        let e'   = e_subst e in
+        let ty'  = s.EcTypes.es_ty ty in
+        if p==p' && tys==tys' && pv==pv' && e==e' && ty==ty' then lv else
+        LvMap((p',tys'),pv',e',ty') in
+
+  let rec i_subst i = 
     match i.i_node with
     | Sasgn(lv,e) ->
         let lv' = lv_subst lv in
         let e'  = e_subst e in
         if lv == lv' && e == e' then i else 
-        asgn(lv',e')
+        i_asgn(lv',e')
     | Srnd(lv,e) ->
         let lv' = lv_subst lv in
         let e'  = e_subst e in
         if lv == lv' && e == e' then i else 
-        rnd(lv',e')
+        i_rnd(lv',e')
     | Scall(olv,mp,args) ->
         let olv' = osmart_map olv lv_subst in
-        let mp'  = EcPath.m_subst_ids s mp in
+        let mp'  = s.EcTypes.es_mp mp in
         let args' = List.smart_map e_subst args in
         if olv == olv' && mp == mp' && args == args' then i else 
-        call(olv',mp',args')
+        i_call(olv',mp',args')
     | Sif(e,s1,s2) ->
         let e' = e_subst e in
-        let s1' = List.smart_map aux s1.s_node in
-        let s2' = List.smart_map aux s2.s_node in
-        if e == e' && s1.s_node == s1' && s2.s_node == s2' then i else
-        if_(e',stmt s1', stmt s2')
+        let s1' = s_subst s1 in
+        let s2' = s_subst s2 in
+        if e == e' && s1 == s1' && s2 == s2' then i else
+        i_if(e', s1', s2')
     | Swhile(e,s1) ->
         let e' = e_subst e in
-        let s1' = List.smart_map aux s1.s_node in
-        if e == e' && s1.s_node == s1' then i else
-        while_(e',stmt s1')
+        let s1' = s_subst s1 in
+        if e == e' && s1 == s1' then i else
+        i_while(e', s1')
     | Sassert e -> 
         let e' = e_subst e in
         if e == e' then i else
-        assert_ e') 
+        i_assert e'
+ 
+  and s_subst s = 
+    let is = s.s_node in
+    let is' = List.smart_map i_subst is in
+    if is == is' then s else stmt is' in
 
-let s_subst_ids s = 
-  let i_subst = i_subst_ids s in
-  fun st -> 
-  let st' = List.smart_map i_subst st.s_node in
-  if st.s_node == st' then st else stmt st'
+  s_subst 
+    
+
 
 (* -------------------------------------------------------------------- *)
 module UM = struct
@@ -279,6 +294,11 @@ end
 type use_flags = UM.flags
 
 (* -------------------------------------------------------------------- *)
+type variable = {
+  v_name : symbol;
+  v_type : EcTypes.ty;
+}
+
 type module_type = EcPath.path
 
 type module_sig = {
@@ -290,12 +310,12 @@ type module_sig = {
 and module_sig_body = module_sig_body_item list
 
 and module_sig_body_item =
-  | Tys_variable of (symbol * EcTypes.ty)
+  | Tys_variable of variable
   | Tys_function of funsig
 
 and funsig = {
   fs_name : symbol;
-  fs_sig  : (symbol * EcTypes.ty) list * EcTypes.ty;
+  fs_sig  : variable list * EcTypes.ty;
   fs_uses : use_flags EcPath.Mp.t;
 }
 
@@ -335,30 +355,26 @@ and function_ = {
 }
 
 and function_def = {
-  f_locals : (symbol * EcTypes.ty) list;
+  f_locals : variable list;
   f_body   : stmt;
-  f_ret    : EcTypes.tyexpr option;
-}
-
-and variable = {
-  v_name : symbol;
-  v_type : EcTypes.ty;
+  f_ret    : EcTypes.expr option;
 }
 
 (* -------------------------------------------------------------------- *)
+let vd_equal vd1 vd2 = 
+  vd1.v_name = vd2.v_name && 
+  EcTypes.ty_equal vd1.v_type vd2.v_type
+
+let vd_hash vd =
+  Why3.Hashcons.combine (Hashtbl.hash vd.v_name) (EcTypes.ty_hash vd.v_type)
+
 let fd_equal f1 f2 =
-  let lc_equal (x1, ty1) (x2, ty2) =
-    (x1 = x2) && (EcTypes.ty_equal ty1 ty2)
-  in
      (s_equal f1.f_body f2.f_body)
   && (EcUtils.opt_equal EcTypes.e_equal f1.f_ret f2.f_ret)
-  && (List.all2 lc_equal f1.f_locals f2.f_locals)
+  && (List.all2 vd_equal f1.f_locals f2.f_locals)
 
 let fd_hash f =
-  let lc_hash (x, ty) =
-    Why3.Hashcons.combine (Hashtbl.hash x) (EcTypes.ty_hash ty)
-  in
-    Why3.Hashcons.combine2
-      (s_hash f.f_body)
-      (Why3.Hashcons.combine_option EcTypes.e_hash f.f_ret)
-      (Why3.Hashcons.combine_list lc_hash 0 f.f_locals)
+  Why3.Hashcons.combine2
+    (s_hash f.f_body)
+    (Why3.Hashcons.combine_option EcTypes.e_hash f.f_ret)
+    (Why3.Hashcons.combine_list vd_hash 0 f.f_locals)

@@ -618,7 +618,7 @@ let import_w3_term env tvm =
         let v, t = Term.t_open_bound tb in
         let (id,_), vm = add_local v vm in
         let f2 = import vm t in
-        f_let (LSymbol id) f1 f2
+        f_let (LSymbol (id,f1.f_ty)) f1 f2
     | Term.Tcase _ -> raise CanNotTranslate (* FIXME : tuple *)
     | Term.Teps _ ->  raise CanNotTranslate 
     | Term.Tquant(q,tq) ->
@@ -1106,11 +1106,12 @@ let trans_form env vm f =
     | Flet(lp,f1,f2) ->
         let f1 = trans_form_b vm f1 in
         begin match lp with
-        | LSymbol id -> 
+        | LSymbol (id,_) -> 
             let id, vm = add_id vm id (Term.t_type f1) in
             let f2 = trans_form vm f2 in
             Term.t_let f1 (Term.t_close_bound id f2)
         | LTuple ids ->
+            let ids = List.map fst ids in
             let t1 = Term.t_type f1 in
             let ids, vm = add_ids vm ids (destr_ty_tuple t1) in
             let pat = 
@@ -1218,7 +1219,7 @@ let trans_oper_body env vm ls = function
   | OB_oper None | OB_pred None -> env,[],Decl.create_param_decl ls
   | OB_oper (Some (ids,body)) ->
       let ids, vm = add_ids vm ids ls.Term.ls_args in
-      let body = EcFol.form_of_exp EcFol.mstd body in
+      let body = EcFol.form_of_expr EcFol.mstd body in
       let env,rb,e = trans_form env vm body in
       let e = if ls.Term.ls_value = None then force_prop e else e in
       env,rb,Decl.create_logic_decl [Decl.make_ls_defn ls ids e]
@@ -1281,7 +1282,7 @@ let add_mod_exp env path me =
       | MI_Function f ->
           let fsig = f.f_sig in
           let ta = 
-            List.map (fun (_,ty) -> trans_ty !env empty_vmap ty) 
+            List.map (fun vd -> trans_ty !env empty_vmap vd.v_type) 
               (fst fsig.fs_sig) in
           let tr = trans_ty !env empty_vmap (snd fsig.fs_sig) in
           let path = EcPath.pqname path fsig.fs_name in

@@ -23,7 +23,7 @@ type locals = EcIdent.t list
 type 'b operator_info = (locals * 'b) option
 
 type operator_kind = 
-  | OB_oper of EcTypes.tyexpr operator_info
+  | OB_oper of EcTypes.expr operator_info
   | OB_pred of EcFol.form operator_info
 
 type operator = {

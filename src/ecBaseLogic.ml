@@ -18,6 +18,10 @@ let pp_error fmt = function
 
 let _ = EcPexception.register pp_error
 
+(* -------------------------------------------------------------------- *)
+(*    Basic construction for building the logic                         *)
+(* -------------------------------------------------------------------- *)
+
 type ('rn,'rd) rule = {
     r_name : 'rn;
     r_hyps : ('rn,'rd) judgment list;
@@ -169,7 +173,6 @@ module Tactic =
       t_on_nth t (List.length ln - 1) gs 
 
     let t_seq_subgoal t lt g = t_subgoal lt (t g)
-     
 
 end
 

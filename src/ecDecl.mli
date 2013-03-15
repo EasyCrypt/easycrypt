@@ -20,7 +20,7 @@ type locals = EcIdent.t list
 type 'b operator_info = (locals * 'b) option
 
 type operator_kind = 
-  | OB_oper of EcTypes.tyexpr operator_info
+  | OB_oper of EcTypes.expr operator_info
   | OB_pred of EcFol.form operator_info
 
 type operator = {
@@ -33,7 +33,7 @@ type operator = {
 val op_sig : operator -> tysig
 val is_pred : operator -> bool
 
-val mk_op   : EcIdent.t list -> dom -> ty -> tyexpr operator_info -> operator
+val mk_op   : EcIdent.t list -> dom -> ty -> expr operator_info -> operator
 val mk_pred : EcIdent.t list -> dom -> form operator_info -> operator
 
 val op_dump : operator -> dnode
