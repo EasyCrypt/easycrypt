@@ -23,14 +23,17 @@ XUNITOUT  ?= xunit.xml
 CHECKARGS ?=
 
 CHECK = \
-	./scripts/runtest.py             \
-	  --bin=./ec.native              \
-	  --bin-args="$(CHECKARGS)"      \
-	  --ok-dir=theories              \
-	  --ok-dir=tests/typing/success  \
-	  --ko-dir=tests/typing/fail     \
-	  --ok-dir=tests/modules/success \
-	  --ko-dir=tests/modules/fail
+	./scripts/runtest.py              \
+	  -I theories                     \
+	  --bin=./ec.native               \
+	  --bin-args="$(CHECKARGS)"       \
+	  --ok-dir=theories               \
+	  --ok-dir=tests/typing/success   \
+	  --ko-dir=tests/typing/fail      \
+	  --ok-dir=tests/modules/success  \
+	  --ko-dir=tests/modules/fail     \
+	  --ok-dir=tests/theories/success \
+	  --ko-dir=tests/theories/fail
 
 CHECKLIBS = \
 	./scripts/runtest.py        \

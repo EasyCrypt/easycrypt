@@ -1,4 +1,4 @@
-require import int.
+require import Int.
 
 theory T.
   cnst myop : int.

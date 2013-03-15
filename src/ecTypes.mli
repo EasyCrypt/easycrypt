@@ -135,6 +135,7 @@ val e_compare : expr -> expr -> int
 val e_hash    : expr -> int
 val e_fv      : expr -> int EcIdent.Mid.t
 val e_ty      : expr -> ty
+
 (* -------------------------------------------------------------------- *)
 val e_int      : int -> expr
 val e_local    : EcIdent.t -> ty -> expr

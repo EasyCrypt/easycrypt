@@ -1143,8 +1143,8 @@ clone_override:
 | TYPE ps=poly_typarams x=ident EQ t=loc(type_exp)
    { (x, PTHO_Type (ps, t)) }
 
-| CNST x=ident tyvars=tyvars_decl EQ e=loc(exp)
-   { (x, PTHO_Op (tyvars, e)) }
+| CNST x=ident EQ e=loc(exp)
+   { (x, PTHO_Op ([], e)) }
 ;
 
 (* -------------------------------------------------------------------- *)

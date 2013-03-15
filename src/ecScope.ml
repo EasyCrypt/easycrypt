@@ -8,6 +8,7 @@ open EcTypes
 open EcDecl
 open EcModules
 
+module Mid  = EcIdent.Mid
 module MSym = EcSymbols.Msym
 
 (* -------------------------------------------------------------------- *)
@@ -117,7 +118,6 @@ module Prover_info = struct
 end
       
 (* -------------------------------------------------------------------- *)
-
 type proof_uc = {
   puc_name : string;
   puc_jdg :  EcLogic.judgment_uc;
@@ -410,7 +410,7 @@ module Theory = struct
   (* ------------------------------------------------------------------ *)
   type evclone = {
     evc_types : (psymbol list * pty) Msym.t;
-    evc_ops   : ((psymbol list) option * pexpr) Msym.t;
+    evc_ops   : (psymbol list * pexpr) Msym.t;
   }
 
   let evc_empty = {
@@ -432,18 +432,31 @@ module Theory = struct
         let x = unloc x in
           match ovrd with
           | PTHO_Type tyd ->
+            begin
               if Msym.mem x evc.evc_types then
                 failwith "duplicated-type-override";
-              if EcEnv.Ty.by_path_opt (EcPath.pqname opath x) scenv = None then
-                failwith "non-existent-type-override";
-              { evc with evc_types = Msym.add x tyd evc.evc_types }
+              match EcEnv.Ty.by_path_opt (EcPath.pqname opath x) scenv with
+              | None ->
+                  failwith "non-existent-type-override"
+              | Some { EcDecl.tyd_type = Some _ } ->
+                  failwith "concrete-type-cloning"
+              | _ -> ()
+            end;
+            { evc with evc_types = Msym.add x tyd evc.evc_types }
   
           | PTHO_Op opd ->
+            begin
               if Msym.mem x evc.evc_ops then
                 failwith "duplicated-op-override";
-              if EcEnv.Op.by_path_opt (EcPath.pqname opath x) scenv = None then
-                failwith "non-existent-op-override";
-              { evc with evc_ops = Msym.add x opd evc.evc_ops }
+              match EcEnv.Op.by_path_opt (EcPath.pqname opath x) scenv with
+              | None
+              | Some { op_kind = OB_pred _ } ->
+                  failwith "non-existent-op-override";
+              | Some { op_kind = OB_oper (Some _) } ->
+                  failwith "concrete-operator-cloning"
+              | _ -> ()
+            end;
+            { evc with evc_ops = Msym.add x opd evc.evc_ops }
       in
         List.fold_left do1 evc_empty thcl.pthc_ext
     in
@@ -472,11 +485,35 @@ module Theory = struct
                   EcEnv.Ty.bind x binding scenv
         end
 
-(*
-        | CTh_operator (x, { op_kind = OB_oper info }) -> begin
-            assert false
+        | CTh_operator (x, ({ op_kind = OB_oper None } as oopd)) -> begin
+            match Msym.find_opt x ovrds.evc_ops with
+            | None -> EcEnv.Op.bind x (EcSubst.subst_op subst oopd) scenv
+            | Some (locals, opbody) ->
+              let refop = EcEnv.Op.by_path (EcPath.pqname opath x) scenv in
+
+              let nparams = List.map EcIdent.fresh refop.op_params in
+              let tyfrsh  =
+                List.fold_left2
+                  (fun map id1 id2 -> Mid.add id1 (EcTypes.tvar id2) map)
+                  Mid.empty refop.op_params nparams in
+              let ndom   = List.map (EcTypes.Tvar.subst tyfrsh) refop.op_dom in
+              let ncodom = EcTypes.Tvar.subst tyfrsh refop.op_codom in
+
+                if List.length ndom <> List.length locals then
+                  failwith "invalid-number-of-parameters";
+
+              let locals = List.map (EcIdent.create -| unloc) locals in
+              let benv   = EcEnv.Var.bind_locals (List.combine locals ndom) scenv in
+              let ue     = EcUnify.UniEnv.create (Some nparams) in
+
+              let opbody = EcTypedtree.transexpcast benv ue ncodom opbody in
+
+                if List.length (EcUnify.UniEnv.tparams ue) <> List.length nparams then
+                  failwith "body-less-generic";
+
+              let nop = EcDecl.mk_op nparams ndom ncodom (Some (locals, opbody)) in
+                EcEnv.Op.bind x nop scenv
           end
-*)
 
         | CTh_operator (x, oopd) ->
             EcEnv.Op.bind x (EcSubst.subst_op subst oopd) scenv
@@ -493,7 +530,8 @@ module Theory = struct
         | CTh_theory (x, cth) ->
             EcEnv.Theory.bindx x (EcSubst.subst_ctheory subst cth) scenv
 
-        | CTh_export _ -> scenv         (* FIXME *)
+        | CTh_export p ->               (* FIXME: subst in p? *)
+            EcEnv.Theory.export p scenv
       in
         let scenv = EcEnv.Theory.enter name scenv in
         let scenv = List.fold_left ovr1 scenv oth.cth_struct in
