@@ -1289,7 +1289,7 @@ module Theory = struct
       let (w3env, rb) =
         List.map_fold (compile1 path) w3env cth.cth_struct
       in
-        (w3env, List.flatten rb)
+        (w3env, List.rev (List.flatten rb))
     in
 
     let cpath = EcPath.path_of_mpath env.env_scope in
