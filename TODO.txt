@@ -32,6 +32,7 @@ Verifier les fonction add dans ecEnv.
 - raffinements
 - import ocaml batteries
 - diff. for modules
+- understand link between operator domains and higher-order
 
 
 Discution : 

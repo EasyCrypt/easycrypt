@@ -5,6 +5,7 @@ open EcSymbols
 open EcPath
 open EcParsetree
 open EcTypes
+open EcDecl
 open EcModules
 
 module MSym = EcSymbols.Msym
@@ -263,7 +264,7 @@ module Ty = struct
 
   let alias (scope : scope) name ty =
     (* FIXME : check that ty is closed, or close it *)
-    let tydecl = {tyd_params = []; tyd_type = Some ty } in
+    let tydecl = { tyd_params = []; tyd_type = Some ty } in
       bind scope (name, tydecl)
 
   let add (scope : scope) (args, name) = 
@@ -308,6 +309,8 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Theory = struct
+  open EcTheory
+
   exception TopScope
 
   (* ------------------------------------------------------------------ *)
@@ -346,15 +349,14 @@ module Theory = struct
         let cth    = EcEnv.Theory.close scope.sc_env in
         let loaded = scope.sc_loaded in
         let required = scope.sc_required in 
-        let sup = { sup with
-                    sc_loaded = loaded } in
-        ((cth,required), scope.sc_name, sup) 
+        let sup = { sup with sc_loaded = loaded } in
+          ((cth, required), scope.sc_name, sup) 
 
   (* ------------------------------------------------------------------ *)
   let exit (scope : scope) =
-    let ((cth,required), name, scope) = exit_r scope in
+    let ((cth, required), name, scope) = exit_r scope in
     let scope = List.fold_right require_loaded required scope in
-    (name, bind scope (name, cth))
+      (name, bind scope (name, cth))
 
   (* ------------------------------------------------------------------ *)
   let import (scope : scope) (name : qsymbol) =
@@ -406,26 +408,94 @@ module Theory = struct
             require_loaded name scope 
 
   (* ------------------------------------------------------------------ *)
+  type evclone = {
+    evc_types : (psymbol list * pty) Msym.t;
+    evc_ops   : ((psymbol list) option * pexpr) Msym.t;
+  }
+
+  let evc_empty = {
+    evc_types = Msym.empty;
+    evc_ops   = Msym.empty;
+  }
+
   let clone (scope : scope) (thcl : theory_cloning) =
-    let cpath = scope.sc_env.EcEnv.env_scope in
+    let scenv = scope.sc_env in
+    let cpath = EcPath.path_of_mpath scenv.EcEnv.env_scope in
+    let name  = odfl (EcPath.basename cpath) (omap thcl.pthc_name unloc) in
 
-    if not (List.for_all ((=) EcPath.PKother) (EcPath.kinds_of_mpath cpath)) then
-      failwith "not-in-theory-scope"; (* FIXME *)
+    let opath, oth = EcEnv.Theory.lookup (unloc thcl.pthc_base) scope.sc_env in
+    let npath = EcPath.pqname cpath name in
+    let subst = EcSubst.add_path EcSubst.empty opath npath in
 
-    let name =
-      odfl
-        (EcPath.basename (EcPath.path_of_mpath cpath))
-        (omap (thcl.pthc_name) unloc)
+    let ovrds =
+      let do1 evc (x, ovrd) =
+        let x = unloc x in
+          match ovrd with
+          | PTHO_Type tyd ->
+              if Msym.mem x evc.evc_types then
+                failwith "duplicated-type-override";
+              if EcEnv.Ty.by_path_opt (EcPath.pqname opath x) scenv = None then
+                failwith "non-existent-type-override";
+              { evc with evc_types = Msym.add x tyd evc.evc_types }
+  
+          | PTHO_Op opd ->
+              if Msym.mem x evc.evc_ops then
+                failwith "duplicated-op-override";
+              if EcEnv.Op.by_path_opt (EcPath.pqname opath x) scenv = None then
+                failwith "non-existent-op-override";
+              { evc with evc_ops = Msym.add x opd evc.evc_ops }
+      in
+        List.fold_left do1 evc_empty thcl.pthc_ext
     in
 
-    let oldp, oth = EcEnv.Theory.lookup (unloc thcl.pthc_base) scope.sc_env in
-    let newp = EcPath.pqname (EcPath.path_of_mpath cpath) name in
-    let subst = EcSubst.add_path EcSubst.empty oldp newp in
-    let nth = EcSubst.subst_ctheory subst oth in
+    let nth =
+      let ovr1 scenv item =
+        match item with
+        | CTh_type (x, otyd) -> begin
+            match Msym.find_opt x ovrds.evc_types with
+            | None -> EcEnv.Ty.bind x (EcSubst.subst_tydecl subst otyd) scenv
+            | Some (nargs, ntyd) ->
+              let refty = EcEnv.Ty.by_path (EcPath.pqname opath x) scenv in
+                if List.length refty.tyd_params <> List.length nargs then
+                  failwith "type-override-parameters-count-mismatch";
+                if refty.tyd_type <> None then
+                  failwith "type-override-of-non-abstract";
 
+                let nargs = List.map (EcIdent.create -| unloc) nargs in
+                let ue    = EcUnify.UniEnv.create (Some nargs) in
+                let ntyd  = EcTypedtree.transty EcTypedtree.tp_tydecl scope.sc_env ue ntyd in
+
+                let binding =
+                  { tyd_params = nargs;
+                    tyd_type   = Some ntyd; }
+                in
+                  EcEnv.Ty.bind x binding scenv
+        end
+
+        | CTh_operator (x, oopd) ->
+            EcEnv.Op.bind x (EcSubst.subst_op subst oopd) scenv
+
+        | CTh_axiom (x, ax) ->
+            EcEnv.Ax.bind x (EcSubst.subst_ax subst ax) scenv
+
+        | CTh_modtype (x, modty) ->
+            EcEnv.ModTy.bind x (EcSubst.subst_modsig subst modty) scenv
+
+        | CTh_module me ->
+            EcEnv.Mod.bind me.me_name (EcSubst.subst_module subst me) scenv
+
+        | CTh_theory (x, cth) ->
+            EcEnv.Theory.bindx x (EcSubst.subst_ctheory subst cth) scenv
+
+        | CTh_export _ -> scenv         (* FIXME *)
+      in
+        let scenv = EcEnv.Theory.enter name scenv in
+        let scenv = List.fold_left ovr1 scenv oth.cth_struct in
+          EcEnv.Theory.close scenv
+    in
       { scope with
           sc_env =
-            EcEnv.Theory.bindx name nth scope.sc_env; }
+            EcEnv.Theory.bind name nth scope.sc_env; }
 
   (* ------------------------------------------------------------------ *)
   let import_w3 scope dir file renaming = 

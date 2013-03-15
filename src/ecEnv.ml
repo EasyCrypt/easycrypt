@@ -1272,7 +1272,7 @@ module Theory = struct
           env_rb   = List.rev_append cth.cth3_rebind env.env_rb;
           env_item = (CTh_theory (id, cth.cth3_theory)) :: env.env_item; }
 
-  (* ------------------------------------------------------------------ *)
+   (* ------------------------------------------------------------------ *)
   let bindx name th env =
     let rec compile1 path w3env item =
       let xpath = fun x -> EcPath.pqname path x in

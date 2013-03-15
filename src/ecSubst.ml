@@ -356,6 +356,9 @@ and subst_ctheory (s : _subst) (cth : ctheory) =
 (* -------------------------  Wrapper --------------------------------- *)
 (* -------------------------------------------------------------------- *)
 
+let subst_ax           s = subst_ax (_subst_of_subst s)
+let subst_op           s = subst_op (_subst_of_subst s)
+let subst_tydecl       s = subst_tydecl (_subst_of_subst s)
 let subst_theory       s = subst_theory (_subst_of_subst s)
 let subst_ctheory      s = subst_ctheory (_subst_of_subst s)
 
