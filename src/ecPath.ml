@@ -347,19 +347,23 @@ module Msubp = struct
         (find path { mp_value = None; mp_submaps = m }).mp_value
 end
 
+(* -------------------------------------------------------------------- *)
 let p_subst (s : path Mp.t) =
-  Hp.memo_rec 107 (fun aux p ->
-    try Mp.find p s
+  let p_subst aux p =
+    try  Mp.find p s
     with Not_found ->
       match p.p_node with
-      | Psymbol _ | Pident _ -> p
-      | Pqname(p1,id) -> 
+      | Psymbol _
+      | Pident  _ -> p
+      | Pqname(p1, id) -> 
           let p1' = aux p1 in
-          if p1 == p1' then p else
-          pqname p1 id)
+            if p1 == p1' then p else pqname p1' id
+  in
+    Hp.memo_rec 107 p_subst
 
-let rec m_subst (sp : path -> path) (sm: mpath EcIdent.Mid.t) m =
-  let p    = m.m_path 
+(* -------------------------------------------------------------------- *)
+let rec m_subst (sp : path -> path) (sm : mpath EcIdent.Mid.t) m =
+  let p    = m.m_path
   and ks   = m.m_kind 
   and args = m.m_args in
   let args = List.map (List.map (m_subst sp sm)) args in
@@ -367,13 +371,16 @@ let rec m_subst (sp : path -> path) (sm: mpath EcIdent.Mid.t) m =
   let rec aux p ks args =
     match p.p_node, ks, args with
     | Psymbol _, _, _ -> raise Not_found
+
     | Pident id, [_], [a] ->
         let mp = EcIdent.Mid.find id sm in
-        m_apply mp a
+          m_apply mp a
+
     | Pqname(p,id), k::ks, a::args ->
         mqname (aux p ks args) k id a 
-    | _, _, _ -> assert false in
-  try aux p ks args
+
+    | _, _, _ -> assert false
+  in
+
+  try  aux p ks args
   with Not_found -> mpath (sp p) ks args
-
-

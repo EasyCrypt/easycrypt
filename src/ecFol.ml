@@ -518,7 +518,6 @@ let is_exists f =
   | _ -> false
   
 (* -------------------------------------------------------------------- *)
-
 let f_map gt g f = 
     match f.f_node with
     | Fquant(q,b,f1) ->
@@ -607,7 +606,6 @@ let f_map gt g f =
         if args == args' && ev == ev' then f else
         f_pr m mp args' ev'
 
-
 type f_subst = { 
     fs_p   : EcPath.path -> EcPath.path;
     fs_ty  : ty -> ty;
@@ -683,6 +681,13 @@ let rec f_subst (s:f_subst) f =
         (* FIXME : this can be dangerous, maybe use a flag *)
         let ty' = s.fs_ty f.f_ty in
         if f.f_ty == ty' then f else f_local id ty')
+  | Fop(p,tys) ->
+      let ty'  = s.fs_ty f.f_ty in
+      let tys' = List.smart_map s.fs_ty tys in
+      let p'   = s.fs_p p in
+        if   f.f_ty == ty' && tys == tys' && p == p'
+        then f
+        else f_op p' tys' ty'
   | Fpvar(pv,m) ->
       let pv' = pv_subst (EcPath.m_subst s.fs_p s.fs_mp) pv in
       let m'  = Mid.find_def m m s.fs_mem in
@@ -731,6 +736,7 @@ let rec f_subst (s:f_subst) f =
       let e'    = (f_subst s) e in
       if m == m' && mp == mp' && args == args' && e == e' then f else
       f_pr m' mp' args' e'
+
   | _ -> f_map s.fs_ty (f_subst s) f 
 
 

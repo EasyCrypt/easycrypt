@@ -472,6 +472,12 @@ module Theory = struct
                   EcEnv.Ty.bind x binding scenv
         end
 
+(*
+        | CTh_operator (x, { op_kind = OB_oper info }) -> begin
+            assert false
+          end
+*)
+
         | CTh_operator (x, oopd) ->
             EcEnv.Op.bind x (EcSubst.subst_op subst oopd) scenv
 

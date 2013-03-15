@@ -22,7 +22,7 @@ exception InconsistentSubst
 type subst = {
   sb_modules : EcPath.mpath Mid.t;
   sb_path    : EcPath.path  Mp.t;
-  }
+}
 
 (* -------------------------------------------------------------------- *)
 let empty : subst = {
@@ -45,13 +45,12 @@ let add_path (s : subst) ~src ~dst =
   { s with sb_path = Mp.add src dst s.sb_path }
 
 (* -------------------------------------------------------------------- *)
-
 type _subst = {
-    s_s   : subst;
-    s_p   : (EcPath.path -> EcPath.path);
-    s_fmp : (EcPath.mpath -> EcPath.mpath);
-    s_ty  : (ty -> ty);
-  }
+  s_s   : subst;
+  s_p   : (EcPath.path -> EcPath.path);
+  s_fmp : (EcPath.mpath -> EcPath.mpath);
+  s_ty  : (ty -> ty);
+}
 
 let _subst_of_subst s = 
   let sp = EcPath.p_subst s.sb_path in
@@ -60,8 +59,7 @@ let _subst_of_subst s =
   { s_s   = s;
     s_p   = sp;
     s_fmp = sm;
-    s_ty  = st;
-  }
+    s_ty  = st; }
 
 let e_subst_of_subst (s:_subst) = 
   { es_p   = s.s_p;
@@ -128,7 +126,6 @@ let subst_function (s : _subst) (f : function_) =
                  fs_sig  = (args', res')  ;
                  fs_uses = uses'          ; };
       f_def  = def' }
-
 
 (* -------------------------------------------------------------------- *)
 let rec subst_module_item (s : _subst) (item : module_item) =
