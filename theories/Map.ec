@@ -312,19 +312,29 @@ axiom extensionality : forall (m1 m2 : ('a,'b) map),
 pred eq_except(m1 m2 : ('a,'b) map, x : 'a) =
 rm x m1 = rm x m2.
 
+lemma eqe_symm :
+  forall(m1 m2 : ('a, 'b) map)(x : 'a),
+  eq_except m1 m2 x =  eq_except m2 m1 x.
+
+
+lemma eqe_trans :
+  forall(m1 m2 m3: ('a, 'b) map)(x : 'a),
+  eq_except m1 m2 x =>  
+  eq_except m2 m3 x =>
+  eq_except m1 m3 x.
+
+lemma eqe_sym :
+  forall(m : ('a, 'b) map)(x : 'a),
+  eq_except m m x.
+
 lemma eqe_update_diff :
   forall(m1 m2 : ('a, 'b) map)(x1 x2: 'a)( y : 'b),
     eq_except m1 m2 x1 => 
     eq_except m1.[x2 <- y] m2.[x2 <- y]  x1.
 
-lemma eqe_update_same_L :
+lemma eqe_update_same :
  forall(m1 m2 : ('a, 'b) map)(x : 'a, y : 'b),
     eq_except m1 m2 x => eq_except m1.[x<-y] m2 x.
-
-lemma eqe_update_same_R :
- forall(m1 m2 : ('a, 'b) map)(x : 'a, y : 'b),
-    eq_except m1 m2 x => eq_except m1 m2.[x<-y] x.
-
 
 lemma eq_except_eq : 
    forall (m1 m2:('a,'b)map)(x:'a, z:'b),
@@ -333,4 +343,51 @@ lemma eq_except_eq :
    m1.[x] = Some z =>
    m1 = m2.[x <- z].
 
-(* Disjoint union of maps *)
+(* alternative definition *)
+lemma eq_except_def : forall (m1 m2 : ('a,'b) map)(x : 'a),
+in_dom x m2 =>
+eq_except m1 m2 x =>
+exists(z : 'b), m1.[x<-z] = m2.
+
+
+(* Disjointness of maps *)
+
+pred disj(m1 m2 : ('a,'b) map) = 
+  (forall (x : 'a), !in_dom x m1 || !in_dom x m2).
+
+lemma disj_comm : forall (m1 m2 : ('a,'b) map), disj m1 m2 <=> disj m2 m1.
+
+lemma disj_empty: forall(m : ('a,'b) map), disj m empty.
+
+lemma disj_upd : forall(m1 m2 : ('a,'b) map)( x : 'a, y : 'b),
+disj m1 m2 => !in_dom x m1 => disj m1 m2.[x<-y].
+
+lemma disj_rm :forall(m1 m2 : ('a,'b) map)( x : 'a),
+disj m1 m2 => disj (rm x m1) m2.
+
+(* Split a map in two maps *)
+
+pred split_map(m m1 m2 : ('a,'b) map) =
+ disj m1 m2 &&
+ (forall (x : 'a), in_dom x m <=> (in_dom x m1 || in_dom x m2)) &&
+ (forall (x : 'a), in_dom x m1 => m.[x] = m1.[x]) &&
+ (forall (x : 'a), in_dom x m2 => m.[x] = m2.[x]).
+
+lemma split_map_empty : forall (m : ('a,'b) map)(x : 'a),
+ split_map m m empty.
+
+lemma split_map_comm : forall (m m1 m2 : ('a,'b) map)(x : 'a, y :'b),
+ split_map m m1 m2 = split_map m m2 m1. 
+
+lemma split_map_upd : forall (m m1 m2 : ('a,'b) map)(x : 'a, y :'b),
+ split_map m m1 m2 => 
+ !in_dom x m2=> 
+ split_map m.[x<-y] m1.[x<-y] m2.
+
+lemma split_map_rm : forall (m m1 m2 : ('a,'b) map)(x : 'a),
+ split_map m m1 m2 => 
+ !in_dom x m2 => 
+ split_map (rm x m) (rm x m1) m2.
+
+
+
