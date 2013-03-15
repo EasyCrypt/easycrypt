@@ -7,5 +7,5 @@ end T.
 theory U.
   clone T as T'.
 
-  op myop' (t : T'.t) : bool = T'.foo t.
+  op myop' (t : T'.t) : bool = T'.myop t.
 end U.
