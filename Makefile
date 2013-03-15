@@ -20,11 +20,10 @@ THEORIES  = $(wildcard theories/*.ec)
 # --------------------------------------------------------------------
 INSTALL   ?= scripts/install-sh
 XUNITOUT  ?= xunit.xml
-CHECKARGS ?=
+CHECKARGS ?= -I theories
 
 CHECK = \
 	./scripts/runtest.py              \
-	  -I theories                     \
 	  --bin=./ec.native               \
 	  --bin-args="$(CHECKARGS)"       \
 	  --ok-dir=theories               \
