@@ -24,7 +24,12 @@ lemma get_upd_case : forall (m : ('a,'b) map,x : 'a, y: 'a, v1 : 'b, v2 : 'b),
  proj (m.[x <- v1].[y]) = v2.
 
 lemma upd_comm : forall (m : ('a,'b) map, x1 : 'a, x2: 'a, y1 : 'b, y2 : 'b),
- x1 <> x2 =>  m.[x1<-y1].[x2<-y2] = m.[x2<-y2].[x1<-y1].
+ x1 <> x2 =>  m.[x1 <- y1].[x2 <- y2] = m.[x2 <- y2].[x1 <- y1]
+proof.
+intros m x1 x2 y1 y2 x1_neq_x2;
+  cut ext_eq: (forall (a:'a), m.[x1 <- y1].[x2 <- y2].[a] = m.[x2 <- y2].[x1 <- y1].[a]);
+  trivial.
+save.
 
  (* domain operator *)
 op dom ['a 'b] : ('a,'b) map -> 'a Set.t.

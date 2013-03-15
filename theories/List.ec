@@ -40,8 +40,7 @@ axiom list_ind: forall (P:('a list) Pred),
 lemma nil_cons: forall (x:'a) xs, x::xs <> [].
 
 lemma destruct_list: forall (xs:'a list),
-  xs = [] \/
-  (exists (y:'a) ys, xs = y::ys).
+  xs = [] \/ (exists (y:'a) ys, xs = y::ys).
 
 lemma hd_tl_decomp: forall (xs:'a list),
   xs <> [] => (hd xs)::(tl xs) = xs.

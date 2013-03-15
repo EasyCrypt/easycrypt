@@ -2,11 +2,47 @@ require        Bool.
 require import Int.
 require        Array.
 
-(* clone Array as Bits.
-export Bits. *)
-(*export Array.*)
-export Array.
+(* We make a clone of the array theory so we
+   can further restrict to fixed size arrays. *)
+clone Array as Bits.
+export Bits.
+
 type bitstring = bool array.
+
+(* Conversions for interaction with other array types *)
+op to_array: bitstring -> bool Array.array.
+
+axiom to_array_length: forall bs,
+  Array.length (to_array bs) = length bs.
+
+axiom to_array_get: forall bs i,
+  0 <= i => i < length bs =>
+  Array.__get (to_array bs) i = bs.[i].
+
+op from_array: bool Array.array -> bitstring.
+
+axiom from_array_length: forall bs,
+  length (from_array bs) = Array.length bs.
+
+axiom from_array_get: forall bs i,
+  0 <= i => i < Array.length bs =>
+  (from_array bs).[i] = Array.__get bs i.
+
+lemma to_array_from_array: forall bs,
+  from_array (to_array bs) = bs
+proof.
+intros bs;
+  apply extentionality<:bool>((from_array (to_array bs)),bs,_);
+  trivial.
+save.
+
+lemma from_array_to_array: forall bs,
+  to_array (from_array bs) = bs
+proof.
+intros bs;
+  apply Array.extentionality<:bool>((to_array (from_array bs)),bs,_);
+  trivial.
+save.
 
 (* Xor *)
 op [^^](bs0:bitstring, bs1:bitstring): bitstring = map2 Bool.xorb bs0 bs1.
