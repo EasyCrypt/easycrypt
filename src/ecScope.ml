@@ -421,9 +421,9 @@ module Theory = struct
   let clone (scope : scope) (thcl : theory_cloning) =
     let scenv = scope.sc_env in
     let cpath = EcPath.path_of_mpath scenv.EcEnv.env_scope in
-    let name  = odfl (EcPath.basename cpath) (omap thcl.pthc_name unloc) in
 
     let opath, oth = EcEnv.Theory.lookup (unloc thcl.pthc_base) scope.sc_env in
+    let name  = odfl (EcPath.basename opath) (omap thcl.pthc_name unloc) in
     let npath = EcPath.pqname cpath name in
     let subst = EcSubst.add_path EcSubst.empty opath npath in
 
