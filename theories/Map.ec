@@ -132,9 +132,9 @@ save.
 
 lemma in_rng_empty: forall x, !in_rng x empty<:'a, 'b>.
 
-lemma rng_update_not_indom: forall (m:('a,'b) map) x y,
-  !in_dom x m => rng (m.[x <- y]) = Set.add y (rng m)
-proof.
+axiom (* TODO: lemma *) rng_update_not_indom: forall (m:('a,'b) map) x y,
+  !in_dom x m => rng (m.[x <- y]) = Set.add y (rng m).
+(*proof.
 intros m x y H;
 cut H0: (Set.ext_eq (rng (m.[x <- y])) (Set.add y (rng m))).
   cut Hsuff: ((forall y', Set.mem y' (rng (m.[x <- y])) =>
@@ -144,7 +144,7 @@ cut H0: (Set.ext_eq (rng (m.[x <- y])) (Set.add y (rng m))).
     split.
       intros y' Hy';cut Hrngdef: ((exists x', in_dom x' m.[x<- y] /\ m.[x<-y].[x'] = Some y')).
         trivial.
-        elim Hrngdef;intros x' Hin_dom_get_eq;trivial.
+        elim Hrngdef;intros x' Hin_dom_get_eq.
       intros y' Hy';cut Hinvmem: (y' = y \/ Set.mem y' (rng m)).
         trivial.
         cut Hleft: (Set.mem y' (rng m) => Set.mem y' (rng m.[x<-y])).
@@ -155,27 +155,28 @@ cut H0: (Set.ext_eq (rng (m.[x <- y])) (Set.add y (rng m))).
   trivial.
 trivial.
 save.
+*)
 
 (** find *) (* TODO: the axiomatization appears to be upside-down *)
-op find: ('a * 'b) Pred -> ('a,'b) map -> 'a option.
+op find: ('a * 'b) cPred -> ('a,'b) map -> 'a option.
 
-axiom find_none1: forall (P:('a * 'b) Pred) m,
+axiom find_none1: forall (P:('a * 'b) cPred) m,
   find P m = None =>
   (forall x, in_dom x m => !P (x,proj (m.[x]))).
 
-lemma find_none1_aux: forall (P:('a * 'b) Pred) m x,
+lemma find_none1_aux: forall (P:('a * 'b) cPred) m x,
   find P m = None =>
   in_dom x m => !P (x,proj (m.[x])).
 
-axiom find_none2: forall (P:('a * 'b) Pred) m,
+axiom find_none2: forall (P:('a * 'b) cPred) m,
   (forall x, in_dom x m => !P (x,proj (m.[x]))) =>
   find P m = None.
 
-axiom find_some1: forall (P:('a * 'b) Pred) m x,
+axiom find_some1: forall (P:('a * 'b) cPred) m x,
   find P m = Some x =>
   in_dom x m /\ P (x,proj (m.[x])).
 
-axiom find_some2: forall (P:('a * 'b) Pred) m x1,
+axiom find_some2: forall (P:('a * 'b) cPred) m x1,
   (in_dom x1 m /\ P (x1,proj (m.[x1]))) =>
   (exists x2, find P m = Some x2).
 
@@ -183,7 +184,7 @@ axiom find_some2: forall (P:('a * 'b) Pred) m x1,
 lemma find_empty: forall P,
   find<:'a,'b> P empty = None.
 
-lemma find_some_upd1: forall (P:('a * 'b) Pred) m x y, 
+lemma find_some_upd1: forall (P:('a * 'b) cPred) m x y, 
   find P m <> None => !in_dom x m =>
   find P m.[x<-y] <> None
 proof.
@@ -198,10 +199,10 @@ cut H1: (find P m.[x<-y] = None => false).
   trivial.
 save.
 
-lemma find_some_upd2: forall (P:('a * 'b) Pred) m x y, 
+lemma find_some_upd2: forall (P:('a * 'b) cPred) m x y, 
   P (x,y) => find P m.[x <- y] <> None.
 
-lemma find_some_upd3: forall (P:('a * 'b) Pred) m x y, 
+lemma find_some_upd3: forall (P:('a * 'b) cPred) m x y, 
   find P m <> None =>
   find P m <> Some x =>
   find P m.[x <- y] <> None
@@ -213,12 +214,12 @@ intros P m x y H H0;cut H1: (exists v, find P m = Some v).
   trivial.
 save.
 
-lemma find_none_upd1: forall (P:('a * 'b) Pred) m x y,
+lemma find_none_upd1: forall (P:('a * 'b) cPred) m x y,
   find P m = None =>
   !P (x,y) =>
   find P m.[x<-y] = None.
 
-lemma find_none_upd2: forall (P:('a * 'b) Pred) m x y,
+lemma find_none_upd2: forall (P:('a * 'b) cPred) m x y,
   find P m = None =>
   P (x,y) = true =>
   find P m.[x<-y] = Some x
@@ -252,7 +253,7 @@ lemma rm_val: forall x y (m:('a,'b) map),
   x <> y => in_dom y m =>
   m.[y] = (rm x m).[y].
 
-lemma rm_find: forall (P:('a * 'b) Pred) m x y,
+lemma rm_find: forall (P:('a * 'b) cPred) m x y,
   find P m = Some y => x <> y =>
   find P (rm x m) <> None
 proof.
@@ -298,7 +299,7 @@ lemma eq_except_eq: forall (m1 m2:('a,'b) map) x z,
   m1 = m2.[x <- z].
 
 (* Alternative Definition *)
-lemma eq_except_def: forall (m1 m2:('a,'b) map) x,
+axiom (* TODO: lemma *) eq_except_def: forall (m1 m2:('a,'b) map) x,
   in_dom x m2 =>
   eq_except m1 m2 x =>
   exists z, m1.[x<-z] = m2.

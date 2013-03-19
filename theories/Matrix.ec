@@ -1,8 +1,8 @@
 require import Pair.
 require import Int.
 
-(* Type declaration and core definitions *)
-(* We could use the type of arrays, but would then require a validity condition *)
+(** Type declaration and core definitions *)
+(* We could use the type of arrays, but would then require an additional validity condition *)
 type 'a matrix.
 
 op size: 'a matrix -> (int * int).
@@ -22,7 +22,7 @@ pred [==] (M0 M1:'a matrix) =
 axiom extentionality: forall (M0 M1:'a matrix),
   M0 == M1 => M0 = M1.
 
-(* Operators *)
+(** Operators *)
 (* new (m,n): allocates a new uninitialized (m,n) matrix *)
 op new: (int * int) -> 'a matrix.
 

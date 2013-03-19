@@ -25,7 +25,7 @@ op tl: 'a list -> 'a list.
 axiom tl_def: forall (x:'a) xs, tl (x::xs) = xs.
 
 (* Induction Principle (should later be free) *)
-axiom list_ind: forall (P:('a list) Pred),
+axiom list_ind: forall (P:('a list) cPred),
   (P []) =>
   (forall x xs, P xs => P (x::xs)) =>
   (forall ys, P ys).
@@ -133,16 +133,16 @@ lemma mem_app_comm: forall (y:'a) xs ys,
   mem y (xs ++ ys) = mem y (ys ++ xs).
 
 (* Liftings from a' Pred to ('a list) Pred *)
-pred all (p :'a Pred,xs) = forall x, mem x xs => p x.
-pred any (p:'a Pred,xs) = exists x, mem x xs /\ p x.
+pred all (p :'a cPred,xs) = forall x, mem x xs => p x.
+pred any (p:'a cPred,xs) = exists x, mem x xs /\ p x.
 
-lemma all_empty: forall (p:'a Pred),  all p [].
-lemma any_empty: forall (p:'a Pred), !any p [].
+lemma all_empty: forall (p:'a cPred),  all p [].
+lemma any_empty: forall (p:'a cPred), !any p [].
 
-lemma all_app: forall (p:'a Pred) xs ys,
+lemma all_app: forall (p:'a cPred) xs ys,
   all p (xs ++ ys) = (all p xs /\ all p ys).
 
-lemma any_app: forall (p:'a Pred) xs ys,
+lemma any_app: forall (p:'a cPred) xs ys,
   any p (xs ++ ys) = (any p xs \/ any p ys).
 
 (* forallb *)
@@ -177,14 +177,14 @@ trivial.
 save.
 
 (* filter *)
-op (* local *) f_filter(p:'a Pred, x, r): 'a list = 
+op (* local *) f_filter(p:'a cPred, x, r): 'a list = 
   if (p x) then x::r else r.
-op filter(p:'a Pred): 'a list -> 'a list =
+op filter(p:'a cPred): 'a list -> 'a list =
   fold_right (f_filter p) [].
 
-lemma filter_nil: forall (p:'a Pred),
+lemma filter_nil: forall (p:'a cPred),
   filter p [] = [].
-lemma filter_cons: forall (p:'a Pred) x xs,
+lemma filter_cons: forall (p:'a cPred) x xs,
   filter p (x::xs) = let rest = filter p xs in
                      if p x then x::rest else rest.
 
@@ -220,7 +220,7 @@ save.
 
 lemma filter_all: forall (xs:'a list) p,
   all p (filter p xs).
-lemma filter_imp: forall (p q:'a Pred) xs,
+lemma filter_imp: forall (p q:'a cPred) xs,
   (forall x, p x => q x) => 
    forall x, mem x (filter p xs) => mem x (filter q xs).
 

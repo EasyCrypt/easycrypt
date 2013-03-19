@@ -6,10 +6,10 @@ let s_cons = "::"
 let s_abs  = "__abs"
 
 (* -------------------------------------------------------------------- *)
-let s_dbool      = (["<top>"; "distr"; "Dbool"     ], "dbool")
-let s_dbitstring = (["<top>"; "distr"; "Dbitstring"], "dbitstring")
-let s_dinter     = (["<top>"; "distr"; "Dinter"    ], "dinter")
-let s_from_int   = (["<top>"; "real" ; "FromInt"   ], "from_int")
+let s_dbool      = (["<top>"; "Distr"; "Dbool"     ], "dbool")
+let s_dbitstring = (["<top>"; "Distr"; "Dbitstring"], "dbitstring")
+let s_dinter     = (["<top>"; "Distr"; "Dinter"    ], "dinter")
+let s_from_int   = (["<top>"; "Real" ; "FromInt"   ], "from_int")
 
 (* -------------------------------------------------------------------- *)
 let id_top       = "<top>"

@@ -1,34 +1,33 @@
-axiom f_extentionality : 
-  forall (f1: 'a -> 'b, f2 : 'a -> 'b),
-     (forall (x:'a), f1 x = f2 x) =>
-     f1 = f2.
+(** Extentional Equality for Functions *)
+pred [==](f1:'a -> 'b, f2:'a -> 'b) =
+  forall x, f1 x = f2 x.
 
-type 'a Pred = 'a -> bool.
+axiom extentionality: forall (f1 f2:'a -> 'b),
+  f1 == f2 => f1 = f2.
 
-pred Pincl (p1:'a Pred, p2:'a Pred) = 
+(** Computable predicates *)
+type 'a cPred = 'a -> bool.
+
+pred cPincl(p1:'a cPred, p2:'a cPred) = 
   forall (a:'a), p1 a => p2 a.
 
-op Ptrue (x:'a) : bool = true.
+(* Operators on Predicates *)
+op cPtrue(x:'a): bool = true.
+op cPfalse(x:'a): bool = false.
+op cPnot(p:'a cPred, a): bool = !p a.
+op cPand(p1:'a cPred, p2:'a cPred, a): bool = p1 a /\ p2 a.
+op cPor(p1:'a cPred, p2:'a cPred, a): bool = p1 a \/ p2 a.
 
-op Pfalse (x:'a) : bool = false.
+op cPeq(x1:'a,x2): bool = x1 = x2.
 
-op Pnot (p:'a Pred, a:'a) : bool = ! p a.
-op Pand (p1: 'a Pred, p2: 'a Pred, a:'a) : bool = p1 a && p2 a.
-op Por  (p1: 'a Pred, p2: 'a Pred, a:'a) : bool = p1 a || p2 a.
-
-op Peq (x1:'a,x2:'a) : bool = x1 = x2.
-
-axiom Ptrue_def  : forall (x:'a), Ptrue x. 
-
-axiom Pfalse_def : forall (x:'a), ! Pfalse x. 
-
-axiom  Pnot_def   : forall (P:'a Pred, x:'a), Pnot P x <=> !P x. 
-
-axiom Pand_def   : forall (P1:_, P2:_, x:'a), 
-  Pand P1 P2 x <=> (P1 x && P2 x).
-
-axiom Por_def    : forall (P1:_, P2:_, x:'a), 
-  Por P1 P2 x <=> (P1 x || P2 x).
+(* Lemmas/Redefinitions *)
+lemma cPtrue_def: forall (x:'a), cPtrue x. 
+lemma cPfalse_def: forall (x:'a), !cPfalse x. 
+lemma cPnot_def: forall (P:'a cPred) x, cPnot P x <=> !P x. 
+lemma cPand_def: forall P1 P2 (x:'a), 
+  cPand P1 P2 x <=> (P1 x /\ P2 x).
+lemma cPor_def: forall P1 P2 (x:'a), 
+  cPor P1 P2 x <=> (P1 x \/ P2 x).
 
 
 

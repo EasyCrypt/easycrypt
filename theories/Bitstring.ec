@@ -1,3 +1,4 @@
+require        Distr.
 require        Bool.
 require import Int.
 require        Array.
@@ -76,3 +77,25 @@ intros bs;
   trivial.
 save.
 
+require import Real.
+require import Distr.
+
+(* Uniform distributions on length-parametric bitstrings *)
+theory Dbitstring.
+  op dbitstring: int -> bitstring distr.
+
+  axiom supp_def: forall (k:int, s:bitstring),
+    in_supp s (dbitstring k) <=> length s = k.
+
+  axiom mu_x_def_in: forall (k:int, s:bitstring),
+    length s = k => mu_x (dbitstring k) s = 1%r/(2^k)%r.
+
+  axiom mu_x_def_other: forall (k:int, s:bitstring),
+    length s <> k => mu_x (dbitstring k) s = 0%r.
+
+  axiom mu_weight_pos: forall (k:int), 0 <= k =>
+    mu_weight (dbitstring k) = 1%r.
+
+  axiom mu_weight_neg: forall (k:int), k < 0 =>
+    mu_weight (dbitstring k) = 0%r.
+end Dbitstring.
