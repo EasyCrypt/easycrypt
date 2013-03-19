@@ -75,3 +75,4 @@ intros bs;
   apply extentionality<:bool> ((bs ^^ bs),(zeros (length bs)),_);
   trivial.
 save.
+
