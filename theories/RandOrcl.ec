@@ -7,9 +7,9 @@ theory RndOrcl.
 
   type to.
   
-  cnst default : to.
+  cnst default: to.
 
-  cnst dsample : to distr.
+  cnst dsample: to distr.
 
   module RO = { 
     var m:(from,to) map
@@ -28,7 +28,7 @@ theory RndOrcl.
 
   module ARO = { 
 
-    var log : from Set.t
+    var log : from Set.set
 
     fun AdvO(x:from) : to = {
       var res1 : to = default;

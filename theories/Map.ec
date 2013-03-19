@@ -33,7 +33,7 @@ intros m x1 x2 y1 y2 x1_neq_x2;
 save.
 
 (** Formalization of map domain *)
-op dom: ('a,'b) map -> 'a Set.t.
+op dom: ('a,'b) map -> 'a Set.set.
 
 axiom dom_def: forall (m:('a,'b) map) x,
   Set.mem x (dom m) <=> m.[x] <> None.
@@ -55,12 +55,12 @@ lemma dom_update: forall (m:('a,'b) map) x y,
   dom (m.[x <- y]) = Set.add x (dom m)
 proof.
 intros m x y;
-  cut H: (Set.ext_eq (dom (m.[x <- y])) (Set.add x (dom m)));
+  apply Set.extentionality<:'a> ((dom (m.[x <- y])),(Set.add x (dom m)),_);
   trivial.
 save.
 
 (** Formalization of map range *)
-op rng: ('a,'b) map -> 'b Set.t.
+op rng: ('a,'b) map -> 'b Set.set.
 
 axiom rng_def: forall (m:('a,'b) map) y,
   Set.mem y (rng m) <=> (exists x, in_dom x m && m.[x] = Some y).
@@ -127,7 +127,8 @@ save.
 
 lemma rng_empty: rng (empty<:'a,'b>) = Set.empty
 proof.
-cut H: (Set.ext_eq (rng (empty<:'a,'b>)) Set.empty);trivial.
+apply Set.extentionality<:'b> ((rng empty<:'a,'b>),Set.empty,_);
+  trivial.
 save.
 
 lemma in_rng_empty: forall x, !in_rng x empty<:'a, 'b>.
