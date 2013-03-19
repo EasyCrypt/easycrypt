@@ -1,0 +1,30 @@
+We are pleased to release the next milestone for the new easycrypt
+system including, along with its bunch of bug fixes, the following
+major features:
+
+  - the option to state claims / equivalences / probabilities, along
+    with the core mechanism for their why3 translation.
+
+  - an extended standard library that includes definition and related
+    theories for scalars (booleans, integers, reals, ...), datatypes
+    (words, bitstrings, arrays, lists, maps...), algebraic structures
+    (prime fields, cyclic groups).
+
+As for the previous release, the documentation is still to be written
+and you should have a look at theories/*.ec and tests/**/*.ec for a
+set of examples.
+
+We are now heading to integrate the tactics mechanism that forms the
+last major missing part for having a working system
+
+As usual, the source code can be downloaded at:
+
+  http://ci.easycrypt.info/nightly
+
+Please note that this milestone is still a preview release dedicated
+to the testing of the new easycrypt system. [*]
+
+-- The EasyCrypt team 
+
+[*] The current stable release (0.2) is still accessible on our main
+    website: http://www.easycrypt.info/
