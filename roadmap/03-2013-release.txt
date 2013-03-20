@@ -14,8 +14,9 @@ As for the previous release, the documentation is still to be written
 and you should have a look at theories/*.ec and tests/**/*.ec for a
 set of examples.
 
-We are now heading to integrate the tactics mechanism that forms the
-last major missing part for having a working system
+We are now heading to integrate the tactics mechanism for equivs, which
+is the last major missing part. When this is done (by end of March), this
+new milestone will be usable to perform full security proofs.
 
 As usual, the source code can be downloaded at:
 
