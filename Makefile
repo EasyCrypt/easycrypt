@@ -38,7 +38,7 @@ CHECK = \
 CHECKLIBS = \
 	./scripts/runtest.py        \
 	  --bin=./ec.native         \
-	  --bin-args="$(CHECKARGS)" \
+	  --bin-args="$(CHECKLIBARGS)" \
 	  --ok-dir=theories         \
 	  --xunit=libresults.xml
 

@@ -1,5 +1,7 @@
 require Map_why.
 
+prover "Eprover" "Alt-Ergo" "Z3".
+
 require import Fun.
 require export Option.
 require        Set.
@@ -73,21 +75,18 @@ lemma upd_in_rng_eq: forall (m:('a,'b) map) x y1 y2,
   y1 = y2 => in_rng y2 (m.[x<-y1])
 proof.
 intros m x y1 y2 H;
-  cut Hsuff: (Set.mem y2 (rng m.[x<-y2])).
+  cut Hsuff: (Set.mem y2 (rng m.[x<-y2]));[ idtac | trivial ].
   cut Hsuff: (in_dom x m.[x<-y2] && m.[x<-y2].[x] = Some y2);trivial.
-  trivial.
 save.
 
 lemma in_dom_in_rng: forall (m:('a,'b) map) x,
   in_dom x m => in_rng (proj m.[x]) m
 proof.
 intros m x Hdom;
-cut Hsuff: (Set.mem (proj m.[x]) (rng m)).
-  cut Hsuff: (exists x', in_dom x' m /\ m.[x] = Some (proj(m.[x']))).
-    trivial.
-    cut A: ((exists x', in_dom x' m /\ proj (m.[x]) = proj (m.[x'])) =>
-            Set.mem (proj m.[x]) (rng m));trivial.
-  trivial.
+cut Hsuff: (Set.mem (proj m.[x]) (rng m));[ idtac | trivial ].
+  cut Hsuff: (exists x', in_dom x' m /\ m.[x] = Some (proj(m.[x'])));[ trivial | idtac ].
+  cut A: ((exists x', in_dom x' m /\ proj (m.[x]) = proj (m.[x'])) =>
+          Set.mem (proj m.[x]) (rng m));trivial.
 save.
 
 lemma upd_in_rng_neq: forall (m:('a,'b) map) x y1 y2,
@@ -133,33 +132,21 @@ save.
 
 lemma in_rng_empty: forall x, !in_rng x empty<:'a, 'b>.
 
-axiom (* TODO: lemma *) rng_update_not_indom: forall (m:('a,'b) map) x y,
-  !in_dom x m => rng (m.[x <- y]) = Set.add y (rng m).
-(*proof.
+lemma rng_update_not_indom: forall (m:('a,'b) map) x y,
+  !in_dom x m => rng (m.[x <- y]) = Set.add y (rng m)
+proof.
 intros m x y H;
 apply Set.extentionality<:'b> ((rng (m.[x <- y])),(Set.add y (rng m)),_);
 cut Hsuff: ((forall y', Set.mem y' (rng (m.[x <- y])) =>
                Set.mem y' (Set.add y (rng m))) /\
             (forall y', Set.mem y' (Set.add y (rng m)) =>
                Set.mem y' (rng (m.[x <- y]))));[ split;[ idtac | trivial ] | trivial ].
-  intros y' Hy';cut Hrngdef: (exists x', in_dom x' m.[x<- y] /\ m.[x<-y].[x'] = Some y').
-    trivial.
-    elim Hrngdef;intros x' in_dom_get.
-      cut Hrngdef2: (exists x', (in_dom x' m /\ m.[x'] = Some y') \/ x' = x).
-        trivial.
-        trivial.
-intros x' Hin_dom_get_eq;trivial.
-
-
-      intros y' Hy';cut Hinvmem: (y' = y \/ Set.mem y' (rng m)).
-        trivial.
-        cut Hleft: (Set.mem y' (rng m) => Set.mem y' (rng m.[x<-y])).
-          intros Hmem;cut Hsuff: (in_rng y' m.[x<-y]);trivial.
-        cut Hright: (y' =  y => Set.mem y' (rng m.[x<-y])).
-          intros Heq;cut Hsuff: (in_rng y' (m.[x<-y]));trivial.
-          trivial.
+intros y';cut case_y_y': (y = y' \/ y <> y');[ trivial | elim case_y_y';[ trivial | idtac ]].
+intros y_neq_y' y'_in_rng;
+  cut y'_in_rng_m: (Set.mem y' (rng m));
+  cut Hdom: (exists x', in_dom x' m /\ m.[x'] = Some y');
+  trivial.
 save.
-*)
 
 (** find *) (* TODO: the axiomatization appears to be upside-down *)
 op find: ('a * 'b) cPred -> ('a,'b) map -> 'a option.
@@ -303,10 +290,17 @@ lemma eq_except_eq: forall (m1 m2:('a,'b) map) x z,
   m1 = m2.[x <- z].
 
 (* Alternative Definition *)
-axiom (* TODO: lemma *) eq_except_def: forall (m1 m2:('a,'b) map) x,
+lemma eq_except_def: forall (m1 m2:('a,'b) map) x,
   in_dom x m2 =>
   eq_except m1 m2 x =>
-  exists z, m1.[x<-z] = m2.
+  exists z, m1.[x<-z] = m2
+proof.
+intros m1 m2 x x_in_dom_m2 m1_eq_except_m2_x;
+cut H: (exists z, m2.[x] = Some z);[ trivial | idtac ].
+elim H;intros z m2_z.
+cut eq_except: (m2 = m1.[x <- z]);[ idtac | trivial ].
+apply eq_except_eq<:'a,'b> (m2,m1,x,z,_,_,_);trivial.
+save.
 
 (** Disjointness of maps *)
 pred disj(m1 m2:('a,'b) map) = forall x,
