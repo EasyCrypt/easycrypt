@@ -11,7 +11,7 @@ type info =
 
 (* -------------------------------------------------------------------- *)
 val addidir    : string -> unit
-val full_check : bool -> int -> unit
+val full_check : bool -> int -> string list option -> unit
 
 val process : EcParsetree.global -> info list 
 

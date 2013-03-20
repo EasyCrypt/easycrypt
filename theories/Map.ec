@@ -137,15 +137,20 @@ axiom (* TODO: lemma *) rng_update_not_indom: forall (m:('a,'b) map) x y,
   !in_dom x m => rng (m.[x <- y]) = Set.add y (rng m).
 (*proof.
 intros m x y H;
-cut H0: (Set.ext_eq (rng (m.[x <- y])) (Set.add y (rng m))).
-  cut Hsuff: ((forall y', Set.mem y' (rng (m.[x <- y])) =>
-                 Set.mem y' (Set.add y (rng m))) /\
-              (forall y', Set.mem y' (Set.add y (rng m)) =>
-                 Set.mem y' (rng (m.[x <- y])))).
-    split.
-      intros y' Hy';cut Hrngdef: ((exists x', in_dom x' m.[x<- y] /\ m.[x<-y].[x'] = Some y')).
+apply Set.extentionality<:'b> ((rng (m.[x <- y])),(Set.add y (rng m)),_);
+cut Hsuff: ((forall y', Set.mem y' (rng (m.[x <- y])) =>
+               Set.mem y' (Set.add y (rng m))) /\
+            (forall y', Set.mem y' (Set.add y (rng m)) =>
+               Set.mem y' (rng (m.[x <- y]))));[ split;[ idtac | trivial ] | trivial ].
+  intros y' Hy';cut Hrngdef: (exists x', in_dom x' m.[x<- y] /\ m.[x<-y].[x'] = Some y').
+    trivial.
+    elim Hrngdef;intros x' in_dom_get.
+      cut Hrngdef2: (exists x', (in_dom x' m /\ m.[x'] = Some y') \/ x' = x).
         trivial.
-        elim Hrngdef;intros x' Hin_dom_get_eq.
+        trivial.
+intros x' Hin_dom_get_eq;trivial.
+
+
       intros y' Hy';cut Hinvmem: (y' = y \/ Set.mem y' (rng m)).
         trivial.
         cut Hleft: (Set.mem y' (rng m) => Set.mem y' (rng m.[x<-y])).
@@ -153,8 +158,6 @@ cut H0: (Set.ext_eq (rng (m.[x <- y])) (Set.add y (rng m))).
         cut Hright: (y' =  y => Set.mem y' (rng m.[x<-y])).
           intros Heq;cut Hsuff: (in_rng y' (m.[x<-y]));trivial.
           trivial.
-  trivial.
-trivial.
 save.
 *)
 

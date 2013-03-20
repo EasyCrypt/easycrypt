@@ -569,7 +569,7 @@ module Prover = struct
     | _ -> raise exn
 
   let _ = EcPexception.register pp_error 
-      
+
   let check_prover_name name = 
     let s = unloc name in
     if not (EcWhy3.check_prover_name s) then 
@@ -596,8 +596,12 @@ module Prover = struct
     let provers = Array.of_list (EcWhy3.known_provers ()) in
     set_prover_info scope None None (Some provers)
 
-  let set_default scope max = 
-    let provers = List.filter EcWhy3.check_prover_name ["Alt-Ergo";"Z3";"Vampire";"Eprover";"Yices"] in
+  let set_default scope max provers =
+    let provers =
+      match provers with
+      | None -> List.filter EcWhy3.check_prover_name ["Alt-Ergo";"Z3";"Vampire";"Eprover";"Yices"]
+      | Some ps -> List.iter (fun s -> if not (EcWhy3.check_prover_name s) then raise (Unknown_prover s)) ps;ps
+    in
     let provers = Array.of_list provers in
     let time = 3 in
     set_prover_info scope (Some max) (Some time) (Some provers) 

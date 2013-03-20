@@ -6,6 +6,7 @@ type options = {
   o_why3       : string option;
   o_full_check : bool;
   o_max_prover : int;
+  o_provers    : string list option;
 }
 
 

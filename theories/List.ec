@@ -10,7 +10,7 @@ op cons(x,xs): 'a list = x::xs.
 
 (** Fold *)
 op fold_right: ('a -> 'b -> 'b) -> 'b -> 'a list -> 'b.
-axiom fold_right_nil : forall (e:'b) (f:'a -> 'b -> 'b),
+axiom fold_right_nil: forall (e:'b) (f:'a -> 'b -> 'b),
   fold_right f  e [] = e.
 axiom fold_right_cons: forall (e:'b) (f:'a -> 'b -> 'b) x xs,
   fold_right f e (x::xs) = f x (fold_right f e xs).

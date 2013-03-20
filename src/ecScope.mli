@@ -109,7 +109,7 @@ end
 module Prover : sig 
   val process     : scope -> pprover_infos -> scope
   val set_all     : scope -> scope 
-  val set_default : scope -> int -> scope
+  val set_default : scope -> int -> string list option -> scope
   val full_check  : scope -> scope
   val check_proof : scope -> bool -> scope
 end

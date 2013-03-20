@@ -90,9 +90,9 @@ lemma write_sub: forall (M M':'a matrix) i j,
   0 <= j => j + snd (size M') <= snd (size M) =>
   sub (write M (i,j) M' (0,0) (size M')) (i,j) (size M') = M'
 proof.
-intros M M' i j i_0 i_bound j_0 j_bound.
-apply extentionality<:'a> ((sub (write M (i,j) M' (0,0) (size M')) (i,j) (size M')),M',_).
-trivial.
+intros M M' i j i_0 i_bound j_0 j_bound;
+  apply extentionality<:'a> ((sub (write M (i,j) M' (0,0) (size M')) (i,j) (size M')),M',_);
+  trivial.
 save.
 
 (* transpose M *)
@@ -109,9 +109,12 @@ axiom transpose_get: forall (M:'a matrix) i j,
 lemma transpose_idempotent: forall (M:'a matrix),
   transpose (transpose M) = M
 proof.
-intros M.
-apply extentionality<:'a> ((transpose (transpose M)),M,_).
-trivial.
+intros M;
+  apply extentionality<:'a> ((transpose (transpose M)),M,_);
+  cut ext: (size (transpose (transpose M)) = size M /\
+            forall i j, 0 <= i => i < fst (size M) => 0 <= j => j < snd (size M) =>
+              (transpose (transpose M)).[(i,j)] = M.[(i,j)]);
+  trivial.
 save.
 
 (* Interactions with arrays *)

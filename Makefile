@@ -21,6 +21,7 @@ THEORIES  = $(wildcard theories/*.ec)
 INSTALL   ?= scripts/install-sh
 XUNITOUT  ?= xunit.xml
 CHECKARGS ?= -I theories
+CHECKLIBARGS ?= $(CHECKARGS) -p Eprover -p Alt-Ergo -p Z3
 
 CHECK = \
 	./scripts/runtest.py              \

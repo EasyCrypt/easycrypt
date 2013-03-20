@@ -76,7 +76,7 @@ let pp_tac_error fmt = function
   | CanNotProve g -> 
       Format.fprintf fmt "Can not prove %a" PE.pp_lgoal g
   | InvalNumOfTactic (i1,i2) ->
-      Format.fprintf fmt "Invalid number of tactics: %i given, %i excepted" i2 i1
+      Format.fprintf fmt "Invalid number of tactics: %i given, %i expected" i2 i1
 
 let _ = EcPexception.register (fun fmt exn ->
   match exn with
