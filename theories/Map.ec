@@ -1,7 +1,5 @@
 require Map_why.
 
-prover "Eprover" "Alt-Ergo" "Z3".
-
 require import Fun.
 require export Option.
 require        Set.
