@@ -180,7 +180,8 @@ let quantify_out_local_pvars _phi = assert false
   quantify_pvars free_pvars phi
 *)
 
-let skip_tac (juc,n as g) =
+let skip_tac (_juc,_n as _g) =
+ assert false (*
   let hyps,concl = get_goal g in
   let _mem,pre,s,post = destr_hl concl in
   match s.EcModules.s_node with
@@ -192,7 +193,7 @@ let skip_tac (juc,n as g) =
       let juc,n1 = new_goal juc (hyps,conc) in
       let rule = {pr_name = RN_skip; pr_hyps=[n1]} in
       upd_rule (juc,n) rule
-
+              *)
 
 
 let wp_tac _i _loc _env (_juc,_n as _g) =
@@ -209,7 +210,9 @@ let wp_tac _i _loc _env (_juc,_n as _g) =
   upd_rule (juc,n) rule
 *)
 
-let app_tac (i,phi) _loc _env (juc,n as g) =
+let app_tac _ _ _ _ = assert false
+(*(i,phi) _loc _env (juc,n as g) =
+
   let hyps,concl = get_goal g in
   let mem,pre,s,post = destr_hl concl in
   let s1,s2 = split_stmt i s.EcModules.s_node  in
@@ -219,7 +222,7 @@ let app_tac (i,phi) _loc _env (juc,n as g) =
   let juc,n2 = new_goal juc (hyps,b) in
   let rule = { pr_name = RN_app (i,phi); pr_hyps = [n1;n2]} in
   upd_rule (juc,n) rule
-
+*)
 
 
 

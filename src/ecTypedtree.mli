@@ -54,8 +54,10 @@ val transexp : EcEnv.env -> EcUnify.unienv -> pexpr -> expr * ty
 val transexpcast : EcEnv.env -> EcUnify.unienv -> ty -> pexpr -> expr
 
 (* -------------------------------------------------------------------- *)
+val transmem     : EcEnv.env -> EcSymbols.symbol EcUtils.located -> EcIdent.t
 val transformula : EcEnv.env -> EcUnify.unienv -> pformula -> EcFol.form 
 val transform    : EcEnv.env -> EcUnify.unienv -> pformula -> ty -> EcFol.form
+val transform_opt: EcEnv.env -> EcUnify.unienv -> pformula -> ty option -> EcFol.form
 
 (* -------------------------------------------------------------------- *)
 val transmodsig  : EcEnv.env -> symbol -> pmodule_sig  -> module_sig

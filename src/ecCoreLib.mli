@@ -48,3 +48,30 @@ val p_eq         : path
 val p_leq        : path
 val p_lt         : path
 
+val p_cut_lemma  : path
+val p_false_elim : path
+val p_and_elim   : path
+val p_anda_elim  : path
+val p_or_elim    : path
+val p_ora_elim   : path
+val p_iff_elim   : path 
+val p_if_elim    : path 
+
+val p_true_intro  : path 
+val p_and_intro   : path 
+val p_anda_intro  : path 
+val p_or_intro_l  : path 
+val p_ora_intro_l : path 
+val p_or_intro_r  : path 
+val p_ora_intro_r : path 
+val p_iff_intro   : path 
+val p_if_intro    : path 
+val p_eq_refl     : path
+
+
+val p_rewrite_l     : path 
+val p_rewrite_r     : path 
+val p_rewrite_iff_l : path 
+val p_rewrite_iff_r : path 
+
+val p_case_eq_bool  : path 

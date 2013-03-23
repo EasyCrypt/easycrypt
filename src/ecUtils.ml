@@ -448,3 +448,16 @@ module Stream = struct
     try  Some (Stream.next stream)
     with Stream.Failure -> None
 end
+
+(* -------------------------------------------------------------------- *)
+
+type 'a located = {
+  pl_loc  : EcLocation.t;
+  pl_desc : 'a;
+}
+
+let unloc  x = x.pl_desc
+let unlocs x = List.map unloc x
+
+let lmap f x = 
+  { x with pl_desc = f x.pl_desc }

@@ -6,13 +6,6 @@ open EcUtils
 let qsymb_of_symb (x : symbol) : qsymbol = ([], x)
 
 (* -------------------------------------------------------------------- *)
-type 'a located = {
-  pl_loc  : EcLocation.t;
-  pl_desc : 'a;
-}
-
-let unloc  x = x.pl_desc
-let unlocs x = List.map unloc x
 let dummyloc x = { pl_loc = EcLocation.dummy; pl_desc = x }
 let dummy_pqs_of_ps s = dummyloc (qsymb_of_symb (unloc s))
 
@@ -155,6 +148,7 @@ and pformula_r =
   | PFlet    of lpattern * pformula * pformula
   | PFforall of pgtybindings * pformula
   | PFexists of pgtybindings * pformula
+  | PFlambda of pgtybindings * pformula
 
   (* for claims *)
   | PFhoareF of pformula * pgamepath * pformula
@@ -208,9 +202,25 @@ type elim_kind =
   | ElimHyp  of pqsymbol * tvar_inst
   | ElimForm of pformula
 
+type elim_arg = 
+  | EA_form of pformula
+  | EA_mem  of pmemory
+(*  | EA_mp   add module application *)
+  | EA_none
+
+
 type pelim = { 
   elim_kind : elim_kind;
-  elim_args : pformula option list 
+  elim_args : elim_arg located list 
+}
+
+
+type preduction = {
+  pbeta  : bool;
+  pdelta : pqsymbol list option;
+  pzeta  : bool;   (* remove let *)
+  piota  : bool;   (* remove case *)
+  plogic : bool;   (* perform logical simplification *)
 }
 
 type ptactic = ptactic_r located
@@ -219,18 +229,26 @@ and ptactic_r =
   | Pidtac
   | Passumption of (pqsymbol option * tvar_inst)
   | Ptrivial    of pprover_infos
-  | Pintro      of posymbol list  (* imp_I, forall_I *)
-  | Psplit                        (* and_I *)
-  | Pexists     of pformula list  (* exists_I *)
-  | Pleft                         (* or_I left *)
-  | Pright                        (* or_I right *)
+  | Pintro      of posymbol list  
+  | Psplit                        
+  | Pexists     of elim_arg located list 
+  | Pleft                         
+  | Pright                        
   | Pelim       of pelim   
   | Papply      of pelim
+  | Pcut        of (psymbol * pformula)
+  | Pgeneralize of pformula list
+  | Pclear      of psymbol list
+  | Prewrite    of (bool * pelim)
+  | Psimplify   of preduction 
+  | Pchange     of pformula
+  | PelimT      of (pformula * pqsymbol)
+  | Pcase       of pformula 
   | Psubgoal    of ptactics
   | Pseq        of ptactics
   | PPhl        of phl_tactics
   | Padmit
-  | Pcut        of (psymbol * pformula)
+
 
 and phl_tactics = 
   | Papp        of (int * pformula)

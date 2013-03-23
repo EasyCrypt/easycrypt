@@ -41,7 +41,7 @@ val op_dump : operator -> dnode
 (* -------------------------------------------------------------------- *)
 type axiom_kind = 
   | Axiom 
-  | Lemma of EcFol.judgment option (* None means cloned lemma *)
+  | Lemma of EcBaseLogic.judgment option (* None means cloned lemma *)
 
 type axiom = {
   ax_params : EcIdent.t list;

@@ -4,6 +4,7 @@ open EcUtils
 open EcIdent
 open EcPath
 open EcTypes
+open EcBaseLogic
 open EcDecl
 open EcFol
 open EcModules
@@ -921,26 +922,7 @@ let force_bool t =
   if t.Term.t_ty = None then bool_of_prop t
   else t
 
-type op_kind = 
-  | OK_true
-  | OK_false
-  | OK_not
-  | OK_and   of bool
-  | OK_or    of bool
-  | OK_imp
-  | OK_iff
-  | OK_eq
-  | OK_other 
 
-let op_kind = 
-  let l = [EcCoreLib.p_true, OK_true; EcCoreLib.p_false, OK_false;
-           EcCoreLib.p_not, OK_not; 
-           EcCoreLib.p_anda, OK_and true; EcCoreLib.p_and, OK_and false; 
-           EcCoreLib.p_ora,  OK_or true;  EcCoreLib.p_or,  OK_or  false; 
-           EcCoreLib.p_imp, OK_imp; EcCoreLib.p_iff, OK_iff;
-           EcCoreLib.p_eq, OK_eq] in
-  let m = List.fold_left (fun m (p,k) -> Mp.add p k m) Mp.empty l in
-  fun p -> try Mp.find p m with _ -> OK_other
 
 let mk_not args  =
   match args with
@@ -978,14 +960,14 @@ let trans_op env vm p tys =
       let ls,ls', tvs = 
         try Mp.find p env.env_op 
         with _ -> 
-          Format.printf "cannot find %s@." (EcPath.tostring p);
+(*          Format.printf "cannot find %s@." (EcPath.tostring p); *)
           assert false in (* FIXME error message *)
       let mtv = 
         try 
           List.fold_left2 (fun mtv tv ty ->
             Ty.Mtv.add tv (trans_ty env vm ty) mtv) Ty.Mtv.empty
             tvs tys 
-        with e -> Format.printf "ICI %s@." (EcPath.tostring p); raise e
+        with e -> raise e
       in
       let targs = List.map (fun t -> Some (Ty.ty_inst mtv t)) ls.Term.ls_args in
       let tres  = omap ls.Term.ls_value (Ty.ty_inst mtv) in
@@ -1026,10 +1008,6 @@ let destr_ty_tuple t =
   match t.Ty.ty_node with
   | Ty.Tyapp (ts, lt) -> assert (Ty.is_ts_tuple ts); lt
   | _ -> assert false 
-
-let trans_quant = function
-  | Lforall -> Term.Tforall
-  | Lexists -> Term.Texists
 
 let merge_branches lb = 
   if List.exists (fun b -> b.Term.t_ty = None) lb then List.map force_prop lb
@@ -1091,7 +1069,11 @@ let trans_form env vm f =
         let tys = trans_gtys !env vm tys in
         let vs, vm = add_ids vm ids tys in
         let f = trans_form vm f in
-        Term.t_quant_close (trans_quant q) vs [] (force_prop f)
+        begin match q with
+        | Lforall -> Term.t_forall_close vs [] (force_prop f)
+        | Lexists -> Term.t_exists_close vs [] (force_prop f)
+        | Llambda -> trans_lambda vs f
+        end
 
     | Fif(f1,f2,f3) ->
         let f1 = trans_form vm f1 in
@@ -1143,7 +1125,7 @@ let trans_form env vm f =
         Term.t_tuple args
 
     | FhoareF _ | FhoareS _ | FequivF _  | FequivS _ -> 
-        raise (CanNotTranslate f)
+        raise (CanNotTranslate f) (* fixme *)
           
     | Fpvar(pv,m) -> 
         let nenv, nrb, pv = trans_pv !env vm pv f.f_ty m in
@@ -1160,8 +1142,48 @@ let trans_form env vm f =
 
   and trans_form_b vm f = force_bool (trans_form vm f)
 
+  and trans_lambda vs body =
+    let pids   = Ident.id_fresh "unamed_lambda_s" in
+    let pid    = Ident.id_fresh "unamed_lambda" in
+    let fv     = 
+      List.fold_left (fun s x -> Term.Mvs.remove x s)
+        body.Term.t_vars vs in    
+
+    let sparams  = Term.Mvs.keys fv in
+    let sdom   = List.map (fun vs -> vs.Term.vs_ty) sparams in
+    let tvs = List.map (fun v -> v.Term.vs_ty) vs in
+    let codom = if body.Term.t_ty = None then Ty.ty_bool else oget body.Term.t_ty in
+    let scodom = List.fold_right Ty.ty_func tvs codom in
+    let lss = Term.create_fsymbol pids sdom scodom in
+    let sdecl  = Decl.create_param_decl lss in
+
+
+    let ls  = Term.create_lsymbol pid (sdom @ tvs) body.Term.t_ty in
+    let params = sparams @ vs in
+    let ldecl  = Decl.make_ls_defn ls params body in 
+    let decl   = Decl.create_logic_decl [ldecl] in
+  
+    let sarg   = List.map Term.t_var sparams in
+    let arg    = List.map Term.t_var params in
+    let lss_papp = Term.t_app_infer lss sarg in
+    let lss_app  = List.fold_left Term.t_func_app lss_papp arg in
+    let ls_app   = Term.t_app_infer ls (sarg@arg) in
+    let concl    =
+      if body.Term.t_ty = None then Term.t_iff (force_prop lss_app) ls_app 
+      else Term.t_equ lss_app ls_app in
+    let spec   = Term.t_forall_close params [] concl in
+    let pr     = Decl.create_prsymbol pids in
+    let spdecl  = Decl.create_prop_decl Decl.Paxiom pr spec in
+    rb := RBfun(decl,sdecl,spdecl) :: !rb;
+    env := { !env with
+             logic_task = 
+             List.fold_left add_decl_with_tuples !env.logic_task 
+               [decl;sdecl;spdecl] };
+    lss_papp 
+
   and trans_ev vm ev = 
     (* FIXME : We should be able to share equal definition *)
+    (* FIXME : use the previous function *)
     (* We assume that the memory is mpost *)
     (* op : sev : fv -> mem |-> bool) 
        op : fev fv m: mem : bool := 
@@ -1187,11 +1209,7 @@ let trans_form env vm f =
     let dom    = List.map (fun vs -> vs.Term.vs_ty) params in
     let lss    = Term.create_fsymbol pids doms codoms in
     let ls     = Term.create_fsymbol pid dom Ty.ty_bool in
-(*    let body   = 
-      let pat = 
-        Term.pat_app (Term.fs_tuple 2) (List.map Term.pat_var vs) tmr in
-      let br = Term.t_close_branch pat body in
-      Term.t_case (Term.t_var mr) [br]  in *)
+
     let decls  = Decl.create_param_decl lss in
     let ldecl  = Decl.make_ls_defn ls params (force_bool body) in 
     let decl   = Decl.create_logic_decl [ldecl] in
@@ -1258,7 +1276,7 @@ let add_ax env path ax =
   | None -> assert false
   | Some f ->
       let env,rb,f = trans_form env vm f in
-      let decl = Decl.create_prop_decl Decl.Paxiom pr f in
+      let decl = Decl.create_prop_decl Decl.Paxiom pr (force_prop f) in
       add_pr env path pr decl, RBax(path,pr,decl)::rb
 
 let add_mod_exp env path me = 

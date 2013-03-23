@@ -1,3 +1,4 @@
+require import Logic.
 require import Int.
 require import Fun.
 

@@ -1,3 +1,4 @@
+require import Logic.
 require export Fun.
 require import Int.
 require import Real.

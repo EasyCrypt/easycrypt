@@ -17,6 +17,7 @@ type gty =
 type quantif = 
   | Lforall
   | Lexists
+  | Llambda
 
 type binding = (EcIdent.t * gty) list
 
@@ -74,6 +75,7 @@ let qt_equal : quantif -> quantif -> bool = (==)
 let qt_hash = function
   | Lforall -> 0
   | Lexists -> 1
+  | Llambda -> 2
 
 let gty_equal ty1 ty2 =
   match ty1, ty2 with
@@ -276,6 +278,7 @@ let rec lp_dump (lp : lpattern) =
 let string_of_quantif = function
   | Lforall -> "Lforall"
   | Lexists -> "Lexists"
+  | Llambda -> "Llambda"
 
 let gty_dump (gty : gty) =
   match gty with
@@ -347,7 +350,8 @@ let f_op x tys ty =
   mk_form (Fop(x,tys)) ty
 
 let f_app f args ty = 
-  match f.f_node with
+  if args = [] then f 
+  else match f.f_node with
   | Fapp(f',args') -> mk_form (Fapp(f', args'@args)) ty
   | _ -> mk_form (Fapp(f,args)) ty
 
@@ -395,15 +399,22 @@ let f_let q f1 f2 = mk_form (Flet(q,f1,f2)) f2.f_ty (* FIXME rename binding *)
 
 let f_quant q b f = 
   if b = [] then f 
-  else match f.f_node with
-  | Fquant(q',b',f') when q = q' ->
-      mk_form (Fquant(q,b@b',f')) ty_bool
-  | _ -> 
-      mk_form (Fquant(q,b,f)) ty_bool
+  else 
+    let q, b, f = 
+      match f.f_node with
+      | Fquant(q',b',f') when q = q' -> q, b@b', f'
+      | _ -> q, b , f in
+    let ty = 
+      if q = Llambda then 
+        let dom = List.map (fun (_,gty) -> 
+          match gty with GTty ty -> ty | _ -> assert false) b in
+        toarrow dom f.f_ty 
+      else ty_bool in
+    mk_form (Fquant(q,b,f)) ty
 
 let f_exists b f = f_quant Lexists b f 
 let f_forall b f = f_quant Lforall b f
-
+let f_lambda b f = f_quant Llambda b f
 
 
 let f_hoareF pre f post = mk_form (FhoareF(pre,f,post)) ty_bool
@@ -435,8 +446,11 @@ type destr_error =
   | Destr_and
   | Destr_or
   | Destr_imp
+  | Destr_iff
+  | Destr_eq
   | Destr_forall
   | Destr_exists
+  | Destr_let1
 
 exception DestrError of destr_error
 
@@ -447,7 +461,6 @@ let is_op_and p =
 
 let is_op_or p = 
   EcPath.p_equal p EcCoreLib.p_or || EcPath.p_equal p EcCoreLib.p_ora
-
 
 let destr_and f = 
   match f.f_node with
@@ -465,6 +478,18 @@ let destr_imp f =
       f1,f2
   | _ -> destr_error Destr_imp 
 
+let destr_iff f = 
+  match f.f_node with
+  | Fapp({f_node = Fop(p,_)},[f1;f2]) when EcPath.p_equal p EcCoreLib.p_iff -> 
+      f1,f2
+  | _ -> destr_error Destr_iff 
+
+let destr_eq f = 
+  match f.f_node with
+  | Fapp({f_node = Fop(p,_)},[f1;f2]) when EcPath.p_equal p EcCoreLib.p_eq -> 
+      f1,f2
+  | _ -> destr_error Destr_eq 
+
 let destr_not f = 
   match f.f_node with
   | Fapp({f_node = Fop(p,_)},[f1]) when EcPath.p_equal p EcCoreLib.p_not -> 
@@ -480,6 +505,11 @@ let destr_exists1 f =
   match f.f_node with
   | Fquant(Lexists,(x,t)::bd,p) -> x,t,f_exists bd p 
   | _ -> destr_error Destr_exists
+
+let destr_let1 f = 
+  match f.f_node with
+  | Flet(LSymbol(x,ty), e1,e2) -> x,ty,e1,e2 
+  | _ -> destr_error Destr_let1
 
 (* -------------------------------------------------------------------- *)
 
@@ -507,6 +537,16 @@ let is_imp f =
   | Fapp({f_node = Fop(p,_)},_) when EcPath.p_equal p EcCoreLib.p_imp -> true
   | _ -> false
 
+let is_iff f = 
+  match f.f_node with
+  | Fapp({f_node = Fop(p,_)},_) when EcPath.p_equal p EcCoreLib.p_iff -> true
+  | _ -> false
+
+let is_eq f = 
+  match f.f_node with
+  | Fapp({f_node = Fop(p,_)},_) when EcPath.p_equal p EcCoreLib.p_eq -> true
+  | _ -> false
+
 let is_forall f = 
   match f.f_node with
   | Fquant(Lforall,_,_) -> true
@@ -516,7 +556,11 @@ let is_exists f =
   match f.f_node with
   | Fquant(Lexists,_,_) -> true
   | _ -> false
-  
+
+let is_let1 f = 
+  match f.f_node with
+  | Flet(LSymbol(_,_), _,_) -> true
+  | _ -> false
 (* -------------------------------------------------------------------- *)
 let f_map gt g f = 
     match f.f_node with
@@ -757,9 +801,12 @@ module Fsubst = struct
   let subst_local id f1 f2 =
     subst_locals (Mid.singleton id f1) f2
 
-  let subst_tvar s = 
+  let init_subst_tvar s = 
     let sty = { ty_subst_id with ts_v = s } in
-    let sf  = { f_subst_id with fs_ty = ty_subst sty } in
+    { f_subst_id with fs_ty = ty_subst sty }
+
+  let subst_tvar s = 
+    let sf  = init_subst_tvar s in
     f_subst sf
 
 end
@@ -858,198 +905,6 @@ let f_iff_simpl f1 f2 =
 let f_eq_simpl f1 f2 = 
   if f_equal f1 f2 then f_true
   else f_eq f1 f2
-  
-
-(* -------------------------------------------------------------------- *)
-
-(* -------------------------------------------------------------------- *)
-(*    Basic construction for building the logic                         *)
-
-type local_kind =
-  | LD_var   of ty * form option
-  | LD_mem
-  | LD_modty of EcModules.module_type
-  | LD_hyp   of form  (* of type bool *)
-
-type l_local = EcIdent.t * local_kind
-
-type hyps = {
-    h_tvar  : EcIdent.t list;
-    h_local : l_local list;
-  }
-
-type l_decl = hyps * form
-
-type prover_info = unit (* FIXME *)
-
-type rule_name = 
-  | RN_admit
-  | RN_clear of EcIdent.t 
-  | RN_prover of prover_info 
-
-  | RN_local  of EcIdent.t
-    (* H:f in G    ===>  E,G |- f  *)
-
-  | RN_global of EcPath.path * ty list
-    (* p: ['as], f in E  ==> E,G |- f{'as <- tys} *)
-
-  | RN_exc_midle 
-    (* E;G |- A \/ !A *)
-
-  | RN_eq of EcIdent.t * form
-    (* E;G |- t ~ u   E;G |- P(t)  ===> E;G |- P(u)  *)
-    (* where ~ := = | <=>                            *)
-
-  | RN_and_I 
-    (* E;G |- A   E;G |- B   ===> E;G |- A /\ B *) 
-
-  | RN_or_I  of bool  (* true = left; false = right *)
-    (* E;G |- A_i   ===> E;G |- A_1 \/ A_2 *) 
-
-  | RN_imp_I 
-    (* E;G,A |- B   ===> E;G |- A => B *) 
-
-  | RN_forall_I 
-    (* E,x:T; G |- P ===> E;G |- forall (x:T), P *)
-
-  | RN_exists_I of form
-    (* E;G |- P{x<-t}  ===> E;G |- exists (x:T), P *)
-
-  | RN_and_E 
-    (* E;G |- A /\ B   E;G |- A => B => C                ===> E;G |- C *)
-
-  | RN_or_E  
-    (* E;G |- A \/ B   E;G |- A => C  E;G |- B => C      ===> E;G |- C *)
-                
-  | RN_imp_E 
-    (* E;G |- A => B   E;G |- A  E;G |- B => C           ===> E;G |- C *)
-                     
-  | RN_forall_E of form 
-    (* E;G |- forall x:t, P  E;G |- P(t) => C            ===> E;G |- C *)
-
-  | RN_exists_E 
-    (* E;G |- exists x:t, P  E;G |- forall x:t, P => C   ===> E;G |- C *)
-
-  | RN_cut of form
-
-  (* H rules *)
-  | RN_app of (int * form)
-  | RN_wp of int
-  | RN_skip
-  | RN_while of form * form * form
-
-type rule = (rule_name, l_decl) EcBaseLogic.rule
-type judgment = (rule_name, l_decl) EcBaseLogic.judgment
-
-module LDecl = struct
-  type error = 
-    | UnknownSymbol   of EcSymbols.symbol 
-    | UnknownIdent    of EcIdent.t
-    | NotAVariable    of EcIdent.t
-    | NotAHypothesis  of EcIdent.t
-    | CanNotClear     of EcIdent.t * EcIdent.t
-    | CannotClearMem
-    | CannotClearModTy
-    | DuplicateIdent  of EcIdent.t
-    | DuplicateSymbol of EcSymbols.symbol
-
-  exception Ldecl_error of error
-
-  let pp_error fmt = function
-    | UnknownSymbol  s  -> 
-        Format.fprintf fmt "Unknown symbol %s" s
-    | UnknownIdent   id -> 
-        Format.fprintf fmt "Unknown ident  %s, please report" 
-          (EcIdent.tostring id)
-    | NotAVariable   id ->
-        Format.fprintf fmt "The symbol %s is not a variable" (EcIdent.name id)
-    | NotAHypothesis id ->
-        Format.fprintf fmt "The symbol %s is not a hypothesis" (EcIdent.name id)
-    | CanNotClear (id1,id2) ->
-        Format.fprintf fmt "Cannot clear %s it is used in %s"
-          (EcIdent.name id1) (EcIdent.name id2)
-    | CannotClearMem ->
-        Format.fprintf fmt "Cannot clear memories"
-    | CannotClearModTy ->
-        Format.fprintf fmt "Cannot clear modules"
-    | DuplicateIdent id ->
-        Format.fprintf fmt "Duplicate ident %s, please report" 
-          (EcIdent.tostring id)
-    | DuplicateSymbol s ->
-        Format.fprintf fmt 
-          "An hypothesis or a variable named %s already exists" s
-
-  let _ = EcPexception.register (fun fmt exn ->
-    match exn with
-    | Ldecl_error e -> pp_error fmt e 
-    | _ -> raise exn)
-
-  let error e = raise (Ldecl_error e)
-
-  let lookup s hyps = 
-    try 
-      List.find (fun (id,_) -> s = EcIdent.name id) hyps.h_local 
-    with _ -> error (UnknownSymbol s)
-
-  let lookup_by_id id hyps = 
-    try 
-      List.assoc_eq EcIdent.id_equal id hyps.h_local 
-    with _ -> error (UnknownIdent id)
-
-  let get_hyp = function
-    | (id, LD_hyp f) -> (id,f)
-    | (id,_) -> error (NotAHypothesis id) 
-
-  let get_var = function
-    | (id, LD_var (ty,_)) -> (id, ty)
-    | (id,_) -> error (NotAVariable id) 
-
-  let lookup_hyp s hyps = get_hyp (lookup s hyps)
-
-  let has_hyp s hyps = 
-    try ignore(lookup_hyp s hyps); true
-    with _ -> false
-
-  let lookup_hyp_by_id id hyps = snd (get_hyp (id, lookup_by_id id hyps))
-
-  let lookup_var s hyps = get_var (lookup s hyps) 
-
-  let lookup_var_by_id id hyps = snd (get_var (id, lookup_by_id id hyps))
-
-  let has_symbol s hyps = 
-    try ignore(lookup s hyps); true with _ -> false 
-
-  let has_ident id hyps = 
-    try ignore(lookup_by_id id hyps); true with _ -> false 
-
-  let check_id id hyps = 
-    if has_ident id hyps then error (DuplicateIdent id)
-    else 
-      let s = EcIdent.name id in
-      if s <> "_" && has_symbol s hyps then error (DuplicateSymbol s) 
-
-  let add_local id ld hyps = 
-    check_id id hyps;
-    { hyps with h_local = (id,ld)::hyps.h_local }
-
-  let clear id hyps = 
-    let r,(_,ld), l = 
-      try List.find_split (fun (id',_) -> EcIdent.id_equal id id') hyps.h_local
-      with _ ->  error (UnknownIdent id) in
-    let check_hyp id = function 
-      | (id', LD_var (_, Some f)) when Mid.mem id f.f_fv ->
-          error (CanNotClear(id,id'))
-      | (id', LD_hyp f) when Mid.mem id f.f_fv -> 
-          error (CanNotClear(id,id'))
-      | _ -> () in
-    begin match ld with
-    | LD_var   _ -> List.iter (check_hyp id) r
-    | LD_mem     -> error CannotClearMem
-    | LD_modty _ -> error CannotClearModTy
-    | LD_hyp   _ -> ()
-    end;
-      { hyps with h_local = List.rev_append r l }
-end
 
 let rec form_of_expr mem (e: expr) = 
   match e.e_node with
@@ -1064,3 +919,32 @@ let rec form_of_expr mem (e: expr) =
   | Eif (e1,e2,e3) -> 
       f_if (form_of_expr mem e1) (form_of_expr mem e2) (form_of_expr mem e3)
 
+type op_kind = 
+  | OK_true
+  | OK_false
+  | OK_not
+  | OK_and   of bool
+  | OK_or    of bool
+  | OK_imp
+  | OK_iff
+  | OK_eq
+  | OK_other 
+
+let op_kind = 
+  let l = [EcCoreLib.p_true, OK_true; EcCoreLib.p_false, OK_false;
+           EcCoreLib.p_not, OK_not; 
+           EcCoreLib.p_anda, OK_and true; EcCoreLib.p_and, OK_and false; 
+           EcCoreLib.p_ora,  OK_or true;  EcCoreLib.p_or,  OK_or  false; 
+           EcCoreLib.p_imp, OK_imp; EcCoreLib.p_iff, OK_iff;
+           EcCoreLib.p_eq, OK_eq] in
+  let tbl = EcPath.Hp.create 11 in
+  List.iter (fun (p,k) -> EcPath.Hp.add tbl p k) l;
+  fun p -> try EcPath.Hp.find tbl p with _ -> OK_other
+
+let is_logical_op op =
+  match op_kind op with
+  | OK_not | OK_and _ | OK_or _ | OK_imp | OK_iff | OK_eq -> true
+  | _ -> false
+
+
+ 

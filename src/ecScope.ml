@@ -120,7 +120,7 @@ end
 (* -------------------------------------------------------------------- *)
 type proof_uc = {
   puc_name : string;
-  puc_jdg :  EcLogic.judgment_uc;
+  puc_jdg :  EcBaseLogic.judgment_uc;
 }
   
 (* -------------------------------------------------------------------- *)
@@ -636,6 +636,7 @@ end
 module Tactic = struct
 
   open EcFol
+  open EcBaseLogic
   open EcLogic
   open EcPhl
 
@@ -643,10 +644,14 @@ module Tactic = struct
   module UE = EcUnify.UniEnv
 
   type tac_error = 
+    | UnknownHypSymbol of symbol
     | UnknownAxiom of qsymbol
+    | UnknownOperator of qsymbol
     | BadTyinstance 
     | NothingToIntro
-    | FormulaExcepted 
+    | FormulaExpected 
+    | MemoryExpected
+    | UnderscoreExpected
     | ElimDoNotWhatToDo 
     | NoCurrentGoal
 
@@ -654,19 +659,28 @@ module Tactic = struct
 
   let pp_tac_error fmt = 
     function 
+      | UnknownHypSymbol s -> 
+        Format.fprintf fmt "Unknown hypothesis or logical variable %s" s
       | UnknownAxiom qs -> 
-          Format.fprintf fmt "Unknown axioms or hypothesisvariable: %a" 
-           pp_qsymbol qs
+        Format.fprintf fmt "Unknown axioms or hypothesis : %a" 
+          pp_qsymbol qs
+      | UnknownOperator qs -> 
+        Format.fprintf fmt "Unknown operator or logical variable %a" 
+          pp_qsymbol qs
       | BadTyinstance -> 
-          Format.fprintf fmt "Invalid type instance"
+        Format.fprintf fmt "Invalid type instance"
       | NothingToIntro ->
-          Format.fprintf fmt "Nothing to introduce"
-      | FormulaExcepted ->
-          Format.fprintf fmt "formula excepted"
+        Format.fprintf fmt "Nothing to introduce"
+      | FormulaExpected ->
+        Format.fprintf fmt "formula expected"
+      | MemoryExpected ->
+        Format.fprintf fmt "Memory expected"
+      | UnderscoreExpected ->
+        Format.fprintf fmt "_ expected"
       | ElimDoNotWhatToDo ->
-          Format.fprintf fmt "Elim : do not known what to do"
+        Format.fprintf fmt "Elim : do not known what to do"
       | NoCurrentGoal ->
-          Format.fprintf fmt "No current goal"
+        Format.fprintf fmt "No current goal"
 
   let _ = EcPexception.register (fun fmt exn ->
     match exn with
@@ -674,11 +688,7 @@ module Tactic = struct
     | _ -> raise exn)
 
   let error loc e = EcLocation.locate_error loc (TacError e)
-
-  let set_loc loc tac g = 
-    try tac g 
-    with e -> EcLocation.locate_error loc e 
-    
+   
   let process_tyargs env hyps tvi = 
     let ue = EcUnify.UniEnv.create (Some hyps.h_tvar) in
     TT.transtvi env ue tvi 
@@ -724,130 +734,166 @@ module Tactic = struct
             set_loc loc (t_hyp env (fst (LDecl.lookup_hyp ps hyps))) g
         | _ -> process_global loc env (pq,tvi) g
 
-  let check_name hyps pi = 
-    let s = odfl "_" (unloc pi) in
-    let id = EcIdent.create s in
-    try 
-      LDecl.check_id id hyps; id
-    with e -> EcLocation.locate_error pi.pl_loc e
+  let process_intros env pis = 
+    let mk_id s = EcIdent.create (odfl "_" s) in
+    let ids = List.map (lmap mk_id) pis in
+    t_intros env ids
 
-  let process_intro pi g = 
-    let hyps,concl = get_goal g in
-    try 
-      let id = check_name hyps pi in
-      if is_forall concl then t_forall_intro id g
-      else if is_imp concl then t_imp_intro id g
-      else error pi.pl_loc NothingToIntro
-    with e -> EcLocation.locate_error pi.pl_loc e
+  let tyenv_of_hyps env hyps =
+    let add env (id,k) =
+      match k with
+      | LD_var (ty,_) -> EcEnv.Var.bind_local id ty env
+      | LD_mem        -> EcEnv.Memory.push (EcEnv.AMAbstract id) env
+      | LD_modty i    -> EcEnv.Mod.bind_local id i env
+      | LD_hyp   _    -> env in
+    List.fold_left add env hyps.h_local
 
-  let process_intros pis = t_lseq (List.map process_intro pis)
-
-  let process_form env g pf ty =
-    let hyps = get_hyps g in
-
-    let locals =
-      let doit1 (id, k) =
-        match k with
-        | EcFol.LD_var (ty, _) -> Some (id, ty)
-        | _ -> None
-      in
-        List.prmap doit1 hyps.h_local
-    in
-
-    let env = EcEnv.Var.bind_locals locals env in
+  let process_elim_arg env hyps oty a = 
     let ue  = EcUnify.UniEnv.create (Some hyps.h_tvar) in
-    let ff  = TT.transform env ue pf ty in
-      EcFol.Fsubst.mapty (Tuni.subst (EcUnify.UniEnv.close ue)) ff
+    let env = tyenv_of_hyps env hyps in
+    match a.pl_desc, oty with
+    | EA_form pf, Some (GTty ty) ->
+      let ff = TT.transform env ue pf ty in
+      AAform (EcFol.Fsubst.mapty (Tuni.subst (EcUnify.UniEnv.close ue)) ff)
+    | _, Some (GTty _) ->
+      error a.pl_loc FormulaExpected
+    | EA_mem mem, Some GTmem ->
+      AAmem (TT.transmem env mem)
+    | _, Some GTmem ->
+      error a.pl_loc MemoryExpected
+    | EA_none, None -> 
+      AAnode
+    | _ , Some (GTmodty _) ->
+      assert false (* not implemented *)
+    | _, None ->
+      error a.pl_loc UnderscoreExpected
+
+  let process_form_opt env hyps pf oty =
+    let env = tyenv_of_hyps env hyps in
+    let ue  = EcUnify.UniEnv.create (Some hyps.h_tvar) in
+    let ff  = TT.transform_opt env ue pf oty in
+    EcFol.Fsubst.mapty (Tuni.subst (EcUnify.UniEnv.close ue)) ff
+
+  let process_form env hyps pf ty =
+    process_form_opt env hyps pf (Some ty)
 
   let process_formula env g pf = 
-    process_form env g pf tbool
-
-  let process_exists1 env pf g =  
-    let f = process_formula env g pf in
-    t_exists_intro env f g 
-
-  let process_exists env pfs = t_lseq (List.map (process_exists1 env) pfs)
-
-  let process_elim env f ot g =
-    match ot with
-    | None -> t_imp_elim f g
-    | Some pf -> begin
-        let (_, ty, _) = EcFol.destr_forall1 f in
-          match ty with
-          | GTty ty -> begin
-              let ft = process_form env g pf ty in
-                t_forall_elim env f ft g
-          end
-          | _ -> assert false           (* FIXME *)
-      end
-
-  let process_intro_elim env ot g =
-    let id = EcIdent.create "_" in
-    let ff = fst(destr_imp (get_concl g)) in
-    let seq = 
-      if ot = None then [t_hyp env id; t_clear id; t_clear id]
-      else [t_hyp env id; t_clear id] in
-    t_seq (t_imp_intro id)
-      (t_seq_subgoal (process_elim env ff ot) seq) g
-
-  let rec process_intro_elims env ots g = 
-    match ots with
-    | [] -> t_id g
-    | ot::ots -> 
-        t_on_last (process_intro_elim env ot g)
-          (process_intro_elims env ots) 
-    
-  let process_elim_kind env g k = 
     let hyps = get_hyps g in
-    match k with
-    | ElimHyp (pq,tvi) ->
+    process_form env hyps pf tbool
+
+  let process_mkn_apply env pe (juc, _ as g) = 
+    let hyps = get_hyps g in
+    let args = pe.elim_args in
+    let (juc,fn), fgs =
+      match pe.elim_kind with
+      | ElimHyp (pq,tvi) ->
         begin match unloc pq with 
         | ([],ps) when LDecl.has_hyp ps hyps ->
-            (* FIXME warning if tvi is not None *)
-            let id,ff = LDecl.lookup_hyp ps hyps in
-            t_hyp env id, ff
+          (* FIXME warning if tvi is not None *)
+          let id,_ = LDecl.lookup_hyp ps hyps in
+          mkn_hyp juc hyps id, []
         | _ -> 
-            let p,args = process_instanciate env hyps (pq,tvi) in
-            let ff = EcEnv.Ax.instanciate p args env in
-            t_glob env p args, ff
+          let p,tys = process_instanciate env hyps (pq,tvi) in
+          mkn_glob env juc hyps p tys, []
         end
-    | ElimForm pf ->
-        let ff = process_formula env g pf in
-        t_id, ff 
+      | ElimForm pf -> 
+        let f = process_formula env g pf in
+        let juc, fn = new_goal juc (hyps, f) in
+        (juc,fn), [fn] 
+    in
+    let (juc,an), ags = mkn_apply process_elim_arg env (juc,fn) args in
+    (juc,an), fgs@ags
 
-  let process_elims loc only_app env pe g =       
-    let tac, ff = process_elim_kind env g pe.elim_kind in
-    if is_forall ff || is_imp ff then
-      begin match pe.elim_args with
-      | [] -> error loc FormulaExcepted 
-      | ot::ots -> 
-          let seq = 
-            if ot = None then [tac;t_id; process_intro_elims env ots]
-            else [tac; process_intro_elims env ots] in
-          t_seq_subgoal (process_elim env ff ot) seq g
-      end
-    else if only_app then error loc ElimDoNotWhatToDo (* FIXME *)
-    else if is_and ff then t_on_first (t_and_elim ff g) tac
-    else if is_or ff then t_on_first (t_or_elim ff g) tac
-    else if is_exists ff then t_on_first (t_exists_elim ff g) tac 
-    else  error loc ElimDoNotWhatToDo
+  let process_apply loc env pe (_,n as g) =
+    let (juc,an), gs = process_mkn_apply env pe g in
+    set_loc loc (t_use env an gs) (juc,n) 
 
-  let process_apply loc env pe g = 
-    let id = EcIdent.create "_" in
-    t_on_last (process_elims loc true env pe g) 
-      (t_seq (t_imp_intro id) (t_hyp env id))
+  let process_elim loc env pe (_,n as g) =
+    let (juc,an), gs = process_mkn_apply env pe g in
+    let (_,f) = get_node (juc, an) in
+    t_on_first (set_loc loc (t_elim env f) (juc,n)) (t_use env an gs)
+
+  let process_rewrite loc env (s,pe) (_,n as g) =
+    let (juc,an), gs = process_mkn_apply env pe g in
+    let (_,f) = get_node (juc, an) in
+    t_seq_subgoal (set_loc loc (t_rewrite env s f))
+      [t_use env an gs; t_red env] (juc,n)
 
   let process_trivial scope pi env g =
     let pi = Prover.mk_prover_info scope pi in
     t_trivial pi env g
 
-  let process_admit g =
-    let rule = { EcBaseLogic.pr_name = RN_prover (); pr_hyps = [] } in
-    upd_rule_done g rule
-
   let process_cut name env phi g = 
     let phi = process_formula env g phi in
-    t_cut (unloc name) phi g
+    t_on_last (t_cut env phi g) 
+      (process_intros env [lmap (fun x -> Some x) name])
+
+  let process_generalize env l =
+    let pr1 pf g = 
+      let hyps = get_hyps g in
+      match pf.pl_desc with
+      | PFident({pl_desc = ([],s)},None) when LDecl.has_symbol s hyps ->
+        let id = fst (LDecl.lookup s hyps) in
+        t_generalize_hyp env id g
+      | _ -> 
+        let f = process_form_opt env hyps pf None in
+        t_generalize_form None env f g in
+    t_lseq (List.rev_map pr1 l)
+
+  let process_clear l g =
+    let hyps = get_hyps g in    
+    let toid ps =
+      let s = ps.pl_desc in
+      if LDecl.has_symbol s hyps then (fst (LDecl.lookup s hyps))
+      else error ps.pl_loc (UnknownHypSymbol s) in
+    let ids = EcIdent.Sid.of_list (List.map toid l) in
+    t_clear ids g
+
+  let process_exists env fs g =
+    gen_t_exists process_elim_arg env fs g
+
+  let process_change env pf g = 
+    let f = process_formula env g pf in
+    set_loc pf.pl_loc (t_change env f) g
+
+  let process_simplify env ri g =
+    let hyps = get_hyps g in
+    let delta_p, delta_h = 
+      match ri.pdelta with
+      | None -> None, None
+      | Some l ->
+        let sop = ref Sp.empty and sid = ref EcIdent.Sid.empty in
+        let do1 ps = 
+          match ps.pl_desc with
+          | ([],s) when LDecl.has_symbol s hyps ->
+            let id = fst (LDecl.lookup s hyps) in
+            sid := EcIdent.Sid.add id !sid;
+          | qs ->
+            let p = 
+              try EcEnv.Op.lookup_path qs env
+              with _ -> error ps.pl_loc (UnknownOperator qs) in        
+            sop := Sp.add p !sop in
+        List.iter do1 l;
+        Some !sop, Some !sid in
+    let ri = {
+      EcReduction.beta    = ri.pbeta;
+      EcReduction.delta_p = delta_p;
+      EcReduction.delta_h = delta_h;
+      EcReduction.zeta    = ri.pzeta;
+      EcReduction.iota    = ri.piota;
+      EcReduction.logic   = ri.plogic; } in
+    t_simplify env ri g 
+
+  let process_elimT loc env (pf,qs) g =
+    let p = set_loc qs.pl_loc (EcEnv.Ax.lookup_path qs.pl_desc) env in
+    let f = process_form_opt env (get_hyps g) pf None in
+    t_seq (set_loc loc (t_elimT env f p)) 
+      (t_simplify env EcReduction.beta_red) g
+
+  let process_case loc env pf g =
+    let f = process_formula env g pf in
+    t_seq (set_loc loc (t_case env f))
+      (t_simplify env EcReduction.betaiota_red) g
 
   let rec process_logic_tacs scope env (tacs:ptactics) (gs:goals) : goals = 
     match tacs with
@@ -868,19 +914,27 @@ module Tactic = struct
       | Pidtac         -> t_id 
       | Passumption pq -> process_assumption loc env pq
       | Ptrivial pi    -> process_trivial scope pi env 
-      | Pintro pi      -> process_intros pi 
-      | Psplit         -> t_and_intro 
-      | Pexists fs     -> process_exists env fs
-      | Pleft          -> t_or_intro true
-      | Pright         -> t_or_intro false
-      | Pelim pe       -> process_elims loc false env pe
+      | Pintro pi      -> process_intros env pi 
+      | Psplit         -> t_split env 
+      | Pexists fs     -> process_exists env fs 
+      | Pleft          -> t_left env 
+      | Pright         -> t_right env 
+      | Pelim pe       -> process_elim  loc env pe
       | Papply pe      -> process_apply loc env pe
+      | Pcut (name,phi)-> process_cut name env phi
+      | Pgeneralize l  -> process_generalize env l
+      | Pclear l       -> process_clear l
+      | Prewrite ri    -> process_rewrite loc env ri 
+      | Psimplify ri   -> process_simplify env ri
+      | Pchange pf     -> process_change env pf 
+      | PelimT i       -> process_elimT loc env i 
+      | Pcase  i       -> process_case  loc env i 
       | Pseq tacs      -> 
           fun (juc,n) -> process_logic_tacs scope env tacs (juc,[n])
       | Psubgoal _     -> assert false 
 
-      | Pcut (name,phi)-> process_cut name env phi
-      | Padmit         -> process_admit
+
+      | Padmit         -> t_admit
       | PPhl tac       -> process_phl (process_form env) tac loc
     in
     set_loc loc tac g
@@ -889,7 +943,7 @@ module Tactic = struct
     let (juc,n) = 
       try get_first_goal juc 
       with _ -> error loc NoCurrentGoal in
-    upd_done (fst (process_logic_tacs scope env tacs (juc,[n])))
+    EcBaseLogic.upd_done (fst (process_logic_tacs scope env tacs (juc,[n])))
 
   let process scope tac =
     if Check_mode.check scope.sc_options then
@@ -934,11 +988,11 @@ module Ax = struct
    res
 
   let start_lemma scope name tparams concl = 
-    let hyps = { EcFol.h_tvar = tparams;
-                 EcFol.h_local = []; } in
+    let hyps = { EcBaseLogic.h_tvar = tparams;
+                 EcBaseLogic.h_local = []; } in
     let puc = {
       puc_name = name ;
-      puc_jdg = EcLogic.open_juc hyps concl } in
+      puc_jdg = EcBaseLogic.open_juc (hyps, concl) } in
     { scope with 
       sc_pr_uc = puc :: scope.sc_pr_uc }
 
@@ -947,10 +1001,10 @@ module Ax = struct
       match scope.sc_pr_uc with
       | [] -> Tactic.error loc Tactic.NoCurrentGoal
       | { puc_name = name; puc_jdg = juc } :: pucs ->
-          let pr = EcLogic.close_juc juc in
-          let hyps,concl = pr.EcBaseLogic.j_decl in
-          let tparams = hyps.EcFol.h_tvar in
-          assert (hyps.EcFol.h_local = []);
+          let pr = EcBaseLogic.close_juc juc in        
+          let hyps,concl = (EcBaseLogic.get_goal (juc,0)).EcBaseLogic.pj_decl in
+          let tparams = hyps.EcBaseLogic.h_tvar in
+          assert (hyps.EcBaseLogic.h_local = []);
           let axd = { ax_params = tparams;
                       ax_spec = Some concl;
                       ax_kind = Lemma (Some pr) } in

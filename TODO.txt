@@ -9,6 +9,60 @@ Verifier les fonction add dans ecEnv.
 
 * Benjamin
 
+tactic : 
+   - rewrite
+   - split iff.
+   - modifier right pour le anda ora
+   - low prio : 
+       apply changer la syntaxe, 
+         apply avec instanciation automatique +
+         apply f   
+   - case in bool (bien reflechir0
+        -------------------
+         if a then b else c
+         case a 
+         a => ??? b   
+         !a => ??? c
+
+   - Ajouter les lambda.
+
+   - reduction if, unfolding of global, 
+     simpl : reduction des if, beta,
+        simplification des formules logiques
+   
+   -rewrite a = b,  (a <=> b),  h:a 
+    meme idee que pour les rewrite  : donner les instances 
+      idem pour toutes les tactics de gauche.
+ 
+(*     foo : a => a = true 
+
+    rewrite h : a ->    a <- true
+    rewrite h : a ->    a <- false
+
+*)
+
+t1;[t2 |  t3]   
+
+
+tactic case sur les formules
+cut (A \/ !A);[ apply excl_midle | ]
+
+A \/ !A
+
+ajout des lambda ? 
+
+
+lemma bool_case : forall (b:bool,Q:bool -> bool), 
+              (b => Q true) => (!b => Q false) => Q b.
+
+lemma list_case : forall (P: 'a list -> bool), 
+    P [] =>
+    P () 
+case f    
+induction f
+case 
+
+
 - verifier que si un theorie est utilis'ee par why3 elle est bind'ee dans 
   ecEnv ...
 

@@ -61,7 +61,7 @@ let op_dump (op : operator) =
 (* -------------------------------------------------------------------- *)
 type axiom_kind = 
   | Axiom 
-  | Lemma of EcFol.judgment option
+  | Lemma of EcBaseLogic.judgment option
 
 type axiom = {
   ax_params : EcIdent.t list;

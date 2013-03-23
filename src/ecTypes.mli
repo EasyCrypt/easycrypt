@@ -29,6 +29,7 @@ val ttuple  : ty list -> ty
 val tconstr : EcPath.path -> ty list -> ty
 val tfun    : ty -> ty -> ty
 
+
 type dom   = ty list
 type tysig = dom * ty 
 

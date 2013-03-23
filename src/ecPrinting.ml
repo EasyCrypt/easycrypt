@@ -8,6 +8,7 @@ open EcModules
 open EcTheory
 open EcDecl
 open EcParsetree
+open EcBaseLogic
 open EcEnv
 
 module NameGen = EcUidgen.NameGen
@@ -82,7 +83,7 @@ module type IPrettyPrinter = sig
   val pr_module   : t -> (EcPath.path * module_expr) pr
   val pr_theory   : t -> (EcPath.path * ctheory    ) pr
   val pr_export   : t -> EcPath.path pr
-  val pr_lgoal    : ?n:int -> t -> (EcFol.hyps * EcFol.form) pr
+  val pr_lgoal    : ?n:int -> t -> EcBaseLogic.l_decl pr
 
   (* ------------------------------------------------------------------ *)
   val pp_type     : t -> ?vmap:NameGen.t -> ty pp
@@ -96,7 +97,7 @@ module type IPrettyPrinter = sig
   val pp_module   : t -> (EcPath.path * module_expr) pp
   val pp_theory   : t -> (EcPath.path * ctheory    ) pp
   val pp_export   : t -> EcPath.path pp
-  val pp_lgoal    : t -> (EcFol.hyps * EcFol.form) pp
+  val pp_lgoal    : t -> EcBaseLogic.l_decl pp
   val pp_fct_def  : t -> EcModules.function_def pp
 end
 
@@ -147,6 +148,7 @@ let tk_export = !^ "export"
 let tk_flip   = !^ "{0,1}"
 let tk_from_int = !^ "%r"
 let tk_forall = !^ "forall"
+let tk_lambda = !^ "lambda"
 let tk_fun    = !^ "fun"
 let tk_if     = !^ "if"
 let tk_in     = !^ "in"
@@ -551,6 +553,7 @@ struct
   let tk_quant = function
     | Lforall -> tk_forall
     | Lexists -> tk_exists
+    | Llambda -> tk_lambda
 
   (* MODULE PPRINTING *)
 

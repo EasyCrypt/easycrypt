@@ -66,3 +66,31 @@ let p_eq         = pervasive id_eq
 let p_leq        = top_int id_leq
 let p_lt         = top_int id_lt
 
+
+let p_logic      = EcPath.pqname p_top "Logic" 
+let p_cut_lemma  = EcPath.pqname p_logic "cut_lemma"
+let p_false_elim = EcPath.pqname p_logic "false_elim"
+let p_and_elim   = EcPath.pqname p_logic "and_elim"
+let p_anda_elim  = EcPath.pqname p_logic "anda_elim"
+let p_or_elim    = EcPath.pqname p_logic "or_elim"
+let p_ora_elim   = EcPath.pqname p_logic "ora_elim"
+let p_iff_elim   = EcPath.pqname p_logic "iff_elim"
+let p_if_elim    = EcPath.pqname p_logic "if_elim"
+
+let p_true_intro  = EcPath.pqname p_logic "true_intro"
+let p_and_intro   = EcPath.pqname p_logic "and_intro"
+let p_anda_intro  = EcPath.pqname p_logic "anda_intro"
+let p_or_intro_l  = EcPath.pqname p_logic "or_intro_l"
+let p_ora_intro_l = EcPath.pqname p_logic "ora_intro_l"
+let p_or_intro_r  = EcPath.pqname p_logic "or_intro_r"
+let p_ora_intro_r = EcPath.pqname p_logic "ora_intro_r"
+let p_iff_intro   = EcPath.pqname p_logic "iff_intro"
+let p_if_intro    = EcPath.pqname p_logic "if_intro"
+let p_eq_refl     = EcPath.pqname p_logic "eq_refl"
+
+let p_rewrite_l     = EcPath.pqname p_logic "rewrite_l"
+let p_rewrite_r     = EcPath.pqname p_logic "rewrite_r"
+let p_rewrite_iff_l = EcPath.pqname p_logic "rewrite_iff_l"
+let p_rewrite_iff_r = EcPath.pqname p_logic "rewrite_iff_r"
+
+let p_case_eq_bool  = EcPath.pqname p_logic "case_eq_bool"

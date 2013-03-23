@@ -1,28 +1,17 @@
+open EcLocation
 open EcUtils
 open EcSymbols
 open EcIdent
 open EcPath
+open EcCoreLib
 open EcTypes
-open EcBaseLogic
 open EcFol
-open EcWhy3
+open EcBaseLogic
 open EcEnv
-
-type pre_rule = rule_name EcBaseLogic.pre_rule
-type pre_judgment = (rule_name, l_decl) EcBaseLogic.pre_judgment
-type judgment_uc = (rule_name, l_decl) EcBaseLogic.judgment_uc
-
-type goals = judgment_uc * int list
-type goal = judgment_uc * int 
-
-type tactic = goal -> goals 
-
-include EcBaseLogic.Tactic
-
-let open_juc hyps concl : judgment_uc = fst (open_juc (hyps, concl))
-let close_juc juc = close_juc juc
+open EcReduction
 
 
+let get_node g = (get_goal g).pj_decl
 let get_goal g = (get_open_goal g).pj_decl      
 let get_hyps g = fst (get_goal g) 
 let get_concl g = snd (get_goal g)
@@ -30,6 +19,17 @@ let get_concl g = snd (get_goal g)
 type tac_error =
   | UnknownAx             of EcPath.path 
   | NotAHypothesis        of EcIdent.t 
+  | UnknownElims          of form
+  | UnknownIntros         of form
+  | UnknownSplit          of form
+  | UnknownRewrite        of form
+  | LogicRequired         
+  | CanNotClearConcl      of EcIdent.t * form
+  | CanNotReconizeElimT 
+  | ToManyArgument
+
+
+
   | ExclMidle             of form
   | And_I                 of form
   | Or_I                  of form
@@ -42,7 +42,6 @@ type tac_error =
   | DupIdInCtxt           of EcIdent.t 
   | CanNotProve           of l_decl
   | InvalNumOfTactic      of int * int
-
 exception TacError of tac_error
 
 
@@ -53,6 +52,29 @@ let pp_tac_error fmt = function
       Format.fprintf fmt "Unknown axiom/lemma %a" PE.pp_path p
   | NotAHypothesis id -> 
       Format.fprintf fmt "Unknown hypothesis %s" (EcIdent.name id)
+  | UnknownElims f ->
+    Format.fprintf fmt "Do not known what to eliminate in %a" PE.pp_form f
+  | UnknownIntros f ->
+    Format.fprintf fmt "Do not known what to introduce in %a" PE.pp_form f
+  | UnknownSplit f ->
+    Format.fprintf fmt "Do not known what how to split %a" PE.pp_form f
+  | UnknownRewrite f ->
+    Format.fprintf fmt "Do not known what how to rewrite %a" PE.pp_form f
+  | LogicRequired ->
+    Format.fprintf fmt "Require import Logic first"
+  | CanNotClearConcl(id,_) ->
+    Format.fprintf fmt "Can not clear %s, it is used in the conclusion"
+      (EcIdent.name id)
+  | CanNotReconizeElimT ->
+    Format.fprintf fmt "Can reconize the elimination lemma"
+  | ToManyArgument ->
+    Format.fprintf fmt "To many argument in the application"
+
+
+
+
+
+
   | ExclMidle f ->
       Format.fprintf fmt "Cannot apply excluded middle on %a" PE.pp_form f
   | And_I f ->
@@ -91,180 +113,439 @@ let t_subgoal lt gs =
     
 let t_admit g = 
   let rule = { pr_name = RN_admit; pr_hyps = [] } in
-  upd_rule_done g rule 
+  upd_rule_done rule g  
 
-let t_hyp env id g = 
-  let (hyps,concl) = get_goal g in
+let check_hyps hyps1 hyps2 = 
+  assert (hyps1 == hyps2) (* FIXME error message *)
+
+(* WARNING this do not generate the subgoal included in n.
+   It could be greate to ensure we have no circular dependency *)
+(* Use the proof of n1 to prove n *)
+let use_node env juc n n1 =
+  let hyps,concl = get_node (juc,n) in
+  let hyps',concl' = get_goal (juc,n1) in
+  check_hyps hyps hyps';
+  check_conv env hyps concl concl';
+  let rule = { pr_name = RN_conv; pr_hyps = [RA_node n] } in
+  fst (upd_rule rule (juc,n1))
+
+let t_use env n gs (juc,n1) =
+  use_node env juc n n1, gs
+
+let t_change env f (juc,n1) = 
+  let hyps = get_hyps (juc,n1) in
+  check_type env f.f_ty tbool;
+  let (juc,n) = new_goal juc (hyps,f) in
+  t_use env n [n] (juc,n1)
+
+let t_red env g =
+  let hyps, concl = get_goal g in
+  let f = EcReduction.h_red EcReduction.full_red env hyps concl in
+  t_change env f g
+
+let t_simplify env ri (juc,n1 as g) =
+  let hyps, concl = get_goal g in
+  let f = EcReduction.simplify ri env hyps concl in
+  let (juc,n) = new_goal juc (hyps,f) in
+  let rule = { pr_name = RN_conv; pr_hyps = [RA_node n] } in
+  upd_rule rule (juc,n1) 
+
+let mkn_hyp juc hyps id =
   let f = LDecl.lookup_hyp_by_id id hyps in
-  check_alpha_equal env f concl;
-  let rule = { pr_name = RN_local id; pr_hyps = [] } in
-  upd_rule_done g rule
+  let juc,n = new_goal juc (hyps,f) in
+  let rule = { pr_name = RN_hyp id; pr_hyps = [] } in
+  let juc, _ = upd_rule_done rule (juc,n) in
+  juc, n
 
-let t_glob env p tys g = 
+let t_hyp env id (juc,n as g) = 
+  let hyps = get_hyps g in
+  let juc,nh = mkn_hyp juc hyps id in
+  use_node env juc nh n, []
+
+let mkn_glob env juc hyps p tys = 
   let f = Ax.instanciate p tys env in
-  let concl = get_concl g in
-  check_alpha_equal env f concl;
-  let rule = { pr_name = RN_global(p,tys); pr_hyps = [] } in
-  upd_rule_done g rule 
+  let juc, n = new_goal juc (hyps,f) in
+  let rule = { pr_name = RN_glob(p,tys); pr_hyps = [] } in
+  let juc, _ = upd_rule_done rule (juc, n) in
+  juc, n
 
-let t_exc_midle env g = 
-  let concl = get_concl g in
-  let f1, f2 = destr_or concl in
-  check_alpha_equal env f2 (f_not f1);
-  let rule = { pr_name = RN_exc_midle; pr_hyps = [] } in
-  upd_rule_done g rule 
+let t_glob env p tys (juc,n as g) = 
+  let hyps = get_hyps g in
+  let juc, nh = mkn_glob env juc hyps p tys in
+  use_node env juc nh n, [] 
 
 let t_trivial pi env g = 
-  let l_decl = get_goal g in
-  if check_goal env pi l_decl then
+  let goal = get_goal g in
+  if check_goal env pi goal then
     let rule = { pr_name = RN_prover (); pr_hyps = [] } in
-    upd_rule_done g rule
-  else tacerror (CanNotProve l_decl)
+    upd_rule_done rule g 
+  else tacerror (CanNotProve goal)
 
-let t_clear id (juc,n as g) = 
+let t_clear ids (juc,n as g) = 
   let hyps,concl = get_goal g in
-  (* FIXME check that id is not in concl *)
-  let hyps = LDecl.clear id hyps in
+  if not (Mid.set_disjoint ids concl.f_fv) then
+    tacerror (CanNotClearConcl(Sid.choose (Mid.set_inter ids concl.f_fv), concl));
+  let hyps = LDecl.clear ids hyps in
   let juc,n1 = new_goal juc (hyps,concl) in
-  let rule = { pr_name = RN_clear id; pr_hyps = [n1] } in
-  upd_rule (juc,n) rule
+  let rule = { pr_name = RN_clear ids; pr_hyps = [RA_node n1] } in
+  upd_rule rule (juc,n) 
 
-let get_equality f = 
-  match f.f_node with
-  | Fapp({f_node = Fop(op,_)},[f1;f2]) when 
-      EcPath.p_equal op EcCoreLib.p_eq || EcPath.p_equal op EcCoreLib.p_iff ->
-      f1, f2
-  | _ -> assert false (* FIXME error message *)
+type app_arg = 
+  | AAform of form
+  | AAmem  of EcIdent.t
+  | AAmp   of EcPath.mpath
+  | AAnode 
 
-let t_eq env feq (id,p) (juc,n as g) = 
-  let t, u = get_equality feq in
+let check_arg do_arg env hyps s x gty a =
+  let a = do_arg env hyps (Some gty) a in
+  match gty, a with
+  | GTty ty  , AAform f ->
+    check_type env ty f.f_ty; (* FIXME error message *)
+    bind_local s x f, RA_form f
+  | GTmem    , AAmem m ->
+    bind_mem s x m, RA_id m
+  | GTmodty _, AAmp mp  ->
+      (* FIXME : check the type of mp *)
+    bind_mod s x mp, RA_mp mp
+  | _ -> assert false (* FIXME error message *) 
+
+let mkn_apply do_arg env (juc,n) args =
+  let hyps,concl = get_node (juc,n) in
+  let check_arg = check_arg do_arg env hyps in
+  let rec check_apply juc s ras f args =
+    match args with
+    | [] -> juc, List.rev ras, f_subst s f
+    | a :: args' ->
+      if is_forall f then 
+        let (x,gty,f') = destr_forall1 f in
+        let s, ra = check_arg s x gty a in
+        check_apply juc s (ra::ras) f' args' 
+      else if is_imp f then 
+        let (f1,f2) = destr_imp f in
+        let a = do_arg env hyps None a in
+        assert (a = AAnode); (* FIXME error message *)
+        let juc, n = new_goal juc (hyps, f_subst s f1) in
+        check_apply juc s (RA_node n :: ras) f2 args' 
+      else 
+        let f = f_subst s f in
+        if is_head_reducible full_red env hyps f then 
+          check_apply juc f_subst_id ras (h_red full_red env hyps f) args
+        else tacerror ToManyArgument in
+  if args = [] then (juc,n), []
+  else
+    let juc, ras, concl = check_apply juc f_subst_id [] concl args in
+    let (juc,n1) = new_goal juc (hyps,concl) in
+    let rule = { pr_name = RN_apply; pr_hyps = RA_node n :: ras} in
+    let juc, _ = upd_rule rule (juc,n1) in
+    let ns = List.pmap (function RA_node n -> Some n | _ -> None) ras in
+    (juc,n1), ns
+ 
+let gen_t_apply do_arg env fn args (juc,n) =
+  let (juc,an), ns = mkn_apply do_arg env (juc,fn) args in
+  (use_node env juc an n, ns)
+
+let gen_t_apply_form do_arg env f args (juc, n as g) = 
+  let hyps = get_hyps g in
+  let juc, fn = new_goal juc (hyps, f) in
+  let juc,ns = gen_t_apply do_arg env fn args (juc,n) in
+  juc, fn::ns
+
+let t_apply_form = gen_t_apply_form (fun _ _ _ a -> a) 
+
+let gen_t_apply_glob do_arg env p tys args (juc,n as g) = 
+  let hyps = get_hyps g in
+  let juc,fn = mkn_glob env juc hyps p tys in
+  gen_t_apply do_arg env fn args (juc,n) 
+
+let t_apply_glob = gen_t_apply_glob (fun _ _ _ a -> a) 
+
+let gen_t_apply_hyp do_arg env id args (juc ,n as g) =
+  let hyps = get_hyps g in
+  let juc,fn = mkn_hyp juc hyps id in
+  gen_t_apply do_arg env fn args (juc, n)
+  
+let t_apply_hyp = gen_t_apply_hyp (fun _ _ _ a -> a)
+
+let check_logic env p = 
+  try ignore (EcEnv.Ax.by_path p env) with _ ->
+    tacerror LogicRequired
+  
+let t_cut env f g =
+  let concl = get_concl g in
+  check_logic env p_cut_lemma;
+  t_apply_glob env p_cut_lemma [] [AAform f;AAform concl;AAnode;AAnode] g
+
+let set_loc loc f x = 
+  try f x 
+  with e -> EcLocation.locate_error loc e 
+ 
+let t_intros env ids (juc,n as g) =
   let hyps, concl = get_goal g in
-  let su = bind_local f_subst_id id u in
-  check_alpha_equal env (f_subst su p) concl;
-  let st = bind_local f_subst_id id t in
-  let juc,n1 = new_goal juc (hyps, feq) in
-  let juc,n2 = new_goal juc (hyps, f_subst st p) in
-  let rule = { pr_name = RN_eq(id,p); pr_hyps = [n1;n2] } in
-  upd_rule (juc,n) rule 
+  let add_local s id x gty = 
+    let id = id.pl_desc in
+    match gty with
+    | GTty ty ->
+      LD_var(ty,None), bind_local s x (f_local id ty)
+    | GTmem   ->
+      LD_mem, bind_mem s x id 
+    | GTmodty i ->
+      LD_modty i, bind_mod s x (EcPath.mident id) in
 
-let t_and_intro (juc,n as g) = 
+  let add_ld id ld hyps =
+    set_loc id.pl_loc (LDecl.add_local id.pl_desc ld) hyps in
+
+  let rec check_intros hyps ids s concl =  
+    match ids with
+    | [] -> hyps, f_subst s concl 
+    | id::ids' ->
+      if is_forall concl then
+        let (x,gty,concl) = destr_forall1 concl in
+        let ld, s = add_local s id x gty in
+        let hyps = add_ld id ld hyps in
+        check_intros hyps ids' s concl
+      else if is_imp concl then
+        let f1, f2 = destr_imp concl in
+        let hyps = add_ld id (LD_hyp (f_subst s f1)) hyps in
+        check_intros hyps ids' s f2
+      else if is_let1 concl then
+        let x,ty,e1,concl = destr_let1 concl in
+        let s = bind_local s x (f_local id.pl_desc ty) in
+        let hyps = add_ld id (LD_var (ty, Some (f_subst s e1))) hyps in
+        check_intros hyps ids' s concl 
+      else if s == f_subst_id then
+        if EcReduction.is_head_reducible full_red env hyps concl then
+          check_intros hyps ids s (h_red full_red env hyps concl)
+        else tacerror (UnknownIntros concl)
+      else check_intros hyps ids f_subst_id (f_subst s concl) in
+  let hyps, concl = check_intros hyps ids f_subst_id concl in
+  let (juc,n1) = new_goal juc (hyps,concl) in
+  let ids = List.map unloc ids in
+  let rule = { pr_name = RN_intros ids; pr_hyps = [RA_node n1]} in
+  upd_rule rule (juc,n)
+
+let t_elim env f (juc,n) =
+  let hyps,concl = get_goal (juc,n) in
+  let rec aux f =
+    match f.f_node with
+    | Fop(p,_) when EcPath.p_equal p p_false -> 
+      check_logic env p_false_elim;
+      t_apply_glob env p_false_elim [] [AAform concl; AAnode] (juc,n)
+      
+    | Fapp({f_node = Fop(p,_)}, [a1;a2] ) ->
+      let lem = 
+        match op_kind p with
+        | OK_and b -> 
+          Some ((if b then p_anda_elim else p_and_elim),[AAnode;AAnode])
+        | OK_or b  -> 
+          Some ((if b then p_ora_elim else p_or_elim),[AAnode;AAnode;AAnode])
+        | OK_iff   -> Some (p_iff_elim,[AAnode;AAnode])
+        | _        -> None in
+      begin match lem with
+      | Some (p,a) ->
+        check_logic env p;
+        t_apply_glob env p [] ([AAform a1;AAform a2;AAform concl]@a) (juc,n)
+      | None -> aux_red f
+      end
+    | Fif(a1,a2,a3) ->
+      check_logic env p_if_elim;
+      t_apply_glob env p_if_elim [] [AAform a1;AAform a2;AAform a3;
+                                     AAform concl;AAnode;AAnode;AAnode] (juc,n)
+    | Fquant(Lexists,bd,f') ->
+      let juc,n1 = new_goal juc (hyps, f) in
+      let juc,n2 = new_goal juc (hyps,f_forall bd (f_imp f' concl)) in
+      let rule = { pr_name = RN_exists_elim; pr_hyps = [RA_node n1; RA_node n2] } in
+      upd_rule rule (juc, n)
+    | _ -> aux_red f
+
+  and aux_red f =
+    if EcReduction.is_head_reducible full_red env hyps f then
+      aux (h_red full_red env hyps f) 
+    else tacerror (UnknownElims f) in
+  aux f
+
+let t_split env g =
+  let hyps, concl = get_goal g in
+  let rec aux f =
+    match f.f_node with
+    | Fop(p,_) when EcPath.p_equal p p_true ->
+      check_logic env p_true_intro;
+      t_glob env p_true_intro [] g
+    | Fapp({f_node = Fop(p,_)}, [f1;f2]) -> 
+      let lem = 
+        match op_kind p with
+        | OK_and b -> 
+          Some ((if b then p_anda_intro else p_and_intro),
+                [], [AAform f1;AAform f2;AAnode;AAnode])
+        | OK_iff   -> Some (p_iff_intro, [], [AAform f1;AAform f2;AAnode;AAnode])
+        | OK_eq    -> Some (p_eq_refl, [f1.f_ty], [AAform f1])
+        | _        -> None in
+      begin match lem with
+      | Some (p,tys,aa) -> check_logic env p; t_apply_glob env p tys aa g 
+      | None -> aux_red f
+      end
+
+    | Fif(f1,f2,f3) ->
+      check_logic env p_if_intro;
+      t_apply_glob env p_if_intro [] 
+        [AAform f1; AAform f2; AAform f3;AAnode;AAnode] g
+    | _ ->  aux_red f 
+  and aux_red f = 
+    if EcReduction.is_head_reducible full_red env hyps f then 
+      aux (h_red full_red env hyps f) 
+    else tacerror (UnknownSplit f) in
+  aux concl
+
+let t_or_intro b env g = 
+  let hyps, concl = get_goal g in
+  let rec aux f =
+    match f.f_node with
+    | Fapp({f_node = Fop(p,_)}, [f1;f2]) when EcPath.p_equal p p_or -> 
+      let lem = if b then p_or_intro_l else p_or_intro_r in
+      check_logic env lem;
+      t_apply_glob env lem [] [AAform f1; AAform f2; AAnode] g
+    | Fapp({f_node = Fop(p,_)}, [f1;f2]) when EcPath.p_equal p p_ora -> 
+      let lem = if b then p_ora_intro_l else p_ora_intro_r in
+      check_logic env lem;
+      t_apply_glob env lem [] [AAform f1; AAform f2; AAnode] g
+    | _ -> 
+      if EcReduction.is_head_reducible full_red env hyps f then 
+        aux (h_red full_red env hyps f) 
+      else tacerror (UnknownSplit f) in
+  aux concl
+
+let t_left = t_or_intro true
+let t_right = t_or_intro false
+
+let pattern_form name env hyps f1 f = 
+  let x = EcIdent.create (odfl "x" name) in
+  let fx = EcFol.f_local x f1.f_ty in
+  let body = 
+    Hf.memo_rec 107 
+      (fun aux f ->
+        if EcReduction.is_alpha_eq env hyps f f1 then fx
+        else f_map (fun ty -> ty) aux f) 
+      f in
+  x, body
+  
+let t_generalize_form name env f g = 
   let hyps,concl = get_goal g in
-  let a,b = destr_and concl in
-  let juc, n1 = new_goal juc (hyps, a) in
-  let juc, n2 = new_goal juc (hyps, b) in
-  let rule = { pr_name = RN_and_I; pr_hyps = [n1;n2] } in
-  upd_rule (juc,n) rule
+  let x,body = pattern_form name env hyps f concl in
+  let ff = f_forall [x,GTty f.f_ty] body in
+  t_apply_form env ff [AAform f] g
 
-let t_or_intro side (juc,n as g) = 
+let t_generalize_hyp env id g =
   let hyps,concl = get_goal g in
-  let a,b = destr_or concl in
-  let juc, n1 = new_goal juc (hyps, if side then a else b) in
-  let rule = { pr_name = RN_or_I side; pr_hyps = [n1] } in
-  upd_rule (juc,n) rule
+  match LDecl.lookup_by_id id hyps with
+  | LD_var (ty,_) -> 
+    t_generalize_form (Some (EcIdent.name id)) env (f_local id ty) g
+  | LD_mem ->
+    let x = EcIdent.fresh id in
+    let s = EcFol.bind_mem f_subst_id id x in
+    let body = f_subst s concl in
+    let ff = f_forall [x, GTmem] body in
+    t_apply_form env ff [AAmem id] g
+  | LD_modty _ -> assert false (* Not implemented *)
+  | LD_hyp f ->
+    t_on_last (t_apply_form env (f_imp f concl) [AAnode] g) (t_hyp env id)
 
-let t_imp_intro id (juc,n as g) = 
+let gen_t_exists do_arg env fs (juc,n as g) =
   let hyps,concl = get_goal g in
-  let a,b = destr_imp concl in
-  let hyps = LDecl.add_local id (LD_hyp a) hyps in
-  let juc, n1 = new_goal juc (hyps, b) in
-  let rule = { pr_name = RN_imp_I; pr_hyps = [n1] } in
-  upd_rule (juc,n) rule
+  let rec aux s ras fs concl =
+    match fs with
+    | [] -> ras, (f_subst s concl)
+    | f::fs' ->
+      if is_exists concl then 
+        let (x,gty,concl) = destr_exists1 concl in
+        let s, a = check_arg do_arg env hyps s x gty f in
+        aux s (a::ras) fs' concl 
+      else 
+        let concl = f_subst s concl in
+        if EcReduction.is_head_reducible full_red env hyps concl then 
+          aux f_subst_id ras fs (h_red full_red env hyps concl)
+        else tacerror (UnknownSplit concl) in
+  let args,concl = aux f_subst_id [] fs concl in
+  let (juc,n1) = new_goal juc (hyps,concl) in
+  let rule = 
+    {pr_name = RN_exists_intro; pr_hyps = List.rev_append args [RA_node n1] } in
+  upd_rule rule (juc,n)
 
-let t_forall_intro id (juc,n as g) =
+let t_exists = gen_t_exists (fun _ _ _ a -> a)
+
+let t_rewrite env side f g =
   let hyps,concl = get_goal g in
-  let id',ty,b = destr_forall1 concl in
-  let s = f_subst_id in
-  let s, local =
-    match ty with
-    | GTty    ty -> bind_local s id' (f_local id ty), LD_var(ty, None)
-    | GTmem      -> bind_mem s id' id, LD_mem
-    | GTmodty p  -> bind_mod s id' (EcPath.mident id), LD_modty p in
-  let hyps = LDecl.add_local id local hyps in
-  let b = f_subst s b in
-  let juc, n1 = new_goal juc (hyps, b) in
-  let rule = { pr_name = RN_forall_I; pr_hyps = [n1] } in
-  upd_rule (juc,n) rule
+  let rec find_rewrite f =
+    if is_eq f then destr_eq f, true
+    else if is_iff f then destr_iff f, false 
+    else if EcReduction.is_head_reducible full_red env hyps f then 
+      find_rewrite (h_red full_red env hyps f)
+    else tacerror (UnknownRewrite f) in
+  let (f1,f2),eq = find_rewrite f in
+  let p,tys = 
+    if eq then (if side then p_rewrite_l else p_rewrite_r), [f1.f_ty]
+    else (if side then p_rewrite_iff_l else p_rewrite_iff_r), [] in
+  check_logic env p;  
+  let pred =
+    let f = if side then f1 else f2 in
+    let x, body = pattern_form None env hyps f concl in
+    f_lambda [x,GTty f.f_ty] body in
+  t_apply_glob env p tys [AAform f1;AAform f2;AAform pred;AAnode;AAnode] g
 
-let t_exists_intro env t (juc,n as g) = 
+
+  
+let t_elimT env f p g =
   let hyps,concl = get_goal g in
-  let id',ty,b = destr_exists1 concl in
-  match ty with
-  | GTty ty -> begin
-      check_type env t.f_ty ty;
-      let s = bind_local f_subst_id id' t in
-      let juc, n1 = new_goal juc (hyps, f_subst s b) in
-      let rule = { pr_name = RN_exists_I t; pr_hyps = [n1] } in
-      upd_rule (juc,n) rule
-  end
-        
-  | _ -> assert false                 (* FIXME *)
+  let ax = EcEnv.Ax.by_path p env in
+  let rec skip_imp a f = 
+    if is_imp f then skip_imp (AAnode::a) (snd (destr_imp f))
+    else a, f in
+  
+  match ax.EcDecl.ax_spec with
+  | None -> tacerror (CanNotReconizeElimT)
+  | Some fax -> 
+    let tys = 
+      let tpred = 
+        try 
+          match destr_forall1 fax with
+          | _, GTty ty, _ -> ty 
+          | _             -> raise Not_found 
+        with _ -> tacerror (CanNotReconizeElimT) in
+      let ue = EcUnify.UniEnv.create (Some hyps.h_tvar) in
+      let (ue, tpred,tys) = 
+        EcUnify.UniEnv.freshen ue ax.EcDecl.ax_params None tpred in
+      EcUnify.unify env ue tpred (tfun f.f_ty tbool);
+      let subst = Tuni.subst (EcUnify.UniEnv.close ue) in
+      List.map subst tys in
+    let fax = EcEnv.Ax.instanciate p tys env in
+    let vx, _, fax = destr_forall1 fax in
+    let pf =
+      let x, body = pattern_form (Some (EcIdent.name vx)) env hyps f concl in
+      f_lambda [x,GTty f.f_ty] body in
+    let aa = 
+      if is_forall fax then
+        let _,_,fax = destr_forall1 fax in
+        let aa, _ = skip_imp [] fax in
+        AAform f::aa
+      else
+        let aa,fax = skip_imp [] fax in
+        if not (is_forall fax) then tacerror (CanNotReconizeElimT);
+        List.rev_append aa [AAform f] in
+    t_apply_glob env p tys (AAform pf::aa) g
+
+let t_case env f g =
+  check_logic env p_case_eq_bool;
+  t_elimT env f p_case_eq_bool g
+
+  
+  
 
 
-let t_and_elim ff (juc,n as g) = 
-  let hyps,concl = get_goal g in
-  let a,b = destr_and ff in
-  let concl = f_imp a (f_imp b concl) in
-  let juc, n1 = new_goal juc (hyps, ff) in
-  let juc, n2 = new_goal juc (hyps, concl) in
-  let rule = { pr_name = RN_and_E; pr_hyps = [n1;n2] } in
-  upd_rule (juc,n) rule
 
-let t_or_elim ff (juc,n as g) = 
-  let hyps,concl = get_goal g in
-  let a,b = destr_or ff in
-  let juc, n1 = new_goal juc (hyps, ff) in
-  let juc, n2 = new_goal juc (hyps, f_imp a concl) in
-  let juc, n3 = new_goal juc (hyps, f_imp b concl) in
-  let rule = { pr_name = RN_or_E; pr_hyps = [n1;n2;n3] } in
-  upd_rule (juc,n) rule
-
-let t_imp_elim ff (juc,n as g) = 
-  let hyps,concl = get_goal g in
-  let a,b = destr_imp ff in
-  let juc, n1 = new_goal juc (hyps, ff) in
-  let juc, n2 = new_goal juc (hyps, a) in
-  let juc, n3 = new_goal juc (hyps, f_imp b concl) in
-  let rule = { pr_name = RN_imp_E; pr_hyps = [n1;n2;n3] } in
-  upd_rule (juc,n) rule
-
-let t_forall_elim env ff t (juc,n as g) = 
-  let hyps,concl = get_goal g in
-  let x,ty,p = destr_forall1 ff in
-  match ty with
-  | GTty ty -> begin
-      check_type env t.f_ty ty;
-      let s = bind_local f_subst_id x t in
-      let p = f_subst s p in
-      let juc, n1 = new_goal juc (hyps, ff) in
-      let juc, n2 = new_goal juc (hyps, f_imp p concl) in
-      let rule = { pr_name = RN_forall_E t; pr_hyps = [n1;n2] } in
-      upd_rule (juc,n) rule 
-    end
-  | _ -> assert false                 (* FIXME *)
-
-let t_exists_elim ff (juc,n as g) = 
-  let hyps,concl = get_goal g in
-  let x, ty, p = destr_exists1 ff in
-  (* FIXME rename x, or check that x is not in concl *)
-  let concl = f_forall [x,ty] (f_imp p concl) in
-  let juc, n1 = new_goal juc (hyps, ff) in
-  let juc, n2 = new_goal juc (hyps, concl) in
-  let rule = { pr_name = RN_exists_E; pr_hyps = [n1;n2] } in
-  upd_rule (juc,n) rule
-
-let t_cut name phi (juc,n as g) =
-  let hyps,concl = get_goal g in
-  let juc, n1 = new_goal juc (hyps, phi) in
-  let hyp = LD_hyp phi in
-  let juc, n2 = new_goal juc (LDecl.add_local (create name) hyp hyps, concl) in
-  let rule = { pr_name = RN_cut phi; pr_hyps = [n1;n2] } in
-  upd_rule (juc,n) rule
 
 let find_in_hyps env f hyps = 
   let test k = 
     try 
       let _, f' = LDecl.get_hyp k in
-      check_alpha_equal env f f'; true
+      check_conv env hyps f f'; true
     with _ -> false in
   fst (List.find test hyps.h_local)
 

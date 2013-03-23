@@ -9,7 +9,7 @@ open EcDecl
 open EcModules
 open EcTheory
 open EcWhy3
-
+open EcBaseLogic
 (* -------------------------------------------------------------------- *)
 module Ssym = EcSymbols.Ssym
 module Msym = EcSymbols.Msym
@@ -962,6 +962,7 @@ module Ty = struct
 end
 
 (* -------------------------------------------------------------------- *)
+
 module Op = struct
   module Px = MC.Px
 
@@ -1016,9 +1017,30 @@ module Op = struct
           (EcPath.path_of_mpath p, check_not_suspended op)) ops
     in
       List.filter (fun (_, op) -> filter op) ops
+
+  let reducible env p = 
+    try 
+      let op = by_path p env in
+      match op.op_kind with
+      | OB_oper(Some _) | OB_pred(Some _) -> true
+      | _ -> false 
+    with _ -> false
+
+  let reduce env p tys =
+    let op = try by_path p env with _ -> assert false in
+    let s = EcFol.Fsubst.init_subst_tvar (EcTypes.Tvar.init op.op_params tys) in
+    let ids, f = 
+      match op.op_kind with
+      | OB_oper(Some(ids,e)) -> (ids, EcFol.form_of_expr EcFol.mhr e)
+      | OB_pred(Some idsf) -> idsf
+      | _ -> raise NotReducible in
+    let bd = List.map2 (fun id ty -> id, GTty ty) ids op.op_dom in 
+    EcFol.f_subst s (f_lambda bd f)
+    
 end
 
 (* -------------------------------------------------------------------- *)
+
 module Ax = struct
   module Px = MC.Px
 
@@ -1487,267 +1509,177 @@ let bind1 ((x, eb) : symbol * ebinding) (env : env) =
 let bindall (items : (symbol * ebinding) list) (env : env) =
   List.fold_left ((^~) bind1) env items  
 
-(* -------------------------------------------------------------------- *)     
-exception IncompatibleType of ty * ty
-exception IncompatibleForm of form * form * form * form
-
-let rec equal_type env t1 t2 = 
-  match t1.ty_node, t2.ty_node with
-  | Tunivar uid1, Tunivar uid2 -> EcUidgen.uid_equal uid1 uid2
-      
-  | Tvar i1, Tvar i2 -> i1 = i2
-  | Ttuple lt1, Ttuple lt2 ->
-      List.for_all2 (equal_type env) lt1 lt2
-  | Tfun(t1,t2), Tfun(t1',t2') ->
-      equal_type env t1 t1' && equal_type env t2 t2'
-  | Tconstr(p1,lt1), Tconstr(p2,lt2) when EcPath.p_equal p1 p2 ->
-      List.for_all2 (equal_type env) lt1 lt2 || 
-      (Ty.defined p1 env &&
-       equal_type env (Ty.unfold p1 lt1 env) (Ty.unfold p2 lt2 env))
-  | Tconstr(p1,lt1), _ when Ty.defined p1 env ->
-      equal_type env (Ty.unfold p1 lt1 env) t2
-  | _, Tconstr(p2,lt2) when Ty.defined p2 env ->
-      equal_type env t1 (Ty.unfold p2 lt2 env)
-  | _, _ -> false
-
-  
-let check_type env t1 t2 = 
-  if not (equal_type env t1 t2) then raise (IncompatibleType(t1,t2))
-
-let rec destr_tfun env tf = 
-  match tf.ty_node with
-  | Tfun(ty1,ty2) -> ty1, ty2
-  | Tconstr(p,tys) when Ty.defined p env ->
-      destr_tfun env (Ty.unfold p tys env) 
-  | _ -> assert false 
-
-let rec ty_fun_app env tf targs = 
-  match targs with
-  | [] -> tf
-  | t1 :: targs ->
-      let dom,codom = destr_tfun env tf in
-      check_type env dom t1;
-      ty_fun_app env codom targs
-
-(* TODO : can be good to also add unfolding of globals and locals *)
-
-let pv_equal_norm env p1 p2 = 
-  pv_equal p1 p2 || 
-  (p1.pv_kind = p2.pv_kind &&
-   EcPath.m_equal 
-     (Mod.unfold_mod_path env p1.pv_name) (Mod.unfold_mod_path env p2.pv_name))
-
-let m_equal_norm env p1 p2 = 
-  EcPath.m_equal p1 p2 || 
-  EcPath.m_equal (Mod.unfold_mod_path env p1) (Mod.unfold_mod_path env p2)
-
-let e_equal_norm env e1 e2 =
-  let find alpha id = try Mid.find id alpha with _ -> id in
-  let check_lpattern alpha lp1 lp2 = 
-    match lp1, lp2 with
-    | LSymbol (id1,_), LSymbol (id2,_) -> Mid.add id1 id2 alpha
-    | LTuple lid1, LTuple lid2 when List.length lid1 = List.length lid2 ->
-        List.fold_left2 (fun alpha (id1,_) (id2,_) -> Mid.add id1 id2 alpha) 
-          alpha lid1 lid2
-    | _, _ -> raise Not_found in
-  let rec aux alpha e1 e2 = 
-    match e1.e_node, e2.e_node with
-    | Eint   i1, Eint   i2 -> i1 = i2
-    | Elocal id1, Elocal id2 -> EcIdent.id_equal (find alpha id1) id2
-    | Evar   p1, Evar   p2 -> pv_equal_norm env p1 p2
-    | Eop(o1,ty1), Eop(o2,ty2) -> 
-        p_equal o1 o2 && List.all2 (equal_type env) ty1 ty2
-
-    | Eapp(f1,args1), Eapp(f2,args2) ->
-        aux alpha f1 f2 &&
-        List.all2 (aux alpha) args1 args2
-    | Elet(p1,f1',g1), Elet(p2,f2',g2) ->
-        aux alpha f1' f2' &&
-        (try aux (check_lpattern alpha p1 p2) g1 g2 with Not_found -> false)
-    | Etuple args1, Etuple args2 -> List.all2 (aux alpha) args1 args2
-    | Eif (a1,b1,c1), Eif(a2,b2,c2) ->
-        aux alpha a1 a2 && aux alpha b1 b2 && aux alpha c1 c2 
-    | _, _ -> false in
-  aux Mid.empty e1 e2
-
-let lv_equal_norm env lv1 lv2 = 
-  match lv1, lv2 with
-  | LvVar(p1,_), LvVar(p2,_) -> pv_equal_norm env p1 p2
-  | LvTuple p1, LvTuple p2 ->
-      List.all2 (fun (p1,_) (p2,_) -> pv_equal_norm env p1 p2) p1 p2
-  | LvMap((m1,ty1),p1,e1,_), LvMap((m2,ty2),p2,e2,_) -> 
-      p_equal m1 m2 &&
-      List.all2 (equal_type env) ty1 ty2 &&
-      pv_equal_norm env p1 p2 && e_equal_norm env e1 e2 
-  | _, _ -> false 
-
-let rec s_equal_norm env s1 s2 = 
-  s_equal s1 s2 || 
-  List.all2 (i_equal_norm env) s1.s_node s2.s_node
-
-and i_equal_norm env i1 i2 = 
-  i_equal i1 i2 || 
-  match i1.i_node, i2.i_node with
-  | Sasgn(lv1,e1), Sasgn(lv2,e2) -> 
-      lv_equal_norm env lv1 lv2 && e_equal_norm env e1 e2
-  | Srnd(lv1,e1), Srnd(lv2,e2) -> 
-      lv_equal_norm env lv1 lv2 && e_equal_norm env e1 e2
-  | Scall(lv1, f1, e1), Scall(lv2,f2,e2) ->
-      oall2 (lv_equal_norm env) lv1 lv2 &&
-      m_equal_norm env f1 f2 &&
-      List.all2 (e_equal_norm env) e1 e2
-  | Sif (a1,b1,c1), Sif(a2,b2,c2) ->
-      e_equal_norm env a1 a2 
-        && s_equal_norm env b1 b2 
-        && s_equal_norm env c1 c2 
-  | Swhile(a1,b1), Swhile(a2,b2) ->
-      e_equal_norm env a1 a2 && s_equal_norm env b1 b2 
-  | Sassert a1, Sassert a2 ->
-      e_equal_norm env a1 a2 
-  | _, _ -> false
-  
-let check_alpha_equal env f1 f2 = 
-  let error f1' f2' = raise (IncompatibleForm(f1,f2,f1',f2')) in
-  let find alpha id = try Mid.find id alpha with _ -> id in
-  let check_lpattern f1 f2 alpha lp1 lp2 = 
-    match lp1, lp2 with
-    | LSymbol (id1,_), LSymbol (id2,_) -> Mid.add id1 id2 alpha
-    | LTuple lid1, LTuple lid2 when List.length lid1 = List.length lid2 ->
-        List.fold_left2 (fun alpha (id1,_) (id2,_) -> Mid.add id1 id2 alpha) 
-          alpha lid1 lid2
-    | _, _ -> error f1 f2 in
-  let check_binding f1 f2 alpha bd1 bd2 =
-    let check_one alpha (x1,ty1) (x2,ty2) =
-      let tyok =
-        match ty1, ty2 with
-        | GTty    ty1, GTty ty2   -> equal_type env ty1 ty2
-        | GTmodty p1 , GTmodty p2 -> ModTy.mod_type_equiv env p1 p2
-        | GTmem      , GTmem      -> true
-        | _          , _          -> false
-      in
-        if   tyok
-        then Mid.add x1 x2 alpha
-        else error f1 f2
-    in
-      List.fold_left2 check_one alpha bd1 bd2 in
-
-  let rec aux alpha f1 f2 = 
-    if Mid.is_empty alpha && f_equal f1 f2 then () 
-    else match f1.f_node, f2.f_node with
-
-    | Fquant(q1,bd1,f1'), Fquant(q2,bd2,f2') when 
-        q1 = q2 && List.length bd1 = List.length bd2 ->
-          let alpha = check_binding f1 f2 alpha bd1 bd2 in
-          aux alpha f1' f2'
-
-    | Fif(a1,b1,c1), Fif(a2,b2,c2) ->
-        aux alpha a1 a2; aux alpha b1 b2; aux alpha c1 c2
-
-    | Flet(p1,f1',g1), Flet(p2,f2',g2) ->
-        aux alpha f1' f2';
-        let alpha = check_lpattern f1 f2 alpha p1 p2 in
-        aux alpha g1 g2
-
-    | Fint i1, Fint i2 when i1 = i2 -> ()
-
-    | Flocal id1, Flocal id2 when EcIdent.id_equal (find alpha id1) id2 -> ()
-
-    | Fpvar(p1,m1), Fpvar(p2,m2) when 
-        EcIdent.id_equal m1 m2 && pv_equal_norm env p1 p2  -> ()
-
-    | Fop(p1, ty1), Fop(p2, ty2) when EcPath.p_equal p1 p2 &&
-        List.all2 (equal_type env) ty1 ty2 -> () 
-
-    | Fapp(f1,args1), Fapp(f2,args2) 
-      when List.length args1 = List.length args2 ->
-        aux alpha f1 f2;
-        List.iter2 (aux alpha) args1 args2
-
-    | Ftuple args1, Ftuple args2 when List.length args1 = List.length args2 ->
-        List.iter2 (aux alpha) args1 args2
-
-    | FhoareF(pre1,p1,post1), FhoareF(pre2,p2,post2) 
-      when m_equal_norm env p1 p2 ->
-        aux alpha pre1  pre2;
-        aux alpha post1 post2
-
-    | FhoareS(_,pre1,s1,post1), FhoareS(_,pre2,s2,post2) 
-      when s_equal_norm env s1 s2 -> 
-        aux alpha pre1  pre2;
-        aux alpha post1 post2
-
-    | FequivF(pre1,(l1,r1),post1), FequivF(pre2,(l2,r2),post2) 
-      when m_equal_norm env l1 l2 && m_equal_norm env r1 r2 ->
-        aux alpha pre1  pre2;
-        aux alpha post1 post2
-
-    | FequivS(pre1,((_,l1),(_,r1)),post1), FequivS(pre2,((_,l2),(_,r2)),post2) 
-      when s_equal_norm env l1 l2 && s_equal_norm env r1 r2 ->
-        aux alpha pre1  pre2;
-        aux alpha post1 post2
-
-    | Fpr(m1,p1,args1,f1'), Fpr(m2,p2,args2,f2') 
-      when EcIdent.id_equal (find alpha m1) m2 &&
-           m_equal_norm env p1 p2 &&  
-           List.length args1 = List.length args2 ->
-        List.iter2 (aux alpha) args1 args2;
-(*        let (id1,ty1) = res1 in
-        let (id2,ty2) = res2 in
-        let alpha = 
-          check_binding f1 f2 alpha [id1,GTty ty1] [id2,GTty ty2] in *)
-        aux alpha f1' f2'
-
-    | _, _ -> error f1 f2
-
-  in
-    aux Mid.empty f1 f2
-
-let is_alpha_equal env f1 f2 = 
-  try check_alpha_equal env f1 f2; true
-  with _ -> false
 
 let norm_pvar env pv = 
   let p = Mod.unfold_mod_path env pv.pv_name in
   if m_equal p pv.pv_name then pv else { pv_name = p; pv_kind = pv.pv_kind }
-  
-let rec norm_form env f =
-  match f.f_node with
-  | Fquant(q,bd,f) ->
-      f_quant q bd (norm_form env f) 
 
-  | Fif(a,b,c) ->
-      f_if (norm_form env a) (norm_form env b) (norm_form env c)
+let norm_form env =
+  let norm_mp = EcPath.Hm.memo 107 (Mod.unfold_mod_path env) in
+  let norm_pv pv = 
+    let p = norm_mp pv.pv_name in
+    if m_equal p pv.pv_name then pv else { pv_name = p; pv_kind = pv.pv_kind } in
+  let norm_form = 
+    EcFol.Hf.memo_rec 107 (fun aux f ->
+      match f.f_node with
+      | Fquant(q,bd,f) ->
+          f_quant q bd (aux f)
 
-  | Flet(p,f,g) ->
-      f_let p (norm_form env f) (norm_form env g)
+      | Fpvar(p,m) -> 
+          let p' = norm_pv p in
+          if p == p' then f else 
+          f_pvar p' f.f_ty m
 
-  | Fint _ | Flocal _ | Fop _ -> f  
+      | FhoareF(pre,p,post) ->
+          let pre' = aux pre and p' = norm_mp p and post' = aux post in
+          if pre == pre' && p == p' && post == post' then f else
+          f_hoareF pre' p' post'
 
-  | Fpvar(p,m) -> f_pvar (norm_pvar env p) f.f_ty m
+      |  FhoareS _ -> assert false (* FIXME ? Not implemented *)
 
-  | Fapp(f,args) ->
-      f_app (norm_form env f) (List.map (norm_form env) args) f.f_ty 
+      | FequivF(pre,(l,r),post) ->
+          let pre' = aux pre and l' = norm_mp l 
+          and r' = norm_mp r and post' = aux post in
+          if pre == pre' && l == l' && r == r' && post == post' then f else
+          f_equivF pre' l' r' post' 
 
-  | Ftuple args ->
-      f_tuple (List.map (norm_form env) args) 
+      | FequivS _ -> assert false (* FIXME ? Not implemented *)
 
-  | FhoareF(pre,p,post) ->
-      f_hoareF (norm_form env pre) 
-        (Mod.unfold_mod_path env p) (norm_form env post)
+      | Fpr(m,p,args,e) ->
+          let p' = norm_mp p and args' = List.smart_map aux args 
+          and e' = aux e in
+          if p == p' && args == args' && e == e' then f else 
+          f_pr m p' args' e' 
+      | _ -> EcFol.f_map (fun ty -> ty) aux f) in
+  norm_form
 
-  |  FhoareS _ -> assert false (* FIXME ? Not implemented *)
-
-  | FequivF(pre,(l,r),post) ->
-      f_equivF (norm_form env pre) 
-        (Mod.unfold_mod_path env l) (Mod.unfold_mod_path env r)
-        (norm_form env post)
-
-  | FequivS _ -> assert false (* FIXME ? Not implemented *)
-
-  | Fpr(m,p,args,f) ->
-      f_pr m (Mod.unfold_mod_path env p) (List.map (norm_form env) args) 
-        (norm_form env f)
+let norm_l_decl env (hyps,concl) = 
+  let norm = norm_form env in
+  let onh (x,lk) = 
+    match lk with
+    | LD_var (ty,o) -> x, LD_var (ty, omap o norm)
+    | LD_mem -> x, lk
+    | LD_modty _ -> x, lk
+    | LD_hyp f -> x, LD_hyp (norm f) in
+  ({ hyps with h_local = List.map onh hyps.h_local}, norm concl)
 
 let check_goal env pi ld = 
-  (* FIXME normalize the goal before sending to why3 *)
-  EcWhy3.check_goal env.env_w3 pi ld
+  EcWhy3.check_goal env.env_w3 pi (norm_l_decl env ld)
+
+(* -------------------------------------------------------------------------- *)
+(*
+type judgment_uc = EcBaseLogic.judgment_uc 
+
+type goals = judgment_uc * int list
+
+type goal = judgment_uc * int 
+
+type tactic = goal -> goals 
+
+let open_juc = EcBaseLogic.open_juc
+
+let t_id = EcBaseLogic.t_id 
+
+let t_on_goals = EcBaseLogic.t_on_goals 
+
+let t_seq = EcBaseLogic.t_seq 
+let t_lseq = EcBaseLogic.t_lseq 
+
+let t_subgoal = EcBaseLogic.t_subgoal 
+
+let t_on_nth = EcBaseLogic.t_on_nth 
+
+let t_on_first = EcBaseLogic.t_on_first 
+
+let t_on_last = EcBaseLogic.t_on_first 
+
+let t_seq_subgoal = EcBaseLogic.t_seq_subgoal
+
+let get_goal g = (get_open_goal g).pj_decl
+let get_hyps g = fst (get_goal g) 
+let get_concl g = snd (get_goal g)
+
+let t_admit =
+  let rule = { pr_name = RN_admit; pr_hyps = [] } in
+  upd_rule_done rule 
+
+let t_clear id (juc,_ as g) = 
+  let hyps,concl = get_goal g in
+  let hyps = LDecl.clear id hyps in
+  assert (not (Mid.mem id concl.f_fv));
+  let juc,n1 = new_goal juc (hyps,concl) in
+  let rule = { pr_name = RN_clear id; pr_hyps = [RA_id id;RA_node n1] } in
+  upd_rule rule g 
+
+let bind s x x' gty = 
+  match gty with 
+  | GTty ty    -> bind_local s x (f_local x' ty), LD_var (ty, None)
+  | GTmodty mt -> bind_mod s x (EcPath.mident x'), LD_modty mt
+  | GTmem      -> bind_mem s x x', LD_mem
+
+let get_intros env hyps ids concl =
+  let rec aux hyps ids s concl = 
+    match ids with
+    | [] -> hyps, EcFol.f_subst s concl 
+    | x'::ids' ->
+      match concl.f_node with
+      | Fquant(Lforall, _, _) ->
+        let (x,gty,concl) = EcFol.destr_forall1 concl in
+	let s,lk = bind s x x' gty in
+        let hyps = LDecl.add_local x' lk hyps in
+        aux hyps ids' s concl
+      | Flet(LSymbol(x,ty),e1,e2) ->
+        let e1 = f_subst s e1 in
+        let s = bind_local s x (f_local x' ty) in
+        let hyps = LDecl.add_local x' (LD_var(ty,Some e1)) hyps in
+        aux hyps ids' s concl
+      | _ when is_imp concl ->
+        let f,concl = destr_imp concl in
+        let hyps = LDecl.add_local x' (LD_hyp (f_subst s f)) hyps in
+        aux hyps ids' s concl
+      | _ -> 
+        if is_reducible env hyps concl then
+          let concl = red env hyps concl in
+          aux hyps ids s concl 
+        else assert false (* FIXME : error message *)
+  in
+  aux hyps ids f_subst_id concl
+
+let t_intros env ids (juc,_ as g) =
+  let hyps,concl = get_goal g in
+  let hyps,concl = get_intros env ids concl in
+  let juc,n1     = new_goal juc (hyps,concl) in 
+  let rule = { pr_name = RN_intros;
+               pr_hyps = List.map (fun x -> RA_id x) ids @ [RA_node n1] } in
+  upd_rule rule g
+    
+(*
+let process_app_f env hyps juc app_f =
+  match app_f with
+  | AFform f -> 
+    check_type f.f_t_ty tbool;
+    let juc, n = new_goal juc (hyps,f) in
+    juc, f, RA_node n 
+  | AFhyp  id -> 
+    let f = LDecl.lookup_hyp_by_id id hyps in
+    juc, f, RA_id id  
+  | AFglob (p,tys) ->
+    let 
+
+    of EcPath.path * ty list 
+*)
+
+  
+let t_apply env app_f app_args (juc,_ as g) =
+  let hyps, concl = get_goal g in
+  let juc, s, f = process_app_f juc app_f in
+  foo
+(* (A => B) => A => B *)
+    
+  
+
+
+
+
+
+  *)

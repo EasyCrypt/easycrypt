@@ -611,7 +611,7 @@ let rec check_tymod_cnv mode (env : EcEnv.env) tin tout =
   let check_item_compatible =
     let check_var_compatible vdin vdout = 
       assert (vdin.v_name = vdout.v_name);
-      if not (EcEnv.equal_type env vdin.v_type vdout.v_type) then
+      if not (EcReduction.equal_type env vdin.v_type vdout.v_type) then
         tymod_cnv_failure (E_TyModCnv_MismatchVarType vdin.v_name)
 
     and check_fun_compatible fin fout =
@@ -622,7 +622,7 @@ let rec check_tymod_cnv mode (env : EcEnv.env) tin tout =
        * instantiating an abstract module with an implementation. *)
 
       let arg_compatible vd1 vd2 = 
-        vd1.v_name = vd2.v_name && EcEnv.equal_type env vd1.v_type vd2.v_type 
+        vd1.v_name = vd2.v_name && EcReduction.equal_type env vd1.v_type vd2.v_type 
       in
 
       let (iargs, oargs) = (fst fin.fs_sig, fst fin.fs_sig) in
@@ -632,7 +632,7 @@ let rec check_tymod_cnv mode (env : EcEnv.env) tin tout =
           tymod_cnv_failure (E_TyModCnv_MismatchFunSig fin.fs_name);
         if not (List.for_all2 arg_compatible iargs oargs) then
           tymod_cnv_failure (E_TyModCnv_MismatchFunSig fin.fs_name);
-        if not (EcEnv.equal_type env ires ores) then
+        if not (EcReduction.equal_type env ires ores) then
           tymod_cnv_failure (E_TyModCnv_MismatchFunSig fin.fs_name);
 
         let flcmp =
@@ -1076,7 +1076,18 @@ let transfpattern env ue (p : EcParsetree.lpattern) =
       (EcEnv.Var.bind_locals xs env, p , ty)
 
 (* -------------------------------------------------------------------- *)
-let transform env ue pf tt =
+let transmem env m =
+  match EcEnv.Memory.lookup (unloc m) env with
+  | None ->
+    tyerror m.pl_loc (UnknownMemory (unloc m))
+      
+  | Some (EcEnv.AMConcrete _) ->
+    tyerror m.pl_loc (AbstractMemoryWanted (unloc m))
+      
+  | Some (EcEnv.AMAbstract mid) ->
+    mid
+
+let transform_opt env ue pf tt =
   let rec transf env f = 
     match f.pl_desc with
     | PFint n ->
@@ -1128,11 +1139,12 @@ let transform env ue pf tt =
         let codom = ty_fun_app env ue op.f_ty esig in
         f_app op es codom
 
-    | PFif (pf1, f2, f3) ->
+    | PFif (pf1, pf2, pf3) ->
         let f1 = transf env pf1 in
         unify_error env ue pf1.pl_loc f1.f_ty tbool;
-        let f2 = transf env f2 in
-        let f3 = transf env f3 in
+        let f2 = transf env pf2 in
+        let f3 = transf env pf3 in
+        unify_error env ue pf2.pl_loc f2.f_ty f3.f_ty;
         f_if f1 f2 f3
 
     | PFlet (lp, pf1, f2) ->
@@ -1154,6 +1166,11 @@ let transform env ue pf tt =
         unify_error env ue pf.pl_loc f.f_ty tbool;
         f_exists xs f
 
+    | PFlambda (xs, f1) ->
+        let env, xs = trans_fbind env ue xs in
+        let f = transf env f1 in
+        f_lambda xs f
+
     | PFprob (gp, args, m, event) ->
         let fpath = trans_gamepath env gp in
         let fun_  = EcEnv.Fun.by_mpath fpath env in
@@ -1171,17 +1188,7 @@ let transform env ue pf tt =
             List.map2 doit1 args (fst fsig)
         in
 
-        let memid =
-          match EcEnv.Memory.lookup (unloc m) env with
-          | None ->
-              tyerror m.pl_loc (UnknownMemory (unloc m))
-
-          | Some (EcEnv.AMConcrete _) ->
-              tyerror m.pl_loc (AbstractMemoryWanted (unloc m))
-
-          | Some (EcEnv.AMAbstract mid) ->
-              mid
-        in
+        let memid = transmem env m in
 
         let event =
           let (_, env) = EcEnv.Fun.enter true memid fpath env in
@@ -1279,8 +1286,12 @@ let transform env ue pf tt =
   in
 
   let f = transf env pf in
-    unify_error env ue pf.pl_loc f.f_ty tt; f
-      
+  oiter tt (unify_error env ue pf.pl_loc f.f_ty); 
+  f
+  
+let transform env ue pf ty =
+  transform_opt env ue pf (Some ty)
 (* -------------------------------------------------------------------- *)
 let transformula env ue pf = 
   transform env ue pf tbool
+

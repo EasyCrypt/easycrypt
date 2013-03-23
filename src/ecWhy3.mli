@@ -51,4 +51,4 @@ val dft_prover_infos : prover_infos
 
 val check_prover_name : string -> bool
 
-val check_goal : env -> prover_infos -> EcFol.l_decl -> bool
+val check_goal : env -> prover_infos -> EcBaseLogic.l_decl -> bool

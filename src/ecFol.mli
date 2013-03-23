@@ -22,6 +22,7 @@ type gty =
 type quantif = 
   | Lforall
   | Lexists
+  | Llambda
 
 type binding =  (EcIdent.t * gty) list
 
@@ -86,6 +87,7 @@ val f_let : EcTypes.lpattern -> form -> form -> form
 val f_quant : quantif -> binding -> form -> form
 val f_exists : binding -> form -> form
 val f_forall : binding -> form -> form
+val f_lambda : binding -> form -> form
 
 val f_hoareF  : form -> EcPath.mpath -> form -> form 
 val f_hoareS   : memenv -> form -> EcModules.stmt -> form -> form 
@@ -146,21 +148,31 @@ type destr_error =
   | Destr_and
   | Destr_or
   | Destr_imp
+  | Destr_iff
+  | Destr_eq
   | Destr_forall
   | Destr_exists
+  | Destr_let1
 
 exception DestrError of destr_error
 
 val destr_and : form -> form * form
 val destr_or : form -> form * form
 val destr_imp : form -> form * form
+val destr_iff : form -> form * form
+val destr_eq  : form -> form * form
+val destr_let1 : form -> EcIdent.t * ty * form * form
 val destr_forall1 : form -> EcIdent.t * gty * form
 val destr_exists1 : form -> EcIdent.t * gty * form
+
 val is_and : form -> bool
 val is_or : form -> bool
 val is_imp : form -> bool
+val is_iff : form -> bool
 val is_forall : form -> bool
 val is_exists : form -> bool
+val is_let1   : form -> bool
+val is_eq     : form -> bool
 
 val f_map : (EcTypes.ty -> EcTypes.ty) -> (form -> form) -> form -> form
 
@@ -188,6 +200,7 @@ module Fsubst :
   sig
     val mapty : (EcTypes.ty -> EcTypes.ty) -> form -> form
     val uni : EcTypes.ty EcUidgen.Muid.t -> form -> form
+    val init_subst_tvar : EcTypes.ty EcIdent.Mid.t -> f_subst
     val subst_tvar : EcTypes.ty EcIdent.Mid.t -> form -> form
 
 (*    val subst_local : EcIdent.t -> form -> form -> form
@@ -195,7 +208,7 @@ module Fsubst :
 
   end
 
-type local_kind = 
+(*type local_kind = 
   | LD_var of EcTypes.ty * form option
   | LD_mem
   | LD_modty of EcModules.module_type
@@ -272,7 +285,19 @@ sig
   val add_local : EcIdent.t -> local_kind -> hyps -> hyps
   val clear : EcIdent.t -> hyps -> hyps
 end
-
+*)
 val form_of_expr : EcMemory.memory -> EcTypes.expr -> form
 
-(* val let_form : (Lvar.t*ty) list -> form -> form -> form *)
+type op_kind = 
+  | OK_true
+  | OK_false
+  | OK_not
+  | OK_and   of bool  (* true = asym *)
+  | OK_or    of bool  (* true = asym *)
+  | OK_imp
+  | OK_iff
+  | OK_eq
+  | OK_other 
+
+val op_kind       : EcPath.path -> op_kind
+val is_logical_op : EcPath.path -> bool

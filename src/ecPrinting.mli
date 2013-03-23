@@ -34,7 +34,7 @@ module type IPrettyPrinter = sig
   val pr_module   : t -> (EcPath.path * module_expr) pr
   val pr_theory   : t -> (EcPath.path * ctheory    ) pr
   val pr_export   : t -> EcPath.path pr
-  val pr_lgoal    : ?n:int -> t -> (EcFol.hyps * EcFol.form) pr
+  val pr_lgoal    : ?n:int -> t -> EcBaseLogic.l_decl pr
 
   (* ------------------------------------------------------------------ *)
   val pp_type     : t -> ?vmap:NameGen.t -> ty pp
@@ -48,7 +48,7 @@ module type IPrettyPrinter = sig
   val pp_module   : t -> (EcPath.path * module_expr) pp
   val pp_theory   : t -> (EcPath.path * ctheory    ) pp
   val pp_export   : t -> EcPath.path pp
-  val pp_lgoal    : t -> (EcFol.hyps * EcFol.form) pp
+  val pp_lgoal    : t -> EcBaseLogic.l_decl pp
   val pp_fct_def  : t -> EcModules.function_def pp
 end
 
@@ -101,7 +101,7 @@ module EcDebugPP : sig
   val pr_theory   : (symbol * ctheory) pr
   val pr_expr     : expr pr
   val pr_form     : EcFol.form pr
-  val pr_lgoal    : (EcFol.hyps * EcFol.form) pr
+  val pr_lgoal    : EcBaseLogic.l_decl pr
 
   (* ------------------------------------------------------------------ *)
   val pp_type     : ?vmap:NameGen.t -> ty pp
@@ -115,7 +115,7 @@ module EcDebugPP : sig
   val pp_theory   : (symbol * ctheory) pp
   val pp_expr     : expr pp
   val pp_form     : EcFol.form pp
-  val pp_lgoal    : (EcFol.hyps * EcFol.form) pp
+  val pp_lgoal    : EcBaseLogic.l_decl pp
 
   val pp_path    : EcPath.path pp
 end

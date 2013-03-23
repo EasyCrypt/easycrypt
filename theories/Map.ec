@@ -1,4 +1,4 @@
-require Map_why.
+require        Map_why.
 
 require import Fun.
 require export Option.
@@ -33,7 +33,7 @@ intros m x1 x2 y1 y2 x1_neq_x2;
 save.
 
 (** Formalization of map domain *)
-op dom: ('a,'b) map -> 'a Set.set.
+op dom : ('a,'b) map -> 'a Set.set.
 
 axiom dom_def: forall (m:('a,'b) map) x,
   Set.mem x (dom m) <=> m.[x] <> None.

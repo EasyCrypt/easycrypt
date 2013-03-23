@@ -54,6 +54,7 @@ val p_size    : path -> int
 (* -------------------------------------------------------------------- *)
 module Mp : Map.S  with type key = path
 module Sp : Mp.Set with type elt = path
+module Hp : EcMaps.EHashtbl.S with type key = path
 
 (* -------------------------------------------------------------------- *)
 type path_kind =

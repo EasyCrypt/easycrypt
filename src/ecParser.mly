@@ -1,4 +1,5 @@
 %{
+  open EcUtils
   open EcParsetree
 
   let error pos msg =
@@ -75,6 +76,27 @@
   let str_and b = if b then "&&" else "/\\"
   let str_or b  = if b then "||" else "\\/"
 
+  let mk_simplify l = 
+    if l = [] then 
+      { pbeta  = true; pdelta = None; 
+        pzeta  = true; piota  = true; plogic = true; }
+    else
+      let zeta = ref false and beta = ref false and iota = ref false
+      and logic = ref false and delta = ref (Some []) in
+      let doarg = function
+        | `Delta l -> 
+          if l = [] || !delta = None then delta := None
+          else delta := Some (odfl [] !delta @ l)
+        | `Zeta    -> zeta  := true
+        | `Iota    -> iota  := true
+        | `Beta    -> beta  := true
+        | `Logic   -> logic := true in
+      List.iter doarg l;
+      { pbeta  = !beta; pdelta = !delta; 
+        pzeta  = !zeta; piota  = !iota; plogic = !logic; }
+
+  let simplify_red = [`Zeta; `Iota; `Beta; `Logic]
+
 %}
 
 %token <EcSymbols.symbol>  IDENT
@@ -120,6 +142,7 @@
 %token EXIST
 %token FINAL
 %token FORALL
+%token LAMBDA
 %token FUN
 %token HOARE
 %token IF
@@ -206,8 +229,21 @@
 %token TRIVIAL
 %token INTROS
 %token ASSUMPTION
+%token GENERALIZE 
+%token CLEAR
 %token SPLIT
 %token ELIM
+%token ELIMT
+%token CASE
+%token REWRITE
+%token SIMPLIFY
+%token DELTA
+%token ZETA 
+%token IOTA 
+%token BETA 
+%token LOGIC
+
+%token CHANGE
 %token APPLY
 // %token IFNEG
 // %token IFSYNC
@@ -601,6 +637,7 @@ form:
 
 | FORALL pd=pgtybindings COMMA e=loc(form) { PFforall (pd, e) }
 | EXIST  pd=pgtybindings COMMA e=loc(form) { PFexists (pd, e) }
+| LAMBDA pd=pgtybindings COMMA e=loc(form) { PFlambda (pd, e) }
 
 (* Distribution *)
 | LKEY n1=number op=loc(COMMA) n2=number RKEY_HAT e=loc(sform)
@@ -1054,17 +1091,19 @@ assumption_args:
 
 underscore_or_ident:
 | UNDERSCORE { None }
-| s=IDENT   { Some s }
+| s=IDENT    { Some s }
 ;
 
 intro_args: l=plist1(loc(underscore_or_ident),empty) { l };
 
-exists_args: l=plist1(loc(sform), COMMA) { l };
-
-underscore_or_form:
-| UNDERSCORE   { None }
-| f=loc(sform)  { Some f }
+elim_arg :
+| UNDERSCORE        { EA_none }
+| f=loc(sform)      { EA_form f }
+| LKEY s=pside RKEY { EA_mem s }
 ;
+
+exists_args: l=plist1(loc(elim_arg), COMMA) { l };
+
 
 elim_kind:
 | p=qident tvi=tvars_app?           { ElimHyp(p,tvi)  }
@@ -1072,16 +1111,38 @@ elim_kind:
 ;
 elim_args:
 | empty { [] }
-| LPAREN l=plist1(underscore_or_form, COMMA) RPAREN { l }
+| LPAREN l=plist1(loc(elim_arg), COMMA) RPAREN { l }
 ;
 
 elim: 
 | k=elim_kind a=elim_args  { { elim_kind = k; elim_args = a } } 
 ;
 
+simplify_arg : 
+| DELTA l=plist0(qident,empty) { `Delta l }
+| ZETA                         { `Zeta }
+| IOTA                         { `Iota }
+| BETA                         { `Beta }
+| LOGIC                        { `Logic }
+;
+simplify :
+| l=plist1(simplify_arg,empty)    { l }
+| SIMPLIFY                        { simplify_red }
+| SIMPLIFY l=plist1(qident,empty) { `Delta l :: simplify_red  }
+| SIMPLIFY DELTA                  { `Delta [] :: simplify_red }
+;
+
+rwside :
+| LEFTARROW                    { false }
+| ARROW                        { true }
+| empty                        { true }
+;
+
 tactic:
 | IDTAC                         { Pidtac }
 | ASSUMPTION a=assumption_args  { Passumption a } 
+| GENERALIZE l=plist1(loc(sform), empty) {Pgeneralize l } 
+| CLEAR l=plist1(ident, empty)  { Pclear l }
 | TRIVIAL pi=prover_info        { Ptrivial pi }
 | INTROS a=intro_args           { Pintro a }
 | SPLIT                         { Psplit }
@@ -1090,6 +1151,11 @@ tactic:
 | RIGHT                         { Pright }
 | ELIM e=elim                   { Pelim e }
 | APPLY e=elim                  { Papply e }
+| l=simplify                    { Psimplify (mk_simplify l) }
+| CHANGE f=loc(sform)           { Pchange f }
+| REWRITE s=rwside e=elim       { Prewrite (s,e) }
+| ELIMT p=qident f=loc(sform)   { PelimT(f,p) }
+| CASE  f=loc(sform)            { Pcase f }
 | LPAREN s=tactics RPAREN       { Pseq s } 
 (* PHL tactics *)
 | APP n=number p=loc(sform)     { PPhl( Papp(n,p) ) }

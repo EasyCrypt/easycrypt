@@ -219,6 +219,7 @@ module Var : sig
 end
 
 (* -------------------------------------------------------------------- *)
+
 module Ax : sig
   type t = axiom
 
@@ -303,6 +304,7 @@ module Theory : sig
 end
 
 (* -------------------------------------------------------------------- *)
+
 module Op : sig
   type t = operator
 
@@ -316,6 +318,8 @@ module Op : sig
   val bind : symbol -> operator -> env -> env
 
   val all : (operator -> bool) -> qsymbol -> env -> (EcPath.path * t) list
+  val reducible : env -> EcPath.path -> bool
+  val reduce    : env -> EcPath.path -> ty list -> form
 end
 
 (* -------------------------------------------------------------------- *)
@@ -352,15 +356,9 @@ val import_w3_dir :
   -> env * ctheory_item list
 
 (* -------------------------------------------------------------------- *)
-exception IncompatibleType of EcTypes.ty * EcTypes.ty
-exception IncompatibleForm of form * form * form * form
-
-val equal_type        : env -> EcTypes.ty -> EcTypes.ty -> bool
-val check_type        : env -> EcTypes.ty -> EcTypes.ty -> unit
-val destr_tfun        : env -> EcTypes.ty -> EcTypes.ty * EcTypes.ty
-val ty_fun_app        : env -> EcTypes.ty -> EcTypes.ty list -> EcTypes.ty
-val check_alpha_equal : env -> EcFol.form -> EcFol.form -> unit
-val is_alpha_equal    : env -> EcFol.form -> EcFol.form -> bool
-val check_goal        : env -> EcWhy3.prover_infos -> EcFol.l_decl -> bool
-
 val norm_pvar         : env -> prog_var -> prog_var
+val check_goal        : env -> EcWhy3.prover_infos -> EcBaseLogic.l_decl -> bool
+
+
+
+
