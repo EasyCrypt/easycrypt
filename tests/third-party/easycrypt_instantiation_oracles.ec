@@ -15,12 +15,12 @@ type t.
 
 (* An adversary with a function using two oracles *)
 module type Oracle = {
-  fun Init(): unit
-  fun O(x:t): group
+  fun init(): unit
+  fun o(x:t): group
 }.
 
 module type A(H:Oracle, F:Oracle) = {
-  fun Main():bool
+  fun main():bool
 }.
 
 (* Experiment *)
@@ -29,30 +29,30 @@ require import Map.
 module Experiment(O1:Oracle, O2:Oracle, A:A) = {
   module A = A(O1,O2)
 
-  fun Main(): bool = {
+  fun main(): bool = {
     var b:bool;
     (* Setup Phase *)
-    O1.Init(); O2.Init();
+    O1.init(); O2.init();
     (* Adversary Call *)
-    b := A.Main();
+    b := A.main();
     return b;
   }
 }.
 
 (* The oracles *)
 (* Note: We would like the following to type as F(RO:Oracle): Oracle *)
-module F(RO:Oracle) = {
+module F(RO:Oracle): Oracle = {
   var k:gf_q
 
-  fun Init(): unit = {
+  fun init(): unit = {
     var k':int;
     k' = $dinter 0 (q - 1);
     k = i_to_gf_q k';
   }
 
-  fun F(x:t): group = {
+  fun f(x:t): group = {
     var y:group;
-    y := RO.O(x);
+    y := RO.o(x);
     y = y ^ k;
     return y;
   }
@@ -62,11 +62,11 @@ module F(RO:Oracle) = {
 module H: Oracle = {
   var state: (t,group) map
 
-  fun Init(): unit = {
+  fun init(): unit = {
     state = empty;
   }
 
-  fun O(x:t): group = {
+  fun o(x:t): group = {
     var y:group;
 
     if (!in_dom x state)
@@ -82,11 +82,11 @@ module H: Oracle = {
 module R: Oracle = {
   var state: (t,group) map
 
-  fun Init(): unit = {
+  fun init(): unit = {
     state = empty;
   }
 
-  fun O(x:t): group = {
+  fun o(x:t): group = {
     var y:group;
 
     if (!in_dom x state)

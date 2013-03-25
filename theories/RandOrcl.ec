@@ -9,19 +9,19 @@ theory ROM.
 
   (* Signature for random oracles from "from" to "to" *)
   module type RO = {
-    fun Init(): unit
-    fun O(x:from): to
+    fun init(): unit
+    fun o(x:from): to
   }.
 
   (* Bare random oracle for use in schemes *)
   module RO: RO = { 
     var m:(from,to) map
 
-    fun Init(): unit = {
+    fun init(): unit = {
       m = empty;
     }
   
-    fun O(x:from): to = {
+    fun o(x:from): to = {
       if (!in_dom x m) m.[x] = $dsample;
       return proj (m.[x]);
     }
@@ -31,19 +31,19 @@ theory ROM.
   cnst qO: int.      (* Maximum number of calls by the adversary *)
   cnst default: to. (* Default element to return on error *)
 
-  module ARO = {
+  module ARO: RO = {
     var log: from Set.set
 
-    fun AdvO(x:from): to = {
+    fun o(x:from): to = {
       var res1: to = default;
       if (Set.mem x log || Set.card log < qO)
-        res1 := RO.O(x); 
+        res1 := RO.o(x); 
       return res1;
     }
 
-    fun Init(): unit = {
+    fun init(): unit = {
       log = Set.empty;
-      RO.Init(); 
+      RO.init(); 
     }
   }.
 end ROM.

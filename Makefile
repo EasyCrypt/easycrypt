@@ -33,7 +33,8 @@ CHECK = \
 	  --ok-dir=tests/modules/success  \
 	  --ko-dir=tests/modules/fail     \
 	  --ok-dir=tests/theories/success \
-	  --ko-dir=tests/theories/fail
+	  --ko-dir=tests/theories/fail    \
+          --ok-dir=tests/third-party
 
 CHECKLIBS = \
 	./scripts/runtest.py        \
