@@ -3,7 +3,8 @@
    functions as parameters -- used when declaring adversaries. *)
 (* Adapted from an example by Alley Stoughton *)
 
-require import Distr.
+require import Int.
+require import Distr. import Dinter.
 require import Prime_field.
 require import Cyclic_group_prime.
 
@@ -33,16 +34,20 @@ module Experiment(O1:Oracle, O2:Oracle, A:A) = {
     (* Setup Phase *)
     O1.Init(); O2.Init();
     (* Adversary Call *)
-    b = A.Main();
+    b := A.Main();
     return b;
   }
 }.
 
-module F(RO:Oracle): Oracle = {
+(* The oracles *)
+(* Note: We would like the following to type as F(RO:Oracle): Oracle *)
+module F(RO:Oracle) = {
   var k:gf_q
 
-  fun Init(): unit {
-    k = i_to_gf_q [0 .. q - 1];
+  fun Init(): unit = {
+    var k':int;
+    k' = $dinter 0 (q - 1);
+    k = i_to_gf_q k';
   }
 
   fun F(x:t): group = {
@@ -77,7 +82,7 @@ module H: Oracle = {
 module R: Oracle = {
   var state: (t,group) map
 
-  fun InitR(): unit = {
+  fun Init(): unit = {
     state = empty;
   }
 
@@ -95,7 +100,7 @@ module R: Oracle = {
 }.
 
 (* The Games *)
-module G0 = Experiment(H,F(H),A(H,F));
+module G0 = Experiment(H,F(H),A(H,F)).
 module G1 = Experiment(H,R,A(H,R));
 
 (* The following remains to express in the new syntax/module system *)
