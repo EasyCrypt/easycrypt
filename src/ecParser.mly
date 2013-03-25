@@ -591,14 +591,7 @@ sform:
     { let mp = mk_loc (EcLocation.make $startpos(x) $endpos(nm)) (nm, x) in
         PFhoareF (pre, mp, post) }
 
-| EQUIV LBRACKET 
-    x1=lident AT nm1=mident TILD x2=lident AT nm2=mident
-    COLON pre=loc(form) LONGARROW post=loc(form)
-  RBRACKET
-
-    { let mp1 = mk_loc (EcLocation.make $startpos(x1) $endpos(nm1)) (nm1, x1) in
-      let mp2 = mk_loc (EcLocation.make $startpos(x2) $endpos(nm2)) (nm2, x2) in
-        PFequivF (pre, (mp1, mp2), post) }
+| EQUIV LBRACKET eb=equiv_body RBRACKET { eb }
 
 | PR LBRACKET
     x=lident args=paren(plist1(loc(sform), COMMA))
@@ -620,8 +613,6 @@ sform:
 | LBRACKET ti=tvars_app? e1=loc(form) op=loc(DOTDOT) e2=loc(form) RBRACKET
     { let id = PFident(mk_loc op.pl_loc EcCoreLib.s_dinter, ti) in
       PFapp(mk_loc op.pl_loc id, [e1; e2]) } 
-
-
 ;
                           
 form:
@@ -690,6 +681,15 @@ form:
           (EcLocation.make $startpos $endpos)
           "malformed random bitstring" }
 ;
+
+equiv_body:
+  x1=lident AT nm1=mident TILD x2=lident AT nm2=mident
+  COLON pre=loc(form) LONGARROW post=loc(form)
+
+    { let mp1 = mk_loc (EcLocation.make $startpos(x1) $endpos(nm1)) (nm1, x1) in
+      let mp2 = mk_loc (EcLocation.make $startpos(x2) $endpos(nm2)) (nm2, x2) in
+        PFequivF (pre, (mp1, mp2), post) }
+
 
 %inline p_form_sm_list0: aout=plist0(loc(form), SEMICOLON) { aout }
 //%inline form_list0: aout=plist0(loc(form), COMMA) { aout }
@@ -773,12 +773,12 @@ lvalue:
 ;
 
 base_instr:
-
 | x=lvalue EQ e=loc(exp)
     { PSasgn (x, e) }
 
 | x=lvalue EQ SAMPLE e=loc(exp)
     { PSrnd(x,e) }
+
 | x=lvalue CEQ f=qident LPAREN es=exp_list0 RPAREN 
     { PScall (Some x, f, es) } 
 
@@ -1090,12 +1090,15 @@ claim:
 | CLAIM x=ident COLON e=loc(exp) h=real_hint { (x, (e, h)) }
 ;
 
-%inline axiom_decl: x=ident COLON e=loc(form) { x,e };
-
 axiom:
-| AXIOM p=axiom_decl       { mk_axiom p PAxiom  } 
-| LEMMA p=axiom_decl       { mk_axiom p PLemma  }
-| LEMMA p=axiom_decl PROOF { mk_axiom p PILemma } 
+| AXIOM x=ident COLON e=loc(form)
+    { mk_axiom (x, e) PAxiom }
+
+| LEMMA x=ident COLON e=loc(form) i=boption(PROOF)
+    { mk_axiom (x, e) (if i then PILemma else PLemma) }
+
+| EQUIV x=ident COLON p=loc(equiv_body) i=boption(PROOF)
+    { mk_axiom (x, p) (if i then PILemma else PLemma) }
 ;
 
 (* -------------------------------------------------------------------- *)
