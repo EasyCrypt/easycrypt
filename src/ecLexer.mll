@@ -25,6 +25,8 @@
     raise (LexicalError (None, "unterminated string"))
 
   let _keywords = [                     (* see [keywords.py] *)
+    "admit"       , ADMIT      ;        (* KW: dangerous *)
+
     "forall"      , FORALL     ;        (* KW: prog *)
     "exists"      , EXIST      ;        (* KW: prog *)
     "lambda"      , LAMBDA     ;        (* KW: prog *)
@@ -68,8 +70,6 @@
     "case"        , CASE       ;        (* KW: tactic *)
     "rewrite"     , REWRITE    ;        (* KW: tactic *)
 
-    "admit"       , ADMIT      ;        (* KW: dangerous *)
-
     (* PHL: tactics *)
     "app"         , APP        ;        (* KW: tactic *)
     "wp"          , WP         ;        (* KW: tactic *)
@@ -101,6 +101,8 @@
     "prover"      , PROVER     ;        (* KW: global *)
     "checkproof"  , CHECKPROOF ;        (* KW: global *)
     "timeout"     , TIMEOUT    ;        (* KW: global *)
+    "on"          , ON         ;        (* KW: global *)
+    "off"         , OFF        ;        (* KW: global *)
 
     "undo"        , UNDO       ;        (* KW: internal *)
   ]

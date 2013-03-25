@@ -266,6 +266,8 @@
 // %token UNROLL
 // %token WP
 %token WHY3
+%token ON
+%token OFF
 
 (* PHL Tactics *)
 %token APP
@@ -1281,13 +1283,10 @@ gprover_info:
 ;
 
 checkproof:
-| CHECKPROOF s=LIDENT {
-  if s = "on" then true 
-  else if s = "off" then false 
-  else error
-      (EcLocation.make $startpos(s) $endpos(s))
-      "argument of check proof should be on or of"
-}
+| CHECKPROOF ON  { true }
+| CHECKPROOF OFF { false }
+;
+
 (* -------------------------------------------------------------------- *)
 (* Global entries                                                       *)
 
