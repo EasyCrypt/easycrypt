@@ -63,7 +63,7 @@ save.
 op rng: ('a,'b) map -> 'b Set.set.
 
 axiom rng_def: forall (m:('a,'b) map) y,
-  Set.mem y (rng m) <=> (exists x, in_dom x m && m.[x] = Some y).
+  Set.mem y (rng m) <=> (exists x, in_dom x m /\ m.[x] = Some y).
 
 op in_rng(x:'b, m:('a,'b) map): bool = 
  Set.mem x (rng m).
@@ -74,7 +74,7 @@ lemma upd_in_rng_eq: forall (m:('a,'b) map) x y1 y2,
 proof.
 intros m x y1 y2 H;
   cut Hsuff: (Set.mem y2 (rng m.[x<-y2]));[ idtac | trivial ].
-  cut Hsuff: (in_dom x m.[x<-y2] && m.[x<-y2].[x] = Some y2);trivial.
+  cut Hsuff: (in_dom x m.[x<-y2] /\ m.[x<-y2].[x] = Some y2);trivial.
 save.
 
 lemma in_dom_in_rng: forall (m:('a,'b) map) x,
@@ -278,7 +278,6 @@ lemma eqe_sym: forall (m:('a,'b) map) x,
 lemma eqe_update_diff: forall (m1 m2:('a,'b) map) x1 x2 y,
   eq_except m1 m2 x1 => 
   eq_except m1.[x2 <- y] m2.[x2 <- y]  x1.
-
 lemma eqe_update_same: forall (m1 m2:('a,'b) map) x y,
   eq_except m1 m2 x => eq_except m1.[x<-y] m2 x.
 
@@ -319,9 +318,9 @@ lemma disj_rm: forall (m1 m2:('a,'b) map) x,
 
 (** Split a map in two maps *)
 pred split_map(m m1 m2:('a,'b) map) =
- disj m1 m2 &&
- (forall x, in_dom x m <=> (in_dom x m1 \/ in_dom x m2)) &&
- (forall x, in_dom x m1 => m.[x] = m1.[x]) &&
+ disj m1 m2 /\
+ (forall x, in_dom x m <=> (in_dom x m1 \/ in_dom x m2)) /\
+ (forall x, in_dom x m1 => m.[x] = m1.[x]) /\
  (forall x, in_dom x m2 => m.[x] = m2.[x]).
 
 lemma split_map_empty: forall (m:('a,'b) map),
