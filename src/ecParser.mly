@@ -237,6 +237,7 @@
 %token ELIMT
 %token CASE
 %token REWRITE
+%token SUBST
 %token SIMPLIFY
 %token DELTA
 %token ZETA 
@@ -1202,6 +1203,7 @@ tactic:
 | l=simplify                    { Psimplify (mk_simplify l) }
 | CHANGE f=loc(sform)           { Pchange f }
 | REWRITE s=rwside e=elim       { Prewrite (s,e) }
+| SUBST l=plist0(ident, empty)  { Psubst l }
 | ELIMT p=qident f=loc(sform)   { PelimT(f,p) }
 | CASE  f=loc(sform)            { Pcase f }
 | LPAREN s=tactics RPAREN       { Pseq s } 

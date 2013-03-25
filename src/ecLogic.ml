@@ -27,7 +27,7 @@ type tac_error =
   | CanNotClearConcl      of EcIdent.t * form
   | CanNotReconizeElimT 
   | ToManyArgument
-
+  | NoHypToSubst          of EcIdent.t option
 
 
   | ExclMidle             of form
@@ -69,6 +69,13 @@ let pp_tac_error fmt = function
     Format.fprintf fmt "Can reconize the elimination lemma"
   | ToManyArgument ->
     Format.fprintf fmt "To many argument in the application"
+  | NoHypToSubst (Some id) ->
+    Format.fprintf fmt "Can not find non recursive equation on %s"
+      (EcIdent.name id)
+  | NoHypToSubst None ->
+    Format.fprintf fmt "Can not find non recursive equation to substite"
+    
+      
 
 
 
@@ -488,7 +495,9 @@ let t_rewrite env side f g =
     let f = if side then f1 else f2 in
     let x, body = pattern_form None env hyps f concl in
     f_lambda [x,GTty f.f_ty] body in
-  t_apply_glob env p tys [AAform f1;AAform f2;AAform pred;AAnode;AAnode] g
+  t_on_last 
+    (t_apply_glob env p tys [AAform f1;AAform f2;AAform pred;AAnode;AAnode] g)
+    (t_red env)
 
 
   
@@ -535,11 +544,67 @@ let t_case env f g =
   check_logic env p_case_eq_bool;
   t_elimT env f p_case_eq_bool g
 
-  
-  
+let t_subst_gen env x h side g =
+  let hyps,concl = get_goal g in
+  let f = LDecl.lookup_hyp_by_id h hyps in
+  let hhyps,_,_ = 
+    List.find_split (fun (id, _) -> EcIdent.id_equal x id) hyps.h_local in
+  let rec gen fv hhyps = 
+    match hhyps with
+    | [] -> ([], [], concl) 
+    | (id, lk) :: hhyps ->
+      if EcIdent.id_equal id h then gen fv hhyps 
+      else match lk with
+      | LD_var (ty, Some body) when not (Mid.set_disjoint body.f_fv fv) ->
+        let aa, ids, concl = gen (Sid.add id fv) hhyps in
+        aa, id::ids, f_let (LSymbol(id,ty)) body concl 
+      | LD_hyp f when not (Mid.set_disjoint f.f_fv fv) ->
+        let aa, ids, concl = gen fv hhyps in
+        id::aa, id::ids, f_imp f concl
+      | _ -> gen fv hhyps in
+  let aa, ids, concl = gen (Sid.singleton x) hhyps in
+  let tointros =
+    List.map (fun id -> { pl_loc = EcLocation.dummy; pl_desc = id }) ids in
+  let t_first =
+    t_seq_subgoal (t_rewrite env side f)
+      [ t_hyp env h;
+        t_seq (t_clear (Sid.of_list (x::h::ids))) (t_intros env tointros) ] in
+  t_seq_subgoal (t_apply_form env concl (List.map (fun _ -> AAnode) aa))
+    (t_first :: List.map (t_hyp env) aa) g
 
+let cansubst_eq env hyps x f1 f2 =
+  match f1.f_node, x with
+  | Flocal id, Some x when EcIdent.id_equal id x -> 
+    let f2 = simplify {no_red with delta_h = None} env hyps f2 in
+    if Mid.mem id f2.f_fv then None else Some id
+  | Flocal id, None ->
+    let f2 = simplify {no_red with delta_h = None} env hyps f2 in
+    if Mid.mem id f2.f_fv then None else Some id
+  | _         -> None
 
+let is_subst_eq env hyps x (hid,lk) = 
+  match lk with
+  | LD_hyp f ->
+    if is_eq f then
+      let f1, f2 = destr_eq f in
+      match cansubst_eq env hyps x f1 f2 with
+      | Some id -> Some(hid, id,true) 
+      | None ->
+        match cansubst_eq env hyps x f2 f1 with
+        | Some id -> Some(hid, id,false) 
+        | None -> None
+    else None
+  | _ -> None
 
+let t_subst1 env x g =
+  let hyps = get_hyps g in
+  match List.pick (is_subst_eq env hyps x) hyps.h_local with
+  | None -> tacerror (NoHypToSubst x)
+  | Some(h, x, side) ->
+    t_subst_gen env x h side g
+
+let t_subst_all env = 
+  t_repeat (t_subst1 env None)
 
 let find_in_hyps env f hyps = 
   let test k = 

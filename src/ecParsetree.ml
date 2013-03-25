@@ -240,6 +240,7 @@ and ptactic_r =
   | Pgeneralize of pformula list
   | Pclear      of psymbol list
   | Prewrite    of (bool * pelim)
+  | Psubst      of psymbol list
   | Psimplify   of preduction 
   | Pchange     of pformula
   | PelimT      of (pformula * pqsymbol)

@@ -817,7 +817,7 @@ module Tactic = struct
     let (juc,an), gs = process_mkn_apply env pe g in
     let (_,f) = get_node (juc, an) in
     t_seq_subgoal (set_loc loc (t_rewrite env s f))
-      [t_use env an gs; t_red env] (juc,n)
+      [t_use env an gs; t_id] (juc,n)
 
   let process_trivial scope pi env g =
     let pi = Prover.mk_prover_info scope pi in
@@ -895,6 +895,18 @@ module Tactic = struct
     t_seq (set_loc loc (t_case env f))
       (t_simplify env EcReduction.betaiota_red) g
 
+  let process_subst loc env ri g =
+    if ri = [] then t_subst_all env g 
+    else
+      let hyps = get_hyps g in
+      let totac ps =
+        let s = ps.pl_desc in
+        try t_subst1 env (Some (fst (LDecl.lookup_var s hyps)))
+        with _ -> error ps.pl_loc (UnknownHypSymbol s) in    
+      let tacs = List.map totac ri in
+      set_loc loc (t_lseq tacs) g 
+    
+
   let rec process_logic_tacs scope env (tacs:ptactics) (gs:goals) : goals = 
     match tacs with
     | [] -> gs
@@ -925,6 +937,7 @@ module Tactic = struct
       | Pgeneralize l  -> process_generalize env l
       | Pclear l       -> process_clear l
       | Prewrite ri    -> process_rewrite loc env ri 
+      | Psubst   ri    -> process_subst loc env ri
       | Psimplify ri   -> process_simplify env ri
       | Pchange pf     -> process_change env pf 
       | PelimT i       -> process_elimT loc env i 

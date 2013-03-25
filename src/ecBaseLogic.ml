@@ -328,3 +328,16 @@ let t_on_last (_,ln as gs) t =
 
 let t_seq_subgoal t lt g = t_subgoal lt (t g)
 
+let t_try t g =
+  try t g 
+  with _ (* FIXME catch only some exception ? *) -> 
+    t_id g
+
+let t_repeat t g =
+  let rec aux g =
+    let r = try Some (t g) with _ -> None in
+    match r with 
+    | None -> t_id g
+    | Some (juc, ln) ->
+      t_subgoal (List.map (fun _ -> aux) ln) (juc,ln) in
+  aux g

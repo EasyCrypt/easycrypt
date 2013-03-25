@@ -1,6 +1,7 @@
 require import Logic.
 require import Int.
 
+
 pred p : 'a.
 
 (* admit *)
@@ -402,6 +403,40 @@ rewrite eqT (a,_).
 apply h.
 split.
 save.
+
+(* subst *)
+
+lemma l_subst_x : forall (x y z : int),
+   x = y + z => x + 1 = (y + z) + 1
+proof.
+ intros x y z h.
+ subst x.
+ split.
+save.
+
+lemma l_subst_xz : forall (x y z : int),
+   x = y + z => y = z => x + 1 = (z + z) + 1
+proof.
+ intros x y z _ _.
+ subst x z.
+ split.
+save.
+
+lemma l_subst : forall (x y z : int),
+   x = y + z => y = z => x + 1 = (z + z) + 1
+proof.
+ intros x y z _ _.
+ subst.
+ split.
+save.
+
+(*
+lemma l_subst_fail : forall (x y z : int),
+   x = y + z => y = y => x + 1 = (z + z) + 1
+proof.
+ intros x y z _ _.
+ subst y.
+*)
 
 (* elimT t l : 
    t : a term of type ty

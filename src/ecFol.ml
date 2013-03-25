@@ -442,6 +442,7 @@ let f_int_lt f1 f2 =
 
 (* -------------------------------------------------------------------- *)
 type destr_error =
+  | Destr_local
   | Destr_not 
   | Destr_and
   | Destr_or
@@ -455,6 +456,11 @@ type destr_error =
 exception DestrError of destr_error
 
 let destr_error e = raise (DestrError e)
+
+let destr_local f = 
+  match f.f_node with
+  | Flocal id -> id
+  | _ -> destr_error Destr_local
 
 let is_op_and p = 
   EcPath.p_equal p EcCoreLib.p_and || EcPath.p_equal p EcCoreLib.p_anda
@@ -512,6 +518,11 @@ let destr_let1 f =
   | _ -> destr_error Destr_let1
 
 (* -------------------------------------------------------------------- *)
+
+let is_local f = 
+  match f.f_node with
+  | Flocal _ -> true
+  | _ -> false
 
 let is_true f = f_equal f f_true
 
