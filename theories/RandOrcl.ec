@@ -1,45 +1,49 @@
 require import Int.
 require import Map.
 
-theory RndOrcl.
-
+theory ROM.
   type from.
-
   type to.
-  
-  cnst default: to.
 
   cnst dsample: to distr.
 
-  module RO = { 
+  (* Signature for random oracles from "from" to "to" *)
+  module type RO = {
+    fun Init(): unit
+    fun O(x:from): to
+  }.
+
+  (* Bare random oracle for use in schemes *)
+  module RO: RO = { 
     var m:(from,to) map
+
+    fun Init(): unit = {
+      m = empty;
+    }
   
-    fun oracle (x:from): to = {
+    fun O(x:from): to = {
       if (!in_dom x m) m.[x] = $dsample;
       return proj (m.[x]);
     }
-
-    fun init () : unit = {
-      m = empty;
-    }
   }.
 
-  cnst max_call : int.
+  (* Wrapped random oracle for use by the adversary *)
+  cnst qO: int.      (* Maximum number of calls by the adversary *)
+  cnst default: to. (* Default element to return on error *)
 
-  module ARO = { 
+  module ARO = {
+    var log: from Set.set
 
-    var log : from Set.set
-
-    fun advO(x:from) : to = {
-      var res1 : to = default;
-      if (!Set.mem x log && Set.card log < max_call)
-        res1 := RO.oracle(x); 
+    fun AdvO(x:from): to = {
+      var res1: to = default;
+      if (Set.mem x log || Set.card log < qO)
+        res1 := RO.O(x); 
       return res1;
     }
 
-    fun init () : unit = {
+    fun Init(): unit = {
       log = Set.empty;
-      RO.init (); 
+      RO.Init(); 
     }
   }.
-end RndOrcl.
+end ROM.
