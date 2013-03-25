@@ -652,6 +652,7 @@ module Tactic = struct
     | FormulaExpected 
     | MemoryExpected
     | UnderscoreExpected
+    | ModuleExpected
     | ElimDoNotWhatToDo 
     | NoCurrentGoal
 
@@ -677,6 +678,8 @@ module Tactic = struct
         Format.fprintf fmt "Memory expected"
       | UnderscoreExpected ->
         Format.fprintf fmt "_ expected"
+      | ModuleExpected ->
+        Format.fprintf fmt "module expected"
       | ElimDoNotWhatToDo ->
         Format.fprintf fmt "Elim : do not known what to do"
       | NoCurrentGoal ->
@@ -763,8 +766,11 @@ module Tactic = struct
       error a.pl_loc MemoryExpected
     | EA_none, None -> 
       AAnode
-    | _ , Some (GTmodty _) ->
+    | EA_mp _mp, Some (GTmodty _) ->
       assert false (* not implemented *)
+    | _, Some (GTmodty _) ->
+      error a.pl_loc ModuleExpected
+
     | _, None ->
       error a.pl_loc UnderscoreExpected
 

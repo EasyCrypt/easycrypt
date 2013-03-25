@@ -205,8 +205,8 @@ type elim_kind =
 type elim_arg = 
   | EA_form of pformula
   | EA_mem  of pmemory
-(*  | EA_mp   add module application *)
-  | EA_none
+  | EA_mp   of pmsymbol
+  | EA_none 
 
 
 type pelim = { 
