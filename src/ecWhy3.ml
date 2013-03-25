@@ -556,7 +556,7 @@ let force_bool codom =
   | None ->  EcTypes.tbool
   | Some t -> t 
 
-exception CanNotTranslate
+exception CanNotTranslateW3Ec
 exception UnboundLS of Term.lsymbol
 
 let import_w3_quant = function
@@ -583,7 +583,7 @@ let import_w3_term env tvm =
   let rec import vm t =
     match t.Term.t_node with
     | Term.Tvar v -> f_local (Term.Mvs.find v vm) (import_ty t.Term.t_ty)
-    | Term.Tconst _ -> raise CanNotTranslate (* FIXME *)
+    | Term.Tconst _ -> raise CanNotTranslateW3Ec (* FIXME *)
     | Term.Tapp(f,wargs) ->
         let args = List.map (import vm) wargs in
         let import_ty = import_w3_ty env tvm in
@@ -619,8 +619,8 @@ let import_w3_term env tvm =
         let (id,_), vm = add_local v vm in
         let f2 = import vm t in
         f_let (LSymbol (id,f1.f_ty)) f1 f2
-    | Term.Tcase _ -> raise CanNotTranslate (* FIXME : tuple *)
-    | Term.Teps _ ->  raise CanNotTranslate 
+    | Term.Tcase _ -> raise CanNotTranslateW3Ec (* FIXME : tuple *)
+    | Term.Teps _ ->  raise CanNotTranslateW3Ec 
     | Term.Tquant(q,tq) ->
         let vs,_,t = Term.t_open_quant tq in 
         let ids, vm = add_locals vs vm in
@@ -702,7 +702,7 @@ let import_w3_pr rn path (env,rb,z as envld) k pr t =
       let _, _, import = import_w3_term env tvm in
       let spec = 
         try Some (import Term.Mvs.empty t);
-        with CanNotTranslate -> None in
+        with CanNotTranslateW3Ec -> None in
       let ax = { 
         ax_params = Wtvm.tparams tvm; (* FIXME assert unicity of string *)
         ax_spec = spec;
@@ -1274,9 +1274,12 @@ let add_ax env path ax =
   match ax.ax_spec with
   | None -> assert false
   | Some f ->
+    try
       let env,rb,f = trans_form env vm f in
       let decl = Decl.create_prop_decl Decl.Paxiom pr (force_prop f) in
       add_pr env path pr decl, RBax(path,pr,decl)::rb
+    with CanNotTranslate _ ->
+      env, []
 
 let add_mod_exp env path me = 
   let is_alias = function ME_Alias _ -> true | _ -> false in
