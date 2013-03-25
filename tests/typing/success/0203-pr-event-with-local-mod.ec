@@ -1,5 +1,5 @@
-require import int.
-require import real.
+require import Int.
+require import Real.
 
 cnst c : real.
 
@@ -13,4 +13,5 @@ module G(X : I) = {
   }
 }.
 
-lemma L : forall {m} (M <: I), Pr[f(0, 0) @ G(M), {m} : x = y] = c.
+lemma L : forall {m} (M <: I), Pr[f(0, 0) @ G(M), {m} : x = y] = c
+  proof.

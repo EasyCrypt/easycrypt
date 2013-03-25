@@ -1,3 +1,3 @@
-require f0100_require1.
-type T = f0100_require1.T.
-import f0100_require1. 
+require F0100_require1.
+type T = F0100_require1.T.
+import F0100_require1. 

@@ -711,7 +711,7 @@ module Memory = struct
     | Some me -> Some (me, oget (byid me env))
 
   let push (me : actmem) (env : env) =
-    assert (byid (actmem_name me) env = None);
+    (* FIXME: assert (byid (actmem_name me) env = None); *)
 
     let id = actmem_name me in
     let maps =

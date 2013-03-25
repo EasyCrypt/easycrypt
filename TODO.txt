@@ -6,6 +6,7 @@ Verifier les fonction add dans ecEnv.
 - pretty-printing de l'AST typé
 - noeud de meta-info dans les AST typés
 - local predicates / operators
+- ec échoue sur une erreur système lorsque why3 est configuré pour 0 prouveur.
 
 * Benjamin
 

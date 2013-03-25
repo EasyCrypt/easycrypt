@@ -339,6 +339,3 @@ lemma split_map_rm: forall (m m1 m2:('a,'b) map) x,
  split_map m m1 m2 => 
  !in_dom x m2 => 
  split_map (rm x m) (rm x m1) m2.
-
-
-

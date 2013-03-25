@@ -328,7 +328,7 @@ struct
   (* ------------------------------------------------------------------ *)
   let is_ident_symbol name = 
     match EcIo.lex_single_token name with
-    | Some EP.IDENT _ -> true
+    | Some EP.LIDENT _ -> true
     | _ -> false
 
   let priority_of_binop_name name =
@@ -784,7 +784,7 @@ struct
           pr_tuple_expr tenv pr_form args
 
       | FhoareF _ ->
-          assert false (* FIXME *)
+          !^ "implement-me"             (* FIXME *)
             
       | FhoareS(_,pre,stmt,post) -> 
         let dbody =
@@ -801,8 +801,8 @@ struct
                  pr_mblocks [dbody];
                  Pp.braces (pr_form tenv outer post) ]
 
-      | FequivF _ | FequivS _ | Fpr _ -> assert false (* FIXME *)
-
+      | FequivF _ | FequivS _ | Fpr _ ->
+          !^ "implement-me"  (* FIXME *)
     in
       pr_form tenv (min_op_prec, `NonAssoc) f
 

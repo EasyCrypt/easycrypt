@@ -1,4 +1,5 @@
-require int.
+require Int.
+
 axiom tutu : forall (x:int, y:int),
    int.[+] x y = 0.
 

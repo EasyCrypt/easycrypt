@@ -17,11 +17,20 @@ let addidir (idir : string) (ecl : ecloader) =
 
 (* -------------------------------------------------------------------- *)
 let locate (name : string) (ecl : ecloader) =
-  let fullname = Printf.sprintf "%s.ec" name in
+  let iname = Printf.sprintf "%s.ec" name in
+  let oname = String.copy iname in
+
+    iname.[0] <- Char.lowercase iname.[0];
+    oname.[0] <- Char.uppercase oname.[0];
+
   let locate idir =
-    let fullname = Filename.concat idir fullname in
-      if   Sys.file_exists fullname
-      then Some fullname
-      else None
+    List.pick
+      (fun name ->
+         let name = Filename.concat idir name in
+           if Sys.file_exists name then
+             Some name
+           else
+             None)
+      [iname; oname]
   in
     List.pick locate ecl.ecl_idirs

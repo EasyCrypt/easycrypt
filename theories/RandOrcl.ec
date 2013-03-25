@@ -14,7 +14,7 @@ theory RndOrcl.
   module RO = { 
     var m:(from,to) map
   
-    fun O (x:from): to = {
+    fun oracle (x:from): to = {
       if (!in_dom x m) m.[x] = $dsample;
       return proj (m.[x]);
     }
@@ -30,10 +30,10 @@ theory RndOrcl.
 
     var log : from Set.set
 
-    fun AdvO(x:from) : to = {
+    fun advO(x:from) : to = {
       var res1 : to = default;
       if (!Set.mem x log && Set.card log < max_call)
-        res1 := RO.O(x); 
+        res1 := RO.oracle(x); 
       return res1;
     }
 
@@ -41,8 +41,5 @@ theory RndOrcl.
       log = Set.empty;
       RO.init (); 
     }
-      
   }.
-
 end RndOrcl.
-

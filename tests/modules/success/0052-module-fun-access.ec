@@ -1,16 +1,16 @@
 type t.
 
 module M1 = { 
-  fun F (x : t) : t = {
+  fun f (x : t) : t = {
    return x;
   }
 }.
 
 module M2 = {
-  fun M1_F (x : t) : t = {
+  fun m1_f (x : t) : t = {
     var r : t;
 
-    r := M1.F(x);
+    r := M1.f(x);
     return r;
   }
 }.

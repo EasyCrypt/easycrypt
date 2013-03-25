@@ -1,5 +1,5 @@
-require import int.
-require import real.
+require import Int.
+require import Real.
 
 cnst c : real.
 
@@ -9,4 +9,5 @@ module G = {
   }
 }.
 
-lemma L : forall {m}, Pr[f(0, 0) @ G, {m} : x + y = res] = c.
+lemma L : forall {m}, Pr[f(0, 0) @ G, {m} : x + y = res] = c
+  proof.

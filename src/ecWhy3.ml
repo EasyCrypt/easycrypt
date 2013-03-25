@@ -76,7 +76,6 @@ let get_w3_th dirname name =
   Env.find_theory (Config.w3_env ()) dirname name
 
 (* ----------------------------------------------------------------------*)
-
 type env = {
     logic_task : Task.task;
     env_ty : Ty.tysymbol Mp.t;
@@ -1313,19 +1312,10 @@ let add_mod_exp env path me =
     add_pa path ty_mod;
     add_comps path me.me_comps;
     !env, !rb
-  
-             
-  
-  
-  
-  
 
 (* -------------------------------------------------------------------- *)
 (* ---------------------- Calling prover ------------------------------ *)
 (* -------------------------------------------------------------------- *)
-
-
-
 exception UnknownProver of string
 
 let get_prover name =
@@ -1428,10 +1418,6 @@ let para_call max_provers provers timelimit task =
             in
             ignore (CP.post_wait_call pc st ());
       done)
-
-
-
-
 
 type prover_infos = 
   { prover_max_run   : int;

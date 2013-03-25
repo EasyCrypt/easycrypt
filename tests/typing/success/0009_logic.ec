@@ -16,4 +16,3 @@ pred A.
 lemma L9 : A || !A.
 lemma L10 : if A then A else !A.
 lemma L11 : (if A then A else !A) = true.
-

@@ -115,14 +115,16 @@
 
 let blank   = [' ' '\t' '\r']
 let newline = '\n'
-let letter  = ['a'-'z' 'A'-'Z']
+let upper   = ['A'-'Z']
+let lower   = ['a'-'z']
+let letter  = upper | lower
 let digit   = ['0'-'9']
 let number  = digit+
 
 let ichar  = (letter | digit | '_' | '\'')
-let ident  = (letter ichar*) | ('_' ichar+)
-
-let prim_ident = '\'' ident
+let lident = (lower ichar*) | ('_' ichar+)
+let uident = upper ichar*
+let tident = '\'' lident
 
 let op_char_1    = ['=' '<' '>']
 let op_char_2    = ['+' '-']
@@ -145,8 +147,9 @@ let binop =
 rule main = parse
   | newline      { Lexing.new_line lexbuf; main lexbuf }
   | blank+       { main lexbuf }
-  | ident as id  { try Hashtbl.find keywords id with Not_found -> IDENT id }
-  | prim_ident   { PRIM_IDENT (Lexing.lexeme lexbuf)}
+  | lident as id { try Hashtbl.find keywords id with Not_found -> LIDENT id }
+  | uident as id { try Hashtbl.find keywords id with Not_found -> UIDENT id }
+  | tident       { TIDENT (Lexing.lexeme lexbuf)}
   | number       { NUM (int_of_string (Lexing.lexeme lexbuf)) }
   | "(*"         { comment lexbuf; main lexbuf }
   | "\""         { STRING (Buffer.contents (string (Buffer.create 0) lexbuf)) }

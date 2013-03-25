@@ -1,4 +1,4 @@
-require import int.
+require import Int.
 
 module G = {
   fun f(x : int, y : int) : int = {
@@ -7,6 +7,4 @@ module G = {
 }.
 
 lemma L : hoare[f @ G : (x = y) ==> (res = x + y)]
-proof.
- admit.
-save.
+  proof.
