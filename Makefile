@@ -17,6 +17,12 @@ VERSION  ?= $(shell date '+%F')
 DISTDIR   = easycrypt-$(VERSION)
 THEORIES  = $(wildcard theories/*.ec)
 
+WHY3_VERSION = 0.80
+WHY3_TARGZ   = why3-$(WHY3_VERSION).tar.gz
+WHY3_URL     = http://ci.easycrypt.info/downloads/$(WHY3_TARGZ)
+
+export OCAMLPATH := $(PWD)/why3/why3-$(WHY3_VERSION)/lib:${OCAMLPATH}
+
 # --------------------------------------------------------------------
 INSTALL   ?= scripts/install-sh
 XUNITOUT  ?= xunit.xml
@@ -46,6 +52,7 @@ CHECKLIBS = \
 # --------------------------------------------------------------------
 .PHONY: all build byte native check check-xunit tags
 .PHONY: clean install uninstall dist distcheck
+.PHONY: why3
 .PHONY: %.ml
 
 all: build
@@ -105,6 +112,19 @@ distcheck: dist
 	rm -rf $(DISTDIR)
 	@echo "$(DISTDIR) is ready for distribution" | \
 	  sed -e 1h -e 1s/./=/g -e 1p -e 1x -e '$$p' -e '$$x'
+
+# --------------------------------------------------------------------
+why3:
+	[ -e why3 ] && rm -rf why3; mkdir why3
+	curl -o why3/$(WHY3_TARGZ) $(WHY3_URL)
+	tar -C why3 -xof why3/$(WHY3_TARGZ)
+	( set -e; cd why3/why3-$(WHY3_VERSION); \
+	    ./configure \
+	        --enable-local \
+	        --disable-coq-tactic \
+	        --disable-coq-libs \
+	        --disable-pvs-libs; \
+	    make && make byte )
 
 # --------------------------------------------------------------------
 %.ml:

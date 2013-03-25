@@ -3,8 +3,10 @@ true : use_menhir, menhir_explain
 true : debug
 true : warn_Z, warn_Y, warn_+28
 
+
 # --------------------------------------------------------------------
 <src> or <pprint> : include
+<why3> : -traverse
 
 # --------------------------------------------------------------------
 <src/*.{ml,mli}> : package(menhirLib), package(why3), package(extunix)

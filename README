@@ -9,20 +9,30 @@
 
    Available at http://gallium.inria.fr/~fpottier/menhir/
 
- * Why3  (>= 0.80)
+ * Why3  (= 0.80)
 
    Available at http://why3.lri.fr/
 
    Why3 must be installed with a set a provers.
    See [http://why3.lri.fr/#provers]
 
+   Why3 libraries must be installed (make byte && make install-lib)
+
+   You can install a local copy of Why3 by running [make why3]. In
+   that case, don't forget to add why3/why3-$version/bin to your path
+   before using easycrypt.
+
+ * Unix extlib
+
+   Available at http://extunix.forge.ocamlcore.org/
+
  * GNU Emacs (>= 0.23)
 
    Available at http://www.gnu.org/software/emacs/
 
-* ProofGeneral 4.2
+ * ProofGeneral 4.2
 
-  Available at http://proofgeneral.inf.ed.ac.uk/
+   Available at http://proofgeneral.inf.ed.ac.uk/
 
 * COMPILATION
 ====================================================================
