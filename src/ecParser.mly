@@ -297,8 +297,6 @@
 
 %nonassoc prec_prefix_op
 %nonassoc above_OP
-%nonassoc DOT
-%nonassoc LIDENT UIDENT
 
 %type <EcParsetree.global> global
 %type <EcParsetree.prog> prog
@@ -345,7 +343,7 @@ uqident:
       pl_loc  = EcLocation.make $startpos $endpos; }
   }
 
-| xs=plist1(UIDENT, DOT) DOT x=UIDENT {
+| xs=namespace DOT x=UIDENT {
     { pl_desc = (xs, x);
       pl_loc  = EcLocation.make $startpos $endpos;
     }
@@ -367,7 +365,7 @@ qident_pbinop:
 | x=oident
     { pqsymb_of_psymb x }
 
-| xs=plist1(UIDENT, DOT) DOT x=oident {
+| xs=namespace DOT x=oident {
     { pl_desc = (xs, unloc x);
       pl_loc  = EcLocation.make $startpos $endpos;
     }
@@ -545,7 +543,6 @@ exp:
 %inline p_exp_sm_list0: aout=plist0(loc(exp), SEMICOLON) { aout }
 
 %inline exp_list0: aout=plist0(loc(exp), COMMA) { aout }
-// %inline exp_list1: aout=plist1(loc(exp), COMMA) { aout }
 %inline sexp_list1: aout=plist1(loc(sexp), empty) { aout }
 %inline exp_list2: aout=plist2(loc(exp), COMMA) { aout }
 
@@ -692,7 +689,6 @@ equiv_body:
 
 
 %inline p_form_sm_list0: aout=plist0(loc(form), SEMICOLON) { aout }
-//%inline form_list0: aout=plist0(loc(form), COMMA) { aout }
 %inline form_list2: aout=plist2(loc(form), COMMA) { aout }
 %inline sform_list1: aout=plist1(loc(sform), empty) { aout }
 
@@ -1275,11 +1271,19 @@ print:
 | AXIOM  qs=qident { Pr_ax qs }
 ;
 
+prover_iconfig:
+| /* empty */   { (None   , None   ) }
+| i=NUM         { (Some i , None   ) }
+| i1=NUM i2=NUM { (Some i1, Some i2) }
+;
+
 prover_info:
-| max=NUM t=NUM? pl=plist1(loc(STRING), empty)? 
-    { { pprov_max = Some max; pprov_time = t; pprov_names = pl } }
-| t=NUM? pl=plist1(loc(STRING), empty)?  
-    { { pprov_max = None; pprov_time = t; pprov_names = pl } }
+| ic=prover_iconfig pl=plist1(loc(STRING), empty)? 
+    { let (m, t) = ic in
+        { pprov_max   = m;
+          pprov_time  = t;
+          pprov_names = pl; } }
+;
 
 gprover_info: 
 | PROVER x=prover_info { x }
