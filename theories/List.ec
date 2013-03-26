@@ -299,9 +299,3 @@ proof.
     
     trivial.
 save.
-
-
-
-
-
-save.
