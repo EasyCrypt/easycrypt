@@ -490,29 +490,24 @@ module Theory = struct
             | None -> EcEnv.Op.bind x (EcSubst.subst_op subst oopd) scenv
             | Some (locals, opbody) ->
               let refop = EcEnv.Op.by_path (EcPath.pqname opath x) scenv in
+              let newop = EcSubst.subst_op subst refop in
 
-              let nparams = List.map EcIdent.fresh refop.op_params in
-              let tyfrsh  =
-                List.fold_left2
-                  (fun map id1 id2 -> Mid.add id1 (EcTypes.tvar id2) map)
-                  Mid.empty refop.op_params nparams in
-              let ndom   = List.map (EcTypes.Tvar.subst tyfrsh) refop.op_dom in
-              let ncodom = EcTypes.Tvar.subst tyfrsh refop.op_codom in
-
-                if List.length ndom <> List.length locals then
+                if List.length newop.op_dom <> List.length locals then
                   failwith "invalid-number-of-parameters";
 
               let locals = List.map (EcIdent.create -| unloc) locals in
-              let benv   = EcEnv.Var.bind_locals (List.combine locals ndom) scenv in
-              let ue     = EcUnify.UniEnv.create (Some nparams) in
+              let benv   = EcEnv.Var.bind_locals (List.combine locals newop.op_dom) scenv in
+              let ue     = EcUnify.UniEnv.create (Some newop.op_params) in
 
-              let opbody = EcTypedtree.transexpcast benv ue ncodom opbody in
+              let opbody = EcTypedtree.transexpcast benv ue newop.op_codom opbody in
 
-                if List.length (EcUnify.UniEnv.tparams ue) <> List.length nparams then
+                if List.length (EcUnify.UniEnv.tparams ue) <> List.length newop.op_params then
                   failwith "body-less-generic";
 
-              let nop = EcDecl.mk_op nparams ndom ncodom (Some (locals, opbody)) in
-                EcEnv.Op.bind x nop scenv
+              let newop =
+                { newop with op_kind = OB_oper (Some (locals, opbody)) }
+              in
+                EcEnv.Op.bind x newop scenv
           end
 
         | CTh_operator (x, oopd) ->
