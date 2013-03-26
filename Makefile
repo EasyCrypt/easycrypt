@@ -17,16 +17,15 @@ VERSION  ?= $(shell date '+%F')
 DISTDIR   = easycrypt-$(VERSION)
 THEORIES  = $(wildcard theories/*.ec)
 
+# --------------------------------------------------------------------
 WHY3_VERSION = 0.80
 WHY3_TARGZ   = why3-$(WHY3_VERSION).tar.gz
 WHY3_URL     = http://ci.easycrypt.info/downloads/$(WHY3_TARGZ)
 
-export OCAMLPATH := $(PWD)/why3/why3-$(WHY3_VERSION)/lib:${OCAMLPATH}
-
 # --------------------------------------------------------------------
-INSTALL   ?= scripts/install-sh
-XUNITOUT  ?= xunit.xml
-CHECKARGS ?= -I theories
+INSTALL      ?= scripts/install-sh
+XUNITOUT     ?= xunit.xml
+CHECKARGS    ?= -I theories
 CHECKLIBARGS ?= $(CHECKARGS) -p Eprover -p Alt-Ergo -p Z3
 
 CHECK = \
@@ -40,30 +39,33 @@ CHECK = \
 	  --ko-dir=tests/modules/fail     \
 	  --ok-dir=tests/theories/success \
 	  --ko-dir=tests/theories/fail    \
-          --ok-dir=tests/third-party
+	  --ok-dir=tests/third-party
 
 CHECKLIBS = \
-	./scripts/runtest.py        \
-	  --bin=./ec.native         \
+	./scripts/runtest.py           \
+	  --bin=./ec.native            \
 	  --bin-args="$(CHECKLIBARGS)" \
-	  --ok-dir=theories         \
+	  --ok-dir=theories            \
 	  --xunit=libresults.xml
 
 # --------------------------------------------------------------------
 .PHONY: all build byte native check check-xunit tags
-.PHONY: clean install uninstall dist distcheck
-.PHONY: why3
-.PHONY: %.ml
+.PHONY: clean install uninstall dist distcheck why3
+.PHONY: toolchain %.ml
 
 all: build
 
 build: native
 
+define do-build
+	$(OCAMLBUILD) "$(1)"
+endef
+
 byte: tags
-	$(OCAMLBUILD) src/ec.byte
+	$(call do-build,src/ec.byte)
 
 native: tags
-	$(OCAMLBUILD) src/ec.native
+	$(call do-build,src/ec.native)
 
 install: ec.native
 	$(INSTALL) -m 0755 -d $(DESTDIR)$(PREFIX)/bin
@@ -93,6 +95,7 @@ clean:
 tags:
 	set -e; for i in $(CONFIG); do [ -e "$$i" ] || ln -s config/"$$i" $$i; done
 
+# --------------------------------------------------------------------
 dist:
 	if [ -e $(DISTDIR) ]; then rm -rf $(DISTDIR); fi
 	./scripts/distribution.py $(DISTDIR) MANIFEST
@@ -114,6 +117,14 @@ distcheck: dist
 	  sed -e 1h -e 1s/./=/g -e 1p -e 1x -e '$$p' -e '$$x'
 
 # --------------------------------------------------------------------
+%.ml:
+	$(call build src/$*.cmo)
+
+# --------------------------------------------------------------------
+%.inferred.mli:
+	$(call build src/$@) && cat _build/src/$@
+
+# --------------------------------------------------------------------
 why3:
 	[ -e why3 ] && rm -rf why3; mkdir why3
 	curl -o why3/$(WHY3_TARGZ) $(WHY3_URL)
@@ -127,9 +138,7 @@ why3:
 	    make && make byte )
 
 # --------------------------------------------------------------------
-%.ml:
-	$(OCAMLBUILD) src/$*.cmo
+TOOLCHAIN_URL := http://ci.easycrypt.info/scripts/ec-build-toolchain
 
-# --------------------------------------------------------------------
-%.inferred.mli:
-	$(OCAMLBUILD) src/$@ && cat _build/src/$@
+toolchain:
+	bash ./scripts/ec-build-toolchain

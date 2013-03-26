@@ -1,0 +1,87 @@
+#! /bin/bash
+
+# --------------------------------------------------------------------
+set -e
+
+# --------------------------------------------------------------------
+: ${OVERSION=3.12.1}
+: ${DEST="${PWD}/_tools"}       # MUST BE ABSOLUTE
+
+# --------------------------------------------------------------------
+OBREW_URL=https://raw.github.com/hcarty/ocamlbrew/master/ocamlbrew-install
+ECOPAM_URL=http://ci.easycrypt.info/opam
+
+OPAM_VERSION=1.0.0
+OPAM_URL=http://www.ocamlpro.com/pub/opam-full-1.0.0.tar.gz
+
+OCONFIG="${DEST}/ocaml-${OVERSION}/etc/ocamlbrew.bashrc"
+
+export OCAMLBREW_BASE=${DEST}
+export OCAMLBREW_FLAGS="-v ${OVERSION} -f"
+
+export OPAMROOT=${DEST}/ocaml-${OVERSION}/opam
+export OPAMFLAGS="--no-setup default ${ECOPAM_URL}"
+
+# --------------------------------------------------------------------
+if [ "${DEST}" != "${DEST//[ ]/}" ]; then
+    echo "Destination folder contains spaces" >&2
+    echo "Please, set the DEST variable to a valid value" >&2
+    exit 1
+fi
+
+# --------------------------------------------------------------------
+set -x
+
+rm -rf "${DEST}" && mkdir "${DEST}" "${DEST}/src"
+curl -kL -o "${DEST}/src/ocamlbrew" ${OBREW_URL}
+bash "${DEST}/src/ocamlbrew"
+
+# --------------------------------------------------------------------
+function build_opam {
+    source "${OCONFIG}"
+
+    curl -kL -O ${OPAM_URL}
+    rm -rf opam-full-${OPAM_VERSION}
+    tar -xozf opam-full-${OPAM_VERSION}.tar.gz
+
+    cd opam-full-${OPAM_VERSION}
+    ./configure --prefix="${DEST}/ocaml-${OVERSION}"
+    make && make install
+
+    "${DEST}"/ocaml-${OVERSION}/bin/opam init ${OPAMFLAGS}
+
+    cat >>"${OCONFIG}" <<EOF
+export OPAMROOT="${OPAMROOT}"
+export OCAMLFIND_CONF="${DEST}/ocaml-${OVERSION}/opam/system/lib/findlib.conf"
+EOF
+    echo 'eval `opam config env`' >>"${OCONFIG}"
+}
+
+( set -e; cd "${DEST}"/ocaml-${OVERSION}/build && build_opam )
+
+source "${OCONFIG}"
+
+for pkg in menhir ocaml-extunix why3; do
+    opam install -v -y $pkg
+done
+
+# --------------------------------------------------------------------
+set +xe
+
+function box {
+    echo
+    echo "$@" |sed -e 1h -e 1s/./=/g -e 1p -e 1x -e '$p' -e '$x'
+    echo
+}
+
+box "EasyCrypt toolchain installed"
+
+cat <<EOF
+%%%
+%%% To use it, type:"
+%%% 
+%%%    source "${OCONFIG}"
+%%% 
+%%% Don't forget to [make clean] the easycrypt source tree
+%%%
+EOF
