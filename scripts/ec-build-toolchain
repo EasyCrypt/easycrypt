@@ -22,6 +22,10 @@ export OCAMLBREW_FLAGS="-v ${OVERSION} -f"
 export OPAMROOT=${DEST}/ocaml-${OVERSION}/opam
 export OPAMFLAGS="--no-setup default ${ECOPAM_URL}"
 
+unset OCAMLFIND_CONF
+unset OCAML_TOPLEVEL_PATH
+unset CAML_LD_LIBRARY_PATH
+
 # --------------------------------------------------------------------
 if [ "${DEST}" != "${DEST//[ ]/}" ]; then
     echo "Destination folder contains spaces" >&2
@@ -33,14 +37,14 @@ fi
 set -x
 
 rm -rf "${DEST}" && mkdir "${DEST}" "${DEST}/src"
-curl -kL -o "${DEST}/src/ocamlbrew" ${OBREW_URL}
+curl -f -kL -o "${DEST}/src/ocamlbrew" ${OBREW_URL}
 bash "${DEST}/src/ocamlbrew"
 
 # --------------------------------------------------------------------
 function build_opam {
     source "${OCONFIG}"
 
-    curl -kL -O ${OPAM_URL}
+    curl -f -kL -O ${OPAM_URL}
     rm -rf opam-full-${OPAM_VERSION}
     tar -xozf opam-full-${OPAM_VERSION}.tar.gz
 
@@ -61,9 +65,7 @@ EOF
 
 source "${OCONFIG}"
 
-for pkg in menhir ocaml-extunix why3; do
-    opam install -v -y $pkg
-done
+opam install -v -y ec-toolchain
 
 # --------------------------------------------------------------------
 set +xe
