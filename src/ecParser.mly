@@ -591,7 +591,7 @@ sform:
 | EQUIV LBRACKET eb=equiv_body RBRACKET { eb }
 
 | PR LBRACKET
-    x=lident args=paren(plist1(loc(sform), COMMA))
+    x=lident args=paren(plist0(loc(sform), COMMA))
     AT nm=mident COMMA LKEY pn=pside RKEY
     COLON event=loc(form)
   RBRACKET
