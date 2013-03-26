@@ -14,8 +14,9 @@ OCAMLBUILD := $(OCAMLBUILD_BIN) $(OCAMLBUILD_EXTRA)
 DESTDIR  ?=
 PREFIX   ?= /usr/local
 VERSION  ?= $(shell date '+%F')
-DISTDIR   = easycrypt-$(VERSION)
-THEORIES  = $(wildcard theories/*.ec)
+DISTDIR  := easycrypt-$(VERSION)
+THEORIES := $(wildcard theories/*.ec)
+INSTALL  := scripts/install-sh
 
 # --------------------------------------------------------------------
 WHY3_VERSION = 0.80
@@ -23,10 +24,10 @@ WHY3_TARGZ   = why3-$(WHY3_VERSION).tar.gz
 WHY3_URL     = http://ci.easycrypt.info/downloads/$(WHY3_TARGZ)
 
 # --------------------------------------------------------------------
-INSTALL      ?= scripts/install-sh
 XUNITOUT     ?= xunit.xml
-CHECKARGS    ?= -I theories
-CHECKLIBARGS ?= $(CHECKARGS) -p Eprover -p Alt-Ergo -p Z3
+ECARGS       ?=
+CHECKARGS    := $(ECARGS) -I theories
+CHECKLIBARGS := $(CHECKARGS) -p Eprover -p Alt-Ergo -p Z3
 
 CHECK = \
 	./scripts/runtest.py              \
@@ -40,7 +41,7 @@ CHECK = \
 	  --ok-dir=tests/theories/success \
 	  --ko-dir=tests/theories/fail    \
 	  --ok-dir=tests/third-party      \
-          --ok-dir=tests/unclassified
+	  --ok-dir=tests/unclassified
 
 CHECKLIBS = \
 	./scripts/runtest.py           \
