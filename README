@@ -20,7 +20,8 @@
 
    You can install a local copy of Why3 by running [make why3]. In
    that case, don't forget to add why3/why3-$version/bin to your path
-   before using easycrypt.
+   before using easycrypt and add $PWD/why/why3-$version/lib to the
+   OCAMLPATH environment variable.
 
  * Unix extlib
 
@@ -33,6 +34,19 @@
  * ProofGeneral 4.2
 
    Available at http://proofgeneral.inf.ed.ac.uk/
+
+* LOCAL TOOLCHAIN
+====================================================================
+
+You can install a local copy of OCaml and all the needed libraries by
+running [make toolchain]. You only need [curl] and the [gcc] compiler.
+
+By default, the destination directory is ${PWD}/_tools. You can change
+this by setting the $DEST variable, e.g.:
+
+  make DEST=/opt/ec-toolchain toolchain
+
+Note that $DEST cannot contain spaces.
 
 * COMPILATION
 ====================================================================
