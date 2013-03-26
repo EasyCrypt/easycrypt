@@ -15,7 +15,7 @@ export Abs.
 theory Triangle.
 
   lemma triangular_inequality : forall (x:_,y:_,z:_),
-     | x-y | <= | x-z |  + | y-z |.
+     `| x-y | <= `| x-z |  + `| y-z |.
 
 end Triangle.
 
@@ -36,4 +36,3 @@ export PowerInt.
 
 op exp : real -> real.
 (* TODO : add axioms*)
-

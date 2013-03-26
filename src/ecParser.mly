@@ -171,6 +171,7 @@
 %token <bool> AND (* true asym : &&, false sym : /\ *)
 %token <bool> OR  (* true asym : ||, false sym : \/ *)
 %token PIPE
+%token TICKPIPE
 // %token PR
 %token PRED
 %token PROVER
@@ -286,7 +287,6 @@
 %right AND 
 
 %nonassoc NOT
-%nonassoc PIPE
 %left EQ NE OP1 GT
 
 %right QUESTION
@@ -296,7 +296,6 @@
 %left OP4 
 
 %nonassoc prec_prefix_op
-%nonassoc above_OP
 
 %type <EcParsetree.global> global
 %type <EcParsetree.prog> prog
@@ -452,10 +451,10 @@ sexp:
 | se=loc(sexp) DLBRACKET ti=tvars_app? e1=loc(exp) LEFTARROW e2=loc(exp) RBRACKET  
    { peset (EcLocation.make $startpos $endpos) ti se e1 e2 }
 
-| PIPE ti=tvars_app? e=loc(exp) PIPE 
+| TICKPIPE ti=tvars_app? e=loc(exp) PIPE 
     { peapp_symb e.pl_loc EcCoreLib.s_abs ti [e] }
 
-| LPAREN es=exp_list2 RPAREN
+| LPAREN es=plist2(loc(exp), COMMA) RPAREN
    { PEtuple es }
 
 | LPAREN e=exp RPAREN
@@ -480,9 +479,9 @@ op1:
 ;
 
 exp:
-| e=sexp { e }  %prec above_OP
+| e=sexp { e }
 
-| e=loc(sexp) args=sexp_list1 { PEapp (e, args) }
+| e=loc(sexp) args=loc(sexp)+ { PEapp (e, args) }
 
 | op=loc(NOT) ti=tvars_app? e=loc(exp)
    { peapp_symb op.pl_loc "!" ti [e] }
@@ -525,13 +524,14 @@ exp:
     { peapp_symb op.pl_loc "*" ti [e1; e2] }
 
 | c=loc(exp) QUESTION e1=loc(exp) COLON e2=loc(exp) %prec OP2
+   { PEif (c, e1, e2) }
+
 | IF c=loc(exp) THEN e1=loc(exp) ELSE e2=loc(exp)
    { PEif (c, e1, e2) }
 
 | LET p=lpattern EQ e1=loc(exp) IN e2=loc(exp)
    { PElet (p, e1, e2) }
 
-(* Distribution *)
 | LKEY n1=number op=loc(COMMA) n2=number RKEY_HAT e=loc(sexp)
     { if   n1 = 0 && n2 = 1 then 
         let id = PEident(mk_loc op.pl_loc EcCoreLib.s_dbitstring, None) in
@@ -543,8 +543,6 @@ exp:
 %inline p_exp_sm_list0: aout=plist0(loc(exp), SEMICOLON) { aout }
 
 %inline exp_list0: aout=plist0(loc(exp), COMMA) { aout }
-%inline sexp_list1: aout=plist1(loc(sexp), empty) { aout }
-%inline exp_list2: aout=plist2(loc(exp), COMMA) { aout }
 
 (* -------------------------------------------------------------------- *)
 (* Formulas                                                             *)
@@ -571,6 +569,9 @@ sform:
 
 | x=loc(sform) LKEY s=pside RKEY
    { PFside (x, s) }
+
+| TICKPIPE ti=tvars_app? e =loc(form) PIPE 
+    { pfapp_symb e.pl_loc EcCoreLib.s_abs ti [e] }
 
 | LPAREN es=form_list2 RPAREN
    { PFtuple es }
@@ -599,9 +600,6 @@ sform:
     { let mp= mk_loc (EcLocation.make $startpos(x) $endpos(nm)) (nm, x) in
         PFprob (mp, args, pn, event) }
 
-| PIPE ti=tvars_app? e =loc(form) PIPE 
-    { pfapp_symb e.pl_loc EcCoreLib.s_abs ti [e] }
-
 | LKEY n1=number op=loc(COMMA) n2=number RKEY
     { if   n1 = 0 && n2 = 1
       then PFident (mk_loc op.pl_loc EcCoreLib.s_dbool, None)
@@ -613,7 +611,7 @@ sform:
 ;
                           
 form:
-| e=sform { e } %prec above_OP
+| e=sform { e }
 
 | e=loc(sform) args=sform_list1 { PFapp (e, args) } 
 

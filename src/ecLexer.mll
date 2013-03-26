@@ -193,6 +193,7 @@ rule main = parse
   | "*"  { STAR }
   | "$"  { SAMPLE }
   | "|"  { PIPE }
+  | "`|" { TICKPIPE }
   | "@"  { AT }
   | "~"  { TILD }
 

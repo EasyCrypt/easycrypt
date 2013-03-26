@@ -13,7 +13,7 @@ export Abs.
 
 theory Triangle.
   lemma triangle_inequality : forall (x:int,y:_,z:_),
-     | x - y | <= | x - z | + | y - z |.
+     `| x - y | <= `| x - z | + `| y - z |.
 
 end Triangle.
 
@@ -34,7 +34,3 @@ end Power.
 export Power.
 
 (* lemma test : forall (x:int), 0 <= x => 1 <= 2^x. *)
-
-
-
-
