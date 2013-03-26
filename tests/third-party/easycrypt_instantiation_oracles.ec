@@ -7,26 +7,31 @@ require import Int.
 require import Distr. import Dinter.
 require import Prime_field.
 require import Cyclic_group_prime.
+require import Set.
+require        RandOrcl.
 
 cnst gDistr: group distr.
 
 (* I think this type is the one that gets instantiated in the main experiment *)
 type t.
 
-(* An adversary with a function using two oracles *)
-module type Oracle = {
-  fun init(): unit
-  fun o(x:t): group
-}.
+(* TODO: Once type-checking is fixed for this, fold the two clones into one *)
+clone RandOrcl as RO' with
+  type from = t,
+  type to = group.
+clone RO' as RO with
+  cnst default = g.
+import RO. (* Maybe we should let users "clone import X as Y"? *)
 
-module type A(H:Oracle, F:Oracle) = {
+(* An adversary with a function using two oracles *)
+module type Adversary(O1:Oracle, O2:Oracle) = {
   fun main():bool
 }.
 
 (* Experiment *)
 require import Map.
 
-module Experiment(O1:Oracle, O2:Oracle, A:A) = {
+module Experiment(O1:Oracle, O2:Oracle, A:Adversary) = {
   module A = A(O1,O2)
 
   fun main(): bool = {
@@ -40,8 +45,15 @@ module Experiment(O1:Oracle, O2:Oracle, A:A) = {
 }.
 
 (* The oracles *)
-(* Note: We would like the following to type as F(RO:Oracle): Oracle *)
-module F(RO:Oracle): Oracle = {
+(* We clone two random oracles of the same type for H and R *)
+clone RO.ROM as RO1.
+module H = RO1.RO.
+
+clone RO.ROM as RO2.
+module R = RO2.RO.
+
+(* F is built on top of H *)
+module F = {
   var k:gf_q
 
   fun init(): unit = {
@@ -52,66 +64,21 @@ module F(RO:Oracle): Oracle = {
 
   fun f(x:t): group = {
     var y:group;
-    y := RO.o(x);
+    y := H.o(x);
     y = y ^ k;
     return y;
   }
 }.
 
-(* In a perfect world, the following two belong to two clones of the same theory *)
-module H: Oracle = {
-  var state: (t,group) map
+(* The claims *)
+require import Real.
 
-  fun init(): unit = {
-    state = empty;
-  }
+cnst epsilon: real.
+axiom Adv_def: forall {m} (A <: Adversary),
+  | Pr[ main() @ Experiment(H,F,A), {m}: res ] -
+    Pr[ main() @ Experiment(H,R,A), {m}: res ] | <= epsilon.
 
-  fun o(x:t): group = {
-    var y:group;
-
-    if (!in_dom x state)
-    {
-      y = $gDistr;
-      state = state.[x <- y];
-    }
-
-    return proj (state.[x]); (* Note: This is safe as long as group is inhabited *)
-  }
-}.
-
-module R: Oracle = {
-  var state: (t,group) map
-
-  fun init(): unit = {
-    state = empty;
-  }
-
-  fun o(x:t): group = {
-    var y:group;
-
-    if (!in_dom x state)
-    {
-      y = $gDistr;
-      state = state.[x <- y];
-    }
-
-  return proj (state.[x]);
-  }
-}.
-
-(* The Games *)
-module G0 = Experiment(H,F(H),A(H,F)).
-module G1 = Experiment(H,R,A(H,R));
-
-(* The following remains to express in the new syntax/module system *)
-(* (* The claims *)
-cnst epsilon : real.
-
-(* This seems simpler than using the "theory" notation: *)
-axiom claim G0G1 :
-  forall (A : A), 
-  | G0(A).Main[res] - G1(A).Main[res] | <= epsilon.
-
+(*
 adversary type B = {
   B1 : () -> t list { t -> group }
   B2 : group list -> bool {t -> group}
