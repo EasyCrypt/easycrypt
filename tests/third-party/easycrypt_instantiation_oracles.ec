@@ -74,9 +74,10 @@ module F = {
 require import Real.
 
 cnst epsilon: real.
+
 axiom Adv_def: forall {m} (A <: Adversary),
-  | Pr[ main() @ Experiment(H,F,A), {m}: res ] -
-    Pr[ main() @ Experiment(H,R,A), {m}: res ] | <= epsilon.
+  `| Pr[ main() @ Experiment(H,F,A), {m}: res ] -
+     Pr[ main() @ Experiment(H,R,A), {m}: res ] | <= epsilon.
 
 (*
 adversary type B = {
