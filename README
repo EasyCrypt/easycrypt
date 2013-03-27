@@ -91,13 +91,15 @@ in the definition of `proof-assistant-table-default':
 
   (easycrypt "EasyCrypt" "ec")
 
+Copy the directory easycrypt/ to <proof-general-home>/generic/
+
 If you have not done so, add the following line to your Emacs
 configuration file (typically ~/.emacs):
 
   (load-file "<proof-general-home>/generic/proof-site.el")
 
 If the EasyCrypt executable is not in your $PATH, set the path to the
-EasyCrypt executable by modifying the variable certicrypt-prog-name
+EasyCrypt executable by modifying the variable easycrypt-prog-name
 inside Emacs:
 
   Proof-General
