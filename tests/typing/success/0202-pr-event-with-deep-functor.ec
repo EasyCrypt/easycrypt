@@ -27,5 +27,5 @@ module G(X : I) = {
   }
 }.
 
-lemma L : forall {m}, Pr[G(MI).Inner(MJ).f(0, 0) @ {m} : x = y] = c
+lemma L : forall &m, Pr[G(MI).Inner(MJ).f(0, 0) @ &m : x = y] = c
 proof. admit. save.

@@ -127,6 +127,7 @@ let ichar  = (letter | digit | '_' | '\'')
 let lident = (lower ichar*) | ('_' ichar+)
 let uident = upper ichar*
 let tident = '\'' lident
+let mident = '&'  (lident | number)
 
 let op_char_1    = ['=' '<' '>']
 let op_char_2    = ['+' '-']
@@ -151,7 +152,8 @@ rule main = parse
   | blank+       { main lexbuf }
   | lident as id { try Hashtbl.find keywords id with Not_found -> LIDENT id }
   | uident as id { try Hashtbl.find keywords id with Not_found -> UIDENT id }
-  | tident       { TIDENT (Lexing.lexeme lexbuf)}
+  | tident       { TIDENT (Lexing.lexeme lexbuf) }
+  | mident       { MIDENT (Lexing.lexeme lexbuf) }
   | number       { NUM (int_of_string (Lexing.lexeme lexbuf)) }
   | "(*"         { comment lexbuf; main lexbuf }
   | "\""         { STRING (Buffer.contents (string (Buffer.create 0) lexbuf)) }
@@ -179,8 +181,8 @@ rule main = parse
   | '_'  { UNDERSCORE }
   | '('  { LPAREN }
   | ')'  { RPAREN }
-  | '{'  { LKEY }
-  | '}'  { RKEY }
+  | '{'  { LBRACE }
+  | '}'  { RBRACE }
   | '['  { LBRACKET }
   | ']'  { RBRACKET }
   | "<:" { LTCOLON }
@@ -188,7 +190,7 @@ rule main = parse
   | ','  { COMMA }
   | ';'  { SEMICOLON }
   | ':'  { COLON }
-  | "}^" { RKEY_HAT }
+  | "}^" { RBRACEHAT }
   | '?'  { QUESTION }
   | "*"  { STAR }
   | "$"  { SAMPLE }

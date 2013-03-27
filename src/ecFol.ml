@@ -21,12 +21,12 @@ type quantif =
 
 type binding = (EcIdent.t * gty) list
 
-let mstd   = EcIdent.create "$std"
-let mpre   = EcIdent.create "$pre"
-let mpost  = EcIdent.create "$post"
-let mhr    = EcIdent.create "$hr"
-let mleft  = EcIdent.create "$1"
-let mright = EcIdent.create "$2"
+let mstd   = EcIdent.create "&std"
+let mpre   = EcIdent.create "&pre"
+let mpost  = EcIdent.create "&post"
+let mhr    = EcIdent.create "&hr"
+let mleft  = EcIdent.create "&1"
+let mright = EcIdent.create "&2"
 
 type form = { 
   f_node : f_node;

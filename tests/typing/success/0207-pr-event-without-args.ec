@@ -6,4 +6,4 @@ module G = {
   }
 }.
 
-axiom L: forall {m}, Pr[G.f() @ {m}: res] = 1%r.
+axiom L: forall &m, Pr[G.f() @ &m: res] = 1%r.

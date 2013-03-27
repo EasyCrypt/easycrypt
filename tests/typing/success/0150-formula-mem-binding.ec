@@ -1,1 +1,1 @@
-lemma L : forall {m}, true.
+lemma L : forall &m, true.

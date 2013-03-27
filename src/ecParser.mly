@@ -102,179 +102,123 @@
 %token <EcSymbols.symbol> LIDENT
 %token <EcSymbols.symbol> UIDENT
 %token <EcSymbols.symbol> TIDENT
+%token <EcSymbols.symbol> MIDENT
 %token <EcSymbols.symbol> PBINOP
 
 %token <int> NUM
 %token <string> STRING
 
-(* Tokens + keywords *)
-%token SAMPLE
-// %token ABSTRACT
-%token UNDERSCORE
+(* Tokens *)
+%token <bool> AND (* true asym : &&, false sym : /\ *)
+%token <bool> OR  (* true asym : ||, false sym : \/ *)
 %token ADMIT
-%token CUT
-// %token ADVERSARY
+%token APP
+%token APPLY
 %token ARROW
 %token AS
-%token AT
-// %token ASPEC
 %token ASSERT
+%token ASSUMPTION
+%token AT
+%token AUTO
 %token AXIOM
-%token LEMMA
-%token PROOF
+%token BETA 
+%token CASE
+%token CEQ
+%token CHANGE
 %token CHECKPROOF
 %token CLAIM
+%token CLEAR
 %token CLONE
 %token CNST
 %token COLON
 %token COMMA
 %token COMPUTE
+%token CUT
+%token DELTA
+%token DLBRACKET
 %token DOT
 %token DOTDOT
 %token DROP
+%token ELIM
+%token ELIMT
 %token ELSE
 %token END
 %token EOF
 %token EQ
-%token CEQ
-// %token EQEQLBRACKET
 %token EQUIV
-%token EXPORT
 %token EXIST
+%token EXPORT
 %token FINAL
 %token FORALL
-%token LAMBDA
+%token FROM_INT
 %token FUN
+%token GENERALIZE 
 %token HOARE
+%token IDTAC
 %token IF
 %token IFF
 %token IMPL
 %token IMPORT
 %token IN
-// %token INCLUDE
-// %token INTERFACE
-// %token KW_AND
-%token DLBRACKET
+%token INTROS
+%token IOTA 
+%token LAMBDA
+%token LBRACE
 %token LBRACKET
+%token LEFT
 %token LEFTARROW
-// %token LEMMA
+%token LEMMA
 %token LET
-%token LKEY
-// %token LLIMP
+%token LOGIC
 %token LONGARROW
 %token LPAREN
 %token MODULE
-%token FROM_INT
 %token NE
 %token NOT
+%token OFF
+%token ON
 %token OP
-%token <bool> AND (* true asym : &&, false sym : /\ *)
-%token <bool> OR  (* true asym : ||, false sym : \/ *)
 %token PIPE
-%token TICKPIPE
-// %token PR
+%token PR
 %token PRED
+%token PRINT
+%token PROOF
 %token PROVER
-%token TIMEOUT
 %token QUESTION
+%token RBRACE
+%token RBRACEHAT
 %token RBRACKET
-// %token RBRACKETLLIMP
-// %token REMOVE
+%token REQUIRE
 %token RES
 %token RETURN
-%token REQUIRE
-// %token USE
-%token RKEY
-%token RKEY_HAT
-// %token ROI
+%token REWRITE
+%token RIGHT
 %token RPAREN
 %token SAME
+%token SAMPLE
+%token SAVE
 %token SEMICOLON
-// %token SET
+%token SIMPLIFY
+%token SKIP
+%token SPLIT
 %token STAR
+%token SUBST
 %token THEN
 %token THEORY
+%token TICKPIPE
 %token TILD
+%token TIMEOUT
+%token TRIVIAL
 %token TYPE
-// %token UNSET
-// %token UPTO
+%token UNDERSCORE
+%token UNDO
 %token USING
 %token VAR
-// %token WHERE
 %token WHILE
-%token WITH
-%token PR
-
-(* Tactics *)
-// %token ABORT
-// %token ALL
-// %token APP
-// %token APRHL
-// %token ASSIGN
-// %token AT
-%token AUTO
-// %token AUTOSYNC
-// %token BACKWARDS
-// %token BY
-// %token CALL
-// %token CASE
-// %token CHECK
-// %token CONDF
-// %token CONDT
-// %token DERANDOMIZE
-// %token EAGER
-// %token EQOBSIN
-// %token FORWARDS
-%token IDTAC
-%token RIGHT
-%token LEFT
-%token TRIVIAL
-%token INTROS
-%token ASSUMPTION
-%token GENERALIZE 
-%token CLEAR
-%token SPLIT
-%token ELIM
-%token ELIMT
-%token CASE
-%token REWRITE
-%token SUBST
-%token SIMPLIFY
-%token DELTA
-%token ZETA 
-%token IOTA 
-%token BETA 
-%token LOGIC
-
-%token CHANGE
-%token APPLY
-// %token IFNEG
-// %token IFSYNC
-// %token INLINE
-// %token LAST
-// %token OPAQUE
-// %token PRHL
-%token PRINT
-// %token RANDOM
-%token SAVE
-// %token SIMPL
-// %token SP
-// %token SPLITWHILE
-// %token SWAP
-// %token TRANSPARENT
-// %token TRY
-%token UNDO
-// %token UNFOLD
-// %token UNROLL
-// %token WP
 %token WHY3
-%token ON
-%token OFF
-
-(* PHL Tactics *)
-%token APP
+%token WITH
 %token WP
-%token SKIP
+%token ZETA 
 
 %token <string> OP1 OP2 OP3 OP4
 %token LTCOLON GT
@@ -308,6 +252,7 @@
 %inline lident: x=loc(LIDENT) { x };
 %inline uident: x=loc(UIDENT) { x };
 %inline tident: x=loc(TIDENT) { x };
+%inline mident: x=loc(MIDENT) { x };
 
 %inline _ident:
 | x=LIDENT { x }
@@ -372,20 +317,20 @@ qident_pbinop:
 ;
 
 (* -------------------------------------------------------------------- *)
-mident1:
+mod_ident1:
 | x=uident
     { (x, []) }
 
-| x=uident LPAREN args=plist1(loc(mident), COMMA) RPAREN
+| x=uident LPAREN args=plist1(loc(mod_qident), COMMA) RPAREN
     { (x, args) }
 ;
 
-%inline mident:
-| x=rlist1(mident1, DOT) { x }
+%inline mod_qident:
+| x=rlist1(mod_ident1, DOT) { x }
 ;
 
 fident:
-| nm=mident DOT x=lident { (nm, x) }
+| nm=mod_qident DOT x=lident { (nm, x) }
 | x=lident { ([], x) }
 ;
 
@@ -404,19 +349,8 @@ fident:
 
 (* -------------------------------------------------------------------- *)
 pside:
-| x=qident {
-    let (qn, id) = x.pl_desc in
-      if qn <> [] then
-        error
-          (EcLocation.make $startpos(x) $endpos(x))
-          "memory names cannot be qualified"
-      else
-        { x with pl_desc = id }
-  }
-
-| x=loc(number) {
-    { x with pl_desc = Printf.sprintf "$%d" x.pl_desc }
-  }
+| x=brace(LIDENT) { x }
+| x=brace(NUM)    { Printf.sprintf "&%d" x }
 ;
 
 (* -------------------------------------------------------------------- *)
@@ -472,7 +406,7 @@ sexp:
     { let id = PEident(mk_loc op.pl_loc EcCoreLib.s_dinter, ti) in
       PEapp(mk_loc op.pl_loc id, [e1; e2]) }
 
-| LKEY n1=number op=loc(COMMA) n2=number RKEY
+| LBRACE n1=number op=loc(COMMA) n2=number RBRACE
     { if   n1 = 0 && n2 = 1
       then PEident (mk_loc op.pl_loc EcCoreLib.s_dbool, None)
       else error (EcLocation.make $startpos $endpos) "malformed bool random" }
@@ -537,7 +471,7 @@ exp:
 | LET p=lpattern EQ e1=loc(exp) IN e2=loc(exp)
    { PElet (p, e1, e2) }
 
-| LKEY n1=number op=loc(COMMA) n2=number RKEY_HAT e=loc(sexp)
+| LBRACE n1=number op=loc(COMMA) n2=number RBRACEHAT e=loc(sexp)
     { if   n1 = 0 && n2 = 1 then 
         let id = PEident(mk_loc op.pl_loc EcCoreLib.s_dbitstring, None) in
         PEapp (mk_loc op.pl_loc id, [e])
@@ -572,19 +506,19 @@ sform:
 | se=loc(sform) DLBRACKET ti=tvars_app? e1=loc(form) LEFTARROW e2=loc(form) RBRACKET
    { pfset (EcLocation.make $startpos $endpos) ti se e1 e2 }
 
-| x=loc(sform) LKEY s=pside RKEY
+| x=loc(sform) s=loc(pside)
    { PFside (x, s) }
 
 | TICKPIPE ti=tvars_app? e =loc(form) PIPE 
     { pfapp_symb e.pl_loc EcCoreLib.s_abs ti [e] }
 
-| LPAREN es=form_list2 RPAREN
+| LPAREN es=plist2(loc(form), COMMA) RPAREN
    { PFtuple es }
 
 | LPAREN e=form RPAREN
    { e }
 
-| LBRACKET ti=tvars_app? es=loc(p_form_sm_list0) RBRACKET
+| LBRACKET ti=tvars_app? es=loc(plist0(loc(form), SEMICOLON)) RBRACKET
    { (pflist es.pl_loc ti es.pl_desc).pl_desc }
 
 | HOARE LBRACKET
@@ -595,14 +529,13 @@ sform:
 | EQUIV LBRACKET eb=equiv_body RBRACKET { eb }
 
 | PR LBRACKET
-    mp=loc(fident) args=paren(plist0(loc(sform), COMMA))
-    AT LKEY pn=pside RKEY
+    mp=loc(fident) args=paren(plist0(loc(sform), COMMA)) AT pn=mident
     COLON event=loc(form)
   RBRACKET
 
     { PFprob (mp, args, pn, event) }
 
-| LKEY n1=number op=loc(COMMA) n2=number RKEY
+| LBRACE n1=number op=loc(COMMA) n2=number RBRACE
     { if   n1 = 0 && n2 = 1
       then PFident (mk_loc op.pl_loc EcCoreLib.s_dbool, None)
       else error (EcLocation.make $startpos $endpos) "malformed bool random" }
@@ -615,7 +548,7 @@ sform:
 form:
 | e=sform { e }
 
-| e=loc(sform) args=sform_list1 { PFapp (e, args) } 
+| e=loc(sform) args=loc(sform)+ { PFapp (e, args) } 
 
 | op=loc(NOT) ti=tvars_app? e=loc(form) 
     { pfapp_symb  op.pl_loc "!" ti [e] }
@@ -667,7 +600,7 @@ form:
 | LAMBDA pd=pgtybindings COMMA e=loc(form) { PFlambda (pd, e) }
 
 (* Distribution *)
-| LKEY n1=number op=loc(COMMA) n2=number RKEY_HAT e=loc(sform)
+| LBRACE n1=number op=loc(COMMA) n2=number RBRACEHAT e=loc(sform)
     { if n1 = 0 && n2 = 1 then 
         let id =
           PFident (mk_loc op.pl_loc EcCoreLib.s_dbitstring, None)
@@ -684,10 +617,6 @@ equiv_body:
   COLON pre=loc(form) LONGARROW post=loc(form)
 
     { PFequivF (pre, (mp1, mp2), post) }
-
-%inline p_form_sm_list0: aout=plist0(loc(form), SEMICOLON) { aout }
-%inline form_list2: aout=plist2(loc(form), COMMA) { aout }
-%inline sform_list1: aout=plist1(loc(sform), empty) { aout }
 
 %inline pgty_varty:
 | x=ident COLON ty=loc(type_exp) { (x, ty) }
@@ -706,7 +635,7 @@ pgtybinding1:
 | x=ident
     { List.map (fun x -> (x, PGTY_Type (mk_loc x.pl_loc PTunivar))) [x] }
 
-| LKEY pn=pside RKEY
+| pn=mident
     { [(pn, PGTY_Mem)] }
 ;
 
@@ -783,15 +712,22 @@ base_instr:
 ;
 
 instr:
-| bi=base_instr SEMICOLON                            { bi }
-| IF LPAREN c=loc(exp) RPAREN b1=block ELSE b2=block { PSif (c, b1, b2) }
-| IF LPAREN c=loc(exp) RPAREN b =block               { PSif (c, b , []) }
-| WHILE LPAREN c=loc(exp) RPAREN b=block             { PSwhile (c, b) }
+| bi=base_instr SEMICOLON
+   { bi }
+
+| IF LPAREN c=loc(exp) RPAREN b1=block ELSE b2=block
+   { PSif (c, b1, b2) }
+
+| IF LPAREN c=loc(exp) RPAREN b=block
+   { PSif (c, b , []) }
+
+| WHILE LPAREN c=loc(exp) RPAREN b=block
+   { PSwhile (c, b) }
 ;
 
 block:
 | i=base_instr SEMICOLON { [i] }
-| LKEY stmt=stmt RKEY    { stmt }
+| stmt=brace(stmt)       { stmt }
 ;
 
 stmt: aout=instr* { aout }
@@ -818,7 +754,7 @@ ret_stmt:
 ;
 
 fun_def_body:
-| LKEY decl=loc_decl* s=stmt rs=ret_stmt RKEY
+| LBRACE decl=loc_decl* s=stmt rs=ret_stmt RBRACE
     { { pfb_locals = decl;
         pfb_body   = s   ;
         pfb_return = rs  ; }
@@ -858,7 +794,7 @@ mod_body:
 | m=qident LPAREN a=plist1(qident, COMMA) RPAREN
     { `App (m, a) }
 
-| LKEY stt=mod_item* RKEY
+| LBRACE stt=mod_item* RBRACE
     { `Struct stt }
 ;
 
@@ -869,10 +805,10 @@ mod_def:
         | `App (m, args) ->
              if p <> [] then
                error (EcLocation.make $startpos $endpos)
-                 "cannot parameterized module aliase";
+                 "cannot parameterized module alias";
              if t <> None then
                error (EcLocation.make $startpos $endpos)
-                 "cannot bind module type to module aliase";
+                 "cannot bind module type to module alias";
              (x, Pm_ident (m, args))
 
         | `Struct st ->
@@ -908,7 +844,7 @@ sig_body:
 ;
 
 sig_struct_body:
-| LKEY ty=signature_item* RKEY
+| LBRACE ty=signature_item* RBRACE
     { ty }
 ;
 
@@ -937,7 +873,7 @@ ifun_decl:
         pfd_uses     = None; }
     }
 
-| x=lident pd=param_decl COLON ty=loc(type_exp) LKEY us=qident* RKEY
+| x=lident pd=param_decl COLON ty=loc(type_exp) us=brace(qident*)
     { { pfd_name     = x      ;
         pfd_tyargs   = pd     ;
         pfd_tyresult = ty     ;
@@ -977,9 +913,14 @@ type_decl_or_def:
 (* Operator definitions                                                 *)
 
 op_tydom:
-| LPAREN RPAREN                                  { [  ] }
-| ty=loc(simpl_type_exp)                          { [ty] }
-| LPAREN tys=plist2(loc(type_exp), COMMA) RPAREN { tys  }
+| LPAREN RPAREN
+    { [  ] }
+
+| ty=loc(simpl_type_exp)
+   { [ty] }
+
+| tys=paren(plist2(loc(type_exp), COMMA))
+   { tys  }
 ;
 
 op_sig:
@@ -1030,30 +971,29 @@ operator:
 ;
 
 predicate:
-| PRED x = op_ident { 
-  { pp_name = x;
-    pp_tyvars = None;
-    pp_dom = None;
-    pp_body = None; }
-  }
-| PRED x = op_ident tyvars=tyvars_decl COLON sty = op_tydom { 
-  { pp_name = x;
-    pp_tyvars = tyvars;
-    pp_dom = Some sty;
-    pp_body = None;
-  } }
-| PRED x = op_ident tyvars=tyvars_decl EQ f=loc(form) {
-  { pp_name = x;
-    pp_tyvars = tyvars;
-    pp_dom = None;
-    pp_body = Some([], f) }
-  }
-| PRED x = op_ident tyvars=tyvars_decl params=param_decl1 EQ f=loc(form) { 
-  { pp_name = x;
-    pp_tyvars = tyvars;
-    pp_dom = Some(List.map snd params);
-    pp_body =Some(List.map fst params, f) }
-  }
+| PRED x = op_ident
+   { { pp_name = x;
+       pp_tyvars = None;
+       pp_dom = None;
+       pp_body = None; } }
+
+| PRED x = op_ident tyvars=tyvars_decl COLON sty = op_tydom
+   { { pp_name = x;
+       pp_tyvars = tyvars;
+       pp_dom = Some sty;
+       pp_body = None; } }
+
+| PRED x = op_ident tyvars=tyvars_decl EQ f=loc(form)
+   { { pp_name = x;
+       pp_tyvars = tyvars;
+       pp_dom = None;
+       pp_body = Some([], f) } }
+
+| PRED x = op_ident tyvars=tyvars_decl params=param_decl1 EQ f=loc(form)
+   { { pp_name = x;
+       pp_tyvars = tyvars;
+       pp_dom = Some(List.map snd params);
+       pp_body =Some(List.map fst params, f) } }
 ;
 
 (* -------------------------------------------------------------------- *)
@@ -1129,31 +1069,26 @@ renaming:
 (* -------------------------------------------------------------------- *)
 (* tactic                                                               *)
 
-assumption_args:
-| empty                   { None  , None }
-| p=qident tvi=tvars_app? { Some p, tvi }
-;
-
 underscore_or_ident:
 | UNDERSCORE { None }
 | s=_ident   { Some s }
 ;
 
-intro_args: l=plist1(loc(underscore_or_ident),empty) { l };
+intro_args: l=loc(underscore_or_ident)+ { l };
 
-elim_arg :
+elim_arg:
 | UNDERSCORE        { EA_none }
 | f=loc(sform)      { EA_form f }
-| LKEY s=pside RKEY { EA_mem s }
+| s=mident          { EA_mem s }
 ;
 
 exists_args: l=plist1(loc(elim_arg), COMMA) { l };
-
 
 elim_kind:
 | p=qident tvi=tvars_app?           { ElimHyp(p,tvi)  }
 | COLON LPAREN f=loc(form) RPAREN   { ElimForm f }
 ;
+
 elim_args:
 | empty { [] }
 | LPAREN l=plist1(loc(elim_arg), COMMA) RPAREN { l }
@@ -1163,55 +1098,106 @@ elim:
 | k=elim_kind a=elim_args  { { elim_kind = k; elim_args = a } } 
 ;
 
-simplify_arg : 
-| DELTA l=plist0(qident,empty) { `Delta l }
-| ZETA                         { `Zeta }
-| IOTA                         { `Iota }
-| BETA                         { `Beta }
-| LOGIC                        { `Logic }
+simplify_arg: 
+| DELTA l=qident* { `Delta l }
+| ZETA            { `Zeta }
+| IOTA            { `Iota }
+| BETA            { `Beta }
+| LOGIC           { `Logic }
 ;
-simplify :
+
+simplify:
 | l=plist1(simplify_arg,empty)    { l }
 | SIMPLIFY                        { simplify_red }
 | SIMPLIFY l=plist1(qident,empty) { `Delta l :: simplify_red  }
 | SIMPLIFY DELTA                  { `Delta [] :: simplify_red }
 ;
 
-rwside :
-| LEFTARROW                    { false }
-| ARROW                        { true }
-| empty                        { true }
+rwside:
+| LEFTARROW { false }
+| ARROW     { true }
+| empty     { true }
 ;
 
 tactic:
-| IDTAC                         { Pidtac }
-| ASSUMPTION a=assumption_args  { Passumption a } 
-| GENERALIZE l=plist1(loc(sform), empty) {Pgeneralize l } 
-| CLEAR l=plist1(ident, empty)  { Pclear l }
-| TRIVIAL pi=prover_info        { Ptrivial pi }
-| INTROS a=intro_args           { Pintro a }
-| SPLIT                         { Psplit }
-| EXIST a=exists_args           { Pexists a }
-| LEFT                          { Pleft }
-| RIGHT                         { Pright }
-| ELIM e=elim                   { Pelim e }
-| APPLY e=elim                  { Papply e }
-| l=simplify                    { Psimplify (mk_simplify l) }
-| CHANGE f=loc(sform)           { Pchange f }
-| REWRITE s=rwside e=elim       { Prewrite (s,e) }
-| SUBST l=plist0(ident, empty)  { Psubst l }
-| ELIMT p=qident f=loc(sform)   { PelimT(f,p) }
-| CASE  f=loc(sform)            { Pcase f }
-| LPAREN s=tactics RPAREN       { Pseq s } 
+| IDTAC
+    { Pidtac }
+
+| ASSUMPTION
+    { Passumption (None, None) }
+
+| ASSUMPTION p=qident tvi=tvars_app?
+   { Passumption (Some p, tvi) } 
+
+| GENERALIZE l=loc(sform)+
+   { Pgeneralize l } 
+
+| CLEAR l=ident+
+   { Pclear l }
+
+| TRIVIAL pi=prover_info
+   { Ptrivial pi }
+
+| INTROS a=intro_args
+   { Pintro a }
+
+| SPLIT
+    { Psplit }
+
+| EXIST a=exists_args
+   { Pexists a }
+
+| LEFT
+    { Pleft }
+
+| RIGHT
+    { Pright }
+
+| ELIM e=elim
+   { Pelim e }
+
+| APPLY e=elim
+   { Papply e }
+
+| l=simplify
+   { Psimplify (mk_simplify l) }
+
+| CHANGE f=loc(sform)
+   { Pchange f }
+
+| REWRITE s=rwside e=elim
+   { Prewrite (s, e) }
+
+| SUBST l=ident*
+   { Psubst l }
+
+| ELIMT p=qident f=loc(sform)
+   { PelimT (f, p) }
+
+| CASE f=loc(sform)
+   { Pcase f }
+
+| LPAREN s=tactics RPAREN
+   { Pseq s } 
+
+| ADMIT
+    { Padmit }
+
+| CUT n=ident COLON p=loc(sform)
+   { Pcut (n, p) }
+
 (* PHL tactics *)
-| APP n=number p=loc(sform)     { PPhl( Papp(n,p) ) }
-| WP  n=number                  { PPhl( Pwp n) }
-| WP                            { PPhl( Pwp 0) }
-| SKIP                          { PPhl(Pskip) }
+| APP n=number p=loc(sform)
+   { PPhl( Papp(n,p) ) }
+
+| WP n=number?
+   { PPhl (Pwp (odfl 0 n)) }
+
+| SKIP
+    { PPhl Pskip }
+
 | WHILE inv=loc(sform) vrnt=loc(sform) bnd=loc(sform)
-                                { PPhl(Pwhile(inv,vrnt,bnd)) }
-| ADMIT                         { Padmit }
-| CUT n=ident COLON p=loc(sform){ Pcut (n,p) }
+   { PPhl (Pwhile (inv, vrnt, bnd)) }
 ;
 
 tactics:
@@ -1375,14 +1361,19 @@ __rlist1(X, S):                         (* left-recursive *)
 ;
 
 (* -------------------------------------------------------------------- *)
+%inline paren(X):
+| LPAREN x=X RPAREN { x }
+;
+
+%inline brace(X):
+| LBRACE x=X RBRACE { x }
+;
+
+(* -------------------------------------------------------------------- *)
 %inline loc(X):
 | x=X {
     { pl_desc = x;
       pl_loc  = EcLocation.make $startpos $endpos;
     }
   }
-;
-
-%inline paren(X):
-| LPAREN x=X RPAREN { x }
 ;
