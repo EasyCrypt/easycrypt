@@ -1,0 +1,38 @@
+\documentclass[a4paper,notitlepage]{book}
+
+\makeindex
+
+\usepackage{xspace}
+\usepackage{makeidx}
+
+\newcommand{\EC}{\textsc{EasyCrypt}\xspace}
+\newcommand{\ECversion}{0.$\beta$\xspace}
+
+\newcommand{\pRHL}{\mathsf{pRHL}\xspace}
+
+\title{\EC Manual}
+\date{Version \ECversion --- \today}
+\author{The \EC Team}
+
+\begin{document}
+\maketitle
+
+\tableofcontents
+
+\part{User Manual}
+% Getting Started: Installation and Basic Usage (updated ElGamal?)
+\input{started}
+% Theories: Types and Operators, Modules, and Cloning
+\input{theories}
+% Tactics: First-Order and pRHL Tactics
+\input{tactics}
+% Libraries
+\input{libs}
+% Examples
+\input{examples}
+
+\part{Language Reference}
+
+\printindex
+
+\end{document}

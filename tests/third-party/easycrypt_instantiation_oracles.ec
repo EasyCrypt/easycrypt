@@ -16,10 +16,9 @@ cnst gDistr: group distr.
 type t.
 
 (* TODO: Once type-checking is fixed for this, fold the two clones into one *)
-clone RandOrcl as RO' with
+clone RandOrcl as RO with
   type from = t,
-  type to = group.
-clone RO' as RO with
+  type to = group,
   cnst default = g.
 import RO. (* Maybe we should let users "clone import X as Y"? *)
 
@@ -76,8 +75,8 @@ require import Real.
 cnst epsilon: real.
 
 axiom Adv_def: forall {m} (A <: Adversary),
-  `| Pr[ main() @ Experiment(H,F,A), {m}: res ] -
-     Pr[ main() @ Experiment(H,R,A), {m}: res ] | <= epsilon.
+  `| Pr[ Experiment(H,F,A).main() @ {m}: res ] -
+     Pr[ Experiment(H,R,A).main() @ {m}: res ] | <= epsilon.
 
 (*
 adversary type B = {
