@@ -1,4 +1,4 @@
-; Generated on Mon Feb  4 16:25:23 2013
+; Generated on Wed Mar 27 12:36:04 2013
 
 (defvar easycrypt-dangerous-keywords '(
   "admit"
@@ -27,11 +27,21 @@
   "Pr"
   "clone"
   "with"
+  "prover"
+  "checkproof"
+  "timeout"
+  "on"
+  "off"
+))
+
+(defvar easycrypt-internal-keywords '(
+  "undo"
 ))
 
 (defvar easycrypt-prog-keywords '(
   "forall"
   "exists"
+  "lambda"
   "let"
   "in"
   "var"
@@ -42,6 +52,9 @@
   "while"
   "assert"
   "return"
+  "res"
+  "equiv"
+  "hoare"
 ))
 
 (defvar easycrypt-tactic-keywords '(
@@ -57,6 +70,24 @@
   "elim"
   "apply"
   "trivial"
+  "cut"
+  "generalize"
+  "clear"
+  "simplify"
+  "delta"
+  "zeta"
+  "beta"
+  "iota"
+  "logic"
+  "change"
+  "elimT"
+  "case"
+  "rewrite"
+  "subst"
+  "app"
+  "wp"
+  "skip"
+  "while"
 ))
 
 (provide 'easycrypt-keywords)
