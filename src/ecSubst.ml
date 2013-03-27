@@ -99,12 +99,12 @@ and subst_modsig_body (s : _subst) (sbody : module_sig_body) =
 
 (* -------------------------------------------------------------------- *)
 and subst_modsig (s : _subst) (comps : module_sig) =
-  { mt_params = comps.mt_params;
-    mt_body   = subst_modsig_body s comps.mt_body;
-    mt_mforb  = 
+  { mis_params = comps.mis_params;
+    mis_body   = subst_modsig_body s comps.mis_body;
+    mis_mforb  = 
       Sp.fold
         (fun p mf -> Sp.add (s.s_p p) mf)
-        comps.mt_mforb Sp.empty; }
+        comps.mis_mforb Sp.empty; }
 
 (* -------------------------------------------------------------------- *)
 let subst_function_def (s : _subst) (def : function_def) =
@@ -149,31 +149,33 @@ and subst_module_items (s : _subst) (items : module_item list) =
 (* -------------------------------------------------------------------- *)
 and subst_module_struct (s : _subst) (bstruct : module_structure) =
   let sbody, newparams =
-    if bstruct.ms_params = [] then s, []
+    if bstruct.ms_params = [] then (s, [])
     else
-      let s, newparams = 
+      let (s, newparams) =
         List.map_fold
           (fun (s : subst) (a, aty) ->
-            let a' = EcIdent.fresh a in
-            let decl = a', EcPath.p_subst s.sb_path aty in
-            add_module s a (EcPath.mident a'), decl)
-          s.s_s bstruct.ms_params in
-      _subst_of_subst s, newparams
+            let a'   = EcIdent.fresh a in
+            let decl = (a', subst_modtype (_subst_of_subst s) aty) in
+              add_module s a (EcPath.mident a'), decl)
+          s.s_s bstruct.ms_params
+      in
+        (_subst_of_subst s, newparams)
   in
-  sbody, { ms_params = newparams;
-           ms_body   = subst_module_items sbody bstruct.ms_body; }
+    (sbody, { ms_params = newparams;
+              ms_body   = subst_module_items sbody bstruct.ms_body; })
 
 (* -------------------------------------------------------------------- *)
 and subst_module_body (s : _subst) (body : module_body) =
   match body with
-  | ME_Alias m -> s, ME_Alias (s.s_fmp m)
+  | ME_Alias m ->
+      s, ME_Alias (s.s_fmp m)
 
   | ME_Structure bstruct ->
       let s, bstruct = subst_module_struct s bstruct in
       s, ME_Structure bstruct
 
   | ME_Decl p ->
-      s, ME_Decl (s.s_p p)
+      s, ME_Decl (subst_modtype s p)
 
 (* -------------------------------------------------------------------- *)
 and subst_module_comps (s : _subst) (comps : module_comps) =
@@ -181,18 +183,20 @@ and subst_module_comps (s : _subst) (comps : module_comps) =
 
 (* -------------------------------------------------------------------- *)
 and subst_module (s : _subst) (m : module_expr) =
-  let s, body'  = subst_module_body s m.me_body in
-  let comps' = subst_module_comps s m.me_comps in
-  let types' = List.map s.s_p m.me_types in
+  let s, body' = subst_module_body s m.me_body in
+  let comps'   = subst_module_comps s m.me_comps in
+  let types'   = List.map (subst_modtype s) m.me_types in
+
   { m with
-    me_body  = body'   ;
-    me_comps = comps'  ;
-    me_uses  = Sp.empty;              (* FIXME *)
-    me_types = types'  ; }
+      me_body  = body'   ;
+      me_comps = comps'  ;
+      me_uses  = Sp.empty;              (* FIXME *)
+      me_types = types'  ; }
 
 (* -------------------------------------------------------------------- *)
 and subst_modtype (s : _subst) (modty : module_type) =
-  s.s_p modty
+  { mt_name = s.s_p modty.mt_name;
+    mt_args = omap modty.mt_args (List.map s.s_fmp); }
 
 (* -------------------------------------------------------------------- *)
 let init_tparams (s : _subst) params params' = 

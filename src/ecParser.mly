@@ -322,10 +322,10 @@ qident_pbinop:
 (* -------------------------------------------------------------------- *)
 mod_ident1:
 | x=uident
-    { (x, []) }
+    { (x, None) }
 
 | x=uident LPAREN args=plist1(loc(mod_qident), COMMA) RPAREN
-    { (x, args) }
+    { (x, Some args) }
 ;
 
 %inline mod_qident:

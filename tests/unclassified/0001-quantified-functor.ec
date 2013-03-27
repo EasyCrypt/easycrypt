@@ -17,4 +17,4 @@ module G(X:I) = {
 }.
 
 cnst c:real.
-axiom A: forall {m} (M <: I), Pr[ f() @ G(M), {m}: res ] = c.
+axiom A: forall &m (M <: I), Pr[ G(M).f() @ &m : res ] = c.

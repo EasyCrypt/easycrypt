@@ -52,8 +52,8 @@ val cth_dump : ctheory -> dnode
 
 
 (* -------------------------------------------------------------------- *)
-val module_comps_of_module_sig_comps :
+val module_comps_of_module_sig_comps:
   module_sig_body -> module_item list
 
-val module_expr_of_module_sig : EcIdent.t ->
-  module_type -> module_sig -> module_expr
+val module_expr_of_module_sig:
+  EcIdent.t -> module_type -> module_sig -> module_expr

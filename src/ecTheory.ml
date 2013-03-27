@@ -127,7 +127,7 @@ let module_comps_of_module_sig_comps (comps : module_sig_body) =
 (* -------------------------------------------------------------------- *)
 let module_expr_of_module_sig (name : EcIdent.t) mp (tymod : module_sig) =
 
-  let tycomps = module_comps_of_module_sig_comps tymod.mt_body in
+  let tycomps = module_comps_of_module_sig_comps tymod.mis_body in
 
     { me_name  = EcIdent.name name;
       me_body  = ME_Decl mp;

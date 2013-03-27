@@ -12,7 +12,7 @@ let dummy_pqs_of_ps s = dummyloc (qsymb_of_symb (unloc s))
 (* -------------------------------------------------------------------- *)
 type psymbol  = symbol  located
 type pqsymbol = qsymbol located
-type pmsymbol = (psymbol * (pmsymbol located) list) list
+type pmsymbol = (psymbol * ((pmsymbol located) list) option) list
 type posymbol = symbol option located
 
 type pty = pty_r located                (* located type *)

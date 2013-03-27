@@ -218,7 +218,10 @@ module Dump = struct
           (fun pp -> dump_amc ~name:"Root" pp env.env_current);
           (fun pp ->
              Mp.dump ~name:"Components"
-               (fun k _ -> EcPath.tostring k)
+               (fun k mc ->
+                 Printf.sprintf "%s (%d)"
+                   (EcPath.tostring k)
+                   (List.length mc.mc_parameters))
                (fun pp (_, mc) ->
                   dump_premc ~name:"Component" pp mc)
                pp env.env_comps)
@@ -485,7 +488,7 @@ module MC = struct
   (* ------------------------------------------------------------------ *)
   let mc_of_module (env : env) (me : module_expr) =
     let rec mc_of_module (scope : EcPath.mpath) (me : module_expr) =
-      let params   = me.me_sig.mt_params in
+      let params   = me.me_sig.mis_params in
       let params   = List.map (fun (x, _) -> EcPath.mident x) params in
       let subscope = EcPath.mqname scope EcPath.PKmodule me.me_name params in
       let xpath = fun k x -> EcPath.mqname subscope k x [] in
@@ -512,7 +515,7 @@ module MC = struct
 
       let mc, submcs =
         List.map_fold mc1_of_module
-          (empty_premc me.me_sig.mt_params)
+          (empty_premc me.me_sig.mis_params)
           me.me_comps
       in
         ((me.me_name, mc), List.prmap (fun x -> x) submcs)
@@ -1040,7 +1043,6 @@ module Op = struct
 end
 
 (* -------------------------------------------------------------------- *)
-
 module Ax = struct
   module Px = MC.Px
 
@@ -1146,7 +1148,23 @@ module Mod = struct
 
   let bind_local name modty env =
     let modsig =
-      check_not_suspended (MC.lookup_by_path Px.for_modtype.Px.px_premc modty env)
+      let modsig =
+        check_not_suspended
+          (MC.lookup_by_path
+             Px.for_modtype.Px.px_premc modty.mt_name env)
+      in
+        match modty.mt_args with
+        | None -> modsig
+        | Some args -> begin
+          assert (List.length modsig.mis_params = List.length args);
+          let subst =
+            List.fold_left2
+              (fun s (mid, _) arg ->
+                EcSubst.add_module s mid arg)
+              EcSubst.empty modsig.mis_params args
+          in
+            { (EcSubst.subst_modsig subst modsig) with mis_params = []; }
+        end
     in
 
     let me    = module_expr_of_module_sig name modty modsig in
@@ -1236,8 +1254,20 @@ module ModTy = struct
     let obj = by_path path env in 
     MC.import Px.for_modtype env (EcPath.mpath_of_path path) obj
 
-  let mod_type_equiv (_ : env) (mty1 : module_type) (mty2 : module_type) =
-    EcPath.p_equal mty1 mty2
+  let mtype_string (m : module_type) =
+    Printf.sprintf "%s(%s)"
+      (EcPath.tostring m.mt_name)
+      (String.concat ", " (List.map EcPath.m_tostring (odfl [] m.mt_args)))
+
+  let mod_type_equiv (env : env) (mty1 : module_type) (mty2 : module_type) =
+       (EcPath.p_equal mty1.mt_name mty2.mt_name)
+    && oall2
+         (List.all2
+            (fun m1 m2 ->
+               let m1 = Mod.unfold_mod_path env m1 in
+               let m2 = Mod.unfold_mod_path env m2 in
+                 EcPath.m_equal m1 m2))
+         mty1.mt_args mty2.mt_args
 
   let has_mod_type (env : env) (dst : module_type list) (src : module_type) =
     List.exists (mod_type_equiv env src) dst
@@ -1522,7 +1552,7 @@ let norm_form env =
   let norm_form = 
     EcFol.Hf.memo_rec 107 (fun aux f ->
       match f.f_node with
-      | Fquant(q,bd,f) ->
+      | Fquant(q,bd,f) ->               (* FIXME: norm module_type *)
           f_quant q bd (aux f)
 
       | Fpvar(p,m) -> 
@@ -1675,11 +1705,4 @@ let t_apply env app_f app_args (juc,_ as g) =
   let juc, s, f = process_app_f juc app_f in
   foo
 (* (A => B) => A => B *)
-    
-  
-
-
-
-
-
-  *)
+*)

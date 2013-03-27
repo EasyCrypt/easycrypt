@@ -507,7 +507,9 @@ let lookup_module_type (env : EcEnv.env) (name : pqsymbol) =
 
 (* -------------------------------------------------------------------- *)
 let transmodtype (env : EcEnv.env) (modty : pmodule_type) =
-  lookup_module_type env modty
+  let (p, sig_) = lookup_module_type env modty in
+  let modty = { mt_name = p; mt_args = None; } in
+    (modty, sig_)
 
 (* -------------------------------------------------------------------- *)
 let rec transmodsig (env : EcEnv.env) (name : symbol) (modty : pmodule_sig) =
@@ -521,9 +523,9 @@ let rec transmodsig (env : EcEnv.env) (name : symbol) (modty : pmodule_sig) =
 
   let env = EcEnv.Mod.enter name margs env in
 
-    { mt_params = margs;
-      mt_body   = transmodsig_body env modty.pmsig_body;
-      mt_mforb  = Sp.empty; }           (* FIXME *)
+    { mis_params = margs;
+      mis_body   = transmodsig_body env modty.pmsig_body;
+      mis_mforb  = Sp.empty; }           (* FIXME *)
 
 (* -------------------------------------------------------------------- *)
 and transmodsig_body (env : EcEnv.env) (is : pmodule_sig_struct_body) =
@@ -585,7 +587,7 @@ let rec check_tymod_cnv mode (env : EcEnv.env) tin tout =
    * different, hence, substitute in [tin.tym_params] types the names
    * of [tout.tym_params] *)
   
-  if List.length tin.mt_params <> List.length tout.mt_params then
+  if List.length tin.mis_params <> List.length tout.mis_params then
     tymod_cnv_failure E_TyModCnv_ParamCountMismatch;
 
   let bsubst =
@@ -597,7 +599,7 @@ let rec check_tymod_cnv mode (env : EcEnv.env) tin tout =
               tymod_cnv_failure (E_TyModCnv_ParamTypeMismatch xin)
           end;
           EcSubst.add_module subst xout (EcPath.mident xin))
-      EcSubst.empty tin.mt_params tout.mt_params
+      EcSubst.empty tin.mis_params tout.mis_params
   in
     (* Check for body inclusion (w.r.t the parameters names substitution).
      * This includes:
@@ -605,8 +607,8 @@ let rec check_tymod_cnv mode (env : EcEnv.env) tin tout =
      *   included use modifiers.
      * - Inclusion of forbidden names set *)
 
-  let tin  = EcSubst.subst_modsig_body bsubst tin.mt_body
-  and tout = tout.mt_body in
+  let tin  = EcSubst.subst_modsig_body bsubst tin.mis_body
+  and tout = tout.mis_body in
 
   let check_item_compatible =
     let check_var_compatible vdin vdout = 
@@ -701,7 +703,7 @@ let rec transmod (env : EcEnv.env) (x : symbol) (m : pmodule_expr) =
   | Pm_ident ({ pl_desc = m }, args) -> begin
       let (mname, mty) = EcEnv.Mod.lookup m env in
       let args = List.map (EcEnv.Mod.lookup^~ env) (unlocs args) in
-      let atymods = mty.me_sig.mt_params in
+      let atymods = mty.me_sig.mis_params in
 
       (* Check module application *)
       if List.length atymods <> List.length args then
@@ -722,9 +724,9 @@ let rec transmod (env : EcEnv.env) (x : symbol) (m : pmodule_expr) =
           me_body  = ME_Alias (EcPath.m_apply mname (List.map fst args));
           me_comps = EcSubst.subst_module_comps bsubst mty.me_comps;
           me_sig   = {
-            mt_params = [];
-            mt_body   = EcSubst.subst_modsig_body bsubst mty.me_sig.mt_body;
-            mt_mforb  = Sp.empty;       (* FIXME *)
+            mis_params = [];
+            mis_body   = EcSubst.subst_modsig_body bsubst mty.me_sig.mis_body;
+            mis_mforb  = Sp.empty;       (* FIXME *)
           };
           me_uses  = Sp.empty;          (* FIXME *)
           me_types = if args = [] then mty.me_types else []; }
@@ -773,9 +775,9 @@ and transstruct (env : EcEnv.env) (x : symbol) (st : pstructure) =
     in
 
     let sigitems = List.pmap tymod1 (List.map snd items) in
-      { mt_params = stparams;
-        mt_body   = sigitems;
-        mt_mforb  = Sp.empty; };    (* FIXME *)
+      { mis_params = stparams;
+        mis_body   = sigitems;
+        mis_mforb  = Sp.empty; };    (* FIXME *)
   in
 
   (* Check that generated signature is structurally included in
@@ -1012,16 +1014,16 @@ let rec trans_msymbol (env : EcEnv.env) (msymb : pmsymbol) =
 
   let mod_expr   = mod_expr.EcEnv.sp_target
   and mod_params =
-       mod_expr.EcEnv.sp_target.me_sig.mt_params
+       mod_expr.EcEnv.sp_target.me_sig.mis_params
     :: mod_expr.EcEnv.sp_params
   and mod_args   =
        List.rev_append
-         (List.map snd msymb)
+         (List.map (fun (_, a) -> odfl [] a) msymb)
          (List.create
             (EcPath.p_size (EcPath.path_of_mpath mod_path)
                - List.length msymb)
-            [])
-  in
+            []) in
+  let ndots = List.length mod_args in
 
   let mod_args =
     List.map
@@ -1031,15 +1033,17 @@ let rec trans_msymbol (env : EcEnv.env) (msymb : pmsymbol) =
           args)
       mod_args
   in
-    List.iter2
-      (fun param arg ->
-         if List.length param <> List.length arg then
-           tyerror dloc ModApplInvalidArity;
-         List.iter2
-           (fun (_, p) (_, a) ->
-              if not (EcEnv.ModTy.has_mod_type env a p) then
-                tyerror dloc ModApplInvalidArgInterface)
-           param arg)
+    List.iter2i
+      (fun i param arg ->
+         if i < ndots-1 && arg <> [] then begin
+           if List.length param <> List.length arg then
+             tyerror dloc ModApplInvalidArity;
+           List.iter2
+             (fun (_, p) (_, a) ->
+               if not (EcEnv.ModTy.has_mod_type env a p) then
+                 tyerror dloc ModApplInvalidArgInterface)
+             param arg
+         end)
       mod_params mod_args;
 
     let aout =
@@ -1048,9 +1052,20 @@ let rec trans_msymbol (env : EcEnv.env) (msymb : pmsymbol) =
         mod_path.EcPath.m_kind
         (List.map (List.map fst) mod_args)
     in
-      (aout, if   mod_expr.me_sig.mt_params = []
-             then mod_expr.me_types
-             else [])
+
+    let me_types =
+      let a =
+        match List.map fst (List.last mod_args) with
+        | [] -> None | a -> Some a
+      in
+        List.map
+          (fun mty ->
+            match mty.mt_args with
+            | Some _ -> mty
+            | None   -> { mty with mt_args = a })
+        mod_expr.me_types
+    in
+      (aout, me_types)
 
 (* -------------------------------------------------------------------- *)
 and trans_gamepath (env : EcEnv.env) gp =
@@ -1291,6 +1306,7 @@ let transform_opt env ue pf tt =
   
 let transform env ue pf ty =
   transform_opt env ue pf (Some ty)
+
 (* -------------------------------------------------------------------- *)
 let transformula env ue pf = 
   transform env ue pf tbool

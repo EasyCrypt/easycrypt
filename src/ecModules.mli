@@ -81,12 +81,15 @@ type variable = {
   v_type : EcTypes.ty;
 }
 
-type module_type = EcPath.path
+type module_type = {
+  mt_name : EcPath.path;
+  mt_args : (EcPath.mpath list) option;
+}
 
 type module_sig = {
-  mt_params : (EcIdent.t * module_type) list;
-  mt_body   : module_sig_body;
-  mt_mforb  : EcPath.Sp.t;
+  mis_params : (EcIdent.t * module_type) list;
+  mis_body   : module_sig_body;
+  mis_mforb  : EcPath.Sp.t;
 }
 
 and module_sig_body = module_sig_body_item list
@@ -141,8 +144,6 @@ and function_def = {
   f_body   : stmt;
   f_ret    : EcTypes.expr option;
 }
-
-
 
 (* -------------------------------------------------------------------- *)
 val fd_equal : function_def -> function_def -> bool

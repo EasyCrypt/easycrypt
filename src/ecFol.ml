@@ -79,15 +79,27 @@ let qt_hash = function
 
 let gty_equal ty1 ty2 =
   match ty1, ty2 with
-  | GTty    ty1, GTty   ty2 -> EcTypes.ty_equal ty1 ty2
-  | GTmodty p1, GTmodty p2  -> EcPath.p_equal p1 p2
-  | GTmem     , GTmem       -> true
-  | _         , _           -> false
+  | GTty ty1, GTty ty2 ->
+      EcTypes.ty_equal ty1 ty2
+
+  | GTmodty p1, GTmodty p2  ->
+       (EcPath.p_equal p1.mt_name p2.mt_name)
+    && (oall2 (List.all2 EcPath.m_equal) p1.mt_args p2.mt_args)
+
+  | GTmem, GTmem -> true
+
+  | _ , _ -> false
 
 let gty_hash = function
-  | GTty    ty -> Why3.Hashcons.combine (EcTypes.ty_hash ty) 0
-  | GTmodty p  -> Why3.Hashcons.combine (EcPath.p_hash   p ) 1
-  | GTmem      -> Hashtbl.hash GTmem
+  | GTty ty ->
+      EcTypes.ty_hash ty
+
+  | GTmodty p  ->
+      Why3.Hashcons.combine_option
+        (Why3.Hashcons.combine_list EcPath.m_hash (EcPath.p_hash p.mt_name))
+        p.mt_args
+
+  | GTmem -> Hashtbl.hash GTmem
 
 let b_equal (b1 : binding) (b2 : binding) =
   let b1_equal (x1, ty1) (x2, ty2) = 
@@ -211,6 +223,7 @@ module Hsform = Why3.Hashcons.Make (struct
         Why3.Hashcons.combine3
           (f_hash pre) (f_hash post)
           (EcPath.m_hash mp1) (EcPath.m_hash mp2)
+
     | FequivS (pre, ((_,s1),(_,s2)), post) ->
         Why3.Hashcons.combine3
           (f_hash pre) (f_hash post)
@@ -711,7 +724,12 @@ let add_binding s (x,gty) =
       let s,(x',ty') = add_local s (x,ty) in
       s,(x',GTty ty')
   | GTmodty p ->
-      let p' = s.fs_p p in
+      let p' = {
+        mt_name = s.fs_p p.mt_name;
+        mt_args =
+          omap p.mt_args
+            (List.map (EcPath.m_subst s.fs_p s.fs_mp));
+      } in
       let x' = EcIdent.fresh x in
       bind_mod s x (EcPath.mident x'), (x',GTmodty p')
   | GTmem ->

@@ -1,3 +1,4 @@
+(* -------------------------------------------------------------------- *)
 open Pprint
 
 (* -------------------------------------------------------------------- *)
@@ -205,6 +206,11 @@ module List = struct
   let ohead (xs : 'a list) =
     match xs with [] -> None | x :: _ -> Some x
 
+  let rec last = function
+    | []      -> failwith "List.last"
+    | [x]     -> x
+    | _ :: xs -> last xs
+
   let create n x =
     let rec aux n xs =
       if n <= 0 then xs else aux (n-1) (x::xs)
@@ -217,6 +223,14 @@ module List = struct
       | x :: xs -> f i x; doit (i + 1) xs
     in
       doit 0 xs
+
+  let iter2i f xs ys =
+    let rec doit i = function
+      | [], [] -> ()
+      | x :: xs, y :: ys -> f i x y; doit (i + 1) (xs, ys)
+      | _, _ -> failwith "List.iter2i"
+    in
+      doit 0 (xs, ys)
 
   let rec pmap (f : 'a -> 'b option) (xs : 'a list) =
     match xs with
