@@ -272,15 +272,17 @@ admit.
 save.  
 
 (* apply :
-   apply g <: > (a,b _)
+   apply (g<: > a b _)
    apply h (a,_,b)
    apply :(f) (a, _)
 *)
 
+(* lemma l_intros : forall (x1 : 'a), p x1 => forall (x2 x3:'a), p x2 => p x3 *)
+
 lemma l_apply_lem : forall (x:'a), p x
 proof.
 intros x.
-apply l_intros <:'a> (x,_,x,x,_).
+apply (l_intros<:'a> x _ x x _).
 admit.
 admit.
 save.
@@ -288,15 +290,15 @@ save.
 lemma l_apply_hyp : forall a b, (a => b) => a => b
 proof.
 intros a b h1 h2.
-apply h1 (_).
+apply (h1 _).
 apply h2.
 save.
 
 lemma l_apply_form : forall a b, (a => a => b) => a => b
 proof.
  intros a b h1 h2.
- apply :(a => b) (_).
- apply h1 (_).
+ apply ((_:a => b) _).
+ apply (h1 _).
  apply h2.
  apply h2.
 save.
@@ -329,21 +331,21 @@ save.
 
 lemma l_elim_and : true
 proof.
- elim l_split_and (true, false).  (* eliminate the application of a lemma *)
- elim l_split_and (false, true).
+ elim (l_split_and true false).  (* eliminate the application of a lemma *)
+ elim (l_split_and false true).
  intros _ _ h _; apply h.
 save.
 
 lemma l_elim_anda : true
 proof.
-  elim :(true && false).  (* eliminate a formula *)
+  elim (_:true && false). (* eliminate a formula *)
   admit.
   admit.
 save.
 
 lemma l_elim_or : true
 proof.
-  elim :( true \/ false).
+  elim (_:true \/ false).
   admit.
   admit.
   admit.
@@ -351,7 +353,7 @@ save.
 
 lemma l_elim_ora : true
 proof.
-  elim :( true || false).
+  elim (_:true || false).
   admit.
   admit.
   admit.
@@ -359,7 +361,7 @@ save.
 
 lemma l_elim_iff : true
 proof.
-  elim :(false <=> true).
+  elim (_:false <=> true).
   admit.
   admit.
 save.
@@ -367,7 +369,7 @@ save.
 lemma l_elim_if :forall (a:bool), true
 proof.
  intros a.
- elim :(if a then true else false).
+ elim (_:if a then true else false).
  admit.
  admit.
  admit.
@@ -389,9 +391,9 @@ lemma l_rewrite : forall (x y:'a), (false => x = y) => x = y => y = x
 proof.
  intros x y h1 h2.
  rewrite h2.       (* hypothesis, or lemma *)
- rewrite <- h1 (_).  (* application of a hypothesis, or lemma *)
+ rewrite <- (h1 _).  (* application of a hypothesis, or lemma *)
 admit.
- rewrite :(x = y).  (* forumula *)
+ rewrite (_:x = y).  (* forumula *)
 admit.
  admit.
 save.
@@ -399,7 +401,7 @@ save.
 lemma l_rewrite_eq : forall a, a => a
 proof.
 intros a h.
-rewrite eqT (a,_).
+rewrite (eqT a _).
 apply h.
 split.
 save.
