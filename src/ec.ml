@@ -80,13 +80,18 @@ let _ =
       let myname = Filename.basename Sys.executable_name
       and mydir  = Filename.dirname  Sys.executable_name in
         match myname with
-        | "ec.native"
-        | "ec.byte" ->
-            Filename.concat mydir "theories"
+        | "ec.native" | "ec.byte" -> begin
+            if Filename.basename (Filename.dirname mydir) = "_build" then
+              List.fold_left Filename.concat mydir
+                [Filename.parent_dir_name;
+                 Filename.parent_dir_name;
+                 "theories"]
+            else
+              Filename.concat mydir "theories"
+          end
 
         | _ ->
-            List.fold_left
-              Filename.concat mydir
+            List.fold_left Filename.concat mydir
               [Filename.parent_dir_name; "lib"; "easycrypt"; "theories"]
     in
       EcCommands.addidir theories

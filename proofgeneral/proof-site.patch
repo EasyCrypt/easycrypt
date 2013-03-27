@@ -1,10 +1,10 @@
---- proof-site.el.orig	2013-02-04 18:15:23.106938670 +0100
-+++ proof-site.el	2013-02-04 16:26:28.343173288 +0100
-@@ -36,6 +36,7 @@
-     '((isar "Isabelle" "thy")
+--- proof-site.el.orig	2013-03-27 12:42:07.061084211 +0100
++++ proof-site.el	2013-03-27 12:41:51.080922301 +0100
+@@ -40,6 +40,7 @@
+       (isar "Isabelle" "thy")
        (coq "Coq" "v" nil (".vo" ".glob"))
        (phox "PhoX" "phx")
 +      (easycrypt "EasyCrypt" "ec")
  
-       ;; Obscure/conflict with other useful modes:
+       ;; Obscure instances or conflict with other Emacs modes.
  

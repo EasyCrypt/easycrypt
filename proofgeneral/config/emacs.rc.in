@@ -1,0 +1,1 @@
+(load-file "_local/ProofGeneral-@VERSION@/generic/proof-site.el")
