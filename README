@@ -91,7 +91,7 @@ in the definition of `proof-assistant-table-default':
 
   (easycrypt "EasyCrypt" "ec")
 
-Copy the directory easycrypt/ to <proof-general-home>/generic/
+Copy the directory easycrypt/ to <proof-general-home>/
 
 If you have not done so, add the following line to your Emacs
 configuration file (typically ~/.emacs):
