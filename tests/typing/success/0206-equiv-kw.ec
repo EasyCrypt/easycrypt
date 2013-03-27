@@ -6,5 +6,5 @@ module G = {
   }
 }.
 
-equiv L : f @ G ~ f @ G : (x{1} = y{1}) ==> (0 = x{1} + y{1})
+equiv L : G.f ~ G.f : (x{1} = y{1}) ==> (0 = x{1} + y{1})
   proof.

@@ -13,5 +13,5 @@ module G(X : I) = {
   }
 }.
 
-lemma L : forall {m} (M <: I), Pr[f(0, 0) @ G(M), {m} : x = y] = c
-  proof.
+lemma L : forall {m} (M <: I), Pr[G(M).f(0, 0) @ {m} : x = y] = c
+proof. admit. save.

@@ -297,6 +297,7 @@
 
 %nonassoc prec_prefix_op
 
+
 %type <EcParsetree.global> global
 %type <EcParsetree.prog> prog
 
@@ -320,9 +321,8 @@
 %inline number: n=NUM { n };
 
 (* -------------------------------------------------------------------- *)
-namespace:
-| x=UIDENT { [x] }
-| xs=namespace DOT x=UIDENT { xs @ [x] }
+%inline namespace:
+| nm=rlist1(UIDENT, DOT) { nm }
 ;
 
 qident:
@@ -380,8 +380,13 @@ mident1:
     { (x, args) }
 ;
 
-mident:
-| x=plist1(mident1, DOT) { (x : pmsymbol) }
+%inline mident:
+| x=rlist1(mident1, DOT) { x }
+;
+
+fident:
+| nm=mident DOT x=lident { (nm, x) }
+| x=lident { ([], x) }
 ;
 
 (* -------------------------------------------------------------------- *)
@@ -583,22 +588,19 @@ sform:
    { (pflist es.pl_loc ti es.pl_desc).pl_desc }
 
 | HOARE LBRACKET
-    x=lident AT nm=mident COLON pre=loc(form) LONGARROW post=loc(form)
+    mp=loc(fident) COLON pre=loc(form) LONGARROW post=loc(form)
   RBRACKET
-
-    { let mp = mk_loc (EcLocation.make $startpos(x) $endpos(nm)) (nm, x) in
-        PFhoareF (pre, mp, post) }
+    { PFhoareF (pre, mp, post) }
 
 | EQUIV LBRACKET eb=equiv_body RBRACKET { eb }
 
 | PR LBRACKET
-    x=lident args=paren(plist0(loc(sform), COMMA))
-    AT nm=mident COMMA LKEY pn=pside RKEY
+    mp=loc(fident) args=paren(plist0(loc(sform), COMMA))
+    AT LKEY pn=pside RKEY
     COLON event=loc(form)
   RBRACKET
 
-    { let mp= mk_loc (EcLocation.make $startpos(x) $endpos(nm)) (nm, x) in
-        PFprob (mp, args, pn, event) }
+    { PFprob (mp, args, pn, event) }
 
 | LKEY n1=number op=loc(COMMA) n2=number RKEY
     { if   n1 = 0 && n2 = 1
@@ -678,13 +680,10 @@ form:
 ;
 
 equiv_body:
-  x1=lident AT nm1=mident TILD x2=lident AT nm2=mident
+  mp1=loc(fident) TILD mp2=loc(fident)
   COLON pre=loc(form) LONGARROW post=loc(form)
 
-    { let mp1 = mk_loc (EcLocation.make $startpos(x1) $endpos(nm1)) (nm1, x1) in
-      let mp2 = mk_loc (EcLocation.make $startpos(x2) $endpos(nm2)) (nm2, x2) in
-        PFequivF (pre, (mp1, mp2), post) }
-
+    { PFequivF (pre, (mp1, mp2), post) }
 
 %inline p_form_sm_list0: aout=plist0(loc(form), SEMICOLON) { aout }
 %inline form_list2: aout=plist2(loc(form), COMMA) { aout }
@@ -1358,6 +1357,21 @@ prog:
 
 %inline empty:
 | /**/ { () }
+;
+
+(* -------------------------------------------------------------------- *)
+__rlist1(X, S):                         (* left-recursive *)
+| x=X { [x] }
+| xs=__rlist1(X, S) S x=X { x :: xs }
+;
+
+%inline rlist0(X, S):
+| /* empty */     { [] }
+| xs=rlist1(X, S) { xs }
+;
+
+%inline rlist1(X, S):
+| xs=__rlist1(X, S) { List.rev xs }
 ;
 
 (* -------------------------------------------------------------------- *)

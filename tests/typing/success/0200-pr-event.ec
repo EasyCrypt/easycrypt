@@ -9,5 +9,5 @@ module G = {
   }
 }.
 
-lemma L : forall {m}, Pr[f(0, 0) @ G, {m} : x + y = res] = c
-  proof.
+lemma L : forall {m}, Pr[G.f(0, 0) @ {m} : x + y = res] = c
+proof. admit. save.

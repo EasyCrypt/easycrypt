@@ -6,7 +6,5 @@ module G = {
   }
 }.
 
-lemma L : hoare[f @ G : (x = y) ==> (res = x + y)]
-proof.
-admit.
-save.
+lemma L : hoare[G.f : (x = y) ==> (res = x + y)]
+proof. admit. save.
