@@ -148,6 +148,8 @@ proof.
 admit.
 save.
 
+
+(* UNITIZED UP TO HERE *)
 (* split 
    try to apply one of the following lemmas proved in Logic :
  true_intro 
