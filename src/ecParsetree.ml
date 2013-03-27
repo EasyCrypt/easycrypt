@@ -198,22 +198,20 @@ let empty_pprover = {
   pprov_names = None;
 }
 
-type elim_kind = 
-  | ElimHyp  of pqsymbol * tvar_inst
-  | ElimForm of pformula
+type fpattern_kind = 
+  | FPNamed of pqsymbol * tvar_inst
+  | FPCut   of pformula
 
-type elim_arg = 
+type fpattern_arg = 
   | EA_form of pformula
   | EA_mem  of pmemory
   | EA_mp   of pmsymbol
   | EA_none 
 
-
-type pelim = { 
-  elim_kind : elim_kind;
-  elim_args : elim_arg located list 
+type fpattern = { 
+  fp_kind : fpattern_kind;
+  fp_args : fpattern_arg located list 
 }
-
 
 type preduction = {
   pbeta  : bool;
@@ -231,15 +229,15 @@ and ptactic_r =
   | Ptrivial    of pprover_infos
   | Pintro      of posymbol list  
   | Psplit                        
-  | Pexists     of elim_arg located list 
+  | Pexists     of fpattern_arg located list 
   | Pleft                         
   | Pright                        
-  | Pelim       of pelim   
-  | Papply      of pelim
+  | Pelim       of fpattern 
+  | Papply      of fpattern
   | Pcut        of (psymbol * pformula)
   | Pgeneralize of pformula list
   | Pclear      of psymbol list
-  | Prewrite    of (bool * pelim)
+  | Prewrite    of (bool * fpattern)
   | Psubst      of psymbol list
   | Psimplify   of preduction 
   | Pchange     of pformula

@@ -97,6 +97,9 @@
 
   let simplify_red = [`Zeta; `Iota; `Beta; `Logic]
 
+  let mk_fpattern kind args =
+    { fp_kind = kind;
+      fp_args = args; }
 %}
 
 %token <EcSymbols.symbol> LIDENT
@@ -185,8 +188,8 @@
 %token PROOF
 %token PROVER
 %token QUESTION
+%token RBOOL
 %token RBRACE
-%token RBRACEHAT
 %token RBRACKET
 %token REQUIRE
 %token RES
@@ -406,10 +409,8 @@ sexp:
     { let id = PEident(mk_loc op.pl_loc EcCoreLib.s_dinter, ti) in
       PEapp(mk_loc op.pl_loc id, [e1; e2]) }
 
-| LBRACE n1=number op=loc(COMMA) n2=number RBRACE
-    { if   n1 = 0 && n2 = 1
-      then PEident (mk_loc op.pl_loc EcCoreLib.s_dbool, None)
-      else error (EcLocation.make $startpos $endpos) "malformed bool random" }
+| r=loc(RBOOL)
+    { PEident (mk_loc r.pl_loc EcCoreLib.s_dbool, None) }
 ;
 
 op1:
@@ -471,11 +472,10 @@ exp:
 | LET p=lpattern EQ e1=loc(exp) IN e2=loc(exp)
    { PElet (p, e1, e2) }
 
-| LBRACE n1=number op=loc(COMMA) n2=number RBRACEHAT e=loc(sexp)
-    { if   n1 = 0 && n2 = 1 then 
-        let id = PEident(mk_loc op.pl_loc EcCoreLib.s_dbitstring, None) in
-        PEapp (mk_loc op.pl_loc id, [e])
-      else error (EcLocation.make $startpos $endpos) "malformed random bitstring" }
+| r=loc(RBOOL) TILD e=loc(sexp)
+    { let id  = PEident(mk_loc r.pl_loc EcCoreLib.s_dbitstring, None) in
+      let loc = EcLocation.make $startpos $endpos in
+        PEapp (mk_loc loc id, [e]) }
 ;
 
 (* -------------------------------------------------------------------- *)
@@ -535,10 +535,8 @@ sform:
 
     { PFprob (mp, args, pn, event) }
 
-| LBRACE n1=number op=loc(COMMA) n2=number RBRACE
-    { if   n1 = 0 && n2 = 1
-      then PFident (mk_loc op.pl_loc EcCoreLib.s_dbool, None)
-      else error (EcLocation.make $startpos $endpos) "malformed bool random" }
+| r=loc(RBOOL)
+    { PFident (mk_loc r.pl_loc EcCoreLib.s_dbool, None) }
 
 | LBRACKET ti=tvars_app? e1=loc(form) op=loc(DOTDOT) e2=loc(form) RBRACKET
     { let id = PFident(mk_loc op.pl_loc EcCoreLib.s_dinter, ti) in
@@ -590,8 +588,11 @@ form:
 | e1=loc(form) op=loc(STAR ) ti=tvars_app? e2=loc(form)  
     { pfapp_symb op.pl_loc "*" ti [e1; e2] }
 
-| c=loc(form) QUESTION e1=loc(form) COLON e2=loc(form) %prec OP2 { PFif (c, e1, e2) }
-| IF c=loc(form) THEN e1=loc(form) ELSE e2=loc(form)             { PFif (c, e1, e2) }
+| c=loc(form) QUESTION e1=loc(form) COLON e2=loc(form) %prec OP2
+   { PFif (c, e1, e2) }
+
+| IF c=loc(form) THEN e1=loc(form) ELSE e2=loc(form)
+   { PFif (c, e1, e2) }
 
 | LET p=lpattern EQ e1=loc(form) IN e2=loc(form) { PFlet (p, e1, e2) }
 
@@ -600,16 +601,10 @@ form:
 | LAMBDA pd=pgtybindings COMMA e=loc(form) { PFlambda (pd, e) }
 
 (* Distribution *)
-| LBRACE n1=number op=loc(COMMA) n2=number RBRACEHAT e=loc(sform)
-    { if n1 = 0 && n2 = 1 then 
-        let id =
-          PFident (mk_loc op.pl_loc EcCoreLib.s_dbitstring, None)
-        in
-          PFapp (mk_loc op.pl_loc id, [e])
-      else
-        error
-          (EcLocation.make $startpos $endpos)
-          "malformed random bitstring" }
+| r=loc(RBOOL) TILD e=loc(sform)
+    { let id  = PFident (mk_loc r.pl_loc EcCoreLib.s_dbitstring, None) in
+      let loc = EcLocation.make $startpos $endpos in
+        PFapp (mk_loc loc id, [e]) }
 ;
 
 equiv_body:
@@ -1074,28 +1069,26 @@ underscore_or_ident:
 | s=_ident   { Some s }
 ;
 
-intro_args: l=loc(underscore_or_ident)+ { l };
+fpattern_head:
+| p=qident tvi=tvars_app?
+   { FPNamed (p, tvi) }
 
-elim_arg:
-| UNDERSCORE        { EA_none }
-| f=loc(sform)      { EA_form f }
-| s=mident          { EA_mem s }
+| LPAREN UNDERSCORE COLON f=loc(form) RPAREN
+   { FPCut f }
 ;
 
-exists_args: l=plist1(loc(elim_arg), COMMA) { l };
-
-elim_kind:
-| p=qident tvi=tvars_app?           { ElimHyp(p,tvi)  }
-| COLON LPAREN f=loc(form) RPAREN   { ElimForm f }
+fpattern_arg:
+| UNDERSCORE   { EA_none }
+| f=loc(sform) { EA_form f }
+| s=mident     { EA_mem s }
 ;
 
-elim_args:
-| empty { [] }
-| LPAREN l=plist1(loc(elim_arg), COMMA) RPAREN { l }
-;
+fpattern:
+| hd=fpattern_head
+   { mk_fpattern hd [] }
 
-elim: 
-| k=elim_kind a=elim_args  { { elim_kind = k; elim_args = a } } 
+| LPAREN hd=fpattern_head args=loc(fpattern_arg)* RPAREN
+   { mk_fpattern hd args }
 ;
 
 simplify_arg: 
@@ -1107,10 +1100,10 @@ simplify_arg:
 ;
 
 simplify:
-| l=plist1(simplify_arg,empty)    { l }
-| SIMPLIFY                        { simplify_red }
-| SIMPLIFY l=plist1(qident,empty) { `Delta l :: simplify_red  }
-| SIMPLIFY DELTA                  { `Delta [] :: simplify_red }
+| l=simplify_arg+    { l }
+| SIMPLIFY           { simplify_red }
+| SIMPLIFY l=qident+ { `Delta l :: simplify_red  }
+| SIMPLIFY DELTA     { `Delta [] :: simplify_red }
 ;
 
 rwside:
@@ -1138,13 +1131,13 @@ tactic:
 | TRIVIAL pi=prover_info
    { Ptrivial pi }
 
-| INTROS a=intro_args
+| INTROS a=loc(underscore_or_ident)+
    { Pintro a }
 
 | SPLIT
     { Psplit }
 
-| EXIST a=exists_args
+| EXIST a=plist1(loc(fpattern_arg), COMMA)
    { Pexists a }
 
 | LEFT
@@ -1153,10 +1146,13 @@ tactic:
 | RIGHT
     { Pright }
 
-| ELIM e=elim
+| ELIM e=fpattern
    { Pelim e }
 
-| APPLY e=elim
+| ELIMT p=qident f=loc(sform)
+   { PelimT (f, p) }
+
+| APPLY e=fpattern
    { Papply e }
 
 | l=simplify
@@ -1165,14 +1161,11 @@ tactic:
 | CHANGE f=loc(sform)
    { Pchange f }
 
-| REWRITE s=rwside e=elim
+| REWRITE s=rwside e=fpattern
    { Prewrite (s, e) }
 
 | SUBST l=ident*
    { Psubst l }
-
-| ELIMT p=qident f=loc(sform)
-   { PelimT (f, p) }
 
 | CASE f=loc(sform)
    { Pcase f }

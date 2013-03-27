@@ -33,7 +33,7 @@ lemma to_array_from_array: forall bs,
   from_array (to_array bs) = bs
 proof.
 intros bs;
-  apply extentionality<:bool>((from_array (to_array bs)),bs,_);
+  apply (extentionality<:bool> (from_array (to_array bs)) bs _);
   trivial.
 save.
 
@@ -41,7 +41,7 @@ lemma from_array_to_array: forall bs,
   to_array (from_array bs) = bs
 proof.
 intros bs;
-  apply Array.extentionality<:bool>((to_array (from_array bs)),bs,_);
+  apply (Array.extentionality<:bool> (to_array (from_array bs)) bs _);
   trivial.
 save.
 
@@ -73,7 +73,7 @@ lemma xor_nilpotent: forall (bs:bitstring),
   bs ^^ bs = zeros (length bs)
 proof.
 intros bs;
-  apply extentionality<:bool> ((bs ^^ bs),(zeros (length bs)),_);
+  apply (extentionality<:bool> (bs ^^ bs) (zeros (length bs)) _);
   trivial.
 save.
 

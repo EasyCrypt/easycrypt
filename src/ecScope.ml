@@ -784,10 +784,10 @@ module Tactic = struct
 
   let process_mkn_apply env pe (juc, _ as g) = 
     let hyps = get_hyps g in
-    let args = pe.elim_args in
+    let args = pe.fp_args in
     let (juc,fn), fgs =
-      match pe.elim_kind with
-      | ElimHyp (pq,tvi) ->
+      match pe.fp_kind with
+      | FPNamed (pq,tvi) ->
         begin match unloc pq with 
         | ([],ps) when LDecl.has_hyp ps hyps ->
           (* FIXME warning if tvi is not None *)
@@ -797,7 +797,7 @@ module Tactic = struct
           let p,tys = process_instanciate env hyps (pq,tvi) in
           mkn_glob env juc hyps p tys, []
         end
-      | ElimForm pf -> 
+      | FPCut pf -> 
         let f = process_formula env g pf in
         let juc, fn = new_goal juc (hyps, f) in
         (juc,fn), [fn] 

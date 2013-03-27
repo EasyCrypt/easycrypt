@@ -30,7 +30,7 @@ lemma mu_weight_0 : forall (d:'a distr),
 proof.
 intros d;split.
   intros H P;cut upper_bound: (mu d P <= mu d cPtrue);
-  [ apply mu_incl<:'a> (P,cPtrue,d,_);trivial |
+  [ apply (mu_incl<:'a> P cPtrue d _);trivial |
     trivial ].
   trivial.
 save.

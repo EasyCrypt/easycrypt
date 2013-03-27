@@ -170,12 +170,13 @@ rule main = parse
   | "<=>" { IFF }
 
   (* string symbols *)
-  | "<-" { LEFTARROW }
-  | "->" { ARROW  }
-  | ".." { DOTDOT }
-  | ".[" { DLBRACKET }
-  | ":=" { CEQ }
-  | "%r" { FROM_INT }
+  | "<-"    { LEFTARROW }
+  | "->"    { ARROW  }
+  | ".."    { DOTDOT }
+  | ".["    { DLBRACKET }
+  | ":="    { CEQ }
+  | "%r"    { FROM_INT }
+  | "{0,1}" { RBOOL }
 
   (* punctuation *)
   | '_'  { UNDERSCORE }
@@ -190,7 +191,6 @@ rule main = parse
   | ','  { COMMA }
   | ';'  { SEMICOLON }
   | ':'  { COLON }
-  | "}^" { RBRACEHAT }
   | '?'  { QUESTION }
   | "*"  { STAR }
   | "$"  { SAMPLE }

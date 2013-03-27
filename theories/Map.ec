@@ -55,7 +55,7 @@ lemma dom_update: forall (m:('a,'b) map) x y,
   dom (m.[x <- y]) = Set.add x (dom m)
 proof.
 intros m x y;
-  apply Set.extentionality<:'a> ((dom (m.[x <- y])),(Set.add x (dom m)),_);
+  apply (Set.extentionality<:'a> (dom (m.[x <- y])) (Set.add x (dom m)) _);
   trivial.
 save.
 
@@ -104,7 +104,7 @@ cut Hleft: (!in_dom x m  => in_rng y1 m.[x<-y2]).
           cut Hrngdef: ((exists x', in_dom x' m.[x<- y2] /\ m.[x<-y2].[x'] = Some y1) => 
                         Set.mem y1 (rng m.[x<-y2])).
             trivial.
-            apply Hrngdef<:'a>(_);trivial.
+            apply (Hrngdef<:'a> _);trivial.
         trivial.
 cut Hright: (m.[x] <> Some y1 => in_rng y1 m.[x<-y2]).
   cut Hex: (exists x, in_dom x m /\ m.[x] = Some y1).
@@ -117,14 +117,14 @@ cut Hright: (m.[x] <> Some y1 => in_rng y1 m.[x<-y2]).
           cut Hrngdef: ((exists x', in_dom x' m.[x<- y2] /\ m.[x<-y2].[x'] = Some y1) => 
                         Set.mem y1 (rng m.[x<-y2])).
             trivial.
-            apply Hrngdef<:'a>(_);trivial.
+            apply (Hrngdef<:'a> _);trivial.
   trivial.
 trivial.
 save.
 
 lemma rng_empty: rng (empty<:'a,'b>) = Set.empty
 proof.
-apply Set.extentionality<:'b> ((rng empty<:'a,'b>),Set.empty,_);
+apply (Set.extentionality<:'b> (rng empty<:'a,'b>) Set.empty _);
   trivial.
 save.
 
@@ -134,7 +134,7 @@ lemma rng_update_not_indom: forall (m:('a,'b) map) x y,
   !in_dom x m => rng (m.[x <- y]) = Set.add y (rng m)
 proof.
 intros m x y H;
-apply Set.extentionality<:'b> ((rng (m.[x <- y])),(Set.add y (rng m)),_);
+apply (Set.extentionality<:'b> (rng (m.[x <- y])) (Set.add y (rng m)) _);
 cut Hsuff: ((forall y', Set.mem y' (rng (m.[x <- y])) =>
                Set.mem y' (Set.add y (rng m))) /\
             (forall y', Set.mem y' (Set.add y (rng m)) =>
@@ -180,7 +180,7 @@ proof.
 intros P m x y H H0;
 cut H1: (find P m.[x<-y] = None => false).
   intros Hfnone;cut H1: (find P m = None).
-    apply find_none2<:'a,'b>(P,m,_).
+    apply (find_none2<:'a,'b> P m _).
       intros z Hz;cut Heq: (z = x => !P (z, proj m.[z])).
         trivial.
         cut Hneq: (z <> x => !P (z, proj m.[z]));trivial.
@@ -199,7 +199,7 @@ proof.
 intros P m x y H H0;cut H1: (exists v, find P m = Some v).
   trivial.
   elim H1;intros v Hfind_v;cut H3: (exists v, find P m.[x<-y] = Some v).
-    apply find_some2<:'a,'b>(P,m.[x<-y],v,_);trivial.
+    apply (find_some2<:'a,'b> P m.[x<-y] v _);trivial.
   trivial.
 save.
 
@@ -296,7 +296,7 @@ intros m1 m2 x x_in_dom_m2 m1_eq_except_m2_x;
 cut H: (exists z, m2.[x] = Some z);[ trivial | idtac ].
 elim H;intros z m2_z.
 cut eq_except: (m2 = m1.[x <- z]);[ idtac | trivial ].
-apply eq_except_eq<:'a,'b> (m2,m1,x,z,_,_,_);trivial.
+apply (eq_except_eq<:'a,'b> m2 m1 x z _ _ _);trivial.
 save.
 
 (** Disjointness of maps *)

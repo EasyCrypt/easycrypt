@@ -54,10 +54,10 @@ lemma destruct_list: forall (xs:'a list),
 proof.
  intros xs.
  elimT list_case xs.
-  intros H;left;apply eq_refl<:'a list>(__nil).
+  intros H;left;apply (eq_refl<:'a list> __nil).
   
   intros y ys H;right.
-  exists y;exists ys;apply eq_refl<:'a list>((y::ys)).
+  exists y;exists ys;apply (eq_refl<:'a list> (y::ys)).
 save.
 
 lemma hd_tl_decomp: forall (xs:'a list),
@@ -90,8 +90,8 @@ lemma length_non_neg: forall (xs:'a list), 0 <= length xs
 proof.
  intros xs.
  elimT list_ind xs.
-  simplify length;rewrite fold_right_nil<:int,'a>(0,f_length);trivial.
-  intros y ys IHys;trivial.
+ simplify length;rewrite (fold_right_nil<:int,'a> 0 f_length);trivial.
+ intros y ys IHys;trivial.
 save.
 
 lemma length_z_nil : forall(xs:'a list), length xs = 0 => xs = []
@@ -293,7 +293,7 @@ proof.
   case (n = 0);intros Hn.
     rewrite Hn;trivial.
     
-    elim H(dv,(n-1),_).
+    elim (H dv (n-1) _).
     trivial.
     trivial.
     

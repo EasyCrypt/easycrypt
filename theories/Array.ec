@@ -1,10 +1,13 @@
-(* A theory of polymorphic arrays.
-   All operators are only partially specified,
-   as we may choose to match them with different
-   programming language construct.
-   The user wanting to instantiate it with particular
-   implementation choices should clone it and add
-   axioms to further refine the operators. *)
+(* A theory of polymorphic arrays. *)
+
+(*
+ * All operators are only partially specified, as we may choose to match
+ * them with different programming language construct.
+ * 
+ * The user wanting to instantiate it with particular implementation
+ * choices should clone it and add axioms to further refine the
+ * operators.
+ *)
 
 require import Int.
 
@@ -41,7 +44,7 @@ lemma empty_unique: forall (xs:'x array),
   length(xs) = 0 => xs = empty
 proof.
 intros xs H;
-  apply extentionality<:'x>(xs,empty,_);
+  apply (extentionality<:'x> xs empty _);
   trivial.
 save.
 
@@ -120,7 +123,7 @@ lemma sub_append_fst: forall (xs0 xs1:'x array),
   sub (xs0 || xs1) 0 (length(xs0)) = xs0
 proof.
 intros xs0 xs1;
-  apply extentionality<:'x> ((sub (xs0 || xs1) 0 (length xs0)),xs0,_);
+  apply (extentionality<:'x> (sub (xs0 || xs1) 0 (length xs0)) xs0 _);
   trivial.
 save.
 
@@ -128,7 +131,7 @@ lemma sub_append_snd: forall (xs0 xs1:'x array),
   sub (xs0 || xs1) (length xs0) (length xs1) = xs1
 proof.
 intros xs0 xs1;
-  apply extentionality<:'x> ((sub (xs0 || xs1) (length xs0) (length xs1)),xs1,_);
+  apply (extentionality<:'x> (sub (xs0 || xs1) (length xs0) (length xs1)) xs1 _);
   trivial.
 save.
 
@@ -171,6 +174,9 @@ lemma write_append: forall (dst src:'x array),
   write dst 0 src 0 (length src) = (src || (sub dst (length src) (length dst - length src)))
 proof.
 intros dst src H;
-  apply extentionality<:'x> ((write dst 0 src 0 (length src)),(src || sub dst (length src) (length dst - length src)),_);
+  apply (extentionality<:'x>
+           (write dst 0 src 0 (length src))
+           (src || sub dst (length src) (length dst - length src))
+           _);
   trivial.
 save.

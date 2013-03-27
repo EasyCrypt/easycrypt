@@ -10,7 +10,6 @@ open EcBaseLogic
 open EcEnv
 open EcReduction
 
-
 let get_node g = (get_goal g).pj_decl
 let get_goal g = (get_open_goal g).pj_decl      
 let get_hyps g = fst (get_goal g) 
@@ -29,7 +28,6 @@ type tac_error =
   | ToManyArgument
   | NoHypToSubst          of EcIdent.t option
 
-
   | ExclMidle             of form
   | And_I                 of form
   | Or_I                  of form
@@ -42,8 +40,8 @@ type tac_error =
   | DupIdInCtxt           of EcIdent.t 
   | CanNotProve           of l_decl
   | InvalNumOfTactic      of int * int
-exception TacError of tac_error
 
+exception TacError of tac_error
 
 module PE = EcPrinting.EcDebugPP (* FIXME *)
 
@@ -74,13 +72,6 @@ let pp_tac_error fmt = function
       (EcIdent.name id)
   | NoHypToSubst None ->
     Format.fprintf fmt "Can not find non recursive equation to substite"
-    
-      
-
-
-
-
-
 
   | ExclMidle f ->
       Format.fprintf fmt "Cannot apply excluded middle on %a" PE.pp_form f
