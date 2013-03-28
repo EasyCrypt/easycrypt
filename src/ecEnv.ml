@@ -486,41 +486,41 @@ module MC = struct
           amc_components = MMsym.add name path mc.amc_components; }
 
   (* ------------------------------------------------------------------ *)
-  let mc_of_module (env : env) (me : module_expr) =
-    let rec mc_of_module (scope : EcPath.mpath) (me : module_expr) =
-      let params   = me.me_sig.mis_params in
-      let params   = List.map (fun (x, _) -> EcPath.mident x) params in
-      let subscope = EcPath.mqname scope EcPath.PKmodule me.me_name params in
-      let xpath = fun k x -> EcPath.mqname subscope k x [] in
+  let rec mc_of_module_r (scope : EcPath.mpath) (me : module_expr) =
+    let params   = me.me_sig.mis_params in
+    let params   = List.map (fun (x, _) -> EcPath.mident x) params in
+    let subscope = EcPath.mqname scope EcPath.PKmodule me.me_name params in
+    let xpath = fun k x -> EcPath.mqname subscope k x [] in
 
-      let mc1_of_module (mc : premc) = function
-      | MI_Module subme ->
-          let xpath = xpath EcPath.PKmodule subme.me_name in
-          let (submc, subcomps) = mc_of_module subscope subme in
-            (mc_bind_module xpath subme
-               (mc_bind_mc (EcPath.path_of_mpath xpath) mc),
-             Some (submc, subcomps))
+    let mc1_of_module (mc : premc) = function
+    | MI_Module subme ->
+        let xpath = xpath EcPath.PKmodule subme.me_name in
+        let (submc, subcomps) = mc_of_module_r subscope subme in
+          (mc_bind_module xpath subme
+             (mc_bind_mc (EcPath.path_of_mpath xpath) mc),
+           Some (submc, subcomps))
 
-      | MI_Variable v ->
-          let vty =
-            { vb_type = v.v_type;
-              vb_kind = PVglob; }
-          in
-            (mc_bind_variable (xpath EcPath.PKother v.v_name) vty mc, None)
+    | MI_Variable v ->
+        let vty =
+          { vb_type = v.v_type;
+            vb_kind = PVglob; }
+        in
+          (mc_bind_variable (xpath EcPath.PKother v.v_name) vty mc, None)
 
-      | MI_Function f ->
-          (mc_bind_function (xpath EcPath.PKother f.f_name) f mc, None)
+    | MI_Function f ->
+        (mc_bind_function (xpath EcPath.PKother f.f_name) f mc, None)
 
-      in
-
-      let mc, submcs =
-        List.map_fold mc1_of_module
-          (empty_premc me.me_sig.mis_params)
-          me.me_comps
-      in
-        ((me.me_name, mc), List.prmap (fun x -> x) submcs)
     in
-      mc_of_module env.env_scope me
+
+    let mc, submcs =
+      List.map_fold mc1_of_module
+        (empty_premc me.me_sig.mis_params)
+        me.me_comps
+    in
+      ((me.me_name, mc), List.prmap (fun x -> x) submcs)
+
+  let mc_of_module (env : env) (me : module_expr) =
+    mc_of_module_r env.env_scope me
 
   (* ------------------------------------------------------------------ *)
   let mc_of_module_param (mid : EcIdent.t) (me : module_expr) =
@@ -543,6 +543,49 @@ module MC = struct
           mc_bind_raw Px.for_function f.f_name (xpath f.f_name) f mc
     in
       List.fold_left mc1_of_module (empty_premc []) me.me_comps
+
+  (* ------------------------------------------------------------------ *)
+  let rec mc_of_ctheory_r (scope : EcPath.mpath) (x, th) =
+    let subscope = EcPath.mqname scope EcPath.PKother x [] in
+    let xpath = fun x k -> EcPath.mqname subscope k x [] in
+
+    let mc1_of_ctheory (mc : premc) = function
+      | CTh_type (xtydecl, tydecl) ->
+          (mc_bind_typedecl (xpath xtydecl EcPath.PKother) tydecl mc, None)
+
+      | CTh_operator (xop, op) ->
+          (mc_bind_operator (xpath xop EcPath.PKother) op mc, None)
+
+      | CTh_axiom (xax, ax) ->
+          (mc_bind_axiom (xpath xax EcPath.PKother) ax mc, None)
+
+      | CTh_modtype (xmodty, modty) ->
+          (mc_bind_modtype (xpath xmodty EcPath.PKother) modty mc, None)
+
+      | CTh_module subme ->
+          let xpath = xpath subme.me_name EcPath.PKmodule in
+          let submcs = mc_of_module_r subscope subme in
+          (mc_bind_module xpath subme
+             (mc_bind_mc (EcPath.path_of_mpath xpath) mc),
+           Some submcs)
+
+      | CTh_theory (xsubth, subth) ->
+          let xpath = xpath xsubth EcPath.PKother in
+          let submcs = mc_of_ctheory_r subscope (xsubth, subth) in
+          (mc_bind_theory xpath subth
+             (mc_bind_mc (EcPath.path_of_mpath xpath) mc),
+           Some submcs)
+
+      | CTh_export _ -> (mc, None)
+    in
+
+    let mc, submcs =
+      List.map_fold mc1_of_ctheory (empty_premc []) th.cth_struct
+    in
+      ((x, mc), List.prmap (fun x -> x) submcs)
+
+  let mc_of_ctheory (env : env) (x : symbol) (th : ctheory) =
+    mc_of_ctheory_r env.env_scope (x, th)
 
   (* ------------------------------------------------------------------ *)
   let bind px env k name obj =
@@ -582,6 +625,19 @@ module MC = struct
           env_current = amc_bind px bname path obj env.env_current; }
 
   (* ------------------------------------------------------------------ *)
+  let rec bind_submc env path ((name, mc), submcs) =
+    let path = EcPath.pqname path name in
+
+    if Mp.find_opt path env.env_comps <> None then
+      raise (DuplicatedBinding (EcPath.basename path));
+
+    bind_submcs
+      { env with env_comps = Mp.add path mc env.env_comps }
+      path submcs
+
+  and bind_submcs env path submcs =
+    List.fold_left (bind_submc^~ path) env submcs
+
   let rec bind_variable x ty env =
     bind Px.for_variable env EcPath.PKother x ty
 
@@ -589,20 +645,6 @@ module MC = struct
     bind Px.for_function env EcPath.PKother x fsig
 
   and bind_module x me env =
-    let rec bind_submc env path ((name, mc), submcs) =
-      let path = EcPath.pqname path name in
-
-      if Mp.find_opt path env.env_comps <> None then
-        raise (DuplicatedBinding (EcPath.basename path));
-
-      bind_submcs
-        { env with env_comps = Mp.add path mc env.env_comps }
-        path submcs
-
-    and bind_submcs env path submcs =
-      List.fold_left (bind_submc^~ path) env submcs
-    in
-
     let (_, mc), submcs = mc_of_module env me in
     let env = bind Px.for_module env EcPath.PKmodule x me in
     let env = bind_mc env me.me_name mc in
@@ -624,41 +666,13 @@ module MC = struct
     bind Px.for_axiom env EcPath.PKother x ax
 
   and bind_theory x cth env =
-    let env, comps = mc_of_ctheory env env.env_scope x cth in
+    let (_, mc), submcs = mc_of_ctheory env x cth in
     let env = bind Px.for_theory env EcPath.PKother x cth in
-    let env = bind_mc env x comps in
-      env
+    let env = bind_mc env x mc in
 
-  and mc_of_ctheory =
-    let rec mc_of_ctheory_struct path (env, mc) = function 
-      | CTh_type     (x, td)  -> env, mc_bind_typedecl (EcPath.mqname path EcPath.PKother x []) td mc
-      | CTh_operator (x, op)  -> env, mc_bind_operator (EcPath.mqname path EcPath.PKother x []) op mc
-      | CTh_axiom    (x, ax)  -> env, mc_bind_axiom    (EcPath.mqname path EcPath.PKother x []) ax mc
-      | CTh_modtype  (x, tm)  -> env, mc_bind_modtype  (EcPath.mqname path EcPath.PKother x []) tm mc
-      | CTh_module   m        -> env, mc_bind_module   (EcPath.mqname path EcPath.PKmodule m.me_name []) m mc
-      | CTh_export   _        -> env, mc
-      | CTh_theory   (x, cth) ->
-          let subpath = EcPath.mqname path EcPath.PKother x [] in
-          let env, submc =
-            List.fold_left
-              (mc_of_ctheory_struct subpath)
-              (env, empty_premc []) cth.cth_struct
-          in
-  
-          let env =
-            let comps = env.env_comps in
-            let comps = Mp.add (EcPath.path_of_mpath subpath) submc comps in
-              { env with env_comps = comps }
-          in
-            (env, mc_bind_mc
-                    (EcPath.path_of_mpath subpath)
-                    (mc_bind_theory subpath cth mc))
-    in
-      fun (env : env) (path : EcPath.mpath) (x : symbol) (cth : ctheory) ->
-        List.fold_left
-          (mc_of_ctheory_struct (EcPath.mqname path EcPath.PKother x []))
-          (env, empty_premc [])
-          cth.cth_struct
+      bind_submcs env
+        (EcPath.pqname (EcPath.path_of_mpath env.env_scope) x)
+        submcs
 end
 
 (* -------------------------------------------------------------------- *)
@@ -965,7 +979,6 @@ module Ty = struct
 end
 
 (* -------------------------------------------------------------------- *)
-
 module Op = struct
   module Px = MC.Px
 
@@ -1409,13 +1422,16 @@ module Theory = struct
 
   (* ------------------------------------------------------------------ *)
   let require x cth env =
-    let rootnm = EcCoreLib.p_top in
+    let rootnm  = EcCoreLib.p_top in
     let mrootnm = EcPath.mpath_of_path rootnm in
-    let thpath = EcPath.pqname rootnm x in
+    let thpath  = EcPath.pqname rootnm x in
     let mthpath = EcPath.mpath_of_path thpath in
 
-    let env, thmc =
-      MC.mc_of_ctheory env mrootnm x cth.cth3_theory
+    let env =
+      let (_, thmc), submcs =
+        MC.mc_of_ctheory_r mrootnm (x, cth.cth3_theory)
+      in
+        MC.bind_submc env rootnm ((x, thmc), submcs)
     in
 
     let topmc = Mp.find rootnm env.env_comps in
@@ -1436,7 +1452,6 @@ module Theory = struct
 
     let comps = env.env_comps in
     let comps = Mp.add rootnm topmc comps in
-    let comps = Mp.add thpath thmc  comps in
 
     { env with
         env_current = current;
