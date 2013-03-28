@@ -782,10 +782,33 @@ and transstruct (env : EcEnv.env) (x : symbol) (st : pstructure) =
 
   (* Check that generated signature is structurally included in
    * associated type mode. *)
-  let types = List.map (transmodtype env) st.ps_signature in
-    List.iter (check_tymod_sub env tymod) (List.map snd types);
+  let types =
+    List.map
+      (fun (aty, oatyp) ->
+        if oatyp <> [] then begin
+          let cmp (x1, _) x2 = (EcIdent.name x1 = unloc x2) in
+            if not (List.all2 cmp stparams oatyp) then
+                tyerror dloc ModApplInvalidArgInterface
+        end;
+        (oatyp <> [], transmodtype env aty))
+      st.ps_signature in
 
-  (* Construct structure representation *)
+  let types =
+    List.map
+      (fun (istyf, ((_, aty) as aout)) ->
+        let aty =        (* FIXME: don't eta params on functor type *)
+          let aparams =
+            if   not istyf
+            then stparams @ aty.mis_params
+            else aty.mis_params
+          in
+            { aty with mis_params =  aparams}
+        in
+          check_tymod_sub env tymod aty; aout)
+      types
+  in
+
+    (* Construct structure representation *)
     { me_name  = x;
       me_body  = ME_Structure { ms_params = stparams;
                                 ms_body   = List.map snd items; };

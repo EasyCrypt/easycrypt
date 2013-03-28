@@ -794,7 +794,7 @@ mod_body:
 ;
 
 mod_def:
-| MODULE x=uident p=mod_params? t=mod_ty? EQ body=mod_body
+| MODULE x=uident p=mod_params? t=mod_aty? EQ body=mod_body
     { let p = EcUtils.odfl [] p in
         match body with
         | `App (m, args) ->
@@ -814,16 +814,21 @@ mod_params:
 | LPAREN a=plist1(sig_param, COMMA) RPAREN  { a }
 ;
 
-mod_ty:
-| COLON t=plist1(mod_type, COMMA) { t }
+mod_aty:
+| COLON t=plist1(mod_aty1, COMMA) { t }
 ;
 
-mod_type:
-| x=qident { x }
+mod_aty1:
+| x=qident { (x, []) }
+| x=qident xs=paren(ident+) { (x, xs) }
 ;
 
 (* -------------------------------------------------------------------- *)
 (* Modules interfaces                                                   *)
+
+%inline mod_type:
+| x = qident { x }
+;
 
 sig_def:
 | MODULE TYPE x=uident args=sig_params? EQ i=sig_body
