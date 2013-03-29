@@ -6,5 +6,8 @@ module type I = {
 
 module M : I = {
   var y : t
-  fun f (x : t) : t = { return t; }
+
+  fun f (x : t) : t = {
+    return x;
+  }
 }.
