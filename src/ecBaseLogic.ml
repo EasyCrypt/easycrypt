@@ -159,6 +159,7 @@ end
 type prover_info = unit (* FIXME *)
 
 type rule_name = 
+(* Logical rule *)
   | RN_admit
   | RN_clear        of EcIdent.Sid.t 
   | RN_prover       of prover_info
@@ -169,9 +170,13 @@ type rule_name =
   | RN_intros       of EcIdent.t list 
   | RN_exists_elim  
   | RN_exists_intro 
-(*
-  | RN_tuple_intro  of EcIdent.t list *)
+(*| RN_tuple_intro  of EcIdent.t list *)
   | RN_conv         
+(* Prhl rule *)
+  | RN_prhl_fun_def 
+
+
+
 and rule_arg = 
   | RA_form of EcFol.form             (* formula             *)
   | RA_id   of EcIdent.t              (* local ident         *)

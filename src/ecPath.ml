@@ -348,20 +348,23 @@ module Msubp = struct
 end
 
 (* -------------------------------------------------------------------- *)
+
 let p_subst (s : path Mp.t) =
-  let p_subst aux p =
-    try  Mp.find p s
-    with Not_found ->
-      match p.p_node with
-      | Psymbol _
-      | Pident  _ -> p
-      | Pqname(p1, id) -> 
+  if Mp.is_empty s then identity
+  else
+    let p_subst aux p =
+      try  Mp.find p s
+      with Not_found ->
+        match p.p_node with
+        | Psymbol _
+        | Pident  _ -> p
+        | Pqname(p1, id) -> 
           let p1' = aux p1 in
-            if p1 == p1' then p else pqname p1' id
-  in
+          if p1 == p1' then p else pqname p1' id in
     Hp.memo_rec 107 p_subst
 
 (* -------------------------------------------------------------------- *)
+
 let rec m_subst (sp : path -> path) (sm : mpath EcIdent.Mid.t) m =
   let p    = m.m_path
   and ks   = m.m_kind 
@@ -384,3 +387,8 @@ let rec m_subst (sp : path -> path) (sm : mpath EcIdent.Mid.t) m =
 
   try  aux p ks args
   with Not_found -> mpath (sp p) ks args
+
+let m_subst (sp : path -> path) (sm : mpath EcIdent.Mid.t) =
+  if sp == identity && EcIdent.Mid.is_empty sm then identity
+  else m_subst sp sm
+

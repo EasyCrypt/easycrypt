@@ -1,7 +1,7 @@
 require Int.
 
-axiom tutu : forall (x:int, y:int),
-   int.[+] x y = 0.
+axiom tutu : forall (x:int, y:int), 
+   Int.[+] x y = 0.
 
 require import int.
 require import real.

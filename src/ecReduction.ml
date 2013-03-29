@@ -314,25 +314,27 @@ let check_alpha_equal ri env hyps f1 f2 =
     | Ftuple args1, Ftuple args2 when List.length args1 = List.length args2 ->
         List.iter2 (aux alpha) args1 args2
 
-    | FhoareF(pre1,p1,post1), FhoareF(pre2,p2,post2) 
-      when m_equal_norm env p1 p2 ->
-        aux alpha pre1  pre2;
-        aux alpha post1 post2
+    | FhoareF hf1, FhoareF hf2 when m_equal_norm env hf1.hf_f hf2.hf_f ->
+        aux alpha hf1.hf_pre hf2.hf_pre;
+        aux alpha hf1.hf_post hf2.hf_post
 
-    | FhoareS(_,pre1,s1,post1), FhoareS(_,pre2,s2,post2) 
-      when s_equal_norm env s1 s2 -> 
-        aux alpha pre1  pre2;
-        aux alpha post1 post2
+    | FhoareS hs1, FhoareS hs2 when s_equal_norm env hs1.hs_s hs2.hs_s -> 
+        (* FIXME should check the memenv *)
+        aux alpha hs1.hs_pre  hs1.hs_pre;
+        aux alpha hs1.hs_post hs2.hs_post
 
-    | FequivF(pre1,(l1,r1),post1), FequivF(pre2,(l2,r2),post2) 
-      when m_equal_norm env l1 l2 && m_equal_norm env r1 r2 ->
-        aux alpha pre1  pre2;
-        aux alpha post1 post2
+    | FequivF ef1, FequivF ef2 
+      when m_equal_norm env ef1.eqf_fl ef2.eqf_fl && 
+           m_equal_norm env ef1.eqf_fr ef2.eqf_fr ->
+        aux alpha ef1.eqf_pre  ef2.eqf_pre;
+        aux alpha ef1.eqf_post ef2.eqf_post
 
-    | FequivS(pre1,((_,l1),(_,r1)),post1), FequivS(pre2,((_,l2),(_,r2)),post2) 
-      when s_equal_norm env l1 l2 && s_equal_norm env r1 r2 ->
-        aux alpha pre1  pre2;
-        aux alpha post1 post2
+    | FequivS es1, FequivS es2 
+      when s_equal_norm env es1.eqs_sl es2.eqs_sl && 
+           s_equal_norm env es1.eqs_sr es2.eqs_sr ->
+        (* FIXME should check the memenv *)
+        aux alpha es1.eqs_pre  es2.eqs_pre;
+        aux alpha es1.eqs_post es2.eqs_post
 
     | Fpr(m1,p1,args1,f1'), Fpr(m2,p2,args2,f2') 
       when EcIdent.id_equal (find alpha m1) m2 &&

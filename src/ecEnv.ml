@@ -52,9 +52,9 @@ let unsuspend f (x : 'a suspension) (args : mpath list list) =
       List.fold_left2
         (List.fold_left2
            (fun s (x, _) a -> EcSubst.add_module s x a))
-        EcSubst.empty ([] :: x.sp_params) args
+        EcSubst.empty ([]::x.sp_params) args
     in
-      if EcSubst.is_empty s then x.sp_target else f s x.sp_target
+     f s x.sp_target
 
   with Invalid_argument "List.fold_left2" ->
     assert false
@@ -149,7 +149,7 @@ and mc =
 
 and actmem =
 | AMAbstract of EcIdent.t
-| AMConcrete of mpath * memenv
+| AMConcrete of memenv
 
 let premc = fun (mc : premc   ) -> PreMc mc
 let actmc = fun (mc : activemc) -> ActMc mc
@@ -669,10 +669,10 @@ module MC = struct
     let (_, mc), submcs = mc_of_ctheory env x cth in
     let env = bind Px.for_theory env EcPath.PKother x cth in
     let env = bind_mc env x mc in
+    bind_submcs env
+      (EcPath.pqname (EcPath.path_of_mpath env.env_scope) x)
+      submcs
 
-      bind_submcs env
-        (EcPath.pqname (EcPath.path_of_mpath env.env_scope) x)
-        submcs
 end
 
 (* -------------------------------------------------------------------- *)
@@ -698,7 +698,7 @@ exception MEError of meerror
 module Memory = struct
   let actmem_name = function
     | AMAbstract x -> x
-    | AMConcrete (_, m) -> EcMemory.memory m
+    | AMConcrete m -> EcMemory.memory m
 
   let byid (me : memory) (env : env) =
     let memories = MMsym.all (EcIdent.name me) env.env_memories in
@@ -738,10 +738,14 @@ module Memory = struct
 
   let push_all memenvs env =
     List.fold_left
-      (fun env (p, m) -> push (AMConcrete (p, m)) env)
+      (fun env m -> push (AMConcrete m) env)
       env memenvs
 
-  let concretize mpath memenv env =
+  let push_active memenv env = 
+    set_active (EcMemory.memory memenv) 
+      (push (AMConcrete memenv) env)
+
+(*  let concretize mpath memenv env =
     let id = EcMemory.memory memenv in
 
     match byid id env with
@@ -752,7 +756,7 @@ module Memory = struct
         { env with
             env_memories =
               MMsym.add (EcIdent.name id) (AMConcrete (mpath, memenv))
-                env.env_memories }
+                env.env_memories } *)
 end
 
 (* -------------------------------------------------------------------- *)
@@ -789,24 +793,22 @@ module Var = struct
   let lookup_progvar ?side qname env =
     let inmem side =
       match fst qname with
-      | [] -> begin
-         match oget (Memory.byid side env) with
-         | AMAbstract _ -> None
-         | AMConcrete (mp, memenv) -> begin
-             match EcMemory.lookup (snd qname) memenv with
-             | None    -> None
-             | Some ty ->
-                 let pv =
-                   { pv_name = EcPath.mqname mp EcPath.PKother (snd qname) [];
-                     pv_kind = PVloc; }
-                 in
-                   Some (pv, ty)
-           end
+      | [] -> 
+        begin match oget (Memory.byid side env) with
+        | AMAbstract _ -> None
+        | AMConcrete memenv -> 
+          let mp = EcMemory.mpath memenv in
+          match EcMemory.lookup (snd qname) memenv with
+          | None    -> None
+          | Some ty ->
+            let pv =
+              { pv_name = EcPath.mqname mp EcPath.PKother (snd qname) [];
+                pv_kind = PVloc; } in
+            Some (pv, ty)
         end
 
       | _ -> None
     in
-
       match obind side inmem with
       | None -> begin
           let (p, x) = MC.lookup Px.for_variable qname env in
@@ -890,39 +892,58 @@ module Fun = struct
     let obj = by_mpath path env in 
     MC.import Px.for_function env path obj
 
-  let memenv ~hasres me path env =
-    let fun_ = (by_path path env).sp_target in
-    let adds =
-      List.fold_left
-        (fun memenv vd -> EcMemory.bind vd.v_name vd.v_type memenv)
-    in
+  let add_in_memenv memenv vd = 
+    EcMemory.bind vd.v_name vd.v_type memenv
 
-    let mem = EcMemory.empty me in
-    let mem = adds mem (fst fun_.f_sig.fs_sig) in
-    let mem =
-      match fun_.f_def with
-      | None   -> mem
-      | Some d -> adds mem d.f_locals in
-    let mem =
-      if   hasres
-      then adds mem [{v_name = "$res"; v_type = snd fun_.f_sig.fs_sig}] 
-      else mem
-    in
-      mem
+  let adds_in_memenv = List.fold_left add_in_memenv 
 
-  let memenv_opt ~hasres me path env =
-    try_lf (fun () -> memenv ~hasres me path env)
+  let actmem_pre me path fun_ =
+    let mem = EcMemory.empty me path in
+    adds_in_memenv mem (fst fun_.f_sig.fs_sig)
 
-  let enter ~hasres me path env =
-    let memenv =
-      memenv hasres me (EcPath.path_of_mpath path) env
-    in
+  let actmem_post me path fun_ = 
+    let mem = EcMemory.empty me path in
+    add_in_memenv mem {v_name = "res"; v_type = snd fun_.f_sig.fs_sig}
 
-    let env =
-      Memory.set_active me 
-        (Memory.push (AMConcrete (path, memenv)) env)
-    in
-      (memenv, env)
+  let actmem_body me path fun_ = 
+    let mem = actmem_pre me path fun_ in
+    match fun_.f_def with
+    | None -> assert false (* FIXME error message *)
+    | Some fd -> fd, adds_in_memenv mem fd.f_locals 
+
+  let prF path env = 
+    let fun_ = by_mpath path env in
+    let post = actmem_post EcFol.mhr path fun_ in 
+    Memory.push_active post env  
+
+  let hoareF path env = 
+    let fun_ = (by_path (EcPath.path_of_mpath path) env).sp_target in
+    let pre = actmem_pre EcFol.mhr path fun_ in 
+    let post = actmem_post EcFol.mhr path fun_ in 
+    Memory.push_active pre env, Memory.push_active post env  
+
+  let hoareS path env = 
+    let fun_ = by_mpath path env in
+    let fd, memenv = actmem_body EcFol.mhr path fun_ in
+    memenv, fd, Memory.push_active memenv env
+
+  let equivF path1 path2 env = 
+    let fun1 = (by_path (EcPath.path_of_mpath path1) env).sp_target in
+    let fun2 = (by_path (EcPath.path_of_mpath path2) env).sp_target in
+    let pre1 = actmem_pre EcFol.mleft path1 fun1 in
+    let pre2 = actmem_pre EcFol.mright path2 fun2 in
+    let post1 = actmem_post EcFol.mleft path1 fun1 in 
+    let post2 = actmem_post EcFol.mright path2 fun2 in 
+    Memory.push_all [pre1; pre2] env,
+    Memory.push_all [post1; post2] env
+
+  let equivS path1 path2 env = 
+    let fun1 = by_mpath path1 env in
+    let fun2 = by_mpath path1 env in
+    let fd1, mem1 = actmem_body EcFol.mleft path1 fun1 in
+    let fd2, mem2 = actmem_body EcFol.mright path2 fun2 in
+    mem1, fd1, mem2, fd2, Memory.push_all [mem1; mem2] env
+
 end
 
 (* -------------------------------------------------------------------- *)
@@ -1559,6 +1580,9 @@ let norm_pvar env pv =
   let p = Mod.unfold_mod_path env pv.pv_name in
   if m_equal p pv.pv_name then pv else { pv_name = p; pv_kind = pv.pv_kind }
 
+(*let norm_eqGlob_mp env mp = 
+  let p = Mod.unfold_mod_path env pv.pv_name in *)
+
 let norm_form env =
   let norm_mp = EcPath.Hm.memo 107 (Mod.unfold_mod_path env) in
   let norm_pv pv = 
@@ -1575,24 +1599,28 @@ let norm_form env =
           if p == p' then f else 
           f_pvar p' f.f_ty m
 
-      | FhoareF(pre,p,post) ->
-          let pre' = aux pre and p' = norm_mp p and post' = aux post in
-          if pre == pre' && p == p' && post == post' then f else
+      | FhoareF hf ->
+          let pre' = aux hf.hf_pre and p' = norm_mp hf.hf_f 
+          and post' = aux hf.hf_post in
+          if hf.hf_pre == pre' && hf.hf_f == p' && 
+            hf.hf_post == post' then f else
           f_hoareF pre' p' post'
 
-      |  FhoareS _ -> assert false (* FIXME ? Not implemented *)
+      | FhoareS _ -> assert false (* FIXME ? Not implemented *)
 
-      | FequivF(pre,(l,r),post) ->
-          let pre' = aux pre and l' = norm_mp l 
-          and r' = norm_mp r and post' = aux post in
-          if pre == pre' && l == l' && r == r' && post == post' then f else
+      | FequivF ef ->
+          let pre' = aux ef.eqf_pre and l' = norm_mp ef.eqf_fl 
+          and r' = norm_mp ef.eqf_fr and post' = aux ef.eqf_post in
+          if ef.eqf_pre == pre' && ef.eqf_fl == l' && 
+            ef.eqf_fr == r' && ef.eqf_post == post' then f else
           f_equivF pre' l' r' post' 
 
       | FequivS _ -> assert false (* FIXME ? Not implemented *)
 
       | Fpr(m,p,args,e) ->
-          let p' = norm_mp p and args' = List.smart_map aux args 
-          and e' = aux e in
+          let p' = norm_mp p in
+          let args' = List.smart_map aux args in
+          let e' = aux e in
           if p == p' && args == args' && e == e' then f else 
           f_pr m p' args' e' 
       | _ -> EcFol.f_map (fun ty -> ty) aux f) in
@@ -1611,113 +1639,3 @@ let norm_l_decl env (hyps,concl) =
 let check_goal env pi ld = 
   EcWhy3.check_goal env.env_w3 pi (norm_l_decl env ld)
 
-(* -------------------------------------------------------------------------- *)
-(*
-type judgment_uc = EcBaseLogic.judgment_uc 
-
-type goals = judgment_uc * int list
-
-type goal = judgment_uc * int 
-
-type tactic = goal -> goals 
-
-let open_juc = EcBaseLogic.open_juc
-
-let t_id = EcBaseLogic.t_id 
-
-let t_on_goals = EcBaseLogic.t_on_goals 
-
-let t_seq = EcBaseLogic.t_seq 
-let t_lseq = EcBaseLogic.t_lseq 
-
-let t_subgoal = EcBaseLogic.t_subgoal 
-
-let t_on_nth = EcBaseLogic.t_on_nth 
-
-let t_on_first = EcBaseLogic.t_on_first 
-
-let t_on_last = EcBaseLogic.t_on_first 
-
-let t_seq_subgoal = EcBaseLogic.t_seq_subgoal
-
-let get_goal g = (get_open_goal g).pj_decl
-let get_hyps g = fst (get_goal g) 
-let get_concl g = snd (get_goal g)
-
-let t_admit =
-  let rule = { pr_name = RN_admit; pr_hyps = [] } in
-  upd_rule_done rule 
-
-let t_clear id (juc,_ as g) = 
-  let hyps,concl = get_goal g in
-  let hyps = LDecl.clear id hyps in
-  assert (not (Mid.mem id concl.f_fv));
-  let juc,n1 = new_goal juc (hyps,concl) in
-  let rule = { pr_name = RN_clear id; pr_hyps = [RA_id id;RA_node n1] } in
-  upd_rule rule g 
-
-let bind s x x' gty = 
-  match gty with 
-  | GTty ty    -> bind_local s x (f_local x' ty), LD_var (ty, None)
-  | GTmodty mt -> bind_mod s x (EcPath.mident x'), LD_modty mt
-  | GTmem      -> bind_mem s x x', LD_mem
-
-let get_intros env hyps ids concl =
-  let rec aux hyps ids s concl = 
-    match ids with
-    | [] -> hyps, EcFol.f_subst s concl 
-    | x'::ids' ->
-      match concl.f_node with
-      | Fquant(Lforall, _, _) ->
-        let (x,gty,concl) = EcFol.destr_forall1 concl in
-	let s,lk = bind s x x' gty in
-        let hyps = LDecl.add_local x' lk hyps in
-        aux hyps ids' s concl
-      | Flet(LSymbol(x,ty),e1,e2) ->
-        let e1 = f_subst s e1 in
-        let s = bind_local s x (f_local x' ty) in
-        let hyps = LDecl.add_local x' (LD_var(ty,Some e1)) hyps in
-        aux hyps ids' s concl
-      | _ when is_imp concl ->
-        let f,concl = destr_imp concl in
-        let hyps = LDecl.add_local x' (LD_hyp (f_subst s f)) hyps in
-        aux hyps ids' s concl
-      | _ -> 
-        if is_reducible env hyps concl then
-          let concl = red env hyps concl in
-          aux hyps ids s concl 
-        else assert false (* FIXME : error message *)
-  in
-  aux hyps ids f_subst_id concl
-
-let t_intros env ids (juc,_ as g) =
-  let hyps,concl = get_goal g in
-  let hyps,concl = get_intros env ids concl in
-  let juc,n1     = new_goal juc (hyps,concl) in 
-  let rule = { pr_name = RN_intros;
-               pr_hyps = List.map (fun x -> RA_id x) ids @ [RA_node n1] } in
-  upd_rule rule g
-    
-(*
-let process_app_f env hyps juc app_f =
-  match app_f with
-  | AFform f -> 
-    check_type f.f_t_ty tbool;
-    let juc, n = new_goal juc (hyps,f) in
-    juc, f, RA_node n 
-  | AFhyp  id -> 
-    let f = LDecl.lookup_hyp_by_id id hyps in
-    juc, f, RA_id id  
-  | AFglob (p,tys) ->
-    let 
-
-    of EcPath.path * ty list 
-*)
-
-  
-let t_apply env app_f app_args (juc,_ as g) =
-  let hyps, concl = get_goal g in
-  let juc, s, f = process_app_f juc app_f in
-  foo
-(* (A => B) => A => B *)
-*)

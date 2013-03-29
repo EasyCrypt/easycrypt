@@ -4,7 +4,7 @@ require import Real.
 cnst c : real.
 
 module type I = {
-  var x : int
+  fun f (x : int) : int
 }.
 
 module G(X : I) = {
@@ -13,5 +13,5 @@ module G(X : I) = {
   }
 }.
 
-lemma L : forall &m (M <: I), Pr[G(M).f(0, 0) @ &m : x = y] = c
+lemma L : forall &m (M <: I), Pr[G(M).f(0, 0) @ &m : res = 0] = c
 proof. admit. save.

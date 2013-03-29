@@ -6,5 +6,5 @@ module G = {
   }
 }.
 
-lemma L : equiv[G.f ~ G.f : (x{1} = y{1}) ==> (0 = x{1} + y{1})]
+lemma L : equiv[G.f ~ G.f : (x{1} = y{1}) ==> (0 = res{1} + res{2})]
 proof. admit. save.

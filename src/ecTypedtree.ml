@@ -530,10 +530,10 @@ let rec transmodsig (env : EcEnv.env) (name : symbol) (modty : pmodule_sig) =
 (* -------------------------------------------------------------------- *)
 and transmodsig_body (env : EcEnv.env) (is : pmodule_sig_struct_body) =
   let transsig1 = function
-    | `VariableDecl x ->
-        let name  = x.pvd_name.pl_desc in
+    | `VariableDecl _x -> assert false (* Not implemented for the moment *)
+(*        let name  = x.pvd_name.pl_desc in
         let type_ = transty_nothing env x.pvd_type in
-          Tys_variable { v_name = name; v_type = type_ }
+          Tys_variable { v_name = name; v_type = type_ } *)
 
     | `FunctionDecl f ->
         let name   = f.pfd_name in
@@ -575,11 +575,11 @@ let tymod_cnv_failure e =
   raise (TymodCnvFailure e)
 
 let tysig_item_name = function
-  | Tys_variable {v_name = x } -> x
+(*  | Tys_variable {v_name = x } -> x *)
   | Tys_function f      -> f.fs_name
 
 let tysig_item_kind = function
-  | Tys_variable _ -> `Variable
+(*  | Tys_variable _ -> `Variable *)
   | Tys_function _ -> `Function
 
 let rec check_tymod_cnv mode (env : EcEnv.env) tin tout =
@@ -611,12 +611,12 @@ let rec check_tymod_cnv mode (env : EcEnv.env) tin tout =
   and tout = tout.mis_body in
 
   let check_item_compatible =
-    let check_var_compatible vdin vdout = 
+   (* let check_var_compatible vdin vdout = 
       assert (vdin.v_name = vdout.v_name);
       if not (EcReduction.equal_type env vdin.v_type vdout.v_type) then
-        tymod_cnv_failure (E_TyModCnv_MismatchVarType vdin.v_name)
+        tymod_cnv_failure (E_TyModCnv_MismatchVarType vdin.v_name) in *)
 
-    and check_fun_compatible fin fout =
+    let check_fun_compatible fin fout =
       assert (fin.fs_name = fout.fs_name);
       (* We currently reject function with compatible signatures but
        * for the arguments names. We plan to leviate this restriction
@@ -648,9 +648,9 @@ let rec check_tymod_cnv mode (env : EcEnv.env) tin tout =
     in
       fun i_item o_item ->
         match i_item, o_item with
-        | Tys_variable xin, Tys_variable xout -> check_var_compatible xin xout
+(*        | Tys_variable xin, Tys_variable xout -> check_var_compatible xin xout *)
         | Tys_function fin, Tys_function fout -> check_fun_compatible fin fout
-        | _               , _                 -> assert false
+(*        | _               , _                 -> assert false *)
   in
 
   let check_for_item (o_item : module_sig_body_item) =
@@ -770,7 +770,7 @@ and transstruct (env : EcEnv.env) (x : symbol) (st : pstructure) =
   let tymod =
     let tymod1 = function
       | MI_Module   _ -> None           (* FIXME: what ? *)
-      | MI_Variable v -> Some (Tys_variable v) 
+      | MI_Variable _v -> None           (* Some (Tys_variable v)  *)
       | MI_Function f -> Some (Tys_function f.f_sig) 
     in
 
@@ -1210,13 +1210,12 @@ let transform_opt env ue pf tt =
         f_lambda xs f
 
     | PFprob (gp, args, m, event) ->
+
         let fpath = trans_gamepath env gp in
         let fun_  = EcEnv.Fun.by_mpath fpath env in
         let fsig  = fun_.f_sig.fs_sig in
-
         if List.length args <> List.length (fst fsig) then
           tyerror f.pl_loc ApplInvalidArity;
-
         let args =
           let doit1 arg {v_type = aty} =
             let aout = transf env arg in
@@ -1225,26 +1224,15 @@ let transform_opt env ue pf tt =
           in
             List.map2 doit1 args (fst fsig)
         in
-
         let memid = transmem env m in
-
-        let event =
-          let (_, env) = EcEnv.Fun.enter true memid fpath env in
-            transf env event
-        in
-
-        (*let resty = snd fun_.f_sig.fs_sig in *)
-          f_pr memid fpath args (*EcIdent.create "$res", resty*) event
+        let event = transf (EcEnv.Fun.prF fpath env) event in
+        f_pr memid fpath args event
 
     | PFhoareF (pre, gp, post) ->
         let fpath = trans_gamepath env gp in
-
-        let pre =
-          let (_, env) = EcEnv.Fun.enter false EcFol.mpre fpath env in
-            transf env pre
-        and post =
-          let (_, env) = EcEnv.Fun.enter true EcFol.mpost fpath env in
-            transf env post
+        let penv, qenv = EcEnv.Fun.hoareF fpath env in
+        let pre  = transf penv pre
+        and post = transf qenv post
         in
 
           f_hoareF pre fpath post
@@ -1253,33 +1241,11 @@ let transform_opt env ue pf tt =
         let fpath1 = trans_gamepath env gp1 in
         let fpath2 = trans_gamepath env gp2 in
 
-        let p1 = EcPath.path_of_mpath fpath1
-        and p2 = EcPath.path_of_mpath fpath2 in
-
-        let pre =
-          let mem1 = EcEnv.Fun.memenv false EcFol.mleft  p1 env in
-          let mem2 = EcEnv.Fun.memenv false EcFol.mright p2 env in
-          let env  = EcEnv.Memory.push_all [(fpath1, mem1); (fpath2, mem2)] env in
-            transf env pre in
-
-        let post =
-          let mem1 = EcEnv.Fun.memenv true EcFol.mleft  p1 env in
-          let mem2 = EcEnv.Fun.memenv true EcFol.mright p2 env in
-          let env  = EcEnv.Memory.push_all [(fpath1, mem1); (fpath2, mem2)] env in
-            transf env post in
+        let penv, qenv = EcEnv.Fun.equivF fpath1 fpath2 env in
+        let pre = transf penv pre in
+        let post = transf qenv post in
 
           f_equivF pre fpath1 fpath2 post
-
-    (* | PFhoare (pre,body,post) -> *)
-    (*   (\* Cesar says: what should I assume about local variables in pre/post? *\) *)
-    (*   let known_ids = ref Mstr.empty in *)
-    (*   let ue = UE.create (Some []) in (\* I ignore this *\) *)
-    (*   (\* FIXME: assuming no return statement, bad error message *\) *)
-    (*   let stmt, _re, _locals, env = transbody known_ids ue env body tunit in *)
-    (*   let pre = transf env pre in *)
-    (*   let post = transf env post in *)
-    (*   let dummy_memory = EcMemory.dummy_memenv in *)
-    (*   f_hoare dummy_memory pre stmt post *)
 
   and trans_fbind env ue decl = 
     let trans1 env ({ pl_desc = x }, pgty) =
@@ -1306,21 +1272,19 @@ let transform_opt env ue pf tt =
     in
       match locals with
       | Some (id, ty) ->
-          if tvi <> None then assert false;
+          if tvi <> None then assert false; (* FIXME : error message *)
           [ (f_local id ty, ue) ]
 
-      | None -> begin
-          let me  = EcEnv.Memory.get_active env in
-          let pvs = select_pv env me name ue tvi psig in
-          let ops = EcUnify.select_op true tvi env name ue psig in
-
-          let prepare_pv (pv, ty, ue)  =
-            (f_pvar pv ty (odfl EcFol.mstd me), ue)
-          and prepare_op ((op, tys), ty, ue) =
-            (f_op op tys ty, ue)
-          in
-            (List.map prepare_pv pvs) @ (List.map prepare_op ops)
-        end
+      | None -> 
+        let ops = EcUnify.select_op true tvi env name ue psig in
+        let prepare_op ((op, tys), ty, ue) = (f_op op tys ty, ue) in
+        let ops = List.map prepare_op ops in
+        match EcEnv.Memory.get_active env with
+        | None -> ops 
+        | Some me ->
+          let pvs = select_pv env (Some me) name ue tvi psig in
+          let prepare_pv (pv, ty, ue) = f_pvar pv ty me, ue in
+          (List.map prepare_pv pvs) @ ops 
   in
 
   let f = transf env pf in

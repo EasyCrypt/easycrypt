@@ -53,7 +53,10 @@ type ty_subst = {
   }
 
 val ty_subst_id : ty_subst
+
 val ty_subst : ty_subst -> ty -> ty
+
+
 
 module Tuni : sig
   val subst1    : (uid * ty) -> ty -> ty
@@ -160,6 +163,7 @@ val e_fold :
 (* -------------------------------------------------------------------- *)
 
 type e_subst = { 
+    es_freshen : bool; (* true means realloc local *)
     es_p   : EcPath.path -> EcPath.path;
     es_ty  : ty -> ty;
     es_mp  : EcPath.mpath -> EcPath.mpath; 
@@ -169,7 +173,7 @@ type e_subst = {
 val e_subst_id   : e_subst
 
 val e_subst_init : 
-    (EcPath.path -> EcPath.path) ->
+    bool -> (EcPath.path -> EcPath.path) ->
       (ty -> ty) -> EcPath.mpath EcIdent.Mid.t -> e_subst
 
 val add_locals   : e_subst -> 

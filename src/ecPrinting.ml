@@ -786,22 +786,17 @@ struct
       | FhoareF _ ->
           !^ "implement-me"             (* FIXME *)
             
-      | FhoareS(_,pre,stmt,post) -> 
+      | FhoareS hs -> 
         let dbody =
-          let bodytenv = tenv
-            (* List.fold_left *)
-            (*   (fun tenv x -> M.add_local tenv (EcIdent.create x)) *)
-            (*   tenv *)
-            (*   (List.map fst (def.f_locals)) *)
-          in
-          List.map (pr_instr bodytenv) stmt.s_node
+          let bodytenv = tenv in
+          List.map (pr_instr bodytenv) hs.hs_s.s_node
         in
 
-        pr_seq [ Pp.braces (pr_form tenv outer pre);
+        pr_seq [ Pp.braces (pr_form tenv outer hs.hs_pre);
                  pr_mblocks [dbody];
-                 Pp.braces (pr_form tenv outer post) ]
+                 Pp.braces (pr_form tenv outer hs.hs_post) ]
 
-      | FequivF _ | FequivS _ | Fpr _ ->
+      | FequivF _ | FequivS _ | Fpr _ | FeqGlob _ ->
           !^ "implement-me"  (* FIXME *)
     in
       pr_form tenv (min_op_prec, `NonAssoc) f

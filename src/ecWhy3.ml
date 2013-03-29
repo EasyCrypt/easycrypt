@@ -1123,7 +1123,7 @@ let trans_form env vm f =
         let args = List.map (trans_form_b vm) args in
         Term.t_tuple args
 
-    | FhoareF _ | FhoareS _ | FequivF _  | FequivS _ -> 
+    | FhoareF _ | FhoareS _ | FequivF _  | FequivS _ | FeqGlob _ -> 
         raise (CanNotTranslate f) (* fixme *)
           
     | Fpvar(pv,m) -> 
@@ -1193,15 +1193,13 @@ let trans_form env vm f =
     *)
     let pids   = Ident.id_fresh "unamed_lambda_s" in
     let pid    = Ident.id_fresh "unamed_lambda" in
-(*    let ty     = trans_ty !env vm ty in *)
-    let vs, vm = add_ids vm [EcFol.mpost(*;id*)] [ty_mem(*;ty*)] in 
+    let vs, vm = add_id vm EcFol.mhr ty_mem in 
     let body   = trans_form vm ev in
-    let fv     = 
-      List.fold_left (fun s x -> Term.Mvs.remove x s)
-        body.Term.t_vars vs in
+
+    let fv     = Term.Mvs.remove vs body.Term.t_vars in
     let extra  = Term.Mvs.keys fv in
-    let tmr    = ty_mem (*Ty.ty_tuple [ty_mem;ty]*) in
-    let mr     = Term.create_vsymbol (Ident.id_fresh "mr") tmr in 
+    let tmr    = ty_mem in
+    let mr     = vs in
     let doms   = List.map (fun vs -> vs.Term.vs_ty) extra in
     let codoms  = Ty.ty_func tmr Ty.ty_bool in
     let params   = extra @ [mr] in
@@ -1236,7 +1234,7 @@ let trans_oper_body env vm ls = function
   | OB_oper None | OB_pred None -> env,[],Decl.create_param_decl ls
   | OB_oper (Some (ids,body)) ->
       let ids, vm = add_ids vm ids ls.Term.ls_args in
-      let body = EcFol.form_of_expr EcFol.mstd body in
+      let body = EcFol.form_of_expr EcFol.mhr body in
       let env,rb,e = trans_form env vm body in
       let e = if ls.Term.ls_value = None then force_prop e else e in
       env,rb,Decl.create_logic_decl [Decl.make_ls_defn ls ids e]

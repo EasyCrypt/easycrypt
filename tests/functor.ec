@@ -27,6 +27,11 @@ module O2 : O = {
   fun o (x:int) : int = { return H.w; }
 }.
 
+module type FOO = {
+  fun f (x:int) : int { O1.o } (* Should not be accepted ? *)
+}.
+
+
 module G(FA:IA, O1 : O, O2 : O) = {
   module A = FA(O1,O2) 
 }.

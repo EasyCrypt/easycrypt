@@ -62,17 +62,19 @@ let _subst_of_subst s =
     s_ty  = st; }
 
 let e_subst_of_subst (s:_subst) = 
-  { es_p   = s.s_p;
-    es_ty  = s.s_ty;
-    es_mp  = s.s_fmp;
-    es_loc = Mid.empty; }
+  { es_freshen = true;
+    es_p       = s.s_p;
+    es_ty      = s.s_ty;
+    es_mp      = s.s_fmp;
+    es_loc     = Mid.empty; }
 
 let f_subst_of_subst (s:_subst) = 
-  { fs_p   = s.s_p;
-    fs_ty  = s.s_ty;
-    fs_mp  = s.s_s.sb_modules;
-    fs_loc = Mid.empty;
-    fs_mem = Mid.empty; }
+  { fs_freshen = true;
+    fs_p       = s.s_p;
+    fs_ty      = s.s_ty;
+    fs_mp      = s.s_s.sb_modules;
+    fs_loc     = Mid.empty;
+    fs_mem     = Mid.empty; }
 
 (* -------------------------------------------------------------------- *)
 let subst_variable (s : _subst) (x : variable) =
@@ -81,8 +83,8 @@ let subst_variable (s : _subst) (x : variable) =
 (* -------------------------------------------------------------------- *)
 let rec subst_modsig_body_item (s : _subst) (item : module_sig_body_item) =
   match item with
-  | Tys_variable vd ->
-      Tys_variable (subst_variable s vd)
+(*  | Tys_variable vd ->
+      Tys_variable (subst_variable s vd) *)
 
   | Tys_function funsig ->
       let args' = List.map (subst_variable s) (fst funsig.fs_sig) in

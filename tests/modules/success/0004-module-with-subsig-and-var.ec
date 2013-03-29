@@ -1,10 +1,10 @@
 type t.
 
 module type I = {
-  var x : t
+ fun f(x : t) : t 
 }.
 
 module M : I = {
-  var x : t
   var y : t
+  fun f (x : t) : t = { return t; }
 }.

@@ -16,13 +16,22 @@ val me_equal : memenv -> memenv -> bool
 exception DuplicatedMemoryBinding of symbol
 
 val memory   : memenv -> memory
+val mpath    : memenv -> EcPath.mpath
 val bindings : memenv -> EcTypes.ty Msym.t
 
 (* -------------------------------------------------------------------- *)
-val empty  : memory -> memenv
+val empty  : memory -> EcPath.mpath -> memenv
 val bind   : symbol -> EcTypes.ty -> memenv -> memenv
 
 val lookup : symbol -> memenv -> EcTypes.ty option
 
-(* until a constructor is defined *)
-val dummy_memenv : memenv
+(* -------------------------------------------------------------------- *)
+
+val me_subst :
+  (EcPath.path -> EcPath.path) ->
+  EcPath.mpath EcIdent.Mid.t ->
+  memory EcIdent.Mid.t ->
+  (EcTypes.ty -> EcTypes.ty) -> memenv -> memenv
+
+
+

@@ -1,9 +1,9 @@
 type t.
 
 module type I = {
-  var x : t
+  fun f (x : t) : t
 }.
 
 module M(X : I) = {
-  var y : t
+  fun g (x:t) : t = { return x; }
 }.

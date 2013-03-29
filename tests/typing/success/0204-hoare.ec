@@ -6,5 +6,5 @@ module G = {
   }
 }.
 
-lemma L : hoare[G.f : (x = y) ==> (res = x + y)]
+lemma L : forall u v, hoare[G.f : (x = u /\ y = v) ==> (res = u + v)]
 proof. admit. save.

@@ -157,24 +157,27 @@ let ty_subst_id =
     ts_v = Mid.empty }
 
 let ty_subst s =
-  Hty.memo_rec 107 (fun aux ty ->
-    match ty.ty_node with 
-    | Tunivar id -> 
+  if s.ts_p == identity && Muid.is_empty s.ts_u && Mid.is_empty s.ts_v then 
+    identity
+  else
+    Hty.memo_rec 107 (fun aux ty ->
+      match ty.ty_node with 
+      | Tunivar id -> 
         odfl ty (Muid.find_opt id s.ts_u) 
-    | Tvar id    -> odfl ty (Mid.find_opt  id s.ts_v)
-    | Ttuple lty -> 
-      let lty' = List.smart_map aux lty in
-      if lty == lty' then ty else
-      ttuple lty'
-    | Tconstr(p, lty) -> 
+      | Tvar id    -> odfl ty (Mid.find_opt  id s.ts_v)
+      | Ttuple lty -> 
+        let lty' = List.smart_map aux lty in
+        if lty == lty' then ty else
+          ttuple lty'
+      | Tconstr(p, lty) -> 
         let lty' = List.smart_map aux lty in
         let p' = s.ts_p p in
         if p == p' && lty == lty' then ty else
-        tconstr p' lty'
-    | Tfun(t1,t2) -> 
+          tconstr p' lty'
+      | Tfun(t1,t2) -> 
         let t1' = aux t1 and t2' = aux t2 in
         if t1 == t1' && t2 == t2' then ty else
-        tfun t1' t2')
+          tfun t1' t2')
 
 module Tuni = struct
   let subst1 ((id, t) : uid * ty) =
@@ -471,48 +474,55 @@ let rec expr_dump (e : expr) =
 (* -------------------------------------------------------------------- *)
 
 type e_subst = { 
-    es_p   : EcPath.path -> EcPath.path;
-    es_ty  : ty -> ty;
-    es_mp  : EcPath.mpath -> EcPath.mpath; 
-    es_loc : expr Mid.t;
+    es_freshen : bool; (* true means realloc local *)
+    es_p       : EcPath.path -> EcPath.path;
+    es_ty      : ty -> ty;
+    es_mp      : EcPath.mpath -> EcPath.mpath; 
+    es_loc     : expr Mid.t;
   }
 
 let e_subst_id = { 
-    es_p   = identity;
-    es_ty  = identity;
-    es_mp  = identity;
-    es_loc = Mid.empty;
+    es_freshen = false;
+    es_p       = identity;
+    es_ty      = identity;
+    es_mp      = identity;
+    es_loc     = Mid.empty;
  }
 
-let e_subst_init on_path on_ty on_mpath = {
-    es_p   = on_path;
-    es_ty  = on_ty;
-    es_mp  = EcPath.Hm.memo 107 (EcPath.m_subst on_path on_mpath);
-    es_loc = Mid.empty;
+let e_subst_init freshen on_path on_ty on_mpath = {
+    es_freshen = freshen;
+    es_p       = on_path;
+    es_ty      = on_ty;
+    es_mp      = EcPath.Hm.memo 107 (EcPath.m_subst on_path on_mpath);
+    es_loc     = Mid.empty;
 }
-      
-let add_local s (x,t) = 
-  let x' = EcIdent.fresh x in
+  
+let add_local s (x,t as xt) = 
+  let x' = if s.es_freshen then EcIdent.fresh x else x in
   let t' = s.es_ty t in
-  let merger o = assert (o = None); Some (e_local x' t') in
-  { s with es_loc = Mid.change merger x s.es_loc }, (x',t')
+  if x == x' && t = t' then s, xt
+  else 
+    let merger o = assert (o = None); Some (e_local x' t') in
+    { s with es_loc = Mid.change merger x s.es_loc }, (x',t')
 
-let add_locals = List.map_fold add_local 
+let add_locals = List.smart_map_fold add_local
 
 let subst_lpattern (s: e_subst) (lp:lpattern) = 
   match lp with
   | LSymbol x ->
       let s, x' = add_local s x in
+      if x == x' then s,lp else
       s , LSymbol x'
   | LTuple xs ->
       let s',xs'  = add_locals s xs in
+      if xs == xs' then s, lp else
       s', LTuple xs'
 
 let rec e_subst (s: e_subst) e =
   match e.e_node with
   | Elocal id -> 
       (try Mid.find id s.es_loc with _ -> 
-        (* FIXME : this can be dangerous, maybe use a flag *)
+        assert (not s.es_freshen);
         let ty' = s.es_ty e.e_ty in
         if e.e_ty == ty' then e else e_local id ty')
   | Evar pv -> 
@@ -527,12 +537,23 @@ let rec e_subst (s: e_subst) e =
       if p == p' && tys == tys' && e.e_ty == ty' then e else
       e_op p' tys' ty'
   | Elet(lp,e1,e2) -> 
-      let e1 = e_subst s e1 in
-      let s,lp = subst_lpattern s lp in
-      let e2 = e_subst s e2 in
-      e_let lp e1 e2
+      let e1' = e_subst s e1 in
+      let s,lp' = subst_lpattern s lp in
+      let e2' = e_subst s e2 in
+      if lp == lp' && e1 == e1' && e2 == e2' then e else 
+      e_let lp' e1' e2'
   | _ -> e_map s.es_ty (e_subst s) e
-    
+
+let is_subst_id s = 
+  not s.es_freshen && s.es_p == identity && 
+    s.es_ty == identity && s.es_mp == identity && Mid.is_empty s.es_loc 
+
+let e_subst s =
+  if is_subst_id s then identity
+  else 
+    if s.es_freshen then e_subst s 
+    else He.memo 107 (e_subst s)
+
 let e_mapty onty = 
   e_subst { e_subst_id with es_ty = onty; }
 

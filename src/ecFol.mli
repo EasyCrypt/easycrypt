@@ -7,9 +7,6 @@ open EcModules
 open EcMemory
 
 (* -------------------------------------------------------------------- *)
-val mstd   : memory
-val mpre   : memory
-val mpost  : memory
 val mhr    : memory
 val mleft  : memory
 val mright : memory
@@ -44,13 +41,41 @@ and f_node =
   | Fapp    of form * form list
   | Ftuple  of form list
 
-  | FhoareF of form * EcPath.mpath * form  (* $pre / $post *)
-  | FhoareS of memenv * form * stmt * form (* $hr  / $hr   *)
+  | FeqGlob of memory * memory * EcPath.mpath    (* FeqGlob(m1,m2,A) means 
+                                                    equality of global variable of A *)
+  | FhoareF of hoareF (* $hr / $hr *)
+  | FhoareS of hoareS (* $hr  / $hr   *)
 
-  | FequivF of form * (EcPath.mpath * EcPath.mpath) * form  (* $left,$right / $left,$right *)
-  | FequivS of form * (memenv * stmt) EcUtils.double * form (* $left,$right / $left,$right *)
+  | FequivF of equivF (* $left,$right / $left,$right *)
+  | FequivS of equivS (* $left,$right / $left,$right *)
 
-  | Fpr     of memory * EcPath.mpath * form list * form 
+  | Fpr     of memory * EcPath.mpath * form list * form (* hr *)
+
+and equivF = { 
+  eqf_pre  : form;
+  eqf_fl   : EcPath.mpath;
+  eqf_fr   : EcPath.mpath;
+  eqf_post : form;
+}
+
+and equivS = {
+  eqs_mel  : EcMemory.memenv;
+  eqs_mer  : EcMemory.memenv;
+  eqs_pre  : form;
+  eqs_sl   : stmt; (* In reverse order *)
+  eqs_sr   : stmt; (* In reverse order *)
+  eqs_post : form; }
+
+and hoareF = { 
+  hf_pre  : form;
+  hf_f    : EcPath.mpath;
+  hf_post : form;
+}
+and hoareS = {
+  hs_me   : memenv;
+  hs_pre  : form; 
+  hs_s    : stmt; (* In reverse order *)
+  hs_post : form; }
 
 (* -------------------------------------------------------------------- *)
 val f_equal   : form -> form -> bool
@@ -90,9 +115,10 @@ val f_forall : binding -> form -> form
 val f_lambda : binding -> form -> form
 
 val f_hoareF  : form -> EcPath.mpath -> form -> form 
-val f_hoareS   : memenv -> form -> EcModules.stmt -> form -> form 
+val f_hoareS  : memenv -> form -> EcModules.stmt -> form -> form 
 val f_equivF  : form -> EcPath.mpath -> EcPath.mpath -> form -> form 
-val f_equivS  : form -> memenv -> EcModules.stmt -> memenv -> EcModules.stmt -> form -> form
+val f_equivS  : 
+ memenv -> memenv -> form -> EcModules.stmt -> EcModules.stmt -> form -> form
 val f_pr      : memory -> EcPath.mpath -> form list -> form -> form
 
 val fop_not : form
@@ -143,19 +169,8 @@ val f_iff_simpl  : form -> form -> form
 val f_eq_simpl     : form -> form -> form
 
 (* -------------------------------------------------------------------- *)
-type destr_error =
-  | Destr_local
-  | Destr_not
-  | Destr_and
-  | Destr_or
-  | Destr_imp
-  | Destr_iff
-  | Destr_eq
-  | Destr_forall
-  | Destr_exists
-  | Destr_let1
 
-exception DestrError of destr_error
+exception DestrError of string
 
 val destr_local   : form -> EcIdent.t 
 val destr_and     : form -> form * form
@@ -166,6 +181,11 @@ val destr_eq      : form -> form * form
 val destr_let1    : form -> EcIdent.t * ty * form * form
 val destr_forall1 : form -> EcIdent.t * gty * form
 val destr_exists1 : form -> EcIdent.t * gty * form
+val destr_equivF  : form -> equivF
+val destr_equivS  : form -> equivS
+val destr_hoareF  : form -> hoareF
+val destr_hoareS  : form -> hoareS
+
 
 val is_and    : form -> bool
 val is_or     : form -> bool
@@ -184,12 +204,13 @@ val f_map : (EcTypes.ty -> EcTypes.ty) -> (form -> form) -> form -> form
 
 (* -------------------------------------------------------------------- *)
 type f_subst = { 
-    fs_p   : EcPath.path -> EcPath.path;
-    fs_ty  : ty -> ty;
-    fs_mp  : EcPath.mpath Mid.t;
-    fs_loc : form Mid.t;
-    fs_mem : EcIdent.t Mid.t;
-  }
+  fs_freshen : bool;
+  fs_p       : EcPath.path -> EcPath.path;
+  fs_ty      : ty -> ty;
+  fs_mp      : EcPath.mpath Mid.t;
+  fs_loc     : form Mid.t;
+  fs_mem     : EcIdent.t Mid.t;
+}
 
 val f_subst_id : f_subst
 

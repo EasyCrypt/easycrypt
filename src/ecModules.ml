@@ -193,71 +193,73 @@ module Hi = MSHi.H
 let s_subst (s: EcTypes.e_subst) = 
 
   let e_subst = EcTypes.e_subst s in
+  if e_subst == identity then identity 
+  else
 
-  let pvt_subst (pv,ty as p) = 
-    let pv' = EcTypes.pv_subst s.EcTypes.es_mp pv in
-    let ty' = s.EcTypes.es_ty ty in
-    if pv == pv' && ty == ty' then p else 
-    (pv',ty') in
+    let pvt_subst (pv,ty as p) = 
+      let pv' = EcTypes.pv_subst s.EcTypes.es_mp pv in
+      let ty' = s.EcTypes.es_ty ty in
+      if pv == pv' && ty == ty' then p else 
+        (pv',ty') in
     
-  let lv_subst lv = 
-    match lv with 
-    | LvVar pvt ->
+    let lv_subst lv = 
+      match lv with 
+      | LvVar pvt ->
         let pvt' = pvt_subst pvt in
         if pvt == pvt' then lv else
-        LvVar pvt
-    | LvTuple pvs ->
+          LvVar pvt
+      | LvTuple pvs ->
         let pvs' = List.smart_map pvt_subst pvs in
         if pvs == pvs' then lv else LvTuple pvs'
-    | LvMap((p,tys), pv, e, ty) ->
+      | LvMap((p,tys), pv, e, ty) ->
         let p'   = s.EcTypes.es_p p in
         let tys' = List.smart_map s.EcTypes.es_ty tys in
         let pv'  = EcTypes.pv_subst s.EcTypes.es_mp pv in
         let e'   = e_subst e in
         let ty'  = s.EcTypes.es_ty ty in
         if p==p' && tys==tys' && pv==pv' && e==e' && ty==ty' then lv else
-        LvMap((p',tys'),pv',e',ty') in
-
-  let rec i_subst i = 
-    match i.i_node with
-    | Sasgn(lv,e) ->
+          LvMap((p',tys'),pv',e',ty') in
+    
+    let rec i_subst i = 
+      match i.i_node with
+      | Sasgn(lv,e) ->
         let lv' = lv_subst lv in
         let e'  = e_subst e in
         if lv == lv' && e == e' then i else 
-        i_asgn(lv',e')
-    | Srnd(lv,e) ->
+          i_asgn(lv',e')
+      | Srnd(lv,e) ->
         let lv' = lv_subst lv in
         let e'  = e_subst e in
         if lv == lv' && e == e' then i else 
-        i_rnd(lv',e')
-    | Scall(olv,mp,args) ->
+          i_rnd(lv',e')
+      | Scall(olv,mp,args) ->
         let olv' = osmart_map olv lv_subst in
         let mp'  = s.EcTypes.es_mp mp in
         let args' = List.smart_map e_subst args in
         if olv == olv' && mp == mp' && args == args' then i else 
-        i_call(olv',mp',args')
-    | Sif(e,s1,s2) ->
+          i_call(olv',mp',args')
+      | Sif(e,s1,s2) ->
         let e' = e_subst e in
         let s1' = s_subst s1 in
         let s2' = s_subst s2 in
         if e == e' && s1 == s1' && s2 == s2' then i else
-        i_if(e', s1', s2')
-    | Swhile(e,s1) ->
+          i_if(e', s1', s2')
+      | Swhile(e,s1) ->
         let e' = e_subst e in
         let s1' = s_subst s1 in
         if e == e' && s1 == s1' then i else
-        i_while(e', s1')
-    | Sassert e -> 
+          i_while(e', s1')
+      | Sassert e -> 
         let e' = e_subst e in
         if e == e' then i else
-        i_assert e'
- 
-  and s_subst s = 
-    let is = s.s_node in
-    let is' = List.smart_map i_subst is in
-    if is == is' then s else stmt is' in
+          i_assert e'
+            
+    and s_subst s = 
+      let is = s.s_node in
+      let is' = List.smart_map i_subst is in
+      if is == is' then s else stmt is' in
 
-  s_subst 
+    s_subst 
     
 
 
@@ -313,7 +315,7 @@ type module_sig = {
 and module_sig_body = module_sig_body_item list
 
 and module_sig_body_item =
-  | Tys_variable of variable
+(*  | Tys_variable of variable *)
   | Tys_function of funsig
 
 and funsig = {
@@ -381,3 +383,10 @@ let fd_hash f =
     (s_hash f.f_body)
     (Why3.Hashcons.combine_option EcTypes.e_hash f.f_ret)
     (Why3.Hashcons.combine_list vd_hash 0 f.f_locals)
+
+(* -------------------------------------------------------------------- *)
+let mty_subst sp sm mty = 
+  let p = sp mty.mt_name in
+  let a = osmart_map mty.mt_args (List.smart_map sm) in
+  if mty.mt_name == p && mty.mt_args == a then mty else 
+  { mt_name = p; mt_args = a }

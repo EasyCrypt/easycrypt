@@ -125,6 +125,7 @@ module Hm : EcMaps.EHashtbl.S with type key = mpath
 
 (* -------------------------------------------------------------------- *)
 val p_subst : path Mp.t -> path -> path
+
 val m_subst : (path -> path) -> mpath EcIdent.Mid.t -> mpath -> mpath
 
 (* -------------------------------------------------------------------- *)

@@ -4,19 +4,19 @@ require import Real.
 cnst c : real.
 
 module type I = {
-  var x : int
+  fun f (x : int) : int 
 }.
 
 module type J = {
-  var y : int
+  fun f (y : int) : int
 }.
 
 module MI : I = {
-  var x : int
+  fun f (x : int) : int = { return x; }
 }.
 
 module MJ : J = {
-  var y : int
+  fun f (y : int) : int = { return y; }
 }.
 
 module G(X : I) = {
@@ -27,5 +27,5 @@ module G(X : I) = {
   }
 }.
 
-lemma L : forall &m, Pr[G(MI).Inner(MJ).f(0, 0) @ &m : x = y] = c
+lemma L : forall &m, Pr[G(MI).Inner(MJ).f(0, 0) @ &m : 0 = res] = c
 proof. admit. save.

@@ -10,18 +10,6 @@ exception CannotApply of string * string
 
 let cannot_apply s1 s2 = raise (CannotApply(s1,s2))
 
-type destr_error =
-  | Destr_hl 
-
-exception DestrError of destr_error
-
-let destr_error e = raise (DestrError e)
-
-let destr_hl f = 
-  match f.f_node with
-    | FhoareS (mem,pre,b,post) -> mem, pre, b, post
-    | _ -> destr_error Destr_hl
-
 let split_stmt n s = List.take_n n s
 
 
@@ -32,10 +20,17 @@ let split_stmt n s = List.take_n n s
 module PVM = struct
     
   module M = EcMaps.Map.Make(struct
+    (* We assume that the mpath are in normal form *)  
     type t = prog_var * EcMemory.memory
     let compare (p1,m1) (p2,m2) = 
       let r = EcIdent.id_compare m1 m2 in
-      if r = 0 then pv_compare p1 p2 
+      if r = 0 then 
+        let r = Pervasives.compare p1.pv_kind p2.pv_kind in
+        if r = 0 then 
+          let p1 = p1.pv_name.EcPath.m_path in
+          let p2 = p2.pv_name.EcPath.m_path in
+          EcPath.p_compare p1 p2 
+        else r
       else r
   end)
 
@@ -61,6 +56,15 @@ module PVM = struct
       match f.f_node with
       | Fpvar(pv,m) -> 
           (try find env pv m s with Not_found -> f)
+(*      | FeqGlob(m1,m2,mp) ->
+        let xs, mps = EcEnv.norm_eqGlob_mp env mp in
+        let add_m f mp = f_and_simpl (f_eqGlob m1 m2 mp) f in
+        let add_v f (x,ty) = 
+          let v1 = aux (f_pvar x ty m1) in
+          let v2 = aux (f_pvar x ty m2) in
+          f_and_simpl (f_eq_simpl v1 v2) f in
+        let eqm = List.fold_left add_m f_true mps in
+        List.fold_left add_v eqm xs  *)
       | FhoareF _ | FhoareS _ | FequivF _ | FequivS _ | Fpr _ -> assert false
       | _ -> EcFol.f_map (fun ty -> ty) aux f)
 
@@ -155,6 +159,33 @@ and wp_instr env m i letsf =
 let wp env m s post = 
   let r,letsf = wp_stmt env m (List.rev s.s_node) ([],PVM.empty,post) in
   List.rev r, mk_let env letsf 
+
+
+(*let t_equivF_def env g =
+  let hyps, concl = get_goal concl in
+  let pre, f1, f2, post = destr_equivF env concl in
+  let fd1 = EcEnv.Fun.by_mpath f1 env in
+  let fd2 = EcEnv.Fun.by_mpath f2 env in
+  let me1 = EcEnv.Fun.memenv (hasres:false) mleft f1.EcPath.m_path f
+    2.EcPath.m_path
+  
+
+
+  let npre = 
+    
+
+
+
+
+let t_prhl_wp 
+*)
+
+
+
+
+
+
+
 
 exception NotSkipStmt
 

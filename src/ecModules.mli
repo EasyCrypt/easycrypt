@@ -95,7 +95,7 @@ type module_sig = {
 and module_sig_body = module_sig_body_item list
 
 and module_sig_body_item =
-  | Tys_variable of variable
+(*  | Tys_variable of variable *)
   | Tys_function of funsig
 
 and funsig = {
@@ -148,3 +148,6 @@ and function_def = {
 (* -------------------------------------------------------------------- *)
 val fd_equal : function_def -> function_def -> bool
 val fd_hash  : function_def -> int
+
+val mty_subst : 
+  (path -> path) -> (mpath -> mpath) ->  module_type -> module_type

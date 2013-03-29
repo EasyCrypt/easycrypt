@@ -131,7 +131,7 @@ and activemc = {
 
 and actmem =
 | AMAbstract of EcIdent.t
-| AMConcrete of mpath * memenv
+| AMConcrete of memenv
 
 (* -------------------------------------------------------------------- *)
 type env = preenv
@@ -162,9 +162,8 @@ module Memory : sig
   val lookup   : symbol -> env -> actmem option
   val current  : env -> (memory * actmem) option
   val push     : actmem -> env -> env
-  val push_all : (mpath * memenv) list -> env -> env
+  val push_all : EcMemory.memenv list -> env -> env
 
-  val concretize : mpath -> memenv -> env -> env
 end
 
 (* -------------------------------------------------------------------- *)
@@ -182,10 +181,19 @@ module Fun : sig
   val sp_lookup     : qsymbol -> env -> (path * t suspension)
   val sp_lookup_opt : qsymbol -> env -> (path * t suspension) option
 
-  val memenv     : hasres:bool -> memory -> EcPath.path -> env -> memenv
-  val memenv_opt : hasres:bool -> memory -> EcPath.path -> env -> memenv option
+  val prF : EcPath.mpath -> env -> env
 
-  val enter : hasres:bool -> memory -> EcPath.mpath -> env -> (memenv * env)
+  val hoareF : EcPath.mpath -> env -> env * env
+
+  val hoareS : EcPath.mpath -> env -> 
+    EcMemory.memenv * EcModules.function_def * env
+
+  val equivF : EcPath.mpath -> EcPath.mpath -> env -> env * env
+
+  val equivS : 
+    EcPath.mpath -> EcPath.mpath -> env ->
+    EcMemory.memenv * EcModules.function_def * EcMemory.memenv *
+      EcModules.function_def * env
 
   val add : EcPath.mpath -> env -> env
 end

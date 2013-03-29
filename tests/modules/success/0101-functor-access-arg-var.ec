@@ -1,13 +1,13 @@
 type t.
 
 module type I = {
-  var x : t
+  fun f() : t 
 }.
 
 module M(X : I) = {
   var y : t
 
   fun init() : unit = {
-    y = X.x;
+    y := X.f();
   }
 }.

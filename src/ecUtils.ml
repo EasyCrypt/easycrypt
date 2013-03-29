@@ -320,15 +320,14 @@ module List = struct
       | x::l -> if f x then r, x, l else aux (x::r) l in
     aux [] l
  
-  let map_fold (f : 'a -> 'b -> 'a * 'c) (b0 : 'a) (xs : 'b list) =
-    let b, ys =
-      List.fold_left
-        (fun (b, ys) x ->
-          let (b, y) = f b x in (b, y :: ys))
-        (b0, []) xs
-    in
-      (b, List.rev ys)
-
+  let map_fold (f : 'a -> 'b -> 'a * 'c) (a : 'a) (xs : 'b list) =
+    let a = ref a in
+    let f b = 
+      let (a',c) = f !a b in
+      a := a'; c in
+    let l = List.map f xs in
+    !a, l
+  
   let map_combine
       (f1  : 'a -> 'c) (f2  : 'b -> 'd)
       (xs1 : 'a list ) (xs2 : 'b list )
@@ -367,6 +366,14 @@ module List = struct
         let tl' = smart_map f tl in
 	if h'==h && tl'==tl then l else 
         h'::tl'
+
+  let smart_map_fold (f : 'a -> 'b -> 'a * 'c) (a : 'a) (xs : 'b list) =
+    let r = ref a in
+    let f b = 
+      let (a,c) = f !r b in
+      r := a; c in
+    let l = smart_map f xs in
+    !r, l
 
 end
 

@@ -1,10 +1,11 @@
 module type I = {
-  var x:bool
+  fun init():unit 
 }.
 
 module M(I:I): I = {
   var x:bool
   fun init():unit = {
-    x = I.x;
+    I.init();
+    x = true;
   }
 }.

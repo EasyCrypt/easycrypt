@@ -1,14 +1,14 @@
 type t.
 
 module type I = {
-  var x : t
+ fun f (x:t) : t 
 }.
 
 module type J = {
-  var y : t
+ fun g (x : t) : t 
 }.
 
 module M : I, J = {
-  var x : t
-  var y : t
+  fun f(x:t) : t = { return x; }
+  fun g(x:t) : t = { return x; }
 }.
