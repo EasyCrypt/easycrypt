@@ -8,3 +8,4 @@ proof.
  skip.
  intros m h.
  assumption h.
+save.
