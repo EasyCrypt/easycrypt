@@ -360,7 +360,6 @@ let t_split env g =
       | Some (p,tys,aa) -> check_logic env p; t_apply_glob env p tys aa g 
       | None -> aux_red f
       end
-
     | Fif(f1,f2,f3) ->
       check_logic env p_if_intro;
       t_apply_glob env p_if_intro [] 

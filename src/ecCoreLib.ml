@@ -34,14 +34,15 @@ let id_iff       = "<=>"
 let id_eq        = "="
 
 let id_leq       = "<="
-let id_lt       = "<"
+let id_lt        = "<"
 
 
 let p_top        = EcPath.extend None id_top
 let p_pervasive  = EcPath.extend (Some p_top) id_pervasive
 let pervasive id = EcPath.extend (Some p_pervasive) id
 
-let top_int id     = EcPath.extend (Some (EcPath.extend (Some p_top) id_Int)) id
+let extend_int id  = EcPath.extend (Some p_top) id
+
 
 
 
@@ -63,8 +64,8 @@ let p_imp        = pervasive id_imp
 let p_iff        = pervasive id_iff
 let p_eq         = pervasive id_eq
 
-let p_leq        = top_int id_leq
-let p_lt         = top_int id_lt
+let p_leq        = extend_int id_leq
+let p_lt         = extend_int id_lt
 
 
 let p_logic      = EcPath.pqname p_top "Logic" 

@@ -832,7 +832,7 @@ and transstruct1 (env : EcEnv.env) (st : pstructure_item) =
           xs
 
   | Pst_fun (decl, body) -> begin
-      let fid = decl.pfd_name.pl_desc in
+      let fid = unloc decl.pfd_name in
       let ue = UE.create (Some []) in
       let known_ids = ref Mstr.empty in
       let env = EcEnv.Fun.enter fid env in
@@ -842,9 +842,8 @@ and transstruct1 (env : EcEnv.env) (st : pstructure_item) =
         List.map (fun (id,ty) -> (id, `Variable (PVloc, ty))) params in
       let env = EcEnv.bindall params_ env in
 
-
       let rty = transty tp_uni env ue decl.pfd_tyresult in
-      let stmt, re, locals, _env = transbody known_ids ue env body rty in
+      let stmt, re, locals = transbody known_ids ue env body rty in
 
       let subst_uni = Tuni.subst (UE.close ue) in
       let check_type ty = 
@@ -906,7 +905,7 @@ and transbody known_ids ue env body rty =
         let re, ty = transexp env ue pe in
         unify_error env ue pe.pl_loc ty rty; Some re 
   in
-    (stmt, re, !locals, env)
+    (stmt, re, !locals)
 
 (* -------------------------------------------------------------------- *)
 and transstmt ue (env : EcEnv.env) (stmt : pstmt) =
@@ -1228,18 +1227,27 @@ let transform_opt env ue pf tt =
         let pre  = transf penv pre
         and post = transf qenv post
         in
+        f_hoareF pre fpath post
 
-          f_hoareF pre fpath post
+    | PFhoareS (pre, body, post) ->
+      let known_ids = ref Mstr.empty in
+      let ue = UE.create (Some []) in (* FIXME: What is this? *)
+      (* FIXME: assuming no return statement *)
+      let stmt, _re, (locals:(symbol*ty) list ) = 
+        transbody known_ids ue env body tunit in
+      let locals = List.map (fun (s,t) -> {v_name=s;v_type=t} ) locals in
+      let menv,env = EcEnv.Fun.hoareS_anonym locals env in
+      let pre = transf env pre in
+      let post = transf env post in
+      f_hoareS menv pre stmt post
 
     | PFequivF (pre, (gp1, gp2), post) ->
         let fpath1 = trans_gamepath env gp1 in
         let fpath2 = trans_gamepath env gp2 in
-
         let penv, qenv = EcEnv.Fun.equivF fpath1 fpath2 env in
         let pre = transf penv pre in
         let post = transf qenv post in
-
-          f_equivF pre fpath1 fpath2 post
+        f_equivF pre fpath1 fpath2 post
 
   and trans_fbind env ue decl = 
     let trans1 env ({ pl_desc = x }, pgty) =
@@ -1266,10 +1274,11 @@ let transform_opt env ue pf tt =
     in
       match locals with
       | Some (id, ty) ->
-          if tvi <> None then assert false; (* FIXME : error message *)
-          [ (f_local id ty, ue) ]
+        if tvi <> None then assert false; (* FIXME : error message *)
+        [ (f_local id ty, ue) ]
 
       | None -> 
+        begin
         let ops = EcUnify.select_op true tvi env name ue psig in
         let prepare_op ((op, tys), ty, ue) = (f_op op tys ty, ue) in
         let ops = List.map prepare_op ops in
@@ -1279,6 +1288,7 @@ let transform_opt env ue pf tt =
           let pvs = select_pv env (Some me) name ue tvi psig in
           let prepare_pv (pv, ty, ue) = f_pvar pv ty me, ue in
           (List.map prepare_pv pvs) @ ops 
+        end
   in
 
   let f = transf env pf in

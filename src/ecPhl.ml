@@ -1,4 +1,5 @@
 
+open EcParsetree
 open EcUtils
 open EcTypes
 open EcFol
@@ -12,7 +13,9 @@ exception CannotApply of string * string
 
 let cannot_apply s1 s2 = raise (CannotApply(s1,s2))
 
+
 let split_stmt n s = List.take_n n s
+
 
 
 (* -------------------------------------------------------------------- *)
@@ -20,7 +23,7 @@ let split_stmt n s = List.take_n n s
 (* -------------------------------------------------------------------- *)
 
 module PVM = struct
-    
+
   module M = EcMaps.Map.Make(struct
     (* We assume that the mpath are in normal form *)  
     type t = prog_var * EcMemory.memory
@@ -76,11 +79,11 @@ module PVM = struct
 
 end
 
+
+
 (* -------------------------------------------------------------------- *)
 (* -------------------------------  Wp -------------------------------- *)
 (* -------------------------------------------------------------------- *)
-
-
 
 let id_of_pv pv = 
   EcIdent.create (EcPath.basename pv.pv_name.EcPath.m_path) 
@@ -261,56 +264,149 @@ let t_skip = t_hS_or_eS t_hoare_skip t_equiv_skip
 
   
 
-let quantify_pvars _pvars _phi = assert false 
-(*
+
+module Pvar = struct
+  type t = EcTypes.prog_var * EcMemory.memory * EcTypes.ty
+  let mk_pvar pv mem ty = (pv,mem,ty)
+  let compare lv1 lv2 = compare lv1 lv2
+end
+module PVset = Set.Make(Pvar)
+let rec free_pvar  fm = 
+  match fm.f_node with
+    | Fint _ | Fop _ -> PVset.empty
+    | Fpvar (pv,mem) -> PVset.singleton (pv,mem,fm.f_ty) 
+    | Flocal _ -> PVset.empty
+    | Fquant(_,_,f) -> free_pvar f
+    | Fif(f1,f2,f3) -> 
+      PVset.union (free_pvar f1) (PVset.union (free_pvar f2) (free_pvar f3))
+    | Flet(_, f1, f2) ->
+      PVset.union (free_pvar f1) (free_pvar f2)
+    | Fapp(f,args) ->
+      List.fold_left (fun s f -> PVset.union s (free_pvar f)) (free_pvar f) args
+    | Ftuple args ->
+      List.fold_left (fun s f -> PVset.union s (free_pvar f)) PVset.empty args 
+    | FhoareS _ (* (_,pre,_,post) *) -> 
+      assert false (* FIXME: not implemented *)
+      (* PVset.union (free_pvar pre) (free_pvar post) *)
+    | _ -> assert false (* FIXME *)
+
+let quantify_pvars env pvars phi = (* assert false  *)
   let f (pv,m,ty) (bds,phi) =
     if EcTypes.is_loc pv then
       let local = EcIdent.create (EcPath.name_mpath pv.EcTypes.pv_name) in
-      let phi = EcFol.Subst.subst_form 
-        (Subst.single_subst (Lvar.mk_pvar pv m) (f_local local ty)) phi in 
+      let s = PVM.add env pv m (f_local local ty) PVM.empty in
+      let phi = PVM.subst env s phi in 
       let bds = (local,GTty ty) :: bds in
       bds,phi
     else (bds,phi)
   in
   let bds,phi = PVset.fold f pvars ([],phi) in
   f_forall bds phi
-*)
 
-let quantify_out_local_pvars _phi = assert false 
-(*
-  let free_pvars = EcFol.free_pvar phi in
-  quantify_pvars free_pvars phi
-*)
-
+let quantify_out_local_pvars env phi = 
+  let free_pvars = free_pvar phi in
+  Format.printf "Found %i free program variables \n" (List.length (PVset.elements free_pvars));
+  Format.print_newline();
+  quantify_pvars env free_pvars phi
 
 
-let wp_tac _i _loc _env (_juc,_n as _g) =
-  assert false
-(*
+
+
+
+
+
+
+
+
+type destr_error =
+  | Destr_hl 
+
+exception DestrError of destr_error
+
+let destr_error e = raise (DestrError e)
+
+
+
+let destr_hl env f = 
+  match f.f_node with
+    | FhoareS hr -> hr.hs_me, hr.hs_pre, hr.hs_s, hr.hs_post
+    | FhoareF hr -> 
+      let pre,fpath,post = hr.hf_pre, hr.hf_f, hr.hf_post  in 
+
+
+      let fun_ = EcEnv.Fun.by_mpath fpath env in
+      let b,ret_e = match fun_.f_def with 
+        | Some fdef -> 
+          fdef.f_body, fdef.f_ret
+        | None -> assert false (* FIXME *)
+      in
+
+      let post = match ret_e with
+        | None -> assert false (* FIXME *)
+        | Some ret_e -> 
+          let _,env = EcEnv.Fun.hoareF fpath env in
+          let res = match EcEnv.Var.lookup_progvar_opt ~side:EcFol.mhr ([],"res") env with
+            | Some (pv,_) -> pv
+            | None -> assert false (* FIXME: error message *)
+          in
+          let subst = PVM.add env res EcFol.mhr (EcFol.form_of_expr EcFol.mhr ret_e) PVM.empty in
+          PVM.subst env subst post
+      in
+
+      let locals = fst fun_.f_sig.fs_sig in
+      let menv = List.fold_left 
+        (fun menv v -> EcMemory.bind v.v_name v.v_type menv)
+        (EcMemory.empty_local EcFol.mhr fpath) locals in
+      menv,pre,b,post
+    | _ -> destr_error Destr_hl
+
+
+
+
+
+
+
+(*****************************************************************************)
+(* TACTICS *)
+(*****************************************************************************)
+
+exception NotSkipStmt
+
+let skip_tac env (juc,n as g) =
   let hyps,concl = get_goal g in
-  let mem,pre,s,post = destr_hl concl in
+  let _mem,pre,s,post = destr_hl env concl in
+  match s.EcModules.s_node with
+    | _ :: _ ->
+      raise NotSkipStmt
+    | [] ->
+      let conc = f_imp pre post in
+      let conc = quantify_out_local_pvars env conc in
+      let juc,n1 = new_goal juc (hyps,conc) in
+      let rule = {pr_name = RN_fixme; pr_hyps=[RA_node n1]} in
+      upd_rule rule (juc,n)
+
+
+let wp_tac i _loc env (juc,n as g) =
+  let hyps,concl = get_goal g in
+  let menv,pre,s,post = destr_hl env concl in
   let s_fix,s_wp = split_stmt i s.EcModules.s_node  in
-  let s_wp,post = wp s_wp post in
+  let s_wp,post = wp env (EcMemory.memory menv) (EcModules.stmt s_wp) post in
   let s = EcModules.stmt (s_fix @ s_wp) in
-  let a = f_hoareS mem pre s post  in
+  let a = f_hoareS menv pre s post  in
   let juc,n' = new_goal juc (hyps,a) in
-  let rule = { pr_name = RN_wp i; pr_hyps = [n']} in
-  upd_rule (juc,n) rule
-*)
+  let rule = { pr_name = RN_fixme; pr_hyps = [RA_node n']} in
+  upd_rule rule (juc,n)
 
-let app_tac _ _ _ _ = assert false
-(*(i,phi) _loc _env (juc,n as g) =
-
+let app_tac (i,phi) _loc env (juc,n as g) =
   let hyps,concl = get_goal g in
-  let mem,pre,s,post = destr_hl concl in
+  let mem,pre,s,post = destr_hl env concl in
   let s1,s2 = split_stmt i s.EcModules.s_node  in
   let a = f_hoareS mem pre (EcModules.stmt s1) phi  in
   let b = f_hoareS mem phi (EcModules.stmt s2) post in
   let juc,n1 = new_goal juc (hyps,a) in
   let juc,n2 = new_goal juc (hyps,b) in
-  let rule = { pr_name = RN_app (i,phi); pr_hyps = [n1;n2]} in
-  upd_rule (juc,n) rule
-*)
+  let rule = { pr_name = RN_fixme; pr_hyps = [RA_node n1; RA_node n2]} in
+  upd_rule rule (juc,n)
 
 
 
@@ -329,7 +425,6 @@ end
 
 module PVset' = Set.Make(Pvar')
 
-(* let modified_pvars stmt -> (EcTypes.prog_var * ty) list *)
 
 let rec modified_pvars_i instr = 
   let f_lval = function 
@@ -353,25 +448,25 @@ and modified_pvars stmt =
   List.fold_left (fun s i -> PVset'.union s (modified_pvars_i i)) 
     PVset'.empty stmt.EcModules.s_node
 
-let while_tac _inv _vrnt _bnd (_juc,_n as _g) = assert false 
-(*
+
+let while_tac env inv vrnt bnd (juc,n as g) = 
   let hyps,concl = get_goal g in
-  let mem,pre,s,post = destr_hl concl in
+  let menv,pre,s,post = destr_hl env concl in
   let rev_s = List.rev s.EcModules.s_node in
   match rev_s with
-    | [] -> cannot_apply "while_tac" ""
+    | [] -> cannot_apply "while_tac" "empty statements"
     | i :: rev_s' ->
-      match i.EcModules.i_node with 
+      match i.EcModules.i_node with
         | EcModules.Swhile (e,c) ->
           (* initialization *)
           (* {P} s' {Inv /\ v <= bdn /\ A mod(s) (Inv /\ ~e => post) } *)
           let mods = modified_pvars c in
-          let f (pv,ty) pvs  = PVset.add (pv,mstd,ty) pvs in
+          let f (pv,ty) pvs  = PVset.add (pv,EcFol.mhr,ty) pvs in
           let mods = PVset'.fold f mods PVset.empty in
-          let e = form_of_exp mstd e in 
-          let p = quantify_pvars mods (f_imp (f_and inv (f_not e)) post) in
-          let post1 = f_and inv (f_and (f_int_leq vrnt bnd) p) in
-          let j1 = f_hoare mem pre (EcModules.stmt (List.rev rev_s')) post1 in
+          let e = form_of_expr (EcMemory.memory menv) e in
+          let p = quantify_pvars env mods (f_imp (f_and inv (f_not e)) post) in
+          let post1 = f_and inv (f_and (f_int_le vrnt bnd) p) in
+          let j1 = f_hoareS menv pre (EcModules.stmt (List.rev rev_s')) post1 in
           let juc,n1 = new_goal juc (hyps,j1) in
 
           (* termination goal *)
@@ -382,25 +477,53 @@ let while_tac _inv _vrnt _bnd (_juc,_n as _g) = assert false
           let bnd_eq = f_eq bnd (f_local bnd_local EcTypes.tint) in
           let pre2 = f_and (f_and inv e) (f_and vrnt_eq bnd_eq) in
           let post2 = f_and vrnt_lt bnd_eq in
-          let j2 = f_hoare mem pre2 c post2 in
+          let j2 = f_hoareS menv pre2 c post2 in
           let juc,n2 = new_goal juc (hyps,j2) in
 
           (* invariant preservation *)
           (* TODO: if prob=1 then the next goal can be merged with previous one,
              otw one cannot *)
           let pre3, post3 = f_and inv e, inv in
-          let j3 = f_hoare mem pre3 c post3 in
+          let j3 = f_hoareS menv pre3 c post3 in
           let juc,n3 = new_goal juc (hyps,j3) in
-          
-          let rule = { pr_name = RN_while(inv,vrnt,bnd); pr_hyps=[n1;n2;n3]} in
-          upd_rule (juc,n) rule
-        | _ -> cannot_apply "while_tac" ""
-*)
+
+          let rule = { pr_name = RN_fixme; pr_hyps=[RA_node n1;RA_node n2;RA_node n3]} in
+          upd_rule rule (juc,n)
+        | _ -> cannot_apply "while_tac" "a while loop is expected"
 
 
-let add_locals_env env locals =
-  let f (s,ty) = (s, `Variable (EcTypes.PVloc, ty)) in
-  let locals = List.map f locals in
-  EcEnv.bindall locals env
+let unfold_hoare_tac env (juc,n as g) =
+  let hyps,concl = get_goal g in
+  let menv,pre,c,post = destr_hl env concl in
+  let j = f_hoareS menv pre c post in
+  let juc,n' = new_goal juc (hyps,j) in
+  let rule = { pr_name = RN_fixme; pr_hyps=[RA_node n']} in
+  upd_rule rule (juc,n)
+
+
+
+
+
+let process_phl env process_form tac loc (_juc,_n as g) = 
+  let hyps,concl = get_goal g in
+  let menv,_pre,_s,_post = destr_hl env concl in
+  let env = EcEnv.Memory.set_active (EcMemory.memory menv) 
+    (EcEnv.Memory.push menv env) in
+  match tac with 
+    | Phoare ->
+      unfold_hoare_tac env g
+    | Papp (i,pf) -> 
+      let f = process_form env hyps pf EcTypes.tbool in
+      app_tac (i,f) loc env g
+    | Pwp i -> 
+      wp_tac i loc env g
+    | Pskip -> 
+      skip_tac env g
+    | Pwhile (inv,varnt,bnd) ->
+      let inv = process_form env hyps inv EcTypes.tbool in
+      let varnt = process_form env hyps varnt EcTypes.tint in
+      let bnd = process_form env hyps bnd EcTypes.tint in
+      while_tac env inv varnt bnd g
+
 
 

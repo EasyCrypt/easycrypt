@@ -172,6 +172,7 @@ type rule_name =
   | RN_exists_intro 
 (*| RN_tuple_intro  of EcIdent.t list *)
   | RN_conv    
+  | RN_fixme
 (* Phl rules *)    
   | RN_hl_fun_def 
   | RN_hl_skip
@@ -296,7 +297,7 @@ let upd_rule_done = upd_rule true
 let upd_rule      = upd_rule false
 
 let t_id (juc,n) = juc,[n]
-    
+
 let t_on_goals t (juc,ln) = 
   let juc,ln = 
     List.fold_left (fun (juc,ln) n ->

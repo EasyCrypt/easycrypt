@@ -151,6 +151,7 @@ and pformula_r =
   | PFlambda of pgtybindings * pformula
 
   (* for claims *)
+  | PFhoareS of pformula * pfunction_body * pformula
   | PFhoareF of pformula * pgamepath * pformula
   | PFequivF of pformula * (pgamepath * pgamepath) * pformula
   | PFprob   of pgamepath * (pformula list) * pmemory * pformula
@@ -255,6 +256,7 @@ and phl_tactics =
   | Papp        of (int * pformula)
   | Pwp         of int
   | Pwhile      of (pformula * pformula * pformula)
+  | Phoare
 and ptactics = ptactic list        
 
 (* -------------------------------------------------------------------- *)

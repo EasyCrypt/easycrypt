@@ -899,11 +899,15 @@ module Fun = struct
     let mem = EcMemory.empty_local me path in
     add_in_memenv mem {v_name = "res"; v_type = snd fun_.f_sig.fs_sig}
 
-  let actmem_body me path fun_ = 
+  let actmem_body me path fun_ =
     let mem = actmem_pre me path fun_ in
     match fun_.f_def with
     | None -> assert false (* FIXME error message *)
-    | Some fd -> fd, adds_in_memenv mem fd.f_locals 
+    | Some fd -> fd, adds_in_memenv mem fd.f_locals
+
+  let actmem_body_anonym me path locals = 
+    let mem = EcMemory.empty_local me path in
+    adds_in_memenv mem locals 
 
   let prF path env = 
     let fun_ = by_mpath path env in
@@ -921,6 +925,11 @@ module Fun = struct
     let fd, memenv = actmem_body EcFol.mhr path fun_ in
     memenv, fd, Memory.push_active memenv env
 
+  let hoareS_anonym locals env = 
+    let path = env.env_scope in
+    let memenv = actmem_body_anonym EcFol.mhr path locals in
+    memenv, Memory.push_active memenv env
+
   let equivF path1 path2 env = 
     let fun1 = (by_path (EcPath.path_of_mpath path1) env).sp_target in
     let fun2 = (by_path (EcPath.path_of_mpath path2) env).sp_target in
@@ -937,6 +946,12 @@ module Fun = struct
     let fd1, mem1 = actmem_body EcFol.mleft path1 fun1 in
     let fd2, mem2 = actmem_body EcFol.mright path2 fun2 in
     mem1, fd1, mem2, fd2, Memory.push_all [mem1; mem2] env
+
+  let equivS_anonym locals1 locals2 env = 
+    let path1, path2 = env.env_scope, env.env_scope in
+    let mem1 = actmem_body_anonym EcFol.mleft path1 locals1 in
+    let mem2 = actmem_body_anonym EcFol.mright path2 locals2 in
+    mem1, mem2, Memory.push_all [mem1; mem2] env
 
   let enter name env =
     enter name EcPath.PKother [] env

@@ -783,8 +783,12 @@ struct
       | Ftuple args ->
           pr_tuple_expr tenv pr_form args
 
-      | FhoareF _ ->
-          !^ "implement-me"             (* FIXME *)
+      | FhoareF hf  ->
+        let pre,fpath,post = hf.hf_pre, hf.hf_f, hf.hf_post in 
+        let spec =  pr_seq [pr_fun_name tenv fpath; Pp.colon;
+                            pr_form tenv outer pre;
+                            Pp.string "==>"; pr_form tenv outer post] in
+        pr_seq [Pp.string "hoare"; Pp.brackets spec  ]
             
       | FhoareS hs -> 
         let dbody =

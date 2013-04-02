@@ -180,8 +180,9 @@ module Fun : sig
 
   val hoareF : EcPath.mpath -> env -> env * env
 
-  val hoareS : EcPath.mpath -> env -> 
-    EcMemory.memenv * EcModules.function_def * env
+  val hoareS : EcPath.mpath -> env -> EcMemory.memenv * EcModules.function_def * env
+
+  val hoareS_anonym : EcModules.variable list -> env -> EcMemory.memenv * env
 
   val equivF : EcPath.mpath -> EcPath.mpath -> env -> env * env
 
@@ -189,6 +190,11 @@ module Fun : sig
     EcPath.mpath -> EcPath.mpath -> env ->
     EcMemory.memenv * EcModules.function_def * EcMemory.memenv *
       EcModules.function_def * env
+
+  val equivS_anonym : 
+    EcModules.variable list ->
+    EcModules.variable list ->
+    env -> EcMemory.memenv * EcMemory.memenv * env
 
   val enter : symbol -> env -> env
   val add : EcPath.mpath -> env -> env

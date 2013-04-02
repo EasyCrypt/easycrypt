@@ -528,6 +528,13 @@ sform:
 
 | EQUIV LBRACKET eb=equiv_body RBRACKET { eb }
 
+| HOARE LBRACKET
+    s=fun_def_body
+    COLON pre=loc(form) LONGARROW post=loc(form)
+  RBRACKET
+	{ PFhoareS (pre,s,post) }
+
+
 | PR LBRACKET
     mp=loc(fident) args=paren(plist0(loc(sform), COMMA)) AT pn=mident
     COLON event=loc(form)
@@ -1196,7 +1203,9 @@ tactic:
     { PPhl Pskip }
 
 | WHILE inv=loc(sform) vrnt=loc(sform) bnd=loc(sform)
-   { PPhl (Pwhile (inv, vrnt, bnd)) }
+    { PPhl (Pwhile (inv, vrnt, bnd)) }
+| HOARE                         
+    { PPhl Phoare }
 
 ;
 
