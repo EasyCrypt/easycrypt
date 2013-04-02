@@ -1185,6 +1185,7 @@ tactic:
    { Pcut (n, p) }
 
 (* PHL tactics *)
+| FUN { PPhl Pfun_def }
 | APP n=number p=loc(sform)
    { PPhl( Papp(n,p) ) }
 
@@ -1196,6 +1197,7 @@ tactic:
 
 | WHILE inv=loc(sform) vrnt=loc(sform) bnd=loc(sform)
    { PPhl (Pwhile (inv, vrnt, bnd)) }
+
 ;
 
 tactics:

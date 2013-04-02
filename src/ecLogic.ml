@@ -27,19 +27,10 @@ type tac_error =
   | CanNotReconizeElimT 
   | ToManyArgument
   | NoHypToSubst          of EcIdent.t option
-
-  | ExclMidle             of form
-  | And_I                 of form
-  | Or_I                  of form
-  | Imp_I                 of form
-  | Forall_I              of form
-  | Exists_I              of form
-  | Imp_E                 of form
-  | Forall_E              of form
-  | Exists_E              of form
-  | DupIdInCtxt           of EcIdent.t 
   | CanNotProve           of l_decl
   | InvalNumOfTactic      of int * int
+  | NotPhl                of bool option
+  | NoSkipStmt
 
 exception TacError of tac_error
 
@@ -72,31 +63,19 @@ let pp_tac_error fmt = function
       (EcIdent.name id)
   | NoHypToSubst None ->
     Format.fprintf fmt "Can not find non recursive equation to substite"
-
-  | ExclMidle f ->
-      Format.fprintf fmt "Cannot apply excluded middle on %a" PE.pp_form f
-  | And_I f ->
-      Format.fprintf fmt "Cannot apply and intro on %a" PE.pp_form f
-  | Or_I f ->
-      Format.fprintf fmt "Cannot apply or intro on %a" PE.pp_form f
-  | Imp_I f ->
-      Format.fprintf fmt "Cannot apply implies intro on %a" PE.pp_form f
-  | Forall_I f ->
-      Format.fprintf fmt "Cannot apply forall intro on %a" PE.pp_form f
-  | Exists_I f ->
-      Format.fprintf fmt "Cannot apply exists intro on %a" PE.pp_form f
-  | Imp_E f ->
-      Format.fprintf fmt "Cannot apply implies elim on %a" PE.pp_form f  
-  | Forall_E f ->
-      Format.fprintf fmt "Cannot apply forall elim on %a" PE.pp_form f
-  | Exists_E f ->
-      Format.fprintf fmt "Cannot apply exists elim on %a" PE.pp_form f
-  | DupIdInCtxt id -> 
-      Format.fprintf fmt "Duplicate name in context %s" (EcIdent.name id)
   | CanNotProve g -> 
-      Format.fprintf fmt "Can not prove %a" PE.pp_lgoal g
+    Format.fprintf fmt "Can not prove %a" PE.pp_lgoal g
   | InvalNumOfTactic (i1,i2) ->
-      Format.fprintf fmt "Invalid number of tactics: %i given, %i expected" i2 i1
+    Format.fprintf fmt "Invalid number of tactics: %i given, %i expected" i2 i1
+  | NoSkipStmt -> 
+    Format.fprintf fmt "Can not apply skip rule"
+  | NotPhl b ->
+    let s = 
+      match b with
+      | None -> "phl/prhl"
+      | Some true -> "phl"
+      | Some false -> "prhl" in
+    Format.fprintf fmt "The conclusion does not end by a %s judgment" s
 
 let _ = EcPexception.register (fun fmt exn ->
   match exn with
@@ -200,7 +179,7 @@ let check_arg do_arg env hyps s x gty a =
   | GTty ty  , AAform f ->
     check_type env ty f.f_ty; (* FIXME error message *)
     bind_local s x f, RA_form f
-  | GTmem    , AAmem m ->
+  | GTmem _   , AAmem m ->
     bind_mem s x m, RA_id m
   | GTmodty _, AAmp mp  ->
       (* FIXME : check the type of mp *)
@@ -284,8 +263,8 @@ let t_intros env ids (juc,n as g) =
     match gty with
     | GTty ty ->
       LD_var(ty,None), bind_local s x (f_local id ty)
-    | GTmem   ->
-      LD_mem, bind_mem s x id 
+    | GTmem me  ->
+      LD_mem me, bind_mem s x id 
     | GTmodty i ->
       LD_modty i, bind_mod s x (EcPath.mident id) in
 
@@ -436,11 +415,11 @@ let t_generalize_hyp env id g =
   match LDecl.lookup_by_id id hyps with
   | LD_var (ty,_) -> 
     t_generalize_form (Some (EcIdent.name id)) env (f_local id ty) g
-  | LD_mem ->
+  | LD_mem mt ->
     let x = EcIdent.fresh id in
     let s = EcFol.bind_mem f_subst_id id x in
     let body = f_subst s concl in
-    let ff = f_forall [x, GTmem] body in
+    let ff = f_forall [x, GTmem mt] body in
     t_apply_form env ff [AAmem id] g
   | LD_modty _ -> assert false (* Not implemented *)
   | LD_hyp f ->

@@ -1052,7 +1052,7 @@ let trans_gty env vm gty =
   match gty with
   | GTty ty -> trans_ty env vm ty
   | GTmodty _ -> ty_mod
-  | GTmem     -> ty_mem
+  | GTmem   _ -> ty_mem (* FIXME declare local variables *)
 
 let trans_gtys env vm gtys =
   List.map (trans_gty env vm) gtys
@@ -1473,7 +1473,7 @@ let check_goal env pi (hyps, concl) =
           env := nenv;
           let pr = Decl.create_prsymbol (preid id) in
           Decl.create_prop_decl Decl.Paxiom pr (force_prop f)
-      | LD_mem     -> 
+      | LD_mem  _ -> 
           let ls = Term.create_fsymbol (preid id) [] ty_mem in
           let decl = Decl.create_param_decl ls in
           vm := { !vm

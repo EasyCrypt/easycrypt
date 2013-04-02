@@ -266,6 +266,10 @@ let string_of_pvar (p : prog_var) =
     (EcPath.m_tostring p.pv_name)
     (string_of_pvar_kind p.pv_kind)
 
+let pv_res (f:EcPath.mpath) = 
+  { pv_name = EcPath.mqname f EcPath.PKother "res" [];
+    pv_kind = PVloc }
+
 (* -------------------------------------------------------------------- *)
 type lpattern =
   | LSymbol of (EcIdent.t * ty)

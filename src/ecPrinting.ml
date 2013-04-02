@@ -731,7 +731,7 @@ struct
     | GTty ty ->
         pr_vardecl tenv (x, ty)
 
-    | GTmem ->
+    | GTmem _ ->
         let tenv1 = M.add_local tenv x in
           (tenv1, pr_seq [pr_local_symb tenv1 x; Pp.colon; tk_memory])
 
@@ -974,7 +974,7 @@ struct
     let dk = 
       match k with
       | LD_var (ty, _body) -> pr_type t ty (* FIXME body *)
-      | LD_mem             -> tk_memory
+      | LD_mem _           -> tk_memory
       | LD_modty p         -> pr_modtype t p
       | LD_hyp f           -> pr_form t f in
     let dh = pr_ident t id ^^ (!^ " : ") ^//^ dk in

@@ -75,7 +75,7 @@ type preenv = private {
   env_locals : (EcIdent.t * EcTypes.ty) MMsym.t;
 
   (* The set of memories (i.e. sided program variables) *)
-  env_memories : actmem MMsym.t;
+  env_memories : EcMemory.memenv MMsym.t;
 
   (* The active memory *)
   env_actmem : EcMemory.memory option;
@@ -129,10 +129,6 @@ and activemc = {
   amc_components : path                             MMsym.t;
 }
 
-and actmem =
-| AMAbstract of EcIdent.t
-| AMConcrete of memenv
-
 (* -------------------------------------------------------------------- *)
 type env = preenv
 
@@ -153,15 +149,14 @@ type meerror =
 exception MEError of meerror
 
 module Memory : sig
-  val actmem_name : actmem -> EcIdent.t
 
   val set_active  : memory -> env -> env
   val get_active  : env -> memory option
 
-  val byid     : memory -> env -> actmem option
-  val lookup   : symbol -> env -> actmem option
-  val current  : env -> (memory * actmem) option
-  val push     : actmem -> env -> env
+  val byid     : memory -> env -> EcMemory.memenv option
+  val lookup   : symbol -> env -> EcMemory.memenv option
+  val current  : env -> EcMemory.memenv option
+  val push     : EcMemory.memenv -> env -> env
   val push_all : EcMemory.memenv list -> env -> env
 
 end
@@ -195,6 +190,7 @@ module Fun : sig
     EcMemory.memenv * EcModules.function_def * EcMemory.memenv *
       EcModules.function_def * env
 
+  val enter : symbol -> env -> env
   val add : EcPath.mpath -> env -> env
 end
 
@@ -263,7 +259,6 @@ module Mod : sig
   val enter : symbol -> (EcIdent.t * module_type) list -> env -> env
   val bind_local : EcIdent.t -> module_type -> env -> env
 
-  val unfold_mod_path : env -> EcPath.mpath -> EcPath.mpath
 end
 
 (* -------------------------------------------------------------------- *)
@@ -281,6 +276,12 @@ module ModTy : sig
 
   val mod_type_equiv : env -> module_type -> module_type -> bool
   val has_mod_type : env -> module_type list -> module_type -> bool
+end
+
+(* -------------------------------------------------------------------- *)
+module NormMp : sig 
+  val norm_mpath : env -> EcPath.mpath -> EcPath.mpath 
+  val norm_pvar  : env -> EcTypes.prog_var -> EcTypes.prog_var
 end
 
 (* -------------------------------------------------------------------- *)
@@ -363,7 +364,7 @@ val import_w3_dir :
   -> env * ctheory_item list
 
 (* -------------------------------------------------------------------- *)
-val norm_pvar         : env -> prog_var -> prog_var
+
 val check_goal        : env -> EcWhy3.prover_infos -> EcBaseLogic.l_decl -> bool
 
 

@@ -13,7 +13,7 @@ type memory = EcMemory.memory
 type gty =
   | GTty    of EcTypes.ty
   | GTmodty of module_type
-  | GTmem
+  | GTmem   of EcMemory.memtype
 
 type quantif = 
   | Lforall
@@ -115,7 +115,7 @@ let gty_equal ty1 ty2 =
        (EcPath.p_equal p1.mt_name p2.mt_name)
     && (oall2 (List.all2 EcPath.m_equal) p1.mt_args p2.mt_args)
 
-  | GTmem, GTmem -> true
+  | GTmem mt1, GTmem mt2 -> EcMemory.mt_equal mt1 mt2
 
   | _ , _ -> false
 
@@ -128,7 +128,7 @@ let gty_hash = function
         (Why3.Hashcons.combine_list EcPath.m_hash (EcPath.p_hash p.mt_name))
         p.mt_args
 
-  | GTmem -> Hashtbl.hash GTmem
+  | GTmem _ -> 1
 
 let b_equal (b1 : binding) (b2 : binding) =
   let b1_equal (x1, ty1) (x2, ty2) = 
@@ -348,7 +348,7 @@ let gty_dump (gty : gty) =
   match gty with
   | GTty    t -> dnode "GTty" [ty_dump t]
   | GTmodty _ -> dleaf "GTmodty"
-  | GTmem     -> dleaf "GTmem"
+  | GTmem   _ -> dleaf "GTmem"
 
 let bd_dump (x, gty) =
   dnode
@@ -424,6 +424,7 @@ let f_true = f_op EcCoreLib.p_true [] ty_bool
 let f_false = f_op EcCoreLib.p_false [] ty_bool
 let f_bool b = if b then f_true else f_false
 let f_int n = mk_form (Fint n) ty_int
+let f_tt = f_op EcCoreLib.p_tt [] ty_unit
 
 let ty_fbool1 = tfun ty_bool ty_bool
 let ty_fbool2 = tfun ty_bool ty_fbool1 
@@ -663,6 +664,26 @@ let is_let1 f =
   match f.f_node with
   | Flet(LSymbol(_,_), _,_) -> true
   | _ -> false
+
+let is_equivS f = 
+  match f.f_node with
+  | FequivS _ -> true
+  | _ -> false
+
+let is_equivF f = 
+  match f.f_node with
+  | FequivF _ -> true
+  | _ -> false
+
+let is_hoareS f = 
+  match f.f_node with
+  | FhoareS _ -> true
+  | _ -> false
+
+let is_hoareF f = 
+  match f.f_node with
+  | FhoareF _ -> true
+  | _ -> false
 (* -------------------------------------------------------------------- *)
 let f_map gt g f = 
     match f.f_node with
@@ -816,10 +837,11 @@ let add_binding s (x,gty as xt) =
     let x' = if s.fs_freshen then EcIdent.fresh x else x in
     if x == x' && p == p' then s,xt else
       bind_mod s x (EcPath.mident x'), (x',GTmodty p')
-  | GTmem ->
-      let x' = if s.fs_freshen then EcIdent.fresh x else x in
-      if x == x' then s,xt else 
-      bind_mem s x x', (x',GTmem)
+  | GTmem mt ->
+    let mt' = EcMemory.mt_subst s.fs_p s.fs_mp s.fs_ty mt in
+    let x' = if s.fs_freshen then EcIdent.fresh x else x in
+    if x == x' && mt == mt' then s,xt else 
+      bind_mem s x x', (x',GTmem mt')
 
 let add_bindings = List.map_fold add_binding
    

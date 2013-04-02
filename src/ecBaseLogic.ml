@@ -26,7 +26,7 @@ let _ = EcPexception.register pp_error
 
 type local_kind =
   | LD_var   of ty * form option
-  | LD_mem
+  | LD_mem   of EcMemory.memtype
   | LD_modty of EcModules.module_type
   | LD_hyp   of form  (* of type bool *)
 
@@ -159,7 +159,7 @@ end
 type prover_info = unit (* FIXME *)
 
 type rule_name = 
-(* Logical rule *)
+(* Logical rules *)
   | RN_admit
   | RN_clear        of EcIdent.Sid.t 
   | RN_prover       of prover_info
@@ -171,9 +171,12 @@ type rule_name =
   | RN_exists_elim  
   | RN_exists_intro 
 (*| RN_tuple_intro  of EcIdent.t list *)
-  | RN_conv         
-(* Prhl rule *)
-  | RN_prhl_fun_def 
+  | RN_conv    
+(* Phl rules *)    
+  | RN_hl_fun_def 
+  | RN_hl_skip
+  | RN_hl_wp
+  | RN_append
 
 
 

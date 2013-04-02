@@ -250,9 +250,10 @@ and ptactic_r =
 
 
 and phl_tactics = 
+  | Pfun_def  
+  | Pskip
   | Papp        of (int * pformula)
   | Pwp         of int
-  | Pskip
   | Pwhile      of (pformula * pformula * pformula)
 and ptactics = ptactic list        
 

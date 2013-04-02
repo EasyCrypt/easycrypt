@@ -58,14 +58,15 @@ let rec ty_fun_app env tf targs =
 (* TODO : can be good to also add unfolding of globals and locals *)
 
 let pv_equal_norm env p1 p2 = 
+  Format.printf "p1 = %s %b @." (EcPath.m_tostring p1.pv_name) (EcTypes.is_loc p1);
+  Format.printf "p2 = %s %b @." (EcPath.m_tostring p2.pv_name) (EcTypes.is_loc p2);
   pv_equal p1 p2 || 
   (p1.pv_kind = p2.pv_kind &&
-   EcPath.m_equal 
-     (Mod.unfold_mod_path env p1.pv_name) (Mod.unfold_mod_path env p2.pv_name))
+   EcPath.m_equal (NormMp.norm_mpath env p1.pv_name) (NormMp.norm_mpath env p2.pv_name))
 
 let m_equal_norm env p1 p2 = 
   EcPath.m_equal p1 p2 || 
-  EcPath.m_equal (Mod.unfold_mod_path env p1) (Mod.unfold_mod_path env p2)
+  EcPath.m_equal (NormMp.norm_mpath env p1) (NormMp.norm_mpath env p2)
 
 let e_equal_norm env e1 e2 =
   let find alpha id = try Mid.find id alpha with _ -> id in
@@ -265,13 +266,21 @@ let check_alpha_equal ri env hyps f1 f2 =
         List.fold_left2 (fun alpha (id1,_) (id2,_) -> Mid.add id1 id2 alpha) 
           alpha lid1 lid2
     | _, _ -> error f1 f2 in
+  let check_memtype mt1 mt2 =
+    match mt1, mt2 with
+    | None, None -> true
+    | Some lmt1, Some lmt2 -> 
+      m_equal_norm env (EcMemory.lmt_mpath lmt1) (EcMemory.lmt_mpath lmt2) &&
+        EcSymbols.Msym.equal (equal_type env) 
+        (EcMemory.lmt_bindings lmt1) (EcMemory.lmt_bindings lmt2) 
+    | _, _ -> false in
   let check_binding f1 f2 alpha bd1 bd2 =
     let check_one alpha (x1,ty1) (x2,ty2) =
       let tyok =
         match ty1, ty2 with
         | GTty    ty1, GTty ty2   -> equal_type env ty1 ty2
         | GTmodty p1 , GTmodty p2 -> ModTy.mod_type_equiv env p1 p2
-        | GTmem      , GTmem      -> true
+        | GTmem   me1, GTmem me2  -> check_memtype me1 me2
         | _          , _          -> false
       in
         if   tyok
@@ -301,8 +310,16 @@ let check_alpha_equal ri env hyps f1 f2 =
 
     | Flocal id1, Flocal id2 when EcIdent.id_equal (find alpha id1) id2 -> ()
 
-    | Fpvar(p1,m1), Fpvar(p2,m2) when 
-        EcIdent.id_equal m1 m2 && pv_equal_norm env p1 p2  -> ()
+    | Fpvar(p1,m1), Fpvar(p2,m2) ->
+      Format.printf "ICI1@.";
+      let t1 = EcIdent.id_equal (find alpha m1) m2 in
+      let t2 = pv_equal_norm env p1 p2 in
+      if not t1 then Format.printf "not t1@.";
+      if not t2 then Format.printf "not t2@.";
+      if t1 && t2 then () 
+      else error f1 f2
+(*      when 
+        EcIdent.id_equal (find alpha m1) m2 && pv_equal_norm env p1 p2  -> () *)
 
     | Fop(p1, ty1), Fop(p2, ty2) when EcPath.p_equal p1 p2 &&
         List.all2 (equal_type env) ty1 ty2 -> () 

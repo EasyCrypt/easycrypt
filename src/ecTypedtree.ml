@@ -835,13 +835,7 @@ and transstruct1 (env : EcEnv.env) (st : pstructure_item) =
       let fid = decl.pfd_name.pl_desc in
       let ue = UE.create (Some []) in
       let known_ids = ref Mstr.empty in
-      (* let add_local s =  *)
-      (*   match Mstr.find_opt s.pl_desc !known_ids with *)
-      (*   | None ->  *)
-      (*       known_ids := Mstr.add s.pl_desc s !known_ids; *)
-      (*       s.pl_desc *)
-      (*   | Some s' -> tyerror s.pl_loc (DuplicatedLocals (Some s')) in *)
-      (* First we add the parameters *)
+      let env = EcEnv.Fun.enter fid env in
       let add_param (s,ty) = add_local known_ids s, transty tp_uni env ue ty in
       let params = List.map add_param decl.pfd_tyargs in
       let params_ = 
@@ -1119,11 +1113,11 @@ let transmem env m =
   | None ->
     tyerror m.pl_loc (UnknownMemory (unloc m))
       
-  | Some (EcEnv.AMConcrete _) ->
-    tyerror m.pl_loc (AbstractMemoryWanted (unloc m))
-      
-  | Some (EcEnv.AMAbstract mid) ->
-    mid
+  | Some me -> 
+    if (EcMemory.memtype me) <> None then
+      tyerror m.pl_loc (AbstractMemoryWanted (unloc m))
+    else EcMemory.memory me
+
 
 let transform_opt env ue pf tt =
   let rec transf env f = 
@@ -1149,7 +1143,7 @@ let transform_opt env ue pf tt =
         let me =
           match EcEnv.Memory.lookup (unloc side) env with
           | None -> tyerror side.pl_loc (UnknownMemory (unloc side))
-          | Some me -> EcEnv.Memory.actmem_name me
+          | Some me -> EcMemory.memory me
         in
           transf (EcEnv.Memory.set_active me env) f
       end
@@ -1260,7 +1254,7 @@ let transform_opt env ue pf tt =
               (EcEnv.Mod.bind_local x mi env, (x, GTmodty mi))
   
         | PGTY_Mem ->
-            (EcEnv.Memory.push (EcEnv.AMAbstract x) env, (x, GTmem))
+            (EcEnv.Memory.push (EcMemory.abstract x) env, (x, GTmem None))
     in
       List.map_fold trans1 env decl
 

@@ -113,6 +113,8 @@ val string_of_pvar : prog_var -> string
 
 val pv_subst : (EcPath.mpath -> EcPath.mpath) -> prog_var -> prog_var 
 
+val pv_res : EcPath.mpath -> prog_var
+
 (* -------------------------------------------------------------------- *)
 type expr = private {
   e_node : expr_node;

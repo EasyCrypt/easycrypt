@@ -371,3 +371,5 @@ let subst_module_comps s = subst_module_comps (_subst_of_subst s)
 let subst_modtype      s = subst_modtype (_subst_of_subst s)
 let subst_modsig       s = subst_modsig (_subst_of_subst s)
 let subst_modsig_body  s = subst_modsig_body (_subst_of_subst s)
+
+let subst_mpath        s = (_subst_of_subst s).s_fmp

@@ -14,7 +14,7 @@ val mright : memory
 type gty =
   | GTty    of EcTypes.ty
   | GTmodty of module_type
-  | GTmem
+  | GTmem   of EcMemory.memtype
 
 type quantif = 
   | Lforall
@@ -100,6 +100,8 @@ val f_pvar : EcTypes.prog_var -> EcTypes.ty -> memory -> form
 val f_true : form
 val f_false : form
 val f_bool : bool -> form
+
+val f_tt  : form
 
 val f_int : int -> form
 
@@ -196,7 +198,10 @@ val is_exists : form -> bool
 val is_let1   : form -> bool
 val is_eq     : form -> bool
 val is_local  : form -> bool 
-
+val is_equivF  : form -> bool
+val is_equivS  : form -> bool
+val is_hoareF  : form -> bool
+val is_hoareS  : form -> bool
 
 
 

@@ -741,7 +741,7 @@ module Tactic = struct
     let add env (id,k) =
       match k with
       | LD_var (ty,_) -> EcEnv.Var.bind_local id ty env
-      | LD_mem        -> EcEnv.Memory.push (EcEnv.AMAbstract id) env
+      | LD_mem mt     -> EcEnv.Memory.push (id,mt) env
       | LD_modty i    -> EcEnv.Mod.bind_local id i env
       | LD_hyp   _    -> env in
     List.fold_left add env hyps.h_local
@@ -755,9 +755,9 @@ module Tactic = struct
       AAform (EcFol.Fsubst.mapty (Tuni.subst (EcUnify.UniEnv.close ue)) ff)
     | _, Some (GTty _) ->
       error a.pl_loc FormulaExpected
-    | EA_mem mem, Some GTmem ->
+    | EA_mem mem, Some (GTmem _) ->
       AAmem (TT.transmem env mem)
-    | _, Some GTmem ->
+    | _, Some (GTmem _)->
       error a.pl_loc MemoryExpected
     | EA_none, None -> 
       AAnode
@@ -907,7 +907,16 @@ module Tactic = struct
       let tacs = List.map totac ri in
       set_loc loc (t_lseq tacs) g 
     
-
+  let process_phl loc env ptac g =
+    let t = 
+      match ptac with
+      | Pfun_def -> EcPhl.t_fun_def env
+      | Pskip    -> EcPhl.t_skip 
+      | Papp _   -> assert false
+      | Pwp  _   -> assert false
+      | Pwhile _ -> assert false in
+    set_loc loc t g
+ 
   let rec process_logic_tacs scope env (tacs:ptactics) (gs:goals) : goals = 
     match tacs with
     | [] -> gs
@@ -949,7 +958,7 @@ module Tactic = struct
 
 
       | Padmit         -> t_admit
-      | PPhl tac       -> process_phl (process_form env) tac loc
+      | PPhl tac       -> process_phl loc env tac 
     in
     set_loc loc tac g
 
