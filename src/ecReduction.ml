@@ -58,8 +58,6 @@ let rec ty_fun_app env tf targs =
 (* TODO : can be good to also add unfolding of globals and locals *)
 
 let pv_equal_norm env p1 p2 = 
-  Format.printf "p1 = %s %b @." (EcPath.m_tostring p1.pv_name) (EcTypes.is_loc p1);
-  Format.printf "p2 = %s %b @." (EcPath.m_tostring p2.pv_name) (EcTypes.is_loc p2);
   pv_equal p1 p2 || 
   (p1.pv_kind = p2.pv_kind &&
    EcPath.m_equal (NormMp.norm_mpath env p1.pv_name) (NormMp.norm_mpath env p2.pv_name))
@@ -310,16 +308,8 @@ let check_alpha_equal ri env hyps f1 f2 =
 
     | Flocal id1, Flocal id2 when EcIdent.id_equal (find alpha id1) id2 -> ()
 
-    | Fpvar(p1,m1), Fpvar(p2,m2) ->
-      Format.printf "ICI1@.";
-      let t1 = EcIdent.id_equal (find alpha m1) m2 in
-      let t2 = pv_equal_norm env p1 p2 in
-      if not t1 then Format.printf "not t1@.";
-      if not t2 then Format.printf "not t2@.";
-      if t1 && t2 then () 
-      else error f1 f2
-(*      when 
-        EcIdent.id_equal (find alpha m1) m2 && pv_equal_norm env p1 p2  -> () *)
+    | Fpvar(p1,m1), Fpvar(p2,m2) when 
+        EcIdent.id_equal (find alpha m1) m2 && pv_equal_norm env p1 p2  -> ()
 
     | Fop(p1, ty1), Fop(p2, ty2) when EcPath.p_equal p1 p2 &&
         List.all2 (equal_type env) ty1 ty2 -> () 
