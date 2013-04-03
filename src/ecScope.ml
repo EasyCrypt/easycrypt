@@ -928,14 +928,14 @@ module Tactic = struct
     | Double(i,j) ->
       let phi = process_prhl_formula env g phi in
       t_equiv_app (i,j) phi g  
-
+    
   let process_phl loc env ptac g =
     let t = 
       match ptac with
       | Pfun_def -> EcPhl.t_fun_def env
       | Pskip    -> EcPhl.t_skip 
       | Papp (k,phi) -> process_app env k phi 
-      | Pwp  _   -> assert false
+      | Pwp  k   -> t_wp env k 
       | Pwhile _ -> assert false in
     set_loc loc t g
  

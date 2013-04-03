@@ -1,4 +1,3 @@
-
 open EcParsetree
 open EcUtils
 open EcTypes
@@ -339,7 +338,8 @@ let t_hoare_app i phi (juc,n as g) =
   let b = f_hoareS hs.hs_me phi (stmt s2) hs.hs_post in
   let juc,n1 = new_goal juc (hyps,a) in
   let juc,n2 = new_goal juc (hyps,b) in
-  let rule = { pr_name = RN_app (Single i,phi) ; pr_hyps = [RA_node n1; RA_node n2]} in
+  let rule = { pr_name = RN_hl_append (Single i,phi) ; 
+               pr_hyps = [RA_node n1; RA_node n2]} in
   upd_rule rule (juc,n)
 
 let t_equiv_app (i,j) phi (juc,n as g) =
@@ -347,32 +347,74 @@ let t_equiv_app (i,j) phi (juc,n as g) =
   let es = destr_equivS concl in
   let sl1,sl2 = s_split i es.eqs_sl in
   let sr1,sr2 = s_split j es.eqs_sr in
-  let a = f_equivS es.eqs_mel es.eqs_mer es.eqs_pre (stmt sl1) (stmt sr1) phi  in
-  let b = f_equivS es.eqs_mel es.eqs_mer phi        (stmt sl2) (stmt sr2) es.eqs_post in
+  let a = f_equivS es.eqs_mel es.eqs_mer es.eqs_pre (stmt sl1) (stmt sr1) phi in
+  let b = 
+    f_equivS es.eqs_mel es.eqs_mer phi (stmt sl2) (stmt sr2) es.eqs_post in
   let juc,n1 = new_goal juc (hyps,a) in
   let juc,n2 = new_goal juc (hyps,b) in
-  let rule = { pr_name = RN_app (Double (i,j), phi) ; 
+  let rule = { pr_name = RN_hl_append (Double (i,j), phi) ; 
                pr_hyps = [RA_node n1; RA_node n2]} in
   upd_rule rule (juc,n)
 
   
 (* -------------------------------------------------------------------- *)
 
-(*
-let wp_tac i _loc env (juc,n as g) =
+let s_skip_last i s =
+  let len = List.length s.s_node in
+  match i with
+  | None -> [], s.s_node 
+  | Some i ->
+    assert (0 <= i && i < len); (* FIXME error message *)
+    s_split (len - i) s 
+
+let check_wp_progress i s remain =
+  match i with
+  | None -> List.length s.s_node - List.length remain
+  | Some i ->
+      assert (remain = []); (* FIXME error message *)
+      i 
+
+let t_hoare_wp env i (juc,n as g) =
   let hyps,concl = get_goal g in
-  let menv,pre,s,post = destr_hl env concl in
-  let s_fix,s_wp = split_stmt i s.EcModules.s_node  in
-  let s_wp,post = wp env (EcMemory.memory menv) (EcModules.stmt s_wp) post in
-  let s = EcModules.stmt (s_fix @ s_wp) in
-  let a = f_hoareS menv pre s post  in
-  let juc,n' = new_goal juc (hyps,a) in
-  let rule = { pr_name = RN_fixme; pr_hyps = [RA_node n']} in
+  let hs = destr_hoareS concl in
+  let s_hd,s_wp = s_skip_last i hs.hs_s in
+  let s_wp,post = 
+    wp env (EcMemory.memory hs.hs_me) (EcModules.stmt s_wp) hs.hs_post in
+  let i = check_wp_progress i hs.hs_s s_wp in
+  let s = EcModules.stmt (s_hd @ s_wp) in
+  let concl = f_hoareS hs.hs_me hs.hs_pre s post  in
+  let juc,n' = new_goal juc (hyps,concl) in
+  let rule = { pr_name = RN_hl_wp (Single i); pr_hyps = [RA_node n']} in
   upd_rule rule (juc,n)
 
+let t_equiv_wp env ij (juc,n as g) = 
+  let hyps,concl = get_goal g in
+  let es = destr_equivS concl in
+  let i = omap ij fst and j = omap ij snd in
+  let s_hdl,s_wpl = s_skip_last i es.eqs_sl in
+  let s_hdr,s_wpr = s_skip_last j es.eqs_sr in
+  let s_wpl,post = 
+    wp env (EcMemory.memory es.eqs_mel) (EcModules.stmt s_wpl) es.eqs_post in
+  let s_wpr, post =
+    wp env (EcMemory.memory es.eqs_mer) (EcModules.stmt s_wpr) post in
+  let i = check_wp_progress i es.eqs_sl s_wpl in
+  let j = check_wp_progress j es.eqs_sr s_wpr in
+  let sl = EcModules.stmt (s_hdl @ s_wpl) in
+  let sr = EcModules.stmt (s_hdr @ s_wpr) in
+  let concl = f_equivS es.eqs_mel es.eqs_mer es.eqs_pre sl sr post in
+  let juc,n' = new_goal juc (hyps,concl) in
+  let rule = { pr_name = RN_hl_wp (Double(i,j)); pr_hyps = [RA_node n']} in
+  upd_rule rule (juc,n)
+
+let t_wp env k =
+  match k with
+  | None -> t_hS_or_eS (t_hoare_wp env None) (t_equiv_wp env None)
+  | Some (Single i) -> t_hoare_wp env (Some i)
+  | Some (Double(i,j)) -> t_equiv_wp env (Some (i,j))
 
 
 
+(*
 
 
 let while_tac env inv vrnt bnd (juc,n as g) = 

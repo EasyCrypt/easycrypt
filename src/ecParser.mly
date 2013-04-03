@@ -1197,8 +1197,8 @@ tactic:
 | APP pos=code_position COLON p=loc(sform)
    { PPhl( Papp(pos,p) ) }
 
-| WP n=number?
-   { PPhl (Pwp (odfl 0 n)) }
+| WP n=code_position?
+   { PPhl (Pwp n) }
 
 | SKIP
     { PPhl Pskip }

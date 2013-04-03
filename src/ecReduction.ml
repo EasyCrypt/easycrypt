@@ -195,8 +195,12 @@ let rec is_head_reducible ri env hyps f =
   | Flet(LTuple _, {f_node = Ftuple _}, _) -> ri.iota
   | Flet(_, e1, _) -> is_head_reducible ri env hyps e1
   | Fapp({f_node = Fquant(Llambda,_,_)}, _) -> ri.beta
-  | Fapp({f_node = Fop(p,_)}, args) when ri.logic && is_logical_op p ->
-    List.exists (fun f -> is_cbool f || is_head_reducible ri env hyps f) args
+  | Fapp({f_node = Fop(p,_)}, ([a1;a2] as args)) 
+      when ri.logic && is_logical_op p ->
+    if EcPath.p_equal p EcCoreLib.p_eq then 
+      EcFol.f_equal a1 a2 || List.exists (is_head_reducible ri env hyps) args
+    else
+      List.exists (fun f -> is_cbool f || is_head_reducible ri env hyps f) args
   | Fapp(f,_) -> is_head_reducible ri env hyps f
   | Fop(p,_) -> reducible_op ri env p 
   | Fif(f1,_,_) -> (ri.iota && is_cbool f1) || is_head_reducible ri env hyps f1
@@ -226,8 +230,10 @@ let rec h_red ri env hyps f =
       List.fold_left2 (fun s (x,_) e1 -> bind_local s x e1) f_subst_id bd args in
     let f' = f_subst s (f_lambda ext_bd body) in
     f_app f' ext_a f.f_ty
-  | Fapp({f_node = Fop(p,_)} as fo, args) when ri.logic && is_logical_op p ->
-    if List.exists is_cbool args then
+  | Fapp({f_node = Fop(p,_)} as fo, ([a1;a2] as args))
+      when ri.logic && is_logical_op p ->
+    if EcPath.p_equal p EcCoreLib.p_eq && EcFol.f_equal a1 a2 ||
+      List.exists is_cbool args then
       match op_kind p, args with
       | OK_not  , [f] -> f_not_simpl f
       | OK_and b, [f1;f2] ->
@@ -238,13 +244,7 @@ let rec h_red ri env hyps f =
       | OK_iff  , [f1;f2] -> f_iff_simpl f1 f2 
       | OK_eq   , [f1;f2] -> f_eq_simpl f1 f2 
       | _                 -> assert false 
-    else 
-      let rec aux args = 
-        match args with
-        | [] -> raise NotReducible
-        | a :: args ->
-          try h_red ri env hyps a :: args with NotReducible -> a :: aux args in
-      f_app fo (aux args) f.f_ty
+    else f_app fo (h_red_args ri env hyps args) f.f_ty
   | Fapp(f1,args) ->
     f_app (h_red ri env hyps f1) args f.f_ty
   | Fop(p,tys) -> reduce_op ri env p tys
@@ -253,7 +253,13 @@ let rec h_red ri env hyps f =
     else if f_equal f1 f_false then f3 
     else f_if (h_red ri env hyps f1) f2 f3 
   | _ -> raise NotReducible 
-  
+and h_red_args ri env hyps args =
+  match args with
+  | [] -> raise NotReducible
+  | a :: args ->
+    try h_red ri env hyps a :: args 
+    with NotReducible -> a :: h_red_args ri env hyps args 
+
 let check_alpha_equal ri env hyps f1 f2 = 
   let error f1' f2' = raise (IncompatibleForm(f1,f2,f1',f2')) in
   let find alpha id = try Mid.find id alpha with _ -> id in

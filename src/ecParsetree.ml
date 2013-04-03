@@ -256,7 +256,7 @@ and phl_tactics =
   | Pfun_def  
   | Pskip
   | Papp        of (int doption * pformula)
-  | Pwp         of int
+  | Pwp         of int doption option 
   | Pwhile      of (pformula * pformula * pformula)
 and ptactics = ptactic list        
 

@@ -174,14 +174,11 @@ type rule_name =
   | RN_exists_intro 
 (*| RN_tuple_intro  of EcIdent.t list *)
   | RN_conv    
-  | RN_fixme
-  | RN_app          of tac_pos * EcFol.form
 (* Phl rules *)    
   | RN_hl_fun_def 
   | RN_hl_skip
-  | RN_hl_wp
-  | RN_append
-
+  | RN_hl_wp        of tac_pos
+  | RN_hl_append    of tac_pos * EcFol.form
 
 
 and rule_arg = 
