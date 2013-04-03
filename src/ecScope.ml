@@ -928,7 +928,11 @@ module Tactic = struct
     | Double(i,j) ->
       let phi = process_prhl_formula env g phi in
       t_equiv_app (i,j) phi g  
-    
+
+  let process_while env phi g =
+    let phi = process_phl_formula env g phi in
+    t_hoare_while env phi g
+
   let process_phl loc env ptac g =
     let t = 
       match ptac with
@@ -936,7 +940,8 @@ module Tactic = struct
       | Pskip    -> EcPhl.t_skip 
       | Papp (k,phi) -> process_app env k phi 
       | Pwp  k   -> t_wp env k 
-      | Pwhile _ -> assert false in
+      | Pwhile phi -> process_while env phi 
+    in
     set_loc loc t g
  
   let rec process_logic_tacs scope env (tacs:ptactics) (gs:goals) : goals = 

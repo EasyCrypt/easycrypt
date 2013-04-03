@@ -1203,8 +1203,8 @@ tactic:
 | SKIP
     { PPhl Pskip }
 
-| WHILE inv=loc(sform) vrnt=loc(sform) bnd=loc(sform)
-    { PPhl (Pwhile (inv, vrnt, bnd)) }
+| WHILE inv=loc(sform) 
+    { PPhl (Pwhile inv) }
 
 ;
 

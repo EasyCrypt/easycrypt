@@ -31,7 +31,8 @@ type tac_error =
   | InvalNumOfTactic      of int * int
   | NotPhl                of bool option
   | NoSkipStmt
-  | InvalidCodePosition of int
+  | InvalidCodePosition   of int
+  | CanNotApply           of string * string
 
 exception TacError of tac_error
 
@@ -79,6 +80,9 @@ let pp_tac_error fmt = function
     Format.fprintf fmt "The conclusion does not end by a %s judgment" s
   | InvalidCodePosition k -> 
     Format.fprintf fmt "Invalid code line number: %i" k
+  | CanNotApply(s1,s2) ->
+    Format.fprintf fmt "Can not apply %s tactic:@\n %s" s1 s2
+ 
     
 
 let _ = EcPexception.register (fun fmt exn ->
@@ -87,6 +91,8 @@ let _ = EcPexception.register (fun fmt exn ->
   | _ -> raise exn)
       
 let tacerror e = raise (TacError e)
+
+let cannot_apply s1 s2 = tacerror (CanNotApply(s1,s2))
 
 let t_subgoal lt gs = 
   try t_subgoal lt gs 

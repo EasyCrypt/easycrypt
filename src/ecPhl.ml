@@ -22,10 +22,7 @@ module PVM = struct
       let r = EcIdent.id_compare m1 m2 in
       if r = 0 then 
         let r = Pervasives.compare p1.pv_kind p2.pv_kind in
-        if r = 0 then 
-          let p1 = p1.pv_name.EcPath.m_path in
-          let p2 = p2.pv_name.EcPath.m_path in
-          EcPath.p_compare p1 p2 
+        if r = 0 then pv_compare_p p1 p2
         else r
       else r
   end)
@@ -70,14 +67,86 @@ module PVM = struct
 
 end
 
+(* -------------------------------------------------------------------- *)
 
+module PV = struct 
+  module M = EcMaps.Map.Make (struct
+    (* We assume that the mpath are in normal form *)  
+    type t = prog_var 
+    let compare = pv_compare_p
+  end)
 
+  type pv_fv = ty M.t
+
+  let empty = M.empty 
+
+  let add env pv ty fv = M.add (NormMp.norm_pvar env pv) ty fv
+
+  let remove env pv fv =
+    M.remove (NormMp.norm_pvar env pv) fv
+
+  let union _env fv1 fv2 =
+    M.merge (fun _ o1 o2 -> if o2 = None then o1 else o2) fv1 fv2
+
+  let mem env pv fv = 
+    M.mem (NormMp.norm_pvar env pv) fv
+
+  let elements = M.bindings 
+
+end
+
+let lp_write env w lp = 
+  let add w (pv,ty) = PV.add env pv ty w in
+  match lp with
+  | LvVar pvt -> add w pvt 
+  | LvTuple pvs -> List.fold_left add w pvs 
+  | LvMap ((_p,_tys),pv,_,ty) -> add w (pv,ty) 
+
+let rec s_write env w s = List.fold_left (i_write env) w s.s_node 
+
+and i_write env w i = 
+  match i.i_node with
+  | Sasgn (lp,_) -> lp_write env w lp
+  | Srnd (lp,_) -> lp_write env w lp
+  | Scall(lp,f,_) -> 
+    let wf = f_write env f in
+    let w  = match lp with None -> w | Some lp -> lp_write env w lp in
+    PV.union env w wf 
+  | Sif (_,s1,s2) -> s_write env (s_write env w s1) s2
+  | Swhile (_,s) -> s_write env w s
+  | Sassert _ -> w 
+    
+and f_write env f =   
+  let func = Fun.by_mpath f env in
+  match func.f_def with
+  | None -> assert false (* Not implemented *)
+  | Some fdef ->
+    let remove_local w {v_name = v } =
+      PV.remove env {pv_name = EcPath.mqname f EcPath.PKother v []; 
+                     pv_kind = PVloc } w in
+    let wf = s_write env PV.empty fdef.f_body in
+    let wf = List.fold_left remove_local wf fdef.f_locals in
+    List.fold_left remove_local wf (fst func.f_sig.fs_sig) 
+   
+
+  
+ 
 (* -------------------------------------------------------------------- *)
 (* -------------------------------  Wp -------------------------------- *)
 (* -------------------------------------------------------------------- *)
 
 let id_of_pv pv = 
   EcIdent.create (EcPath.basename pv.pv_name.EcPath.m_path) 
+
+let generalize_mod env m modi f = 
+  let elts = PV.elements modi in
+  let create (pv,ty) = id_of_pv pv, GTty ty in
+  let b = List.map create elts in
+  let s = List.fold_left2 (fun s (pv,ty) (id, _) ->
+    PVM.add env pv m (f_local id ty) s) PVM.empty elts b in
+  let f = PVM.subst env s f in
+  f_forall_simpl b f
+
 
 let lv_subst env m lv f =
   match lv with
@@ -181,33 +250,13 @@ let t_hS_or_eS th te g =
   else tacerror (NotPhl None)
 
 
-
-
 module Pvar = struct
   type t = EcTypes.prog_var * EcMemory.memory * EcTypes.ty
   let compare lv1 lv2 = compare lv1 lv2
 end
 module PVset = Set.Make(Pvar)
-let rec free_pvar  fm = 
-  match fm.f_node with
-    | Fint _ | Fop _ -> PVset.empty
-    | Fpvar (pv,mem) -> PVset.singleton (pv,mem,fm.f_ty) 
-    | Flocal _ -> PVset.empty
-    | Fquant(_,_,f) -> free_pvar f
-    | Fif(f1,f2,f3) -> 
-      PVset.union (free_pvar f1) (PVset.union (free_pvar f2) (free_pvar f3))
-    | Flet(_, f1, f2) ->
-      PVset.union (free_pvar f1) (free_pvar f2)
-    | Fapp(f,args) ->
-      List.fold_left (fun s f -> PVset.union s (free_pvar f)) (free_pvar f) args
-    | Ftuple args ->
-      List.fold_left (fun s f -> PVset.union s (free_pvar f)) PVset.empty args 
-    | FhoareS _ (* (_,pre,_,post) *) -> 
-      assert false (* FIXME: not implemented *)
-      (* PVset.union (free_pvar pre) (free_pvar post) *)
-    | _ -> assert false (* FIXME *)
 
-let quantify_pvars env pvars phi = (* assert false  *)
+let quantify_pvars env pvars phi = 
   let f (pv,m,ty) (bds,phi) =
     if EcTypes.is_loc pv then
       let local = EcIdent.create (EcPath.name_mpath pv.EcTypes.pv_name) in
@@ -220,9 +269,6 @@ let quantify_pvars env pvars phi = (* assert false  *)
   let bds,phi = PVset.fold f pvars ([],phi) in
   f_forall bds phi
 
-let quantify_out_local_pvars env phi = 
-  let free_pvars = free_pvar phi in
-  quantify_pvars env free_pvars phi
 
 
 let rec modified_pvars_i m instr = 
@@ -412,11 +458,40 @@ let t_wp env k =
   | Some (Single i) -> t_hoare_wp env (Some i)
   | Some (Double(i,j)) -> t_equiv_wp env (Some (i,j))
 
+(* -------------------------------------------------------------------- *)
+  
+let t_hoare_while env inv (juc,n1 as g) =
+  let hyps,concl = get_goal g in
+  let hs = destr_hoareS concl in
+  let error_message () = 
+    cannot_apply "while" "the last instruction should be a while" in
+  match List.rev hs.hs_s.s_node with
+  | [] -> error_message ()
+  | i :: r ->
+    match i.i_node with
+    | Swhile (e,c) ->
+      let m = EcMemory.memory hs.hs_me in
+      let e = form_of_expr m e in
+      (* the body preserve the invariant *)
+      let b_pre  = f_and_simpl inv e in
+      let b_post = inv in
+      let b_concl = f_hoareS hs.hs_me b_pre c b_post in
+      let (juc,nb) = new_goal juc (hyps,b_concl) in
+      (* the wp of the while *)
+      let post = f_imp_simpl (f_not_simpl e) (f_imp_simpl inv hs.hs_post) in
+      let post = generalize_mod env m (s_write env PV.empty c) post in
+      let post = f_and_simpl inv post in
+      let concl = f_hoareS hs.hs_me hs.hs_pre (stmt (List.rev r)) post in
+      let (juc,n) = new_goal juc (hyps,concl) in
+      let rule = { pr_name = RN_hl_while inv; 
+                   pr_hyps=[RA_node nb;RA_node n;]} in
+      upd_rule rule (juc, n1)
+    | _ -> error_message ()
+
+
 
 
 (*
-
-
 let while_tac env inv vrnt bnd (juc,n as g) = 
   let hyps,concl = get_goal g in
   let menv,pre,s,post = destr_hl env concl in
@@ -459,8 +534,9 @@ let while_tac env inv vrnt bnd (juc,n as g) =
           upd_rule rule (juc,n)
         | _ -> cannot_apply "while_tac" "a while loop is expected"
 
+
+
+
+
+
 *)
-
-
-
-

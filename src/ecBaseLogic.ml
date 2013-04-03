@@ -179,6 +179,7 @@ type rule_name =
   | RN_hl_skip
   | RN_hl_wp        of tac_pos
   | RN_hl_append    of tac_pos * EcFol.form
+  | RN_hl_while     of EcFol.form
 
 
 and rule_arg = 
