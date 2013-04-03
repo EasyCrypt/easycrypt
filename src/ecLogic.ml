@@ -31,6 +31,7 @@ type tac_error =
   | InvalNumOfTactic      of int * int
   | NotPhl                of bool option
   | NoSkipStmt
+  | InvalidCodePosition of int
 
 exception TacError of tac_error
 
@@ -46,29 +47,29 @@ let pp_tac_error fmt = function
   | UnknownIntros f ->
     Format.fprintf fmt "Do not known what to introduce in %a" PE.pp_form f
   | UnknownSplit f ->
-    Format.fprintf fmt "Do not known what how to split %a" PE.pp_form f
+    Format.fprintf fmt "Do not known how to split %a" PE.pp_form f
   | UnknownRewrite f ->
-    Format.fprintf fmt "Do not known what how to rewrite %a" PE.pp_form f
+    Format.fprintf fmt "Do not known how to rewrite %a" PE.pp_form f
   | LogicRequired ->
     Format.fprintf fmt "Require import Logic first"
   | CanNotClearConcl(id,_) ->
-    Format.fprintf fmt "Can not clear %s, it is used in the conclusion"
+    Format.fprintf fmt "Cannot clear %s, it is used in the conclusion"
       (EcIdent.name id)
   | CanNotReconizeElimT ->
-    Format.fprintf fmt "Can reconize the elimination lemma"
+    Format.fprintf fmt "Cannot reconize the elimination lemma"
   | ToManyArgument ->
-    Format.fprintf fmt "To many argument in the application"
+    Format.fprintf fmt "Too many arguments in the application"
   | NoHypToSubst (Some id) ->
-    Format.fprintf fmt "Can not find non recursive equation on %s"
+    Format.fprintf fmt "Cannot find non recursive equation on %s"
       (EcIdent.name id)
   | NoHypToSubst None ->
-    Format.fprintf fmt "Can not find non recursive equation to substite"
+    Format.fprintf fmt "Cannot find non recursive equation to substitute"
   | CanNotProve g -> 
-    Format.fprintf fmt "Can not prove %a" PE.pp_lgoal g
+    Format.fprintf fmt "Cannot prove %a" PE.pp_lgoal g
   | InvalNumOfTactic (i1,i2) ->
     Format.fprintf fmt "Invalid number of tactics: %i given, %i expected" i2 i1
   | NoSkipStmt -> 
-    Format.fprintf fmt "Can not apply skip rule"
+    Format.fprintf fmt "Cannot apply skip rule"
   | NotPhl b ->
     let s = 
       match b with
@@ -76,6 +77,9 @@ let pp_tac_error fmt = function
       | Some true -> "phl"
       | Some false -> "prhl" in
     Format.fprintf fmt "The conclusion does not end by a %s judgment" s
+  | InvalidCodePosition k -> 
+    Format.fprintf fmt "Invalid code line number: %i" k
+    
 
 let _ = EcPexception.register (fun fmt exn ->
   match exn with

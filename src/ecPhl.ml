@@ -223,8 +223,6 @@ let quantify_pvars env pvars phi = (* assert false  *)
 
 let quantify_out_local_pvars env phi = 
   let free_pvars = free_pvar phi in
-  Format.printf "Found %i free program variables \n" (List.length (PVset.elements free_pvars));
-  Format.print_newline();
   quantify_pvars env free_pvars phi
 
 
@@ -329,10 +327,14 @@ let t_skip = t_hS_or_eS t_hoare_skip t_equiv_skip
 
 (* -------------------------------------------------------------------- *)
 
+let s_split i s =
+  if i < 1 || List.length s.s_node < i then tacerror (InvalidCodePosition i)
+  else s_split i s
+
 let t_hoare_app i phi (juc,n as g) =
   let hyps,concl = get_goal g in
   let hs = destr_hoareS concl in
-  let s1,s2 = s_split i hs.hs_s  in (* FIXME catch exception *)
+  let s1,s2 = s_split i hs.hs_s in
   let a = f_hoareS hs.hs_me hs.hs_pre (stmt s1) phi  in
   let b = f_hoareS hs.hs_me phi (stmt s2) hs.hs_post in
   let juc,n1 = new_goal juc (hyps,a) in
@@ -343,8 +345,8 @@ let t_hoare_app i phi (juc,n as g) =
 let t_equiv_app (i,j) phi (juc,n as g) =
   let hyps,concl = get_goal g in
   let es = destr_equivS concl in
-  let sl1,sl2 = s_split i es.eqs_sl  in (* FIXME catch exception *)
-  let sr1,sr2 = s_split j es.eqs_sr  in (* FIXME catch exception *)
+  let sl1,sl2 = s_split i es.eqs_sl in
+  let sr1,sr2 = s_split j es.eqs_sr in
   let a = f_equivS es.eqs_mel es.eqs_mer es.eqs_pre (stmt sl1) (stmt sr1) phi  in
   let b = f_equivS es.eqs_mel es.eqs_mer phi        (stmt sl2) (stmt sr2) es.eqs_post in
   let juc,n1 = new_goal juc (hyps,a) in
