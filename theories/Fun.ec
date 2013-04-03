@@ -1,5 +1,5 @@
 (** Extentional Equality for Functions *)
-pred [==](f1:'a -> 'b, f2:'a -> 'b) =
+pred (==)(f1:'a -> 'b, f2:'a -> 'b) =
   forall x, f1 x = f2 x.
 
 axiom extentionality: forall (f1 f2:'a -> 'b),
@@ -28,10 +28,3 @@ lemma cPand_def: forall P1 P2 (x:'a),
   cPand P1 P2 x <=> (P1 x /\ P2 x).
 lemma cPor_def: forall P1 P2 (x:'a), 
   cPor P1 P2 x <=> (P1 x \/ P2 x).
-
-
-
-
-
-
-

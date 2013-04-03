@@ -253,7 +253,7 @@ cut H: (in_dom y m /\ P (y,proj (m.[y])) = true).
 save.
 
 (** extentional equality *)
-pred [==] (m1 m2:('a,'b) map) = 
+pred (==) (m1 m2:('a,'b) map) = 
   (forall x, in_dom x m1 <=> in_dom x m2) &&
   (forall x, in_dom x m1 => m1.[x] = m2.[x]).
 

@@ -12,7 +12,7 @@ axiom size_pos: forall (M:'a matrix),
 
 op __get: ('a matrix,(int * int)) -> 'a.
 
-pred [==] (M0 M1:'a matrix) =
+pred (==) (M0 M1:'a matrix) =
   size M0 = size M1 /\
   forall (i j:int),
     0 <= i => i < fst (size M0) =>

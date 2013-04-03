@@ -29,7 +29,7 @@ axiom Set_ind: forall (P:('a set) cPred),
   forall S, P S.
 
 (* Extentional Equality *)
-pred [==] (X1 X2:'a set) = forall (x:'a),
+pred (==) (X1 X2:'a set) = forall (x:'a),
   mem x X1 <=> mem x X2.
 
 lemma eq_refl: forall (X:'a set), X == X.
@@ -43,7 +43,7 @@ axiom extentionality: forall (X1 X2:'a set),
   X1 == X2 => X1 = X2.
 
 (* Subset *)
-pred [<=] (X1 X2:'a set) = forall x,
+pred (<=) (X1 X2:'a set) = forall x,
   mem x X1 => mem x X2.
 
 lemma sub_refl: forall (X:'a set), X <= X.
@@ -366,7 +366,7 @@ end Drestr.
 
 (* Scaled Restriction of a Distribution *)
 theory Dexcepted.
-  op [\] (d:'a distr,X:'a set): 'a distr =
+  op (\) (d:'a distr,X:'a set): 'a distr =
     Dscale.dscale (Drestr.drestr d X). 
 
   lemma supp_def: forall (x:'a) d X,

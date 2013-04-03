@@ -8,13 +8,13 @@ axiom q_pos: 0 < q.
 
 type gf_q.
 
-op [*]: (gf_q,gf_q) -> gf_q.  (* multiplication modulo q *)
-op [+]: (gf_q,gf_q) -> gf_q.  (* addition modulo q *)
+op ( * ): (gf_q,gf_q) -> gf_q.  (* multiplication modulo q *)
+op ( + ): (gf_q,gf_q) -> gf_q.  (* addition modulo q *)
 op neg: gf_q -> gf_q.         (* the additive inverse *)
 op inv: gf_q -> gf_q.         (* the multiplicative inverse *)
 
-op [-] (x y:gf_q): gf_q = x + (neg y). (* subtraction modulo q *)
-op [/] (x y:gf_q): gf_q = x * (inv y). (* division modulo q for y <> 0 *)
+op (-) (x y:gf_q): gf_q = x + (neg y). (* subtraction modulo q *)
+op (/) (x y:gf_q): gf_q = x * (inv y). (* division modulo q for y <> 0 *)
 
 
 cnst gf_q0: gf_q. (* zero *)

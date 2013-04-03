@@ -1,6 +1,6 @@
 type 'a list.
 cnst __nil ['a] : 'a list.
-op [::] ['a] : ('a, 'a list) -> 'a list.
+op (::) ['a] : ('a, 'a list) -> 'a list.
 
 op foo  (x:_, l:_) : _ = x :: <:'a=int> l.
 op foo1 (x:_, l:_) : _ = x :: <:int> l.

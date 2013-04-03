@@ -4,11 +4,11 @@ require import Prime_field.
 type group.
 cnst g:group. (* the generator *)
 
-op [*]:(group, group) -> group.   (* multiplication of group elements *)
-op [^]:(group, gf_q) -> group.    (* exponentiation *)
+op ( * ):(group, group) -> group.   (* multiplication of group elements *)
+op ( ^ ):(group, gf_q) -> group.    (* exponentiation *)
 op log:group -> gf_q.             (* discrete logarithm *)
 
-op [/] (a b:group): group = g^(log a - log b).
+op (/) (a b:group): group = g^(log a - log b).
 
 axiom group_pow_add: forall (x y:gf_q),
   g ^ x * g ^ y = g ^ (x + y).

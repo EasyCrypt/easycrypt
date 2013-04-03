@@ -74,9 +74,9 @@ require import Real.
 
 cnst epsilon: real.
 
-axiom Adv_def: forall {m} (A <: Adversary),
-  `| Pr[ Experiment(H,F,A).main() @ {m}: res ] -
-     Pr[ Experiment(H,R,A).main() @ {m}: res ] | <= epsilon.
+axiom Adv_def: forall &m (A <: Adversary),
+  `| Pr[ Experiment(H,F,A).main() @ &m: res ] -
+     Pr[ Experiment(H,R,A).main() @ &m: res ] | <= epsilon.
 
 (*
 adversary type B = {

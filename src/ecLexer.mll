@@ -155,10 +155,12 @@ rule main = parse
   | tident       { TIDENT (Lexing.lexeme lexbuf) }
   | mident       { MIDENT (Lexing.lexeme lexbuf) }
   | number       { NUM (int_of_string (Lexing.lexeme lexbuf)) }
-  | "(*"         { comment lexbuf; main lexbuf }
-  | "\""         { STRING (Buffer.contents (string (Buffer.create 0) lexbuf)) }
 
-  | '[' (binop as s) ']' { PBINOP s }
+  | "(*" binop "*)" { main lexbuf }
+  | '(' blank* (binop as s) blank* ')' { PBINOP s }
+
+  | "(*" { comment lexbuf; main lexbuf }
+  | "\"" { STRING (Buffer.contents (string (Buffer.create 0) lexbuf)) }
 
   (* boolean operators *)
   | '!'   { NOT }

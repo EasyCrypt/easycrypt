@@ -101,7 +101,7 @@ elimT list_ind xs;trivial.
 save.
 
 (* append *)
-op [++](xs ys:'a list): 'a list = fold_right [::] ys xs.
+op (++)(xs ys:'a list): 'a list = fold_right (::) ys xs.
 
 lemma app_nil: forall (ys:'a list), [] ++ ys = ys.
 lemma app_cons: forall (x:'a) xs ys, (x::xs) ++ ys = x::(xs ++ ys).

@@ -9,7 +9,7 @@ axiom length_pos: 0 <= length.
 type word.
 op __get: word -> int -> bool.
 
-pred [==](w0, w1:word) = forall i,
+pred (==)(w0, w1:word) = forall i,
   0 <= i => i < length =>
   w0.[i] = w1.[i].
 
@@ -29,7 +29,7 @@ axiom zeros_get: forall i,
   zeros.[i] = false.
 
 (* xor *)
-op [^^]: word -> word -> word.
+op (^^): word -> word -> word.
 axiom xor_get: forall w0 w1 i,
   0 <= i => i < length =>
   (w0 ^^ w1).[i] = Bool.xorb w0.[i] w1.[i].
