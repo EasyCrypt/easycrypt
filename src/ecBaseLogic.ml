@@ -158,6 +158,8 @@ end
 
 type prover_info = unit (* FIXME *)
 
+type tac_pos = Pos_single of int | Pos_rel of int * int
+
 type rule_name = 
 (* Logical rules *)
   | RN_admit
@@ -173,6 +175,7 @@ type rule_name =
 (*| RN_tuple_intro  of EcIdent.t list *)
   | RN_conv    
   | RN_fixme
+  | RN_app          of tac_pos * EcFol.form
 (* Phl rules *)    
   | RN_hl_fun_def 
   | RN_hl_skip

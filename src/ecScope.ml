@@ -912,7 +912,9 @@ module Tactic = struct
       match ptac with
       | Pfun_def -> EcPhl.t_fun_def env
       | Pskip    -> EcPhl.t_skip 
-      | Papp _   -> assert false
+      | Papp (k,phi)   -> 
+        let phi = process_formula env g phi in
+        t_app (k,phi) loc
       | Pwp  _   -> assert false
       | Pwhile _ -> assert false in
     set_loc loc t g

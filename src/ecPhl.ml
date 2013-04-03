@@ -170,6 +170,10 @@ let wp env m s post =
   List.rev r, mk_let env letsf 
 
 
+(* -------------------------------------------------------------------- *)
+(* ----------------------  Auxiliary functions  ----------------------- *)
+(* -------------------------------------------------------------------- *)
+
 let destr_hoareF c =
   try destr_hoareF c with DestrError _ -> tacerror (NotPhl (Some true))
 let destr_hoareS c =
@@ -185,84 +189,74 @@ let t_hS_or_eS th te g =
   else if is_equivS concl then te g
   else tacerror (NotPhl None)
 
-(* -------------------------------------------------------------------- *)
+type destr_error =
+  | Destr_hl 
 
-let t_hoareF_fun_def env (juc,n1 as g) = 
-  let hyps,concl = get_goal g in
-  let hf = destr_hoareF concl in
-  let memenv, fdef, env = Fun.hoareS hf.hf_f env in (* FIXME catch exception *)
-  let m = EcMemory.memory memenv in
-  let fres = 
-    match fdef.f_ret with
-    | None -> f_tt
-    | Some e -> form_of_expr m e in
-  let post = PVM.subst1 env (pv_res hf.hf_f) m fres hf.hf_post in
-  let concl' = f_hoareS memenv hf.hf_pre fdef.f_body post in
-  let (juc,n) = new_goal juc (hyps,concl') in
-  let rule = { pr_name = RN_hl_fun_def; pr_hyps = [RA_node n] } in
-  upd_rule rule (juc,n1)
+exception DestrError of destr_error
+exception NotSkipStmt
 
-let t_equivF_fun_def env (juc,n1 as g) = 
-  let hyps,concl = get_goal g in
-  let ef = destr_equivF concl in
-  let memenvl,fdefl,memenvr,fdefr,env = Fun.equivS ef.eqf_fl ef.eqf_fr env in (* FIXME catch exception *)
-  let ml, mr = EcMemory.memory memenvl, EcMemory.memory memenvr in
-  let fresl = 
-    match fdefl.f_ret with
-    | None -> f_tt
-    | Some e -> form_of_expr ml e in
-  let fresr = 
-    match fdefr.f_ret with
-    | None -> f_tt
-    | Some e -> form_of_expr mr e in
-  let s = PVM.add env (pv_res ef.eqf_fl) ml fresl PVM.empty in
-  let s = PVM.add env (pv_res ef.eqf_fr) mr fresr s in
-  let post = PVM.subst env s ef.eqf_post in
-  let concl' = f_equivS memenvl memenvr ef.eqf_pre fdefl.f_body fdefr.f_body post in
-  let (juc,n) = new_goal juc (hyps,concl') in
-  let rule = { pr_name = RN_hl_fun_def; pr_hyps = [RA_node n] } in
-  upd_rule rule (juc,n1)
+let destr_error e = raise (DestrError e)
 
-let t_fun_def env g =
-  let concl = get_concl g in
-  if is_hoareF concl then t_hoareF_fun_def env g
-  else if is_equivF concl then t_equivF_fun_def env g
-  else tacerror (NotPhl None)
+let destr_hl env f = 
+  match f.f_node with
+    | FhoareS hr -> hr.hs_me, hr.hs_pre, hr.hs_s, hr.hs_post
+    | FhoareF hr -> 
+      let pre,fpath,post = hr.hf_pre, hr.hf_f, hr.hf_post  in 
+      let fun_ = EcEnv.Fun.by_mpath fpath env in
+      let b,ret_e = match fun_.f_def with 
+        | Some fdef -> 
+          fdef.f_body, fdef.f_ret
+        | None -> assert false (* FIXME *)
+      in
+      let post = match ret_e with
+        | None -> assert false (* FIXME *)
+        | Some ret_e -> 
+          let _,env = EcEnv.Fun.hoareF fpath env in
+          let res = match EcEnv.Var.lookup_progvar_opt ~side:EcFol.mhr ([],"res") env with
+            | Some (pv,_) -> pv
+            | None -> assert false (* FIXME: error message *)
+          in
+          let subst = PVM.add env res EcFol.mhr (EcFol.form_of_expr EcFol.mhr ret_e) PVM.empty in
+          PVM.subst env subst post
+      in
+      let locals = fst fun_.f_sig.fs_sig in
+      let menv = List.fold_left 
+        (fun menv v -> EcMemory.bind v.v_name v.v_type menv)
+        (EcMemory.empty_local EcFol.mhr fpath) locals in
+      menv,pre,b,post
+    | _ -> destr_error Destr_hl
 
+let upd_body body s = {body with EcModules.f_body = s}
 
-(* -------------------------------------------------------------------- *)
-  
-let t_hoare_skip (juc,n as g) =
-  let hyps,concl = get_goal g in
-  let hs = destr_hoareS concl in
-  if hs.hs_s.s_node <> [] then tacerror NoSkipStmt;
-  let concl = f_imp hs.hs_pre hs.hs_post in
-  let (m,mt) = hs.hs_me in 
-  let concl = f_forall [(m,GTmem mt)] concl in
-  let juc, n1 = new_goal juc (hyps,concl) in
-  let rule = {pr_name = RN_hl_skip; pr_hyps = [RA_node n1]} in
-  upd_rule rule (juc,n) 
+module Pvar' = struct
+  type t = EcTypes.prog_var * EcTypes.ty
+  let mk_pvar pv mem ty = (pv,mem,ty)
+  let compare lv1 lv2 = compare lv1 lv2
+end
 
-let t_equiv_skip (juc,n as g) =
-  let hyps,concl = get_goal g in
-  let es = destr_equivS concl in
-  if es.eqs_sl.s_node <> [] then tacerror NoSkipStmt;
-  if es.eqs_sr.s_node <> [] then tacerror NoSkipStmt;
-  let concl = f_imp es.eqs_pre es.eqs_post in
-  let (ml,mtl) = es.eqs_mel in 
-  let (mr,mtr) = es.eqs_mer in 
-  let concl = f_forall [(ml,GTmem mtl); (mr,GTmem mtr)] concl in
-  let juc, n1 = new_goal juc (hyps,concl) in
-  let rule = {pr_name = RN_hl_skip; pr_hyps = [RA_node n1]} in
-  upd_rule rule (juc,n) 
+module PVset' = Set.Make(Pvar')
 
-let t_skip = t_hS_or_eS t_hoare_skip t_equiv_skip 
-    
-(* -------------------------------------------------------------------- *)
+let rec modified_pvars_i instr = 
+  let f_lval = function 
+    | EcModules.LvVar (pv,ty ) -> PVset'.singleton (pv,ty)
+    | EcModules.LvTuple pvs -> 
+      List.fold_left (fun s (pv,ty) -> PVset'.add (pv,ty) s) PVset'.empty pvs
+    | EcModules.LvMap ((_p,_tys),pv,_,ty) -> 
+      (* FIXME: What are p and tys for? *)
+      PVset'.singleton (pv,ty)
+  in
+  match instr.EcModules.i_node with
+  | EcModules.Sasgn (lval,_) -> f_lval lval
+  | EcModules.Srnd (lval,_) -> f_lval lval
+  | EcModules.Scall _ -> assert false
+  | EcModules.Sif (_,s1,s2) -> 
+    PVset'.union (modified_pvars s1) (modified_pvars s2)
+  | EcModules.Swhile (_,s) -> modified_pvars s
+  | EcModules.Sassert _ -> PVset'.empty
 
-
-
-  
+and modified_pvars stmt = 
+  List.fold_left (fun s i -> PVset'.union s (modified_pvars_i i)) 
+    PVset'.empty stmt.EcModules.s_node
 
 
 module Pvar = struct
@@ -310,6 +304,97 @@ let quantify_out_local_pvars env phi =
   quantify_pvars env free_pvars phi
 
 
+(* -------------------------------------------------------------------- *)
+(* -------------------------  Tactics --------------------------------- *)
+(* -------------------------------------------------------------------- *)
+
+
+let t_hoareF_fun_def env (juc,n1 as g) = 
+  let hyps,concl = get_goal g in
+  let hf = destr_hoareF concl in
+  let memenv, fdef, env = Fun.hoareS hf.hf_f env in (* FIXME catch exception *)
+  let m = EcMemory.memory memenv in
+  let fres = 
+    match fdef.f_ret with
+    | None -> f_tt
+    | Some e -> form_of_expr m e in
+  let post = PVM.subst1 env (pv_res hf.hf_f) m fres hf.hf_post in
+  let concl' = f_hoareS memenv hf.hf_pre fdef.f_body post in
+  let (juc,n) = new_goal juc (hyps,concl') in
+  let rule = { pr_name = RN_hl_fun_def; pr_hyps = [RA_node n] } in
+  upd_rule rule (juc,n1)
+
+let t_equivF_fun_def env (juc,n1 as g) = 
+  let hyps,concl = get_goal g in
+  let ef = destr_equivF concl in
+  let memenvl,fdefl,memenvr,fdefr,env = Fun.equivS ef.eqf_fl ef.eqf_fr env in (* FIXME catch exception *)
+  let ml, mr = EcMemory.memory memenvl, EcMemory.memory memenvr in
+  let fresl = 
+    match fdefl.f_ret with
+    | None -> f_tt
+    | Some e -> form_of_expr ml e in
+  let fresr = 
+    match fdefr.f_ret with
+    | None -> f_tt
+    | Some e -> form_of_expr mr e in
+  let s = PVM.add env (pv_res ef.eqf_fl) ml fresl PVM.empty in
+  let s = PVM.add env (pv_res ef.eqf_fr) mr fresr s in
+  let post = PVM.subst env s ef.eqf_post in
+  let concl' = f_equivS memenvl memenvr ef.eqf_pre fdefl.f_body fdefr.f_body post in
+  let (juc,n) = new_goal juc (hyps,concl') in
+  let rule = { pr_name = RN_hl_fun_def; pr_hyps = [RA_node n] } in
+  upd_rule rule (juc,n1)
+
+let t_fun_def env g =
+  let concl = get_concl g in
+  if is_hoareF concl then t_hoareF_fun_def env g
+  else if is_equivF concl then t_equivF_fun_def env g
+  else tacerror (NotPhl None)
+
+
+  
+let t_hoare_skip (juc,n as g) =
+  let hyps,concl = get_goal g in
+  let hs = destr_hoareS concl in
+  if hs.hs_s.s_node <> [] then tacerror NoSkipStmt;
+  let concl = f_imp hs.hs_pre hs.hs_post in
+  let (m,mt) = hs.hs_me in 
+
+  let concl = f_forall [(m,GTmem mt)] concl in
+  let juc, n1 = new_goal juc (hyps,concl) in
+  let rule = {pr_name = RN_hl_skip; pr_hyps = [RA_node n1]} in
+  upd_rule rule (juc,n)
+
+let t_equiv_skip (juc,n as g) =
+  let hyps,concl = get_goal g in
+  let es = destr_equivS concl in
+  if es.eqs_sl.s_node <> [] then tacerror NoSkipStmt;
+  if es.eqs_sr.s_node <> [] then tacerror NoSkipStmt;
+  let concl = f_imp es.eqs_pre es.eqs_post in
+  let (ml,mtl) = es.eqs_mel in 
+  let (mr,mtr) = es.eqs_mer in 
+  let concl = f_forall [(ml,GTmem mtl); (mr,GTmem mtr)] concl in
+  let juc, n1 = new_goal juc (hyps,concl) in
+  let rule = {pr_name = RN_hl_skip; pr_hyps = [RA_node n1]} in
+  upd_rule rule (juc,n)
+
+let t_skip = t_hS_or_eS t_hoare_skip t_equiv_skip 
+
+
+
+let t_app (i,phi) _loc (juc,n as g) =
+      let hyps,concl = get_goal g in
+      let hs = destr_hoareS concl in
+      let s1,s2 = split_stmt i hs.hs_s.s_node  in
+      let a = f_hoareS hs.hs_me hs.hs_pre (stmt s1) phi  in
+      let b = f_hoareS hs.hs_me phi (stmt s2) hs.hs_post in
+      let juc,n1 = new_goal juc (hyps,a) in
+      let juc,n2 = new_goal juc (hyps,b) in
+      let rule = { pr_name = RN_app (Pos_single i,phi) ; pr_hyps = [RA_node n1; RA_node n2]} in
+      upd_rule rule (juc,n)
+
+    
+(* -------------------------------------------------------------------- *)
 
 
 
@@ -318,59 +403,9 @@ let quantify_out_local_pvars env phi =
 
 
 
-type destr_error =
-  | Destr_hl 
-
-exception DestrError of destr_error
-
-let destr_error e = raise (DestrError e)
 
 
 
-let destr_hl env f = 
-  match f.f_node with
-    | FhoareS hr -> hr.hs_me, hr.hs_pre, hr.hs_s, hr.hs_post
-    | FhoareF hr -> 
-      let pre,fpath,post = hr.hf_pre, hr.hf_f, hr.hf_post  in 
-
-
-      let fun_ = EcEnv.Fun.by_mpath fpath env in
-      let b,ret_e = match fun_.f_def with 
-        | Some fdef -> 
-          fdef.f_body, fdef.f_ret
-        | None -> assert false (* FIXME *)
-      in
-
-      let post = match ret_e with
-        | None -> assert false (* FIXME *)
-        | Some ret_e -> 
-          let _,env = EcEnv.Fun.hoareF fpath env in
-          let res = match EcEnv.Var.lookup_progvar_opt ~side:EcFol.mhr ([],"res") env with
-            | Some (pv,_) -> pv
-            | None -> assert false (* FIXME: error message *)
-          in
-          let subst = PVM.add env res EcFol.mhr (EcFol.form_of_expr EcFol.mhr ret_e) PVM.empty in
-          PVM.subst env subst post
-      in
-
-      let locals = fst fun_.f_sig.fs_sig in
-      let menv = List.fold_left 
-        (fun menv v -> EcMemory.bind v.v_name v.v_type menv)
-        (EcMemory.empty_local EcFol.mhr fpath) locals in
-      menv,pre,b,post
-    | _ -> destr_error Destr_hl
-
-
-
-
-
-
-
-(*****************************************************************************)
-(* TACTICS *)
-(*****************************************************************************)
-
-exception NotSkipStmt
 
 let skip_tac env (juc,n as g) =
   let hyps,concl = get_goal g in
@@ -397,56 +432,9 @@ let wp_tac i _loc env (juc,n as g) =
   let rule = { pr_name = RN_fixme; pr_hyps = [RA_node n']} in
   upd_rule rule (juc,n)
 
-let app_tac (i,phi) _loc env (juc,n as g) =
-  let hyps,concl = get_goal g in
-  let mem,pre,s,post = destr_hl env concl in
-  let s1,s2 = split_stmt i s.EcModules.s_node  in
-  let a = f_hoareS mem pre (EcModules.stmt s1) phi  in
-  let b = f_hoareS mem phi (EcModules.stmt s2) post in
-  let juc,n1 = new_goal juc (hyps,a) in
-  let juc,n2 = new_goal juc (hyps,b) in
-  let rule = { pr_name = RN_fixme; pr_hyps = [RA_node n1; RA_node n2]} in
-  upd_rule rule (juc,n)
 
 
 
-let upd_body body s = 
-  {body with EcModules.f_body = s}
-
-(* to EcModule *)
-
-module Pvar' = struct
-  type t = EcTypes.prog_var * EcTypes.ty
-
-  let mk_pvar pv mem ty = (pv,mem,ty)
-
-  let compare lv1 lv2 = compare lv1 lv2
-end
-
-module PVset' = Set.Make(Pvar')
-
-
-let rec modified_pvars_i instr = 
-  let f_lval = function 
-    | EcModules.LvVar (pv,ty ) -> PVset'.singleton (pv,ty)
-    | EcModules.LvTuple pvs -> 
-      List.fold_left (fun s (pv,ty) -> PVset'.add (pv,ty) s) PVset'.empty pvs
-    | EcModules.LvMap ((_p,_tys),pv,_,ty) -> 
-      (* FIXME: What are p and tys for? *)
-      PVset'.singleton (pv,ty)
-  in
-  match instr.EcModules.i_node with
-  | EcModules.Sasgn (lval,_) -> f_lval lval
-  | EcModules.Srnd (lval,_) -> f_lval lval
-  | EcModules.Scall _ -> assert false
-  | EcModules.Sif (_,s1,s2) -> 
-    PVset'.union (modified_pvars s1) (modified_pvars s2)
-  | EcModules.Swhile (_,s) -> modified_pvars s
-  | EcModules.Sassert _ -> PVset'.empty
-
-and modified_pvars stmt = 
-  List.fold_left (fun s i -> PVset'.union s (modified_pvars_i i)) 
-    PVset'.empty stmt.EcModules.s_node
 
 
 let while_tac env inv vrnt bnd (juc,n as g) = 
@@ -512,9 +500,9 @@ let process_phl env process_form tac loc (_juc,_n as g) =
   match tac with 
     | Phoare ->
       unfold_hoare_tac env g
-    | Papp (i,pf) -> 
-      let f = process_form env hyps pf EcTypes.tbool in
-      app_tac (i,f) loc env g
+    (* | Papp (i,pf) ->  *)
+    (*   let f = process_form env hyps pf EcTypes.tbool in *)
+    (*   app_tac (i,f) loc env g *)
     | Pwp i -> 
       wp_tac i loc env g
     | Pskip -> 
