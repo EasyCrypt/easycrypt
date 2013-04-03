@@ -187,6 +187,9 @@ let i_assert e            = mk_instr (Sassert e)
 let stmt s = 
   Hstmt.hashcons { s_node = s; s_tag = -1; s_fv = EcIdent.Mid.empty}
 
+let s_split n s = List.take_n n s.s_node
+
+
 module MSHi = EcMaps.MakeMSH(struct type t = instr let tag i = i.i_tag end)
 module Hi = MSHi.H
 

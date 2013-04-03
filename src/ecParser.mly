@@ -1193,8 +1193,9 @@ tactic:
 
 (* PHL tactics *)
 | FUN { PPhl Pfun_def }
-| APP n=number p=loc(sform)
-   { PPhl( Papp(n,p) ) }
+
+| APP pos=code_position COLON p=loc(sform)
+   { PPhl( Papp(pos,p) ) }
 
 | WP n=number?
    { PPhl (Pwp (odfl 0 n)) }
@@ -1206,6 +1207,12 @@ tactic:
     { PPhl (Pwhile (inv, vrnt, bnd)) }
 
 ;
+
+code_position:
+| n=number { Single n }
+| n1=number n2=number { Double(n1,n2) } 
+;
+
 
 tactics:
 | t=loc(tactic)                        { [t] }

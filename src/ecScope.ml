@@ -907,14 +907,34 @@ module Tactic = struct
       let tacs = List.map totac ri in
       set_loc loc (t_lseq tacs) g 
     
+
+  let process_phl_formula env g phi =
+    let hyps, concl = get_goal g in
+    let hs = set_loc phi.pl_loc destr_hoareS concl in
+    let env = EcEnv.Memory.push_active hs.hs_me env in
+    process_form env hyps phi tbool
+
+  let process_prhl_formula env g phi =
+    let hyps, concl = get_goal g in
+    let es = set_loc phi.pl_loc destr_equivS concl in
+    let env = EcEnv.Memory.push_all [es.eqs_mel; es.eqs_mer] env in
+    process_form env hyps phi tbool
+    
+  let process_app env k phi g =
+    match k with
+    | Single i ->
+      let phi = process_phl_formula env g phi in
+      t_hoare_app i phi g
+    | Double(i,j) ->
+      let phi = process_prhl_formula env g phi in
+      t_equiv_app (i,j) phi g  
+
   let process_phl loc env ptac g =
     let t = 
       match ptac with
       | Pfun_def -> EcPhl.t_fun_def env
       | Pskip    -> EcPhl.t_skip 
-      | Papp (k,phi)   -> 
-        let phi = process_formula env g phi in
-        t_app (k,phi) loc
+      | Papp (k,phi) -> process_app env k phi 
       | Pwp  _   -> assert false
       | Pwhile _ -> assert false in
     set_loc loc t g

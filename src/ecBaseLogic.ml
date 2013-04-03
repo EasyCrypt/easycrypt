@@ -158,7 +158,7 @@ end
 
 type prover_info = unit (* FIXME *)
 
-type tac_pos = Pos_single of int | Pos_rel of int * int
+type tac_pos = int doption
 
 type rule_name = 
 (* Logical rules *)

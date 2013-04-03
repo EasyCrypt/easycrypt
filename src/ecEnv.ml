@@ -942,7 +942,7 @@ module Fun = struct
 
   let equivS path1 path2 env = 
     let fun1 = by_mpath path1 env in
-    let fun2 = by_mpath path1 env in
+    let fun2 = by_mpath path2 env in
     let fd1, mem1 = actmem_body EcFol.mleft path1 fun1 in
     let fd2, mem2 = actmem_body EcFol.mright path2 fun2 in
     mem1, fd1, mem2, fd2, Memory.push_all [mem1; mem2] env

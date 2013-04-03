@@ -795,12 +795,39 @@ struct
           let bodytenv = tenv in
           List.map (pr_instr bodytenv) hs.hs_s.s_node
         in
+        let spec = 
+          pr_seq [ pr_mblocks [dbody]; Pp.colon;
+                   pr_form tenv outer hs.hs_pre;
+                   Pp.string "==>"; 
+                   pr_form tenv outer hs.hs_post ] in
+        pr_seq [Pp.string "hoareS"; Pp.brackets spec  ]
 
-        pr_seq [ Pp.braces (pr_form tenv outer hs.hs_pre);
-                 pr_mblocks [dbody];
-                 Pp.braces (pr_form tenv outer hs.hs_post) ]
+      | FequivF ef  ->
+        let pre,fpathl,fpathr,post = ef.eqf_pre, ef.eqf_fl, ef.eqf_fr,ef.eqf_post in 
+        let spec =  pr_seq [pr_fun_name tenv fpathl;Pp.string "~"; pr_fun_name tenv fpathr;
+                            Pp.colon;
+                            pr_form tenv outer pre;
+                            Pp.string "==>"; pr_form tenv outer post] in
+        pr_seq [Pp.string "equiv"; Pp.brackets spec  ]
+            
+      | FequivS es -> 
+        let dbodyl =
+          let bodytenv = tenv in
+          List.map (pr_instr bodytenv) es.eqs_sl.s_node
+        in
+        let dbodyr =
+          let bodytenv = tenv in
+          List.map (pr_instr bodytenv) es.eqs_sr.s_node
+        in
+        let spec = 
+          pr_seq [ pr_mblocks [dbodyl]; !^ "~"; pr_mblocks [dbodyr];Pp.colon;
+                   pr_form tenv outer es.eqs_pre;
+                   Pp.string "==>"; 
+                   pr_form tenv outer es.eqs_post ] in
+        pr_seq [Pp.string "equivS"; Pp.brackets spec  ]
 
-      | FequivF _ | FequivS _ | Fpr _ | FeqGlob _ ->
+   
+      | Fpr _ | FeqGlob _ ->
           !^ "implement-me"  (* FIXME *)
     in
       pr_form tenv (min_op_prec, `NonAssoc) f

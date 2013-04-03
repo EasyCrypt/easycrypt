@@ -60,6 +60,8 @@ val i_assert  : expr -> instr
 
 val stmt : instr list -> stmt
 
+val s_split : int -> stmt -> instr list * instr list
+
 (* -------------------------------------------------------------------- *)
 module UM : sig
   type flag  = [`Call | `Read | `Write]

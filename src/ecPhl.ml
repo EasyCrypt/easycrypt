@@ -9,14 +9,6 @@ open EcEnv
 open EcLogic
 open EcModules
 
-exception CannotApply of string * string
-
-let cannot_apply s1 s2 = raise (CannotApply(s1,s2))
-
-
-let split_stmt n s = List.take_n n s
-
-
 
 (* -------------------------------------------------------------------- *)
 (* -------------------------  Substitution  --------------------------- *)
@@ -313,6 +305,8 @@ let t_fun_def env g =
   if is_hoareF concl then t_hoareF_fun_def env g
   else if is_equivF concl then t_equivF_fun_def env g
   else tacerror (NotPhl None)
+
+(* -------------------------------------------------------------------- *)
   
 let t_hoare_skip (juc,n as g) =
   let hyps,concl = get_goal g in
@@ -341,17 +335,33 @@ let t_equiv_skip (juc,n as g) =
 
 let t_skip = t_hS_or_eS t_hoare_skip t_equiv_skip 
 
-let t_app (i,phi) _loc (juc,n as g) =
-      let hyps,concl = get_goal g in
-      let hs = destr_hoareS concl in
-      let s1,s2 = split_stmt i hs.hs_s.s_node  in
-      let a = f_hoareS hs.hs_me hs.hs_pre (stmt s1) phi  in
-      let b = f_hoareS hs.hs_me phi (stmt s2) hs.hs_post in
-      let juc,n1 = new_goal juc (hyps,a) in
-      let juc,n2 = new_goal juc (hyps,b) in
-      let rule = { pr_name = RN_app (Pos_single i,phi) ; pr_hyps = [RA_node n1; RA_node n2]} in
-      upd_rule rule (juc,n)
-    
+(* -------------------------------------------------------------------- *)
+
+let t_hoare_app i phi (juc,n as g) =
+  let hyps,concl = get_goal g in
+  let hs = destr_hoareS concl in
+  let s1,s2 = s_split i hs.hs_s  in (* FIXME catch exception *)
+  let a = f_hoareS hs.hs_me hs.hs_pre (stmt s1) phi  in
+  let b = f_hoareS hs.hs_me phi (stmt s2) hs.hs_post in
+  let juc,n1 = new_goal juc (hyps,a) in
+  let juc,n2 = new_goal juc (hyps,b) in
+  let rule = { pr_name = RN_app (Single i,phi) ; pr_hyps = [RA_node n1; RA_node n2]} in
+  upd_rule rule (juc,n)
+
+let t_equiv_app (i,j) phi (juc,n as g) =
+  let hyps,concl = get_goal g in
+  let es = destr_equivS concl in
+  let sl1,sl2 = s_split i es.eqs_sl  in (* FIXME catch exception *)
+  let sr1,sr2 = s_split j es.eqs_sr  in (* FIXME catch exception *)
+  let a = f_equivS es.eqs_mel es.eqs_mer es.eqs_pre (stmt sl1) (stmt sr1) phi  in
+  let b = f_equivS es.eqs_mel es.eqs_mer phi        (stmt sl2) (stmt sr2) es.eqs_post in
+  let juc,n1 = new_goal juc (hyps,a) in
+  let juc,n2 = new_goal juc (hyps,b) in
+  let rule = { pr_name = RN_app (Double (i,j), phi) ; 
+               pr_hyps = [RA_node n1; RA_node n2]} in
+  upd_rule rule (juc,n)
+
+  
 (* -------------------------------------------------------------------- *)
 
 (*

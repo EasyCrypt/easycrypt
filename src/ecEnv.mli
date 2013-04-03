@@ -153,11 +153,12 @@ module Memory : sig
   val set_active  : memory -> env -> env
   val get_active  : env -> memory option
 
-  val byid     : memory -> env -> EcMemory.memenv option
-  val lookup   : symbol -> env -> EcMemory.memenv option
-  val current  : env -> EcMemory.memenv option
-  val push     : EcMemory.memenv -> env -> env
-  val push_all : EcMemory.memenv list -> env -> env
+  val byid        : memory -> env -> EcMemory.memenv option
+  val lookup      : symbol -> env -> EcMemory.memenv option
+  val current     : env -> EcMemory.memenv option
+  val push        : EcMemory.memenv -> env -> env
+  val push_all    : EcMemory.memenv list -> env -> env
+  val push_active : EcMemory.memenv -> env -> env
 
 end
 
