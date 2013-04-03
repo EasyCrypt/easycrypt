@@ -396,8 +396,8 @@ let rec f_dump (f : form) : dnode =
     | FequivS _ -> dleaf "FequivS"
     | Fpr     _ -> dleaf "Fpr"
   in
-    (* dnode "Form" [ty_dump f.f_ty; node] *)
-    node
+     dnode "Form" [ty_dump f.f_ty; node] 
+(*    node *)
 
 (* -------------------------------------------------------------------- *)
 let mk_form node ty =  Hsform.hashcons 
@@ -418,7 +418,7 @@ let f_app f args ty =
   if args = [] then f 
   else match f.f_node with
   | Fapp(f',args') -> mk_form (Fapp(f', args'@args)) ty
-  | _ -> mk_form (Fapp(f,args)) ty
+  | _ -> mk_form (Fapp(f,args)) ty 
 
 let f_true = f_op EcCoreLib.p_true [] ty_bool
 let f_false = f_op EcCoreLib.p_false [] ty_bool
@@ -1074,8 +1074,8 @@ let rec form_of_expr mem (e: expr) =
   | Elocal id -> f_local id e.e_ty
   | Evar pv -> f_pvar pv e.e_ty mem
   | Eop (op,tys) -> f_op op tys e.e_ty
-  | Eapp (e,es) -> 
-      f_app (form_of_expr mem e) (List.map (form_of_expr mem) es) e.e_ty
+  | Eapp (ef,es) -> 
+      f_app (form_of_expr mem ef) (List.map (form_of_expr mem) es) e.e_ty
   | Elet (lpt,e1,e2) -> f_let lpt (form_of_expr mem e1) (form_of_expr mem e2)
   | Etuple es -> f_tuple (List.map (form_of_expr mem) es)
   | Eif (e1,e2,e3) -> 

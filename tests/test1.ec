@@ -1,7 +1,10 @@
-require import Int.
+require Logic.
 
-lemma foo : [<=] 1 2
+lemma foo : forall (a b : bool), a /\ !(1=2) => a
 proof.
+ simplify.
+ intros a b h.
+ elim h.
 
 print op Int.[<=].
 

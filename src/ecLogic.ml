@@ -183,6 +183,8 @@ type app_arg =
   | AAmp   of EcPath.mpath
   | AAnode 
 
+
+
 let check_arg do_arg env hyps s x gty a =
   let a = do_arg env hyps (Some gty) a in
   match gty, a with

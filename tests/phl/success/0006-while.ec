@@ -1,4 +1,5 @@
 require Logic.
+
 module M = { 
   fun f () : int * int = {
     var x, y : int;
@@ -31,14 +32,14 @@ module M1 = {
   }
 }.
 
+
 lemma foo1 : hoare [M1.f : true ==> res = (10,10)]
 proof.
  fun.
  while (x=1).   
  wp;skip.
- simplify;intros _ h.
-(*  elim h. FIXME : bug ? *)
- trivial.
+ intros _ h.
+ elim h;intros h1 _; assumption h1.
  wp;skip.
  intros _ _;split.
  split .

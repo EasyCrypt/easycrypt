@@ -16,6 +16,10 @@ let _ = EcPexception.register (fun fmt exn ->
   match exn with
   | IncompatibleForm(f1,f2,f3,f4) ->
     Format.fprintf fmt "the formula %a is not compatible with %a, since %a is not compatible with %a" PE.pp_form f1 PE.pp_form f2 PE.pp_form f3 PE.pp_form f4
+  | IncompatibleType(ty1,ty2) ->
+    let pp_type = PE.pp_type ~vmap:(EcUidgen.NameGen.create()) in
+    Format.fprintf fmt "the type %a is not compatible with %a"
+      pp_type ty1 pp_type ty2
   | _ -> raise exn)
       
 let rec equal_type env t1 t2 = 
@@ -195,10 +199,13 @@ let rec is_head_reducible ri env hyps f =
   | Flet(LTuple _, {f_node = Ftuple _}, _) -> ri.iota
   | Flet(_, e1, _) -> is_head_reducible ri env hyps e1
   | Fapp({f_node = Fquant(Llambda,_,_)}, _) -> ri.beta
-  | Fapp({f_node = Fop(p,_)}, ([a1;a2] as args)) 
+  | Fapp({f_node = Fop(p,_)}, args) 
       when ri.logic && is_logical_op p ->
-    if EcPath.p_equal p EcCoreLib.p_eq then 
-      EcFol.f_equal a1 a2 || List.exists (is_head_reducible ri env hyps) args
+    if EcPath.p_equal p EcCoreLib.p_eq then
+      match args with
+      | [a1;a2] -> 
+        EcFol.f_equal a1 a2 || List.exists (is_head_reducible ri env hyps) args
+      | _ -> false
     else
       List.exists (fun f -> is_cbool f || is_head_reducible ri env hyps f) args
   | Fapp(f,_) -> is_head_reducible ri env hyps f
@@ -230,12 +237,17 @@ let rec h_red ri env hyps f =
       List.fold_left2 (fun s (x,_) e1 -> bind_local s x e1) f_subst_id bd args in
     let f' = f_subst s (f_lambda ext_bd body) in
     f_app f' ext_a f.f_ty
-  | Fapp({f_node = Fop(p,_)} as fo, ([a1;a2] as args))
+  | Fapp({f_node = Fop(p,_)} as fo, args)
       when ri.logic && is_logical_op p ->
-    if EcPath.p_equal p EcCoreLib.p_eq && EcFol.f_equal a1 a2 ||
-      List.exists is_cbool args then
+    if EcPath.p_equal p EcCoreLib.p_eq then
+      match args with
+      | [a1;a2] ->
+        if EcFol.f_equal a1 a2 then f_true
+        else f_app fo (h_red_args ri env hyps args) f.f_ty
+      | _ -> raise NotReducible 
+    else if List.exists is_cbool args then
       match op_kind p, args with
-      | OK_not  , [f] -> f_not_simpl f
+      | OK_not  , [f1] -> f_not_simpl f1
       | OK_and b, [f1;f2] ->
         if b then f_anda_simpl f1 f2 else f_and_simpl f1 f2
       | OK_or b , [f1;f2] ->
@@ -243,7 +255,7 @@ let rec h_red ri env hyps f =
       | OK_imp  , [f1;f2] -> f_imp_simpl f1 f2 
       | OK_iff  , [f1;f2] -> f_iff_simpl f1 f2 
       | OK_eq   , [f1;f2] -> f_eq_simpl f1 f2 
-      | _                 -> assert false 
+      | _                 -> f
     else f_app fo (h_red_args ri env hyps args) f.f_ty
   | Fapp(f1,args) ->
     f_app (h_red ri env hyps f1) args f.f_ty
