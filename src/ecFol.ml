@@ -507,14 +507,14 @@ let f_pr m f args e = mk_form (Fpr(m,f,args,e)) ty_real
 
 
 
-let fop_int_leq = f_op EcCoreLib.p_leq [] (tfun tint (tfun tint ty_bool))
+let fop_int_leq = f_op EcCoreLib.p_int_leq [] (tfun tint (tfun tint ty_bool))
 let f_int_le f1 f2 = 
   if ty_equal f1.f_ty tint then 
     f_app fop_int_leq [f1;f2] ty_bool
   else 
     assert false (* FIXME *)
 
-let fop_int_lt = f_op EcCoreLib.p_lt [] (tfun tint (tfun tint ty_bool))
+let fop_int_lt = f_op EcCoreLib.p_int_lt [] (tfun tint (tfun tint ty_bool))
 let f_int_lt f1 f2 = 
   if ty_equal f1.f_ty tint then 
     f_app fop_int_lt [f1;f2] ty_bool

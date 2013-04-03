@@ -189,44 +189,7 @@ let t_hS_or_eS th te g =
   else if is_equivS concl then te g
   else tacerror (NotPhl None)
 
-type destr_error =
-  | Destr_hl 
 
-exception DestrError of destr_error
-exception NotSkipStmt
-
-let destr_error e = raise (DestrError e)
-
-let destr_hl env f = 
-  match f.f_node with
-    | FhoareS hr -> hr.hs_me, hr.hs_pre, hr.hs_s, hr.hs_post
-    | FhoareF hr -> 
-      let pre,fpath,post = hr.hf_pre, hr.hf_f, hr.hf_post  in 
-      let fun_ = EcEnv.Fun.by_mpath fpath env in
-      let b,ret_e = match fun_.f_def with 
-        | Some fdef -> 
-          fdef.f_body, fdef.f_ret
-        | None -> assert false (* FIXME *)
-      in
-      let post = match ret_e with
-        | None -> assert false (* FIXME *)
-        | Some ret_e -> 
-          let _,env = EcEnv.Fun.hoareF fpath env in
-          let res = match EcEnv.Var.lookup_progvar_opt ~side:EcFol.mhr ([],"res") env with
-            | Some (pv,_) -> pv
-            | None -> assert false (* FIXME: error message *)
-          in
-          let subst = PVM.add env res EcFol.mhr (EcFol.form_of_expr EcFol.mhr ret_e) PVM.empty in
-          PVM.subst env subst post
-      in
-      let locals = fst fun_.f_sig.fs_sig in
-      let menv = List.fold_left 
-        (fun menv v -> EcMemory.bind v.v_name v.v_type menv)
-        (EcMemory.empty_local EcFol.mhr fpath) locals in
-      menv,pre,b,post
-    | _ -> destr_error Destr_hl
-
-let upd_body body s = {body with EcModules.f_body = s}
 
 module Pvar' = struct
   type t = EcTypes.prog_var * EcTypes.ty
@@ -350,8 +313,6 @@ let t_fun_def env g =
   if is_hoareF concl then t_hoareF_fun_def env g
   else if is_equivF concl then t_equivF_fun_def env g
   else tacerror (NotPhl None)
-
-
   
 let t_hoare_skip (juc,n as g) =
   let hyps,concl = get_goal g in
@@ -380,8 +341,6 @@ let t_equiv_skip (juc,n as g) =
 
 let t_skip = t_hS_or_eS t_hoare_skip t_equiv_skip 
 
-
-
 let t_app (i,phi) _loc (juc,n as g) =
       let hyps,concl = get_goal g in
       let hs = destr_hoareS concl in
@@ -392,35 +351,10 @@ let t_app (i,phi) _loc (juc,n as g) =
       let juc,n2 = new_goal juc (hyps,b) in
       let rule = { pr_name = RN_app (Pos_single i,phi) ; pr_hyps = [RA_node n1; RA_node n2]} in
       upd_rule rule (juc,n)
-
     
 (* -------------------------------------------------------------------- *)
 
-
-
-
-
-
-
-
-
-
-
-
-let skip_tac env (juc,n as g) =
-  let hyps,concl = get_goal g in
-  let _mem,pre,s,post = destr_hl env concl in
-  match s.EcModules.s_node with
-    | _ :: _ ->
-      raise NotSkipStmt
-    | [] ->
-      let conc = f_imp pre post in
-      let conc = quantify_out_local_pvars env conc in
-      let juc,n1 = new_goal juc (hyps,conc) in
-      let rule = {pr_name = RN_fixme; pr_hyps=[RA_node n1]} in
-      upd_rule rule (juc,n)
-
-
+(*
 let wp_tac i _loc env (juc,n as g) =
   let hyps,concl = get_goal g in
   let menv,pre,s,post = destr_hl env concl in
@@ -479,39 +413,8 @@ let while_tac env inv vrnt bnd (juc,n as g) =
           upd_rule rule (juc,n)
         | _ -> cannot_apply "while_tac" "a while loop is expected"
 
+*)
 
-let unfold_hoare_tac env (juc,n as g) =
-  let hyps,concl = get_goal g in
-  let menv,pre,c,post = destr_hl env concl in
-  let j = f_hoareS menv pre c post in
-  let juc,n' = new_goal juc (hyps,j) in
-  let rule = { pr_name = RN_fixme; pr_hyps=[RA_node n']} in
-  upd_rule rule (juc,n)
-
-
-
-
-
-let process_phl env process_form tac loc (_juc,_n as g) = 
-  let hyps,concl = get_goal g in
-  let menv,_pre,_s,_post = destr_hl env concl in
-  let env = EcEnv.Memory.set_active (EcMemory.memory menv) 
-    (EcEnv.Memory.push menv env) in
-  match tac with 
-    | Phoare ->
-      unfold_hoare_tac env g
-    (* | Papp (i,pf) ->  *)
-    (*   let f = process_form env hyps pf EcTypes.tbool in *)
-    (*   app_tac (i,f) loc env g *)
-    | Pwp i -> 
-      wp_tac i loc env g
-    | Pskip -> 
-      skip_tac env g
-    | Pwhile (inv,varnt,bnd) ->
-      let inv = process_form env hyps inv EcTypes.tbool in
-      let varnt = process_form env hyps varnt EcTypes.tint in
-      let bnd = process_form env hyps bnd EcTypes.tint in
-      while_tac env inv varnt bnd g
 
 
 

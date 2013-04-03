@@ -1360,7 +1360,7 @@ module Ax = struct
     let env = MC.bind_axiom name ax env in
     let (w3, rb) = 
       EcWhy3.add_ax env.env_w3
-        (EcPath.extend (Some (EcPath.path_of_mpath env.env_scope)) name)
+        (EcPath.pqname (EcPath.path_of_mpath env.env_scope) name)
         (NormMp.norm_ax env ax) in
     { env with
       env_w3   = w3;
@@ -1597,7 +1597,7 @@ let import_w3_dir env dir name rd =
 (* -------------------------------------------------------------------- *)
 let initial = 
   let env0 = empty in
-  let env = enter EcCoreLib.id_pervasive EcPath.PKother [] env0 in
+  let env = enter EcCoreLib.id_Pervasive EcPath.PKother [] env0 in
   let unit_rn = 
     let tunit = Why3.Ty.ts_tuple 0 in
     let nunit = tunit.Why3.Ty.ts_name.Why3.Ident.id_string in
@@ -1631,8 +1631,8 @@ let initial =
   ] in
   let env, _ = import_w3 env EcWhy3.distr_theory distr_rn in
   let cth = Theory.close env in
-  let env1 = Theory.bind EcCoreLib.id_pervasive cth env0 in
-  let env1 = Theory.import EcCoreLib.p_pervasive env1 in
+  let env1 = Theory.bind EcCoreLib.id_Pervasive cth env0 in
+  let env1 = Theory.import EcCoreLib.p_Pervasive env1 in
   env1
 
 (* -------------------------------------------------------------------- *)

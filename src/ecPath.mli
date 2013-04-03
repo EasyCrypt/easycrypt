@@ -47,7 +47,6 @@ val toqsymbol : path -> qsymbol
 val basename  : path -> symbol
 val prefix    : path -> path option
 val rootname  : path -> symbol
-val extend    : path option -> symbol -> path
 val tolist    : path -> symbol list 
 val p_size    : path -> int
 

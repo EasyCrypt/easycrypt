@@ -1204,8 +1204,6 @@ tactic:
 
 | WHILE inv=loc(sform) vrnt=loc(sform) bnd=loc(sform)
     { PPhl (Pwhile (inv, vrnt, bnd)) }
-| HOARE                         
-    { PPhl Phoare }
 
 ;
 

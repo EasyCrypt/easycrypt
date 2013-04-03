@@ -21,10 +21,10 @@ val s_from_int   : qsymbol
 (*           predefined path                                             *)
 (* ----------------------------------------------------------------------*)
 val id_top       : symbol
-val id_pervasive : symbol
+val id_Pervasive : symbol
 
 val p_top       : path
-val p_pervasive : path
+val p_Pervasive : path
 
 val p_unit       : path
 val p_bool       : path
@@ -45,8 +45,8 @@ val p_imp        : path
 val p_iff        : path
 val p_eq         : path
 
-val p_leq        : path
-val p_lt         : path
+val p_int_leq    : path
+val p_int_lt     : path
 
 val p_cut_lemma  : path
 val p_false_elim : path

@@ -258,7 +258,6 @@ and phl_tactics =
   | Papp        of (int * pformula)
   | Pwp         of int
   | Pwhile      of (pformula * pformula * pformula)
-  | Phoare
 and ptactics = ptactic list        
 
 (* -------------------------------------------------------------------- *)

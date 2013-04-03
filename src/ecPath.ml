@@ -116,11 +116,6 @@ let rec rootname p =
   | Pident x      -> EcIdent.name x
   | Pqname (p, _) -> rootname p
 
-let extend (p : path option) (x : symbol) =
-  match p with
-  | None   -> psymbol x
-  | Some p -> pqname p x
-
 let rec p_size p =
   match p.p_node with
   | Psymbol _     -> 1

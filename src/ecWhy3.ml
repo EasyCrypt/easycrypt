@@ -546,7 +546,7 @@ let import_w3_tydef rn path (env,rb,z) ty =
   let def = omap ty.Ty.ts_def (import_w3_ty env tvm) in
   let eid = Renaming.get_ts rn ty in
   let td = { tyd_params = params; tyd_type = def } in
-  let p = EcPath.extend (Some path) eid in
+  let p = EcPath.pqname path eid in
   let env = add_w3_ty env p ty in
   let rb  = rbadd_w3_ty rb p ty in 
     (env, rb, Zdecl (Th_type (eid, td)) :: z)
@@ -668,7 +668,7 @@ let import_w3_ls rn path (env,rb,z) ls =
   let params = List.map (Wtvm.get tvm) wparams in
   let eid = Renaming.get_ls rn ls in
   let op = mk_op params dom (force_bool codom) None in
-  let p = EcPath.extend (Some path) eid in
+  let p = EcPath.pqname path eid in
   let odecl = mk_highorder_func ls in
   let env = add_w3_ls env p ls wparams odecl in 
   let rb  = rbadd_w3_ls rb p ls wparams odecl in 
@@ -708,7 +708,7 @@ let import_w3_pr rn path (env,rb,z as envld) k pr t =
         ax_spec = spec;
         ax_kind = if k = Decl.Plemma then assert false (*FIXME Lemma *)
         else Axiom } in
-      let p = EcPath.extend (Some path) eid in
+      let p = EcPath.pqname path eid in
       let env = add_w3_pr env p pr in
       let rb  = rbadd_w3_pr rb p pr in 
       env, rb, Zdecl(Th_axiom (eid,ax)) :: z
@@ -745,7 +745,7 @@ let import_decls rn path env rb decls =
     | _, [], _ -> assert false in
   let open_ ls path z = 
     List.fold_left (fun (path, z) s -> 
-      EcPath.extend (Some path) s, (Zenter s) :: z) (path, z) ls
+      EcPath.pqname path s, (Zenter s) :: z) (path, z) ls
   in
     
   let close_open ls ls' path z = 

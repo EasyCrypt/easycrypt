@@ -13,12 +13,11 @@ let s_from_int   = (["<top>"; "Real" ; "FromInt"   ], "from_int")
 
 (* -------------------------------------------------------------------- *)
 let id_top       = "<top>"
-let id_pervasive = "Pervasive"
+let id_Pervasive = "Pervasive"
 let id_unit      = "unit"
 let id_tt        = "tt"
 let id_bool      = "bool"
 let id_int       = "int"
-let id_Int       = "Int"
 let id_real      = "real"
 let id_distr     = "distr"
 
@@ -37,61 +36,62 @@ let id_leq       = "<="
 let id_lt        = "<"
 
 
-let p_top        = EcPath.extend None id_top
-let p_pervasive  = EcPath.extend (Some p_top) id_pervasive
-let pervasive id = EcPath.extend (Some p_pervasive) id
+let p_top        = EcPath.psymbol id_top
+let p_Pervasive  = EcPath.pqname p_top id_Pervasive
+let _Pervasive id = EcPath.pqname p_Pervasive id
 
-let extend_int id  = EcPath.extend (Some p_top) id
+let p_unit       = _Pervasive id_unit
+let p_tt         = _Pervasive id_tt
+let p_bool       = _Pervasive id_bool
+let p_int        = _Pervasive id_int
+let p_real       = _Pervasive id_real
+let p_distr      = _Pervasive id_distr
+
+let p_true       = _Pervasive id_true
+let p_false      = _Pervasive id_false
+let p_not        = _Pervasive id_not
+let p_anda       = _Pervasive id_anda 
+let p_and        = _Pervasive id_and
+let p_ora        = _Pervasive id_ora
+let p_or         = _Pervasive id_or
+let p_imp        = _Pervasive id_imp
+let p_iff        = _Pervasive id_iff
+let p_eq         = _Pervasive id_eq
+
+let id_Int       = "Int"
+let p_Int        = EcPath.pqname p_top id_Int 
+let _Int id      = EcPath.pqname p_Int id
+
+let p_int_leq    = _Int  id_leq
+let p_int_lt     = _Int  id_lt
 
 
+let p_Logic         = EcPath.pqname p_top "Logic" 
+let _Logic    id    = EcPath.pqname p_Logic id
 
+let p_cut_lemma     = _Logic "cut_lemma"
+let p_false_elim    = _Logic "false_elim"
+let p_and_elim      = _Logic "and_elim"
+let p_anda_elim     = _Logic "anda_elim"
+let p_or_elim       = _Logic "or_elim"
+let p_ora_elim      = _Logic "ora_elim"
+let p_iff_elim      = _Logic "iff_elim"
+let p_if_elim       = _Logic "if_elim"
 
-let p_unit       = pervasive id_unit
-let p_tt         = pervasive id_tt
-let p_bool       = pervasive id_bool
-let p_int        = pervasive id_int
-let p_real       = pervasive id_real
-let p_distr      = pervasive id_distr
+let p_true_intro    = _Logic "true_intro"
+let p_and_intro     = _Logic "and_intro"
+let p_anda_intro    = _Logic "anda_intro"
+let p_or_intro_l    = _Logic "or_intro_l"
+let p_ora_intro_l   = _Logic "ora_intro_l"
+let p_or_intro_r    = _Logic "or_intro_r"
+let p_ora_intro_r   = _Logic "ora_intro_r"
+let p_iff_intro     = _Logic "iff_intro"
+let p_if_intro      = _Logic "if_intro"
+let p_eq_refl       = _Logic "eq_refl"
 
-let p_true       = pervasive id_true
-let p_false      = pervasive id_false
-let p_not        = pervasive id_not
-let p_anda       = pervasive id_anda 
-let p_and        = pervasive id_and
-let p_ora        = pervasive id_ora
-let p_or         = pervasive id_or
-let p_imp        = pervasive id_imp
-let p_iff        = pervasive id_iff
-let p_eq         = pervasive id_eq
+let p_rewrite_l     = _Logic "rewrite_l"
+let p_rewrite_r     = _Logic "rewrite_r"
+let p_rewrite_iff_l = _Logic "rewrite_iff_l"
+let p_rewrite_iff_r = _Logic "rewrite_iff_r"
 
-let p_leq        = extend_int id_leq
-let p_lt         = extend_int id_lt
-
-
-let p_logic      = EcPath.pqname p_top "Logic" 
-let p_cut_lemma  = EcPath.pqname p_logic "cut_lemma"
-let p_false_elim = EcPath.pqname p_logic "false_elim"
-let p_and_elim   = EcPath.pqname p_logic "and_elim"
-let p_anda_elim  = EcPath.pqname p_logic "anda_elim"
-let p_or_elim    = EcPath.pqname p_logic "or_elim"
-let p_ora_elim   = EcPath.pqname p_logic "ora_elim"
-let p_iff_elim   = EcPath.pqname p_logic "iff_elim"
-let p_if_elim    = EcPath.pqname p_logic "if_elim"
-
-let p_true_intro  = EcPath.pqname p_logic "true_intro"
-let p_and_intro   = EcPath.pqname p_logic "and_intro"
-let p_anda_intro  = EcPath.pqname p_logic "anda_intro"
-let p_or_intro_l  = EcPath.pqname p_logic "or_intro_l"
-let p_ora_intro_l = EcPath.pqname p_logic "ora_intro_l"
-let p_or_intro_r  = EcPath.pqname p_logic "or_intro_r"
-let p_ora_intro_r = EcPath.pqname p_logic "ora_intro_r"
-let p_iff_intro   = EcPath.pqname p_logic "iff_intro"
-let p_if_intro    = EcPath.pqname p_logic "if_intro"
-let p_eq_refl     = EcPath.pqname p_logic "eq_refl"
-
-let p_rewrite_l     = EcPath.pqname p_logic "rewrite_l"
-let p_rewrite_r     = EcPath.pqname p_logic "rewrite_r"
-let p_rewrite_iff_l = EcPath.pqname p_logic "rewrite_iff_l"
-let p_rewrite_iff_r = EcPath.pqname p_logic "rewrite_iff_r"
-
-let p_case_eq_bool  = EcPath.pqname p_logic "case_eq_bool"
+let p_case_eq_bool  = _Logic "case_eq_bool"
