@@ -183,40 +183,9 @@ let t_hS_or_eS th te g =
 
 
 
-module Pvar' = struct
-  type t = EcTypes.prog_var * EcTypes.ty
-  let mk_pvar pv mem ty = (pv,mem,ty)
-  let compare lv1 lv2 = compare lv1 lv2
-end
-
-module PVset' = Set.Make(Pvar')
-
-let rec modified_pvars_i instr = 
-  let f_lval = function 
-    | EcModules.LvVar (pv,ty ) -> PVset'.singleton (pv,ty)
-    | EcModules.LvTuple pvs -> 
-      List.fold_left (fun s (pv,ty) -> PVset'.add (pv,ty) s) PVset'.empty pvs
-    | EcModules.LvMap ((_p,_tys),pv,_,ty) -> 
-      (* FIXME: What are p and tys for? *)
-      PVset'.singleton (pv,ty)
-  in
-  match instr.EcModules.i_node with
-  | EcModules.Sasgn (lval,_) -> f_lval lval
-  | EcModules.Srnd (lval,_) -> f_lval lval
-  | EcModules.Scall _ -> assert false
-  | EcModules.Sif (_,s1,s2) -> 
-    PVset'.union (modified_pvars s1) (modified_pvars s2)
-  | EcModules.Swhile (_,s) -> modified_pvars s
-  | EcModules.Sassert _ -> PVset'.empty
-
-and modified_pvars stmt = 
-  List.fold_left (fun s i -> PVset'.union s (modified_pvars_i i)) 
-    PVset'.empty stmt.EcModules.s_node
-
 
 module Pvar = struct
   type t = EcTypes.prog_var * EcMemory.memory * EcTypes.ty
-  let mk_pvar pv mem ty = (pv,mem,ty)
   let compare lv1 lv2 = compare lv1 lv2
 end
 module PVset = Set.Make(Pvar)
@@ -257,6 +226,29 @@ let quantify_out_local_pvars env phi =
   Format.printf "Found %i free program variables \n" (List.length (PVset.elements free_pvars));
   Format.print_newline();
   quantify_pvars env free_pvars phi
+
+
+let rec modified_pvars_i m instr = 
+  let f_lval = function 
+    | EcModules.LvVar (pv,ty ) -> PVset.singleton (pv,m,ty)
+    | EcModules.LvTuple pvs -> 
+      List.fold_left (fun s (pv,ty) -> PVset.add (pv,m,ty) s) PVset.empty pvs
+    | EcModules.LvMap ((_p,_tys),pv,_,ty) -> 
+      (* FIXME: What are p and tys for? *)
+      PVset.singleton (pv,m,ty)
+  in
+  match instr.EcModules.i_node with
+  | EcModules.Sasgn (lval,_) -> f_lval lval
+  | EcModules.Srnd (lval,_) -> f_lval lval
+  | EcModules.Scall _ -> assert false
+  | EcModules.Sif (_,s1,s2) -> 
+    PVset.union (modified_pvars m s1) (modified_pvars m s2)
+  | EcModules.Swhile (_,s) -> modified_pvars m s
+  | EcModules.Sassert _ -> PVset.empty
+
+and modified_pvars m stmt = 
+  List.fold_left (fun s i -> PVset.union s (modified_pvars_i m i))
+    PVset.empty stmt.EcModules.s_node
 
 
 (* -------------------------------------------------------------------- *)
@@ -392,9 +384,9 @@ let while_tac env inv vrnt bnd (juc,n as g) =
         | EcModules.Swhile (e,c) ->
           (* initialization *)
           (* {P} s' {Inv /\ v <= bdn /\ A mod(s) (Inv /\ ~e => post) } *)
-          let mods = modified_pvars c in
-          let f (pv,ty) pvs  = PVset.add (pv,EcFol.mhr,ty) pvs in
-          let mods = PVset'.fold f mods PVset.empty in
+          let mods = modified_pvars EcFol.mhr c in
+          let f (pv,m,ty) pvs  = PVset.add (pv,m,ty) pvs in
+          (* let mods = PVset.fold f mods PVset.empty in *)
           let e = form_of_expr (EcMemory.memory menv) e in
           let p = quantify_pvars env mods (f_imp (f_and inv (f_not e)) post) in
           let post1 = f_and inv (f_and (f_int_le vrnt bnd) p) in
