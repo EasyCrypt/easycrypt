@@ -258,6 +258,8 @@ and phl_tactics =
   | Papp        of (int doption * pformula)
   | Pwp         of int doption option 
   | Pwhile      of pformula
+  | Prcond      of (bool * int)
+  | Pcond       of tac_side
 and ptactics = ptactic list        
 
 (* -------------------------------------------------------------------- *)

@@ -136,6 +136,7 @@
 %token COLON
 %token COMMA
 %token COMPUTE
+%token COND
 %token CUT
 %token DELTA
 %token DLBRACKET
@@ -191,6 +192,8 @@
 %token RBOOL
 %token RBRACE
 %token RBRACKET
+%token RCONDF
+%token RCONDT
 %token REQUIRE
 %token RES
 %token RETURN
@@ -1206,7 +1209,28 @@ tactic:
 | WHILE inv=loc(sform) 
     { PPhl (Pwhile inv) }
 
+| RCONDT i=number 
+    {PPhl (Prcond(true,i))}
+| RCONDF i=number 
+    {PPhl (Prcond(false,i))}
+| COND s=side
+    { PPhl (Pcond s) }
 ;
+
+side_num:
+| LBRACE n=number RBRACE {
+     if n <> 1 && n <> 2 then
+       error
+         (EcLocation.make $startpos $endpos)
+         "variable side must be 1 or 2"
+     else
+       n
+ }
+;
+
+side:
+| LBRACE i=side_num RBRACE {if i=1 then Some true else Some false }
+| empty { None }
 
 code_position:
 | n=number { Single n }

@@ -321,9 +321,18 @@ and modified_pvars m stmt =
 (* -------------------------  Tactics --------------------------------- *)
 (* -------------------------------------------------------------------- *)
 
+let prove_goal_by sub_gs rule (juc, n as g) =
+  let hyps,_ = get_goal g in
+  let add_sgoal (juc,ns) sg = 
+    let juc,n = new_goal juc (hyps,sg) in juc, RA_node n::ns
+  in
+  let juc,ns = List.fold_left add_sgoal (juc,[]) sub_gs in
+  let rule = { pr_name = rule ; pr_hyps = List.rev ns} in
+  upd_rule rule (juc,n)
 
-let t_hoareF_fun_def env (juc,n1 as g) = 
-  let hyps,concl = get_goal g in
+
+let t_hoareF_fun_def env g = 
+  let concl = get_concl g in
   let hf = destr_hoareF concl in
   let memenv, fdef, env = Fun.hoareS hf.hf_f env in (* FIXME catch exception *)
   let m = EcMemory.memory memenv in
@@ -333,12 +342,11 @@ let t_hoareF_fun_def env (juc,n1 as g) =
     | Some e -> form_of_expr m e in
   let post = PVM.subst1 env (pv_res hf.hf_f) m fres hf.hf_po in
   let concl' = f_hoareS memenv hf.hf_pr fdef.f_body post in
-  let (juc,n) = new_goal juc (hyps,concl') in
-  let rule = { pr_name = RN_hl_fun_def; pr_hyps = [RA_node n] } in
-  upd_rule rule (juc,n1)
+  prove_goal_by [concl'] RN_hl_fun_def g
 
-let t_equivF_fun_def env (juc,n1 as g) = 
-  let hyps,concl = get_goal g in
+
+let t_equivF_fun_def env g = 
+  let concl = get_concl g in
   let ef = destr_equivF concl in
   let memenvl,fdefl,memenvr,fdefr,env = Fun.equivS ef.ef_fl ef.ef_fr env in 
                                 (* FIXME catch exception *)
@@ -356,9 +364,8 @@ let t_equivF_fun_def env (juc,n1 as g) =
   let post = PVM.subst env s ef.ef_po in
   let concl' = 
     f_equivS memenvl memenvr ef.ef_pr fdefl.f_body fdefr.f_body post in
-  let (juc,n) = new_goal juc (hyps,concl') in
-  let rule = { pr_name = RN_hl_fun_def; pr_hyps = [RA_node n] } in
-  upd_rule rule (juc,n1)
+  prove_goal_by [concl'] RN_hl_fun_def g
+
 
 let t_fun_def env g =
   let concl = get_concl g in
@@ -368,20 +375,18 @@ let t_fun_def env g =
 
 (* -------------------------------------------------------------------- *)
   
-let t_hoare_skip (juc,n as g) =
-  let hyps,concl = get_goal g in
+let t_hoare_skip g =
+  let concl = get_concl g in
   let hs = destr_hoareS concl in
   if hs.hs_s.s_node <> [] then tacerror NoSkipStmt;
   let concl = f_imp hs.hs_pr hs.hs_po in
   let (m,mt) = hs.hs_m in 
-
   let concl = f_forall [(m,GTmem mt)] concl in
-  let juc, n1 = new_goal juc (hyps,concl) in
-  let rule = {pr_name = RN_hl_skip; pr_hyps = [RA_node n1]} in
-  upd_rule rule (juc,n)
+  prove_goal_by [concl] RN_hl_skip g
 
-let t_equiv_skip (juc,n as g) =
-  let hyps,concl = get_goal g in
+
+let t_equiv_skip g =
+  let concl = get_concl g in
   let es = destr_equivS concl in
   if es.es_sl.s_node <> [] then tacerror NoSkipStmt;
   if es.es_sr.s_node <> [] then tacerror NoSkipStmt;
@@ -389,42 +394,37 @@ let t_equiv_skip (juc,n as g) =
   let (ml,mtl) = es.es_ml in 
   let (mr,mtr) = es.es_mr in 
   let concl = f_forall [(ml,GTmem mtl); (mr,GTmem mtr)] concl in
-  let juc, n1 = new_goal juc (hyps,concl) in
-  let rule = {pr_name = RN_hl_skip; pr_hyps = [RA_node n1]} in
-  upd_rule rule (juc,n)
+  prove_goal_by [concl] RN_hl_skip g
+
 
 let t_skip = t_hS_or_eS t_hoare_skip t_equiv_skip 
 
 (* -------------------------------------------------------------------- *)
 
-let s_split i s =
-  if i < 0 || List.length s.s_node < i then tacerror (InvalidCodePosition i)
+      
+
+let s_split msg i s =
+  let len = List.length s.s_node in
+  if i < 0 ||  len < i then tacerror (InvalidCodePosition (msg,i,1,len))
   else s_split i s
 
-let t_hoare_app i phi (juc,n as g) =
-  let hyps,concl = get_goal g in
+let t_hoare_app i phi g =
+  let concl = get_concl g in
   let hs = destr_hoareS concl in
-  let s1,s2 = s_split i hs.hs_s in
+  let s1,s2 = s_split "app" i hs.hs_s in
   let a = f_hoareS_r { hs with hs_s = stmt s1; hs_po = phi }  in
   let b = f_hoareS_r { hs with hs_pr = phi; hs_s = stmt s2 } in
-  let juc,n1 = new_goal juc (hyps,a) in
-  let juc,n2 = new_goal juc (hyps,b) in
-  let rule = { pr_name = RN_hl_append (Single i,phi) ; 
-               pr_hyps = [RA_node n1; RA_node n2]} in
-  upd_rule rule (juc,n)
+  prove_goal_by [a;b] (RN_hl_append (Single i,phi)) g
 
-let t_equiv_app (i,j) phi (juc,n as g) =
-  let hyps,concl = get_goal g in
+
+let t_equiv_app (i,j) phi g =
+  let concl = get_concl g in
   let es = destr_equivS concl in
-  let sl1,sl2 = s_split i es.es_sl in
-  let sr1,sr2 = s_split j es.es_sr in
+  let sl1,sl2 = s_split "app" i es.es_sl in
+  let sr1,sr2 = s_split "app" j es.es_sr in
   let a = f_equivS_r {es with es_sl=stmt sl1; es_sr=stmt sr1; es_po=phi} in
   let b = f_equivS_r {es with es_pr=phi; es_sl=stmt sl2; es_sr=stmt sr2} in
-  let juc,n1 = new_goal juc (hyps,a) in
-  let juc,n2 = new_goal juc (hyps,b) in
-  let rule = { pr_name = RN_hl_append (Double (i,j), phi) ; 
-               pr_hyps = [RA_node n1; RA_node n2]} in
-  upd_rule rule (juc,n)
+  prove_goal_by [a;b] (RN_hl_append (Double (i,j), phi)) g
 
   
 (* -------------------------------------------------------------------- *)
@@ -434,11 +434,8 @@ let s_split_o msg i s =
   match i with
   | None -> [], s.s_node
   | Some i ->
-    if 0 <= i && i <= len then s_split i s
-    else
-      (* merge message with the InvalidCodePosition *)
-      cannot_apply msg 
-        (Format.sprintf "%i should be between 0 and %i" i len)
+    if (0 <= i && i <= len) then s_split msg i s 
+    else tacerror (InvalidCodePosition (msg,i,0,len))
 
 let check_wp_progress msg i s remain =
   match i with
@@ -578,6 +575,100 @@ let t_hoare_call env pre post g =
 
 
   
+
+
+
+
+
+
+(* -------------------------------------------------------------------- *)
+
+let t_rcond b at_pos g = 
+  (* TODO: can we avoid verifying s_head twice? *)
+  let concl = get_concl g in
+  let hs = destr_hoareS concl in
+  let s_head,s_tail = s_split "rcond" at_pos hs.hs_s in
+  let s,e = 
+    match s_tail with
+      | [] -> assert false (* FIXME *)
+      | c :: s_tail' ->
+        match b, c.i_node with 
+          | true, Sif (e,c,_)  ->
+            let s = s_head @ (c.s_node @ s_tail') in
+            let e = form_of_expr EcFol.mhr e in
+            s, e
+          | false, Sif (e,_,c)  ->
+            let s = s_head @ (c.s_node @ s_tail') in
+            let e = f_not (form_of_expr EcFol.mhr e) in
+            s, e
+          | _ -> assert false
+  in
+  let j1 = f_hoareS hs.hs_m hs.hs_pr (stmt s_head) e in
+  let j2 = f_hoareS hs.hs_m hs.hs_pr (stmt s) hs.hs_po in
+  prove_goal_by [j1;j2] (RN_hl_rcond (b,at_pos)) g
+
+
+(* the equiv version doesn't make sense, we should have a wrapper to
+   apply hoare rules to equiv goals by passing the memory as
+   parameter *)
+
+(* -------------------------------------------------------------------- *)
+
+let t_hoare_cond g =
+  let concl = get_concl g in
+  let hs = destr_hoareS concl in 
+  let s = hs.hs_s.s_node in
+  match s with 
+    | [] -> assert false (* FIXME *)
+    | c :: s_tail' ->
+      match c.i_node with 
+        | Sif (e,ct,cf) ->
+          let e = form_of_expr EcFol.mhr e in
+          let st = stmt (ct.s_node @ s_tail') in
+          let sf = stmt (cf.s_node @ s_tail') in
+          let f1 = f_hoareS hs.hs_m (f_and hs.hs_pr e) st hs.hs_po in
+          let f2 = f_hoareS hs.hs_m (f_and hs.hs_pr (f_not e)) sf hs.hs_po in
+          prove_goal_by [f1;f2] RN_hl_cond g
+        | _ -> assert false (* FIXME *)
+
+
+let t_equiv_cond side g =
+  let concl = get_concl g in
+  let es = destr_equivS concl in
+  match side with
+    | Some _ -> assert false
+    | None -> 
+      let sl,sr = es.es_sl, es.es_sr in
+      match sl.s_node,sr.s_node with
+        | [],_ | _,[] -> assert false (* FIXME *)
+        | il::sl, ir::sr ->
+          match il.i_node, ir.i_node with
+            | Sif(el,ctl,cfl), Sif(er,ctr,cfr) ->
+              let el = form_of_expr (EcMemory.memory es.es_ml) el in
+              let er = form_of_expr (EcMemory.memory es.es_mr) er in
+              let stl = stmt (ctl.s_node @ sl) in
+              let sfl = stmt (cfl.s_node @ sl) in
+              let str = stmt (ctr.s_node @ sr) in
+              let sfr = stmt (cfr.s_node @ sr) in
+              let f = f_imp es.es_pr (f_eq el er) in
+              let f1 = f_equivS es.es_ml es.es_mr 
+                (f_and es.es_pr (f_and el er)) 
+                stl str es.es_po in
+              let f2 = f_equivS es.es_ml es.es_mr 
+                (f_and es.es_pr (f_and (f_not el) (f_not er))) 
+                sfl sfr es.es_po in
+              prove_goal_by [f;f1;f2] RN_hl_cond g
+
+            | _ -> assert false (* FIXME *)
+
+          
+      
+      
+
+(* -------------------------------------------------------------------- *)
+
+
+
 
 
 

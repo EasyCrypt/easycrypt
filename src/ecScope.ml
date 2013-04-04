@@ -937,6 +937,17 @@ module Tactic = struct
       t_hoare_while env (process_phl_formula env g phi) g 
     else cannot_apply "while" "the conclusion is not a hoare or a equiv"
 
+  let process_cond side g =
+    let concl = get_concl g in
+    if is_equivS concl then 
+      t_equiv_cond side g
+    else if is_hoareS concl then
+      match side with
+        | Some _ -> cannot_apply "cond" "Unexpected side in non relational goal"
+        | None ->
+          t_hoare_cond g
+    else cannot_apply "while" "the conclusion is not a hoare or a equiv goal"
+
   let process_phl loc env ptac g =
     let t = 
       match ptac with
@@ -944,6 +955,8 @@ module Tactic = struct
       | Pskip    -> EcPhl.t_skip 
       | Papp (k,phi) -> process_app env k phi 
       | Pwp  k   -> t_wp env k 
+      | Prcond (b,i) -> t_rcond b i 
+      | Pcond side   -> process_cond side 
       | Pwhile phi -> process_while env phi 
     in
     set_loc loc t g

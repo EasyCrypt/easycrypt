@@ -40,6 +40,8 @@ type 'a doption =
   | Single of 'a
   | Double of 'a * 'a
 
+type tac_side = bool option
+
 (* -------------------------------------------------------------------- *)
 let opt_equal (f : 'a -> 'a -> bool) o1 o2 =
   match o1, o2 with

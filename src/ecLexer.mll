@@ -75,6 +75,9 @@
     "wp"          , WP         ;        (* KW: tactic *)
     "skip"        , SKIP       ;        (* KW: tactic *)
     "while"       , WHILE      ;        (* KW: tactic *)
+    "rcondt"      , RCONDT     ;        (* KW: tactic *)
+    "rcondf"      , RCONDF     ;        (* KW: tactic *)
+    "cond"        , COND       ;        (* KW: tactic *)
 
     "axiom"       , AXIOM      ;        (* KW: global *)
     "lemma"       , LEMMA      ;        (* KW: global *)
@@ -189,7 +192,7 @@ rule main = parse
   | '['  { LBRACKET }
   | ']'  { RBRACKET }
   | "<:" { LTCOLON }
-  | ">"  { GT }                      
+  | ">"  { GT }
   | ','  { COMMA }
   | ';'  { SEMICOLON }
   | ':'  { COLON }

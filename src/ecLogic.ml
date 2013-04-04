@@ -31,7 +31,7 @@ type tac_error =
   | InvalNumOfTactic      of int * int
   | NotPhl                of bool option
   | NoSkipStmt
-  | InvalidCodePosition   of int
+  | InvalidCodePosition   of string*int*int*int
   | CanNotApply           of string * string
 
 exception TacError of tac_error
@@ -78,8 +78,8 @@ let pp_tac_error fmt = function
       | Some true -> "phl"
       | Some false -> "prhl" in
     Format.fprintf fmt "The conclusion does not end by a %s judgment" s
-  | InvalidCodePosition k -> 
-    Format.fprintf fmt "Invalid code line number: %i" k
+  | InvalidCodePosition (msg,k,lb,up) -> 
+    Format.fprintf fmt "%s: Invalid code line number %i, expected in [%i,%i]" msg k lb up
   | CanNotApply(s1,s2) ->
     Format.fprintf fmt "Can not apply %s tactic:@\n %s" s1 s2
  
