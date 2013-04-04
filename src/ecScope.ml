@@ -948,8 +948,14 @@ module Tactic = struct
       let pre  = process_form penv hyps pre tbool in
       let post = process_form qenv hyps post tbool in
       t_hoare_call env pre post g
-    | FequivS _es ->
-      assert false (* Not implemented *)
+    | FequivS es ->
+      let error () = 
+         cannot_apply "call" "the last instruction should be a call" in
+      let (_,fl,_),(_,fr,_),_,_ = s_last_calls error es.es_sl es.es_sr in
+      let penv, qenv = EcEnv.Fun.equivF fl fr env in
+      let pre  = process_form penv hyps pre tbool in
+      let post = process_form qenv hyps post tbool in
+      t_equiv_call env pre post g
     | _ -> cannot_apply "call" "the conclusion is not a hoare or a equiv"
       
   let process_cond side g =

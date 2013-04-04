@@ -556,7 +556,7 @@ let subst_args_call env m f =
     PVM.add_none env (pv_loc f v.v_name) m (form_of_expr m e) s)
   
 let t_hoare_call env fpre fpost (juc,n1 as g) =
-  (* FIXME : check the well formess of the pre and the post *)
+  (* FIXME : check the well formess of the pre and the post ? *)
   let hyps,concl = get_goal g in
   let hs = destr_hoareS concl in
   let error () = 
@@ -578,6 +578,45 @@ let t_hoare_call env fpre fpost (juc,n1 as g) =
   let spre = subst_args_call env m f (fst fsig.fs_sig) args PVM.empty in
   let post = f_anda_simpl (PVM.subst env spre fpre) post in
   let concl = f_hoareS_r { hs with hs_s = s; hs_po=post} in
+  let (juc,n) = new_goal juc (hyps,concl) in
+  let rule = { pr_name = RN_hl_call (fpre, fpost); 
+               pr_hyps =[RA_node nf;RA_node n;]} in
+  upd_rule rule (juc, n1)
+
+let t_equiv_call env fpre fpost (juc,n1 as g) =
+  (* FIXME : check the well formess of the pre and the post ? *)
+  let hyps,concl = get_goal g in
+  let es = destr_equivS concl in
+  let error () = 
+    cannot_apply "call" "the last instruction should be a call" in
+  let (lpl,fl,argsl),(lpr,fr,argsr),sl,sr = 
+    s_last_calls error es.es_sl es.es_sr in
+  let ml = EcMemory.memory es.es_ml in
+  let mr = EcMemory.memory es.es_mr in
+  let fsigl = (Fun.by_mpath fl env).f_sig in
+  let fsigr = (Fun.by_mpath fr env).f_sig in
+  (* The functions satisfies the specification *)
+  let f_concl = f_equivF fpre fl fr fpost in
+  let juc,nf = new_goal juc (hyps, f_concl) in
+  (* The wp *)
+  let pvresl = pv_res fl and pvresr = pv_res fr in
+  let vresl = EcIdent.create "result_L" in
+  let vresr = EcIdent.create "result_R" in
+  let fresl = f_local vresl (snd fsigl.fs_sig) in
+  let fresr = f_local vresr (snd fsigr.fs_sig) in
+  let post = wp_asgn_call env ml lpl fresl es.es_po in
+  let post = wp_asgn_call env mr lpr fresr post in
+  let s    = 
+    PVM.add env pvresl ml fresl (PVM.add env pvresr mr fresr PVM.empty) in   
+  let fpost = PVM.subst env s fpost in 
+  let modil = f_write env fl in
+  let modir = f_write env fr in
+  let post = generalize_mod env mr modir (f_imp_simpl fpost post) in
+  let post = generalize_mod env ml modil post in
+  let spre = subst_args_call env ml fl (fst fsigl.fs_sig) argsl PVM.empty in
+  let spre = subst_args_call env mr fr (fst fsigr.fs_sig) argsr spre in
+  let post = f_anda_simpl (PVM.subst env spre fpre) post in
+  let concl = f_equivS_r { es with es_sl = sl; es_sr = sr; es_po=post} in
   let (juc,n) = new_goal juc (hyps,concl) in
   let rule = { pr_name = RN_hl_call (fpre, fpost); 
                pr_hyps =[RA_node nf;RA_node n;]} in
