@@ -911,13 +911,13 @@ module Tactic = struct
   let process_phl_formula env g phi =
     let hyps, concl = get_goal g in
     let hs = set_loc phi.pl_loc destr_hoareS concl in
-    let env = EcEnv.Memory.push_active hs.hs_me env in
+    let env = EcEnv.Memory.push_active hs.hs_m env in
     process_form env hyps phi tbool
 
   let process_prhl_formula env g phi =
     let hyps, concl = get_goal g in
     let es = set_loc phi.pl_loc destr_equivS concl in
-    let env = EcEnv.Memory.push_all [es.eqs_mel; es.eqs_mer] env in
+    let env = EcEnv.Memory.push_all [es.es_ml; es.es_mr] env in
     process_form env hyps phi tbool
     
   let process_app env k phi g =

@@ -1163,18 +1163,18 @@ module NormMp = struct
             f_pvar p' f.f_ty m
 
         | FhoareF hf ->
-          let pre' = aux hf.hf_pre and p' = norm_mp hf.hf_f 
-          and post' = aux hf.hf_post in
-          if hf.hf_pre == pre' && hf.hf_f == p' && hf.hf_post == post' then f else
+          let pre' = aux hf.hf_pr and p' = norm_mp hf.hf_f 
+          and post' = aux hf.hf_po in
+          if hf.hf_pr == pre' && hf.hf_f == p' && hf.hf_po == post' then f else
           f_hoareF pre' p' post'
 
 (*        | FhoareS _ -> assert false (* FIXME ? Not implemented *) *)
 
         | FequivF ef ->
-          let pre' = aux ef.eqf_pre and l' = norm_mp ef.eqf_fl 
-          and r' = norm_mp ef.eqf_fr and post' = aux ef.eqf_post in
-          if ef.eqf_pre == pre' && ef.eqf_fl == l' && 
-            ef.eqf_fr == r' && ef.eqf_post == post' then f else
+          let pre' = aux ef.ef_pr and l' = norm_mp ef.ef_fl 
+          and r' = norm_mp ef.ef_fr and post' = aux ef.ef_po in
+          if ef.ef_pr == pre' && ef.ef_fl == l' && 
+            ef.ef_fr == r' && ef.ef_po == post' then f else
           f_equivF pre' l' r' post' 
 
 (*        | FequivS _ -> assert false (* FIXME ? Not implemented *) *)

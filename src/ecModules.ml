@@ -191,7 +191,37 @@ let rstmt s = stmt (List.rev s)
 
 let s_split n s = List.take_n n s.s_node
 
+let destr_asgn i = 
+  match i.i_node with
+  | Sasgn(lv,e) -> (lv,e)
+  | _ -> raise Not_found
 
+let destr_rnd i = 
+  match i.i_node with
+  | Srnd(lv,e) -> (lv,e)
+  | _ -> raise Not_found
+
+let destr_call i = 
+  match i.i_node with
+  | Scall(lv,f,es) -> (lv,f,es)
+  | _ -> raise Not_found
+
+let destr_if i = 
+  match i.i_node with
+  | Sif(e,s1,s2) -> (e,s1,s2)
+  | _ -> raise Not_found
+
+let destr_while i = 
+  match i.i_node with
+  | Swhile(e,s) -> (e,s)
+  | _ -> raise Not_found
+
+let destr_assert i = 
+  match i.i_node with
+  | Sassert e -> e
+  | _ -> raise Not_found
+
+(* -------------------------------------------------------------------- *)
 module MSHi = EcMaps.MakeMSH(struct type t = instr let tag i = i.i_tag end)
 module Hi = MSHi.H
 

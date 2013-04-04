@@ -784,7 +784,7 @@ struct
           pr_tuple_expr tenv pr_form args
 
       | FhoareF hf  ->
-        let pre,fpath,post = hf.hf_pre, hf.hf_f, hf.hf_post in 
+        let pre,fpath,post = hf.hf_pr, hf.hf_f, hf.hf_po in 
         let spec =  pr_seq [pr_fun_name tenv fpath; Pp.colon;
                             pr_form tenv outer pre;
                             Pp.string "==>"; pr_form tenv outer post] in
@@ -797,13 +797,13 @@ struct
         in
         let spec = 
           pr_seq [ pr_mblocks [dbody]; Pp.colon;
-                   pr_form tenv outer hs.hs_pre;
+                   pr_form tenv outer hs.hs_pr;
                    Pp.string "==>"; 
-                   pr_form tenv outer hs.hs_post ] in
+                   pr_form tenv outer hs.hs_po ] in
         pr_seq [Pp.string "hoareS"; Pp.brackets spec  ]
 
       | FequivF ef  ->
-        let pre,fpathl,fpathr,post = ef.eqf_pre, ef.eqf_fl, ef.eqf_fr,ef.eqf_post in 
+        let pre,fpathl,fpathr,post = ef.ef_pr, ef.ef_fl, ef.ef_fr,ef.ef_po in 
         let spec =  pr_seq [pr_fun_name tenv fpathl;Pp.string "~"; pr_fun_name tenv fpathr;
                             Pp.colon;
                             pr_form tenv outer pre;
@@ -813,17 +813,17 @@ struct
       | FequivS es -> 
         let dbodyl =
           let bodytenv = tenv in
-          List.map (pr_instr bodytenv) es.eqs_sl.s_node
+          List.map (pr_instr bodytenv) es.es_sl.s_node
         in
         let dbodyr =
           let bodytenv = tenv in
-          List.map (pr_instr bodytenv) es.eqs_sr.s_node
+          List.map (pr_instr bodytenv) es.es_sr.s_node
         in
         let spec = 
           pr_seq [ pr_mblocks [dbodyl]; !^ "~"; pr_mblocks [dbodyr];Pp.colon;
-                   pr_form tenv outer es.eqs_pre;
+                   pr_form tenv outer es.es_pr;
                    Pp.string "==>"; 
-                   pr_form tenv outer es.eqs_post ] in
+                   pr_form tenv outer es.es_po ] in
         pr_seq [Pp.string "equivS"; Pp.brackets spec  ]
 
    

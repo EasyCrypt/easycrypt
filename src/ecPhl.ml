@@ -127,9 +127,32 @@ and f_write env f =
     let wf = s_write env PV.empty fdef.f_body in
     let wf = List.fold_left remove_local wf fdef.f_locals in
     List.fold_left remove_local wf (fst func.f_sig.fs_sig) 
-   
 
-  
+
+(* -------------------------------------------------------------------- *)
+
+let s_last destr_i error s =
+  match List.rev s.s_node with
+  | [] -> error ()
+  | i :: r ->
+    try destr_i i, rstmt r 
+    with Not_found -> error ()
+
+let s_lasts destr_i error sl sr =
+  let hl,tl = s_last destr_i error sl in
+  let hr,tr = s_last destr_i error sr in
+  hl,hr,tl,tr
+
+let s_last_rnd     = s_last destr_rnd
+let s_last_rnds    = s_lasts destr_rnd
+let s_last_call    = s_last destr_call
+let s_last_calls   = s_lasts destr_call
+let s_last_if      = s_last destr_if
+let s_last_ifs     = s_lasts destr_if
+let s_last_while   = s_last destr_while
+let s_last_whiles  = s_lasts destr_while
+let s_last_assert  = s_last destr_assert 
+let s_last_asserts = s_lasts destr_assert 
  
 (* -------------------------------------------------------------------- *)
 (* -------------------------------  Wp -------------------------------- *)
@@ -308,8 +331,8 @@ let t_hoareF_fun_def env (juc,n1 as g) =
     match fdef.f_ret with
     | None -> f_tt
     | Some e -> form_of_expr m e in
-  let post = PVM.subst1 env (pv_res hf.hf_f) m fres hf.hf_post in
-  let concl' = f_hoareS memenv hf.hf_pre fdef.f_body post in
+  let post = PVM.subst1 env (pv_res hf.hf_f) m fres hf.hf_po in
+  let concl' = f_hoareS memenv hf.hf_pr fdef.f_body post in
   let (juc,n) = new_goal juc (hyps,concl') in
   let rule = { pr_name = RN_hl_fun_def; pr_hyps = [RA_node n] } in
   upd_rule rule (juc,n1)
@@ -317,7 +340,8 @@ let t_hoareF_fun_def env (juc,n1 as g) =
 let t_equivF_fun_def env (juc,n1 as g) = 
   let hyps,concl = get_goal g in
   let ef = destr_equivF concl in
-  let memenvl,fdefl,memenvr,fdefr,env = Fun.equivS ef.eqf_fl ef.eqf_fr env in (* FIXME catch exception *)
+  let memenvl,fdefl,memenvr,fdefr,env = Fun.equivS ef.ef_fl ef.ef_fr env in 
+                                (* FIXME catch exception *)
   let ml, mr = EcMemory.memory memenvl, EcMemory.memory memenvr in
   let fresl = 
     match fdefl.f_ret with
@@ -327,10 +351,11 @@ let t_equivF_fun_def env (juc,n1 as g) =
     match fdefr.f_ret with
     | None -> f_tt
     | Some e -> form_of_expr mr e in
-  let s = PVM.add env (pv_res ef.eqf_fl) ml fresl PVM.empty in
-  let s = PVM.add env (pv_res ef.eqf_fr) mr fresr s in
-  let post = PVM.subst env s ef.eqf_post in
-  let concl' = f_equivS memenvl memenvr ef.eqf_pre fdefl.f_body fdefr.f_body post in
+  let s = PVM.add env (pv_res ef.ef_fl) ml fresl PVM.empty in
+  let s = PVM.add env (pv_res ef.ef_fr) mr fresr s in
+  let post = PVM.subst env s ef.ef_po in
+  let concl' = 
+    f_equivS memenvl memenvr ef.ef_pr fdefl.f_body fdefr.f_body post in
   let (juc,n) = new_goal juc (hyps,concl') in
   let rule = { pr_name = RN_hl_fun_def; pr_hyps = [RA_node n] } in
   upd_rule rule (juc,n1)
@@ -347,8 +372,8 @@ let t_hoare_skip (juc,n as g) =
   let hyps,concl = get_goal g in
   let hs = destr_hoareS concl in
   if hs.hs_s.s_node <> [] then tacerror NoSkipStmt;
-  let concl = f_imp hs.hs_pre hs.hs_post in
-  let (m,mt) = hs.hs_me in 
+  let concl = f_imp hs.hs_pr hs.hs_po in
+  let (m,mt) = hs.hs_m in 
 
   let concl = f_forall [(m,GTmem mt)] concl in
   let juc, n1 = new_goal juc (hyps,concl) in
@@ -358,11 +383,11 @@ let t_hoare_skip (juc,n as g) =
 let t_equiv_skip (juc,n as g) =
   let hyps,concl = get_goal g in
   let es = destr_equivS concl in
-  if es.eqs_sl.s_node <> [] then tacerror NoSkipStmt;
-  if es.eqs_sr.s_node <> [] then tacerror NoSkipStmt;
-  let concl = f_imp es.eqs_pre es.eqs_post in
-  let (ml,mtl) = es.eqs_mel in 
-  let (mr,mtr) = es.eqs_mer in 
+  if es.es_sl.s_node <> [] then tacerror NoSkipStmt;
+  if es.es_sr.s_node <> [] then tacerror NoSkipStmt;
+  let concl = f_imp es.es_pr es.es_po in
+  let (ml,mtl) = es.es_ml in 
+  let (mr,mtr) = es.es_mr in 
   let concl = f_forall [(ml,GTmem mtl); (mr,GTmem mtr)] concl in
   let juc, n1 = new_goal juc (hyps,concl) in
   let rule = {pr_name = RN_hl_skip; pr_hyps = [RA_node n1]} in
@@ -380,8 +405,8 @@ let t_hoare_app i phi (juc,n as g) =
   let hyps,concl = get_goal g in
   let hs = destr_hoareS concl in
   let s1,s2 = s_split i hs.hs_s in
-  let a = f_hoareS_r { hs with hs_s = stmt s1; hs_post = phi }  in
-  let b = f_hoareS_r { hs with hs_pre = phi; hs_s = stmt s2 } in
+  let a = f_hoareS_r { hs with hs_s = stmt s1; hs_po = phi }  in
+  let b = f_hoareS_r { hs with hs_pr = phi; hs_s = stmt s2 } in
   let juc,n1 = new_goal juc (hyps,a) in
   let juc,n2 = new_goal juc (hyps,b) in
   let rule = { pr_name = RN_hl_append (Single i,phi) ; 
@@ -391,10 +416,10 @@ let t_hoare_app i phi (juc,n as g) =
 let t_equiv_app (i,j) phi (juc,n as g) =
   let hyps,concl = get_goal g in
   let es = destr_equivS concl in
-  let sl1,sl2 = s_split i es.eqs_sl in
-  let sr1,sr2 = s_split j es.eqs_sr in
-  let a = f_equivS_r {es with eqs_sl=stmt sl1; eqs_sr=stmt sl2; eqs_post=phi} in
-  let b = f_equivS_r {es with eqs_pre=phi; eqs_sl=stmt sl2; eqs_sr=stmt sr2} in
+  let sl1,sl2 = s_split i es.es_sl in
+  let sr1,sr2 = s_split j es.es_sr in
+  let a = f_equivS_r {es with es_sl=stmt sl1; es_sr=stmt sr1; es_po=phi} in
+  let b = f_equivS_r {es with es_pr=phi; es_sl=stmt sl2; es_sr=stmt sr2} in
   let juc,n1 = new_goal juc (hyps,a) in
   let juc,n2 = new_goal juc (hyps,b) in
   let rule = { pr_name = RN_hl_append (Double (i,j), phi) ; 
@@ -431,10 +456,10 @@ let t_hoare_wp env i (juc,n as g) =
   let hs = destr_hoareS concl in
   let s_hd,s_wp = s_split_o "wp" i hs.hs_s in
   let s_wp,post = 
-    wp env (EcMemory.memory hs.hs_me) (EcModules.stmt s_wp) hs.hs_post in
+    wp env (EcMemory.memory hs.hs_m) (EcModules.stmt s_wp) hs.hs_po in
   let i = check_wp_progress "wp" i hs.hs_s s_wp in
   let s = EcModules.stmt (s_hd @ s_wp) in
-  let concl = f_hoareS_r { hs with hs_s = s; hs_post = post} in
+  let concl = f_hoareS_r { hs with hs_s = s; hs_po = post} in
   let juc,n' = new_goal juc (hyps,concl) in
   let rule = { pr_name = RN_hl_wp (Single i); pr_hyps = [RA_node n']} in
   upd_rule rule (juc,n)
@@ -443,17 +468,17 @@ let t_equiv_wp env ij (juc,n as g) =
   let hyps,concl = get_goal g in
   let es = destr_equivS concl in
   let i = omap ij fst and j = omap ij snd in
-  let s_hdl,s_wpl = s_split_o "wp" i es.eqs_sl in
-  let s_hdr,s_wpr = s_split_o "wp" j es.eqs_sr in
+  let s_hdl,s_wpl = s_split_o "wp" i es.es_sl in
+  let s_hdr,s_wpr = s_split_o "wp" j es.es_sr in
   let s_wpl,post = 
-    wp env (EcMemory.memory es.eqs_mel) (EcModules.stmt s_wpl) es.eqs_post in
+    wp env (EcMemory.memory es.es_ml) (EcModules.stmt s_wpl) es.es_po in
   let s_wpr, post =
-    wp env (EcMemory.memory es.eqs_mer) (EcModules.stmt s_wpr) post in
-  let i = check_wp_progress "wp" i es.eqs_sl s_wpl in
-  let j = check_wp_progress "wp" j es.eqs_sr s_wpr in
+    wp env (EcMemory.memory es.es_mr) (EcModules.stmt s_wpr) post in
+  let i = check_wp_progress "wp" i es.es_sl s_wpl in
+  let j = check_wp_progress "wp" j es.es_sr s_wpr in
   let sl = EcModules.stmt (s_hdl @ s_wpl) in
   let sr = EcModules.stmt (s_hdr @ s_wpr) in
-  let concl = f_equivS_r {es with eqs_sl = sl; eqs_sr=sr;eqs_post = post} in
+  let concl = f_equivS_r {es with es_sl = sl; es_sr=sr; es_po = post} in
   let juc,n' = new_goal juc (hyps,concl) in
   let rule = { pr_name = RN_hl_wp (Double(i,j)); pr_hyps = [RA_node n']} in
   upd_rule rule (juc,n)
@@ -469,15 +494,70 @@ let t_wp env k =
 let t_hoare_while env inv (juc,n1 as g) =
   let hyps,concl = get_goal g in
   let hs = destr_hoareS concl in
-  let error_message () = 
+  let error () = 
     cannot_apply "while" "the last instruction should be a while" in
+  let ((e,c),s) = s_last_while error hs.hs_s in
+  let m = EcMemory.memory hs.hs_m in
+  let e = form_of_expr m e in
+      (* the body preserve the invariant *)
+  let b_pre  = f_and_simpl inv e in
+  let b_post = inv in
+  let b_concl = f_hoareS hs.hs_m b_pre c b_post in
+  let (juc,nb) = new_goal juc (hyps,b_concl) in
+      (* the wp of the while *)
+  let post = f_imps_simpl [f_not_simpl e; inv] hs.hs_po in
+  let modi = s_write env PV.empty c in
+  let post = generalize_mod env m modi post in
+  let post = f_and_simpl inv post in
+  let concl = f_hoareS_r { hs with hs_s = s; hs_po=post} in
+  let (juc,n) = new_goal juc (hyps,concl) in
+  let rule = { pr_name = RN_hl_while inv; 
+               pr_hyps=[RA_node nb;RA_node n;]} in
+  upd_rule rule (juc, n1)
+
+let t_equiv_while env inv (juc,n1 as g) =
+  let hyps,concl = get_goal g in
+  let es = destr_equivS concl in
+  let error () = 
+    cannot_apply "while" "the last instructions should be a while" in
+  let (el,cl), (er,cr), sl, sr = s_last_whiles error es.es_sl es.es_sr in
+  let ml = EcMemory.memory es.es_ml in
+  let mr = EcMemory.memory es.es_mr in
+  let el = form_of_expr ml el in
+  let er = form_of_expr mr er in
+  let sync_cond = f_iff_simpl el er in
+      (* the body preserve the invariant *)
+  let b_pre  = f_ands_simpl [inv; el] er in
+  let b_post = f_and_simpl inv sync_cond in
+  let b_concl = f_equivS es.es_ml es.es_mr b_pre cl cr b_post in
+  let (juc,nb) = new_goal juc (hyps,b_concl) in
+      (* the wp of the while *)
+  let post = 
+    f_imps_simpl [f_not_simpl el;f_not_simpl er; inv] es.es_po in
+  let modil = s_write env PV.empty cl in
+  let modir = s_write env PV.empty cr in
+  let post = generalize_mod env mr modir post in
+  let post = generalize_mod env ml modil post in
+  let post = f_and_simpl inv post in
+  let concl = f_equivS_r {es with es_sl = sl; es_sr = sr; es_po = post} in
+  let (juc,n) = new_goal juc (hyps,concl) in
+  let rule = { pr_name = RN_hl_while inv; 
+               pr_hyps=[RA_node nb;RA_node n;]} in
+  upd_rule rule (juc, n1)
+
+(* -------------------------------------------------------------------- *)
+(*
+let t_hoare_call env pre post g =
+  let hyps,concl = get_goal g in
+  let hs = destr_hoareS concl in
+  let error_message () = 
+    cannot_apply "call" "the last instruction should be a call" in
   match List.rev hs.hs_s.s_node with
   | [] -> error_message ()
   | i :: r ->
     match i.i_node with
-    | Swhile (e,c) ->
+    | Scall (lp,f,args) ->
       let m = EcMemory.memory hs.hs_me in
-      let e = form_of_expr m e in
       (* the body preserve the invariant *)
       let b_pre  = f_and_simpl inv e in
       let b_post = inv in
@@ -493,95 +573,12 @@ let t_hoare_while env inv (juc,n1 as g) =
       let rule = { pr_name = RN_hl_while inv; 
                    pr_hyps=[RA_node nb;RA_node n;]} in
       upd_rule rule (juc, n1)
-    | _ -> error_message ()
+    | _ -> error_message ()  
+*)
 
-let t_equiv_while env inv (juc,n1 as g) =
-  let hyps,concl = get_goal g in
-  let es = destr_equivS concl in
-  let error_message () = 
-    cannot_apply "while" "the last instructions should be a while" in
-  match List.rev es.eqs_sl.s_node, List.rev es.eqs_sr.s_node with
-  | il::rl, ir::rr ->
-    begin match il.i_node, ir.i_node with
-    | Swhile(el,cl), Swhile(er,cr) ->
-      let ml = EcMemory.memory es.eqs_mel in
-      let mr = EcMemory.memory es.eqs_mer in
-      let el = form_of_expr ml el in
-      let er = form_of_expr mr er in
-      let sync_cond = f_iff_simpl el er in
-      (* the body preserve the invariant *)
-      let b_pre  = f_ands_simpl [inv; el] er in
-      let b_post = f_and_simpl inv sync_cond in
-      let b_concl = f_equivS es.eqs_mel es.eqs_mer b_pre cl cr b_post in
-      let (juc,nb) = new_goal juc (hyps,b_concl) in
-      (* the wp of the while *)
-      let post = 
-        f_imps_simpl [f_not_simpl el;f_not_simpl er; inv] es.eqs_post in
-      let modil = s_write env PV.empty cl in
-      let modir = s_write env PV.empty cr in
-      let post = generalize_mod env mr modir post in
-      let post = generalize_mod env ml modil post in
-      let post = f_and_simpl inv post in
-      let concl = 
-        f_equivS_r {es with eqs_sl=rstmt rl; eqs_sr=rstmt rr; eqs_post=post} in
-      let (juc,n) = new_goal juc (hyps,concl) in
-      let rule = { pr_name = RN_hl_while inv; 
-                   pr_hyps=[RA_node nb;RA_node n;]} in
-      upd_rule rule (juc, n1)
-    | _ -> error_message ()
-    end
-  | _ -> error_message ()
 
   
 
 
 
-(*
-let while_tac env inv vrnt bnd (juc,n as g) = 
-  let hyps,concl = get_goal g in
-  let menv,pre,s,post = destr_hl env concl in
-  let rev_s = List.rev s.EcModules.s_node in
-  match rev_s with
-    | [] -> cannot_apply "while_tac" "empty statements"
-    | i :: rev_s' ->
-      match i.EcModules.i_node with
-        | EcModules.Swhile (e,c) ->
-          (* initialization *)
-          (* {P} s' {Inv /\ v <= bdn /\ A mod(s) (Inv /\ ~e => post) } *)
-          let mods = modified_pvars EcFol.mhr c in
-          let f (pv,m,ty) pvs  = PVset.add (pv,m,ty) pvs in
-          (* let mods = PVset.fold f mods PVset.empty in *)
-          let e = form_of_expr (EcMemory.memory menv) e in
-          let p = quantify_pvars env mods (f_imp (f_and inv (f_not e)) post) in
-          let post1 = f_and inv (f_and (f_int_le vrnt bnd) p) in
-          let j1 = f_hoareS menv pre (EcModules.stmt (List.rev rev_s')) post1 in
-          let juc,n1 = new_goal juc (hyps,j1) in
 
-          (* termination goal *)
-          let vrnt_local = EcIdent.create "k" in
-          let bnd_local = EcIdent.create "b" in
-          let vrnt_eq = f_eq vrnt (f_local vrnt_local EcTypes.tint) in
-          let vrnt_lt = f_int_lt vrnt (f_local vrnt_local EcTypes.tint) in
-          let bnd_eq = f_eq bnd (f_local bnd_local EcTypes.tint) in
-          let pre2 = f_and (f_and inv e) (f_and vrnt_eq bnd_eq) in
-          let post2 = f_and vrnt_lt bnd_eq in
-          let j2 = f_hoareS menv pre2 c post2 in
-          let juc,n2 = new_goal juc (hyps,j2) in
-
-          (* invariant preservation *)
-          (* TODO: if prob=1 then the next goal can be merged with previous one,
-             otw one cannot *)
-          let pre3, post3 = f_and inv e, inv in
-          let j3 = f_hoareS menv pre3 c post3 in
-          let juc,n3 = new_goal juc (hyps,j3) in
-
-          let rule = { pr_name = RN_fixme; pr_hyps=[RA_node n1;RA_node n2;RA_node n3]} in
-          upd_rule rule (juc,n)
-        | _ -> cannot_apply "while_tac" "a while loop is expected"
-
-
-
-
-
-
-*)

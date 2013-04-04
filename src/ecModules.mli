@@ -64,6 +64,14 @@ val rstmt : instr list -> stmt
 
 val s_split : int -> stmt -> instr list * instr list
 
+(* the following functions raise Not_found if the argument does not match *) 
+val destr_asgn   : instr -> lvalue * expr
+val destr_rnd    : instr -> lvalue * expr
+val destr_call   : instr -> lvalue option * mpath * expr list
+val destr_if     : instr -> expr * stmt * stmt
+val destr_while  : instr -> expr * stmt
+val destr_assert : instr -> expr
+
 (* -------------------------------------------------------------------- *)
 module UM : sig
   type flag  = [`Call | `Read | `Write]

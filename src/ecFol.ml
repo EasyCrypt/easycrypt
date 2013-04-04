@@ -58,30 +58,30 @@ and f_node =
   | Fpr     of memory * EcPath.mpath * form list * form (* hr *)
 
 and equivF = { 
-  eqf_pre  : form;
-  eqf_fl   : EcPath.mpath;
-  eqf_fr   : EcPath.mpath;
-  eqf_post : form;
+  ef_pr  : form;
+  ef_fl   : EcPath.mpath;
+  ef_fr   : EcPath.mpath;
+  ef_po : form;
 }
 
 and equivS = {
-  eqs_mel  : EcMemory.memenv;
-  eqs_mer  : EcMemory.memenv;
-  eqs_pre  : form;
-  eqs_sl   : stmt; (* In reverse order *)
-  eqs_sr   : stmt; (* In reverse order *)
-  eqs_post : form; }
+  es_ml  : EcMemory.memenv;
+  es_mr  : EcMemory.memenv;
+  es_pr  : form;
+  es_sl   : stmt; (* In reverse order *)
+  es_sr   : stmt; (* In reverse order *)
+  es_po : form; }
 
 and hoareF = { 
-  hf_pre  : form;
+  hf_pr  : form;
   hf_f    : EcPath.mpath;
-  hf_post : form;
+  hf_po : form;
 }
 and hoareS = {
-  hs_me   : EcMemory.memenv;
-  hs_pre  : form; 
+  hs_m   : EcMemory.memenv;
+  hs_pr  : form; 
   hs_s    : stmt; (* In reverse order *)
-  hs_post : form; }
+  hs_po : form; }
 
 
 (*-------------------------------------------------------------------- *)
@@ -143,29 +143,29 @@ let b_hash (bs : binding) =
     Why3.Hashcons.combine_list b1_hash 0 bs
 
 let eqf_equal ef1 ef2 = 
-     f_equal ef1.eqf_pre ef2.eqf_pre
-  && f_equal ef1.eqf_post ef2.eqf_post
-  && EcPath.m_equal ef1.eqf_fl ef2.eqf_fl 
-  && EcPath.m_equal ef1.eqf_fr ef2.eqf_fr
+     f_equal ef1.ef_pr ef2.ef_pr
+  && f_equal ef1.ef_po ef2.ef_po
+  && EcPath.m_equal ef1.ef_fl ef2.ef_fl 
+  && EcPath.m_equal ef1.ef_fr ef2.ef_fr
 
 let eqs_equal es1 es2 = 
-     f_equal es1.eqs_pre es2.eqs_pre
-  && f_equal es1.eqs_post es2.eqs_post
-  && s_equal es1.eqs_sl es2.eqs_sl
-  && s_equal es1.eqs_sr es2.eqs_sr
-  && EcMemory.me_equal es1.eqs_mel es2.eqs_mel
-  && EcMemory.me_equal es1.eqs_mer es2.eqs_mer 
+     f_equal es1.es_pr es2.es_pr
+  && f_equal es1.es_po es2.es_po
+  && s_equal es1.es_sl es2.es_sl
+  && s_equal es1.es_sr es2.es_sr
+  && EcMemory.me_equal es1.es_ml es2.es_ml
+  && EcMemory.me_equal es1.es_mr es2.es_mr 
 
 let hf_equal hf1 hf2 = 
-     f_equal hf1.hf_pre hf2.hf_pre
-  && f_equal hf1.hf_post hf2.hf_post
+     f_equal hf1.hf_pr hf2.hf_pr
+  && f_equal hf1.hf_po hf2.hf_po
   && EcPath.m_equal hf1.hf_f hf2.hf_f
 
 let hs_equal hs1 hs2 = 
-     f_equal hs1.hs_pre hs2.hs_pre
-  && f_equal hs1.hs_post hs2.hs_post
+     f_equal hs1.hs_pr hs2.hs_pr
+  && f_equal hs1.hs_po hs2.hs_po
   && s_equal hs1.hs_s hs2.hs_s
-  && EcMemory.me_equal hs1.hs_me hs2.hs_me
+  && EcMemory.me_equal hs1.hs_m hs2.hs_m
 
 (* -------------------------------------------------------------------- *)
 module Hsform = Why3.Hashcons.Make (struct
@@ -257,21 +257,21 @@ module Hsform = Why3.Hashcons.Make (struct
 
     | FhoareF hf ->
         Why3.Hashcons.combine2
-          (f_hash hf.hf_pre) (f_hash hf.hf_post) (EcPath.m_hash hf.hf_f)
+          (f_hash hf.hf_pr) (f_hash hf.hf_po) (EcPath.m_hash hf.hf_f)
 
     | FhoareS hs ->
         Why3.Hashcons.combine2
-          (f_hash hs.hs_pre) (f_hash hs.hs_post) (EcModules.s_hash hs.hs_s)
+          (f_hash hs.hs_pr) (f_hash hs.hs_po) (EcModules.s_hash hs.hs_s)
 
     | FequivF ef ->
         Why3.Hashcons.combine3
-          (f_hash ef.eqf_pre) (f_hash ef.eqf_post)
-          (EcPath.m_hash ef.eqf_fl) (EcPath.m_hash ef.eqf_fr)
+          (f_hash ef.ef_pr) (f_hash ef.ef_po)
+          (EcPath.m_hash ef.ef_fl) (EcPath.m_hash ef.ef_fr)
 
     | FequivS es ->
         Why3.Hashcons.combine3
-          (f_hash es.eqs_pre) (f_hash es.eqs_post)
-          (EcModules.s_hash es.eqs_sl) (EcModules.s_hash es.eqs_sr)
+          (f_hash es.es_pr) (f_hash es.es_po)
+          (EcModules.s_hash es.es_sl) (EcModules.s_hash es.es_sr)
 
     | Fpr (m, mp, args, ev) ->
         let id =
@@ -304,21 +304,21 @@ module Hsform = Why3.Hashcons.Make (struct
       EcPath.m_fv fv mp
     | FhoareF hf ->
         let fv = 
-          fv_union (Mid.remove mpre (f_fv hf.hf_pre)) 
-            (Mid.remove mpost (f_fv hf.hf_post)) in
+          fv_union (Mid.remove mpre (f_fv hf.hf_pr)) 
+            (Mid.remove mpost (f_fv hf.hf_po)) in
         EcPath.m_fv fv hf.hf_f
     | FhoareS hs ->
-        let fv = Mid.remove mhr (fv_union (f_fv hs.hs_pre) (f_fv hs.hs_post)) in
+        let fv = Mid.remove mhr (fv_union (f_fv hs.hs_pr) (f_fv hs.hs_po)) in
         fv_union (EcModules.s_fv hs.hs_s) fv
     | FequivF ef ->
       let fv = 
-        fv_diff (fv_union (f_fv ef.eqf_pre) (f_fv ef.eqf_post)) fv_mlr in
-      EcPath.m_fv (EcPath.m_fv fv ef.eqf_fl) ef.eqf_fr
+        fv_diff (fv_union (f_fv ef.ef_pr) (f_fv ef.ef_po)) fv_mlr in
+      EcPath.m_fv (EcPath.m_fv fv ef.ef_fl) ef.ef_fr
     | FequivS es ->
         let fv = 
-          fv_diff (fv_union (f_fv es.eqs_pre) (f_fv es.eqs_post)) fv_mlr in
+          fv_diff (fv_union (f_fv es.es_pr) (f_fv es.es_po)) fv_mlr in
         fv_union fv 
-          (fv_union (EcModules.s_fv es.eqs_sl) (EcModules.s_fv es.eqs_sr))
+          (fv_union (EcModules.s_fv es.es_sl) (EcModules.s_fv es.es_sr))
     | Fpr (m,mp,args,event) ->
         let fve = Mid.remove mpost (f_fv event) in
         let fv  = EcPath.m_fv fve mp in
@@ -485,26 +485,26 @@ let f_lambda b f = f_quant Llambda b f
 let f_eqGlob m1 m2 mp = mk_form (FeqGlob(m1,m2,mp)) ty_bool
 
 let f_hoareF pre f post = 
-  let hf = { hf_pre = pre; hf_f = f; hf_post = post } in
+  let hf = { hf_pr = pre; hf_f = f; hf_po = post } in
   mk_form (FhoareF hf) ty_bool
 
 let f_hoareS_r hs = mk_form (FhoareS hs) ty_bool
 
 let f_hoareS mem pre s post = 
-  f_hoareS_r { hs_me = mem; hs_pre = pre; hs_s = s; hs_post = post } 
+  f_hoareS_r { hs_m = mem; hs_pr = pre; hs_s = s; hs_po = post } 
 
 
 let f_equivF pre fl fr post = 
-  let ef = { eqf_pre = pre; eqf_fl = fl; eqf_fr = fr; eqf_post = post } in
+  let ef = { ef_pr = pre; ef_fl = fl; ef_fr = fr; ef_po = post } in
   mk_form (FequivF ef) ty_bool
 
 let f_equivS_r es = mk_form (FequivS es) ty_bool
 
 let f_equivS meml memr pre sl sr post = 
-   f_equivS_r { eqs_mel = meml; eqs_mer = memr; 
-                eqs_pre = pre; 
-                eqs_sl = sl; eqs_sr = sr; 
-                eqs_post = post } 
+   f_equivS_r { es_ml = meml; es_mr = memr; 
+                es_pr = pre; 
+                es_sl = sl; es_sr = sr; 
+                es_po = post } 
 
 let f_pr m f args e = mk_form (Fpr(m,f,args,e)) ty_real
 
@@ -750,28 +750,28 @@ let f_map gt g f =
         f_eqGlob m1 m2 mp
 
     | FhoareF hf -> 
-        let pre' = g hf.hf_pre in
-        let post' = g hf.hf_post in
-        if hf.hf_pre == pre' && hf.hf_post == post' then f else 
+        let pre' = g hf.hf_pr in
+        let post' = g hf.hf_po in
+        if hf.hf_pr == pre' && hf.hf_po == post' then f else 
         f_hoareF pre' hf.hf_f post'
 
     | FhoareS hs ->
-        let pre' = g hs.hs_pre in
-        let post' = g hs.hs_post in
-        if hs.hs_pre == pre' && hs.hs_post == post' then f else 
-        f_hoareS hs.hs_me pre' hs.hs_s post'
+        let pre' = g hs.hs_pr in
+        let post' = g hs.hs_po in
+        if hs.hs_pr == pre' && hs.hs_po == post' then f else 
+        f_hoareS hs.hs_m pre' hs.hs_s post'
 
     | FequivF ef -> 
-        let pre' = g ef.eqf_pre in
-        let post' = g ef.eqf_post in
-        if ef.eqf_pre == pre' && ef.eqf_post == post' then f else 
-        f_equivF pre' ef.eqf_fl ef.eqf_fr post'
+        let pre' = g ef.ef_pr in
+        let post' = g ef.ef_po in
+        if ef.ef_pr == pre' && ef.ef_po == post' then f else 
+        f_equivF pre' ef.ef_fl ef.ef_fr post'
 
     | FequivS es ->
-        let pre' = g es.eqs_pre in
-        let post' = g es.eqs_post in
-        if es.eqs_pre == pre' && es.eqs_post == post' then f else 
-        f_equivS es.eqs_mel es.eqs_mer pre' es.eqs_sl es.eqs_sr post'
+        let pre' = g es.es_pr in
+        let post' = g es.es_po in
+        if es.es_pr == pre' && es.es_po == post' then f else 
+        f_equivS es.es_ml es.es_mr pre' es.es_sl es.es_sr post'
 
     | Fpr(m,mp,args,ev) -> 
         let args' = List.smart_map g args in
@@ -887,47 +887,47 @@ let rec f_subst (s:f_subst) f =
 
   | FhoareF hf ->
       assert (not (Mid.mem mhr s.fs_mem) && not (Mid.mem mhr s.fs_mem));
-      let pre'  = f_subst s hf.hf_pre in
-      let post' = f_subst s hf.hf_post in
+      let pre'  = f_subst s hf.hf_pr in
+      let post' = f_subst s hf.hf_po in
       let mp'   = EcPath.m_subst s.fs_p s.fs_mp hf.hf_f in
-      if hf.hf_pre == pre' && hf.hf_post == post' && hf.hf_f == mp' then f else 
+      if hf.hf_pr == pre' && hf.hf_po == post' && hf.hf_f == mp' then f else 
       f_hoareF pre' mp' post'
   | FhoareS hs ->
       assert (not (Mid.mem mhr s.fs_mem));
-      let pre'  = f_subst s hs.hs_pre in
-      let post' = f_subst s hs.hs_post in
+      let pre'  = f_subst s hs.hs_pr in
+      let post' = f_subst s hs.hs_po in
       let es    = e_subst_init s.fs_freshen s.fs_p s.fs_ty s.fs_mp in
       let st'   = EcModules.s_subst es hs.hs_s in
-      let me'  = EcMemory.me_subst s.fs_p s.fs_mp s.fs_mem s.fs_ty hs.hs_me in
-      if hs.hs_me == me' && 
-        hs.hs_pre == pre' && hs.hs_s == st' && hs.hs_post == post' then f else
+      let me'  = EcMemory.me_subst s.fs_p s.fs_mp s.fs_mem s.fs_ty hs.hs_m in
+      if hs.hs_m == me' && 
+        hs.hs_pr == pre' && hs.hs_s == st' && hs.hs_po == post' then f else
       f_hoareS me' pre' st' post'
   | FequivF ef ->
       assert (not (Mid.mem mleft s.fs_mem) && not (Mid.mem mright s.fs_mem));
-      let pre'    = f_subst s ef.eqf_pre in
-      let post'   = f_subst s ef.eqf_post in
+      let pre'    = f_subst s ef.ef_pr in
+      let post'   = f_subst s ef.ef_po in
       let m_subst = EcPath.m_subst s.fs_p s.fs_mp in 
-      let mp1'    = m_subst ef.eqf_fl in
-      let mp2'    = m_subst ef.eqf_fr in
-      if ef.eqf_pre == pre' && ef.eqf_post == post' && 
-        ef.eqf_fl == mp1' && ef.eqf_fr == mp2' then f 
+      let mp1'    = m_subst ef.ef_fl in
+      let mp2'    = m_subst ef.ef_fr in
+      if ef.ef_pr == pre' && ef.ef_po == post' && 
+        ef.ef_fl == mp1' && ef.ef_fr == mp2' then f 
       else f_equivF pre' mp1' mp2' post'
   | FequivS eqs -> 
       assert (not (Mid.mem mleft s.fs_mem) && not (Mid.mem mright s.fs_mem));
-      let pre'  = f_subst s eqs.eqs_pre in
-      let post' = f_subst s eqs.eqs_post in
+      let pre'  = f_subst s eqs.es_pr in
+      let post' = f_subst s eqs.es_po in
       let me1'   = 
-        EcMemory.me_subst s.fs_p s.fs_mp s.fs_mem s.fs_ty eqs.eqs_mel in
+        EcMemory.me_subst s.fs_p s.fs_mp s.fs_mem s.fs_ty eqs.es_ml in
       let me2'   = 
-        EcMemory.me_subst s.fs_p s.fs_mp s.fs_mem s.fs_ty eqs.eqs_mer in
+        EcMemory.me_subst s.fs_p s.fs_mp s.fs_mem s.fs_ty eqs.es_mr in
       let es = e_subst_init s.fs_freshen s.fs_p s.fs_ty s.fs_mp in
       let s_subst = EcModules.s_subst es in
-      let st1' = s_subst eqs.eqs_sl in
-      let st2' = s_subst eqs.eqs_sr in
-      if eqs.eqs_mel == me1' && eqs.eqs_mer == me2' &&
-        eqs.eqs_pre == pre' && 
-        eqs.eqs_sl == st1' && eqs.eqs_sr == st2' && 
-        eqs.eqs_post == post' then f else
+      let st1' = s_subst eqs.es_sl in
+      let st2' = s_subst eqs.es_sr in
+      if eqs.es_ml == me1' && eqs.es_mr == me2' &&
+        eqs.es_pr == pre' && 
+        eqs.es_sl == st1' && eqs.es_sr == st2' && 
+        eqs.es_po == post' then f else
       f_equivS me1' me2' pre' st1' st2' post'
   | Fpr(m,mp,args,e) ->
       assert (not (Mid.mem mpost s.fs_mem));

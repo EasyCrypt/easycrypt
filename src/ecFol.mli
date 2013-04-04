@@ -52,30 +52,30 @@ and f_node =
   | Fpr     of memory * EcPath.mpath * form list * form (* hr *)
 
 and equivF = { 
-  eqf_pre  : form;
-  eqf_fl   : EcPath.mpath;
-  eqf_fr   : EcPath.mpath;
-  eqf_post : form;
+  ef_pr  : form;
+  ef_fl   : EcPath.mpath;
+  ef_fr   : EcPath.mpath;
+  ef_po : form;
 }
 
 and equivS = {
-  eqs_mel  : EcMemory.memenv;
-  eqs_mer  : EcMemory.memenv;
-  eqs_pre  : form;
-  eqs_sl   : stmt; (* In reverse order *)
-  eqs_sr   : stmt; (* In reverse order *)
-  eqs_post : form; }
+  es_ml  : EcMemory.memenv;
+  es_mr  : EcMemory.memenv;
+  es_pr  : form;
+  es_sl   : stmt;
+  es_sr   : stmt;
+  es_po : form; }
 
 and hoareF = { 
-  hf_pre  : form;
+  hf_pr  : form;
   hf_f    : EcPath.mpath;
-  hf_post : form;
+  hf_po : form;
 }
 and hoareS = {
-  hs_me   : memenv;
-  hs_pre  : form; 
-  hs_s    : stmt; (* In reverse order *)
-  hs_post : form; }
+  hs_m   : EcMemory.memenv;
+  hs_pr  : form; 
+  hs_s    : stmt;
+  hs_po : form; }
 
 (* -------------------------------------------------------------------- *)
 val f_equal   : form -> form -> bool
