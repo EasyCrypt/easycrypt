@@ -19,11 +19,6 @@ THEORIES := $(wildcard theories/*.ec)
 INSTALL  := scripts/install-sh
 
 # --------------------------------------------------------------------
-WHY3_VERSION = 0.80
-WHY3_TARGZ   = why3-$(WHY3_VERSION).tar.gz
-WHY3_URL     = http://ci.easycrypt.info/downloads/$(WHY3_TARGZ)
-
-# --------------------------------------------------------------------
 XUNITOUT     ?= xunit.xml
 ECARGS       ?=
 CHECKARGS    := $(ECARGS) -I theories
@@ -127,19 +122,6 @@ distcheck: dist
 # --------------------------------------------------------------------
 %.inferred.mli:
 	$(call build src/$@) && cat _build/src/$@
-
-# --------------------------------------------------------------------
-why3:
-	[ -e why3 ] && rm -rf why3; mkdir why3
-	curl -o why3/$(WHY3_TARGZ) $(WHY3_URL)
-	tar -C why3 -xof why3/$(WHY3_TARGZ)
-	( set -e; cd why3/why3-$(WHY3_VERSION); \
-	    ./configure \
-	        --enable-local \
-	        --disable-coq-tactic \
-	        --disable-coq-libs \
-	        --disable-pvs-libs; \
-	    make && make byte )
 
 # --------------------------------------------------------------------
 TOOLCHAIN_URL := http://ci.easycrypt.info/scripts/ec-build-toolchain
