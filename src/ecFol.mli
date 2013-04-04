@@ -116,12 +116,14 @@ val f_exists : binding -> form -> form
 val f_forall : binding -> form -> form
 val f_lambda : binding -> form -> form
 
-val f_hoareF  : form -> EcPath.mpath -> form -> form 
-val f_hoareS  : memenv -> form -> EcModules.stmt -> form -> form 
-val f_equivF  : form -> EcPath.mpath -> EcPath.mpath -> form -> form 
-val f_equivS  : 
+val f_hoareF   : form -> EcPath.mpath -> form -> form 
+val f_hoareS   : memenv -> form -> EcModules.stmt -> form -> form 
+val f_hoareS_r : hoareS -> form
+val f_equivF   : form -> EcPath.mpath -> EcPath.mpath -> form -> form 
+val f_equivS   : 
  memenv -> memenv -> form -> EcModules.stmt -> EcModules.stmt -> form -> form
-val f_pr      : memory -> EcPath.mpath -> form list -> form -> form
+val f_equivS_r : equivS -> form
+val f_pr       : memory -> EcPath.mpath -> form list -> form -> form
 
 val fop_not : form
 val f_not : form -> form
@@ -162,10 +164,12 @@ val f_forall_simpl  : binding -> form -> form
 
 val f_not_simpl  : form -> form
 val f_and_simpl  : form -> form -> form
+val f_ands_simpl  : form list -> form -> form
 val f_anda_simpl : form -> form -> form
 val f_or_simpl   : form -> form -> form
 val f_ora_simpl  : form -> form -> form
 val f_imp_simpl  : form -> form -> form
+val f_imps_simpl  : form list -> form -> form
 val f_iff_simpl  : form -> form -> form
 
 val f_eq_simpl     : form -> form -> form

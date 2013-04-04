@@ -488,20 +488,23 @@ let f_hoareF pre f post =
   let hf = { hf_pre = pre; hf_f = f; hf_post = post } in
   mk_form (FhoareF hf) ty_bool
 
+let f_hoareS_r hs = mk_form (FhoareS hs) ty_bool
+
 let f_hoareS mem pre s post = 
-  let hs = { hs_me = mem; hs_pre = pre; hs_s = s; hs_post = post } in
-  mk_form (FhoareS hs) ty_bool
+  f_hoareS_r { hs_me = mem; hs_pre = pre; hs_s = s; hs_post = post } 
+
 
 let f_equivF pre fl fr post = 
   let ef = { eqf_pre = pre; eqf_fl = fl; eqf_fr = fr; eqf_post = post } in
   mk_form (FequivF ef) ty_bool
 
+let f_equivS_r es = mk_form (FequivS es) ty_bool
+
 let f_equivS meml memr pre sl sr post = 
-   let es = { eqs_mel = meml; eqs_mer = memr; 
-              eqs_pre = pre; 
-              eqs_sl = sl; eqs_sr = sr; 
-              eqs_post = post } in
-  mk_form (FequivS es) ty_bool
+   f_equivS_r { eqs_mel = meml; eqs_mer = memr; 
+                eqs_pre = pre; 
+                eqs_sl = sl; eqs_sr = sr; 
+                eqs_post = post } 
 
 let f_pr m f args e = mk_form (Fpr(m,f,args,e)) ty_real
 
@@ -1028,6 +1031,8 @@ let f_and_simpl f1 f2 =
   else if is_false f2 then f_false 
   else f_and f1 f2
 
+let f_ands_simpl = List.fold_right f_and_simpl
+
 let f_anda_simpl f1 f2 = 
   if is_true f1 then f2
   else if is_false f1 then f_false
@@ -1055,6 +1060,8 @@ let f_imp_simpl f1 f2 =
   else if is_false f2 then f_not_simpl f1
   else f_imp f1 f2 
     (* FIXME : simplify x = f1 => f2 into x = f1 => f2{x<-f2} *)
+
+let f_imps_simpl = List.fold_right f_imp_simpl 
 
 let f_iff_simpl f1 f2 = 
   if f_equal f1 f2 then f_true

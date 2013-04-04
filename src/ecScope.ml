@@ -930,8 +930,12 @@ module Tactic = struct
       t_equiv_app (i,j) phi g  
 
   let process_while env phi g =
-    let phi = process_phl_formula env g phi in
-    t_hoare_while env phi g
+    let concl = get_concl g in
+    if is_equivS concl then 
+      t_equiv_while env (process_prhl_formula env g phi) g
+    else if is_hoareS concl then 
+      t_hoare_while env (process_phl_formula env g phi) g 
+    else cannot_apply "while" "the conclusion is not a hoare or a equiv"
 
   let process_phl loc env ptac g =
     let t = 

@@ -59,6 +59,8 @@ val i_while   : expr * stmt -> instr
 val i_assert  : expr -> instr
 
 val stmt : instr list -> stmt
+(* [rstmt l] is stmt (List.rev l) *)
+val rstmt : instr list -> stmt
 
 val s_split : int -> stmt -> instr list * instr list
 
