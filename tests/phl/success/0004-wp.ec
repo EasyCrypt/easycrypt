@@ -1,3 +1,4 @@
+require Logic.
 module M = {
   fun f (w x:int) : int = {
     var y, z : int;
@@ -13,14 +14,15 @@ lemma foo : hoare [M.f : true ==> res = 1 ]
 proof.
  fun.
  wp.
- admit.
+ skip;intros _ _;split.
 save.
 
 lemma foo1 : hoare [M.f : true ==> res = 1 ]
 proof.
  fun.
- wp 3.
- admit.
+ wp 1.
+ wp 0.
+ skip;intros _ _;split.
 save.
 
     

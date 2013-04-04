@@ -10,4 +10,4 @@ module M = {
 lemma foo : hoare [M.g : true ==> true]
 proof.
  fun.
- wp 0.
+ wp 3.

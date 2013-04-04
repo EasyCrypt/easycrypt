@@ -373,7 +373,7 @@ let t_skip = t_hS_or_eS t_hoare_skip t_equiv_skip
 (* -------------------------------------------------------------------- *)
 
 let s_split i s =
-  if i < 1 || List.length s.s_node < i then tacerror (InvalidCodePosition i)
+  if i < 0 || List.length s.s_node < i then tacerror (InvalidCodePosition i)
   else s_split i s
 
 let t_hoare_app i phi (juc,n as g) =
@@ -405,28 +405,35 @@ let t_equiv_app (i,j) phi (juc,n as g) =
   
 (* -------------------------------------------------------------------- *)
 
-let s_skip_last i s =
+let s_split_o msg i s = 
   let len = List.length s.s_node in
   match i with
-  | None -> [], s.s_node 
+  | None -> [], s.s_node
   | Some i ->
-    assert (0 <= i && i < len); (* FIXME error message *)
-    s_split (len - i) s 
+    if 0 <= i && i <= len then s_split i s
+    else
+      (* merge message with the InvalidCodePosition *)
+      cannot_apply msg 
+        (Format.sprintf "%i should be between 0 and %i" i len)
 
-let check_wp_progress i s remain =
+let check_wp_progress msg i s remain =
   match i with
   | None -> List.length s.s_node - List.length remain
   | Some i ->
-      assert (remain = []); (* FIXME error message *)
-      i 
+    let len = List.length remain in
+    if len = 0 then i
+    else
+      cannot_apply msg 
+        (Format.sprintf "remaining %i instruction%s" len 
+           (if len = 1 then "" else "s"))
 
 let t_hoare_wp env i (juc,n as g) =
   let hyps,concl = get_goal g in
   let hs = destr_hoareS concl in
-  let s_hd,s_wp = s_skip_last i hs.hs_s in
+  let s_hd,s_wp = s_split_o "wp" i hs.hs_s in
   let s_wp,post = 
     wp env (EcMemory.memory hs.hs_me) (EcModules.stmt s_wp) hs.hs_post in
-  let i = check_wp_progress i hs.hs_s s_wp in
+  let i = check_wp_progress "wp" i hs.hs_s s_wp in
   let s = EcModules.stmt (s_hd @ s_wp) in
   let concl = f_hoareS hs.hs_me hs.hs_pre s post  in
   let juc,n' = new_goal juc (hyps,concl) in
@@ -437,14 +444,14 @@ let t_equiv_wp env ij (juc,n as g) =
   let hyps,concl = get_goal g in
   let es = destr_equivS concl in
   let i = omap ij fst and j = omap ij snd in
-  let s_hdl,s_wpl = s_skip_last i es.eqs_sl in
-  let s_hdr,s_wpr = s_skip_last j es.eqs_sr in
+  let s_hdl,s_wpl = s_split_o "wp" i es.eqs_sl in
+  let s_hdr,s_wpr = s_split_o "wp" j es.eqs_sr in
   let s_wpl,post = 
     wp env (EcMemory.memory es.eqs_mel) (EcModules.stmt s_wpl) es.eqs_post in
   let s_wpr, post =
     wp env (EcMemory.memory es.eqs_mer) (EcModules.stmt s_wpr) post in
-  let i = check_wp_progress i es.eqs_sl s_wpl in
-  let j = check_wp_progress j es.eqs_sr s_wpr in
+  let i = check_wp_progress "wp" i es.eqs_sl s_wpl in
+  let j = check_wp_progress "wp" j es.eqs_sr s_wpr in
   let sl = EcModules.stmt (s_hdl @ s_wpl) in
   let sr = EcModules.stmt (s_hdr @ s_wpr) in
   let concl = f_equivS es.eqs_mel es.eqs_mer es.eqs_pre sl sr post in
