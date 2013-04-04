@@ -217,9 +217,9 @@ let mkn_apply do_arg env (juc,n) args =
         check_apply juc s (RA_node n :: ras) f2 args' 
       else 
         let f = f_subst s f in
-        if is_head_reducible full_red env hyps f then 
-          check_apply juc f_subst_id ras (h_red full_red env hyps f) args
-        else tacerror ToManyArgument in
+        match h_red_opt full_red env hyps f with
+        | None -> tacerror ToManyArgument
+        | Some f ->  check_apply juc f_subst_id ras f args in
   if args = [] then (juc,n), []
   else
     let juc, ras, concl = check_apply juc f_subst_id [] concl args in
@@ -302,9 +302,9 @@ let t_intros env ids (juc,n as g) =
         let hyps = add_ld id (LD_var (ty, Some (f_subst s e1))) hyps in
         check_intros hyps ids' s concl 
       else if s == f_subst_id then
-        if EcReduction.is_head_reducible full_red env hyps concl then
-          check_intros hyps ids s (h_red full_red env hyps concl)
-        else tacerror (UnknownIntros concl)
+        match h_red_opt full_red env hyps concl with
+        | None -> tacerror (UnknownIntros concl)
+        | Some concl -> check_intros hyps ids s concl
       else check_intros hyps ids f_subst_id (f_subst s concl) in
   let hyps, concl = check_intros hyps ids f_subst_id concl in
   let (juc,n1) = new_goal juc (hyps,concl) in
@@ -347,9 +347,9 @@ let t_elim env f (juc,n) =
     | _ -> aux_red f
 
   and aux_red f =
-    if EcReduction.is_head_reducible full_red env hyps f then
-      aux (h_red full_red env hyps f) 
-    else tacerror (UnknownElims f) in
+    match h_red_opt full_red env hyps f with
+    | Some f -> aux f
+    | _ -> tacerror (UnknownElims f) in
   aux f
 
 let t_split env g =
@@ -378,9 +378,9 @@ let t_split env g =
         [AAform f1; AAform f2; AAform f3;AAnode;AAnode] g
     | _ ->  aux_red f 
   and aux_red f = 
-    if EcReduction.is_head_reducible full_red env hyps f then 
-      aux (h_red full_red env hyps f) 
-    else tacerror (UnknownSplit f) in
+    match h_red_opt full_red env hyps f with
+    | Some f -> aux f 
+    | None -> tacerror (UnknownSplit f) in
   aux concl
 
 let t_or_intro b env g = 
@@ -396,9 +396,9 @@ let t_or_intro b env g =
       check_logic env lem;
       t_apply_glob env lem [] [AAform f1; AAform f2; AAnode] g
     | _ -> 
-      if EcReduction.is_head_reducible full_red env hyps f then 
-        aux (h_red full_red env hyps f) 
-      else tacerror (UnknownSplit f) in
+      match h_red_opt full_red env hyps f with
+      | Some f -> aux f
+      | None -> tacerror (UnknownSplit f) in
   aux concl
 
 let t_left = t_or_intro true
@@ -448,9 +448,9 @@ let gen_t_exists do_arg env fs (juc,n as g) =
         aux s (a::ras) fs' concl 
       else 
         let concl = f_subst s concl in
-        if EcReduction.is_head_reducible full_red env hyps concl then 
-          aux f_subst_id ras fs (h_red full_red env hyps concl)
-        else tacerror (UnknownSplit concl) in
+        match h_red_opt full_red env hyps concl with
+        | Some f -> aux f_subst_id ras fs f
+        | None -> tacerror (UnknownSplit concl) in
   let args,concl = aux f_subst_id [] fs concl in
   let (juc,n1) = new_goal juc (hyps,concl) in
   let rule = 
@@ -464,9 +464,10 @@ let t_rewrite env side f g =
   let rec find_rewrite f =
     if is_eq f then destr_eq f, true
     else if is_iff f then destr_iff f, false 
-    else if EcReduction.is_head_reducible full_red env hyps f then 
-      find_rewrite (h_red full_red env hyps f)
-    else tacerror (UnknownRewrite f) in
+    else 
+      match h_red_opt full_red env hyps f with 
+      | Some f -> find_rewrite f 
+      | None   -> tacerror (UnknownRewrite f) in
   let (f1,f2),eq = find_rewrite f in
   let p,tys = 
     if eq then (if side then p_rewrite_l else p_rewrite_r), [f1.f_ty]
