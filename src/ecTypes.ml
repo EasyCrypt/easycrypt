@@ -273,9 +273,11 @@ let string_of_pvar (p : prog_var) =
     (EcPath.m_tostring p.pv_name)
     (string_of_pvar_kind p.pv_kind)
 
-let pv_res (f:EcPath.mpath) = 
-  { pv_name = EcPath.mqname f EcPath.PKother "res" [];
+let pv_loc f s = 
+  { pv_name = EcPath.mqname f EcPath.PKother s [];
     pv_kind = PVloc }
+
+let pv_res (f:EcPath.mpath) = pv_loc f "res"
 
 (* -------------------------------------------------------------------- *)
 type lpattern =

@@ -114,6 +114,7 @@ val string_of_pvar : prog_var -> string
 
 val pv_subst : (EcPath.mpath -> EcPath.mpath) -> prog_var -> prog_var 
 
+val pv_loc : EcPath.mpath -> symbol -> prog_var
 val pv_res : EcPath.mpath -> prog_var
 
 (* -------------------------------------------------------------------- *)

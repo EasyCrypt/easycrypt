@@ -543,35 +543,48 @@ let t_equiv_while env inv (juc,n1 as g) =
   upd_rule rule (juc, n1)
 
 (* -------------------------------------------------------------------- *)
-(*
-let t_hoare_call env pre post g =
+
+let wp_asgn_call env m lv res post =
+  match lv with
+  | None -> post
+  | Some lv ->
+    let lpe,se = lv_subst env m lv res in
+    mk_let env ([lpe],se,post)
+
+let subst_args_call env m f =
+  List.fold_right2 (fun v e s ->
+    PVM.add_none env (pv_loc f v.v_name) m (form_of_expr m e) s)
+  
+let t_hoare_call env fpre fpost (juc,n1 as g) =
+  (* FIXME : check the well formess of the pre and the post *)
   let hyps,concl = get_goal g in
   let hs = destr_hoareS concl in
-  let error_message () = 
+  let error () = 
     cannot_apply "call" "the last instruction should be a call" in
-  match List.rev hs.hs_s.s_node with
-  | [] -> error_message ()
-  | i :: r ->
-    match i.i_node with
-    | Scall (lp,f,args) ->
-      let m = EcMemory.memory hs.hs_me in
-      (* the body preserve the invariant *)
-      let b_pre  = f_and_simpl inv e in
-      let b_post = inv in
-      let b_concl = f_hoareS hs.hs_me b_pre c b_post in
-      let (juc,nb) = new_goal juc (hyps,b_concl) in
-      (* the wp of the while *)
-      let post = f_imps_simpl [f_not_simpl e; inv] hs.hs_post in
-      let modi = s_write env PV.empty c in
-      let post = generalize_mod env m modi post in
-      let post = f_and_simpl inv post in
-      let concl = f_hoareS_r { hs with hs_s = rstmt r; hs_post=post} in
-      let (juc,n) = new_goal juc (hyps,concl) in
-      let rule = { pr_name = RN_hl_while inv; 
-                   pr_hyps=[RA_node nb;RA_node n;]} in
-      upd_rule rule (juc, n1)
-    | _ -> error_message ()  
-*)
+  let (lp,f,args),s = s_last_call error hs.hs_s in
+  let m = EcMemory.memory hs.hs_m in
+  let fsig = (Fun.by_mpath f env).f_sig in
+  (* The function satisfies the specification *)
+  let f_concl = f_hoareF fpre f fpost in
+  let juc,nf = new_goal juc (hyps, f_concl) in
+  (* The wp *)
+  let pvres = pv_res f in
+  let vres = EcIdent.create "result" in
+  let fres = f_local vres (snd fsig.fs_sig) in
+  let post = wp_asgn_call env m lp fres hs.hs_po in
+  let fpost = PVM.subst1 env pvres m fres fpost in 
+  let modi = f_write env f in
+  let post = generalize_mod env m modi (f_imp_simpl fpost post) in
+  let spre = subst_args_call env m f (fst fsig.fs_sig) args PVM.empty in
+  let post = f_anda_simpl (PVM.subst env spre fpre) post in
+  let concl = f_hoareS_r { hs with hs_s = s; hs_po=post} in
+  let (juc,n) = new_goal juc (hyps,concl) in
+  let rule = { pr_name = RN_hl_call (fpre, fpost); 
+               pr_hyps =[RA_node nf;RA_node n;]} in
+  upd_rule rule (juc, n1)
+
+
+
 
 
   

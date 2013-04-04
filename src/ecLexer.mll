@@ -74,7 +74,7 @@
     "app"         , APP        ;        (* KW: tactic *)
     "wp"          , WP         ;        (* KW: tactic *)
     "skip"        , SKIP       ;        (* KW: tactic *)
-    "while"       , WHILE      ;        (* KW: tactic *)
+    "call"        , CALL       ;        (* KW: tactic *)
     "rcondt"      , RCONDT     ;        (* KW: tactic *)
     "rcondf"      , RCONDF     ;        (* KW: tactic *)
     "cond"        , COND       ;        (* KW: tactic *)

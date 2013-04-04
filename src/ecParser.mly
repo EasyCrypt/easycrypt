@@ -224,6 +224,7 @@
 %token WHY3
 %token WITH
 %token WP
+%token CALL
 %token ZETA 
 
 %token <string> OP1 OP2 OP3 OP4
@@ -1208,7 +1209,8 @@ tactic:
 
 | WHILE inv=loc(sform) 
     { PPhl (Pwhile inv) }
-
+| CALL pre=loc(sform) post=loc(sform) 
+    { PPhl (Pcall(pre,post)) }
 | RCONDT i=number 
     {PPhl (Prcond(true,i))}
 | RCONDF i=number 

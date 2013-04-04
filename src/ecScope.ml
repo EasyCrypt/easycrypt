@@ -931,12 +931,27 @@ module Tactic = struct
 
   let process_while env phi g =
     let concl = get_concl g in
-    if is_equivS concl then 
-      t_equiv_while env (process_prhl_formula env g phi) g
-    else if is_hoareS concl then 
+    if is_hoareS concl then 
       t_hoare_while env (process_phl_formula env g phi) g 
+    else if is_equivS concl then 
+      t_equiv_while env (process_prhl_formula env g phi) g
     else cannot_apply "while" "the conclusion is not a hoare or a equiv"
 
+  let process_call env pre post g =
+    let hyps,concl = get_goal g in
+    match concl.f_node with
+    | FhoareS hs ->
+      let error () = 
+        cannot_apply "call" "the last instruction should be a call" in
+      let (_,f,_),_ = s_last_call error hs.hs_s in
+      let penv, qenv = EcEnv.Fun.hoareF f env in
+      let pre  = process_form penv hyps pre tbool in
+      let post = process_form qenv hyps post tbool in
+      t_hoare_call env pre post g
+    | FequivS _es ->
+      assert false (* Not implemented *)
+    | _ -> cannot_apply "call" "the conclusion is not a hoare or a equiv"
+      
   let process_cond side g =
     let concl = get_concl g in
     if is_equivS concl then 
@@ -946,7 +961,7 @@ module Tactic = struct
         | Some _ -> cannot_apply "cond" "Unexpected side in non relational goal"
         | None ->
           t_hoare_cond g
-    else cannot_apply "while" "the conclusion is not a hoare or a equiv goal"
+    else cannot_apply "cond" "the conclusion is not a hoare or a equiv goal"
 
   let process_phl loc env ptac g =
     let t = 
@@ -958,6 +973,7 @@ module Tactic = struct
       | Prcond (b,i) -> t_rcond b i 
       | Pcond side   -> process_cond side 
       | Pwhile phi -> process_while env phi 
+      | Pcall(pre,post) -> process_call env pre post
     in
     set_loc loc t g
  

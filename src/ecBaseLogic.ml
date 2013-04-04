@@ -182,6 +182,7 @@ type rule_name =
   | RN_hl_rcond     of bool * int
   | RN_hl_cond
   | RN_hl_while     of EcFol.form
+  | RN_hl_call      of EcFol.form * EcFol.form
 
 and rule_arg = 
   | RA_form of EcFol.form             (* formula             *)
