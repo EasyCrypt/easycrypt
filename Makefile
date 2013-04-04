@@ -50,7 +50,7 @@ CHECKLIBS = \
 # --------------------------------------------------------------------
 .PHONY: all build byte native check check-xunit tags
 .PHONY: clean install uninstall dist distcheck why3
-.PHONY: toolchain %.ml
+.PHONY: pg toolchain %.ml
 
 all: build
 
@@ -122,6 +122,10 @@ distcheck: dist
 # --------------------------------------------------------------------
 %.inferred.mli:
 	$(call build src/$@) && cat _build/src/$@
+
+# --------------------------------------------------------------------
+pg:
+	$(MAKE) -C proofgeneral run-local
 
 # --------------------------------------------------------------------
 TOOLCHAIN_URL := http://ci.easycrypt.info/scripts/ec-build-toolchain
