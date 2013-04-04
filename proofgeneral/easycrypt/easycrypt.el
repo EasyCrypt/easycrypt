@@ -2,8 +2,6 @@
 (require 'easycrypt-syntax)
 (require 'easycrypt-hooks)
 (require 'easycrypt-abbrev)
-;(load-library "hideshow")
-
 
 (add-to-list 'hs-special-modes-alist
   '(easycrypt-mode "{" "}" "/[*/]" nil nil))
@@ -176,6 +174,8 @@
 
 (defun easycrypt-highlight-error-hook ()
   (easycrypt-highlight-error ))
+
+(add-hook 'proof-activate-scripting-hook '(lambda () (when proof-three-window-enable (proof-layout-windows))))
 
 (add-hook 'proof-shell-handle-error-or-interrupt-hook 'easycrypt-highlight-error-hook t)
 
