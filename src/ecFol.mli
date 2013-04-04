@@ -239,9 +239,6 @@ module Fsubst :
     val init_subst_tvar : EcTypes.ty EcIdent.Mid.t -> f_subst
     val subst_tvar : EcTypes.ty EcIdent.Mid.t -> form -> form
 
-(*    val subst_local : EcIdent.t -> form -> form -> form
-    val subst_locals : form EcIdent.Mid.t -> form -> form *)
-
   end
 
 

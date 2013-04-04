@@ -24,23 +24,32 @@ ECARGS       ?=
 CHECKARGS    := $(ECARGS) -I theories
 CHECKLIBARGS := $(CHECKARGS) -p Eprover -p Alt-Ergo -p Z3
 
-CHECK = \
-	./scripts/runtest.py              \
-	  --bin=./ec.native               \
-	  --bin-args="$(CHECKARGS)"       \
-	  --ok-dir=theories               \
+OKTESTS = \
 	  --ok-dir=tests/typing/success   \
-	  --ko-dir=tests/typing/fail      \
 	  --ok-dir=tests/modules/success  \
-	  --ko-dir=tests/modules/fail     \
 	  --ok-dir=tests/theories/success \
-	  --ko-dir=tests/theories/fail    \
 	  --ok-dir=tests/third-party      \
 	  --ok-dir=tests/unclassified     \
 	  --ok-dir=tests/tactics/success  \
-	  --ko-dir=tests/tactics/fail
+	  --ok-dir=tests/phl/success      \
+	  --ok-dir=tests/prhl/success     
 
-CHECKLIBS = \
+KOTESTS = \
+	  --ko-dir=tests/typing/fail      \
+	  --ko-dir=tests/modules/fail     \
+	  --ko-dir=tests/theories/fail    \
+	  --ko-dir=tests/tactics/fail     \
+	  --ko-dir=tests/phl/fail         \
+	  --ko-dir=tests/prhl/fail       
+
+THTESTS = --ok-dir=theories
+
+CHECK = \
+	./scripts/runtest.py              \
+	  --bin=./ec.native               \
+	  --bin-args="$(CHECKARGS)"       
+
+CHECKLIBS =
 	./scripts/runtest.py           \
 	  --bin=./ec.native            \
 	  --bin-args="$(CHECKLIBARGS)" \
@@ -78,14 +87,17 @@ uninstall:
 	-@rmdir $(DESTDIR)$(PREFIX)/lib/easycrypt/theories
 	-@rmdir $(DESTDIR)$(PREFIX)/lib/easycrypt
 
+tests: ec.native
+	$(CHECK) $(OKTESTS) $(KOTESTS)
+
 check: ec.native
-	$(CHECK)
+	$(CHECK) $(THTESTS) $(OKTESTS) $(KOTESTS)
 
 checklibs: ec.native
 	$(CHECKLIBS)
 
 check-xunit: ec.native
-	$(CHECK) --xunit="$(XUNITOUT)"
+	$(CHECK) $(THTESTS) $(OKTESTS) $(KOTESTS) --xunit="$(XUNITOUT)"
 
 clean:
 	$(OCAMLBUILD) -clean

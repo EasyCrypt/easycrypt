@@ -1211,10 +1211,10 @@ tactic:
     { PPhl (Pwhile inv) }
 | CALL pre=loc(sform) post=loc(sform) 
     { PPhl (Pcall(pre,post)) }
-| RCONDT i=number 
-    {PPhl (Prcond(true,i))}
-| RCONDF i=number 
-    {PPhl (Prcond(false,i))}
+| RCONDT s=side i=number 
+    {PPhl (Prcond(s,true,i))}
+| RCONDF s=side i=number 
+    {PPhl (Prcond(s,false,i))}
 | COND s=side
     { PPhl (Pcond s) }
 ;

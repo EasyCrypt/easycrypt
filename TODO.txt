@@ -39,6 +39,13 @@ tactic :
 
 
 Discution : 
+  semantique de hoare f : p => q 
+    forall m, p m => range q [f m]
+  ou avoir simplement le range.
+
+  rajouter le assume il y a une semantique facile pour le justifier.
+
+    
   Nomage des variables (path) :
     Variables de programe : 
       Globals            :  th_path :: mod_path :: var_id

@@ -10,7 +10,7 @@ module M = {
 lemma foo : hoare [M.f : true ==> res = 2 ]
 proof.
  fun.
- rcondt 1.
+ rcondt 2.
  wp; skip; trivial.
  wp;skip;trivial.
 save.

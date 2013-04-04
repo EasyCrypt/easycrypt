@@ -777,11 +777,23 @@ module Tactic = struct
 
   let process_form env hyps pf ty =
     process_form_opt env hyps pf (Some ty)
-
+      
   let process_formula env g pf = 
     let hyps = get_hyps g in
     process_form env hyps pf tbool
 
+  let process_phl_formula env g phi =
+    let hyps, concl = get_goal g in
+    let hs = set_loc phi.pl_loc destr_hoareS concl in
+    let env = EcEnv.Memory.push_active hs.hs_m env in
+    process_form env hyps phi tbool
+
+  let process_prhl_formula env g phi =
+    let hyps, concl = get_goal g in
+    let es = set_loc phi.pl_loc destr_equivS concl in
+    let env = EcEnv.Memory.push_all [es.es_ml; es.es_mr] env in
+    process_form env hyps phi tbool
+      
   let process_mkn_apply env pe (juc, _ as g) = 
     let hyps = get_hyps g in
     let args = pe.fp_args in
@@ -892,9 +904,18 @@ module Tactic = struct
       (t_simplify env EcReduction.beta_red) g
 
   let process_case loc env pf g =
-    let f = process_formula env g pf in
-    t_seq (set_loc loc (t_case env f))
-      (t_simplify env EcReduction.betaiota_red) g
+    let concl = get_concl g in
+    match concl.f_node with
+    | FhoareS _ ->
+      let f = process_phl_formula env g pf in
+      t_hoare_case f g
+    | FequivS _ -> 
+      let f = process_prhl_formula env g pf in
+      t_equiv_case f g 
+    | _ ->
+      let f = process_formula env g pf in
+      t_seq (set_loc loc (t_case env f))
+        (t_simplify env EcReduction.betaiota_red) g
 
   let process_subst loc env ri g =
     if ri = [] then t_subst_all env g 
@@ -906,20 +927,7 @@ module Tactic = struct
         with _ -> error ps.pl_loc (UnknownHypSymbol s) in    
       let tacs = List.map totac ri in
       set_loc loc (t_lseq tacs) g 
-    
-
-  let process_phl_formula env g phi =
-    let hyps, concl = get_goal g in
-    let hs = set_loc phi.pl_loc destr_hoareS concl in
-    let env = EcEnv.Memory.push_active hs.hs_m env in
-    process_form env hyps phi tbool
-
-  let process_prhl_formula env g phi =
-    let hyps, concl = get_goal g in
-    let es = set_loc phi.pl_loc destr_equivS concl in
-    let env = EcEnv.Memory.push_all [es.es_ml; es.es_mr] env in
-    process_form env hyps phi tbool
-    
+        
   let process_app env k phi g =
     match k with
     | Single i ->
@@ -941,17 +949,13 @@ module Tactic = struct
     let hyps,concl = get_goal g in
     match concl.f_node with
     | FhoareS hs ->
-      let error () = 
-        cannot_apply "call" "the last instruction should be a call" in
-      let (_,f,_),_ = s_last_call error hs.hs_s in
+      let (_,f,_),_ = s_last_call "call" hs.hs_s in
       let penv, qenv = EcEnv.Fun.hoareF f env in
       let pre  = process_form penv hyps pre tbool in
       let post = process_form qenv hyps post tbool in
       t_hoare_call env pre post g
     | FequivS es ->
-      let error () = 
-         cannot_apply "call" "the last instruction should be a call" in
-      let (_,fl,_),(_,fr,_),_,_ = s_last_calls error es.es_sl es.es_sr in
+      let (_,fl,_),(_,fr,_),_,_ = s_last_calls "call" es.es_sl es.es_sr in
       let penv, qenv = EcEnv.Fun.equivF fl fr env in
       let pre  = process_form penv hyps pre tbool in
       let post = process_form qenv hyps post tbool in
@@ -976,7 +980,7 @@ module Tactic = struct
       | Pskip    -> EcPhl.t_skip 
       | Papp (k,phi) -> process_app env k phi 
       | Pwp  k   -> t_wp env k 
-      | Prcond (b,i) -> t_rcond b i 
+      | Prcond (side,b,i) -> t_rcond side b i 
       | Pcond side   -> process_cond side 
       | Pwhile phi -> process_while env phi 
       | Pcall(pre,post) -> process_call env pre post

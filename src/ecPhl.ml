@@ -1,5 +1,6 @@
 open EcParsetree
 open EcUtils
+open EcIdent
 open EcTypes
 open EcFol
 open EcModules
@@ -143,16 +144,19 @@ let s_lasts destr_i error sl sr =
   let hr,tr = s_last destr_i error sr in
   hl,hr,tl,tr
 
-let s_last_rnd     = s_last destr_rnd
-let s_last_rnds    = s_lasts destr_rnd
-let s_last_call    = s_last destr_call
-let s_last_calls   = s_lasts destr_call
-let s_last_if      = s_last destr_if
-let s_last_ifs     = s_lasts destr_if
-let s_last_while   = s_last destr_while
-let s_last_whiles  = s_lasts destr_while
-let s_last_assert  = s_last destr_assert 
-let s_last_asserts = s_lasts destr_assert 
+let last_error si st () = 
+  cannot_apply st ("the last instruction should be a"^si)
+
+let s_last_rnd     st = s_last  destr_rnd    (last_error " rnd" st)
+let s_last_rnds    st = s_lasts destr_rnd    (last_error " rnd" st)
+let s_last_call    st = s_last  destr_call   (last_error " call" st)
+let s_last_calls   st = s_lasts destr_call   (last_error " call" st)
+let s_last_if      st = s_last  destr_if     (last_error "n if" st)
+let s_last_ifs     st = s_lasts destr_if     (last_error "n if" st)
+let s_last_while   st = s_last  destr_while  (last_error " while" st)
+let s_last_whiles  st = s_lasts destr_while  (last_error " while" st)
+let s_last_assert  st = s_last  destr_assert (last_error "n assert" st)
+let s_last_asserts st = s_lasts destr_assert (last_error "n assert" st)
  
 (* -------------------------------------------------------------------- *)
 (* -------------------------------  Wp -------------------------------- *)
@@ -272,51 +276,6 @@ let t_hS_or_eS th te g =
   else if is_equivS concl then te g
   else tacerror (NotPhl None)
 
-
-module Pvar = struct
-  type t = EcTypes.prog_var * EcMemory.memory * EcTypes.ty
-  let compare lv1 lv2 = compare lv1 lv2
-end
-module PVset = Set.Make(Pvar)
-
-let quantify_pvars env pvars phi = 
-  let f (pv,m,ty) (bds,phi) =
-    if EcTypes.is_loc pv then
-      let local = EcIdent.create (EcPath.name_mpath pv.EcTypes.pv_name) in
-      let s = PVM.add env pv m (f_local local ty) PVM.empty in
-      let phi = PVM.subst env s phi in 
-      let bds = (local,GTty ty) :: bds in
-      bds,phi
-    else (bds,phi)
-  in
-  let bds,phi = PVset.fold f pvars ([],phi) in
-  f_forall bds phi
-
-
-
-let rec modified_pvars_i m instr = 
-  let f_lval = function 
-    | EcModules.LvVar (pv,ty ) -> PVset.singleton (pv,m,ty)
-    | EcModules.LvTuple pvs -> 
-      List.fold_left (fun s (pv,ty) -> PVset.add (pv,m,ty) s) PVset.empty pvs
-    | EcModules.LvMap ((_p,_tys),pv,_,ty) -> 
-      (* FIXME: What are p and tys for? *)
-      PVset.singleton (pv,m,ty)
-  in
-  match instr.EcModules.i_node with
-  | EcModules.Sasgn (lval,_) -> f_lval lval
-  | EcModules.Srnd (lval,_) -> f_lval lval
-  | EcModules.Scall _ -> assert false
-  | EcModules.Sif (_,s1,s2) -> 
-    PVset.union (modified_pvars m s1) (modified_pvars m s2)
-  | EcModules.Swhile (_,s) -> modified_pvars m s
-  | EcModules.Sassert _ -> PVset.empty
-
-and modified_pvars m stmt = 
-  List.fold_left (fun s i -> PVset.union s (modified_pvars_i m i))
-    PVset.empty stmt.EcModules.s_node
-
-
 (* -------------------------------------------------------------------- *)
 (* -------------------------  Tactics --------------------------------- *)
 (* -------------------------------------------------------------------- *)
@@ -401,12 +360,23 @@ let t_skip = t_hS_or_eS t_hoare_skip t_equiv_skip
 
 (* -------------------------------------------------------------------- *)
 
-      
+let s_split_i msg i s = 
+  let len = List.length s.s_node in
+  if not (0 < i && i <= len) then tacerror (InvalidCodePosition (msg,i,1,len));
+  let hd,tl = s_split (i-1) s in
+  hd, List.hd tl, (List.tl tl)
 
 let s_split msg i s =
   let len = List.length s.s_node in
-  if i < 0 ||  len < i then tacerror (InvalidCodePosition (msg,i,1,len))
+  if i < 0 ||  len < i then tacerror (InvalidCodePosition (msg,i,0,len))
   else s_split i s
+
+let s_split_o msg i s = 
+  match i with
+  | None -> [], s.s_node
+  | Some i -> s_split msg i s 
+
+(* -------------------------------------------------------------------- *)
 
 let t_hoare_app i phi g =
   let concl = get_concl g in
@@ -429,13 +399,6 @@ let t_equiv_app (i,j) phi g =
   
 (* -------------------------------------------------------------------- *)
 
-let s_split_o msg i s = 
-  let len = List.length s.s_node in
-  match i with
-  | None -> [], s.s_node
-  | Some i ->
-    if (0 <= i && i <= len) then s_split msg i s 
-    else tacerror (InvalidCodePosition (msg,i,0,len))
 
 let check_wp_progress msg i s remain =
   match i with
@@ -448,8 +411,8 @@ let check_wp_progress msg i s remain =
         (Format.sprintf "remaining %i instruction%s" len 
            (if len = 1 then "" else "s"))
 
-let t_hoare_wp env i (juc,n as g) =
-  let hyps,concl = get_goal g in
+let t_hoare_wp env i g =
+  let concl = get_concl g in
   let hs = destr_hoareS concl in
   let s_hd,s_wp = s_split_o "wp" i hs.hs_s in
   let s_wp,post = 
@@ -457,12 +420,11 @@ let t_hoare_wp env i (juc,n as g) =
   let i = check_wp_progress "wp" i hs.hs_s s_wp in
   let s = EcModules.stmt (s_hd @ s_wp) in
   let concl = f_hoareS_r { hs with hs_s = s; hs_po = post} in
-  let juc,n' = new_goal juc (hyps,concl) in
-  let rule = { pr_name = RN_hl_wp (Single i); pr_hyps = [RA_node n']} in
-  upd_rule rule (juc,n)
+  prove_goal_by [concl] (RN_hl_wp (Single i)) g
 
-let t_equiv_wp env ij (juc,n as g) = 
-  let hyps,concl = get_goal g in
+
+let t_equiv_wp env ij g = 
+  let concl = get_concl g in
   let es = destr_equivS concl in
   let i = omap ij fst and j = omap ij snd in
   let s_hdl,s_wpl = s_split_o "wp" i es.es_sl in
@@ -476,9 +438,7 @@ let t_equiv_wp env ij (juc,n as g) =
   let sl = EcModules.stmt (s_hdl @ s_wpl) in
   let sr = EcModules.stmt (s_hdr @ s_wpr) in
   let concl = f_equivS_r {es with es_sl = sl; es_sr=sr; es_po = post} in
-  let juc,n' = new_goal juc (hyps,concl) in
-  let rule = { pr_name = RN_hl_wp (Double(i,j)); pr_hyps = [RA_node n']} in
-  upd_rule rule (juc,n)
+  prove_goal_by [concl] (RN_hl_wp (Double(i,j))) g
 
 let t_wp env k =
   match k with
@@ -488,36 +448,28 @@ let t_wp env k =
 
 (* -------------------------------------------------------------------- *)
   
-let t_hoare_while env inv (juc,n1 as g) =
-  let hyps,concl = get_goal g in
+let t_hoare_while env inv g =
+  let concl = get_concl g in
   let hs = destr_hoareS concl in
-  let error () = 
-    cannot_apply "while" "the last instruction should be a while" in
-  let ((e,c),s) = s_last_while error hs.hs_s in
+  let ((e,c),s) = s_last_while "while" hs.hs_s in
   let m = EcMemory.memory hs.hs_m in
   let e = form_of_expr m e in
       (* the body preserve the invariant *)
   let b_pre  = f_and_simpl inv e in
   let b_post = inv in
   let b_concl = f_hoareS hs.hs_m b_pre c b_post in
-  let (juc,nb) = new_goal juc (hyps,b_concl) in
       (* the wp of the while *)
   let post = f_imps_simpl [f_not_simpl e; inv] hs.hs_po in
   let modi = s_write env PV.empty c in
   let post = generalize_mod env m modi post in
   let post = f_and_simpl inv post in
   let concl = f_hoareS_r { hs with hs_s = s; hs_po=post} in
-  let (juc,n) = new_goal juc (hyps,concl) in
-  let rule = { pr_name = RN_hl_while inv; 
-               pr_hyps=[RA_node nb;RA_node n;]} in
-  upd_rule rule (juc, n1)
+  prove_goal_by [b_concl;concl] (RN_hl_while inv) g
 
-let t_equiv_while env inv (juc,n1 as g) =
-  let hyps,concl = get_goal g in
+let t_equiv_while env inv g =
+  let concl = get_concl g in
   let es = destr_equivS concl in
-  let error () = 
-    cannot_apply "while" "the last instructions should be a while" in
-  let (el,cl), (er,cr), sl, sr = s_last_whiles error es.es_sl es.es_sr in
+  let (el,cl), (er,cr), sl, sr = s_last_whiles "while" es.es_sl es.es_sr in
   let ml = EcMemory.memory es.es_ml in
   let mr = EcMemory.memory es.es_mr in
   let el = form_of_expr ml el in
@@ -527,7 +479,6 @@ let t_equiv_while env inv (juc,n1 as g) =
   let b_pre  = f_ands_simpl [inv; el] er in
   let b_post = f_and_simpl inv sync_cond in
   let b_concl = f_equivS es.es_ml es.es_mr b_pre cl cr b_post in
-  let (juc,nb) = new_goal juc (hyps,b_concl) in
       (* the wp of the while *)
   let post = 
     f_imps_simpl [f_not_simpl el;f_not_simpl er; inv] es.es_po in
@@ -537,10 +488,7 @@ let t_equiv_while env inv (juc,n1 as g) =
   let post = generalize_mod env ml modil post in
   let post = f_and_simpl inv post in
   let concl = f_equivS_r {es with es_sl = sl; es_sr = sr; es_po = post} in
-  let (juc,n) = new_goal juc (hyps,concl) in
-  let rule = { pr_name = RN_hl_while inv; 
-               pr_hyps=[RA_node nb;RA_node n;]} in
-  upd_rule rule (juc, n1)
+  prove_goal_by [b_concl; concl] (RN_hl_while inv) g 
 
 (* -------------------------------------------------------------------- *)
 
@@ -559,9 +507,7 @@ let t_hoare_call env fpre fpost (juc,n1 as g) =
   (* FIXME : check the well formess of the pre and the post ? *)
   let hyps,concl = get_goal g in
   let hs = destr_hoareS concl in
-  let error () = 
-    cannot_apply "call" "the last instruction should be a call" in
-  let (lp,f,args),s = s_last_call error hs.hs_s in
+  let (lp,f,args),s = s_last_call "call" hs.hs_s in
   let m = EcMemory.memory hs.hs_m in
   let fsig = (Fun.by_mpath f env).f_sig in
   (* The function satisfies the specification *)
@@ -587,10 +533,8 @@ let t_equiv_call env fpre fpost (juc,n1 as g) =
   (* FIXME : check the well formess of the pre and the post ? *)
   let hyps,concl = get_goal g in
   let es = destr_equivS concl in
-  let error () = 
-    cannot_apply "call" "the last instruction should be a call" in
   let (lpl,fl,argsl),(lpr,fr,argsr),sl,sr = 
-    s_last_calls error es.es_sl es.es_sr in
+    s_last_calls "call" es.es_sl es.es_sr in
   let ml = EcMemory.memory es.es_ml in
   let mr = EcMemory.memory es.es_mr in
   let fsigl = (Fun.by_mpath fl env).f_sig in
@@ -626,46 +570,77 @@ let t_equiv_call env fpre fpost (juc,n1 as g) =
 
 
 
-  
-
-
-
-
 
 
 (* -------------------------------------------------------------------- *)
 
-let t_rcond b at_pos g = 
-  (* TODO: can we avoid verifying s_head twice? *)
+
+let gen_rcond b m at_pos s =
+  let head, i, tail = s_split_i "rcond" at_pos s in 
+  let e, s = 
+    match i.i_node with
+    | Sif(e,s1,s2) -> e, if b then s1.s_node else s2.s_node
+    | Swhile(e,s1) -> e, if b then s1.s_node@[i] else [] 
+    | _ -> 
+      cannot_apply "rcond" 
+        (Format.sprintf "the %ith instruction is not a conditionnal" at_pos) in
+  let e = form_of_expr m e in
+  let e = if b then e else f_not e in
+  stmt head, e, stmt (head@s@tail)
+  
+let t_hoare_rcond b at_pos g = 
+  (* TODO: generalize the rule using assume *)
   let concl = get_concl g in
   let hs = destr_hoareS concl in
-  let s_head,s_tail = s_split "rcond" at_pos hs.hs_s in
-  let s,e = 
-    match s_tail with
-      | [] -> assert false (* FIXME *)
-      | c :: s_tail' ->
-        match b, c.i_node with 
-          | true, Sif (e,c,_)  ->
-            let s = s_head @ (c.s_node @ s_tail') in
-            let e = form_of_expr EcFol.mhr e in
-            s, e
-          | false, Sif (e,_,c)  ->
-            let s = s_head @ (c.s_node @ s_tail') in
-            let e = f_not (form_of_expr EcFol.mhr e) in
-            s, e
-          | _ -> assert false
-  in
-  let j1 = f_hoareS hs.hs_m hs.hs_pr (stmt s_head) e in
-  let j2 = f_hoareS hs.hs_m hs.hs_pr (stmt s) hs.hs_po in
-  prove_goal_by [j1;j2] (RN_hl_rcond (b,at_pos)) g
+  let m  = EcMemory.memory hs.hs_m in 
+  let hd,e,s = gen_rcond b m at_pos hs.hs_s in
+  let concl1  = f_hoareS_r { hs with hs_s = hd; hs_po = e } in
+  let concl2  = f_hoareS_r { hs with hs_s = s } in
+  prove_goal_by [concl1;concl2] (RN_hl_rcond (None, b,at_pos)) g  
 
+let t_equiv_rcond side b at_pos g =
+  let concl = get_concl g in
+  let es = destr_equivS concl in
+  let m,mo,s = 
+    if side then es.es_ml,es.es_mr, es.es_sl 
+    else         es.es_mr,es.es_ml, es.es_sr in
+  let hd,e,s = gen_rcond b EcFol.mhr at_pos s in 
+  let mo' = EcIdent.create "m" in
+  let s1 = 
+    Mid.add (EcMemory.memory mo) mo' 
+      (Mid.add (EcMemory.memory m) EcFol.mhr Mid.empty) in
+  let pre1  = f_subst {f_subst_id with fs_mem = s1} es.es_pr in
+  let concl1 = 
+    f_forall [mo',GTmem (EcMemory.memtype mo)] 
+      (f_hoareS (EcFol.mhr,EcMemory.memtype m) pre1 hd e) in
+  let sl,sr = if b then s, es.es_sr else es.es_sl, s in
+  let concl2 = f_equivS_r { es with es_sl = sl; es_sr = sr } in
+  prove_goal_by [concl1;concl2] (RN_hl_rcond (Some side,b,at_pos)) g 
 
-(* the equiv version doesn't make sense, we should have a wrapper to
-   apply hoare rules to equiv goals by passing the memory as
-   parameter *)
+let t_rcond side b at_pos g =
+  match side with
+  | None -> t_hoare_rcond b at_pos g
+  | Some side -> t_equiv_rcond side b at_pos g
 
 (* -------------------------------------------------------------------- *)
 
+let t_hoare_case f g =
+  let concl = get_concl g in
+  let hs = destr_hoareS concl in
+  let concl1 = f_hoareS_r { hs with hs_pr = f_and_simpl hs.hs_pr f } in
+  let concl2 = f_hoareS_r { hs with hs_pr = f_and_simpl hs.hs_pr (f_not f) } in
+  prove_goal_by [concl1;concl2] (RN_hl_case f) g
+
+let t_equiv_case f g = 
+  let concl = get_concl g in
+  let es = destr_equivS concl in
+  let concl1 = f_equivS_r { es with es_pr = f_and_simpl es.es_pr f } in
+  let concl2 = f_equivS_r { es with es_pr = f_and_simpl es.es_pr (f_not f) } in
+  prove_goal_by [concl1;concl2] (RN_hl_case f) g
+
+(* -------------------------------------------------------------------- *)
+
+(* TODO : define it in term of case and rcond *)
 let t_hoare_cond g =
   let concl = get_concl g in
   let hs = destr_hoareS concl in 
@@ -713,15 +688,4 @@ let t_equiv_cond side g =
 
             | _ -> assert false (* FIXME *)
 
-          
-      
-      
-
 (* -------------------------------------------------------------------- *)
-
-
-
-
-
-
-
