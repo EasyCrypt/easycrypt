@@ -34,3 +34,11 @@ end Power.
 export Power.
 
 (* lemma test : forall (x:int), 0 <= x => 1 <= 2^x. *)
+
+theory Induction.
+  lemma induction: forall (p:int -> bool),
+    (p 0) =>
+    (forall j, 0 < j => p (j - 1) => p j) =>
+    (forall i, 0 <= i => p i).
+end Induction.
+
