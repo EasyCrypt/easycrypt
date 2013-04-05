@@ -1,32 +1,38 @@
 (* -------------------------------------------------------------------- *)
 open EcSymbols
+open EcLocation
 open EcParsetree
 
 (* -------------------------------------------------------------------- *)
 type scope
+
+type proof_uc = {
+  puc_name : string;
+  puc_jdg :  EcBaseLogic.judgment_uc;
+}
 
 val empty : scope
 val path  : scope -> EcPath.path
 val name  : scope -> symbol
 val env   : scope -> EcEnv.env
 val attop : scope -> bool
+val goal  : scope -> proof_uc list
 
 module Op : sig
   (* [add scope op] type-checks the given *parsed* operator [op] in
    * scope [scope], and add it to it. Raises [DuplicatedNameInContext]
    * if a type with given name already exists. *)
-  val add : scope -> poperator -> scope
+  val add : scope -> poperator located -> scope
 end
 
 module Pred : sig
   (* [add scope op] type-checks the given *parsed* operator [op] in
    * scope [scope], and add it to it. Raises [DuplicatedNameInContext]
    * if a type with given name already exists. *)
-  val add : scope -> ppredicate -> scope
+  val add : scope -> ppredicate located -> scope
 end
 
 module Ax : sig
-
   (* [add scope op] type-checks the given *parsed* operator [op] in
    * scope [scope], and add it to it. Raises [DuplicatedNameInContext]
    * if an axiom with given name already exists. *)
@@ -38,13 +44,13 @@ module Ty : sig
   (* [add scope t] adds an abstract type with name [t] to scope
    * [scope]. Raises [DuplicatedNameInContext] if a type with
    * given name already exists. *)
-  val add : scope -> (psymbol list * psymbol) -> scope
+  val add : scope -> (psymbol list * psymbol) located -> scope
 
   (* [define scope t body] adds a defined type with name [t] and body
    * [body] to scope [scope]. Can raise any exception triggered by the
    * type-checker or [DuplicatedNameInContext] in case a type with name
    * [t] already exists *)
-  val define : scope -> (psymbol list * psymbol) -> pty -> scope
+  val define : scope -> (psymbol list * psymbol) located -> pty -> scope
 end
 
 module Mod : sig
@@ -101,9 +107,7 @@ module Theory : sig
 end
 
 module Tactic : sig
-  val process  : scope -> ptactics -> scope
-  val out_goal : scope -> Pprint.document option
-
+  val process : scope -> ptactics -> scope
 end
 
 module Prover : sig 

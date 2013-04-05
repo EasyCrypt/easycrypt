@@ -32,5 +32,6 @@ module MMsym : sig
 end
 
 (* -------------------------------------------------------------------- *)
-val pp_symbol  : symbol EcFormat.pp
-val pp_qsymbol : qsymbol EcFormat.pp
+val pp_symbol  : Format.formatter -> symbol -> unit
+val pp_qsymbol : Format.formatter -> qsymbol -> unit
+

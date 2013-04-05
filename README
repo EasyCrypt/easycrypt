@@ -18,16 +18,6 @@
 
    Why3 libraries must be installed (make byte && make install-lib)
 
-   You can install a local copy of Why3 by running [make why3]. In
-   that case, don't forget to add why3/why3-$version/bin to your path
-   before using easycrypt and add $PWD/why/why3-$version/lib to the
-   OCAMLPATH environment variable.
-
-   Note that the [LOCAL TOOLCHAIN] (see below) is already including a
-   local copy of Why3. The [LOCAL TOOLCHAIN] IS the preferred method
-   to install a local copy of Why3. The [make why3] method will be
-   deprecated in a near future.
-
  * Unix extlib
 
    Available at http://extunix.forge.ocamlcore.org/

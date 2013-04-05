@@ -38,7 +38,7 @@ local:
 	  $(CURDIR)/_local/emacs.rc
 
 run-local:
-	emacs \
+	emacs -q \
 	  --execute '(load-file "_local/emacs.rc")' \
 	  --execute '(cd "$(CURDIR)/..")' \
 	  --execute '(setq easycrypt-prog-name "$(CURDIR)/../ec.native -emacs")'

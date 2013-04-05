@@ -2,6 +2,7 @@
 open EcUtils
 open EcMaps
 open EcSymbols
+open EcLocation
 open EcPath
 open EcParsetree
 open EcTypes
@@ -163,6 +164,10 @@ let attop (scope : scope) =
   scope.sc_top = None
 
 (* -------------------------------------------------------------------- *)
+let goal (scope : scope) =
+  scope.sc_pr_uc
+
+(* -------------------------------------------------------------------- *)
 let for_loading (scope : scope) =
   { empty with
       sc_loaded  = scope.sc_loaded;
@@ -182,35 +187,36 @@ let subscope (scope : scope) (name : symbol) =
   }
 
 (* -------------------------------------------------------------------- *)
-let init_unienv tparams = 
-  let build tparams = 
-    let l = ref [] in
-    let check ps = 
-      let s = unloc ps in
-      if List.mem s !l then 
-        EcTypedtree.tyerror ps.pl_loc (EcTypedtree.DuplicatedLocals (Some ps)) 
-      else (l:= s::!l;EcIdent.create s) in
-    List.map check tparams in
-  let tparams = omap tparams build in 
-  EcUnify.UniEnv.create tparams
+let ue_for_decl (env : EcEnv.env) (loc, tparams) =
+  let tparams = omap tparams
+    (fun tparams ->
+      let tparams = List.map unloc tparams in
+        if not (List.uniq tparams) then
+          EcTyping.tyerror loc env EcTyping.DuplicatedTyVar;
+        List.map EcIdent.create tparams)
+  in
+    EcUnify.UniEnv.create tparams
 
+(* -------------------------------------------------------------------- *)
 module Op = struct
   open EcTypes
   open EcDecl
   open EcEnv
 
-  module TT = EcTypedtree
+  module TT = EcTyping
 
   let bind (scope : scope) ((x, op) : _ * operator) =
     { scope with
         sc_env = EcEnv.Op.bind x op scope.sc_env; }
 
-  let add (scope : scope) (op : poperator) =
-    let ue = init_unienv op.po_tyvars in
-    let tp =  TT.tp_relax in
-    let dom  = TT.transtys tp scope.sc_env ue (odfl [] op.po_dom) in
+  let add (scope : scope) (op : poperator located) =
+    let op = op.pl_desc and loc = op.pl_loc in
+
+    let ue     = ue_for_decl scope.sc_env (loc, op.po_tyvars) in
+    let tp     =  TT.tp_relax in
+    let dom    = TT.transtys tp scope.sc_env ue (odfl [] op.po_dom) in
     let codom  = TT.transty tp scope.sc_env ue op.po_codom in
-    let body =
+    let body   =
       match op.po_body with
       | None -> None
       | Some(xs, body) ->
@@ -220,21 +226,25 @@ module Op = struct
           in
           let body = TT.transexpcast env ue codom body in
           Some (xs, body) in
-    let uni = Tuni.subst (EcUnify.UniEnv.close ue) in
-    let body = omap body (fun (ids,body) -> ids, e_mapty uni body) in
-    let (dom,codom) = List.map uni dom, uni codom in
-    let tparams = EcUnify.UniEnv.tparams ue in 
-    let tyop = EcDecl.mk_op tparams dom codom body in
+
+    let uni          = Tuni.subst (EcUnify.UniEnv.close ue) in
+    let body         = omap body (fun (ids, body) -> ids, e_mapty uni body) in
+    let (dom, codom) = (List.map uni dom, uni codom) in
+    let tparams      = EcUnify.UniEnv.tparams ue in 
+    let tyop         = EcDecl.mk_op tparams dom codom body in
+
       bind scope (unloc op.po_name, tyop)
 end
 
 (* -------------------------------------------------------------------- *)
 module Pred = struct
-  module TT = EcTypedtree
+  module TT = EcTyping
 
-  let add (scope : scope) (op : ppredicate) =
-    let ue = init_unienv op.pp_tyvars in
-    let tp =  TT.tp_relax in 
+  let add (scope : scope) (op : ppredicate located) =
+    let op = op.pl_desc and loc = op.pl_loc in
+
+    let ue   = ue_for_decl scope.sc_env (loc, op.pp_tyvars) in
+    let tp   =  TT.tp_relax in 
     let dom  = TT.transtys tp scope.sc_env ue (odfl [] op.pp_dom) in
     let body =
       match op.pp_body with
@@ -243,12 +253,16 @@ module Pred = struct
           let xs = List.map EcIdent.create (unlocs xs) in
           let env = EcEnv.Var.bind_locals (List.combine xs dom) scope.sc_env in
           let body = TT.transformula env ue body in
-          Some(xs, body) in
-    let uni = Tuni.subst (EcUnify.UniEnv.close ue) in
-    let body = omap body (fun (ids,body) -> ids, EcFol.Fsubst.mapty uni body) in
-    let dom = List.map uni dom in
+
+          Some(xs, body)
+    in
+
+    let uni     = Tuni.subst (EcUnify.UniEnv.close ue) in
+    let body    = omap body (fun (ids, body) -> ids, EcFol.Fsubst.mapty uni body) in
+    let dom     = List.map uni dom in
     let tparams = EcUnify.UniEnv.tparams ue in
-    let tyop = EcDecl.mk_pred tparams dom body in
+    let tyop    = EcDecl.mk_pred tparams dom body in
+
       Op.bind scope (unloc op.pp_name, tyop)
 
 end
@@ -256,28 +270,25 @@ end
 (* -------------------------------------------------------------------- *)
 module Ty = struct
   open EcDecl
-  open EcTypedtree
+  open EcTyping
 
-  let bind (scope : scope) ((x, tydecl) : _ * tydecl) =
+  let bind (scope : scope) ((x, tydecl) : (_ * tydecl)) =
     { scope with
         sc_env = EcEnv.Ty.bind x tydecl scope.sc_env; }
 
-  let alias (scope : scope) name ty =
-    (* FIXME : check that ty is closed, or close it *)
-    let tydecl = { tyd_params = []; tyd_type = Some ty } in
-      bind scope (name, tydecl)
-
-  let add (scope : scope) (args, name) = 
-    let ue = init_unienv (Some args) in
+  let add (scope : scope) info =
+    let (args, name) = info.pl_desc and loc = info.pl_loc in
+    let ue     = ue_for_decl scope.sc_env (loc, Some args) in
     let tydecl = {
       tyd_params = EcUnify.UniEnv.tparams ue;
       tyd_type   = None;
     } in
       bind scope (unloc name, tydecl)
 
-  let define (scope : scope) (args, name) body = 
-    let ue = init_unienv (Some args) in
-    let body = transty tp_tydecl scope.sc_env ue body in
+  let define (scope : scope) info body =
+    let (args, name) = info.pl_desc and loc = info.pl_loc in
+    let ue     = ue_for_decl scope.sc_env (loc, Some args) in
+    let body   = transty tp_tydecl scope.sc_env ue body in
     let tydecl = {
       tyd_params = EcUnify.UniEnv.tparams ue;
       tyd_type   = Some body;
@@ -292,7 +303,7 @@ module Mod = struct
         sc_env = EcEnv.Mod.bind m.me_name m scope.sc_env; }
 
   let add (scope : scope) (name : symbol) m =
-    let m = EcTypedtree.transmod scope.sc_env name m in
+    let m = EcTyping.transmod scope.sc_env name m in
     bind scope m
 end
 
@@ -303,7 +314,7 @@ module ModType = struct
         sc_env = EcEnv.ModTy.bind x tysig scope.sc_env; }
 
   let add (scope : scope) (name : symbol) (i : pmodule_sig) =
-    let tysig = EcTypedtree.transmodsig scope.sc_env name i in
+    let tysig = EcTyping.transmodsig scope.sc_env name i in
       bind scope (name, tysig)
 end
 
@@ -476,7 +487,7 @@ module Theory = struct
 
                 let nargs = List.map (EcIdent.create -| unloc) nargs in
                 let ue    = EcUnify.UniEnv.create (Some nargs) in
-                let ntyd  = EcTypedtree.transty EcTypedtree.tp_tydecl scope.sc_env ue ntyd in
+                let ntyd  = EcTyping.transty EcTyping.tp_tydecl scope.sc_env ue ntyd in
 
                 let binding =
                   { tyd_params = nargs;
@@ -499,7 +510,7 @@ module Theory = struct
               let benv   = EcEnv.Var.bind_locals (List.combine locals newop.op_dom) scenv in
               let ue     = EcUnify.UniEnv.create (Some newop.op_params) in
 
-              let opbody = EcTypedtree.transexpcast benv ue newop.op_codom opbody in
+              let opbody = EcTyping.transexpcast benv ue newop.op_codom opbody in
 
                 if List.length (EcUnify.UniEnv.tparams ue) <> List.length newop.op_params then
                   failwith "body-less-generic";
@@ -563,7 +574,7 @@ module Prover = struct
         Format.fprintf fmt "Unknown prover %s" s 
     | _ -> raise exn
 
-  let _ = EcPexception.register pp_error 
+  let _ = EcPException.register pp_error 
 
   let check_prover_name name = 
     let s = unloc name in
@@ -629,13 +640,12 @@ module Prover = struct
 end
 
 module Tactic = struct
-
   open EcFol
   open EcBaseLogic
   open EcLogic
   open EcPhl
 
-  module TT = EcTypedtree
+  module TT = EcTyping
   module UE = EcUnify.UniEnv
 
   type tac_error = 
@@ -680,7 +690,7 @@ module Tactic = struct
       | NoCurrentGoal ->
         Format.fprintf fmt "No current goal"
 
-  let _ = EcPexception.register (fun fmt exn ->
+  let _ = EcPException.register (fun fmt exn ->
     match exn with
     | TacError e -> pp_tac_error fmt e 
     | _ -> raise exn)
@@ -689,10 +699,10 @@ module Tactic = struct
    
   let process_tyargs env hyps tvi = 
     let ue = EcUnify.UniEnv.create (Some hyps.h_tvar) in
-    TT.transtvi env ue tvi 
+      omap tvi (TT.transtvi env ue)
 
   let process_instanciate env hyps ({pl_desc = pq; pl_loc = loc} ,tvi) = 
-    let p,ax = 
+    let (p, ax) = 
       try EcEnv.Ax.lookup pq env
       with _ -> error loc (UnknownAxiom pq) in
     let args = process_tyargs env hyps tvi in
@@ -1045,21 +1055,6 @@ module Tactic = struct
           { scope with 
             sc_pr_uc = { puc with puc_jdg = juc } :: pucs }
     else scope
-
-  let out_goal scope = 
-    match scope.sc_pr_uc with
-    | [] -> None 
-    | puc :: _ ->
-        let juc = puc.puc_jdg in
-        let doc = 
-          try 
-            let n_subgoals = List.length (snd (find_all_goals juc)) in
-            let g = get_goal (get_first_goal juc) in
-            (EcPrinting.EcPP.pr_lgoal ~n:n_subgoals (EcPrinting.EcPP.mono scope.sc_env) g)
-          with EcBaseLogic.NotAnOpenGoal _ -> 
-            Pprint.text "No more goals" in
-        Some doc
-
 end 
 
 (* -------------------------------------------------------------------- *)
@@ -1068,7 +1063,7 @@ module Ax = struct
   open EcTypes
   open EcDecl
 
-  module TT = EcTypedtree
+  module TT = EcTyping
 
   let bind (scope : scope) ((x, ax) : _ * axiom) =
    let res = 

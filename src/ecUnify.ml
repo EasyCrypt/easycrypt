@@ -66,7 +66,6 @@ module UniEnv = struct
     ue.unidecl <- Suid.add uid ue.unidecl;
     tuni uid
 
-
   let init_freshen ue params tvi = 
     let ue = copy ue in
     let s = 
@@ -179,7 +178,6 @@ let unify (env : EcEnv.env) (ue : unienv) =
     unify
 
 (* -------------------------------------------------------------------- *)
-
 let filter_tvi = function 
   | None -> fun _ -> true
   | Some (UniEnv.TVIunamed l) -> 

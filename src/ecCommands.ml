@@ -1,11 +1,47 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open EcSymbols
+open EcLocation
 open EcParsetree
-open EcTypedtree
+open EcTyping
 open EcOptions
+open EcLogic
 open EcPrinting
-open Pprint.Operators
+open EcPrinting.Pp
+
+(* -------------------------------------------------------------------- *)
+exception TopError of EcLocation.t * exn
+
+let rec toperror_of_exn exn =
+  match exn with
+  | TopError (loc, e)    -> Some (loc, e)
+  | TyError  (loc, _, _) -> Some (loc, exn)
+  | TacError _           -> Some (_dummy, exn)
+  | ParseError (loc, _)  -> Some (loc, exn)
+  | LocError (loc, e)    -> begin
+      match toperror_of_exn e with
+      | None -> Some (loc, e)
+      | Some (loc, e) -> Some (loc, e)
+    end
+  | _ -> None
+
+let toperror_of_exn exn =
+  match toperror_of_exn exn with
+  | Some (loc, exn) -> TopError (loc, exn)
+  | None            -> exn
+
+let pp_toperror fmt loc exn =
+  Format.fprintf fmt "%s: %a"
+    (EcLocation.tostring loc)
+    EcPException.exn_printer exn
+
+let () =
+  let pp fmt exn =
+    match exn with
+    | TopError (loc, exn) -> pp_toperror fmt loc exn
+    | _ -> raise exn
+  in
+    EcPException.register pp
 
 (* -------------------------------------------------------------------- *)
 type info =
@@ -13,7 +49,7 @@ type info =
 | GI_AddedAxiom     of symbol
 | GI_AddedOperator  of symbol
 | GI_AddedPredicate of symbol
-| GI_Goal           of Pprint.document
+| GI_Goal           of EcScope.proof_uc
 
 (* -------------------------------------------------------------------- *)
 let loader = EcLoader.create ()
@@ -24,36 +60,36 @@ let process_pr scope p =
   match p with 
   | Pr_ty qs ->
       let (x, ty) = EcEnv.Ty.lookup qs.pl_desc env in
-      EcPP.pr_typedecl (EcPP.mono env) (x, ty)
+      EcPrinting.pr_typedecl env (x, ty)
         
   | Pr_op qs | Pr_pr qs ->
       let (x, op) = EcEnv.Op.lookup qs.pl_desc env in
-      EcPP.pr_opdecl (EcPP.mono env) (x, op)
+      EcPrinting.pr_opdecl env (x, op)
         
   | Pr_th qs ->
       let (p, th) = EcEnv.Theory.lookup qs.pl_desc env in
-      EcPP.pr_theory (EcPP.mono env) (p, th)
+      EcPrinting.pr_theory env (p, th)
   | Pr_ax qs ->
       let (p, ax) = EcEnv.Ax.lookup qs.pl_desc env in
-      EcPP.pr_axiom (EcPP.mono env) (p, ax)
+      EcPrinting.pr_axiom env (p, ax)
 
 let process_print scope p = 
   let doc = process_pr scope p in
-    EcPrinting.pretty (doc ^^ Pprint.hardline)
+    EcPrinting.Pp.pretty stdout (doc ^^ Pp.hardline)
 
 (* -------------------------------------------------------------------- *)
 let addidir (idir : string) =
   EcLoader.addidir idir loader
 
 (* -------------------------------------------------------------------- *)
-let rec process_type (scope : EcScope.scope) (tyd : ptydecl) =
-  let tyname = (tyd.pty_tyvars, tyd.pty_name) in
+let rec process_type (scope : EcScope.scope) (tyd : ptydecl located) =
+  let tyname = (tyd.pl_desc.pty_tyvars, tyd.pl_desc.pty_name) in
   let scope = 
-    match tyd.pty_body with
-    | None    -> EcScope.Ty.add    scope tyname
-    | Some bd -> EcScope.Ty.define scope tyname bd
+    match tyd.pl_desc.pty_body with
+    | None    -> EcScope.Ty.add    scope (mk_loc tyd.pl_loc tyname)
+    | Some bd -> EcScope.Ty.define scope (mk_loc tyd.pl_loc tyname) bd
   in
-    (scope, [GI_AddedType (unloc tyd.pty_name)])
+    (scope, [GI_AddedType (unloc tyd.pl_desc.pty_name)])
   
 (* -------------------------------------------------------------------- *)
 and process_module (scope : EcScope.scope) (x, m) =
@@ -64,14 +100,14 @@ and process_interface (scope : EcScope.scope) (x, i) =
   (EcScope.ModType.add scope x.pl_desc i, [])
 
 (* -------------------------------------------------------------------- *)
-and process_operator (scope : EcScope.scope) (op : poperator) =
+and process_operator (scope : EcScope.scope) (op : poperator located) =
   let scope = EcScope.Op.add scope op in
-    (scope, [GI_AddedOperator (unloc op.po_name)])
+    (scope, [GI_AddedOperator (unloc op.pl_desc.po_name)])
 
 (* -------------------------------------------------------------------- *)
-and process_predicate (scope : EcScope.scope) (p : ppredicate) =
+and process_predicate (scope : EcScope.scope) (p : ppredicate located) =
   let scope = EcScope.Pred.add scope p in
-    (scope, [GI_AddedPredicate (unloc p.pp_name)])
+    (scope, [GI_AddedPredicate (unloc p.pl_desc.pp_name)])
 
 (* -------------------------------------------------------------------- *)
 and process_axiom (scope : EcScope.scope) (ax : paxiom) =
@@ -148,14 +184,16 @@ and process_checkproof scope b =
   (scope, [])
 
 (* -------------------------------------------------------------------- *)
-and process (scope : EcScope.scope) (g : global) =
+and process (scope : EcScope.scope) (g : global located) =
+  let loc = g.pl_loc in
+
   let (scope, infos) =
-    match g with
-    | Gtype      t    -> process_type       scope t
+    match g.pl_desc with
+    | Gtype      t    -> process_type       scope (mk_loc loc t)
     | Gmodule    m    -> process_module     scope m
     | Ginterface i    -> process_interface  scope i
-    | Goperator  o    -> process_operator   scope o
-    | Gpredicate p    -> process_predicate  scope p
+    | Goperator  o    -> process_operator   scope (mk_loc loc o)
+    | Gpredicate p    -> process_predicate  scope (mk_loc loc p)
     | Gaxiom     a    -> process_axiom      scope a
     | Gclaim     c    -> process_claim      scope c
     | GthOpen    name -> process_th_open    scope name.pl_desc
@@ -171,12 +209,10 @@ and process (scope : EcScope.scope) (g : global) =
     | Gcheckproof b   -> process_checkproof scope b
     | Gsave      loc  -> process_save       scope loc
   in
-  (* EcEnv.dump EcDebug.initial (EcScope.env scope); *)
-  (* EcPrinting.pretty (EcScope.Tactic.out_goal scope) ; *)
-  (scope, infos)
+    (scope, infos)
 
 (* -------------------------------------------------------------------- *)
-and process_internal (scope : EcScope.scope) (g : global) =
+and process_internal (scope : EcScope.scope) (g : global located) =
   fst (process scope g)
 
 (* -------------------------------------------------------------------- *)
@@ -204,19 +240,20 @@ let undo (olduuid : int) =
         context := (i, List.hd stack, List.tl stack)
       done;
       let (_, scope, _) = !context in
-      List.ocons (omap (EcScope.Tactic.out_goal scope) (fun d -> GI_Goal d)) []
+        otolist
+          (omap
+             (List.ohead (EcScope.goal scope))
+             (fun d -> GI_Goal d))
     end
   else []
 
 (* -------------------------------------------------------------------- *)
-let process (g : global) =
+let process (g : global located) =
   let (idx, scope, stack) = !context in
   let (newscope, infos) = process scope g in
     context := (idx+1, newscope, scope :: stack);
-  let infos = 
-    List.ocons (omap (EcScope.Tactic.out_goal newscope) (fun d -> GI_Goal d)) 
-      infos in
-  List.rev infos
-
-
-
+  let infos =
+    let goal = List.ohead (EcScope.goal newscope) in
+      List.ocons (omap goal (fun d -> GI_Goal d)) infos
+  in
+    List.rev infos

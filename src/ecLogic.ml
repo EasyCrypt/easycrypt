@@ -1,3 +1,4 @@
+(* -------------------------------------------------------------------- *)
 open EcLocation
 open EcUtils
 open EcSymbols
@@ -10,11 +11,13 @@ open EcBaseLogic
 open EcEnv
 open EcReduction
 
-let get_node g = (get_goal g).pj_decl
-let get_goal g = (get_open_goal g).pj_decl      
-let get_hyps g = fst (get_goal g) 
+(* -------------------------------------------------------------------- *)
+let get_node  g = (get_goal g).pj_decl
+let get_goal  g = (get_open_goal g).pj_decl      
+let get_hyps  g = fst (get_goal g) 
 let get_concl g = snd (get_goal g)
 
+(* -------------------------------------------------------------------- *)
 type tac_error =
   | UnknownAx             of EcPath.path 
   | NotAHypothesis        of EcIdent.t 
@@ -23,11 +26,11 @@ type tac_error =
   | UnknownSplit          of form
   | UnknownRewrite        of form
   | LogicRequired         
-  | CanNotClearConcl      of EcIdent.t * form
-  | CanNotReconizeElimT 
-  | ToManyArgument
+  | CannotClearConcl      of EcIdent.t * form
+  | CannotReconizeElimT 
+  | TooManyArgument
   | NoHypToSubst          of EcIdent.t option
-  | CanNotProve           of l_decl
+  | CannotProve           of l_decl
   | InvalNumOfTactic      of int * int
   | NotPhl                of bool option
   | NoSkipStmt
@@ -36,37 +39,37 @@ type tac_error =
 
 exception TacError of tac_error
 
-module PE = EcPrinting.EcDebugPP (* FIXME *)
-
-let pp_tac_error fmt = function
+let pp_tac_error fmt error =
+  let env = EcEnv.initial in            (* FIXME *)
+  match error with
   | UnknownAx p ->
       Format.fprintf fmt "Unknown axiom/lemma %a" PE.pp_path p
   | NotAHypothesis id -> 
       Format.fprintf fmt "Unknown hypothesis %s" (EcIdent.name id)
   | UnknownElims f ->
-    Format.fprintf fmt "Do not known what to eliminate in %a" PE.pp_form f
+    Format.fprintf fmt "Do not known what to eliminate in %a" (PE.pp_form env) f
   | UnknownIntros f ->
-    Format.fprintf fmt "Do not known what to introduce in %a" PE.pp_form f
+    Format.fprintf fmt "Do not known what to introduce in %a" (PE.pp_form env) f
   | UnknownSplit f ->
-    Format.fprintf fmt "Do not known how to split %a" PE.pp_form f
+    Format.fprintf fmt "Do not known how to split %a" (PE.pp_form env) f
   | UnknownRewrite f ->
-    Format.fprintf fmt "Do not known how to rewrite %a" PE.pp_form f
+    Format.fprintf fmt "Do not known how to rewrite %a" (PE.pp_form env) f
   | LogicRequired ->
     Format.fprintf fmt "Require import Logic first"
-  | CanNotClearConcl(id,_) ->
+  | CannotClearConcl(id,_) ->
     Format.fprintf fmt "Cannot clear %s, it is used in the conclusion"
       (EcIdent.name id)
-  | CanNotReconizeElimT ->
+  | CannotReconizeElimT ->
     Format.fprintf fmt "Cannot reconize the elimination lemma"
-  | ToManyArgument ->
+  | TooManyArgument ->
     Format.fprintf fmt "Too many arguments in the application"
   | NoHypToSubst (Some id) ->
     Format.fprintf fmt "Cannot find non recursive equation on %s"
       (EcIdent.name id)
   | NoHypToSubst None ->
     Format.fprintf fmt "Cannot find non recursive equation to substitute"
-  | CanNotProve g -> 
-    Format.fprintf fmt "Cannot prove %a" PE.pp_lgoal g
+  | CannotProve _ -> 
+    Format.fprintf fmt "Cannot prove current goal"
   | InvalNumOfTactic (i1,i2) ->
     Format.fprintf fmt "Invalid number of tactics: %i given, %i expected" i2 i1
   | NoSkipStmt -> 
@@ -85,18 +88,21 @@ let pp_tac_error fmt = function
  
     
 
-let _ = EcPexception.register (fun fmt exn ->
+let _ = EcPException.register (fun fmt exn ->
   match exn with
-  | TacError e -> pp_tac_error fmt e 
+  | TacError error -> pp_tac_error fmt error
   | _ -> raise exn)
       
-let tacerror e = raise (TacError e)
+let tacerror error = raise (TacError error)
 
 let cannot_apply s1 s2 = tacerror (CanNotApply(s1,s2))
 
 let t_subgoal lt gs = 
-  try t_subgoal lt gs 
-  with InvalidNumberOfTactic (i1,i2) -> tacerror (InvalNumOfTactic (i1,i2))
+  try
+    t_subgoal lt gs 
+  with
+  | InvalidNumberOfTactic (i1, i2) ->
+      tacerror (InvalNumOfTactic (i1, i2))
     
 let t_admit g = 
   let rule = { pr_name = RN_admit; pr_hyps = [] } in
@@ -106,7 +112,7 @@ let check_hyps hyps1 hyps2 =
   assert (hyps1 == hyps2) (* FIXME error message *)
 
 (* WARNING this do not generate the subgoal included in n.
-   It could be greate to ensure we have no circular dependency *)
+   It could be greater to ensure we have no circular dependency *)
 (* Use the proof of n1 to prove n *)
 let use_node env juc n n1 =
   let hyps,concl = get_node (juc,n) in
@@ -166,12 +172,12 @@ let t_trivial pi env g =
   if check_goal env pi goal then
     let rule = { pr_name = RN_prover (); pr_hyps = [] } in
     upd_rule_done rule g 
-  else tacerror (CanNotProve goal)
+  else tacerror (CannotProve goal)
 
 let t_clear ids (juc,n as g) = 
   let hyps,concl = get_goal g in
   if not (Mid.set_disjoint ids concl.f_fv) then
-    tacerror (CanNotClearConcl(Sid.choose (Mid.set_inter ids concl.f_fv), concl));
+    tacerror (CannotClearConcl(Sid.choose (Mid.set_inter ids concl.f_fv), concl));
   let hyps = LDecl.clear ids hyps in
   let juc,n1 = new_goal juc (hyps,concl) in
   let rule = { pr_name = RN_clear ids; pr_hyps = [RA_node n1] } in
@@ -216,7 +222,7 @@ let mkn_apply do_arg env (juc,n) args =
       else 
         let f = f_subst s f in
         match h_red_opt full_red env hyps f with
-        | None -> tacerror ToManyArgument
+        | None -> tacerror TooManyArgument
         | Some f ->  check_apply juc f_subst_id ras f args in
   if args = [] then (juc,n), []
   else
@@ -316,7 +322,7 @@ let t_intros env ids (juc,n as g) =
 (* internal use *)
 let t_intros_i env ids g = 
   t_intros env 
-    (List.map (fun id -> {pl_desc = id; pl_loc = EcLocation.dummy}) ids)
+    (List.map (fun id -> {pl_desc = id; pl_loc = EcLocation._dummy}) ids)
     g
 
 let t_elim env f (juc,n) =
@@ -406,7 +412,7 @@ let t_or_intro b env g =
       | None -> tacerror (UnknownSplit f) in
   aux concl
 
-let t_left = t_or_intro true
+let t_left  = t_or_intro true
 let t_right = t_or_intro false
 
 let pattern_form name env hyps f1 f = 
@@ -503,7 +509,7 @@ let t_elimT env f p g =
     else a, f in
   
   match ax.EcDecl.ax_spec with
-  | None -> tacerror (CanNotReconizeElimT)
+  | None -> tacerror (CannotReconizeElimT)
   | Some fax -> 
     let tys = 
       let tpred = 
@@ -511,7 +517,7 @@ let t_elimT env f p g =
           match destr_forall1 fax with
           | _, GTty ty, _ -> ty 
           | _             -> raise Not_found 
-        with _ -> tacerror (CanNotReconizeElimT) in
+        with _ -> tacerror (CannotReconizeElimT) in
       let ue = EcUnify.UniEnv.create (Some hyps.h_tvar) in
       let (ue, tpred,tys) = 
         EcUnify.UniEnv.freshen ue ax.EcDecl.ax_params None tpred in
@@ -530,7 +536,7 @@ let t_elimT env f p g =
         AAform f::aa
       else
         let aa,fax = skip_imp [] fax in
-        if not (is_forall fax) then tacerror (CanNotReconizeElimT);
+        if not (is_forall fax) then tacerror (CannotReconizeElimT);
         List.rev_append aa [AAform f] in
     t_apply_glob env p tys (AAform pf::aa) g
 
@@ -558,7 +564,7 @@ let t_subst_gen env x h side g =
       | _ -> gen fv hhyps in
   let aa, ids, concl = gen (Sid.singleton x) hhyps in
   let tointros =
-    List.map (fun id -> { pl_loc = EcLocation.dummy; pl_desc = id }) ids in
+    List.map (fun id -> { pl_loc = EcLocation._dummy; pl_desc = id }) ids in
   let t_first =
     t_seq_subgoal (t_rewrite env side f)
       [ t_hyp env h;
@@ -607,7 +613,3 @@ let find_in_hyps env f hyps =
       check_conv env hyps f f'; true
     with _ -> false in
   fst (List.find test hyps.h_local)
-
-
-
-

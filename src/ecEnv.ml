@@ -208,6 +208,9 @@ let preenv (env : preenv) : env = env
 let root (env : env) = EcPath.path_of_mpath env.env_scope
 
 (* -------------------------------------------------------------------- *)
+let mroot (env : env) = env.env_scope
+
+(* -------------------------------------------------------------------- *)
 module Dump = struct
   let rec dump ?(name = "Environment") pp (env : env) =
       EcDebug.onseq pp name ~extra:(EcPath.m_tostring env.env_scope)
@@ -836,9 +839,9 @@ module Var = struct
        (fun env (name, ty) -> bind_local name ty env)
        env bindings
 
-  let add (path : EcPath.mpath) (env : env) =
-    let obj = by_mpath path env in 
-      MC.import Px.for_variable env path obj
+  let add (path : EcPath.path) (env : env) =
+    let obj = (by_path path env).sp_target in 
+      MC.import Px.for_variable env (EcPath.mpath_of_path path) obj
 end
 
 (* -------------------------------------------------------------------- *)
@@ -882,9 +885,9 @@ module Fun = struct
   let bind name fun_ env =
     MC.bind_function name fun_ env
 
-  let add (path : EcPath.mpath) (env : env) =
-    let obj = by_mpath path env in 
-    MC.import Px.for_function env path obj
+  let add (path : EcPath.path) (env : env) =
+    let obj = (by_path path env).sp_target in 
+      MC.import Px.for_function env (EcPath.mpath_of_path path) obj
 
   let add_in_memenv memenv vd = 
     EcMemory.bind vd.v_name vd.v_type memenv
@@ -955,7 +958,6 @@ module Fun = struct
 
   let enter name env =
     enter name EcPath.PKother [] env
-
 end
 
 (* -------------------------------------------------------------------- *)
@@ -1105,9 +1107,9 @@ module Mod = struct
       (fun env (name, me) -> bind_local name me env)
       env bindings
 
-  let add (path : EcPath.mpath) (env : env) =
-    let obj = by_mpath path env in
-      MC.import Px.for_module env path obj
+  let add (path : EcPath.path) (env : env) =
+    let obj = (by_path path env).sp_target in
+      MC.import Px.for_module env (EcPath.mpath_of_path path) obj
 
   let enter name params env =
     let env = enter name EcPath.PKmodule (List.map fst params) env in

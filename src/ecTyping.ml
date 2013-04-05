@@ -2,6 +2,7 @@
 open EcUtils
 open EcMaps
 open EcSymbols
+open EcLocation
 open EcParsetree
 open EcTypes
 open EcDecl
@@ -19,133 +20,67 @@ module Mm = EcPath.Mm
 module Mid = EcIdent.Mid
 
 (* -------------------------------------------------------------------- *)
-let dloc = EcLocation.dummy               (* FIXME: TO BE REMOVED *)
+type modapp_error =
+| MAE_WrongArgCount
+| MAE_InvalidArgType
+
+type modtyp_error =
+| MTE_FunSigDoesNotRepeatArgNames
+
+type funapp_error =
+| FAE_WrongArgCount
+
+type mem_error =
+| MAE_IsConcrete
+
+type tyerror =
+| UniVarNotAllowed
+| TypeVarNotAllowed
+| OnlyMonoTypeAllowed
+| UnboundTypeParameter of symbol
+| UnknownTypeName      of qsymbol
+| InvalidTypeAppl      of qsymbol * int * int
+| DuplicatedTyVar
+| DuplicatedLocal      of symbol
+| NonLinearPattern
+| TypeMismatch         of (ty * ty) * (ty * ty)
+| UnknownVarOrOp       of qsymbol * ty list
+| MultipleOpMatch      of qsymbol * ty list
+| UnknownModName       of qsymbol
+| UnknownTyModName     of qsymbol
+| UnknownFunName       of qsymbol
+| UnknownModVar        of qsymbol
+| UnknownMemName       of symbol
+| InvalidFunAppl       of funapp_error
+| InvalidModAppl       of modapp_error
+| InvalidModType       of modtyp_error
+| InvalidMem           of symbol * mem_error
+
+exception TyError of EcLocation.t * EcEnv.env * tyerror
+
+let tyerror loc env e = raise (TyError (loc, env, e))
 
 (* -------------------------------------------------------------------- *)
-type tyerror =
-  | UnknownVariable          of qsymbol
-  | UnknownFunction          of qsymbol
-  | UnknownTypeName          of qsymbol
-  | UnknownTyModName         of qsymbol
-  | UnknownMemory            of symbol
-  | AbstractMemoryWanted     of symbol
-  | UnknownModName           of qsymbol
-  | UnknownOperatorForSig    of qsymbol * ty list
-  | InvalidNumberOfTypeArgs  of qsymbol * int * int
-  | ApplInvalidArity
-  | UnboundTypeParameter     of symbol
-  | OpNotOverloadedForSig    of qsymbol * ty list
-  | UnexpectedType           of ty * ty * ty * ty
-  | NonLinearPattern         of lpattern
-  | DuplicatedLocals         of psymbol option
-  | ProbaExpressionForbidden
-  | PatternForbiden
-  | ModApplToNonFunctor
-  | ModApplInvalidArity
-  | ModApplInvalidArgInterface
-  | UnificationVariableNotAllowed
-  | TypeVariableNotAllowed
-  | RandomExprNotAllowed
-  | UnNamedTypeVariable
-  | UnusedTypeVariable
+let pp_tyerror fmt _error =
+  Format.fprintf fmt "type-error"
 
-exception TyError of tyerror
+let () =
+  let pp fmt exn =
+    match exn with
+    | TyError (_, _, e) -> pp_tyerror fmt e
+    | _ -> raise exn
+  in
+    EcPException.register pp
 
-module PE = EcPrinting.EcDebugPP (* FIXME *)
+(* -------------------------------------------------------------------- *)
+module UE = EcUnify.UniEnv
 
-let pp_typerror fmt = function
-    | UnknownVariable name
-        -> Format.fprintf fmt "Unknown variable: %a" pp_qsymbol name
-  
-    | UnknownFunction name
-        -> Format.fprintf fmt "Unknown function: %a" pp_qsymbol name
-  
-    | UnknownTypeName name
-        -> Format.fprintf fmt "Unknown type name: %a" pp_qsymbol name
-
-    | UnknownModName name
-        -> Format.fprintf fmt "Unknown module name: %a" pp_qsymbol name
-  
-    | UnknownTyModName name
-        -> Format.fprintf fmt "Unknown module type name: %a" pp_qsymbol name
-
-    | UnknownMemory name
-        -> Format.fprintf fmt "Unknown memory name: %a" pp_symbol name
-
-    | AbstractMemoryWanted name
-        -> Format.fprintf fmt "This memory should be abstract: %a" pp_symbol name
-
-    | UnknownOperatorForSig (name, tys)
-        -> Format.fprintf fmt "Cannot find operator %a with signature %a" 
-            pp_qsymbol name
-            PE.pp_dom tys
-  
-    | InvalidNumberOfTypeArgs (name, n, i)
-        -> Format.fprintf fmt 
-            "The type %a is applied to %i paramaters while %i is excepted"
-            pp_qsymbol name i n
-  
-    | ApplInvalidArity
-        -> Format.fprintf fmt "Wrong number of arguments"
-  
-    | UnboundTypeParameter name
-        -> Format.fprintf fmt "Unbound type parameter: %s" name
-  
-    | OpNotOverloadedForSig (name, _)   (* FIXME / DUPLICATED *)
-        -> Format.fprintf fmt "Cannot find operator %a" pp_qsymbol name
-  
-    | UnexpectedType (ty1, ty2, t1, t2)
-        ->
-          let pp_type = PE.pp_type ~vmap:(EcUidgen.NameGen.create()) in
-            Format.fprintf fmt "@[the expression has type %a@\n" pp_type ty1;
-            Format.fprintf fmt "It is expected to have type %a.@\n" pp_type ty2;
-            Format.fprintf fmt "Can not unify %a and %a@]" pp_type t1 pp_type t2
-  
-    | NonLinearPattern _
-        -> Format.fprintf fmt "Non-linear pattern"
-  
-    | DuplicatedLocals None
-        -> Format.fprintf fmt "DuplicatedLocals"
-
-    | DuplicatedLocals (Some s)
-        -> Format.fprintf fmt "A symbol %s already declared at %s"
-            s.pl_desc (EcLocation.tostring s.pl_loc)
-    | ProbaExpressionForbidden
-        -> Format.fprintf fmt "ProbaExpressionForbidden"
-  
-    | PatternForbiden
-        -> Format.fprintf fmt "PatternForbiden"
-  
-    | ModApplToNonFunctor
-        -> Format.fprintf fmt "ModApplToNonFunctor"
-  
-    | ModApplInvalidArity
-        -> Format.fprintf fmt "Wrong number of module parameters"
-  
-    | ModApplInvalidArgInterface
-        -> Format.fprintf fmt "ModApplInvalidArgInterface"
-
-    | TypeVariableNotAllowed 
-        -> Format.fprintf fmt "Type variable not allowed"
-
-    | UnificationVariableNotAllowed 
-        -> Format.fprintf fmt "unification variable not allowed"
-
-    | RandomExprNotAllowed 
-        -> Format.fprintf fmt "random expression not allowed"
-
-    | UnNamedTypeVariable 
-        -> Format.fprintf fmt "unnamed type variable"
-
-    | UnusedTypeVariable 
-        -> Format.fprintf fmt "unused type variable" 
-  
-let _ = EcPexception.register (fun fmt exn -> 
-  match exn with
-  | TyError e -> Format.fprintf fmt "%a" pp_typerror e
-  | _ -> raise exn)
-
-let tyerror loc x = EcLocation.locate_error loc (TyError x)
+let unify_or_fail (env : EcEnv.env) ue loc ty1 ty2 = 
+  try  EcUnify.unify env ue ty1 ty2 
+  with EcUnify.UnificationFailure(t1, t2) ->
+    let tyinst = Tuni.subst (UE.asmap ue) in
+      tyerror loc env (TypeMismatch ((tyinst ty1, tyinst ty2),
+                                     (tyinst  t1, tyinst  t2)))
 
 (* -------------------------------------------------------------------- *)
 let e_inuse =
@@ -229,12 +164,6 @@ let (i_inuse, s_inuse) =
     (i_inuse Mm.empty, s_inuse Mm.empty)
 
 (* -------------------------------------------------------------------- *)
-module UE = EcUnify.UniEnv
-
-(* Politique de nommage :
-   les variables locales masquent les autres noms courts.
-*)
-  
 let select_local env (qs,s) = 
   if   qs = []
   then EcEnv.Var.lookup_local_opt s env 
@@ -269,87 +198,77 @@ let gen_select_op pred tvi env name ue psig =
 let select_op env name ue tvi psig =
   gen_select_op false tvi env name ue psig 
 
+(* -------------------------------------------------------------------- *)
 type typolicy = {
-    tp_uni         : bool;   (* "_" allowed                         *)
-    tp_tvar        : bool;   (* type variable allowed               *)
-  }
-
-(* for type declaration *)
-let tp_tydecl = {
-  tp_uni         = false;
-  tp_tvar        = true;
+  tp_uni  : bool;   (* "_" (Tuniar) allowed  *)
+  tp_tvar : bool;   (* type variable allowed *)
 }
 
-(* used for operators, formulas and predicate *)
-let tp_relax = {
-  tp_uni         = true;
-  tp_tvar        = true;
-}
-
-(* used for global variables, signature of function in module type *)
-let tp_nothing = {
-  tp_uni         = false;
-  tp_tvar        = false;
-}
-
-(* used for declaration of parameters and local variables in function *)
-let tp_uni = {
-  tp_uni         = true;
-  tp_tvar        = false;
-}
+let tp_tydecl  = { tp_uni = false; tp_tvar = true ; } (* type decl. *)
+let tp_relax   = { tp_uni = true ; tp_tvar = true ; } (* ops/forms/preds *)
+let tp_nothing = { tp_uni = false; tp_tvar = false; } (* module type annot. *)
+let tp_uni     = { tp_uni = true ; tp_tvar = false; } (* params/local vars. *)
 
 (* -------------------------------------------------------------------- *)
-let rec transty tp (env : EcEnv.env) ue ty =
+let rec transty (tp : typolicy) (env : EcEnv.env) ue ty =
   match ty.pl_desc with
    | PTunivar ->
-       if tp.tp_uni then UE.fresh_uid ue
-       else tyerror ty.pl_loc UnificationVariableNotAllowed;
+       if   tp.tp_uni
+       then UE.fresh_uid ue
+       else tyerror ty.pl_loc env UniVarNotAllowed
 
    | PTvar s ->
        if tp.tp_tvar then 
          try tvar (UE.get_var ue s.pl_desc)
-         with _ -> tyerror s.pl_loc (UnboundTypeParameter s.pl_desc)
-       else tyerror s.pl_loc TypeVariableNotAllowed;
+         with _ -> tyerror s.pl_loc env (UnboundTypeParameter s.pl_desc)
+       else
+         tyerror s.pl_loc env TypeVarNotAllowed;
 
   | PTtuple tys   -> 
       ttuple (transtys tp env ue tys)
 
-  | PTnamed { pl_desc = name } -> 
-      begin match EcEnv.Ty.lookup_opt name env with
-      | None -> tyerror ty.pl_loc (UnknownTypeName name)
+  | PTnamed { pl_desc = name } -> begin
+      match EcEnv.Ty.lookup_opt name env with
+      | None ->
+          tyerror ty.pl_loc env (UnknownTypeName name)
+
       | Some (p, tydecl) ->
-          if tydecl.tyd_params <> [] then
-            tyerror ty.pl_loc
-              (InvalidNumberOfTypeArgs(name,List.length tydecl.tyd_params, 0));
+          if tydecl.tyd_params <> [] then begin
+            let nargs = List.length tydecl.tyd_params in
+              tyerror ty.pl_loc env (InvalidTypeAppl (name, nargs, 0))
+          end;
           tconstr p []
       end
+
   | PTfun(ty1,ty2) ->
       tfun (transty tp env ue ty1) (transty tp env ue ty2) 
         
-  | PTapp ({ pl_desc = name }, tyargs) -> 
-      begin match EcEnv.Ty.lookup_opt name env with
-      | None -> tyerror ty.pl_loc (UnknownTypeName name)
+  | PTapp ({ pl_desc = name }, tyargs) -> begin
+      match EcEnv.Ty.lookup_opt name env with
+      | None ->
+          tyerror ty.pl_loc env (UnknownTypeName name)
+  
       | Some (p, tydecl) ->
-          let nargs = List.length tyargs in
+          let nargs    = List.length tyargs in
           let expected = List.length tydecl.tyd_params in
+
           if nargs <> expected then
-            tyerror ty.pl_loc (InvalidNumberOfTypeArgs (name, expected, nargs));
+            tyerror ty.pl_loc env (InvalidTypeAppl (name, expected, nargs));
+
           let tyargs = transtys tp env ue tyargs in 
-          tconstr p tyargs
+            tconstr p tyargs
       end
 
 and transtys tp (env : EcEnv.env) ue tys = 
   List.map (transty tp env ue) tys
 
-let transty_nothing = 
+let transty_for_decl =
   let ue = UE.create (Some []) in
   fun env ty -> transty tp_nothing env ue ty
 
 (* -------------------------------------------------------------------- *)
-exception NonLinearPattern of EcParsetree.lpattern
-
-let transpattern1 _env ue (p : EcParsetree.lpattern) = 
-  match p with
+let transpattern1 env ue (p : EcParsetree.plpattern) = 
+  match p.pl_desc with
   | LPSymbol { pl_desc = x } ->
       let ty = UE.fresh_uid ue in
       let x  = EcIdent.create x in
@@ -357,13 +276,14 @@ let transpattern1 _env ue (p : EcParsetree.lpattern) =
 
   | LPTuple xs ->
       let xs = unlocs xs in
-      if not (List.uniq xs) then raise (NonLinearPattern p)
+      if not (List.uniq xs) then
+        tyerror p.pl_loc env NonLinearPattern
       else
         let xs     = List.map EcIdent.create xs in
         let subtys = List.map (fun _ -> UE.fresh_uid ue) xs in
         (LTuple (List.combine xs subtys), ttuple subtys)
 
-let transpattern env ue (p : EcParsetree.lpattern) =
+let transpattern env ue (p : EcParsetree.plpattern) =
   match transpattern1 env ue p with
   | (LSymbol (x,ty)) as p, _ ->
       EcEnv.Var.bind_local x ty env, p, ty
@@ -372,27 +292,20 @@ let transpattern env ue (p : EcParsetree.lpattern) =
       EcEnv.Var.bind_locals xs env, p, ty
 
 (* -------------------------------------------------------------------- *)
-let unify_error env ue loc ty1 ty2 = 
-  try  EcUnify.unify env ue ty1 ty2 
-  with EcUnify.UnificationFailure(t1,t2) ->
-    let inst_uni = Tuni.subst (UE.asmap ue) in
-    tyerror loc (UnexpectedType (inst_uni ty1, inst_uni ty2, 
-                                 inst_uni t1 , inst_uni t2 ))
-
 let transtvi env ue tvi = 
-  match tvi with
-  | None -> None
-  | Some (TVIunamed lt) ->
-      Some (UE.TVIunamed (List.map (transty tp_relax env ue) lt))
-  | Some (TVInamed lst) ->
-      let add l (s,t) = 
-        try
-          let s' = fst (List.find (fun (s',_) -> unloc s = unloc s') l) in
-          tyerror s.pl_loc (DuplicatedLocals (Some s'))
-        with Not_found ->
-          (s, transty tp_relax env ue t) :: l in
+  match tvi.pl_desc with
+  | TVIunamed lt ->
+      UE.TVIunamed (List.map (transty tp_relax env ue) lt)
+
+  | TVInamed lst ->
+      let add locals (s, t) =
+        if List.exists (fun (s', _) -> unloc s = unloc s') locals then
+          tyerror tvi.pl_loc env DuplicatedTyVar;
+        (s, transty tp_relax env ue t) :: locals
+      in
+
       let lst = List.fold_left add [] lst in
-      Some (UE.TVInamed (List.rev_map (fun (s,t) -> unloc s, t) lst))
+        UE.TVInamed (List.rev_map (fun (s,t) -> unloc s, t) lst)
   
 let rec destr_tfun env ue tf = 
   match tf.ty_node with
@@ -421,46 +334,52 @@ let transexp (env : EcEnv.env) (ue : EcUnify.unienv) e =
     | PEint i -> (e_int i, tint)
 
     | PEident ({ pl_desc = name }, tvi) -> 
-        let tvi = transtvi env ue tvi in
+        let tvi = omap tvi (transtvi env ue) in
         let ops = select_op env name ue tvi [] in
         begin match ops with
-        | [] | _ :: _ :: _ -> (* FIXME: better error message *)
-            tyerror loc (UnknownOperatorForSig (name, []))
+        | [] -> tyerror loc env (UnknownVarOrOp (name, []))
+
+        | _ :: _ :: _ ->
+            tyerror loc env (MultipleOpMatch (name, []))
+
         | [op, ty, subue] ->
             EcUnify.UniEnv.restore ~src:subue ~dst:ue;
             op, ty
         end
 
     | PEapp ({pl_desc = PEident({ pl_desc = name; pl_loc = loc }, tvi)}, es) ->
-        let tvi = transtvi env ue tvi in  
+        let tvi  = omap tvi (transtvi env ue) in  
         let es   = List.map (transexp env) es in
         let esig = snd (List.split es) in
         let ops  = select_op env name ue tvi esig in
         begin match ops with
-        | [] | _ :: _ :: _ ->        (* FIXME: better error message *)
+        | [] ->
             let esig = Tuni.subst_dom (EcUnify.UniEnv.asmap ue) esig in
-            tyerror loc (UnknownOperatorForSig (name, esig))
+              tyerror loc env (UnknownVarOrOp (name, esig))
+
+        | _ :: _ :: _ ->
+            let esig = Tuni.subst_dom (EcUnify.UniEnv.asmap ue) esig in
+              tyerror loc env (MultipleOpMatch (name, esig))
               
         | [op, ty, subue] ->
             EcUnify.UniEnv.restore ~src:subue ~dst:ue;
             let codom = ty_fun_app env ue ty esig in
-            (e_app op (List.map fst es) codom, codom)
+              (e_app op (List.map fst es) codom, codom)
         end
 
-    | PEapp(pe,pes) ->
+    | PEapp (pe, pes) ->
         let e,ty = transexp env pe in
         let es = List.map (transexp env) pes in
         let esig = snd (List.split es) in
         let codom = ty_fun_app env ue ty esig in
-        (e_app e (List.map fst es) codom, codom)
+          (e_app e (List.map fst es) codom, codom)
 
     | PElet (p, pe1, pe2) ->
-      let (penv, p, pty) = transpattern env ue p in
+      let (penv, pt, pty) = transpattern env ue p in
       let e1, ty1 = transexp  env pe1 in
       let e2, ty2 = transexp penv pe2 in
-      (* FIXME loc should be p *)
-      unify_error env ue loc pty ty1;
-      (e_let p e1 e2, ty2)
+        unify_or_fail env ue p.pl_loc pty ty1;
+        (e_let pt e1 e2, ty2)
 
     | PEtuple es ->
         let tes = List.map (transexp env) es in
@@ -471,18 +390,19 @@ let transexp (env : EcEnv.env) (ue : EcUnify.unienv) e =
       let c, tyc = transexp env pc in
       let e1, ty1 = transexp env pe1 in
       let e2, ty2 = transexp env pe2 in
-        unify_error env ue pc.pl_loc tyc tbool;
-        unify_error env ue pe2.pl_loc ty2 ty1;
+        unify_or_fail env ue pc.pl_loc tyc tbool;
+        unify_or_fail env ue pe2.pl_loc ty2 ty1;
         (e_if c e1 e2, ty1)
 
   in
     transexp env e
 
 let transexpcast (env : EcEnv.env) (ue : EcUnify.unienv) t e =
-  let e',t' = transexp env ue e in
-  try EcUnify.unify env ue t' t; e'
-  with EcUnify.UnificationFailure(t1,t2) ->
-    tyerror e.pl_loc (UnexpectedType (t',t, t1, t2))
+  let (e', t') = transexp env ue e in
+
+  try  EcUnify.unify env ue t' t; e'
+  with EcUnify.UnificationFailure (t1, t2) ->
+    tyerror e.pl_loc env (TypeMismatch ((t', t), (t1, t2)))
 
 (* -------------------------------------------------------------------- *)
 exception DuplicatedSigItemName
@@ -496,13 +416,13 @@ let name_of_sigitem = function
 (* -------------------------------------------------------------------- *)
 let lookup_module (env : EcEnv.env) (name : pqsymbol) =
   match EcEnv.Mod.lookup_opt (unloc name) env with
-  | None   -> tyerror name.pl_loc (UnknownModName (unloc name))
+  | None   -> tyerror name.pl_loc env (UnknownModName (unloc name))
   | Some x -> x
 
 (* -------------------------------------------------------------------- *)
 let lookup_module_type (env : EcEnv.env) (name : pqsymbol) =
   match EcEnv.ModTy.lookup_opt (unloc name) env with
-  | None   -> tyerror name.pl_loc (UnknownTyModName (unloc name))
+  | None   -> tyerror name.pl_loc env (UnknownTyModName (unloc name))
   | Some x -> x
 
 (* -------------------------------------------------------------------- *)
@@ -540,10 +460,10 @@ and transmodsig_body (env : EcEnv.env) (is : pmodule_sig_struct_body) =
         let tyargs =
           List.map                      (* FIXME: continuation *)
             (fun (x, ty) -> { v_name = x.pl_desc; 
-                              v_type = transty_nothing env ty})
+                              v_type = transty_for_decl env ty})
             f.pfd_tyargs
         in
-        let resty  = transty_nothing env f.pfd_tyresult in
+        let resty = transty_for_decl env f.pfd_tyresult in
           if not (List.uniq (List.map fst f.pfd_tyargs)) then
             raise (DuplicatedArgumentsName f);
           Tys_function
@@ -691,15 +611,8 @@ let check_tymod_sub = check_tymod_cnv `Sub
 and check_tymod_eq  = check_tymod_cnv `Eq
 
 (* -------------------------------------------------------------------- *)
-let add_local known_ids s = 
-  match Mstr.find_opt s.pl_desc !known_ids with
-    | None -> 
-      known_ids := Mstr.add s.pl_desc s !known_ids;
-      s.pl_desc
-    | Some s' -> tyerror s.pl_loc (DuplicatedLocals (Some s')) 
-
-let rec transmod (env : EcEnv.env) (x : symbol) (m : pmodule_expr) =
-  match m with
+let rec transmod (env : EcEnv.env) (x : symbol) (me : pmodule_expr) =
+  match me.pl_desc with
   | Pm_ident ({ pl_desc = m }, args) -> begin
       let (mname, mty) = EcEnv.Mod.lookup m env in
       let args = List.map (EcEnv.Mod.lookup^~ env) (unlocs args) in
@@ -707,7 +620,7 @@ let rec transmod (env : EcEnv.env) (x : symbol) (m : pmodule_expr) =
 
       (* Check module application *)
       if List.length atymods <> List.length args then
-        tyerror dloc ModApplInvalidArity;
+        tyerror me.pl_loc env (InvalidModAppl MAE_WrongArgCount);
 
       let bsubst =
         List.fold_left2
@@ -718,8 +631,7 @@ let rec transmod (env : EcEnv.env) (x : symbol) (m : pmodule_expr) =
                EcSubst.add_module subst xty xarg)
           EcSubst.empty args atymods
       in
-
-      (* EcSubstitute args. in result type *)
+        (* EcSubstitute args. in result type *)
         { me_name  = x;
           me_body  = ME_Alias (EcPath.m_apply mname (List.map fst args));
           me_comps = EcSubst.subst_module_comps bsubst mty.me_comps;
@@ -737,7 +649,7 @@ let rec transmod (env : EcEnv.env) (x : symbol) (m : pmodule_expr) =
 
 (* -------------------------------------------------------------------- *)
 and transstruct (env : EcEnv.env) (x : symbol) (st : pstructure) =
-  (* Check parameters types *)
+  (* Check parameters types *) (* FIXME: dup names *)
   let stparams =
     List.map                          (* FIXME: exn *)
       (fun (a, aty) ->
@@ -769,9 +681,9 @@ and transstruct (env : EcEnv.env) (x : symbol) (st : pstructure) =
   (* Generate structure signature *)
   let tymod =
     let tymod1 = function
-      | MI_Module   _ -> None           (* FIXME: what ? *)
+      | MI_Module   _  -> None           (* FIXME: what ? *)
       | MI_Variable _v -> None           (* Some (Tys_variable v)  *)
-      | MI_Function f -> Some (Tys_function f.f_sig) 
+      | MI_Function f  -> Some (Tys_function f.f_sig)
     in
 
     let sigitems = List.pmap tymod1 (List.map snd items) in
@@ -784,11 +696,12 @@ and transstruct (env : EcEnv.env) (x : symbol) (st : pstructure) =
    * associated type mode. *)
   let types =
     List.map
-      (fun (aty, oatyp) ->
+      (fun { pl_desc = (aty, oatyp); pl_loc = loc } ->
         if oatyp <> [] then begin
           let cmp (x1, _) x2 = (EcIdent.name x1 = unloc x2) in
             if not (List.all2 cmp stparams oatyp) then
-                tyerror dloc ModApplInvalidArgInterface
+                tyerror loc env
+                  (InvalidModType MTE_FunSigDoesNotRepeatArgNames)
         end;
         (oatyp <> [], transmodtype env aty))
       st.ps_signature in
@@ -825,90 +738,183 @@ and transstruct1 (env : EcEnv.env) (st : pstructure_item) =
         [(m, MI_Module me)]
 
   | Pst_var (xs, ty) ->
-      let ty = transty_nothing env ty in
+      let ty = transty_for_decl env ty in
         List.map
           (fun { pl_desc = x } ->
             (x, MI_Variable { v_name = x; v_type = ty; }))
           xs
 
   | Pst_fun (decl, body) -> begin
-      let fid = unloc decl.pfd_name in
-      let ue = UE.create (Some []) in
-      let known_ids = ref Mstr.empty in
-      let env = EcEnv.Fun.enter fid env in
-      let add_param (s,ty) = add_local known_ids s, transty tp_uni env ue ty in
-      let params = List.map add_param decl.pfd_tyargs in
-      let params_ = 
-        List.map (fun (id,ty) -> (id, `Variable (PVloc, ty))) params in
-      let env = EcEnv.bindall params_ env in
+      let ue  = UE.create (Some []) in
+      let env = EcEnv.Fun.enter decl.pfd_name.pl_desc env in
 
-      let rty = transty tp_uni env ue decl.pfd_tyresult in
-      let stmt, re, locals = transbody known_ids ue env body rty in
+      let symbols = ref Sstr.empty
+      and env     = ref env in
+      
+      (* Type-check function parameters / check for dups *)
+      let params =
+        let params = ref [] in
+        let add_param (x, pty) =
+          let ty = transty tp_uni !env ue pty in
+          let pr = (unloc x, `Variable (PVloc, ty)) in
+            fundef_add_symbol !env symbols x;
+            params  := ({ v_name = unloc x; v_type = ty }, pty.pl_loc) :: !params;
+            env     := EcEnv.bindall [pr] !env
+        in
+          List.iter add_param decl.pfd_tyargs;
+          List.rev !params
+      in
 
-      let subst_uni = Tuni.subst (UE.close ue) in
-      let check_type ty = 
-        let ty = subst_uni ty in
-        assert (EcUidgen.Suid.is_empty (Tuni.fv ty)); (* FIXME error message *)
-        ty in
-      let check_decl (id,ty) = {v_name = id; v_type = check_type ty} in
-      let params = List.map check_decl params in
-      let locals = List.rev_map check_decl locals in
-      let rty = check_type rty in
-      let es = { EcTypes.e_subst_id with es_ty = subst_uni } in
-      let stmt = s_subst es stmt in
-      let re = omap re (e_subst es) in
-      let fun_ = 
-        { f_name   = fid;
+      (* Type-check body *)
+      let retty  = transty tp_uni !env ue decl.pfd_tyresult in
+      let (env, stmt, result, prelude, locals) =
+        transbody ue symbols !env retty body
+      in
+
+      (* Close all types *)
+      let su      = Tuni.subst (UE.close ue) in
+      let retty   = fundef_check_type su env (retty, decl.pfd_tyresult.pl_loc) in
+      let params  = List.map (fundef_check_decl  su env) params in
+      let locals  = List.map (fundef_check_decl  su env) locals in
+      let prelude = List.map (fundef_check_iasgn su env) prelude in
+
+      let clsubst = { EcTypes.e_subst_id with es_ty = su } in
+      let stmt    = s_subst clsubst stmt
+      and result  = omap result (e_subst clsubst) in
+
+      (* Compose all results *)
+      let fun_ =
+        { f_name   = decl.pfd_name.pl_desc;
           f_sig    = {
             fs_name = decl.pfd_name.pl_desc;
-            fs_sig  = (params, rty);
+            fs_sig  = (params, retty);
             fs_uses = Mp.empty;   (* FIXME *)
           };
           f_def = Some {
             f_locals = locals;
-            f_body   = stmt;
-            f_ret    = re;
+            f_body   = EcModules.stmt (prelude @ stmt.s_node);
+            f_ret    = result;
           };
-        } in 
-      [(fid, MI_Function fun_)]
+        }
+      in 
+        [(decl.pfd_name.pl_desc, MI_Function fun_)]
   end
 
   | Pst_alias _ -> assert false
 
-and transbody known_ids ue env body rty = 
-  let init = ref [] in
-  let locals = ref [] in
-  let add_local ty s = (add_local known_ids s, `Variable (PVloc, ty)) in
-  let add_locals env (ss,ty, e) = 
-    let ty = transty tp_uni env ue ty in
-    let locs = List.map (add_local ty) ss in
-    let newenv = EcEnv.bindall locs env in
-    List.iter (fun (id, _) -> locals := (id,ty) :: !locals) locs;
-    oiter e (fun pe -> 
-      let e, ety = transexp env ue pe in
-      unify_error env ue pe.pl_loc ety ty;
-      List.iter (fun (id,_) ->
-        let p,_ = 
-          oget (EcEnv.Var.lookup_progvar_opt ([], id) newenv) in
-        init := i_asgn (LvVar(p,ty) , e) :: !init) locs);
-    newenv 
-  in
-  let env = List.fold_left add_locals env body.pfb_locals in
-  let stmt = transstmt ue env body.pfb_body in 
-  let stmt = EcModules.stmt ((List.rev !init) @ stmt.s_node) in
-  let re =
-    match body.pfb_return with
-      | None    -> 
-        (* FIXME error message or location *)
-        unify_error env ue EcLocation.dummy rty tunit; None
+(* -------------------------------------------------------------------- *)
+and transbody ue symbols (env : EcEnv.env) retty pbody =
+    let env     = ref env
+    and mpath   = EcEnv.mroot env
+    and prelude = ref []
+    and locals  = ref [] in
+
+    (* Type-check local variables / check for dups *)
+    let add_local (xs, pty, init) =
+      List.iter (fundef_add_symbol !env symbols) xs;
+
+      let ty     = transty tp_uni !env ue pty in
+      let xsvars =
+        match xs with
+        | [_] -> [ty]
+        | _   -> List.map (fun _ -> UE.fresh_uid ue) xs in
+      let init   =
+        let check_init pinit =
+          let (init, initty) = transexp !env ue pinit in
+            unify_or_fail !env ue pinit.pl_loc ty initty;
+            init
+        in
+          omap init check_init
+      in
+        begin
+          let xsty =
+            match xsvars with
+            | [ty] -> ty
+            | _    -> ttuple xsvars
+          in
+            unify_or_fail !env ue pty.pl_loc ty xsty
+        end;
+
+        env := begin
+          let topr = fun x xty -> (unloc x, `Variable (PVloc, xty)) in
+            EcEnv.bindall (List.map2 topr xs xsvars) !env
+        end;
+
+        let mylocals =
+          List.map2
+            (fun x xty ->
+               let x = unloc x in
+               let p = EcPath.mqname mpath EcPath.PKother x [] in
+                 ({ v_name  = x; v_type  = xty   },
+                  { pv_name = p; pv_kind = PVloc },
+                  xty, pty.pl_loc))
+            xs xsvars
+        in
+
+        locals :=
+           List.rev_append
+            (List.map (fun (v, _, _, pl) -> (v, pl)) mylocals)
+            !locals;
+
+        oiter init
+          (fun init ->
+            let iasgn =
+              List.map (fun (_, v, xty, _) -> (v, xty)) mylocals
+            in
+               prelude := (iasgn, init, pty.pl_loc) :: !prelude)
+    in
+
+    List.iter add_local pbody.pfb_locals;
+
+    let body   = transstmt ue !env pbody.pfb_body in
+    let result =
+      match pbody.pfb_return with
+      | None ->
+          unify_or_fail !env ue EcLocation._dummy retty tunit;
+          None
+
       | Some pe ->
-        let re, ty = transexp env ue pe in
-        unify_error env ue pe.pl_loc ty rty; Some re 
-  in
-    (stmt, re, !locals)
+          let (e, ety) = transexp !env ue pe in
+            unify_or_fail !env ue pe.pl_loc ety retty;
+            Some e
+    in
+      (!env, body, result, List.rev !prelude, List.rev !locals)
 
 (* -------------------------------------------------------------------- *)
-and transstmt ue (env : EcEnv.env) (stmt : pstmt) =
+and fundef_add_symbol env symbols x =  (* for locals dup check *)
+  if Sstr.mem x.pl_desc !symbols then
+    tyerror x.pl_loc env (DuplicatedLocal x.pl_desc);
+  symbols := Sstr.add x.pl_desc !symbols
+
+and fundef_check_type subst_uni env (ty, loc) = 
+  let ty = subst_uni ty in
+    if not (EcUidgen.Suid.is_empty (Tuni.fv ty)) then
+      tyerror loc env OnlyMonoTypeAllowed;
+    ty
+
+and fundef_check_decl subst_uni env (decl, loc) =
+  { decl with
+      v_type = fundef_check_type subst_uni env (decl.v_type, loc) }
+
+and fundef_check_iasgn subst_uni env (pl, init, loc) =
+  let pl =
+    List.map
+      (fun (p, ty) ->
+        (p, fundef_check_type subst_uni env (ty, loc)))
+      pl
+  in
+  let pl =
+    match pl with
+    | [xty] -> LvVar xty
+    | xtys  -> LvTuple xtys
+  in
+
+  let clsubst = { EcTypes.e_subst_id with es_ty = subst_uni } in
+
+    i_asgn (pl, e_subst clsubst init)
+
+(* -------------------------------------------------------------------- *)
+and transstmt ue (env : EcEnv.env) (stmt : pstmt) : stmt =
   EcModules.stmt (List.map (transinstr ue env) stmt)
 
 (* -------------------------------------------------------------------- *)
@@ -916,13 +922,13 @@ and transinstr ue (env : EcEnv.env) (i : pinstr) =
   let transcall name args =
     let fpath, fdef =
       try
-        EcEnv.Fun.lookup name env
+        EcEnv.Fun.lookup name.pl_desc env
       with EcEnv.LookupFailure _ ->
-        tyerror dloc (UnknownFunction name)
+        tyerror name.pl_loc env (UnknownFunName name.pl_desc)
 
     in
       if List.length args <> List.length (fst fdef.f_sig.fs_sig) then
-        tyerror dloc ApplInvalidArity;
+        tyerror name.pl_loc env (InvalidFunAppl FAE_WrongArgCount);
   
       let args =
         List.map2
@@ -947,12 +953,12 @@ and transinstr ue (env : EcEnv.env) (i : pinstr) =
       EcUnify.unify env ue (tdistr lty) rty;
       i_rnd(lvalue, rvalue)
 
-  | PScall (None, { pl_desc = name }, args) ->
+  | PScall (None, name, args) ->
       let (fpath, args, rty) = transcall name args in
       EcUnify.unify env ue tunit rty;
       i_call (None, fpath, args)
 
-  | PScall (Some lvalue, { pl_desc = name }, args) ->
+  | PScall (Some lvalue, name, args) ->
       let lvalue, lty = translvalue ue env lvalue in
       let (fpath, args, rty) = transcall name args in
       EcUnify.unify env ue lty rty;
@@ -981,11 +987,11 @@ and transinstr ue (env : EcEnv.env) (i : pinstr) =
 (* -------------------------------------------------------------------- *)
 and trans_pv env { pl_desc = x; pl_loc = loc } = 
   match EcEnv.Var.lookup_progvar_opt x env with
-  | None -> tyerror loc (UnknownVariable x)
+  | None -> tyerror loc env (UnknownModVar x)
   | Some(pv,xty) -> pv, xty 
 
 and translvalue ue (env : EcEnv.env) lvalue =
-  match lvalue with
+  match lvalue.pl_desc with
   | PLvSymbol x ->
       let pty = trans_pv env x in
       LvVar pty, snd pty
@@ -996,23 +1002,35 @@ and translvalue ue (env : EcEnv.env) lvalue =
       (LvTuple xs, ty)
 
   | PLvMap (x, tvi, e) ->
-      let tvi = transtvi env ue tvi in  
+      let tvi = omap tvi (transtvi env ue) in
       let codomty = UE.fresh_uid ue in
       let pv,xty = trans_pv env x in
       let e, ety = transexp env ue e in
       let name =  ([],EcCoreLib.s_set) in
       let esig = [xty; ety; codomty] in
       let ops = select_op env name ue tvi esig in
+
       match ops with
-      | [ ({e_node = Eop (p,tys) }, _, subue)] ->
-          EcUnify.UniEnv.restore ~src:subue ~dst:ue;
-          (LvMap ((p,tys), pv, e, codomty), codomty) 
-      | _ ->        (* FIXME: better error message *)
+      | [] ->
           let esig = Tuni.subst_dom (EcUnify.UniEnv.asmap ue) esig in
-          tyerror x.pl_loc (UnknownOperatorForSig (name, esig))
+            tyerror x.pl_loc env (UnknownVarOrOp (name, esig))
+
+      | _ :: _ :: _ ->
+          let esig = Tuni.subst_dom (EcUnify.UniEnv.asmap ue) esig in
+            tyerror x.pl_loc env (MultipleOpMatch (name, esig))
+
+      | [({e_node = Eop (p, tys) }, _, subue)] ->
+          EcUnify.UniEnv.restore ~src:subue ~dst:ue;
+          (LvMap ((p, tys), pv, e, codomty), codomty)
+
+      | [_] ->                          (* FIXME: dubious *)
+          let esig = Tuni.subst_dom (EcUnify.UniEnv.asmap ue) esig in
+            tyerror x.pl_loc env (UnknownVarOrOp (name, esig))
 
 (* -------------------------------------------------------------------- *)
-let rec trans_msymbol (env : EcEnv.env) (msymb : pmsymbol) =
+let rec trans_msymbol (env : EcEnv.env) (msymb : pmsymbol located) =
+  let msymb = msymb.pl_desc and loc = msymb.pl_loc in
+
   let mod_qname =
     match List.rev_map fst msymb with
     | [] -> assert false
@@ -1024,7 +1042,7 @@ let rec trans_msymbol (env : EcEnv.env) (msymb : pmsymbol) =
   let (mod_path, mod_expr) =
     match EcEnv.Mod.sp_lookup_opt mod_qname.pl_desc env with
     | None ->
-        tyerror mod_qname.pl_loc
+        tyerror mod_qname.pl_loc env
           (UnknownModName mod_qname.pl_desc)
     | Some me -> me in
 
@@ -1044,20 +1062,18 @@ let rec trans_msymbol (env : EcEnv.env) (msymb : pmsymbol) =
   let mod_args =
     List.map
       (fun args ->
-        List.map
-          (fun { pl_desc = arg } -> trans_msymbol env arg)
-          args)
+        List.map (trans_msymbol env) args)
       mod_args
   in
     List.iter2i
       (fun i param arg ->
          if i < ndots-1 && arg <> [] then begin
            if List.length param <> List.length arg then
-             tyerror dloc ModApplInvalidArity;
+             tyerror loc env (InvalidModAppl MAE_WrongArgCount);
            List.iter2
              (fun (_, p) (_, a) ->
                if not (EcEnv.ModTy.has_mod_type env a p) then
-                 tyerror dloc ModApplInvalidArgInterface)
+                 tyerror loc env (InvalidModAppl MAE_InvalidArgType))
              param arg
          end)
       mod_params mod_args;
@@ -1085,21 +1101,23 @@ let rec trans_msymbol (env : EcEnv.env) (msymb : pmsymbol) =
 
 (* -------------------------------------------------------------------- *)
 and trans_gamepath (env : EcEnv.env) gp =
+  let loc = gp.pl_loc in
+
   let modsymb = List.map (unloc -| fst) (fst (unloc gp))
   and funsymb = unloc (snd (unloc gp)) in
   let _, _ =
     match EcEnv.Fun.sp_lookup_opt (modsymb, funsymb) env with
-    | None -> tyerror gp.pl_loc (UnknownFunction (modsymb, funsymb))
+    | None -> tyerror gp.pl_loc env (UnknownFunName (modsymb, funsymb))
     | Some (p, me) -> (p, me)
   in
 
-  let fpath = fst (trans_msymbol env (fst (unloc gp))) in
+  let fpath = fst (trans_msymbol env (mk_loc loc (fst (unloc gp)))) in
   let fpath = EcPath.mqname fpath EcPath.PKother funsymb [] in
 
     fpath
 
 (* -------------------------------------------------------------------- *)
-let transfpattern env ue (p : EcParsetree.lpattern) =
+let transfpattern env ue (p : EcParsetree.plpattern) =
   match transpattern1 env ue p with
   | LSymbol (x,ty) as p, _ ->
       (EcEnv.Var.bind_local x ty env, p, ty)
@@ -1110,14 +1128,14 @@ let transfpattern env ue (p : EcParsetree.lpattern) =
 let transmem env m =
   match EcEnv.Memory.lookup (unloc m) env with
   | None ->
-    tyerror m.pl_loc (UnknownMemory (unloc m))
+      tyerror m.pl_loc env (UnknownMemName (unloc m))
       
   | Some me -> 
-    if (EcMemory.memtype me) <> None then
-      tyerror m.pl_loc (AbstractMemoryWanted (unloc m))
-    else EcMemory.memory me
+      if (EcMemory.memtype me) <> None then
+        tyerror m.pl_loc env (InvalidMem (unloc m, MAE_IsConcrete));
+      (fst me)
 
-
+(* -------------------------------------------------------------------- *)
 let transform_opt env ue pf tt =
   let rec transf env f = 
     match f.pl_desc with
@@ -1128,11 +1146,15 @@ let transform_opt env ue pf tt =
         f_tuple (List.map (transf env) args)
 
     | PFident ({ pl_desc = name;pl_loc = loc }, tvi) -> 
-        let tvi = transtvi env ue tvi in
+        let tvi = omap tvi (transtvi env ue) in
         let ops = select_sided_op env name ue tvi [] in
         begin match ops with
-        | [] | _ :: _ :: _ -> (* FIXME: better error message *)
-            tyerror loc (UnknownOperatorForSig (name, []))
+        | [] ->
+            tyerror loc env (UnknownVarOrOp (name, []))
+
+        | _ :: _ :: _ ->
+            tyerror loc env (MultipleOpMatch (name, []))
+
         | [op, subue] ->
             EcUnify.UniEnv.restore ~src:subue ~dst:ue;
             op
@@ -1141,21 +1163,25 @@ let transform_opt env ue pf tt =
     | PFside (f, side) -> begin
         let me =
           match EcEnv.Memory.lookup (unloc side) env with
-          | None -> tyerror side.pl_loc (UnknownMemory (unloc side))
+          | None -> tyerror side.pl_loc env (UnknownMemName (unloc side))
           | Some me -> EcMemory.memory me
         in
           transf (EcEnv.Memory.set_active me env) f
       end
 
     | PFapp ({pl_desc = PFident({ pl_desc = name; pl_loc = loc }, tvi)}, es) ->
-        let tvi  = transtvi env ue tvi in  
+        let tvi  = omap tvi (transtvi env ue) in  
         let es   = List.map (transf env) es in
         let esig = List.map EcFol.f_ty es in 
         let ops  = select_sided_op env name ue tvi esig in
           begin match ops with
-          | [] | _ :: _ :: _ ->        (* FIXME: better error message *)
+          | [] ->
               let esig = Tuni.subst_dom (EcUnify.UniEnv.asmap ue) esig in
-                tyerror loc (UnknownOperatorForSig (name, esig))
+                tyerror loc env (UnknownVarOrOp (name, esig))
+
+          | _ :: _ :: _ ->
+              let esig = Tuni.subst_dom (EcUnify.UniEnv.asmap ue) esig in
+                tyerror loc env (MultipleOpMatch (name, esig))
   
           | [op, subue] ->
               EcUnify.UniEnv.restore ~src:subue ~dst:ue;
@@ -1172,29 +1198,29 @@ let transform_opt env ue pf tt =
 
     | PFif (pf1, pf2, pf3) ->
         let f1 = transf env pf1 in
-        unify_error env ue pf1.pl_loc f1.f_ty tbool;
+        unify_or_fail env ue pf1.pl_loc f1.f_ty tbool;
         let f2 = transf env pf2 in
         let f3 = transf env pf3 in
-        unify_error env ue pf2.pl_loc f2.f_ty f3.f_ty;
+        unify_or_fail env ue pf2.pl_loc f2.f_ty f3.f_ty;
         f_if f1 f2 f3
 
     | PFlet (lp, pf1, f2) ->
         let (penv, p, pty) = transfpattern env ue lp in
         let f1 = transf env pf1 in
-        unify_error env ue pf1.pl_loc f1.f_ty pty;
+        unify_or_fail env ue pf1.pl_loc f1.f_ty pty;
         let f2 = transf penv f2 in
         f_let p f1 f2 
 
     | PFforall (xs, pf) ->
         let env, xs = trans_fbind env ue xs in
         let f = transf env pf in
-        unify_error env ue pf.pl_loc f.f_ty tbool;
+        unify_or_fail env ue pf.pl_loc f.f_ty tbool;
         f_forall xs f
 
     | PFexists (xs, f1) ->
         let env, xs = trans_fbind env ue xs in
         let f = transf env f1 in
-        unify_error env ue pf.pl_loc f.f_ty tbool;
+        unify_or_fail env ue pf.pl_loc f.f_ty tbool;
         f_exists xs f
 
     | PFlambda (xs, f1) ->
@@ -1203,16 +1229,15 @@ let transform_opt env ue pf tt =
         f_lambda xs f
 
     | PFprob (gp, args, m, event) ->
-
         let fpath = trans_gamepath env gp in
         let fun_  = EcEnv.Fun.by_mpath fpath env in
         let fsig  = fun_.f_sig.fs_sig in
         if List.length args <> List.length (fst fsig) then
-          tyerror f.pl_loc ApplInvalidArity;
+          tyerror f.pl_loc env (InvalidFunAppl FAE_WrongArgCount);
         let args =
           let doit1 arg {v_type = aty} =
             let aout = transf env arg in
-              unify_error env ue arg.pl_loc aout.f_ty aty;
+              unify_or_fail env ue arg.pl_loc aout.f_ty aty;
               aout
           in
             List.map2 doit1 args (fst fsig)
@@ -1230,16 +1255,23 @@ let transform_opt env ue pf tt =
         f_hoareF pre fpath post
 
     | PFhoareS (pre, body, post) ->
-      let known_ids = ref Mstr.empty in
-      let ue = UE.create (Some []) in (* FIXME: What is this? *)
-      (* FIXME: assuming no return statement *)
-      let stmt, _re, (locals:(symbol*ty) list ) = 
-        transbody known_ids ue env body tunit in
-      let locals = List.map (fun (s,t) -> {v_name=s;v_type=t} ) locals in
-      let menv,env = EcEnv.Fun.hoareS_anonym locals env in
-      let pre = transf env pre in
-      let post = transf env post in
-      f_hoareS menv pre stmt post
+        let symbols = ref Mstr.empty in
+        let ue      = UE.create (Some []) in
+
+        let (env, stmt, _re, prelude, locals) =
+          transbody ue symbols env tunit body
+        in
+
+        let su      = Tuni.subst (UE.close ue) in
+        let locals  = List.map (fundef_check_decl  su env) locals in
+        let prelude = List.map (fundef_check_iasgn su env) prelude in
+        let clsubst = { EcTypes.e_subst_id with es_ty = su } in
+        let stmt    = s_subst clsubst stmt in
+
+        let (menv, env) = EcEnv.Fun.hoareS_anonym locals env in
+        let pre  = transf env pre in
+        let post = transf env post in
+        f_hoareS menv pre (EcModules.stmt (prelude @ stmt.s_node)) post
 
     | PFequivF (pre, (gp1, gp2), post) ->
         let fpath1 = trans_gamepath env gp1 in
@@ -1292,13 +1324,13 @@ let transform_opt env ue pf tt =
   in
 
   let f = transf env pf in
-  oiter tt (unify_error env ue pf.pl_loc f.f_ty); 
+  oiter tt (unify_or_fail env ue pf.pl_loc f.f_ty); 
   f
   
+(* -------------------------------------------------------------------- *)
 let transform env ue pf ty =
   transform_opt env ue pf (Some ty)
 
 (* -------------------------------------------------------------------- *)
 let transformula env ue pf = 
   transform env ue pf tbool
-

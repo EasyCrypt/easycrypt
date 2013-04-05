@@ -134,6 +134,7 @@ type env = preenv
 
 val preenv  : env -> preenv
 val root    : env -> EcPath.path
+val mroot   : env -> EcPath.mpath
 val initial : env
 
 (* -------------------------------------------------------------------- *)
@@ -198,7 +199,7 @@ module Fun : sig
     env -> EcMemory.memenv * EcMemory.memenv * env
 
   val enter : symbol -> env -> env
-  val add : EcPath.mpath -> env -> env
+  val add : EcPath.path -> env -> env
 end
 
 (* -------------------------------------------------------------------- *)
@@ -226,7 +227,7 @@ module Var : sig
   val bind    : symbol -> pvar_kind -> EcTypes.ty -> env -> env
   val bindall : (symbol * EcTypes.ty) list -> pvar_kind -> env -> env
 
-  val add : EcPath.mpath -> env -> env
+  val add : EcPath.path -> env -> env
 end
 
 (* -------------------------------------------------------------------- *)
@@ -260,7 +261,7 @@ module Mod : sig
   val sp_lookup     : qsymbol -> env -> mpath * t suspension
   val sp_lookup_opt : qsymbol -> env -> (mpath * t suspension) option
 
-  val add  : EcPath.mpath -> env -> env
+  val add  : EcPath.path -> env -> env
   val bind : symbol -> module_expr -> env -> env
 
   val enter : symbol -> (EcIdent.t * module_type) list -> env -> env
@@ -319,7 +320,6 @@ module Theory : sig
 end
 
 (* -------------------------------------------------------------------- *)
-
 module Op : sig
   type t = operator
 
@@ -371,9 +371,4 @@ val import_w3_dir :
   -> env * ctheory_item list
 
 (* -------------------------------------------------------------------- *)
-
-val check_goal        : env -> EcWhy3.prover_infos -> EcBaseLogic.l_decl -> bool
-
-
-
-
+val check_goal : env -> EcWhy3.prover_infos -> EcBaseLogic.l_decl -> bool

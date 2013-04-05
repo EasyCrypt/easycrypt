@@ -21,7 +21,7 @@ proof.
    elim h;clear h;intros h1 _.
    elim h1;intros heq1 heq2;clear h1.
    rewrite heq1;rewrite heq2. simplify. split.
- wp;skip.
+ wp; skip.
  intros m1 m2 h;elim h;intros heq1 heq2;rewrite heq1; rewrite heq2; simplify.
  clear h heq1 heq2.
  intros x1 i1 x2 i2 _ _ h1;elim h1;intros heq1 heq2;subst; simplify.

@@ -74,8 +74,8 @@ and hoareF = {
 and hoareS = {
   hs_m   : EcMemory.memenv;
   hs_pr  : form; 
-  hs_s    : stmt;
-  hs_po : form; }
+  hs_s   : stmt;
+  hs_po  : form; }
 
 (* -------------------------------------------------------------------- *)
 val f_equal   : form -> form -> bool

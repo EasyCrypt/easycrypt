@@ -1,60 +1,72 @@
 (* -------------------------------------------------------------------- *)
 open EcSymbols
+open EcLocation
 open EcParsetree
 open EcTypes
 open EcDecl
 open EcModules
 
 (* -------------------------------------------------------------------- *)
+type modapp_error =
+| MAE_WrongArgCount
+| MAE_InvalidArgType
+
+type modtyp_error =
+| MTE_FunSigDoesNotRepeatArgNames
+
+type funapp_error =
+| FAE_WrongArgCount
+
+type mem_error =
+| MAE_IsConcrete
+
 type tyerror =
-  | UnknownVariable          of qsymbol
-  | UnknownFunction          of qsymbol
-  | UnknownTypeName          of qsymbol
-  | UnknownTyModName         of qsymbol
-  | UnknownMemory            of symbol
-  | AbstractMemoryWanted     of symbol
-  | UnknownModName           of qsymbol
-  | UnknownOperatorForSig    of qsymbol * ty list
-  | InvalidNumberOfTypeArgs  of qsymbol * int * int
-  | ApplInvalidArity
-  | UnboundTypeParameter     of symbol
-  | OpNotOverloadedForSig    of qsymbol * ty list
-  | UnexpectedType           of ty * ty * ty * ty
-  | NonLinearPattern         of lpattern
-  | DuplicatedLocals         of psymbol option
-  | ProbaExpressionForbidden
-  | PatternForbiden
-  | ModApplToNonFunctor
-  | ModApplInvalidArity
-  | ModApplInvalidArgInterface
-  | UnificationVariableNotAllowed
-  | TypeVariableNotAllowed
-  | RandomExprNotAllowed
-  | UnNamedTypeVariable
-  | UnusedTypeVariable
+| UniVarNotAllowed
+| TypeVarNotAllowed
+| OnlyMonoTypeAllowed
+| UnboundTypeParameter of symbol
+| UnknownTypeName      of qsymbol
+| InvalidTypeAppl      of qsymbol * int * int
+| DuplicatedTyVar
+| DuplicatedLocal      of symbol
+| NonLinearPattern
+| TypeMismatch         of (ty * ty) * (ty * ty)
+| UnknownVarOrOp       of qsymbol * ty list
+| MultipleOpMatch      of qsymbol * ty list
+| UnknownModName       of qsymbol
+| UnknownTyModName     of qsymbol
+| UnknownFunName       of qsymbol
+| UnknownModVar        of qsymbol
+| UnknownMemName       of symbol
+| InvalidFunAppl       of funapp_error
+| InvalidModAppl       of modapp_error
+| InvalidModType       of modtyp_error
+| InvalidMem           of symbol * mem_error
 
-exception TyError of tyerror
+exception TyError of EcLocation.t * EcEnv.env * tyerror
 
-val tyerror : EcLocation.t -> tyerror -> 'a
+val tyerror : EcLocation.t -> EcEnv.env -> tyerror -> 'a
 
 (* -------------------------------------------------------------------- *)
 type typolicy
+
 val tp_tydecl : typolicy
 val tp_relax  : typolicy
 
 (* -------------------------------------------------------------------- *)
 val transty : typolicy -> EcEnv.env -> EcUnify.unienv -> pty -> ty 
+
 val transtys :  
     typolicy -> EcEnv.env -> EcUnify.unienv -> pty list -> ty list
 
-val transtvi : EcEnv.env -> EcUnify.unienv -> tvar_inst -> EcUnify.UniEnv.tvi
+val transtvi : EcEnv.env -> EcUnify.unienv -> ptyannot -> EcUnify.UniEnv.tvar_inst_kind
 
 (* -------------------------------------------------------------------- *)
 val transexp : EcEnv.env -> EcUnify.unienv -> pexpr -> expr * ty
 val transexpcast : EcEnv.env -> EcUnify.unienv -> ty -> pexpr -> expr
 
 (* -------------------------------------------------------------------- *)
-val transmem     : EcEnv.env -> EcSymbols.symbol EcUtils.located -> EcIdent.t
+val transmem     : EcEnv.env -> EcSymbols.symbol located -> EcIdent.t
 val transformula : EcEnv.env -> EcUnify.unienv -> pformula -> EcFol.form 
 val transform    : EcEnv.env -> EcUnify.unienv -> pformula -> ty -> EcFol.form
 val transform_opt: EcEnv.env -> EcUnify.unienv -> pformula -> ty option -> EcFol.form

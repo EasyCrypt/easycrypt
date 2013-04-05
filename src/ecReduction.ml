@@ -1,3 +1,4 @@
+(* -------------------------------------------------------------------- *)     
 open EcUtils
 open EcIdent
 open EcPath
@@ -6,22 +7,23 @@ open EcModules
 open EcFol
 open EcBaseLogic
 open EcEnv
+
 (* -------------------------------------------------------------------- *)     
-exception IncompatibleType of ty * ty
-exception IncompatibleForm of form * form * form * form
+exception IncompatibleType of env * (ty * ty)
+exception IncompatibleForm of env * (form * form)
 
-module PE = EcPrinting.EcDebugPP (* FIXME *)
+module PE = EcPrinting
 
-let _ = EcPexception.register (fun fmt exn ->
+let _ = EcPException.register (fun fmt exn ->
   match exn with
-  | IncompatibleForm(f1,f2,f3,f4) ->
-    Format.fprintf fmt "the formula %a is not compatible with %a, since %a is not compatible with %a" PE.pp_form f1 PE.pp_form f2 PE.pp_form f3 PE.pp_form f4
-  | IncompatibleType(ty1,ty2) ->
-    let pp_type = PE.pp_type ~vmap:(EcUidgen.NameGen.create()) in
-    Format.fprintf fmt "the type %a is not compatible with %a"
-      pp_type ty1 pp_type ty2
+  | IncompatibleForm (env, (f1, f2)) ->
+      Format.fprintf fmt
+        "the formula %a is not compatible with %a\n%!"
+        (PE.pp_form env) f1 (PE.pp_form env) f2
+
   | _ -> raise exn)
       
+(* -------------------------------------------------------------------- *)     
 let rec equal_type env t1 t2 = 
   match t1.ty_node, t2.ty_node with
   | Tunivar uid1, Tunivar uid2 -> EcUidgen.uid_equal uid1 uid2
@@ -41,8 +43,10 @@ let rec equal_type env t1 t2 =
       equal_type env t1 (Ty.unfold p2 lt2 env)
   | _, _ -> false
   
+(* -------------------------------------------------------------------- *)     
 let check_type env t1 t2 = 
-  if not (equal_type env t1 t2) then raise (IncompatibleType(t1,t2))
+  if not (equal_type env t1 t2) then
+    raise (IncompatibleType (env, (t1, t2)))
 
 let rec destr_tfun env tf = 
   match tf.ty_node with
@@ -137,11 +141,11 @@ and i_equal_norm env i1 i2 =
 
 type reduction_info = {
   beta    : bool;
-  delta_p : Sp.t option;   (* None means all *)
-  delta_h : Sid.t option;  (* None means all *)
-  zeta    : bool;   (* remove let *)
-  iota    : bool;   (* remove case *)
-  logic   : bool;   (* perform logical simplification *)
+  delta_p : Sp.t option;          (* None means all *)
+  delta_h : Sid.t option;         (* None means all *)
+  zeta    : bool;                 (* reduce let  *)
+  iota    : bool;                 (* reduce case *)
+  logic   : bool;                 (* perform logical simplification *)
 }
 
 let full_red = {
@@ -152,8 +156,7 @@ let full_red = {
   iota    = true;
   logic   = true;
 }
-  
-  
+   
 let no_red = {
   beta    = false;
   delta_p = Some Sp.empty;
@@ -249,15 +252,15 @@ let h_red_opt ri env hyps f =
   with NotReducible -> None
 
 let check_alpha_equal ri env hyps f1 f2 = 
-  let error f1' f2' = raise (IncompatibleForm(f1,f2,f1',f2')) in
+  let error () = raise (IncompatibleForm (env, (f1, f2))) in
   let find alpha id = try Mid.find id alpha with _ -> id in
-  let check_lpattern f1 f2 alpha lp1 lp2 = 
+  let check_lpattern alpha lp1 lp2 = 
     match lp1, lp2 with
     | LSymbol (id1,_), LSymbol (id2,_) -> Mid.add id1 id2 alpha
     | LTuple lid1, LTuple lid2 when List.length lid1 = List.length lid2 ->
         List.fold_left2 (fun alpha (id1,_) (id2,_) -> Mid.add id1 id2 alpha) 
           alpha lid1 lid2
-    | _, _ -> error f1 f2 in
+    | _, _ -> error () in
   let check_memtype mt1 mt2 =
     match mt1, mt2 with
     | None, None -> true
@@ -266,7 +269,7 @@ let check_alpha_equal ri env hyps f1 f2 =
         EcSymbols.Msym.equal (equal_type env) 
         (EcMemory.lmt_bindings lmt1) (EcMemory.lmt_bindings lmt2) 
     | _, _ -> false in
-  let check_binding f1 f2 alpha bd1 bd2 =
+  let check_binding alpha bd1 bd2 =
     let check_one alpha (x1,ty1) (x2,ty2) =
       let tyok =
         match ty1, ty2 with
@@ -277,7 +280,7 @@ let check_alpha_equal ri env hyps f1 f2 =
       in
         if   tyok
         then Mid.add x1 x2 alpha
-        else error f1 f2
+        else error ()
     in
       List.fold_left2 check_one alpha bd1 bd2 in
 
@@ -287,7 +290,7 @@ let check_alpha_equal ri env hyps f1 f2 =
 
     | Fquant(q1,bd1,f1'), Fquant(q2,bd2,f2') when 
         q1 = q2 && List.length bd1 = List.length bd2 ->
-          let alpha = check_binding f1 f2 alpha bd1 bd2 in
+          let alpha = check_binding alpha bd1 bd2 in
           aux alpha f1' f2'
 
     | Fif(a1,b1,c1), Fif(a2,b2,c2) ->
@@ -295,7 +298,7 @@ let check_alpha_equal ri env hyps f1 f2 =
 
     | Flet(p1,f1',g1), Flet(p2,f2',g2) ->
         aux alpha f1' f2';
-        let alpha = check_lpattern f1 f2 alpha p1 p2 in
+        let alpha = check_lpattern alpha p1 p2 in
         aux alpha g1 g2
 
     | Fint i1, Fint i2 when i1 = i2 -> ()
@@ -344,7 +347,7 @@ let check_alpha_equal ri env hyps f1 f2 =
         List.iter2 (aux alpha) args1 args2;
         aux alpha f1' f2'
 
-    | _, _ -> error f1 f2
+    | _, _ -> error ()
   and aux alpha f1 f2 = 
     try aux1 alpha f1 f2 
     with e ->
@@ -372,8 +375,3 @@ let rec simplify ri env hyps f =
   let f' = try h_red ri env hyps f with NotReducible -> f in
   if f == f' then f_map (fun ty -> ty) (simplify ri env hyps) f
   else simplify ri env hyps f'
-
-
-
-  
-

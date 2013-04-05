@@ -2,7 +2,8 @@ require Logic.
 
 module M = { 
   fun f () : int * int = {
-    var x, y : int;
+    var x : int;
+    var y : int;
     x = 1;
     y = 0;
     while (true) {
@@ -22,7 +23,8 @@ save.
 
 module M1 = { 
   fun f () : int * int= {
-    var x, y : int;
+    var x : int;
+    var y : int;
     x = 1;
     y = 10;
     while (x <> y) {
@@ -31,7 +33,6 @@ module M1 = {
     return (x,y);
   }
 }.
-
 
 lemma foo1 : hoare [M1.f : true ==> res = (10,10)]
 proof.
@@ -45,10 +46,3 @@ proof.
  split .
  intros x h _;rewrite h;split.
 save.
-
-
-
-
-
-
-

@@ -9,7 +9,9 @@ val from_string  : string -> ecreader
 (* -------------------------------------------------------------------- *)
 val finalize : ecreader -> unit
 val parse    : ecreader -> EcParsetree.prog
-val parseall : ecreader -> EcParsetree.global list
+val parseall : ecreader -> (EcParsetree.global EcLocation.located) list
+val drain    : ecreader -> unit
+val lexbuf   : ecreader -> Lexing.lexbuf
 
 (* -------------------------------------------------------------------- *)
 val lex_single_token : string -> EcParser.token option

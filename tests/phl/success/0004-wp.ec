@@ -1,7 +1,8 @@
 require Logic.
 module M = {
   fun f (w x:int) : int = {
-    var y, z : int;
+    var y : int;
+    var z : int;
     y = 1;
     z = x;
     x = y;

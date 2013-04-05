@@ -1,13 +1,26 @@
 (* -------------------------------------------------------------------- *)
 open EcSymbols
+open EcLocation
 open EcUtils
 
 (* -------------------------------------------------------------------- *)
-let qsymb_of_symb (x : symbol) : qsymbol = ([], x)
+exception ParseError of EcLocation.t * string option
+
+let pp_parse_error fmt msg =
+  match msg with
+  | Some msg -> Format.fprintf fmt "parse error: %s" msg
+  | None     -> Format.fprintf fmt "parse error"
+
+let () =
+  let pp fmt exn =
+    match exn with
+    | ParseError (_loc, msg) -> pp_parse_error fmt msg
+    | _ -> raise exn
+  in
+    EcPException.register pp
 
 (* -------------------------------------------------------------------- *)
-let dummyloc x = { pl_loc = EcLocation.dummy; pl_desc = x }
-let dummy_pqs_of_ps s = dummyloc (qsymb_of_symb (unloc s))
+let qsymb_of_symb (x : symbol) : qsymbol = ([], x)
 
 (* -------------------------------------------------------------------- *)
 type psymbol  = symbol  located
@@ -15,9 +28,8 @@ type pqsymbol = qsymbol located
 type pmsymbol = (psymbol * ((pmsymbol located) list) option) list
 type posymbol = symbol option located
 
-type pty = pty_r located                (* located type *)
-
-and pty_r =
+(* -------------------------------------------------------------------- *)
+type pty_r =
   | PTunivar
   | PTtuple     of pty list
   | PTnamed     of pqsymbol
@@ -25,32 +37,32 @@ and pty_r =
   | PTapp       of pqsymbol * pty list
   | PTfun       of pty * pty
 
-type tvar_inst_kind = 
-  | TVIunamed of pty list
-  | TVInamed  of (psymbol * pty) list
-
-type tvar_inst = tvar_inst_kind option
-
-type pexpr  = pexpr_r located  (* located expression *)
-
 and pexpr_r =
   | PEint      of int                               (* int. literal       *)
-  | PEident    of pqsymbol * tvar_inst              (* symbol             *)
+  | PEident    of pqsymbol * ptyannot option        (* symbol             *)
   | PEapp      of pexpr * pexpr list                (* op. application    *)
-  | PElet      of lpattern * pexpr * pexpr          (* let binding        *)
+  | PElet      of plpattern * pexpr * pexpr         (* let binding        *)
   | PEtuple    of pexpr list                        (* tuple constructor  *)
   | PEif       of pexpr * pexpr * pexpr             (* _ ? _ : _          *)
 
-and lpattern =
+and ptyannot_r = 
+  | TVIunamed of pty list
+  | TVInamed  of (psymbol * pty) list
+
+and plpattern_r =
   | LPSymbol of psymbol
   | LPTuple  of psymbol list
 
-type ptylocals = (psymbol * pty) list
-
-type plvalue =
+and plvalue_r =
   | PLvSymbol of pqsymbol
   | PLvTuple  of pqsymbol list
-  | PLvMap    of pqsymbol * tvar_inst * pexpr
+  | PLvMap    of pqsymbol * ptyannot option * pexpr
+
+and pty       = pty_r       located
+and pexpr     = pexpr_r     located
+and plpattern = plpattern_r located
+and plvalue   = plvalue_r   located
+and ptyannot  = ptyannot_r  located
 
 (* -------------------------------------------------------------------- *)
 type pinstr =
@@ -64,10 +76,10 @@ type pinstr =
 and pstmt = pinstr list
 
 (* -------------------------------------------------------------------- *)
-type pmodule_sig =
-  | Pmty_struct of pmodule_sig_struct
+type pmodule_type = pqsymbol 
 
-and pmodule_type = pqsymbol 
+and pmodule_sig =
+  | Pmty_struct of pmodule_sig_struct
 
 and pmodule_sig_struct = {
   pmsig_params : (psymbol * pmodule_type) list;
@@ -88,20 +100,22 @@ and pvariable_decl = {
 
 and pfunction_decl = {
   pfd_name     : psymbol;
-  pfd_tyargs   : ptylocals;
+  pfd_tyargs   : (psymbol * pty) list;
   pfd_tyresult : pty;
   pfd_uses     : (pqsymbol list) option;
 }
 
 (* -------------------------------------------------------------------- *)
-and pmodule_expr =
+and pmodule_expr_r =
   | Pm_ident  of pqsymbol * pqsymbol list
   | Pm_struct of pstructure
+
+and pmodule_expr = pmodule_expr_r located
 
 and pstructure = {
   ps_params    : (psymbol * pmodule_type) list;
   ps_body      : pstructure_item list;
-  ps_signature : (pqsymbol * psymbol list) list;
+  ps_signature : ((pqsymbol * psymbol list) located) list;
 }
 
 and pstructure_item =
@@ -141,11 +155,11 @@ type pformula  = pformula_r located
 and pformula_r = 
   | PFint    of int
   | PFtuple  of pformula list
-  | PFident  of pqsymbol * tvar_inst
+  | PFident  of pqsymbol * ptyannot option
   | PFside   of pformula * psymbol
   | PFapp    of pformula * pformula list
   | PFif     of pformula * pformula * pformula
-  | PFlet    of lpattern * pformula * pformula
+  | PFlet    of plpattern * pformula * pformula
   | PFforall of pgtybindings * pformula
   | PFexists of pgtybindings * pformula
   | PFlambda of pgtybindings * pformula
@@ -155,7 +169,6 @@ and pformula_r =
   | PFhoareF of pformula * pgamepath * pformula
   | PFequivF of pformula * (pgamepath * pgamepath) * pformula
   | PFprob   of pgamepath * (pformula list) * pmemory * pformula
-
 
 and pgtybinding  = psymbol * pgty
 and pgtybindings = pgtybinding list
@@ -177,7 +190,7 @@ type paxiom = {
 (* -------------------------------------------------------------------- *)
 type 'a abstr_def = 
   | AbstrDef of pty list option
-  | ConcrDef of ptylocals * 'a 
+  | ConcrDef of (psymbol *pty) list * 'a 
 
 type ppredicate = {
   pp_name   : psymbol;
@@ -200,7 +213,7 @@ let empty_pprover = {
 }
 
 type fpattern_kind = 
-  | FPNamed of pqsymbol * tvar_inst
+  | FPNamed of pqsymbol * ptyannot option
   | FPCut   of pformula
 
 type fpattern_arg = 
@@ -223,12 +236,18 @@ type preduction = {
 }
 
 
+(* -------------------------------------------------------------------- *)
+type 'a doption = 
+  | Single of 'a
+  | Double of 'a * 'a
+
+type tac_side = bool option
 
 type ptactic = ptactic_r located
 
 and ptactic_r = 
   | Pidtac
-  | Passumption of (pqsymbol option * tvar_inst)
+  | Passumption of (pqsymbol option * ptyannot option)
   | Ptrivial    of pprover_infos
   | Pintro      of posymbol list  
   | Psplit                        
@@ -250,7 +269,6 @@ and ptactic_r =
   | Pseq        of ptactics
   | PPhl        of phl_tactics
   | Padmit
-
 
 and phl_tactics = 
   | Pfun_def  
@@ -352,5 +370,5 @@ type global =
   | Gsave        of EcLocation.t
 
 type prog =
-  | P_Prog of global list * bool
+  | P_Prog of (global located) list * bool
   | P_Undo of int

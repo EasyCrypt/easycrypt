@@ -23,12 +23,11 @@ and ty_node =
 val ty_equal : ty -> ty -> bool
 val ty_hash  : ty -> int 
 
-val tuni   : EcUidgen.uid -> ty
-val tvar   : EcIdent.t -> ty
+val tuni    : EcUidgen.uid -> ty
+val tvar    : EcIdent.t -> ty
 val ttuple  : ty list -> ty
 val tconstr : EcPath.path -> ty list -> ty
 val tfun    : ty -> ty -> ty
-
 
 type dom   = ty list
 type tysig = dom * ty 
@@ -47,16 +46,14 @@ val dom_dump : dom -> EcDebug.dnode
 
 (* -------------------------------------------------------------------- *)
 type ty_subst = {
-    ts_p : EcPath.path -> EcPath.path;
-    ts_u : ty Muid.t;
-    ts_v : ty Mid.t;
-  }
+  ts_p : EcPath.path -> EcPath.path;
+  ts_u : ty Muid.t;
+  ts_v : ty Mid.t;
+}
 
 val ty_subst_id : ty_subst
 
 val ty_subst : ty_subst -> ty -> ty
-
-
 
 module Tuni : sig
   val subst1    : (uid * ty) -> ty -> ty

@@ -1357,7 +1357,7 @@ let para_call max_provers provers timelimit task =
  (*  Format.printf "Prover %s started and set at %i@." prover i *)
     with e -> 
       Format.printf "Error when starting %s: %a" prover 
-        EcPexception.exn_printer e;
+        EcPException.exn_printer e;
       ()
   in
 

@@ -485,7 +485,6 @@ let rec expr_dump (e : expr) =
   | _ -> dleaf "expression"
 
 (* -------------------------------------------------------------------- *)
-
 type e_subst = { 
     es_freshen : bool; (* true means realloc local *)
     es_p       : EcPath.path -> EcPath.path;

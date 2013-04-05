@@ -22,7 +22,7 @@ let pp_error fmt = function
         "Invalid number of tactic, %i tactics expected, %i given" i1 i2 
   | e -> raise e
 
-let _ = EcPexception.register pp_error
+let _ = EcPException.register pp_error
 
 type local_kind =
   | LD_var   of ty * form option
@@ -69,7 +69,7 @@ module LDecl = struct
         Format.fprintf fmt 
           "An hypothesis or a variable named %s already exists" s
 
-  let _ = EcPexception.register (fun fmt exn ->
+  let _ = EcPException.register (fun fmt exn ->
     match exn with
     | Ldecl_error e -> pp_error fmt e 
     | _ -> raise exn)
@@ -175,10 +175,10 @@ end
 
 type prover_info = unit (* FIXME *)
 
-type tac_pos = int doption
+type tac_pos = int EcParsetree.doption
 
 type rule_name = 
-(* Logical rules *)
+   (* Logical rules *)
   | RN_admit
   | RN_clear        of EcIdent.Sid.t 
   | RN_prover       of prover_info
@@ -191,7 +191,8 @@ type rule_name =
   | RN_exists_intro 
 (*| RN_tuple_intro  of EcIdent.t list *)
   | RN_conv    
-(* Phl rules *)    
+
+    (* Phl rules *)    
   | RN_hl_fun_def 
   | RN_hl_skip
   | RN_hl_wp        of tac_pos

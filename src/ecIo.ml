@@ -2,11 +2,6 @@
 open EcUtils
 
 (* -------------------------------------------------------------------- *)
-let lexer = fun lexbuf ->
-  let token = EcLexer.main lexbuf in
-    (token, Lexing.lexeme_start_p lexbuf, Lexing.lexeme_end_p lexbuf)
-
-(* -------------------------------------------------------------------- *)
 let lexbuf_from_channel = fun name channel ->
   let lexbuf = Lexing.from_channel channel in
     lexbuf.Lexing.lex_curr_p <- {
@@ -27,19 +22,25 @@ type parser_t =
 
 (* -------------------------------------------------------------------- *)
 type ecreader_r = {
-  ecr_lexbuf : Lexing.lexbuf;
-  ecr_parser : parser_t;
+  (*---*) ecr_lexbuf  : Lexing.lexbuf;
+  (*---*) ecr_parser  : parser_t;
+  mutable ecr_atstart : bool;
 }
 
 type ecreader = ecreader_r Disposable.t
+
+(* -------------------------------------------------------------------- *)
+let lexbuf (reader : ecreader) =
+  (Disposable.get reader).ecr_lexbuf
 
 (* -------------------------------------------------------------------- *)
 let from_channel ~name channel =
   let lexbuf = lexbuf_from_channel name channel in
 
     Disposable.create
-      { ecr_lexbuf = lexbuf;
-        ecr_parser = parserfun (); }
+      { ecr_lexbuf  = lexbuf;
+        ecr_parser  = parserfun ();
+        ecr_atstart = true; }
 
 (* -------------------------------------------------------------------- *)
 let from_file filename =
@@ -48,8 +49,9 @@ let from_file filename =
       let lexbuf = lexbuf_from_channel filename channel in
 
         Disposable.create ~cb:(fun _ -> close_in channel)
-          { ecr_lexbuf = lexbuf;
-            ecr_parser = parserfun (); }
+          { ecr_lexbuf  = lexbuf;
+            ecr_parser  = parserfun ();
+            ecr_atstart = true; }
 
     with
       | e ->
@@ -61,17 +63,36 @@ let from_string data =
   let lexbuf = Lexing.from_string data in
 
     Disposable.create
-      { ecr_lexbuf = lexbuf;
-        ecr_parser = parserfun (); }
+      { ecr_lexbuf  = lexbuf;
+        ecr_parser  = parserfun ();
+        ecr_atstart = true; }
 
 (* -------------------------------------------------------------------- *)
 let finalize (ecreader : ecreader) =
   Disposable.dispose ecreader
 
 (* -------------------------------------------------------------------- *)
+let lexer = fun ecreader ->
+  let lexbuf = ecreader.ecr_lexbuf in
+  let token  = EcLexer.main lexbuf in
+    ecreader.ecr_atstart <- (token = EcParser.FINAL);
+    (token, Lexing.lexeme_start_p lexbuf, Lexing.lexeme_end_p lexbuf)
+
+(* -------------------------------------------------------------------- *)
+let drain (ecreader : ecreader) =
+  let ecreader = Disposable.get ecreader in
+  let rec drain () =
+    match lexer ecreader with
+    | (EcParser.FINAL, _, _) -> ()
+    | _ -> drain ()
+  in
+    if not ecreader.ecr_atstart then
+      drain ()
+
+(* -------------------------------------------------------------------- *)
 let parse (ecreader : ecreader) =
   let ecreader = Disposable.get ecreader in
-    ecreader.ecr_parser (fun () -> lexer ecreader.ecr_lexbuf)
+    ecreader.ecr_parser (fun () -> lexer ecreader)
 
 (* -------------------------------------------------------------------- *)
 let parseall (ecreader : ecreader) =
