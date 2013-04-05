@@ -980,6 +980,39 @@ module Tactic = struct
           t_hoare_cond env g
     else cannot_apply "cond" "the conclusion is not a hoare or a equiv goal"
 
+  let rec process_swap1 env info g =
+    let side,pos = info.pl_desc in
+    match side with
+    | None -> 
+      t_seq (process_swap1 env {info with pl_desc = (Some true, pos)})
+        (process_swap1 env {info with pl_desc = (Some false, pos)}) g
+    | Some side -> 
+      let tac = 
+        match pos with 
+        | SKbase(p1,p2,p3) -> t_equiv_swap env side p1 p2 p3
+        | SKmove p -> 
+          if 0 < p then t_equiv_swap env side 1 2 (p+1)
+          else if p < 0 then 
+            let concl = get_concl g in 
+            let es = set_loc info.pl_loc destr_equivS concl in 
+            let s = if side then es.es_sl else es.es_sr in
+            let len = List.length s.s_node in
+            t_equiv_swap env side (len-p) len len
+          else (* p = 0 *) t_id
+        | SKmovei(i,p) ->
+          if 0 < p then t_equiv_swap env side i (i+1) (i+p)
+          else if p < 0 then t_equiv_swap env side (i+p) i i
+          else (* p = 0 *) t_id
+        | SKmoveinter(i1,i2,p) ->
+          if 0 < p then t_equiv_swap env side i1 (i2+1) (i2+p)
+          else if p < 0 then t_equiv_swap env side (i1+p) i1 i2
+          else (* p = 0 *) t_id
+      in
+      set_loc info.pl_loc tac g
+
+  let process_swap env info = 
+    t_lseq (List.map (process_swap1 env) info) 
+
   let process_phl loc env ptac g =
     let t = 
       match ptac with
@@ -991,7 +1024,7 @@ module Tactic = struct
       | Pcond side   -> process_cond env side 
       | Pwhile phi -> process_while env phi 
       | Pcall(pre,post) -> process_call env pre post
-      | Pswap info -> t_swap env info
+      | Pswap info -> process_swap env info
     in
     set_loc loc t g
  

@@ -243,6 +243,12 @@ type 'a doption =
 
 type tac_side = bool option
 
+type  swap_kind = 
+  | SKbase of int * int * int
+  | SKmove of int
+  | SKmovei of int * int
+  | SKmoveinter of int * int * int 
+
 type ptactic = ptactic_r located
 
 and ptactic_r = 
@@ -279,7 +285,7 @@ and phl_tactics =
   | Pcall       of pformula * pformula
   | Prcond      of (bool option * bool * int)
   | Pcond       of tac_side
-  | Pswap       of (tac_side * (int * int * int))
+  | Pswap       of ((tac_side * swap_kind) located list)
 
 and ptactics = ptactic list        
 

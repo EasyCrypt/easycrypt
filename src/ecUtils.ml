@@ -466,3 +466,6 @@ module Stream = struct
     try  Some (Stream.next stream)
     with Stream.Failure -> None
 end
+
+(* -------------------------------------------------------------------- *)
+

@@ -724,38 +724,7 @@ let t_equiv_swap env side p1 p2 p3 g =
     if side then swap es.es_sl, es.es_sr else es.es_sl, swap es.es_sr in
   let concl = f_equivS_r {es with es_sl = sl; es_sr = sr } in
   prove_goal_by [concl] (RN_hl_swap(side,p1,p2,p3)) g
-
-let rec t_swap env (side, info) g =
-  match side with
-  | None -> 
-    t_seq (t_swap env (Some true, info)) 
-      (t_swap env (Some false, info)) g
-  | Some side -> 
-    let p1,p2,p3 = info in
-    t_equiv_swap env side p1 p2 p3 g
-
-
-(*
-let t_equiv_swap env side start length delta = 
-  let swap s =
-    let hd,tl = s_split "swap" (start - 1) s in
-    let toswap, tl  = 
-      let len = List.length tl in
-      if 0 <= length && length <= len then List.take_n length tl
-      else cannot_apply "swap" "the last position is outside of the statement" in
-    let hd,tojump,tl = 
-      if 0 <= delta then
-        let len = List.length tl in 
-        if delta <= len then 
-          let tojump,tl = List.take_n delta tl in
-          
-        else cannot_apply "swap" "the move is to big"
-        
-*)
-        
     
-  
-  
 (* -------------------------------------------------------------------- *)
 
 (* TODO : define it in term of case and rcond *)

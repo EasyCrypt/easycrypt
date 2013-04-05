@@ -1243,9 +1243,25 @@ tactic:
 | IF s=side?
     { PPhl (Pcond s) }
 
-| SWAP s=side? i1=number i2=number i3=number 
-    { PPhl (Pswap(s, (i1, i2, i3))) }
+| SWAP info=plist1(loc(swap_info),COMMA)
+    { PPhl (Pswap info) }
 ;
+
+swap_info:
+| s=side? p=swap_pos { s,p }
+;
+
+
+swap_pos:
+| i1=number i2=number i3=number                      { SKbase(i1,i2,i3)     }
+| p=int                                              { SKmove p             }
+| i1=number p=int                                    { SKmovei(i1,p)        }
+| LBRACKET i1=number DOTDOT i2=number RBRACKET p=int { SKmoveinter(i1,i2,p) }
+;
+int:
+| n=number { n }  (* FIXME how to get negative number *) 
+;
+
 
 side:
 | LBRACE n=number RBRACE {
