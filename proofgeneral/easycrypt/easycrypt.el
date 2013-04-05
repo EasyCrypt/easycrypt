@@ -19,9 +19,7 @@
   :type 'string
   :group 'easycrypt-config)
 
-;(defconst easycrypt-outline-regexp
-;  (concat (proof-ids-to-regexp test) "[ \t]*\\(?:" "\\)" )
-;  "Outline regexp for EasyCrypt games documents")
+(defconst easycrypt-shell-init-cmd "require import Logic. ")
 
 ;;
 ;; ======== Configuration of generic modes ========
@@ -46,7 +44,7 @@
   ;; For func-menu and finding goal...save regions
   (setq  proof-goal-command-p                  'easycrypt-goal-command-p
          proof-save-command-regexp             "save"
-			proof-really-save-command-p           'easycrypt-save-command-p
+            proof-really-save-command-p           'easycrypt-save-command-p
          proof-goal-with-hole-regexp           easycrypt-named-entity-regexp
          proof-goal-with-hole-result           1
          proof-save-with-hole-regexp           nil
@@ -62,7 +60,6 @@
   ; Options
   (setq  proof-three-window-enable             t
          proof-auto-multiple-files             t)
-  ;(set (make-local-variable 'outline-regexp)   "game" );easycrypt-outline-regexp)  
 
   ; Setting indents 
   (set   (make-local-variable 'indent-tabs-mode) nil)
@@ -74,6 +71,8 @@
          proof-indent-enclose-regexp  easycrypt-indent-enclose-regexp
          proof-indent-open-regexp     easycrypt-indent-open-regexp
          proof-indent-close-regexp    easycrypt-indent-close-regexp)
+
+  (setq proof-shell-init-cmd easycrypt-shell-init-cmd)
 
   (easycrypt-init-syntax-table)
   ;; we can cope with nested comments
@@ -134,48 +133,42 @@
   "Remove [error] in the error message and extract the position
   and length of the error "
   (proof-with-current-buffer-if-exists proof-response-buffer
-    (goto-char (point-max))
 
-	 ; Match and remove [error]
-	 (when (re-search-backward "\\(\\[error\\]\\)" nil t)
-		(let ((text (match-string 1)))
-		  (let ((inhibit-read-only t))
-			 (delete-region (match-beginning 0) (match-end 0)))))
+     (goto-char (point-max))
+     (when (re-search-backward "\\[error-\\([0-9]+\\)-\\([0-9]+\\)\\]" nil t)
+        (let* ((inhibit-read-only t)
+               (pos1 (string-to-number (match-string 1)))
+               (pos2 (string-to-number (match-string 2)))
+               (len (- pos2 pos1)))
 
-    (goto-char (point-max))
-	 ; Extract the begin-position and end-position
-    (when (re-search-backward "characters \\([0-9]+\\)-\\([0-9]+\\)" nil t)
-		 (let* ((pos1 (string-to-number (match-string 1)))
-				  (pos2 (string-to-number (match-string 2)))
-				  (len (- pos2 pos1) ))
-			(list pos1 len)))))
-
+              (delete-region (match-beginning 0) (match-end 0))
+              (list pos1 len)))))
 
 (defun easycrypt-advance-until-command ()
-   (while (proof-looking-at "\\s-")
-			 (forward-char 1)))
+   (while (proof-looking-at "\\s-") (forward-char 1)))
 
-(defun easycrypt-highlight-error () 
+(defun easycrypt-highlight-error ()
   "Use 'easycrypt-get-last-error-location' to know the position
   of the error and then highlight in the script buffer"
   (proof-with-current-buffer-if-exists proof-script-buffer
     (let ((mtch (easycrypt-get-last-error-location)))
-		(when mtch
-		  (let ((pos (car mtch))
-				  (lgth (cadr mtch)))
+        (when mtch
+          (let ((pos (car mtch))
+                  (lgth (cadr mtch)))
           (if (eq (proof-unprocessed-begin) (point-min))
-				(goto-char (proof-unprocessed-begin))
-				(goto-char (+ (proof-unprocessed-begin) 1)))
-		    (easycrypt-advance-until-command)
-			 (goto-char (+ (point) pos))
-			 (span-make-self-removing-span (point) (+ (point) lgth)
-												;	 'face 'proof-script-sticky-error-face))))))
-													 'face 'proof-script-highlight-error-face))))))
+                (goto-char (proof-unprocessed-begin))
+                (goto-char (+ (proof-unprocessed-begin) 1)))
+            (easycrypt-advance-until-command)
+             (goto-char (+ (point) pos))
+             (span-make-self-removing-span (point) (+ (point) lgth)
+                                                     'face 'proof-script-highlight-error-face))))))
 
 (defun easycrypt-highlight-error-hook ()
   (easycrypt-highlight-error ))
 
-(add-hook 'proof-activate-scripting-hook '(lambda () (when proof-three-window-enable (proof-layout-windows))))
+(add-hook
+  'proof-activate-scripting-hook
+  '(lambda () (when proof-three-window-enable (proof-layout-windows))))
 
 (add-hook 'proof-shell-handle-error-or-interrupt-hook 'easycrypt-highlight-error-hook t)
 

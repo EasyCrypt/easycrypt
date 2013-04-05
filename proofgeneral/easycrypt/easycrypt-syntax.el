@@ -98,7 +98,7 @@
 ;
 ;; ----- regular expressions
 
-(defvar easycrypt-error-regexp "^\\[error\\]\\|^anomaly"
+(defvar easycrypt-error-regexp "^\\[error-[0-9]+-[0-9]+\\]\\|^anomaly"
   "A regexp indicating that the EasyCrypt process has identified an error.")
 
 (defvar easycrypt-shell-proof-completed-regexp "QED"
