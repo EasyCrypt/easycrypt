@@ -1,3 +1,4 @@
+require import Logic.
 
 type t.
 
@@ -5,7 +6,6 @@ cnst b1 : bool.
 cnst b2 : bool.
 cnst e1 : t.
 cnst e2 : t.
-
 
 module M = {
   var x, y : t
@@ -18,12 +18,10 @@ module M = {
   }
 }.
 
-
-require import Logic.
-
-lemma foo : hoare [M.f : (b1 => M.y=e1) && (b2 => M.y=e2) && (b1||b2) ==> M.x=M.y ]
+lemma foo : hoare [M.f : (b1 => M.y=e1) && (b2 => M.y=e2) && (b1||b2) ==> 
+                         M.x=M.y ]
 proof.
  fun.
- cond; wp; skip;  trivial.
+ if; wp; skip;  trivial.
 save.
 

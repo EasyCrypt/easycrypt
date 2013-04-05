@@ -136,6 +136,23 @@ module LDecl = struct
     check_id id hyps;
     { hyps with h_local = (id,ld)::hyps.h_local }
 
+  let fresh_id hyps s = 
+    let s = 
+      if s = "_" || not (has_symbol s hyps) then s
+      else 
+        let rec aux n = 
+          let s = s ^ string_of_int n in
+          if has_symbol s hyps then aux (n+1) else s in
+        aux 0 in
+    EcIdent.create s
+      
+  let fresh_ids hyps s =
+    let hyps = ref hyps in
+    List.map (fun s -> 
+      let id = fresh_id !hyps s in
+      hyps := add_local id (LD_var(tbool,None)) !hyps;
+      id) s
+
   let clear ids hyps = 
     let fv_lk = function
       | LD_var (_,Some f) | LD_hyp f -> f.f_fv

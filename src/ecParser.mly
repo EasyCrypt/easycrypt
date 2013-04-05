@@ -136,7 +136,6 @@
 %token COLON
 %token COMMA
 %token COMPUTE
-%token COND
 %token CUT
 %token DELTA
 %token DLBRACKET
@@ -1215,12 +1214,12 @@ tactic:
     {PPhl (Prcond(s,true,i))}
 | RCONDF s=side i=number 
     {PPhl (Prcond(s,false,i))}
-| COND s=side
+| IF s=side
     { PPhl (Pcond s) }
 ;
 
 side_num:
-| LBRACE n=number RBRACE {
+| n=number {
      if n <> 1 && n <> 2 then
        error
          (EcLocation.make $startpos $endpos)

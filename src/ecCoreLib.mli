@@ -51,6 +51,8 @@ val p_int_lt     : path
 val p_cut_lemma  : path
 val p_false_elim : path
 val p_and_elim   : path
+val p_and_proj_l : path
+val p_and_proj_r : path
 val p_anda_elim  : path
 val p_or_elim    : path
 val p_ora_elim   : path

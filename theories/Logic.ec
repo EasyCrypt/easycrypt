@@ -5,6 +5,12 @@ lemma false_elim : forall (c : bool), false => c.
 lemma and_elim : forall (a b c:bool), 
     (a /\ b) => (a => b => c) => c.
 
+lemma and_proj_l : forall (a b:bool),
+    (a /\ b) => a.
+
+lemma and_proj_r : forall (a b:bool),
+    (a /\ b) => b.
+
 lemma anda_elim : forall (a b c:bool),
     (a && b) => (a => b => c) => c.
 

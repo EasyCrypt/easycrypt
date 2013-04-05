@@ -1,6 +1,7 @@
 open EcParsetree
 open EcUtils
 open EcIdent
+open EcCoreLib
 open EcTypes
 open EcFol
 open EcModules
@@ -157,7 +158,9 @@ let s_last_while   st = s_last  destr_while  (last_error " while" st)
 let s_last_whiles  st = s_lasts destr_while  (last_error " while" st)
 let s_last_assert  st = s_last  destr_assert (last_error "n assert" st)
 let s_last_asserts st = s_lasts destr_assert (last_error "n assert" st)
- 
+
+
+
 (* -------------------------------------------------------------------- *)
 (* -------------------------------  Wp -------------------------------- *)
 (* -------------------------------------------------------------------- *)
@@ -334,13 +337,16 @@ let t_fun_def env g =
 
 (* -------------------------------------------------------------------- *)
   
+let gen_mems m f = 
+  let bds = List.map (fun (m,mt) -> (m,GTmem mt)) m in
+  f_forall bds f
+
 let t_hoare_skip g =
   let concl = get_concl g in
   let hs = destr_hoareS concl in
   if hs.hs_s.s_node <> [] then tacerror NoSkipStmt;
   let concl = f_imp hs.hs_pr hs.hs_po in
-  let (m,mt) = hs.hs_m in 
-  let concl = f_forall [(m,GTmem mt)] concl in
+  let concl = gen_mems [hs.hs_m] concl in
   prove_goal_by [concl] RN_hl_skip g
 
 
@@ -350,9 +356,7 @@ let t_equiv_skip g =
   if es.es_sl.s_node <> [] then tacerror NoSkipStmt;
   if es.es_sr.s_node <> [] then tacerror NoSkipStmt;
   let concl = f_imp es.es_pr es.es_po in
-  let (ml,mtl) = es.es_ml in 
-  let (mr,mtr) = es.es_mr in 
-  let concl = f_forall [(ml,GTmem mtl); (mr,GTmem mtr)] concl in
+  let concl = gen_mems [es.es_ml; es.es_mr] concl in
   prove_goal_by [concl] RN_hl_skip g
 
 
@@ -611,9 +615,9 @@ let t_equiv_rcond side b at_pos g =
       (Mid.add (EcMemory.memory m) EcFol.mhr Mid.empty) in
   let pre1  = f_subst {f_subst_id with fs_mem = s1} es.es_pr in
   let concl1 = 
-    f_forall [mo',GTmem (EcMemory.memtype mo)] 
+    gen_mems [mo', EcMemory.memtype mo] 
       (f_hoareS (EcFol.mhr,EcMemory.memtype m) pre1 hd e) in
-  let sl,sr = if b then s, es.es_sr else es.es_sl, s in
+  let sl,sr = if side then s, es.es_sr else es.es_sl, s in
   let concl2 = f_equivS_r { es with es_sl = sl; es_sr = sr } in
   prove_goal_by [concl1;concl2] (RN_hl_rcond (Some side,b,at_pos)) g 
 
@@ -634,38 +638,83 @@ let t_hoare_case f g =
 let t_equiv_case f g = 
   let concl = get_concl g in
   let es = destr_equivS concl in
-  let concl1 = f_equivS_r { es with es_pr = f_and_simpl es.es_pr f } in
-  let concl2 = f_equivS_r { es with es_pr = f_and_simpl es.es_pr (f_not f) } in
+  let concl1 = f_equivS_r { es with es_pr = f_and es.es_pr f } in
+  let concl2 = f_equivS_r { es with es_pr = f_and es.es_pr (f_not f) } in
   prove_goal_by [concl1;concl2] (RN_hl_case f) g
 
+let t_he_case f g =
+  t_hS_or_eS (t_hoare_case f) (t_equiv_case f) g 
 (* -------------------------------------------------------------------- *)
 
 (* TODO : define it in term of case and rcond *)
-let t_hoare_cond g =
+
+let s_first_if s = 
+  match s.s_node with
+  | [] -> cannot_apply "if" "the first instruction should be a if"
+  | i::_ -> 
+    try destr_if i with Not_found -> 
+      cannot_apply "if" "the first instruction should be a if"
+
+let t_gen_cond env side e g =
+  let hyps = get_hyps g in
+  let m1,m2,h,h1,h2 = match LDecl.fresh_ids hyps ["m";"m";"_";"_";"_"] with
+    | [m1;m2;h;h1;h2] -> m1,m2,h,h1,h2
+    | _ -> assert false in
+  let t_introm = if side <> None then t_intros_i env [m1] else t_id in
+  let t_sub b g = 
+    t_seq_subgoal (t_rcond side b 1)
+      [ t_lseq [t_introm; t_skip;t_intros_i env ([m2;h]);
+                t_elim_hyp env h;
+                t_intros_i env [h1; h2]; t_hyp env h2];
+        t_id ] g in
+  t_seq_subgoal (t_he_case e) [t_sub true; t_sub false] g
+
+let t_hoare_cond env g = 
   let concl = get_concl g in
   let hs = destr_hoareS concl in 
-  let s = hs.hs_s.s_node in
-  match s with 
-    | [] -> assert false (* FIXME *)
-    | c :: s_tail' ->
-      match c.i_node with 
-        | Sif (e,ct,cf) ->
-          let e = form_of_expr EcFol.mhr e in
-          let st = stmt (ct.s_node @ s_tail') in
-          let sf = stmt (cf.s_node @ s_tail') in
-          let f1 = f_hoareS hs.hs_m (f_and hs.hs_pr e) st hs.hs_po in
-          let f2 = f_hoareS hs.hs_m (f_and hs.hs_pr (f_not e)) sf hs.hs_po in
-          prove_goal_by [f1;f2] RN_hl_cond g
-        | _ -> assert false (* FIXME *)
+  let (e,_,_) = s_first_if hs.hs_s in
+  t_gen_cond env None (form_of_expr (EcMemory.memory hs.hs_m) e) g
 
-
-let t_equiv_cond side g =
-  let concl = get_concl g in
+let rec t_equiv_cond env side g =
+  let hyps,concl = get_goal g in
   let es = destr_equivS concl in
   match side with
-    | Some _ -> assert false
-    | None -> 
-      let sl,sr = es.es_sl, es.es_sr in
+  | Some s ->
+    let e = 
+      if s then 
+        let (e,_,_) = s_first_if es.es_sl in
+        form_of_expr (EcMemory.memory es.es_ml) e
+      else
+        let (e,_,_) = s_first_if es.es_sr in
+        form_of_expr (EcMemory.memory es.es_mr) e in
+    t_gen_cond env side e g
+  | None -> 
+      let el,_,_ = s_first_if es.es_sl in
+      let er,_,_ = s_first_if es.es_sr in
+      let el = form_of_expr (EcMemory.memory es.es_ml) el in
+      let er = form_of_expr (EcMemory.memory es.es_mr) er in
+      let fiff = gen_mems [es.es_ml;es.es_mr] (f_imp es.es_pr (f_iff el er)) in
+      let hiff,m1,m2,h,h1,h2 = 
+        match LDecl.fresh_ids hyps ["hiff";"m1";"m2";"h";"h";"h"] with 
+        | [hiff;m1;m2;h;h1;h2] -> hiff,m1,m2,h,h1,h2 
+        | _ -> assert false in
+      let t_aux = 
+        t_lseq [t_intros_i env [m1];
+                t_skip;
+                t_intros_i env [m2;h];
+                t_elim_hyp env h;
+                t_intros_i env [h1;h2];
+                t_seq_subgoal (t_rewrite_hyp env false hiff [AAmem m1;AAmem m2;AAnode])
+                  [t_hyp env h1; t_hyp env h2]] in
+      t_seq_subgoal (t_cut env fiff)
+        [ t_id;
+          t_seq (t_intros_i env [hiff])
+            (t_seq_subgoal (t_equiv_cond env (Some true))
+               [t_seq_subgoal (t_equiv_rcond false true  1) [t_aux; t_clear (Sid.singleton hiff)];
+                t_seq_subgoal (t_equiv_rcond false false 1) [t_aux; t_clear (Sid.singleton hiff)]
+               ])
+        ] g
+(*
       match sl.s_node,sr.s_node with
         | [],_ | _,[] -> assert false (* FIXME *)
         | il::sl, ir::sr ->
@@ -687,5 +736,5 @@ let t_equiv_cond side g =
               prove_goal_by [f;f1;f2] RN_hl_cond g
 
             | _ -> assert false (* FIXME *)
-
+*)
 (* -------------------------------------------------------------------- *)

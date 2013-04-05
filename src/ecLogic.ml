@@ -183,8 +183,6 @@ type app_arg =
   | AAmp   of EcPath.mpath
   | AAnode 
 
-
-
 let check_arg do_arg env hyps s x gty a =
   let a = do_arg env hyps (Some gty) a in
   match gty, a with
@@ -258,11 +256,14 @@ let t_apply_hyp = gen_t_apply_hyp (fun _ _ _ a -> a)
 let check_logic env p = 
   try ignore (EcEnv.Ax.by_path p env) with _ ->
     tacerror LogicRequired
-  
+
+let t_apply_logic env p tyargs args g =
+  check_logic env p;
+  t_apply_glob env p tyargs args g
+
 let t_cut env f g =
   let concl = get_concl g in
-  check_logic env p_cut_lemma;
-  t_apply_glob env p_cut_lemma [] [AAform f;AAform concl;AAnode;AAnode] g
+  t_apply_logic env p_cut_lemma [] [AAform f;AAform concl;AAnode;AAnode] g
 
 let set_loc loc f x = 
   try f x 
@@ -312,13 +313,18 @@ let t_intros env ids (juc,n as g) =
   let rule = { pr_name = RN_intros ids; pr_hyps = [RA_node n1]} in
   upd_rule rule (juc,n)
 
+(* internal use *)
+let t_intros_i env ids g = 
+  t_intros env 
+    (List.map (fun id -> {pl_desc = id; pl_loc = EcLocation.dummy}) ids)
+    g
+
 let t_elim env f (juc,n) =
   let hyps,concl = get_goal (juc,n) in
   let rec aux f =
     match f.f_node with
     | Fop(p,_) when EcPath.p_equal p p_false -> 
-      check_logic env p_false_elim;
-      t_apply_glob env p_false_elim [] [AAform concl; AAnode] (juc,n)
+      t_apply_logic env p_false_elim [] [AAform concl; AAnode] (juc,n)
       
     | Fapp({f_node = Fop(p,_)}, [a1;a2] ) ->
       let lem = 
@@ -331,13 +337,11 @@ let t_elim env f (juc,n) =
         | _        -> None in
       begin match lem with
       | Some (p,a) ->
-        check_logic env p;
-        t_apply_glob env p [] ([AAform a1;AAform a2;AAform concl]@a) (juc,n)
+        t_apply_logic env p [] ([AAform a1;AAform a2;AAform concl]@a) (juc,n)
       | None -> aux_red f
       end
     | Fif(a1,a2,a3) ->
-      check_logic env p_if_elim;
-      t_apply_glob env p_if_elim [] [AAform a1;AAform a2;AAform a3;
+      t_apply_logic env p_if_elim [] [AAform a1;AAform a2;AAform a3;
                                      AAform concl;AAnode;AAnode;AAnode] (juc,n)
     | Fquant(Lexists,bd,f') ->
       let juc,n1 = new_goal juc (hyps, f) in
@@ -351,6 +355,10 @@ let t_elim env f (juc,n) =
     | Some f -> aux f
     | _ -> tacerror (UnknownElims f) in
   aux f
+
+let t_elim_hyp env h g =
+  let f = LDecl.lookup_hyp_by_id h (get_hyps g) in
+  t_on_first (t_elim env f g) (t_hyp env h) 
 
 let t_split env g =
   let hyps, concl = get_goal g in
@@ -369,12 +377,11 @@ let t_split env g =
         | OK_eq    -> Some (p_eq_refl, [f1.f_ty], [AAform f1])
         | _        -> None in
       begin match lem with
-      | Some (p,tys,aa) -> check_logic env p; t_apply_glob env p tys aa g 
+      | Some (p,tys,aa) -> t_apply_logic env p tys aa g 
       | None -> aux_red f
       end
     | Fif(f1,f2,f3) ->
-      check_logic env p_if_intro;
-      t_apply_glob env p_if_intro [] 
+      t_apply_logic env p_if_intro [] 
         [AAform f1; AAform f2; AAform f3;AAnode;AAnode] g
     | _ ->  aux_red f 
   and aux_red f = 
@@ -389,12 +396,10 @@ let t_or_intro b env g =
     match f.f_node with
     | Fapp({f_node = Fop(p,_)}, [f1;f2]) when EcPath.p_equal p p_or -> 
       let lem = if b then p_or_intro_l else p_or_intro_r in
-      check_logic env lem;
-      t_apply_glob env lem [] [AAform f1; AAform f2; AAnode] g
+      t_apply_logic env lem [] [AAform f1; AAform f2; AAnode] g
     | Fapp({f_node = Fop(p,_)}, [f1;f2]) when EcPath.p_equal p p_ora -> 
       let lem = if b then p_ora_intro_l else p_ora_intro_r in
-      check_logic env lem;
-      t_apply_glob env lem [] [AAform f1; AAform f2; AAnode] g
+      t_apply_logic env lem [] [AAform f1; AAform f2; AAnode] g
     | _ -> 
       match h_red_opt full_red env hyps f with
       | Some f -> aux f
@@ -472,16 +477,23 @@ let t_rewrite env side f g =
   let p,tys = 
     if eq then (if side then p_rewrite_l else p_rewrite_r), [f1.f_ty]
     else (if side then p_rewrite_iff_l else p_rewrite_iff_r), [] in
-  check_logic env p;  
   let pred =
     let f = if side then f1 else f2 in
     let x, body = pattern_form None env hyps f concl in
     f_lambda [x,GTty f.f_ty] body in
   t_on_last 
-    (t_apply_glob env p tys [AAform f1;AAform f2;AAform pred;AAnode;AAnode] g)
+    (t_apply_logic env p tys [AAform f1;AAform f2;AAform pred;AAnode;AAnode] g)
     (t_red env)
 
+let t_rewrite_node env ((juc,an), gs) side n =
+  let (_,f) = get_node (juc, an) in
+  t_seq_subgoal (t_rewrite env side f) 
+    [t_use env an gs;t_id] (juc,n)
 
+let t_rewrite_hyp env side id args (juc,n as g) =
+  let hyps = get_hyps g in
+  let g' = mkn_hyp juc hyps id in
+  t_rewrite_node env (mkn_apply (fun _ _ _ a -> a) env g' args) side n
   
 let t_elimT env f p g =
   let hyps,concl = get_goal g in

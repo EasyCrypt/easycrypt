@@ -827,10 +827,7 @@ module Tactic = struct
     t_on_first (set_loc loc (t_elim env f) (juc,n)) (t_use env an gs)
 
   let process_rewrite loc env (s,pe) (_,n as g) =
-    let (juc,an), gs = process_mkn_apply env pe g in
-    let (_,f) = get_node (juc, an) in
-    t_seq_subgoal (set_loc loc (t_rewrite env s f))
-      [t_use env an gs; t_id] (juc,n)
+    set_loc loc (t_rewrite_node env (process_mkn_apply env pe g) s) n
 
   let process_trivial scope pi env g =
     let pi = Prover.mk_prover_info scope pi in
@@ -962,15 +959,15 @@ module Tactic = struct
       t_equiv_call env pre post g
     | _ -> cannot_apply "call" "the conclusion is not a hoare or a equiv"
       
-  let process_cond side g =
+  let process_cond env side g =
     let concl = get_concl g in
     if is_equivS concl then 
-      t_equiv_cond side g
+      t_equiv_cond env side g
     else if is_hoareS concl then
       match side with
         | Some _ -> cannot_apply "cond" "Unexpected side in non relational goal"
         | None ->
-          t_hoare_cond g
+          t_hoare_cond env g
     else cannot_apply "cond" "the conclusion is not a hoare or a equiv goal"
 
   let process_phl loc env ptac g =
@@ -981,7 +978,7 @@ module Tactic = struct
       | Papp (k,phi) -> process_app env k phi 
       | Pwp  k   -> t_wp env k 
       | Prcond (side,b,i) -> t_rcond side b i 
-      | Pcond side   -> process_cond side 
+      | Pcond side   -> process_cond env side 
       | Pwhile phi -> process_while env phi 
       | Pcall(pre,post) -> process_call env pre post
     in
