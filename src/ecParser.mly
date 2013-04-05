@@ -191,6 +191,7 @@
 %token RBRACKET
 %token RCONDF
 %token RCONDT
+%token SWAP
 %token REQUIRE
 %token RES
 %token RETURN
@@ -1233,31 +1234,28 @@ tactic:
 | CALL pre=sform post=sform
     { PPhl (Pcall(pre,post)) }
 
-| RCONDT i=number
-    {PPhl (Prcond(None, true, i))}
+| RCONDT s=side? i=number
+    {PPhl (Prcond(s, true, i))}
 
-| RCONDT s=side i=number
-    {PPhl (Prcond(Some s, true, i))}
-
-| RCONDF i=number 
-    {PPhl (Prcond(None, false, i))}
-
-| RCONDF s=side i=number 
-    {PPhl (Prcond(Some s, false, i))}
+| RCONDF s=side? i=number 
+    {PPhl (Prcond(s, false, i))}
 
 | IF s=side?
     { PPhl (Pcond s) }
+
+| SWAP s=side? i1=number i2=number i3=number 
+    { PPhl (Pswap(s, (i1, i2, i3))) }
 ;
 
 side:
-| n=number {
-     match n with
-     | 1 -> true
-     | 2 -> false
-     | _ -> error
+| LBRACE n=number RBRACE {
+   match n with
+   | 1 -> true
+   | 2 -> false
+   | _ -> error
               (EcLocation.make $startpos $endpos)
               (Some "variable side must be 1 or 2")
-  }
+ }
 ;
 
 code_position:

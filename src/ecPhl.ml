@@ -90,6 +90,12 @@ module PV = struct
   let union _env fv1 fv2 =
     M.merge (fun _ o1 o2 -> if o2 = None then o1 else o2) fv1 fv2
 
+  let disjoint _env fv1 fv2 = 
+    M.set_disjoint fv1 fv2
+
+  let inter _env fv1 fv2 = 
+    M.set_inter fv1 fv2
+
   let mem env pv fv = 
     M.mem (NormMp.norm_pvar env pv) fv
 
@@ -130,6 +136,47 @@ and f_write env f =
     let wf = List.fold_left remove_local wf fdef.f_locals in
     List.fold_left remove_local wf (fst func.f_sig.fs_sig) 
 
+let s_write env = s_write env PV.empty
+
+let rec e_read env r e = 
+  match e.e_node with
+  | Evar pv -> PV.add env pv e.e_ty r
+  | _ -> e_fold (e_read env) r e
+
+let lp_read env r lp = 
+  match lp with
+  | LvVar _ -> r
+  | LvTuple _ -> r
+  | LvMap ((_,_),pv,e,ty) -> e_read env (PV.add env pv ty r) e
+
+let rec s_read env w s = List.fold_left (i_read env) w s.s_node 
+
+and i_read env r i = 
+  match i.i_node with
+  | Sasgn (lp,e) -> e_read env (lp_read env r lp) e
+  | Srnd (lp,e)  -> e_read env (lp_read env r lp) e 
+  | Scall(lp,f,es) -> 
+    let r = List.fold_left (e_read env) r es in
+    let r  = match lp with None -> r | Some lp -> lp_read env r lp in
+    let rf = f_read env f in
+    PV.union env r rf 
+  | Sif (e,s1,s2) -> s_read env (s_read env (e_read env r e) s1) s2
+  | Swhile (e,s) -> s_read env (e_read env r e) s
+  | Sassert e -> e_read env r e
+    
+and f_read env f =   
+  let func = Fun.by_mpath f env in
+  match func.f_def with
+  | None -> assert false (* Not implemented *)
+  | Some fdef ->
+    let remove_local w {v_name = v } =
+      PV.remove env {pv_name = EcPath.mqname f EcPath.PKother v []; 
+                     pv_kind = PVloc } w in
+    let wf = s_read env PV.empty fdef.f_body in
+    let wf = List.fold_left remove_local wf fdef.f_locals in
+    List.fold_left remove_local wf (fst func.f_sig.fs_sig) 
+
+let s_read env = s_read env PV.empty
 
 (* -------------------------------------------------------------------- *)
 
@@ -464,7 +511,7 @@ let t_hoare_while env inv g =
   let b_concl = f_hoareS hs.hs_m b_pre c b_post in
       (* the wp of the while *)
   let post = f_imps_simpl [f_not_simpl e; inv] hs.hs_po in
-  let modi = s_write env PV.empty c in
+  let modi = s_write env c in
   let post = generalize_mod env m modi post in
   let post = f_and_simpl inv post in
   let concl = f_hoareS_r { hs with hs_s = s; hs_po=post} in
@@ -486,8 +533,8 @@ let t_equiv_while env inv g =
       (* the wp of the while *)
   let post = 
     f_imps_simpl [f_not_simpl el;f_not_simpl er; inv] es.es_po in
-  let modil = s_write env PV.empty cl in
-  let modir = s_write env PV.empty cr in
+  let modil = s_write env cl in
+  let modir = s_write env cr in
   let post = generalize_mod env mr modir post in
   let post = generalize_mod env ml modil post in
   let post = f_and_simpl inv post in
@@ -644,6 +691,71 @@ let t_equiv_case f g =
 
 let t_he_case f g =
   t_hS_or_eS (t_hoare_case f) (t_equiv_case f) g 
+
+(* -------------------------------------------------------------------- *)
+let check_swap env s1 s2 = 
+  let m1,m2 = s_write env s1, s_write env s2 in
+  let r1,r2 = s_read env s1, s_read env s2 in
+  let m2r1 = PV.disjoint env m2 r1 in
+  let m1m2 = PV.disjoint env m1 m2 in
+  let m1r2 = PV.disjoint env m1 r2 in
+  let error () = (* FIXME : better error message *)
+    cannot_apply "swap" "the two statements are not independent" in
+  if not m2r1 then error ();
+  if not m1m2 then error ();
+  if not m1r2 then error ()
+
+let t_equiv_swap env side p1 p2 p3 g =
+  let swap s = 
+    let s = s.s_node in
+    let len = List.length s in
+    if not (1<= p1 && p1 < p2 && p2 <= p3 && p3 <= len) then
+      cannot_apply "swap" 
+        (Format.sprintf "invalid position, 1 <= %i < %i <= %i <= %i"
+           p1 p2 p3 len);
+    let hd,tl = List.take_n (p1-1) s in
+    let s12,tl = List.take_n (p2-p1) tl in
+    let s23,tl = List.take_n (p3-p2+1) tl in
+    check_swap env (stmt s12) (stmt s23);
+    stmt (List.flatten [hd;s23;s12;tl]) in
+  let concl = get_concl g in
+  let es    = destr_equivS concl in
+  let sl,sr = 
+    if side then swap es.es_sl, es.es_sr else es.es_sl, swap es.es_sr in
+  let concl = f_equivS_r {es with es_sl = sl; es_sr = sr } in
+  prove_goal_by [concl] (RN_hl_swap(side,p1,p2,p3)) g
+
+let rec t_swap env (side, info) g =
+  match side with
+  | None -> 
+    t_seq (t_swap env (Some true, info)) 
+      (t_swap env (Some false, info)) g
+  | Some side -> 
+    let p1,p2,p3 = info in
+    t_equiv_swap env side p1 p2 p3 g
+
+
+(*
+let t_equiv_swap env side start length delta = 
+  let swap s =
+    let hd,tl = s_split "swap" (start - 1) s in
+    let toswap, tl  = 
+      let len = List.length tl in
+      if 0 <= length && length <= len then List.take_n length tl
+      else cannot_apply "swap" "the last position is outside of the statement" in
+    let hd,tojump,tl = 
+      if 0 <= delta then
+        let len = List.length tl in 
+        if delta <= len then 
+          let tojump,tl = List.take_n delta tl in
+          
+        else cannot_apply "swap" "the move is to big"
+        
+*)
+        
+    
+  
+  
 (* -------------------------------------------------------------------- *)
 
 (* TODO : define it in term of case and rcond *)
@@ -714,27 +826,5 @@ let rec t_equiv_cond env side g =
                 t_seq_subgoal (t_equiv_rcond false false 1) [t_aux; t_clear (Sid.singleton hiff)]
                ])
         ] g
-(*
-      match sl.s_node,sr.s_node with
-        | [],_ | _,[] -> assert false (* FIXME *)
-        | il::sl, ir::sr ->
-          match il.i_node, ir.i_node with
-            | Sif(el,ctl,cfl), Sif(er,ctr,cfr) ->
-              let el = form_of_expr (EcMemory.memory es.es_ml) el in
-              let er = form_of_expr (EcMemory.memory es.es_mr) er in
-              let stl = stmt (ctl.s_node @ sl) in
-              let sfl = stmt (cfl.s_node @ sl) in
-              let str = stmt (ctr.s_node @ sr) in
-              let sfr = stmt (cfr.s_node @ sr) in
-              let f = f_imp es.es_pr (f_eq el er) in
-              let f1 = f_equivS es.es_ml es.es_mr 
-                (f_and es.es_pr (f_and el er)) 
-                stl str es.es_po in
-              let f2 = f_equivS es.es_ml es.es_mr 
-                (f_and es.es_pr (f_and (f_not el) (f_not er))) 
-                sfl sfr es.es_po in
-              prove_goal_by [f;f1;f2] RN_hl_cond g
 
-            | _ -> assert false (* FIXME *)
-*)
 (* -------------------------------------------------------------------- *)

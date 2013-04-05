@@ -279,6 +279,7 @@ and phl_tactics =
   | Pcall       of pformula * pformula
   | Prcond      of (bool option * bool * int)
   | Pcond       of tac_side
+  | Pswap       of (tac_side * (int * int * int))
 
 and ptactics = ptactic list        
 

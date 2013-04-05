@@ -20,11 +20,11 @@ lemma foo_side :
   equiv [M.f ~ M.f : b{1} = b{2} ==> M.x{1}=M.x{2} ]
 proof.
  fun.
- if 1.
- if 2.
+ if {1}.
+ if {2}.
  wp;skip;simplify;intros m1 m2;split.
  wp;skip;trivial.
- rcondf 2 1.
+ rcondf {2} 1.
   intros m;skip;trivial.
  wp;skip;trivial.
 save.

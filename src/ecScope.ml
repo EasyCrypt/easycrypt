@@ -991,6 +991,7 @@ module Tactic = struct
       | Pcond side   -> process_cond env side 
       | Pwhile phi -> process_while env phi 
       | Pcall(pre,post) -> process_call env pre post
+      | Pswap info -> t_swap env info
     in
     set_loc loc t g
  
