@@ -997,7 +997,7 @@ module Tactic = struct
             let es = set_loc info.pl_loc destr_equivS concl in 
             let s = if side then es.es_sl else es.es_sr in
             let len = List.length s.s_node in
-            t_equiv_swap env side (len-p) len len
+            t_equiv_swap env side (len+p) len len
           else (* p = 0 *) t_id
         | SKmovei(i,p) ->
           if 0 < p then t_equiv_swap env side i (i+1) (i+p)

@@ -1260,6 +1260,9 @@ swap_pos:
 ;
 int:
 | n=number { n }  (* FIXME how to get negative number *) 
+| m=loc(OP2) n=number 
+    { if m.pl_desc = "-" then -n else error m.pl_loc (Some "int expected") }
+ 
 ;
 
 

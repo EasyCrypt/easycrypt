@@ -21,6 +21,13 @@ proof.
   swap {2} 1 2 3.
   swap {2} 1 3 4.
   swap 1 3 4.
+  swap [1..2] 2.
+  swap [3..4] -2.
+  swap 2 2.
+  swap -1.
+  swap 1.
+  swap {1} [2..3] 1.
+  swap {2} [2..3] -1.
   wp;skip;intros m1 m2 h;assumption h.
 save.
 

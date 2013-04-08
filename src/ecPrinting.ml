@@ -80,8 +80,8 @@ end = struct
   let seq ?(sep = "") ?(break = false) ?(spacing = (false, true)) ds =
     fold1 (fun d1 d2 -> d1 ^/^ !^sep ^@@^ d2) ds
 
-  let join = fold1 (^/^)
-  let glue = fold1 (^^)
+  let join  = fold1 (^/^)
+  let glue  = fold1 (^^)
 
   let compile =
     let rec compile (flat : bool) = function
@@ -248,7 +248,7 @@ let is_ident_symbol name =
 
 let pr_qsymbol ((nm, x) : qsymbol) =
   let pr_symbol (x : symbol) =
-    if is_ident_symbol x then x else Printf.sprintf "[%s]" x
+    if is_ident_symbol x then x else Printf.sprintf "(%s)" x
   in
 
   let x  = pr_symbol x
@@ -574,6 +574,18 @@ let pr_lvalue (ppenv : ppenv) (lv : lvalue) =
       (pr_pv ppenv x) ^^ (pr_bracket (pr_expr ppenv e))
 
 (* -------------------------------------------------------------------- *)
+let is_base_instr i = 
+  match i.i_node with
+  | Sasgn _ | Srnd _ | Scall _ | Sassert _ -> true
+  | Sif _ | Swhile _ -> false
+
+let is_base_block s = 
+  match s.s_node with
+  | [i] -> is_base_instr i
+  | _   -> false
+
+let is_empty_block s = s.s_node = []
+
 let rec pr_instr (ppenv : ppenv) (i : instr) =
   let doc =
     match i.i_node with
@@ -589,31 +601,37 @@ let rec pr_instr (ppenv : ppenv) (i : instr) =
           let args = List.map (pr_expr ppenv) args in
             name ^^ (pr_paren (Pp.seq ~sep:"," args))
         in
-          match lv with
-          | None    -> doc
-          | Some lv -> Pp.join [pr_lvalue ppenv lv; !^"="; doc]
-      end
+        match lv with
+        | None    -> doc
+        | Some lv -> Pp.join [pr_lvalue ppenv lv; !^":="; doc]
+    end
 
     | Sassert e ->
         Pp.join [tk_assert; pr_paren (pr_expr ppenv e)]
 
     | Sif (e, b1, b2) ->
         let e  = pr_paren (pr_expr ppenv e) in
-        let b1 = pr_bracket (pr_stmt ppenv b1) in
-        let b2 = pr_bracket (pr_stmt ppenv b2) in
-          Pp.join [tk_if; e; b1; tk_else; b2]
+        let b1 = pr_sblock ppenv b1 in
+        let b2 = 
+          if is_empty_block b2 then []
+          else [tk_else; pr_sblock ppenv b2] in
+          Pp.join ([tk_if; e; b1] @ b2)
 
     | Swhile (e, body) ->
         let e = pr_paren (pr_expr ppenv e) in
-        let body = pr_bracket (pr_stmt ppenv body) in
+        let body = pr_sblock ppenv body in
           Pp.join [tk_while; e; body]
 
   in
-    doc ^^ !^";"
+  if is_base_instr i then doc ^^ !^";" else doc
+
+and pr_sblock (ppenv:ppenv) (s:stmt) = 
+  if is_base_block s then pr_stmt ppenv s 
+  else pr_brace (pr_stmt ppenv s) 
 
 (* -------------------------------------------------------------------- *)
 and pr_stmt (ppenv : ppenv) (s : stmt) =
-  Pp.join (List.map (pr_instr ppenv) s.s_node)
+  pr_block (List.map (pr_instr ppenv) s.s_node)
 
 (* -------------------------------------------------------------------- *)
 let rec pr_module_item (scope : EcPath.path) (ppenv : ppenv) (item : module_item) =
@@ -784,7 +802,7 @@ let pr_form (ppenv : ppenv) (f : form) =
         !^ "implement-me"             (* FIXME *)
           
     | FhoareS hs -> 
-        let dbody =
+        let dbody =  (* FIXME : add local program variables ? *)
           let bodyppenv = ppenv in
             List.map (pr_instr bodyppenv) hs.hs_s.s_node
         in
@@ -793,8 +811,28 @@ let pr_form (ppenv : ppenv) (f : form) =
             pr_mblocks [dbody];
             pr_brace (pr_form ppenv outer hs.hs_po);
           ]
-
-    | FequivF _ | FequivS _ | Fpr _ | FeqGlob _ ->
+    | FequivS es -> 
+      let dbodyl =  (* FIXME : add local program variables ? *)
+          let bodyppenv = ppenv in
+            List.map (pr_instr bodyppenv) es.es_sl.s_node
+      in
+      let dbodyr =  (* FIXME : add local program variables ? *)
+        let bodyppenv = ppenv in
+        List.map (pr_instr bodyppenv) es.es_sr.s_node
+      in
+      Pp.join [
+        !^ "equiv";
+        pr_bracket (
+          Pp.join [
+            pr_mblocks [dbodyl];
+            !^ "~";
+            pr_mblocks [dbodyr];
+            !^ ":";
+            pr_form ppenv outer es.es_pr;
+            !^ "==>";
+            pr_form ppenv outer es.es_po;
+          ] ) ]
+    | FequivF _ | Fpr _ | FeqGlob _ ->
         !^ "implement-me"  (* FIXME *)
   in
     pr_form ppenv (min_op_prec, `NonAssoc) f
