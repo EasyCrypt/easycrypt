@@ -52,7 +52,6 @@ let unsuspend f (x : 'a suspension) (args : mpath list list) =
       List.fold_left2
         (List.fold_left2
            (fun s (x, _) a -> EcSubst.add_module s x a))
-(*        EcSubst.empty ([]::x.sp_params) args *)
         EcSubst.empty x.sp_params (List.tl args)
     in
      f s x.sp_target
@@ -1013,7 +1012,6 @@ module Ty = struct
     | _ -> raise (LookupFailure (`Path name))
 end
 
-
 (* -------------------------------------------------------------------- *)
 module Mod = struct
   type t = module_expr
@@ -1117,29 +1115,37 @@ module Mod = struct
        
 end
 
-module NormMp = struct 
-  let rec norm_mpath env p = 
-    match p.EcPath.m_kind with
-    | [] | [EcPath.PKmodule] -> assert false
-    | [EcPath.PKother] 
-    | EcPath.PKother :: EcPath.PKother :: _ -> p (* it is a theory path *)
-    | _ ->
-      match EcPath.m_split p with
-      | None -> assert false
-      | Some(prefix,k,x,args) -> 
-        if k = EcPath.PKother then 
-          let args = List.map (norm_mpath env) args in
-          EcPath.mqname (norm_mpath env prefix) k x args
-        else 
-          let def = Mod.by_path (EcPath.path_of_mpath p) env in
-          match def.sp_target.me_body with
-          | ME_Alias alias ->
+(* -------------------------------------------------------------------- *)
+module NormMp = struct
+  let rec norm_mpath env p =
+    match oget (List.ohead p.EcPath.m_kind) with
+    | EcPath.PKother  -> p
+    | EcPath.PKmodule -> begin
+        match Mod.by_path_opt (EcPath.path_of_mpath p) env with
+        | Some ({ sp_target = { me_body = ME_Alias alias } } as def) ->
             let alias = { def with sp_target = alias } in
-            let p = unsuspend EcSubst.subst_mpath alias (EcPath.args_of_mpath p) in
-            norm_mpath env (EcPath.m_apply p args) 
-          | _ ->
-            let args = List.map (norm_mpath env) args in
-            EcPath.mqname (norm_mpath env prefix) k x args
+            let args  = EcPath.args_of_mpath p in
+            let alias = unsuspend EcSubst.subst_mpath alias args in
+              norm_mpath env alias
+
+        | _ -> begin
+            match EcPath.m_split p with
+            | None -> p
+
+            | Some(prefix, k, x, args) -> 
+                let args = List.map (norm_mpath env) args in
+                  EcPath.mqname (norm_mpath env prefix) k x args
+          end
+      end
+
+  let norm_mpath env p =
+    match EcPath.m_split p with
+    | Some (prefix, (PKother as k), x, args) ->
+        assert (args = []);
+        EcPath.mqname (norm_mpath env prefix) k x []
+
+    | None | Some (_, PKmodule, _, _) ->
+        norm_mpath env p
 
   let norm_pvar env pv = 
     let p = norm_mpath env pv.pv_name in
