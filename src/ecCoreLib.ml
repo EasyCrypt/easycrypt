@@ -32,7 +32,7 @@ let id_imp       = "=>"
 let id_iff       = "<=>"
 let id_eq        = "="
 
-let id_leq       = "<="
+let id_le        = "<="
 let id_lt        = "<"
 
 
@@ -62,8 +62,15 @@ let id_Int       = "Int"
 let p_Int        = EcPath.pqname p_top id_Int 
 let _Int id      = EcPath.pqname p_Int id
 
-let p_int_leq    = _Int  id_leq
+let p_int_le     = _Int  id_le
 let p_int_lt     = _Int  id_lt
+
+let id_Real      = "Real"
+let p_Real       = EcPath.pqname p_top id_Real
+let _Real id     = EcPath.pqname p_Real id
+
+let p_real_le    = _Real id_le
+let p_real_lt    = _Real id_lt   
 
 
 let p_Logic         = EcPath.pqname p_top "Logic" 

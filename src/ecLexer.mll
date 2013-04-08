@@ -69,7 +69,7 @@
     "rcondt"      , RCONDT     ;        (* KW: tactic *)
     "rcondf"      , RCONDF     ;        (* KW: tactic *)
     "swap"        , SWAP       ;        (* KW: tactic *)
-
+    "equiv_deno"  , EQUIVDENO  ;        (* KW: tactic *) 
     "axiom"       , AXIOM      ;        (* KW: global *)
     "lemma"       , LEMMA      ;        (* KW: global *)
     "proof"       , PROOF      ;        (* KW: global *)

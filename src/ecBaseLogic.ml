@@ -202,7 +202,7 @@ type rule_name =
   | RN_hl_while     of EcFol.form
   | RN_hl_call      of EcFol.form * EcFol.form
   | RN_hl_swap      of bool * int * int * int
-
+  | RN_hl_deno      
 and rule_arg = 
   | RA_form of EcFol.form             (* formula             *)
   | RA_id   of EcIdent.t              (* local ident         *)

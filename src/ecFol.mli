@@ -191,7 +191,7 @@ val destr_equivF  : form -> equivF
 val destr_equivS  : form -> equivS
 val destr_hoareF  : form -> hoareF
 val destr_hoareS  : form -> hoareS
-
+val destr_pr      : form -> memory * EcPath.mpath * form list * form (* hr *) 
 
 val is_and    : form -> bool
 val is_or     : form -> bool
@@ -206,7 +206,7 @@ val is_equivF  : form -> bool
 val is_equivS  : form -> bool
 val is_hoareF  : form -> bool
 val is_hoareS  : form -> bool
-
+val is_pr      : form -> bool
 
 
 val f_map : (EcTypes.ty -> EcTypes.ty) -> (form -> form) -> form -> form

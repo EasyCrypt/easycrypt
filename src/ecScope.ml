@@ -1013,6 +1013,19 @@ module Tactic = struct
   let process_swap env info = 
     t_lseq (List.map (process_swap1 env) info) 
 
+  let process_equiv_deno env (pre,post) g = 
+    let hyps,concl = get_goal g in
+    let _op, f1, f2 =
+      match concl.f_node with
+      | Fapp({f_node = Fop(op,_)}, [f1;f2]) when is_pr f1 && is_pr f2 -> op, f1, f2
+      | _ -> cannot_apply "equiv_deno" "" in (* FIXME error message *) 
+    let _,fl,_,_ = destr_pr f1 in
+    let _,fr,_,_ = destr_pr f2 in
+    let penv, qenv = EcEnv.Fun.equivF fl fr env in
+    let pre  = process_form penv hyps pre  tbool in
+    let post = process_form qenv hyps post tbool in
+    t_equiv_deno env pre post g
+    
   let process_phl loc env ptac g =
     let t = 
       match ptac with
@@ -1025,6 +1038,7 @@ module Tactic = struct
       | Pwhile phi -> process_while env phi 
       | Pcall(pre,post) -> process_call env pre post
       | Pswap info -> process_swap env info
+      | Pequivdeno info -> process_equiv_deno env info
     in
     set_loc loc t g
  

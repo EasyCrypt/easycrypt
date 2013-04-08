@@ -186,6 +186,8 @@ module Fun : sig
 
   val hoareS_anonym : EcModules.variable list -> env -> EcMemory.memenv * env
 
+  val actmem_post :  EcMemory.memory ->
+           EcPath.mpath -> EcModules.function_ -> EcMemory.memenv
   val equivF : EcPath.mpath -> EcPath.mpath -> env -> env * env
 
   val equivS : 

@@ -286,6 +286,7 @@ and phl_tactics =
   | Prcond      of (bool option * bool * int)
   | Pcond       of tac_side
   | Pswap       of ((tac_side * swap_kind) located list)
+  | Pequivdeno  of (pformula * pformula)
 
 and ptactics = ptactic list        
 

@@ -510,10 +510,10 @@ let f_pr m f args e = mk_form (Fpr(m,f,args,e)) ty_real
 
 
 
-let fop_int_leq = f_op EcCoreLib.p_int_leq [] (tfun tint (tfun tint ty_bool))
+let fop_int_le = f_op EcCoreLib.p_int_le [] (tfun tint (tfun tint ty_bool))
 let f_int_le f1 f2 = 
   if ty_equal f1.f_ty tint then 
-    f_app fop_int_leq [f1;f2] ty_bool
+    f_app fop_int_le [f1;f2] ty_bool
   else 
     assert false (* FIXME *)
 
@@ -610,7 +610,10 @@ let destr_hoareF f =
   | FhoareF es -> es 
   | _ -> destr_error "hoareF"
 
-
+let destr_pr f = 
+  match f.f_node with
+  | Fpr (m,f,a,ev) -> (m,f,a,ev)
+  | _ -> destr_error "pr"
 
 (* -------------------------------------------------------------------- *)
 
@@ -687,6 +690,12 @@ let is_hoareF f =
   match f.f_node with
   | FhoareF _ -> true
   | _ -> false
+
+let is_pr f = 
+  match f.f_node with
+  | Fpr _ -> true
+  | _ -> false
+
 (* -------------------------------------------------------------------- *)
 let f_map gt g f = 
     match f.f_node with

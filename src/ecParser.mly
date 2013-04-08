@@ -192,6 +192,7 @@
 %token RCONDF
 %token RCONDT
 %token SWAP
+%token EQUIVDENO
 %token REQUIRE
 %token RES
 %token RETURN
@@ -1245,6 +1246,7 @@ tactic:
 
 | SWAP info=plist1(loc(swap_info),COMMA)
     { PPhl (Pswap info) }
+| EQUIVDENO pre=sform post=sform { PPhl(Pequivdeno(pre,post)) }
 ;
 
 swap_info:
