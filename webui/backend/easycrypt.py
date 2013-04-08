@@ -57,7 +57,7 @@ class EasyCryptClient(object):
 
         pundo  = self.prompt
         prompt = self.__read_prompt()
-        match  = re.search('^\[error\](.*)', prompt, re.M | re.S)
+        match  = re.search('^\[error-\d+-\d+\](.*)', prompt, re.M | re.S)
 
         if match is None:
             message = dict(
@@ -92,7 +92,7 @@ class EasyCryptClient(object):
         assert (self.easycrypt == None)
 
         self.easycrypt = \
-            sp.Popen(['easycrypt', '-emacs'],
+            sp.Popen(['../../ec.native', '-emacs'],
                      stdin  = sp.PIPE,
                      stdout = sp.PIPE,
                      stderr = sp.STDOUT)
