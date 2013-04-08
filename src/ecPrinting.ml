@@ -24,6 +24,8 @@ module Pp : sig
   val (^//^) : doc -> doc -> doc (* concat. with break. inter-space           *)
   val (^@@^) : doc -> doc -> doc (* concat. with break. inter-space + nesting *)
 
+  val indent : int -> doc -> doc
+
   val fold1 : (doc -> doc -> doc) -> doc list -> doc
 
   val seq : ?sep:string -> ?break:bool -> ?spacing:(bool * bool) -> doc list -> doc
@@ -39,6 +41,7 @@ end = struct
   type doc =
   | DEmpty
   | DHardline
+  | DIndent   of int * doc
   | DString   of string
   | DCat      of doc * blank * doc
   | DFlat     of doc
@@ -53,6 +56,9 @@ end = struct
 
   let hardline =
     DHardline
+
+  let indent (i : int) (d : doc) =
+    DIndent (i, d)
 
   let (!^) = string
 
@@ -89,6 +95,9 @@ end = struct
       | DString s -> Pprint.string s
       | DFlat d   -> compile true d
       | DHardline -> Pprint.ifflat (Pprint.break1) (Pprint.hardline)
+
+      | DIndent (i, d) ->
+          Pprint.indent i (compile flat d)
 
       | DCat (d1, (i, b), d2) -> 
         let d1 = compile flat d1
