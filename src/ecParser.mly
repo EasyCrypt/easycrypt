@@ -1152,9 +1152,16 @@ rwside:
 ;
 
 conseq:
-| f1=form LONGARROW f2=form     { Some f1, Some f2 }
-| UNDERSCORE LONGARROW f2=form  { None, Some f2 }
+| empty                         { None, None }
+| f1=form                       { Some f1, None }
+| f1=form LONGARROW             { Some f1, None }
 | f1=form LONGARROW UNDERSCORE  { Some f1, None }
+| LONGARROW f2=form             { None, Some f2 }
+| UNDERSCORE LONGARROW f2=form  { None, Some f2 }
+| f1=form LONGARROW f2=form     { Some f1, Some f2 }
+
+
+
 ;
 tactic:
 | IDTAC

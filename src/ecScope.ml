@@ -1014,7 +1014,6 @@ module Tactic = struct
   let process_swap env info = 
     t_lseq (List.map (process_swap1 env) info) 
 
-
   let process_equiv_deno env info (_,n as g) = 
     let process_cut env g (pre,post) = 
       let hyps,concl = get_goal g in
@@ -1026,18 +1025,70 @@ module Tactic = struct
       let _,fl,_,_ = destr_pr f1 in
       let _,fr,_,_ = destr_pr f2 in
       let penv, qenv = EcEnv.Fun.equivF fl fr env in
-      match pre,post with
-      | Some pre, Some post ->
-        let pre  = process_form penv hyps pre  tbool in
-        let post = process_form qenv hyps post tbool in
-        f_equivF pre fl fr post 
-      | _, _ -> assert false (* FIXME error message *) in
+      let pre  = omap_dfl pre  f_true (fun p -> process_form penv hyps p tbool) in
+      let post = omap_dfl post f_true (fun p -> process_form qenv hyps p tbool) in
+      f_equivF pre fl fr post in
     let (juc,an), gs = process_mkn_apply process_cut env info g in
     let pre,post =
       let (_,f) = get_node (juc,an) in
       let ef = destr_equivF f in
       ef.ef_pr, ef.ef_po in
     t_on_first (t_equiv_deno env pre post (juc,n)) (t_use env an gs)
+
+  let process_conseq env info (_, n as g) =
+    let t_pre = ref t_id and t_post = ref t_id in
+    let tac1 g =
+      let hyps = get_hyps g in
+      let m, h = match LDecl.fresh_ids hyps ["m";"H"] with
+        | [m;h] -> m,h
+        | _ -> assert false in
+      t_seq (t_intros_i env [m;h]) (t_hyp env h) g in
+    let tac2 g =
+      let hyps = get_hyps g in
+      let m1,m2, h = match LDecl.fresh_ids hyps ["m";"m";"H"] with
+        | [m1;m2;h] -> m1,m2,h
+        | _ -> assert false in
+      t_seq (t_intros_i env [m1;m2;h]) (t_hyp env h) g in
+    let process_cut env g (pre,post) =
+      let hyps,concl = get_goal g in        
+      let tac, penv, qenv, gpre, gpost, fmake = 
+        match concl.f_node with
+        | FhoareF hf ->
+          let penv, qenv = EcEnv.Fun.hoareF hf.hf_f env in
+          tac1, penv, qenv, hf.hf_pr, hf.hf_po, 
+          (fun pre post -> f_hoareF pre hf.hf_f post)
+        | FhoareS hs ->
+          let env = EcEnv.Memory.push_active hs.hs_m env in
+          tac1, env, env, hs.hs_pr, hs.hs_po,
+          (fun pre post -> f_hoareS_r { hs with hs_pr = pre; hs_po = post })
+        | FequivF ef ->
+          let penv, qenv = EcEnv.Fun.equivF ef.ef_fl ef.ef_fr env in
+          tac2, penv, qenv, ef.ef_pr, ef.ef_po,
+          (fun pre post -> f_equivF pre ef.ef_fl ef.ef_fr post)
+        | FequivS es -> 
+          let env = EcEnv.Memory.push_all [es.es_ml; es.es_mr] env in
+          tac2, env, env, es.es_pr, es.es_po,
+          (fun pre post -> f_equivS_r { es with es_pr = pre; es_po = post }) 
+        | _ -> assert false (* FIXME error message *)
+      in
+      let pre = match pre with
+        | None -> t_pre := tac; gpre 
+        | Some pre ->  process_form penv hyps pre tbool in
+      let post = match post with
+        | None -> t_post := tac; gpost 
+        | Some post ->  process_form qenv hyps post tbool in
+      fmake pre post in
+    let (juc,an), gs = process_mkn_apply process_cut env info g in
+    let t_conseq = 
+      let (_,f) = get_node (juc,an) in
+      match f.f_node with
+      | FhoareF hf -> t_hoareF_conseq env hf.hf_pr hf.hf_po
+      | FhoareS hs -> t_hoareS_conseq env hs.hs_pr hs.hs_po
+      | FequivF ef -> t_equivF_conseq env ef.ef_pr ef.ef_po
+      | FequivS es -> t_equivS_conseq env es.es_pr es.es_po 
+      | _ -> assert false (* FIXME error message *) in
+    t_seq_subgoal t_conseq
+      [!t_pre; !t_post; t_use env an gs] (juc,n)
     
   let process_phl loc env ptac g =
     let t = 
@@ -1051,6 +1102,7 @@ module Tactic = struct
       | Pwhile phi -> process_while env phi 
       | Pcall(pre,post) -> process_call env pre post
       | Pswap info -> process_swap env info
+      | Pconseq info -> process_conseq env info
       | Pequivdeno info -> process_equiv_deno env info
     in
     set_loc loc t g

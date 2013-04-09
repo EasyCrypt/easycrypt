@@ -106,6 +106,9 @@ let ofold (x : 'a option) (f : 'a -> 'b -> 'b) (v : 'b) =
 let omap (x : 'a option) (f : 'a -> 'b) =
   match x with None -> None | Some x -> Some (f x)
 
+let omap_dfl (x:'a option) (d:'b) (f:'a -> 'b) =
+  match x with None -> d  | Some x -> f x
+
 let osmart_map (x : 'a option) (f : 'a -> 'b) =
   match x with 
   | None -> x 
