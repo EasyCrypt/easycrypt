@@ -35,6 +35,9 @@ let id_eq        = "="
 let id_le        = "<="
 let id_lt        = "<"
 
+let id_in_supp   = "in_supp"
+let id_mu_x      = "mu_x"
+
 
 let p_top        = EcPath.psymbol id_top
 let p_Pervasive  = EcPath.pqname p_top id_Pervasive
@@ -71,6 +74,13 @@ let _Real id     = EcPath.pqname p_Real id
 
 let p_real_le    = _Real id_le
 let p_real_lt    = _Real id_lt   
+
+let id_Distr     = "Distr"
+let p_Distr      = EcPath.pqname p_top id_Distr
+let _Distr id    = EcPath.pqname p_Distr id
+
+let p_in_supp    = _Distr id_in_supp
+let p_mu_x       = _Distr id_mu_x
 
 
 let p_Logic         = EcPath.pqname p_top "Logic" 

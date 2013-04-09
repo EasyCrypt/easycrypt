@@ -524,6 +524,18 @@ let f_int_lt f1 f2 =
   else 
     assert false (* FIXME *)
 
+
+let fop_in_supp ty = f_op EcCoreLib.p_in_supp [] (tfun ty (tfun (tdistr ty) ty_bool))
+let f_in_supp f1 f2 = f_app (fop_in_supp f1.f_ty) [f1;f2] ty_bool
+
+
+(* mu_x : 'a distr -> 'a -> real *)
+let fop_mu_x ty = f_op EcCoreLib.p_mu_x [] (tfun (tdistr ty) (tfun ty  ty_real))
+let f_mu_x f1 f2 = f_app (fop_mu_x f1.f_ty) [f1;f2] ty_real
+
+
+
+
 (* -------------------------------------------------------------------- *)
 
 exception DestrError of string
@@ -949,6 +961,10 @@ let rec f_subst (s:f_subst) f =
 
   | _ -> f_map s.fs_ty (f_subst s) f 
 
+let subst_form x t f =
+  let s = bind_local f_subst_id x t in
+  f_subst s f
+
 let is_subst_id s = 
   s.fs_freshen = false &&
   s.fs_p == identity && s.fs_ty == identity && 
@@ -1019,6 +1035,15 @@ let f_let_simpl lp f1 f2 =
 let f_lets_simpl =
   (* FIXME : optimize this *)
   List.fold_right (fun (lp,f1) f2 -> f_let_simpl lp f1 f2) 
+
+let rec f_app_simpl f args ty = 
+  if args = [] then f 
+  else match f.f_node,args with
+    | Fquant (Llambda,(id,_)::bds,f), arg::args ->
+      let f = f_lambda bds (subst_form id arg f ) in
+      f_app_simpl f args ty
+    | Fapp(f',args'),_ -> mk_form (Fapp(f', args'@args)) ty
+    | _ -> mk_form (Fapp(f,args)) ty 
 
 let f_forall_simpl b f = 
   let b = List.filter (fun (id,_) -> Mid.mem id (f_fv f)) b in

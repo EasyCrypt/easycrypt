@@ -47,9 +47,11 @@ val p_eq         : path
 
 val p_int_le     : path
 val p_int_lt     : path
-
 val p_real_le    : path
 val p_real_lt    : path
+
+val p_in_supp    : path
+val p_mu_x       : path
 
 val p_cut_lemma  : path
 val p_false_elim : path

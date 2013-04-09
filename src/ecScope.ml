@@ -775,7 +775,6 @@ module Tactic = struct
       assert false (* not implemented *)
     | _, Some (GTmodty _) ->
       error a.pl_loc ModuleExpected
-
     | _, None ->
       error a.pl_loc UnderscoreExpected
 
@@ -792,17 +791,21 @@ module Tactic = struct
     let hyps = get_hyps g in
     process_form env hyps pf tbool
 
-  let process_phl_formula env g phi =
+  let process_phl_form ty env g phi =
     let hyps, concl = get_goal g in
     let hs = set_loc phi.pl_loc destr_hoareS concl in
     let env = EcEnv.Memory.push_active hs.hs_m env in
-    process_form env hyps phi tbool
+    process_form env hyps phi ty
 
-  let process_prhl_formula env g phi =
+  let process_prhl_form ty env g phi =
     let hyps, concl = get_goal g in
     let es = set_loc phi.pl_loc destr_equivS concl in
     let env = EcEnv.Memory.push_all [es.es_ml; es.es_mr] env in
-    process_form env hyps phi tbool
+    process_form env hyps phi ty
+
+  let process_phl_formula = process_phl_form tbool
+
+  let process_prhl_formula = process_prhl_form tbool
       
   let process_mkn_apply process_cut env pe (juc, _ as g) = 
     let hyps = get_hyps g in
@@ -1014,6 +1017,39 @@ module Tactic = struct
   let process_swap env info = 
     t_lseq (List.map (process_swap1 env) info) 
 
+
+  let process_rnd env bij_info g =
+    let concl = get_concl g in
+    let process_form f ty = 
+      if is_equivS concl then
+        process_prhl_form ty env g f
+      else if is_hoareS concl then
+        process_prhl_form ty env g f
+      else (* is_*F *) assert false (* FIXME: error "unfolded judgmented was expected" *)
+    in
+    let bij_info = match bij_info with
+      | RIid -> RIid
+      | RIidempotent f ->
+        RIidempotent (process_form f)
+      | RIbij (f,finv) -> 
+        RIbij (process_form f, process_form finv)
+    in
+    t_equiv_rnd env bij_info g
+
+  let process_equiv_deno env (pre,post) g = 
+    let hyps,concl = get_goal g in
+    let _op, f1, f2 =
+      match concl.f_node with
+      | Fapp({f_node = Fop(op,_)}, [f1;f2]) when is_pr f1 && is_pr f2 -> op, f1, f2
+      | _ -> cannot_apply "equiv_deno" "" in (* FIXME error message *) 
+    let _,fl,_,_ = destr_pr f1 in
+    let _,fr,_,_ = destr_pr f2 in
+    let penv, qenv = EcEnv.Fun.equivF fl fr env in
+    let pre  = process_form penv hyps pre  tbool in
+    let post = process_form qenv hyps post tbool in
+    t_equiv_deno env pre post g
+
+
   let process_equiv_deno env info (_,n as g) = 
     let process_cut env g (pre,post) = 
       let hyps,concl = get_goal g in
@@ -1089,6 +1125,7 @@ module Tactic = struct
       | _ -> assert false (* FIXME error message *) in
     t_seq_subgoal t_conseq
       [!t_pre; !t_post; t_use env an gs] (juc,n)
+
     
   let process_phl loc env ptac g =
     let t = 
@@ -1102,6 +1139,7 @@ module Tactic = struct
       | Pwhile phi -> process_while env phi 
       | Pcall(pre,post) -> process_call env pre post
       | Pswap info -> process_swap env info
+      | Prnd info -> process_rnd env info
       | Pconseq info -> process_conseq env info
       | Pequivdeno info -> process_equiv_deno env info
     in

@@ -153,6 +153,12 @@ val f_int_le : form -> form -> form
 
 val f_int_lt  : form -> form -> form
 
+val fop_in_supp  : EcTypes.ty -> form
+val f_in_supp  : form -> form -> form
+
+val fop_mu_x  : EcTypes.ty -> form
+val f_mu_x  : form -> form -> form
+
 (* -------------------------------------------------------------------- *)
 val f_if_simpl  : form -> form -> form -> form
 val f_let_simpl : EcTypes.lpattern -> form -> form -> form
@@ -160,7 +166,8 @@ val f_lets_simpl : (EcTypes.lpattern * form) list -> form -> form
 
 (*val f_quant_simpl : quantif -> binding -> form -> form
   val f_exists_simpl : binding -> form -> form *)
-val f_forall_simpl  : binding -> form -> form
+val f_forall_simpl : binding -> form -> form
+val f_app_simpl : form -> form list -> EcTypes.ty -> form
 
 val f_not_simpl  : form -> form
 val f_and_simpl  : form -> form -> form
@@ -231,6 +238,8 @@ val bind_mem   : f_subst -> EcIdent.t -> EcIdent.t -> f_subst
 val bind_mod   : f_subst -> EcIdent.t -> EcPath.mpath -> f_subst
    
 val f_subst : f_subst -> form -> form 
+
+val subst_form : EcIdent.t -> form -> form -> form 
 
 module Fsubst :
   sig

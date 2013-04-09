@@ -199,6 +199,7 @@
 %token RETURN
 %token REWRITE
 %token RIGHT
+%token RND
 %token RPAREN
 %token SAME
 %token SAMPLE
@@ -1260,10 +1261,25 @@ tactic:
 | SWAP info=plist1(loc(swap_info),COMMA)
     { PPhl (Pswap info) }
 
+| RND info=rnd_info
+    {PPhl (Prnd info) }
+
+
 | EQUIVDENO info=fpattern(conseq) { PPhl(Pequivdeno info) }
 
 | CONSEQ info=fpattern(conseq) { PPhl(Pconseq info) }
 ;
+
+
+rnd_info:
+| LPAREN e1=sform RPAREN LPAREN e2=sform RPAREN
+  {RIbij (e1,e2) }
+| LPAREN e=sform RPAREN
+  {RIidempotent e }
+| empty
+  {RIid }
+;
+
 
 swap_info:
 | s=side? p=swap_pos { s,p }

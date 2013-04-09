@@ -245,6 +245,11 @@ type 'a doption =
   | Single of 'a
   | Double of 'a * 'a
 
+type 'a rnd_bij_info =
+  | RIid
+  | RIidempotent of 'a
+  | RIbij of ('a * 'a)
+
 type tac_side = bool option
 
 type  swap_kind = 
@@ -290,6 +295,7 @@ and phl_tactics =
   | Prcond      of (bool option * bool * int)
   | Pcond       of tac_side
   | Pswap       of ((tac_side * swap_kind) located list)
+  | Prnd        of pformula rnd_bij_info
   | Pconseq     of cfpattern
   | Pequivdeno  of cfpattern
 

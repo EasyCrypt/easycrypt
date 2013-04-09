@@ -307,6 +307,18 @@ let wp env m s post =
   List.rev r, mk_let env letsf 
 
 
+
+(* let subst_form env m lv e f = *)
+(*   let s = PVM.add env "pv" PVM.empty in *)
+(*   mk_let env letsf *)
+
+let subst_form_lv env m lv t f =
+  let lpe, se = lv_subst env m lv t in
+  let s = PVM.merge se PVM.empty in
+  mk_let env ([lpe], s,f)
+
+  
+
 (* -------------------------------------------------------------------- *)
 (* ----------------------  Auxiliary functions  ----------------------- *)
 (* -------------------------------------------------------------------- *)
@@ -491,6 +503,7 @@ let t_equiv_wp env ij g =
   let concl = f_equivS_r {es with es_sl = sl; es_sr=sr; es_po = post} in
   prove_goal_by [concl] (RN_hl_wp (Double(i,j))) g
 
+
 let t_wp env k =
   match k with
   | None -> t_hS_or_eS (t_hoare_wp env None) (t_equiv_wp env None)
@@ -531,8 +544,7 @@ let t_equiv_while env inv g =
   let b_post = f_and_simpl inv sync_cond in
   let b_concl = f_equivS es.es_ml es.es_mr b_pre cl cr b_post in
       (* the wp of the while *)
-  let post = 
-    f_imps_simpl [f_not_simpl el;f_not_simpl er; inv] es.es_po in
+  let post = f_imps_simpl [f_not_simpl el;f_not_simpl er; inv] es.es_po in
   let modil = s_write env cl in
   let modir = s_write env cr in
   let post = generalize_mod env mr modir post in
@@ -580,9 +592,9 @@ let t_hoare_call env fpre fpost (juc,n1 as g) =
                pr_hyps =[RA_node nf;RA_node n;]} in
   upd_rule rule (juc, n1)
 
-let t_equiv_call env fpre fpost (juc,n1 as g) =
+let t_equiv_call env fpre fpost g =
   (* FIXME : check the well formess of the pre and the post ? *)
-  let hyps,concl = get_goal g in
+  let concl = get_concl g in
   let es = destr_equivS concl in
   let (lpl,fl,argsl),(lpr,fr,argsr),sl,sr = 
     s_last_calls "call" es.es_sl es.es_sr in
@@ -592,7 +604,6 @@ let t_equiv_call env fpre fpost (juc,n1 as g) =
   let fsigr = (Fun.by_mpath fr env).f_sig in
   (* The functions satisfies the specification *)
   let f_concl = f_equivF fpre fl fr fpost in
-  let juc,nf = new_goal juc (hyps, f_concl) in
   (* The wp *)
   let pvresl = pv_res fl and pvresr = pv_res fr in
   let vresl = EcIdent.create "result_L" in
@@ -612,10 +623,7 @@ let t_equiv_call env fpre fpost (juc,n1 as g) =
   let spre = subst_args_call env mr fr (fst fsigr.fs_sig) argsr spre in
   let post = f_anda_simpl (PVM.subst env spre fpre) post in
   let concl = f_equivS_r { es with es_sl = sl; es_sr = sr; es_po=post} in
-  let (juc,n) = new_goal juc (hyps,concl) in
-  let rule = { pr_name = RN_hl_call (fpre, fpost); 
-               pr_hyps =[RA_node nf;RA_node n;]} in
-  upd_rule rule (juc, n1)
+  prove_goal_by [f_concl;concl] (RN_hl_call (fpre, fpost)) g
 
 
 (* -------------------------------------------------------------------- *)
@@ -867,6 +875,97 @@ let rec t_equiv_cond env side g =
                ])
         ] g
 
+
+
+
+(* -------------------------------------------------------------------- *)
+
+
+let proj_distr_ty ty = match ty.ty_node with
+  | Tconstr(_,lty) when List.length lty = 1  -> 
+    List.hd lty
+  | _ -> assert false
+
+let (===) = f_eq_simpl 
+let (==>) = f_imp_simpl
+let (&&&) = f_anda_simpl
+
+let rec wp_equiv_rnd env bij_info g =
+  let concl = get_concl g in
+  let es = destr_equivS concl in
+  let (lvL,muL),(lvR,muR),sl',sr'= s_last_rnds "rnd" es.es_sl es.es_sr in
+  (* is_distr_exp hyps env muL; *) (* FIXME *)
+  (* is_distr_exp hyps env muR; *)
+  let tyL = proj_distr_ty (e_ty muL) in
+  let tyR = proj_distr_ty (e_ty muR) in
+  let x_id, y_id = EcIdent.create "x", EcIdent.create "y" in
+  let x = f_local x_id tyL in
+  let y = f_local y_id tyR in
+  let muL = EcFol.form_of_expr (EcMemory.memory es.es_ml) muL in
+  let muR = EcFol.form_of_expr (EcMemory.memory es.es_mr) muR in
+  match bij_info with
+    | RIbij (f,finv) ->
+      let tf = f (tfun tyL tyR ) in
+      let tfinv = finv (tfun tyR tyL ) in
+      let f t = f_app_simpl tf  [t] tyR in
+      let finv t = f_app_simpl tfinv [t] tyL in
+      let supp_cond1 = (f_in_supp x muL) ==> 
+        ((f_mu_x muL x) === (f_mu_x muR (f x))) in
+      let supp_cond2 = (f_in_supp y muR) ==> (f_in_supp (finv y) muL) in
+      let inv_cond1 =  (f_in_supp x muL) ==> ((finv (f x)) === x) in
+      let inv_cond2 =  (f_in_supp y muR) ==> ((f (finv y)) === y) in
+      let post = subst_form_lv env (EcMemory.memory es.es_ml) lvL x es.es_po in
+      let post = subst_form_lv env (EcMemory.memory es.es_mr) lvR (f x) post in
+      let post = (f_in_supp x muL) ==> post in
+      let post = supp_cond1 &&& supp_cond2 &&& inv_cond1 &&& inv_cond2 &&& post in
+      let post = f_forall_simpl [(x_id,GTty tyL);(y_id,GTty tyR)] post in
+      let concl = f_equivS_r {es with es_sl=sl'; es_sr=sr'; es_po=post} in
+      prove_goal_by [concl] (RN_hl_equiv_rnd (RIbij (tf,tfinv))) g
+    | RIidempotent bij -> 
+      wp_equiv_rnd env (RIbij (bij, bij)) g
+    | RIid -> 
+      let bij = fun _ -> f_lambda [x_id,GTty tyL] x in
+      wp_equiv_rnd env (RIbij (bij, bij)) g
+
+
+let t_equiv_rnd = wp_equiv_rnd (* FIXME: wrapper *)
+
+
+
+let t_equiv_deno env pre post g =
+  let concl = get_concl g in
+  let cmp, f1, f2 =
+    match concl.f_node with
+    | Fapp({f_node = Fop(op,_)}, [f1;f2]) when is_pr f1 && is_pr f2 &&
+        (EcPath.p_equal op EcCoreLib.p_eq || 
+           EcPath.p_equal op EcCoreLib.p_real_le) ->
+      EcPath.p_equal op EcCoreLib.p_eq, f1, f2
+    | _ -> cannot_apply "equiv_deno" "" in (* FIXME error message *)
+  let (ml,fl,argsl,evl) = destr_pr f1 in
+  let (mr,fr,argsr,evr) = destr_pr f2 in
+  let concl_e = f_equivF pre fl fr post in
+  let funl = EcEnv.Fun.by_mpath fl env in
+  let funr = EcEnv.Fun.by_mpath fr env in
+  (* building the substitution for the pre *)
+  (* we should substitute param by args and left by ml and right by mr *)
+  let sargs = 
+    List.fold_left2 (fun s v a -> PVM.add env (pv_loc fr v.v_name) mright a s)
+      PVM.empty (fst funr.f_sig.fs_sig) argsr in
+  let sargs = 
+    List.fold_left2 (fun s v a -> PVM.add env (pv_loc fl v.v_name) mleft a s)
+      sargs (fst funl.f_sig.fs_sig) argsl in
+  let smem = { f_subst_id with 
+    fs_mem = Mid.add mleft ml (Mid.singleton mright mr) } in
+  let concl_pr  = f_subst smem (PVM.subst env sargs pre) in
+  (* building the substitution for the post *)
+  let smeml = { f_subst_id with fs_mem = Mid.singleton mhr mleft } in
+  let smemr = { f_subst_id with fs_mem = Mid.singleton mhr mright } in
+  let evl   = f_subst smeml evl and evr = f_subst smemr evr in
+  let cmp   = if cmp then f_iff else f_imp in 
+  let mel = EcEnv.Fun.actmem_post mleft fl funl in
+  let mer = EcEnv.Fun.actmem_post mright fr funr in
+  let concl_po = gen_mems [mel;mer] (f_imp post (cmp evl evr)) in
+  prove_goal_by [concl_e;concl_pr;concl_po] RN_hl_deno g  
 
     
     

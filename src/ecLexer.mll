@@ -69,6 +69,7 @@
     "rcondt"      , RCONDT     ;        (* KW: tactic *)
     "rcondf"      , RCONDF     ;        (* KW: tactic *)
     "swap"        , SWAP       ;        (* KW: tactic *)
+    "rnd"         , RND        ;        (* KW: tactic *)
     "equiv_deno"  , EQUIVDENO  ;        (* KW: tactic *) 
     "conseq"      , CONSEQ     ;        (* KW: tactic *) 
 
