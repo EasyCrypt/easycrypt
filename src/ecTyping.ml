@@ -61,13 +61,86 @@ exception TyError of EcLocation.t * EcEnv.env * tyerror
 let tyerror loc env e = raise (TyError (loc, env, e))
 
 (* -------------------------------------------------------------------- *)
-let pp_tyerror fmt _error =
-  Format.fprintf fmt "type-error"
+let pp_tyerror fmt env error =
+  let msg x = Format.fprintf fmt x in
+
+  let pp_type fmt ty =
+    EcPrinting.pp_type env fmt ty
+  in
+
+  match error with
+  | UniVarNotAllowed ->
+      msg "type place holders not allowed"
+
+  | TypeVarNotAllowed ->
+      msg "type variables not allowed"
+
+  | OnlyMonoTypeAllowed ->
+      msg "only monomorph types allowed here"
+
+  | UnboundTypeParameter x ->
+      msg "unbound type parameter: %s" x
+
+  | UnknownTypeName qs ->
+      msg "unknown type name: %a" pp_qsymbol qs
+
+  | InvalidTypeAppl (name, _, _) ->
+      msg "invalid type application: %a" pp_qsymbol name
+
+  | DuplicatedTyVar ->
+      msg "a type variable appear at least twice"
+
+  | DuplicatedLocal name ->
+      msg "duplicated local/parameters name: %s" name
+
+  | NonLinearPattern ->
+      msg "non-linear pattern matching"
+
+  | TypeMismatch ((ty1, ty2), _) ->
+      msg "incompatible type\n";
+      msg "expecting: %a" pp_type ty1;
+      msg "      got: %a" pp_type ty2
+
+  | UnknownVarOrOp (name, _) ->
+      msg "unknown variable or operator: %a" pp_qsymbol name
+
+  | MultipleOpMatch (name, _) ->
+      msg "more than one operator matches: %a" pp_qsymbol name
+
+  | UnknownModName name ->
+      msg "unknown module: %a" pp_qsymbol name
+
+  | UnknownTyModName name ->
+      msg "unknown type name: %a" pp_qsymbol name
+
+  | UnknownFunName name ->
+      msg "unknown function: %a" pp_qsymbol name
+
+  | UnknownModVar x ->
+      msg "unknown module-level variable: %a" pp_qsymbol x
+
+  | UnknownMemName m ->
+      msg "unknown memory: %s" m
+
+  | InvalidFunAppl FAE_WrongArgCount ->
+      msg "invalid function application: wrong number of arguments"
+
+  | InvalidModAppl MAE_WrongArgCount ->
+      msg "invalid module application: wrong number of arguments"
+
+  | InvalidModAppl MAE_InvalidArgType ->
+      msg "invalid module application: arguments do not match required interfaces"
+
+  | InvalidModType MTE_FunSigDoesNotRepeatArgNames ->
+      msg "applied argument names must repeat functor argument names"
+
+  | InvalidMem (name, MAE_IsConcrete) ->
+      msg "the memory %s must be abstract" name
 
 let () =
   let pp fmt exn =
     match exn with
-    | TyError (_, _, e) -> pp_tyerror fmt e
+    | TyError (_, env, e) -> pp_tyerror fmt env e
     | _ -> raise exn
   in
     EcPException.register pp
