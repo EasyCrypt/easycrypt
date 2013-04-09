@@ -44,14 +44,6 @@ let () =
     EcPException.register pp
 
 (* -------------------------------------------------------------------- *)
-type info =
-| GI_AddedType      of symbol
-| GI_AddedAxiom     of symbol
-| GI_AddedOperator  of symbol
-| GI_AddedPredicate of symbol
-| GI_Goal           of EcScope.proof_uc
-
-(* -------------------------------------------------------------------- *)
 let loader = EcLoader.create ()
 
 (* -------------------------------------------------------------------- *)
@@ -82,6 +74,20 @@ let addidir (idir : string) =
   EcLoader.addidir idir loader
 
 (* -------------------------------------------------------------------- *)
+type notifier = string -> unit
+
+let default_notifier msg =
+  Format.eprintf "%s\n%!" msg
+
+let _notifier = ref (default_notifier : notifier)
+
+let set_notifier (n : notifier) = _notifier := n
+let get_notifier () = !_notifier
+
+let notify msg =
+  Format.ksprintf (fun msg -> !_notifier msg) msg
+
+(* -------------------------------------------------------------------- *)
 let rec process_type (scope : EcScope.scope) (tyd : ptydecl located) =
   let tyname = (tyd.pl_desc.pty_tyvars, tyd.pl_desc.pty_name) in
   let scope = 
@@ -89,46 +95,49 @@ let rec process_type (scope : EcScope.scope) (tyd : ptydecl located) =
     | None    -> EcScope.Ty.add    scope (mk_loc tyd.pl_loc tyname)
     | Some bd -> EcScope.Ty.define scope (mk_loc tyd.pl_loc tyname) bd
   in
-    (scope, [GI_AddedType (unloc tyd.pl_desc.pty_name)])
+    notify "added type: `%s'" (unloc tyd.pl_desc.pty_name);
+    scope
   
 (* -------------------------------------------------------------------- *)
 and process_module (scope : EcScope.scope) (x, m) =
-  (EcScope.Mod.add scope x.pl_desc m, [])
+  EcScope.Mod.add scope x.pl_desc m
 
 (* -------------------------------------------------------------------- *)
 and process_interface (scope : EcScope.scope) (x, i) =
-  (EcScope.ModType.add scope x.pl_desc i, [])
+  EcScope.ModType.add scope x.pl_desc i
 
 (* -------------------------------------------------------------------- *)
 and process_operator (scope : EcScope.scope) (op : poperator located) =
   let scope = EcScope.Op.add scope op in
-    (scope, [GI_AddedOperator (unloc op.pl_desc.po_name)])
+    notify "added operator: `%s'" (unloc op.pl_desc.po_name);
+    scope
 
 (* -------------------------------------------------------------------- *)
 and process_predicate (scope : EcScope.scope) (p : ppredicate located) =
   let scope = EcScope.Pred.add scope p in
-    (scope, [GI_AddedPredicate (unloc p.pl_desc.pp_name)])
+    notify "added predicate: `%s'" (unloc p.pl_desc.pp_name);
+    scope
 
 (* -------------------------------------------------------------------- *)
 and process_axiom (scope : EcScope.scope) (ax : paxiom) =
   let (name, scope) = EcScope.Ax.add scope ax in
-  let info = EcUtils.omap name (fun x -> GI_AddedAxiom x)
-  in
-    (scope, EcUtils.otolist info)
+    EcUtils.oiter name
+      (fun x -> notify "added axiom: `%s'" x);
+    scope
 
 (* -------------------------------------------------------------------- *)
 and process_claim (scope : EcScope.scope) _ =
-  (scope, [])
+  scope
 
 (* -------------------------------------------------------------------- *)
 and process_th_open (scope : EcScope.scope) name =
-  (EcScope.Theory.enter scope name, [])
+  EcScope.Theory.enter scope name
 
 (* -------------------------------------------------------------------- *)
 and process_th_close (scope : EcScope.scope) name =
   if (EcScope.name scope) <> name then
     failwith "invalid theory name";     (* FIXME *)
-  (snd (EcScope.Theory.exit scope), [])
+  snd (EcScope.Theory.exit scope)
 
 (* -------------------------------------------------------------------- *)
 and process_th_require (scope : EcScope.scope) (x,io) = 
@@ -143,51 +152,52 @@ and process_th_require (scope : EcScope.scope) (x,io) =
             List.fold_left process_internal iscope commands in 
         let scope = EcScope.Theory.require scope name loader in
           match io with
-          | None       -> (scope, [])
+          | None       -> scope
           | Some true  -> process_th_export scope ([], name)
           | Some false -> process_th_import scope ([], name)
 
 (* -------------------------------------------------------------------- *)
 and process_th_import (scope : EcScope.scope) name =
-  (EcScope.Theory.import scope name, [])
+  EcScope.Theory.import scope name
 
 (* -------------------------------------------------------------------- *)
 and process_th_export (scope : EcScope.scope) name =
-  (EcScope.Theory.export scope name, [])
+  EcScope.Theory.export scope name
 
 (* -------------------------------------------------------------------- *)
 and process_th_clone (scope : EcScope.scope) thcl =
-  (EcScope.Theory.clone scope thcl, [])
+  EcScope.Theory.clone scope thcl
 
 (* -------------------------------------------------------------------- *)
 and process_w3_import (scope : EcScope.scope) (p, f, r) =
-  (EcScope.Theory.import_w3 scope p f r, [])
+  EcScope.Theory.import_w3 scope p f r
 
 (* -------------------------------------------------------------------- *)
 and process_tactics (scope : EcScope.scope) t = 
-  (EcScope.Tactic.process scope t, [])
+  EcScope.Tactic.process scope t
 
 (* -------------------------------------------------------------------- *)
 and process_save (scope : EcScope.scope) loc =
-  let name, scope = EcScope.Ax.save scope loc in
-  let gi = EcUtils.odfl [] (EcUtils.omap name (fun n -> [GI_AddedAxiom n])) in
-  (scope, gi)
+  let (name, scope) = EcScope.Ax.save scope loc in
+    EcUtils.oiter name
+      (fun x -> notify "added axiom: `%s'" x);
+    scope
 
 (* -------------------------------------------------------------------- *)
 and process_proverinfo scope pi = 
   let scope = EcScope.Prover.process scope pi in
-  (scope, [])
+    scope
 
 (* -------------------------------------------------------------------- *)
 and process_checkproof scope b = 
   let scope = EcScope.Prover.check_proof scope b in
-  (scope, [])
+    scope
 
 (* -------------------------------------------------------------------- *)
 and process (scope : EcScope.scope) (g : global located) =
   let loc = g.pl_loc in
 
-  let (scope, infos) =
+  let scope =
     match g.pl_desc with
     | Gtype      t    -> process_type       scope (mk_loc loc t)
     | Gmodule    m    -> process_module     scope m
@@ -203,21 +213,26 @@ and process (scope : EcScope.scope) (g : global located) =
     | GthExport  name -> process_th_export  scope name.pl_desc
     | GthClone   thcl -> process_th_clone   scope thcl
     | GthW3      a    -> process_w3_import  scope a
-    | Gprint     p    -> process_print      scope p; (scope, [])
+    | Gprint     p    -> process_print      scope p; scope
     | Gtactics   t    -> process_tactics    scope t
     | Gprover_info pi -> process_proverinfo scope pi
     | Gcheckproof b   -> process_checkproof scope b
     | Gsave      loc  -> process_save       scope loc
   in
-    (scope, infos)
+    scope
 
 (* -------------------------------------------------------------------- *)
 and process_internal (scope : EcScope.scope) (g : global located) =
-  fst (process scope g)
+  process scope g
 
 (* -------------------------------------------------------------------- *)
 let context = ref (0, EcScope.empty, [])
 
+(* -------------------------------------------------------------------- *)
+let current () =
+  let (_, scope, _) = !context in scope
+
+(* -------------------------------------------------------------------- *)
 let full_check b max_provers provers =
   let (idx,scope,l) = !context in
   assert (idx = 0 && l = []);  
@@ -238,22 +253,69 @@ let undo (olduuid : int) =
       for i = (uuid ()) - 1 downto olduuid do
         let (_, _scope, stack) = !context in
         context := (i, List.hd stack, List.tl stack)
-      done;
-      let (_, scope, _) = !context in
-        otolist
-          (omap
-             (List.ohead (EcScope.goal scope))
-             (fun d -> GI_Goal d))
+      done
     end
-  else []
 
 (* -------------------------------------------------------------------- *)
 let process (g : global located) =
   let (idx, scope, stack) = !context in
-  let (newscope, infos) = process scope g in
-    context := (idx+1, newscope, scope :: stack);
-  let infos =
-    let goal = List.ohead (EcScope.goal newscope) in
-      List.ocons (omap goal (fun d -> GI_Goal d)) infos
-  in
-    List.rev infos
+  let newscope = process scope g in
+    context := (idx+1, newscope, scope :: stack)
+
+(* -------------------------------------------------------------------- *)
+module IntCommand = struct
+  open EcScope
+  open EcBaseLogic
+  open EcLogic
+  open EcPrinting
+  open EcPrinting.Pp
+
+  let goalline = String.make 72 '-'
+
+  let prgoal (stream : out_channel) (n, (hyps, concl)) =
+    let pr_hyp t (id, k) = 
+      let dk = 
+        match k with
+        | LD_var (ty, _body) -> pr_type t ty (* FIXME body *)
+        | LD_mem _           -> tk_memory
+        | LD_modty p         -> pr_modtype t p
+        | LD_hyp f           -> pr_form t f
+      in
+
+      let dh = Pp.join [pr_ident t id; !^":"; dk] in
+        Printf.fprintf stream "%t\n%!"
+          (fun stream -> Pp.pretty stream dh);
+        PPE.add_local t id
+    in
+      begin
+        match n with
+        | 0 -> Printf.fprintf stream "Current goal\n%!"
+        | _ -> Printf.fprintf stream "Current goal (remaining: %d)\n%!" n
+      end;
+      Printf.fprintf stream "Type variables: %t\n%!"
+        (fun stream ->
+          let doc = List.map (pr_tvar EcEnv.initial) hyps.h_tvar in (* FIXME *)
+            Pp.pretty stream (Pp.seq ~sep:"," doc));
+      let _ =
+        List.fold_left pr_hyp EcEnv.initial (List.rev hyps.h_local) (* FIXME *)
+      in
+        Printf.fprintf stream "%s\n%!" goalline;
+        Printf.fprintf stream "%t\n%!"
+          (fun stream -> Pp.pretty stream (pr_form EcEnv.initial concl)) (* FIXME *)
+
+  let prgoal_current (stream : out_channel) =
+    let (_, scope, _) = !context in
+
+      match List.ohead (EcScope.goal scope) with
+      | None -> ()
+
+      | Some goal -> begin
+          let juc = goal.puc_jdg in
+          try 
+            let n = List.length (snd (find_all_goals juc)) in
+            let g = get_goal (get_first_goal juc) in
+              prgoal stream (n, g)
+          with EcBaseLogic.NotAnOpenGoal _ -> 
+            Printf.fprintf stream "No more goals\n%!"
+      end
+end

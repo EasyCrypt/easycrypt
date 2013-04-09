@@ -168,9 +168,6 @@ end = struct
 
   exception Disposed
 
-  let create ?(cb : ('a -> unit) option) (x : 'a) =
-    ref (Some (cb, x))
-
   let get (p : 'a t) =
     match !p with
     | None        -> raise Disposed
@@ -185,6 +182,10 @@ end = struct
 
     let oldp = !p in
       p := None; do_dispose oldp
+
+  let create ?(cb : ('a -> unit) option) (x : 'a) =
+    let r = ref (Some (cb, x)) in
+      Gc.finalise (fun r -> dispose r) r; r
 end
 
 (* -------------------------------------------------------------------- *)
