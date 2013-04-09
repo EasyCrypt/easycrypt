@@ -113,7 +113,7 @@ val prefix: string -> document -> document
 (* [infix middle left right]
       Flat layout: [left] [middle] [right]
       Otherwise:   [left] [middle]
-                     [right]
+                     [Right]
  *)
 val infix: string -> document -> document -> document
 

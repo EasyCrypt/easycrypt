@@ -203,29 +203,29 @@ let check_arg do_arg env hyps s x gty a =
   | _ -> assert false (* FIXME error message *) 
 
 let mkn_apply do_arg env (juc,n) args =
-  let hyps,concl = get_node (juc,n) in
-  let check_arg = check_arg do_arg env hyps in
-  let rec check_apply juc s ras f args =
-    match args with
-    | [] -> juc, List.rev ras, f_subst s f
-    | a :: args' ->
-      if is_forall f then 
-        let (x,gty,f') = destr_forall1 f in
-        let s, ra = check_arg s x gty a in
-        check_apply juc s (ra::ras) f' args' 
-      else if is_imp f then 
-        let (f1,f2) = destr_imp f in
-        let a = do_arg env hyps None a in
-        assert (a = AAnode); (* FIXME error message *)
-        let juc, n = new_goal juc (hyps, f_subst s f1) in
-        check_apply juc s (RA_node n :: ras) f2 args' 
-      else 
-        let f = f_subst s f in
-        match h_red_opt full_red env hyps f with
-        | None -> tacerror TooManyArgument
-        | Some f ->  check_apply juc f_subst_id ras f args in
   if args = [] then (juc,n), []
   else
+    let hyps,concl = get_node (juc,n) in
+    let check_arg = check_arg do_arg env hyps in
+    let rec check_apply juc s ras f args =
+      match args with
+      | [] -> juc, List.rev ras, f_subst s f
+      | a :: args' ->
+        if is_forall f then 
+          let (x,gty,f') = destr_forall1 f in
+          let s, ra = check_arg s x gty a in
+          check_apply juc s (ra::ras) f' args' 
+        else if is_imp f then 
+          let (f1,f2) = destr_imp f in
+          let a = do_arg env hyps None a in
+          assert (a = AAnode); (* FIXME error message *)
+          let juc, n = new_goal juc (hyps, f_subst s f1) in
+          check_apply juc s (RA_node n :: ras) f2 args' 
+        else 
+          let f = f_subst s f in
+          match h_red_opt full_red env hyps f with
+          | None -> tacerror TooManyArgument
+          | Some f ->  check_apply juc f_subst_id ras f args in
     let juc, ras, concl = check_apply juc f_subst_id [] concl args in
     let (juc,n1) = new_goal juc (hyps,concl) in
     let rule = { pr_name = RN_apply; pr_hyps = RA_node n :: ras} in

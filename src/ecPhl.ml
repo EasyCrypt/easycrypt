@@ -618,13 +618,102 @@ let t_equiv_call env fpre fpost (juc,n1 as g) =
   upd_rule rule (juc, n1)
 
 
+(* -------------------------------------------------------------------- *)
+
+let t_hoareF_conseq env pre post g =
+  let concl = get_concl g in
+  let hf = destr_hoareF concl in
+  let mpr,mpo = EcEnv.Fun.hoareF_memenv hf.hf_f env in
+  let concl1 = gen_mems [mpr] (f_imp pre hf.hf_pr) in
+  let concl2 = gen_mems [mpo] (f_imp hf.hf_po post) in
+  let concl3 = f_hoareF pre hf.hf_f post in
+  prove_goal_by [concl1; concl2; concl3] (RN_hl_conseq) g  
+    
+
+let t_hoareS_conseq _env pre post g =
+  let concl = get_concl g in
+  let hs = destr_hoareS concl in
+  let concl1 = gen_mems [hs.hs_m] (f_imp pre hs.hs_pr) in
+  let concl2 = gen_mems [hs.hs_m] (f_imp hs.hs_po post) in
+  let concl3 = f_hoareS_r { hs with hs_pr = pre; hs_po = post } in
+  prove_goal_by [concl1; concl2; concl3] (RN_hl_conseq) g
 
 
+let t_equivF_conseq env pre post g =
+  let concl = get_concl g in
+  let ef = destr_equivF concl in
+  let (mprl,mprr),(mpol,mpor) = EcEnv.Fun.equivF_memenv ef.ef_fl ef.ef_fr env in
+  let concl1 = gen_mems [mprl;mprr] (f_imp pre ef.ef_pr) in
+  let concl2 = gen_mems [mpol;mpor] (f_imp ef.ef_po post) in
+  let concl3 = f_equivF pre ef.ef_fl ef.ef_fr post in
+  prove_goal_by [concl1; concl2; concl3] (RN_hl_conseq) g  
 
+let t_equivS_conseq _env pre post g =
+  let concl = get_concl g in
+  let es = destr_equivS concl in
+  let concl1 = gen_mems [es.es_ml;es.es_mr] (f_imp pre es.es_pr) in
+  let concl2 = gen_mems [es.es_ml;es.es_mr] (f_imp es.es_po post) in
+  let concl3 = f_equivS_r { es with es_pr = pre; es_po = post } in
+  prove_goal_by [concl1; concl2; concl3] (RN_hl_conseq) g
+  
 
+(* -------------------------------------------`------------------------- *)
+
+let t_hoare_case f g =
+  let concl = get_concl g in
+  let hs = destr_hoareS concl in
+  let concl1 = f_hoareS_r { hs with hs_pr = f_and_simpl hs.hs_pr f } in
+  let concl2 = f_hoareS_r { hs with hs_pr = f_and_simpl hs.hs_pr (f_not f) } in
+  prove_goal_by [concl1;concl2] (RN_hl_case f) g
+
+let t_equiv_case f g = 
+  let concl = get_concl g in
+  let es = destr_equivS concl in
+  let concl1 = f_equivS_r { es with es_pr = f_and es.es_pr f } in
+  let concl2 = f_equivS_r { es with es_pr = f_and es.es_pr (f_not f) } in
+  prove_goal_by [concl1;concl2] (RN_hl_case f) g
+
+let t_he_case f g =
+  t_hS_or_eS (t_hoare_case f) (t_equiv_case f) g 
 
 (* -------------------------------------------------------------------- *)
 
+let t_equiv_deno env pre post g =
+  let concl = get_concl g in
+  let cmp, f1, f2 =
+    match concl.f_node with
+    | Fapp({f_node = Fop(op,_)}, [f1;f2]) when is_pr f1 && is_pr f2 &&
+        (EcPath.p_equal op EcCoreLib.p_eq || 
+           EcPath.p_equal op EcCoreLib.p_real_le) ->
+      EcPath.p_equal op EcCoreLib.p_eq, f1, f2
+    | _ -> cannot_apply "equiv_deno" "" in (* FIXME error message *)
+  let (ml,fl,argsl,evl) = destr_pr f1 in
+  let (mr,fr,argsr,evr) = destr_pr f2 in
+  let concl_e = f_equivF pre fl fr post in
+  let funl = EcEnv.Fun.by_mpath fl env in
+  let funr = EcEnv.Fun.by_mpath fr env in
+  (* building the substitution for the pre *)
+  (* we should substitute param by args and left by ml and right by mr *)
+  let sargs = 
+    List.fold_left2 (fun s v a -> PVM.add env (pv_loc fr v.v_name) mright a s)
+      PVM.empty (fst funr.f_sig.fs_sig) argsr in
+  let sargs = 
+    List.fold_left2 (fun s v a -> PVM.add env (pv_loc fl v.v_name) mleft a s)
+      sargs (fst funl.f_sig.fs_sig) argsl in
+  let smem = { f_subst_id with 
+    fs_mem = Mid.add mleft ml (Mid.singleton mright mr) } in
+  let concl_pr  = f_subst smem (PVM.subst env sargs pre) in
+  (* building the substitution for the post *)
+  let smeml = { f_subst_id with fs_mem = Mid.singleton mhr mleft } in
+  let smemr = { f_subst_id with fs_mem = Mid.singleton mhr mright } in
+  let evl   = f_subst smeml evl and evr = f_subst smemr evr in
+  let cmp   = if cmp then f_iff else f_imp in 
+  let mel = EcEnv.Fun.actmem_post mleft fl funl in
+  let mer = EcEnv.Fun.actmem_post mright fr funr in
+  let concl_po = gen_mems [mel;mer] (f_imp post (cmp evl evr)) in
+  prove_goal_by [concl_e;concl_pr;concl_po] RN_hl_deno g  
+
+(* -------------------------------------------------------------------- *)
 
 let gen_rcond b m at_pos s =
   let head, i, tail = s_split_i "rcond" at_pos s in 
@@ -672,25 +761,6 @@ let t_rcond side b at_pos g =
   match side with
   | None -> t_hoare_rcond b at_pos g
   | Some side -> t_equiv_rcond side b at_pos g
-
-(* -------------------------------------------------------------------- *)
-
-let t_hoare_case f g =
-  let concl = get_concl g in
-  let hs = destr_hoareS concl in
-  let concl1 = f_hoareS_r { hs with hs_pr = f_and_simpl hs.hs_pr f } in
-  let concl2 = f_hoareS_r { hs with hs_pr = f_and_simpl hs.hs_pr (f_not f) } in
-  prove_goal_by [concl1;concl2] (RN_hl_case f) g
-
-let t_equiv_case f g = 
-  let concl = get_concl g in
-  let es = destr_equivS concl in
-  let concl1 = f_equivS_r { es with es_pr = f_and es.es_pr f } in
-  let concl2 = f_equivS_r { es with es_pr = f_and es.es_pr (f_not f) } in
-  prove_goal_by [concl1;concl2] (RN_hl_case f) g
-
-let t_he_case f g =
-  t_hS_or_eS (t_hoare_case f) (t_equiv_case f) g 
 
 (* -------------------------------------------------------------------- *)
 let check_swap env s1 s2 = 
@@ -797,42 +867,6 @@ let rec t_equiv_cond env side g =
                ])
         ] g
 
-(* -------------------------------------------------------------------- *)
-
-let t_equiv_deno env pre post g =
-  let concl = get_concl g in
-  let cmp, f1, f2 =
-    match concl.f_node with
-    | Fapp({f_node = Fop(op,_)}, [f1;f2]) when is_pr f1 && is_pr f2 &&
-        (EcPath.p_equal op EcCoreLib.p_eq || 
-           EcPath.p_equal op EcCoreLib.p_real_le) ->
-      EcPath.p_equal op EcCoreLib.p_eq, f1, f2
-    | _ -> cannot_apply "equiv_deno" "" in (* FIXME error message *)
-  let (ml,fl,argsl,evl) = destr_pr f1 in
-  let (mr,fr,argsr,evr) = destr_pr f2 in
-  let concl_e = f_equivF pre fl fr post in
-  let funl = EcEnv.Fun.by_mpath fl env in
-  let funr = EcEnv.Fun.by_mpath fr env in
-  (* building the substitution for the pre *)
-  (* we should substitute param by args and left by ml and right by mr *)
-  let sargs = 
-    List.fold_left2 (fun s v a -> PVM.add env (pv_loc fr v.v_name) mright a s)
-      PVM.empty (fst funr.f_sig.fs_sig) argsr in
-  let sargs = 
-    List.fold_left2 (fun s v a -> PVM.add env (pv_loc fl v.v_name) mleft a s)
-      sargs (fst funl.f_sig.fs_sig) argsl in
-  let smem = { f_subst_id with 
-    fs_mem = Mid.add mleft ml (Mid.singleton mright mr) } in
-  let concl_pr  = f_subst smem (PVM.subst env sargs pre) in
-  (* building the substitution for the post *)
-  let smeml = { f_subst_id with fs_mem = Mid.singleton mhr mleft } in
-  let smemr = { f_subst_id with fs_mem = Mid.singleton mhr mright } in
-  let evl   = f_subst smeml evl and evr = f_subst smemr evr in
-  let cmp   = if cmp then f_iff else f_imp in 
-  let mel = EcEnv.Fun.actmem_post mleft fl funl in
-  let mer = EcEnv.Fun.actmem_post mright fr funr in
-  let concl_po = gen_mems [mel;mer] (f_imp post (cmp evl evr)) in
-  prove_goal_by [concl_e;concl_pr;concl_po] RN_hl_deno g  
 
     
     

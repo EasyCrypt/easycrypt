@@ -180,6 +180,8 @@ module Fun : sig
 
   val prF : EcPath.mpath -> env -> env
 
+  val hoareF_memenv : EcPath.mpath -> env -> EcMemory.memenv * EcMemory.memenv
+
   val hoareF : EcPath.mpath -> env -> env * env
 
   val hoareS : EcPath.mpath -> env -> EcMemory.memenv * EcModules.function_def * env
@@ -188,6 +190,10 @@ module Fun : sig
 
   val actmem_post :  EcMemory.memory ->
            EcPath.mpath -> EcModules.function_ -> EcMemory.memenv
+
+  val equivF_memenv : EcPath.mpath -> EcPath.mpath -> env -> 
+    (EcMemory.memenv * EcMemory.memenv) * (EcMemory.memenv * EcMemory.memenv) 
+
   val equivF : EcPath.mpath -> EcPath.mpath -> env -> env * env
 
   val equivS : 

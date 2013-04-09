@@ -916,10 +916,14 @@ module Fun = struct
     let post = actmem_post EcFol.mhr path fun_ in 
     Memory.push_active post env  
 
-  let hoareF path env = 
+  let hoareF_memenv path env = 
     let fun_ = (by_path (EcPath.path_of_mpath path) env).sp_target in
     let pre = actmem_pre EcFol.mhr path fun_ in 
     let post = actmem_post EcFol.mhr path fun_ in 
+    pre,post
+    
+  let hoareF path env = 
+    let pre,post = hoareF_memenv path env in
     Memory.push_active pre env, Memory.push_active post env  
 
   let hoareS path env = 
@@ -932,13 +936,17 @@ module Fun = struct
     let memenv = actmem_body_anonym EcFol.mhr path locals in
     memenv, Memory.push_active memenv env
 
-  let equivF path1 path2 env = 
+  let equivF_memenv path1 path2 env = 
     let fun1 = (by_path (EcPath.path_of_mpath path1) env).sp_target in
     let fun2 = (by_path (EcPath.path_of_mpath path2) env).sp_target in
     let pre1 = actmem_pre EcFol.mleft path1 fun1 in
     let pre2 = actmem_pre EcFol.mright path2 fun2 in
     let post1 = actmem_post EcFol.mleft path1 fun1 in 
-    let post2 = actmem_post EcFol.mright path2 fun2 in 
+    let post2 = actmem_post EcFol.mright path2 fun2 in
+    (pre1,pre2), (post1,post2)
+
+  let equivF path1 path2 env = 
+    let (pre1,pre2),(post1,post2) = equivF_memenv path1 path2 env in
     Memory.push_all [pre1; pre2] env,
     Memory.push_all [post1; post2] env
 

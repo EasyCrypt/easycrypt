@@ -193,6 +193,7 @@
 %token RCONDT
 %token SWAP
 %token EQUIVDENO
+%token CONSEQ
 %token REQUIRE
 %token RES
 %token RETURN
@@ -1107,25 +1108,25 @@ underscore_or_ident:
 | s=_ident   { Some s }
 ;
 
-fpattern_head:
+fpattern_head(F):
 | p=qident tvi=tvars_app?
    { FPNamed (p, tvi) }
 
-| LPAREN UNDERSCORE COLON f=form RPAREN
+| LPAREN UNDERSCORE COLON f=F RPAREN
    { FPCut f }
 ;
 
 fpattern_arg:
 | UNDERSCORE   { EA_none }
-| f=sform { EA_form f }
+| f=sform      { EA_form f }
 | s=mident     { EA_mem s }
 ;
 
-fpattern:
-| hd=fpattern_head
+fpattern(F):
+| hd=fpattern_head(F)
    { mk_fpattern hd [] }
 
-| LPAREN hd=fpattern_head args=loc(fpattern_arg)* RPAREN
+| LPAREN hd=fpattern_head(F) args=loc(fpattern_arg)* RPAREN
    { mk_fpattern hd args }
 ;
 
@@ -1150,6 +1151,11 @@ rwside:
 | empty     { true }
 ;
 
+conseq:
+| f1=form LONGARROW f2=form     { Some f1, Some f2 }
+| UNDERSCORE LONGARROW f2=form  { None, Some f2 }
+| f1=form LONGARROW UNDERSCORE  { Some f1, None }
+;
 tactic:
 | IDTAC
     { Pidtac }
@@ -1184,13 +1190,13 @@ tactic:
 | RIGHT
     { Pright }
 
-| ELIM e=fpattern
+| ELIM e=fpattern(form)
    { Pelim e }
 
 | ELIMT p=qident f=sform
    { PelimT (f, p) }
 
-| APPLY e=fpattern
+| APPLY e=fpattern(form)
    { Papply e }
 
 | l=simplify
@@ -1199,7 +1205,7 @@ tactic:
 | CHANGE f=sform
    { Pchange f }
 
-| REWRITE s=rwside e=fpattern
+| REWRITE s=rwside e=fpattern(form)
    { Prewrite (s, e) }
 
 | SUBST l=ident*
@@ -1246,7 +1252,10 @@ tactic:
 
 | SWAP info=plist1(loc(swap_info),COMMA)
     { PPhl (Pswap info) }
-| EQUIVDENO pre=sform post=sform { PPhl(Pequivdeno(pre,post)) }
+
+| EQUIVDENO info=fpattern(conseq) { PPhl(Pequivdeno info) }
+
+| CONSEQ info=fpattern(conseq) { PPhl(Pconseq info) }
 ;
 
 swap_info:

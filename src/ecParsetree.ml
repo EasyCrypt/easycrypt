@@ -212,9 +212,9 @@ let empty_pprover = {
   pprov_names = None;
 }
 
-type fpattern_kind = 
+type 'a fpattern_kind = 
   | FPNamed of pqsymbol * ptyannot option
-  | FPCut   of pformula
+  | FPCut   of 'a 
 
 type fpattern_arg = 
   | EA_form of pformula
@@ -222,10 +222,14 @@ type fpattern_arg =
   | EA_mp   of pmsymbol
   | EA_none 
 
-type fpattern = { 
-  fp_kind : fpattern_kind;
+type 'a fpattern = { 
+  fp_kind : 'a fpattern_kind;
   fp_args : fpattern_arg located list 
 }
+
+type ffpattern = pformula fpattern
+
+type cfpattern = (pformula option * pformula option) fpattern
 
 type preduction = {
   pbeta  : bool;
@@ -260,12 +264,12 @@ and ptactic_r =
   | Pexists     of fpattern_arg located list 
   | Pleft                         
   | Pright                        
-  | Pelim       of fpattern 
-  | Papply      of fpattern
+  | Pelim       of ffpattern 
+  | Papply      of ffpattern
   | Pcut        of (psymbol * pformula)
   | Pgeneralize of pformula list
   | Pclear      of psymbol list
-  | Prewrite    of (bool * fpattern)
+  | Prewrite    of (bool * ffpattern)
   | Psubst      of psymbol list
   | Psimplify   of preduction 
   | Pchange     of pformula
@@ -286,7 +290,8 @@ and phl_tactics =
   | Prcond      of (bool option * bool * int)
   | Pcond       of tac_side
   | Pswap       of ((tac_side * swap_kind) located list)
-  | Pequivdeno  of (pformula * pformula)
+  | Pconseq     of cfpattern
+  | Pequivdeno  of cfpattern
 
 and ptactics = ptactic list        
 
