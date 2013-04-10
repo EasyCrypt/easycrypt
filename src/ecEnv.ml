@@ -1677,8 +1677,12 @@ let norm_l_decl env (hyps,concl) =
     | LD_mem _ -> x, lk
     | LD_modty _ -> x, lk
     | LD_hyp f -> x, LD_hyp (norm f) in
-  ({ hyps with h_local = List.map onh hyps.h_local}, norm concl)
+  let concl = norm concl in
+  let lhyps = List.map onh hyps.h_local in
+  ({ hyps with h_local = lhyps}, concl)
 
-let check_goal env pi ld = 
-  EcWhy3.check_goal env.env_w3 pi (norm_l_decl env ld)
+let check_goal env pi ld =
+  let ld = (norm_l_decl env ld) in
+  let res = EcWhy3.check_goal env.env_w3 pi ld in
+  res
 

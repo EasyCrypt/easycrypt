@@ -525,7 +525,7 @@ let f_int_lt f1 f2 =
     assert false (* FIXME *)
 
 
-let fop_in_supp ty = f_op EcCoreLib.p_in_supp [] (tfun ty (tfun (tdistr ty) ty_bool))
+let fop_in_supp ty = f_op EcCoreLib.p_in_supp [ty] (tfun ty (tfun (tdistr ty) ty_bool))
 let f_in_supp f1 f2 = f_app (fop_in_supp f1.f_ty) [f1;f2] ty_bool
 
 

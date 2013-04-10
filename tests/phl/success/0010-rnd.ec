@@ -21,8 +21,7 @@ fun.
 rnd.
 simplify.
 skip.
-intros _ _ _ x y H.
-assumption.
+trivial.
 save.
 
 
