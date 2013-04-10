@@ -530,8 +530,8 @@ let f_in_supp f1 f2 = f_app (fop_in_supp f1.f_ty) [f1;f2] ty_bool
 
 
 (* mu_x : 'a distr -> 'a -> real *)
-let fop_mu_x ty = f_op EcCoreLib.p_mu_x [] (tfun (tdistr ty) (tfun ty  ty_real))
-let f_mu_x f1 f2 = f_app (fop_mu_x f1.f_ty) [f1;f2] ty_real
+let fop_mu_x ty = f_op EcCoreLib.p_mu_x [ty] (tfun (tdistr ty) (tfun ty  ty_real))
+let f_mu_x f1 f2 = f_app (fop_mu_x f2.f_ty) [f1;f2] ty_real
 
 
 
