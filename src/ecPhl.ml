@@ -884,7 +884,7 @@ let rec t_equiv_cond env side g =
 let proj_distr_ty ty = match ty.ty_node with
   | Tconstr(_,lty) when List.length lty = 1  -> 
     List.hd lty
-  | _ -> assert false
+  | _ -> cannot_apply "rnd" "not a distribution expression"
 
 let (===) = f_eq_simpl 
 let (==>) = f_imp_simpl
@@ -894,8 +894,7 @@ let rec wp_equiv_rnd env bij_info g =
   let concl = get_concl g in
   let es = destr_equivS concl in
   let (lvL,muL),(lvR,muR),sl',sr'= s_last_rnds "rnd" es.es_sl es.es_sr in
-  (* is_distr_exp hyps env muL; *) (* FIXME *)
-  (* is_distr_exp hyps env muR; *)
+  (* FIXME: exception when not rnds found *)
   let tyL = proj_distr_ty (e_ty muL) in
   let tyR = proj_distr_ty (e_ty muR) in
   let x_id, y_id = EcIdent.create "x", EcIdent.create "y" in

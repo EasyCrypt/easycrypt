@@ -1272,9 +1272,9 @@ tactic:
 
 
 rnd_info:
-| LPAREN e1=sform RPAREN LPAREN e2=sform RPAREN
+| e1=sform COMMA e2=sform 
   {RIbij (e1,e2) }
-| LPAREN e=sform RPAREN
+| e=sform 
   {RIidempotent e }
 | empty
   {RIid }
