@@ -67,7 +67,7 @@ let process_pr scope p =
 
 let process_print scope p = 
   let doc = process_pr scope p in
-    EcPrinting.Pp.pretty stdout (doc ^^ Pp.hardline)
+    EcPrinting.pretty stdout (doc ^^ Pp.hardline)
 
 (* -------------------------------------------------------------------- *)
 let addidir (idir : string) =
@@ -268,7 +268,6 @@ module IntCommand = struct
   open EcBaseLogic
   open EcLogic
   open EcPrinting
-  open EcPrinting.Pp
 
   let goalline = String.make 72 '-'
 
@@ -282,9 +281,9 @@ module IntCommand = struct
         | LD_hyp f           -> pr_form t f
       in
 
-      let dh = Pp.join [pr_ident t id; !^":"; dk] in
+      let dh = join [pr_ident t id; !^":"; dk] in
         Printf.fprintf stream "%t\n%!"
-          (fun stream -> Pp.pretty stream dh);
+          (fun stream -> pretty stream dh);
         PPE.add_local t id
     in
       begin
@@ -295,13 +294,13 @@ module IntCommand = struct
       Printf.fprintf stream "Type variables: %t\n%!"
         (fun stream ->
           let doc = List.map (pr_tvar EcEnv.initial) hyps.h_tvar in (* FIXME *)
-            Pp.pretty stream (Pp.seq ~sep:"," doc));
+            pretty stream (seq ~sep:"," doc));
       let _ =
         List.fold_left pr_hyp EcEnv.initial (List.rev hyps.h_local) (* FIXME *)
       in
         Printf.fprintf stream "%s\n%!" goalline;
         Printf.fprintf stream "%t\n%!"
-          (fun stream -> Pp.pretty stream (pr_form EcEnv.initial concl)) (* FIXME *)
+          (fun stream -> pretty stream (pr_form EcEnv.initial concl)) (* FIXME *)
 
   let prgoal_current (stream : out_channel) =
     let (_, scope, _) = !context in

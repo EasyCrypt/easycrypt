@@ -9,124 +9,21 @@ open EcTheory
 open EcBaseLogic
 
 (* -------------------------------------------------------------------- *)
-module Pp : sig
-  type doc
 
-  val empty    : doc
-  val string   : string -> doc
-  val flat     : doc -> doc
-  val hardline : doc
+module Pp = Pprint
+let (!^) = Pp.string
+let (^^) = Pp.(^^)
+let (^/^) d1 d2 = d1 ^^ !^" " ^^ d2
+let (^//^) x y = x ^^ Pp.break1 ^^ y
+let (^@@^) x ?(nest=2) y = 
+  Pp.group (x ^^ Pp.nest nest (Pp.break1 ^^ y))
+let glue  = Pp.fold1 (^^)
+let join  = Pp.fold1 (^/^)
 
-  val (!^) : string -> doc
+let seq ?(sep=",") ?(nest=2) docs =
+  Pp.fold1 (fun d1 d2 -> (^@@^) (d1 ^^ !^sep) ~nest d2) docs
 
-  val (^^)   : doc -> doc -> doc (* concat. without spaces                    *)
-  val (^/^)  : doc -> doc -> doc (* concat. with inter-space                  *)
-  val (^//^) : doc -> doc -> doc (* concat. with break. inter-space           *)
-  val (^@@^) : doc -> doc -> doc (* concat. with break. inter-space + nesting *)
-
-  val indent : int -> doc -> doc
-
-  val fold1 : (doc -> doc -> doc) -> doc list -> doc
-
-  val seq : ?sep:string -> ?break:bool -> ?spacing:(bool * bool) -> doc list -> doc
-
-  val join : doc list -> doc            (* concat. with non-breakable spaces *)
-  val glue : doc list -> doc            (* non-breakable concat. (no spaces) *)
-
-  val pretty    : out_channel -> doc -> unit
-  val fmtpretty : Format.formatter -> doc -> unit
-end = struct
-  type blank = int * int option        (* width * nesting/breakable *)
-
-  type doc =
-  | DEmpty
-  | DHardline
-  | DIndent   of int * doc
-  | DString   of string
-  | DCat      of doc * blank * doc
-  | DFlat     of doc
-
-  let empty = DEmpty
-
-  let string (s : string) =
-    DString s
-
-  let flat (d : doc) =
-    DFlat d
-
-  let hardline =
-    DHardline
-
-  let indent (i : int) (d : doc) =
-    DIndent (i, d)
-
-  let (!^) = string
-
-  let (^^) (d1 : doc) (d2 : doc) =
-    match d1, d2 with
-    | DEmpty, _ -> d2
-    | _, DEmpty -> d1
-    | _, _ -> DCat (d1, (0, None), d2)
-
-  let (^/^) (d1 : doc) (d2 : doc) =
-    DCat (d1, (1, None), d2)
-
-  let (^//^) (d1 : doc) (d2 : doc) =
-    DCat (d1, (1, Some 0), d2)
-
-  let (^@@^) (d1 : doc) (d2 : doc) =
-    DCat (d1, (1, Some 2), d2)
-
-  let fold1 (f : doc -> doc -> doc) (ds : doc list) =
-    match ds with
-    | []      -> empty
-    | [d]     -> d
-    | d :: ds -> List.fold_left f d ds
-
-  let seq ?(sep = "") ?(break = false) ?(spacing = (false, true)) ds =
-    fold1 (fun d1 d2 -> d1 ^/^ !^sep ^@@^ d2) ds
-
-  let join  = fold1 (^/^)
-  let glue  = fold1 (^^)
-
-  let compile =
-    let rec compile (flat : bool) = function
-      | DEmpty    -> Pprint.empty
-      | DString s -> Pprint.string s
-      | DFlat d   -> compile true d
-      | DHardline -> Pprint.ifflat (Pprint.break1) (Pprint.hardline)
-
-      | DIndent (i, d) ->
-          Pprint.indent i (compile flat d)
-
-      | DCat (d1, (i, b), d2) -> 
-        let d1 = compile flat d1
-        and d2 =
-          let blank =
-            if b = None || flat then Pprint.blank else Pprint.break in
-          let d2 = compile flat d2 in
-          let d2 =
-            if i > 0 then Pprint.(^^) (blank i) d2 else d2 in
-          let d2 =
-            match b with
-            | None -> d2
-            | Some _ when flat -> d2
-            | Some b ->
-              let d2 = Pprint.group d2 in
-                if b > 0 then Pprint.nest b d2 else d2
-          in
-            d2
-        in
-          Pprint.(^^) d1 d2
-    in
-      compile false
-
-  let pretty stream doc =
-    Pprint.Channel.pretty 0.8 80 stream (compile doc)
-
-  let fmtpretty fmt doc =
-    Pprint.Formatter.pretty 0.8 80 fmt (compile doc)
-end
+let seqc0  = seq ~sep:"," ~nest:0 
 
 (* -------------------------------------------------------------------- *)
 module EP = EcParser
@@ -145,47 +42,91 @@ module PPE = struct
   let add_ty    (ppenv : ppenv) ty    = EcEnv.Ty.add ty ppenv
   let add_op    (ppenv : ppenv) op    = EcEnv.Op.add op ppenv
   let add_ax    (ppenv : ppenv) ax    = EcEnv.Ax.add ax ppenv
-
-  let shorten (query : qsymbol -> bool) =
+      
+  let shorten (lookup : qsymbol -> ppenv -> EcPath.path) 
+              (ppenv  : ppenv) (p:EcPath.path) =
     let for1 (nm : symbol list) (x : symbol) =
-      if query (nm, x) then Some (nm, x) else None
+      let qs = (nm,x) in
+      try 
+        if EcPath.p_equal (lookup qs ppenv) p then Some qs else None
+      with _ -> None
     in
 
     let rec doit (nm : symbol list) (x : symbol) =
       match nm with
       | [] -> for1 [] x
-      | r :: subnm -> begin
-          match doit subnm x with
-          | Some qs -> Some qs
-          | None    -> for1 nm x
+      | _ :: subnm -> begin
+        match doit subnm x with
+        | Some qs -> Some qs
+        | None    -> for1 nm x
       end
     in
+    let (nm, x) = EcPath.toqsymbol p in
+    match doit nm x with
+    | Some qs -> qs
+    | None -> (nm, x)
 
-      fun (p : EcPath.path) ->
-        let (nm, x) = EcPath.toqsymbol p in
-          match doit nm x with
-          | Some qs -> qs
-          | None -> (nm, x)
+  let ty_symb = shorten EcEnv.Ty.lookup_path 
 
-  let th_symb (ppenv : ppenv) (p : EcPath.path) =
-    let query qs = EcEnv.Theory.lookup_opt qs ppenv <> None in
-      shorten query p
+  let op_symb = shorten EcEnv.Op.lookup_path
 
-  let tyname_symb (ppenv : ppenv) (p : EcPath.path) =
-    let query qs = EcEnv.Theory.lookup_opt qs ppenv <> None in
-      shorten query p
+  let ax_symb = shorten EcEnv.Ax.lookup_path
 
-  let op_symb (ppenv : ppenv) (p : EcPath.path) =
-    let query qs = EcEnv.Op.lookup_opt qs ppenv <> None in
-      shorten query p    
+  let th_symb = shorten EcEnv.Theory.lookup_path
+    
+  let mty_symb = shorten EcEnv.ModTy.lookup_path 
+
+  let rec shorten_m (ppenv  : ppenv) (p:EcPath.mpath) =
+    let for1 (nm : symbol list) (x : symbol)  =
+      let qs = (nm,x) in
+      try 
+        let (mp, _) = EcEnv.Mod.sp_lookup qs ppenv in
+        if EcPath.p_equal mp.EcPath.m_path p.EcPath.m_path then Some qs 
+        else None
+      with _ -> None
+    in
+
+    let rec doit (nm : symbol list) (x : symbol) =
+      match nm with
+      | [] -> for1 [] x
+      | _ :: subnm -> begin
+        match doit subnm x with
+        | Some qs -> Some qs
+        | None    -> for1 nm x
+      end
+    in
+    let (nm, x) = EcPath.toqsymbol p.EcPath.m_path in
+    let (nm, x) = match doit nm x with Some qs -> qs | None -> (nm, x) in
+    let r = List.take (List.length nm + 1) p.EcPath.m_args in
+    let r = List.map (List.map (shorten_m ppenv)) r in
+    let a = List.hd r and r = List.rev (List.tl r) in
+    List.combine nm r @ [x,a]
+
+  let rec shorten_mx ppenv p =
+    match EcPath.m_split p with
+    | Some(p,EcPath.PKother,s,a) ->
+      assert (a = []);
+      shorten_mx ppenv p @ [s,[]]
+    | Some(_,EcPath.PKmodule,_,_) ->
+      shorten_m ppenv p
+    | _ -> assert false 
+      
+  let mod_symb = shorten_m 
+  let fun_symb = shorten_mx
+  let pv_symb ppenv pv = shorten_mx ppenv pv.pv_name
+    
+
+(*  let shorten_m (ppenv : ppenv) (p:EcPath.mpath) =
+    let 
+*)   
+
+(*  let fun_symb (ppenv : ppenv) (p : EcPath.path) =
+    let query qs = EcEnv.Fun.lookup_opt qs ppenv <> None in
+      shorten query p *)
+         
+        
+
 end
-
-(* -------------------------------------------------------------------- *)
-let (!^)   = Pp.(!^)
-let (^^)   = Pp.(^^)
-let (^/^)  = Pp.(^/^)
-let (^//^) = Pp.(^//^)
-let (^@@^) = Pp.(^@@^)
 
 (* -------------------------------------------------------------------- *)
 let tk_as     = !^"as"
@@ -200,6 +141,7 @@ let tk_export = !^"export"
 let tk_flip   = !^"{0,1}"
 let tk_forall = !^"forall"
 let tk_fun    = !^"fun"
+let tk_return = !^"return"
 let tk_if     = !^"if"
 let tk_in     = !^"in"
 let tk_lambda = !^"lambda"
@@ -221,29 +163,44 @@ let tk_tild     = !^"~"
 let tk_arrow    = !^"->"
 let tk_larrow   = !^"<-"
 let tk_pipe     = !^"|"
+let tk_dot      = !^"."
 let tk_dotdot   = !^".."
+let tk_eq       = !^"="
 
 (* -------------------------------------------------------------------- *)
-let pr_paren   d = Pp.glue [!^"("; d; !^")"]
-let pr_bracket d = Pp.glue [!^"["; d; !^"]"]
-let pr_brace   d = Pp.glue [!^"{"; d; !^"}"]
-let pr_angle   d = Pp.glue [!^"<"; d; !^">"]
+let pr_paren   = Pp.parens
+let pr_bracket = Pp.brackets
+let pr_brace   = Pp.braces
+let pr_angle   = Pp.angles
 
 let pr_dotted d = d ^^ !^"."
 
-let pr_block (docs : Pp.doc list) =
+let pr_column docs =
+  Pp.fold1 (^//^) docs
+
+let pr_column2 docs = 
+  Pp.break0 ^^
+    Pp.fold1 (fun x y -> x ^^ Pp.break0 ^^ Pp.break0 ^^ y) docs ^^
+    Pp.break0
+
+let pr_br_block doc =
+  if doc = Pp.empty then pr_brace Pp.empty 
+  else
+    pr_brace ((Pp.nest 2 (Pp.break0 ^^ doc)) ^^ Pp.break0)
+
+let pr_block docs =
   Pp.fold1
-    (fun d1 d2 -> d1 ^^ Pp.hardline ^^ d2)
+    (fun d1 d2 -> d1 ^^ Pp.break1 ^^ d2)
     docs
 
-let pr_mblocks (docs : (Pp.doc list) list) =
-  let hardline2 = Pp.hardline ^^ Pp.hardline in
+let pr_mblocks docs = 
+  let hardline2 = Pp.break1 ^^ Pp.break1 in
 
   let docs =
     List.map
-      (Pp.fold1 (fun d1 d2 -> d1 ^^ Pp.hardline ^^ d2))
+      (Pp.fold1 (fun d1 d2 -> d1 ^^ Pp.break1 ^^ d2))
       docs
-  in
+  in 
     Pp.fold1
       (fun d1 d2 -> d1 ^^ hardline2 ^^ d2)
       docs
@@ -254,6 +211,16 @@ let is_ident_symbol name =
   | Some EP.LIDENT _ -> true
   | Some EP.UIDENT _ -> true
   | _ -> false
+
+let rec pr_msymbol qm = 
+  match qm with
+  | [] -> assert false
+  | [x,args] -> !^x ^^ pr_margs args
+  | (x,args) :: qm -> !^x ^^ pr_margs args ^^ tk_dot ^^ pr_msymbol qm
+and pr_margs args = 
+  if args = [] then Pp.empty
+  else pr_paren (seqc0 (List.map pr_msymbol args))
+  
 
 let pr_qsymbol ((nm, x) : qsymbol) =
   let pr_symbol (x : symbol) =
@@ -271,10 +238,10 @@ let pr_univar (_ppe : ppenv) (i : _) =
   !^ (Printf.sprintf "#%d" i)
 
 let pr_tvar (_ppe : ppenv) (a : EcIdent.t) =
-  !^ (EcIdent.tostring a)
+  !^ (EcIdent.name a)
 
 let pr_tyname (ppe : ppenv) (p : EcPath.path) =
-  pr_qsymbol (PPE.tyname_symb ppe p)
+  pr_qsymbol (PPE.ty_symb ppe p)
 
 let pr_ident (_ppe : ppenv) (x : EcIdent.t) =
   !^ (EcIdent.tostring x)
@@ -282,16 +249,20 @@ let pr_ident (_ppe : ppenv) (x : EcIdent.t) =
 let pr_local (_ppe : ppenv) (x : EcIdent.t) =
   !^ (EcIdent.tostring x)
 
-let pr_funname (_ppe : ppenv) (p : EcPath.mpath) =
-  !^ (EcPath.m_tostring p)
+let pr_funname (ppe : ppenv) (p : EcPath.mpath) =
+  pr_msymbol (PPE.fun_symb ppe p)
+
+let pr_modname (ppe : ppenv) (p : EcPath.mpath) =
+  pr_msymbol (PPE.mod_symb ppe p)
 
 let pr_thname (_ppe : ppenv) (p : EcPath.path) =
   !^ (EcPath.tostring p)
 
-let pr_pv (_ppe : ppenv) (x : prog_var) =
-  !^ (EcPath.m_tostring x.pv_name)
+let pr_pv (ppe : ppenv) (x : prog_var) =
+  pr_msymbol (PPE.pv_symb ppe x)
 
 (* -------------------------------------------------------------------- *)
+
 let pr_type (ppe : ppenv) (ty : ty) =
   let rec pr_type btuple (ty : ty) =
     match ty.ty_node with
@@ -300,15 +271,18 @@ let pr_type (ppe : ppenv) (ty : ty) =
 
     | Ttuple tys ->
         let doc = List.map (pr_type true) tys in
-        let doc = Pp.seq ~sep:"*" ~spacing:(true, true) doc in
+        let doc = seq ~sep:" *" doc in
           if btuple then pr_paren doc else doc
 
     | Tconstr (name, tyargs) -> begin
         let name = pr_tyname ppe name in
           match tyargs with
-          | []   -> name
-          | [ty] -> (pr_type true ty) ^/^ name
-          | _    -> (Pp.join (List.map (pr_type false) tyargs)) ^/^ name
+          | []      -> name
+          | [ty]    -> (pr_type true ty) ^/^ name
+          | ty::tys -> 
+            pr_paren (
+              (^@@^) (pr_type false ty ^^ !^",") ~nest:1 
+                (seqc0 (List.map (pr_type false) tys))) ^/^ name
       end
 
     | Tfun (ty1, ty2) ->
@@ -402,40 +376,50 @@ let pr_if3 (ppenv : ppenv) pr_sub outer b e1 e2 =
   let dc  = pr_sub ppenv (e_bin_prio_if3, `Left    ) b  in
   let d1  = pr_sub ppenv (min_op_prec   , `NonAssoc) e1 in
   let d2  = pr_sub ppenv (e_bin_prio_if3, `Right   ) e2 in
-  let doc = Pp.join [dc; !^"?"; d1; !^":"; d2] in
-    maybe_paren outer e_bin_prio_if3 doc
-
+  let doc = join [dc; !^"?"; d1; !^":"; d2] in
+  maybe_paren outer e_bin_prio_if3 doc 
 (* -------------------------------------------------------------------- *)
-let pr_if (ppenv : ppenv) pr_sub outer b e1 e2 =
+
+let pr_if_t_e (ppenv : ppenv) pr_sub outer b e1 e2 =
   let dc  = pr_sub ppenv (min_op_prec  , `NonAssoc) b  in
   let d1  = pr_sub ppenv (min_op_prec  , `NonAssoc) e1 in
   let d2  = pr_sub ppenv (e_bin_prio_if, `Right   ) e2 in
-  let doc = Pp.join [tk_if; dc; tk_then; d1; tk_else; d2] in
-    maybe_paren outer e_bin_prio_if doc
+  let doc = 
+    (join [tk_if; dc; tk_then] ^@@^ d1) ^//^ 
+          (tk_else ^@@^ d2) in
+  maybe_paren outer e_bin_prio_if doc 
+  
+let pr_if ppenv pr_sub outer b e1 e2 =
+  Pp.group (Pp.ifflat (pr_if3 ppenv pr_sub outer b e1 e2)
+              (pr_if_t_e ppenv pr_sub outer b e1 e2)) 
+
 
 (* -------------------------------------------------------------------- *)
 let pr_let (ppenv : ppenv) pr_sub outer pt e1 e2 =
   let ids = lp_ids pt in
   let subppenv = List.fold_left PPE.add_local ppenv ids in
 
-  let dpt = Pp.seq ~sep:"," (List.map (pr_local subppenv) ids) in
+  let dpt = seq (List.map (pr_local subppenv) ids) in
 
   let d1  = pr_sub ppenv (e_bin_prio_letin, `NonAssoc) e1 in
   let d2  = pr_sub subppenv (e_bin_prio_letin, `NonAssoc) e2 in
-  let doc = Pp.join [tk_let; dpt; !^"="; d1; tk_in; d2] in
+  let doc = 
+    (^@@^) ~nest:0 
+      (join [tk_let; dpt; tk_eq] ^@@^ (d1 ^/^ tk_in))
+      d2 in
     maybe_paren outer e_bin_prio_letin doc
 
 (* -------------------------------------------------------------------- *)
 let pr_tuple_expr (ppenv : ppenv) pr_sub es =
   let docs = List.map (pr_sub ppenv (min_op_prec, `NonAssoc)) es in
-    pr_paren (Pp.seq ~sep:"," docs)
+    pr_paren (seq docs)
 
 (* -------------------------------------------------------------------- *)
 let pr_op_name (ppenv : ppenv) (p : EcPath.path) =
   pr_qsymbol (PPE.op_symb ppenv p)
 
 (* -------------------------------------------------------------------- *)
-let pr_opapp (ppenv : ppenv) pr_sub outer op tvi es =
+let pr_opapp (ppenv : ppenv) pr_sub outer op _tvi es =
   let (nm, opname) = PPE.op_symb ppenv op in
   
   let pr_as_std_op () =
@@ -447,13 +431,13 @@ let pr_opapp (ppenv : ppenv) pr_sub outer op tvi es =
 
         | "__abs", [e] -> 
             let e = pr_sub ppenv (min_op_prec, `NonAssoc) e in
-              (Pp.glue [tk_pipe; e; tk_pipe], appprio)
+              (glue [tk_pipe; e; tk_pipe], appprio)
 
         | "__get", [e1; e2] ->
             let e1 = pr_sub ppenv (e_get_prio , `Left)     e1 in
             let e2 = pr_sub ppenv (min_op_prec, `NonAssoc) e2 in
 
-            let doc = Pp.join [e1; pr_bracket e2] in
+            let doc = join [e1; pr_bracket e2] in
               (doc, e_get_prio)
 
         | "__set", [e1; e2; e3] ->
@@ -461,15 +445,15 @@ let pr_opapp (ppenv : ppenv) pr_sub outer op tvi es =
             let e2 = pr_sub ppenv (min_op_prec, `NonAssoc) e2 in
             let e3 = pr_sub ppenv (min_op_prec, `NonAssoc) e3 in
 
-            let doc = Pp.join [e1; pr_bracket (Pp.join [e2; tk_larrow; e3])] in
+            let doc = join [e1; pr_bracket (join [e2; tk_larrow; e3])] in
               (doc, e_get_prio)
 
         | _ ->
             let es = List.map (pr_sub ppenv (appprio, `Right)) es in
-              (Pp.join ((pr_qsymbol (nm, opname)) :: es), appprio)
+              (join ((pr_qsymbol (nm, opname)) :: es), appprio)
       else 
         let es = List.map (pr_sub ppenv (appprio, `Right)) es in
-          (Pp.join ((pr_qsymbol (nm, opname)) :: es), appprio)
+          (join ((pr_qsymbol (nm, opname)) :: es), appprio)
     in
       maybe_paren outer prio doc
 
@@ -498,7 +482,7 @@ let pr_opapp (ppenv : ppenv) pr_sub outer op tvi es =
           | Some opprio ->
               let d1  = pr_sub ppenv (opprio, `Left ) e1 in
               let d2  = pr_sub ppenv (opprio, `Right) e2 in
-              let doc = Pp.join [d1; !^ opname ; d2] in
+              let doc = join [d1; !^ opname ; d2] in
               Some (maybe_paren outer opprio doc)
           end
       | _ -> None
@@ -512,16 +496,16 @@ let pr_opapp (ppenv : ppenv) pr_sub outer op tvi es =
 
     | [e] when qs = EcCoreLib.s_dbitstring ->
         let e = pr_sub ppenv (max_op_prec, `NonAssoc) e in
-          Some (Pp.glue [tk_flip; tk_tild; e])
+          Some (glue [tk_flip; tk_tild; e])
 
     | [e] when qs = EcCoreLib.s_from_int ->
         let e = pr_sub ppenv (max_op_prec, `NonAssoc) e in
-          Some (Pp.glue [e; tk_from_int])
+          Some (glue [e; tk_from_int])
 
     | [e1; e2] when qs = EcCoreLib.s_dinter ->
         let e1 = pr_sub ppenv (min_op_prec, `NonAssoc) e1 in
         let e2 = pr_sub ppenv (min_op_prec, `NonAssoc) e2 in
-          Some (pr_bracket (Pp.glue [e1; tk_dotdot; e2]))
+          Some (pr_bracket (glue [e1; tk_dotdot; e2]))
 
     | _ -> None
 
@@ -541,7 +525,7 @@ let pr_expr (ppenv : ppenv) (e : expr) =
     | Elocal x ->
         pr_local ppenv x
 
-    | Eop (op, tys) -> (* FIXME infix, prefix, ty_inst *)
+    | Eop (op, _tys) -> (* FIXME infix, prefix, ty_inst *)
         pr_op_name ppenv op
 
     | Eint i ->
@@ -559,7 +543,7 @@ let pr_expr (ppenv : ppenv) (e : expr) =
     | Eapp (e, args) -> 
         let e    = pr_expr ppenv (max_op_prec, `NonAssoc) e in
         let args = List.map (pr_expr ppenv (min_op_prec, `NonAssoc)) args in
-          e ^^ (pr_paren (Pp.seq ~sep:"," args))
+          e ^^ (pr_paren (seq args))
 
     | Elet (pt, e1, e2) ->
         pr_let ppenv pr_expr outer pt e1 e2
@@ -577,7 +561,7 @@ let pr_lvalue (ppenv : ppenv) (lv : lvalue) =
 
   | LvTuple ps ->
       let ps = List.map ((pr_pv ppenv) -| fst) ps in
-        pr_paren (Pp.seq ~sep:"," ps)
+        pr_paren (seq ps)
 
   | LvMap (_, x, e, _) ->
       (pr_pv ppenv x) ^^ (pr_bracket (pr_expr ppenv e))
@@ -599,24 +583,26 @@ let rec pr_instr (ppenv : ppenv) (i : instr) =
   let doc =
     match i.i_node with
     | Sasgn (lv, e) ->
-        Pp.join [pr_lvalue ppenv lv; !^"="; pr_expr ppenv e]
+      join [pr_lvalue ppenv lv; tk_eq] ^@@^ 
+        pr_expr ppenv e
 
     | Srnd (lv, e) ->
-        Pp.join [pr_lvalue ppenv lv; !^"="; !^"$"; pr_expr ppenv e]
+        join [pr_lvalue ppenv lv; tk_eq] ^@@^
+          glue [!^"$"; pr_expr ppenv e]
 
     | Scall (lv, name, args) -> begin
         let doc = 
           let name = pr_funname ppenv name in
           let args = List.map (pr_expr ppenv) args in
-            name ^^ (pr_paren (Pp.seq ~sep:"," args))
+            name ^^ (pr_paren (seq args))
         in
         match lv with
         | None    -> doc
-        | Some lv -> Pp.join [pr_lvalue ppenv lv; !^":="; doc]
+        | Some lv -> join [pr_lvalue ppenv lv; !^":=";] ^@@^ doc
     end
 
     | Sassert e ->
-        Pp.join [tk_assert; pr_paren (pr_expr ppenv e)]
+        join [tk_assert; pr_paren (pr_expr ppenv e)]
 
     | Sif (e, b1, b2) ->
         let e  = pr_paren (pr_expr ppenv e) in
@@ -624,12 +610,12 @@ let rec pr_instr (ppenv : ppenv) (i : instr) =
         let b2 = 
           if is_empty_block b2 then []
           else [tk_else; pr_sblock ppenv b2] in
-          Pp.join ([tk_if; e; b1] @ b2)
+          join ([tk_if; e; b1] @ b2)
 
     | Swhile (e, body) ->
         let e = pr_paren (pr_expr ppenv e) in
         let body = pr_sblock ppenv body in
-          Pp.join [tk_while; e; body]
+          join [tk_while; e; body]
 
   in
   if is_base_instr i then doc ^^ !^";" else doc
@@ -661,7 +647,7 @@ let rec pr_module_item (scope : EcPath.path) (ppenv : ppenv) (item : module_item
 
 (* -------------------------------------------------------------------- *)
 and pr_modvar (ppenv : ppenv) ((_, v) : EcPath.path * variable) =
-  Pp.join [tk_var; !^(v.v_name); !^":"; pr_type ppenv v.v_type]
+  join [tk_var; !^(v.v_name); !^":"; pr_type ppenv v.v_type]
 
 (* -------------------------------------------------------------------- *)
 and pr_modfun (ppenv : ppenv) ((_, f) : EcPath.path * function_) =
@@ -670,12 +656,12 @@ and pr_modfun (ppenv : ppenv) ((_, f) : EcPath.path * function_) =
 
   let dparams =
     List.map
-      (fun vd -> Pp.join [!^(vd.v_name); !^":"; pr_type ppenv vd.v_type])
+      (fun vd -> join [!^(vd.v_name); !^":"; pr_type ppenv vd.v_type])
       fparams in
-  let dparams = pr_paren (Pp.seq ~sep:"," dparams) in
+  let dparams = pr_paren (seq dparams) in
 
   let prelude =
-    Pp.join [tk_fun; !^fname ^^ dparams; !^":"; pr_type ppenv fres]
+    join [tk_fun; !^fname ^^ dparams; !^":"; pr_type ppenv fres]
   in
 
     match f.f_def with
@@ -683,31 +669,40 @@ and pr_modfun (ppenv : ppenv) ((_, f) : EcPath.path * function_) =
         prelude
 
     | Some def ->
-        let dlocals =
+      let dlocals =
           List.map
             (fun vd -> pr_local ppenv (EcIdent.create vd.v_name))
             def.f_locals
 
-        and dbody =
-          let bodyppenv =
-            List.fold_left
-              (fun ppenv x -> PPE.add_local ppenv (EcIdent.create x.v_name))
-              ppenv
-              ((fst f.f_sig.fs_sig) @ def.f_locals)
-          in
-            List.map (pr_instr bodyppenv) def.f_body.s_node
+      and dbody =
+        let bodyppenv =
+          List.fold_left
+            (fun ppenv x -> PPE.add_local ppenv (EcIdent.create x.v_name))
+            ppenv
+            ((fst f.f_sig.fs_sig) @ def.f_locals)
         in
-          (Pp.join [prelude; !^"="]) ^/^ (pr_mblocks [dlocals; dbody])
+        List.map (pr_instr bodyppenv) def.f_body.s_node
+      in
+      let body = 
+        pr_column dlocals ^//^ Pp.empty ^//^ pr_column dbody in
+      let body = 
+        match def.f_ret with
+        | None -> body 
+        | Some e -> body ^//^ (tk_return ^@@^ (pr_expr ppenv e ^^ !^";")) in
+      join [prelude; tk_eq] ^/^ 
+        pr_br_block body
+
 
 (* -------------------------------------------------------------------- *)
 and pr_module (ppenv : ppenv) ((p, m) : EcPath.path * module_expr) =
   let mename  = m.me_name in
-  let prelude = Pp.join [tk_module; !^mename] in
+  let prelude = join [tk_module; !^mename] in
   let moddoc  =
 
     match m.me_body with
     | ME_Alias m -> 
-        Pp.join [prelude; !^"="; !^ (EcPath.m_tostring m)]
+        join [prelude; tk_eq] ^@@^ 
+          pr_modname ppenv m
 
     | ME_Decl _modty ->
         assert false                  (* FIXME *)
@@ -716,8 +711,8 @@ and pr_module (ppenv : ppenv) ((p, m) : EcPath.path * module_expr) =
         let _, bodydoc =
           List.map_fold (pr_module_item p) ppenv mstruct.ms_body
         in
-              (Pp.join [prelude; !^"="])
-          ^/^ (pr_brace (pr_block bodydoc))
+        join [prelude; tk_eq] ^/^ 
+          pr_br_block (pr_column2 bodydoc)
   in
     pr_dotted moddoc
 
@@ -732,14 +727,14 @@ let pr_typedecl (ppenv : ppenv) ((x, tyd) : EcPath.path * tydecl) =
     match tyd.tyd_params with
     | []  -> Pp.empty
     | [a] -> pr_tvar ppenv a
-    | la  -> pr_paren (Pp.seq ~sep:"," (List.map (pr_tvar ppenv) la))
+    | la  -> pr_paren (seq (List.map (pr_tvar ppenv) la))
   in
 
-  let doc = tk_type ^//^ dparams ^^ (!^basename) in
+  let doc = tk_type ^/^ dparams ^/^ (!^basename) in
   let doc =
     match tyd.tyd_type with
     | None    -> doc
-    | Some ty -> doc ^//^ !^"=" ^//^ (pr_type ppenv ty)
+    | Some ty -> (doc ^/^ !^"=") ^@@^ (pr_type ppenv ty)
   in
     pr_dotted doc
 
@@ -748,20 +743,20 @@ let pr_binding (ppenv : ppenv) (x, ty) =
   match ty with
   | GTty ty ->
       let tenv1 = PPE.add_local ppenv x in
-        (tenv1, Pp.join [pr_local tenv1 x; !^":"; pr_type ppenv ty])
+        (tenv1, join [pr_local tenv1 x; !^":"; pr_type ppenv ty])
 
   | GTmem _ ->                          (* FIXME *)
       let ppenv1 = PPE.add_local ppenv x in
-        (ppenv1, Pp.join [pr_local ppenv1 x; !^":"; tk_memory])
+        (ppenv1, join [pr_local ppenv1 x; !^":"; tk_memory])
 
   | GTmodty p ->
       let ppenv1 = PPE.add_local ppenv x in
-        (ppenv1, Pp.join [pr_local ppenv1 x; !^":"; pr_modtype ppenv p])
+        (ppenv1, join [pr_local ppenv1 x; !^":"; pr_modtype ppenv p])
 
 (* -------------------------------------------------------------------- *)
 let pr_bindings (ppenv : ppenv) (b : binding) =
   let ppenv, bs = List.map_fold pr_binding ppenv b in
-    ppenv, pr_paren (Pp.seq ~sep:"," bs)
+    ppenv, pr_paren (seq bs)
 
 (* -------------------------------------------------------------------- *)
 let tk_quant = function
@@ -780,11 +775,11 @@ let pr_form (ppenv : ppenv) (f : form) =
         pr_local ppenv id
 
     | Fpvar (x, i) ->                 (* FIXME *)
-        Pp.join [pr_pv ppenv x; pr_brace (pr_local ppenv i)]
+        join [pr_pv ppenv x; pr_brace (pr_local ppenv i)]
 
     | Fquant (q, bd, f) ->
         let (subppenv, dd) = pr_bindings ppenv bd in 
-          Pp.join [tk_quant q; dd^^(!^","); pr_form subppenv outer f]
+          join [tk_quant q; dd^^(!^","); pr_form subppenv outer f]
 
     | Fif (b, f1, f2) ->
         pr_if ppenv pr_form outer b f1 f2
@@ -792,7 +787,7 @@ let pr_form (ppenv : ppenv) (f : form) =
     | Flet (lp, f1, f2) ->
         pr_let ppenv pr_form outer lp f1 f2
 
-    | Fop(op, tvi) ->		    (* FIXME infix, prefix, ty_inst *)
+    | Fop(op, _tvi) ->		    (* FIXME infix, prefix, ty_inst *)
         pr_op_name ppenv op
 
     | Fapp ({f_node = Fop (p, tys)}, args) ->
@@ -802,20 +797,24 @@ let pr_form (ppenv : ppenv) (f : form) =
         let e    = pr_form ppenv (max_op_prec, `NoneAssoc) e in
         let args = List.map (pr_form ppenv (min_op_prec, `NonAssoc)) args in
 
-          e ^^ (pr_paren (Pp.seq ~sep:"," args))
+          e ^^ (pr_paren (seq args))
 
     | Ftuple args ->
         pr_tuple_expr ppenv pr_form args
 
-    | FhoareF _ ->
-        !^ "implement-me"             (* FIXME *)
+    | FhoareF hf ->
+      let pr_form = pr_form ppenv (min_op_prec, `NonAssoc) in
+      Pp.surround 0 Pp.break1 
+        (pr_brace (pr_form hf.hf_pr)) 
+        ( pr_funname ppenv hf.hf_f) 
+        (pr_brace (pr_form hf.hf_po))
           
     | FhoareS hs -> 
         let dbody =  (* FIXME : add local program variables ? *)
           let bodyppenv = ppenv in
             List.map (pr_instr bodyppenv) hs.hs_s.s_node
         in
-          Pp.join [
+          join [
             pr_brace (pr_form ppenv outer hs.hs_pr);
             pr_mblocks [dbody];
             pr_brace (pr_form ppenv outer hs.hs_po);
@@ -829,10 +828,10 @@ let pr_form (ppenv : ppenv) (f : form) =
         let bodyppenv = ppenv in
         List.map (pr_instr bodyppenv) es.es_sr.s_node
       in
-      Pp.join [
+      join [
         !^ "equiv";
         pr_bracket (
-          Pp.join [
+          join [
             pr_mblocks [dbodyl];
             !^ "~";
             pr_mblocks [dbodyr];
@@ -868,18 +867,18 @@ let pr_tyvarsdecl (ppenv : ppenv) ids =
   if ids = [] then
     Pp.empty
   else
-    pr_bracket (Pp.join (List.map (pr_tvar ppenv) ids))
+    pr_bracket (join (List.map (pr_tvar ppenv) ids))
 
 let pr_vardecl (ppenv : ppenv) (x, ty) =
   let tenv1 = PPE.add_local ppenv x in
-    (tenv1, Pp.join [pr_local tenv1 x; !^":"; pr_type ppenv ty])
+    (tenv1, join [pr_local tenv1 x; !^":"; pr_type ppenv ty])
 
 let pr_vardecls (ppenv : ppenv) ds =
   let ppenv, ds = List.map_fold pr_vardecl ppenv ds in
-    (ppenv, pr_paren (Pp.seq ~sep:"," ds))
+    (ppenv, pr_paren (seq ds))
 
 let pr_dom (ppenv : ppenv) dom =
-  pr_paren (Pp.seq ~sep:"*"(List.map (pr_type ppenv) dom))
+  pr_paren (seq ~sep:" *"(List.map (pr_type ppenv) dom))
 
 let pr_sig (ppenv : ppenv) (dom, codom) =
   match dom with
@@ -895,11 +894,11 @@ let pr_opdecl (ppenv : ppenv) ((x, op) : EcPath.path * operator) =
         let dop = if op.op_dom = [] then tk_cnst else tk_op in
         let ddecl =
           match i with
-          | None -> Pp.join [!^":"; pr_sig ppenv (op_sig op)]
+          | None -> join [!^":"; pr_sig ppenv (op_sig op)]
           | Some (ids, e) ->
               let vardecls = List.combine ids op.op_dom in
               let subppenv, dd = pr_vardecls ppenv vardecls in
-                Pp.join [
+                join [
                   dd; !^":"; pr_type ppenv op.op_codom;
                   !^"="; pr_expr subppenv e]
         in
@@ -908,16 +907,16 @@ let pr_opdecl (ppenv : ppenv) ((x, op) : EcPath.path * operator) =
     | OB_pred i ->
         let ddecl =
           match i with
-          | None -> Pp.join [!^":"; pr_dom ppenv op.op_dom]
+          | None -> join [!^":"; pr_dom ppenv op.op_dom]
           | Some (ids, f) ->
               let vardecls = List.combine ids op.op_dom in
               let subppenv, dd = pr_vardecls ppenv vardecls in
-                Pp.join [dd; !^"="; pr_form subppenv f]
+                join [dd; !^"="; pr_form subppenv f]
         in
         tk_pred, ddecl in
 
   let doc =
-    Pp.join [dop; !^basename; pr_tyvarsdecl ppenv op.op_params; ddecl]
+    join [dop; !^basename; pr_tyvarsdecl ppenv op.op_params; ddecl]
   in
     pr_dotted doc
 
@@ -935,7 +934,7 @@ let pr_axiom (ppenv : ppenv) ((x, ax) : EcPath.path * axiom) =
     | [] -> !^basename
     | _  -> 
         let args = List.map (pr_ident ppenv) ax.ax_params in
-          !^basename ^^ (pr_angle (Pp.seq ~sep:"," args))
+          !^basename ^^ (pr_angle (seq args))
 
   and spec =
     match ax.ax_spec with
@@ -943,12 +942,12 @@ let pr_axiom (ppenv : ppenv) ((x, ax) : EcPath.path * axiom) =
     | Some f -> pr_form ppenv f
   in
 
-    pr_dotted (Pp.join [tk; pr_name; !^":"; spec])
+    pr_dotted (join [tk; pr_name; !^":"; spec])
 
 (* -------------------------------------------------------------------- *)
 let pr_modsig (_ppenv : ppenv) ((x, _tymod) : EcPath.path * module_sig) =
   let basename = EcPath.basename x in
-    pr_dotted (Pp.join [tk_module; tk_type; !^basename; !^"="])
+    pr_dotted (join [tk_module; tk_type; !^basename; !^"="])
 
 (* -------------------------------------------------------------------- *)
 let pr_export (ppenv : ppenv) (p : EcPath.path) =
@@ -991,7 +990,7 @@ and pr_theory (ppenv : ppenv) ((name, ctheory) : EcPath.path * ctheory) =
   let pr_ext ((x, e) : EcIdent.t * ctheory_override) =
     match e with
     | CTHO_Type ty ->
-        Pp.join [tk_type; pr_ident ppenv x; !^"="; pr_type ppenv ty]
+        join [tk_type; pr_ident ppenv x; !^"="; pr_type ppenv ty]
   in
     match ctheory.cth_desc with
     | CTh_clone p ->
@@ -1007,30 +1006,35 @@ and pr_theory (ppenv : ppenv) ((name, ctheory) : EcPath.path * ctheory) =
           | [] -> doc
           | _  ->
             let pext = List.map pr_ext p.cthc_ext in
-            let pext = [tk_with; (Pp.seq ~sep:"," pext)] in
+            let pext = [tk_with; (seq pext)] in
               doc @ pext
         in
-          Pp.join doc
+          join doc
 
     | CTh_struct cstruct ->
         let basename = EcPath.basename name in
         let _, pr_cstruct =
           List.map_fold (pr_ctheory_item name) ppenv cstruct
         in
-          pr_mblocks
-            [[pr_dotted (tk_theory ^//^ !^basename)];
-             pr_cstruct;
-             [pr_dotted (tk_end    ^//^ !^basename)]]
+       pr_dotted (tk_theory ^/^ !^basename) ^^
+        (Pp.nest 2 (Pp.break0 ^^ pr_column2 (pr_cstruct))) ^^ Pp.break0 ^^
+         pr_dotted (tk_end    ^/^ !^basename)
 
 (* -------------------------------------------------------------------- *)
 let pp_path (fmt : Format.formatter) (p : EcPath.path) =
-  Format.printf "%s" (EcPath.tostring p)
+  Format.fprintf fmt "%s" (EcPath.tostring p)
+
+let fmtpretty = 
+  Pprint.Formatter.pretty 0.8 80
 
 let pp_type (ppenv : ppenv) (fmt : Format.formatter) ty =
-  Pp.fmtpretty fmt (pr_type ppenv ty)
+  fmtpretty fmt (pr_type ppenv ty)
 
 let pp_dom (ppenv : ppenv) (fmt : Format.formatter) dom =
-  Pp.fmtpretty fmt (pr_dom ppenv dom)
+  fmtpretty fmt (pr_dom ppenv dom)
 
 let pp_form (ppenv : ppenv) (fmt : Format.formatter) (f : form) =
-  Pp.fmtpretty fmt (pr_form ppenv f)
+  fmtpretty fmt (pr_form ppenv f)
+
+let pretty stream doc =
+  Pprint.Channel.pretty 0.8 80 stream doc

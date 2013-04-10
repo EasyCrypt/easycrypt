@@ -1,5 +1,37 @@
-require int.
-import  int.
+require import Int.
+require import List.
+module M = { 
+  fun f (x:int) : int = { 
+    var b : bool;
+    b = if x = 0 then true else false;
+    b = if x + x + x + x + x + x + x = 0 + 0 + 0 + 0 + 0 then true else false;
+    b = if x = 0 then x + x + x + x + x + x + x = 0 + 0 + 0 + 0 + 0 else x + x + x + x + x + x + x = 0 + 0 + 0 + 0 + 0;
+    if (b) b = false;
+    else b = true;
+    return 0;
+  }
+}.
+
+module M1 = {
+  fun f (x:int) : int = {
+    var b : bool;
+    var y : int;
+    y = let w = 0 in x + w;
+    return y;
+}
+
+type t1 = int * int.
+print type t1.
+type ('a,'b,'c,'d) t2 = ('a * int * int * int * int * int * int * int * int * int * int * int * int * int * int * ('b * int) * 'c *'d) list.
+print type t2.
+type t3 = (int * int, int -> int -> int -> int -> int -> int -> int -> int -> int -> int -> int,int * int, int * int ) t2.
+print type t3.
+type t4 = int -> int -> (int * int, int -> int -> int -> int -> int -> int -> int -> int -> int -> int -> int,int * int, int * int ) t2.
+print type t4.
+lemma foo : hoare [M.f : true ==> true]
+proof.
+  fun. 
+print type int.
 
 theory T.
   type t1.
