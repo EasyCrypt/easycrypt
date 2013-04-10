@@ -28,6 +28,6 @@ val uuid : unit -> int
 
 (* -------------------------------------------------------------------- *)
 module IntCommand : sig
-  val prgoal : out_channel -> int * (EcBaseLogic.hyps * EcFol.form) -> unit
+  val prgoal : EcEnv.env -> out_channel -> int * (EcBaseLogic.hyps * EcFol.form) -> unit
   val prgoal_current : out_channel -> unit
 end

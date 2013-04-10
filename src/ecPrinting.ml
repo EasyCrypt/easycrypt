@@ -1,5 +1,6 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
+open EcMaps
 open EcSymbols
 open EcTypes
 open EcFol
@@ -28,27 +29,62 @@ let seqc0  = seq ~sep:"," ~nest:0
 (* -------------------------------------------------------------------- *)
 module EP = EcParser
 
-type ppenv = EcEnv.env
+type ppenv = 
+  { pp_env : EcEnv.env;
+    pp_loc : string EcIdent.Mid.t;
+    pp_s   : Sstr.t
+  }
+
+let empty env = 
+  { pp_env = env;
+    pp_loc = EcIdent.Mid.empty;
+    pp_s   = Sstr.empty }
 
 module PPE = struct
-  let add_local (ppenv : ppenv) _ =
-    ppenv
+    
+  let add_local (ppenv : ppenv) x =
+    let s = 
+      let s = EcIdent.name x in
+      if Sstr.mem s ppenv.pp_s then
+        let rec aux n =
+          let s = Format.sprintf "%s%i" s n in
+          if Sstr.mem s ppenv.pp_s then aux (n+1) 
+          else s in
+        aux 0 
+      else s in
+    { ppenv with
+      pp_loc = EcIdent.Mid.add x s ppenv.pp_loc;
+      pp_s   = Sstr.add s ppenv.pp_s
+    }
 
-  let add_pvar  (ppenv : ppenv) pv    = EcEnv.Var.add pv ppenv
-  let add_fun   (ppenv : ppenv) f     = EcEnv.Fun.add f ppenv
-  let add_mod   (ppenv : ppenv) me    = EcEnv.Mod.add me ppenv
-  let add_modty (ppenv : ppenv) modty = EcEnv.ModTy.add modty ppenv
-  let add_th    (ppenv : ppenv) th    = EcEnv.Theory.add th ppenv
-  let add_ty    (ppenv : ppenv) ty    = EcEnv.Ty.add ty ppenv
-  let add_op    (ppenv : ppenv) op    = EcEnv.Op.add op ppenv
-  let add_ax    (ppenv : ppenv) ax    = EcEnv.Ax.add ax ppenv
+  let add_pvar  (ppenv : ppenv) pv    = 
+    { ppenv with pp_env = EcEnv.Var.add pv ppenv.pp_env }
+  let add_fun   (ppenv : ppenv) f     = 
+    { ppenv with pp_env = EcEnv.Fun.add f ppenv.pp_env }
+  let add_mod   (ppenv : ppenv) me    = 
+    { ppenv with pp_env = EcEnv.Mod.add me ppenv.pp_env }
+  let add_modty (ppenv : ppenv) modty = 
+    { ppenv with pp_env = EcEnv.ModTy.add modty ppenv.pp_env }
+  let add_th    (ppenv : ppenv) th    = 
+    { ppenv with pp_env = EcEnv.Theory.add th ppenv.pp_env }
+  let add_ty    (ppenv : ppenv) ty    = 
+    { ppenv with pp_env = EcEnv.Ty.add ty ppenv.pp_env }
+  let add_op    (ppenv : ppenv) op    = 
+    { ppenv with pp_env = EcEnv.Op.add op ppenv.pp_env }
+  let add_ax    (ppenv : ppenv) ax    = 
+    { ppenv with pp_env = EcEnv.Ax.add ax ppenv.pp_env }
       
-  let shorten (lookup : qsymbol -> ppenv -> EcPath.path) 
+  let check_empty ppenv (nm,s) =
+    nm <> [] || not (Sstr.mem s ppenv.pp_s)
+ 
+  let shorten (lookup : qsymbol -> EcEnv.env -> EcPath.path) 
               (ppenv  : ppenv) (p:EcPath.path) =
     let for1 (nm : symbol list) (x : symbol) =
       let qs = (nm,x) in
       try 
-        if EcPath.p_equal (lookup qs ppenv) p then Some qs else None
+        if EcPath.p_equal (lookup qs ppenv.pp_env) p && 
+          check_empty ppenv qs then Some qs 
+        else None
       with _ -> None
     in
 
@@ -66,6 +102,10 @@ module PPE = struct
     | Some qs -> qs
     | None -> (nm, x)
 
+  let loc_symb ppenv x = 
+    try EcIdent.Mid.find x ppenv.pp_loc 
+    with _ -> EcIdent.name x 
+
   let ty_symb = shorten EcEnv.Ty.lookup_path 
 
   let op_symb = shorten EcEnv.Op.lookup_path
@@ -80,7 +120,7 @@ module PPE = struct
     let for1 (nm : symbol list) (x : symbol)  =
       let qs = (nm,x) in
       try 
-        let (mp, _) = EcEnv.Mod.sp_lookup qs ppenv in
+        let (mp, _) = EcEnv.Mod.sp_lookup qs ppenv.pp_env in
         if EcPath.p_equal mp.EcPath.m_path p.EcPath.m_path then Some qs 
         else None
       with _ -> None
@@ -188,7 +228,7 @@ let pr_br_block doc =
   else
     pr_brace ((Pp.nest 2 (Pp.break0 ^^ doc)) ^^ Pp.break0)
 
-let pr_block docs =
+let pr_block docs = 
   Pp.fold1
     (fun d1 d2 -> d1 ^^ Pp.break1 ^^ d2)
     docs
@@ -246,8 +286,8 @@ let pr_tyname (ppe : ppenv) (p : EcPath.path) =
 let pr_ident (_ppe : ppenv) (x : EcIdent.t) =
   !^ (EcIdent.tostring x)
 
-let pr_local (_ppe : ppenv) (x : EcIdent.t) =
-  !^ (EcIdent.tostring x)
+let pr_local (ppe : ppenv) (x : EcIdent.t) =
+  !^ (PPE.loc_symb ppe x)
 
 let pr_funname (ppe : ppenv) (p : EcPath.mpath) =
   pr_msymbol (PPE.fun_symb ppe p)
@@ -305,7 +345,7 @@ let maybe_paren (outer, side) inner doc =
       | `Postfix     , `Left     -> true
       | `Prefix      , `Right    -> true
       | `Infix `Left , `Left     -> (pi = po) && (fo = `Infix `Left )
-      | `Infix `Right, `Right    -> (pi = po) && (fo = `Index `Right)
+      | `Infix `Right, `Right    -> (pi = po) && (fo = `Infix `Right)
       | _            , `NonAssoc -> fi = fo
       | _            , _         -> false
   in
@@ -482,7 +522,8 @@ let pr_opapp (ppenv : ppenv) pr_sub outer op _tvi es =
           | Some opprio ->
               let d1  = pr_sub ppenv (opprio, `Left ) e1 in
               let d2  = pr_sub ppenv (opprio, `Right) e2 in
-              let doc = join [d1; !^ opname ; d2] in
+              let nest = if opname = "=>" then 0 else 2 in 
+              let doc = (^@@^) (d1 ^/^ !^ opname) ~nest d2 in 
               Some (maybe_paren outer opprio doc)
           end
       | _ -> None
@@ -523,7 +564,7 @@ let pr_expr (ppenv : ppenv) (e : expr) =
         pr_pv ppenv x
 
     | Elocal x ->
-        pr_local ppenv x
+        !^ (EcIdent.name x)
 
     | Eop (op, _tys) -> (* FIXME infix, prefix, ty_inst *)
         pr_op_name ppenv op
@@ -765,85 +806,83 @@ let tk_quant = function
   | Llambda -> tk_lambda
 
 (* -------------------------------------------------------------------- *)
-let pr_form (ppenv : ppenv) (f : form) =
-  let rec pr_form (ppenv : ppenv) outer (f : form) =
-    match f.f_node with
-    | Fint n ->
-        !^ (string_of_int n)
+let rec pr_form_rec (ppenv : ppenv) outer (f : form) =
+  match f.f_node with
+  | Fint n ->
+    !^ (string_of_int n)
+      
+  | Flocal id ->
+    pr_local ppenv id
+      
+  | Fpvar (x, i) ->                 (* FIXME *)
+    join [pr_pv ppenv x; pr_brace (pr_local ppenv i)]
+      
+  | Fquant (q, bd, f) ->
+    let (subppenv, dd) = pr_bindings ppenv bd in 
+    join [tk_quant q; dd^^(!^",")] ^@@^ pr_form_rec subppenv outer f
+      
+  | Fif (b, f1, f2) ->
+    pr_if ppenv pr_form_rec outer b f1 f2
+      
+  | Flet (lp, f1, f2) ->
+    pr_let ppenv pr_form_rec outer lp f1 f2
+      
+  | Fop(op, _tvi) ->		    (* FIXME infix, prefix, ty_inst *)
+    pr_op_name ppenv op
+      
+  | Fapp ({f_node = Fop (p, tys)}, args) ->
+    pr_opapp ppenv pr_form_rec outer p tys args
+      
+  | Fapp (e, args) ->
+    let e    = pr_form_rec ppenv (max_op_prec, `NoneAssoc) e in
+    let args = List.map (pr_form_rec ppenv (max_op_prec, `NonAssoc)) args in
+    seq ~sep:"" (e::args)
+      
+  | Ftuple args ->
+    pr_tuple_expr ppenv pr_form_rec args
+      
+  | FhoareF hf ->
+    Pp.surround 0 Pp.break1 
+      (pr_brace (pr_form ppenv hf.hf_pr)) 
+      ( pr_funname ppenv hf.hf_f) 
+      (pr_brace (pr_form ppenv hf.hf_po))
+      
+  | FhoareS hs -> 
+    (*let dbody =  (* FIXME : add local program variables ? *)
+      let bodyppenv = ppenv in
+      List.map (pr_instr bodyppenv) hs.hs_s.s_node
+    in *)
+    Pp.surround 0 Pp.break1
+      (pr_brace (pr_form ppenv hs.hs_pr)) 
+      (pr_stmt ppenv hs.hs_s)
+      (pr_brace (pr_form ppenv hs.hs_po))
+      
+  | FequivS es ->
+    
+    let dbodyl =  (* FIXME : add local program variables ? *)
+      let bodyppenv = ppenv in
+      List.map (pr_instr bodyppenv) es.es_sl.s_node
+    in
+    let dbodyr =  (* FIXME : add local program variables ? *)
+      let bodyppenv = ppenv in
+      List.map (pr_instr bodyppenv) es.es_sr.s_node
+    in
+    join [
+      !^ "equiv";
+      pr_bracket (
+        join [
+          pr_mblocks [dbodyl];
+          !^ "~";
+          pr_mblocks [dbodyr];
+          !^ ":";
+          pr_form_rec ppenv outer es.es_pr;
+          !^ "==>";
+          pr_form_rec ppenv outer es.es_po;
+        ] ) ]
+  | FequivF _ | Fpr _ | FeqGlob _ ->
+    !^ "implement-me"  (* FIXME *)
+and pr_form ppenv f = pr_form_rec ppenv (min_op_prec, `NonAssoc) f
 
-    | Flocal id ->
-        pr_local ppenv id
-
-    | Fpvar (x, i) ->                 (* FIXME *)
-        join [pr_pv ppenv x; pr_brace (pr_local ppenv i)]
-
-    | Fquant (q, bd, f) ->
-        let (subppenv, dd) = pr_bindings ppenv bd in 
-          join [tk_quant q; dd^^(!^","); pr_form subppenv outer f]
-
-    | Fif (b, f1, f2) ->
-        pr_if ppenv pr_form outer b f1 f2
-
-    | Flet (lp, f1, f2) ->
-        pr_let ppenv pr_form outer lp f1 f2
-
-    | Fop(op, _tvi) ->		    (* FIXME infix, prefix, ty_inst *)
-        pr_op_name ppenv op
-
-    | Fapp ({f_node = Fop (p, tys)}, args) ->
-        pr_opapp ppenv pr_form outer p tys args
-
-    | Fapp (e, args) ->
-        let e    = pr_form ppenv (max_op_prec, `NoneAssoc) e in
-        let args = List.map (pr_form ppenv (min_op_prec, `NonAssoc)) args in
-
-          e ^^ (pr_paren (seq args))
-
-    | Ftuple args ->
-        pr_tuple_expr ppenv pr_form args
-
-    | FhoareF hf ->
-      let pr_form = pr_form ppenv (min_op_prec, `NonAssoc) in
-      Pp.surround 0 Pp.break1 
-        (pr_brace (pr_form hf.hf_pr)) 
-        ( pr_funname ppenv hf.hf_f) 
-        (pr_brace (pr_form hf.hf_po))
-          
-    | FhoareS hs -> 
-        let dbody =  (* FIXME : add local program variables ? *)
-          let bodyppenv = ppenv in
-            List.map (pr_instr bodyppenv) hs.hs_s.s_node
-        in
-          join [
-            pr_brace (pr_form ppenv outer hs.hs_pr);
-            pr_mblocks [dbody];
-            pr_brace (pr_form ppenv outer hs.hs_po);
-          ]
-    | FequivS es -> 
-      let dbodyl =  (* FIXME : add local program variables ? *)
-          let bodyppenv = ppenv in
-            List.map (pr_instr bodyppenv) es.es_sl.s_node
-      in
-      let dbodyr =  (* FIXME : add local program variables ? *)
-        let bodyppenv = ppenv in
-        List.map (pr_instr bodyppenv) es.es_sr.s_node
-      in
-      join [
-        !^ "equiv";
-        pr_bracket (
-          join [
-            pr_mblocks [dbodyl];
-            !^ "~";
-            pr_mblocks [dbodyr];
-            !^ ":";
-            pr_form ppenv outer es.es_pr;
-            !^ "==>";
-            pr_form ppenv outer es.es_po;
-          ] ) ]
-    | FequivF _ | Fpr _ | FeqGlob _ ->
-        !^ "implement-me"  (* FIXME *)
-  in
-    pr_form ppenv (min_op_prec, `NonAssoc) f
 
 (* -------------------------------------------------------------------- *)
 let pr_fct_def ppenv def = 
@@ -869,21 +908,21 @@ let pr_tyvarsdecl (ppenv : ppenv) ids =
   else
     pr_bracket (join (List.map (pr_tvar ppenv) ids))
 
-let pr_vardecl (ppenv : ppenv) (x, ty) =
+let pr_locdecl (ppenv : ppenv) (x, ty) =
   let tenv1 = PPE.add_local ppenv x in
-    (tenv1, join [pr_local tenv1 x; !^":"; pr_type ppenv ty])
+  (tenv1, join [pr_local tenv1 x; !^":"; pr_type ppenv ty])
 
-let pr_vardecls (ppenv : ppenv) ds =
-  let ppenv, ds = List.map_fold pr_vardecl ppenv ds in
+let pr_locdecls (ppenv : ppenv) ds =
+    let ppenv, ds = List.map_fold pr_locdecl ppenv ds in
     (ppenv, pr_paren (seq ds))
 
 let pr_dom (ppenv : ppenv) dom =
-  pr_paren (seq ~sep:" *"(List.map (pr_type ppenv) dom))
+  pr_paren (seq ~sep:","(List.map (pr_type ppenv) dom))
 
 let pr_sig (ppenv : ppenv) (dom, codom) =
   match dom with
   | [] -> pr_type ppenv codom
-  | _  -> (pr_dom ppenv dom) ^//^ tk_arrow ^//^ (pr_type ppenv codom)
+  | _  -> (pr_dom ppenv dom) ^/^ tk_arrow ^@@^ (pr_type ppenv codom)
 
 let pr_opdecl (ppenv : ppenv) ((x, op) : EcPath.path * operator) =
   let basename = EcPath.basename x in
@@ -897,10 +936,12 @@ let pr_opdecl (ppenv : ppenv) ((x, op) : EcPath.path * operator) =
           | None -> join [!^":"; pr_sig ppenv (op_sig op)]
           | Some (ids, e) ->
               let vardecls = List.combine ids op.op_dom in
-              let subppenv, dd = pr_vardecls ppenv vardecls in
+              let subppenv, dd = 
+                if vardecls = [] then ppenv, Pp.empty 
+                else pr_locdecls ppenv vardecls in
                 join [
                   dd; !^":"; pr_type ppenv op.op_codom;
-                  !^"="; pr_expr subppenv e]
+                  !^"="] ^@@^ pr_expr subppenv e
         in
           (dop, ddecl)
 
@@ -910,7 +951,7 @@ let pr_opdecl (ppenv : ppenv) ((x, op) : EcPath.path * operator) =
           | None -> join [!^":"; pr_dom ppenv op.op_dom]
           | Some (ids, f) ->
               let vardecls = List.combine ids op.op_dom in
-              let subppenv, dd = pr_vardecls ppenv vardecls in
+              let subppenv, dd = pr_locdecls ppenv vardecls in
                 join [dd; !^"="; pr_form subppenv f]
         in
         tk_pred, ddecl in
@@ -1027,14 +1068,14 @@ let pp_path (fmt : Format.formatter) (p : EcPath.path) =
 let fmtpretty = 
   Pprint.Formatter.pretty 0.8 80
 
-let pp_type (ppenv : ppenv) (fmt : Format.formatter) ty =
-  fmtpretty fmt (pr_type ppenv ty)
+let pp_type (ppenv : EcEnv.env) (fmt : Format.formatter) ty =
+  fmtpretty fmt (pr_type (empty ppenv) ty)
 
-let pp_dom (ppenv : ppenv) (fmt : Format.formatter) dom =
-  fmtpretty fmt (pr_dom ppenv dom)
+let pp_dom (ppenv : EcEnv.env) (fmt : Format.formatter) dom =
+  fmtpretty fmt (pr_dom (empty ppenv) dom)
 
-let pp_form (ppenv : ppenv) (fmt : Format.formatter) (f : form) =
-  fmtpretty fmt (pr_form ppenv f)
+let pp_form (ppenv : EcEnv.env) (fmt : Format.formatter) (f : form) =
+  fmtpretty fmt (pr_form (empty ppenv) f)
 
 let pretty stream doc =
   Pprint.Channel.pretty 0.8 80 stream doc

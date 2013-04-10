@@ -52,18 +52,18 @@ let process_pr scope p =
   match p with 
   | Pr_ty qs ->
       let (x, ty) = EcEnv.Ty.lookup qs.pl_desc env in
-      EcPrinting.pr_typedecl env (x, ty)
+      EcPrinting.pr_typedecl (EcPrinting.empty env) (x, ty)
         
   | Pr_op qs | Pr_pr qs ->
       let (x, op) = EcEnv.Op.lookup qs.pl_desc env in
-      EcPrinting.pr_opdecl env (x, op)
+      EcPrinting.pr_opdecl (EcPrinting.empty env) (x, op)
         
   | Pr_th qs ->
       let (p, th) = EcEnv.Theory.lookup qs.pl_desc env in
-      EcPrinting.pr_theory env (p, th)
+      EcPrinting.pr_theory (EcPrinting.empty env) (p, th)
   | Pr_ax qs ->
       let (p, ax) = EcEnv.Ax.lookup qs.pl_desc env in
-      EcPrinting.pr_axiom env (p, ax)
+      EcPrinting.pr_axiom (EcPrinting.empty env) (p, ax)
 
 let process_print scope p = 
   let doc = process_pr scope p in
@@ -271,7 +271,7 @@ module IntCommand = struct
 
   let goalline = String.make 72 '-'
 
-  let prgoal (stream : out_channel) (n, (hyps, concl)) =
+  let prgoal env (stream : out_channel) (n, (hyps, concl)) =
     let pr_hyp t (id, k) = 
       let dk = 
         match k with
@@ -293,14 +293,16 @@ module IntCommand = struct
       end;
       Printf.fprintf stream "Type variables: %t\n%!"
         (fun stream ->
-          let doc = List.map (pr_tvar EcEnv.initial) hyps.h_tvar in (* FIXME *)
+          let doc = 
+            List.map (pr_tvar (EcPrinting.empty env))
+              hyps.h_tvar in (* FIXME *)
             pretty stream (seq ~sep:"," doc));
       let _ =
-        List.fold_left pr_hyp EcEnv.initial (List.rev hyps.h_local) (* FIXME *)
+        List.fold_left pr_hyp (EcPrinting.empty env) (List.rev hyps.h_local) (* FIXME *)
       in
         Printf.fprintf stream "%s\n%!" goalline;
         Printf.fprintf stream "%t\n%!"
-          (fun stream -> pretty stream (pr_form EcEnv.initial concl)) (* FIXME *)
+          (fun stream -> pretty stream (pr_form (EcPrinting.empty env) concl)) (* FIXME *)
 
   let prgoal_current (stream : out_channel) =
     let (_, scope, _) = !context in
@@ -313,7 +315,7 @@ module IntCommand = struct
           try 
             let n = List.length (snd (find_all_goals juc)) in
             let g = get_goal (get_first_goal juc) in
-              prgoal stream (n, g)
+              prgoal (EcScope.env scope) stream (n, g)
           with EcBaseLogic.NotAnOpenGoal _ -> 
             Printf.fprintf stream "No more goals\n%!"
       end

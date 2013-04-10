@@ -1,7 +1,12 @@
 require import Int.
 require import List.
-module M = { 
-  fun f (x:int) : int = { 
+theory T.
+module type I = {
+  fun g (x:int) : int
+}.
+
+module M(U:I) = { 
+  fun f (x y : int) : int = { 
     var b : bool;
     b = if x = 0 then true else false;
     b = if x + x + x + x + x + x + x = 0 + 0 + 0 + 0 + 0 then true else false;
@@ -11,14 +16,60 @@ module M = {
     return 0;
   }
 }.
+end T.
+ print theory T. 
+
+cnst c : int -> int -> int = (+).
+print op c.
+op p (x x:int) : int = x + x.
+print op p.
+
+lemma foo : let x = 1 + 1 in x = x
+proof.
+ intros x.
+
+op p1 : (int, int) -> int.
+print op p1.
+
+theory T1.
+ type t = int.
+end T1.
+
+theory T2.
+type t = T1.t.
+end T2.
+import T1.
+print type T2.t.
+type t = T2.t.
+print type T2.t.
+
 
 module M1 = {
+
   fun f (x:int) : int = {
     var b : bool;
     var y : int;
-    y = let w = 0 in x + w;
+    y = let w = 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 +0 + 0 + 0  in x + w;
     return y;
-}
+  }
+
+}.
+
+lemma toto : forall x, p (x + x + x + x + x + x + x + x + x + x + x + x ) (x + x + x + x+ x) = x
+proof.
+
+.
+
+
+lemma foo1 : forall x, (x+x) + x = x + (x + x)
+proof.
+
+lemma foo2 : (true => true => true) => true => true => true => true=> true => true => true => true => true => true
+proof.
+
+lemma foo : hoare [M1.f : true ==> true /\ true  /\ true  /\ true  /\ true  /\ true  /\ true  /\ true]
+proof.
+  fun. 
 
 type t1 = int * int.
 print type t1.
