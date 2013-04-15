@@ -79,7 +79,7 @@ type preenv = private {
 
   (* The active memory *)
   env_actmem : EcMemory.memory option;
- 
+
   (* Why3 environment && meta-data *)
   env_w3     : EcWhy3.env;
   env_rb     : EcWhy3.rebinding;        (* in reverse order *)
@@ -196,12 +196,12 @@ module Fun : sig
 
   val equivF : EcPath.mpath -> EcPath.mpath -> env -> env * env
 
-  val equivS : 
+  val equivS :
     EcPath.mpath -> EcPath.mpath -> env ->
     EcMemory.memenv * EcModules.function_def * EcMemory.memenv *
       EcModules.function_def * env
 
-  val equivS_anonym : 
+  val equivS_anonym :
     EcModules.variable list ->
     EcModules.variable list ->
     env -> EcMemory.memenv * EcMemory.memenv * env
@@ -251,7 +251,7 @@ module Ax : sig
   val add  : EcPath.path -> env -> env
   val bind : symbol -> axiom -> env -> env
 
-  val instanciate : EcPath.path -> EcTypes.ty list -> env -> EcFol.form 
+  val instanciate : EcPath.path -> EcTypes.ty list -> env -> EcFol.form
 end
 
 (* -------------------------------------------------------------------- *)
@@ -295,8 +295,8 @@ module ModTy : sig
 end
 
 (* -------------------------------------------------------------------- *)
-module NormMp : sig 
-  val norm_mpath : env -> EcPath.mpath -> EcPath.mpath 
+module NormMp : sig
+  val norm_mpath : env -> EcPath.mpath -> EcPath.mpath
   val norm_pvar  : env -> EcTypes.prog_var -> EcTypes.prog_var
 end
 
@@ -379,4 +379,4 @@ val import_w3_dir :
   -> env * ctheory_item list
 
 (* -------------------------------------------------------------------- *)
-val check_goal : env -> EcWhy3.prover_infos -> EcBaseLogic.l_decl -> bool
+val check_goal : env -> EcProvers.prover_infos -> EcBaseLogic.l_decl -> bool

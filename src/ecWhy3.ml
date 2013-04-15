@@ -14,68 +14,6 @@ module Mp   = EcPath.Mp
 module Msym = EcSymbols.Msym
 
 (* ----------------------------------------------------------------------*)
-module Config : sig
-  type prover =
-    string * Why3.Whyconf.config_prover * Why3.Driver.driver
-
-  val load    : string option -> unit
-  val config  : unit -> Whyconf.config
-  val main    : unit -> Whyconf.main
-  val w3_env  : unit -> Env.env
-  val provers : unit -> prover list
-  val known_provers : unit -> string list
-end = struct
-  type prover =
-    string * Why3.Whyconf.config_prover * Why3.Driver.driver
-
-  let theconfig  : (Whyconf.config option) ref = ref None
-  let themain    : (Whyconf.main   option) ref = ref None
-  let thew3_env  : (Env.env        option) ref = ref None
-  let theprovers : (_              list  ) ref = ref []
-
-  let load why3config =
-    if !theconfig = None then begin
-      let config  = Whyconf.read_config why3config in
-      let main    = Whyconf.get_main config in
-      Whyconf.load_plugins main;
-      let w3_env  = Env.create_env (Whyconf.loadpath main) in
-      let provers =
-        Whyconf.Mprover.fold
-          (fun p config l ->
-            (p.Whyconf.prover_name, config,
-             Driver.load_driver w3_env config.Whyconf.driver []) :: l)
-          (Whyconf.get_provers config) []
-      in
-        theconfig  := Some config;
-        themain    := Some main;
-        thew3_env  := Some w3_env;
-        theprovers := provers
-    end
-
-  let config () =
-    load None; EcUtils.oget !theconfig
-
-  let main () =
-    load None; EcUtils.oget !themain
-
-  let w3_env () =
-    load None; EcUtils.oget !thew3_env
-
-  let provers () =
-    load None; !theprovers
-
-  let known_provers () = 
-    List.map (fun (p,_,_) -> p) (provers())
-
-end
-
-let initialize    = Config.load
-let known_provers = Config.known_provers
-
-let get_w3_th dirname name =
-  Env.find_theory (Config.w3_env ()) dirname name
-
-(* ----------------------------------------------------------------------*)
 type env = {
     logic_task : Task.task;
     env_ty : Ty.tysymbol Mp.t;
@@ -88,26 +26,26 @@ type env = {
 let w3_ls_true = Term.fs_bool_true
 let w3_ls_false = Term.fs_bool_false
 
-let w3_ls_not, decl_not, spec_not = 
-  let ls = 
-    Term.create_fsymbol (Ident.id_fresh "Not") [] 
+let w3_ls_not, decl_not, spec_not =
+  let ls =
+    Term.create_fsymbol (Ident.id_fresh "Not") []
       (Ty.ty_func Ty.ty_bool Ty.ty_bool) in
   let decl = Decl.create_param_decl ls in
   let preid = Ident.id_fresh "b" in
   let id = Term.create_vsymbol preid Ty.ty_bool in
   let b = Term.t_var id in
   let f_app = Term.t_func_app (Term.t_app_infer ls []) b in
-  let form = 
-    Term.t_forall_close [id] [] 
-      (Term.t_iff (Term.t_equ f_app Term.t_bool_true) 
+  let form =
+    Term.t_forall_close [id] []
+      (Term.t_iff (Term.t_equ f_app Term.t_bool_true)
          (Term.t_not (Term.t_equ b Term.t_bool_true))) in
   let pr = Decl.create_prsymbol (Ident.id_fresh "Not_spec") in
   let decl_spec = Decl.create_prop_decl Decl.Paxiom pr form in
-  ls, decl, decl_spec 
+  ls, decl, decl_spec
 
-let mk_w3_opp2 s mk = 
-  let ls = 
-    Term.create_fsymbol (Ident.id_fresh s) [] 
+let mk_w3_opp2 s mk =
+  let ls =
+    Term.create_fsymbol (Ident.id_fresh s) []
      (Ty.ty_func Ty.ty_bool (Ty.ty_func Ty.ty_bool Ty.ty_bool)) in
   let decl = Decl.create_param_decl ls in
   let preid = Ident.id_fresh "b" in
@@ -115,25 +53,25 @@ let mk_w3_opp2 s mk =
   let id2 = Term.create_vsymbol preid Ty.ty_bool in
   let b1 = Term.t_var id1 in
   let b2 = Term.t_var id2 in
-  let f_app = 
+  let f_app =
     Term.t_func_app (Term.t_func_app (Term.t_app_infer ls []) b1) b2 in
-  let form = 
-    Term.t_forall_close [id1;id2] [] 
-      (Term.t_iff (Term.t_equ f_app Term.t_bool_true) 
-         (mk (Term.t_equ b1 Term.t_bool_true) 
+  let form =
+    Term.t_forall_close [id1;id2] []
+      (Term.t_iff (Term.t_equ f_app Term.t_bool_true)
+         (mk (Term.t_equ b1 Term.t_bool_true)
             (Term.t_equ b2 Term.t_bool_true))) in
   let pr = Decl.create_prsymbol (Ident.id_fresh (s^"_spec")) in
   let decl_spec = Decl.create_prop_decl Decl.Paxiom pr form in
-  ls, decl, decl_spec 
+  ls, decl, decl_spec
 
 let w3_ls_and, decl_and, spec_and = mk_w3_opp2 "AND" Term.t_and
-let w3_ls_anda, decl_anda, spec_anda = mk_w3_opp2 "ANDA" Term.t_and_asym  
+let w3_ls_anda, decl_anda, spec_anda = mk_w3_opp2 "ANDA" Term.t_and_asym
 let w3_ls_or, decl_or, spec_or = mk_w3_opp2 "OR" Term.t_or
 let w3_ls_ora, decl_ora, spec_ora = mk_w3_opp2 "OR" Term.t_or_asym
 let w3_ls_imp, decl_imp, spec_imp = mk_w3_opp2 "IMP" Term.t_implies
 let w3_ls_iff, decl_iff, spec_iff = mk_w3_opp2 "IFF" Term.t_iff
 
-let w3_ls_eq, decl_eq, spec_eq = 
+let w3_ls_eq, decl_eq, spec_eq =
   let a  = Ty.create_tvsymbol (Ident.id_fresh "'a") in
   let ta = Ty.ty_var a in
   let ty = (Ty.ty_func ta (Ty.ty_func ta Ty.ty_bool)) in
@@ -144,65 +82,65 @@ let w3_ls_eq, decl_eq, spec_eq =
   let id2 = Term.create_vsymbol preid ta in
   let b1 = Term.t_var id1 in
   let b2 = Term.t_var id2 in
-  let f_app = 
+  let f_app =
     Term.t_func_app (Term.t_func_app (Term.fs_app ls [] ty) b1) b2 in
-  let form = 
-    Term.t_forall_close [id1;id2] [] 
-      (Term.t_iff (Term.t_equ f_app Term.t_bool_true) 
+  let form =
+    Term.t_forall_close [id1;id2] []
+      (Term.t_iff (Term.t_equ f_app Term.t_bool_true)
          (Term.t_equ b1 b2)) in
   let pr = Decl.create_prsymbol (Ident.id_fresh ("EQ_spec")) in
   let decl_spec = Decl.create_prop_decl Decl.Paxiom pr form in
-  ls, decl, decl_spec 
+  ls, decl, decl_spec
 
-let ts_distr, fs_mu, distr_theory = 
+let ts_distr, fs_mu, distr_theory =
   let th  = Theory.create_theory (Ident.id_fresh "Distr") in
   let th  = Theory.use_export th Theory.bool_theory in
   let th  = Theory.use_export th Theory.highord_theory in
   let vta = Ty.create_tvsymbol (Ident.id_fresh "ta") in
-  let ta  = Ty.ty_var vta in 
+  let ta  = Ty.ty_var vta in
   let tdistr = Ty.create_tysymbol (Ident.id_fresh "distr") [vta] None in
   let th  = Theory.add_ty_decl th tdistr in
-  let mu  = 
-    Term.create_fsymbol (Ident.id_fresh "mu") 
-      [Ty.ty_app tdistr [ta]; Ty.ty_func ta Ty.ty_bool] 
+  let mu  =
+    Term.create_fsymbol (Ident.id_fresh "mu")
+      [Ty.ty_app tdistr [ta]; Ty.ty_func ta Ty.ty_bool]
       Ty.ty_real in
   let th = Theory.add_param_decl th mu in
-  tdistr, mu, Theory.close_theory th 
-  
+  tdistr, mu, Theory.close_theory th
+
 let ty_distr t = Ty.ty_app ts_distr [t]
 
 (* Special type for translation of hoare, equiv and pr *)
-let ts_mem = Ty.create_tysymbol (Ident.id_fresh "memory") [] None 
+let ts_mem = Ty.create_tysymbol (Ident.id_fresh "memory") [] None
 let ty_mem = Ty.ty_app ts_mem []
 
 let ts_mod = Ty.create_tysymbol (Ident.id_fresh "module") [] None
-let ty_mod = Ty.ty_app ts_mod [] 
+let ty_mod = Ty.ty_app ts_mod []
 
 let ts_mod_name = Ty.create_tysymbol (Ident.id_fresh "module_name") [] None
 let ty_mod_name = Ty.ty_app ts_mod_name []
 
-let ts_fun_name = 
-  let ta = Ty.create_tvsymbol (Ident.id_fresh "ta") 
+let ts_fun_name =
+  let ta = Ty.create_tvsymbol (Ident.id_fresh "ta")
   and tr = Ty.create_tvsymbol (Ident.id_fresh "tr") in
   Ty.create_tysymbol (Ident.id_fresh "fun_name") [ta;tr] None
 let ty_fun_name ta tr = Ty.ty_app ts_fun_name [Ty.ty_tuple ta; tr]
 
-let ts_var_name = 
+let ts_var_name =
   let t = Ty.create_tvsymbol (Ident.id_fresh "t") in
   Ty.create_tysymbol (Ident.id_fresh "var_name") [t] None
 let ty_var_name t = Ty.ty_app ts_var_name [t]
 
-let fs_getmod = 
+let fs_getmod =
   Term.create_fsymbol (Ident.id_fresh "getmod") [ty_mod; ty_mod_name] ty_mod
 
-let getmod m mn = Term.t_app_infer fs_getmod [m;mn] 
+let getmod m mn = Term.t_app_infer fs_getmod [m;mn]
 
-let fs_appmod = 
+let fs_appmod =
   Term.create_fsymbol (Ident.id_fresh "appmod") [ty_mod;ty_mod] ty_mod
 
 let appmod f m = Term.t_app_infer fs_appmod [f;m]
 
-let fs_getvar = 
+let fs_getvar =
   let t = Ty.ty_var (Ty.create_tvsymbol (Ident.id_fresh "t")) in
   let tv = ty_var_name t in
   Term.create_fsymbol (Ident.id_fresh "getvar") [tv; ty_mem] t
@@ -211,11 +149,11 @@ let getvar v mem = Term.t_app_infer fs_getvar [v; mem]
 
 (*let ty_mem_t tr = Ty.ty_tuple [ty_mem; tr] *)
 
-let fs_sem = 
+let fs_sem =
   let ta = Ty.ty_var (Ty.create_tvsymbol (Ident.id_fresh "ta"))
   and tr = Ty.ty_var (Ty.create_tvsymbol (Ident.id_fresh "tr")) in
   let tf = Ty.ty_app ts_fun_name [ta; tr] in
-  Term.create_fsymbol (Ident.id_fresh "sem") 
+  Term.create_fsymbol (Ident.id_fresh "sem")
       [ty_mod;tf;ty_mem;ta] (ty_distr ty_mem) (*(ty_mem_t tr)*)
 
 let ty_event (*tr*) = Ty.ty_func (*(ty_mem_t tr)*) ty_mem Ty.ty_bool
@@ -233,12 +171,12 @@ let add_decl_with_tuples task d =
   let add n task = Task.use_export task (Theory.tuple_theory n) in
   Task.add_decl (Stdlib.Sint.fold add ixs task) d
 
-let initial_task = 
-  let task = 
-    List.fold_left Task.use_export None 
+let initial_task =
+  let task =
+    List.fold_left Task.use_export None
       [Theory.builtin_theory;Theory.bool_theory;Theory.highord_theory;
        distr_theory] in
-  let task = 
+  let task =
     List.fold_left Task.add_decl task
       [decl_not; spec_not;
        decl_and; spec_and; decl_anda; spec_anda;
@@ -246,28 +184,28 @@ let initial_task =
        decl_imp; spec_imp; decl_iff; spec_iff;
        decl_eq; spec_eq ] in
   let ts = [ts_mem; ts_mod; ts_mod_name; ts_fun_name; ts_var_name] in
-  let add_ty_decl task ts = 
+  let add_ty_decl task ts =
     add_decl_with_tuples task (Decl.create_ty_decl ts) in
   let fs = [fs_appmod; fs_getmod; fs_getvar; fs_sem;] in
   let add_param_decl task fs =
     add_decl_with_tuples task (Decl.create_param_decl fs) in
   let task = List.fold_left add_ty_decl task ts in
   List.fold_left add_param_decl task fs
-  
+
 let empty = {
-    logic_task = initial_task; 
+    logic_task = initial_task;
     env_ty     = Mp.empty;
     env_op     = Mp.empty;
     env_ax     = Mp.empty;
     env_pa     = Mp.empty;
     env_w3     = Ident.Mid.empty;
-  } 
+  }
 
 (* ---------------------------------------------------------------------- *)
-    
+
 type rebinding_w3 = {
     rb_th   : Theory.theory;
-    rb_decl : Decl.decl list; 
+    rb_decl : Decl.decl list;
     rb_ty   : Ty.tysymbol Mp.t;
     rb_op   : (Term.lsymbol * Term.lsymbol * Ty.tvsymbol list) Mp.t;
     rb_ax   : Decl.prsymbol Mp.t;
@@ -281,22 +219,22 @@ let rb_empty th = {
     rb_op     = Mp.empty;
     rb_ax     = Mp.empty;
     rb_w3     = Ident.Mid.empty;
-  } 
+  }
 
 type highorder_decl = (Term.lsymbol * Decl.decl * Decl.decl) option
 
-type rebinding_item = 
-  | RBuse of rebinding_w3 
+type rebinding_item =
+  | RBuse of rebinding_w3
   | RBty  of EcPath.path * Ty.tysymbol * Decl.decl
   | RBop  of EcPath.path * (Term.lsymbol * Ty.tvsymbol list) * Decl.decl *
-                highorder_decl 
+                highorder_decl
   | RBax  of EcPath.path * Decl.prsymbol * Decl.decl
   | RBpa  of EcPath.path * Term.lsymbol
   | RBfun of Decl.decl * Decl.decl * Decl.decl
 
 type rebinding = rebinding_item list
 
-let merge check k o1 o2 = 
+let merge check k o1 o2 =
   match o1, o2 with
   | Some e1, Some e2 -> check k e1 e2; o1
   | _, None -> o1
@@ -307,31 +245,31 @@ exception MergeW3Op of EcPath.path * Term.lsymbol * Term.lsymbol
 exception MergeW3Ax of EcPath.path * Decl.prsymbol * Decl.prsymbol
 exception MergeW3Id of Ident.ident * EcPath.path * EcPath.path
 
-let merge_ty = 
-  let check p t1 t2 = 
+let merge_ty =
+  let check p t1 t2 =
     if not (Ty.ts_equal t1 t2) then raise (MergeW3Ty(p,t1,t2)) in
   Mp.merge (merge check)
 
 let merge_op =
-  let check p (t1,_,_) (t2,_,_) = 
+  let check p (t1,_,_) (t2,_,_) =
     if not (Term.ls_equal t1 t2) then raise (MergeW3Op(p,t1,t2)) in
   Mp.merge (merge check)
 
-let merge_ax = 
-  let check p t1 t2 = 
+let merge_ax =
+  let check p t1 t2 =
     if not (Decl.pr_equal t1 t2) then raise (MergeW3Ax(p,t1,t2)) in
   Mp.merge (merge check)
 
-let merge_id = 
-  let check p (t1,_) (t2,_) = 
+let merge_id =
+  let check p (t1,_) (t2,_) =
     if not (EcPath.p_equal t1 t2) then raise (MergeW3Id(p,t1,t2)) in
   Ident.Mid.merge (merge check)
 
 let add_ts env path ts decl =
-  if Mp.mem path env.env_ty then 
+  if Mp.mem path env.env_ty then
     (assert (Ty.ts_equal ts (Mp.find path env.env_ty)); env)
-  else 
-    { env with 
+  else
+    { env with
       env_ty = Mp.add path ts env.env_ty;
       logic_task = add_decl_with_tuples env.logic_task decl }
 
@@ -339,24 +277,24 @@ let add_ls env path ls tparams decl odecl =
   let ls', add' =
     match odecl with
     | None -> ls, fun t -> t
-    | Some(ls', decl', decl_s) -> 
+    | Some(ls', decl', decl_s) ->
         ls', fun t ->
           let t = add_decl_with_tuples t decl' in
           add_decl_with_tuples t decl_s in
-  { env with 
+  { env with
     env_op = Mp.add path (ls,ls',tparams) env.env_op;
     logic_task = add' (add_decl_with_tuples env.logic_task decl) }
 
-let add_param env path ls = 
+let add_param env path ls =
   let decl = Decl.create_param_decl ls in
   { env with
     env_pa = Mp.add path (Term.t_app_infer ls []) env.env_pa;
     logic_task = add_decl_with_tuples env.logic_task decl}
-    
+
 let mk_highorder_func ls =
   let targs = ls.Term.ls_args in
   let tres = ls.Term.ls_value in
-  if targs = [] then None 
+  if targs = [] then None
   else
     let pid = Ident.id_fresh (ls.Term.ls_name.Ident.id_string ^ "_ho") in
     let codom = (odfl Ty.ty_bool tres) in
@@ -368,7 +306,7 @@ let mk_highorder_func ls =
     let preid = Ident.id_fresh "x" in
     let params = List.map (Term.create_vsymbol preid) targs in
     let args = List.map Term.t_var params in
-    let f_app' = 
+    let f_app' =
       List.fold_left Term.t_func_app (Term.fs_app ls' [] ty) args in
     let f_app = Term.t_app ls args tres in
     let spec =
@@ -378,12 +316,12 @@ let mk_highorder_func ls =
     let spec = Term.t_forall_close params [] spec in
     let decl_s = Decl.create_prop_decl Decl.Paxiom pr spec in
     Some(ls',decl',decl_s)
-    
+
 let add_pr env path pr decl =
-  if Mp.mem path env.env_ax then 
+  if Mp.mem path env.env_ax then
     (assert (Decl.pr_equal pr (Mp.find path env.env_ax)); env)
-  else 
-    { env with 
+  else
+    { env with
       env_ax = Mp.add path pr env.env_ax;
       logic_task = add_decl_with_tuples env.logic_task decl }
 
@@ -391,7 +329,7 @@ let rebind_item env = function
   | RBuse w3 ->
       let task = Task.use_export env.logic_task w3.rb_th in
       let task = List.fold_left Task.add_decl task w3.rb_decl in
-      { env with 
+      { env with
         logic_task = task;
         env_ty = merge_ty env.env_ty w3.rb_ty;
         env_op = merge_op env.env_op w3.rb_op;
@@ -401,10 +339,10 @@ let rebind_item env = function
   | RBty(p,ts,decl) -> add_ts env p ts decl
   | RBop(p,(ls,tvs),decl,odecl) -> add_ls env p ls tvs decl odecl
   | RBax(p,pr,decl) -> add_pr env p pr decl
-  | RBpa(p,ls)      -> add_param env p ls 
+  | RBpa(p,ls)      -> add_param env p ls
   | RBfun(decl,decls,sdecl) ->
-      let task = 
-        List.fold_left add_decl_with_tuples 
+      let task =
+        List.fold_left add_decl_with_tuples
           env.logic_task [decl;decls;sdecl] in
       { env with logic_task = task }
 
@@ -414,7 +352,7 @@ let rebind = List.fold_left rebind_item
 (* -----------------------  Import why3 theory -------------------------- *)
 (* ---------------------------------------------------------------------- *)
 type renaming_kind =
-  | RDts 
+  | RDts
   | RDls
   | RDpr
 
@@ -422,16 +360,16 @@ type renaming_decl = (string list * renaming_kind * EcSymbols.symbol) list
 
 let w3_id_string id = id.Ident.id_string
 
-module Renaming = struct 
+module Renaming = struct
   type renaming = {
       r_ts : EcSymbols.symbol Ty.Mts.t;
       r_ls : EcSymbols.symbol Term.Mls.t;
       r_pr : EcSymbols.symbol Decl.Mpr.t
     }
 
-  let init rd th = 
+  let init rd th =
     let ns = th.Theory.th_export in
-    let rec aux ts ls pr rd = 
+    let rec aux ts ls pr rd =
       match rd with
       | [] -> { r_ts = ts; r_ls = ls; r_pr = pr }
       | (p,RDts,id) :: rd ->
@@ -439,15 +377,15 @@ module Renaming = struct
           aux ts ls pr rd
       | (p,RDls,id) :: rd ->
           let ls = Term.Mls.add (Theory.ns_find_ls ns p) id ls in
-          aux ts ls pr rd 
-      | (p,RDpr,id)::rd -> 
+          aux ts ls pr rd
+      | (p,RDpr,id)::rd ->
           let pr = Decl.Mpr.add (Theory.ns_find_pr ns p) id pr in
           aux ts ls pr rd in
     aux Ty.Mts.empty Term.Mls.empty Decl.Mpr.empty rd
 
-  let get_ts rn ts = 
-    try Ty.Mts.find ts rn.r_ts 
-    with _ -> 
+  let get_ts rn ts =
+    try Ty.Mts.find ts rn.r_ts
+    with _ ->
       let id = ts.Ty.ts_name in
         w3_id_string id
 
@@ -459,32 +397,32 @@ module Renaming = struct
     let prf = String.sub s 0 7 in
     if prf = "prefix " then String.sub s 7 (len - 7) else
     if s = "mixfix []" then EcCoreLib.s_get else
-    if s = "mixfix [<-]" then EcCoreLib.s_set else 
+    if s = "mixfix [<-]" then EcCoreLib.s_set else
     s
-    
-  let get_ls rn ls = 
-    try Term.Mls.find ls rn.r_ls 
+
+  let get_ls rn ls =
+    try Term.Mls.find ls rn.r_ls
     with _ ->
       let id = ls.Term.ls_name in
       let s  = remove_infix (w3_id_string id) in
         s
 
-  let get_pr rn pr = 
-    try Decl.Mpr.find pr rn.r_pr 
+  let get_pr rn pr =
+    try Decl.Mpr.find pr rn.r_pr
     with _ ->
       let id = pr.Decl.pr_name in
         w3_id_string id
 end
-      
-module Wtvm = 
+
+module Wtvm =
   struct
 
-    type t = EcIdent.t Ty.Mtv.t ref 
+    type t = EcIdent.t Ty.Mtv.t ref
 
-    let create () = ref Ty.Mtv.empty 
+    let create () = ref Ty.Mtv.empty
 
-    let get tvm tv = 
-      try Ty.Mtv.find tv !tvm 
+    let get tvm tv =
+      try Ty.Mtv.find tv !tvm
       with _ ->
         let s = w3_id_string tv.Ty.tv_name in
         assert (String.length s <> 0);
@@ -493,52 +431,52 @@ module Wtvm =
         tvm := Ty.Mtv.add tv id !tvm;
         id
 
-    let tparams tvm = Ty.Mtv.values !tvm 
-      
+    let tparams tvm = Ty.Mtv.values !tvm
+
   end
-      
-exception UnknownWhy3Ident of Ident.ident 
 
-let path_of_id env id = 
-  try Ident.Mid.find id env.env_w3 
-  with _ -> raise (UnknownWhy3Ident id) 
+exception UnknownWhy3Ident of Ident.ident
 
-let rec import_w3_ty env tvm ty = 
+let path_of_id env id =
+  try Ident.Mid.find id env.env_w3
+  with _ -> raise (UnknownWhy3Ident id)
+
+let rec import_w3_ty env tvm ty =
   match ty.Ty.ty_node with
   | Ty.Tyvar v -> tvar (Wtvm.get tvm v)
   | Ty.Tyapp(t, args) ->
       let args = List.map (import_w3_ty env tvm) args in
-      try 
+      try
         let path,_ = path_of_id env t.Ty.ts_name in
         tconstr path args
       with e ->
         if Ty.is_ts_tuple t then ttuple args
-        else if Ty.ts_equal t Ty.ts_func then 
+        else if Ty.ts_equal t Ty.ts_func then
           let t1,t2 = List.hd2 args in
           tfun t1 t2
         else if Ty.ts_equal t Ty.ts_pred then
           let t1,t2 = List.hd args, tbool in
           tfun t1 t2
         else raise e
-  
-let exists_w3 env id = 
-  Ident.Mid.mem id env.env_w3 
 
-let add_w3_ty env p ty = 
-  { env with 
+let exists_w3 env id =
+  Ident.Mid.mem id env.env_w3
+
+let add_w3_ty env p ty =
+  { env with
     env_ty = Mp.add p ty env.env_ty;
     env_w3 = Ident.Mid.add (ty.Ty.ts_name) (p,[]) env.env_w3 }
 
-let rbadd_w3_ty rb p ty = 
+let rbadd_w3_ty rb p ty =
   { rb with
     rb_ty = Mp.add p ty rb.rb_ty;
-    rb_w3 = Ident.Mid.add (ty.Ty.ts_name) (p,[]) rb.rb_w3 } 
+    rb_w3 = Ident.Mid.add (ty.Ty.ts_name) (p,[]) rb.rb_w3 }
 
 type zipper_elem =
   | Zenter of EcSymbols.symbol
   | Zdecl  of theory_item
 
-and zipper = zipper_elem list 
+and zipper = zipper_elem list
 
 let import_w3_tydef rn path (env,rb,z) ty =
   let tvm = Wtvm.create () in
@@ -548,13 +486,13 @@ let import_w3_tydef rn path (env,rb,z) ty =
   let td = { tyd_params = params; tyd_type = def } in
   let p = EcPath.pqname path eid in
   let env = add_w3_ty env p ty in
-  let rb  = rbadd_w3_ty rb p ty in 
+  let rb  = rbadd_w3_ty rb p ty in
     (env, rb, Zdecl (Th_type (eid, td)) :: z)
 
-let force_bool codom = 
+let force_bool codom =
   match codom with
   | None ->  EcTypes.tbool
-  | Some t -> t 
+  | Some t -> t
 
 exception CanNotTranslateW3Ec
 exception UnboundLS of Term.lsymbol
@@ -563,20 +501,20 @@ let import_w3_quant = function
   | Term.Tforall -> Lforall
   | Term.Texists -> Lexists
 
-let is_asym t = 
+let is_asym t =
   Ident.Slab.mem Term.asym_label t.Term.t_label
-  
+
 let import_w3_term env tvm =
   let memo = Ty.Hty.memo 37 (import_w3_ty env tvm) in
-  let import_ty ty = 
+  let import_ty ty =
     match ty with
     | None -> EcTypes.tbool
     | Some t -> memo t in
-  let add_local v vm = 
+  let add_local v vm =
     let id = EcIdent.create (w3_id_string v.Term.vs_name) in
     let ty = import_ty (Some v.Term.vs_ty) in
     (id,ty), Term.Mvs.add v id vm in
-  let add_locals vs vm = 
+  let add_locals vs vm =
     let r = ref vm in
     let its = List.map (fun v -> let (d,vm) = add_local v !r in r := vm; d) vs in
     its, !r in
@@ -589,9 +527,9 @@ let import_w3_term env tvm =
         let import_ty = import_w3_ty env tvm in
         let wty = t.Term.t_ty in
         let codom = odfl tbool (omap wty import_ty) in
-        begin try 
-          let p,tvs = 
-            try Ident.Mid.find f.Term.ls_name env.env_w3 
+        begin try
+          let p,tvs =
+            try Ident.Mid.find f.Term.ls_name env.env_w3
             with _ -> raise (UnboundLS f) in
           let s = Term.ls_app_inst f wargs wty in
           let tys = List.map (fun vs -> import_ty (Ty.Mtv.find vs s)) tvs in
@@ -600,14 +538,14 @@ let import_w3_term env tvm =
           f_app op args codom
         with UnboundLS f as e ->
           if Term.is_fs_tuple f then f_tuple args
-          else 
-            if (Term.ls_equal f Term.fs_func_app || 
+          else
+            if (Term.ls_equal f Term.fs_func_app ||
             Term.ls_equal f Term.ps_pred_app) then
               let a1,a2 = List.hd2 args in
               f_app a1 [a2] codom
-            else raise e 
+            else raise e
         end
-          
+
     | Term.Tif(t1,t2,t3) ->
         let f1 = import vm t1 in
         let f2 = import vm t2 in
@@ -620,9 +558,9 @@ let import_w3_term env tvm =
         let f2 = import vm t in
         f_let (LSymbol (id,f1.f_ty)) f1 f2
     | Term.Tcase _ -> raise CanNotTranslateW3Ec (* FIXME : tuple *)
-    | Term.Teps _ ->  raise CanNotTranslateW3Ec 
+    | Term.Teps _ ->  raise CanNotTranslateW3Ec
     | Term.Tquant(q,tq) ->
-        let vs,_,t = Term.t_open_quant tq in 
+        let vs,_,t = Term.t_open_quant tq in
         let ids, vm = add_locals vs vm in
         let ids = List.map (fun (x, ty) -> (x, GTty ty)) ids in
         let f = import vm t in
@@ -631,9 +569,9 @@ let import_w3_term env tvm =
         let f1 = import vm t1 in
         let f2 = import vm t2 in
         begin match op with
-        | Term.Tand     -> 
+        | Term.Tand     ->
             if is_asym t1 then f_anda f1 f2 else f_and f1 f2
-        | Term.Tor      -> 
+        | Term.Tor      ->
             if is_asym t1 then f_ora f1 f2 else f_or f1 f2
         | Term.Timplies -> f_imp f1 f2
         | Term.Tiff     -> f_iff f1 f2
@@ -641,26 +579,26 @@ let import_w3_term env tvm =
     | Term.Tnot t -> f_not (import vm t)
     | Term.Ttrue  -> f_true
     | Term.Tfalse -> f_false in
-  import_ty, add_locals, import 
+  import_ty, add_locals, import
 
-let add_w3_ls env p ls wparams odecl = 
+let add_w3_ls env p ls wparams odecl =
   let ls' = match odecl with None -> ls | Some (ls',_,_) -> ls' in
-  { env with 
-    env_op = Mp.add p (ls,ls',wparams) env.env_op; 
+  { env with
+    env_op = Mp.add p (ls,ls',wparams) env.env_op;
     env_w3 = Ident.Mid.add ls.Term.ls_name (p,wparams) env.env_w3 }
-    
-let rbadd_w3_ls rb p ls wparams odecl = 
-  let ls',rb_decl = 
-    match odecl with 
+
+let rbadd_w3_ls rb p ls wparams odecl =
+  let ls',rb_decl =
+    match odecl with
     | None -> ls, rb.rb_decl
     | Some (ls',d',ds) -> ls', ds::d'::rb.rb_decl in
-  { rb with 
-    rb_op = Mp.add p (ls,ls',wparams) rb.rb_op; 
+  { rb with
+    rb_op = Mp.add p (ls,ls',wparams) rb.rb_op;
     rb_w3 = Ident.Mid.add ls.Term.ls_name (p,wparams) rb.rb_w3;
     rb_decl = rb_decl;
   }
 
-let import_w3_ls rn path (env,rb,z) ls = 
+let import_w3_ls rn path (env,rb,z) ls =
   let tvm = Wtvm.create () in
   let dom = List.map (import_w3_ty env tvm) ls.Term.ls_args in
   let codom = omap ls.Term.ls_value (import_w3_ty env tvm) in
@@ -670,27 +608,27 @@ let import_w3_ls rn path (env,rb,z) ls =
   let op = mk_op params (toarrow dom (force_bool codom)) None in
   let p = EcPath.pqname path eid in
   let odecl = mk_highorder_func ls in
-  let env = add_w3_ls env p ls wparams odecl in 
-  let rb  = rbadd_w3_ls rb p ls wparams odecl in 
+  let env = add_w3_ls env p ls wparams odecl in
+  let rb  = rbadd_w3_ls rb p ls wparams odecl in
   env, rb, Zdecl (Th_operator (eid,op)) :: z
-    
-let import_w3_constructor rn path envld (ls, pls) = 
+
+let import_w3_constructor rn path envld (ls, pls) =
   let envld = import_w3_ls rn path envld ls in
-  List.fold_left (fun envld ols -> 
+  List.fold_left (fun envld ols ->
     match ols with
     | Some ls -> import_w3_ls rn path envld ls
     | None -> envld) envld pls
-    
-let import_w3_constructors rn path = 
-  List.fold_left (import_w3_constructor rn path) 
 
-let add_w3_pr env p pr = 
-  { env with 
+let import_w3_constructors rn path =
+  List.fold_left (import_w3_constructor rn path)
+
+let add_w3_pr env p pr =
+  { env with
     env_ax = Mp.add p pr env.env_ax;
     env_w3 = Ident.Mid.add (pr.Decl.pr_name) (p,[]) env.env_w3 }
 
-let rbadd_w3_pr rb p pr = 
-  { rb with 
+let rbadd_w3_pr rb p pr =
+  { rb with
     rb_ax = Mp.add p pr rb.rb_ax;
     rb_w3 = Ident.Mid.add (pr.Decl.pr_name) (p,[]) rb.rb_w3 }
 
@@ -700,59 +638,59 @@ let import_w3_pr rn path (env,rb,z as envld) k pr t =
       let eid = Renaming.get_pr rn pr in
       let tvm = Wtvm.create () in
       let _, _, import = import_w3_term env tvm in
-      let spec = 
+      let spec =
         try Some (import Term.Mvs.empty t);
         with CanNotTranslateW3Ec -> None in
-      let ax = { 
+      let ax = {
         ax_tparams = Wtvm.tparams tvm; (* FIXME assert unicity of string *)
         ax_spec = spec;
         ax_kind = if k = Decl.Plemma then assert false (*FIXME Lemma *)
         else Axiom } in
       let p = EcPath.pqname path eid in
       let env = add_w3_pr env p pr in
-      let rb  = rbadd_w3_pr rb p pr in 
+      let rb  = rbadd_w3_pr rb p pr in
       env, rb, Zdecl(Th_axiom (eid,ax)) :: z
   | Decl.Pgoal | Decl.Pskip -> envld
 
 
-let import_decl rn path envld d = 
+let import_decl rn path envld d =
   match d.Decl.d_node with
-  | Decl.Dtype ty -> import_w3_tydef rn path envld ty 
+  | Decl.Dtype ty -> import_w3_tydef rn path envld ty
   | Decl.Ddata ddl ->
       let lty, lc = List.split ddl in
       let envld = List.fold_left (import_w3_tydef rn path) envld lty in
-      List.fold_left (import_w3_constructors rn path) envld lc 
+      List.fold_left (import_w3_constructors rn path) envld lc
   | Decl.Dparam ls -> import_w3_ls rn path envld ls
   | Decl.Dlogic lls ->
-      let lls = List.map fst lls in 
+      let lls = List.map fst lls in
       List.fold_left (import_w3_ls rn path) envld lls
   | Decl.Dind _  -> envld  (* FIXME *)
-  | Decl.Dprop (k,pr,t) -> import_w3_pr rn path envld k pr t 
+  | Decl.Dprop (k,pr,t) -> import_w3_pr rn path envld k pr t
 
 let import_decls rn path env rb decls =
-  let rec diff ls ls' = 
+  let rec diff ls ls' =
     match ls, ls' with
     | s::ls, s'::ls' when s = s' -> diff ls ls'
     | _, _ -> List.rev ls, ls' in
-  let rec close accu ls path z = 
+  let rec close accu ls path z =
     match ls, z, path.EcPath.p_node with
-    | [], _, _ -> path, z 
+    | [], _, _ -> path, z
     | s::ls, Zenter id:: z, EcPath.Pqname(p,id') ->
         assert (s = id && EcSymbols.equal id id');
         close [] ls p (Zdecl (Th_theory (id, accu)) :: z)
     | _s::_ls, Zenter _id:: _z, _ -> assert false
     | _, Zdecl d::z, _ -> close (d::accu) ls path z
     | _, [], _ -> assert false in
-  let open_ ls path z = 
-    List.fold_left (fun (path, z) s -> 
+  let open_ ls path z =
+    List.fold_left (fun (path, z) s ->
       EcPath.pqname path s, (Zenter s) :: z) (path, z) ls
   in
-    
-  let close_open ls ls' path z = 
+
+  let close_open ls ls' path z =
     let ls, ls' = diff ls ls' in
     let path, z = close [] ls path z in
-    open_ ls' path z in 
-  let rec aux ls path (env,rb,z as envld) decls = 
+    open_ ls' path z in
+  let rec aux ls path (env,rb,z as envld) decls =
     match decls with
     | d::decls ->
         let ids = d.Decl.d_news in
@@ -763,9 +701,9 @@ let import_decls rn path env rb decls =
           let ls' = List.rev (List.tl (List.rev s)) in
           let path, z = close_open ls ls' path z in
           let envld = import_decl rn path (env,rb,z) d in
-          aux ls' path envld decls 
-    | [] -> 
-        let final_close z = 
+          aux ls' path envld decls
+    | [] ->
+        let final_close z =
           List.rev_map (function Zdecl d -> d | _ -> assert false) z in
         let _, z = close [] ls path z in
         (env,rb,final_close z) in
@@ -781,24 +719,24 @@ let import_w3 env path th rd =
   let _env,rb,ld = import_decls rn path env rb decls in
   let rb = { rb with rb_decl = List.rev rb.rb_decl } in
   ld, RBuse rb
-  
+
 (* ----------------------------------------------------------------------- *)
 (* ------------------------ Exporting to why3 ---------------------------- *)
 (* ----------------------------------------------------------------------- *)
-let preid id = 
+let preid id =
   Ident.id_fresh (EcIdent.name id)
 
-let str_p p = 
+let str_p p =
   let ls,s = EcPath.toqsymbol p in
   List.fold_right (fun s1 s2 -> s1 ^ "_" ^ s2) ls s
-  
+
 let preid_p p = Ident.id_fresh (str_p p)
 
-let create_tvsymbol id = 
+let create_tvsymbol id =
   Ty.create_tvsymbol (preid id)
 
 type vmap = {
-    vm_tv : Ty.ty Mid.t; 
+    vm_tv : Ty.ty Mid.t;
     vm_id : Term.term Mid.t;
   }
 
@@ -807,19 +745,19 @@ let empty_vmap =
     vm_id = Mid.empty; }
 
 exception UnboundTypeVariable of EcIdent.t
-      
+
 
 (* ------------------------ Types -----------------------------------------*)
 
-let trans_pty env p = 
-  try Mp.find p env.env_ty 
+let trans_pty env p =
+  try Mp.find p env.env_ty
   with _ -> assert false
 
-let trans_tv vm tv = 
+let trans_tv vm tv =
   try Mid.find tv vm.vm_tv
   with _ -> raise (UnboundTypeVariable tv)
 
-let rec trans_ty env vm ty = 
+let rec trans_ty env vm ty =
   match ty.ty_node with
   | Tunivar _ -> assert false
   | Tvar id -> trans_tv vm id
@@ -833,44 +771,44 @@ and trans_tys env vm tys = List.map (trans_ty env vm) tys
 
 let trans_oty env vm oty =
   match oty with
-  | None -> None 
+  | None -> None
   | Some t -> Some (trans_ty env vm t)
 
-let trans_typarams vm tparams = 
+let trans_typarams vm tparams =
   let vm = ref vm in
-  let trans_tv id = 
+  let trans_tv id =
     assert (not (Mid.mem id !vm.vm_tv));
     let tv = create_tvsymbol id in
     vm := {!vm with vm_tv = Mid.add id (Ty.ty_var tv) !vm.vm_tv };
     tv in
   let tparams = List.map trans_tv tparams in
   tparams, !vm
-  
+
 let trans_tydecl env path td =
   let pid = preid_p path in
   let tparams, vm = trans_typarams empty_vmap td.tyd_params in
   let body = omap td.tyd_type (trans_ty env vm) in
-  Ty.create_tysymbol pid tparams body 
+  Ty.create_tysymbol pid tparams body
 
 (* --------------------------- Formulas ------------------------------- *)
 
-let trans_lv vm lv = 
+let trans_lv vm lv =
   try Mid.find lv vm.vm_id with _ -> assert false
 
 let trans_pa env p = try Mp.find p env.env_pa with _ -> assert false
 
-let trans_pv env vm pv ty mem = 
+let trans_pv env vm pv ty mem =
   let p   = EcPath.path_of_mpath pv.pv_name in
   let m   = trans_lv vm mem in
-  try env, [], getvar (Mp.find p env.env_pa) m with _ -> 
+  try env, [], getvar (Mp.find p env.env_pa) m with _ ->
     if pv.pv_kind <> PVloc then assert false;
     let ty = trans_ty env empty_vmap ty in
     let ls = Term.create_fsymbol (preid_p p) [] (ty_var_name ty) in
     let env = add_param env p ls in
     let v = Mp.find p env.env_pa in
-    env, [RBpa(p,ls)], getvar v m 
+    env, [RBpa(p,ls)], getvar v m
 
-let create_vsymbol id ty = Term.create_vsymbol (preid id) ty 
+let create_vsymbol id ty = Term.create_vsymbol (preid id) ty
 
 let add_id vm id ty =
   assert (not (Mid.mem id vm.vm_id));
@@ -879,10 +817,10 @@ let add_id vm id ty =
              vm_id = Mid.add id (Term.t_var wid) vm.vm_id } in
   wid, vm
 
-let add_ids vm ids lty = 
+let add_ids vm ids lty =
   assert (List.length lty = List.length ids);
   let vm = ref vm in
-  let wids = 
+  let wids =
     List.map2 (fun id ty -> let wid, vm' = add_id !vm id ty in vm := vm'; wid)
       ids lty in
   wids, !vm
@@ -890,34 +828,34 @@ let add_ids vm ids lty =
 let t_app p args ty =
   if p.Term.ls_value = None then Term.t_app p args None
   else Term.t_app p args (Some ty)
-    
-let prop_of_bool t = 
+
+let prop_of_bool t =
   assert (Ty.oty_equal t.Term.t_ty (Some Ty.ty_bool));
   match t.Term.t_node with
-  | Term.Tif(t1,t2,t3) when 
+  | Term.Tif(t1,t2,t3) when
       Term.t_equal t2 Term.t_bool_true &&
       Term.t_equal t3 Term.t_bool_false -> t1
   | _ ->
       if Term.t_equal t Term.t_bool_true then Term.t_true
-      else if Term.t_equal t Term.t_bool_false then Term.t_false 
+      else if Term.t_equal t Term.t_bool_false then Term.t_false
       else Term.t_equ t Term.t_bool_true
 
-let force_prop t = 
+let force_prop t =
   if t.Term.t_ty = None then t
   else prop_of_bool t
 
-let bool_of_prop t = 
+let bool_of_prop t =
   assert (t.Term.t_ty = None);
   match t.Term.t_node with
   | Term.Ttrue -> Term.t_bool_true
   | Term.Tfalse -> Term.t_bool_false
   | Term.Tapp(ls,[t;tt]) when
-      Term.t_equal tt Term.t_bool_true && 
+      Term.t_equal tt Term.t_bool_true &&
       Term.ls_equal ls Term.ps_equ -> t
-  | _ -> 
-      Term.t_if t Term.t_bool_true Term.t_bool_false 
+  | _ ->
+      Term.t_if t Term.t_bool_true Term.t_bool_false
 
-let force_bool t = 
+let force_bool t =
   if t.Term.t_ty = None then bool_of_prop t
   else t
 
@@ -928,7 +866,7 @@ let mk_not args  =
   | [e] -> Term.t_not e
   | _ -> assert false
 
-let mk_pred2 f l = 
+let mk_pred2 f l =
   match l with
   | [e1;e2] -> f e1 e2
   | _ -> assert false
@@ -940,7 +878,7 @@ let mk_or  = mk_pred2 Term.t_or
 let mk_imp = mk_pred2 Term.t_implies
 let mk_iff = mk_pred2 Term.t_iff
 let mk_eq  = mk_pred2 Term.t_equ
-  
+
 let trans_op env vm p tys =
   match op_kind p with
   | OK_true  -> ([],None), w3_ls_true, fun _ -> Term.t_true
@@ -952,20 +890,20 @@ let trans_op env vm p tys =
   | OK_or  false -> ([None;None],None), w3_ls_or, mk_or
   | OK_imp   -> ([None;None],None), w3_ls_imp, mk_imp
   | OK_iff   -> ([None;None],None), w3_ls_iff, mk_iff
-  | OK_eq    -> 
+  | OK_eq    ->
       let ty = trans_ty env vm (List.hd tys) in
       ([Some ty;Some ty],None), w3_ls_eq, mk_eq
   | OK_other ->
-      let ls,ls', tvs = 
-        try Mp.find p env.env_op 
-        with _ -> 
+      let ls,ls', tvs =
+        try Mp.find p env.env_op
+        with _ ->
 (*          Format.printf "cannot find %s@." (EcPath.tostring p); *)
           assert false in (* FIXME error message *)
       let mtv = 
 (*        try  *)
           List.fold_left2 (fun mtv tv ty ->
             Ty.Mtv.add tv (trans_ty env vm ty) mtv) Ty.Mtv.empty
-            tvs tys 
+            tvs tys
        (* with Invalid_argument "List.fold_left2" as e->
           Format.printf "p = %s@." (EcPath.tostring p);
           Format.printf "tvs = %i; tys = %i@." 
@@ -977,11 +915,11 @@ let trans_op env vm p tys =
       let tres  = omap ls.Term.ls_value (Ty.ty_inst mtv) in
       let mk args = Term.t_app ls args tres in
       (targs,tres), ls', mk
- 
-let apply_highorder f args = 
+
+let apply_highorder f args =
   List.fold_left (fun f a -> Term.t_func_app f (force_bool a)) f args
 
-let cast_arg a ty = 
+let cast_arg a ty =
   match a.Term.t_ty, ty with
   | None, None -> a
   | None, Some _ -> force_bool a
@@ -989,13 +927,13 @@ let cast_arg a ty =
   | Some _,Some _ -> a
 
 let cast_app mk args targs = mk (List.map2 cast_arg args targs)
- 
-let rec highorder_type targs tres = 
+
+let rec highorder_type targs tres =
   match targs with
   | [] -> odfl Ty.ty_bool tres
   | a::targs -> Ty.ty_func a (highorder_type targs tres)
-  
-let trans_app env vm p tys args = 
+
+let trans_app env vm p tys args =
   let (targs,tres), ls', mk = trans_op env vm p tys in
   let arity = List.length targs in
   let nargs = List.length args in
@@ -1006,20 +944,20 @@ let trans_app env vm p tys args =
   else (* arity > nargs *)
     let targs = List.map (odfl Ty.ty_bool) targs in
     let fty = highorder_type targs tres in
-    apply_highorder (Term.fs_app ls' [] fty) args 
+    apply_highorder (Term.fs_app ls' [] fty) args
 
 let destr_ty_tuple t =
   match t.Ty.ty_node with
   | Ty.Tyapp (ts, lt) -> assert (Ty.is_ts_tuple ts); lt
-  | _ -> assert false 
+  | _ -> assert false
 
-let merge_branches lb = 
+let merge_branches lb =
   if List.exists (fun b -> b.Term.t_ty = None) lb then List.map force_prop lb
   else lb
 
 exception CanNotTranslate of form
 
-let rec trans_mod env vm mp = 
+let rec trans_mod env vm mp =
 
   let is_mod ks = match ks with EcPath.PKmodule::_ -> true | _ -> false in
 
@@ -1028,25 +966,25 @@ let rec trans_mod env vm mp =
     | Pident id, _, [a] ->
         let mo = trans_lv vm id in
         app_mod mo a
-    | Psymbol _, [EcPath.PKmodule], [a] -> 
+    | Psymbol _, [EcPath.PKmodule], [a] ->
         let mo = trans_pa env p in
         app_mod mo a
-    | Pqname(p',_), EcPath.PKmodule::ks, a::args -> 
+    | Pqname(p',_), EcPath.PKmodule::ks, a::args ->
         if is_mod ks then
           let mo = aux p' ks args in
           let mn = trans_pa env p in
           app_mod (getmod mo mn) a
         else
           let mo = trans_pa env p in
-          app_mod mo a 
+          app_mod mo a
     | _, _, _ -> assert false
   and app_mod mo a =
     if a = [] then mo else
     let a = List.map (trans_mod env vm) a in
     List.fold_left appmod mo a in
   aux mp.EcPath.m_path mp.EcPath.m_kind mp.EcPath.m_args
-  
-let trans_fun env vm mp = 
+
+let trans_fun env vm mp =
   let p = EcPath.path_of_mpath mp in
   let fn = trans_pa env p in
   let mp,_,_,_ = oget (EcPath.m_split mp) in
@@ -1065,8 +1003,8 @@ let trans_gtys env vm gtys =
 let trans_form env vm f =
   let env = ref env in
   let rb  = ref [] in
-  
-  let rec trans_form vm f = 
+
+  let rec trans_form vm f =
     match f.f_node with
     | Fquant(q,b,f) ->
         let ids, tys = List.split b in
@@ -1083,7 +1021,7 @@ let trans_form env vm f =
         let f1 = trans_form vm f1 in
         let f2 = trans_form vm f2 in
         let f3 = trans_form vm f3 in
-        let f2,f3 = 
+        let f2,f3 =
           match merge_branches [f2;f3] with
           | [f2;f3] -> f2, f3
           | _ -> assert false in
@@ -1092,7 +1030,7 @@ let trans_form env vm f =
     | Flet(lp,f1,f2) ->
         let f1 = trans_form_b vm f1 in
         begin match lp with
-        | LSymbol (id,_) -> 
+        | LSymbol (id,_) ->
             let id, vm = add_id vm id (Term.t_type f1) in
             let f2 = trans_form vm f2 in
             Term.t_let f1 (Term.t_close_bound id f2)
@@ -1100,21 +1038,21 @@ let trans_form env vm f =
             let ids = List.map fst ids in
             let t1 = Term.t_type f1 in
             let ids, vm = add_ids vm ids (destr_ty_tuple t1) in
-            let pat = 
-              Term.pat_app (Term.fs_tuple (List.length ids)) 
+            let pat =
+              Term.pat_app (Term.fs_tuple (List.length ids))
                 (List.map Term.pat_var ids) t1 in
             let f2 = trans_form vm f2 in
             let br = Term.t_close_branch pat f2 in
-            Term.t_case f1 [br] 
+            Term.t_case f1 [br]
         end
 
     | Fint n ->
         let n = Term.ConstInt(Term.IConstDecimal (string_of_int n)) in
-        Term.t_const n 
+        Term.t_const n
 
     | Flocal id -> trans_lv vm id
 
-    | Fop(p,tys) -> trans_app !env vm p tys [] 
+    | Fop(p,tys) -> trans_app !env vm p tys []
 
     | Fapp({f_node = Fop(p,tys) },args) ->
         let args = List.map (trans_form vm) args in
@@ -1123,23 +1061,23 @@ let trans_form env vm f =
     | Fapp(e,args) ->
         let args = List.map (trans_form vm) args in
         apply_highorder (trans_form vm e) args
-          
+
     | Ftuple args ->
         let args = List.map (trans_form_b vm) args in
         Term.t_tuple args
 
-    | FhoareF _ | FhoareS _ | FequivF _  | FequivS _ | FeqGlob _ -> 
+    | FhoareF _ | FhoareS _ | FequivF _  | FequivS _ | FeqGlob _ ->
         raise (CanNotTranslate f) (* fixme *)
-          
-    | Fpvar(pv,m) -> 
+
+    | Fpvar(pv,m) ->
         let nenv, nrb, pv = trans_pv !env vm pv f.f_ty m in
         env := nenv;
         rb  := nrb @ !rb;
         pv
 
-    | Fpr(mem,mp,args,ev) -> 
+    | Fpr(mem,mp,args,ev) ->
         let mem   = trans_lv vm mem in
-        let mo, f = trans_fun !env vm mp in 
+        let mo, f = trans_fun !env vm mp in
         let args  = List.map (trans_form_b vm) args in
         let ev    = trans_ev vm ev in
         getpr mo f mem args ev
@@ -1149,9 +1087,9 @@ let trans_form env vm f =
   and trans_lambda vs body =
     let pids   = Ident.id_fresh "unamed_lambda_s" in
     let pid    = Ident.id_fresh "unamed_lambda" in
-    let fv     = 
+    let fv     =
       List.fold_left (fun s x -> Term.Mvs.remove x s)
-        body.Term.t_vars vs in    
+        body.Term.t_vars vs in
 
     let sparams  = Term.Mvs.keys fv in
     let sdom   = List.map (fun vs -> vs.Term.vs_ty) sparams in
@@ -1164,41 +1102,41 @@ let trans_form env vm f =
 
     let ls  = Term.create_lsymbol pid (sdom @ tvs) body.Term.t_ty in
     let params = sparams @ vs in
-    let ldecl  = Decl.make_ls_defn ls params body in 
+    let ldecl  = Decl.make_ls_defn ls params body in
     let decl   = Decl.create_logic_decl [ldecl] in
-  
+
     let sarg   = List.map Term.t_var sparams in
     let arg    = List.map Term.t_var params in
     let lss_papp = Term.t_app_infer lss sarg in
     let lss_app  = List.fold_left Term.t_func_app lss_papp arg in
     let ls_app   = Term.t_app_infer ls (sarg@arg) in
     let concl    =
-      if body.Term.t_ty = None then Term.t_iff (force_prop lss_app) ls_app 
+      if body.Term.t_ty = None then Term.t_iff (force_prop lss_app) ls_app
       else Term.t_equ lss_app ls_app in
     let spec   = Term.t_forall_close params [] concl in
     let pr     = Decl.create_prsymbol pids in
     let spdecl  = Decl.create_prop_decl Decl.Paxiom pr spec in
     rb := RBfun(decl,sdecl,spdecl) :: !rb;
     env := { !env with
-             logic_task = 
-             List.fold_left add_decl_with_tuples !env.logic_task 
+             logic_task =
+             List.fold_left add_decl_with_tuples !env.logic_task
                [decl;sdecl;spdecl] };
-    lss_papp 
+    lss_papp
 
-  and trans_ev vm ev = 
+  and trans_ev vm ev =
     (* FIXME : We should be able to share equal definition *)
     (* FIXME : use the previous function *)
     (* We assume that the memory is mpost *)
-    (* op : sev : fv -> mem |-> bool) 
-       op : fev fv m: mem : bool := 
+    (* op : sev : fv -> mem |-> bool)
+       op : fev fv m: mem : bool :=
           let (m,r) = mr in
           [ev]
-       forall fv (mr : mem*ty), 
-          sev fv @ mr = fev fv mr 
+       forall fv (mr : mem*ty),
+          sev fv @ mr = fev fv mr
     *)
     let pids   = Ident.id_fresh "unamed_lambda_s" in
     let pid    = Ident.id_fresh "unamed_lambda" in
-    let vs, vm = add_id vm EcFol.mhr ty_mem in 
+    let vs, vm = add_id vm EcFol.mhr ty_mem in
     let body   = trans_form vm ev in
 
     let fv     = Term.Mvs.remove vs body.Term.t_vars in
@@ -1213,22 +1151,22 @@ let trans_form env vm f =
     let ls     = Term.create_fsymbol pid dom Ty.ty_bool in
 
     let decls  = Decl.create_param_decl lss in
-    let ldecl  = Decl.make_ls_defn ls params (force_bool body) in 
+    let ldecl  = Decl.make_ls_defn ls params (force_bool body) in
     let decl   = Decl.create_logic_decl [ldecl] in
     let args   = List.map Term.t_var extra in
     let arg    = List.map Term.t_var params in
     let lss_app = Term.t_app_infer lss args in
     let app_s  = Term.t_func_app lss_app (Term.t_var mr) in
     let app    = Term.t_app_infer ls arg in
-    let spec   = 
-      Term.t_forall_close params [] 
+    let spec   =
+      Term.t_forall_close params []
         (Term.t_iff (force_prop app_s) (force_prop app)) in
     let pr     = Decl.create_prsymbol pids in
     let sdecl  = Decl.create_prop_decl Decl.Paxiom pr spec in
     rb := RBfun(decl,decls,sdecl) :: !rb;
     env := { !env with
-             logic_task = 
-             List.fold_left add_decl_with_tuples !env.logic_task 
+             logic_task =
+             List.fold_left add_decl_with_tuples !env.logic_task
                [decl;decls;sdecl] };
     lss_app in
 
@@ -1306,7 +1244,7 @@ let add_ax env path ax =
     with CanNotTranslate _ ->
       env, []
 
-let add_mod_exp env path me = 
+let add_mod_exp env path me =
   let is_alias = function ME_Alias _ -> true | _ -> false in
   if is_alias me.me_body then env, []
   else
@@ -1316,22 +1254,22 @@ let add_mod_exp env path me =
       let ls = Term.create_fsymbol (preid_p path) [] ty in
       env := add_param !env path ls;
       rb := RBpa(path,ls)::!rb in
-    let rec add_comps path comps = List.iter (add_comp path) comps 
-    and add_comp path comp = 
+    let rec add_comps path comps = List.iter (add_comp path) comps
+    and add_comp path comp =
       match comp with
-      | MI_Module me  -> add_me path me 
+      | MI_Module me  -> add_me path me
       | MI_Variable v ->
           let ty = trans_ty !env empty_vmap v.v_type in
           let path = EcPath.pqname path v.v_name in
           add_pa path (ty_var_name ty)
       | MI_Function f ->
           let fsig = f.f_sig in
-          let ta = 
-            List.map (fun vd -> trans_ty !env empty_vmap vd.v_type) 
+          let ta =
+            List.map (fun vd -> trans_ty !env empty_vmap vd.v_type)
               (fst fsig.fs_sig) in
           let tr = trans_ty !env empty_vmap (snd fsig.fs_sig) in
           let path = EcPath.pqname path fsig.fs_name in
-          add_pa path (ty_fun_name ta tr) 
+          add_pa path (ty_fun_name ta tr)
     and add_me path me =
       if not (is_alias me.me_body) then
         let path = EcPath.pqname path me.me_name in
@@ -1341,178 +1279,57 @@ let add_mod_exp env path me =
     add_comps path me.me_comps;
     !env, !rb
 
-(* -------------------------------------------------------------------- *)
-(* ---------------------- Calling prover ------------------------------ *)
-(* -------------------------------------------------------------------- *)
-exception UnknownProver of string
-
-let get_prover name =
-  List.find (fun (s,_,_) -> s = name) (Config.provers ())
-
-let check_prover_name name = 
-  try ignore(get_prover name); true with _ -> false 
-
-(* -------------------------------------------------------------------- *)
-let restartable_syscall (call : unit -> 'a) : 'a =
-  let output = ref None in
-    while !output = None do
-      try  output := Some (call ())
-      with
-      | Unix.Unix_error (errno, _, _) when errno = Unix.EINTR -> ()
-    done;
-    EcUtils.oget !output
-
-let para_call max_provers provers timelimit task = 
-  let module CP = Call_provers in
-
-  let pcs    = Array.create max_provers None in
-
-  (* Run process, ignoring prover failing to start *)
-  let run i prover =
-    try 
-      let (_, pr, dr)  = get_prover prover in
-(*      Format.printf "Start prover %s@." prover; *)
-      let pc =
-        Driver.prove_task ~command:pr.Whyconf.command ~timelimit dr task () in
-
-      begin
-        try
-          ExtUnix.All.setpgid (CP.prover_call_pid pc) 0
-        with Unix.Unix_error _ -> ()
-      end;
-      pcs.(i) <- Some(prover, pc)
- (*  Format.printf "Prover %s started and set at %i@." prover i *)
-    with e -> 
-      Format.printf "Error when starting %s: %a" prover 
-        EcPException.exn_printer e;
-      ()
-  in
-
-  (* Start the provers, at most max_provers run in the same time *)
-  let nb_provers = Array.length provers in
-  let min = if max_provers < nb_provers then max_provers else nb_provers in
-  for i = 0 to min - 1 do run i provers.(i) done; 
-  (* Other provers are set in a queue *)
-  let pqueue = Queue.create () in
-  for i = min to nb_provers - 1 do Queue.add provers.(i) pqueue done;
-  
-  (* Wait for the first prover giving a definitive answer *)    
-  let status = ref None in
-  EcUtils.try_finally
-    (fun () ->
-      let alives = ref (-1) in
-      while !alives <> 0 && !status = None do
-        let pid, st = restartable_syscall Unix.wait in
-        alives := 0;
-        for i = 0 to (Array.length pcs) - 1 do
-          match pcs.(i) with
-          | None -> ()
-          | Some (_prover, pc) ->
-              if CP.prover_call_pid pc = pid then begin
-                pcs.(i) <- None;            (* DO IT FIRST *)
-                let ans = (CP.post_wait_call pc st ()).CP.pr_answer in
-                (*Format.eprintf "prover `%s' return %a@."
-                  prover CP.print_prover_answer ans; *)
-                match ans with
-                | CP.Valid   -> status := Some true
-                | CP.Invalid -> status := Some false
-                | _          -> 
-                    if not (Queue.is_empty pqueue) then 
-                      run i (Queue.take pqueue)
-              end;
-              if pcs.(i) <> None then incr alives
-        done
-      done;
-      !status)
-
-    (* Clean-up: hard kill + wait for remaining provers *)
-    (fun () ->
-      for i = 0 to (Array.length pcs) - 1 do
-        match pcs.(i) with
-        | None    -> ()
-        | Some (_prover,pc) ->
-            let pid = CP.prover_call_pid pc in
-            pcs.(i) <- None;
-            begin try
-(*              Format.printf
-                "Killing (SIGTERM) prover `%s' (pid = %d)@."
-                prover pid; *)
-              Unix.kill (-pid) 15;      (* kill process group *)
-            with Unix.Unix_error _ -> ()
-            end;
-(*            Format.printf "prover %s finished@." prover; *)
-            let _, st =
-              restartable_syscall (fun () -> Unix.waitpid [] pid)
-            in
-            ignore (CP.post_wait_call pc st ());
-      done)
-
-type prover_infos = 
-  { prover_max_run   : int;
-    prover_names     : string array;
-    prover_timelimit : int; }    
-
-let dft_prover_infos = 
-  { prover_max_run   = 7;       
-    prover_names     = [||];
-    prover_timelimit = 3; }
-
-
-let call_prover_task pi task =
-  para_call pi.prover_max_run pi.prover_names pi.prover_timelimit task = 
-  Some true
-
-let check_w3_formula pi task f = 
+let check_w3_formula pi task f =
   let pr   = Decl.create_prsymbol (Ident.id_fresh "goal") in
   let decl = Decl.create_prop_decl Decl.Pgoal pr f in
   let task = add_decl_with_tuples task decl in
-  call_prover_task pi task
-  
+  EcProvers.call_prover_task pi task
+
 exception CanNotProve of axiom
 
-let check_goal env pi (hyps, concl) = 
+let check_goal env pi (hyps, concl) =
   let vm = ref empty_vmap in
   let env = ref env in
-  let trans_tv id = 
+  let trans_tv id =
     let ts = Ty.create_tysymbol (preid id) [] None in
     let decl = Decl.create_ty_decl ts in
     vm := { !vm with vm_tv = Mid.add id (Ty.ty_app ts []) !vm.vm_tv};
-    env := { !env with 
+    env := { !env with
              logic_task = add_decl_with_tuples !env.logic_task decl } in
   let trans_hyp (id,ld) =
-    let decl = 
+    let decl =
       match ld with
-      | LD_var (ty,body) -> 
+      | LD_var (ty,body) ->
           let codom = trans_ty !env !vm ty in
           let pid = preid id in
           let ls = Term.create_fsymbol pid [] codom in
           let decl = match body with
           | None -> Decl.create_param_decl ls
-          | Some e -> 
-              let nenv, _, e = trans_form !env !vm e in 
+          | Some e ->
+              let nenv, _, e = trans_form !env !vm e in
               env := nenv;
               Decl.create_logic_decl [Decl.make_ls_defn ls [] e] in
-          vm := { !vm 
+          vm := { !vm
                 with vm_id = Mid.add id (t_app ls [] codom) !vm.vm_id };
           decl
-      | LD_hyp f -> 
+      | LD_hyp f ->
           let nenv, _, f = trans_form !env !vm f in
           env := nenv;
           let pr = Decl.create_prsymbol (preid id) in
           Decl.create_prop_decl Decl.Paxiom pr (force_prop f)
-      | LD_mem  _ -> 
+      | LD_mem  _ ->
           let ls = Term.create_fsymbol (preid id) [] ty_mem in
           let decl = Decl.create_param_decl ls in
           vm := { !vm
                 with vm_id = Mid.add id (t_app ls [] ty_mem) !vm.vm_id };
           decl
-      | LD_modty _ -> 
+      | LD_modty _ ->
           let ls = Term.create_fsymbol (preid id) [] ty_mod in
           let decl = Decl.create_param_decl ls in
           vm := { !vm
                 with vm_id = Mid.add id (t_app ls [] ty_mod) !vm.vm_id };
           decl in
-          
+
     env := { !env with
              logic_task = add_decl_with_tuples !env.logic_task decl };
   in

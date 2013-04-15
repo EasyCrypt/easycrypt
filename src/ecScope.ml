@@ -13,18 +13,18 @@ module Mid  = EcIdent.Mid
 module MSym = EcSymbols.Msym
 
 (* -------------------------------------------------------------------- *)
-type action = { 
+type action = {
   for_loading  : exn -> exn;
-} 
+}
 
 (* -------------------------------------------------------------------- *)
 module type IOptions = sig
-  type option 
+  type option
 
   val register          : action -> exn -> option
   val register_identity : exn -> option
 
-  type options 
+  type options
 
   val init  : unit -> options
   val get   : options -> option -> exn
@@ -36,7 +36,7 @@ end
 (* -------------------------------------------------------------------- *)
 module Options : IOptions = struct
   type option = int
-       
+
   type options = (action * exn) Mint.t
 
   let known_options : options ref = ref Mint.empty
@@ -45,85 +45,85 @@ module Options : IOptions = struct
     for_loading  = (fun x -> x);
   }
 
-  let count = ref 0 
-  let initialized = ref false 
+  let count = ref 0
+  let initialized = ref false
 
   let register action exn =
     if !initialized then assert false;
     let opt = !count in
     incr count;
     known_options := Mint.add opt (action,exn) !known_options;
-    opt 
+    opt
 
   let register_identity = register identity
 
-  let init () = 
+  let init () =
     initialized := true;
     !known_options
 
-  let get options opt = 
-    snd (Mint.find opt options) 
-      
-  let set options opt exn = 
+  let get options opt =
+    snd (Mint.find opt options)
+
+  let set options opt exn =
     Mint.change (function None -> assert false | Some(act,_) -> Some (act, exn))
       opt options
 
-  let for_loading options = 
+  let for_loading options =
     Mint.map (fun (act, exn) -> act, act.for_loading exn) options
 
   let for_subscope options = options
 
-end 
+end
 
 (* -------------------------------------------------------------------- *)
-module Check_mode = struct   
+module Check_mode = struct
   exception Full_check    (* Disable: checkproof off, i.e. check every think *)
   exception Check of bool (* true check proofs, false do not check *)
-      
-  let for_loading = function 
+
+  let for_loading = function
     | Check _ -> Check false
-    | exn     -> exn 
+    | exn     -> exn
 
   let default = Check true
 
-  let mode = Options.register { for_loading = for_loading } default  
+  let mode = Options.register { for_loading = for_loading } default
 
-  let check options = 
+  let check options =
     match Options.get options mode with
     | Check b -> b
     | _       -> true
 
-  let check_proof options b = 
+  let check_proof options b =
     match Options.get options mode with
-    | Check b' when b <> b' -> 
+    | Check b' when b <> b' ->
         Options.set options mode (Check b')
-    | _ -> options 
+    | _ -> options
 
-  let full_check options = 
+  let full_check options =
     Options.set options mode Full_check
 end
 
 (* -------------------------------------------------------------------- *)
 module Prover_info = struct
-  exception PI of EcWhy3.prover_infos
+  exception PI of EcProvers.prover_infos
 
-  let npi = Options.register_identity (PI EcWhy3.dft_prover_infos)
+  let npi = Options.register_identity (PI EcProvers.dft_prover_infos)
 
-  let set options pi = 
+  let set options pi =
     Options.set options npi (PI pi)
 
-  let get options = 
+  let get options =
     match Options.get options npi with
     | PI pi -> pi
     | _     -> assert false
 end
-      
+
 (* -------------------------------------------------------------------- *)
 type proof_uc = {
   puc_name : string;
   puc_jdg :  EcBaseLogic.judgment_uc;
 }
-  
+
 (* -------------------------------------------------------------------- *)
 type scope = {
   sc_name       : symbol;
@@ -131,7 +131,7 @@ type scope = {
   sc_top        : scope option;
   sc_loaded     : (EcEnv.ctheory_w3 * symbol list) Msym.t;
   sc_required   : symbol list;
-  sc_pr_uc      : proof_uc list; 
+  sc_pr_uc      : proof_uc list;
   sc_options    : Options.options;
 }
 
@@ -227,7 +227,7 @@ module Op = struct
     let uni          = Tuni.subst (EcUnify.UniEnv.close ue) in
     let body         = omap body (e_mapty uni) in
     let ty           = uni ty in
-    let tparams      = EcUnify.UniEnv.tparams ue in 
+    let tparams      = EcUnify.UniEnv.tparams ue in
     let tyop         = EcDecl.mk_op tparams ty body in
     bind scope (unloc op.po_name, tyop)
 end
@@ -332,30 +332,30 @@ module Theory = struct
     subscope scope name
 
   (* ------------------------------------------------------------------ *)
-  let rec require_loaded id scope = 
+  let rec require_loaded id scope =
     if required scope id then
       scope
-    else 
+    else
       match Msym.find_opt id scope.sc_loaded with
-      | Some (rth, ids) -> 
+      | Some (rth, ids) ->
           let scope = List.fold_right require_loaded ids scope in
           let env   = EcEnv.Theory.require id rth scope.sc_env in
-            { scope with 
+            { scope with
               sc_env = env;
               sc_required = id :: scope.sc_required; }
 
-      | None -> assert false 
+      | None -> assert false
 
-  (* -------------------------------------------------------------------- *)             
+  (* -------------------------------------------------------------------- *)
   let exit_r (scope : scope) =
     match scope.sc_top with
     | None     -> raise TopScope
     | Some sup ->
         let cth    = EcEnv.Theory.close scope.sc_env in
         let loaded = scope.sc_loaded in
-        let required = scope.sc_required in 
+        let required = scope.sc_required in
         let sup = { sup with sc_loaded = loaded } in
-          ((cth, required), scope.sc_name, sup) 
+          ((cth, required), scope.sc_name, sup)
 
   (* ------------------------------------------------------------------ *)
   let exit (scope : scope) =
@@ -376,18 +376,18 @@ module Theory = struct
       sc_env = EcEnv.Theory.export path scope.sc_env }
 
   (* ------------------------------------------------------------------ *)
-  let check_end_required scope thname = 
+  let check_end_required scope thname =
     if scope.sc_name <> thname then
-      begin 
-        let msg = 
-          Printf.sprintf 
+      begin
+        let msg =
+          Printf.sprintf
             "end-of-file while processing external theory %s %s"
             scope.sc_name thname in
         failwith msg
       end;
     if scope.sc_pr_uc <> [] then
-      let msg = 
-        Printf.sprintf 
+      let msg =
+        Printf.sprintf
           "end-of-file while processing proof %s" scope.sc_name
       in
         failwith msg
@@ -398,19 +398,19 @@ module Theory = struct
       scope
     else
       match Msym.find_opt name scope.sc_loaded with
-      | Some _ -> require_loaded name scope 
+      | Some _ -> require_loaded name scope
 
-      | None -> 
+      | None ->
           let imported = enter (for_loading scope) name in
           let thname   = imported.sc_name in
           let imported = loader imported in
           check_end_required imported thname;
-          let cthr, name, imported = exit_r imported in 
-          let scope = 
+          let cthr, name, imported = exit_r imported in
+          let scope =
             { scope with
                 sc_loaded = Msym.add name cthr imported.sc_loaded; }
           in
-            require_loaded name scope 
+            require_loaded name scope
 
   (* ------------------------------------------------------------------ *)
   type evclone = {
@@ -448,7 +448,7 @@ module Theory = struct
               | _ -> ()
             end;
             { evc with evc_types = Msym.add x tyd evc.evc_types }
-  
+
           | PTHO_Op opd ->
             begin
               if Msym.mem x evc.evc_ops then
@@ -545,12 +545,12 @@ module Theory = struct
             EcEnv.Theory.bind name nth scope.sc_env; }
 
   (* ------------------------------------------------------------------ *)
-  let import_w3 scope dir file renaming = 
-    let mk_renaming (l,k,s) = 
-      let k = 
-        match k with 
-        | RNty -> EcWhy3.RDts 
-        | RNop -> EcWhy3.RDls 
+  let import_w3 scope dir file renaming =
+    let mk_renaming (l,k,s) =
+      let k =
+        match k with
+        | RNty -> EcWhy3.RDts
+        | RNop -> EcWhy3.RDls
         | RNpr -> EcWhy3.RDpr
       in
         (l, k, s)
@@ -563,74 +563,74 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Prover = struct
-  exception Unknown_prover of string 
+  exception Unknown_prover of string
 
-  let pp_error fmt exn = 
+  let pp_error fmt exn =
     match exn with
     | Unknown_prover s ->
-        Format.fprintf fmt "Unknown prover %s" s 
+        Format.fprintf fmt "Unknown prover %s" s
     | _ -> raise exn
 
-  let _ = EcPException.register pp_error 
+  let _ = EcPException.register pp_error
 
-  let check_prover_name name = 
+  let check_prover_name name =
     let s = unloc name in
-    if not (EcWhy3.check_prover_name s) then 
-      EcLocation.locate_error name.pl_loc (Unknown_prover s); 
+    if not (EcProvers.check_prover_name s) then
+      EcLocation.locate_error name.pl_loc (Unknown_prover s);
     s
 
-  let mk_prover_info scope max time ns = 
+  let mk_prover_info scope max time ns =
     let dft = Prover_info.get scope.sc_options in
-    let time = odfl dft.EcWhy3.prover_timelimit time in
+    let time = odfl dft.EcProvers.prover_timelimit time in
     let time = if time < 1 then 1 else time in
-    let provers = odfl dft.EcWhy3.prover_names ns in
-    let provers = List.filter (fun s -> s <> "Yices") 
+    let provers = odfl dft.EcProvers.prover_names ns in
+    let provers = List.filter (fun s -> s <> "Yices")
         (Array.to_list provers) in
-    let max     = odfl dft.EcWhy3.prover_max_run max in
-    { EcWhy3.prover_max_run   = max;
-      EcWhy3.prover_names     = Array.of_list provers;
-      EcWhy3.prover_timelimit = time } 
+    let max     = odfl dft.EcProvers.prover_max_run max in
+    { EcProvers.prover_max_run   = max;
+      EcProvers.prover_names     = Array.of_list provers;
+      EcProvers.prover_timelimit = time }
 
-  let set_prover_info scope max time ns = 
+  let set_prover_info scope max time ns =
     let pi = mk_prover_info scope max time ns in
     { scope with sc_options = Prover_info.set scope.sc_options pi }
 
-  let set_all scope = 
-    let provers = Array.of_list (EcWhy3.known_provers ()) in
+  let set_all scope =
+    let provers = Array.of_list (EcProvers.known_provers ()) in
     set_prover_info scope None None (Some provers)
 
   let set_default scope max provers =
     let provers =
       match provers with
-      | None -> List.filter EcWhy3.check_prover_name ["Alt-Ergo";"Z3";"Vampire";"Eprover";"Yices"]
-      | Some ps -> List.iter (fun s -> if not (EcWhy3.check_prover_name s) then raise (Unknown_prover s)) ps;ps
+      | None -> List.filter EcProvers.check_prover_name ["Alt-Ergo";"Z3";"Vampire";"Eprover";"Yices"]
+      | Some ps -> List.iter (fun s -> if not (EcProvers.check_prover_name s) then raise (Unknown_prover s)) ps;ps
     in
     let provers = Array.of_list provers in
     let time = 3 in
-    set_prover_info scope (Some max) (Some time) (Some provers) 
+    set_prover_info scope (Some max) (Some time) (Some provers)
 (*    set_all scope*)
 
-  let process scope pi = 
+  let process scope pi =
     let max  = pi.pprov_max in
     let time = pi.pprov_time in
-    let ns   = pi.pprov_names in 
-    let ns   = omap ns (List.map check_prover_name) in 
+    let ns   = pi.pprov_names in
+    let ns   = omap ns (List.map check_prover_name) in
     let ns   = omap ns Array.of_list in
     set_prover_info scope max time ns
 
   let mk_prover_info scope pi =
     let max  = pi.pprov_max in
     let time = pi.pprov_time in
-    let ns   = pi.pprov_names in 
-    let ns   = omap ns (List.map check_prover_name) in 
+    let ns   = pi.pprov_names in
+    let ns   = omap ns (List.map check_prover_name) in
     let ns   = omap ns Array.of_list in
     mk_prover_info scope max time ns
 
-  let full_check scope = 
-    { scope with 
-      sc_options = Check_mode.full_check scope.sc_options } 
+  let full_check scope =
+    { scope with
+      sc_options = Check_mode.full_check scope.sc_options }
 
-  let check_proof scope b = 
+  let check_proof scope b =
     { scope with
       sc_options = Check_mode.check_proof scope.sc_options b}
 
@@ -645,32 +645,32 @@ module Tactic = struct
   module TT = EcTyping
   module UE = EcUnify.UniEnv
 
-  type tac_error = 
+  type tac_error =
     | UnknownHypSymbol of symbol
     | UnknownAxiom of qsymbol
     | UnknownOperator of qsymbol
-    | BadTyinstance 
+    | BadTyinstance
     | NothingToIntro
-    | FormulaExpected 
+    | FormulaExpected
     | MemoryExpected
     | UnderscoreExpected
     | ModuleExpected
-    | ElimDoNotWhatToDo 
+    | ElimDoNotWhatToDo
     | NoCurrentGoal
 
   exception TacError of tac_error
 
-  let pp_tac_error fmt = 
-    function 
-      | UnknownHypSymbol s -> 
+  let pp_tac_error fmt =
+    function
+      | UnknownHypSymbol s ->
         Format.fprintf fmt "Unknown hypothesis or logical variable %s" s
-      | UnknownAxiom qs -> 
-        Format.fprintf fmt "Unknown axioms or hypothesis : %a" 
+      | UnknownAxiom qs ->
+        Format.fprintf fmt "Unknown axioms or hypothesis : %a"
           pp_qsymbol qs
-      | UnknownOperator qs -> 
-        Format.fprintf fmt "Unknown operator or logical variable %a" 
+      | UnknownOperator qs ->
+        Format.fprintf fmt "Unknown operator or logical variable %a"
           pp_qsymbol qs
-      | BadTyinstance -> 
+      | BadTyinstance ->
         Format.fprintf fmt "Invalid type instance"
       | NothingToIntro ->
         Format.fprintf fmt "Nothing to introduce"
@@ -689,57 +689,57 @@ module Tactic = struct
 
   let _ = EcPException.register (fun fmt exn ->
     match exn with
-    | TacError e -> pp_tac_error fmt e 
+    | TacError e -> pp_tac_error fmt e
     | _ -> raise exn)
 
   let error loc e = EcLocation.locate_error loc (TacError e)
-   
-  let process_tyargs env hyps tvi = 
+
+  let process_tyargs env hyps tvi =
     let ue = EcUnify.UniEnv.create (Some hyps.h_tvar) in
       omap tvi (TT.transtvi env ue)
 
-  let process_instanciate env hyps ({pl_desc = pq; pl_loc = loc} ,tvi) = 
-    let (p, ax) = 
+  let process_instanciate env hyps ({pl_desc = pq; pl_loc = loc} ,tvi) =
+    let (p, ax) =
       try EcEnv.Ax.lookup pq env
       with _ -> error loc (UnknownAxiom pq) in
     let args = process_tyargs env hyps tvi in
-    let args = 
+    let args =
       match ax.EcDecl.ax_tparams, args with
       | [], None -> []
       | [], Some _ -> error loc BadTyinstance
       | ltv, Some (UE.TVIunamed l) ->
           if not (List.length ltv = List.length l) then error loc BadTyinstance;
-          l 
+          l
       | ltv, Some (UE.TVInamed l) ->
-          let get id = 
-            try List.assoc (EcIdent.name id) l 
+          let get id =
+            try List.assoc (EcIdent.name id) l
             with _ -> error loc BadTyinstance in
-          List.map get ltv 
+          List.map get ltv
       | _, None -> error loc BadTyinstance in
-    p,args 
-    
-  let process_global loc env tvi g = 
+    p,args
+
+  let process_global loc env tvi g =
     let hyps = get_hyps g in
     let p, tyargs = process_instanciate env hyps tvi in
-    set_loc loc t_glob env p tyargs g 
+    set_loc loc t_glob env p tyargs g
 
-  let process_assumption loc env (pq,tvi) g = 
+  let process_assumption loc env (pq,tvi) g =
     let hyps,concl = get_goal g in
     match pq with
-    | None -> 
-        if (tvi <> None) then error loc BadTyinstance; 
-        let h  = 
-          try find_in_hyps env concl hyps 
+    | None ->
+        if (tvi <> None) then error loc BadTyinstance;
+        let h  =
+          try find_in_hyps env concl hyps
           with _ -> assert false in
         t_hyp env h g
     | Some pq ->
         match unloc pq with
         | ([],ps) when LDecl.has_hyp ps hyps ->
-            if (tvi <> None) then error pq.pl_loc BadTyinstance; 
+            if (tvi <> None) then error pq.pl_loc BadTyinstance;
             set_loc loc (t_hyp env (fst (LDecl.lookup_hyp ps hyps))) g
         | _ -> process_global loc env (pq,tvi) g
 
-  let process_intros env pis = 
+  let process_intros env pis =
     let mk_id s = EcIdent.create (odfl "_" s) in
     let ids = List.map (lmap mk_id) pis in
     t_intros env ids
@@ -753,7 +753,7 @@ module Tactic = struct
       | LD_hyp   _    -> env in
     List.fold_left add env hyps.h_local
 
-  let process_elim_arg env hyps oty a = 
+  let process_elim_arg env hyps oty a =
     let ue  = EcUnify.UniEnv.create (Some hyps.h_tvar) in
     let env = tyenv_of_hyps env hyps in
     match a.pl_desc, oty with
@@ -766,7 +766,7 @@ module Tactic = struct
       AAmem (TT.transmem env mem)
     | _, Some (GTmem _)->
       error a.pl_loc MemoryExpected
-    | EA_none, None -> 
+    | EA_none, None ->
       AAnode
     | EA_mp _mp, Some (GTmodty _) ->
       assert false (* not implemented *)
@@ -783,8 +783,8 @@ module Tactic = struct
 
   let process_form env hyps pf ty =
     process_form_opt env hyps pf (Some ty)
-      
-  let process_formula env g pf = 
+
+  let process_formula env g pf =
     let hyps = get_hyps g in
     process_form env hyps pf tbool
 
@@ -810,26 +810,26 @@ module Tactic = struct
     let (juc,fn), fgs =
       match pe.fp_kind with
       | FPNamed (pq,tvi) ->
-        begin match unloc pq with 
+        begin match unloc pq with
         | ([],ps) when LDecl.has_hyp ps hyps ->
           (* FIXME warning if tvi is not None *)
           let id,_ = LDecl.lookup_hyp ps hyps in
           mkn_hyp juc hyps id, []
-        | _ -> 
+        | _ ->
           let p,tys = process_instanciate env hyps (pq,tvi) in
           mkn_glob env juc hyps p tys, []
         end
-      | FPCut pf -> 
+      | FPCut pf ->
         let f = process_cut env g pf in
         let juc, fn = new_goal juc (hyps, f) in
-        (juc,fn), [fn] 
+        (juc,fn), [fn]
     in
     let (juc,an), ags = mkn_apply process_elim_arg env (juc,fn) args in
     (juc,an), fgs@ags
 
   let process_apply loc env pe (_,n as g) =
     let (juc,an), gs = process_mkn_apply process_formula env pe g in
-    set_loc loc (t_use env an gs) (juc,n) 
+    set_loc loc (t_use env an gs) (juc,n)
 
   let process_elim loc env pe (_,n as g) =
     let (juc,an), gs = process_mkn_apply process_formula env pe g in
@@ -844,25 +844,25 @@ module Tactic = struct
     let pi = Prover.mk_prover_info scope pi in
     t_trivial pi env g
 
-  let process_cut name env phi g = 
+  let process_cut name env phi g =
     let phi = process_formula env g phi in
-    t_on_last (t_cut env phi g) 
+    t_on_last (t_cut env phi g)
       (process_intros env [lmap (fun x -> Some x) name])
 
   let process_generalize env l =
-    let pr1 pf g = 
+    let pr1 pf g =
       let hyps = get_hyps g in
       match pf.pl_desc with
       | PFident({pl_desc = ([],s)},None) when LDecl.has_symbol s hyps ->
         let id = fst (LDecl.lookup s hyps) in
         t_generalize_hyp env id g
-      | _ -> 
+      | _ ->
         let f = process_form_opt env hyps pf None in
         t_generalize_form None env f g in
     t_lseq (List.rev_map pr1 l)
 
   let process_clear l g =
-    let hyps = get_hyps g in    
+    let hyps = get_hyps g in
     let toid ps =
       let s = ps.pl_desc in
       if LDecl.has_symbol s hyps then (fst (LDecl.lookup s hyps))
@@ -873,26 +873,26 @@ module Tactic = struct
   let process_exists env fs g =
     gen_t_exists process_elim_arg env fs g
 
-  let process_change env pf g = 
+  let process_change env pf g =
     let f = process_formula env g pf in
     set_loc pf.pl_loc (t_change env f) g
 
   let process_simplify env ri g =
     let hyps = get_hyps g in
-    let delta_p, delta_h = 
+    let delta_p, delta_h =
       match ri.pdelta with
       | None -> None, None
       | Some l ->
         let sop = ref Sp.empty and sid = ref EcIdent.Sid.empty in
-        let do1 ps = 
+        let do1 ps =
           match ps.pl_desc with
           | ([],s) when LDecl.has_symbol s hyps ->
             let id = fst (LDecl.lookup s hyps) in
             sid := EcIdent.Sid.add id !sid;
           | qs ->
-            let p = 
+            let p =
               try EcEnv.Op.lookup_path qs env
-              with _ -> error ps.pl_loc (UnknownOperator qs) in        
+              with _ -> error ps.pl_loc (UnknownOperator qs) in
             sop := Sp.add p !sop in
         List.iter do1 l;
         Some !sop, Some !sid in
@@ -903,12 +903,12 @@ module Tactic = struct
       EcReduction.zeta    = ri.pzeta;
       EcReduction.iota    = ri.piota;
       EcReduction.logic   = ri.plogic; } in
-    t_simplify env ri g 
+    t_simplify env ri g
 
   let process_elimT loc env (pf,qs) g =
     let p = set_loc qs.pl_loc (EcEnv.Ax.lookup_path qs.pl_desc) env in
     let f = process_form_opt env (get_hyps g) pf None in
-    t_seq (set_loc loc (t_elimT env f p)) 
+    t_seq (set_loc loc (t_elimT env f p))
       (t_simplify env EcReduction.beta_red) g
 
   let process_case loc env pf g =
@@ -917,25 +917,25 @@ module Tactic = struct
     | FhoareS _ ->
       let f = process_phl_formula env g pf in
       t_hoare_case f g
-    | FequivS _ -> 
+    | FequivS _ ->
       let f = process_prhl_formula env g pf in
-      t_equiv_case f g 
+      t_equiv_case f g
     | _ ->
       let f = process_formula env g pf in
       t_seq (set_loc loc (t_case env f))
         (t_simplify env EcReduction.betaiota_red) g
 
   let process_subst loc env ri g =
-    if ri = [] then t_subst_all env g 
+    if ri = [] then t_subst_all env g
     else
       let hyps = get_hyps g in
       let totac ps =
         let s = ps.pl_desc in
         try t_subst1 env (Some (fst (LDecl.lookup_var s hyps)))
-        with _ -> error ps.pl_loc (UnknownHypSymbol s) in    
+        with _ -> error ps.pl_loc (UnknownHypSymbol s) in
       let tacs = List.map totac ri in
-      set_loc loc (t_lseq tacs) g 
-        
+      set_loc loc (t_lseq tacs) g
+
   let process_app env k phi g =
     match k with
     | Single i ->
@@ -943,13 +943,13 @@ module Tactic = struct
       t_hoare_app i phi g
     | Double(i,j) ->
       let phi = process_prhl_formula env g phi in
-      t_equiv_app (i,j) phi g  
+      t_equiv_app (i,j) phi g
 
   let process_while env phi g =
     let concl = get_concl g in
-    if is_hoareS concl then 
-      t_hoare_while env (process_phl_formula env g phi) g 
-    else if is_equivS concl then 
+    if is_hoareS concl then
+      t_hoare_while env (process_phl_formula env g phi) g
+    else if is_equivS concl then
       t_equiv_while env (process_prhl_formula env g phi) g
     else cannot_apply "while" "the conclusion is not a hoare or a equiv"
 
@@ -969,10 +969,10 @@ module Tactic = struct
       let post = process_form qenv hyps post tbool in
       t_equiv_call env pre post g
     | _ -> cannot_apply "call" "the conclusion is not a hoare or a equiv"
-      
+
   let process_cond env side g =
     let concl = get_concl g in
-    if is_equivS concl then 
+    if is_equivS concl then
       t_equiv_cond env side g
     else if is_hoareS concl then
       match side with
@@ -984,18 +984,18 @@ module Tactic = struct
   let rec process_swap1 env info g =
     let side,pos = info.pl_desc in
     match side with
-    | None -> 
+    | None ->
       t_seq (process_swap1 env {info with pl_desc = (Some true, pos)})
         (process_swap1 env {info with pl_desc = (Some false, pos)}) g
-    | Some side -> 
-      let tac = 
-        match pos with 
+    | Some side ->
+      let tac =
+        match pos with
         | SKbase(p1,p2,p3) -> t_equiv_swap env side p1 p2 p3
-        | SKmove p -> 
+        | SKmove p ->
           if 0 < p then t_equiv_swap env side 1 2 (p+1)
-          else if p < 0 then 
-            let concl = get_concl g in 
-            let es = set_loc info.pl_loc destr_equivS concl in 
+          else if p < 0 then
+            let concl = get_concl g in
+            let es = set_loc info.pl_loc destr_equivS concl in
             let s = if side then es.es_sl else es.es_sr in
             let len = List.length s.s_node in
             t_equiv_swap env side (len+p) len len
@@ -1011,8 +1011,8 @@ module Tactic = struct
       in
       set_loc info.pl_loc tac g
 
-  let process_swap env info = 
-    t_lseq (List.map (process_swap1 env) info) 
+  let process_swap env info =
+    t_lseq (List.map (process_swap1 env) info)
 
 
   let process_rnd env bij_info g =
@@ -1125,15 +1125,15 @@ module Tactic = struct
 
     
   let process_phl loc env ptac g =
-    let t = 
+    let t =
       match ptac with
       | Pfun_def -> EcPhl.t_fun_def env
-      | Pskip    -> EcPhl.t_skip 
-      | Papp (k,phi) -> process_app env k phi 
-      | Pwp  k   -> t_wp env k 
-      | Prcond (side,b,i) -> t_rcond side b i 
-      | Pcond side   -> process_cond env side 
-      | Pwhile phi -> process_while env phi 
+      | Pskip    -> EcPhl.t_skip
+      | Papp (k,phi) -> process_app env k phi
+      | Pwp  k   -> t_wp env k
+      | Prcond (side,b,i) -> t_rcond side b i
+      | Pcond side   -> process_cond env side
+      | Pwhile phi -> process_while env phi
       | Pcall(pre,post) -> process_call env pre post
       | Pswap info -> process_swap env info
       | Prnd info -> process_rnd env info
@@ -1141,24 +1141,24 @@ module Tactic = struct
       | Pequivdeno info -> process_equiv_deno env info
     in
     set_loc loc t g
- 
-  let rec process_logic_tacs scope env (tacs:ptactics) (gs:goals) : goals = 
+
+  let rec process_logic_tacs scope env (tacs:ptactics) (gs:goals) : goals =
     match tacs with
     | [] -> gs
-    | {pl_desc = Psubgoal tacs1; pl_loc = loc } :: tacs2 ->  
-        let gs = 
-          set_loc loc 
+    | {pl_desc = Psubgoal tacs1; pl_loc = loc } :: tacs2 ->
+        let gs =
+          set_loc loc
             (t_subgoal (List.map (process_logic_tac scope env) tacs1)) gs in
         process_logic_tacs scope env tacs2 gs
     | tac1 :: tacs2 ->
         let gs = t_on_goals (process_logic_tac scope env tac1) gs in
-        process_logic_tacs scope env tacs2 gs 
+        process_logic_tacs scope env tacs2 gs
 
-  and process_logic_tac scope env (tac:ptactic) (g:goal) : goals = 
+  and process_logic_tac scope env (tac:ptactic) (g:goal) : goals =
     let loc = tac.pl_loc in
-    let tac = 
+    let tac =
       match unloc tac with
-      | Pidtac         -> t_id 
+      | Pidtac         -> t_id
       | Prepeat t      -> t_repeat (process_logic_tac scope env t)
       | Pdo (None,t)   -> 
         let tac = (process_logic_tac scope env t) in
@@ -1166,50 +1166,50 @@ module Tactic = struct
       | Pdo (Some i, t) -> t_do i (process_logic_tac scope env t)
       | Ptry t         -> t_try (process_logic_tac scope env t)
       | Passumption pq -> process_assumption loc env pq
-      | Ptrivial pi    -> process_trivial scope pi env 
-      | Pintro pi      -> process_intros env pi 
-      | Psplit         -> t_split env 
-      | Pexists fs     -> process_exists env fs 
-      | Pleft          -> t_left env 
-      | Pright         -> t_right env 
+      | Ptrivial pi    -> process_trivial scope pi env
+      | Pintro pi      -> process_intros env pi
+      | Psplit         -> t_split env
+      | Pexists fs     -> process_exists env fs
+      | Pleft          -> t_left env
+      | Pright         -> t_right env
       | Pelim pe       -> process_elim  loc env pe
       | Papply pe      -> process_apply loc env pe
       | Pcut (name,phi)-> process_cut name env phi
       | Pgeneralize l  -> process_generalize env l
       | Pclear l       -> process_clear l
-      | Prewrite ri    -> process_rewrite loc env ri 
+      | Prewrite ri    -> process_rewrite loc env ri
       | Psubst   ri    -> process_subst loc env ri
       | Psimplify ri   -> process_simplify env ri
-      | Pchange pf     -> process_change env pf 
-      | PelimT i       -> process_elimT loc env i 
-      | Pcase  i       -> process_case  loc env i 
-      | Pseq tacs      -> 
+      | Pchange pf     -> process_change env pf
+      | PelimT i       -> process_elimT loc env i
+      | Pcase  i       -> process_case  loc env i
+      | Pseq tacs      ->
           fun (juc,n) -> process_logic_tacs scope env tacs (juc,[n])
-      | Psubgoal _     -> assert false 
+      | Psubgoal _     -> assert false
 
 
       | Padmit         -> t_admit
-      | PPhl tac       -> process_phl loc env tac 
+      | PPhl tac       -> process_phl loc env tac
     in
     set_loc loc tac g
 
-  let process_logic scope env juc loc tacs = 
-    let (juc,n) = 
-      try get_first_goal juc 
+  let process_logic scope env juc loc tacs =
+    let (juc,n) =
+      try get_first_goal juc
       with _ -> error loc NoCurrentGoal in
     EcBaseLogic.upd_done (fst (process_logic_tacs scope env tacs (juc,[n])))
 
   let process scope tac =
     if Check_mode.check scope.sc_options then
-      let loc = match tac with | [] -> assert false | t::_ -> t.pl_loc in  
+      let loc = match tac with | [] -> assert false | t::_ -> t.pl_loc in
       match scope.sc_pr_uc with
       | [] -> error loc NoCurrentGoal
       | puc :: pucs ->
           let juc = process_logic scope scope.sc_env puc.puc_jdg loc tac in
-          { scope with 
+          { scope with
             sc_pr_uc = { puc with puc_jdg = juc } :: pucs }
     else scope
-end 
+end
 
 (* -------------------------------------------------------------------- *)
 module Ax = struct
@@ -1220,27 +1220,27 @@ module Ax = struct
   module TT = EcTyping
 
   let bind (scope : scope) ((x, ax) : _ * axiom) =
-   let res = 
+   let res =
     { scope with
         sc_env  = EcEnv.Ax.bind x ax scope.sc_env; }
       in
    res
 
-  let start_lemma scope name tparams concl = 
+  let start_lemma scope name tparams concl =
     let hyps = { EcBaseLogic.h_tvar = tparams;
                  EcBaseLogic.h_local = []; } in
     let puc = {
       puc_name = name ;
       puc_jdg = EcBaseLogic.open_juc (hyps, concl) } in
-    { scope with 
+    { scope with
       sc_pr_uc = puc :: scope.sc_pr_uc }
 
-  let save scope loc = 
+  let save scope loc =
     if Check_mode.check scope.sc_options then
       match scope.sc_pr_uc with
       | [] -> Tactic.error loc Tactic.NoCurrentGoal
       | { puc_name = name; puc_jdg = juc } :: pucs ->
-          let pr = EcBaseLogic.close_juc juc in        
+          let pr = EcBaseLogic.close_juc juc in
           let hyps,concl = (EcBaseLogic.get_goal (juc,0)).EcBaseLogic.pj_decl in
           let tparams = hyps.EcBaseLogic.h_tvar in
           assert (hyps.EcBaseLogic.h_local = []);
@@ -1254,23 +1254,23 @@ module Ax = struct
   let add (scope : scope) (ax : paxiom) =
     let ue = EcUnify.UniEnv.create None in
     let concl = TT.transformula scope.sc_env ue ax.pa_formula in
-    let concl = 
+    let concl =
       EcFol.Fsubst.uni (EcUnify.UniEnv.close ue) concl in
     let tparams = EcUnify.UniEnv.tparams ue in
     let check = Check_mode.check scope.sc_options in
     let loc = ax.pa_name.pl_loc in
 
     match ax.pa_kind with
-    | PILemma when check -> 
-        None, start_lemma scope (unloc ax.pa_name) tparams concl 
-    | PLemma when check -> 
+    | PILemma when check ->
+        None, start_lemma scope (unloc ax.pa_name) tparams concl
+    | PLemma when check ->
         let scope = start_lemma scope (unloc ax.pa_name) tparams concl in
-        let scope = 
+        let scope =
           Tactic.process scope
             [{ pl_loc = loc; pl_desc = Ptrivial empty_pprover }] in
         let name, scope = save scope loc in
         name, scope
-    | _ -> 
+    | _ ->
         let axd = { ax_tparams = tparams;
                     ax_spec = Some concl;
                     ax_kind = Axiom } in
