@@ -224,38 +224,32 @@ let subst_tydecl (s : _subst) (tyd : tydecl) =
   { tyd_params = params'; tyd_type = body }
 
 (* -------------------------------------------------------------------- *)
-let subst_op_kind (s : _subst) dom (kind : operator_kind) =
+let subst_op_kind (s : _subst) (kind : operator_kind) =
   match kind with 
-  | OB_oper (Some (params, body)) ->
+  | OB_oper (Some body) ->
       let s = e_subst_of_subst s in
-      let s, ds = EcTypes.add_locals s (List.combine params dom) in
-      let params = List.map fst ds in
       let body  = EcTypes.e_subst s body in
-      OB_oper (Some (params, body)) 
-  | OB_pred (Some (params, body)) ->   
+      OB_oper (Some body)
+  | OB_pred (Some body) ->   
       let s = f_subst_of_subst s in
-      let s, ds = EcFol.add_locals s (List.combine params dom) in
-      let params = List.map fst ds in
       let body  = EcFol.f_subst s body in
-      OB_pred (Some (params, body)) 
+      OB_pred (Some body) 
   | _ -> kind
 
 (* -------------------------------------------------------------------- *)
 let subst_op (s : _subst) (op : operator) =
-  let params = List.map EcIdent.fresh op.op_params in
-  let sty    = init_tparams s op.op_params params in
-  let dom    = List.map sty.s_ty op.op_dom in
-  let codom  = sty.s_ty op.op_codom in
-  let kind   = subst_op_kind sty op.op_dom (* the old one *) op.op_kind in
-  { op_params = params;
-    op_dom    = dom   ;
-    op_codom  = codom ;
+  let tparams = List.map EcIdent.fresh op.op_tparams in
+  let sty    = init_tparams s op.op_tparams tparams in
+  let ty     = sty.s_ty op.op_ty in
+  let kind   = subst_op_kind sty op.op_kind in
+  { op_tparams = tparams;
+    op_ty      = ty   ;
     op_kind   = kind  ; }
 
 (* -------------------------------------------------------------------- *)
 let subst_ax (s : _subst) (ax : axiom) =
-  let params = List.map EcIdent.fresh ax.ax_params in
-  let s      = init_tparams s ax.ax_params params in
+  let params = List.map EcIdent.fresh ax.ax_tparams in
+  let s      = init_tparams s ax.ax_tparams params in
   let spec   = 
     match ax.ax_spec with
     | None -> None
@@ -267,7 +261,7 @@ let subst_ax (s : _subst) (ax : axiom) =
     | Axiom   -> Axiom
     | Lemma _ -> Lemma None
   in
-    { ax_params = params;
+    { ax_tparams = params;
       ax_spec   = spec  ;
       ax_kind   = kind  ; }
 

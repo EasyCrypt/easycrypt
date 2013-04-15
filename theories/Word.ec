@@ -1,7 +1,7 @@
 require        Bool.
 require import Int.
 
-cnst length: int.
+op length: int.
 axiom length_pos: 0 <= length.
 
 (* A word only has the get operator: its size is fixed. *)
@@ -23,7 +23,7 @@ axiom set_get: forall w i j b,
   w.[i <- b].[j] = (i = j) ? b : w.[j].
 
 (* zeros *)
-cnst zeros: word.
+op zeros: word.
 axiom zeros_get: forall i,
   0 <= i => i < length =>
   zeros.[i] = false.
@@ -99,7 +99,7 @@ require import Distr.
 
 (* Uniform distribution on fixed-length words *)
 theory Dword.
-  cnst dword: word distr.
+  op dword: word distr.
 
   axiom supp_def: forall (w:word), in_supp w dword.
 

@@ -1207,8 +1207,8 @@ module NormMp = struct
       
   let norm_op env op = 
     match op.op_kind with
-    | OB_pred (Some (ids,f)) ->
-      { op with op_kind = OB_pred (Some(ids, norm_form env f)) }
+    | OB_pred (Some f) ->
+      { op with op_kind = OB_pred (Some(norm_form env f)) }
     | _ -> op
 
   let norm_ax env ax =
@@ -1334,14 +1334,14 @@ module Op = struct
 
   let reduce env p tys =
     let op = try by_path p env with _ -> assert false in
-    let s = EcFol.Fsubst.init_subst_tvar (EcTypes.Tvar.init op.op_params tys) in
-    let ids, f = 
+    let s = 
+      EcFol.Fsubst.init_subst_tvar (EcTypes.Tvar.init op.op_tparams tys) in
+    let f = 
       match op.op_kind with
-      | OB_oper(Some(ids,e)) -> (ids, EcFol.form_of_expr EcFol.mhr e)
+      | OB_oper(Some e) -> EcFol.form_of_expr EcFol.mhr e
       | OB_pred(Some idsf) -> idsf
       | _ -> raise NotReducible in
-    let bd = List.map2 (fun id ty -> id, GTty ty) ids op.op_dom in 
-    EcFol.f_subst s (f_lambda bd f)
+    EcFol.f_subst s f
     
 end
 
@@ -1396,7 +1396,7 @@ module Ax = struct
   let instanciate p tys env = 
     match by_path_opt p env with
     | Some ({ ax_spec = Some f } as ax) ->
-        Fsubst.subst_tvar (EcTypes.Tvar.init ax.ax_params tys) f
+        Fsubst.subst_tvar (EcTypes.Tvar.init ax.ax_tparams tys) f
     | _ -> raise (LookupFailure (`Path p)) 
 end
 
@@ -1635,8 +1635,9 @@ let initial =
     ["False"], EcWhy3.RDls, EcPath.basename EcCoreLib.p_false ] in
   let env, _ = import_w3 env Why3.Theory.bool_theory bool_rn in
   let add_bool sign env path = 
+    let ty = EcTypes.toarrow sign EcTypes.tbool in
     Op.bind_logical (EcPath.basename path) 
-      (mk_op [] sign EcTypes.tbool None) env in
+      (mk_op [] ty None) env in
   let env = add_bool [EcTypes.tbool] env EcCoreLib.p_not in
   let env = List.fold_left (add_bool [EcTypes.tbool;EcTypes.tbool]) env
       [EcCoreLib.p_and;EcCoreLib.p_anda; 

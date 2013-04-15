@@ -182,11 +182,11 @@ let filter_tvi = function
   | None -> fun _ -> true
   | Some (UniEnv.TVIunamed l) -> 
       let len = List.length l in
-      fun op -> List.length op.EcDecl.op_params = len
+      fun op -> List.length op.EcDecl.op_tparams = len
   | Some (UniEnv.TVInamed ls) -> fun op ->
       List.for_all 
         (fun (s,_) -> 
-          List.exists (fun id -> EcIdent.name id = s) op.EcDecl.op_params) ls
+          List.exists (fun id -> EcIdent.name id = s) op.EcDecl.op_tparams) ls
 
 let tfun_expected ue psig = 
   let tres = UniEnv.fresh_uid ue in
@@ -199,10 +199,9 @@ let select_op pred tvi env name ue psig =
     fti op in
   let ops = EcEnv.Op.all fop name env in
   let select (path, op) = 
-    let subue,(dom,codom),tys = 
-      UniEnv.freshensig ue op.EcDecl.op_params tvi (EcDecl.op_sig op) in
+    let subue,top, tys = 
+      UniEnv.freshen ue op.EcDecl.op_tparams tvi (EcDecl.op_ty op) in
     try 
-      let top = EcTypes.toarrow dom codom in
       let texpected = tfun_expected subue psig in
       unify env subue top texpected; 
       Some ((path,tys), top, subue) 

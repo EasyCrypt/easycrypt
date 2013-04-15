@@ -39,6 +39,8 @@
     "compute"     , COMPUTE    ;        (* KW: tactic *)
     "same"        , SAME       ;        (* KW: tactic *)
     "idtac"       , IDTAC      ;        (* KW: tactic *)
+    "try"         , TRY        ;        (* KW: tactic *)
+
     "assumption"  , ASSUMPTION ;        (* KW: tactic *)
     "intros"      , INTROS     ;        (* KW: tactic *)
     "split"       , SPLIT      ;        (* KW: tactic *)
@@ -78,7 +80,6 @@
     "proof"       , PROOF      ;        (* KW: global *)
     "save"        , SAVE       ;        (* KW: global *)
     "claim"       , CLAIM      ;        (* KW: global *)
-    "cnst"        , CNST       ;        (* KW: global *)
     "drop"        , DROP       ;        (* KW: global *)
     "end"         , END        ;        (* KW: global *)
     "import"      , IMPORT     ;        (* KW: global *)

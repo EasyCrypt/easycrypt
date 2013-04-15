@@ -2,10 +2,10 @@ require import Logic.
 
 type t.
 
-cnst b1 : bool.
-cnst b2 : bool.
-cnst e1 : t.
-cnst e2 : t.
+op b1 : bool.
+op b2 : bool.
+op e1 : t.
+op e2 : t.
 
 module M = {
   var x, y : t

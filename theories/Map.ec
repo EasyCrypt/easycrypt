@@ -8,7 +8,7 @@ require        Set.
 type ('a,'b) map = ('a,'b option) Map_why.map.
 
 (* empty, get and set: note that get returns an option *)
-cnst empty:('a,'b) map = Map_why.const None.
+op empty:('a,'b) map = Map_why.const None.
 op __get(m:('a,'b) map, x:'a): 'b option = Map_why.__get m x.
 op __set(m:('a,'b) map, x:'a, y:'b): ('a,'b) map = Map_why.__set m x (Some y).
 

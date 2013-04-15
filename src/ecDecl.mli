@@ -17,24 +17,21 @@ val tydecl_dump : tydecl -> dnode
 (* -------------------------------------------------------------------- *)
 type locals = EcIdent.t list 
 
-type 'b operator_info = (locals * 'b) option
-
 type operator_kind = 
-  | OB_oper of EcTypes.expr operator_info
-  | OB_pred of EcFol.form operator_info
+  | OB_oper of EcTypes.expr option
+  | OB_pred of EcFol.form option
 
 type operator = {
-  op_params : EcIdent.t list;
-  op_dom    : EcTypes.dom;        
-  op_codom  : EcTypes.ty;
-  op_kind   : operator_kind;
+  op_tparams : EcIdent.t list;
+  op_ty      : EcTypes.ty;        
+  op_kind    : operator_kind;
 }
 
-val op_sig : operator -> tysig
+val op_ty : operator -> ty
 val is_pred : operator -> bool
 
-val mk_op   : EcIdent.t list -> dom -> ty -> expr operator_info -> operator
-val mk_pred : EcIdent.t list -> dom -> form operator_info -> operator
+val mk_op   : EcIdent.t list -> ty -> expr option -> operator
+val mk_pred : EcIdent.t list -> ty list -> form option -> operator
 
 val op_dump : operator -> dnode
 
@@ -44,7 +41,7 @@ type axiom_kind =
   | Lemma of EcBaseLogic.judgment option (* None means cloned lemma *)
 
 type axiom = {
-  ax_params : EcIdent.t list;
+  ax_tparams : EcIdent.t list;
   ax_spec   : EcFol.form option;
   ax_kind   : axiom_kind
 }

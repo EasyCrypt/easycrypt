@@ -399,6 +399,16 @@ let rec ty_fun_app env ue tf targs =
       (try EcUnify.unify env ue t1 dom with _ -> assert false);
       ty_fun_app env ue codom targs
 
+let transbinding env ue bd =
+  let trans_bd1 env (xs, pty) = 
+    let ty = transty tp_relax env ue pty in
+    let xs = List.map (fun x -> EcIdent.create x.pl_desc, ty) xs in
+    let env = EcEnv.Var.bind_locals xs env in
+    env, xs in
+  let env, bd = List.map_fold trans_bd1 env bd in
+  let bd = List.flatten bd in
+  env, bd
+
 let transexp (env : EcEnv.env) (ue : EcUnify.unienv) e =
   let rec transexp (env : EcEnv.env) (e : pexpr) =
     let loc = e.pl_loc in
@@ -427,8 +437,8 @@ let transexp (env : EcEnv.env) (ue : EcUnify.unienv) e =
         let ops  = select_op env name ue tvi esig in
         begin match ops with
         | [] ->
-            let esig = Tuni.subst_dom (EcUnify.UniEnv.asmap ue) esig in
-              tyerror loc env (UnknownVarOrOp (name, esig))
+          let esig = Tuni.subst_dom (EcUnify.UniEnv.asmap ue) esig in
+          tyerror loc env (UnknownVarOrOp (name, esig))
 
         | _ :: _ :: _ ->
             let esig = Tuni.subst_dom (EcUnify.UniEnv.asmap ue) esig in
@@ -466,6 +476,11 @@ let transexp (env : EcEnv.env) (ue : EcUnify.unienv) e =
         unify_or_fail env ue pc.pl_loc tyc tbool;
         unify_or_fail env ue pe2.pl_loc ty2 ty1;
         (e_if c e1 e2, ty1)
+
+    | PElambda(bd, pe) ->
+      let env, xs = transbinding env ue bd in
+      let e,ty = transexp env pe in
+      (e_lam xs e, ty)
 
   in
     transexp env e
@@ -1297,9 +1312,9 @@ let transform_opt env ue pf tt =
         f_exists xs f
 
     | PFlambda (xs, f1) ->
-        let env, xs = trans_fbind env ue xs in
+        let env, xs = transbinding env ue xs in
         let f = transf env f1 in
-        f_lambda xs f
+        f_lambda (List.map (fun (x,ty) -> (x,GTty ty)) xs) f
 
     | PFprob (gp, args, m, event) ->
         let fpath = trans_gamepath env gp in
@@ -1355,21 +1370,33 @@ let transform_opt env ue pf tt =
         f_equivF pre fpath1 fpath2 post
 
   and trans_fbind env ue decl = 
-    let trans1 env ({ pl_desc = x }, pgty) =
-      let x = EcIdent.create x in
+    let trans1 env (xs, pgty) =
         match pgty with
         | PGTY_Type ty -> 
-            let ty = transty tp_relax env ue ty in
-              (EcEnv.Var.bind_local x ty env, (x, GTty ty))
+          let ty = transty tp_relax env ue ty in
+          let xs = List.map (fun x -> EcIdent.create x.pl_desc, ty) xs in
+          let env = EcEnv.Var.bind_locals xs env in
+          let xs = List.map (fun (x,ty) -> x,GTty ty) xs in
+          env, xs
   
         | PGTY_ModTy mi ->
-            let (mi, _) = transmodtype env mi in
-              (EcEnv.Mod.bind_local x mi env, (x, GTmodty mi))
-  
+          let (mi, _) = transmodtype env mi in
+          let ty = GTmodty mi in
+          let add1 env x = 
+            let x = EcIdent.create x.pl_desc in
+            let env = EcEnv.Mod.bind_local x mi env in
+            env, (x, ty) in
+          List.map_fold add1 env xs 
+
         | PGTY_Mem ->
-            (EcEnv.Memory.push (EcMemory.abstract x) env, (x, GTmem None))
-    in
-      List.map_fold trans1 env decl
+          let ty = GTmem None in
+          let add1 env x = 
+            let x = EcIdent.create x.pl_desc in
+            let env = EcEnv.Memory.push (EcMemory.abstract x) env in
+            env, (x, ty) in
+          List.map_fold add1 env xs in
+    let env, bd = List.map_fold trans1 env decl in
+    env, List.flatten bd
 
   and select_sided_op env ((qs, x) as name) ue tvi psig =
     let locals =

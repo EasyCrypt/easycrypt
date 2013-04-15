@@ -55,11 +55,27 @@ module M1 = {
 
 }.
 
-lemma toto : forall x, p (x + x + x + x + x + x + x + x + x + x + x + x ) (x + x + x + x+ x) = x
+op p20 : int -> int -> int -> int -> int -> int -> int -> int -> int -> int -> int -> int -> int -> int -> int -> int -> int -> int -> int -> int -> int -> int -> int -> int.
+
+lemma toto1 : 
+  p (p20 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1) 
+    (p20 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1) = 1
 proof.
 
-.
-
+lemma toto : forall x, p (x + x + x + x + x + x + x + x + x + x + x + x ) (x + x + x + x+ x) = x
+proof.
+(*
+Require Import ZArith.
+Open Scope Z_scope.
+Parameter p : Z -> Z -> Z -> Z.
+Lemma foo : forall (b:bool) x, 
+ p 
+  (if b then x + x + x + x + x + x + x + x + x + x + x + x + x 
+   else x + x + x + x + x + x + x + x + x + x + x + x + x) 
+ ( x + x + x + x+ x + x+ x+ x+x + x + x + x+ x + x+ x+ x+x + x + x + 
+   x+ x + x+ x+ x+x + x + x + x+ x + x+ x+ x+ x) x = 
+  x + x + x + x + x + x + x + x + x + x + x + x.
+*)
 
 lemma foo1 : forall x, (x+x) + x = x + (x + x)
 proof.

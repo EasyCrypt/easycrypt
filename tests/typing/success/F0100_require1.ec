@@ -1,6 +1,6 @@
 type T.
 
-cnst t : T.
+op t : T.
 
 pred P : T.
 

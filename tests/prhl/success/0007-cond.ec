@@ -2,8 +2,8 @@ require import Logic.
 
 type t.
 
-cnst e1 : t.
-cnst e2 : t.
+op e1 : t.
+op e2 : t.
 
 module M = {
   var x : t

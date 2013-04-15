@@ -1,14 +1,14 @@
 require import Int.
 require import Real.
 
-cnst c : real.
+op c : real.
 
 module type I = {
   fun f (x : int) : int
 }.
 
 module G(X : I) = {
-  fun f(x : int, y : int) : int = {
+  fun f(x y : int) : int = {
     return x + y;
   }
 }.

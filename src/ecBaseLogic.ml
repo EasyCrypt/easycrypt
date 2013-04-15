@@ -378,3 +378,7 @@ let t_repeat t g =
     | Some (juc, ln) ->
       t_subgoal (List.map (fun _ -> aux) ln) (juc,ln) in
   aux g
+
+let rec t_do n t =
+  if n <= 0 then t_id
+  else t_seq t (t_do (n-1) t)

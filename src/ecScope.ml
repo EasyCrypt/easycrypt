@@ -213,27 +213,23 @@ module Op = struct
     let op = op.pl_desc and loc = op.pl_loc in
 
     let ue     = ue_for_decl scope.sc_env (loc, op.po_tyvars) in
-    let tp     =  TT.tp_relax in
-    let dom    = TT.transtys tp scope.sc_env ue (odfl [] op.po_dom) in
-    let codom  = TT.transty tp scope.sc_env ue op.po_codom in
-    let body   =
-      match op.po_body with
-      | None -> None
-      | Some(xs, body) ->
-          let xs = List.map EcIdent.create (unlocs xs) in
-          let env =
-            EcEnv.Var.bind_locals (List.combine xs dom) scope.sc_env
-          in
-          let body = TT.transexpcast env ue codom body in
-          Some (xs, body) in
-
+    let tp     = TT.tp_relax in
+    let ty, body = 
+      match op.po_def with
+      | POabstr pty -> TT.transty tp scope.sc_env ue pty, None
+      | POconcr(bd,pty,pe) ->
+        let env = scope.sc_env in
+        let codom = TT.transty tp env ue pty in 
+        let env, xs = TT.transbinding env ue bd in
+        let body = TT.transexpcast env ue codom pe in
+        let lam = EcTypes.e_lam xs body in
+        lam.EcTypes.e_ty, Some lam in
     let uni          = Tuni.subst (EcUnify.UniEnv.close ue) in
-    let body         = omap body (fun (ids, body) -> ids, e_mapty uni body) in
-    let (dom, codom) = (List.map uni dom, uni codom) in
+    let body         = omap body (e_mapty uni) in
+    let ty           = uni ty in
     let tparams      = EcUnify.UniEnv.tparams ue in 
-    let tyop         = EcDecl.mk_op tparams dom codom body in
-
-      bind scope (unloc op.po_name, tyop)
+    let tyop         = EcDecl.mk_op tparams ty body in
+    bind scope (unloc op.po_name, tyop)
 end
 
 (* -------------------------------------------------------------------- *)
@@ -242,23 +238,21 @@ module Pred = struct
 
   let add (scope : scope) (op : ppredicate located) =
     let op = op.pl_desc and loc = op.pl_loc in
-
-    let ue   = ue_for_decl scope.sc_env (loc, op.pp_tyvars) in
-    let tp   =  TT.tp_relax in 
-    let dom  = TT.transtys tp scope.sc_env ue (odfl [] op.pp_dom) in
-    let body =
-      match op.pp_body with
-      | None -> None
-      | Some(xs, body) ->
-          let xs = List.map EcIdent.create (unlocs xs) in
-          let env = EcEnv.Var.bind_locals (List.combine xs dom) scope.sc_env in
-          let body = TT.transformula env ue body in
-
-          Some(xs, body)
-    in
-
+    let ue     = ue_for_decl scope.sc_env (loc, op.pp_tyvars) in
+    let tp     = TT.tp_relax in
+    let dom, body = 
+      match op.pp_def with
+      | PPabstr ptys -> 
+        List.map (TT.transty tp scope.sc_env ue) ptys, None
+      | PPconcr(bd,pe) ->
+        let env, xs = TT.transbinding scope.sc_env ue bd in
+        let body = TT.transformula env ue pe in
+        let dom = List.map snd xs in
+        let xs = List.map (fun (x,ty) -> x, EcFol.GTty ty) xs in
+        let lam = EcFol.f_lambda xs body in
+        dom, Some lam in
     let uni     = Tuni.subst (EcUnify.UniEnv.close ue) in
-    let body    = omap body (fun (ids, body) -> ids, EcFol.Fsubst.mapty uni body) in
+    let body    = omap body (EcFol.Fsubst.mapty uni) in
     let dom     = List.map uni dom in
     let tparams = EcUnify.UniEnv.tparams ue in
     let tyop    = EcDecl.mk_pred tparams dom body in
@@ -499,7 +493,9 @@ module Theory = struct
         | CTh_operator (x, ({ op_kind = OB_oper None } as oopd)) -> begin
             match Msym.find_opt x ovrds.evc_ops with
             | None -> EcEnv.Op.bind x (EcSubst.subst_op subst oopd) scenv
-            | Some (locals, opbody) ->
+            | Some (_locals, _opbody) ->
+              assert false (* FIXME *)
+(*
               let refop = EcEnv.Op.by_path (EcPath.pqname opath x) scenv in
               let newop = EcSubst.subst_op subst refop in
 
@@ -508,17 +504,18 @@ module Theory = struct
 
               let locals = List.map (EcIdent.create -| unloc) locals in
               let benv   = EcEnv.Var.bind_locals (List.combine locals newop.op_dom) scenv in
-              let ue     = EcUnify.UniEnv.create (Some newop.op_params) in
+              let ue     = EcUnify.UniEnv.create (Some newop.op_tparams) in
 
               let opbody = EcTyping.transexpcast benv ue newop.op_codom opbody in
 
-                if List.length (EcUnify.UniEnv.tparams ue) <> List.length newop.op_params then
+                if List.length (EcUnify.UniEnv.tparams ue) <> List.length newop.op_tparams then
                   failwith "body-less-generic";
 
               let newop =
                 { newop with op_kind = OB_oper (Some (locals, opbody)) }
               in
                 EcEnv.Op.bind x newop scenv
+*)
           end
 
         | CTh_operator (x, oopd) ->
@@ -707,7 +704,7 @@ module Tactic = struct
       with _ -> error loc (UnknownAxiom pq) in
     let args = process_tyargs env hyps tvi in
     let args = 
-      match ax.EcDecl.ax_params, args with
+      match ax.EcDecl.ax_tparams, args with
       | [], None -> []
       | [], Some _ -> error loc BadTyinstance
       | ltv, Some (UE.TVIunamed l) ->
@@ -1162,6 +1159,12 @@ module Tactic = struct
     let tac = 
       match unloc tac with
       | Pidtac         -> t_id 
+      | Prepeat t      -> t_repeat (process_logic_tac scope env t)
+      | Pdo (None,t)   -> 
+        let tac = (process_logic_tac scope env t) in
+        t_seq tac (t_repeat tac)
+      | Pdo (Some i, t) -> t_do i (process_logic_tac scope env t)
+      | Ptry t         -> t_try (process_logic_tac scope env t)
       | Passumption pq -> process_assumption loc env pq
       | Ptrivial pi    -> process_trivial scope pi env 
       | Pintro pi      -> process_intros env pi 
@@ -1241,7 +1244,7 @@ module Ax = struct
           let hyps,concl = (EcBaseLogic.get_goal (juc,0)).EcBaseLogic.pj_decl in
           let tparams = hyps.EcBaseLogic.h_tvar in
           assert (hyps.EcBaseLogic.h_local = []);
-          let axd = { ax_params = tparams;
+          let axd = { ax_tparams = tparams;
                       ax_spec = Some concl;
                       ax_kind = Lemma (Some pr) } in
           let scope = { scope with sc_pr_uc = pucs } in
@@ -1268,7 +1271,7 @@ module Ax = struct
         let name, scope = save scope loc in
         name, scope
     | _ -> 
-        let axd = { ax_params = tparams;
+        let axd = { ax_tparams = tparams;
                     ax_spec = Some concl;
                     ax_kind = Axiom } in
         Some (unloc ax.pa_name), bind scope (unloc ax.pa_name, axd)

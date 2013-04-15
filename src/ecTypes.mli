@@ -20,6 +20,8 @@ and ty_node =
   | Tconstr of EcPath.path * ty list
   | Tfun    of ty * ty
 
+type dom = ty list
+
 val ty_equal : ty -> ty -> bool
 val ty_hash  : ty -> int 
 
@@ -29,20 +31,16 @@ val ttuple  : ty list -> ty
 val tconstr : EcPath.path -> ty list -> ty
 val tfun    : ty -> ty -> ty
 
-type dom   = ty list
-type tysig = dom * ty 
-
 (* -------------------------------------------------------------------- *)
 val tunit      : ty
 val tbool      : ty
 val tint       : ty
 val treal      : ty
 val tdistr     : ty -> ty
-val toarrow    : dom -> ty -> ty
+val toarrow    : ty list -> ty -> ty
 
 (* -------------------------------------------------------------------- *)
 val ty_dump  : ty -> EcDebug.dnode
-val dom_dump : dom -> EcDebug.dnode
 
 (* -------------------------------------------------------------------- *)
 type ty_subst = {
@@ -61,7 +59,6 @@ module Tuni : sig
   val subst_dom : ty Muid.t -> dom -> dom
   val occur     : uid -> ty -> bool
   val fv        : ty -> Suid.t
-  val fv_sig    : tysig -> Suid.t
 end
 
 module Tvar : sig
@@ -69,7 +66,6 @@ module Tvar : sig
   val subst   : ty Mid.t -> ty -> ty
   val init    : EcIdent.t list -> ty list -> ty Mid.t
   val fv      : ty -> Sid.t
-  val fv_sig  : tysig -> Sid.t
 end
 
 (* -------------------------------------------------------------------- *)
@@ -123,6 +119,7 @@ type expr = private {
 }
 
 and expr_node =
+  | Elam   of (EcIdent.t * ty) list * expr (* lambda expression *)
   | Eint   of int                        (* int. literal          *)
   | Elocal of EcIdent.t                  (* let-variables         *)
   | Evar   of prog_var                   (* module variable       *)
@@ -150,7 +147,7 @@ val e_app      : expr -> expr list -> ty -> expr
 val e_let      : lpattern -> expr -> expr -> expr
 val e_tuple    : expr list -> expr
 val e_if       : expr -> expr -> expr -> expr
-
+val e_lam      : (EcIdent.t * ty) list -> expr -> expr
 (* -------------------------------------------------------------------- *)
 val e_map :
      (ty     -> ty    ) (* 1-subtype op. *)

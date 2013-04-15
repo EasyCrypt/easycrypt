@@ -1,6 +1,6 @@
 type 'a list.
-cnst __nil ['a] : 'a list.
+op __nil ['a] : 'a list.
 
-cnst c1 : int list = [].
-cnst c2 : _ = [<:int>].
-cnst c3 : _ = [<:'a=int>]. 
+op c1 : int list = [].
+op c2 : _ = [<:int>].
+op c3 : _ = [<:'a=int>]. 

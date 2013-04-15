@@ -36,6 +36,21 @@ type pty_r =
   | PTvar       of psymbol
   | PTapp       of pqsymbol * pty list
   | PTfun       of pty * pty
+and pty       = pty_r       located
+
+type ptyannot_r = 
+  | TVIunamed of pty list
+  | TVInamed  of (psymbol * pty) list
+and ptyannot  = ptyannot_r  located
+
+type plpattern_r =
+  | LPSymbol of psymbol
+  | LPTuple  of psymbol list
+and plpattern = plpattern_r located
+
+
+type ptybinding  = psymbol list * pty
+and ptybindings = ptybinding list
 
 and pexpr_r =
   | PEint      of int                               (* int. literal       *)
@@ -44,27 +59,17 @@ and pexpr_r =
   | PElet      of plpattern * pexpr * pexpr         (* let binding        *)
   | PEtuple    of pexpr list                        (* tuple constructor  *)
   | PEif       of pexpr * pexpr * pexpr             (* _ ? _ : _          *)
+  | PElambda   of ptybindings * pexpr
+and pexpr     = pexpr_r     located
 
-and ptyannot_r = 
-  | TVIunamed of pty list
-  | TVInamed  of (psymbol * pty) list
+(* -------------------------------------------------------------------- *)
 
-and plpattern_r =
-  | LPSymbol of psymbol
-  | LPTuple  of psymbol list
-
-and plvalue_r =
+type plvalue_r =
   | PLvSymbol of pqsymbol
   | PLvTuple  of pqsymbol list
   | PLvMap    of pqsymbol * ptyannot option * pexpr
-
-and pty       = pty_r       located
-and pexpr     = pexpr_r     located
-and plpattern = plpattern_r located
 and plvalue   = plvalue_r   located
-and ptyannot  = ptyannot_r  located
 
-(* -------------------------------------------------------------------- *)
 type pinstr =
   | PSasgn   of plvalue * pexpr
   | PSrnd    of plvalue * pexpr
@@ -131,15 +136,6 @@ and pfunction_body = {
 }
 
 (* -------------------------------------------------------------------- *)
-type poperator = {
-  po_name   : psymbol;
-  po_tyvars : psymbol list option;
-  po_dom    : pty list option;
-  po_codom  : pty;  
-  po_body   : (psymbol list * pexpr) option;
-}
-
-(* -------------------------------------------------------------------- *)
 type ptydecl = {
   pty_name   : psymbol;
   pty_tyvars : psymbol list;
@@ -162,7 +158,7 @@ and pformula_r =
   | PFlet    of plpattern * pformula * pformula
   | PFforall of pgtybindings * pformula
   | PFexists of pgtybindings * pformula
-  | PFlambda of pgtybindings * pformula
+  | PFlambda of ptybindings * pformula
 
   (* for claims *)
   | PFhoareS of pformula * pfunction_body * pformula
@@ -170,7 +166,7 @@ and pformula_r =
   | PFequivF of pformula * (pgamepath * pgamepath) * pformula
   | PFprob   of pgamepath * (pformula list) * pmemory * pformula
 
-and pgtybinding  = psymbol * pgty
+and pgtybinding  = psymbol list * pgty
 and pgtybindings = pgtybinding list
 
 and pgty =
@@ -179,24 +175,35 @@ and pgty =
 | PGTY_Mem
 
 (* -------------------------------------------------------------------- *)
+
+type pop_def =
+  | POabstr of pty
+  | POconcr of ptybindings * pty * pexpr
+
+type poperator = {
+  po_name   : psymbol;
+  po_tyvars : psymbol list option;
+  po_def    : pop_def
+}
+
+type ppred_def = 
+  | PPabstr of pty list
+  | PPconcr of ptybindings * pformula  
+
+type ppredicate = {
+  pp_name   : psymbol;
+  pp_tyvars : psymbol list option;
+  pp_def    : ppred_def;
+}
+
+
+(* -------------------------------------------------------------------- *)
 type paxiom_kind = PAxiom | PLemma | PILemma
 
 type paxiom = {
   pa_name    : psymbol;
   pa_formula : pformula;
   pa_kind : paxiom_kind;
-}
-
-(* -------------------------------------------------------------------- *)
-type 'a abstr_def = 
-  | AbstrDef of pty list option
-  | ConcrDef of (psymbol *pty) list * 'a 
-
-type ppredicate = {
-  pp_name   : psymbol;
-  pp_tyvars : psymbol list option;
-  pp_dom    : pty list option;
-  pp_body   : (psymbol list * pformula) option;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -262,6 +269,9 @@ type ptactic = ptactic_r located
 
 and ptactic_r = 
   | Pidtac
+  | Prepeat     of ptactic  
+  | Pdo         of int option * ptactic (* None means do 1 then repeat *)
+  | Ptry        of ptactic 
   | Passumption of (pqsymbol option * ptyannot option)
   | Ptrivial    of pprover_infos
   | Pintro      of posymbol list  

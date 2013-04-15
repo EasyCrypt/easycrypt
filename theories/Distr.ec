@@ -66,7 +66,7 @@ end Dunit.
 
 (* Uniform distribution on (closed) integer intervals *)
 theory Dinter.
-  op dinter: (int,int) -> int distr.
+  op dinter: int -> int -> int distr.
 
   axiom supp_def: forall i j x,
     in_supp x (dinter i j) <=> i <= x /\ x <= j.
@@ -111,7 +111,7 @@ end Dscale.
 
 (* Laplacian *) (* TODO: This is drafty! *)
 theory Dlap.
-  op dlap: (int,real) -> int distr.
+  op dlap: int -> real -> int distr.
 
   axiom in_supp: forall mean scale x, 
     0%r <= scale => in_supp x (dlap mean scale).

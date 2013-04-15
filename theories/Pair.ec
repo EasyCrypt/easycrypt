@@ -9,7 +9,7 @@ require import Distr.
 
 (* Product distribution *)
 theory Dprod.
-  op dprod:('a distr,'b distr) -> ('a * 'b) distr.
+  op dprod: 'a distr -> 'b distr -> ('a * 'b) distr.
   
   axiom supp_def: forall (d1:'a distr) (d2:'b distr) p, 
     in_supp p (dprod d1 d2) <=>

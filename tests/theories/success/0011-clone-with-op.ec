@@ -1,7 +1,7 @@
 require import Int.
 
 theory T.
-  cnst myop : int.
+  op myop : int.
 end T.
 
-clone T as U with cnst myop = 0.
+clone T as U with op myop = 0.

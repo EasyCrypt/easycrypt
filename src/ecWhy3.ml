@@ -667,7 +667,7 @@ let import_w3_ls rn path (env,rb,z) ls =
   let wparams = Ty.Stv.elements (Term.ls_ty_freevars ls) in
   let params = List.map (Wtvm.get tvm) wparams in
   let eid = Renaming.get_ls rn ls in
-  let op = mk_op params dom (force_bool codom) None in
+  let op = mk_op params (toarrow dom (force_bool codom)) None in
   let p = EcPath.pqname path eid in
   let odecl = mk_highorder_func ls in
   let env = add_w3_ls env p ls wparams odecl in 
@@ -704,7 +704,7 @@ let import_w3_pr rn path (env,rb,z as envld) k pr t =
         try Some (import Term.Mvs.empty t);
         with CanNotTranslateW3Ec -> None in
       let ax = { 
-        ax_params = Wtvm.tparams tvm; (* FIXME assert unicity of string *)
+        ax_tparams = Wtvm.tparams tvm; (* FIXME assert unicity of string *)
         ax_spec = spec;
         ax_kind = if k = Decl.Plemma then assert false (*FIXME Lemma *)
         else Axiom } in
@@ -1235,29 +1235,51 @@ let trans_form env vm f =
   let f = trans_form vm f in
   !env, !rb, f
 
-let trans_oper_body env vm ls = function
-  | OB_oper None | OB_pred None -> env,[],Decl.create_param_decl ls
-  | OB_oper (Some (ids,body)) ->
-      let ids, vm = add_ids vm ids ls.Term.ls_args in
-      let body = EcFol.form_of_expr EcFol.mhr body in
-      let env,rb,e = trans_form env vm body in
-      let e = if ls.Term.ls_value = None then force_prop e else e in
-      env,rb,Decl.create_logic_decl [Decl.make_ls_defn ls ids e]
-  | OB_pred (Some(ids,body) ) ->
-      let ids,vm = add_ids vm ids ls.Term.ls_args in
-      let env,rb,e = trans_form env vm body in
-      let e = force_prop e in 
-      env,rb,Decl.create_logic_decl [Decl.make_ls_defn ls ids e]
+let destr_ty_fun ty =
+  let rec aux tys codom =
+    match codom.Ty.ty_node with
+    | Ty.Tyapp(ts,[dom;codom]) when Ty.ts_equal ts Ty.ts_func ->
+      aux (dom::tys) codom
+    | _ -> List.rev tys, codom in
+  aux [] ty
+
+let trans_oper_body env vm ty body = 
+  let body = 
+    match body with
+    | OB_oper o -> omap o (EcFol.form_of_expr EcFol.mhr)
+    | OB_pred o -> o in
+  match body with
+  | None ->
+    let ty = trans_ty env vm ty in    
+    let dom, codom = destr_ty_fun ty in
+    let codom = if Ty.ty_equal codom Ty.ty_bool then None else Some codom in
+    env, [], dom, codom, None
+  | Some body ->
+    let bd, body =
+      match body.f_node with
+      | Fquant(Llambda,bd,f) -> bd, f
+      | _ -> [], body in
+    let ids, dom = List.split bd in
+    let dom = trans_gtys env vm dom in
+    let vs, vm = add_ids vm ids dom in
+    let env,rb,f = trans_form env vm body in
+    let f = 
+      if Ty.oty_equal f.Term.t_ty (Some Ty.ty_bool) then
+        force_prop f 
+      else f in
+    env, rb, dom, f.Term.t_ty, Some(vs,f)
 
 let trans_oper env path op = 
-  let wparams,vm = trans_typarams empty_vmap op.op_params in
+  let wparams,vm = trans_typarams empty_vmap op.op_tparams in
   let pid = preid_p path in
-  let dom = trans_tys env vm op.op_dom in
-  let codom = trans_ty env vm op.op_codom in
-  let codom = if Ty.ty_equal codom Ty.ty_bool then None else Some codom in
+  let env, rb, dom, codom, body = trans_oper_body env vm op.op_ty op.op_kind in
   let ls = Term.create_lsymbol pid dom codom in
-  let env, rb, body = trans_oper_body env vm ls op.op_kind in
-  env, rb, ls, wparams, body
+  let decl = 
+    match body with
+    | None -> Decl.create_param_decl ls
+    | Some(ids,f) ->
+      Decl.create_logic_decl [Decl.make_ls_defn ls ids f] in
+  env, rb, ls, wparams, decl
 
 let add_ty env path td =
   let ts = trans_tydecl env path td in
@@ -1273,7 +1295,7 @@ let add_op env path op =
 
 let add_ax env path ax =
   let pr = Decl.create_prsymbol (preid_p path) in
-  let _,vm = trans_typarams empty_vmap ax.ax_params in
+  let _,vm = trans_typarams empty_vmap ax.ax_tparams in
   match ax.ax_spec with
   | None -> assert false
   | Some f ->

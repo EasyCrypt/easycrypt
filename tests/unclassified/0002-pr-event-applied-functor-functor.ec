@@ -1,5 +1,5 @@
 module type J = {
-  var b:bool
+(*  var b:bool *)
 }.
 
 module type I(X:J) = {
@@ -17,7 +17,7 @@ module G(X:I) = {
 }.
 
 module M: J = {
-  var b:bool
+(*  var b:bool *)
 }.
 
 cnst c:real.

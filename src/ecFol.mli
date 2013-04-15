@@ -16,6 +16,8 @@ type gty =
   | GTmodty of module_type
   | GTmem   of EcMemory.memtype
 
+val destr_gty : gty -> EcTypes.ty
+
 type quantif = 
   | Lforall
   | Lexists

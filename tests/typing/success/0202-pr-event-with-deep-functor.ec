@@ -1,7 +1,7 @@
 require import Int.
 require import Real.
 
-cnst c : real.
+op c : real.
 
 module type I = {
   fun f (x : int) : int 

@@ -61,6 +61,9 @@ val transtys :
 
 val transtvi : EcEnv.env -> EcUnify.unienv -> ptyannot -> EcUnify.UniEnv.tvar_inst_kind
 
+val transbinding :  EcEnv.env -> EcUnify.unienv -> ptybindings ->
+  EcEnv.env * (EcIdent.t * EcTypes.ty) list
+
 (* -------------------------------------------------------------------- *)
 val transexp : EcEnv.env -> EcUnify.unienv -> pexpr -> expr * ty
 val transexpcast : EcEnv.env -> EcUnify.unienv -> ty -> pexpr -> expr

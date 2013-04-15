@@ -75,10 +75,10 @@ save.
 
 
 
-cnst a : int.
-cnst b : int.
-cnst c : int.
-cnst d : int.
+op a : int.
+op b : int.
+op c : int.
+op d : int.
 
 axiom a_le_b : a <= b.
 

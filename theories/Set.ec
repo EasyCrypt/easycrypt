@@ -8,19 +8,19 @@ require import Fun.
 type 'a set.
 
 (* These will all be axiomatized *)
-cnst empty: 'a set.
-op add: ('a, 'a set) -> 'a set.
-op pick: 'a set -> 'a.
-op rm: ('a, 'a set) -> 'a set.
-op union: ('a set,'a set) -> 'a set.
-op inter: ('a set, 'a set) -> 'a set.
-op mem: ('a, 'a set) -> bool.
-op card: 'a set -> int.
+op empty : 'a set.
+op add   : 'a -> 'a set -> 'a set.
+op pick  : 'a set -> 'a.
+op rm    : 'a -> 'a set -> 'a set.
+op union : 'a set -> 'a set -> 'a set.
+op inter : 'a set -> 'a set -> 'a set.
+op mem   : 'a -> 'a set -> bool.
+op card  : 'a set -> int.
 
 (* Derived operators and predicates *)
-op singleton(x:'a): 'a set = add x empty.
-op is_empty(X:'a set): bool = X = empty.
-pred cPmem(X, x:'a) = mem x X.
+op singleton (x:'a) : 'a set = add x empty.
+op is_empty (X:'a set) : bool = X = empty.
+op cPmem X (x:'a) = mem x X.
 
 (* "Induction Principle" *)
 axiom Set_ind: forall (P:('a set) cPred),
@@ -95,7 +95,7 @@ lemma singleton_card: forall (x:'a),
   card (singleton x) = 1.
 
 (* filter *)
-op filter: ('a cPred,'a set) -> 'a set.
+op filter: 'a cPred -> 'a set -> 'a set.
 
 axiom filter_mem: forall (x:'a) P X,
   mem x (filter P X) <=> (mem x X /\ P x).
@@ -163,16 +163,16 @@ lemma union_comm: forall (X Y:'a set),
   union X Y = union Y X
 proof.
 intros X Y;
-  apply (extentionality<:'a> (union X Y) (union Y X) _);
-  trivial.
+  apply (extentionality<:'a> (union X Y) (union Y X) _).
+  intros x;trivial.
 save.
 
 lemma union_add: forall (x:'a) X Y,
   add x (union X Y) = union (add x X) Y
 proof.
-intros x X Y;
-  apply (extentionality<:'a> (add x (union X Y)) (union (add x X) Y) _);
-  trivial.
+ intros x X Y.
+  apply (extentionality<:'a> (add x (union X Y)) (union (add x X) Y) _).
+  intros y;trivial.
 save.
 
 lemma subset_union1: forall (X Y:'a set),
@@ -343,11 +343,12 @@ theory Duni.
 
   axiom mu_weight: forall (X:'a set), 
      !is_empty X => mu_weight (duni X) = 1%r.
+
 end Duni.
 
 (* Restriction of a distribution (sub-distribution) *)
 theory Drestr.
-  op drestr: ('a distr,'a set) -> 'a distr.
+  op drestr: 'a distr -> 'a set -> 'a distr.
  
   axiom supp_def: forall (x:'a) d X, 
      in_supp x (drestr d X) <=> in_supp x d /\ !mem x X.

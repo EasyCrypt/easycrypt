@@ -130,7 +130,6 @@
 %token CLAIM
 %token CLEAR
 %token CLONE
-%token CNST
 %token COLON
 %token COMMA
 %token COMPUTE
@@ -156,6 +155,7 @@
 %token GENERALIZE 
 %token HOARE
 %token IDTAC
+%token TRY
 %token IF
 %token IFF
 %token IMPL
@@ -494,6 +494,24 @@ expr_u:
     { let id  = PEident(mk_loc r.pl_loc EcCoreLib.s_dbitstring, None) in
       let loc = EcLocation.make $startpos $endpos in
         PEapp (mk_loc loc id, [e]) }
+
+| LAMBDA pd=ptybindings COMMA e=expr { PElambda (pd, e) } 
+;
+
+%inline pty_varty:
+| x=ident+                        {
+   let loc = EcLocation.make $startpos $endpos in
+   (x, mk_loc loc PTunivar) }
+| x=ident+ COLON ty=loc(type_exp) { (x, ty) }
+;
+
+ptybinding1:
+| LPAREN bds=plist1(pty_varty, COMMA) RPAREN { bds }
+| x=ident { [[x], mk_loc x.pl_loc PTunivar] }
+;
+
+ptybindings:
+| x=ptybinding1+ { List.flatten x } 
 ;
 
 (* -------------------------------------------------------------------- *)
@@ -623,7 +641,7 @@ form_u:
 
 | FORALL pd=pgtybindings COMMA e=form { PFforall (pd, e) }
 | EXIST  pd=pgtybindings COMMA e=form { PFexists (pd, e) }
-| LAMBDA pd=pgtybindings COMMA e=form { PFlambda (pd, e) }
+| LAMBDA pd=ptybindings COMMA e=form { PFlambda (pd, e) }
 
 | r=loc(RBOOL) TILD e=sform
     { let id  = PFident (mk_loc r.pl_loc EcCoreLib.s_dbitstring, None) in
@@ -637,25 +655,14 @@ equiv_body:
 
     { PFequivF (pre, (mp1, mp2), post) }
 
-%inline pgty_varty:
-| x=ident COLON ty=loc(type_exp) { (x, ty) }
-;
-
 pgtybinding1:
+| x=ptybinding1 { List.map (fun (xs,ty) -> xs, PGTY_Type ty) x }
+
 | LPAREN x=uident LTCOLON mi=qident RPAREN
-    { [(x, PGTY_ModTy mi)] }
-
-| LPAREN x1=ident x2=ident xs=ident* COLON t=loc(type_exp) RPAREN
-    { List.map (fun x -> (x, PGTY_Type t)) (x1 :: x2 :: xs) }
-
-| LPAREN bds=plist1(pgty_varty, COMMA) RPAREN
-    { List.map (fun (x, ty) -> (x, PGTY_Type ty)) bds }
-
-| x=ident
-    { List.map (fun x -> (x, PGTY_Type (mk_loc x.pl_loc PTunivar))) [x] }
+    { [[x], PGTY_ModTy mi] }
 
 | pn=mident
-    { [(pn, PGTY_Mem)] }
+    { [[pn], PGTY_Mem] }
 ;
 
 pgtybindings:
@@ -698,11 +705,6 @@ typed_vars:
 param_decl:
 | LPAREN aout=plist0(typed_vars, COMMA) RPAREN { List.flatten aout }
 ;
-
-param_decl1:
-| LPAREN aout=plist1(typed_vars, COMMA) RPAREN { List.flatten aout }
-;
-
 
 (* -------------------------------------------------------------------- *)
 (* Statements                                                           *)
@@ -958,10 +960,6 @@ op_tydom:
    { tys  }
 ;
 
-op_sig:
-| dom=op_tydom ARROW codom=loc(type_exp) { (Some dom, codom) }
-;
-
 op_ident:
 | x=ident       { x }
 | x=loc(PBINOP) { x }
@@ -970,65 +968,56 @@ op_ident:
 tyvars_decl:
 | LBRACKET tyvars=tident* RBRACKET { Some tyvars }
 | empty { None }
+;
     
 operator:
-| OP x=op_ident tyvars=tyvars_decl COLON sty=op_sig {
+| OP x=op_ident tyvars=tyvars_decl COLON sty=loc(type_exp) {
     { po_name   = x      ;
       po_tyvars = tyvars ;
-      po_dom    = fst sty;
-      po_codom  = snd sty;
-      po_body   = None   ; }
+      po_def    = POabstr sty; }
   }
 
-| OP x=op_ident tyvars=tyvars_decl p=param_decl1 COLON codom=loc(type_exp)
+| OP x=op_ident tyvars=tyvars_decl COLON sty=loc(type_exp) EQ b=expr {
+    { po_name   = x      ;
+      po_tyvars = tyvars ;
+      po_def    = POconcr([],sty,b); }
+  }
+
+| OP x=op_ident tyvars=tyvars_decl eq=loc(EQ) b=expr {
+    { po_name   = x      ;
+      po_tyvars = tyvars ;
+      po_def    = POconcr([],mk_loc eq.pl_loc PTunivar,b); }
+  }
+
+| OP x=op_ident tyvars=tyvars_decl p=ptybindings eq=loc(EQ) b=expr {
+    { po_name   = x      ;
+      po_tyvars = tyvars ;
+      po_def    = POconcr(p,mk_loc eq.pl_loc PTunivar,b); }
+  }
+| OP x=op_ident tyvars=tyvars_decl p=ptybindings COLON codom=loc(type_exp)
     EQ b=expr {
     { po_name   = x      ;
       po_tyvars = tyvars ;
-      po_dom    = Some(List.map snd p);
-      po_codom  = codom  ;
-      po_body   = Some(List.map fst p, b); }
-  }
+      po_def    = POconcr(p,codom,b); }
+  } 
 
-| CNST x=ident tyvars=tyvars_decl COLON ty=loc(type_exp) {
-    { po_name   = x    ;
-      po_tyvars = tyvars   ;
-      po_dom = None    ;
-      po_codom = ty    ;
-      po_body = None   ; }
-  }
-| CNST x=ident tyvars=tyvars_decl COLON ty=loc(type_exp) EQ e=expr {
-    { po_name   = x     ;
-      po_tyvars = tyvars;
-      po_dom = None     ;
-      po_codom = ty     ;
-      po_body = Some([], e) ; }
-  }
 ;
 
 predicate:
 | PRED x = op_ident
    { { pp_name = x;
        pp_tyvars = None;
-       pp_dom = None;
-       pp_body = None; } }
+       pp_def = PPabstr []; } }
 
 | PRED x = op_ident tyvars=tyvars_decl COLON sty = op_tydom
    { { pp_name = x;
        pp_tyvars = tyvars;
-       pp_dom = Some sty;
-       pp_body = None; } }
+       pp_def = PPabstr sty; } }
 
-| PRED x = op_ident tyvars=tyvars_decl EQ f=form
+| PRED x = op_ident tyvars=tyvars_decl p=ptybindings EQ f=form
    { { pp_name = x;
        pp_tyvars = tyvars;
-       pp_dom = None;
-       pp_body = Some([], f) } }
-
-| PRED x = op_ident tyvars=tyvars_decl params=param_decl1 EQ f=form
-   { { pp_name = x;
-       pp_tyvars = tyvars;
-       pp_dom = Some(List.map snd params);
-       pp_body =Some(List.map fst params, f) } }
+       pp_def = PPconcr(p,f); } } 
 ;
 
 (* -------------------------------------------------------------------- *)
@@ -1167,6 +1156,12 @@ conseq:
 tactic:
 | IDTAC
     { Pidtac }
+
+| STAR t=loc(tactic) { Prepeat t }
+
+| NOT n=option(number) t=loc(tactic) { Pdo(n,t) }
+
+| TRY t=loc(tactic) { Ptry t }
 
 | ASSUMPTION
     { Passumption (None, None) }
@@ -1322,11 +1317,12 @@ tactics:
 ;
 
 tactics0:
-| ts=tactics { Pseq ts } 
+| ts=tactics    { Pseq ts } 
+| x=loc(empty)  { Pseq [mk_loc x.pl_loc Pidtac] }
 ;
 
 %inline tactics2: ts=plist1(tactic2, SEMICOLON) { ts };
-tsubgoal: LBRACKET ts=plist0(loc(tactics0), PIPE) RBRACKET { Psubgoal ts };
+tsubgoal: LBRACKET ts=plist1(loc(tactics0), PIPE) RBRACKET { Psubgoal ts };
 
 tactic2: 
 | ts=loc(tsubgoal) { ts }
@@ -1356,7 +1352,7 @@ clone_override:
 | TYPE ps=poly_typarams x=ident EQ t=loc(type_exp)
    { (x, PTHO_Type (ps, t)) }
 
-| CNST x=ident EQ e=expr
+| OP x=ident EQ e=expr
    { (x, PTHO_Op ([], e)) }
 ;
 

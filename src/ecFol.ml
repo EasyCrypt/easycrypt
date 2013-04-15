@@ -463,6 +463,10 @@ let f_if f1 f2 f3 = mk_form (Fif(f1,f2,f3)) f2.f_ty
 
 let f_let q f1 f2 = mk_form (Flet(q,f1,f2)) f2.f_ty (* FIXME rename binding *)
 
+let destr_gty = function 
+  | GTty ty -> ty 
+  | _ -> assert false
+
 let f_quant q b f = 
   if b = [] then f 
   else 
@@ -472,8 +476,7 @@ let f_quant q b f =
       | _ -> q, b , f in
     let ty = 
       if q = Llambda then 
-        let dom = List.map (fun (_,gty) -> 
-          match gty with GTty ty -> ty | _ -> assert false) b in
+        let dom = List.map (fun (_,gty) -> destr_gty gty) b in
         toarrow dom f.f_ty 
       else ty_bool in
     mk_form (Fquant(q,b,f)) ty
@@ -1121,6 +1124,8 @@ let rec form_of_expr mem (e: expr) =
   | Etuple es -> f_tuple (List.map (form_of_expr mem) es)
   | Eif (e1,e2,e3) -> 
       f_if (form_of_expr mem e1) (form_of_expr mem e2) (form_of_expr mem e3)
+  | Elam(b,e) ->
+    f_lambda (List.map (fun (x,ty) -> (x,GTty ty)) b) (form_of_expr mem e)
 
 type op_kind = 
   | OK_true

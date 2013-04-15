@@ -520,7 +520,7 @@ let t_elimT env f p g =
         with _ -> tacerror (CannotReconizeElimT) in
       let ue = EcUnify.UniEnv.create (Some hyps.h_tvar) in
       let (ue, tpred,tys) = 
-        EcUnify.UniEnv.freshen ue ax.EcDecl.ax_params None tpred in
+        EcUnify.UniEnv.freshen ue ax.EcDecl.ax_tparams None tpred in
       EcUnify.unify env ue tpred (tfun f.f_ty tbool);
       let subst = Tuni.subst (EcUnify.UniEnv.close ue) in
       List.map subst tys in

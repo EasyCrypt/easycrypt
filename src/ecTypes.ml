@@ -20,10 +20,11 @@ and ty_node =
   | Tfun    of ty * ty
 
 type dom = ty list
-type tysig = dom * ty 
 
 let ty_equal : ty -> ty -> bool = (==)
 let ty_hash ty = ty.ty_tag
+
+
 
 module Hsty = Why3.Hashcons.Make (struct
   type t = ty
@@ -110,10 +111,6 @@ let rec ty_dump (ty : ty) =
       dnode "Tfun" [ty_dump ty1; ty_dump ty2]
 
 (* -------------------------------------------------------------------- *)
-let dom_dump (dom : dom) =
-  dnode "domain" (List.map ty_dump dom)
-
-(* -------------------------------------------------------------------- *)
 let ty_map f t = 
   match t.ty_node with 
   | Tunivar _ | Tvar _ -> t
@@ -186,7 +183,8 @@ module Tuni = struct
   let subst (uidmap : ty Muid.t) =
     ty_subst { ty_subst_id with ts_u = uidmap } 
 
-  let subst_dom uidmap = List.map (subst uidmap)
+  let subst_dom uidmap =
+    List.map (subst uidmap) 
 
   let occur u = 
     let rec aux t = 
@@ -202,8 +200,6 @@ module Tuni = struct
 
   let fv = fv_rec Suid.empty
 
-  let fv_sig (dom, codom) = 
-    List.fold_left fv_rec (fv codom) dom
 end
 
 module Tvar = struct 
@@ -223,9 +219,6 @@ module Tvar = struct
     | _ -> ty_fold fv_rec fv t 
 
   let fv = fv_rec Sid.empty
-
-  let fv_sig (dom, codom) = 
-    List.fold_left fv_rec (fv codom) dom
 
 end
 
@@ -308,14 +301,15 @@ type expr = {
 }
 
 and expr_node =
-  | Eint   of int                        (* int. literal          *)
-  | Elocal of EcIdent.t                  (* let-variables         *)
-  | Evar   of prog_var                   (* module variable       *)
-  | Eop    of EcPath.path * ty list      (* op apply to type args *)
-  | Eapp   of expr * expr list       (* op. application       *)
-  | Elet   of lpattern * expr * expr (* let binding           *)
-  | Etuple of expr list                (* tuple constructor     *)
-  | Eif    of expr * expr * expr   (* _ ? _ : _             *)
+  | Elam   of (EcIdent.t * ty) list * expr (* lambda expression *)
+  | Eint   of int                          (* int. literal          *)
+  | Elocal of EcIdent.t                    (* let-variables         *)
+  | Evar   of prog_var                     (* module variable       *)
+  | Eop    of EcPath.path * ty list        (* op apply to type args *)
+  | Eapp   of expr * expr list             (* op. application       *)
+  | Elet   of lpattern * expr * expr       (* let binding           *)
+  | Etuple of expr list                    (* tuple constructor     *)
+  | Eif    of expr * expr * expr           (* _ ? _ : _             *)
 
 
 
@@ -347,11 +341,18 @@ let fv_node = function
     List.fold_left (fun s e -> fv_union s (e_fv e)) Mid.empty es
   | Eif(e1,e2,e3) ->
       fv_union (e_fv e1) (fv_union (e_fv e2) (e_fv e3))
+  | Elam(b,e) ->
+    List.fold_left (fun s (id,_) -> Mid.remove id s) (e_fv e) b
 
 (* -------------------------------------------------------------------- *)
 module Hexpr = Why3.Hashcons.Make (struct 
   type t = expr
 
+  let b_equal b1 b2 =
+    let b1_equal (x1, ty1) (x2, ty2) = 
+      EcIdent.id_equal x1 x2 && ty_equal ty1 ty2 in
+    List.all2 b1_equal b1 b2
+ 
   let equal_node e1 e2 =
     match e1, e2 with
     | Eint   i1, Eint   i2 -> i1 == i2
@@ -374,12 +375,19 @@ module Hexpr = Why3.Hashcons.Make (struct
 
     | Eif (c1, e1, f1), Eif (c2, e2, f2) ->
         (e_equal c1 c2) && (e_equal e1 e2) && (e_equal f1 f2)
-
+    | Elam(b1,e1), Elam(b2,e2) ->
+      e_equal e1 e2 && b_equal b1 b2
     | _, _ -> false
 
   let equal e1 e2 = 
     equal_node e1.e_node e2.e_node && 
     ty_equal e1.e_ty e2.e_ty 
+
+  let b_hash bs =
+    let b1_hash (x, ty) = 
+      Why3.Hashcons.combine (EcIdent.tag x) (ty_hash ty)
+    in
+    Why3.Hashcons.combine_list b1_hash 0 bs
 
   let hash e = 
     match e.e_node with
@@ -404,6 +412,8 @@ module Hexpr = Why3.Hashcons.Make (struct
     | Eif (c, e1, e2) ->
         Why3.Hashcons.combine2
           (e_hash c) (e_hash e1) (e_hash e2)
+    | Elam(b,e) ->
+      Why3.Hashcons.combine (e_hash e) (b_hash b) 
           
   let tag n e = { e with e_tag = n;
                   e_fv = fv_node e.e_node }
@@ -420,6 +430,15 @@ let e_op x targs ty = mk_expr (Eop (x, targs)) ty
 let e_let pt e1 e2  = mk_expr (Elet (pt, e1, e2)) e2.e_ty
 let e_tuple es      = mk_expr (Etuple es) (ttuple (List.map e_ty es))
 let e_if   c e1 e2  = mk_expr (Eif (c, e1, e2)) e2.e_ty
+let e_lam b e =
+  if b = [] then e
+  else 
+    let b, e = 
+      match e.e_node with
+      | Elam(b',e) -> b@b',e
+      | _ -> b, e in
+    let ty = toarrow (List.map snd b) e.e_ty in
+    mk_expr (Elam(b,e)) ty
 
 let e_app x args = 
   match x.e_node with
@@ -462,6 +481,15 @@ let e_map fty fe e =
       let e3' = fe e3 in 
       if e1 == e1' && e2 == e2' && e3 = e3' then e else
       e_if e1' e2' e3' 
+  | Elam(b,e1) ->
+    let dop (x,ty as xty) =
+      let ty' = fty ty in
+      if ty == ty' then xty else (x,ty') in
+    let b' = List.smart_map dop b in
+    let e1' = fe e1 in
+    if b == b' && e1 == e1' then e else
+    e_lam b' e1'
+    
 
 let rec e_fold fe state e =
   match e.e_node with
@@ -473,6 +501,7 @@ let rec e_fold fe state e =
   | Elet (_, e1, e2)      -> List.fold_left fe state [e1; e2]
   | Etuple es             -> List.fold_left fe state es
   | Eif (e1, e2, e3)      -> List.fold_left fe state [e1; e2; e3]
+  | Elam(_,e1)            -> fe state e1
 
 module MSHe = EcMaps.MakeMSH(struct type t = expr let tag e = e.e_tag end)
 module Me = MSHe.M  
@@ -554,6 +583,11 @@ let rec e_subst (s: e_subst) e =
       let e2' = e_subst s e2 in
       if lp == lp' && e1 == e1' && e2 == e2' then e else 
       e_let lp' e1' e2'
+  | Elam(b,e1) ->
+    let s, b' = add_locals s b in
+    let e1' = e_subst s e1 in
+    if b == b' && e1 == e1' then e else
+    e_lam b' e1'  
   | _ -> e_map s.es_ty (e_subst s) e
 
 let is_subst_id s = 
@@ -626,6 +660,9 @@ module Dump = struct
         
       | Eif (c, e1, e2) ->
           EcDebug.onhlist pp "Eif" ex_dump [c; e1; e2]
+
+      | Elam(_b,e) ->                   (* FIXME *)
+        EcDebug.onhlist pp "Elam" ex_dump [e]
     in
       fun e -> ex_dump pp e
 end

@@ -10,7 +10,7 @@ op size: 'a matrix -> (int * int).
 axiom size_pos: forall (M:'a matrix),
   0 <= fst (size M) /\ 0 <= snd (size M).
 
-op __get: ('a matrix,(int * int)) -> 'a.
+op __get: 'a matrix -> (int * int) -> 'a.
 
 pred (==) (M0 M1:'a matrix) =
   size M0 = size M1 /\
@@ -31,7 +31,7 @@ axiom new_size: forall m n,
   size (new<:'a> (m,n)) = (m,n).
 
 (* set M (i,j) a: M.[(i,j) <- a] whenever (i,j) < size M [pairwise] *)
-op __set: ('a matrix,(int * int),'a) -> 'a matrix.
+op __set:  'a matrix -> (int * int) -> 'a -> 'a matrix.
 
 axiom set_size: forall (M: 'a matrix) i j a,
   0 <= i => i < fst (size M) =>
@@ -46,7 +46,7 @@ axiom set_get: forall (M:'a matrix) i j k l a,
   M.[(i,j) <- a].[(k,l)] = ((i,j) = (k,l)) ? a : M.[(k,l)].
 
 (* sub M (i,j) (m,n): extracts the sub matrix of size (m,n) starting at (i,j) [whenever sizes fit] *)
-op sub: ('a matrix,(int * int),(int * int)) -> 'a matrix.
+op sub: 'a matrix -> (int * int) -> (int * int) -> 'a matrix.
 
 axiom sub_size: forall (M:'a matrix) i j m n,
   0 <= i => 0 <= m => i + m <= fst (size M) =>
@@ -61,7 +61,8 @@ axiom sub_get: forall (M:'a matrix) i j m n k l,
   (sub M (i,j) (m,n)).[(k,l)] = M.[(i + k,j + l)].
 
 (* write M (i,j) M' (k,l) (m,n): copy the contents of (sub M' (k,l) (m,n)) into M starting at index (i,j) *)
-op write: ('a matrix,(int * int),'a matrix,(int * int),(int * int)) -> 'a matrix.
+op write: 'a matrix -> (int * int) -> 
+          'a matrix -> (int * int) -> (int * int) -> 'a matrix.
 
 axiom write_size: forall (M M':'a matrix) i j k l m n,
   0 <= m => 0 <= n =>
@@ -135,7 +136,7 @@ axiom to_array_get: forall (M:'a matrix) i,
   Array.__get (to_array M) i = M.[(i,0)].
 
 (* Extracting a row *)
-op row: ('a matrix,int) -> 'a Array.array.
+op row: 'a matrix -> int -> 'a Array.array.
 
 axiom row_length: forall (M:'a matrix) j,
   0 <= j => j < snd (size M) =>
@@ -147,7 +148,7 @@ axiom row_get: forall (M:'a matrix) j i,
   Array.__get (row M j) i = M.[(i,j)].
 
 (* Extracting a column *)
-op column: ('a matrix,int) -> 'a Array.array.
+op column: 'a matrix -> int -> 'a Array.array.
 
 axiom column_length: forall (M:'a matrix) i,
   0 <= i => i < fst (size M) =>

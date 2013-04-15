@@ -11,11 +11,34 @@ Verifier les fonction add dans ecEnv.
 * Benjamin
 
 tactic : 
-  apply avec instanciation automatique +
-          apply f   
 
-- verifier que si un theorie est utilis'ee par why3 elle est bind'ee dans 
-  ecEnv ...
+  + tactic phl/prhl 
+    - eqobs_in
+    - not_modify
+    - hoare -> equiv
+    - inlining
+    - derandomize
+    - call for adversary
+    - rename trivial into prover 
+    - use trivial for more sofisticated tactic:
+          simplify; intuition; subst; try split;prover  
+    - subst should also works for program variable.
+
+
+  + tactic
+    - apply avec instanciation automatique +
+      apply f   
+    - notation apply recursive
+
+  + Why3 : 
+    - partage des events (* ie. function annonyme *)
+    - netoyage des tasks 
+    - base de hint  (* Voir avec francois *)
+    - triggers      (* Voir avec francois *)
+
+clone : 
+  + finir les toutes les instanciations possibles
+
 
 * Parsing:
 - Nom long pour les operateurs infix, 
@@ -24,7 +47,6 @@ tactic :
 - Affichage des noms long ou cours, ty instance
 
 * TODO
-- require : do not check
 - chemins privés (attendre la fin des modules)
 - hash-consing
 - réfléchir sur le pb d'instanciation de modules
@@ -33,9 +55,7 @@ tactic :
 - batterie de tests
 - mot-clef "use" + nettoyage de task
 - raffinements
-- import ocaml batteries
 - diff. for modules
-- understand link between operator domains and higher-order
 
 
 Discution : 

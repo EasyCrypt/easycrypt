@@ -1,5 +1,5 @@
 module type J = {
-  var b:bool
+ (* var b:bool *)
 }.
 
 module type I(X:J) = {
@@ -16,5 +16,5 @@ module G(X:I) = {
   }
 }.
 
-cnst c:real.
+op c:real.
 axiom A: forall &m (M <: I), Pr[ G(M).f() @ &m : res ] = c.

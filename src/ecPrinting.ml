@@ -557,6 +557,14 @@ let pr_opapp (ppenv : ppenv) pr_sub outer op _tvi es =
                    try_pr_as_binop])
 
 (* -------------------------------------------------------------------- *)
+let pr_locdecl (ppenv : ppenv) (x, ty) =
+  let tenv1 = PPE.add_local ppenv x in
+  (tenv1, join [pr_local tenv1 x; !^":"; pr_type ppenv ty])
+
+let pr_locdecls (ppenv : ppenv) ds =
+    let ppenv, ds = List.map_fold pr_locdecl ppenv ds in
+    (ppenv, pr_paren (seq ds))
+
 let pr_expr (ppenv : ppenv) (e : expr) =
   let rec pr_expr (ppenv : ppenv) outer (e : expr) =
     match e.e_node with
@@ -588,6 +596,11 @@ let pr_expr (ppenv : ppenv) (e : expr) =
 
     | Elet (pt, e1, e2) ->
         pr_let ppenv pr_expr outer pt e1 e2
+
+    | Elam (vardecls, e) ->
+      let ppenv, v = pr_locdecls ppenv vardecls in
+      (tk_lambda ^/^ v) ^@@^ (pr_expr ppenv (min_op_prec, `NonAssoc) e)
+        
 
   in
     pr_expr ppenv (min_op_prec, `NonAssoc) e
@@ -908,56 +921,44 @@ let pr_tyvarsdecl (ppenv : ppenv) ids =
   else
     pr_bracket (join (List.map (pr_tvar ppenv) ids))
 
-let pr_locdecl (ppenv : ppenv) (x, ty) =
-  let tenv1 = PPE.add_local ppenv x in
-  (tenv1, join [pr_local tenv1 x; !^":"; pr_type ppenv ty])
-
-let pr_locdecls (ppenv : ppenv) ds =
-    let ppenv, ds = List.map_fold pr_locdecl ppenv ds in
-    (ppenv, pr_paren (seq ds))
-
-let pr_dom (ppenv : ppenv) dom =
-  pr_paren (seq ~sep:","(List.map (pr_type ppenv) dom))
-
-let pr_sig (ppenv : ppenv) (dom, codom) =
-  match dom with
-  | [] -> pr_type ppenv codom
-  | _  -> (pr_dom ppenv dom) ^/^ tk_arrow ^@@^ (pr_type ppenv codom)
-
 let pr_opdecl (ppenv : ppenv) ((x, op) : EcPath.path * operator) =
   let basename = EcPath.basename x in
 
   let dop, ddecl =
     match op.op_kind with
     | OB_oper i ->
-        let dop = if op.op_dom = [] then tk_cnst else tk_op in
-        let ddecl =
-          match i with
-          | None -> join [!^":"; pr_sig ppenv (op_sig op)]
-          | Some (ids, e) ->
-              let vardecls = List.combine ids op.op_dom in
-              let subppenv, dd = 
-                if vardecls = [] then ppenv, Pp.empty 
-                else pr_locdecls ppenv vardecls in
-                join [
-                  dd; !^":"; pr_type ppenv op.op_codom;
-                  !^"="] ^@@^ pr_expr subppenv e
-        in
-          (dop, ddecl)
+      let ddecl =
+        match i with
+        | None -> join [!^":"; pr_type ppenv (op_ty op)]
+        | Some e ->
+          let vardecls, e =
+            match e.e_node with
+            | Elam (vardecls,e) -> vardecls, e
+            | _ -> [], e in
+          let subppenv, dd = 
+            if vardecls = [] then ppenv, Pp.empty 
+            else pr_locdecls ppenv vardecls in
+          join [
+            dd; !^":"; pr_type ppenv e.e_ty;
+            !^"="] ^@@^ pr_expr subppenv e in
+      (tk_op, ddecl)
 
     | OB_pred i ->
-        let ddecl =
-          match i with
-          | None -> join [!^":"; pr_dom ppenv op.op_dom]
-          | Some (ids, f) ->
-              let vardecls = List.combine ids op.op_dom in
-              let subppenv, dd = pr_locdecls ppenv vardecls in
-                join [dd; !^"="; pr_form subppenv f]
-        in
-        tk_pred, ddecl in
+      let ddecl =
+        match i with
+        | None -> join [!^":"; pr_type ppenv (op_ty op)]
+        | Some f ->
+          let vardecls, f =
+            match f.f_node with
+            | Fquant(Llambda,vardecls,f) -> vardecls, f
+            | _ -> [], f in
+          let vardecls = List.map (fun (x,t) -> x,EcFol.destr_gty t) vardecls in
+          let subppenv, dd = pr_locdecls ppenv vardecls in
+          join [dd; !^"="; pr_form subppenv f] in
+      tk_pred, ddecl in
 
   let doc =
-    join [dop; !^basename; pr_tyvarsdecl ppenv op.op_params; ddecl]
+    join [dop; !^basename; pr_tyvarsdecl ppenv op.op_tparams; ddecl]
   in
     pr_dotted doc
 
@@ -971,10 +972,10 @@ let pr_axiom (ppenv : ppenv) ((x, ax) : EcPath.path * axiom) =
     | Lemma _ -> tk_lemma
 
   and pr_name =
-    match ax.ax_params with
+    match ax.ax_tparams with
     | [] -> !^basename
     | _  -> 
-        let args = List.map (pr_ident ppenv) ax.ax_params in
+        let args = List.map (pr_ident ppenv) ax.ax_tparams in
           !^basename ^^ (pr_angle (seq args))
 
   and spec =
@@ -1070,9 +1071,6 @@ let fmtpretty =
 
 let pp_type (ppenv : EcEnv.env) (fmt : Format.formatter) ty =
   fmtpretty fmt (pr_type (empty ppenv) ty)
-
-let pp_dom (ppenv : EcEnv.env) (fmt : Format.formatter) dom =
-  fmtpretty fmt (pr_dom (empty ppenv) dom)
 
 let pp_form (ppenv : EcEnv.env) (fmt : Format.formatter) (f : form) =
   fmtpretty fmt (pr_form (empty ppenv) f)

@@ -36,7 +36,7 @@ axiom extentionality: forall (xs0:'x array, xs1:'x array),
 (*      Functional Operators     *)
 (*********************************)
 (* empty *)
-cnst empty: 'x array.
+op empty: 'x array.
 
 axiom empty_length: length (empty<:'x>) = 0.
 
@@ -49,7 +49,7 @@ intros xs H;
 save.
 
 (* cons *)
-op (::): ('x,'x array) -> 'x array.
+op (::) : 'x -> 'x array -> 'x array.
 
 axiom cons_length: forall (x:'x, xs:'x array),
   length (x::xs) = 1 + length xs.
@@ -62,7 +62,7 @@ lemma cons_nonempty: forall (x:'x, xs:'x array),
   x::xs <> empty.
 
 (* snoc *)
-op (:::): ('x array,'x) -> 'x array.
+op (:::): 'x array -> 'x -> 'x array.
 
 axiom snoc_length: forall (xs:'x array, x:'x),
   length (xs:::x) = length xs + 1.
@@ -75,7 +75,7 @@ lemma snoc_nonempty: forall (xs:'x array, x:'x),
   xs:::x <> empty.
 
 (* append *)
-op (||): ('x array,'x array) -> 'x array.
+op (||): 'x array -> 'x array -> 'x array.
 
 axiom append_length: forall (xs0 xs1:'x array),
   length (xs0 || xs1) = length xs0  + length xs1.
