@@ -1017,11 +1017,11 @@ module Tactic = struct
 
   let process_rnd env bij_info g =
     let concl = get_concl g in
-    let process_form f ty = 
+    let process_form f ty1 ty2 = 
       if is_equivS concl then
-        process_prhl_form ty env g f
+        process_prhl_form (tfun ty1 ty2) env g f 
       else if is_hoareS concl then
-        process_prhl_form ty env g f
+        process_phl_form  (tfun ty1 ty2) env g f
       else (* is_*F *) assert false (* FIXME: error "unfolded judgmented was expected" *)
     in
     let bij_info = match bij_info with

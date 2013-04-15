@@ -886,11 +886,11 @@ let proj_distr_ty ty = match ty.ty_node with
     List.hd lty
   | _ -> cannot_apply "rnd" "not a distribution expression"
 
-let (===) = f_eq_simpl 
-let (==>) = f_imp_simpl
-let (&&&) = f_anda_simpl
+let (===) = f_eq 
+let (==>) = f_imp
+let (&&&) = f_anda
 
-let rec wp_equiv_rnd env bij_info g =
+let rec wp_equiv_rnd env (f,finv) g =
   let concl = get_concl g in
   let es = destr_equivS concl in
   let (lvL,muL),(lvR,muR),sl',sr'= s_last_rnds "rnd" es.es_sl es.es_sr in
@@ -902,33 +902,38 @@ let rec wp_equiv_rnd env bij_info g =
   let y = f_local y_id tyR in
   let muL = EcFol.form_of_expr (EcMemory.memory es.es_ml) muL in
   let muR = EcFol.form_of_expr (EcMemory.memory es.es_mr) muR in
-  match bij_info with
-    | RIbij (f,finv) ->
-      let tf = f (tfun tyL tyR ) in
-      let tfinv = finv (tfun tyR tyL ) in
-      let f t = f_app_simpl tf  [t] tyR in
-      let finv t = f_app_simpl tfinv [t] tyL in
-      let supp_cond1 = (f_in_supp x muL) ==> 
-        ((f_mu_x muL x) === (f_mu_x muR (f x))) in
-      let supp_cond2 = (f_in_supp y muR) ==> (f_in_supp (finv y) muL) in
-      let inv_cond1 =  (f_in_supp x muL) ==> ((finv (f x)) === x) in
-      let inv_cond2 =  (f_in_supp y muR) ==> ((f (finv y)) === y) in
-      let post = subst_form_lv env (EcMemory.memory es.es_ml) lvL x es.es_po in
-      let post = subst_form_lv env (EcMemory.memory es.es_mr) lvR (f x) post in
-      let post = (f_in_supp x muL) ==> post in
-      let post = supp_cond1 &&& supp_cond2 &&& inv_cond1 &&& inv_cond2 &&& post in
-      let post = f_forall_simpl [(x_id,GTty tyL);(y_id,GTty tyR)] post in
-      let concl = f_equivS_r {es with es_sl=sl'; es_sr=sr'; es_po=post} in
-      prove_goal_by [concl] (RN_hl_equiv_rnd (RIbij (tf,tfinv))) g
-    | RIidempotent bij -> 
-      wp_equiv_rnd env (RIbij (bij, bij)) g
+  (* *)
+  let tf = f tyL tyR in
+  let tfinv = finv tyR tyL in
+  let f t = f_app tf  [t] tyR in
+  let finv t = f_app tfinv [t] tyL in
+  let supp_cond1 = (f_in_supp x muL) ==> 
+    ((f_mu_x muL x) === (f_mu_x muR (f x))) in
+  let supp_cond2 = (f_in_supp y muR) ==> (f_in_supp (finv y) muL) in
+  let inv_cond1 =  (f_in_supp x muL) ==> ((finv (f x)) === x) in
+  let inv_cond2 =  (f_in_supp y muR) ==> ((f (finv y)) === y) in
+  let post = subst_form_lv env (EcMemory.memory es.es_ml) lvL x es.es_po in
+  let post = subst_form_lv env (EcMemory.memory es.es_mr) lvR (f x) post in
+  let post = (f_in_supp x muL) ==> post in
+  let post = supp_cond1 &&& supp_cond2 &&& inv_cond1 &&& inv_cond2 &&& post in
+  let post = f_forall_simpl [(x_id,GTty tyL);(y_id,GTty tyR)] post in
+  let concl = f_equivS_r {es with es_sl=sl'; es_sr=sr'; es_po=post} in
+  prove_goal_by [concl] (RN_hl_equiv_rnd (RIbij (tf,tfinv))) g
+
+
+let t_equiv_rnd env bij_info = 
+  let f,finv =  match bij_info with 
+    | RIbij (f,finv) -> f,finv
+    | RIidempotent bij -> bij, bij
     | RIid -> 
-      let bij = fun _ -> f_lambda [x_id,GTty tyL] x in
-      wp_equiv_rnd env (RIbij (bij, bij)) g
+        let z_id = EcIdent.create "z" in
+        let z = f_local z_id in
+        let bij = fun tyL tyR -> f_lambda [z_id,GTty tyR] (z tyL) in 
+        bij, bij
+  in wp_equiv_rnd env (f,finv) 
 
 
-let t_equiv_rnd = wp_equiv_rnd (* FIXME: wrapper *)
-
+(* -------------------------------------------------------------------- *)
 
 
 let t_equiv_deno env pre post g =

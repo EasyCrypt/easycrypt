@@ -173,15 +173,16 @@ val f_app_simpl : form -> form list -> EcTypes.ty -> form
 
 val f_not_simpl  : form -> form
 val f_and_simpl  : form -> form -> form
-val f_ands_simpl  : form list -> form -> form
+val f_ands_simpl : form list -> form -> form
+val f_ands       : form list -> form -> form
 val f_anda_simpl : form -> form -> form
 val f_or_simpl   : form -> form -> form
 val f_ora_simpl  : form -> form -> form
 val f_imp_simpl  : form -> form -> form
-val f_imps_simpl  : form list -> form -> form
+val f_imps       : form list -> form -> form
+val f_imps_simpl : form list -> form -> form
 val f_iff_simpl  : form -> form -> form
-
-val f_eq_simpl     : form -> form -> form
+val f_eq_simpl   : form -> form -> form
 
 (* -------------------------------------------------------------------- *)
 

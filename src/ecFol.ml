@@ -1069,6 +1069,7 @@ let f_and_simpl f1 f2 =
   else f_and f1 f2
 
 let f_ands_simpl = List.fold_right f_and_simpl
+let f_ands       = List.fold_right f_and
 
 let f_anda_simpl f1 f2 = 
   if is_true f1 then f2
@@ -1099,6 +1100,7 @@ let f_imp_simpl f1 f2 =
     (* FIXME : simplify x = f1 => f2 into x = f1 => f2{x<-f2} *)
 
 let f_imps_simpl = List.fold_right f_imp_simpl 
+let f_imps = List.fold_right f_imp 
 
 let f_iff_simpl f1 f2 = 
   if f_equal f1 f2 then f_true
