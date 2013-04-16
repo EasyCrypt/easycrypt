@@ -118,6 +118,7 @@
 (* Tokens *)
 %token <bool> AND (* true asym : &&, false sym : /\ *)
 %token <bool> OR  (* true asym : ||, false sym : \/ *)
+%token ADD
 %token ADMIT
 %token APP
 %token APPLY
@@ -180,6 +181,7 @@
 %token LOGIC
 %token LONGARROW
 %token LPAREN
+%token MINUS
 %token MODULE
 %token NE
 %token NOT
@@ -250,7 +252,7 @@
 %left EQ NE OP1 GT
 
 %right QUESTION
-%left OP2 
+%left OP2 MINUS ADD
 %right ARROW
 %left OP3 STAR
 %left OP4 
@@ -356,6 +358,8 @@ fident:
 | x=OR    { str_or  x }
 | STAR    { "*" }
 | GT      { ">" }
+| ADD     { "+" }
+| MINUS   { "-" }
 | x=OP1   { x   }
 | x=OP2   { x   }
 | x=OP3   { x   }
@@ -457,6 +461,12 @@ expr_u:
 
 | e1=expr op=loc(GT) ti=tvars_app? e2=expr %prec OP1
     { peapp_symb op.pl_loc ">" ti [e1; e2] }
+
+| e1=expr op=loc(ADD) ti=tvars_app? e2=expr 
+    { peapp_symb op.pl_loc "+" ti [e1; e2] }
+
+| e1=expr op=loc(MINUS) ti=tvars_app? e2=expr 
+    { peapp_symb op.pl_loc "-" ti [e1; e2] }
 
 | e1=expr op=loc(OP2) ti=tvars_app? e2=expr 
     { peapp_symb op.pl_loc op.pl_desc ti [e1; e2] }
@@ -607,6 +617,12 @@ form_u:
 
 | e1=form op=loc(GT) ti=tvars_app? e2=form %prec OP1 
     { pfapp_symb op.pl_loc ">" ti [e1; e2] } 
+
+| e1=form op=loc(MINUS) ti=tvars_app? e2=form  
+    { pfapp_symb op.pl_loc "-" ti [e1; e2] }
+
+| e1=form op=loc(ADD) ti=tvars_app? e2=form  
+    { pfapp_symb op.pl_loc "+" ti [e1; e2] }
 
 | e1=form op=loc(OP2) ti=tvars_app? e2=form  
     { pfapp_symb op.pl_loc op.pl_desc ti [e1; e2] }
@@ -1308,13 +1324,11 @@ swap_pos:
 | i1=number p=int                                    { SKmovei(i1,p)        }
 | LBRACKET i1=number DOTDOT i2=number RBRACKET p=int { SKmoveinter(i1,i2,p) }
 ;
-int:
-| n=number { n }  (* FIXME how to get negative number *) 
-| m=loc(OP2) n=number 
-    { if m.pl_desc = "-" then -n else error m.pl_loc (Some "int expected") }
- 
-;
 
+int:
+| n=number { n }
+| m=loc(MINUS) n=number { -n }
+;
 
 side:
 | LBRACE n=number RBRACE {

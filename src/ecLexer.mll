@@ -138,12 +138,12 @@ let op_char_234  = op_char_2 | op_char_34
 let op_char_1234 = op_char_1 | op_char_234
 
 let op1 = op_char_1234* op_char_1 op_char_1234*
-let op2 = op_char_234*  op_char_2 op_char_234*  
-let op3 = op_char_34*   op_char_3 op_char_34* 
-let op4 = op_char_4+ 
+let op2 = op_char_234*  op_char_2 op_char_234+
+let op3 = op_char_34*   op_char_3 op_char_34*
+let op4 = op_char_4+
 
 let binop = 
-  op1 | op2 | op3 | op4 |
+  op1 | op2 | op3 | op4 | '+' | '-' |
   '!' | "&&" | "/\\" | "||" | "\\/" | "=>" | "<=>" | '>' | "="
 
 (* -------------------------------------------------------------------- *)
@@ -206,6 +206,9 @@ rule main = parse
   (* comparison *)
   | "="  { EQ }
   | "<>" { NE }
+
+  | "-" { MINUS }
+  | "+" { ADD }
 
   | op1 as s  { OP1 s }
   | op2 as s  { OP2 s }
