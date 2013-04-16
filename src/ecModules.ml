@@ -4,6 +4,7 @@ open EcSymbols
 
 (* -------------------------------------------------------------------- *)
 module Sp = EcPath.Sp
+module Sm = EcPath.Sm
 
 (* -------------------------------------------------------------------- *)
 type lvalue =
@@ -354,9 +355,11 @@ and module_sig_body_item =
   | Tys_function of funsig
 
 and funsig = {
-  fs_name : symbol;
-  fs_sig  : variable list * EcTypes.ty;
-  fs_uses : use_flags EcPath.Mp.t;
+  fs_name   : symbol;
+  fs_sig    : variable list * EcTypes.ty;
+  fs_calls  : EcPath.mpath list;
+  fs_reads  : Sm.t;
+  fs_writes : Sm.t;
 }
 
 (* -------------------------------------------------------------------- *)

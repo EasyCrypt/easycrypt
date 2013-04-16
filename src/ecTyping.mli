@@ -1,5 +1,6 @@
 (* -------------------------------------------------------------------- *)
 open EcSymbols
+open EcPath
 open EcLocation
 open EcParsetree
 open EcTypes
@@ -84,6 +85,12 @@ val check_tymod_sub : EcEnv.env -> module_sig -> module_sig -> unit
 val check_tymod_eq  : EcEnv.env -> module_sig -> module_sig -> unit
 
 (* -------------------------------------------------------------------- *)
-val e_inuse : expr -> EcPath.Sm.t
-val i_inuse : instr  -> use_flags EcPath.Mm.t
-val s_inuse : stmt   -> use_flags EcPath.Mm.t
+type uses = mpath list * (Sm.t * Sm.t)
+
+val e_inuse : expr  -> Sm.t
+val i_inuse : instr -> uses
+val s_inuse : stmt  -> uses
+
+val uses_of_funsig : funsig -> uses
+
+val norm_uses : EcEnv.env -> uses -> Sm.t * (Sm.t * Sm.t)

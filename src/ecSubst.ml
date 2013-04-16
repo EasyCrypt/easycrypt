@@ -7,6 +7,7 @@ open EcModules
 open EcTheory
 
 module Sp    = EcPath.Sp
+module Sm    = EcPath.Sm
 module Mp    = EcPath.Mp
 module Mid   = EcIdent.Mid
 
@@ -81,19 +82,26 @@ let subst_variable (s : _subst) (x : variable) =
   { x with v_type = s.s_ty x.v_type; }
 
 (* -------------------------------------------------------------------- *)
+let subst_funsig (s : _subst) (funsig : funsig) =
+  let args' = List.map (subst_variable s) (fst funsig.fs_sig) in
+  let res'  = s.s_ty (snd funsig.fs_sig) in
+
+  let fs_calls  = List.map s.s_fmp funsig.fs_calls
+  and fs_reads  = Sm.fold (fun p m -> Sm.add (s.s_fmp p) m) Sm.empty funsig.fs_reads
+  and fs_writes = Sm.fold (fun p m -> Sm.add (s.s_fmp p) m) Sm.empty funsig.fs_writes in
+
+  { fs_name = funsig.fs_name;
+    fs_sig  = (args', res');
+    fs_calls; fs_reads; fs_writes; }
+
+(* -------------------------------------------------------------------- *)
 let rec subst_modsig_body_item (s : _subst) (item : module_sig_body_item) =
   match item with
 (*  | Tys_variable vd ->
       Tys_variable (subst_variable s vd) *)
 
   | Tys_function funsig ->
-      let args' = List.map (subst_variable s) (fst funsig.fs_sig) in
-      let res'  = s.s_ty (snd funsig.fs_sig) in
-      let uses' = funsig.fs_uses in (* FIXME *)
-      Tys_function
-        { fs_name = funsig.fs_name;
-          fs_sig  = (args', res') ;
-          fs_uses = uses'         }
+      Tys_function (subst_funsig s funsig)
 
 (* -------------------------------------------------------------------- *)
 and subst_modsig_body (s : _subst) (sbody : module_sig_body) =
@@ -117,17 +125,12 @@ let subst_function_def (s : _subst) (def : function_def) =
 
 (* -------------------------------------------------------------------- *)
 let subst_function (s : _subst) (f : function_) =
-  let args' = List.map (subst_variable s) (fst f.f_sig.fs_sig) in
-  let res'  = s.s_ty (snd f.f_sig.fs_sig) in
-  let uses' = f.f_sig.fs_uses in (* FIXME *)
-  let def'  = omap f.f_def (subst_function_def s)
+  let sig' = subst_funsig s f.f_sig in
+  let def' = omap f.f_def (subst_function_def s) in
       
-  in
-    { f_name = f.f_name;
-      f_sig  = { fs_name = f.f_sig.fs_name;
-                 fs_sig  = (args', res')  ;
-                 fs_uses = uses'          ; };
-      f_def  = def' }
+  { f_name = f.f_name;
+    f_sig  = sig';
+    f_def  = def' }
 
 (* -------------------------------------------------------------------- *)
 let rec subst_module_item (s : _subst) (item : module_item) =

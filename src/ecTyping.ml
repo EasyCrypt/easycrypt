@@ -167,34 +167,52 @@ let e_inuse =
     | _ -> e_fold inuse map e
   in
     fun e -> inuse Sm.empty e
-  
-(* -------------------------------------------------------------------- *)
-let (i_inuse, s_inuse) =
-  let addflags p e map =
-     Mm.change
-       (fun flags -> Some (List.fold_left UM.add (odfl UM.empty flags) e))
-       p map
-  in
 
-  let rec lv_inuse (map : use_flags Mm.t) (lv : lvalue) =
+(* -------------------------------------------------------------------- *)
+type uses = EcPath.mpath list * (Sm.t * Sm.t)
+
+let empty_uses : uses = ([], (Sm.empty, Sm.empty))
+
+let add_call ((m, rw) : uses) p : uses =
+  (p :: m, rw)
+
+let add_read ((m, (r, w)) : uses) p : uses =
+  (m, (Sm.add p r, w))
+
+let add_write ((m, (r, w)) : uses) p : uses =
+  (m, (r, Sm.add p w))
+
+let uses_of_funsig (fs : funsig) =
+  (fs.fs_calls, (fs.fs_reads, fs.fs_writes))
+
+let norm_uses (env : EcEnv.env) ((m, (r, w)) : uses) =
+  let norm map =
+    Sm.fold
+      (fun p map -> Sm.add (EcEnv.NormMp.norm_mpath env p) map)
+      Sm.empty map
+  in
+    (norm (Sm.of_list m), (norm r, norm w))
+
+let (i_inuse, s_inuse, se_inuse) =
+  let rec lv_inuse (map : uses) (lv : lvalue) =
     match lv with
     | LvVar (p,_) ->
-        addflags p.pv_name [`Write] map
+        add_write map p.pv_name
 
     | LvTuple ps ->
         List.fold_left
-          (fun map (p, _) -> addflags p.pv_name [`Write] map)
+          (fun map (p, _) -> add_write map p.pv_name)
           map ps
 
     | LvMap (_, p, e, _) ->
       (* Maps are not modified in place but feed to a mutator
          operator that returns the augmented map and assigning the
          result to [p]. Hence the [`Read | `Write] flag. *)
-      let map = addflags p.pv_name [`Read; `Write] map in
+      let map = add_write (add_read map p.pv_name) p.pv_name in
       let map = se_inuse map e in
         map
 
-  and i_inuse (map : use_flags Mm.t) (i : instr) =
+  and i_inuse (map : uses) (i : instr) =
     match i.i_node with
     | Sasgn (lv, e) ->
       let map = lv_inuse map lv in
@@ -208,7 +226,7 @@ let (i_inuse, s_inuse) =
 
     | Scall (lv, p, es) -> begin
       let map = List.fold_left se_inuse map es in
-      let map = addflags p [`Call] map in
+      let map = add_call map p in
       let map = ofold lv ((^~) lv_inuse) map in
         map
     end
@@ -227,14 +245,14 @@ let (i_inuse, s_inuse) =
     | Sassert e ->
       se_inuse map e
 
-  and s_inuse (map : use_flags Mm.t) (s : stmt) =
+  and s_inuse (map : uses) (s : stmt) =
     List.fold_left i_inuse map s.s_node
 
-  and se_inuse (map : use_flags Mm.t) (e : expr) =
-    Sm.fold (fun p map -> addflags p [`Read] map) (e_inuse e) map
+  and se_inuse ((m, (r, w)) : uses) (e : expr) =
+    (m, (Sm.union r (e_inuse e), w))
 
   in
-    (i_inuse Mm.empty, s_inuse Mm.empty)
+    (i_inuse empty_uses, s_inuse empty_uses, se_inuse)
 
 (* -------------------------------------------------------------------- *)
 let select_local env (qs,s) = 
@@ -555,9 +573,11 @@ and transmodsig_body (env : EcEnv.env) (is : pmodule_sig_struct_body) =
           if not (List.uniq (List.map fst f.pfd_tyargs)) then
             raise (DuplicatedArgumentsName f);
           Tys_function
-            { fs_name = name.pl_desc;
-              fs_sig  = (tyargs, resty);
-              fs_uses = Mp.empty; }
+            { fs_name   = name.pl_desc;
+              fs_sig    = (tyargs, resty);
+              fs_calls  = [];
+              fs_reads  = Sm.empty;
+              fs_writes = Sm.empty; }
 
   in
 
@@ -645,12 +665,23 @@ let rec check_tymod_cnv mode (env : EcEnv.env) tin tout =
         if not (EcReduction.equal_type env ires ores) then
           tymod_cnv_failure (E_TyModCnv_MismatchFunSig fin.fs_name);
 
-        let flcmp =
+        let flcmp () =
+          let (icalls, (ireads, iwrites)) = norm_uses env (uses_of_funsig fin)
+          and (ocalls, (oreads, owrites)) = norm_uses env (uses_of_funsig fout) in
+
           match mode with
-          | `Sub -> Mp.submap (fun _ flin flout -> UM.included flin flout)
-          | `Eq  -> Mp.equal  (fun flin flout -> UM.equal flin flout)
+          | `Sub ->
+                 (Sm.subset icalls  ocalls )
+              && (Sm.subset ireads  oreads )
+              && (Sm.subset iwrites owrites)
+
+          | `Eq  ->
+                 (Sm.equal icalls  ocalls )
+              && (Sm.equal ireads  oreads )
+              && (Sm.equal iwrites owrites)
+
         in
-          if not (flcmp fin.fs_uses fout.fs_uses) then
+          if not (flcmp ()) then
             tymod_cnv_failure (E_TyModCnv_MismatchFunSig fin.fs_name);
 
     in
@@ -869,18 +900,26 @@ and transstruct1 (env : EcEnv.env) (st : pstructure_item) =
       let clsubst = { EcTypes.e_subst_id with es_ty = su } in
       let stmt    = s_subst clsubst stmt
       and result  = omap result (e_subst clsubst) in
+      let stmt    = EcModules.stmt (prelude @ stmt.s_node) in
+
+      (* Computes reads/writes/calls *)
+      let (calls, (reads, writes)) =
+        ofold result ((^~) se_inuse) (s_inuse stmt)
+      in
 
       (* Compose all results *)
       let fun_ =
         { f_name   = decl.pfd_name.pl_desc;
           f_sig    = {
-            fs_name = decl.pfd_name.pl_desc;
-            fs_sig  = (params, retty);
-            fs_uses = Mp.empty;   (* FIXME *)
+            fs_name   = decl.pfd_name.pl_desc;
+            fs_sig    = (params, retty);
+            fs_calls  = calls;
+            fs_reads  = reads;
+            fs_writes = writes;
           };
           f_def = Some {
             f_locals = locals;
-            f_body   = EcModules.stmt (prelude @ stmt.s_node);
+            f_body   = stmt;
             f_ret    = result;
           };
         }

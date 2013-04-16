@@ -74,21 +74,6 @@ val destr_while  : instr -> expr * stmt
 val destr_assert : instr -> expr
 
 (* -------------------------------------------------------------------- *)
-module UM : sig
-  type flag  = [`Call | `Read | `Write]
-  type flags
-
-  val empty     : flags
-  val singleton : flag -> flags
-  val add       : flags -> flag -> flags
-  val have      : flags -> flag -> bool
-  val equal     : flags -> flags -> bool
-  val included  : flags -> flags -> bool
-end
-
-type use_flags = UM.flags
-
-(* -------------------------------------------------------------------- *)
 type variable = {
   v_name : symbol;
   v_type : EcTypes.ty;
@@ -112,9 +97,11 @@ and module_sig_body_item =
   | Tys_function of funsig
 
 and funsig = {
-  fs_name : symbol;
-  fs_sig  : variable list * EcTypes.ty;
-  fs_uses : use_flags EcPath.Mp.t;
+  fs_name   : symbol;
+  fs_sig    : variable list * EcTypes.ty;
+  fs_calls  : mpath list;
+  fs_reads  : Sm.t;
+  fs_writes : Sm.t;
 }
 
 (* -------------------------------------------------------------------- *)
