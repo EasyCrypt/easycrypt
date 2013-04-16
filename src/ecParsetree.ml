@@ -143,6 +143,13 @@ type ptydecl = {
 }
 
 (* -------------------------------------------------------------------- *)
+type pdatatype = {
+  ptd_name   : psymbol;
+  ptd_tyvars : psymbol list;
+  ptd_ctors  : (psymbol * pty option) list;
+}
+
+(* -------------------------------------------------------------------- *)
 type pgamepath = (pmsymbol * psymbol) located
 type pmemory   = psymbol
 
@@ -385,6 +392,7 @@ type global =
   | Gaxiom       of paxiom
   | Gclaim       of claim
   | Gtype        of ptydecl
+  | Gdatatype    of pdatatype
   | Gprint       of pprint
   | GthOpen      of psymbol
   | GthClose     of psymbol

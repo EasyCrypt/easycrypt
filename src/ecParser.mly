@@ -23,6 +23,12 @@
     pty_body   = body;
   }
 
+  let mk_datatype (tyvars, name) ctors = {
+    ptd_name   = name;
+    ptd_tyvars = tyvars;
+    ptd_ctors  = ctors;
+  }
+
   let mk_peid_symb loc s ti = 
     mk_loc loc (PEident (pqsymb_of_symb loc s, ti))
 
@@ -134,6 +140,7 @@
 %token COMMA
 %token COMPUTE
 %token CUT
+%token DATATYPE
 %token DELTA
 %token DLBRACKET
 %token DOT
@@ -176,6 +183,7 @@
 %token MODULE
 %token NE
 %token NOT
+%token OF
 %token OFF
 %token ON
 %token OP
@@ -926,7 +934,7 @@ ivar_decl:
 (* -------------------------------------------------------------------- *)
 (* EcTypes declarations / definitions                                   *)
 
-poly_typarams:
+typarams:
 | empty
     { []  }
 
@@ -938,12 +946,25 @@ poly_typarams:
 ;
 
 type_decl:
-| TYPE tydecl=poly_typarams x=ident { (tydecl, x) }
+| TYPE tya=typarams x=ident { (tya, x) }
 ;
 
 type_decl_or_def:
 | td=type_decl { mk_tydecl td None }
 | td=type_decl EQ te=loc(type_exp) { mk_tydecl td (Some te) }
+;
+
+(* -------------------------------------------------------------------- *)
+(* Datatypes                                                            *)
+
+datatype_def:
+| DATATYPE tya=typarams x=ident EQ PIPE? ctors=plist1(dt_ctor_def, PIPE)
+    { mk_datatype (tya, x) ctors }
+;
+
+dt_ctor_def:
+| x=uident { (x, None) }
+| x=uident OF ty=loc(simpl_type_exp) { (x, (Some ty)) }
 ;
 
 (* -------------------------------------------------------------------- *)
@@ -1349,7 +1370,7 @@ clone_with:
 ;
 
 clone_override:
-| TYPE ps=poly_typarams x=ident EQ t=loc(type_exp)
+| TYPE ps=typarams x=ident EQ t=loc(type_exp)
    { (x, PTHO_Type (ps, t)) }
 
 | OP x=ident EQ e=expr
@@ -1395,23 +1416,25 @@ checkproof:
 (* Global entries                                                       *)
 
 global_:
-| theory_open      { GthOpen    $1 }
-| theory_close     { GthClose   $1 }
-| theory_require   { GthRequire $1 }
-| theory_import    { GthImport  $1 }
-| theory_export    { GthExport  $1 }
-| theory_clone     { GthClone   $1 }
-| theory_w3        { GthW3      $1 }
-| mod_def          { Gmodule    $1 }
-| sig_def          { Ginterface $1 }
-| type_decl_or_def { Gtype      $1 }
-| operator         { Goperator  $1 }
-| predicate        { Gpredicate $1 }
-| axiom            { Gaxiom     $1 }
-| claim            { Gclaim     $1 }
-| tactics          { Gtactics   $1 }
+| theory_open      { GthOpen      $1 }
+| theory_close     { GthClose     $1 }
+| theory_require   { GthRequire   $1 }
+| theory_import    { GthImport    $1 }
+| theory_export    { GthExport    $1 }
+| theory_clone     { GthClone     $1 }
+| theory_w3        { GthW3        $1 }
+| mod_def          { Gmodule      $1 }
+| sig_def          { Ginterface   $1 }
+| type_decl_or_def { Gtype        $1 }
+| datatype_def     { Gdatatype    $1 }
+| operator         { Goperator    $1 }
+| predicate        { Gpredicate   $1 }
+| axiom            { Gaxiom       $1 }
+| claim            { Gclaim       $1 }
+| tactics          { Gtactics     $1 }
 | gprover_info     { Gprover_info $1 }
-| checkproof       { Gcheckproof $1 }
+| checkproof       { Gcheckproof  $1 }
+
 | x=loc(SAVE)      { Gsave x.pl_loc }
 | PRINT p=print    { Gprint     p  }
 ;

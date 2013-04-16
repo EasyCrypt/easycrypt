@@ -99,6 +99,10 @@ let rec process_type (scope : EcScope.scope) (tyd : ptydecl located) =
     scope
   
 (* -------------------------------------------------------------------- *)
+and process_datatype (_scope : EcScope.scope) _ =
+  failwith "not-implemented-yet"
+
+(* -------------------------------------------------------------------- *)
 and process_module (scope : EcScope.scope) (x, m) =
   EcScope.Mod.add scope x.pl_desc m
 
@@ -200,6 +204,7 @@ and process (scope : EcScope.scope) (g : global located) =
   let scope =
     match g.pl_desc with
     | Gtype      t    -> process_type       scope (mk_loc loc t)
+    | Gdatatype  t    -> process_datatype   scope (mk_loc loc t)
     | Gmodule    m    -> process_module     scope m
     | Ginterface i    -> process_interface  scope i
     | Goperator  o    -> process_operator   scope (mk_loc loc o)
