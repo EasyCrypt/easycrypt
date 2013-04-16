@@ -58,7 +58,7 @@ clone :
 - diff. for modules
 
 
-Discution : 
+Discussion :
   semantique de hoare f : p => q 
     forall m, p m => range q [f m]
   ou avoir simplement le range.
@@ -105,3 +105,22 @@ Discution :
 *** Note de discussion
 
 i_inuse : LvMap `Read ok mais aussi `Write
+
+*** 
+
+ - Les types sont étendus avec un constructeur unaire Tglob.  Tglob(M)
+   représente le types des variables globales (en tant que n-uplet) de
+   M. Il est incertain si Tglob(M) ne contient que le types des
+   variables non connues de M ou non.
+
+ - Les formules sont étendues avec un nouveau constructeur
+   représentant les variables globales d'un module dans une mémoire
+   donnée:
+
+     Cglob : module x mem -> form
+
+ - Faire l'extension de la substitution en conséquence.
+
+***
+
+ - 
