@@ -2,10 +2,10 @@
 require import Prime_field.
 
 type group.
-cnst g:group. (* the generator *)
+op g:group. (* the generator *)
 
-op ( * ):(group, group) -> group.   (* multiplication of group elements *)
-op ( ^ ):(group, gf_q) -> group.    (* exponentiation *)
+op ( * ): group -> group -> group.   (* multiplication of group elements *)
+op ( ^ ): group -> gf_q -> group.    (* exponentiation *)
 op log:group -> gf_q.             (* discrete logarithm *)
 
 op (/) (a b:group): group = g^(log a - log b).

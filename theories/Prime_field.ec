@@ -2,14 +2,14 @@
 require import Int.
 
 (* the order of field is a prime q *)
-cnst q: int.
+op q: int.
 axiom q_pos: 0 < q.
 (* TODO: Add an axiom asserting primality of q. *)
 
 type gf_q.
 
-op ( * ): (gf_q,gf_q) -> gf_q.  (* multiplication modulo q *)
-op ( + ): (gf_q,gf_q) -> gf_q.  (* addition modulo q *)
+op ( * ): gf_q -> gf_q -> gf_q.  (* multiplication modulo q *)
+op ( + ): gf_q -> gf_q -> gf_q.  (* addition modulo q *)
 op neg: gf_q -> gf_q.         (* the additive inverse *)
 op inv: gf_q -> gf_q.         (* the multiplicative inverse *)
 
@@ -17,8 +17,8 @@ op (-) (x y:gf_q): gf_q = x + (neg y). (* subtraction modulo q *)
 op (/) (x y:gf_q): gf_q = x * (inv y). (* division modulo q for y <> 0 *)
 
 
-cnst gf_q0: gf_q. (* zero *)
-cnst gf_q1: gf_q. (* one *)
+op gf_q0: gf_q. (* zero *)
+op gf_q1: gf_q. (* one *)
 
 (** Field axioms, compare "Harrison: Theorem proving with the Real Numbers, p. 10" *)
 axiom one_zero: gf_q0 <> gf_q1.

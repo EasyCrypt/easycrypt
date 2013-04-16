@@ -4,9 +4,9 @@ require import Map.
 type from.
 type to.
 
-cnst dsample: to distr. (* Distribution to use on the target type *)
-cnst qO: int.           (* Maximum number of calls by the adversary *)
-cnst default: to.       (* Default element to return on error by the adversary wrapper *)
+op dsample: to distr. (* Distribution to use on the target type *)
+op qO: int.           (* Maximum number of calls by the adversary *)
+op default: to.       (* Default element to return on error by the adversary wrapper *)
 
 (* Signature for random oracles from "from" to "to" *)
 module type Oracle = {

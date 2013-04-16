@@ -4,7 +4,7 @@ require import Int.
 (* Core Datatype *)
 type 'a multiset.
 
-cnst empty: 'a multiset.
+op empty: 'a multiset.
 op   add  : 'a multiset -> 'a -> 'a multiset.
 
 axiom induction: forall (xs:'a multiset) (p:'a multiset -> bool),
