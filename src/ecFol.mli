@@ -50,12 +50,12 @@ and f_node =
   | FequivF of equivF (* $left,$right / $left,$right *)
   | FequivS of equivS (* $left,$right / $left,$right *)
 
-  | Fpr     of memory * EcPath.mpath * form list * form (* hr *)
+  | Fpr     of memory * EcPath.xpath * form list * form (* hr *)
 
 and equivF = { 
   ef_pr  : form;
-  ef_fl   : EcPath.mpath;
-  ef_fr   : EcPath.mpath;
+  ef_fl   : EcPath.xpath;
+  ef_fr   : EcPath.xpath;
   ef_po : form;
 }
 
@@ -69,7 +69,7 @@ and equivS = {
 
 and hoareF = { 
   hf_pr  : form;
-  hf_f    : EcPath.mpath;
+  hf_f    : EcPath.xpath;
   hf_po : form;
 }
 and hoareS = {
@@ -117,14 +117,14 @@ val f_exists : binding -> form -> form
 val f_forall : binding -> form -> form
 val f_lambda : binding -> form -> form
 
-val f_hoareF   : form -> EcPath.mpath -> form -> form 
+val f_hoareF   : form -> EcPath.xpath -> form -> form 
 val f_hoareS   : memenv -> form -> EcModules.stmt -> form -> form 
 val f_hoareS_r : hoareS -> form
-val f_equivF   : form -> EcPath.mpath -> EcPath.mpath -> form -> form 
+val f_equivF   : form -> EcPath.xpath -> EcPath.xpath -> form -> form 
 val f_equivS   : 
  memenv -> memenv -> form -> EcModules.stmt -> EcModules.stmt -> form -> form
 val f_equivS_r : equivS -> form
-val f_pr       : memory -> EcPath.mpath -> form list -> form -> form
+val f_pr       : memory -> EcPath.xpath -> form list -> form -> form
 
 val fop_not : form
 val f_not : form -> form
@@ -200,7 +200,7 @@ val destr_equivF  : form -> equivF
 val destr_equivS  : form -> equivS
 val destr_hoareF  : form -> hoareF
 val destr_hoareS  : form -> hoareS
-val destr_pr      : form -> memory * EcPath.mpath * form list * form (* hr *) 
+val destr_pr      : form -> memory * EcPath.xpath * form list * form (* hr *) 
 
 val is_and    : form -> bool
 val is_or     : form -> bool

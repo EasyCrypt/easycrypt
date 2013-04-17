@@ -48,6 +48,7 @@ and mpath_top =
 
 (* -------------------------------------------------------------------- *)
 val mpath_abs : ident -> mpath list -> mpath
+val mident    : ident -> mpath
 val mpath_crt : path -> mpath list -> path option -> mpath
 
 val m_equal   : mpath -> mpath -> bool
@@ -92,3 +93,4 @@ val p_subst : path Mp.t -> path -> path
 
 val m_subst : (path -> path) -> mpath Mid.t -> mpath -> mpath
 val x_subst : (mpath -> mpath) -> xpath -> xpath
+val x_substm : (path -> path) -> mpath Mid.t -> xpath -> xpath

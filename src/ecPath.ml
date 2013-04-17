@@ -146,6 +146,7 @@ let mk_mpath p args =
   Hsmpath.hashcons { m_top = p; m_args = args; m_tag = -1; }
 
 let mpath_abs id args = mk_mpath (`Abstract id) args
+let mident id = mpath_abs id []
 let mpath_crt p args sp = mk_mpath (`Concrete(p,sp)) args
 
 let m_apply mp args = 
@@ -269,4 +270,6 @@ let x_subst (sm : mpath -> mpath) =
     if x.x_top == top then x 
     else xpath top x.x_sub
 
+let x_substm sp sm = 
+  x_subst (m_subst sp sm)
 

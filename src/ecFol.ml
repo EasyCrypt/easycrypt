@@ -55,12 +55,12 @@ and f_node =
   | FequivF of equivF (* $left,$right / $left,$right *)
   | FequivS of equivS (* $left,$right / $left,$right *)
 
-  | Fpr     of memory * EcPath.mpath * form list * form (* hr *)
+  | Fpr     of memory * EcPath.xpath * form list * form (* hr *)
 
 and equivF = { 
   ef_pr  : form;
-  ef_fl   : EcPath.mpath;
-  ef_fr   : EcPath.mpath;
+  ef_fl   : EcPath.xpath;
+  ef_fr   : EcPath.xpath;
   ef_po : form;
 }
 
@@ -74,7 +74,7 @@ and equivS = {
 
 and hoareF = { 
   hf_pr  : form;
-  hf_f    : EcPath.mpath;
+  hf_f    : EcPath.xpath;
   hf_po : form;
 }
 and hoareS = {
@@ -145,8 +145,8 @@ let b_hash (bs : binding) =
 let eqf_equal ef1 ef2 = 
      f_equal ef1.ef_pr ef2.ef_pr
   && f_equal ef1.ef_po ef2.ef_po
-  && EcPath.m_equal ef1.ef_fl ef2.ef_fl 
-  && EcPath.m_equal ef1.ef_fr ef2.ef_fr
+  && EcPath.x_equal ef1.ef_fl ef2.ef_fl 
+  && EcPath.x_equal ef1.ef_fr ef2.ef_fr
 
 let eqs_equal es1 es2 = 
      f_equal es1.es_pr es2.es_pr
@@ -159,7 +159,7 @@ let eqs_equal es1 es2 =
 let hf_equal hf1 hf2 = 
      f_equal hf1.hf_pr hf2.hf_pr
   && f_equal hf1.hf_po hf2.hf_po
-  && EcPath.m_equal hf1.hf_f hf2.hf_f
+  && EcPath.x_equal hf1.hf_f hf2.hf_f
 
 let hs_equal hs1 hs2 = 
      f_equal hs1.hs_pr hs2.hs_pr
@@ -214,7 +214,7 @@ module Hsform = Why3.Hashcons.Make (struct
 
     | Fpr (m1, mp1, args1, ev1), Fpr (m2, mp2, args2, ev2) ->
            EcIdent.id_equal m1  m2
-        && EcPath.m_equal   mp1 mp2
+        && EcPath.x_equal   mp1 mp2
         && f_equal          ev1 ev2
         && (List.all2 f_equal args1 args2)
 
@@ -256,7 +256,7 @@ module Hsform = Why3.Hashcons.Make (struct
 
     | FhoareF hf ->
         Why3.Hashcons.combine2
-          (f_hash hf.hf_pr) (f_hash hf.hf_po) (EcPath.m_hash hf.hf_f)
+          (f_hash hf.hf_pr) (f_hash hf.hf_po) (EcPath.x_hash hf.hf_f)
 
     | FhoareS hs ->
         Why3.Hashcons.combine2
@@ -265,7 +265,7 @@ module Hsform = Why3.Hashcons.Make (struct
     | FequivF ef ->
         Why3.Hashcons.combine3
           (f_hash ef.ef_pr) (f_hash ef.ef_po)
-          (EcPath.m_hash ef.ef_fl) (EcPath.m_hash ef.ef_fr)
+          (EcPath.x_hash ef.ef_fl) (EcPath.x_hash ef.ef_fr)
 
     | FequivS es ->
         Why3.Hashcons.combine3
@@ -276,7 +276,7 @@ module Hsform = Why3.Hashcons.Make (struct
         let id =
           Why3.Hashcons.combine2
             (EcIdent.id_hash m)
-            (EcPath.m_hash   mp)
+            (EcPath.x_hash   mp)
             (f_hash          ev)
         in
           Why3.Hashcons.combine_list f_hash id args
@@ -288,7 +288,7 @@ module Hsform = Why3.Hashcons.Make (struct
     | Fint _  | Fop _ -> Mid.empty
     | Fpvar (pv,m) ->
       let fv = fv_add m Mid.empty in
-      EcPath.m_fv fv pv.pv_name
+      EcPath.x_fv fv pv.pv_name
     | Fglob (mp,m) ->
       let fv = fv_add m Mid.empty in
       EcPath.m_fv fv mp
@@ -308,14 +308,14 @@ module Hsform = Why3.Hashcons.Make (struct
         let fv = 
           fv_union (Mid.remove mpre (f_fv hf.hf_pr)) 
             (Mid.remove mpost (f_fv hf.hf_po)) in
-        EcPath.m_fv fv hf.hf_f
+        EcPath.x_fv fv hf.hf_f
     | FhoareS hs ->
         let fv = Mid.remove mhr (fv_union (f_fv hs.hs_pr) (f_fv hs.hs_po)) in
         fv_union (EcModules.s_fv hs.hs_s) fv
     | FequivF ef ->
       let fv = 
         fv_diff (fv_union (f_fv ef.ef_pr) (f_fv ef.ef_po)) fv_mlr in
-      EcPath.m_fv (EcPath.m_fv fv ef.ef_fl) ef.ef_fr
+      EcPath.x_fv (EcPath.x_fv fv ef.ef_fl) ef.ef_fr
     | FequivS es ->
         let fv = 
           fv_diff (fv_union (f_fv es.es_pr) (f_fv es.es_po)) fv_mlr in
@@ -323,7 +323,7 @@ module Hsform = Why3.Hashcons.Make (struct
           (fv_union (EcModules.s_fv es.es_sl) (EcModules.s_fv es.es_sr))
     | Fpr (m,mp,args,event) ->
         let fve = Mid.remove mpost (f_fv event) in
-        let fv  = EcPath.m_fv fve mp in
+        let fv  = EcPath.x_fv fve mp in
         List.fold_left (fun s f -> fv_union s (f_fv f))
           (fv_add m fv) args
   
@@ -867,7 +867,7 @@ let add_binding s (x,gty as xt) =
     if x == x' && p == p' then s,xt else
       bind_mod s x (EcPath.mident x'), (x',GTmodty p')
   | GTmem mt ->
-    let mt' = EcMemory.mt_subst s.fs_p s.fs_mp s.fs_ty mt in
+    let mt' = EcMemory.mt_substm s.fs_p s.fs_mp s.fs_ty mt in
     let x' = if s.fs_freshen then EcIdent.fresh x else x in
     if x == x' && mt == mt' then s,xt else 
       bind_mem s x x', (x',GTmem mt')
@@ -899,7 +899,7 @@ let rec f_subst (s:f_subst) f =
       if   f.f_ty == ty' && tys == tys' && p == p' then f else 
       f_op p' tys' ty'
   | Fpvar(pv,m) ->
-      let pv' = pv_subst (EcPath.m_subst s.fs_p s.fs_mp) pv in
+      let pv' = pv_subst (EcPath.x_substm s.fs_p s.fs_mp) pv in
       let m'  = Mid.find_def m m s.fs_mem in
       let ty' = s.fs_ty f.f_ty in
       if pv == pv' && m == m' && ty' = f.f_ty then f else 
@@ -915,7 +915,7 @@ let rec f_subst (s:f_subst) f =
       assert (not (Mid.mem mhr s.fs_mem) && not (Mid.mem mhr s.fs_mem));
       let pre'  = f_subst s hf.hf_pr in
       let post' = f_subst s hf.hf_po in
-      let mp'   = EcPath.m_subst s.fs_p s.fs_mp hf.hf_f in
+      let mp'   = EcPath.x_substm s.fs_p s.fs_mp hf.hf_f in
       if hf.hf_pr == pre' && hf.hf_po == post' && hf.hf_f == mp' then f else 
       f_hoareF pre' mp' post'
   | FhoareS hs ->
@@ -924,7 +924,7 @@ let rec f_subst (s:f_subst) f =
       let post' = f_subst s hs.hs_po in
       let es    = e_subst_init s.fs_freshen s.fs_p s.fs_ty s.fs_mp in
       let st'   = EcModules.s_subst es hs.hs_s in
-      let me'  = EcMemory.me_subst s.fs_p s.fs_mp s.fs_mem s.fs_ty hs.hs_m in
+      let me'  = EcMemory.me_substm s.fs_p s.fs_mp s.fs_mem s.fs_ty hs.hs_m in
       if hs.hs_m == me' && 
         hs.hs_pr == pre' && hs.hs_s == st' && hs.hs_po == post' then f else
       f_hoareS me' pre' st' post'
@@ -932,7 +932,7 @@ let rec f_subst (s:f_subst) f =
       assert (not (Mid.mem mleft s.fs_mem) && not (Mid.mem mright s.fs_mem));
       let pre'    = f_subst s ef.ef_pr in
       let post'   = f_subst s ef.ef_po in
-      let m_subst = EcPath.m_subst s.fs_p s.fs_mp in 
+      let m_subst = EcPath.x_substm s.fs_p s.fs_mp in 
       let mp1'    = m_subst ef.ef_fl in
       let mp2'    = m_subst ef.ef_fr in
       if ef.ef_pr == pre' && ef.ef_po == post' && 
@@ -943,9 +943,9 @@ let rec f_subst (s:f_subst) f =
       let pre'  = f_subst s eqs.es_pr in
       let post' = f_subst s eqs.es_po in
       let me1'   = 
-        EcMemory.me_subst s.fs_p s.fs_mp s.fs_mem s.fs_ty eqs.es_ml in
+        EcMemory.me_substm s.fs_p s.fs_mp s.fs_mem s.fs_ty eqs.es_ml in
       let me2'   = 
-        EcMemory.me_subst s.fs_p s.fs_mp s.fs_mem s.fs_ty eqs.es_mr in
+        EcMemory.me_substm s.fs_p s.fs_mp s.fs_mem s.fs_ty eqs.es_mr in
       let es = e_subst_init s.fs_freshen s.fs_p s.fs_ty s.fs_mp in
       let s_subst = EcModules.s_subst es in
       let st1' = s_subst eqs.es_sl in
@@ -958,7 +958,7 @@ let rec f_subst (s:f_subst) f =
   | Fpr(m,mp,args,e) ->
       assert (not (Mid.mem mpost s.fs_mem));
       let m'    = Mid.find_def m m s.fs_mem in
-      let mp'   = EcPath.m_subst s.fs_p s.fs_mp mp in
+      let mp'   = EcPath.x_substm s.fs_p s.fs_mp mp in
       let args' = List.smart_map (f_subst s) args in
       let e'    = (f_subst s) e in
       if m == m' && mp == mp' && args == args' && e == e' then f else

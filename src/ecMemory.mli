@@ -44,7 +44,18 @@ val mt_subst :
   (EcPath.xpath -> EcPath.xpath) ->
   (EcTypes.ty -> EcTypes.ty) -> memtype -> memtype
 
+val mt_substm :
+  (EcPath.path -> EcPath.path) ->
+  EcPath.mpath EcIdent.Mid.t ->
+  (EcTypes.ty -> EcTypes.ty) -> memtype -> memtype
+
 val me_subst :
   (EcPath.xpath -> EcPath.xpath) ->
+  memory EcIdent.Mid.t ->
+  (EcTypes.ty -> EcTypes.ty) -> memenv -> memenv
+
+val me_substm :
+ (EcPath.path -> EcPath.path) ->
+  EcPath.mpath EcIdent.Mid.t ->
   memory EcIdent.Mid.t ->
   (EcTypes.ty -> EcTypes.ty) -> memenv -> memenv
