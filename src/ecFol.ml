@@ -1112,7 +1112,14 @@ let f_iff_simpl f1 f2 =
 
 let f_eq_simpl f1 f2 = 
   if f_equal f1 f2 then f_true
-  else f_eq f1 f2
+  else match f1.f_node, f2.f_node with
+  | Fint _ , Fint _ -> f_false
+  | Fop (op1, []) , Fop (op2, []) when
+    (EcPath.p_equal op1 EcCoreLib.p_true &&
+     EcPath.p_equal op2 EcCoreLib.p_false) ||
+     (EcPath.p_equal op2 EcCoreLib.p_true &&
+     EcPath.p_equal op1 EcCoreLib.p_false) -> f_false
+  | _ -> f_eq f1 f2
 
 let rec form_of_expr mem (e: expr) = 
   match e.e_node with
