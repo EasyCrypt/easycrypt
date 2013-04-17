@@ -95,23 +95,23 @@ type pvar_kind =
   | PVloc
 
 type prog_var = {
-  pv_name : EcPath.mpath;
+  pv_name : EcPath.xpath;
   pv_kind : pvar_kind;
 }
 
 val pv_equal   : prog_var -> prog_var -> bool 
 val pv_compare : prog_var -> prog_var -> int
-val pv_compare_p : prog_var -> prog_var -> int
+(* val pv_compare_p : prog_var -> prog_var -> int *)
 val pv_hash    : prog_var -> int
 val pv_fv      : prog_var -> int EcIdent.Mid.t
 val is_loc     : prog_var -> bool
 
 val string_of_pvar : prog_var -> string
 
-val pv_subst : (EcPath.mpath -> EcPath.mpath) -> prog_var -> prog_var 
+val pv_subst : (EcPath.xpath -> EcPath.xpath) -> prog_var -> prog_var 
 
-val pv_loc : EcPath.mpath -> symbol -> prog_var
-val pv_res : EcPath.mpath -> prog_var
+val pv_loc : EcPath.xpath -> symbol -> prog_var
+val pv_res : EcPath.xpath -> prog_var
 
 (* -------------------------------------------------------------------- *)
 type expr = private {
@@ -165,10 +165,11 @@ val e_fold :
 
 type e_subst = { 
     es_freshen : bool; (* true means realloc local *)
-    es_p   : EcPath.path -> EcPath.path;
-    es_ty  : ty -> ty;
-    es_mp  : EcPath.mpath -> EcPath.mpath; 
-    es_loc : expr Mid.t;
+    es_p       : EcPath.path -> EcPath.path;
+    es_ty      : ty -> ty;
+    es_mp      : EcPath.mpath -> EcPath.mpath; 
+    es_xp      : EcPath.xpath -> EcPath.xpath;
+    es_loc     : expr Mid.t;
   }
 
 val e_subst_id   : e_subst

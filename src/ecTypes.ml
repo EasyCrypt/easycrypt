@@ -25,8 +25,6 @@ type dom = ty list
 let ty_equal : ty -> ty -> bool = (==)
 let ty_hash ty = ty.ty_tag
 
-
-
 module Hsty = Why3.Hashcons.Make (struct
   type t = ty
 
@@ -244,28 +242,29 @@ type pvar_kind =
   | PVloc 
 
 type prog_var = {
-  pv_name : EcPath.mpath;
+  pv_name : EcPath.xpath;
   pv_kind : pvar_kind;
 }
 
 let pv_equal v1 v2 = 
-  EcPath.m_equal v1.pv_name v2.pv_name && v1.pv_kind = v2.pv_kind 
+  EcPath.x_equal v1.pv_name v2.pv_name && v1.pv_kind = v2.pv_kind 
 
 let pv_hash v = 
-  Why3.Hashcons.combine (EcPath.m_hash v.pv_name)
+  Why3.Hashcons.combine (EcPath.x_hash v.pv_name)
     (if v.pv_kind = PVglob then 1 else 0)
 
 let pv_compare v1 v2 = 
-  let r = EcPath.m_compare v1.pv_name v2.pv_name in
+  let r = EcPath.x_compare v1.pv_name v2.pv_name in
   if r = 0 then Pervasives.compare v1.pv_kind v2.pv_kind
   else r 
 
-let pv_compare_p v1 v2 =
+(*let pv_compare_p v1 v2 =
+  
   let r = 
     EcPath.p_compare (EcPath.path_of_mpath v1.pv_name) 
       (EcPath.path_of_mpath v2.pv_name) in
   if r = 0 then Pervasives.compare v1.pv_kind v2.pv_kind
-  else r 
+  else r *)
 
 let is_loc v = match v.pv_kind with PVloc -> true | _ -> false
   
@@ -279,14 +278,14 @@ let string_of_pvar_kind = function
 
 let string_of_pvar (p : prog_var) =
   Printf.sprintf "%s[%s]"
-    (EcPath.m_tostring p.pv_name)
+    (EcPath.x_tostring p.pv_name)
     (string_of_pvar_kind p.pv_kind)
 
 let pv_loc f s = 
-  { pv_name = EcPath.mqname f EcPath.PKother s [];
+  { pv_name = EcPath.xqname f s;
     pv_kind = PVloc }
 
-let pv_res (f:EcPath.mpath) = pv_loc f "res"
+let pv_res (f:EcPath.xpath) = pv_loc f "res"
 
 (* -------------------------------------------------------------------- *)
 type lpattern =
@@ -343,7 +342,7 @@ let lp_fv = function
   | LTuple ids -> 
       List.fold_left (fun s (id,_) -> Sid.add id s) Sid.empty ids
 
-let pv_fv pv = EcPath.m_fv Mid.empty pv.pv_name
+let pv_fv pv = EcPath.x_fv Mid.empty pv.pv_name
 
 let fv_node = function 
   | Eint _ | Eop _ -> Mid.empty
@@ -535,6 +534,7 @@ type e_subst = {
     es_p       : EcPath.path -> EcPath.path;
     es_ty      : ty -> ty;
     es_mp      : EcPath.mpath -> EcPath.mpath; 
+    es_xp      : EcPath.xpath -> EcPath.xpath;
     es_loc     : expr Mid.t;
   }
 
@@ -543,16 +543,25 @@ let e_subst_id = {
     es_p       = identity;
     es_ty      = identity;
     es_mp      = identity;
+    es_xp      = identity;
     es_loc     = Mid.empty;
  }
 
-let e_subst_init freshen on_path on_ty on_mpath = {
+let e_subst_init freshen on_path on_ty on_mpath = 
+  let on_mp = 
+    let f = EcPath.m_subst on_path on_mpath in
+    if f == identity then f else EcPath.Hm.memo 107 f in
+  let on_xp = 
+    let f = EcPath.x_subst on_mp in
+    if f == identity then f else EcPath.Hx.memo 107 f in
+  {
     es_freshen = freshen;
     es_p       = on_path;
     es_ty      = on_ty;
-    es_mp      = EcPath.Hm.memo 107 (EcPath.m_subst on_path on_mpath);
+    es_mp      = on_mp;
+    es_xp      = on_xp;
     es_loc     = Mid.empty;
-}
+  }
   
 let add_local s (x,t as xt) = 
   let x' = if s.es_freshen then EcIdent.fresh x else x in
@@ -561,7 +570,7 @@ let add_local s (x,t as xt) =
   else 
     let merger o = assert (o = None); Some (e_local x' t') in
     { s with es_loc = Mid.change merger x s.es_loc }, (x',t')
-
+      
 let add_locals = List.smart_map_fold add_local
 
 let subst_lpattern (s: e_subst) (lp:lpattern) = 
@@ -583,7 +592,7 @@ let rec e_subst (s: e_subst) e =
         let ty' = s.es_ty e.e_ty in
         if e.e_ty == ty' then e else e_local id ty')
   | Evar pv -> 
-      let pv' = pv_subst s.es_mp pv in
+      let pv' = pv_subst s.es_xp pv in
       let ty' = s.es_ty e.e_ty in
       if pv == pv' && e.e_ty == ty' then e 
       else e_var pv' ty'
@@ -660,7 +669,7 @@ module Dump = struct
         
       | Evar x ->
           EcDebug.onhlist pp
-            "Evar" ~extra:(EcPath.m_tostring x.pv_name)
+            "Evar" ~extra:(EcPath.x_tostring x.pv_name)
             ty_dump []
 
       | Eop (x, tys) ->
