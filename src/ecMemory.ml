@@ -13,7 +13,7 @@ let mem_equal = EcIdent.id_equal
 (* -------------------------------------------------------------------- *)
 
 type local_memtype = {
-  mt_path : EcPath.mpath;
+  mt_path : EcPath.xpath;
   mt_vars : ty Msym.t
 }
 
@@ -21,10 +21,10 @@ type memtype = local_memtype option
 
 
 let lmt_equal mt1 mt2 =   
-  EcPath.m_equal mt1.mt_path mt2.mt_path &&
+  EcPath.x_equal mt1.mt_path mt2.mt_path &&
     Msym.equal ty_equal mt1.mt_vars mt2.mt_vars
 
-let lmt_mpath mt = mt.mt_path
+let lmt_xpath mt = mt.mt_path
 let lmt_bindings mt = mt.mt_vars
 
 let mt_equal mt1 mt2 = 
@@ -33,9 +33,9 @@ let mt_equal mt1 mt2 =
   | None, None         -> true
   | _   , _            -> false
 
-let mt_mpath = function
+let mt_xpath = function
   | None -> assert false
-  | Some mt -> lmt_mpath mt
+  | Some mt -> lmt_xpath mt
  
 let mt_bindings = function
   | None -> assert false
@@ -51,7 +51,7 @@ let me_equal (m1,mt1) (m2,mt2) =
 (* -------------------------------------------------------------------- *)
 let memory   (m,_) = m
 let memtype  (_,mt) = mt
-let mpath    (_,mt) = mt_mpath mt
+let xpath    (_,mt) = mt_xpath mt
 let bindings (_,mt) = mt_bindings mt
 
 (* -------------------------------------------------------------------- *)
@@ -83,20 +83,20 @@ let lookup (x : symbol) ((_,mt) : memenv) =
 let is_bound x me = lookup x me <> None
   
 (* -------------------------------------------------------------------- *)
-let mt_subst sp smp st o =
+let mt_subst sx st o =
   match o with
   | None -> o
   | Some mt ->
-    let p' = EcPath.m_subst sp smp mt.mt_path in
+    let p' = sx mt.mt_path in
     let vars' = 
       if st == identity then mt.mt_vars else
         Msym.map st mt.mt_vars in (* FIXME could be greate to use smart_map *)
     if p' == mt.mt_path && vars' == mt.mt_vars then o else
       Some { mt_path   = p'; mt_vars   = vars' }
 
-let me_subst sp smp sm st (m,mt as me) =
+let me_subst sx sm st (m,mt as me) =
   let m' = EcIdent.Mid.find_def m m sm in
-  let mt' = mt_subst sp smp st mt in
+  let mt' = mt_subst sx st mt in
   if m' == m && mt' == mt then me else 
     (m', mt')
 
