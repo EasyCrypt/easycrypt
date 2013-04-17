@@ -3,22 +3,6 @@ open EcMaps
 open EcSymbols
 
 (* -------------------------------------------------------------------- *)
-(* We distinguish 3 kinds of paths:
- * - [path] is the type of paths without functor applications. It is
- *   designed to uniquely designate objects definition. Lookups using
- *   paths are possible and lead to [suspended objects], i.e. object
- *   definitions under a set of module parameters.
- *
- * - [mpath] is the type of paths of fully applied module when these ones
- *   are used as container. It is defined as a [path] and the list of
- *   functor application parameters.
- *
- * - [xpath] is the type of paths for concrete objects. It is defined as
- *   a [mpath] (the container path) and a [symbol] (the name of the
- *   object in the container). (FIXME: Currently unused)
- *)
-
-(* -------------------------------------------------------------------- *)
 type path = private {
   p_node : path_node;
   p_tag  : int
@@ -86,21 +70,6 @@ val m_apply : mpath -> mpath list -> mpath
 val m_fv    : int EcIdent.Mid.t -> mpath -> int EcIdent.Mid.t
 
 (* -------------------------------------------------------------------- *)
-type xpath = private {
-  xp_node : mpath * symbol;
-  xp_tag  : int;
-}
-
-(* -------------------------------------------------------------------- *)
-val xpath   : mpath -> symbol -> xpath
-val x_name  : xpath -> symbol
-val x_scope : xpath -> mpath
-
-val x_equal   : xpath -> xpath -> bool
-val x_compare : xpath -> xpath -> int
-val x_hash    : xpath -> int
-
-(* -------------------------------------------------------------------- *)
 
 (* Create a [mpath] from a [path] assuming that all components are
  * non-applied (i.e. applied to an empty list of arguments *)
@@ -113,9 +82,8 @@ val kinds_of_mpath : mpath -> path_kind list
 
 (* -------------------------------------------------------------------- *)
 
-(* [mpath/xpath] dump *)
+(* [mpath] dump *)
 val m_tostring : mpath -> string
-val x_tostring : xpath -> string
 
 (* -------------------------------------------------------------------- *)
 module Mm : Map.S   with type key = mpath

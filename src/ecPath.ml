@@ -229,56 +229,6 @@ let rec m_tostring(m : mpath) =
     aux p m.m_kind args
 
 (* -------------------------------------------------------------------- *)
-type xpath = {
-  xp_node : mpath * symbol;
-  xp_tag  : int;
-}
-
-(* -------------------------------------------------------------------- *)
-let x_equal   = ((==) : xpath -> xpath -> bool)
-let x_hash    = fun p -> p.xp_tag
-let x_compare = fun p1 p2 -> x_hash p1 - x_hash p2
-
-module Hsxpath = Why3.Hashcons.Make (struct 
-  type t = xpath
-
-  let equal_node p1 p2 = 
-    let (m1, id1) = p1 in
-    let (m2, id2) = p2 in
-      (id1 = id2) && (m_equal m1 m2)
-
-  let equal p1 p2 = equal_node p1.xp_node p2.xp_node
-
-  let hash p = 
-    let (m, id) = p.xp_node in 
-      Why3.Hashcons.combine (m_hash m) (Hashtbl.hash id)
-          
-  let tag n p = { p with xp_tag = n }
-end)
-
-module XPath = MakeMSH (struct
-  type t  = xpath
-  let tag = x_hash
-end)
-
-module Sx = XPath.S
-module Mx = XPath.M
-module Hx = XPath.H
-
-(* -------------------------------------------------------------------- *)
-let mk_xpath node =
-  Hsxpath.hashcons { xp_node = node; xp_tag = -1; }
-
-let xpath (m : mpath) (id : symbol) =
-  mk_xpath (m, id)
-
-let x_scope { xp_node = (m, _) } = m
-let x_name  { xp_node = (_, x) } = x
-
-let x_tostring { xp_node = (m, x) } =
-  Printf.sprintf "%s.%s" (m_tostring m) x
-
-(* -------------------------------------------------------------------- *)
 module Msubp = struct
   type 'a t = ('a submaps) Msym.t
 
