@@ -109,7 +109,8 @@ let ts_distr, fs_mu, distr_theory =
 
 let ty_distr t = Ty.ty_app ts_distr [t]
 
-(* Special type for translation of hoare, equiv and pr *)
+(* Special type for translation of glob, hoare, equiv and pr *)
+
 let ts_mem = Ty.create_tysymbol (Ident.id_fresh "memory") [] None
 let ty_mem = Ty.ty_app ts_mem []
 
@@ -147,6 +148,13 @@ let fs_getvar =
 
 let getvar v mem = Term.t_app_infer fs_getvar [v; mem]
 
+let ts_glob = Ty.create_tysymbol (Ident.id_fresh "global") [] None
+let ty_glob = Ty.ty_app ts_glob []
+let fs_getglob = 
+  Term.create_fsymbol (Ident.id_fresh "getglob") [ty_mod;ty_mem] ty_glob
+let getglob mp m = 
+  Term.t_app_infer fs_getglob [mp;m]
+
 (*let ty_mem_t tr = Ty.ty_tuple [ty_mem; tr] *)
 
 let fs_sem =
@@ -183,10 +191,10 @@ let initial_task =
        decl_or; spec_or; decl_ora; spec_ora;
        decl_imp; spec_imp; decl_iff; spec_iff;
        decl_eq; spec_eq ] in
-  let ts = [ts_mem; ts_mod; ts_mod_name; ts_fun_name; ts_var_name] in
+  let ts = [ts_mem; ts_mod; ts_mod_name; ts_fun_name; ts_var_name;ts_glob] in
   let add_ty_decl task ts =
     add_decl_with_tuples task (Decl.create_ty_decl ts) in
-  let fs = [fs_appmod; fs_getmod; fs_getvar; fs_sem;] in
+  let fs = [fs_appmod; fs_getmod; fs_getvar; fs_sem;fs_getmod] in
   let add_param_decl task fs =
     add_decl_with_tuples task (Decl.create_param_decl fs) in
   let task = List.fold_left add_ty_decl task ts in
@@ -759,6 +767,7 @@ let trans_tv vm tv =
 
 let rec trans_ty env vm ty =
   match ty.ty_node with
+  | Tglob _ -> ty_glob (* FIXME *)
   | Tunivar _ -> assert false
   | Tvar id -> trans_tv vm id
   | Ttuple tys -> Ty.ty_tuple (trans_tys env vm tys)
@@ -1066,7 +1075,7 @@ let trans_form env vm f =
         let args = List.map (trans_form_b vm) args in
         Term.t_tuple args
 
-    | FhoareF _ | FhoareS _ | FequivF _  | FequivS _ | FeqGlob _ ->
+    | FhoareF _ | FhoareS _ | FequivF _ | FequivS _ -> 
         raise (CanNotTranslate f) (* fixme *)
 
     | Fpvar(pv,m) ->
@@ -1074,6 +1083,10 @@ let trans_form env vm f =
         env := nenv;
         rb  := nrb @ !rb;
         pv
+    | Fglob(mp,m) ->
+      let mo = trans_mod !env vm mp in
+      let mem = trans_lv vm m in
+      getglob mo mem
 
     | Fpr(mem,mp,args,ev) ->
         let mem   = trans_lv vm mem in

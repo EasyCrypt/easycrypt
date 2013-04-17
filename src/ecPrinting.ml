@@ -306,6 +306,7 @@ let pr_pv (ppe : ppenv) (x : prog_var) =
 let pr_type (ppe : ppenv) (ty : ty) =
   let rec pr_type btuple (ty : ty) =
     match ty.ty_node with
+    | Tglob _m    -> assert false (* FIXME *)
     | Tunivar ui -> pr_univar ppe ui
     | Tvar    a  -> pr_tvar ppe a
 
@@ -829,7 +830,8 @@ let rec pr_form_rec (ppenv : ppenv) outer (f : form) =
       
   | Fpvar (x, i) ->                 (* FIXME *)
     join [pr_pv ppenv x; pr_brace (pr_local ppenv i)]
-      
+
+    
   | Fquant (q, bd, f) ->
     let (subppenv, dd) = pr_bindings ppenv bd in 
     join [tk_quant q; dd^^(!^",")] ^@@^ pr_form_rec subppenv outer f
@@ -892,7 +894,7 @@ let rec pr_form_rec (ppenv : ppenv) outer (f : form) =
           !^ "==>";
           pr_form_rec ppenv outer es.es_po;
         ] ) ]
-  | FequivF _ | Fpr _ | FeqGlob _ ->
+  | FequivF _ | Fpr _ | Fglob _ ->      
     !^ "implement-me"  (* FIXME *)
 and pr_form ppenv f = pr_form_rec ppenv (min_op_prec, `NonAssoc) f
 

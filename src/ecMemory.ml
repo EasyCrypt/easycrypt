@@ -80,6 +80,8 @@ let lookup (x : symbol) ((_,mt) : memenv) =
   | None -> None
   | Some mt ->  Msym.find_opt x (lmt_bindings mt)
 
+let is_bound x me = lookup x me <> None
+  
 (* -------------------------------------------------------------------- *)
 let mt_subst sp smp st o =
   match o with

@@ -39,12 +39,11 @@ and f_node =
   | Fint    of int
   | Flocal  of EcIdent.t
   | Fpvar   of EcTypes.prog_var * memory
+  | Fglob   of EcPath.mpath * memory
   | Fop     of EcPath.path * ty list
   | Fapp    of form * form list
   | Ftuple  of form list
 
-  | FeqGlob of memory * memory * EcPath.mpath    (* FeqGlob(m1,m2,A) means 
-                                                    equality of global variable of A *)
   | FhoareF of hoareF (* $hr / $hr *)
   | FhoareS of hoareS (* $hr  / $hr   *)
 
@@ -144,7 +143,7 @@ val f_ora : form -> form -> form
 
 val fop_imp : form
 val f_imp : form -> form -> form
-
+val f_imps : form list -> form -> form
 val fop_iff : form
 val f_iff : form -> form -> form
 
@@ -166,8 +165,8 @@ val f_if_simpl  : form -> form -> form -> form
 val f_let_simpl : EcTypes.lpattern -> form -> form -> form
 val f_lets_simpl : (EcTypes.lpattern * form) list -> form -> form
 
-(*val f_quant_simpl : quantif -> binding -> form -> form
-  val f_exists_simpl : binding -> form -> form *)
+(* WARNING : this function should be use only in a context ensuring that the
+   quantified variables can be instanciated *)
 val f_forall_simpl : binding -> form -> form
 val f_app_simpl : form -> form list -> EcTypes.ty -> form
 

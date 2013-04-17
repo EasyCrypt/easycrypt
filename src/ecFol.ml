@@ -43,12 +43,12 @@ and f_node =
   | Fint    of int
   | Flocal  of EcIdent.t
   | Fpvar   of EcTypes.prog_var * memory
+  | Fglob   of EcPath.mpath     * memory
   | Fop     of EcPath.path * ty list
   | Fapp    of form * form list
   | Ftuple  of form list
 
-  | FeqGlob of memory * memory * EcPath.mpath    (* FeqGlob(m1,m2,A) means 
-                                                    equality of global variable of A *)
+
   | FhoareF of hoareF (* $hr / $hr *)
   | FhoareS of hoareS (* $hr  / $hr   *)
 
@@ -239,8 +239,11 @@ module Hsform = Why3.Hashcons.Make (struct
 
     | Flocal id -> EcIdent.tag id
 
-    | Fpvar(pv, s) ->
-        Why3.Hashcons.combine (EcTypes.pv_hash pv) (EcIdent.id_hash s)
+    | Fpvar(pv, m) ->
+        Why3.Hashcons.combine (EcTypes.pv_hash pv) (EcIdent.id_hash m)
+
+    | Fglob(mp, m) ->
+        Why3.Hashcons.combine (EcPath.m_hash mp) (EcIdent.id_hash m)
 
     | Fop(p, lty) -> 
         Why3.Hashcons.combine_list ty_hash (EcPath.p_hash p) lty
@@ -250,10 +253,6 @@ module Hsform = Why3.Hashcons.Make (struct
 
     | Ftuple args ->
         Why3.Hashcons.combine_list f_hash 0 args
-
-    | FeqGlob(m1,m2,mp) ->
-      Why3.Hashcons.combine2
-        (EcIdent.id_hash m1) (EcIdent.id_hash m2) (EcPath.m_hash mp)
 
     | FhoareF hf ->
         Why3.Hashcons.combine2
@@ -286,7 +285,13 @@ module Hsform = Why3.Hashcons.Make (struct
   let fv_mlr = Sid.add mleft (Sid.singleton mright)
 
   let fv_node = function
-    | Fint _ | Fpvar _ | Fop _ -> Mid.empty
+    | Fint _  | Fop _ -> Mid.empty
+    | Fpvar (pv,m) ->
+      let fv = fv_add m Mid.empty in
+      EcPath.m_fv fv pv.pv_name
+    | Fglob (mp,m) ->
+      let fv = fv_add m Mid.empty in
+      EcPath.m_fv fv mp
     | Flocal id -> fv_singleton id 
     | Fquant(_,b,f) -> 
         List.fold_left (fun s (id,_) -> Mid.remove id s) (f_fv f) b 
@@ -299,9 +304,6 @@ module Hsform = Why3.Hashcons.Make (struct
         List.fold_left (fun s a -> fv_union s (f_fv a)) (f_fv f) args
     | Ftuple args ->
         List.fold_left (fun s a -> fv_union s (f_fv a)) Mid.empty args
-    | FeqGlob(m1,m2,mp) ->
-      let fv = fv_add m1 (fv_add m2 Mid.empty) in
-      EcPath.m_fv fv mp
     | FhoareF hf ->
         let fv = 
           fv_union (Mid.remove mpre (f_fv hf.hf_pr)) 
@@ -389,7 +391,7 @@ let rec f_dump (f : form) : dnode =
     | Ftuple fs ->
         dnode "Ftuple" (List.map f_dump fs)
   
-    | FeqGlob _ -> dleaf "FeqGlob"
+    | Fglob _ -> dleaf "Fglob"
     | FhoareF _ -> dleaf "FhoareF"
     | FhoareS _ -> dleaf "FhoareS"
     | FequivF _ -> dleaf "FequivF"
@@ -446,6 +448,7 @@ let f_ora  f1 f2 = f_app fop_ora [f1;f2] ty_bool
 
 let fop_imp = f_op EcCoreLib.p_imp [] ty_fbool2
 let f_imp f1 f2 = f_app fop_imp [f1;f2] ty_bool
+let f_imps = List.fold_right f_imp
 
 let fop_iff = f_op EcCoreLib.p_iff [] ty_fbool2
 let f_iff f1 f2 = f_app fop_iff [f1;f2] ty_bool
@@ -485,7 +488,7 @@ let f_exists b f = f_quant Lexists b f
 let f_forall b f = f_quant Lforall b f
 let f_lambda b f = f_quant Llambda b f
 
-let f_eqGlob m1 m2 mp = mk_form (FeqGlob(m1,m2,mp)) ty_bool
+let f_glob mp m = mk_form (Fglob(mp,m)) (tglob mp)
 
 let f_hoareF pre f post = 
   let hf = { hf_pr = pre; hf_f = f; hf_po = post } in
@@ -752,6 +755,8 @@ let f_map gt g f =
         if f.f_ty == ty' then f else 
         f_pvar id ty' s
 
+    | Fglob _ -> f
+
     | Fop(p,tys) -> 
         let tys' = List.smart_map gt tys in
         let ty' = gt f.f_ty in
@@ -769,9 +774,6 @@ let f_map gt g f =
         let es' = List.smart_map g es in
         if es == es' then f else 
         f_tuple es'
-
-    | FeqGlob(m1,m2,mp) ->
-        f_eqGlob m1 m2 mp
 
     | FhoareF hf -> 
         let pre' = g hf.hf_pr in
@@ -903,11 +905,11 @@ let rec f_subst (s:f_subst) f =
       if pv == pv' && m == m' && ty' = f.f_ty then f else 
       f_pvar pv' ty' m'
 
-  | FeqGlob(m1,m2,mp) ->
-    let m1' = Mid.find_def m1 m1 s.fs_mem in
-    let m2' = Mid.find_def m2 m2 s.fs_mem in
+  | Fglob(mp,m) ->
+    let m'  = Mid.find_def m m s.fs_mem in
     let mp' = EcPath.m_subst s.fs_p s.fs_mp mp in
-    f_eqGlob m1' m2' mp'
+    if m == m' && mp==mp' then f else
+    f_glob mp' m'
 
   | FhoareF hf ->
       assert (not (Mid.mem mhr s.fs_mem) && not (Mid.mem mhr s.fs_mem));

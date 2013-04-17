@@ -207,6 +207,8 @@ type rule_name =
   | RN_hl_swap      of bool * int * int * int
   | RN_hl_equiv_rnd of rnd_bij_info
   | RN_hl_conseq 
+  | RN_hl_hoare_equiv 
+  | RN_hl_inline    of bool * int list
   | RN_hl_deno      
 
 and rule_arg = 

@@ -56,7 +56,7 @@ type _subst = {
 let _subst_of_subst s = 
   let sp = EcPath.p_subst s.sb_path in
   let sm = EcPath.Hm.memo 107 (EcPath.m_subst sp s.sb_modules) in
-  let st = EcTypes.ty_subst { ty_subst_id with ts_p = sp } in
+  let st = EcTypes.ty_subst { ty_subst_id with ts_p = sp; ts_mp = sm } in
   { s_s   = s;
     s_p   = sp;
     s_fmp = sm;
@@ -212,8 +212,9 @@ let init_tparams (s : _subst) params params' =
         Mid.empty params params' in
     let sty = 
       { ty_subst_id with 
-        ts_p = s.s_p;
-        ts_v = styv; } in
+        ts_p  = s.s_p;
+        ts_mp = s.s_fmp;
+        ts_v  = styv; } in
     { s with s_ty = EcTypes.ty_subst sty } 
 
 let subst_tydecl (s : _subst) (tyd : tydecl) =

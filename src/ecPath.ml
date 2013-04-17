@@ -2,7 +2,7 @@
 open EcUtils
 open EcMaps
 open EcSymbols
-
+open EcIdent
 (* -------------------------------------------------------------------- *)
 type path = {
   p_node : path_node;
@@ -11,26 +11,8 @@ type path = {
 
 and path_node =
 | Psymbol of symbol
-| Pident  of EcIdent.t
 | Pqname  of path * symbol
 
-type path_kind =
-| PKmodule
-| PKother
-
-type mpath = {
-  m_path : path;
-  m_kind : path_kind list; 
-  m_args : mpath list list;
-  m_tag  : int;
-}
-
-let name_path path = match path.p_node with 
-  | Psymbol s -> s
-  | Pident id -> EcIdent.name id
-  | Pqname (_,s) -> s
-
-let name_mpath mpath = name_path mpath.m_path
 
 (* -------------------------------------------------------------------- *)
 let p_equal   = ((==) : path -> path -> bool)
@@ -43,7 +25,6 @@ module Hspath = Why3.Hashcons.Make (struct
   let equal_node p1 p2 = 
     match p1, p2 with
     | Psymbol id1, Psymbol id2 -> EcSymbols.equal id1 id2
-    | Pident  id1, Pident  id2 -> EcIdent.id_equal id1 id2
     | Pqname (p1, id1), Pqname(p2, id2) -> 
         EcSymbols.equal id1 id2 && p_equal p1 p2
     | _ -> false
@@ -53,7 +34,6 @@ module Hspath = Why3.Hashcons.Make (struct
   let hash p = 
     match p.p_node with
     | Psymbol id    -> Hashtbl.hash id
-    | Pident  id    -> EcIdent.tag id
     | Pqname (p,id) -> Why3.Hashcons.combine p.p_tag (Hashtbl.hash id)
           
   let tag n p = { p with p_tag = n }
@@ -73,60 +53,57 @@ let mk_path node =
   Hspath.hashcons { p_node = node; p_tag = -1; }
 
 let psymbol id   = mk_path (Psymbol id)
-let pident  id   = mk_path (Pident id)
 let pqname  p id = mk_path (Pqname(p,id))
 
 (* -------------------------------------------------------------------- *)
 let rec tostring p =
   match p.p_node with
   | Psymbol x    -> x
-  | Pident x     -> EcIdent.name x
   | Pqname (p,x) -> Printf.sprintf "%s.%s" (tostring p) x
 
 let tolist =
   let rec aux l p = 
     match p.p_node with 
     | Psymbol x     -> x :: l
-    | Pident x      -> EcIdent.name x :: l
     | Pqname (p, x) -> aux (x :: l) p in
   aux []
 
 let toqsymbol (p : path) =
   match p.p_node with
   | Psymbol x     -> ([], x)
-  | Pident x      -> ([], EcIdent.name x)
   | Pqname (p, x) -> (tolist p, x)
 
 let basename p = 
   match p.p_node with 
   | Psymbol x     -> x
-  | Pident  x     -> EcIdent.name x
   | Pqname (_, x) -> x
 
 let prefix p = 
   match p.p_node with 
-  | Psymbol _ | Pident _ -> None
+  | Psymbol _ -> None
   | Pqname (p, _) -> Some p
 
 let rec rootname p = 
   match p.p_node with 
   | Psymbol x     -> x
-  | Pident x      -> EcIdent.name x
   | Pqname (p, _) -> rootname p
 
 let rec p_size p =
   match p.p_node with
   | Psymbol _     -> 1
-  | Pident  _     -> 1
   | Pqname (p, _) -> 1 + (p_size p)
 
-let rec p_fv fv p = 
-  match p.p_node with
-  | Psymbol _ -> fv 
-  | Pident id -> EcIdent.fv_add id fv
-  | Pqname(p,_) -> p_fv fv p
-
 (* -------------------------------------------------------------------- *)
+type mpath = {
+  m_top  : mpath_top;
+  m_args : mpath list;
+  m_tag  : int;
+}
+
+and mpath_top =
+[ | `Abstract of ident
+  | `Concrete of path * path option ]
+
 let m_equal   = ((==) : mpath -> mpath -> bool)
 let m_hash    = fun p -> p.m_tag
 let m_compare = fun p1 p2 -> m_hash p1 - m_hash p2
@@ -135,16 +112,22 @@ module Hsmpath = Why3.Hashcons.Make (struct
   type t = mpath
 
   let equal m1 m2 = 
-    p_equal m1.m_path m2.m_path &&
-    m1.m_kind = m2.m_kind &&
-    List.all2 (List.all2 m_equal) m1.m_args m2.m_args
-
+    let t = 
+      match m1.m_top, m2.m_top with
+      | `Abstract id1, `Abstract id2 -> EcIdent.id_equal id1 id2
+      | `Concrete(p1,o1), `Concrete(p2,o2) ->
+        p_equal p1 p2 && oall2 p_equal o1 o2
+      | _, _ -> false in
+    t && List.all2 m_equal m1.m_args m2.m_args
 
   let hash m = 
-    let p = m.m_path and args = m.m_args in 
-      Why3.Hashcons.combine_list 
-        (Why3.Hashcons.combine_list m_hash 0)
-        p.p_tag args
+    let hash = 
+      match m.m_top with
+      | `Abstract id -> EcIdent.id_hash id
+      | `Concrete(p, o) -> 
+        ofold o (fun s h -> Why3.Hashcons.combine h (p_hash s))
+          (p_hash p) in
+    Why3.Hashcons.combine_list m_hash hash m.m_args
           
   let tag n p = { p with m_tag = n }
 end)
@@ -158,73 +141,89 @@ module Sm = MPath.S
 module Mm = MPath.M
 module Hm = MPath.H
 
+(* -------------------------------------------------------------------- *)
+let mk_mpath p args =
+  Hsmpath.hashcons { m_top = p; m_args = args; m_tag = -1; }
+
+let mpath_abs id args = mk_mpath (`Abstract id) args
+let mpath_crt p args sp = mk_mpath (`Concrete(p,sp)) args
+
+let m_apply mp args = 
+  let args' = mp.m_args in
+  if args' = [] then mk_mpath mp.m_top args 
+  else (assert (args = []); mp)
+
 let rec m_fv fv mp = 
-  List.fold_left (List.fold_left m_fv) (p_fv fv (mp.m_path)) mp.m_args 
+  let fv = 
+    match mp.m_top with 
+    | `Abstract id -> EcIdent.fv_add id fv 
+    | `Concrete _ -> fv in
+  List.fold_left m_fv fv mp.m_args 
+
+
 
 (* -------------------------------------------------------------------- *)
-let mk_mpath p k args =
-  Hsmpath.hashcons { m_path = p; m_kind = k; m_args = args; m_tag = -1; }
 
-let mpath = mk_mpath
+type xpath = {
+  x_top : mpath;
+  x_sub : path;
+  x_tag : int;
+}
 
-let mident  id = mk_mpath (pident  id) [PKmodule] [[]]
-let msymbol id = mk_mpath (psymbol id) [PKother]  [[]]
+let x_equal   = ((==) : xpath -> xpath -> bool)
+let x_hash    = fun p -> p.x_tag
+let x_compare = fun p1 p2 -> x_hash p1 - x_hash p2
 
-let mqname m k id a = 
-  mk_mpath (pqname m.m_path id) (k::m.m_kind) (a::m.m_args)
+module Hsxpath = Why3.Hashcons.Make (struct 
+  type t = xpath
 
-let m_split m =
-  match m.m_path.p_node, m.m_kind, m.m_args with
-  | Pqname (prefix, x), k :: ks, a :: pfargs ->
-      Some (mpath prefix ks pfargs, k, x, a)
+  let equal m1 m2 = 
+    m_equal m1.x_top m2.x_top && p_equal m1.x_sub m2.x_sub
 
-  | _, _, _ -> None
+  let hash m = 
+    Why3.Hashcons.combine (m_hash m.x_top) (p_hash m.x_sub)
 
-let m_apply m newargs =
-  match m.m_args with
-  | [] -> assert false
-  | a :: args -> mpath m.m_path m.m_kind ((a @ newargs) :: args)
+  let tag n p = { p with x_tag = n }
+end)
 
-let path_of_mpath  m = m.m_path 
-let args_of_mpath  m = m.m_args
-let kinds_of_mpath m = m.m_kind
+module XPath = MakeMSH (struct
+  type t  = xpath
+  let tag = x_hash
+end)
 
-let mpath_of_path p = 
-  let rec args p = 
-    match p.p_node with
-    | Pident _      -> assert false 
-    | Psymbol _     -> [PKother], [[]]
-    | Pqname (p, _) -> 
-        let k, args = args p in
-        PKother::k,[]::args in
-  let k, args = args p in
-  mk_mpath p k args
+module Sx = XPath.S
+module Mx = XPath.M
+module Hx = XPath.H
+
+let xpath top sub =
+  Hsxpath.hashcons { x_top = top; x_sub = sub; x_tag = -1; }
+
+let x_fv fv xp = m_fv fv xp.x_top 
+
+
+  
 
 (* -------------------------------------------------------------------- *)
+  
 let rec m_tostring(m : mpath) = 
-  let p = m.m_path and args = m.m_args in
-
-  let app_tostring id a =
-    if   a = []
-    then id 
+  let top, sub = 
+    match m.m_top with
+    | `Abstract id -> EcIdent.name id, ""
+    | `Concrete (p,sub) ->
+      tostring p, 
+      ofold sub (fun p _ ->
+        Format.sprintf ".%s" (tostring p)) "" in
+  let args = 
+    let a = m.m_args in
+    if   a = [] then ""
     else
       let args = List.map m_tostring a in
-        Printf.sprintf "%s(%s)" id (String.concat ", " args)
-  in
-  let rec aux p ks args = 
-    match p.p_node, ks, args with
-    | Psymbol id , [_], [a] -> app_tostring id a 
-    | Pident   id, [_], [a] -> app_tostring (EcIdent.name id) a
+      Printf.sprintf "(%s)" (String.concat ", " args) in
+  Printf.sprintf "%s%s%s" top args sub
 
-    | Pqname(p, id), k::ks, a::args ->
-        let s1 = aux p ks args in
-        let s2 = app_tostring id a in
-        let s =  if k = PKmodule then "@" else "." in
-          Format.sprintf "%s%s%s" s1 s s2 
-
-    | _, _, _ -> assert false
-  in
-    aux p m.m_kind args
+let x_tostring x = 
+  Printf.sprintf "%s.%s" 
+    (m_tostring x.x_top) (tostring x.x_sub)
 
 (* -------------------------------------------------------------------- *)
 let p_subst (s : path Mp.t) =
@@ -234,8 +233,7 @@ let p_subst (s : path Mp.t) =
       try  Mp.find p s
       with Not_found ->
         match p.p_node with
-        | Psymbol _
-        | Pident  _ -> p
+        | Psymbol _ -> p
         | Pqname(p1, id) -> 
           let p1' = aux p1 in
           if p1 == p1' then p else pqname p1' id in
@@ -243,29 +241,32 @@ let p_subst (s : path Mp.t) =
 
 (* -------------------------------------------------------------------- *)
 let rec m_subst (sp : path -> path) (sm : mpath EcIdent.Mid.t) m =
-  let p    = m.m_path
-  and ks   = m.m_kind 
-  and args = m.m_args in
-  let args = List.map (List.map (m_subst sp sm)) args in
-
-  let rec aux p ks args =
-    match p.p_node, ks, args with
-    | Psymbol _, _, _ -> raise Not_found
-
-    | Pident id, [_], [a] ->
-        let mp = EcIdent.Mid.find id sm in
-          m_apply mp a
-
-    | Pqname(p,id), k::ks, a::args ->
-        mqname (aux p ks args) k id a 
-
-    | _, _, _ -> assert false
-  in
-
-  try  aux p ks args
-  with Not_found -> mpath (sp p) ks args
-
+  let args = List.smart_map (m_subst sp sm) m.m_args in
+  match m.m_top with
+  | `Concrete(p,sub) -> 
+    let p' = sp p in
+    let top = if p == p' then m.m_top else `Concrete(p',sub) in
+    if m.m_top == top && m.m_args == args then m else 
+      mk_mpath top args 
+  | `Abstract id ->
+    try 
+      let m' = EcIdent.Mid.find id sm in
+      m_apply m' args 
+    with Not_found -> 
+      if m.m_args == args then m else
+        mk_mpath m.m_top args 
+      
 let m_subst (sp : path -> path) (sm : mpath EcIdent.Mid.t) =
   if sp == identity && EcIdent.Mid.is_empty sm then identity
   else m_subst sp sm
+
+(* -------------------------------------------------------------------- *)
+
+let x_subst (sm : mpath -> mpath) = 
+  if sm == identity then identity 
+  else fun x -> 
+    let top = sm x.x_top in
+    if x.x_top == top then x 
+    else xpath top x.x_sub
+
 

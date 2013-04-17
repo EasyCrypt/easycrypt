@@ -38,7 +38,7 @@ val abstract    : memory -> memenv
 
 val bind   : symbol -> EcTypes.ty -> memenv -> memenv
 val lookup : symbol -> memenv -> EcTypes.ty option
-
+val is_bound : symbol -> memenv -> bool
 (* -------------------------------------------------------------------- *)
 val mt_subst :
  (EcPath.path -> EcPath.path) ->

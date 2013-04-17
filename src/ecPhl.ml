@@ -10,7 +10,6 @@ open EcEnv
 open EcLogic
 open EcModules
 
-
 (* -------------------------------------------------------------------- *)
 (* -------------------------  Substitution  --------------------------- *)
 (* -------------------------------------------------------------------- *)
@@ -78,30 +77,50 @@ module PV = struct
     let compare = pv_compare_p
   end)
 
-  type pv_fv = ty M.t
+  type pv_fv = 
+    { pv : ty M.t;
+      glob : EcPath.Sm.t;
+    }
 
-  let empty = M.empty 
+  let empty = 
+    { pv = M.empty;
+      glob = EcPath.Sm.empty }
 
-  let add env pv ty fv = M.add (NormMp.norm_pvar env pv) ty fv
+  let add env pv ty fv = 
+    { fv with pv = M.add (NormMp.norm_pvar env pv) ty fv.pv }
+
+  let add_glob env mp fv =
+    { fv with glob = EcPath.Sm.add (NormMp.norm_mpath env mp) fv.glob}
 
   let remove env pv fv =
-    M.remove (NormMp.norm_pvar env pv) fv
+    { fv with pv = M.remove (NormMp.norm_pvar env pv) fv.pv }
 
   let union _env fv1 fv2 =
-    M.merge (fun _ o1 o2 -> if o2 = None then o1 else o2) fv1 fv2
+    { pv = M.merge (fun _ o1 o2 -> if o2 = None then o1 else o2) fv1.pv fv2.pv;
+      glob = EcPath.Sm.union fv1.glob fv2.glob }
 
   let disjoint _env fv1 fv2 = 
-    M.set_disjoint fv1 fv2
+    M.set_disjoint fv1.pv fv2.pv &&
+      EcPath.Sm.disjoint fv1.glob fv2.glob
 
   let inter _env fv1 fv2 = 
-    M.set_inter fv1 fv2
+    { pv = M.set_inter fv1.pv fv2.pv;
+      glob = EcPath.Sm.inter fv1.glob fv2.glob }
 
-  let mem env pv fv = 
-    M.mem (NormMp.norm_pvar env pv) fv
-
-  let elements = M.bindings 
+  let elements fv = M.bindings fv.pv (* FIXME *)
 
 end
+
+let destr_adv_fun f = 
+  match EcPath.m_split f with
+  | Some(mp,_,_,[]) ->
+    begin match mp.EcPath.m_path.EcPath.p_node with
+    | EcPath.Pident x -> EcPath.mident x
+    | _ -> assert false
+    end 
+  | _ -> assert false
+  
+let oracles _func = assert false
 
 let lp_write env w lp = 
   let add w (pv,ty) = PV.add env pv ty w in
@@ -117,17 +136,22 @@ and i_write env w i =
   | Sasgn (lp,_) -> lp_write env w lp
   | Srnd (lp,_) -> lp_write env w lp
   | Scall(lp,f,_) -> 
+    let w  = match lp with None -> w | Some lp -> lp_write env w lp in    
     let wf = f_write env f in
-    let w  = match lp with None -> w | Some lp -> lp_write env w lp in
-    PV.union env w wf 
+    PV.union env w wf
   | Sif (_,s1,s2) -> s_write env (s_write env w s1) s2
   | Swhile (_,s) -> s_write env w s
   | Sassert _ -> w 
     
-and f_write env f =   
+and f_write env f = 
+  let f = NormMp.norm_mpath env f in
   let func = Fun.by_mpath f env in
   match func.f_def with
-  | None -> assert false (* Not implemented *)
+  | None -> 
+    let a = destr_adv_fun f in
+    let w = PV.add_glob env a PV.empty in
+    let add w o = PV.union env (f_write env o) w in
+    List.fold_left add w (oracles func)
   | Some fdef ->
     let remove_local w {v_name = v } =
       PV.remove env {pv_name = EcPath.mqname f EcPath.PKother v []; 
@@ -167,7 +191,11 @@ and i_read env r i =
 and f_read env f =   
   let func = Fun.by_mpath f env in
   match func.f_def with
-  | None -> assert false (* Not implemented *)
+  | None -> 
+    let a = destr_adv_fun f in
+    let r = PV.add_glob env a PV.empty in 
+    let add r o = PV.union env (f_read env o) r in
+    List.fold_left add r (oracles func)
   | Some fdef ->
     let remove_local w {v_name = v } =
       PV.remove env {pv_name = EcPath.mqname f EcPath.PKother v []; 
@@ -664,8 +692,47 @@ let t_equivS_conseq _env pre post g =
   let concl3 = f_equivS_r { es with es_pr = pre; es_po = post } in
   prove_goal_by [concl1; concl2; concl3] (RN_hl_conseq) g
   
+(* --------------------------------------------------------------------- *)
 
-(* -------------------------------------------`------------------------- *)
+let t_hoare_equiv _env p q p1 q1 p2 q2 g =
+  let concl = get_concl g in
+  let es = destr_equivS concl in
+  let s1 = bind_mem f_subst_id mhr (fst es.es_ml) in
+  let s2 = bind_mem f_subst_id mhr (fst es.es_mr) in
+  let concl1 = 
+    gen_mems [es.es_ml;es.es_mr] 
+      (f_imp es.es_pr (f_and p (f_and (f_subst s1 p1) (f_subst s2 p2)))) in
+  let concl2 = 
+    gen_mems [es.es_ml;es.es_mr]
+      (f_imps [q;f_subst s1 q1;f_subst s2 q2] es.es_po) in
+  let concl3 = 
+    f_hoareS (mhr,snd es.es_ml) p1 es.es_sl q1 in
+  let concl4 = 
+    f_hoareS (mhr,snd es.es_mr) p2 es.es_sr q2 in
+  let concl5 = 
+    f_equivS_r { es with es_pr = p; es_po = q } in
+  prove_goal_by [concl1; concl2; concl3; concl4; concl5] 
+    RN_hl_hoare_equiv g
+
+(*
+let t_equiv_mod 
+{P} c1 ~ c2 {Q}
+P => forall mod, Q => Q' 
+-------------------------
+{P} c1 ~ c2 {Q'}
+*)
+
+(*
+let t_equiv_true 
+lossless c1
+lossless c2
+------------------
+{P} c1 ~ c2 {true}
+
+*)
+
+
+(* --------------------------------------------------------------------- *)
 
 let t_hoare_case f g =
   let concl = get_concl g in
@@ -876,6 +943,122 @@ let rec t_equiv_cond env side g =
         ] g
 
 
+(* -------------------------------------------------------------------- *)
+(* TODO move this *)
+(*
+type code_position = 
+  | CPat of int
+  | CPif of int * bool * code_position
+
+type code_zip = 
+  | CZempty 
+  | CZapp of int * instr list * instr list * code_zip
+  | CZif  of expr * bool * stmt * code_zip
+  | CZwhile of expr * code_zip
+
+let rec s_split_pos z cp s = 
+  match cp with
+  | CPat p -> 
+    let hd,i,tl = s_split "get_code_position" p s in (* FIXME error message *)
+    i, CZapp(i,hd,tl,z)
+  | CPif(p,b,cp) ->
+    let hd,i,tl = s_split "get_code_position" p s in (* FIXME error message *)
+    let z = CZapp(p,hd,tl,z) in
+    match i.i_node with
+    | S_if(e,s1,s2) ->
+      let s,s' = if b then s1,s2 else s2,s1 in
+      s_split_aux (CZif(e,b,s',z)) cp s
+    | S_while(e,s) ->
+      assert b; (* FIXME error message *)
+      s_split_aux (CZwhile(e,z)) cp s
+    | _ -> assert false (* FIXME error message *)
+
+let s_split_pos = s_split_pos CZempty
+
+let rec app_code_zip s z = 
+  match z with
+  | CZempty -> stmt s
+  | CZapp(_,hd,tl,z) -> 
+    app_code_zip (List.flatten [hd;s;tl] z)
+  | CZif(e,b,s',z) ->
+    let s = stmt s in
+    let s1,s2 = if b then s,s' else s',s in
+    app_code_zip [i_if(e,s1,s2)] z
+  | CZwhile(e,z) ->
+    app_code_zip [i_while(e,stmt s)] z
+
+let freshen_locals me s f vs = 
+  let s = ref s in
+  let me = ref me in
+  let mk_v v = 
+    let vn = v.v_name in 
+    let vn = 
+      if not (EcMemory.is_bound vn !me) then vn 
+      else 
+        (* TODO share the code with EcBaseLogic.fresh_ids *)
+        let rec aux n = 
+          let vn = vn ^ string_of_int n in
+          if (EcMemory.is_bound vn !me) then aux (n+1) else vn in
+        aux 0 in
+    me := EcMemory.bind vn v.v_type !me;
+    s  := EcPath.Mm.add 
+    
+let inline1 env me i = 
+  match i.i_node with
+  | Scall(lv,f,args) ->
+    let fdef = EcEnv.Fun.by_mpath env f in
+    let body = odfl (fun _ -> assert false) fdef.f_def in
+                   (* FIXME error message *) 
+    let s = e_subst_id in
+    let me, s, params = freshen_locals me s f (fst fdef.f_sig.fs_sig) in
+    let me, s, _ = freshen_locals me s f body.f_locals in
+    let sparams = List.map2 (fun v e -> i_asgn(LvVar v,e )) params args in
+    let sb = s_subst s body.f_body in
+    let sr = 
+      ofold body.f_ret (fun l e -> i_asgn (oget lv, e_subst s e)::l) [] in
+    me, List.flatten [sparams;sb;sr]
+  | _ -> assert false (* FIXME error message *)
+      
+    
+let rec inline env me pos s = 
+  match pos with
+  | CPat p ->
+    let hd,i,tl = s_split "inline" p s in
+    let me, s = inline1 env me i in
+    me, stmt (List.flatten [hd;s;tl])
+  | CPif(p,b,pos) ->
+    let hd,i,tl = s_split "inline" p s in
+    match i.i_node with
+    | Sif(e,s1,s2) ->
+      let me, s = inline env me pos (if b then s1 else s2) in
+      let s1,s2 = if b then s,s2 else s1,s in
+      let i =  i_if(e,s1,s2) in
+      me, stmt (hd @ i :: tl)
+    | Swhile(e,s) ->
+      assert b; (* FIXME error message *)
+      let me, s = inline env me pos s in
+      let i = i_while(e,s) in
+      me, stmt (hd @ i :: tl)
+    | _ -> assert false (* FIXME error message *) 
+        
+    
+    
+  
+  
+  
+
+let t_equiv_inline env side pos g =
+  let concl = get_concl g in
+  let es = destr_equivS concl in
+  let me,s = if side then es.es_ml, es.es_sl else es.es_mr, es.es_sr in
+  let me,s = inline me s pos in
+  let es = 
+    if side then {es with es_ml = me; es_sl = s }
+    else { es with es_mr = me; es_sr = s } in
+  let concl = f_equivS_r es in
+  prove_goal_by [concl] (RN_hl_inline(side,pos)) g
+  
+*)  
 
 
 (* -------------------------------------------------------------------- *)

@@ -13,6 +13,7 @@ Verifier les fonction add dans ecEnv.
 tactic : 
 
   + tactic phl/prhl 
+    -
     - eqobs_in
     - not_modify
     - hoare -> equiv
@@ -26,6 +27,7 @@ tactic :
 
 
   + tactic
+    - set 
     - apply avec instanciation automatique +
       apply f   
     - notation apply recursive
@@ -48,7 +50,7 @@ clone :
 
 * TODO
 - chemins privés (attendre la fin des modules)
-- hash-consing
+
 - réfléchir sur le pb d'instanciation de modules
   (=> hypothèses sur adversaire - e.g. pour up-to-bad)
 - arbre de preuve + contexte dynamique de preuve

@@ -14,6 +14,7 @@ type ty = private {
 }
 
 and ty_node =
+  | Tglob   of EcPath.mpath (* The tuple of global variable of the module *)
   | Tunivar of EcUidgen.uid
   | Tvar    of EcIdent.t 
   | Ttuple  of ty list
@@ -30,6 +31,7 @@ val tvar    : EcIdent.t -> ty
 val ttuple  : ty list -> ty
 val tconstr : EcPath.path -> ty list -> ty
 val tfun    : ty -> ty -> ty
+val tglob   : EcPath.mpath -> ty 
 
 (* -------------------------------------------------------------------- *)
 val tunit      : ty
@@ -44,9 +46,10 @@ val ty_dump  : ty -> EcDebug.dnode
 
 (* -------------------------------------------------------------------- *)
 type ty_subst = {
-  ts_p : EcPath.path -> EcPath.path;
-  ts_u : ty Muid.t;
-  ts_v : ty Mid.t;
+  ts_p  : EcPath.path -> EcPath.path;
+  ts_mp : EcPath.mpath -> EcPath.mpath;
+  ts_u  : ty Muid.t;
+  ts_v  : ty Mid.t;
 }
 
 val ty_subst_id : ty_subst

@@ -1159,9 +1159,6 @@ module NormMp = struct
     let p = norm_mpath env pv.pv_name in
     if m_equal p pv.pv_name then pv else { pv_name = p; pv_kind = pv.pv_kind }
 
-  (*let norm_eqGlob_mp env mp =
-    let p = Mod.unfold_mod_path env pv.pv_name in *)
-
   let norm_form env =
     let norm_mp = EcPath.Hm.memo 107 (norm_mpath env) in
     let norm_pv pv =

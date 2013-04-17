@@ -43,8 +43,8 @@ type mpath = private {
 }
 
 and mpath_top =
-| `Abstract of ident
-| `Concrete of path * path option
+[ | `Abstract of ident
+  | `Concrete of path * path option ]
 
 (* -------------------------------------------------------------------- *)
 val mpath_abs : ident -> mpath list -> mpath
@@ -90,4 +90,4 @@ module Hx : EcMaps.EHashtbl.S with type key = xpath
 val p_subst : path Mp.t -> path -> path
 
 val m_subst : (path -> path) -> mpath Mid.t -> mpath -> mpath
-val x_subst : (path -> path) -> mpath Mid.t -> xpath -> xpath
+val x_subst : (mpath -> mpath) -> xpath -> xpath
