@@ -25,8 +25,6 @@ type mpath = {
   m_tag  : int;
 }
 
-type proot = [ `Symbol of symbol | `Ident of EcIdent.t ]
-
 let name_path path = match path.p_node with 
   | Psymbol s -> s
   | Pident id -> EcIdent.name id
@@ -229,71 +227,6 @@ let rec m_tostring(m : mpath) =
     aux p m.m_kind args
 
 (* -------------------------------------------------------------------- *)
-module Msubp = struct
-  type 'a t = ('a submaps) Msym.t
-
-  and 'a submaps = {
-    mp_value   : 'a option;
-    mp_submaps : 'a t;
-  }
-
-  let empty : 'a t = Msym.empty
-
-  let empty_sm : 'a submaps = {
-    mp_value   = None;
-    mp_submaps = empty;
-  }
-
-  let rec update up (path : path) (m : 'a t) =
-    match path.p_node with
-    | Pident  _ -> invalid_arg "path-with-ident"
-    | Psymbol x -> up x m
-    | Pqname (path, x) ->
-        let up supx supm =
-          let doupdate subxsm =
-            let supxsm = odfl empty_sm subxsm in
-              Some { supxsm with mp_submaps = up x supxsm.mp_submaps }
-          in
-            Msym.change doupdate supx supm
-        in
-          update up path m
-
-  let add (path : path) (v : 'a) (m : 'a t) =
-    let add1 (x : symbol) (v : 'a) (m : 'a t) =
-      let doupdate sm =
-        let sm = odfl empty_sm sm in
-          Some { sm with mp_value = Some v }
-      in
-        Msym.change doupdate x m
-    in
-      update (add1^~ v) path m
-
-  let find =
-    let find1 (x : symbol) (sm : 'a submaps) =
-      match Msym.find_opt x sm.mp_submaps with
-      | None -> { mp_value   = sm.mp_value;
-                  mp_submaps = empty; }
-
-      | Some subsm -> begin
-          match subsm.mp_value with
-          | None   -> { subsm with mp_value = sm.mp_value }
-          | Some _ -> subsm
-        end
-    in
-
-    let rec find (path : path) (sm : 'a submaps) =
-      match path.p_node with
-      | Pident  _      -> invalid_arg "path-with-ident"
-      | Psymbol x      -> find1 x sm
-      | Pqname  (p, x) -> find1 x (find p sm)
-    in
-
-      fun (path : path) (m : 'a t) ->
-        (find path { mp_value = None; mp_submaps = m }).mp_value
-end
-
-(* -------------------------------------------------------------------- *)
-
 let p_subst (s : path Mp.t) =
   if Mp.is_empty s then identity
   else
@@ -309,7 +242,6 @@ let p_subst (s : path Mp.t) =
     Hp.memo_rec 107 p_subst
 
 (* -------------------------------------------------------------------- *)
-
 let rec m_subst (sp : path -> path) (sm : mpath EcIdent.Mid.t) m =
   let p    = m.m_path
   and ks   = m.m_kind 

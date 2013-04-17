@@ -59,7 +59,7 @@ CHECKLIBS =
 # --------------------------------------------------------------------
 .PHONY: all build byte native check check-xunit tags
 .PHONY: clean install uninstall dist distcheck why3
-.PHONY: pg toolchain %.ml
+.PHONY: pg toolchain %.ml %.mli %.inferred.mli
 
 all: build
 
@@ -130,6 +130,10 @@ distcheck: dist
 # --------------------------------------------------------------------
 %.ml:
 	$(call build src/$*.cmo)
+
+# --------------------------------------------------------------------
+%.mli:
+	$(call build src/$*.cmi)
 
 # --------------------------------------------------------------------
 %.inferred.mli:

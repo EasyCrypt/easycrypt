@@ -1,4 +1,5 @@
 (* -------------------------------------------------------------------- *)
+open EcIdent
 open EcMaps
 open EcSymbols
 
@@ -10,20 +11,15 @@ type path = private {
 
 and path_node =
 | Psymbol of symbol
-| Pident  of EcIdent.t
 | Pqname  of path * symbol
 
-type proot = [ `Symbol of symbol | `Ident of EcIdent.t ]
-
 (* -------------------------------------------------------------------- *)
-val psymbol   : symbol -> path
-val pident    : EcIdent.t -> path
-val pqname    : path -> symbol -> path
+val psymbol : symbol -> path
+val pqname  : path -> symbol -> path
 
 val p_equal   : path -> path -> bool
 val p_compare : path -> path -> int
 val p_hash    : path -> int
-val p_fv      : int EcIdent.Mid.t -> path -> int EcIdent.Mid.t
 
 (* -------------------------------------------------------------------- *)
 val tostring  : path -> string
@@ -40,50 +36,45 @@ module Sp : Mp.Set with type elt = path
 module Hp : EcMaps.EHashtbl.S with type key = path
 
 (* -------------------------------------------------------------------- *)
-type path_kind =
-| PKmodule
-| PKother
-
 type mpath = private {
-  m_path : path;
-  m_kind : path_kind list; 
-  m_args : mpath list list;
+  m_top  : mpath_top;
+  m_args : mpath list;
   m_tag  : int;
 }
 
-val name_path : path -> symbol (* ? *)
-val name_mpath : mpath -> symbol (* ? *)
+and mpath_top =
+| `Abstract of ident
+| `Concrete of path * path option
 
 (* -------------------------------------------------------------------- *)
-val mpath   : path -> path_kind list -> mpath list list -> mpath
-val mident  : EcIdent.t -> mpath
-val msymbol : symbol -> mpath
-val mqname  : mpath -> path_kind -> symbol -> mpath list -> mpath
+val mpath_abs : ident -> mpath list -> mpath
+val mpath_crt : path -> mpath list -> path option -> mpath
 
 val m_equal   : mpath -> mpath -> bool
 val m_compare : mpath -> mpath -> int
 val m_hash    : mpath -> int
+val m_apply   : mpath -> mpath list -> mpath
 
-val m_split : mpath -> (mpath * path_kind * symbol * mpath list) option
-val m_apply : mpath -> mpath list -> mpath
-
-val m_fv    : int EcIdent.Mid.t -> mpath -> int EcIdent.Mid.t
+val m_fv : int EcIdent.Mid.t -> mpath -> int EcIdent.Mid.t
 
 (* -------------------------------------------------------------------- *)
+type xpath = private {
+  x_top : mpath;
+  x_sub : path;
+  x_tag : int;
+}
 
-(* Create a [mpath] from a [path] assuming that all components are
- * non-applied (i.e. applied to an empty list of arguments *)
-val mpath_of_path : path  -> mpath 
+val xpath : mpath -> path -> xpath
 
-(* Project a [mpath] to is associated [path], [arguments] and [kinds] *)
-val path_of_mpath  : mpath -> path
-val args_of_mpath  : mpath -> mpath list list
-val kinds_of_mpath : mpath -> path_kind list
+val x_equal   : xpath -> xpath -> bool
+val x_compare : xpath -> xpath -> int
+val x_hash    : xpath -> int
+
+val x_fv : int EcIdent.Mid.t -> xpath -> int EcIdent.Mid.t
 
 (* -------------------------------------------------------------------- *)
-
-(* [mpath] dump *)
 val m_tostring : mpath -> string
+val x_tostring : xpath -> string
 
 (* -------------------------------------------------------------------- *)
 module Mm : Map.S   with type key = mpath
@@ -91,20 +82,12 @@ module Sm : Mm.Set with type elt = mpath
 module Hm : EcMaps.EHashtbl.S with type key = mpath
 
 (* -------------------------------------------------------------------- *)
-val p_subst : path Mp.t -> path -> path
-
-val m_subst : (path -> path) -> mpath EcIdent.Mid.t -> mpath -> mpath
+module Mx : Map.S   with type key = xpath
+module Sx : Mx.Set with type elt = xpath
+module Hx : EcMaps.EHashtbl.S with type key = xpath
 
 (* -------------------------------------------------------------------- *)
-module Msubp : sig
-  (* Maps implementation with [path] as keys. When asking the value of
-   * a [path], retrieve the longest prefix of [path] that has been
-   * associated to a value, and return this one. It is an error to give
-   * paths prefixed by an [ident] to any of these functions. *)
+val p_subst : path Mp.t -> path -> path
 
-  type +'a t
-
-  val empty : 'a t
-  val add   : path -> 'a -> 'a t -> 'a t
-  val find  : path -> 'a t -> 'a option
-end
+val m_subst : (path -> path) -> mpath Mid.t -> mpath -> mpath
+val x_subst : (path -> path) -> mpath Mid.t -> xpath -> xpath
