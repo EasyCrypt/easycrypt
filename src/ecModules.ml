@@ -357,9 +357,13 @@ and module_sig_body_item =
 and funsig = {
   fs_name   : symbol;
   fs_sig    : variable list * EcTypes.ty;
-  fs_calls  : EcPath.mpath list;
-  fs_reads  : Sm.t;
-  fs_writes : Sm.t;
+  fs_uses   : uses;
+}
+
+and uses = {
+  us_calls  : EcPath.mpath list;
+  us_reads  : Sm.t;
+  us_writes : Sm.t;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -401,6 +405,7 @@ and function_def = {
   f_locals : variable list;
   f_body   : stmt;
   f_ret    : EcTypes.expr option;
+  f_uses   : uses;
 }
 
 (* -------------------------------------------------------------------- *)

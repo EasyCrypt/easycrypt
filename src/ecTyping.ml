@@ -169,29 +169,27 @@ let e_inuse =
     fun e -> inuse Sm.empty e
 
 (* -------------------------------------------------------------------- *)
-type uses = EcPath.mpath list * (Sm.t * Sm.t)
+let empty_uses : uses =
+  { us_calls  = [];
+    us_reads  = Sm.empty;
+    us_writes = Sm.empty; }
 
-let empty_uses : uses = ([], (Sm.empty, Sm.empty))
+let add_call (u : uses) p : uses =
+  { u with us_calls = p :: u.us_calls }
 
-let add_call ((m, rw) : uses) p : uses =
-  (p :: m, rw)
+let add_read (u : uses) p : uses =
+  { u with us_reads = Sm.add p u.us_reads }
 
-let add_read ((m, (r, w)) : uses) p : uses =
-  (m, (Sm.add p r, w))
+let add_write (u : uses) p : uses =
+  { u with us_writes = Sm.add p u.us_writes }
 
-let add_write ((m, (r, w)) : uses) p : uses =
-  (m, (r, Sm.add p w))
-
-let uses_of_funsig (fs : funsig) =
-  (fs.fs_calls, (fs.fs_reads, fs.fs_writes))
-
-let norm_uses (env : EcEnv.env) ((m, (r, w)) : uses) =
+let norm_uses (env : EcEnv.env) (u : uses) =
   let norm map =
     Sm.fold
       (fun p map -> Sm.add (EcEnv.NormMp.norm_mpath env p) map)
       Sm.empty map
   in
-    (norm (Sm.of_list m), (norm r, norm w))
+    (norm (Sm.of_list u.us_calls), (norm u.us_reads, norm u.us_writes))
 
 let (i_inuse, s_inuse, se_inuse) =
   let rec lv_inuse (map : uses) (lv : lvalue) =
@@ -248,8 +246,8 @@ let (i_inuse, s_inuse, se_inuse) =
   and s_inuse (map : uses) (s : stmt) =
     List.fold_left i_inuse map s.s_node
 
-  and se_inuse ((m, (r, w)) : uses) (e : expr) =
-    (m, (Sm.union r (e_inuse e), w))
+  and se_inuse (u : uses) (e : expr) =
+    { u with us_reads = Sm.union u.us_reads (e_inuse e) }
 
   in
     (i_inuse empty_uses, s_inuse empty_uses, se_inuse)
@@ -575,10 +573,11 @@ and transmodsig_body (env : EcEnv.env) (is : pmodule_sig_struct_body) =
           Tys_function
             { fs_name   = name.pl_desc;
               fs_sig    = (tyargs, resty);
-              fs_calls  = [];
-              fs_reads  = Sm.empty;
-              fs_writes = Sm.empty; }
-
+              fs_uses   = {
+                us_calls  = [];
+                us_reads  = Sm.empty;
+                us_writes = Sm.empty;
+              } }
   in
 
   let items = List.map transsig1 is in
@@ -666,8 +665,8 @@ let rec check_tymod_cnv mode (env : EcEnv.env) tin tout =
           tymod_cnv_failure (E_TyModCnv_MismatchFunSig fin.fs_name);
 
         let flcmp () =
-          let (icalls, (ireads, iwrites)) = norm_uses env (uses_of_funsig fin)
-          and (ocalls, (oreads, owrites)) = norm_uses env (uses_of_funsig fout) in
+          let (icalls, (ireads, iwrites)) = norm_uses env fin.fs_uses
+          and (ocalls, (oreads, owrites)) = norm_uses env fout.fs_uses in
 
           match mode with
           | `Sub ->
@@ -903,9 +902,7 @@ and transstruct1 (env : EcEnv.env) (st : pstructure_item) =
       let stmt    = EcModules.stmt (prelude @ stmt.s_node) in
 
       (* Computes reads/writes/calls *)
-      let (calls, (reads, writes)) =
-        ofold result ((^~) se_inuse) (s_inuse stmt)
-      in
+      let uses = ofold result ((^~) se_inuse) (s_inuse stmt) in
 
       (* Compose all results *)
       let fun_ =
@@ -913,14 +910,13 @@ and transstruct1 (env : EcEnv.env) (st : pstructure_item) =
           f_sig    = {
             fs_name   = decl.pfd_name.pl_desc;
             fs_sig    = (params, retty);
-            fs_calls  = calls;
-            fs_reads  = reads;
-            fs_writes = writes;
+            fs_uses   = uses;           (* FIXME: filter *)
           };
           f_def = Some {
             f_locals = locals;
             f_body   = stmt;
             f_ret    = result;
+            f_uses   = uses;
           };
         }
       in 

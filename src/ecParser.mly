@@ -1327,7 +1327,7 @@ swap_pos:
 
 int:
 | n=number { n }
-| m=loc(MINUS) n=number { -n }
+| loc(MINUS) n=number { -n }
 ;
 
 side:

@@ -82,17 +82,22 @@ let subst_variable (s : _subst) (x : variable) =
   { x with v_type = s.s_ty x.v_type; }
 
 (* -------------------------------------------------------------------- *)
+let subst_fun_uses (s : _subst) (u : uses) =
+  let calls  = List.map s.s_fmp u.us_calls
+  and reads  = Sm.fold (fun p m -> Sm.add (s.s_fmp p) m) Sm.empty u.us_reads
+  and writes = Sm.fold (fun p m -> Sm.add (s.s_fmp p) m) Sm.empty u.us_writes in
+
+  { us_calls = calls; us_reads = reads; us_writes = writes; }
+
+(* -------------------------------------------------------------------- *)
 let subst_funsig (s : _subst) (funsig : funsig) =
   let args' = List.map (subst_variable s) (fst funsig.fs_sig) in
   let res'  = s.s_ty (snd funsig.fs_sig) in
-
-  let fs_calls  = List.map s.s_fmp funsig.fs_calls
-  and fs_reads  = Sm.fold (fun p m -> Sm.add (s.s_fmp p) m) Sm.empty funsig.fs_reads
-  and fs_writes = Sm.fold (fun p m -> Sm.add (s.s_fmp p) m) Sm.empty funsig.fs_writes in
+  let uses' = subst_fun_uses s funsig.fs_uses in
 
   { fs_name = funsig.fs_name;
     fs_sig  = (args', res');
-    fs_calls; fs_reads; fs_writes; }
+    fs_uses = uses'; }
 
 (* -------------------------------------------------------------------- *)
 let rec subst_modsig_body_item (s : _subst) (item : module_sig_body_item) =
@@ -121,7 +126,8 @@ let subst_function_def (s : _subst) (def : function_def) =
   let es = e_subst_of_subst s in
   { f_locals = def.f_locals;
     f_body   = s_subst es def.f_body;
-    f_ret    = omap def.f_ret (e_subst es); }
+    f_ret    = omap def.f_ret (e_subst es);
+    f_uses   = subst_fun_uses s def.f_uses; }
 
 (* -------------------------------------------------------------------- *)
 let subst_function (s : _subst) (f : function_) =
