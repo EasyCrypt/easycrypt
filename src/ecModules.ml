@@ -1,10 +1,7 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open EcSymbols
-
-(* -------------------------------------------------------------------- *)
-module Sp = EcPath.Sp
-module Sm = EcPath.Sm
+open EcPath
 
 (* -------------------------------------------------------------------- *)
 type lvalue =
@@ -54,7 +51,7 @@ type instr = {
 and instr_node =
   | Sasgn   of lvalue * EcTypes.expr
   | Srnd    of lvalue * EcTypes.expr
-  | Scall   of lvalue option * EcPath.mpath * EcTypes.expr list
+  | Scall   of lvalue option * EcPath.xpath * EcTypes.expr list
   | Sif     of EcTypes.expr * stmt * stmt
   | Swhile  of EcTypes.expr * stmt
   | Sassert of EcTypes.expr
@@ -88,9 +85,9 @@ module Hinstr = Why3.Hashcons.Make (struct
     | Srnd (lv1, e1), Srnd (lv2, e2) ->
         (lv_equal lv1 lv2) && (EcTypes.e_equal e1 e2)
 
-    | Scall (lv1, m1, es1), Scall (lv2, m2, es2) ->
+    | Scall (lv1, f1, es1), Scall (lv2, f2, es2) ->
            (EcUtils.opt_equal lv_equal lv1 lv2)
-        && (EcPath.m_equal m1 m2)
+        && (EcPath.x_equal f1 f2)
         && (List.all2 EcTypes.e_equal es1 es2)
 
     | Sif (c1, s1, r1), Sif (c2, s2, r2) ->
@@ -119,10 +116,10 @@ module Hinstr = Why3.Hashcons.Make (struct
         Why3.Hashcons.combine
           (Hashtbl.hash lv) (EcTypes.e_hash e)
 
-    | Scall (lv, m, tys) ->
+    | Scall (lv, f, tys) ->
         Why3.Hashcons.combine_list EcTypes.e_hash
           (Why3.Hashcons.combine
-             (Hashtbl.hash lv) (EcPath.m_hash m))
+             (Hashtbl.hash lv) (EcPath.x_hash f))
           tys
 
     | Sif (c, s1, s2) ->
@@ -140,7 +137,7 @@ module Hinstr = Why3.Hashcons.Make (struct
     | Srnd (lv,e) -> 
         EcIdent.fv_union (lv_fv lv) (EcTypes.e_fv e)
     | Scall(olv,f,args) ->
-        let ffv = EcPath.m_fv EcIdent.Mid.empty f in
+        let ffv = EcPath.x_fv EcIdent.Mid.empty f in
         let ofv = ofold olv (fun lv s -> EcIdent.fv_union s (lv_fv lv)) ffv in
         List.fold_left
           (fun s a -> EcIdent.fv_union s (EcTypes.e_fv a)) ofv args
@@ -233,7 +230,7 @@ let s_subst (s: EcTypes.e_subst) =
   else
 
     let pvt_subst (pv,ty as p) = 
-      let pv' = EcTypes.pv_subst s.EcTypes.es_mp pv in
+      let pv' = EcTypes.pv_subst s.EcTypes.es_xp pv in
       let ty' = s.EcTypes.es_ty ty in
       if pv == pv' && ty == ty' then p else 
         (pv',ty') in
@@ -250,7 +247,7 @@ let s_subst (s: EcTypes.e_subst) =
       | LvMap((p,tys), pv, e, ty) ->
         let p'   = s.EcTypes.es_p p in
         let tys' = List.smart_map s.EcTypes.es_ty tys in
-        let pv'  = EcTypes.pv_subst s.EcTypes.es_mp pv in
+        let pv'  = EcTypes.pv_subst s.EcTypes.es_xp pv in
         let e'   = e_subst e in
         let ty'  = s.EcTypes.es_ty ty in
         if p==p' && tys==tys' && pv==pv' && e==e' && ty==ty' then lv else
@@ -270,7 +267,7 @@ let s_subst (s: EcTypes.e_subst) =
           i_rnd(lv',e')
       | Scall(olv,mp,args) ->
         let olv' = osmart_map olv lv_subst in
-        let mp'  = s.EcTypes.es_mp mp in
+        let mp'  = s.EcTypes.es_xp mp in
         let args' = List.smart_map e_subst args in
         if olv == olv' && mp == mp' && args == args' then i else 
           i_call(olv',mp',args')
@@ -361,9 +358,9 @@ and funsig = {
 }
 
 and uses = {
-  us_calls  : EcPath.mpath list;
-  us_reads  : Sm.t;
-  us_writes : Sm.t;
+  us_calls  : EcPath.xpath list;
+  us_reads  : Sx.t;
+  us_writes : Sx.t;
 }
 
 (* -------------------------------------------------------------------- *)

@@ -28,7 +28,7 @@ type instr = private {
 and instr_node =
   | Sasgn   of lvalue * EcTypes.expr
   | Srnd    of lvalue * EcTypes.expr
-  | Scall   of lvalue option * EcPath.mpath * EcTypes.expr list
+  | Scall   of lvalue option * EcPath.xpath * EcTypes.expr list
   | Sif     of EcTypes.expr * stmt * stmt
   | Swhile  of EcTypes.expr * stmt
   | Sassert of EcTypes.expr
@@ -54,7 +54,7 @@ val s_subst   : e_subst -> stmt -> stmt
 (* -------------------------------------------------------------------- *)
 val i_asgn    : lvalue * expr -> instr
 val i_rnd     : lvalue * expr -> instr
-val i_call    : lvalue option * mpath * expr list -> instr
+val i_call    : lvalue option * xpath * expr list -> instr
 val i_if      : expr * stmt * stmt -> instr
 val i_while   : expr * stmt -> instr
 val i_assert  : expr -> instr
@@ -68,7 +68,7 @@ val s_split : int -> stmt -> instr list * instr list
 (* the following functions raise Not_found if the argument does not match *) 
 val destr_asgn   : instr -> lvalue * expr
 val destr_rnd    : instr -> lvalue * expr
-val destr_call   : instr -> lvalue option * mpath * expr list
+val destr_call   : instr -> lvalue option * xpath * expr list
 val destr_if     : instr -> expr * stmt * stmt
 val destr_while  : instr -> expr * stmt
 val destr_assert : instr -> expr
@@ -103,9 +103,9 @@ and funsig = {
 }
 
 and uses = {
-  us_calls  : mpath list;
-  us_reads  : Sm.t;
-  us_writes : Sm.t;
+  us_calls  : xpath list;
+  us_reads  : Sx.t;
+  us_writes : Sx.t;
 }
 
 (* -------------------------------------------------------------------- *)
