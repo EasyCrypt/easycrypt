@@ -138,7 +138,7 @@ type scope = {
 (* -------------------------------------------------------------------- *)
 let empty =
   let env = EcEnv.initial in
-    { sc_name       = EcPath.basename (EcPath.path_of_mpath env.EcEnv.env_scope);
+    { sc_name       = EcPath.basename (EcEnv.root env);
       sc_env        = EcEnv.initial;
       sc_top        = None;
       sc_loaded     = Msym.empty;
@@ -425,7 +425,7 @@ module Theory = struct
 
   let clone (scope : scope) (thcl : theory_cloning) =
     let scenv = scope.sc_env in
-    let cpath = EcPath.path_of_mpath scenv.EcEnv.env_scope in
+    let cpath = EcEnv.root scenv in
 
     let opath, oth = EcEnv.Theory.lookup (unloc thcl.pthc_base) scope.sc_env in
     let name  = odfl (EcPath.basename opath) (omap thcl.pthc_name unloc) in

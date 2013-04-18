@@ -101,7 +101,8 @@ type prog_var = {
 
 val pv_equal   : prog_var -> prog_var -> bool 
 val pv_compare : prog_var -> prog_var -> int
-(* val pv_compare_p : prog_var -> prog_var -> int *)
+(* work only if the prog_var has been normalized *)
+val pv_compare_p : prog_var -> prog_var -> int 
 val pv_hash    : prog_var -> int
 val pv_fv      : prog_var -> int EcIdent.Mid.t
 val is_loc     : prog_var -> bool

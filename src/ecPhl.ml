@@ -111,14 +111,14 @@ module PV = struct
 
 end
 
-let destr_adv_fun f = 
+(*let destr_adv_fun f = 
   match EcPath.m_split f with
   | Some(mp,_,_,[]) ->
     begin match mp.EcPath.m_path.EcPath.p_node with
     | EcPath.Pident x -> EcPath.mident x
     | _ -> assert false
     end 
-  | _ -> assert false
+  | _ -> assert false *)
   
 let oracles _func = assert false
 
@@ -144,17 +144,19 @@ and i_write env w i =
   | Sassert _ -> w 
     
 and f_write env f = 
-  let f = NormMp.norm_mpath env f in
-  let func = Fun.by_mpath f env in
+  let f = NormMp.norm_xpath env f in
+  let func = Fun.by_xpath f env in
   match func.f_def with
-  | None -> 
+  | None -> assert false
+(*
     let a = destr_adv_fun f in
     let w = PV.add_glob env a PV.empty in
     let add w o = PV.union env (f_write env o) w in
     List.fold_left add w (oracles func)
+*)
   | Some fdef ->
     let remove_local w {v_name = v } =
-      PV.remove env {pv_name = EcPath.mqname f EcPath.PKother v []; 
+      PV.remove env {pv_name = EcPath.xqname f v; 
                      pv_kind = PVloc } w in
     let wf = s_write env PV.empty fdef.f_body in
     let wf = List.fold_left remove_local wf fdef.f_locals in
@@ -189,16 +191,17 @@ and i_read env r i =
   | Sassert e -> e_read env r e
     
 and f_read env f =   
-  let func = Fun.by_mpath f env in
+  let func = Fun.by_xpath f env in
   match func.f_def with
-  | None -> 
+  | None -> assert false 
+(*
     let a = destr_adv_fun f in
     let r = PV.add_glob env a PV.empty in 
     let add r o = PV.union env (f_read env o) r in
-    List.fold_left add r (oracles func)
+    List.fold_left add r (oracles func) *)
   | Some fdef ->
     let remove_local w {v_name = v } =
-      PV.remove env {pv_name = EcPath.mqname f EcPath.PKother v []; 
+      PV.remove env {pv_name = EcPath.xqname f v; 
                      pv_kind = PVloc } w in
     let wf = s_read env PV.empty fdef.f_body in
     let wf = List.fold_left remove_local wf fdef.f_locals in
@@ -241,7 +244,7 @@ let s_last_asserts st = s_lasts destr_assert (last_error "n assert" st)
 (* -------------------------------------------------------------------- *)
 
 let id_of_pv pv = 
-  EcIdent.create (EcPath.basename pv.pv_name.EcPath.m_path) 
+  EcIdent.create (EcPath.basename pv.pv_name.EcPath.x_sub) 
 
 let generalize_mod env m modi f = 
   let elts = PV.elements modi in
@@ -600,7 +603,7 @@ let t_hoare_call env fpre fpost (juc,n1 as g) =
   let hs = destr_hoareS concl in
   let (lp,f,args),s = s_last_call "call" hs.hs_s in
   let m = EcMemory.memory hs.hs_m in
-  let fsig = (Fun.by_mpath f env).f_sig in
+  let fsig = (Fun.by_xpath f env).f_sig in
   (* The function satisfies the specification *)
   let f_concl = f_hoareF fpre f fpost in
   let juc,nf = new_goal juc (hyps, f_concl) in
@@ -628,8 +631,8 @@ let t_equiv_call env fpre fpost g =
     s_last_calls "call" es.es_sl es.es_sr in
   let ml = EcMemory.memory es.es_ml in
   let mr = EcMemory.memory es.es_mr in
-  let fsigl = (Fun.by_mpath fl env).f_sig in
-  let fsigr = (Fun.by_mpath fr env).f_sig in
+  let fsigl = (Fun.by_xpath fl env).f_sig in
+  let fsigr = (Fun.by_xpath fr env).f_sig in
   (* The functions satisfies the specification *)
   let f_concl = f_equivF fpre fl fr fpost in
   (* The wp *)
@@ -765,8 +768,8 @@ let t_equiv_deno env pre post g =
   let (ml,fl,argsl,evl) = destr_pr f1 in
   let (mr,fr,argsr,evr) = destr_pr f2 in
   let concl_e = f_equivF pre fl fr post in
-  let funl = EcEnv.Fun.by_mpath fl env in
-  let funr = EcEnv.Fun.by_mpath fr env in
+  let funl = EcEnv.Fun.by_xpath fl env in
+  let funr = EcEnv.Fun.by_xpath fr env in
   (* building the substitution for the pre *)
   (* we should substitute param by args and left by ml and right by mr *)
   let sargs = 
@@ -1131,8 +1134,8 @@ let t_equiv_deno env pre post g =
   let (ml,fl,argsl,evl) = destr_pr f1 in
   let (mr,fr,argsr,evr) = destr_pr f2 in
   let concl_e = f_equivF pre fl fr post in
-  let funl = EcEnv.Fun.by_mpath fl env in
-  let funr = EcEnv.Fun.by_mpath fr env in
+  let funl = EcEnv.Fun.by_xpath fl env in
+  let funr = EcEnv.Fun.by_xpath fr env in
   (* building the substitution for the pre *)
   (* we should substitute param by args and left by ml and right by mr *)
   let sargs = 

@@ -258,13 +258,10 @@ let pv_compare v1 v2 =
   if r = 0 then Pervasives.compare v1.pv_kind v2.pv_kind
   else r 
 
-(*let pv_compare_p v1 v2 =
-  
-  let r = 
-    EcPath.p_compare (EcPath.path_of_mpath v1.pv_name) 
-      (EcPath.path_of_mpath v2.pv_name) in
-  if r = 0 then Pervasives.compare v1.pv_kind v2.pv_kind
-  else r *)
+let pv_compare_p v1 v2 =
+  let r = EcPath.x_compare_na v1.pv_name v2.pv_name in
+  if r = 0 then Pervasives.compare v1.pv_kind v2.pv_kind 
+  else r 
 
 let is_loc v = match v.pv_kind with PVloc -> true | _ -> false
   
