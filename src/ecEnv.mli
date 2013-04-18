@@ -19,7 +19,7 @@ open EcTheory
  *)
 type 'a suspension = {
   sp_target : 'a;
-  sp_params : (EcIdent.t * module_type) list list;
+  sp_params : (EcIdent.t * module_type) list;
 }
 
 val is_suspended : 'a suspension -> bool
@@ -59,7 +59,7 @@ type varbind = {
 type env 
 
 val root    : env -> path
-val mroot   : env -> mpath
+val mroot   : env -> xpath
 val initial : env
 
 (* -------------------------------------------------------------------- *)

@@ -17,10 +17,14 @@ module Mp = EcPath.Mp
 module Sm = EcPath.Sm
 module Mm = EcPath.Mm
 
+module Sx = EcPath.Sx
+module Mx = EcPath.Mx
+
 module Mid = EcIdent.Mid
 
 (* -------------------------------------------------------------------- *)
 type modapp_error =
+| MAE_WrongArgPosition
 | MAE_WrongArgCount
 | MAE_InvalidArgType
 
@@ -125,6 +129,9 @@ let pp_tyerror fmt env error =
   | InvalidFunAppl FAE_WrongArgCount ->
       msg "invalid function application: wrong number of arguments"
 
+  | InvalidModAppl MAE_WrongArgPosition ->
+      msg "invalid module application: wrong arguments position"
+
   | InvalidModAppl MAE_WrongArgCount ->
       msg "invalid module application: wrong number of arguments"
 
@@ -157,39 +164,39 @@ let unify_or_fail (env : EcEnv.env) ue loc ty1 ty2 =
 
 (* -------------------------------------------------------------------- *)
 let e_inuse =
-  let rec inuse (map : Sm.t) (e : expr) =
+  let rec inuse (map : Sx.t) (e : expr) =
     match e.e_node with
     | Evar p -> begin
         match p.pv_kind with
-        | PVglob -> Sm.add p.pv_name map
+        | PVglob -> Sx.add p.pv_name map
         | _      -> map
       end
     | _ -> e_fold inuse map e
   in
-    fun e -> inuse Sm.empty e
+    fun e -> inuse Sx.empty e
 
 (* -------------------------------------------------------------------- *)
 let empty_uses : uses =
   { us_calls  = [];
-    us_reads  = Sm.empty;
-    us_writes = Sm.empty; }
+    us_reads  = Sx.empty;
+    us_writes = Sx.empty; }
 
 let add_call (u : uses) p : uses =
   { u with us_calls = p :: u.us_calls }
 
 let add_read (u : uses) p : uses =
-  { u with us_reads = Sm.add p u.us_reads }
+  { u with us_reads = Sx.add p u.us_reads }
 
 let add_write (u : uses) p : uses =
-  { u with us_writes = Sm.add p u.us_writes }
+  { u with us_writes = Sx.add p u.us_writes }
 
 let norm_uses (env : EcEnv.env) (u : uses) =
   let norm map =
-    Sm.fold
-      (fun p map -> Sm.add (EcEnv.NormMp.norm_mpath env p) map)
-      Sm.empty map
+    Sx.fold
+      (fun p map -> Sx.add (EcEnv.NormMp.norm_xpath env p) map)
+      Sx.empty map
   in
-    (norm (Sm.of_list u.us_calls), (norm u.us_reads, norm u.us_writes))
+    (norm (Sx.of_list u.us_calls), (norm u.us_reads, norm u.us_writes))
 
 let (i_inuse, s_inuse, se_inuse) =
   let rec lv_inuse (map : uses) (lv : lvalue) =
@@ -247,7 +254,7 @@ let (i_inuse, s_inuse, se_inuse) =
     List.fold_left i_inuse map s.s_node
 
   and se_inuse (u : uses) (e : expr) =
-    { u with us_reads = Sm.union u.us_reads (e_inuse e) }
+    { u with us_reads = Sx.union u.us_reads (e_inuse e) }
 
   in
     (i_inuse empty_uses, s_inuse empty_uses, se_inuse)
@@ -575,8 +582,8 @@ and transmodsig_body (env : EcEnv.env) (is : pmodule_sig_struct_body) =
               fs_sig    = (tyargs, resty);
               fs_uses   = {
                 us_calls  = [];
-                us_reads  = Sm.empty;
-                us_writes = Sm.empty;
+                us_reads  = Sx.empty;
+                us_writes = Sx.empty;
               } }
   in
 
@@ -670,14 +677,14 @@ let rec check_tymod_cnv mode (env : EcEnv.env) tin tout =
 
           match mode with
           | `Sub ->
-                 (Sm.subset icalls  ocalls )
-              && (Sm.subset ireads  oreads )
-              && (Sm.subset iwrites owrites)
+                 (Sx.subset icalls  ocalls )
+              && (Sx.subset ireads  oreads )
+              && (Sx.subset iwrites owrites)
 
           | `Eq  ->
-                 (Sm.equal icalls  ocalls )
-              && (Sm.equal ireads  oreads )
-              && (Sm.equal iwrites owrites)
+                 (Sx.equal icalls  ocalls )
+              && (Sx.equal ireads  oreads )
+              && (Sx.equal iwrites owrites)
 
         in
           if not (flcmp ()) then
@@ -967,7 +974,7 @@ and transbody ue symbols (env : EcEnv.env) retty pbody =
           List.map2
             (fun x xty ->
                let x = unloc x in
-               let p = EcPath.mqname mpath EcPath.PKother x [] in
+               let p = EcPath.xqname mpath x in
                  ({ v_name  = x; v_type  = xty   },
                   { pv_name = p; pv_kind = PVloc },
                   xty, pty.pl_loc))
@@ -1151,93 +1158,78 @@ and translvalue ue (env : EcEnv.env) lvalue =
             tyerror x.pl_loc env (UnknownVarOrOp (name, esig))
 
 (* -------------------------------------------------------------------- *)
+
+let process_msymb (msymb : pmsymbol located) =
+  let top,args,sm = 
+    try
+      let r,(x,args), sm = 
+        List.find_split (fun (_,args) -> args <> None) msymb.pl_desc in
+      List.rev_append r [x,None], args, sm 
+    with Not_found ->
+      msymb.pl_desc, None, [] in
+  let top = List.map (fun (x,args) -> assert (args = None); x) top in
+  let sm  = List.map (fun (x,args) -> assert (args = None); x) sm in
+  top, args, sm
+  
+
 let rec trans_msymbol (env : EcEnv.env) (msymb : pmsymbol located) =
-  let msymb = msymb.pl_desc and loc = msymb.pl_loc in
-
-  let mod_qname =
-    match List.rev_map fst msymb with
+  let loc = msymb.pl_loc in
+  let top, args, sm = process_msymb msymb in
+  let to_qsymbol l = 
+    match List.rev l with
     | [] -> assert false
-    | x :: qn ->
-        { pl_desc = (List.rev_map unloc qn, unloc x);
-          pl_loc  = x.pl_loc; }
-  in
-
-  let (mod_path, mod_expr) =
-    match EcEnv.Mod.sp_lookup_opt mod_qname.pl_desc env with
+    | x::qn ->
+      { pl_desc = (List.rev_map unloc qn, unloc x);
+        pl_loc  = x.pl_loc; } in
+  let top_qname = to_qsymbol (top@sm) in
+  let (top_path, {EcEnv.sp_target = mod_expr; EcEnv.sp_params = subst}) =
+    match EcEnv.Mod.sp_lookup_opt top_qname.pl_desc env with
     | None ->
-        tyerror mod_qname.pl_loc env
-          (UnknownModName mod_qname.pl_desc)
+      tyerror top_qname.pl_loc env
+        (UnknownModName top_qname.pl_desc)
     | Some me -> me in
+  begin match top_path with
+  | `Concrete(_,Some sub) -> 
+    if not (EcPath.p_size sub = List.length sm) then
+      tyerror loc env (InvalidModAppl MAE_WrongArgPosition);
+  | _ -> ()
+  end;
+  let args = omap args (List.map (trans_msymbol env))  in
+  if args = None then (* sm is [] *)
+    EcPath.mpath top_path [],
+    List.map (fun mt -> { mt with mt_args = None }) mod_expr.me_types 
+  else 
+    let args = 
+      match args with None -> [] | Some args -> args in
+    List.iter2
+      (fun (_, p) (_, a) ->
+        if not (EcEnv.ModTy.has_mod_type env a p) then
+          tyerror loc env (InvalidModAppl MAE_InvalidArgType))
+      subst args;
+    let args = List.map fst args in
+    let subst = 
+      List.fold_left2 (fun s (x,_) a -> EcSubst.add_module s x a) 
+        EcSubst.empty subst args in
+    EcPath.mpath top_path args,
+    List.map (EcSubst.subst_modtype subst) mod_expr.me_types
 
-  let mod_expr   = mod_expr.EcEnv.sp_target
-  and mod_params =
-       mod_expr.EcEnv.sp_target.me_sig.mis_params
-    :: mod_expr.EcEnv.sp_params
-  and mod_args   =
-       List.rev_append
-         (List.map (fun (_, a) -> odfl [] a) msymb)
-         (List.create
-            (EcPath.p_size (EcPath.path_of_mpath mod_path)
-               - List.length msymb)
-            []) in
-  let ndots = List.length mod_args in
-
-  let mod_args =
-    List.map
-      (fun args ->
-        List.map (trans_msymbol env) args)
-      mod_args
-  in
-    List.iter2i
-      (fun i param arg ->
-         if i < ndots-1 && arg <> [] then begin
-           if List.length param <> List.length arg then
-             tyerror loc env (InvalidModAppl MAE_WrongArgCount);
-           List.iter2
-             (fun (_, p) (_, a) ->
-               if not (EcEnv.ModTy.has_mod_type env a p) then
-                 tyerror loc env (InvalidModAppl MAE_InvalidArgType))
-             param arg
-         end)
-      mod_params mod_args;
-
-    let aout =
-      EcPath.mpath
-        mod_path.EcPath.m_path
-        mod_path.EcPath.m_kind
-        (List.map (List.map fst) mod_args)
-    in
-
-    let me_types =
-      let a =
-        match List.map fst (List.last mod_args) with
-        | [] -> None | a -> Some a
-      in
-        List.map
-          (fun mty ->
-            match mty.mt_args with
-            | Some _ -> mty
-            | None   -> { mty with mt_args = a })
-        mod_expr.me_types
-    in
-      (aout, me_types)
 
 (* -------------------------------------------------------------------- *)
 and trans_gamepath (env : EcEnv.env) gp =
   let loc = gp.pl_loc in
-
+  
   let modsymb = List.map (unloc -| fst) (fst (unloc gp))
   and funsymb = unloc (snd (unloc gp)) in
-  let _, _ =
+
+  
+  let _ =
     match EcEnv.Fun.sp_lookup_opt (modsymb, funsymb) env with
     | None -> tyerror gp.pl_loc env (UnknownFunName (modsymb, funsymb))
-    | Some (p, me) -> (p, me)
+    | Some _ -> ()
   in
 
-  let fpath = fst (trans_msymbol env (mk_loc loc (fst (unloc gp)))) in
-  let fpath = EcPath.mqname fpath EcPath.PKother funsymb [] in
-
-    fpath
+  let mpath = fst (trans_msymbol env (mk_loc loc (fst (unloc gp)))) in
+  EcPath.xpath mpath (EcPath.psymbol funsymb)
 
 (* -------------------------------------------------------------------- *)
 let transfpattern env ue (p : EcParsetree.plpattern) =
@@ -1353,7 +1345,7 @@ let transform_opt env ue pf tt =
 
     | PFprob (gp, args, m, event) ->
         let fpath = trans_gamepath env gp in
-        let fun_  = EcEnv.Fun.by_mpath fpath env in
+        let fun_  = EcEnv.Fun.by_xpath fpath env in
         let fsig  = fun_.f_sig.fs_sig in
         if List.length args <> List.length (fst fsig) then
           tyerror f.pl_loc env (InvalidFunAppl FAE_WrongArgCount);
