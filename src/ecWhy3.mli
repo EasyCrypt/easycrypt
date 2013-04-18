@@ -36,6 +36,10 @@ val add_ax : env -> EcPath.path -> EcDecl.axiom -> env * rebinding
 val add_mod_exp :
     env -> EcPath.path -> EcModules.module_expr -> env * rebinding
 
+val add_mod_sig :
+    env -> EcPath.path -> EcModules.module_sig -> env * rebinding
+
+
 
 (*****************************************************************************)
 

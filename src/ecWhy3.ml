@@ -1,6 +1,7 @@
 (* ----------------------------------------------------------------------*)
 open Why3
 open EcUtils
+open EcSymbols
 open EcIdent
 open EcPath
 open EcTypes
@@ -20,6 +21,7 @@ type env = {
     env_op : (Term.lsymbol * Term.lsymbol * Ty.tvsymbol list) Mp.t;
     env_ax : Decl.prsymbol Mp.t;
     env_pa : Term.term Mp.t;
+    env_na : Term.term Mp.t;
     env_w3 : (EcPath.path * Ty.tvsymbol list) Ident.Mid.t;
   }
 
@@ -110,9 +112,25 @@ let ts_distr, fs_mu, distr_theory =
 let ty_distr t = Ty.ty_app ts_distr [t]
 
 (* Special type for translation of glob, hoare, equiv and pr *)
+(*
+  type memory
+  type name 
+  type mod 
+  type 't var 
+  type ('ta, 'tr) fun
+  op mod_var : mod -> name -> name -> 't var 
+  op mod_fun : mod -> name -> ('ta,'tr) fun
+  op sub_mod : mod -> name -> mod
+  op app_mod : mod -> mod -> mod
+  op get_var : 't var -> memory -> 't
+  op sem : ('ta,'tr) fun -> memory -> 'ta -> memory distr
+*)
 
 let ts_mem = Ty.create_tysymbol (Ident.id_fresh "memory") [] None
 let ty_mem = Ty.ty_app ts_mem []
+
+let ts_name = Ty.create_tysymbol (Ident.id_fresh "name") [] None
+let ty_name = Ty.ty_app ts_name [] 
 
 let ts_mod = Ty.create_tysymbol (Ident.id_fresh "module") [] None
 let ty_mod = Ty.ty_app ts_mod []
@@ -120,55 +138,72 @@ let ty_mod = Ty.ty_app ts_mod []
 let ts_mod_name = Ty.create_tysymbol (Ident.id_fresh "module_name") [] None
 let ty_mod_name = Ty.ty_app ts_mod_name []
 
-let ts_fun_name =
-  let ta = Ty.create_tvsymbol (Ident.id_fresh "ta")
-  and tr = Ty.create_tvsymbol (Ident.id_fresh "tr") in
-  Ty.create_tysymbol (Ident.id_fresh "fun_name") [ta;tr] None
-let ty_fun_name ta tr = Ty.ty_app ts_fun_name [Ty.ty_tuple ta; tr]
-
-let ts_var_name =
+let ts_var = 
   let t = Ty.create_tvsymbol (Ident.id_fresh "t") in
-  Ty.create_tysymbol (Ident.id_fresh "var_name") [t] None
-let ty_var_name t = Ty.ty_app ts_var_name [t]
+  Ty.create_tysymbol (Ident.id_fresh "var") [t] None
+let ty_var t = Ty.ty_app ts_var [t]
 
-let fs_getmod =
-  Term.create_fsymbol (Ident.id_fresh "getmod") [ty_mod; ty_mod_name] ty_mod
+let ts_fun =
+  let ta = Ty.create_tvsymbol (Ident.id_fresh "ta")
+(*  and tr = Ty.create_tvsymbol (Ident.id_fresh "tr") *) in
+  Ty.create_tysymbol (Ident.id_fresh "fun") [ta(*;tr*)] None
+let ty_fun ta (* tr *) = Ty.ty_app ts_fun [Ty.ty_tuple ta (*; tr *)]
 
-let getmod m mn = Term.t_app_infer fs_getmod [m;mn]
-
-let fs_appmod =
-  Term.create_fsymbol (Ident.id_fresh "appmod") [ty_mod;ty_mod] ty_mod
-
-let appmod f m = Term.t_app_infer fs_appmod [f;m]
-
-let fs_getvar =
+let fs_mod_var =
   let t = Ty.ty_var (Ty.create_tvsymbol (Ident.id_fresh "t")) in
-  let tv = ty_var_name t in
-  Term.create_fsymbol (Ident.id_fresh "getvar") [tv; ty_mem] t
+  let tv = ty_var t in
+  Term.create_fsymbol (Ident.id_fresh "mod_var") [ty_mod; ty_name] tv
 
-let getvar v mem = Term.t_app_infer fs_getvar [v; mem]
+let mod_var mo na t =
+  Term.fs_app fs_mod_var [mo;na] (ty_var t) 
+
+let fs_mod_fun = 
+  let ta = Ty.ty_var (Ty.create_tvsymbol (Ident.id_fresh "ta"))
+(*  and tr = Ty.ty_var (Ty.create_tvsymbol (Ident.id_fresh "tr")) *) in 
+  let tf = Ty.ty_app ts_fun [ta(*; tr*)] in
+  Term.create_fsymbol (Ident.id_fresh "mod_fun") [ty_mod; ty_name] tf
+
+let mod_fun mo na ta (* tr *) = 
+  Term.fs_app fs_mod_fun [mo;na] (ty_fun ta (* tr *))
+
+let fs_sub_mod =
+  Term.create_fsymbol (Ident.id_fresh "sub_mod") [ty_mod; ty_name] ty_mod
+
+let sub_mod mo na = 
+  Term.fs_app fs_sub_mod [mo;na] ty_mod
+
+let fs_app_mod = 
+  Term.create_fsymbol (Ident.id_fresh "app_mod") [ty_mod;ty_mod] ty_mod
+
+let app_mod f m = 
+  Term.fs_app fs_app_mod [f;m] ty_mod 
+
+let fs_get_var = 
+  let t = Ty.ty_var (Ty.create_tvsymbol (Ident.id_fresh "t")) in
+  Term.create_fsymbol (Ident.id_fresh "get_var") [ty_var t;ty_mem] t
+  
+let get_var v m = 
+  Term.t_app_infer fs_get_var [v;m] 
+
+let fs_sem = 
+  let ta = Ty.ty_var (Ty.create_tvsymbol (Ident.id_fresh "ta"))
+(*  and tr = Ty.ty_var (Ty.create_tvsymbol (Ident.id_fresh "tr")) *) in
+  let tf = Ty.ty_app ts_fun [ta (*; tr *)] in
+  Term.create_fsymbol (Ident.id_fresh "sem") [tf;ty_mem;ta] (ty_distr ty_mem)
+
+let getpr f mem args ev =
+  let sem = Term.t_app_infer fs_sem [f;mem;Term.t_tuple args] in
+  Term.t_app_infer fs_mu [sem;ev]
 
 let ts_glob = Ty.create_tysymbol (Ident.id_fresh "global") [] None
 let ty_glob = Ty.ty_app ts_glob []
+
 let fs_getglob = 
   Term.create_fsymbol (Ident.id_fresh "getglob") [ty_mod;ty_mem] ty_glob
+
 let getglob mp m = 
   Term.t_app_infer fs_getglob [mp;m]
 
-(*let ty_mem_t tr = Ty.ty_tuple [ty_mem; tr] *)
-
-let fs_sem =
-  let ta = Ty.ty_var (Ty.create_tvsymbol (Ident.id_fresh "ta"))
-  and tr = Ty.ty_var (Ty.create_tvsymbol (Ident.id_fresh "tr")) in
-  let tf = Ty.ty_app ts_fun_name [ta; tr] in
-  Term.create_fsymbol (Ident.id_fresh "sem")
-      [ty_mod;tf;ty_mem;ta] (ty_distr ty_mem) (*(ty_mem_t tr)*)
-
-let ty_event (*tr*) = Ty.ty_func (*(ty_mem_t tr)*) ty_mem Ty.ty_bool
-
-let getpr m fn mem args ev =
-  let sem = Term.t_app_infer fs_sem [m;fn;mem;Term.t_tuple args] in
-  Term.t_app_infer fs_mu [sem;ev]
 
 let add_decl_with_tuples task d =
   let ids = Ident.Mid.set_diff d.Decl.d_syms (Task.task_known task) in
@@ -191,10 +226,11 @@ let initial_task =
        decl_or; spec_or; decl_ora; spec_ora;
        decl_imp; spec_imp; decl_iff; spec_iff;
        decl_eq; spec_eq ] in
-  let ts = [ts_mem; ts_mod; ts_mod_name; ts_fun_name; ts_var_name;ts_glob] in
+  let ts = [ts_mem; ts_name;ts_mod; ts_var; ts_fun;ts_glob] in
   let add_ty_decl task ts =
     add_decl_with_tuples task (Decl.create_ty_decl ts) in
-  let fs = [fs_appmod; fs_getmod; fs_getvar; fs_sem;fs_getmod] in
+  let fs = [fs_mod_var; fs_mod_fun; fs_sub_mod; fs_app_mod; fs_get_var;
+            fs_sem;fs_getglob] in
   let add_param_decl task fs =
     add_decl_with_tuples task (Decl.create_param_decl fs) in
   let task = List.fold_left add_ty_decl task ts in
@@ -206,6 +242,7 @@ let empty = {
     env_op     = Mp.empty;
     env_ax     = Mp.empty;
     env_pa     = Mp.empty;
+    env_na     = Mp.empty;
     env_w3     = Ident.Mid.empty;
   }
 
@@ -238,6 +275,7 @@ type rebinding_item =
                 highorder_decl
   | RBax  of EcPath.path * Decl.prsymbol * Decl.decl
   | RBpa  of EcPath.path * Term.lsymbol
+  | RBna  of EcPath.path * Term.lsymbol
   | RBfun of Decl.decl * Decl.decl * Decl.decl
 
 type rebinding = rebinding_item list
@@ -295,8 +333,16 @@ let add_ls env path ls tparams decl odecl =
 
 let add_param env path ls =
   let decl = Decl.create_param_decl ls in
+  let add o = assert (o = None); Some (Term.t_app_infer ls []) in
   { env with
-    env_pa = Mp.add path (Term.t_app_infer ls []) env.env_pa;
+    env_pa = Mp.change add path env.env_pa;
+    logic_task = add_decl_with_tuples env.logic_task decl}
+
+let add_nparam env path ls =
+  let decl = Decl.create_param_decl ls in
+  let add o = assert (o = None); Some (Term.t_app_infer ls []) in
+  { env with
+    env_na = Mp.change add path env.env_na;
     logic_task = add_decl_with_tuples env.logic_task decl}
 
 let mk_highorder_func ls =
@@ -348,6 +394,7 @@ let rebind_item env = function
   | RBop(p,(ls,tvs),decl,odecl) -> add_ls env p ls tvs decl odecl
   | RBax(p,pr,decl) -> add_pr env p pr decl
   | RBpa(p,ls)      -> add_param env p ls
+  | RBna(p,ls)      -> add_nparam env p ls
   | RBfun(decl,decls,sdecl) ->
       let task =
         List.fold_left add_decl_with_tuples
@@ -735,10 +782,12 @@ let preid id =
   Ident.id_fresh (EcIdent.name id)
 
 let str_p p =
-  let ls,s = EcPath.toqsymbol p in
-  List.fold_right (fun s1 s2 -> s1 ^ "_" ^ s2) ls s
+  Ident.id_fresh (String.map (fun c -> if c = '.' then '_' else c) p)
 
-let preid_p p = Ident.id_fresh (str_p p)
+
+let preid_p p = str_p (EcPath.tostring p)
+let preid_mp mp = str_p (EcPath.m_tostring mp)
+let preid_xp xp = str_p (EcPath.x_tostring xp)
 
 let create_tvsymbol id =
   Ty.create_tvsymbol (preid id)
@@ -805,17 +854,45 @@ let trans_lv vm lv =
   try Mid.find lv vm.vm_id with _ -> assert false
 
 let trans_pa env p = try Mp.find p env.env_pa with _ -> assert false
+let trans_na env p = try Mp.find p env.env_na with _ -> assert false
+
+let rec trans_mod env vm mp =
+  let mo = 
+    match mp.EcPath.m_top with
+    | `Abstract id -> trans_lv vm id 
+    | `Concrete(top,None) -> trans_pa env top
+    | `Concrete(top,Some sub) ->
+      let m = trans_pa env top in
+      let n = trans_na env sub in
+      sub_mod m n in
+  let add_arg mo a = app_mod mo (trans_mod env vm a) in
+  List.fold_left add_arg mo mp.EcPath.m_args
+
+let trans_fun env vm xp targs =
+  let mp = xp.EcPath.x_top in
+  let p = xp.EcPath.x_sub in
+  let m = trans_mod env vm mp in
+  let fn = trans_na env p in
+  mod_fun m fn targs
+
+let base_mp mp = EcPath.mpath mp.EcPath.m_top [] 
 
 let trans_pv env vm pv ty mem =
-  let p   = EcPath.path_of_mpath pv.pv_name in
-  let m   = trans_lv vm mem in
-  try env, [], getvar (Mp.find p env.env_pa) m with _ ->
-    if pv.pv_kind <> PVloc then assert false;
-    let ty = trans_ty env empty_vmap ty in
-    let ls = Term.create_fsymbol (preid_p p) [] (ty_var_name ty) in
-    let env = add_param env p ls in
-    let v = Mp.find p env.env_pa in
-    env, [RBpa(p,ls)], getvar v m
+  let xp = pv.pv_name in
+  let mp = base_mp xp.EcPath.x_top in
+  let p  = xp.EcPath.x_sub in
+  let mo = trans_mod env vm mp in
+  let mem = trans_lv vm mem in
+  let ty = trans_ty env vm ty in
+  let env, rb, na = 
+    try env, [], trans_na env p 
+    with _ ->
+      assert (pv.pv_kind = PVloc);
+      let ls = Term.create_fsymbol (preid_p p) [] ty_name in
+      let env = add_nparam env p ls in
+      env, [RBna(p,ls)], trans_na env p in
+  let v = mod_var mo na ty in
+  env, rb, get_var v mem
 
 let create_vsymbol id ty = Term.create_vsymbol (preid id) ty
 
@@ -966,39 +1043,7 @@ let merge_branches lb =
 
 exception CanNotTranslate of form
 
-let rec trans_mod env vm mp =
 
-  let is_mod ks = match ks with EcPath.PKmodule::_ -> true | _ -> false in
-
-  let rec aux p ks args =
-    match p.EcPath.p_node, ks, args with
-    | Pident id, _, [a] ->
-        let mo = trans_lv vm id in
-        app_mod mo a
-    | Psymbol _, [EcPath.PKmodule], [a] ->
-        let mo = trans_pa env p in
-        app_mod mo a
-    | Pqname(p',_), EcPath.PKmodule::ks, a::args ->
-        if is_mod ks then
-          let mo = aux p' ks args in
-          let mn = trans_pa env p in
-          app_mod (getmod mo mn) a
-        else
-          let mo = trans_pa env p in
-          app_mod mo a
-    | _, _, _ -> assert false
-  and app_mod mo a =
-    if a = [] then mo else
-    let a = List.map (trans_mod env vm) a in
-    List.fold_left appmod mo a in
-  aux mp.EcPath.m_path mp.EcPath.m_kind mp.EcPath.m_args
-
-let trans_fun env vm mp =
-  let p = EcPath.path_of_mpath mp in
-  let fn = trans_pa env p in
-  let mp,_,_,_ = oget (EcPath.m_split mp) in
-  let mo = trans_mod env vm mp in
-  mo, fn
 
 let trans_gty env vm gty =
   match gty with
@@ -1090,10 +1135,11 @@ let trans_form env vm f =
 
     | Fpr(mem,mp,args,ev) ->
         let mem   = trans_lv vm mem in
-        let mo, f = trans_fun !env vm mp in
         let args  = List.map (trans_form_b vm) args in
+        let f = 
+          trans_fun !env vm mp (List.map (fun t -> oget t.Term.t_ty) args) in
         let ev    = trans_ev vm ev in
-        getpr mo f mem args ev
+        getpr f mem args ev
 
   and trans_form_b vm f = force_bool (trans_form vm f)
 
@@ -1261,36 +1307,48 @@ let add_mod_exp env path me =
   let is_alias = function ME_Alias _ -> true | _ -> false in
   if is_alias me.me_body then env, []
   else
-    let env = ref env in
-    let rb  = ref [] in
-    let add_pa path ty =
-      let ls = Term.create_fsymbol (preid_p path) [] ty in
-      env := add_param !env path ls;
-      rb := RBpa(path,ls)::!rb in
+    let ls = Term.create_fsymbol (preid_p path) [] ty_mod in
+    let env = ref (add_param env path ls) in
+    let rb  = ref [RBpa(path,ls)] in
+    let add_name path = 
+      if not (Mp.mem path !env.env_na) then 
+        let ls = Term.create_fsymbol (preid_p path) [] ty_name in
+        env := add_nparam !env path ls;
+        rb  := RBna(path,ls) :: !rb in
+    let pqname path s =
+      match path with
+      | None -> EcPath.psymbol s
+      | Some p -> EcPath.pqname p s in
     let rec add_comps path comps = List.iter (add_comp path) comps
     and add_comp path comp =
       match comp with
       | MI_Module me  -> add_me path me
-      | MI_Variable v ->
-          let ty = trans_ty !env empty_vmap v.v_type in
-          let path = EcPath.pqname path v.v_name in
-          add_pa path (ty_var_name ty)
-      | MI_Function f ->
-          let fsig = f.f_sig in
-          let ta =
-            List.map (fun vd -> trans_ty !env empty_vmap vd.v_type)
-              (fst fsig.fs_sig) in
-          let tr = trans_ty !env empty_vmap (snd fsig.fs_sig) in
-          let path = EcPath.pqname path fsig.fs_name in
-          add_pa path (ty_fun_name ta tr)
+      | MI_Variable v -> add_name (pqname path v.v_name)
+      | MI_Function f -> add_name (pqname path f.f_name)
     and add_me path me =
       if not (is_alias me.me_body) then
-        let path = EcPath.pqname path me.me_name in
-        add_pa path ty_mod_name;
-        add_comps path me.me_comps in
-    add_pa path ty_mod;
-    add_comps path me.me_comps;
+        let path = pqname path me.me_name in
+        add_name path;
+        add_comps (Some path) me.me_comps in
+    add_comps None me.me_comps;
     !env, !rb
+
+let add_mod_sig env _path s = 
+  let env = ref env in
+  let rb = ref [] in
+  let add_name path = 
+    if not (Mp.mem path !env.env_na) then 
+      let ls = Term.create_fsymbol (preid_p path) [] ty_name in
+      env := add_nparam !env path ls;
+      rb  := RBna(path,ls) :: !rb in
+  let add_item = function
+    | Tys_function fs -> add_name (EcPath.psymbol fs.fs_name) in
+  List.iter add_item s.mis_body;
+  !env, !rb
+    
+      
+
+    
 
 let check_w3_formula pi task f =
   let pr   = Decl.create_prsymbol (Ident.id_fresh "goal") in

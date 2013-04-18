@@ -47,6 +47,7 @@ and mpath_top =
   | `Concrete of path * path option ]
 
 (* -------------------------------------------------------------------- *)
+val mpath     : mpath_top -> mpath list -> mpath
 val mpath_abs : ident -> mpath list -> mpath
 val mident    : ident -> mpath
 val mpath_crt : path -> mpath list -> path option -> mpath
@@ -55,7 +56,6 @@ val m_equal   : mpath -> mpath -> bool
 val m_compare : mpath -> mpath -> int
 val m_hash    : mpath -> int
 val m_apply   : mpath -> mpath list -> mpath
-
 val m_fv : int EcIdent.Mid.t -> mpath -> int EcIdent.Mid.t
 
 (* -------------------------------------------------------------------- *)
