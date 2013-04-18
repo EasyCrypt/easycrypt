@@ -95,7 +95,7 @@ let mt_subst sx st o =
       Some { mt_path   = p'; mt_vars   = vars' }
 
 let mt_substm sp smp st o =
-  mt_subst (EcPath.x_substm sp smp)) st o
+  mt_subst (EcPath.x_substm sp smp) st o
 
 let me_subst sx sm st (m,mt as me) =
   let m' = EcIdent.Mid.find_def m m sm in
@@ -104,7 +104,7 @@ let me_subst sx sm st (m,mt as me) =
     (m', mt')
 
 let me_substm sp smp sm st me =
-  me_subst (EcPath.x_substm sp smp) sm st o
+  me_subst (EcPath.x_substm sp smp) sm st me
 
 
 

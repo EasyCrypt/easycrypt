@@ -1469,8 +1469,8 @@ prog:
 | UNDO d=number FINAL
    { P_Undo d }
 
-| x=loc(error)
-   { error (EcLocation.make $startpos(x) $endpos(x)) None }
+| error
+   { error (EcLocation.make $startpos $endpos) None }
 ;
 
 (* -------------------------------------------------------------------- *)

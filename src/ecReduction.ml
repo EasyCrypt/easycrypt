@@ -67,9 +67,14 @@ let rec ty_fun_app env tf targs =
 
 let pv_equal_norm env p1 p2 = 
   pv_equal p1 p2 || 
-  (p1.pv_kind = p2.pv_kind &&
-   EcPath.m_equal (NormMp.norm_mpath env p1.pv_name) (NormMp.norm_mpath env p2.pv_name))
+    (p1.pv_kind = p2.pv_kind &&
+        EcPath.x_equal_na (NormMp.norm_xpath env p1.pv_name) 
+          (NormMp.norm_xpath env p2.pv_name))
 
+let x_equal_norm env p1 p2 = 
+  EcPath.x_equal p1 p2 || 
+  EcPath.x_equal (NormMp.norm_xpath env p1) (NormMp.norm_xpath env p2)
+  
 let m_equal_norm env p1 p2 = 
   EcPath.m_equal p1 p2 || 
   EcPath.m_equal (NormMp.norm_mpath env p1) (NormMp.norm_mpath env p2)
@@ -127,7 +132,7 @@ and i_equal_norm env i1 i2 =
       lv_equal_norm env lv1 lv2 && e_equal_norm env e1 e2
   | Scall(lv1, f1, e1), Scall(lv2,f2,e2) ->
       oall2 (lv_equal_norm env) lv1 lv2 &&
-      m_equal_norm env f1 f2 &&
+      x_equal_norm env f1 f2 &&
       List.all2 (e_equal_norm env) e1 e2
   | Sif (a1,b1,c1), Sif(a2,b2,c2) ->
       e_equal_norm env a1 a2 
@@ -265,7 +270,7 @@ let check_alpha_equal ri env hyps f1 f2 =
     match mt1, mt2 with
     | None, None -> true
     | Some lmt1, Some lmt2 -> 
-      m_equal_norm env (EcMemory.lmt_mpath lmt1) (EcMemory.lmt_mpath lmt2) &&
+      x_equal_norm env (EcMemory.lmt_xpath lmt1) (EcMemory.lmt_xpath lmt2) &&
         EcSymbols.Msym.equal (equal_type env) 
         (EcMemory.lmt_bindings lmt1) (EcMemory.lmt_bindings lmt2) 
     | _, _ -> false in
@@ -318,7 +323,7 @@ let check_alpha_equal ri env hyps f1 f2 =
     | Ftuple args1, Ftuple args2 when List.length args1 = List.length args2 ->
         List.iter2 (aux alpha) args1 args2
 
-    | FhoareF hf1, FhoareF hf2 when m_equal_norm env hf1.hf_f hf2.hf_f ->
+    | FhoareF hf1, FhoareF hf2 when x_equal_norm env hf1.hf_f hf2.hf_f ->
         aux alpha hf1.hf_pr hf2.hf_pr;
         aux alpha hf1.hf_po hf2.hf_po
 
@@ -328,8 +333,8 @@ let check_alpha_equal ri env hyps f1 f2 =
         aux alpha hs1.hs_po hs2.hs_po
 
     | FequivF ef1, FequivF ef2 
-      when m_equal_norm env ef1.ef_fl ef2.ef_fl && 
-           m_equal_norm env ef1.ef_fr ef2.ef_fr ->
+      when x_equal_norm env ef1.ef_fl ef2.ef_fl && 
+           x_equal_norm env ef1.ef_fr ef2.ef_fr ->
         aux alpha ef1.ef_pr  ef2.ef_pr;
         aux alpha ef1.ef_po ef2.ef_po
 
@@ -342,7 +347,7 @@ let check_alpha_equal ri env hyps f1 f2 =
 
     | Fpr(m1,p1,args1,f1'), Fpr(m2,p2,args2,f2') 
       when EcIdent.id_equal (find alpha m1) m2 &&
-           m_equal_norm env p1 p2 &&  
+           x_equal_norm env p1 p2 &&  
            List.length args1 = List.length args2 ->
         List.iter2 (aux alpha) args1 args2;
         aux alpha f1' f2'

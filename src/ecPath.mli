@@ -49,10 +49,13 @@ and mpath_top =
 (* -------------------------------------------------------------------- *)
 val mpath     : mpath_top -> mpath list -> mpath
 val mpath_abs : ident -> mpath list -> mpath
+val mqname    : mpath -> symbol -> mpath
+
 val mident    : ident -> mpath
 val mpath_crt : path -> mpath list -> path option -> mpath
 
 val m_equal   : mpath -> mpath -> bool
+val mt_equal  : mpath_top -> mpath_top -> bool
 val m_compare : mpath -> mpath -> int
 val m_hash    : mpath -> int
 val m_apply   : mpath -> mpath list -> mpath
@@ -69,6 +72,9 @@ val xpath : mpath -> path -> xpath
 val xqname : xpath -> symbol -> xpath
 
 val x_equal   : xpath -> xpath -> bool
+(* This function make sense only var xpath representing a program variable 
+   and if the mpath (x_top) is in normal form *)
+val x_equal_na : xpath -> xpath -> bool
 val x_compare : xpath -> xpath -> int
 val x_hash    : xpath -> int
 

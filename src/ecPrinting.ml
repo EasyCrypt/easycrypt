@@ -116,12 +116,14 @@ module PPE = struct
     
   let mty_symb = shorten EcEnv.ModTy.lookup_path 
 
-  let rec shorten_m (ppenv  : ppenv) (p:EcPath.mpath) =
+  let rec shorten_m (_ppenv  : ppenv) (p:EcPath.mpath) =
+    EcPath.m_tostring p
+(*
     let for1 (nm : symbol list) (x : symbol)  =
       let qs = (nm,x) in
       try 
         let (mp, _) = EcEnv.Mod.sp_lookup qs ppenv.pp_env in
-        if EcPath.p_equal mp.EcPath.m_path p.EcPath.m_path then Some qs 
+        if EcPath.mt_equal mp p.EcPath.m_top then Some qs 
         else None
       with _ -> None
     in
@@ -141,15 +143,17 @@ module PPE = struct
     let r = List.map (List.map (shorten_m ppenv)) r in
     let a = List.hd r and r = List.rev (List.tl r) in
     List.combine nm r @ [x,a]
-
-  let rec shorten_mx ppenv p =
+*)
+  let rec shorten_mx _ppenv xp =
+    EcPath.x_tostring xp
+    (*
     match EcPath.m_split p with
     | Some(p,EcPath.PKother,s,a) ->
       assert (a = []);
       shorten_mx ppenv p @ [s,[]]
     | Some(_,EcPath.PKmodule,_,_) ->
       shorten_m ppenv p
-    | _ -> assert false 
+    | _ -> assert false *)
       
   let mod_symb = shorten_m 
   let fun_symb = shorten_mx
@@ -289,17 +293,17 @@ let pr_ident (_ppe : ppenv) (x : EcIdent.t) =
 let pr_local (ppe : ppenv) (x : EcIdent.t) =
   !^ (PPE.loc_symb ppe x)
 
-let pr_funname (ppe : ppenv) (p : EcPath.mpath) =
-  pr_msymbol (PPE.fun_symb ppe p)
+let pr_funname (ppe : ppenv) (p : EcPath.xpath) =
+  !^ (*pr_msymbol*) (PPE.fun_symb ppe p)
 
 let pr_modname (ppe : ppenv) (p : EcPath.mpath) =
-  pr_msymbol (PPE.mod_symb ppe p)
+  !^ (*pr_msymbol*) (PPE.mod_symb ppe p)
 
 let pr_thname (_ppe : ppenv) (p : EcPath.path) =
   !^ (EcPath.tostring p)
 
 let pr_pv (ppe : ppenv) (x : prog_var) =
-  pr_msymbol (PPE.pv_symb ppe x)
+  !^ (*pr_msymbol*) (PPE.pv_symb ppe x)
 
 (* -------------------------------------------------------------------- *)
 
@@ -684,28 +688,29 @@ and pr_stmt (ppenv : ppenv) (s : stmt) =
   pr_block (List.map (pr_instr ppenv) s.s_node)
 
 (* -------------------------------------------------------------------- *)
-let rec pr_module_item (scope : EcPath.path) (ppenv : ppenv) (item : module_item) =
-  let xpath x = EcPath.pqname scope x in
-
+let rec pr_module_item (scope : EcPath.mpath) (ppenv : ppenv) (item : module_item) =
     match item with
     | MI_Variable v ->
-        let doc = pr_modvar ppenv (xpath v.v_name, v) in
-          (PPE.add_pvar ppenv (xpath v.v_name), doc)
-
+      let xpath = EcPath.xpath scope (EcPath.psymbol v.v_name) in
+      let doc = pr_modvar ppenv v in
+      (PPE.add_pvar ppenv xpath, doc)
+        
     | MI_Function f ->
-        let doc = pr_modfun ppenv (xpath f.f_name, f) in
-          (PPE.add_fun ppenv (xpath f.f_name), doc)
-
+      let xpath = EcPath.xpath scope (EcPath.psymbol f.f_name) in
+      let doc = pr_modfun ppenv f in
+      (PPE.add_fun ppenv xpath , doc)
+        
     | MI_Module me ->
-        let doc = pr_module ppenv (xpath me.me_name, me) in
-          (PPE.add_mod ppenv (xpath me.me_name), doc)
+      let scope = EcPath.mqname scope me.me_name in
+      let doc = pr_module ppenv (scope, me) in
+      (PPE.add_mod ppenv scope, doc)
 
 (* -------------------------------------------------------------------- *)
-and pr_modvar (ppenv : ppenv) ((_, v) : EcPath.path * variable) =
+and pr_modvar (ppenv : ppenv) (v : variable) =
   join [tk_var; !^(v.v_name); !^":"; pr_type ppenv v.v_type]
 
 (* -------------------------------------------------------------------- *)
-and pr_modfun (ppenv : ppenv) ((_, f) : EcPath.path * function_) =
+and pr_modfun (ppenv : ppenv) (f : function_) =
   let fname = f.f_sig.fs_name in
   let fparams, fres = f.f_sig.fs_sig in
 
@@ -749,7 +754,7 @@ and pr_modfun (ppenv : ppenv) ((_, f) : EcPath.path * function_) =
 
 
 (* -------------------------------------------------------------------- *)
-and pr_module (ppenv : ppenv) ((p, m) : EcPath.path * module_expr) =
+and pr_module (ppenv : ppenv) ((p, m) : EcPath.mpath * module_expr) =
   let mename  = m.me_name in
   let prelude = join [tk_module; !^mename] in
   let moddoc  =
@@ -1019,8 +1024,9 @@ let rec pr_ctheory_item (scope : EcPath.path) (ppenv : ppenv) (item : ctheory_it
         (PPE.add_modty ppenv (xpath x), doc)
 
   | CTh_module m ->
-      let doc = pr_module ppenv (xpath m.me_name, m) in
-        (PPE.add_mod ppenv (xpath m.me_name), doc)
+    let mp = EcPath.mpath_crt (xpath m.me_name) [] None in
+    let doc = pr_module ppenv (mp, m) in
+    (PPE.add_mod ppenv mp, doc)
 
   | CTh_theory (x, th) ->
       let doc = pr_theory ppenv (xpath x, th) in

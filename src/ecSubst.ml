@@ -8,6 +8,7 @@ open EcTheory
 
 module Sp    = EcPath.Sp
 module Sm    = EcPath.Sm
+module Sx    = EcPath.Sx
 module Mp    = EcPath.Mp
 module Mid   = EcIdent.Mid
 
@@ -67,6 +68,7 @@ let e_subst_of_subst (s:_subst) =
     es_p       = s.s_p;
     es_ty      = s.s_ty;
     es_mp      = s.s_fmp;
+    es_xp      = EcPath.x_subst s.s_fmp;
     es_loc     = Mid.empty; }
 
 let f_subst_of_subst (s:_subst) = 
@@ -83,9 +85,10 @@ let subst_variable (s : _subst) (x : variable) =
 
 (* -------------------------------------------------------------------- *)
 let subst_fun_uses (s : _subst) (u : uses) =
-  let calls  = List.map s.s_fmp u.us_calls
-  and reads  = Sm.fold (fun p m -> Sm.add (s.s_fmp p) m) Sm.empty u.us_reads
-  and writes = Sm.fold (fun p m -> Sm.add (s.s_fmp p) m) Sm.empty u.us_writes in
+  let x_subst = EcPath.x_subst s.s_fmp in
+  let calls  = List.map x_subst u.us_calls
+  and reads  = Sx.fold (fun p m -> Sx.add (x_subst p) m) Sx.empty u.us_reads
+  and writes = Sx.fold (fun p m -> Sx.add (x_subst p) m) Sx.empty u.us_writes in
 
   { us_calls = calls; us_reads = reads; us_writes = writes; }
 

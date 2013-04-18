@@ -105,6 +105,14 @@ and mpath_top =
   | `Concrete of path * path option ]
 
 let m_equal   = ((==) : mpath -> mpath -> bool)
+
+let mt_equal mt1 mt2 = 
+  match mt1, mt2 with
+  | `Abstract id1, `Abstract id2 -> EcIdent.id_equal id1 id2
+  | `Concrete(p1,o1), `Concrete(p2,o2) ->
+    p_equal p1 p2 && oall2 p_equal o1 o2
+  | _, _ -> false 
+
 let m_hash    = fun p -> p.m_tag
 let m_compare = fun p1 p2 -> m_hash p1 - m_hash p2
 
@@ -112,13 +120,7 @@ module Hsmpath = Why3.Hashcons.Make (struct
   type t = mpath
 
   let equal m1 m2 = 
-    let t = 
-      match m1.m_top, m2.m_top with
-      | `Abstract id1, `Abstract id2 -> EcIdent.id_equal id1 id2
-      | `Concrete(p1,o1), `Concrete(p2,o2) ->
-        p_equal p1 p2 && oall2 p_equal o1 o2
-      | _, _ -> false in
-    t && List.all2 m_equal m1.m_args m2.m_args
+    mt_equal m1.m_top m2.m_top  && List.all2 m_equal m1.m_args m2.m_args
 
   let hash m = 
     let hash = 
@@ -142,16 +144,23 @@ module Mm = MPath.M
 module Hm = MPath.H
 
 (* -------------------------------------------------------------------- *)
-let mk_mpath p args =
+let mpath p args =
   Hsmpath.hashcons { m_top = p; m_args = args; m_tag = -1; }
 
-let mpath_abs id args = mk_mpath (`Abstract id) args
+let mpath_abs id args = mpath (`Abstract id) args
 let mident id = mpath_abs id []
-let mpath_crt p args sp = mk_mpath (`Concrete(p,sp)) args
 
+let mpath_crt p args sp = mpath (`Concrete(p,sp)) args
+
+let mqname mp x = 
+  match mp.m_top with
+  | `Concrete(top,None) -> mpath_crt top mp.m_args (Some (psymbol x))
+  | `Concrete(top,Some sub) -> mpath_crt top mp.m_args (Some (pqname sub x))
+  | _ -> assert false
+  
 let m_apply mp args = 
   let args' = mp.m_args in
-  if args' = [] then mk_mpath mp.m_top args 
+  if args' = [] then mpath mp.m_top args 
   else (assert (args = []); mp)
 
 let rec m_fv fv mp = 
@@ -172,6 +181,10 @@ type xpath = {
 }
 
 let x_equal   = ((==) : xpath -> xpath -> bool)
+let x_equal_na x1 x2 = 
+  mt_equal x1.x_top.m_top x2.x_top.m_top &&
+    p_equal x1.x_sub x2.x_sub
+
 let x_hash    = fun p -> p.x_tag
 let x_compare = fun p1 p2 -> x_hash p1 - x_hash p2
 
@@ -248,14 +261,14 @@ let rec m_subst (sp : path -> path) (sm : mpath EcIdent.Mid.t) m =
     let p' = sp p in
     let top = if p == p' then m.m_top else `Concrete(p',sub) in
     if m.m_top == top && m.m_args == args then m else 
-      mk_mpath top args 
+      mpath top args 
   | `Abstract id ->
     try 
       let m' = EcIdent.Mid.find id sm in
       m_apply m' args 
     with Not_found -> 
       if m.m_args == args then m else
-        mk_mpath m.m_top args 
+        mpath m.m_top args 
       
 let m_subst (sp : path -> path) (sm : mpath EcIdent.Mid.t) =
   if sp == identity && EcIdent.Mid.is_empty sm then identity
