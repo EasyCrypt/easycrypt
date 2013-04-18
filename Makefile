@@ -49,7 +49,7 @@ CHECK = \
 	  --bin=./ec.native               \
 	  --bin-args="$(CHECKARGS)"       
 
-CHECKLIBS =
+CHECKLIBS = \
 	./scripts/runtest.py           \
 	  --bin=./ec.native            \
 	  --bin-args="$(CHECKLIBARGS)" \
