@@ -16,6 +16,7 @@ and path_node =
 (* -------------------------------------------------------------------- *)
 val psymbol : symbol -> path
 val pqname  : path -> symbol -> path
+val pqoname : path option -> symbol -> path
 
 val p_equal   : path -> path -> bool
 val p_compare : path -> path -> int
@@ -61,6 +62,8 @@ val m_hash    : mpath -> int
 val m_apply   : mpath -> mpath list -> mpath
 val m_fv : int EcIdent.Mid.t -> mpath -> int EcIdent.Mid.t
 
+val path_of_mpath : mpath -> path
+
 (* -------------------------------------------------------------------- *)
 type xpath = private {
   x_top : mpath;
@@ -68,7 +71,7 @@ type xpath = private {
   x_tag : int;
 }
 
-val xpath : mpath -> path -> xpath
+val xpath  : mpath -> path -> xpath
 val xqname : xpath -> symbol -> xpath
 
 val x_equal   : xpath -> xpath -> bool

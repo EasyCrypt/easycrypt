@@ -293,40 +293,6 @@ let s_subst (s: EcTypes.e_subst) =
       if is == is' then s else stmt is' in
 
     s_subst 
-    
-
-
-(* -------------------------------------------------------------------- *)
-module UM = struct
-  (* TODO: to be rewritten using -pxp OCaml 4.0 feature *)
-
-  type flag  = [`Call | `Read | `Write]
-  type flags = UseFlags of int
-
-  let iflag = function 
-    | `Call  -> 0
-    | `Read  -> 1
-    | `Write -> 2
-
-  let empty = UseFlags 0
-
-  let add (UseFlags f : flags) (e : flag) =
-    UseFlags (f lor (1 lsl (iflag e)))
-
-  let have (UseFlags f : flags) (e : flag) =
-    (f land (1 lsl (iflag e))) != 0
-
-  let singleton (e : flag) =
-    add empty e
-
-  let equal (UseFlags fin) (UseFlags fout) =
-    fin == fout
-
-  let included (UseFlags fin) (UseFlags fout) =
-    (lnot fin) land fout == 0
-end
-
-type use_flags = UM.flags
 
 (* -------------------------------------------------------------------- *)
 type variable = {
