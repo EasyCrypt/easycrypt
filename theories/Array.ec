@@ -10,6 +10,7 @@
  *)
 
 require import Int.
+require Fun. (* For reasoning about higher-order operators *)
 
 (*********************************)
 (*             Core              *)
@@ -21,7 +22,7 @@ type 'x array.
 op length: 'x array -> int.
 axiom length_pos: forall (xs:'x array), 0 <= length xs.
 
-(* And a bunch of element *)
+(* And a bunch of elements *)
 op __get: 'x array -> int -> 'x.
 
 (* Equality is extentional *)
@@ -96,6 +97,26 @@ axiom sub_get: forall (xs:'x array) (s l i:int),
   0 <= i => i <= l =>
   (sub xs s l).[i] = xs.[i + s].
 
+(* fold_left *)
+op fold_right: ('state -> 'x -> 'state) -> 'state -> 'x array -> 'state.
+
+axiom fold_right_base: forall (f:'state -> 'x -> 'state) s,
+  (fold_right f s empty) = s.
+
+axiom fold_right_ind: forall (f:'state -> 'x -> 'state) s xs,
+  0 < length xs =>
+  (fold_right f s xs) = fold_right f (f s xs.[0]) (sub xs 1 (length xs - 1)).
+
+(* fold_left *)
+op fold_left: ('x -> 'state -> 'state) -> 'x array -> 'state -> 'state.
+
+axiom fold_left_base: forall (f:'x -> 'state -> 'state) s,
+  (fold_left f empty s) = s.
+
+axiom fold_left_ind: forall (f:'x -> 'state -> 'state) s xs,
+  0 < length xs =>
+  (fold_left f xs s) = f xs.[0] (fold_left f (sub xs 1 (length xs - 1)) s).
+
 (* map *)
 op map: ('x -> 'y) -> 'x array -> 'y array.
 
@@ -135,6 +156,38 @@ intros xs0 xs1;
   trivial.
 save.
 
+(* Induction Principle *)
+axiom induction: forall (p:'x array -> bool),
+  p empty =>
+  (forall x xs, p xs => p (x::xs)) =>
+  (forall xs, p xs).
+
+lemma fold_left_deterministic: forall (f1 f2:'x -> 'state -> 'state) s1 s2 xs1 xs2,
+  f1 = f2 => s1 = s2 => xs1 = xs2 =>
+  fold_left f1 xs1 s1 = fold_left f2 xs2 s2.
+
+(* This proof needs cleaned up, and the lemma library completed. *)
+lemma fold_length: forall (xs:'x array),
+  fold_left (lambda x n, n + 1) xs 0 = length xs
+proof.
+intros xs.
+apply (induction<:'x> (lambda xs', fold_left (lambda x n, n + 1) xs' 0 = length xs') _ _ xs).
+trivial.
+simplify.
+intros x xs' IH.
+cut length_def:(length (x::xs') = length xs' + 1);[ trivial | rewrite length_def;rewrite <- IH ].
+cut sub_eq:(sub (x::xs') 1 (length (x::xs') - 1) = xs');[ apply (extentionality<:'x> (sub (x::xs') 1 (length (x::xs') - 1)) xs' _);trivial | ].
+cut fold_def:(fold_left (lambda x n, n + 1) xs' 0 = fold_left (lambda x n, n + 1) (sub (x::xs') 1 (length (x::xs') - 1)) 0);[ rewrite sub_eq | ].
+apply (fold_left_deterministic<:int,'x> (lambda x n, n + 1) (lambda x n, n + 1) 0 0 xs' xs' _ _).
+  apply (Fun.extentionality<:int -> int,'x> (lambda x n, n + 1) (lambda x n, n + 1) _).
+  delta beta.
+  intros x'. apply (Fun.extentionality<:int,int> (lambda n, n + 1) (lambda n, n + 1) _).
+  delta beta. trivial.
+trivial.
+rewrite fold_def;clear fold_def.
+apply (fold_left_ind<:int,'x> (lambda x n, n + 1) 0 (x::xs') _);trivial.
+save.
+
 (*********************************)
 (*      Imperative Operators     *)
 (*********************************)
@@ -166,6 +219,17 @@ axiom write_get: forall (dst src:'x array) (dOff sOff l i:int),
   (dOff <= i => i < dOff + l => (write dst dOff src sOff l).[i] = src.[i - dOff + sOff]) &&
   (dOff + l <= i => i < length dst => (write dst dOff src sOff l).[i] = dst.[i]).
 
+(* init *)
+op init: int -> 'x -> 'x array.
+
+axiom init_length: forall (x:'x) l,
+  0 <= l =>
+  length (init l x) = l.
+
+axiom init_get: forall (x:'x) l i,
+  0 <= l => 0 <= i => i < l =>
+  (init l x).[i] = x.
+
 (*********************************)
 (*       Some Mixed Lemmas       *)
 (*********************************)
@@ -177,6 +241,6 @@ intros dst src H;
   apply (extentionality<:'x>
            (write dst 0 src 0 (length src))
            (src || sub dst (length src) (length dst - length src))
-           _);
-  trivial.
+           _).
+  delta beta;split;trivial.
 save.
