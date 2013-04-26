@@ -70,7 +70,7 @@ axiom snoc_length: forall (xs:'x array, x:'x),
 
 axiom snoc_get: forall (xs:'x array, x:'x, i:int),
   0 <= i => i <= length xs =>
-  (xs:::x).[i] = (0 < length xs) ? xs.[i] : x.
+  (xs:::x).[i] = (i < length xs) ? xs.[i] : x.
 
 lemma snoc_nonempty: forall (xs:'x array, x:'x),
   xs:::x <> empty.
