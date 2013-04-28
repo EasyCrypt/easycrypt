@@ -103,6 +103,13 @@ let ofold (x : 'a option) (f : 'a -> 'b -> 'b) (v : 'b) =
   | None   -> v
   | Some x -> f x v
 
+let ocompare cmp x1 x2 =
+  match x1, x2 with
+  | None   , None    -> 0
+  | Some x1, Some x2 -> cmp x1 x2
+  | None   , Some _  -> -1
+  | Some _ , None    -> 1
+
 let omap (x : 'a option) (f : 'a -> 'b) =
   match x with None -> None | Some x -> Some (f x)
 

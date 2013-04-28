@@ -135,10 +135,8 @@ end
 module Var : sig
   type t = varbind
 
-  val by_path     : mpath_top -> path -> env -> t suspension
-  val by_path_opt : mpath_top -> path -> env -> (t suspension) option
-  val by_mpath    : xpath -> env -> t
-  val by_mpath_opt: xpath -> env -> t option
+  val by_path     : xpath -> env -> t
+  val by_path_opt : xpath -> env -> t option
 
   (* Lookup restricted to given kind of variables *)
   val lookup_locals    : symbol -> env -> (EcIdent.t * EcTypes.ty) list
@@ -187,10 +185,6 @@ module Mod : sig
   val lookup_opt  : qsymbol -> env -> (mpath * t) option
   val lookup_path : qsymbol -> env -> mpath
 
-  val sp_lookup     : qsymbol -> env -> mpath_top * t suspension
-  val sp_lookup_opt : qsymbol -> env -> (mpath_top * t suspension) option
-
-  val add  : mpath -> env -> env
   val bind : symbol -> module_expr -> env -> env
 
   val enter : symbol -> (EcIdent.t * module_type) list -> env -> env
