@@ -20,11 +20,8 @@ module Mid  = EcIdent.Mid
 (* -------------------------------------------------------------------- *)
 type 'a suspension = {
   sp_target : 'a;
-  sp_params : (EcIdent.t * module_type) list;
+  sp_params : int * (EcIdent.t * module_type) list;
 }
-
-let is_suspended sp =
-  sp.sp_params <> []
 
 (* -------------------------------------------------------------------- *)
 type ctheory_w3 = {
@@ -129,6 +126,13 @@ let dump ?name _ _ = ()                 (* FIXME *)
 
 (* -------------------------------------------------------------------- *)
 type env = preenv
+
+(* -------------------------------------------------------------------- *)
+let root (env : env) =
+  env.env_scope
+
+let mroot (env : env) =
+  EcPath.mpath_crt env.env_scope [] None (* FIXME *)
 
 (* -------------------------------------------------------------------- *)
 let empty_mc params = {
@@ -797,6 +801,14 @@ module Fun = struct
   let lookup_opt name env =
     try_lf (fun () -> lookup name env)
 
+  let sp_lookup qname (env : env) =
+    let (((i, a), p), x) = MC.lookup_fun qname env in
+    let obj = { sp_target = x; sp_params = (i, a); } in
+      (p, obj)
+
+  let sp_lookup_opt name env =
+    try_lf (fun () -> sp_lookup name env)
+
   let lookup_path name env =
     fst (lookup name env)
 
@@ -955,6 +967,14 @@ module Mod = struct
 
   let lookup_opt name env =
     try_lf (fun () -> lookup name env)
+
+  let sp_lookup qname (env : env) =
+    let (((i, a), p), x) = MC.lookup_mod qname env in
+    let obj = { sp_target = x; sp_params = (i, a); } in
+      (p.EcPath.m_top, obj)
+
+  let sp_lookup_opt name env =
+    try_lf (fun () -> sp_lookup name env)
 
   let lookup_path name env =
     fst (lookup name env)

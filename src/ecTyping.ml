@@ -891,9 +891,9 @@ and transstruct1 (env : EcEnv.env) (st : pstructure_item) =
       in
 
       (* Type-check body *)
-      let retty  = transty tp_uni !env ue decl.pfd_tyresult in
+      let retty = transty tp_uni !env ue decl.pfd_tyresult in
       let (env, stmt, result, prelude, locals) =
-        transbody ue symbols !env retty body
+        transbody ue decl.pfd_name.pl_desc symbols !env retty body
       in
 
       (* Close all types *)
@@ -933,11 +933,14 @@ and transstruct1 (env : EcEnv.env) (st : pstructure_item) =
   | Pst_alias _ -> assert false
 
 (* -------------------------------------------------------------------- *)
-and transbody ue symbols (env : EcEnv.env) retty pbody =
+and transbody ue fname symbols (env : EcEnv.env) retty pbody =
     let env     = ref env
-    and mpath   = EcEnv.mroot env
     and prelude = ref []
     and locals  = ref [] in
+
+    let mpath = EcEnv.mroot !env in
+    let mpath = EcPath.xpath mpath (EcPath.psymbol fname) in
+
 
     (* Type-check local variables / check for dups *)
     let add_local (xs, pty, init) =
@@ -1158,7 +1161,6 @@ and translvalue ue (env : EcEnv.env) lvalue =
             tyerror x.pl_loc env (UnknownVarOrOp (name, esig))
 
 (* -------------------------------------------------------------------- *)
-
 let process_msymb (msymb : pmsymbol located) =
   let top,args,sm = 
     try
@@ -1167,52 +1169,72 @@ let process_msymb (msymb : pmsymbol located) =
       List.rev_append r [x,None], args, sm 
     with Not_found ->
       msymb.pl_desc, None, [] in
-  let top = List.map (fun (x,args) -> assert (args = None); x) top in
-  let sm  = List.map (fun (x,args) -> assert (args = None); x) sm in
+  (* This is a typing error, not an assertion failure! *)
+  let top = List.map (fun (x, args) -> assert (args = None); x) top in
+  let sm  = List.map (fun (x, args) -> assert (args = None); x) sm in
   top, args, sm
   
-
+(* -------------------------------------------------------------------- *)
 let rec trans_msymbol (env : EcEnv.env) (msymb : pmsymbol located) =
   let loc = msymb.pl_loc in
-  let top, args, sm = process_msymb msymb in
+  let (top, args, sm) = process_msymb msymb in
+
   let to_qsymbol l = 
     match List.rev l with
     | [] -> assert false
     | x::qn ->
-      { pl_desc = (List.rev_map unloc qn, unloc x);
-        pl_loc  = x.pl_loc; } in
+        { pl_desc = (List.rev_map unloc qn, unloc x);
+          pl_loc  = x.pl_loc; }
+  in
+
   let top_qname = to_qsymbol (top@sm) in
-  let (top_path, {EcEnv.sp_target = mod_expr; EcEnv.sp_params = subst}) =
+
+  let (top_path, {EcEnv.sp_target = mod_expr; EcEnv.sp_params = (spi, params)}) =
     match EcEnv.Mod.sp_lookup_opt top_qname.pl_desc env with
     | None ->
-      tyerror top_qname.pl_loc env
-        (UnknownModName top_qname.pl_desc)
-    | Some me -> me in
+        tyerror top_qname.pl_loc env (UnknownModName top_qname.pl_desc)
+    | Some me -> me
+  in
+
   begin match top_path with
-  | `Concrete(_,Some sub) -> 
-    if not (EcPath.p_size sub = List.length sm) then
-      tyerror loc env (InvalidModAppl MAE_WrongArgPosition);
+  | `Concrete (_, Some sub) ->          (* FIXME: dead wrong *)
+      if not (EcPath.p_size sub = List.length sm) then
+        tyerror loc env (InvalidModAppl MAE_WrongArgPosition);
   | _ -> ()
   end;
-  let args = omap args (List.map (trans_msymbol env))  in
-  if args = None then (* sm is [] *)
-    EcPath.mpath top_path [],
-    List.map (fun mt -> { mt with mt_args = None }) mod_expr.me_types 
-  else 
-    let args = 
-      match args with None -> [] | Some args -> args in
-    List.iter2
-      (fun (_, p) (_, a) ->
-        if not (EcEnv.ModTy.has_mod_type env a p) then
-          tyerror loc env (InvalidModAppl MAE_InvalidArgType))
-      subst args;
-    let args = List.map fst args in
-    let subst = 
-      List.fold_left2 (fun s (x,_) a -> EcSubst.add_module s x a) 
-        EcSubst.empty subst args in
-    EcPath.mpath top_path args,
-    List.map (EcSubst.subst_modtype subst) mod_expr.me_types
 
+  let args = omap args (List.map (trans_msymbol env)) in
+
+  match args with
+  | None ->
+      let mp = EcPath.mpath top_path [] in
+      let mt =
+        List.map (fun mt -> { mt with mt_args = None })
+          mod_expr.me_types
+      in
+        (mp, mt)
+
+  | Some args ->
+      List.iter2
+        (fun (_, p) (_, a) ->
+          if not (EcEnv.ModTy.has_mod_type env a p) then
+            tyerror loc env (InvalidModAppl MAE_InvalidArgType))
+        params args;
+
+      let args = List.map fst args in
+
+      let subst = 
+        List.fold_left2
+          (fun s (x,_) a -> EcSubst.add_module s x a) 
+          EcSubst.empty params args
+      in
+
+      let mp = EcPath.mpath top_path args in
+      let mt = 
+        List.map (EcSubst.subst_modtype subst)
+          mod_expr.me_types
+      in
+        (mp, mt)
 
 (* -------------------------------------------------------------------- *)
 and trans_gamepath (env : EcEnv.env) gp =
@@ -1220,7 +1242,6 @@ and trans_gamepath (env : EcEnv.env) gp =
   
   let modsymb = List.map (unloc -| fst) (fst (unloc gp))
   and funsymb = unloc (snd (unloc gp)) in
-
   
   let _ =
     match EcEnv.Fun.sp_lookup_opt (modsymb, funsymb) env with
@@ -1229,7 +1250,7 @@ and trans_gamepath (env : EcEnv.env) gp =
   in
 
   let mpath = fst (trans_msymbol env (mk_loc loc (fst (unloc gp)))) in
-  EcPath.xpath mpath (EcPath.psymbol funsymb)
+    EcPath.xpath mpath (EcPath.psymbol funsymb)
 
 (* -------------------------------------------------------------------- *)
 let transfpattern env ue (p : EcParsetree.plpattern) =
@@ -1374,7 +1395,7 @@ let transform_opt env ue pf tt =
         let ue      = UE.create (Some []) in
 
         let (env, stmt, _re, prelude, locals) =
-          transbody ue symbols env tunit body
+          transbody ue "$stmt" symbols env tunit body (* FIXME: $stmt ? *)
         in
 
         let su      = Tuni.subst (UE.close ue) in

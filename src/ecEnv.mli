@@ -10,19 +10,10 @@ open EcModules
 open EcTheory
 
 (* -------------------------------------------------------------------- *)
-
-(* A [path] is missing the module application information. As such, when
- * resolving a path, it is not returned a object but a suspension to
- * that object. This suspension can resolved by providing the missing
- * modules parameters. Such a resolved suspension only contains path of the
- * for [EPath _]. See the environment API for more information.
- *)
 type 'a suspension = {
   sp_target : 'a;
-  sp_params : (EcIdent.t * module_type) list;
+  sp_params : int * (EcIdent.t * module_type) list;
 }
-
-val is_suspended : 'a suspension -> bool
 
 (* -------------------------------------------------------------------- *)
 type varbind = {
@@ -34,6 +25,8 @@ type varbind = {
 type env 
 
 val initial : env
+val root  : env -> EcPath.path
+val mroot : env -> EcPath.mpath
 
 (* -------------------------------------------------------------------- *)
 val dump : ?name:string -> EcDebug.ppdebug -> env -> unit
@@ -55,7 +48,6 @@ type meerror =
 exception MEError of meerror
 
 module Memory : sig
-
   val set_active  : memory -> env -> env
   val get_active  : env -> memory option
 
@@ -65,7 +57,6 @@ module Memory : sig
   val push        : memenv -> env -> env
   val push_all    : memenv list -> env -> env
   val push_active : memenv -> env -> env
-
 end
 
 (* -------------------------------------------------------------------- *)
@@ -77,6 +68,9 @@ module Fun : sig
   val lookup      : qsymbol -> env -> xpath * t
   val lookup_opt  : qsymbol -> env -> (xpath * t) option
   val lookup_path : qsymbol -> env -> xpath
+
+  val sp_lookup      : qsymbol -> env -> xpath * t suspension
+  val sp_lookup_opt  : qsymbol -> env -> (xpath * t suspension) option
 
   val enter : symbol -> env -> env
   val add   : xpath -> env -> env
@@ -158,6 +152,9 @@ module Mod : sig
   val lookup      : qsymbol -> env -> mpath * t
   val lookup_opt  : qsymbol -> env -> (mpath * t) option
   val lookup_path : qsymbol -> env -> mpath
+
+  val sp_lookup     : qsymbol -> env -> mpath_top * (module_expr suspension)
+  val sp_lookup_opt : qsymbol -> env -> (mpath_top * (module_expr suspension)) option
 
   val bind : symbol -> module_expr -> env -> env
 
