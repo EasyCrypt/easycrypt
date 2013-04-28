@@ -186,6 +186,9 @@ let lookup_error cause =
   raise (LookupFailure cause)
 
 (* -------------------------------------------------------------------- *)
+exception DuplicatedBinding of symbol
+
+(* -------------------------------------------------------------------- *)
 let unsuspend _ (_, o) _ = o
 
 (* -------------------------------------------------------------------- *)
@@ -400,9 +403,6 @@ module MC = struct
   let _up_var _ mc x obj =
     { mc with mc_variables = MMsym.add x obj mc.mc_variables }
 
-  let bind_var x vb env =
-    bind _up_var x vb env
-
   let import_var p var env =
     import (_up_var true) p var env
 
@@ -414,9 +414,6 @@ module MC = struct
 
   let _up_fun _ mc x obj =
     { mc with mc_functions = MMsym.add x obj mc.mc_functions }
-
-  let bind_fun x vb env =
-    bind _up_fun x vb env
 
   let import_fun p fun_ env =
     import (_up_fun true) p fun_ env
@@ -430,9 +427,6 @@ module MC = struct
   let _up_mod _ mc x obj =
     { mc with mc_modules = MMsym.add x obj mc.mc_modules }
 
-  let bind_mod x mod_ env =
-    bind _up_mod x mod_ env
-
   let import_mod p mod_ env =
     import (_up_mod true) p mod_ env
 
@@ -445,9 +439,6 @@ module MC = struct
   let _up_tydecl _ mc x obj =
     { mc with mc_tydecls = MMsym.add x obj mc.mc_tydecls }
 
-  let bind_tydecl x tyd env =
-    bind _up_tydecl x tyd env
-
   let import_tydecl p tyd env =
     import (_up_tydecl true) (IPPath p) tyd env
 
@@ -459,9 +450,6 @@ module MC = struct
 
   let _up_modty _ mc x obj =
     { mc with mc_modsigs = MMsym.add x obj mc.mc_modsigs }
-
-  let bind_modty x msig env =
-    bind _up_modty x msig env
 
   let import_modty p msig env =
     import (_up_modty true) (IPPath p) msig env
@@ -480,9 +468,6 @@ module MC = struct
   let _up_operator _ mc x obj =
       { mc with mc_operators = MMsym.add x obj mc.mc_operators }
 
-  let bind_operator x op env =
-    bind _up_operator x op env
-
   let import_operator p op env =
     import (_up_operator true) (IPPath p) op env
 
@@ -495,9 +480,6 @@ module MC = struct
   let _up_axiom _ mc x obj =
     { mc with mc_axioms = MMsym.add x obj mc.mc_axioms }
 
-  let bind_axiom x ax env =
-    bind _up_axiom x ax env
-
   let import_axiom p ax env =
     import (_up_axiom true) (IPPath p) ax env
 
@@ -509,9 +491,6 @@ module MC = struct
     match lookup (fun mc -> mc.mc_theories) qnx env with
     | None -> lookup_error (`QSymbol qnx)
     | Some (p, (args, obj)) -> (_downpath_for_th env p args, obj)
-
-  let bind_theory x th env =
-    bind _up_theory x th env
 
   let import_theory p th env =
     import (_up_theory true) (IPPath p) th env
@@ -558,21 +537,86 @@ module MC = struct
 
       | CTh_export _ -> (mc, None)
     in 
+
     let (mc, submcs) =
       List.map_fold mc1_of_ctheory (empty_mc None) th.cth_struct
     in
       ((x, mc), List.prmap (fun x -> x) submcs)
 
-  (* -------------------------------------------------------------------- *)
-  let bind_submc _ _ _ = assert false   (* FIXME *)
+  let mc_of_ctheory (env : env) (x : symbol) (th : ctheory) =
+    mc_of_ctheory_r env.env_scope (x, th)
+
+  (* ------------------------------------------------------------------ *)
+  let rec bind_submc env path ((name, mc), submcs) =
+    let path = EcPath.pqname path name in
+
+    if Mip.find_opt (IPPath path) env.env_comps <> None then
+      raise (DuplicatedBinding (EcPath.basename path));
+
+    bind_submcs
+      { env with env_comps = Mip.add (IPPath path) mc env.env_comps }
+      path submcs
+
+  and bind_submcs env path submcs =
+    List.fold_left (bind_submc^~ path) env submcs
+
+  and bind_mc x mc env =
+    let path = EcPath.pqname env.env_scope x in
+
+    { env with
+        env_current = _up_mc true env.env_current path;
+        env_comps =
+          Mip.change
+            (fun mc -> Some (_up_mc false (oget mc) path))
+            (IPPath env.env_scope)
+            (Mip.add (IPPath path) mc env.env_comps); }
+
+  and bind_theory x th env =
+    let (_, mc), submcs = mc_of_ctheory env x th in
+    let env = bind _up_theory x th env in
+    let env = bind_mc x mc env in
+    let env =
+      bind_submcs env
+        (EcPath.pqname env.env_scope x)
+        submcs
+    in
+      env
+
+  and bind_axiom x ax env =
+    bind _up_axiom x ax env
+
+  and bind_operator x op env =
+    bind _up_operator x op env
+
+  and bind_modty x msig env =
+    bind _up_modty x msig env
+
+  and bind_tydecl x tyd env =
+    bind _up_tydecl x tyd env
+
+  and bind_mod x mod_ env =
+    bind _up_mod x mod_ env
+
+  and bind_fun x vb env =
+    bind _up_fun x vb env
+
+  and bind_var x vb env =
+    bind _up_var x vb env
 end
 
 (* -------------------------------------------------------------------- *)
-let enter (name : symbol) (env : env) =
-  { env with
-      env_scope = (EcPath.pqname env.env_scope name);
-      env_rb    = [];
-      env_item  = []; }
+let enter ?params (name : symbol) (env : env) =
+  let path = EcPath.pqname env.env_scope name in
+
+  if Mip.find_opt (IPPath path) env.env_comps <> None then
+    raise (DuplicatedBinding name);
+
+  let env = MC.bind_mc name (empty_mc params) env in
+
+    { env with
+        env_scope = (EcPath.pqname env.env_scope name);
+        env_rb    = [];
+        env_item  = []; }
 
 (* -------------------------------------------------------------------- *)
 type meerror =
