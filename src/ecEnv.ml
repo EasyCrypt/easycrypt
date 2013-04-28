@@ -300,16 +300,18 @@ module MC = struct
 
   (* ------------------------------------------------------------------ *)
   let rec _params_of_path p env =
-    let mc = oget (Mip.find_opt (IPPath p) env.env_comps) in
-      match EcPath.prefix p with
-      | None   -> [mc.mc_parameters]
-      | Some p -> mc.mc_parameters :: (_params_of_path p env)
+    match EcPath.prefix p with
+    | None   -> []
+    | Some p ->
+        let mc = oget (Mip.find_opt (IPPath p) env.env_comps) in
+          mc.mc_parameters :: (_params_of_path p env)
 
   (* ------------------------------------------------------------------ *)
   let _params_of_ipath p env =
     match p with
-    | IPPath  p -> _params_of_path p env
-    | IPIdent _ -> [(oget (Mip.find_opt p env.env_comps)).mc_parameters]
+    | IPPath  p           -> _params_of_path p env
+    | IPIdent (_, None)   -> []
+    | IPIdent (_, Some _) -> [(oget (Mip.find_opt p env.env_comps)).mc_parameters]
 
   (* ------------------------------------------------------------------ *)
   let by_path proj p env =
