@@ -25,48 +25,28 @@ type 'a suspension = {
 val is_suspended : 'a suspension -> bool
 
 (* -------------------------------------------------------------------- *)
-
-(* Describe the kind of objects that can be bound in an environment.
- * We alse define 2 classes of objects:
- * - containers    : theory   / module
- * - module values : variable / function
- *)
-
-type okind = [
-  | `Variable
-  | `Function
-  | `Theory
-  | `Module
-  | `ModType
-  | `TypeDecls
-  | `OpDecls
-  | `Lemma
-]
-
-module Kinds : EcUtils.IFlags with type flag = okind
-
-val ok_container : Kinds.t
-val ok_modvalue  : Kinds.t
-
-(* -------------------------------------------------------------------- *)
 type varbind = {
   vb_type  : EcTypes.ty;
   vb_kind  : EcTypes.pvar_kind;
 }
 
-
 (* -------------------------------------------------------------------- *)
 type env 
 
-val root    : env -> path
-val mroot   : env -> xpath
 val initial : env
 
 (* -------------------------------------------------------------------- *)
 val dump : ?name:string -> EcDebug.ppdebug -> env -> unit
 
 (* -------------------------------------------------------------------- *)
-exception LookupFailure of [`Path of path | `QSymbol of qsymbol]
+type lookup_error = [
+  | `XPath   of xpath
+  | `MPath   of mpath
+  | `Path    of path
+  | `QSymbol of qsymbol
+]
+
+exception LookupFailure of lookup_error
 
 (* -------------------------------------------------------------------- *)
 type meerror =
@@ -92,18 +72,17 @@ end
 module Fun : sig
   type t = function_
 
-  val by_path     : mpath_top -> path -> env -> t suspension
-  val by_path_opt : mpath_top -> path -> env -> (t suspension) option
   val by_xpath    : xpath -> env -> t
   val by_xpath_opt: xpath -> env -> t option
   val lookup      : qsymbol -> env -> xpath * t
   val lookup_opt  : qsymbol -> env -> (xpath * t) option
   val lookup_path : qsymbol -> env -> xpath
 
-  val sp_lookup     : qsymbol -> env -> (mpath_top * path * t suspension)
-  val sp_lookup_opt : qsymbol -> env -> 
-    (mpath_top * path * t suspension) option
+  val enter : symbol -> env -> env
+  val add   : xpath -> env -> env
 
+  (* ------------------------------------------------------------------ *)
+  (* FIXME: what are these functions for? *)
   val prF : xpath -> env -> env
 
   val hoareF_memenv : xpath -> env -> memenv * memenv
@@ -126,17 +105,14 @@ module Fun : sig
 
   val equivS_anonym : variable list -> variable list -> env -> 
     memenv * memenv * env
-
-  val enter : symbol -> env -> env
-  val add : xpath -> env -> env
 end
 
 (* -------------------------------------------------------------------- *)
 module Var : sig
   type t = varbind
 
-  val by_path     : xpath -> env -> t
-  val by_path_opt : xpath -> env -> t option
+  val by_xpath     : xpath -> env -> t
+  val by_xpath_opt : xpath -> env -> t option
 
   (* Lookup restricted to given kind of variables *)
   val lookup_locals    : symbol -> env -> (EcIdent.t * EcTypes.ty) list
@@ -177,8 +153,6 @@ end
 module Mod : sig
   type t = module_expr
 
-  val by_path     : mpath_top -> env -> t suspension
-  val by_path_opt : mpath_top -> env -> (t suspension) option
   val by_mpath    : mpath -> env -> t
   val by_mpath_opt: mpath -> env -> t option
   val lookup      : qsymbol -> env -> mpath * t
@@ -190,6 +164,7 @@ module Mod : sig
   val enter : symbol -> (EcIdent.t * module_type) list -> env -> env
   val bind_local : EcIdent.t -> module_type -> env -> env
 
+  val add : mpath -> env -> env
 end
 
 (* -------------------------------------------------------------------- *)

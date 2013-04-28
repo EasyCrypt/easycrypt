@@ -28,9 +28,7 @@ val toqsymbol : path -> qsymbol
 val basename  : path -> symbol
 val prefix    : path -> path option
 val rootname  : path -> symbol
-val extend    : path -> symbol list -> path
 val tolist    : path -> symbol list 
-val cat       : path -> path -> path
 val p_size    : path -> int
 
 (* -------------------------------------------------------------------- *)
@@ -62,9 +60,7 @@ val mt_equal  : mpath_top -> mpath_top -> bool
 val m_compare : mpath -> mpath -> int
 val m_hash    : mpath -> int
 val m_apply   : mpath -> mpath list -> mpath
-val m_fv : int EcIdent.Mid.t -> mpath -> int EcIdent.Mid.t
-
-val path_of_mpath : mpath -> path
+val m_fv      : int EcIdent.Mid.t -> mpath -> int EcIdent.Mid.t
 
 (* -------------------------------------------------------------------- *)
 type xpath = private {
@@ -77,11 +73,13 @@ val xpath  : mpath -> path -> xpath
 val xqname : xpath -> symbol -> xpath
 
 val x_equal   : xpath -> xpath -> bool
-(* This function make sense only var xpath representing a program variable 
-   and if the mpath (x_top) is in normal form *)
-val x_equal_na : xpath -> xpath -> bool
 val x_compare : xpath -> xpath -> int
 val x_hash    : xpath -> int
+
+(* These functions expect xpath representing program variables
+ * with a normalized [x_top] field. *)
+val x_equal_na   : xpath -> xpath -> bool
+val x_compare_na : xpath -> xpath -> int
 
 val x_fv : int EcIdent.Mid.t -> xpath -> int EcIdent.Mid.t
 

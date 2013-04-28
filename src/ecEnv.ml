@@ -18,6 +18,15 @@ module Mp   = EcPath.Mp
 module Mid  = EcIdent.Mid
 
 (* -------------------------------------------------------------------- *)
+type 'a suspension = {
+  sp_target : 'a;
+  sp_params : (EcIdent.t * module_type) list;
+}
+
+let is_suspended sp =
+  sp.sp_params <> []
+
+(* -------------------------------------------------------------------- *)
 type ctheory_w3 = {
   cth3_rebind : EcWhy3.rebinding;
   cth3_theory : ctheory;
@@ -44,6 +53,12 @@ let check_not_suspended (params, obj) =
 type ipath =
 | IPPath  of EcPath.path
 | IPIdent of EcIdent.t * EcPath.path option
+
+let ibasename p =
+  match p with
+  | IPPath p -> EcPath.basename p
+  | IPIdent (m, None) -> EcIdent.name m
+  | IPIdent (_, Some p) -> EcPath.basename p
 
 module IPathC = struct
   type t = ipath
@@ -108,6 +123,9 @@ type preenv = {
   env_rb       : EcWhy3.rebinding;        (* in reverse order *)
   env_item     : ctheory_item list        (* in reverse order *)
 }
+
+(* -------------------------------------------------------------------- *)
+let dump ?name _ _ = ()                 (* FIXME *)
 
 (* -------------------------------------------------------------------- *)
 type env = preenv
@@ -301,7 +319,7 @@ module MC = struct
               (fun mc -> (mc, x))
       end
 
-      | IPIdent (m, None) -> None
+      | IPIdent (_, None) -> None
 
       | IPIdent (m, Some p) ->
           let prefix = EcPath.prefix p in
@@ -315,6 +333,12 @@ module MC = struct
       | Some obj -> Some (_params_of_ipath p env, snd obj)
 
   (* ------------------------------------------------------------------ *)
+  let path_of_qn (top : EcPath.path) (qn : symbol list) =
+    List.fold_left EcPath.pqname top qn
+
+  let pcat (p1 : EcPath.path) (p2 : EcPath.path) =
+    path_of_qn p1 (EcPath.tolist p2)
+
   let lookup_mc qn env =
       match qn with
       | [] -> Some env.env_current
@@ -326,7 +350,7 @@ module MC = struct
                 match p, qn with
                 | IPIdent _, [] -> Some p
                 | IPIdent _, _  -> None
-                | IPPath  p, _  -> Some (IPPath (EcPath.extend p qn)))
+                | IPPath  p, _  -> Some (IPPath (path_of_qn p qn)))
           in
             obind p (fun p -> Mip.find_opt p env.env_comps)
 
@@ -359,10 +383,9 @@ module MC = struct
             env.env_comps; }
 
   let import up p obj env =
-    let name = EcPath.basename p in
-
+    let name = ibasename p in
       { env with env_current =
-          up env.env_current name (IPPath p, obj) }
+          up env.env_current name (p, obj) }
 
   (* -------------------------------------------------------------------- *)
   let lookup_var qnx env =
@@ -370,11 +393,14 @@ module MC = struct
     | None -> lookup_error (`QSymbol qnx)
     | Some (p, (args, obj)) -> (_downpath_for_var env p args, obj)
 
+  let _up_var _ mc x obj =
+    { mc with mc_variables = MMsym.add x obj mc.mc_variables }
+
   let bind_var x vb env =
-    let up _ mc x obj =
-      { mc with mc_variables = MMsym.add x obj mc.mc_variables }
-    in
-      bind up x vb env
+    bind _up_var x vb env
+
+  let import_var p var env =
+    import (_up_var true) p var env
 
   (* -------------------------------------------------------------------- *)
   let lookup_fun qnx env =
@@ -382,11 +408,14 @@ module MC = struct
     | None -> lookup_error (`QSymbol qnx)
     | Some (p, (args, obj)) -> (_downpath_for_fun env p args, obj)
 
+  let _up_fun _ mc x obj =
+    { mc with mc_functions = MMsym.add x obj mc.mc_functions }
+
   let bind_fun x vb env =
-    let up _ mc x obj =
-      { mc with mc_functions = MMsym.add x obj mc.mc_functions }
-    in
-      bind up x vb env
+    bind _up_fun x vb env
+
+  let import_fun p fun_ env =
+    import (_up_fun true) p fun_ env
 
   (* -------------------------------------------------------------------- *)
   let lookup_mod qnx env =
@@ -405,7 +434,7 @@ module MC = struct
 
   (* -------------------------------------------------------------------- *)
   let lookup_tydecl qnx env =
-    match lookup (fun mc -> mc.mc_theories) qnx env with
+    match lookup (fun mc -> mc.mc_tydecls) qnx env with
     | None -> lookup_error (`QSymbol qnx)
     | Some (p, (args, obj)) -> (_downpath_for_tydecl env p args, obj)
 
@@ -416,7 +445,7 @@ module MC = struct
     bind _up_tydecl x tyd env
 
   let import_tydecl p tyd env =
-    import (_up_tydecl true) p tyd env
+    import (_up_tydecl true) (IPPath p) tyd env
 
   (* -------------------------------------------------------------------- *)
   let lookup_modty qnx env =
@@ -431,7 +460,7 @@ module MC = struct
     bind _up_modty x msig env
 
   let import_modty p msig env =
-    import (_up_modty true) p msig env
+    import (_up_modty true) (IPPath p) msig env
 
   (* -------------------------------------------------------------------- *)
   let lookup_operator qnx env =
@@ -451,7 +480,7 @@ module MC = struct
     bind _up_operator x op env
 
   let import_operator p op env =
-    import (_up_operator true) p op env
+    import (_up_operator true) (IPPath p) op env
 
   (* -------------------------------------------------------------------- *)
   let lookup_axiom qnx env =
@@ -466,17 +495,22 @@ module MC = struct
     bind _up_axiom x ax env
 
   let import_axiom p ax env =
-    import (_up_axiom true) p ax env
+    import (_up_axiom true) (IPPath p) ax env
 
   (* -------------------------------------------------------------------- *)
   let _up_theory _ mc x obj =
     { mc with mc_theories = MMsym.add x obj mc.mc_theories }
 
+  let lookup_theory qnx env =
+    match lookup (fun mc -> mc.mc_theories) qnx env with
+    | None -> lookup_error (`QSymbol qnx)
+    | Some (p, (args, obj)) -> (_downpath_for_th env p args, obj)
+
   let bind_theory x th env =
     bind _up_theory x th env
 
   let import_theory p th env =
-    import (_up_theory true) p th env
+    import (_up_theory true) (IPPath p) th env
 
   (* -------------------------------------------------------------------- *)
   let _up_mc _ mc p =
@@ -597,7 +631,7 @@ let ipath_of_mpath_opt (p : mpath_top) =
       IPIdent (i, None)
 
   | `Concrete (p1, p2) ->
-      let pr = odfl p1 (omap p2 (EcPath.cat p1)) in
+      let pr = odfl p1 (omap p2 (MC.pcat p1)) in
         IPPath pr
 
 let ipath_of_mpath (p : mpath) =
@@ -606,7 +640,7 @@ let ipath_of_mpath (p : mpath) =
       (IPIdent (i, None), (1, p.EcPath.m_args))
 
   | `Concrete (p1, p2) ->
-      let pr = odfl p1 (omap p2 (EcPath.cat p1)) in
+      let pr = odfl p1 (omap p2 (MC.pcat p1)) in
         (IPPath pr, (EcPath.p_size p1, p.EcPath.m_args))
 
 let ipath_of_xpath (p : xpath) =
@@ -633,7 +667,7 @@ let try_lf f =
 module Var = struct
   type t = varbind
 
-  let by_path (p : xpath) (env : env) =
+  let by_xpath (p : xpath) (env : env) =
     match ipath_of_xpath p with
     | None -> lookup_error (`XPath p)
 
@@ -647,8 +681,13 @@ module Var = struct
              o
       end
 
-  let by_path_opt (p : xpath) (env : env) =
-    try_lf (fun () -> by_path p env)
+  let by_xpath_opt (p : xpath) (env : env) =
+    try_lf (fun () -> by_xpath p env)
+
+  let add (path : EcPath.xpath) (env : env) =
+    let obj = by_xpath path env in
+    let ip = fst (oget (ipath_of_xpath path)) in
+      MC.import_var ip obj env
 
   let lookup_locals name env =
     MMsym.all name env.env_locals
@@ -721,6 +760,9 @@ end
 module Fun = struct
   type t = EcModules.function_
 
+  let enter (x : symbol) (env : env) =
+    enter x env
+
   let by_ipath (p : ipath) (env : env) =
     MC.by_path (fun mc -> mc.mc_functions) p env
 
@@ -760,6 +802,11 @@ module Fun = struct
 
   let bind name fun_ env =
     MC.bind_fun name fun_ env
+
+  let add (path : EcPath.xpath) (env : env) =
+    let obj = by_xpath path env in
+    let ip = fst (oget (ipath_of_xpath path)) in
+      MC.import_fun ip obj env
 
   let add_in_memenv memenv vd =
     EcMemory.bind vd.v_name vd.v_type memenv
@@ -896,6 +943,10 @@ module Mod = struct
   let by_mpath_opt (p : EcPath.mpath) (env : env) =
     try_lf (fun () -> by_mpath p env)
 
+  let add (p : EcPath.mpath) (env : env) =
+    let obj = by_mpath p env in
+      MC.import_mod (fst (ipath_of_mpath p)) obj env
+
   let lookup qname (env : env) =
     let (((_, a), p), x) = MC.lookup_mod qname env in
       if a <> [] then
@@ -920,7 +971,7 @@ module Mod = struct
         env_rb   = rb @ env.env_rb;
         env_item = CTh_module me :: env.env_item }
 
-  let bind_local name modty env =
+  let bind_local _name _modty _env =
     assert false
 
 (*
@@ -967,6 +1018,10 @@ module Mod = struct
     List.fold_left
       (fun env (name, me) -> bind_local name me env)
       env bindings
+
+  let enter name params env =
+    let env = enter name env in
+      bind_locals params env
 end
 
 (* -------------------------------------------------------------------- *)
@@ -982,6 +1037,10 @@ module Ty = struct
     match by_path_opt p env with
     | None -> lookup_error (`Path p)
     | Some obj -> obj
+
+  let add (p : EcPath.path) (env : env) =
+    let obj = by_path p env in
+      MC.import_tydecl p obj env
 
   let lookup qname (env : env) =
     MC.lookup_tydecl qname env
@@ -1128,6 +1187,10 @@ module ModTy = struct
     | None -> lookup_error (`Path p)
     | Some obj -> obj
 
+  let add (p : EcPath.path) (env : env) =
+    let obj = by_path p env in
+      MC.import_modty p obj env
+
   let lookup qname (env : env) =
     MC.lookup_modty qname env
 
@@ -1169,6 +1232,10 @@ module Op = struct
     match by_path_opt p env with
     | None -> lookup_error (`Path p)
     | Some obj -> obj
+
+  let add (p : EcPath.path) (env : env) =
+    let obj = by_path p env in
+      MC.import_operator p obj env
 
   let lookup qname (env : env) =
     MC.lookup_operator qname env
@@ -1239,6 +1306,10 @@ module Ax = struct
     | None -> lookup_error (`Path p)
     | Some obj -> obj
 
+  let add (p : EcPath.path) (env : env) =
+    let obj = by_path p env in
+      MC.import_axiom p obj env
+
   let lookup qname (env : env) =
     MC.lookup_axiom qname env
 
@@ -1304,8 +1375,12 @@ module Theory = struct
     | None -> lookup_error (`Path p)
     | Some obj -> obj
 
+  let add (p : EcPath.path) (env : env) =
+    let obj = by_path p env in
+      MC.import_theory p obj env
+
   let lookup qname (env : env) =
-    MC.lookup_operator qname env
+    MC.lookup_theory qname env
 
   let lookup_opt name env =
     try_lf (fun () -> lookup name env)
@@ -1372,7 +1447,7 @@ module Theory = struct
             MC.import_modty (xpath x) ty env
 
         | CTh_module m ->
-            MC.import_mod (xpath m.me_name) m env
+            MC.import_mod (IPPath (xpath m.me_name)) m env
 
         | CTh_export p ->
             import env p (by_path p env)
@@ -1503,6 +1578,24 @@ let initial =
   let env1 = Theory.bind EcCoreLib.id_Pervasive cth env0 in
   let env1 = Theory.import EcCoreLib.p_Pervasive env1 in
   env1
+
+(* -------------------------------------------------------------------- *)
+type ebinding = [
+  | `Variable  of EcTypes.pvar_kind * EcTypes.ty
+  | `Function  of function_
+  | `Module    of module_expr
+  | `ModType   of module_sig
+]
+
+let bind1 ((x, eb) : symbol * ebinding) (env : env) =
+  match eb with
+  | `Variable v -> Var   .bind x (fst v) (snd v) env
+  | `Function f -> Fun   .bind x f env
+  | `Module   m -> Mod   .bind x m env
+  | `ModType  i -> ModTy .bind x i env
+
+let bindall (items : (symbol * ebinding) list) (env : env) =
+  List.fold_left ((^~) bind1) env items
 
 (* -------------------------------------------------------------------- *)
 let norm_l_decl env (hyps,concl) =

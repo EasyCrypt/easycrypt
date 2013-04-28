@@ -13,7 +13,6 @@ and path_node =
 | Psymbol of symbol
 | Pqname  of path * symbol
 
-
 (* -------------------------------------------------------------------- *)
 let p_equal   = ((==) : path -> path -> bool)
 let p_hash    = fun p -> p.p_tag
@@ -54,6 +53,11 @@ let mk_path node =
 
 let psymbol id   = mk_path (Psymbol id)
 let pqname  p id = mk_path (Pqname(p,id))
+
+let pqoname p id =
+  match p with
+  | None   -> psymbol id
+  | Some p -> pqname p id
 
 (* -------------------------------------------------------------------- *)
 let rec tostring p =
@@ -109,7 +113,7 @@ let m_equal   = ((==) : mpath -> mpath -> bool)
 let mt_equal mt1 mt2 = 
   match mt1, mt2 with
   | `Abstract id1, `Abstract id2 -> EcIdent.id_equal id1 id2
-  | `Concrete(p1,o1), `Concrete(p2,o2) ->
+  | `Concrete(p1, o1), `Concrete(p2, o2) ->
     p_equal p1 p2 && oall2 p_equal o1 o2
   | _, _ -> false 
 
@@ -170,10 +174,7 @@ let rec m_fv fv mp =
     | `Concrete _ -> fv in
   List.fold_left m_fv fv mp.m_args 
 
-
-
 (* -------------------------------------------------------------------- *)
-
 type xpath = {
   x_top : mpath;
   x_sub : path;
@@ -181,12 +182,15 @@ type xpath = {
 }
 
 let x_equal   = ((==) : xpath -> xpath -> bool)
-let x_equal_na x1 x2 = 
-  mt_equal x1.x_top.m_top x2.x_top.m_top &&
-    p_equal x1.x_sub x2.x_sub
-
 let x_hash    = fun p -> p.x_tag
 let x_compare = fun p1 p2 -> x_hash p1 - x_hash p2
+
+let x_equal_na x1 x2 = 
+     mt_equal x1.x_top.m_top x2.x_top.m_top
+  && p_equal x1.x_sub x2.x_sub
+
+let x_compare_na x1 x2 =
+  x_compare x1 x2 (* FIXME: doc says something about x_top being normalized *)
 
 module Hsxpath = Why3.Hashcons.Make (struct 
   type t = xpath
