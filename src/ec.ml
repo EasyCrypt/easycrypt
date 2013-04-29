@@ -75,6 +75,10 @@ let _ =
       if !terminate then exit 0
 
     with e -> begin
+      if not (EcTerminal.interactive terminal) then begin
+        Printexc.print_backtrace stderr;
+        Printf.fprintf stderr "\n%!";
+      end;
       EcTerminal.finish
         (`ST_Failure (EcCommands.toperror_of_exn e))
         terminal;
