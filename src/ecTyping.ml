@@ -893,7 +893,7 @@ and transstruct1 (env : EcEnv.env) (st : pstructure_item) =
       (* Type-check body *)
       let retty = transty tp_uni !env ue decl.pfd_tyresult in
       let (env, stmt, result, prelude, locals) =
-        transbody ue decl.pfd_name.pl_desc symbols !env retty body
+        transbody ue symbols !env retty body
       in
 
       (* Close all types *)
@@ -933,13 +933,12 @@ and transstruct1 (env : EcEnv.env) (st : pstructure_item) =
   | Pst_alias _ -> assert false
 
 (* -------------------------------------------------------------------- *)
-and transbody ue fname symbols (env : EcEnv.env) retty pbody =
+and transbody ue symbols (env : EcEnv.env) retty pbody =
     let env     = ref env
     and prelude = ref []
     and locals  = ref [] in
 
-    let mpath = EcEnv.mroot !env in
-    let mpath = EcPath.xpath mpath (EcPath.psymbol fname) in
+    let mpath = oget (EcEnv.xroot !env) in
 
     (* Type-check local variables / check for dups *)
     let add_local (xs, pty, init) =
@@ -977,6 +976,7 @@ and transbody ue fname symbols (env : EcEnv.env) retty pbody =
             (fun x xty ->
                let x = unloc x in
                let p = EcPath.xqname mpath x in
+                 Printf.printf "PRELUDE: %s\n%!" (EcPath.x_tostring p);
                  ({ v_name  = x; v_type  = xty   },
                   { pv_name = p; pv_kind = PVloc },
                   xty, pty.pl_loc))
@@ -1408,7 +1408,8 @@ let transform_opt env ue pf tt =
         let ue      = UE.create (Some []) in
 
         let (env, stmt, _re, prelude, locals) =
-          transbody ue "$stmt" symbols env tunit body (* FIXME: $stmt ? *)
+          let env = EcEnv.Fun.enter "$stmt" env in
+            transbody ue symbols env tunit body (* FIXME: $stmt ? *)
         in
 
         let su      = Tuni.subst (UE.close ue) in

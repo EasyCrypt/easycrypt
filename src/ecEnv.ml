@@ -117,7 +117,7 @@ type mc = {
 
 (* -------------------------------------------------------------------- *)
 type preenv = {
-  env_scope    : EcPath.path;
+  env_scope    : escope;
   env_current  : mc;
   env_comps    : mc Mip.t;
   env_locals   : (EcIdent.t * EcTypes.ty) MMsym.t;
@@ -128,13 +128,35 @@ type preenv = {
   env_item     : ctheory_item list        (* in reverse order *)
 }
 
+and escope = {
+  ec_path  : EcPath.path;
+  ec_scope : [ `Theory
+             | `Module of EcPath.mpath
+             | `Fun    of EcPath.xpath ];
+}
+
 (* -------------------------------------------------------------------- *)
 type env = preenv
 
 (* -------------------------------------------------------------------- *)
+let root (env : env) =
+  env.env_scope.ec_path
+
+let mroot (env : env) =
+  match env.env_scope.ec_scope with
+  | `Theory   -> EcPath.mpath_crt (root env) [] None
+  | `Module m -> m
+  | `Fun    x -> x.EcPath.x_top
+
+let xroot (env : env) =
+  match env.env_scope.ec_scope with
+  | `Fun x -> Some x
+  | _ -> None
+
+(* -------------------------------------------------------------------- *)
 module Dump = struct
   let rec dump ?(name = "Environment") pp (env : env) =
-      EcDebug.onseq pp name ~extra:(EcPath.tostring env.env_scope)
+      EcDebug.onseq pp name ~extra:(EcPath.tostring (root env))
         (Stream.of_list [
           (fun pp -> dump_mc ~name:"Root" pp env.env_current);
           (fun pp ->
@@ -167,14 +189,6 @@ end
 
 let dump = Dump.dump
 
-
-(* -------------------------------------------------------------------- *)
-let root (env : env) =
-  env.env_scope
-
-let mroot (env : env) =
-  EcPath.mpath_crt env.env_scope [] None (* FIXME *)
-
 (* -------------------------------------------------------------------- *)
 let empty_mc params = {
   mc_parameters = params;
@@ -195,7 +209,7 @@ let empty =
   let path = EcPath.psymbol name in
 
   let env  =
-    { env_scope    = path;
+    { env_scope    = { ec_path = path; ec_scope = `Theory; };
       env_current  = { (empty_mc None) with
                          mc_components =
                            MMsym.add name (IPPath path) MMsym.empty; };
@@ -446,7 +460,9 @@ module MC = struct
 
   (* ------------------------------------------------------------------ *)
   let bind up x obj env =
-    let obj = (IPPath (EcPath.pqname env.env_scope x), obj) in
+    let obj = (IPPath (EcPath.pqname (root env) x), obj) in
+
+    Printf.printf "BIND: %s\n%!" (EcPath.tostring (root env));
 
     let env =
       { env with env_current =
@@ -455,7 +471,7 @@ module MC = struct
       { env with env_comps =
           Mip.change
             (fun mc -> Some (up false (oget mc) x obj))
-            (IPPath env.env_scope)
+            (IPPath (root env))
             env.env_comps; }
 
   let import up p obj env =
@@ -638,7 +654,7 @@ module MC = struct
         me
 
   let mc_of_module (env : env) (me : module_expr) =
-    mc_of_module_r env.env_scope me
+    mc_of_module_r (root env) me
 
   (* ------------------------------------------------------------------ *)
   let rec mc_of_ctheory_r (scope : EcPath.path) (x, th) =
@@ -678,7 +694,7 @@ module MC = struct
       ((x, mc), List.prmap (fun x -> x) submcs)
 
   let mc_of_ctheory (env : env) (x : symbol) (th : ctheory) =
-    mc_of_ctheory_r env.env_scope (x, th)
+    mc_of_ctheory_r (root env) (x, th)
 
   (* ------------------------------------------------------------------ *)
   let rec bind_submc env path ((name, mc), submcs) =
@@ -695,14 +711,14 @@ module MC = struct
     List.fold_left (bind_submc^~ path) env submcs
 
   and bind_mc x mc env =
-    let path = EcPath.pqname env.env_scope x in
+    let path = EcPath.pqname (root env) x in
 
     { env with
         env_current = _up_mc true env.env_current path;
         env_comps =
           Mip.change
             (fun mc -> Some (_up_mc false (oget mc) path))
-            (IPPath env.env_scope)
+            (IPPath (root env))
             (Mip.add (IPPath path) mc env.env_comps); }
 
   and bind_theory x th env =
@@ -711,7 +727,7 @@ module MC = struct
     let env = bind_mc x mc env in
     let env =
       bind_submcs env
-        (EcPath.pqname env.env_scope x)
+        (EcPath.pqname (root env) x)
         submcs
     in
       env
@@ -722,7 +738,7 @@ module MC = struct
     let env = bind_mc x mc env in
     let env =
       bind_submcs env
-        (EcPath.pqname env.env_scope x)
+        (EcPath.pqname (root env) x)
         submcs
     in
       env
@@ -747,18 +763,49 @@ module MC = struct
 end
 
 (* -------------------------------------------------------------------- *)
-let enter ?params (name : symbol) (env : env) =
-  let path = EcPath.pqname env.env_scope name in
+exception InvalidStateForEnter
+
+let enter mode (name : symbol) (env : env) =
+  let path = EcPath.pqname (root env) name in
 
   if Mip.find_opt (IPPath path) env.env_comps <> None then
     raise (DuplicatedBinding name);
 
-  let env = MC.bind_mc name (empty_mc params) env in
+  match mode, env.env_scope.ec_scope with
+  | `Theory, `Theory ->
+      let env = MC.bind_mc name (empty_mc None) env in
+        { env with
+            env_scope = { ec_path = path; ec_scope = `Theory; };
+            env_rb    = [];
+            env_item  = []; }
 
-    { env with
-        env_scope = (EcPath.pqname env.env_scope name);
-        env_rb    = [];
-        env_item  = []; }
+  | `Module [], `Module mpath ->
+      let mpath = EcPath.mqname mpath name in
+      let env   = MC.bind_mc name (empty_mc None) env in
+        { env with
+            env_scope = { ec_path = path; ec_scope = `Module mpath; };
+            env_rb    = [];
+            env_item  = []; }
+
+  | `Module params, `Theory ->
+      let idents = List.map (fun (x, _) -> EcPath.mident x) params in
+      let mpath  = EcPath.mpath_crt path idents None in
+      let env    = MC.bind_mc name (empty_mc (Some params)) env in
+        { env with
+            env_scope = { ec_path = path; ec_scope = `Module mpath; };
+            env_rb    = [];
+            env_item  = []; }
+
+  | `Fun, `Module mpath ->
+      let xpath = EcPath.xpath mpath (EcPath.psymbol name) in
+      let env   = MC.bind_mc name (empty_mc None) env in (* FIXME: remove *)
+        { env with
+            env_scope = { ec_path = path; ec_scope = `Fun xpath; };
+            env_rb    = [];
+            env_item  = []; }
+
+  | _, _ ->
+      raise InvalidStateForEnter
 
 (* -------------------------------------------------------------------- *)
 type meerror =
@@ -956,7 +1003,7 @@ module Fun = struct
   type t = EcModules.function_
 
   let enter (x : symbol) (env : env) =
-    enter x env
+    enter `Fun x env
 
   let by_ipath (p : ipath) (env : env) =
     MC.by_path (fun mc -> mc.mc_functions) p env
@@ -1179,7 +1226,7 @@ module Mod = struct
     let env = MC.bind_mod name me env in
     let (w3, rb) =
       EcWhy3.add_mod_exp env.env_w3
-          (EcPath.pqname env.env_scope name) me
+          (EcPath.pqname (root env) name) me
     in
       { env with
         env_w3   = w3;
@@ -1235,7 +1282,7 @@ module Mod = struct
       env bindings
 
   let enter name params env =
-    let env = enter ~params name env in
+    let env = enter (`Module params) name env in
       bind_locals params env
 end
 
@@ -1270,7 +1317,7 @@ module Ty = struct
     let env = MC.bind_tydecl name ty env in
     let (w3, rb) =
         EcWhy3.add_ty env.env_w3
-          (EcPath.pqname env.env_scope name) ty
+          (EcPath.pqname (root env) name) ty
     in
       { env with
           env_w3   = w3;
@@ -1468,7 +1515,7 @@ module Op = struct
     let op = NormMp.norm_op env op in
     let (w3, rb) =
         EcWhy3.add_op env.env_w3
-          (EcPath.pqname env.env_scope name) op
+          (EcPath.pqname (root env) name) op
     in
       { env with
           env_w3   = w3;
@@ -1540,7 +1587,7 @@ module Ax = struct
     let env = MC.bind_axiom name ax env in
     let (w3, rb) =
       EcWhy3.add_ax env.env_w3
-        (EcPath.pqname env.env_scope name)
+        (EcPath.pqname (root env) name)
         (NormMp.norm_ax env ax) in
     { env with
       env_w3   = w3;
@@ -1579,7 +1626,7 @@ module Theory = struct
 
   (* ------------------------------------------------------------------ *)
   let enter name env =
-    enter name env
+    enter `Theory name env
 
   (* ------------------------------------------------------------------ *)
   let by_path_opt (p : EcPath.path) (env : env) =
@@ -1633,8 +1680,9 @@ module Theory = struct
         (w3env, List.rev (List.flatten rb))
     in
 
-    let cpath = env.env_scope in
-    let (w3env, rb) = compile (EcPath.pqname cpath name) env.env_w3 th in
+    let (w3env, rb) =
+      compile (EcPath.pqname (root env) name) env.env_w3 th
+    in
 
     let env = MC.bind_theory name th env in
       { env with
@@ -1726,7 +1774,7 @@ end
 
 (* -------------------------------------------------------------------- *)
 let import_w3 env th rd =
-  let lth, rbi = EcWhy3.import_w3 env.env_w3 env.env_scope th rd in
+  let lth, rbi = EcWhy3.import_w3 env.env_w3 (root env) th rd in
   let cth = List.map Theory.ctheory_item_of_theory_item lth in
 
   let env = {
@@ -1757,7 +1805,7 @@ let import_w3_dir env dir name rd =
 (* -------------------------------------------------------------------- *)
 let initial =
   let env0 = empty in
-  let env = enter EcCoreLib.id_Pervasive env0 in
+  let env = enter `Theory EcCoreLib.id_Pervasive env0 in
   let unit_rn =
     let tunit = Why3.Ty.ts_tuple 0 in
     let nunit = tunit.Why3.Ty.ts_name.Why3.Ident.id_string in

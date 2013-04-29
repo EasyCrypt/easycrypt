@@ -27,6 +27,7 @@ type env
 val initial : env
 val root  : env -> EcPath.path
 val mroot : env -> EcPath.mpath
+val xroot : env -> EcPath.xpath option
 
 (* -------------------------------------------------------------------- *)
 val dump : ?name:string -> EcDebug.ppdebug -> env -> unit

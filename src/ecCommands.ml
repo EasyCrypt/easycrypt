@@ -224,7 +224,7 @@ and process (scope : EcScope.scope) (g : global located) =
     | Gcheckproof b   -> process_checkproof scope b
     | Gsave      loc  -> process_save       scope loc
   in
-    (EcEnv.dump EcDebug.initial (EcScope.env scope));
+(*    (EcEnv.dump EcDebug.initial (EcScope.env scope)); *)
     scope
 
 (* -------------------------------------------------------------------- *)
