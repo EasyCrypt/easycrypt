@@ -23,7 +23,7 @@ let ppup pp ?enum b =
 
 (* -------------------------------------------------------------------- *)
 let initial =
-  { ppindent = []; ppstream = stderr; ppmode = `Xml; }
+  { ppindent = []; ppstream = stderr; ppmode = `ATree; }
 
 (* -------------------------------------------------------------------- *)
 module ATree = struct

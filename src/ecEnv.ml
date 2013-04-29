@@ -259,7 +259,7 @@ module MC = struct
       | (p, `Dn q) -> (p, Some q)
 
   (* ------------------------------------------------------------------ *)
-  let _downpath_for_var _env p args =
+  let _downpath_for_var (local : bool) _env p args =
     List.iter
       (fun arg -> Printf.printf "%b\n" (arg = None))
       args;
@@ -280,12 +280,23 @@ module MC = struct
               let (p, q) = _cutpath (i+1) p in
                 match q with
                 | None -> assert false
-                | Some q ->
-                    EcPath.xpath
-                      (EcPath.mpath_crt
-                         p (List.map EcPath.mident n)
-                         (EcPath.prefix q))
-                      (EcPath.psymbol (EcPath.basename q))
+                | Some q -> begin
+                    if local then
+                      let vname = EcPath.basename q in
+                      let fpath = oget (EcPath.prefix q) in
+                      let fname = EcPath.basename fpath in
+                        EcPath.xpath
+                          (EcPath.mpath_crt
+                             p (List.map EcPath.mident n)
+                             (EcPath.prefix fpath))
+                          (EcPath.pqname (EcPath.psymbol fname) vname)
+                    else
+                      EcPath.xpath
+                        (EcPath.mpath_crt
+                           p (List.map EcPath.mident n)
+                           (EcPath.prefix q))
+                        (EcPath.psymbol (EcPath.basename q))
+                end
           end
 
           | IPIdent (m, x) -> begin
@@ -305,7 +316,7 @@ module MC = struct
     with Not_found ->
       assert false
 
-  let _downpath_for_fun = _downpath_for_var
+  let _downpath_for_fun = _downpath_for_var false
 
   (* ------------------------------------------------------------------ *)
   let _downpath_for_mod _env p args =
@@ -456,7 +467,9 @@ module MC = struct
   let lookup_var qnx env =
     match lookup (fun mc -> mc.mc_variables) qnx env with
     | None -> lookup_error (`QSymbol qnx)
-    | Some (p, (args, obj)) -> (_downpath_for_var env p args, obj)
+    | Some (p, (args, obj)) ->
+      let local = (obj.vb_kind = EcTypes.PVloc) in
+        (_downpath_for_var local env p args, obj)
 
   let _up_var _ mc x obj =
     { mc with mc_variables = MMsym.add x obj mc.mc_variables }
@@ -835,7 +848,8 @@ module Var = struct
         match MC.by_path (fun mc -> mc.mc_variables) ip env with
         | None -> lookup_error (`XPath p)
         | Some (params, o) ->
-           let ((spi, params), _) = MC._downpath_for_var env ip params in
+           let local = o.vb_kind = EcTypes.PVloc in
+           let ((spi, params), _) = MC._downpath_for_var local env ip params in
              if i <> spi || List.length args <> List.length params then
                assert false;
              o
@@ -876,7 +890,8 @@ module Var = struct
                 let pv =
                   { pv_name = EcPath.xqname mp (snd qname);
                     pv_kind = PVloc; }
-              in
+                in
+                  Printf.printf "XP1: %s\n%!" (EcPath.x_tostring pv.pv_name);
                 Some (pv, ty)
             end
 
@@ -888,6 +903,7 @@ module Var = struct
           let (((_, a), p), x) = MC.lookup_var qname env in
             if a <> [] then
               raise (LookupFailure (`QSymbol qname));
+            Printf.printf "XP2: %s\n%!" (EcPath.x_tostring p);
             ({ pv_name = p; pv_kind = x.vb_kind }, x.vb_type)
         end
 

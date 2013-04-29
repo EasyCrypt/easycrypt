@@ -834,8 +834,7 @@ let rec pr_form_rec (ppenv : ppenv) outer (f : form) =
     pr_local ppenv id
       
   | Fpvar (x, i) ->                 (* FIXME *)
-    join [pr_pv ppenv x; pr_brace (pr_local ppenv i)]
-
+      join [pr_pv ppenv x; pr_brace (pr_local ppenv i)]
     
   | Fquant (q, bd, f) ->
     let (subppenv, dd) = pr_bindings ppenv bd in 

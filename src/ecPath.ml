@@ -237,7 +237,6 @@ let rec m_tostring (m : mpath) =
 
   let args = 
     let a = m.m_args in
-
       match a with
       | [] -> ""
       | _  -> 
@@ -247,7 +246,7 @@ let rec m_tostring (m : mpath) =
     Printf.sprintf "%s%s%s" top args sub
 
 let x_tostring x = 
-  Printf.sprintf "%s.%s" 
+  Printf.sprintf "%s./%s" 
     (m_tostring x.x_top) (tostring x.x_sub)
 
 (* -------------------------------------------------------------------- *)

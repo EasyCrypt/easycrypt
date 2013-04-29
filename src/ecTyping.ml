@@ -875,7 +875,7 @@ and transstruct1 (env : EcEnv.env) (st : pstructure_item) =
 
       let symbols = ref Sstr.empty
       and env     = ref env in
-      
+
       (* Type-check function parameters / check for dups *)
       let params =
         let params = ref [] in
@@ -940,7 +940,6 @@ and transbody ue fname symbols (env : EcEnv.env) retty pbody =
 
     let mpath = EcEnv.mroot !env in
     let mpath = EcPath.xpath mpath (EcPath.psymbol fname) in
-
 
     (* Type-check local variables / check for dups *)
     let add_local (xs, pty, init) =
@@ -1198,6 +1197,9 @@ let rec trans_msymbol (env : EcEnv.env) (msymb : pmsymbol located) =
 
   begin match top_path with
   | `Concrete (_, Some sub) ->          (* FIXME: dead wrong *)
+      Printf.printf "MSYM: %s\n%!" (EcPath.tostring sub);
+      Printf.printf "MSYM: %d %d\n"
+        (EcPath.p_size sub) (List.length sm);
       if not (EcPath.p_size sub = List.length sm) then
         tyerror loc env (InvalidModAppl MAE_WrongArgPosition);
   | _ -> ()
