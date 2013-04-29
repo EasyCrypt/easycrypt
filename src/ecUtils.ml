@@ -452,6 +452,13 @@ end
 module String = struct
   include String
 
+  let map f s =
+    let r = String.create (String.length s) in
+      for i = 0 to (String.length s) - 1 do
+        r.[i] <- f s.[i]
+      done;
+      r
+
   let slice ?first ?last (s : string) =
     let first = odfl 0 first in
     let last  = odfl (String.length s) last in
@@ -477,6 +484,3 @@ module Stream = struct
     try  Some (Stream.next stream)
     with Stream.Failure -> None
 end
-
-(* -------------------------------------------------------------------- *)
-
