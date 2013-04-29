@@ -72,7 +72,7 @@
          proof-indent-open-regexp     easycrypt-indent-open-regexp
          proof-indent-close-regexp    easycrypt-indent-close-regexp)
 
-  (setq proof-shell-init-cmd easycrypt-shell-init-cmd)
+  ;; (setq proof-shell-init-cmd easycrypt-shell-init-cmd)
 
   (easycrypt-init-syntax-table)
   ;; we can cope with nested comments
