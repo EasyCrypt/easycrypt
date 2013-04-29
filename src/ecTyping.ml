@@ -798,8 +798,8 @@ and transstruct (env : EcEnv.env) (x : symbol) (st : pstructure) =
       List.fold_left
         (fun (env, acc) item ->
           let newitems = transstruct1 env item in
-            (EcEnv.bindall (List.map tydecl1 newitems) env,
-             List.rev_append acc newitems))
+          let env = EcEnv.bindall (List.map tydecl1 newitems) env in
+            (env, List.rev_append acc newitems))
         (env, []) st.ps_body
   in
 

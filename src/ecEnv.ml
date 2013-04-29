@@ -603,50 +603,60 @@ module MC = struct
       { env with env_current = mc }
 
   (* ------------------------------------------------------------------ *)
-  let mc_of_module_r scope (me : module_expr) =
-    let rec mc_of_module_r (p1, args, p2) me =
-      let subp2 x =
-        let p = EcPath.pqoname p2 x in
-          (p, pcat p1 p)
-      in
-
-      let mc1_of_module (mc : mc) = function
-        | MI_Module subme ->
-            assert (subme.me_sig.mis_params = []);
-  
-            let (subp2, mep) = subp2 subme.me_name in
-            let submcs = mc_of_module_r (p1, args, Some subp2) subme in
-            let mc = _up_mc false mc mep in
-            let mc = _up_mod false mc subme.me_name (IPPath mep, subme) in
-              (mc, Some submcs)
-  
-        | MI_Variable v ->
-            let (_subp2, mep) = subp2 v.v_name in
-            let vty  =
-              { vb_type = v.v_type;
-                vb_kind = PVglob; }
-            in
-              (_up_var false mc v.v_name (IPPath mep, vty), None)
-  
-        | MI_Function f ->
-            let (_subp2, mep) = subp2 f.f_name in
-              (_up_fun false mc f.f_name (IPPath mep, f), None)
-      in
-
-      let (mc, submcs) =
-        List.map_fold mc1_of_module
-          (empty_mc
-             (if p2 = None then Some me.me_sig.mis_params else None))
-          me.me_comps
-      in
-        ((me.me_name, mc), List.prmap (fun x -> x) submcs)
+  let rec mc_of_module_r (p1, args, p2) me =
+    let subp2 x =
+      let p = EcPath.pqoname p2 x in
+        (p, pcat p1 p)
     in
-      mc_of_module_r
-        (EcPath.pqname scope me.me_name, me.me_sig.mis_params, None)
-        me
+
+    let mc1_of_module (mc : mc) = function
+      | MI_Module subme ->
+          assert (subme.me_sig.mis_params = []);
+
+          let (subp2, mep) = subp2 subme.me_name in
+          let submcs = mc_of_module_r (p1, args, Some subp2) subme in
+          let mc = _up_mc false mc mep in
+          let mc = _up_mod false mc subme.me_name (IPPath mep, subme) in
+            (mc, Some submcs)
+
+      | MI_Variable v ->
+          let (_subp2, mep) = subp2 v.v_name in
+          let vty  =
+            { vb_type = v.v_type;
+              vb_kind = PVglob; }
+          in
+            (_up_var false mc v.v_name (IPPath mep, vty), None)
+
+      | MI_Function f ->
+          let (_subp2, mep) = subp2 f.f_name in
+            (_up_fun false mc f.f_name (IPPath mep, f), None)
+    in
+
+    let (mc, submcs) =
+      List.map_fold mc1_of_module
+        (empty_mc
+           (if p2 = None then Some me.me_sig.mis_params else None))
+        me.me_comps
+    in
+      ((me.me_name, mc), List.prmap (fun x -> x) submcs)
 
   let mc_of_module (env : env) (me : module_expr) =
-    mc_of_module_r (root env) me
+    match env.env_scope.ec_scope with
+    | `Theory ->
+        let p1   = EcPath.pqname (root env) me.me_name
+        and args = me.me_sig.mis_params in
+          mc_of_module_r (p1, args, None) me
+
+    | `Module mpath -> begin
+       match mpath.EcPath.m_top with
+       | `Concrete (p1, p2) ->
+           let p2 = EcPath.pqoname p2 me.me_name in
+             mc_of_module_r (p1, mpath.EcPath.m_args, Some p2) me
+
+       | `Abstract _ -> assert false
+    end
+
+    | `Fun _ -> assert false
 
   (* ------------------------------------------------------------------ *)
   let rec mc_of_ctheory_r (scope : EcPath.path) (x, th) =
