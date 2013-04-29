@@ -57,6 +57,13 @@ let ibasename p =
   | IPIdent (m, None) -> EcIdent.name m
   | IPIdent (_, Some p) -> EcPath.basename p
 
+let itostring = function
+  | IPPath p -> EcPath.tostring p
+  | IPIdent (m, None) -> EcIdent.tostring m
+  | IPIdent (m, Some p) ->
+      Printf.sprintf "%s.%s"
+        (EcIdent.tostring m) (EcPath.tostring p)
+
 module IPathC = struct
   type t = ipath
 
@@ -134,14 +141,7 @@ module Dump = struct
              Mip.dump ~name:"Components"
                (fun k mc ->
                  Printf.sprintf "%s (%s)"
-                   (match k with
-                    | IPIdent (m, None) ->
-                        EcIdent.tostring m
-                    | IPIdent (m, Some p) ->
-                        Printf.sprintf "%s.%s"
-                          (EcIdent.tostring m) (EcPath.tostring p)
-                    | IPPath p ->
-                        EcPath.tostring p)
+                   (itostring k)
                    (match mc.mc_parameters with
                     | None   -> "none"
                     | Some p -> string_of_int (List.length p)))
@@ -239,6 +239,8 @@ module MC = struct
 
   (* ------------------------------------------------------------------ *)
   let _cutpath i p =
+    Printf.printf "CUT/%d: %s\n%!" i (EcPath.tostring p);
+
     let rec doit i p =
       match p.EcPath.p_node with
       | EcPath.Psymbol _ ->
@@ -252,11 +254,16 @@ module MC = struct
       end
     in
       match doit i p with
+      | (p, `Ct 0) -> (p, None)
       | (_, `Ct _) -> assert false
-      | (p, `Dn q) -> (p, q)
+      | (p, `Dn q) -> (p, Some q)
 
   (* ------------------------------------------------------------------ *)
   let _downpath_for_var _env p args =
+    List.iter
+      (fun arg -> Printf.printf "%b\n" (arg = None))
+      args;
+
     try
       let (l, a, r) = List.find_split (fun x -> x <> None) args in
         if not (List.for_all (fun x -> x = None) r) then
@@ -268,14 +275,18 @@ module MC = struct
 
         let ap =
           match p with
-          | IPPath p ->
+          | IPPath p -> begin
              (* p,q = frontier with the first module *)
-              let (p, q) = _cutpath i p in
-                EcPath.xpath
-                  (EcPath.mpath_crt
-                     p (List.map EcPath.mident n)
-                     (EcPath.prefix q))
-                  (EcPath.psymbol (EcPath.basename q))
+              let (p, q) = _cutpath (i+1) p in
+                match q with
+                | None -> assert false
+                | Some q ->
+                    EcPath.xpath
+                      (EcPath.mpath_crt
+                         p (List.map EcPath.mident n)
+                         (EcPath.prefix q))
+                      (EcPath.psymbol (EcPath.basename q))
+          end
 
           | IPIdent (m, x) -> begin
               if i <> 1 then assert false;
@@ -289,7 +300,7 @@ module MC = struct
               | _ -> assert false
           end
         in
-          ((List.length l, a), ap)
+          ((i+1, a), ap)
 
     with Not_found ->
       assert false
@@ -298,32 +309,33 @@ module MC = struct
 
   (* ------------------------------------------------------------------ *)
   let _downpath_for_mod _env p args =
-    try
-      let (l, a, r) = List.find_split (fun x -> x <> None) args in
-        if not (List.for_all (fun x -> x = None) r) then
-          assert false;
+    let (l, a, r) =
+      try
+        List.find_split (fun x -> x <> None) args
+      with Not_found ->
+        (args, Some [], [])
+    in
+      if not (List.for_all (fun x -> x = None) r) then
+        assert false;
 
-        let i = List.length l in        (* position of args in path *)
-        let a = oget a in               (* arguments of top enclosing module *)
-        let n = List.map fst a in       (* argument names *)
+      let i = List.length l in        (* position of args in path *)
+      let a = oget a in               (* arguments of top enclosing module *)
+      let n = List.map fst a in       (* argument names *)
 
-        let ap =
-          match p with
-          | IPPath p ->
-             (* p,q = frontier with the first module *)
-              let (p, q) = _cutpath i p in
-                EcPath.mpath_crt p (List.map EcPath.mident n) (Some q)
+      let ap =
+        match p with
+        | IPPath p ->
+           (* p,q = frontier with the first module *)
+            let (p, q) = _cutpath (i+1) p in
+              EcPath.mpath_crt p (List.map EcPath.mident n) q
 
-          | IPIdent (m, None) ->
-              if i <> 1 then assert false;
-              EcPath.mpath_abs m (List.map EcPath.mident n)
+        | IPIdent (m, None) ->
+            if i <> 1 then assert false;
+            EcPath.mpath_abs m (List.map EcPath.mident n)
 
-          | _ -> assert false
-        in
-          ((List.length l, a), ap)
-
-    with Not_found ->
-      assert false
+        | _ -> assert false
+      in
+        ((List.length l, a), ap)
 
   (* ------------------------------------------------------------------ *)
   let _downpath_for_th _env p args =
@@ -340,12 +352,15 @@ module MC = struct
   let _downpath_for_axiom    = _downpath_for_th
 
   (* ------------------------------------------------------------------ *)
-  let rec _params_of_path p env =
-    match EcPath.prefix p with
-    | None   -> []
-    | Some p ->
-        let mc = oget (Mip.find_opt (IPPath p) env.env_comps) in
-          mc.mc_parameters :: (_params_of_path p env)
+  let _params_of_path p env =
+    let rec _params_of_path acc p =
+      match EcPath.prefix p with
+      | None   -> acc
+      | Some p ->
+          let mc = oget (Mip.find_opt (IPPath p) env.env_comps) in
+            _params_of_path (mc.mc_parameters :: acc) p
+    in
+      _params_of_path [] p
 
   (* ------------------------------------------------------------------ *)
   let _params_of_ipath p env =
@@ -550,6 +565,52 @@ module MC = struct
       { env with env_current = mc }
 
   (* ------------------------------------------------------------------ *)
+  let mc_of_module_r scope (me : module_expr) =
+    let rec mc_of_module_r (p1, args, p2) me =
+      let subp2 x =
+        let p = EcPath.pqoname p2 x in
+          (p, pcat p1 p)
+      in
+
+      let mc1_of_module (mc : mc) = function
+        | MI_Module subme ->
+            assert (subme.me_sig.mis_params = []);
+  
+            let (subp2, mep) = subp2 subme.me_name in
+            let submcs = mc_of_module_r (p1, args, Some subp2) subme in
+            let mc = _up_mc false mc mep in
+            let mc = _up_mod false mc subme.me_name (IPPath mep, subme) in
+              (mc, Some submcs)
+  
+        | MI_Variable v ->
+            let (_subp2, mep) = subp2 v.v_name in
+            let vty  =
+              { vb_type = v.v_type;
+                vb_kind = PVglob; }
+            in
+              (_up_var false mc v.v_name (IPPath mep, vty), None)
+  
+        | MI_Function f ->
+            let (_subp2, mep) = subp2 f.f_name in
+              (_up_fun false mc f.f_name (IPPath mep, f), None)
+      in
+
+      let (mc, submcs) =
+        List.map_fold mc1_of_module
+          (empty_mc
+             (if p2 = None then Some me.me_sig.mis_params else None))
+          me.me_comps
+      in
+        ((me.me_name, mc), List.prmap (fun x -> x) submcs)
+    in
+      mc_of_module_r
+        (EcPath.pqname scope me.me_name, me.me_sig.mis_params, None)
+        me
+
+  let mc_of_module (env : env) (me : module_expr) =
+    mc_of_module_r env.env_scope me
+
+  (* ------------------------------------------------------------------ *)
   let rec mc_of_ctheory_r (scope : EcPath.path) (x, th) =
     let subscope = EcPath.pqname scope x in
     let expath = fun x -> EcPath.pqname subscope x in
@@ -625,6 +686,23 @@ module MC = struct
     in
       env
 
+  and bind_mod x mod_ env =
+    let (_, mc), submcs = mc_of_module env mod_ in
+    let env = bind _up_mod x mod_ env in
+    let env = bind_mc x mc env in
+    let env =
+      bind_submcs env
+        (EcPath.pqname env.env_scope x)
+        submcs
+    in
+      env
+
+  and bind_fun x vb env =
+    bind _up_fun x vb env
+
+  and bind_var x vb env =
+    bind _up_var x vb env
+
   and bind_axiom x ax env =
     bind _up_axiom x ax env
 
@@ -636,15 +714,6 @@ module MC = struct
 
   and bind_tydecl x tyd env =
     bind _up_tydecl x tyd env
-
-  and bind_mod x mod_ env =
-    bind _up_mod x mod_ env
-
-  and bind_fun x vb env =
-    bind _up_fun x vb env
-
-  and bind_var x vb env =
-    bind _up_var x vb env
 end
 
 (* -------------------------------------------------------------------- *)
@@ -858,6 +927,8 @@ module Fun = struct
     MC.by_path (fun mc -> mc.mc_functions) p env
 
   let by_xpath (p : EcPath.xpath) (env : env) =
+    Printf.printf "Fun.by_xpath: %s\n%!" (EcPath.x_tostring p);
+
     match ipath_of_xpath p with
     | None -> lookup_error (`XPath p)
 
@@ -866,6 +937,7 @@ module Fun = struct
         | None -> lookup_error (`XPath p)
         | Some (params, o) ->
            let ((spi, params), _op) = MC._downpath_for_fun env ip params in
+             Printf.printf "Fun.by_xpath: %d %d\n%!" i spi;
              if i <> spi || List.length args <> List.length params then
                assert false;
              let s =

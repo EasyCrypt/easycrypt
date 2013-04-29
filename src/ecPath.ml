@@ -222,22 +222,29 @@ let xqname x s = xpath x.x_top (pqname x.x_sub s)
   
 
 (* -------------------------------------------------------------------- *)
-  
-let rec m_tostring(m : mpath) = 
+let rec m_tostring (m : mpath) = 
   let top, sub = 
     match m.m_top with
-    | `Abstract id -> EcIdent.name id, ""
-    | `Concrete (p,sub) ->
-      tostring p, 
-      ofold sub (fun p _ ->
-        Format.sprintf ".%s" (tostring p)) "" in
+    | `Abstract id -> (EcIdent.name id, "")
+
+    | `Concrete (p, sub) ->
+      let strsub = 
+        ofold sub (fun p _ ->
+          Format.sprintf ".%s" (tostring p)) ""
+      in
+        (tostring p, strsub)
+  in
+
   let args = 
     let a = m.m_args in
-    if   a = [] then ""
-    else
-      let args = List.map m_tostring a in
-      Printf.sprintf "(%s)" (String.concat ", " args) in
-  Printf.sprintf "%s%s%s" top args sub
+
+      match a with
+      | [] -> ""
+      | _  -> 
+        let stra = List.map m_tostring a in
+          Printf.sprintf "(%s)" (String.concat ", " stra)
+  in
+    Printf.sprintf "%s%s%s" top args sub
 
 let x_tostring x = 
   Printf.sprintf "%s.%s" 
