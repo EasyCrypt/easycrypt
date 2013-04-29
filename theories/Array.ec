@@ -9,6 +9,7 @@
  * operators.
  *)
 
+require import Logic.
 require import Int.
 require Fun. (* For reasoning about higher-order operators *)
 
