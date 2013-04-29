@@ -1086,7 +1086,7 @@ module Mod = struct
       env bindings
 
   let enter name params env =
-    let env = enter name env in
+    let env = enter ~params name env in
       bind_locals params env
 end
 
