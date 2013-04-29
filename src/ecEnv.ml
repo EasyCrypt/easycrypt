@@ -253,8 +253,6 @@ module MC = struct
 
   (* ------------------------------------------------------------------ *)
   let _cutpath i p =
-    Printf.printf "CUT/%d: %s\n%!" i (EcPath.tostring p);
-
     let rec doit i p =
       match p.EcPath.p_node with
       | EcPath.Psymbol _ ->
@@ -274,10 +272,6 @@ module MC = struct
 
   (* ------------------------------------------------------------------ *)
   let _downpath_for_var (local : bool) _env p args =
-    List.iter
-      (fun arg -> Printf.printf "%b\n" (arg = None))
-      args;
-
     try
       let (l, a, r) = List.find_split (fun x -> x <> None) args in
         if not (List.for_all (fun x -> x = None) r) then
@@ -461,8 +455,6 @@ module MC = struct
   (* ------------------------------------------------------------------ *)
   let bind up x obj env =
     let obj = (IPPath (EcPath.pqname (root env) x), obj) in
-
-    Printf.printf "BIND: %s\n%!" (EcPath.tostring (root env));
 
     let env =
       { env with env_current =
@@ -878,8 +870,6 @@ let ipath_of_mpath (p : mpath) =
 
   | `Concrete (p1, p2) ->
       let pr = odfl p1 (omap p2 (MC.pcat p1)) in
-        Printf.printf "IM: %s %s\n%!" (EcPath.tostring p1)
-          (odfl "<none>" (omap p2 EcPath.tostring));
         (IPPath pr, ((EcPath.p_size p1)-1, p.EcPath.m_args))
 
 let ipath_of_xpath (p : xpath) =
@@ -957,8 +947,7 @@ module Var = struct
                   { pv_name = EcPath.xqname mp (snd qname);
                     pv_kind = PVloc; }
                 in
-                  Printf.printf "XP1: %s\n%!" (EcPath.x_tostring pv.pv_name);
-                Some (pv, ty)
+                  Some (pv, ty)
             end
 
       | _ -> None
@@ -969,7 +958,6 @@ module Var = struct
           let (((_, a), p), x) = MC.lookup_var qname env in
             if a <> [] then
               raise (LookupFailure (`QSymbol qname));
-            Printf.printf "XP2: %s\n%!" (EcPath.x_tostring p);
             ({ pv_name = p; pv_kind = x.vb_kind }, x.vb_type)
         end
 
@@ -1009,8 +997,6 @@ module Fun = struct
     MC.by_path (fun mc -> mc.mc_functions) p env
 
   let by_xpath (p : EcPath.xpath) (env : env) =
-    Printf.printf "Fun.by_xpath: %s\n%!" (EcPath.x_tostring p);
-
     match ipath_of_xpath p with
     | None -> lookup_error (`XPath p)
 
@@ -1019,7 +1005,6 @@ module Fun = struct
         | None -> lookup_error (`XPath p)
         | Some (params, o) ->
            let ((spi, params), _op) = MC._downpath_for_fun env ip params in
-             Printf.printf "Fun.by_xpath: %d %d\n%!" i spi;
              if i <> spi || List.length args <> List.length params then
                assert false;
              let s =
@@ -1191,7 +1176,6 @@ module Mod = struct
           let ((spi, params), _op) =
             MC._downpath_for_mod env ip params
           in
-            Printf.printf "Mod.by_mpath: %d %d\n%!" i spi;
             unsuspend (i, args) (spi, params) o
 
   let by_mpath_opt (p : EcPath.mpath) (env : env) =
@@ -1347,7 +1331,6 @@ module NormMp = struct
       | Some ((spi, params), ({ me_body = ME_Alias alias } as m)) ->
           assert (m.me_sig.mis_params = []);
           let p =
-            Printf.printf "UNSUSPEND: %d %d\n%!" i spi;
             Mod.unsuspend_r EcSubst.subst_mpath
               (i, args) (spi, params) alias
           in

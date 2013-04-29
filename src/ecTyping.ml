@@ -976,7 +976,6 @@ and transbody ue symbols (env : EcEnv.env) retty pbody =
             (fun x xty ->
                let x = unloc x in
                let p = EcPath.xqname mpath x in
-                 Printf.printf "PRELUDE: %s\n%!" (EcPath.x_tostring p);
                  ({ v_name  = x; v_type  = xty   },
                   { pv_name = p; pv_kind = PVloc },
                   xty, pty.pl_loc))
@@ -1206,10 +1205,6 @@ let rec trans_msymbol (env : EcEnv.env) (msymb : pmsymbol located) =
 
   begin match top_path with
   | `Concrete (_, Some sub) ->
-      Printf.printf "MSYM: %s\n%!" (EcPath.tostring sub);
-      Printf.printf "MSYM: %s\n%!" (String.concat ", " (List.map unloc sm));
-      Printf.printf "MSYM: %d %d\n%!"
-        (EcPath.p_size sub) (List.length sm);
       if args <> None then
         if not (EcPath.p_size sub = List.length sm) then
           tyerror loc env (InvalidModAppl MAE_WrongArgPosition);
