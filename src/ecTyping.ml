@@ -1160,23 +1160,32 @@ and translvalue ue (env : EcEnv.env) lvalue =
             tyerror x.pl_loc env (UnknownVarOrOp (name, esig))
 
 (* -------------------------------------------------------------------- *)
-let process_msymb (msymb : pmsymbol located) =
-  let top,args,sm = 
+let process_msymb (env : EcEnv.env) (msymb : pmsymbol located) =
+  let (top, args, sm) = 
     try
-      let r,(x,args), sm = 
-        List.find_split (fun (_,args) -> args <> None) msymb.pl_desc in
-      List.rev_append r [x,None], args, sm 
+      let (r, (x, args), sm) =
+        List.find_split (fun (_,args) -> args <> None) msymb.pl_desc
+      in
+        List.rev_append r [x,None], args, sm 
     with Not_found ->
-      msymb.pl_desc, None, [] in
+      msymb.pl_desc, None, []
+  in
+
   (* This is a typing error, not an assertion failure! *)
-  let top = List.map (fun (x, args) -> assert (args = None); x) top in
-  let sm  = List.map (fun (x, args) -> assert (args = None); x) sm in
-  top, args, sm
+  let (top, sm) =
+    let ca (x, args) =
+      if args <> None then
+        tyerror msymb.pl_loc env (InvalidModAppl MAE_WrongArgPosition);
+      x
+    in
+      (List.map ca top, List.map ca sm)
+  in
+    (top, args, sm)
   
 (* -------------------------------------------------------------------- *)
 let rec trans_msymbol (env : EcEnv.env) (msymb : pmsymbol located) =
   let loc = msymb.pl_loc in
-  let (top, args, sm) = process_msymb msymb in
+  let (top, args, sm) = process_msymb env msymb in
 
   let to_qsymbol l = 
     match List.rev l with
@@ -1196,12 +1205,14 @@ let rec trans_msymbol (env : EcEnv.env) (msymb : pmsymbol located) =
   in
 
   begin match top_path with
-  | `Concrete (_, Some sub) ->          (* FIXME: dead wrong *)
+  | `Concrete (_, Some sub) ->
       Printf.printf "MSYM: %s\n%!" (EcPath.tostring sub);
-      Printf.printf "MSYM: %d %d\n"
+      Printf.printf "MSYM: %s\n%!" (String.concat ", " (List.map unloc sm));
+      Printf.printf "MSYM: %d %d\n%!"
         (EcPath.p_size sub) (List.length sm);
-      if not (EcPath.p_size sub = List.length sm) then
-        tyerror loc env (InvalidModAppl MAE_WrongArgPosition);
+      if args <> None then
+        if not (EcPath.p_size sub = List.length sm) then
+          tyerror loc env (InvalidModAppl MAE_WrongArgPosition);
   | _ -> ()
   end;
 

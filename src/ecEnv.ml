@@ -471,7 +471,9 @@ module MC = struct
       let local = (obj.vb_kind = EcTypes.PVloc) in
         (_downpath_for_var local env p args, obj)
 
-  let _up_var _ mc x obj =
+  let _up_var candup mc x obj =
+    if not candup && MMsym.last x mc.mc_variables <> None then
+      raise (DuplicatedBinding x);
     { mc with mc_variables = MMsym.add x obj mc.mc_variables }
 
   let import_var p var env =
@@ -483,7 +485,9 @@ module MC = struct
     | None -> lookup_error (`QSymbol qnx)
     | Some (p, (args, obj)) -> (_downpath_for_fun env p args, obj)
 
-  let _up_fun _ mc x obj =
+  let _up_fun candup mc x obj =
+    if not candup && MMsym.last x mc.mc_functions <> None then
+      raise (DuplicatedBinding x);
     { mc with mc_functions = MMsym.add x obj mc.mc_functions }
 
   let import_fun p fun_ env =
@@ -495,7 +499,9 @@ module MC = struct
     | None -> lookup_error (`QSymbol qnx)
     | Some (p, (args, obj)) -> (_downpath_for_mod env p args, obj)
 
-  let _up_mod _ mc x obj =
+  let _up_mod candup mc x obj =
+    if not candup && MMsym.last x mc.mc_modules <> None then
+      raise (DuplicatedBinding x);
     { mc with mc_modules = MMsym.add x obj mc.mc_modules }
 
   let import_mod p mod_ env =
@@ -507,7 +513,9 @@ module MC = struct
     | None -> lookup_error (`QSymbol qnx)
     | Some (p, (args, obj)) -> (_downpath_for_tydecl env p args, obj)
 
-  let _up_tydecl _ mc x obj =
+  let _up_tydecl candup mc x obj =
+    if not candup && MMsym.last x mc.mc_tydecls <> None then
+      raise (DuplicatedBinding x);
     { mc with mc_tydecls = MMsym.add x obj mc.mc_tydecls }
 
   let import_tydecl p tyd env =
@@ -519,7 +527,9 @@ module MC = struct
     | None -> lookup_error (`QSymbol qnx)
     | Some (p, (args, obj)) -> (_downpath_for_modsig env p args, obj)
 
-  let _up_modty _ mc x obj =
+  let _up_modty candup mc x obj =
+    if not candup && MMsym.last x mc.mc_modsigs <> None then
+      raise (DuplicatedBinding x);
     { mc with mc_modsigs = MMsym.add x obj mc.mc_modsigs }
 
   let import_modty p msig env =
@@ -536,8 +546,10 @@ module MC = struct
       (fun (p, (args, obj)) -> (_downpath_for_operator env p args, obj))
       (lookup_all (fun mc -> mc.mc_operators) qnx env)
 
-  let _up_operator _ mc x obj =
-      { mc with mc_operators = MMsym.add x obj mc.mc_operators }
+  let _up_operator candup mc x obj =
+    if not candup && MMsym.last x mc.mc_operators <> None then
+      raise (DuplicatedBinding x);
+    { mc with mc_operators = MMsym.add x obj mc.mc_operators }
 
   let import_operator p op env =
     import (_up_operator true) (IPPath p) op env
@@ -548,14 +560,18 @@ module MC = struct
     | None -> lookup_error (`QSymbol qnx)
     | Some (p, (args, obj)) -> (_downpath_for_axiom env p args, obj)
 
-  let _up_axiom _ mc x obj =
+  let _up_axiom candup mc x obj =
+    if not candup && MMsym.last x mc.mc_axioms <> None then
+      raise (DuplicatedBinding x);
     { mc with mc_axioms = MMsym.add x obj mc.mc_axioms }
 
   let import_axiom p ax env =
     import (_up_axiom true) (IPPath p) ax env
 
   (* -------------------------------------------------------------------- *)
-  let _up_theory _ mc x obj =
+  let _up_theory candup mc x obj =
+    if not candup && MMsym.last x mc.mc_theories <> None then
+      raise (DuplicatedBinding x);
     { mc with mc_theories = MMsym.add x obj mc.mc_theories }
 
   let lookup_theory qnx env =
@@ -567,9 +583,10 @@ module MC = struct
     import (_up_theory true) (IPPath p) th env
 
   (* -------------------------------------------------------------------- *)
-  let _up_mc _ mc p =
+  let _up_mc candup mc p =
     let name = EcPath.basename p in
-
+    if not candup && MMsym.last name mc.mc_components <> None then
+      raise (DuplicatedBinding name);
     { mc with mc_components =
         MMsym.add name (IPPath p) mc.mc_components }
 
@@ -814,7 +831,9 @@ let ipath_of_mpath (p : mpath) =
 
   | `Concrete (p1, p2) ->
       let pr = odfl p1 (omap p2 (MC.pcat p1)) in
-        (IPPath pr, (EcPath.p_size p1, p.EcPath.m_args))
+        Printf.printf "IM: %s %s\n%!" (EcPath.tostring p1)
+          (odfl "<none>" (omap p2 EcPath.tostring));
+        (IPPath pr, ((EcPath.p_size p1)-1, p.EcPath.m_args))
 
 let ipath_of_xpath (p : xpath) =
   match p.EcPath.x_sub.EcPath.p_node with
@@ -826,8 +845,8 @@ let ipath_of_xpath (p : xpath) =
         | _ -> None
       in
 
-      let (p, a) = ipath_of_mpath p.EcPath.x_top in
-        omap (xt p) (fun p -> (p, a))
+      let (p, (i, a)) = ipath_of_mpath p.EcPath.x_top in
+        omap (xt p) (fun p -> (p, (i+1, a)))
 
   | _ -> None
 
@@ -1125,6 +1144,7 @@ module Mod = struct
           let ((spi, params), _op) =
             MC._downpath_for_mod env ip params
           in
+            Printf.printf "Mod.by_mpath: %d %d\n%!" i spi;
             unsuspend (i, args) (spi, params) o
 
   let by_mpath_opt (p : EcPath.mpath) (env : env) =
@@ -1280,7 +1300,9 @@ module NormMp = struct
       | Some ((spi, params), ({ me_body = ME_Alias alias } as m)) ->
           assert (m.me_sig.mis_params = []);
           let p =
-            Mod.unsuspend_r EcSubst.subst_mpath (i, args) (spi, params) alias
+            Printf.printf "UNSUSPEND: %d %d\n%!" i spi;
+            Mod.unsuspend_r EcSubst.subst_mpath
+              (i, args) (spi, params) alias
           in
             norm_mpath env p
 
