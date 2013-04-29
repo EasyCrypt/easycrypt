@@ -163,7 +163,7 @@ let ty_subst_id =
     ts_v  = Mid.empty }
 
 let ty_subst s =
-  if s.ts_p == identity && s.ts_mp = identity &&
+  if s.ts_p == identity && s.ts_mp == identity &&
      Muid.is_empty s.ts_u && Mid.is_empty s.ts_v then 
     identity
   else
