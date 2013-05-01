@@ -10,7 +10,7 @@ require import Cyclic_group_prime.
 require import Set.
 require        RandOrcl.
 
-cnst gDistr: group distr.
+op gDistr: group distr.
 
 (* I think this type is the one that gets instantiated in the main experiment *)
 type t.
@@ -19,7 +19,7 @@ type t.
 clone RandOrcl as RO with
   type from = t,
   type to = group,
-  cnst default = g.
+  op default = g.
 import RO. (* Maybe we should let users "clone import X as Y"? *)
 
 (* An adversary with a function using two oracles *)
@@ -72,7 +72,7 @@ module F = {
 (* The claims *)
 require import Real.
 
-cnst epsilon: real.
+op epsilon: real.
 
 axiom Adv_def: forall &m (A <: Adversary),
   `| Pr[ Experiment(H,F,A).main() @ &m: res ] -

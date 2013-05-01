@@ -493,29 +493,28 @@ module Theory = struct
         | CTh_operator (x, ({ op_kind = OB_oper None } as oopd)) -> begin
             match Msym.find_opt x ovrds.evc_ops with
             | None -> EcEnv.Op.bind x (EcSubst.subst_op subst oopd) scenv
-            | Some (_locals, _opbody) ->
-              assert false (* FIXME *)
+            | Some (locals, opbody) ->
+                assert (locals = []);
+  
+                let refop = EcEnv.Op.by_path (EcPath.pqname opath x) scenv in
+                let newop = EcSubst.subst_op subst refop in
+  
 (*
-              let refop = EcEnv.Op.by_path (EcPath.pqname opath x) scenv in
-              let newop = EcSubst.subst_op subst refop in
-
-                if List.length newop.op_dom <> List.length locals then
-                  failwith "invalid-number-of-parameters";
-
-              let locals = List.map (EcIdent.create -| unloc) locals in
-              let benv   = EcEnv.Var.bind_locals (List.combine locals newop.op_dom) scenv in
-              let ue     = EcUnify.UniEnv.create (Some newop.op_tparams) in
-
-              let opbody = EcTyping.transexpcast benv ue newop.op_codom opbody in
-
-                if List.length (EcUnify.UniEnv.tparams ue) <> List.length newop.op_tparams then
-                  failwith "body-less-generic";
-
-              let newop =
-                { newop with op_kind = OB_oper (Some (locals, opbody)) }
-              in
-                EcEnv.Op.bind x newop scenv
+                let locals = List.map (EcIdent.create -| unloc) locals in
+                let benv   = EcEnv.Var.bind_locals (List.combine locals newop.op_dom) scenv in
 *)
+                let benv = scenv in
+                let ue   = EcUnify.UniEnv.create (Some newop.op_tparams) in
+  
+                let opbody = EcTyping.transexpcast benv ue newop.op_ty opbody in
+  
+                  if List.length (EcUnify.UniEnv.tparams ue) <> List.length newop.op_tparams then
+                    failwith "body-less-generic";
+  
+                let newop =
+                  { newop with op_kind = OB_oper (Some opbody) }
+                in
+                  EcEnv.Op.bind x newop scenv
           end
 
         | CTh_operator (x, oopd) ->

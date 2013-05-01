@@ -1305,8 +1305,8 @@ module Mod = struct
       { env with
           env_current = (
             let current = env.env_current in
-            let current = MC._up_mc  false current path in
-            let current = MC._up_mod false current me.me_name (path, me) in
+            let current = MC._up_mc  true current path in
+            let current = MC._up_mod true current me.me_name (path, me) in
               current);
           env_comps = Mip.add path comps env.env_comps; }
     in
