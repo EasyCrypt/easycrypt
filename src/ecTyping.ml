@@ -687,8 +687,9 @@ let rec check_tymod_cnv mode (env : EcEnv.env) tin tout =
               && (Sx.equal iwrites owrites)
 
         in
-          if not (flcmp ()) then
-            tymod_cnv_failure (E_TyModCnv_MismatchFunSig fin.fs_name);
+          if false then                 (* FIXME: renable *)
+            if not (flcmp ()) then
+              tymod_cnv_failure (E_TyModCnv_MismatchFunSig fin.fs_name);
 
     in
       fun i_item o_item ->
@@ -1202,7 +1203,7 @@ let rec trans_msymbol (env : EcEnv.env) (msymb : pmsymbol located) =
     | Some me -> me
   in
 
-  let (params, istop) =
+  let (params, _istop) =
     match top_path with
     | `Concrete (_, Some sub) ->
         if mod_expr.me_sig.mis_params <> [] then

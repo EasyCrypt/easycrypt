@@ -1,13 +1,15 @@
-module type J = {
-(*  var b:bool *)
-}.
+(* FIXME: disabled - this test is a non-sense
 
-module type I(X:J) = {
+module type I = {
   fun init(b:bool): unit
   fun get(): bool
 }.
 
-module G(X:I) = {
+module type J = {
+  fun f() : bool
+}.
+
+module G(X:I) : J = {
   fun f(): bool = {
     var b:bool;
     X.init(true);
@@ -16,9 +18,7 @@ module G(X:I) = {
   }
 }.
 
-module M: J = {
-(*  var b:bool *)
-}.
+op c:real.
 
-cnst c:real.
-axiom A: forall &m (M' <: I(M)), Pr[ G(M').f() @ &m : res ] = c.
+axiom A: forall &m (M' <: I(M)), Pr[G(M').f() @ &m : res] = c.
+*)

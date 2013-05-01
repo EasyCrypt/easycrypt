@@ -1,8 +1,4 @@
-module type J = {
- (* var b:bool *)
-}.
-
-module type I(X:J) = {
+module type I = {
   fun init(b:bool): unit
   fun get(): bool
 }.

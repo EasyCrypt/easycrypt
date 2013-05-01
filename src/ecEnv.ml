@@ -366,7 +366,7 @@ module MC = struct
               EcPath.mpath_crt p (List.map EcPath.mident n) q
 
         | IPIdent (m, None) ->
-            if i <> 1 then assert false;
+            if i <> 0 then assert false;
             EcPath.mpath_abs m (List.map EcPath.mident n)
 
         | _ -> assert false
@@ -1189,11 +1189,6 @@ module Fun = struct
     let mem1 = actmem_body_anonym EcFol.mleft path1 locals1 in
     let mem2 = actmem_body_anonym EcFol.mright path2 locals2 in
     mem1, mem2, Memory.push_all [mem1; mem2] env
-*)
-
-(*
-  let enter name env =
-    enter name EcPath.PKother [] env
 *)
 end
 
