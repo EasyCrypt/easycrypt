@@ -1,9 +1,11 @@
-/_build
+_build
 /_tags
 /myocamlbuild.ml
-ec.native
-ec.byte
+*.native
+*.byte
 /local
 /why3
 /_tools
 /proofgeneral/_local
+setup.data
+setup.log
