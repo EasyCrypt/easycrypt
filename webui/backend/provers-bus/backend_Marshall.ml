@@ -68,7 +68,7 @@ open Printf
 (* hello_hooks:
 
    Define the processor hooks so that a message is logged
-   for each. Normally,� one inherits from
+   for each. Normally, one inherits from
    Netplex_kit.empty_processor_hooks and defines only the
    hooks that are needed.
  *)

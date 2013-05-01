@@ -41,7 +41,7 @@ let client_fun ic oc =
        output_string oc lineM ;
        flush oc ;
        (* Receive*)
-       let r = Marshal.from_channel ic
+       let r = (Marshal.from_channel ic : string)
        in Printf.printf "Response : %s\n\n" r;
           if r = "END" then ( shutdown_connection ic ; raise Exit) ;
      done
