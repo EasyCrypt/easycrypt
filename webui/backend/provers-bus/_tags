@@ -1,0 +1,24 @@
+# OASIS_START
+# DO NOT EDIT (digest: e083195f7300b31a4bbf1f8bbe024d07)
+# Ignore VCS directories, you can use the same kind of rule outside 
+# OASIS_START/STOP if you want to exclude directories that contains 
+# useless stuff for the build process
+<**/.svn>: -traverse
+<**/.svn>: not_hygienic
+".bzr": -traverse
+".bzr": not_hygienic
+".hg": -traverse
+".hg": not_hygienic
+".git": -traverse
+".git": not_hygienic
+"_darcs": -traverse
+"_darcs": not_hygienic
+# Executable client
+<client_Marshal.{native,byte}>: pkg_unix
+<*.ml{,i}>: pkg_unix
+# Executable server
+<backend_Marshall.{native,byte}>: pkg_netplex
+<backend_Marshall.{native,byte}>: pkg_nethttpd
+<*.ml{,i}>: pkg_netplex
+<*.ml{,i}>: pkg_nethttpd
+# OASIS_STOP
