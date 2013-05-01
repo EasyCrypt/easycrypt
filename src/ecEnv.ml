@@ -726,7 +726,9 @@ module MC = struct
           (add2mc _up_modty xmodty modty mc, None)
 
       | CTh_module subme ->
-          (add2mc _up_mod subme.me_name subme mc, None) (* FIXME *)
+          let args = subme.me_sig.mis_params in
+          let submcs = mc_of_module_r (expath subme.me_name, args, None) subme in
+            (add2mc _up_mod subme.me_name subme mc, Some submcs)
 
       | CTh_theory (xsubth, subth) ->
           let submcs = mc_of_ctheory_r subscope (xsubth, subth) in
