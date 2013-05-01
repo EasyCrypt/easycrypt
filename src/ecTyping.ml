@@ -1170,7 +1170,6 @@ let process_msymb (env : EcEnv.env) (msymb : pmsymbol located) =
       msymb.pl_desc, None, []
   in
 
-  (* This is a typing error, not an assertion failure! *)
   let (top, sm) =
     let ca (x, args) =
       if args <> None then
@@ -1203,13 +1202,26 @@ let rec trans_msymbol (env : EcEnv.env) (msymb : pmsymbol located) =
     | Some me -> me
   in
 
-  begin match top_path with
-  | `Concrete (_, Some sub) ->
-      if args <> None then
-        if not (EcPath.p_size sub = List.length sm) then
-          tyerror loc env (InvalidModAppl MAE_WrongArgPosition);
-  | _ -> ()
-  end;
+  let (params, istop) =
+    match top_path with
+    | `Concrete (_, Some sub) ->
+        if mod_expr.me_sig.mis_params <> [] then
+          assert false;
+        if args <> None then
+          if not (EcPath.p_size sub = List.length sm) then
+            tyerror loc env (InvalidModAppl MAE_WrongArgPosition);
+        (params, false)
+
+    | `Concrete (p, None) ->
+        if (params <> []) || ((spi+1) <> EcPath.p_size p) then
+          assert false;
+        (mod_expr.me_sig.mis_params, true)
+
+    | `Abstract _ ->
+        if (params <> []) || spi <> 0 then
+          assert false;
+        (mod_expr.me_sig.mis_params, true)
+  in
 
   let args = omap args (List.map (trans_msymbol env)) in
 

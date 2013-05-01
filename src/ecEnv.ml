@@ -1011,7 +1011,6 @@ module Var = struct
 
       match obind side inmem with
       | None -> begin
-          (dump EcDebug.initial env);
           let (((_, a), p), x) = MC.lookup_var qname env in
             if a <> [] then
               raise (LookupFailure (`QSymbol qname));
