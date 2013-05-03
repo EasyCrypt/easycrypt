@@ -481,13 +481,13 @@ let transexp (env : EcEnv.env) (ue : EcUnify.unienv) e =
           (e_app e (List.map fst es) codom, codom)
 
     | PElet (p, pe1, pe2) ->
-      let (penv, pt, pty) = transpattern env ue p in
-
-      let e1, ty1 = transexp  env pe1 in
-      unify_or_fail env ue p.pl_loc pty ty1;
-
-      let e2, ty2 = transexp penv pe2 in
-      (e_let pt e1 e2, ty2)
+        let (penv, pt, pty) = transpattern env ue p in
+  
+        let e1, ty1 = transexp  env pe1 in
+        unify_or_fail env ue p.pl_loc pty ty1;
+  
+        let e2, ty2 = transexp penv pe2 in
+        (e_let pt e1 e2, ty2)
 
     | PEtuple es ->
         let tes = List.map (transexp env) es in
@@ -503,9 +503,14 @@ let transexp (env : EcEnv.env) (ue : EcUnify.unienv) e =
         (e_if c e1 e2, ty1)
 
     | PElambda(bd, pe) ->
-      let env, xs = transbinding env ue bd in
-      let e,ty = transexp env pe in
-      (e_lam xs e, ty)
+        let env, xs = transbinding env ue bd in
+        let e, ty = transexp env pe in
+        let ty =
+          List.fold_right
+            (fun (_, xty) ty -> EcTypes.tfun xty ty)
+            xs ty
+        in
+          (e_lam xs e, ty)
 
   in
     transexp env e
