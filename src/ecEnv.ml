@@ -1588,7 +1588,7 @@ module Op = struct
       | OB_pred(Some idsf) -> idsf
       | _ -> raise NotReducible
     in
-      EcFol.f_subst s f
+      EcFol.f_subst { s with EcFol.fs_freshen = true } f
 end
 
 (* -------------------------------------------------------------------- *)
