@@ -15,7 +15,7 @@ type notifier = string -> unit
 
 val set_notifier : notifier -> unit
 val get_notifier : unit -> notifier
-val notify : ('a, unit, string, unit) format4 -> 'a
+val notify : EcScope.scope -> ('a, unit, string, unit) format4 -> 'a
 
 (* -------------------------------------------------------------------- *)
 val current : unit -> EcScope.scope

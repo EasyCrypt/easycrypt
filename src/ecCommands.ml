@@ -84,8 +84,11 @@ let _notifier = ref (default_notifier : notifier)
 let set_notifier (n : notifier) = _notifier := n
 let get_notifier () = !_notifier
 
-let notify msg =
-  Format.ksprintf (fun msg -> !_notifier msg) msg
+let notify scope msg =
+  Format.ksprintf
+    (fun msg ->
+      if EcScope.verbose scope then !_notifier msg)
+    msg
 
 (* -------------------------------------------------------------------- *)
 let rec process_type (scope : EcScope.scope) (tyd : ptydecl located) =
@@ -95,7 +98,7 @@ let rec process_type (scope : EcScope.scope) (tyd : ptydecl located) =
     | None    -> EcScope.Ty.add    scope (mk_loc tyd.pl_loc tyname)
     | Some bd -> EcScope.Ty.define scope (mk_loc tyd.pl_loc tyname) bd
   in
-    notify "added type: `%s'" (unloc tyd.pl_desc.pty_name);
+    notify scope "added type: `%s'" (unloc tyd.pl_desc.pty_name);
     scope
   
 (* -------------------------------------------------------------------- *)
@@ -113,20 +116,20 @@ and process_interface (scope : EcScope.scope) (x, i) =
 (* -------------------------------------------------------------------- *)
 and process_operator (scope : EcScope.scope) (op : poperator located) =
   let scope = EcScope.Op.add scope op in
-    notify "added operator: `%s'" (unloc op.pl_desc.po_name);
+    notify scope "added operator: `%s'" (unloc op.pl_desc.po_name);
     scope
 
 (* -------------------------------------------------------------------- *)
 and process_predicate (scope : EcScope.scope) (p : ppredicate located) =
   let scope = EcScope.Pred.add scope p in
-    notify "added predicate: `%s'" (unloc p.pl_desc.pp_name);
+    notify scope "added predicate: `%s'" (unloc p.pl_desc.pp_name);
     scope
 
 (* -------------------------------------------------------------------- *)
 and process_axiom (scope : EcScope.scope) (ax : paxiom) =
   let (name, scope) = EcScope.Ax.add scope ax in
     EcUtils.oiter name
-      (fun x -> notify "added axiom: `%s'" x);
+      (fun x -> notify scope "added axiom: `%s'" x);
     scope
 
 (* -------------------------------------------------------------------- *)
@@ -184,7 +187,7 @@ and process_tactics (scope : EcScope.scope) t =
 and process_save (scope : EcScope.scope) loc =
   let (name, scope) = EcScope.Ax.save scope loc in
     EcUtils.oiter name
-      (fun x -> notify "added axiom: `%s'" x);
+      (fun x -> notify scope "added axiom: `%s'" x);
     scope
 
 (* -------------------------------------------------------------------- *)

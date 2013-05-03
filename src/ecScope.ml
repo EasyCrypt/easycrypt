@@ -72,12 +72,29 @@ module Options : IOptions = struct
     Mint.map (fun (act, exn) -> act, act.for_loading exn) options
 
   let for_subscope options = options
+end
 
+(* -------------------------------------------------------------------- *)
+module Notifier = struct
+  exception Verbose of bool
+
+  let for_loading = function
+    | Verbose _ -> Verbose false
+    | exn -> exn
+
+  let default = Verbose true
+
+  let mode = Options.register { for_loading } default
+
+  let verbose options =
+    match Options.get options mode with
+    | Verbose b -> b
+    | _ -> assert false
 end
 
 (* -------------------------------------------------------------------- *)
 module Check_mode = struct
-  exception Full_check    (* Disable: checkproof off, i.e. check every think *)
+  exception Full_check    (* Disable: checkproof off, i.e. check everything *)
   exception Check of bool (* true check proofs, false do not check *)
 
   let for_loading = function
@@ -86,7 +103,7 @@ module Check_mode = struct
 
   let default = Check true
 
-  let mode = Options.register { for_loading = for_loading } default
+  let mode = Options.register { for_loading } default
 
   let check options =
     match Options.get options mode with
@@ -166,6 +183,10 @@ let attop (scope : scope) =
 (* -------------------------------------------------------------------- *)
 let goal (scope : scope) =
   scope.sc_pr_uc
+
+(* -------------------------------------------------------------------- *)
+let verbose (scope : scope) =
+  Notifier.verbose scope.sc_options
 
 (* -------------------------------------------------------------------- *)
 let for_loading (scope : scope) =

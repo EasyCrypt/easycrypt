@@ -11,12 +11,13 @@ type proof_uc = {
   puc_jdg :  EcBaseLogic.judgment_uc;
 }
 
-val empty : scope
-val path  : scope -> EcPath.path
-val name  : scope -> symbol
-val env   : scope -> EcEnv.env
-val attop : scope -> bool
-val goal  : scope -> proof_uc list
+val empty   : scope
+val path    : scope -> EcPath.path
+val name    : scope -> symbol
+val env     : scope -> EcEnv.env
+val attop   : scope -> bool
+val goal    : scope -> proof_uc list
+val verbose : scope -> bool
 
 module Op : sig
   (* [add scope op] type-checks the given *parsed* operator [op] in
