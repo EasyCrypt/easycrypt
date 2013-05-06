@@ -102,6 +102,8 @@ let subst_funsig (s : _subst) (funsig : funsig) =
     fs_sig  = (args', res');
     fs_uses = uses'; }
 
+let i = ref 0
+
 (* -------------------------------------------------------------------- *)
 let rec subst_modsig_body_item (s : _subst) (item : module_sig_body_item) =
   match item with
@@ -117,12 +119,17 @@ and subst_modsig_body (s : _subst) (sbody : module_sig_body) =
 
 (* -------------------------------------------------------------------- *)
 and subst_modsig (s : _subst) (comps : module_sig) =
-  { mis_params = comps.mis_params;
+  { mis_params = List.map (sndmap (subst_modtype s)) comps.mis_params;
     mis_body   = subst_modsig_body s comps.mis_body;
     mis_mforb  = 
       Sp.fold
         (fun p mf -> Sp.add (s.s_p p) mf)
         comps.mis_mforb Sp.empty; }
+
+(* -------------------------------------------------------------------- *)
+and subst_modtype (s : _subst) (modty : module_type) =
+  { mt_name = s.s_p modty.mt_name;
+    mt_args = omap modty.mt_args (List.map s.s_fmp); }
 
 (* -------------------------------------------------------------------- *)
 let subst_function_def (s : _subst) (def : function_def) =
@@ -199,18 +206,15 @@ and subst_module_comps (s : _subst) (comps : module_comps) =
 and subst_module (s : _subst) (m : module_expr) =
   let s, body' = subst_module_body s m.me_body in
   let comps'   = subst_module_comps s m.me_comps in
+  let sig'     = subst_modsig s m.me_sig in
   let types'   = List.map (subst_modtype s) m.me_types in
 
   { m with
-      me_body  = body'   ;
-      me_comps = comps'  ;
+      me_body  = body';
+      me_comps = comps';
+      me_sig   = sig';
       me_uses  = Sp.empty;              (* FIXME *)
-      me_types = types'  ; }
-
-(* -------------------------------------------------------------------- *)
-and subst_modtype (s : _subst) (modty : module_type) =
-  { mt_name = s.s_p modty.mt_name;
-    mt_args = omap modty.mt_args (List.map s.s_fmp); }
+      me_types = types'; }
 
 (* -------------------------------------------------------------------- *)
 let init_tparams (s : _subst) params params' = 
