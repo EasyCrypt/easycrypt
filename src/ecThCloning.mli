@@ -7,6 +7,7 @@ open EcEnv
 type ovkind =
 | OVK_Type
 | OVK_Operator
+| OVK_Predicate
 
 type clone_error =
 | CE_DupOverride    of ovkind * symbol
@@ -14,6 +15,7 @@ type clone_error =
 | CE_CrtOverride    of ovkind * symbol
 | CE_TypeArgMism    of ovkind * symbol
 | CE_OpIncompatible of symbol
+| CE_PrIncompatible of symbol
 
 exception CloneError of EcEnv.env * clone_error
 

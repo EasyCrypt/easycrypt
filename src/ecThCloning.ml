@@ -11,6 +11,7 @@ open EcTheory
 type ovkind =
 | OVK_Type
 | OVK_Operator
+| OVK_Predicate
 
 type clone_error =
 | CE_DupOverride    of ovkind * symbol
@@ -18,6 +19,7 @@ type clone_error =
 | CE_CrtOverride    of ovkind * symbol
 | CE_TypeArgMism    of ovkind * symbol
 | CE_OpIncompatible of symbol
+| CE_PrIncompatible of symbol
 
 exception CloneError of EcEnv.env * clone_error
 
@@ -26,8 +28,9 @@ let clone_error env error =
 
 (* -------------------------------------------------------------------- *)
 let string_of_ovkind = function
-  | OVK_Type     -> "type"
-  | OVK_Operator -> "operator"
+  | OVK_Type      -> "type"
+  | OVK_Operator  -> "operator"
+  | OVK_Predicate -> "predicate"
 
 (* -------------------------------------------------------------------- *)
 let pp_clone_error fmt _env error =
@@ -53,6 +56,9 @@ let pp_clone_error fmt _env error =
   | CE_OpIncompatible x ->
       msg "operator `%s' body is not compatible with its declaration" x
 
+  | CE_PrIncompatible x ->
+      msg "predicate `%s' body is not compatible with its declaration" x
+
 let () =
   let pp fmt exn =
     match exn with
@@ -63,13 +69,15 @@ let () =
 
 (* ------------------------------------------------------------------ *)
 type evclone = {
-  evc_types : (ty_override located)  Msym.t;
+  evc_types : (ty_override located) Msym.t;
   evc_ops   : (op_override located) Msym.t;
+  evc_preds : (pr_override located) Msym.t;
 }
 
 let evc_empty = {
   evc_types = Msym.empty;
   evc_ops   = Msym.empty;
+  evc_preds = Msym.empty;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -106,8 +114,7 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
     let do1 evc (x, ovrd) =
       let { pl_loc = l; pl_desc = x; } = x in
         match ovrd with
-        | PTHO_Type tyd ->
-          begin
+        | PTHO_Type tyd -> begin
             if Msym.mem x evc.evc_types then
               clone_error scenv (CE_DupOverride (OVK_Type, x));
             match EcEnv.Ty.by_path_opt (EcPath.pqname opath x) scenv with
@@ -121,8 +128,7 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
           end;
           { evc with evc_types = Msym.add x (mk_loc l tyd) evc.evc_types }
 
-        | PTHO_Op opd ->
-          begin
+        | PTHO_Op opd -> begin
             if Msym.mem x evc.evc_ops then
               clone_error scenv (CE_DupOverride (OVK_Operator, x));
             match EcEnv.Op.by_path_opt (EcPath.pqname opath x) scenv with
@@ -134,6 +140,19 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
             | _ -> ()
           end;
           { evc with evc_ops = Msym.add x (mk_loc l opd) evc.evc_ops }
+
+        | PTHO_Pred pr -> begin
+            if Msym.mem x evc.evc_preds then
+              clone_error scenv (CE_DupOverride (OVK_Predicate, x));
+            match EcEnv.Op.by_path_opt (EcPath.pqname opath x) scenv with
+            | None
+            | Some { op_kind = OB_oper _ } ->
+                clone_error scenv (CE_UnkOverride (OVK_Predicate, x));
+            | Some { op_kind = OB_pred (Some _) } ->
+                clone_error scenv (CE_CrtOverride (OVK_Predicate, x));
+            | _ -> ()
+          end;
+          { evc with evc_preds = Msym.add x (mk_loc l pr) evc.evc_preds }
     in
       List.fold_left do1 evc_empty thcl.pthc_ext
   in
@@ -195,6 +214,42 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
                 if not (ty_compatible scenv (reftyvars, refty) (newtyvars, newty)) then
                   clone_error scenv (CE_OpIncompatible x);
                 EcEnv.Op.bind x newop scenv
+      end
+
+      | CTh_operator (x, ({ op_kind = OB_pred None} as oopr)) -> begin
+          match Msym.find_opt x ovrds.evc_preds with
+          | None ->
+              EcEnv.Op.bind x (EcSubst.subst_op subst oopr) scenv
+
+          | Some { pl_desc = prov; pl_loc = loc; } ->
+              let newpr =
+                let ue = EcTyping.ue_for_decl scenv (loc, prov.prov_tyvars) in
+                let (dom, body) =
+                  let env     = scenv in
+                  let env, xs = EcTyping.transbinding env ue prov.prov_args in
+                  let body    = EcTyping.transformula env ue prov.prov_body in
+                  let dom     = List.map snd xs in
+                  let xs      = List.map (fun (x,ty) -> x, EcFol.GTty ty) xs in
+                  let lam     = EcFol.f_lambda xs body in
+                    (dom, lam)
+                in
+                let uni     = EcTypes.Tuni.subst (EcUnify.UniEnv.close ue) in
+                let body    = EcFol.Fsubst.mapty uni body in
+                let dom     = List.map uni dom in
+                let tparams = EcUnify.UniEnv.tparams ue in
+                  mk_pred tparams dom (Some body)
+              in
+
+              let (reftyvars, refty) =
+                let refpr = EcEnv.Op.by_path (EcPath.pqname opath x) scenv in
+                let refpr = EcSubst.subst_op subst refpr in
+                  (refpr.op_tparams, refpr.op_ty)
+              and (newtyvars, newty) =
+                (newpr.op_tparams, newpr.op_ty)
+              in
+                if not (ty_compatible scenv (reftyvars, refty) (newtyvars, newty)) then
+                  clone_error scenv (CE_OpIncompatible x);
+                EcEnv.Op.bind x newpr scenv
         end
 
       | CTh_operator (x, oopd) ->

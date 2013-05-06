@@ -1412,6 +1412,22 @@ clone_override:
        opov_body   = e;
      } in
        (x, PTHO_Op ov) }
+
+| PRED x=op_ident tyvars=tyvars_decl p=ptybindings EQ f=form
+   { let ov = {
+       prov_tyvars = tyvars;
+       prov_args   = p;
+       prov_body   = f;
+     } in
+       (x, PTHO_Pred ov) }
+
+| PRED x=op_ident tyvars=tyvars_decl EQ f=form
+   { let ov = {
+       prov_tyvars = tyvars;
+       prov_args   = [];
+       prov_body   = f;
+     } in
+       (x, PTHO_Pred ov) }
 ;
 
 (* -------------------------------------------------------------------- *)
