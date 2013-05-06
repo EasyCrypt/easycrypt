@@ -849,6 +849,19 @@ let trans_tydecl env path td =
   Ty.create_tysymbol pid tparams body
 
 (* --------------------------- Formulas ------------------------------- *)
+let path_of_mpathtop (mp : mpath_top) =
+  match mp with
+  | `Abstract id ->
+      EcPath.psymbol (EcIdent.tostring id)
+
+  | `Concrete (p1, p2) ->
+      List.fold_left EcPath.pqname p1
+        (odfl [] (omap p2 EcPath.tolist))
+
+let path_of_xpath (xp : xpath) =
+  let p1 = path_of_mpathtop xp.EcPath.x_top.EcPath.m_top in
+  let p2 = xp.EcPath.x_sub in
+      List.fold_left EcPath.pqname p1 (EcPath.tolist p2)
 
 let trans_lv vm lv =
   try Mid.find lv vm.vm_id with _ -> assert false
@@ -870,8 +883,8 @@ let rec trans_mod env vm mp =
 
 let trans_fun env vm xp targs =
   let mp = xp.EcPath.x_top in
-  let p = xp.EcPath.x_sub in
-  let m = trans_mod env vm mp in
+  let p  = path_of_xpath xp in
+  let m  = trans_mod env vm mp in
   let fn = trans_na env p in
   mod_fun m fn targs
 
@@ -880,7 +893,7 @@ let base_mp mp = EcPath.mpath mp.EcPath.m_top []
 let trans_pv env vm pv ty mem =
   let xp = pv.pv_name in
   let mp = base_mp xp.EcPath.x_top in
-  let p  = xp.EcPath.x_sub in
+  let p  = path_of_xpath xp in
   let mo = trans_mod env vm mp in
   let mem = trans_lv vm mem in
   let ty = trans_ty env vm ty in
@@ -1315,22 +1328,18 @@ let add_mod_exp env path me =
         let ls = Term.create_fsymbol (preid_p path) [] ty_name in
         env := add_nparam !env path ls;
         rb  := RBna(path,ls) :: !rb in
-    let pqname path s =
-      match path with
-      | None -> EcPath.psymbol s
-      | Some p -> EcPath.pqname p s in
     let rec add_comps path comps = List.iter (add_comp path) comps
     and add_comp path comp =
       match comp with
       | MI_Module me  -> add_me path me
-      | MI_Variable v -> add_name (pqname path v.v_name)
-      | MI_Function f -> add_name (pqname path f.f_name)
+      | MI_Variable v -> add_name (EcPath.pqname path v.v_name)
+      | MI_Function f -> add_name (EcPath.pqname path f.f_name)
     and add_me path me =
       if not (is_alias me.me_body) then
         let path = pqname path me.me_name in
         add_name path;
-        add_comps (Some path) me.me_comps in
-    add_comps None me.me_comps;
+        add_comps path me.me_comps in
+    add_comps path me.me_comps;
     !env, !rb
 
 let add_mod_sig env _path s = 
