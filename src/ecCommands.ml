@@ -227,6 +227,12 @@ and process (scope : EcScope.scope) (g : global located) =
     | Gcheckproof b   -> process_checkproof scope b
     | Gsave      loc  -> process_save       scope loc
   in
+    begin
+      try
+        ignore (Sys.getenv "ECDEBUG");
+        EcEnv.dump EcDebug.initial (EcScope.env scope)
+      with Not_found -> ()
+    end;
     scope
 
 (* -------------------------------------------------------------------- *)
