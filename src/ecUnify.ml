@@ -20,7 +20,6 @@ type unienv =
     } 
 
 module UniEnv = struct
-  
   type tvar_inst_kind = 
     | TVIunamed of ty list
     | TVInamed  of (EcSymbols.symbol * ty) list

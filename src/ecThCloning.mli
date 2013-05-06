@@ -9,11 +9,11 @@ type ovkind =
 | OVK_Operator
 
 type clone_error =
-| CE_DupOverride   of ovkind * symbol
-| CE_UnkOverride   of ovkind * symbol
-| CE_CrtOverride   of ovkind * symbol
-| CE_TypeArgMism   of ovkind * symbol
-| CE_OpBodyLessGen of symbol
+| CE_DupOverride    of ovkind * symbol
+| CE_UnkOverride    of ovkind * symbol
+| CE_CrtOverride    of ovkind * symbol
+| CE_TypeArgMism    of ovkind * symbol
+| CE_OpIncompatible of symbol
 
 exception CloneError of EcEnv.env * clone_error
 

@@ -26,8 +26,6 @@ module UniEnv : sig
   val repr       : unienv -> ty -> ty
   val dump       : EcDebug.ppdebug -> unienv -> unit
   val freshen    : unienv -> EcIdent.t list -> tvi -> ty -> unienv * ty * ty list
-(*  val freshendom : unienv -> EcIdent.t list -> tvi -> dom -> unienv * dom * ty list *)
-(*  val freshensig : unienv -> EcIdent.t list -> tvi -> tysig -> unienv * tysig * ty list *)
   val close      : unienv -> ty Muid.t
   val asmap      : unienv -> ty Muid.t
   val tparams    : unienv -> EcIdent.t list

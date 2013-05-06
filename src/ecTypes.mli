@@ -152,6 +152,7 @@ val e_let      : lpattern -> expr -> expr -> expr
 val e_tuple    : expr list -> expr
 val e_if       : expr -> expr -> expr -> expr
 val e_lam      : (EcIdent.t * ty) list -> expr -> expr
+
 (* -------------------------------------------------------------------- *)
 val e_map :
      (ty     -> ty    ) (* 1-subtype op. *)
@@ -163,15 +164,14 @@ val e_fold :
   ('state -> expr -> 'state) -> 'state -> expr -> 'state
 
 (* -------------------------------------------------------------------- *)
-
 type e_subst = { 
-    es_freshen : bool; (* true means realloc local *)
-    es_p       : EcPath.path -> EcPath.path;
-    es_ty      : ty -> ty;
-    es_mp      : EcPath.mpath -> EcPath.mpath; 
-    es_xp      : EcPath.xpath -> EcPath.xpath;
-    es_loc     : expr Mid.t;
-  }
+  es_freshen : bool; (* true means realloc local *)
+  es_p       : EcPath.path -> EcPath.path;
+  es_ty      : ty -> ty;
+  es_mp      : EcPath.mpath -> EcPath.mpath; 
+  es_xp      : EcPath.xpath -> EcPath.xpath;
+  es_loc     : expr Mid.t;
+}
 
 val e_subst_id   : e_subst
 

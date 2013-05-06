@@ -13,11 +13,11 @@ type ovkind =
 | OVK_Operator
 
 type clone_error =
-| CE_DupOverride   of ovkind * symbol
-| CE_UnkOverride   of ovkind * symbol
-| CE_CrtOverride   of ovkind * symbol
-| CE_TypeArgMism   of ovkind * symbol
-| CE_OpBodyLessGen of symbol
+| CE_DupOverride    of ovkind * symbol
+| CE_UnkOverride    of ovkind * symbol
+| CE_CrtOverride    of ovkind * symbol
+| CE_TypeArgMism    of ovkind * symbol
+| CE_OpIncompatible of symbol
 
 exception CloneError of EcEnv.env * clone_error
 
@@ -50,8 +50,8 @@ let pp_clone_error fmt _env error =
       msg "type argument mismatch for %s `%s'"
         (string_of_ovkind kd) x
 
-  | CE_OpBodyLessGen x ->
-      msg "operator `%s' body type is not generic enough" x
+  | CE_OpIncompatible x ->
+      msg "operator `%s' body is not compatible with its declaration" x
 
 let () =
   let pp fmt exn =
@@ -63,8 +63,8 @@ let () =
 
 (* ------------------------------------------------------------------ *)
 type evclone = {
-  evc_types : (psymbol list * pty) Msym.t;
-  evc_ops   : op_override Msym.t;
+  evc_types : (ty_override located)  Msym.t;
+  evc_ops   : (op_override located) Msym.t;
 }
 
 let evc_empty = {
@@ -72,6 +72,28 @@ let evc_empty = {
   evc_ops   = Msym.empty;
 }
 
+(* -------------------------------------------------------------------- *)
+exception Incompatible
+
+let ty_compatible env (rtyvars, rty) (ntyvars, nty) =
+  if List.length rtyvars <> List.length ntyvars then
+    raise Incompatible;
+  let s =
+    EcIdent.Mid.of_list
+      (List.map2
+         (fun a1 a2 -> (a1, EcTypes.tvar a2))
+         rtyvars ntyvars)
+  in
+
+  let nty = EcTypes.Tvar.subst s nty in
+    if not (EcReduction.equal_type env rty nty) then
+      raise Incompatible
+
+let ty_compatible env t1 t2 =
+  try  ty_compatible env t1 t2; true
+  with Incompatible -> false
+
+(* -------------------------------------------------------------------- *)
 let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
   let cpath = EcEnv.root scenv in
 
@@ -82,7 +104,7 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
 
   let ovrds =
     let do1 evc (x, ovrd) =
-      let x = unloc x in
+      let { pl_loc = l; pl_desc = x; } = x in
         match ovrd with
         | PTHO_Type tyd ->
           begin
@@ -97,7 +119,7 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
                 if List.length refty.tyd_params <> List.length (fst tyd) then
                   clone_error scenv (CE_TypeArgMism (OVK_Type, x));
           end;
-          { evc with evc_types = Msym.add x tyd evc.evc_types }
+          { evc with evc_types = Msym.add x (mk_loc l tyd) evc.evc_types }
 
         | PTHO_Op opd ->
           begin
@@ -111,7 +133,7 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
                 clone_error scenv (CE_CrtOverride (OVK_Operator, x));
             | _ -> ()
           end;
-          { evc with evc_ops = Msym.add x opd evc.evc_ops }
+          { evc with evc_ops = Msym.add x (mk_loc l opd) evc.evc_ops }
     in
       List.fold_left do1 evc_empty thcl.pthc_ext
   in
@@ -124,7 +146,7 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
           | None ->
               EcEnv.Ty.bind x (EcSubst.subst_tydecl subst otyd) scenv
 
-          | Some (nargs, ntyd) ->
+          | Some { pl_desc = (nargs, ntyd) } ->
               (* Already checked:
                *   1. type is abstract
                *   2. type argument count are equal *)
@@ -144,29 +166,34 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
           | None ->
               EcEnv.Op.bind x (EcSubst.subst_op subst oopd) scenv
 
-          | Some opov ->
-              assert (opov.opov_args = []);
-              assert (opov.opov_tyvars = None);
-
-              let refop = EcEnv.Op.by_path (EcPath.pqname opath x) scenv in
-              let newop = EcSubst.subst_op subst refop in
-
-(*
-              let locals = List.map (EcIdent.create -| unloc) locals in
-              let benv   = EcEnv.Var.bind_locals (List.combine locals newop.op_dom) scenv in
-*)
-
-              let benv = scenv in
-              let ue   = EcUnify.UniEnv.create (Some newop.op_tparams) in
-
-              let opbody = EcTyping.transexpcast benv ue newop.op_ty opov.opov_body in
-
-                if List.length (EcUnify.UniEnv.tparams ue) <> List.length newop.op_tparams then
-                  clone_error scenv (CE_OpBodyLessGen x);
-
+          | Some { pl_desc = opov; pl_loc = loc; } ->
               let newop =
-                { newop with op_kind = OB_oper (Some opbody) }
+                let ue = EcTyping.ue_for_decl scenv (loc, opov.opov_tyvars) in
+                let tp = EcTyping.tp_relax in
+                let (ty, body) =
+                  let env     = scenv in
+                  let codom   = EcTyping.transty tp env ue opov.opov_retty in 
+                  let env, xs = EcTyping.transbinding env ue opov.opov_args in
+                  let body    = EcTyping.transexpcast env ue codom opov.opov_body in
+                  let lam     = EcTypes.e_lam xs body in
+                    (lam.EcTypes.e_ty, Some lam)
+                in
+                let uni     = EcTypes.Tuni.subst (EcUnify.UniEnv.close ue) in
+                let body    = omap body (EcTypes.e_mapty uni) in
+                let ty      = uni ty in
+                let tparams = EcUnify.UniEnv.tparams ue in
+                  mk_op tparams ty body
               in
+
+              let (reftyvars, refty) =
+                let refop = EcEnv.Op.by_path (EcPath.pqname opath x) scenv in
+                let refop = EcSubst.subst_op subst refop in
+                  (refop.op_tparams, refop.op_ty)
+              and (newtyvars, newty) =
+                (newop.op_tparams, newop.op_ty)
+              in
+                if not (ty_compatible scenv (reftyvars, refty) (newtyvars, newty)) then
+                  clone_error scenv (CE_OpIncompatible x);
                 EcEnv.Op.bind x newop scenv
         end
 
