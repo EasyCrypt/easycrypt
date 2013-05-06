@@ -64,7 +64,7 @@ let () =
 (* ------------------------------------------------------------------ *)
 type evclone = {
   evc_types : (psymbol list * pty) Msym.t;
-  evc_ops   : (psymbol list * pexpr) Msym.t;
+  evc_ops   : op_override Msym.t;
 }
 
 let evc_empty = {
@@ -141,9 +141,12 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
 
       | CTh_operator (x, ({ op_kind = OB_oper None } as oopd)) -> begin
           match Msym.find_opt x ovrds.evc_ops with
-          | None -> EcEnv.Op.bind x (EcSubst.subst_op subst oopd) scenv
-          | Some (locals, opbody) ->
-              assert (locals = []);
+          | None ->
+              EcEnv.Op.bind x (EcSubst.subst_op subst oopd) scenv
+
+          | Some opov ->
+              assert (opov.opov_args = []);
+              assert (opov.opov_tyvars = None);
 
               let refop = EcEnv.Op.by_path (EcPath.pqname opath x) scenv in
               let newop = EcSubst.subst_op subst refop in
@@ -156,7 +159,7 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
               let benv = scenv in
               let ue   = EcUnify.UniEnv.create (Some newop.op_tparams) in
 
-              let opbody = EcTyping.transexpcast benv ue newop.op_ty opbody in
+              let opbody = EcTyping.transexpcast benv ue newop.op_ty opov.opov_body in
 
                 if List.length (EcUnify.UniEnv.tparams ue) <> List.length newop.op_tparams then
                   clone_error scenv (CE_OpBodyLessGen x);

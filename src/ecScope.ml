@@ -208,17 +208,6 @@ let subscope (scope : scope) (name : symbol) =
   }
 
 (* -------------------------------------------------------------------- *)
-let ue_for_decl (env : EcEnv.env) (loc, tparams) =
-  let tparams = omap tparams
-    (fun tparams ->
-      let tparams = List.map unloc tparams in
-        if not (List.uniq tparams) then
-          EcTyping.tyerror loc env EcTyping.DuplicatedTyVar;
-        List.map EcIdent.create tparams)
-  in
-    EcUnify.UniEnv.create tparams
-
-(* -------------------------------------------------------------------- *)
 module Op = struct
   open EcTypes
   open EcDecl
@@ -232,25 +221,30 @@ module Op = struct
 
   let add (scope : scope) (op : poperator located) =
     let op = op.pl_desc and loc = op.pl_loc in
+    let ue = TT.ue_for_decl scope.sc_env (loc, op.po_tyvars) in
+    let tp = TT.tp_relax in
 
-    let ue     = ue_for_decl scope.sc_env (loc, op.po_tyvars) in
-    let tp     = TT.tp_relax in
-    let ty, body = 
+    let (ty, body) =
       match op.po_def with
-      | POabstr pty -> TT.transty tp scope.sc_env ue pty, None
-      | POconcr(bd,pty,pe) ->
-        let env = scope.sc_env in
-        let codom = TT.transty tp env ue pty in 
-        let env, xs = TT.transbinding env ue bd in
-        let body = TT.transexpcast env ue codom pe in
-        let lam = EcTypes.e_lam xs body in
-        lam.EcTypes.e_ty, Some lam in
-    let uni          = Tuni.subst (EcUnify.UniEnv.close ue) in
-    let body         = omap body (e_mapty uni) in
-    let ty           = uni ty in
-    let tparams      = EcUnify.UniEnv.tparams ue in
-    let tyop         = EcDecl.mk_op tparams ty body in
-    bind scope (unloc op.po_name, tyop)
+      | POabstr pty ->
+          TT.transty tp scope.sc_env ue pty, None
+
+      | POconcr (bd, pty, pe) ->
+          let env     = scope.sc_env in
+          let codom   = TT.transty tp env ue pty in 
+          let env, xs = TT.transbinding env ue bd in
+          let body    = TT.transexpcast env ue codom pe in
+          let lam     = EcTypes.e_lam xs body in
+            lam.EcTypes.e_ty, Some lam
+    in
+
+    let uni     = Tuni.subst (EcUnify.UniEnv.close ue) in
+    let body    = omap body (e_mapty uni) in
+    let ty      = uni ty in
+    let tparams = EcUnify.UniEnv.tparams ue in
+    let tyop    = EcDecl.mk_op tparams ty body in
+
+      bind scope (unloc op.po_name, tyop)
 end
 
 (* -------------------------------------------------------------------- *)
@@ -259,7 +253,7 @@ module Pred = struct
 
   let add (scope : scope) (op : ppredicate located) =
     let op = op.pl_desc and loc = op.pl_loc in
-    let ue     = ue_for_decl scope.sc_env (loc, op.pp_tyvars) in
+    let ue     = TT.ue_for_decl scope.sc_env (loc, op.pp_tyvars) in
     let tp     = TT.tp_relax in
     let dom, body = 
       match op.pp_def with

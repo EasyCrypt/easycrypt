@@ -381,7 +381,14 @@ type theory_cloning = {
 
 and theory_override =
 | PTHO_Type of (psymbol list * pty)
-| PTHO_Op   of (psymbol list * pexpr)
+| PTHO_Op   of op_override
+
+and op_override = {
+  opov_tyvars : psymbol list option;
+  opov_args   : ptybinding list;
+  opov_retty  : pty;
+  opov_body   : pexpr;
+}
 
 (* -------------------------------------------------------------------- *)
 type global =

@@ -56,6 +56,12 @@ val tp_tydecl : typolicy
 val tp_relax  : typolicy
 
 (* -------------------------------------------------------------------- *)
+val ue_for_decl :
+     EcEnv.env
+  -> (EcLocation.t * psymbol list option)
+  -> EcUnify.unienv
+
+(* -------------------------------------------------------------------- *)
 val transty : typolicy -> EcEnv.env -> EcUnify.unienv -> pty -> ty 
 
 val transtys :  

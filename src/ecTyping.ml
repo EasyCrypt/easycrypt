@@ -306,6 +306,17 @@ let tp_nothing = { tp_uni = false; tp_tvar = false; } (* module type annot. *)
 let tp_uni     = { tp_uni = true ; tp_tvar = false; } (* params/local vars. *)
 
 (* -------------------------------------------------------------------- *)
+let ue_for_decl (env : EcEnv.env) (loc, tparams) =
+  let tparams = omap tparams
+    (fun tparams ->
+      let tparams = List.map unloc tparams in
+        if not (List.uniq tparams) then
+          tyerror loc env DuplicatedTyVar;
+        List.map EcIdent.create tparams)
+  in
+    EcUnify.UniEnv.create tparams
+
+(* -------------------------------------------------------------------- *)
 let rec transty (tp : typolicy) (env : EcEnv.env) ue ty =
   match ty.pl_desc with
    | PTunivar ->

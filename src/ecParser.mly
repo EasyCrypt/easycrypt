@@ -1009,35 +1009,34 @@ tyvars_decl:
     
 operator:
 | OP x=op_ident tyvars=tyvars_decl COLON sty=loc(type_exp) {
-    { po_name   = x      ;
-      po_tyvars = tyvars ;
+    { po_name   = x;
+      po_tyvars = tyvars;
       po_def    = POabstr sty; }
   }
 
 | OP x=op_ident tyvars=tyvars_decl COLON sty=loc(type_exp) EQ b=expr {
-    { po_name   = x      ;
-      po_tyvars = tyvars ;
-      po_def    = POconcr([],sty,b); }
+    { po_name   = x;
+      po_tyvars = tyvars;
+      po_def    = POconcr ([], sty, b); }
   }
 
 | OP x=op_ident tyvars=tyvars_decl eq=loc(EQ) b=expr {
-    { po_name   = x      ;
-      po_tyvars = tyvars ;
-      po_def    = POconcr([],mk_loc eq.pl_loc PTunivar,b); }
+    { po_name   = x;
+      po_tyvars = tyvars;
+      po_def    = POconcr([], mk_loc eq.pl_loc PTunivar, b); }
   }
 
 | OP x=op_ident tyvars=tyvars_decl p=ptybindings eq=loc(EQ) b=expr {
-    { po_name   = x      ;
-      po_tyvars = tyvars ;
-      po_def    = POconcr(p,mk_loc eq.pl_loc PTunivar,b); }
+    { po_name   = x;
+      po_tyvars = tyvars;
+      po_def    = POconcr(p, mk_loc eq.pl_loc PTunivar, b); }
   }
 | OP x=op_ident tyvars=tyvars_decl p=ptybindings COLON codom=loc(type_exp)
     EQ b=expr {
-    { po_name   = x      ;
-      po_tyvars = tyvars ;
-      po_def    = POconcr(p,codom,b); }
+    { po_name   = x;
+      po_tyvars = tyvars;
+      po_def    = POconcr(p, codom, b); }
   } 
-
 ;
 
 predicate:
@@ -1387,8 +1386,32 @@ clone_override:
 | TYPE ps=typarams x=ident EQ t=loc(type_exp)
    { (x, PTHO_Type (ps, t)) }
 
-| OP x=ident EQ e=expr
-   { (x, PTHO_Op ([], e)) }
+| OP x=op_ident tyvars=tyvars_decl COLON sty=loc(type_exp) EQ e=expr
+   { let ov = {
+       opov_tyvars = tyvars;
+       opov_args   = [];
+       opov_retty  = sty;
+       opov_body   = e;
+     } in
+       (x, PTHO_Op ov) }
+
+| OP x=op_ident tyvars=tyvars_decl eq=loc(EQ) e=expr
+   { let ov = {
+       opov_tyvars = tyvars;
+       opov_args   = [];
+       opov_retty  = mk_loc eq.pl_loc PTunivar;
+       opov_body   = e;
+     } in
+       (x, PTHO_Op ov) }
+
+| OP x=op_ident tyvars=tyvars_decl p=ptybindings eq=loc(EQ) e=expr
+   { let ov = {
+       opov_tyvars = tyvars;
+       opov_args   = p;
+       opov_retty  = mk_loc eq.pl_loc PTunivar;
+       opov_body   = e;
+     } in
+       (x, PTHO_Op ov) }
 ;
 
 (* -------------------------------------------------------------------- *)
