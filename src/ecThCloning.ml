@@ -8,6 +8,60 @@ open EcModules
 open EcTheory
 
 (* ------------------------------------------------------------------ *)
+type ovkind =
+| OVK_Type
+| OVK_Operator
+
+type clone_error =
+| CE_DupOverride   of ovkind * symbol
+| CE_UnkOverride   of ovkind * symbol
+| CE_CrtOverride   of ovkind * symbol
+| CE_TypeArgMism   of ovkind * symbol
+| CE_OpBodyLessGen of symbol
+
+exception CloneError of EcEnv.env * clone_error
+
+let clone_error env error =
+  raise (CloneError (env, error))
+
+(* -------------------------------------------------------------------- *)
+let string_of_ovkind = function
+  | OVK_Type     -> "type"
+  | OVK_Operator -> "operator"
+
+(* -------------------------------------------------------------------- *)
+let pp_clone_error fmt _env error =
+  let msg x = Format.fprintf fmt x in
+
+  match error with
+  | CE_DupOverride (kd, x) ->
+      msg "the %s `%s' is instantiate twice"
+        (string_of_ovkind kd) x
+
+  | CE_UnkOverride (kd, x) ->
+      msg "unknown %s `%s'"
+        (string_of_ovkind kd) x
+
+  | CE_CrtOverride (kd, x) ->
+      msg "cannot instantiate the _concrete_ %s `%s'"
+        (string_of_ovkind kd) x
+
+  | CE_TypeArgMism (kd, x) ->
+      msg "type argument mismatch for %s `%s'"
+        (string_of_ovkind kd) x
+
+  | CE_OpBodyLessGen x ->
+      msg "operator `%s' body type is not generic enough" x
+
+let () =
+  let pp fmt exn =
+    match exn with
+    | CloneError (env, e) -> pp_clone_error fmt env e
+    | _ -> raise exn
+  in
+    EcPException.register pp
+
+(* ------------------------------------------------------------------ *)
 type evclone = {
   evc_types : (psymbol list * pty) Msym.t;
   evc_ops   : (psymbol list * pexpr) Msym.t;
@@ -33,26 +87,28 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
         | PTHO_Type tyd ->
           begin
             if Msym.mem x evc.evc_types then
-              failwith "duplicated-type-override";
+              clone_error scenv (CE_DupOverride (OVK_Type, x));
             match EcEnv.Ty.by_path_opt (EcPath.pqname opath x) scenv with
             | None ->
-                failwith "non-existent-type-override"
+                clone_error scenv (CE_UnkOverride (OVK_Type, x));
             | Some { EcDecl.tyd_type = Some _ } ->
-                failwith "concrete-type-cloning"
-            | _ -> ()
+                clone_error scenv (CE_CrtOverride (OVK_Type, x));
+            | Some refty ->
+                if List.length refty.tyd_params <> List.length (fst tyd) then
+                  clone_error scenv (CE_TypeArgMism (OVK_Type, x));
           end;
           { evc with evc_types = Msym.add x tyd evc.evc_types }
 
         | PTHO_Op opd ->
           begin
             if Msym.mem x evc.evc_ops then
-              failwith "duplicated-op-override";
+              clone_error scenv (CE_DupOverride (OVK_Operator, x));
             match EcEnv.Op.by_path_opt (EcPath.pqname opath x) scenv with
             | None
             | Some { op_kind = OB_pred _ } ->
-                failwith "non-existent-op-override";
+                clone_error scenv (CE_UnkOverride (OVK_Operator, x));
             | Some { op_kind = OB_oper (Some _) } ->
-                failwith "concrete-operator-cloning"
+                clone_error scenv (CE_CrtOverride (OVK_Operator, x));
             | _ -> ()
           end;
           { evc with evc_ops = Msym.add x opd evc.evc_ops }
@@ -65,14 +121,13 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
       match item with
       | CTh_type (x, otyd) -> begin
           match Msym.find_opt x ovrds.evc_types with
-          | None -> EcEnv.Ty.bind x (EcSubst.subst_tydecl subst otyd) scenv
-          | Some (nargs, ntyd) ->
-            let refty = EcEnv.Ty.by_path (EcPath.pqname opath x) scenv in
-              if List.length refty.tyd_params <> List.length nargs then
-                failwith "type-override-parameters-count-mismatch";
-              if refty.tyd_type <> None then
-                failwith "type-override-of-non-abstract";
+          | None ->
+              EcEnv.Ty.bind x (EcSubst.subst_tydecl subst otyd) scenv
 
+          | Some (nargs, ntyd) ->
+              (* Already checked:
+               *   1. type is abstract
+               *   2. type argument count are equal *)
               let nargs = List.map (EcIdent.create -| unloc) nargs in
               let ue    = EcUnify.UniEnv.create (Some nargs) in
               let ntyd  = EcTyping.transty EcTyping.tp_tydecl scenv ue ntyd in
@@ -104,7 +159,7 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
               let opbody = EcTyping.transexpcast benv ue newop.op_ty opbody in
 
                 if List.length (EcUnify.UniEnv.tparams ue) <> List.length newop.op_tparams then
-                  failwith "body-less-generic";
+                  clone_error scenv (CE_OpBodyLessGen x);
 
               let newop =
                 { newop with op_kind = OB_oper (Some opbody) }
