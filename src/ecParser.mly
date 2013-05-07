@@ -1129,9 +1129,11 @@ renaming:
 (* -------------------------------------------------------------------- *)
 (* tactic                                                               *)
 
-underscore_or_ident:
+intro_pattern:
 | UNDERSCORE { None }
-| s=_ident   { Some s }
+| s=LIDENT   { Some s }
+| s=UIDENT   { Some s }
+| s=MIDENT   { Some s }
 ;
 
 fpattern_head(F):
@@ -1214,7 +1216,7 @@ tactic:
 | TRIVIAL pi=prover_info
    { Ptrivial pi }
 
-| INTROS a=loc(underscore_or_ident)+
+| INTROS a=loc(intro_pattern)+
    { Pintro a }
 
 | SPLIT

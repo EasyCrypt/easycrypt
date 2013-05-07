@@ -116,3 +116,20 @@ let lex_single_token name =
       | _ -> None
 
   with EcLexer.LexicalError _ -> None
+
+(* -------------------------------------------------------------------- *)
+let is_sym_ident x =
+  match lex_single_token x with
+  | Some (EcParser.LIDENT _) -> true
+  | Some (EcParser.UIDENT _) -> true
+  | _ -> false
+
+let is_mem_ident x =
+  match lex_single_token x with
+  | Some (EcParser.MIDENT _) -> true
+  | _ -> false
+
+let is_mod_ident x =
+  match lex_single_token x with
+  | Some (EcParser.UIDENT _) -> true
+  | _ -> false

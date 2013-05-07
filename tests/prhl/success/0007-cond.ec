@@ -22,10 +22,10 @@ proof.
  fun.
  if {1}.
  if {2}.
- wp;skip;simplify;intros m1 m2;split.
+ wp;skip;simplify;intros &m1 &m2;split.
  wp;skip;trivial.
  rcondf {2} 1.
-  intros m;skip;trivial.
+  intros &m;skip;trivial.
  wp;skip;trivial.
 save.
 
@@ -34,7 +34,7 @@ lemma foo :
 proof.
  fun.
  if.
- intros m1 m2 Heq;rewrite Heq;simplify;trivial.
+ intros &m1 &m2 Heq;rewrite Heq;simplify;trivial.
  wp;skip;trivial.
  wp;skip;trivial.
 save.

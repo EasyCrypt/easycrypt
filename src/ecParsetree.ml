@@ -26,7 +26,6 @@ let qsymb_of_symb (x : symbol) : qsymbol = ([], x)
 type psymbol  = symbol  located
 type pqsymbol = qsymbol located
 type pmsymbol = (psymbol * ((pmsymbol located) list) option) list
-type posymbol = symbol option located
 
 (* -------------------------------------------------------------------- *)
 type pty_r =
@@ -266,7 +265,7 @@ type 'a rnd_bij_info =
 
 type tac_side = bool option
 
-type  swap_kind = 
+type swap_kind = 
   | SKbase of int * int * int
   | SKmove of int
   | SKmovei of int * int
@@ -281,7 +280,7 @@ and ptactic_r =
   | Ptry        of ptactic 
   | Passumption of (pqsymbol option * ptyannot option)
   | Ptrivial    of pprover_infos
-  | Pintro      of posymbol list  
+  | Pintro      of (symbol option) located list
   | Psplit                        
   | Pexists     of fpattern_arg located list 
   | Pleft                         

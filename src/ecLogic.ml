@@ -36,6 +36,7 @@ type tac_error =
   | NoSkipStmt
   | InvalidCodePosition   of string*int*int*int
   | CanNotApply           of string * string
+  | InvalidName           of string
 
 exception TacError of tac_error
 
@@ -85,6 +86,8 @@ let pp_tac_error fmt error =
     Format.fprintf fmt "%s: Invalid code line number %i, expected in [%i,%i]" msg k lb up
   | CanNotApply(s1,s2) ->
     Format.fprintf fmt "Can not apply %s tactic:@\n %s" s1 s2
+  | InvalidName x ->
+    Format.fprintf fmt "Invalid name for this kind of object: %s" x
 
 
 
@@ -278,14 +281,24 @@ let set_loc loc f x =
 let t_intros env ids (juc,n as g) =
   let hyps, concl = get_goal g in
   let add_local s id x gty =
-    let id = id.pl_desc in
+    let id   = id.pl_desc in
+    let name = EcIdent.name id in
     match gty with
     | GTty ty ->
-      LD_var(ty,None), bind_local s x (f_local id ty)
-    | GTmem me  ->
-      LD_mem me, bind_mem s x id
+        if name <> "_" && not (EcIo.is_sym_ident name) then
+          tacerror (InvalidName name);
+        LD_var(ty,None), bind_local s x (f_local id ty)
+
+    | GTmem me ->
+        if name <> "_" && not (EcIo.is_mem_ident name) then
+          tacerror (InvalidName name);
+        LD_mem me, bind_mem s x id
+
     | GTmodty i ->
-      LD_modty i, bind_mod s x (EcPath.mident id) in
+        if name <> "_" && not (EcIo.is_mod_ident name) then
+          tacerror (InvalidName name);
+        LD_modty i, bind_mod s x (EcPath.mident id)
+  in
 
   let add_ld id ld hyps =
     set_loc id.pl_loc (LDecl.add_local id.pl_desc ld) hyps in

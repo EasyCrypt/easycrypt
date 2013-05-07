@@ -823,7 +823,7 @@ let t_equiv_rcond side b at_pos g =
     if side then es.es_ml,es.es_mr, es.es_sl 
     else         es.es_mr,es.es_ml, es.es_sr in
   let hd,e,s = gen_rcond b EcFol.mhr at_pos s in 
-  let mo' = EcIdent.create "m" in
+  let mo' = EcIdent.create "&m" in
   let s1 = 
     Mid.add (EcMemory.memory mo) mo' 
       (Mid.add (EcMemory.memory m) EcFol.mhr Mid.empty) in
@@ -884,7 +884,7 @@ let s_first_if s =
 
 let t_gen_cond env side e g =
   let hyps = get_hyps g in
-  let m1,m2,h,h1,h2 = match LDecl.fresh_ids hyps ["m";"m";"_";"_";"_"] with
+  let m1,m2,h,h1,h2 = match LDecl.fresh_ids hyps ["&m";"&m";"_";"_";"_"] with
     | [m1;m2;h;h1;h2] -> m1,m2,h,h1,h2
     | _ -> assert false in
   let t_introm = if side <> None then t_intros_i env [m1] else t_id in
@@ -922,7 +922,7 @@ let rec t_equiv_cond env side g =
       let er = form_of_expr (EcMemory.memory es.es_mr) er in
       let fiff = gen_mems [es.es_ml;es.es_mr] (f_imp es.es_pr (f_iff el er)) in
       let hiff,m1,m2,h,h1,h2 = 
-        match LDecl.fresh_ids hyps ["hiff";"m1";"m2";"h";"h";"h"] with 
+        match LDecl.fresh_ids hyps ["hiff";"&m1";"&m2";"h";"h";"h"] with 
         | [hiff;m1;m2;h;h1;h2] -> hiff,m1,m2,h,h1,h2 
         | _ -> assert false in
       let t_aux = 

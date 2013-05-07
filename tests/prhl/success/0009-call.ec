@@ -37,9 +37,9 @@ proof.
   fun.
   call (x{1}=w{2}) (res{1} = res{2} /\ M1.y{1} = M2.y{2}).
     fun;wp;skip.
-    intros m1 m2 h;simplify;assumption.
+    intros &m1 &m2 h;simplify;assumption.
   skip.
-  intros m1 m2 h;elim h;clear h;intros h1 h2.
+  intros &m1 &m2 h;elim h;clear h;intros h1 h2.
   elim h2;clear h2;intros h2 h3.
   split;[ assumption | intros _ y1 y2 h];elim h;clear h;intros _ _.
   subst;simplify;split;assumption.

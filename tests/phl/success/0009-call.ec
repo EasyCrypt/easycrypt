@@ -21,8 +21,8 @@ proof.
   intros xi zi;fun.
   call (x=xi) (res = 3 /\ M.y = xi).
     fun;wp;skip.
-    intros m _;subst;simplify;split.
+    intros &m _;subst;simplify;split.
   skip.
-  intros m h;elim h;clear h;intros _ _;subst;simplify.
+  intros &m h;elim h;clear h;intros _ _;subst;simplify.
   intros y h;assumption h.
 save.

@@ -631,8 +631,7 @@ module Tactic = struct
 
   let process_intros env pis =
     let mk_id s = EcIdent.create (odfl "_" s) in
-    let ids = List.map (lmap mk_id) pis in
-    t_intros env ids
+      t_intros env (List.map (lmap mk_id) pis)
 
   let tyenv_of_hyps env hyps =
     let add env (id,k) =
@@ -962,13 +961,13 @@ module Tactic = struct
     let t_pre = ref t_id and t_post = ref t_id in
     let tac1 g =
       let hyps = get_hyps g in
-      let m, h = match LDecl.fresh_ids hyps ["m";"H"] with
+      let m, h = match LDecl.fresh_ids hyps ["&m";"H"] with
         | [m;h] -> m,h
         | _ -> assert false in
       t_seq (t_intros_i env [m;h]) (t_hyp env h) g in
     let tac2 g =
       let hyps = get_hyps g in
-      let m1,m2, h = match LDecl.fresh_ids hyps ["m";"m";"H"] with
+      let m1,m2, h = match LDecl.fresh_ids hyps ["&m";"&m";"H"] with
         | [m1;m2;h] -> m1,m2,h
         | _ -> assert false in
       t_seq (t_intros_i env [m1;m2;h]) (t_hyp env h) g in
