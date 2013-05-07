@@ -898,8 +898,36 @@ let rec pr_form_rec (ppenv : ppenv) outer (f : form) =
           !^ "==>";
           pr_form_rec ppenv outer es.es_po;
         ] ) ]
-  | FequivF _ | Fpr _ | Fglob _ ->      
-    !^ "implement-me"  (* FIXME *)
+
+  | Fpr (m, f, args, event) ->
+      join [
+        !^ "Pr";
+        pr_bracket (
+          join [
+            pr_funname ppenv f;
+            pr_paren (join (List.map (pr_form_rec ppenv outer) args));
+            !^ "@";
+            pr_ident ppenv m;
+            !^ ":";
+            pr_form_rec ppenv outer event
+          ])]
+
+  | FequivF eqv ->
+      join [
+        !^ "equiv";
+        pr_bracket (
+          join [
+            pr_funname ppenv eqv.ef_fl;
+            !^ "~";
+            pr_funname ppenv eqv.ef_fr;
+            !^ ":";
+            pr_form_rec ppenv outer eqv.ef_pr;
+            !^ "==>";
+            pr_form_rec ppenv outer eqv.ef_po ])]
+
+  | Fglob _ ->
+     !^ "implement-me"
+
 and pr_form ppenv f = pr_form_rec ppenv (min_op_prec, `NonAssoc) f
 
 

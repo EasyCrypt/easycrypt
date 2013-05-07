@@ -1295,7 +1295,6 @@ tactic:
 | RND info=rnd_info
     {PPhl (Prnd info) }
 
-
 | EQUIVDENO info=fpattern(conseq) { PPhl(Pequivdeno info) }
 
 | CONSEQ info=fpattern(conseq) { PPhl(Pconseq info) }
