@@ -301,8 +301,9 @@ type variable = {
 }
 
 type module_type = {
-  mt_name : EcPath.path;
-  mt_args : (EcPath.mpath list) option;
+  mt_params : (EcIdent.t * module_type) list;
+  mt_name   : EcPath.path;
+  mt_args   : EcPath.mpath list;
 }
 
 type module_sig = {
@@ -391,8 +392,21 @@ let fd_hash f =
     (Why3.Hashcons.combine_list vd_hash 0 f.f_locals)
 
 (* -------------------------------------------------------------------- *)
-let mty_subst sp sm mty = 
-  let p = sp mty.mt_name in
-  let a = osmart_map mty.mt_args (List.smart_map sm) in
-  if mty.mt_name == p && mty.mt_args == a then mty else 
-  { mt_name = p; mt_args = a }
+let rec mty_subst sp sm mty =
+  let mt_params = List.map (sndmap (mty_subst sp sm)) mty.mt_params in
+  let mt_name   = sp mty.mt_name in
+  let mt_args   = List.map sm mty.mt_args in
+    { mt_params; mt_name; mt_args; }
+
+let mty_hash mty =
+  Why3.Hashcons.combine2
+    (EcPath.p_hash mty.mt_name)
+    (Why3.Hashcons.combine_list
+       (fun (x, _) -> EcIdent.id_hash x)
+       0 mty.mt_params)
+    (Why3.Hashcons.combine_list EcPath.m_hash 0 mty.mt_args)
+
+let rec mty_equal mty1 mty2 =
+     (EcPath.p_equal mty1.mt_name mty2.mt_name)
+  && (List.all2 EcPath.m_equal mty1.mt_args mty2.mt_args)
+  && (List.all2 (pair_equal EcIdent.id_equal mty_equal) mty1.mt_params mty2.mt_params)

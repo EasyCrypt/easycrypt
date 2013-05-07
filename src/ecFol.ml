@@ -112,8 +112,7 @@ let gty_equal ty1 ty2 =
       EcTypes.ty_equal ty1 ty2
 
   | GTmodty p1, GTmodty p2  ->
-       (EcPath.p_equal p1.mt_name p2.mt_name)
-    && (oall2 (List.all2 EcPath.m_equal) p1.mt_args p2.mt_args)
+      EcModules.mty_equal p1 p2
 
   | GTmem mt1, GTmem mt2 -> EcMemory.mt_equal mt1 mt2
 
@@ -124,9 +123,7 @@ let gty_hash = function
       EcTypes.ty_hash ty
 
   | GTmodty p  ->
-      Why3.Hashcons.combine_option
-        (Why3.Hashcons.combine_list EcPath.m_hash (EcPath.p_hash p.mt_name))
-        p.mt_args
+      EcModules.mty_hash p
 
   | GTmem _ -> 1
 

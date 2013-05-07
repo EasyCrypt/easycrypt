@@ -79,9 +79,10 @@ type variable = {
   v_type : EcTypes.ty;
 }
 
-type module_type = {
-  mt_name : EcPath.path;
-  mt_args : (EcPath.mpath list) option;
+type module_type = {                   (* Always in eta-normal form *)
+  mt_params : (EcIdent.t * module_type) list;
+  mt_name   : EcPath.path;
+  mt_args   : EcPath.mpath list;
 }
 
 type module_sig = {
@@ -156,3 +157,6 @@ val fd_hash  : function_def -> int
 
 val mty_subst : 
   (path -> path) -> (mpath -> mpath) ->  module_type -> module_type
+
+val mty_equal : module_type -> module_type -> bool
+val mty_hash  : module_type -> int

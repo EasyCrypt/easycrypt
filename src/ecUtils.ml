@@ -34,6 +34,9 @@ let fst_map (f : 'a -> 'c) ((x, y) : 'a * 'b) =
 let snd_map (f : 'b -> 'c) ((x, y) : 'a * 'b) =
   (x, f y)
 
+let pair_equal tx ty (x1, y1) (x2, y2) =
+  (tx x1 x2) && (ty y1 y2)
+
 (* -------------------------------------------------------------------- *)
 let opt_equal (f : 'a -> 'a -> bool) o1 o2 =
   match o1, o2 with

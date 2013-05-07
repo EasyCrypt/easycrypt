@@ -557,7 +557,11 @@ let lookup_module_type (env : EcEnv.env) (name : pqsymbol) =
 (* -------------------------------------------------------------------- *)
 let transmodtype (env : EcEnv.env) (modty : pmodule_type) =
   let (p, sig_) = lookup_module_type env modty in
-  let modty = { mt_name = p; mt_args = None; } in
+  let modty = {                         (* eta-normal form *)
+    mt_params = sig_.mis_params;
+    mt_name   = p;
+    mt_args   = List.map (EcPath.mident -| fst) sig_.mis_params;
+  } in
     (modty, sig_)
 
 (* -------------------------------------------------------------------- *)
@@ -825,7 +829,7 @@ and transstruct (env : EcEnv.env) (x : symbol) (st : pstructure) =
   (* Generate structure signature *)
   let tymod =
     let tymod1 = function
-      | MI_Module   _  -> None           (* FIXME: what ? *)
+      | MI_Module   _  -> None
       | MI_Variable _v -> None           (* Some (Tys_variable v)  *)
       | MI_Function f  -> Some (Tys_function f.f_sig)
     in
@@ -847,22 +851,27 @@ and transstruct (env : EcEnv.env) (x : symbol) (st : pstructure) =
                 tyerror loc env
                   (InvalidModType MTE_FunSigDoesNotRepeatArgNames)
         end;
-        (oatyp <> [], transmodtype env aty))
-      st.ps_signature in
 
-  let types =
-    List.map
-      (fun (istyf, ((_, aty) as aout)) ->
-        let aty =        (* FIXME: don't eta params on functor type *)
-          let aparams =
-            if   not istyf
-            then stparams @ aty.mis_params
-            else aty.mis_params
-          in
-            { aty with mis_params =  aparams}
+        let (aty, asig) = transmodtype env aty in
+        let aparams =
+          match oatyp = [] with
+          | true  -> stparams @ asig.mis_params
+          | false -> asig.mis_params
         in
-          check_tymod_sub env tymod aty; aout)
-      types
+          check_tymod_sub env tymod { asig with mis_params = aparams };
+          match oatyp = [] with
+          | true  -> { aty with mt_params = stparams @ aty.mt_params }
+          | false ->
+              let subst =
+                List.fold_left2
+                  (fun subst (x1, _) (x2, _) ->
+                     EcSubst.add_module subst x1 (EcPath.mident x2))
+                  EcSubst.empty asig.mis_params aty.mt_params
+              in
+                { aty with
+                    mt_params = asig.mis_params;
+                    mt_args   = List.map (EcSubst.subst_mpath subst) aty.mt_args })
+      st.ps_signature
   in
 
     (* Construct structure representation *)
@@ -872,7 +881,7 @@ and transstruct (env : EcEnv.env) (x : symbol) (st : pstructure) =
       me_comps = List.map snd items;
       me_uses  = Sp.empty;              (* FIXME *)
       me_sig   = tymod;
-      me_types = List.map fst types; }
+      me_types = types; }
 
 (* -------------------------------------------------------------------- *)
 and transstruct1 (env : EcEnv.env) (st : pstructure_item) =
@@ -1221,7 +1230,7 @@ let rec trans_msymbol (env : EcEnv.env) (msymb : pmsymbol located) =
     | Some me -> me
   in
 
-  let (params, _istop) =
+  let (params, istop) =
     match top_path with
     | `Concrete (_, Some sub) ->
         if mod_expr.me_sig.mis_params <> [] then
@@ -1247,20 +1256,19 @@ let rec trans_msymbol (env : EcEnv.env) (msymb : pmsymbol located) =
   match args with
   | None ->
       let mp = EcPath.mpath top_path [] in
-      let mt =
-        List.map (fun mt -> { mt with mt_args = None })
-          mod_expr.me_types
-      in
-        (mp, mt)
+      let mt = mod_expr.me_types in
+        (mp, mod_expr.me_sig.mis_params, mt)
 
   | Some args ->
+      if List.length params <> List.length args then
+        tyerror loc env (InvalidModAppl MAE_WrongArgCount);
       List.iter2
-        (fun (_, p) (_, a) ->
+        (fun (_, p) (_, _, a) ->
           if not (EcEnv.ModTy.has_mod_type env a p) then
             tyerror loc env (InvalidModAppl MAE_InvalidArgType))
         params args;
 
-      let args = List.map fst args in
+      let args = List.map proj3_1 args in
 
       let subst = 
         List.fold_left2
@@ -1269,11 +1277,20 @@ let rec trans_msymbol (env : EcEnv.env) (msymb : pmsymbol located) =
       in
 
       let mp = EcPath.mpath top_path args in
-      let mt = 
-        List.map (EcSubst.subst_modtype subst)
-          mod_expr.me_types
+      let mt =
+        match istop with
+        | false ->
+            List.map (EcSubst.subst_modtype subst) mod_expr.me_types
+        | true  ->
+            List.map
+              (fun mt ->
+                { mt_name   = mt.mt_name;
+                  mt_params = [];
+                  mt_args   = List.map (EcSubst.subst_mpath subst) mt.mt_args })
+              mod_expr.me_types
+              
       in
-        (mp, mt)
+        (mp, [], mt)
 
 (* -------------------------------------------------------------------- *)
 and trans_gamepath (env : EcEnv.env) gp =
@@ -1288,7 +1305,11 @@ and trans_gamepath (env : EcEnv.env) gp =
     | Some _ -> ()
   in
 
-  let mpath = fst (trans_msymbol env (mk_loc loc (fst (unloc gp)))) in
+  let (mpath, args, _) =
+    trans_msymbol env (mk_loc loc (fst (unloc gp)))
+  in
+    if args <> [] then
+      tyerror gp.pl_loc env (UnknownFunName (modsymb, funsymb));
     EcPath.xpath mpath (EcPath.psymbol funsymb)
 
 (* -------------------------------------------------------------------- *)

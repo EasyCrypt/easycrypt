@@ -128,8 +128,9 @@ and subst_modsig (s : _subst) (comps : module_sig) =
 
 (* -------------------------------------------------------------------- *)
 and subst_modtype (s : _subst) (modty : module_type) =
-  { mt_name = s.s_p modty.mt_name;
-    mt_args = omap modty.mt_args (List.map s.s_fmp); }
+  { mt_params = List.map (fun (x, mty) -> (x, subst_modtype s mty)) modty.mt_params;
+    mt_name   = s.s_p modty.mt_name;
+    mt_args   = List.map s.s_fmp modty.mt_args; }
 
 (* -------------------------------------------------------------------- *)
 let subst_function_def (s : _subst) (def : function_def) =

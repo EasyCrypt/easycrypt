@@ -1284,8 +1284,8 @@ module Mod = struct
         | Some x -> x
       in
         match modty.mt_args with
-        | None -> modsig
-        | Some args -> begin
+        | [] -> modsig
+        | args -> begin
           assert (List.length modsig.mis_params = List.length args);
           let subst =
             List.fold_left2
@@ -1504,15 +1504,39 @@ module ModTy = struct
       { env with
           env_item = CTh_modtype (name, modty) :: env.env_item }
 
-  let mod_type_equiv (env : env) (mty1 : module_type) (mty2 : module_type) =
-       (EcPath.p_equal mty1.mt_name mty2.mt_name)
-    && oall2
-         (List.all2
-            (fun m1 m2 ->
-               let m1 = NormMp.norm_mpath env m1 in
-               let m2 = NormMp.norm_mpath env m2 in
-                 EcPath.m_equal m1 m2))
-         mty1.mt_args mty2.mt_args
+  exception ModTypeNotEquiv
+
+  let rec mod_type_equiv (env : env) (mty1 : module_type) (mty2 : module_type) =
+    if not (EcPath.p_equal mty1.mt_name mty2.mt_name) then
+      raise ModTypeNotEquiv;
+
+    if List.length mty1.mt_params <> List.length mty2.mt_params then
+      raise ModTypeNotEquiv;
+    if List.length mty1.mt_args <> List.length mty2.mt_args then
+      raise ModTypeNotEquiv;
+
+    let subst =
+      List.fold_left2
+        (fun subst (x1, p1) (x2, p2) ->
+          let p1 = EcSubst.subst_modtype subst p1 in
+          let p2 = EcSubst.subst_modtype subst p2 in
+            mod_type_equiv env p1 p2;
+            EcSubst.add_module subst x1 (EcPath.mident x2))
+        EcSubst.empty mty1.mt_params mty2.mt_params
+    in
+
+    if not (
+         List.all2
+           (fun m1 m2 ->
+             let m1 = NormMp.norm_mpath env (EcSubst.subst_mpath subst m1) in
+             let m2 = NormMp.norm_mpath env (EcSubst.subst_mpath subst m2) in
+               EcPath.m_equal m1 m2)
+            mty1.mt_args mty2.mt_args) then
+      raise ModTypeNotEquiv
+
+  let mod_type_equiv env mty1 mty2 =
+    try  mod_type_equiv env mty1 mty2; true
+    with ModTypeNotEquiv -> false
 
   let has_mod_type (env : env) (dst : module_type list) (src : module_type) =
     List.exists (mod_type_equiv env src) dst
