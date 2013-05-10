@@ -964,7 +964,9 @@ module Var = struct
         | Some (params, o) ->
            let local = o.vb_kind = EcTypes.PVloc in
            let ((spi, params), _) = MC._downpath_for_var local env ip params in
-             if i <> spi || List.length args <> List.length params then
+             if i <> spi then
+               assert false;
+             if params <> [] && List.length args <> List.length params then
                assert false;
              o
       end
@@ -1013,9 +1015,8 @@ module Var = struct
 
       match obind side inmem with
       | None -> begin
-          let (((_, a), p), x) = MC.lookup_var qname env in
-            if a <> [] then
-              raise (LookupFailure (`QSymbol qname));
+          (* Variable are never suspended *)
+          let (((_, _), p), x) = MC.lookup_var qname env in
             ({ pv_name = p; pv_kind = x.vb_kind }, x.vb_type)
         end
 
