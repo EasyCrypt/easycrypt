@@ -240,7 +240,7 @@ let s_subst (s: EcTypes.e_subst) =
       | LvVar pvt ->
         let pvt' = pvt_subst pvt in
         if pvt == pvt' then lv else
-          LvVar pvt
+          LvVar pvt'
       | LvTuple pvs ->
         let pvs' = List.smart_map pvt_subst pvs in
         if pvs == pvs' then lv else LvTuple pvs'

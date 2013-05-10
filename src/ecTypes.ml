@@ -564,7 +564,7 @@ let e_subst_init freshen on_path on_ty on_mpath =
 let add_local s (x,t as xt) = 
   let x' = if s.es_freshen then EcIdent.fresh x else x in
   let t' = s.es_ty t in
-  if x == x' && t = t' then s, xt
+  if x == x' && t == t' then s, xt
   else 
     let merger o = assert (o = None); Some (e_local x' t') in
     { s with es_loc = Mid.change merger x s.es_loc }, (x',t')
