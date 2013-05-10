@@ -1284,18 +1284,14 @@ module Mod = struct
         | None -> lookup_error (`Path modty.mt_name)
         | Some x -> x
       in
-        match modty.mt_args with
-        | [] -> modsig
-        | args -> begin
-          assert (List.length modsig.mis_params = List.length args);
-          let subst =
-            List.fold_left2
-              (fun s (mid, _) arg ->
-                EcSubst.add_module s mid arg)
-              EcSubst.empty modsig.mis_params args
-          in
-            { (EcSubst.subst_modsig subst modsig) with mis_params = []; }
-        end
+
+      let subst =
+        List.fold_left2
+          (fun s (mid, _) arg ->
+            EcSubst.add_module s mid arg)
+          EcSubst.empty modsig.mis_params modty.mt_args
+      in
+        { (EcSubst.subst_modsig subst modsig) with mis_params = modty.mt_params }
     in
 
     let me    = module_expr_of_module_sig name modty modsig in

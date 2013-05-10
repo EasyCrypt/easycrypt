@@ -1245,13 +1245,15 @@ let rec trans_msymbol (env : EcEnv.env) (msymb : pmsymbol located) =
           assert false;
         (mod_expr.me_sig.mis_params, true)
 
-    | `Abstract _ ->
+    | `Abstract m ->
         if (params <> []) || spi <> 0 then
           assert false;
         (mod_expr.me_sig.mis_params, true)
   in
 
   let args = omap args (List.map (trans_msymbol env)) in
+
+  Printf.printf "%b\n%!" istop;
 
   match args with
   | None ->
