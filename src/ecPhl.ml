@@ -372,8 +372,7 @@ let t_hS_or_eS th te g =
 (* -------------------------------------------------------------------- *)
 (* -------------------------  Tactics --------------------------------- *)
 (* -------------------------------------------------------------------- *)
-
-let prove_goal_by sub_gs rule (juc, n as g) =
+let prove_goal_by sub_gs rule (juc,n as g) =
   let hyps,_ = get_goal g in
   let add_sgoal (juc,ns) sg = 
     let juc,n = new_goal juc (hyps,sg) in juc, RA_node n::ns
@@ -381,7 +380,6 @@ let prove_goal_by sub_gs rule (juc, n as g) =
   let juc,ns = List.fold_left add_sgoal (juc,[]) sub_gs in
   let rule = { pr_name = rule ; pr_hyps = List.rev ns} in
   upd_rule rule (juc,n)
-
 
 let t_hoareF_fun_def env g = 
   let concl = get_concl g in
@@ -637,8 +635,8 @@ let t_equiv_call env fpre fpost g =
   let f_concl = f_equivF fpre fl fr fpost in
   (* The wp *)
   let pvresl = pv_res fl and pvresr = pv_res fr in
-  let vresl = EcIdent.create "result_L" in
-  let vresr = EcIdent.create "result_R" in
+  let vresl = LDecl.fresh_id (get_hyps g) "result_L" in
+  let vresr = LDecl.fresh_id (get_hyps g) "result_R" in
   let fresl = f_local vresl (snd fsigl.fs_sig) in
   let fresr = f_local vresr (snd fsigr.fs_sig) in
   let post = wp_asgn_call env ml lpl fresl es.es_po in
@@ -654,8 +652,13 @@ let t_equiv_call env fpre fpost g =
   let spre = subst_args_call env mr fr (fst fsigr.fs_sig) argsr spre in
   let post = f_anda_simpl (PVM.subst env spre fpre) post in
   let concl = f_equivS_r { es with es_sl = sl; es_sr = sr; es_po=post} in
-  prove_goal_by [f_concl;concl] (RN_hl_call (fpre, fpost)) g
-
+  let concl =
+    f_forall
+      [(vresl, GTty (snd fsigl.fs_sig));
+       (vresr, GTty (snd fsigr.fs_sig))]
+      concl
+  in
+    prove_goal_by [f_concl;concl] (RN_hl_call (fpre, fpost)) g
 
 (* -------------------------------------------------------------------- *)
 
