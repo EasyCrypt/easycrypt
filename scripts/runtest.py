@@ -164,6 +164,7 @@ def _main():
             scripts = os.listdir(dirname)
         except OSError, e:
             logging.warning("cannot scan `%s': %s" % (dirname, e))
+            return []
         scripts = sorted([x for x in scripts if x.endswith('.ec')])
         logging.debug("%.4d script(s) found in `%s'" % (len(scripts), dirname))
 
