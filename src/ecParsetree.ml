@@ -158,7 +158,7 @@ and pformula_r =
   | PFint    of int
   | PFtuple  of pformula list
   | PFident  of pqsymbol * ptyannot option
-  | PFside   of pformula * psymbol
+  | PFside   of pformula * (int * symbol) located
   | PFapp    of pformula * pformula list
   | PFif     of pformula * pformula * pformula
   | PFlet    of plpattern * pformula * pformula

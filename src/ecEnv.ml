@@ -876,8 +876,10 @@ module Memory = struct
       | []     -> None
       | m :: _ -> Some m
 
-  let lookup (me : symbol) (env : env) =
-    MMsym.last me env.env_memories
+  let lookup (g : int) (me : symbol) (env : env) =
+    let mems = MMsym.all me env.env_memories in
+      try  Some (List.nth mems g)
+      with Failure _ -> None
 
   let set_active (me : memory) (env : env) =
     match byid me env with
