@@ -1017,6 +1017,7 @@ module Var = struct
       | None -> begin
           (* Variable are never suspended *)
           let (((_, _), p), x) = MC.lookup_var qname env in
+          let p = EcPath.xpath (EcPath.mpath p.x_top.m_top []) p.x_sub in
             ({ pv_name = p; pv_kind = x.vb_kind }, x.vb_type)
         end
 
