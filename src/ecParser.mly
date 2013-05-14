@@ -370,7 +370,7 @@ fident:
 pside_:
 | x=LIDENT     { (0, Printf.sprintf "&%s" x) }
 | x=NUM        { (0, Printf.sprintf "&%d" x) }
-| ADD x=pside  { (1 + fst x, snd x) }
+| ADD x=pside_ { (1 + fst x, snd x) }
 ;
 
 pside:
