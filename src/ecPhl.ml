@@ -147,20 +147,20 @@ and f_write env f =
   let f = NormMp.norm_xpath env f in
   let func = Fun.by_xpath f env in
   match func.f_def with
-  | None -> assert false
+  | FBabs _ -> assert false
 (*
     let a = destr_adv_fun f in
     let w = PV.add_glob env a PV.empty in
     let add w o = PV.union env (f_write env o) w in
     List.fold_left add w (oracles func)
 *)
-  | Some fdef ->
+  | FBdef fdef ->
     let remove_local w {v_name = v } =
       PV.remove env {pv_name = EcPath.xqname f v; 
                      pv_kind = PVloc } w in
     let wf = s_write env PV.empty fdef.f_body in
     let wf = List.fold_left remove_local wf fdef.f_locals in
-    List.fold_left remove_local wf (fst func.f_sig.fs_sig) 
+    List.fold_left remove_local wf (func.f_sig.fs_params) 
 
 let s_write env = s_write env PV.empty
 
@@ -193,19 +193,19 @@ and i_read env r i =
 and f_read env f =   
   let func = Fun.by_xpath f env in
   match func.f_def with
-  | None -> assert false 
+  | FBabs _ -> assert false 
 (*
     let a = destr_adv_fun f in
     let r = PV.add_glob env a PV.empty in 
     let add r o = PV.union env (f_read env o) r in
     List.fold_left add r (oracles func) *)
-  | Some fdef ->
+  | FBdef fdef ->
     let remove_local w {v_name = v } =
       PV.remove env {pv_name = EcPath.xqname f v; 
                      pv_kind = PVloc } w in
     let wf = s_read env PV.empty fdef.f_body in
     let wf = List.fold_left remove_local wf fdef.f_locals in
-    List.fold_left remove_local wf (fst func.f_sig.fs_sig) 
+    List.fold_left remove_local wf func.f_sig.fs_params 
 
 let s_read env = s_read env PV.empty
 
@@ -608,12 +608,12 @@ let t_hoare_call env fpre fpost (juc,n1 as g) =
   (* The wp *)
   let pvres = pv_res f in
   let vres = EcIdent.create "result" in
-  let fres = f_local vres (snd fsig.fs_sig) in
+  let fres = f_local vres fsig.fs_ret in
   let post = wp_asgn_call env m lp fres hs.hs_po in
   let fpost = PVM.subst1 env pvres m fres fpost in 
   let modi = f_write env f in
   let post = generalize_mod env m modi (f_imp_simpl fpost post) in
-  let spre = subst_args_call env m f (fst fsig.fs_sig) args PVM.empty in
+  let spre = subst_args_call env m f fsig.fs_params args PVM.empty in
   let post = f_anda_simpl (PVM.subst env spre fpre) post in
   let concl = f_hoareS_r { hs with hs_s = s; hs_po=post} in
   let (juc,n) = new_goal juc (hyps,concl) in
@@ -637,8 +637,8 @@ let t_equiv_call env fpre fpost g =
   let pvresl = pv_res fl and pvresr = pv_res fr in
   let vresl = LDecl.fresh_id (get_hyps g) "result_L" in
   let vresr = LDecl.fresh_id (get_hyps g) "result_R" in
-  let fresl = f_local vresl (snd fsigl.fs_sig) in
-  let fresr = f_local vresr (snd fsigr.fs_sig) in
+  let fresl = f_local vresl fsigl.fs_ret in
+  let fresr = f_local vresr fsigr.fs_ret in
   let post = wp_asgn_call env ml lpl fresl es.es_po in
   let post = wp_asgn_call env mr lpr fresr post in
   let s    = 
@@ -648,14 +648,14 @@ let t_equiv_call env fpre fpost g =
   let modir = f_write env fr in
   let post = generalize_mod env mr modir (f_imp_simpl fpost post) in
   let post = generalize_mod env ml modil post in
-  let spre = subst_args_call env ml fl (fst fsigl.fs_sig) argsl PVM.empty in
-  let spre = subst_args_call env mr fr (fst fsigr.fs_sig) argsr spre in
+  let spre = subst_args_call env ml fl fsigl.fs_params argsl PVM.empty in
+  let spre = subst_args_call env mr fr fsigr.fs_params argsr spre in
   let post = f_anda_simpl (PVM.subst env spre fpre) post in
   let concl = f_equivS_r { es with es_sl = sl; es_sr = sr; es_po=post} in
   let concl =
     f_forall
-      [(vresl, GTty (snd fsigl.fs_sig));
-       (vresr, GTty (snd fsigr.fs_sig))]
+      [(vresl, GTty fsigl.fs_ret);
+       (vresr, GTty fsigr.fs_ret)]
       concl
   in
     prove_goal_by [f_concl;concl] (RN_hl_call (None, fpre, fpost)) g
@@ -934,10 +934,10 @@ let t_equiv_deno env pre post g =
   (* we should substitute param by args and left by ml and right by mr *)
   let sargs = 
     List.fold_left2 (fun s v a -> PVM.add env (pv_loc fr v.v_name) mright a s)
-      PVM.empty (fst funr.f_sig.fs_sig) argsr in
+      PVM.empty funr.f_sig.fs_params argsr in
   let sargs = 
     List.fold_left2 (fun s v a -> PVM.add env (pv_loc fl v.v_name) mleft a s)
-      sargs (fst funl.f_sig.fs_sig) argsl in
+      sargs funl.f_sig.fs_params argsl in
   let smem = { f_subst_id with 
     fs_mem = Mid.add mleft ml (Mid.singleton mright mr) } in
   let concl_pr  = f_subst smem (PVM.subst env sargs pre) in
@@ -1300,10 +1300,10 @@ let t_equiv_deno env pre post g =
   (* we should substitute param by args and left by ml and right by mr *)
   let sargs = 
     List.fold_left2 (fun s v a -> PVM.add env (pv_loc fr v.v_name) mright a s)
-      PVM.empty (fst funr.f_sig.fs_sig) argsr in
+      PVM.empty funr.f_sig.fs_params argsr in
   let sargs = 
     List.fold_left2 (fun s v a -> PVM.add env (pv_loc fl v.v_name) mleft a s)
-      sargs (fst funl.f_sig.fs_sig) argsl in
+      sargs funl.f_sig.fs_params argsl in
   let smem = { f_subst_id with 
     fs_mem = Mid.add mleft ml (Mid.singleton mright mr) } in
   let concl_pr  = f_subst smem (PVM.subst env sargs pre) in

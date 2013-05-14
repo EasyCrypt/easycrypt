@@ -1127,17 +1127,17 @@ module Fun = struct
 
   let actmem_pre me path fun_ =
     let mem = EcMemory.empty_local me path in
-    adds_in_memenv mem (fst fun_.f_sig.fs_sig)
+    adds_in_memenv mem fun_.f_sig.fs_params
 
   let actmem_post me path fun_ =
     let mem = EcMemory.empty_local me path in
-    add_in_memenv mem {v_name = "res"; v_type = snd fun_.f_sig.fs_sig}
+    add_in_memenv mem {v_name = "res"; v_type = fun_.f_sig.fs_ret}
 
   let actmem_body me path fun_ =
     let mem = actmem_pre me path fun_ in
     match fun_.f_def with
-    | None -> assert false (* FIXME error message *)
-    | Some fd -> fd, adds_in_memenv mem fd.f_locals
+    | FBabs _ -> assert false (* FIXME error message *)
+    | FBdef fd -> fd, adds_in_memenv mem fd.f_locals
 
   let actmem_body_anonym me path locals =
     let mem = EcMemory.empty_local me path in

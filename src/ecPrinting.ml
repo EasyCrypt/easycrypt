@@ -712,7 +712,7 @@ and pr_modvar (ppenv : ppenv) (v : variable) =
 (* -------------------------------------------------------------------- *)
 and pr_modfun (ppenv : ppenv) (f : function_) =
   let fname = f.f_sig.fs_name in
-  let fparams, fres = f.f_sig.fs_sig in
+  let fparams, fres = f.f_sig.fs_params, f.f_sig.fs_ret in
 
   let dparams =
     List.map
@@ -725,10 +725,9 @@ and pr_modfun (ppenv : ppenv) (f : function_) =
   in
 
     match f.f_def with
-    | None ->
-        prelude
+    | FBabs _ -> prelude (* FIXME oracle info *)
 
-    | Some def ->
+    | FBdef def ->
       let dlocals =
           List.map
             (fun vd -> pr_local ppenv (EcIdent.create vd.v_name))
@@ -739,7 +738,7 @@ and pr_modfun (ppenv : ppenv) (f : function_) =
           List.fold_left
             (fun ppenv x -> PPE.add_local ppenv (EcIdent.create x.v_name))
             ppenv
-            ((fst f.f_sig.fs_sig) @ def.f_locals)
+            ((f.f_sig.fs_params) @ def.f_locals)
         in
         List.map (pr_instr bodyppenv) def.f_body.s_node
       in

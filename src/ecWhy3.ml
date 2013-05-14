@@ -1351,7 +1351,7 @@ let add_mod_sig env _path s =
       env := add_nparam !env path ls;
       rb  := RBna(path,ls) :: !rb in
   let add_item = function
-    | Tys_function fs -> add_name (EcPath.psymbol fs.fs_name) in
+    | Tys_function (fs,_) -> add_name (EcPath.psymbol fs.fs_name) in
   List.iter add_item s.mis_body;
   !env, !rb
     

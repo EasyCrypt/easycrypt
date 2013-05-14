@@ -702,7 +702,7 @@ equiv_body:
 pgtybinding1:
 | x=ptybinding1 { List.map (fun (xs,ty) -> xs, PGTY_Type ty) x }
 
-| LPAREN x=uident LTCOLON mi=qident RPAREN
+| LPAREN x=uident LTCOLON mi=mod_type RPAREN
     { [[x], PGTY_ModTy mi] }
 
 | pn=mident
@@ -908,7 +908,8 @@ mod_aty1:
 (* Modules interfaces                                                   *)
 
 %inline mod_type:
-| x = qident { x }
+| x = qident { (x,[]) }
+| x = qident LBRACE restr=plist1(qident,COMMA) RBRACE { (x,restr) }
 ;
 
 sig_def:

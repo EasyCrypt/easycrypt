@@ -80,7 +80,7 @@ type pinstr =
 and pstmt = pinstr list
 
 (* -------------------------------------------------------------------- *)
-type pmodule_type = pqsymbol 
+type pmodule_type = pqsymbol * pqsymbol list
 
 and pmodule_sig =
   | Pmty_struct of pmodule_sig_struct
@@ -177,7 +177,7 @@ and pgtybindings = pgtybinding list
 
 and pgty =
 | PGTY_Type  of pty
-| PGTY_ModTy of pqsymbol
+| PGTY_ModTy of pmodule_type
 | PGTY_Mem
 
 (* -------------------------------------------------------------------- *)
