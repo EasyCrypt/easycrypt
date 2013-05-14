@@ -44,7 +44,7 @@ type tyerror =
 | InvalidModAppl       of modapp_error
 | InvalidModType       of modtyp_error
 | InvalidMem           of symbol * mem_error
-
+| OnlyModParamAreOracle of qsymbol
 exception TyError of EcLocation.t * EcEnv.env * tyerror
 
 val tyerror : EcLocation.t -> EcEnv.env -> tyerror -> 'a

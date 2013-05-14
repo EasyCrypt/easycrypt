@@ -115,11 +115,11 @@ let module_comps_of_module_sig_comps (comps : module_sig_body) =
 (*    | Tys_variable vd ->
         MI_Variable vd *)
 
-    | Tys_function funsig ->
+    | Tys_function(funsig, oi) ->
         MI_Function { 
           f_name = funsig.fs_name;
           f_sig  = funsig;
-          f_def  = None;
+          f_def  = FBabs oi;
         }
   in
     List.map onitem comps
@@ -133,5 +133,4 @@ let module_expr_of_module_sig (name : EcIdent.t) mp (tymod : module_sig) =
       me_body  = ME_Decl mp;
       me_comps = tycomps;
       me_sig   = tymod;
-      me_uses  = Sp.empty;                (* FIXME *)
       me_types = [mp]; }
