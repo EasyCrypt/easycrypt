@@ -53,7 +53,7 @@ module Memory : sig
   val get_active  : env -> memory option
 
   val byid        : memory -> env -> memenv option
-  val lookup      : symbol -> env -> memenv option
+  val lookup      : int -> symbol -> env -> memenv option
   val current     : env -> memenv option
   val push        : memenv -> env -> env
   val push_all    : memenv list -> env -> env

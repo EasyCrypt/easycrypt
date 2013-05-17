@@ -24,7 +24,7 @@ install-soft: $(PGROOT)
 	fi
 	( cd $(PGROOT)/generic && patch -p0 -t ) < proof-site.patch
 	../scripts/install-sh -m 0755 -d $(PGROOT)/easycrypt
-	ln -t $(PGROOT)/easycrypt easycrypt/*.el
+	for i in easycrypt/*.el; do ln -s $(CURDIR)/$$i $(PGROOT)/easycrypt; done
 
 uninstall: $(PGROOT)/easycrypt
 	( cd $(PGROOT)/generic && patch -p0 -tR ) < proof-site.patch
@@ -50,4 +50,4 @@ run-local:
 	emacs -q \
 	  --execute '(load-file "_local/emacs.rc")' \
 	  --execute '(cd "$(CURDIR)/..")' \
-	  --execute '(setq easycrypt-prog-name "$(CURDIR)/../ec.native -emacs")'
+	  --execute '(setq easycrypt-prog-name "$(CURDIR)/../ec.native -emacs -I /home/strub/Projects/GCircuits/proof")'

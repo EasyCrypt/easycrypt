@@ -367,9 +367,14 @@ fident:
 ;
 
 (* -------------------------------------------------------------------- *)
+pside_:
+| x=LIDENT     { (0, Printf.sprintf "&%s" x) }
+| x=NUM        { (0, Printf.sprintf "&%d" x) }
+| ADD x=pside_ { (1 + fst x, snd x) }
+;
+
 pside:
-| x=brace(LIDENT) { Printf.sprintf "&%s" x }
-| x=brace(NUM)    { Printf.sprintf "&%d" x }
+| x=brace(pside_) { x }
 ;
 
 (* -------------------------------------------------------------------- *)

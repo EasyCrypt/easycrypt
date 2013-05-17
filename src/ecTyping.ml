@@ -54,7 +54,7 @@ type tyerror =
 | UnknownTyModName     of qsymbol
 | UnknownFunName       of qsymbol
 | UnknownModVar        of qsymbol
-| UnknownMemName       of symbol
+| UnknownMemName       of int * symbol
 | InvalidFunAppl       of funapp_error
 | InvalidModAppl       of modapp_error
 | InvalidModType       of modtyp_error
@@ -123,8 +123,8 @@ let pp_tyerror fmt env error =
   | UnknownModVar x ->
       msg "unknown module-level variable: %a" pp_qsymbol x
 
-  | UnknownMemName m ->
-      msg "unknown memory: %s" m
+  | UnknownMemName (g, m) ->
+      msg "unknown memory: %s[g=%d]" m g
 
   | InvalidFunAppl FAE_WrongArgCount ->
       msg "invalid function application: wrong number of arguments"
@@ -801,6 +801,22 @@ let rec transmod (env : EcEnv.env) (x : symbol) (me : pmodule_expr) =
       if List.length atymods <> List.length args then
         tyerror me.pl_loc env (InvalidModAppl MAE_WrongArgCount);
 
+      let metypes =
+        let metype1 mty1 =
+          assert (List.length mty1.mt_params = List.length atymods);
+          let s =
+            List.fold_left2
+              (fun s (xarg, _) (xty, _) ->
+                 EcSubst.add_module s xty xarg)
+              EcSubst.empty args mty1.mt_params
+          in
+            { mty1 with
+                mt_params = [];
+                mt_args   = List.map (EcSubst.subst_mpath s) mty1.mt_args; }
+        in
+          List.map metype1 mty.me_types
+      in
+
       let bsubst =
         List.fold_left2
           (fun subst (xarg, arg) (xty, tymod) ->
@@ -818,7 +834,7 @@ let rec transmod (env : EcEnv.env) (x : symbol) (me : pmodule_expr) =
             mis_params = [];
             mis_body   = EcSubst.subst_modsig_body bsubst mty.me_sig.mis_body;
           };
-          me_types = if args = [] then mty.me_types else []; }
+          me_types = metypes; }
   end
 
   | Pm_struct st ->
@@ -1356,9 +1372,9 @@ let transfpattern env ue (p : EcParsetree.plpattern) =
 
 (* -------------------------------------------------------------------- *)
 let transmem env m =
-  match EcEnv.Memory.lookup (unloc m) env with
+  match EcEnv.Memory.lookup 0 (unloc m) env with
   | None ->
-      tyerror m.pl_loc env (UnknownMemName (unloc m))
+      tyerror m.pl_loc env (UnknownMemName (0, unloc m))
       
   | Some me -> 
       if (EcMemory.memtype me) <> None then
@@ -1391,9 +1407,10 @@ let transform_opt env ue pf tt =
         end
 
     | PFside (f, side) -> begin
+        let (sloc, (gen, side)) = (side.pl_loc, unloc side) in
         let me =
-          match EcEnv.Memory.lookup (unloc side) env with
-          | None -> tyerror side.pl_loc env (UnknownMemName (unloc side))
+          match EcEnv.Memory.lookup gen side env with
+          | None -> tyerror sloc env (UnknownMemName (gen, side))
           | Some me -> EcMemory.memory me
         in
           transf (EcEnv.Memory.set_active me env) f
