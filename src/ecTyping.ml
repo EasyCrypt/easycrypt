@@ -683,8 +683,8 @@ let rec check_tymod_cnv mode (env : EcEnv.env) tin tout =
         vd1.v_name = vd2.v_name && EcReduction.equal_type env vd1.v_type vd2.v_type 
       in
 
-      let (iargs, oargs) = (fst fin.fs_sig, fst fin.fs_sig) in
-      let (ires , ores ) = (snd fin.fs_sig, snd fin.fs_sig) in
+      let (iargs, oargs) = (fst fin.fs_sig, fst fout.fs_sig) in
+      let (ires , ores ) = (snd fin.fs_sig, snd fout.fs_sig) in
 
         if List.length iargs <> List.length oargs then
           tymod_cnv_failure (E_TyModCnv_MismatchFunSig fin.fs_name);
