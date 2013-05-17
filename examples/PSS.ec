@@ -77,8 +77,9 @@ theory SignatureScheme.
     fun a(pk:pkey): (bitstring * bitstring)
   }.
 
-  module EF_CMA(S:SigScheme_Oracles_ROM, Adv:SigAdversary_ROM) = {
-    module A = Adv(S)
+  module EF_CMA(S:SigScheme_ROM, Adv:SigAdversary_ROM) = {
+    module O = Sig_Oracles_ROM(S)
+    module A = Adv(O)
 
     fun main(): bool = {
       var pk:pkey;
@@ -86,10 +87,10 @@ theory SignatureScheme.
       var s:bitstring;
       var forged:bool;
       var queried:bool;
-      pk := S.init();
+      pk := O.init();
       (m,s) := A.a(pk);
-      forged := S.verify(pk,m,s);
-      queried := S.wasQueried(m);
+      forged := O.verify(pk,m,s);
+      queried := O.wasQueried(m);
       return forged /\ !queried;
     }
   }.
