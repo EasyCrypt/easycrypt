@@ -344,7 +344,18 @@ module MC = struct
   let _downpath_for_fun = _downpath_for_var false
 
   (* ------------------------------------------------------------------ *)
-  let _downpath_for_mod _env p args =
+  let _downpath_for_mod env p args =
+    let prefix =
+      let prefix_of_mtop = function
+        | `Concrete (p1, _) -> Some p1
+        | `Abstract _ -> None
+      in
+        match env.env_scope.ec_scope with
+        | `Theory   -> None
+        | `Module m -> prefix_of_mtop m.EcPath.m_top
+        | `Fun    m -> prefix_of_mtop m.EcPath.x_top.EcPath.m_top
+    in          
+
     let (l, a, r) =
       try
         List.find_split (fun x -> x <> None) args
@@ -358,20 +369,21 @@ module MC = struct
       let a = oget a in               (* arguments of top enclosing module *)
       let n = List.map fst a in       (* argument names *)
 
-      let ap =
+      let (ap, inscope) =
         match p with
         | IPPath p ->
            (* p,q = frontier with the first module *)
             let (p, q) = _cutpath (i+1) p in
-              EcPath.mpath_crt p (List.map EcPath.mident n) q
+              (EcPath.mpath_crt p (List.map EcPath.mident n) q,
+               odfl false (omap prefix (EcPath.p_equal p)))
 
         | IPIdent (m, None) ->
             if i <> 0 then assert false;
-            EcPath.mpath_abs m (List.map EcPath.mident n)
+            (EcPath.mpath_abs m (List.map EcPath.mident n), false)
 
         | _ -> assert false
       in
-        ((List.length l, a), ap)
+        ((List.length l, if inscope then [] else a), ap)
 
   (* ------------------------------------------------------------------ *)
   let _downpath_for_th _env p args =
