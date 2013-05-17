@@ -770,6 +770,22 @@ let rec transmod (env : EcEnv.env) (x : symbol) (me : pmodule_expr) =
       if List.length atymods <> List.length args then
         tyerror me.pl_loc env (InvalidModAppl MAE_WrongArgCount);
 
+      let metypes =
+        let metype1 mty1 =
+          assert (List.length mty1.mt_params = List.length atymods);
+          let s =
+            List.fold_left2
+              (fun s (xarg, _) (xty, _) ->
+                 EcSubst.add_module s xty xarg)
+              EcSubst.empty args mty1.mt_params
+          in
+            { mty1 with
+                mt_params = [];
+                mt_args   = List.map (EcSubst.subst_mpath s) mty1.mt_args; }
+        in
+          List.map metype1 mty.me_types
+      in
+
       let bsubst =
         List.fold_left2
           (fun subst (xarg, arg) (xty, tymod) ->
@@ -789,7 +805,7 @@ let rec transmod (env : EcEnv.env) (x : symbol) (me : pmodule_expr) =
             mis_mforb  = Sp.empty;       (* FIXME *)
           };
           me_uses  = Sp.empty;          (* FIXME *)
-          me_types = if args = [] then mty.me_types else []; }
+          me_types = metypes; }
   end
 
   | Pm_struct st ->
