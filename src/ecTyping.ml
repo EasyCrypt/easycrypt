@@ -1269,8 +1269,6 @@ let rec trans_msymbol (env : EcEnv.env) (msymb : pmsymbol located) =
 
   let args = omap args (List.map (trans_msymbol env)) in
 
-  Printf.printf "%b\n%!" istop;
-
   match args with
   | None ->
       let mp = EcPath.mpath top_path [] in
