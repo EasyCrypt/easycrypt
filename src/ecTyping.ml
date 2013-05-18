@@ -1196,7 +1196,7 @@ and translvalue ue (env : EcEnv.env) lvalue =
 
       | [({e_node = Eop (p, tys) }, _, subue)] ->
           EcUnify.UniEnv.restore ~src:subue ~dst:ue;
-          (LvMap ((p, tys), pv, e, codomty), codomty)
+          (LvMap ((p, tys), pv, e, xty), codomty)
 
       | [_] ->                          (* FIXME: dubious *)
           let esig = Tuni.subst_dom (EcUnify.UniEnv.asmap ue) esig in

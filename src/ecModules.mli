@@ -9,7 +9,7 @@ open EcTypes
  * - op is the map-set operator
  * - m  is the map to be updated 
  * - x  is the index to update
- * - ty is the type of the value associated to x *)
+ * - ty is the type of the value [m] *)
 type lvalue =
   | LvVar   of (EcTypes.prog_var * EcTypes.ty)
   | LvTuple of (EcTypes.prog_var * EcTypes.ty) list
