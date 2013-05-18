@@ -15,6 +15,8 @@ let () = Stack.push core_printer exn_printers
 (* -------------------------------------------------------------------- *)
 let register ppexn = Stack.push ppexn exn_printers
 
+let () = register Why3.Exn_printer.exn_printer
+
 (* -------------------------------------------------------------------- *)
 exception Exit_loop
 
