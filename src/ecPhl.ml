@@ -825,7 +825,7 @@ let _inline env f occs me stmt =
                 (fun (v, newx) e ->
                   let newpv = {
                     pv_name = P.xqname (EcMemory.xpath me) newx;
-                    pv_kind = PVglob;
+                    pv_kind = PVloc;
                   } in
                     i_asgn (LvVar (newpv, v.v_type), e))
                 (List.combine (fst f.f_sig.fs_sig) anames)
