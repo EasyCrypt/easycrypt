@@ -307,7 +307,7 @@ and phl_tactics =
   | Papp        of (int doption * pformula)
   | Pwp         of int doption option 
   | Pwhile      of pformula
-  | Pcall       of pformula * pformula
+  | Pcall       of tac_side * (pformula * pformula)
   | Prcond      of (bool option * bool * int)
   | Pcond       of tac_side
   | Pswap       of ((tac_side * swap_kind) located list)

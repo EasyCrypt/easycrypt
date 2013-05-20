@@ -58,29 +58,29 @@ and f_node =
   | Fpr     of memory * EcPath.xpath * form list * form (* hr *)
 
 and equivF = { 
-  ef_pr  : form;
-  ef_fl   : EcPath.xpath;
-  ef_fr   : EcPath.xpath;
+  ef_pr : form;
+  ef_fl : EcPath.xpath;
+  ef_fr : EcPath.xpath;
   ef_po : form;
 }
 
 and equivS = {
-  es_ml  : EcMemory.memenv;
-  es_mr  : EcMemory.memenv;
-  es_pr  : form;
-  es_sl   : stmt; (* In reverse order *)
-  es_sr   : stmt; (* In reverse order *)
+  es_ml : EcMemory.memenv;
+  es_mr : EcMemory.memenv;
+  es_pr : form;
+  es_sl : stmt; (* In reverse order *)
+  es_sr : stmt; (* In reverse order *)
   es_po : form; }
 
 and hoareF = { 
-  hf_pr  : form;
-  hf_f    : EcPath.xpath;
+  hf_pr : form;
+  hf_f  : EcPath.xpath;
   hf_po : form;
 }
 and hoareS = {
-  hs_m   : EcMemory.memenv;
-  hs_pr  : form; 
-  hs_s    : stmt; (* In reverse order *)
+  hs_m  : EcMemory.memenv;
+  hs_pr : form; 
+  hs_s  : stmt; (* In reverse order *)
   hs_po : form; }
 
 

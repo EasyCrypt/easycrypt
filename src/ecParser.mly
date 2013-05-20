@@ -1299,8 +1299,8 @@ tactic:
 | WHILE inv=sform
     { PPhl (Pwhile inv) }
 
-| CALL pre=sform post=sform
-    { PPhl (Pcall(pre,post)) }
+| CALL s=side? pre=sform post=sform
+    { PPhl (Pcall (s, (pre, post))) }
 
 | RCONDT s=side? i=number
     {PPhl (Prcond(s, true, i))}

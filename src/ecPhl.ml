@@ -617,7 +617,7 @@ let t_hoare_call env fpre fpost (juc,n1 as g) =
   let post = f_anda_simpl (PVM.subst env spre fpre) post in
   let concl = f_hoareS_r { hs with hs_s = s; hs_po=post} in
   let (juc,n) = new_goal juc (hyps,concl) in
-  let rule = { pr_name = RN_hl_call (fpre, fpost); 
+  let rule = { pr_name = RN_hl_call (None, fpre, fpost); 
                pr_hyps =[RA_node nf;RA_node n;]} in
   upd_rule rule (juc, n1)
 
@@ -631,7 +631,7 @@ let t_equiv_call env fpre fpost g =
   let mr = EcMemory.memory es.es_mr in
   let fsigl = (Fun.by_xpath fl env).f_sig in
   let fsigr = (Fun.by_xpath fr env).f_sig in
-  (* The functions satisfies the specification *)
+  (* The function satisfies its specification *)
   let f_concl = f_equivF fpre fl fr fpost in
   (* The wp *)
   let pvresl = pv_res fl and pvresr = pv_res fr in
@@ -658,7 +658,46 @@ let t_equiv_call env fpre fpost g =
        (vresr, GTty (snd fsigr.fs_sig))]
       concl
   in
-    prove_goal_by [f_concl;concl] (RN_hl_call (fpre, fpost)) g
+    prove_goal_by [f_concl;concl] (RN_hl_call (None, fpre, fpost)) g
+
+let t_equiv_call1 env side fpre fpost g =
+  let concl = get_concl g in
+  let equiv = destr_equivS concl in
+
+  let (me, stmt) =
+    match side with
+    | true  -> (EcMemory.memory equiv.es_ml, equiv.es_sl)
+    | false -> (EcMemory.memory equiv.es_mr, equiv.es_sr)
+  in
+
+  let (lp, f, args), fstmt = s_last_call "call" stmt in
+  let fsig = (Fun.by_xpath f env).f_sig in
+
+  (* The function satisfies its specification *)
+  let fconcl = f_hoareF fpre f fpost in
+
+  (* WP *)
+  let pvres  = pv_res f in
+  let vres   = LDecl.fresh_id (get_hyps g) "result" in
+  let fres   = f_local vres (snd fsig.fs_sig) in
+  let post   = wp_asgn_call env me lp fres equiv.es_po in
+  let subst  = PVM.add env pvres me fres PVM.empty in
+  let msubst = EcFol.bind_mem EcFol.f_subst_id EcFol.mhr me in
+  let fpost  = PVM.subst env subst (f_subst msubst fpost) in
+  let modi   = f_write env f in
+  let post   = f_imp_simpl fpost post in
+  let post   = generalize_mod env me modi post in
+  let spre   = PVM.empty in
+  let spre   = subst_args_call env me f (fst fsig.fs_sig) args spre in
+  let post   = f_anda_simpl (PVM.subst env spre (f_subst msubst fpre)) post in
+  let concl  =
+    match side with
+    | true  -> { equiv with es_sl = fstmt; es_po = post; }
+    | false -> { equiv with es_sr = fstmt; es_po = post; } in
+  let concl  = f_equivS_r concl in
+  let concl  = f_forall [(vres, GTty (snd fsig.fs_sig))] concl in
+
+    prove_goal_by [fconcl; concl] (RN_hl_call (Some side, fpre, fpost)) g
 
 (* -------------------------------------------------------------------- *)
 

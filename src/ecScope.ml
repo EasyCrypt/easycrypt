@@ -842,21 +842,30 @@ module Tactic = struct
       t_equiv_while env (process_prhl_formula env g phi) g
     else cannot_apply "while" "the conclusion is not a hoare or a equiv"
 
-  let process_call env pre post g =
+  let process_call env side pre post g =
     let hyps,concl = get_goal g in
-    match concl.f_node with
-    | FhoareS hs ->
+    match concl.f_node, side with
+    | FhoareS hs, None ->
       let (_,f,_),_ = s_last_call "call" hs.hs_s in
       let penv, qenv = EcEnv.Fun.hoareF f env in
       let pre  = process_form penv hyps pre tbool in
       let post = process_form qenv hyps post tbool in
       t_hoare_call env pre post g
-    | FequivS es ->
+    | FhoareS _, Some _ ->
+      cannot_apply "call" "side can only be given for prhl judgements"
+    | FequivS es, None ->
       let (_,fl,_),(_,fr,_),_,_ = s_last_calls "call" es.es_sl es.es_sr in
       let penv, qenv = EcEnv.Fun.equivF fl fr env in
       let pre  = process_form penv hyps pre tbool in
       let post = process_form qenv hyps post tbool in
       t_equiv_call env pre post g
+    | FequivS es, Some side ->
+      let fstmt = match side with false -> es.es_sl | true -> es.es_sr in
+      let (_,f,_),_ = s_last_call "call" fstmt in
+      let penv, qenv = EcEnv.Fun.hoareF f env in
+      let pre  = process_form penv hyps pre tbool in
+      let post = process_form qenv hyps post tbool in
+      t_equiv_call1 env side pre post g
     | _ -> cannot_apply "call" "the conclusion is not a hoare or a equiv"
 
   let process_cond env side g =
@@ -1030,7 +1039,7 @@ module Tactic = struct
       | Prcond (side,b,i) -> t_rcond side b i
       | Pcond side   -> process_cond env side
       | Pwhile phi -> process_while env phi
-      | Pcall(pre,post) -> process_call env pre post
+      | Pcall(side, (pre, post)) -> process_call env side pre post
       | Pswap info -> process_swap env info
       | Pinline (f, s, o) -> process_inline env f s o
       | Prnd info -> process_rnd env info
