@@ -88,12 +88,12 @@ val m_tostring : mpath -> string
 val x_tostring : xpath -> string
 
 (* -------------------------------------------------------------------- *)
-module Mm : Map.S   with type key = mpath
+module Mm : Map.S  with type key = mpath
 module Sm : Mm.Set with type elt = mpath
 module Hm : EcMaps.EHashtbl.S with type key = mpath
 
 (* -------------------------------------------------------------------- *)
-module Mx : Map.S   with type key = xpath
+module Mx : Map.S  with type key = xpath
 module Sx : Mx.Set with type elt = xpath
 module Hx : EcMaps.EHashtbl.S with type key = xpath
 

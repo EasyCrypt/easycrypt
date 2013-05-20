@@ -37,6 +37,7 @@ type tac_error =
   | InvalidCodePosition   of string*int*int*int
   | CanNotApply           of string * string
   | InvalidName           of string
+  | User                  of string
 
 exception TacError of tac_error
 
@@ -88,8 +89,8 @@ let pp_tac_error fmt error =
     Format.fprintf fmt "Can not apply %s tactic:@\n %s" s1 s2
   | InvalidName x ->
     Format.fprintf fmt "Invalid name for this kind of object: %s" x
-
-
+  | User msg ->
+    Format.fprintf fmt "%s" msg
 
 let _ = EcPException.register (fun fmt exn ->
   match exn with
@@ -97,6 +98,11 @@ let _ = EcPException.register (fun fmt exn ->
   | _ -> raise exn)
 
 let tacerror error = raise (TacError error)
+
+let tacuerror fmt =
+  Printf.ksprintf
+    (fun msg -> raise (TacError (User msg)))
+    fmt
 
 let cannot_apply s1 s2 = tacerror (CanNotApply(s1,s2))
 

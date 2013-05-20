@@ -169,6 +169,7 @@
 %token IMPL
 %token IMPORT
 %token IN
+%token INLINE
 %token INTROS
 %token IOTA 
 %token LAMBDA
@@ -305,6 +306,20 @@ uqident:
   }
 
 | xs=namespace DOT x=UIDENT {
+    { pl_desc = (xs, x);
+      pl_loc  = EcLocation.make $startpos $endpos;
+    }
+  }
+;
+
+(* -------------------------------------------------------------------- *)
+lqident:
+| x=LIDENT {
+    { pl_desc = ([], x);
+      pl_loc  = EcLocation.make $startpos $endpos; }
+  }
+
+| xs=namespace DOT x=LIDENT {
     { pl_desc = (xs, x);
       pl_loc  = EcLocation.make $startpos $endpos;
     }
@@ -1300,13 +1315,20 @@ tactic:
     { PPhl (Pswap info) }
 
 | RND info=rnd_info
-    {PPhl (Prnd info) }
+    { PPhl (Prnd info) }
 
-| EQUIVDENO info=fpattern(conseq) { PPhl(Pequivdeno info) }
+| INLINE o=occurences? f=lqident
+    { PPhl (Pinline (f, None, o)) }
 
-| CONSEQ info=fpattern(conseq) { PPhl(Pconseq info) }
+| INLINE s=side o=occurences? f=lqident
+    { PPhl (Pinline (f, Some s, o)) }
+
+| EQUIVDENO info=fpattern(conseq)
+    { PPhl(Pequivdeno info) }
+
+| CONSEQ info=fpattern(conseq)
+    { PPhl(Pconseq info) }
 ;
-
 
 rnd_info:
 | e1=sform COMMA e2=sform 
@@ -1317,11 +1339,9 @@ rnd_info:
   {RIid }
 ;
 
-
 swap_info:
 | s=side? p=swap_pos { s,p }
 ;
-
 
 swap_pos:
 | i1=number i2=number i3=number                      { SKbase(i1,i2,i3)     }
@@ -1344,6 +1364,16 @@ side:
               (EcLocation.make $startpos $endpos)
               (Some "variable side must be 1 or 2")
  }
+;
+
+occurences:
+| p=paren(NUM+) {
+    if List.mem 0 p then
+      error
+        (EcLocation.make $startpos $endpos)
+        (Some "`0' is not a valid occurence");
+    p
+  }
 ;
 
 code_position:

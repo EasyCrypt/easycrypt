@@ -81,8 +81,8 @@ val ty_sub_exists : (ty -> bool) -> ty -> bool
 
 (* -------------------------------------------------------------------- *)
 type lpattern =
-  | LSymbol of (EcIdent.t*ty)
-  | LTuple  of (EcIdent.t*ty) list
+  | LSymbol of (EcIdent.t * ty)
+  | LTuple  of (EcIdent.t * ty) list
 
 val lp_equal : lpattern -> lpattern -> bool
 val lp_hash  : lpattern -> int 
@@ -124,14 +124,14 @@ type expr = private {
 
 and expr_node =
   | Elam   of (EcIdent.t * ty) list * expr (* lambda expression *)
-  | Eint   of int                        (* int. literal          *)
-  | Elocal of EcIdent.t                  (* let-variables         *)
-  | Evar   of prog_var                   (* module variable       *)
-  | Eop    of EcPath.path * ty list      (* op apply to type args *)
-  | Eapp   of expr * expr list           (* op. application       *)
-  | Elet   of lpattern * expr * expr     (* let binding           *)
-  | Etuple of expr list                  (* tuple constructor     *)
-  | Eif    of expr * expr * expr         (* _ ? _ : _             *)
+  | Eint   of int                          (* int. literal          *)
+  | Elocal of EcIdent.t                    (* let-variables         *)
+  | Evar   of prog_var                     (* module variable       *)
+  | Eop    of EcPath.path * ty list        (* op apply to type args *)
+  | Eapp   of expr * expr list             (* op. application       *)
+  | Elet   of lpattern * expr * expr       (* let binding           *)
+  | Etuple of expr list                    (* tuple constructor     *)
+  | Eif    of expr * expr * expr           (* _ ? _ : _             *)
 
 val expr_dump   : expr -> dnode
 
@@ -155,7 +155,7 @@ val e_lam      : (EcIdent.t * ty) list -> expr -> expr
 
 (* -------------------------------------------------------------------- *)
 val e_map :
-     (ty     -> ty    ) (* 1-subtype op. *)
+     (ty   -> ty  ) (* 1-subtype op. *)
   -> (expr -> expr) (* 1-subexpr op. *)
   -> expr
   -> expr
@@ -173,13 +173,13 @@ type e_subst = {
   es_loc     : expr Mid.t;
 }
 
-val e_subst_id   : e_subst
+val e_subst_id : e_subst
 
 val e_subst_init : 
     bool -> (EcPath.path -> EcPath.path) ->
       (ty -> ty) -> EcPath.mpath EcIdent.Mid.t -> e_subst
 
-val add_locals   : e_subst -> 
+val add_locals : e_subst -> 
   (EcIdent.t * ty) list -> e_subst * (EcIdent.t * ty) list
 
 val e_subst : e_subst -> expr -> expr

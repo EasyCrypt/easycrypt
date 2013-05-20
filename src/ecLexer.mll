@@ -63,6 +63,7 @@
     "case"        , CASE       ;        (* KW: tactic *)
     "rewrite"     , REWRITE    ;        (* KW: tactic *)
     "subst"       , SUBST      ;        (* KW: tactic *)
+
     (* PHL: tactics *)
     "app"         , APP        ;        (* KW: tactic *)
     "wp"          , WP         ;        (* KW: tactic *)
@@ -74,6 +75,7 @@
     "rnd"         , RND        ;        (* KW: tactic *)
     "equiv_deno"  , EQUIVDENO  ;        (* KW: tactic *) 
     "conseq"      , CONSEQ     ;        (* KW: tactic *) 
+    "inline"      , INLINE     ;        (* KW: tactic *)
 
     "axiom"       , AXIOM      ;        (* KW: global *)
     "lemma"       , LEMMA      ;        (* KW: global *)

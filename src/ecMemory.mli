@@ -36,8 +36,8 @@ val bindings : memenv -> EcTypes.ty Msym.t
 val empty_local : memory -> EcPath.xpath -> memenv
 val abstract    : memory -> memenv
 
-val bind   : symbol -> EcTypes.ty -> memenv -> memenv
-val lookup : symbol -> memenv -> EcTypes.ty option
+val bind     : symbol -> EcTypes.ty -> memenv -> memenv
+val lookup   : symbol -> memenv -> EcTypes.ty option
 val is_bound : symbol -> memenv -> bool
 
 (* -------------------------------------------------------------------- *)

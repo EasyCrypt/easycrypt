@@ -60,11 +60,11 @@ and equivF = {
 }
 
 and equivS = {
-  es_ml  : EcMemory.memenv;
-  es_mr  : EcMemory.memenv;
-  es_pr  : form;
-  es_sl   : stmt;
-  es_sr   : stmt;
+  es_ml : EcMemory.memenv;
+  es_mr : EcMemory.memenv;
+  es_pr : form;
+  es_sl : stmt;
+  es_sr : stmt;
   es_po : form; }
 
 and hoareF = { 

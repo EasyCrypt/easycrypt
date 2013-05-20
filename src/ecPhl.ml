@@ -757,6 +757,118 @@ let t_equiv_case f g =
 let t_he_case f g =
   t_hS_or_eS (t_hoare_case f) (t_equiv_case f) g 
 
+(* --------------------------------------------------------------------- *)
+let _inline_freshen me v =
+  let rec for_idx idx =
+    let x = Printf.sprintf "%s%d" v.v_name idx in
+      if EcMemory.is_bound x me then
+        for_idx (idx+1)
+      else
+        (EcMemory.bind x v.v_type me, x)
+  in
+    if EcMemory.is_bound v.v_name me then
+      for_idx 0
+    else
+      (EcMemory.bind v.v_name v.v_type me, v.v_name)
+
+let _inline env f occs me stmt =
+  let module P = EcPath in
+
+  let maxocc = List.fold_left max 0 (odfl [] occs) in
+
+  let rec doit1 (me, idx) instr =
+    match instr.i_node with
+    | Sasgn   _ -> ((me, idx), [instr])
+    | Sassert _ -> ((me, idx), [instr])
+    | Srnd    _ -> ((me, idx), [instr])
+
+    | Sif (e, s1, s2) ->
+        let ((me, idx), s1) = doit (me, idx) s1 in
+        let ((me, idx), s2) = doit (me, idx) s2 in
+          ((me, idx), [i_if (e, s1, s2)])
+
+    | Swhile (e, s) ->
+        let ((me, idx), s) = doit (me, idx) s in
+          ((me, idx), [i_while (e, s)])
+
+    | Scall (lv, p, args) ->
+        let p' = P.xpath (P.mpath p.P.x_top.P.m_top []) p.P.x_sub in
+          if not (EcPath.x_equal p' f) then
+            ((me, idx), [i_call (lv, p, args)])
+          else if occs <> None && not (List.mem idx (odfl [] occs)) then
+            ((me, idx+1), [i_call (lv, p, args)])
+          else
+            let f = EcEnv.Fun.by_xpath p env in
+
+            let me, anames = List.map_fold _inline_freshen me (fst f.f_sig.fs_sig) in
+            let me, lnames = List.map_fold _inline_freshen me (oget f.f_def).f_locals in
+
+            let subst =
+              let for1 mx v x =
+                P.Mx.add
+                  (P.xqname p' v.v_name)
+                  (P.xqname (EcMemory.xpath me) x)
+                  mx
+              in
+
+              let mx = P.Mx.empty in
+              let mx = List.fold_left2 for1 mx (fst f.f_sig.fs_sig) anames in
+              let mx = List.fold_left2 for1 mx (oget f.f_def).f_locals lnames in
+
+                { e_subst_id with
+                    es_freshen = true;
+                    es_xp      = (fun xp -> odfl xp (P.Mx.find_opt xp mx)); }
+            in
+
+            let prelude =
+              List.map2
+                (fun (v, newx) e ->
+                  let newpv = {
+                    pv_name = P.xqname (EcMemory.xpath me) newx;
+                    pv_kind = PVglob;
+                  } in
+                    i_asgn (LvVar (newpv, v.v_type), e))
+                (List.combine (fst f.f_sig.fs_sig) anames)
+                args
+            in
+
+            let body  = (oget f.f_def).f_body in
+            let body  = s_subst subst body in
+              ((me, idx+1), prelude @ body.s_node)
+  
+  and doit (me, idx) stmt =
+    let ((me, idx), stmt) =
+      List.map_fold doit1 (me, idx) stmt.s_node
+    in
+      ((me, idx), EcModules.stmt (List.flatten stmt))
+  in
+
+  let ((me, idx), stmt) = doit (me, 1) stmt in
+    if maxocc > 0 && idx <= maxocc then
+      tacuerror "%d is not a valid occurence" maxocc;
+    (me, stmt)
+
+let t_inline_hoare env f occs g =
+  let concl      = snd (get_goal g) in
+  let hoare      = destr_hoareS concl in
+  let (me, stmt) = _inline env f occs hoare.hs_m hoare.hs_s in
+  let concl      = f_hoareS_r { hoare with hs_m = me; hs_s = stmt; } in
+    prove_goal_by [concl] (RN_hl_inline (None, occs, f)) g
+
+let t_inline_equiv env f side occs g =
+  let concl = snd (get_goal g) in
+  let equiv = destr_equivS concl in
+  let concl =
+    match side with
+    | true  ->
+        let (me, stmt) = _inline env f occs equiv.es_ml equiv.es_sl in
+          f_equivS_r { equiv with es_ml = me; es_sl = stmt; }
+    | false ->
+        let (me, stmt) = _inline env f occs equiv.es_mr equiv.es_sr in
+          f_equivS_r { equiv with es_mr = me; es_sr = stmt; }
+  in
+    prove_goal_by [concl] (RN_hl_inline (Some side, occs, f)) g
+
 (* -------------------------------------------------------------------- *)
 
 let t_equiv_deno env pre post g =

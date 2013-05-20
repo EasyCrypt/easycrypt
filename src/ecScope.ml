@@ -903,6 +903,13 @@ module Tactic = struct
   let process_swap env info =
     t_lseq (List.map (process_swap1 env) info)
 
+  let process_inline env f side occs g =
+    let (fp, f) = EcEnv.Fun.sp_lookup (unloc f) env in
+      if f.EcEnv.sp_target.f_def = None then
+        failwith "function is abstract";
+      match side with
+      | None      -> t_inline_hoare env fp occs g
+      | Some side -> t_inline_equiv env fp side occs g
 
   let process_rnd env bij_info g =
     let concl = get_concl g in
@@ -1025,6 +1032,7 @@ module Tactic = struct
       | Pwhile phi -> process_while env phi
       | Pcall(pre,post) -> process_call env pre post
       | Pswap info -> process_swap env info
+      | Pinline (f, s, o) -> process_inline env f s o
       | Prnd info -> process_rnd env info
       | Pconseq info -> process_conseq env info
       | Pequivdeno info -> process_equiv_deno env info
