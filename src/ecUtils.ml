@@ -92,6 +92,9 @@ module Flags(X : IFlag) : IFlags
 end
 
 (* -------------------------------------------------------------------- *)
+let none = None
+let some = fun x -> Some x
+
 let oiter (x : 'a option) (f : 'a -> unit) =
   match x with None -> () | Some x -> f x
 

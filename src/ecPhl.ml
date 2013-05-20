@@ -830,11 +830,17 @@ let _inline env f occs me stmt =
                     i_asgn (LvVar (newpv, v.v_type), e))
                 (List.combine (fst f.f_sig.fs_sig) anames)
                 args
+
+            and resasgn =
+              match (oget f.f_def).f_ret with
+              | None   -> None
+              | Some r -> Some (i_asgn (oget lv, e_subst subst r))
             in
 
             let body  = (oget f.f_def).f_body in
             let body  = s_subst subst body in
-              ((me, idx+1), prelude @ body.s_node)
+
+              ((me, idx+1), prelude @ body.s_node @ (otolist resasgn))
   
   and doit (me, idx) stmt =
     let ((me, idx), stmt) =
