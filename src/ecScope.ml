@@ -202,7 +202,7 @@ let subscope (scope : scope) (name : symbol) =
     sc_env        = env;
     sc_top        = Some scope;
     sc_loaded     = scope.sc_loaded;
-    sc_required   = [];
+    sc_required   = scope.sc_required;
     sc_pr_uc      = [];
     sc_options    = Options.for_subscope scope.sc_options;
   }
