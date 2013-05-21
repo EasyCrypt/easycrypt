@@ -70,7 +70,7 @@ and equivS = {
   es_pr  : form;
   es_sl  : stmt; 
   es_sr  : stmt; 
-  es_po : form; }
+  es_po  : form; }
 
 and hoareF = { 
   hf_pr : form;
