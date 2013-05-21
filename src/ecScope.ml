@@ -860,7 +860,7 @@ module Tactic = struct
       let post = process_form qenv hyps post tbool in
       t_equiv_call env pre post g
     | FequivS es, Some side ->
-      let fstmt = match side with false -> es.es_sl | true -> es.es_sr in
+      let fstmt = match side with true -> es.es_sl | false -> es.es_sr in
       let (_,f,_),_ = s_last_call "call" fstmt in
       let penv, qenv = EcEnv.Fun.hoareF f env in
       let pre  = process_form penv hyps pre tbool in
