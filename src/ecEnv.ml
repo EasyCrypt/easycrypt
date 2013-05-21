@@ -538,7 +538,8 @@ module MC = struct
   let lookup_mod qnx env =
     match lookup (fun mc -> mc.mc_modules) qnx env with
     | None -> lookup_error (`QSymbol qnx)
-    | Some (p, (args, obj)) -> (_downpath_for_mod env p args, obj)
+    | Some (p, (args, obj)) -> 
+      (_downpath_for_mod env p args, obj)
 
   let _up_mod candup mc x obj =
     if not candup && MMsym.last x mc.mc_modules <> None then
@@ -1071,6 +1072,7 @@ module Fun = struct
     MC.by_path (fun mc -> mc.mc_functions) p env
 
   let by_xpath (p : EcPath.xpath) (env : env) =
+    Format.printf "by_xpath %s@." (EcPath.x_tostring p);
     match ipath_of_xpath p with
     | None -> lookup_error (`XPath p)
 
@@ -1079,14 +1081,15 @@ module Fun = struct
         | None -> lookup_error (`XPath p)
         | Some (params, o) ->
            let ((spi, params), _op) = MC._downpath_for_fun env ip params in
-             if i <> spi || List.length args <> List.length params then
-               assert false;
-             let s =
-               List.fold_left2
-                 (fun s (x, _) a -> EcSubst.add_module s x a)
-                 EcSubst.empty params args
-             in
-               EcSubst.subst_function s o
+           Format.printf "i = %i; spi = %i@." i spi;
+           if i <> spi || List.length args <> List.length params then
+             assert false;
+           let s =
+             List.fold_left2
+               (fun s (x, _) a -> EcSubst.add_module s x a)
+               EcSubst.empty params args
+           in
+           EcSubst.subst_function s o
       end
 
   let by_xpath_opt (p : EcPath.xpath) (env : env) =
@@ -1255,9 +1258,10 @@ module Mod = struct
       MC.import_mod (fst (ipath_of_mpath p)) obj env
 
   let lookup qname (env : env) =
-    let (((_, a), p), x) = MC.lookup_mod qname env in
-      if a <> [] then
-        raise (LookupFailure (`QSymbol qname));
+    let (((_, _a), p), x) = MC.lookup_mod qname env in
+    (* FIXME : Ca c'est bizare quand on fait des foncteurs *)
+(*      if a <> [] then
+        raise (LookupFailure (`QSymbol qname)); *)
       (p, x)
 
   let lookup_opt name env =
@@ -1286,7 +1290,7 @@ module Mod = struct
         env_rb   = rb @ env.env_rb;
         env_item = CTh_module me :: env.env_item }
 
-  let bind_local name modty env =
+  let bind_local name modty restr env =
     let modsig =
       let modsig =
         match
@@ -1306,10 +1310,11 @@ module Mod = struct
             EcSubst.add_module s mid arg)
           EcSubst.empty modsig.mis_params modty.mt_args
       in
-        { (EcSubst.subst_modsig subst modsig) with mis_params = modty.mt_params }
+        { (EcSubst.subst_modsig subst modsig) with 
+          mis_params = modty.mt_params }
     in
 
-    let me    = module_expr_of_module_sig name modty modsig in
+    let me    = module_expr_of_module_sig name modty modsig restr in
     let path  = IPIdent (name, None) in
     let comps = MC.mc_of_module_param name me in
 
@@ -1326,7 +1331,7 @@ module Mod = struct
 
   let bind_locals bindings env =
     List.fold_left
-      (fun env (name, me) -> bind_local name me env)
+      (fun env (name, me) -> bind_local name me EcPath.Sm.empty env)
       env bindings
 
   let enter name params env =
@@ -1427,6 +1432,39 @@ module NormMp = struct
       then pv
       else { pv_name = p; pv_kind = pv.pv_kind }
 
+  let globals env m mp = 
+    match (Mod.by_mpath mp env).me_body with
+    | ME_Structure ms ->
+        (* FIXME: What to do with the module parameter *)
+      let sx = 
+        EcPath.Mx.fold (fun x ty l -> f_pvar (pv_glob x) ty m :: l) 
+          ms.ms_vars [] in
+      f_tuple sx, ms.ms_uses
+    | _ -> assert false
+
+  let rec norm_glob env m mp = 
+    let mp = norm_mpath env mp in
+    let gtop = 
+      match mp.EcPath.m_top with
+      | `Abstract _ -> f_glob (EcPath.mpath mp.EcPath.m_top []) m
+      | `Concrete(p,_) -> 
+        let top = EcPath.mpath (`Concrete(p,None)) mp.EcPath.m_args in
+        let sx,us = globals env m top in
+        let us = 
+          List.map (fun mp -> fst (globals env m mp)) (EcPath.Sm.elements us) in
+        f_tuple (sx::us) in
+    let gargs = List.map (norm_glob env m) mp.EcPath.m_args in
+    f_tuple (gtop :: gargs)
+
+  let norm_tglob env mp =
+    let g = (norm_glob env mhr mp) in
+    g.f_ty
+
+  let tglob_reducible env mp = 
+    match (norm_tglob env mp).ty_node with
+    | Tglob mp' -> not (EcPath.m_equal mp mp')
+    | _ -> true
+
   let norm_form env =
     let norm_xp = EcPath.Hx.memo 107 (norm_xpath env) in
     let norm_pv pv =
@@ -1447,6 +1485,8 @@ module NormMp = struct
           if p == p' then f else
             f_pvar p' f.f_ty m
 
+        | Fglob(p,m) -> norm_glob env m p
+          
         | FhoareF hf ->
           let pre' = aux hf.hf_pr and p' = norm_xp hf.hf_f
           and post' = aux hf.hf_po in

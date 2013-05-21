@@ -16,15 +16,25 @@ open EcModules
 
 module PVM = struct
 
+  type mem_sel = 
+  | MSvar of prog_var
+  | MSmod of EcPath.mpath (* Only abstract module *)
+      
   module M = EcMaps.Map.Make(struct
-    (* We assume that the mpath are in normal form *)  
-    type t = prog_var * EcMemory.memory
+    (* We assume that the mpath are in normal form *) 
+ 
+    type t = mem_sel * EcMemory.memory
+
+    let ms_compare ms1 ms2 = 
+      match ms1, ms2 with
+      | MSvar v1, MSvar v2 -> pv_compare_p v1 v2
+      | MSmod m1, MSmod m2 -> EcPath.m_compare m1 m2
+      | MSvar _, MSmod _ -> -1
+      | MSmod _, MSvar _ -> 1
+
     let compare (p1,m1) (p2,m2) = 
       let r = EcIdent.id_compare m1 m2 in
-      if r = 0 then 
-        let r = Pervasives.compare p1.pv_kind p2.pv_kind in
-        if r = 0 then pv_compare_p p1 p2
-        else r
+      if r = 0 then ms_compare p1 p2 
       else r
   end)
 
@@ -32,9 +42,11 @@ module PVM = struct
 
   let empty = M.empty 
 
-  let pvm env pv m = EcEnv.NormMp.norm_pvar env pv, m
+  let pvm env pv m = (MSvar (EcEnv.NormMp.norm_pvar env pv), m)
 
   let add env pv m f s = M.add (pvm env pv m) f s 
+
+  let add_glob _env mp m f s = M.add (MSmod mp, m) f s
 
   let add_none env pv m f s =
     M.change (fun o -> if o = None then Some f else o) (pvm env pv m) s
@@ -50,24 +62,21 @@ module PVM = struct
       match f.f_node with
       | Fpvar(pv,m) -> 
           (try find env pv m s with Not_found -> f)
-(*      | FeqGlob(m1,m2,mp) ->
-        let xs, mps = EcEnv.norm_eqGlob_mp env mp in
-        let add_m f mp = f_and_simpl (f_eqGlob m1 m2 mp) f in
-        let add_v f (x,ty) = 
-          let v1 = aux (f_pvar x ty m1) in
-          let v2 = aux (f_pvar x ty m2) in
-          f_and_simpl (f_eq_simpl v1 v2) f in
-        let eqm = List.fold_left add_m f_true mps in
-        List.fold_left add_v eqm xs  *)
+      | Fglob(mp,m) ->
+        let f' = EcEnv.NormMp.norm_glob env m mp in
+        if f_equal f f' then
+          (try M.find (MSmod mp,m) s with Not_found -> f)
+        else aux f'
       | FhoareF _ | FhoareS _ | FequivF _ | FequivS _ | Fpr _ -> assert false
       | _ -> EcFol.f_map (fun ty -> ty) aux f)
 
   let subst1 env pv m f = 
     let s = add env pv m f empty in
     subst env s
-
+      
 end
 
+  
 (* -------------------------------------------------------------------- *)
 
 module PV = struct 
@@ -78,8 +87,8 @@ module PV = struct
   end)
 
   type pv_fv = 
-    { pv : ty M.t;
-      glob : EcPath.Sm.t;
+    { pv : ty M.t;         (* The key are in normal form *)
+      glob : EcPath.Sm.t;  (* The set of abstract module *)
     }
 
   let empty = 
@@ -101,26 +110,116 @@ module PV = struct
 
   let disjoint _env fv1 fv2 = 
     M.set_disjoint fv1.pv fv2.pv &&
+      (* FIXME not suffisant use disjoint_g *)
       EcPath.Sm.disjoint fv1.glob fv2.glob
+
+  let diff _env fv1 fv2 = 
+    { pv = M.set_diff fv1.pv fv2.pv;
+      glob = EcPath.Sm.diff fv1.glob fv2.glob }
 
   let inter _env fv1 fv2 = 
     { pv = M.set_inter fv1.pv fv2.pv;
       glob = EcPath.Sm.inter fv1.glob fv2.glob }
 
-  let elements fv = M.bindings fv.pv (* FIXME *)
+  let elements fv = M.bindings fv.pv, EcPath.Sm.elements fv.glob (* FIXME *)
+
+  let fv env m f =
+    let rec aux fv f = 
+      match f.f_node with
+      | Fquant(_,_,f1) -> aux fv f1
+      | Fif(f1,f2,f3) -> aux (aux (aux fv f1) f2) f3
+      | Flet(_,f1,f2) -> aux (aux fv f1) f2
+      | Fpvar(x,m') -> 
+        if EcIdent.id_equal m m' then add env x f.f_ty fv else fv
+      | Fglob (mp,m') ->
+        if EcIdent.id_equal m m' then 
+          let f' = EcEnv.NormMp.norm_glob env m mp in
+          if f_equal f f' then add_glob env mp fv
+          else aux fv f'
+        else fv
+      | Fint _ | Flocal _ | Fop _ -> fv
+      | Fapp(e, es) -> List.fold_left aux (aux fv e) es
+      | Ftuple es   -> List.fold_left aux fv es
+      | FhoareF _  | FhoareS _ | FequivF _ | FequivS _ | Fpr _ -> assert false 
+    in
+    aux empty f
+
+  let disjoint_g env mp1 mp2 = 
+    let me1, me2 = EcEnv.Mod.by_mpath mp1 env, EcEnv.Mod.by_mpath mp2 env in
+    match me1.me_body, me2.me_body with
+    | ME_Decl(_,nu1), ME_Decl(_,nu2) ->
+      EcPath.Sm.mem mp2 nu1 || EcPath.Sm.mem mp1 nu2
+    | ME_Decl(_,nu1), ME_Structure ms2 ->
+      EcPath.Sm.mem mp2 nu1 &&
+        EcPath.Sm.for_all (fun m -> EcPath.Sm.mem m nu1) ms2.ms_uses
+    | ME_Structure ms1, ME_Decl(_,nu2) ->
+      EcPath.Sm.mem mp1 nu2 &&
+        EcPath.Sm.for_all (fun m -> EcPath.Sm.mem m nu2) ms1.ms_uses
+    | ME_Structure ms1, ME_Structure ms2 ->
+      let us1 = EcPath.Sm.add mp1 ms1.ms_uses in
+      let us2 = EcPath.Sm.add mp2 ms2.ms_uses in
+      EcPath.Sm.disjoint us1 us2 
+    | _, _ -> assert false 
+      
+  let check env modi fv = 
+    let not_gen = diff env fv modi in 
+    let mk_topv s = 
+      M.fold (fun x _ topv ->
+        if is_loc x then topv 
+        else
+          let x=x.pv_name in
+          let top = 
+            match x.EcPath.x_top.EcPath.m_top with
+            | `Concrete(p,_) -> `Concrete(p,None)
+            | t -> t in
+          EcPath.Sm.add (EcPath.mpath top []) topv) s EcPath.Sm.empty in
+    let topv = mk_topv not_gen.pv in
+    let topvg = mk_topv modi.pv in
+    let topm = not_gen.glob in
+    
+    let check s1 s2 = 
+      EcPath.Sm.for_all (fun mp1 ->
+        EcPath.Sm.for_all (fun mp2 -> disjoint_g env mp1 mp2) s1) s2 in
+
+    (* FIXME error message *)
+    assert (check modi.glob topv);
+    assert (check modi.glob topm);
+    assert (check topvg topm)
+      
+  let check_depend env fv mp = 
+    (* FIXME error message *)
+    let check_v v _ty =
+      assert (is_glob v);
+      let top = 
+        match v.pv_name.EcPath.x_top.EcPath.m_top with
+        | `Concrete(p,_) -> `Concrete(p,None)
+        | t -> t in 
+      assert (disjoint_g env mp (EcPath.mpath top [])) in
+    M.iter check_v fv.pv;
+    let check_m m = assert (disjoint_g env mp m) in
+    EcPath.Sm.iter check_m fv.glob 
 
 end
 
-(*let destr_adv_fun f = 
-  match EcPath.m_split f with
-  | Some(mp,_,_,[]) ->
-    begin match mp.EcPath.m_path.EcPath.p_node with
-    | EcPath.Pident x -> EcPath.mident x
-    | _ -> assert false
-    end 
-  | _ -> assert false *)
-  
-let oracles _func = assert false
+let get_abs_functor f = 
+  let f = f.EcPath.x_top in
+  match f.EcPath.m_top with
+  | `Abstract _ -> EcPath.mpath (f.EcPath.m_top) []
+  | _ -> assert false
+
+let rec f_write env w f = 
+  let f = NormMp.norm_xpath env f in
+  let func = Fun.by_xpath f env in
+  match func.f_def with
+  | FBabs oi ->
+    let mp = get_abs_functor f in
+    List.fold_left (f_write env) (PV.add_glob env mp w) oi.oi_calls
+  | FBdef fdef ->
+    let add x w = 
+      let vb = Var.by_xpath x env in
+      PV.add env { pv_name = x; pv_kind = PVglob } vb.vb_type w in
+    let w = EcPath.Sx.fold add fdef.f_uses.us_writes w in
+    List.fold_left (f_write env) w fdef.f_uses.us_calls
 
 let lp_write env w lp = 
   let add w (pv,ty) = PV.add env pv ty w in
@@ -137,32 +236,24 @@ and i_write env w i =
   | Srnd (lp,_) -> lp_write env w lp
   | Scall(lp,f,_) -> 
     let w  = match lp with None -> w | Some lp -> lp_write env w lp in    
-    let wf = f_write env f in
-    PV.union env w wf
+    f_write env w f 
   | Sif (_,s1,s2) -> s_write env (s_write env w s1) s2
   | Swhile (_,s) -> s_write env w s
   | Sassert _ -> w 
     
-and f_write env f = 
+let rec f_read env r f = 
   let f = NormMp.norm_xpath env f in
   let func = Fun.by_xpath f env in
   match func.f_def with
-  | FBabs _ -> assert false
-(*
-    let a = destr_adv_fun f in
-    let w = PV.add_glob env a PV.empty in
-    let add w o = PV.union env (f_write env o) w in
-    List.fold_left add w (oracles func)
-*)
+  | FBabs oi ->
+    let mp = get_abs_functor f in
+    List.fold_left (f_read env) (PV.add_glob env mp r) oi.oi_calls
   | FBdef fdef ->
-    let remove_local w {v_name = v } =
-      PV.remove env {pv_name = EcPath.xqname f v; 
-                     pv_kind = PVloc } w in
-    let wf = s_write env PV.empty fdef.f_body in
-    let wf = List.fold_left remove_local wf fdef.f_locals in
-    List.fold_left remove_local wf (func.f_sig.fs_params) 
-
-let s_write env = s_write env PV.empty
+    let add x r = 
+      let vb = Var.by_xpath x env in
+      PV.add env { pv_name = x; pv_kind = PVglob } vb.vb_type r in
+    let r = EcPath.Sx.fold add fdef.f_uses.us_reads r in
+    List.fold_left (f_read env) r fdef.f_uses.us_calls
 
 let rec e_read env r e = 
   match e.e_node with
@@ -184,30 +275,16 @@ and i_read env r i =
   | Scall(lp,f,es) -> 
     let r = List.fold_left (e_read env) r es in
     let r  = match lp with None -> r | Some lp -> lp_read env r lp in
-    let rf = f_read env f in
-    PV.union env r rf 
+    f_read env r f 
   | Sif (e,s1,s2) -> s_read env (s_read env (e_read env r e) s1) s2
   | Swhile (e,s) -> s_read env (e_read env r e) s
   | Sassert e -> e_read env r e
     
-and f_read env f =   
-  let func = Fun.by_xpath f env in
-  match func.f_def with
-  | FBabs _ -> assert false 
-(*
-    let a = destr_adv_fun f in
-    let r = PV.add_glob env a PV.empty in 
-    let add r o = PV.union env (f_read env o) r in
-    List.fold_left add r (oracles func) *)
-  | FBdef fdef ->
-    let remove_local w {v_name = v } =
-      PV.remove env {pv_name = EcPath.xqname f v; 
-                     pv_kind = PVloc } w in
-    let wf = s_read env PV.empty fdef.f_body in
-    let wf = List.fold_left remove_local wf fdef.f_locals in
-    List.fold_left remove_local wf func.f_sig.fs_params 
 
-let s_read env = s_read env PV.empty
+let f_write env f = f_write env PV.empty f
+let f_read  env f = f_read  env PV.empty f
+let s_write env s = s_write env PV.empty s
+let s_read  env s = s_read  env PV.empty s
 
 (* -------------------------------------------------------------------- *)
 
@@ -246,14 +323,25 @@ let s_last_asserts st = s_lasts destr_assert (last_error "n assert" st)
 let id_of_pv pv = 
   EcIdent.create (EcPath.basename pv.pv_name.EcPath.x_sub) 
 
-let generalize_mod env m modi f = 
-  let elts = PV.elements modi in
+let id_of_mp mp = 
+  match mp.EcPath.m_top with
+  | `Abstract id -> EcIdent.fresh id
+  | _ -> assert false 
+
+let generalize_mod env m modi f =
+  let fv = PV.fv env m f in
+  PV.check env modi fv;
+  let elts,glob = PV.elements modi in
   let create (pv,ty) = id_of_pv pv, GTty ty in
   let b = List.map create elts in
   let s = List.fold_left2 (fun s (pv,ty) (id, _) ->
     PVM.add env pv m (f_local id ty) s) PVM.empty elts b in
+  let create mp = id_of_mp mp, GTty (tglob mp) in
+  let b' = List.map create glob in
+  let s = List.fold_left2 (fun s mp (id,_) ->
+    PVM.add_glob env mp m (f_local id (tglob mp)) s) s glob b' in
   let f = PVM.subst env s f in
-  f_forall_simpl b f
+  f_forall_simpl (b'@b) f
 
 
 let lv_subst env m lv f =
@@ -369,9 +457,6 @@ let t_hS_or_eS th te g =
   else if is_equivS concl then te g
   else tacerror (NotPhl None)
 
-(* -------------------------------------------------------------------- *)
-(* -------------------------  Tactics --------------------------------- *)
-(* -------------------------------------------------------------------- *)
 let prove_goal_by sub_gs rule (juc,n as g) =
   let hyps,_ = get_goal g in
   let add_sgoal (juc,ns) sg = 
@@ -380,6 +465,52 @@ let prove_goal_by sub_gs rule (juc,n as g) =
   let juc,ns = List.fold_left add_sgoal (juc,[]) sub_gs in
   let rule = { pr_name = rule ; pr_hyps = List.rev ns} in
   upd_rule rule (juc,n)
+
+let gen_mems m f = 
+  let bds = List.map (fun (m,mt) -> (m,GTmem mt)) m in
+  f_forall bds f
+
+(* -------------------------------------------------------------------- *)
+(* -------------------------  Tactics --------------------------------- *)
+(* -------------------------------------------------------------------- *)
+
+let t_hoareF_conseq env pre post g =
+  let concl = get_concl g in
+  let hf = destr_hoareF concl in
+  let mpr,mpo = EcEnv.Fun.hoareF_memenv hf.hf_f env in
+  let concl1 = gen_mems [mpr] (f_imp pre hf.hf_pr) in
+  let concl2 = gen_mems [mpo] (f_imp hf.hf_po post) in
+  let concl3 = f_hoareF pre hf.hf_f post in
+  prove_goal_by [concl1; concl2; concl3] (RN_hl_conseq) g  
+    
+
+let t_hoareS_conseq _env pre post g =
+  let concl = get_concl g in
+  let hs = destr_hoareS concl in
+  let concl1 = gen_mems [hs.hs_m] (f_imp pre hs.hs_pr) in
+  let concl2 = gen_mems [hs.hs_m] (f_imp hs.hs_po post) in
+  let concl3 = f_hoareS_r { hs with hs_pr = pre; hs_po = post } in
+  prove_goal_by [concl1; concl2; concl3] (RN_hl_conseq) g
+
+
+let t_equivF_conseq env pre post g =
+  let concl = get_concl g in
+  let ef = destr_equivF concl in
+  let (mprl,mprr),(mpol,mpor) = EcEnv.Fun.equivF_memenv ef.ef_fl ef.ef_fr env in
+  let concl1 = gen_mems [mprl;mprr] (f_imp pre ef.ef_pr) in
+  let concl2 = gen_mems [mpol;mpor] (f_imp ef.ef_po post) in
+  let concl3 = f_equivF pre ef.ef_fl ef.ef_fr post in
+  prove_goal_by [concl1; concl2; concl3] (RN_hl_conseq) g  
+
+let t_equivS_conseq _env pre post g =
+  let concl = get_concl g in
+  let es = destr_equivS concl in
+  let concl1 = gen_mems [es.es_ml;es.es_mr] (f_imp pre es.es_pr) in
+  let concl2 = gen_mems [es.es_ml;es.es_mr] (f_imp es.es_po post) in
+  let concl3 = f_equivS_r { es with es_pr = pre; es_po = post } in
+  prove_goal_by [concl1; concl2; concl3] (RN_hl_conseq) g
+
+(* -------------------------------------------------------------------- *)
 
 let t_hoareF_fun_def env g = 
   let concl = get_concl g in
@@ -401,19 +532,26 @@ let t_equivF_fun_def env g =
   let memenvl,fdefl,memenvr,fdefr,env = Fun.equivS ef.ef_fl ef.ef_fr env in 
                                 (* FIXME catch exception *)
   let ml, mr = EcMemory.memory memenvl, EcMemory.memory memenvr in
+  Format.printf "ICI1@.";
   let fresl = 
     match fdefl.f_ret with
     | None -> f_tt
     | Some e -> form_of_expr ml e in
+  Format.printf "ICI2@.";
   let fresr = 
     match fdefr.f_ret with
     | None -> f_tt
     | Some e -> form_of_expr mr e in
+  Format.printf "ICI3@.";
   let s = PVM.add env (pv_res ef.ef_fl) ml fresl PVM.empty in
+  Format.printf "ICI4@.";
   let s = PVM.add env (pv_res ef.ef_fr) mr fresr s in
+  Format.printf "ICI5@.";
   let post = PVM.subst env s ef.ef_po in
+  Format.printf "ICI6@.";
   let concl' = 
     f_equivS memenvl memenvr ef.ef_pr fdefl.f_body fdefr.f_body post in
+  
   prove_goal_by [concl'] RN_hl_fun_def g
 
 
@@ -423,12 +561,54 @@ let t_fun_def env g =
   else if is_equivF concl then t_equivF_fun_def env g
   else tacerror (NotPhl None)
 
+let equivF_abs_spec env fl fr inv = 
+  let fl = EcEnv.NormMp.norm_xpath env fl in
+  let fr = EcEnv.NormMp.norm_xpath env fr in
+  let subl = fl.EcPath.x_sub in
+  let subr = fr.EcPath.x_sub in
+  let topl = EcPath.mpath (fl.EcPath.x_top.EcPath.m_top) [] in
+  let topr = EcPath.mpath (fr.EcPath.x_top.EcPath.m_top) [] in
+  assert (EcPath.p_equal subl subr && EcPath.m_equal topl topr);  
+                                               (* FIXME error message *)
+  let ml, mr = mleft, mright in
+  let fvl = PV.fv env ml inv in
+  let fvr = PV.fv env mr inv in
+  PV.check_depend env fvl topl;
+  PV.check_depend env fvr topr;
+  (* TODO check only global variable *)
+  let defl, defr = EcEnv.Fun.by_xpath fl env, EcEnv.Fun.by_xpath fr env in
+  let oil, oir = 
+    match defl.f_def, defr.f_def with
+    | FBabs oil, FBabs oir -> oil, oir
+    | _ -> assert false (* FIXME error message *)
+  in
+  let ospec o_l o_r = 
+    let fo_l = EcEnv.Fun.by_xpath o_l env in
+    let fo_r = EcEnv.Fun.by_xpath o_r env in
+    let eq_params = 
+      f_eqparams o_l fo_l.f_sig.fs_params ml o_r fo_r.f_sig.fs_params mr in
+    let eq_res = f_eqres o_l fo_l.f_sig.fs_ret ml o_r fo_r.f_sig.fs_ret mr in
+    let pre = EcFol.f_and eq_params inv in
+    let post = EcFol.f_and eq_res inv in
+    f_equivF pre o_l o_r post in
+  let sg = List.map2 ospec oil.oi_calls oir.oi_calls in
+  let eq_params = 
+    f_eqparams fl defl.f_sig.fs_params ml fr defr.f_sig.fs_params mr in
+  let eq_res = f_eqres fl defl.f_sig.fs_ret ml fr defr.f_sig.fs_ret mr in
+  let eqglob = f_eqglob topl ml topr mr in
+  let pre = f_ands [eq_params; eqglob; inv] in
+  let post = f_ands [eq_res; eqglob; inv] in
+  pre, post, sg
+
+let t_equivF_abs env inv g = 
+  let concl = get_concl g in
+  let ef = destr_equivF concl in
+  let pre, post, sg = equivF_abs_spec env ef.ef_fl ef.ef_fr inv in
+  let tac g' = prove_goal_by sg (RN_hl_fun_abs inv) g' in
+  t_on_last (t_equivF_conseq env pre post g) tac
+
 (* -------------------------------------------------------------------- *)
   
-let gen_mems m f = 
-  let bds = List.map (fun (m,mt) -> (m,GTmem mt)) m in
-  f_forall bds f
-
 let t_hoare_skip g =
   let concl = get_concl g in
   let hs = destr_hoareS concl in
@@ -539,6 +719,7 @@ let t_wp env k =
   | Some (Single i) -> t_hoare_wp env (Some i)
   | Some (Double(i,j)) -> t_equiv_wp env (Some (i,j))
 
+
 (* -------------------------------------------------------------------- *)
   
 let t_hoare_while env inv g =
@@ -621,16 +802,28 @@ let t_hoare_call env fpre fpost (juc,n1 as g) =
                pr_hyps =[RA_node nf;RA_node n;]} in
   upd_rule rule (juc, n1)
 
+let tyenv_of_hyps env hyps =
+  let add env (id,k) =
+    match k with
+    | LD_var (ty,_) -> EcEnv.Var.bind_local id ty env
+    | LD_mem mt     -> EcEnv.Memory.push (id,mt) env
+    | LD_modty (i,r)    -> EcEnv.Mod.bind_local id i r env
+    | LD_hyp   _    -> env in
+  List.fold_left add env hyps.h_local
+
 let t_equiv_call env fpre fpost g =
   (* FIXME : check the well formess of the pre and the post ? *)
-  let concl = get_concl g in
+  let hyps, concl = get_goal g in
+  let env = tyenv_of_hyps env hyps in
   let es = destr_equivS concl in
   let (lpl,fl,argsl),(lpr,fr,argsr),sl,sr = 
     s_last_calls "call" es.es_sl es.es_sr in
   let ml = EcMemory.memory es.es_ml in
   let mr = EcMemory.memory es.es_mr in
+  Format.printf "ICI2@.";
   let fsigl = (Fun.by_xpath fl env).f_sig in
   let fsigr = (Fun.by_xpath fr env).f_sig in
+  Format.printf "ICI3@.";
   (* The functions satisfies the specification *)
   let f_concl = f_equivF fpre fl fr fpost in
   (* The wp *)
@@ -659,44 +852,6 @@ let t_equiv_call env fpre fpost g =
       concl
   in
     prove_goal_by [f_concl;concl] (RN_hl_call (fpre, fpost)) g
-
-(* -------------------------------------------------------------------- *)
-
-let t_hoareF_conseq env pre post g =
-  let concl = get_concl g in
-  let hf = destr_hoareF concl in
-  let mpr,mpo = EcEnv.Fun.hoareF_memenv hf.hf_f env in
-  let concl1 = gen_mems [mpr] (f_imp pre hf.hf_pr) in
-  let concl2 = gen_mems [mpo] (f_imp hf.hf_po post) in
-  let concl3 = f_hoareF pre hf.hf_f post in
-  prove_goal_by [concl1; concl2; concl3] (RN_hl_conseq) g  
-    
-
-let t_hoareS_conseq _env pre post g =
-  let concl = get_concl g in
-  let hs = destr_hoareS concl in
-  let concl1 = gen_mems [hs.hs_m] (f_imp pre hs.hs_pr) in
-  let concl2 = gen_mems [hs.hs_m] (f_imp hs.hs_po post) in
-  let concl3 = f_hoareS_r { hs with hs_pr = pre; hs_po = post } in
-  prove_goal_by [concl1; concl2; concl3] (RN_hl_conseq) g
-
-
-let t_equivF_conseq env pre post g =
-  let concl = get_concl g in
-  let ef = destr_equivF concl in
-  let (mprl,mprr),(mpol,mpor) = EcEnv.Fun.equivF_memenv ef.ef_fl ef.ef_fr env in
-  let concl1 = gen_mems [mprl;mprr] (f_imp pre ef.ef_pr) in
-  let concl2 = gen_mems [mpol;mpor] (f_imp ef.ef_po post) in
-  let concl3 = f_equivF pre ef.ef_fl ef.ef_fr post in
-  prove_goal_by [concl1; concl2; concl3] (RN_hl_conseq) g  
-
-let t_equivS_conseq _env pre post g =
-  let concl = get_concl g in
-  let es = destr_equivS concl in
-  let concl1 = gen_mems [es.es_ml;es.es_mr] (f_imp pre es.es_pr) in
-  let concl2 = gen_mems [es.es_ml;es.es_mr] (f_imp es.es_po post) in
-  let concl3 = f_equivS_r { es with es_pr = pre; es_po = post } in
-  prove_goal_by [concl1; concl2; concl3] (RN_hl_conseq) g
   
 (* --------------------------------------------------------------------- *)
 

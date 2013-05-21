@@ -633,15 +633,6 @@ module Tactic = struct
     let mk_id s = EcIdent.create (odfl "_" s) in
       t_intros env (List.map (lmap mk_id) pis)
 
-  let tyenv_of_hyps env hyps =
-    let add env (id,k) =
-      match k with
-      | LD_var (ty,_) -> EcEnv.Var.bind_local id ty env
-      | LD_mem mt     -> EcEnv.Memory.push (id,mt) env
-      | LD_modty i    -> EcEnv.Mod.bind_local id i env
-      | LD_hyp   _    -> env in
-    List.fold_left add env hyps.h_local
-
   let process_elim_arg env hyps oty a =
     let ue  = EcUnify.UniEnv.create (Some hyps.h_tvar) in
     let env = tyenv_of_hyps env hyps in
@@ -853,9 +844,13 @@ module Tactic = struct
       t_hoare_call env pre post g
     | FequivS es ->
       let (_,fl,_),(_,fr,_),_,_ = s_last_calls "call" es.es_sl es.es_sr in
-      let penv, qenv = EcEnv.Fun.equivF fl fr env in
+      Format.printf "ICI_2@.";
+      let env' = tyenv_of_hyps env hyps in
+      let penv, qenv = EcEnv.Fun.equivF fl fr env' in
+      Format.printf "ICI_1@.";
       let pre  = process_form penv hyps pre tbool in
       let post = process_form qenv hyps post tbool in
+      Format.printf "ICI1@.";
       t_equiv_call env pre post g
     | _ -> cannot_apply "call" "the conclusion is not a hoare or a equiv"
 
@@ -1013,10 +1008,15 @@ module Tactic = struct
       [!t_pre; !t_post; t_use env an gs] (juc,n)
 
     
+  let process_fun_abs env f g = 
+    assert false 
+(*  let hyps = get_hyps g in *)
+    
   let process_phl loc env ptac g =
     let t =
       match ptac with
       | Pfun_def -> EcPhl.t_fun_def env
+      | Pfun_abs f -> process_fun_abs env f
       | Pskip    -> EcPhl.t_skip
       | Papp (k,phi) -> process_app env k phi
       | Pwp  k   -> t_wp env k

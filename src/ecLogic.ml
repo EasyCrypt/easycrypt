@@ -294,10 +294,10 @@ let t_intros env ids (juc,n as g) =
           tacerror (InvalidName name);
         LD_mem me, bind_mem s x id
 
-    | GTmodty i ->
+    | GTmodty (i,r) ->
         if name <> "_" && not (EcIo.is_mod_ident name) then
           tacerror (InvalidName name);
-        LD_modty i, bind_mod s x (EcPath.mident id)
+        LD_modty (i,r), bind_mod s x (EcPath.mident id)
   in
 
   let add_ld id ld hyps =

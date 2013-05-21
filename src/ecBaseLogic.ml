@@ -27,7 +27,7 @@ let _ = EcPException.register pp_error
 type local_kind =
   | LD_var   of ty * form option
   | LD_mem   of EcMemory.memtype
-  | LD_modty of EcModules.module_type
+  | LD_modty of EcModules.module_type * EcPath.Sm.t
   | LD_hyp   of form  (* of type bool *)
 
 type l_local = EcIdent.t * local_kind
@@ -197,6 +197,7 @@ type rule_name =
 
     (* Phl rules *)    
   | RN_hl_fun_def 
+  | RN_hl_fun_abs   of EcFol.form
   | RN_hl_skip
   | RN_hl_wp        of tac_pos
   | RN_hl_append    of tac_pos * EcFol.form
