@@ -344,7 +344,7 @@ module MC = struct
   let _downpath_for_fun = _downpath_for_var false
 
   (* ------------------------------------------------------------------ *)
-  let _downpath_for_mod env p args =
+  let _downpath_for_mod spsc env p args =
     let prefix =
       let prefix_of_mtop = function
         | `Concrete (p1, _) -> Some p1
@@ -383,7 +383,7 @@ module MC = struct
 
         | _ -> assert false
       in
-        ((List.length l, if inscope then [] else a), ap)
+        ((List.length l, if inscope && not spsc then [] else a), ap)
 
   (* ------------------------------------------------------------------ *)
   let _downpath_for_th _env p args =
@@ -538,7 +538,8 @@ module MC = struct
   let lookup_mod qnx env =
     match lookup (fun mc -> mc.mc_modules) qnx env with
     | None -> lookup_error (`QSymbol qnx)
-    | Some (p, (args, obj)) -> (_downpath_for_mod env p args, obj)
+    | Some (p, (args, obj)) -> 
+      (_downpath_for_mod false env p args, obj)
 
   let _up_mod candup mc x obj =
     if not candup && MMsym.last x mc.mc_modules <> None then
@@ -1224,11 +1225,14 @@ module Mod = struct
 
   let unsuspend = unsuspend_r EcSubst.subst_module
 
-  let by_ipath (p : ipath) (env : env) =
+  let by_ipath_r (spsc : bool) (p : ipath) (env : env) =
     let obj = MC.by_path (fun mc -> mc.mc_modules) p env in
-    omap obj
-      (fun (args, obj) ->
-         (fst (MC._downpath_for_mod env p args), obj))
+      omap obj
+        (fun (args, obj) ->
+          (fst (MC._downpath_for_mod spsc env p args), obj))
+
+  let by_ipath (p : ipath) (env : env) =
+    by_ipath_r false p env
 
   let by_path (p : mpath_top) (env : env) =
     by_ipath (ipath_of_mpath_opt p) env
@@ -1243,7 +1247,7 @@ module Mod = struct
       | None -> lookup_error (`MPath p)
       | Some (params, o) ->
           let ((spi, params), _op) =
-            MC._downpath_for_mod env ip params
+            MC._downpath_for_mod false env ip params
           in
             unsuspend (i, args) (spi, params) o
 
@@ -1391,7 +1395,7 @@ end
 module NormMp = struct
   let rec norm_mpath env p =
     let (ip, (i, args)) = ipath_of_mpath p in
-      match Mod.by_ipath ip env with
+      match Mod.by_ipath_r true ip env with
       | Some ((spi, params), ({ me_body = ME_Alias alias } as m)) ->
           assert (m.me_sig.mis_params = []);
           let p =
