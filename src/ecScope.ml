@@ -846,13 +846,10 @@ module Tactic = struct
       cannot_apply "call" "side can only be given for prhl judgements"
     | FequivS es, None ->
       let (_,fl,_),(_,fr,_),_,_ = s_last_calls "call" es.es_sl es.es_sr in
-      Format.printf "ICI_2@.";
       let env' = tyenv_of_hyps env hyps in
       let penv, qenv = EcEnv.Fun.equivF fl fr env' in
-      Format.printf "ICI_1@.";
       let pre  = process_form penv hyps pre tbool in
       let post = process_form qenv hyps post tbool in
-      Format.printf "ICI1@.";
       t_equiv_call env pre post g
     | FequivS es, Some side ->
       let fstmt = match side with false -> es.es_sl | true -> es.es_sr in
@@ -1026,9 +1023,11 @@ module Tactic = struct
       [!t_pre; !t_post; t_use env an gs] (juc,n)
 
     
-  let process_fun_abs env f g = 
-    assert false 
-(*  let hyps = get_hyps g in *)
+  let process_fun_abs env inv g = 
+    let env' = EcEnv.Fun.inv_memenv env in
+    let inv = process_formula env' g inv in
+    t_equivF_abs env inv g
+    
     
   let process_phl loc env ptac g =
     let t =

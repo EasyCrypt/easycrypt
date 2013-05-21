@@ -310,7 +310,7 @@ let pr_pv (ppe : ppenv) (x : prog_var) =
 let pr_type (ppe : ppenv) (ty : ty) =
   let rec pr_type btuple (ty : ty) =
     match ty.ty_node with
-    | Tglob _m    -> assert false (* FIXME *)
+    | Tglob m    -> pr_paren (join [!^ "glob"; pr_modname ppe m])
     | Tunivar ui -> pr_univar ppe ui
     | Tvar    a  -> pr_tvar ppe a
 

@@ -89,6 +89,8 @@ module Fun : sig
   val hoareS_anonym : variable list -> env -> memenv * env
 
   val actmem_post :  memory -> xpath -> function_ -> memenv
+    
+  val inv_memenv : env -> env 
 
   val equivF_memenv : xpath -> xpath -> env -> 
     (memenv * memenv) * (memenv * memenv) 

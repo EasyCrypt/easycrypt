@@ -1134,7 +1134,9 @@ let f_imp_simpl f1 f2 =
   if is_true f1 then f2
   else if is_false f1 || is_true f2 then f_true
   else if is_false f2 then f_not_simpl f1
-  else f_imp f1 f2 
+  else 
+    if f_equal f1 f2 then f_true
+    else f_imp f1 f2 
     (* FIXME : simplify x = f1 => f2 into x = f1 => f2{x<-f2} *)
 
 let f_imps_simpl = List.fold_right f_imp_simpl 

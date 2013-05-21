@@ -1072,17 +1072,18 @@ module Fun = struct
     MC.by_path (fun mc -> mc.mc_functions) p env
 
   let by_xpath (p : EcPath.xpath) (env : env) =
-    Format.printf "by_xpath %s@." (EcPath.x_tostring p);
     match ipath_of_xpath p with
     | None -> lookup_error (`XPath p)
 
-    | Some (ip, (i, args)) -> begin
+    | Some (ip, (_i, args)) -> begin
         match MC.by_path (fun mc -> mc.mc_functions) ip env with
         | None -> lookup_error (`XPath p)
         | Some (params, o) ->
-           let ((spi, params), _op) = MC._downpath_for_fun env ip params in
-           Format.printf "i = %i; spi = %i@." i spi;
-           if i <> spi || List.length args <> List.length params then
+           let ((_spi, params), _op) = MC._downpath_for_fun env ip params in
+(*           Format.printf "i = %i; spi = %i@." i spi; *)
+(*   FIXME should we add the test i <> spi *)
+           
+           if (*i <> spi ||*) List.length args <> List.length params then
              assert false;
            let s =
              List.fold_left2
@@ -1145,6 +1146,14 @@ module Fun = struct
   let actmem_body_anonym me path locals =
     let mem = EcMemory.empty_local me path in
     adds_in_memenv mem locals
+      
+  let inv_memenv env = 
+    let path = mroot env in
+    let xpath = EcPath.xpath path (EcPath.psymbol "") in (* dummy value *)
+    let meml = EcMemory.empty_local EcFol.mleft xpath in
+    let memr = EcMemory.empty_local EcFol.mright xpath in
+    Memory.push_all [meml;memr] env
+    
 
   let prF path env =
     let fun_ = by_xpath path env in

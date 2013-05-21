@@ -316,6 +316,7 @@ let s_last_asserts st = s_lasts destr_assert (last_error "n assert" st)
 
 
 
+
 (* -------------------------------------------------------------------- *)
 (* -------------------------------  Wp -------------------------------- *)
 (* -------------------------------------------------------------------- *)
@@ -470,13 +471,23 @@ let gen_mems m f =
   let bds = List.map (fun (m,mt) -> (m,GTmem mt)) m in
   f_forall bds f
 
+let tyenv_of_hyps env hyps =
+  let add env (id,k) =
+    match k with
+    | LD_var (ty,_) -> EcEnv.Var.bind_local id ty env
+    | LD_mem mt     -> EcEnv.Memory.push (id,mt) env
+    | LD_modty (i,r)    -> EcEnv.Mod.bind_local id i r env
+    | LD_hyp   _    -> env in
+  List.fold_left add env hyps.h_local
+
 (* -------------------------------------------------------------------- *)
 (* -------------------------  Tactics --------------------------------- *)
 (* -------------------------------------------------------------------- *)
 
 let t_hoareF_conseq env pre post g =
-  let concl = get_concl g in
+  let hyps,concl = get_goal g in
   let hf = destr_hoareF concl in
+  let env = tyenv_of_hyps env hyps in
   let mpr,mpo = EcEnv.Fun.hoareF_memenv hf.hf_f env in
   let concl1 = gen_mems [mpr] (f_imp pre hf.hf_pr) in
   let concl2 = gen_mems [mpo] (f_imp hf.hf_po post) in
@@ -494,8 +505,9 @@ let t_hoareS_conseq _env pre post g =
 
 
 let t_equivF_conseq env pre post g =
-  let concl = get_concl g in
+  let hyps,concl = get_goal g in
   let ef = destr_equivF concl in
+  let env = tyenv_of_hyps env hyps in
   let (mprl,mprr),(mpol,mpor) = EcEnv.Fun.equivF_memenv ef.ef_fl ef.ef_fr env in
   let concl1 = gen_mems [mprl;mprr] (f_imp pre ef.ef_pr) in
   let concl2 = gen_mems [mpol;mpor] (f_imp ef.ef_po post) in
@@ -532,23 +544,17 @@ let t_equivF_fun_def env g =
   let memenvl,fdefl,memenvr,fdefr,env = Fun.equivS ef.ef_fl ef.ef_fr env in 
                                 (* FIXME catch exception *)
   let ml, mr = EcMemory.memory memenvl, EcMemory.memory memenvr in
-  Format.printf "ICI1@.";
   let fresl = 
     match fdefl.f_ret with
     | None -> f_tt
     | Some e -> form_of_expr ml e in
-  Format.printf "ICI2@.";
   let fresr = 
     match fdefr.f_ret with
     | None -> f_tt
     | Some e -> form_of_expr mr e in
-  Format.printf "ICI3@.";
   let s = PVM.add env (pv_res ef.ef_fl) ml fresl PVM.empty in
-  Format.printf "ICI4@.";
   let s = PVM.add env (pv_res ef.ef_fr) mr fresr s in
-  Format.printf "ICI5@.";
   let post = PVM.subst env s ef.ef_po in
-  Format.printf "ICI6@.";
   let concl' = 
     f_equivS memenvl memenvr ef.ef_pr fdefl.f_body fdefr.f_body post in
   
@@ -601,9 +607,10 @@ let equivF_abs_spec env fl fr inv =
   pre, post, sg
 
 let t_equivF_abs env inv g = 
-  let concl = get_concl g in
+  let hyps, concl = get_goal g in
   let ef = destr_equivF concl in
-  let pre, post, sg = equivF_abs_spec env ef.ef_fl ef.ef_fr inv in
+  let env' = tyenv_of_hyps env hyps in
+  let pre, post, sg = equivF_abs_spec env' ef.ef_fl ef.ef_fr inv in
   let tac g' = prove_goal_by sg (RN_hl_fun_abs inv) g' in
   t_on_last (t_equivF_conseq env pre post g) tac
 
@@ -802,15 +809,6 @@ let t_hoare_call env fpre fpost (juc,n1 as g) =
                pr_hyps =[RA_node nf;RA_node n;]} in
   upd_rule rule (juc, n1)
 
-let tyenv_of_hyps env hyps =
-  let add env (id,k) =
-    match k with
-    | LD_var (ty,_) -> EcEnv.Var.bind_local id ty env
-    | LD_mem mt     -> EcEnv.Memory.push (id,mt) env
-    | LD_modty (i,r)    -> EcEnv.Mod.bind_local id i r env
-    | LD_hyp   _    -> env in
-  List.fold_left add env hyps.h_local
-
 let t_equiv_call env fpre fpost g =
   (* FIXME : check the well formess of the pre and the post ? *)
   let hyps, concl = get_goal g in
@@ -820,10 +818,8 @@ let t_equiv_call env fpre fpost g =
     s_last_calls "call" es.es_sl es.es_sr in
   let ml = EcMemory.memory es.es_ml in
   let mr = EcMemory.memory es.es_mr in
-  Format.printf "ICI2@.";
   let fsigl = (Fun.by_xpath fl env).f_sig in
   let fsigr = (Fun.by_xpath fr env).f_sig in
-  Format.printf "ICI3@.";
   (* The functions satisfy their specification *)
   let f_concl = f_equivF fpre fl fr fpost in
   (* The wp *)
@@ -841,16 +837,15 @@ let t_equiv_call env fpre fpost g =
   let modir = f_write env fr in
   let post = generalize_mod env mr modir (f_imp_simpl fpost post) in
   let post = generalize_mod env ml modil post in
+  let post = 
+    f_forall_simpl
+      [(vresl, GTty fsigl.fs_ret);
+       (vresr, GTty fsigr.fs_ret)]
+      post in
   let spre = subst_args_call env ml fl fsigl.fs_params argsl PVM.empty in
   let spre = subst_args_call env mr fr fsigr.fs_params argsr spre in
   let post = f_anda_simpl (PVM.subst env spre fpre) post in
   let concl = f_equivS_r { es with es_sl = sl; es_sr = sr; es_po=post} in
-  let concl =
-    f_forall
-      [(vresl, GTty fsigl.fs_ret);
-       (vresr, GTty fsigr.fs_ret)]
-      concl
-  in
   prove_goal_by [f_concl;concl] (RN_hl_call (None, fpre, fpost)) g
 
 let t_equiv_call1 env side fpre fpost g =
