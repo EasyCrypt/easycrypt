@@ -872,7 +872,7 @@ let t_equiv_call1 env side fpre fpost g =
   (* WP *)
   let pvres  = pv_res f in
   let vres   = LDecl.fresh_id (get_hyps g) "result" in
-  let fres   = f_local vres (snd fsig.fs_sig) in
+  let fres   = f_local vres fsig.fs_ret in
   let post   = wp_asgn_call env me lp fres equiv.es_po in
   let subst  = PVM.add env pvres me fres PVM.empty in
   let msubst = EcFol.bind_mem EcFol.f_subst_id EcFol.mhr me in
@@ -881,14 +881,14 @@ let t_equiv_call1 env side fpre fpost g =
   let post   = f_imp_simpl fpost post in
   let post   = generalize_mod env me modi post in
   let spre   = PVM.empty in
-  let spre   = subst_args_call env me f (fst fsig.fs_sig) args spre in
+  let spre   = subst_args_call env me f fsig.fs_params args spre in
   let post   = f_anda_simpl (PVM.subst env spre (f_subst msubst fpre)) post in
   let concl  =
     match side with
     | true  -> { equiv with es_sl = fstmt; es_po = post; }
     | false -> { equiv with es_sr = fstmt; es_po = post; } in
   let concl  = f_equivS_r concl in
-  let concl  = f_forall [(vres, GTty (snd fsig.fs_sig))] concl in
+  let concl  = f_forall [(vres, GTty fsig.fs_ret)] concl in
   prove_goal_by [fconcl; concl] (RN_hl_call (Some side, fpre, fpost)) g
 
 (* --------------------------------------------------------------------- *)
@@ -992,9 +992,14 @@ let _inline env f occs me stmt =
             ((me, idx+1), [i_call (lv, p, args)])
           else
             let f = EcEnv.Fun.by_xpath p env in
-
-            let me, anames = List.map_fold _inline_freshen me (fst f.f_sig.fs_sig) in
-            let me, lnames = List.map_fold _inline_freshen me (oget f.f_def).f_locals in
+            let fdef = 
+              match f.f_def with
+              | FBdef def -> def 
+              | _ -> assert false in
+            let me, anames = 
+              List.map_fold _inline_freshen me f.f_sig.fs_params in
+            let me, lnames = 
+              List.map_fold _inline_freshen me fdef.f_locals in
 
             let subst =
               let for1 mx v x =
@@ -1005,8 +1010,8 @@ let _inline env f occs me stmt =
               in
 
               let mx = P.Mx.empty in
-              let mx = List.fold_left2 for1 mx (fst f.f_sig.fs_sig) anames in
-              let mx = List.fold_left2 for1 mx (oget f.f_def).f_locals lnames in
+              let mx = List.fold_left2 for1 mx f.f_sig.fs_params anames in
+              let mx = List.fold_left2 for1 mx fdef.f_locals lnames in
 
                 { e_subst_id with
                     es_freshen = true;
@@ -1021,16 +1026,16 @@ let _inline env f occs me stmt =
                     pv_kind = PVloc;
                   } in
                     i_asgn (LvVar (newpv, v.v_type), e))
-                (List.combine (fst f.f_sig.fs_sig) anames)
+                (List.combine f.f_sig.fs_params anames)
                 args
 
             and resasgn =
-              match (oget f.f_def).f_ret with
+              match fdef.f_ret with
               | None   -> None
               | Some r -> Some (i_asgn (oget lv, e_subst subst r))
             in
 
-            let body  = (oget f.f_def).f_body in
+            let body  = fdef.f_body in
             let body  = s_subst subst body in
 
               ((me, idx+1), prelude @ body.s_node @ (otolist resasgn))

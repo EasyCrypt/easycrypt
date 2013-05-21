@@ -909,11 +909,13 @@ module Tactic = struct
 
   let process_inline env f side occs g =
     let (fp, f) = EcEnv.Fun.sp_lookup (unloc f) env in
-      if f.EcEnv.sp_target.f_def = None then
-        failwith "function is abstract";
-      match side with
-      | None      -> t_inline_hoare env fp occs g
-      | Some side -> t_inline_equiv env fp side occs g
+    begin match f.EcEnv.sp_target.f_def with
+    | FBabs _ -> failwith "function is abstract";
+    | _ -> ()
+    end;
+    match side with
+    | None      -> t_inline_hoare env fp occs g
+    | Some side -> t_inline_equiv env fp side occs g
 
   let process_rnd env bij_info g =
     let concl = get_concl g in
