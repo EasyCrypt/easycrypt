@@ -1279,43 +1279,10 @@ let t_equiv_rnd env bij_info =
   in wp_equiv_rnd env (f,finv) 
 
 
-(* -------------------------------------------------------------------- *)
 
 
-let t_equiv_deno env pre post g =
-  let concl = get_concl g in
-  let cmp, f1, f2 =
-    match concl.f_node with
-    | Fapp({f_node = Fop(op,_)}, [f1;f2]) when is_pr f1 && is_pr f2 &&
-        (EcPath.p_equal op EcCoreLib.p_eq || 
-           EcPath.p_equal op EcCoreLib.p_real_le) ->
-      EcPath.p_equal op EcCoreLib.p_eq, f1, f2
-    | _ -> cannot_apply "equiv_deno" "" in (* FIXME error message *)
-  let (ml,fl,argsl,evl) = destr_pr f1 in
-  let (mr,fr,argsr,evr) = destr_pr f2 in
-  let concl_e = f_equivF pre fl fr post in
-  let funl = EcEnv.Fun.by_xpath fl env in
-  let funr = EcEnv.Fun.by_xpath fr env in
-  (* building the substitution for the pre *)
-  (* we should substitute param by args and left by ml and right by mr *)
-  let sargs = 
-    List.fold_left2 (fun s v a -> PVM.add env (pv_loc fr v.v_name) mright a s)
-      PVM.empty (fst funr.f_sig.fs_sig) argsr in
-  let sargs = 
-    List.fold_left2 (fun s v a -> PVM.add env (pv_loc fl v.v_name) mleft a s)
-      sargs (fst funl.f_sig.fs_sig) argsl in
-  let smem = { f_subst_id with 
-    fs_mem = Mid.add mleft ml (Mid.singleton mright mr) } in
-  let concl_pr  = f_subst smem (PVM.subst env sargs pre) in
-  (* building the substitution for the post *)
-  let smeml = { f_subst_id with fs_mem = Mid.singleton mhr mleft } in
-  let smemr = { f_subst_id with fs_mem = Mid.singleton mhr mright } in
-  let evl   = f_subst smeml evl and evr = f_subst smemr evr in
-  let cmp   = if cmp then f_iff else f_imp in 
-  let mel = EcEnv.Fun.actmem_post mleft fl funl in
-  let mer = EcEnv.Fun.actmem_post mright fr funr in
-  let concl_po = gen_mems [mel;mer] (f_imp post (cmp evl evr)) in
-  prove_goal_by [concl_e;concl_pr;concl_po] RN_hl_deno g  
+
+
 
     
     
