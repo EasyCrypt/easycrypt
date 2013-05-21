@@ -238,6 +238,7 @@
 %token WP
 %token CALL
 %token ZETA 
+%token GLOB
 
 %token <string> OP1 OP2 OP3 OP4
 %token LTCOLON GT
@@ -622,6 +623,8 @@ sform_u:
 ;
                           
 form_u:
+| GLOB mp=loc(mod_qident) { PFglob mp }
+
 | e=sform_u { e }
 
 | e=sform args=sform+ { PFapp (e, args) } 
@@ -702,7 +705,7 @@ equiv_body:
 pgtybinding1:
 | x=ptybinding1 { List.map (fun (xs,ty) -> xs, PGTY_Type ty) x }
 
-| LPAREN x=uident LTCOLON mi=mod_type RPAREN
+| LPAREN x=uident LTCOLON mi=mod_type_restr RPAREN
     { [[x], PGTY_ModTy mi] }
 
 | pn=mident
@@ -908,8 +911,12 @@ mod_aty1:
 (* Modules interfaces                                                   *)
 
 %inline mod_type:
+| x = qident { x }
+;
+
+%inline mod_type_restr:
 | x = qident { (x,[]) }
-| x = qident LBRACE restr=plist1(qident,COMMA) RBRACE { (x,restr) }
+| x = qident LBRACE restr=plist1(loc(mod_qident),COMMA) RBRACE { (x,restr) }
 ;
 
 sig_def:
@@ -1286,7 +1293,8 @@ tactic:
    { Pcut (n, p) }
 
 (* PHL tactics *)
-| FUN { PPhl Pfun_def }
+| FUN        { PPhl Pfun_def }
+| FUN f=form { PPhl (Pfun_abs f) }
 
 | APP pos=code_position COLON p=sform
    { PPhl (Papp (pos, p)) }

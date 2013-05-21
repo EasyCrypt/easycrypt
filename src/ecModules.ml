@@ -304,28 +304,20 @@ type funsig = {
   fs_name   : symbol;
   fs_params : variable list;
   fs_ret    : EcTypes.ty;
-(*  fs_uses   : uses; *)
-}
-
-type uses = {
-  us_calls  : xpath list;
-  us_reads  : Sx.t;
-  us_writes : Sx.t;
 }
 
 (* -------------------------------------------------------------------- *)
 
 type oracle_info = {
   oi_calls  : xpath list; (* The list of oracle that can be called *)
-  oi_reads  : Sx.t;       (* The list of global prog var of the outside word *)
-  oi_writes : Sx.t;       (* that can be read only or read and write *)
+(*  oi_reads  : Sx.t;    (* The list of global prog var of the outside word *)
+  oi_writes : Sx.t;      (* that can be read only or read and write *) *)
 }
 
 type module_type = {
   mt_params : (EcIdent.t * module_type) list;
   mt_name   : EcPath.path;
   mt_args   : EcPath.mpath list;
-  mt_forb   : Sm.t;
 }
 
 type module_sig_body_item =
@@ -340,6 +332,12 @@ type module_sig = {
 }
 
 (* -------------------------------------------------------------------- *)
+
+type uses = {
+  us_calls  : xpath list;
+  us_reads  : Sx.t;
+  us_writes : Sx.t;
+}
 
 type function_def = {
   f_locals : variable list;
@@ -359,25 +357,26 @@ type function_ = {
 }
 
 (* -------------------------------------------------------------------- *)
+
 type module_expr = {
-  me_name  : symbol;
-  me_body  : module_body;
-  me_comps : module_comps;
-  me_sig   : module_sig;
-  me_types : module_type list;
+  me_name      : symbol;
+  me_body      : module_body;
+  me_comps     : module_comps;
+  me_sig       : module_sig; 
+  me_types     : module_type list;
 }
 
 and module_body =
   | ME_Alias       of EcPath.mpath
   | ME_Structure   of module_structure
-  | ME_Decl        of module_type
+  | ME_Decl        of module_type * EcPath.Sm.t
 
 and module_structure = {
   ms_params : (EcIdent.t * module_type) list;
   ms_body   : module_item list;
-  ms_uses   : Sm.t; (* The set of top used inside the structure *)
-  ms_var    : Sx.t; (* The set of global variabled declare inside the 
+  ms_vars   : EcTypes.ty Mx.t; (* The set of global variable declared inside the 
                             module and it sub module *)
+  ms_uses   : Sm.t; (* The set of external top module used inside the module *)
 }
 
 and module_item =
@@ -413,8 +412,7 @@ let rec mty_subst sp sm mty =
   let mt_params = List.map (sndmap (mty_subst sp sm)) mty.mt_params in
   let mt_name   = sp mty.mt_name in
   let mt_args   = List.map sm mty.mt_args in
-  let mt_forb   = Sm.fold (fun x s -> Sm.add (sm x) s) mty.mt_forb Sm.empty in
-    { mt_params; mt_name; mt_args; mt_forb}
+  { mt_params; mt_name; mt_args; }
 
 let mty_hash mty =
   Why3.Hashcons.combine2
@@ -428,4 +426,4 @@ let rec mty_equal mty1 mty2 =
      (EcPath.p_equal mty1.mt_name mty2.mt_name)
   && (List.all2 EcPath.m_equal mty1.mt_args mty2.mt_args)
   && (List.all2 (pair_equal EcIdent.id_equal mty_equal) mty1.mt_params mty2.mt_params)
-  && (Sm.equal mty1.mt_forb mty2.mt_forb)
+

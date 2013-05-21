@@ -80,7 +80,7 @@ type pinstr =
 and pstmt = pinstr list
 
 (* -------------------------------------------------------------------- *)
-type pmodule_type = pqsymbol * pqsymbol list
+type pmodule_type = pqsymbol 
 
 and pmodule_sig =
   | Pmty_struct of pmodule_sig_struct
@@ -149,6 +149,8 @@ type pdatatype = {
 }
 
 (* -------------------------------------------------------------------- *)
+type pmodule_type_restr = pqsymbol * pmsymbol located list
+
 type pgamepath = (pmsymbol * psymbol) located
 type pmemory   = psymbol
 
@@ -165,6 +167,7 @@ and pformula_r =
   | PFforall of pgtybindings * pformula
   | PFexists of pgtybindings * pformula
   | PFlambda of ptybindings * pformula
+  | PFglob   of pmsymbol located 
 
   (* for claims *)
   | PFhoareS of pformula * pfunction_body * pformula
@@ -177,7 +180,7 @@ and pgtybindings = pgtybinding list
 
 and pgty =
 | PGTY_Type  of pty
-| PGTY_ModTy of pmodule_type
+| PGTY_ModTy of pmodule_type_restr
 | PGTY_Mem
 
 (* -------------------------------------------------------------------- *)
@@ -303,6 +306,7 @@ and ptactic_r =
 
 and phl_tactics = 
   | Pfun_def  
+  | Pfun_abs    of pformula
   | Pskip
   | Papp        of (int doption * pformula)
   | Pwp         of int doption option 

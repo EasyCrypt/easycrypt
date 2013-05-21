@@ -198,6 +198,7 @@ let reduce_op ri env p tys =
   | Some s when Sp.mem p s -> Op.reduce env p tys 
   | _ -> raise NotReducible
 
+(* FIXME add reduction for glob *)
 let rec h_red ri env hyps f = 
   match f.f_node with
   | Flocal x -> reduce_local ri hyps x 
@@ -279,7 +280,10 @@ let check_alpha_equal ri env hyps f1 f2 =
       let tyok =
         match ty1, ty2 with
         | GTty    ty1, GTty ty2   -> equal_type env ty1 ty2
-        | GTmodty p1 , GTmodty p2 -> ModTy.mod_type_equiv env p1 p2
+        | GTmodty (p1,r1) , GTmodty(p2,r2) -> 
+          ModTy.mod_type_equiv env p1 p2 &&
+            EcPath.Sm.equal r1 r2 
+            (* FIXME : Did we have to perform reduction ?*)
         | GTmem   me1, GTmem me2  -> check_memtype me1 me2
         | _          , _          -> false
       in
@@ -312,6 +316,9 @@ let check_alpha_equal ri env hyps f1 f2 =
 
     | Fpvar(p1,m1), Fpvar(p2,m2) when 
         EcIdent.id_equal (find alpha m1) m2 && pv_equal_norm env p1 p2  -> ()
+    
+    | Fglob(p1,m1), Fglob(p2,m2) when
+        m_equal_norm env p1 p2 &&  EcIdent.id_equal (find alpha m1) m2 -> ()
 
     | Fop(p1, ty1), Fop(p2, ty2) when EcPath.p_equal p1 p2 &&
         List.all2 (equal_type env) ty1 ty2 -> () 

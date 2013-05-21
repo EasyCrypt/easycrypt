@@ -83,33 +83,29 @@ type funsig = {
   fs_name   : symbol;
   fs_params : variable list;
   fs_ret    : EcTypes.ty;
-(*  fs_uses   : uses; *)
-}
-
-type uses = {
-  us_calls  : xpath list;
-  us_reads  : Sx.t;
-  us_writes : Sx.t;
 }
 
 (* -------------------------------------------------------------------- *)
 
-type oracle_info = {
-  oi_calls  : xpath list; (* The list of oracle that can be called *)
-  oi_reads  : Sx.t;       (* The list of global prog var of the outside word *)
-  oi_writes : Sx.t;       (* that can be read only or read and write *)
-}
+(* An oracle in a function provided by a module parameter of a functor *)
 
 type module_type = {                   (* Always in eta-normal form *)
   mt_params : (EcIdent.t * module_type) list;
   mt_name   : EcPath.path;
   mt_args   : EcPath.mpath list;
-  mt_forb   : Sm.t
+}
+
+type oracle_info = {
+  oi_calls  : xpath list; (* The list of oracle that can be called *)
+(*  oi_reads  : Sx.t;   (* The list of global prog var of the outside word *)
+  oi_writes : Sx.t;     (* that can be read only or read and write *) *)
 }
 
 type module_sig_body_item =
 (*  | Tys_variable of variable *)
   | Tys_function of funsig * oracle_info
+           (* oracle_info contain only function provided by the 
+              module parameters *)
 
 type module_sig_body = module_sig_body_item list
 
@@ -119,6 +115,11 @@ type module_sig = {
 }
 
 (* -------------------------------------------------------------------- *)
+type uses = {
+  us_calls  : xpath list;
+  us_reads  : Sx.t;
+  us_writes : Sx.t;
+}
 
 type function_def = {
   f_locals : variable list;
@@ -137,29 +138,27 @@ type function_ = {
   f_def    : function_body;
 }
 
-
-
 (* -------------------------------------------------------------------- *)
+
 type module_expr = {
-  me_name  : symbol;
-  me_body  : module_body;
-  me_comps : module_comps;
-  me_sig   : module_sig;
-  me_types : module_type list;
+  me_name      : symbol;
+  me_body      : module_body;
+  me_comps     : module_comps;
+  me_sig       : module_sig; 
+  me_types     : module_type list;
 }
 
 and module_body =
   | ME_Alias       of EcPath.mpath
   | ME_Structure   of module_structure
-  | ME_Decl        of module_type
+  | ME_Decl        of module_type * EcPath.Sm.t
 
 and module_structure = {
   ms_params : (EcIdent.t * module_type) list;
   ms_body   : module_item list;
-  ms_uses   : Sm.t; (* The set of top module used inside the structure.
-                       Do not contain the module parameters *)
-  ms_var    : Sx.t; (* The set of global variabled declare inside the 
+  ms_vars   : ty Mx.t; (* The set of global variable declare inside the 
                             module and it sub module *)
+  ms_uses   : Sm.t; (* The set of external top module used inside the module *)
 }
 
 and module_item =

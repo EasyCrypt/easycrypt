@@ -12,7 +12,7 @@ type memory = EcMemory.memory
 (* -------------------------------------------------------------------- *)
 type gty =
   | GTty    of EcTypes.ty
-  | GTmodty of module_type
+  | GTmodty of module_type * EcPath.Sm.t
   | GTmem   of EcMemory.memtype
 
 type quantif = 
@@ -65,11 +65,11 @@ and equivF = {
 }
 
 and equivS = {
-  es_ml : EcMemory.memenv;
-  es_mr : EcMemory.memenv;
-  es_pr : form;
-  es_sl : stmt; (* In reverse order *)
-  es_sr : stmt; (* In reverse order *)
+  es_ml  : EcMemory.memenv;
+  es_mr  : EcMemory.memenv;
+  es_pr  : form;
+  es_sl  : stmt; 
+  es_sr  : stmt; 
   es_po : form; }
 
 and hoareF = { 
@@ -80,7 +80,7 @@ and hoareF = {
 and hoareS = {
   hs_m  : EcMemory.memenv;
   hs_pr : form; 
-  hs_s  : stmt; (* In reverse order *)
+  hs_s  : stmt; 
   hs_po : form; }
 
 
@@ -111,8 +111,8 @@ let gty_equal ty1 ty2 =
   | GTty ty1, GTty ty2 ->
       EcTypes.ty_equal ty1 ty2
 
-  | GTmodty p1, GTmodty p2  ->
-      EcModules.mty_equal p1 p2
+  | GTmodty (p1, r1), GTmodty (p2,r2)  ->
+      EcModules.mty_equal p1 p2 && EcPath.Sm.equal r1 r2
 
   | GTmem mt1, GTmem mt2 -> EcMemory.mt_equal mt1 mt2
 
@@ -122,7 +122,7 @@ let gty_hash = function
   | GTty ty ->
       EcTypes.ty_hash ty
 
-  | GTmodty p  ->
+  | GTmodty (p,_)  ->
       EcModules.mty_hash p
 
   | GTmem _ -> 1
@@ -187,6 +187,9 @@ module Hsform = Why3.Hashcons.Make (struct
 
     | Fpvar(pv1,s1), Fpvar(pv2,s2) -> 
         EcIdent.id_equal s1 s2 && EcTypes.pv_equal pv1 pv2
+    
+    | Fglob(mp1,m1), Fglob(mp2,m2) ->
+      EcPath.m_equal mp1 mp2 && EcIdent.id_equal m1 m2
 
     | Fop(p1,lty1), Fop(p2,lty2) ->
         EcPath.p_equal p1 p2 && List.all2 ty_equal lty1 lty2
@@ -433,7 +436,11 @@ let f_not f = f_app fop_not [f] ty_bool
 
 let fop_and = f_op EcCoreLib.p_and [] ty_fbool2
 let f_and f1 f2 = f_app fop_and [f1;f2] ty_bool
-
+let f_ands fs = 
+  match List.rev fs with
+  | [] -> f_true
+  | f::fs -> List.fold_left (fun f2 f1 -> f_and f1 f2) f fs
+    
 let fop_anda = f_op EcCoreLib.p_anda [] ty_fbool2
 let f_anda f1 f2 = f_app fop_anda [f1;f2] ty_bool
 
@@ -453,11 +460,39 @@ let f_iff f1 f2 = f_app fop_iff [f1;f2] ty_bool
 let fop_eq ty = f_op EcCoreLib.p_eq [ty] (tfun ty (tfun ty ty_bool))
 let f_eq f1 f2 = f_app (fop_eq f1.f_ty) [f1;f2] ty_bool
 
+let f_eqs fs1 fs2 =
+  match List.rev fs1, List.rev fs2 with
+  | [], [] -> f_true
+  | f1::fs1, f2::fs2 ->
+    List.fold_left2 (fun eq f1 f2 ->
+      f_and (f_eq f1 f2) eq) (f_eq f1 f2) fs1 fs2
+  | _, _ -> assert false
+
 let f_local x ty = mk_form (Flocal x) ty
-let f_pvar x ty s = mk_form (Fpvar(x, s)) ty
+
+let f_pvar x ty m = mk_form (Fpvar(x, m)) ty
+
+let f_pvloc f v m = 
+  f_pvar (EcTypes.pv_loc f v.v_name) v.v_type m
+
+let f_pvlocs f vs m =
+  List.map (fun v -> f_pvloc f v m) vs
+
+let f_glob mp m = mk_form (Fglob(mp,m)) (tglob mp)
+
+let f_eqparams f1 vs1 m1 f2 vs2 m2 = 
+  f_eqs (f_pvlocs f1 vs1 m1) (f_pvlocs f2 vs2 m2)
+
+let f_eqres f1 ty1 m1 f2 ty2 m2 =
+  f_eq (f_pvar (pv_res f1) ty1 m1)  (f_pvar (pv_res f2) ty2 m2)
+
+let f_eqglob mp1 m1 mp2 m2 =  
+  f_eq (f_glob mp1 m1) (f_glob mp2 m2)
 
 let f_tuple args = 
-  mk_form (Ftuple args) (ttuple (List.map f_ty args))
+  match args with
+  | [x] -> x
+  | _ -> mk_form (Ftuple args) (ttuple (List.map f_ty args))
 
 let f_if f1 f2 f3 = mk_form (Fif(f1,f2,f3)) f2.f_ty 
 
@@ -485,7 +520,7 @@ let f_exists b f = f_quant Lexists b f
 let f_forall b f = f_quant Lforall b f
 let f_lambda b f = f_quant Llambda b f
 
-let f_glob mp m = mk_form (Fglob(mp,m)) (tglob mp)
+
 
 let f_hoareF pre f post = 
   let hf = { hf_pr = pre; hf_f = f; hf_po = post } in
@@ -802,6 +837,8 @@ let f_map gt g f =
         if args == args' && ev == ev' then f else
         f_pr m mp args' ev'
 
+
+
 type f_subst = { 
     fs_freshen : bool; (* true means realloc local *)
     fs_p       : EcPath.path -> EcPath.path;
@@ -858,11 +895,14 @@ let add_binding s (x,gty as xt) =
       let s, (x',ty') = add_local s (x,ty) in
       if x == x' && ty == ty' then s,xt else
       s,(x',GTty ty')
-  | GTmodty p ->
-    let p' = mty_subst s.fs_p (EcPath.m_subst s.fs_p s.fs_mp) p in
+  | GTmodty (p,r) ->
+    let sub = (EcPath.m_subst s.fs_p s.fs_mp) in
+    let p' = mty_subst s.fs_p sub p in
+    let r' = 
+      EcPath.Sm.fold (fun m r' -> EcPath.Sm.add (sub m) r') r EcPath.Sm.empty in
     let x' = if s.fs_freshen then EcIdent.fresh x else x in
-    if x == x' && p == p' then s,xt else
-      bind_mod s x (EcPath.mident x'), (x',GTmodty p')
+    if x == x' && p == p' && EcPath.Sm.equal r r' then s,xt else
+      bind_mod s x (EcPath.mident x'), (x',GTmodty(p',r'))
   | GTmem mt ->
     let mt' = EcMemory.mt_substm s.fs_p s.fs_mp s.fs_ty mt in
     let x' = if s.fs_freshen then EcIdent.fresh x else x in
@@ -1068,7 +1108,6 @@ let f_and_simpl f1 f2 =
   else f_and f1 f2
 
 let f_ands_simpl = List.fold_right f_and_simpl
-let f_ands       = List.fold_right f_and
 
 let f_anda_simpl f1 f2 = 
   if is_true f1 then f2

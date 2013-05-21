@@ -9,6 +9,7 @@ open EcTheory
 module Sp    = EcPath.Sp
 module Sm    = EcPath.Sm
 module Sx    = EcPath.Sx
+module Mx    = EcPath.Mx
 module Mp    = EcPath.Mp
 module Mid   = EcIdent.Mid
 
@@ -96,10 +97,10 @@ let subst_fun_uses (s : _subst) (u : uses) =
 let subst_oracle_info (s:_subst) (x:oracle_info) = 
   let x_subst = EcPath.x_subst s.s_fmp in
   { oi_calls  = List.map x_subst x.oi_calls;
-    oi_reads  = 
+    (*oi_reads  = 
       Sx.fold (fun p m -> Sx.add (x_subst p) m) Sx.empty x.oi_reads;
     oi_writes = 
-      Sx.fold (fun p m -> Sx.add (x_subst p) m) Sx.empty x.oi_writes }
+      Sx.fold (fun p m -> Sx.add (x_subst p) m) Sx.empty x.oi_writes*) }
 
 
 (* -------------------------------------------------------------------- *)
@@ -136,8 +137,8 @@ and subst_modtype (s : _subst) (modty : module_type) =
       List.map (fun (x, mty) -> (x, subst_modtype s mty)) modty.mt_params;
     mt_name   = s.s_p modty.mt_name;
     mt_args   = List.map s.s_fmp modty.mt_args;
-    mt_forb   = 
-      Sm.fold (fun x f -> Sm.add (s.s_fmp x) f) modty.mt_forb Sm.empty;
+   (* mt_forb   = 
+      Sm.fold (fun x f -> Sm.add (s.s_fmp x) f) modty.mt_forb Sm.empty; *)
   }
 
 (* -------------------------------------------------------------------- *)
@@ -193,16 +194,16 @@ and subst_module_struct (s : _subst) (bstruct : module_structure) =
       in
         (_subst_of_subst s, newparams)
   in
-  (sbody, { ms_params = newparams;
-            ms_body   = subst_module_items sbody bstruct.ms_body; 
-            ms_uses   = 
-              Sm.fold (fun m u -> Sm.add (s.s_fmp m) u) bstruct.ms_uses
-                Sm.empty;
-            ms_var    = 
-              let es = e_subst_of_subst s in
-              Sx.fold (fun x w -> Sx.add (es.es_xp x) w) 
-                bstruct.ms_var Sx.empty;
-          })
+  let es = e_subst_of_subst s in
+  (sbody, 
+   { ms_params = newparams;
+     ms_body   = subst_module_items sbody bstruct.ms_body; 
+     ms_vars   = 
+       Mx.fold (fun x ty w -> Mx.add (es.es_xp x) (es.es_ty ty) w)
+         bstruct.ms_vars Mx.empty;
+     ms_uses   =
+       Sm.fold (fun m u -> Sm.add (es.es_mp m) u) bstruct.ms_uses Sm.empty;
+   })
 
 (* -------------------------------------------------------------------- *)
 and subst_module_body (s : _subst) (body : module_body) =
@@ -214,8 +215,9 @@ and subst_module_body (s : _subst) (body : module_body) =
       let s, bstruct = subst_module_struct s bstruct in
       s, ME_Structure bstruct
 
-  | ME_Decl p ->
-      s, ME_Decl (subst_modtype s p)
+  | ME_Decl _ -> assert false (* FIXME *)
+(*
+      s, ME_Decl (subst_modtype s p, Sm.fold (fun nu -> ) *)
 
 (* -------------------------------------------------------------------- *)
 and subst_module_comps (s : _subst) (comps : module_comps) =

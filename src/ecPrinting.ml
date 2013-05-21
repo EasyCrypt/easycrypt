@@ -763,7 +763,7 @@ and pr_module (ppenv : ppenv) ((p, m) : EcPath.mpath * module_expr) =
         join [prelude; tk_eq] ^@@^ 
           pr_modname ppenv m
 
-    | ME_Decl _modty ->
+    | ME_Decl _ ->
         assert false                  (* FIXME *)
 
     | ME_Structure mstruct ->
@@ -776,7 +776,7 @@ and pr_module (ppenv : ppenv) ((p, m) : EcPath.mpath * module_expr) =
     pr_dotted moddoc
 
 (* -------------------------------------------------------------------- *)
-let pr_modtype (_ppenv : ppenv) (_ : module_type) =
+let pr_modtype (_ppenv : ppenv) (_ : module_type) (_:EcPath.Sm.t) =
   Pp.empty                            (* FIXME *)
 
 (* -------------------------------------------------------------------- *)
@@ -808,9 +808,9 @@ let pr_binding (ppenv : ppenv) (x, ty) =
       let ppenv1 = PPE.add_local ppenv x in
         (ppenv1, join [pr_local ppenv1 x; !^":"; tk_memory])
 
-  | GTmodty p ->
+  | GTmodty (p,r) -> (* FIXME print restriction *)
       let ppenv1 = PPE.add_local ppenv x in
-        (ppenv1, join [pr_local ppenv1 x; !^":"; pr_modtype ppenv p])
+        (ppenv1, join [pr_local ppenv1 x; !^":"; pr_modtype ppenv p r])
 
 (* -------------------------------------------------------------------- *)
 let pr_bindings (ppenv : ppenv) (b : binding) =
@@ -924,8 +924,10 @@ let rec pr_form_rec (ppenv : ppenv) outer (f : form) =
             !^ "==>";
             pr_form_rec ppenv outer eqv.ef_po ])]
 
-  | Fglob _ ->
-     !^ "implement-me"
+  | Fglob (mp,m) ->
+    join [
+      pr_paren (join [!^ "glob"; pr_modname ppenv mp]);
+      pr_brace (pr_local ppenv m) ]
 
 and pr_form ppenv f = pr_form_rec ppenv (min_op_prec, `NonAssoc) f
 
