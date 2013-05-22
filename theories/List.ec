@@ -68,8 +68,21 @@ op (* local *) f_mem(x:'a,y,b): bool = x = y \/ b.
 op mem (x:'a): 'a list -> bool = 
   fold_right (f_mem x) false.
 
+lemma mem_nil : forall (x : 'a), mem x [] = false.
+lemma mem_cons : forall(x y : 'a, xs : 'a list), 
+ mem y (x::xs) = (x = y \/ mem y xs)
+proof.
+ intros x y xs.
+ simplify mem.
+ cut H: (fold_right (f_mem y) false (x :: xs) = 
+   f_mem y x (fold_right (f_mem y) false xs)).
+ trivial.
+ rewrite H.
+ trivial.
+save.
+
 lemma mem_eq: forall (x:'a) xs, mem x (x::xs).
-lemma mem_cons: forall (x y:'a) xs, mem y xs => mem y (x::xs).
+lemma mem_cons_mon : forall (x y:'a) xs, mem y xs => mem y (x::xs).
 lemma mem_not_nil: forall (y:'a) xs, mem y xs => xs <> [].
 lemma mem_hd: forall (xs:'a list), xs <> [] => mem (hd xs) xs.
 lemma not_mem_empty: forall (xs:'a list), xs = [] <=> (forall x, !mem x xs).
@@ -109,7 +122,7 @@ save.
 
 (* append *)
 
-op [++] (xs ys: 'a list) : 'a list = fold_right [::] ys xs.
+op (++) (xs ys: 'a list) : 'a list = fold_right (::) ys xs.
 
 lemma app_nil: forall (ys:'a list), [] ++ ys = ys.
 lemma app_cons: forall (x:'a) xs ys, (x::xs) ++ ys = x::(xs ++ ys).
@@ -172,7 +185,6 @@ lemma eq_forallb_all: forall (p:'a -> bool) xs,
 proof.
  intros p xs;elimT list_ind xs.
   trivial.
-  
   intros y ys H.
   cut H1: ((p y /\ all p ys) <=> (p y /\ forallb p ys)).
   trivial.
@@ -206,7 +218,12 @@ lemma filter_cons: forall (p:'a cPred) x xs,
                      if p x then x::rest else rest
 proof.
  intros p x xs.
- case (p x);trivial.
+ simplify filter.
+ cut Heq : 
+  (fold_right (f_filter p) __nil (x :: xs) = 
+   (f_filter p x (fold_right (f_filter p) __nil xs))).
+  trivial.
+  trivial.
 save.
 
 lemma filter_mem: forall (x:'a) xs p,
@@ -295,10 +312,10 @@ proof.
  elimT list_ind xs.
  trivial.
  intros x' xs' IH.
- rewrite map_cons<:'b, 'a>(f,x',xs').
- rewrite map_cons<:'b, 'a>(g,x',xs').
+ rewrite (map_cons<:'b, 'a> f x' xs').
+ rewrite (map_cons<:'b, 'a> g x' xs').
  rewrite IH.
- rewrite H (x').
+ rewrite (H x').
  trivial.
 save.
 
@@ -318,7 +335,7 @@ proof.
   case (n = 0);intros Hn.
     rewrite Hn;trivial.
     
-  elim H(dv,(n-1),_).
+  elim (H dv (n-1) _).
    trivial.
    trivial.
    trivial.
