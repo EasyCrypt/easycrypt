@@ -1175,9 +1175,10 @@ fpattern_head(F):
 ;
 
 fpattern_arg:
-| UNDERSCORE   { EA_none }
-| f=sform      { EA_form f }
-| s=mident     { EA_mem s }
+| UNDERSCORE        { EA_none }
+| f=sform           { EA_form f }
+| s=mident          { EA_mem s }
+| LPAREN COLON m=loc(mod_qident) RPAREN { EA_mp m } (* FIXME NOTATION *)
 ;
 
 fpattern(F):

@@ -158,7 +158,10 @@ and module_structure = {
   ms_body   : module_item list;
   ms_vars   : ty Mx.t; (* The set of global variable declare inside the 
                             module and it sub module *)
-  ms_uses   : Sm.t; (* The set of external top module used inside the module *)
+  ms_uses   : Sm.t; (* The set of external top module used inside the module,
+                       It is an invariant that those modules are defined 
+                       (i.e are ME_structure).
+                    *)
 }
 
 and module_item =

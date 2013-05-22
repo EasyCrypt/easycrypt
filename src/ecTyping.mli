@@ -86,6 +86,7 @@ val transform_opt: EcEnv.env -> EcUnify.unienv -> pformula -> ty option -> EcFol
 val transmodsig  : EcEnv.env -> symbol -> pmodule_sig  -> module_sig
 val transmodtype : EcEnv.env -> pmodule_type -> module_type * module_sig
 val transmod     : EcEnv.env -> symbol -> pmodule_expr -> module_expr
+val trans_msymbol : EcEnv.env -> pmsymbol located -> EcPath.mpath
 
 (* -------------------------------------------------------------------- *)
 val check_tymod_sub : EcEnv.env -> module_sig -> module_sig -> unit

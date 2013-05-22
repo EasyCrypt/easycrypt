@@ -65,6 +65,22 @@ intros A.
  skip;trivial.
 save.
 
+module A (O:IO) : Adv'(O) = { 
+  fun a (x:int) : int = {
+    var r : int;
+    r := O.h(x);
+    return r;
+  }
+}.
+
+lemma foo1 :
+   equiv [ G(A).main ~ G(A).main : 
+           x{1} = x{2} /\ (glob A){1} = (glob A){2} ==> 
+           res{1} = res{2} /\  (glob A){1} = (glob A){2} ]
+proof.
+ apply (foo' (:A)).
+save.
+
 
 (*
 

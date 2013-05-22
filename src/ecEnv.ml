@@ -1083,7 +1083,7 @@ module Fun = struct
 (*           Format.printf "i = %i; spi = %i@." i spi; *)
 (*   FIXME should we add the test i <> spi *)
            
-           if (*i <> spi ||*) List.length args <> List.length params then
+           if (*i <> spi || *) List.length args <> List.length params then
              assert false;
            let s =
              List.fold_left2
