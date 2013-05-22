@@ -20,8 +20,10 @@ proof.
  fun.
  call (x{1} = x{2} /\ (glob A){1} = (glob A){2}) 
       (res{1} = res{2} /\  (glob A){1} = (glob A){2}).
- fun true; try (simplify;intros &1 &2;split).
- skip;simplify;trivial.
+ fun true;try (simplify;split).
+ skip;simplify. (* Il y a un bug : les variables sont des fois avec les
+                   arguments des foncteurs d'autres fois non *)
+ trivial.
 save.
 
 module type IO = { 

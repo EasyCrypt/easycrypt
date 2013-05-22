@@ -41,11 +41,5 @@ proof.
   skip.
   intros &m1 &m2 h;elim h;clear h;intros h1 h2.
   elim h2;clear h2;intros h2 h3.
-<<<<<<< HEAD
-  rewrite h1; rewrite h3;simplify.
-  intros _ _ _ _;split.
-=======
-  split;[ assumption | intros _ rL rR y1 y2 h];elim h;clear h;intros _ _.
-  subst;simplify;assumption.
->>>>>>> 1e740813982cfd92884406e8dabdae70bd47e4f3
+  rewrite h1; rewrite h3;simplify;split.
 save.

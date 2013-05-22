@@ -256,6 +256,22 @@ let rec h_red ri env hyps f =
     if f_equal f1 f_true then f2 
     else if f_equal f1 f_false then f3 
     else f_if (h_red ri env hyps f1) f2 f3 
+  | Fquant(Lforall,b,f1) ->
+    begin 
+      try f_forall_simpl b (h_red ri env hyps f1)
+      with NotReducible ->
+        let f' = f_forall_simpl b f1 in
+        if f_equal f f' then raise NotReducible
+        else f'
+    end
+  | Fquant(Lexists,b,f1) ->
+    begin 
+      try f_exists_simpl b (h_red ri env hyps f1)
+      with NotReducible ->
+        let f' = f_exists_simpl b f1 in
+        if f_equal f f' then raise NotReducible
+        else f'
+    end
   | _ -> raise NotReducible 
 and h_red_args ri env hyps args =
   match args with

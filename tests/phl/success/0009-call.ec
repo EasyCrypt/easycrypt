@@ -23,6 +23,5 @@ proof.
     fun;wp;skip.
     intros &m _;subst;simplify;split.
   skip.
-  intros &m h;elim h;clear h;intros _ _;subst;simplify.
-  intros y;split.
+  intros &m h;elim h;clear h;intros _ _;subst;simplify;split.
 save.

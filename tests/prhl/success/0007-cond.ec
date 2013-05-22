@@ -22,7 +22,7 @@ proof.
  fun.
  if {1}.
  if {2}.
- wp;skip;simplify;intros &m1 &m2;split.
+ wp;skip;simplify;split.
  wp;skip;trivial.
  rcondf {2} 1.
   intros &m;skip;trivial.
