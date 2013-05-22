@@ -867,7 +867,10 @@ let trans_lv vm lv =
   try Mid.find lv vm.vm_id with _ -> assert false
 
 let trans_pa env p = try Mp.find p env.env_pa with _ -> assert false
-let trans_na env p = try Mp.find p env.env_na with _ -> assert false
+let trans_na env p = 
+  try Mp.find p env.env_na with _ -> 
+(*    Format.printf "trans_na %s@." (EcPath.tostring p); *)
+    assert false
 
 let rec trans_mod env vm mp =
   let mo = 
@@ -876,7 +879,7 @@ let rec trans_mod env vm mp =
     | `Concrete(top,None) -> trans_pa env top
     | `Concrete(top,Some sub) ->
       let m = trans_pa env top in
-      let n = trans_na env sub in
+      let n = trans_na env (EcPath.pappend top sub) in
       sub_mod m n in
   let add_arg mo a = app_mod mo (trans_mod env vm a) in
   List.fold_left add_arg mo mp.EcPath.m_args

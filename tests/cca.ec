@@ -57,7 +57,30 @@ module G (A:Adv') = {
   } 
 }.
 
- 
+lemma foo' : 
+  forall (A<:Adv' {G}), 
+    equiv [ G(A).main ~ G(A).main : 
+         x{1} = x{2} /\ (glob A){1} = (glob A){2} ==> 
+         res{1} = res{2} /\  (glob A){1} = (glob A){2} ]
+proof.
+intros A. 
+ fun.
+ call (x{1} = x{2} /\ (glob A){1} = (glob A){2} /\ true) 
+      (res{1} = res{2} /\ (glob A){1} = (glob A){2} /\ true).
+ fun true.
+ simplify.
+ intros &1 &2.
+ intros H;elim H;clear H;intros H1 H2.
+ split.
+ trivial.
+ assumption.     
+ trivial.
+ fun.
+ skip.
+ trivial.
+ skip.
+ trivial.
+save.
 
 
 (*
