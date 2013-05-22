@@ -170,5 +170,7 @@ apply (Array.extentionality<:'a> (row M i) (column (transpose M) i) _).
                forall j, 0 <= j => j < fst (size M) =>
                  Array.__get (row M i) j = M.[(j,i)] /\
                  Array.__get (column (transpose M) i) j = (transpose M).[(i,j)] /\
-                 (transpose M).[(i,j)] = M.[(j,i)]);trivial.
+                 (transpose M).[(i,j)] = M.[(j,i)]);[ | trivial ].
+  split;[ trivial | split;[ trivial | intros j j_0 j_bound;split;[ trivial | split;[ | trivial ] ] ] ].
+  apply (column_get<:'a> (transpose M) i j _ _ _ _);trivial.
 save.
