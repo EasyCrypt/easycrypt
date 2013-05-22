@@ -135,5 +135,6 @@ proof.
  fun.
  rnd (lambda x, f x), (lambda x, finv x ).
  skip.
- trivial.
+ intros &1 &2 _ x y.
+ split;[ split;[ split;trivial | trivial ] | trivial ].
 save.
