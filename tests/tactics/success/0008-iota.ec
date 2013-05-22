@@ -1,3 +1,4 @@
+require import Logic.
 
 lemma l: forall (x y:int),
   let (u,v) = (x,y) in
