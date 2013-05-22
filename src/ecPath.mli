@@ -17,6 +17,7 @@ and path_node =
 val psymbol : symbol -> path
 val pqname  : path -> symbol -> path
 val pqoname : path option -> symbol -> path
+val pappend : path -> path -> path
 
 val p_equal   : path -> path -> bool
 val p_compare : path -> path -> int
