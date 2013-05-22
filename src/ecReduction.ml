@@ -151,6 +151,7 @@ type reduction_info = {
   zeta    : bool;                 (* reduce let  *)
   iota    : bool;                 (* reduce case *)
   logic   : bool;                 (* perform logical simplification *)
+  modpath : bool;                 (* reduce module path *)
 }
 
 let full_red = {
@@ -160,6 +161,7 @@ let full_red = {
   zeta    = true;
   iota    = true;
   logic   = true;
+  modpath = true;
 }
    
 let no_red = {
@@ -169,6 +171,7 @@ let no_red = {
   zeta    = false;
   iota    = false;
   logic   = false;
+  modpath = false;
 } 
 
 let beta_red = { no_red with beta = true }
@@ -209,6 +212,14 @@ let rec h_red ri env hyps f =
     let s = 
       List.fold_left2 (fun s (x,_) e1 -> bind_local s x e1) f_subst_id ids es in
     f_subst s e2
+  | Fglob(mp,m) when ri.modpath ->
+    let f' = EcEnv.NormMp.norm_glob env m mp in
+    if f_equal f f' then raise NotReducible
+    else f' 
+  | Fpvar (pv,m) when ri.modpath ->
+    let pv' = EcEnv.NormMp.norm_pvar env pv in
+    if pv_equal pv pv' then raise NotReducible 
+    else f_pvar pv' f.f_ty m
   | Flet(lp,f1,f2) -> f_let lp (h_red ri env hyps f1) f2 
   | Fapp({f_node = Fquant(Llambda,bd,body)}, args) when ri.beta -> 
     let nbd = List.length bd in
