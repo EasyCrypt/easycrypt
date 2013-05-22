@@ -195,7 +195,7 @@ let t_clear ids (juc,n as g) =
 type app_arg =
   | AAform of form
   | AAmem  of EcIdent.t
-  | AAmp   of EcPath.mpath
+  | AAmp   of EcPath.mpath * EcModules.module_type list
   | AAnode
 
 let check_arg do_arg env hyps s x gty a =
@@ -206,9 +206,12 @@ let check_arg do_arg env hyps s x gty a =
     bind_local s x f, RA_form f
   | GTmem _   , AAmem m ->
     bind_mem s x m, RA_id m
-  | GTmodty _, AAmp mp  ->
-      (* FIXME : check the type of mp *)
-    bind_mod s x mp, RA_mp mp
+  | GTmodty (emt, _), AAmp (mp, mt)  ->
+    (* FIXME: create a dedicated function for module application *)
+    (* FIXME: this function should enforce modules memory model *)
+      if not (EcEnv.ModTy.has_mod_type env mt emt) then
+        failwith "invalid-modtype";
+      bind_mod s x mp, RA_mp mp
   | _ -> assert false (* FIXME error message *)
 
 let mkn_apply do_arg env (juc,n) args =

@@ -1484,7 +1484,6 @@ let rec trans_msymbol (env : EcEnv.env) (msymb : pmsymbol located) =
         (mp, [], mt)
 
 (* -------------------------------------------------------------------- *)
- 
 and trans_gamepath (env : EcEnv.env) gp =
   let loc = gp.pl_loc in
   

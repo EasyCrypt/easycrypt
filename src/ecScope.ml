@@ -648,8 +648,9 @@ module Tactic = struct
       error a.pl_loc MemoryExpected
     | EA_none, None ->
       AAnode
-    | EA_mp _mp, Some (GTmodty _) ->
-      assert false (* not implemented *)
+    | EA_mp mp , Some (GTmodty _) ->
+      let (mp, _, mt) = EcTyping.trans_msymbol env (mk_loc a.pl_loc mp) in
+        AAmp (mp, mt)
     | _, Some (GTmodty _) ->
       error a.pl_loc ModuleExpected
     | _, None ->
