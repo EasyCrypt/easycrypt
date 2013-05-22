@@ -910,6 +910,9 @@ module Tactic = struct
     | FBabs _ -> failwith "function is abstract";
     | _ -> ()
     end;
+
+    let fp = xpath (mpath fp.x_top.m_top []) fp.x_sub in
+
     match side with
     | None      -> t_inline_hoare env fp occs g
     | Some side -> t_inline_equiv env fp side occs g
