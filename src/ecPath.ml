@@ -54,6 +54,11 @@ let mk_path node =
 let psymbol id   = mk_path (Psymbol id)
 let pqname  p id = mk_path (Pqname(p,id))
 
+let rec pappend p1 p2 = 
+  match p2.p_node with
+  | Psymbol id -> pqname p1 id
+  | Pqname(p2,id) -> pqname (pappend p1 p2) id
+
 let pqoname p id =
   match p with
   | None   -> psymbol id

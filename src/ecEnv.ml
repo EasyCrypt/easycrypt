@@ -1075,19 +1075,22 @@ module Fun = struct
     match ipath_of_xpath p with
     | None -> lookup_error (`XPath p)
 
-    | Some (ip, (i, args)) -> begin
+    | Some (ip, (_i, args)) -> begin
         match MC.by_path (fun mc -> mc.mc_functions) ip env with
         | None -> lookup_error (`XPath p)
         | Some (params, o) ->
-           let ((spi, params), _op) = MC._downpath_for_fun env ip params in
-             if i <> spi || List.length args <> List.length params then
-               assert false;
-             let s =
-               List.fold_left2
-                 (fun s (x, _) a -> EcSubst.add_module s x a)
-                 EcSubst.empty params args
-             in
-               EcSubst.subst_function s o
+           let ((_spi, params), _op) = MC._downpath_for_fun env ip params in
+(*           Format.printf "i = %i; spi = %i@." i spi; *)
+(*   FIXME should we add the test i <> spi *)
+           
+           if (*i <> spi ||*) List.length args <> List.length params then
+             assert false;
+           let s =
+             List.fold_left2
+               (fun s (x, _) a -> EcSubst.add_module s x a)
+               EcSubst.empty params args
+           in
+           EcSubst.subst_function s o
       end
 
   let by_xpath_opt (p : EcPath.xpath) (env : env) =
@@ -1128,21 +1131,29 @@ module Fun = struct
 
   let actmem_pre me path fun_ =
     let mem = EcMemory.empty_local me path in
-    adds_in_memenv mem (fst fun_.f_sig.fs_sig)
+    adds_in_memenv mem fun_.f_sig.fs_params
 
   let actmem_post me path fun_ =
     let mem = EcMemory.empty_local me path in
-    add_in_memenv mem {v_name = "res"; v_type = snd fun_.f_sig.fs_sig}
+    add_in_memenv mem {v_name = "res"; v_type = fun_.f_sig.fs_ret}
 
   let actmem_body me path fun_ =
     let mem = actmem_pre me path fun_ in
     match fun_.f_def with
-    | None -> assert false (* FIXME error message *)
-    | Some fd -> fd, adds_in_memenv mem fd.f_locals
+    | FBabs _ -> assert false (* FIXME error message *)
+    | FBdef fd -> fd, adds_in_memenv mem fd.f_locals
 
   let actmem_body_anonym me path locals =
     let mem = EcMemory.empty_local me path in
     adds_in_memenv mem locals
+      
+  let inv_memenv env = 
+    let path = mroot env in
+    let xpath = EcPath.xpath path (EcPath.psymbol "") in (* dummy value *)
+    let meml = EcMemory.empty_local EcFol.mleft xpath in
+    let memr = EcMemory.empty_local EcFol.mright xpath in
+    Memory.push_all [meml;memr] env
+    
 
   let prF path env =
     let fun_ = by_xpath path env in
@@ -1259,9 +1270,10 @@ module Mod = struct
       MC.import_mod (fst (ipath_of_mpath p)) obj env
 
   let lookup qname (env : env) =
-    let (((_, a), p), x) = MC.lookup_mod qname env in
-      if a <> [] then
-        raise (LookupFailure (`QSymbol qname));
+    let (((_, _a), p), x) = MC.lookup_mod qname env in
+    (* FIXME : Ca c'est bizare quand on fait des foncteurs *)
+(*      if a <> [] then
+        raise (LookupFailure (`QSymbol qname)); *)
       (p, x)
 
   let lookup_opt name env =
@@ -1290,7 +1302,7 @@ module Mod = struct
         env_rb   = rb @ env.env_rb;
         env_item = CTh_module me :: env.env_item }
 
-  let bind_local name modty env =
+  let bind_local name modty restr env =
     let modsig =
       let modsig =
         match
@@ -1310,10 +1322,11 @@ module Mod = struct
             EcSubst.add_module s mid arg)
           EcSubst.empty modsig.mis_params modty.mt_args
       in
-        { (EcSubst.subst_modsig subst modsig) with mis_params = modty.mt_params }
+        { (EcSubst.subst_modsig subst modsig) with 
+          mis_params = modty.mt_params }
     in
 
-    let me    = module_expr_of_module_sig name modty modsig in
+    let me    = module_expr_of_module_sig name modty modsig restr in
     let path  = IPIdent (name, None) in
     let comps = MC.mc_of_module_param name me in
 
@@ -1330,7 +1343,7 @@ module Mod = struct
 
   let bind_locals bindings env =
     List.fold_left
-      (fun env (name, me) -> bind_local name me env)
+      (fun env (name, me) -> bind_local name me EcPath.Sm.empty env)
       env bindings
 
   let enter name params env =
@@ -1431,6 +1444,39 @@ module NormMp = struct
       then pv
       else { pv_name = p; pv_kind = pv.pv_kind }
 
+  let globals env m mp = 
+    match (Mod.by_mpath mp env).me_body with
+    | ME_Structure ms ->
+        (* FIXME: What to do with the module parameter *)
+      let sx = 
+        EcPath.Mx.fold (fun x ty l -> f_pvar (pv_glob x) ty m :: l) 
+          ms.ms_vars [] in
+      f_tuple sx, ms.ms_uses
+    | _ -> assert false
+
+  let rec norm_glob env m mp = 
+    let mp = norm_mpath env mp in
+    let gtop = 
+      match mp.EcPath.m_top with
+      | `Abstract _ -> f_glob (EcPath.mpath mp.EcPath.m_top []) m
+      | `Concrete(p,_) -> 
+        let top = EcPath.mpath (`Concrete(p,None)) mp.EcPath.m_args in
+        let sx,us = globals env m top in
+        let us = 
+          List.map (fun mp -> fst (globals env m mp)) (EcPath.Sm.elements us) in
+        f_tuple (sx::us) in
+    let gargs = List.map (norm_glob env m) mp.EcPath.m_args in
+    f_tuple (gtop :: gargs)
+
+  let norm_tglob env mp =
+    let g = (norm_glob env mhr mp) in
+    g.f_ty
+
+  let tglob_reducible env mp = 
+    match (norm_tglob env mp).ty_node with
+    | Tglob mp' -> not (EcPath.m_equal mp mp')
+    | _ -> true
+
   let norm_form env =
     let norm_xp = EcPath.Hx.memo 107 (norm_xpath env) in
     let norm_pv pv =
@@ -1451,6 +1497,8 @@ module NormMp = struct
           if p == p' then f else
             f_pvar p' f.f_ty m
 
+        | Fglob(p,m) -> norm_glob env m p
+          
         | FhoareF hf ->
           let pre' = aux hf.hf_pr and p' = norm_xp hf.hf_f
           and post' = aux hf.hf_po in

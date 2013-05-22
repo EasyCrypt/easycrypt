@@ -21,6 +21,7 @@
     "forall"      , FORALL     ;        (* KW: prog *)
     "exists"      , EXIST      ;        (* KW: prog *)
     "lambda"      , LAMBDA     ;        (* KW: prog *)
+    "glob"        , GLOB       ;        (* KW: prog *)
     "let"         , LET        ;        (* KW: prog *)
     "in"          , IN         ;        (* KW: prog *)
     "var"         , VAR        ;        (* KW: prog *)

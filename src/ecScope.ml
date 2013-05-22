@@ -633,15 +633,6 @@ module Tactic = struct
     let mk_id s = EcIdent.create (odfl "_" s) in
       t_intros env (List.map (lmap mk_id) pis)
 
-  let tyenv_of_hyps env hyps =
-    let add env (id,k) =
-      match k with
-      | LD_var (ty,_) -> EcEnv.Var.bind_local id ty env
-      | LD_mem mt     -> EcEnv.Memory.push (id,mt) env
-      | LD_modty i    -> EcEnv.Mod.bind_local id i env
-      | LD_hyp   _    -> env in
-    List.fold_left add env hyps.h_local
-
   let process_elim_arg env hyps oty a =
     let ue  = EcUnify.UniEnv.create (Some hyps.h_tvar) in
     let env = tyenv_of_hyps env hyps in
@@ -855,7 +846,8 @@ module Tactic = struct
       cannot_apply "call" "side can only be given for prhl judgements"
     | FequivS es, None ->
       let (_,fl,_),(_,fr,_),_,_ = s_last_calls "call" es.es_sl es.es_sr in
-      let penv, qenv = EcEnv.Fun.equivF fl fr env in
+      let env' = tyenv_of_hyps env hyps in
+      let penv, qenv = EcEnv.Fun.equivF fl fr env' in
       let pre  = process_form penv hyps pre tbool in
       let post = process_form qenv hyps post tbool in
       t_equiv_call env pre post g
@@ -914,11 +906,13 @@ module Tactic = struct
 
   let process_inline env f side occs g =
     let (fp, f) = EcEnv.Fun.sp_lookup (unloc f) env in
-      if f.EcEnv.sp_target.f_def = None then
-        failwith "function is abstract";
-      match side with
-      | None      -> t_inline_hoare env fp occs g
-      | Some side -> t_inline_equiv env fp side occs g
+    begin match f.EcEnv.sp_target.f_def with
+    | FBabs _ -> failwith "function is abstract";
+    | _ -> ()
+    end;
+    match side with
+    | None      -> t_inline_hoare env fp occs g
+    | Some side -> t_inline_equiv env fp side occs g
 
   let process_rnd env bij_info g =
     let concl = get_concl g in
@@ -1029,10 +1023,17 @@ module Tactic = struct
       [!t_pre; !t_post; t_use env an gs] (juc,n)
 
     
+  let process_fun_abs env inv g = 
+    let env' = EcEnv.Fun.inv_memenv env in
+    let inv = process_formula env' g inv in
+    t_equivF_abs env inv g
+    
+    
   let process_phl loc env ptac g =
     let t =
       match ptac with
       | Pfun_def -> EcPhl.t_fun_def env
+      | Pfun_abs f -> process_fun_abs env f
       | Pskip    -> EcPhl.t_skip
       | Papp (k,phi) -> process_app env k phi
       | Pwp  k   -> t_wp env k

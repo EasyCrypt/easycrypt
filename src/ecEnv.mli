@@ -89,6 +89,8 @@ module Fun : sig
   val hoareS_anonym : variable list -> env -> memenv * env
 
   val actmem_post :  memory -> xpath -> function_ -> memenv
+    
+  val inv_memenv : env -> env 
 
   val equivF_memenv : xpath -> xpath -> env -> 
     (memenv * memenv) * (memenv * memenv) 
@@ -160,7 +162,7 @@ module Mod : sig
   val bind : symbol -> module_expr -> env -> env
 
   val enter : symbol -> (EcIdent.t * module_type) list -> env -> env
-  val bind_local : EcIdent.t -> module_type -> env -> env
+  val bind_local : EcIdent.t -> module_type -> EcPath.Sm.t -> env -> env
 
   val add : mpath -> env -> env
 end
@@ -187,6 +189,9 @@ module NormMp : sig
   val norm_mpath : env -> mpath -> mpath
   val norm_xpath : env -> xpath -> xpath
   val norm_pvar  : env -> EcTypes.prog_var -> EcTypes.prog_var
+  val norm_glob  : env -> EcMemory.memory -> mpath -> EcFol.form 
+  val norm_tglob : env -> mpath -> EcTypes.ty 
+  val tglob_reducible : env -> mpath -> bool
 end
 
 (* -------------------------------------------------------------------- *)
