@@ -37,7 +37,7 @@ module G' = {
 
 
 (* /\ and && are not compatible??? *)
-equiv test' : G'.f ~ G'.f : true ==> 0<= res{1} /\ res{1} <= 10
+equiv test' : G'.f ~ G'.f : true ==> 0 <= res{1} /\ res{1} <= 10
 proof.
 fun.
 rnd; skip; trivial.
@@ -123,7 +123,8 @@ proof.
  skip.
   axiom aux_test_wp : forall x, in_supp x (dinter a b) => 
     mu_x (dinter a b) x = mu_x (dinter c d) (f x).
- trivial.
+ intros &1 &2 _ x y.
+ split;[ split;[ split;trivial | trivial ] | trivial ].
 save.
 
 
