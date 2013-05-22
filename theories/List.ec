@@ -7,8 +7,6 @@ import why3 "list" "List"
    op "Nil" as "__nil";
    op "Cons" as "::".
 
-op cons(x,xs): 'a list = x::xs.
-
 (** Fold *)
 op fold_right: ('a -> 'b -> 'b) -> 'b -> 'a list -> 'b.
 axiom fold_right_nil: forall (e:'b) (f:'a -> 'b -> 'b),
@@ -54,10 +52,10 @@ lemma destruct_list: forall (xs:'a list),
 proof.
  intros xs.
  elimT list_case xs.
-  intros H;left;apply (eq_refl<:'a list> __nil).
-  
+  intros H;left;trivial.
+
   intros y ys H;right.
-  exists y;exists ys;apply (eq_refl<:'a list> (y::ys)).
+  exists y;exists ys;trivial.
 save.
 
 lemma hd_tl_decomp: forall (xs:'a list),
@@ -90,9 +88,17 @@ lemma length_non_neg: forall (xs:'a list), 0 <= length xs
 proof.
  intros xs.
  elimT list_ind xs.
- simplify length;rewrite (fold_right_nil<:int,'a> 0 f_length);trivial.
- intros y ys IHys;trivial.
+ simplify length; trivial.
+ intros y ys IHys.
+ cut H1 : (length (y :: ys) = 1 + length ys).
+  trivial.
+ rewrite H1;trivial.
 save.
+
+lemma length_cons_S : forall (xs:'a list, x: 'a), 
+ length (x::xs) = 1 + length xs.
+
+lemma length_cons_nz : forall (xs:'a list, x: 'a), length (x::xs) <> 0.
 
 lemma length_z_nil : forall(xs:'a list), length xs = 0 => xs = []
 proof.
@@ -100,8 +106,10 @@ intros xs.
 elimT list_ind xs;trivial.
 save.
 
+
 (* append *)
-op (++)(xs ys:'a list): 'a list = fold_right (::) ys xs.
+
+op [++] (xs ys: 'a list) : 'a list = fold_right [::] ys xs.
 
 lemma app_nil: forall (ys:'a list), [] ++ ys = ys.
 lemma app_cons: forall (x:'a) xs ys, (x::xs) ++ ys = x::(xs ++ ys).
@@ -204,8 +212,18 @@ save.
 lemma filter_mem: forall (x:'a) xs p,
   mem x (filter p xs) = (mem x xs /\ p x)
 proof.
- intros x xs ys.
- elimT list_ind xs;trivial.
+ intros x xs P.
+ elimT list_ind xs.
+ trivial.
+ intros y ys H.
+ case (P y); intros Hp.
+ cut Heq: (filter P (y::ys) = y :: filter P ys).
+  trivial. 
+ rewrite Heq;trivial.
+ cut Heq: (filter P (y::ys) = filter P ys).
+  trivial.
+ rewrite Heq.
+ trivial.
 save.
 
 lemma filter_app: forall (xs ys:'a list) p,
@@ -274,7 +292,14 @@ lemma map_ext: forall xs (f g:'a -> 'b),
   map f xs = map g xs
 proof.
  intros xs f g H.
- elimT list_ind xs;trivial.
+ elimT list_ind xs.
+ trivial.
+ intros x' xs' IH.
+ rewrite map_cons<:'b, 'a>(f,x',xs').
+ rewrite map_cons<:'b, 'a>(g,x',xs').
+ rewrite IH.
+ rewrite H (x').
+ trivial.
 save.
 
 op (*local*) f_nth (x, r:'a -> int -> 'a, y, n): 'a =
@@ -293,9 +318,8 @@ proof.
   case (n = 0);intros Hn.
     rewrite Hn;trivial.
     
-    elim (H dv (n-1) _).
-    trivial.
-    trivial.
-    
-    trivial.
+  elim H(dv,(n-1),_).
+   trivial.
+   trivial.
+   trivial.
 save.
