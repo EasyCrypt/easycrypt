@@ -782,7 +782,9 @@ module Tactic = struct
       EcReduction.delta_h = delta_h;
       EcReduction.zeta    = ri.pzeta;
       EcReduction.iota    = ri.piota;
-      EcReduction.logic   = ri.plogic; } in
+      EcReduction.logic   = ri.plogic; 
+      EcReduction.modpath = ri.pmodpath;
+    } in
     t_simplify env ri g
 
   let process_elimT loc env (pf,qs) g =
