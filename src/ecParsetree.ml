@@ -248,11 +248,12 @@ type ffpattern = pformula fpattern
 type cfpattern = (pformula option * pformula option) fpattern
 
 type preduction = {
-  pbeta  : bool;
-  pdelta : pqsymbol list option;
-  pzeta  : bool;   (* remove let *)
-  piota  : bool;   (* remove case *)
-  plogic : bool;   (* perform logical simplification *)
+  pbeta   : bool;
+  pdelta  : pqsymbol list option;
+  pzeta   : bool;   (* remove let *)
+  piota   : bool;   (* remove case *)
+  plogic  : bool;   (* perform logical simplification *)
+  pmodpath : bool;   (* normalize modpath *)
 }
 
 

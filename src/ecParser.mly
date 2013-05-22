@@ -81,7 +81,7 @@
     if l = [] then
       { pbeta  = true; pzeta  = true;
         piota  = true; plogic = true;
-        pdelta = None;  }
+        pdelta = None; pmodpath = true }
     else
       let doarg acc = function
         | `Delta l -> 
@@ -89,17 +89,18 @@
             then { acc with pdelta = None }
             else { acc with pdelta = Some (oget acc.pdelta @ l) }
 
-        | `Zeta    -> { acc with pzeta  = true }
-        | `Iota    -> { acc with piota  = true }
-        | `Beta    -> { acc with pbeta  = true }
-        | `Logic   -> { acc with plogic = true }
+        | `Zeta    -> { acc with pzeta    = true }
+        | `Iota    -> { acc with piota    = true }
+        | `Beta    -> { acc with pbeta    = true }
+        | `Logic   -> { acc with plogic   = true }
+        | `ModPath -> { acc with pmodpath = true}
       in
         List.fold_left doarg
           { pbeta  = false; pzeta  = false;
             piota  = false; plogic = false;
-            pdelta = Some [];  } l
+            pdelta = Some []; pmodpath = false } l
 
-  let simplify_red = [`Zeta; `Iota; `Beta; `Logic]
+  let simplify_red = [`Zeta; `Iota; `Beta; `Logic; `ModPath]
 
   let mk_fpattern kind args =
     { fp_kind = kind;
@@ -181,6 +182,7 @@
 %token LEMMA
 %token LET
 %token LOGIC
+%token MODPATH
 %token LONGARROW
 %token LPAREN
 %token MINUS
@@ -1195,6 +1197,7 @@ simplify_arg:
 | IOTA            { `Iota }
 | BETA            { `Beta }
 | LOGIC           { `Logic }
+| MODPATH         { `ModPath }
 ;
 
 simplify:

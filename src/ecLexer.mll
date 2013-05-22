@@ -59,6 +59,7 @@
     "beta"        , BETA       ;        (* KW: tactic *)
     "iota"        , IOTA       ;        (* KW: tactic *)
     "logic"       , LOGIC      ;        (* KW: tactic *)
+    "modpath"     , MODPATH    ;        (* KW: tactic *)
     "change"      , CHANGE     ;        (* KW: tactic *)
     "elimT"       , ELIMT      ;        (* KW: tactic *)
     "case"        , CASE       ;        (* KW: tactic *)
