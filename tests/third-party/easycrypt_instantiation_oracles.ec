@@ -15,7 +15,6 @@ op gDistr: group distr.
 (* I think this type is the one that gets instantiated in the main experiment *)
 type t.
 
-(* TODO: Once type-checking is fixed for this, fold the two clones into one *)
 clone RandOrcl as RO with
   type from = t,
   type to = group,
@@ -52,7 +51,7 @@ clone RO.ROM as RO2.
 module R = RO2.RO.
 
 (* F is built on top of H *)
-module F = {
+module F:Oracle = {
   var k:gf_q
 
   fun init(): unit = {
@@ -61,7 +60,7 @@ module F = {
     k = i_to_gf_q k';
   }
 
-  fun f(x:t): group = {
+  fun o(x:t): group = {
     var y:group;
     y := H.o(x);
     y = y ^ k;
