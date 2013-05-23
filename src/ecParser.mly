@@ -1180,7 +1180,7 @@ fpattern_arg:
 | f=sform      { EA_form f }
 | s=mident     { EA_mem s }
 
-| x=loc(mod_qident) AS_MODULE { EA_mp x }
+| x=mod_qident AS_MODULE { EA_mp x }
 ;
 
 fpattern(F):
