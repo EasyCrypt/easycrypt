@@ -927,30 +927,25 @@ module Tactic = struct
     | None      -> t_inline_hoare env fp occs g
     | Some side -> t_inline_equiv env fp side occs g
 
+
   let process_rnd env tac_info g =
     let concl = get_concl g in
-    match tac_info with
-      | RTbij bij_info ->
-        if is_equivS concl then
-          let process_form f ty1 ty2 = process_prhl_form (tfun ty1 ty2) env g f in
-          let bij_info = match bij_info with
-            | RIid -> RIid
-            | RIidempotent f ->
-              RIidempotent (process_form f)
-            | RIbij (f,finv) -> 
-              RIbij (process_form f, process_form finv)
-          in
-          t_equiv_rnd env bij_info g
-        else
-          assert false (* FIXME: error "unfolded equiv judgmented was expected" *)
-      | RTbd (opt_bd,event) -> (
-        if is_bdHoareS concl then 
-          let opt_bd = omap opt_bd (process_phl_form treal env g)  in
-          let event ty = process_phl_form (tfun ty tbool) env g event in
-          t_bd_hoare_rnd env (opt_bd,event) g
-        else
-          assert false (* FIXME: error "unfolded bounded hoare judgment was expected" *)
-      )
+    match tac_info with 
+      | RTbij RIid when is_hoareS concl -> t_hoare_rnd env g
+      | RTbij bij_info when is_equivS concl ->
+        let process_form f ty1 ty2 = process_prhl_form (tfun ty1 ty2) env g f in
+        let bij_info = match bij_info with
+          | RIid -> RIid
+          | RIidempotent f -> RIidempotent (process_form f)
+          | RIbij (f,finv) -> RIbij (process_form f, process_form finv)
+        in
+        t_equiv_rnd env bij_info g
+      | RTbd (opt_bd,event) when is_bdHoareS concl ->
+        let opt_bd = omap opt_bd (process_phl_form treal env g)  in
+        let event ty = process_phl_form (tfun ty tbool) env g event in
+        t_bd_hoare_rnd env (opt_bd,event) g
+      | _ -> cannot_apply "rnd" "unexpected instruction or wrong arguments"
+
 
   let process_equiv_deno env (pre,post) g = 
     let hyps,concl = get_goal g in

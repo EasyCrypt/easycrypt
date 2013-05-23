@@ -1408,7 +1408,22 @@ let (===) = f_eq
 let (==>) = f_imp
 let (&&&) = f_anda
 
-let rec wp_equiv_rnd env (f,finv) g =
+let t_hoare_rnd env g =
+  let concl = get_concl g in
+  let hs = destr_hoareS concl in
+  let (lv,distr),s= s_last_rnd "rnd" hs.hs_s in
+  (* FIXME: exception when not rnds found *)
+  let ty_distr = proj_distr_ty (e_ty distr) in
+  let x_id = EcIdent.create "x" in
+  let x = f_local x_id ty_distr in
+  let distr = EcFol.form_of_expr (EcMemory.memory hs.hs_m) distr in
+  let post = subst_form_lv env (EcMemory.memory hs.hs_m) lv x hs.hs_po in
+  let post = (f_in_supp x distr) ==> post in
+  let post = f_forall_simpl [(x_id,GTty ty_distr)] post in
+  let concl = f_hoareS_r {hs with hs_s=s; hs_po=post} in
+  prove_goal_by [concl] RN_hl_hoare_rnd g
+
+let wp_equiv_rnd env (f,finv) g =
   let concl = get_concl g in
   let es = destr_equivS concl in
   let (lvL,muL),(lvR,muR),sl',sr'= s_last_rnds "rnd" es.es_sl es.es_sr in
