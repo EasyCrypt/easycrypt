@@ -215,9 +215,10 @@ and subst_module_body (s : _subst) (body : module_body) =
       let s, bstruct = subst_module_struct s bstruct in
       s, ME_Structure bstruct
 
-  | ME_Decl _ -> assert false (* FIXME *)
-(*
-      s, ME_Decl (subst_modtype s p, Sm.fold (fun nu -> ) *)
+  | ME_Decl (p,r) -> 
+    s, ME_Decl(subst_modtype s p,
+               EcPath.Sm.fold 
+                 (fun x r -> EcPath.Sm.add (s.s_fmp x) r) r EcPath.Sm.empty)
 
 (* -------------------------------------------------------------------- *)
 and subst_module_comps (s : _subst) (comps : module_comps) =
@@ -228,13 +229,13 @@ and subst_module (s : _subst) (m : module_expr) =
   let s, body' = subst_module_body s m.me_body in
   let comps'   = subst_module_comps s m.me_comps in
   let sig'     = subst_modsig s m.me_sig in
-  let types'   = List.map (subst_modtype s) m.me_types in
+(*  let types'   = List.map (subst_modtype s) m.me_types in *)
 
   { m with
       me_body  = body';
       me_comps = comps';
       me_sig   = sig';
-      me_types = types'; }
+(*      me_types = types'; *) }
 
 (* -------------------------------------------------------------------- *)
 let init_tparams (s : _subst) params params' = 

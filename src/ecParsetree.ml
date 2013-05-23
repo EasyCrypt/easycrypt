@@ -25,6 +25,7 @@ let qsymb_of_symb (x : symbol) : qsymbol = ([], x)
 (* -------------------------------------------------------------------- *)
 type psymbol  = symbol  located
 type pqsymbol = qsymbol located
+
 type pmsymbol = (psymbol * ((pmsymbol located) list) option) list
 
 (* -------------------------------------------------------------------- *)
@@ -111,7 +112,7 @@ and pfunction_decl = {
 
 (* -------------------------------------------------------------------- *)
 and pmodule_expr_r =
-  | Pm_ident  of pqsymbol * pqsymbol list
+  | Pm_ident  of pmsymbol
   | Pm_struct of pstructure
 
 and pmodule_expr = pmodule_expr_r located

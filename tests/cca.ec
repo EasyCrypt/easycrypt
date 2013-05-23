@@ -1,3 +1,17 @@
+module type I = { 
+  fun f() : unit
+  fun init () : unit 
+}.
+
+module type IF (X:I) = { 
+  fun init() : unit { X.init }
+}.
+
+module F(X:I) : IF(X), I = { 
+   fun f() : unit = { X.f(); }
+   fun init() : unit = { X.init();}
+}.
+
 module type Adv = {
   fun a (x:int) : int {} 
 }.
@@ -9,6 +23,13 @@ module Test (A:Adv) = {
     return r;
   }
 }.
+
+module A : Adv = {
+  fun a (x:int) : int = { return x; }
+}.
+
+module M = Test(A).
+
 
 lemma foo : 
   forall (A<:Adv {Test}), 
@@ -34,7 +55,7 @@ module type Adv' (O:IO) = {
   fun a (x:int) : int { O.h } (* check that the oracle are disjoint *)
 }.
 
-module G (A:Adv') = {
+module G (B:Adv') = {
 
   module O : IO = { 
     fun h (x:int) : int = {
@@ -42,11 +63,11 @@ module G (A:Adv') = {
     }
   }
 
-  module A1 = A(O)
+  module A1 = B(O) 
 
   fun main (x:int) : int = { 
     var r : int;
-    r := A1.a(x);
+    r := A1.a(x); 
     return r; 
   } 
 }.
