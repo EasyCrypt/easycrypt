@@ -88,7 +88,7 @@ let p_Distr      = EcPath.pqname p_top id_Distr
 let _Distr id    = EcPath.pqname p_Distr id
 
 let p_in_supp    = _Distr id_in_supp
-let p_mu       = _Distr id_mu
+let p_mu         = _Pervasive id_mu
 let p_mu_x       = _Distr id_mu_x
 
 

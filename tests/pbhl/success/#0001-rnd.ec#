@@ -13,10 +13,6 @@ module M = {
 }.
 
 
-lemma test : mu Dbool.dbool (lambda (x : bool), (x = true)) =
-    1%r / 2%r proof.
-trivial.
-save.
 
 lemma asd: bd_hoare [ M.f : true ==> res] [=] [1%r/2%r] 
 proof.

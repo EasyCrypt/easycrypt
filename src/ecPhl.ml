@@ -373,6 +373,13 @@ let t_hS_or_eS th te g =
   else if is_equivS concl then te g
   else tacerror (NotPhl None)
 
+let t_hS_or_bhS_or_eS th tbh te g =
+  let concl = get_concl g in
+  if is_hoareS concl then th g
+  else if is_bdHoareS concl then tbh g
+  else if is_equivS concl then te g
+  else tacerror (NotPhl None)
+
 (* -------------------------------------------------------------------- *)
 (* -------------------------  Tactics --------------------------------- *)
 (* -------------------------------------------------------------------- *)
@@ -396,6 +403,19 @@ let t_hoareF_fun_def env g =
     | Some e -> form_of_expr m e in
   let post = PVM.subst1 env (pv_res hf.hf_f) m fres hf.hf_po in
   let concl' = f_hoareS memenv hf.hf_pr fdef.f_body post in
+  prove_goal_by [concl'] RN_hl_fun_def g
+
+let t_bdHoareF_fun_def env g = 
+  let concl = get_concl g in
+  let bhf = destr_bdHoareF concl in
+  let memenv, fdef, env = Fun.hoareS bhf.bhf_f env in (* FIXME catch exception *)
+  let m = EcMemory.memory memenv in
+  let fres = 
+    match fdef.f_ret with
+    | None -> f_tt
+    | Some e -> form_of_expr m e in
+  let post = PVM.subst1 env (pv_res bhf.bhf_f) m fres bhf.bhf_po in
+  let concl' = f_bdHoareS memenv bhf.bhf_pr fdef.f_body post bhf.bhf_cmp bhf.bhf_bd  in
   prove_goal_by [concl'] RN_hl_fun_def g
 
 
@@ -424,6 +444,7 @@ let t_equivF_fun_def env g =
 let t_fun_def env g =
   let concl = get_concl g in
   if is_hoareF concl then t_hoareF_fun_def env g
+  else if is_bdHoareF concl then t_bdHoareF_fun_def env g
   else if is_equivF concl then t_equivF_fun_def env g
   else tacerror (NotPhl None)
 
@@ -441,6 +462,15 @@ let t_hoare_skip g =
   let concl = gen_mems [hs.hs_m] concl in
   prove_goal_by [concl] RN_hl_skip g
 
+let t_bdHoare_skip g =
+  let concl = get_concl g in
+  let bhs = destr_bdHoareS concl in
+  if bhs.bhs_s.s_node <> [] then tacerror NoSkipStmt;
+  if bhs.bhs_cmp <> FHeq || not (f_equal bhs.bhs_bd (f_real_of_int 1)) then
+    cannot_apply "skip" "bound must be \"= 1\"";
+  let concl = f_imp bhs.bhs_pr bhs.bhs_po in
+  let concl = gen_mems [bhs.bhs_m] concl in
+  prove_goal_by [concl] RN_hl_skip g
 
 let t_equiv_skip g =
   let concl = get_concl g in
@@ -452,7 +482,7 @@ let t_equiv_skip g =
   prove_goal_by [concl] RN_hl_skip g
 
 
-let t_skip = t_hS_or_eS t_hoare_skip t_equiv_skip 
+let t_skip = t_hS_or_bhS_or_eS t_hoare_skip t_bdHoare_skip t_equiv_skip 
 
 (* -------------------------------------------------------------------- *)
 

@@ -210,8 +210,9 @@ rule main = parse
   | "="  { EQ }
   | "<>" { NE }
 
-  | "<="  { LEQ }
-  | ">="  { GEQ }
+  | "[<=]"  { HLEQ }
+  | "[>=]"  { HGEQ }
+  | "[=]"   { HEQ }
 
   | "-" { MINUS }
   | "+" { ADD }

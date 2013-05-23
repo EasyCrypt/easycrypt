@@ -679,8 +679,15 @@ module Tactic = struct
 
   let process_phl_form ty env g phi =
     let hyps, concl = get_goal g in
-    let hs = set_loc phi.pl_loc destr_hoareS concl in
-    let env = EcEnv.Memory.push_active hs.hs_m env in
+    let m = 
+      try 
+        let hs = set_loc phi.pl_loc destr_hoareS concl in
+        hs.hs_m
+      with _ ->
+        let hs = set_loc phi.pl_loc destr_bdHoareS concl in
+        hs.bhs_m
+    in
+    let env = EcEnv.Memory.push_active m env in
     process_form env hyps phi ty
 
   let process_prhl_form ty env g phi =
@@ -936,14 +943,14 @@ module Tactic = struct
           t_equiv_rnd env bij_info g
         else
           assert false (* FIXME: error "unfolded equiv judgmented was expected" *)
-      | RTbd (opt_bd,event) ->
+      | RTbd (opt_bd,event) -> (
         if is_bdHoareS concl then 
           let opt_bd = omap opt_bd (process_phl_form treal env g)  in
           let event ty = process_phl_form (tfun ty tbool) env g event in
           t_bd_hoare_rnd env (opt_bd,event) g
         else
           assert false (* FIXME: error "unfolded bounded hoare judgment was expected" *)
-
+      )
 
   let process_equiv_deno env (pre,post) g = 
     let hyps,concl = get_goal g in
@@ -1039,8 +1046,8 @@ module Tactic = struct
   let process_phl loc env ptac g =
     let t =
       match ptac with
-      | Pfun_def -> EcPhl.t_fun_def env
-      | Pskip    -> EcPhl.t_skip
+      | Pfun_def -> t_fun_def env
+      | Pskip    -> t_skip
       | Papp (k,phi) -> process_app env k phi
       | Pwp  k   -> t_wp env k
       | Prcond (side,b,i) -> t_rcond side b i

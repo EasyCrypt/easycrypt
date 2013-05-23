@@ -162,7 +162,9 @@
 %token FROM_INT
 %token FUN
 %token GENERALIZE 
-%token GEQ
+%token HEQ
+%token HGEQ
+%token HLEQ
 %token HOARE
 %token IDTAC
 %token TRY
@@ -181,7 +183,6 @@
 %token LEFTARROW
 %token LEMMA
 %token LET
-%token LEQ
 %token LOGIC
 %token LONGARROW
 %token LPAREN
@@ -637,9 +638,9 @@ sform_u:
 ;
 
 hoare_bd_cmp :
-  | LEQ {PFHle}
-  | EQ  {PFHeq}
-  | GEQ {PFHge}
+  | HLEQ {PFHle}
+  | HEQ  {PFHeq}
+  | HGEQ {PFHge}
                           
 form_u:
 | e=sform_u { e }
@@ -1357,8 +1358,8 @@ rnd_info:
   {RTbij (RIidempotent e) }
 | empty
   {RTbij (RIid) }
-(* | LBRACE e1=sform COMMA e2=sform LBRACE *)
-(*   {RTbd (Some e1,e2)} *)
+| LBRACE e1=sform COMMA e2=sform RBRACE
+  {RTbd (Some e1,e2)}
 ;
 
 swap_info:
