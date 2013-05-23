@@ -289,7 +289,7 @@ module MC = struct
       | (p, `Dn q) -> (p, Some q)
 
   (* ------------------------------------------------------------------ *)
-  let _downpath_for_var (local : bool) (spsc : bool) env p args =
+  let _downpath_for_modcp isvar ~local ~spsc env p args =
     let prefix =
       let prefix_of_mtop = function
         | `Concrete (p1, _) -> Some p1
@@ -325,13 +325,13 @@ module MC = struct
                         let fname = EcPath.basename fpath in
                           EcPath.xpath
                             (EcPath.mpath_crt
-                               p (List.map EcPath.mident n)
+                               p (if isvar then [] else List.map EcPath.mident n)
                                (EcPath.prefix fpath))
                             (EcPath.pqname (EcPath.psymbol fname) vname)
                       else
                         EcPath.xpath
                           (EcPath.mpath_crt
-                             p (List.map EcPath.mident n)
+                             p (if isvar then [] else List.map EcPath.mident n)
                              (EcPath.prefix q))
                           (EcPath.psymbol (EcPath.basename q))
                     in
@@ -346,7 +346,8 @@ module MC = struct
               | Some (EcPath.Psymbol x) ->
                   let ap =
                     EcPath.xpath
-                      (EcPath.mpath_abs m (List.map EcPath.mident n))
+                      (EcPath.mpath_abs m
+                         (if isvar then [] else List.map EcPath.mident n))
                       (EcPath.psymbol x)
                   in
                     (ap, false)
@@ -354,12 +355,13 @@ module MC = struct
               | _ -> assert false
           end
         in
-          ((i+1, if inscope && not spsc then [] else a), ap)
+          ((i+1, if (inscope && not spsc) || isvar then [] else a), ap)
 
     with Not_found ->
       assert false
 
-  let _downpath_for_fun = _downpath_for_var false
+  let _downpath_for_var = _downpath_for_modcp true
+  let _downpath_for_fun = _downpath_for_modcp false ~local:false
 
   (* ------------------------------------------------------------------ *)
   let _downpath_for_mod spsc env p args =
@@ -1157,7 +1159,8 @@ module Var = struct
     | None -> begin
       match p.EcPath.x_sub.EcPath.p_node with
       | EcPath.Pqname ({ p_node = EcPath.Psymbol f }, x) -> begin
-        let fp = EcPath.xpath p.EcPath.x_top (EcPath.psymbol f) in
+        let mp = EcPath.mpath p.EcPath.x_top.EcPath.m_top [] in
+        let fp = EcPath.xpath mp (EcPath.psymbol f) in
         let f  = Fun.by_xpath_r ~susp:true ~spsc fp env in
           try
             let v = List.find (fun v -> v.v_name = x) f.f_sig.fs_params in
