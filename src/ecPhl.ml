@@ -201,7 +201,7 @@ let get_abs_functor f =
   | `Abstract _ -> EcPath.mpath (f.EcPath.m_top) []
   | _ -> assert false
 
-let rec f_write env w f = 
+let rec f_write env w f =
   let f = NormMp.norm_xpath env f in
   let func = Fun.by_xpath f env in
   match func.f_def with

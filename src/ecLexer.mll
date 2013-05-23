@@ -182,7 +182,6 @@ rule main = parse
   | ".["    { DLBRACKET }
   | ":="    { CEQ }
   | "%r"    { FROM_INT }
-  | "%m"    { AS_MODULE }
   | "{0,1}" { RBOOL }
 
   (* punctuation *)

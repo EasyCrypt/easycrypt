@@ -32,6 +32,7 @@ module MMsym : sig
 end
 
 (* -------------------------------------------------------------------- *)
-val pp_symbol  : Format.formatter -> symbol -> unit
+val pp_symbol  : Format.formatter -> symbol  -> unit
 val pp_qsymbol : Format.formatter -> qsymbol -> unit
 
+val string_of_qsymbol : qsymbol -> string
