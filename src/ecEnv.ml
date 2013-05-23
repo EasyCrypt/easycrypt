@@ -1161,7 +1161,7 @@ module Var = struct
         let f  = Fun.by_xpath_r ~susp:true ~spsc fp env in
           try
             let v = List.find (fun v -> v.v_name = x) f.f_sig.fs_params in
-              { vb_type = v.v_type; vb_kind = PVglob; }
+              { vb_type = v.v_type; vb_kind = PVloc; }
           with Not_found -> begin
             match f.f_def with
             | FBdef def -> begin
