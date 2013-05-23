@@ -125,7 +125,6 @@
 %token APPLY
 %token ARROW
 %token AS
-%token AS_MODULE
 %token ASSERT
 %token ASSUMPTION
 %token AT
@@ -1179,8 +1178,7 @@ fpattern_arg:
 | UNDERSCORE   { EA_none }
 | f=sform      { EA_form f }
 | s=mident     { EA_mem s }
-
-| x=mod_qident AS_MODULE { EA_mp x }
+| LPAREN LTCOLON x=mod_qident RPAREN { EA_mp x }
 ;
 
 fpattern(F):

@@ -271,7 +271,7 @@ module MC = struct
       | (p, `Dn q) -> (p, Some q)
 
   (* ------------------------------------------------------------------ *)
-  let _downpath_for_var (local : bool) env p args =
+  let _downpath_for_var (local : bool) (spsc : bool) env p args =
     let prefix =
       let prefix_of_mtop = function
         | `Concrete (p1, _) -> Some p1
@@ -336,7 +336,7 @@ module MC = struct
               | _ -> assert false
           end
         in
-          ((i+1, if inscope then [] else a), ap)
+          ((i+1, if inscope && not spsc then [] else a), ap)
 
     with Not_found ->
       assert false
@@ -510,7 +510,7 @@ module MC = struct
     | None -> lookup_error (`QSymbol qnx)
     | Some (p, (args, obj)) ->
       let local = (obj.vb_kind = EcTypes.PVloc) in
-        (_downpath_for_var local env p args, obj)
+        (_downpath_for_var local false env p args, obj)
 
   let _up_var candup mc x obj =
     if not candup && MMsym.last x mc.mc_variables <> None then
@@ -524,7 +524,7 @@ module MC = struct
   let lookup_fun qnx env =
     match lookup (fun mc -> mc.mc_functions) qnx env with
     | None -> lookup_error (`QSymbol qnx)
-    | Some (p, (args, obj)) -> (_downpath_for_fun env p args, obj)
+    | Some (p, (args, obj)) -> (_downpath_for_fun false env p args, obj)
 
   let _up_fun candup mc x obj =
     if not candup && MMsym.last x mc.mc_functions <> None then
@@ -939,7 +939,7 @@ let ipath_of_mpath_opt (p : mpath_top) =
 let ipath_of_mpath (p : mpath) =
   match p.EcPath.m_top with
   | `Abstract i ->
-      (IPIdent (i, None), (1, p.EcPath.m_args))
+      (IPIdent (i, None), (0, p.EcPath.m_args))
 
   | `Concrete (p1, p2) ->
       let pr = odfl p1 (omap p2 (MC.pcat p1)) in
@@ -969,7 +969,7 @@ let try_lf f =
 module Var = struct
   type t = varbind
 
-  let by_xpath (p : xpath) (env : env) =
+  let by_xpath_r (spsc : bool) (p : xpath) (env : env) =
     match ipath_of_xpath p with
     | None -> lookup_error (`XPath p)
 
@@ -978,13 +978,16 @@ module Var = struct
         | None -> lookup_error (`XPath p)
         | Some (params, o) ->
            let local = o.vb_kind = EcTypes.PVloc in
-           let ((spi, params), _) = MC._downpath_for_var local env ip params in
+           let ((spi, params), _) = MC._downpath_for_var local spsc env ip params in
              if i <> spi then
                assert false;
              if params <> [] && List.length args <> List.length params then
                assert false;
              o
       end
+
+  let by_xpath (p : xpath) (env : env) =
+    by_xpath_r true p env
 
   let by_xpath_opt (p : xpath) (env : env) =
     try_lf (fun () -> by_xpath p env)
@@ -1071,19 +1074,16 @@ module Fun = struct
   let by_ipath (p : ipath) (env : env) =
     MC.by_path (fun mc -> mc.mc_functions) p env
 
-  let by_xpath (p : EcPath.xpath) (env : env) =
+  let by_xpath_r (spsc : bool) (p : EcPath.xpath) (env : env) =
     match ipath_of_xpath p with
     | None -> lookup_error (`XPath p)
 
-    | Some (ip, (_i, args)) -> begin
+    | Some (ip, (i, args)) -> begin
         match MC.by_path (fun mc -> mc.mc_functions) ip env with
         | None -> lookup_error (`XPath p)
         | Some (params, o) ->
-           let ((_spi, params), _op) = MC._downpath_for_fun env ip params in
-(*           Format.printf "i = %i; spi = %i@." i spi; *)
-(*   FIXME should we add the test i <> spi *)
-           
-           if (*i <> spi || *) List.length args <> List.length params then
+           let ((spi, params), _op) = MC._downpath_for_fun spsc env ip params in
+           if i <> spi || List.length args <> List.length params then
              assert false;
            let s =
              List.fold_left2
@@ -1092,6 +1092,9 @@ module Fun = struct
            in
            EcSubst.subst_function s o
       end
+
+  let by_xpath (p : EcPath.xpath) (env : env) =
+    by_xpath_r true p env
 
   let by_xpath_opt (p : EcPath.xpath) (env : env) =
     try_lf (fun () -> by_xpath p env)
@@ -1243,7 +1246,7 @@ module Mod = struct
           (fst (MC._downpath_for_mod spsc env p args), obj))
 
   let by_ipath (p : ipath) (env : env) =
-    by_ipath_r false p env
+    by_ipath_r true p env
 
   let by_path (p : mpath_top) (env : env) =
     by_ipath (ipath_of_mpath_opt p) env
