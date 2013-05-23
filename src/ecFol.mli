@@ -176,6 +176,7 @@ val f_lets_simpl : (EcTypes.lpattern * form) list -> form -> form
 (* WARNING : this function should be use only in a context ensuring that the
    quantified variables can be instanciated *)
 val f_forall_simpl : binding -> form -> form
+val f_exists_simpl : binding -> form -> form
 val f_app_simpl    : form -> form list -> EcTypes.ty -> form
 
 val f_not_simpl  : form -> form

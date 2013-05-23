@@ -649,7 +649,7 @@ module Tactic = struct
     | EA_none, None ->
       AAnode
     | EA_mp mp , Some (GTmodty _) ->
-      let (mp, _, mt) = EcTyping.trans_msymbol env (mk_loc a.pl_loc mp) in
+      let (mp, _, mt) = TT.trans_msymbol env (mk_loc a.pl_loc mp) in
         AAmp (mp, mt)
     | _, Some (GTmodty _) ->
       error a.pl_loc ModuleExpected

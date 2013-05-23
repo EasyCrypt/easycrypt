@@ -172,12 +172,20 @@ let m_apply mp args =
   if args' = [] then mpath mp.m_top args 
   else (assert (args = []); mp)
 
+let m_functor mp = 
+  let top = 
+    match mp.m_top with
+    | `Concrete(p,Some _) -> `Concrete(p,None)
+    | t -> t in
+  mpath top []
+
 let rec m_fv fv mp = 
   let fv = 
     match mp.m_top with 
     | `Abstract id -> EcIdent.fv_add id fv 
     | `Concrete _ -> fv in
   List.fold_left m_fv fv mp.m_args 
+
 
 (* -------------------------------------------------------------------- *)
 type xpath = {

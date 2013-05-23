@@ -192,6 +192,28 @@ let t_clear ids (juc,n as g) =
   let rule = { pr_name = RN_clear ids; pr_hyps = [RA_node n1] } in
   upd_rule rule (juc,n)
 
+let tyenv_of_hyps env hyps =
+  let add env (id,k) =
+    match k with
+    | LD_var (ty,_) -> EcEnv.Var.bind_local id ty env
+    | LD_mem mt     -> EcEnv.Memory.push (id,mt) env
+    | LD_modty (i,r)    -> EcEnv.Mod.bind_local id i r env
+    | LD_hyp   _    -> env in
+  List.fold_left add env hyps.h_local
+
+let check_modtype _env _mp _i _restr = ()
+ (* TODO FIXME *)
+(*
+  let me = EcEnv.Mod.by_mpath mp in
+  if not (EcEnv.ModTy.has_mod_type env me.me_types) then
+    assert false (* FIXME error message *);
+  let use = top_uses mp in
+  let 
+*)  
+  
+
+  
+
 type app_arg =
   | AAform of form
   | AAmem  of EcIdent.t

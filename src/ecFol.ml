@@ -1091,6 +1091,10 @@ let f_forall_simpl b f =
   let b = List.filter (fun (id,_) -> Mid.mem id (f_fv f)) b in
   f_forall b f 
 
+let f_exists_simpl b f = 
+  let b = List.filter (fun (id,_) -> Mid.mem id (f_fv f)) b in
+  f_exists b f 
+
 let f_quant_simpl q b f =
   if q = Lforall then f_forall_simpl b f else f_exists b f
 

@@ -168,11 +168,8 @@ module PV = struct
         if is_loc x then topv 
         else
           let x=x.pv_name in
-          let top = 
-            match x.EcPath.x_top.EcPath.m_top with
-            | `Concrete(p,_) -> `Concrete(p,None)
-            | t -> t in
-          EcPath.Sm.add (EcPath.mpath top []) topv) s EcPath.Sm.empty in
+          let top = EcPath.m_functor x.EcPath.x_top in
+          EcPath.Sm.add top topv) s EcPath.Sm.empty in
     let topv = mk_topv not_gen.pv in
     let topvg = mk_topv modi.pv in
     let topm = not_gen.glob in
@@ -190,11 +187,8 @@ module PV = struct
     (* FIXME error message *)
     let check_v v _ty =
       assert (is_glob v);
-      let top = 
-        match v.pv_name.EcPath.x_top.EcPath.m_top with
-        | `Concrete(p,_) -> `Concrete(p,None)
-        | t -> t in 
-      assert (disjoint_g env mp (EcPath.mpath top [])) in
+      let top = EcPath.m_functor v.pv_name.EcPath.x_top in
+      assert (disjoint_g env mp top) in
     M.iter check_v fv.pv;
     let check_m m = assert (disjoint_g env mp m) in
     EcPath.Sm.iter check_m fv.glob 
@@ -470,15 +464,6 @@ let prove_goal_by sub_gs rule (juc,n as g) =
 let gen_mems m f = 
   let bds = List.map (fun (m,mt) -> (m,GTmem mt)) m in
   f_forall bds f
-
-let tyenv_of_hyps env hyps =
-  let add env (id,k) =
-    match k with
-    | LD_var (ty,_) -> EcEnv.Var.bind_local id ty env
-    | LD_mem mt     -> EcEnv.Memory.push (id,mt) env
-    | LD_modty (i,r)    -> EcEnv.Mod.bind_local id i r env
-    | LD_hyp   _    -> env in
-  List.fold_left add env hyps.h_local
 
 (* -------------------------------------------------------------------- *)
 (* -------------------------  Tactics --------------------------------- *)

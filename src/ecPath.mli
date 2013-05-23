@@ -63,6 +63,8 @@ val m_hash    : mpath -> int
 val m_apply   : mpath -> mpath list -> mpath
 val m_fv      : int EcIdent.Mid.t -> mpath -> int EcIdent.Mid.t
 
+val m_functor : mpath -> mpath
+
 (* -------------------------------------------------------------------- *)
 type xpath = private {
   x_top : mpath;
