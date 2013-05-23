@@ -154,6 +154,8 @@ type pmodule_type_restr = pqsymbol * pmsymbol located list
 type pgamepath = (pmsymbol * psymbol) located
 type pmemory   = psymbol
 
+type phoarecmp = PFHle | PFHeq | PFHge
+
 type pformula  = pformula_r located
 
 and pformula_r = 
@@ -170,10 +172,12 @@ and pformula_r =
   | PFglob   of pmsymbol located 
 
   (* for claims *)
-  | PFhoareS of pformula * pfunction_body * pformula
-  | PFhoareF of pformula * pgamepath * pformula
-  | PFequivF of pformula * (pgamepath * pgamepath) * pformula
-  | PFprob   of pgamepath * (pformula list) * pmemory * pformula
+  | PFhoareS   of pformula * pfunction_body * pformula
+  | PFhoareF   of pformula * pgamepath * pformula
+  | PFequivF   of pformula * (pgamepath * pgamepath) * pformula
+  | PFprob     of pgamepath * (pformula list) * pmemory * pformula
+  | PFBDhoareS of pformula * pfunction_body * pformula * phoarecmp * pformula
+  | PFBDhoareF of pformula * pgamepath * pformula * phoarecmp * pformula
 
 and pgtybinding  = psymbol list * pgty
 and pgtybindings = pgtybinding list
@@ -267,6 +271,10 @@ type 'a rnd_bij_info =
   | RIidempotent of 'a
   | RIbij of ('a * 'a)
 
+type 'a rnd_tac_info =
+  | RTbij of 'a rnd_bij_info
+  | RTbd of ('a option * 'a)
+
 type tac_side = bool option
 
 type swap_kind = 
@@ -317,7 +325,7 @@ and phl_tactics =
   | Pcond       of tac_side
   | Pswap       of ((tac_side * swap_kind) located list)
   | Pinline     of pqsymbol * tac_side * (int list option)
-  | Prnd        of pformula rnd_bij_info
+  | Prnd        of pformula rnd_tac_info
   | Pconseq     of cfpattern
   | Pequivdeno  of cfpattern
 

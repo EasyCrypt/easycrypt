@@ -140,7 +140,8 @@ module PV = struct
       | Fint _ | Flocal _ | Fop _ -> fv
       | Fapp(e, es) -> List.fold_left aux (aux fv e) es
       | Ftuple es   -> List.fold_left aux fv es
-      | FhoareF _  | FhoareS _ | FequivF _ | FequivS _ | Fpr _ -> assert false 
+      | FhoareF _  | FhoareS _ | FbdHoareF _  | FbdHoareS _ 
+      | FequivF _ | FequivS _ | Fpr _ -> assert false 
     in
     aux empty f
 
@@ -441,6 +442,10 @@ let destr_hoareF c =
   try destr_hoareF c with DestrError _ -> tacerror (NotPhl (Some true))
 let destr_hoareS c =
   try destr_hoareS c with DestrError _ -> tacerror (NotPhl (Some true))
+let destr_bdHoareF c =
+  try destr_bdHoareF c with DestrError _ -> tacerror (NotPhl (Some true))
+let destr_bdHoareS c =
+  try destr_bdHoareS c with DestrError _ -> tacerror (NotPhl (Some true))
 let destr_equivF c =
   try destr_equivF c with DestrError _ -> tacerror (NotPhl (Some false))
 let destr_equivS c =
@@ -451,6 +456,15 @@ let t_hS_or_eS th te g =
   if is_hoareS concl then th g
   else if is_equivS concl then te g
   else tacerror (NotPhl None)
+
+let t_hS_or_bhS_or_eS th tbh te g =
+  let concl = get_concl g in
+  if is_hoareS concl then th g
+  else if is_bdHoareS concl then tbh g
+  else if is_equivS concl then te g
+  else tacerror (NotPhl None)
+
+
 
 let prove_goal_by sub_gs rule (juc,n as g) =
   let hyps,_ = get_goal g in
@@ -522,6 +536,19 @@ let t_hoareF_fun_def env g =
   let concl' = f_hoareS memenv hf.hf_pr fdef.f_body post in
   prove_goal_by [concl'] RN_hl_fun_def g
 
+let t_bdHoareF_fun_def env g = 
+  let concl = get_concl g in
+  let bhf = destr_bdHoareF concl in
+  let memenv, fdef, env = Fun.hoareS bhf.bhf_f env in (* FIXME catch exception *)
+  let m = EcMemory.memory memenv in
+  let fres = 
+    match fdef.f_ret with
+    | None -> f_tt
+    | Some e -> form_of_expr m e in
+  let post = PVM.subst1 env (pv_res bhf.bhf_f) m fres bhf.bhf_po in
+  let concl' = f_bdHoareS memenv bhf.bhf_pr fdef.f_body post bhf.bhf_cmp bhf.bhf_bd  in
+  prove_goal_by [concl'] RN_hl_fun_def g
+
 
 let t_equivF_fun_def env g = 
   let concl = get_concl g in
@@ -549,6 +576,7 @@ let t_equivF_fun_def env g =
 let t_fun_def env g =
   let concl = get_concl g in
   if is_hoareF concl then t_hoareF_fun_def env g
+  else if is_bdHoareF concl then t_bdHoareF_fun_def env g
   else if is_equivF concl then t_equivF_fun_def env g
   else tacerror (NotPhl None)
 
@@ -609,6 +637,15 @@ let t_hoare_skip g =
   let concl = gen_mems [hs.hs_m] concl in
   prove_goal_by [concl] RN_hl_skip g
 
+let t_bdHoare_skip g =
+  let concl = get_concl g in
+  let bhs = destr_bdHoareS concl in
+  if bhs.bhs_s.s_node <> [] then tacerror NoSkipStmt;
+  if bhs.bhs_cmp <> FHeq || not (f_equal bhs.bhs_bd (f_real_of_int 1)) then
+    cannot_apply "skip" "bound must be \"= 1\"";
+  let concl = f_imp bhs.bhs_pr bhs.bhs_po in
+  let concl = gen_mems [bhs.bhs_m] concl in
+  prove_goal_by [concl] RN_hl_skip g
 
 let t_equiv_skip g =
   let concl = get_concl g in
@@ -620,7 +657,7 @@ let t_equiv_skip g =
   prove_goal_by [concl] RN_hl_skip g
 
 
-let t_skip = t_hS_or_eS t_hoare_skip t_equiv_skip 
+let t_skip = t_hS_or_bhS_or_eS t_hoare_skip t_bdHoare_skip t_equiv_skip 
 
 (* -------------------------------------------------------------------- *)
 
@@ -1366,16 +1403,27 @@ let t_equiv_inline env side pos g =
 (* -------------------------------------------------------------------- *)
 
 
-let proj_distr_ty ty = match ty.ty_node with
-  | Tconstr(_,lty) when List.length lty = 1  -> 
-    List.hd lty
-  | _ -> cannot_apply "rnd" "not a distribution expression"
 
 let (===) = f_eq 
 let (==>) = f_imp
 let (&&&) = f_anda
 
-let rec wp_equiv_rnd env (f,finv) g =
+let t_hoare_rnd env g =
+  let concl = get_concl g in
+  let hs = destr_hoareS concl in
+  let (lv,distr),s= s_last_rnd "rnd" hs.hs_s in
+  (* FIXME: exception when not rnds found *)
+  let ty_distr = proj_distr_ty (e_ty distr) in
+  let x_id = EcIdent.create "x" in
+  let x = f_local x_id ty_distr in
+  let distr = EcFol.form_of_expr (EcMemory.memory hs.hs_m) distr in
+  let post = subst_form_lv env (EcMemory.memory hs.hs_m) lv x hs.hs_po in
+  let post = (f_in_supp x distr) ==> post in
+  let post = f_forall_simpl [(x_id,GTty ty_distr)] post in
+  let concl = f_hoareS_r {hs with hs_s=s; hs_po=post} in
+  prove_goal_by [concl] RN_hl_hoare_rnd g
+
+let wp_equiv_rnd env (f,finv) g =
   let concl = get_concl g in
   let es = destr_equivS concl in
   let (lvL,muL),(lvR,muR),sl',sr'= s_last_rnds "rnd" es.es_sl es.es_sr in
@@ -1416,3 +1464,72 @@ let t_equiv_rnd env bij_info =
         let bij = fun tyL tyR -> f_lambda [z_id,GTty tyR] (z tyL) in 
         bij, bij
   in wp_equiv_rnd env (f,finv) 
+
+
+
+
+
+(* --------------------------------------------------------------------- *)
+(* ---- Bounded Probabilistic Hoare Logic ------------------------------ *)
+(* --------------------------------------------------------------------- *)
+
+(* 
+ * Instead of introducing new type constructors for bounded probabilistic
+ * Hoare judgments, I consider Hoare involved in numeric relations as such
+ * judgments.
+ * 
+ * Tactics have different application rules depending on whether one is
+ * dealing with {P}c{Q}<=k, {P}c{Q}=k or {P}c{Q} >= k
+ * 
+ * t_bd_hoare_gen just reduces occurrences of k >= {P}c{Q} to
+ * {P}c{Q}<=k and likewise for ...
+ * However, for the moment, comparisons of the form {P}c{Q}<={P'}c'{Q'} 
+ * cannot be disambiguated
+ *)
+
+
+(*
+ * "hr cmp_op bd" represents the goal g conclusion
+ * opt_bd is a "bound Option" provided by the user 
+ *   (if cmp_bd is "<=" then opt_bd must be None or equal to bd)
+ * event is a cPred (see theories/Fun.ec) that must be "equivalent"
+ *   to the post of hr
+ *)
+
+let t_bd_hoare_rnd env (opt_bd,event) g =
+  let concl = get_concl g in
+  let bhs = destr_bdHoareS concl in
+
+  let (lv,distr),s = s_last_rnd "bd_hoare_rnd" bhs.bhs_s in
+  let ty_distr = proj_distr_ty (e_ty distr) in
+  let distr = EcFol.form_of_expr (EcMemory.memory bhs.bhs_m) distr in
+  let event = event ty_distr in
+
+  let new_cmp_op,new_hoare_bd, bounded_distr =
+    match bhs.bhs_cmp, opt_bd with
+      | FHle, Some bd' when not (EcFol.f_equal bhs.bhs_bd bd') ->
+        cannot_apply "bd_hoare_rnd"
+          "Rule for upper-bounded hoare triples requires a total bound"
+      | FHle, _ ->
+          FHeq, EcFol.f_real_of_int 1, f_real_le (f_mu distr event) bhs.bhs_bd
+      | FHge, Some bd' when not (EcFol.f_equal bhs.bhs_bd bd') -> 
+          bhs.bhs_cmp, EcFol.f_real_div bhs.bhs_bd bd', f_real_le bd' (f_mu distr event)
+      | FHge, _ -> FHeq, EcFol.f_real_of_int 1, f_real_le bhs.bhs_bd (f_mu distr event)
+      | FHeq, Some bd' when not (EcFol.f_equal bhs.bhs_bd bd') -> 
+          bhs.bhs_cmp, EcFol.f_real_div bhs.bhs_bd bd', f_eq (f_mu distr event) bd'
+      | FHeq, _ -> FHeq, EcFol.f_real_of_int 1, f_eq (f_mu distr event) bhs.bhs_bd
+  in
+
+  let v_id = EcIdent.create "v" in
+  let v = f_local v_id ty_distr in
+  let post_v = subst_form_lv env (EcMemory.memory bhs.bhs_m) lv v bhs.bhs_po in
+  let event_v = f_app event [v] tbool in
+  let post_equiv_event = f_forall_simpl [(v_id,GTty ty_distr)] (f_iff post_v (event_v)) in
+  let post = bounded_distr &&& post_equiv_event in
+  let concl = f_bdHoareS_r {bhs with bhs_s=s; bhs_po=post; bhs_cmp=new_cmp_op; 
+    bhs_bd=new_hoare_bd} in
+  prove_goal_by [concl] (RN_bhl_rnd (opt_bd,event) ) g
+
+
+
+ 

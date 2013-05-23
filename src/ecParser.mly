@@ -130,6 +130,7 @@
 %token AT
 %token AUTO
 %token AXIOM
+%token BDHOARE
 %token BETA 
 %token CASE
 %token CEQ
@@ -162,6 +163,9 @@
 %token FROM_INT
 %token FUN
 %token GENERALIZE 
+%token HEQ
+%token HGEQ
+%token HLEQ
 %token HOARE
 %token IDTAC
 %token TRY
@@ -609,6 +613,18 @@ sform_u:
   RBRACKET
 	{ PFhoareS (pre, s, post) }
 
+| BDHOARE 
+    LBRACKET mp=loc(fident) COLON pre=form LONGARROW post=form  RBRACKET
+    cmp = hoare_bd_cmp
+    LBRACKET bd=form RBRACKET
+	{ PFBDhoareF (pre, mp, post, cmp, bd) }
+
+| BDHOARE 
+    LBRACKET s=fun_def_body COLON pre=form LONGARROW post=form  RBRACKET
+    cmp = hoare_bd_cmp
+    LBRACKET bd=form RBRACKET
+	{ PFBDhoareS (pre, s, post, cmp, bd) }
+
 | PR LBRACKET
     mp=loc(fident) args=paren(plist0(sform, COMMA)) AT pn=mident
     COLON event=form
@@ -623,6 +639,11 @@ sform_u:
     { let id = PFident(mk_loc op.pl_loc EcCoreLib.s_dinter, ti) in
       PFapp(mk_loc op.pl_loc id, [e1; e2]) } 
 ;
+
+hoare_bd_cmp :
+  | HLEQ {PFHle}
+  | HEQ  {PFHeq}
+  | HGEQ {PFHge}
                           
 form_u:
 | GLOB mp=loc(mod_qident) { PFglob mp }
@@ -1345,11 +1366,13 @@ tactic:
 
 rnd_info:
 | e1=sform COMMA e2=sform 
-  {RIbij (e1,e2) }
+  {RTbij (RIbij (e1,e2)) }
 | e=sform 
-  {RIidempotent e }
+  {RTbij (RIidempotent e) }
 | empty
-  {RIid }
+  {RTbij (RIid) }
+| LBRACE e1=sform COMMA e2=sform RBRACE
+  {RTbd (Some e1,e2)}
 ;
 
 swap_info:

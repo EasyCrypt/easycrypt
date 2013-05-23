@@ -207,10 +207,13 @@ type rule_name =
   | RN_hl_call      of bool option * EcFol.form * EcFol.form
   | RN_hl_swap      of bool * int * int * int
   | RN_hl_inline    of bool option * int list option * EcPath.xpath
+  | RN_hl_hoare_rnd
   | RN_hl_equiv_rnd of rnd_bij_info
   | RN_hl_conseq 
   | RN_hl_hoare_equiv 
   | RN_hl_deno      
+
+  | RN_bhl_rnd of (EcFol.form option * EcFol.form)
 
 and rule_arg = 
   | RA_form of EcFol.form             (* formula             *)
