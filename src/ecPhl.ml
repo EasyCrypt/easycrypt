@@ -823,6 +823,7 @@ let t_hoare_call env fpre fpost (juc,n1 as g) =
   let fpost = PVM.subst1 env pvres m fres fpost in 
   let modi = f_write env f in
   let post = generalize_mod env m modi (f_imp_simpl fpost post) in
+  let post = f_forall_simpl [(vres, GTty fsig.fs_ret)] post in
   let spre = subst_args_call env m f fsig.fs_params args PVM.empty in
   let post = f_anda_simpl (PVM.subst env spre fpre) post in
   let concl = f_hoareS_r { hs with hs_s = s; hs_po=post} in
