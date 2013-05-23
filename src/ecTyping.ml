@@ -1696,9 +1696,3 @@ let transform env ue pf ty =
 (* -------------------------------------------------------------------- *)
 let transformula env ue pf = 
   transform env ue pf tbool
-
-(* -------------------------------------------------------------------- *)
-
-let trans_msymbol env gp = 
-  let (mp,_,_) = trans_msymbol env gp in
-  mp
