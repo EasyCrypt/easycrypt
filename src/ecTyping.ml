@@ -143,9 +143,10 @@ let pp_tyerror fmt env error =
 
   | InvalidMem (name, MAE_IsConcrete) ->
       msg "the memory %s must be abstract" name
+
   | OnlyModParamAreOracle name ->
-    msg "the function %a is not provided by a module parameter"
-      pp_qsymbol name
+      msg "the function %a is not provided by a module parameter"
+        pp_qsymbol name
 
 let () =
   let pp fmt exn =

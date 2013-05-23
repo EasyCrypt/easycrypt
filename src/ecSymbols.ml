@@ -75,6 +75,9 @@ end
 (* -------------------------------------------------------------------- *)
 let pp_symbol fmt s = Format.fprintf fmt "%s" s
 
-let rec pp_qsymbol fmt = function
-  | ([]    , x) -> Format.fprintf fmt "%s" x
-  | (n :: p, x) -> Format.fprintf fmt "%s.%a" n pp_qsymbol (p, x)
+let rec string_of_qsymbol = function
+  | ([]    , x) -> Printf.sprintf "%s" x
+  | (n :: p, x) -> Printf.sprintf "%s.%s" n (string_of_qsymbol (p, x))
+
+let rec pp_qsymbol fmt qn =
+  Format.fprintf fmt "%s" (string_of_qsymbol qn)

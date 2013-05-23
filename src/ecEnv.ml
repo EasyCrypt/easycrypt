@@ -237,6 +237,24 @@ type lookup_error = [
 
 exception LookupFailure of lookup_error
 
+let pp_lookup_failure fmt e =
+  let p =
+    match e with
+    | `XPath   p -> EcPath.x_tostring p
+    | `MPath   p -> EcPath.m_tostring p
+    | `Path    p -> EcPath.tostring p
+    | `QSymbol p -> string_of_qsymbol p
+  in
+    Format.fprintf fmt "unknown symbol: %s" p
+
+let () =
+  let pp fmt exn =
+    match exn with
+    | LookupFailure p -> pp_lookup_failure fmt p
+    | _ -> raise exn
+  in
+    EcPException.register pp
+
 let lookup_error cause =
   raise (LookupFailure cause)
 
@@ -966,105 +984,6 @@ let try_lf f =
   with LookupFailure _ -> None
 
 (* -------------------------------------------------------------------- *)
-module Var = struct
-  type t = varbind
-
-  let by_xpath_r (spsc : bool) (p : xpath) (env : env) =
-    match ipath_of_xpath p with
-    | None -> lookup_error (`XPath p)
-
-    | Some (ip, (i, args)) -> begin
-        match MC.by_path (fun mc -> mc.mc_variables) ip env with
-        | None -> lookup_error (`XPath p)
-        | Some (params, o) ->
-           let local = o.vb_kind = EcTypes.PVloc in
-           let ((spi, params), _) = MC._downpath_for_var local spsc env ip params in
-             if i <> spi then
-               assert false;
-             if params <> [] && List.length args <> List.length params then
-               assert false;
-             o
-      end
-
-  let by_xpath (p : xpath) (env : env) =
-    by_xpath_r true p env
-
-  let by_xpath_opt (p : xpath) (env : env) =
-    try_lf (fun () -> by_xpath p env)
-
-  let add (path : EcPath.xpath) (env : env) =
-    let obj = by_xpath path env in
-    let ip = fst (oget (ipath_of_xpath path)) in
-      MC.import_var ip obj env
-
-  let lookup_locals name env =
-    MMsym.all name env.env_locals
-
-  let lookup_local name env =
-    match MMsym.last name env.env_locals with
-    | None   -> raise (LookupFailure (`QSymbol ([], name)))
-    | Some x -> x
-
-  let lookup_local_opt name env =
-    MMsym.last name env.env_locals
-
-  let lookup_progvar ?side qname env =
-    let inmem side =
-      match fst qname with
-      | [] ->
-          let memenv = oget (Memory.byid side env) in
-
-          if EcMemory.memtype memenv = None then
-            None
-          else
-            let mp = EcMemory.xpath memenv in
-            begin match EcMemory.lookup (snd qname) memenv with
-            | None    -> None
-            | Some ty ->
-                let pv =
-                  { pv_name = EcPath.xqname mp (snd qname);
-                    pv_kind = PVloc; }
-                in
-                  Some (pv, ty)
-            end
-
-      | _ -> None
-    in
-
-      match obind side inmem with
-      | None -> begin
-          (* Variable are never suspended *)
-          let (((_, _), p), x) = MC.lookup_var qname env in
-          let p = EcPath.xpath (EcPath.mpath p.x_top.m_top []) p.x_sub in
-            ({ pv_name = p; pv_kind = x.vb_kind }, x.vb_type)
-        end
-
-      | Some (pv, ty) -> (pv, ty)
-
-  let lookup_progvar_opt ?side name env =
-    try_lf (fun () -> lookup_progvar ?side name env)
-
-  let bind name pvkind ty env =
-    let vb = { vb_type = ty; vb_kind = pvkind; } in
-      MC.bind_var name vb env
-
-  let bindall bindings pvkind env =
-    List.fold_left
-      (fun env (name, ty) -> bind name pvkind ty env)
-      env bindings
-
-   let bind_local name ty env =
-     let s = EcIdent.name name in
-       { env with
-           env_locals = MMsym.add s (name, ty) env.env_locals }
-
-   let bind_locals bindings env =
-     List.fold_left
-       (fun env (name, ty) -> bind_local name ty env)
-       env bindings
-end
-
-(* -------------------------------------------------------------------- *)
 module Fun = struct
   type t = EcModules.function_
 
@@ -1074,7 +993,7 @@ module Fun = struct
   let by_ipath (p : ipath) (env : env) =
     MC.by_path (fun mc -> mc.mc_functions) p env
 
-  let by_xpath_r (spsc : bool) (p : EcPath.xpath) (env : env) =
+  let by_xpath_r ~susp ~spsc (p : EcPath.xpath) (env : env) =
     match ipath_of_xpath p with
     | None -> lookup_error (`XPath p)
 
@@ -1083,18 +1002,24 @@ module Fun = struct
         | None -> lookup_error (`XPath p)
         | Some (params, o) ->
            let ((spi, params), _op) = MC._downpath_for_fun spsc env ip params in
-           if i <> spi || List.length args <> List.length params then
+           if i <> spi || susp && args <> [] then
              assert false;
-           let s =
-             List.fold_left2
-               (fun s (x, _) a -> EcSubst.add_module s x a)
-               EcSubst.empty params args
-           in
-           EcSubst.subst_function s o
+           if not susp && List.length args <> List.length params then
+             assert false;
+
+           if susp then
+             o
+           else
+             let s =
+               List.fold_left2
+                 (fun s (x, _) a -> EcSubst.add_module s x a)
+                 EcSubst.empty params args
+             in
+             EcSubst.subst_function s o
       end
 
   let by_xpath (p : EcPath.xpath) (env : env) =
-    by_xpath_r true p env
+    by_xpath_r ~susp:false ~spsc:true p env
 
   let by_xpath_opt (p : EcPath.xpath) (env : env) =
     try_lf (fun () -> by_xpath p env)
@@ -1221,6 +1146,123 @@ module Fun = struct
     let mem2 = actmem_body_anonym EcFol.mright path2 locals2 in
     mem1, mem2, Memory.push_all [mem1; mem2] env
 *)
+end
+
+(* -------------------------------------------------------------------- *)
+module Var = struct
+  type t = varbind
+
+  let by_xpath_r (spsc : bool) (p : xpath) (env : env) =
+    match ipath_of_xpath p with
+    | None -> begin
+      match p.EcPath.x_sub.EcPath.p_node with
+      | EcPath.Pqname ({ p_node = EcPath.Psymbol f }, x) -> begin
+        let fp = EcPath.xpath p.EcPath.x_top (EcPath.psymbol f) in
+        let f  = Fun.by_xpath_r ~susp:true ~spsc fp env in
+          try
+            let v = List.find (fun v -> v.v_name = x) f.f_sig.fs_params in
+              { vb_type = v.v_type; vb_kind = PVglob; }
+          with Not_found -> begin
+            match f.f_def with
+            | FBdef def -> begin
+              try
+                let v = List.find (fun v -> v.v_name = x) def.f_locals in
+                  { vb_type = v.v_type; vb_kind = PVloc; }
+              with Not_found -> lookup_error (`XPath p)
+            end
+            | FBabs _ -> lookup_error (`XPath p)
+          end
+      end
+      | _ -> lookup_error (`XPath p)
+    end
+
+    | Some (ip, (i, _args)) -> begin
+        match MC.by_path (fun mc -> mc.mc_variables) ip env with
+        | None -> lookup_error (`XPath p)
+        | Some (params, o) ->
+           let local = o.vb_kind = EcTypes.PVloc in
+           let ((spi, _params), _) = MC._downpath_for_var local spsc env ip params in
+             if i <> spi then
+               assert false;
+             o
+      end
+
+  let by_xpath (p : xpath) (env : env) =
+    by_xpath_r true p env
+
+  let by_xpath_opt (p : xpath) (env : env) =
+    try_lf (fun () -> by_xpath p env)
+
+  let add (path : EcPath.xpath) (env : env) =
+    let obj = by_xpath path env in
+    let ip = fst (oget (ipath_of_xpath path)) in
+      MC.import_var ip obj env
+
+  let lookup_locals name env =
+    MMsym.all name env.env_locals
+
+  let lookup_local name env =
+    match MMsym.last name env.env_locals with
+    | None   -> raise (LookupFailure (`QSymbol ([], name)))
+    | Some x -> x
+
+  let lookup_local_opt name env =
+    MMsym.last name env.env_locals
+
+  let lookup_progvar ?side qname env =
+    let inmem side =
+      match fst qname with
+      | [] ->
+          let memenv = oget (Memory.byid side env) in
+
+          if EcMemory.memtype memenv = None then
+            None
+          else
+            let mp = EcMemory.xpath memenv in
+            begin match EcMemory.lookup (snd qname) memenv with
+            | None    -> None
+            | Some ty ->
+                let pv =
+                  { pv_name = EcPath.xqname mp (snd qname);
+                    pv_kind = PVloc; }
+                in
+                  Some (pv, ty)
+            end
+
+      | _ -> None
+    in
+
+      match obind side inmem with
+      | None -> begin
+          (* Variable are never suspended *)
+          let (((_, _), p), x) = MC.lookup_var qname env in
+          let p = EcPath.xpath (EcPath.mpath p.x_top.m_top []) p.x_sub in
+            ({ pv_name = p; pv_kind = x.vb_kind }, x.vb_type)
+        end
+
+      | Some (pv, ty) -> (pv, ty)
+
+  let lookup_progvar_opt ?side name env =
+    try_lf (fun () -> lookup_progvar ?side name env)
+
+  let bind name pvkind ty env =
+    let vb = { vb_type = ty; vb_kind = pvkind; } in
+      MC.bind_var name vb env
+
+  let bindall bindings pvkind env =
+    List.fold_left
+      (fun env (name, ty) -> bind name pvkind ty env)
+      env bindings
+
+   let bind_local name ty env =
+     let s = EcIdent.name name in
+       { env with
+           env_locals = MMsym.add s (name, ty) env.env_locals }
+
+   let bind_locals bindings env =
+     List.fold_left
+       (fun env (name, ty) -> bind_local name ty env)
+       env bindings
 end
 
 (* -------------------------------------------------------------------- *)
