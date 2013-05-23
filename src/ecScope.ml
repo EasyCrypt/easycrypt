@@ -671,8 +671,15 @@ module Tactic = struct
 
   let process_phl_form ty env g phi =
     let hyps, concl = get_goal g in
-    let hs = set_loc phi.pl_loc destr_hoareS concl in
-    let env = EcEnv.Memory.push_active hs.hs_m env in
+    let m = 
+      try 
+        let hs = set_loc phi.pl_loc destr_hoareS concl in
+        hs.hs_m
+      with _ ->
+        let hs = set_loc phi.pl_loc destr_bdHoareS concl in
+        hs.bhs_m
+    in
+    let env = EcEnv.Memory.push_active m env in
     process_form env hyps phi ty
 
   let process_prhl_form ty env g phi =
@@ -920,23 +927,30 @@ module Tactic = struct
     | None      -> t_inline_hoare env fp occs g
     | Some side -> t_inline_equiv env fp side occs g
 
-  let process_rnd env bij_info g =
+  let process_rnd env tac_info g =
     let concl = get_concl g in
-    let process_form f ty1 ty2 = 
-      if is_equivS concl then
-        process_prhl_form (tfun ty1 ty2) env g f 
-      else if is_hoareS concl then
-        process_phl_form  (tfun ty1 ty2) env g f
-      else (* is_*F *) assert false (* FIXME: error "unfolded judgmented was expected" *)
-    in
-    let bij_info = match bij_info with
-      | RIid -> RIid
-      | RIidempotent f ->
-        RIidempotent (process_form f)
-      | RIbij (f,finv) -> 
-        RIbij (process_form f, process_form finv)
-    in
-    t_equiv_rnd env bij_info g
+    match tac_info with
+      | RTbij bij_info ->
+        if is_equivS concl then
+          let process_form f ty1 ty2 = process_prhl_form (tfun ty1 ty2) env g f in
+          let bij_info = match bij_info with
+            | RIid -> RIid
+            | RIidempotent f ->
+              RIidempotent (process_form f)
+            | RIbij (f,finv) -> 
+              RIbij (process_form f, process_form finv)
+          in
+          t_equiv_rnd env bij_info g
+        else
+          assert false (* FIXME: error "unfolded equiv judgmented was expected" *)
+      | RTbd (opt_bd,event) -> (
+        if is_bdHoareS concl then 
+          let opt_bd = omap opt_bd (process_phl_form treal env g)  in
+          let event ty = process_phl_form (tfun ty tbool) env g event in
+          t_bd_hoare_rnd env (opt_bd,event) g
+        else
+          assert false (* FIXME: error "unfolded bounded hoare judgment was expected" *)
+      )
 
   let process_equiv_deno env (pre,post) g = 
     let hyps,concl = get_goal g in

@@ -39,6 +39,7 @@ val tbool      : ty
 val tint       : ty
 val treal      : ty
 val tdistr     : ty -> ty
+val tcpred     : ty -> ty
 val toarrow    : ty list -> ty -> ty
 
 (* -------------------------------------------------------------------- *)
@@ -193,3 +194,7 @@ module Dump : sig
   val ty_dump : EcDebug.ppdebug -> ty -> unit
   val ex_dump : EcDebug.ppdebug -> expr -> unit
 end
+
+(* projects 'a Distr type into 'a *)
+val proj_distr_ty : ty -> ty
+

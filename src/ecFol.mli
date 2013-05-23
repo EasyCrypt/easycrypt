@@ -25,6 +25,9 @@ type quantif =
 
 type binding =  (EcIdent.t * gty) list
 
+type hoarecmp = FHle | FHeq | FHge
+
+
 type form = private { 
   f_node : f_node;
   f_ty   : ty; 
@@ -46,6 +49,9 @@ and f_node =
 
   | FhoareF of hoareF (* $hr / $hr *)
   | FhoareS of hoareS (* $hr  / $hr   *)
+
+  | FbdHoareF of bdHoareF (* $hr / $hr *)
+  | FbdHoareS of bdHoareS (* $hr  / $hr   *)
 
   | FequivF of equivF (* $left,$right / $left,$right *)
   | FequivS of equivS (* $left,$right / $left,$right *)
@@ -78,6 +84,23 @@ and hoareS = {
   hs_s   : stmt;
   hs_po  : form; }
 
+and bdHoareF = {
+  bhf_pr  : form; 
+  bhf_f  : EcPath.xpath;
+  bhf_po  : form;
+  bhf_cmp : hoarecmp;
+  bhf_bd  : form;
+}
+and bdHoareS = {
+  bhs_m   : EcMemory.memenv;
+  bhs_pr  : form; 
+  bhs_s   : stmt;
+  bhs_po  : form;
+  bhs_cmp : hoarecmp;
+  bhs_bd  : form;
+}
+
+
 (* -------------------------------------------------------------------- *)
 val f_equal   : form -> form -> bool
 val f_compare : form -> form -> int
@@ -107,6 +130,8 @@ val f_tt  : form
 
 val f_int : int -> form
 
+val f_real_of_int : int -> form
+
 val f_op : EcPath.path -> EcTypes.ty list -> EcTypes.ty -> form
 val f_app : form -> form list -> EcTypes.ty -> form
 
@@ -121,6 +146,11 @@ val f_lambda : binding -> form -> form
 val f_hoareF   : form -> EcPath.xpath -> form -> form 
 val f_hoareS   : memenv -> form -> EcModules.stmt -> form -> form 
 val f_hoareS_r : hoareS -> form
+val f_bdHoareF   : form -> EcPath.xpath -> form -> 
+  hoarecmp -> form -> form 
+val f_bdHoareS   : memenv -> form -> EcModules.stmt -> form -> 
+  hoarecmp -> form -> form 
+val f_bdHoareS_r : bdHoareS -> form
 val f_equivF   : form -> EcPath.xpath -> EcPath.xpath -> form -> form 
 val f_equivS   : 
  memenv -> memenv -> form -> EcModules.stmt -> EcModules.stmt -> form -> form
@@ -162,11 +192,17 @@ val f_eqglob   : EcPath.mpath -> memory ->
 val f_int_le : form -> form -> form
 val f_int_lt  : form -> form -> form
 
+val f_real_le : form -> form -> form
+val f_real_lt  : form -> form -> form
+
+val f_real_div  : form -> form -> form
+
 val fop_in_supp  : EcTypes.ty -> form
 val f_in_supp    : form -> form -> form
 
 val fop_mu_x  : EcTypes.ty -> form
-val f_mu_x    : form -> form -> form
+val f_mu  : form -> form -> form
+val f_mu_x  : form -> form -> form
 
 (* -------------------------------------------------------------------- *)
 val f_if_simpl   : form -> form -> form -> form
@@ -208,6 +244,8 @@ val destr_equivF  : form -> equivF
 val destr_equivS  : form -> equivS
 val destr_hoareF  : form -> hoareF
 val destr_hoareS  : form -> hoareS
+val destr_bdHoareF  : form -> bdHoareF
+val destr_bdHoareS  : form -> bdHoareS
 val destr_pr      : form -> memory * EcPath.xpath * form list * form (* hr *) 
 
 val is_and    : form -> bool
@@ -223,6 +261,8 @@ val is_equivF  : form -> bool
 val is_equivS  : form -> bool
 val is_hoareF  : form -> bool
 val is_hoareS  : form -> bool
+val is_bdHoareF  : form -> bool
+val is_bdHoareS  : form -> bool
 val is_pr      : form -> bool
 
 

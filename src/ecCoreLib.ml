@@ -20,6 +20,8 @@ let id_bool      = "bool"
 let id_int       = "int"
 let id_real      = "real"
 let id_distr     = "distr"
+let id_cpred     = "cPred"
+let id_from_int  = "from_int"
 
 let id_true      = "true"
 let id_false     = "false"
@@ -35,7 +37,10 @@ let id_eq        = "="
 let id_le        = "<="
 let id_lt        = "<"
 
+let id_div        = "/"
+
 let id_in_supp   = "in_supp"
+let id_mu        = "mu"
 let id_mu_x      = "mu_x"
 
 
@@ -49,6 +54,8 @@ let p_bool       = _Pervasive id_bool
 let p_int        = _Pervasive id_int
 let p_real       = _Pervasive id_real
 let p_distr      = _Pervasive id_distr
+let p_cpred      = _Pervasive id_cpred
+let p_from_int   = _Pervasive id_from_int
 
 let p_true       = _Pervasive id_true
 let p_false      = _Pervasive id_false
@@ -74,12 +81,14 @@ let _Real id     = EcPath.pqname p_Real id
 
 let p_real_le    = _Real id_le
 let p_real_lt    = _Real id_lt   
+let p_real_div   = _Real id_div   
 
 let id_Distr     = "Distr"
 let p_Distr      = EcPath.pqname p_top id_Distr
 let _Distr id    = EcPath.pqname p_Distr id
 
 let p_in_supp    = _Distr id_in_supp
+let p_mu         = _Pervasive id_mu
 let p_mu_x       = _Distr id_mu_x
 
 
