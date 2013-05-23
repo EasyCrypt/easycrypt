@@ -875,9 +875,33 @@ let rec pr_form_rec (ppenv : ppenv) outer (f : form) =
       (pr_brace (pr_form ppenv hs.hs_pr)) 
       (pr_stmt ppenv hs.hs_s)
       (pr_brace (pr_form ppenv hs.hs_po))
+
+  (* inheriting above errors by C&P *)
+  (* FIXME: the printing results are not parseable! *)
+  | FbdHoareF bhf ->
+    join [
+      Pp.surround 2 Pp.break1
+        (pr_brace (pr_form ppenv bhf.bhf_pr))
+        ( pr_funname ppenv bhf.bhf_f)
+        (pr_brace (pr_form ppenv bhf.bhf_po));
+      (match bhf.bhf_cmp with FHle -> !^"<=" | FHeq -> !^"=" | FHge -> !^">=");
+      pr_form ppenv bhf.bhf_bd
+    ]
+  | FbdHoareS bhs ->
+    (*let dbody =  (* FIXME : add local program variables ? *)
+      let bodyppenv = ppenv in
+      List.map (pr_instr bodyppenv) hs.hs_s.s_node
+    in *)
+    join [
+      Pp.surround 2 Pp.break1
+        (pr_brace (pr_form ppenv bhs.bhs_pr))
+        (pr_stmt ppenv bhs.bhs_s)
+        (pr_brace (pr_form ppenv bhs.bhs_po));
+      (match bhs.bhs_cmp with FHle -> !^"<=" | FHeq -> !^"=" | FHge -> !^">=");
+      pr_form ppenv bhs.bhs_bd
+    ]
       
   | FequivS es ->
-    
     let dbodyl =  (* FIXME : add local program variables ? *)
       let bodyppenv = ppenv in
       List.map (pr_instr bodyppenv) es.es_sl.s_node

@@ -34,6 +34,7 @@
     "res"         , RES        ;        (* KW: prog *)
     "equiv"       , EQUIV      ;        (* KW: prog *)
     "hoare"       , HOARE      ;        (* KW: prog *)
+    "bd_hoare"    , BDHOARE    ;        (* KW: prog *)
 
     "using"       , USING      ;        (* KW: tactic *)
     "compute"     , COMPUTE    ;        (* KW: tactic *)
@@ -208,6 +209,9 @@ rule main = parse
   (* comparison *)
   | "="  { EQ }
   | "<>" { NE }
+
+  | "<="  { LEQ }
+  | ">="  { GEQ }
 
   | "-" { MINUS }
   | "+" { ADD }

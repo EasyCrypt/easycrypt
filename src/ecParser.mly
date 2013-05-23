@@ -129,6 +129,7 @@
 %token AT
 %token AUTO
 %token AXIOM
+%token BDHOARE
 %token BETA 
 %token CASE
 %token CEQ
@@ -161,6 +162,7 @@
 %token FROM_INT
 %token FUN
 %token GENERALIZE 
+%token GEQ
 %token HOARE
 %token IDTAC
 %token TRY
@@ -179,6 +181,7 @@
 %token LEFTARROW
 %token LEMMA
 %token LET
+%token LEQ
 %token LOGIC
 %token LONGARROW
 %token LPAREN
@@ -606,6 +609,18 @@ sform_u:
   RBRACKET
 	{ PFhoareS (pre, s, post) }
 
+| BDHOARE 
+    LBRACKET mp=loc(fident) COLON pre=form LONGARROW post=form  RBRACKET
+    cmp = hoare_bd_cmp
+    LBRACKET bd=form RBRACKET
+	{ PFBDhoareF (pre, mp, post, cmp, bd) }
+
+| BDHOARE 
+    LBRACKET s=fun_def_body COLON pre=form LONGARROW post=form  RBRACKET
+    cmp = hoare_bd_cmp
+    LBRACKET bd=form RBRACKET
+	{ PFBDhoareS (pre, s, post, cmp, bd) }
+
 | PR LBRACKET
     mp=loc(fident) args=paren(plist0(sform, COMMA)) AT pn=mident
     COLON event=form
@@ -620,6 +635,11 @@ sform_u:
     { let id = PFident(mk_loc op.pl_loc EcCoreLib.s_dinter, ti) in
       PFapp(mk_loc op.pl_loc id, [e1; e2]) } 
 ;
+
+hoare_bd_cmp :
+  | LEQ {PFHle}
+  | EQ  {PFHeq}
+  | GEQ {PFHge}
                           
 form_u:
 | e=sform_u { e }

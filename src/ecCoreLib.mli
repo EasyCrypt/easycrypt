@@ -31,6 +31,8 @@ val p_bool       : path
 val p_int        : path
 val p_real       : path
 val p_distr      : path 
+val p_cpred      : path 
+val p_from_int   : path
 
 val p_tt         : path
 val p_true       : path
@@ -51,6 +53,7 @@ val p_real_le    : path
 val p_real_lt    : path
 
 val p_in_supp    : path
+val p_mu       : path
 val p_mu_x       : path
 
 val p_cut_lemma  : path

@@ -1133,7 +1133,7 @@ let trans_form env vm f =
         let args = List.map (trans_form_b vm) args in
         Term.t_tuple args
 
-    | FhoareF _ | FhoareS _ | FequivF _ | FequivS _ -> 
+    | FhoareF _ | FhoareS _ | FbdHoareF _ | FbdHoareS _ | FequivF _ | FequivS _ -> 
         raise (CanNotTranslate f) (* fixme *)
 
     | Fpvar(pv,m) ->

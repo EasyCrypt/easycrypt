@@ -88,7 +88,8 @@ let tglob m      = mk_ty (Tglob m)
 let tunit      = tconstr EcCoreLib.p_unit  []
 let tbool      = tconstr EcCoreLib.p_bool  []
 let tint       = tconstr EcCoreLib.p_int   []
-let tdistr  ty = tconstr EcCoreLib.p_distr [ty]
+let tdistr ty  = tconstr EcCoreLib.p_distr [ty]
+let tcpred ty  = tconstr EcCoreLib.p_cpred [ty]
 let treal      = tconstr EcCoreLib.p_real  []
  
 let toarrow dom ty = 
@@ -692,3 +693,9 @@ module Dump = struct
     in
       fun e -> ex_dump pp e
 end
+
+
+let proj_distr_ty ty = match ty.ty_node with
+  | Tconstr(_,lty) when List.length lty = 1  -> 
+    List.hd lty
+  | _ -> assert false (* FIXME *)

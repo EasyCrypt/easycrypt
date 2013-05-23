@@ -1227,10 +1227,6 @@ let t_equiv_inline env side pos g =
 (* -------------------------------------------------------------------- *)
 
 
-let proj_distr_ty ty = match ty.ty_node with
-  | Tconstr(_,lty) when List.length lty = 1  -> 
-    List.hd lty
-  | _ -> cannot_apply "rnd" "not a distribution expression"
 
 let (===) = f_eq 
 let (==>) = f_imp
@@ -1283,8 +1279,84 @@ let t_equiv_rnd env bij_info =
 
 
 
+(* --------------------------------------------------------------------- *)
+(* ---- Bounded Probabilistic Hoare Logic ------------------------------ *)
+(* --------------------------------------------------------------------- *)
 
-    
-    
+(* 
+ * Instead of introducing new type constructors for bounded probabilistic
+ * Hoare judgments, I consider Hoare involved in numeric relations as such
+ * judgments.
+ * 
+ * Tactics have different application rules depending on whether one is
+ * dealing with {P}c{Q}<=k, {P}c{Q}=k or {P}c{Q} >= k
+ * 
+ * t_bd_hoare_gen just reduces occurrences of k >= {P}c{Q} to
+ * {P}c{Q}<=k and likewise for ...
+ * However, for the moment, comparisons of the form {P}c{Q}<={P'}c'{Q'} 
+ * cannot be disambiguated
+ *)
+
+(* This generic wrapper just ... *)
+(* let t_bd_hoare_gen tac g = *)
+(*   let concl = get_concl g in *)
+(*   match concl.f_node with *)
+(*     | Fapp ({f_node = Fop(cmp_op,_)},[hr;bd]) when is_hoareS *)
+
+
+(*
+ * "hr cmp_op bd" represents the goal g conclusion
+ * opt_bd is a "bound Option" provided by the user 
+ *   (if cmp_bd is "<=" then opt_bd must be None or equal to bd)
+ * event is a cPred (see theories/Fun.ec) that must be "equivalent"
+ *   to the post of hr
+ *)
+(* let wp_bd_hoare_rnd env hr cmp_op bd (opt_bd,event) g = *)
+(*   let new_cmp_op,new_hoare_bd,distr_bd =  *)
+(*     if EcPath.p_equal cmp_op EcCoreLib.p_le then *)
+(*       begin *)
+(*         match opt_bd with *)
+(*           | Some bd' when not (EcFol.f_equal bd bd') ->  *)
+(*             cannot_apply "bd_hoare_rnd"  *)
+(*               "Rule for upper-bounded hoare triples requires a total bound" *)
+(*           | _ ->  *)
+(*             EcCoreLib.p_eq, EcFol.f_real_of_int 1, bd *)
+(*       end *)
+(*     else  *)
+(*       match opt_bd with *)
+(*         | Some bd' -> cmp_op, EcFol.f_real_div bd bd', bd' *)
+(*         | None -> EcCoreLib.p_eq, EcFol.f_real_of_int 1, bd *)
+(*   in *)
+
+(*   let new_cmp_op = f_op new_cmp_op [] .... *)
+
+(*   let (lv,distr),s = s_last_rnd "bd_hoare_rnd" hr.hs_s in *)
+(*   let ty_distr = proj_distr_ty (e_ty distr) in *)
+
+(*   let v_id = EcIndent.create "v" in *)
+(*   let v = f_local v_id ty_distr in *)
+(*   let post = subst_form_lv env (EcMemory.memory hr.hs_m) lv v hr.hs_po in *)
+(*   let event_v = f_app event [v] tbool in *)
+(*   let post =  *)
+(*     (f_app new_cmp_op [(f_mu distr event);new_hoare_bd] ) *)
+(*       &&& *)
+(*       (f_forall_simpl (v_id,GTty ty_distr) (f_iff post (event_v === true)) ) *)
+(*   in *)
+  
+  
+
+
+(* let t_bd_hoare_rnd env g = *)
+(*   let concl = get_concl g in *)
+(*   let hr,cmp_op,bd = *)
+(*     match concl.f_node with *)
+(*       | Fapp ({f_node = Fop(cmp_op,_)},[hr;bd]) when is_hoareS hr &&  *)
+(*           (EcPath.p_equal op EcCoreLib.p_le || *)
+(*              EcPath.p_equal op EcCoreLib.p_eq || *)
+(*              EcPath.p_equal op EcCoreLib.p_ge ) *)
+(*           -> hr,cmp_op,bd *)
+(*       | _ -> cannot_apply "bd_hoare_rnd" "" *)
+(*   in *)
+(*   wp_bd_hoare_rnd env hr cmp_op bd (opt_bd,event) g *)
 
  

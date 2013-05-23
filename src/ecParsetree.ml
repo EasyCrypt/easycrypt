@@ -152,6 +152,8 @@ type pdatatype = {
 type pgamepath = (pmsymbol * psymbol) located
 type pmemory   = psymbol
 
+type phoarecmp = PFHle | PFHeq | PFHge
+
 type pformula  = pformula_r located
 
 and pformula_r = 
@@ -167,10 +169,12 @@ and pformula_r =
   | PFlambda of ptybindings * pformula
 
   (* for claims *)
-  | PFhoareS of pformula * pfunction_body * pformula
-  | PFhoareF of pformula * pgamepath * pformula
-  | PFequivF of pformula * (pgamepath * pgamepath) * pformula
-  | PFprob   of pgamepath * (pformula list) * pmemory * pformula
+  | PFhoareS   of pformula * pfunction_body * pformula
+  | PFhoareF   of pformula * pgamepath * pformula
+  | PFequivF   of pformula * (pgamepath * pgamepath) * pformula
+  | PFprob     of pgamepath * (pformula list) * pmemory * pformula
+  | PFBDhoareS of pformula * pfunction_body * pformula * phoarecmp * pformula
+  | PFBDhoareF of pformula * pgamepath * pformula * phoarecmp * pformula
 
 and pgtybinding  = psymbol list * pgty
 and pgtybindings = pgtybinding list

@@ -25,6 +25,9 @@ type quantif =
 
 type binding =  (EcIdent.t * gty) list
 
+type hoarecmp = FHle | FHeq | FHge
+
+
 type form = private { 
   f_node : f_node;
   f_ty   : ty; 
@@ -46,6 +49,9 @@ and f_node =
 
   | FhoareF of hoareF (* $hr / $hr *)
   | FhoareS of hoareS (* $hr  / $hr   *)
+
+  | FbdHoareF of bdHoareF (* $hr / $hr *)
+  | FbdHoareS of bdHoareS (* $hr  / $hr   *)
 
   | FequivF of equivF (* $left,$right / $left,$right *)
   | FequivS of equivS (* $left,$right / $left,$right *)
@@ -77,6 +83,23 @@ and hoareS = {
   hs_pr  : form; 
   hs_s   : stmt;
   hs_po  : form; }
+
+and bdHoareF = {
+  bhf_pr  : form; 
+  bhf_f  : EcPath.xpath;
+  bhf_po  : form;
+  bhf_cmp : hoarecmp;
+  bhf_bd  : form;
+}
+and bdHoareS = {
+  bhs_m   : EcMemory.memenv;
+  bhs_pr  : form; 
+  bhs_s   : stmt;
+  bhs_po  : form;
+  bhs_cmp : hoarecmp;
+  bhs_bd  : form;
+}
+
 
 (* -------------------------------------------------------------------- *)
 val f_equal   : form -> form -> bool
@@ -120,6 +143,11 @@ val f_lambda : binding -> form -> form
 val f_hoareF   : form -> EcPath.xpath -> form -> form 
 val f_hoareS   : memenv -> form -> EcModules.stmt -> form -> form 
 val f_hoareS_r : hoareS -> form
+val f_bdHoareF   : form -> EcPath.xpath -> form -> 
+  hoarecmp -> form -> form 
+val f_bdHoareS   : memenv -> form -> EcModules.stmt -> form -> 
+  hoarecmp -> form -> form 
+val f_bdHoareS_r : bdHoareS -> form
 val f_equivF   : form -> EcPath.xpath -> EcPath.xpath -> form -> form 
 val f_equivS   : 
  memenv -> memenv -> form -> EcModules.stmt -> EcModules.stmt -> form -> form
