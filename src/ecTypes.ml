@@ -245,6 +245,11 @@ type pvar_kind =
   | PVglob
   | PVloc 
 
+(* TODO : 
+   make the type private
+   ensure that the m_path does not contain arguments *)
+   
+
 type prog_var = {
   pv_name : EcPath.xpath;
   pv_kind : pvar_kind;
