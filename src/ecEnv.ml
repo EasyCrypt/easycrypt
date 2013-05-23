@@ -1226,7 +1226,7 @@ module Var = struct
             | None    -> None
             | Some ty ->
                 let pv =
-                  { pv_name = EcPath.xqname mp (snd qname);
+                  { pv_name = EcPath.xqvar mp (snd qname);
                     pv_kind = PVloc; }
                 in
                   Some (pv, ty)

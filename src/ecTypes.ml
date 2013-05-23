@@ -284,7 +284,7 @@ let string_of_pvar (p : prog_var) =
     (string_of_pvar_kind p.pv_kind)
 
 let pv_loc f s = 
-  { pv_name = EcPath.xqname f s;
+  { pv_name = EcPath.xqvar f s;
     pv_kind = PVloc }
 
 let pv_glob x = 

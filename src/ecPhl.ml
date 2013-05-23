@@ -984,8 +984,8 @@ let _inline env f occs me stmt =
             let subst =
               let for1 mx v x =
                 P.Mx.add
-                  (P.xqname p' v.v_name)
-                  (P.xqname (EcMemory.xpath me) x)
+                  (P.xqvar p' v.v_name)
+                  (P.xqvar (EcMemory.xpath me) x)
                   mx
               in
 
@@ -1002,7 +1002,7 @@ let _inline env f occs me stmt =
               List.map2
                 (fun (v, newx) e ->
                   let newpv = {
-                    pv_name = P.xqname (EcMemory.xpath me) newx;
+                    pv_name = P.xqvar (EcMemory.xpath me) newx;
                     pv_kind = PVloc;
                   } in
                     i_asgn (LvVar (newpv, v.v_type), e))

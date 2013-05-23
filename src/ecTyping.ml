@@ -1112,7 +1112,7 @@ and transbody ue symbols (env : EcEnv.env) retty pbody =
           List.map2
             (fun x xty ->
                let x = unloc x in
-               let p = EcPath.xqname mpath x in
+               let p = EcPath.xqvar mpath x in
                  ({ v_name  = x; v_type  = xty   },
                   { pv_name = p; pv_kind = PVloc },
                   xty, pty.pl_loc))
