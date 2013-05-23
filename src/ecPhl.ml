@@ -358,6 +358,10 @@ let destr_hoareF c =
   try destr_hoareF c with DestrError _ -> tacerror (NotPhl (Some true))
 let destr_hoareS c =
   try destr_hoareS c with DestrError _ -> tacerror (NotPhl (Some true))
+let destr_bdHoareF c =
+  try destr_bdHoareF c with DestrError _ -> tacerror (NotPhl (Some true))
+let destr_bdHoareS c =
+  try destr_bdHoareS c with DestrError _ -> tacerror (NotPhl (Some true))
 let destr_equivF c =
   try destr_equivF c with DestrError _ -> tacerror (NotPhl (Some false))
 let destr_equivS c =
@@ -1311,52 +1315,41 @@ let t_equiv_rnd env bij_info =
  * event is a cPred (see theories/Fun.ec) that must be "equivalent"
  *   to the post of hr
  *)
-(* let wp_bd_hoare_rnd env hr cmp_op bd (opt_bd,event) g = *)
-(*   let new_cmp_op,new_hoare_bd,distr_bd =  *)
-(*     if EcPath.p_equal cmp_op EcCoreLib.p_le then *)
-(*       begin *)
-(*         match opt_bd with *)
-(*           | Some bd' when not (EcFol.f_equal bd bd') ->  *)
-(*             cannot_apply "bd_hoare_rnd"  *)
-(*               "Rule for upper-bounded hoare triples requires a total bound" *)
-(*           | _ ->  *)
-(*             EcCoreLib.p_eq, EcFol.f_real_of_int 1, bd *)
-(*       end *)
-(*     else  *)
-(*       match opt_bd with *)
-(*         | Some bd' -> cmp_op, EcFol.f_real_div bd bd', bd' *)
-(*         | None -> EcCoreLib.p_eq, EcFol.f_real_of_int 1, bd *)
-(*   in *)
 
-(*   let new_cmp_op = f_op new_cmp_op [] .... *)
+let t_bd_hoare_rnd env (opt_bd,event) g =
+  let concl = get_concl g in
+  let bhs = destr_bdHoareS concl in
 
-(*   let (lv,distr),s = s_last_rnd "bd_hoare_rnd" hr.hs_s in *)
-(*   let ty_distr = proj_distr_ty (e_ty distr) in *)
+  let (lv,distr),s = s_last_rnd "bd_hoare_rnd" bhs.bhs_s in
+  let ty_distr = proj_distr_ty (e_ty distr) in
+  let distr = EcFol.form_of_expr (EcMemory.memory bhs.bhs_m) distr in
+  let event = event ty_distr in
 
-(*   let v_id = EcIndent.create "v" in *)
-(*   let v = f_local v_id ty_distr in *)
-(*   let post = subst_form_lv env (EcMemory.memory hr.hs_m) lv v hr.hs_po in *)
-(*   let event_v = f_app event [v] tbool in *)
-(*   let post =  *)
-(*     (f_app new_cmp_op [(f_mu distr event);new_hoare_bd] ) *)
-(*       &&& *)
-(*       (f_forall_simpl (v_id,GTty ty_distr) (f_iff post (event_v === true)) ) *)
-(*   in *)
-  
-  
+  let new_cmp_op,new_hoare_bd, bounded_distr =
+    match bhs.bhs_cmp, opt_bd with
+      | FHle, Some bd' when not (EcFol.f_equal bhs.bhs_bd bd') ->
+        cannot_apply "bd_hoare_rnd"
+          "Rule for upper-bounded hoare triples requires a total bound"
+      | FHle, _ ->
+          FHeq, EcFol.f_real_of_int 1, f_real_le (f_mu distr event) bhs.bhs_bd
+      | FHge, Some bd' when not (EcFol.f_equal bhs.bhs_bd bd') -> 
+          bhs.bhs_cmp, EcFol.f_real_div bhs.bhs_bd bd', f_real_le bd' (f_mu distr event)
+      | FHge, _ -> FHeq, EcFol.f_real_of_int 1, f_real_le bhs.bhs_bd (f_mu distr event)
+      | FHeq, Some bd' when not (EcFol.f_equal bhs.bhs_bd bd') -> 
+          bhs.bhs_cmp, EcFol.f_real_div bhs.bhs_bd bd', f_eq (f_mu distr event) bd'
+      | FHeq, _ -> FHeq, EcFol.f_real_of_int 1, f_eq (f_mu distr event) bhs.bhs_bd
+  in
+
+  let v_id = EcIdent.create "v" in
+  let v = f_local v_id ty_distr in
+  let post_v = subst_form_lv env (EcMemory.memory bhs.bhs_m) lv v bhs.bhs_po in
+  let event_v = f_app event [v] tbool in
+  let post_equiv_event = f_forall_simpl [(v_id,GTty ty_distr)] (f_iff post_v (event_v)) in
+  let post = bounded_distr &&& post_equiv_event in
+  let concl = f_bdHoareS_r {bhs with bhs_s=s; bhs_po=post; bhs_cmp=new_cmp_op; 
+    bhs_bd=new_hoare_bd} in
+  prove_goal_by [concl] (RN_bhl_rnd (opt_bd,event) ) g
 
 
-(* let t_bd_hoare_rnd env g = *)
-(*   let concl = get_concl g in *)
-(*   let hr,cmp_op,bd = *)
-(*     match concl.f_node with *)
-(*       | Fapp ({f_node = Fop(cmp_op,_)},[hr;bd]) when is_hoareS hr &&  *)
-(*           (EcPath.p_equal op EcCoreLib.p_le || *)
-(*              EcPath.p_equal op EcCoreLib.p_eq || *)
-(*              EcPath.p_equal op EcCoreLib.p_ge ) *)
-(*           -> hr,cmp_op,bd *)
-(*       | _ -> cannot_apply "bd_hoare_rnd" "" *)
-(*   in *)
-(*   wp_bd_hoare_rnd env hr cmp_op bd (opt_bd,event) g *)
 
  

@@ -1352,11 +1352,13 @@ tactic:
 
 rnd_info:
 | e1=sform COMMA e2=sform 
-  {RIbij (e1,e2) }
+  {RTbij (RIbij (e1,e2)) }
 | e=sform 
-  {RIidempotent e }
+  {RTbij (RIidempotent e) }
 | empty
-  {RIid }
+  {RTbij (RIid) }
+(* | LBRACE e1=sform COMMA e2=sform LBRACE *)
+(*   {RTbd (Some e1,e2)} *)
 ;
 
 swap_info:

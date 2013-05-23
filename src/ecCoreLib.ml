@@ -37,6 +37,8 @@ let id_eq        = "="
 let id_le        = "<="
 let id_lt        = "<"
 
+let id_div        = "/"
+
 let id_in_supp   = "in_supp"
 let id_mu        = "mu"
 let id_mu_x      = "mu_x"
@@ -79,6 +81,7 @@ let _Real id     = EcPath.pqname p_Real id
 
 let p_real_le    = _Real id_le
 let p_real_lt    = _Real id_lt   
+let p_real_div   = _Real id_div   
 
 let id_Distr     = "Distr"
 let p_Distr      = EcPath.pqname p_top id_Distr

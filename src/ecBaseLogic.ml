@@ -211,6 +211,8 @@ type rule_name =
   | RN_hl_hoare_equiv 
   | RN_hl_deno      
 
+  | RN_bhl_rnd of (EcFol.form option * EcFol.form)
+
 and rule_arg = 
   | RA_form of EcFol.form             (* formula             *)
   | RA_id   of EcIdent.t              (* local ident         *)

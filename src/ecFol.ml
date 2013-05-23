@@ -581,16 +581,38 @@ let f_pr m f args e = mk_form (Fpr(m,f,args,e)) ty_real
 
 
 let fop_int_le = f_op EcCoreLib.p_int_le [] (tfun tint (tfun tint ty_bool))
+let fop_int_lt = f_op EcCoreLib.p_int_lt [] (tfun tint (tfun tint ty_bool))
+let fop_real_le = f_op EcCoreLib.p_real_le [] (tfun treal (tfun treal ty_bool))
+let fop_real_lt = f_op EcCoreLib.p_real_lt [] (tfun treal (tfun treal ty_bool))
+let fop_real_div = f_op EcCoreLib.p_real_div [] (tfun treal (tfun treal treal))
+
 let f_int_le f1 f2 = 
   if ty_equal f1.f_ty tint then 
     f_app fop_int_le [f1;f2] ty_bool
   else 
     assert false (* FIXME *)
 
-let fop_int_lt = f_op EcCoreLib.p_int_lt [] (tfun tint (tfun tint ty_bool))
 let f_int_lt f1 f2 = 
   if ty_equal f1.f_ty tint then 
     f_app fop_int_lt [f1;f2] ty_bool
+  else 
+    assert false (* FIXME *)
+
+let f_real_le f1 f2 = 
+  if ty_equal f1.f_ty treal then 
+    f_app fop_real_le [f1;f2] ty_bool
+  else 
+    assert false (* FIXME *)
+
+let f_real_lt f1 f2 = 
+  if ty_equal f1.f_ty treal then 
+    f_app fop_real_lt [f1;f2] ty_bool
+  else 
+    assert false (* FIXME *)
+
+let f_real_div f1 f2 =
+  if ty_equal f1.f_ty treal && ty_equal f2.f_ty treal then
+    f_app fop_real_div [f1;f2] ty_real
   else 
     assert false (* FIXME *)
 
