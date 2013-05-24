@@ -217,7 +217,7 @@ let check_modtype _env _mp _i _restr = ()
 type app_arg =
   | AAform of form
   | AAmem  of EcIdent.t
-  | AAmp   of EcPath.mpath * EcModules.module_type list
+  | AAmp   of EcPath.mpath * EcModules.module_sig 
   | AAnode
 
 let check_arg do_arg env hyps s x gty a =
@@ -231,8 +231,8 @@ let check_arg do_arg env hyps s x gty a =
   | GTmodty (emt, _), AAmp (mp, mt)  ->
     (* FIXME: create a dedicated function for module application *)
     (* FIXME: this function should enforce modules memory model *)
-      if not (EcEnv.ModTy.has_mod_type env mt emt) then
-        failwith "invalid-modtype";
+(*      if not (EcEnv.ModTy.has_mod_type env mt emt) then
+        failwith "invalid-modtype"; *)
       bind_mod s x mp, RA_mp mp
   | _ -> assert false (* FIXME error message *)
 

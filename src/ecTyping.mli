@@ -12,6 +12,7 @@ type modapp_error =
 | MAE_WrongArgPosition
 | MAE_WrongArgCount
 | MAE_InvalidArgType
+| MAE_AccesSubModFunctor
 
 type modtyp_error =
 | MTE_FunSigDoesNotRepeatArgNames
@@ -86,12 +87,7 @@ val transform_opt: EcEnv.env -> EcUnify.unienv -> pformula -> ty option -> EcFol
 val transmodsig   : EcEnv.env -> symbol -> pmodule_sig  -> module_sig
 val transmodtype  : EcEnv.env -> pmodule_type -> module_type * module_sig
 val transmod      : EcEnv.env -> symbol -> pmodule_expr -> module_expr
-val trans_msymbol : EcEnv.env -> pmsymbol located
-                      -> mpath * (EcIdent.t * module_type) list * module_type list
-
-(* -------------------------------------------------------------------- *)
-val check_tymod_sub : EcEnv.env -> module_sig -> module_sig -> unit
-val check_tymod_eq  : EcEnv.env -> module_sig -> module_sig -> unit
+val trans_msymbol : EcEnv.env -> pmsymbol located -> mpath * module_sig
 
 (* -------------------------------------------------------------------- *)
 val e_inuse : expr  -> Sx.t

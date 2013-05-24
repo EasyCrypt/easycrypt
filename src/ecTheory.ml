@@ -134,4 +134,4 @@ let module_expr_of_module_sig (name : EcIdent.t) mp (tymod : module_sig)
       me_body  = ME_Decl (mp,restr);
       me_comps = tycomps;
       me_sig   = tymod;
-      me_types = [mp]; }
+      (* me_types = [mp]; *) }

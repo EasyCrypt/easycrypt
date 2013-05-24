@@ -890,11 +890,12 @@ mod_item:
 (* Modules                                                              *)
 
 mod_body:
-| m=qident
+(*| m=qident
     { `App (m, []) }
 
 | m=qident LPAREN a=plist1(qident, COMMA) RPAREN
-    { `App (m, a) }
+    { `App (m, a) } *)
+| m=mod_qident { `App m }
 
 | LBRACE stt=mod_item* RBRACE
     { `Struct stt }
@@ -904,14 +905,14 @@ mod_def:
 | MODULE x=uident p=mod_params? t=mod_aty? EQ body=loc(mod_body)
     { let p = EcUtils.odfl [] p in
         match body.pl_desc with
-        | `App (m, args) ->
+        | `App m ->
              if p <> [] then
                error (EcLocation.make $startpos $endpos)
                  (Some "cannot parameterized module alias");
              if t <> None then
                error (EcLocation.make $startpos $endpos)
-                 (Some "cannot bind module type to module alias");
-             (x, mk_loc body.pl_loc (Pm_ident (m, args)))
+                 (Some "cannot bind module type to module alias"); 
+             (x, mk_loc body.pl_loc (Pm_ident m))
 
         | `Struct st ->
              (x, mk_loc body.pl_loc (mk_mod ?modtypes:t p st)) }
