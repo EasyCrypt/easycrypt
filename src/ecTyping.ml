@@ -1112,7 +1112,7 @@ and transbody ue symbols (env : EcEnv.env) retty pbody =
           List.map2
             (fun x xty ->
                let x = unloc x in
-               let p = EcPath.xqname mpath x in
+               let p = EcPath.xqvar mpath x in
                  ({ v_name  = x; v_type  = xty   },
                   { pv_name = p; pv_kind = PVloc },
                   xty, pty.pl_loc))
@@ -1603,22 +1603,52 @@ let transform_opt env ue pf tt =
     | PFhoareS (pre, body, post) ->
         let symbols = ref Mstr.empty in
         let ue      = UE.create (Some []) in
-
         let (env, stmt, _re, prelude, locals) =
           let env = EcEnv.Fun.enter "$stmt" env in
             transbody ue symbols env tunit body (* FIXME: $stmt ? *)
         in
-
         let su      = Tuni.subst (UE.close ue) in
         let locals  = List.map (fundef_check_decl  su env) locals in
         let prelude = List.map (fundef_check_iasgn su env) prelude in
         let clsubst = { EcTypes.e_subst_id with es_ty = su } in
         let stmt    = s_subst clsubst stmt in
-
         let (menv, env) = EcEnv.Fun.hoareS_anonym locals env in
         let pre  = transf env pre in
         let post = transf env post in
         f_hoareS menv pre (EcModules.stmt (prelude @ stmt.s_node)) post
+
+    | PFBDhoareF (pre, gp, post, hcmp,bd) ->
+        let fpath = trans_gamepath env gp in
+        let penv, qenv = EcEnv.Fun.hoareF fpath env in
+        let pre  = transf penv pre in
+        let post = transf qenv post in
+        let hcmp = 
+          match hcmp with PFHle -> FHle | PFHeq -> FHeq | PFHge -> FHge
+        in
+        let bd = transf env bd in
+        f_bdHoareF pre fpath post hcmp bd
+
+    | PFBDhoareS (pre, body, post, hcmp,bd) ->
+        let symbols = ref Mstr.empty in
+        let ue      = UE.create (Some []) in
+        let hcmp = 
+          match hcmp with PFHle -> FHle | PFHeq -> FHeq | PFHge -> FHge
+        in
+        let bd = transf env bd in
+        let (env, stmt, _re, prelude, locals) =
+          let env = EcEnv.Fun.enter "$stmt" env in
+            transbody ue symbols env tunit body (* FIXME: $stmt ? *)
+        in
+        let su      = Tuni.subst (UE.close ue) in
+        let locals  = List.map (fundef_check_decl  su env) locals in
+        let prelude = List.map (fundef_check_iasgn su env) prelude in
+        let clsubst = { EcTypes.e_subst_id with es_ty = su } in
+        let stmt    = s_subst clsubst stmt in
+        let (menv, env) = EcEnv.Fun.hoareS_anonym locals env in
+        let pre  = transf env pre in
+        let post = transf env post in
+        f_bdHoareS menv pre (EcModules.stmt (prelude @ stmt.s_node)) post hcmp bd
+
 
     | PFequivF (pre, (gp1, gp2), post) ->
         let fpath1 = trans_gamepath env gp1 in

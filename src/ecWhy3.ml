@@ -999,8 +999,9 @@ let trans_op env vm p tys =
       let ls,ls', tvs =
         try Mp.find p env.env_op
         with _ ->
-(*          Format.printf "cannot find %s@." (EcPath.tostring p); *)
-          assert false in (* FIXME error message *)
+          (
+            Format.printf "cannot find %s@." (EcPath.tostring p);
+            assert false) in (* FIXME error message *)
       let mtv = 
 (*        try  *)
           List.fold_left2 (fun mtv tv ty ->
@@ -1136,7 +1137,7 @@ let trans_form env vm f =
         let args = List.map (trans_form_b vm) args in
         Term.t_tuple args
 
-    | FhoareF _ | FhoareS _ | FequivF _ | FequivS _ -> 
+    | FhoareF _ | FhoareS _ | FbdHoareF _ | FbdHoareS _ | FequivF _ | FequivS _ -> 
         raise (CanNotTranslate f) (* fixme *)
 
     | Fpvar(pv,m) ->

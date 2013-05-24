@@ -92,7 +92,8 @@ let tglob m      = mk_ty (Tglob m)
 let tunit      = tconstr EcCoreLib.p_unit  []
 let tbool      = tconstr EcCoreLib.p_bool  []
 let tint       = tconstr EcCoreLib.p_int   []
-let tdistr  ty = tconstr EcCoreLib.p_distr [ty]
+let tdistr ty  = tconstr EcCoreLib.p_distr [ty]
+let tcpred ty  = tconstr EcCoreLib.p_cpred [ty]
 let treal      = tconstr EcCoreLib.p_real  []
  
 let toarrow dom ty = 
@@ -289,7 +290,7 @@ let string_of_pvar (p : prog_var) =
     (string_of_pvar_kind p.pv_kind)
 
 let pv_loc f s = 
-  { pv_name = EcPath.xqname f s;
+  { pv_name = EcPath.xqvar f s;
     pv_kind = PVloc }
 
 let pv_glob x = 
@@ -704,3 +705,9 @@ module Dump = struct
     in
       fun e -> ex_dump pp e
 end
+
+
+let proj_distr_ty ty = match ty.ty_node with
+  | Tconstr(_,lty) when List.length lty = 1  -> 
+    List.hd lty
+  | _ -> assert false (* FIXME *)
