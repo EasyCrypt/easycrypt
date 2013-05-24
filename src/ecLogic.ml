@@ -192,10 +192,32 @@ let t_clear ids (juc,n as g) =
   let rule = { pr_name = RN_clear ids; pr_hyps = [RA_node n1] } in
   upd_rule rule (juc,n)
 
+let tyenv_of_hyps env hyps =
+  let add env (id,k) =
+    match k with
+    | LD_var (ty,_) -> EcEnv.Var.bind_local id ty env
+    | LD_mem mt     -> EcEnv.Memory.push (id,mt) env
+    | LD_modty (i,r)    -> EcEnv.Mod.bind_local id i r env
+    | LD_hyp   _    -> env in
+  List.fold_left add env hyps.h_local
+
+let check_modtype _env _mp _i _restr = ()
+ (* TODO FIXME *)
+(*
+  let me = EcEnv.Mod.by_mpath mp in
+  if not (EcEnv.ModTy.has_mod_type env me.me_types) then
+    assert false (* FIXME error message *);
+  let use = top_uses mp in
+  let 
+*)  
+  
+
+  
+
 type app_arg =
   | AAform of form
   | AAmem  of EcIdent.t
-  | AAmp   of EcPath.mpath
+  | AAmp   of EcPath.mpath * EcModules.module_type list
   | AAnode
 
 let check_arg do_arg env hyps s x gty a =
@@ -206,9 +228,12 @@ let check_arg do_arg env hyps s x gty a =
     bind_local s x f, RA_form f
   | GTmem _   , AAmem m ->
     bind_mem s x m, RA_id m
-  | GTmodty _, AAmp mp  ->
-      (* FIXME : check the type of mp *)
-    bind_mod s x mp, RA_mp mp
+  | GTmodty (emt, _), AAmp (mp, mt)  ->
+    (* FIXME: create a dedicated function for module application *)
+    (* FIXME: this function should enforce modules memory model *)
+      if not (EcEnv.ModTy.has_mod_type env mt emt) then
+        failwith "invalid-modtype";
+      bind_mod s x mp, RA_mp mp
   | _ -> assert false (* FIXME error message *)
 
 let mkn_apply do_arg env (juc,n) args =
@@ -300,10 +325,10 @@ let t_intros env ids (juc,n as g) =
           tacerror (InvalidName name);
         LD_mem me, bind_mem s x id
 
-    | GTmodty i ->
+    | GTmodty (i,r) ->
         if name <> "_" && not (EcIo.is_mod_ident name) then
           tacerror (InvalidName name);
-        LD_modty i, bind_mod s x (EcPath.mident id)
+        LD_modty (i,r), bind_mod s x (EcPath.mident id)
   in
 
   let add_ld id ld hyps =

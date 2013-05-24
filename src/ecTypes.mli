@@ -107,12 +107,14 @@ val pv_compare_p : prog_var -> prog_var -> int
 val pv_hash    : prog_var -> int
 val pv_fv      : prog_var -> int EcIdent.Mid.t
 val is_loc     : prog_var -> bool
+val is_glob    : prog_var -> bool
 
 val string_of_pvar : prog_var -> string
 
 val pv_subst : (EcPath.xpath -> EcPath.xpath) -> prog_var -> prog_var 
 
 val pv_loc : EcPath.xpath -> symbol -> prog_var
+val pv_glob : EcPath.xpath -> prog_var 
 val pv_res : EcPath.xpath -> prog_var
 
 (* -------------------------------------------------------------------- *)

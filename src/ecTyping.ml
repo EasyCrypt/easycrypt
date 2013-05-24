@@ -59,7 +59,7 @@ type tyerror =
 | InvalidModAppl       of modapp_error
 | InvalidModType       of modtyp_error
 | InvalidMem           of symbol * mem_error
-
+| OnlyModParamAreOracle of qsymbol
 exception TyError of EcLocation.t * EcEnv.env * tyerror
 
 let tyerror loc env e = raise (TyError (loc, env, e))
@@ -143,6 +143,10 @@ let pp_tyerror fmt env error =
 
   | InvalidMem (name, MAE_IsConcrete) ->
       msg "the memory %s must be abstract" name
+
+  | OnlyModParamAreOracle name ->
+      msg "the function %a is not provided by a module parameter"
+        pp_qsymbol name
 
 let () =
   let pp fmt exn =
@@ -554,6 +558,12 @@ let lookup_module_type (env : EcEnv.env) (name : pqsymbol) =
   | None   -> tyerror name.pl_loc env (UnknownTyModName (unloc name))
   | Some x -> x
 
+let lookup_fun env name =
+  try
+    EcEnv.Fun.lookup name.pl_desc env
+  with EcEnv.LookupFailure _ ->
+    tyerror name.pl_loc env (UnknownFunName name.pl_desc) 
+
 (* -------------------------------------------------------------------- *)
 let transmodtype (env : EcEnv.env) (modty : pmodule_type) =
   let (p, sig_) = lookup_module_type env modty in
@@ -564,6 +574,7 @@ let transmodtype (env : EcEnv.env) (modty : pmodule_type) =
   } in
     (modty, sig_)
 
+
 (* -------------------------------------------------------------------- *)
 let rec transmodsig (env : EcEnv.env) (name : symbol) (modty : pmodule_sig) =
   let Pmty_struct modty = modty in
@@ -573,15 +584,17 @@ let rec transmodsig (env : EcEnv.env) (name : symbol) (modty : pmodule_sig) =
       (EcIdent.create (unloc x), fst (transmodtype env i)))
       modty.pmsig_params
   in
-
-  let env = EcEnv.Mod.enter name margs env in
-
-    { mis_params = margs;
-      mis_body   = transmodsig_body env modty.pmsig_body;
-      mis_mforb  = Sp.empty; }           (* FIXME *)
+  let sa = 
+    List.fold_left (fun sa (x,_) -> Sm.add (EcPath.mident x) sa) Sm.empty margs
+  in
+  let env  = EcEnv.Mod.enter name margs env in
+  let body = transmodsig_body env sa modty.pmsig_body in
+  { mis_params = margs;
+    mis_body   = body; }
 
 (* -------------------------------------------------------------------- *)
-and transmodsig_body (env : EcEnv.env) (is : pmodule_sig_struct_body) =
+and transmodsig_body (env : EcEnv.env) (sa : Sm.t)
+    (is : pmodule_sig_struct_body) =
   let transsig1 = function
     | `VariableDecl _x -> assert false (* Not implemented for the moment *)
 (*        let name  = x.pvd_name.pl_desc in
@@ -599,14 +612,26 @@ and transmodsig_body (env : EcEnv.env) (is : pmodule_sig_struct_body) =
         let resty = transty_for_decl env f.pfd_tyresult in
           if not (List.uniq (List.map fst f.pfd_tyargs)) then
             raise (DuplicatedArgumentsName f);
-          Tys_function
-            { fs_name   = name.pl_desc;
-              fs_sig    = (tyargs, resty);
-              fs_uses   = {
-                us_calls  = [];
-                us_reads  = Sx.empty;
-                us_writes = Sx.empty;
-              } }
+        let calls = 
+          match f.pfd_uses with
+          | None -> []
+          | Some pfd_uses ->
+            List.map (fun name -> 
+              let f, _ = lookup_fun env name in
+              let p = f.EcPath.x_top in
+              if not (Sm.mem p sa) then 
+                tyerror name.pl_loc env (OnlyModParamAreOracle name.pl_desc);
+              f
+            )
+              pfd_uses in
+        Tys_function
+          ({ fs_name   = name.pl_desc;
+             fs_params = tyargs;
+             fs_ret    = resty; },
+           { oi_calls = calls;
+             (*oi_reads = Sx.empty;
+             oi_writes = Sx.empty; *)
+             })
   in
 
   let items = List.map transsig1 is in
@@ -632,11 +657,12 @@ let tymod_cnv_failure e =
 
 let tysig_item_name = function
 (*  | Tys_variable {v_name = x } -> x *)
-  | Tys_function f      -> f.fs_name
+  | Tys_function (f,_)      -> f.fs_name
 
 let tysig_item_kind = function
 (*  | Tys_variable _ -> `Variable *)
   | Tys_function _ -> `Function
+
 
 let rec check_tymod_cnv mode (env : EcEnv.env) tin tout =
   (* Check parameters for compatibility. Parameters names may be
@@ -657,22 +683,22 @@ let rec check_tymod_cnv mode (env : EcEnv.env) tin tout =
           EcSubst.add_module subst xout (EcPath.mident xin))
       EcSubst.empty tin.mis_params tout.mis_params
   in
-    (* Check for body inclusion (w.r.t the parameters names substitution).
-     * This includes:
-     * - Variables / functions inclusion with equal signatures +
-     *   included use modifiers.
-     * - Inclusion of forbidden names set *)
-
+  (* Check for body inclusion (w.r.t the parameters names substitution).
+   * This includes:
+   * - Variables / functions inclusion with equal signatures +
+   *   included use modifiers.
+   *)
+  (* TODO PY : Should we inverse the subtitution (ie subst in tout) *)
   let tin  = EcSubst.subst_modsig_body bsubst tin.mis_body
   and tout = tout.mis_body in
 
   let check_item_compatible =
-   (* let check_var_compatible vdin vdout = 
-      assert (vdin.v_name = vdout.v_name);
-      if not (EcReduction.equal_type env vdin.v_type vdout.v_type) then
-        tymod_cnv_failure (E_TyModCnv_MismatchVarType vdin.v_name) in *)
-
-    let check_fun_compatible fin fout =
+    (* let check_var_compatible vdin vdout = 
+       assert (vdin.v_name = vdout.v_name);
+       if not (EcReduction.equal_type env vdin.v_type vdout.v_type) then
+       tymod_cnv_failure (E_TyModCnv_MismatchVarType vdin.v_name) in *)
+    
+    let check_fun_compatible (fin,oin) (fout,oout) =
       assert (fin.fs_name = fout.fs_name);
       (* We currently reject function with compatible signatures but
        * for the arguments names. We plan to leviate this restriction
@@ -683,8 +709,8 @@ let rec check_tymod_cnv mode (env : EcEnv.env) tin tout =
         vd1.v_name = vd2.v_name && EcReduction.equal_type env vd1.v_type vd2.v_type 
       in
 
-      let (iargs, oargs) = (fst fin.fs_sig, fst fout.fs_sig) in
-      let (ires , ores ) = (snd fin.fs_sig, snd fout.fs_sig) in
+      let (iargs, oargs) = (fin.fs_params, fout.fs_params) in
+      let (ires , ores ) = ( fin.fs_ret, fout.fs_ret) in
 
         if List.length iargs <> List.length oargs then
           tymod_cnv_failure (E_TyModCnv_MismatchFunSig fin.fs_name);
@@ -694,30 +720,25 @@ let rec check_tymod_cnv mode (env : EcEnv.env) tin tout =
           tymod_cnv_failure (E_TyModCnv_MismatchFunSig fin.fs_name);
 
         let flcmp () =
-          let (icalls, (ireads, iwrites)) = norm_uses env fin.fs_uses
-          and (ocalls, (oreads, owrites)) = norm_uses env fout.fs_uses in
-
+          let norm oi = 
+            List.fold_left (fun s f -> 
+              EcPath.Sx.add (EcEnv.NormMp.norm_xpath env f) s)
+              EcPath.Sx.empty oi.oi_calls in
+          let icalls = norm oin in
+          let ocalls = norm oout in
           match mode with
-          | `Sub ->
-                 (Sx.subset icalls  ocalls )
-              && (Sx.subset ireads  oreads )
-              && (Sx.subset iwrites owrites)
-
-          | `Eq  ->
-                 (Sx.equal icalls  ocalls )
-              && (Sx.equal ireads  oreads )
-              && (Sx.equal iwrites owrites)
-
+          | `Sub ->Sx.subset icalls ocalls
+          | `Eq  -> Sx.equal icalls ocalls
         in
-          if false then                 (* FIXME: renable *)
-            if not (flcmp ()) then
-              tymod_cnv_failure (E_TyModCnv_MismatchFunSig fin.fs_name);
-
+        if not (flcmp ()) then
+          tymod_cnv_failure (E_TyModCnv_MismatchFunSig fin.fs_name);
+        
     in
       fun i_item o_item ->
         match i_item, o_item with
 (*        | Tys_variable xin, Tys_variable xout -> check_var_compatible xin xout *)
-        | Tys_function fin, Tys_function fout -> check_fun_compatible fin fout
+        | Tys_function (fin,oin), Tys_function (fout,oout) -> 
+          check_fun_compatible (fin,oin) (fout,oout)
 (*        | _               , _                 -> assert false *)
   in
 
@@ -761,15 +782,13 @@ and check_tymod_eq  = check_tymod_cnv `Eq
 (* -------------------------------------------------------------------- *)
 let rec transmod (env : EcEnv.env) (x : symbol) (me : pmodule_expr) =
   match me.pl_desc with
-  | Pm_ident ({ pl_desc = m }, args) -> begin
-      let (mname, mty) = EcEnv.Mod.lookup m env in
-      let args = List.map (EcEnv.Mod.lookup^~ env) (unlocs args) in
+  | Pm_ident (m, args) -> begin
+      let (mname, mty) = lookup_module env m in
+      let args = List.map (lookup_module env) args in
       let atymods = mty.me_sig.mis_params in
-
       (* Check module application *)
       if List.length atymods <> List.length args then
         tyerror me.pl_loc env (InvalidModAppl MAE_WrongArgCount);
-
       let metypes =
         let metype1 mty1 =
           assert (List.length mty1.mt_params = List.length atymods);
@@ -785,31 +804,33 @@ let rec transmod (env : EcEnv.env) (x : symbol) (me : pmodule_expr) =
         in
           List.map metype1 mty.me_types
       in
-
       let bsubst =
         List.fold_left2
           (fun subst (xarg, arg) (xty, tymod) ->
              let tymod = EcSubst.subst_modtype subst tymod in
-               if not (EcEnv.ModTy.has_mod_type env arg.me_types tymod) then
-                 tymod_cnv_failure (E_TyModCnv_ParamTypeMismatch xty);
-               EcSubst.add_module subst xty xarg)
+             if not (EcEnv.ModTy.has_mod_type env arg.me_types tymod) then
+               tymod_cnv_failure (E_TyModCnv_ParamTypeMismatch xty);
+             EcSubst.add_module subst xty xarg)
           EcSubst.empty args atymods
       in
         (* EcSubstitute args. in result type *)
-        { me_name  = x;
-          me_body  = ME_Alias (EcPath.m_apply mname (List.map fst args));
-          me_comps = EcSubst.subst_module_comps bsubst mty.me_comps;
-          me_sig   = {
-            mis_params = [];
-            mis_body   = EcSubst.subst_modsig_body bsubst mty.me_sig.mis_body;
-            mis_mforb  = Sp.empty;       (* FIXME *)
-          };
-          me_uses  = Sp.empty;          (* FIXME *)
-          me_types = metypes; }
+      { me_name  = x;
+        me_body  = ME_Alias (EcPath.m_apply mname (List.map fst args));
+        me_comps = EcSubst.subst_module_comps bsubst mty.me_comps;
+        me_sig   = {
+          mis_params = [];
+          mis_body   = 
+            let rm_oi = function 
+              | Tys_function (fsig,_) -> Tys_function(fsig, {oi_calls = []}) in
+            let body = List.map rm_oi mty.me_sig.mis_body in
+            EcSubst.subst_modsig_body bsubst body;
+        };
+        me_types = metypes; }
   end
 
   | Pm_struct st ->
-      transstruct env x st
+    let res = transstruct env x st in
+    res
 
 (* -------------------------------------------------------------------- *)
 and transstruct (env : EcEnv.env) (x : symbol) (st : pstructure) =
@@ -824,7 +845,7 @@ and transstruct (env : EcEnv.env) (x : symbol) (st : pstructure) =
   (* Check structure items, extending environment initially with
    * structure arguments, and then with previously checked items.
    *)
-  let (_, items) =
+  let (envi, items) =
     let tydecl1 (x, obj) =
       match obj with
       | MI_Module   m -> (x, `Module   m)
@@ -833,27 +854,45 @@ and transstruct (env : EcEnv.env) (x : symbol) (st : pstructure) =
     in
 
     let env = EcEnv.Mod.enter x stparams env in
-
-      List.fold_left
-        (fun (env, acc) item ->
-          let newitems = transstruct1 env item in
-          let env = EcEnv.bindall (List.map tydecl1 newitems) env in
-            (env, List.rev_append acc newitems))
-        (env, []) st.ps_body
+    List.fold_left
+      (fun (env, acc) item ->
+        let newitems = transstruct1 env item in
+        let env = EcEnv.bindall (List.map tydecl1 newitems) env in
+        (env, List.rev_append acc newitems))
+      (env, []) st.ps_body
   in
-
+  let items = List.map snd items in
+  let mroot = EcEnv.mroot envi in
+  let top = EcPath.m_functor mroot in
+  let mparams = 
+    List.fold_left (fun rm mp -> EcPath.Sm.add mp rm) 
+      EcPath.Sm.empty mroot.EcPath.m_args in
+  let rm = EcPath.Sm.add top mparams in
   (* Generate structure signature *)
   let tymod =
     let tymod1 = function
       | MI_Module   _  -> None
       | MI_Variable _v -> None           (* Some (Tys_variable v)  *)
-      | MI_Function f  -> Some (Tys_function f.f_sig)
+      | MI_Function f  -> 
+        let calls = 
+          match f.f_def with
+          | FBdef def ->
+            let rec f_call c f =
+              let f = EcEnv.NormMp.norm_xpath envi f in
+              let top = EcPath.m_functor f.EcPath.x_top in
+              let c = 
+                if EcPath.Sm.mem top mparams then EcPath.Sx.add f c else c in
+              match (EcEnv.Fun.by_xpath f envi).f_def with
+              | FBdef def -> List.fold_left f_call c def.f_uses.us_calls 
+              | FBabs oi -> List.fold_left f_call c oi.oi_calls in
+            List.fold_left f_call EcPath.Sx.empty def.f_uses.us_calls 
+          | FBabs _ -> assert false in
+        Some (Tys_function (f.f_sig, {oi_calls  = EcPath.Sx.elements calls; }))
     in
 
-    let sigitems = List.pmap tymod1 (List.map snd items) in
+    let sigitems = List.pmap tymod1 items in
       { mis_params = stparams;
-        mis_body   = sigitems;
-        mis_mforb  = Sp.empty; };    (* FIXME *)
+        mis_body   = sigitems; };    (* FIXME *)
   in
 
   (* Check that generated signature is structurally included in
@@ -867,44 +906,98 @@ and transstruct (env : EcEnv.env) (x : symbol) (st : pstructure) =
                 tyerror loc env
                   (InvalidModType MTE_FunSigDoesNotRepeatArgNames)
         end;
-
         let (aty, asig) = transmodtype env aty in
         let aparams =
           match oatyp = [] with
           | true  -> stparams @ asig.mis_params
           | false -> asig.mis_params
         in
-          check_tymod_sub env tymod { asig with mis_params = aparams };
-          match oatyp = [] with
-          | true  -> { aty with mt_params = stparams @ aty.mt_params }
-          | false ->
-              let subst =
-                List.fold_left2
-                  (fun subst (x1, _) (x2, _) ->
-                     EcSubst.add_module subst x1 (EcPath.mident x2))
-                  EcSubst.empty asig.mis_params aty.mt_params
-              in
-                { aty with
-                    mt_params = asig.mis_params;
-                    mt_args   = List.map (EcSubst.subst_mpath subst) aty.mt_args })
+        check_tymod_sub env tymod { asig with mis_params = aparams };
+        match oatyp = [] with
+        | true  -> { aty with mt_params = stparams @ aty.mt_params }
+        | false ->
+          let subst =
+            List.fold_left2
+              (fun subst (x1, _) (x2, _) ->
+                EcSubst.add_module subst x1 (EcPath.mident x2))
+              EcSubst.empty asig.mis_params aty.mt_params
+          in
+          { aty with
+            mt_params = asig.mis_params;
+            mt_args   = List.map (EcSubst.subst_mpath subst) aty.mt_args })
       st.ps_signature
   in
+  (* Construct structure representation *)
 
-    (* Construct structure representation *)
-    { me_name  = x;
-      me_body  = ME_Structure { ms_params = stparams;
-                                ms_body   = List.map snd items; };
-      me_comps = List.map snd items;
-      me_uses  = Sp.empty;              (* FIXME *)
-      me_sig   = tymod;
-      me_types = types; }
+  (* TODO : PY : it is strange to have the module parameter in the path of the
+                 variable *)
+  let vars = 
+    List.fold_left (fun vs item ->
+      match item with
+      | MI_Module me ->
+        begin match me.me_body with
+        | ME_Structure ms -> 
+          EcPath.Mx.union (fun _ _ _ -> assert false) vs ms.ms_vars
+        | _ -> vs 
+        end 
+      | MI_Variable x ->
+        let mp = EcEnv.mroot env in
+        let xp  = EcPath.xpath mp (EcPath.psymbol x.v_name) in
+        EcPath.Mx.add xp x.v_type vs
+      | MI_Function _ -> vs) EcPath.Mx.empty items in
 
+   let rec add_uses us mp = 
+    let mp = EcEnv.NormMp.norm_mpath envi mp in
+    let top = EcPath.m_functor mp in
+    let us = 
+      if EcPath.Sm.mem top rm then us 
+      else
+        let uses = 
+          match (EcEnv.Mod.by_mpath top envi).me_body with
+          | ME_Structure ms -> EcPath.Sm.add top ms.ms_uses
+          | _ -> assert false in
+        EcPath.Sm.union uses us in
+    List.fold_left add_uses us mp.EcPath.m_args in
+  let rec uses us items = 
+    List.fold_left (fun us item ->
+      match item with
+      | MI_Module me ->
+        begin match me.me_body with
+        | ME_Structure ms -> EcPath.Sm.union us ms.ms_uses 
+        | ME_Alias mp -> add_uses us mp 
+        | ME_Decl _ -> assert false
+        end
+      | MI_Variable _ -> us
+      | MI_Function fd ->
+        begin match fd.f_def with
+        | FBdef fdef ->
+          let fus = fdef.f_uses in
+          let us = 
+            List.fold_left (fun us fn ->
+              add_uses us fn.EcPath.x_top) us fus.us_calls in
+          EcPath.Sx.fold (fun xp us ->
+            add_uses us xp.EcPath.x_top)
+            (EcPath.Sx.union fus.us_reads fus.us_writes) us
+        | FBabs _ -> assert false
+        end) us items in
+  let uses = uses EcPath.Sm.empty items in
+  { me_name  = x;
+    me_body  = 
+      ME_Structure 
+        { ms_params = stparams;
+          ms_body   = items; 
+          ms_vars   = vars; 
+          ms_uses   = uses };
+    me_comps = items;
+    me_sig   = tymod;
+    me_types = types; }
+  
 (* -------------------------------------------------------------------- *)
 and transstruct1 (env : EcEnv.env) (st : pstructure_item) =
   match st with
   | Pst_mod ({ pl_desc = m }, me) ->
-      let me = transmod env m me in
-        [(m, MI_Module me)]
+    let me = transmod env m me in
+    [(m, MI_Module me)]
 
   | Pst_var (xs, ty) ->
       let ty = transty_for_decl env ty in
@@ -960,10 +1053,10 @@ and transstruct1 (env : EcEnv.env) (st : pstructure_item) =
         { f_name   = decl.pfd_name.pl_desc;
           f_sig    = {
             fs_name   = decl.pfd_name.pl_desc;
-            fs_sig    = (params, retty);
-            fs_uses   = uses;           (* FIXME: filter *)
+            fs_params = params;
+            fs_ret    = retty;
           };
-          f_def = Some {
+          f_def = FBdef {
             f_locals = locals;
             f_body   = stmt;
             f_ret    = result;
@@ -1019,7 +1112,7 @@ and transbody ue symbols (env : EcEnv.env) retty pbody =
           List.map2
             (fun x xty ->
                let x = unloc x in
-               let p = EcPath.xqname mpath x in
+               let p = EcPath.xqvar mpath x in
                  ({ v_name  = x; v_type  = xty   },
                   { pv_name = p; pv_kind = PVloc },
                   xty, pty.pl_loc))
@@ -1095,14 +1188,8 @@ and transstmt ue (env : EcEnv.env) (stmt : pstmt) : stmt =
 (* -------------------------------------------------------------------- *)
 and transinstr ue (env : EcEnv.env) (i : pinstr) =
   let transcall name args =
-    let fpath, fdef =
-      try
-        EcEnv.Fun.lookup name.pl_desc env
-      with EcEnv.LookupFailure _ ->
-        tyerror name.pl_loc env (UnknownFunName name.pl_desc)
-
-    in
-      if List.length args <> List.length (fst fdef.f_sig.fs_sig) then
+    let fpath, fdef = lookup_fun env name in
+      if List.length args <> List.length fdef.f_sig.fs_params then
         tyerror name.pl_loc env (InvalidFunAppl FAE_WrongArgCount);
   
       let args =
@@ -1110,9 +1197,9 @@ and transinstr ue (env : EcEnv.env) (i : pinstr) =
           (fun a {v_type = ty} ->
             let a, aty = transexp env ue a in
               EcUnify.unify env ue aty ty; a)
-          args (fst fdef.f_sig.fs_sig)
+          args fdef.f_sig.fs_params
       in
-        (fpath, args, snd fdef.f_sig.fs_sig)
+        (fpath, args, fdef.f_sig.fs_ret)
   in
 
   match i with
@@ -1202,6 +1289,37 @@ and translvalue ue (env : EcEnv.env) lvalue =
           let esig = Tuni.subst_dom (EcUnify.UniEnv.asmap ue) esig in
             tyerror x.pl_loc env (UnknownVarOrOp (name, esig))
 
+
+
+
+(*let transmod (env : EcEnv.env) (x : symbol) (me : pmodule_expr) =
+  let me = transmod env x me in
+  begin match me.me_body with
+  | ME_Alias mp -> check_mod_app_disjoint env mp
+  | ME_Structure ms ->
+    let rec check_item env = function
+      | MI_Module me ->
+        begin match me.me_body with
+        | ME_Alias mp -> 
+          check_mod_app_disjoint env mp;
+        | ME_Structure ms ->
+          check_struct env me.me_name ms 
+        | ME_Decl _ -> assert false
+        end;
+        EcEnv.bind1 (me.me_name, `Module me)
+      | MI_Variable v -> 
+        EcEnv.bind1 (v.v_name, `Variable(PVglob,v.v_type)) env
+      | MI_Function f ->
+        EcEnv.bind1 (f.f_name,`Function f) env
+    and check_struct env x ms =
+      
+    
+  | _ -> ()
+  end;
+  me
+*)
+
+
 (* -------------------------------------------------------------------- *)
 let process_msymb (env : EcEnv.env) (msymb : pmsymbol located) =
   let (top, args, sm) = 
@@ -1261,7 +1379,7 @@ let rec trans_msymbol (env : EcEnv.env) (msymb : pmsymbol located) =
           assert false;
         (mod_expr.me_sig.mis_params, true)
 
-    | `Abstract m ->
+    | `Abstract _m ->
         if (params <> []) || spi <> 0 then
           assert false;
         (mod_expr.me_sig.mis_params, true)
@@ -1302,7 +1420,8 @@ let rec trans_msymbol (env : EcEnv.env) (msymb : pmsymbol located) =
               (fun mt ->
                 { mt_name   = mt.mt_name;
                   mt_params = [];
-                  mt_args   = List.map (EcSubst.subst_mpath subst) mt.mt_args })
+                  mt_args   = List.map (EcSubst.subst_mpath subst) mt.mt_args;
+                })
               mod_expr.me_types
               
       in
@@ -1348,9 +1467,23 @@ let transmem env m =
       (fst me)
 
 (* -------------------------------------------------------------------- *)
+let trans_topmsymbol env gp = 
+  let (mp,_,_) = trans_msymbol env gp in
+  let top = EcPath.m_functor mp in
+  let mp = EcPath.m_apply top mp.EcPath.m_args in
+  mp 
+
 let transform_opt env ue pf tt =
   let rec transf env f = 
     match f.pl_desc with
+    | PFglob gp ->
+      let mp = trans_topmsymbol env gp in
+      let me =  
+        match EcEnv.Memory.current env with
+        | None -> assert false (* FIXME error message *)
+        | Some me -> EcMemory.memory me in
+      f_glob mp me
+      
     | PFint n ->
         f_int n
 
@@ -1444,7 +1577,7 @@ let transform_opt env ue pf tt =
     | PFprob (gp, args, m, event) ->
         let fpath = trans_gamepath env gp in
         let fun_  = EcEnv.Fun.by_xpath fpath env in
-        let fsig  = fun_.f_sig.fs_sig in
+        let fsig  = fun_.f_sig.fs_params, fun_.f_sig.fs_ret in
         if List.length args <> List.length (fst fsig) then
           tyerror f.pl_loc env (InvalidFunAppl FAE_WrongArgCount);
         let args =
@@ -1535,12 +1668,16 @@ let transform_opt env ue pf tt =
           let xs = List.map (fun (x,ty) -> x,GTty ty) xs in
           env, xs
   
-        | PGTY_ModTy mi ->
+        | PGTY_ModTy(mi,restr) ->
           let (mi, _) = transmodtype env mi in
-          let ty = GTmodty mi in
+          let restr = 
+            List.fold_left (fun r m -> 
+              EcPath.Sm.add (trans_topmsymbol env m) r) EcPath.Sm.empty restr in
+
+          let ty = GTmodty (mi, restr) in
           let add1 env x = 
             let x = EcIdent.create x.pl_desc in
-            let env = EcEnv.Mod.bind_local x mi env in
+            let env = EcEnv.Mod.bind_local x mi restr env in
             env, (x, ty) in
           List.map_fold add1 env xs 
 

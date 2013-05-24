@@ -633,15 +633,6 @@ module Tactic = struct
     let mk_id s = EcIdent.create (odfl "_" s) in
       t_intros env (List.map (lmap mk_id) pis)
 
-  let tyenv_of_hyps env hyps =
-    let add env (id,k) =
-      match k with
-      | LD_var (ty,_) -> EcEnv.Var.bind_local id ty env
-      | LD_mem mt     -> EcEnv.Memory.push (id,mt) env
-      | LD_modty i    -> EcEnv.Mod.bind_local id i env
-      | LD_hyp   _    -> env in
-    List.fold_left add env hyps.h_local
-
   let process_elim_arg env hyps oty a =
     let ue  = EcUnify.UniEnv.create (Some hyps.h_tvar) in
     let env = tyenv_of_hyps env hyps in
@@ -657,8 +648,9 @@ module Tactic = struct
       error a.pl_loc MemoryExpected
     | EA_none, None ->
       AAnode
-    | EA_mp _mp, Some (GTmodty _) ->
-      assert false (* not implemented *)
+    | EA_mp mp , Some (GTmodty _) ->
+      let (mp, _, mt) = TT.trans_msymbol env (mk_loc a.pl_loc mp) in
+        AAmp (mp, mt)
     | _, Some (GTmodty _) ->
       error a.pl_loc ModuleExpected
     | _, None ->
@@ -798,7 +790,9 @@ module Tactic = struct
       EcReduction.delta_h = delta_h;
       EcReduction.zeta    = ri.pzeta;
       EcReduction.iota    = ri.piota;
-      EcReduction.logic   = ri.plogic; } in
+      EcReduction.logic   = ri.plogic; 
+      EcReduction.modpath = ri.pmodpath;
+    } in
     t_simplify env ri g
 
   let process_elimT loc env (pf,qs) g =
@@ -862,7 +856,8 @@ module Tactic = struct
       cannot_apply "call" "side can only be given for prhl judgements"
     | FequivS es, None ->
       let (_,fl,_),(_,fr,_),_,_ = s_last_calls "call" es.es_sl es.es_sr in
-      let penv, qenv = EcEnv.Fun.equivF fl fr env in
+      let env' = tyenv_of_hyps env hyps in
+      let penv, qenv = EcEnv.Fun.equivF fl fr env' in
       let pre  = process_form penv hyps pre tbool in
       let post = process_form qenv hyps post tbool in
       t_equiv_call env pre post g
@@ -921,36 +916,36 @@ module Tactic = struct
 
   let process_inline env f side occs g =
     let (fp, f) = EcEnv.Fun.sp_lookup (unloc f) env in
-      if f.EcEnv.sp_target.f_def = None then
-        failwith "function is abstract";
-      match side with
-      | None      -> t_inline_hoare env fp occs g
-      | Some side -> t_inline_equiv env fp side occs g
+    begin match f.EcEnv.sp_target.f_def with
+    | FBabs _ -> failwith "function is abstract";
+    | _ -> ()
+    end;
+
+    let fp = xpath (mpath fp.x_top.m_top []) fp.x_sub in
+
+    match side with
+    | None      -> t_inline_hoare env fp occs g
+    | Some side -> t_inline_equiv env fp side occs g
+
 
   let process_rnd env tac_info g =
     let concl = get_concl g in
-    match tac_info with
-      | RTbij bij_info ->
-        if is_equivS concl then
-          let process_form f ty1 ty2 = process_prhl_form (tfun ty1 ty2) env g f in
-          let bij_info = match bij_info with
-            | RIid -> RIid
-            | RIidempotent f ->
-              RIidempotent (process_form f)
-            | RIbij (f,finv) -> 
-              RIbij (process_form f, process_form finv)
-          in
-          t_equiv_rnd env bij_info g
-        else
-          assert false (* FIXME: error "unfolded equiv judgmented was expected" *)
-      | RTbd (opt_bd,event) -> (
-        if is_bdHoareS concl then 
-          let opt_bd = omap opt_bd (process_phl_form treal env g)  in
-          let event ty = process_phl_form (tfun ty tbool) env g event in
-          t_bd_hoare_rnd env (opt_bd,event) g
-        else
-          assert false (* FIXME: error "unfolded bounded hoare judgment was expected" *)
-      )
+    match tac_info with 
+      | RTbij RIid when is_hoareS concl -> t_hoare_rnd env g
+      | RTbij bij_info when is_equivS concl ->
+        let process_form f ty1 ty2 = process_prhl_form (tfun ty1 ty2) env g f in
+        let bij_info = match bij_info with
+          | RIid -> RIid
+          | RIidempotent f -> RIidempotent (process_form f)
+          | RIbij (f,finv) -> RIbij (process_form f, process_form finv)
+        in
+        t_equiv_rnd env bij_info g
+      | RTbd (opt_bd,event) when is_bdHoareS concl ->
+        let opt_bd = omap opt_bd (process_phl_form treal env g)  in
+        let event ty = process_phl_form (tfun ty tbool) env g event in
+        t_bd_hoare_rnd env (opt_bd,event) g
+      | _ -> cannot_apply "rnd" "unexpected instruction or wrong arguments"
+
 
   let process_equiv_deno env (pre,post) g = 
     let hyps,concl = get_goal g in
@@ -1043,11 +1038,18 @@ module Tactic = struct
       [!t_pre; !t_post; t_use env an gs] (juc,n)
 
     
+  let process_fun_abs env inv g = 
+    let env' = EcEnv.Fun.inv_memenv env in
+    let inv = process_formula env' g inv in
+    t_equivF_abs env inv g
+    
+    
   let process_phl loc env ptac g =
     let t =
       match ptac with
-      | Pfun_def -> t_fun_def env
-      | Pskip    -> t_skip
+      | Pfun_def -> EcPhl.t_fun_def env
+      | Pfun_abs f -> process_fun_abs env f
+      | Pskip    -> EcPhl.t_skip
       | Papp (k,phi) -> process_app env k phi
       | Pwp  k   -> t_wp env k
       | Prcond (side,b,i) -> t_rcond side b i

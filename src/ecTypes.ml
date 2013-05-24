@@ -79,7 +79,11 @@ let tuni uid = mk_ty (Tunivar uid)
 
 let tvar id = mk_ty (Tvar id)
 
-let ttuple lt    = mk_ty (Ttuple lt)
+let ttuple lt    = 
+  match lt with
+  | [t] -> t
+  | _ -> mk_ty (Ttuple lt)
+
 let tconstr p lt = mk_ty (Tconstr(p,lt))
 let tfun t1 t2   = mk_ty (Tfun(t1,t2)) 
 let tglob m      = mk_ty (Tglob m)
@@ -261,11 +265,11 @@ let pv_compare v1 v2 =
 
 let pv_compare_p v1 v2 =
   let r = EcPath.x_compare_na v1.pv_name v2.pv_name in
-    if   r = 0
-    then Pervasives.compare v1.pv_kind v2.pv_kind 
-    else r
+  if r = 0 then Pervasives.compare v1.pv_kind v2.pv_kind 
+  else r
 
 let is_loc v = match v.pv_kind with PVloc -> true | _ -> false
+let is_glob v = match v.pv_kind with PVglob -> true | _ -> false
   
 let pv_subst m_subst pv = 
   let mp' = m_subst pv.pv_name in
@@ -281,8 +285,11 @@ let string_of_pvar (p : prog_var) =
     (string_of_pvar_kind p.pv_kind)
 
 let pv_loc f s = 
-  { pv_name = EcPath.xqname f s;
+  { pv_name = EcPath.xqvar f s;
     pv_kind = PVloc }
+
+let pv_glob x = 
+  { pv_name = x; pv_kind = PVglob }
 
 let pv_res (f:EcPath.xpath) = pv_loc f "res"
 

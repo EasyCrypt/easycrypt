@@ -149,6 +149,8 @@ type pdatatype = {
 }
 
 (* -------------------------------------------------------------------- *)
+type pmodule_type_restr = pqsymbol * pmsymbol located list
+
 type pgamepath = (pmsymbol * psymbol) located
 type pmemory   = psymbol
 
@@ -167,6 +169,7 @@ and pformula_r =
   | PFforall of pgtybindings * pformula
   | PFexists of pgtybindings * pformula
   | PFlambda of ptybindings * pformula
+  | PFglob   of pmsymbol located 
 
   (* for claims *)
   | PFhoareS   of pformula * pfunction_body * pformula
@@ -181,7 +184,7 @@ and pgtybindings = pgtybinding list
 
 and pgty =
 | PGTY_Type  of pty
-| PGTY_ModTy of pqsymbol
+| PGTY_ModTy of pmodule_type_restr
 | PGTY_Mem
 
 (* -------------------------------------------------------------------- *)
@@ -249,11 +252,12 @@ type ffpattern = pformula fpattern
 type cfpattern = (pformula option * pformula option) fpattern
 
 type preduction = {
-  pbeta  : bool;
-  pdelta : pqsymbol list option;
-  pzeta  : bool;   (* remove let *)
-  piota  : bool;   (* remove case *)
-  plogic : bool;   (* perform logical simplification *)
+  pbeta   : bool;
+  pdelta  : pqsymbol list option;
+  pzeta   : bool;   (* remove let *)
+  piota   : bool;   (* remove case *)
+  plogic  : bool;   (* perform logical simplification *)
+  pmodpath : bool;   (* normalize modpath *)
 }
 
 
@@ -311,6 +315,7 @@ and ptactic_r =
 
 and phl_tactics = 
   | Pfun_def  
+  | Pfun_abs    of pformula
   | Pskip
   | Papp        of (int doption * pformula)
   | Pwp         of int doption option 

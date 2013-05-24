@@ -291,7 +291,7 @@ module IntCommand = struct
         match k with
         | LD_var (ty, _body) -> pr_type t ty (* FIXME body *)
         | LD_mem _           -> tk_memory
-        | LD_modty p         -> pr_modtype t p
+        | LD_modty (p,r)         -> pr_modtype t p r
         | LD_hyp f           -> pr_form t f
       in
 

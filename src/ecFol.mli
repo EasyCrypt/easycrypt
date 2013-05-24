@@ -13,7 +13,7 @@ val mright : memory
 
 type gty =
   | GTty    of EcTypes.ty
-  | GTmodty of module_type
+  | GTmodty of module_type * EcPath.Sm.t
   | GTmem   of EcMemory.memtype
 
 val destr_gty : gty -> EcTypes.ty
@@ -42,7 +42,7 @@ and f_node =
   | Fint    of int
   | Flocal  of EcIdent.t
   | Fpvar   of EcTypes.prog_var * memory
-  | Fglob   of EcPath.mpath * memory
+  | Fglob   of EcPath.mpath * memory 
   | Fop     of EcPath.path * ty list
   | Fapp    of form * form list
   | Ftuple  of form list
@@ -119,8 +119,9 @@ val f_dump : form -> dnode
 val mk_form : f_node -> EcTypes.ty -> form
 
 val f_local : EcIdent.t -> EcTypes.ty -> form
-val f_pvar : EcTypes.prog_var -> EcTypes.ty -> memory -> form
-
+val f_pvar  : EcTypes.prog_var -> EcTypes.ty -> memory -> form
+val f_pvloc : EcPath.xpath -> EcModules.variable -> memory -> form
+val f_glob  : EcPath.mpath -> memory -> form
 val f_true : form
 val f_false : form
 val f_bool : bool -> form
@@ -160,25 +161,33 @@ val fop_not : form
 val f_not : form -> form
 
 val fop_and : form
-val f_and : form -> form -> form
+val f_and   : form -> form -> form
+val f_ands  : form list -> form
 
 val fop_anda : form
-val f_anda : form -> form -> form
+val f_anda   : form -> form -> form
 
-val fop_or : form
-val f_or : form -> form -> form
+val fop_or  : form
+val f_or    : form -> form -> form
 
 val fop_ora : form
-val f_ora : form -> form -> form
+val f_ora   : form -> form -> form
 
 val fop_imp : form
-val f_imp : form -> form -> form
-val f_imps : form list -> form -> form
+val f_imp   : form -> form -> form
+val f_imps  : form list -> form -> form
 val fop_iff : form
-val f_iff : form -> form -> form
+val f_iff   : form -> form -> form
 
-val fop_eq : EcTypes.ty -> form
-val f_eq : form -> form -> form
+val fop_eq     : EcTypes.ty -> form
+val f_eq       : form -> form -> form
+val f_eqs      : form list -> form list -> form
+val f_eqparams : EcPath.xpath -> variable list -> memory ->
+                 EcPath.xpath -> variable list -> memory -> form
+val f_eqres    : EcPath.xpath -> EcTypes.ty -> memory ->
+                 EcPath.xpath -> EcTypes.ty -> memory -> form
+val f_eqglob   : EcPath.mpath -> memory -> 
+                 EcPath.mpath -> memory -> form 
 
 val f_int_le : form -> form -> form
 val f_int_lt  : form -> form -> form
@@ -189,26 +198,26 @@ val f_real_lt  : form -> form -> form
 val f_real_div  : form -> form -> form
 
 val fop_in_supp  : EcTypes.ty -> form
-val f_in_supp  : form -> form -> form
+val f_in_supp    : form -> form -> form
 
 val fop_mu_x  : EcTypes.ty -> form
 val f_mu  : form -> form -> form
 val f_mu_x  : form -> form -> form
 
 (* -------------------------------------------------------------------- *)
-val f_if_simpl  : form -> form -> form -> form
-val f_let_simpl : EcTypes.lpattern -> form -> form -> form
+val f_if_simpl   : form -> form -> form -> form
+val f_let_simpl  : EcTypes.lpattern -> form -> form -> form
 val f_lets_simpl : (EcTypes.lpattern * form) list -> form -> form
 
 (* WARNING : this function should be use only in a context ensuring that the
    quantified variables can be instanciated *)
 val f_forall_simpl : binding -> form -> form
-val f_app_simpl : form -> form list -> EcTypes.ty -> form
+val f_exists_simpl : binding -> form -> form
+val f_app_simpl    : form -> form list -> EcTypes.ty -> form
 
 val f_not_simpl  : form -> form
 val f_and_simpl  : form -> form -> form
 val f_ands_simpl : form list -> form -> form
-val f_ands       : form list -> form -> form
 val f_anda_simpl : form -> form -> form
 val f_or_simpl   : form -> form -> form
 val f_ora_simpl  : form -> form -> form

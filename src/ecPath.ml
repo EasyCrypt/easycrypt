@@ -54,6 +54,11 @@ let mk_path node =
 let psymbol id   = mk_path (Psymbol id)
 let pqname  p id = mk_path (Pqname(p,id))
 
+let rec pappend p1 p2 = 
+  match p2.p_node with
+  | Psymbol id -> pqname p1 id
+  | Pqname(p2,id) -> pqname (pappend p1 p2) id
+
 let pqoname p id =
   match p with
   | None   -> psymbol id
@@ -173,12 +178,20 @@ let m_apply mp args =
   if args' = [] then mpath mp.m_top args 
   else (assert (args = []); mp)
 
+let m_functor mp = 
+  let top = 
+    match mp.m_top with
+    | `Concrete(p,Some _) -> `Concrete(p,None)
+    | t -> t in
+  mpath top []
+
 let rec m_fv fv mp = 
   let fv = 
     match mp.m_top with 
     | `Abstract id -> EcIdent.fv_add id fv 
     | `Concrete _ -> fv in
   List.fold_left m_fv fv mp.m_args 
+
 
 (* -------------------------------------------------------------------- *)
 type xpath = {
@@ -226,11 +239,15 @@ let x_fv fv xp = m_fv fv xp.x_top
 
 let xqname x s = xpath x.x_top (pqname x.x_sub s)
 
+let xqvar x s =
+  let x = xpath (mpath x.x_top.m_top []) x.x_sub in
+    xqname x s
+
 (* -------------------------------------------------------------------- *)
 let rec m_tostring (m : mpath) = 
   let top, sub = 
     match m.m_top with
-    | `Abstract id -> (EcIdent.name id, "")
+    | `Abstract id -> (EcIdent.tostring id, "")
 
     | `Concrete (p, sub) ->
       let strsub = 

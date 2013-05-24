@@ -9,6 +9,7 @@ open EcTheory
 module Sp    = EcPath.Sp
 module Sm    = EcPath.Sm
 module Sx    = EcPath.Sx
+module Mx    = EcPath.Mx
 module Mp    = EcPath.Mp
 module Mid   = EcIdent.Mid
 
@@ -93,16 +94,24 @@ let subst_fun_uses (s : _subst) (u : uses) =
   { us_calls = calls; us_reads = reads; us_writes = writes; }
 
 (* -------------------------------------------------------------------- *)
+let subst_oracle_info (s:_subst) (x:oracle_info) = 
+  let x_subst = EcPath.x_subst s.s_fmp in
+  { oi_calls  = List.map x_subst x.oi_calls;
+    (*oi_reads  = 
+      Sx.fold (fun p m -> Sx.add (x_subst p) m) Sx.empty x.oi_reads;
+    oi_writes = 
+      Sx.fold (fun p m -> Sx.add (x_subst p) m) Sx.empty x.oi_writes*) }
+
+
+(* -------------------------------------------------------------------- *)
 let subst_funsig (s : _subst) (funsig : funsig) =
-  let args' = List.map (subst_variable s) (fst funsig.fs_sig) in
-  let res'  = s.s_ty (snd funsig.fs_sig) in
-  let uses' = subst_fun_uses s funsig.fs_uses in
+  let args' = List.map (subst_variable s) (funsig.fs_params) in
+  let res'  = s.s_ty (funsig.fs_ret) in
+(*  let uses' = subst_fun_uses s funsig.fs_uses in *)
 
-  { fs_name = funsig.fs_name;
-    fs_sig  = (args', res');
-    fs_uses = uses'; }
-
-let i = ref 0
+  { fs_name   = funsig.fs_name;
+    fs_params = args';
+    fs_ret    = res'; }
 
 (* -------------------------------------------------------------------- *)
 let rec subst_modsig_body_item (s : _subst) (item : module_sig_body_item) =
@@ -110,8 +119,8 @@ let rec subst_modsig_body_item (s : _subst) (item : module_sig_body_item) =
 (*  | Tys_variable vd ->
       Tys_variable (subst_variable s vd) *)
 
-  | Tys_function funsig ->
-      Tys_function (subst_funsig s funsig)
+  | Tys_function (funsig, oi) ->
+      Tys_function (subst_funsig s funsig, subst_oracle_info s oi)
 
 (* -------------------------------------------------------------------- *)
 and subst_modsig_body (s : _subst) (sbody : module_sig_body) =
@@ -120,17 +129,17 @@ and subst_modsig_body (s : _subst) (sbody : module_sig_body) =
 (* -------------------------------------------------------------------- *)
 and subst_modsig (s : _subst) (comps : module_sig) =
   { mis_params = List.map (sndmap (subst_modtype s)) comps.mis_params;
-    mis_body   = subst_modsig_body s comps.mis_body;
-    mis_mforb  = 
-      Sp.fold
-        (fun p mf -> Sp.add (s.s_p p) mf)
-        comps.mis_mforb Sp.empty; }
+    mis_body   = subst_modsig_body s comps.mis_body; }
 
 (* -------------------------------------------------------------------- *)
 and subst_modtype (s : _subst) (modty : module_type) =
-  { mt_params = List.map (fun (x, mty) -> (x, subst_modtype s mty)) modty.mt_params;
+  { mt_params = 
+      List.map (fun (x, mty) -> (x, subst_modtype s mty)) modty.mt_params;
     mt_name   = s.s_p modty.mt_name;
-    mt_args   = List.map s.s_fmp modty.mt_args; }
+    mt_args   = List.map s.s_fmp modty.mt_args;
+   (* mt_forb   = 
+      Sm.fold (fun x f -> Sm.add (s.s_fmp x) f) modty.mt_forb Sm.empty; *)
+  }
 
 (* -------------------------------------------------------------------- *)
 let subst_function_def (s : _subst) (def : function_def) =
@@ -143,8 +152,10 @@ let subst_function_def (s : _subst) (def : function_def) =
 (* -------------------------------------------------------------------- *)
 let subst_function (s : _subst) (f : function_) =
   let sig' = subst_funsig s f.f_sig in
-  let def' = omap f.f_def (subst_function_def s) in
-      
+  let def' = 
+    match f.f_def with 
+    | FBdef def -> FBdef (subst_function_def s def)
+    | FBabs oi  -> FBabs (subst_oracle_info s oi) in
   { f_name = f.f_name;
     f_sig  = sig';
     f_def  = def' }
@@ -183,8 +194,16 @@ and subst_module_struct (s : _subst) (bstruct : module_structure) =
       in
         (_subst_of_subst s, newparams)
   in
-    (sbody, { ms_params = newparams;
-              ms_body   = subst_module_items sbody bstruct.ms_body; })
+  let es = e_subst_of_subst s in
+  (sbody, 
+   { ms_params = newparams;
+     ms_body   = subst_module_items sbody bstruct.ms_body; 
+     ms_vars   = 
+       Mx.fold (fun x ty w -> Mx.add (es.es_xp x) (es.es_ty ty) w)
+         bstruct.ms_vars Mx.empty;
+     ms_uses   =
+       Sm.fold (fun m u -> Sm.add (es.es_mp m) u) bstruct.ms_uses Sm.empty;
+   })
 
 (* -------------------------------------------------------------------- *)
 and subst_module_body (s : _subst) (body : module_body) =
@@ -196,8 +215,9 @@ and subst_module_body (s : _subst) (body : module_body) =
       let s, bstruct = subst_module_struct s bstruct in
       s, ME_Structure bstruct
 
-  | ME_Decl p ->
-      s, ME_Decl (subst_modtype s p)
+  | ME_Decl _ -> assert false (* FIXME *)
+(*
+      s, ME_Decl (subst_modtype s p, Sm.fold (fun nu -> ) *)
 
 (* -------------------------------------------------------------------- *)
 and subst_module_comps (s : _subst) (comps : module_comps) =
@@ -214,7 +234,6 @@ and subst_module (s : _subst) (m : module_expr) =
       me_body  = body';
       me_comps = comps';
       me_sig   = sig';
-      me_uses  = Sp.empty;              (* FIXME *)
       me_types = types'; }
 
 (* -------------------------------------------------------------------- *)

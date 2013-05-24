@@ -142,36 +142,42 @@ end
 let unify (env : EcEnv.env) (ue : unienv) =
   let rec unify (t1 : ty) (t2 : ty) = 
     let r1, r2 = UniEnv.repr ue t1, UniEnv.repr ue t2 in 
-    match r1.ty_node, r2.ty_node with
-    | Tvar i1, Tvar i2 -> 
-        (* FIXME use equal *)
+    if ty_equal r1 r2 then ()
+    else
+      match r1.ty_node, r2.ty_node with
+(*      | Tvar i1, Tvar i2 -> 
         if not (EcIdent.id_equal i1 i2) then 
-          raise (UnificationFailure (t1, t2))
+          raise (UnificationFailure (t1, t2)) *)
+            
+      | Tunivar id, _ -> UniEnv.bind ue id r2
+      | _, Tunivar id -> UniEnv.bind ue id r1
 
-    | Tunivar id, _ -> UniEnv.bind ue id r2
-    | _, Tunivar id -> UniEnv.bind ue id r1
-
-    | Ttuple lt1, Ttuple lt2 ->
+      | Ttuple lt1, Ttuple lt2 ->
         if List.length lt1 <> List.length lt2 then 
           raise (UnificationFailure (t1, t2));
         List.iter2 unify lt1 lt2
 
-    | Tfun(t1,t2), Tfun(t1',t2') ->
+      | Tfun(t1,t2), Tfun(t1',t2') ->
         unify t1 t1'; unify t2 t2'
 
-    | Tconstr(p1, lt1), Tconstr(p2, lt2) when EcPath.p_equal p1 p2 ->
+      | Tconstr(p1, lt1), Tconstr(p2, lt2) when EcPath.p_equal p1 p2 ->
         if List.length lt1 <> List.length lt2 then
           raise (UnificationFailure (t1, t2));
         List.iter2 unify lt1 lt2
 
-    | Tconstr(p, lt), _ when EcEnv.Ty.defined p env ->
+      | Tglob mp, _ when EcEnv.NormMp.tglob_reducible env mp ->
+        unify (EcEnv.NormMp.norm_tglob env mp) r2
+
+      | _, Tglob mp when EcEnv.NormMp.tglob_reducible env mp ->
+        unify (EcEnv.NormMp.norm_tglob env mp) r1
+   
+      | Tconstr(p, lt), _ when EcEnv.Ty.defined p env ->
         unify (EcEnv.Ty.unfold p lt env) r2
-
-    | _, Tconstr(p, lt) when EcEnv.Ty.defined p env ->
+          
+      | _, Tconstr(p, lt) when EcEnv.Ty.defined p env ->
         unify r1 (EcEnv.Ty.unfold p lt env)
-    
 
-    | _, _ -> raise (UnificationFailure(t1, t2))
+      | _, _ -> raise (UnificationFailure(t1, t2))
 
   in
     unify

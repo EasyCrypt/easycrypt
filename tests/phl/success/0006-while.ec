@@ -17,8 +17,8 @@ lemma foo : hoare [M.f : true ==> res = (1,0)]
 proof.
  fun.
  while (x=1).   
- wp;skip;simplify;intros _;split.
- wp;skip;simplify;intros _;split.
+ wp;skip;simplify;split.
+ wp;skip;simplify;split.
 save.
 
 module M1 = { 

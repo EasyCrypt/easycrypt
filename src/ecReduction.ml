@@ -151,6 +151,7 @@ type reduction_info = {
   zeta    : bool;                 (* reduce let  *)
   iota    : bool;                 (* reduce case *)
   logic   : bool;                 (* perform logical simplification *)
+  modpath : bool;                 (* reduce module path *)
 }
 
 let full_red = {
@@ -160,6 +161,7 @@ let full_red = {
   zeta    = true;
   iota    = true;
   logic   = true;
+  modpath = true;
 }
    
 let no_red = {
@@ -169,6 +171,7 @@ let no_red = {
   zeta    = false;
   iota    = false;
   logic   = false;
+  modpath = false;
 } 
 
 let beta_red = { no_red with beta = true }
@@ -198,6 +201,7 @@ let reduce_op ri env p tys =
   | Some s when Sp.mem p s -> Op.reduce env p tys 
   | _ -> raise NotReducible
 
+(* FIXME add reduction for glob *)
 let rec h_red ri env hyps f = 
   match f.f_node with
   | Flocal x -> reduce_local ri hyps x 
@@ -208,6 +212,14 @@ let rec h_red ri env hyps f =
     let s = 
       List.fold_left2 (fun s (x,_) e1 -> bind_local s x e1) f_subst_id ids es in
     f_subst s e2
+  | Fglob(mp,m) when ri.modpath ->
+    let f' = EcEnv.NormMp.norm_glob env m mp in
+    if f_equal f f' then raise NotReducible
+    else f' 
+  | Fpvar (pv,m) when ri.modpath ->
+    let pv' = EcEnv.NormMp.norm_pvar env pv in
+    if pv_equal pv pv' then raise NotReducible 
+    else f_pvar pv' f.f_ty m
   | Flet(lp,f1,f2) -> f_let lp (h_red ri env hyps f1) f2 
   | Fapp({f_node = Fquant(Llambda,bd,body)}, args) when ri.beta -> 
     let nbd = List.length bd in
@@ -244,6 +256,22 @@ let rec h_red ri env hyps f =
     if f_equal f1 f_true then f2 
     else if f_equal f1 f_false then f3 
     else f_if (h_red ri env hyps f1) f2 f3 
+  | Fquant(Lforall,b,f1) ->
+    begin 
+      try f_forall_simpl b (h_red ri env hyps f1)
+      with NotReducible ->
+        let f' = f_forall_simpl b f1 in
+        if f_equal f f' then raise NotReducible
+        else f'
+    end
+  | Fquant(Lexists,b,f1) ->
+    begin 
+      try f_exists_simpl b (h_red ri env hyps f1)
+      with NotReducible ->
+        let f' = f_exists_simpl b f1 in
+        if f_equal f f' then raise NotReducible
+        else f'
+    end
   | _ -> raise NotReducible 
 and h_red_args ri env hyps args =
   match args with
@@ -279,7 +307,10 @@ let check_alpha_equal ri env hyps f1 f2 =
       let tyok =
         match ty1, ty2 with
         | GTty    ty1, GTty ty2   -> equal_type env ty1 ty2
-        | GTmodty p1 , GTmodty p2 -> ModTy.mod_type_equiv env p1 p2
+        | GTmodty (p1,r1) , GTmodty(p2,r2) -> 
+          ModTy.mod_type_equiv env p1 p2 &&
+            EcPath.Sm.equal r1 r2 
+            (* FIXME : Did we have to perform reduction ?*)
         | GTmem   me1, GTmem me2  -> check_memtype me1 me2
         | _          , _          -> false
       in
@@ -312,6 +343,9 @@ let check_alpha_equal ri env hyps f1 f2 =
 
     | Fpvar(p1,m1), Fpvar(p2,m2) when 
         EcIdent.id_equal (find alpha m1) m2 && pv_equal_norm env p1 p2  -> ()
+    
+    | Fglob(p1,m1), Fglob(p2,m2) when
+        m_equal_norm env p1 p2 &&  EcIdent.id_equal (find alpha m1) m2 -> ()
 
     | Fop(p1, ty1), Fop(p2, ty2) when EcPath.p_equal p1 p2 &&
         List.all2 (equal_type env) ty1 ty2 -> () 

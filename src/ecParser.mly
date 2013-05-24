@@ -81,7 +81,7 @@
     if l = [] then
       { pbeta  = true; pzeta  = true;
         piota  = true; plogic = true;
-        pdelta = None;  }
+        pdelta = None; pmodpath = true }
     else
       let doarg acc = function
         | `Delta l -> 
@@ -89,17 +89,18 @@
             then { acc with pdelta = None }
             else { acc with pdelta = Some (oget acc.pdelta @ l) }
 
-        | `Zeta    -> { acc with pzeta  = true }
-        | `Iota    -> { acc with piota  = true }
-        | `Beta    -> { acc with pbeta  = true }
-        | `Logic   -> { acc with plogic = true }
+        | `Zeta    -> { acc with pzeta    = true }
+        | `Iota    -> { acc with piota    = true }
+        | `Beta    -> { acc with pbeta    = true }
+        | `Logic   -> { acc with plogic   = true }
+        | `ModPath -> { acc with pmodpath = true}
       in
         List.fold_left doarg
           { pbeta  = false; pzeta  = false;
             piota  = false; plogic = false;
-            pdelta = Some [];  } l
+            pdelta = Some []; pmodpath = false } l
 
-  let simplify_red = [`Zeta; `Iota; `Beta; `Logic]
+  let simplify_red = [`Zeta; `Iota; `Beta; `Logic; `ModPath]
 
   let mk_fpattern kind args =
     { fp_kind = kind;
@@ -184,6 +185,7 @@
 %token LEMMA
 %token LET
 %token LOGIC
+%token MODPATH
 %token LONGARROW
 %token LPAREN
 %token MINUS
@@ -242,6 +244,7 @@
 %token WP
 %token CALL
 %token ZETA 
+%token GLOB
 
 %token <string> OP1 OP2 OP3 OP4
 %token LTCOLON GT
@@ -643,6 +646,8 @@ hoare_bd_cmp :
   | HGEQ {PFHge}
                           
 form_u:
+| GLOB mp=loc(mod_qident) { PFglob mp }
+
 | e=sform_u { e }
 
 | e=sform args=sform+ { PFapp (e, args) } 
@@ -723,7 +728,7 @@ equiv_body:
 pgtybinding1:
 | x=ptybinding1 { List.map (fun (xs,ty) -> xs, PGTY_Type ty) x }
 
-| LPAREN x=uident LTCOLON mi=qident RPAREN
+| LPAREN x=uident LTCOLON mi=mod_type_restr RPAREN
     { [[x], PGTY_ModTy mi] }
 
 | pn=mident
@@ -930,6 +935,11 @@ mod_aty1:
 
 %inline mod_type:
 | x = qident { x }
+;
+
+%inline mod_type_restr:
+| x = qident { (x,[]) }
+| x = qident LBRACE restr=plist1(loc(mod_qident),COMMA) RBRACE { (x,restr) }
 ;
 
 sig_def:
@@ -1189,6 +1199,7 @@ fpattern_arg:
 | UNDERSCORE   { EA_none }
 | f=sform      { EA_form f }
 | s=mident     { EA_mem s }
+| LPAREN LTCOLON x=mod_qident RPAREN { EA_mp x }
 ;
 
 fpattern(F):
@@ -1205,6 +1216,7 @@ simplify_arg:
 | IOTA            { `Iota }
 | BETA            { `Beta }
 | LOGIC           { `Logic }
+| MODPATH         { `ModPath }
 ;
 
 simplify:
@@ -1306,7 +1318,8 @@ tactic:
    { Pcut (n, p) }
 
 (* PHL tactics *)
-| FUN { PPhl Pfun_def }
+| FUN        { PPhl Pfun_def }
+| FUN f=form { PPhl (Pfun_abs f) }
 
 | APP pos=code_position COLON p=sform
    { PPhl (Papp (pos, p)) }
