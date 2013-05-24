@@ -156,8 +156,8 @@ module Mod : sig
   val lookup_opt  : qsymbol -> env -> (mpath * t) option
   val lookup_path : qsymbol -> env -> mpath
 
-  val sp_lookup     : qsymbol -> env -> mpath_top * (module_expr suspension)
-  val sp_lookup_opt : qsymbol -> env -> (mpath_top * (module_expr suspension)) option
+  val sp_lookup     : qsymbol -> env -> mpath * (module_expr suspension)
+  val sp_lookup_opt : qsymbol -> env -> (mpath * (module_expr suspension)) option
 
   val bind : symbol -> module_expr -> env -> env
 

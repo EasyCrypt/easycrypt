@@ -72,6 +72,10 @@ module G (B:Adv') = {
   } 
 }.
 
+module F1 (B:Adv') = { 
+  module A1 = B(G.O)
+}.
+
 lemma foo' : 
   forall (A<:Adv' {G}), 
     equiv [ G(A).main ~ G(A).main : 

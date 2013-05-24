@@ -237,7 +237,7 @@ let xqname x s = xpath x.x_top (pqname x.x_sub s)
 let rec m_tostring (m : mpath) = 
   let top, sub = 
     match m.m_top with
-    | `Abstract id -> (EcIdent.name id ^ string_of_int (EcIdent.tag id), "")
+    | `Abstract id -> (EcIdent.name id(* ^ string_of_int (EcIdent.tag id)*), "")
 
     | `Concrete (p, sub) ->
       let strsub = 

@@ -12,6 +12,7 @@ type modapp_error =
 | MAE_WrongArgPosition
 | MAE_WrongArgCount
 | MAE_InvalidArgType
+| MAE_AccesSubModFunctor
 
 type modtyp_error =
 | MTE_FunSigDoesNotRepeatArgNames

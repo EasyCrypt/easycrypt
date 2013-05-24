@@ -27,6 +27,7 @@ type modapp_error =
 | MAE_WrongArgPosition
 | MAE_WrongArgCount
 | MAE_InvalidArgType
+| MAE_AccesSubModFunctor
 
 type modtyp_error =
 | MTE_FunSigDoesNotRepeatArgNames
@@ -137,6 +138,8 @@ let pp_tyerror fmt env error =
 
   | InvalidModAppl MAE_InvalidArgType ->
       msg "invalid module application: arguments do not match required interfaces"
+  | InvalidModAppl MAE_AccesSubModFunctor ->
+    msg "invalid module application: can not access to a sub-module of a partially applied functor"
 
   | InvalidModType MTE_FunSigDoesNotRepeatArgNames ->
       msg "applied argument names must repeat functor argument names"
@@ -845,9 +848,8 @@ let rec trans_msymbol (env : EcEnv.env) (msymb : pmsymbol located) =
         tyerror top_qname.pl_loc env (UnknownModName top_qname.pl_desc)
     | Some me -> me
   in
-
   let (params, istop) =
-    match top_path with
+    match top_path.EcPath.m_top with
     | `Concrete (_, Some sub) ->
         if mod_expr.me_sig.mis_params <> [] then
           assert false;
@@ -871,10 +873,13 @@ let rec trans_msymbol (env : EcEnv.env) (msymb : pmsymbol located) =
 
   match args with
   | None ->
-      let mp = EcPath.mpath top_path [] in
-        (mp, mod_expr.me_sig)
+    if not istop && params <> [] then
+      tyerror loc env (InvalidModAppl MAE_AccesSubModFunctor); 
+
+    (top_path, mod_expr.me_sig)
 
   | Some args ->
+    let top_path = top_path.EcPath.m_top in
       if List.length params <> List.length args then
         tyerror loc env (InvalidModAppl MAE_WrongArgCount);
     List.iter2
@@ -977,7 +982,6 @@ let rec transmod (env : EcEnv.env) (x : symbol) (me : pmodule_expr) =
     
     let me = EcEnv.Mod.by_mpath mp env in
     { me with me_name  = x; me_body  = ME_Alias mp; } *)
-    
     begin match mp.EcPath.m_top with
     | `Concrete(_, Some _) 
     | _ when mp.EcPath.m_args = [] ->
