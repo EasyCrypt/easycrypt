@@ -122,6 +122,28 @@ end
   
 let oracles _func = assert false
 
+(* computes the program variables occurring free in f with memory m *)
+let rec free_pv_form m env f = 
+  let fv = free_pv_form m env in
+  match f.f_node with
+  | Fpvar (pv,m') when m=m' -> PV.add env pv f.f_ty PV.empty
+  | Fquant (_,_,f) 
+    -> fv f
+  | Fif (f1,f2,f3) 
+    -> PV.union env (fv f1) (PV.union env (fv f2) (fv f3))
+  | Flet (_,f1,f2)
+    -> PV.union env (fv f1) (fv f2)
+  | Fapp (f,fs) 
+    -> List.fold_left (fun s f -> PV.union env (fv f) s) (fv f) fs
+  | Ftuple fs 
+    -> List.fold_left (fun s f -> PV.union env (fv f) s) PV.empty fs
+  | Fint _ | Flocal _ | Fglob _ | Fop _ | Fpvar _ 
+    -> PV.empty
+  | FhoareF _ | FhoareS _
+  | FbdHoareF _ | FbdHoareS _
+  | FequivF _ | FequivS _
+  | Fpr _ -> assert false (* FIXME: extend if necessary *)
+
 let lp_write env w lp = 
   let add w (pv,ty) = PV.add env pv ty w in
   match lp with
@@ -310,6 +332,9 @@ let wp_asgn env m s post =
 
 exception No_wp
 
+(* wp functions operates only over assignments and conditional statements.
+   Any weakening on this restriction may break the soundness of bounded hoare logic 
+*)
 let rec wp_stmt env m (stmt: EcModules.instr list) letsf = 
   match stmt with
   | [] -> stmt, letsf
@@ -371,6 +396,12 @@ let t_hS_or_eS th te g =
   let concl = get_concl g in
   if is_hoareS concl then th g
   else if is_equivS concl then te g
+  else tacerror (NotPhl None)
+
+let t_hS_or_bhS th te g =
+  let concl = get_concl g in
+  if is_hoareS concl then th g
+  else if is_bdHoareS concl then te g
   else tacerror (NotPhl None)
 
 let t_hS_or_bhS_or_eS th tbh te g =
@@ -466,8 +497,9 @@ let t_bdHoare_skip g =
   let concl = get_concl g in
   let bhs = destr_bdHoareS concl in
   if bhs.bhs_s.s_node <> [] then tacerror NoSkipStmt;
-  if bhs.bhs_cmp <> FHeq || not (f_equal bhs.bhs_bd (f_real_of_int 1)) then
-    cannot_apply "skip" "bound must be \"= 1\"";
+  if (bhs.bhs_cmp <> FHeq && bhs.bhs_cmp <> FHge) ||
+    not (f_equal bhs.bhs_bd (f_real_of_int 1)) then
+    cannot_apply "skip" "bound must be \">= 1\"";
   let concl = f_imp bhs.bhs_pr bhs.bhs_po in
   let concl = gen_mems [bhs.bhs_m] concl in
   prove_goal_by [concl] RN_hl_skip g
@@ -548,6 +580,27 @@ let t_hoare_wp env i g =
   let concl = f_hoareS_r { hs with hs_s = s; hs_po = post} in
   prove_goal_by [concl] (RN_hl_wp (Single i)) g
 
+let t_bdHoare_wp env i g =
+  let concl = get_concl g in
+  let bhs = destr_bdHoareS concl in
+  let s_hd,s_wp = s_split_o "wp" i bhs.bhs_s in
+  let s_wp = EcModules.stmt s_wp in
+
+  let m = EcMemory.memory bhs.bhs_m in
+
+  let fv_bd = free_pv_form m env bhs.bhs_bd in
+  let modi = s_write env s_wp in
+
+  if not (PV.disjoint env fv_bd modi) then 
+    cannot_apply "wp" "Not_implemented: bound is modified by the statement";
+
+  let s_wp,post = 
+    wp env m s_wp bhs.bhs_po in
+  let i = check_wp_progress "wp" i bhs.bhs_s s_wp in
+  let s = EcModules.stmt (s_hd @ s_wp) in
+  let concl = f_bdHoareS_r { bhs with bhs_s = s; bhs_po = post} in
+  prove_goal_by [concl] (RN_hl_wp (Single i)) g
+
 
 let t_equiv_wp env ij g = 
   let concl = get_concl g in
@@ -567,10 +620,9 @@ let t_equiv_wp env ij g =
   prove_goal_by [concl] (RN_hl_wp (Double(i,j))) g
 
 
-let t_wp env k =
-  match k with
-  | None -> t_hS_or_eS (t_hoare_wp env None) (t_equiv_wp env None)
-  | Some (Single i) -> t_hoare_wp env (Some i)
+let t_wp env k = match k with
+  | None -> t_hS_or_bhS_or_eS (t_hoare_wp env None) (t_bdHoare_wp env None) (t_equiv_wp env None)
+  | Some (Single i) -> t_hS_or_bhS (t_hoare_wp env (Some i)) (t_bdHoare_wp env (Some i))
   | Some (Double(i,j)) -> t_equiv_wp env (Some (i,j))
 
 (* -------------------------------------------------------------------- *)

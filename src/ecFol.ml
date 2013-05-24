@@ -484,7 +484,6 @@ let f_op_real_of_int = f_op EcCoreLib.p_from_int [] (tfun ty_int ty_real)
 let f_real_of_int n = f_app f_op_real_of_int [f_int n] ty_real
 
 
-
 let ty_fbool1 = tfun ty_bool ty_bool
 let ty_fbool2 = tfun ty_bool ty_fbool1 
 

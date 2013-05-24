@@ -25,6 +25,7 @@ val p_hash    : path -> int
 (* -------------------------------------------------------------------- *)
 val tostring  : path -> string
 val toqsymbol : path -> qsymbol
+val fromqsymbol : qsymbol -> path
 val basename  : path -> symbol
 val prefix    : path -> path option
 val rootname  : path -> symbol

@@ -77,6 +77,12 @@ let toqsymbol (p : path) =
   | Psymbol x     -> ([], x)
   | Pqname (p, x) -> (tolist p, x)
 
+let fromqsymbol ((symbs,symb) : qsymbol) =
+  match symbs with
+    | [] -> pqname (psymbol "<top>") symb
+  | s::symbs ->
+    pqname (List.fold_left pqname (psymbol s) symbs) symb
+
 let basename p = 
   match p.p_node with 
   | Psymbol x     -> x

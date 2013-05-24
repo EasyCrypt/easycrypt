@@ -4,28 +4,26 @@ require import Bool.
 require import Real.
 
 
+require Logic.
 module M = {
-  fun f (y:bool) : bool = {
-    var x : bool;
-    x = $Dbool.dbool; 
-    return x=y;
+  fun f (w x:int) : int = {
+    var y : int;
+    var z : int;
+    y = 1;
+    z = x;
+    x = y;
+    y = z; 
+    return x;
   }
 }.
-
-lemma test: bd_hoare [ M.f : true ==> res] [=] [1%r/2%r] 
+lemma test : bd_hoare [M.f : true ==> res = 1 ] [>=] [1%r]
 proof.
-fun.
-rnd {  (1%r/2%r), (lambda (x:bool), x=y) }.
-skip.
-simplify.
-(* trivial. *) (* some bug *)
-intros &hr.
-trivial.
+ fun.
+ wp.
+ skip;intros _ _;split.
 save.
 
-
 op b : bool.
-
 
 module M2 = {
   var z : bool
@@ -36,17 +34,13 @@ module M2 = {
     return z=y;
   }
 }.
-
 lemma test2: bd_hoare [ M2.f : b ==> res] [=] [1%r/2%r] 
 proof.
 fun.
 wp.
 rnd {  (1%r/2%r), (lambda (x:bool), x=y) }.
 skip.
-simplify.
-(* trivial. *) (* some bug *)
-intros &hr.
-trivial.
+intros _ n; split; [trivial|trivial].
 save.
 
 
@@ -59,36 +53,15 @@ module M3 = {
     return x;
   }
 }.
-
 lemma test3: bd_hoare [ M3.f : true ==> res=b] [>=] [1%r] 
 proof.
 fun.
 wp.
 rnd {  1%r, (lambda x, true) }.
-skip.
-simplify.
-trivial.
+skip; trivial.
 save.
 
-require Logic.
-module M4 = {
-  fun f (w x:int) : int = {
-    var y : int;
-    var z : int;
-    y = 1;
-    z = x;
-    x = y;
-    y = z; 
-    return x;
-  }
-}.
 
-lemma foo : bd_hoare [M4.f : true ==> res = 1 ] [=] [1%r]
-proof.
- fun.
- wp.
- skip;intros _ _;split.
-save.
 
 
 
