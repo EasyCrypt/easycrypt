@@ -946,11 +946,11 @@ module Tactic = struct
         (process_inline_all env (Some false) fs) g
     | FequivS es, Some b ->
       let sp = pat_all fs (if b then es.es_sl else es.es_sr) in
-      if sp = [] then t_id g
+      if sp = [] then t_id None g
       else t_seq (t_inline_equiv env b sp) (process_inline_all env side fs) g
     | FhoareS hs, None ->
       let sp = pat_all fs hs.hs_s in
-      if sp = [] then t_id g
+      if sp = [] then t_id None g
       else t_seq (t_inline_hoare env sp) (process_inline_all env side fs) g
     | _, _ -> assert false (* FIXME error message *)
     
