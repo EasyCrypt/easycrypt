@@ -287,7 +287,7 @@ type swap_kind =
 type ptactic = ptactic_r located
 
 and ptactic_r = 
-  | Pidtac
+  | Pidtac      of string option
   | Prepeat     of ptactic  
   | Pdo         of int option * ptactic (* None means do 1 then repeat *)
   | Ptry        of ptactic 

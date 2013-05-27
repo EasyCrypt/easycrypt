@@ -899,15 +899,15 @@ module Tactic = struct
             let s = if side then es.es_sl else es.es_sr in
             let len = List.length s.s_node in
             t_equiv_swap env side (len+p) len len
-          else (* p = 0 *) t_id
+          else (* p = 0 *) t_id None
         | SKmovei(i,p) ->
           if 0 < p then t_equiv_swap env side i (i+1) (i+p)
           else if p < 0 then t_equiv_swap env side (i+p) i i
-          else (* p = 0 *) t_id
+          else (* p = 0 *) t_id None
         | SKmoveinter(i1,i2,p) ->
           if 0 < p then t_equiv_swap env side i1 (i2+1) (i2+p)
           else if p < 0 then t_equiv_swap env side (i1+p) i1 i2
-          else (* p = 0 *) t_id
+          else (* p = 0 *) t_id None
       in
       set_loc info.pl_loc tac g
 
@@ -983,7 +983,7 @@ module Tactic = struct
     t_on_first (t_equiv_deno env pre post (juc,n)) (t_use env an gs)
 
   let process_conseq env info (_, n as g) =
-    let t_pre = ref t_id and t_post = ref t_id in
+    let t_pre = ref (t_id None) and t_post = ref (t_id None) in
     let tac1 g =
       let hyps = get_hyps g in
       let m, h = match LDecl.fresh_ids hyps ["&m";"H"] with
@@ -1080,7 +1080,7 @@ module Tactic = struct
     let loc = tac.pl_loc in
     let tac =
       match unloc tac with
-      | Pidtac         -> t_id
+      | Pidtac msg     -> t_id msg
       | Prepeat t      -> t_repeat (process_logic_tac scope env t)
       | Pdo (None,t)   -> 
         let tac = (process_logic_tac scope env t) in

@@ -1247,7 +1247,10 @@ conseq:
 ;
 tactic:
 | IDTAC
-    { Pidtac }
+    { Pidtac None }
+
+| IDTAC s=STRING
+    { Pidtac (Some s) }
 
 | STAR t=loc(tactic) { Prepeat t }
 
@@ -1425,7 +1428,7 @@ tactics:
 
 tactics0:
 | ts=tactics    { Pseq ts } 
-| x=loc(empty)  { Pseq [mk_loc x.pl_loc Pidtac] }
+| x=loc(empty)  { Pseq [mk_loc x.pl_loc (Pidtac None)] }
 ;
 
 %inline tactics2: ts=plist1(tactic2, SEMICOLON) { ts };

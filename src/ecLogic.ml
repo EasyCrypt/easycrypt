@@ -538,7 +538,7 @@ let t_rewrite env side f g =
 let t_rewrite_node env ((juc,an), gs) side n =
   let (_,f) = get_node (juc, an) in
   t_seq_subgoal (t_rewrite env side f)
-    [t_use env an gs;t_id] (juc,n)
+    [t_use env an gs;t_id None] (juc,n)
 
 let t_rewrite_hyp env side id args (juc,n as g) =
   let hyps = get_hyps g in

@@ -1224,13 +1224,13 @@ let t_gen_cond env side e g =
   let m1,m2,h,h1,h2 = match LDecl.fresh_ids hyps ["&m";"&m";"_";"_";"_"] with
     | [m1;m2;h;h1;h2] -> m1,m2,h,h1,h2
     | _ -> assert false in
-  let t_introm = if side <> None then t_intros_i env [m1] else t_id in
+  let t_introm = if side <> None then t_intros_i env [m1] else t_id None in
   let t_sub b g = 
     t_seq_subgoal (t_rcond side b 1)
       [ t_lseq [t_introm; t_skip;t_intros_i env ([m2;h]);
                 t_elim_hyp env h;
                 t_intros_i env [h1; h2]; t_hyp env h2];
-        t_id ] g in
+        t_id None] g in
   t_seq_subgoal (t_he_case e) [t_sub true; t_sub false] g
 
 let t_hoare_cond env g = 
@@ -1272,7 +1272,7 @@ let rec t_equiv_cond env side g =
                                  [AAmem m1;AAmem m2;AAnode])
                   [t_hyp env h1; t_hyp env h2]] in
       t_seq_subgoal (t_cut env fiff)
-        [ t_id;
+        [ t_id None;
           t_seq (t_intros_i env [hiff])
             (t_seq_subgoal (t_equiv_cond env (Some true))
                [t_seq_subgoal (t_equiv_rcond false true  1) 
