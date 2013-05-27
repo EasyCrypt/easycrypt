@@ -1691,6 +1691,7 @@ let transform_opt env ue pf tt =
         let hcmp = 
           match hcmp with PFHle -> FHle | PFHeq -> FHeq | PFHge -> FHge
         in
+        (* FIXME: check that there are not pvars in bd *)
         let bd = transf env bd in
         f_bdHoareF pre fpath post hcmp bd
 
@@ -1700,6 +1701,7 @@ let transform_opt env ue pf tt =
         let hcmp = 
           match hcmp with PFHle -> FHle | PFHeq -> FHeq | PFHge -> FHge
         in
+        (* FIXME: check that there are not pvars in bd *)
         let bd = transf env bd in
         let (env, stmt, _re, prelude, locals) =
           let env = EcEnv.Fun.enter "$stmt" env in

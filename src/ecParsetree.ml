@@ -267,14 +267,14 @@ type 'a doption =
   | Single of 'a
   | Double of 'a * 'a
 
-type 'a rnd_bij_info =
-  | RIid
-  | RIidempotent of 'a
-  | RIbij of ('a * 'a)
+(* type 'a rnd_bij_info = *)
+(*   | RIid *)
+(*   | RIidempotent of 'a *)
+(*   | RIbij of ('a * 'a) *)
 
-type 'a rnd_tac_info =
-  | RTbij of 'a rnd_bij_info
-  | RTbd of ('a option * 'a)
+type 'a rnd_tac_info = ('a option) * ('a option)
+  (* | RTbij of 'a rnd_bij_info *)
+  (* | RTbd of ('a option * 'a) *)
 
 type tac_side = bool option
 

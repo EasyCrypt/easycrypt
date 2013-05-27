@@ -874,11 +874,11 @@ module Tactic = struct
     let concl = get_concl g in
     if is_equivS concl then
       t_equiv_cond env side g
-    else if is_hoareS concl then
+    else if is_hoareS concl || is_bdHoareS concl then
       match side with
         | Some _ -> cannot_apply "cond" "Unexpected side in non relational goal"
         | None ->
-          t_hoare_cond env g
+          if is_hoareS concl then t_hoare_cond env g else t_bdHoare_cond env g
     else cannot_apply "cond" "the conclusion is not a hoare or a equiv goal"
 
   let rec process_swap1 env info g =
@@ -931,19 +931,19 @@ module Tactic = struct
   let process_rnd env tac_info g =
     let concl = get_concl g in
     match tac_info with 
-      | RTbij RIid when is_hoareS concl -> t_hoare_rnd env g
-      | RTbij bij_info when is_equivS concl ->
+      | (None, None) when is_hoareS concl -> t_hoare_rnd env g
+      | opt_bd, opt_event when is_bdHoareS concl ->
+        let opt_bd = omap opt_bd (process_phl_form treal env g)  in
+        let event ty = omap opt_event (process_phl_form (tfun ty tbool) env g) in
+        t_bd_hoare_rnd env (opt_bd,event) g
+      | _ when is_equivS concl ->
         let process_form f ty1 ty2 = process_prhl_form (tfun ty1 ty2) env g f in
-        let bij_info = match bij_info with
-          | RIid -> RIid
-          | RIidempotent f -> RIidempotent (process_form f)
-          | RIbij (f,finv) -> RIbij (process_form f, process_form finv)
+        let bij_info = match tac_info with
+          | None,None -> None, None
+          | Some f, None | None, Some f -> Some (process_form f), None
+          | Some f, Some finv -> Some (process_form f), Some (process_form finv)
         in
         t_equiv_rnd env bij_info g
-      | RTbd (opt_bd,event) when is_bdHoareS concl ->
-        let opt_bd = omap opt_bd (process_phl_form treal env g)  in
-        let event ty = process_phl_form (tfun ty tbool) env g event in
-        t_bd_hoare_rnd env (opt_bd,event) g
       | _ -> cannot_apply "rnd" "unexpected instruction or wrong arguments"
 
 
@@ -1043,7 +1043,7 @@ module Tactic = struct
     let inv = process_formula env' g inv in
     t_equivF_abs env inv g
     
-    
+
   let process_phl loc env ptac g =
     let t =
       match ptac with
