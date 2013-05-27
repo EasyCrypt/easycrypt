@@ -914,14 +914,108 @@ module Tactic = struct
   let process_swap env info =
     t_lseq (List.map (process_swap1 env) info)
 
-  let process_inline env f side occs g =
+  (* TODO move this *)
+  let pat_all fs s =
+    let rec aux_i i = 
+      match i.i_node with
+      | Scall(_,f,_) -> 
+        if EcPath.Sx.mem f fs then Some IPpat else None
+      | Sif(_,s1,s2) -> 
+        let sp1 = aux_s 0 s1.s_node in
+        let sp2 = aux_s 0 s2.s_node in
+        if sp1 = [] && sp2 = [] then None 
+        else Some (IPif(sp1,sp2))
+      | Swhile(_,s) ->
+        let sp = aux_s 0 s.s_node in
+        if sp = [] then None else Some (IPwhile(sp)) 
+      | _ -> None
+    and aux_s n s = 
+      match s with
+      | [] -> []
+      | i::s ->
+        match aux_i i with
+        | Some ip -> (n,ip) :: aux_s 0 s 
+        | None -> aux_s (n+1) s in
+    aux_s 0 s.s_node
+    
+  let rec process_inline_all env side fs g =
+    let concl = get_concl g in
+    match concl.f_node, side with
+    | FequivS _, None ->
+      t_seq (process_inline_all env (Some true) fs)
+        (process_inline_all env (Some false) fs) g
+    | FequivS es, Some b ->
+      let sp = pat_all fs (if b then es.es_sl else es.es_sr) in
+      if sp = [] then t_id g
+      else t_seq (t_inline_equiv env b sp) (process_inline_all env side fs) g
+    | FhoareS hs, None ->
+      let sp = pat_all fs hs.hs_s in
+      if sp = [] then t_id g
+      else t_seq (t_inline_hoare env sp) (process_inline_all env side fs) g
+    | _, _ -> assert false (* FIXME error message *)
+    
+  let pat_of_occs cond occs s =
+    let occs = ref occs in
+    let rec aux_i occ i = 
+      match i.i_node with
+      | Scall (_,f,_) -> 
+        if cond f then 
+          let occ = 1 + occ in
+          if Sint.mem occ !occs then begin
+            occs := Sint.remove occ !occs; 
+            occ, Some IPpat
+          end else occ, None
+        else occ, None
+      | Sif(_,s1,s2) ->
+        let occ, sp1 = aux_s occ 0 s1.s_node in
+        let occ, sp2 = aux_s occ 0 s2.s_node in
+        let ip = if sp1 = [] && sp2 = [] then None else Some(IPif(sp1,sp2)) in
+        occ, ip
+      | Swhile(_,s) ->
+        let occ, sp = aux_s occ 0 s.s_node in
+        let ip = if sp = [] then None else Some(IPwhile sp) in
+        occ, ip
+      | _ -> occ, None 
+    and aux_s occ n s =
+      match s with
+      | [] -> occ, []
+      | i::s ->
+        match aux_i occ i with
+        | occ, Some ip -> 
+          let occ, sp = aux_s occ 0 s in
+          occ, (n,ip) :: sp
+        | occ, None -> aux_s occ (n+1) s in
+    let _, sp = aux_s 0 0 s.s_node in
+    assert (Sint.is_empty !occs); (* FIXME error message *)
+    sp
+
+  let process_inline_occs env side fs occs g =
+    let cond = 
+      if EcPath.Sx.is_empty fs then fun _ -> true
+      else fun f -> EcPath.Sx.mem f fs in
+    let occs = Sint.of_list occs in
+    let concl = get_concl g in
+    match concl.f_node, side with
+    | FequivS es, Some b ->
+      let sp =  pat_of_occs cond occs (if b then es.es_sl else es.es_sr) in
+      t_inline_equiv env b sp g 
+    | FhoareS hs, None ->
+      let sp =  pat_of_occs cond occs hs.hs_s in
+      t_inline_hoare env sp g 
+    | _, _ -> assert false (* FIXME error message *)
+    
+
+  let process_inline env side (fs, occs) g =
     let hyps = get_hyps g in
     let env' = tyenv_of_hyps env hyps in
-    let f = EcTyping.trans_gamepath env' f in
-    match side with
-    | None      -> t_inline_hoare env f occs g
-    | Some side -> t_inline_equiv env f side occs g
-
+    let fs = 
+      List.fold_left (fun fs f ->
+        let f = EcTyping.trans_gamepath env' f in
+        EcPath.Sx.add f fs) EcPath.Sx.empty fs 
+    in
+    match occs with
+    | None -> process_inline_all env side fs g
+    | Some occs -> process_inline_occs env side fs occs g
 
   let process_rnd env tac_info g =
     let concl = get_concl g in
@@ -1052,7 +1146,7 @@ module Tactic = struct
       | Pwhile phi -> process_while env phi
       | Pcall(side, (pre, post)) -> process_call env side pre post
       | Pswap info -> process_swap env info
-      | Pinline (f, s, o) -> process_inline env f s o
+      | Pinline (s, info) -> process_inline env s info
       | Prnd info -> process_rnd env info
       | Pconseq info -> process_conseq env info
       | Pequivdeno info -> process_equiv_deno env info

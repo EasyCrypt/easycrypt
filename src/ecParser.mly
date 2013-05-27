@@ -1338,11 +1338,8 @@ tactic:
 | RND info=rnd_info
     { PPhl (Prnd info) }
 
-| INLINE o=occurences? f=loc(fident)
-    { PPhl (Pinline (f, None, o)) }
-
-| INLINE s=side o=occurences? f=loc(fident)
-    { PPhl (Pinline (f, Some s, o)) }
+| INLINE s=side? o=occurences? f=plist0(loc(fident), empty)
+    { PPhl (Pinline (s, (f, o))) }
 
 | EQUIVDENO info=fpattern(conseq)
     { PPhl(Pequivdeno info) }

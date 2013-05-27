@@ -971,6 +971,7 @@ let t_he_case f g =
   t_hS_or_eS (t_hoare_case f) (t_equiv_case f) g 
 
 (* --------------------------------------------------------------------- *)
+
 let _inline_freshen me v =
   let rec for_idx idx =
     let x = Printf.sprintf "%s%d" v.v_name idx in
@@ -984,113 +985,99 @@ let _inline_freshen me v =
     else
       (EcMemory.bind v.v_name v.v_type me, v.v_name)
 
-let _inline env hyps f occs me stmt =
+let _inline env hyps me sp s =
   let env = tyenv_of_hyps env hyps in
   let module P = EcPath in
 
-  let maxocc = List.fold_left max 0 (odfl [] occs) in
-
-  let rec doit1 (me, idx) instr =
-    match instr.i_node with
-    | Sasgn   _ -> ((me, idx), [instr])
-    | Sassert _ -> ((me, idx), [instr])
-    | Srnd    _ -> ((me, idx), [instr])
-
-    | Sif (e, s1, s2) ->
-        let ((me, idx), s1) = doit (me, idx) s1 in
-        let ((me, idx), s2) = doit (me, idx) s2 in
-          ((me, idx), [i_if (e, s1, s2)])
-
-    | Swhile (e, s) ->
-        let ((me, idx), s) = doit (me, idx) s in
-          ((me, idx), [i_while (e, s)])
-
-    | Scall (lv, p, args) -> 
-      (* TODO FIXME *)
-      if not (EcPath.x_equal p f) then
-        ((me, idx), [i_call (lv, p, args)])
-      else if occs <> None && not (List.mem idx (odfl [] occs)) then
-        ((me, idx+1), [i_call (lv, p, args)])
-      else
-        let p = EcEnv.NormMp.norm_xpath env p in
-        let f = EcEnv.Fun.by_xpath p env in
-        let fdef = 
-          match f.f_def with
-          | FBdef def -> def 
-          | _ -> assert false in
-        let me, anames = 
-          List.map_fold _inline_freshen me f.f_sig.fs_params in
-        let me, lnames = 
-          List.map_fold _inline_freshen me fdef.f_locals in
-        
-        (* TODO : use the PV module instead *)
-        let subst =
-          let for1 mx v x =
-            P.Mx.add
-              (P.xqname p v.v_name)
-              (P.xqname (EcMemory.xpath me) x)
-              mx
-          in
-          
-          let mx = P.Mx.empty in
-          let mx = List.fold_left2 for1 mx f.f_sig.fs_params anames in
-          let mx = List.fold_left2 for1 mx fdef.f_locals lnames in
-          
-          { e_subst_id with
-            es_freshen = true;
-            es_xp      = (fun xp -> odfl xp (P.Mx.find_opt xp mx)); }
-        in
-        
-        let prelude =
-          List.map2
-            (fun (v, newx) e ->
-              let newpv = pv_loc (EcMemory.xpath me) newx in
-              i_asgn (LvVar (newpv, v.v_type), e))
-            (List.combine f.f_sig.fs_params anames)
-            args
-
-        and resasgn =
-          match fdef.f_ret with
-          | None   -> None
-          | Some r -> Some (i_asgn (oget lv, e_subst subst r))
-        in
-
-        let body  = fdef.f_body in
-        let body  = s_subst subst body in
-        
-        ((me, idx+1), prelude @ body.s_node @ (otolist resasgn))
-  and doit (me, idx) stmt =
-    let ((me, idx), stmt) =
-      List.map_fold doit1 (me, idx) stmt.s_node
+  let inline1 me lv p args = 
+    let p = EcEnv.NormMp.norm_xpath env p in
+    let f = EcEnv.Fun.by_xpath p env in
+    let fdef = 
+      match f.f_def with
+      | FBdef def -> def 
+      | _ -> assert false in (* FIXME error message *)
+    let me, anames = 
+      List.map_fold _inline_freshen me f.f_sig.fs_params in
+    let me, lnames = 
+      List.map_fold _inline_freshen me fdef.f_locals in
+    let subst =
+      let for1 mx v x =
+        (* Remark p is in normal form so (P.xqname p v.v_name) is *)
+        P.Mx.add
+          (P.xqname p v.v_name)
+          (P.xqname (EcMemory.xpath me) x)
+          mx
+      in
+      let mx = P.Mx.empty in
+      let mx = List.fold_left2 for1 mx f.f_sig.fs_params anames in
+      let mx = List.fold_left2 for1 mx fdef.f_locals lnames in
+      let on_xp xp =
+        let xp' = EcEnv.NormMp.norm_xpath env xp in
+        P.Mx.find_def xp xp' mx  in
+      { e_subst_id with es_xp = on_xp }
     in
-      ((me, idx), EcModules.stmt (List.flatten stmt))
-  in
 
-  let ((me, idx), stmt) = doit (me, 1) stmt in
-    if maxocc > 0 && idx <= maxocc then
-      tacuerror "%d is not a valid occurence" maxocc;
-    (me, stmt)
+    let prelude =
+      List.map2
+        (fun (v, newx) e ->
+          let newpv = pv_loc (EcMemory.xpath me) newx in
+          i_asgn (LvVar (newpv, v.v_type), e))
+        (List.combine f.f_sig.fs_params anames)
+        args in
 
-let t_inline_hoare env f occs g =
-  let hyps, concl      = get_goal g in
+    let body  = s_subst subst fdef.f_body in
+
+    let resasgn =
+      match fdef.f_ret with
+      | None   -> None
+      | Some r -> Some (i_asgn (oget lv, e_subst subst r)) in
+
+    me, prelude @ body.s_node @ (otolist resasgn) in
+
+  let rec inline_i me ip i = 
+    match ip, i.i_node with
+    | IPpat, Scall (lv, p, args) -> 
+      inline1 me lv p args 
+    | IPif(sp1, sp2), Sif(e,s1,s2) ->
+      let me,s1 = inline_s me sp1 s1.s_node in
+      let me,s2 = inline_s me sp2 s2.s_node in
+      me, [i_if(e,stmt s1, stmt s2)]
+    | IPwhile sp, Swhile(e,s) ->
+      let me,s = inline_s me sp s.s_node in
+      me, [i_while(e,stmt s)]
+    | _, _ -> assert false (* FIXME error message *)
+  and inline_s me sp s = 
+    match sp with
+    | [] -> me, s
+    | (toskip,ip)::sp ->
+      let r,i,s = List.split_n toskip s in
+      let me,si = inline_i me ip i in
+      let me,s = inline_s me sp s in
+      me, List.rev_append r (si@ s) in
+  let me, s = inline_s me sp s.s_node in
+  me, stmt s 
+
+
+let t_inline_hoare env sp g =
+  let hyps,concl = get_goal g in
   let hoare      = destr_hoareS concl in
-  let (me, stmt) = _inline env hyps f occs hoare.hs_m hoare.hs_s in
+  let (me, stmt) = _inline env hyps hoare.hs_m sp hoare.hs_s in
   let concl      = f_hoareS_r { hoare with hs_m = me; hs_s = stmt; } in
-    prove_goal_by [concl] (RN_hl_inline (None, occs, f)) g
+  prove_goal_by [concl] (RN_hl_inline (None, sp)) g
 
-let t_inline_equiv env f side occs g =
+let t_inline_equiv env side sp g =
   let hyps, concl = get_goal g in
   let equiv = destr_equivS concl in
   let concl =
     match side with
     | true  ->
-        let (me, stmt) = _inline env hyps f occs equiv.es_ml equiv.es_sl in
-          f_equivS_r { equiv with es_ml = me; es_sl = stmt; }
+      let (me, stmt) = _inline env hyps equiv.es_ml sp equiv.es_sl in
+      f_equivS_r { equiv with es_ml = me; es_sl = stmt; }
     | false ->
-        let (me, stmt) = _inline env hyps f occs equiv.es_mr equiv.es_sr in
-          f_equivS_r { equiv with es_mr = me; es_sr = stmt; }
+      let (me, stmt) = _inline env hyps equiv.es_mr sp equiv.es_sr in
+      f_equivS_r { equiv with es_mr = me; es_sr = stmt; }
   in
-    prove_goal_by [concl] (RN_hl_inline (Some side, occs, f)) g
+  prove_goal_by [concl] (RN_hl_inline (Some side, sp)) g
 
 (* -------------------------------------------------------------------- *)
 
@@ -1285,133 +1272,8 @@ let rec t_equiv_cond env side g =
 
 
 (* -------------------------------------------------------------------- *)
-(* TODO move this *)
-
-(*
-type i_pat =
-  | IPpat
-  | IPif of s_pat * s_pat
-  | IPwhile of s_pat * s_pat
-and = (int * i_pat) list        
-        (* the int represent the number of instruction to skip) *)
 
 
-
-type code_position
-
-type code_position = 
-  | CPat of int
-  | CPif of int * bool * code_position
-
-type code_zip = 
-  | CZempty 
-  | CZapp of int * instr list * instr list * code_zip
-  | CZif  of expr * bool * stmt * code_zip
-  | CZwhile of expr * code_zip
-
-let rec s_split_pos z cp s = 
-  match cp with
-  | CPat p -> 
-    let hd,i,tl = s_split "get_code_position" p s in (* FIXME error message *)
-    i, CZapp(i,hd,tl,z)
-  | CPif(p,b,cp) ->
-    let hd,i,tl = s_split "get_code_position" p s in (* FIXME error message *)
-    let z = CZapp(p,hd,tl,z) in
-    match i.i_node with
-    | S_if(e,s1,s2) ->
-      let s,s' = if b then s1,s2 else s2,s1 in
-      s_split_aux (CZif(e,b,s',z)) cp s
-    | S_while(e,s) ->
-      assert b; (* FIXME error message *)
-      s_split_aux (CZwhile(e,z)) cp s
-    | _ -> assert false (* FIXME error message *)
-
-let s_split_pos = s_split_pos CZempty
-
-let rec app_code_zip s z = 
-  match z with
-  | CZempty -> stmt s
-  | CZapp(_,hd,tl,z) -> 
-    app_code_zip (List.flatten [hd;s;tl] z)
-  | CZif(e,b,s',z) ->
-    let s = stmt s in
-    let s1,s2 = if b then s,s' else s',s in
-    app_code_zip [i_if(e,s1,s2)] z
-  | CZwhile(e,z) ->
-    app_code_zip [i_while(e,stmt s)] z
-
-let freshen_locals me s f vs = 
-  let s = ref s in
-  let me = ref me in
-  let mk_v v = 
-    let vn = v.v_name in 
-    let vn = 
-      if not (EcMemory.is_bound vn !me) then vn 
-      else 
-        (* TODO share the code with EcBaseLogic.fresh_ids *)
-        let rec aux n = 
-          let vn = vn ^ string_of_int n in
-          if (EcMemory.is_bound vn !me) then aux (n+1) else vn in
-        aux 0 in
-    me := EcMemory.bind vn v.v_type !me;
-    s  := EcPath.Mm.add 
-    
-let inline1 env me i = 
-  match i.i_node with
-  | Scall(lv,f,args) ->
-    let fdef = EcEnv.Fun.by_mpath env f in
-    let body = odfl (fun _ -> assert false) fdef.f_def in
-                   (* FIXME error message *) 
-    let s = e_subst_id in
-    let me, s, params = freshen_locals me s f (fst fdef.f_sig.fs_sig) in
-    let me, s, _ = freshen_locals me s f body.f_locals in
-    let sparams = List.map2 (fun v e -> i_asgn(LvVar v,e )) params args in
-    let sb = s_subst s body.f_body in
-    let sr = 
-      ofold body.f_ret (fun l e -> i_asgn (oget lv, e_subst s e)::l) [] in
-    me, List.flatten [sparams;sb;sr]
-  | _ -> assert false (* FIXME error message *)
-      
-    
-let rec inline env me pos s = 
-  match pos with
-  | CPat p ->
-    let hd,i,tl = s_split "inline" p s in
-    let me, s = inline1 env me i in
-    me, stmt (List.flatten [hd;s;tl])
-  | CPif(p,b,pos) ->
-    let hd,i,tl = s_split "inline" p s in
-    match i.i_node with
-    | Sif(e,s1,s2) ->
-      let me, s = inline env me pos (if b then s1 else s2) in
-      let s1,s2 = if b then s,s2 else s1,s in
-      let i =  i_if(e,s1,s2) in
-      me, stmt (hd @ i :: tl)
-    | Swhile(e,s) ->
-      assert b; (* FIXME error message *)
-      let me, s = inline env me pos s in
-      let i = i_while(e,s) in
-      me, stmt (hd @ i :: tl)
-    | _ -> assert false (* FIXME error message *) 
-        
-    
-    
-  
-  
-  
-
-let t_equiv_inline env side pos g =
-  let concl = get_concl g in
-  let es = destr_equivS concl in
-  let me,s = if side then es.es_ml, es.es_sl else es.es_mr, es.es_sr in
-  let me,s = inline me s pos in
-  let es = 
-    if side then {es with es_ml = me; es_sl = s }
-    else { es with es_mr = me; es_sr = s } in
-  let concl = f_equivS_r es in
-  prove_goal_by [concl] (RN_hl_inline(side,pos)) g
-  
-*)  
 
 
 (* -------------------------------------------------------------------- *)
@@ -1478,10 +1340,6 @@ let t_equiv_rnd env bij_info =
         let bij = fun tyL tyR -> f_lambda [z_id,GTty tyR] (z tyL) in 
         bij, bij
   in wp_equiv_rnd env (f,finv) 
-
-
-
-
 
 (* --------------------------------------------------------------------- *)
 (* ---- Bounded Probabilistic Hoare Logic ------------------------------ *)
