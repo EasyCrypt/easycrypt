@@ -1010,6 +1010,13 @@ let t_hoare_case f g =
   let concl2 = f_hoareS_r { hs with hs_pr = f_and_simpl hs.hs_pr (f_not f) } in
   prove_goal_by [concl1;concl2] (RN_hl_case f) g
 
+let t_bdHoare_case f g =
+  let concl = get_concl g in
+  let bhs = destr_bdHoareS concl in
+  let concl1 = f_bdHoareS_r { bhs with bhs_pr = f_and_simpl bhs.bhs_pr f } in
+  let concl2 = f_bdHoareS_r { bhs with bhs_pr = f_and_simpl bhs.bhs_pr (f_not f) } in
+  prove_goal_by [concl1;concl2] (RN_hl_case f) g
+
 let t_equiv_case f g = 
   let concl = get_concl g in
   let es = destr_equivS concl in
@@ -1018,7 +1025,7 @@ let t_equiv_case f g =
   prove_goal_by [concl1;concl2] (RN_hl_case f) g
 
 let t_he_case f g =
-  t_hS_or_eS (t_hoare_case f) (t_equiv_case f) g 
+  t_hS_or_bhS_or_eS (t_hoare_case f) (t_bdHoare_case f) (t_equiv_case f) g 
 
 (* --------------------------------------------------------------------- *)
 let _inline_freshen me v =
@@ -1205,6 +1212,18 @@ let t_hoare_rcond b at_pos g =
   let concl2  = f_hoareS_r { hs with hs_s = s } in
   prove_goal_by [concl1;concl2] (RN_hl_rcond (None, b,at_pos)) g  
 
+let t_bdHoare_rcond b at_pos g = 
+  (* TODO: generalize the rule using assume *)
+  if at_pos <> 1 then
+    cannot_apply "rcond" "position must be 1 in bounded Hoare judgments";
+  let concl = get_concl g in
+  let bhs = destr_bdHoareS concl in
+  let m  = EcMemory.memory bhs.bhs_m in 
+  let hd,e,s = gen_rcond b m at_pos bhs.bhs_s in
+  let concl1  = f_bdHoareS_r { bhs with bhs_s = hd; bhs_po = e } in
+  let concl2  = f_bdHoareS_r { bhs with bhs_s = s } in
+  prove_goal_by [concl1;concl2] (RN_hl_rcond (None, b,at_pos)) g  
+
 let t_equiv_rcond side b at_pos g =
   let concl = get_concl g in
   let es = destr_equivS concl in
@@ -1225,9 +1244,11 @@ let t_equiv_rcond side b at_pos g =
   prove_goal_by [concl1;concl2] (RN_hl_rcond (Some side,b,at_pos)) g 
 
 let t_rcond side b at_pos g =
+  let concl = get_concl g in
   match side with
-  | None -> t_hoare_rcond b at_pos g
-  | Some side -> t_equiv_rcond side b at_pos g
+    | None when is_bdHoareS concl -> t_bdHoare_rcond b at_pos g
+    | None -> t_hoare_rcond b at_pos g
+    | Some side -> t_equiv_rcond side b at_pos g
 
 (* -------------------------------------------------------------------- *)
 let check_swap env s1 s2 = 
@@ -1290,6 +1311,12 @@ let t_hoare_cond env g =
   let hs = destr_hoareS concl in 
   let (e,_,_) = s_first_if hs.hs_s in
   t_gen_cond env None (form_of_expr (EcMemory.memory hs.hs_m) e) g
+
+let t_bdHoare_cond env g = 
+  let concl = get_concl g in
+  let bhs = destr_bdHoareS concl in 
+  let (e,_,_) = s_first_if bhs.bhs_s in
+  t_gen_cond env None (form_of_expr (EcMemory.memory bhs.bhs_m) e) g
 
 let rec t_equiv_cond env side g =
   let hyps,concl = get_goal g in
@@ -1476,6 +1503,7 @@ let t_hoare_rnd env g =
   let concl = f_hoareS_r {hs with hs_s=s; hs_po=post} in
   prove_goal_by [concl] RN_hl_hoare_rnd g
 
+
 let wp_equiv_rnd env (f,finv) g =
   let concl = get_concl g in
   let es = destr_equivS concl in
@@ -1504,19 +1532,19 @@ let wp_equiv_rnd env (f,finv) g =
   let post = supp_cond1 &&& supp_cond2 &&& inv_cond1 &&& inv_cond2 &&& post in
   let post = f_forall_simpl [(x_id,GTty tyL);(y_id,GTty tyR)] post in
   let concl = f_equivS_r {es with es_sl=sl'; es_sr=sr'; es_po=post} in
-  prove_goal_by [concl] (RN_hl_equiv_rnd (RIbij (tf,tfinv))) g
+  prove_goal_by [concl] (RN_hl_equiv_rnd ((Some tf, Some tfinv))) g
 
 
 let t_equiv_rnd env bij_info = 
   let f,finv =  match bij_info with 
-    | RIbij (f,finv) -> f,finv
-    | RIidempotent bij -> bij, bij
-    | RIid -> 
-        let z_id = EcIdent.create "z" in
-        let z = f_local z_id in
-        let bij = fun tyL tyR -> f_lambda [z_id,GTty tyR] (z tyL) in 
-        bij, bij
-  in wp_equiv_rnd env (f,finv) 
+    | Some f, Some finv ->  f, finv
+    | Some bij, None | None, Some bij -> bij, bij
+    | None, None -> 
+      let z_id = EcIdent.create "z" in
+      let z = f_local z_id in
+      let bij = fun tyL tyR -> f_lambda [z_id,GTty tyR] (z tyL) in 
+      bij, bij
+  in wp_equiv_rnd env (f, finv) 
 
 
 
@@ -1549,14 +1577,17 @@ let t_equiv_rnd env bij_info =
  *   to the post of hr
  *)
 
-let t_bd_hoare_rnd env (opt_bd,event) g =
+let t_bd_hoare_rnd env (opt_bd,opt_event) g =
   let concl = get_concl g in
   let bhs = destr_bdHoareS concl in
 
   let (lv,distr),s = s_last_rnd "bd_hoare_rnd" bhs.bhs_s in
   let ty_distr = proj_distr_ty (e_ty distr) in
   let distr = EcFol.form_of_expr (EcMemory.memory bhs.bhs_m) distr in
-  let event = event ty_distr in
+  let event = match opt_event ty_distr with 
+    | Some event -> event 
+    | None -> cannot_apply "rnd" "Optional events still not supported"
+  in
 
   let new_cmp_op,new_hoare_bd, bounded_distr =
     match bhs.bhs_cmp, opt_bd with

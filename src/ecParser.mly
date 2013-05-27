@@ -1349,7 +1349,8 @@ tactic:
     { PPhl (Pswap info) }
 
 | RND info=rnd_info
-    { PPhl (Prnd info) }
+    { (* let rnd_info = match info with None -> None,None | Some ri -> ri in *)
+      PPhl (Prnd info) }
 
 | INLINE o=occurences? f=lqident
     { PPhl (Pinline (f, None, o)) }
@@ -1365,14 +1366,14 @@ tactic:
 ;
 
 rnd_info:
-| e1=sform COMMA e2=sform 
-  {RTbij (RIbij (e1,e2)) }
-| e=sform 
-  {RTbij (RIidempotent e) }
+| e1=sform e2=sform 
+  { Some e1, Some e2 }
+| e=sform UNDERSCORE 
+  { Some e, None }
+| UNDERSCORE e=sform 
+  { None, Some e }
 | empty
-  {RTbij (RIid) }
-| LBRACE e1=sform COMMA e2=sform RBRACE
-  {RTbd (Some e1,e2)}
+  {None, None }
 ;
 
 swap_info:
