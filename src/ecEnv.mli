@@ -189,6 +189,9 @@ module NormMp : sig
   val norm_mpath : env -> mpath -> mpath
   val norm_xpath : env -> xpath -> xpath
   val norm_pvar  : env -> EcTypes.prog_var -> EcTypes.prog_var
+  val add_uses   : env -> Sm.t -> Sm.t -> mpath -> Sm.t 
+  val top_uses   : env -> mpath -> Sm.t 
+  val norm_restr : env -> Sm.t -> Sm.t
   val norm_glob  : env -> EcMemory.memory -> mpath -> EcFol.form 
   val norm_tglob : env -> mpath -> EcTypes.ty 
   val tglob_reducible : env -> mpath -> bool

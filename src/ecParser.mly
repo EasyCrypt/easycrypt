@@ -320,20 +320,6 @@ uqident:
 ;
 
 (* -------------------------------------------------------------------- *)
-lqident:
-| x=LIDENT {
-    { pl_desc = ([], x);
-      pl_loc  = EcLocation.make $startpos $endpos; }
-  }
-
-| xs=namespace DOT x=LIDENT {
-    { pl_desc = (xs, x);
-      pl_loc  = EcLocation.make $startpos $endpos;
-    }
-  }
-;
-
-(* -------------------------------------------------------------------- *)
 %inline _oident:
 | x=LIDENT { x }
 | x=UIDENT { x }
@@ -1352,10 +1338,10 @@ tactic:
 | RND info=rnd_info
     { PPhl (Prnd info) }
 
-| INLINE o=occurences? f=lqident
+| INLINE o=occurences? f=loc(fident)
     { PPhl (Pinline (f, None, o)) }
 
-| INLINE s=side o=occurences? f=lqident
+| INLINE s=side o=occurences? f=loc(fident)
     { PPhl (Pinline (f, Some s, o)) }
 
 | EQUIVDENO info=fpattern(conseq)

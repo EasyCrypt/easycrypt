@@ -915,17 +915,12 @@ module Tactic = struct
     t_lseq (List.map (process_swap1 env) info)
 
   let process_inline env f side occs g =
-    let (fp, f) = EcEnv.Fun.sp_lookup (unloc f) env in
-    begin match f.EcEnv.sp_target.f_def with
-    | FBabs _ -> failwith "function is abstract";
-    | _ -> ()
-    end;
-
-    let fp = xpath (mpath fp.x_top.m_top []) fp.x_sub in
-
+    let hyps = get_hyps g in
+    let env' = tyenv_of_hyps env hyps in
+    let f = EcTyping.trans_gamepath env' f in
     match side with
-    | None      -> t_inline_hoare env fp occs g
-    | Some side -> t_inline_equiv env fp side occs g
+    | None      -> t_inline_hoare env f occs g
+    | Some side -> t_inline_equiv env f side occs g
 
 
   let process_rnd env tac_info g =

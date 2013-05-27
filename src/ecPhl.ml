@@ -42,7 +42,9 @@ module PVM = struct
 
   let empty = M.empty 
 
-  let pvm env pv m = (MSvar (EcEnv.NormMp.norm_pvar env pv), m)
+  let pvm env pv m = 
+    let pv = EcEnv.NormMp.norm_pvar env pv in 
+    (MSvar pv, m)
 
   let add env pv m f s = M.add (pvm env pv m) f s 
 
@@ -212,7 +214,7 @@ let rec f_write env w f =
   | FBdef fdef ->
     let add x w = 
       let vb = Var.by_xpath x env in
-      PV.add env { pv_name = x; pv_kind = PVglob } vb.vb_type w in
+      PV.add env (pv_glob x) vb.vb_type w in
     let w = EcPath.Sx.fold add fdef.f_uses.us_writes w in
     List.fold_left (f_write env) w fdef.f_uses.us_calls
 
@@ -246,7 +248,7 @@ let rec f_read env r f =
   | FBdef fdef ->
     let add x r = 
       let vb = Var.by_xpath x env in
-      PV.add env { pv_name = x; pv_kind = PVglob } vb.vb_type r in
+      PV.add env (pv_glob x) vb.vb_type r in
     let r = EcPath.Sx.fold add fdef.f_uses.us_reads r in
     List.fold_left (f_read env) r fdef.f_uses.us_calls
 
@@ -982,7 +984,8 @@ let _inline_freshen me v =
     else
       (EcMemory.bind v.v_name v.v_type me, v.v_name)
 
-let _inline env f occs me stmt =
+let _inline env hyps f occs me stmt =
+  let env = tyenv_of_hyps env hyps in
   let module P = EcPath in
 
   let maxocc = List.fold_left max 0 (odfl [] occs) in
@@ -1002,62 +1005,60 @@ let _inline env f occs me stmt =
         let ((me, idx), s) = doit (me, idx) s in
           ((me, idx), [i_while (e, s)])
 
-    | Scall (lv, p, args) ->
-        let p' = P.xpath (P.mpath p.P.x_top.P.m_top []) p.P.x_sub in
-          if not (EcPath.x_equal p' f) then
-            ((me, idx), [i_call (lv, p, args)])
-          else if occs <> None && not (List.mem idx (odfl [] occs)) then
-            ((me, idx+1), [i_call (lv, p, args)])
-          else
-            let f = EcEnv.Fun.by_xpath p env in
-            let fdef = 
-              match f.f_def with
-              | FBdef def -> def 
-              | _ -> assert false in
-            let me, anames = 
-              List.map_fold _inline_freshen me f.f_sig.fs_params in
-            let me, lnames = 
-              List.map_fold _inline_freshen me fdef.f_locals in
+    | Scall (lv, p, args) -> 
+      (* TODO FIXME *)
+      if not (EcPath.x_equal p f) then
+        ((me, idx), [i_call (lv, p, args)])
+      else if occs <> None && not (List.mem idx (odfl [] occs)) then
+        ((me, idx+1), [i_call (lv, p, args)])
+      else
+        let p = EcEnv.NormMp.norm_xpath env p in
+        let f = EcEnv.Fun.by_xpath p env in
+        let fdef = 
+          match f.f_def with
+          | FBdef def -> def 
+          | _ -> assert false in
+        let me, anames = 
+          List.map_fold _inline_freshen me f.f_sig.fs_params in
+        let me, lnames = 
+          List.map_fold _inline_freshen me fdef.f_locals in
+        
+        (* TODO : use the PV module instead *)
+        let subst =
+          let for1 mx v x =
+            P.Mx.add
+              (P.xqname p v.v_name)
+              (P.xqname (EcMemory.xpath me) x)
+              mx
+          in
+          
+          let mx = P.Mx.empty in
+          let mx = List.fold_left2 for1 mx f.f_sig.fs_params anames in
+          let mx = List.fold_left2 for1 mx fdef.f_locals lnames in
+          
+          { e_subst_id with
+            es_freshen = true;
+            es_xp      = (fun xp -> odfl xp (P.Mx.find_opt xp mx)); }
+        in
+        
+        let prelude =
+          List.map2
+            (fun (v, newx) e ->
+              let newpv = pv_loc (EcMemory.xpath me) newx in
+              i_asgn (LvVar (newpv, v.v_type), e))
+            (List.combine f.f_sig.fs_params anames)
+            args
 
-            let subst =
-              let for1 mx v x =
-                P.Mx.add
-                  (P.xqvar p' v.v_name)
-                  (P.xqvar (EcMemory.xpath me) x)
-                  mx
-              in
+        and resasgn =
+          match fdef.f_ret with
+          | None   -> None
+          | Some r -> Some (i_asgn (oget lv, e_subst subst r))
+        in
 
-              let mx = P.Mx.empty in
-              let mx = List.fold_left2 for1 mx f.f_sig.fs_params anames in
-              let mx = List.fold_left2 for1 mx fdef.f_locals lnames in
-
-                { e_subst_id with
-                    es_freshen = true;
-                    es_xp      = (fun xp -> odfl xp (P.Mx.find_opt xp mx)); }
-            in
-
-            let prelude =
-              List.map2
-                (fun (v, newx) e ->
-                  let newpv = {
-                    pv_name = P.xqvar (EcMemory.xpath me) newx;
-                    pv_kind = PVloc;
-                  } in
-                    i_asgn (LvVar (newpv, v.v_type), e))
-                (List.combine f.f_sig.fs_params anames)
-                args
-
-            and resasgn =
-              match fdef.f_ret with
-              | None   -> None
-              | Some r -> Some (i_asgn (oget lv, e_subst subst r))
-            in
-
-            let body  = fdef.f_body in
-            let body  = s_subst subst body in
-
-              ((me, idx+1), prelude @ body.s_node @ (otolist resasgn))
-  
+        let body  = fdef.f_body in
+        let body  = s_subst subst body in
+        
+        ((me, idx+1), prelude @ body.s_node @ (otolist resasgn))
   and doit (me, idx) stmt =
     let ((me, idx), stmt) =
       List.map_fold doit1 (me, idx) stmt.s_node
@@ -1071,22 +1072,22 @@ let _inline env f occs me stmt =
     (me, stmt)
 
 let t_inline_hoare env f occs g =
-  let concl      = snd (get_goal g) in
+  let hyps, concl      = get_goal g in
   let hoare      = destr_hoareS concl in
-  let (me, stmt) = _inline env f occs hoare.hs_m hoare.hs_s in
+  let (me, stmt) = _inline env hyps f occs hoare.hs_m hoare.hs_s in
   let concl      = f_hoareS_r { hoare with hs_m = me; hs_s = stmt; } in
     prove_goal_by [concl] (RN_hl_inline (None, occs, f)) g
 
 let t_inline_equiv env f side occs g =
-  let concl = snd (get_goal g) in
+  let hyps, concl = get_goal g in
   let equiv = destr_equivS concl in
   let concl =
     match side with
     | true  ->
-        let (me, stmt) = _inline env f occs equiv.es_ml equiv.es_sl in
+        let (me, stmt) = _inline env hyps f occs equiv.es_ml equiv.es_sl in
           f_equivS_r { equiv with es_ml = me; es_sl = stmt; }
     | false ->
-        let (me, stmt) = _inline env f occs equiv.es_mr equiv.es_sr in
+        let (me, stmt) = _inline env hyps f occs equiv.es_mr equiv.es_sr in
           f_equivS_r { equiv with es_mr = me; es_sr = stmt; }
   in
     prove_goal_by [concl] (RN_hl_inline (Some side, occs, f)) g
@@ -1285,7 +1286,19 @@ let rec t_equiv_cond env side g =
 
 (* -------------------------------------------------------------------- *)
 (* TODO move this *)
+
 (*
+type i_pat =
+  | IPpat
+  | IPif of s_pat * s_pat
+  | IPwhile of s_pat * s_pat
+and = (int * i_pat) list        
+        (* the int represent the number of instruction to skip) *)
+
+
+
+type code_position
+
 type code_position = 
   | CPat of int
   | CPif of int * bool * code_position

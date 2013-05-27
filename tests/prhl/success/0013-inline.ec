@@ -16,6 +16,8 @@ module M = {
 
 lemma e : equiv[M.g ~ M.g : a{1} = a{2} ==> res{1} = res{2}]
 proof.
-  fun; inline {1} M.f; inline {2} M.f.
+  fun.
+  inline {1} M.f.
+  inline {2} M.f.
   wp; skip; trivial.
 save.

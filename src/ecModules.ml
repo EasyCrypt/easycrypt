@@ -369,7 +369,7 @@ type module_expr = {
 and module_body =
   | ME_Alias       of EcPath.mpath
   | ME_Structure   of module_structure
-  | ME_Decl        of module_type * EcPath.Sm.t
+  | ME_Decl        of module_type * EcPath.Sm.t 
 
 and module_structure = {
   ms_params : (EcIdent.t * module_type) list;

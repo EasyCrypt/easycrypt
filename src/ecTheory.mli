@@ -56,4 +56,4 @@ val module_comps_of_module_sig_comps:
   module_sig_body -> module_item list
 
 val module_expr_of_module_sig:
-  EcIdent.t -> module_type -> module_sig ->  EcPath.Sm.t -> module_expr
+  EcIdent.t -> module_type -> module_sig -> EcPath.Sm.t -> module_expr

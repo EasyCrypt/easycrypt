@@ -233,10 +233,6 @@ let x_fv fv xp = m_fv fv xp.x_top
 
 let xqname x s = xpath x.x_top (pqname x.x_sub s)
 
-let xqvar x s =
-  let x = xpath (mpath x.x_top.m_top []) x.x_sub in
-    xqname x s
-
 (* -------------------------------------------------------------------- *)
 let rec m_tostring (m : mpath) = 
   let top, sub = 

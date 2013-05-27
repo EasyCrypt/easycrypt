@@ -325,7 +325,7 @@ and phl_tactics =
   | Prcond      of (bool option * bool * int)
   | Pcond       of tac_side
   | Pswap       of ((tac_side * swap_kind) located list)
-  | Pinline     of pqsymbol * tac_side * (int list option)
+  | Pinline     of pgamepath * tac_side * (int list option)
   | Prnd        of pformula rnd_tac_info
   | Pconseq     of cfpattern
   | Pequivdeno  of cfpattern

@@ -216,9 +216,10 @@ and subst_module_body (s : _subst) (body : module_body) =
       s, ME_Structure bstruct
 
   | ME_Decl (p,r) -> 
-    s, ME_Decl(subst_modtype s p,
-               EcPath.Sm.fold 
-                 (fun x r -> EcPath.Sm.add (s.s_fmp x) r) r EcPath.Sm.empty)
+    let sr r = 
+      EcPath.Sm.fold 
+        (fun x r -> EcPath.Sm.add (s.s_fmp x) r) r EcPath.Sm.empty in
+    s, ME_Decl(subst_modtype s p, sr r)
 
 (* -------------------------------------------------------------------- *)
 and subst_module_comps (s : _subst) (comps : module_comps) =

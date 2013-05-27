@@ -201,18 +201,22 @@ let tyenv_of_hyps env hyps =
     | LD_hyp   _    -> env in
   List.fold_left add env hyps.h_local
 
-let check_modtype _env _mp _i _restr = ()
- (* TODO FIXME *)
-(*
-  let me = EcEnv.Mod.by_mpath mp in
-  if not (EcEnv.ModTy.has_mod_type env me.me_types) then
-    assert false (* FIXME error message *);
-  let use = top_uses mp in
-  let 
-*)  
-  
-
-  
+let check_modtype_restr env mp mt i restr = 
+  EcTyping.check_sig_mt_cnv env mt i;
+  let restr = EcEnv.NormMp.norm_restr env restr in
+  let us = EcEnv.NormMp.top_uses env mp in
+  let check u = 
+    let me = EcEnv.Mod.by_mpath u env in
+    match me.EcModules.me_body with 
+    | EcModules.ME_Decl(_,nu) ->
+      let nu = EcEnv.NormMp.norm_restr env nu in
+      let diff = EcPath.Sm.diff restr nu in
+      if not (EcPath.Sm.is_empty diff) then assert false; 
+                                    (* FIXME error message *)
+    | EcModules.ME_Structure _ -> 
+      if EcPath.Sm.mem u restr then assert false (* FIXME error message *)
+    | _ -> assert false in
+  EcPath.Sm.iter check us; 
 
 type app_arg =
   | AAform of form
@@ -228,11 +232,8 @@ let check_arg do_arg env hyps s x gty a =
     bind_local s x f, RA_form f
   | GTmem _   , AAmem m ->
     bind_mem s x m, RA_id m
-  | GTmodty (emt, _), AAmp (mp, mt)  ->
-    (* FIXME: create a dedicated function for module application *)
-    (* FIXME: this function should enforce modules memory model *)
-(*      if not (EcEnv.ModTy.has_mod_type env mt emt) then
-        failwith "invalid-modtype"; *)
+  | GTmodty (emt, restr), AAmp (mp, mt)  ->
+    check_modtype_restr env mp mt emt restr;
       bind_mod s x mp, RA_mp mp
   | _ -> assert false (* FIXME error message *)
 
