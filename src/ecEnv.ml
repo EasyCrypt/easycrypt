@@ -325,13 +325,13 @@ module MC = struct
                         let fname = EcPath.basename fpath in
                           EcPath.xpath
                             (EcPath.mpath_crt
-                               p (if isvar then [] else List.map EcPath.mident n)
+                               p (if isvar && not local then [] else List.map EcPath.mident n)
                                (EcPath.prefix fpath))
                             (EcPath.pqname (EcPath.psymbol fname) vname)
                       else
                         EcPath.xpath
                           (EcPath.mpath_crt
-                             p (if isvar then [] else List.map EcPath.mident n)
+                             p (if isvar && not local then [] else List.map EcPath.mident n)
                              (EcPath.prefix q))
                           (EcPath.psymbol (EcPath.basename q))
                     in
