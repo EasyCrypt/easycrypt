@@ -874,11 +874,11 @@ module Tactic = struct
     let concl = get_concl g in
     if is_equivS concl then
       t_equiv_cond env side g
-    else if is_hoareS concl then
+    else if is_hoareS concl || is_bdHoareS concl then
       match side with
         | Some _ -> cannot_apply "cond" "Unexpected side in non relational goal"
         | None ->
-          t_hoare_cond env g
+          if is_hoareS concl then t_hoare_cond env g else t_bdHoare_cond env g
     else cannot_apply "cond" "the conclusion is not a hoare or a equiv goal"
 
   let rec process_swap1 env info g =
@@ -914,36 +914,125 @@ module Tactic = struct
   let process_swap env info =
     t_lseq (List.map (process_swap1 env) info)
 
-  let process_inline env f side occs g =
-    let (fp, f) = EcEnv.Fun.sp_lookup (unloc f) env in
-    begin match f.EcEnv.sp_target.f_def with
-    | FBabs _ -> failwith "function is abstract";
-    | _ -> ()
-    end;
-
-    let fp = xpath (mpath fp.x_top.m_top []) fp.x_sub in
-
-    match side with
-    | None      -> t_inline_hoare env fp occs g
-    | Some side -> t_inline_equiv env fp side occs g
-
-
-  let process_rnd env tac_info g =
+  (* TODO move this *)
+  let pat_all fs s =
+    let rec aux_i i = 
+      match i.i_node with
+      | Scall(_,f,_) -> 
+        if EcPath.Sx.mem f fs then Some IPpat else None
+      | Sif(_,s1,s2) -> 
+        let sp1 = aux_s 0 s1.s_node in
+        let sp2 = aux_s 0 s2.s_node in
+        if sp1 = [] && sp2 = [] then None 
+        else Some (IPif(sp1,sp2))
+      | Swhile(_,s) ->
+        let sp = aux_s 0 s.s_node in
+        if sp = [] then None else Some (IPwhile(sp)) 
+      | _ -> None
+    and aux_s n s = 
+      match s with
+      | [] -> []
+      | i::s ->
+        match aux_i i with
+        | Some ip -> (n,ip) :: aux_s 0 s 
+        | None -> aux_s (n+1) s in
+    aux_s 0 s.s_node
+    
+  let rec process_inline_all env side fs g =
     let concl = get_concl g in
-    match tac_info with 
-      | RTbij RIid when is_hoareS concl -> t_hoare_rnd env g
-      | RTbij bij_info when is_equivS concl ->
-        let process_form f ty1 ty2 = process_prhl_form (tfun ty1 ty2) env g f in
-        let bij_info = match bij_info with
-          | RIid -> RIid
-          | RIidempotent f -> RIidempotent (process_form f)
-          | RIbij (f,finv) -> RIbij (process_form f, process_form finv)
-        in
-        t_equiv_rnd env bij_info g
-      | RTbd (opt_bd,event) when is_bdHoareS concl ->
+    match concl.f_node, side with
+    | FequivS _, None ->
+      t_seq (process_inline_all env (Some true) fs)
+        (process_inline_all env (Some false) fs) g
+    | FequivS es, Some b ->
+      let sp = pat_all fs (if b then es.es_sl else es.es_sr) in
+      if sp = [] then t_id g
+      else t_seq (t_inline_equiv env b sp) (process_inline_all env side fs) g
+    | FhoareS hs, None ->
+      let sp = pat_all fs hs.hs_s in
+      if sp = [] then t_id g
+      else t_seq (t_inline_hoare env sp) (process_inline_all env side fs) g
+    | _, _ -> assert false (* FIXME error message *)
+    
+  let pat_of_occs cond occs s =
+    let occs = ref occs in
+    let rec aux_i occ i = 
+      match i.i_node with
+      | Scall (_,f,_) -> 
+        if cond f then 
+          let occ = 1 + occ in
+          if Sint.mem occ !occs then begin
+            occs := Sint.remove occ !occs; 
+            occ, Some IPpat
+          end else occ, None
+        else occ, None
+      | Sif(_,s1,s2) ->
+        let occ, sp1 = aux_s occ 0 s1.s_node in
+        let occ, sp2 = aux_s occ 0 s2.s_node in
+        let ip = if sp1 = [] && sp2 = [] then None else Some(IPif(sp1,sp2)) in
+        occ, ip
+      | Swhile(_,s) ->
+        let occ, sp = aux_s occ 0 s.s_node in
+        let ip = if sp = [] then None else Some(IPwhile sp) in
+        occ, ip
+      | _ -> occ, None 
+    and aux_s occ n s =
+      match s with
+      | [] -> occ, []
+      | i::s ->
+        match aux_i occ i with
+        | occ, Some ip -> 
+          let occ, sp = aux_s occ 0 s in
+          occ, (n,ip) :: sp
+        | occ, None -> aux_s occ (n+1) s in
+    let _, sp = aux_s 0 0 s.s_node in
+    assert (Sint.is_empty !occs); (* FIXME error message *)
+    sp
+
+  let process_inline_occs env side fs occs g =
+    let cond = 
+      if EcPath.Sx.is_empty fs then fun _ -> true
+      else fun f -> EcPath.Sx.mem f fs in
+    let occs = Sint.of_list occs in
+    let concl = get_concl g in
+    match concl.f_node, side with
+    | FequivS es, Some b ->
+      let sp =  pat_of_occs cond occs (if b then es.es_sl else es.es_sr) in
+      t_inline_equiv env b sp g 
+    | FhoareS hs, None ->
+      let sp =  pat_of_occs cond occs hs.hs_s in
+      t_inline_hoare env sp g 
+    | _, _ -> assert false (* FIXME error message *)
+    
+
+  let process_inline env side (fs, occs) g =
+    let hyps = get_hyps g in
+    let env' = tyenv_of_hyps env hyps in
+    let fs = 
+      List.fold_left (fun fs f ->
+        let f = EcTyping.trans_gamepath env' f in
+        EcPath.Sx.add f fs) EcPath.Sx.empty fs 
+    in
+    match occs with
+    | None -> process_inline_all env side fs g
+    | Some occs -> process_inline_occs env side fs occs g
+
+  let process_rnd side env tac_info g =
+    let concl = get_concl g in
+    match side, tac_info with 
+      | None, (None, None) when is_hoareS concl -> t_hoare_rnd env g
+      | None, (opt_bd, opt_event) when is_bdHoareS concl ->
         let opt_bd = omap opt_bd (process_phl_form treal env g)  in
-        let event ty = process_phl_form (tfun ty tbool) env g event in
+        let event ty = omap opt_event (process_phl_form (tfun ty tbool) env g) in
         t_bd_hoare_rnd env (opt_bd,event) g
+      | _ when is_equivS concl ->
+        let process_form f ty1 ty2 = process_prhl_form (tfun ty1 ty2) env g f in
+        let bij_info = match tac_info with
+          | None,None -> None, None
+          | Some f, None | None, Some f -> Some (process_form f), None
+          | Some f, Some finv -> Some (process_form f), Some (process_form finv)
+        in
+        t_equiv_rnd side env bij_info g
       | _ -> cannot_apply "rnd" "unexpected instruction or wrong arguments"
 
 
@@ -1043,7 +1132,7 @@ module Tactic = struct
     let inv = process_formula env' g inv in
     t_equivF_abs env inv g
     
-    
+
   let process_phl loc env ptac g =
     let t =
       match ptac with
@@ -1057,8 +1146,8 @@ module Tactic = struct
       | Pwhile phi -> process_while env phi
       | Pcall(side, (pre, post)) -> process_call env side pre post
       | Pswap info -> process_swap env info
-      | Pinline (f, s, o) -> process_inline env f s o
-      | Prnd info -> process_rnd env info
+      | Pinline (s, info) -> process_inline env s info
+      | Prnd (side,info) -> process_rnd side env info
       | Pconseq info -> process_conseq env info
       | Pequivdeno info -> process_equiv_deno env info
     in

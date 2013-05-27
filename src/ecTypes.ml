@@ -289,14 +289,23 @@ let string_of_pvar (p : prog_var) =
     (EcPath.x_tostring p.pv_name)
     (string_of_pvar_kind p.pv_kind)
 
+(* Important : global variables are never suspended, local are 
+   since they contain the path of the function. *)
+   
 let pv_loc f s = 
-  { pv_name = EcPath.xqvar f s;
+  { pv_name = EcPath.xqname f s;
     pv_kind = PVloc }
 
-let pv_glob x = 
+let pv_res (f:EcPath.xpath) = pv_loc f "res"
+
+let pv_glob x =
+  let top = x.EcPath.x_top in
+  let x = 
+    if top.EcPath.m_args = [] then x
+    else EcPath.xpath (EcPath.m_functor top) x.EcPath.x_sub in
   { pv_name = x; pv_kind = PVglob }
 
-let pv_res (f:EcPath.xpath) = pv_loc f "res"
+let pv x k = { pv_name = x; pv_kind = k }
 
 (* -------------------------------------------------------------------- *)
 type lpattern =

@@ -64,7 +64,7 @@ module G4 = {
 equiv different : G3.f ~ G4.f : true ==> G3.z{1} + 1 = G4.z{2}
 proof.
  fun.
- rnd (lambda z, z + 1), (lambda z, z - 1).
+ rnd (lambda z, z + 1) (lambda z, z - 1).
  skip.
  trivial.
 save.
@@ -115,13 +115,14 @@ module G6 = {
 
 axiom Q_valid : forall (x:int), a <= x => x <= b => Q(x, f(x)).
 
+axiom aux_test_wp : forall x, in_supp x (dinter a b) => 
+mu_x (dinter a b) x = mu_x (dinter c d) (f x).
+
 equiv test_wp : G5.f ~ G6.f : true ==> Q(G5.z{1},G6.z{2})
 proof.
  fun.
- rnd (lambda x, f x), (lambda x, finv x).
+ rnd (lambda x, f x) (lambda x, finv x).
  skip.
-  axiom aux_test_wp : forall x, in_supp x (dinter a b) => 
-    mu_x (dinter a b) x = mu_x (dinter c d) (f x).
  intros &1 &2 _ x y.
  split;[ split;[ split;trivial | trivial ] | trivial ].
 save.
@@ -132,8 +133,28 @@ equiv test_sp : G5.f ~ G6.f : Q(G5.z{1},G6.z{2}) ==>
  exists (u v:int), Q(u, v)
 proof.
  fun.
- rnd (lambda x, f x), (lambda x, finv x ).
+ rnd (lambda x, f x) (lambda x, finv x ).
  skip.
  intros &1 &2 _ x y.
  split;[ split;[ split;trivial | trivial ] | trivial ].
 save.
+
+
+(* one-sided *)
+module M = {
+  fun f() : int = {
+    var k : int;
+    k = $dinter 0 10;
+    return k;
+  }
+}.
+
+lemma M_in_range:
+  equiv [ M.f ~ M.f : true ==> 0 <= res{1} /\ res{2} <= 10 ]
+proof.
+fun.
+ rnd{1}.
+ rnd{2}.
+ skip;trivial.
+save.
+

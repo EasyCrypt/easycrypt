@@ -82,6 +82,12 @@ let toqsymbol (p : path) =
   | Psymbol x     -> ([], x)
   | Pqname (p, x) -> (tolist p, x)
 
+let fromqsymbol ((symbs,symb) : qsymbol) =
+  match symbs with
+    | [] -> pqname (psymbol "<top>") symb
+  | s::symbs ->
+    pqname (List.fold_left pqname (psymbol s) symbs) symb
+
 let basename p = 
   match p.p_node with 
   | Psymbol x     -> x
@@ -232,10 +238,6 @@ let xpath top sub =
 let x_fv fv xp = m_fv fv xp.x_top 
 
 let xqname x s = xpath x.x_top (pqname x.x_sub s)
-
-let xqvar x s =
-  let x = xpath (mpath x.x_top.m_top []) x.x_sub in
-    xqname x s
 
 (* -------------------------------------------------------------------- *)
 let rec m_tostring (m : mpath) = 

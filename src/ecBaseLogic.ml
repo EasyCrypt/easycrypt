@@ -177,8 +177,15 @@ type prover_info = unit (* FIXME *)
 
 type tac_pos = int EcParsetree.doption
 
+type i_pat =
+  | IPpat
+  | IPif of s_pat * s_pat
+  | IPwhile of s_pat 
+and s_pat = (int * i_pat) list        
+        (* the int represent the number of instruction to skip) *)
 
-type rnd_bij_info = form EcParsetree.rnd_bij_info
+
+type rnd_tac_info = form EcParsetree.rnd_tac_info
 
 type rule_name = 
    (* Logical rules *)
@@ -206,9 +213,9 @@ type rule_name =
   | RN_hl_while     of EcFol.form
   | RN_hl_call      of bool option * EcFol.form * EcFol.form
   | RN_hl_swap      of bool * int * int * int
-  | RN_hl_inline    of bool option * int list option * EcPath.xpath
+  | RN_hl_inline    of bool option * s_pat 
   | RN_hl_hoare_rnd
-  | RN_hl_equiv_rnd of rnd_bij_info
+  | RN_hl_equiv_rnd of rnd_tac_info
   | RN_hl_conseq 
   | RN_hl_hoare_equiv 
   | RN_hl_deno      

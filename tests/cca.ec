@@ -72,9 +72,10 @@ module G (B:Adv') = {
   } 
 }.
 
-module F1 (B:Adv') = { 
+(* module F1 (B:Adv') = { 
   module A1 = B(G.O)
 }.
+*)
 
 lemma foo' : 
   forall (A<:Adv' {G}), 
@@ -92,7 +93,7 @@ intros A.
  skip;trivial.
 save.
 
-module A (O:IO) : Adv'(O) = { 
+module A' (O:IO) : Adv'(O) = { 
   fun a (x:int) : int = {
     var r : int;
     r := O.h(x);
@@ -101,13 +102,24 @@ module A (O:IO) : Adv'(O) = {
 }.
 
 lemma foo1 :
-   equiv [ G(A).main ~ G(A).main : 
-           x{1} = x{2} /\ (glob A){1} = (glob A){2} ==> 
-           res{1} = res{2} /\  (glob A){1} = (glob A){2} ]
+   equiv [ G(A').main ~ G(A').main : 
+           x{1} = x{2} /\ (glob A'){1} = (glob A'){2} ==> 
+           res{1} = res{2} /\  (glob A'){1} = (glob A'){2} ]
 proof.
- apply (foo' (:A)).
+ apply (foo' (<:A')).
 save.
 
+
+lemma foo2 : forall (x:int) &m1 &m2, 
+     Pr[G(A').main(x) @ &m1 : res = 0] = Pr[G(A').main(x) @ &m1 : res = 0]
+proof.
+ intros xv &m1 &m2.
+ equiv_deno (_ : x{1} = x{2} /\ (glob A'){1} = (glob A'){2} ==> 
+                 res{1} = res{2} /\  (glob A'){1} = (glob A'){2}).
+ apply foo1.
+ simplify;trivial.
+ trivial.
+save.
 
 (*
 

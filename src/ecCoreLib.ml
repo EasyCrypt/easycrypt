@@ -55,7 +55,7 @@ let p_int        = _Pervasive id_int
 let p_real       = _Pervasive id_real
 let p_distr      = _Pervasive id_distr
 let p_cpred      = _Pervasive id_cpred
-let p_from_int   = _Pervasive id_from_int
+let p_from_int   = EcPath.fromqsymbol s_from_int
 
 let p_true       = _Pervasive id_true
 let p_false      = _Pervasive id_false

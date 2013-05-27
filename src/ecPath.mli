@@ -26,6 +26,7 @@ val p_hash    : path -> int
 (* -------------------------------------------------------------------- *)
 val tostring  : path -> string
 val toqsymbol : path -> qsymbol
+val fromqsymbol : qsymbol -> path
 val basename  : path -> symbol
 val prefix    : path -> path option
 val rootname  : path -> symbol
@@ -74,7 +75,6 @@ type xpath = private {
 
 val xpath  : mpath -> path -> xpath
 val xqname : xpath -> symbol -> xpath
-val xqvar  : xpath -> symbol -> xpath
 
 val x_equal   : xpath -> xpath -> bool
 val x_compare : xpath -> xpath -> int

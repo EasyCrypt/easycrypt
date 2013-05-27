@@ -1,8 +1,8 @@
-
 require import Logic.
 require import Distr.
 require import Bool.
 require import Real.
+
 
 module M = {
   fun f (y:bool) : bool = {
@@ -12,25 +12,14 @@ module M = {
   }
 }.
 
-
-lemma test : mu Dbool.dbool (lambda (x : bool), (x = true)) =
-    1%r / 2%r proof.
-trivial.
-save.
-
-lemma asd: bd_hoare [ M.f : true ==> res] [=] [1%r/2%r] 
+lemma test: bd_hoare [ M.f : true ==> res] [=] [1%r/2%r] 
 proof.
 fun.
-rnd {  (1%r/2%r), (lambda (x:bool), x=y) }.
+rnd (1%r/2%r) (lambda (x:bool), x=y).
 skip.
 simplify.
 (* trivial. *) (* some bug *)
 intros &hr.
 trivial.
 save.
-
-
-
-
-
 

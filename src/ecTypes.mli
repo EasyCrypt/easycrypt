@@ -95,7 +95,7 @@ type pvar_kind =
   | PVglob
   | PVloc
 
-type prog_var = {
+type prog_var = private {
   pv_name : EcPath.xpath;
   pv_kind : pvar_kind;
 }
@@ -113,9 +113,10 @@ val string_of_pvar : prog_var -> string
 
 val pv_subst : (EcPath.xpath -> EcPath.xpath) -> prog_var -> prog_var 
 
-val pv_loc : EcPath.xpath -> symbol -> prog_var
+val pv_loc  : EcPath.xpath -> symbol -> prog_var
 val pv_glob : EcPath.xpath -> prog_var 
-val pv_res : EcPath.xpath -> prog_var
+val pv_res  : EcPath.xpath -> prog_var
+val pv      : EcPath.xpath -> pvar_kind -> prog_var
 
 (* -------------------------------------------------------------------- *)
 type expr = private {

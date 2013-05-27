@@ -1118,25 +1118,13 @@ and transstruct (env : EcEnv.env) (x : symbol) (st : pstructure) =
         EcPath.Mx.add xp x.v_type vs
       | MI_Function _ -> vs) EcPath.Mx.empty items in
 
-   let rec add_uses us mp = 
-    let mp = EcEnv.NormMp.norm_mpath envi mp in
-    let top = EcPath.m_functor mp in
-    let us = 
-      if EcPath.Sm.mem top rm then us 
-      else
-        let uses = 
-          match (EcEnv.Mod.by_mpath top envi).me_body with
-          | ME_Structure ms -> EcPath.Sm.add top ms.ms_uses
-          | _ -> assert false in
-        EcPath.Sm.union uses us in
-    List.fold_left add_uses us mp.EcPath.m_args in
-  let rec uses us items = 
+   let rec uses us items = 
     List.fold_left (fun us item ->
       match item with
       | MI_Module me ->
         begin match me.me_body with
         | ME_Structure ms -> EcPath.Sm.union us ms.ms_uses 
-        | ME_Alias mp -> add_uses us mp 
+        | ME_Alias mp -> EcEnv.NormMp.add_uses envi rm us mp 
         | ME_Decl _ -> assert false
         end
       | MI_Variable _ -> us
@@ -1146,9 +1134,10 @@ and transstruct (env : EcEnv.env) (x : symbol) (st : pstructure) =
           let fus = fdef.f_uses in
           let us = 
             List.fold_left (fun us fn ->
-              add_uses us fn.EcPath.x_top) us fus.us_calls in
+              EcEnv.NormMp.add_uses envi rm us fn.EcPath.x_top) 
+              us fus.us_calls in
           EcPath.Sx.fold (fun xp us ->
-            add_uses us xp.EcPath.x_top)
+            EcEnv.NormMp.add_uses envi rm us xp.EcPath.x_top)
             (EcPath.Sx.union fus.us_reads fus.us_writes) us
         | FBabs _ -> assert false
         end) us items in
@@ -1284,9 +1273,8 @@ and transbody ue symbols (env : EcEnv.env) retty pbody =
           List.map2
             (fun x xty ->
                let x = unloc x in
-               let p = EcPath.xqvar mpath x in
-                 ({ v_name  = x; v_type  = xty   },
-                  { pv_name = p; pv_kind = PVloc },
+                 ({ v_name  = x; v_type  = xty   }, 
+                  pv_loc mpath x,
                   xty, pty.pl_loc))
             xs xsvars
         in
@@ -1691,6 +1679,7 @@ let transform_opt env ue pf tt =
         let hcmp = 
           match hcmp with PFHle -> FHle | PFHeq -> FHeq | PFHge -> FHge
         in
+        (* FIXME: check that there are not pvars in bd *)
         let bd = transf env bd in
         f_bdHoareF pre fpath post hcmp bd
 
@@ -1700,6 +1689,7 @@ let transform_opt env ue pf tt =
         let hcmp = 
           match hcmp with PFHle -> FHle | PFHeq -> FHeq | PFHge -> FHge
         in
+        (* FIXME: check that there are not pvars in bd *)
         let bd = transf env bd in
         let (env, stmt, _re, prelude, locals) =
           let env = EcEnv.Fun.enter "$stmt" env in

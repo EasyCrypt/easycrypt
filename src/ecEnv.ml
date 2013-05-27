@@ -1220,7 +1220,6 @@ module Var = struct
       match fst qname with
       | [] ->
           let memenv = oget (Memory.byid side env) in
-
           if EcMemory.memtype memenv = None then
             None
           else
@@ -1228,25 +1227,19 @@ module Var = struct
             begin match EcMemory.lookup (snd qname) memenv with
             | None    -> None
             | Some ty ->
-                let pv =
-                  { pv_name = EcPath.xqvar mp (snd qname);
-                    pv_kind = PVloc; }
-                in
-                  Some (pv, ty)
+                let pv = pv_loc mp (snd qname) in
+                Some (pv, ty)
             end
 
       | _ -> None
     in
+    match obind side inmem with
+    | None -> 
+        (* TODO FIXME, suspended for local program variable *)
+        let (((_, _), p), x) = MC.lookup_var qname env in
+        (pv p x.vb_kind, x.vb_type)
 
-      match obind side inmem with
-      | None -> begin
-          (* Variable are never suspended *)
-          let (((_, _), p), x) = MC.lookup_var qname env in
-          let p = EcPath.xpath (EcPath.mpath p.x_top.m_top []) p.x_sub in
-            ({ pv_name = p; pv_kind = x.vb_kind }, x.vb_type)
-        end
-
-      | Some (pv, ty) -> (pv, ty)
+    | Some (pv, ty) -> (pv, ty)
 
   let lookup_progvar_opt ?side name env =
     try_lf (fun () -> lookup_progvar ?side name env)
@@ -1466,43 +1459,59 @@ end
 
 (* -------------------------------------------------------------------- *)
 module NormMp = struct
+
   let rec norm_mpath env p =
     let (ip, (i, args)) = ipath_of_mpath p in
-      match Mod.by_ipath_r true ip env with
-      | Some ((spi, params), ({ me_body = ME_Alias alias } as m)) ->
-          assert (m.me_sig.mis_params = []);
-          let p =
-            Mod.unsuspend_r EcSubst.subst_mpath
-              (i, args) (spi, params) alias
-          in
-            norm_mpath env p
-
-      | _ -> begin
-        match p.EcPath.m_top with
-        | `Abstract _
-        | `Concrete (_, None) -> p
-
-        | `Concrete (p1, Some p2) -> begin
-          let name = EcPath.basename p2 in
-          let pr   = EcPath.mpath_crt p1 p.EcPath.m_args (EcPath.prefix p2) in
-          let pr   = norm_mpath env pr in
-
-            match pr.EcPath.m_top with
-            | `Abstract _ -> p
-            | `Concrete (p1, p2) ->
-                 EcPath.mpath_crt p1 pr.EcPath.m_args
-                   (Some (EcPath.pqoname p2 name))
-        end
+    match Mod.by_ipath_r true ip env with
+    | Some ((spi, params), ({ me_body = ME_Alias alias } as m)) ->
+      assert (m.me_sig.mis_params = []);
+      let p = 
+        Mod.unsuspend_r EcSubst.subst_mpath (i, args) (spi, params) alias in
+      norm_mpath env p
+    | _ -> begin
+      match p.EcPath.m_top with
+      | `Abstract _
+      | `Concrete (_, None) -> p
+        
+      | `Concrete (p1, Some p2) -> begin
+        let name = EcPath.basename p2 in
+        let pr   = EcPath.mpath_crt p1 p.EcPath.m_args (EcPath.prefix p2) in
+        let pr   = norm_mpath env pr in
+        match pr.EcPath.m_top with
+        | `Abstract _ -> p
+        | `Concrete (p1, p2) ->
+          EcPath.mpath_crt p1 pr.EcPath.m_args (Some (EcPath.pqoname p2 name))
       end
+    end
+
+  let rec add_uses env rm us mp = 
+    let mp = norm_mpath env mp in
+    let top = EcPath.m_functor mp in
+    let us = 
+      if EcPath.Sm.mem top rm then us 
+      else
+        let us = 
+          match (Mod.by_mpath top env).me_body with
+          | ME_Structure ms -> EcPath.Sm.union ms.ms_uses us
+          | ME_Decl _       -> us
+          | _ -> assert false in
+        EcPath.Sm.add top us in
+    List.fold_left (add_uses env rm) us mp.EcPath.m_args 
+
+  let top_uses env mp = add_uses env EcPath.Sm.empty EcPath.Sm.empty mp
+
+  let norm_restr env restr = 
+    EcPath.Sm.fold (fun mp r -> add_uses env EcPath.Sm.empty r mp)
+      EcPath.Sm.empty restr
 
   let norm_xpath env p =
     EcPath.xpath (norm_mpath env p.EcPath.x_top) p.EcPath.x_sub
 
   let norm_pvar env pv = 
     let p = norm_xpath env pv.pv_name in
-      if   x_equal p pv.pv_name
-      then pv
-      else { pv_name = p; pv_kind = pv.pv_kind }
+    if   x_equal p pv.pv_name
+    then pv
+    else EcTypes.pv p pv.pv_kind 
 
   let globals env m mp = 
     match (Mod.by_mpath mp env).me_body with
@@ -1541,9 +1550,9 @@ module NormMp = struct
     let norm_xp = EcPath.Hx.memo 107 (norm_xpath env) in
     let norm_pv pv =
       let p = norm_xp pv.pv_name in
-        if   x_equal p pv.pv_name
-        then pv
-        else { pv_name = p; pv_kind = pv.pv_kind }
+      if   x_equal p pv.pv_name
+      then pv
+      else EcTypes.pv p pv.pv_kind 
     in
 
     let norm_form =

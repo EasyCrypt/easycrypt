@@ -42,7 +42,9 @@ module PVM = struct
 
   let empty = M.empty 
 
-  let pvm env pv m = (MSvar (EcEnv.NormMp.norm_pvar env pv), m)
+  let pvm env pv m = 
+    let pv = EcEnv.NormMp.norm_pvar env pv in 
+    (MSvar pv, m)
 
   let add env pv m f s = M.add (pvm env pv m) f s 
 
@@ -212,9 +214,31 @@ let rec f_write env w f =
   | FBdef fdef ->
     let add x w = 
       let vb = Var.by_xpath x env in
-      PV.add env { pv_name = x; pv_kind = PVglob } vb.vb_type w in
+      PV.add env (pv_glob x) vb.vb_type w in
     let w = EcPath.Sx.fold add fdef.f_uses.us_writes w in
     List.fold_left (f_write env) w fdef.f_uses.us_calls
+
+(* computes the program variables occurring free in f with memory m *)
+let rec free_pv_form m env f = 
+  let fv = free_pv_form m env in
+  match f.f_node with
+  | Fpvar (pv,m') when m=m' -> PV.add env pv f.f_ty PV.empty
+  | Fquant (_,_,f) 
+    -> fv f
+  | Fif (f1,f2,f3) 
+    -> PV.union env (fv f1) (PV.union env (fv f2) (fv f3))
+  | Flet (_,f1,f2)
+    -> PV.union env (fv f1) (fv f2)
+  | Fapp (f,fs) 
+    -> List.fold_left (fun s f -> PV.union env (fv f) s) (fv f) fs
+  | Ftuple fs 
+    -> List.fold_left (fun s f -> PV.union env (fv f) s) PV.empty fs
+  | Fint _ | Flocal _ | Fglob _ | Fop _ | Fpvar _ 
+    -> PV.empty
+  | FhoareF _ | FhoareS _
+  | FbdHoareF _ | FbdHoareS _
+  | FequivF _ | FequivS _
+  | Fpr _ -> assert false (* FIXME: extend if necessary *)
 
 let lp_write env w lp = 
   let add w (pv,ty) = PV.add env pv ty w in
@@ -246,7 +270,7 @@ let rec f_read env r f =
   | FBdef fdef ->
     let add x r = 
       let vb = Var.by_xpath x env in
-      PV.add env { pv_name = x; pv_kind = PVglob } vb.vb_type r in
+      PV.add env (pv_glob x) vb.vb_type r in
     let r = EcPath.Sx.fold add fdef.f_uses.us_reads r in
     List.fold_left (f_read env) r fdef.f_uses.us_calls
 
@@ -394,6 +418,9 @@ let wp_asgn env m s post =
 
 exception No_wp
 
+(* wp functions operates only over assignments and conditional statements.
+   Any weakening on this restriction may break the soundness of bounded hoare logic 
+*)
 let rec wp_stmt env m (stmt: EcModules.instr list) letsf = 
   match stmt with
   | [] -> stmt, letsf
@@ -455,6 +482,12 @@ let t_hS_or_eS th te g =
   let concl = get_concl g in
   if is_hoareS concl then th g
   else if is_equivS concl then te g
+  else tacerror (NotPhl None)
+
+let t_hS_or_bhS th te g =
+  let concl = get_concl g in
+  if is_hoareS concl then th g
+  else if is_bdHoareS concl then te g
   else tacerror (NotPhl None)
 
 let t_hS_or_bhS_or_eS th tbh te g =
@@ -641,8 +674,9 @@ let t_bdHoare_skip g =
   let concl = get_concl g in
   let bhs = destr_bdHoareS concl in
   if bhs.bhs_s.s_node <> [] then tacerror NoSkipStmt;
-  if bhs.bhs_cmp <> FHeq || not (f_equal bhs.bhs_bd (f_real_of_int 1)) then
-    cannot_apply "skip" "bound must be \"= 1\"";
+  if (bhs.bhs_cmp <> FHeq && bhs.bhs_cmp <> FHge) ||
+    not (f_equal bhs.bhs_bd (f_real_of_int 1)) then
+    cannot_apply "skip" "bound must be \">= 1\"";
   let concl = f_imp bhs.bhs_pr bhs.bhs_po in
   let concl = gen_mems [bhs.bhs_m] concl in
   prove_goal_by [concl] RN_hl_skip g
@@ -723,6 +757,27 @@ let t_hoare_wp env i g =
   let concl = f_hoareS_r { hs with hs_s = s; hs_po = post} in
   prove_goal_by [concl] (RN_hl_wp (Single i)) g
 
+let t_bdHoare_wp env i g =
+  let concl = get_concl g in
+  let bhs = destr_bdHoareS concl in
+  let s_hd,s_wp = s_split_o "wp" i bhs.bhs_s in
+  let s_wp = EcModules.stmt s_wp in
+
+  let m = EcMemory.memory bhs.bhs_m in
+
+  let fv_bd = free_pv_form m env bhs.bhs_bd in
+  let modi = s_write env s_wp in
+
+  if not (PV.disjoint env fv_bd modi) then 
+    cannot_apply "wp" "Not_implemented: bound is modified by the statement";
+
+  let s_wp,post = 
+    wp env m s_wp bhs.bhs_po in
+  let i = check_wp_progress "wp" i bhs.bhs_s s_wp in
+  let s = EcModules.stmt (s_hd @ s_wp) in
+  let concl = f_bdHoareS_r { bhs with bhs_s = s; bhs_po = post} in
+  prove_goal_by [concl] (RN_hl_wp (Single i)) g
+
 
 let t_equiv_wp env ij g = 
   let concl = get_concl g in
@@ -742,10 +797,9 @@ let t_equiv_wp env ij g =
   prove_goal_by [concl] (RN_hl_wp (Double(i,j))) g
 
 
-let t_wp env k =
-  match k with
-  | None -> t_hS_or_eS (t_hoare_wp env None) (t_equiv_wp env None)
-  | Some (Single i) -> t_hoare_wp env (Some i)
+let t_wp env k = match k with
+  | None -> t_hS_or_bhS_or_eS (t_hoare_wp env None) (t_bdHoare_wp env None) (t_equiv_wp env None)
+  | Some (Single i) -> t_hS_or_bhS (t_hoare_wp env (Some i)) (t_bdHoare_wp env (Some i))
   | Some (Double(i,j)) -> t_equiv_wp env (Some (i,j))
 
 
@@ -958,6 +1012,13 @@ let t_hoare_case f g =
   let concl2 = f_hoareS_r { hs with hs_pr = f_and_simpl hs.hs_pr (f_not f) } in
   prove_goal_by [concl1;concl2] (RN_hl_case f) g
 
+let t_bdHoare_case f g =
+  let concl = get_concl g in
+  let bhs = destr_bdHoareS concl in
+  let concl1 = f_bdHoareS_r { bhs with bhs_pr = f_and_simpl bhs.bhs_pr f } in
+  let concl2 = f_bdHoareS_r { bhs with bhs_pr = f_and_simpl bhs.bhs_pr (f_not f) } in
+  prove_goal_by [concl1;concl2] (RN_hl_case f) g
+
 let t_equiv_case f g = 
   let concl = get_concl g in
   let es = destr_equivS concl in
@@ -966,9 +1027,10 @@ let t_equiv_case f g =
   prove_goal_by [concl1;concl2] (RN_hl_case f) g
 
 let t_he_case f g =
-  t_hS_or_eS (t_hoare_case f) (t_equiv_case f) g 
+  t_hS_or_bhS_or_eS (t_hoare_case f) (t_bdHoare_case f) (t_equiv_case f) g 
 
 (* --------------------------------------------------------------------- *)
+
 let _inline_freshen me v =
   let rec for_idx idx =
     let x = Printf.sprintf "%s%d" v.v_name idx in
@@ -982,114 +1044,99 @@ let _inline_freshen me v =
     else
       (EcMemory.bind v.v_name v.v_type me, v.v_name)
 
-let _inline env f occs me stmt =
+let _inline env hyps me sp s =
+  let env = tyenv_of_hyps env hyps in
   let module P = EcPath in
 
-  let maxocc = List.fold_left max 0 (odfl [] occs) in
-
-  let rec doit1 (me, idx) instr =
-    match instr.i_node with
-    | Sasgn   _ -> ((me, idx), [instr])
-    | Sassert _ -> ((me, idx), [instr])
-    | Srnd    _ -> ((me, idx), [instr])
-
-    | Sif (e, s1, s2) ->
-        let ((me, idx), s1) = doit (me, idx) s1 in
-        let ((me, idx), s2) = doit (me, idx) s2 in
-          ((me, idx), [i_if (e, s1, s2)])
-
-    | Swhile (e, s) ->
-        let ((me, idx), s) = doit (me, idx) s in
-          ((me, idx), [i_while (e, s)])
-
-    | Scall (lv, p, args) ->
-        let p' = P.xpath (P.mpath p.P.x_top.P.m_top []) p.P.x_sub in
-          if not (EcPath.x_equal p' f) then
-            ((me, idx), [i_call (lv, p, args)])
-          else if occs <> None && not (List.mem idx (odfl [] occs)) then
-            ((me, idx+1), [i_call (lv, p, args)])
-          else
-            let f = EcEnv.Fun.by_xpath p env in
-            let fdef = 
-              match f.f_def with
-              | FBdef def -> def 
-              | _ -> assert false in
-            let me, anames = 
-              List.map_fold _inline_freshen me f.f_sig.fs_params in
-            let me, lnames = 
-              List.map_fold _inline_freshen me fdef.f_locals in
-
-            let subst =
-              let for1 mx v x =
-                P.Mx.add
-                  (P.xqvar p' v.v_name)
-                  (P.xqvar (EcMemory.xpath me) x)
-                  mx
-              in
-
-              let mx = P.Mx.empty in
-              let mx = List.fold_left2 for1 mx f.f_sig.fs_params anames in
-              let mx = List.fold_left2 for1 mx fdef.f_locals lnames in
-
-                { e_subst_id with
-                    es_freshen = true;
-                    es_xp      = (fun xp -> odfl xp (P.Mx.find_opt xp mx)); }
-            in
-
-            let prelude =
-              List.map2
-                (fun (v, newx) e ->
-                  let newpv = {
-                    pv_name = P.xqvar (EcMemory.xpath me) newx;
-                    pv_kind = PVloc;
-                  } in
-                    i_asgn (LvVar (newpv, v.v_type), e))
-                (List.combine f.f_sig.fs_params anames)
-                args
-
-            and resasgn =
-              match fdef.f_ret with
-              | None   -> None
-              | Some r -> Some (i_asgn (oget lv, e_subst subst r))
-            in
-
-            let body  = fdef.f_body in
-            let body  = s_subst subst body in
-
-              ((me, idx+1), prelude @ body.s_node @ (otolist resasgn))
-  
-  and doit (me, idx) stmt =
-    let ((me, idx), stmt) =
-      List.map_fold doit1 (me, idx) stmt.s_node
+  let inline1 me lv p args = 
+    let p = EcEnv.NormMp.norm_xpath env p in
+    let f = EcEnv.Fun.by_xpath p env in
+    let fdef = 
+      match f.f_def with
+      | FBdef def -> def 
+      | _ -> assert false in (* FIXME error message *)
+    let me, anames = 
+      List.map_fold _inline_freshen me f.f_sig.fs_params in
+    let me, lnames = 
+      List.map_fold _inline_freshen me fdef.f_locals in
+    let subst =
+      let for1 mx v x =
+        (* Remark p is in normal form so (P.xqname p v.v_name) is *)
+        P.Mx.add
+          (P.xqname p v.v_name)
+          (P.xqname (EcMemory.xpath me) x)
+          mx
+      in
+      let mx = P.Mx.empty in
+      let mx = List.fold_left2 for1 mx f.f_sig.fs_params anames in
+      let mx = List.fold_left2 for1 mx fdef.f_locals lnames in
+      let on_xp xp =
+        let xp' = EcEnv.NormMp.norm_xpath env xp in
+        P.Mx.find_def xp xp' mx  in
+      { e_subst_id with es_xp = on_xp }
     in
-      ((me, idx), EcModules.stmt (List.flatten stmt))
-  in
 
-  let ((me, idx), stmt) = doit (me, 1) stmt in
-    if maxocc > 0 && idx <= maxocc then
-      tacuerror "%d is not a valid occurence" maxocc;
-    (me, stmt)
+    let prelude =
+      List.map2
+        (fun (v, newx) e ->
+          let newpv = pv_loc (EcMemory.xpath me) newx in
+          i_asgn (LvVar (newpv, v.v_type), e))
+        (List.combine f.f_sig.fs_params anames)
+        args in
 
-let t_inline_hoare env f occs g =
-  let concl      = snd (get_goal g) in
+    let body  = s_subst subst fdef.f_body in
+
+    let resasgn =
+      match fdef.f_ret with
+      | None   -> None
+      | Some r -> Some (i_asgn (oget lv, e_subst subst r)) in
+
+    me, prelude @ body.s_node @ (otolist resasgn) in
+
+  let rec inline_i me ip i = 
+    match ip, i.i_node with
+    | IPpat, Scall (lv, p, args) -> 
+      inline1 me lv p args 
+    | IPif(sp1, sp2), Sif(e,s1,s2) ->
+      let me,s1 = inline_s me sp1 s1.s_node in
+      let me,s2 = inline_s me sp2 s2.s_node in
+      me, [i_if(e,stmt s1, stmt s2)]
+    | IPwhile sp, Swhile(e,s) ->
+      let me,s = inline_s me sp s.s_node in
+      me, [i_while(e,stmt s)]
+    | _, _ -> assert false (* FIXME error message *)
+  and inline_s me sp s = 
+    match sp with
+    | [] -> me, s
+    | (toskip,ip)::sp ->
+      let r,i,s = List.split_n toskip s in
+      let me,si = inline_i me ip i in
+      let me,s = inline_s me sp s in
+      me, List.rev_append r (si@ s) in
+  let me, s = inline_s me sp s.s_node in
+  me, stmt s 
+
+
+let t_inline_hoare env sp g =
+  let hyps,concl = get_goal g in
   let hoare      = destr_hoareS concl in
-  let (me, stmt) = _inline env f occs hoare.hs_m hoare.hs_s in
+  let (me, stmt) = _inline env hyps hoare.hs_m sp hoare.hs_s in
   let concl      = f_hoareS_r { hoare with hs_m = me; hs_s = stmt; } in
-    prove_goal_by [concl] (RN_hl_inline (None, occs, f)) g
+  prove_goal_by [concl] (RN_hl_inline (None, sp)) g
 
-let t_inline_equiv env f side occs g =
-  let concl = snd (get_goal g) in
+let t_inline_equiv env side sp g =
+  let hyps, concl = get_goal g in
   let equiv = destr_equivS concl in
   let concl =
     match side with
     | true  ->
-        let (me, stmt) = _inline env f occs equiv.es_ml equiv.es_sl in
-          f_equivS_r { equiv with es_ml = me; es_sl = stmt; }
+      let (me, stmt) = _inline env hyps equiv.es_ml sp equiv.es_sl in
+      f_equivS_r { equiv with es_ml = me; es_sl = stmt; }
     | false ->
-        let (me, stmt) = _inline env f occs equiv.es_mr equiv.es_sr in
-          f_equivS_r { equiv with es_mr = me; es_sr = stmt; }
+      let (me, stmt) = _inline env hyps equiv.es_mr sp equiv.es_sr in
+      f_equivS_r { equiv with es_mr = me; es_sr = stmt; }
   in
-    prove_goal_by [concl] (RN_hl_inline (Some side, occs, f)) g
+  prove_goal_by [concl] (RN_hl_inline (Some side, sp)) g
 
 (* -------------------------------------------------------------------- *)
 
@@ -1128,6 +1175,7 @@ let t_equiv_deno env pre post g =
   let concl_po = gen_mems [mel;mer] (f_imp post (cmp evl evr)) in
   prove_goal_by [concl_e;concl_pr;concl_po] RN_hl_deno g  
 
+
 (* -------------------------------------------------------------------- *)
 
 let gen_rcond b m at_pos s =
@@ -1153,6 +1201,18 @@ let t_hoare_rcond b at_pos g =
   let concl2  = f_hoareS_r { hs with hs_s = s } in
   prove_goal_by [concl1;concl2] (RN_hl_rcond (None, b,at_pos)) g  
 
+let t_bdHoare_rcond b at_pos g = 
+  (* TODO: generalize the rule using assume *)
+  if at_pos <> 1 then
+    cannot_apply "rcond" "position must be 1 in bounded Hoare judgments";
+  let concl = get_concl g in
+  let bhs = destr_bdHoareS concl in
+  let m  = EcMemory.memory bhs.bhs_m in 
+  let hd,e,s = gen_rcond b m at_pos bhs.bhs_s in
+  let concl1  = f_bdHoareS_r { bhs with bhs_s = hd; bhs_po = e } in
+  let concl2  = f_bdHoareS_r { bhs with bhs_s = s } in
+  prove_goal_by [concl1;concl2] (RN_hl_rcond (None, b,at_pos)) g  
+
 let t_equiv_rcond side b at_pos g =
   let concl = get_concl g in
   let es = destr_equivS concl in
@@ -1173,9 +1233,11 @@ let t_equiv_rcond side b at_pos g =
   prove_goal_by [concl1;concl2] (RN_hl_rcond (Some side,b,at_pos)) g 
 
 let t_rcond side b at_pos g =
+  let concl = get_concl g in
   match side with
-  | None -> t_hoare_rcond b at_pos g
-  | Some side -> t_equiv_rcond side b at_pos g
+    | None when is_bdHoareS concl -> t_bdHoare_rcond b at_pos g
+    | None -> t_hoare_rcond b at_pos g
+    | Some side -> t_equiv_rcond side b at_pos g
 
 (* -------------------------------------------------------------------- *)
 let check_swap env s1 s2 = 
@@ -1239,6 +1301,12 @@ let t_hoare_cond env g =
   let (e,_,_) = s_first_if hs.hs_s in
   t_gen_cond env None (form_of_expr (EcMemory.memory hs.hs_m) e) g
 
+let t_bdHoare_cond env g = 
+  let concl = get_concl g in
+  let bhs = destr_bdHoareS concl in 
+  let (e,_,_) = s_first_if bhs.bhs_s in
+  t_gen_cond env None (form_of_expr (EcMemory.memory bhs.bhs_m) e) g
+
 let rec t_equiv_cond env side g =
   let hyps,concl = get_goal g in
   let es = destr_equivS concl in
@@ -1284,121 +1352,8 @@ let rec t_equiv_cond env side g =
 
 
 (* -------------------------------------------------------------------- *)
-(* TODO move this *)
-(*
-type code_position = 
-  | CPat of int
-  | CPif of int * bool * code_position
 
-type code_zip = 
-  | CZempty 
-  | CZapp of int * instr list * instr list * code_zip
-  | CZif  of expr * bool * stmt * code_zip
-  | CZwhile of expr * code_zip
 
-let rec s_split_pos z cp s = 
-  match cp with
-  | CPat p -> 
-    let hd,i,tl = s_split "get_code_position" p s in (* FIXME error message *)
-    i, CZapp(i,hd,tl,z)
-  | CPif(p,b,cp) ->
-    let hd,i,tl = s_split "get_code_position" p s in (* FIXME error message *)
-    let z = CZapp(p,hd,tl,z) in
-    match i.i_node with
-    | S_if(e,s1,s2) ->
-      let s,s' = if b then s1,s2 else s2,s1 in
-      s_split_aux (CZif(e,b,s',z)) cp s
-    | S_while(e,s) ->
-      assert b; (* FIXME error message *)
-      s_split_aux (CZwhile(e,z)) cp s
-    | _ -> assert false (* FIXME error message *)
-
-let s_split_pos = s_split_pos CZempty
-
-let rec app_code_zip s z = 
-  match z with
-  | CZempty -> stmt s
-  | CZapp(_,hd,tl,z) -> 
-    app_code_zip (List.flatten [hd;s;tl] z)
-  | CZif(e,b,s',z) ->
-    let s = stmt s in
-    let s1,s2 = if b then s,s' else s',s in
-    app_code_zip [i_if(e,s1,s2)] z
-  | CZwhile(e,z) ->
-    app_code_zip [i_while(e,stmt s)] z
-
-let freshen_locals me s f vs = 
-  let s = ref s in
-  let me = ref me in
-  let mk_v v = 
-    let vn = v.v_name in 
-    let vn = 
-      if not (EcMemory.is_bound vn !me) then vn 
-      else 
-        (* TODO share the code with EcBaseLogic.fresh_ids *)
-        let rec aux n = 
-          let vn = vn ^ string_of_int n in
-          if (EcMemory.is_bound vn !me) then aux (n+1) else vn in
-        aux 0 in
-    me := EcMemory.bind vn v.v_type !me;
-    s  := EcPath.Mm.add 
-    
-let inline1 env me i = 
-  match i.i_node with
-  | Scall(lv,f,args) ->
-    let fdef = EcEnv.Fun.by_mpath env f in
-    let body = odfl (fun _ -> assert false) fdef.f_def in
-                   (* FIXME error message *) 
-    let s = e_subst_id in
-    let me, s, params = freshen_locals me s f (fst fdef.f_sig.fs_sig) in
-    let me, s, _ = freshen_locals me s f body.f_locals in
-    let sparams = List.map2 (fun v e -> i_asgn(LvVar v,e )) params args in
-    let sb = s_subst s body.f_body in
-    let sr = 
-      ofold body.f_ret (fun l e -> i_asgn (oget lv, e_subst s e)::l) [] in
-    me, List.flatten [sparams;sb;sr]
-  | _ -> assert false (* FIXME error message *)
-      
-    
-let rec inline env me pos s = 
-  match pos with
-  | CPat p ->
-    let hd,i,tl = s_split "inline" p s in
-    let me, s = inline1 env me i in
-    me, stmt (List.flatten [hd;s;tl])
-  | CPif(p,b,pos) ->
-    let hd,i,tl = s_split "inline" p s in
-    match i.i_node with
-    | Sif(e,s1,s2) ->
-      let me, s = inline env me pos (if b then s1 else s2) in
-      let s1,s2 = if b then s,s2 else s1,s in
-      let i =  i_if(e,s1,s2) in
-      me, stmt (hd @ i :: tl)
-    | Swhile(e,s) ->
-      assert b; (* FIXME error message *)
-      let me, s = inline env me pos s in
-      let i = i_while(e,s) in
-      me, stmt (hd @ i :: tl)
-    | _ -> assert false (* FIXME error message *) 
-        
-    
-    
-  
-  
-  
-
-let t_equiv_inline env side pos g =
-  let concl = get_concl g in
-  let es = destr_equivS concl in
-  let me,s = if side then es.es_ml, es.es_sl else es.es_mr, es.es_sr in
-  let me,s = inline me s pos in
-  let es = 
-    if side then {es with es_ml = me; es_sl = s }
-    else { es with es_mr = me; es_sr = s } in
-  let concl = f_equivS_r es in
-  prove_goal_by [concl] (RN_hl_inline(side,pos)) g
-  
-*)  
 
 
 (* -------------------------------------------------------------------- *)
@@ -1423,6 +1378,33 @@ let t_hoare_rnd env g =
   let post = f_forall_simpl [(x_id,GTty ty_distr)] post in
   let concl = f_hoareS_r {hs with hs_s=s; hs_po=post} in
   prove_goal_by [concl] RN_hl_hoare_rnd g
+
+
+let wp_equiv_disj_rnd side env g =
+  let concl = get_concl g in
+  let es = destr_equivS concl in
+  let m,s = 
+    if side then es.es_ml, es.es_sl 
+    else         es.es_mr, es.es_sr 
+  in
+  let (lv,distr),s= s_last_rnd "rnd" s in
+
+  (* FIXME: exception when not rnds found *)
+  let ty_distr = proj_distr_ty (e_ty distr) in
+  let x_id = EcIdent.create "x" in
+  let x = f_local x_id ty_distr in
+  let distr = EcFol.form_of_expr (EcMemory.memory m) distr in
+  let post = subst_form_lv env (EcMemory.memory m) lv x es.es_po in
+  let post = (f_in_supp x distr) ==> post in
+  let post = f_forall_simpl [(x_id,GTty ty_distr)] post in
+  let concl = 
+    if side then f_equivS_r {es with es_sl=s; es_po=post} 
+    else  f_equivS_r {es with es_sr=s; es_po=post} 
+  in
+  prove_goal_by [concl] RN_hl_hoare_rnd g
+  
+
+
 
 let wp_equiv_rnd env (f,finv) g =
   let concl = get_concl g in
@@ -1452,60 +1434,32 @@ let wp_equiv_rnd env (f,finv) g =
   let post = supp_cond1 &&& supp_cond2 &&& inv_cond1 &&& inv_cond2 &&& post in
   let post = f_forall_simpl [(x_id,GTty tyL);(y_id,GTty tyR)] post in
   let concl = f_equivS_r {es with es_sl=sl'; es_sr=sr'; es_po=post} in
-  prove_goal_by [concl] (RN_hl_equiv_rnd (RIbij (tf,tfinv))) g
+  prove_goal_by [concl] (RN_hl_equiv_rnd ((Some tf, Some tfinv))) g
 
+let t_equiv_rnd side env bij_info = 
+  match side with
+    | Some side -> wp_equiv_disj_rnd side env 
+    | None  ->
+      let f,finv =  match bij_info with 
+        | Some f, Some finv ->  f, finv
+        | Some bij, None | None, Some bij -> bij, bij
+        | None, None -> 
+          let z_id = EcIdent.create "z" in
+          let z = f_local z_id in
+          let bij = fun tyL tyR -> f_lambda [z_id,GTty tyR] (z tyL) in 
+          bij, bij
+      in wp_equiv_rnd env (f, finv) 
 
-let t_equiv_rnd env bij_info = 
-  let f,finv =  match bij_info with 
-    | RIbij (f,finv) -> f,finv
-    | RIidempotent bij -> bij, bij
-    | RIid -> 
-        let z_id = EcIdent.create "z" in
-        let z = f_local z_id in
-        let bij = fun tyL tyR -> f_lambda [z_id,GTty tyR] (z tyL) in 
-        bij, bij
-  in wp_equiv_rnd env (f,finv) 
-
-
-
-
-
-(* --------------------------------------------------------------------- *)
-(* ---- Bounded Probabilistic Hoare Logic ------------------------------ *)
-(* --------------------------------------------------------------------- *)
-
-(* 
- * Instead of introducing new type constructors for bounded probabilistic
- * Hoare judgments, I consider Hoare involved in numeric relations as such
- * judgments.
- * 
- * Tactics have different application rules depending on whether one is
- * dealing with {P}c{Q}<=k, {P}c{Q}=k or {P}c{Q} >= k
- * 
- * t_bd_hoare_gen just reduces occurrences of k >= {P}c{Q} to
- * {P}c{Q}<=k and likewise for ...
- * However, for the moment, comparisons of the form {P}c{Q}<={P'}c'{Q'} 
- * cannot be disambiguated
- *)
-
-
-(*
- * "hr cmp_op bd" represents the goal g conclusion
- * opt_bd is a "bound Option" provided by the user 
- *   (if cmp_bd is "<=" then opt_bd must be None or equal to bd)
- * event is a cPred (see theories/Fun.ec) that must be "equivalent"
- *   to the post of hr
- *)
-
-let t_bd_hoare_rnd env (opt_bd,event) g =
+let t_bd_hoare_rnd env (opt_bd,opt_event) g =
   let concl = get_concl g in
   let bhs = destr_bdHoareS concl in
-
   let (lv,distr),s = s_last_rnd "bd_hoare_rnd" bhs.bhs_s in
   let ty_distr = proj_distr_ty (e_ty distr) in
   let distr = EcFol.form_of_expr (EcMemory.memory bhs.bhs_m) distr in
-  let event = event ty_distr in
-
+  let event = match opt_event ty_distr with 
+    | Some event -> event 
+    | None -> cannot_apply "rnd" "Optional events still not supported"
+  in
   let new_cmp_op,new_hoare_bd, bounded_distr =
     match bhs.bhs_cmp, opt_bd with
       | FHle, Some bd' when not (EcFol.f_equal bhs.bhs_bd bd') ->
@@ -1520,7 +1474,6 @@ let t_bd_hoare_rnd env (opt_bd,event) g =
           bhs.bhs_cmp, EcFol.f_real_div bhs.bhs_bd bd', f_eq (f_mu distr event) bd'
       | FHeq, _ -> FHeq, EcFol.f_real_of_int 1, f_eq (f_mu distr event) bhs.bhs_bd
   in
-
   let v_id = EcIdent.create "v" in
   let v = f_local v_id ty_distr in
   let post_v = subst_form_lv env (EcMemory.memory bhs.bhs_m) lv v bhs.bhs_po in
