@@ -1349,9 +1349,8 @@ tactic:
 | SWAP info=plist1(loc(swap_info),COMMA)
     { PPhl (Pswap info) }
 
-| RND info=rnd_info
-    { (* let rnd_info = match info with None -> None,None | Some ri -> ri in *)
-      PPhl (Prnd info) }
+| RND s=side? info=rnd_info
+    { PPhl (Prnd (s,info)) }
 
 | INLINE o=occurences? f=lqident
     { PPhl (Pinline (f, None, o)) }

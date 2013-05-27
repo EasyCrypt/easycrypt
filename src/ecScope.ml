@@ -928,11 +928,11 @@ module Tactic = struct
     | Some side -> t_inline_equiv env fp side occs g
 
 
-  let process_rnd env tac_info g =
+  let process_rnd side env tac_info g =
     let concl = get_concl g in
-    match tac_info with 
-      | (None, None) when is_hoareS concl -> t_hoare_rnd env g
-      | opt_bd, opt_event when is_bdHoareS concl ->
+    match side, tac_info with 
+      | None, (None, None) when is_hoareS concl -> t_hoare_rnd env g
+      | None, (opt_bd, opt_event) when is_bdHoareS concl ->
         let opt_bd = omap opt_bd (process_phl_form treal env g)  in
         let event ty = omap opt_event (process_phl_form (tfun ty tbool) env g) in
         t_bd_hoare_rnd env (opt_bd,event) g
@@ -943,7 +943,7 @@ module Tactic = struct
           | Some f, None | None, Some f -> Some (process_form f), None
           | Some f, Some finv -> Some (process_form f), Some (process_form finv)
         in
-        t_equiv_rnd env bij_info g
+        t_equiv_rnd side env bij_info g
       | _ -> cannot_apply "rnd" "unexpected instruction or wrong arguments"
 
 
@@ -1058,7 +1058,7 @@ module Tactic = struct
       | Pcall(side, (pre, post)) -> process_call env side pre post
       | Pswap info -> process_swap env info
       | Pinline (f, s, o) -> process_inline env f s o
-      | Prnd info -> process_rnd env info
+      | Prnd (side,info) -> process_rnd side env info
       | Pconseq info -> process_conseq env info
       | Pequivdeno info -> process_equiv_deno env info
     in

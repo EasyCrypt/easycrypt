@@ -1187,6 +1187,7 @@ let t_equiv_deno env pre post g =
   let concl_po = gen_mems [mel;mer] (f_imp post (cmp evl evr)) in
   prove_goal_by [concl_e;concl_pr;concl_po] RN_hl_deno g  
 
+
 (* -------------------------------------------------------------------- *)
 
 let gen_rcond b m at_pos s =
@@ -1504,6 +1505,32 @@ let t_hoare_rnd env g =
   prove_goal_by [concl] RN_hl_hoare_rnd g
 
 
+let wp_equiv_disj_rnd side env g =
+  let concl = get_concl g in
+  let es = destr_equivS concl in
+  let m,s = 
+    if side then es.es_ml, es.es_sl 
+    else         es.es_mr, es.es_sr 
+  in
+  let (lv,distr),s= s_last_rnd "rnd" s in
+
+  (* FIXME: exception when not rnds found *)
+  let ty_distr = proj_distr_ty (e_ty distr) in
+  let x_id = EcIdent.create "x" in
+  let x = f_local x_id ty_distr in
+  let distr = EcFol.form_of_expr (EcMemory.memory m) distr in
+  let post = subst_form_lv env (EcMemory.memory m) lv x es.es_po in
+  let post = (f_in_supp x distr) ==> post in
+  let post = f_forall_simpl [(x_id,GTty ty_distr)] post in
+  let concl = 
+    if side then f_equivS_r {es with es_sl=s; es_po=post} 
+    else  f_equivS_r {es with es_sr=s; es_po=post} 
+  in
+  prove_goal_by [concl] RN_hl_hoare_rnd g
+  
+
+
+
 let wp_equiv_rnd env (f,finv) g =
   let concl = get_concl g in
   let es = destr_equivS concl in
@@ -1535,52 +1562,25 @@ let wp_equiv_rnd env (f,finv) g =
   prove_goal_by [concl] (RN_hl_equiv_rnd ((Some tf, Some tfinv))) g
 
 
-let t_equiv_rnd env bij_info = 
-  let f,finv =  match bij_info with 
-    | Some f, Some finv ->  f, finv
-    | Some bij, None | None, Some bij -> bij, bij
-    | None, None -> 
-      let z_id = EcIdent.create "z" in
-      let z = f_local z_id in
-      let bij = fun tyL tyR -> f_lambda [z_id,GTty tyR] (z tyL) in 
-      bij, bij
-  in wp_equiv_rnd env (f, finv) 
+let t_equiv_rnd side env bij_info = 
+  match side with
+    | Some side -> wp_equiv_disj_rnd side env 
+    | None  ->
+      let f,finv =  match bij_info with 
+        | Some f, Some finv ->  f, finv
+        | Some bij, None | None, Some bij -> bij, bij
+        | None, None -> 
+          let z_id = EcIdent.create "z" in
+          let z = f_local z_id in
+          let bij = fun tyL tyR -> f_lambda [z_id,GTty tyR] (z tyL) in 
+          bij, bij
+      in wp_equiv_rnd env (f, finv) 
 
 
-
-
-
-(* --------------------------------------------------------------------- *)
-(* ---- Bounded Probabilistic Hoare Logic ------------------------------ *)
-(* --------------------------------------------------------------------- *)
-
-(* 
- * Instead of introducing new type constructors for bounded probabilistic
- * Hoare judgments, I consider Hoare involved in numeric relations as such
- * judgments.
- * 
- * Tactics have different application rules depending on whether one is
- * dealing with {P}c{Q}<=k, {P}c{Q}=k or {P}c{Q} >= k
- * 
- * t_bd_hoare_gen just reduces occurrences of k >= {P}c{Q} to
- * {P}c{Q}<=k and likewise for ...
- * However, for the moment, comparisons of the form {P}c{Q}<={P'}c'{Q'} 
- * cannot be disambiguated
- *)
-
-
-(*
- * "hr cmp_op bd" represents the goal g conclusion
- * opt_bd is a "bound Option" provided by the user 
- *   (if cmp_bd is "<=" then opt_bd must be None or equal to bd)
- * event is a cPred (see theories/Fun.ec) that must be "equivalent"
- *   to the post of hr
- *)
 
 let t_bd_hoare_rnd env (opt_bd,opt_event) g =
   let concl = get_concl g in
   let bhs = destr_bdHoareS concl in
-
   let (lv,distr),s = s_last_rnd "bd_hoare_rnd" bhs.bhs_s in
   let ty_distr = proj_distr_ty (e_ty distr) in
   let distr = EcFol.form_of_expr (EcMemory.memory bhs.bhs_m) distr in
@@ -1588,7 +1588,6 @@ let t_bd_hoare_rnd env (opt_bd,opt_event) g =
     | Some event -> event 
     | None -> cannot_apply "rnd" "Optional events still not supported"
   in
-
   let new_cmp_op,new_hoare_bd, bounded_distr =
     match bhs.bhs_cmp, opt_bd with
       | FHle, Some bd' when not (EcFol.f_equal bhs.bhs_bd bd') ->
@@ -1603,7 +1602,6 @@ let t_bd_hoare_rnd env (opt_bd,opt_event) g =
           bhs.bhs_cmp, EcFol.f_real_div bhs.bhs_bd bd', f_eq (f_mu distr event) bd'
       | FHeq, _ -> FHeq, EcFol.f_real_of_int 1, f_eq (f_mu distr event) bhs.bhs_bd
   in
-
   let v_id = EcIdent.create "v" in
   let v = f_local v_id ty_distr in
   let post_v = subst_form_lv env (EcMemory.memory bhs.bhs_m) lv v bhs.bhs_po in

@@ -267,14 +267,8 @@ type 'a doption =
   | Single of 'a
   | Double of 'a * 'a
 
-(* type 'a rnd_bij_info = *)
-(*   | RIid *)
-(*   | RIidempotent of 'a *)
-(*   | RIbij of ('a * 'a) *)
 
 type 'a rnd_tac_info = ('a option) * ('a option)
-  (* | RTbij of 'a rnd_bij_info *)
-  (* | RTbd of ('a option * 'a) *)
 
 type tac_side = bool option
 
@@ -326,7 +320,7 @@ and phl_tactics =
   | Pcond       of tac_side
   | Pswap       of ((tac_side * swap_kind) located list)
   | Pinline     of pqsymbol * tac_side * (int list option)
-  | Prnd        of pformula rnd_tac_info
+  | Prnd        of tac_side * pformula rnd_tac_info
   | Pconseq     of cfpattern
   | Pequivdeno  of cfpattern
 
