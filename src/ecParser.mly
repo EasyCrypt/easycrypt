@@ -1335,8 +1335,8 @@ tactic:
 | SWAP info=plist1(loc(swap_info),COMMA)
     { PPhl (Pswap info) }
 
-| RND info=rnd_info
-    { PPhl (Prnd info) }
+| RND s=side? info=rnd_info
+    { PPhl (Prnd (s,info)) }
 
 | INLINE s=side? o=occurences? f=plist0(loc(fident), empty)
     { PPhl (Pinline (s, (f, o))) }
@@ -1349,14 +1349,14 @@ tactic:
 ;
 
 rnd_info:
-| e1=sform COMMA e2=sform 
-  {RTbij (RIbij (e1,e2)) }
-| e=sform 
-  {RTbij (RIidempotent e) }
+| e1=sform e2=sform 
+  { Some e1, Some e2 }
+| e=sform UNDERSCORE 
+  { Some e, None }
+| UNDERSCORE e=sform 
+  { None, Some e }
 | empty
-  {RTbij (RIid) }
-| LBRACE e1=sform COMMA e2=sform RBRACE
-  {RTbd (Some e1,e2)}
+  {None, None }
 ;
 
 swap_info:

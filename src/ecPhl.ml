@@ -218,6 +218,28 @@ let rec f_write env w f =
     let w = EcPath.Sx.fold add fdef.f_uses.us_writes w in
     List.fold_left (f_write env) w fdef.f_uses.us_calls
 
+(* computes the program variables occurring free in f with memory m *)
+let rec free_pv_form m env f = 
+  let fv = free_pv_form m env in
+  match f.f_node with
+  | Fpvar (pv,m') when m=m' -> PV.add env pv f.f_ty PV.empty
+  | Fquant (_,_,f) 
+    -> fv f
+  | Fif (f1,f2,f3) 
+    -> PV.union env (fv f1) (PV.union env (fv f2) (fv f3))
+  | Flet (_,f1,f2)
+    -> PV.union env (fv f1) (fv f2)
+  | Fapp (f,fs) 
+    -> List.fold_left (fun s f -> PV.union env (fv f) s) (fv f) fs
+  | Ftuple fs 
+    -> List.fold_left (fun s f -> PV.union env (fv f) s) PV.empty fs
+  | Fint _ | Flocal _ | Fglob _ | Fop _ | Fpvar _ 
+    -> PV.empty
+  | FhoareF _ | FhoareS _
+  | FbdHoareF _ | FbdHoareS _
+  | FequivF _ | FequivS _
+  | Fpr _ -> assert false (* FIXME: extend if necessary *)
+
 let lp_write env w lp = 
   let add w (pv,ty) = PV.add env pv ty w in
   match lp with
@@ -396,6 +418,9 @@ let wp_asgn env m s post =
 
 exception No_wp
 
+(* wp functions operates only over assignments and conditional statements.
+   Any weakening on this restriction may break the soundness of bounded hoare logic 
+*)
 let rec wp_stmt env m (stmt: EcModules.instr list) letsf = 
   match stmt with
   | [] -> stmt, letsf
@@ -457,6 +482,12 @@ let t_hS_or_eS th te g =
   let concl = get_concl g in
   if is_hoareS concl then th g
   else if is_equivS concl then te g
+  else tacerror (NotPhl None)
+
+let t_hS_or_bhS th te g =
+  let concl = get_concl g in
+  if is_hoareS concl then th g
+  else if is_bdHoareS concl then te g
   else tacerror (NotPhl None)
 
 let t_hS_or_bhS_or_eS th tbh te g =
@@ -643,8 +674,9 @@ let t_bdHoare_skip g =
   let concl = get_concl g in
   let bhs = destr_bdHoareS concl in
   if bhs.bhs_s.s_node <> [] then tacerror NoSkipStmt;
-  if bhs.bhs_cmp <> FHeq || not (f_equal bhs.bhs_bd (f_real_of_int 1)) then
-    cannot_apply "skip" "bound must be \"= 1\"";
+  if (bhs.bhs_cmp <> FHeq && bhs.bhs_cmp <> FHge) ||
+    not (f_equal bhs.bhs_bd (f_real_of_int 1)) then
+    cannot_apply "skip" "bound must be \">= 1\"";
   let concl = f_imp bhs.bhs_pr bhs.bhs_po in
   let concl = gen_mems [bhs.bhs_m] concl in
   prove_goal_by [concl] RN_hl_skip g
@@ -725,6 +757,27 @@ let t_hoare_wp env i g =
   let concl = f_hoareS_r { hs with hs_s = s; hs_po = post} in
   prove_goal_by [concl] (RN_hl_wp (Single i)) g
 
+let t_bdHoare_wp env i g =
+  let concl = get_concl g in
+  let bhs = destr_bdHoareS concl in
+  let s_hd,s_wp = s_split_o "wp" i bhs.bhs_s in
+  let s_wp = EcModules.stmt s_wp in
+
+  let m = EcMemory.memory bhs.bhs_m in
+
+  let fv_bd = free_pv_form m env bhs.bhs_bd in
+  let modi = s_write env s_wp in
+
+  if not (PV.disjoint env fv_bd modi) then 
+    cannot_apply "wp" "Not_implemented: bound is modified by the statement";
+
+  let s_wp,post = 
+    wp env m s_wp bhs.bhs_po in
+  let i = check_wp_progress "wp" i bhs.bhs_s s_wp in
+  let s = EcModules.stmt (s_hd @ s_wp) in
+  let concl = f_bdHoareS_r { bhs with bhs_s = s; bhs_po = post} in
+  prove_goal_by [concl] (RN_hl_wp (Single i)) g
+
 
 let t_equiv_wp env ij g = 
   let concl = get_concl g in
@@ -744,10 +797,9 @@ let t_equiv_wp env ij g =
   prove_goal_by [concl] (RN_hl_wp (Double(i,j))) g
 
 
-let t_wp env k =
-  match k with
-  | None -> t_hS_or_eS (t_hoare_wp env None) (t_equiv_wp env None)
-  | Some (Single i) -> t_hoare_wp env (Some i)
+let t_wp env k = match k with
+  | None -> t_hS_or_bhS_or_eS (t_hoare_wp env None) (t_bdHoare_wp env None) (t_equiv_wp env None)
+  | Some (Single i) -> t_hS_or_bhS (t_hoare_wp env (Some i)) (t_bdHoare_wp env (Some i))
   | Some (Double(i,j)) -> t_equiv_wp env (Some (i,j))
 
 
@@ -960,6 +1012,13 @@ let t_hoare_case f g =
   let concl2 = f_hoareS_r { hs with hs_pr = f_and_simpl hs.hs_pr (f_not f) } in
   prove_goal_by [concl1;concl2] (RN_hl_case f) g
 
+let t_bdHoare_case f g =
+  let concl = get_concl g in
+  let bhs = destr_bdHoareS concl in
+  let concl1 = f_bdHoareS_r { bhs with bhs_pr = f_and_simpl bhs.bhs_pr f } in
+  let concl2 = f_bdHoareS_r { bhs with bhs_pr = f_and_simpl bhs.bhs_pr (f_not f) } in
+  prove_goal_by [concl1;concl2] (RN_hl_case f) g
+
 let t_equiv_case f g = 
   let concl = get_concl g in
   let es = destr_equivS concl in
@@ -968,7 +1027,7 @@ let t_equiv_case f g =
   prove_goal_by [concl1;concl2] (RN_hl_case f) g
 
 let t_he_case f g =
-  t_hS_or_eS (t_hoare_case f) (t_equiv_case f) g 
+  t_hS_or_bhS_or_eS (t_hoare_case f) (t_bdHoare_case f) (t_equiv_case f) g 
 
 (* --------------------------------------------------------------------- *)
 
@@ -1116,6 +1175,7 @@ let t_equiv_deno env pre post g =
   let concl_po = gen_mems [mel;mer] (f_imp post (cmp evl evr)) in
   prove_goal_by [concl_e;concl_pr;concl_po] RN_hl_deno g  
 
+
 (* -------------------------------------------------------------------- *)
 
 let gen_rcond b m at_pos s =
@@ -1141,6 +1201,18 @@ let t_hoare_rcond b at_pos g =
   let concl2  = f_hoareS_r { hs with hs_s = s } in
   prove_goal_by [concl1;concl2] (RN_hl_rcond (None, b,at_pos)) g  
 
+let t_bdHoare_rcond b at_pos g = 
+  (* TODO: generalize the rule using assume *)
+  if at_pos <> 1 then
+    cannot_apply "rcond" "position must be 1 in bounded Hoare judgments";
+  let concl = get_concl g in
+  let bhs = destr_bdHoareS concl in
+  let m  = EcMemory.memory bhs.bhs_m in 
+  let hd,e,s = gen_rcond b m at_pos bhs.bhs_s in
+  let concl1  = f_bdHoareS_r { bhs with bhs_s = hd; bhs_po = e } in
+  let concl2  = f_bdHoareS_r { bhs with bhs_s = s } in
+  prove_goal_by [concl1;concl2] (RN_hl_rcond (None, b,at_pos)) g  
+
 let t_equiv_rcond side b at_pos g =
   let concl = get_concl g in
   let es = destr_equivS concl in
@@ -1161,9 +1233,11 @@ let t_equiv_rcond side b at_pos g =
   prove_goal_by [concl1;concl2] (RN_hl_rcond (Some side,b,at_pos)) g 
 
 let t_rcond side b at_pos g =
+  let concl = get_concl g in
   match side with
-  | None -> t_hoare_rcond b at_pos g
-  | Some side -> t_equiv_rcond side b at_pos g
+    | None when is_bdHoareS concl -> t_bdHoare_rcond b at_pos g
+    | None -> t_hoare_rcond b at_pos g
+    | Some side -> t_equiv_rcond side b at_pos g
 
 (* -------------------------------------------------------------------- *)
 let check_swap env s1 s2 = 
@@ -1226,6 +1300,12 @@ let t_hoare_cond env g =
   let hs = destr_hoareS concl in 
   let (e,_,_) = s_first_if hs.hs_s in
   t_gen_cond env None (form_of_expr (EcMemory.memory hs.hs_m) e) g
+
+let t_bdHoare_cond env g = 
+  let concl = get_concl g in
+  let bhs = destr_bdHoareS concl in 
+  let (e,_,_) = s_first_if bhs.bhs_s in
+  t_gen_cond env None (form_of_expr (EcMemory.memory bhs.bhs_m) e) g
 
 let rec t_equiv_cond env side g =
   let hyps,concl = get_goal g in
@@ -1299,6 +1379,33 @@ let t_hoare_rnd env g =
   let concl = f_hoareS_r {hs with hs_s=s; hs_po=post} in
   prove_goal_by [concl] RN_hl_hoare_rnd g
 
+
+let wp_equiv_disj_rnd side env g =
+  let concl = get_concl g in
+  let es = destr_equivS concl in
+  let m,s = 
+    if side then es.es_ml, es.es_sl 
+    else         es.es_mr, es.es_sr 
+  in
+  let (lv,distr),s= s_last_rnd "rnd" s in
+
+  (* FIXME: exception when not rnds found *)
+  let ty_distr = proj_distr_ty (e_ty distr) in
+  let x_id = EcIdent.create "x" in
+  let x = f_local x_id ty_distr in
+  let distr = EcFol.form_of_expr (EcMemory.memory m) distr in
+  let post = subst_form_lv env (EcMemory.memory m) lv x es.es_po in
+  let post = (f_in_supp x distr) ==> post in
+  let post = f_forall_simpl [(x_id,GTty ty_distr)] post in
+  let concl = 
+    if side then f_equivS_r {es with es_sl=s; es_po=post} 
+    else  f_equivS_r {es with es_sr=s; es_po=post} 
+  in
+  prove_goal_by [concl] RN_hl_hoare_rnd g
+  
+
+
+
 let wp_equiv_rnd env (f,finv) g =
   let concl = get_concl g in
   let es = destr_equivS concl in
@@ -1327,56 +1434,32 @@ let wp_equiv_rnd env (f,finv) g =
   let post = supp_cond1 &&& supp_cond2 &&& inv_cond1 &&& inv_cond2 &&& post in
   let post = f_forall_simpl [(x_id,GTty tyL);(y_id,GTty tyR)] post in
   let concl = f_equivS_r {es with es_sl=sl'; es_sr=sr'; es_po=post} in
-  prove_goal_by [concl] (RN_hl_equiv_rnd (RIbij (tf,tfinv))) g
+  prove_goal_by [concl] (RN_hl_equiv_rnd ((Some tf, Some tfinv))) g
 
+let t_equiv_rnd side env bij_info = 
+  match side with
+    | Some side -> wp_equiv_disj_rnd side env 
+    | None  ->
+      let f,finv =  match bij_info with 
+        | Some f, Some finv ->  f, finv
+        | Some bij, None | None, Some bij -> bij, bij
+        | None, None -> 
+          let z_id = EcIdent.create "z" in
+          let z = f_local z_id in
+          let bij = fun tyL tyR -> f_lambda [z_id,GTty tyR] (z tyL) in 
+          bij, bij
+      in wp_equiv_rnd env (f, finv) 
 
-let t_equiv_rnd env bij_info = 
-  let f,finv =  match bij_info with 
-    | RIbij (f,finv) -> f,finv
-    | RIidempotent bij -> bij, bij
-    | RIid -> 
-        let z_id = EcIdent.create "z" in
-        let z = f_local z_id in
-        let bij = fun tyL tyR -> f_lambda [z_id,GTty tyR] (z tyL) in 
-        bij, bij
-  in wp_equiv_rnd env (f,finv) 
-
-(* --------------------------------------------------------------------- *)
-(* ---- Bounded Probabilistic Hoare Logic ------------------------------ *)
-(* --------------------------------------------------------------------- *)
-
-(* 
- * Instead of introducing new type constructors for bounded probabilistic
- * Hoare judgments, I consider Hoare involved in numeric relations as such
- * judgments.
- * 
- * Tactics have different application rules depending on whether one is
- * dealing with {P}c{Q}<=k, {P}c{Q}=k or {P}c{Q} >= k
- * 
- * t_bd_hoare_gen just reduces occurrences of k >= {P}c{Q} to
- * {P}c{Q}<=k and likewise for ...
- * However, for the moment, comparisons of the form {P}c{Q}<={P'}c'{Q'} 
- * cannot be disambiguated
- *)
-
-
-(*
- * "hr cmp_op bd" represents the goal g conclusion
- * opt_bd is a "bound Option" provided by the user 
- *   (if cmp_bd is "<=" then opt_bd must be None or equal to bd)
- * event is a cPred (see theories/Fun.ec) that must be "equivalent"
- *   to the post of hr
- *)
-
-let t_bd_hoare_rnd env (opt_bd,event) g =
+let t_bd_hoare_rnd env (opt_bd,opt_event) g =
   let concl = get_concl g in
   let bhs = destr_bdHoareS concl in
-
   let (lv,distr),s = s_last_rnd "bd_hoare_rnd" bhs.bhs_s in
   let ty_distr = proj_distr_ty (e_ty distr) in
   let distr = EcFol.form_of_expr (EcMemory.memory bhs.bhs_m) distr in
-  let event = event ty_distr in
-
+  let event = match opt_event ty_distr with 
+    | Some event -> event 
+    | None -> cannot_apply "rnd" "Optional events still not supported"
+  in
   let new_cmp_op,new_hoare_bd, bounded_distr =
     match bhs.bhs_cmp, opt_bd with
       | FHle, Some bd' when not (EcFol.f_equal bhs.bhs_bd bd') ->
@@ -1391,7 +1474,6 @@ let t_bd_hoare_rnd env (opt_bd,event) g =
           bhs.bhs_cmp, EcFol.f_real_div bhs.bhs_bd bd', f_eq (f_mu distr event) bd'
       | FHeq, _ -> FHeq, EcFol.f_real_of_int 1, f_eq (f_mu distr event) bhs.bhs_bd
   in
-
   let v_id = EcIdent.create "v" in
   let v = f_local v_id ty_distr in
   let post_v = subst_form_lv env (EcMemory.memory bhs.bhs_m) lv v bhs.bhs_po in
