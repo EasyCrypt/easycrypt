@@ -17,6 +17,7 @@ type lvalue =
                   EcTypes.prog_var * EcTypes.expr * EcTypes.ty
 
 val lv_equal : lvalue -> lvalue -> bool
+val symbol_of_lv : lvalue -> symbol
 
 (* --------------------------------------------------------------------- *)
 type instr = private {

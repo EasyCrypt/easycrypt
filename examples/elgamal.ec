@@ -128,7 +128,7 @@ proof.
   fun.
   inline ElGamal.kg ElGamal.enc ElGamal.dec.
   wp.
-  rnd. (* Bizare d'appeller la variable x (plutot que y) *)
+  rnd.
   wp.
   rnd.
   skip.

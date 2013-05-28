@@ -280,6 +280,9 @@ let pv_subst m_subst pv =
   let mp' = m_subst pv.pv_name in
   if pv.pv_name == mp' then pv else { pv with pv_name = mp'}
 
+let symbol_of_pv pv = 
+  EcPath.basename pv.pv_name.EcPath.x_sub
+
 let string_of_pvar_kind = function
   | PVglob -> "PVglob"
   | PVloc  -> "PVloc"

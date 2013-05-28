@@ -109,6 +109,7 @@ val pv_fv      : prog_var -> int EcIdent.Mid.t
 val is_loc     : prog_var -> bool
 val is_glob    : prog_var -> bool
 
+val symbol_of_pv   : prog_var -> symbol
 val string_of_pvar : prog_var -> string
 
 val pv_subst : (EcPath.xpath -> EcPath.xpath) -> prog_var -> prog_var 

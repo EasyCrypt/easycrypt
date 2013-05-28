@@ -1462,7 +1462,7 @@ let t_hoare_rnd env g =
   let (lv,distr),s= s_last_rnd "rnd" hs.hs_s in
   (* FIXME: exception when not rnds found *)
   let ty_distr = proj_distr_ty (e_ty distr) in
-  let x_id = EcIdent.create "x" in
+  let x_id = EcIdent.create (symbol_of_lv lv) in
   let x = f_local x_id ty_distr in
   let distr = EcFol.form_of_expr (EcMemory.memory hs.hs_m) distr in
   let post = subst_form_lv env (EcMemory.memory hs.hs_m) lv x hs.hs_po in
@@ -1483,7 +1483,7 @@ let wp_equiv_disj_rnd side env g =
 
   (* FIXME: exception when not rnds found *)
   let ty_distr = proj_distr_ty (e_ty distr) in
-  let x_id = EcIdent.create "x" in
+  let x_id = EcIdent.create (symbol_of_lv lv) in
   let x = f_local x_id ty_distr in
   let distr = EcFol.form_of_expr (EcMemory.memory m) distr in
   let post = subst_form_lv env (EcMemory.memory m) lv x es.es_po in
@@ -1505,7 +1505,8 @@ let wp_equiv_rnd env (f,finv) g =
   (* FIXME: exception when not rnds found *)
   let tyL = proj_distr_ty (e_ty muL) in
   let tyR = proj_distr_ty (e_ty muR) in
-  let x_id, y_id = EcIdent.create "x", EcIdent.create "y" in
+  let x_id = EcIdent.create (symbol_of_lv lvL ^ "L")
+  and y_id = EcIdent.create (symbol_of_lv lvR ^ "R") in
   let x = f_local x_id tyL in
   let y = f_local y_id tyR in
   let muL = EcFol.form_of_expr (EcMemory.memory es.es_ml) muL in
@@ -1539,6 +1540,10 @@ let t_equiv_rnd side env bij_info =
           let z_id = EcIdent.create "z" in
           let z = f_local z_id in
           let bij = fun tyL tyR -> f_lambda [z_id,GTty tyR] (z tyL) in 
+          (* TODO Cezar : Can it be not well typed: normally tyL and tyR should
+             be equal.
+             I propose to replace tyL by tyR
+            *)
           bij, bij
       in wp_equiv_rnd env (f, finv) 
 
