@@ -1318,7 +1318,7 @@ module Mod = struct
 
       | Some (params, o) ->
           let ((spi, params), op) = MC._downpath_for_mod false env ip params in
-          let (params, istop) =
+          let (params, _istop) =
             match op.EcPath.m_top with
             | `Concrete (_, Some _) ->
                 assert (o.me_sig.mis_params <> []);
@@ -1326,7 +1326,7 @@ module Mod = struct
         
             | `Concrete (p, None) ->
                 assert ((params = []) || ((spi+1) = EcPath.p_size p));
-                (o.me_sig.mis_params, true)
+                ((if args = [] then [] else o.me_sig.mis_params), true)
         
             | `Abstract _m ->
                 assert ((params <> []) || spi <> 0);
@@ -1478,7 +1478,6 @@ end
 
 (* -------------------------------------------------------------------- *)
 module NormMp = struct
-
   let rec norm_mpath env p =
     let (ip, (i, args)) = ipath_of_mpath p in
     match Mod.by_ipath_r true ip env with

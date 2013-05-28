@@ -228,12 +228,12 @@ let check_arg do_arg env hyps s x gty a =
   let a = do_arg env hyps (Some gty) a in
   match gty, a with
   | GTty ty  , AAform f ->
-    check_type env ty f.f_ty; (* FIXME error message *)
-    bind_local s x f, RA_form f
+      check_type env ty f.f_ty; (* FIXME error message *)
+      bind_local s x f, RA_form f
   | GTmem _   , AAmem m ->
-    bind_mem s x m, RA_id m
+      bind_mem s x m, RA_id m
   | GTmodty (emt, restr), AAmp (mp, mt)  ->
-    check_modtype_restr env mp mt emt restr;
+      check_modtype_restr env mp mt emt restr;
       bind_mod s x mp, RA_mp mp
   | _ -> assert false (* FIXME error message *)
 
