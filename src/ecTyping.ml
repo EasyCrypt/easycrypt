@@ -804,16 +804,15 @@ let check_sig_mt_cnv env sin tyout =
   check_sig_cnv `Sub env sin sout
 
 (* -------------------------------------------------------------------- *)
-
-let process_msymb (env : EcEnv.env) (msymb : pmsymbol located) =
+let split_msymb (env : EcEnv.env) (msymb : pmsymbol located) =
   let (top, args, sm) = 
     try
       let (r, (x, args), sm) =
         List.find_split (fun (_,args) -> args <> None) msymb.pl_desc
       in
-        List.rev_append r [x,None], args, sm 
+        (List.rev_append r [x, None], args, sm)
     with Not_found ->
-      msymb.pl_desc, None, []
+      (msymb.pl_desc, None, [])
   in
 
   let (top, sm) =
@@ -827,10 +826,9 @@ let process_msymb (env : EcEnv.env) (msymb : pmsymbol located) =
     (top, args, sm)
 
 (* -------------------------------------------------------------------- *)
-
 let rec trans_msymbol (env : EcEnv.env) (msymb : pmsymbol located) =
   let loc = msymb.pl_loc in
-  let (top, args, sm) = process_msymb env msymb in
+  let (top, args, sm) = split_msymb env msymb in
 
   let to_qsymbol l = 
     match List.rev l with
@@ -848,6 +846,7 @@ let rec trans_msymbol (env : EcEnv.env) (msymb : pmsymbol located) =
         tyerror top_qname.pl_loc env (UnknownModName top_qname.pl_desc)
     | Some me -> me
   in
+
   let (params, istop) =
     match top_path.EcPath.m_top with
     | `Concrete (_, Some sub) ->
@@ -899,75 +898,6 @@ let rec trans_msymbol (env : EcEnv.env) (msymb : pmsymbol located) =
         (fun (Tys_function(s,_)) -> Tys_function(s,{oi_calls = []})) body in
     let mp = EcPath.mpath top_path args in
     (mp, {mis_params = []; mis_body = body})
-
-(*
-let rec trans_msymbol (env : EcEnv.env) (msymb : pmsymbol located) =
-  let loc = msymb.pl_loc in
-  let (top, args, sm) = process_msymb env msymb in
-
-  let to_qsymbol l = 
-    match List.rev l with
-    | [] -> assert false
-    | x::qn ->
-        { pl_desc = (List.rev_map unloc qn, unloc x);
-          pl_loc  = x.pl_loc; }
-  in
-
-  let top_qname = to_qsymbol (top@sm) in
-  Format.printf "top_qname = %a@." pp_qsymbol top_qname.pl_desc;
-
-  let (top_path, {EcEnv.sp_target = mod_expr; EcEnv.sp_params = (spi, params)}) =
-    match EcEnv.Mod.sp_lookup_opt top_qname.pl_desc env with
-    | None ->
-        tyerror top_qname.pl_loc env (UnknownModName top_qname.pl_desc)
-    | Some me -> me
-  in
-
-  let (params, _istop) =
-    match top_path with
-    | `Concrete (_, Some sub) ->
-        if mod_expr.me_sig.mis_params <> [] then
-          assert false;
-        if args <> None then
-          if not (EcPath.p_size sub = List.length sm) then
-            tyerror loc env (InvalidModAppl MAE_WrongArgPosition);
-        (params, false)
-
-    | `Concrete (p, None) ->
-        if (params <> []) || ((spi+1) <> EcPath.p_size p) then
-          assert false;
-        (mod_expr.me_sig.mis_params, true)
-
-    | `Abstract _m ->
-        if (params <> []) || spi <> 0 then
-          assert false;
-        (mod_expr.me_sig.mis_params, true)
-  in
-
-  let args = omap args (List.map (trans_msymbol env)) in
-
-  match args with
-  | None ->
-      let mp = EcPath.mpath top_path [] in
-      (mp, mod_expr.me_sig)
-
-  | Some args ->
-      if List.length params <> List.length args then
-        tyerror loc env (InvalidModAppl MAE_WrongArgCount);
-      List.iter2
-        (fun (_, p) (_, a) ->
-          try check_sig_mt_cnv env a p
-          with _ -> tyerror loc env (InvalidModAppl MAE_InvalidArgType))
-        params args;
-
-      let args = List.map fst args in
-      let mp = EcPath.mpath top_path args in
-      Format.printf "ICI1@.";
-      let me = EcEnv.Mod.by_mpath mp env in
-      Format.printf "ICI2@.";
-      (mp, me.me_sig)
-*)
-
 
 (* -------------------------------------------------------------------- *)
 let rec transmod (env : EcEnv.env) (x : symbol) (me : pmodule_expr) =
@@ -1142,16 +1072,14 @@ and transstruct (env : EcEnv.env) (x : symbol) (st : pstructure) =
         | FBabs _ -> assert false
         end) us items in
   let uses = uses EcPath.Sm.empty items in
-  { me_name  = x;
-    me_body  = 
-      ME_Structure 
-        { ms_params = stparams;
-          ms_body   = items; 
-          ms_vars   = vars; 
-          ms_uses   = uses };
-    me_comps = items;
-    me_sig   = tymod;
-   }
+    { me_name  = x;
+      me_body  = 
+        ME_Structure 
+          { ms_body = items; 
+            ms_vars = vars; 
+            ms_uses = uses };
+      me_comps = items;
+      me_sig   = tymod; }
   
 (* -------------------------------------------------------------------- *)
 and transstruct1 (env : EcEnv.env) (st : pstructure_item) =

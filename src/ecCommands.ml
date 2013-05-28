@@ -201,6 +201,13 @@ and process_checkproof scope b =
     scope
 
 (* -------------------------------------------------------------------- *)
+and process_pragma scope opt =
+  match unloc opt with
+  | "silent"  -> EcScope.set_verbose scope false
+  | "verbose" -> EcScope.set_verbose scope true
+  | _         -> scope
+
+(* -------------------------------------------------------------------- *)
 and process (scope : EcScope.scope) (g : global located) =
   let loc = g.pl_loc in
 
@@ -226,6 +233,7 @@ and process (scope : EcScope.scope) (g : global located) =
     | Gprover_info pi -> process_proverinfo scope pi
     | Gcheckproof b   -> process_checkproof scope b
     | Gsave      loc  -> process_save       scope loc
+    | Gpragma    opt  -> process_pragma     scope opt
   in
     begin
       try

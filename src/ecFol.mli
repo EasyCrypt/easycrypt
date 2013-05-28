@@ -131,6 +131,7 @@ val f_tt  : form
 val f_int : int -> form
 
 val f_real_of_int : int -> form
+val f_rone : form
 
 val f_op : EcPath.path -> EcTypes.ty list -> EcTypes.ty -> form
 val f_app : form -> form list -> EcTypes.ty -> form
@@ -148,6 +149,7 @@ val f_hoareS   : memenv -> form -> EcModules.stmt -> form -> form
 val f_hoareS_r : hoareS -> form
 val f_bdHoareF   : form -> EcPath.xpath -> form -> 
   hoarecmp -> form -> form 
+val f_losslessF  : EcPath.xpath -> form
 val f_bdHoareS   : memenv -> form -> EcModules.stmt -> form -> 
   hoarecmp -> form -> form 
 val f_bdHoareS_r : bdHoareS -> form
@@ -291,8 +293,8 @@ val bind_mod   : f_subst -> EcIdent.t -> EcPath.mpath -> f_subst
    
 val f_subst : f_subst -> form -> form 
 
-val subst_form : EcIdent.t -> form -> form -> form 
-
+val subst_form   : EcIdent.t -> form -> form -> form 
+val f_subst_mem  : EcIdent.t -> EcIdent.t -> form -> form 
 module Fsubst :
   sig
     val mapty : (EcTypes.ty -> EcTypes.ty) -> form -> form

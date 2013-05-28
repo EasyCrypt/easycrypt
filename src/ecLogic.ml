@@ -228,12 +228,12 @@ let check_arg do_arg env hyps s x gty a =
   let a = do_arg env hyps (Some gty) a in
   match gty, a with
   | GTty ty  , AAform f ->
-    check_type env ty f.f_ty; (* FIXME error message *)
-    bind_local s x f, RA_form f
+      check_type env ty f.f_ty; (* FIXME error message *)
+      bind_local s x f, RA_form f
   | GTmem _   , AAmem m ->
-    bind_mem s x m, RA_id m
+      bind_mem s x m, RA_id m
   | GTmodty (emt, restr), AAmp (mp, mt)  ->
-    check_modtype_restr env mp mt emt restr;
+      check_modtype_restr env mp mt emt restr;
       bind_mod s x mp, RA_mp mp
   | _ -> assert false (* FIXME error message *)
 
@@ -241,6 +241,7 @@ let mkn_apply do_arg env (juc,n) args =
   if args = [] then (juc,n), []
   else
     let hyps,concl = get_node (juc,n) in
+    let env = tyenv_of_hyps env hyps in
     let check_arg = check_arg do_arg env hyps in
     let rec check_apply juc s ras f args =
       match args with
@@ -539,7 +540,7 @@ let t_rewrite env side f g =
 let t_rewrite_node env ((juc,an), gs) side n =
   let (_,f) = get_node (juc, an) in
   t_seq_subgoal (t_rewrite env side f)
-    [t_use env an gs;t_id] (juc,n)
+    [t_use env an gs;t_id None] (juc,n)
 
 let t_rewrite_hyp env side id args (juc,n as g) =
   let hyps = get_hyps g in

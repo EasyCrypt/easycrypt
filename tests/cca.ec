@@ -30,7 +30,6 @@ module A : Adv = {
 
 module M = Test(A).
 
-
 lemma foo : 
   forall (A<:Adv {Test}), 
     equiv [ Test(A).main ~ Test(A).main : 

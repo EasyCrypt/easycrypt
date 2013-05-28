@@ -8,6 +8,11 @@ PGROOT ?= /usr/share/emacs/site-lisp/ProofGeneral
 all:
 	@echo "Type '$(MAKE) install' for installing ec-mode"
 
+keywords: easycrypt/easycrypt-keywords.el
+
+easycrypt/easycrypt-keywords.el: ../src/ecLexer.mll
+	../scripts/keywords.py -m emacs < $< > $@
+
 install: $(PGROOT)
 	@if [ -d $(PGROOT)/easycrypt ]; then \
 	  echo "This PG version has already been patched" >&2; \

@@ -154,14 +154,12 @@ and module_body =
   | ME_Decl        of module_type * EcPath.Sm.t 
 
 and module_structure = {
-  ms_params : (EcIdent.t * module_type) list;
   ms_body   : module_item list;
-  ms_vars   : ty Mx.t; (* The set of global variable declare inside the 
-                            module and it sub module *)
-  ms_uses   : Sm.t; (* The set of external top module used inside the module,
-                       It is an invariant that those modules are defined 
-                       (i.e are ME_structure).
-                    *)
+  ms_vars   : ty Mx.t; (* The set of global variables declared by the
+                          module and it submodules *)
+  ms_uses : Sm.t; (* The set of external top-level modules used by the module.
+                     It is an invariant that those modules are defined 
+                     (i.e are ME_structure). *)
 }
 
 and module_item =

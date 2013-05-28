@@ -637,7 +637,8 @@ let rec e_subst (s: e_subst) e =
 
 let is_subst_id s = 
   not s.es_freshen && s.es_p == identity && 
-    s.es_ty == identity && s.es_mp == identity && Mid.is_empty s.es_loc 
+    s.es_ty == identity && s.es_mp == identity && 
+    s.es_xp == identity && Mid.is_empty s.es_loc 
 
 let e_subst s =
   if is_subst_id s then identity

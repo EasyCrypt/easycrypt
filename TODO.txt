@@ -126,3 +126,207 @@ i_inuse : LvMap `Read ok mais aussi `Write
 ***
 
  - 
+
+*** upto rule
+
+* Preliminary definitions :
+  + DISTR 
+    distr (A:Type) := (A -> [0,1]) -> [0,1]
+
+  + SEM : notation [c] m 
+    sem (s:stmt) (m:mem) : distr mem 
+ 
+  + RANGE
+    range A (P : A -> Prop) (d:distr A) : Prop := 
+       forall (f:A -> [0,1]),  (forall a, P a -> f a = 0) => d f = 0
+
+  + LOSSLESS 
+    lossless A (d:distr A) : Prop := d 1_true = 1
+
+  + RANGEB : notation { P } c { Q } = 1 
+                            (* Particular case of Cesar implementation *)
+    rangeb : (P : mem -> Prop) (c:stmt) (Q:mem -> Prop) : Prop := 
+       forall m, P m => [c] m 1_Q = 1
+
+    Remark 1 : range P ([c] m) + lossless ([c] m) => rangeb P c 
+
+  + LIFT 
+    lift (R:A -> B -> Prop) (d1:distr A) (d2:distr B) :=
+      exists d:distr (A * B), 
+        condition 1 : d o Fst = d1
+        condition 2 : d o Snd = d2
+        condition 3 : range R d   (abusing notation the relation R can be see 
+                                  as a predicate over (A * B) )
+  + EQUIV :
+    equiv (P:mem -> mem -> Prop) (c1 c2:stmt) (Q:mem -> mem -> Prop) :=
+       forall m1 m2, P m1 m2 => lift Q ([c1] m1) ([c2] m2)
+
+
+* Usefull Lemmas :
+  + lemma mu_cte :
+    d (Fcte r) = r * d 1_true
+    if lossless d, d (Fcte r) = r
+
+  + lemma 1 : 
+    {P} c {Q} = 1  => forall m, P m => [c] m E = [c] m (E_{|Q})
+    where E_{|Q} = fun m' -> 1_Q m' * E m'  
+ 
+  + lemma 2 : 
+      {P} c {Q} = 1 => forall m, P m => [c] m 1_true = 1
+     Proof. trivial, since Q => true
+
+  + lemma 3 :
+     H1 : {P1} c1 {Q1} = 1                  =>
+     H2 : {P2} c2 {Q2} = 1                  =>
+     H3 : (forall m1 m2, P m1 m2 => P1 m1)  =>
+     H4 : (forall m1 m2, P m1 m2 => P2 m2)  =>
+     H5 : (forall m1 m2, Q1 m1 => Q2 m2 => Q m1 m2) =>
+
+     forall m1 m2, 
+        H6 : P m1 m2 =>
+        lift Q ([c1]m1) ([c2]m2)
+    Proof.
+      take d = 
+        Mlet ([c1] m1) 
+          (fun m1' -> Mlet ([c2] m2) 
+             (fun m2' -> (m1', m2'))) 
+
+      condition 1 : d o Fst == [c1] m1 
+        forall E,
+          (d o Fst) E = 
+          [c1] m1 (fun m1' -> [c2] m2 (fun m2' -> E (fst (m1',m2')))) =
+          [c1] m1 (fun m1' -> [c2] m2 (E m1')) =      
+          (* mu_cst  *)
+          [c1] m1 (fun m1' -> E m1' * [c2] m2 True) = 
+          (* lemma 2 + H2 + H3 + H6 *)
+          [c1] m1 (fun m1' -> E m1') = 
+          [c1] m1 E (* CQFD *)
+
+      condition 2 : d o Snd = [c2] m2
+         same as 1 since 
+         d == Mlet ([c2] m2)
+                (fun m2' -> Mlet ([c1] m1) (fun m1' -> (m1',m2'))) 
+
+      condition 3 (range (fun (m1,m2) -> Q m1 m2) d) :
+         - assume H7 : (forall m1' m2', Q m1' m2' => f (m1', m2') = 0)
+         we should prove d f = 0
+         d f = 
+         [c1] m1 (fun m1' -> [c2] m2 (fun m2' -> f (m1', m2')) =
+                (* by lemma 1 + H3 + H6 *)
+         [c1] m1 (fun m1' -> 1_Q1 m1' * [c2] m2 (fun m2' -> f (m1',m2'))) =
+                (* mu_cte *)
+         [c1] m1 (fun m1' -> [c2] m2 (fun m2' -> 1_Q1 m1' * f (m1', m2'))) =
+                (* by lemma 1 + H4 + H6 *)
+         [c1] m1 (fun m1' -> [c2] m2 
+                     (fun m2' -> 1_Q1 m1' * 1_Q2 m2' * f (m1',m2'))) =
+                (* by next remark *)                 
+         [c1] m1 (fun m1' -> [c2] m2 (Fcte 0)) = 
+         [c1] m1 (fun m1' -> 0) = [c1] m1 (Fcte 0) =
+         0 (* CQFD *)
+        next_remark : 
+          forall m1' m2',
+             1_Q1 m1' * 1_Q2 m2' * f (m1',m2') = 0
+         if !(Q1 m1' /\ Q2 m2') then !Q1 m1' \/ !Q2  m2' and trivial
+         else by H5 + H7 
+
+   
+Now we try to prove the upto bad rule :
+
+  P,Q : sided formulas depending only of global variables disjoint of the 
+         adversary memory.
+  Bad a formula depending only of global variables disjoint of the adversary 
+  memory.
+  ( i.e. the adversary can not write global variables of P, Q and Bad )
+
+  condition 1 : o1_i ~ o2_i : 
+     !Bad{2} /\ ={args} /\ (glob A){1) = (glob A){2} /\ P ==> 
+     if Bad{2} then Q
+     else (={res} /\ (glob A){1) = (glob A){2} /\ P )
+
+  condition 2 : forall m2, Bad m2 => { Q(_,m2) } o1_i { Q(_,m2) }
+           where Q(_,m2) means fun m1 -> Q m1 m2.
+  condition 3 : forall m1, { Bad /\ Q m1 } o2_i { Bad /\ Q m1 } 
+         
+
+  condition 4 : forall m, lossless ([o1_i] m)
+
+  condition 5 : forall m, lossless ([o2_i] m)
+
+  condition 5 : forall o, 
+      (forall m,  lossless ([o] m)) =>
+      forall m, lossless ([A.f_{o}] m)
+----------------------------------------------------------------------
+  A.f_{o1} ~ A.f{o2} : 
+     if Bad{2} then Q
+     else (={params} /\ (glob A){1) = (glob A){2} /\ P ) ==> 
+     if Bad{2} then Q
+     else (={res} /\ (glob A){1) = (glob A){2} /\ P )
+
+Proof by induction on the adversary statement (more precisely 
+by induction on the well formed adversary predicate)
+We prove :
+   s(o1) ~ s(o2) : 
+     if Bad{2} then Q 
+     else ( (mem A){1) = (mem A){2} /\ P ) 
+     ==>
+     if Bad{2} then Q 
+     else ( (mem A){1) = (mem A){2} /\ P )
+
+Instead of using equiv we use lift :
+let INV = if Bad{2} then Q else ( (mem A){1) = (mem A){2} /\ P )
+
+  forall s m1 m2,
+     INV m1 m2 =>
+     lossless ([s_{o1}] m1) =>
+     lossless ([s_{o2}] m2) =>
+     lift INV ([s(o1)] m1) ([s(o1)] m2)
+
+By induction on s.
+Each case start by a case analysing on Bad m2
+if Bad m2 is true the we use the same proof that for lemma 3
+we need to prove 
+    range ([s_{o1}] m1) Q(_, m2)
+and range ([s_{o2}] m2) (Q m1)
+This is easy because s can not write the variable of Q
+
+Now we have to do all case knowing !(Bad m2) :
+We have 
+  (1)   (mem A) m1 = (mem A) m2 and 
+  (2)   P m1 m2
++ case s := x = e trivial since
+  x does not affect P, and e m1 = e m2 by (1)
++ case s := i;s'
+  We apply the induction hypothesis on i 
+  First difficulty prove that lossless ([i_{oj}] mj) 
+   (if not then ([s_{oj}] mj) is not lossless,  absurd)
+  Then we apply the induction hypothesis on s' 
+  remark that the initial memory mj' given to s' are "reachable" from i, mj
+  and so if !lossless ([s'_{oj}] mj') then !lossless ([s_{oj}] mj)
++ case s := if e then s' else s''
+  e m1 = e m2 by 1 and so both statement take the same branch and
+  we conclude by induction hypothesis.
++ case s := while e do s' 
+  should be a mixte of case if and cons.
+  The difficulty is to prove that s' is lossless for each "reachable" state
+  of the loop.
++ case s := x := f(e)  
+  two possibility : 
+   1/ f is an oracle, trivial by hypothesis
+   2/ f is an adversary function by induction hypothesis
+
+  
+
+
+
+
+
+  
+
+
+
+     
+
+
+
+
+

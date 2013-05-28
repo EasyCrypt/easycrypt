@@ -17,7 +17,9 @@ val name    : scope -> symbol
 val env     : scope -> EcEnv.env
 val attop   : scope -> bool
 val goal    : scope -> proof_uc list
-val verbose : scope -> bool
+
+val verbose     : scope -> bool
+val set_verbose : scope -> bool -> scope
 
 module Op : sig
   (* [add scope op] type-checks the given *parsed* operator [op] in

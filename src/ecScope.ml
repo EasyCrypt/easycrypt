@@ -65,7 +65,8 @@ module Options : IOptions = struct
     snd (Mint.find opt options)
 
   let set options opt exn =
-    Mint.change (function None -> assert false | Some(act,_) -> Some (act, exn))
+    Mint.change
+      (function None -> assert false | Some(act,_) -> Some (act, exn))
       opt options
 
   let for_loading options =
@@ -76,19 +77,25 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Notifier = struct
-  exception Verbose of bool
+  exception Verbose of [`ForLoading | `Verbose of bool]
 
   let for_loading = function
-    | Verbose _ -> Verbose false
+    | Verbose _ -> Verbose `ForLoading
     | exn -> exn
 
-  let default = Verbose true
+  let default = Verbose (`Verbose true)
 
   let mode = Options.register { for_loading } default
 
   let verbose options =
     match Options.get options mode with
     | Verbose b -> b
+    | _ -> assert false
+
+  let set options b =
+    match Options.get options mode with
+    | Verbose (`ForLoading) -> options
+    | Verbose (`Verbose _)  -> Options.set options mode (Verbose (`Verbose b))
     | _ -> assert false
 end
 
@@ -186,7 +193,13 @@ let goal (scope : scope) =
 
 (* -------------------------------------------------------------------- *)
 let verbose (scope : scope) =
-  Notifier.verbose scope.sc_options
+  match Notifier.verbose scope.sc_options with
+  | `ForLoading -> false
+  | `Verbose b  -> b
+
+(* -------------------------------------------------------------------- *)
+let set_verbose (scope : scope) (b : bool) =
+  { scope with sc_options =  Notifier.set scope.sc_options b }
 
 (* -------------------------------------------------------------------- *)
 let for_loading (scope : scope) =
@@ -908,15 +921,15 @@ module Tactic = struct
             let s = if side then es.es_sl else es.es_sr in
             let len = List.length s.s_node in
             t_equiv_swap env side (len+p) len len
-          else (* p = 0 *) t_id
+          else (* p = 0 *) t_id None
         | SKmovei(i,p) ->
           if 0 < p then t_equiv_swap env side i (i+1) (i+p)
           else if p < 0 then t_equiv_swap env side (i+p) i i
-          else (* p = 0 *) t_id
+          else (* p = 0 *) t_id None
         | SKmoveinter(i1,i2,p) ->
           if 0 < p then t_equiv_swap env side i1 (i2+1) (i2+p)
           else if p < 0 then t_equiv_swap env side (i1+p) i1 i2
-          else (* p = 0 *) t_id
+          else (* p = 0 *) t_id None
       in
       set_loc info.pl_loc tac g
 
@@ -951,16 +964,24 @@ module Tactic = struct
     let concl = get_concl g in
     match concl.f_node, side with
     | FequivS _, None ->
-      t_seq (process_inline_all env (Some true) fs)
-        (process_inline_all env (Some false) fs) g
+        t_seq
+          (process_inline_all env (Some true ) fs)
+          (process_inline_all env (Some false) fs) g
     | FequivS es, Some b ->
-      let sp = pat_all fs (if b then es.es_sl else es.es_sr) in
-      if sp = [] then t_id g
-      else t_seq (t_inline_equiv env b sp) (process_inline_all env side fs) g
+        let sp = pat_all fs (if b then es.es_sl else es.es_sr) in
+          if   sp = []
+          then t_id None g
+          else t_seq
+                 (t_inline_equiv env b sp)
+                 (process_inline_all env side fs) g
     | FhoareS hs, None ->
-      let sp = pat_all fs hs.hs_s in
-      if sp = [] then t_id g
-      else t_seq (t_inline_hoare env sp) (process_inline_all env side fs) g
+        let sp = pat_all fs hs.hs_s in
+          if   sp = []
+          then t_id None g
+          else t_seq
+                 (t_inline_hoare env sp)
+                 (process_inline_all env side fs) g
+
     | _, _ -> assert false (* FIXME error message *)
     
   let pat_of_occs cond occs s =
@@ -1014,17 +1035,22 @@ module Tactic = struct
     | _, _ -> assert false (* FIXME error message *)
     
 
-  let process_inline env side (fs, occs) g =
-    let hyps = get_hyps g in
-    let env' = tyenv_of_hyps env hyps in
-    let fs = 
-      List.fold_left (fun fs f ->
-        let f = EcTyping.trans_gamepath env' f in
-        EcPath.Sx.add f fs) EcPath.Sx.empty fs 
-    in
-    match occs with
-    | None -> process_inline_all env side fs g
-    | Some occs -> process_inline_occs env side fs occs g
+  let process_inline env infos g =
+    match infos with
+    | `ByName (side, (fs, occs)) -> begin
+        let hyps = get_hyps g in
+        let env' = tyenv_of_hyps env hyps in
+        let fs = 
+          List.fold_left (fun fs f ->
+            let f = EcTyping.trans_gamepath env' f in
+            EcPath.Sx.add f fs) EcPath.Sx.empty fs 
+        in
+        match occs with
+        | None -> process_inline_all env side fs g
+        | Some occs -> process_inline_occs env side fs occs g
+      end
+
+    | `ByPattern _ -> failwith "not-implemented"
 
   let process_rnd side env tac_info g =
     let concl = get_concl g in
@@ -1043,21 +1069,6 @@ module Tactic = struct
         in
         t_equiv_rnd side env bij_info g
       | _ -> cannot_apply "rnd" "unexpected instruction or wrong arguments"
-
-
-  let process_equiv_deno env (pre,post) g = 
-    let hyps,concl = get_goal g in
-    let _op, f1, f2 =
-      match concl.f_node with
-      | Fapp({f_node = Fop(op,_)}, [f1;f2]) when is_pr f1 && is_pr f2 -> op, f1, f2
-      | _ -> cannot_apply "equiv_deno" "" in (* FIXME error message *) 
-    let _,fl,_,_ = destr_pr f1 in
-    let _,fr,_,_ = destr_pr f2 in
-    let penv, qenv = EcEnv.Fun.equivF fl fr env in
-    let pre  = process_form penv hyps pre  tbool in
-    let post = process_form qenv hyps post tbool in
-    t_equiv_deno env pre post g
-
 
   let process_equiv_deno env info (_,n as g) = 
     let process_cut env g (pre,post) = 
@@ -1081,7 +1092,7 @@ module Tactic = struct
     t_on_first (t_equiv_deno env pre post (juc,n)) (t_use env an gs)
 
   let process_conseq env info (_, n as g) =
-    let t_pre = ref t_id and t_post = ref t_id in
+    let t_pre = ref (t_id None) and t_post = ref (t_id None) in
     let tac1 g =
       let hyps = get_hyps g in
       let m, h = match LDecl.fresh_ids hyps ["&m";"H"] with
@@ -1134,19 +1145,30 @@ module Tactic = struct
       | _ -> assert false (* FIXME error message *) in
     t_seq_subgoal t_conseq
       [!t_pre; !t_post; t_use env an gs] (juc,n)
-
     
-  let process_fun_abs env inv g = 
+  let process_fun_abs env inv g =
     let env' = EcEnv.Fun.inv_memenv env in
     let inv = process_formula env' g inv in
     t_equivF_abs env inv g
     
-
+  let process_fun_upto env (bad, p, o) g =
+    let env' = EcEnv.Fun.inv_memenv env in 
+    let p = process_formula env' g p in
+    let q = 
+      match o with
+      | None -> EcFol.f_true
+      | Some q -> process_formula env' g q in
+    let bad = 
+      let env =  EcEnv.Memory.push (EcFol.mhr,None) env in
+      process_formula env g bad in
+    t_equivF_abs_upto env bad p q g
+      
   let process_phl loc env ptac g =
     let t =
       match ptac with
       | Pfun_def -> EcPhl.t_fun_def env
       | Pfun_abs f -> process_fun_abs env f
+      | Pfun_upto info -> process_fun_upto env info 
       | Pskip    -> EcPhl.t_skip
       | Papp (dir,k,phi,f) -> process_app env dir k phi f
       | Pwp  k   -> t_wp env k
@@ -1155,12 +1177,17 @@ module Tactic = struct
       | Pwhile phi -> process_while env phi
       | Pcall(side, (pre, post)) -> process_call env side pre post
       | Pswap info -> process_swap env info
-      | Pinline (s, info) -> process_inline env s info
+      | Pinline info -> process_inline env info
       | Prnd (side,info) -> process_rnd side env info
       | Pconseq info -> process_conseq env info
       | Pequivdeno info -> process_equiv_deno env info
     in
     set_loc loc t g
+
+  let process_debug env =
+    let l = fun x -> EcLocation.mk_loc EcLocation._dummy x in
+    let (p, _) = EcTyping.trans_msymbol env (l [(l "M", Some [l [(l "K", None)]])]) in
+      ignore (EcEnv.Mod.by_mpath p env)
 
   let rec process_logic_tacs scope env (tacs:ptactics) (gs:goals) : goals =
     match tacs with
@@ -1178,7 +1205,7 @@ module Tactic = struct
     let loc = tac.pl_loc in
     let tac =
       match unloc tac with
-      | Pidtac         -> t_id
+      | Pidtac msg     -> t_id msg
       | Prepeat t      -> t_repeat (process_logic_tac scope env t)
       | Pdo (None,t)   -> 
         let tac = (process_logic_tac scope env t) in
@@ -1207,8 +1234,9 @@ module Tactic = struct
           fun (juc,n) -> process_logic_tacs scope env tacs (juc,[n])
       | Psubgoal _     -> assert false
 
-
       | Padmit         -> t_admit
+      | Pdebug         -> process_debug env; t_id None
+
       | PPhl tac       -> process_phl loc env tac
     in
     set_loc loc tac g

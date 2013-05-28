@@ -133,6 +133,7 @@
 %token BACKS
 %token BDHOARE
 %token BETA 
+%token CALL
 %token CASE
 %token CEQ
 %token CHANGE
@@ -143,8 +144,10 @@
 %token COLON
 %token COMMA
 %token COMPUTE
+%token CONSEQ
 %token CUT
 %token DATATYPE
+%token DEBUG
 %token DELTA
 %token DLBRACKET
 %token DOT
@@ -157,6 +160,7 @@
 %token EOF
 %token EQ
 %token EQUIV
+%token EQUIVDENO
 %token EXIST
 %token EXPORT
 %token FINAL
@@ -165,12 +169,12 @@
 %token FROM_INT
 %token FUN
 %token GENERALIZE 
+%token GLOB
 %token HEQ
 %token HGEQ
 %token HLEQ
 %token HOARE
 %token IDTAC
-%token TRY
 %token IF
 %token IFF
 %token IMPL
@@ -187,10 +191,10 @@
 %token LEMMA
 %token LET
 %token LOGIC
-%token MODPATH
 %token LONGARROW
 %token LPAREN
 %token MINUS
+%token MODPATH
 %token MODULE
 %token NE
 %token NOT
@@ -200,6 +204,7 @@
 %token OP
 %token PIPE
 %token PR
+%token PRAGMA
 %token PRED
 %token PRINT
 %token PROOF
@@ -210,9 +215,6 @@
 %token RBRACKET
 %token RCONDF
 %token RCONDT
-%token SWAP
-%token EQUIVDENO
-%token CONSEQ
 %token REQUIRE
 %token RES
 %token RETURN
@@ -229,12 +231,14 @@
 %token SPLIT
 %token STAR
 %token SUBST
+%token SWAP
 %token THEN
 %token THEORY
 %token TICKPIPE
 %token TILD
 %token TIMEOUT
 %token TRIVIAL
+%token TRY
 %token TYPE
 %token UNDERSCORE
 %token UNDO
@@ -244,9 +248,7 @@
 %token WHY3
 %token WITH
 %token WP
-%token CALL
 %token ZETA 
-%token GLOB
 
 %token <string> OP1 OP2 OP3 OP4
 %token LTCOLON GT
@@ -1167,6 +1169,41 @@ renaming:
 %inline string_list: l=plist1(STRING,empty) { l };
 
 (* -------------------------------------------------------------------- *)
+(* pattern selection (tactics)                                          *)
+idpattern:
+| x=ident { [x] }
+| LBRACKET xs=ident+ RBRACKET { xs }
+;
+
+ipattern:
+| UNDERSCORE
+    { PtAny }
+
+| UNDERSCORE CEQ f=idpattern LPAREN UNDERSCORE RPAREN
+    { PtAsgn f }
+
+| IF UNDERSCORE LBRACE p=spattern RBRACE
+    { PtIf (p, `NoElse) }
+
+| IF UNDERSCORE LBRACE p=spattern RBRACE UNDERSCORE
+    { PtIf (p, `MaybeElse) }
+
+| IF UNDERSCORE LBRACE p1=spattern RBRACE ELSE LBRACE p2=spattern RBRACE
+    { PtIf (p1, `Else p2) }
+
+| WHILE UNDERSCORE LBRACE p=spattern RBRACE
+    { PtWhile p }
+;
+
+spattern:
+| UNDERSCORE { () }
+;
+
+tselect:
+| p=ipattern { p }
+;
+
+(* -------------------------------------------------------------------- *)
 (* tactic                                                               *)
 
 intro_pattern:
@@ -1239,7 +1276,10 @@ tac_dir :
 
 tactic:
 | IDTAC
-    { Pidtac }
+    { Pidtac None }
+
+| IDTAC s=STRING
+    { Pidtac (Some s) }
 
 | STAR t=loc(tactic) { Prepeat t }
 
@@ -1311,8 +1351,15 @@ tactic:
    { Pcut (n, p) }
 
 (* PHL tactics *)
-| FUN        { PPhl Pfun_def }
-| FUN f=form { PPhl (Pfun_abs f) }
+
+| FUN
+    { PPhl Pfun_def }
+
+| FUN f=sform
+    { PPhl (Pfun_abs f) }
+
+| FUN bad=sform p=sform q=sform? 
+    { PPhl(Pfun_upto(bad,p,q)) }
 
 | APP d=tac_dir pos=code_position COLON p=sform f=sform?
    { PPhl (Papp (d,pos, p,f)) }
@@ -1342,27 +1389,34 @@ tactic:
     { PPhl (Pswap info) }
 
 | RND s=side? info=rnd_info
-    { PPhl (Prnd (s,info)) }
+    { PPhl (Prnd (s, info)) }
 
 | INLINE s=side? o=occurences? f=plist0(loc(fident), empty)
-    { PPhl (Pinline (s, (f, o))) }
+    { PPhl (Pinline (`ByName (s, (f, o)))) }
+
+| p=tselect INLINE
+    { PPhl (Pinline (`ByPattern p)) }
 
 | EQUIVDENO info=fpattern(conseq)
-    { PPhl(Pequivdeno info) }
+    { PPhl (Pequivdeno info) }
 
 | CONSEQ info=fpattern(conseq)
-    { PPhl(Pconseq info) }
+    { PPhl (Pconseq info) }
+
+(* DEBUG *)
+| DEBUG
+    { Pdebug }
 ;
 
 rnd_info:
 | e1=sform e2=sform 
-  { Some e1, Some e2 }
+    { Some e1, Some e2 }
 | e=sform UNDERSCORE 
-  { Some e, None }
+    { Some e, None }
 | UNDERSCORE e=sform 
-  { None, Some e }
+    { None, Some e }
 | empty
-  {None, None }
+    {None, None }
 ;
 
 swap_info:
@@ -1370,10 +1424,17 @@ swap_info:
 ;
 
 swap_pos:
-| i1=number i2=number i3=number                      { SKbase(i1,i2,i3)     }
-| p=int                                              { SKmove p             }
-| i1=number p=int                                    { SKmovei(i1,p)        }
-| LBRACKET i1=number DOTDOT i2=number RBRACKET p=int { SKmoveinter(i1,i2,p) }
+| i1=number i2=number i3=number
+    { SKbase (i1, i2, i3) }
+
+| p=int
+    { SKmove p }
+
+| i1=number p=int
+    { SKmovei (i1, p) }
+
+| LBRACKET i1=number DOTDOT i2=number RBRACKET p=int
+    { SKmoveinter (i1, i2, p) }
 ;
 
 int:
@@ -1414,7 +1475,7 @@ tactics:
 
 tactics0:
 | ts=tactics    { Pseq ts } 
-| x=loc(empty)  { Pseq [mk_loc x.pl_loc Pidtac] }
+| x=loc(empty)  { Pseq [mk_loc x.pl_loc (Pidtac None)] }
 ;
 
 %inline tactics2: ts=plist1(tactic2, SEMICOLON) { ts };
@@ -1551,7 +1612,8 @@ global_:
 | checkproof       { Gcheckproof  $1 }
 
 | x=loc(SAVE)      { Gsave x.pl_loc }
-| PRINT p=print    { Gprint     p  }
+| PRINT p=print    { Gprint     p   }
+| PRAGMA x=lident  { Gpragma    x   }
 ;
 
 stop:
