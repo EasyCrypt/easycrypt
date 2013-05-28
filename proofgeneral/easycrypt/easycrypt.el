@@ -72,6 +72,10 @@
          proof-indent-open-regexp     easycrypt-indent-open-regexp
          proof-indent-close-regexp    easycrypt-indent-close-regexp)
 
+  ; Silent/verbose mode for batch processing
+  (setq proof-shell-start-silent-cmd "pragma silent. "
+        proof-shell-stop-silent-cmd  "pragma verbose. ")
+
   ;; (setq proof-shell-init-cmd easycrypt-shell-init-cmd)
 
   (easycrypt-init-syntax-table)

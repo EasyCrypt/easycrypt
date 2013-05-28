@@ -1,4 +1,4 @@
-; Generated on Wed Mar 27 12:36:04 2013
+; Generated on Tue May 28 14:49:11 2013
 
 (defvar easycrypt-dangerous-keywords '(
   "admit"
@@ -10,17 +10,18 @@
   "proof"
   "save"
   "claim"
-  "cnst"
   "drop"
   "end"
   "import"
   "export"
   "module"
+  "of"
   "op"
   "pred"
   "require"
   "theory"
   "type"
+  "datatype"
   "print"
   "why3"
   "as"
@@ -36,12 +37,15 @@
 
 (defvar easycrypt-internal-keywords '(
   "undo"
+  "debug"
+  "pragma"
 ))
 
 (defvar easycrypt-prog-keywords '(
   "forall"
   "exists"
   "lambda"
+  "glob"
   "let"
   "in"
   "var"
@@ -55,6 +59,7 @@
   "res"
   "equiv"
   "hoare"
+  "bd_hoare"
 ))
 
 (defvar easycrypt-tactic-keywords '(
@@ -62,6 +67,7 @@
   "compute"
   "same"
   "idtac"
+  "try"
   "assumption"
   "intros"
   "split"
@@ -79,6 +85,7 @@
   "beta"
   "iota"
   "logic"
+  "modpath"
   "change"
   "elimT"
   "case"
@@ -87,7 +94,14 @@
   "app"
   "wp"
   "skip"
-  "while"
+  "call"
+  "rcondt"
+  "rcondf"
+  "swap"
+  "rnd"
+  "equiv_deno"
+  "conseq"
+  "inline"
 ))
 
 (provide 'easycrypt-keywords)

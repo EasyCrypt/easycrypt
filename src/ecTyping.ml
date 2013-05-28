@@ -846,6 +846,7 @@ let rec trans_msymbol (env : EcEnv.env) (msymb : pmsymbol located) =
         tyerror top_qname.pl_loc env (UnknownModName top_qname.pl_desc)
     | Some me -> me
   in
+
   let (params, istop) =
     match top_path.EcPath.m_top with
     | `Concrete (_, Some sub) ->
