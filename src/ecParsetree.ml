@@ -261,22 +261,28 @@ type preduction = {
   pmodpath : bool;   (* normalize modpath *)
 }
 
-
 (* -------------------------------------------------------------------- *)
 type 'a doption = 
   | Single of 'a
   | Double of 'a * 'a
-
 
 type 'a rnd_tac_info = ('a option) * ('a option)
 
 type tac_side = bool option
 
 type swap_kind = 
-  | SKbase of int * int * int
-  | SKmove of int
-  | SKmovei of int * int
+  | SKbase      of int * int * int
+  | SKmove      of int
+  | SKmovei     of int * int
   | SKmoveinter of int * int * int 
+
+type pipattern =
+  | PtAny
+  | PtAsgn  of psymbol list
+  | PtIf    of pspattern * [`NoElse | `MaybeElse | `Else of pspattern]
+  | PtWhile of pspattern
+
+and pspattern = unit
 
 type ptactic = ptactic_r located
 
@@ -319,10 +325,14 @@ and phl_tactics =
   | Prcond      of (bool option * bool * int)
   | Pcond       of tac_side
   | Pswap       of ((tac_side * swap_kind) located list)
-  | Pinline     of tac_side * (pgamepath list* int list option)
+  | Pinline     of pinline_arg
   | Prnd        of tac_side * pformula rnd_tac_info
   | Pconseq     of cfpattern
   | Pequivdeno  of cfpattern
+
+and pinline_arg =
+  [ `ByName    of tac_side * (pgamepath list * int list option)
+  | `ByPattern of pipattern ]
 
 and ptactics = ptactic list        
 

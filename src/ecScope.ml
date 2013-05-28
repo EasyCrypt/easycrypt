@@ -942,16 +942,24 @@ module Tactic = struct
     let concl = get_concl g in
     match concl.f_node, side with
     | FequivS _, None ->
-      t_seq (process_inline_all env (Some true) fs)
-        (process_inline_all env (Some false) fs) g
+        t_seq
+          (process_inline_all env (Some true ) fs)
+          (process_inline_all env (Some false) fs) g
     | FequivS es, Some b ->
-      let sp = pat_all fs (if b then es.es_sl else es.es_sr) in
-      if sp = [] then t_id None g
-      else t_seq (t_inline_equiv env b sp) (process_inline_all env side fs) g
+        let sp = pat_all fs (if b then es.es_sl else es.es_sr) in
+          if   sp = []
+          then t_id None g
+          else t_seq
+                 (t_inline_equiv env b sp)
+                 (process_inline_all env side fs) g
     | FhoareS hs, None ->
-      let sp = pat_all fs hs.hs_s in
-      if sp = [] then t_id None g
-      else t_seq (t_inline_hoare env sp) (process_inline_all env side fs) g
+        let sp = pat_all fs hs.hs_s in
+          if   sp = []
+          then t_id None g
+          else t_seq
+                 (t_inline_hoare env sp)
+                 (process_inline_all env side fs) g
+
     | _, _ -> assert false (* FIXME error message *)
     
   let pat_of_occs cond occs s =
@@ -1005,17 +1013,22 @@ module Tactic = struct
     | _, _ -> assert false (* FIXME error message *)
     
 
-  let process_inline env side (fs, occs) g =
-    let hyps = get_hyps g in
-    let env' = tyenv_of_hyps env hyps in
-    let fs = 
-      List.fold_left (fun fs f ->
-        let f = EcTyping.trans_gamepath env' f in
-        EcPath.Sx.add f fs) EcPath.Sx.empty fs 
-    in
-    match occs with
-    | None -> process_inline_all env side fs g
-    | Some occs -> process_inline_occs env side fs occs g
+  let process_inline env infos g =
+    match infos with
+    | `ByName (side, (fs, occs)) -> begin
+        let hyps = get_hyps g in
+        let env' = tyenv_of_hyps env hyps in
+        let fs = 
+          List.fold_left (fun fs f ->
+            let f = EcTyping.trans_gamepath env' f in
+            EcPath.Sx.add f fs) EcPath.Sx.empty fs 
+        in
+        match occs with
+        | None -> process_inline_all env side fs g
+        | Some occs -> process_inline_occs env side fs occs g
+      end
+
+    | `ByPattern _ -> failwith "not-implemented"
 
   let process_rnd side env tac_info g =
     let concl = get_concl g in
@@ -1146,7 +1159,7 @@ module Tactic = struct
       | Pwhile phi -> process_while env phi
       | Pcall(side, (pre, post)) -> process_call env side pre post
       | Pswap info -> process_swap env info
-      | Pinline (s, info) -> process_inline env s info
+      | Pinline info -> process_inline env info
       | Prnd (side,info) -> process_rnd side env info
       | Pconseq info -> process_conseq env info
       | Pequivdeno info -> process_equiv_deno env info
