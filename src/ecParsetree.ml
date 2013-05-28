@@ -440,6 +440,7 @@ type global =
   | Gprover_info of pprover_infos
   | Gcheckproof  of bool
   | Gsave        of EcLocation.t
+  | Gpragma      of psymbol
 
 type prog =
   | P_Prog of (global located) list * bool

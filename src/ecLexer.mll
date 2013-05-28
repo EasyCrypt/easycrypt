@@ -111,6 +111,7 @@
 
     "undo"        , UNDO       ;        (* KW: internal *)
     "debug"       , DEBUG      ;        (* KW: internal *)
+    "pragma"      , PRAGMA     ;        (* KW: internal *)
   ]
 
   let keywords = Hashtbl.create 97

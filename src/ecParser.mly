@@ -132,6 +132,7 @@
 %token AXIOM
 %token BDHOARE
 %token BETA 
+%token CALL
 %token CASE
 %token CEQ
 %token CHANGE
@@ -142,6 +143,7 @@
 %token COLON
 %token COMMA
 %token COMPUTE
+%token CONSEQ
 %token CUT
 %token DATATYPE
 %token DEBUG
@@ -157,6 +159,7 @@
 %token EOF
 %token EQ
 %token EQUIV
+%token EQUIVDENO
 %token EXIST
 %token EXPORT
 %token FINAL
@@ -164,12 +167,12 @@
 %token FROM_INT
 %token FUN
 %token GENERALIZE 
+%token GLOB
 %token HEQ
 %token HGEQ
 %token HLEQ
 %token HOARE
 %token IDTAC
-%token TRY
 %token IF
 %token IFF
 %token IMPL
@@ -186,10 +189,10 @@
 %token LEMMA
 %token LET
 %token LOGIC
-%token MODPATH
 %token LONGARROW
 %token LPAREN
 %token MINUS
+%token MODPATH
 %token MODULE
 %token NE
 %token NOT
@@ -199,6 +202,7 @@
 %token OP
 %token PIPE
 %token PR
+%token PRAGMA
 %token PRED
 %token PRINT
 %token PROOF
@@ -209,9 +213,6 @@
 %token RBRACKET
 %token RCONDF
 %token RCONDT
-%token SWAP
-%token EQUIVDENO
-%token CONSEQ
 %token REQUIRE
 %token RES
 %token RETURN
@@ -228,12 +229,14 @@
 %token SPLIT
 %token STAR
 %token SUBST
+%token SWAP
 %token THEN
 %token THEORY
 %token TICKPIPE
 %token TILD
 %token TIMEOUT
 %token TRIVIAL
+%token TRY
 %token TYPE
 %token UNDERSCORE
 %token UNDO
@@ -243,9 +246,7 @@
 %token WHY3
 %token WITH
 %token WP
-%token CALL
 %token ZETA 
-%token GLOB
 
 %token <string> OP1 OP2 OP3 OP4
 %token LTCOLON GT
@@ -1599,7 +1600,8 @@ global_:
 | checkproof       { Gcheckproof  $1 }
 
 | x=loc(SAVE)      { Gsave x.pl_loc }
-| PRINT p=print    { Gprint     p  }
+| PRINT p=print    { Gprint     p   }
+| PRAGMA x=lident  { Gpragma    x   }
 ;
 
 stop:

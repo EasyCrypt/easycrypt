@@ -65,7 +65,8 @@ module Options : IOptions = struct
     snd (Mint.find opt options)
 
   let set options opt exn =
-    Mint.change (function None -> assert false | Some(act,_) -> Some (act, exn))
+    Mint.change
+      (function None -> assert false | Some(act,_) -> Some (act, exn))
       opt options
 
   let for_loading options =
@@ -76,19 +77,25 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Notifier = struct
-  exception Verbose of bool
+  exception Verbose of [`ForLoading | `Verbose of bool]
 
   let for_loading = function
-    | Verbose _ -> Verbose false
+    | Verbose _ -> Verbose `ForLoading
     | exn -> exn
 
-  let default = Verbose true
+  let default = Verbose (`Verbose true)
 
   let mode = Options.register { for_loading } default
 
   let verbose options =
     match Options.get options mode with
     | Verbose b -> b
+    | _ -> assert false
+
+  let set options b =
+    match Options.get options mode with
+    | Verbose (`ForLoading) -> options
+    | Verbose (`Verbose _)  -> Options.set options mode (Verbose (`Verbose b))
     | _ -> assert false
 end
 
@@ -186,7 +193,13 @@ let goal (scope : scope) =
 
 (* -------------------------------------------------------------------- *)
 let verbose (scope : scope) =
-  Notifier.verbose scope.sc_options
+  match Notifier.verbose scope.sc_options with
+  | `ForLoading -> false
+  | `Verbose b  -> b
+
+(* -------------------------------------------------------------------- *)
+let set_verbose (scope : scope) (b : bool) =
+  { scope with sc_options =  Notifier.set scope.sc_options b }
 
 (* -------------------------------------------------------------------- *)
 let for_loading (scope : scope) =
