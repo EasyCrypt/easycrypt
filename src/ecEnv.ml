@@ -1269,7 +1269,7 @@ module Mod = struct
   type t = module_expr
 
   let unsuspend_r f (i, args) (spi, params) o =
-    (* FIXME it seem that the substitution is perform if params = [] *)
+    (* FIXME: it seems that the substitution is performed even if params = [] *)
     if i <> spi || List.length args <> List.length params then
       assert false;
     let s =
@@ -1279,23 +1279,26 @@ module Mod = struct
     in
       f s o
 
-  let clear_sig _sig = 
+  let clear_sig sig_ =
     { mis_params = [];
       mis_body   =
-        List.map (fun i -> 
-          let Tys_function(s,_) = i in Tys_function(s,{oi_calls = []}))
-          _sig.mis_body }
+        List.map
+          (function Tys_function(s, _) -> Tys_function(s, {oi_calls = []}))
+          sig_.mis_body }
 
-  let unsuspend (i, args) (spi, params) o = 
-    let me = unsuspend_r EcSubst.subst_module (i, args) (spi, params) o in
-    if args <> [] then { me with me_sig = clear_sig me.me_sig }
-    else me
+  let unsuspend (i, args) (spi, params) me =
+    let me =
+      match args with
+      | [] -> me
+      | _  -> { me with me_sig = clear_sig me.me_sig }
+    in
+      unsuspend_r EcSubst.subst_module (i, args) (spi, params) me
 
   let by_ipath_r (spsc : bool) (p : ipath) (env : env) =
     let obj = MC.by_path (fun mc -> mc.mc_modules) p env in
-    omap obj
-      (fun (args, obj) ->
-        (fst (MC._downpath_for_mod spsc env p args), obj))
+      omap obj
+        (fun (args, obj) ->
+          (fst (MC._downpath_for_mod spsc env p args), obj))
 
   let by_ipath (p : ipath) (env : env) =
     by_ipath_r true p env
@@ -1310,10 +1313,26 @@ module Mod = struct
     let (ip, (i, args)) = ipath_of_mpath p in
 
       match MC.by_path (fun mc -> mc.mc_modules) ip env with
-      | None -> lookup_error (`MPath p)
+      | None ->
+          lookup_error (`MPath p)
+
       | Some (params, o) ->
-        let ((spi, params), _op) = MC._downpath_for_mod false env ip params in
-        unsuspend (i, args) (spi, params) o
+          let ((spi, params), op) = MC._downpath_for_mod false env ip params in
+          let (params, istop) =
+            match op.EcPath.m_top with
+            | `Concrete (_, Some _) ->
+                assert (o.me_sig.mis_params <> []);
+                (params, false)
+        
+            | `Concrete (p, None) ->
+                assert ((params = []) || ((spi+1) = EcPath.p_size p));
+                (o.me_sig.mis_params, true)
+        
+            | `Abstract _m ->
+                assert ((params <> []) || spi <> 0);
+                (o.me_sig.mis_params, true)
+          in
+            unsuspend (i, args) (spi, params) o
 
   let by_mpath_opt (p : EcPath.mpath) (env : env) =
     try_lf (fun () -> by_mpath p env)

@@ -337,7 +337,9 @@ let upd_rule d pr (juc,n as g) =
 let upd_rule_done = upd_rule true
 let upd_rule      = upd_rule false
 
-let t_id (juc,n) = juc,[n]
+let t_id msg (juc,n) =
+  oiter msg (fun x -> Printf.fprintf stderr "DEBUG: %s\n%!" x);
+  (juc, [n])
 
 let t_on_goals t (juc,ln) = 
   let juc,ln = 
@@ -350,7 +352,7 @@ let t_seq t1 t2 g = t_on_goals t2 (t1 g)
         
 let rec t_lseq lt = 
   match lt with
-  | [] -> t_id 
+  | [] -> t_id None
   | t1::lt -> t_seq t1 (t_lseq lt)
 
 let t_subgoal lt (juc,ln) =
@@ -381,17 +383,17 @@ let t_seq_subgoal t lt g = t_subgoal lt (t g)
 let t_try t g =
   try t g 
   with _ (* FIXME catch only some exception ? *) -> 
-    t_id g
+    t_id None g
 
 let t_repeat t g =
   let rec aux g =
     let r = try Some (t g) with _ -> None in
     match r with 
-    | None -> t_id g
+    | None -> t_id None g
     | Some (juc, ln) ->
       t_subgoal (List.map (fun _ -> aux) ln) (juc,ln) in
   aux g
 
 let rec t_do n t =
-  if n <= 0 then t_id
+  if n <= 0 then t_id None
   else t_seq t (t_do (n-1) t)
