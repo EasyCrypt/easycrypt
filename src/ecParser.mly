@@ -1350,11 +1350,8 @@ tactic:
 | FUN f=sform
     { PPhl (Pfun_abs f) }
 
-| FUN bad=sform p=sform 
-    { PPhl(Pfun_upto(bad,p,None)) }
-
-| FUN bad=sform p=sform q=sform 
-    { PPhl(Pfun_upto(bad,p,Some q)) }
+| FUN bad=sform p=sform q=sform? 
+    { PPhl(Pfun_upto(bad,p,q)) }
 
 | APP pos=code_position COLON p=sform
    { PPhl (Papp (pos, p)) }
