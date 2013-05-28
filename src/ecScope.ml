@@ -1164,7 +1164,10 @@ module Tactic = struct
     in
     set_loc loc t g
 
-  let process_debug _env = ()
+  let process_debug env =
+    let l = fun x -> EcLocation.mk_loc EcLocation._dummy x in
+    let (p, _) = EcTyping.trans_msymbol env (l [(l "M", Some [l [(l "K", None)]])]) in
+      ignore (EcEnv.Mod.by_mpath p env)
 
   let rec process_logic_tacs scope env (tacs:ptactics) (gs:goals) : goals =
     match tacs with
