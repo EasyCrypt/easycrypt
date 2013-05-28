@@ -719,7 +719,30 @@ let t_hoare_app i phi g =
   let s1,s2 = s_split "app" i hs.hs_s in
   let a = f_hoareS_r { hs with hs_s = stmt s1; hs_po = phi }  in
   let b = f_hoareS_r { hs with hs_pr = phi; hs_s = stmt s2 } in
-  prove_goal_by [a;b] (RN_hl_append (Single i,phi)) g
+  prove_goal_by [a;b] (RN_hl_append (true,Single i,phi,None)) g
+
+let t_bdHoare_app dir i phi opt_bd g =
+  let concl = get_concl g in
+  let bhs = destr_bdHoareS concl in
+  let s1,s2 = s_split "app" i bhs.bhs_s in
+  let bd1,bd2,cmp1,cmp2 = 
+    match opt_bd, bhs.bhs_cmp with
+      | Some g, FHeq | Some g, FHge ->
+        if dir then f_real_div_simpl bhs.bhs_bd g, g, bhs.bhs_cmp, bhs.bhs_cmp
+        else g, f_real_div_simpl bhs.bhs_bd g, bhs.bhs_cmp, bhs.bhs_cmp
+      | Some _, FHle -> 
+        cannot_apply "app" "optional bound parameter not supported with this judgment"
+      | None, _ -> 
+        if dir then f_real_of_int 1, bhs.bhs_bd, FHeq, bhs.bhs_cmp
+        else bhs.bhs_bd, f_real_of_int 1, bhs.bhs_cmp, FHeq
+  in
+  let a = f_bdHoareS_r { bhs with bhs_s = stmt s1; bhs_po = phi; 
+    bhs_bd = bd1; bhs_cmp = cmp1 } in
+  let b = f_bdHoareS_r { bhs with bhs_pr = phi; bhs_s = stmt s2;
+    bhs_bd = bd2; bhs_cmp = cmp2 } in
+  prove_goal_by [a;b] (RN_hl_append (dir, Single i,phi,opt_bd)) g
+      
+
 
 
 let t_equiv_app (i,j) phi g =
@@ -729,7 +752,7 @@ let t_equiv_app (i,j) phi g =
   let sr1,sr2 = s_split "app" j es.es_sr in
   let a = f_equivS_r {es with es_sl=stmt sl1; es_sr=stmt sr1; es_po=phi} in
   let b = f_equivS_r {es with es_pr=phi; es_sl=stmt sl2; es_sr=stmt sr2} in
-  prove_goal_by [a;b] (RN_hl_append (Double (i,j), phi)) g
+  prove_goal_by [a;b] (RN_hl_append (true,Double (i,j), phi,None)) g
 
   
 (* -------------------------------------------------------------------- *)
@@ -1468,10 +1491,10 @@ let t_bd_hoare_rnd env (opt_bd,opt_event) g =
       | FHle, _ ->
           FHeq, EcFol.f_real_of_int 1, f_real_le (f_mu distr event) bhs.bhs_bd
       | FHge, Some bd' when not (EcFol.f_equal bhs.bhs_bd bd') -> 
-          bhs.bhs_cmp, EcFol.f_real_div bhs.bhs_bd bd', f_real_le bd' (f_mu distr event)
+          bhs.bhs_cmp, EcFol.f_real_div_simpl bhs.bhs_bd bd', f_real_le bd' (f_mu distr event)
       | FHge, _ -> FHeq, EcFol.f_real_of_int 1, f_real_le bhs.bhs_bd (f_mu distr event)
       | FHeq, Some bd' when not (EcFol.f_equal bhs.bhs_bd bd') -> 
-          bhs.bhs_cmp, EcFol.f_real_div bhs.bhs_bd bd', f_eq (f_mu distr event) bd'
+          bhs.bhs_cmp, EcFol.f_real_div_simpl bhs.bhs_bd bd', f_eq (f_mu distr event) bd'
       | FHeq, _ -> FHeq, EcFol.f_real_of_int 1, f_eq (f_mu distr event) bhs.bhs_bd
   in
   let v_id = EcIdent.create "v" in

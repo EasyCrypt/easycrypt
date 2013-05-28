@@ -227,6 +227,8 @@ val f_imps_simpl : form list -> form -> form
 val f_iff_simpl  : form -> form -> form
 val f_eq_simpl   : form -> form -> form
 
+val f_real_div_simpl  : form -> form -> form
+
 (* -------------------------------------------------------------------- *)
 
 exception DestrError of string

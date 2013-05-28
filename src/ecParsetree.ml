@@ -312,7 +312,7 @@ and phl_tactics =
   | Pfun_def  
   | Pfun_abs    of pformula
   | Pskip
-  | Papp        of (int doption * pformula)
+  | Papp        of (bool * int doption * pformula * pformula option)
   | Pwp         of int doption option 
   | Pwhile      of pformula
   | Pcall       of tac_side * (pformula * pformula)
