@@ -1329,7 +1329,7 @@ module Mod = struct
                 ((if args = [] then [] else o.me_sig.mis_params), true)
         
             | `Abstract _m ->
-                assert ((params <> []) || spi <> 0);
+                assert ((params = []) || spi = 0);
                 (o.me_sig.mis_params, true)
           in
             unsuspend (i, args) (spi, params) o

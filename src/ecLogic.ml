@@ -241,6 +241,7 @@ let mkn_apply do_arg env (juc,n) args =
   if args = [] then (juc,n), []
   else
     let hyps,concl = get_node (juc,n) in
+    let env = tyenv_of_hyps env hyps in
     let check_arg = check_arg do_arg env hyps in
     let rec check_apply juc s ras f args =
       match args with
