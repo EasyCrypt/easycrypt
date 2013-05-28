@@ -205,6 +205,7 @@ type rule_name =
     (* Phl rules *)    
   | RN_hl_fun_def 
   | RN_hl_fun_abs   of EcFol.form
+  | RN_hl_fun_upto  of EcFol.form * EcFol.form * EcFol.form
   | RN_hl_skip
   | RN_hl_wp        of tac_pos
   | RN_hl_append    of tac_pos * EcFol.form

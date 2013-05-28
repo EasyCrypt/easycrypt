@@ -318,6 +318,7 @@ and ptactic_r =
 and phl_tactics = 
   | Pfun_def  
   | Pfun_abs    of pformula
+  | Pfun_upto   of (pformula * pformula * pformula option)
   | Pskip
   | Papp        of (int doption * pformula)
   | Pwp         of int doption option 

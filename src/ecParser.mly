@@ -1342,11 +1342,18 @@ tactic:
    { Pcut (n, p) }
 
 (* PHL tactics *)
+
 | FUN
     { PPhl Pfun_def }
 
-| FUN f=form
+| FUN f=sform
     { PPhl (Pfun_abs f) }
+
+| FUN bad=sform p=sform 
+    { PPhl(Pfun_upto(bad,p,None)) }
+
+| FUN bad=sform p=sform q=sform 
+    { PPhl(Pfun_upto(bad,p,Some q)) }
 
 | APP pos=code_position COLON p=sform
    { PPhl (Papp (pos, p)) }

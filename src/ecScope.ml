@@ -1139,16 +1139,29 @@ module Tactic = struct
     t_seq_subgoal t_conseq
       [!t_pre; !t_post; t_use env an gs] (juc,n)
     
-  let process_fun_abs env inv g = 
+  let process_fun_abs env inv g =
     let env' = EcEnv.Fun.inv_memenv env in
     let inv = process_formula env' g inv in
     t_equivF_abs env inv g
-
+    
+  let process_fun_upto env (bad, p, o) g =
+    let env' = EcEnv.Fun.inv_memenv env in 
+    let p = process_formula env' g p in
+    let q = 
+      match o with
+      | None -> EcFol.f_true
+      | Some q -> process_formula env' g q in
+    let bad = 
+      let env =  EcEnv.Memory.push (EcFol.mhr,None) env in
+      process_formula env g bad in
+    t_equivF_abs_upto env bad p q g
+      
   let process_phl loc env ptac g =
     let t =
       match ptac with
       | Pfun_def -> EcPhl.t_fun_def env
       | Pfun_abs f -> process_fun_abs env f
+      | Pfun_upto info -> process_fun_upto env info 
       | Pskip    -> EcPhl.t_skip
       | Papp (k,phi) -> process_app env k phi
       | Pwp  k   -> t_wp env k

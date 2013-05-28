@@ -6,7 +6,7 @@ let s_cons = "::"
 let s_abs  = "__abs"
 
 (* -------------------------------------------------------------------- *)
-let s_dbool      = (["<top>"; "Distr"; "Dbool"     ], "dbool")
+let s_dbool      = (["<top>"; "Bool"; "Dbool"     ], "dbool")
 let s_dbitstring = (["<top>"; "Distr"; "Dbitstring"], "dbitstring")
 let s_dinter     = (["<top>"; "Distr"; "Dinter"    ], "dinter")
 let s_from_int   = (["<top>"; "Real" ; "FromInt"   ], "from_int")

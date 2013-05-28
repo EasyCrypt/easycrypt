@@ -613,21 +613,32 @@ let t_fun_def env g =
   else if is_equivF concl then t_equivF_fun_def env g
   else tacerror (NotPhl None)
 
-let equivF_abs_spec env fl fr inv = 
+  
+(* TODO FIXME : oracle should ensure that the adversary state still equal:
+   two solutions : 
+     - add the equality in the pre and post.
+     - ensure that oracle do not write the adversary state
+ *)
+
+let check_adv env fl fr = 
   let fl = EcEnv.NormMp.norm_xpath env fl in
   let fr = EcEnv.NormMp.norm_xpath env fr in
   let subl = fl.EcPath.x_sub in
   let subr = fr.EcPath.x_sub in
-  let topl = EcPath.mpath (fl.EcPath.x_top.EcPath.m_top) [] in
-  let topr = EcPath.mpath (fr.EcPath.x_top.EcPath.m_top) [] in
+  let topl = EcPath.m_functor fl.EcPath.x_top in
+  let topr = EcPath.m_functor fr.EcPath.x_top in
   assert (EcPath.p_equal subl subr && EcPath.m_equal topl topr);  
+  fl,topl,fr,topr
                                                (* FIXME error message *)
+ 
+let equivF_abs_spec env fl fr inv = 
+  let fl,topl,fr,topr = check_adv env fl fr in
   let ml, mr = mleft, mright in
   let fvl = PV.fv env ml inv in
   let fvr = PV.fv env mr inv in
   PV.check_depend env fvl topl;
   PV.check_depend env fvr topr;
-  (* TODO check only global variable *)
+  (* TODO check there is only global variable *)
   let defl, defr = EcEnv.Fun.by_xpath fl env, EcEnv.Fun.by_xpath fr env in
   let oil, oir = 
     match defl.f_def, defr.f_def with
@@ -659,6 +670,86 @@ let t_equivF_abs env inv g =
   let pre, post, sg = equivF_abs_spec env' ef.ef_fl ef.ef_fr inv in
   let tac g' = prove_goal_by sg (RN_hl_fun_abs inv) g' in
   t_on_last (t_equivF_conseq env pre post g) tac
+
+let equivF_abs_upto env fl fr bad invP invQ = 
+  let fl,topl,fr,topr = check_adv env fl fr in
+  let ml, mr = mleft, mright in
+  let bad2 = f_subst_mem mhr mr bad in
+  let allinv = f_ands [bad2; invP; invQ] in
+  let fvl = PV.fv env ml allinv in
+  let fvr = PV.fv env mr allinv in
+  PV.check_depend env fvl topl;
+  PV.check_depend env fvr topr;
+  (* TODO check there is only global variable *)
+  let defl, defr = EcEnv.Fun.by_xpath fl env, EcEnv.Fun.by_xpath fr env in
+  let oil, oir = 
+    match defl.f_def, defr.f_def with
+    | FBabs oil, FBabs oir -> oil, oir
+    | _ -> assert false (* FIXME error message *)
+  in
+  let eqglob = f_eqglob topl ml topr mr in
+  let egP    = f_and eqglob invP in
+  let ospec o_l o_r = 
+    let fo_l = EcEnv.Fun.by_xpath o_l env in
+    let fo_r = EcEnv.Fun.by_xpath o_r env in
+    let eq_params = 
+      f_eqparams o_l fo_l.f_sig.fs_params ml o_r fo_r.f_sig.fs_params mr in
+    let eq_res = f_eqres o_l fo_l.f_sig.fs_ret ml o_r fo_r.f_sig.fs_ret mr in
+    let pre = EcFol.f_ands [EcFol.f_not bad2; eq_params; egP] in
+    let post = EcFol.f_if bad2 invQ (f_and eq_res egP) in
+    let cond1 = f_equivF pre o_l o_r post in
+    let cond2 =
+      let q = f_subst_mem ml EcFol.mhr invQ in
+      f_forall [mr,GTmem None] (f_imp bad2 (f_hoareF q o_l q)) in
+    let cond3 = 
+      let q = f_subst_mem mr EcFol.mhr invQ in
+      let bq = f_and bad q in
+      f_forall [ml,GTmem None] (f_hoareF bq o_r bq) in
+    let cond4 = f_losslessF o_l in
+    let cond5 = f_losslessF o_r in
+    [cond1;cond2;cond3;cond4;cond5] in
+  let sg = List.map2 ospec oil.oi_calls oir.oi_calls in
+  let sg = List.flatten sg in
+  let lossless_a = 
+    let _sig = (EcEnv.Mod.by_mpath topl env).me_sig in
+    let bd = 
+      List.map (fun (id,mt) -> (id,GTmodty(mt,EcPath.Sm.empty))) 
+        _sig.mis_params in               (* Should we put restriction here *)
+    let args = List.map (fun (id,_) -> EcPath.mident id) _sig.mis_params in
+    let sub = fl.EcPath.x_sub in
+    let concl = 
+      f_losslessF (EcPath.xpath (EcPath.m_apply topl args) sub ) in
+    let calls = 
+      let name = EcPath.basename sub in
+      let Tys_function(_,oi) = 
+        List.find (fun (Tys_function(fs,_)) -> fs.fs_name = name)
+          _sig.mis_body in
+      oi.oi_calls in
+    let hyps = List.map f_losslessF calls in
+    f_forall bd (f_imps hyps concl) in
+  let sg = lossless_a :: sg in
+  let eq_params = 
+    f_eqparams fl defl.f_sig.fs_params ml fr defr.f_sig.fs_params mr in
+  let eq_res = f_eqres fl defl.f_sig.fs_ret ml fr defr.f_sig.fs_ret mr in
+  let pre = f_if bad2 invQ (f_and eq_params egP) in
+  let post = f_if bad2 invQ (f_and eq_res egP) in
+  pre, post, sg
+
+let t_equivF_abs_upto env bad invP invQ g = 
+  let hyps, concl = get_goal g in
+  let ef = destr_equivF concl in
+  let env' = tyenv_of_hyps env hyps in
+  let pre, post, sg = equivF_abs_upto env' ef.ef_fl ef.ef_fr bad invP invQ in
+  let tac g' = prove_goal_by sg (RN_hl_fun_upto(bad,invP,invQ)) g' in
+  t_on_last (t_equivF_conseq env pre post g) tac
+
+
+  
+
+  
+  
+  
+
 
 (* -------------------------------------------------------------------- *)
   
@@ -1072,7 +1163,8 @@ let _inline env hyps me sp s =
       let mx = List.fold_left2 for1 mx fdef.f_locals lnames in
       let on_xp xp =
         let xp' = EcEnv.NormMp.norm_xpath env xp in
-        P.Mx.find_def xp xp' mx  in
+        P.Mx.find_def xp xp' mx 
+      in
       { e_subst_id with es_xp = on_xp }
     in
 
