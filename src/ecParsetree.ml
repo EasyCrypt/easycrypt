@@ -313,6 +313,7 @@ and ptactic_r =
   | Pseq        of ptactics
   | PPhl        of phl_tactics
   | Padmit
+  | Pdebug
 
 and phl_tactics = 
   | Pfun_def  

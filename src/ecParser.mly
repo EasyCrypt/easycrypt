@@ -144,6 +144,7 @@
 %token COMPUTE
 %token CUT
 %token DATATYPE
+%token DEBUG
 %token DELTA
 %token DLBRACKET
 %token DOT
@@ -1341,8 +1342,11 @@ tactic:
    { Pcut (n, p) }
 
 (* PHL tactics *)
-| FUN        { PPhl Pfun_def }
-| FUN f=form { PPhl (Pfun_abs f) }
+| FUN
+    { PPhl Pfun_def }
+
+| FUN f=form
+    { PPhl (Pfun_abs f) }
 
 | APP pos=code_position COLON p=sform
    { PPhl (Papp (pos, p)) }
@@ -1385,6 +1389,10 @@ tactic:
 
 | CONSEQ info=fpattern(conseq)
     { PPhl (Pconseq info) }
+
+(* DEBUG *)
+| DEBUG
+    { Pdebug }
 ;
 
 rnd_info:

@@ -110,6 +110,7 @@
     "off"         , OFF        ;        (* KW: global *)
 
     "undo"        , UNDO       ;        (* KW: internal *)
+    "debug"       , DEBUG      ;        (* KW: internal *)
   ]
 
   let keywords = Hashtbl.create 97

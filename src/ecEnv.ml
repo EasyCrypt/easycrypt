@@ -1312,8 +1312,8 @@ module Mod = struct
       match MC.by_path (fun mc -> mc.mc_modules) ip env with
       | None -> lookup_error (`MPath p)
       | Some (params, o) ->
-        let ((spi, params), _op) = MC._downpath_for_mod false env ip params in
-        unsuspend (i, args) (spi, params) o
+          let ((spi, params), _op) = MC._downpath_for_mod false env ip params in
+            unsuspend (i, args) (spi, params) o
 
   let by_mpath_opt (p : EcPath.mpath) (env : env) =
     try_lf (fun () -> by_mpath p env)

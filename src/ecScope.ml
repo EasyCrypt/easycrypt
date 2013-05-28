@@ -1138,13 +1138,11 @@ module Tactic = struct
       | _ -> assert false (* FIXME error message *) in
     t_seq_subgoal t_conseq
       [!t_pre; !t_post; t_use env an gs] (juc,n)
-
     
   let process_fun_abs env inv g = 
     let env' = EcEnv.Fun.inv_memenv env in
     let inv = process_formula env' g inv in
     t_equivF_abs env inv g
-    
 
   let process_phl loc env ptac g =
     let t =
@@ -1165,6 +1163,8 @@ module Tactic = struct
       | Pequivdeno info -> process_equiv_deno env info
     in
     set_loc loc t g
+
+  let process_debug _env = ()
 
   let rec process_logic_tacs scope env (tacs:ptactics) (gs:goals) : goals =
     match tacs with
@@ -1211,8 +1211,9 @@ module Tactic = struct
           fun (juc,n) -> process_logic_tacs scope env tacs (juc,[n])
       | Psubgoal _     -> assert false
 
-
       | Padmit         -> t_admit
+      | Pdebug         -> process_debug env; t_id None
+
       | PPhl tac       -> process_phl loc env tac
     in
     set_loc loc tac g
