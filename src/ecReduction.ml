@@ -19,7 +19,8 @@ let _ = EcPException.register (fun fmt exn ->
   | IncompatibleForm (env, (f1, f2)) ->
       Format.fprintf fmt
         "the formula %a is not compatible with %a\n%!"
-        (PE.pp_form env) f1 (PE.pp_form env) f2
+        (PE.pp_form (PE.PPEnv.ofenv env)) f1
+        (PE.pp_form (PE.PPEnv.ofenv env)) f2
 
   | _ -> raise exn)
       
