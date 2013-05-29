@@ -20,19 +20,19 @@ module type Adv(O:O) = {
 }.
 
 
-module A1(O:O) : Adv1(O), Adv12(O) (*, Adv(O) *) = {
+module A1(O:O) : Adv1(O), Adv12(O) , Adv(O) = {
   fun a () : unit = {
     O.o1();
   }
 }.
 
-module A2(O:O) : Adv2(O), Adv12(O)(*, Adv(O) *)  = {
+module A2(O:O) : Adv2(O), Adv12(O), Adv(O)   = {
   fun a () : unit = {
     O.o2();
   }
 }.
 
-module A(O:O) : Adv12(O) (*, Adv(O) *) = {
+module A(O:O) : Adv12(O) , Adv(O) = {
   fun a () : unit = {
     O.o1(); 
     O.o2();
