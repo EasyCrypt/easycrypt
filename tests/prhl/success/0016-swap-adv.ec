@@ -29,3 +29,5 @@ proof.
 intros A.
 fun.
 swap{1} 1 1.
+admit.
+save.
