@@ -294,8 +294,8 @@ val bind_mod   : f_subst -> EcIdent.t -> EcPath.mpath -> f_subst
    
 val f_subst : f_subst -> form -> form 
 
-val subst_form   : EcIdent.t -> form -> form -> form 
-val f_subst_mem  : EcIdent.t -> EcIdent.t -> form -> form 
+val f_subst_local : EcIdent.t -> form -> form -> form 
+val f_subst_mem   : EcIdent.t -> EcIdent.t -> form -> form 
 module Fsubst :
   sig
     val mapty : (EcTypes.ty -> EcTypes.ty) -> form -> form

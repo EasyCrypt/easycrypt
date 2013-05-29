@@ -1155,7 +1155,7 @@ let rec f_subst (s:f_subst) f =
 
   | _ -> f_map s.fs_ty (f_subst s) f 
 
-let subst_form x t =
+let f_subst_local x t =
   (* TODO check if x occur in f to not perform the subst *)
   let s = bind_local f_subst_id x t in
   f_subst s 
@@ -1240,7 +1240,7 @@ let rec f_app_simpl f args ty =
   if args = [] then f 
   else match f.f_node,args with
     | Fquant (Llambda,(id,_)::bds,f), arg::args ->
-      let f = f_lambda bds (subst_form id arg f ) in
+      let f = f_lambda bds (f_subst_local id arg f ) in
       f_app_simpl f args ty
     | Fapp(f',args'),_ -> mk_form (Fapp(f', args'@args)) ty
     | _ -> mk_form (Fapp(f,args)) ty 
