@@ -675,12 +675,12 @@ let tysig_item_kind = function
   | Tys_function _ -> `Function
   
 let sig_of_mt env (mt:module_type) = 
-  let _sig = EcEnv.ModTy.by_path mt.mt_name env in
+  let sig_ = EcEnv.ModTy.by_path mt.mt_name env in
   let subst = 
     List.fold_left2 (fun s (x1,_) a ->
-      EcSubst.add_module s x1 a) EcSubst.empty _sig.mis_params mt.mt_args in
+      EcSubst.add_module s x1 a) EcSubst.empty sig_.mis_params mt.mt_args in
   let items =
-    EcSubst.subst_modsig_body subst _sig.mis_body in
+    EcSubst.subst_modsig_body subst sig_.mis_body in
   let params = mt.mt_params in
   let keep = 
     List.fold_left (fun k (x,_) ->
