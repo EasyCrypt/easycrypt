@@ -28,3 +28,4 @@ val uuid : unit -> int
 
 (* -------------------------------------------------------------------- *)
 val pp_current_goal : Format.formatter -> unit
+val pp_maybe_current_goal : Format.formatter -> unit

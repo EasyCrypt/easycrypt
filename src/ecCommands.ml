@@ -304,3 +304,9 @@ let pp_current_goal stream =
       with L.NotAnOpenGoal _ -> 
         Format.fprintf stream "No more goals\n%!"
   end
+
+let pp_maybe_current_goal stream =
+  let (_, scope, _) = !context in
+    match EcScope.verbose scope with
+    | true  -> pp_current_goal stream
+    | false -> ()
