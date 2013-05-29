@@ -154,7 +154,8 @@ let pp_tyerror fmt env error =
 let () =
   let pp fmt exn =
     match exn with
-    | TyError (_, env, e) -> pp_tyerror fmt env e
+    | TyError (_, env, e) ->
+        pp_tyerror fmt (EcPrinting.PPEnv.ofenv env) e
     | _ -> raise exn
   in
     EcPException.register pp
