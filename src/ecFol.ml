@@ -1156,14 +1156,12 @@ let rec f_subst (s:f_subst) f =
   | _ -> f_map s.fs_ty (f_subst s) f 
 
 let f_subst_local x t =
-  (* TODO check if x occur in f to not perform the subst *)
   let s = f_bind_local f_subst_id x t in
-  f_subst s 
+  fun f -> if Mid.mem x f.f_fv then f_subst s f else f
 
 let f_subst_mem m1 m2 = 
-  (* TODO check if x occur in f to not perform the subst *)
   let s = f_bind_mem f_subst_id m1 m2 in
-  f_subst s  
+  fun f -> if Mid.mem m1 f.f_fv then f_subst s f else f
 
 let is_subst_id s = 
   s.fs_freshen = false &&
