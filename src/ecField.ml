@@ -205,3 +205,91 @@ let field_norm (term : 'a field) : 'a field list * 'a field =
 						| [x] -> x
 						| _ -> Plus ss
 		) in (!poblg,norm term)
+
+let rec eqfield (t1 : 'a field) (t2 : 'a field) : ('a field list * ('a field * 'a field) list) = 
+	match (t1,t2) with
+		| (Times ts1, Times ts2) -> 
+			let mts1 = List.fold_left (fun is i -> let (_,i') = field_norm i in
+																match i' with
+																	| Times ts -> ts @ is
+																	| _ -> i' :: is) [] ts1 in
+			let mts2 = List.fold_left (fun is i -> let (_,i') = field_norm i in
+																match i' with
+																	| Times ts -> ts @ is
+																	| _ -> i' :: is) [] ts2 in
+			let (i1,r1) = List.fold_left (fun (ls,rs) i -> match i with
+															| Inv i' -> (i' :: ls,rs)
+															| _ -> (ls,i::rs)) ([],[]) mts1 in
+			let (i2,r2) = List.fold_left (fun (ls,rs) i -> match i with
+															| Inv i' -> (i' :: ls,rs)
+															| _ -> (ls,i::rs)) ([],[]) mts2 in
+			let rem1 = match r1 with
+						| [] -> One
+						| x :: [] -> x
+						| _ -> Times r1 in
+			let rem2 = match r2 with
+						| [] -> One
+						| x :: [] -> x
+						| _ -> Times r2 in
+			(match (i1,i2) with
+					| ([],[]) -> let ((o1,t1'),(o2,t2')) = (field_norm t1, field_norm t2) in
+									if (cmp t1' t2' = 0) then (o1 @ o2,[]) else
+												(o1 @ o2, (t1',t2'):: [])
+					| (_,[]) -> let (o1,o2) = eqfield rem1 (Times (rem2 :: i1)) in
+												(i1 @ o1, o2)
+					| ([],_) -> let (o1,o2) = eqfield (Times (rem1 :: i2)) rem2 in
+												(i2 @ o1, o2)
+					| _ -> let (o1,o2) = eqfield (Times (rem1 :: i2)) (Times (rem2 :: i1)) in
+												(i1 @ i2 @ o1,o2))
+		| (Times ts1, _) -> 
+			let mts1 = List.fold_left (fun is i -> let (_,i') = field_norm i in
+																match i' with
+																	| Times ts -> ts @ is
+																	| _ -> i' :: is) [] ts1 in
+			let (i1,r1) = List.fold_left (fun (ls,rs) i -> match i with
+															| Inv i' -> (i' :: ls,rs)
+															| _ -> (ls,i::rs)) ([],[]) mts1 in
+			let rem1 = match r1 with
+						| [] -> One
+						| x :: [] -> x
+						| _ -> Times r1 in
+			(match i1 with
+					| [] -> 
+							let (o2,t2') = field_norm t2 in
+							(match t2' with
+								| Times _ -> let (ob1,eqt) = eqfield t1 t2' in
+												(o2 @ ob1, eqt)
+								| _ -> let (o1,t1') = field_norm t1 in
+											if (cmp t1' t2' = 0) then (o2 @ o1,[]) else
+											(o2 @ o1,(t1',t2') :: []))
+					| _ -> let (o1,o2) = eqfield rem1 (Times (t2 :: i1)) in
+											(i1 @ o1,o2))
+		| (_, Times ts2) ->
+			let mts2 = List.fold_left (fun is i -> let (_,i') = field_norm i in
+																match i' with
+																	| Times ts -> ts @ is
+																	| _ -> i' :: is) [] ts2 in
+			let (i2,r2) = List.fold_left (fun (ls,rs) i -> match i with
+															| Inv i' -> (i' :: ls,rs)
+															| _ -> (ls,i::rs)) ([],[]) mts2 in
+			let rem2 = match r2 with
+						| [] -> One
+						| x :: [] -> x
+						| _ -> Times r2 in
+			(match i2 with
+				| [] -> let (tss1,t1') = field_norm t1 in
+						(match t1' with
+								| Times _ -> let (ob2, eqt) =  eqfield t1' t2 in
+															(tss1 @ ob2, eqt)
+								| _ -> let (tss2,t2') = field_norm t2 in
+									if (cmp t1' t2' = 0) then (tss1 @ tss2 ,[]) else (tss1 @ tss2,(t1',t2') :: []))
+				| _ -> let (o1,o2) = eqfield (Times (t1 :: i2)) rem2  in
+ 													( i2 @ o1, o2))
+		| _ -> let ((o1,t1'),(o2,t2')) = (field_norm t1, field_norm t2) in
+				let obligaciones = o1 @ o2 in
+				(match (t1',t2') with
+						| (Times _, _) -> let (l,r) = eqfield t1' t2' in
+											(l @ obligaciones, r)
+						| (_, Times _) -> let (l,r) = eqfield t1' t2' in
+											(l @ obligaciones, r)
+						| _ -> if (cmp t1' t2' = 0) then (obligaciones, []) else (obligaciones, [(t1',t2')]))
