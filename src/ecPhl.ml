@@ -1038,7 +1038,7 @@ let t_equiv_call1 env side fpre fpost g =
   let fres   = f_local vres fsig.fs_ret in
   let post   = wp_asgn_call env me lp fres equiv.es_po in
   let subst  = PVM.add env pvres me fres PVM.empty in
-  let msubst = EcFol.bind_mem EcFol.f_subst_id EcFol.mhr me in
+  let msubst = EcFol.f_bind_mem EcFol.f_subst_id EcFol.mhr me in
   let fpost  = PVM.subst env subst (f_subst msubst fpost) in
   let modi   = f_write env f in
   let post   = f_imp_simpl fpost post in
@@ -1059,8 +1059,8 @@ let t_equiv_call1 env side fpre fpost g =
 let t_hoare_equiv _env p q p1 q1 p2 q2 g =
   let concl = get_concl g in
   let es = destr_equivS concl in
-  let s1 = bind_mem f_subst_id mhr (fst es.es_ml) in
-  let s2 = bind_mem f_subst_id mhr (fst es.es_mr) in
+  let s1 = f_bind_mem f_subst_id mhr (fst es.es_ml) in
+  let s2 = f_bind_mem f_subst_id mhr (fst es.es_mr) in
   let concl1 = 
     gen_mems [es.es_ml;es.es_mr] 
       (f_imp es.es_pr (f_and p (f_and (f_subst s1 p1) (f_subst s2 p2)))) in

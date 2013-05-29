@@ -206,11 +206,12 @@ let rec h_red ri env hyps f =
   match f.f_node with
   | Flocal x -> reduce_local ri hyps x 
   | Flet(LSymbol(x,_), e1, e2) when ri.zeta ->
-    let s = bind_local f_subst_id x e1 in
+    let s = f_bind_local f_subst_id x e1 in
     f_subst s e2
   | Flet(LTuple ids, { f_node = Ftuple es }, e2) when ri.iota ->
     let s = 
-      List.fold_left2 (fun s (x,_) e1 -> bind_local s x e1) f_subst_id ids es in
+      List.fold_left2 (fun s (x,_) e1 -> f_bind_local s x e1) 
+        f_subst_id ids es in
     f_subst s e2
   | Fglob(mp,m) when ri.modpath ->
     let f' = EcEnv.NormMp.norm_glob env m mp in

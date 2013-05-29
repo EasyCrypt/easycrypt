@@ -986,15 +986,15 @@ let f_subst_id = {
   fs_mem     = Mid.empty
 }
 
-let bind_local s x t = 
+let f_bind_local s x t = 
   let merger o = assert (o = None); Some t in
   { s with fs_loc = Mid.change merger x s.fs_loc }
 
-let bind_mem s m1 m2 = 
+let f_bind_mem s m1 m2 = 
   let merger o = assert (o = None); Some m2 in
   { s with fs_mem = Mid.change merger m1 s.fs_mem }
 
-let bind_mod s x mp = 
+let f_bind_mod s x mp = 
   let merger o = assert (o = None); Some mp in
   { s with fs_mp = Mid.change merger x s.fs_mp }
 
@@ -1003,7 +1003,7 @@ let add_local s (x,t as xt) =
   let t' = s.fs_ty t in
   if x == x' && t == t' then s, xt
   else 
-    bind_local s x (f_local x' t'), (x',t')
+    f_bind_local s x (f_local x' t'), (x',t')
 
 let add_locals = List.smart_map_fold add_local
 
@@ -1031,12 +1031,12 @@ let add_binding s (x,gty as xt) =
       EcPath.Sm.fold (fun m r' -> EcPath.Sm.add (sub m) r') r EcPath.Sm.empty in
     let x' = if s.fs_freshen then EcIdent.fresh x else x in
     if x == x' && p == p' && EcPath.Sm.equal r r' then s,xt else
-      bind_mod s x (EcPath.mident x'), (x',GTmodty(p',r'))
+      f_bind_mod s x (EcPath.mident x'), (x',GTmodty(p',r'))
   | GTmem mt ->
     let mt' = EcMemory.mt_substm s.fs_p s.fs_mp s.fs_ty mt in
     let x' = if s.fs_freshen then EcIdent.fresh x else x in
     if x == x' && mt == mt' then s,xt else 
-      bind_mem s x x', (x',GTmem mt')
+      f_bind_mem s x x', (x',GTmem mt')
 
 let add_bindings = List.map_fold add_binding
    
@@ -1157,12 +1157,12 @@ let rec f_subst (s:f_subst) f =
 
 let f_subst_local x t =
   (* TODO check if x occur in f to not perform the subst *)
-  let s = bind_local f_subst_id x t in
+  let s = f_bind_local f_subst_id x t in
   f_subst s 
 
 let f_subst_mem m1 m2 = 
   (* TODO check if x occur in f to not perform the subst *)
-  let s = bind_mem f_subst_id m1 m2 in
+  let s = f_bind_mem f_subst_id m1 m2 in
   f_subst s  
 
 let is_subst_id s = 
@@ -1245,7 +1245,7 @@ let rec f_app_simpl f args ty =
 and f_betared_simpl subst bds f args =
   match bds, args with
   | (x,GTty _)::bds, arg :: args ->
-    f_betared_simpl (bind_local subst x arg) bds f args 
+    f_betared_simpl (f_bind_local subst x arg) bds f args 
   | (_,_)::_, _ :: _ -> assert false
   | _, [] -> f_lambda bds f 
   | [], _ -> f_app_simpl (f_subst subst f) args f.f_ty
