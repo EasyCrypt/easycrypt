@@ -1,6 +1,230 @@
 \chapter{Writing Proofs}
+
 \section{First-Order Tactics}
-\section{$\pRHL$ Tactics}
+
+\subsection{The \texttt{case} tactic}
+%
+
+\subsection{The \texttt{unfold} tactic}
+%
+
+\subsection{The \texttt{simplify} tactic}
+%
+
+\subsection{The \texttt{trivial} tactic}
+%
+
+\section{Probabilistic Hoare logic}
+
+
+
+\section{Bounded probabilistic Hoare logic}
+
+\subsection{The \texttt{rnd} tactic}
+%
+\Syntax 
+\verb+rnd+ (\textit{formula} $|$ \_ ) (\textit{formula} $|$ \_ )
+
+\Description
+the first optional parameter $p$ is a computable predicate (i.e., \verb+'a cPred+)
+(i.e., \verb+'a -> bool+ ). Assume $d$ of type \verb+A Distr.distr+:
+\begin{displaymath}
+\begin{array}{c}
+  \infrule{
+    \bdHoareSeq{c}{\pre}{\mu\, d\, p \leq f \land 
+      (\forall v\in A.~ \post\subst{x}{v} \Leftrightarrow p\, v)}{1} 
+  }{
+    \bdHoareSle{c;\Rand{x}{d}}{\pre}{\post}{f}
+  }\left[\verb+rnd+\ p\right]
+\\[4ex]
+\end{array}
+\end{displaymath}
+If $p$ is not given then the tool attempts to build it from $\post$
+(not implemented yet).
+
+For judgments bounded by $(=,\geq)$ the tactic additionally accepts as second parameter a real
+number $g$ representing a bound:
+\begin{displaymath}
+  \infrule{
+    \bdHoareSge{c}{\pre}{\mu\, d\, p \geq g \land 
+      (\forall v\in A.~ \post\subst{x}{v} \Leftrightarrow p\, v)}{\frac{f}{g}} 
+  }{
+    \bdHoareSge{c;\Rand{x}{d}}{\pre}{\post}{f}
+  }\left[\verb+rnd+\ p\ g\right]
+\\[4ex]
+\end{displaymath}
+If $g$ is not given then $g=f$ in the rule.
+
+\subsection{The \texttt{app} tactic}
+%
+\Syntax 
+\verb+app+ \verb+[>>|<<]+ \textit{num} \textit{formula} [\textit{formula}]
+
+\Description
+Direction \verb+<<+ by default.
+The first formula is the intermediate predicate.
+Assume $s_2$ is at program position $n$:
+\begin{displaymath}
+  \infrule{
+    \bdHoareSeq{s1}{P}{R}{1} \qquad \bdHoareSle{s2}{R}{Q}{f}
+  }{
+    \bdHoareSle{s1;s2}{P}{Q}{f}
+  }\left[\verb+app+\ n\ R\right]
+\end{displaymath}
+
+The following is implemented but unsound:
+\begin{displaymath}
+  \infrule{
+    \bdHoareSle{s1}{P}{R}{f} \qquad \bdHoareSeq{s2}{R}{Q}{1}
+  }{
+    \bdHoareSle{s1;s2}{P}{Q}{f}
+  }\left[\verb+app+ \verb+>>+\ n\ R\right]
+\end{displaymath}
+
+The following is a generalization but not implemented:
+\begin{displaymath}
+  \infrule{
+    \begin{array}{c}
+      \bdHoareSle{s1}{P}{R}{f_1} \qquad \bdHoareSle{s2}{R}{Q}{f_2}
+      \\
+      \bdHoareSle{s1}{P}{R}{g_1} \qquad \bdHoareSle{s2}{R}{Q}{g_2}
+      \\
+      f_1 f_2 + g_1 g_2 \leq f 
+    \end{array}
+  }{
+    \bdHoareSle{s1;s2}{P}{Q}{f}
+  }
+\end{displaymath}
+
+
+The second parameter (optional) is a real number representing a bound (only supported for $=$ and $\geq$).
+\begin{displaymath}
+\begin{array}{c}
+  \infrule{
+    \bdHoareSge{s1}{P}{R}{f/g} \qquad \bdHoareSge{s2}{R}{Q}{g}
+  }{
+    \bdHoareSge{s1;s2}{P}{Q}{f}
+  }\left[\verb+app+\ n\ R\ g\right]
+\\[4ex]
+  \infrule{
+    \bdHoareSge{s1}{P}{R}{g} \qquad \bdHoareSge{s2}{R}{Q}{f/g}
+  }{
+    \bdHoareSge{s1;s2}{P}{Q}{f}
+  }\left[\verb+app>>+\ n\ R\ g\right]
+\end{array}
+\end{displaymath}
+Similar rules hold for $=$. If the parameter $g$ is not given then
+$g=f$ in the rule. 
+
+\subsection{The \texttt{if} tactic}
+%
+(similar to probabilistic Hoare \verb+if+ tactic)
+\begin{displaymath}
+\begin{array}{c}
+  \infrule{
+    \bdHoareSle{c_1}{\pre \land b}{\post}{f}\qquad
+    \bdHoareSle{c_2}{\pre \land \neg b}{\post}{f}
+  }{
+    \bdHoareSle{\Cond{b}{c_1}{c_2}}{\pre}{\post}{f}
+  }\left[\verb+if+ \right] 
+\\[4ex]
+\end{array}
+\end{displaymath}
+Similar rules hold for $=,\geq$.
+
+\subsection{The \texttt{wp} tactic}
+%
+\Syntax \verb+wp+
+
+\Description
+Assuming \verb+wp+ complete (weakest) and $c$ is straight-line code,
+$\bdHoareSeq{c}{\mathsf{wp}(c,\post)}{\post}{1}$, plus sequential
+composition rule, we have:
+\begin{displaymath}
+  \infrule{
+    \bdHoareSle{c_1}{\pre }{\mathsf{wp}(c_2,\post)}{f}
+  }{
+    \bdHoareSle{c_1;c_2}{\pre}{\post}{f}
+  }\left[\verb+wp+ \right] 
+\end{displaymath}
+Similar rules hold for $=,\geq$.
+
+
+\subsection{The \texttt{skip} tactic}
+%
+
+\subsection{The \texttt{condt,condf} tactic}
+%
+
+
+%***** NOT IMPLEMENTED 
+
+\subsection{The \texttt{while} tactic}
+\Syntax \verb+while+ \textit{formula} \textit{formula} 
+[\textit{formula} \textit{formula}]
+%
+
+\Description
+The first formula is the loop invariant. 
+The second one is a real expression bound $g$.
+If $g=1$ then the third and fourth formulae are ignored, otherwise
+required.
+...
+\begin{displaymath}
+  \infrule{
+    \begin{array}{c}
+    \bdHoareSge{c'}{\pre }{\chi \land \forall M.~ \chi \land \neg b
+      \Rightarrow \post}{f} 
+    \\[.5ex]
+    \forall k.~ \bdHoareSeq{c}{\chi \land b \land e = k}{\chi \land e
+      < k}{1}
+  \end{array}
+}{
+    \bdHoareSge{c';\While{b}{c}}{\pre}{\post}{f}
+  }\left[\verb+while+\ \chi\ 1 \right] 
+\end{displaymath}
+Similarly for (=).
+
+For an arbitrary bound $g$ the following rule generalizes the one
+above:
+\begin{displaymath}
+  \infrule{
+    \begin{array}{c}
+    \bdHoareSge{c'}{\pre }{\chi \land \forall M.~ (e\leq n) \land (\chi \land \neg b
+      \Rightarrow \post)}{\frac{f}{g^n}} 
+    \\[.5ex]
+    \bdHoareSge{c}{\chi \land b}{\chi}{g}
+    \\[.5ex]
+    \forall k.~ \bdHoareSeq{c}{\chi \land b \land e = k}{e<k}{1}
+  \end{array}
+}{
+    \bdHoareSge{c';\While{b}{c}}{\pre}{\post}{f}
+  }\left[\verb+while+\ \chi\ 1 \right] 
+\end{displaymath}
+
+
+There is no appropriate rule for $(\leq)$.
+
+
+\subsection{The \texttt{call} tactic}
+%
+
+
+\subsection{The \texttt{inline} tactic}
+%
+
+\subsection{The \texttt{swap} tactic}
+%
+
+
+\section{Relational probabilistic Hoare logic}
+
+
+\section{Combination of Tactics}
+
+
+\section{Automated Tactics}
+
 
 %%% Local Variables: 
 %%% mode: latex
