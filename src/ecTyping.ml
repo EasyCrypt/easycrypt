@@ -1426,7 +1426,7 @@ let trans_gamepath (env : EcEnv.env) gp =
   let (mpath, _sig) = trans_msymbol env (mk_loc loc (fst (unloc gp))) in
   if _sig.mis_params <> [] then
     tyerror gp.pl_loc env (UnknownFunName (modsymb, funsymb));
-  EcPath.xpath mpath (EcPath.psymbol funsymb)
+  EcPath.xpath_fun mpath funsymb
 
 (* -------------------------------------------------------------------- *)
 let transfpattern env ue (p : EcParsetree.plpattern) =

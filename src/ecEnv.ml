@@ -881,7 +881,7 @@ let enter mode (name : symbol) (env : env) =
             env_item  = []; }
 
   | `Fun, `Module mpath ->
-      let xpath = EcPath.xpath mpath (EcPath.psymbol name) in
+      let xpath = EcPath.xpath_fun mpath name in
       let env   = MC.bind_mc name (empty_mc None) env in (* FIXME: remove *)
         { env with
             env_scope = { ec_path = path; ec_scope = `Fun xpath; };
@@ -1081,10 +1081,10 @@ module Fun = struct
     adds_in_memenv mem locals
       
   let inv_memenv env = 
-    let path = mroot env in
-    let xpath = EcPath.xpath path (EcPath.psymbol "") in (* dummy value *)
-    let meml = EcMemory.empty_local EcFol.mleft xpath in
-    let memr = EcMemory.empty_local EcFol.mright xpath in
+    let path  = mroot env in
+    let xpath = EcPath.xpath_fun path "" in (* dummy value *)
+    let meml  = EcMemory.empty_local EcFol.mleft xpath in
+    let memr  = EcMemory.empty_local EcFol.mright xpath in
     Memory.push_all [meml;memr] env
     
 
@@ -1162,8 +1162,8 @@ module Var = struct
     | None -> begin
       match p.EcPath.x_sub.EcPath.p_node with
       | EcPath.Pqname ({ p_node = EcPath.Psymbol f }, x) -> begin
-        let mp = EcPath.mpath p.EcPath.x_top.EcPath.m_top [] in
-        let fp = EcPath.xpath mp (EcPath.psymbol f) in
+        let mp = EcPath.m_functor p.EcPath.x_top in
+        let fp = EcPath.xpath_fun mp f in
         let f  = Fun.by_xpath_r ~susp:true ~spsc fp env in
           try
             let v = List.find (fun v -> v.v_name = x) f.f_sig.fs_params in

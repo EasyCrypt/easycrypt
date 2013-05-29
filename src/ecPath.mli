@@ -74,6 +74,7 @@ type xpath = private {
 }
 
 val xpath  : mpath -> path -> xpath
+val xpath_fun : mpath -> symbol -> xpath
 val xqname : xpath -> symbol -> xpath
 
 val x_equal   : xpath -> xpath -> bool

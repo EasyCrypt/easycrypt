@@ -696,7 +696,7 @@ let rec pr_module_item (scope : EcPath.mpath) (ppenv : ppenv) (item : module_ite
       (PPE.add_pvar ppenv xpath, doc)
         
     | MI_Function f ->
-      let xpath = EcPath.xpath scope (EcPath.psymbol f.f_name) in
+      let xpath = EcPath.xpath_fun scope f.f_name in
       let doc = pr_modfun ppenv f in
       (PPE.add_fun ppenv xpath , doc)
         

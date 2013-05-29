@@ -237,6 +237,7 @@ let xpath top sub =
 
 let x_fv fv xp = m_fv fv xp.x_top 
 
+let xpath_fun mp f = xpath mp (psymbol f)
 let xqname x s = xpath x.x_top (pqname x.x_sub s)
 
 (* -------------------------------------------------------------------- *)
