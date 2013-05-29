@@ -221,19 +221,8 @@ let rec h_red ri env hyps f =
     if pv_equal pv pv' then raise NotReducible 
     else f_pvar pv' f.f_ty m
   | Flet(lp,f1,f2) -> f_let lp (h_red ri env hyps f1) f2 
-  | Fapp({f_node = Fquant(Llambda,bd,body)}, args) when ri.beta -> 
-    let nbd = List.length bd in
-    let na  = List.length args in
-    let args, ext_a =
-      if nbd < na then List.take_n nbd args 
-      else args, [] in
-    let bd, ext_bd = 
-      if na < nbd then List.take_n na bd 
-      else bd, [] in
-    let s = 
-      List.fold_left2 (fun s (x,_) e1 -> bind_local s x e1) f_subst_id bd args in
-    let f' = f_subst s (f_lambda ext_bd body) in
-    f_app f' ext_a f.f_ty
+  | Fapp({f_node = Fquant(Llambda,bds,body)}, args) when ri.beta -> 
+    f_betared_simpl bds body args
   | Fapp({f_node = Fop(p,_)} as fo, args)
       when ri.logic && is_logical_op p ->
     let f' = 
