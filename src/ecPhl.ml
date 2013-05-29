@@ -766,7 +766,7 @@ let t_bdHoare_skip g =
   let bhs = destr_bdHoareS concl in
   if bhs.bhs_s.s_node <> [] then tacerror NoSkipStmt;
   if (bhs.bhs_cmp <> FHeq && bhs.bhs_cmp <> FHge) ||
-    not (f_equal bhs.bhs_bd (f_real_of_int 1)) then
+     not (f_equal bhs.bhs_bd f_r1) then
     cannot_apply "skip" "bound must be \">= 1\"";
   let concl = f_imp bhs.bhs_pr bhs.bhs_po in
   let concl = gen_mems [bhs.bhs_m] concl in
@@ -1563,13 +1563,13 @@ let t_bd_hoare_rnd env (opt_bd,opt_event) g =
         cannot_apply "bd_hoare_rnd"
           "Rule for upper-bounded hoare triples requires a total bound"
       | FHle, _ ->
-          FHeq, EcFol.f_real_of_int 1, f_real_le (f_mu distr event) bhs.bhs_bd
+          FHeq, EcFol.f_r1, f_real_le (f_mu distr event) bhs.bhs_bd
       | FHge, Some bd' when not (EcFol.f_equal bhs.bhs_bd bd') -> 
           bhs.bhs_cmp, EcFol.f_real_div bhs.bhs_bd bd', f_real_le bd' (f_mu distr event)
-      | FHge, _ -> FHeq, EcFol.f_real_of_int 1, f_real_le bhs.bhs_bd (f_mu distr event)
+      | FHge, _ -> FHeq, EcFol.f_r1, f_real_le bhs.bhs_bd (f_mu distr event)
       | FHeq, Some bd' when not (EcFol.f_equal bhs.bhs_bd bd') -> 
           bhs.bhs_cmp, EcFol.f_real_div bhs.bhs_bd bd', f_eq (f_mu distr event) bd'
-      | FHeq, _ -> FHeq, EcFol.f_real_of_int 1, f_eq (f_mu distr event) bhs.bhs_bd
+      | FHeq, _ -> FHeq, EcFol.f_r1, f_eq (f_mu distr event) bhs.bhs_bd
   in
   let v_id = EcIdent.create "v" in
   let v = f_local v_id ty_distr in

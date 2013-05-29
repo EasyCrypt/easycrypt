@@ -484,8 +484,10 @@ let f_int n = mk_form (Fint n) ty_int
 let f_tt = f_op EcCoreLib.p_tt [] ty_unit
 
 let f_op_real_of_int = f_op EcCoreLib.p_from_int [] (tfun ty_int ty_real)
-let f_real_of_int n = f_app f_op_real_of_int [f_int n] ty_real
-let f_rone = f_real_of_int 1
+let f_real_of_int f  = f_app f_op_real_of_int [f] ty_real
+let f_rint n         = f_real_of_int (f_int n)
+let f_r0             = f_rint 0 
+let f_r1             = f_rint 1
 
 let ty_fbool1 = tfun ty_bool ty_bool
 let ty_fbool2 = tfun ty_bool ty_fbool1 
@@ -592,8 +594,7 @@ let f_bdHoareF pre f post hcmp bd =
   let bhf = { bhf_pr = pre; bhf_f = f; bhf_po = post; 
               bhf_cmp = hcmp; bhf_bd = bd } in
   mk_form (FbdHoareF bhf) ty_bool
-let f_losslessF f = 
-  f_bdHoareF f_true f f_true FHeq f_rone
+let f_losslessF f = f_bdHoareF f_true f f_true FHeq f_r1
 
 let f_bdHoareS_r bhs = mk_form (FbdHoareS bhs) ty_bool
 let f_bdHoareS mem pre s post hcmp bd = 

@@ -130,8 +130,11 @@ val f_tt  : form
 
 val f_int : int -> form
 
-val f_real_of_int : int -> form
-val f_rone : form
+val f_real_of_int : form -> form
+val f_rint        : int -> form
+val f_r0          : form
+val f_r1          : form
+
 
 val f_op : EcPath.path -> EcTypes.ty list -> EcTypes.ty -> form
 val f_app : form -> form list -> EcTypes.ty -> form
