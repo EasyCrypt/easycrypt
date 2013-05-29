@@ -617,7 +617,15 @@ and transmodsig_body (env : EcEnv.env) (sa : Sm.t)
             raise (DuplicatedArgumentsName f);
         let calls = 
           match f.pfd_uses with
-          | None -> []
+          | None -> 
+            let do_one mp calls = 
+              let sig_ = (EcEnv.Mod.by_mpath mp env).me_sig in
+              if sig_.mis_params <> [] then calls
+              else 
+                let fs = List.map (fun (Tys_function(fsig,_)) ->
+                  EcPath.xpath_fun mp fsig.fs_name) sig_.mis_body in
+                fs@calls in
+            Sm.fold do_one sa []
           | Some pfd_uses ->
             List.map (fun name -> 
               let f, _ = lookup_fun env name in
