@@ -1207,6 +1207,7 @@ module Tactic = struct
       | Ptrivial pi    -> process_trivial scope pi env
       | Pintro pi      -> process_intros env pi
       | Psplit         -> t_split env
+      | Pfield         -> process_debug env; t_id None
       | Pexists fs     -> process_exists env fs
       | Pleft          -> t_left env
       | Pright         -> t_right env

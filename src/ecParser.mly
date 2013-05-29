@@ -227,6 +227,7 @@
 %token SIMPLIFY
 %token SKIP
 %token SPLIT
+%token FIELD
 %token STAR
 %token SUBST
 %token SWAP
@@ -1299,6 +1300,9 @@ tactic:
 
 | SPLIT
     { Psplit }
+
+| FIELD
+    { Pfield }
 
 | EXIST a=plist1(loc(fpattern_arg), COMMA)
    { Pexists a }
