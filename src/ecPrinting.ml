@@ -1001,20 +1001,27 @@ let get_ppnode_stats pps =
 
 (* -------------------------------------------------------------------- *)
 let pp_depth mode =
-  let rec pp_depth stats fmt d =
-    match d with
-    | []      -> stats
-    | d1 :: d -> begin
-        match pp_depth stats fmt d with
-        | []     -> assert false
-        | s1:: s -> begin
-            match mode with
-            | `Plain  -> Format.fprintf fmt "%*d." s1 d1; s
-            | `Blank  -> Format.fprintf fmt "%s-" (String.make s1 '-'); s
+  let rec pp_depth fmt (s, d) =
+    match s, d with
+    | [], []   -> ()
+    | [], _::_ -> assert false
+
+    | s1::s, [] ->
+        Format.fprintf fmt "%s" (String.make (s1+1) '-');
+        Format.fprintf fmt "%a" pp_depth (s, [])
+
+    | s1::s, d1::d -> begin
+        match mode with
+        | `Plain  -> Format.fprintf fmt "%*d." s1 d1
+        | `Blank  -> begin
+            match d with
+            | [] -> Format.fprintf fmt "%*s." s1 ""
+            | _  -> Format.fprintf fmt "%*s " s1 ""
         end
-    end
+      end;
+      Format.fprintf fmt "%a" pp_depth (s, d)
   in
-    fun stats fmt d -> ignore (pp_depth stats fmt d)
+    fun stats d fmt -> ignore (pp_depth fmt (stats, List.rev d))
 
 let pp_node_r side ((maxl, maxr), stats) =
   let rec pp_node_r idt depth fmt node =
@@ -1024,14 +1031,14 @@ let pp_node_r side ((maxl, maxr), stats) =
           let l = odfl "" l and r = odfl "" r in
             match side with
             | `Both ->
-                Format.fprintf fmt "(%a)  %-*s | %-*s  (%a)@\n%!"
-                  (pp_depth mode stats) ((offset+1) :: depth)
+                Format.fprintf fmt "%-*s (%t) %-*s@\n%!"
                   maxl (Printf.sprintf "%*s%s" (2*idt) "" l)
+                  (pp_depth mode stats ((offset+1) :: depth))
                   maxr (Printf.sprintf "%*s%s" (2*idt) "" r)
-                  (pp_depth mode stats) ((offset+1) :: depth)
+
             | `Left ->
-                Format.fprintf fmt "(%a)  %-*s@\n%!"
-                  (pp_depth mode stats) ((offset+1) :: depth)
+                Format.fprintf fmt "(%t)  %-*s@\n%!"
+                  (pp_depth mode stats ((offset+1) :: depth))
                   maxl (Printf.sprintf "%*s%s" (2*idt) "" l)
         in
   
@@ -1040,7 +1047,7 @@ let pp_node_r side ((maxl, maxr), stats) =
   
           forline `Plain l r;
           List.iter2o(forline `Blank) (odfl [] ls) (odfl [] rs);
-          pp_node_r (idt+1) (offset :: depth) fmt sub
+          pp_node_r (idt+1) ((offset+1) :: depth) fmt sub
       in
         List.iter do1 node1
   
