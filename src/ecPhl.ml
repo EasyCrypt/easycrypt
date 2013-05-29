@@ -1356,7 +1356,7 @@ let check_swap env s1 s2 =
   if not m1r2 then error ()
 
 let t_equiv_swap env side p1 p2 p3 g =
-  let swap s = 
+  let swap env s = 
     let s = s.s_node in
     let len = List.length s in
     if not (1<= p1 && p1 < p2 && p2 <= p3 && p3 <= len) then
@@ -1368,10 +1368,11 @@ let t_equiv_swap env side p1 p2 p3 g =
     let s23,tl = List.take_n (p3-p2+1) tl in
     check_swap env (stmt s12) (stmt s23);
     stmt (List.flatten [hd;s23;s12;tl]) in
-  let concl = get_concl g in
+  let hyps, concl = get_goal g in
   let es    = destr_equivS concl in
+  let env = tyenv_of_hyps env hyps in
   let sl,sr = 
-    if side then swap es.es_sl, es.es_sr else es.es_sl, swap es.es_sr in
+    if side then swap env es.es_sl, es.es_sr else es.es_sl, swap env es.es_sr in
   let concl = f_equivS_r {es with es_sl = sl; es_sr = sr } in
   prove_goal_by [concl] (RN_hl_swap(side,p1,p2,p3)) g
     
