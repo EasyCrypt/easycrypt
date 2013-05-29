@@ -118,20 +118,33 @@ and subst_modsig_body (s : _subst) (sbody : module_sig_body) =
   List.map (subst_modsig_body_item s) sbody
 
 (* -------------------------------------------------------------------- *)
-and subst_modsig (s : _subst) (comps : module_sig) =
+and subst_modsig ?params (s : _subst) (comps : module_sig) =
   let sbody, newparams =
-    match comps.mis_params with
-    | [] -> (s, [])
-    | _  ->
+    match params with
+    | None -> begin
+        match comps.mis_params with
+        | [] -> (s, [])
+        | _  ->
+          let aout =
+            List.map_fold
+              (fun (s : subst) (a, aty) ->
+                let a'   = EcIdent.fresh a in
+                let decl = (a', subst_modtype (_subst_of_subst s) aty) in
+                  add_module s a (EcPath.mident a'), decl)
+              s.s_s comps.mis_params
+          in
+            fstmap _subst_of_subst aout
+    end
+
+  | Some params ->
       let aout =
         List.map_fold
-          (fun (s : subst) (a, aty) ->
-            let a'   = EcIdent.fresh a in
-            let decl = (a', subst_modtype (_subst_of_subst s) aty) in
-              add_module s a (EcPath.mident a'), decl)
-          s.s_s comps.mis_params
-      in
-        fstmap _subst_of_subst aout
+          (fun (s : subst) ((a, aty), a') ->
+              let decl = (a', subst_modtype (_subst_of_subst s) aty) in
+                add_module s a (EcPath.mident a'), decl)
+            s.s_s (List.combine comps.mis_params params)
+        in
+          fstmap _subst_of_subst aout
   in
 
   let comps =
@@ -386,7 +399,7 @@ let subst_function     s = subst_function (_subst_of_subst s)
 let subst_module       s = subst_module (_subst_of_subst s)
 let subst_module_comps s = subst_module_comps (_subst_of_subst s)
 let subst_modtype      s = subst_modtype (_subst_of_subst s)
-let subst_modsig       s = fun x -> snd (subst_modsig (_subst_of_subst s) x)
+let subst_modsig         = fun ?params s x -> snd (subst_modsig ?params (_subst_of_subst s) x)
 let subst_modsig_body  s = subst_modsig_body (_subst_of_subst s)
 
 let subst_mpath        s = (_subst_of_subst s).s_fmp
