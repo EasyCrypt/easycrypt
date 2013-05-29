@@ -1245,7 +1245,7 @@ and f_betared_simpl subst bds f args =
   | (x,GTty _)::bds, arg :: args ->
     f_betared_simpl (f_bind_local subst x arg) bds f args 
   | (_,_)::_, _ :: _ -> assert false
-  | _, [] -> f_lambda bds f 
+  | _, [] -> f_lambda bds (f_subst subst f) 
   | [], _ -> f_app_simpl (f_subst subst f) args f.f_ty
 
 let f_betared_simpl bds f args = f_betared_simpl f_subst_id bds f args
