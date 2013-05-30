@@ -1309,8 +1309,6 @@ module Mod = struct
     try_lf (fun () -> by_path p env)
 
   let by_mpath (p : mpath) (env : env) =
-    Printf.printf "%s\n%!" (EcPath.m_tostring p);
-
     let (ip, (i, args)) = ipath_of_mpath p in
 
       match MC.by_path (fun mc -> mc.mc_modules) ip env with
