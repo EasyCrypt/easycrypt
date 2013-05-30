@@ -327,7 +327,7 @@ let check_alpha_equal ri env hyps f1 f2 =
   let check_bindings env subst bd1 bd2 =
     List.fold_left2 check_binding (env,subst) bd1 bd2 in
 
-  let check_local subst id1 id2 = 
+  let check_local subst id1 f2 id2 = 
     match (Mid.find_def f2 id2 subst.fs_loc).f_node with
     | Flocal id2 -> ensure (EcIdent.id_equal id1 id2)
     | _ -> assert false in
@@ -335,16 +335,16 @@ let check_alpha_equal ri env hyps f1 f2 =
     let m2 = Mid.find_def m2 m2 subst.fs_mem in
     ensure (EcIdent.id_equal m1 m2) in    
   let check_pv env subst pv1 pv2 = 
-    let pv2 = pv_subst (EcPath.x_substm subst.fs_p subst.fs_mp) pv2 in
+    let pv2 = pv_subst (EcPath.x_substm subst.fs_sty.ts_p subst.fs_mp) pv2 in
     ensure (pv_equal_norm env pv1 pv2) in
   let check_mp env subst mp1 mp2 = 
-    let mp2 = EcPath.m_subst subst.fs_p subst.fs_mp mp2 in
+    let mp2 = EcPath.m_subst subst.fs_sty.ts_p subst.fs_mp mp2 in
     ensure (m_equal_norm env mp1 mp2) in
   let check_xp env subst xp1 xp2 = 
     ensure (EcPath.p_equal xp1.EcPath.x_sub xp2.EcPath.x_sub);
     check_mp env subst xp1.EcPath.x_top xp2.EcPath.x_top in
   let check_s env s s1 s2 = 
-    let es = e_subst_init s.fs_freshen s.fs_p s.fs_ty s.fs_mp in
+    let es = e_subst_init s.fs_freshen s.fs_sty.ts_p s.fs_ty s.fs_mp in
     let s2 = EcModules.s_subst es s2 in
     ensure (s_equal_norm env s1 s2) in
 
@@ -367,7 +367,7 @@ let check_alpha_equal ri env hyps f1 f2 =
 
     | Fint i1, Fint i2 when i1 = i2 -> ()
 
-    | Flocal id1, Flocal id2 -> check_local subst id1 id2
+    | Flocal id1, Flocal id2 -> check_local subst id1 f2 id2
 
     | Fpvar(p1,m1), Fpvar(p2,m2) ->
       check_mem subst m1 m2;

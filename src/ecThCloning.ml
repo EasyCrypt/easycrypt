@@ -233,9 +233,9 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
                   let lam     = EcFol.f_lambda xs body in
                     (dom, lam)
                 in
-                let uni     = EcTypes.Tuni.subst (EcUnify.UniEnv.close ue) in
-                let body    = EcFol.Fsubst.mapty uni body in
-                let dom     = List.map uni dom in
+                let uni     = EcUnify.UniEnv.close ue in
+                let body    = EcFol.Fsubst.uni uni body in
+                let dom     = List.map (EcTypes.Tuni.subst uni) dom in
                 let tparams = EcUnify.UniEnv.tparams ue in
                   mk_pred tparams dom (Some body)
               in

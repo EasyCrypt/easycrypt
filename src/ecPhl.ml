@@ -1290,12 +1290,12 @@ let t_equiv_deno env pre post g =
   let sargs = 
     List.fold_left2 (fun s v a -> PVM.add env (pv_loc fl v.v_name) mleft a s)
       sargs funl.f_sig.fs_params argsl in
-  let smem = { f_subst_id with 
-    fs_mem = Mid.add mleft ml (Mid.singleton mright mr) } in
+  let smem = 
+    f_bind_mem (f_bind_mem f_subst_id mright mr) mleft ml in
   let concl_pr  = f_subst smem (PVM.subst env sargs pre) in
   (* building the substitution for the post *)
-  let smeml = { f_subst_id with fs_mem = Mid.singleton mhr mleft } in
-  let smemr = { f_subst_id with fs_mem = Mid.singleton mhr mright } in
+  let smeml = f_bind_mem f_subst_id mhr mleft in 
+  let smemr = f_bind_mem f_subst_id mhr mright in
   let evl   = f_subst smeml evl and evr = f_subst smemr evr in
   let cmp   = if cmp then f_iff else f_imp in 
   let mel = EcEnv.Fun.actmem_post mleft fl funl in
@@ -1350,9 +1350,10 @@ let t_equiv_rcond side b at_pos g =
   let hd,e,s = gen_rcond b EcFol.mhr at_pos s in 
   let mo' = EcIdent.create "&m" in
   let s1 = 
-    Mid.add (EcMemory.memory mo) mo' 
-      (Mid.add (EcMemory.memory m) EcFol.mhr Mid.empty) in
-  let pre1  = f_subst {f_subst_id with fs_mem = s1} es.es_pr in
+    f_bind_mem 
+      (f_bind_mem f_subst_id (EcMemory.memory m) EcFol.mhr)
+      (EcMemory.memory mo) mo' in
+  let pre1  = f_subst s1 es.es_pr in
   let concl1 = 
     gen_mems [mo', EcMemory.memtype mo] 
       (f_hoareS (EcFol.mhr,EcMemory.memtype m) pre1 hd e) in

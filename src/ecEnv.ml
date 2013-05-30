@@ -1746,15 +1746,13 @@ module Op = struct
 
   let reduce env p tys =
     let op = try by_path p env with _ -> assert false in
-    let s = 
-      EcFol.Fsubst.init_subst_tvar (EcTypes.Tvar.init op.op_tparams tys) in
     let f = 
       match op.op_kind with
       | OB_oper(Some e) -> EcFol.form_of_expr EcFol.mhr e
       | OB_pred(Some idsf) -> idsf
       | _ -> raise NotReducible
     in
-      EcFol.f_subst { s with EcFol.fs_freshen = true } f
+    EcFol.Fsubst.subst_tvar (EcTypes.Tvar.init op.op_tparams tys) f
 end
 
 (* -------------------------------------------------------------------- *)
