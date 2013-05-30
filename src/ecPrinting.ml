@@ -1021,19 +1021,21 @@ let pp_depth mode =
     | [], _::_ -> assert false
 
     | s1::s, [] ->
-        Format.fprintf fmt "%s" (String.make (s1+1) '-');
+        let sp = match s with [] -> "" | _ -> "-" in
+        Format.fprintf fmt "%s%s" (String.make s1 '-') sp;
         Format.fprintf fmt "%a" pp_depth (s, [])
 
     | s1::s, d1::d -> begin
         let (d1, c1) = ((snd d1) + 1, fst d1) in
+        let sp = match s with [] -> "" | _ -> "-" in
 
         match mode with
-        | `Plain  -> Format.fprintf fmt "%*d%c" s1 d1 c1
-        | `Blank  -> begin
+        | `Plain -> begin
             match d with
-            | [] -> Format.fprintf fmt "%*s%c" s1 "" c1
-            | _  -> Format.fprintf fmt "%*s " s1 ""
+            | [] -> Format.fprintf fmt "%*d%s" s1 d1 sp
+            | _  -> Format.fprintf fmt "%*d%c" s1 d1 c1
         end
+        | `Blank -> Format.fprintf fmt "%*s%s" s1 "" sp
       end;
       Format.fprintf fmt "%a" pp_depth (s, d)
   in

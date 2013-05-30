@@ -119,8 +119,12 @@
 (* Tokens *)
 %token <bool> AND (* true asym : &&, false sym : /\ *)
 %token <bool> OR  (* true asym : ||, false sym : \/ *)
+
+%token <EcParsetree.codepos> CPOS
+
 %token ADD
 %token ADMIT
+%token ALIAS
 %token APP
 %token APPLY
 %token ARROW
@@ -1269,10 +1273,16 @@ conseq:
 ;
 
 
-tac_dir : 
-  | BACKS {true }
-  | FWDS  {false}
-  | empty {true}
+tac_dir: 
+| BACKS {  true }
+| FWDS  { false }
+| empty {  true }
+;
+
+codepos:
+| i=NUM  { (i, None) }
+| c=CPOS { c }
+;
 
 tactic:
 | IDTAC
@@ -1393,6 +1403,12 @@ tactic:
 
 | INLINE s=side? o=occurences? f=plist0(loc(fident), empty)
     { PPhl (Pinline (`ByName (s, (f, o)))) }
+
+| ALIAS s=side? o=CPOS
+    { PPhl (Palias (s, o, None)) }
+
+| ALIAS s=side? o=codepos WITH x=lident
+    { PPhl (Palias (s, o, Some x)) }
 
 | p=tselect INLINE
     { PPhl (Pinline (`ByPattern p)) }
