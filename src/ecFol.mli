@@ -281,37 +281,40 @@ val is_pr      : form -> bool
 val f_map : (EcTypes.ty -> EcTypes.ty) -> (form -> form) -> form -> form
 
 (* -------------------------------------------------------------------- *)
-type f_subst = { 
-  fs_freshen : bool;
-  fs_p       : EcPath.path -> EcPath.path;
-  fs_ty      : ty -> ty;
+type f_subst = private { 
+  fs_freshen : bool; (* true means realloc local *)
   fs_mp      : EcPath.mpath Mid.t;
   fs_loc     : form Mid.t;
   fs_mem     : EcIdent.t Mid.t;
+  fs_sty     : ty_subst;
+  fs_ty      : ty -> ty;
 }
 
 val f_subst_id : f_subst
-
+val is_subst_id : f_subst -> bool
+val f_subst_init : 
+  bool -> EcPath.mpath Mid.t -> ty_subst -> f_subst
+  
 val add_locals : f_subst -> (EcIdent.t * EcTypes.ty) list -> 
   f_subst * (EcIdent.t * EcTypes.ty) list
 
 val f_bind_local : f_subst -> EcIdent.t -> form -> f_subst
 val f_bind_mem   : f_subst -> EcIdent.t -> EcIdent.t -> f_subst
 val f_bind_mod   : f_subst -> EcIdent.t -> EcPath.mpath -> f_subst
-   
-val f_subst : f_subst -> form -> form 
+
+val gty_subst : f_subst -> gty -> gty
+val f_subst   : f_subst -> form -> form 
 
 val f_subst_local : EcIdent.t -> form -> form -> form 
 val f_subst_mem   : EcIdent.t -> EcIdent.t -> form -> form 
 module Fsubst :
   sig
-    val mapty : (EcTypes.ty -> EcTypes.ty) -> form -> form
     val uni : EcTypes.ty EcUidgen.Muid.t -> form -> form
-    val init_subst_tvar : EcTypes.ty EcIdent.Mid.t -> f_subst
     val subst_tvar : EcTypes.ty EcIdent.Mid.t -> form -> form
-
   end
 
+(* return true is the formula does not contain type variable unification *)
+val f_check_uni : form -> bool
 
 val form_of_expr : EcMemory.memory -> EcTypes.expr -> form
 

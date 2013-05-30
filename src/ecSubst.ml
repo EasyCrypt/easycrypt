@@ -52,16 +52,19 @@ type _subst = {
   s_s   : subst;
   s_p   : (EcPath.path -> EcPath.path);
   s_fmp : (EcPath.mpath -> EcPath.mpath);
+  s_sty : ty_subst;
   s_ty  : (ty -> ty);
 }
 
 let _subst_of_subst s = 
   let sp = EcPath.p_subst s.sb_path in
   let sm = EcPath.Hm.memo 107 (EcPath.m_subst sp s.sb_modules) in
-  let st = EcTypes.ty_subst { ty_subst_id with ts_p = sp; ts_mp = sm } in
+  let sty = { ty_subst_id with ts_p = sp; ts_mp = sm } in
+  let st = EcTypes.ty_subst sty in
   { s_s   = s;
     s_p   = sp;
     s_fmp = sm;
+    s_sty = sty;
     s_ty  = st; }
 
 let e_subst_of_subst (s:_subst) = 
@@ -73,12 +76,7 @@ let e_subst_of_subst (s:_subst) =
     es_loc     = Mid.empty; }
 
 let f_subst_of_subst (s:_subst) = 
-  { fs_freshen = true;
-    fs_p       = s.s_p;
-    fs_ty      = s.s_ty;
-    fs_mp      = s.s_s.sb_modules;
-    fs_loc     = Mid.empty;
-    fs_mem     = Mid.empty; }
+  f_subst_init true s.s_s.sb_modules s.s_sty
 
 (* -------------------------------------------------------------------- *)
 let subst_variable (s : _subst) (x : variable) =
@@ -149,7 +147,7 @@ and subst_modsig ?params (s : _subst) (comps : module_sig) =
 
   let comps =
     { mis_params = newparams;
-      mis_body   = subst_modsig_body s comps.mis_body; }
+      mis_body   = subst_modsig_body sbody comps.mis_body; }
   in
     (sbody, comps)
 
@@ -247,7 +245,7 @@ let init_tparams (s : _subst) params params' =
         ts_p  = s.s_p;
         ts_mp = s.s_fmp;
         ts_v  = styv; } in
-    { s with s_ty = EcTypes.ty_subst sty } 
+    { s with s_sty = sty; s_ty = EcTypes.ty_subst sty } 
 
 let subst_tydecl (s : _subst) (tyd : tydecl) =
   let params' = List.map EcIdent.fresh tyd.tyd_params in

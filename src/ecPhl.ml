@@ -758,11 +758,11 @@ let equivF_abs_upto env fl fr bad invP invQ =
   let sg = List.map2 ospec oil.oi_calls oir.oi_calls in
   let sg = List.flatten sg in
   let lossless_a = 
-    let _sig = (EcEnv.Mod.by_mpath topl env).me_sig in
+    let sig_ = (EcEnv.Mod.by_mpath topl env).me_sig in
     let bd = 
-      List.map (fun (id,mt) -> (id,GTmodty(mt,EcPath.Sm.empty))) 
-        _sig.mis_params in               (* Should we put restriction here *)
-    let args = List.map (fun (id,_) -> EcPath.mident id) _sig.mis_params in
+      List.map (fun (id,mt) -> id,GTmodty(mt,EcPath.Sm.empty))
+        sig_.mis_params in               (* Should we put restriction here *)
+    let args = List.map (fun (id,_) -> EcPath.mident id) sig_.mis_params in
     let sub = fl.EcPath.x_sub in
     let concl = 
       f_losslessF (EcPath.xpath (EcPath.m_apply topl args) sub ) in
@@ -770,7 +770,7 @@ let equivF_abs_upto env fl fr bad invP invQ =
       let name = EcPath.basename sub in
       let Tys_function(_,oi) = 
         List.find (fun (Tys_function(fs,_)) -> fs.fs_name = name)
-          _sig.mis_body in
+          sig_.mis_body in
       oi.oi_calls in
     let hyps = List.map f_losslessF calls in
     f_forall bd (f_imps hyps concl) in
@@ -1358,12 +1358,12 @@ let t_equiv_deno env pre post g =
   let sargs = 
     List.fold_left2 (fun s v a -> PVM.add env (pv_loc fl v.v_name) mleft a s)
       sargs funl.f_sig.fs_params argsl in
-  let smem = { f_subst_id with 
-    fs_mem = Mid.add mleft ml (Mid.singleton mright mr) } in
+  let smem = 
+    f_bind_mem (f_bind_mem f_subst_id mright mr) mleft ml in
   let concl_pr  = f_subst smem (PVM.subst env sargs pre) in
   (* building the substitution for the post *)
-  let smeml = { f_subst_id with fs_mem = Mid.singleton mhr mleft } in
-  let smemr = { f_subst_id with fs_mem = Mid.singleton mhr mright } in
+  let smeml = f_bind_mem f_subst_id mhr mleft in 
+  let smemr = f_bind_mem f_subst_id mhr mright in
   let evl   = f_subst smeml evl and evr = f_subst smemr evr in
   let cmp   = if cmp then f_iff else f_imp in 
   let mel = EcEnv.Fun.actmem_post mleft fl funl in
@@ -1418,9 +1418,10 @@ let t_equiv_rcond side b at_pos g =
   let hd,e,s = gen_rcond b EcFol.mhr at_pos s in 
   let mo' = EcIdent.create "&m" in
   let s1 = 
-    Mid.add (EcMemory.memory mo) mo' 
-      (Mid.add (EcMemory.memory m) EcFol.mhr Mid.empty) in
-  let pre1  = f_subst {f_subst_id with fs_mem = s1} es.es_pr in
+    f_bind_mem 
+      (f_bind_mem f_subst_id (EcMemory.memory m) EcFol.mhr)
+      (EcMemory.memory mo) mo' in
+  let pre1  = f_subst s1 es.es_pr in
   let concl1 = 
     gen_mems [mo', EcMemory.memtype mo] 
       (f_hoareS (EcFol.mhr,EcMemory.memtype m) pre1 hd e) in

@@ -1331,7 +1331,7 @@ module Mod = struct
                 assert ((params = []) || spi = 0);
                 ((if args = [] then [] else o.me_sig.mis_params), true)
           in
-            unsuspend (i, args) (spi, params) o
+          unsuspend (i, args) (spi, params) o
 
   let by_mpath_opt (p : EcPath.mpath) (env : env) =
     try_lf (fun () -> by_mpath p env)
@@ -1389,7 +1389,6 @@ module Mod = struct
         EcSubst.subst_modsig
           ~params:(List.map fst modty.mt_params) EcSubst.empty modsig
     in
-
     let me    = module_expr_of_module_sig name modty modsig restr in
     let path  = IPIdent (name, None) in
     let comps = MC.mc_of_module_param name me in
@@ -1747,15 +1746,13 @@ module Op = struct
 
   let reduce env p tys =
     let op = try by_path p env with _ -> assert false in
-    let s = 
-      EcFol.Fsubst.init_subst_tvar (EcTypes.Tvar.init op.op_tparams tys) in
     let f = 
       match op.op_kind with
       | OB_oper(Some e) -> EcFol.form_of_expr EcFol.mhr e
       | OB_pred(Some idsf) -> idsf
       | _ -> raise NotReducible
     in
-      EcFol.f_subst { s with EcFol.fs_freshen = true } f
+    EcFol.Fsubst.subst_tvar (EcTypes.Tvar.init op.op_tparams tys) f
 end
 
 (* -------------------------------------------------------------------- *)

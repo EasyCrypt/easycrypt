@@ -280,9 +280,9 @@ module Pred = struct
         let xs = List.map (fun (x,ty) -> x, EcFol.GTty ty) xs in
         let lam = EcFol.f_lambda xs body in
         dom, Some lam in
-    let uni     = Tuni.subst (EcUnify.UniEnv.close ue) in
-    let body    = omap body (EcFol.Fsubst.mapty uni) in
-    let dom     = List.map uni dom in
+    let uni     = EcUnify.UniEnv.close ue in
+    let body    = omap body (EcFol.Fsubst.uni uni) in
+    let dom     = List.map (Tuni.subst uni) dom in
     let tparams = EcUnify.UniEnv.tparams ue in
     let tyop    = EcDecl.mk_pred tparams dom body in
 
@@ -653,7 +653,7 @@ module Tactic = struct
     match a.pl_desc, oty with
     | EA_form pf, Some (GTty ty) ->
       let ff = TT.transform env ue pf ty in
-      AAform (EcFol.Fsubst.mapty (Tuni.subst (EcUnify.UniEnv.close ue)) ff)
+      AAform (EcFol.Fsubst.uni (EcUnify.UniEnv.close ue) ff)
     | _, Some (GTty _) ->
       error a.pl_loc FormulaExpected
     | EA_mem mem, Some (GTmem _) ->
@@ -674,7 +674,7 @@ module Tactic = struct
     let env = tyenv_of_hyps env hyps in
     let ue  = EcUnify.UniEnv.create (Some hyps.h_tvar) in
     let ff  = TT.transform_opt env ue pf oty in
-    EcFol.Fsubst.mapty (Tuni.subst (EcUnify.UniEnv.close ue)) ff
+    EcFol.Fsubst.uni (EcUnify.UniEnv.close ue) ff
 
   let process_form env hyps pf ty =
     process_form_opt env hyps pf (Some ty)
@@ -1163,7 +1163,7 @@ module Tactic = struct
       | None -> EcFol.f_true
       | Some q -> process_formula env' g q in
     let bad = 
-      let env =  EcEnv.Memory.push (EcFol.mhr,None) env in
+      let env =  EcEnv.Memory.push_active (EcFol.mhr,None) env in
       process_formula env g bad in
     t_equivF_abs_upto env bad p q g
       

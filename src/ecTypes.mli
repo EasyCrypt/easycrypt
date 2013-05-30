@@ -44,7 +44,8 @@ val toarrow    : ty list -> ty -> ty
 
 (* -------------------------------------------------------------------- *)
 val ty_dump  : ty -> EcDebug.dnode
-
+exception FoundUnivar
+val ty_check_uni : ty -> unit
 (* -------------------------------------------------------------------- *)
 type ty_subst = {
   ts_p  : EcPath.path -> EcPath.path;
@@ -53,7 +54,8 @@ type ty_subst = {
   ts_v  : ty Mid.t;
 }
 
-val ty_subst_id : ty_subst
+val ty_subst_id    : ty_subst
+val is_ty_subst_id : ty_subst -> bool
 
 val ty_subst : ty_subst -> ty -> ty
 
