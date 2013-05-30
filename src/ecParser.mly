@@ -1404,7 +1404,7 @@ tactic:
 | INLINE s=side? o=occurences? f=plist0(loc(fident), empty)
     { PPhl (Pinline (`ByName (s, (f, o)))) }
 
-| ALIAS s=side? o=CPOS
+| ALIAS s=side? o=codepos
     { PPhl (Palias (s, o, None)) }
 
 | ALIAS s=side? o=codepos WITH x=lident

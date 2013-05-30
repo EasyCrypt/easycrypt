@@ -18,6 +18,7 @@ type lvalue =
 
 val lv_equal : lvalue -> lvalue -> bool
 val symbol_of_lv : lvalue -> symbol
+val ty_of_lv : lvalue -> EcTypes.ty
 
 (* --------------------------------------------------------------------- *)
 type instr = private {

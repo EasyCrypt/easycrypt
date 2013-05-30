@@ -1053,6 +1053,9 @@ module Tactic = struct
 
     | `ByPattern _ -> failwith "not-implemented"
 
+  let process_alias env (side, cpos, id) g =
+    t_alias env side cpos id g
+
   let process_rnd side env tac_info g =
     let concl = get_concl g in
     match side, tac_info with 
@@ -1179,6 +1182,7 @@ module Tactic = struct
       | Pcall(side, (pre, post)) -> process_call env side pre post
       | Pswap info -> process_swap env info
       | Pinline info -> process_inline env info
+      | Palias info -> process_alias env info
       | Prnd (side,info) -> process_rnd side env info
       | Pconseq info -> process_conseq env info
       | Pequivdeno info -> process_equiv_deno env info

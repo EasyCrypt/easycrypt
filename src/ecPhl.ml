@@ -11,6 +11,44 @@ open EcLogic
 open EcModules
 
 (* -------------------------------------------------------------------- *)
+module CPos = struct
+  exception InvalidCPos
+
+  let rec fold ((i, sub) : codepos) f state s =
+    assert (i > 0);
+
+    let (s1, i, s2) =
+      try  List.split_n (i-1) s.s_node 
+      with Not_found -> raise InvalidCPos
+    in
+
+    let (state', si) =
+      match sub with
+      | None -> f state i
+      | Some (b, sub) -> begin
+          match i.i_node, b with
+          | Swhile (e, sw), 0 ->
+              let state', sw' = fold sub f state sw in
+                (state', [i_while (e, sw')])
+          | Sif (e, ifs1, ifs2), 0 ->
+              let state', ifs1' = fold sub f state ifs1 in
+                (state', [i_if (e, ifs1', ifs2)])
+          | Sif (e, ifs1, ifs2), 1 ->
+              let state', ifs2' = fold sub f state ifs2 in
+                (state', [i_if (e, ifs1, ifs2')])
+          | _ -> raise InvalidCPos
+      end
+    in
+      match si with
+      | [i'] when i == i' && state == state' -> (state, s)
+      | _ -> (state', stmt (s1 @ si @ s2))
+
+  let t_fold cpos f state s =
+    try  fold cpos f state s
+    with InvalidCPos -> tacuerror "invalid code position"
+end
+
+(* -------------------------------------------------------------------- *)
 (* -------------------------  Substitution  --------------------------- *)
 (* -------------------------------------------------------------------- *)
 
@@ -459,8 +497,6 @@ let subst_form_lv env m lv t f =
   let s = PVM.merge se PVM.empty in
   mk_let env ([lpe], s,f)
 
-  
-
 (* -------------------------------------------------------------------- *)
 (* ----------------------  Auxiliary functions  ----------------------- *)
 (* -------------------------------------------------------------------- *)
@@ -754,16 +790,7 @@ let t_equivF_abs_upto env bad invP invQ g =
   let tac g' = prove_goal_by sg (RN_hl_fun_upto(bad,invP,invQ)) g' in
   t_on_last (t_equivF_conseq env pre post g) tac
 
-
-  
-
-  
-  
-  
-
-
-(* -------------------------------------------------------------------- *)
-  
+(* -------------------------------------------------------------------- *)  
 let t_hoare_skip g =
   let concl = get_concl g in
   let hs = destr_hoareS concl in
@@ -791,7 +818,6 @@ let t_equiv_skip g =
   let concl = f_imp es.es_pr es.es_po in
   let concl = gen_mems [es.es_ml; es.es_mr] concl in
   prove_goal_by [concl] RN_hl_skip g
-
 
 let t_skip = t_hS_or_bhS_or_eS t_hoare_skip t_bdHoare_skip t_equiv_skip 
 
@@ -1129,9 +1155,7 @@ lossless c2
 
 *)
 
-
 (* --------------------------------------------------------------------- *)
-
 let t_hoare_case f g =
   let concl = get_concl g in
   let hs = destr_hoareS concl in
@@ -1157,7 +1181,6 @@ let t_he_case f g =
   t_hS_or_bhS_or_eS (t_hoare_case f) (t_bdHoare_case f) (t_equiv_case f) g 
 
 (* --------------------------------------------------------------------- *)
-
 let _inline_freshen me v =
   let rec for_idx idx =
     let x = Printf.sprintf "%s%d" v.v_name idx in
@@ -1240,10 +1263,9 @@ let _inline env hyps me sp s =
       let r,i,s = List.split_n toskip s in
       let me,si = inline_i me ip i in
       let me,s = inline_s me sp s in
-      me, List.rev_append r (si@ s) in
+      me, List.rev_append r (si @ s) in
   let me, s = inline_s me sp s.s_node in
   me, stmt s 
-
 
 let t_inline_hoare env sp g =
   let hyps,concl = get_goal g in
@@ -1267,7 +1289,53 @@ let t_inline_equiv env side sp g =
   prove_goal_by [concl] (RN_hl_inline (Some side, sp)) g
 
 (* -------------------------------------------------------------------- *)
+let alias_stmt id me i =
+  match i.i_node with
+  | Srnd (lv, e) ->
+      let id       = odfl "x" (omap id EcLocation.unloc) in
+      let ty       = ty_of_lv lv in
+      let id       = { v_name = id; v_type = ty; } in
+      let (me, id) = _inline_freshen me id in
+      let pv       = pv_loc (EcMemory.xpath me) id in
 
+        (me, [i_rnd (LvVar (pv, ty), e); i_asgn (lv, e_var pv ty)])
+
+  | _ ->
+      tacuerror "cannot create an alias for that kind of instruction"
+
+let t_alias_hoare _env cpos id g =
+  let _hyps, concl = get_goal g in
+  let hoare        = destr_hoareS concl in
+  let (me, stmt)   = CPos.t_fold cpos (alias_stmt id) hoare.hs_m hoare.hs_s in
+  let concl        = f_hoareS_r { hoare with hs_m = me; hs_s = stmt; } in
+
+    prove_goal_by [concl] (RN_hl_alias (None, cpos)) g
+
+let t_alias_equiv _env side cpos id g =
+  let _hyps, concl = get_goal g in
+  let equiv = destr_equivS concl in
+  let concl =
+    match side with
+    | true  ->
+        let (me, stmt) =
+          CPos.t_fold cpos (alias_stmt id) equiv.es_ml equiv.es_sl
+        in
+          f_equivS_r { equiv with es_ml = me; es_sl = stmt; }
+
+    | false ->
+        let (me, stmt) =
+          CPos.t_fold cpos (alias_stmt id) equiv.es_mr equiv.es_sr
+        in
+          f_equivS_r { equiv with es_mr = me; es_sr = stmt; }
+  in
+    prove_goal_by [concl] (RN_hl_alias (Some side, cpos)) g
+
+let t_alias env side cpos id g =
+  match side with
+  | None      -> t_alias_hoare env      cpos id g
+  | Some side -> t_alias_equiv env side cpos id g
+
+(* -------------------------------------------------------------------- *)
 let t_equiv_deno env pre post g =
   let concl = get_concl g in
   let cmp, f1, f2 =
@@ -1479,16 +1547,7 @@ let rec t_equiv_cond env side g =
                ])
         ] g
 
-
 (* -------------------------------------------------------------------- *)
-
-
-
-
-(* -------------------------------------------------------------------- *)
-
-
-
 let (===) = f_eq 
 let (==>) = f_imp
 let (&&&) = f_anda
@@ -1507,7 +1566,6 @@ let t_hoare_rnd env g =
   let post = f_forall_simpl [(x_id,GTty ty_distr)] post in
   let concl = f_hoareS_r {hs with hs_s=s; hs_po=post} in
   prove_goal_by [concl] RN_hl_hoare_rnd g
-
 
 let wp_equiv_disj_rnd side env g =
   let concl = get_concl g in
@@ -1531,9 +1589,6 @@ let wp_equiv_disj_rnd side env g =
     else  f_equivS_r {es with es_sr=s; es_po=post} 
   in
   prove_goal_by [concl] RN_hl_hoare_rnd g
-  
-
-
 
 let wp_equiv_rnd env (f,finv) g =
   let concl = get_concl g in
