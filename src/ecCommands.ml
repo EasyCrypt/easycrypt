@@ -6,8 +6,6 @@ open EcParsetree
 open EcTyping
 open EcOptions
 open EcLogic
-open EcPrinting
-open EcPrinting.Pp
 
 (* -------------------------------------------------------------------- *)
 exception TopError of EcLocation.t * exn
@@ -47,27 +45,29 @@ let () =
 let loader = EcLoader.create ()
 
 (* -------------------------------------------------------------------- *)
-let process_pr scope p = 
+let process_pr fmt scope p = 
   let env = EcScope.env scope in
+  let ppe = EcPrinting.PPEnv.ofenv env in
+
   match p with 
   | Pr_ty qs ->
       let (x, ty) = EcEnv.Ty.lookup qs.pl_desc env in
-      EcPrinting.pr_typedecl (EcPrinting.empty env) (x, ty)
+          EcPrinting.pp_typedecl ppe fmt (x, ty)
         
   | Pr_op qs | Pr_pr qs ->
       let (x, op) = EcEnv.Op.lookup qs.pl_desc env in
-      EcPrinting.pr_opdecl (EcPrinting.empty env) (x, op)
+        EcPrinting.pp_opdecl ppe fmt (x, op)
         
   | Pr_th qs ->
       let (p, th) = EcEnv.Theory.lookup qs.pl_desc env in
-      EcPrinting.pr_theory (EcPrinting.empty env) (p, th)
+        EcPrinting.pp_theory ppe fmt (p, th)
+
   | Pr_ax qs ->
       let (p, ax) = EcEnv.Ax.lookup qs.pl_desc env in
-      EcPrinting.pr_axiom (EcPrinting.empty env) (p, ax)
+        EcPrinting.pp_axiom ppe fmt (p, ax)
 
 let process_print scope p = 
-  let doc = process_pr scope p in
-    EcPrinting.pretty stdout (doc ^^ Pp.hardline)
+  process_pr Format.std_formatter scope p
 
 (* -------------------------------------------------------------------- *)
 let addidir (idir : string) =
@@ -285,60 +285,28 @@ let process (g : global located) =
     context := (idx+1, newscope, scope :: stack)
 
 (* -------------------------------------------------------------------- *)
-module IntCommand = struct
-  open EcScope
-  open EcBaseLogic
-  open EcLogic
-  open EcPrinting
+module S = EcScope
+module L = EcBaseLogic
 
-  let goalline = String.make 72 '-'
+let pp_current_goal stream =
+  let (_, scope, _) = !context in
 
-  let prgoal env (stream : out_channel) (n, (hyps, concl)) =
-    let pr_hyp t (id, k) = 
-      let dk = 
-        match k with
-        | LD_var (ty, _body) -> pr_type t ty (* FIXME body *)
-        | LD_mem _           -> tk_memory
-        | LD_modty (p,r)         -> pr_modtype t p r
-        | LD_hyp f           -> pr_form t f
-      in
+  match List.ohead (S.goal scope) with
+  | None -> ()
 
-      let dh = join [pr_ident t id; !^":"; dk] in
-        Printf.fprintf stream "%t\n%!"
-          (fun stream -> pretty stream dh);
-        PPE.add_local t id
-    in
-      begin
-        match n with
-        | 0 -> Printf.fprintf stream "Current goal\n%!"
-        | _ -> Printf.fprintf stream "Current goal (remaining: %d)\n%!" n
-      end;
-      Printf.fprintf stream "Type variables: %t\n%!"
-        (fun stream ->
-          let doc = 
-            List.map (pr_tvar (EcPrinting.empty env))
-              hyps.h_tvar in (* FIXME *)
-            pretty stream (seq ~sep:"," doc));
-      let _ =
-        List.fold_left pr_hyp (EcPrinting.empty env) (List.rev hyps.h_local) (* FIXME *)
-      in
-        Printf.fprintf stream "%s\n%!" goalline;
-        Printf.fprintf stream "%t\n%!"
-          (fun stream -> pretty stream (pr_form (EcPrinting.empty env) concl)) (* FIXME *)
+  | Some goal -> begin
+      let juc = goal.S.puc_jdg in
+      let ppe = EcPrinting.PPEnv.ofenv (S.env scope) in
+      try
+        let n = List.length (snd (L.find_all_goals juc)) in
+        let g = get_goal (L.get_first_goal juc) in
+          EcPrinting.pp_goal ppe stream (n, g)
+      with L.NotAnOpenGoal _ -> 
+        Format.fprintf stream "No more goals\n%!"
+  end
 
-  let prgoal_current (stream : out_channel) =
-    let (_, scope, _) = !context in
-
-      match List.ohead (EcScope.goal scope) with
-      | None -> ()
-
-      | Some goal -> begin
-          let juc = goal.puc_jdg in
-          try 
-            let n = List.length (snd (find_all_goals juc)) in
-            let g = get_goal (get_first_goal juc) in
-              prgoal (EcScope.env scope) stream (n, g)
-          with EcBaseLogic.NotAnOpenGoal _ -> 
-            Printf.fprintf stream "No more goals\n%!"
-      end
-end
+let pp_maybe_current_goal stream =
+  let (_, scope, _) = !context in
+    match EcScope.verbose scope with
+    | true  -> pp_current_goal stream
+    | false -> ()

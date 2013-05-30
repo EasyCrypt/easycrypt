@@ -81,3 +81,23 @@ let rec string_of_qsymbol = function
 
 let rec pp_qsymbol fmt qn =
   Format.fprintf fmt "%s" (string_of_qsymbol qn)
+
+let rec string_of_msymbol ?(top = true) (mx : msymbol) =
+  match mx with
+  | [] ->
+      ""
+
+  | [(x, [])] ->
+      x
+
+  | [(x, a)] ->
+      Printf.sprintf "%s(%s)" x (string_of_msymbol ~top:false a)
+
+  | nm :: x ->
+      Printf.sprintf "%s%s%s"
+        (string_of_msymbol ~top [nm])
+        (if top then "." else ", ")
+        (string_of_msymbol ~top:true x)
+
+let pp_msymbol fmt x =
+  Format.fprintf fmt "%s" (string_of_msymbol x)
