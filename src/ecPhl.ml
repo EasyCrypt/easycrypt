@@ -513,45 +513,77 @@ let gen_mems m f =
 module CPos = struct
   exception InvalidCPos
 
-  let rec fold ((i, sub) : codepos) f state s =
-    assert (i > 0);
+  module P = EcPath
 
+  type ipath =
+  | ZTop
+  | ZWhile  of expr * spath
+  | ZIfThen of expr * spath * stmt
+  | ZIfElse of expr * stmt  * spath
+
+  and spath = (instr list * instr list) * ipath
+
+  type zipper = {
+    z_head : instr list;                (* instructions on my left (rev)       *)
+    z_tail : instr list;                (* instructions on my right (me incl.) *)
+    z_path : ipath ;                    (* path (zipper) leading to me         *)
+  }
+
+  let zipper hd tl zpr = { z_head = hd; z_tail = tl; z_path = zpr; }
+    
+  let rec zipper_of_cpos ((i, sub) : codepos) zpr s =
     let (s1, i, s2) =
       try  List.split_n (i-1) s.s_node 
       with Not_found -> raise InvalidCPos
     in
 
-    let (state', si) =
-      match sub with
-      | None -> f state i
-      | Some (b, sub) -> begin
-          match i.i_node, b with
-          | Swhile (e, sw), 0 ->
-              let state', sw' = fold sub f state sw in
-                (state', [i_while (e, sw')])
-          | Sif (e, ifs1, ifs2), 0 ->
-              let state', ifs1' = fold sub f state ifs1 in
-                (state', [i_if (e, ifs1', ifs2)])
-          | Sif (e, ifs1, ifs2), 1 ->
-              let state', ifs2' = fold sub f state ifs2 in
-                (state', [i_if (e, ifs1, ifs2')])
-          | _ -> raise InvalidCPos
-      end
-    in
-      match si with
-      | [i'] when i == i' && state == state' -> (state, s)
-      | _ -> (state', stmt (s1 @ si @ s2))
+    match sub with
+    | None -> zipper s1 (i::s2) zpr
+    | Some (b, sub) -> begin
+      match i.i_node, b with
+      | Swhile (e, sw), 0 ->
+          zipper_of_cpos sub (ZWhile (e, ((s1, s2), zpr))) sw
+      | Sif (e, ifs1, ifs2), 0 ->
+          zipper_of_cpos sub (ZIfThen (e, ((s1, s2), zpr), ifs2)) ifs1
+      | Sif (e, ifs1, ifs2), 1 ->
+          zipper_of_cpos sub (ZIfElse (e, ifs1, ((s1, s2), zpr))) ifs2
+      | _ -> raise InvalidCPos
+    end
 
-  let t_fold cpos f state s =
+  let zipper_of_cpos cpos s = zipper_of_cpos cpos ZTop s
+
+  let rec zip i ((hd, tl), ip) =
+    let s = stmt (List.rev_append hd (List.ocons i tl)) in
+
+    match ip with
+    | ZTop -> s
+    | ZWhile  (e, sp)     -> zip (Some (i_while (e, s))) sp
+    | ZIfThen (e, sp, se) -> zip (Some (i_if (e, s, se))) sp
+    | ZIfElse (e, se, sp) -> zip (Some (i_if (e, se, s))) sp
+
+  let zip zpr = zip None ((zpr.z_head, zpr.z_tail), zpr.z_path)
+
+  let rec fold cpos f state s =
+    let zpr = zipper_of_cpos cpos s in
+
+      match zpr.z_tail with
+      | []      -> raise InvalidCPos
+      | i :: tl -> begin
+          match f state i with
+          | (state', [i']) when i == i' && state == state' -> (state, s)
+          | (state', si  ) -> (state', zip { zpr with z_tail = si @ tl })
+      end
+
+  let t_fold f cpos (state, s) =
     try  fold cpos f state s
     with InvalidCPos -> tacuerror "invalid code position"
 
-  let t_code_transform env side cpos tr tx g =
+  let t_code_transform _env side cpos tr tx g =
     match side with
     | None ->
         let _, concl   = get_goal g in
         let hoare      = destr_hoareS concl in
-        let (me, stmt) = t_fold cpos tx hoare.hs_m hoare.hs_s in
+        let (me, stmt) = tx cpos (hoare.hs_m, hoare.hs_s) in
         let concl      = f_hoareS_r { hoare with hs_m = me; hs_s = stmt; } in
           prove_goal_by [concl] (tr None) g
   
@@ -559,7 +591,7 @@ module CPos = struct
         let _, concl = get_goal g in
         let es       = destr_equivS concl in
         let me, stmt = if side then (es.es_ml, es.es_sl) else (es.es_mr, es.es_sr) in
-        let me, stmt = t_fold cpos tx me stmt in
+        let me, stmt = tx cpos (me, stmt) in
         let concl    =
           match side with
           | true  -> f_equivS_r { es with es_ml = me; es_sl = stmt; }
@@ -1324,8 +1356,8 @@ let alias_stmt id me i =
       tacuerror "cannot create an alias for that kind of instruction"
 
 let t_alias env side cpos id g =
-  let tr = fun side -> RN_hl_alias (None, cpos) in
-    CPos.t_code_transform env side cpos tr (alias_stmt id) g
+  let tr = fun side -> RN_hl_alias (side, cpos) in
+    CPos.t_code_transform env side cpos tr (CPos.t_fold (alias_stmt id)) g
 
 (* -------------------------------------------------------------------- *)
 let t_equiv_deno env pre post g =
