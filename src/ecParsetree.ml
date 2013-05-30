@@ -325,6 +325,7 @@ and phl_tactics =
   | Papp        of (bool * int doption * pformula * pformula option)
   | Pwp         of int doption option 
   | Pwhile      of pformula
+  | Pfission    of (tac_side * codepos * (int * (int * int)))
   | Pcall       of tac_side * (pformula * pformula)
   | Prcond      of (bool option * bool * int)
   | Pcond       of tac_side

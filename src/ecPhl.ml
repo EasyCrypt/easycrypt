@@ -247,7 +247,9 @@ let lp_write env w lp =
   | LvTuple pvs -> List.fold_left add w pvs 
   | LvMap ((_p,_tys),pv,_,ty) -> add w (pv,ty) 
 
-let rec s_write env w s = List.fold_left (i_write env) w s.s_node 
+let rec is_write env w s = List.fold_left (i_write env) w s
+
+and s_write env w s = is_write env w s.s_node
 
 and i_write env w i = 
   match i.i_node with
@@ -285,7 +287,9 @@ let lp_read env r lp =
   | LvTuple _ -> r
   | LvMap ((_,_),pv,e,ty) -> e_read env (PV.add env pv ty r) e
 
-let rec s_read env w s = List.fold_left (i_read env) w s.s_node 
+let rec is_read env w s = List.fold_left (i_read env) w s
+
+and s_read env w s = is_read env w s.s_node
 
 and i_read env r i = 
   match i.i_node with
@@ -563,27 +567,31 @@ module CPos = struct
 
   let zip zpr = zip None ((zpr.z_head, zpr.z_tail), zpr.z_path)
 
-  let rec fold cpos f state s =
+  let rec fold env cpos f state s =
     let zpr = zipper_of_cpos cpos s in
 
       match zpr.z_tail with
       | []      -> raise InvalidCPos
       | i :: tl -> begin
-          match f state i with
+          match f env state i with
           | (state', [i']) when i == i' && state == state' -> (state, s)
           | (state', si  ) -> (state', zip { zpr with z_tail = si @ tl })
       end
 
-  let t_fold f cpos (state, s) =
-    try  fold cpos f state s
+  let t_fold f env cpos (state, s) =
+    try  fold env cpos f state s
     with InvalidCPos -> tacuerror "invalid code position"
 
-  let t_code_transform _env side cpos tr tx g =
+  let t_zip f env cpos (state, s) =
+    try  snd_map zip (f env state (zipper_of_cpos cpos s))
+    with InvalidCPos -> tacuerror "invalid code position"
+
+  let t_code_transform env side cpos tr tx g =
     match side with
     | None ->
         let _, concl   = get_goal g in
         let hoare      = destr_hoareS concl in
-        let (me, stmt) = tx cpos (hoare.hs_m, hoare.hs_s) in
+        let (me, stmt) = tx env cpos (hoare.hs_m, hoare.hs_s) in
         let concl      = f_hoareS_r { hoare with hs_m = me; hs_s = stmt; } in
           prove_goal_by [concl] (tr None) g
   
@@ -591,7 +599,7 @@ module CPos = struct
         let _, concl = get_goal g in
         let es       = destr_equivS concl in
         let me, stmt = if side then (es.es_ml, es.es_sl) else (es.es_mr, es.es_sr) in
-        let me, stmt = tx cpos (me, stmt) in
+        let me, stmt = tx env cpos (me, stmt) in
         let concl    =
           match side with
           | true  -> f_equivS_r { es with es_ml = me; es_sl = stmt; }
@@ -1341,7 +1349,7 @@ let t_inline_equiv env side sp g =
   prove_goal_by [concl] (RN_hl_inline (Some side, sp)) g
 
 (* -------------------------------------------------------------------- *)
-let alias_stmt id me i =
+let alias_stmt id _env me i =
   match i.i_node with
   | Srnd (lv, e) ->
       let id       = odfl "x" (omap id EcLocation.unloc) in
@@ -1358,6 +1366,69 @@ let alias_stmt id me i =
 let t_alias env side cpos id g =
   let tr = fun side -> RN_hl_alias (side, cpos) in
     CPos.t_code_transform env side cpos tr (CPos.t_fold (alias_stmt id)) g
+
+(* -------------------------------------------------------------------- *)
+let check_fission_independence env b init c1 c2 c3 =
+  let check_disjoint s1 s2 = 
+    if not (PV.M.set_disjoint s1 s2) then
+      tacuerror "in loop-fission, independence check failed"
+  in
+
+  let fv_b    = (e_read   env PV.empty b   ).PV.pv in
+  let rd_init = (is_read  env PV.empty init).PV.pv in
+  let wr_init = (is_write env PV.empty init).PV.pv in
+  let rd_c1   = (is_read  env PV.empty c1  ).PV.pv in
+  let rd_c2   = (is_read  env PV.empty c2  ).PV.pv in
+  let rd_c3   = (is_read  env PV.empty c3  ).PV.pv in
+  let wr_c1   = (is_write env PV.empty c1  ).PV.pv in
+  let wr_c2   = (is_write env PV.empty c2  ).PV.pv in
+  let wr_c3   = (is_write env PV.empty c3  ).PV.pv in
+
+  check_disjoint rd_c1 wr_c2;
+  check_disjoint rd_c2 wr_c1;
+  List.iter (check_disjoint fv_b) [wr_c1; wr_c2];
+  check_disjoint fv_b (PV.M.set_diff wr_c3 wr_init);
+   List.iter (check_disjoint rd_init) [wr_init; wr_c1; wr_c3];
+  List.iter (check_disjoint rd_c3) [wr_c1; wr_c2]
+
+let fission_stmt (il, (d1, d2)) env me zpr =
+  if d2 < d1 then
+    tacuerror "%s, %s"
+      "in loop-fission"
+      "second break offset must not be lower than the first one";
+  
+  let (hd, init, b, sw, tl) =
+    match zpr.CPos.z_tail with
+    | { i_node = Swhile (b, sw) } :: tl -> begin
+        if List.length zpr.CPos.z_head < il then
+          tacuerror "while-loop is not headed by long enough intructions";
+      let (init, hd) = List.take_n il zpr.CPos.z_head in
+        (hd, init, b, sw, tl)
+      end
+    | _ -> tacuerror "code position does not lead to a while-loop"
+  in
+
+  if d2 > List.length sw.s_node then
+    tacuerror "in loop fission, invalid offsets range";
+
+  let (s1, s2, s3) =
+    let (s1, s2) = List.take_n (d1   ) sw.s_node in
+    let (s2, s3) = List.take_n (d2-d1) s2 in
+      (s1, s2, s3)
+  in
+
+  check_fission_independence env b init s1 s2 s3;
+
+  let wl1 = i_while (b, stmt (s1 @ s3)) in
+  let wl2 = i_while (b, stmt (s2 @ s3)) in
+  let fis =   (List.rev_append init [wl1])
+            @ (List.rev_append init [wl2]) in
+
+    (me, { zpr with CPos.z_head = hd; CPos.z_tail = fis @ tl })
+
+let t_fission env side cpos infos g =
+  let tr = fun side -> RN_hl_fission (side, cpos, infos) in
+    CPos.t_code_transform env side cpos tr (CPos.t_zip (fission_stmt infos)) g
 
 (* -------------------------------------------------------------------- *)
 let t_equiv_deno env pre post g =

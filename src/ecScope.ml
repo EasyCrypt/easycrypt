@@ -866,6 +866,9 @@ module Tactic = struct
       t_equiv_while env (process_prhl_formula env g phi) g
     else cannot_apply "while" "the conclusion is not a hoare or a equiv"
 
+  let process_fission env (side, cpos, infos) g =
+    t_fission env side cpos infos g
+
   let process_call env side pre post g =
     let hyps,concl = get_goal g in
     match concl.f_node, side with
@@ -1179,6 +1182,7 @@ module Tactic = struct
       | Prcond (side,b,i) -> t_rcond side b i
       | Pcond side   -> process_cond env side
       | Pwhile phi -> process_while env phi
+      | Pfission info -> process_fission env info
       | Pcall(side, (pre, post)) -> process_call env side pre post
       | Pswap info -> process_swap env info
       | Pinline info -> process_inline env info

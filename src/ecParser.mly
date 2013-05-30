@@ -168,6 +168,8 @@
 %token EXIST
 %token EXPORT
 %token FINAL
+%token FISSION
+%token FUSION
 %token FORALL
 %token FWDS
 %token FROM_INT
@@ -1409,6 +1411,12 @@ tactic:
 
 | ALIAS s=side? o=codepos WITH x=lident
     { PPhl (Palias (s, o, Some x)) }
+
+| FISSION s=side? o=codepos AT d1=NUM COMMA d2=NUM
+    { PPhl (Pfission (s, o, (1, (d1, d2)))) }
+
+| FISSION s=side? o=codepos NOT i=NUM AT d1=NUM COMMA d2=NUM
+    { PPhl (Pfission (s, o, (i, (d1, d2)))) }
 
 | p=tselect INLINE
     { PPhl (Pinline (`ByPattern p)) }
