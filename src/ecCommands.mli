@@ -5,7 +5,7 @@ open EcLocation
 (* -------------------------------------------------------------------- *)
 exception TopError of EcLocation.t * exn
 
-val toperror_of_exn : exn -> exn
+val toperror_of_exn : ?gloc:EcLocation.t -> exn -> exn
 
 (* -------------------------------------------------------------------- *)
 val addidir : string -> unit

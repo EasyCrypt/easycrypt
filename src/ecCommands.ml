@@ -10,21 +10,29 @@ open EcLogic
 (* -------------------------------------------------------------------- *)
 exception TopError of EcLocation.t * exn
 
-let rec toperror_of_exn exn =
+let rec toperror_of_exn ?gloc exn =
   match exn with
-  | TopError (loc, e)    -> Some (loc, e)
   | TyError  (loc, _, _) -> Some (loc, exn)
-  | TacError _           -> Some (_dummy, exn)
+  | TacError _           -> Some (odfl _dummy gloc, exn)
   | ParseError (loc, _)  -> Some (loc, exn)
   | LocError (loc, e)    -> begin
-      match toperror_of_exn e with
+      let gloc =
+        if loc == EcLocation._dummy then gloc else Some loc
+      in
+      match toperror_of_exn ?gloc e with
       | None -> Some (loc, e)
       | Some (loc, e) -> Some (loc, e)
     end
+  | TopError (loc, e) ->
+      let gloc = 
+        if loc == EcLocation._dummy then gloc else Some loc
+      in
+        Some (odfl _dummy gloc, e)
+
   | _ -> None
 
-let toperror_of_exn exn =
-  match toperror_of_exn exn with
+let toperror_of_exn ?gloc exn =
+  match toperror_of_exn ?gloc exn with
   | Some (loc, exn) -> TopError (loc, exn)
   | None            -> exn
 
