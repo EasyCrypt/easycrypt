@@ -1150,7 +1150,7 @@ module Tactic = struct
       | None -> EcFol.f_true
       | Some q -> process_formula env' g q in
     let bad = 
-      let env =  EcEnv.Memory.push (EcFol.mhr,None) env in
+      let env =  EcEnv.Memory.push_active (EcFol.mhr,None) env in
       process_formula env g bad in
     t_equivF_abs_upto env bad p q g
       
