@@ -28,6 +28,11 @@ module PPEnv = struct
   let enter ppe scope =
     { ppe with ppe_scope = Some scope; }
 
+  let enter_by_memid ppe id =
+    match EcEnv.Memory.byid id ppe.ppe_env with
+    | None   -> ppe
+    | Some m -> enter ppe (EcMemory.xpath m)
+
   let add_local x _ = x
 
   let p_shorten cond p =
@@ -657,7 +662,8 @@ let rec pp_form_r (ppe : PPEnv.t) outer fmt f =
       pp_local ppe fmt id
       
   | Fpvar (x, i) ->
-      Format.fprintf fmt "%a{%a}" (pp_pv ppe) x (pp_local ppe) i
+      let ppe = PPEnv.enter_by_memid ppe i in
+        Format.fprintf fmt "%a{%a}" (pp_pv ppe) x (pp_local ppe) i
     
   | Fquant (q, bd, f) ->
       let (subppe, pp) = pp_bindings ppe bd in
@@ -670,8 +676,8 @@ let rec pp_form_r (ppe : PPEnv.t) outer fmt f =
   | Flet (lp, f1, f2) ->
       pp_let ppe pp_form_r outer fmt (lp, f1, f2)
       
-  | Fop (op, _tvi) ->
-      pp_opname ppe fmt op
+  | Fop (op, tvi) ->
+      pp_opapp ppe pp_form_r outer fmt (op, tvi, [])
       
   | Fapp ({f_node = Fop (p, tys)}, args) ->
       pp_opapp ppe pp_form_r outer fmt (p, tys, args)
@@ -1082,6 +1088,11 @@ let pp_hoareF (ppe : PPEnv.t) fmt hf =
 
 (* -------------------------------------------------------------------- *)
 let pp_hoareS (ppe : PPEnv.t) fmt hs =
+  let ppe =
+    { ppe with
+        PPEnv.ppe_env = EcEnv.Memory.push hs.hs_m ppe.PPEnv.ppe_env }
+  in
+
   let ppnode = collect2_s hs.hs_s.s_node [] in
   let ppnode =
     c_ppnode ~width:80
@@ -1106,6 +1117,14 @@ let pp_equivF (ppe : PPEnv.t) fmt ef =
 
 (* -------------------------------------------------------------------- *)
 let pp_equivS (ppe : PPEnv.t) fmt es =
+  let ppe =
+    List.fold_left
+      (fun ppe m ->
+         { ppe with
+             PPEnv.ppe_env = EcEnv.Memory.push m ppe.PPEnv.ppe_env })
+      ppe [es.es_ml; es.es_mr]
+  in
+
   let ppnode = collect2_s es.es_sl.s_node es.es_sr.s_node in
   let ppnode =
     c_ppnode ~width:40
