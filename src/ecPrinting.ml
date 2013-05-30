@@ -717,8 +717,8 @@ let rec pp_form_r (ppe : PPEnv.t) outer fmt f =
         (pp_form_r ppe (max_op_prec, `NonAssoc)) es.es_pr
         (pp_form_r ppe (max_op_prec, `NonAssoc)) es.es_po
 
-  | Fglob (mp, _) ->
-      Format.fprintf fmt "glob %s" (P.m_tostring mp)
+  | Fglob (mp, me) ->
+      Format.fprintf fmt "(glob %a){%a}" (pp_topmod ppe) mp (pp_local ppe) me
 
   | Fpr _ ->
       Format.fprintf fmt "Fpr[to-be-done]"
@@ -831,32 +831,32 @@ type ppnode1 = [
   | `EBlk
 ]
 
-type ppnode = ppnode1 * ppnode1 * ppnode list list
+type ppnode = ppnode1 * ppnode1 * [`P | `Q | `B] * ppnode list list
 
 type cppnode1 = string list
-type cppnode  = cppnode1 * cppnode1 * cppnode list list
+type cppnode  = cppnode1 * cppnode1 * char * cppnode list list
 
 let at n i =
   match i, n with
-  | Sasgn (lv, e)    , 0 -> Some (`Asgn (lv, e)    , [])
-  | Srnd  (lv, e)    , 0 -> Some (`Rnd  (lv, e)    , [])
-  | Scall (lv, f, es), 0 -> Some (`Call (lv, f, es), [])
-  | Sassert e        , 0 -> Some (`Assert e        , [])
+  | Sasgn (lv, e)    , 0 -> Some (`Asgn (lv, e)    , `P, [])
+  | Srnd  (lv, e)    , 0 -> Some (`Rnd  (lv, e)    , `P, [])
+  | Scall (lv, f, es), 0 -> Some (`Call (lv, f, es), `P, [])
+  | Sassert e        , 0 -> Some (`Assert e        , `P, [])
 
-  | Swhile (e, s), 0 -> Some (`While e, s.s_node)
-  | Swhile _     , 1 -> Some (`EBlk   , [])
+  | Swhile (e, s), 0 -> Some (`While e, `P, s.s_node)
+  | Swhile _     , 1 -> Some (`EBlk   , `B, [])
 
-  | Sif (e, s, _ ), 0 -> Some (`If e, s.s_node)
+  | Sif (e, s, _ ), 0 -> Some (`If e, `P, s.s_node)
   | Sif (_, _, s ), 1 -> begin
       match s.s_node with
-      | [] -> Some (`EBlk, [])
-      | _  -> Some (`Else, s.s_node)
+      | [] -> Some (`EBlk, `B, [])
+      | _  -> Some (`Else, `Q, s.s_node)
     end
 
   | Sif (_, _, s), 2 -> begin
       match s.s_node with
       | [] -> None
-      | _  -> Some (`EBlk, [])
+      | _  -> Some (`EBlk, `B, [])
     end
 
   | _, _ -> None
@@ -866,12 +866,18 @@ let rec collect2_i i1 i2 : ppnode list =
     match obind i1 (at n), obind i2 (at n) with
     | None, None -> []
 
-    | Some (p1, s1), None -> collect1_i `Left  p1 s1 :: doit (n+1)
-    | None, Some (p2, s2) -> collect1_i `Right p2 s2 :: doit (n+1)
+    | Some (p1, c1, s1), None -> collect1_i `Left  p1 s1 c1 :: doit (n+1)
+    | None, Some (p2, c2, s2) -> collect1_i `Right p2 s2 c2 :: doit (n+1)
 
-    | Some (p1, s1), Some (p2, s2) ->
+    | Some (p1, c1, s1), Some (p2, c2, s2) ->
         let sub_p = collect2_s s1 s2 in
-          (p1, p2, sub_p) :: doit (n+1)
+        let c =
+          match c1, c2 with
+          | `B,  c |  c, `B -> c
+          | `P, `P | `Q, `Q -> c1
+          | `P, `Q | `Q, `P -> `Q
+        in
+          (p1, p2, c, sub_p) :: doit (n+1)
   in
     doit 0
 
@@ -886,13 +892,13 @@ and collect2_s s1 s2 : ppnode list list =
          collect2_i (Some i1.i_node) (Some i2.i_node)
       :: collect2_s s1 s2
 
-and collect1_i side p s =
+and collect1_i side p s c =
   let (p1, p2), (s1, s2) =
     match side with
     | `Left  -> (p, `None), (s, [])
     | `Right -> (`None, p), ([], s)
   in
-    (p1, p2, collect2_s s1 s2)
+    (p1, p2, c, collect2_s s1 s2)
 
 (* -------------------------------------------------------------------- *)
 let c_split ?width pp x =
@@ -954,22 +960,23 @@ let c_ppnode1 ~width ppe (pp1 : ppnode1) =
   | `None     -> []
 
 let rec c_ppnode ~width (xl, xr) ppe (pps : ppnode list list) =
-  let do1 ((p1, p2, subs) : ppnode) : cppnode =
+  let do1 ((p1, p2, c, subs) : ppnode) : cppnode =
     let p1   = c_ppnode1 ~width (PPEnv.enter ppe xl) p1 in
     let p2   = c_ppnode1 ~width (PPEnv.enter ppe xr) p2 in
     let subs = c_ppnode  ~width (xl, xr) ppe subs in
-      (p1, p2, subs)
+    let c    = match c with `B -> ' ' | `P -> '.' | `Q -> '?' in
+      (p1, p2, c, subs)
   in
     List.map (List.map do1) pps
 
 (* -------------------------------------------------------------------- *)
 let rec get_ppnode_stats (pps : cppnode list list) : (int * int) * int list =
   (* Top-level instruction strings (left/right) *)
-  let ls = List.map (List.map (fun (l, _, _) -> l)) pps
-  and rs = List.map (List.map (fun (_, r, _) -> r)) pps in
+  let ls = List.map (List.map (fun (l, _, _, _) -> l)) pps
+  and rs = List.map (List.map (fun (_, r, _, _) -> r)) pps in
 
   (* Sub printing commands *)
-  let subs = List.map (List.map (fun (_, _, pps) -> pps)) pps in
+  let subs = List.map (List.map (fun (_, _, _, pps) -> pps)) pps in
   let subs = List.flatten subs in
 
   (* Sub stats *)
@@ -1014,17 +1021,23 @@ let pp_depth mode =
     | [], _::_ -> assert false
 
     | s1::s, [] ->
-        Format.fprintf fmt "%s" (String.make (s1+1) '-');
+        let sp = match s with [] -> "" | _ -> "-" in
+        Format.fprintf fmt "%s%s" (String.make s1 '-') sp;
         Format.fprintf fmt "%a" pp_depth (s, [])
 
     | s1::s, d1::d -> begin
+        let (d1, c1) = ((snd d1) + 1, fst d1) in
+
         match mode with
-        | `Plain  -> Format.fprintf fmt "%*d." s1 d1
-        | `Blank  -> begin
+        | `Plain -> begin
+          let sp = match s with [] -> "" | _ -> "-" in
             match d with
-            | [] -> Format.fprintf fmt "%*s." s1 ""
-            | _  -> Format.fprintf fmt "%*s " s1 ""
+            | [] -> Format.fprintf fmt "%*d%s" s1 d1 sp
+            | _  -> Format.fprintf fmt "%*d%c" s1 d1 c1
         end
+        | `Blank ->
+          let sp = match s with [] -> "" | _ -> " " in
+            Format.fprintf fmt "%*s%s" s1 "" sp
       end;
       Format.fprintf fmt "%a" pp_depth (s, d)
   in
@@ -1033,19 +1046,19 @@ let pp_depth mode =
 let pp_node_r side ((maxl, maxr), stats) =
   let rec pp_node_r idt depth fmt node =
     let fori offset (node1 : cppnode list) =
-      let do1 ((ls, rs, sub) : cppnode) =
+      let do1 ((ls, rs, pc, sub) : cppnode) =
         let forline mode l r =
           let l = odfl "" l and r = odfl "" r in
             match side with
             | `Both ->
                 Format.fprintf fmt "%-*s (%t) %-*s@\n%!"
                   maxl (Printf.sprintf "%*s%s" (2*idt) "" l)
-                  (pp_depth mode stats ((offset+1) :: depth))
+                  (pp_depth mode stats ((pc, offset) :: depth))
                   maxr (Printf.sprintf "%*s%s" (2*idt) "" r)
 
             | `Left ->
                 Format.fprintf fmt "(%t)  %-*s@\n%!"
-                  (pp_depth mode stats ((offset+1) :: depth))
+                  (pp_depth mode stats ((pc, offset) :: depth))
                   maxl (Printf.sprintf "%*s%s" (2*idt) "" l)
         in
   
@@ -1054,7 +1067,7 @@ let pp_node_r side ((maxl, maxr), stats) =
   
           forline `Plain l r;
           List.iter2o(forline `Blank) (odfl [] ls) (odfl [] rs);
-          pp_node_r (idt+1) ((offset+1) :: depth) fmt sub
+          pp_node_r (idt+1) ((pc, offset) :: depth) fmt sub
       in
         List.iter do1 node1
   

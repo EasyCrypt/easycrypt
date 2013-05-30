@@ -79,6 +79,7 @@
     "equiv_deno"  , EQUIVDENO  ;        (* KW: tactic *) 
     "conseq"      , CONSEQ     ;        (* KW: tactic *) 
     "inline"      , INLINE     ;        (* KW: tactic *)
+    "alias"       , ALIAS      ;        (* KW: tactic *)
 
     "axiom"       , AXIOM      ;        (* KW: global *)
     "lemma"       , LEMMA      ;        (* KW: global *)
@@ -120,6 +121,26 @@
     List.iter
       (fun (x, y) -> Hashtbl.add keywords x y)
       _keywords
+
+  exception InvalidCodePosition
+
+  let cposition_of_string =
+    let cpos1 x =
+      try  int_of_string x
+      with Failure "int_of_string" -> raise InvalidCodePosition
+    in
+
+    let rec doit = function
+      | Str.Text c :: []                  -> (cpos1 c, None)
+      | Str.Text c :: Str.Delim "." :: tl -> (cpos1 c, Some (0, doit tl))
+      | Str.Text c :: Str.Delim "?" :: tl -> (cpos1 c, Some (1, doit tl))
+      | _ -> raise InvalidCodePosition
+    in
+      fun s -> doit (Str.full_split (Str.regexp "[.?]") s)
+
+  let cposition_of_string s =
+    try  Some (cposition_of_string s)
+    with InvalidCodePosition -> None
 }
 
 let blank   = [' ' '\t' '\r']
@@ -188,6 +209,11 @@ rule main = parse
   | ":="    { CEQ }
   | "%r"    { FROM_INT }
   | "{0,1}" { RBOOL }
+
+  (* position *)
+  | (digit+ ['.' '?'])+ digit+ {
+      CPOS (oget (cposition_of_string (Lexing.lexeme lexbuf)))
+    } 
 
   (* punctuation *)
   | '_'  { UNDERSCORE }
