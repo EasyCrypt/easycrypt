@@ -996,7 +996,12 @@ let f_bind_mem s m1 m2 =
 
 let f_bind_mod s x mp = 
   let merger o = assert (o = None); Some mp in
-  { s with fs_mp = Mid.change merger x s.fs_mp }
+  let smp = Mid.change merger x s.fs_mp in
+  let s_ty = 
+    { ty_subst_id with 
+      ts_p = s.fs_p; 
+      ts_mp = EcPath.m_subst s.fs_p smp } in
+  { s with fs_ty = ty_subst s_ty; fs_mp = smp }
 
 let add_local s (x,t as xt) = 
   let x' = if s.fs_freshen then EcIdent.fresh x else x in
