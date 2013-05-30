@@ -130,6 +130,7 @@
 %token AT
 %token AUTO
 %token AXIOM
+%token BACKS
 %token BDHOARE
 %token BETA 
 %token CALL
@@ -164,6 +165,7 @@
 %token EXPORT
 %token FINAL
 %token FORALL
+%token FWDS
 %token FROM_INT
 %token FUN
 %token GENERALIZE 
@@ -1266,6 +1268,12 @@ conseq:
 | f1=form LONGARROW f2=form     { Some f1, Some f2 }
 ;
 
+
+tac_dir : 
+  | BACKS {true }
+  | FWDS  {false}
+  | empty {true}
+
 tactic:
 | IDTAC
     { Pidtac None }
@@ -1353,8 +1361,8 @@ tactic:
 | FUN bad=sform p=sform q=sform? 
     { PPhl(Pfun_upto(bad,p,q)) }
 
-| APP pos=code_position COLON p=sform
-   { PPhl (Papp (pos, p)) }
+| APP d=tac_dir pos=code_position COLON p=sform f=sform?
+   { PPhl (Papp (d,pos, p,f)) }
 
 | WP n=code_position?
    { PPhl (Pwp n) }

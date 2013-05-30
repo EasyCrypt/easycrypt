@@ -5,8 +5,8 @@ true : warn_Z, warn_Y, warn_+28
 
 
 # --------------------------------------------------------------------
-<src> or <pprint> : include
-<why3> : -traverse
+<src>    : include
+<why3>   : -traverse
 <_tools> : -traverse
 
 # --------------------------------------------------------------------

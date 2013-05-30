@@ -6,12 +6,6 @@ README
 config/_tags
 config/myocamlbuild.ml
 
-# pprint library
-pprint/*.ml
-pprint/*.mli
-pprint/README
-pprint/LICENSE
-
 # proofgeneral
 proofgeneral/Makefile
 proofgeneral/proof-site.patch

@@ -5,7 +5,7 @@ open EcLocation
 (* -------------------------------------------------------------------- *)
 exception TopError of EcLocation.t * exn
 
-val toperror_of_exn : exn -> exn
+val toperror_of_exn : ?gloc:EcLocation.t -> exn -> exn
 
 (* -------------------------------------------------------------------- *)
 val addidir : string -> unit
@@ -27,7 +27,5 @@ val undo : int -> unit
 val uuid : unit -> int
 
 (* -------------------------------------------------------------------- *)
-module IntCommand : sig
-  val prgoal : EcEnv.env -> out_channel -> int * (EcBaseLogic.hyps * EcFol.form) -> unit
-  val prgoal_current : out_channel -> unit
-end
+val pp_current_goal : Format.formatter -> unit
+val pp_maybe_current_goal : Format.formatter -> unit

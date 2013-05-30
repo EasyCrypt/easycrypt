@@ -64,7 +64,7 @@ object(self)
 
     match status with
     | `ST_Ok ->
-        EcCommands.IntCommand.prgoal_current stdout
+        EcCommands.pp_maybe_current_goal Format.std_formatter
 
     | `ST_Failure e ->
         let (loc, e) =
@@ -102,7 +102,7 @@ object
   method finish (status : status) =
     match status with
     | `ST_Ok ->
-        EcCommands.IntCommand.prgoal_current stdout
+        EcCommands.pp_maybe_current_goal Format.std_formatter
 
     | `ST_Failure e ->
         EcPException.exn_printer Format.err_formatter e

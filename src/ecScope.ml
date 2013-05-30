@@ -26,9 +26,9 @@ module type IOptions = sig
 
   type options
 
-  val init  : unit -> options
-  val get   : options -> option -> exn
-  val set   : options -> option -> exn -> options
+  val init         : unit -> options
+  val get          : options -> option -> exn
+  val set          : options -> option -> exn -> options
   val for_loading  : options -> options
   val for_subscope : options -> options
 end
@@ -156,7 +156,7 @@ type scope = {
   sc_loaded     : (EcEnv.ctheory_w3 * symbol list) Msym.t;
   sc_required   : symbol list;
   sc_pr_uc      : proof_uc list;
-  sc_options    : Options.options;
+  sc_options    : Options.options ref;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -168,7 +168,7 @@ let empty =
       sc_loaded     = Msym.empty;
       sc_required   = [];
       sc_pr_uc      = [];
-      sc_options    = Options.init ();
+      sc_options    = ref (Options.init ());
     }
 
 (* -------------------------------------------------------------------- *)
@@ -193,19 +193,20 @@ let goal (scope : scope) =
 
 (* -------------------------------------------------------------------- *)
 let verbose (scope : scope) =
-  match Notifier.verbose scope.sc_options with
+  match Notifier.verbose !(scope.sc_options) with
   | `ForLoading -> false
   | `Verbose b  -> b
 
 (* -------------------------------------------------------------------- *)
 let set_verbose (scope : scope) (b : bool) =
-  { scope with sc_options =  Notifier.set scope.sc_options b }
+  scope.sc_options := Notifier.set !(scope.sc_options) b;
+  scope
 
 (* -------------------------------------------------------------------- *)
 let for_loading (scope : scope) =
   { empty with
       sc_loaded  = scope.sc_loaded;
-      sc_options = Options.for_loading scope.sc_options; }
+      sc_options = ref (Options.for_loading !(scope.sc_options)); }
 
 (* -------------------------------------------------------------------- *)
 let subscope (scope : scope) (name : symbol) =
@@ -217,7 +218,7 @@ let subscope (scope : scope) (name : symbol) =
     sc_loaded     = scope.sc_loaded;
     sc_required   = scope.sc_required;
     sc_pr_uc      = [];
-    sc_options    = Options.for_subscope scope.sc_options;
+    sc_options    = ref (Options.for_subscope !(scope.sc_options));
   }
 
 (* -------------------------------------------------------------------- *)
@@ -483,7 +484,7 @@ module Prover = struct
     s
 
   let mk_prover_info scope max time ns =
-    let dft = Prover_info.get scope.sc_options in
+    let dft = Prover_info.get !(scope.sc_options) in
     let time = odfl dft.EcProvers.prover_timelimit time in
     let time = if time < 1 then 1 else time in
     let provers = odfl dft.EcProvers.prover_names ns in
@@ -496,7 +497,8 @@ module Prover = struct
 
   let set_prover_info scope max time ns =
     let pi = mk_prover_info scope max time ns in
-    { scope with sc_options = Prover_info.set scope.sc_options pi }
+      scope.sc_options := Prover_info.set !(scope.sc_options) pi;
+      scope
 
   let set_all scope =
     let provers = Array.of_list (EcProvers.known_provers ()) in
@@ -530,13 +532,12 @@ module Prover = struct
     mk_prover_info scope max time ns
 
   let full_check scope =
-    { scope with
-      sc_options = Check_mode.full_check scope.sc_options }
+    scope.sc_options := Check_mode.full_check !(scope.sc_options);
+    scope
 
   let check_proof scope b =
-    { scope with
-      sc_options = Check_mode.check_proof scope.sc_options b}
-
+    scope.sc_options := Check_mode.check_proof !(scope.sc_options) b;
+    scope
 end
 
 module Tactic = struct
@@ -839,14 +840,23 @@ module Tactic = struct
       let tacs = List.map totac ri in
       set_loc loc (t_lseq tacs) g
 
-  let process_app env k phi g =
-    match k with
-    | Single i ->
-      let phi = process_phl_formula env g phi in
-      t_hoare_app i phi g
-    | Double(i,j) ->
-      let phi = process_prhl_formula env g phi in
-      t_equiv_app (i,j) phi g
+  let process_app env dir k phi bd_opt g =
+    let concl = get_concl g in
+    match k, bd_opt with
+      | Single i, None when is_hoareS concl ->
+        let phi = process_phl_formula env g phi in
+        t_hoare_app i phi g
+      | Single i, _ when is_bdHoareS concl ->
+        let phi = process_phl_formula env g phi in
+        let bd_opt = omap bd_opt (process_phl_form treal env g) in
+        t_bdHoare_app dir i phi bd_opt g
+      | Double(i,j), None ->
+        let phi = process_prhl_formula env g phi in
+        t_equiv_app (i,j) phi g
+      | Single _, None ->
+        cannot_apply "app" "wrong position parameter"
+      | _, Some _ ->
+        cannot_apply "app" "optional bound parameter not supported"
 
   let process_while env phi g =
     let concl = get_concl g in
@@ -1161,7 +1171,7 @@ module Tactic = struct
       | Pfun_abs f -> process_fun_abs env f
       | Pfun_upto info -> process_fun_upto env info 
       | Pskip    -> EcPhl.t_skip
-      | Papp (k,phi) -> process_app env k phi
+      | Papp (dir,k,phi,f) -> process_app env dir k phi f
       | Pwp  k   -> t_wp env k
       | Prcond (side,b,i) -> t_rcond side b i
       | Pcond side   -> process_cond env side
@@ -1239,7 +1249,7 @@ module Tactic = struct
     EcBaseLogic.upd_done (fst (process_logic_tacs scope env tacs (juc,[n])))
 
   let process scope tac =
-    if Check_mode.check scope.sc_options then
+    if Check_mode.check !(scope.sc_options) then
       let loc = match tac with | [] -> assert false | t::_ -> t.pl_loc in
       match scope.sc_pr_uc with
       | [] -> error loc NoCurrentGoal
@@ -1275,7 +1285,7 @@ module Ax = struct
       sc_pr_uc = puc :: scope.sc_pr_uc }
 
   let save scope loc =
-    if Check_mode.check scope.sc_options then
+    if Check_mode.check !(scope.sc_options) then
       match scope.sc_pr_uc with
       | [] -> Tactic.error loc Tactic.NoCurrentGoal
       | { puc_name = name; puc_jdg = juc } :: pucs ->
@@ -1296,7 +1306,7 @@ module Ax = struct
     let concl =
       EcFol.Fsubst.uni (EcUnify.UniEnv.close ue) concl in
     let tparams = EcUnify.UniEnv.tparams ue in
-    let check = Check_mode.check scope.sc_options in
+    let check = Check_mode.check !(scope.sc_options) in
     let loc = ax.pa_name.pl_loc in
 
     match ax.pa_kind with

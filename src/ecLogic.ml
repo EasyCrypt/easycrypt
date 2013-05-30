@@ -42,7 +42,7 @@ type tac_error =
 exception TacError of tac_error
 
 let pp_tac_error fmt error =
-  let env = EcEnv.initial in            (* FIXME *)
+  let env = PE.PPEnv.ofenv EcEnv.initial in (* FIXME *)
   match error with
   | UnknownAx p ->
       Format.fprintf fmt "Unknown axiom/lemma %a" PE.pp_path p

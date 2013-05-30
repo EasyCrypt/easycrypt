@@ -522,8 +522,7 @@ module MC = struct
 
   let import up p obj env =
     let name = ibasename p in
-      { env with env_current =
-          up env.env_current name (p, obj) }
+      { env with env_current = up env.env_current name (p, obj) }
 
   (* -------------------------------------------------------------------- *)
   let lookup_var qnx env =
@@ -1914,7 +1913,9 @@ module Theory = struct
             MC.import_modty (xpath x) ty env
 
         | CTh_module m ->
-            MC.import_mod (IPPath (xpath m.me_name)) m env
+            let env = MC.import_mod (IPPath (xpath m.me_name)) m env in
+            let env = MC.import_mc (IPPath (xpath m.me_name)) env in
+              env
 
         | CTh_export p ->
             import env p (by_path p env)

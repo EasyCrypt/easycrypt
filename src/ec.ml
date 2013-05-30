@@ -66,19 +66,24 @@ let _ =
         match EcTerminal.next terminal with
         | EcParsetree.P_Prog (commands, locterm) ->
             terminate := locterm;
-            ignore (List.map EcCommands.process commands);
+            List.iter
+              (fun p ->
+                 let loc = p.EcLocation.pl_loc in
+                   try  EcCommands.process p
+                   with e -> begin
+                     if not (EcTerminal.interactive terminal) then
+                       Printf.fprintf stderr "%t\n%!" Printexc.print_backtrace;
+                   raise (EcCommands.toperror_of_exn ~gloc:loc e)
+                 end)
+              commands
 
         | EcParsetree.P_Undo i ->
-            ignore (EcCommands.undo i)
+            EcCommands.undo i
       end;
       EcTerminal.finish `ST_Ok terminal;
       if !terminate then exit 0
 
     with e -> begin
-      if not (EcTerminal.interactive terminal) then begin
-        Printexc.print_backtrace stderr;
-        Printf.fprintf stderr "\n%!";
-      end;
       EcTerminal.finish
         (`ST_Failure (EcCommands.toperror_of_exn e))
         terminal;

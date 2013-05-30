@@ -162,6 +162,8 @@ rule main = parse
   | tident       { TIDENT (Lexing.lexeme lexbuf) }
   | mident       { MIDENT (Lexing.lexeme lexbuf) }
   | number       { NUM (int_of_string (Lexing.lexeme lexbuf)) }
+  | "<<"         {BACKS}
+  | ">>"         {FWDS }
 
   | "(*" binop "*)" { main lexbuf }
   | '(' blank* (binop as s) blank* ')' { PBINOP s }
