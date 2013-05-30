@@ -1310,8 +1310,6 @@ module Mod = struct
     try_lf (fun () -> by_path p env)
 
   let by_mpath (p : mpath) (env : env) =
-    Printf.printf "%s\n%!" (EcPath.m_tostring p);
-
     let (ip, (i, args)) = ipath_of_mpath p in
 
       match MC.by_path (fun mc -> mc.mc_modules) ip env with
@@ -1334,7 +1332,7 @@ module Mod = struct
                 assert ((params = []) || spi = 0);
                 ((if args = [] then [] else o.me_sig.mis_params), true)
           in
-            unsuspend (i, args) (spi, params) o
+          unsuspend (i, args) (spi, params) o
 
   let by_mpath_opt (p : EcPath.mpath) (env : env) =
     try_lf (fun () -> by_mpath p env)
@@ -1392,7 +1390,6 @@ module Mod = struct
         EcSubst.subst_modsig
           ~params:(List.map fst modty.mt_params) EcSubst.empty modsig
     in
-
     let me    = module_expr_of_module_sig name modty modsig restr in
     let path  = IPIdent (name, None) in
     let comps = MC.mc_of_module_param name me in
