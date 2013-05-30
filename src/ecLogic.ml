@@ -412,6 +412,9 @@ let t_elim_hyp env h g =
   let f = LDecl.lookup_hyp_by_id h (get_hyps g) in
   t_on_first (t_elim env f g) (t_hyp env h)
 
+let t_field env (plus,times,inv,minus,z,o) g =
+	t_id None
+
 let t_split env g =
   let hyps, concl = get_goal g in
   let rec aux f =
