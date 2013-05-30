@@ -11,44 +11,6 @@ open EcLogic
 open EcModules
 
 (* -------------------------------------------------------------------- *)
-module CPos = struct
-  exception InvalidCPos
-
-  let rec fold ((i, sub) : codepos) f state s =
-    assert (i > 0);
-
-    let (s1, i, s2) =
-      try  List.split_n (i-1) s.s_node 
-      with Not_found -> raise InvalidCPos
-    in
-
-    let (state', si) =
-      match sub with
-      | None -> f state i
-      | Some (b, sub) -> begin
-          match i.i_node, b with
-          | Swhile (e, sw), 0 ->
-              let state', sw' = fold sub f state sw in
-                (state', [i_while (e, sw')])
-          | Sif (e, ifs1, ifs2), 0 ->
-              let state', ifs1' = fold sub f state ifs1 in
-                (state', [i_if (e, ifs1', ifs2)])
-          | Sif (e, ifs1, ifs2), 1 ->
-              let state', ifs2' = fold sub f state ifs2 in
-                (state', [i_if (e, ifs1, ifs2')])
-          | _ -> raise InvalidCPos
-      end
-    in
-      match si with
-      | [i'] when i == i' && state == state' -> (state, s)
-      | _ -> (state', stmt (s1 @ si @ s2))
-
-  let t_fold cpos f state s =
-    try  fold cpos f state s
-    with InvalidCPos -> tacuerror "invalid code position"
-end
-
-(* -------------------------------------------------------------------- *)
 (* -------------------------  Substitution  --------------------------- *)
 (* -------------------------------------------------------------------- *)
 
@@ -533,8 +495,6 @@ let t_hS_or_bhS_or_eS th tbh te g =
   else if is_equivS concl then te g
   else tacerror (NotPhl None)
 
-
-
 let prove_goal_by sub_gs rule (juc,n as g) =
   let hyps,_ = get_goal g in
   let add_sgoal (juc,ns) sg = 
@@ -547,6 +507,66 @@ let prove_goal_by sub_gs rule (juc,n as g) =
 let gen_mems m f = 
   let bds = List.map (fun (m,mt) -> (m,GTmem mt)) m in
   f_forall bds f
+
+
+(* -------------------------------------------------------------------- *)
+module CPos = struct
+  exception InvalidCPos
+
+  let rec fold ((i, sub) : codepos) f state s =
+    assert (i > 0);
+
+    let (s1, i, s2) =
+      try  List.split_n (i-1) s.s_node 
+      with Not_found -> raise InvalidCPos
+    in
+
+    let (state', si) =
+      match sub with
+      | None -> f state i
+      | Some (b, sub) -> begin
+          match i.i_node, b with
+          | Swhile (e, sw), 0 ->
+              let state', sw' = fold sub f state sw in
+                (state', [i_while (e, sw')])
+          | Sif (e, ifs1, ifs2), 0 ->
+              let state', ifs1' = fold sub f state ifs1 in
+                (state', [i_if (e, ifs1', ifs2)])
+          | Sif (e, ifs1, ifs2), 1 ->
+              let state', ifs2' = fold sub f state ifs2 in
+                (state', [i_if (e, ifs1, ifs2')])
+          | _ -> raise InvalidCPos
+      end
+    in
+      match si with
+      | [i'] when i == i' && state == state' -> (state, s)
+      | _ -> (state', stmt (s1 @ si @ s2))
+
+  let t_fold cpos f state s =
+    try  fold cpos f state s
+    with InvalidCPos -> tacuerror "invalid code position"
+
+  let t_code_transform env side cpos tr tx g =
+    match side with
+    | None ->
+        let _, concl   = get_goal g in
+        let hoare      = destr_hoareS concl in
+        let (me, stmt) = t_fold cpos tx hoare.hs_m hoare.hs_s in
+        let concl      = f_hoareS_r { hoare with hs_m = me; hs_s = stmt; } in
+          prove_goal_by [concl] (tr None) g
+  
+    | Some side ->
+        let _, concl = get_goal g in
+        let es       = destr_equivS concl in
+        let me, stmt = if side then (es.es_ml, es.es_sl) else (es.es_mr, es.es_sr) in
+        let me, stmt = t_fold cpos tx me stmt in
+        let concl    =
+          match side with
+          | true  -> f_equivS_r { es with es_ml = me; es_sl = stmt; }
+          | false -> f_equivS_r { es with es_mr = me; es_sr = stmt; }
+        in
+          prove_goal_by [concl] (tr (Some side)) g
+end
 
 (* -------------------------------------------------------------------- *)
 (* -------------------------  Tactics --------------------------------- *)
@@ -1303,37 +1323,9 @@ let alias_stmt id me i =
   | _ ->
       tacuerror "cannot create an alias for that kind of instruction"
 
-let t_alias_hoare _env cpos id g =
-  let _hyps, concl = get_goal g in
-  let hoare        = destr_hoareS concl in
-  let (me, stmt)   = CPos.t_fold cpos (alias_stmt id) hoare.hs_m hoare.hs_s in
-  let concl        = f_hoareS_r { hoare with hs_m = me; hs_s = stmt; } in
-
-    prove_goal_by [concl] (RN_hl_alias (None, cpos)) g
-
-let t_alias_equiv _env side cpos id g =
-  let _hyps, concl = get_goal g in
-  let equiv = destr_equivS concl in
-  let concl =
-    match side with
-    | true  ->
-        let (me, stmt) =
-          CPos.t_fold cpos (alias_stmt id) equiv.es_ml equiv.es_sl
-        in
-          f_equivS_r { equiv with es_ml = me; es_sl = stmt; }
-
-    | false ->
-        let (me, stmt) =
-          CPos.t_fold cpos (alias_stmt id) equiv.es_mr equiv.es_sr
-        in
-          f_equivS_r { equiv with es_mr = me; es_sr = stmt; }
-  in
-    prove_goal_by [concl] (RN_hl_alias (Some side, cpos)) g
-
 let t_alias env side cpos id g =
-  match side with
-  | None      -> t_alias_hoare env      cpos id g
-  | Some side -> t_alias_equiv env side cpos id g
+  let tr = fun side -> RN_hl_alias (None, cpos) in
+    CPos.t_code_transform env side cpos tr (alias_stmt id) g
 
 (* -------------------------------------------------------------------- *)
 let t_equiv_deno env pre post g =
