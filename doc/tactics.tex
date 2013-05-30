@@ -72,15 +72,6 @@ Assume $s_2$ is at program position $n$:
   }\left[\verb+app+\ n\ R\right]
 \end{displaymath}
 
-The following is implemented but unsound:
-\begin{displaymath}
-  \infrule{
-    \bdHoareSle{s1}{P}{R}{f} \qquad \bdHoareSeq{s2}{R}{Q}{1}
-  }{
-    \bdHoareSle{s1;s2}{P}{Q}{f}
-  }\left[\verb+app+ \verb+>>+\ n\ R\right]
-\end{displaymath}
-
 The following is a generalization but not implemented:
 \begin{displaymath}
   \infrule{

@@ -823,6 +823,8 @@ let t_bdHoare_app dir i phi opt_bd g =
         else g, f_real_div_simpl bhs.bhs_bd g, bhs.bhs_cmp, bhs.bhs_cmp
       | Some _, FHle -> 
         cannot_apply "app" "optional bound parameter not supported with this judgment"
+      | None, FHge when not dir -> 
+        cannot_apply "app" "forward direction not allowed for upper bounded Hoare judgments "
       | None, _ -> 
         if dir then f_real_of_int 1, bhs.bhs_bd, FHeq, bhs.bhs_cmp
         else bhs.bhs_bd, f_real_of_int 1, bhs.bhs_cmp, FHeq
