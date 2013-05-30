@@ -72,3 +72,17 @@ let snd = prod (Plus (u :: minus d :: minus (prod b v) :: [])) div
 let term = pair fst snd
 let rs = pair r s
 let _ = mostrar2 term rs
+(* Avioms: *)
+let _ = mostrar2 (sum a Zero) (sum Zero a)
+let _ = mostrar2 (sum a b) (sum b a)
+let _ = mostrar2 (sum a (sum b c)) (sum (sum a b) c)
+let _ = mostrar2 (prod One a) a
+let _ = mostrar2 (prod a b) (prod b a)
+let _ = mostrar2 (prod a (prod b c)) (prod (prod a b) c)
+let _ = mostrar2 (prod a Zero) Zero 
+let _ = mostrar2 (prod a (sum b c)) (sum (prod a b) (prod a c))
+(* Others *)
+let _ = mostrar2 a (minus a) 
+let _ = mostrar2 a b
+let _ = mostrar2 (sum a (minus a)) Zero
+let _ = mostrar2 (Plus (minus (prod One a) :: minus (prod One a) :: a :: a :: [])) Zero

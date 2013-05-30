@@ -297,6 +297,9 @@ let rec eqfield (t1 : 'a field) (t2 : 'a field) : ('a field list * ('a field * '
 														| 0 -> List.fold_left (fun (zs,pb) (l,r) -> let (z,pbs) = eqfield l r in (z @ zs,pbs @ pb)
 																			) ([],[]) (List.combine args1 args2)
 														| _ -> ([],(Op (op1,args1) , Op (op2,args2)) :: []))
+		| (Plus xs, Plus ys) -> let (pbs,t') = (field_norm (Plus ((Minus (Plus xs)) :: ys))) in (*We can do a better search...*)
+								let (z,pp) = eqfield t' Zero in
+									(pbs @ z, pp)
 		| _ -> let ((o1,t1'),(o2,t2')) = (field_norm t1, field_norm t2) in
 				let obligaciones = o1 @ o2 in
 				(match (t1',t2') with
