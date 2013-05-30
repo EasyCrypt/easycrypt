@@ -617,7 +617,15 @@ and transmodsig_body (env : EcEnv.env) (sa : Sm.t)
             raise (DuplicatedArgumentsName f);
         let calls = 
           match f.pfd_uses with
-          | None -> []
+          | None -> 
+            let do_one mp calls = 
+              let sig_ = (EcEnv.Mod.by_mpath mp env).me_sig in
+              if sig_.mis_params <> [] then calls
+              else 
+                let fs = List.map (fun (Tys_function(fsig,_)) ->
+                  EcPath.xpath_fun mp fsig.fs_name) sig_.mis_body in
+                fs@calls in
+            Sm.fold do_one sa []
           | Some pfd_uses ->
             List.map (fun name -> 
               let f, _ = lookup_fun env name in
@@ -667,12 +675,12 @@ let tysig_item_kind = function
   | Tys_function _ -> `Function
   
 let sig_of_mt env (mt:module_type) = 
-  let _sig = EcEnv.ModTy.by_path mt.mt_name env in
+  let sig_ = EcEnv.ModTy.by_path mt.mt_name env in
   let subst = 
     List.fold_left2 (fun s (x1,_) a ->
-      EcSubst.add_module s x1 a) EcSubst.empty _sig.mis_params mt.mt_args in
+      EcSubst.add_module s x1 a) EcSubst.empty sig_.mis_params mt.mt_args in
   let items =
-    EcSubst.subst_modsig_body subst _sig.mis_body in
+    EcSubst.subst_modsig_body subst sig_.mis_body in
   let params = mt.mt_params in
   let keep = 
     List.fold_left (fun k (x,_) ->
@@ -1426,7 +1434,7 @@ let trans_gamepath (env : EcEnv.env) gp =
   let (mpath, _sig) = trans_msymbol env (mk_loc loc (fst (unloc gp))) in
   if _sig.mis_params <> [] then
     tyerror gp.pl_loc env (UnknownFunName (modsymb, funsymb));
-  EcPath.xpath mpath (EcPath.psymbol funsymb)
+  EcPath.xpath_fun mpath funsymb
 
 (* -------------------------------------------------------------------- *)
 let transfpattern env ue (p : EcParsetree.plpattern) =

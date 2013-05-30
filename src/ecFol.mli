@@ -130,8 +130,11 @@ val f_tt  : form
 
 val f_int : int -> form
 
-val f_real_of_int : int -> form
-val f_rone : form
+val f_real_of_int : form -> form
+val f_rint        : int -> form
+val f_r0          : form
+val f_r1          : form
+
 
 val f_op : EcPath.path -> EcTypes.ty list -> EcTypes.ty -> form
 val f_app : form -> form list -> EcTypes.ty -> form
@@ -216,6 +219,7 @@ val f_lets_simpl : (EcTypes.lpattern * form) list -> form -> form
 val f_forall_simpl : binding -> form -> form
 val f_exists_simpl : binding -> form -> form
 val f_app_simpl    : form -> form list -> EcTypes.ty -> form
+val f_betared_simpl : binding -> form -> form list -> form
 
 val f_not_simpl  : form -> form
 val f_and_simpl  : form -> form -> form
@@ -287,14 +291,14 @@ val f_subst_id : f_subst
 val add_locals : f_subst -> (EcIdent.t * EcTypes.ty) list -> 
   f_subst * (EcIdent.t * EcTypes.ty) list
 
-val bind_local : f_subst -> EcIdent.t -> form -> f_subst
-val bind_mem   : f_subst -> EcIdent.t -> EcIdent.t -> f_subst
-val bind_mod   : f_subst -> EcIdent.t -> EcPath.mpath -> f_subst
+val f_bind_local : f_subst -> EcIdent.t -> form -> f_subst
+val f_bind_mem   : f_subst -> EcIdent.t -> EcIdent.t -> f_subst
+val f_bind_mod   : f_subst -> EcIdent.t -> EcPath.mpath -> f_subst
    
 val f_subst : f_subst -> form -> form 
 
-val subst_form   : EcIdent.t -> form -> form -> form 
-val f_subst_mem  : EcIdent.t -> EcIdent.t -> form -> form 
+val f_subst_local : EcIdent.t -> form -> form -> form 
+val f_subst_mem   : EcIdent.t -> EcIdent.t -> form -> form 
 module Fsubst :
   sig
     val mapty : (EcTypes.ty -> EcTypes.ty) -> form -> form

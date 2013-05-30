@@ -484,8 +484,10 @@ let f_int n = mk_form (Fint n) ty_int
 let f_tt = f_op EcCoreLib.p_tt [] ty_unit
 
 let f_op_real_of_int = f_op EcCoreLib.p_from_int [] (tfun ty_int ty_real)
-let f_real_of_int n = f_app f_op_real_of_int [f_int n] ty_real
-let f_rone = f_real_of_int 1
+let f_real_of_int f  = f_app f_op_real_of_int [f] ty_real
+let f_rint n         = f_real_of_int (f_int n)
+let f_r0             = f_rint 0 
+let f_r1             = f_rint 1
 
 let ty_fbool1 = tfun ty_bool ty_bool
 let ty_fbool2 = tfun ty_bool ty_fbool1 
@@ -592,8 +594,7 @@ let f_bdHoareF pre f post hcmp bd =
   let bhf = { bhf_pr = pre; bhf_f = f; bhf_po = post; 
               bhf_cmp = hcmp; bhf_bd = bd } in
   mk_form (FbdHoareF bhf) ty_bool
-let f_losslessF f = 
-  f_bdHoareF f_true f f_true FHeq f_rone
+let f_losslessF f = f_bdHoareF f_true f f_true FHeq f_r1
 
 let f_bdHoareS_r bhs = mk_form (FbdHoareS bhs) ty_bool
 let f_bdHoareS mem pre s post hcmp bd = 
@@ -655,7 +656,7 @@ let f_real_prod f1 f2 =
     assert false (* FIXME *)
 
 let f_real_div f1 f2 =
-  if ty_equal f1.f_ty treal && ty_equal f2.f_ty treal && not (f_equal f2 (f_real_of_int 0)) then
+  if ty_equal f1.f_ty treal && ty_equal f2.f_ty treal && not (f_equal f2 f_r0) then
     f_app fop_real_div [f1;f2] ty_real
   else 
     assert false (* FIXME *)
@@ -673,11 +674,11 @@ let rec f_real_prod_simpl f1 f2 =
       f_real_div_simpl (f_real_prod_simpl f1_1 f2) f1_2
     | Fapp (op1,[{f_node=Fint n1}]), Fapp (op2,[{f_node=Fint n2}]) 
       when f_equal f_op_real_of_int op1 && f_equal f_op_real_of_int op2 ->
-      f_real_of_int (n1 * n2)
+      f_real_of_int (f_int (n1 * n2))
     | _ ->
-      if f_equal (f_real_of_int 0) f1 || f_equal (f_real_of_int 0) f1 then f_real_of_int 0
-      else if f_equal (f_real_of_int 1) f1 then f2
-      else if f_equal (f_real_of_int 1) f2 then f1
+      if f_equal f_r0 f1 || f_equal f_r0 f1 then f_r0
+      else if f_equal f_r1 f1 then f2
+      else if f_equal f_r1 f2 then f1
       else f_real_prod f1 f2
 
 and f_real_div_simpl f1 f2 =
@@ -698,8 +699,8 @@ and f_real_div_simpl f1 f2 =
       begin
         let n = gcd n1 n2 in
         if n <> 1 then 
-          f_real_div_simpl (f_real_of_int (n1/n)) (f_real_of_int (n2/n))
-        else f_real_div (f_real_of_int n1) (f_real_of_int n2)
+          f_real_div_simpl (f_real_of_int (f_int (n1/n))) (f_real_of_int (f_int (n2/n)))
+        else f_real_div (f_real_of_int (f_int n1)) (f_real_of_int (f_int n2))
       end
     | _ -> f_real_div f1 f2
 
@@ -1035,15 +1036,15 @@ let f_subst_id = {
   fs_mem     = Mid.empty
 }
 
-let bind_local s x t = 
+let f_bind_local s x t = 
   let merger o = assert (o = None); Some t in
   { s with fs_loc = Mid.change merger x s.fs_loc }
 
-let bind_mem s m1 m2 = 
+let f_bind_mem s m1 m2 = 
   let merger o = assert (o = None); Some m2 in
   { s with fs_mem = Mid.change merger m1 s.fs_mem }
 
-let bind_mod s x mp = 
+let f_bind_mod s x mp = 
   let merger o = assert (o = None); Some mp in
   { s with fs_mp = Mid.change merger x s.fs_mp }
 
@@ -1052,7 +1053,7 @@ let add_local s (x,t as xt) =
   let t' = s.fs_ty t in
   if x == x' && t == t' then s, xt
   else 
-    bind_local s x (f_local x' t'), (x',t')
+    f_bind_local s x (f_local x' t'), (x',t')
 
 let add_locals = List.smart_map_fold add_local
 
@@ -1080,12 +1081,12 @@ let add_binding s (x,gty as xt) =
       EcPath.Sm.fold (fun m r' -> EcPath.Sm.add (sub m) r') r EcPath.Sm.empty in
     let x' = if s.fs_freshen then EcIdent.fresh x else x in
     if x == x' && p == p' && EcPath.Sm.equal r r' then s,xt else
-      bind_mod s x (EcPath.mident x'), (x',GTmodty(p',r'))
+      f_bind_mod s x (EcPath.mident x'), (x',GTmodty(p',r'))
   | GTmem mt ->
     let mt' = EcMemory.mt_substm s.fs_p s.fs_mp s.fs_ty mt in
     let x' = if s.fs_freshen then EcIdent.fresh x else x in
     if x == x' && mt == mt' then s,xt else 
-      bind_mem s x x', (x',GTmem mt')
+      f_bind_mem s x x', (x',GTmem mt')
 
 let add_bindings = List.map_fold add_binding
    
@@ -1204,15 +1205,13 @@ let rec f_subst (s:f_subst) f =
 
   | _ -> f_map s.fs_ty (f_subst s) f 
 
-let subst_form x t =
-  (* TODO check if x occur in f to not perform the subst *)
-  let s = bind_local f_subst_id x t in
-  f_subst s 
+let f_subst_local x t =
+  let s = f_bind_local f_subst_id x t in
+  fun f -> if Mid.mem x f.f_fv then f_subst s f else f
 
 let f_subst_mem m1 m2 = 
-  (* TODO check if x occur in f to not perform the subst *)
-  let s = bind_mem f_subst_id m1 m2 in
-  f_subst s  
+  let s = f_bind_mem f_subst_id m1 m2 in
+  fun f -> if Mid.mem m1 f.f_fv then f_subst s f else f
 
 let is_subst_id s = 
   s.fs_freshen = false &&
@@ -1288,11 +1287,18 @@ let f_lets_simpl =
 let rec f_app_simpl f args ty = 
   if args = [] then f 
   else match f.f_node,args with
-    | Fquant (Llambda,(id,_)::bds,f), arg::args ->
-      let f = f_lambda bds (subst_form id arg f ) in
-      f_app_simpl f args ty
+    | Fquant (Llambda, bds,f), args -> f_betared_simpl f_subst_id bds f args
     | Fapp(f',args'),_ -> mk_form (Fapp(f', args'@args)) ty
     | _ -> mk_form (Fapp(f,args)) ty 
+and f_betared_simpl subst bds f args =
+  match bds, args with
+  | (x,GTty _)::bds, arg :: args ->
+    f_betared_simpl (f_bind_local subst x arg) bds f args 
+  | (_,_)::_, _ :: _ -> assert false
+  | _, [] -> f_lambda bds (f_subst subst f) 
+  | [], _ -> f_app_simpl (f_subst subst f) args f.f_ty
+
+let f_betared_simpl bds f args = f_betared_simpl f_subst_id bds f args
 
 let f_forall_simpl b f = 
   let b = List.filter (fun (id,_) -> Mid.mem id (f_fv f)) b in

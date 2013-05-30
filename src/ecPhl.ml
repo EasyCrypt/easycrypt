@@ -516,13 +516,21 @@ let gen_mems m f =
 (* -------------------------  Tactics --------------------------------- *)
 (* -------------------------------------------------------------------- *)
 
+(* {spre} . {spost}     pre => spre  spost => post
+   --------------------------------------------------
+       {pre} . {post} 
+*)
+let conseq_cond pre post spre spost = 
+  f_imp pre spre, f_imp spost post
+ 
 let t_hoareF_conseq env pre post g =
   let hyps,concl = get_goal g in
   let hf = destr_hoareF concl in
   let env = tyenv_of_hyps env hyps in
   let mpr,mpo = EcEnv.Fun.hoareF_memenv hf.hf_f env in
-  let concl1 = gen_mems [mpr] (f_imp pre hf.hf_pr) in
-  let concl2 = gen_mems [mpo] (f_imp hf.hf_po post) in
+  let cond1, cond2 = conseq_cond hf.hf_pr hf.hf_po pre post in
+  let concl1 = gen_mems [mpr] cond1 in
+  let concl2 = gen_mems [mpo] cond2 in
   let concl3 = f_hoareF pre hf.hf_f post in
   prove_goal_by [concl1; concl2; concl3] (RN_hl_conseq) g  
     
@@ -530,8 +538,9 @@ let t_hoareF_conseq env pre post g =
 let t_hoareS_conseq _env pre post g =
   let concl = get_concl g in
   let hs = destr_hoareS concl in
-  let concl1 = gen_mems [hs.hs_m] (f_imp pre hs.hs_pr) in
-  let concl2 = gen_mems [hs.hs_m] (f_imp hs.hs_po post) in
+  let cond1, cond2 = conseq_cond hs.hs_pr hs.hs_po pre post in
+  let concl1 = gen_mems [hs.hs_m] cond1 in
+  let concl2 = gen_mems [hs.hs_m] cond2 in
   let concl3 = f_hoareS_r { hs with hs_pr = pre; hs_po = post } in
   prove_goal_by [concl1; concl2; concl3] (RN_hl_conseq) g
 
@@ -541,16 +550,18 @@ let t_equivF_conseq env pre post g =
   let ef = destr_equivF concl in
   let env = tyenv_of_hyps env hyps in
   let (mprl,mprr),(mpol,mpor) = EcEnv.Fun.equivF_memenv ef.ef_fl ef.ef_fr env in
-  let concl1 = gen_mems [mprl;mprr] (f_imp pre ef.ef_pr) in
-  let concl2 = gen_mems [mpol;mpor] (f_imp ef.ef_po post) in
+  let cond1, cond2 = conseq_cond ef.ef_pr ef.ef_po pre post in
+  let concl1 = gen_mems [mprl;mprr] cond1 in
+  let concl2 = gen_mems [mpol;mpor] cond2 in
   let concl3 = f_equivF pre ef.ef_fl ef.ef_fr post in
   prove_goal_by [concl1; concl2; concl3] (RN_hl_conseq) g  
 
 let t_equivS_conseq _env pre post g =
   let concl = get_concl g in
   let es = destr_equivS concl in
-  let concl1 = gen_mems [es.es_ml;es.es_mr] (f_imp pre es.es_pr) in
-  let concl2 = gen_mems [es.es_ml;es.es_mr] (f_imp es.es_po post) in
+  let cond1, cond2 = conseq_cond es.es_pr es.es_po pre post in
+  let concl1 = gen_mems [es.es_ml;es.es_mr] cond1 in
+  let concl2 = gen_mems [es.es_ml;es.es_mr] cond2 in
   let concl3 = f_equivS_r { es with es_pr = pre; es_po = post } in
   prove_goal_by [concl1; concl2; concl3] (RN_hl_conseq) g
  
@@ -766,7 +777,7 @@ let t_bdHoare_skip g =
   let bhs = destr_bdHoareS concl in
   if bhs.bhs_s.s_node <> [] then tacerror NoSkipStmt;
   if (bhs.bhs_cmp <> FHeq && bhs.bhs_cmp <> FHge) ||
-    not (f_equal bhs.bhs_bd (f_real_of_int 1)) then
+     not (f_equal bhs.bhs_bd f_r1) then
     cannot_apply "skip" "bound must be \">= 1\"";
   let concl = f_imp bhs.bhs_pr bhs.bhs_po in
   let concl = gen_mems [bhs.bhs_m] concl in
@@ -826,8 +837,8 @@ let t_bdHoare_app dir i phi opt_bd g =
       | None, FHge when not dir -> 
         cannot_apply "app" "forward direction not allowed for upper bounded Hoare judgments "
       | None, _ -> 
-        if dir then f_real_of_int 1, bhs.bhs_bd, FHeq, bhs.bhs_cmp
-        else bhs.bhs_bd, f_real_of_int 1, bhs.bhs_cmp, FHeq
+        if dir then f_r1, bhs.bhs_bd, FHeq, bhs.bhs_cmp
+        else bhs.bhs_bd, f_r1, bhs.bhs_cmp, FHeq
   in
   let a = f_bdHoareS_r { bhs with bhs_s = stmt s1; bhs_po = phi; 
     bhs_bd = bd1; bhs_cmp = cmp1 } in
@@ -1063,7 +1074,7 @@ let t_equiv_call1 env side fpre fpost g =
   let fres   = f_local vres fsig.fs_ret in
   let post   = wp_asgn_call env me lp fres equiv.es_po in
   let subst  = PVM.add env pvres me fres PVM.empty in
-  let msubst = EcFol.bind_mem EcFol.f_subst_id EcFol.mhr me in
+  let msubst = EcFol.f_bind_mem EcFol.f_subst_id EcFol.mhr me in
   let fpost  = PVM.subst env subst (f_subst msubst fpost) in
   let modi   = f_write env f in
   let post   = f_imp_simpl fpost post in
@@ -1084,8 +1095,8 @@ let t_equiv_call1 env side fpre fpost g =
 let t_hoare_equiv _env p q p1 q1 p2 q2 g =
   let concl = get_concl g in
   let es = destr_equivS concl in
-  let s1 = bind_mem f_subst_id mhr (fst es.es_ml) in
-  let s2 = bind_mem f_subst_id mhr (fst es.es_mr) in
+  let s1 = f_bind_mem f_subst_id mhr (fst es.es_ml) in
+  let s2 = f_bind_mem f_subst_id mhr (fst es.es_mr) in
   let concl1 = 
     gen_mems [es.es_ml;es.es_mr] 
       (f_imp es.es_pr (f_and p (f_and (f_subst s1 p1) (f_subst s2 p2)))) in
@@ -1370,7 +1381,7 @@ let check_swap env s1 s2 =
   if not m1r2 then error ()
 
 let t_equiv_swap env side p1 p2 p3 g =
-  let swap s = 
+  let swap env s = 
     let s = s.s_node in
     let len = List.length s in
     if not (1<= p1 && p1 < p2 && p2 <= p3 && p3 <= len) then
@@ -1382,10 +1393,11 @@ let t_equiv_swap env side p1 p2 p3 g =
     let s23,tl = List.take_n (p3-p2+1) tl in
     check_swap env (stmt s12) (stmt s23);
     stmt (List.flatten [hd;s23;s12;tl]) in
-  let concl = get_concl g in
+  let hyps, concl = get_goal g in
   let es    = destr_equivS concl in
+  let env = tyenv_of_hyps env hyps in
   let sl,sr = 
-    if side then swap es.es_sl, es.es_sr else es.es_sl, swap es.es_sr in
+    if side then swap env es.es_sl, es.es_sr else es.es_sl, swap env es.es_sr in
   let concl = f_equivS_r {es with es_sl = sl; es_sr = sr } in
   prove_goal_by [concl] (RN_hl_swap(side,p1,p2,p3)) g
     
@@ -1487,7 +1499,7 @@ let t_hoare_rnd env g =
   let (lv,distr),s= s_last_rnd "rnd" hs.hs_s in
   (* FIXME: exception when not rnds found *)
   let ty_distr = proj_distr_ty (e_ty distr) in
-  let x_id = EcIdent.create "x" in
+  let x_id = EcIdent.create (symbol_of_lv lv) in
   let x = f_local x_id ty_distr in
   let distr = EcFol.form_of_expr (EcMemory.memory hs.hs_m) distr in
   let post = subst_form_lv env (EcMemory.memory hs.hs_m) lv x hs.hs_po in
@@ -1508,7 +1520,7 @@ let wp_equiv_disj_rnd side env g =
 
   (* FIXME: exception when not rnds found *)
   let ty_distr = proj_distr_ty (e_ty distr) in
-  let x_id = EcIdent.create "x" in
+  let x_id = EcIdent.create (symbol_of_lv lv) in
   let x = f_local x_id ty_distr in
   let distr = EcFol.form_of_expr (EcMemory.memory m) distr in
   let post = subst_form_lv env (EcMemory.memory m) lv x es.es_po in
@@ -1530,7 +1542,8 @@ let wp_equiv_rnd env (f,finv) g =
   (* FIXME: exception when not rnds found *)
   let tyL = proj_distr_ty (e_ty muL) in
   let tyR = proj_distr_ty (e_ty muR) in
-  let x_id, y_id = EcIdent.create "x", EcIdent.create "y" in
+  let x_id = EcIdent.create (symbol_of_lv lvL ^ "L")
+  and y_id = EcIdent.create (symbol_of_lv lvR ^ "R") in
   let x = f_local x_id tyL in
   let y = f_local y_id tyR in
   let muL = EcFol.form_of_expr (EcMemory.memory es.es_ml) muL in
@@ -1564,6 +1577,10 @@ let t_equiv_rnd side env bij_info =
           let z_id = EcIdent.create "z" in
           let z = f_local z_id in
           let bij = fun tyL tyR -> f_lambda [z_id,GTty tyR] (z tyL) in 
+          (* TODO Cezar : Can it be not well typed: normally tyL and tyR should
+             be equal.
+             I propose to replace tyL by tyR
+            *)
           bij, bij
       in wp_equiv_rnd env (f, finv) 
 
@@ -1583,13 +1600,13 @@ let t_bd_hoare_rnd env (opt_bd,opt_event) g =
         cannot_apply "bd_hoare_rnd"
           "Rule for upper-bounded hoare triples requires a total bound"
       | FHle, _ ->
-          FHeq, EcFol.f_real_of_int 1, f_real_le (f_mu distr event) bhs.bhs_bd
+          FHeq, EcFol.f_r1, f_real_le (f_mu distr event) bhs.bhs_bd
       | FHge, Some bd' when not (EcFol.f_equal bhs.bhs_bd bd') -> 
           bhs.bhs_cmp, EcFol.f_real_div_simpl bhs.bhs_bd bd', f_real_le bd' (f_mu distr event)
-      | FHge, _ -> FHeq, EcFol.f_real_of_int 1, f_real_le bhs.bhs_bd (f_mu distr event)
+      | FHge, _ -> FHeq, EcFol.f_r1, f_real_le bhs.bhs_bd (f_mu distr event)
       | FHeq, Some bd' when not (EcFol.f_equal bhs.bhs_bd bd') -> 
           bhs.bhs_cmp, EcFol.f_real_div_simpl bhs.bhs_bd bd', f_eq (f_mu distr event) bd'
-      | FHeq, _ -> FHeq, EcFol.f_real_of_int 1, f_eq (f_mu distr event) bhs.bhs_bd
+      | FHeq, _ -> FHeq, EcFol.f_r1, f_eq (f_mu distr event) bhs.bhs_bd
   in
   let v_id = EcIdent.create "v" in
   let v = f_local v_id ty_distr in

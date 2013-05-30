@@ -229,12 +229,12 @@ let check_arg do_arg env hyps s x gty a =
   match gty, a with
   | GTty ty  , AAform f ->
       check_type env ty f.f_ty; (* FIXME error message *)
-      bind_local s x f, RA_form f
+      f_bind_local s x f, RA_form f
   | GTmem _   , AAmem m ->
-      bind_mem s x m, RA_id m
+      f_bind_mem s x m, RA_id m
   | GTmodty (emt, restr), AAmp (mp, mt)  ->
       check_modtype_restr env mp mt emt restr;
-      bind_mod s x mp, RA_mp mp
+      f_bind_mod s x mp, RA_mp mp
   | _ -> assert false (* FIXME error message *)
 
 let mkn_apply do_arg env (juc,n) args =
@@ -320,17 +320,17 @@ let t_intros env ids (juc,n as g) =
     | GTty ty ->
         if name <> "_" && not (EcIo.is_sym_ident name) then
           tacerror (InvalidName name);
-        LD_var(ty,None), bind_local s x (f_local id ty)
+        LD_var(ty,None), f_bind_local s x (f_local id ty)
 
     | GTmem me ->
         if name <> "_" && not (EcIo.is_mem_ident name) then
           tacerror (InvalidName name);
-        LD_mem me, bind_mem s x id
+        LD_mem me, f_bind_mem s x id
 
     | GTmodty (i,r) ->
         if name <> "_" && not (EcIo.is_mod_ident name) then
           tacerror (InvalidName name);
-        LD_modty (i,r), bind_mod s x (EcPath.mident id)
+        LD_modty (i,r), f_bind_mod s x (EcPath.mident id)
   in
 
   let add_ld id ld hyps =
@@ -351,7 +351,7 @@ let t_intros env ids (juc,n as g) =
         check_intros hyps ids' s f2
       else if is_let1 concl then
         let x,ty,e1,concl = destr_let1 concl in
-        let s = bind_local s x (f_local id.pl_desc ty) in
+        let s = f_bind_local s x (f_local id.pl_desc ty) in
         let hyps = add_ld id (LD_var (ty, Some (f_subst s e1))) hyps in
         check_intros hyps ids' s concl
       else if s == f_subst_id then
@@ -485,7 +485,7 @@ let t_generalize_hyp env id g =
     t_generalize_form (Some (EcIdent.name id)) env (f_local id ty) g
   | LD_mem mt ->
     let x = EcIdent.fresh id in
-    let s = EcFol.bind_mem f_subst_id id x in
+    let s = EcFol.f_bind_mem f_subst_id id x in
     let body = f_subst s concl in
     let ff = f_forall [x, GTmem mt] body in
     t_apply_form env ff [AAmem id] g
