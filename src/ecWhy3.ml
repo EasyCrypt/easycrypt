@@ -1060,13 +1060,11 @@ let merge_branches lb =
 
 exception CanNotTranslate of form
 
-
-
 let trans_gty env vm gty =
   match gty with
-  | GTty ty -> trans_ty env vm ty
-  | GTmodty _ -> ty_mod
-  | GTmem   _ -> ty_mem (* FIXME declare local variables *)
+  | GTty ty   -> Some (trans_ty env vm ty)
+  | GTmodty _ -> None
+  | GTmem   _ -> Some ty_mem (* FIXME declare local variables *)
 
 let trans_gtys env vm gtys =
   List.map (trans_gty env vm) gtys
@@ -1077,15 +1075,20 @@ let trans_form env vm f =
 
   let rec trans_form vm f =
     match f.f_node with
-    | Fquant(q,b,f) ->
+    | Fquant(q,b,fq) ->
         let ids, tys = List.split b in
         let tys = trans_gtys !env vm tys in
+        let tys =
+          List.map
+            (function None -> raise (CanNotTranslate f) | Some x -> x)
+            tys
+        in
         let vs, vm = add_ids vm ids tys in
-        let f = trans_form vm f in
+        let fq = trans_form vm fq in
         begin match q with
-        | Lforall -> Term.t_forall_close vs [] (force_prop f)
-        | Lexists -> Term.t_exists_close vs [] (force_prop f)
-        | Llambda -> trans_lambda vs f
+        | Lforall -> Term.t_forall_close vs [] (force_prop fq)
+        | Lexists -> Term.t_exists_close vs [] (force_prop fq)
+        | Llambda -> trans_lambda vs fq
         end
 
     | Fif(f1,f2,f3) ->
@@ -1138,7 +1141,7 @@ let trans_form env vm f =
         Term.t_tuple args
 
     | FhoareF _ | FhoareS _ | FbdHoareF _ | FbdHoareS _ | FequivF _ | FequivS _ -> 
-        raise (CanNotTranslate f) (* fixme *)
+        raise (CanNotTranslate f) (* FIXME: We don't want to translate these *)
 
     | Fpvar(pv,m) ->
         let nenv, nrb, pv = trans_pv !env vm pv f.f_ty m in
@@ -1274,7 +1277,7 @@ let trans_oper_body env vm ty body =
       | Fquant(Llambda,bd,f) -> bd, f
       | _ -> [], body in
     let ids, dom = List.split bd in
-    let dom = trans_gtys env vm dom in
+    let dom = List.map oget (trans_gtys env vm dom) in
     let vs, vm = add_ids vm ids dom in
     let env,rb,f = trans_form env vm body in
     let f = 
