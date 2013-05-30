@@ -1391,6 +1391,7 @@ let check_fission_independence env b init c1 c2 c3 =
    List.iter (check_disjoint rd_init) [wr_init; wr_c1; wr_c3];
   List.iter (check_disjoint rd_c3) [wr_c1; wr_c2]
 
+(* -------------------------------------------------------------------- *)
 let fission_stmt (il, (d1, d2)) env me zpr =
   if d2 < d1 then
     tacuerror "%s, %s"
@@ -1401,7 +1402,7 @@ let fission_stmt (il, (d1, d2)) env me zpr =
     match zpr.CPos.z_tail with
     | { i_node = Swhile (b, sw) } :: tl -> begin
         if List.length zpr.CPos.z_head < il then
-          tacuerror "while-loop is not headed by long enough intructions";
+          tacuerror "while-loop is not headed by %d intructions" il;
       let (init, hd) = List.take_n il zpr.CPos.z_head in
         (hd, init, b, sw, tl)
       end
@@ -1429,6 +1430,55 @@ let fission_stmt (il, (d1, d2)) env me zpr =
 let t_fission env side cpos infos g =
   let tr = fun side -> RN_hl_fission (side, cpos, infos) in
     CPos.t_code_transform env side cpos tr (CPos.t_zip (fission_stmt infos)) g
+
+(* -------------------------------------------------------------------- *)
+let fusion_stmt (il, (d1, d2)) env me zpr =
+  let (hd, init1, b1, sw1, tl) =
+    match zpr.CPos.z_tail with
+    | { i_node = Swhile (b, sw) } :: tl -> begin
+        if List.length zpr.CPos.z_head < il then
+          tacuerror "1st while-loop is not headed by %d intruction(s)" il;
+      let (init, hd) = List.take_n il zpr.CPos.z_head in
+        (hd, init, b, sw, tl)
+      end
+    | _ -> tacuerror "code position does not lead to a while-loop"
+  in
+
+  let (init2, b2, sw2, tl) =
+    if List.length tl < il then
+      tacuerror "1st first-loop is not followed by %d instruction(s)" il;
+    let (init2, tl) = List.take_n il tl in
+      match tl with
+      | { i_node = Swhile (b2, sw2) } :: tl -> (List.rev init2, b2, sw2, tl)
+      | _ -> tacuerror "cannot find the 2nd while-loop"
+  in
+
+  if d1 > List.length sw1.s_node then
+    tacuerror "in loop-fusion, body is less than %d instruction(s)" d1;
+  if d2 > List.length sw2.s_node then
+    tacuerror "in loop-fusion, body is less than %d instruction(s)" d2;
+
+  let (sw1, fini1) = List.take_n d1 sw1.s_node in
+  let (sw2, fini2) = List.take_n d2 sw2.s_node in
+
+  (* FIXME: costly *)
+  if not (EcReduction.s_equal_norm env (stmt init1) (stmt init2)) then
+    tacuerror "in loop-fusion, preludes do not match";
+  if not (EcReduction.s_equal_norm env (stmt fini1) (stmt fini2)) then
+    tacuerror "in loop-fusion, finalizers do not match";
+  if not (EcReduction.e_equal_norm env b1 b2) then
+    tacuerror "in loop-fusion, while conditions do not match";
+
+  check_fission_independence env b1 init1 sw1 sw2 fini1;
+
+  let wl  = i_while (b1, stmt (sw1 @ sw2 @ fini1)) in
+  let fus = List.rev_append init1 [wl] in
+
+    (me, { zpr with CPos.z_head = hd; CPos.z_tail = fus @ tl; })
+
+let t_fusion env side cpos infos g =
+  let tr = fun side -> RN_hl_fusion (side, cpos, infos) in
+    CPos.t_code_transform env side cpos tr (CPos.t_zip (fusion_stmt infos)) g
 
 (* -------------------------------------------------------------------- *)
 let t_equiv_deno env pre post g =

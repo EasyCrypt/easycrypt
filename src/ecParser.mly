@@ -1418,6 +1418,12 @@ tactic:
 | FISSION s=side? o=codepos NOT i=NUM AT d1=NUM COMMA d2=NUM
     { PPhl (Pfission (s, o, (i, (d1, d2)))) }
 
+| FUSION s=side? o=codepos AT d1=NUM COMMA d2=NUM
+    { PPhl (Pfusion (s, o, (1, (d1, d2)))) }
+
+| FUSION s=side? o=codepos NOT i=NUM AT d1=NUM COMMA d2=NUM
+    { PPhl (Pfusion (s, o, (i, (d1, d2)))) }
+
 | p=tselect INLINE
     { PPhl (Pinline (`ByPattern p)) }
 
