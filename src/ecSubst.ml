@@ -149,7 +149,7 @@ and subst_modsig ?params (s : _subst) (comps : module_sig) =
 
   let comps =
     { mis_params = newparams;
-      mis_body   = subst_modsig_body s comps.mis_body; }
+      mis_body   = subst_modsig_body sbody comps.mis_body; }
   in
     (sbody, comps)
 
