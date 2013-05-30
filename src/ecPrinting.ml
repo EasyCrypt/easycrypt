@@ -176,10 +176,6 @@ let pp_tyname _ppe fmt p =
   Format.fprintf fmt "%s" (P.tostring p)
 
 (* -------------------------------------------------------------------- *)
-let pp_opname (_ : PPEnv.t) fmt p =
-  Format.fprintf fmt "%s" (P.tostring p)
-
-(* -------------------------------------------------------------------- *)
 let pp_funname (ppe : PPEnv.t) fmt p =
   Format.fprintf fmt "%a.%a"
     (pp_topmod ppe) p.P.x_top pp_path p.P.x_sub
@@ -350,15 +346,22 @@ let pp_tuple (ppe : PPEnv.t) pp_sub es =
   pp_paren (pp_list ",@ " (pp_sub ppe (min_op_prec, `NonAssoc))) es
 
 (* -------------------------------------------------------------------- *)
+let pp_opname_as_operator fmt (nm, op) =
+  match nm with
+  | [] -> Format.fprintf fmt "%s" op
+  | _  ->
+      let op = Printf.sprintf "(%s)" op in
+        EcSymbols.pp_qsymbol fmt (nm, op)
+
 let pp_opapp (ppe : PPEnv.t) pp_sub outer fmt (op, _tvi, es) =
   let (nm, opname) = PPEnv.op_symb ppe op in
-  
+
   let pp_as_std_op fmt =
     let pp_stdapp fmt =
       match es with
       | [] -> EcSymbols.pp_qsymbol fmt (nm, opname)
       | _  ->
-          Format.fprintf fmt "%a %a"
+          Format.fprintf fmt "%a@ %a"
             EcSymbols.pp_qsymbol (nm, opname)
             (pp_list "@ " (pp_sub ppe (appprio, `Right))) es
     in
@@ -401,43 +404,41 @@ let pp_opapp (ppe : PPEnv.t) pp_sub outer fmt (op, _tvi, es) =
       maybe_paren outer prio (fun fmt () -> pp fmt) fmt
 
   and try_pp_as_uniop () =
-    if nm = [] then
-      match es with
-      | [e] ->
-          begin match priority_of_uniop opname with
-          | None -> None
-          | Some opprio  ->
-              let opprio = (opprio, `Prefix) in
-              let pp fmt =
-                Format.fprintf fmt "%s %a" opname
-                  (pp_sub ppe (opprio, `NonAssoc)) e in
-              let pp fmt =
-                maybe_paren outer opprio (fun fmt () -> pp fmt) fmt
-              in
-                Some pp
-          end
-      | _ -> None
-    else None
+    match es with
+    | [e] ->
+        begin match priority_of_uniop opname with
+        | None -> None
+        | Some opprio  ->
+            let opprio = (opprio, `Prefix) in
+            let pp fmt =
+              Format.fprintf fmt "%a@ %a"
+                pp_opname_as_operator (nm, opname)
+                (pp_sub ppe (opprio, `NonAssoc)) e in
+            let pp fmt =
+              maybe_paren outer opprio (fun fmt () -> pp fmt) fmt
+            in
+              Some pp
+        end
+    | _ -> None
 
   and try_pp_as_binop () =
-    if nm = [] then
-      match es with
-      | [e1; e2] ->
-          begin match priority_of_binop_name opname with
-          | None -> None
-          | Some opprio ->
-              let pp fmt =
-                Format.fprintf fmt "%a %s@ %a"
-                  (pp_sub ppe (opprio, `Left)) e1
-                  opname
-                  (pp_sub ppe (opprio, `Right)) e2 in
-              let pp fmt =
-                maybe_paren outer opprio (fun fmt () -> pp fmt) fmt
-              in
-                Some pp
-          end
-      | _ -> None
-    else None
+    match es with
+    | [e1; e2] ->
+        begin match priority_of_binop_name opname with
+        | None -> None
+        | Some opprio ->
+            let pp fmt =
+              Format.fprintf fmt "%a %a@ %a"
+                (pp_sub ppe (opprio, `Left)) e1
+                pp_opname_as_operator (nm, opname)
+                (pp_sub ppe (opprio, `Right)) e2 in
+            let pp fmt =
+              maybe_paren outer opprio (fun fmt () -> pp fmt) fmt
+            in
+              Some pp
+        end
+
+    | _ -> None
         
   and try_pp_special () = 
     let qs = P.toqsymbol op in
@@ -560,7 +561,7 @@ let pp_instr_for_form (ppe : PPEnv.t) fmt i =
         (pp_lvalue ppe) lv (pp_expr ppe) e
 
   | Srnd (lv, e) ->
-      Format.fprintf fmt "%a =@ $%a"
+      Format.fprintf fmt "%a =$@ [<hov 2>%a@]"
         (pp_lvalue ppe) lv (pp_expr ppe) e
 
   | Scall (None, xp, args) ->
@@ -918,13 +919,13 @@ let pp_i_call (ppe : PPEnv.t) fmt (lv, xp, args) =
         (pp_list ",@ " (pp_expr ppe)) args
 
   | Some lv ->
-      Format.fprintf fmt "%a :=@ %a(%a)"
+      Format.fprintf fmt "@[<hov 2>%a :=@ %a(%a)@]"
         (pp_lvalue ppe) lv
         (pp_funname ppe) xp
         (pp_list ",@ " (pp_expr ppe)) args
 
 let pp_i_rnd (ppe : PPEnv.t) fmt (lv, e) =
-  Format.fprintf fmt "%a =@ $%a"
+  Format.fprintf fmt "%a =$@ @[<hov 2>%a@]"
     (pp_lvalue ppe) lv (pp_expr ppe) e
 
 let pp_i_if (ppe : PPEnv.t) fmt e =
