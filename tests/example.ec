@@ -17,6 +17,17 @@ proof.
 admit.
 save.
 
+op sum (x y : int) : int  = x + y.
+op prod (x y : int) : int = x * y.
+op minus (x : int) : int = (0- x).
+op inv (x : int) : int = (1 / x).
+op eq (x y : int) : bool = x = y.
+lemma l_field : forall (x y: int), eq x y
+proof.
+  intros x y.
+  field sum prod minus inv 1 0 eq.
+admit.
+save.
 (* intros *)
 lemma l_intros : forall (x1 : 'a), p x1 => forall (x2 x3:'a), p x2 => p x3
 proof.

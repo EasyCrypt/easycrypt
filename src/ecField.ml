@@ -1,14 +1,15 @@
 open Printf
+open EcFol
 (****** field Type  ******)
-type 'a field = Plus of 'a field list (* (+ [t1,...,tn])  *)
-	| Times of 'a field list
-	(* | Exp of 'a field * 'a field*)
-	| Minus of 'a field  (* (- t)*)
-	| Inv of 'a field  (* inv(t) = 1/t  *)
+type field = Plus of field list (* (+ [t1,...,tn])  *)
+	| Times of field list
+	(* | Exp of form field * form field*)
+	| Minus of field  (* (- t)*)
+	| Inv of field  (* inv(t) = 1/t  *)
 	| One 
 	| Zero
-	| Value of 'a
-	| Op of 'a * 'a field list
+	| Value of form
+	| Op of form * field list
 (*************************)
 exception Div_by_Zero
 exception Err
@@ -24,7 +25,7 @@ let rec list_cmp ts ps =
 		| (x::xs,y::ys) -> (match cmp x y with
 									| 0 -> list_cmp xs ys
 									| a -> a)
-and cmp (t1 : 'a field) (t2 : 'a field) : int =
+and cmp (t1 : field) (t2 : field) : int =
 	match (t1,t2) with
 	| (Zero, Zero) -> 0
 	| (_, Zero) -> 1
@@ -32,7 +33,7 @@ and cmp (t1 : 'a field) (t2 : 'a field) : int =
 	| (One, One) -> 0
 	| (_, One) -> 1
 	| (One, _) -> -1
-	| (Value a, Value b) -> compare a b (*  <<<--- Replace this  *)
+	| (Value a, Value b) -> f_compare a b (*  <<<--- Replace this  *)
 	| (_, Value _) -> 1
 	| (Value _, _) -> -1
 	| (Inv a, Inv b) -> cmp a b
@@ -51,15 +52,15 @@ and cmp (t1 : 'a field) (t2 : 'a field) : int =
 							list_cmp xs' ys'
 	| (_, Times _) -> 1
 	| (Times _, _) -> -1
-	| (Op (op1, args1) , Op (op2,args2) ) -> (match (compare op1 op2) with
+	| (Op (op1, args1) , Op (op2,args2) ) -> (match (f_compare op1 op2) with
 												| 0 -> list_cmp args1 args2 
 												| a -> a)
 
-let rec drop (n : int)  (xs : 'a list) : 'a list = match (n,xs) with
+let rec drop (n : int)  (xs : form list) : form list = match (n,xs) with
 													| (0,_) -> xs
 													| (_,[]) -> [] 
 													| (n,y::ys) -> drop (n-1) ys
-let rec rmvinvs (ts : 'a field list) : 'a field list =
+let rec rmvinvs (ts : field list) : field list =
   let (invs,noinvs) = List.fold_left (fun (is,ns) i ->
 										match i with
 											| Inv _ -> (i :: is,ns)
@@ -85,7 +86,7 @@ let rec rmvinvs (ts : 'a field list) : 'a field list =
 			) in
 	removing (invs,noinvs)
 
-let rec rmvinvs2 (ts : 'a field list) : 'a field list =
+let rec rmvinvs2 (ts : field list) : field list =
   let (invs,noinvs) = List.fold_left (fun (is,ns) i ->
 										match i with
 											| Minus _ -> (i :: is,ns)
@@ -111,7 +112,7 @@ let rec rmvinvs2 (ts : 'a field list) : 'a field list =
 			) in
 	removing (invs,noinvs)
 
-let rec search (ts : 'a field list) : ('a field option * 'a field list) =
+let rec search (ts : field list) : (field option * field list) =
 	(match ts with
 		| [] -> (None, [])
 		| (Plus t)::ts -> (Some (Plus t), ts)
@@ -133,9 +134,9 @@ let rec nprint (t : string field) =
 (*************************)
 (* Given a field term, return a list of different-zero proof obligations
 and a new field term (with no fresh variables) but normalized *)
-let field_norm (term : 'a field) : 'a field list * 'a field =
+let field_norm (term : field) : field list * field =
 	let poblg = ref [] in
-	let rec norm (t : 'a field) : 'a field =
+	let rec norm (t : field) : field =
 		(match t with
 			| One -> One
 			| Zero -> Zero
@@ -214,7 +215,7 @@ let field_norm (term : 'a field) : 'a field list * 'a field =
 			| Op (op, args) -> Op (op, List.map norm args) 
 		) in (!poblg,norm term)
 
-let rec eqfield (t1 : 'a field) (t2 : 'a field) : ('a field list * ('a field * 'a field) list) = 
+let rec eqfield (t1 : field) (t2 : field) : (field list * (field * field) list) = 
 	match (t1,t2) with
 		| (Times ts1, Times ts2) -> 
 			let mts1 = List.fold_left (fun is i -> let (_,i') = field_norm i in
@@ -293,7 +294,7 @@ let rec eqfield (t1 : 'a field) (t2 : 'a field) : ('a field list * ('a field * '
 									if (cmp t1' t2' = 0) then (tss1 @ tss2 ,[]) else (tss1 @ tss2,(t1',t2') :: []))
 				| _ -> let (o1,o2) = eqfield (Times (t1 :: i2)) rem2  in
  													( i2 @ o1, o2))
-		| (Op (op1,args1) , Op (op2, args2)) -> (match (compare op1 op2) with (* replace this...*)
+		| (Op (op1,args1) , Op (op2, args2)) -> (match (f_compare op1 op2) with (* replace this...*)
 														| 0 -> List.fold_left (fun (zs,pb) (l,r) -> let (z,pbs) = eqfield l r in (z @ zs,pbs @ pb)
 																			) ([],[]) (List.combine args1 args2)
 														| _ -> ([],(Op (op1,args1) , Op (op2,args2)) :: []))

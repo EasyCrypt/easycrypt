@@ -1301,8 +1301,8 @@ tactic:
 | SPLIT
     { Psplit }
 
-| FIELD plus=sform times=sform inv=sform minus=sform z=sform o=sform
-    { Pfield (plus,times,inv,minus,z,o)}
+| FIELD plus=sform times=sform inv=sform minus=sform z=sform o=sform eq=sform
+    { Pfield (plus,times,inv,minus,z,o,eq)}
 
 | EXIST a=plist1(loc(fpattern_arg), COMMA)
    { Pexists a }
