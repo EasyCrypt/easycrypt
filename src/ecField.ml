@@ -8,6 +8,7 @@ type 'a field = Plus of 'a field list (* (+ [t1,...,tn])  *)
 	| One 
 	| Zero
 	| Value of 'a
+	| Op of 'a * 'a field list
 (*************************)
 exception Div_by_Zero
 exception Err
@@ -31,7 +32,7 @@ and cmp (t1 : 'a field) (t2 : 'a field) : int =
 	| (One, One) -> 0
 	| (_, One) -> 1
 	| (One, _) -> -1
-	| (Value a, Value b) -> compare a b
+	| (Value a, Value b) -> compare a b (*  <<<--- Replace this  *)
 	| (_, Value _) -> 1
 	| (Value _, _) -> -1
 	| (Inv a, Inv b) -> cmp a b
@@ -48,6 +49,11 @@ and cmp (t1 : 'a field) (t2 : 'a field) : int =
 	| (Times xs, Times ys) -> let ys' = List.fast_sort cmp ys in
 							let xs' = List.fast_sort cmp xs in
 							list_cmp xs' ys'
+	| (_, Times _) -> 1
+	| (Times _, _) -> -1
+	| (Op (op1, args1) , Op (op2,args2) ) -> (match (compare op1 op2) with
+												| 0 -> list_cmp args1 args2 
+												| a -> a)
 
 let rec drop (n : int)  (xs : 'a list) : 'a list = match (n,xs) with
 													| (0,_) -> xs
@@ -119,8 +125,9 @@ let rec nprint (t : string field) =
 		| Value t -> print_string t
 		| Plus xs -> print_string "(+, ";List.iter (fun i -> nprint i; print_string " ") xs; print_string ")"
 		| Times xs -> print_string "(*, ";List.iter (fun i -> nprint i; print_string " ") xs; print_string ")"
-		| Minus t -> print_string "-("; nprint t; print_string ")"
-		| Inv t -> print_string "inv("; nprint t; print_string ")")
+		| Minus t -> print_string "(-,"; nprint t; print_string ")"
+		| Inv t -> print_string "inv("; nprint t; print_string ")"
+		| Op (op , args) -> print_string "("; print_string op; print_string ", ";List.iter (fun i -> nprint i; print_string " ") args; print_string ")")
 
 	
 (*************************)
@@ -200,10 +207,11 @@ let field_norm (term : 'a field) : 'a field list * 'a field =
 															| Zero -> is 
 															| _ -> i' :: is) [] xs in
 					let ss = rmvinvs2 ts' in
-					match ss with
+					(match ss with
 						| [] -> Zero
 						| [x] -> x
-						| _ -> Plus ss
+						| _ -> Plus ss)
+			| Op (op, args) -> Op (op, List.map norm args) 
 		) in (!poblg,norm term)
 
 let rec eqfield (t1 : 'a field) (t2 : 'a field) : ('a field list * ('a field * 'a field) list) = 
@@ -285,6 +293,10 @@ let rec eqfield (t1 : 'a field) (t2 : 'a field) : ('a field list * ('a field * '
 									if (cmp t1' t2' = 0) then (tss1 @ tss2 ,[]) else (tss1 @ tss2,(t1',t2') :: []))
 				| _ -> let (o1,o2) = eqfield (Times (t1 :: i2)) rem2  in
  													( i2 @ o1, o2))
+		| (Op (op1,args1) , Op (op2, args2)) -> (match (compare op1 op2) with (* replace this...*)
+														| 0 -> List.fold_left (fun (zs,pb) (l,r) -> let (z,pbs) = eqfield l r in (z @ zs,pbs @ pb)
+																			) ([],[]) (List.combine args1 args2)
+														| _ -> ([],(Op (op1,args1) , Op (op2,args2)) :: []))
 		| _ -> let ((o1,t1'),(o2,t2')) = (field_norm t1, field_norm t2) in
 				let obligaciones = o1 @ o2 in
 				(match (t1',t2') with

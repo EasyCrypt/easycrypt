@@ -49,3 +49,26 @@ let _ = mostrar t5
 let _ = mostrar t6
 let _ = mostrar2 t6 r
 (* Test2 *)
+(* *(a*s + b*r + d) -d - b * (c*s + r))  * inv (a - b*c) = s *)
+let tt1 = Plus ( prod a s :: prod  b r :: d :: [])
+let tt2 = prod b (sum (prod c s) r)
+let tt3 = inv (sum a (minus (prod b c)))
+let tl = Plus (tt1 :: minus d :: minus tt2 :: [])
+let t = prod tl tt3
+let _ = mostrar2 t s
+(* Test3 *)
+(*
+	u = (a*s + b*r + d
+	v = c*s + r
+	( (a*v + c * d - c * u) * inv (a-b*c),
+		(u - d - b*v) * inv (a-b*c)) = (r,s) )
+*)
+let pair a b = Op ("Pair",[a;b])
+let u = Plus (prod a s :: prod b r :: d :: [])
+let v = sum (prod c s) r
+let div = inv (sum a (minus (prod b c)))
+let fst = prod (Plus (prod a v :: prod c d :: minus (prod c u) ::  [])) div
+let snd = prod (Plus (u :: minus d :: minus (prod b v) :: [])) div
+let term = pair fst snd
+let rs = pair r s
+let _ = mostrar2 term rs
