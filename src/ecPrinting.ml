@@ -717,8 +717,8 @@ let rec pp_form_r (ppe : PPEnv.t) outer fmt f =
         (pp_form_r ppe (max_op_prec, `NonAssoc)) es.es_pr
         (pp_form_r ppe (max_op_prec, `NonAssoc)) es.es_po
 
-  | Fglob (mp, _) ->
-      Format.fprintf fmt "glob %s" (P.m_tostring mp)
+  | Fglob (mp, me) ->
+      Format.fprintf fmt "(glob %a){%a}" (pp_topmod ppe) mp (pp_local ppe) me
 
   | Fpr _ ->
       Format.fprintf fmt "Fpr[to-be-done]"
