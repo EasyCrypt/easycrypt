@@ -285,6 +285,7 @@ type f_subst = {
 }
 
 val f_subst_id : f_subst
+val is_subst_id : f_subst -> bool
 
 val add_locals : f_subst -> (EcIdent.t * EcTypes.ty) list -> 
   f_subst * (EcIdent.t * EcTypes.ty) list
@@ -292,8 +293,9 @@ val add_locals : f_subst -> (EcIdent.t * EcTypes.ty) list ->
 val f_bind_local : f_subst -> EcIdent.t -> form -> f_subst
 val f_bind_mem   : f_subst -> EcIdent.t -> EcIdent.t -> f_subst
 val f_bind_mod   : f_subst -> EcIdent.t -> EcPath.mpath -> f_subst
-   
-val f_subst : f_subst -> form -> form 
+
+val gty_subst : f_subst -> gty -> gty
+val f_subst   : f_subst -> form -> form 
 
 val f_subst_local : EcIdent.t -> form -> form -> form 
 val f_subst_mem   : EcIdent.t -> EcIdent.t -> form -> form 

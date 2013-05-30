@@ -986,6 +986,11 @@ let f_subst_id = {
   fs_mem     = Mid.empty
 }
 
+let is_subst_id s = 
+  s.fs_freshen = false &&
+  s.fs_p == identity && s.fs_ty == identity && 
+  Mid.is_empty s.fs_mp && Mid.is_empty s.fs_loc && Mid.is_empty s.fs_mem
+
 let f_bind_local s x t = 
   let merger o = assert (o = None); Some t in
   { s with fs_loc = Mid.change merger x s.fs_loc }
@@ -1023,25 +1028,32 @@ let subst_lpattern (s: f_subst) (lp:lpattern) =
       if xs == xs' then s, lp else 
       s, LTuple xs'
 
-let add_binding s (x,gty as xt) =
-  match gty with
+let gty_subst s gty = 
+  if is_subst_id s then gty 
+  else match gty with
   | GTty ty -> 
-      let s, (x',ty') = add_local s (x,ty) in
-      if x == x' && ty == ty' then s,xt else
-      s,(x',GTty ty')
-  | GTmodty (p,r) ->
+    let ty' = s.fs_ty ty in
+    if ty == ty' then gty else GTty ty'
+  | GTmodty(p,r) ->
     let sub = (EcPath.m_subst s.fs_p s.fs_mp) in
     let p' = mty_subst s.fs_p sub p in
     let r' = 
       EcPath.Sm.fold (fun m r' -> EcPath.Sm.add (sub m) r') r EcPath.Sm.empty in
-    let x' = if s.fs_freshen then EcIdent.fresh x else x in
-    if x == x' && p == p' && EcPath.Sm.equal r r' then s,xt else
-      f_bind_mod s x (EcPath.mident x'), (x',GTmodty(p',r'))
+    if p == p' && EcPath.Sm.equal r r' then gty else GTmodty(p',r')
   | GTmem mt ->
     let mt' = EcMemory.mt_substm s.fs_p s.fs_mp s.fs_ty mt in
-    let x' = if s.fs_freshen then EcIdent.fresh x else x in
-    if x == x' && mt == mt' then s,xt else 
-      f_bind_mem s x x', (x',GTmem mt')
+    if mt == mt' then gty else GTmem mt'
+
+let add_binding s (x,gty as xt) =
+  let gty' = gty_subst s gty in
+  let x' = if s.fs_freshen then EcIdent.fresh x else x in
+  if x == x' && gty == gty' then (s,xt)
+  else
+    let s = match gty' with
+      | GTty ty -> f_bind_local s x (f_local x' ty) 
+      | GTmodty _ -> f_bind_mod s x (EcPath.mident x')
+      | GTmem _ -> f_bind_mem s x x' in
+    s,(x',gty')
 
 let add_bindings = List.map_fold add_binding
    
@@ -1167,11 +1179,6 @@ let f_subst_local x t =
 let f_subst_mem m1 m2 = 
   let s = f_bind_mem f_subst_id m1 m2 in
   fun f -> if Mid.mem m1 f.f_fv then f_subst s f else f
-
-let is_subst_id s = 
-  s.fs_freshen = false &&
-  s.fs_p == identity && s.fs_ty == identity && 
-  Mid.is_empty s.fs_mp && Mid.is_empty s.fs_loc && Mid.is_empty s.fs_mem
   
 let f_subst s = 
   if is_subst_id s then identity

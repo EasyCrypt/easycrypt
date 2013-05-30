@@ -722,11 +722,11 @@ let equivF_abs_upto env fl fr bad invP invQ =
   let sg = List.map2 ospec oil.oi_calls oir.oi_calls in
   let sg = List.flatten sg in
   let lossless_a = 
-    let _sig = (EcEnv.Mod.by_mpath topl env).me_sig in
+    let sig_ = (EcEnv.Mod.by_mpath topl env).me_sig in
     let bd = 
-      List.map (fun (id,mt) -> (id,GTmodty(mt,EcPath.Sm.empty))) 
-        _sig.mis_params in               (* Should we put restriction here *)
-    let args = List.map (fun (id,_) -> EcPath.mident id) _sig.mis_params in
+      List.map (fun (id,mt) -> id,GTmodty(mt,EcPath.Sm.empty))
+        sig_.mis_params in               (* Should we put restriction here *)
+    let args = List.map (fun (id,_) -> EcPath.mident id) sig_.mis_params in
     let sub = fl.EcPath.x_sub in
     let concl = 
       f_losslessF (EcPath.xpath (EcPath.m_apply topl args) sub ) in
@@ -734,7 +734,7 @@ let equivF_abs_upto env fl fr bad invP invQ =
       let name = EcPath.basename sub in
       let Tys_function(_,oi) = 
         List.find (fun (Tys_function(fs,_)) -> fs.fs_name = name)
-          _sig.mis_body in
+          sig_.mis_body in
       oi.oi_calls in
     let hyps = List.map f_losslessF calls in
     f_forall bd (f_imps hyps concl) in

@@ -275,119 +275,176 @@ let h_red_opt ri env hyps f =
   with NotReducible -> None
 
 let check_alpha_equal ri env hyps f1 f2 = 
-  let error () = raise (IncompatibleForm (env, (f1, f2))) in
-  let find alpha id = try Mid.find id alpha with _ -> id in
-  let check_lpattern alpha lp1 lp2 = 
+(*FIXME:  let env = tyenv_of_hyps env hyps in *)
+  let exn = IncompatibleForm (env, (f1, f2)) in
+  let error () = raise exn in
+  let ensure t = if not t then error () in
+
+  let check_ty env subst ty1 ty2 =
+    ensure (equal_type env ty1 (subst.fs_ty ty2)) in
+
+  let add_local (env, subst) (x1,ty1) (x2,ty2) = 
+    check_ty env subst ty1 ty2;
+    env, 
+    if id_equal x1 x2 then subst 
+    else f_bind_local subst x2 (f_local x1 ty1) in
+  let check_lpattern env subst lp1 lp2 = 
     match lp1, lp2 with
-    | LSymbol (id1,_), LSymbol (id2,_) -> Mid.add id1 id2 alpha
+    | LSymbol xt1, LSymbol xt2 -> add_local (env, subst) xt1 xt2 
     | LTuple lid1, LTuple lid2 when List.length lid1 = List.length lid2 ->
-        List.fold_left2 (fun alpha (id1,_) (id2,_) -> Mid.add id1 id2 alpha) 
-          alpha lid1 lid2
-    | _, _ -> error () in
-  let check_memtype mt1 mt2 =
+      List.fold_left2 add_local (env,subst) lid1 lid2
+    | _, _ -> error() in
+
+  let check_memtype env mt1 mt2 =
     match mt1, mt2 with
-    | None, None -> true
+    | None, None -> ()
     | Some lmt1, Some lmt2 -> 
-      x_equal_norm env (EcMemory.lmt_xpath lmt1) (EcMemory.lmt_xpath lmt2) &&
-        EcSymbols.Msym.equal (equal_type env) 
-        (EcMemory.lmt_bindings lmt1) (EcMemory.lmt_bindings lmt2) 
-    | _, _ -> false in
-  let check_binding alpha bd1 bd2 =
-    let check_one alpha (x1,ty1) (x2,ty2) =
-      let tyok =
-        match ty1, ty2 with
-        | GTty    ty1, GTty ty2   -> equal_type env ty1 ty2
-        | GTmodty (p1,r1) , GTmodty(p2,r2) -> 
-          ModTy.mod_type_equiv env p1 p2 &&
-            EcPath.Sm.equal r1 r2 
-            (* FIXME : Did we have to perform reduction ?*)
-        | GTmem   me1, GTmem me2  -> check_memtype me1 me2
-        | _          , _          -> false
-      in
-        if   tyok
-        then Mid.add x1 x2 alpha
-        else error ()
-    in
-      List.fold_left2 check_one alpha bd1 bd2 in
+      let xp1, xp2 = EcMemory.lmt_xpath lmt1, EcMemory.lmt_xpath lmt2 in
+      ensure (x_equal_norm env xp1 xp2);
+      let m1, m2 = EcMemory.lmt_bindings lmt1, EcMemory.lmt_bindings lmt2 in
+      ensure (EcSymbols.Msym.equal (equal_type env) m1 m2)
+    | _, _ -> error () in
+  (* TODO all declaration in env, do it also in add local *)
+  let check_binding (env, subst) (x1,gty1) (x2,gty2) = 
+    let gty2 = gty_subst subst gty2 in
+    match gty1, gty2 with
+    | GTty ty1, GTty ty2 -> 
+      ensure (equal_type env ty1 ty2);
+      env, 
+      if id_equal x1 x2 then subst else f_bind_local subst x2 (f_local x1 ty1)
+    | GTmodty (p1,r1) , GTmodty(p2,r2) -> 
+      ensure (ModTy.mod_type_equiv env p1 p2 && EcPath.Sm.equal r1 r2);
+      Mod.bind_local x1 p1 r1 env, 
+      if id_equal x1 x2 then subst 
+      else f_bind_mod subst x2 (EcPath.mident x1)
+    | GTmem   me1, GTmem me2  -> 
+      check_memtype env me1 me2;
+      env, 
+      if id_equal x1 x2 then subst 
+      else f_bind_mem subst x2 x1 
+    | _, _ -> error () in
+  let check_bindings env subst bd1 bd2 =
+    List.fold_left2 check_binding (env,subst) bd1 bd2 in
 
-  let rec aux1 alpha f1 f2 = 
-    if Mid.is_empty alpha && f_equal f1 f2 then () 
+  let check_local subst id1 id2 = 
+    match (Mid.find_def f2 id2 subst.fs_loc).f_node with
+    | Flocal id2 -> ensure (EcIdent.id_equal id1 id2)
+    | _ -> assert false in
+  let check_mem subst m1 m2 = 
+    let m2 = Mid.find_def m2 m2 subst.fs_mem in
+    ensure (EcIdent.id_equal m1 m2) in    
+  let check_pv env subst pv1 pv2 = 
+    let pv2 = pv_subst (EcPath.x_substm subst.fs_p subst.fs_mp) pv2 in
+    ensure (pv_equal_norm env pv1 pv2) in
+  let check_mp env subst mp1 mp2 = 
+    let mp2 = EcPath.m_subst subst.fs_p subst.fs_mp mp2 in
+    ensure (m_equal_norm env mp1 mp2) in
+  let check_xp env subst xp1 xp2 = 
+    ensure (EcPath.p_equal xp1.EcPath.x_sub xp2.EcPath.x_sub);
+    check_mp env subst xp1.EcPath.x_top xp2.EcPath.x_top in
+  let check_s env s s1 s2 = 
+    let es = e_subst_init s.fs_freshen s.fs_p s.fs_ty s.fs_mp in
+    let s2 = EcModules.s_subst es s2 in
+    ensure (s_equal_norm env s1 s2) in
+
+  let rec aux1 env subst f1 f2 = 
+    if is_subst_id subst && f_equal f1 f2 then () 
     else match f1.f_node, f2.f_node with
-
+      
     | Fquant(q1,bd1,f1'), Fquant(q2,bd2,f2') when 
         q1 = q2 && List.length bd1 = List.length bd2 ->
-          let alpha = check_binding alpha bd1 bd2 in
-          aux alpha f1' f2'
+      let env, subst = check_bindings env subst bd1 bd2 in
+      aux env subst f1' f2'
 
     | Fif(a1,b1,c1), Fif(a2,b2,c2) ->
-        aux alpha a1 a2; aux alpha b1 b2; aux alpha c1 c2
+      aux env subst a1 a2; aux env subst b1 b2; aux env subst c1 c2
 
     | Flet(p1,f1',g1), Flet(p2,f2',g2) ->
-        aux alpha f1' f2';
-        let alpha = check_lpattern alpha p1 p2 in
-        aux alpha g1 g2
+      aux env subst f1' f2';
+      let (env,subst) = check_lpattern env subst p1 p2 in
+      aux env subst g1 g2
 
     | Fint i1, Fint i2 when i1 = i2 -> ()
 
-    | Flocal id1, Flocal id2 when EcIdent.id_equal (find alpha id1) id2 -> ()
+    | Flocal id1, Flocal id2 -> check_local subst id1 id2
 
-    | Fpvar(p1,m1), Fpvar(p2,m2) when 
-        EcIdent.id_equal (find alpha m1) m2 && pv_equal_norm env p1 p2  -> ()
+    | Fpvar(p1,m1), Fpvar(p2,m2) ->
+      check_mem subst m1 m2;
+      check_pv env subst p1 p2
     
-    | Fglob(p1,m1), Fglob(p2,m2) when
-        m_equal_norm env p1 p2 &&  EcIdent.id_equal (find alpha m1) m2 -> ()
+    | Fglob(p1,m1), Fglob(p2,m2) ->
+      check_mem subst m1 m2;
+      check_mp env subst p1 p2
 
-    | Fop(p1, ty1), Fop(p2, ty2) when EcPath.p_equal p1 p2 &&
-        List.all2 (equal_type env) ty1 ty2 -> () 
+    | Fop(p1, ty1), Fop(p2, ty2) when EcPath.p_equal p1 p2 ->
+      List.iter2 (check_ty env subst) ty1 ty2
 
-    | Fapp(f1',args1), Fapp(f2',args2) when List.length args1 = List.length args2 ->
-      aux alpha f1' f2';
-      List.iter2 (aux alpha) args1 args2
+    | Fapp(f1',args1), Fapp(f2',args2) when 
+        List.length args1 = List.length args2 ->
+      aux env subst f1' f2';
+      List.iter2 (aux env subst) args1 args2
 
     | Ftuple args1, Ftuple args2 when List.length args1 = List.length args2 ->
-        List.iter2 (aux alpha) args1 args2
+      List.iter2 (aux env subst) args1 args2
 
-    | FhoareF hf1, FhoareF hf2 when x_equal_norm env hf1.hf_f hf2.hf_f ->
-        aux alpha hf1.hf_pr hf2.hf_pr;
-        aux alpha hf1.hf_po hf2.hf_po
+    | FhoareF hf1, FhoareF hf2 -> 
+      check_xp env subst hf1.hf_f hf2.hf_f;
+      aux env subst hf1.hf_pr hf2.hf_pr;
+      aux env subst hf1.hf_po hf2.hf_po
 
-    | FhoareS hs1, FhoareS hs2 when s_equal_norm env hs1.hs_s hs2.hs_s -> 
-        (* FIXME should check the memenv *)
-        aux alpha hs1.hs_pr  hs1.hs_pr;
-        aux alpha hs1.hs_po hs2.hs_po
+    | FhoareS hs1, FhoareS hs2 -> 
+      check_s env subst hs1.hs_s hs2.hs_s;
+      (* FIXME should check the memenv *)
+      aux env subst hs1.hs_pr hs1.hs_pr;
+      aux env subst hs1.hs_po hs2.hs_po
 
-    | FequivF ef1, FequivF ef2 
-      when x_equal_norm env ef1.ef_fl ef2.ef_fl && 
-           x_equal_norm env ef1.ef_fr ef2.ef_fr ->
-        aux alpha ef1.ef_pr  ef2.ef_pr;
-        aux alpha ef1.ef_po ef2.ef_po
+    | FbdHoareF hf1, FbdHoareF hf2 -> 
+      ensure (hf1.bhf_cmp = hf2.bhf_cmp);
+      check_xp env subst hf1.bhf_f hf2.bhf_f;
+      aux env subst hf1.bhf_pr hf2.bhf_pr;
+      aux env subst hf1.bhf_po hf2.bhf_po;
+      aux env subst hf1.bhf_bd hf2.bhf_bd
 
-    | FequivS es1, FequivS es2 
-      when s_equal_norm env es1.es_sl es2.es_sl && 
-           s_equal_norm env es1.es_sr es2.es_sr ->
-        (* FIXME should check the memenv *)
-        aux alpha es1.es_pr es2.es_pr;
-        aux alpha es1.es_po es2.es_po
+    | FbdHoareS hs1, FbdHoareS hs2 ->
+      ensure (hs1.bhs_cmp = hs2.bhs_cmp);
+      check_s env subst hs1.bhs_s hs2.bhs_s;
+      (* FIXME should check the memenv *)
+      aux env subst hs1.bhs_pr hs1.bhs_pr;
+      aux env subst hs1.bhs_po hs2.bhs_po;
+      aux env subst hs1.bhs_bd hs2.bhs_bd
 
-    | Fpr(m1,p1,args1,f1'), Fpr(m2,p2,args2,f2') 
-      when EcIdent.id_equal (find alpha m1) m2 &&
-           x_equal_norm env p1 p2 &&  
-           List.length args1 = List.length args2 ->
-        List.iter2 (aux alpha) args1 args2;
-        aux alpha f1' f2'
+    | FequivF ef1, FequivF ef2 -> 
+      check_xp env subst ef1.ef_fl ef2.ef_fl;
+      check_xp env subst ef1.ef_fr ef2.ef_fr;
+      aux env subst ef1.ef_pr ef2.ef_pr;
+      aux env subst ef1.ef_po ef2.ef_po
+
+    | FequivS es1, FequivS es2 ->
+      check_s env subst es1.es_sl es2.es_sl;
+      check_s env subst es1.es_sr es2.es_sr;
+      (* FIXME should check the memenv *)
+      aux env subst es1.es_pr es2.es_pr;
+      aux env subst es1.es_po es2.es_po
+
+    | Fpr(m1,p1,args1,f1'), Fpr(m2,p2,args2,f2') ->
+      check_mem subst m1 m2;
+      check_xp env subst p1 p2;
+      ensure (List.length args1 = List.length args2);
+      List.iter2 (aux env subst) args1 args2;
+      aux env subst f1' f2'
 
     | _, _ -> error ()
-  and aux alpha f1 f2 = 
-    try aux1 alpha f1 f2 
-    with e ->
+  and aux env subst f1 f2 = 
+    try aux1 env subst f1 f2 
+    with e when e == exn ->
       match h_red_opt ri env hyps f1 with
-      | Some f1 -> aux alpha f1 f2
+      | Some f1 -> aux env subst f1 f2
       | None -> 
         match h_red_opt ri env hyps f2 with
-        | Some f2 -> aux alpha f1 f2
+        | Some f2 -> aux env subst f1 f2
         | None -> raise e
   in
-  aux Mid.empty f1 f2
+  aux env f_subst_id f1 f2
 
 let check_alpha_eq = check_alpha_equal no_red
 let check_conv     = check_alpha_equal full_red
