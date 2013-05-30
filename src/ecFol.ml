@@ -622,6 +622,7 @@ let fop_int_le = f_op EcCoreLib.p_int_le [] (tfun tint (tfun tint ty_bool))
 let fop_int_lt = f_op EcCoreLib.p_int_lt [] (tfun tint (tfun tint ty_bool))
 let fop_real_le = f_op EcCoreLib.p_real_le [] (tfun treal (tfun treal ty_bool))
 let fop_real_lt = f_op EcCoreLib.p_real_lt [] (tfun treal (tfun treal ty_bool))
+let fop_real_prod = f_op EcCoreLib.p_real_prod [] (tfun treal (tfun treal treal))
 let fop_real_div = f_op EcCoreLib.p_real_div [] (tfun treal (tfun treal treal))
 
 let f_int_le f1 f2 = 
@@ -648,11 +649,60 @@ let f_real_lt f1 f2 =
   else 
     assert false (* FIXME *)
 
-let f_real_div f1 f2 =
+let f_real_prod f1 f2 =
   if ty_equal f1.f_ty treal && ty_equal f2.f_ty treal then
+    f_app fop_real_prod [f1;f2] ty_real
+  else 
+    assert false (* FIXME *)
+
+let f_real_div f1 f2 =
+  if ty_equal f1.f_ty treal && ty_equal f2.f_ty treal && not (f_equal f2 f_r0) then
     f_app fop_real_div [f1;f2] ty_real
   else 
     assert false (* FIXME *)
+
+let rec gcd a b = if b = 0 then a else gcd b (a mod b)
+
+let rec f_real_prod_simpl f1 f2 =
+  match f1.f_node, f2.f_node with
+    | Fapp (op1,[f1_1;f1_2]), Fapp (op2,[f2_1;f2_2]) 
+      when f_equal op1 fop_real_div && f_equal op2 fop_real_div ->
+      f_real_div_simpl (f_real_prod_simpl f1_1 f2_1) (f_real_prod_simpl f1_2 f2_2)
+    | _, Fapp (op2,[f2_1;f2_2]) when f_equal op2 fop_real_div ->
+      f_real_div_simpl (f_real_prod_simpl f1 f2_1) f2_2
+    | Fapp (op1,[f1_1;f1_2]), _ when f_equal op1 fop_real_div ->
+      f_real_div_simpl (f_real_prod_simpl f1_1 f2) f1_2
+    | Fapp (op1,[{f_node=Fint n1}]), Fapp (op2,[{f_node=Fint n2}]) 
+      when f_equal f_op_real_of_int op1 && f_equal f_op_real_of_int op2 ->
+      f_real_of_int (f_int (n1 * n2))
+    | _ ->
+      if f_equal f_r0 f1 || f_equal f_r0 f1 then f_r0
+      else if f_equal f_r1 f1 then f2
+      else if f_equal f_r1 f2 then f1
+      else f_real_prod f1 f2
+
+and f_real_div_simpl f1 f2 =
+  match f1.f_node, f2.f_node with
+    | Fapp (op1,[f1_1;f1_2]), Fapp (op2,[f2_1;f2_2]) 
+      when f_equal op1 fop_real_div && f_equal op2 fop_real_div ->
+      f_real_div_simpl (f_real_prod_simpl f1_1 f2_2) (f_real_prod_simpl f1_2 f2_1)
+    | _, Fapp (op2,[f2_1;f2_2]) 
+      when f_equal op2 fop_real_div ->
+      f_real_div_simpl (f_real_prod_simpl f1 f2_2) f2_1
+    | Fapp (op,[f1_1;f1_2]), _ 
+      when f_equal op fop_real_div ->
+      f_real_div_simpl f1_1 (f_real_prod_simpl f1_2 f2)
+    | _ , Fapp (op2,[{f_node=Fint 1}]) 
+      when f_equal f_op_real_of_int op2 -> f1
+    | Fapp (op1,[{f_node=Fint n1}]), Fapp (op2,[{f_node=Fint n2}]) 
+      when f_equal f_op_real_of_int op1 && f_equal f_op_real_of_int op2 && n2<>0 ->
+      begin
+        let n = gcd n1 n2 in
+        if n <> 1 then 
+          f_real_div_simpl (f_real_of_int (f_int (n1/n))) (f_real_of_int (f_int (n2/n)))
+        else f_real_div (f_real_of_int (f_int n1)) (f_real_of_int (f_int n2))
+      end
+    | _ -> f_real_div f1 f2
 
 
 let fop_in_supp ty = f_op EcCoreLib.p_in_supp [ty] (tfun ty (tfun (tdistr ty) ty_bool))

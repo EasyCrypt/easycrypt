@@ -38,7 +38,7 @@ lemma test2: bd_hoare [ M2.f : b ==> res] [=] [1%r/2%r]
 proof.
 fun.
 wp.
-rnd {  (1%r/2%r), (lambda (x:bool), x=y) }.
+rnd (1%r/2%r) (lambda (x:bool), x=y).
 skip.
 intros _ n; split; [trivial|trivial].
 save.
@@ -57,7 +57,7 @@ lemma test3: bd_hoare [ M3.f : true ==> res=b] [>=] [1%r]
 proof.
 fun.
 wp.
-rnd {  1%r, (lambda x, true) }.
+rnd 1%r (lambda x, true) .
 skip; trivial.
 save.
 

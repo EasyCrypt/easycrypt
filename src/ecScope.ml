@@ -840,14 +840,23 @@ module Tactic = struct
       let tacs = List.map totac ri in
       set_loc loc (t_lseq tacs) g
 
-  let process_app env k phi g =
-    match k with
-    | Single i ->
-      let phi = process_phl_formula env g phi in
-      t_hoare_app i phi g
-    | Double(i,j) ->
-      let phi = process_prhl_formula env g phi in
-      t_equiv_app (i,j) phi g
+  let process_app env dir k phi bd_opt g =
+    let concl = get_concl g in
+    match k, bd_opt with
+      | Single i, None when is_hoareS concl ->
+        let phi = process_phl_formula env g phi in
+        t_hoare_app i phi g
+      | Single i, _ when is_bdHoareS concl ->
+        let phi = process_phl_formula env g phi in
+        let bd_opt = omap bd_opt (process_phl_form treal env g) in
+        t_bdHoare_app dir i phi bd_opt g
+      | Double(i,j), None ->
+        let phi = process_prhl_formula env g phi in
+        t_equiv_app (i,j) phi g
+      | Single _, None ->
+        cannot_apply "app" "wrong position parameter"
+      | _, Some _ ->
+        cannot_apply "app" "optional bound parameter not supported"
 
   let process_while env phi g =
     let concl = get_concl g in
@@ -1162,7 +1171,7 @@ module Tactic = struct
       | Pfun_abs f -> process_fun_abs env f
       | Pfun_upto info -> process_fun_upto env info 
       | Pskip    -> EcPhl.t_skip
-      | Papp (k,phi) -> process_app env k phi
+      | Papp (dir,k,phi,f) -> process_app env dir k phi f
       | Pwp  k   -> t_wp env k
       | Prcond (side,b,i) -> t_rcond side b i
       | Pcond side   -> process_cond env side
