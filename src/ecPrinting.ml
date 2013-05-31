@@ -332,7 +332,7 @@ let maybe_paren (outer, side) inner pp =
       | `Prefix      , `Right    -> true
       | `Infix `Left , `Left     -> (pi = po) && (fo = `Infix `Left )
       | `Infix `Right, `Right    -> (pi = po) && (fo = `Infix `Right)
-      | _            , `NonAssoc -> fi = fo
+      | _            , `NonAssoc -> (pi = po) && (fi = fo)
       | _            , _         -> false
   in
     pp_maybe_paren (not (noparens inner outer side)) pp
@@ -341,6 +341,7 @@ let maybe_paren (outer, side) inner pp =
 let e_bin_prio_impl   = (10, `Infix `Right)
 let e_bin_prio_if     = (15, `Prefix)
 let e_bin_prio_if3    = (17, `Infix `NonAssoc)
+let e_bin_prio_lambda = (18, `Prefix)
 let e_bin_prio_letin  = (19, `Prefix)
 let e_bin_prio_or     = (20, `Infix `Right)
 let e_bin_prio_and    = (25, `Infix `Right)
@@ -419,7 +420,7 @@ let pp_let (ppe : PPEnv.t) pp_sub outer fmt (pt, e1, e2) =
   let pp fmt (pt, e1, e2) =
     let ids    = lp_ids pt in
     let subppe = List.fold_left PPEnv.add_local ppe ids in
-      Format.fprintf fmt "@[<hov 0>let %a =@;<1 2> [@%a@]@ in@ %a@]"
+      Format.fprintf fmt "@[<hov 0>let %a =@;<1 2>@[%a@]@ in@ %a@]"
         (pp_list ", " (pp_local ppe)) ids
         (pp_sub ppe (e_bin_prio_letin, `NonAssoc)) e1
         (pp_sub subppe (e_bin_prio_letin, `NonAssoc)) e2
@@ -431,6 +432,7 @@ let pp_tuple (ppe : PPEnv.t) pp_sub es =
   pp_paren (pp_list ",@ " (pp_sub ppe (min_op_prec, `NonAssoc))) es
 
 (* -------------------------------------------------------------------- *)
+
 let pp_opname fmt (nm, op) = 
   let op = 
     if is_unbinop op then Format.sprintf "( %s )" op
@@ -481,27 +483,27 @@ let pp_opapp (ppe : PPEnv.t) pp_sub outer fmt (op, _tvi, es) =
               (pp, e_get_prio)
 
         | _ ->
-            (pp_stdapp, if es = [] then max_op_prec else appprio)
+            (pp_stdapp, if es = [] then max_op_prec else min_op_prec)
       else 
-        (pp_stdapp, appprio)
+        (pp_stdapp, if es = [] then max_op_prec else min_op_prec)
     in
       maybe_paren outer prio (fun fmt () -> pp fmt) fmt
 
   and try_pp_as_uniop () =
     match es with
     | [e] -> 
-      if nm = [] then 
+      if mn = [] then
         begin match priority_of_unop opname with
         | None -> None
         | Some opprio  ->
-            let opprio = (opprio, `Prefix) in
-            let pp fmt =
-              Format.fprintf fmt "@[%s@ %a@]" opname
-                (pp_sub ppe (opprio, `NonAssoc)) e in
-            let pp fmt =
-              maybe_paren outer opprio (fun fmt () -> pp fmt) fmt
-            in
-              Some pp
+          let opprio = (opprio, `Prefix) in
+          let pp fmt =
+            Format.fprintf fmt "@[%s@ %a@]" opname
+              (pp_sub ppe (opprio, `NonAssoc)) e in
+          let pp fmt =
+            maybe_paren outer opprio (fun fmt () -> pp fmt) fmt
+          in
+          Some pp
         end
       else None
     | _ -> None 
@@ -509,22 +511,21 @@ let pp_opapp (ppe : PPEnv.t) pp_sub outer fmt (op, _tvi, es) =
   and try_pp_as_binop () =
     match es with
     | [e1; e2] ->
-      if nm = [] then 
+      if mn = [] then
         begin match priority_of_binop opname with
         | None -> None
         | Some opprio ->
-            let pp fmt =
-              Format.fprintf fmt "@[%a %s@ %a@]"
-                (pp_sub ppe (opprio, `Left)) e1
-                opname
-                (pp_sub ppe (opprio, `Right)) e2 in
-            let pp fmt =
-              maybe_paren outer opprio (fun fmt () -> pp fmt) fmt
-            in
-              Some pp
+          let pp fmt =
+            Format.fprintf fmt "@[%a %s@ %a@]"
+              (pp_sub ppe (opprio, `Left)) e1
+              opname
+              (pp_sub ppe (opprio, `Right)) e2 in
+          let pp fmt =
+            maybe_paren outer opprio (fun fmt () -> pp fmt) fmt
+          in
+          Some pp
         end
       else None
-
     | _ -> None
         
   and try_pp_special () = 
@@ -621,8 +622,11 @@ let pp_expr (ppe : PPEnv.t) fmt (e : expr) =
 
     | Elam (vardecls, e) ->
         let (subppe, pp) = pp_locbinds ppe vardecls in
-          Format.fprintf fmt "lambda %t,@ %a"
+        let pp fmt () =
+          Format.fprintf fmt "@[<hov 2>lambda %t,@ %a@]"
             pp (pp_expr subppe (min_op_prec, `NonAssoc)) e
+        in
+          maybe_paren outer e_bin_prio_lambda pp fmt ()
 
   in
     pp_expr ppe (min_op_prec, `NonAssoc) fmt e
@@ -1138,7 +1142,7 @@ let pp_node_r side ((maxl, maxr), stats) =
           let l = odfl "" l and r = odfl "" r in
             match side with
             | `Both ->
-                Format.fprintf fmt "%-*s (%t) %-*s@\n%!"
+                Format.fprintf fmt "%-*s  (%t)  %-*s@\n%!"
                   maxl (Printf.sprintf "%*s%s" (2*idt) "" l)
                   (pp_depth mode stats ((pc, offset) :: depth))
                   maxr (Printf.sprintf "%*s%s" (2*idt) "" r)
@@ -1169,17 +1173,11 @@ let pp_node mode fmt node =
 
 (* -------------------------------------------------------------------- *)
 let pp_pre (ppe : PPEnv.t) fmt pre =
-  let pre = c_split (pp_form ppe) pre in
-    List.iter
-      (fun x -> Format.fprintf fmt "??> %s@\n%!" x)
-      pre
+  Format.fprintf fmt "??> @[<hov 2>@]%a@\n%!" (pp_form ppe) pre
 
 (* -------------------------------------------------------------------- *)
 let pp_post (ppe : PPEnv.t) fmt post =
-  let post = c_split (pp_form ppe) post in
-    List.iter
-      (fun x -> Format.fprintf fmt "--> %s@\n%!" x)
-      post
+  Format.fprintf fmt "--> @[<hov 2>@]%a@\n%!" (pp_form ppe) post
 
 (* -------------------------------------------------------------------- *)
 let pp_hoareF (ppe : PPEnv.t) fmt hf =
@@ -1272,8 +1270,8 @@ let pp_equivS (ppe : PPEnv.t) fmt es =
       (EcMemory.xpath es.es_ml, EcMemory.xpath es.es_mr)
       ppe ppnode
   in
-    Format.fprintf fmt "Left  : %a@\n%!" (pp_funname ppe) (EcMemory.xpath es.es_ml);
-    Format.fprintf fmt "Right : %a@\n%!" (pp_funname ppe) (EcMemory.xpath es.es_mr);
+    Format.fprintf fmt "&1 (right) : %a@\n%!" (pp_funname ppe) (EcMemory.xpath es.es_ml);
+    Format.fprintf fmt "&2 (left ) : %a@\n%!" (pp_funname ppe) (EcMemory.xpath es.es_mr);
     Format.fprintf fmt "@\n%!";
     Format.fprintf fmt "%a%!" (pp_pre ppe) es.es_pr;
     Format.fprintf fmt "@\n%!";
