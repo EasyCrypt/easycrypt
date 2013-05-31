@@ -248,6 +248,7 @@
 %token TYPE
 %token UNDERSCORE
 %token UNDO
+%token UNROLL
 %token USING
 %token VAR
 %token WHILE
@@ -1423,6 +1424,9 @@ tactic:
 
 | FUSION s=side? o=codepos NOT i=NUM AT d1=NUM COMMA d2=NUM
     { PPhl (Pfusion (s, o, (i, (d1, d2)))) }
+
+| UNROLL s=side? o=codepos
+    { PPhl (Punroll (s, o)) }
 
 | p=tselect INLINE
     { PPhl (Pinline (`ByPattern p)) }

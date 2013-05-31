@@ -872,6 +872,9 @@ module Tactic = struct
   let process_fusion env (side, cpos, infos) g =
     t_fusion env side cpos infos g
 
+  let process_unroll env (side, cpos) g =
+    t_unroll env side cpos g
+
   let process_call env side pre post g =
     let hyps,concl = get_goal g in
     match concl.f_node, side with
@@ -1187,6 +1190,7 @@ module Tactic = struct
       | Pwhile phi -> process_while env phi
       | Pfission info -> process_fission env info
       | Pfusion info -> process_fusion env info
+      | Punroll info -> process_unroll env info
       | Pcall(side, (pre, post)) -> process_call env side pre post
       | Pswap info -> process_swap env info
       | Pinline info -> process_inline env info

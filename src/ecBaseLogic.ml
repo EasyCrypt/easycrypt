@@ -216,6 +216,7 @@ type rule_name =
   | RN_hl_while     of EcFol.form
   | RN_hl_fission   of bool option * codepos * (int * (int * int))
   | RN_hl_fusion    of bool option * codepos * (int * (int * int))
+  | RN_hl_unroll    of bool option * codepos
   | RN_hl_call      of bool option * EcFol.form * EcFol.form
   | RN_hl_swap      of bool * int * int * int
   | RN_hl_inline    of bool option * s_pat 

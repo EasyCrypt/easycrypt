@@ -1481,6 +1481,16 @@ let t_fusion env side cpos infos g =
     CPos.t_code_transform env side cpos tr (CPos.t_zip (fusion_stmt infos)) g
 
 (* -------------------------------------------------------------------- *)
+let unroll_stmt _env me i =
+  match i.i_node with
+  | Swhile (e, sw) -> (me, [i_if (e, sw, stmt []); i])
+  | _ -> tacuerror "cannot find a while loop at given position"
+
+let t_unroll env side cpos g =
+  let tr = fun side -> RN_hl_unroll (side, cpos) in
+    CPos.t_code_transform env side cpos tr (CPos.t_fold unroll_stmt) g
+
+(* -------------------------------------------------------------------- *)
 let t_equiv_deno env pre post g =
   let concl = get_concl g in
   let cmp, f1, f2 =
