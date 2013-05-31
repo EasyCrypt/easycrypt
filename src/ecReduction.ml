@@ -244,9 +244,9 @@ let rec h_red ri env hyps f =
     f_app (h_red ri env hyps f1) args f.f_ty
   | Fop(p,tys) -> reduce_op ri env p tys
   | Fif(f1,f2,f3) when ri.iota ->
-    let f' = f_if_simpl f1 f2 f2 in
+    let f' = f_if_simpl f1 f2 f3 in
     if f_equal f f' then f_if (h_red ri env hyps f1) f2 f3
-    else f_if_simpl (h_red ri env hyps f1) f2 f3 
+    else f' 
   | Fquant(Lforall,b,f1) ->
     begin 
       try f_forall_simpl b (h_red ri env hyps f1)

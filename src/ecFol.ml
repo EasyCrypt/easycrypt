@@ -1376,10 +1376,10 @@ let f_if_simpl f1 f2 f3 =
   | Some true, _, _  -> f2
   | Some false, _, _ -> f3
   | _, Some true, _  -> f_imp_simpl (f_not_simpl f1) f3
-  | _, Some false, _ -> f_and_simpl (f_not_simpl f1) f3
+  | _, Some false, _ -> f_anda_simpl (f_not_simpl f1) f3
   | _, _, Some true  -> f_imp_simpl f1 f2
-  | _, _, Some false -> f_and_simpl f1 f2
-  | _, _, _          -> f_if f1 f2 f2
+  | _, _, Some false -> f_anda_simpl f1 f2
+  | _, _, _          -> f_if f1 f2 f3
 
 let f_imps_simpl = List.fold_right f_imp_simpl 
 let f_imps = List.fold_right f_imp 
