@@ -488,7 +488,7 @@ let pp_opapp (ppe : PPEnv.t) pp_sub outer fmt (op, _tvi, es) =
               Some pp
         end
       else None
-    | _ -> None
+    | _ -> None 
 
   and try_pp_as_binop () =
     match es with
@@ -545,7 +545,7 @@ let pp_opapp (ppe : PPEnv.t) pp_sub outer fmt (op, _tvi, es) =
     (odfl
        pp_as_std_op
        (List.fpick [try_pp_special ;
-                    try_pp_as_uniop;
+                    try_pp_as_uniop; 
                     try_pp_as_binop])) fmt ()
 
 (* --------------------------------------------------------------------  *)
