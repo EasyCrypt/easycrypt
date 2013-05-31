@@ -1,5 +1,7 @@
 (* cyclic groups of prime order *)
 require import Prime_field.
+require import Real.
+require import Distr.
 
 type group.
 op g:group. (* the generator *)
@@ -22,6 +24,19 @@ axiom group_log_pow: forall (a:group),
 axiom group_pow_log: forall (x:gf_q),
   log (g ^ x) = x.
 
+
+theory Dgroup.
+  op dgroup: group distr.
+
+  axiom supp_def: forall (s:group),
+    in_supp s dgroup.
+
+  axiom mu_x_def_in: forall (s:group),
+    mu_x dgroup s = 1%r/q%r.
+
+  axiom mu_weight_pos: mu_weight dgroup = 1%r.
+
+end Dgroup.
 
 (* tests 
 
