@@ -1143,7 +1143,7 @@ let pp_node_r side ((maxl, maxr), stats) =
           let l = odfl "" l and r = odfl "" r in
             match side with
             | `Both ->
-                Format.fprintf fmt "%-*s (%t) %-*s@\n%!"
+                Format.fprintf fmt "%-*s  (%t)  %-*s@\n%!"
                   maxl (Printf.sprintf "%*s%s" (2*idt) "" l)
                   (pp_depth mode stats ((pc, offset) :: depth))
                   maxr (Printf.sprintf "%*s%s" (2*idt) "" r)
@@ -1271,8 +1271,8 @@ let pp_equivS (ppe : PPEnv.t) fmt es =
       (EcMemory.xpath es.es_ml, EcMemory.xpath es.es_mr)
       ppe ppnode
   in
-    Format.fprintf fmt "Left  : %a@\n%!" (pp_funname ppe) (EcMemory.xpath es.es_ml);
-    Format.fprintf fmt "Right : %a@\n%!" (pp_funname ppe) (EcMemory.xpath es.es_mr);
+    Format.fprintf fmt "&1 (right) : %a@\n%!" (pp_funname ppe) (EcMemory.xpath es.es_ml);
+    Format.fprintf fmt "&2 (left ) : %a@\n%!" (pp_funname ppe) (EcMemory.xpath es.es_mr);
     Format.fprintf fmt "@\n%!";
     Format.fprintf fmt "%a%!" (pp_pre ppe) es.es_pr;
     Format.fprintf fmt "@\n%!";
