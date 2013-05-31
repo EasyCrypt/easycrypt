@@ -50,6 +50,13 @@ module PPEnv = struct
     let (nm, x) = shorten (List.rev nm) ([], x) in
       (nm, x)
 
+  let ty_symb (ppe : t) p = 
+      let exists sm =
+      try  EcPath.p_equal (EcEnv.Ty.lookup_path sm ppe.ppe_env) p
+      with EcEnv.LookupFailure _ -> false
+    in
+      p_shorten exists p
+
   let op_symb (ppe : t) p =
     let exists sm =
       try  EcPath.p_equal (EcEnv.Op.lookup_path sm ppe.ppe_env) p
@@ -172,8 +179,8 @@ let pp_tyunivar _ppe fmt x =
   Format.fprintf fmt "#%d" x
 
 (* -------------------------------------------------------------------- *)
-let pp_tyname _ppe fmt p =
-  Format.fprintf fmt "%s" (P.tostring p)
+let pp_tyname ppe fmt p =
+  Format.fprintf fmt "%a" EcSymbols.pp_qsymbol (PPEnv.ty_symb ppe p)
 
 (* -------------------------------------------------------------------- *)
 let pp_funname (ppe : PPEnv.t) fmt p =
@@ -294,6 +301,8 @@ let priority_of_binop_name name =
   | Some EP.GT    -> Some e_bin_prio_op1
   | Some EP.OP1 _ -> Some e_bin_prio_op1
   | Some EP.OP2 _ -> Some e_bin_prio_op2
+  | Some EP.ADD   -> Some e_bin_prio_op2
+  | Some EP.MINUS -> Some e_bin_prio_op2
   | Some EP.OP3 _ -> Some e_bin_prio_op3
   | Some EP.STAR  -> Some e_bin_prio_op3
   | Some EP.OP4 _ -> Some e_bin_prio_op4
@@ -308,6 +317,8 @@ let priority_of_uniop name =
   | Some(EP.AND _)-> Some e_uni_prio_uminus  
   | Some(EP.OR _) -> Some e_uni_prio_uminus  
   | Some EP.STAR  -> Some e_uni_prio_uminus  
+  | Some EP.ADD   -> Some e_uni_prio_uminus  
+  | Some EP.MINUS -> Some e_uni_prio_uminus  
   | Some EP.GT    -> Some e_uni_prio_uminus  
   | Some EP.OP1 _ -> Some e_uni_prio_uminus 
   | Some EP.OP2 _ -> Some e_uni_prio_uminus
@@ -350,7 +361,7 @@ let pp_opname_as_operator fmt (nm, op) =
   match nm with
   | [] -> Format.fprintf fmt "%s" op
   | _  ->
-      let op = Printf.sprintf "(%s)" op in
+      let op = Printf.sprintf "( %s )" op in
         EcSymbols.pp_qsymbol fmt (nm, op)
 
 let pp_opapp (ppe : PPEnv.t) pp_sub outer fmt (op, _tvi, es) =
@@ -370,7 +381,7 @@ let pp_opapp (ppe : PPEnv.t) pp_sub outer fmt (op, _tvi, es) =
       if nm = [] then
         match opname, es with
         | "__nil", [] ->
-            ((fun fmt -> pp_string fmt "{}"), max_op_prec)
+            ((fun fmt -> pp_string fmt "[]"), max_op_prec)
 
         | "__abs", [e] ->
             let pp fmt =
@@ -381,7 +392,7 @@ let pp_opapp (ppe : PPEnv.t) pp_sub outer fmt (op, _tvi, es) =
 
         | "__get", [e1; e2] ->
             let pp fmt =
-              Format.fprintf fmt "%a[%a]"
+              Format.fprintf fmt "%a.[%a]"
                 (pp_sub ppe (e_get_prio, `Left)) e1
                 (pp_sub ppe (min_op_prec, `NonAssoc)) e2
             in
@@ -389,7 +400,7 @@ let pp_opapp (ppe : PPEnv.t) pp_sub outer fmt (op, _tvi, es) =
 
         | "__set", [e1; e2; e3] ->
             let pp fmt =
-              Format.fprintf fmt "%a[%a <- %a]"
+              Format.fprintf fmt "%a.[%a <- %a]"
                 (pp_sub ppe (e_get_prio , `Left    )) e1
                 (pp_sub ppe (min_op_prec, `NonAssoc)) e2
                 (pp_sub ppe (min_op_prec, `NonAssoc)) e3
@@ -405,7 +416,8 @@ let pp_opapp (ppe : PPEnv.t) pp_sub outer fmt (op, _tvi, es) =
 
   and try_pp_as_uniop () =
     match es with
-    | [e] ->
+    | [e] -> 
+      if nm = [] then 
         begin match priority_of_uniop opname with
         | None -> None
         | Some opprio  ->
@@ -419,11 +431,13 @@ let pp_opapp (ppe : PPEnv.t) pp_sub outer fmt (op, _tvi, es) =
             in
               Some pp
         end
+      else None
     | _ -> None
 
   and try_pp_as_binop () =
     match es with
     | [e1; e2] ->
+      if nm = [] then 
         begin match priority_of_binop_name opname with
         | None -> None
         | Some opprio ->
@@ -437,6 +451,7 @@ let pp_opapp (ppe : PPEnv.t) pp_sub outer fmt (op, _tvi, es) =
             in
               Some pp
         end
+      else None
 
     | _ -> None
         
@@ -462,7 +477,7 @@ let pp_opapp (ppe : PPEnv.t) pp_sub outer fmt (op, _tvi, es) =
 
     | [e1; e2] when qs = EcCoreLib.s_dinter ->
         let pp fmt () =
-          Format.fprintf fmt "{%a..%a}"
+          Format.fprintf fmt "[%a..%a]"
             (pp_sub ppe (min_op_prec, `NonAssoc)) e1
             (pp_sub ppe (min_op_prec, `NonAssoc)) e2
         in
