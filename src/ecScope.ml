@@ -1179,6 +1179,24 @@ module Tactic = struct
     let l = fun x -> EcLocation.mk_loc EcLocation._dummy x in
     let (p, _) = EcTyping.trans_msymbol env (l [(l "M", Some [l [(l "K", None)]])]) in
       ignore (EcEnv.Mod.by_mpath p env)
+  
+  let process_field env (p,t,i,m,z,o,e) g =
+		let (hyps,concl) = get_goal g in
+			(match concl.f_node with
+				| Fapp(eq',[arg1;arg2]) ->
+					let ty = f_ty arg1 in
+					let eq = process_form env hyps e (tfun ty (tfun ty tbool)) in
+					if (f_equal eq eq' ) then
+						let p' = process_form env hyps p (tfun ty (tfun ty ty)) in 
+						let t' = process_form env hyps t (tfun ty (tfun ty ty)) in 
+						let i' = process_form env hyps i (tfun ty ty) in 
+		 				let m' = process_form env hyps m (tfun ty ty) in 
+						let z' = process_form env hyps z ty in 
+						let o' = process_form env hyps o ty in 
+						t_field env (p',t',i',m',z',o',eq) (arg1,arg2)
+					else
+						cannot_apply "field" "the eq doeesn't coincide"
+				| _ -> cannot_apply "field" "Think more about the goal")
 
   let rec process_logic_tacs scope env (tacs:ptactics) (gs:goals) : goals =
     match tacs with
@@ -1207,7 +1225,7 @@ module Tactic = struct
       | Ptrivial pi    -> process_trivial scope pi env
       | Pintro pi      -> process_intros env pi
       | Psplit         -> t_split env
-      | Pfield ops -> (*process_debug env;*) t_field env ops
+      | Pfield (p,t,i,m,z,o,e) -> process_field env (p,t,i,m,z,o,e) g
       | Pexists fs     -> process_exists env fs
       | Pleft          -> t_left env
       | Pright         -> t_right env

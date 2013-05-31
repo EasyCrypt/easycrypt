@@ -201,6 +201,7 @@ type rule_name =
   | RN_exists_intro 
 (*| RN_tuple_intro  of EcIdent.t list *)
   | RN_conv    
+  | RN_field (* field tactic *)
 
     (* Phl rules *)    
   | RN_hl_fun_def 
