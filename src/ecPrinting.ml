@@ -1174,17 +1174,11 @@ let pp_node mode fmt node =
 
 (* -------------------------------------------------------------------- *)
 let pp_pre (ppe : PPEnv.t) fmt pre =
-  let pre = c_split (pp_form ppe) pre in
-    List.iter
-      (fun x -> Format.fprintf fmt "??> %s@\n%!" x)
-      pre
+  Format.fprintf fmt "??> @[<hov 2>@]%a@\n%!" (pp_form ppe) pre
 
 (* -------------------------------------------------------------------- *)
 let pp_post (ppe : PPEnv.t) fmt post =
-  let post = c_split (pp_form ppe) post in
-    List.iter
-      (fun x -> Format.fprintf fmt "--> %s@\n%!" x)
-      post
+  Format.fprintf fmt "--> @[<hov 2>@]%a@\n%!" (pp_form ppe) post
 
 (* -------------------------------------------------------------------- *)
 let pp_hoareF (ppe : PPEnv.t) fmt hf =
