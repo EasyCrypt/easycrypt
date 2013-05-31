@@ -345,10 +345,10 @@ let maybe_paren (outer, side) inner pp =
     pp_maybe_paren (not (noparens inner outer side)) pp
 
 (* -------------------------------------------------------------------- *)
+let e_bin_prio_lambda = ( 5, `Prefix)
 let e_bin_prio_impl   = (10, `Infix `Right)
 let e_bin_prio_if     = (15, `Prefix)
 let e_bin_prio_if3    = (17, `Infix `NonAssoc)
-let e_bin_prio_lambda = (5, `Prefix)
 let e_bin_prio_letin  = (19, `Prefix)
 let e_bin_prio_or     = (20, `Infix `Right)
 let e_bin_prio_and    = (25, `Infix `Right)
@@ -360,7 +360,7 @@ let e_bin_prio_op4    = (60, `Infix `Left)
 
 let e_uni_prio_not    =  26
 let e_uni_prio_uminus = 500
-let appprio           = (10000, `Infix `NonAssoc)
+let appprio           = (10000, `Infix `Left)
 let e_get_prio        = (20000, `Infix `Left)
 
 let min_op_prec = (-1     , `Infix `NonAssoc)
@@ -636,8 +636,8 @@ let pp_expr (ppe : PPEnv.t) fmt (e : expr) =
         pp_opapp ppe pp_expr outer fmt (op, tys, args)
 
     | Eapp (e, args) -> 
-        pp_list "@[<hov 2>@ ]"
-          (pp_expr ppe (max_op_prec, `NonAssoc)) fmt
+        Format.fprintf fmt "@[<hov 2>%a@]"
+          (pp_list "@ " (pp_expr ppe (max_op_prec, `NonAssoc)))
           (e :: args)
 
     | Elet (pt, e1, e2) ->
