@@ -343,7 +343,7 @@ let min_op_prec = (-1     , `Infix `NonAssoc)
 let max_op_prec = (max_int, `Infix `NonAssoc)
 
 (* -------------------------------------------------------------------- *)
-let priority_of_binop_name name =
+let priority_of_binop name =
   match EcIo.lex_single_token name with
   | Some EP.IMPL  -> Some e_bin_prio_impl
   | Some EP.IFF   -> Some e_bin_prio_impl
@@ -363,7 +363,7 @@ let priority_of_binop_name name =
   | _ -> None
 
 (* -------------------------------------------------------------------- *)
-let priority_of_uniop name =
+let priority_of_unop name =
   match EcIo.lex_single_token name with
   | Some EP.NOT   -> Some e_uni_prio_not
   | Some EP.EQ    -> Some e_uni_prio_uminus
@@ -380,9 +380,14 @@ let priority_of_uniop name =
   | _             -> None
 
 (* -------------------------------------------------------------------- *)
-let is_binop name =
-  (priority_of_binop_name name) <> None
+let is_unop name = 
+  (priority_of_unop name) <> None
 
+let is_binop name =
+  (priority_of_binop name) <> None
+
+let is_unbinop name = is_unop name || is_binop name
+  
 (* -------------------------------------------------------------------- *)
 let pp_if3 (ppe : PPEnv.t) pp_sub outer fmt (b, e1, e2) =
   let pp fmt (b, e1, e2)=
@@ -398,7 +403,7 @@ let pp_let (ppe : PPEnv.t) pp_sub outer fmt (pt, e1, e2) =
   let pp fmt (pt, e1, e2) =
     let ids    = lp_ids pt in
     let subppe = List.fold_left PPEnv.add_local ppe ids in
-      Format.fprintf fmt "@[<hov 2>let %a =@ @[<hov 2>%a@]@ in @[<hov 2>%a@]@]"
+      Format.fprintf fmt "@[<hov 0>let %a =@;<1 2> [@%a@]@ in@ %a@]"
         (pp_list ", " (pp_local ppe)) ids
         (pp_sub ppe (e_bin_prio_letin, `NonAssoc)) e1
         (pp_sub subppe (e_bin_prio_letin, `NonAssoc)) e2
@@ -412,7 +417,8 @@ let pp_tuple (ppe : PPEnv.t) pp_sub es =
 (* -------------------------------------------------------------------- *)
 let pp_opname_as_operator fmt (nm, op) =
   match nm with
-  | [] -> Format.fprintf fmt "%s" op
+  | [] -> 
+    Format.fprintf fmt "%s" op
   | _  ->
       let op = Printf.sprintf "( %s )" op in
         EcSymbols.pp_qsymbol fmt (nm, op)
@@ -425,7 +431,7 @@ let pp_opapp (ppe : PPEnv.t) pp_sub outer fmt (op, _tvi, es) =
       match es with
       | [] -> EcSymbols.pp_qsymbol fmt (nm, opname)
       | _  ->
-          Format.fprintf fmt "%a@ %a"
+          Format.fprintf fmt "@[<hov 2>%a@ %a@]"
             EcSymbols.pp_qsymbol (nm, opname)
             (pp_list "@ " (pp_sub ppe (appprio, `Right))) es
     in
@@ -445,7 +451,7 @@ let pp_opapp (ppe : PPEnv.t) pp_sub outer fmt (op, _tvi, es) =
 
         | "__get", [e1; e2] ->
             let pp fmt =
-              Format.fprintf fmt "%a.[%a]"
+              Format.fprintf fmt "@[%a.[%a]@]"
                 (pp_sub ppe (e_get_prio, `Left)) e1
                 (pp_sub ppe (min_op_prec, `NonAssoc)) e2
             in
@@ -453,7 +459,7 @@ let pp_opapp (ppe : PPEnv.t) pp_sub outer fmt (op, _tvi, es) =
 
         | "__set", [e1; e2; e3] ->
             let pp fmt =
-              Format.fprintf fmt "%a.[%a <- %a]"
+              Format.fprintf fmt "@[%a.[%a <- %a]@]"
                 (pp_sub ppe (e_get_prio , `Left    )) e1
                 (pp_sub ppe (min_op_prec, `NonAssoc)) e2
                 (pp_sub ppe (min_op_prec, `NonAssoc)) e3
@@ -461,7 +467,7 @@ let pp_opapp (ppe : PPEnv.t) pp_sub outer fmt (op, _tvi, es) =
               (pp, e_get_prio)
 
         | _ ->
-            (pp_stdapp, appprio)
+            (pp_stdapp, if es = [] then max_op_prec else appprio)
       else 
         (pp_stdapp, appprio)
     in
@@ -471,12 +477,12 @@ let pp_opapp (ppe : PPEnv.t) pp_sub outer fmt (op, _tvi, es) =
     match es with
     | [e] -> 
       if nm = [] then 
-        begin match priority_of_uniop opname with
+        begin match priority_of_unop opname with
         | None -> None
         | Some opprio  ->
             let opprio = (opprio, `Prefix) in
             let pp fmt =
-              Format.fprintf fmt "%a@ %a"
+              Format.fprintf fmt "@[%a@ %a@]"
                 pp_opname_as_operator (nm, opname)
                 (pp_sub ppe (opprio, `NonAssoc)) e in
             let pp fmt =
@@ -491,11 +497,11 @@ let pp_opapp (ppe : PPEnv.t) pp_sub outer fmt (op, _tvi, es) =
     match es with
     | [e1; e2] ->
       if nm = [] then 
-        begin match priority_of_binop_name opname with
+        begin match priority_of_binop opname with
         | None -> None
         | Some opprio ->
             let pp fmt =
-              Format.fprintf fmt "%a %a@ %a"
+              Format.fprintf fmt "@[%a %a@ %a@]"
                 (pp_sub ppe (opprio, `Left)) e1
                 pp_opname_as_operator (nm, opname)
                 (pp_sub ppe (opprio, `Right)) e2 in
