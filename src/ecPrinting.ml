@@ -69,6 +69,8 @@ module PPEnv = struct
       in
         ppe
 
+  let add_locals ppe xs = List.fold_left add_local ppe xs
+
   let p_shorten cond p =
     let rec shorten prefix (nm, x) =
       match cond (nm, x) with
@@ -260,9 +262,14 @@ let pp_pv (ppe : PPEnv.t) fmt p =
         (pp_topmod ppe) p.P.x_top pp_path p.P.x_sub
 
 (* -------------------------------------------------------------------- *)
-let pp_modtype (ppe : PPEnv.t) fmt ((mty, _) : module_type * _) =
-  Format.fprintf fmt "%a"
-    EcSymbols.pp_msymbol (PPEnv.modtype_symb ppe mty)
+let pp_modtype (ppe : PPEnv.t) fmt ((mty, r) : module_type * _) =
+  let pp_restr fmt r =
+    if EcPath.Sm.is_empty r then ()
+    else 
+      Format.fprintf fmt "{@[%a@]}"
+        (pp_list ",@ " (pp_topmod ppe)) (EcPath.Sm.elements r) in
+  Format.fprintf fmt "%a%a"
+    EcSymbols.pp_msymbol (PPEnv.modtype_symb ppe mty) pp_restr r
 
 (* -------------------------------------------------------------------- *)
 let pp_local (ppe : PPEnv.t) fmt x =
@@ -419,7 +426,7 @@ let pp_if3 (ppe : PPEnv.t) pp_sub outer fmt (b, e1, e2) =
 let pp_let (ppe : PPEnv.t) pp_sub outer fmt (pt, e1, e2) =
   let pp fmt (pt, e1, e2) =
     let ids    = lp_ids pt in
-    let subppe = List.fold_left PPEnv.add_local ppe ids in
+    let subppe = PPEnv.add_locals ppe ids in
       Format.fprintf fmt "@[<hov 0>let %a =@;<1 2>@[%a@]@ in@ %a@]"
         (pp_list ", " (pp_local ppe)) ids
         (pp_sub ppe (e_bin_prio_letin, `NonAssoc)) e1
@@ -616,7 +623,7 @@ let pp_expr (ppe : PPEnv.t) fmt (e : expr) =
         pp_opapp ppe pp_expr outer fmt (op, tys, args)
 
     | Eapp (e, args) -> 
-        pp_list "@ "
+        pp_list "@[<hov 2>@ ]"
           (pp_expr ppe (max_op_prec, `NonAssoc)) fmt
           (e :: args)
 
@@ -651,20 +658,20 @@ let pp_lvalue (ppe : PPEnv.t) fmt lv =
 let pp_instr_for_form (ppe : PPEnv.t) fmt i =
   match i.i_node with
   | Sasgn (lv, e) ->
-      Format.fprintf fmt "%a =@ %a"
+      Format.fprintf fmt "%a =@;<1 2>%a"
         (pp_lvalue ppe) lv (pp_expr ppe) e
 
   | Srnd (lv, e) ->
-      Format.fprintf fmt "%a =$@ [<hov 2>%a@]"
+      Format.fprintf fmt "%a =@;<1 2>$%a"
         (pp_lvalue ppe) lv (pp_expr ppe) e
 
   | Scall (None, xp, args) ->
-      Format.fprintf fmt "%a(%a)"
+      Format.fprintf fmt "%a(@[<hov 0>%a@])"
         (pp_funname ppe) xp
         (pp_list ",@ " (pp_expr ppe)) args
 
   | Scall (Some lv, xp, args) ->
-      Format.fprintf fmt "%a :=@ %a(%a)"
+      Format.fprintf fmt "%a :=@;<1 2>@[%a(@[<hov 0>%a@])@]"
         (pp_lvalue ppe) lv
         (pp_funname ppe) xp
         (pp_list ",@ " (pp_expr ppe)) args
@@ -709,33 +716,35 @@ let string_of_quant = function
   | Llambda -> "lambda"
 
 (* -------------------------------------------------------------------- *)
-let pp_binding (ppe : PPEnv.t) (x, ty) =
+  
+let pp_binding (ppe : PPEnv.t) (xs, ty) =
   match ty with
   | GTty ty ->
-      let tenv1  = PPEnv.add_local ppe x in
+      let tenv1  = PPEnv.add_locals ppe xs in
       let pp fmt =
         Format.fprintf fmt "(%a : %a)"
-          (pp_local tenv1) x (pp_type  ppe) ty
+          (pp_list "@ " (pp_local tenv1)) xs (pp_type ppe) ty
       in
         (tenv1, pp)
 
   | GTmem _ ->
-      let tenv1  = PPEnv.add_local ppe x in
+      let tenv1  = PPEnv.add_locals ppe xs in
       let pp fmt =
-        Format.fprintf fmt "(%a : memory)" (pp_local tenv1) x
+        Format.fprintf fmt "%a" (pp_list "@ " (pp_local tenv1)) xs
       in
         (tenv1, pp)
 
   | GTmodty (p, sm) ->
-      let tenv1  = PPEnv.add_local ppe x in
+      let tenv1  = PPEnv.add_locals ppe xs in
       let pp fmt =
         Format.fprintf fmt "(%a <: %a)"
-          (pp_local tenv1) x (pp_modtype ppe) (p, sm)
+          (pp_list "@ " (pp_local tenv1)) xs (pp_modtype ppe) (p, sm)
       in
         (tenv1, pp)
 
 (* -------------------------------------------------------------------- *)
-let rec pp_bindings ppe bds =
+
+let rec pp_bindings_aux ppe bds =
   match bds with
   | [] ->
       (ppe, fun _ -> ())
@@ -744,8 +753,21 @@ let rec pp_bindings ppe bds =
         (ppe, fun fmt -> Format.fprintf fmt "%t" pp)
   | bd :: bds ->
       let ppe, pp1 = pp_binding  ppe bd  in
-      let ppe, pp2 = pp_bindings ppe bds in
+      let ppe, pp2 = pp_bindings_aux ppe bds in
         (ppe, fun fmt -> Format.fprintf fmt "%t@ %t" pp1 pp2)
+
+let rec pp_bindings ppe bds = 
+  let rec merge (xs,gty) bds = 
+    match bds with
+    | [] -> [List.rev xs, gty]
+    | (x,gty') :: bds ->
+      if EcFol.gty_equal gty gty' then merge (x::xs, gty) bds
+      else (List.rev xs,gty) :: merge ([x], gty') bds  in
+  match bds with
+  | [] -> pp_bindings_aux ppe []
+  | (x,gty)::bds -> pp_bindings_aux ppe (merge ([x],gty) bds)
+
+
 
 (* -------------------------------------------------------------------- *)
 let rec pp_form_r (ppe : PPEnv.t) outer fmt f =
