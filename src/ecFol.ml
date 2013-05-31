@@ -1266,14 +1266,6 @@ module Fsubst = struct
 
 end
 
-
-
-let f_if_simpl f1 f2 f3 =
-  if f_equal f2 f3 then f2
-  else if is_true f1 then f2 
-  else if is_false f1 then f3
-  else f_if f1 f2 f3
-
 let can_subst f = 
   match f.f_node with
   | Fint _ | Flocal _ | Fpvar _ | Fop _ -> true
@@ -1372,6 +1364,22 @@ let f_imp_simpl f1 f2 =
     if f_equal f1 f2 then f_true
     else f_imp f1 f2 
     (* FIXME : simplify x = f1 => f2 into x = f1 => f2{x<-f2} *)
+
+let bool_val f = 
+  if is_true f then Some true
+  else if is_false f then Some false
+  else None 
+
+let f_if_simpl f1 f2 f3 =
+  if f_equal f2 f3 then f2
+  else match bool_val f1, bool_val f2, bool_val f3 with
+  | Some true, _, _  -> f2
+  | Some false, _, _ -> f3
+  | _, Some true, _  -> f_imp_simpl (f_not_simpl f1) f3
+  | _, Some false, _ -> f_anda_simpl (f_not_simpl f1) f3
+  | _, _, Some true  -> f_imp_simpl f1 f2
+  | _, _, Some false -> f_anda_simpl f1 f2
+  | _, _, _          -> f_if f1 f2 f3
 
 let f_imps_simpl = List.fold_right f_imp_simpl 
 let f_imps = List.fold_right f_imp 

@@ -1384,41 +1384,44 @@ let check_goal env pi (hyps, concl) =
     env := { !env with
              logic_task = add_decl_with_tuples !env.logic_task decl } in
   let trans_hyp (id,ld) =
-    let decl =
-      match ld with
-      | LD_var (ty,body) ->
+    try 
+      let decl =
+        match ld with
+        | LD_var (ty,body) ->
           let codom = trans_ty !env !vm ty in
           let pid = preid id in
           let ls = Term.create_fsymbol pid [] codom in
           let decl = match body with
-          | None -> Decl.create_param_decl ls
-          | Some e ->
+            | None -> Decl.create_param_decl ls
+            | Some e ->
               let nenv, _, e = trans_form !env !vm e in
               env := nenv;
               Decl.create_logic_decl [Decl.make_ls_defn ls [] e] in
           vm := { !vm
-                with vm_id = Mid.add id (t_app ls [] codom) !vm.vm_id };
+                  with vm_id = Mid.add id (t_app ls [] codom) !vm.vm_id };
           decl
-      | LD_hyp f ->
+        | LD_hyp f ->
           let nenv, _, f = trans_form !env !vm f in
           env := nenv;
           let pr = Decl.create_prsymbol (preid id) in
           Decl.create_prop_decl Decl.Paxiom pr (force_prop f)
-      | LD_mem  _ ->
+            
+        | LD_mem  _ ->
           let ls = Term.create_fsymbol (preid id) [] ty_mem in
           let decl = Decl.create_param_decl ls in
           vm := { !vm
-                with vm_id = Mid.add id (t_app ls [] ty_mem) !vm.vm_id };
+                  with vm_id = Mid.add id (t_app ls [] ty_mem) !vm.vm_id };
           decl
-      | LD_modty _ ->
+        | LD_modty _ ->
           let ls = Term.create_fsymbol (preid id) [] ty_mod in
           let decl = Decl.create_param_decl ls in
           vm := { !vm
-                with vm_id = Mid.add id (t_app ls [] ty_mod) !vm.vm_id };
+                  with vm_id = Mid.add id (t_app ls [] ty_mod) !vm.vm_id };
           decl in
-
-    env := { !env with
-             logic_task = add_decl_with_tuples !env.logic_task decl };
+      
+      env := { !env with
+        logic_task = add_decl_with_tuples !env.logic_task decl }
+    with CanNotTranslate _ -> ()
   in
   List.iter trans_tv hyps.h_tvar;
   List.iter trans_hyp (List.rev hyps.h_local);

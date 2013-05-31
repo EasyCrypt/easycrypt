@@ -494,10 +494,12 @@ let e_lam b e =
     let ty = toarrow (List.map snd b) e.e_ty in
     mk_expr (Elam(b,e)) ty
 
-let e_app x args = 
-  match x.e_node with
-  | Eapp(x', args') -> mk_expr (Eapp (x', (args'@args)))
-  | _ -> mk_expr (Eapp (x, args))
+let e_app x args ty = 
+  if args = [] then x 
+  else
+    match x.e_node with
+    | Eapp(x', args') -> mk_expr (Eapp (x', (args'@args))) ty
+    | _ -> mk_expr (Eapp (x, args)) ty
 
 (* -------------------------------------------------------------------- *)
 let lp_ids = function
