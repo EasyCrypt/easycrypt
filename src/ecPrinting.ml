@@ -341,6 +341,7 @@ let maybe_paren (outer, side) inner pp =
 let e_bin_prio_impl   = (10, `Infix `Right)
 let e_bin_prio_if     = (15, `Prefix)
 let e_bin_prio_if3    = (17, `Infix `NonAssoc)
+let e_bin_prio_lambda = (18, `Prefix)
 let e_bin_prio_letin  = (19, `Prefix)
 let e_bin_prio_or     = (20, `Infix `Right)
 let e_bin_prio_and    = (25, `Infix `Right)
@@ -419,7 +420,7 @@ let pp_let (ppe : PPEnv.t) pp_sub outer fmt (pt, e1, e2) =
   let pp fmt (pt, e1, e2) =
     let ids    = lp_ids pt in
     let subppe = List.fold_left PPEnv.add_local ppe ids in
-      Format.fprintf fmt "@[<hov 0>let %a =@;<1 2> [@%a@]@ in@ %a@]"
+      Format.fprintf fmt "@[<hov 0>let %a =@;<1 2>@[%a@]@ in@ %a@]"
         (pp_list ", " (pp_local ppe)) ids
         (pp_sub ppe (e_bin_prio_letin, `NonAssoc)) e1
         (pp_sub subppe (e_bin_prio_letin, `NonAssoc)) e2
@@ -624,8 +625,11 @@ let pp_expr (ppe : PPEnv.t) fmt (e : expr) =
 
     | Elam (vardecls, e) ->
         let (subppe, pp) = pp_locbinds ppe vardecls in
-          Format.fprintf fmt "lambda %t,@ %a"
+        let pp fmt () =
+          Format.fprintf fmt "@[<hov 2>lambda %t,@ %a@]"
             pp (pp_expr subppe (min_op_prec, `NonAssoc)) e
+        in
+          maybe_paren outer e_bin_prio_lambda pp fmt ()
 
   in
     pp_expr ppe (min_op_prec, `NonAssoc) fmt e
