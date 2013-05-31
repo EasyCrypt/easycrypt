@@ -492,7 +492,7 @@ let pp_opapp (ppe : PPEnv.t) pp_sub outer fmt (op, _tvi, es) =
   and try_pp_as_uniop () =
     match es with
     | [e] -> 
-      if mn = [] then
+      if nm = [] then
         begin match priority_of_unop opname with
         | None -> None
         | Some opprio  ->
@@ -511,7 +511,7 @@ let pp_opapp (ppe : PPEnv.t) pp_sub outer fmt (op, _tvi, es) =
   and try_pp_as_binop () =
     match es with
     | [e1; e2] ->
-      if mn = [] then
+      if nm = [] then
         begin match priority_of_binop opname with
         | None -> None
         | Some opprio ->
