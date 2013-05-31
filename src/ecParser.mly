@@ -1241,7 +1241,7 @@ fpattern(F):
 ;
 
 simplify_arg: 
-| DELTA l=qident* { `Delta l }
+| DELTA l=qident_pbinop* { `Delta l }
 | ZETA            { `Zeta }
 | IOTA            { `Iota }
 | BETA            { `Beta }
@@ -1252,7 +1252,7 @@ simplify_arg:
 simplify:
 | l=simplify_arg+    { l }
 | SIMPLIFY           { simplify_red }
-| SIMPLIFY l=qident+ { `Delta l  :: simplify_red  }
+| SIMPLIFY l=qident_pbinop+ { `Delta l  :: simplify_red  }
 | SIMPLIFY DELTA     { `Delta [] :: simplify_red }
 ;
 
