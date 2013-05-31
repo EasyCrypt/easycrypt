@@ -106,6 +106,7 @@ and bdHoareS = {
 
 
 (* -------------------------------------------------------------------- *)
+val gty_equal : gty  -> gty -> bool
 val f_equal   : form -> form -> bool
 val f_compare : form -> form -> int
 val f_hash    : form -> int 
