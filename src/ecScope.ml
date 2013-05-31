@@ -858,12 +858,28 @@ module Tactic = struct
       | _, Some _ ->
         cannot_apply "app" "optional bound parameter not supported"
 
-  let process_while env phi g =
+  let process_while env phi vrnt_opt info g =
     let concl = get_concl g in
     if is_hoareS concl then
-      t_hoare_while env (process_phl_formula env g phi) g
+      match vrnt_opt,info with
+        | None, None ->
+          t_hoare_while env (process_phl_formula env g phi) g
+        | _ -> cannot_apply "while" "wrong arguments"
+    else if is_bdHoareS concl then
+      match vrnt_opt,info with
+        | Some vrnt, info ->
+          t_bdHoare_while env 
+            (process_phl_formula env g phi) 
+            (process_phl_form tint env g vrnt) 
+            (omap info (fun (bd,i) -> process_phl_form treal env g bd,
+              process_phl_form tint env g i))
+            g
+        | _ -> cannot_apply "while" "wrong arguments"
     else if is_equivS concl then
-      t_equiv_while env (process_prhl_formula env g phi) g
+      match vrnt_opt,info with
+        | None, None ->
+          t_equiv_while env (process_prhl_formula env g phi) g
+        | _ -> cannot_apply "while" "wrong arguments"
     else cannot_apply "while" "the conclusion is not a hoare or a equiv"
 
   let process_fission env (side, cpos, infos) g =
@@ -874,6 +890,32 @@ module Tactic = struct
 
   let process_unroll env (side, cpos) g =
     t_unroll env side cpos g
+
+
+  let process_exp env hyps e oty =
+    let env = tyenv_of_hyps env hyps in
+    let ue  = EcUnify.UniEnv.create (Some hyps.h_tvar) in
+    TT.transexpcast env ue oty e
+    (* Some substitution like 
+          EcFol.Fsubst.uni (EcUnify.UniEnv.close ue) e 
+       is missing?
+    *)
+  let process_phl_exp env g e ty = 
+    let hyps, concl = get_goal g in
+    let m = 
+      try 
+        let hs = set_loc e.pl_loc destr_hoareS concl in
+        hs.hs_m
+      with _ ->
+        let hs = set_loc e.pl_loc destr_bdHoareS concl in
+        hs.bhs_m
+    in
+    let env = EcEnv.Memory.push_active m env in
+    process_exp env hyps e ty
+
+  let process_splitwhile env (b, side, cpos) g =
+    let b = process_phl_exp env g b tbool in
+    t_splitwhile b env side cpos g
 
   let process_call env side pre post g =
     let hyps,concl = get_goal g in
@@ -1187,10 +1229,11 @@ module Tactic = struct
       | Pwp  k   -> t_wp env k
       | Prcond (side,b,i) -> t_rcond side b i
       | Pcond side   -> process_cond env side
-      | Pwhile phi -> process_while env phi
+      | Pwhile (phi,vrnt_opt,info) -> process_while env phi vrnt_opt info
       | Pfission info -> process_fission env info
       | Pfusion info -> process_fusion env info
       | Punroll info -> process_unroll env info
+      | Psplitwhile info -> process_splitwhile env info
       | Pcall(side, (pre, post)) -> process_call env side pre post
       | Pswap info -> process_swap env info
       | Pinline info -> process_inline env info
