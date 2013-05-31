@@ -348,7 +348,7 @@ let maybe_paren (outer, side) inner pp =
 let e_bin_prio_impl   = (10, `Infix `Right)
 let e_bin_prio_if     = (15, `Prefix)
 let e_bin_prio_if3    = (17, `Infix `NonAssoc)
-let e_bin_prio_lambda = (18, `Prefix)
+let e_bin_prio_lambda = (5, `Prefix)
 let e_bin_prio_letin  = (19, `Prefix)
 let e_bin_prio_or     = (20, `Infix `Right)
 let e_bin_prio_and    = (25, `Infix `Right)
@@ -421,6 +421,15 @@ let pp_if3 (ppe : PPEnv.t) pp_sub outer fmt (b, e1, e2) =
       (pp_sub ppe (e_bin_prio_if3, `Right)) e2
   in
     maybe_paren outer e_bin_prio_if3 pp fmt (b, e1, e2)
+
+let pp_if_form (ppe : PPEnv.t) pp_sub outer fmt (b, e1, e2) =
+  let pp fmt (b, e1, e2) =
+    Format.fprintf fmt "@[@[<hov 2>if %a@ then@ %a@]@ @[<hov 2>else@ %a@]@]"
+      (pp_sub ppe (min_op_prec, `NonAssoc)) b
+      (pp_sub ppe (min_op_prec, `NonAssoc)) e1
+      (pp_sub ppe (e_bin_prio_if, `Right)) e2 (* FIXME *)
+  in
+    maybe_paren outer e_bin_prio_if pp fmt (b, e1, e2)
 
 (* -------------------------------------------------------------------- *)
 let pp_let (ppe : PPEnv.t) pp_sub outer fmt (pt, e1, e2) =
@@ -769,6 +778,11 @@ let rec pp_bindings ppe bds =
   | (x,gty)::bds -> pp_bindings_aux ppe (merge ([x], gty) bds)
 
 (* -------------------------------------------------------------------- *)
+let string_of_hcmp = function
+  | FHle -> "<="
+  | FHeq -> "="
+  | FHge -> ">="
+
 let rec pp_form_r (ppe : PPEnv.t) outer fmt f =
   match f.f_node with
   | Fint n ->
@@ -783,11 +797,13 @@ let rec pp_form_r (ppe : PPEnv.t) outer fmt f =
     
   | Fquant (q, bd, f) ->
       let (subppe, pp) = pp_bindings ppe bd in
+      let pp fmt () = 
         Format.fprintf fmt "@[<hov 2>%s %t,@ %a@]"
-          (string_of_quant q) pp (pp_form_r subppe outer) f
+          (string_of_quant q) pp (pp_form subppe) f in
+      maybe_paren outer e_bin_prio_lambda pp fmt ()
 
   | Fif (b, f1, f2) ->
-      pp_if3 ppe pp_form_r outer fmt (b, f1, f2)
+      pp_if_form ppe pp_form_r outer fmt (b, f1, f2)
       
   | Flet (lp, f1, f2) ->
       pp_let ppe pp_form_r outer fmt (lp, f1, f2)
@@ -807,46 +823,57 @@ let rec pp_form_r (ppe : PPEnv.t) outer fmt f =
       pp_tuple ppe pp_form_r fmt args
       
   | FhoareF hf ->
-      Format.fprintf fmt "hoare[@[<hov 2>%a :@\n%a@ ==> @[<hov 2>%a@]@]]"
-        (pp_funname ppe) hf.hf_f
-        (pp_form_r ppe (max_op_prec, `NonAssoc)) hf.hf_pr
-        (pp_form_r ppe (max_op_prec, `NonAssoc)) hf.hf_po
+    Format.fprintf fmt "hoare[@[<hov 2>@ %a :@ @[%a ==>@ %a@]@]]"
+      (pp_funname ppe) hf.hf_f
+      (pp_form ppe) hf.hf_pr
+      (pp_form ppe) hf.hf_po
       
   | FhoareS hs -> 
-      Format.fprintf fmt "hoare[@[<hov 2>%a :@\n%a@ ==> @[<hov 2>%a@]@]]"
-        (pp_stmt_for_form ppe) hs.hs_s
-        (pp_form_r ppe (max_op_prec, `NonAssoc)) hs.hs_pr
-        (pp_form_r ppe (max_op_prec, `NonAssoc)) hs.hs_po
+    Format.fprintf fmt "hoare[@[<hov 2>@ %a :@ @[%a ==>@ %a@]@]]"
+      (pp_stmt_for_form ppe) hs.hs_s
+      (pp_form ppe) hs.hs_pr
+      (pp_form ppe) hs.hs_po
 
   | FequivF eqv ->
-      Format.fprintf fmt "equiv[@[<hov 2>%a ~ %a :@\n%a@ ==> @[<hov 2>%a@]@]]"
-        (pp_funname ppe) eqv.ef_fl
-        (pp_funname ppe) eqv.ef_fr
-        (pp_form_r ppe (max_op_prec, `NonAssoc)) eqv.ef_pr
-        (pp_form_r ppe (max_op_prec, `NonAssoc)) eqv.ef_po
+    Format.fprintf fmt "equiv[@[<hov 2>@ %a ~@ %a :@ @[%a ==>@ %a@]@]]"
+      (pp_funname ppe) eqv.ef_fl
+      (pp_funname ppe) eqv.ef_fr
+      (pp_form ppe) eqv.ef_pr
+      (pp_form ppe) eqv.ef_po
       
   | FequivS es ->
-      Format.fprintf fmt "@[<hov 2>equiv[@ %a ~@ %a :@ %a ==>@ %a]@]"
-        (pp_stmt_for_form ppe) es.es_sl
-        (pp_stmt_for_form ppe) es.es_sr
-        (pp_form_r ppe (max_op_prec, `NonAssoc)) es.es_pr
-        (pp_form_r ppe (max_op_prec, `NonAssoc)) es.es_po
+    Format.fprintf fmt "equiv[@[<hov 2>@ %a ~@ %a :@ @[%a ==>@ %a@]@]]"
+      (pp_stmt_for_form ppe) es.es_sl
+      (pp_stmt_for_form ppe) es.es_sr
+      (pp_form ppe) es.es_pr
+      (pp_form ppe) es.es_po
 
   | Fglob (mp, me) ->
-      Format.fprintf fmt "(glob %a){%a}" (pp_topmod ppe) mp (pp_local ppe) me
+    Format.fprintf fmt "(glob %a){%a}" (pp_topmod ppe) mp (pp_local ppe) me
 
   | Fpr (m,f,args,ev) ->
-      Format.fprintf fmt "Pr[@[%a(@[%a@]) @@ %a :@ %a@]]"
-        (pp_funname ppe) f 
-        (pp_list ",@ " (pp_form_r ppe (max_op_prec, `NonAssoc))) args
-        (pp_local ppe) m
-        (pp_form_r ppe (max_op_prec, `NonAssoc)) ev
+    Format.fprintf fmt "Pr[@[%a(@[%a@]) @@ %a :@ %a@]]"
+      (pp_funname ppe) f 
+      (pp_list ",@ " (pp_form ppe)) args
+      (pp_local ppe) m
+      (pp_form ppe) ev
 
-  | FbdHoareF _ ->
-      Format.fprintf fmt "PHoareF[to-be-done]"
+  | FbdHoareF hf ->
+    Format.fprintf fmt "bd_hoare[@[<hov 2>@ %a :@ @[%a ==>@ %a@]@]] [%s] [%a]"
+      (pp_funname ppe) hf.bhf_f
+      (pp_form ppe) hf.bhf_pr
+      (pp_form ppe) hf.bhf_po
+      (string_of_hcmp hf.bhf_cmp)
+      (pp_form ppe) hf.bhf_bd 
+  | FbdHoareS hs ->
+    Format.fprintf fmt "bd_hoare[@[<hov 2>@ %a :@ @[%a ==>@ %a@]@]] [%s] [%a]"
+      (pp_stmt_for_form ppe) hs.bhs_s
+      (pp_form ppe) hs.bhs_pr
+      (pp_form ppe) hs.bhs_po
+      (string_of_hcmp hs.bhs_cmp)
+      (pp_form ppe) hs.bhs_bd 
+      
 
-  | FbdHoareS _ ->
-      Format.fprintf fmt "PHoareS[to-be-done]"
 
 and pp_form ppe fmt f =
   pp_form_r ppe (min_op_prec, `NonAssoc) fmt f
