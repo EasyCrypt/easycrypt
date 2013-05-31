@@ -540,7 +540,6 @@ module CPos = struct
       try  List.split_n (i-1) s.s_node 
       with Not_found -> raise InvalidCPos
     in
-
     match sub with
     | None -> zipper s1 (i::s2) zpr
     | Some (b, sub) -> begin
@@ -1519,6 +1518,19 @@ let unroll_stmt _env me i =
 let t_unroll env side cpos g =
   let tr = fun side -> RN_hl_unroll (side, cpos) in
     CPos.t_code_transform env side cpos tr (CPos.t_fold unroll_stmt) g
+
+(* -------------------------------------------------------------------- *)
+let splitwhile_stmt b _env me i =
+  match i.i_node with
+  | Swhile (e, sw) -> 
+    let op_and = e_op EcCoreLib.p_and [] (tfun tbool (tfun tbool tbool)) in
+    let e = e_app op_and [e;b] tbool in
+    (me, [i_while (e,sw); i])
+  | _ -> tacuerror "cannot find a while loop at given position"
+
+let t_splitwhile b env side cpos g =
+  let tr = fun side -> RN_hl_splitwhile (b,side, cpos) in
+    CPos.t_code_transform env side cpos tr (CPos.t_fold (splitwhile_stmt b)) g
 
 (* -------------------------------------------------------------------- *)
 let t_equiv_deno env pre post g =

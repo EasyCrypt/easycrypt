@@ -235,6 +235,7 @@
 %token SIMPLIFY
 %token SKIP
 %token SPLIT
+%token SPLITWHILE
 %token STAR
 %token SUBST
 %token SWAP
@@ -1427,6 +1428,9 @@ tactic:
 
 | UNROLL s=side? o=codepos
     { PPhl (Punroll (s, o)) }
+
+| SPLITWHILE c=expr COLON s=side? o=codepos
+    { PPhl (Psplitwhile (c,s,o)) }
 
 | p=tselect INLINE
     { PPhl (Pinline (`ByPattern p)) }

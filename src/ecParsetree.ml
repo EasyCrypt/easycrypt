@@ -328,6 +328,7 @@ and phl_tactics =
   | Pfission    of (tac_side * codepos * (int * (int * int)))
   | Pfusion     of (tac_side * codepos * (int * (int * int)))
   | Punroll     of (tac_side * codepos)
+  | Psplitwhile  of (pexpr * tac_side * codepos )
   | Pcall       of tac_side * (pformula * pformula)
   | Prcond      of (bool option * bool * int)
   | Pcond       of tac_side

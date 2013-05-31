@@ -891,6 +891,32 @@ module Tactic = struct
   let process_unroll env (side, cpos) g =
     t_unroll env side cpos g
 
+
+  let process_exp env hyps e oty =
+    let env = tyenv_of_hyps env hyps in
+    let ue  = EcUnify.UniEnv.create (Some hyps.h_tvar) in
+    TT.transexpcast env ue oty e
+    (* Some substitution like 
+          EcFol.Fsubst.uni (EcUnify.UniEnv.close ue) e 
+       is missing?
+    *)
+  let process_phl_exp env g e ty = 
+    let hyps, concl = get_goal g in
+    let m = 
+      try 
+        let hs = set_loc e.pl_loc destr_hoareS concl in
+        hs.hs_m
+      with _ ->
+        let hs = set_loc e.pl_loc destr_bdHoareS concl in
+        hs.bhs_m
+    in
+    let env = EcEnv.Memory.push_active m env in
+    process_exp env hyps e ty
+
+  let process_splitwhile env (b, side, cpos) g =
+    let b = process_phl_exp env g b tbool in
+    t_splitwhile b env side cpos g
+
   let process_call env side pre post g =
     let hyps,concl = get_goal g in
     match concl.f_node, side with
@@ -1207,6 +1233,7 @@ module Tactic = struct
       | Pfission info -> process_fission env info
       | Pfusion info -> process_fusion env info
       | Punroll info -> process_unroll env info
+      | Psplitwhile info -> process_splitwhile env info
       | Pcall(side, (pre, post)) -> process_call env side pre post
       | Pswap info -> process_swap env info
       | Pinline info -> process_inline env info
