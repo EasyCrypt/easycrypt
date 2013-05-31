@@ -314,6 +314,7 @@ and ptactic_r =
   | PPhl        of phl_tactics
   | Padmit
   | Pfield		of (pformula * pformula * pformula * pformula * pformula * pformula * pformula)
+  | Pfieldsimp	of (pformula * pformula * pformula * pformula * pformula * pformula * pformula)
   | Pdebug
 
 and phl_tactics = 

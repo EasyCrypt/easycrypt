@@ -1193,9 +1193,24 @@ module Tactic = struct
 		 				let m' = process_form env hyps m (tfun ty ty) in 
 						let z' = process_form env hyps z ty in 
 						let o' = process_form env hyps o ty in 
-						t_field env (p',t',i',m',z',o',eq) (arg1,arg2)
+						t_field (p',t',i',m',z',o',eq) (arg1,arg2)
 					else
 						cannot_apply "field" "the eq doeesn't coincide"
+				| _ -> cannot_apply "field" "Think more about the goal")
+
+  let process_field_simp env (p,t,i,m,z,o,e) g =
+		let (hyps,concl) = get_goal g in
+			(match concl.f_node with
+				| Fapp(_,arg1 :: _) ->
+					let ty = f_ty arg1 in
+					let eq = process_form env hyps e (tfun ty (tfun ty tbool)) in
+					let p' = process_form env hyps p (tfun ty (tfun ty ty)) in 
+					let t' = process_form env hyps t (tfun ty (tfun ty ty)) in 
+					let i' = process_form env hyps i (tfun ty ty) in 
+		 			let m' = process_form env hyps m (tfun ty ty) in 
+					let z' = process_form env hyps z ty in 
+					let o' = process_form env hyps o ty in 
+					t_field_simp (p',t',i',m',z',o',eq) concl
 				| _ -> cannot_apply "field" "Think more about the goal")
 
   let rec process_logic_tacs scope env (tacs:ptactics) (gs:goals) : goals =
@@ -1226,6 +1241,7 @@ module Tactic = struct
       | Pintro pi      -> process_intros env pi
       | Psplit         -> t_split env
       | Pfield (p,t,i,m,z,o,e) -> process_field env (p,t,i,m,z,o,e) g
+      | Pfieldsimp (p,t,i,m,z,o,e) -> process_field_simp env (p,t,i,m,z,o,e) g
       | Pexists fs     -> process_exists env fs
       | Pleft          -> t_left env
       | Pright         -> t_right env

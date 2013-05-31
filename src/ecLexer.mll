@@ -67,6 +67,7 @@
     "rewrite"     , REWRITE    ;        (* KW: tactic *)
     "subst"       , SUBST      ;        (* KW: tactic *)
     "field"       , FIELD      ;        (* KW: tactic *)
+    "field_simplify"       , FIELDSIMP ;        (* KW: tactic *)
 
     (* PHL: tactics *)
     "app"         , APP        ;        (* KW: tactic *)
