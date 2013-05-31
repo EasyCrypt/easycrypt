@@ -711,14 +711,12 @@ let equivF_abs_upto env fl fr bad invP invQ =
     let cond1 = f_equivF pre o_l o_r post in
     let cond2 =
       let q = f_subst_mem ml EcFol.mhr invQ in
-      f_forall [mr,GTmem None] (f_imp bad2 (f_hoareF q o_l q)) in
+      f_forall [mr,GTmem None] (f_imp bad2 (f_bdHoareF q o_l q FHeq f_r1)) in
     let cond3 = 
       let q = f_subst_mem mr EcFol.mhr invQ in
       let bq = f_and bad q in
-      f_forall [ml,GTmem None] (f_hoareF bq o_r bq) in
-    let cond4 = f_losslessF o_l in
-    let cond5 = f_losslessF o_r in
-    [cond1;cond2;cond3;cond4;cond5] in
+      f_forall [ml,GTmem None] (f_bdHoareF bq o_r bq FHeq f_r1) in
+    [cond1;cond2;cond3] in
   let sg = List.map2 ospec oil.oi_calls oir.oi_calls in
   let sg = List.flatten sg in
   let lossless_a = 
