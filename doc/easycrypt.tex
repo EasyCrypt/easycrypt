@@ -4,10 +4,12 @@
 
 \usepackage{xspace}
 \usepackage{makeidx}
+\usepackage{mdframed}
+\usepackage[procnames]{listings}
 \usepackage{infer}
+\usepackage[pagebackref,colorlinks=true,linkcolor=black,linktoc=all,citecolor=blue]{hyperref}
 
 \input{defs}
-
 
 \newcommand{\EC}{\textsc{EasyCrypt}\xspace}
 \newcommand{\ECversion}{0.$\beta$\xspace}
@@ -19,6 +21,7 @@
 \newcommand{\bdHoareSeq}[4]{\bdHoareS{#1}{#2}{#3}{=}{#4}}
 \newcommand{\bdHoareSge}[4]{\bdHoareS{#1}{#2}{#3}{\geq}{#4}}
 
+\lstset{numberbychapter=false} %% Set to true if chapter numbering is desired
 
 
 \title{\EC Manual}

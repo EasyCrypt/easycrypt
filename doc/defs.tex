@@ -1,3 +1,4 @@
+% !TeX root = easycrypt.tex
 %% Misc
 \newcommand{\DONE}{}% {{\color{red}DONE}}
 \newcommand{\Example}{\paragraph*{Example}}
@@ -71,8 +72,6 @@
 
 %% Names
 
-\newcommand{\easycrypt}{\textsf{EasyCrypt}\xspace}
-\newcommand{\EasyCrypt}{\textsf{EasyCrypt}\xspace}
 \newcommand{\CertiCrypt}{\textsf{CertiCrypt}\xspace}
 \newcommand{\CertiPriv}{\textsf{CertiPriv}\xspace}
 \newcommand{\ProVerif}{\textsf{ProVerif}\xspace}
@@ -132,45 +131,6 @@
 \newcommand{\nat}{\mathbb{N}}
 \newcommand{\real}{\mathbb{R}}
 \newcommand{\option}[1]{#1_\bot}
-
-%% Constants and operators
-
-\newcommand{\true}{\mathsf{true}}
-\newcommand{\false}{\mathsf{false}}
-\newcommand{\nil}{\mathsf{nil}}
-\newcommand{\hd}{\mathsf{hd}}
-\newcommand{\tl}{\mathsf{tl}}
-\newcommand{\app}{\mathbin{+\mkern-7mu+}}
-\newcommand{\concat}{\parallel}
-\newcommand{\xor}{\oplus}
-\newcommand{\msb}[2]{[#1]^{#2}}
-\newcommand{\lsb}[2]{[#1]_{#2}}
-\newcommand{\dom}{\mathsf{dom}}
-\newcommand{\ran}{\mathsf{ran}}
-\newcommand{\fst}{\mathsf{fst}}
-\newcommand{\snd}{\mathsf{snd}}
-\newcommand{\some}[1]{#1}
-\newcommand{\none}{\bot}
-
-%% Language
-
-\newcommand{\Skip}{\mathsf{skip}}
-\newcommand{\Seq}[2]{#1;\ #2}
-\newcommand{\Ass}[2]{#1 \leftarrow #2}
-\newcommand{\Rand}[2]{#1 \stackrel{\raisebox{-.25ex}[.25ex]%
-{\tiny $\mathdollar$}}{\raisebox{-.2ex}[.2ex]{$\leftarrow$}} #2}
-\newcommand{\Randi}[2]{\Rand{#1}{[0..#2]}}
-\newcommand{\Randb}[1]{\Rand{#1}{\bit}}
-\newcommand{\Randbs}[2]{\Rand{#1}{\bitstring{#2}}}
-\newcommand{\Cond}[3]{\mathsf{if}\ #1\ \mathsf{then}\ #2\ \mathsf{else}\ #3}
-\newcommand{\Condt}[2]{\mathsf{if}\ #1\ \mathsf{then}\ #2}
-\newcommand{\Else}{\mathsf{else}\ }
-\newcommand{\Elsif}{\mathsf{elsif}\ }
-\newcommand{\nWhile}[3]{\mathsf{while}_{#1}\ #2\ \mathsf{do}\ #3}
-\newcommand{\While}[2]{\mathsf{while}\ #1\ \mathsf{do}\ #2}
-\newcommand{\Call}[3]{#1 \leftarrow #2\mathsf{(}#3\mathsf{)}}
-\newcommand{\Return}{\mathsf{return}}
-\newcommand{\Assert}[1]{\mathsf{assert}~#1}
 
 %% Mathematics
 
@@ -265,6 +225,109 @@
 \newcommand{\LH}{\gl{L}_H}
 \newcommand{\LD}{\gl{L}_\Dec}
 \newcommand{\cdef}{\gl{\gamma_\mathsf{def}}}
+
+%% Constants and operators
+% TODO: Update!
+\newcommand{\true}{\mathsf{true}}
+\newcommand{\false}{\mathsf{false}}
+\newcommand{\nil}{\mathsf{nil}}
+\newcommand{\hd}{\mathsf{hd}}
+\newcommand{\tl}{\mathsf{tl}}
+\newcommand{\app}{\mathbin{+\mkern-7mu+}}
+\newcommand{\concat}{\parallel}
+\newcommand{\xor}{\oplus}
+\newcommand{\msb}[2]{[#1]^{#2}}
+\newcommand{\lsb}[2]{[#1]_{#2}}
+\newcommand{\dom}{\mathsf{dom}}
+\newcommand{\ran}{\mathsf{ran}}
+\newcommand{\fst}{\mathsf{fst}}
+\newcommand{\snd}{\mathsf{snd}}
+\newcommand{\some}[1]{#1}
+\newcommand{\none}{\bot}
+
+%% Language
+% TODO: Update!
+\newcommand{\Skip}{\mathsf{skip}}
+\newcommand{\Seq}[2]{#1;\ #2}
+\newcommand{\Ass}[2]{#1 \leftarrow #2}
+\newcommand{\Rand}[2]{#1 \stackrel{\raisebox{-.25ex}[.25ex]%
+{\tiny $\mathdollar$}}{\raisebox{-.2ex}[.2ex]{$\leftarrow$}} #2}
+\newcommand{\Randi}[2]{\Rand{#1}{[0..#2]}}
+\newcommand{\Randb}[1]{\Rand{#1}{\bit}}
+\newcommand{\Randbs}[2]{\Rand{#1}{\bitstring{#2}}}
+\newcommand{\Cond}[3]{\mathsf{if}\ #1\ \mathsf{then}\ #2\ \mathsf{else}\ #3}
+\newcommand{\Condt}[2]{\mathsf{if}\ #1\ \mathsf{then}\ #2}
+\newcommand{\Else}{\mathsf{else}\ }
+\newcommand{\Elsif}{\mathsf{elsif}\ }
+\newcommand{\nWhile}[3]{\mathsf{while}_{#1}\ #2\ \mathsf{do}\ #3}
+\newcommand{\While}[2]{\mathsf{while}\ #1\ \mathsf{do}\ #2}
+\newcommand{\Call}[3]{#1 \leftarrow #2\mathsf{(}#3\mathsf{)}}
+\newcommand{\Return}{\mathsf{return}}
+\newcommand{\Assert}[1]{\mathsf{assert}~#1}
+
+%% Language definition
+\lstnewenvironment{easycrypt}[2][]%
+  {\lstset{language=easycrypt,caption=#2,#1}}%
+  {}
+
+\newcommand{\rawec}[2][]{\lstinline[language=easycrypt,#1]{#2}}
+\newcommand{\ec}[2][]{\lstinline[language=easycrypt,style=easycrypt-pretty,#1]{#2}}
+
+\lstdefinelanguage{easycrypt}{
+  style=easycrypt-default,
+  procnamekeys={op,pred,fun},
+  procnamestyle={\sffamily\itshape},
+  morekeywords=[1]{theory,end},
+  morekeywords=[2]{type,op,axiom,lemma,module,pred,lambda},
+  morekeywords=[3]{var,fun},
+  morekeywords=[4]{while,if},
+  morekeywords=[5]{bool,int,real,bitstring,array,list,matrix,word},
+  morekeywords=[6]{forall,exists},
+%  moredirectives={prover,print}, % Incomplete
+  morecomment=[n][\itseries]{(*}{*)},
+  morecomment=[n][\bfseries]{(**}{*)}
+}
+
+\lstdefinestyle{easycrypt-default}{
+  columns=fullflexible,
+  captionpos=b,
+  frame=tb,
+  xleftmargin=.1\textwidth,
+  xrightmargin=.1\textwidth,
+  basicstyle=\small\sffamily,
+  identifierstyle={},
+  keywordstyle=[1]{\bfseries},
+  keywordstyle=[2]{\bfseries},
+  keywordstyle=[3]{\bfseries},
+  keywordstyle=[4]{\bfseries},
+  keywordstyle=[5]{\itshape},
+  keywordstyle=[6]{\bfseries}
+}
+
+\lstdefinestyle{easycrypt-pretty}{
+    basicstyle=\small\sffamily,
+    literate={:=}{{$\mathrel{\gets}$}}1
+              {<=}{{$\binop{\leq}$}}1
+              {>=}{{$\geq$}}1
+              {=\$}{{$\stackrel{\$}{\gets}$}}1
+              {forall}{{$\forall$}}1
+              {exists}{{$\exists$}}1
+              {->}{{$\rightarrow\;$}}1
+              {=>}{{$\Rightarrow\;$}}1
+              {==>}{{$\Rrightarrow\;$}}1
+              {\/\\}{{$\wedge$}}1
+              {\\\/}{{$\vee$}}1
+              {.\[}{{[}}1
+              {'a}{{$\alpha\,$}}1
+              {'b}{{$\beta\,$}}1
+              {'c}{{$\gamma\,$}}1
+              {'x}{{$\chi\,$}}1
+              {lambda}{{$\lambda\,$}}1
+}
+
+%% Typesetting
+\newcommand{\titledbox}[4]{{\color{#1}\fbox{\begin{minipage}{#2}{\textbf{#3:} \color{black}#4}\end{minipage}}}}
+\newcommand{\warningbox}[1]{\titledbox{red}{.9\textwidth}{Warning}{#1}}
 
 %%% Local Variables: 
 %%% mode: latex
