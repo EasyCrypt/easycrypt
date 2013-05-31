@@ -362,13 +362,11 @@ let pp_tuple (ppe : PPEnv.t) pp_sub es =
   pp_paren (pp_list ",@ " (pp_sub ppe (min_op_prec, `NonAssoc))) es
 
 (* -------------------------------------------------------------------- *)
-let pp_opname_as_operator fmt (nm, op) =
-  match nm with
-  | [] -> 
-    Format.fprintf fmt "%s" op
-  | _  ->
-      let op = Printf.sprintf "( %s )" op in
-        EcSymbols.pp_qsymbol fmt (nm, op)
+let pp_opname fmt (nm, op) = 
+  let op = 
+    if is_unbinop op then Format.sprintf "( %s )" op
+    else op in
+  EcSymbols.pp_qsymbol fmt (nm, op)
 
 let pp_opapp (ppe : PPEnv.t) pp_sub outer fmt (op, _tvi, es) =
   let (nm, opname) = PPEnv.op_symb ppe op in
@@ -376,11 +374,11 @@ let pp_opapp (ppe : PPEnv.t) pp_sub outer fmt (op, _tvi, es) =
   let pp_as_std_op fmt =
     let pp_stdapp fmt =
       match es with
-      | [] -> EcSymbols.pp_qsymbol fmt (nm, opname)
+      | [] -> pp_opname fmt (nm, opname)
       | _  ->
-          Format.fprintf fmt "@[<hov 2>%a@ %a@]"
-            EcSymbols.pp_qsymbol (nm, opname)
-            (pp_list "@ " (pp_sub ppe (appprio, `Right))) es
+        Format.fprintf fmt "@[<hov 2>%a@ %a@]"
+          pp_opname (nm, opname)
+          (pp_list "@ " (pp_sub ppe (appprio, `Right))) es
     in
 
     let (pp, prio) =
@@ -429,8 +427,7 @@ let pp_opapp (ppe : PPEnv.t) pp_sub outer fmt (op, _tvi, es) =
         | Some opprio  ->
             let opprio = (opprio, `Prefix) in
             let pp fmt =
-              Format.fprintf fmt "@[%a@ %a@]"
-                pp_opname_as_operator (nm, opname)
+              Format.fprintf fmt "@[%s@ %a@]" opname
                 (pp_sub ppe (opprio, `NonAssoc)) e in
             let pp fmt =
               maybe_paren outer opprio (fun fmt () -> pp fmt) fmt
@@ -448,9 +445,9 @@ let pp_opapp (ppe : PPEnv.t) pp_sub outer fmt (op, _tvi, es) =
         | None -> None
         | Some opprio ->
             let pp fmt =
-              Format.fprintf fmt "@[%a %a@ %a@]"
+              Format.fprintf fmt "@[%a %s@ %a@]"
                 (pp_sub ppe (opprio, `Left)) e1
-                pp_opname_as_operator (nm, opname)
+                opname
                 (pp_sub ppe (opprio, `Right)) e2 in
             let pp fmt =
               maybe_paren outer opprio (fun fmt () -> pp fmt) fmt
