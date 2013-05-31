@@ -119,7 +119,7 @@ module PPEnv = struct
           let exists sm =
             match EcEnv.Mod.sp_lookup_opt sm ppe.ppe_env with
             | None -> false
-            | Some (mp1, _) -> P.mt_equal mp1.P.m_top mp.P.m_top
+            | Some (mp1, _) -> P.mt_equal mp1.P.m_top (`Concrete (p1, None))
           in
   
           let rec shorten prefix (nm, x) =
@@ -439,15 +439,15 @@ let pp_tuple (ppe : PPEnv.t) pp_sub es =
   pp_paren (pp_list ",@ " (pp_sub ppe (min_op_prec, `NonAssoc))) es
 
 (* -------------------------------------------------------------------- *)
-
 let pp_opname fmt (nm, op) = 
   let op = 
     if is_unbinop op then 
-      if op.[0] = '*' || op.[String.length op -1] = '*' then 
+      if op.[0] = '*' || op.[String.length op - 1] = '*' then 
         Format.sprintf "( %s )" op
       else Format.sprintf "(%s)" op
-    else op in
-  EcSymbols.pp_qsymbol fmt (nm, op)
+    else op
+  in
+    EcSymbols.pp_qsymbol fmt (nm, op)
 
 let pp_opapp (ppe : PPEnv.t) pp_sub outer fmt (op, _tvi, es) =
   let (nm, opname) = PPEnv.op_symb ppe op in
@@ -743,7 +743,6 @@ let pp_binding (ppe : PPEnv.t) (xs, ty) =
         (tenv1, pp)
 
 (* -------------------------------------------------------------------- *)
-
 let rec pp_bindings_aux ppe bds =
   match bds with
   | [] ->
@@ -761,13 +760,13 @@ let rec pp_bindings ppe bds =
     match bds with
     | [] -> [List.rev xs, gty]
     | (x,gty') :: bds ->
-      if EcFol.gty_equal gty gty' then merge (x::xs, gty) bds
-      else (List.rev xs,gty) :: merge ([x], gty') bds  in
+        if   EcFol.gty_equal gty gty'
+        then merge (x::xs, gty) bds
+        else (List.rev xs,gty) :: merge ([x], gty') bds
+  in
   match bds with
   | [] -> pp_bindings_aux ppe []
-  | (x,gty)::bds -> pp_bindings_aux ppe (merge ([x],gty) bds)
-
-
+  | (x,gty)::bds -> pp_bindings_aux ppe (merge ([x], gty) bds)
 
 (* -------------------------------------------------------------------- *)
 let rec pp_form_r (ppe : PPEnv.t) outer fmt f =

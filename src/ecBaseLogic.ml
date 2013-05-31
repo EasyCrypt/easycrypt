@@ -213,10 +213,11 @@ type rule_name =
   | RN_hl_append    of bool * tac_pos * EcFol.form * EcFol.form option
   | RN_hl_rcond     of bool option * bool * int
   | RN_hl_case      of form
-  | RN_hl_while     of EcFol.form
+  | RN_hl_while     of EcFol.form * EcFol.form option * (EcFol.form * EcFol.form) option
   | RN_hl_fission   of bool option * codepos * (int * (int * int))
   | RN_hl_fusion    of bool option * codepos * (int * (int * int))
   | RN_hl_unroll    of bool option * codepos
+  | RN_hl_splitwhile of EcTypes.expr *  bool option * codepos
   | RN_hl_call      of bool option * EcFol.form * EcFol.form
   | RN_hl_swap      of bool * int * int * int
   | RN_hl_inline    of bool option * s_pat 
