@@ -117,7 +117,7 @@ module PPEnv = struct
           let exists sm =
             match EcEnv.Mod.sp_lookup_opt sm ppe.ppe_env with
             | None -> false
-            | Some (mp1, _) -> P.mt_equal mp1.P.m_top mp.P.m_top
+            | Some (mp1, _) -> P.mt_equal mp1.P.m_top (`Concrete (p1, None))
           in
   
           let rec shorten prefix (nm, x) =
