@@ -307,6 +307,22 @@ type assoc  = [`Left | `Right | `NonAssoc]
 type fixity = [`Prefix | `Postfix | `Infix of assoc]
 type opprec = int * fixity
 
+let string_of_assoc = function
+  | `Left     -> "left"
+  | `Right    -> "right"
+  | `NonAssoc -> "non-assoc"
+
+let string_of_fixity = function
+  | `Prefix  -> "prefix"
+  | `Postfix -> "postfix"
+  | `Infix a -> Printf.sprintf "index[%s]" (string_of_assoc a)
+
+let string_of_oprec ((i, f) : opprec) =
+  Printf.sprintf "%s @ %d" (string_of_fixity f) i
+
+let string_of_oprec_ctx (((i, f), a) : opprec * assoc) =
+  Printf.sprintf "%s @ %d [%s]" (string_of_fixity f) i (string_of_assoc a)
+
 (* -------------------------------------------------------------------- *)
 let maybe_paren (outer, side) inner pp =
   let noparens ((pi, fi) as _inner) ((po, fo) as _outer) side =
