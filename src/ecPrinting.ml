@@ -435,7 +435,10 @@ let pp_tuple (ppe : PPEnv.t) pp_sub es =
 
 let pp_opname fmt (nm, op) = 
   let op = 
-    if is_unbinop op then Format.sprintf "( %s )" op
+    if is_unbinop op then 
+      if op.[0] = '*' || op.[String.length op -1] = '*' then 
+        Format.sprintf "( %s )" op
+      else Format.sprintf "(%s)" op
     else op in
   EcSymbols.pp_qsymbol fmt (nm, op)
 
