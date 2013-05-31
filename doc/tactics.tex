@@ -156,33 +156,42 @@ Similar rules hold for $=,\geq$.
 %
 
 \Description
-The first formula is the loop invariant. 
-The second one is a real expression bound $g$.
-If $g=1$ then the third and fourth formulae are ignored, otherwise
-required.
-...
+%
+The first formula is the loop invariant.
+%
+The second one is a variant expression. 
+%
+The third one is a real expression bound $g$ and the fourth one an
+integer expression $n$.
+%
+If $g$ is not given then it is interpreted as $g=1$, and the fourth
+formula is ignored, otherwise required. $M$ stands for the variables
+that may be modified by $c$.
+
 \begin{displaymath}
   \infrule{
     \begin{array}{c}
-    \bdHoareSge{c'}{\pre }{\chi \land \forall M.~ \chi \land \neg b
-      \Rightarrow \post}{f} 
+    \bdHoareSge{c'}{\pre }{\chi \land 
+      \forall M.~ (\chi \land 0 \leq e \Rightarrow \neg b)  \land
+      \chi \land \neg b \Rightarrow \post}{f} 
     \\[.5ex]
     \forall k.~ \bdHoareSeq{c}{\chi \land b \land e = k}{\chi \land e
       < k}{1}
   \end{array}
 }{
     \bdHoareSge{c';\While{b}{c}}{\pre}{\post}{f}
-  }\left[\verb+while+\ \chi\ 1 \right] 
+  }\left[\verb+while+\ \chi\ e \right] 
 \end{displaymath}
 Similarly for (=).
 
 For an arbitrary bound $g$ the following rule generalizes the one
-above:
+above for lower bounded judgments:
 \begin{displaymath}
   \infrule{
     \begin{array}{c}
-    \bdHoareSge{c'}{\pre }{\chi \land \forall M.~ (e\leq n) \land (\chi \land \neg b
-      \Rightarrow \post)}{\frac{f}{g^n}} 
+    \bdHoareSge{c'}{\pre }{\chi \land e \leq n \land 
+      \forall M.~ (\chi \land 0 \leq e \Rightarrow \neg b) 
+      \land (\chi \land \neg b \Rightarrow \post)}{\frac{f}{g^n}} 
     \\[.5ex]
     \bdHoareSge{c}{\chi \land b}{\chi}{g}
     \\[.5ex]
@@ -190,7 +199,25 @@ above:
   \end{array}
 }{
     \bdHoareSge{c';\While{b}{c}}{\pre}{\post}{f}
-  }\left[\verb+while+\ \chi\ 1 \right] 
+  }\left[\verb+while+\ \chi\ e\ g\ n \right] 
+\end{displaymath}
+
+and the folowing one for exact judgments (=):
+\begin{displaymath}
+  \infrule{
+    \begin{array}{c}
+    \bdHoareSge{c'}{\pre }{\chi \land e = n \land 
+      \forall M.~ (\chi\Rightarrow (0\leq e \Leftrightarrow \neg b)) 
+        \land (\chi \land \neg b \Rightarrow \post)}
+      {\frac{f}{g^n}}
+    \\[.5ex]
+    \bdHoareSge{c}{\chi \land b}{\chi}{g}
+    \\[.5ex]
+    \forall k.~ \bdHoareSeq{c}{\chi \land b \land e = k}{e=k-1}{1}
+  \end{array}
+}{
+    \bdHoareSge{c';\While{b}{c}}{\pre}{\post}{f}
+  }\left[\verb+while+\ \chi\ e\ g\ n \right] 
 \end{displaymath}
 
 

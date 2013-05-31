@@ -1370,8 +1370,8 @@ tactic:
 | SKIP
     { PPhl Pskip }
 
-| WHILE inv=sform
-    { PPhl (Pwhile inv) }
+| WHILE info=while_tac_info
+    { PPhl (Pwhile info) }
 
 | CALL s=side? pre=sform post=sform
     { PPhl (Pcall (s, (pre, post))) }
@@ -1407,6 +1407,13 @@ tactic:
 | DEBUG
     { Pdebug }
 ;
+
+while_tac_info : 
+| inv=sform { inv,None,None } 
+| inv=sform vrnt=sform 
+    { inv, Some vrnt, None }
+| inv=sform vrnt=sform bd=sform n_iter=sform
+    { inv, Some vrnt, Some (bd,n_iter) }
 
 rnd_info:
 | e1=sform e2=sform 
