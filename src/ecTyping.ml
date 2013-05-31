@@ -106,8 +106,12 @@ let pp_tyerror fmt env error =
       msg "expecting: %a" pp_type ty1;
       msg "      got: %a" pp_type ty2
 
-  | UnknownVarOrOp (name, _) ->
-      msg "unknown variable or operator: %a" pp_qsymbol name
+  | UnknownVarOrOp (name, tys) -> begin
+      match tys with
+      | [] -> msg "unknown variable or constant: `%a'" pp_qsymbol name
+      | _  -> msg "unknown operator `%a' for signature (%a)"
+                pp_qsymbol name (EcPrinting.pp_list " *@ " pp_type) tys
+  end
 
   | MultipleOpMatch (name, _) ->
       msg "more than one operator matches: %a" pp_qsymbol name
