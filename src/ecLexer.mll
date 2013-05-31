@@ -246,9 +246,8 @@ rule main = parse
   | "="  { EQ }
   | "<>" { NE }
 
-  | "[<=]"  { HLEQ }
-  | "[>=]"  { HGEQ }
-  | "[=]"   { HEQ }
+  | "<="  { LE }
+  | ">="  { GE }
 
   | "-" { MINUS }
   | "+" { ADD }

@@ -176,9 +176,6 @@
 %token FUN
 %token GENERALIZE 
 %token GLOB
-%token HEQ
-%token HGEQ
-%token HLEQ
 %token HOARE
 %token IDTAC
 %token IF
@@ -259,7 +256,7 @@
 %token ZETA 
 
 %token <string> OP1 OP2 OP3 OP4
-%token LTCOLON GT
+%token LTCOLON GT GE LE
 
 %nonassoc COMMA ELSE
 
@@ -269,7 +266,7 @@
 %right AND 
 
 %nonassoc NOT
-%left EQ NE OP1 GT
+%left EQ NE OP1 GT GE LE
 
 %right QUESTION
 %left OP2 MINUS ADD
@@ -378,6 +375,8 @@ fident:
 | x=OR    { str_or  x }
 | STAR    { "*" }
 | GT      { ">" }
+| GE      { ">=" }
+| LE      { "<=" }
 | ADD     { "+" }
 | MINUS   { "-" }
 | x=OP1   { x   }
@@ -481,11 +480,24 @@ expr_u:
 | op=loc(binop) ti=tvars_app? e=expr %prec prec_prefix_op
    { peapp_symb op.pl_loc op.pl_desc ti [e] } 
 
-| e1=expr op=loc(OP1) ti=tvars_app? e2=expr %prec OP1
+| e1=expr op=loc(OP1) ti=tvars_app? e2=expr 
     { peapp_symb op.pl_loc op.pl_desc ti [e1; e2] }
 
-| e1=expr op=loc(GT) ti=tvars_app? e2=expr %prec OP1
+| e1=expr op=loc(GT) ti=tvars_app? e2=expr  
     { peapp_symb op.pl_loc ">" ti [e1; e2] }
+
+| e1=expr op=loc(LE) ti=tvars_app? e2=expr
+    { peapp_symb op.pl_loc "<=" ti [e1; e2] }
+
+| e1=expr op=loc(GE) ti=tvars_app? e2=expr
+    { peapp_symb op.pl_loc ">=" ti [e1; e2] }
+
+| e1=expr op=loc(EQ) ti=tvars_app? e2=expr
+    { peapp_symb op.pl_loc "=" ti [e1; e2] }
+
+| e1=expr op=loc(NE) ti=tvars_app? e2=expr
+    { peapp_symb op.pl_loc "!" None 
+      [ mk_loc op.pl_loc (peapp_symb op.pl_loc "=" ti [e1; e2])] }
 
 | e1=expr op=loc(ADD) ti=tvars_app? e2=expr 
     { peapp_symb op.pl_loc "+" ti [e1; e2] }
@@ -513,13 +525,6 @@ expr_u:
 
 | e1=expr op=loc(AND) ti=tvars_app? e2=expr 
     { peapp_symb op.pl_loc (str_and op.pl_desc) ti [e1; e2] }
-
-| e1=expr op=loc(EQ) ti=tvars_app? e2=expr  
-    { peapp_symb op.pl_loc "=" ti [e1; e2] }
-
-| e1=expr op=loc(NE) ti=tvars_app? e2=expr 
-    { peapp_symb op.pl_loc "!" None 
-      [ mk_loc op.pl_loc (peapp_symb op.pl_loc "=" ti [e1; e2])] }
 
 | e1=expr op=loc(STAR) ti=tvars_app?  e2=expr  
     { peapp_symb op.pl_loc "*" ti [e1; e2] }
@@ -611,18 +616,6 @@ sform_u:
   RBRACKET
 	{ PFhoareS (pre, s, post) }
 
-| BDHOARE 
-    LBRACKET mp=loc(fident) COLON pre=form LONGARROW post=form  RBRACKET
-    cmp = hoare_bd_cmp
-    LBRACKET bd=form RBRACKET
-	{ PFBDhoareF (pre, mp, post, cmp, bd) }
-
-| BDHOARE 
-    LBRACKET s=fun_def_body COLON pre=form LONGARROW post=form  RBRACKET
-    cmp = hoare_bd_cmp
-    LBRACKET bd=form RBRACKET
-	{ PFBDhoareS (pre, s, post, cmp, bd) }
-
 | PR LBRACKET
     mp=loc(fident) args=paren(plist0(sform, COMMA)) AT pn=mident
     COLON event=form
@@ -637,11 +630,6 @@ sform_u:
     { let id = PFident(mk_loc op.pl_loc EcCoreLib.s_dinter, ti) in
       PFapp(mk_loc op.pl_loc id, [e1; e2]) } 
 ;
-
-hoare_bd_cmp :
-  | HLEQ {PFHle}
-  | HEQ  {PFHeq}
-  | HGEQ {PFHge}
                           
 form_u:
 | GLOB mp=loc(mod_qident) { PFglob mp }
@@ -656,16 +644,29 @@ form_u:
 | op=loc(binop) ti=tvars_app? e=form %prec prec_prefix_op
    { pfapp_symb op.pl_loc op.pl_desc ti [e] } 
 
-| e1=form op=loc(OP1) ti=tvars_app? e2=form %prec OP1 
+| e1=form op=loc(OP1) ti=tvars_app? e2=form
     { pfapp_symb op.pl_loc op.pl_desc ti [e1; e2] } 
 
-| e1=form op=loc(GT) ti=tvars_app? e2=form %prec OP1 
+| e1=form op=loc(GT) ti=tvars_app? e2=form
     { pfapp_symb op.pl_loc ">" ti [e1; e2] } 
 
-| e1=form op=loc(MINUS) ti=tvars_app? e2=form  
+| e1=form op=loc(LE) ti=tvars_app? e2=form
+    { pfapp_symb op.pl_loc "<=" ti [e1; e2] } 
+
+| e1=form op=loc(GE) ti=tvars_app? e2=form
+    { pfapp_symb op.pl_loc ">=" ti [e1; e2] } 
+
+| e1=form op=loc(EQ) ti=tvars_app? e2=form
+    { pfapp_symb op.pl_loc "=" ti [e1; e2] }
+
+| e1=form op=loc(NE) ti=tvars_app? e2=form
+    { pfapp_symb op.pl_loc "!" None 
+      [ mk_loc op.pl_loc (pfapp_symb op.pl_loc "=" ti [e1; e2])] }
+
+| e1=form op=loc(MINUS) ti=tvars_app? e2=form
     { pfapp_symb op.pl_loc "-" ti [e1; e2] }
 
-| e1=form op=loc(ADD) ti=tvars_app? e2=form  
+| e1=form op=loc(ADD) ti=tvars_app? e2=form 
     { pfapp_symb op.pl_loc "+" ti [e1; e2] }
 
 | e1=form op=loc(OP2) ti=tvars_app? e2=form  
@@ -689,13 +690,6 @@ form_u:
 | e1=form op=loc(AND) ti=tvars_app? e2=form  
     { pfapp_symb op.pl_loc (str_and op.pl_desc) ti [e1; e2] }
 
-| e1=form op=loc(EQ) ti=tvars_app? e2=form  
-    { pfapp_symb op.pl_loc "=" ti [e1; e2] }
-
-| e1=form op=loc(NE) ti=tvars_app? e2=form 
-    { pfapp_symb op.pl_loc "!" None 
-      [ mk_loc op.pl_loc (pfapp_symb op.pl_loc "=" ti [e1; e2])] }
-
 | e1=form op=loc(STAR ) ti=tvars_app? e2=form  
     { pfapp_symb op.pl_loc "*" ti [e1; e2] }
 
@@ -715,7 +709,25 @@ form_u:
     { let id  = PFident (mk_loc r.pl_loc EcCoreLib.s_dbitstring, None) in
       let loc = EcLocation.make $startpos $endpos in
         PFapp (mk_loc loc id, [e]) }
+
+| BDHOARE 
+    LBRACKET mp=loc(fident) COLON pre=form LONGARROW post=form  RBRACKET
+    cmp = hoare_bd_cmp
+    bd=sform
+	{ PFBDhoareF (pre, mp, post, cmp, bd) }
+
+| BDHOARE 
+    LBRACKET s=fun_def_body COLON pre=form LONGARROW post=form  RBRACKET
+    cmp = hoare_bd_cmp
+    bd=sform
+	{ PFBDhoareS (pre, s, post, cmp, bd) }
+
 ;
+
+hoare_bd_cmp :
+  | LE {PFHle}
+  | EQ {PFHeq}
+  | GE {PFHge}
 
 equiv_body:
   mp1=loc(fident) TILD mp2=loc(fident)

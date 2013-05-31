@@ -64,8 +64,8 @@ module F2(A:Adv) = {
 
 lemma foo : forall (A<:Adv{RO,F2}), 
   (forall (O<:O),  
-      bd_hoare [O.hashA : true ==> true] [=] [1%r] => 
-      bd_hoare [A(O).a : true ==> true] [=] [1%r]) =>  
+      bd_hoare [O.hashA : true ==> true] = 1%r => 
+      bd_hoare [A(O).a : true ==> true] = 1%r) =>  
   equiv [F1(A).main ~ F2(A).main : 
      (glob A){1} = (glob A){2} ==> 
      (!mem F2.xs RO.logA){2} => res{1} = res{2}]

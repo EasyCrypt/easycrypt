@@ -376,6 +376,8 @@ let priority_of_binop name =
   | Some EP.EQ    -> Some e_bin_prio_eq
   | Some EP.NE    -> Some e_bin_prio_eq
   | Some EP.GT    -> Some e_bin_prio_op1
+  | Some EP.GE    -> Some e_bin_prio_op1
+  | Some EP.LE    -> Some e_bin_prio_op1
   | Some EP.OP1 _ -> Some e_bin_prio_op1
   | Some EP.OP2 _ -> Some e_bin_prio_op2
   | Some EP.ADD   -> Some e_bin_prio_op2
@@ -397,6 +399,8 @@ let priority_of_unop name =
   | Some EP.ADD   -> Some e_uni_prio_uminus  
   | Some EP.MINUS -> Some e_uni_prio_uminus  
   | Some EP.GT    -> Some e_uni_prio_uminus  
+  | Some EP.GE    -> Some e_uni_prio_uminus  
+  | Some EP.LE    -> Some e_uni_prio_uminus  
   | Some EP.OP1 _ -> Some e_uni_prio_uminus 
   | Some EP.OP2 _ -> Some e_uni_prio_uminus
   | Some EP.OP3 _ -> Some e_uni_prio_uminus
@@ -859,19 +863,19 @@ let rec pp_form_r (ppe : PPEnv.t) outer fmt f =
       (pp_form ppe) ev
 
   | FbdHoareF hf ->
-    Format.fprintf fmt "bd_hoare[@[<hov 2>@ %a :@ @[%a ==>@ %a@]@]] [%s] [%a]"
+    Format.fprintf fmt "bd_hoare[@[<hov 2>@ %a :@ @[%a ==>@ %a@]@]] %s %a"
       (pp_funname ppe) hf.bhf_f
       (pp_form ppe) hf.bhf_pr
       (pp_form ppe) hf.bhf_po
       (string_of_hcmp hf.bhf_cmp)
-      (pp_form ppe) hf.bhf_bd 
+      (pp_form_r ppe (max_op_prec,`NonAssoc)) hf.bhf_bd 
   | FbdHoareS hs ->
-    Format.fprintf fmt "bd_hoare[@[<hov 2>@ %a :@ @[%a ==>@ %a@]@]] [%s] [%a]"
+    Format.fprintf fmt "bd_hoare[@[<hov 2>@ %a :@ @[%a ==>@ %a@]@]] %s %a"
       (pp_stmt_for_form ppe) hs.bhs_s
       (pp_form ppe) hs.bhs_pr
       (pp_form ppe) hs.bhs_po
       (string_of_hcmp hs.bhs_cmp)
-      (pp_form ppe) hs.bhs_bd 
+      (pp_form_r ppe (max_op_prec,`NonAssoc)) hs.bhs_bd 
       
 
 
