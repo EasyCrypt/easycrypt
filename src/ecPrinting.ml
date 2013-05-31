@@ -827,7 +827,7 @@ let rec pp_form_r (ppe : PPEnv.t) outer fmt f =
         (pp_form_r ppe (max_op_prec, `NonAssoc)) eqv.ef_po
       
   | FequivS es ->
-      Format.fprintf fmt "equiv[@[<hov 2>%a ~ %a :@\n%a@ ==> @[<hov 2>%a@]@]]"
+      Format.fprintf fmt "@[<hov 2>equiv[@ %a ~@ %a :@ %a ==>@ %a]@]"
         (pp_stmt_for_form ppe) es.es_sl
         (pp_stmt_for_form ppe) es.es_sr
         (pp_form_r ppe (max_op_prec, `NonAssoc)) es.es_pr
@@ -836,8 +836,12 @@ let rec pp_form_r (ppe : PPEnv.t) outer fmt f =
   | Fglob (mp, me) ->
       Format.fprintf fmt "(glob %a){%a}" (pp_topmod ppe) mp (pp_local ppe) me
 
-  | Fpr _ ->
-      Format.fprintf fmt "Fpr[to-be-done]"
+  | Fpr (m,f,args,ev) ->
+      Format.fprintf fmt "Pr[@[%a(@[%a@]) @@ %a :@ %a@]]"
+        (pp_funname ppe) f 
+        (pp_list ",@ " (pp_form_r ppe (max_op_prec, `NonAssoc))) args
+        (pp_local ppe) m
+        (pp_form_r ppe (max_op_prec, `NonAssoc)) ev
 
   | FbdHoareF _ ->
       Format.fprintf fmt "PHoareF[to-be-done]"
@@ -1198,11 +1202,11 @@ let pp_node mode fmt node =
 
 (* -------------------------------------------------------------------- *)
 let pp_pre (ppe : PPEnv.t) fmt pre =
-  Format.fprintf fmt "??> @[<hov 2>@]%a@\n%!" (pp_form ppe) pre
+  Format.fprintf fmt "@[<hov 2>pre =@ %a@]\n" (pp_form ppe) pre
 
 (* -------------------------------------------------------------------- *)
 let pp_post (ppe : PPEnv.t) fmt post =
-  Format.fprintf fmt "--> @[<hov 2>@]%a@\n%!" (pp_form ppe) post
+  Format.fprintf fmt "@[<hov 2>post =@ %a@]\n" (pp_form ppe) post
 
 (* -------------------------------------------------------------------- *)
 let pp_hoareF (ppe : PPEnv.t) fmt hf =
@@ -1295,8 +1299,8 @@ let pp_equivS (ppe : PPEnv.t) fmt es =
       (EcMemory.xpath es.es_ml, EcMemory.xpath es.es_mr)
       ppe ppnode
   in
-    Format.fprintf fmt "&1 (right) : %a@\n%!" (pp_funname ppe) (EcMemory.xpath es.es_ml);
-    Format.fprintf fmt "&2 (left ) : %a@\n%!" (pp_funname ppe) (EcMemory.xpath es.es_mr);
+    Format.fprintf fmt "&1 (left ) : %a@\n%!" (pp_funname ppe) (EcMemory.xpath es.es_ml);
+    Format.fprintf fmt "&2 (right) : %a@\n%!" (pp_funname ppe) (EcMemory.xpath es.es_mr);
     Format.fprintf fmt "@\n%!";
     Format.fprintf fmt "%a%!" (pp_pre ppe) es.es_pr;
     Format.fprintf fmt "@\n%!";
@@ -1322,19 +1326,19 @@ let pp_goal (ppe : PPEnv.t) fmt (n, (hyps, concl)) =
     in
       (ppe, pp)
   in
-    begin
-      match n with
-      | 0 -> Format.fprintf fmt "Current goal@\n@\n%!"
-      | _ -> Format.fprintf fmt "Current goal (remaining: %d)@\n@\n%!" n
-    end;
+  begin
+    match n with
+    | 1 -> Format.fprintf fmt "Current goal@\n@\n%!"
+    | _ -> Format.fprintf fmt "Current goal (remaining: %d)@\n@\n%!" n
+  end;
 
-    begin
-      match hyps.EcBaseLogic.h_tvar with
-      | [] -> Format.fprintf fmt "Type variables: <none>@\n\n%!"
-      | tv ->
-          Format.fprintf fmt "Type variables: %a@\n\n%!"
-            (pp_list ", " (pp_tyvar ppe)) tv
-    end;
+  begin
+    match hyps.EcBaseLogic.h_tvar with
+    | [] -> Format.fprintf fmt "Type variables: <none>@\n\n%!"
+    | tv ->
+      Format.fprintf fmt "Type variables: %a@\n\n%!"
+        (pp_list ", " (pp_tyvar ppe)) tv
+  end;
 
     let ppe =
       List.fold_left

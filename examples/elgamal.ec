@@ -139,7 +139,6 @@ proof.
   rewrite (mul_div (g ^ (x * y)) (m{m1}));split.
 save.
 
-
 (* No we try to prove IND-CPA security *)
 
 module type Inverter = { 
@@ -256,18 +255,28 @@ lemma equiv1 : forall (A<:Adv),
   equiv[CPA(ElGamal,A).main ~ DDH0(Inv(A)).main : 
          (glob A){1}=(glob A){2} ==> res{1} = res{2} ]
 proof.
- intros A;fun.         
+ intros A.
+ fun.
  inline ElGamal.kg ElGamal.enc Inv(A).inv.
  wp.
  call (c{1} = c{2} /\ (glob A){1} = (glob A){2}) (res{1}=res{2} /\ (glob A){1} = (glob A){2}).
  fun true;try (simplify;split).
- wp.
-(*
- simplify.
- : equiv [A2.a2 ~ A2.a2 : 
-claim Pr1 : INDCPA.Main[res] = DDH0.Main[res] 
-auto.
-       
+ swap{1} 7 -5. 
+ wp;rnd.
+ call (pk{1} = pk{2} /\ (glob A){1} = (glob A){2}) (res{1}=res{2} /\ (glob A){1} = (glob A){2}).
+ fun true;try (simplify;split).
+ wp; *rnd;skip;simplify;trivial.
+save.
+
+lemma Pr1 : forall (A<:Adv) &m, 
+   Pr[CPA(ElGamal,A).main() @ &m : res] = 
+   Pr[DDH0(Inv(A)).main() @ &m : res]
+proof.
+ intros A &m.
+ equiv_deno (equiv1 (<:A));trivial.
+save.
+
+    (*    
 claim Pr2 : G1.Main[res] = DDH1.Main[res] 
 auto.
 
