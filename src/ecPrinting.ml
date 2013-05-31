@@ -1137,6 +1137,46 @@ let pp_hoareS (ppe : PPEnv.t) fmt hs =
     Format.fprintf fmt "%a%!" (pp_post ppe) hs.hs_po
 
 (* -------------------------------------------------------------------- *)
+let string_of_hrcmp = function
+  | FHle -> "[=]"
+  | FHeq -> "[<=]"
+  | FHge -> "[>=]"
+
+(* -------------------------------------------------------------------- *)
+let pp_bdhoareF (ppe : PPEnv.t) fmt hf =
+  let scmp = string_of_hrcmp hf.bhf_cmp in
+
+  Format.fprintf fmt "%a@\n%!" (pp_pre ppe) hf.bhf_pr;
+  Format.fprintf fmt "    %a@\n%!" (pp_funname ppe) hf.bhf_f;
+  Format.fprintf fmt "    %s @[<hov 2>%a@]@\n%!" scmp (pp_form ppe) hf.bhf_bd;
+  Format.fprintf fmt "@\n%a%!" (pp_post ppe) hf.bhf_po
+
+(* -------------------------------------------------------------------- *)
+let pp_bdhoareS (ppe : PPEnv.t) fmt hs =
+  let ppe =
+    { ppe with
+        PPEnv.ppe_env = EcEnv.Memory.push hs.bhs_m ppe.PPEnv.ppe_env }
+  in
+
+  let ppnode = collect2_s hs.bhs_s.s_node [] in
+  let ppnode =
+    c_ppnode ~width:80
+      (EcMemory.xpath hs.bhs_m, EcMemory.xpath hs.bhs_m)
+      ppe ppnode
+  in
+
+  let scmp = string_of_hrcmp hs.bhs_cmp in
+
+    Format.fprintf fmt "Context : %a@\n%!" (pp_funname ppe) (EcMemory.xpath hs.bhs_m);
+    Format.fprintf fmt "Bound   : @[<hov 2>%s %a@]@\n%!" scmp (pp_form ppe) hs.bhs_bd;
+    Format.fprintf fmt "@\n%!";
+    Format.fprintf fmt "%a%!" (pp_pre ppe) hs.bhs_pr;
+    Format.fprintf fmt "@\n%!";
+    Format.fprintf fmt "%a" (pp_node `Left) ppnode;
+    Format.fprintf fmt "@\n%!";
+    Format.fprintf fmt "%a%!" (pp_post ppe) hs.bhs_po
+
+(* -------------------------------------------------------------------- *)
 let pp_equivF (ppe : PPEnv.t) fmt ef =
   Format.fprintf fmt "%a@\n%!" (pp_pre ppe) ef.ef_pr;
   Format.fprintf fmt "    %a ~ %a@\n%!"
@@ -1201,10 +1241,12 @@ let pp_goal (ppe : PPEnv.t) fmt (n, (hyps, concl)) =
 
     begin
       match concl.f_node with
-      | FhoareF hf -> pp_hoareF ppe fmt hf
-      | FhoareS hs -> pp_hoareS ppe fmt hs
-      | FequivF ef -> pp_equivF ppe fmt ef
-      | FequivS es -> pp_equivS ppe fmt es
+      | FbdHoareF hf -> pp_bdhoareF ppe fmt hf
+      | FbdHoareS hs -> pp_bdhoareS ppe fmt hs
+      | FhoareF hf   -> pp_hoareF   ppe fmt hf
+      | FhoareS hs   -> pp_hoareS   ppe fmt hs
+      | FequivF ef   -> pp_equivF   ppe fmt ef
+      | FequivS es   -> pp_equivS   ppe fmt es
       | _ -> Format.fprintf fmt "%a@\n%!" (pp_form ppe) concl
     end
 
