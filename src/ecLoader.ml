@@ -13,7 +13,7 @@ let create () = {
 
 (* -------------------------------------------------------------------- *)
 let addidir (idir : string) (ecl : ecloader) =
-  ecl.ecl_idirs <- ecl.ecl_idirs @ [idir]
+  ecl.ecl_idirs <- idir :: ecl.ecl_idirs
 
 (* -------------------------------------------------------------------- *)
 let locate (name : string) (ecl : ecloader) =
