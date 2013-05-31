@@ -39,12 +39,16 @@ let field_to_form (f : ty field) (plus : form) (minus : form) (times : form) (in
 			| Minus x -> mk_form (Fapp (minus, ffm x :: [])) ty
 	in ffm f
 
+let rec rmvrep ts = match ts with
+					| [] -> []
+					| x :: xs -> x :: ( rmvrep (List.fold_left (fun is i -> if (f_equal x i) then is else (i::is)) [] xs) )
+
 let appfield ((form1,form2) :form * form) (plus : form) (minus : form) (times : form) (inv : form) (zero : form) (one : form) 
 	: (form list * (form * form) list) =
 	let mff t = form_to_field t plus minus times inv zero one in
 	let ffm t = field_to_form t plus minus times inv zero one in
 	let (zs,obs) = eqfield (mff form1) (mff form2) in
-	let fzs = List.fold_left (fun is l ->  (ffm l) :: is) [] zs in
+	let fzs = rmvrep (List.fold_left (fun is l ->  (ffm l) :: is) [] zs) in
 	let fobs = List.fold_left (fun is (l,r) -> (ffm l, ffm r) :: is) [] obs in
 	(fzs,fobs)
 
@@ -53,6 +57,6 @@ let appfield_simp (f : form) (plus : form) (minus : form) (times : form) (inv : 
 	let mff t = form_to_field t plus minus times inv zero one in
 	let ffm t = field_to_form t plus minus times inv zero one in
 	let (zs,res) = field_norm (mff f) in
-	let fzs = List.fold_left (fun is l ->  (ffm l) :: is) [] zs in
+	let fzs = rmvrep (List.fold_left (fun is l ->  (ffm l) :: is) [] zs) in
 	(fzs, ffm res)
 

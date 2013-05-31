@@ -1203,14 +1203,14 @@ module Tactic = struct
 			(match concl.f_node with
 				| Fapp(_,arg1 :: _) ->
 					let ty = f_ty arg1 in
-					let eq = process_form env hyps e (tfun ty (tfun ty tbool)) in
+					let e' = process_form env hyps e (tfun ty (tfun ty tbool)) in 
 					let p' = process_form env hyps p (tfun ty (tfun ty ty)) in 
 					let t' = process_form env hyps t (tfun ty (tfun ty ty)) in 
 					let i' = process_form env hyps i (tfun ty ty) in 
 		 			let m' = process_form env hyps m (tfun ty ty) in 
 					let z' = process_form env hyps z ty in 
 					let o' = process_form env hyps o ty in 
-					t_field_simp (p',t',i',m',z',o',eq) concl
+					t_field_simp (p',t',i',m',z',o',e') concl
 				| _ -> cannot_apply "field" "Think more about the goal")
 
   let rec process_logic_tacs scope env (tacs:ptactics) (gs:goals) : goals =

@@ -17,17 +17,6 @@ proof.
 admit.
 save.
 
-op sum (x y : int) : int  = x + y.
-op prod (x y : int) : int = x * y.
-op minus (x : int) : int = (0- x).
-op inv (x : int) : int = (1 / x).
-op eq (x y : int) : bool = x = y.
-lemma l_field : forall (x y: int), eq x y
-proof.
-  intros x y.
-  field sum prod minus inv 1 0 eq.
-admit.
-save.
 (* intros *)
 lemma l_intros : forall (x1 : 'a), p x1 => forall (x2 x3:'a), p x2 => p x3
 proof.
@@ -55,10 +44,12 @@ proof.
   admit.
 save. 
 
+
 (* clear *)
 lemma l_clear : forall (x1 : 'a), p x1 => forall (x2 x3:'a), p x2 => p x3
 proof.
   intros x1 hx1 x2 x3 hx2.
+
   generalize x1 hx1 x2 x3 hx2.
   clear hx1 x1. (* can be in any order x1 hx1 or hx1 x1 *)
   clear x2 x3 hx2.
