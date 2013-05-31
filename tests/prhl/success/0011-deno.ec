@@ -26,7 +26,7 @@ proof.
  fun.
  wp;skip;intros &m1 &m2 h; rewrite h;intros h1;assumption h1.
  split.
- intros &m1 &m2 H; assumption H.
+ intros &m1 &m2 H;assumption H.
 save.
 
 lemma lequiv : equiv [M.f ~ M.f : x{1} = x{2} ==> res{1} = res{2}]

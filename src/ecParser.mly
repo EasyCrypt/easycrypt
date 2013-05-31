@@ -119,8 +119,12 @@
 (* Tokens *)
 %token <bool> AND (* true asym : &&, false sym : /\ *)
 %token <bool> OR  (* true asym : ||, false sym : \/ *)
+
+%token <EcParsetree.codepos> CPOS
+
 %token ADD
 %token ADMIT
+%token ALIAS
 %token APP
 %token APPLY
 %token ARROW
@@ -164,6 +168,8 @@
 %token EXIST
 %token EXPORT
 %token FINAL
+%token FISSION
+%token FUSION
 %token FORALL
 %token FWDS
 %token FROM_INT
@@ -242,6 +248,7 @@
 %token TYPE
 %token UNDERSCORE
 %token UNDO
+%token UNROLL
 %token USING
 %token VAR
 %token WHILE
@@ -1237,7 +1244,7 @@ fpattern(F):
 ;
 
 simplify_arg: 
-| DELTA l=qident* { `Delta l }
+| DELTA l=qident_pbinop* { `Delta l }
 | ZETA            { `Zeta }
 | IOTA            { `Iota }
 | BETA            { `Beta }
@@ -1248,7 +1255,7 @@ simplify_arg:
 simplify:
 | l=simplify_arg+    { l }
 | SIMPLIFY           { simplify_red }
-| SIMPLIFY l=qident+ { `Delta l  :: simplify_red  }
+| SIMPLIFY l=qident_pbinop+ { `Delta l  :: simplify_red  }
 | SIMPLIFY DELTA     { `Delta [] :: simplify_red }
 ;
 
@@ -1269,10 +1276,16 @@ conseq:
 ;
 
 
-tac_dir : 
-  | BACKS {true }
-  | FWDS  {false}
-  | empty {true}
+tac_dir: 
+| BACKS {  true }
+| FWDS  { false }
+| empty {  true }
+;
+
+codepos:
+| i=NUM  { (i, None) }
+| c=CPOS { c }
+;
 
 tactic:
 | IDTAC
@@ -1393,6 +1406,27 @@ tactic:
 
 | INLINE s=side? o=occurences? f=plist0(loc(fident), empty)
     { PPhl (Pinline (`ByName (s, (f, o)))) }
+
+| ALIAS s=side? o=codepos
+    { PPhl (Palias (s, o, None)) }
+
+| ALIAS s=side? o=codepos WITH x=lident
+    { PPhl (Palias (s, o, Some x)) }
+
+| FISSION s=side? o=codepos AT d1=NUM COMMA d2=NUM
+    { PPhl (Pfission (s, o, (1, (d1, d2)))) }
+
+| FISSION s=side? o=codepos NOT i=NUM AT d1=NUM COMMA d2=NUM
+    { PPhl (Pfission (s, o, (i, (d1, d2)))) }
+
+| FUSION s=side? o=codepos AT d1=NUM COMMA d2=NUM
+    { PPhl (Pfusion (s, o, (1, (d1, d2)))) }
+
+| FUSION s=side? o=codepos NOT i=NUM AT d1=NUM COMMA d2=NUM
+    { PPhl (Pfusion (s, o, (i, (d1, d2)))) }
+
+| UNROLL s=side? o=codepos
+    { PPhl (Punroll (s, o)) }
 
 | p=tselect INLINE
     { PPhl (Pinline (`ByPattern p)) }

@@ -247,7 +247,9 @@ let lp_write env w lp =
   | LvTuple pvs -> List.fold_left add w pvs 
   | LvMap ((_p,_tys),pv,_,ty) -> add w (pv,ty) 
 
-let rec s_write env w s = List.fold_left (i_write env) w s.s_node 
+let rec is_write env w s = List.fold_left (i_write env) w s
+
+and s_write env w s = is_write env w s.s_node
 
 and i_write env w i = 
   match i.i_node with
@@ -285,7 +287,9 @@ let lp_read env r lp =
   | LvTuple _ -> r
   | LvMap ((_,_),pv,e,ty) -> e_read env (PV.add env pv ty r) e
 
-let rec s_read env w s = List.fold_left (i_read env) w s.s_node 
+let rec is_read env w s = List.fold_left (i_read env) w s
+
+and s_read env w s = is_read env w s.s_node
 
 and i_read env r i = 
   match i.i_node with
@@ -459,8 +463,6 @@ let subst_form_lv env m lv t f =
   let s = PVM.merge se PVM.empty in
   mk_let env ([lpe], s,f)
 
-  
-
 (* -------------------------------------------------------------------- *)
 (* ----------------------  Auxiliary functions  ----------------------- *)
 (* -------------------------------------------------------------------- *)
@@ -497,8 +499,6 @@ let t_hS_or_bhS_or_eS th tbh te g =
   else if is_equivS concl then te g
   else tacerror (NotPhl None)
 
-
-
 let prove_goal_by sub_gs rule (juc,n as g) =
   let hyps,_ = get_goal g in
   let add_sgoal (juc,ns) sg = 
@@ -511,6 +511,102 @@ let prove_goal_by sub_gs rule (juc,n as g) =
 let gen_mems m f = 
   let bds = List.map (fun (m,mt) -> (m,GTmem mt)) m in
   f_forall bds f
+
+
+(* -------------------------------------------------------------------- *)
+module CPos = struct
+  exception InvalidCPos
+
+  module P = EcPath
+
+  type ipath =
+  | ZTop
+  | ZWhile  of expr * spath
+  | ZIfThen of expr * spath * stmt
+  | ZIfElse of expr * stmt  * spath
+
+  and spath = (instr list * instr list) * ipath
+
+  type zipper = {
+    z_head : instr list;                (* instructions on my left (rev)       *)
+    z_tail : instr list;                (* instructions on my right (me incl.) *)
+    z_path : ipath ;                    (* path (zipper) leading to me         *)
+  }
+
+  let zipper hd tl zpr = { z_head = hd; z_tail = tl; z_path = zpr; }
+    
+  let rec zipper_of_cpos ((i, sub) : codepos) zpr s =
+    let (s1, i, s2) =
+      try  List.split_n (i-1) s.s_node 
+      with Not_found -> raise InvalidCPos
+    in
+
+    match sub with
+    | None -> zipper s1 (i::s2) zpr
+    | Some (b, sub) -> begin
+      match i.i_node, b with
+      | Swhile (e, sw), 0 ->
+          zipper_of_cpos sub (ZWhile (e, ((s1, s2), zpr))) sw
+      | Sif (e, ifs1, ifs2), 0 ->
+          zipper_of_cpos sub (ZIfThen (e, ((s1, s2), zpr), ifs2)) ifs1
+      | Sif (e, ifs1, ifs2), 1 ->
+          zipper_of_cpos sub (ZIfElse (e, ifs1, ((s1, s2), zpr))) ifs2
+      | _ -> raise InvalidCPos
+    end
+
+  let zipper_of_cpos cpos s = zipper_of_cpos cpos ZTop s
+
+  let rec zip i ((hd, tl), ip) =
+    let s = stmt (List.rev_append hd (List.ocons i tl)) in
+
+    match ip with
+    | ZTop -> s
+    | ZWhile  (e, sp)     -> zip (Some (i_while (e, s))) sp
+    | ZIfThen (e, sp, se) -> zip (Some (i_if (e, s, se))) sp
+    | ZIfElse (e, se, sp) -> zip (Some (i_if (e, se, s))) sp
+
+  let zip zpr = zip None ((zpr.z_head, zpr.z_tail), zpr.z_path)
+
+  let rec fold env cpos f state s =
+    let zpr = zipper_of_cpos cpos s in
+
+      match zpr.z_tail with
+      | []      -> raise InvalidCPos
+      | i :: tl -> begin
+          match f env state i with
+          | (state', [i']) when i == i' && state == state' -> (state, s)
+          | (state', si  ) -> (state', zip { zpr with z_tail = si @ tl })
+      end
+
+  let t_fold f env cpos (state, s) =
+    try  fold env cpos f state s
+    with InvalidCPos -> tacuerror "invalid code position"
+
+  let t_zip f env cpos (state, s) =
+    try  snd_map zip (f env state (zipper_of_cpos cpos s))
+    with InvalidCPos -> tacuerror "invalid code position"
+
+  let t_code_transform env side cpos tr tx g =
+    match side with
+    | None ->
+        let _, concl   = get_goal g in
+        let hoare      = destr_hoareS concl in
+        let (me, stmt) = tx env cpos (hoare.hs_m, hoare.hs_s) in
+        let concl      = f_hoareS_r { hoare with hs_m = me; hs_s = stmt; } in
+          prove_goal_by [concl] (tr None) g
+  
+    | Some side ->
+        let _, concl = get_goal g in
+        let es       = destr_equivS concl in
+        let me, stmt = if side then (es.es_ml, es.es_sl) else (es.es_mr, es.es_sr) in
+        let me, stmt = tx env cpos (me, stmt) in
+        let concl    =
+          match side with
+          | true  -> f_equivS_r { es with es_ml = me; es_sl = stmt; }
+          | false -> f_equivS_r { es with es_mr = me; es_sr = stmt; }
+        in
+          prove_goal_by [concl] (tr (Some side)) g
+end
 
 (* -------------------------------------------------------------------- *)
 (* -------------------------  Tactics --------------------------------- *)
@@ -711,22 +807,20 @@ let equivF_abs_upto env fl fr bad invP invQ =
     let cond1 = f_equivF pre o_l o_r post in
     let cond2 =
       let q = f_subst_mem ml EcFol.mhr invQ in
-      f_forall [mr,GTmem None] (f_imp bad2 (f_hoareF q o_l q)) in
+      f_forall [mr,GTmem None] (f_imp bad2 (f_bdHoareF q o_l q FHeq f_r1)) in
     let cond3 = 
       let q = f_subst_mem mr EcFol.mhr invQ in
       let bq = f_and bad q in
-      f_forall [ml,GTmem None] (f_hoareF bq o_r bq) in
-    let cond4 = f_losslessF o_l in
-    let cond5 = f_losslessF o_r in
-    [cond1;cond2;cond3;cond4;cond5] in
+      f_forall [ml,GTmem None] (f_bdHoareF bq o_r bq FHeq f_r1) in
+    [cond1;cond2;cond3] in
   let sg = List.map2 ospec oil.oi_calls oir.oi_calls in
   let sg = List.flatten sg in
   let lossless_a = 
-    let _sig = (EcEnv.Mod.by_mpath topl env).me_sig in
+    let sig_ = (EcEnv.Mod.by_mpath topl env).me_sig in
     let bd = 
-      List.map (fun (id,mt) -> (id,GTmodty(mt,EcPath.Sm.empty))) 
-        _sig.mis_params in               (* Should we put restriction here *)
-    let args = List.map (fun (id,_) -> EcPath.mident id) _sig.mis_params in
+      List.map (fun (id,mt) -> id,GTmodty(mt,EcPath.Sm.empty))
+        sig_.mis_params in               (* Should we put restriction here *)
+    let args = List.map (fun (id,_) -> EcPath.mident id) sig_.mis_params in
     let sub = fl.EcPath.x_sub in
     let concl = 
       f_losslessF (EcPath.xpath (EcPath.m_apply topl args) sub ) in
@@ -734,7 +828,7 @@ let equivF_abs_upto env fl fr bad invP invQ =
       let name = EcPath.basename sub in
       let Tys_function(_,oi) = 
         List.find (fun (Tys_function(fs,_)) -> fs.fs_name = name)
-          _sig.mis_body in
+          sig_.mis_body in
       oi.oi_calls in
     let hyps = List.map f_losslessF calls in
     f_forall bd (f_imps hyps concl) in
@@ -754,16 +848,7 @@ let t_equivF_abs_upto env bad invP invQ g =
   let tac g' = prove_goal_by sg (RN_hl_fun_upto(bad,invP,invQ)) g' in
   t_on_last (t_equivF_conseq env pre post g) tac
 
-
-  
-
-  
-  
-  
-
-
-(* -------------------------------------------------------------------- *)
-  
+(* -------------------------------------------------------------------- *)  
 let t_hoare_skip g =
   let concl = get_concl g in
   let hs = destr_hoareS concl in
@@ -791,7 +876,6 @@ let t_equiv_skip g =
   let concl = f_imp es.es_pr es.es_po in
   let concl = gen_mems [es.es_ml; es.es_mr] concl in
   prove_goal_by [concl] RN_hl_skip g
-
 
 let t_skip = t_hS_or_bhS_or_eS t_hoare_skip t_bdHoare_skip t_equiv_skip 
 
@@ -1161,9 +1245,7 @@ lossless c2
 
 *)
 
-
 (* --------------------------------------------------------------------- *)
-
 let t_hoare_case f g =
   let concl = get_concl g in
   let hs = destr_hoareS concl in
@@ -1189,7 +1271,6 @@ let t_he_case f g =
   t_hS_or_bhS_or_eS (t_hoare_case f) (t_bdHoare_case f) (t_equiv_case f) g 
 
 (* --------------------------------------------------------------------- *)
-
 let _inline_freshen me v =
   let rec for_idx idx =
     let x = Printf.sprintf "%s%d" v.v_name idx in
@@ -1272,10 +1353,9 @@ let _inline env hyps me sp s =
       let r,i,s = List.split_n toskip s in
       let me,si = inline_i me ip i in
       let me,s = inline_s me sp s in
-      me, List.rev_append r (si@ s) in
+      me, List.rev_append r (si @ s) in
   let me, s = inline_s me sp s.s_node in
   me, stmt s 
-
 
 let t_inline_hoare env sp g =
   let hyps,concl = get_goal g in
@@ -1299,7 +1379,148 @@ let t_inline_equiv env side sp g =
   prove_goal_by [concl] (RN_hl_inline (Some side, sp)) g
 
 (* -------------------------------------------------------------------- *)
+let alias_stmt id _env me i =
+  match i.i_node with
+  | Srnd (lv, e) ->
+      let id       = odfl "x" (omap id EcLocation.unloc) in
+      let ty       = ty_of_lv lv in
+      let id       = { v_name = id; v_type = ty; } in
+      let (me, id) = _inline_freshen me id in
+      let pv       = pv_loc (EcMemory.xpath me) id in
 
+        (me, [i_rnd (LvVar (pv, ty), e); i_asgn (lv, e_var pv ty)])
+
+  | _ ->
+      tacuerror "cannot create an alias for that kind of instruction"
+
+let t_alias env side cpos id g =
+  let tr = fun side -> RN_hl_alias (side, cpos) in
+    CPos.t_code_transform env side cpos tr (CPos.t_fold (alias_stmt id)) g
+
+(* -------------------------------------------------------------------- *)
+let check_fission_independence env b init c1 c2 c3 =
+  let check_disjoint s1 s2 = 
+    if not (PV.M.set_disjoint s1 s2) then
+      tacuerror "in loop-fission, independence check failed"
+  in
+
+  let fv_b    = (e_read   env PV.empty b   ).PV.pv in
+  let rd_init = (is_read  env PV.empty init).PV.pv in
+  let wr_init = (is_write env PV.empty init).PV.pv in
+  let rd_c1   = (is_read  env PV.empty c1  ).PV.pv in
+  let rd_c2   = (is_read  env PV.empty c2  ).PV.pv in
+  let rd_c3   = (is_read  env PV.empty c3  ).PV.pv in
+  let wr_c1   = (is_write env PV.empty c1  ).PV.pv in
+  let wr_c2   = (is_write env PV.empty c2  ).PV.pv in
+  let wr_c3   = (is_write env PV.empty c3  ).PV.pv in
+
+  check_disjoint rd_c1 wr_c2;
+  check_disjoint rd_c2 wr_c1;
+  List.iter (check_disjoint fv_b) [wr_c1; wr_c2];
+  check_disjoint fv_b (PV.M.set_diff wr_c3 wr_init);
+   List.iter (check_disjoint rd_init) [wr_init; wr_c1; wr_c3];
+  List.iter (check_disjoint rd_c3) [wr_c1; wr_c2]
+
+(* -------------------------------------------------------------------- *)
+let fission_stmt (il, (d1, d2)) env me zpr =
+  if d2 < d1 then
+    tacuerror "%s, %s"
+      "in loop-fission"
+      "second break offset must not be lower than the first one";
+  
+  let (hd, init, b, sw, tl) =
+    match zpr.CPos.z_tail with
+    | { i_node = Swhile (b, sw) } :: tl -> begin
+        if List.length zpr.CPos.z_head < il then
+          tacuerror "while-loop is not headed by %d intructions" il;
+      let (init, hd) = List.take_n il zpr.CPos.z_head in
+        (hd, init, b, sw, tl)
+      end
+    | _ -> tacuerror "code position does not lead to a while-loop"
+  in
+
+  if d2 > List.length sw.s_node then
+    tacuerror "in loop fission, invalid offsets range";
+
+  let (s1, s2, s3) =
+    let (s1, s2) = List.take_n (d1   ) sw.s_node in
+    let (s2, s3) = List.take_n (d2-d1) s2 in
+      (s1, s2, s3)
+  in
+
+  check_fission_independence env b init s1 s2 s3;
+
+  let wl1 = i_while (b, stmt (s1 @ s3)) in
+  let wl2 = i_while (b, stmt (s2 @ s3)) in
+  let fis =   (List.rev_append init [wl1])
+            @ (List.rev_append init [wl2]) in
+
+    (me, { zpr with CPos.z_head = hd; CPos.z_tail = fis @ tl })
+
+let t_fission env side cpos infos g =
+  let tr = fun side -> RN_hl_fission (side, cpos, infos) in
+    CPos.t_code_transform env side cpos tr (CPos.t_zip (fission_stmt infos)) g
+
+(* -------------------------------------------------------------------- *)
+let fusion_stmt (il, (d1, d2)) env me zpr =
+  let (hd, init1, b1, sw1, tl) =
+    match zpr.CPos.z_tail with
+    | { i_node = Swhile (b, sw) } :: tl -> begin
+        if List.length zpr.CPos.z_head < il then
+          tacuerror "1st while-loop is not headed by %d intruction(s)" il;
+      let (init, hd) = List.take_n il zpr.CPos.z_head in
+        (hd, init, b, sw, tl)
+      end
+    | _ -> tacuerror "code position does not lead to a while-loop"
+  in
+
+  let (init2, b2, sw2, tl) =
+    if List.length tl < il then
+      tacuerror "1st first-loop is not followed by %d instruction(s)" il;
+    let (init2, tl) = List.take_n il tl in
+      match tl with
+      | { i_node = Swhile (b2, sw2) } :: tl -> (List.rev init2, b2, sw2, tl)
+      | _ -> tacuerror "cannot find the 2nd while-loop"
+  in
+
+  if d1 > List.length sw1.s_node then
+    tacuerror "in loop-fusion, body is less than %d instruction(s)" d1;
+  if d2 > List.length sw2.s_node then
+    tacuerror "in loop-fusion, body is less than %d instruction(s)" d2;
+
+  let (sw1, fini1) = List.take_n d1 sw1.s_node in
+  let (sw2, fini2) = List.take_n d2 sw2.s_node in
+
+  (* FIXME: costly *)
+  if not (EcReduction.s_equal_norm env (stmt init1) (stmt init2)) then
+    tacuerror "in loop-fusion, preludes do not match";
+  if not (EcReduction.s_equal_norm env (stmt fini1) (stmt fini2)) then
+    tacuerror "in loop-fusion, finalizers do not match";
+  if not (EcReduction.e_equal_norm env b1 b2) then
+    tacuerror "in loop-fusion, while conditions do not match";
+
+  check_fission_independence env b1 init1 sw1 sw2 fini1;
+
+  let wl  = i_while (b1, stmt (sw1 @ sw2 @ fini1)) in
+  let fus = List.rev_append init1 [wl] in
+
+    (me, { zpr with CPos.z_head = hd; CPos.z_tail = fus @ tl; })
+
+let t_fusion env side cpos infos g =
+  let tr = fun side -> RN_hl_fusion (side, cpos, infos) in
+    CPos.t_code_transform env side cpos tr (CPos.t_zip (fusion_stmt infos)) g
+
+(* -------------------------------------------------------------------- *)
+let unroll_stmt _env me i =
+  match i.i_node with
+  | Swhile (e, sw) -> (me, [i_if (e, sw, stmt []); i])
+  | _ -> tacuerror "cannot find a while loop at given position"
+
+let t_unroll env side cpos g =
+  let tr = fun side -> RN_hl_unroll (side, cpos) in
+    CPos.t_code_transform env side cpos tr (CPos.t_fold unroll_stmt) g
+
+(* -------------------------------------------------------------------- *)
 let t_equiv_deno env pre post g =
   let concl = get_concl g in
   let cmp, f1, f2 =
@@ -1322,12 +1543,12 @@ let t_equiv_deno env pre post g =
   let sargs = 
     List.fold_left2 (fun s v a -> PVM.add env (pv_loc fl v.v_name) mleft a s)
       sargs funl.f_sig.fs_params argsl in
-  let smem = { f_subst_id with 
-    fs_mem = Mid.add mleft ml (Mid.singleton mright mr) } in
+  let smem = 
+    f_bind_mem (f_bind_mem f_subst_id mright mr) mleft ml in
   let concl_pr  = f_subst smem (PVM.subst env sargs pre) in
   (* building the substitution for the post *)
-  let smeml = { f_subst_id with fs_mem = Mid.singleton mhr mleft } in
-  let smemr = { f_subst_id with fs_mem = Mid.singleton mhr mright } in
+  let smeml = f_bind_mem f_subst_id mhr mleft in 
+  let smemr = f_bind_mem f_subst_id mhr mright in
   let evl   = f_subst smeml evl and evr = f_subst smemr evr in
   let cmp   = if cmp then f_iff else f_imp in 
   let mel = EcEnv.Fun.actmem_post mleft fl funl in
@@ -1382,9 +1603,10 @@ let t_equiv_rcond side b at_pos g =
   let hd,e,s = gen_rcond b EcFol.mhr at_pos s in 
   let mo' = EcIdent.create "&m" in
   let s1 = 
-    Mid.add (EcMemory.memory mo) mo' 
-      (Mid.add (EcMemory.memory m) EcFol.mhr Mid.empty) in
-  let pre1  = f_subst {f_subst_id with fs_mem = s1} es.es_pr in
+    f_bind_mem 
+      (f_bind_mem f_subst_id (EcMemory.memory m) EcFol.mhr)
+      (EcMemory.memory mo) mo' in
+  let pre1  = f_subst s1 es.es_pr in
   let concl1 = 
     gen_mems [mo', EcMemory.memtype mo] 
       (f_hoareS (EcFol.mhr,EcMemory.memtype m) pre1 hd e) in
@@ -1511,16 +1733,7 @@ let rec t_equiv_cond env side g =
                ])
         ] g
 
-
 (* -------------------------------------------------------------------- *)
-
-
-
-
-(* -------------------------------------------------------------------- *)
-
-
-
 let (===) = f_eq 
 let (==>) = f_imp
 let (&&&) = f_anda
@@ -1539,7 +1752,6 @@ let t_hoare_rnd env g =
   let post = f_forall_simpl [(x_id,GTty ty_distr)] post in
   let concl = f_hoareS_r {hs with hs_s=s; hs_po=post} in
   prove_goal_by [concl] RN_hl_hoare_rnd g
-
 
 let wp_equiv_disj_rnd side env g =
   let concl = get_concl g in
@@ -1563,9 +1775,6 @@ let wp_equiv_disj_rnd side env g =
     else  f_equivS_r {es with es_sr=s; es_po=post} 
   in
   prove_goal_by [concl] RN_hl_hoare_rnd g
-  
-
-
 
 let wp_equiv_rnd env (f,finv) g =
   let concl = get_concl g in

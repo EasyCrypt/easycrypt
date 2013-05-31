@@ -284,6 +284,8 @@ type pipattern =
 
 and pspattern = unit
 
+type codepos = int * ((int * codepos) option)
+
 type ptactic = ptactic_r located
 
 and ptactic_r = 
@@ -323,12 +325,16 @@ and phl_tactics =
   | Papp        of (bool * int doption * pformula * pformula option)
   | Pwp         of int doption option 
   | Pwhile      of (pformula * pformula option * (pformula * pformula) option)
+  | Pfission    of (tac_side * codepos * (int * (int * int)))
+  | Pfusion     of (tac_side * codepos * (int * (int * int)))
+  | Punroll     of (tac_side * codepos)
   | Pcall       of tac_side * (pformula * pformula)
   | Prcond      of (bool option * bool * int)
   | Pcond       of tac_side
   | Pswap       of ((tac_side * swap_kind) located list)
   | Pinline     of pinline_arg
   | Prnd        of tac_side * pformula rnd_tac_info
+  | Palias      of (tac_side * codepos * psymbol option)
   | Pconseq     of cfpattern
   | Pequivdeno  of cfpattern
 

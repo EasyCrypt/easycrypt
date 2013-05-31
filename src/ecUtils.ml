@@ -1,7 +1,4 @@
 (* -------------------------------------------------------------------- *)
-open Pprint
-
-(* -------------------------------------------------------------------- *)
 let tryexn (ignoreexn : exn -> bool) (f : unit -> 'a) =
   try  Some (f ())
   with e -> if ignoreexn e then None else raise e
@@ -220,6 +217,12 @@ module List = struct
   let ohead (xs : 'a list) =
     match xs with [] -> None | x :: _ -> Some x
 
+  let otail (xs : 'a list) =
+    match xs with [] -> None | _ :: xs -> Some xs
+
+  let min b xs = List.fold_left min b xs
+  let max b xs = List.fold_left max b xs
+
   let rec last = function
     | []      -> failwith "List.last"
     | [x]     -> x
@@ -246,10 +249,25 @@ module List = struct
     in
       doit 0 (xs, ys)
 
+  let rec fusion f xs ys =
+    match xs, ys with
+    | _ , [] -> xs
+    | [], _  -> ys
+
+    | x::xs, y::ys ->
+        let z = f x y in z :: (fusion f xs ys)
+
   let rec pmap (f : 'a -> 'b option) (xs : 'a list) =
     match xs with
     | []      -> []
     | x :: xs -> ocons (f x) (pmap f xs)
+
+  let rec iter2o f xs ys =
+    match xs, ys with
+    | []   , []    -> ()
+    | x::xs, []    -> f (Some x) (None  ); iter2o f xs []
+    | []   , y::ys -> f (None  ) (Some y); iter2o f [] ys
+    | x::xs, y::ys -> f (Some x) (Some y); iter2o f xs ys
 
   let prmap f l = 
     let rec aux r l = 

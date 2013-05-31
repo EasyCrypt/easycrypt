@@ -24,14 +24,14 @@ val p_compare : path -> path -> int
 val p_hash    : path -> int
 
 (* -------------------------------------------------------------------- *)
-val tostring  : path -> string
-val toqsymbol : path -> qsymbol
+val tostring    : path -> string
+val toqsymbol   : path -> qsymbol
 val fromqsymbol : qsymbol -> path
-val basename  : path -> symbol
-val prefix    : path -> path option
-val rootname  : path -> symbol
-val tolist    : path -> symbol list 
-val p_size    : path -> int
+val basename    : path -> symbol
+val prefix      : path -> path option
+val rootname    : path -> symbol
+val tolist      : path -> symbol list 
+val p_size      : path -> int
 
 (* -------------------------------------------------------------------- *)
 module Mp : Map.S  with type key = path

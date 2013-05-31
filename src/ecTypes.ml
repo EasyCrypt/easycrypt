@@ -153,6 +153,20 @@ let ty_sub_exists f t =
   | Tconstr (_, lty) -> List.exists f lty
   | Tfun (t1,t2) -> f t1 || f t2
   
+let ty_iter f t = 
+  match t.ty_node with
+  | Tglob _ | Tunivar _ | Tvar _ -> ()
+  | Ttuple lty -> List.iter f lty
+  | Tconstr (_, lty) -> List.iter f lty
+  | Tfun (t1,t2) -> f t1; f t2
+
+exception FoundUnivar
+
+let rec ty_check_uni t = 
+  match t.ty_node with
+  | Tunivar _ -> raise FoundUnivar
+  | _ -> ty_iter ty_check_uni t
+
 (* -------------------------------------------------------------------- *)
 type ty_subst = {
     ts_p  : EcPath.path -> EcPath.path;
@@ -167,10 +181,12 @@ let ty_subst_id =
     ts_u  = Muid.empty;
     ts_v  = Mid.empty }
 
+let is_ty_subst_id s = 
+  s.ts_p == identity && s.ts_mp == identity &&
+    Muid.is_empty s.ts_u && Mid.is_empty s.ts_v
+
 let ty_subst s =
-  if s.ts_p == identity && s.ts_mp == identity &&
-     Muid.is_empty s.ts_u && Mid.is_empty s.ts_v then 
-    identity
+  if is_ty_subst_id s then identity
   else
     Hty.memo_rec 107 (fun aux ty ->
       match ty.ty_node with 
@@ -478,10 +494,12 @@ let e_lam b e =
     let ty = toarrow (List.map snd b) e.e_ty in
     mk_expr (Elam(b,e)) ty
 
-let e_app x args = 
-  match x.e_node with
-  | Eapp(x', args') -> mk_expr (Eapp (x', (args'@args)))
-  | _ -> mk_expr (Eapp (x, args))
+let e_app x args ty = 
+  if args = [] then x 
+  else
+    match x.e_node with
+    | Eapp(x', args') -> mk_expr (Eapp (x', (args'@args))) ty
+    | _ -> mk_expr (Eapp (x, args)) ty
 
 (* -------------------------------------------------------------------- *)
 let lp_ids = function
