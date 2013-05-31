@@ -44,9 +44,14 @@ let lv_fv = function
 let symbol_of_lv = function
   | LvVar(pv, _) -> EcTypes.symbol_of_pv pv
   | LvTuple pvs -> 
-    let ls = List.map (fun (pv,_) -> EcTypes.symbol_of_pv pv) pvs in
-    String.concat "" ls
+      let ls = List.map (fun (pv,_) -> EcTypes.symbol_of_pv pv) pvs in
+        String.concat "" ls
   | LvMap(_,pv,_,_) -> EcTypes.symbol_of_pv pv
+
+let ty_of_lv = function
+  | LvVar   (_, ty)       -> ty
+  | LvTuple tys           -> EcTypes.ttuple (List.map snd tys)
+  | LvMap   (_, _, _, ty) -> ty
 
 (* -------------------------------------------------------------------- *)
 type instr = {

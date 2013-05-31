@@ -80,6 +80,8 @@
     "conseq"      , CONSEQ     ;        (* KW: tactic *) 
     "inline"      , INLINE     ;        (* KW: tactic *)
     "alias"       , ALIAS      ;        (* KW: tactic *)
+    "fission"     , FISSION    ;        (* KW: tactic *)
+    "fusion"      , FUSION     ;        (* KW: tactic *)
 
     "axiom"       , AXIOM      ;        (* KW: global *)
     "lemma"       , LEMMA      ;        (* KW: global *)

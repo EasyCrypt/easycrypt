@@ -325,13 +325,15 @@ and phl_tactics =
   | Papp        of (bool * int doption * pformula * pformula option)
   | Pwp         of int doption option 
   | Pwhile      of pformula
+  | Pfission    of (tac_side * codepos * (int * (int * int)))
+  | Pfusion     of (tac_side * codepos * (int * (int * int)))
   | Pcall       of tac_side * (pformula * pformula)
   | Prcond      of (bool option * bool * int)
   | Pcond       of tac_side
   | Pswap       of ((tac_side * swap_kind) located list)
   | Pinline     of pinline_arg
   | Prnd        of tac_side * pformula rnd_tac_info
-  | Palias      of tac_side * codepos * psymbol option
+  | Palias      of (tac_side * codepos * psymbol option)
   | Pconseq     of cfpattern
   | Pequivdeno  of cfpattern
 
