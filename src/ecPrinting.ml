@@ -433,7 +433,7 @@ let pp_opapp (ppe : PPEnv.t) pp_sub outer fmt (op, _tvi, es) =
       | _  ->
           Format.fprintf fmt "@[<hov 2>%a@ %a@]"
             EcSymbols.pp_qsymbol (nm, opname)
-            (pp_list "@ " (pp_sub ppe (appprio, `Right))) es
+            (pp_list "@ " (pp_sub ppe (appprio, `NonAssoc))) es
     in
 
     let (pp, prio) =
