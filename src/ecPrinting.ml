@@ -1,4 +1,5 @@
 (* -------------------------------------------------------------------- *)
+open EcSymbols
 open EcUtils
 open EcTypes
 open EcModules
@@ -8,19 +9,28 @@ open EcFol
 module P  = EcPath
 module EP = EcParser
 
+module Ssym = EcSymbols.Ssym
+module Msym = EcSymbols.Msym
+module Sid  = EcIdent.Sid
+module Mid  = EcIdent.Mid
+
 (* -------------------------------------------------------------------- *)
 type 'a pp = Format.formatter -> 'a -> unit
 
 (* -------------------------------------------------------------------- *)
 module PPEnv = struct
   type t = {
-    ppe_env   : EcEnv.env;
-    ppe_scope : EcPath.xpath option;
+    ppe_env    : EcEnv.env;
+    ppe_scope  : EcPath.xpath option;
+    ppe_locals : symbol Mid.t;
+    ppe_inuse  : Ssym.t
   }
 
   let ofenv (env : EcEnv.env) =
-    { ppe_env   = env;
-      ppe_scope = None; }
+    { ppe_env    = env;
+      ppe_scope  = None;
+      ppe_locals = Mid.empty;
+      ppe_inuse  = Ssym.empty; }
 
   let tyvar (_ : t) x =
     EcIdent.tostring x
@@ -33,7 +43,31 @@ module PPEnv = struct
     | None   -> ppe
     | Some m -> enter ppe (EcMemory.xpath m)
 
-  let add_local x _ = x
+
+  let add_local ppe =
+    let inuse name =
+      let env = ppe.ppe_env in
+         (Ssym.mem name ppe.ppe_inuse)
+      || (EcEnv.Mod.sp_lookup_opt      ([], name) env <> None)
+      || (EcEnv.Var.lookup_local_opt        name  env <> None)
+      || (EcEnv.Var.lookup_progvar_opt ([], name) env <> None)
+    in
+
+    fun id ->
+      let name = ref (EcIdent.name id) in
+      let i    = ref 0 in
+  
+        while inuse !name do
+          name := Printf.sprintf "%s%d" (EcIdent.name id) !i;
+          incr i
+        done;
+
+      let ppe =
+        { ppe with
+            ppe_inuse  = Ssym.add !name ppe.ppe_inuse;
+            ppe_locals = Mid.add id !name ppe.ppe_locals; }
+      in
+        ppe
 
   let p_shorten cond p =
     let rec shorten prefix (nm, x) =
@@ -65,36 +99,47 @@ module PPEnv = struct
       p_shorten exists p
 
   let rec mod_symb (ppe : t) mp : EcSymbols.msymbol =
-    match mp.P.m_top with
-    | `Abstract x ->
-        [EcIdent.name x, []]
-
-    | `Concrete (p1, p2) ->
-        let exists sm =
-          match EcEnv.Mod.sp_lookup_opt sm ppe.ppe_env with
-          | None -> false
-          | Some (mp1, _) -> P.mt_equal mp1.P.m_top mp.P.m_top
-        in
-
-        let rec shorten prefix (nm, x) =
-          match exists (nm, x) with
-          | true  -> (nm, x)
-          | false -> begin
-              match prefix with
-              | [] -> (nm, x)
-              | n :: prefix -> shorten prefix (n :: nm, x)
-          end
-        in
-
-        let (nm, x) = P.toqsymbol p1 in
-        let (nm, x) = shorten (List.rev nm) ([], x) in
-
-        let msymb =
-            (List.map (fun x -> (x, [])) nm)
-          @ [(x, List.flatten (List.map (mod_symb ppe) mp.P.m_args))]
-          @ (List.map (fun x -> (x, [])) (odfl [] (omap p2 P.tolist)))
-        in
-          msymb
+    let (nm, x, p2) =
+      match mp.P.m_top with
+      | `Abstract x ->
+          let name =
+            match Mid.find_opt x ppe.ppe_locals with
+            | Some name -> name
+            | None ->
+                let name = EcIdent.name x in
+                  match EcEnv.Mod.sp_lookup_opt ([], name) ppe.ppe_env with
+                  | Some (p, _) when EcPath.mt_equal mp.P.m_top p.P.m_top -> name
+                  | _ -> EcIdent.tostring x
+          in
+            ([], name, None)
+  
+      | `Concrete (p1, p2) ->
+          let exists sm =
+            match EcEnv.Mod.sp_lookup_opt sm ppe.ppe_env with
+            | None -> false
+            | Some (mp1, _) -> P.mt_equal mp1.P.m_top mp.P.m_top
+          in
+  
+          let rec shorten prefix (nm, x) =
+            match exists (nm, x) with
+            | true  -> (nm, x)
+            | false -> begin
+                match prefix with
+                | [] -> (nm, x)
+                | n :: prefix -> shorten prefix (n :: nm, x)
+            end
+          in
+  
+          let (nm, x) = P.toqsymbol p1 in
+          let (nm, x) = shorten (List.rev nm) ([], x) in
+            (nm, x, p2)
+    in
+    let msymb =
+        (List.map (fun x -> (x, [])) nm)
+      @ [(x, List.flatten (List.map (mod_symb ppe) mp.P.m_args))]
+      @ (List.map (fun x -> (x, [])) (odfl [] (omap p2 P.tolist)))
+    in
+      msymb
 
   let rec modtype_symb (ppe : t) mty =
     let exists sm =
@@ -122,6 +167,14 @@ module PPEnv = struct
     in
       msymb
 
+  let local_symb ppe x =
+    match Mid.find_opt x ppe.ppe_locals with
+    | Some name -> name
+    | None ->
+        let name = EcIdent.name x in
+          match EcEnv.Var.lookup_local_opt name ppe.ppe_env with
+          | Some (id, _) when EcIdent.id_equal id x -> name
+          | _ -> EcIdent.name x
 end
 
 (* -------------------------------------------------------------------- *)
@@ -212,8 +265,8 @@ let pp_modtype (ppe : PPEnv.t) fmt ((mty, _) : module_type * _) =
     EcSymbols.pp_msymbol (PPEnv.modtype_symb ppe mty)
 
 (* -------------------------------------------------------------------- *)
-let pp_local (_ppe : PPEnv.t) fmt x =
-  Format.fprintf fmt "%s" (EcIdent.name x)
+let pp_local (ppe : PPEnv.t) fmt x =
+  Format.fprintf fmt "%s" (PPEnv.local_symb ppe x)
 
 (* -------------------------------------------------------------------- *)
 let rec pp_type_r ppe btuple fmt ty =
@@ -1213,15 +1266,19 @@ let pp_equivS (ppe : PPEnv.t) fmt es =
 let goalline = String.make 72 '-'
 
 let pp_goal (ppe : PPEnv.t) fmt (n, (hyps, concl)) =
-  let pp_hyp fmt (id, k) = 
-    let dk fmt =
-      match k with
-      | EcBaseLogic.LD_var (ty, _body) -> pp_type ppe fmt ty
-      | EcBaseLogic.LD_mem _           -> Format.fprintf fmt "memory"
-      | EcBaseLogic.LD_modty (p, sm)   -> pp_modtype ppe fmt (p, sm)
-      | EcBaseLogic.LD_hyp f           -> pp_form ppe fmt f
+  let pp_hyp ppe (id, k) = 
+    let ppe = PPEnv.add_local ppe id
+    and dk fmt =
+        match k with
+        | EcBaseLogic.LD_var (ty, _body) -> pp_type ppe fmt ty
+        | EcBaseLogic.LD_mem _           -> Format.fprintf fmt "memory"
+        | EcBaseLogic.LD_modty (p, sm)   -> pp_modtype ppe fmt (p, sm)
+        | EcBaseLogic.LD_hyp f           -> pp_form ppe fmt f
     in
+    let pp fmt =
       Format.fprintf fmt "%-.2s: @[<hov 2>%t@]@\n%!" (EcIdent.name id) dk
+    in
+      (ppe, pp)
   in
     begin
       match n with
@@ -1236,7 +1293,15 @@ let pp_goal (ppe : PPEnv.t) fmt (n, (hyps, concl)) =
           Format.fprintf fmt "Type variables: %a@\n\n%!"
             (pp_list ", " (pp_tyvar ppe)) tv
     end;
-    List.iter (pp_hyp fmt) (List.rev hyps.EcBaseLogic.h_local);
+
+    let ppe =
+      List.fold_left
+        (fun ppe lh ->
+           let (ppe, pp) = pp_hyp ppe lh in
+             pp fmt; ppe)
+        ppe (List.rev hyps.EcBaseLogic.h_local);
+    in
+
     Format.fprintf fmt "%s@\n%!" goalline;
 
     begin
