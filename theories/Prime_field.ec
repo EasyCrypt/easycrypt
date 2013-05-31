@@ -1,5 +1,7 @@
 (* prime fields GF(q) for q prime *)
 require import Int.
+require import Distr.
+require import Real.
 
 (* the order of field is a prime q *)
 op q: int.
@@ -86,6 +88,19 @@ axiom gf_q_to_i_inverse: forall (x:int),
 
 axiom i_to_gf_inverse: forall (x:gf_q),
   i_to_gf_q (gf_q_to_i x) = x.
+
+theory Dgf_q.
+  op dgf_q: gf_q distr.
+
+  axiom supp_def: forall (s:gf_q),
+    in_supp s dgf_q.
+
+  axiom mu_x_def_in: forall (s:gf_q),
+    mu_x dgf_q s = 1%r/q%r.
+
+  axiom mu_weight_pos: mu_weight dgf_q = 1%r.
+
+end Dgf_q.
 
 (* some lemmas for testing
 lemma a:
