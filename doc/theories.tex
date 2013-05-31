@@ -1,14 +1,87 @@
+% !TeX root = easycrypt.tex
+
 \chapter{Theories}
 
-\section{Types and Operators}
+Definitions and lemmas can be grouped in theories, that can be imported to
+provide new language functionalities as required for a particular proof.
+Currently, \EC supports user-defined types and operators
+(Section~\ref{sec:types}) and user-defined distributions
+(Section~\ref{sec:distributions}). In addition, theories can declare modules and
+functors (Section~\ref{sec:modules}), used to represent schemes, oracles and
+experiments, as well as abstract types for such modules, which can be used to
+modularize proofs or represent abstract adversaries. Finally, theories can be
+cloned and refined (Section~\ref{sec:cloning}), which allows the user to
+consider small variants of a theory without having to create a new one from
+scratch, or to consider concrete implementation details only when necessary for
+the proof.
 
-\section{Describing Distributions}
+We illustrate each of the basic concepts with commented excerpts from the
+standard library distributed with \EC. The standard library is documented
+further in Chapter~\ref{chap:libraries}.
 
-\section{Modules and Functors}
+\section{Types and Operators\label{sec:types}}
 
-\section{Cloning Theories}
+At the core of any \EC specification is a set of types and functional operators
+on those types. Types are \emph{non-empty} sets of values, and operators are
+\emph{mathematical} functions between them.
 
-%%% Local Variables: 
-%%% mode: latex
-%%% TeX-master: "easycrypt"
-%%% End: 
+\warningbox{Currently, the easiest way to define types and operators is to
+declare them abstractly and specify them using axioms. It is \emph{very}
+important for the consistency of the logical context to remember that types are
+\emph{always} assumed to be non-empty, and that operators are functionals
+(total, deterministic and side-effect free) when writing such definitions.}
+
+The following \EC code declares an abstract type of polymorphic arrays, equipped
+with a length operator (whose result is never negative), an indexing operator
+and extensional equality.
+
+\begin{easycrypt}[label={lst:arrays}]{[Polymorphic arrays]A type for polymorphic arrays}
+type 'a array.
+
+op length: 'x array -> int.
+axiom length_pos: forall (xs:'x array), 0 <= length xs.
+
+op "_.[_]": 'x array -> int -> 'x.
+
+pred (==)(xs0:'x array, xs1:'x array) =
+  length xs0 = length xs1 /\
+  forall i, 0 <= i => i < length xs0 => xs0.[i] = xs1.[i].
+
+axiom extensionality: forall (xs0 xs1:'x array),
+  xs0 == xs1 => xs0 = xs1.
+\end{easycrypt}
+
+The language of operators and predicates is functional in style, and
+comma-separated lists of parameters are in fact currified, in this context, to
+yield functional symbols that can be partially applied. (For example, the infix
+extensional equality predicate \ec{(==)} defined in Listing~\ref{lst:arrays} has
+type \ec{'x array -> 'x array -> bool}.)
+
+Special syntax is used to introduce two hard-coded mixfix operators (generally
+considered to correspond to set and get operations on various types). The
+``\rawec[literate={\_}{{$\cdot$}}1]{_.[_]}'' operator (named \emph{get}
+throughout this manual) is hard-coded as a binary operator. The
+``\rawec[literate={_}{{$\cdot$}}1]{_.[_<-_]}'' operator (not yet encountered,
+and named \emph{set} in the rest of this manual) is hard-coded as a ternary
+operator. In addition, a constant operator ``\rawec{[]}'' can be defined, and
+will often be referred to as the \emph{empty} constant, depending on its type
+and the current scope.
+
+Infix operators are declared between parentheses, and can be used either in
+infix syntax using the symbol itself (for example, \rawec{x == y}), or in prefix
+syntax using their parenthesized form (for example, \rawec{(==) x y}).
+
+As illustrated in the definition of the extensional equality predicate, type
+annotations are optional when types can be inferred.
+
+\warningbox{One could expect the type annotations in the \rawec{extensionality}
+axiom to be optional. However, they are currently required so that the type
+variable can be instantiated.}
+
+\section{Describing Distributions\label{sec:distributions}}
+
+\section{Modules and Functors\label{sec:modules}}
+
+\section{Requiring, Cloning and Realizing Theories\label{sec:cloning}}
+
+%%% Local Variables: %%% mode: latex %%% TeX-master: "easycrypt" %%% End:
