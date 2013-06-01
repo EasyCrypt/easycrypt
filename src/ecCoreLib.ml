@@ -125,3 +125,9 @@ let p_rewrite_iff_l = _Logic "rewrite_iff_l"
 let p_rewrite_iff_r = _Logic "rewrite_iff_r"
 
 let p_case_eq_bool  = _Logic "case_eq_bool"
+
+let p_eq_tuple_intro n = 
+  if 2 <= n && n <= 9 then
+    let name = Format.sprintf "eq_tuple%i_intro" n in
+    _Logic name
+  else raise Not_found

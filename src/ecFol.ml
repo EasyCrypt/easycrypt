@@ -725,6 +725,11 @@ exception DestrError of string
 
 let destr_error e = raise (DestrError e)
 
+let destr_tuple f = 
+  match f.f_node with
+  | Ftuple fs -> fs
+  | _ -> destr_error "tuple"
+
 let destr_local f = 
   match f.f_node with
   | Flocal id -> id
@@ -821,6 +826,11 @@ let destr_pr f =
   | _ -> destr_error "pr"
 
 (* -------------------------------------------------------------------- *)
+
+let is_tuple f = 
+  match f.f_node with
+  | Ftuple fs -> true
+  | _ -> false
 
 let is_local f = 
   match f.f_node with

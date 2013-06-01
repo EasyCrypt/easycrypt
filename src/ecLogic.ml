@@ -427,7 +427,22 @@ let t_split env g =
           Some ((if b then p_anda_intro else p_and_intro),
                 [], [AAform f1;AAform f2;AAnode;AAnode])
         | OK_iff   -> Some (p_iff_intro, [], [AAform f1;AAform f2;AAnode;AAnode])
-        | OK_eq    -> Some (p_eq_refl, [f1.f_ty], [AAform f1])
+        | OK_eq    -> 
+          let env = tyenv_of_hyps env hyps in
+          if EcReduction.is_conv env hyps f1 f2 then
+            Some (p_eq_refl, [f1.f_ty], [AAform f1])
+          else 
+            begin 
+              try 
+                let fs1 = destr_tuple f1 in
+                let fs2 = destr_tuple f2 in
+                let lemma = p_eq_tuple_intro (List.length fs1) in
+                let toForm l = List.map (fun f -> AAform f) l in
+                let toNode l = List.map (fun _ -> AAnode) l in
+                let toTy l = List.map (fun f -> f.f_ty) l in
+                Some (lemma, toTy fs1, toForm fs1 @ toForm fs2 @ toNode fs1)
+              with _ -> None
+            end
         | _        -> None in
       begin match lem with
       | Some (p,tys,aa) -> t_apply_logic env p tys aa g

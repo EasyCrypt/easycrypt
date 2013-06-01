@@ -245,6 +245,7 @@ val f_real_div_simpl  : form -> form -> form
 exception DestrError of string
 
 val destr_local   : form -> EcIdent.t 
+val destr_tuple   : form -> form list
 val destr_and     : form -> form * form
 val destr_or      : form -> form * form
 val destr_imp     : form -> form * form
@@ -261,6 +262,7 @@ val destr_bdHoareF  : form -> bdHoareF
 val destr_bdHoareS  : form -> bdHoareS
 val destr_pr      : form -> memory * EcPath.xpath * form list * form (* hr *) 
 
+val is_tuple  : form -> bool
 val is_and    : form -> bool
 val is_or     : form -> bool
 val is_imp    : form -> bool
