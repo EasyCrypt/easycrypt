@@ -109,7 +109,7 @@ module Theory : sig
   val import_w3 : scope -> string list -> string -> w3_renaming list -> scope
 end
 
-module Tactic : sig
+module Tactics : sig
   val process : scope -> ptactics -> scope
 end
 

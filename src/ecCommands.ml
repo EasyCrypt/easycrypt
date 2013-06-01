@@ -189,7 +189,7 @@ and process_w3_import (scope : EcScope.scope) (p, f, r) =
 
 (* -------------------------------------------------------------------- *)
 and process_tactics (scope : EcScope.scope) t = 
-  EcScope.Tactic.process scope t
+  EcScope.Tactics.process scope t
 
 (* -------------------------------------------------------------------- *)
 and process_save (scope : EcScope.scope) loc =
