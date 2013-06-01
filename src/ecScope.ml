@@ -1359,23 +1359,34 @@ module Ax = struct
           Some name, bind scope (name, axd)
     else None, scope
 
-  let add (scope : scope) (ax : paxiom) =
-    let ue = EcUnify.UniEnv.create None in
-    let concl = TT.transformula scope.sc_env ue ax.pa_formula in
+  let add (scope : scope) (ax : paxiom located) =
+    let loc = ax.pl_loc and ax = ax.pl_desc in
+    let ue = TT.ue_for_decl scope.sc_env (loc, ax.pa_tyvars) in
+    let pconcl, tintro = 
+      match ax.pa_vars with
+      | None -> 
+        ax.pa_formula, { pl_loc = loc; pl_desc = Pidtac None } 
+      | Some vs -> 
+        let pconcl = { pl_loc = loc; pl_desc = PFforall(vs, ax.pa_formula) } in
+        let vs = List.map (fun (ids,_) -> 
+          List.map (fun x -> {pl_desc = Some x.pl_desc; pl_loc = x.pl_loc}) ids)
+          vs in
+        pconcl, {pl_loc=loc; pl_desc = Pintro (List.flatten vs)} in
+    let concl = TT.transformula scope.sc_env ue pconcl in
     let concl =
       EcFol.Fsubst.uni (EcUnify.UniEnv.close ue) concl in
     let tparams = EcUnify.UniEnv.tparams ue in
     let check = Check_mode.check !(scope.sc_options) in
-    let loc = ax.pa_name.pl_loc in
-
     match ax.pa_kind with
     | PILemma when check ->
-        None, start_lemma scope (unloc ax.pa_name) tparams concl
+      let scope = start_lemma scope (unloc ax.pa_name) tparams concl in
+      let scope = Tactic.process scope [tintro] in
+      None, scope
     | PLemma when check ->
         let scope = start_lemma scope (unloc ax.pa_name) tparams concl in
         let scope =
           Tactic.process scope
-            [{ pl_loc = loc; pl_desc = Ptrivial empty_pprover }] in
+            [tintro; { pl_loc = loc; pl_desc = Ptrivial empty_pprover }] in
         let name, scope = save scope loc in
         name, scope
     | _ ->

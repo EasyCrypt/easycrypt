@@ -251,11 +251,10 @@ module G2(A:Adv) = {
   }
 }.
  
-lemma equiv1 : forall (A<:Adv), 
-  equiv[CPA(ElGamal,A).main ~ DDH0(Inv(A)).main : 
-         (glob A){1}=(glob A){2} ==> res{1} = res{2} ]
+equiv equiv1 (A<:Adv) :  
+   CPA(ElGamal,A).main ~ DDH0(Inv(A)).main : 
+      (glob A){1}=(glob A){2} ==> res{1} = res{2}
 proof.
- intros A.
  fun.
  inline ElGamal.kg ElGamal.enc Inv(A).inv.
  wp.
@@ -268,19 +267,17 @@ proof.
  wp; *rnd;skip;simplify;trivial.
 save.
 
-lemma Pr1 : forall (A<:Adv) &m, 
+lemma Pr1 (A<:Adv) &m : 
    Pr[CPA(ElGamal,A).main() @ &m : res] = 
    Pr[DDH0(Inv(A)).main() @ &m : res]
 proof.
- intros A &m.
  equiv_deno (equiv1 (<:A));trivial.
 save.
 
-lemma Pr2 : forall (A<:Adv) &m, 
+lemma Pr2 (A<:Adv) &m : 
    Pr[G1(A).main() @ &m : res] = 
    Pr[DDH1(Inv(A)).main() @ &m : res]
 proof.
- intros A &m.
  equiv_deno (_: (glob A){1}=(glob A){2} ==> res{1} = res{2});try trivial.
   fun. inline{2} Inv(A).inv.
   swap{1} 7 -4;wp.
@@ -294,15 +291,14 @@ proof.
   wp;*rnd;skip;trivial.
 save.
 
-(* TODO move this *)
-lemma paire_ind : forall (p:'a * 'b -> bool) (x:'a * 'b),
+(* TODO move this, and generalize *)
+lemma paire_ind (p:'a * 'b -> bool) (x:'a * 'b) :
   (forall a b, x = (a,b) => p (a,b)) =>
   p x.
 
-lemma Fact3 : forall (A<:Adv) &m, 
+lemma Fact3 (A<:Adv) &m : 
   Pr[G1(A).main() @ &m : res] = Pr[G2(A).main() @ &m : res]
 proof.
- intros A &m.
  equiv_deno (_: (glob A){1}=(glob A){2} ==> res{1} = res{2});try trivial.
  fun. 
  swap{2} 10 -4;wp.
@@ -333,19 +329,19 @@ proof.
 save.
 
 require import Real.
-lemma Pr4_aux : forall (A<:Adv) , 
+lemma Pr4_aux (A<:Adv) :
    (forall &m, bd_hoare[A.a1 : true ==> true] = 1%r) =>
    (forall &m, bd_hoare[A.a2 : true ==> true] = 1%r) =>
    bd_hoare [G2(A).main : true ==> res] = (1%r / 2%r)
 (*   Pr[G2(A).main() @ &m : res] = 1%r / 2%r *)
 proof.
- intros A Ha1 Ha2.
+ intros Ha1 Ha2.
  fun.
  rnd (1%r / 2%r) (lambda b,  b = b'). (* check this rule *)
  admit.
 save.
 
-lemma Pr4 : forall (A<:Adv) &m, 
+lemma Pr4 (A<:Adv) &m : 
    (bd_hoare[A.a1 : true ==> true] = 1%r) =>
    (bd_hoare[A.a2 : true ==> true] = 1%r) =>
    Pr[G2(A).main() @ &m : res] = 1%r / 2%r
@@ -353,13 +349,13 @@ proof.
  admit. (* TODO : how to use the previous lemma to do this *)
 save.
 
-lemma Conclusion1 : forall (A<:Adv) &m, 
+lemma Conclusion1 (A<:Adv) &m : 
    (bd_hoare[A.a1 : true ==> true] = 1%r) =>
    (forall &m, bd_hoare[A.a2 : true ==> true] = 1%r) =>
  `| Pr[CPA(ElGamal, A).main() @ &m : res] - 1%r / 2%r | = 
  `| Pr[DDH0(Inv(A)).main() @ &m :res] - Pr[DDH1(Inv(A)).main() @ &m :res] |
 proof. 
-  intros A &m Ha1 Ha2.
+  intros Ha1 Ha2.
   rewrite (Pr1 (<:A) &m).
   rewrite <- (Pr4 (<:A) &m _ _);try assumption.
   rewrite <- (Fact3 (<:A) &m).
@@ -367,15 +363,14 @@ proof.
   split.
 save.
 
-lemma Conclusion : 
- forall (A<:Adv) &m, 
+lemma Conclusion (A<:Adv) &m :
    (bd_hoare[A.a1 : true ==> true] = 1%r) =>
    (bd_hoare[A.a2 : true ==> true] = 1%r) =>
    exists (I<:Inverter), 
    `| Pr[CPA(ElGamal, A).main() @ &m : res] - 1%r / 2%r | = 
    `| Pr[DDH0(I).main() @ &m :res] - Pr[DDH1(I).main() @ &m :res] |
 proof.
-  intros A &m Ha1 Ha2.
+  intros Ha1 Ha2.
   exists (<:Inv(A)).
   apply (Conclusion1 (<:A) &m _ _);assumption.
 save.

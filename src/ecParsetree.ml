@@ -216,8 +216,10 @@ type paxiom_kind = PAxiom | PLemma | PILemma
 
 type paxiom = {
   pa_name    : psymbol;
+  pa_tyvars  : psymbol list option;
+  pa_vars    : pgtybindings option;  
   pa_formula : pformula;
-  pa_kind : paxiom_kind;
+  pa_kind    : paxiom_kind;
 }
 
 (* -------------------------------------------------------------------- *)

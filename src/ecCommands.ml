@@ -134,7 +134,7 @@ and process_predicate (scope : EcScope.scope) (p : ppredicate located) =
     scope
 
 (* -------------------------------------------------------------------- *)
-and process_axiom (scope : EcScope.scope) (ax : paxiom) =
+and process_axiom (scope : EcScope.scope) (ax : paxiom located) =
   let (name, scope) = EcScope.Ax.add scope ax in
     EcUtils.oiter name
       (fun x -> notify scope "added axiom: `%s'" x);
@@ -227,7 +227,7 @@ and process (scope : EcScope.scope) (g : global located) =
     | Ginterface i    -> process_interface  scope i
     | Goperator  o    -> process_operator   scope (mk_loc loc o)
     | Gpredicate p    -> process_predicate  scope (mk_loc loc p)
-    | Gaxiom     a    -> process_axiom      scope a
+    | Gaxiom     a    -> process_axiom      scope (mk_loc loc a)
     | Gclaim     c    -> process_claim      scope c
     | GthOpen    name -> process_th_open    scope name.pl_desc
     | GthClose   name -> process_th_close   scope name.pl_desc

@@ -71,8 +71,12 @@
   let pflist loc ti (es : pformula    list) : pformula    = 
     List.fold_right (fun e1 e2 -> pf_cons loc ti e1 e2) es (pf_nil loc ti)
 
-  let mk_axiom p k = 
-    { pa_name = fst p; pa_formula = snd p; pa_kind = k }
+  let mk_axiom (x,ty,vd,f) k = 
+    { pa_name = x; 
+      pa_tyvars = ty;
+      pa_vars   = vd;
+      pa_formula = f; 
+      pa_kind = k }
 
   let str_and b = if b then "&&" else "/\\"
   let str_or  b = if b then "||" else "\\/"
@@ -1145,15 +1149,19 @@ claim:
 | CLAIM x=ident COLON e=expr h=real_hint { (x, (e, h)) }
 ;
 
+lemma_decl :
+| x=ident tyvars=tyvars_decl pd=pgtybindings? COLON f=form { x,tyvars,pd,f }
+;
+
 axiom:
-| AXIOM x=ident COLON e=form
-    { mk_axiom (x, e) PAxiom }
+| AXIOM d=lemma_decl 
+    { mk_axiom d PAxiom }
 
-| LEMMA x=ident COLON e=form i=boption(PROOF)
-    { mk_axiom (x, e) (if i then PILemma else PLemma) }
+| LEMMA d=lemma_decl i=boption(PROOF)
+    { mk_axiom d (if i then PILemma else PLemma) }
 
-| EQUIV x=ident COLON p=loc(equiv_body) i=boption(PROOF)
-    { mk_axiom (x, p) (if i then PILemma else PLemma) }
+| EQUIV x=ident pd=pgtybindings? COLON p=loc(equiv_body) i=boption(PROOF)
+    { mk_axiom (x,None,pd, p) (if i then PILemma else PLemma) }
 ;
 
 (* -------------------------------------------------------------------- *)

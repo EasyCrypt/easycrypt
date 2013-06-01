@@ -39,7 +39,7 @@ module Ax : sig
   (* [add scope op] type-checks the given *parsed* operator [op] in
    * scope [scope], and add it to it. Raises [DuplicatedNameInContext]
    * if an axiom with given name already exists. *)
-  val add  : scope -> paxiom -> string option * scope
+  val add  : scope -> paxiom located -> string option * scope
   val save : scope -> EcLocation.t -> string option * scope
 end
 
