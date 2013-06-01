@@ -40,6 +40,9 @@ tactic :
                                 x2 = y2
   split 
 
+ add tactic like : intros \ for intros H;clear H.
+
+
   + tactic phl/prhl 
     -
     - eqobs_in
