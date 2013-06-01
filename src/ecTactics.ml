@@ -18,6 +18,9 @@ module TT = EcTyping
 module UE = EcUnify.UniEnv
 
 (* -------------------------------------------------------------------- *)
+type pprovers = EcParsetree.pprover_infos -> EcProvers.prover_infos
+
+(* -------------------------------------------------------------------- *)
 type tac_error =
   | UnknownHypSymbol of symbol
   | UnknownAxiom     of qsymbol
