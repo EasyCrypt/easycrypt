@@ -7,9 +7,19 @@ Printer :
   les hyp
 
 Parser  : 
-  introduire une notation looslessA : 
++  introduire une notation looslessA : 
     (forall (O<:O),  bd_hoare [O.hashA : true ==> true] [=] [1%r] => 
       bd_hoare [A(O).a : true ==> true] [=] [1%r]).
+
+
++ could be greate to allow the following syntaxe :
+  lemma foo (x:int) : concl 
+  proof.
+  a short cut for 
+  lemma foo : forall (x:int), concl
+  proof.
+    intros x.
+
 
 Message d'erreur:
 (* rewrite (Set.add_mem F2.xs{m2} x{m2} RO.logA{m2}). *)
@@ -25,7 +35,10 @@ Message d'erreur:
 
 * Benjamin
 
-tactic : 
+tactic :
+ concl := (x1,x2) = (y1,y2) --> x1 = y1
+                                x2 = y2
+  split 
 
   + tactic phl/prhl 
     -
