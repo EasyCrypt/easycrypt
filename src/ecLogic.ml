@@ -233,8 +233,9 @@ let check_arg do_arg env hyps s x gty a =
   | GTmem _   , AAmem m ->
       f_bind_mem s x m, RA_id m
   | GTmodty (emt, restr), AAmp (mp, mt)  ->
-      check_modtype_restr env mp mt emt restr;
-      f_bind_mod s x mp, RA_mp mp
+    let env = tyenv_of_hyps env hyps in
+    check_modtype_restr env mp mt emt restr;
+    f_bind_mod s x mp, RA_mp mp
   | _ -> assert false (* FIXME error message *)
 
 let mkn_apply do_arg env (juc,n) args =
