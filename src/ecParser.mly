@@ -1420,6 +1420,9 @@ tactic:
 | INLINE s=side? o=occurences? f=plist0(loc(fident), empty)
     { PPhl (Pinline (`ByName (s, (f, o)))) }
 
+| p=tselect INLINE
+    { PPhl (Pinline (`ByPattern p)) }
+
 | ALIAS s=side? o=codepos
     { PPhl (Palias (s, o, None)) }
 
@@ -1443,9 +1446,6 @@ tactic:
 
 | SPLITWHILE c=expr COLON s=side? o=codepos
     { PPhl (Psplitwhile (c,s,o)) }
-
-| p=tselect INLINE
-    { PPhl (Pinline (`ByPattern p)) }
 
 | EQUIVDENO info=fpattern(conseq)
     { PPhl (Pequivdeno info) }
