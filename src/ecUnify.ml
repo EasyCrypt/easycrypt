@@ -169,7 +169,7 @@ let unify (env : EcEnv.env) (ue : unienv) =
         unify (EcEnv.NormMp.norm_tglob env mp) r2
 
       | _, Tglob mp when EcEnv.NormMp.tglob_reducible env mp ->
-        unify (EcEnv.NormMp.norm_tglob env mp) r1
+        unify r1 (EcEnv.NormMp.norm_tglob env mp)
    
       | Tconstr(p, lt), _ when EcEnv.Ty.defined p env ->
         unify (EcEnv.Ty.unfold p lt env) r2

@@ -318,12 +318,9 @@ proof.
  wp;*rnd;skip.
  simplify; simplify. (* FIXME *)
  intros &m1 &m2 Hg x Hx y Hy.
- (* rewrite Hg. (* FIXME *) *)
- split;[trivial | ].
- intros H;clear H.
+ rewrite Hg;simplify.
  intros rL rR gA0 gA1 H;elim H;clear H;intros Heqr HeqA.
- (* rewrite HeqA (* FIXME *) *)
- subst rL.
+ subst.
  elimT paire_ind rR. 
  intros m0 m1 Heq;simplify.
  intros b _ zL zR;split;[ | trivial ].
