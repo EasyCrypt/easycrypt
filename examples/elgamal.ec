@@ -169,7 +169,7 @@ module DDH1(I:Inverter) = {
     x  = $[0..q-1];
     y  = $[0..q-1];
     z  = $[0..q-1]; 
-    d := I.inv(g^x, g^y, g^(x*y));
+    d := I.inv(g^x, g^y, g^z);
 
     return d;
   }     
@@ -276,26 +276,110 @@ proof.
  equiv_deno (equiv1 (<:A));trivial.
 save.
 
-    (*    
-claim Pr2 : G1.Main[res] = DDH1.Main[res] 
-auto.
-
-timeout 3.
-
-equiv Fact3 : G1.Main ~ G2.Main : (true).
- swap{2} [10-10] -4;auto.
- rnd ((z + log(if b then m0 else m1){2}) %% q), 
-     ((z - log(if b then m0 else m1){2}) %% q).
- trivial; auto; trivial.
+lemma Pr2 : forall (A<:Adv) &m, 
+   Pr[G1(A).main() @ &m : res] = 
+   Pr[DDH1(Inv(A)).main() @ &m : res]
+proof.
+ intros A &m.
+ equiv_deno (_: (glob A){1}=(glob A){2} ==> res{1} = res{2});try trivial.
+  fun. inline{2} Inv(A).inv.
+  swap{1} 7 -4;wp.
+  call (c{1} = c{2} /\ (glob A){1} = (glob A){2})
+      (res{1}=res{2} /\ (glob A){1} = (glob A){2}).
+    fun true;try (simplify;split).
+  wp;rnd.
+  call (pk{1} = pk{2} /\ (glob A){1} = (glob A){2}) 
+             (res{1}=res{2} /\ (glob A){1} = (glob A){2}).
+    fun true;try (simplify;split).
+  wp;*rnd;skip;trivial.
 save.
 
-claim Pr3 : G1.Main[res] = G2.Main[res]
-using Fact3.
+(* TODO move this *)
+lemma paire_ind : forall (p:'a * 'b -> bool) (x:'a * 'b),
+  (forall a b, x = (a,b) => p (a,b)) =>
+  p x.
 
-claim Pr4 : G2.Main[res] = 1%r / 2%r
-compute.
+lemma Fact3 : forall (A<:Adv) &m, 
+  Pr[G1(A).main() @ &m : res] = Pr[G2(A).main() @ &m : res]
+proof.
+ intros A &m.
+ equiv_deno (_: (glob A){1}=(glob A){2} ==> res{1} = res{2});try trivial.
+ fun. 
+ swap{2} 10 -4;wp.
+ call (c{1} = c{2} /\ (glob A){1} = (glob A){2})
+      (res{1}=res{2} /\ (glob A){1} = (glob A){2}).
+    fun true;try (simplify;split).
+ wp; rnd (lambda (z:int), (z + log(if b then m1 else m0){2}) %% q)
+     (lambda (z:int), (z - log(if b then m1 else m0){2}) %% q).
+ wp;rnd;simplify.
+ call (pk{1} = pk{2} /\ (glob A){1} = (glob A){2}) 
+             (res{1}=res{2} /\ (glob A){1} = (glob A){2}).
+   fun true;try (simplify;split).
+ wp;*rnd;skip.
+ simplify; simplify. (* FIXME *)
+ intros &m1 &m2 Hg x Hx y Hy.
+ (* rewrite Hg. (* FIXME *) *)
+ split;[trivial | ].
+ intros H;clear H.
+ intros rL rR gA0 gA1 H;elim H;clear H;intros Heqr HeqA.
+ (* rewrite HeqA (* FIXME *) *)
+ subst rL.
+ elimT paire_ind rR. 
+ intros m0 m1 Heq;simplify.
+ intros b _ zL zR;split;[ | trivial ].
+ split;[ | trivial].
+ split;[ | trivial].
+ split;[trivial | ].
+ intros _ _. (* TODO intros clear *)
+ rewrite (Distr.Dinter.supp_def 0 (q-1)  ((zR - (log (if b then m1 else m0))) %% q)).
+ trivial.
+save.
 
-claim Conclusion : 
- | INDCPA.Main[res] - 1%r / 2%r | = | DDH0.Main[res] - DDH1.Main[res] |.
+require import Real.
+lemma Pr4_aux : forall (A<:Adv) , 
+   (forall &m, bd_hoare[A.a1 : true ==> true] = 1%r) =>
+   (forall &m, bd_hoare[A.a2 : true ==> true] = 1%r) =>
+   bd_hoare [G2(A).main : true ==> res] = (1%r / 2%r)
+(*   Pr[G2(A).main() @ &m : res] = 1%r / 2%r *)
+proof.
+ intros A Ha1 Ha2.
+ fun.
+ rnd (1%r / 2%r) (lambda b,  b = b'). (* check this rule *)
+ admit.
+save.
 
-*)
+lemma Pr4 : forall (A<:Adv) &m, 
+   (bd_hoare[A.a1 : true ==> true] = 1%r) =>
+   (bd_hoare[A.a2 : true ==> true] = 1%r) =>
+   Pr[G2(A).main() @ &m : res] = 1%r / 2%r
+proof.
+ admit. (* TODO : how to use the previous lemma to do this *)
+save.
+
+lemma Conclusion1 : forall (A<:Adv) &m, 
+   (bd_hoare[A.a1 : true ==> true] = 1%r) =>
+   (forall &m, bd_hoare[A.a2 : true ==> true] = 1%r) =>
+ `| Pr[CPA(ElGamal, A).main() @ &m : res] - 1%r / 2%r | = 
+ `| Pr[DDH0(Inv(A)).main() @ &m :res] - Pr[DDH1(Inv(A)).main() @ &m :res] |
+proof. 
+  intros A &m Ha1 Ha2.
+  rewrite (Pr1 (<:A) &m).
+  rewrite <- (Pr4 (<:A) &m _ _);try assumption.
+  rewrite <- (Fact3 (<:A) &m).
+  rewrite (Pr2 (<:A) &m).
+  split.
+save.
+
+lemma Conclusion : 
+ forall (A<:Adv) &m, 
+   (bd_hoare[A.a1 : true ==> true] = 1%r) =>
+   (bd_hoare[A.a2 : true ==> true] = 1%r) =>
+   exists (I<:Inverter), 
+   `| Pr[CPA(ElGamal, A).main() @ &m : res] - 1%r / 2%r | = 
+   `| Pr[DDH0(I).main() @ &m :res] - Pr[DDH1(I).main() @ &m :res] |
+proof.
+  intros A &m Ha1 Ha2.
+  exists (<:Inv(A)).
+  apply (Conclusion1 (<:A) &m _ _);assumption.
+save.
+
