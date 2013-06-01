@@ -298,7 +298,7 @@ end
 (* -------------------------------------------------------------------- *)
 module Tactics = struct
   open EcBaseLogic
-  open EcTactics
+  open EcHiTactics
 
   let pi scope pi = Prover.mk_prover_info scope pi
 
@@ -595,7 +595,7 @@ module Ax = struct
   let save scope loc =
     if Check_mode.check !(scope.sc_options) then
       match scope.sc_pr_uc with
-      | [] -> EcTactics.error loc EcTactics.NoCurrentGoal
+      | [] -> EcHiTactics.error loc EcHiTactics.NoCurrentGoal
       | { puc_name = name; puc_jdg = juc } :: pucs ->
           let pr = EcBaseLogic.close_juc juc in
           let hyps,concl = (EcBaseLogic.get_goal (juc,0)).EcBaseLogic.pj_decl in
