@@ -1321,6 +1321,27 @@ tactic:
 
 | TRY t=loc(tactic) { Ptry t }
 
+| LPAREN s=tactics RPAREN
+   { Pseq s } 
+
+| ADMIT
+    { Padmit }
+
+| CASE f=sform
+   { Pcase f }
+
+| x=logtactic
+   { Plogic x }
+
+| x=phltactic
+   { PPhl x }
+
+(* DEBUG *)
+| DEBUG
+    { Pdebug }
+;
+
+logtactic:
 | ASSUMPTION
     { Passumption (None, None) }
 
@@ -1372,106 +1393,94 @@ tactic:
 | SUBST l=ident*
    { Psubst l }
 
-| CASE f=sform
-   { Pcase f }
-
-| LPAREN s=tactics RPAREN
-   { Pseq s } 
-
-| ADMIT
-    { Padmit }
-
 | CUT n=ident COLON p=sform
    { Pcut (n, p) }
+;
 
-(* PHL tactics *)
-
+phltactic:
 | FUN
-    { PPhl Pfun_def }
+    { Pfun_def }
 
 | FUN f=sform
-    { PPhl (Pfun_abs f) }
+    { Pfun_abs f }
 
 | FUN bad=sform p=sform q=sform? 
-    { PPhl(Pfun_upto(bad,p,q)) }
+    { Pfun_upto(bad, p, q) }
 
 | APP d=tac_dir pos=code_position COLON p=sform f=sform?
-   { PPhl (Papp (d,pos, p,f)) }
+   { Papp (d,pos, p,f) }
 
 | WP n=code_position?
-   { PPhl (Pwp n) }
+   { Pwp n }
 
 | SKIP
-    { PPhl Pskip }
+    { Pskip }
 
 | WHILE info=while_tac_info
-    { PPhl (Pwhile info) }
+    { Pwhile info }
 
 | CALL s=side? pre=sform post=sform
-    { PPhl (Pcall (s, (pre, post))) }
+    { Pcall (s, (pre, post)) }
 
 | RCONDT s=side? i=number
-    {PPhl (Prcond(s, true, i))}
+    { Prcond (s, true, i) }
 
 | RCONDF s=side? i=number 
-    {PPhl (Prcond(s, false, i))}
+    { Prcond (s, false, i) }
 
 | IF s=side?
-    { PPhl (Pcond s) }
+    { Pcond s }
 
 | SWAP info=plist1(loc(swap_info),COMMA)
-    { PPhl (Pswap info) }
+    { Pswap info }
 
 | RND s=side? info=rnd_info
-    { PPhl (Prnd (s, info)) }
+    { Prnd (s, info) }
 
 | INLINE s=side? o=occurences? f=plist0(loc(fident), empty)
-    { PPhl (Pinline (`ByName (s, (f, o)))) }
+    { Pinline (`ByName (s, (f, o))) }
 
 | p=tselect INLINE
-    { PPhl (Pinline (`ByPattern p)) }
+    { Pinline (`ByPattern p) }
 
 | ALIAS s=side? o=codepos
-    { PPhl (Palias (s, o, None)) }
+    { Palias (s, o, None) }
 
 | ALIAS s=side? o=codepos WITH x=lident
-    { PPhl (Palias (s, o, Some x)) }
+    { Palias (s, o, Some x) }
 
 | FISSION s=side? o=codepos AT d1=NUM COMMA d2=NUM
-    { PPhl (Pfission (s, o, (1, (d1, d2)))) }
+    { Pfission (s, o, (1, (d1, d2))) }
 
 | FISSION s=side? o=codepos NOT i=NUM AT d1=NUM COMMA d2=NUM
-    { PPhl (Pfission (s, o, (i, (d1, d2)))) }
+    { Pfission (s, o, (i, (d1, d2))) }
 
 | FUSION s=side? o=codepos AT d1=NUM COMMA d2=NUM
-    { PPhl (Pfusion (s, o, (1, (d1, d2)))) }
+    { Pfusion (s, o, (1, (d1, d2))) }
 
 | FUSION s=side? o=codepos NOT i=NUM AT d1=NUM COMMA d2=NUM
-    { PPhl (Pfusion (s, o, (i, (d1, d2)))) }
+    { Pfusion (s, o, (i, (d1, d2))) }
 
 | UNROLL s=side? o=codepos
-    { PPhl (Punroll (s, o)) }
+    { Punroll (s, o) }
 
 | SPLITWHILE c=expr COLON s=side? o=codepos
-    { PPhl (Psplitwhile (c,s,o)) }
+    { Psplitwhile (c, s, o) }
 
 | EQUIVDENO info=fpattern(conseq)
-    { PPhl (Pequivdeno info) }
+    { Pequivdeno info }
 
 | CONSEQ info=fpattern(conseq)
-    { PPhl (Pconseq info) }
-
-(* DEBUG *)
-| DEBUG
-    { Pdebug }
+    { Pconseq info }
 ;
 
 while_tac_info : 
-| inv=sform { inv,None,None } 
+| inv=sform
+    { (inv, None, None) }
 | inv=sform vrnt=sform 
-    { inv, Some vrnt, None }
+    { (inv, Some vrnt, None) }
 | inv=sform vrnt=sform bd=sform n_iter=sform
-    { inv, Some vrnt, Some (bd,n_iter) }
+    { (inv, Some vrnt, Some (bd, n_iter)) }
 
 rnd_info:
 | e1=sform e2=sform 

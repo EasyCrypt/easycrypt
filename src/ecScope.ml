@@ -298,6 +298,7 @@ end
 (* -------------------------------------------------------------------- *)
 module Tactics = struct
   open EcBaseLogic
+  open EcHiLogic
   open EcHiTactics
 
   let pi scope pi = Prover.mk_prover_info scope pi
@@ -595,7 +596,7 @@ module Ax = struct
   let save scope loc =
     if Check_mode.check !(scope.sc_options) then
       match scope.sc_pr_uc with
-      | [] -> EcHiTactics.error loc EcHiTactics.NoCurrentGoal
+      | [] -> EcHiLogic.error loc EcHiLogic.NoCurrentGoal
       | { puc_name = name; puc_jdg = juc } :: pucs ->
           let pr = EcBaseLogic.close_juc juc in
           let hyps,concl = (EcBaseLogic.get_goal (juc,0)).EcBaseLogic.pj_decl in
@@ -620,7 +621,7 @@ module Ax = struct
         let vs = List.map (fun (ids,_) -> 
           List.map (fun x -> {pl_desc = Some x.pl_desc; pl_loc = x.pl_loc}) ids)
           vs in
-        pconcl, {pl_loc=loc; pl_desc = Pintro (List.flatten vs)} in
+        pconcl, { pl_loc=loc; pl_desc = Plogic (Pintro (List.flatten vs)) } in
     let concl = TT.transformula scope.sc_env ue pconcl in
     let concl =
       EcFol.Fsubst.uni (EcUnify.UniEnv.close ue) concl in
@@ -635,7 +636,7 @@ module Ax = struct
         let scope = start_lemma scope (unloc ax.pa_name) tparams concl in
         let scope =
           Tactics.process scope
-            [tintro; { pl_loc = loc; pl_desc = Ptrivial empty_pprover }] in
+            [tintro; { pl_loc = loc; pl_desc = Plogic (Ptrivial empty_pprover) }] in
         let name, scope = save scope loc in
         name, scope
     | _ ->

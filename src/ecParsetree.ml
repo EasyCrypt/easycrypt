@@ -288,38 +288,7 @@ and pspattern = unit
 
 type codepos = int * ((int * codepos) option)
 
-type ptactic = ptactic_r located
-
-and ptactic_r = 
-  | Pidtac      of string option
-  | Prepeat     of ptactic  
-  | Pdo         of int option * ptactic (* None means do 1 then repeat *)
-  | Ptry        of ptactic 
-  | Passumption of (pqsymbol option * ptyannot option)
-  | Ptrivial    of pprover_infos
-  | Pintro      of (symbol option) located list
-  | Psplit                        
-  | Pexists     of fpattern_arg located list 
-  | Pleft                         
-  | Pright                        
-  | Pelim       of ffpattern 
-  | Papply      of ffpattern
-  | Pcut        of (psymbol * pformula)
-  | Pgeneralize of pformula list
-  | Pclear      of psymbol list
-  | Prewrite    of (bool * ffpattern)
-  | Psubst      of psymbol list
-  | Psimplify   of preduction 
-  | Pchange     of pformula
-  | PelimT      of (pformula * pqsymbol)
-  | Pcase       of pformula 
-  | Psubgoal    of ptactics
-  | Pseq        of ptactics
-  | PPhl        of phl_tactics
-  | Padmit
-  | Pdebug
-
-and phl_tactics = 
+type phltactic = 
   | Pfun_def  
   | Pfun_abs    of pformula
   | Pfun_upto   of (pformula * pformula * pformula option)
@@ -344,6 +313,40 @@ and phl_tactics =
 and pinline_arg =
   [ `ByName    of tac_side * (pgamepath list * int list option)
   | `ByPattern of pipattern ]
+
+type logtactic =
+  | Passumption of (pqsymbol option * ptyannot option)
+  | Ptrivial    of pprover_infos
+  | Pintro      of (symbol option) located list
+  | Psplit                        
+  | Pexists     of fpattern_arg located list 
+  | Pleft                         
+  | Pright                        
+  | Pelim       of ffpattern 
+  | Papply      of ffpattern
+  | Pcut        of (psymbol * pformula)
+  | Pgeneralize of pformula list
+  | Pclear      of psymbol list
+  | Prewrite    of (bool * ffpattern)
+  | Psubst      of psymbol list
+  | Psimplify   of preduction 
+  | Pchange     of pformula
+  | PelimT      of (pformula * pqsymbol)
+
+type ptactic = ptactic_r located
+
+and ptactic_r = 
+  | Pidtac      of string option
+  | Prepeat     of ptactic  
+  | Pdo         of int option * ptactic (* None means do 1 then repeat *)
+  | Ptry        of ptactic 
+  | Psubgoal    of ptactics
+  | Pseq        of ptactics
+  | Pcase       of pformula 
+  | Plogic      of logtactic
+  | PPhl        of phltactic
+  | Padmit
+  | Pdebug
 
 and ptactics = ptactic list        
 

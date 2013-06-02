@@ -306,7 +306,6 @@ and i_read env r i =
   | Sif (e,s1,s2) -> s_read env (s_read env (e_read env r e) s1) s2
   | Swhile (e,s) -> s_read env (e_read env r e) s
   | Sassert e -> e_read env r e
-    
 
 let f_write env f = f_write env PV.empty f
 let f_read  env f = f_read  env PV.empty f
