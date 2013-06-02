@@ -3,6 +3,7 @@ open EcParsetree
 open EcIdent
 open EcTypes
 open EcModules
+open EcFol
 
 (* -------------------------------------------------------------------- *)
 module Zipper : sig
@@ -65,3 +66,22 @@ module IMatch : sig
   val get_as_while : mtch -> int -> instr * (expr * stmt)
   val get_as_if    : mtch -> int -> instr * (expr * stmt * stmt)
 end
+
+(* -------------------------------------------------------------------- *)
+(* Formulas rigid unification                                           *)
+(* -------------------------------------------------------------------- *)
+type 'a evmap
+
+module EV : sig
+  val empty     : 'a evmap
+  val of_idents : ident list -> 'a evmap
+
+  val add   : ident -> 'a evmap -> 'a evmap
+  val get   : ident -> 'a evmap -> [`Unset | `Set of 'a] option
+  val doget : ident -> 'a evmap -> 'a
+end
+
+(* -------------------------------------------------------------------- *)
+exception MatchFailure
+
+val f_match : EcEnv.env -> form evmap -> ptn:form -> form -> form evmap
