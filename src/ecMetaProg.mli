@@ -1,11 +1,41 @@
 (* -------------------------------------------------------------------- *)
-(* Expressions / formulas matching for tactics                          *)
-(* -------------------------------------------------------------------- *)
-
+open EcParsetree
 open EcIdent
 open EcTypes
 open EcModules
 
+(* -------------------------------------------------------------------- *)
+module Zipper : sig
+  type ipath =
+  | ZTop
+  | ZWhile  of expr * spath
+  | ZIfThen of expr * spath * stmt
+  | ZIfElse of expr * stmt  * spath
+
+  and spath = (instr list * instr list) * ipath
+
+  type zipper = {
+    z_head : instr list;                (* instructions on my left (rev)       *)
+    z_tail : instr list;                (* instructions on my right (me incl.) *)
+    z_path : ipath ;                    (* path (zipper) leading to me         *)
+  }
+
+  exception InvalidCPos
+
+  val zipper : instr list -> instr list -> ipath -> zipper
+
+  val zipper_of_cpos : codepos -> stmt -> zipper
+
+  val zip : zipper -> stmt
+
+  type ('a, 'state) folder =
+    'a -> 'state -> instr -> 'state * instr list
+
+  val fold : 'a -> codepos -> ('a, 'state) folder -> 'state -> stmt -> 'state * stmt
+end
+
+(* -------------------------------------------------------------------- *)
+(* Expressions / formulas matching for tactics                          *)
 (* -------------------------------------------------------------------- *)
 module IMatch : sig
   (* pattern can be

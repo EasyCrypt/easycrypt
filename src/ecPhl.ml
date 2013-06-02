@@ -1,3 +1,4 @@
+(* -------------------------------------------------------------------- *)
 open EcParsetree
 open EcUtils
 open EcIdent
@@ -9,6 +10,9 @@ open EcBaseLogic
 open EcEnv
 open EcLogic
 open EcModules
+open EcMetaProg
+
+module Zpr = EcMetaProg.Zipper
 
 (* -------------------------------------------------------------------- *)
 (* -------------------------  Substitution  --------------------------- *)
@@ -337,9 +341,6 @@ let s_last_whiles  st = s_lasts destr_while  (last_error " while" st)
 let s_last_assert  st = s_last  destr_assert (last_error "n assert" st)
 let s_last_asserts st = s_lasts destr_assert (last_error "n assert" st)
 
-
-
-
 (* -------------------------------------------------------------------- *)
 (* -------------------------------  Wp -------------------------------- *)
 (* -------------------------------------------------------------------- *)
@@ -513,99 +514,34 @@ let gen_mems m f =
   f_forall bds f
 
 
-(* -------------------------------------------------------------------- *)
-module CPos = struct
-  exception InvalidCPos
+let t_fold f env cpos (state, s) =
+  try  Zpr.fold env cpos f state s
+  with Zpr.InvalidCPos -> tacuerror "invalid code position"
 
-  module P = EcPath
+let t_zip f env cpos (state, s) =
+  try  snd_map Zpr.zip (f env state (Zpr.zipper_of_cpos cpos s))
+  with Zpr.InvalidCPos -> tacuerror "invalid code position"
 
-  type ipath =
-  | ZTop
-  | ZWhile  of expr * spath
-  | ZIfThen of expr * spath * stmt
-  | ZIfElse of expr * stmt  * spath
+let t_code_transform env side cpos tr tx g =
+  match side with
+  | None ->
+      let _, concl   = get_goal g in
+      let hoare      = destr_hoareS concl in
+      let (me, stmt) = tx env cpos (hoare.hs_m, hoare.hs_s) in
+      let concl      = f_hoareS_r { hoare with hs_m = me; hs_s = stmt; } in
+        prove_goal_by [concl] (tr None) g
 
-  and spath = (instr list * instr list) * ipath
-
-  type zipper = {
-    z_head : instr list;                (* instructions on my left (rev)       *)
-    z_tail : instr list;                (* instructions on my right (me incl.) *)
-    z_path : ipath ;                    (* path (zipper) leading to me         *)
-  }
-
-  let zipper hd tl zpr = { z_head = hd; z_tail = tl; z_path = zpr; }
-    
-  let rec zipper_of_cpos ((i, sub) : codepos) zpr s =
-    let (s1, i, s2) =
-      try  List.split_n (i-1) s.s_node 
-      with Not_found -> raise InvalidCPos
-    in
-    match sub with
-    | None -> zipper s1 (i::s2) zpr
-    | Some (b, sub) -> begin
-      match i.i_node, b with
-      | Swhile (e, sw), 0 ->
-          zipper_of_cpos sub (ZWhile (e, ((s1, s2), zpr))) sw
-      | Sif (e, ifs1, ifs2), 0 ->
-          zipper_of_cpos sub (ZIfThen (e, ((s1, s2), zpr), ifs2)) ifs1
-      | Sif (e, ifs1, ifs2), 1 ->
-          zipper_of_cpos sub (ZIfElse (e, ifs1, ((s1, s2), zpr))) ifs2
-      | _ -> raise InvalidCPos
-    end
-
-  let zipper_of_cpos cpos s = zipper_of_cpos cpos ZTop s
-
-  let rec zip i ((hd, tl), ip) =
-    let s = stmt (List.rev_append hd (List.ocons i tl)) in
-
-    match ip with
-    | ZTop -> s
-    | ZWhile  (e, sp)     -> zip (Some (i_while (e, s))) sp
-    | ZIfThen (e, sp, se) -> zip (Some (i_if (e, s, se))) sp
-    | ZIfElse (e, se, sp) -> zip (Some (i_if (e, se, s))) sp
-
-  let zip zpr = zip None ((zpr.z_head, zpr.z_tail), zpr.z_path)
-
-  let rec fold env cpos f state s =
-    let zpr = zipper_of_cpos cpos s in
-
-      match zpr.z_tail with
-      | []      -> raise InvalidCPos
-      | i :: tl -> begin
-          match f env state i with
-          | (state', [i']) when i == i' && state == state' -> (state, s)
-          | (state', si  ) -> (state', zip { zpr with z_tail = si @ tl })
-      end
-
-  let t_fold f env cpos (state, s) =
-    try  fold env cpos f state s
-    with InvalidCPos -> tacuerror "invalid code position"
-
-  let t_zip f env cpos (state, s) =
-    try  snd_map zip (f env state (zipper_of_cpos cpos s))
-    with InvalidCPos -> tacuerror "invalid code position"
-
-  let t_code_transform env side cpos tr tx g =
-    match side with
-    | None ->
-        let _, concl   = get_goal g in
-        let hoare      = destr_hoareS concl in
-        let (me, stmt) = tx env cpos (hoare.hs_m, hoare.hs_s) in
-        let concl      = f_hoareS_r { hoare with hs_m = me; hs_s = stmt; } in
-          prove_goal_by [concl] (tr None) g
-  
-    | Some side ->
-        let _, concl = get_goal g in
-        let es       = destr_equivS concl in
-        let me, stmt = if side then (es.es_ml, es.es_sl) else (es.es_mr, es.es_sr) in
-        let me, stmt = tx env cpos (me, stmt) in
-        let concl    =
-          match side with
-          | true  -> f_equivS_r { es with es_ml = me; es_sl = stmt; }
-          | false -> f_equivS_r { es with es_mr = me; es_sr = stmt; }
-        in
-          prove_goal_by [concl] (tr (Some side)) g
-end
+  | Some side ->
+      let _, concl = get_goal g in
+      let es       = destr_equivS concl in
+      let me, stmt = if side then (es.es_ml, es.es_sl) else (es.es_mr, es.es_sr) in
+      let me, stmt = tx env cpos (me, stmt) in
+      let concl    =
+        match side with
+        | true  -> f_equivS_r { es with es_ml = me; es_sl = stmt; }
+        | false -> f_equivS_r { es with es_mr = me; es_sr = stmt; }
+      in
+        prove_goal_by [concl] (tr (Some side)) g
 
 (* -------------------------------------------------------------------- *)
 (* -------------------------  Tactics --------------------------------- *)
@@ -1394,7 +1330,7 @@ let alias_stmt id _env me i =
 
 let t_alias env side cpos id g =
   let tr = fun side -> RN_hl_alias (side, cpos) in
-    CPos.t_code_transform env side cpos tr (CPos.t_fold (alias_stmt id)) g
+    t_code_transform env side cpos tr (t_fold (alias_stmt id)) g
 
 (* -------------------------------------------------------------------- *)
 let check_fission_independence env b init c1 c2 c3 =
@@ -1428,11 +1364,11 @@ let fission_stmt (il, (d1, d2)) env me zpr =
       "second break offset must not be lower than the first one";
   
   let (hd, init, b, sw, tl) =
-    match zpr.CPos.z_tail with
+    match zpr.Zpr.z_tail with
     | { i_node = Swhile (b, sw) } :: tl -> begin
-        if List.length zpr.CPos.z_head < il then
+        if List.length zpr.Zpr.z_head < il then
           tacuerror "while-loop is not headed by %d intructions" il;
-      let (init, hd) = List.take_n il zpr.CPos.z_head in
+      let (init, hd) = List.take_n il zpr.Zpr.z_head in
         (hd, init, b, sw, tl)
       end
     | _ -> tacuerror "code position does not lead to a while-loop"
@@ -1454,20 +1390,20 @@ let fission_stmt (il, (d1, d2)) env me zpr =
   let fis =   (List.rev_append init [wl1])
             @ (List.rev_append init [wl2]) in
 
-    (me, { zpr with CPos.z_head = hd; CPos.z_tail = fis @ tl })
+    (me, { zpr with Zpr.z_head = hd; Zpr.z_tail = fis @ tl })
 
 let t_fission env side cpos infos g =
   let tr = fun side -> RN_hl_fission (side, cpos, infos) in
-    CPos.t_code_transform env side cpos tr (CPos.t_zip (fission_stmt infos)) g
+    t_code_transform env side cpos tr (t_zip (fission_stmt infos)) g
 
 (* -------------------------------------------------------------------- *)
 let fusion_stmt (il, (d1, d2)) env me zpr =
   let (hd, init1, b1, sw1, tl) =
-    match zpr.CPos.z_tail with
+    match zpr.Zpr.z_tail with
     | { i_node = Swhile (b, sw) } :: tl -> begin
-        if List.length zpr.CPos.z_head < il then
+        if List.length zpr.Zpr.z_head < il then
           tacuerror "1st while-loop is not headed by %d intruction(s)" il;
-      let (init, hd) = List.take_n il zpr.CPos.z_head in
+      let (init, hd) = List.take_n il zpr.Zpr.z_head in
         (hd, init, b, sw, tl)
       end
     | _ -> tacuerror "code position does not lead to a while-loop"
@@ -1503,11 +1439,11 @@ let fusion_stmt (il, (d1, d2)) env me zpr =
   let wl  = i_while (b1, stmt (sw1 @ sw2 @ fini1)) in
   let fus = List.rev_append init1 [wl] in
 
-    (me, { zpr with CPos.z_head = hd; CPos.z_tail = fus @ tl; })
+    (me, { zpr with Zpr.z_head = hd; Zpr.z_tail = fus @ tl; })
 
 let t_fusion env side cpos infos g =
   let tr = fun side -> RN_hl_fusion (side, cpos, infos) in
-    CPos.t_code_transform env side cpos tr (CPos.t_zip (fusion_stmt infos)) g
+    t_code_transform env side cpos tr (t_zip (fusion_stmt infos)) g
 
 (* -------------------------------------------------------------------- *)
 let unroll_stmt _env me i =
@@ -1517,7 +1453,7 @@ let unroll_stmt _env me i =
 
 let t_unroll env side cpos g =
   let tr = fun side -> RN_hl_unroll (side, cpos) in
-    CPos.t_code_transform env side cpos tr (CPos.t_fold unroll_stmt) g
+    t_code_transform env side cpos tr (t_fold unroll_stmt) g
 
 (* -------------------------------------------------------------------- *)
 let splitwhile_stmt b _env me i =
@@ -1530,7 +1466,7 @@ let splitwhile_stmt b _env me i =
 
 let t_splitwhile b env side cpos g =
   let tr = fun side -> RN_hl_splitwhile (b,side, cpos) in
-    CPos.t_code_transform env side cpos tr (CPos.t_fold (splitwhile_stmt b)) g
+    t_code_transform env side cpos tr (t_fold (splitwhile_stmt b)) g
 
 (* -------------------------------------------------------------------- *)
 let t_equiv_deno env pre post g =
