@@ -163,9 +163,18 @@ module PPEnv = struct
     let (nm, x) = P.toqsymbol mty.mt_name in
     let (nm, x) = shorten (List.rev nm) ([], x) in
 
+    let isfunctor =
+      List.all2 EcPath.m_equal
+	(List.map (fun (x, _) -> EcPath.mident x) mty.mt_params)
+	mty.mt_args
+    in
+
     let msymb =
-        (List.map (fun x -> (x, [])) nm)
-      @ [(x, List.flatten (List.map (mod_symb ppe) mty.mt_args))]
+      match isfunctor with
+      | true  -> (List.map (fun x -> (x, [])) nm) @ [(x, [])]
+      | false ->
+           (List.map (fun x -> (x, [])) nm)
+         @ [(x, List.flatten (List.map (mod_symb ppe) mty.mt_args))]
     in
       msymb
 
