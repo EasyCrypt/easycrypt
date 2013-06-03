@@ -298,6 +298,9 @@ let process_inline env infos g =
 
   | `ByPattern _ -> failwith "not-implemented"
 
+let process_kill env (side, cpos, len) g =
+  t_kill env side cpos len g
+
 let process_alias env (side, cpos, id) g =
   t_alias env side cpos id g
 
@@ -432,6 +435,7 @@ let process_phl loc env ptac g =
     | Pcall(side, (pre, post)) -> process_call env side pre post
     | Pswap info               -> process_swap env info
     | Pinline info             -> process_inline env info
+    | Pkill info               -> process_kill env info
     | Palias info              -> process_alias env info
     | Prnd (side, info)        -> process_rnd side env info
     | Pconseq info             -> process_conseq env info

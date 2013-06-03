@@ -189,7 +189,8 @@
 %token IN
 %token INLINE
 %token INTROS
-%token IOTA 
+%token IOTA
+%token KILL
 %token LAMBDA
 %token LBRACE
 %token LBRACKET
@@ -1447,6 +1448,12 @@ phltactic:
 
 | INLINE s=side? o=occurences? f=plist0(loc(fident), empty)
     { Pinline (`ByName (s, (f, o))) }
+
+| KILL s=side? o=codepos 
+    { Pkill (s, o, 1) }
+
+| KILL s=side? o=codepos NOT n=NUM
+    { Pkill (s, o, n) }
 
 | p=tselect INLINE
     { Pinline (`ByPattern p) }

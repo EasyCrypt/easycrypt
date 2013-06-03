@@ -1313,6 +1313,10 @@ let t_inline_equiv env side sp g =
   prove_goal_by [concl] (RN_hl_inline (Some side, sp)) g
 
 (* -------------------------------------------------------------------- *)
+let t_kill _env _side _cpos _len _g =
+  tacuerror "not implemented yet"
+
+(* -------------------------------------------------------------------- *)
 let alias_stmt id _env me i =
   match i.i_node with
   | Srnd (lv, e) ->
