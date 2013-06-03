@@ -1,0 +1,14 @@
+#! /bin/bash
+
+function report { echo "$@"; exit 0; }
+
+System="$(uname)"
+Darwin=/Applications/Emacs.app/Contents/MacOS/Emacs
+
+if [ ! -z "${EMACS}" ]; then report "${EMACS}"; fi
+
+if [ ${System} == "Darwin" ]; then
+  if [ -f ${Darwin} ]; then report "${Darwin}"; fi
+fi
+
+report "emacs"

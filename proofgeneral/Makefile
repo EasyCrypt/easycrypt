@@ -4,8 +4,9 @@
 .PHONY: all install install-soft uninstall local run-local
 
 PGROOT ?= /usr/share/emacs/site-lisp/ProofGeneral
-EMACS  ?= emacs
+EMACS  ?= $(shell ./scripts/find-emacs)
 
+# --------------------------------------------------------------------
 all:
 	@echo "Type '$(MAKE) install' for installing ec-mode"
 
