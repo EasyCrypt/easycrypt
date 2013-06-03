@@ -292,19 +292,32 @@ let select_pv env side name ue tvi psig =
         select pvs
     with EcEnv.LookupFailure _ -> []
 
-let gen_select_op pred tvi env name ue psig =
+let gen_select_op ~actonly ~pred (fpv, fop, flc) tvi env name ue psig =
   match select_local env name with
   | Some(id, ty) -> 
       if tvi <> None then assert false; (* FIXME error message *)
-      [ (e_local id ty, ty, ue) ]
-  | None ->
-      let pvs = select_pv env None name ue tvi psig in
-      let ops = EcUnify.select_op pred tvi env name ue psig in
-      List.map (fun (pv,ty,ue) -> e_var pv ty, ty, ue) pvs @ 
-      List.map (fun ((op,tys), ty,ue) -> e_op op tys ty, ty, ue) ops
+      [ flc (id, ty, ue) ]
 
-let select_op env name ue tvi psig =
-  gen_select_op false tvi env name ue psig 
+  | None ->
+      let ops = EcUnify.select_op pred tvi env name ue psig in
+      let me, pvs =
+        match EcEnv.Memory.get_active env, actonly with
+        | None, true -> (None, [])
+        | me  , _    -> (  me, select_pv env me name ue tvi psig)
+      in
+        (List.map (fpv me) pvs) @ (List.map fop ops)
+
+let select_exp_op env name ue tvi psig =
+  let ppv = (fun _ (pv, ty, ue) -> (e_var pv ty, ty, ue))
+  and pop = (fun ((op, tys), ty, ue) -> (e_op op tys ty, ty, ue))
+  and flc = (fun (id, ty, ue) -> (e_local id ty, ty, ue)) in
+    gen_select_op ~actonly:false ~pred:false (ppv, pop, flc) tvi env name ue psig 
+
+let select_form_op env name ue tvi psig =
+  let ppv = (fun me (pv, ty, ue) -> (f_pvar pv ty (oget me), ue))
+  and pop = (fun ((op, tys), ty, ue) -> (f_op op tys ty, ue))
+  and flc = (fun (id, ty, ue) -> (f_local id ty, ue)) in
+    gen_select_op ~actonly:true ~pred:true (ppv, pop, flc) tvi env name ue psig 
 
 (* -------------------------------------------------------------------- *)
 type typolicy = {
@@ -464,7 +477,7 @@ let transexp (env : EcEnv.env) (ue : EcUnify.unienv) e =
 
     | PEident ({ pl_desc = name }, tvi) -> 
         let tvi = omap tvi (transtvi env ue) in
-        let ops = select_op env name ue tvi [] in
+        let ops = select_exp_op env name ue tvi [] in
         begin match ops with
         | [] -> tyerror loc env (UnknownVarOrOp (name, []))
 
@@ -480,7 +493,7 @@ let transexp (env : EcEnv.env) (ue : EcUnify.unienv) e =
         let tvi  = omap tvi (transtvi env ue) in  
         let es   = List.map (transexp env) es in
         let esig = snd (List.split es) in
-        let ops  = select_op env name ue tvi esig in
+        let ops  = select_exp_op env name ue tvi esig in
         begin match ops with
         | [] ->
           let esig = Tuni.subst_dom (EcUnify.UniEnv.asmap ue) esig in
@@ -1371,7 +1384,7 @@ and translvalue ue (env : EcEnv.env) lvalue =
       let e, ety = transexp env ue e in
       let name =  ([],EcCoreLib.s_set) in
       let esig = [xty; ety; codomty] in
-      let ops = select_op env name ue tvi esig in
+      let ops = select_exp_op env name ue tvi esig in
 
       match ops with
       | [] ->
@@ -1487,7 +1500,7 @@ let transform_opt env ue pf tt =
 
     | PFident ({ pl_desc = name;pl_loc = loc }, tvi) -> 
         let tvi = omap tvi (transtvi env ue) in
-        let ops = select_sided_op env name ue tvi [] in
+        let ops = select_form_op env name ue tvi [] in
         begin match ops with
         | [] ->
             tyerror loc env (UnknownVarOrOp (name, []))
@@ -1514,7 +1527,7 @@ let transform_opt env ue pf tt =
         let tvi  = omap tvi (transtvi env ue) in  
         let es   = List.map (transf env) es in
         let esig = List.map EcFol.f_ty es in 
-        let ops  = select_sided_op env name ue tvi esig in
+        let ops  = select_form_op env name ue tvi esig in
           begin match ops with
           | [] ->
               let esig = Tuni.subst_dom (EcUnify.UniEnv.asmap ue) esig in
@@ -1687,30 +1700,6 @@ let transform_opt env ue pf tt =
           List.map_fold add1 env xs in
     let env, bd = List.map_fold trans1 env decl in
     env, List.flatten bd
-
-  and select_sided_op env ((qs, x) as name) ue tvi psig =
-    let locals =
-      if   qs = []
-      then EcEnv.Var.lookup_local_opt x env
-      else None
-    in
-      match locals with
-      | Some (id, ty) ->
-        if tvi <> None then assert false; (* FIXME : error message *)
-        [ (f_local id ty, ue) ]
-
-      | None -> 
-        begin
-        let ops = EcUnify.select_op true tvi env name ue psig in
-        let prepare_op ((op, tys), ty, ue) = (f_op op tys ty, ue) in
-        let ops = List.map prepare_op ops in
-        match EcEnv.Memory.get_active env with
-        | None -> ops 
-        | Some me ->
-          let pvs = select_pv env (Some me) name ue tvi psig in
-          let prepare_pv (pv, ty, ue) = f_pvar pv ty me, ue in
-          (List.map prepare_pv pvs) @ ops 
-        end
   in
 
   let f = transf env pf in
