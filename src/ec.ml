@@ -38,10 +38,12 @@ let _ =
       EcCommands.addidir theories
   end;
 
+  List.iter EcCommands.addidir !options.o_idirs;
   oiter !options.o_input
     (fun input ->
       EcCommands.addidir (Filename.dirname input));
-  List.iter EcCommands.addidir !options.o_idirs;
+  if !options.o_emacs then
+    EcCommands.addidir Filename.current_dir_name;
 
   (* Initialize I/O + interaction module *)
   let terminal =

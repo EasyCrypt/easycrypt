@@ -50,9 +50,6 @@ let () =
     EcPException.register pp
 
 (* -------------------------------------------------------------------- *)
-let loader = EcLoader.create ()
-
-(* -------------------------------------------------------------------- *)
 let process_pr fmt scope p = 
   let env = EcScope.env scope in
   let ppe = EcPrinting.PPEnv.ofenv env in
@@ -76,10 +73,6 @@ let process_pr fmt scope p =
 
 let process_print scope p = 
   process_pr Format.std_formatter scope p
-
-(* -------------------------------------------------------------------- *)
-let addidir (idir : string) =
-  EcLoader.addidir idir loader
 
 (* -------------------------------------------------------------------- *)
 type notifier = string -> unit
@@ -155,16 +148,21 @@ and process_th_close (scope : EcScope.scope) name =
   snd (EcScope.Theory.exit scope)
 
 (* -------------------------------------------------------------------- *)
-and process_th_require (scope : EcScope.scope) (x,io) = 
+and process_th_require ld scope (x, io) = 
   let name  = x.pl_desc in
-    match EcLoader.locate name loader with
+    match EcLoader.locate name ld with
     | None ->
         failwith ("cannot locate: " ^ name) (* FIXME *)
 
     | Some filename ->
+        let dirname = Filename.dirname filename in
+	let subld   = EcLoader.dup ld in
+
+	EcLoader.addidir dirname subld;
+
         let loader iscope =
           let commands = EcIo.parseall (EcIo.from_file filename) in
-            List.fold_left process_internal iscope commands in 
+            List.fold_left (process_internal subld) iscope commands in 
         let scope = EcScope.Theory.require scope name loader in
           match io with
           | None       -> scope
@@ -216,7 +214,7 @@ and process_pragma scope opt =
   | _         -> scope
 
 (* -------------------------------------------------------------------- *)
-and process (scope : EcScope.scope) (g : global located) =
+and process (ld : EcLoader.ecloader) (scope : EcScope.scope) g =
   let loc = g.pl_loc in
 
   let scope =
@@ -231,7 +229,7 @@ and process (scope : EcScope.scope) (g : global located) =
     | Gclaim     c    -> process_claim      scope c
     | GthOpen    name -> process_th_open    scope name.pl_desc
     | GthClose   name -> process_th_close   scope name.pl_desc
-    | GthRequire name -> process_th_require scope name
+    | GthRequire name -> process_th_require ld scope name
     | GthImport  name -> process_th_import  scope name.pl_desc
     | GthExport  name -> process_th_export  scope name.pl_desc
     | GthClone   thcl -> process_th_clone   scope thcl
@@ -252,8 +250,14 @@ and process (scope : EcScope.scope) (g : global located) =
     scope
 
 (* -------------------------------------------------------------------- *)
-and process_internal (scope : EcScope.scope) (g : global located) =
-  process scope g
+and process_internal ld scope g =
+  process ld scope g
+
+(* -------------------------------------------------------------------- *)
+let loader  = EcLoader.create ()
+
+let addidir (idir : string) =
+  EcLoader.addidir idir loader
 
 (* -------------------------------------------------------------------- *)
 let context = ref (0, EcScope.empty, [])
@@ -289,7 +293,7 @@ let undo (olduuid : int) =
 (* -------------------------------------------------------------------- *)
 let process (g : global located) =
   let (idx, scope, stack) = !context in
-  let newscope = process scope g in
+  let newscope = process loader scope g in
     context := (idx+1, newscope, scope :: stack)
 
 (* -------------------------------------------------------------------- *)
