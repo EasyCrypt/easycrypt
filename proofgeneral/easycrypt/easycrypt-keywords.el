@@ -71,6 +71,8 @@
   "assumption"
   "intros"
   "split"
+  "field"
+  "field_simplify"
   "left"
   "right"
   "elim"
