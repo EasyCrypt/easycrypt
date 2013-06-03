@@ -131,31 +131,18 @@ lemma DDH0_Hybrid0: forall (A <: LDDH_DISTINGUISHER),
 proof.
   intros A.
   fun.
-  (* complain about undefined memory reference 
-  app 2 1 : ((glob A){1} = (glob A){2} /\ LDDH_Hyb.i{1} = 0 /\ LDDH_Hyb.O.c{1} = LDDH_Hyb.O.c{2}). *)
+  (* BUG1: This should complain about undefined variable, there is no LDDH_Hyb.0.c{2}  *)
+  (* app 2 1 : ((glob A){1} = (glob A){2} /\ LDDH_Hyb.i{1} = 0 /\ LDDH_Hyb.O.c{1} = LDDH_Hyb.O.c{2}). *)
   app 2 1 :
     ((glob A){1} = (glob A){2} /\ LDDH_Hyb.i{1} = 0 /\ LDDH_Hyb.O.c{1} = LDDH0.O.c{2}).
   wp.
   skip.
   trivial.
+  (* BUG2: unknown symbol: <top>.LDDH_Hyb./getTriple => indeed, there is only LDDH_Hyb.O.getTriple *)
   call ((glob A){1} = (glob A){2} && LDDH_Hyb.i{1} = 0)
        (res{1} = res{2} && LDDH_Hyb.i{1} = 0).
-    fun (LDDH_Hybrid_Oracles.i{1}=0).
-    trivial.
-    trivial.
-    simplify.
-    fun.
-    
-    trivial.
-    
 
-  trivial.
-  inline {2} LDDH0(A).main.
-  inline {1} LDDH_Hybrid(A).main.
-admit.
-save.
-
-
+(* OLD
 lemma DDH0_Hybrid0: forall (A <: LDDH_DISTINGUISHER),
   equiv [ LDDH_Hybrid(A).main ~ LDDH1(A).main : i{1} = q_t ==> res{1} = res{2} ]
 proof.
@@ -177,7 +164,7 @@ try (trivial).
       elim H3;clear H3;intros H3 H4.
       intros rL rR H5.
       rewrite H1.
-
+*)
 
 (*
     1. forall A. LDDH_Hybrid(A)_0 = LDDH0(A) and
