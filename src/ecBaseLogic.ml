@@ -202,6 +202,9 @@ type rule_name =
   | RN_exists_intro 
 (*| RN_tuple_intro  of EcIdent.t list *)
   | RN_conv    
+	(* Field & Ring*)
+  | RN_field 
+  | RN_field_simp 
 
     (* Phl rules *)    
   | RN_hl_fun_def 

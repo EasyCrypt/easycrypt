@@ -319,6 +319,8 @@ type logtactic =
   | Ptrivial    of pprover_infos
   | Pintro      of (symbol option) located list
   | Psplit                        
+  | Pfield		of (pformula * pformula * pformula * pformula * pformula * pformula * pformula)
+  | Pfieldsimp	of (pformula * pformula * pformula * pformula * pformula * pformula * pformula)
   | Pexists     of fpattern_arg located list 
   | Pleft                         
   | Pright                        

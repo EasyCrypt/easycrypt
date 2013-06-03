@@ -237,6 +237,8 @@
 %token SKIP
 %token SPLIT
 %token SPLITWHILE
+%token FIELD
+%token FIELDSIMP
 %token STAR
 %token SUBST
 %token SWAP
@@ -1362,6 +1364,12 @@ logtactic:
 
 | SPLIT
     { Psplit }
+
+| FIELD plus=sform times=sform inv=sform minus=sform z=sform o=sform eq=sform
+    { Pfield (plus,times,inv,minus,z,o,eq)}
+
+| FIELDSIMP plus=sform times=sform inv=sform minus=sform z=sform o=sform  eq=sform
+    { Pfieldsimp (plus,times,inv,minus,z,o,eq)}
 
 | EXIST a=plist1(loc(fpattern_arg), COMMA)
    { Pexists a }

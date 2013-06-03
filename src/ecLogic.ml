@@ -11,6 +11,7 @@ open EcBaseLogic
 open EcEnv
 open EcReduction
 
+open EcEctoField
 (* -------------------------------------------------------------------- *)
 let get_node  g = (get_goal g).pj_decl
 let get_goal  g = (get_open_goal g).pj_decl
@@ -412,6 +413,27 @@ let t_elim env f (juc,n) =
 let t_elim_hyp env h g =
   let f = LDecl.lookup_hyp_by_id h (get_hyps g) in
   t_on_first (t_elim env f g) (t_hyp env h)
+
+
+let prove_goal_by sub_gs rule (juc,n as g) =
+  let hyps,_ = get_goal g in
+  let add_sgoal (juc,ns) sg = 
+    let juc,n = new_goal juc (hyps,sg) in juc, RA_node n::ns
+  in
+  let juc,ns = List.fold_left add_sgoal (juc,[]) sub_gs in
+  let rule = { pr_name = rule ; pr_hyps = List.rev ns} in
+  upd_rule rule (juc,n)
+
+let t_field (plus,times,inv,minus,z,o,eq) (t1,t2) g =
+	let (pzs,pbs) = appfield (t1, t2) plus minus times inv z o in
+	let pzs' = List.fold_left (fun is i -> (f_not (mk_form (Fapp (eq, [i;z])) tbool)) :: is) [] pzs in
+	let pbs' = List.fold_left (fun is (l,r) -> (mk_form (Fapp(eq, l :: r :: [])) tbool) :: is) [] pbs in
+	prove_goal_by (pzs' @ pbs') RN_field g
+
+let t_field_simp (plus,times,inv,minus,z,o,eq) t1 g =
+	let (pzs,res) = appfield_simp t1 plus minus times inv z o in
+	let pzs' = List.fold_left (fun is i -> (f_not (mk_form (Fapp (eq, [i;z])) tbool)) :: is) [] pzs in
+	prove_goal_by (res :: pzs') RN_field g
 
 let t_split env g =
   let hyps, concl = get_goal g in

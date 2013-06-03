@@ -44,10 +44,12 @@ proof.
   admit.
 save. 
 
+
 (* clear *)
 lemma l_clear : forall (x1 : 'a), p x1 => forall (x2 x3:'a), p x2 => p x3
 proof.
   intros x1 hx1 x2 x3 hx2.
+
   generalize x1 hx1 x2 x3 hx2.
   clear hx1 x1. (* can be in any order x1 hx1 or hx1 x1 *)
   clear x2 x3 hx2.
