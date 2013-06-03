@@ -33,7 +33,7 @@ the first optional parameter $p$ is a computable predicate (i.e., \verb+'a cPred
 \begin{array}{c}
   \infrule{
     \bdHoareSeq{c}{\pre}{\mu\, d\, p \leq f \land 
-      (\forall v\in A.~ \post\subst{x}{v} \Leftrightarrow p\, v)}{1} 
+      (\forall v\in \mathsf{support}(d).~ \post\subst{x}{v} \Rightarrow p\, v)}{1} 
   }{
     \bdHoareSle{c;\Rand{x}{d}}{\pre}{\post}{f}
   }\left[\verb+rnd+\ p\right]
@@ -48,7 +48,7 @@ number $g$ representing a bound:
 \begin{displaymath}
   \infrule{
     \bdHoareSge{c}{\pre}{\mu\, d\, p \geq g \land 
-      (\forall v\in A.~ \post\subst{x}{v} \Leftrightarrow p\, v)}{\frac{f}{g}} 
+      (\forall v\in \mathsf{support}(d).~ \post\subst{x}{v} \Rightarrow p\, v)}{\frac{f}{g}} 
   }{
     \bdHoareSge{c;\Rand{x}{d}}{\pre}{\post}{f}
   }\left[\verb+rnd+\ p\ g\right]
