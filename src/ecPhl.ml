@@ -1458,9 +1458,10 @@ let t_unroll env side cpos g =
 let splitwhile_stmt b _env me i =
   match i.i_node with
   | Swhile (e, sw) -> 
-    let op_and = e_op EcCoreLib.p_and [] (tfun tbool (tfun tbool tbool)) in
-    let e = e_app op_and [e;b] tbool in
-    (me, [i_while (e,sw); i])
+      let op_and = e_op EcCoreLib.p_and [] (tfun tbool (tfun tbool tbool)) in
+      let e = e_app op_and [e; b] tbool in
+        (me, [i_while (e, sw); i])
+
   | _ -> tacuerror "cannot find a while loop at given position"
 
 let t_splitwhile b env side cpos g =

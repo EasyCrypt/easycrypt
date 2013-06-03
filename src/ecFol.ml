@@ -825,11 +825,21 @@ let destr_pr f =
   | Fpr (m,f,a,ev) -> (m,f,a,ev)
   | _ -> destr_error "pr"
 
-(* -------------------------------------------------------------------- *)
+let destr_programS side f =
+  match side, f.f_node with
+  | None  , FhoareS   hs  -> (hs.hs_m, hs.hs_s)
+  | None  , FbdHoareS bhs -> (bhs.bhs_m, bhs.bhs_s)
+  | Some b, FequivS   es  -> begin
+      match b with
+      | true  -> (es.es_ml, es.es_sl)
+      | false -> (es.es_mr, es.es_sr)
+  end
+  | _, _ -> destr_error "programS"
 
+(* -------------------------------------------------------------------- *)
 let is_tuple f = 
   match f.f_node with
-  | Ftuple fs -> true
+  | Ftuple _ -> true
   | _ -> false
 
 let is_local f = 
