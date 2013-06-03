@@ -661,7 +661,8 @@ let pp_lvalue (ppe : PPEnv.t) fmt lv =
       pp_pv ppe fmt p
 
   | LvTuple ps ->
-      pp_paren (pp_list ", " (pp_pv ppe)) fmt (List.map fst ps)
+      Format.fprintf fmt "@[<hov 2>%a@]"
+        (pp_paren (pp_list ",@ " (pp_pv ppe))) (List.map fst ps)
 
   | LvMap (_, x, e, _) ->
       Format.fprintf fmt "%a[%a]"
