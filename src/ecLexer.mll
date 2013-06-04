@@ -51,6 +51,7 @@
     "elim"        , ELIM       ;        (* KW: tactic *)
     "apply"       , APPLY      ;        (* KW: tactic *)
     "trivial"     , TRIVIAL    ;        (* KW: tactic *)
+    "progress"    , PROGRESS   ;        (* KW: tactic *)
     "cut"         , CUT        ;        (* KW: tactic *)
     "generalize"  , GENERALIZE ;        (* KW: tactic *)
     "clear"       , CLEAR      ;        (* KW: tactic *)

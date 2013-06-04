@@ -377,6 +377,7 @@ let process_conseq env info (_, n as g) =
         let env = EcEnv.Memory.push_all [es.es_ml; es.es_mr] env in
         tac2, env, env, es.es_pr, es.es_po,
         (fun pre post -> f_equivS_r { es with es_pr = pre; es_po = post }) 
+      (* FIXME CESAR add rule for bd_Hoare *)
       | _ -> assert false (* FIXME error message *)
     in
     let pre = match pre with

@@ -189,6 +189,7 @@ module NormMp : sig
   val norm_mpath : env -> mpath -> mpath
   val norm_xpath : env -> xpath -> xpath
   val norm_pvar  : env -> EcTypes.prog_var -> EcTypes.prog_var
+  val norm_form  : env -> form -> form
   val add_uses   : env -> Sm.t -> Sm.t -> mpath -> Sm.t 
   val top_uses   : env -> mpath -> Sm.t 
   val norm_restr : env -> Sm.t -> Sm.t

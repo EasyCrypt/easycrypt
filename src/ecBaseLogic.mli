@@ -62,6 +62,8 @@ module LDecl : sig
   val fresh_ids : hyps -> symbol list -> EcIdent.t list
 
   val clear : EcIdent.Sid.t -> hyps -> hyps
+
+  val ld_subst : EcFol.f_subst -> local_kind -> local_kind
 end
 
 (* -------------------------------------------------------------------- *)
@@ -189,3 +191,4 @@ val t_lseq : tactic list -> tactic
 val t_repeat : tactic -> tactic
 val t_do     : int -> tactic -> tactic
 val t_try    : tactic -> tactic
+val t_or     : tactic -> tactic -> tactic

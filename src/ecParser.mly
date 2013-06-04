@@ -249,6 +249,7 @@
 %token TILD
 %token TIMEOUT
 %token TRIVIAL
+%token PROGRESS
 %token TRY
 %token TYPE
 %token UNDERSCORE
@@ -1333,6 +1334,8 @@ tactic:
 | CASE f=sform
    { Pcase f }
 
+| PROGRESS t=loc(tactic)? { Pprogress t }
+
 | x=logtactic
    { Plogic x }
 
@@ -1399,7 +1402,7 @@ logtactic:
 | REWRITE s=rwside e=fpattern(form)
    { Prewrite (s, e) }
 
-| SUBST l=ident*
+| SUBST l=sform*
    { Psubst l }
 
 | CUT n=ident COLON p=sform
