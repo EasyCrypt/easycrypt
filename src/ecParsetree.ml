@@ -328,7 +328,7 @@ type logtactic =
   | Pgeneralize of pformula list
   | Pclear      of psymbol list
   | Prewrite    of (bool * ffpattern)
-  | Psubst      of psymbol list
+  | Psubst      of pformula list
   | Psimplify   of preduction 
   | Pchange     of pformula
   | PelimT      of (pformula * pqsymbol)
@@ -345,6 +345,7 @@ and ptactic_r =
   | Pcase       of pformula 
   | Plogic      of logtactic
   | PPhl        of phltactic
+  | Pprogress   of ptactic option
   | Padmit
   | Pdebug
 

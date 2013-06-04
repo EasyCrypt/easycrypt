@@ -115,6 +115,10 @@ module PV = struct
 
   let elements fv = M.bindings fv.pv, EcPath.Sm.elements fv.glob (* FIXME *)
 
+  let mem_pv pv fv = M.mem pv fv.pv 
+
+  let mem_glob mp fv = EcPath.Sm.mem mp fv.glob
+
   let fv env m f =
     let rec aux fv f = 
       match f.f_node with
