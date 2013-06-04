@@ -1319,19 +1319,6 @@ let t_inline_equiv env side sp g =
   prove_goal_by [concl] (RN_hl_inline (Some side, sp)) g
 
 (* -------------------------------------------------------------------- *)
-let check_swap env s1 s2 = 
-  let m1,m2 = s_write env s1, s_write env s2 in
-  let r1,r2 = s_read env s1, s_read env s2 in
-  let m2r1 = PV.disjoint env m2 r1 in
-  let m1m2 = PV.disjoint env m1 m2 in
-  let m1r2 = PV.disjoint env m1 r2 in
-  let error () = (* FIXME : better error message *)
-    cannot_apply "swap" "the two statements are not independent" in
-  if not m2r1 then error ();
-  if not m1m2 then error ();
-  if not m1r2 then error ()
-
-
 let t_kill env side cpos olen g =
   let kill_stmt _env (_, po) me zpr =
     let error fmt =
