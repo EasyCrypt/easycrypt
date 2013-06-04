@@ -1161,7 +1161,7 @@ module Var = struct
     | None -> begin
       match p.EcPath.x_sub.EcPath.p_node with
       | EcPath.Pqname ({ p_node = EcPath.Psymbol f }, x) -> begin
-        let mp = EcPath.m_functor p.EcPath.x_top in
+        let mp = EcPath.mpath p.EcPath.x_top.EcPath.m_top [] in
         let fp = EcPath.xpath_fun mp f in
         let f  = Fun.by_xpath_r ~susp:true ~spsc fp env in
           try
