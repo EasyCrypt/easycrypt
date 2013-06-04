@@ -835,9 +835,14 @@ let rec pp_form_r (ppe : PPEnv.t) outer fmt f =
   | Flocal id ->
       pp_local ppe fmt id
       
-  | Fpvar (x, i) ->
+  | Fpvar (x, i) -> begin
       let ppe = PPEnv.enter_by_memid ppe i in
-        Format.fprintf fmt "%a{%a}" (pp_pv ppe) x (pp_mem ppe) i
+        match EcEnv.Memory.get_active ppe.PPEnv.ppe_env with
+        | Some i' when EcMemory.mem_equal i i' ->
+            Format.fprintf fmt "%a" (pp_pv ppe) x
+        | _ ->
+            Format.fprintf fmt "%a{%a}" (pp_pv ppe) x (pp_mem ppe) i
+  end
 
   | Fquant (q, bd, f) ->
       let (subppe, pp) = pp_bindings ppe bd in
@@ -1286,7 +1291,9 @@ let pp_hoareF (ppe : PPEnv.t) fmt hf =
 let pp_hoareS (ppe : PPEnv.t) fmt hs =
   let ppe =
     { ppe with
-        PPEnv.ppe_env = EcEnv.Memory.push hs.hs_m ppe.PPEnv.ppe_env }
+        PPEnv.ppe_env =
+          EcEnv.Memory.set_active (fst hs.hs_m)
+            (EcEnv.Memory.push hs.hs_m ppe.PPEnv.ppe_env) }
   in
 
   let ppnode = collect2_s hs.hs_s.s_node [] in
