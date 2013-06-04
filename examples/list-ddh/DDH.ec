@@ -12,35 +12,25 @@ op a = Dgf_q.dgf_q.
 (* sampling dh-triples and random-triples *)
 module DH_distrs = {
   fun sample_dh() : group * group * group = {
-    var xi : int;
-    var yi : int;
     var x : gf_q;
     var y : gf_q;
     var d : bool;
 
-    xi = $[0..q-1];
-    yi = $[0..q-1];
     x  = $Dgf_q.dgf_q;
-    y  = i_to_gf_q(yi);
+    y  = $Dgf_q.dgf_q;
 
     return (g^x, g^y, g^(x*y));
   }
 
   fun sample_random() : group * group * group = {
-    var xi : int;
-    var yi : int;
-    var zi : int;
     var x : gf_q;
     var y : gf_q;
     var z : gf_q;
     var d : bool;
 
-    xi = $[0..q-1];
-    yi = $[0..q-1];
-    zi = $[0..q-1];
-    x  = i_to_gf_q(xi);
-    y  = i_to_gf_q(yi);
-    z  = i_to_gf_q(zi);
+    x  = $Dgf_q.dgf_q;
+    y  = $Dgf_q.dgf_q;
+    z  = $Dgf_q.dgf_q;
 
     return (g^x, g^y, g^z);
   }

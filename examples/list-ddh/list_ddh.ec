@@ -39,9 +39,9 @@ module LDDH0(A : LDDH_DISTINGUISHER) = {
       r = None;
 
       if (c < q_t) {
-        c = c + 1;
         t := DH_distrs.sample_dh();
         r = Some(t);
+        c = c + 1;
       }
       return r;
     }
@@ -68,9 +68,9 @@ module LDDH1(A : LDDH_DISTINGUISHER) = {
       var r : (group * group * group) option;
       r = None;
       if (c < q_t) {
-        c = c + 1;
         t := DH_distrs.sample_random();
         r = Some(t);
+        c = c + 1;
       }
       return r;
     }
@@ -112,7 +112,6 @@ module LDDH_Hyb(A : LDDH_DISTINGUISHER) = {
     }
   }
 
-
   module AD = A(O)
   
   fun main(ia : int) : bool = {
@@ -125,46 +124,60 @@ module LDDH_Hyb(A : LDDH_DISTINGUISHER) = {
 }.
 
 
-lemma DDH0_Hybrid0: forall (A <: LDDH_DISTINGUISHER),
+lemma DDH0_Hybrid0: forall (A <: LDDH_DISTINGUISHER {LDDH_Hyb, DH_distrs}),
   equiv [ LDDH_Hyb(A).main ~ LDDH0(A).main :
      ((glob A){1} = (glob A){2}) /\ ia{1} = 0 ==> res{1} = res{2} ]
 proof.
   intros A.
   fun.
-  (* BUG1: This should complain about undefined variable, there is no LDDH_Hyb.0.c{2}  *)
-  (* app 2 1 : ((glob A){1} = (glob A){2} /\ LDDH_Hyb.i{1} = 0 /\ LDDH_Hyb.O.c{1} = LDDH_Hyb.O.c{2}). *)
   app 2 1 :
-    ((glob A){1} = (glob A){2} /\ LDDH_Hyb.i{1} = 0 /\ LDDH_Hyb.O.c{1} = LDDH0.O.c{2}).
+    (    (glob A){1} = (glob A){2} /\ LDDH_Hyb.i{1} = 0
+     /\ LDDH_Hyb.O.c{1} = LDDH0.O.c{2} /\ LDDH0.O.c{2} = 0).
   wp.
   skip.
   trivial.
-  (* BUG2: unknown symbol: <top>.LDDH_Hyb./getTriple => indeed, there is only LDDH_Hyb.O.getTriple *)
-  call ((glob A){1} = (glob A){2} && LDDH_Hyb.i{1} = 0)
-       (res{1} = res{2} && LDDH_Hyb.i{1} = 0).
+  call (   (glob A){1} = (glob A){2} /\ LDDH_Hyb.i{1} = 0
+        /\ LDDH_Hyb.O.c{1} = LDDH0.O.c{2} /\ LDDH0.O.c{2} = 0)
+       (res{1} = res{2}).
+  (* Bug? Adversary A not allowed to touch O.c since the restriction wrt. LDDH_Hyb
+     should also account for the inner module LDDH_Hyb.O.
+     Note that I cannot add LDDH_Hyb to restriction above. 
+  fun (LDDH_Hyb.i{1} = 0 /\ LDDH_Hyb.O.c{1} = LDDH0.O.c{2} /\ LDDH0.O.c >= 0). *)
+  fun (LDDH_Hyb.i{1} = 0).
+  trivial.
+  trivial.
+  fun.
+  app 0 0 : (   LDDH_Hyb.i{1} = 0 /\ LDDH_Hyb.O.c{1} = LDDH0.O.c{2}
+             /\ LDDH_Hyb.O.c{1} >= 0).
+    admit. (* sidestep Bug? above *)
+  app 1 1 : (   r{1} = None /\ r{1} = r{2} /\ LDDH_Hyb.i{1} = 0
+             /\ LDDH_Hyb.O.c{1} = LDDH0.O.c{2} /\ LDDH_Hyb.O.c{1} >= 0).
+    wp.
+    skip.
+    trivial.
+  if.
+    trivial.
+  rcondf {1} 1.
+    intros &m.
+    skip.
+    trivial.
+  wp.
+  call (true) (res{1} = res{2}).
+  fun.
+  wp.
+  rnd.
+  rnd.
+  skip.
+  simplify.
+  trivial.
+  skip.
+  trivial.
+  skip.
+  trivial.
+  skip.
+  trivial.
+save.
 
-(* OLD
-lemma DDH0_Hybrid0: forall (A <: LDDH_DISTINGUISHER),
-  equiv [ LDDH_Hybrid(A).main ~ LDDH1(A).main : i{1} = q_t ==> res{1} = res{2} ]
-proof.
-
-
-call ((!mem F2.xs RO.logA){2} /\ h{1} = h{2} /\ (glob A){1} = (glob A){2} /\
-         RO.logA{1} = RO.logA{2} /\ eq_except RO.mH{1} RO.mH{2} F2.xs{2})
-       ( (!mem F2.xs RO.logA){2} => res{1} = res{2} ).
-    fun (mem F2.xs RO.logA)
-        (RO.logA{1} = RO.logA{2} /\ eq_except RO.mH{1} RO.mH{2} F2.xs{2}) true;
-
-try (trivial).
-      apply Hlossless.  
-      fun; inline RO.hash;wp;rnd;wp;skip;simplify.
-      intros &m1 &m2 H.
-      elim H;clear H;intros H H1.
-      elim H1;clear H1;intros H1 H2.
-      elim H2;clear H2;intros H2 H3.
-      elim H3;clear H3;intros H3 H4.
-      intros rL rR H5.
-      rewrite H1.
-*)
 
 (*
     1. forall A. LDDH_Hybrid(A)_0 = LDDH0(A) and
