@@ -1069,7 +1069,7 @@ and transstruct (env : EcEnv.env) (x : symbol) (st : pstructure) =
         | _ -> vs 
         end 
       | MI_Variable x ->
-        let mp = EcEnv.mroot env in
+        let mp = EcEnv.mroot env0 in
         let xp  = EcPath.xpath mp (EcPath.psymbol x.v_name) in
         EcPath.Mx.add xp x.v_type vs
       | MI_Function _ -> vs) EcPath.Mx.empty items in

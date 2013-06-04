@@ -1527,7 +1527,8 @@ module NormMp = struct
     | ME_Structure ms ->
         (* FIXME: What to do with the module parameter *)
       let sx = 
-        EcPath.Mx.fold (fun x ty l -> f_pvar (pv_glob x) ty m :: l) 
+        EcPath.Mx.fold (fun x ty l -> 
+          f_pvar (pv_glob x) ty m :: l) 
           ms.ms_vars [] in
       f_tuple sx, ms.ms_uses
     | _ -> assert false
