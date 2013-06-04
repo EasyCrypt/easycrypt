@@ -1332,26 +1332,43 @@ let check_swap env s1 s2 =
   if not m1r2 then error ()
 
 
-let t_kill env side cpos len g =
+let t_kill env side cpos olen g =
   let kill_stmt _env (_, po) me zpr =
-    if List.length zpr.Zpr.z_tail < len then
-      tacuerror "cannot find %d consecutive instructions at given position" len;
-    let (ks, tl) = List.take_n len zpr.Zpr.z_tail in
+    let error fmt =
+      Format.ksprintf
+        (fun msg -> tacuerror "cannot kill code, %s" msg)
+        fmt
+    in
+
+    let (ks, tl) =
+      match olen with
+      | None -> (zpr.Zpr.z_tail, [])
+      | Some len ->
+          if List.length zpr.Zpr.z_tail < len then
+            tacuerror "cannot find %d consecutive instructions at given position" len;
+          List.take_n len zpr.Zpr.z_tail
+    in
 
     let ks_wr = is_write env PV.empty ks in
-    let tl_rd = is_read  env PV.empty tl in
     let po_rd = free_pv_form (fst me) env po in
 
-    if not (PV.disjoint env ks_wr tl_rd) then
-      tacuerror "cannot kill code, it is not dead";
+    List.iteri
+      (fun i is ->
+         let is_rd = is_read env PV.empty is in
+           if not (PV.disjoint env ks_wr is_rd) then
+             match i with
+             | 0 -> error "code writes variables used by the current block"
+             | _ -> error "code writes variables used by the %dth parent block" i)
+      (Zpr.after ~strict:false { zpr with Zpr.z_tail = tl; });
+
     if not (PV.disjoint env ks_wr po_rd) then
-      tacuerror "cannot kill code, the post-condition depends on it";
+      error "code writes variables used by the post-condition";
 
     let kslconcl = EcFol.f_bdHoareS me f_true (stmt ks) f_true FHeq f_r1 in
       (me, { zpr with Zpr.z_tail = tl; }, [kslconcl])
   in
 
-  let tr = fun side -> RN_hl_kill (side, cpos, len) in
+  let tr = fun side -> RN_hl_kill (side, cpos, olen) in
     t_code_transform env side cpos tr (t_zip kill_stmt) g
 
 (* -------------------------------------------------------------------- *)

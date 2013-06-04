@@ -1450,10 +1450,13 @@ phltactic:
     { Pinline (`ByName (s, (f, o))) }
 
 | KILL s=side? o=codepos 
-    { Pkill (s, o, 1) }
+    { Pkill (s, o, Some 1) }
 
 | KILL s=side? o=codepos NOT n=NUM
-    { Pkill (s, o, n) }
+    { Pkill (s, o, Some n) }
+
+| KILL s=side? o=codepos NOT n=NUM STAR
+    { Pkill (s, o, None) }
 
 | p=tselect INLINE
     { Pinline (`ByPattern p) }

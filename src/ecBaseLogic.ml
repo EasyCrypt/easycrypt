@@ -224,7 +224,7 @@ type rule_name =
   | RN_hl_call      of bool option * EcFol.form * EcFol.form
   | RN_hl_swap      of bool * int * int * int
   | RN_hl_inline    of bool option * s_pat 
-  | RN_hl_kill      of bool option * codepos * int
+  | RN_hl_kill      of bool option * codepos * int option
   | RN_hl_alias     of bool option * codepos
   | RN_hl_hoare_rnd
   | RN_hl_equiv_rnd of rnd_tac_info

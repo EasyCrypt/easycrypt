@@ -305,7 +305,7 @@ type phltactic =
   | Pcond       of tac_side
   | Pswap       of ((tac_side * swap_kind) located list)
   | Pinline     of pinline_arg
-  | Pkill       of (tac_side * codepos * int)
+  | Pkill       of (tac_side * codepos * int option)
   | Prnd        of tac_side * pformula rnd_tac_info
   | Palias      of (tac_side * codepos * psymbol option)
   | Pconseq     of cfpattern
