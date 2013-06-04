@@ -175,7 +175,7 @@ let bhf_equal bhf1 bhf2 =
   && EcPath.x_equal bhf1.bhf_f bhf2.bhf_f
   && bhf1.bhf_cmp = bhf2.bhf_cmp
   && f_equal bhf1.bhf_bd bhf2.bhf_bd
-let bhs_equal bhs1 bhs2 = 
+let bhs_equal bhs1 bhs2 =
      f_equal bhs1.bhs_pr bhs2.bhs_pr
   && f_equal bhs1.bhs_po bhs2.bhs_po
   && s_equal bhs1.bhs_s bhs2.bhs_s
@@ -832,8 +832,18 @@ let destr_pr f =
   | Fpr (m,f,a,ev) -> (m,f,a,ev)
   | _ -> destr_error "pr"
 
-(* -------------------------------------------------------------------- *)
+let destr_programS side f =
+  match side, f.f_node with
+  | None  , FhoareS   hs  -> (hs.hs_m, hs.hs_s)
+  | None  , FbdHoareS bhs -> (bhs.bhs_m, bhs.bhs_s)
+  | Some b, FequivS   es  -> begin
+      match b with
+      | true  -> (es.es_ml, es.es_sl)
+      | false -> (es.es_mr, es.es_sr)
+  end
+  | _, _ -> destr_error "programS"
 
+(* -------------------------------------------------------------------- *)
 let is_tuple f = 
   match f.f_node with
   | Ftuple _ -> true

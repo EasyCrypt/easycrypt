@@ -1,4 +1,4 @@
-; Generated on Tue May 28 14:49:11 2013
+; Generated on Mon Jun  3 09:49:11 2013
 
 (defvar easycrypt-dangerous-keywords '(
   "admit"
@@ -71,6 +71,8 @@
   "assumption"
   "intros"
   "split"
+  "field"
+  "field_simplify"
   "left"
   "right"
   "elim"
@@ -102,6 +104,11 @@
   "equiv_deno"
   "conseq"
   "inline"
+  "alias"
+  "fission"
+  "fusion"
+  "unroll"
+  "splitwhile"
 ))
 
 (provide 'easycrypt-keywords)

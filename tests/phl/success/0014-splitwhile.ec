@@ -1,6 +1,5 @@
 require Logic.
 require import Int.
-require import Real.
 
 module M1 = { 
   fun f () : int * int= {
@@ -26,5 +25,10 @@ proof.
   wp; skip; trivial.
 save.
 
-
-
+lemma test2 : equiv [M1.f ~ M1.f : true ==> true]
+proof.
+  fun.
+  splitwhile (x<=5) : {2} 3.
+  splitwhile (x<=5) : {2} 3.
+  admit.
+save.

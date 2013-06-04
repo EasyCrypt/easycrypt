@@ -218,6 +218,9 @@ type rule_name =
   | RN_exists_intro 
 (*| RN_tuple_intro  of EcIdent.t list *)
   | RN_conv    
+	(* Field & Ring*)
+  | RN_field 
+  | RN_field_simp 
 
     (* Phl rules *)    
   | RN_hl_fun_def 
@@ -237,6 +240,7 @@ type rule_name =
   | RN_hl_call      of bool option * EcFol.form * EcFol.form
   | RN_hl_swap      of bool * int * int * int
   | RN_hl_inline    of bool option * s_pat 
+  | RN_hl_kill      of bool option * codepos * int option
   | RN_hl_alias     of bool option * codepos
   | RN_hl_hoare_rnd
   | RN_hl_equiv_rnd of rnd_tac_info

@@ -8,6 +8,7 @@ open EcTypes
 open EcModules
 open EcFol
 
+open EcMetaProg
 open EcBaseLogic
 open EcLogic
 open EcPhl
@@ -190,8 +191,46 @@ let process_mkn_apply process_cut env pe (juc, _ as g) =
 
 (* -------------------------------------------------------------------- *)
 let process_apply loc env pe (_,n as g) =
-  let (juc,an), gs = process_mkn_apply process_formula env pe g in
-  set_loc loc (t_use env an gs) (juc,n)
+  let (juc, an), gs = process_mkn_apply process_formula env pe g in
+    try
+      set_loc loc (t_use env an gs) (juc,n)
+    with tope ->
+      let (_, tp) = (get_node (juc, n)) in
+
+      let rec doit ids fp =
+        let (x, gty, fp) =
+          match is_forall fp with
+          | true  -> destr_forall1 fp
+          | false -> raise tope
+        in
+
+        let ty = match gty with GTty ty -> ty | _ -> raise tope in
+
+        try
+          let ev = EV.of_idents (List.map fst ((x, ty) :: ids)) in
+          let ev = EcMetaProg.f_match env ev ~ptn:fp tp in
+          let (s, ras) =
+            List.map_fold
+              (fun s (x, xty) ->
+                 let xf = EV.doget x ev in
+                   EcReduction.check_type env xty xf.f_ty;
+                   (f_bind_local s x xf, RA_form xf))
+              f_subst_id (List.rev ((x, ty) :: ids))
+          in
+
+          let concl     = f_subst s fp in
+          let (juc, n1) = new_goal juc (get_hyps g, concl) in
+          let rule      = { pr_name = RN_apply; pr_hyps = RA_node an :: ras } in
+          let juc, _    = upd_rule rule (juc, n1) in
+          let ns        = List.pmap (function RA_node n -> Some n | _ -> None) ras in
+
+            (set_loc loc (t_use env n1 (gs @ ns))) (juc, n)
+
+        with MatchFailure ->
+          doit ((x, ty) :: ids) fp
+
+      in
+        doit [] (snd (get_node (juc, an)))
 
 (* -------------------------------------------------------------------- *)
 let process_elim loc env pe (_,n as g) =
@@ -298,12 +337,49 @@ let process_subst loc env ri g =
     set_loc loc (t_lseq tacs) g
 
 (* -------------------------------------------------------------------- *)
+  let process_field (p,t,i,m,z,o,e) env g =
+		let (hyps,concl) = get_goal g in
+			(match concl.f_node with
+				| Fapp(eq',[arg1;arg2]) ->
+					let ty = f_ty arg1 in
+					let eq = process_form env hyps e (tfun ty (tfun ty tbool)) in
+					if (f_equal eq eq' ) then
+						let p' = process_form env hyps p (tfun ty (tfun ty ty)) in 
+						let t' = process_form env hyps t (tfun ty (tfun ty ty)) in 
+						let i' = process_form env hyps i (tfun ty ty) in 
+		 				let m' = process_form env hyps m (tfun ty ty) in 
+						let z' = process_form env hyps z ty in 
+						let o' = process_form env hyps o ty in 
+						t_field (p',t',i',m',z',o',eq) (arg1,arg2) g
+					else
+						cannot_apply "field" "the eq doesn't coincide"
+				| _ -> cannot_apply "field" "Think more about the goal")
+
+  let process_field_simp (p,t,i,m,z,o,e) env g =
+		let (hyps,concl) = get_goal g in
+			(match concl.f_node with
+				| Fapp(_,arg1 :: _) ->
+					let ty = f_ty arg1 in
+					let e' = process_form env hyps e (tfun ty (tfun ty tbool)) in 
+					let p' = process_form env hyps p (tfun ty (tfun ty ty)) in 
+					let t' = process_form env hyps t (tfun ty (tfun ty ty)) in 
+					let i' = process_form env hyps i (tfun ty ty) in 
+		 			let m' = process_form env hyps m (tfun ty ty) in 
+					let z' = process_form env hyps z ty in 
+					let o' = process_form env hyps o ty in 
+					t_field_simp (p',t',i',m',z',o',e') concl g
+				| _ -> cannot_apply "field_simplify" "Think more about the goal")
+
+
+(* -------------------------------------------------------------------- *)
 let process_logic mkpv loc env t =
   match t with
   | Passumption pq -> process_assumption loc env pq
   | Ptrivial pi    -> process_trivial mkpv pi env
   | Pintro pi      -> process_intros env pi
   | Psplit         -> t_split env
+  | Pfield st      -> process_field st env
+  | Pfieldsimp st  -> process_field_simp st env 
   | Pexists fs     -> process_exists env fs
   | Pleft          -> t_left env
   | Pright         -> t_right env

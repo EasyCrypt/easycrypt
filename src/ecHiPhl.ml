@@ -90,31 +90,26 @@ let process_fusion env (side, cpos, infos) g =
 let process_unroll env (side, cpos) g =
   t_unroll env side cpos g
 
-
 let process_exp env hyps e oty =
   let env = tyenv_of_hyps env hyps in
   let ue  = EcUnify.UniEnv.create (Some hyps.h_tvar) in
-  TT.transexpcast env ue oty e
-  (* Some substitution like 
-        EcFol.Fsubst.uni (EcUnify.UniEnv.close ue) e 
-     is missing?
-  *)
-let process_phl_exp env g e ty = 
-  let hyps, concl = get_goal g in
-  let m = 
-    try 
-      let hs = set_loc e.pl_loc destr_hoareS concl in
-      hs.hs_m
-    with _ ->
-      let hs = set_loc e.pl_loc destr_bdHoareS concl in
-      hs.bhs_m
+  let e   = TT.transexpcast env ue oty e in
+    EcTypes.e_uni (EcUnify.UniEnv.close ue) e
+
+let process_phl_exp env side e ty g =
+  let (hyps, concl) = get_goal g in
+
+  let (m, _) =
+    try  destr_programS side concl
+    with _ -> tacuerror "conclusion not of the right form"
   in
+
   let env = EcEnv.Memory.push_active m env in
-  process_exp env hyps e ty
+    process_exp env hyps e ty
 
 let process_splitwhile env (b, side, cpos) g =
-  let b = process_phl_exp env g b tbool in
-  t_splitwhile b env side cpos g
+  let b = process_phl_exp env side b tbool g in
+    t_splitwhile b env side cpos g
 
 let process_call env side pre post g =
   let hyps,concl = get_goal g in
@@ -303,6 +298,9 @@ let process_inline env infos g =
 
   | `ByPattern _ -> failwith "not-implemented"
 
+let process_kill env (side, cpos, len) g =
+  t_kill env side cpos len g
+
 let process_alias env (side, cpos, id) g =
   t_alias env side cpos id g
 
@@ -438,6 +436,7 @@ let process_phl loc env ptac g =
     | Pcall(side, (pre, post)) -> process_call env side pre post
     | Pswap info               -> process_swap env info
     | Pinline info             -> process_inline env info
+    | Pkill info               -> process_kill env info
     | Palias info              -> process_alias env info
     | Prnd (side, info)        -> process_rnd side env info
     | Pconseq info             -> process_conseq env info

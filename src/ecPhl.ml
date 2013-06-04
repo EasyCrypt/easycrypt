@@ -328,35 +328,51 @@ let gen_mems m f =
   let bds = List.map (fun (m,mt) -> (m,GTmem mt)) m in
   f_forall bds f
 
-
-let t_fold f env cpos (state, s) =
-  try  Zpr.fold env cpos f state s
+let t_fold f env cpos _ (state, s) =
+  try
+    let (me, f) = Zpr.fold env cpos f state s in
+      (me, f, [])
   with Zpr.InvalidCPos -> tacuerror "invalid code position"
 
-let t_zip f env cpos (state, s) =
-  try  snd_map Zpr.zip (f env state (Zpr.zipper_of_cpos cpos s))
+let t_zip f env cpos prpo (state, s) =
+  try
+    let (me, zpr, gs) = f env prpo state (Zpr.zipper_of_cpos cpos s) in
+      (me, Zpr.zip zpr, gs)
   with Zpr.InvalidCPos -> tacuerror "invalid code position"
 
-let t_code_transform env side cpos tr tx g =
+let t_code_transform env side ?(bdhoare = false) cpos tr tx g =
   match side with
-  | None ->
-      let _, concl   = get_goal g in
-      let hoare      = destr_hoareS concl in
-      let (me, stmt) = tx env cpos (hoare.hs_m, hoare.hs_s) in
-      let concl      = f_hoareS_r { hoare with hs_m = me; hs_s = stmt; } in
-        prove_goal_by [concl] (tr None) g
+  | None -> begin
+      let _, concl = get_goal g in
+
+      if is_hoareS concl then
+        let hoare    = destr_hoareS concl in
+        let pr, po   = hoare.hs_pr, hoare.hs_po in
+        let (me, stmt, cs) = tx env cpos (pr, po) (hoare.hs_m, hoare.hs_s) in
+        let concl = f_hoareS_r { hoare with hs_m = me; hs_s = stmt; } in
+          prove_goal_by (concl :: cs) (tr None) g
+      else if bdhoare && is_bdHoareS concl then
+        let hoare    = destr_bdHoareS concl in
+        let pr, po   = hoare.bhs_pr, hoare.bhs_po in
+        let (me, stmt, cs) = tx env cpos (pr, po) (hoare.bhs_m, hoare.bhs_s) in
+        let concl = f_bdHoareS_r { hoare with bhs_m = me; bhs_s = stmt; } in
+          prove_goal_by (concl :: cs) (tr None) g
+      else
+        tacuerror "conclusion should be a hoare statement"
+ end
 
   | Some side ->
-      let _, concl = get_goal g in
-      let es       = destr_equivS concl in
-      let me, stmt = if side then (es.es_ml, es.es_sl) else (es.es_mr, es.es_sr) in
-      let me, stmt = tx env cpos (me, stmt) in
-      let concl    =
+      let _, concl  = get_goal g in
+      let es        = destr_equivS concl in
+      let pre, post = es.es_pr, es.es_po in
+      let me, stmt     = if side then (es.es_ml, es.es_sl) else (es.es_mr, es.es_sr) in
+      let me, stmt, cs = tx env cpos (pre, post) (me, stmt) in
+      let concl =
         match side with
         | true  -> f_equivS_r { es with es_ml = me; es_sl = stmt; }
         | false -> f_equivS_r { es with es_mr = me; es_sr = stmt; }
       in
-        prove_goal_by [concl] (tr (Some side)) g
+        prove_goal_by (concl :: cs) (tr (Some side)) g
 
 (* -------------------------------------------------------------------- *)
 (* -------------------------  Tactics --------------------------------- *)
@@ -817,7 +833,8 @@ let t_bdHoare_while env inv vrnt info g =
       cannot_apply "while" "not implemented"
 
 let t_equiv_while env inv g =
-  let concl = get_concl g in
+  let (hyps, concl) = get_goal g in
+  let env1 = tyenv_of_hyps env hyps in
   let es = destr_equivS concl in
   let (el,cl), (er,cr), sl, sr = s_last_whiles "while" es.es_sl es.es_sr in
   let ml = EcMemory.memory es.es_ml in
@@ -831,10 +848,10 @@ let t_equiv_while env inv g =
   let b_concl = f_equivS es.es_ml es.es_mr b_pre cl cr b_post in
       (* the wp of the while *)
   let post = f_imps_simpl [f_not_simpl el;f_not_simpl er; inv] es.es_po in
-  let modil = s_write env cl in
-  let modir = s_write env cr in
-  let post = generalize_mod env mr modir post in
-  let post = generalize_mod env ml modil post in
+  let modil = s_write env1 cl in
+  let modir = s_write env1 cr in
+  let post = generalize_mod env1 mr modir post in
+  let post = generalize_mod env1 ml modil post in
   let post = f_and_simpl inv post in
   let concl = f_equivS_r {es with es_sl = sl; es_sr = sr; es_po = post} in
   prove_goal_by [b_concl; concl] (RN_hl_while (inv,None,None)) g 
@@ -1129,6 +1146,46 @@ let t_inline_equiv env side sp g =
   prove_goal_by [concl] (RN_hl_inline (Some side, sp)) g
 
 (* -------------------------------------------------------------------- *)
+let t_kill env side cpos olen g =
+  let kill_stmt _env (_, po) me zpr =
+    let error fmt =
+      Format.ksprintf
+        (fun msg -> tacuerror "cannot kill code, %s" msg)
+        fmt
+    in
+
+    let (ks, tl) =
+      match olen with
+      | None -> (zpr.Zpr.z_tail, [])
+      | Some len ->
+          if List.length zpr.Zpr.z_tail < len then
+            tacuerror "cannot find %d consecutive instructions at given position" len;
+          List.take_n len zpr.Zpr.z_tail
+    in
+
+    let ks_wr = is_write env PV.empty ks in
+    let po_rd = free_pv_form (fst me) env po in
+
+    List.iteri
+      (fun i is ->
+         let is_rd = is_read env PV.empty is in
+           if not (PV.disjoint env ks_wr is_rd) then
+             match i with
+             | 0 -> error "code writes variables used by the current block"
+             | _ -> error "code writes variables used by the %dth parent block" i)
+      (Zpr.after ~strict:false { zpr with Zpr.z_tail = tl; });
+
+    if not (PV.disjoint env ks_wr po_rd) then
+      error "code writes variables used by the post-condition";
+
+    let kslconcl = EcFol.f_bdHoareS me f_true (stmt ks) f_true FHeq f_r1 in
+      (me, { zpr with Zpr.z_tail = tl; }, [kslconcl])
+  in
+
+  let tr = fun side -> RN_hl_kill (side, cpos, olen) in
+    t_code_transform env side ~bdhoare:true cpos tr (t_zip kill_stmt) g
+
+(* -------------------------------------------------------------------- *)
 let alias_stmt id _env me i =
   match i.i_node with
   | Srnd (lv, e) ->
@@ -1205,11 +1262,12 @@ let fission_stmt (il, (d1, d2)) env me zpr =
   let fis =   (List.rev_append init [wl1])
             @ (List.rev_append init [wl2]) in
 
-    (me, { zpr with Zpr.z_head = hd; Zpr.z_tail = fis @ tl })
+    (me, { zpr with Zpr.z_head = hd; Zpr.z_tail = fis @ tl }, [])
 
 let t_fission env side cpos infos g =
   let tr = fun side -> RN_hl_fission (side, cpos, infos) in
-    t_code_transform env side cpos tr (t_zip (fission_stmt infos)) g
+  let cb = fun env _ me zpr -> fission_stmt infos env me zpr in
+    t_code_transform env side cpos tr (t_zip cb) g
 
 (* -------------------------------------------------------------------- *)
 let fusion_stmt (il, (d1, d2)) env me zpr =
@@ -1254,11 +1312,12 @@ let fusion_stmt (il, (d1, d2)) env me zpr =
   let wl  = i_while (b1, stmt (sw1 @ sw2 @ fini1)) in
   let fus = List.rev_append init1 [wl] in
 
-    (me, { zpr with Zpr.z_head = hd; Zpr.z_tail = fus @ tl; })
+    (me, { zpr with Zpr.z_head = hd; Zpr.z_tail = fus @ tl; }, [])
 
 let t_fusion env side cpos infos g =
   let tr = fun side -> RN_hl_fusion (side, cpos, infos) in
-    t_code_transform env side cpos tr (t_zip (fusion_stmt infos)) g
+  let cb = fun env _ me zpr -> fusion_stmt infos env me zpr in
+    t_code_transform env side cpos tr (t_zip cb) g
 
 (* -------------------------------------------------------------------- *)
 let unroll_stmt _env me i =
@@ -1274,9 +1333,10 @@ let t_unroll env side cpos g =
 let splitwhile_stmt b _env me i =
   match i.i_node with
   | Swhile (e, sw) -> 
-    let op_and = e_op EcCoreLib.p_and [] (tfun tbool (tfun tbool tbool)) in
-    let e = e_app op_and [e;b] tbool in
-    (me, [i_while (e,sw); i])
+      let op_and = e_op EcCoreLib.p_and [] (tfun tbool (tfun tbool tbool)) in
+      let e = e_app op_and [e; b] tbool in
+        (me, [i_while (e, sw); i])
+
   | _ -> tacuerror "cannot find a while loop at given position"
 
 let t_splitwhile b env side cpos g =

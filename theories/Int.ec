@@ -81,5 +81,15 @@ theory Induction.
     (p 0) =>
     (forall j, 0 < j => p (j - 1) => p j) =>
     (forall i, 0 <= i => p i).
+
+  lemma strongInduction:
+    forall (p:int -> bool),
+      (forall j, 0 <= j => (forall k, k >= 0 => k < j => p k) => p j) =>
+        (forall i, 0 <= i => p i)
+    proof.
+      intros p hyp i iVal.
+      cut temp : (forall k, k > 0 => k <= i => p k);[|trivial].
+      apply (Induction.induction (lambda i, forall k, k > 0 => k <= i => p k) _ _ i _);trivial.
+  save.
 end Induction.
 
