@@ -524,15 +524,26 @@ let t_zip f env cpos prpo (state, s) =
       (me, Zpr.zip zpr, gs)
   with Zpr.InvalidCPos -> tacuerror "invalid code position"
 
-let t_code_transform env side cpos tr tx g =
+let t_code_transform env side ?(bdhoare = false) cpos tr tx g =
   match side with
-  | None ->
+  | None -> begin
       let _, concl = get_goal g in
-      let hoare    = destr_hoareS concl in
-      let pr, po   = hoare.hs_pr, hoare.hs_po in
-      let (me, stmt, cs) = tx env cpos (pr, po) (hoare.hs_m, hoare.hs_s) in
-      let concl = f_hoareS_r { hoare with hs_m = me; hs_s = stmt; } in
-        prove_goal_by (concl :: cs) (tr None) g
+
+      if is_hoareS concl then
+        let hoare    = destr_hoareS concl in
+        let pr, po   = hoare.hs_pr, hoare.hs_po in
+        let (me, stmt, cs) = tx env cpos (pr, po) (hoare.hs_m, hoare.hs_s) in
+        let concl = f_hoareS_r { hoare with hs_m = me; hs_s = stmt; } in
+          prove_goal_by (concl :: cs) (tr None) g
+      else if bdhoare && is_bdHoareS concl then
+        let hoare    = destr_bdHoareS concl in
+        let pr, po   = hoare.bhs_pr, hoare.bhs_po in
+        let (me, stmt, cs) = tx env cpos (pr, po) (hoare.bhs_m, hoare.bhs_s) in
+        let concl = f_bdHoareS_r { hoare with bhs_m = me; bhs_s = stmt; } in
+          prove_goal_by (concl :: cs) (tr None) g
+      else
+        tacuerror "conclusion should be a hoare statement"
+ end
 
   | Some side ->
       let _, concl  = get_goal g in
@@ -1356,7 +1367,7 @@ let t_kill env side cpos olen g =
   in
 
   let tr = fun side -> RN_hl_kill (side, cpos, olen) in
-    t_code_transform env side cpos tr (t_zip kill_stmt) g
+    t_code_transform env side ~bdhoare:true cpos tr (t_zip kill_stmt) g
 
 (* -------------------------------------------------------------------- *)
 let alias_stmt id _env me i =
