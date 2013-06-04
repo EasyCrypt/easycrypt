@@ -175,27 +175,17 @@ type tactic = goal -> goals
 
 val t_id : string option -> tactic
 
-val t_seq :
-     ('a -> 'b * 'c list)
-  -> ('b * 'c -> 'b * 'd list)
-  -> 'a -> 'b * 'd list
+val t_on_first : goals -> tactic -> goals
+val t_on_last  : goals -> tactic -> goals
 
-val t_repeat : ('a * 'b -> 'a * 'b list) -> 'a * 'b -> 'a * 'b list
+val t_subgoal  : tactic list -> goals -> goals
+val t_on_goals : tactic -> goals -> goals
 
-val t_subgoal : ('a * 'b -> 'a * 'c list) list -> 'a * 'b list -> 'a * 'c list
+val t_seq_subgoal : tactic -> tactic list -> tactic
 
-val t_on_first : 'a * 'b list -> ('a * 'b -> 'c * 'b list) -> 'c * 'b list
-val t_on_last  : 'a * 'b list -> ('a * 'b -> 'c * 'b list) -> 'c * 'b list
+val t_seq  : tactic -> tactic -> tactic
+val t_lseq : tactic list -> tactic
 
-val t_seq_subgoal :
-     ('a -> 'b * 'c list)
-  -> ('b * 'c -> 'b * 'd list) list
-  -> 'a -> 'b * 'd list
-
-val t_lseq : ('a * 'b -> 'a * 'b list) list -> 'a * 'b -> 'a * 'b list
-
-val t_on_goals : ('a * 'b -> 'a * 'c list) -> 'a * 'b list -> 'a * 'c list
-
-val t_do : int -> ('a * 'b -> 'a * 'b list) -> 'a * 'b -> 'a * 'b list
-
-val t_try : ('a * 'b -> 'a * 'b list) -> 'a * 'b -> 'a * 'b list
+val t_repeat : tactic -> tactic
+val t_do     : int -> tactic -> tactic
+val t_try    : tactic -> tactic
