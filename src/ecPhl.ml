@@ -512,35 +512,40 @@ let gen_mems m f =
   let bds = List.map (fun (m,mt) -> (m,GTmem mt)) m in
   f_forall bds f
 
-
-let t_fold f env cpos (state, s) =
-  try  Zpr.fold env cpos f state s
+let t_fold f env cpos _ (state, s) =
+  try
+    let (me, f) = Zpr.fold env cpos f state s in
+      (me, f, [])
   with Zpr.InvalidCPos -> tacuerror "invalid code position"
 
-let t_zip f env cpos (state, s) =
-  try  snd_map Zpr.zip (f env state (Zpr.zipper_of_cpos cpos s))
+let t_zip f env cpos prpo (state, s) =
+  try
+    let (me, zpr, gs) = f env prpo state (Zpr.zipper_of_cpos cpos s) in
+      (me, Zpr.zip zpr, gs)
   with Zpr.InvalidCPos -> tacuerror "invalid code position"
 
 let t_code_transform env side cpos tr tx g =
   match side with
   | None ->
-      let _, concl   = get_goal g in
-      let hoare      = destr_hoareS concl in
-      let (me, stmt) = tx env cpos (hoare.hs_m, hoare.hs_s) in
-      let concl      = f_hoareS_r { hoare with hs_m = me; hs_s = stmt; } in
-        prove_goal_by [concl] (tr None) g
+      let _, concl = get_goal g in
+      let hoare    = destr_hoareS concl in
+      let pr, po   = hoare.hs_pr, hoare.hs_po in
+      let (me, stmt, cs) = tx env cpos (pr, po) (hoare.hs_m, hoare.hs_s) in
+      let concl = f_hoareS_r { hoare with hs_m = me; hs_s = stmt; } in
+        prove_goal_by (concl :: cs) (tr None) g
 
   | Some side ->
-      let _, concl = get_goal g in
-      let es       = destr_equivS concl in
-      let me, stmt = if side then (es.es_ml, es.es_sl) else (es.es_mr, es.es_sr) in
-      let me, stmt = tx env cpos (me, stmt) in
-      let concl    =
+      let _, concl  = get_goal g in
+      let es        = destr_equivS concl in
+      let pre, post = es.es_pr, es.es_po in
+      let me, stmt     = if side then (es.es_ml, es.es_sl) else (es.es_mr, es.es_sr) in
+      let me, stmt, cs = tx env cpos (pre, post) (me, stmt) in
+      let concl =
         match side with
         | true  -> f_equivS_r { es with es_ml = me; es_sl = stmt; }
         | false -> f_equivS_r { es with es_mr = me; es_sr = stmt; }
       in
-        prove_goal_by [concl] (tr (Some side)) g
+        prove_goal_by (concl :: cs) (tr (Some side)) g
 
 (* -------------------------------------------------------------------- *)
 (* -------------------------  Tactics --------------------------------- *)
@@ -1313,8 +1318,40 @@ let t_inline_equiv env side sp g =
   prove_goal_by [concl] (RN_hl_inline (Some side, sp)) g
 
 (* -------------------------------------------------------------------- *)
-let t_kill _env _side _cpos _len _g =
-  tacuerror "not implemented yet"
+let check_swap env s1 s2 = 
+  let m1,m2 = s_write env s1, s_write env s2 in
+  let r1,r2 = s_read env s1, s_read env s2 in
+  let m2r1 = PV.disjoint env m2 r1 in
+  let m1m2 = PV.disjoint env m1 m2 in
+  let m1r2 = PV.disjoint env m1 r2 in
+  let error () = (* FIXME : better error message *)
+    cannot_apply "swap" "the two statements are not independent" in
+  if not m2r1 then error ();
+  if not m1m2 then error ();
+  if not m1r2 then error ()
+
+
+let t_kill env side cpos len g =
+  let kill_stmt _env (_, po) me zpr =
+    if List.length zpr.Zpr.z_tail < len then
+      tacuerror "cannot find %d consecutive instructions at given position" len;
+    let (ks, tl) = List.take_n len zpr.Zpr.z_tail in
+
+    let ks_wr = is_write env PV.empty ks in
+    let tl_rd = is_read  env PV.empty tl in
+    let po_rd = free_pv_form (fst me) env po in
+
+    if not (PV.disjoint env ks_wr tl_rd) then
+      tacuerror "cannot kill code, it is not dead";
+    if not (PV.disjoint env ks_wr po_rd) then
+      tacuerror "cannot kill code, the post-condition depends on it";
+
+    let kslconcl = EcFol.f_bdHoareS me f_true (stmt ks) f_true FHeq f_r1 in
+      (me, { zpr with Zpr.z_tail = tl; }, [kslconcl])
+  in
+
+  let tr = fun side -> RN_hl_kill (side, cpos, len) in
+    t_code_transform env side cpos tr (t_zip kill_stmt) g
 
 (* -------------------------------------------------------------------- *)
 let alias_stmt id _env me i =
@@ -1393,11 +1430,12 @@ let fission_stmt (il, (d1, d2)) env me zpr =
   let fis =   (List.rev_append init [wl1])
             @ (List.rev_append init [wl2]) in
 
-    (me, { zpr with Zpr.z_head = hd; Zpr.z_tail = fis @ tl })
+    (me, { zpr with Zpr.z_head = hd; Zpr.z_tail = fis @ tl }, [])
 
 let t_fission env side cpos infos g =
   let tr = fun side -> RN_hl_fission (side, cpos, infos) in
-    t_code_transform env side cpos tr (t_zip (fission_stmt infos)) g
+  let cb = fun env _ me zpr -> fission_stmt infos env me zpr in
+    t_code_transform env side cpos tr (t_zip cb) g
 
 (* -------------------------------------------------------------------- *)
 let fusion_stmt (il, (d1, d2)) env me zpr =
@@ -1442,11 +1480,12 @@ let fusion_stmt (il, (d1, d2)) env me zpr =
   let wl  = i_while (b1, stmt (sw1 @ sw2 @ fini1)) in
   let fus = List.rev_append init1 [wl] in
 
-    (me, { zpr with Zpr.z_head = hd; Zpr.z_tail = fus @ tl; })
+    (me, { zpr with Zpr.z_head = hd; Zpr.z_tail = fus @ tl; }, [])
 
 let t_fusion env side cpos infos g =
   let tr = fun side -> RN_hl_fusion (side, cpos, infos) in
-    t_code_transform env side cpos tr (t_zip (fusion_stmt infos)) g
+  let cb = fun env _ me zpr -> fusion_stmt infos env me zpr in
+    t_code_transform env side cpos tr (t_zip cb) g
 
 (* -------------------------------------------------------------------- *)
 let unroll_stmt _env me i =

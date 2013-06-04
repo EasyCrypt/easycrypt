@@ -15,5 +15,3 @@ lemma L : equiv[M.f ~ M.f : true ==> res{1} = 0]
 proof.
   fun; kill {1} 2; admit.
 save.
-
-

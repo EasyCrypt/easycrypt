@@ -175,7 +175,7 @@ let bhf_equal bhf1 bhf2 =
   && EcPath.x_equal bhf1.bhf_f bhf2.bhf_f
   && bhf1.bhf_cmp = bhf2.bhf_cmp
   && f_equal bhf1.bhf_bd bhf2.bhf_bd
-let bhs_equal bhs1 bhs2 = 
+let bhs_equal bhs1 bhs2 =
      f_equal bhs1.bhs_pr bhs2.bhs_pr
   && f_equal bhs1.bhs_po bhs2.bhs_po
   && s_equal bhs1.bhs_s bhs2.bhs_s

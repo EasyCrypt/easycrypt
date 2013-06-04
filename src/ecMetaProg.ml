@@ -67,6 +67,23 @@ module Zipper = struct
 
   let zip zpr = zip None ((zpr.z_head, zpr.z_tail), zpr.z_path)
 
+  let after ~strict zpr =
+    let rec doit acc ip =
+      match ip with
+      | ZTop                          -> acc
+      | ZWhile  (_, ((_, is), ip))    -> doit (is :: acc) ip
+      | ZIfThen (_, ((_, is), ip), _) -> doit (is :: acc) ip
+      | ZIfElse (_, _, ((_, is), ip)) -> doit (is :: acc) ip
+    in
+
+    let after =
+      match zpr.z_tail, strict with
+      | []     , _     -> doit [[]] zpr.z_path
+      | is     , false -> doit [is] zpr.z_path
+      | _ :: is, true  -> doit [is] zpr.z_path
+    in
+      List.rev after
+
   let rec fold env cpos f state s =
     let zpr = zipper_of_cpos cpos s in
 
