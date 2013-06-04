@@ -285,6 +285,16 @@ let pp_local (ppe : PPEnv.t) fmt x =
   Format.fprintf fmt "%s" (PPEnv.local_symb ppe x)
 
 (* -------------------------------------------------------------------- *)
+let pp_mem (ppe : PPEnv.t) fmt x =
+  let x = Format.sprintf "%s" (PPEnv.local_symb ppe x) in
+  let x =
+    if   x <> "" && x.[0] = '&'
+    then String.sub x 1 (String.length x - 1)
+    else x
+  in
+    Format.fprintf fmt "%s" x
+
+(* -------------------------------------------------------------------- *)
 let rec pp_type_r ppe btuple fmt ty =
   match ty.ty_node with
   | Tglob m -> Format.fprintf fmt "(glob %a)" (pp_topmod ppe) m
@@ -760,7 +770,6 @@ let string_of_quant = function
   | Llambda -> "lambda"
 
 (* -------------------------------------------------------------------- *)
-  
 let pp_binding (ppe : PPEnv.t) (xs, ty) =
   match ty with
   | GTty ty ->
@@ -828,8 +837,8 @@ let rec pp_form_r (ppe : PPEnv.t) outer fmt f =
       
   | Fpvar (x, i) ->
       let ppe = PPEnv.enter_by_memid ppe i in
-        Format.fprintf fmt "%a{%a}" (pp_pv ppe) x (pp_local ppe) i
-    
+        Format.fprintf fmt "%a{%a}" (pp_pv ppe) x (pp_mem ppe) i
+
   | Fquant (q, bd, f) ->
       let (subppe, pp) = pp_bindings ppe bd in
       let pp fmt () = 
