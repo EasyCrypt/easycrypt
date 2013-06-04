@@ -1006,7 +1006,8 @@ let t_bdHoare_while env inv vrnt info g =
       cannot_apply "while" "not implemented"
 
 let t_equiv_while env inv g =
-  let concl = get_concl g in
+  let (hyps, concl) = get_goal g in
+  let env1 = tyenv_of_hyps env hyps in
   let es = destr_equivS concl in
   let (el,cl), (er,cr), sl, sr = s_last_whiles "while" es.es_sl es.es_sr in
   let ml = EcMemory.memory es.es_ml in
@@ -1020,10 +1021,10 @@ let t_equiv_while env inv g =
   let b_concl = f_equivS es.es_ml es.es_mr b_pre cl cr b_post in
       (* the wp of the while *)
   let post = f_imps_simpl [f_not_simpl el;f_not_simpl er; inv] es.es_po in
-  let modil = s_write env cl in
-  let modir = s_write env cr in
-  let post = generalize_mod env mr modir post in
-  let post = generalize_mod env ml modil post in
+  let modil = s_write env1 cl in
+  let modir = s_write env1 cr in
+  let post = generalize_mod env1 mr modir post in
+  let post = generalize_mod env1 ml modil post in
   let post = f_and_simpl inv post in
   let concl = f_equivS_r {es with es_sl = sl; es_sr = sr; es_po = post} in
   prove_goal_by [b_concl; concl] (RN_hl_while (inv,None,None)) g 
