@@ -1329,7 +1329,9 @@ let pp_bdhoareF (ppe : PPEnv.t) fmt hf =
 let pp_bdhoareS (ppe : PPEnv.t) fmt hs =
   let ppe =
     { ppe with
-        PPEnv.ppe_env = EcEnv.Memory.push hs.bhs_m ppe.PPEnv.ppe_env }
+        PPEnv.ppe_env =
+          EcEnv.Memory.set_active (fst hs.bhs_m)
+            (EcEnv.Memory.push hs.bhs_m ppe.PPEnv.ppe_env) }
   in
 
   let ppnode = collect2_s hs.bhs_s.s_node [] in
