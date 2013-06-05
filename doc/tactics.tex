@@ -1,28 +1,35 @@
 % !TeX root = easycrypt.tex
 \chapter{Writing Proofs}
 
-\section{First-Order Tactics}
+\section{Ambient Logic (Guillaume)}
+
+%% TODO (Francois): For index, rather than \texttt, use \rawec and make a class of keywords for tactics and tacticals
 
 \subsection{The \texttt{case} tactic}
+\index{ambient}{case@\texttt{case}}
 %
 
 \subsection{The \texttt{unfold} tactic}
+\index{ambient}{unfold@\texttt{unfold}}
 %
 
 \subsection{The \texttt{simplify} tactic}
+\index{ambient}{simplify@\texttt{simplify}}
 %
 
 \subsection{The \texttt{trivial} tactic}
+\index{ambient}{trivial@\texttt{trivial}}
 %
 
-\section{Probabilistic Hoare logic}
+\section{Program Logics (C\'esar)}
 
-
-
-\section{Bounded probabilistic Hoare logic}
-
-\subsection{The \texttt{rnd} tactic}
+\subsection{Reasoning about random samplings: the \texttt{rnd} tactic}
 %
+\subsubsection{Hoare Logic}
+\index{hoare}{Program Reasoning!rnd@\texttt{rnd}}
+
+\subsubsection{Probabilistic Hoare Logic}
+\index{phl}{Program Reasoning!rnd@\texttt{rnd}}
 \Syntax 
 \verb+rnd+ (\textit{formula} $|$ \_ ) (\textit{formula} $|$ \_ )
 
@@ -56,8 +63,16 @@ number $g$ representing a bound:
 \end{displaymath}
 If $g$ is not given then $g=f$ in the rule.
 
-\subsection{The \texttt{app} tactic}
+\subsubsection{Relational Hoare Logic}
+\index{prhl}{Program Reasoning!rnd@\texttt{rnd}}
+
+\subsection{Reasoning about sequential composition: the \texttt{seq} tactic}
 %
+\subsubsection{Hoare Logic}
+\index{hoare}{Program Reasoning!seq@\texttt{seq}}
+
+\subsubsection{Probabilistic Hoare Logic}
+\index{phl}{Program Reasoning!seq@\texttt{seq}}
 \Syntax 
 \verb+app+ \verb+[>>|<<]+ \textit{num} \textit{formula} [\textit{formula}]
 
@@ -108,8 +123,14 @@ The second parameter (optional) is a real number representing a bound (only supp
 Similar rules hold for $=$. If the parameter $g$ is not given then
 $g=f$ in the rule. 
 
-\subsection{The \texttt{if} tactic}
+\subsubsection{Relational Hoare Logic}
+\index{prhl}{Program Reasoning!seq@\texttt{seq}}
+
+\subsection{Reasoning about conditionals: the \texttt{if} tactic}
 %
+\subsubsection{Hoare and Probabilistic Hoare Logic}
+\index{hoare}{Program Reasoning!if@\texttt{if}}
+\index{phl}{Program Reasoning!if@\texttt{if}}
 (similar to probabilistic Hoare \verb+if+ tactic)
 \begin{displaymath}
 \begin{array}{c}
@@ -124,8 +145,16 @@ $g=f$ in the rule.
 \end{displaymath}
 Similar rules hold for $=,\geq$.
 
-\subsection{The \texttt{wp} tactic}
+\subsubsection{Relational Hoare Logic}
+\index{prhl}{Program Reasoning!if@\texttt{if}}
+
+\subsection{Computing weakest preconditions: the \texttt{wp} tactic}
 %
+\subsubsection{Hoare Logic}
+\index{hoare}{Program Reasoning!wp@\texttt{wp}}
+
+\subsubsection{Probabilistic Hoare Logic}
+\index{phl}{Program Reasoning!wp@\texttt{wp}}
 \Syntax \verb+wp+
 
 \Description
@@ -141,17 +170,30 @@ composition rule, we have:
 \end{displaymath}
 Similar rules hold for $=,\geq$.
 
+\subsubsection{Relational Hoare Logic}
+\index{prhl}{Program Reasoning!wp@\texttt{wp}}
 
-\subsection{The \texttt{skip} tactic}
+\subsection{Concluding proofs of programs: the \texttt{skip} tactic}
+\index{hoare}{Program Reasoning!skip@\texttt{skip}}
+\index{phl}{Program Reasoning!skip@\texttt{skip}}
+\index{prhl}{Program Reasoning!skip@\texttt{skip}}
 %
 
-\subsection{The \texttt{condt,condf} tactic}
+\subsection{Simplifying conditionals: the \texttt{condt,condf} tactic}
 %
-
+\subsubsection{Probabilistic Hoare Logic}
+\index{tactics!probabilistic Hoare logic!condt@\texttt{condt}}
+\index{tactics!probabilistic Hoare logic!condf@\texttt{condf}}
 
 %***** NOT IMPLEMENTED 
 
-\subsection{The \texttt{while} tactic}
+\warningbox{The rest of this section describes tactics that are not yet implemented.}
+
+\subsection{Reasoning about loops: the \texttt{while} tactic}
+%
+\subsubsection{Probabilistic Hoare Logic}
+\index{phl}{Program Reasoning!while@\texttt{while}}
+
 \Syntax \verb+while+ \textit{formula} \textit{formula} 
 [\textit{formula} \textit{formula}]
 %
@@ -224,10 +266,8 @@ and the folowing one for exact judgments (=):
 
 There is no appropriate rule for $(\leq)$.
 
-
 \subsection{The \texttt{call} tactic}
 %
-
 
 \subsection{The \texttt{inline} tactic}
 %
@@ -236,10 +276,7 @@ There is no appropriate rule for $(\leq)$.
 %
 
 
-\section{Relational probabilistic Hoare logic}
-
-
-\section{Combination of Tactics}
+\section{Tacticals}
 
 
 \section{Automated Tactics}

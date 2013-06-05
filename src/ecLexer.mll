@@ -79,6 +79,9 @@
     "rcondf"      , RCONDF     ;        (* KW: tactic *)
     "swap"        , SWAP       ;        (* KW: tactic *)
     "rnd"         , RND        ;        (* KW: tactic *)
+    "bdhoare_deno", BDHOAREDENO  ;  
+
+    (* KW: tactic *) 
     "equiv_deno"  , EQUIVDENO  ;        (* KW: tactic *) 
     "conseq"      , CONSEQ     ;        (* KW: tactic *) 
     "inline"      , INLINE     ;        (* KW: tactic *)

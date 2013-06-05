@@ -396,7 +396,6 @@ let t_hoareF_conseq env pre post g =
   let concl3 = f_hoareF pre hf.hf_f post in
   prove_goal_by [concl1; concl2; concl3] (RN_hl_conseq) g  
     
-
 let t_hoareS_conseq _env pre post g =
   let concl = get_concl g in
   let hs = destr_hoareS concl in
@@ -406,6 +405,25 @@ let t_hoareS_conseq _env pre post g =
   let concl3 = f_hoareS_r { hs with hs_pr = pre; hs_po = post } in
   prove_goal_by [concl1; concl2; concl3] (RN_hl_conseq) g
 
+let t_bdHoareF_conseq env pre post g =
+  let hyps,concl = get_goal g in
+  let bhf = destr_bdHoareF concl in
+  let env = tyenv_of_hyps env hyps in
+  let mpr,mpo = EcEnv.Fun.hoareF_memenv bhf.bhf_f env in
+  let cond1, cond2 = conseq_cond bhf.bhf_pr bhf.bhf_po pre post in
+  let concl1 = gen_mems [mpr] cond1 in
+  let concl2 = gen_mems [mpo] cond2 in
+  let concl3 = f_bdHoareF pre bhf.bhf_f post bhf.bhf_cmp bhf.bhf_bd in
+  prove_goal_by [concl1; concl2; concl3] (RN_hl_conseq) g  
+
+let t_bdHoareS_conseq _env pre post g =
+  let concl = get_concl g in
+  let bhs = destr_bdHoareS concl in
+  let cond1, cond2 = conseq_cond bhs.bhs_pr bhs.bhs_po pre post in
+  let concl1 = gen_mems [bhs.bhs_m] cond1 in
+  let concl2 = gen_mems [bhs.bhs_m] cond2 in
+  let concl3 = f_bdHoareS_r { bhs with bhs_pr = pre; bhs_po = post } in
+  prove_goal_by [concl1; concl2; concl3] (RN_hl_conseq) g
 
 let t_equivF_conseq env pre post g =
   let hyps,concl = get_goal g in
@@ -1344,6 +1362,38 @@ let t_splitwhile b env side cpos g =
     t_code_transform env side cpos tr (t_fold (splitwhile_stmt b)) g
 
 (* -------------------------------------------------------------------- *)
+
+let t_bdHoare_deno env pre post g =
+  let concl = get_concl g in
+  let cmp, f, bd =
+    match concl.f_node with
+    | Fapp({f_node = Fop(op,_)}, [f;bd]) when is_pr f &&
+        (EcPath.p_equal op EcCoreLib.p_eq || 
+           EcPath.p_equal op EcCoreLib.p_real_le ) ->
+      let cmp = if EcPath.p_equal op EcCoreLib.p_eq then FHeq else FHle in
+      cmp, f , bd
+    | Fapp({f_node = Fop(op,_)}, [bd;f]) when is_pr f &&
+        (EcPath.p_equal op EcCoreLib.p_eq) ->
+      FHeq, f , bd
+    | _ -> cannot_apply "hoare_deno" "" (* FIXME error message *)
+  in 
+  let (m,f,args,ev) = destr_pr f in
+  let concl_e = f_bdHoareF pre f post cmp bd in
+  let fun_ = EcEnv.Fun.by_xpath f env in
+  (* building the substitution for the pre *)
+  let sargs = 
+    List.fold_left2 (fun s v a -> PVM.add env (pv_loc f v.v_name) mhr a s)
+      PVM.empty fun_.f_sig.fs_params args in
+  let smem = f_bind_mem f_subst_id mhr m in
+  let concl_pr  = f_subst smem (PVM.subst env sargs pre) in
+  (* building the substitution for the post *)
+  let smem_ = f_bind_mem f_subst_id mhr mhr in 
+  let ev   = f_subst smem_ ev in
+  let me = EcEnv.Fun.actmem_post mhr f fun_ in
+  let concl_po = gen_mems [me] (f_imp post ev) in
+  prove_goal_by [concl_e;concl_pr;concl_po] RN_hl_deno g  
+
+
 let t_equiv_deno env pre post g =
   let concl = get_concl g in
   let cmp, f1, f2 =

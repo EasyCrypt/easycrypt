@@ -140,6 +140,7 @@
 %token AXIOM
 %token BACKS
 %token BDHOARE
+%token BDHOAREDENO
 %token BETA 
 %token CALL
 %token CASE
@@ -1490,6 +1491,9 @@ phltactic:
 
 | EQUIVDENO info=fpattern(conseq)
     { Pequivdeno info }
+
+| BDHOAREDENO info=fpattern(conseq)
+    { Pbdhoaredeno info }
 
 | CONSEQ info=fpattern(conseq)
     { Pconseq info }
