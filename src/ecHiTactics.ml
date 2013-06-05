@@ -62,6 +62,12 @@ and process_logic_tac mkpv env (tac:ptactic) (g:goal) : goals =
     | Pseq tacs      -> fun (juc,n) -> process_logic_tacs mkpv env tacs (juc,[n])
     | Psubgoal _     -> assert false
     | Pcase  i       -> process_case  loc env i
+    | Pprogress t    -> 
+      let t = 
+        match t with 
+        | None -> t_id None 
+        | Some t -> process_logic_tac mkpv env t in
+      t_progress env t
     | Padmit         -> t_admit
     | Pdebug         -> process_debug env; t_id None
     | Plogic t       -> process_logic mkpv loc env t

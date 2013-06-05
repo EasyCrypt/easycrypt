@@ -5,9 +5,9 @@ open EcIdent
 open EcCoreLib
 open EcTypes
 open EcFol
-open EcModules
 open EcBaseLogic
 open EcEnv
+open EcPV
 open EcLogic
 open EcModules
 open EcMetaProg
@@ -17,190 +17,6 @@ module Zpr = EcMetaProg.Zipper
 (* -------------------------------------------------------------------- *)
 (* -------------------------  Substitution  --------------------------- *)
 (* -------------------------------------------------------------------- *)
-
-module PVM = struct
-
-  type mem_sel = 
-  | MSvar of prog_var
-  | MSmod of EcPath.mpath (* Only abstract module *)
-      
-  module M = EcMaps.Map.Make(struct
-    (* We assume that the mpath are in normal form *) 
- 
-    type t = mem_sel * EcMemory.memory
-
-    let ms_compare ms1 ms2 = 
-      match ms1, ms2 with
-      | MSvar v1, MSvar v2 -> pv_compare_p v1 v2
-      | MSmod m1, MSmod m2 -> EcPath.m_compare m1 m2
-      | MSvar _, MSmod _ -> -1
-      | MSmod _, MSvar _ -> 1
-
-    let compare (p1,m1) (p2,m2) = 
-      let r = EcIdent.id_compare m1 m2 in
-      if r = 0 then ms_compare p1 p2 
-      else r
-  end)
-
-  type subst = form M.t
-
-  let empty = M.empty 
-
-  let pvm env pv m = 
-    let pv = EcEnv.NormMp.norm_pvar env pv in 
-    (MSvar pv, m)
-
-  let add env pv m f s = M.add (pvm env pv m) f s 
-
-  let add_glob _env mp m f s = M.add (MSmod mp, m) f s
-
-  let add_none env pv m f s =
-    M.change (fun o -> if o = None then Some f else o) (pvm env pv m) s
-
-  let merge (s1:subst) (s2:subst) =
-    M.merge (fun _ o1 o2 -> if o2 = None then o1 else o2) s1 s2
-
-  let find env pv m s =
-    M.find (pvm env pv m) s
-
-  let subst env (s:subst) = 
-    Hf.memo_rec 107 (fun aux f ->
-      match f.f_node with
-      | Fpvar(pv,m) -> 
-          (try find env pv m s with Not_found -> f)
-      | Fglob(mp,m) ->
-        let f' = EcEnv.NormMp.norm_glob env m mp in
-        if f_equal f f' then
-          (try M.find (MSmod mp,m) s with Not_found -> f)
-        else aux f'
-      | FhoareF _ | FhoareS _ | FequivF _ | FequivS _ | Fpr _ -> assert false
-      | _ -> EcFol.f_map (fun ty -> ty) aux f)
-
-  let subst1 env pv m f = 
-    let s = add env pv m f empty in
-    subst env s
-      
-end
-
-  
-(* -------------------------------------------------------------------- *)
-
-module PV = struct 
-  module M = EcMaps.Map.Make (struct
-    (* We assume that the mpath are in normal form *)  
-    type t = prog_var 
-    let compare = pv_compare_p
-  end)
-
-  type pv_fv = 
-    { pv : ty M.t;         (* The key are in normal form *)
-      glob : EcPath.Sm.t;  (* The set of abstract module *)
-    }
-
-  let empty = 
-    { pv = M.empty;
-      glob = EcPath.Sm.empty }
-
-  let add env pv ty fv = 
-    { fv with pv = M.add (NormMp.norm_pvar env pv) ty fv.pv }
-
-  let add_glob env mp fv =
-    { fv with glob = EcPath.Sm.add (NormMp.norm_mpath env mp) fv.glob}
-
-  let remove env pv fv =
-    { fv with pv = M.remove (NormMp.norm_pvar env pv) fv.pv }
-
-  let union _env fv1 fv2 =
-    { pv = M.merge (fun _ o1 o2 -> if o2 = None then o1 else o2) fv1.pv fv2.pv;
-      glob = EcPath.Sm.union fv1.glob fv2.glob }
-
-  let disjoint _env fv1 fv2 = 
-    M.set_disjoint fv1.pv fv2.pv &&
-      (* FIXME not suffisant use disjoint_g *)
-      EcPath.Sm.disjoint fv1.glob fv2.glob
-
-  let diff _env fv1 fv2 = 
-    { pv = M.set_diff fv1.pv fv2.pv;
-      glob = EcPath.Sm.diff fv1.glob fv2.glob }
-
-  let inter _env fv1 fv2 = 
-    { pv = M.set_inter fv1.pv fv2.pv;
-      glob = EcPath.Sm.inter fv1.glob fv2.glob }
-
-  let elements fv = M.bindings fv.pv, EcPath.Sm.elements fv.glob (* FIXME *)
-
-  let fv env m f =
-    let rec aux fv f = 
-      match f.f_node with
-      | Fquant(_,_,f1) -> aux fv f1
-      | Fif(f1,f2,f3) -> aux (aux (aux fv f1) f2) f3
-      | Flet(_,f1,f2) -> aux (aux fv f1) f2
-      | Fpvar(x,m') -> 
-        if EcIdent.id_equal m m' then add env x f.f_ty fv else fv
-      | Fglob (mp,m') ->
-        if EcIdent.id_equal m m' then 
-          let f' = EcEnv.NormMp.norm_glob env m mp in
-          if f_equal f f' then add_glob env mp fv
-          else aux fv f'
-        else fv
-      | Fint _ | Flocal _ | Fop _ -> fv
-      | Fapp(e, es) -> List.fold_left aux (aux fv e) es
-      | Ftuple es   -> List.fold_left aux fv es
-      | FhoareF _  | FhoareS _ | FbdHoareF _  | FbdHoareS _ 
-      | FequivF _ | FequivS _ | Fpr _ -> assert false 
-    in
-    aux empty f
-
-  let disjoint_g env mp1 mp2 = 
-    let me1, me2 = EcEnv.Mod.by_mpath mp1 env, EcEnv.Mod.by_mpath mp2 env in
-    match me1.me_body, me2.me_body with
-    | ME_Decl(_,nu1), ME_Decl(_,nu2) ->
-      EcPath.Sm.mem mp2 nu1 || EcPath.Sm.mem mp1 nu2
-    | ME_Decl(_,nu1), ME_Structure ms2 ->
-      EcPath.Sm.mem mp2 nu1 &&
-        EcPath.Sm.for_all (fun m -> EcPath.Sm.mem m nu1) ms2.ms_uses
-    | ME_Structure ms1, ME_Decl(_,nu2) ->
-      EcPath.Sm.mem mp1 nu2 &&
-        EcPath.Sm.for_all (fun m -> EcPath.Sm.mem m nu2) ms1.ms_uses
-    | ME_Structure ms1, ME_Structure ms2 ->
-      let us1 = EcPath.Sm.add mp1 ms1.ms_uses in
-      let us2 = EcPath.Sm.add mp2 ms2.ms_uses in
-      EcPath.Sm.disjoint us1 us2 
-    | _, _ -> assert false 
-      
-  let check env modi fv = 
-    let not_gen = diff env fv modi in 
-    let mk_topv s = 
-      M.fold (fun x _ topv ->
-        if is_loc x then topv 
-        else
-          let x=x.pv_name in
-          let top = EcPath.m_functor x.EcPath.x_top in
-          EcPath.Sm.add top topv) s EcPath.Sm.empty in
-    let topv = mk_topv not_gen.pv in
-    let topvg = mk_topv modi.pv in
-    let topm = not_gen.glob in
-    
-    let check s1 s2 = 
-      EcPath.Sm.for_all (fun mp1 ->
-        EcPath.Sm.for_all (fun mp2 -> disjoint_g env mp1 mp2) s1) s2 in
-
-    (* FIXME error message *)
-    assert (check modi.glob topv);
-    assert (check modi.glob topm);
-    assert (check topvg topm)
-      
-  let check_depend env fv mp = 
-    (* FIXME error message *)
-    let check_v v _ty =
-      assert (is_glob v);
-      let top = EcPath.m_functor v.pv_name.EcPath.x_top in
-      assert (disjoint_g env mp top) in
-    M.iter check_v fv.pv;
-    let check_m m = assert (disjoint_g env mp m) in
-    EcPath.Sm.iter check_m fv.glob 
-
-end
 
 let get_abs_functor f = 
   let f = f.EcPath.x_top in
@@ -524,15 +340,26 @@ let t_zip f env cpos prpo (state, s) =
       (me, Zpr.zip zpr, gs)
   with Zpr.InvalidCPos -> tacuerror "invalid code position"
 
-let t_code_transform env side cpos tr tx g =
+let t_code_transform env side ?(bdhoare = false) cpos tr tx g =
   match side with
-  | None ->
+  | None -> begin
       let _, concl = get_goal g in
-      let hoare    = destr_hoareS concl in
-      let pr, po   = hoare.hs_pr, hoare.hs_po in
-      let (me, stmt, cs) = tx env cpos (pr, po) (hoare.hs_m, hoare.hs_s) in
-      let concl = f_hoareS_r { hoare with hs_m = me; hs_s = stmt; } in
-        prove_goal_by (concl :: cs) (tr None) g
+
+      if is_hoareS concl then
+        let hoare    = destr_hoareS concl in
+        let pr, po   = hoare.hs_pr, hoare.hs_po in
+        let (me, stmt, cs) = tx env cpos (pr, po) (hoare.hs_m, hoare.hs_s) in
+        let concl = f_hoareS_r { hoare with hs_m = me; hs_s = stmt; } in
+          prove_goal_by (concl :: cs) (tr None) g
+      else if bdhoare && is_bdHoareS concl then
+        let hoare    = destr_bdHoareS concl in
+        let pr, po   = hoare.bhs_pr, hoare.bhs_po in
+        let (me, stmt, cs) = tx env cpos (pr, po) (hoare.bhs_m, hoare.bhs_s) in
+        let concl = f_bdHoareS_r { hoare with bhs_m = me; bhs_s = stmt; } in
+          prove_goal_by (concl :: cs) (tr None) g
+      else
+        tacuerror "conclusion should be a hoare statement"
+ end
 
   | Some side ->
       let _, concl  = get_goal g in
@@ -1006,7 +833,8 @@ let t_bdHoare_while env inv vrnt info g =
       cannot_apply "while" "not implemented"
 
 let t_equiv_while env inv g =
-  let concl = get_concl g in
+  let (hyps, concl) = get_goal g in
+  let env1 = tyenv_of_hyps env hyps in
   let es = destr_equivS concl in
   let (el,cl), (er,cr), sl, sr = s_last_whiles "while" es.es_sl es.es_sr in
   let ml = EcMemory.memory es.es_ml in
@@ -1020,10 +848,10 @@ let t_equiv_while env inv g =
   let b_concl = f_equivS es.es_ml es.es_mr b_pre cl cr b_post in
       (* the wp of the while *)
   let post = f_imps_simpl [f_not_simpl el;f_not_simpl er; inv] es.es_po in
-  let modil = s_write env cl in
-  let modir = s_write env cr in
-  let post = generalize_mod env mr modir post in
-  let post = generalize_mod env ml modil post in
+  let modil = s_write env1 cl in
+  let modir = s_write env1 cr in
+  let post = generalize_mod env1 mr modir post in
+  let post = generalize_mod env1 ml modil post in
   let post = f_and_simpl inv post in
   let concl = f_equivS_r {es with es_sl = sl; es_sr = sr; es_po = post} in
   prove_goal_by [b_concl; concl] (RN_hl_while (inv,None,None)) g 
@@ -1318,40 +1146,44 @@ let t_inline_equiv env side sp g =
   prove_goal_by [concl] (RN_hl_inline (Some side, sp)) g
 
 (* -------------------------------------------------------------------- *)
-let check_swap env s1 s2 = 
-  let m1,m2 = s_write env s1, s_write env s2 in
-  let r1,r2 = s_read env s1, s_read env s2 in
-  let m2r1 = PV.disjoint env m2 r1 in
-  let m1m2 = PV.disjoint env m1 m2 in
-  let m1r2 = PV.disjoint env m1 r2 in
-  let error () = (* FIXME : better error message *)
-    cannot_apply "swap" "the two statements are not independent" in
-  if not m2r1 then error ();
-  if not m1m2 then error ();
-  if not m1r2 then error ()
-
-
-let t_kill env side cpos len g =
+let t_kill env side cpos olen g =
   let kill_stmt _env (_, po) me zpr =
-    if List.length zpr.Zpr.z_tail < len then
-      tacuerror "cannot find %d consecutive instructions at given position" len;
-    let (ks, tl) = List.take_n len zpr.Zpr.z_tail in
+    let error fmt =
+      Format.ksprintf
+        (fun msg -> tacuerror "cannot kill code, %s" msg)
+        fmt
+    in
+
+    let (ks, tl) =
+      match olen with
+      | None -> (zpr.Zpr.z_tail, [])
+      | Some len ->
+          if List.length zpr.Zpr.z_tail < len then
+            tacuerror "cannot find %d consecutive instructions at given position" len;
+          List.take_n len zpr.Zpr.z_tail
+    in
 
     let ks_wr = is_write env PV.empty ks in
-    let tl_rd = is_read  env PV.empty tl in
     let po_rd = free_pv_form (fst me) env po in
 
-    if not (PV.disjoint env ks_wr tl_rd) then
-      tacuerror "cannot kill code, it is not dead";
+    List.iteri
+      (fun i is ->
+         let is_rd = is_read env PV.empty is in
+           if not (PV.disjoint env ks_wr is_rd) then
+             match i with
+             | 0 -> error "code writes variables used by the current block"
+             | _ -> error "code writes variables used by the %dth parent block" i)
+      (Zpr.after ~strict:false { zpr with Zpr.z_tail = tl; });
+
     if not (PV.disjoint env ks_wr po_rd) then
-      tacuerror "cannot kill code, the post-condition depends on it";
+      error "code writes variables used by the post-condition";
 
     let kslconcl = EcFol.f_bdHoareS me f_true (stmt ks) f_true FHeq f_r1 in
       (me, { zpr with Zpr.z_tail = tl; }, [kslconcl])
   in
 
-  let tr = fun side -> RN_hl_kill (side, cpos, len) in
-    t_code_transform env side cpos tr (t_zip kill_stmt) g
+  let tr = fun side -> RN_hl_kill (side, cpos, olen) in
+    t_code_transform env side ~bdhoare:true cpos tr (t_zip kill_stmt) g
 
 (* -------------------------------------------------------------------- *)
 let alias_stmt id _env me i =

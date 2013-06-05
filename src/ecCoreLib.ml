@@ -131,3 +131,15 @@ let p_eq_tuple_intro n =
     let name = Format.sprintf "eq_tuple%i_intro" n in
     _Logic name
   else raise Not_found
+
+let p_eq_tuple_elim n = 
+  if 2 <= n && n <= 9 then
+    let name = Format.sprintf "eq_tuple%i_elim" n in
+    _Logic name
+  else raise Not_found
+
+let p_tuple_ind n = 
+  if 2 <= n && n <= 9 then
+    let name = Format.sprintf "tuple%i_ind" n in
+    _Logic name
+  else raise Not_found

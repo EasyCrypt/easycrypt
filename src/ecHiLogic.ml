@@ -246,7 +246,7 @@ let process_rewrite loc env (s,pe) (_,n as g) =
 (* -------------------------------------------------------------------- *)
 let process_trivial mkpv pi env g =
   let pi = mkpv pi in
-  t_trivial pi env g
+  t_seq (t_simplify_nodelta env) (t_trivial pi env) g
 
 (* -------------------------------------------------------------------- *)
 let process_cut name env phi g =
@@ -330,9 +330,9 @@ let process_subst loc env ri g =
   else
     let hyps = get_hyps g in
     let totac ps =
-      let s = ps.pl_desc in
-      try t_subst1 env (Some (fst (LDecl.lookup_var s hyps)))
-      with _ -> error ps.pl_loc (UnknownHypSymbol s) in
+      let f = process_form_opt env hyps ps None in
+      try t_subst1 env (Some f) 
+      with _ -> assert false (* FIXME error message *) in
     let tacs = List.map totac ri in
     set_loc loc (t_lseq tacs) g
 

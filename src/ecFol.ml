@@ -769,6 +769,13 @@ let destr_eq f =
       f1,f2
   | _ -> destr_error "eq" 
 
+let destr_eq_or_iff f = 
+  match f.f_node with
+  | Fapp({f_node = Fop(p,_)},[f1;f2]) when 
+      EcPath.p_equal p EcCoreLib.p_iff || EcPath.p_equal p EcCoreLib.p_eq -> 
+      f1,f2
+  | _ -> destr_error "eq_or_iff"
+
 let destr_not f = 
   match f.f_node with
   | Fapp({f_node = Fop(p,_)},[f1]) when EcPath.p_equal p EcCoreLib.p_not -> 
@@ -853,33 +860,40 @@ let is_false f = f_equal f f_false
   
 let is_and f = 
   match f.f_node with
-  | Fapp({f_node = Fop(p,_)},_) -> is_op_and p 
+  | Fapp({f_node = Fop(p,_)},[_;_]) -> is_op_and p 
   | _ -> false 
 
 let is_or f = 
   match f.f_node with
-  | Fapp({f_node = Fop(p,_)},_) -> is_op_or p 
+  | Fapp({f_node = Fop(p,_)},[_;_]) -> is_op_or p 
   | _ -> false 
 
 let is_not f = 
   match f.f_node with
-  | Fapp({f_node = Fop(p,_)},_) -> EcPath.p_equal p EcCoreLib.p_not 
+  | Fapp({f_node = Fop(p,_)},[_]) -> EcPath.p_equal p EcCoreLib.p_not 
   | _ -> false
 
 let is_imp f = 
   match f.f_node with
-  | Fapp({f_node = Fop(p,_)},_) when EcPath.p_equal p EcCoreLib.p_imp -> true
+  | Fapp({f_node = Fop(p,_)},[_;_]) -> EcPath.p_equal p EcCoreLib.p_imp
   | _ -> false
 
 let is_iff f = 
   match f.f_node with
-  | Fapp({f_node = Fop(p,_)},_) when EcPath.p_equal p EcCoreLib.p_iff -> true
+  | Fapp({f_node = Fop(p,_)},[_;_]) -> EcPath.p_equal p EcCoreLib.p_iff
   | _ -> false
 
 let is_eq f = 
   match f.f_node with
-  | Fapp({f_node = Fop(p,_)},_) when EcPath.p_equal p EcCoreLib.p_eq -> true
+  | Fapp({f_node = Fop(p,_)},[_;_]) -> EcPath.p_equal p EcCoreLib.p_eq 
   | _ -> false
+
+let is_eq_or_iff f = 
+  match f.f_node with
+  | Fapp({f_node = Fop(p,_)},[_;_]) -> 
+      EcPath.p_equal p EcCoreLib.p_eq || EcPath.p_equal p EcCoreLib.p_iff
+  | _ -> false
+
 
 let is_forall f = 
   match f.f_node with

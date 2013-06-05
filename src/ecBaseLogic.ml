@@ -167,6 +167,22 @@ module LDecl = struct
           let inter = Mid.set_inter ids fv in
           error (CanNotClear(Sid.choose inter, id)) in
     { hyps with h_local = List.filter check hyps.h_local }
+
+  let ld_subst s ld = 
+    match ld with
+    | LD_var (ty, body) ->
+      LD_var (s.fs_ty ty, omap body (f_subst s))
+    | LD_mem mt ->
+      LD_mem (EcMemory.mt_substm s.fs_sty.ts_p s.fs_mp s.fs_ty mt)
+    | LD_modty(p,r) ->
+      let sub = s.fs_sty.ts_mp in
+      let p' = EcModules.mty_subst s.fs_sty.ts_p sub p in
+      let r' = 
+        EcPath.Sm.fold (fun m r' -> EcPath.Sm.add (sub m) r') r 
+          EcPath.Sm.empty in
+      LD_modty(p',r')
+    | LD_hyp f -> LD_hyp (f_subst s f)
+
 end
 
 
@@ -224,7 +240,7 @@ type rule_name =
   | RN_hl_call      of bool option * EcFol.form * EcFol.form
   | RN_hl_swap      of bool * int * int * int
   | RN_hl_inline    of bool option * s_pat 
-  | RN_hl_kill      of bool option * codepos * int
+  | RN_hl_kill      of bool option * codepos * int option
   | RN_hl_alias     of bool option * codepos
   | RN_hl_hoare_rnd
   | RN_hl_equiv_rnd of rnd_tac_info
@@ -397,6 +413,11 @@ let t_try t g =
   with _ (* FIXME catch only some exception ? *) -> 
     t_id None g
 
+let t_or t1 t2 g = 
+  try t1 g 
+  with _ (* FIXME catch only some exception ? *) -> 
+    t2 g
+
 let t_repeat t g =
   let rec aux g =
     let r = try Some (t g) with _ -> None in
@@ -409,3 +430,4 @@ let t_repeat t g =
 let rec t_do n t =
   if n <= 0 then t_id None
   else t_seq t (t_do (n-1) t)
+

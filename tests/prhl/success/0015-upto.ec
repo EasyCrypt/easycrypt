@@ -77,23 +77,11 @@ proof.
     fun (mem F2.xs RO.logA)
       (RO.logA{1} = RO.logA{2} /\ eq_except RO.mH{1} RO.mH{2} F2.xs{2}) true;try (trivial).
       apply Hlossless.  
-      fun; inline RO.hash;wp;rnd;wp;skip;simplify.
-      intros &m1 &m2 H.
-      elim H;clear H;intros H H1.
-      elim H1;clear H1;intros H1 H2.
-      elim H2;clear H2;intros H2 H3.
-      elim H3;clear H3;intros H3 H4.
-      intros rL rR H5.
-      rewrite H1.
-      rewrite (add_mem <:int> F2.xs{m2} x{m2} RO.logA{m2}).
-      case (F2.xs{m2} = x{m2});[trivial | intros Hneq;simplify] .
-      simplify in_dom.
-      rewrite (H4 x{m2} _);[apply Hneq | ].
-      case (RO.mH{m2}.[x{m2}] = None);trivial.
+      fun; inline RO.hash;wp;rnd;wp;skip;simplify;trivial.
 
     (* Hoare goal *)
     admit.
     admit.
   inline RO.hash;wp;rnd;wp;skip;simplify;trivial.
 save.
-                
+
