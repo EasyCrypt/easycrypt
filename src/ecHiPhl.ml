@@ -400,6 +400,14 @@ let process_conseq env info (_, n as g) =
         let env = EcEnv.Memory.push_active hs.hs_m env in
         tac1, env, env, hs.hs_pr, hs.hs_po,
         (fun pre post -> f_hoareS_r { hs with hs_pr = pre; hs_po = post })
+      | FbdHoareF bhf ->
+        let penv, qenv = EcEnv.Fun.hoareF bhf.bhf_f env in
+        tac1, penv, qenv, bhf.bhf_pr, bhf.bhf_po, 
+        (fun pre post -> f_bdHoareF pre bhf.bhf_f post bhf.bhf_cmp bhf.bhf_bd)
+      | FbdHoareS bhs ->
+        let env = EcEnv.Memory.push_active bhs.bhs_m env in
+        tac1, env, env, bhs.bhs_pr, bhs.bhs_po,
+        (fun pre post -> f_bdHoareS_r { bhs with bhs_pr = pre; bhs_po = post })
       | FequivF ef ->
         let penv, qenv = EcEnv.Fun.equivF ef.ef_fl ef.ef_fr env in
         tac2, penv, qenv, ef.ef_pr, ef.ef_po,
@@ -408,8 +416,7 @@ let process_conseq env info (_, n as g) =
         let env = EcEnv.Memory.push_all [es.es_ml; es.es_mr] env in
         tac2, env, env, es.es_pr, es.es_po,
         (fun pre post -> f_equivS_r { es with es_pr = pre; es_po = post }) 
-      (* FIXME CESAR add rule for bd_Hoare *)
-      | _ -> assert false (* FIXME error message *)
+      | _ -> tacuerror "cannot apply conseq rule, not a phl/prhl judgement"
     in
     let pre = match pre with
       | None -> t_pre := tac; gpre 
@@ -424,6 +431,8 @@ let process_conseq env info (_, n as g) =
     match f.f_node with
     | FhoareF hf -> t_hoareF_conseq env hf.hf_pr hf.hf_po
     | FhoareS hs -> t_hoareS_conseq env hs.hs_pr hs.hs_po
+    | FbdHoareF hf -> t_bdHoareF_conseq env hf.bhf_pr hf.bhf_po
+    | FbdHoareS hs -> t_bdHoareS_conseq env hs.bhs_pr hs.bhs_po
     | FequivF ef -> t_equivF_conseq env ef.ef_pr ef.ef_po
     | FequivS es -> t_equivS_conseq env es.es_pr es.es_po 
     | _ -> assert false (* FIXME error message *) in

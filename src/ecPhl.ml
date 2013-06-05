@@ -396,7 +396,6 @@ let t_hoareF_conseq env pre post g =
   let concl3 = f_hoareF pre hf.hf_f post in
   prove_goal_by [concl1; concl2; concl3] (RN_hl_conseq) g  
     
-
 let t_hoareS_conseq _env pre post g =
   let concl = get_concl g in
   let hs = destr_hoareS concl in
@@ -406,6 +405,25 @@ let t_hoareS_conseq _env pre post g =
   let concl3 = f_hoareS_r { hs with hs_pr = pre; hs_po = post } in
   prove_goal_by [concl1; concl2; concl3] (RN_hl_conseq) g
 
+let t_bdHoareF_conseq env pre post g =
+  let hyps,concl = get_goal g in
+  let bhf = destr_bdHoareF concl in
+  let env = tyenv_of_hyps env hyps in
+  let mpr,mpo = EcEnv.Fun.hoareF_memenv bhf.bhf_f env in
+  let cond1, cond2 = conseq_cond bhf.bhf_pr bhf.bhf_po pre post in
+  let concl1 = gen_mems [mpr] cond1 in
+  let concl2 = gen_mems [mpo] cond2 in
+  let concl3 = f_bdHoareF pre bhf.bhf_f post bhf.bhf_cmp bhf.bhf_bd in
+  prove_goal_by [concl1; concl2; concl3] (RN_hl_conseq) g  
+
+let t_bdHoareS_conseq _env pre post g =
+  let concl = get_concl g in
+  let bhs = destr_bdHoareS concl in
+  let cond1, cond2 = conseq_cond bhs.bhs_pr bhs.bhs_po pre post in
+  let concl1 = gen_mems [bhs.bhs_m] cond1 in
+  let concl2 = gen_mems [bhs.bhs_m] cond2 in
+  let concl3 = f_bdHoareS_r { bhs with bhs_pr = pre; bhs_po = post } in
+  prove_goal_by [concl1; concl2; concl3] (RN_hl_conseq) g
 
 let t_equivF_conseq env pre post g =
   let hyps,concl = get_goal g in
