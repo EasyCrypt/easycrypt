@@ -309,7 +309,8 @@ type phltactic =
   | Prnd        of tac_side * pformula rnd_tac_info
   | Palias      of (tac_side * codepos * psymbol option)
   | Pconseq     of cfpattern
-  | Pequivdeno  of cfpattern
+  | Pbdhoaredeno  of cfpattern
+  | Pequivdeno    of cfpattern
 
 and pinline_arg =
   [ `ByName    of tac_side * (pgamepath list * int list option)

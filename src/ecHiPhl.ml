@@ -322,6 +322,36 @@ let process_rnd side env tac_info g =
       t_equiv_rnd side env bij_info g
     | _ -> cannot_apply "rnd" "unexpected instruction or wrong arguments"
 
+(* César says: too much code repetition w.r.t. ecPhl *)
+let process_bdHoare_deno env info (_,n as g) = 
+  let process_cut env g (pre,post) = 
+    let hyps,concl = get_goal g in
+    let cmp, f, bd =
+      match concl.f_node with
+      | Fapp({f_node = Fop(op,_)}, [f;bd]) when is_pr f &&
+          (EcPath.p_equal op EcCoreLib.p_eq || 
+             EcPath.p_equal op EcCoreLib.p_real_le ) ->
+        let cmp = if EcPath.p_equal op EcCoreLib.p_eq then FHeq else FHle in
+        cmp, f, bd
+      | Fapp({f_node = Fop(op,_)}, [bd;f]) when is_pr f 
+          &&
+            (EcPath.p_equal op EcCoreLib.p_eq) ->
+        FHeq, f , bd
+      | _ -> cannot_apply "bdHoare_deno" 
+        "the conclusion is not a suitable Pr expression" in (* FIXME error message *) 
+    let _,f,_,event = destr_pr f in
+    let penv, qenv = EcEnv.Fun.hoareF f env in
+    let pre  = omap_dfl pre  f_true (fun p -> process_form penv hyps p tbool) in
+    let post = omap_dfl post event  (fun p -> process_form qenv hyps p tbool) in
+    f_bdHoareF pre f post cmp bd 
+  in
+  let (juc,an), gs = process_mkn_apply process_cut env info g in
+  let pre,post =
+    let (_,f) = get_node (juc,an) in
+    let bhf = destr_bdHoareF f in
+    bhf.bhf_pr, bhf.bhf_po in
+  t_on_first (t_bdHoare_deno env pre post (juc,n)) (t_use env an gs)
+
 let process_equiv_deno env info (_,n as g) = 
   let process_cut env g (pre,post) = 
     let hyps,concl = get_goal g in
@@ -334,6 +364,7 @@ let process_equiv_deno env info (_,n as g) =
     let _,fr,_,_ = destr_pr f2 in
     let penv, qenv = EcEnv.Fun.equivF fl fr env in
     let pre  = omap_dfl pre  f_true (fun p -> process_form penv hyps p tbool) in
+    (* FIXME: Benjamin : below: put a better default event instead of f_true *)
     let post = omap_dfl post f_true (fun p -> process_form qenv hyps p tbool) in
     f_equivF pre fl fr post in
   let (juc,an), gs = process_mkn_apply process_cut env info g in
@@ -439,6 +470,7 @@ let process_phl loc env ptac g =
     | Palias info              -> process_alias env info
     | Prnd (side, info)        -> process_rnd side env info
     | Pconseq info             -> process_conseq env info
+    | Pbdhoaredeno info        -> process_bdHoare_deno env info
     | Pequivdeno info          -> process_equiv_deno env info
   in
     set_loc loc t g
