@@ -1,6 +1,6 @@
 % !TeX root = easycrypt.tex
 
-\chapter{Theories}
+\chapter{Theories (Fran\c{c}ois + Gilles)\label{chap:theories}}
 
 Definitions and lemmas can be grouped in theories, that can be imported to
 provide new language functionalities as required for a particular proof.
@@ -31,6 +31,7 @@ important for the consistency of the logical context to remember that types are
 \emph{always} assumed to be non-empty, and that operators are functionals
 (total, deterministic and side-effect free) when writing such definitions.}
 
+\subsection{Basic Usage}
 The following \EC code declares an abstract type of polymorphic arrays, equipped
 with a length operator (whose result is never negative), an indexing operator
 and extensional equality.
@@ -78,9 +79,72 @@ annotations are optional when types can be inferred.
 axiom to be optional. However, they are currently required so that the type
 variable can be instantiated.}
 
+\subsection{Higher-Order Operators}
+Operators can be higher-order. For example, the code sample shown in
+Listing~\ref{lst:init_arrays} illustrates how one can axiomatically specify an
+operator which creates a fresh array and initializes its elements with
+index-dependent values. We illustrate its usage by defining an operator
+\ec{init} that, given an integer $n$, produces the array containing integers $0$
+through $n$, in ascending order.
+
+\begin{easycrypt}[label={lst:init_arrays}]{[Index-dependent array initializer]An operator initializing an array with index-dependent values}
+op init: (int -> 'x) -> int -> 'x array.
+
+axiom init_length: forall (f:int -> 'x) l,
+  0 <= l => length (init f l) = l.
+
+axiom init_get: forall (f:int -> 'x) l i,
+  0 <= l => 0 <= i => i < l =>
+  (init f l).[i] = f i.
+
+op first_ints n = init (lambda i, i) n.
+\end{easycrypt}
+
+The \rawec{lambda} notation works as expected. The argument types can be
+specified where necessary. Equality on lambda terms is extensional.
+
 \section{Describing Distributions\label{sec:distributions}}
 
+\EC offers support for user-defined distributions. Distributions are defined by
+formally defining their density function, represented by the built-in operator
+\rawec{op mu: 'a distr -> ('a -> bool) -> real.} For example, the uniform
+distribution on booleans is defined, in the standard library, as displayed in
+Listing~\ref{lst:dbool}, where \rawec{caract P x} is \rawec{1\%r} if \rawec{P}
+holds on \rawec{x} and \rawec{0\%r} otherwise.
+
+\begin{easycrypt}[label={lst:dbool}]{[Uniform Boolean distribution]Defining the uniform distribution on booleans}
+op dbool: bool distr.
+
+axiom mu_def: forall (P:bool -> bool), 
+  mu dbool P =
+    (1%r/2%r) * caract P true +
+    (1%r/2%r) * caract P false.
+\end{easycrypt}
+
+It may not always be this easy to define distributions. More examples of
+user-provided definitions, and some distribution transformers that make it
+possible to define new distributions from existing ones, can be found in the
+standard library (Chapter~\ref{chap:libraries}).
+
+\warningbox{Distributions are defined axiomatically, and no well-formedness checks are performed.}
+
 \section{Modules and Functors\label{sec:modules}}
+
+So far, we have only considered features whose goal is to extend the language of
+expressions and the semantic domain of values. Specifications of schemes,
+oracles, assumptions and game-based security properties all use modules (and
+module signatures) and functors, which we now discuss, using random oracles as
+example.
+
+\section{Lemmas and Judgements}
+
+\subsection{Ambient Lemmas}
+
+\subsection{(Possibilistic) Hoare Judgements}
+
+\subsection{Probabilistic Hoare Judgements}
+
+\subsection{Relational Hoare Judgements}
 
 \section{Requiring, Cloning and Realizing Theories\label{sec:cloning}}
 
