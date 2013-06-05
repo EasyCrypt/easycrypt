@@ -695,24 +695,39 @@ let t_bdHoare_app dir i phi opt_bd g =
   let concl = get_concl g in
   let bhs = destr_bdHoareS concl in
   let s1,s2 = s_split "app" i bhs.bhs_s in
-  let bd1,bd2,cmp1,cmp2 = 
-    match opt_bd, bhs.bhs_cmp with
-      | Some g, FHeq | Some g, FHge ->
-        if dir then f_real_div_simpl bhs.bhs_bd g, g, bhs.bhs_cmp, bhs.bhs_cmp
-        else g, f_real_div_simpl bhs.bhs_bd g, bhs.bhs_cmp, bhs.bhs_cmp
-      | Some _, FHle -> 
-        cannot_apply "app" "optional bound parameter not supported with this judgment"
-      | None, FHge when not dir -> 
-        cannot_apply "app" "forward direction not allowed for upper bounded Hoare judgments "
-      | None, _ -> 
+  match opt_bd, bhs.bhs_cmp with
+    | None, FHle when dir ->
+      let a = f_hoareS bhs.bhs_m bhs.bhs_pr (stmt s1) phi in
+      let b = f_bdHoareS_r { bhs with bhs_pr = phi; bhs_s = stmt s2} in
+      prove_goal_by [a;b] (RN_hl_append (dir, Single i,phi,opt_bd)) g
+      
+    | Some _ , FHle ->
+      cannot_apply "app" 
+        "optional bound parameter not supported with upper bounded Hoare judgments"
+    | None, FHge when not dir -> 
+      cannot_apply "app" 
+        "forward direction not supported with upper bounded Hoare judgments "
+    | Some bd, FHeq | Some bd, FHge ->
+      let bd1,bd2,cmp1,cmp2 = 
+        if dir then f_real_div_simpl bhs.bhs_bd bd, bd, bhs.bhs_cmp, bhs.bhs_cmp
+        else bd, f_real_div_simpl bhs.bhs_bd bd, bhs.bhs_cmp, bhs.bhs_cmp
+      in
+      let a = f_bdHoareS_r { bhs with bhs_s = stmt s1; bhs_po = phi; 
+        bhs_bd = bd1; bhs_cmp = cmp1 } in
+      let b = f_bdHoareS_r { bhs with bhs_pr = phi; bhs_s = stmt s2;
+        bhs_bd = bd2; bhs_cmp = cmp2 } in
+      prove_goal_by [a;b] (RN_hl_append (dir, Single i,phi,opt_bd)) g
+
+    | None, _ -> 
+      let bd1,bd2,cmp1,cmp2 = 
         if dir then f_r1, bhs.bhs_bd, FHeq, bhs.bhs_cmp
         else bhs.bhs_bd, f_r1, bhs.bhs_cmp, FHeq
-  in
-  let a = f_bdHoareS_r { bhs with bhs_s = stmt s1; bhs_po = phi; 
-    bhs_bd = bd1; bhs_cmp = cmp1 } in
-  let b = f_bdHoareS_r { bhs with bhs_pr = phi; bhs_s = stmt s2;
-    bhs_bd = bd2; bhs_cmp = cmp2 } in
-  prove_goal_by [a;b] (RN_hl_append (dir, Single i,phi,opt_bd)) g
+      in
+      let a = f_bdHoareS_r { bhs with bhs_s = stmt s1; bhs_po = phi; 
+        bhs_bd = bd1; bhs_cmp = cmp1 } in
+      let b = f_bdHoareS_r { bhs with bhs_pr = phi; bhs_s = stmt s2;
+        bhs_bd = bd2; bhs_cmp = cmp2 } in
+      prove_goal_by [a;b] (RN_hl_append (dir, Single i,phi,opt_bd)) g
       
 
 
