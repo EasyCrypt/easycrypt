@@ -10,8 +10,8 @@ open EcFol
 open EcBaseLogic
 open EcEnv
 open EcReduction
-
 open EcEctoField
+
 (* -------------------------------------------------------------------- *)
 let get_node  g = (get_goal g).pj_decl
 let get_goal  g = (get_open_goal g).pj_decl
@@ -575,53 +575,6 @@ let t_field_simp (plus,times,inv,minus,z,o,eq) t1 g =
 	let pzs' = List.fold_left (fun is i -> (f_not (mk_form (Fapp (eq, [i;z])) tbool)) :: is) [] pzs in
 	prove_goal_by (res :: pzs') RN_field g
 
-
-let t_split env g =
-  let hyps, concl = get_goal g in
-  let rec aux f =
-    match f.f_node with
-    | Fop(p,_) when EcPath.p_equal p p_true ->
-      check_logic env p_true_intro;
-      t_glob env p_true_intro [] g
-    | Fapp({f_node = Fop(p,_)}, [f1;f2]) ->
-      let lem =
-        match op_kind p with
-        | OK_and b ->
-          Some ((if b then p_anda_intro else p_and_intro),
-                [], [AAform f1;AAform f2;AAnode;AAnode])
-        | OK_iff   -> Some (p_iff_intro, [], [AAform f1;AAform f2;AAnode;AAnode])
-        | OK_eq    -> 
-          let env = tyenv_of_hyps env hyps in
-          if EcReduction.is_conv env hyps f1 f2 then
-            Some (p_eq_refl, [f1.f_ty], [AAform f1])
-          else 
-            begin 
-              try 
-                let fs1 = destr_tuple f1 in
-                let fs2 = destr_tuple f2 in
-                let lemma = p_eq_tuple_intro (List.length fs1) in
-                let toForm l = List.map (fun f -> AAform f) l in
-                let toNode l = List.map (fun _ -> AAnode) l in
-                let toTy l = List.map (fun f -> f.f_ty) l in
-                Some (lemma, toTy fs1, toForm fs1 @ toForm fs2 @ toNode fs1)
-              with _ -> None
-            end
-        | _        -> None in
-      begin match lem with
-      | Some (p,tys,aa) -> t_apply_logic env p tys aa g
-      | None -> aux_red f
-      end
-    | Fif(f1,_f2,_f3) ->
-      t_case env f1 g 
-(*      t_apply_logic env p_if_intro []
-        [AAform f1; AAform f2; AAform f3;AAnode;AAnode] g *)
-    | _ ->  aux_red f
-  and aux_red f =
-    match h_red_opt full_red env hyps f with
-    | Some f -> aux f
-    | None -> tacerror (UnknownSplit f) in
-  aux concl
-
 let gen_t_exists do_arg env fs (juc,n as g) =
   let hyps,concl = get_goal g in
   let rec aux s ras fs concl =
@@ -678,6 +631,79 @@ let t_rewrite_hyp env side id args (juc,n as g) =
   let g' = mkn_hyp juc hyps id in
   t_rewrite_node env (mkn_apply (fun _ _ _ a -> a) env g' args) side n
 
+  
+(* This tactic works only if the conclusion is exactly a reflexive equality*)
+let t_reflex env g =
+  let _, concl = get_goal g in
+  let (f,_) = destr_eq concl in
+  t_apply_logic env p_eq_refl [f.f_ty] [AAform f] g
+  
+let genSplitTuple env types =
+  let create x = EcIdent.fresh (EcIdent.create x) in
+  let parseType ty =
+    let x = create "x" in
+    let y = create "y" in
+    (((x, GTty ty), (y, GTty ty)),
+    (EcFol.f_local x ty, EcFol.f_local y ty))
+  in
+  let (vars, fvars) = List.split (List.map parseType types) in
+  let (varsx, varsy) = List.split vars in
+  let (fvarsx, fvarsy) = List.split fvars in
+  let bindings = varsx@varsy in
+  let hyps = List.map (fun (x,y) -> f_eq x y) fvars in
+  let body = f_eq (f_tuple fvarsx) (f_tuple fvarsy) in
+  let f = f_forall bindings (f_imps hyps body) in
+  let introVars = List.map (fun _ -> create "_") bindings in
+  let introHyps = List.map (fun _ -> create "_") fvarsx in
+  let rews = List.map (fun h -> t_rewrite_hyp env true h []) introHyps in
+  (f, t_seq (t_lseq (t_intros_i env (introVars@introHyps)::rews)) (t_reflex env))
+  
+let t_split env g =
+  let hyps, concl = get_goal g in
+  let rec aux f =
+    match f.f_node with
+    | Fop(p,_) when EcPath.p_equal p p_true ->
+      check_logic env p_true_intro;
+      t_glob env p_true_intro [] g
+    | Fapp({f_node = Fop(p,_)}, [f1;f2]) ->
+      begin
+        match op_kind p with
+        | OK_and b -> 
+          t_apply_logic env (if b then p_anda_intro else p_and_intro)
+                [] [AAform f1;AAform f2;AAnode;AAnode] g
+        | OK_iff   ->
+          t_apply_logic env p_iff_intro []
+                [AAform f1;AAform f2;AAnode;AAnode] g
+        | OK_eq    -> 
+          let env0 = tyenv_of_hyps env hyps in
+          if EcReduction.is_conv env0 hyps f1 f2 then
+            t_reflex env g
+          else
+            if is_tuple f1 && is_tuple f2 then
+              let fs1 = destr_tuple f1 in
+              let fs2 = destr_tuple f2 in
+              let types = List.map (fun v -> v.f_ty) fs1 in
+              let toForm l = List.map (fun f -> AAform f) l in
+              let nodes = List.map (fun _ -> AAnode) fs1 in
+              let _idtacs = List.map (fun _ -> (t_id None)) fs1 in (* FIXME *)
+              let (lem, proof) = genSplitTuple env types in
+              let gs =
+                t_apply_form env lem ((toForm fs1)@(toForm fs2)@nodes) g in
+              t_on_first gs proof
+            else
+              aux_red f
+        | _ -> aux_red f
+      end
+    | Fif(f1,_f2,_f3) ->
+      t_case env f1 g 
+(*      t_apply_logic env p_if_intro []
+        [AAform f1; AAform f2; AAform f3;AAnode;AAnode] g *)
+    | _ ->  aux_red f
+  and aux_red f =
+    match h_red_opt full_red env hyps f with
+    | Some f -> aux f
+    | None -> tacerror (UnknownSplit f) in
+  aux concl
 
 let t_subst_gen env x h side g =
   let hyps,concl = get_goal g in

@@ -103,6 +103,8 @@ and bdHoareS = {
   bhs_bd  : form;
 }
 
+type app_bd_info = AppNone | AppSingle of form
+                   | AppMult of (form * form * form * form)
 
 (*-------------------------------------------------------------------- *)
 let f_equal : form -> form -> bool = (==)
@@ -622,6 +624,7 @@ let fop_int_le = f_op EcCoreLib.p_int_le [] (tfun tint (tfun tint ty_bool))
 let fop_int_lt = f_op EcCoreLib.p_int_lt [] (tfun tint (tfun tint ty_bool))
 let fop_real_le = f_op EcCoreLib.p_real_le [] (tfun treal (tfun treal ty_bool))
 let fop_real_lt = f_op EcCoreLib.p_real_lt [] (tfun treal (tfun treal ty_bool))
+let fop_real_sum = f_op EcCoreLib.p_real_sum [] (tfun treal (tfun treal treal))
 let fop_real_prod = f_op EcCoreLib.p_real_prod [] (tfun treal (tfun treal treal))
 let fop_real_div = f_op EcCoreLib.p_real_div [] (tfun treal (tfun treal treal))
 
@@ -649,6 +652,12 @@ let f_real_lt f1 f2 =
   else 
     assert false (* FIXME *)
 
+let f_real_sum f1 f2 =
+  if ty_equal f1.f_ty treal && ty_equal f2.f_ty treal then
+    f_app fop_real_sum [f1;f2] ty_real
+  else 
+    assert false (* FIXME *)
+
 let f_real_prod f1 f2 =
   if ty_equal f1.f_ty treal && ty_equal f2.f_ty treal then
     f_app fop_real_prod [f1;f2] ty_real
@@ -662,6 +671,17 @@ let f_real_div f1 f2 =
     assert false (* FIXME *)
 
 let rec gcd a b = if b = 0 then a else gcd b (a mod b)
+
+let rec f_real_sum_simpl f1 f2 =
+  match f1.f_node, f2.f_node with
+    | Fapp (op1,[{f_node=Fint n1}]), Fapp (op2,[{f_node=Fint n2}]) 
+      when f_equal f_op_real_of_int op1 && f_equal f_op_real_of_int op2 ->
+      f_real_of_int (f_int (n1 + n2))
+    | _ ->
+      if f_equal f_r0 f1 then f2
+      else if f_equal f_r0 f2 then f1
+      else f_real_prod f1 f2
+    
 
 let rec f_real_prod_simpl f1 f2 =
   match f1.f_node, f2.f_node with

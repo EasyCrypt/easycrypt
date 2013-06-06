@@ -105,7 +105,7 @@ type rule_name =
   | RN_hl_skip
   | RN_hl_wp        of tac_pos
   (* append: bool indicates direction: true backwards *)
-  | RN_hl_append    of bool * tac_pos * EcFol.form * EcFol.form option
+  | RN_hl_append    of bool * tac_pos * EcFol.form * EcFol.app_bd_info
   | RN_hl_rcond     of bool option * bool * int
   | RN_hl_case      of form
   | RN_hl_while     of EcFol.form * EcFol.form option * (EcFol.form * EcFol.form) option
@@ -123,6 +123,9 @@ type rule_name =
   | RN_hl_conseq 
   | RN_hl_hoare_equiv 
   | RN_hl_deno      
+  | RN_hl_hoare_bd_hoare      
+  | RN_hl_prbounded      
+  | RN_hl_bdeq      
 
   | RN_bhl_rnd of (EcFol.form option * EcFol.form)
 

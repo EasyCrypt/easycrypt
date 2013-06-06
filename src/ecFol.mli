@@ -27,6 +27,7 @@ type binding =  (EcIdent.t * gty) list
 
 type hoarecmp = FHle | FHeq | FHge
 
+
 type form = private { 
   f_node : f_node;
   f_ty   : ty; 
@@ -103,6 +104,9 @@ and bdHoareS = {
   bhs_bd  : form;
 }
 
+type app_bd_info = AppNone | AppSingle of form
+                   | AppMult of (form * form * form * form)
+
 
 (* -------------------------------------------------------------------- *)
 val gty_equal : gty  -> gty -> bool
@@ -113,7 +117,7 @@ val f_fv      : form -> int Mid.t
 val f_ty      : form -> EcTypes.ty
 
 module Mf : Map.S with type key = form
-module Sf : Mf.Set with type elt = form 
+module Sf : Set.S with module M = Map.MakeBase(Mf)
 module Hf : EHashtbl.S with type key = form
 
 (* -------------------------------------------------------------------- *)
@@ -204,7 +208,9 @@ val f_int_lt  : form -> form -> form
 val f_real_le : form -> form -> form
 val f_real_lt  : form -> form -> form
 
-val f_real_div  : form -> form -> form
+val f_real_div   : form -> form -> form
+val f_real_sum   : form -> form -> form
+val f_real_prod  : form -> form -> form
 
 val fop_in_supp  : EcTypes.ty -> form
 val f_in_supp    : form -> form -> form
@@ -237,7 +243,9 @@ val f_imps_simpl : form list -> form -> form
 val f_iff_simpl  : form -> form -> form
 val f_eq_simpl   : form -> form -> form
 
-val f_real_div_simpl  : form -> form -> form
+val f_real_sum_simpl   : form -> form -> form
+val f_real_prod_simpl  : form -> form -> form
+val f_real_div_simpl   : form -> form -> form
 
 (* -------------------------------------------------------------------- *)
 

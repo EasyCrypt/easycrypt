@@ -82,13 +82,23 @@ The first formula is the intermediate predicate.
 Assume $s_2$ is at program position $n$:
 \begin{displaymath}
   \infrule{
-    \bdHoareSeq{s1}{P}{R}{1} \qquad \bdHoareSle{s2}{R}{Q}{f}
+    \hoareS{s1}{P}{R} \qquad \bdHoareSle{s2}{R}{Q}{f}
+  }{
+    \bdHoareSle{s1;s2}{P}{Q}{f}
+  }\left[\verb+app+\ n\ R\right]
+\end{displaymath}
+%
+Which, if preferred, can be rewritten to:
+\begin{displaymath}
+  \infrule{
+    \hoareS{s1}{P}{\lambda m. \Prm{s_2}{m}{Q}\leq f} \qquad 
   }{
     \bdHoareSle{s1;s2}{P}{Q}{f}
   }\left[\verb+app+\ n\ R\right]
 \end{displaymath}
 
-The following is a generalization but not implemented:
+
+The following rule is a generalization but not implemented:
 \begin{displaymath}
   \infrule{
     \begin{array}{c}

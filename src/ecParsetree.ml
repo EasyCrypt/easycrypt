@@ -288,12 +288,19 @@ and pspattern = unit
 
 type codepos = int * ((int * codepos) option)
 
+(* AppSingle are optional for bounded Phl judgments
+   AppMult is required by most general rule for upper bounded Phl
+   AppNone is required for the rest of judgments 
+*)
+type p_app_bd_info = PAppNone | PAppSingle of pformula 
+                   | PAppMult of (pformula * pformula * pformula * pformula)
+
 type phltactic = 
   | Pfun_def  
   | Pfun_abs    of pformula
   | Pfun_upto   of (pformula * pformula * pformula option)
   | Pskip
-  | Papp        of (bool * int doption * pformula * pformula option)
+  | Papp        of (bool * int doption * pformula * p_app_bd_info)
   | Pwp         of int doption option 
   | Pwhile      of (pformula * pformula option * (pformula * pformula) option)
   | Pfission    of (tac_side * codepos * (int * (int * int)))
@@ -311,6 +318,10 @@ type phltactic =
   | Pconseq     of cfpattern
   | Pbdhoaredeno  of cfpattern
   | Pequivdeno    of cfpattern
+  | Phoare
+  | Pbdhoare
+  | Pprbounded
+  | Pbdeq 
 
 and pinline_arg =
   [ `ByName    of tac_side * (pgamepath list * int list option)

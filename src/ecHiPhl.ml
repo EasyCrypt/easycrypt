@@ -39,22 +39,32 @@ let process_phl_formula = process_phl_form tbool
 
 let process_prhl_formula = process_prhl_form tbool
 
-let process_app env dir k phi bd_opt g =
+let process_phl_bd_info env g bd_info = match bd_info with
+  | PAppNone -> AppNone
+  | PAppSingle f -> AppSingle (process_phl_form treal env g f)
+  | PAppMult(f1,f2,f3,f4) ->
+    let f1 = process_phl_form treal env g f1 in
+    let f2 = process_phl_form treal env g f2 in
+    let f3 = process_phl_form treal env g f3 in
+    let f4 = process_phl_form treal env g f4 in
+    AppMult(f1,f2,f3,f4)
+
+let process_app env dir k phi bd_info g =
   let concl = get_concl g in
-  match k, bd_opt with
-    | Single i, None when is_hoareS concl ->
+  match k, bd_info with
+    | Single i, PAppNone when is_hoareS concl ->
       let phi = process_phl_formula env g phi in
       t_hoare_app i phi g
     | Single i, _ when is_bdHoareS concl ->
       let phi = process_phl_formula env g phi in
-      let bd_opt = omap bd_opt (process_phl_form treal env g) in
-      t_bdHoare_app dir i phi bd_opt g
-    | Double(i,j), None ->
+      let bd_info = process_phl_bd_info env g bd_info in
+      t_bdHoare_app dir i phi bd_info g
+    | Double(i,j), PAppNone ->
       let phi = process_prhl_formula env g phi in
       t_equiv_app (i,j) phi g
-    | Single _, None ->
+    | Single _, PAppNone ->
       cannot_apply "app" "wrong position parameter"
-    | _, Some _ ->
+    | _, _ ->
       cannot_apply "app" "optional bound parameter not supported"
 
 let process_while env phi vrnt_opt info g =
@@ -455,7 +465,13 @@ let process_fun_upto env (bad, p, o) g =
     let env =  EcEnv.Memory.push_active (EcFol.mhr,None) env in
     process_formula env g bad in
   t_equivF_abs_upto env bad p q g
-    
+
+
+let process_hoare_bd_hoare g = t_hoare_bd_hoare g
+let process_prbounded = t_prbounded
+let process_bdeq = t_bdeq
+
+
 (* -------------------------------------------------------------------- *)
 let process_phl loc env ptac g =
   let t =
@@ -482,5 +498,8 @@ let process_phl loc env ptac g =
     | Pconseq info             -> process_conseq env info
     | Pbdhoaredeno info        -> process_bdHoare_deno env info
     | Pequivdeno info          -> process_equiv_deno env info
+    | Phoare | Pbdhoare        -> process_hoare_bd_hoare
+    | Pprbounded               -> process_prbounded
+    | Pbdeq                    -> process_bdeq
   in
     set_loc loc t g
