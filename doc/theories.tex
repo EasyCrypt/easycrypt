@@ -140,12 +140,14 @@ We first formally define the functionalities a random oracle is expected to
 provide, as a \emph{module type}, or \emph{signature}
 (Listing~\ref{lst:modulesig}). Any module implementation \rawec{M} that provides
 \emph{at least} the functions from a module type \rawec{Mt} is said to be of
-type \rawec{Mt} (denoted \rawec{M :> Mt}).
+type \rawec{Mt} (denoted \rawec{M :> Mt}). Module types cannot specify state
+directly. Instead, if a global variable of the module should be exposed to the
+outside, getter and setter functions can be added to the module signature.
 
 \begin{easycrypt}[label={lst:modulesig}]{[A signature for random oracles]A signature for random oracles from bitstrings to bitstrings}
 module type RO = {
-  fun init():unit;
-  fun h(x:bitstring):bitstring; }.
+  fun init():unit
+  fun h(x:bitstring):bitstring }.
 \end{easycrypt}
 
 Such a module signature can then be given various realizations. For example, Listing~\ref{lst:modules} shows two possible realizations of a random oracle, both of which assume a positive integer constant \rawec{qH}, used to bound the number of calls to the oracle, and two positive integer constants \rawec{inLen} and \rawec{outLen} representing the input and output lengths of the random oracles.
@@ -216,6 +218,19 @@ module RO_E: RO = {
 \begin{easycrypt}[frame=non,xleftmargin=0pt,xrightmargin=0pt,label={lst:modules}]{[Two random oracles]Two possible implementations of module type \rawec{RO}}
 \end{easycrypt}
 \end{minipage}
+
+\subsection{Functors and Oracle Annotations}
+Modules can in fact be specified as functors, parameterized by other modules
+whose functions can be accessed as oracles. For example, the signature shown in
+Listing~\ref{lst:functorsig} describes a class of modules that are given access
+to a random oracle but whose unique function can in fact only call the \rawec{h}
+function provided by the parameter.
+
+\begin{easycrypt}[label={lst:functorsig}]{[A functor signature]A functor signature}
+module type RO_adv(O:RO) = {
+  fun a(): bool { O.h }
+}.
+\end{easycrypt}
 
 \section{Lemmas and Judgements}
 
