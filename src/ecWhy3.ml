@@ -263,7 +263,7 @@ type rebinding_item =
   | RBmp  of EcPath.mpath * Term.lsymbol
   | RBxpf  of EcPath.xpath * Term.lsymbol
   | RBxpv  of EcPath.xpath * Term.lsymbol
-  | RBfun of Decl.decl * Decl.decl * Decl.decl
+  | RBfun of Decl.decl (* Decl.decl *) * Decl.decl
 
 type rebinding = rebinding_item list
 
@@ -392,10 +392,10 @@ let rebind_item env = function
   | RBmp(p,ls)      -> add_mp env p ls
   | RBxpv(p,ls)     -> add_xpv env p ls
   | RBxpf(p,ls)     -> add_xpf env p ls
-  | RBfun(decl,decls,sdecl) ->
+  | RBfun(decl,(*decls,*)sdecl) ->
       let task =
         List.fold_left add_decl_with_tuples
-          env.logic_task [decl;decls;sdecl] in
+          env.logic_task [decl(*;decls*);sdecl] in
       { env with logic_task = task }
 
 let rebind = List.fold_left rebind_item
@@ -1140,16 +1140,16 @@ let trans_form env f =
     | Fop(p,tys) -> trans_app !env p tys []
 
     | Fapp({f_node = Fop(p,tys) },args) ->
-        let args = List.map trans_form args in
-        trans_app !env p tys args
+      let args = List.map trans_form args in
+      trans_app !env p tys args
 
     | Fapp(e,args) ->
-        let args = List.map trans_form args in
-        apply_highorder (trans_form e) args
+      let args = List.map trans_form args in
+      apply_highorder (trans_form e) args
 
     | Ftuple args ->
-        let args = List.map trans_form_b args in
-        Term.t_tuple args
+      let args = List.map trans_form_b args in
+      Term.t_tuple args
 
     | FhoareF _   -> raise (CanNotTranslate "FhoareF")
     | FhoareS _   -> raise (CanNotTranslate "FhoareS")
@@ -1178,43 +1178,39 @@ let trans_form env f =
   and trans_form_b f = force_bool (trans_form f)
 
   and trans_lambda vs body =
-    let pids   = Ident.id_fresh "unamed_lambda_s" in
-    let pid    = Ident.id_fresh "unamed_lambda" in
+    (* We compute the free variable of the lambda *)
     let fv     =
       List.fold_left (fun s x -> Term.Mvs.remove x s)
         body.Term.t_vars vs in
-
-    let sparams  = Term.Mvs.keys fv in
-    let sdom   = List.map (fun vs -> vs.Term.vs_ty) sparams in
+    let fv_ids = Term.Mvs.keys fv in
+    let tfv = List.map (fun v -> v.Term.vs_ty) fv_ids in
     let tvs = List.map (fun v -> v.Term.vs_ty) vs in
     let codom = if body.Term.t_ty = None then Ty.ty_bool else oget body.Term.t_ty in
-    let scodom = List.fold_right Ty.ty_func tvs codom in
-    let lss = Term.create_fsymbol pids sdom scodom in
-    let sdecl  = Decl.create_param_decl lss in
-
-
-    let ls  = Term.create_lsymbol pid (sdom @ tvs) body.Term.t_ty in
-    let params = sparams @ vs in
-    let ldecl  = Decl.make_ls_defn ls params body in
-    let decl   = Decl.create_logic_decl [ldecl] in
-
-    let sarg   = List.map Term.t_var sparams in
-    let arg    = List.map Term.t_var params in
-    let lss_papp = Term.t_app_infer lss sarg in
-    let lss_app  = List.fold_left Term.t_func_app lss_papp arg in
-    let ls_app   = Term.t_app_infer ls (sarg@arg) in
-    let concl    =
-      if body.Term.t_ty = None then Term.t_iff (force_prop lss_app) ls_app
-      else Term.t_equ lss_app ls_app in
-    let spec   = Term.t_forall_close params [] concl in
-    let pr     = Decl.create_prsymbol pids in
-    let spdecl  = Decl.create_prop_decl Decl.Paxiom pr spec in
-    rb := RBfun(decl,sdecl,spdecl) :: !rb;
+    (* We create the symbol corresponding to the lambda *)
+    let lam_sym = Ident.id_fresh "unamed_lambda" in 
+    let flam_sym = 
+      Term.create_fsymbol lam_sym tfv 
+        (List.fold_right Ty.ty_func tvs codom) in
+    let decl_sym = Decl.create_param_decl flam_sym in
+    (* We create the spec *)
+    let fvargs   = List.map Term.t_var fv_ids in
+    let vsargs   = List.map Term.t_var vs in
+    let flam_app = 
+      Term.t_app_infer flam_sym fvargs in
+    let flam_fullapp = 
+      List.fold_left Term.t_func_app flam_app vsargs in
+    let concl = 
+      if body.Term.t_ty = None then Term.t_iff (force_prop flam_fullapp) body
+      else Term.t_equ flam_fullapp body in
+    let spec = Term.t_forall_close (fv_ids@vs) [] concl in
+    let spec_sym = Decl.create_prsymbol (Ident.id_fresh "unamed_lambda_spec") in
+    let decl_spec = Decl.create_prop_decl Decl.Paxiom spec_sym spec in
+    rb := RBfun(decl_sym,decl_spec) :: !rb;
     env := { !env with
              logic_task =
              List.fold_left add_decl_with_tuples !env.logic_task
-               [decl;sdecl;spdecl] };
-    lss_papp
+               [decl_sym;decl_spec] };
+    flam_app
 
   and trans_ev ev =
     (* FIXME : We should be able to share equal definition *)
@@ -1258,11 +1254,11 @@ let trans_form env f =
         (Term.t_iff (force_prop app_s) (force_prop app)) in
     let pr     = Decl.create_prsymbol pids in
     let sdecl  = Decl.create_prop_decl Decl.Paxiom pr spec in
-    rb := RBfun(decl,decls,sdecl) :: !rb;
+    rb := RBfun(decl(*,decls*),sdecl) :: !rb;
     env := { !env with
              logic_task =
              List.fold_left add_decl_with_tuples !env.logic_task
-               [decl;decls;sdecl] };
+               [decl;(*decls;*)sdecl] };
     restore mid;
     lss_app in
 
