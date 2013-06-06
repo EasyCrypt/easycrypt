@@ -133,8 +133,89 @@ standard library (Chapter~\ref{chap:libraries}).
 So far, we have only considered features whose goal is to extend the language of
 expressions and the semantic domain of values. Specifications of schemes,
 oracles, assumptions and game-based security properties all use modules (and
-module signatures) and functors, which we now discuss, using random oracles as
-example.
+module signatures) and functors, which we now discuss, using a simple modular
+definition of a random oracle from bitstrings to bitstrings as an example.
+
+We first formally define the functionalities a random oracle is expected to
+provide, as a \emph{module type}, or \emph{signature}
+(Listing~\ref{lst:modulesig}). Any module implementation \rawec{M} that provides
+\emph{at least} the functions from a module type \rawec{Mt} is said to be of
+type \rawec{Mt} (denoted \rawec{M :> Mt}).
+
+\begin{easycrypt}[label={lst:modulesig}]{[A signature for random oracles]A signature for random oracles from bitstrings to bitstrings}
+module type RO = {
+  fun init():unit;
+  fun h(x:bitstring):bitstring; }.
+\end{easycrypt}
+
+Such a module signature can then be given various realizations. For example, Listing~\ref{lst:modules} shows two possible realizations of a random oracle, both of which assume a positive integer constant \rawec{qH}, used to bound the number of calls to the oracle, and two positive integer constants \rawec{inLen} and \rawec{outLen} representing the input and output lengths of the random oracles.
+
+%% The following is probably the single most disgusting thing I've ever typeset in Latex... and I've done ugly things.
+\begin{minipage}{\textwidth}
+\hrule
+\begin{multicols}{2}
+\begin{easycrypt}[frame=none,xleftmargin=0pt,xrightmargin=0pt]{}
+module RO_L: RO = {
+  var cG: int
+  var mG: (bitstring,bitstring) map
+
+  fun init() = {
+    mG = empty;
+    cG = 0;
+  }
+
+  fun h(x:bitstring) = {
+    var r:bitstring;
+    var res:bitstring = empty;
+    if (length x = inLen && cG < qG)
+    {
+      cG = cG + 1;
+      r = $dbitstring(outLen);
+      if (!mem(x,dom mG)) mG[x] = r;
+      res = mG[x];
+    }
+    return res;
+  }
+}.
+\end{easycrypt}
+\columnbreak
+\begin{easycrypt}[frame=none,xleftmargin=0pt,xrightmargin=0pt]{}
+module RO_E: RO = {
+  var tape: bitstring list
+  var mG: (bitstring,bitstring) map
+
+  fun init() = {
+    var r:bitstring;
+    tape = [];
+    mG = empty;
+    while (length tape < qG)
+    {
+      r = $dbitstring(outLen);
+      tape = r :: tape;
+    }
+  }
+
+  fun h(x:bitstring) = {
+    var r:bitstring;
+    var res:bitstring = empty;
+    if (length x = inLen &&
+       length tape <> 0)
+    {
+      r = hd tape;
+      if (!mem(x,dom mG))
+        mG[x] = r;
+      res = mG[x];
+      tape = tl tape;
+    }
+    return res;
+  }
+}.
+\end{easycrypt}
+\end{multicols}
+\hrule
+\begin{easycrypt}[frame=non,xleftmargin=0pt,xrightmargin=0pt,label={lst:modules}]{[Two random oracles]Two possible implementations of module type \rawec{RO}}
+\end{easycrypt}
+\end{minipage}
 
 \section{Lemmas and Judgements}
 
