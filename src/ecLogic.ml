@@ -380,40 +380,55 @@ let t_intros_i env ids g =
 (* internal use *)
 (* Generate a lemma and his prove that permits to elim a tuple *)
 let genElimTuple env types =
+  let un = ref (-1) in
+  let fresh () = un := !un + 1;EcIdent.fresh (EcIdent.create ("a"^(string_of_int (!un)))) in
   let create t =
-    let v = EcIdent.fresh (EcIdent.create "_") in
-    ((v, t), (v, GTty t),EcFol.f_local v t)
+    let v = fresh () in
+    ((v, GTty t),EcFol.f_local v t)
   in
-  let parseType ty =
-    let (_, bX, fX) = create ty in
-    let (_, bY, fY) = create ty in
+  let createBis t =
+    let v = fresh () in
+    ((v, t), EcFol.f_local v t)
+  in
+  let parseType cr ty =
+    let (bX, fX) = cr ty in
+    let (bY, fY) = cr ty in
     ((bX, bY), (fX, fY))
   in
-  let (_, bC, fC) = create EcTypes.tbool in
-  let (vars, fvars) = List.split (List.map parseType types) in
+  let (bC, fC) = create EcTypes.tbool in
+  let (vars, fvars) = List.split (List.map (parseType create) types) in
   let (varsx, varsy) = List.split vars in
   let (fvarsx, fvarsy) = List.split fvars in
   let bindings = varsx@varsy@[bC] in
-  let lTup = (f_tuple fvarsx) in
-  let rTup = (f_tuple fvarsy) in
-  let hyp1 = f_eq lTup rTup in
-  let hyp2 = f_imps (List.map (fun (x,y) -> f_eq x y) fvars) fC in
+  let hyp1 = f_eq (f_tuple fvarsx) (f_tuple fvarsy) in
+  let hyp2 = f_imp (f_ands (List.map (fun (x,y) -> f_eq x y) fvars)) fC in
   let f = f_forall bindings (f_imps [hyp1; hyp2] fC) in
-  let pred =
-    let (_, bT, fT) = create (ttuple types) in
-    let projs = List.map create types in
-    let fprojs = (List.map (fun (_,_,x) -> x) projs) in
-    let intro = LTuple (List.map (fun (x,_,_) -> x) projs) in
-    let eqs = List.map (fun (x, y) -> f_eq x y) (List.combine fprojs fvarsy) in
+  let pred vars =
+    let (lvars, rvars) = List.split vars in
+    let (bT, fT) = create (ttuple types) in
+    let projs = List.map createBis types in
+    let (intro, fprojs) = List.split projs in
+    let introTu = LTuple intro in
+    let eqs = List.map (fun (x, y) -> f_eq x y) (List.combine fprojs rvars) in
     let body = f_ands eqs in
-    f_lambda [bT] (f_let intro rTup body)
+    f_app (f_lambda [bT] (f_let introTu fT body)) [f_tuple lvars] (EcTypes.ttuple types)
   in
-  (*t_seq t_apply_form env pred [lTup]
-  t_lseq [ () t_simplify]*)
-  (*let introVars = List.map (fun x -> create "_") bindings in
-  let introHyps = List.map (fun x -> create "_") fvarsx in
-  let rews = List.map (fun h -> t_rewrite_hyp env true h []) introHyps in*)
-  (f, t_admit (*t_seq (t_lseq (t_intros_i env (introVars@introHyps)::rews)) (t_reflex env)*))
+  let (locVars, locVarsF) = List.split (List.map (parseType createBis) types) in
+  let (locC, locCF) = createBis EcTypes.tbool in
+  let introVars =
+    let (a, b) = List.split locVars in
+    fst (List.split (a@b@[locC]))
+  in
+  let h1 = fresh () in
+  let h2 = fresh () in
+  let intro = t_intros_i env (introVars@[h1;h2]) in
+  let proof = [
+    intro;
+    t_apply_hyp env h2 [AAnode];
+    t_apply_form env (pred locVarsF) [];
+    t_admit
+  ] in
+  (f, t_lseq proof)
 
 let t_elim env f (juc,n) =
   let hyps,concl = get_goal (juc,n) in
