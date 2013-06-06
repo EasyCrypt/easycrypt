@@ -14,10 +14,6 @@ open EcMetaProg
 
 module Zpr = EcMetaProg.Zipper
 
-(* -------------------------------------------------------------------- *)
-(* -------------------------  Substitution  --------------------------- *)
-(* -------------------------------------------------------------------- *)
-
 let get_abs_functor f = 
   let f = f.EcPath.x_top in
   match f.EcPath.m_top with
