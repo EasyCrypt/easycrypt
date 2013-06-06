@@ -862,8 +862,15 @@ let find_in_hyps env f hyps =
     with _ -> false in
   fst (List.find test hyps.h_local)
 
+let t_assumption env g = 
+  let hyps,concl = get_goal g in
+  let h = find_in_hyps env concl hyps in
+  t_hyp env h g
+    
 let t_progress env t_final g =
-  let rec aux g = t_seq (t_simplify_nodelta env) aux1 g 
+  let rec aux g = t_seq (t_simplify_nodelta env) aux0 g 
+  and aux0 g = 
+    t_or (t_assumption env) aux1 g 
   and aux1 g = 
     let hyps,concl = get_goal g in
     match concl.f_node with
