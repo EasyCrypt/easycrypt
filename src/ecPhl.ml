@@ -689,25 +689,34 @@ let t_hoare_app i phi g =
   let s1,s2 = s_split "app" i hs.hs_s in
   let a = f_hoareS_r { hs with hs_s = stmt s1; hs_po = phi }  in
   let b = f_hoareS_r { hs with hs_pr = phi; hs_s = stmt s2 } in
-  prove_goal_by [a;b] (RN_hl_append (true,Single i,phi,None)) g
+  prove_goal_by [a;b] (RN_hl_append (true,Single i,phi,AppNone)) g
 
-let t_bdHoare_app dir i phi opt_bd g =
+let t_bdHoare_app dir i phi bd_info g =
   let concl = get_concl g in
   let bhs = destr_bdHoareS concl in
   let s1,s2 = s_split "app" i bhs.bhs_s in
-  match opt_bd, bhs.bhs_cmp with
-    | None, FHle when dir ->
+  match bd_info, bhs.bhs_cmp with
+    | AppNone, FHle when dir ->
       let a = f_hoareS bhs.bhs_m bhs.bhs_pr (stmt s1) phi in
       let b = f_bdHoareS_r { bhs with bhs_pr = phi; bhs_s = stmt s2} in
-      prove_goal_by [a;b] (RN_hl_append (dir, Single i,phi,opt_bd)) g
-      
-    | Some _ , FHle ->
-      cannot_apply "app" 
-        "optional bound parameter not supported with upper bounded Hoare judgments"
-    | None, FHge when not dir -> 
+      prove_goal_by [a;b] (RN_hl_append (dir, Single i,phi,bd_info)) g
+    | AppMult (f1,f2,g1,g2), FHle ->
+      let a1 = f_bdHoareS_r { bhs with bhs_po = phi; bhs_s = stmt s1; bhs_bd=f1}  in
+      let b1 = f_bdHoareS_r { bhs with bhs_pr = phi; bhs_s = stmt s2; bhs_bd=f2} in
+      let a2 = f_bdHoareS_r { bhs with bhs_po = f_not phi; bhs_s = stmt s1; bhs_bd=g1}  in
+      let b2 = f_bdHoareS_r { bhs with bhs_pr = f_not phi; bhs_s = stmt s2; bhs_bd=g2} in
+      let bd_g = f_real_le (f_real_sum (f_real_prod f1 f2) (f_real_prod g1 g2)) bhs.bhs_bd in
+      prove_goal_by [a1;b1;a2;b2;bd_g] (RN_hl_append (dir, Single i,phi,bd_info)) g
+
+    | _, FHle when not dir -> 
       cannot_apply "app" 
         "forward direction not supported with upper bounded Hoare judgments "
-    | Some bd, FHeq | Some bd, FHge ->
+      
+    | AppSingle _ , FHle ->
+      cannot_apply "app" 
+        "single optional bound parameter not supported with upper bounded Hoare judgments"
+
+    | AppSingle bd, FHeq | AppSingle bd, FHge ->
       let bd1,bd2,cmp1,cmp2 = 
         if dir then f_real_div_simpl bhs.bhs_bd bd, bd, bhs.bhs_cmp, bhs.bhs_cmp
         else bd, f_real_div_simpl bhs.bhs_bd bd, bhs.bhs_cmp, bhs.bhs_cmp
@@ -716,9 +725,9 @@ let t_bdHoare_app dir i phi opt_bd g =
         bhs_bd = bd1; bhs_cmp = cmp1 } in
       let b = f_bdHoareS_r { bhs with bhs_pr = phi; bhs_s = stmt s2;
         bhs_bd = bd2; bhs_cmp = cmp2 } in
-      prove_goal_by [a;b] (RN_hl_append (dir, Single i,phi,opt_bd)) g
+      prove_goal_by [a;b] (RN_hl_append (dir, Single i,phi,bd_info)) g
 
-    | None, _ -> 
+    | AppNone, _ -> 
       let bd1,bd2,cmp1,cmp2 = 
         if dir then f_r1, bhs.bhs_bd, FHeq, bhs.bhs_cmp
         else bhs.bhs_bd, f_r1, bhs.bhs_cmp, FHeq
@@ -727,8 +736,11 @@ let t_bdHoare_app dir i phi opt_bd g =
         bhs_bd = bd1; bhs_cmp = cmp1 } in
       let b = f_bdHoareS_r { bhs with bhs_pr = phi; bhs_s = stmt s2;
         bhs_bd = bd2; bhs_cmp = cmp2 } in
-      prove_goal_by [a;b] (RN_hl_append (dir, Single i,phi,opt_bd)) g
+      prove_goal_by [a;b] (RN_hl_append (dir, Single i,phi,bd_info)) g
       
+    | AppMult _, _ ->
+      cannot_apply "app" 
+        "multiple bound parameters not supported with lower bounded and exact Hoare judgments"
 
 
 
@@ -739,7 +751,7 @@ let t_equiv_app (i,j) phi g =
   let sr1,sr2 = s_split "app" j es.es_sr in
   let a = f_equivS_r {es with es_sl=stmt sl1; es_sr=stmt sr1; es_po=phi} in
   let b = f_equivS_r {es with es_pr=phi; es_sl=stmt sl2; es_sr=stmt sr2} in
-  prove_goal_by [a;b] (RN_hl_append (true,Double (i,j), phi,None)) g
+  prove_goal_by [a;b] (RN_hl_append (true,Double (i,j), phi,AppNone)) g
 
   
 (* -------------------------------------------------------------------- *)
@@ -1748,5 +1760,34 @@ let t_bd_hoare_rnd env (opt_bd,opt_event) g =
   prove_goal_by [concl] (RN_bhl_rnd (opt_bd,event) ) g
 
 
+let t_hoare_bd_hoare g =
+  let concl = get_concl g in
+  if is_bdHoareS concl then
+    let bhs = destr_bdHoareS concl in
+    let concl1 = f_hoareS bhs.bhs_m bhs.bhs_pr bhs.bhs_s (f_not bhs.bhs_po) in
+    let concl2 = f_real_le bhs.bhs_bd f_r0  in
+    prove_goal_by [concl1;concl2] RN_hl_hoare_bd_hoare g
+  else if is_hoareS concl then
+    let hs = destr_hoareS concl in
+    let concl1 = f_bdHoareS hs.hs_m hs.hs_pr hs.hs_s (f_not hs.hs_po) FHeq f_r0 in
+    prove_goal_by [concl1] RN_hl_hoare_bd_hoare g
+  else 
+    cannot_apply "hoare/bd_hoare" "" (* FIXME: error message *)
 
- 
+let t_prbounded g = 
+  let concl = get_concl g in
+  let bhs = destr_bdHoareS concl in 
+  let cond = match bhs.bhs_cmp with
+    | FHle -> f_real_le f_r1 bhs.bhs_bd
+    | FHge -> f_real_le bhs.bhs_bd f_r0
+    | FHeq ->
+      cannot_apply "pr_bounded" "" (* FIXME: error message *)
+  in
+  prove_goal_by [cond] RN_hl_prbounded g
+
+let t_bdeq g = 
+  let concl = get_concl g in
+  let bhs = destr_bdHoareS concl in 
+  let concl = f_bdHoareS_r {bhs with bhs_cmp=FHeq } in
+  prove_goal_by [concl] RN_hl_prbounded g
+  

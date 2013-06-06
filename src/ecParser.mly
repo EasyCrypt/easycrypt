@@ -139,6 +139,7 @@
 %token AUTO
 %token AXIOM
 %token BACKS
+%token BDEQ
 %token BDHOARE
 %token BDHOAREDENO
 %token BETA 
@@ -214,6 +215,7 @@
 %token PIPE
 %token PR
 %token PRAGMA
+%token PRBOUNDED
 %token PRED
 %token PRINT
 %token PROOF
@@ -1410,6 +1412,11 @@ logtactic:
    { Pcut (n, p) }
 ;
 
+app_bd_info:
+  | empty { PAppNone }
+  | f=sform { PAppSingle f }
+  | f1=sform f2=sform g1=sform g2=sform { PAppMult (f1,f2,g1,g2) }
+
 phltactic:
 | FUN
     { Pfun_def }
@@ -1420,7 +1427,7 @@ phltactic:
 | FUN bad=sform p=sform q=sform? 
     { Pfun_upto(bad, p, q) }
 
-| APP d=tac_dir pos=code_position COLON p=sform f=sform?
+| APP d=tac_dir pos=code_position COLON p=sform f=app_bd_info
    { Papp (d,pos, p,f) }
 
 | WP n=code_position?
@@ -1497,6 +1504,12 @@ phltactic:
 
 | CONSEQ info=fpattern(conseq)
     { Pconseq info }
+
+(* basic pr based tacs *)
+| HOARE {Phoare}
+| BDHOARE {Pbdhoare}
+| PRBOUNDED {Pprbounded}
+| BDEQ {Pbdeq}
 ;
 
 while_tac_info : 
