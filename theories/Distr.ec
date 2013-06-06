@@ -73,7 +73,7 @@ theory Dinter.
 
   axiom mu_x_def_in: forall i j x,
     in_supp x (dinter i j) =>
-    mu_x (dinter i j) x = 1%r / (i - j + 1)%r.
+    mu_x (dinter i j) x = 1%r / (j - i + 1)%r.
 
   axiom mu_x_def_nin: forall (i j x:int),
     !in_supp x (dinter i j) =>  mu_x (dinter i j) x = 0%r.

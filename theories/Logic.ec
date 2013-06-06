@@ -84,7 +84,11 @@ lemma eq_tuple2_elim :
     (x1:'a1) (x2:'a2)
     (y1:'a1) (y2:'a2) c,
     (x1,x2) = (y1,y2) =>
-    (x1 = y1 => x2 = y2 => c) => c.
+    (x1 = y1 /\ x2 = y2 => c) => c proof.
+intros x1 x2 y1 y2 c h1 h2.
+apply (h2 _).
+apply (_:(lambda t, let (a, b) = t in a = y1 /\ b = y2) (x1, x2)).
+apply (_:(lambda t, let (a, b) = t in a = y1 /\ b = y2) (x1, x2)).
 
 lemma eq_tuple3_elim : 
   forall 
