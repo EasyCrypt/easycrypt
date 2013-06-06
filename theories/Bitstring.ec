@@ -77,6 +77,32 @@ intros bs;
   trivial.
 save.
 
+lemma xor_assoc : forall (x y z : bitstring), 
+length(x) = length(y) => length(y) = length(z) =>
+ (x ^^ y) ^^ z = x ^^ (y ^^ z)
+proof.
+ intros x y z Hleq1 Hleq2.
+ apply (extentionality<:bool>  ((x ^^ y) ^^ z) (x ^^ (y ^^ z)) _).
+ delta (==);simplify.
+ split;try trivial.
+ delta (^^);simplify.
+ intros i H H0.
+ rewrite (map2_get<:bool,bool,bool> (map2 Bool.xorb x y) z Bool.xorb i _ _ _);
+try trivial.
+ rewrite (map2_get<:bool,bool,bool> x y Bool.xorb i _ _ _);
+try trivial.
+ rewrite (map2_get<:bool,bool,bool> x (map2 Bool.xorb y z)  Bool.xorb i _ _ _);
+try trivial.
+save.
+
+lemma xor_zeroes_neutral : forall (x : bitstring),
+x ^^ zeros(length(x)) = x
+proof.
+ intros x.
+ apply (extentionality<:bool> (x^^ zeros(length x)) x _).
+ trivial.
+save.
+
 require import Real.
 require import Distr.
 
