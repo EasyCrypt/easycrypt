@@ -969,6 +969,13 @@ let rec transmod (env : EcEnv.env) (x : symbol) (me : pmodule_expr) =
 
   | Pm_struct st ->
     let res = transstruct env x st in
+(*    let sig_ = res.me_sig in
+    Format.printf "module %s : @." x;
+    List.iter (fun (Tys_function(fs,call)) ->
+      Format.printf "   fun %s { " fs.fs_name;
+      List.iter (fun x -> Format.printf "%s " (EcPath.x_tostring x))
+        call.oi_calls;
+      Format.printf "}@.") sig_.mis_body; *)
     res
 
 (* -------------------------------------------------------------------- *)
@@ -1008,24 +1015,31 @@ and transstruct (env : EcEnv.env) (x : symbol) (st : pstructure) =
   let rm = EcPath.Sm.add top mparams in
   (* Generate structure signature *)
   let tymod =
+    let mparams = 
+      List.fold_left (fun mparams (id,_) ->
+        Sm.add (EcPath.mident id) mparams) Sm.empty stparams in 
     let tymod1 = function
       | MI_Module   _  -> None
       | MI_Variable _v -> None           (* Some (Tys_variable v)  *)
       | MI_Function f  -> 
-        let calls = 
+        let all_calls = 
           match f.f_def with
           | FBdef def ->
             let rec f_call c f =
               let f = EcEnv.NormMp.norm_xpath envi f in
-              let top = EcPath.m_functor f.EcPath.x_top in
-              let c = 
-                if EcPath.Sm.mem top mparams then EcPath.Sx.add f c else c in
-              match (EcEnv.Fun.by_xpath f envi).f_def with
-              | FBdef def -> List.fold_left f_call c def.f_uses.us_calls 
-              | FBabs oi -> List.fold_left f_call c oi.oi_calls in
+              if EcPath.Sx.mem f c then c
+              else 
+                let c = EcPath.Sx.add f c in
+                match (EcEnv.Fun.by_xpath f envi).f_def with
+                | FBdef def -> List.fold_left f_call c def.f_uses.us_calls 
+                | FBabs oi -> List.fold_left f_call c oi.oi_calls in
             List.fold_left f_call EcPath.Sx.empty def.f_uses.us_calls 
           | FBabs _ -> assert false in
-        Some (Tys_function (f.f_sig, {oi_calls  = EcPath.Sx.elements calls; }))
+        let filter f = 
+          let ftop = EcPath.m_functor f.EcPath.x_top in
+          Sm.mem ftop mparams in
+        let calls = List.filter filter (EcPath.Sx.elements all_calls) in
+        Some (Tys_function (f.f_sig, {oi_calls  = calls }))
     in
 
     let sigitems = List.pmap tymod1 items in
@@ -1057,8 +1071,6 @@ and transstruct (env : EcEnv.env) (x : symbol) (st : pstructure) =
   List.iter check1 st.ps_signature;
   (* Construct structure representation *)
 
-  (* TODO : PY : it is strange to have the module parameter in the path of the
-                 variable *)
   let vars = 
     List.fold_left (fun vs item ->
       match item with

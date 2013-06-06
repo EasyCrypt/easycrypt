@@ -10,8 +10,8 @@ open EcFol
 open EcBaseLogic
 open EcEnv
 open EcReduction
-
 open EcEctoField
+
 (* -------------------------------------------------------------------- *)
 let get_node  g = (get_goal g).pj_decl
 let get_goal  g = (get_open_goal g).pj_decl
@@ -634,7 +634,7 @@ let t_rewrite_hyp env side id args (juc,n as g) =
   
 (* This tactic works only if the conclusion is exactly a reflexive equality*)
 let t_reflex env g =
-  let hyps, concl = get_goal g in
+  let _, concl = get_goal g in
   let (f,_) = destr_eq concl in
   t_apply_logic env p_eq_refl [f.f_ty] [AAform f] g
   
@@ -653,8 +653,8 @@ let genSplitTuple env types =
   let hyps = List.map (fun (x,y) -> f_eq x y) fvars in
   let body = f_eq (f_tuple fvarsx) (f_tuple fvarsy) in
   let f = f_forall bindings (f_imps hyps body) in
-  let introVars = List.map (fun x -> create "_") bindings in
-  let introHyps = List.map (fun x -> create "_") fvarsx in
+  let introVars = List.map (fun _ -> create "_") bindings in
+  let introHyps = List.map (fun _ -> create "_") fvarsx in
   let rews = List.map (fun h -> t_rewrite_hyp env true h []) introHyps in
   (f, t_seq (t_lseq (t_intros_i env (introVars@introHyps)::rews)) (t_reflex env))
   
@@ -685,13 +685,14 @@ let t_split env g =
               let types = List.map (fun v -> v.f_ty) fs1 in
               let toForm l = List.map (fun f -> AAform f) l in
               let nodes = List.map (fun _ -> AAnode) fs1 in
-              let idtacs = List.map (fun _ -> (t_id None)) fs1 in
+              let _idtacs = List.map (fun _ -> (t_id None)) fs1 in (* FIXME *)
               let (lem, proof) = genSplitTuple env types in
               let gs =
                 t_apply_form env lem ((toForm fs1)@(toForm fs2)@nodes) g in
               t_on_first gs proof
             else
               aux_red f
+        | _ -> aux_red f
       end
     | Fif(f1,_f2,_f3) ->
       t_case env f1 g 
@@ -861,8 +862,15 @@ let find_in_hyps env f hyps =
     with _ -> false in
   fst (List.find test hyps.h_local)
 
+let t_assumption env g = 
+  let hyps,concl = get_goal g in
+  let h = find_in_hyps env concl hyps in
+  t_hyp env h g
+    
 let t_progress env t_final g =
-  let rec aux g = t_seq (t_simplify_nodelta env) aux1 g 
+  let rec aux g = t_seq (t_simplify_nodelta env) aux0 g 
+  and aux0 g = 
+    t_or (t_assumption env) aux1 g 
   and aux1 g = 
     let hyps,concl = get_goal g in
     match concl.f_node with

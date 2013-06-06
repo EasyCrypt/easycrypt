@@ -12,7 +12,7 @@ val compare : symbol -> symbol -> int
 
 (* -------------------------------------------------------------------- *)
 module Msym : Map.S with type key = symbol
-module Ssym : Msym.Set
+module Ssym : Set.S with module M = Map.MakeBase(Msym)
 
 module MMsym : sig
   type +'a t

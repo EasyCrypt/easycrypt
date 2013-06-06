@@ -83,7 +83,7 @@ module IPathC = struct
 end
 
 module Mip = EcMaps.Map.Make(IPathC)
-module Sip = Mip.Set
+module Sip = EcMaps.Set.MakeOfMap(Mip)
 
 (* -------------------------------------------------------------------- *)
 type varbind = {

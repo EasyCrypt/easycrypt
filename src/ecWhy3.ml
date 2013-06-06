@@ -19,14 +19,15 @@ module Msym = EcSymbols.Msym
 (* ----------------------------------------------------------------------*)
 type env = {
     logic_task : Task.task;
-    env_ty : Ty.tysymbol Mp.t;
-    env_op : (Term.lsymbol * Term.lsymbol * Ty.tvsymbol list) Mp.t;
-    env_ax : Decl.prsymbol Mp.t;
-    env_mp : Term.lsymbol Mm.t;
-    env_xp : Term.lsymbol Mx.t;
-    env_tv : Ty.ty Mid.t;
-    env_id : Term.term Mid.t;
-    env_w3 : (EcPath.path * Ty.tvsymbol list) Ident.Mid.t;
+    env_ty  : Ty.tysymbol Mp.t;
+    env_op  : (Term.lsymbol * Term.lsymbol * Ty.tvsymbol list) Mp.t;
+    env_ax  : Decl.prsymbol Mp.t;
+    env_mp  : Term.lsymbol Mm.t;
+    env_xpv : Term.lsymbol Mx.t;
+    env_xpf : Term.lsymbol Mx.t;
+    env_tv  : Ty.ty Mid.t;
+    env_id  : Term.term Mid.t;
+    env_w3  : (EcPath.path * Ty.tvsymbol list) Ident.Mid.t;
   }
 
 let w3_ls_true = Term.fs_bool_true
@@ -219,15 +220,16 @@ let initial_task =
   List.fold_left add_param_decl task fs
 
 let empty = {
-    logic_task = initial_task;
-    env_ty     = Mp.empty;
-    env_op     = Mp.empty;
-    env_ax     = Mp.empty;
-    env_mp     = Mm.empty;
-    env_xp     = Mx.empty;
-    env_tv     = Mid.empty;
-    env_id     = Mid.empty;
-    env_w3     = Ident.Mid.empty;
+    logic_task  = initial_task;
+    env_ty      = Mp.empty;
+    env_op      = Mp.empty;
+    env_ax      = Mp.empty;
+    env_mp      = Mm.empty;
+    env_xpv     = Mx.empty;
+    env_xpf     = Mx.empty;
+    env_tv      = Mid.empty;
+    env_id      = Mid.empty;
+    env_w3      = Ident.Mid.empty;
   }
 
 (* ---------------------------------------------------------------------- *)
@@ -259,8 +261,9 @@ type rebinding_item =
                 highorder_decl
   | RBax  of EcPath.path * Decl.prsymbol * Decl.decl
   | RBmp  of EcPath.mpath * Term.lsymbol
-  | RBxp  of EcPath.xpath * Term.lsymbol
-  | RBfun of Decl.decl * Decl.decl * Decl.decl
+  | RBxpf  of EcPath.xpath * Term.lsymbol
+  | RBxpv  of EcPath.xpath * Term.lsymbol
+  | RBfun of Decl.decl (* Decl.decl *) * Decl.decl
 
 type rebinding = rebinding_item list
 
@@ -322,11 +325,18 @@ let add_mp env mp ls =
     env_mp = Mm.change add mp env.env_mp;
     logic_task = add_decl_with_tuples env.logic_task decl}
 
-let add_xp env xp ls =
+let add_xpv env xp ls =
   let decl = Decl.create_param_decl ls in
   let add o = assert (o = None); Some ls in
   { env with
-    env_xp = Mx.change add xp env.env_xp;
+    env_xpv = Mx.change add xp env.env_xpv;
+    logic_task = add_decl_with_tuples env.logic_task decl}
+
+let add_xpf env xp ls =
+  let decl = Decl.create_param_decl ls in
+  let add o = assert (o = None); Some ls in
+  { env with
+    env_xpf = Mx.change add xp env.env_xpf;
     logic_task = add_decl_with_tuples env.logic_task decl}
 
 
@@ -380,11 +390,12 @@ let rebind_item env = function
   | RBop(p,(ls,tvs),decl,odecl) -> add_ls env p ls tvs decl odecl
   | RBax(p,pr,decl) -> add_pr env p pr decl
   | RBmp(p,ls)      -> add_mp env p ls
-  | RBxp(p,ls)      -> add_xp env p ls
-  | RBfun(decl,decls,sdecl) ->
+  | RBxpv(p,ls)     -> add_xpv env p ls
+  | RBxpf(p,ls)     -> add_xpf env p ls
+  | RBfun(decl,(*decls,*)sdecl) ->
       let task =
         List.fold_left add_decl_with_tuples
-          env.logic_task [decl;decls;sdecl] in
+          env.logic_task [decl(*;decls*);sdecl] in
       { env with logic_task = task }
 
 let rebind = List.fold_left rebind_item
@@ -847,7 +858,8 @@ let trans_lv env lv =
 
 let trans_mp env p = try Mm.find p env.env_mp with _ -> assert false
 
-let trans_xp env p = try Mx.find p env.env_xp with _ -> assert false
+let trans_xpv env p = try Mx.find p env.env_xpv with _ -> assert false
+let trans_xpf env p = try Mx.find p env.env_xpf with _ -> assert false
 
 let rm_mp_args mp = 
   EcPath.mpath mp.EcPath.m_top []
@@ -870,13 +882,13 @@ let rm_xp_args xp =
 let trans_fun env xp targs =
   let args = List.map (trans_mod env) xp.EcPath.x_top.EcPath.m_args in
   let xp = rm_xp_args xp in
-  let fs = trans_xp env xp in
+  let fs = trans_xpf env xp in
   Term.fs_app fs args (ty_fun targs)
 
 let trans_pvloc env xp ty = 
   let args = List.map (trans_mod env) xp.EcPath.x_top.EcPath.m_args in
   let xp = rm_xp_args xp in
-  let fs = trans_xp env xp in
+  let fs = trans_xpv env xp in
   Term.fs_app fs args (ty_var ty)
 
 let trans_pv env pv ty mem =
@@ -885,7 +897,7 @@ let trans_pv env pv ty mem =
   let ty = trans_ty env ty in
   let v = 
     if is_loc pv then trans_pvloc env xp ty 
-    else Term.fs_app (trans_xp env xp) [] (ty_var ty) in
+    else Term.fs_app (trans_xpv env xp) [] (ty_var ty) in
   get_var v mem 
 
 let create_vsymbol id ty = Term.create_vsymbol (preid id) ty
@@ -1046,8 +1058,8 @@ let trans_gty env gty =
       let add id ty env =
         let ty = trans_ty env ty in
         let xp = EcPath.xqname xp id in
-        if Mx.mem xp env.env_xp then
-          let ls = Mx.find xp env.env_xp in
+        if Mx.mem xp env.env_xpv then
+          let ls = Mx.find xp env.env_xpv in
           assert (List.all2 Ty.ty_equal ls.Term.ls_args tparams);
           assert (Ty.oty_equal ls.Term.ls_value (Some (ty_var ty)));
           env
@@ -1055,7 +1067,7 @@ let trans_gty env gty =
           let ls = Term.create_fsymbol (preid_xp xp) tparams (ty_var ty) in
           let decl = Decl.create_param_decl ls in
           { env with
-            env_xp = Mx.add xp ls env.env_xp;
+            env_xpv = Mx.add xp ls env.env_xpv;
             logic_task = add_decl_with_tuples env.logic_task decl } in
       let env = Msym.fold add (EcMemory.lmt_bindings lmt) env in
       env, ty_mem
@@ -1120,7 +1132,7 @@ let trans_form env f =
       res
 
     | Fint n ->
-        let n = Term.ConstInt(Term.IConstDecimal (string_of_int n)) in
+        let n = Number.ConstInt(Number.int_const_dec (string_of_int n)) in
         Term.t_const n
 
     | Flocal id -> trans_lv !env id
@@ -1128,16 +1140,16 @@ let trans_form env f =
     | Fop(p,tys) -> trans_app !env p tys []
 
     | Fapp({f_node = Fop(p,tys) },args) ->
-        let args = List.map trans_form args in
-        trans_app !env p tys args
+      let args = List.map trans_form args in
+      trans_app !env p tys args
 
     | Fapp(e,args) ->
-        let args = List.map trans_form args in
-        apply_highorder (trans_form e) args
+      let args = List.map trans_form args in
+      apply_highorder (trans_form e) args
 
     | Ftuple args ->
-        let args = List.map trans_form_b args in
-        Term.t_tuple args
+      let args = List.map trans_form_b args in
+      Term.t_tuple args
 
     | FhoareF _   -> raise (CanNotTranslate "FhoareF")
     | FhoareS _   -> raise (CanNotTranslate "FhoareS")
@@ -1160,99 +1172,51 @@ let trans_form env f =
         let args  = List.map trans_form_b args in
         let f = 
           trans_fun !env mp (List.map (fun t -> oget t.Term.t_ty) args) in
-        let ev    = trans_ev ev in
+        let mid = save () in
+        let env0, ty = trans_gty !env (GTmem None) in
+        let env1, vs  = add_id env0 (EcFol.mhr, ty) in
+        env := env1;
+        let evbody = trans_form ev in
+        let ev = trans_lambda [vs] evbody in
+        restore mid;
         getpr f mem args ev
 
   and trans_form_b f = force_bool (trans_form f)
 
   and trans_lambda vs body =
-    let pids   = Ident.id_fresh "unamed_lambda_s" in
-    let pid    = Ident.id_fresh "unamed_lambda" in
+    (* We compute the free variable of the lambda *)
     let fv     =
       List.fold_left (fun s x -> Term.Mvs.remove x s)
         body.Term.t_vars vs in
-
-    let sparams  = Term.Mvs.keys fv in
-    let sdom   = List.map (fun vs -> vs.Term.vs_ty) sparams in
+    let fv_ids = Term.Mvs.keys fv in
+    let tfv = List.map (fun v -> v.Term.vs_ty) fv_ids in
     let tvs = List.map (fun v -> v.Term.vs_ty) vs in
     let codom = if body.Term.t_ty = None then Ty.ty_bool else oget body.Term.t_ty in
-    let scodom = List.fold_right Ty.ty_func tvs codom in
-    let lss = Term.create_fsymbol pids sdom scodom in
-    let sdecl  = Decl.create_param_decl lss in
-
-
-    let ls  = Term.create_lsymbol pid (sdom @ tvs) body.Term.t_ty in
-    let params = sparams @ vs in
-    let ldecl  = Decl.make_ls_defn ls params body in
-    let decl   = Decl.create_logic_decl [ldecl] in
-
-    let sarg   = List.map Term.t_var sparams in
-    let arg    = List.map Term.t_var params in
-    let lss_papp = Term.t_app_infer lss sarg in
-    let lss_app  = List.fold_left Term.t_func_app lss_papp arg in
-    let ls_app   = Term.t_app_infer ls (sarg@arg) in
-    let concl    =
-      if body.Term.t_ty = None then Term.t_iff (force_prop lss_app) ls_app
-      else Term.t_equ lss_app ls_app in
-    let spec   = Term.t_forall_close params [] concl in
-    let pr     = Decl.create_prsymbol pids in
-    let spdecl  = Decl.create_prop_decl Decl.Paxiom pr spec in
-    rb := RBfun(decl,sdecl,spdecl) :: !rb;
+    (* We create the symbol corresponding to the lambda *)
+    let lam_sym = Ident.id_fresh "unamed_lambda" in 
+    let flam_sym = 
+      Term.create_fsymbol lam_sym tfv 
+        (List.fold_right Ty.ty_func tvs codom) in
+    let decl_sym = Decl.create_param_decl flam_sym in
+    (* We create the spec *)
+    let fvargs   = List.map Term.t_var fv_ids in
+    let vsargs   = List.map Term.t_var vs in
+    let flam_app = 
+      Term.t_app_infer flam_sym fvargs in
+    let flam_fullapp = 
+      List.fold_left Term.t_func_app flam_app vsargs in
+    let concl = 
+      if body.Term.t_ty = None then Term.t_iff (force_prop flam_fullapp) body
+      else Term.t_equ flam_fullapp body in
+    let spec = Term.t_forall_close (fv_ids@vs) [] concl in
+    let spec_sym = Decl.create_prsymbol (Ident.id_fresh "unamed_lambda_spec") in
+    let decl_spec = Decl.create_prop_decl Decl.Paxiom spec_sym spec in
+    rb := RBfun(decl_sym,decl_spec) :: !rb;
     env := { !env with
              logic_task =
              List.fold_left add_decl_with_tuples !env.logic_task
-               [decl;sdecl;spdecl] };
-    lss_papp
-
-  and trans_ev ev =
-    (* FIXME : We should be able to share equal definition *)
-    (* FIXME : use the previous function *)
-    (* We assume that the memory is mpost *)
-    (* op : sev : fv -> mem |-> bool)
-       op : fev fv m: mem : bool :=
-          let (m,r) = mr in
-          [ev]
-       forall fv (mr : mem*ty),
-          sev fv @ mr = fev fv mr
-    *)
-    let pids   = Ident.id_fresh "unamed_lambda_s" in
-    let pid    = Ident.id_fresh "unamed_lambda" in
-    let mid    = save () in 
-    let env0, vs = add_id !env (EcFol.mhr, ty_mem) in
-    env := env0;
-    let body   = trans_form ev in
-
-    let fv     = Term.Mvs.remove vs body.Term.t_vars in
-    let extra  = Term.Mvs.keys fv in
-    let tmr    = ty_mem in
-    let mr     = vs in
-    let doms   = List.map (fun vs -> vs.Term.vs_ty) extra in
-    let codoms  = Ty.ty_func tmr Ty.ty_bool in
-    let params   = extra @ [mr] in
-    let dom    = List.map (fun vs -> vs.Term.vs_ty) params in
-    let lss    = Term.create_fsymbol pids doms codoms in
-    let ls     = Term.create_fsymbol pid dom Ty.ty_bool in
-
-    let decls  = Decl.create_param_decl lss in
-    let ldecl  = Decl.make_ls_defn ls params (force_bool body) in
-    let decl   = Decl.create_logic_decl [ldecl] in
-    let args   = List.map Term.t_var extra in
-    let arg    = List.map Term.t_var params in
-    let lss_app = Term.t_app_infer lss args in
-    let app_s  = Term.t_func_app lss_app (Term.t_var mr) in
-    let app    = Term.t_app_infer ls arg in
-    let spec   =
-      Term.t_forall_close params []
-        (Term.t_iff (force_prop app_s) (force_prop app)) in
-    let pr     = Decl.create_prsymbol pids in
-    let sdecl  = Decl.create_prop_decl Decl.Paxiom pr spec in
-    rb := RBfun(decl,decls,sdecl) :: !rb;
-    env := { !env with
-             logic_task =
-             List.fold_left add_decl_with_tuples !env.logic_task
-               [decl;decls;sdecl] };
-    restore mid;
-    lss_app in
+               [decl_sym;decl_spec] };
+    flam_app in
 
   let f = trans_form f in
   !env, !rb, f
@@ -1348,19 +1312,19 @@ let add_mod_exp_mp env mp me =
     let env = ref (add_mp env mp ls) in
     let rb  = ref [RBmp(mp,ls)] in
     let tparams = List.map (fun _ -> ty_mod) me.me_sig.mis_params in
-    let add_xp xp ls = 
-      env := add_xp !env xp ls;
-      rb  := RBxp(xp,ls) :: !rb in
+    let add_xpv xp ls = 
+      env := add_xpv !env xp ls;
+      rb  := RBxpv(xp,ls) :: !rb in
     let add_gpv xp ty =
-      assert (not (Mx.mem xp !env.env_xp));
+      assert (not (Mx.mem xp !env.env_xpv));
       let ty = trans_ty !env ty in
       let ls = Term.create_fsymbol (preid_xp xp) [] (ty_var ty) in
-      add_xp xp ls in
+      add_xpv xp ls in
     let add_lpv xp ty =
-      assert (not (Mx.mem xp !env.env_xp));
+      assert (not (Mx.mem xp !env.env_xpv));
       let ty = trans_ty !env ty in
       let ls = Term.create_fsymbol (preid_xp xp) tparams (ty_var ty) in
-      add_xp xp ls in
+      add_xpv xp ls in
     let rec add_comps mp comps = List.iter (add_comp mp) comps
     and add_comp mp comp =
       match comp with
@@ -1376,7 +1340,8 @@ let add_mod_exp_mp env mp me =
         let tys = List.map (fun v -> trans_ty !env v.v_type) f.f_sig.fs_params in
         let xp = EcPath.xpath_fun mp f.f_name in
         let ls = Term.create_fsymbol (preid_xp xp) tparams (ty_fun tys) in
-        add_xp xp ls;
+        env := add_xpf !env xp ls;
+        rb  := RBxpf(xp,ls) :: !rb;
         List.iter (fun v -> add_lpv (EcPath.xqname xp v.v_name) v.v_type) f.f_sig.fs_params;
         add_lpv (EcPath.xqname xp "res") f.f_sig.fs_ret in
     add_comps mp me.me_comps;

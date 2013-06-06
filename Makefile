@@ -59,7 +59,7 @@ CHECKLIBS = \
 # --------------------------------------------------------------------
 .PHONY: all build byte native check check-xunit tags
 .PHONY: clean install uninstall dist distcheck why3
-.PHONY: pg toolchain %.ml %.mli %.inferred.mli
+.PHONY: pg toolchain update-toolchain %.ml %.mli %.inferred.mli
 
 all: build
 
@@ -148,3 +148,9 @@ TOOLCHAIN_URL := http://ci.easycrypt.info/scripts/ec-build-toolchain
 
 toolchain:
 	bash ./scripts/ec-build-toolchain
+
+update-toolchain:
+	$$(./scripts/activate-toolchain.sh) \
+	  && opam update  -y \
+	  && opam remove  -y ec-toolchain \
+	  && opam install -y ec-toolchain

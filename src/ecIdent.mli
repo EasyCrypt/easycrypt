@@ -23,7 +23,7 @@ val id_hash : t -> int
 
 (* -------------------------------------------------------------------- *)
 module Mid : Map.S with type key = t
-module Sid : Mid.Set with type elt = t
+module Sid : Set.S with module M = Map.MakeBase(Mid)
 
 (* -------------------------------------------------------------------- *)
 val fv_singleton : ident -> int Mid.t
