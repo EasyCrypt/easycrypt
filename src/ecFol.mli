@@ -117,7 +117,7 @@ val f_fv      : form -> int Mid.t
 val f_ty      : form -> EcTypes.ty
 
 module Mf : Map.S with type key = form
-module Sf : Mf.Set with type elt = form 
+module Sf : Set.S with module M = Map.MakeBase(Mf)
 module Hf : EHashtbl.S with type key = form
 
 (* -------------------------------------------------------------------- *)

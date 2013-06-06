@@ -1120,7 +1120,7 @@ let trans_form env f =
       res
 
     | Fint n ->
-        let n = Term.ConstInt(Term.IConstDecimal (string_of_int n)) in
+        let n = Number.ConstInt(Number.int_const_dec (string_of_int n)) in
         Term.t_const n
 
     | Flocal id -> trans_lv !env id

@@ -17,7 +17,7 @@ val forsym : uidmap -> symbol -> uid
 val uid_equal : uid -> uid -> bool
 
 module Muid : Map.S with type key = uid
-module Suid : Muid.Set with type elt = uid
+module Suid : Set.S with module M = Map.MakeBase(Muid)
 
 (* -------------------------------------------------------------------- *)
 module NameGen : sig
@@ -27,4 +27,3 @@ module NameGen : sig
   val create : unit -> t
   val get    : t -> uid -> string
 end
-

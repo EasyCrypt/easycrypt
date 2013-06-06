@@ -25,7 +25,7 @@ module IdComparable = struct
 end
 
 module Mid = Map.Make(IdComparable)
-module Sid = Mid.Set
+module Sid = Set.MakeOfMap(Mid)
 
 (* -------------------------------------------------------------------- *)
 

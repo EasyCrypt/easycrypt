@@ -10,12 +10,13 @@ let equal : symbol -> symbol -> bool = (=)
 let compare : symbol -> symbol -> int = Pervasives.compare
 
 (* -------------------------------------------------------------------- *)
-module Msym = Map.Make(struct
+module SymCmp = struct
   type t = symbol
-  let  compare = Pervasives.compare
-end)
+  let compare = (Pervasives.compare : t -> t -> int)
+end
 
-module Ssym = Msym.Set
+module Msym = EcMaps.Map.Make(SymCmp)
+module Ssym = EcMaps.Set.MakeOfMap(Msym)
 
 (* -------------------------------------------------------------------- *)
 module MMsym : sig
