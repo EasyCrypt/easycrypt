@@ -1172,7 +1172,13 @@ let trans_form env f =
         let args  = List.map trans_form_b args in
         let f = 
           trans_fun !env mp (List.map (fun t -> oget t.Term.t_ty) args) in
-        let ev    = trans_ev ev in
+        let mid = save () in
+        let env0, ty = trans_gty !env (GTmem None) in
+        let env1, vs  = add_id env0 (EcFol.mhr, ty) in
+        env := env1;
+        let evbody = trans_form ev in
+        let ev = trans_lambda [vs] evbody in
+        restore mid;
         getpr f mem args ev
 
   and trans_form_b f = force_bool (trans_form f)
@@ -1210,57 +1216,7 @@ let trans_form env f =
              logic_task =
              List.fold_left add_decl_with_tuples !env.logic_task
                [decl_sym;decl_spec] };
-    flam_app
-
-  and trans_ev ev =
-    (* FIXME : We should be able to share equal definition *)
-    (* FIXME : use the previous function *)
-    (* We assume that the memory is mpost *)
-    (* op : sev : fv -> mem |-> bool)
-       op : fev fv m: mem : bool :=
-          let (m,r) = mr in
-          [ev]
-       forall fv (mr : mem*ty),
-          sev fv @ mr = fev fv mr
-    *)
-    let pids   = Ident.id_fresh "unamed_lambda_s" in
-    let pid    = Ident.id_fresh "unamed_lambda" in
-    let mid    = save () in 
-    let env0, vs = add_id !env (EcFol.mhr, ty_mem) in
-    env := env0;
-    let body   = trans_form ev in
-
-    let fv     = Term.Mvs.remove vs body.Term.t_vars in
-    let extra  = Term.Mvs.keys fv in
-    let tmr    = ty_mem in
-    let mr     = vs in
-    let doms   = List.map (fun vs -> vs.Term.vs_ty) extra in
-    let codoms  = Ty.ty_func tmr Ty.ty_bool in
-    let params   = extra @ [mr] in
-    let dom    = List.map (fun vs -> vs.Term.vs_ty) params in
-    let lss    = Term.create_fsymbol pids doms codoms in
-    let ls     = Term.create_fsymbol pid dom Ty.ty_bool in
-
-    let decls  = Decl.create_param_decl lss in
-    let ldecl  = Decl.make_ls_defn ls params (force_bool body) in
-    let decl   = Decl.create_logic_decl [ldecl] in
-    let args   = List.map Term.t_var extra in
-    let arg    = List.map Term.t_var params in
-    let lss_app = Term.t_app_infer lss args in
-    let app_s  = Term.t_func_app lss_app (Term.t_var mr) in
-    let app    = Term.t_app_infer ls arg in
-    let spec   =
-      Term.t_forall_close params []
-        (Term.t_iff (force_prop app_s) (force_prop app)) in
-    let pr     = Decl.create_prsymbol pids in
-    let sdecl  = Decl.create_prop_decl Decl.Paxiom pr spec in
-    rb := RBfun(decl(*,decls*),sdecl) :: !rb;
-    env := { !env with
-             logic_task =
-             List.fold_left add_decl_with_tuples !env.logic_task
-               [decl;(*decls;*)sdecl] };
-    restore mid;
-    lss_app in
+    flam_app in
 
   let f = trans_form f in
   !env, !rb, f
