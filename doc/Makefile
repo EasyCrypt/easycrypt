@@ -15,6 +15,8 @@ all: final
 $(MAIN).pdf $(MAIN).aux $(IDXFILES): $(MAIN).tex
 	$(TEX) $^
 
+index: $(INDFILES)
+
 %.ind: %.idx
 	$(IDX) $<
 
