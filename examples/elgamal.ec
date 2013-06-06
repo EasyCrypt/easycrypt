@@ -264,7 +264,20 @@ proof.
  wp;rnd.
  call (pk{1} = pk{2} /\ (glob A){1} = (glob A){2}) (res{1}=res{2} /\ (glob A){1} = (glob A){2}).
  fun true;try (simplify;split).
- wp; *rnd;skip;simplify;trivial.
+ wp; *rnd;skip. simplify;trivial. 
+
+(* Just to test tactic *)
+(* intros &m1 &m2 Heq.
+ subst;simplify.
+ intros x Hx y Hy rL rR A0 A1 H;elim H;clear H; intros H1 H2.
+ subst.
+ elimT tuple2_ind rR.
+ intros a b _;simplify.
+ intros b1 _;split.
+ trivial.
+ intros _ r1L r2L A0 A2 H;elim H;clear H;intros H1 H2.
+ subst;simplify.
+ split. *)
 save.
 
 lemma Pr1 (A<:Adv) &m : 
@@ -288,13 +301,8 @@ proof.
   call (pk{1} = pk{2} /\ (glob A){1} = (glob A){2}) 
              (res{1}=res{2} /\ (glob A){1} = (glob A){2}).
     fun true;try (simplify;split).
-  wp;*rnd;skip;trivial.
+  wp;*rnd;skip;trivial. 
 save.
-
-(* TODO move this, and generalize *)
-lemma paire_ind (p:'a * 'b -> bool) (x:'a * 'b) :
-  (forall a b, x = (a,b) => p (a,b)) =>
-  p x.
 
 lemma Fact3 (A<:Adv) &m : 
   Pr[G1(A).main() @ &m : res] = Pr[G2(A).main() @ &m : res]
@@ -311,33 +319,20 @@ proof.
  call (pk{1} = pk{2} /\ (glob A){1} = (glob A){2}) 
              (res{1}=res{2} /\ (glob A){1} = (glob A){2}).
    fun true;try (simplify;split).
- wp;*rnd;skip.
- simplify; simplify. (* FIXME *)
- intros &m1 &m2 Hg x Hx y Hy.
- rewrite Hg;simplify.
- intros rL rR gA0 gA1 H;elim H;clear H;intros Heqr HeqA.
- subst.
- elimT paire_ind rR. 
- intros m0 m1 Heq;simplify.
- intros b _ zL zR;split;[ | trivial ].
- split;[ | trivial].
- split;[ | trivial].
- split;[trivial | ].
- intros _ _. (* TODO intros clear *)
- rewrite (Distr.Dinter.supp_def 0 (q-1)  ((zR - (log (if b then m1 else m0))) %% q)).
- trivial.
+ wp;*rnd;skip; progress trivial.
 save.
 
 require import Real.
+
 lemma Pr4_aux (A<:Adv) :
-   (forall &m, bd_hoare[A.a1 : true ==> true] = 1%r) =>
-   (forall &m, bd_hoare[A.a2 : true ==> true] = 1%r) =>
-   bd_hoare [G2(A).main : true ==> res] = (1%r / 2%r)
+   (bd_hoare[A.a1 : true ==> true] = 1%r) =>
+   (bd_hoare[A.a2 : true ==> true] = 1%r) =>
+   bd_hoare [G2(A).main : true ==> res] <= (1%r / 2%r)
 (*   Pr[G2(A).main() @ &m : res] = 1%r / 2%r *)
 proof.
  intros Ha1 Ha2.
  fun.
- rnd (1%r / 2%r) (lambda b,  b = b'). (* check this rule *)
+ rnd (1%r / 2%r) (lambda b,  b = b'). 
  admit.
 save.
 
@@ -359,8 +354,7 @@ proof.
   rewrite (Pr1 (<:A) &m).
   rewrite <- (Pr4 (<:A) &m _ _);try assumption.
   rewrite <- (Fact3 (<:A) &m).
-  rewrite (Pr2 (<:A) &m).
-  split.
+  rewrite (Pr2 (<:A) &m);trivial.
 save.
 
 lemma Conclusion (A<:Adv) &m :

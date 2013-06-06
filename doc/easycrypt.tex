@@ -1,13 +1,18 @@
 \documentclass[a4paper,notitlepage]{book}
 
-\makeindex
-
+\usepackage{multind}
 \usepackage{xspace}
-\usepackage{makeidx}
 \usepackage{mdframed}
 \usepackage[procnames]{listings}
 \usepackage{infer}
 \usepackage[pagebackref,colorlinks=true,linkcolor=black,linktoc=all,citecolor=blue]{hyperref}
+\usepackage[usenames,dvipsnames]{xcolor}
+
+\makeindex{easycrypt}
+\makeindex{ambient}
+\makeindex{hoare}
+\makeindex{phl}
+\makeindex{prhl}
 
 \input{defs}
 
@@ -45,8 +50,14 @@
 % Examples
 \input{examples}
 
-\part{Language Reference}
+\part{Language Reference (Pierre-Yves)}
 
-\printindex
+\cleardoublepage
+\addcontentsline{toc}{part}{Index}
+\printindex{easycrypt}{General Index}
+\printindex{ambient}{Index of Ambient Logic Tactics}
+\printindex{hoare}{Index of Possibilistic Hoare Logic Tactics}
+\printindex{phl}{Index of Probabilistic Hoare Logic Tactics}
+\printindex{prhl}{Index of Probabilistic Relational Hoare Logic Tactics}
 
 \end{document}

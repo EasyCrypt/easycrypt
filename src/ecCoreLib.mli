@@ -89,6 +89,5 @@ val p_rewrite_iff_l : path
 val p_rewrite_iff_r : path 
 
 val p_case_eq_bool  : path 
-val p_eq_tuple_intro : int -> path
 val p_eq_tuple_elim  : int -> path
 val p_tuple_ind      : int -> path

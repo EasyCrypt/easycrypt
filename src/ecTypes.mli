@@ -21,6 +21,10 @@ and ty_node =
   | Tconstr of EcPath.path * ty list
   | Tfun    of ty * ty
 
+module Mty : Map.S  with type key = ty
+module Sty : Mty.Set with type elt = ty
+module Hty : EcMaps.EHashtbl.S with type key = ty
+
 type dom = ty list
 
 val ty_equal : ty -> ty -> bool

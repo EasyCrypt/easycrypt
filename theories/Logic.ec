@@ -79,29 +79,12 @@ lemma neqF : forall (x:bool), !x => (x = false).
 lemma eqT_iff : forall (x:bool), (x = true) <=> x.
 lemma neqF_iff : forall (x:bool), (x = false) <=> !x.
 
-lemma eq_tuple2_intro :
-  forall 
-    (x1:'a1) (x2:'a2)
-    (y1:'a1) (y2:'a2),
-    x1 = y1 => 
-    x2 = y2 => 
-    (x1,x2) = (y1,y2).
-
 lemma eq_tuple2_elim :
  forall 
     (x1:'a1) (x2:'a2)
     (y1:'a1) (y2:'a2) c,
     (x1,x2) = (y1,y2) =>
     (x1 = y1 => x2 = y2 => c) => c.
-
-lemma eq_tuple3_intro : 
-  forall 
-    (x1:'a1) (x2:'a2) (x3:'a3)
-    (y1:'a1) (y2:'a2) (y3:'a3),
-    x1 = y1 => 
-    x2 = y2 => 
-    x3 = y3 => 
-    (x1,x2,x3) = (y1,y2,y3).
 
 lemma eq_tuple3_elim : 
   forall 
@@ -110,33 +93,12 @@ lemma eq_tuple3_elim :
     (x1,x2,x3) = (y1,y2,y3) =>
     (x1 = y1 => x2 = y2 => x3 = y3 => c) => c.
 
-lemma eq_tuple4_intro : 
-  forall 
-    (x1:'a1) (x2:'a2) (x3:'a3) (x4:'a4)
-    (y1:'a1) (y2:'a2) (y3:'a3) (y4:'a4),
-    x1 = y1 => 
-    x2 = y2 => 
-    x3 = y3 => 
-    x4 = y4 =>
-    (x1,x2,x3,x4) = (y1,y2,y3,y4).
-
 lemma eq_tuple4_elim : 
   forall 
     (x1:'a1) (x2:'a2) (x3:'a3) (x4:'a4)
     (y1:'a1) (y2:'a2) (y3:'a3) (y4:'a4) c,
     (x1,x2,x3,x4) = (y1,y2,y3,y4) =>
     (x1 = y1 => x2 = y2 => x3 = y3 => x4 = y4 => c) => c.
-
-lemma eq_tuple5_intro : 
-  forall 
-    (x1:'a1) (x2:'a2) (x3:'a3) (x4:'a4) (x5:'a5)
-    (y1:'a1) (y2:'a2) (y3:'a3) (y4:'a4) (y5:'a5),
-    x1 = y1 => 
-    x2 = y2 => 
-    x3 = y3 => 
-    x4 = y4 =>
-    x5 = y5 =>
-    (x1,x2,x3,x4,x5) = (y1,y2,y3,y4,y5).
 
 lemma eq_tuple5_elim : 
   forall 
@@ -145,37 +107,12 @@ lemma eq_tuple5_elim :
     (x1,x2,x3,x4,x5) = (y1,y2,y3,y4,y5) =>
     (x1 = y1 => x2 = y2 => x3 = y3 => x4 = y4 => x5 = y5 => c) => c.
 
-lemma eq_tuple6_intro : 
-  forall 
-    (x1:'a1) (x2:'a2) (x3:'a3) (x4:'a4) (x5:'a5) (x6:'a6)
-    (y1:'a1) (y2:'a2) (y3:'a3) (y4:'a4) (y5:'a5) (y6:'a6),
-    x1 = y1 => 
-    x2 = y2 => 
-    x3 = y3 => 
-    x4 = y4 =>
-    x5 = y5 =>
-    x6 = y6 =>
-    (x1,x2,x3,x4,x5,x6) = (y1,y2,y3,y4,y5,y6).
-
 lemma eq_tuple6_elim : 
   forall 
     (x1:'a1) (x2:'a2) (x3:'a3) (x4:'a4) (x5:'a5) (x6:'a6)
     (y1:'a1) (y2:'a2) (y3:'a3) (y4:'a4) (y5:'a5) (y6:'a6) c,
     (x1,x2,x3,x4,x5,x6) = (y1,y2,y3,y4,y5,y6) =>
     (x1 = y1 => x2 = y2 => x3 = y3 => x4 = y4 => x5 = y5 => x6 = y6 => c) => c.
-
-lemma eq_tuple7_intro : 
-  forall 
-    (x1:'a1) (x2:'a2) (x3:'a3) (x4:'a4) (x5:'a5) (x6:'a6) (x7:'a7)
-    (y1:'a1) (y2:'a2) (y3:'a3) (y4:'a4) (y5:'a5) (y6:'a6) (y7:'a7),
-    x1 = y1 => 
-    x2 = y2 => 
-    x3 = y3 => 
-    x4 = y4 =>
-    x5 = y5 =>
-    x6 = y6 =>
-    x7 = y7 =>
-    (x1,x2,x3,x4,x5,x6,x7) = (y1,y2,y3,y4,y5,y6,y7).
 
 lemma eq_tuple7_elim : 
   forall 
@@ -184,20 +121,6 @@ lemma eq_tuple7_elim :
     (x1,x2,x3,x4,x5,x6,x7) = (y1,y2,y3,y4,y5,y6,y7) =>
     (x1 = y1 => x2 = y2 => x3 = y3 => x4 = y4 => x5 = y5 => x6 = y6 => x7 = y7 => c) => c.
 
-lemma eq_tuple8_intro : 
-  forall 
-    (x1:'a1) (x2:'a2) (x3:'a3) (x4:'a4) (x5:'a5) (x6:'a6) (x7:'a7) (x8:'a8)
-    (y1:'a1) (y2:'a2) (y3:'a3) (y4:'a4) (y5:'a5) (y6:'a6) (y7:'a7) (y8:'a8),
-    x1 = y1 => 
-    x2 = y2 => 
-    x3 = y3 => 
-    x4 = y4 =>
-    x5 = y5 =>
-    x6 = y6 =>
-    x7 = y7 =>
-    x8 = y8 =>
-    (x1,x2,x3,x4,x5,x6,x7,x8) = (y1,y2,y3,y4,y5,y6,y7,y8).
-
 lemma eq_tuple8_elim : 
   forall 
     (x1:'a1) (x2:'a2) (x3:'a3) (x4:'a4) (x5:'a5) (x6:'a6) (x7:'a7) (x8:'a8)
@@ -205,21 +128,6 @@ lemma eq_tuple8_elim :
     (x1,x2,x3,x4,x5,x6,x7,x8) = (y1,y2,y3,y4,y5,y6,y7,y8) =>
     (x1 = y1 => x2 = y2 => x3 = y3 => x4 = y4 => x5 = y5 => x6 = y6 => x7 = y7 =>
     x8 = y8 => c) => c.
-
-lemma eq_tuple9_intro : 
-  forall 
-    (x1:'a1) (x2:'a2) (x3:'a3) (x4:'a4) (x5:'a5) (x6:'a6) (x7:'a7) (x8:'a8) (x9:'a9)
-    (y1:'a1) (y2:'a2) (y3:'a3) (y4:'a4) (y5:'a5) (y6:'a6) (y7:'a7) (y8:'a8) (y9:'a9),
-    x1 = y1 => 
-    x2 = y2 => 
-    x3 = y3 => 
-    x4 = y4 =>
-    x5 = y5 =>
-    x6 = y6 =>
-    x7 = y7 =>
-    x8 = y8 =>
-    x9 = y9 =>
-    (x1,x2,x3,x4,x5,x6,x7,x8,x9) = (y1,y2,y3,y4,y5,y6,y7,y8,y9).
 
 lemma eq_tuple9_elim : 
   forall 
