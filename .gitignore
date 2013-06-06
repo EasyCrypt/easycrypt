@@ -11,3 +11,7 @@ _build
 setup.data
 setup.log
 /attic
+doc/*\.ilg
+doc/*\.ind
+doc/*\.bbl
+doc/*\.blg
