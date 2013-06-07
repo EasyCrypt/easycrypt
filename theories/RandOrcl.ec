@@ -24,21 +24,24 @@ theory ROM.
     }
   
     fun o(x:from): to = {
-      if (!in_dom x m) m.[x] = $dsample;
+      var y : to;
+      y = $dsample;
+      if (!in_dom x m) m.[x] = y;
       return proj (m.[x]);
     }
   }.
 
   (* Wrapped random oracle for use by the adversary *)
-  (* TODO: We would like the following to type as module ARO(RO:Oracle): Oracle = { [...] }. *)
-  module ARO(RO:Oracle) = {
+  module ARO(RO:Oracle) : Oracle = {
     var log: from Set.set
 
     fun o(x:from): to = {
-      var res1: to = default;
-      if (Set.mem x log || Set.card log < qO)
-        res1 := RO.o(x); 
-      return res1;
+      var y: to = default;
+      if (Set.mem x log || Set.card log < qO) {
+        log = Set.add x log;
+        y := RO.o(x); 
+      }
+      return y;
     }
 
     fun init(): unit = {
