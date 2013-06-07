@@ -422,14 +422,11 @@ let t_intros_i env ids g =
     (List.map (fun id -> {pl_desc = id; pl_loc = EcLocation._dummy}) ids)
     g
 
-(*TODO:check that it's correct and doesn't already exists *)
-let fresh () = EcIdent.fresh (EcIdent.create "_")
-
 let createVarForBinding t =
-  let v = fresh () in ((v, GTty t),EcFol.f_local v t)
+  let v = EcIdent.create "_" in ((v, GTty t),EcFol.f_local v t)
 
 let createVarForLet t =
-  let v = fresh () in ((v, t), EcFol.f_local v t)
+  let v = EcIdent.create "_" in ((v, t), EcFol.f_local v t)
 
 (* This tactic works only if the conclusion is exactly a reflexive equality *)
 let t_reflex env g =
@@ -476,8 +473,8 @@ let gen_eq_tuple_elim_proof env types =
     fst (List.split (a@b@[locC]))
   in
   let (_, rvars) = List.split locVarsF in
-  let h1 = fresh () in
-  let h2 = fresh () in
+  let h1 = EcIdent.create "_" in
+  let h2 = EcIdent.create "_" in
   let intro = t_intros_i env (introVars@[h1;h2]) in
   t_lseq [
     intro;
@@ -502,8 +499,8 @@ let gen_split_tuple_lemma types =
 
 (* Generate the proof for gen_split_tuple_proof *)
 let gen_split_tuple_proof env types =
-  let introVars = List.map (fun _ -> fresh ()) (types@types) in
-  let introHyps = List.map (fun _ -> fresh ()) types in
+  let introVars = List.map (fun _ -> EcIdent.create "_") (types@types) in
+  let introHyps = List.map (fun _ -> EcIdent.create "_") types in
   let rews = List.map (fun h -> t_rewrite_hyp env true h []) introHyps in
   t_seq (t_lseq ((t_intros_i env (introVars@introHyps))::rews)) (t_reflex env)
 
