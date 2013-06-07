@@ -35,12 +35,12 @@
 
 \Description
 the first optional parameter $p$ is a computable predicate (i.e., \verb+'a cPred+)
-(i.e., \verb+'a -> bool+ ). Assume $d$ of type \verb+A Distr.distr+:
+(i.e., \verb+'a -> bool+ ). Assume $d$ of type \verb+A Distr.distr+. 
 \begin{displaymath}
 \begin{array}{c}
   \infrule{
-    \bdHoareSeq{c}{\pre}{\mu\, d\, p \leq f \land 
-      (\forall v\in \mathsf{support}(d).~ \post\subst{x}{v} \Rightarrow p\, v)}{1} 
+    \hoareS{c}{\pre}{\mu\, d\, p \leq f \land 
+      (\forall v\in \mathsf{support}(d).~ \post\subst{x}{v} \Rightarrow p\, v)}
   }{
     \bdHoareSle{c;\Rand{x}{d}}{\pre}{\post}{f}
   }\left[\verb+rnd+\ p\right]
@@ -50,17 +50,27 @@ the first optional parameter $p$ is a computable predicate (i.e., \verb+'a cPred
 If $p$ is not given then the tool attempts to build it from $\post$
 (not implemented yet).
 
-For judgments bounded by $(=,\geq)$ the tactic additionally accepts as second parameter a real
-number $g$ representing a bound:
+For lower-bounded and exact probabilistic judgments the tactic
+additionally accepts an optional parameter $g$ of type \verb+real+
+representing a bound:
 \begin{displaymath}
   \infrule{
     \bdHoareSge{c}{\pre}{\mu\, d\, p \geq g \land 
-      (\forall v\in \mathsf{support}(d).~ \post\subst{x}{v} \Rightarrow p\, v)}{\frac{f}{g}} 
+      (\forall v\in \mathsf{support}(d).~ p\, v \Rightarrow \post\subst{x}{v} )}{\frac{f}{g}} 
   }{
     \bdHoareSge{c;\Rand{x}{d}}{\pre}{\post}{f}
   }\left[\verb+rnd+\ p\ g\right]
-\\[4ex]
 \end{displaymath}
+%
+\begin{displaymath}
+  \infrule{
+    \bdHoareSeq{c}{\pre}{\mu\, d\, p = g \land 
+      (\forall v\in \mathsf{support}(d).~ p\, v \Leftrightarrow \post\subst{x}{v} )}{\frac{f}{g}} 
+  }{
+    \bdHoareSeq{c;\Rand{x}{d}}{\pre}{\post}{f}
+  }\left[\verb+rnd+\ p\ g\right]
+\end{displaymath}
+%
 If $g$ is not given then $g=f$ in the rule.
 
 \subsubsection{Relational Hoare Logic}
@@ -74,31 +84,17 @@ If $g$ is not given then $g=f$ in the rule.
 \subsubsection{Probabilistic Hoare Logic}
 \index{phl}{Program Reasoning!seq@\texttt{seq}}
 \Syntax 
-\verb+app+ \verb+[>>|<<]+ \textit{num} \textit{formula} [\textit{formula}]
+\verb+app+ \verb+[>>|<<]+ \textit{num} \textit{formula} (
+[\textit{formula} \verb+|+ \textit{formula} \textit{formula}
+\textit{formula} \textit{formula}]
 
 \Description
 Direction \verb+<<+ by default.
 The first formula is the intermediate predicate.
-Assume $s_2$ is at program position $n$:
-\begin{displaymath}
-  \infrule{
-    \hoareS{s1}{P}{R} \qquad \bdHoareSle{s2}{R}{Q}{f}
-  }{
-    \bdHoareSle{s1;s2}{P}{Q}{f}
-  }\left[\verb+app+\ n\ R\right]
-\end{displaymath}
-%
-Which, if preferred, can be rewritten to:
-\begin{displaymath}
-  \infrule{
-    \hoareS{s1}{P}{\lambda m. \Prm{s_2}{m}{Q}\leq f} \qquad 
-  }{
-    \bdHoareSle{s1;s2}{P}{Q}{f}
-  }\left[\verb+app+\ n\ R\right]
-\end{displaymath}
+Assume $s_2$ is at program position $n$.
 
-
-The following rule is a generalization but not implemented:
+For upper bounded judgments, the most general variant of the
+\verb+app+ rule (i.e., when four bounds are given as parameters) implements the following rule:
 \begin{displaymath}
   \infrule{
     \begin{array}{c}
@@ -112,9 +108,29 @@ The following rule is a generalization but not implemented:
     \bdHoareSle{s1;s2}{P}{Q}{f}
   }
 \end{displaymath}
+%
+If no argument is given then the following rule is applied:
+\begin{displaymath}
+  \infrule{
+    \hoareS{s1}{P}{R} \qquad \bdHoareSle{s2}{R}{Q}{f}
+  }{
+    \bdHoareSle{s1;s2}{P}{Q}{f}
+  }\left[\verb+app+\ n\ R\right]
+\end{displaymath}
+%
+\warningbox{Which, if preferred, can be rewritten to:}
+\begin{displaymath}
+  \infrule{
+    \hoareS{s1}{P}{\lambda m. \Prm{s_2}{m}{Q}\leq f} \qquad 
+  }{
+    \bdHoareSle{s1;s2}{P}{Q}{f}
+  }\left[\verb+app+\ n\ R\right]
+\end{displaymath}
 
 
-The second parameter (optional) is a real number representing a bound (only supported for $=$ and $\geq$).
+
+For lower bounded and exact judgments, the app tactic implements the following rules
+
 \begin{displaymath}
 \begin{array}{c}
   \infrule{
@@ -130,6 +146,9 @@ The second parameter (optional) is a real number representing a bound (only supp
   }\left[\verb+app>>+\ n\ R\ g\right]
 \end{array}
 \end{displaymath}
+%
+The second parameter (optional) is a real number representing a bound (only supported for $=$ and $\geq$).
+%
 Similar rules hold for $=$. If the parameter $g$ is not given then
 $g=f$ in the rule. 
 
@@ -192,8 +211,157 @@ Similar rules hold for $=,\geq$.
 \subsection{Simplifying conditionals: the \texttt{condt,condf} tactic}
 %
 \subsubsection{Probabilistic Hoare Logic}
-\index{tactics!probabilistic Hoare logic!condt@\texttt{condt}}
-\index{tactics!probabilistic Hoare logic!condf@\texttt{condf}}
+\index{tactics}{probabilistic Hoare logic!condt@\texttt{condt}}
+\index{tactics}{probabilistic Hoare logic!condf@\texttt{condf}}
+
+
+\subsection{Reasoning about function calls: the \texttt{call} tactic}
+%
+\subsubsection{Hoare Logic}
+\index{hoare}{Program Reasoning!call@\texttt{call}}
+\Syntax \verb+call+ formula formula
+\Description
+
+Let $p$ stand for the formal parameters of function $f$, $\result_f$
+the result variable of function $f$, and $\vec{m}$ the set of
+variables modifiable by $f$.
+\begin{displaymath}
+  \infrule{
+    \begin{array}{c}
+      \hoareS{c}{\pre}{\pre_f\subst{\vec{p}}{\vec{y}} \land
+        \forall v.~ \forall \vec{z}.~ 
+        \post_f\subst{\result_f}{v}\subst{\vec{m}}{\vec{z}}
+        \Rightarrow \post\subst{x}{v}\subst{\vec{m}}{\vec{z}}
+      }
+      \\[.5ex]
+      \hoareS{f}{\pre_f}{\post_f}
+    \end{array}
+  }{
+    \hoareS{c;\Call{x}{f}{\vec{y}}}{\pre}{\post}
+  } \left[\verb+call+~ \pre_f~ \post_f \right]
+\end{displaymath}
+
+
+
+\subsubsection{Probabilistic Hoare Logic}
+\index{phl}{probabilistic Hoare logic!call@\texttt{call}}
+
+\Syntax \verb+call+ formula formula [formula]
+
+\Description
+
+Let $p$ stand for the formal parameters of function $f$, $\result_f$
+the result variable of function $f$, and $\vec{m}$ the set of
+variables modifiable by $f$.
+\begin{displaymath}
+  \infrule{
+    \begin{array}{c}
+      \hoareS{c}{\pre}{\pre_f\subst{\vec{p}}{\vec{y}} \land
+        \forall v.~ \forall \vec{z}.~ 
+        \post_f\subst{\result_f}{v}\subst{\vec{m}}{\vec{z}}
+        \Rightarrow \post\subst{x}{v}\subst{\vec{m}}{\vec{z}}
+      }
+      \\[.5ex]
+      \bdHoareSle{f}{\pre_f}{\post_f}{\delta}
+    \end{array}
+  }{
+    \bdHoareSle{c;\Call{x}{f}{\vec{y}}}{\pre}{\post}{\delta}
+  } \left[\verb+call+~ \pre_f~ \post_f \right]
+\end{displaymath}
+
+\begin{displaymath}
+  \infrule{
+    \begin{array}{c}
+      \bdHoareSeq{c}{\pre}{\pre_f\subst{\vec{p}}{\vec{y}} \land
+        \forall v.~ \forall \vec{z}.~ 
+        \post_f\subst{\result_f}{v}\subst{\vec{m}}{\vec{z}}
+        \Rightarrow \post\subst{x}{v}\subst{\vec{m}}{\vec{z}}}{\frac{\delta}{\delta'}}
+    \\[.5ex]
+    \bdHoareSeq{f}{\pre_f}{\post_f}{\delta'}
+  \end{array}
+  }{
+    \bdHoareSeq{c;\Call{x}{f}{\vec{y}}}{\pre}{\post}{\delta}
+  } \left[\verb+call+~ \pre_f~ \post_f~ \delta' \right]
+\end{displaymath}
+
+\begin{displaymath}
+  \infrule{
+    \begin{array}{c}
+      \bdHoareSge{c}{\pre}{\pre_f\subst{\vec{p}}{\vec{y}} \land
+        \forall v.~ \forall \vec{z}.~ 
+        \post_f\subst{\result_f}{v}\subst{\vec{m}}{\vec{z}}
+        \Rightarrow \post\subst{x}{v}\subst{\vec{m}}{\vec{z}}}
+      {\frac{\delta}{\delta'}}
+    \\[.5ex]
+    \bdHoareSge{f}{\pre_f}{\post_f}{\delta'}
+  \end{array}
+  }{
+    \bdHoareSge{c;\Call{x}{f}{\vec{y}}}{\pre}{\post}{\delta}
+  } \left[\verb+call+~ \pre_f~ \post_f ~\delta' \right]
+\end{displaymath}
+
+If no parameter is given for the lower-bounded and exact judgements
+then $\delta'=1$.
+
+\warningbox{New tactics, needs structuring.}
+
+\subsection{: the \texttt{hoare,hoare\_bd,pr\_bounded,bd\_eq}}
+
+\subsubsection{Possibilistic and probabilistic Hoare Logic}
+\Syntax \verb+hoare+, \verb+hoare_bd+
+allows to switch between possibilistic and probabilistic logics
+according to these rules:
+\begin{displaymath}
+\begin{array}{cc}
+\infrule{
+  \hoareS{c}{\pre}{\neg \post} \quad f = 0
+}{
+  \bdHoareSeq{c}{\pre}{\post}{f}
+}
+&
+\infrule{
+  \bdHoareSeq{c}{\pre}{\neg\post}{0}
+}{
+  \hoareS{c}{\pre}{\post}
+}
+\end{array}
+\end{displaymath}
+
+\Syntax \verb+pr_bounded+
+discharges goals by applying trivial probability properties:
+\begin{displaymath}
+\begin{array}{cc}
+\infrule{
+}{
+  \bdHoareSle{c}{\pre}{\post}{1}
+}
+&
+\infrule{
+}{
+  \bdHoareSge{c}{\pre}{\post}{0}
+}
+\end{array}
+\end{displaymath}
+
+\Syntax \verb+bd_eq+
+\begin{displaymath}
+\begin{array}{cc}
+\infrule{
+  \bdHoareSeq{c}{\pre}{\post}{f}
+}{
+  \bdHoareSle{c}{\pre}{\post}{f}
+}
+&
+\infrule{
+  \bdHoareSeq{c}{\pre}{\post}{f}
+}{
+  \bdHoareSge{c}{\pre}{\post}{f}
+}
+\end{array}
+\end{displaymath}
+
+
+
 
 %***** NOT IMPLEMENTED 
 
@@ -276,8 +444,6 @@ and the folowing one for exact judgments (=):
 
 There is no appropriate rule for $(\leq)$.
 
-\subsection{The \texttt{call} tactic}
-%
 
 \subsection{The \texttt{inline} tactic}
 %
