@@ -1,4 +1,4 @@
-; Generated on Mon Jun  3 09:49:11 2013
+; Generated on Sun Jun  9 23:42:01 2013
 
 (defvar easycrypt-dangerous-keywords '(
   "admit"
@@ -68,16 +68,16 @@
   "same"
   "idtac"
   "try"
+  "by"
   "assumption"
   "intros"
   "split"
-  "field"
-  "field_simplify"
   "left"
   "right"
   "elim"
   "apply"
   "trivial"
+  "progress"
   "cut"
   "generalize"
   "clear"
@@ -93,6 +93,8 @@
   "case"
   "rewrite"
   "subst"
+  "field"
+  "field_simplify"
   "app"
   "wp"
   "skip"
@@ -109,6 +111,7 @@
   "fusion"
   "unroll"
   "splitwhile"
+  "kill"
 ))
 
 (provide 'easycrypt-keywords)
