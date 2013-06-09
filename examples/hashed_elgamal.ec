@@ -6,9 +6,15 @@ require import Map.
 require import Set.
 require import Real.
 require import Logic.
+require Word.
 require RandOrcl.
 
-type bitstring.
+op k : int.
+
+clone Word as Bitstring with
+ op length = k.
+
+type bitstring = Bitstring.word.
 type group.
 
 op g  : group.
@@ -25,23 +31,23 @@ type ciphertext = group * bitstring.
 
 op (^) : group -> int -> group.
 
-op (^^) : bitstring -> bitstring -> bitstring.
+op (^^) : bitstring -> bitstring -> bitstring = Bitstring.(^^).
 
-op zeros : bitstring.
+op zeros : bitstring = Bitstring.zeros.
 
-op uniform : bitstring distr.
+op uniform : bitstring distr = Bitstring.Dword.dword.
 
 axiom pow_mul : forall (x, y:int), (g ^ x) ^ y = g ^ (x * y).
 
-axiom xor_absorb : forall (x:bitstring), x ^^ x = zeros.
+lemma xor_absorb : forall (x:bitstring), x ^^ x = zeros.
 
-axiom xor_zeros : forall (x:bitstring), zeros ^^ x = x.
+lemma xor_zeros : forall (x:bitstring), zeros ^^ x = x.
 
 axiom xor_assoc : forall (x,y,z:bitstring), x ^^ (y ^^ z) = (x ^^ y) ^^ z.
 
-axiom uniform_total : forall (x:bitstring), Distr.in_supp x uniform.
+lemma uniform_total : forall (x:bitstring), Distr.in_supp x uniform.
 
-axiom uniform_spec : 
+lemma uniform_spec : 
   forall (x y:bitstring), Distr.mu_x uniform x = Distr.mu_x uniform y.
  
 clone RandOrcl as RandOrcl_group with 
