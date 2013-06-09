@@ -1466,7 +1466,7 @@ phltactic:
 | KILL s=side? o=codepos NOT n=NUM
     { Pkill (s, o, Some n) }
 
-| KILL s=side? o=codepos NOT n=NUM STAR
+| KILL s=side? o=codepos NOT STAR
     { Pkill (s, o, None) }
 
 | p=tselect INLINE
