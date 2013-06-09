@@ -30,14 +30,14 @@ module type Adversary(O1:Oracle, O2:Oracle) = {
 require import Map.
 
 module Experiment(O1:Oracle, O2:Oracle, A:Adversary) = {
-  module A = A(O1,O2)
+  module A_ = A(O1,O2)
 
   fun main(): bool = {
     var b:bool;
     (* Setup Phase *)
     O1.init(); O2.init();
     (* Adversary Call *)
-    b := A.main();
+    b := A_.main();
     return b;
   }
 }.
