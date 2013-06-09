@@ -15,6 +15,8 @@ all: final
 $(MAIN).pdf $(MAIN).aux $(IDXFILES): $(MAIN).tex
 	$(TEX) $^
 
+index: $(INDFILES)
+
 %.ind: %.idx
 	$(IDX) $<
 
@@ -25,4 +27,4 @@ final: $(FILES) $(INDFILES) $(BBLFILE)
 	$(TEX) $(MAIN).tex
 
 clean:
-	rm -f *.aux *.out *.blg *.bbl *.log *.dvi *.toc *.idx *.ilg *.ind *.lof $(MAIN).pdf *~
+	rm -f *.aux *.out *.blg *.bbl *.log *.dvi *.toc *.idx *.ilg *.ind *.lof *.synctex.gz $(MAIN).pdf *~

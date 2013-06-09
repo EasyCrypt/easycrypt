@@ -914,16 +914,15 @@ let subst_args_call env m f =
   List.fold_right2 (fun v e s ->
     PVM.add_none env (pv_loc f v.v_name) m (form_of_expr m e) s)
   
-let t_hoare_call env fpre fpost (juc,n1 as g) =
+let t_hoare_call env fpre fpost g =
   (* FIXME : check the well formess of the pre and the post ? *)
-  let hyps,concl = get_goal g in
+  let concl = get_concl g in
   let hs = destr_hoareS concl in
   let (lp,f,args),s = s_last_call "call" hs.hs_s in
   let m = EcMemory.memory hs.hs_m in
   let fsig = (Fun.by_xpath f env).f_sig in
   (* The function satisfies the specification *)
   let f_concl = f_hoareF fpre f fpost in
-  let juc,nf = new_goal juc (hyps, f_concl) in
   (* The wp *)
   let pvres = pv_res f in
   let vres = EcIdent.create "result" in
@@ -936,10 +935,62 @@ let t_hoare_call env fpre fpost (juc,n1 as g) =
   let spre = subst_args_call env m f fsig.fs_params args PVM.empty in
   let post = f_anda_simpl (PVM.subst env spre fpre) post in
   let concl = f_hoareS_r { hs with hs_s = s; hs_po=post} in
-  let (juc,n) = new_goal juc (hyps,concl) in
-  let rule = { pr_name = RN_hl_call (None, fpre, fpost); 
-               pr_hyps =[RA_node nf;RA_node n;]} in
-  upd_rule rule (juc, n1)
+  prove_goal_by [f_concl;concl] (RN_hl_call (None, fpre, fpost)) g
+
+
+let t_bdHoare_call env fpre fpost opt_bd g =
+  (* FIXME : check the well formess of the pre and the post ? *)
+  let concl = get_concl g in
+  let bhs = destr_bdHoareS concl in
+  let (lp,f,args),s = s_last_call "call" bhs.bhs_s in
+  let m = EcMemory.memory bhs.bhs_m in
+  let fsig = (Fun.by_xpath f env).f_sig in
+
+  (* The wp *)
+  let pvres = pv_res f in
+  let vres = EcIdent.create "result" in
+  let fres = f_local vres fsig.fs_ret in
+  let post = wp_asgn_call env m lp fres bhs.bhs_po in
+  let fpost = PVM.subst1 env pvres m fres fpost in 
+  let modi = f_write env f in
+  let post = generalize_mod env m modi (f_imp_simpl fpost post) in
+  let post = f_forall_simpl [(vres, GTty fsig.fs_ret)] post in
+  let spre = subst_args_call env m f fsig.fs_params args PVM.empty in
+  let post = f_anda_simpl (PVM.subst env spre fpre) post in
+
+  (* most of the above code is duplicated from t_hoare_call *)
+
+  let f_concl,concl = match bhs.bhs_cmp, opt_bd with
+    | FHle, Some _ -> cannot_apply "call" 
+      "optional bound parameter not allowed for upper-bounded judgements"
+    | FHle, None -> 
+      let f_concl =  f_bdHoareF fpre f fpost FHle bhs.bhs_bd in
+      let concl = f_hoareS bhs.bhs_m bhs.bhs_pr s post in
+      f_concl,concl
+    | FHeq, Some bd ->
+      let f_concl = f_bdHoareF fpre f fpost FHeq bd in
+      let concl = f_bdHoareS_r { bhs with bhs_s = s; bhs_po=post; 
+        bhs_bd=f_real_div bhs.bhs_bd bd} in
+      f_concl,concl
+    | FHeq, None -> 
+      let f_concl = f_bdHoareF fpre f fpost FHeq bhs.bhs_bd in
+      let concl = f_bdHoareS_r { bhs with bhs_s = s; bhs_po=post; 
+        bhs_bd=f_r1 } in
+      f_concl,concl
+    | FHge, Some bd -> 
+      let f_concl = f_bdHoareF fpre f fpost FHge bd in
+      let concl = f_bdHoareS_r { bhs with bhs_s = s; bhs_po=post; 
+        bhs_bd=f_real_div bhs.bhs_bd bd} in
+      f_concl,concl
+    | FHge, None -> 
+      let f_concl = f_bdHoareF fpre f fpost FHge bhs.bhs_bd in
+      let concl = f_bdHoareS_r { bhs with bhs_s = s; bhs_po=post; 
+        bhs_cmp=FHeq; bhs_bd=f_r1} in
+      f_concl,concl
+  in
+  prove_goal_by [f_concl;concl] (RN_hl_call (None, fpre, fpost)) g
+
+      
 
 let t_equiv_call env fpre fpost g =
   (* FIXME : check the well formess of the pre and the post ? *)
@@ -1735,28 +1786,58 @@ let t_bd_hoare_rnd env (opt_bd,opt_event) g =
     | Some event -> event 
     | None -> cannot_apply "rnd" "Optional events still not supported"
   in
-  let new_cmp_op,new_hoare_bd, bounded_distr =
+
+  let v_id = EcIdent.create "v" in
+  let v = f_local v_id ty_distr in
+  let post_v = subst_form_lv env (EcMemory.memory bhs.bhs_m) lv v bhs.bhs_po in
+  let event_v = f_app event [v] tbool in
+  let v_in_supp = f_in_supp v distr in
+
+  let concl = 
     match bhs.bhs_cmp, opt_bd with
       | FHle, Some bd' when not (EcFol.f_equal bhs.bhs_bd bd') ->
         cannot_apply "bd_hoare_rnd"
           "Rule for upper-bounded hoare triples requires a total bound"
       | FHle, _ ->
-          FHeq, EcFol.f_r1, f_real_le (f_mu distr event) bhs.bhs_bd
+        let bounded_distr = f_real_le (f_mu distr event) bhs.bhs_bd in
+        let post_equiv_event = f_forall_simpl [v_id,GTty ty_distr] 
+          (f_imps_simpl [v_in_supp;post_v] event_v) in
+        let post = bounded_distr &&& post_equiv_event in
+        f_hoareS bhs.bhs_m bhs.bhs_pr s post 
+
       | FHge, Some bd' when not (EcFol.f_equal bhs.bhs_bd bd') -> 
-          bhs.bhs_cmp, EcFol.f_real_div_simpl bhs.bhs_bd bd', f_real_le bd' (f_mu distr event)
-      | FHge, _ -> FHeq, EcFol.f_r1, f_real_le bhs.bhs_bd (f_mu distr event)
+        let new_hoare_bd, bounded_distr =
+          EcFol.f_real_div_simpl bhs.bhs_bd bd', f_real_le bd' (f_mu distr event)
+        in
+        let post_equiv_event = f_forall_simpl [v_id,GTty ty_distr] 
+          (f_imps_simpl [v_in_supp;event_v] post_v) in
+        let post = bounded_distr &&& post_equiv_event in
+        f_bdHoareS_r {bhs with bhs_s=s; bhs_po=post; bhs_bd=new_hoare_bd}
+
+      | FHge, _ -> 
+        let bounded_distr = f_real_le bhs.bhs_bd (f_mu distr event) in
+        let post_equiv_event = f_forall_simpl [v_id,GTty ty_distr] 
+          (f_imps_simpl [v_in_supp;event_v] post_v) in
+        let post = bounded_distr &&& post_equiv_event in
+        f_bdHoareS_r {bhs with bhs_s=s; bhs_po=post; bhs_cmp=FHeq; bhs_bd=EcFol.f_r1} 
+
       | FHeq, Some bd' when not (EcFol.f_equal bhs.bhs_bd bd') -> 
-          bhs.bhs_cmp, EcFol.f_real_div_simpl bhs.bhs_bd bd', f_eq (f_mu distr event) bd'
-      | FHeq, _ -> FHeq, EcFol.f_r1, f_eq (f_mu distr event) bhs.bhs_bd
+        let new_hoare_bd, bounded_distr =
+          EcFol.f_real_div_simpl bhs.bhs_bd bd', f_eq (f_mu distr event) bd'
+        in
+        let post_equiv_event = f_forall_simpl [v_id,GTty ty_distr] 
+          (f_imp_simpl v_in_supp (f_iff_simpl event_v post_v)) in
+        let post = bounded_distr &&& post_equiv_event in
+        f_bdHoareS_r {bhs with bhs_s=s; bhs_po=post; bhs_bd=new_hoare_bd} 
+
+      | FHeq, _ -> 
+        let bounded_distr = f_eq (f_mu distr event) bhs.bhs_bd in
+        let post_equiv_event = f_forall_simpl [v_id,GTty ty_distr] 
+          (f_imp_simpl v_in_supp (f_iff_simpl event_v post_v)) in
+        let post = bounded_distr &&& post_equiv_event in
+        f_bdHoareS_r {bhs with bhs_s=s; bhs_po=post; bhs_bd=EcFol.f_r1} 
   in
-  let v_id = EcIdent.create "v" in
-  let v = f_local v_id ty_distr in
-  let post_v = subst_form_lv env (EcMemory.memory bhs.bhs_m) lv v bhs.bhs_po in
-  let event_v = f_app event [v] tbool in
-  let post_equiv_event = f_forall_simpl [(v_id,GTty ty_distr)] (f_iff post_v (event_v)) in
-  let post = bounded_distr &&& post_equiv_event in
-  let concl = f_bdHoareS_r {bhs with bhs_s=s; bhs_po=post; bhs_cmp=new_cmp_op; 
-    bhs_bd=new_hoare_bd} in
+
   prove_goal_by [concl] (RN_bhl_rnd (opt_bd,event) ) g
 
 
@@ -1765,14 +1846,14 @@ let t_hoare_bd_hoare g =
   if is_bdHoareS concl then
     let bhs = destr_bdHoareS concl in
     let concl1 = f_hoareS bhs.bhs_m bhs.bhs_pr bhs.bhs_s (f_not bhs.bhs_po) in
-    let concl2 = f_real_le bhs.bhs_bd f_r0  in
+    let concl2 = f_eq bhs.bhs_bd f_r0  in
     prove_goal_by [concl1;concl2] RN_hl_hoare_bd_hoare g
   else if is_hoareS concl then
     let hs = destr_hoareS concl in
     let concl1 = f_bdHoareS hs.hs_m hs.hs_pr hs.hs_s (f_not hs.hs_po) FHeq f_r0 in
     prove_goal_by [concl1] RN_hl_hoare_bd_hoare g
   else 
-    cannot_apply "hoare/bd_hoare" "" (* FIXME: error message *)
+    cannot_apply "hoare/bd_hoare" "a hoare or bd_hoare judgment was expected" 
 
 let t_prbounded g = 
   let concl = get_concl g in
@@ -1781,7 +1862,7 @@ let t_prbounded g =
     | FHle -> f_real_le f_r1 bhs.bhs_bd
     | FHge -> f_real_le bhs.bhs_bd f_r0
     | FHeq ->
-      cannot_apply "pr_bounded" "" (* FIXME: error message *)
+      cannot_apply "pr_bounded" "cannot solve the probabilistic judgement" 
   in
   prove_goal_by [cond] RN_hl_prbounded g
 

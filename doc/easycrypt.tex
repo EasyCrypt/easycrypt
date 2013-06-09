@@ -1,5 +1,6 @@
 \documentclass[a4paper,notitlepage]{book}
 
+\usepackage{multicol}
 \usepackage{multind}
 \usepackage{xspace}
 \usepackage{mdframed}
@@ -21,7 +22,7 @@
 
 \newcommand{\pRHL}{\mathsf{pRHL}\xspace}
 \newcommand{\hoareS}[3]{\left[{#1}:{#2}\Longrightarrow{#3}\right]}
-\newcommand{\bdHoareS}[5]{{\hoareS{#1}{#2}{#3}} {#4}{#5}}
+\newcommand{\bdHoareS}[5]{{\hoareS{#1}{#2}{#3}}\,{#4}\,{#5}}
 \newcommand{\bdHoareSle}[4]{\bdHoareS{#1}{#2}{#3}{\leq}{#4}}
 \newcommand{\bdHoareSeq}[4]{\bdHoareS{#1}{#2}{#3}{=}{#4}}
 \newcommand{\bdHoareSge}[4]{\bdHoareS{#1}{#2}{#3}{\geq}{#4}}

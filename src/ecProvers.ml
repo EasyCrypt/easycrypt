@@ -85,6 +85,7 @@ let restartable_syscall (call : unit -> 'a) : 'a =
     EcUtils.oget !output
 
 let para_call max_provers provers timelimit task =
+  (*Format.printf "%a@." Why3.Pretty.print_task task;*)
   let module CP = Call_provers in
 
   let pcs    = Array.create max_provers None in
@@ -94,6 +95,7 @@ let para_call max_provers provers timelimit task =
     try
       let (_, pr, dr)  = get_prover prover in
 (*      Format.printf "Start prover %s@." prover; *)
+      (*Format.eprintf "%a@." (Why3.Driver.print_task dr) task;*)
       let pc =
         Driver.prove_task ~command:pr.Whyconf.command ~timelimit dr task () in
 
