@@ -52,6 +52,13 @@ intros w0 w1;
   trivial.
 save.
 
+lemma xor_assoc : forall x y z, x ^^ (y ^^ z) = (x ^^ y) ^^ z
+proof.
+  intros x y z.
+  apply (extensionality (x ^^ (y ^^ z)) ((x ^^ y) ^^ z) _).
+  intros i Hge Hlt; trivial.
+save.
+
 lemma xor_zeros: forall w,
   w ^^ zeros = w
 proof.

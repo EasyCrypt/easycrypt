@@ -11,8 +11,7 @@ require RandOrcl.
 
 op k : int.
 
-clone Word as Bitstring with
- op length = k.
+clone Word as Bitstring with op length = k.
 
 type bitstring = Bitstring.word.
 type group.
@@ -43,7 +42,7 @@ lemma xor_absorb : forall (x:bitstring), x ^^ x = zeros.
 
 lemma xor_zeros : forall (x:bitstring), zeros ^^ x = x.
 
-axiom xor_assoc : forall (x,y,z:bitstring), x ^^ (y ^^ z) = (x ^^ y) ^^ z.
+lemma xor_assoc : forall (x, y, z:bitstring), x ^^ (y ^^ z) = (x ^^ y) ^^ z.
 
 lemma uniform_total : forall (x:bitstring), Distr.in_supp x uniform.
 
