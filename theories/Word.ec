@@ -13,7 +13,7 @@ pred (==)(w0, w1:word) = forall i,
   0 <= i => i < length =>
   w0.[i] = w1.[i].
 
-axiom extentionality: forall w0 w1,
+axiom extensionality: forall w0 w1,
   w0 == w1 => w0 = w1.
 
 (* set *)
@@ -38,7 +38,7 @@ lemma xor_nilpotent: forall w,
   w ^^ w = zeros
 proof.
 intros w;
-  apply (extentionality (w ^^ w) zeros _);
+  apply (extensionality (w ^^ w) zeros _);
   trivial.
 save.
 
@@ -46,7 +46,7 @@ lemma xor_commutative: forall w0 w1,
   w0 ^^ w1 = w1 ^^ w0
 proof.
 intros w0 w1;
-  apply (extentionality (w0 ^^ w1) (w1 ^^ w0) _);
+  apply (extensionality (w0 ^^ w1) (w1 ^^ w0) _);
   cut xorb_commute: (forall i, 0 <= i => i < length =>
                       (w0 ^^ w1).[i] = (w1 ^^ w0).[i]);
   trivial.
@@ -56,7 +56,7 @@ lemma xor_zeros: forall w,
   w ^^ zeros = w
 proof.
 intros w;
-  apply (extentionality (w ^^ zeros) w _);
+  apply (extensionality (w ^^ zeros) w _);
   cut xorb_zeros: (forall i, 0 <= i => i < length =>
                     (w ^^ zeros).[i] = w.[i]);
   trivial.
@@ -82,7 +82,7 @@ lemma to_array_from_array: forall a,
   to_array (from_array a) = a
 proof.
 intros a Length;
-  apply (Array.extentionality<:bool> (to_array (from_array a)) a _);
+  apply (Array.extensionality<:bool> (to_array (from_array a)) a _);
   trivial.
 save.
 
@@ -90,7 +90,7 @@ lemma from_array_to_array: forall w,
   from_array (to_array w) = w
 proof.
 intros w;
-  apply (extentionality (from_array (to_array w)) w _);
+  apply (extensionality (from_array (to_array w)) w _);
   trivial.
 save.
 

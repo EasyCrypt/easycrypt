@@ -39,7 +39,7 @@ lemma eq_sym: forall (X Y:'a set), X == Y => Y == X.
 lemma eq_trans: forall (X Y Z:'a set),
   X == Y => Y == Z => X == Z.
 
-axiom extentionality: forall (X1 X2:'a set),
+axiom extensionality: forall (X1 X2:'a set),
   X1 == X2 => X1 = X2.
 
 (* Subset *)
@@ -71,7 +71,7 @@ lemma mem_add: forall (x:'a) X,
   mem x X => X = add x X
 proof.
 intros x X x_in_X;
-  apply (extentionality<:'a>  X (add x X) _);
+  apply (extensionality<:'a>  X (add x X) _);
   trivial.
 save.
 
@@ -155,7 +155,7 @@ lemma union_empty: forall (X:'a set),
   union X empty = X
 proof.
 intros X;
-  apply (extentionality<:'a> (union X empty) X _);
+  apply (extensionality<:'a> (union X empty) X _);
   trivial.
 save.
 
@@ -163,7 +163,7 @@ lemma union_comm: forall (X Y:'a set),
   union X Y = union Y X
 proof.
 intros X Y;
-  apply (extentionality<:'a> (union X Y) (union Y X) _).
+  apply (extensionality<:'a> (union X Y) (union Y X) _).
   intros x;trivial.
 save.
 
@@ -171,7 +171,7 @@ lemma union_add: forall (x:'a) X Y,
   add x (union X Y) = union (add x X) Y
 proof.
  intros x X Y.
-  apply (extentionality<:'a> (add x (union X Y)) (union (add x X) Y) _).
+  apply (extensionality<:'a> (add x (union X Y)) (union (add x X) Y) _).
   intros y;trivial.
 save.
 
@@ -244,7 +244,7 @@ lemma inter_empty: forall (X:'a set),
   inter X empty = empty
 proof.
 intros X;
-  apply (extentionality<:'a> (inter X empty) empty _);
+  apply (extensionality<:'a> (inter X empty) empty _);
   trivial.
 save.
 
@@ -252,7 +252,7 @@ lemma inter_comm: forall (X Y:'a set),
   inter X Y = inter Y X
 proof.
 intros X Y;
-  apply (extentionality<:'a> (inter X Y) (inter Y X) _);
+  apply (extensionality<:'a> (inter X Y) (inter Y X) _);
   trivial.
 save.
 
@@ -260,7 +260,7 @@ lemma inter_add: forall (x:'a) X Y,
   add x (inter X Y) = inter (add x X) (add x Y)
 proof.
 intros x X Y;
-  apply (extentionality<:'a> (add x (inter X Y)) (inter (add x X) (add x Y)) _);
+  apply (extensionality<:'a> (add x (inter X Y)) (inter (add x X) (add x Y)) _);
   cut ext: (forall y, mem y (add x (inter X Y)) = mem y (inter (add x X) (add x Y)));trivial.
 save.
 
@@ -268,7 +268,7 @@ lemma inter_add2: forall (x:'a) X Y,
   mem x Y => add x (inter X Y) = inter (add x X)  Y
 proof.
 intros x X Y x_in_Y;
-  apply (extentionality<:'a> (add x (inter X Y)) (inter (add x X)  Y) _);
+  apply (extensionality<:'a> (add x (inter X Y)) (inter (add x X)  Y) _);
   trivial.
 save.
 
@@ -276,7 +276,7 @@ lemma inter_add3: forall (x:'a) X Y,
   !mem x Y => (inter X Y) = inter (add x X) Y
 proof.
 intros x X Y x_nin_Y;
-  apply (extentionality<:'a> (inter X Y) (inter (add x X) Y) _);
+  apply (extensionality<:'a> (inter X Y) (inter (add x X) Y) _);
   trivial.
 save.
 

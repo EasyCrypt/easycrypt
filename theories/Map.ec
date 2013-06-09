@@ -59,7 +59,7 @@ lemma dom_update: forall (m:('a,'b) map) x y,
   dom (m.[x <- y]) = Set.add x (dom m)
 proof.
 intros m x y;
-  apply (Set.extentionality<:'a> (dom (m.[x <- y])) (Set.add x (dom m)) _);
+  apply (Set.extensionality<:'a> (dom (m.[x <- y])) (Set.add x (dom m)) _);
   trivial.
 save.
 
@@ -82,15 +82,12 @@ intros m x Hdom.
 cut Hx : (m.[x] = Some (proj(m.[x])));trivial.
 save.
 
-lemma upd_in_rng_neq: forall (m:('a,'b) map) x y1 y2,
-  in_rng y1 m =>
-  (!in_dom x m \/ m.[x] <> Some y1) =>
-  in_rng y1 m.[x<-y2].
-
 lemma rng_empty: rng (empty<:'a,'b>) = Set.empty
 proof.
-apply (Set.extentionality<:'b> (rng empty<:'a,'b>) Set.empty _);
-  trivial.
+  apply (Set.extensionality<:'b> (rng empty<:'a,'b>) Set.empty _).
+  intros x.
+  rewrite (rng_def<:'a,'b> (Map_why.const None) x).
+  split; intros _; trivial.
 save.
 
 lemma in_rng_empty: forall x, !in_rng x empty<:'a, 'b>.
@@ -98,10 +95,17 @@ lemma in_rng_empty: forall x, !in_rng x empty<:'a, 'b>.
 lemma rng_update_not_indom: forall (m:('a,'b) map) x y,
   !in_dom x m => rng (m.[x <- y]) = Set.add y (rng m)
 proof.
-intros m x y H;
-apply (Set.extentionality<:'b> (rng (m.[x <- y])) (Set.add y (rng m)) _).
-intros z;trivial.
+  intros m x y H.
+  apply (Set.extensionality<:'b> (rng (m.[x <- y])) (Set.add y (rng m)) _).
+  intros z.
+  rewrite (rng_def<:'a,'b> m.[x <- y] z); split; intros _; trivial.
 save.
+
+lemma upd_in_rng_neq: forall (m:('a,'b) map) x y1 y2,
+  in_rng y1 m =>
+  (!in_dom x m \/ m.[x] <> Some y1) =>
+  in_rng y1 m.[x<-y2].
+
 
 (** find *) (* TODO: the axiomatization appears to be upside-down *)
 op find: ('a * 'b) cPred -> ('a,'b) map -> 'a option.
@@ -209,12 +213,12 @@ cut H: (in_dom y m /\ P (y,proj (m.[y])) = true).
   cut H': (in_dom y (rm x m) /\ P (y,proj ((rm x m).[y])) = true);trivial.
 save.
 
-(** extentional equality *)
+(** extensional equality *)
 pred (==) (m1 m2:('a,'b) map) = (* TODO : Why we use in_dom here ? *)
   (forall x, in_dom x m1 <=> in_dom x m2) &&
   (forall x, in_dom x m1 => m1.[x] = m2.[x]).
 
-axiom extentionality: forall (m1 m2:('a,'b) map),
+axiom extensionality: forall (m1 m2:('a,'b) map),
   m1 == m2 => m1 = m2.
 
 (** equal except *)

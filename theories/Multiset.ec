@@ -27,7 +27,7 @@ op eq(x y:'a):bool = x = y.
 pred (==)(m0, m1:'a multiset) = forall (x:'a),
   count m0 (eq x) = count m1 (eq x).
 
-axiom extentionality: forall (m0 m1:'a multiset),
+axiom extensionality: forall (m0 m1:'a multiset),
   m0 == m1 => m0 = m1.
 
 (* del *)
@@ -60,6 +60,6 @@ lemma add_commutative: forall (x y:'a) xs,
   add (add xs x) y = add (add xs y) x
 proof.
 intros x y xs;
-apply (extentionality<:'a> (add (add xs x) y) (add (add xs y) x) _);
+apply (extensionality<:'a> (add (add xs x) y) (add (add xs y) x) _);
 trivial.
 save.

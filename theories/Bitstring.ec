@@ -33,7 +33,7 @@ lemma to_array_from_array: forall bs,
   from_array (to_array bs) = bs
 proof.
 intros bs;
-  apply (extentionality<:bool> (from_array (to_array bs)) bs _);
+  apply (extensionality<:bool> (from_array (to_array bs)) bs _);
   trivial.
 save.
 
@@ -41,7 +41,7 @@ lemma from_array_to_array: forall bs,
   to_array (from_array bs) = bs
 proof.
 intros bs;
-  apply (Array.extentionality<:bool> (to_array (from_array bs)) bs _);
+  apply (Array.extensionality<:bool> (to_array (from_array bs)) bs _);
   trivial.
 save.
 
@@ -73,7 +73,7 @@ lemma xor_nilpotent: forall (bs:bitstring),
   bs ^^ bs = zeros (length bs)
 proof.
 intros bs;
-  apply (extentionality<:bool> (bs ^^ bs) (zeros (length bs)) _);
+  apply (extensionality<:bool> (bs ^^ bs) (zeros (length bs)) _);
   trivial.
 save.
 
@@ -82,7 +82,7 @@ length(x) = length(y) => length(y) = length(z) =>
  (x ^^ y) ^^ z = x ^^ (y ^^ z)
 proof.
  intros x y z Hleq1 Hleq2.
- apply (extentionality<:bool>  ((x ^^ y) ^^ z) (x ^^ (y ^^ z)) _).
+ apply (extensionality<:bool>  ((x ^^ y) ^^ z) (x ^^ (y ^^ z)) _).
  delta (==);simplify.
  split;try trivial.
  delta (^^);simplify.
@@ -99,7 +99,7 @@ lemma xor_zeroes_neutral : forall (x : bitstring),
 x ^^ zeros(length(x)) = x
 proof.
  intros x.
- apply (extentionality<:bool> (x^^ zeros(length x)) x _).
+ apply (extensionality<:bool> (x^^ zeros(length x)) x _).
  trivial.
 save.
 

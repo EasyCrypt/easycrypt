@@ -26,12 +26,12 @@ axiom length_pos: forall (xs:'x array), 0 <= length xs.
 (* And a bunch of elements *)
 op __get: 'x array -> int -> 'x.
 
-(* Equality is extentional *)
+(* Equality is extensional *)
 pred (==) (xs0:'x array, xs1:'x array) =
   length xs0 = length xs1 /\
   forall (i:int), 0 <= i => i < length xs0 => xs0.[i] = xs1.[i].
 
-axiom extentionality: forall (xs0:'x array, xs1:'x array),
+axiom extensionality: forall (xs0:'x array, xs1:'x array),
   xs0 == xs1 => xs0 = xs1.
 
 (*********************************)
@@ -46,7 +46,7 @@ lemma empty_unique: forall (xs:'x array),
   length(xs) = 0 => xs = empty
 proof.
 intros xs H;
-  apply (extentionality<:'x> xs empty _);
+  apply (extensionality<:'x> xs empty _);
   trivial.
 save.
 
@@ -145,7 +145,7 @@ lemma sub_append_fst: forall (xs0 xs1:'x array),
   sub (xs0 || xs1) 0 (length(xs0)) = xs0
 proof.
 intros xs0 xs1;
-  apply (extentionality<:'x> (sub (xs0 || xs1) 0 (length xs0)) xs0 _);
+  apply (extensionality<:'x> (sub (xs0 || xs1) 0 (length xs0)) xs0 _);
   trivial.
 save.
 
@@ -153,7 +153,7 @@ lemma sub_append_snd: forall (xs0 xs1:'x array),
   sub (xs0 || xs1) (length xs0) (length xs1) = xs1
 proof.
 intros xs0 xs1;
-  apply (extentionality<:'x> (sub (xs0 || xs1) (length xs0) (length xs1)) xs1 _);
+  apply (extensionality<:'x> (sub (xs0 || xs1) (length xs0) (length xs1)) xs1 _);
   trivial.
 save.
 
@@ -177,12 +177,12 @@ trivial.
 simplify.
 intros x xs' IH.
 cut length_def:(length (x::xs') = length xs' + 1);[ trivial | rewrite length_def;rewrite <- IH ].
-cut sub_eq:(sub (x::xs') 1 (length (x::xs') - 1) = xs');[ apply (extentionality<:'x> (sub (x::xs') 1 (length (x::xs') - 1)) xs' _);trivial | ].
+cut sub_eq:(sub (x::xs') 1 (length (x::xs') - 1) = xs');[ apply (extensionality<:'x> (sub (x::xs') 1 (length (x::xs') - 1)) xs' _);trivial | ].
 cut fold_def:(fold_left (lambda x n, n + 1) xs' 0 = fold_left (lambda x n, n + 1) (sub (x::xs') 1 (length (x::xs') - 1)) 0);[ rewrite sub_eq | ].
 apply (fold_left_deterministic<:int,'x> (lambda x n, n + 1) (lambda x n, n + 1) 0 0 xs' xs' _ _).
-  apply (Fun.extentionality<:int -> int,'x> (lambda x n, n + 1) (lambda x n, n + 1) _).
+  apply (Fun.extensionality<:int -> int,'x> (lambda x n, n + 1) (lambda x n, n + 1) _).
   delta beta.
-  intros x'. apply (Fun.extentionality<:int,int> (lambda n, n + 1) (lambda n, n + 1) _).
+  intros x'. apply (Fun.extensionality<:int,int> (lambda n, n + 1) (lambda n, n + 1) _).
   delta beta. trivial.
 trivial.
 rewrite fold_def;clear fold_def.
@@ -239,7 +239,7 @@ lemma write_append: forall (dst src:'x array),
   write dst 0 src 0 (length src) = (src || (sub dst (length src) (length dst - length src)))
 proof.
 intros dst src H;
-  apply (extentionality<:'x>
+  apply (extensionality<:'x>
            (write dst 0 src 0 (length src))
            (src || sub dst (length src) (length dst - length src))
            _).

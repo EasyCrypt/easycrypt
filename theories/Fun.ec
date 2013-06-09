@@ -2,7 +2,7 @@
 pred (==)(f1:'a -> 'b, f2:'a -> 'b) =
   forall x, f1 x = f2 x.
 
-axiom extentionality: forall (f1 f2:'a -> 'b),
+axiom extensionality: forall (f1 f2:'a -> 'b),
   f1 == f2 => f1 = f2.
 
 (** Computable predicates *)
