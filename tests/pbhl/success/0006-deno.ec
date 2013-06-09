@@ -13,7 +13,7 @@ module M = {
 }.
 
 
-lemma test : forall &m, Pr[M.f() @ &m : res ] = 1%r/2%r
+lemma test : forall &m, Pr[M.f() @ &m : res ] = 1%r/2%r.
 proof.
 intros &m.
 bdhoare_deno (_ : true ==> _ );

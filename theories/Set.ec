@@ -32,12 +32,13 @@ axiom Set_ind: forall (P:('a set) cPred),
 pred (==) (X1 X2:'a set) = forall (x:'a),
   mem x X1 <=> mem x X2.
 
-lemma eq_refl: forall (X:'a set), X == X.
+lemma eq_refl: forall (X:'a set), X == X by [].
 
-lemma eq_sym: forall (X Y:'a set), X == Y => Y == X.
+lemma eq_sym: forall (X Y:'a set), X == Y => Y == X by [].
 
 lemma eq_trans: forall (X Y Z:'a set),
-  X == Y => Y == Z => X == Z.
+  X == Y => Y == Z => X == Z
+by [].
 
 axiom extensionality: forall (X1 X2:'a set),
   X1 == X2 => X1 = X2.
@@ -46,19 +47,21 @@ axiom extensionality: forall (X1 X2:'a set),
 pred (<=) (X1 X2:'a set) = forall x,
   mem x X1 => mem x X2.
 
-lemma sub_refl: forall (X:'a set), X <= X.
+lemma sub_refl: forall (X:'a set), X <= X by [].
 
 lemma sub_anti_sym: forall (X Y:'a set),
-  X <= Y => Y <= X => X == Y.
+  X <= Y => Y <= X => X == Y
+by [].
 
 lemma sub_trans: forall (X Y Z:'a set),
-  X <= Y => Y <= Z => X <= Z.
+  X <= Y => Y <= Z => X <= Z
+by [].
 
 (** Specification of operators *)
 (* empty *)
 axiom empty_mem: forall (x:'a), !mem x empty.
 
-lemma empty_subset: forall (X:'a set), empty <= X.
+lemma empty_subset: forall (X:'a set), empty <= X by [].
 
 (* add *)
 axiom add_mem: forall (x y:'a) X, 
@@ -68,7 +71,7 @@ axiom add_card: forall (x:'a) X,
   !mem x X => card (add x X) = card X + 1.
 
 lemma mem_add: forall (x:'a) X,
-  mem x X => X = add x X
+  mem x X => X = add x X.
 proof.
 intros x X x_in_X;
   apply (extensionality<:'a>  X (add x X) _);
@@ -76,14 +79,15 @@ intros x X x_in_X;
 save.
 
 lemma add_subset: forall (x:'a) X,
-  X <= add x X.
+  X <= add x X
+by [].
 
 (* card *)
 axiom card_empty: card<:'a> empty = 0.
 axiom card_rm: forall (x:'a) S, mem x S => card S = 1 + card(rm x S).
 
 pred (* local *) cP_card_pos (X:'a set) = 0 <= card X.
-lemma card_pos: forall (X:'a set), 0 <= card X
+lemma card_pos: forall (X:'a set), 0 <= card X.
 proof.
 intros X;cut IH: (cP_card_pos X);
 [ apply (Set_ind<:'a> cP_card_pos _ _ X);trivial |
@@ -92,7 +96,8 @@ save.
 
 (* singleton *)
 lemma singleton_card: forall (x:'a),
-  card (singleton x) = 1.
+  card (singleton x) = 1
+by [].
 
 (* filter *)
 op filter: 'a cPred -> 'a set -> 'a set.
@@ -110,14 +115,16 @@ axiom filter_cPeq_card_in : forall (x:'a) X,
   mem x X => card (filter (cPeq x) X) = 1.
 
 lemma filter_subset: forall (P:'a cPred) X,
- filter P X <= X.
+ filter P X <= X
+by [].
 
 (* pick *)
 axiom pick_spec: forall (X:'a set), 
   X <> empty => mem (pick X) X.
 
 lemma pick_singleton: forall (x:'a), 
-  pick (singleton x) = x.
+  pick (singleton x) = x
+by [].
 
 (* rm *)
 axiom rm_spec_not_mem: forall (x:'a) X,
@@ -130,17 +137,20 @@ axiom rm_mem: forall (x:'a) X,
   !mem x (rm x X).
 
 lemma rm_subs: forall (x:'a) X,
-  rm x X <= X.
+  rm x X <= X
+by [].
 
 lemma rm_card: forall (x:'a) X,
-  card(rm x X) <= card X.
+  card(rm x X) <= card X
+by [].
 
 lemma card_non_empty: forall (x:'a) X,
-  mem x X => card X = 1 + card (rm x X).
+  mem x X => card X = 1 + card (rm x X)
+by [].
 
 pred (* local *) cP_is_empty_card(X:'a set) = card X = 0 => is_empty X.
 lemma is_empty_card: forall (X:'a set),
-  card X = 0 => is_empty X 
+  card X = 0 => is_empty X. 
 proof.
 intros X;cut IH: (cP_is_empty_card X);
 [ apply (Set_ind<:'a> cP_is_empty_card _ _ X); trivial |
@@ -152,7 +162,7 @@ axiom union_mem: forall (x:'a) X Y,
   mem x (union X Y) <=> (mem x X \/ mem x Y).
 
 lemma union_empty: forall (X:'a set),
-  union X empty = X
+  union X empty = X.
 proof.
 intros X;
   apply (extensionality<:'a> (union X empty) X _);
@@ -160,7 +170,7 @@ intros X;
 save.
 
 lemma union_comm: forall (X Y:'a set),
-  union X Y = union Y X
+  union X Y = union Y X.
 proof.
 intros X Y;
   apply (extensionality<:'a> (union X Y) (union Y X) _).
@@ -168,7 +178,7 @@ intros X Y;
 save.
 
 lemma union_add: forall (x:'a) X Y,
-  add x (union X Y) = union (add x X) Y
+  add x (union X Y) = union (add x X) Y.
 proof.
  intros x X Y.
   apply (extensionality<:'a> (add x (union X Y)) (union (add x X) Y) _).
@@ -176,13 +186,14 @@ proof.
 save.
 
 lemma subset_union1: forall (X Y:'a set),
-  X <= union X Y.
+  X <= union X Y
+by [].
 
 pred (* local *) cP_subset_union(X:'a set) = forall Y,
   X <= Y => exists Z, Y = union X Z.
 
 lemma subset_union2: forall (X Y:'a set),
-  X <= Y => exists Z, Y = union X Z
+  X <= Y => exists Z, Y = union X Z.
 proof.
 intros X;cut H0: (cP_subset_union X).
   apply (Set_ind<:'a> cP_subset_union _ _ X).
@@ -202,7 +213,7 @@ save.
 pred (* local *) cP_union_card1(X:'a set) = forall Y,
   card (union X Y) <= card(X) + card(Y).
 lemma union_card1: forall (X Y:'a set),
-  card (union X Y) <= card (X) + card(Y)
+  card (union X Y) <= card (X) + card(Y).
 proof.
 intros X;cut H: (cP_union_card1 X);
 [ apply (Set_ind<:'a> cP_union_card1 _ _ X); trivial |
@@ -212,7 +223,7 @@ save.
 pred (* local *) cP_union_card2(Y:'a set) = forall (X:'a set),
   card X <= card (union X Y).
 lemma union_card2: forall (Y X:'a set),
-  card X <= card (union X Y)
+  card X <= card (union X Y).
 proof. 
 intros Y;cut H: (cP_union_card2 Y).
   apply (Set_ind<:'a> cP_union_card2 _ _ Y). 
@@ -228,7 +239,7 @@ intros Y;cut H: (cP_union_card2 Y).
 save.
 
 lemma subset_card: forall (X Y:'a set),
-  X <= Y => (card X) <= (card Y)
+  X <= Y => (card X) <= (card Y).
 proof.
 intros X Y H;cut H0: (exists Z, Y = union X Z).
   trivial.
@@ -241,7 +252,7 @@ axiom inter_mem: forall (x:'a) X Y,
   mem x (inter X Y) <=> (mem x X /\ mem x Y).
 
 lemma inter_empty: forall (X:'a set),
-  inter X empty = empty
+  inter X empty = empty.
 proof.
 intros X;
   apply (extensionality<:'a> (inter X empty) empty _);
@@ -249,7 +260,7 @@ intros X;
 save.
 
 lemma inter_comm: forall (X Y:'a set),
-  inter X Y = inter Y X
+  inter X Y = inter Y X.
 proof.
 intros X Y;
   apply (extensionality<:'a> (inter X Y) (inter Y X) _);
@@ -257,7 +268,7 @@ intros X Y;
 save.
 
 lemma inter_add: forall (x:'a) X Y,
-  add x (inter X Y) = inter (add x X) (add x Y)
+  add x (inter X Y) = inter (add x X) (add x Y).
 proof.
 intros x X Y;
   apply (extensionality<:'a> (add x (inter X Y)) (inter (add x X) (add x Y)) _);
@@ -265,7 +276,7 @@ intros x X Y;
 save.
 
 lemma inter_add2: forall (x:'a) X Y,
-  mem x Y => add x (inter X Y) = inter (add x X)  Y
+  mem x Y => add x (inter X Y) = inter (add x X)  Y.
 proof.
 intros x X Y x_in_Y;
   apply (extensionality<:'a> (add x (inter X Y)) (inter (add x X)  Y) _);
@@ -273,7 +284,7 @@ intros x X Y x_in_Y;
 save.
 
 lemma inter_add3: forall (x:'a) X Y,
-  !mem x Y => (inter X Y) = inter (add x X) Y
+  !mem x Y => (inter X Y) = inter (add x X) Y.
 proof.
 intros x X Y x_nin_Y;
   apply (extensionality<:'a> (inter X Y) (inter (add x X) Y) _);
@@ -281,16 +292,18 @@ intros x X Y x_nin_Y;
 save.
 
 lemma subset_inter: forall (X Y:'a set),
-  inter X Y <= X.
+  inter X Y <= X
+by [].
 
 lemma card_inter: forall (X Y:'a set),
-  card (inter X Y) <= card X.
+  card (inter X Y) <= card X
+by [].
 
 pred (*local *) cP_union_inter(X:'a set) = forall Y,
   card (union X Y) + card (inter X Y) = card X + card Y.
 
 lemma card_union_inter: forall (X Y:'a set),
-  card (union X Y) + card (inter X Y) = card X + card Y
+  card (union X Y) + card (inter X Y) = card X + card Y.
 proof. 
 intros X;cut IH: (cP_union_inter X).
   apply (Set_ind<:'a> cP_union_inter _ _  X).
@@ -372,7 +385,7 @@ theory Dexcepted.
 
   lemma supp_def: forall (x:'a) d X,
      (in_supp x (d \ X) => (in_supp x d /\ !mem x X)) /\
-     ((in_supp x d /\ !mem x X) => in_supp x (d \ X))
+     ((in_supp x d /\ !mem x X) => in_supp x (d \ X)).
   proof.
   intros d X x;split.
     intros in_supp;split;trivial.
@@ -380,8 +393,10 @@ theory Dexcepted.
   save.
     
   lemma mu_x_def: forall (x:'a) d X,
-     mu_x (d \ X) x = (in_supp x (d \ X)) ? mu_x d x / (mu_weight d - mu d (cPmem X)) : 0%r.
+     mu_x (d \ X) x = (in_supp x (d \ X)) ? mu_x d x / (mu_weight d - mu d (cPmem X)) : 0%r
+  by [].
 
   lemma mu_weight_def: forall (d:'a distr) X,
-    mu_weight (d \ X) = (mu_weight d = mu d (cPmem X)) ? 0%r : 1%r.
+    mu_weight (d \ X) = (mu_weight d = mu d (cPmem X)) ? 0%r : 1%r
+  by [].
 end Dexcepted.

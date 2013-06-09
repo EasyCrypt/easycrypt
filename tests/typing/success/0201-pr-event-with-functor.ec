@@ -19,5 +19,5 @@ module G(X : I) = {
   }
 }.
 
-lemma L : forall &m, Pr[G(M).f(0, 0) @ &m : res = 0] = c
+lemma L : forall &m, Pr[G(M).f(0, 0) @ &m : res = 0] = c.
 proof. admit. save. 

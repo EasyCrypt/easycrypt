@@ -2,7 +2,8 @@ import why3 "bool" "Bool"
   op "xorb" as "^^".
 
 lemma xorb_spec: forall b1 b2,
-  b1 ^^ b2 <=> b1 = !b2.
+  b1 ^^ b2 <=> b1 = !b2
+by [].
 
 op xorb(b0 b1:bool):bool =  b0 ^^ b1.
 
@@ -25,7 +26,7 @@ theory Dbool.
   axiom mu_x_def: forall (b:bool),
     mu_x dbool b = 1%r/2%r.
 
-  lemma mu_weight: mu_weight dbool = 1%r
+  lemma mu_weight: mu_weight dbool = 1%r.
   proof.
   cut H: (caract cPtrue true = 1%r /\ caract cPtrue false = 1%r);
     trivial.

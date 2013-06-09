@@ -30,7 +30,7 @@ axiom from_array_get: forall bs i,
   (from_array bs).[i] = Array.__get bs i.
 
 lemma to_array_from_array: forall bs,
-  from_array (to_array bs) = bs
+  from_array (to_array bs) = bs.
 proof.
 intros bs;
   apply (extensionality<:bool> (from_array (to_array bs)) bs _);
@@ -38,7 +38,7 @@ intros bs;
 save.
 
 lemma from_array_to_array: forall bs,
-  to_array (from_array bs) = bs
+  to_array (from_array bs) = bs.
 proof.
 intros bs;
   apply (Array.extensionality<:bool> (to_array (from_array bs)) bs _);
@@ -50,12 +50,14 @@ op (^^)(bs0 bs1:bitstring): bitstring = map2 Bool.xorb bs0 bs1.
 
 lemma xor_length: forall (bs0 bs1:bitstring),
   length bs0 = length bs1 =>
-  length (bs0 ^^ bs1) = length bs0.
+  length (bs0 ^^ bs1) = length bs0
+by [].
 
 lemma xor_get: forall (bs0 bs1:bitstring) (i:int),
   length bs0 = length bs1 =>
   0 <= i => i < length bs0 =>
-  (bs0 ^^ bs1).[i] = Bool.xorb bs0.[i] bs1.[i].
+  (bs0 ^^ bs1).[i] = Bool.xorb bs0.[i] bs1.[i]
+by [].
 
 (* Zero for bitstrings *)
 op zeros: int -> bitstring.
@@ -70,7 +72,7 @@ axiom zeros_get: forall (l i:int),
 
 (* Lemmas *)
 lemma xor_nilpotent: forall (bs:bitstring),
-  bs ^^ bs = zeros (length bs)
+  bs ^^ bs = zeros (length bs).
 proof.
 intros bs;
   apply (extensionality<:bool> (bs ^^ bs) (zeros (length bs)) _);
@@ -79,7 +81,7 @@ save.
 
 lemma xor_assoc : forall (x y z : bitstring), 
 length(x) = length(y) => length(y) = length(z) =>
- (x ^^ y) ^^ z = x ^^ (y ^^ z)
+ (x ^^ y) ^^ z = x ^^ (y ^^ z).
 proof.
  intros x y z Hleq1 Hleq2.
  apply (extensionality<:bool>  ((x ^^ y) ^^ z) (x ^^ (y ^^ z)) _).
@@ -96,7 +98,7 @@ try trivial.
 save.
 
 lemma xor_zeroes_neutral : forall (x : bitstring),
-x ^^ zeros(length(x)) = x
+x ^^ zeros(length(x)) = x.
 proof.
  intros x.
  apply (extensionality<:bool> (x^^ zeros(length x)) x _).

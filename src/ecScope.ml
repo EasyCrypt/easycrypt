@@ -623,21 +623,29 @@ module Ax = struct
       EcFol.Fsubst.uni (EcUnify.UniEnv.close ue) concl in
     let tparams = EcUnify.UniEnv.tparams ue in
     let check = Check_mode.check scope.sc_options in
+
     match ax.pa_kind with
     | PILemma when check ->
       let scope = start_lemma scope (unloc ax.pa_name) tparams concl in
       let scope = Tactics.process scope [tintro] in
       None, scope
-    | PLemma when check ->
+
+    | PLemma tc when check ->
+        let tc =
+          match tc with
+          | Some tc -> [tc]
+          | None    ->
+              let dtc = Plogic (Ptrivial empty_pprover) in
+                [tintro; { pl_loc = loc; pl_desc = dtc }]
+        in
+
         let scope = start_lemma scope (unloc ax.pa_name) tparams concl in
-        let scope =
-          Tactics.process scope
-            [tintro; { pl_loc = loc; pl_desc = Plogic (Ptrivial empty_pprover) }] in
-        let name, scope = save scope loc in
-        name, scope
+        let scope = Tactics.process scope tc in
+          save scope loc
+
     | _ ->
         let axd = { ax_tparams = tparams;
-                    ax_spec = Some concl;
-                    ax_kind = Axiom } in
+                    ax_spec    = Some concl;
+                    ax_kind    = Axiom } in
         Some (unloc ax.pa_name), bind scope (unloc ax.pa_name, axd)
 end

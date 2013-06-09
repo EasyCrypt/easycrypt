@@ -35,7 +35,7 @@ axiom xor_get: forall w0 w1 i,
   (w0 ^^ w1).[i] = Bool.xorb w0.[i] w1.[i].
 
 lemma xor_nilpotent: forall w,
-  w ^^ w = zeros
+  w ^^ w = zeros.
 proof.
 intros w;
   apply (extensionality (w ^^ w) zeros _);
@@ -43,7 +43,7 @@ intros w;
 save.
 
 lemma xor_commutative: forall w0 w1,
-  w0 ^^ w1 = w1 ^^ w0
+  w0 ^^ w1 = w1 ^^ w0.
 proof.
 intros w0 w1;
   apply (extensionality (w0 ^^ w1) (w1 ^^ w0) _);
@@ -60,7 +60,7 @@ proof.
 save.
 
 lemma xor_zeros: forall w,
-  w ^^ zeros = w
+  w ^^ zeros = w.
 proof.
 intros w;
   apply (extensionality (w ^^ zeros) w _);
@@ -86,7 +86,7 @@ axiom from_array_get: forall a i,
 
 lemma to_array_from_array: forall a,
   Array.length a = length =>
-  to_array (from_array a) = a
+  to_array (from_array a) = a.
 proof.
 intros a Length;
   apply (Array.extensionality<:bool> (to_array (from_array a)) a _);
@@ -94,7 +94,7 @@ intros a Length;
 save.
 
 lemma from_array_to_array: forall w,
-  from_array (to_array w) = w
+  from_array (to_array w) = w.
 proof.
 intros w;
   apply (extensionality (from_array (to_array w)) w _);

@@ -21,10 +21,12 @@ op cPor(p1:'a cPred, p2:'a cPred, a): bool = p1 a \/ p2 a.
 op cPeq(x1:'a,x2): bool = x1 = x2.
 
 (* Lemmas/Redefinitions *)
-lemma cPtrue_def: forall (x:'a), cPtrue x. 
-lemma cPfalse_def: forall (x:'a), !cPfalse x. 
-lemma cPnot_def: forall (P:'a cPred) x, cPnot P x <=> !P x. 
+lemma cPtrue_def: forall (x:'a), cPtrue x by []. 
+lemma cPfalse_def: forall (x:'a), !cPfalse x by []. 
+lemma cPnot_def: forall (P:'a cPred) x, cPnot P x <=> !P x by []. 
 lemma cPand_def: forall P1 P2 (x:'a), 
-  cPand P1 P2 x <=> (P1 x /\ P2 x).
+  cPand P1 P2 x <=> (P1 x /\ P2 x)
+by [].
 lemma cPor_def: forall P1 P2 (x:'a), 
-  cPor P1 P2 x <=> (P1 x \/ P2 x).
+  cPor P1 P2 x <=> (P1 x \/ P2 x)
+by [].

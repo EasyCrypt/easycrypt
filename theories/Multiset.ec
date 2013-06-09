@@ -41,7 +41,7 @@ axiom del_nonempty: forall (x y:'a) xs,
 
 (* lemmas *)
 lemma count_pos: forall (xs:'a multiset) p,
-  0 <= count xs p
+  0 <= count xs p.
 proof.
 intros xs p.
 apply (induction<:'a> xs (lambda xs, 0 <= count xs p) _ _);
@@ -49,7 +49,7 @@ trivial.
 save.
 
 lemma card_add: forall (x:'a) xs,
-  count (add xs x) (lambda x, true) = 1 + count xs (lambda x, true)
+  count (add xs x) (lambda x, true) = 1 + count xs (lambda x, true).
 proof.
 intros x xs; generalize x; clear x.
 apply (induction<:'a> xs 
@@ -65,7 +65,7 @@ trivial.
 save.
 
 lemma add_commutative: forall (x y:'a) xs,
-  add (add xs x) y = add (add xs y) x
+  add (add xs x) y = add (add xs y) x.
 proof.
 intros x y xs;
 apply (extensionality<:'a> (add (add xs x) y) (add (add xs y) x) _);

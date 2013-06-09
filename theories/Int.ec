@@ -15,7 +15,8 @@ export Abs.
 
 theory Triangle.
   lemma triangle_inequality : forall (x:int,y:_,z:_),
-     `| x - y | <= `| x - z | + `| y - z |.
+     `| x - y | <= `| x - z | + `| y - z |
+  by [].
 end Triangle.
 
 theory Extrema.
@@ -23,14 +24,17 @@ theory Extrema.
 
   lemma min_is_lb: forall a b,
     min a b <= a /\
-    min a b <= b.
+    min a b <= b
+  by [].
 
   lemma min_is_glb: forall x a b,
     x <= a => x <= b =>
-    x <= min a b.
+    x <= min a b
+  by [].
 
   lemma min_is_extremum: forall a b,
-    min a b = a \/ min a b = b.
+    min a b = a \/ min a b = b
+  by [].
 
 (* This is much more satisfying: it defines the notion,
    and proves that it exists and is unique by giving it a
@@ -51,14 +55,17 @@ theory Extrema.
 
   lemma max_is_ub: forall a b,
     a <= max a b /\
-    b <= max a b.
+    b <= max a b
+  by [].
 
   lemma max_is_lub: forall x a b,
     a <= x => b <= x =>
-    max a b <= x.
+    max a b <= x
+  by [].
 
   lemma max_is_extremum: forall a b,
-    max a b = a \/ max a b = b.
+    max a b = a \/ max a b = b
+  by [].
 end Extrema.
 export Extrema.
 
@@ -87,7 +94,7 @@ theory Induction.
   lemma strongInduction:
     forall (p:int -> bool),
       (forall j, 0 <= j => (forall k, k >= 0 => k < j => p k) => p j) =>
-        (forall i, 0 <= i => p i)
+        (forall i, 0 <= i => p i).
     proof.
       intros p hyp i iVal.
       cut temp : (forall k, k > 0 => k <= i => p k);[|trivial].

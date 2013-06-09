@@ -43,7 +43,7 @@ op empty: 'x array.
 axiom empty_length: length (empty<:'x>) = 0.
 
 lemma empty_unique: forall (xs:'x array),
-  length(xs) = 0 => xs = empty
+  length(xs) = 0 => xs = empty.
 proof.
 intros xs H;
   apply (extensionality<:'x> xs empty _);
@@ -61,7 +61,8 @@ axiom cons_get: forall (x:'x, xs:'x array, i:int),
   (x::xs).[i] = (0 = i) ? x : xs.[i - 1].
 
 lemma cons_nonempty: forall (x:'x, xs:'x array),
-  x::xs <> empty.
+  x::xs <> empty
+by [].
 
 (* snoc *)
 op (:::): 'x array -> 'x -> 'x array.
@@ -74,7 +75,8 @@ axiom snoc_get: forall (xs:'x array, x:'x, i:int),
   (xs:::x).[i] = (i < length xs) ? xs.[i] : x.
 
 lemma snoc_nonempty: forall (xs:'x array, x:'x),
-  xs:::x <> empty.
+  xs:::x <> empty
+by [].
 
 (* append *)
 op (||): 'x array -> 'x array -> 'x array.
@@ -142,7 +144,7 @@ axiom map2_get: forall (xs:'x array, ys:'y array, f:'x -> 'y -> 'z, i:int),
 
 (* lemmas *)
 lemma sub_append_fst: forall (xs0 xs1:'x array),
-  sub (xs0 || xs1) 0 (length(xs0)) = xs0
+  sub (xs0 || xs1) 0 (length(xs0)) = xs0.
 proof.
 intros xs0 xs1;
   apply (extensionality<:'x> (sub (xs0 || xs1) 0 (length xs0)) xs0 _);
@@ -150,7 +152,7 @@ intros xs0 xs1;
 save.
 
 lemma sub_append_snd: forall (xs0 xs1:'x array),
-  sub (xs0 || xs1) (length xs0) (length xs1) = xs1
+  sub (xs0 || xs1) (length xs0) (length xs1) = xs1.
 proof.
 intros xs0 xs1;
   apply (extensionality<:'x> (sub (xs0 || xs1) (length xs0) (length xs1)) xs1 _);
@@ -165,11 +167,12 @@ axiom induction: forall (p:'x array -> bool),
 
 lemma fold_left_deterministic: forall (f1 f2:'x -> 'state -> 'state) s1 s2 xs1 xs2,
   f1 = f2 => s1 = s2 => xs1 = xs2 =>
-  fold_left f1 xs1 s1 = fold_left f2 xs2 s2.
+  fold_left f1 xs1 s1 = fold_left f2 xs2 s2
+by [].
 
 (* This proof needs cleaned up, and the lemma library completed. *)
 lemma fold_length: forall (xs:'x array),
-  fold_left (lambda x n, n + 1) xs 0 = length xs
+  fold_left (lambda x n, n + 1) xs 0 = length xs.
 proof.
 intros xs.
 apply (induction<:'x> (lambda xs', fold_left (lambda x n, n + 1) xs' 0 = length xs') _ _ xs).
@@ -236,7 +239,7 @@ axiom init_get: forall (x:'x) l i,
 (*********************************)
 lemma write_append: forall (dst src:'x array),
   length src <= length dst =>
-  write dst 0 src 0 (length src) = (src || (sub dst (length src) (length dst - length src)))
+  write dst 0 src 0 (length src) = (src || (sub dst (length src) (length dst - length src))).
 proof.
 intros dst src H;
   apply (extensionality<:'x>
