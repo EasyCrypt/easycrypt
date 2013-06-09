@@ -51,8 +51,16 @@ save.
 lemma card_add: forall (x:'a) xs,
   count (add xs x) (lambda x, true) = 1 + count xs (lambda x, true)
 proof.
-intros x xs;
-apply (induction<:'a> xs (lambda xs, count (add xs x) (lambda x, true) = 1 + count xs (lambda x, true)) _ _);
+intros x xs; generalize x; clear x.
+apply (induction<:'a> xs 
+ (lambda xs, forall x, 
+  count (add xs x) (lambda x, true) = 1 + count xs (lambda x, true)) _ _).
+trivial.
+simplify; intros xs1 x H x1.
+rewrite (count_nonempty<:'a> x xs1 (lambda x, true)).
+rewrite (count_nonempty<:'a> x1 (add xs1 x) (lambda x, true)).
+rewrite (H x); simplify.
+generalize (count xs1 (lambda (x : 'a), true)).
 trivial.
 save.
 
