@@ -1,4 +1,4 @@
-; Generated on Sun Jun  9 23:42:01 2013
+; Generated on Sun Jun  9 23:54:53 2013
 
 (defvar easycrypt-dangerous-keywords '(
   "admit"
@@ -9,6 +9,7 @@
   "lemma"
   "proof"
   "save"
+  "qed"
   "claim"
   "drop"
   "end"

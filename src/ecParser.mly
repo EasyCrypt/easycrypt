@@ -221,6 +221,7 @@
 %token PRINT
 %token PROOF
 %token PROVER
+%token QED
 %token QUESTION
 %token RBOOL
 %token RBRACE
@@ -1742,6 +1743,7 @@ global_:
 | checkproof       { Gcheckproof  $1 }
 
 | x=loc(SAVE)      { Gsave x.pl_loc }
+| x=loc(QED)       { Gsave x.pl_loc }
 | PRINT p=print    { Gprint     p   }
 | PRAGMA x=lident  { Gpragma    x   }
 ;
