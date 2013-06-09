@@ -42,6 +42,7 @@
     "same"        , SAME       ;        (* KW: tactic *)
     "idtac"       , IDTAC      ;        (* KW: tactic *)
     "try"         , TRY        ;        (* KW: tactic *)
+    "by"          , BY         ;        (* KW: tactic *)
 
     "assumption"  , ASSUMPTION ;        (* KW: tactic *)
     "intros"      , INTROS     ;        (* KW: tactic *)

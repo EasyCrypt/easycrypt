@@ -71,12 +71,12 @@
   let pflist loc ti (es : pformula    list) : pformula    = 
     List.fold_right (fun e1 e2 -> pf_cons loc ti e1 e2) es (pf_nil loc ti)
 
-  let mk_axiom (x,ty,vd,f) k = 
-    { pa_name = x; 
-      pa_tyvars = ty;
-      pa_vars   = vd;
-      pa_formula = f; 
-      pa_kind = k }
+  let mk_axiom (x, ty, vd, f) k = 
+    { pa_name    = x ; 
+      pa_tyvars  = ty;
+      pa_vars    = vd;
+      pa_formula = f ; 
+      pa_kind    = k ; }
 
   let str_and b = if b then "&&" else "/\\"
   let str_or  b = if b then "||" else "\\/"
@@ -143,6 +143,7 @@
 %token BDHOARE
 %token BDHOAREDENO
 %token BETA 
+%token BY
 %token CALL
 %token CASE
 %token CEQ
@@ -1164,11 +1165,23 @@ axiom:
 | AXIOM d=lemma_decl 
     { mk_axiom d PAxiom }
 
-| LEMMA d=lemma_decl i=boption(PROOF)
-    { mk_axiom d (if i then PILemma else PLemma) }
+| LEMMA d=lemma_decl
+    { mk_axiom d PILemma }
 
-| EQUIV x=ident pd=pgtybindings? COLON p=loc(equiv_body) i=boption(PROOF)
-    { mk_axiom (x,None,pd, p) (if i then PILemma else PLemma) }
+| LEMMA d=lemma_decl BY t=loc(tactic)
+    { mk_axiom d (PLemma (Some t)) }
+
+| LEMMA d=lemma_decl BY LBRACKET RBRACKET
+    { mk_axiom d (PLemma None) }
+
+| EQUIV x=ident pd=pgtybindings? COLON p=loc(equiv_body)
+    { mk_axiom (x, None, pd, p) PILemma }
+
+| EQUIV x=ident pd=pgtybindings? COLON p=loc(equiv_body) BY t=loc(tactic)
+    { mk_axiom (x, None, pd, p) (PLemma (Some t)) }
+
+| EQUIV x=ident pd=pgtybindings? COLON p=loc(equiv_body) BY LBRACKET RBRACKET
+    { mk_axiom (x, None, pd, p) (PLemma None) }
 ;
 
 (* -------------------------------------------------------------------- *)
@@ -1324,7 +1337,7 @@ tactic:
 
 | STAR t=loc(tactic) { Prepeat t }
 
-| NOT n=option(number) t=loc(tactic) { Pdo(n,t) }
+| NOT n=option(number) t=loc(tactic) { Pdo(n, t) }
 
 | TRY t=loc(tactic) { Ptry t }
 
@@ -1598,6 +1611,11 @@ tactic2:
 | t=loc(tactic)    { t } 
 ;
 
+tactics_or_prf:
+| t=tactics { `Actual t }
+| PROOF     { `Proof }
+;
+
 (* -------------------------------------------------------------------- *)
 (* Theory cloning                                                       *)
 
@@ -1719,7 +1737,7 @@ global_:
 | predicate        { Gpredicate   $1 }
 | axiom            { Gaxiom       $1 }
 | claim            { Gclaim       $1 }
-| tactics          { Gtactics     $1 }
+| tactics_or_prf   { Gtactics     $1 }
 | gprover_info     { Gprover_info $1 }
 | checkproof       { Gcheckproof  $1 }
 
