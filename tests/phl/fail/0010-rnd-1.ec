@@ -10,7 +10,7 @@ module G0 = {
 }.
 
 (* Should not be provable *)
-equiv minimal : G0.f ~ G0.f : true ==> res{1} < res{2}
+equiv minimal : G0.f ~ G0.f : true ==> res{1} < res{2}.
 proof.
  fun.
  rnd (lambda z, z-1) , (lambda z, z+1).

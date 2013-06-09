@@ -2,7 +2,7 @@ module M = {
   fun f () : unit = { }
 }.
 
-equiv foo : M.f ~ M.f : true ==> true
+equiv foo : M.f ~ M.f : true ==> true.
 proof.
   fun.
   skip.

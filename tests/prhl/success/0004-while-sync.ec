@@ -11,7 +11,7 @@ module M = {
 }.
 
 equiv foo : M.f ~ M.f : 
-  M.y{1} = M.y{2} /\ x{1}=x{2} ==> res{1} = res{2} /\ M.y{1} = M.y{2}
+  M.y{1} = M.y{2} /\ x{1}=x{2} ==> res{1} = res{2} /\ M.y{1} = M.y{2}.
 proof.
  fun.
  while (x{1} = x{2} /\ i{1} = i{2}).
@@ -41,7 +41,7 @@ module MM(A:T) = {
 }.
 
 equiv foo (A<:T) : MM(A).f ~ MM(A).f : 
-  (glob A){1} = (glob A){2} /\ M.y{1} = M.y{2} /\ x{1}=x{2} ==> res{1} = res{2} /\ M.y{1} = M.y{2}
+  (glob A){1} = (glob A){2} /\ M.y{1} = M.y{2} /\ x{1}=x{2} ==> res{1} = res{2} /\ M.y{1} = M.y{2}.
 proof.
  fun.
  while (x{1} = x{2} /\ i{1} = i{2}).

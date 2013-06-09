@@ -7,7 +7,7 @@ module M = {
   }
 }.
 
-lemma foo : hoare [M.g : true ==> true]
+lemma foo : hoare [M.g : true ==> true].
 proof.
  fun.
  wp 3.

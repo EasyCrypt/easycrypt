@@ -68,7 +68,7 @@ lemma foo : forall (A<:Adv{RO,F2}),
       bd_hoare [A(O).a : true ==> true] = 1%r) =>  
   equiv [F1(A).main ~ F2(A).main : 
      (glob A){1} = (glob A){2} ==> 
-     (!mem F2.xs RO.logA){2} => res{1} = res{2}]
+     (!mem F2.xs RO.logA){2} => res{1} = res{2}].
 proof.
   intros A Hlossless;fun.
   call ((!mem F2.xs RO.logA){2} /\ h{1} = h{2} /\ (glob A){1} = (glob A){2} /\

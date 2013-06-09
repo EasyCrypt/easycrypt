@@ -26,7 +26,7 @@ op in_supp (x, d:'a distr): bool = mu_x d x <> 0%r.
 (** Lemmas *)
 lemma mu_weight_0 : forall (d:'a distr),
   (mu_weight d = 0%r => forall P, mu d P = 0%r) /\
-  ((forall P, mu d P = 0%r) => mu_weight d = 0 %r)
+  ((forall P, mu d P = 0%r) => mu_weight d = 0 %r).
 proof.
 intros d;split.
   intros H P;cut upper_bound: (mu d P <= mu d cPtrue);
@@ -46,16 +46,20 @@ theory Dunit.
     !P x => mu (dunit x) P = 0%r.
 
   lemma mu_x_def_eq: forall (x:'a),
-    mu_x (dunit x) x = 1%r.
+    mu_x (dunit x) x = 1%r
+  by [].
 
   lemma mu_x_def_neq: forall (x y:'a),
-    x <> y => mu_x (dunit x) y = 0%r.
+    x <> y => mu_x (dunit x) y = 0%r
+  by [].
 
   lemma supp_def: forall (x1 x2:'a), 
-    in_supp x1 (dunit x2) <=> x1 = x2.
+    in_supp x1 (dunit x2) <=> x1 = x2
+  by [].
 
   lemma mu_weight: forall (x:'a),
-     mu_weight (dunit x) = 1%r.
+     mu_weight (dunit x) = 1%r
+  by [].
 end Dunit.
 
 (** FIXME/ TODO 

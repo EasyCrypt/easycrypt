@@ -1,4 +1,4 @@
-lemma l: forall a, a => a
+lemma l: forall a, a => a.
 proof.
 intros a h.
 assumption.

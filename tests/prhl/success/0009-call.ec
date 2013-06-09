@@ -32,7 +32,7 @@ module M2 = {
 
 lemma foo : 
   equiv [M1.g ~ M2.g : M1.z{1}=M2.z{2} /\ M1.y{1} = M2.y{2} /\ x{1} = w{2} 
-        ==> res{1} = res{2} /\ M1.z{1} = M2.z{2} /\ M1.y{1} = M2.y{2}]
+        ==> res{1} = res{2} /\ M1.z{1} = M2.z{2} /\ M1.y{1} = M2.y{2}].
 proof.
   fun.
   call (x{1}=w{2}) (res{1} = res{2} /\ M1.y{1} = M2.y{2}).

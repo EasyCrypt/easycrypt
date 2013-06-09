@@ -13,7 +13,7 @@ module M = {
   }
 }.
 
-lemma foo : hoare [M.f : true ==> res = (1,0)]
+lemma foo : hoare [M.f : true ==> res = (1,0)].
 proof.
  fun.
  while (x=1).   
@@ -34,7 +34,7 @@ module M1 = {
   }
 }.
 
-lemma foo1 : hoare [M1.f : true ==> res = (10,10)]
+lemma foo1 : hoare [M1.f : true ==> res = (10,10)].
 proof.
  fun.
  while (x=1).   

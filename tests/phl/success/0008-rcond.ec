@@ -7,7 +7,7 @@ module M = {
   }
 }.
 
-lemma foo : hoare [M.f : true ==> res = 2 ]
+lemma foo : hoare [M.f : true ==> res = 2 ].
 proof.
  fun.
  rcondt 2.
