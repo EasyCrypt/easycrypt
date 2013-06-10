@@ -20,7 +20,7 @@ module G2 = {
 }.
 
 (* Should not be provable *)
-equiv backward : G1.f ~ G2.f : true ==> true
+equiv backward : G1.f ~ G2.f : true ==> true.
 proof. 
  fun.
  wp.

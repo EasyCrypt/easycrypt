@@ -126,7 +126,7 @@ module LDDH_Hyb(A : LDDH_DISTINGUISHER) = {
 
 lemma DDH0_Hybrid0: forall (A <: LDDH_DISTINGUISHER {LDDH_Hyb, DH_distrs}),
   equiv [ LDDH_Hyb(A).main ~ LDDH0(A).main :
-     ((glob A){1} = (glob A){2}) /\ ia{1} = 0 ==> res{1} = res{2} ]
+     ((glob A){1} = (glob A){2}) /\ ia{1} = 0 ==> res{1} = res{2} ].
 proof.
   intros A.
   fun.

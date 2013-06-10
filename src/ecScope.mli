@@ -4,6 +4,8 @@ open EcLocation
 open EcParsetree
 
 (* -------------------------------------------------------------------- *)
+exception HiScopeError of EcLocation.t option * string
+
 type scope
 
 type proof_uc = {

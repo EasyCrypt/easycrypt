@@ -43,14 +43,24 @@ module PPEnv = struct
     | None   -> ppe
     | Some m -> enter ppe (EcMemory.xpath m)
 
-
   let add_local ppe =
+    let in_active_mem name =
+      let env = ppe.ppe_env in
+
+      match EcEnv.Memory.get_active env with
+      | None -> false
+      | Some mid ->
+          let mem = oget (EcEnv.Memory.byid mid env) in
+            EcMemory.lookup name mem <> None
+    in
+
     let inuse name =
       let env = ppe.ppe_env in
          (Ssym.mem name ppe.ppe_inuse)
       || (EcEnv.Mod.sp_lookup_opt      ([], name) env <> None)
       || (EcEnv.Var.lookup_local_opt        name  env <> None)
       || (EcEnv.Var.lookup_progvar_opt ([], name) env <> None)
+      || (in_active_mem name)
     in
 
     fun id ->
@@ -809,17 +819,17 @@ let rec pp_bindings_aux ppe bds =
         (ppe, fun fmt -> Format.fprintf fmt "%t@ %t" pp1 pp2)
 
 let rec pp_bindings ppe bds = 
-  let rec merge (xs,gty) bds = 
+  let rec merge (xs, gty) bds = 
     match bds with
     | [] -> [List.rev xs, gty]
-    | (x,gty') :: bds ->
+    | (x, gty') :: bds ->
         if   EcFol.gty_equal gty gty'
         then merge (x::xs, gty) bds
-        else (List.rev xs,gty) :: merge ([x], gty') bds
+        else (List.rev xs, gty) :: merge ([x], gty') bds
   in
   match bds with
   | [] -> pp_bindings_aux ppe []
-  | (x,gty)::bds -> pp_bindings_aux ppe (merge ([x], gty) bds)
+  | (x, gty) :: bds -> pp_bindings_aux ppe (merge ([x], gty) bds)
 
 (* -------------------------------------------------------------------- *)
 let string_of_hcmp = function
@@ -912,6 +922,7 @@ let rec pp_form_r (ppe : PPEnv.t) outer fmt f =
       (pp_form ppe) hf.bhf_po
       (string_of_hcmp hf.bhf_cmp)
       (pp_form_r ppe (max_op_prec,`NonAssoc)) hf.bhf_bd 
+
   | FbdHoareS hs ->
     Format.fprintf fmt "bd_hoare[@[<hov 2>@ %a :@ @[%a ==>@ %a@]@]] %s %a"
       (pp_stmt_for_form ppe) hs.bhs_s

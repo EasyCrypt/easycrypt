@@ -308,6 +308,51 @@ let check_logic env p =
 let t_apply_logic env p tyargs args g =
   check_logic env p;
   t_apply_glob env p tyargs args g
+  
+
+let pattern_form name env hyps f1 f =
+  let x = EcIdent.create (odfl "x" name) in
+  let fx = EcFol.f_local x f1.f_ty in
+  let body =
+    Hf.memo_rec 107
+      (fun aux f ->
+        if EcReduction.is_alpha_eq env hyps f f1 then fx
+        else f_map (fun ty -> ty) aux f)
+      f in
+  x, body
+
+let t_rewrite_gen fpat env side f g = 
+  let hyps,concl = get_goal g in
+  let rec find_rewrite f =
+    if is_eq f then destr_eq f, true
+    else if is_iff f then destr_iff f, false
+    else
+      match h_red_opt full_red env hyps f with
+      | Some f -> find_rewrite f
+      | None   -> tacerror (UnknownRewrite f) in
+  let (f1,f2),eq = find_rewrite f in
+  let p,tys =
+    if eq then (if side then p_rewrite_l else p_rewrite_r), [f1.f_ty]
+    else (if side then p_rewrite_iff_l else p_rewrite_iff_r), [] in
+  let pred =
+    let f = if side then f1 else f2 in
+    let x, body = fpat env hyps f concl in
+    f_lambda [x,GTty f.f_ty] body in
+  t_on_last
+    (t_apply_logic env p tys [AAform f1;AAform f2;AAform pred;AAnode;AAnode] g)
+    (t_red env)
+
+let t_rewrite = t_rewrite_gen (pattern_form None)
+
+let t_rewrite_node env ((juc,an), gs) side n =
+  let (_,f) = get_node (juc, an) in
+  t_seq_subgoal (t_rewrite env side f)
+    [t_use env an gs;t_id None] (juc,n)
+
+let t_rewrite_hyp env side id args (juc,n as g) =
+  let hyps = get_hyps g in
+  let g' = mkn_hyp juc hyps id in
+  t_rewrite_node env (mkn_apply (fun _ _ _ a -> a) env g' args) side n
 
 let t_cut env f g =
   let concl = get_concl g in
@@ -377,6 +422,88 @@ let t_intros_i env ids g =
     (List.map (fun id -> {pl_desc = id; pl_loc = EcLocation._dummy}) ids)
     g
 
+let createVarForBinding t =
+  let v = EcIdent.create "_" in ((v, GTty t),EcFol.f_local v t)
+
+let createVarForLet t =
+  let v = EcIdent.create "_" in ((v, t), EcFol.f_local v t)
+
+(* This tactic works only if the conclusion is exactly a reflexive equality *)
+let t_reflex env g =
+  let _, concl = get_goal g in
+  let (f,_) = destr_eq concl in
+  t_apply_logic env p_eq_refl [f.f_ty] [AAform f] g
+
+(* Use to create two set of vars of a list of types*)
+let parseType create types =
+  let parse ty =
+    let (bX, fX) = create ty in
+    let (bY, fY) = create ty in
+    ((bX, bY), (fX, fY))
+  in
+  List.split (List.map parse types)
+
+(* Generate a lemma that permits to elim a tuple *)
+let gen_eq_tuple_elim_lemma types =
+  let (bC, fC) = createVarForBinding EcTypes.tbool in
+  let (vars, fvars) = parseType createVarForBinding types in
+  let (varsx, varsy) = List.split vars in
+  let (fvarsx, fvarsy) = List.split fvars in
+  let bindings = varsx@varsy@[bC] in
+  let hyp1 = f_eq (f_tuple fvarsx) (f_tuple fvarsy) in
+  let hyp2 = f_imps (List.map (fun (x,y) -> f_eq x y) fvars) fC in
+  f_forall bindings (f_imps [hyp1; hyp2] fC)
+
+(* Generate a proof of eq_tuple_elim *)
+let gen_eq_tuple_elim_proof env types =
+  let pred rvars fc =
+    let (bT, fT) = createVarForBinding (ttuple types) in
+    let projs = List.map createVarForLet types in
+    let (intro, fprojs) = List.split projs in
+    let introTu = LTuple intro in
+    let eqs = List.map (fun (x, y) -> f_eq x y) (List.combine fprojs rvars) in
+    let body = f_imps eqs fc in
+    f_app (f_lambda [bT] (f_let introTu fT body)) [f_tuple rvars] (EcTypes.tbool)
+  in
+  
+  let (locVars, locVarsF) = parseType createVarForLet types in
+  let (locC, locCF) = createVarForLet EcTypes.tbool in
+  let introVars =
+    let (a, b) = List.split locVars in
+    fst (List.split (a@b@[locC]))
+  in
+  let (_, rvars) = List.split locVarsF in
+  let h1 = EcIdent.create "_" in
+  let h2 = EcIdent.create "_" in
+  let intro = t_intros_i env (introVars@[h1;h2]) in
+  t_lseq [
+    intro;
+    t_seq_subgoal
+      (t_apply_form env (pred rvars locCF) (List.map (fun _ -> AAnode) types))
+      ((
+        t_lseq [t_rewrite_hyp env false h1 [];
+        t_apply_hyp env h2 [];
+        t_apply_logic env p_true_intro [] []]
+      )::(List.map (fun _ -> t_reflex env) types))
+  ]
+  
+(* Generate a lemma that permits to split tuple *)
+let gen_split_tuple_lemma types =
+  let (vars, fvars) = parseType createVarForBinding types in
+  let (varsx, varsy) = List.split vars in
+  let (fvarsx, fvarsy) = List.split fvars in
+  let bindings = varsx@varsy in
+  let hyps = List.map (fun (x,y) -> f_eq x y) fvars in
+  let body = f_eq (f_tuple fvarsx) (f_tuple fvarsy) in
+  f_forall bindings (f_imps hyps body)
+
+(* Generate the proof for gen_split_tuple_proof *)
+let gen_split_tuple_proof env types =
+  let introVars = List.map (fun _ -> EcIdent.create "_") (types@types) in
+  let introHyps = List.map (fun _ -> EcIdent.create "_") types in
+  let rews = List.map (fun h -> t_rewrite_hyp env true h []) introHyps in
+  t_seq (t_lseq ((t_intros_i env (introVars@introHyps))::rews)) (t_reflex env)
+
 let t_elim env f (juc,n) =
   let hyps,concl = get_goal (juc,n) in
   let rec aux f =
@@ -385,31 +512,27 @@ let t_elim env f (juc,n) =
       t_apply_logic env p_false_elim [] [AAform concl; AAnode] (juc,n)
 
     | Fapp({f_node = Fop(p,_)}, [a1;a2] ) ->
-      let lem =
+      begin
         match op_kind p with
         | OK_and b ->
-          Some ((if b then p_anda_elim else p_and_elim),[],
-                [AAform a1;AAform a2;AAform concl;AAnode;AAnode])
+          t_apply_logic env (if b then p_anda_elim else p_and_elim) []
+                [AAform a1;AAform a2;AAform concl;AAnode;AAnode] (juc,n)
         | OK_or b  ->
-          Some ((if b then p_ora_elim else p_or_elim),[],
-                [AAform a1;AAform a2;AAform concl;AAnode;AAnode;AAnode])
+          t_apply_logic env (if b then p_ora_elim else p_or_elim) []
+                [AAform a1;AAform a2;AAform concl;AAnode;AAnode;AAnode] (juc,n)
         | OK_iff   -> 
-          Some (p_iff_elim, [],
-                [AAform a1;AAform a2;AAform concl;AAnode;AAnode])
-        | OK_eq    ->
-          if is_tuple a1 && is_tuple a2 then 
-            let f1s = destr_tuple a1 in
-            let f2s = destr_tuple a2 in
-            Some (p_eq_tuple_elim (List.length f1s),
-                  List.map (fun f -> f.f_ty) f1s,
-                  List.map (fun f -> AAform f) (f1s @ f2s @ [concl]) @
-                  [AAnode; AAnode])
-          else None            
-        | _        -> None in
-      begin match lem with
-      | Some (p,tys, a) ->
-        t_apply_logic env p tys a (juc,n)
-      | None -> aux_red f
+          t_apply_logic env p_iff_elim []
+                [AAform a1;AAform a2;AAform concl;AAnode;AAnode] (juc,n)
+        | OK_eq when is_tuple a1 && is_tuple a2 ->
+          let fs1 = destr_tuple a1 in
+          let fs2 = destr_tuple a2 in
+          let types = List.map (fun v -> v.f_ty) fs1 in
+          let args = List.map (fun f -> AAform f) (fs1 @ fs2 @ [concl]) in
+          let lemma = gen_eq_tuple_elim_lemma types in
+          let proof = gen_eq_tuple_elim_proof env types in
+          let gs = t_apply_form env lemma (args@[AAnode; AAnode]) (juc,n) in
+          t_on_first gs proof
+        | _        -> aux_red f
       end
     | Fif(a1,a2,a3) ->
       t_apply_logic env p_if_elim [] [AAform a1;AAform a2;AAform a3;
@@ -449,17 +572,6 @@ let t_or_intro b env g =
 
 let t_left  = t_or_intro true
 let t_right = t_or_intro false
-
-let pattern_form name env hyps f1 f =
-  let x = EcIdent.create (odfl "x" name) in
-  let fx = EcFol.f_local x f1.f_ty in
-  let body =
-    Hf.memo_rec 107
-      (fun aux f ->
-        if EcReduction.is_alpha_eq env hyps f f1 then fx
-        else f_map (fun ty -> ty) aux f)
-      f in
-  x, body
 
 let t_generalize_form name env f g =
   let hyps,concl = get_goal g in
@@ -598,68 +710,9 @@ let gen_t_exists do_arg env fs (juc,n as g) =
 
 let t_exists = gen_t_exists (fun _ _ _ a -> a)
 
-let t_rewrite_gen fpat env side f g = 
-  let hyps,concl = get_goal g in
-  let rec find_rewrite f =
-    if is_eq f then destr_eq f, true
-    else if is_iff f then destr_iff f, false
-    else
-      match h_red_opt full_red env hyps f with
-      | Some f -> find_rewrite f
-      | None   -> tacerror (UnknownRewrite f) in
-  let (f1,f2),eq = find_rewrite f in
-  let p,tys =
-    if eq then (if side then p_rewrite_l else p_rewrite_r), [f1.f_ty]
-    else (if side then p_rewrite_iff_l else p_rewrite_iff_r), [] in
-  let pred =
-    let f = if side then f1 else f2 in
-    let x, body = fpat env hyps f concl in
-    f_lambda [x,GTty f.f_ty] body in
-  t_on_last
-    (t_apply_logic env p tys [AAform f1;AAform f2;AAform pred;AAnode;AAnode] g)
-    (t_red env)
-
-let t_rewrite = t_rewrite_gen (pattern_form None)
-
-let t_rewrite_node env ((juc,an), gs) side n =
-  let (_,f) = get_node (juc, an) in
-  t_seq_subgoal (t_rewrite env side f)
-    [t_use env an gs;t_id None] (juc,n)
-
-let t_rewrite_hyp env side id args (juc,n as g) =
-  let hyps = get_hyps g in
-  let g' = mkn_hyp juc hyps id in
-  t_rewrite_node env (mkn_apply (fun _ _ _ a -> a) env g' args) side n
-
-  
-(* This tactic works only if the conclusion is exactly a reflexive equality*)
-let t_reflex env g =
-  let _, concl = get_goal g in
-  let (f,_) = destr_eq concl in
-  t_apply_logic env p_eq_refl [f.f_ty] [AAform f] g
-  
-let genSplitTuple env types =
-  let create x = EcIdent.fresh (EcIdent.create x) in
-  let parseType ty =
-    let x = create "x" in
-    let y = create "y" in
-    (((x, GTty ty), (y, GTty ty)),
-    (EcFol.f_local x ty, EcFol.f_local y ty))
-  in
-  let (vars, fvars) = List.split (List.map parseType types) in
-  let (varsx, varsy) = List.split vars in
-  let (fvarsx, fvarsy) = List.split fvars in
-  let bindings = varsx@varsy in
-  let hyps = List.map (fun (x,y) -> f_eq x y) fvars in
-  let body = f_eq (f_tuple fvarsx) (f_tuple fvarsy) in
-  let f = f_forall bindings (f_imps hyps body) in
-  let introVars = List.map (fun _ -> create "_") bindings in
-  let introHyps = List.map (fun _ -> create "_") fvarsx in
-  let rews = List.map (fun h -> t_rewrite_hyp env true h []) introHyps in
-  (f, t_seq (t_lseq (t_intros_i env (introVars@introHyps)::rews)) (t_reflex env))
-  
 let t_split env g =
   let hyps, concl = get_goal g in
+  let env0 = tyenv_of_hyps env hyps in
   let rec aux f =
     match f.f_node with
     | Fop(p,_) when EcPath.p_equal p p_true ->
@@ -674,30 +727,20 @@ let t_split env g =
         | OK_iff   ->
           t_apply_logic env p_iff_intro []
                 [AAform f1;AAform f2;AAnode;AAnode] g
-        | OK_eq    -> 
-          let env0 = tyenv_of_hyps env hyps in
-          if EcReduction.is_conv env0 hyps f1 f2 then
-            t_reflex env g
-          else
-            if is_tuple f1 && is_tuple f2 then
-              let fs1 = destr_tuple f1 in
-              let fs2 = destr_tuple f2 in
-              let types = List.map (fun v -> v.f_ty) fs1 in
-              let toForm l = List.map (fun f -> AAform f) l in
-              let nodes = List.map (fun _ -> AAnode) fs1 in
-              let _idtacs = List.map (fun _ -> (t_id None)) fs1 in (* FIXME *)
-              let (lem, proof) = genSplitTuple env types in
-              let gs =
-                t_apply_form env lem ((toForm fs1)@(toForm fs2)@nodes) g in
-              t_on_first gs proof
-            else
-              aux_red f
-        | _ -> aux_red f
+        | OK_eq when EcReduction.is_conv env0 hyps f1 f2 -> t_reflex env g
+        | OK_eq when is_tuple f1 && is_tuple f2 ->
+          let fs1 = destr_tuple f1 in
+          let fs2 = destr_tuple f2 in
+          let types = List.map (fun v -> v.f_ty) fs1 in
+          let args = List.map (fun f -> AAform f) (fs1@fs2) in
+          let nodes = List.map (fun _ -> AAnode) fs1 in
+          let lemma = gen_split_tuple_lemma types in
+          let proof = gen_split_tuple_proof env types in
+          let gs = t_apply_form env lemma (args@nodes) g in
+          t_on_first gs proof
+         | _ -> aux_red f
       end
-    | Fif(f1,_f2,_f3) ->
-      t_case env f1 g 
-(*      t_apply_logic env p_if_intro []
-        [AAform f1; AAform f2; AAform f3;AAnode;AAnode] g *)
+    | Fif(f1,_f2,_f3) -> t_case env f1 g
     | _ ->  aux_red f
   and aux_red f =
     match h_red_opt full_red env hyps f with
@@ -867,10 +910,10 @@ let t_assumption env g =
   let h = find_in_hyps env concl hyps in
   t_hyp env h g
     
-let t_progress env t_final g =
+let t_progress env tac g =
   let rec aux g = t_seq (t_simplify_nodelta env) aux0 g 
   and aux0 g = 
-    t_or (t_assumption env) aux1 g 
+    t_seq (t_try tac) aux1 g
   and aux1 g = 
     let hyps,concl = get_goal g in
     match concl.f_node with
@@ -884,8 +927,7 @@ let t_progress env t_final g =
     | Fapp({f_node = Fop(p,_)}, [f1;_]) when EcPath.p_equal p EcCoreLib.p_imp ->
       let id = LDecl.fresh_id hyps "H" in
       t_seq (t_intros_i env [id]) (aux2 id f1) g
-    | _ -> 
-      t_or (t_seq (t_split env) aux) t_final g
+    | _ -> t_try (t_seq (t_split env) aux) g
   and aux2 id f g = 
     let t1 = 
       match f.f_node with

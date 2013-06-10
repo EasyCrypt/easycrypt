@@ -15,7 +15,7 @@ module M1 = {
   }
 }.
 
-lemma test1 : bd_hoare [M1.f : true ==> true] [=] [1%r]
+lemma test1 : bd_hoare [M1.f : true ==> true] [=] [1%r].
 proof.
   fun.
   while (x<=y) (y-x).

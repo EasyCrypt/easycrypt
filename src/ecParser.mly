@@ -71,12 +71,12 @@
   let pflist loc ti (es : pformula    list) : pformula    = 
     List.fold_right (fun e1 e2 -> pf_cons loc ti e1 e2) es (pf_nil loc ti)
 
-  let mk_axiom (x,ty,vd,f) k = 
-    { pa_name = x; 
-      pa_tyvars = ty;
-      pa_vars   = vd;
-      pa_formula = f; 
-      pa_kind = k }
+  let mk_axiom (x, ty, vd, f) k = 
+    { pa_name    = x ; 
+      pa_tyvars  = ty;
+      pa_vars    = vd;
+      pa_formula = f ; 
+      pa_kind    = k ; }
 
   let str_and b = if b then "&&" else "/\\"
   let str_or  b = if b then "||" else "\\/"
@@ -143,9 +143,11 @@
 %token BDHOARE
 %token BDHOAREDENO
 %token BETA 
+%token BY
 %token CALL
 %token CASE
 %token CEQ
+%token CFOLD
 %token CHANGE
 %token CHECKPROOF
 %token CLAIM
@@ -155,6 +157,7 @@
 %token COMMA
 %token COMPUTE
 %token CONSEQ
+%token CONST
 %token CUT
 %token DATATYPE
 %token DEBUG
@@ -222,6 +225,7 @@
 %token PROOF
 %token PROR
 %token PROVER
+%token QED
 %token QUESTION
 %token RBOOL
 %token RBRACE
@@ -1081,34 +1085,45 @@ tyvars_decl:
 | LBRACKET tyvars=tident* RBRACKET { Some tyvars }
 | empty { None }
 ;
-    
+
+%inline op_or_const:
+| OP    { `Op }
+| CONST { `Const }
+;
+
 operator:
-| OP x=op_ident tyvars=tyvars_decl COLON sty=loc(type_exp) {
-    { po_name   = x;
+| k=op_or_const x=op_ident tyvars=tyvars_decl COLON sty=loc(type_exp) {
+    { po_kind   = k;
+      po_name   = x;
       po_tyvars = tyvars;
       po_def    = POabstr sty; }
   }
 
-| OP x=op_ident tyvars=tyvars_decl COLON sty=loc(type_exp) EQ b=expr {
-    { po_name   = x;
+| k=op_or_const x=op_ident tyvars=tyvars_decl COLON sty=loc(type_exp) EQ b=expr {
+    { po_kind   = k;
+      po_name   = x;
       po_tyvars = tyvars;
       po_def    = POconcr ([], sty, b); }
   }
 
-| OP x=op_ident tyvars=tyvars_decl eq=loc(EQ) b=expr {
-    { po_name   = x;
+| k=op_or_const x=op_ident tyvars=tyvars_decl eq=loc(EQ) b=expr {
+    { po_kind   = k;
+      po_name   = x;
       po_tyvars = tyvars;
       po_def    = POconcr([], mk_loc eq.pl_loc PTunivar, b); }
   }
 
-| OP x=op_ident tyvars=tyvars_decl p=ptybindings eq=loc(EQ) b=expr {
-    { po_name   = x;
+| k=op_or_const x=op_ident tyvars=tyvars_decl p=ptybindings eq=loc(EQ) b=expr {
+    { po_kind   = k;
+      po_name   = x;
       po_tyvars = tyvars;
       po_def    = POconcr(p, mk_loc eq.pl_loc PTunivar, b); }
   }
-| OP x=op_ident tyvars=tyvars_decl p=ptybindings COLON codom=loc(type_exp)
+
+| k=op_or_const x=op_ident tyvars=tyvars_decl p=ptybindings COLON codom=loc(type_exp)
     EQ b=expr {
-    { po_name   = x;
+    { po_kind   = k;
+      po_name   = x;
       po_tyvars = tyvars;
       po_def    = POconcr(p, codom, b); }
   } 
@@ -1166,11 +1181,23 @@ axiom:
 | AXIOM d=lemma_decl 
     { mk_axiom d PAxiom }
 
-| LEMMA d=lemma_decl i=boption(PROOF)
-    { mk_axiom d (if i then PILemma else PLemma) }
+| LEMMA d=lemma_decl
+    { mk_axiom d PILemma }
 
-| EQUIV x=ident pd=pgtybindings? COLON p=loc(equiv_body) i=boption(PROOF)
-    { mk_axiom (x,None,pd, p) (if i then PILemma else PLemma) }
+| LEMMA d=lemma_decl BY t=loc(tactic)
+    { mk_axiom d (PLemma (Some t)) }
+
+| LEMMA d=lemma_decl BY LBRACKET RBRACKET
+    { mk_axiom d (PLemma None) }
+
+| EQUIV x=ident pd=pgtybindings? COLON p=loc(equiv_body)
+    { mk_axiom (x, None, pd, p) PILemma }
+
+| EQUIV x=ident pd=pgtybindings? COLON p=loc(equiv_body) BY t=loc(tactic)
+    { mk_axiom (x, None, pd, p) (PLemma (Some t)) }
+
+| EQUIV x=ident pd=pgtybindings? COLON p=loc(equiv_body) BY LBRACKET RBRACKET
+    { mk_axiom (x, None, pd, p) (PLemma None) }
 ;
 
 (* -------------------------------------------------------------------- *)
@@ -1326,7 +1353,7 @@ tactic:
 
 | STAR t=loc(tactic) { Prepeat t }
 
-| NOT n=option(number) t=loc(tactic) { Pdo(n,t) }
+| NOT n=option(number) t=loc(tactic) { Pdo(n, t) }
 
 | TRY t=loc(tactic) { Ptry t }
 
@@ -1456,6 +1483,12 @@ phltactic:
 | SWAP info=plist1(loc(swap_info),COMMA)
     { Pswap info }
 
+| CFOLD s=side? c=codepos NOT n=NUM
+    { Pcfold (s, c, Some n) }
+
+| CFOLD s=side? c=codepos
+    { Pcfold (s, c, None) }
+
 | RND s=side? info=rnd_info
     { Prnd (s, info) }
 
@@ -1468,7 +1501,7 @@ phltactic:
 | KILL s=side? o=codepos NOT n=NUM
     { Pkill (s, o, Some n) }
 
-| KILL s=side? o=codepos NOT n=NUM STAR
+| KILL s=side? o=codepos NOT STAR
     { Pkill (s, o, None) }
 
 | p=tselect INLINE
@@ -1602,6 +1635,11 @@ tactic2:
 | t=loc(tactic)    { t } 
 ;
 
+tactics_or_prf:
+| t=tactics { `Actual t }
+| PROOF     { `Proof }
+;
+
 (* -------------------------------------------------------------------- *)
 (* Theory cloning                                                       *)
 
@@ -1723,11 +1761,12 @@ global_:
 | predicate        { Gpredicate   $1 }
 | axiom            { Gaxiom       $1 }
 | claim            { Gclaim       $1 }
-| tactics          { Gtactics     $1 }
+| tactics_or_prf   { Gtactics     $1 }
 | gprover_info     { Gprover_info $1 }
 | checkproof       { Gcheckproof  $1 }
 
 | x=loc(SAVE)      { Gsave x.pl_loc }
+| x=loc(QED)       { Gsave x.pl_loc }
 | PRINT p=print    { Gprint     p   }
 | PRAGMA x=lident  { Gpragma    x   }
 ;

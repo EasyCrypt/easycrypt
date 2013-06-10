@@ -42,6 +42,7 @@
     "same"        , SAME       ;        (* KW: tactic *)
     "idtac"       , IDTAC      ;        (* KW: tactic *)
     "try"         , TRY        ;        (* KW: tactic *)
+    "by"          , BY         ;        (* KW: tactic *)
 
     "assumption"  , ASSUMPTION ;        (* KW: tactic *)
     "intros"      , INTROS     ;        (* KW: tactic *)
@@ -67,6 +68,7 @@
     "case"        , CASE       ;        (* KW: tactic *)
     "rewrite"     , REWRITE    ;        (* KW: tactic *)
     "subst"       , SUBST      ;        (* KW: tactic *)
+    "cfold"       , CFOLD      ;        (* KW: tactic *)
     "field"       , FIELD      ;        (* KW: tactic *)
     "field_simplify", FIELDSIMP;        (* KW: tactic *)
 
@@ -100,6 +102,7 @@
     "lemma"       , LEMMA      ;        (* KW: global *)
     "proof"       , PROOF      ;        (* KW: global *)
     "save"        , SAVE       ;        (* KW: global *)
+    "qed"         , QED        ;        (* KW: global *)
     "claim"       , CLAIM      ;        (* KW: global *)
     "drop"        , DROP       ;        (* KW: global *)
     "end"         , END        ;        (* KW: global *)
@@ -107,6 +110,7 @@
     "export"      , EXPORT     ;        (* KW: global *)
     "module"      , MODULE     ;        (* KW: global *)
     "of"          , OF         ;        (* KW: global *)
+    "const"       , CONST      ;        (* KW: global *)
     "op"          , OP         ;        (* KW: global *)
     "pred"        , PRED       ;        (* KW: global *)
     "require"     , REQUIRE    ;        (* KW: global *)

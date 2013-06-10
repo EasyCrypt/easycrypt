@@ -24,7 +24,7 @@ print op c.
 op p (x x:int) : int = x + x.
 print op p.
 
-lemma foo : let x = 1 + 1 in x = x
+lemma foo : let x = 1 + 1 in x = x.
 proof.
  intros x.
 
@@ -59,10 +59,10 @@ op p20 : int -> int -> int -> int -> int -> int -> int -> int -> int -> int -> i
 
 lemma toto1 : 
   p (p20 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1) 
-    (p20 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1) = 1
+    (p20 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1) = 1.
 proof.
 
-lemma toto : forall x, p (x + x + x + x + x + x + x + x + x + x + x + x ) (x + x + x + x+ x) = x
+lemma toto : forall x, p (x + x + x + x + x + x + x + x + x + x + x + x ) (x + x + x + x+ x) = x.
 proof.
 (*
 Require Import ZArith.
@@ -77,13 +77,13 @@ Lemma foo : forall (b:bool) x,
   x + x + x + x + x + x + x + x + x + x + x + x.
 *)
 
-lemma foo1 : forall x, (x+x) + x = x + (x + x)
+lemma foo1 : forall x, (x+x) + x = x + (x + x).
 proof.
 
-lemma foo2 : (true => true => true) => true => true => true => true=> true => true => true => true => true => true
+lemma foo2 : (true => true => true) => true => true => true => true=> true => true => true => true => true => true.
 proof.
 
-lemma foo : hoare [M1.f : true ==> true /\ true  /\ true  /\ true  /\ true  /\ true  /\ true  /\ true]
+lemma foo : hoare [M1.f : true ==> true /\ true  /\ true  /\ true  /\ true  /\ true  /\ true  /\ true].
 proof.
   fun. 
 
@@ -95,7 +95,7 @@ type t3 = (int * int, int -> int -> int -> int -> int -> int -> int -> int -> in
 print type t3.
 type t4 = int -> int -> (int * int, int -> int -> int -> int -> int -> int -> int -> int -> int -> int -> int,int * int, int * int ) t2.
 print type t4.
-lemma foo : hoare [M.f : true ==> true]
+lemma foo : hoare [M.f : true ==> true].
 proof.
   fun. 
 print type int.

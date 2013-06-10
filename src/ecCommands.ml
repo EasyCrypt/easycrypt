@@ -8,6 +8,13 @@ open EcOptions
 open EcLogic
 
 (* -------------------------------------------------------------------- *)
+type pragma = {
+  pm_verbose : bool; (* true => display goal after each command *)
+}
+
+let pragma = ref { pm_verbose = true; }
+
+(* -------------------------------------------------------------------- *)
 exception TopError of EcLocation.t * exn
 
 let rec toperror_of_exn ?gloc exn =
@@ -15,6 +22,7 @@ let rec toperror_of_exn ?gloc exn =
   | TyError  (loc, _, _) -> Some (loc, exn)
   | TacError _           -> Some (odfl _dummy gloc, exn)
   | ParseError (loc, _)  -> Some (loc, exn)
+
   | LocError (loc, e)    -> begin
       let gloc =
         if loc == EcLocation._dummy then gloc else Some loc
@@ -23,11 +31,14 @@ let rec toperror_of_exn ?gloc exn =
       | None -> Some (loc, e)
       | Some (loc, e) -> Some (loc, e)
     end
+
   | TopError (loc, e) ->
-      let gloc = 
-        if loc == EcLocation._dummy then gloc else Some loc
-      in
+      let gloc =  if loc == EcLocation._dummy then gloc else Some loc in
         Some (odfl _dummy gloc, e)
+
+  | EcScope.HiScopeError (loc, msg) ->
+      let gloc = odfl _dummy loc in
+        Some (gloc, EcScope.HiScopeError (None, msg))
 
   | _ -> None
 
@@ -161,8 +172,16 @@ and process_th_require ld scope (x, io) =
 	EcLoader.addidir dirname subld;
 
         let loader iscope =
-          let commands = EcIo.parseall (EcIo.from_file filename) in
-            List.fold_left (process_internal subld) iscope commands in 
+          let i_pragma = !pragma in
+
+          try
+            let commands = EcIo.parseall (EcIo.from_file filename) in
+            let commands = List.fold_left (process_internal subld) iscope commands in
+              pragma := i_pragma; commands
+          with e ->
+            pragma := i_pragma; raise e
+        in
+
         let scope = EcScope.Theory.require scope name loader in
           match io with
           | None       -> scope
@@ -187,7 +206,9 @@ and process_w3_import (scope : EcScope.scope) (p, f, r) =
 
 (* -------------------------------------------------------------------- *)
 and process_tactics (scope : EcScope.scope) t = 
-  EcScope.Tactics.process scope t
+  match t with
+  | `Actual t -> EcScope.Tactics.process scope t
+  | `Proof    -> scope (* FIXME: check that we are at the beginning of proof script*)
 
 (* -------------------------------------------------------------------- *)
 and process_save (scope : EcScope.scope) loc =
@@ -207,11 +228,13 @@ and process_checkproof scope b =
     scope
 
 (* -------------------------------------------------------------------- *)
-and process_pragma scope opt =
-  match unloc opt with
-  | "silent"  -> EcScope.set_verbose scope false
-  | "verbose" -> EcScope.set_verbose scope true
-  | _         -> scope
+and process_pragma (scope : EcScope.scope) opt =
+  begin
+    match unloc opt with
+    | "silent"  -> pragma := { !pragma with pm_verbose = false }
+    | "verbose" -> pragma := { !pragma with pm_verbose = true  }
+    | _         -> ()
+  end; scope
 
 (* -------------------------------------------------------------------- *)
 and process (ld : EcLoader.ecloader) (scope : EcScope.scope) g =
@@ -219,26 +242,26 @@ and process (ld : EcLoader.ecloader) (scope : EcScope.scope) g =
 
   let scope =
     match g.pl_desc with
-    | Gtype      t    -> process_type       scope (mk_loc loc t)
-    | Gdatatype  t    -> process_datatype   scope (mk_loc loc t)
-    | Gmodule    m    -> process_module     scope m
-    | Ginterface i    -> process_interface  scope i
-    | Goperator  o    -> process_operator   scope (mk_loc loc o)
-    | Gpredicate p    -> process_predicate  scope (mk_loc loc p)
-    | Gaxiom     a    -> process_axiom      scope (mk_loc loc a)
-    | Gclaim     c    -> process_claim      scope c
-    | GthOpen    name -> process_th_open    scope name.pl_desc
-    | GthClose   name -> process_th_close   scope name.pl_desc
+    | Gtype      t    -> process_type       scope  (mk_loc loc t)
+    | Gdatatype  t    -> process_datatype   scope  (mk_loc loc t)
+    | Gmodule    m    -> process_module     scope  m
+    | Ginterface i    -> process_interface  scope  i
+    | Goperator  o    -> process_operator   scope  (mk_loc loc o)
+    | Gpredicate p    -> process_predicate  scope  (mk_loc loc p)
+    | Gaxiom     a    -> process_axiom      scope  (mk_loc loc a)
+    | Gclaim     c    -> process_claim      scope  c
+    | GthOpen    name -> process_th_open    scope  name.pl_desc
+    | GthClose   name -> process_th_close   scope  name.pl_desc
     | GthRequire name -> process_th_require ld scope name
-    | GthImport  name -> process_th_import  scope name.pl_desc
-    | GthExport  name -> process_th_export  scope name.pl_desc
-    | GthClone   thcl -> process_th_clone   scope thcl
-    | GthW3      a    -> process_w3_import  scope a
-    | Gprint     p    -> process_print      scope p; scope
-    | Gtactics   t    -> process_tactics    scope t
-    | Gprover_info pi -> process_proverinfo scope pi
-    | Gcheckproof b   -> process_checkproof scope b
-    | Gsave      loc  -> process_save       scope loc
+    | GthImport  name -> process_th_import  scope  name.pl_desc
+    | GthExport  name -> process_th_export  scope  name.pl_desc
+    | GthClone   thcl -> process_th_clone   scope  thcl
+    | GthW3      a    -> process_w3_import  scope  a
+    | Gprint     p    -> process_print      scope  p; scope
+    | Gtactics   t    -> process_tactics    scope  t
+    | Gprover_info pi -> process_proverinfo scope  pi
+    | Gcheckproof b   -> process_checkproof scope  b
+    | Gsave      loc  -> process_save       scope  loc
     | Gpragma    opt  -> process_pragma     scope opt
   in
     begin
@@ -318,7 +341,6 @@ let pp_current_goal stream =
   end
 
 let pp_maybe_current_goal stream =
-  let (_, scope, _) = !context in
-    match EcScope.verbose scope with
-    | true  -> pp_current_goal stream
-    | false -> ()
+  match (!pragma).pm_verbose with
+  | true  -> pp_current_goal stream
+  | false -> ()

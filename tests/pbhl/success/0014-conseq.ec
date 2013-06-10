@@ -13,8 +13,7 @@ module M = {
   }
 }.
 
-lemma foo : bd_hoare [M.f : false ==> res] = (1%r/2%r)
-proof.
+lemma foo : bd_hoare [M.f : false ==> res] = (1%r/2%r).
   conseq ( _: true ==> res=true).
   trivial.
   trivial.
@@ -31,8 +30,7 @@ module M2 = {
 }.
 
 
-lemma foo2 : bd_hoare [M2.f : true ==> false] <= 1%r
-proof.
+lemma foo2 : bd_hoare [M2.f : true ==> false] <= 1%r.
   conseq ( _: true ==> res<=2).
   trivial.
   trivial.
@@ -42,8 +40,7 @@ proof.
 save.
 
 
-lemma foo3 : bd_hoare [M2.f : true ==> true] >= (1%r/2%r)
-proof.
+lemma foo3 : bd_hoare [M2.f : true ==> true] >= (1%r/2%r).
   conseq ( _: true ==> res=2).
   trivial.
   trivial.

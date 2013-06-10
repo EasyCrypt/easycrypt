@@ -6,4 +6,4 @@ pred P : T.
 
 axiom Pt : P(t).
 
-lemma Pt' : P(t).
+lemma Pt' : P(t) by [].

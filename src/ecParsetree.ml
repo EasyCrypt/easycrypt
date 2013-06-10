@@ -36,7 +36,7 @@ type pty_r =
   | PTvar       of psymbol
   | PTapp       of pqsymbol * pty list
   | PTfun       of pty * pty
-and pty       = pty_r       located
+and pty = pty_r located
 
 type ptyannot_r = 
   | TVIunamed of pty list
@@ -195,6 +195,7 @@ type pop_def =
   | POconcr of ptybindings * pty * pexpr
 
 type poperator = {
+  po_kind   : [`Op | `Const];
   po_name   : psymbol;
   po_tyvars : psymbol list option;
   po_def    : pop_def
@@ -208,18 +209,6 @@ type ppredicate = {
   pp_name   : psymbol;
   pp_tyvars : psymbol list option;
   pp_def    : ppred_def;
-}
-
-
-(* -------------------------------------------------------------------- *)
-type paxiom_kind = PAxiom | PLemma | PILemma
-
-type paxiom = {
-  pa_name    : psymbol;
-  pa_tyvars  : psymbol list option;
-  pa_vars    : pgtybindings option;  
-  pa_formula : pformula;
-  pa_kind    : paxiom_kind;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -311,6 +300,7 @@ type phltactic =
   | Prcond      of (bool option * bool * int)
   | Pcond       of tac_side
   | Pswap       of ((tac_side * swap_kind) located list)
+  | Pcfold      of (tac_side * codepos * int option)
   | Pinline     of pinline_arg
   | Pkill       of (tac_side * codepos * int option)
   | Prnd        of tac_side * pformula rnd_tac_info
@@ -367,6 +357,17 @@ and ptactic_r =
   | Pdebug
 
 and ptactics = ptactic list        
+
+(* -------------------------------------------------------------------- *)
+type paxiom_kind = PAxiom | PLemma of ptactic option | PILemma
+
+type paxiom = {
+  pa_name    : psymbol;
+  pa_tyvars  : psymbol list option;
+  pa_vars    : pgtybindings option;  
+  pa_formula : pformula;
+  pa_kind    : paxiom_kind;
+}
 
 (* -------------------------------------------------------------------- *)
 type ident_spec = psymbol list
@@ -467,7 +468,7 @@ type global =
   | GthExport    of pqsymbol
   | GthClone     of theory_cloning
   | GthW3        of (string list * string * w3_renaming list)
-  | Gtactics     of ptactics
+  | Gtactics     of [`Proof | `Actual of ptactics]
   | Gprover_info of pprover_infos
   | Gcheckproof  of bool
   | Gsave        of EcLocation.t
