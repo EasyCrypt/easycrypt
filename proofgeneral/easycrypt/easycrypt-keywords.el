@@ -1,4 +1,4 @@
-; Generated on Sun Jun  9 23:54:53 2013
+; Generated on Mon Jun 10 18:53:10 2013
 
 (defvar easycrypt-dangerous-keywords '(
   "admit"
@@ -17,6 +17,7 @@
   "export"
   "module"
   "of"
+  "const"
   "op"
   "pred"
   "require"
@@ -94,6 +95,7 @@
   "case"
   "rewrite"
   "subst"
+  "cfold"
   "field"
   "field_simplify"
   "app"

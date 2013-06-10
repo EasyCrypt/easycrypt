@@ -22,6 +22,7 @@ let rec toperror_of_exn ?gloc exn =
   | TyError  (loc, _, _) -> Some (loc, exn)
   | TacError _           -> Some (odfl _dummy gloc, exn)
   | ParseError (loc, _)  -> Some (loc, exn)
+
   | LocError (loc, e)    -> begin
       let gloc =
         if loc == EcLocation._dummy then gloc else Some loc
@@ -30,11 +31,14 @@ let rec toperror_of_exn ?gloc exn =
       | None -> Some (loc, e)
       | Some (loc, e) -> Some (loc, e)
     end
+
   | TopError (loc, e) ->
-      let gloc = 
-        if loc == EcLocation._dummy then gloc else Some loc
-      in
+      let gloc =  if loc == EcLocation._dummy then gloc else Some loc in
         Some (odfl _dummy gloc, e)
+
+  | EcScope.HiScopeError (loc, msg) ->
+      let gloc = odfl _dummy loc in
+        Some (gloc, EcScope.HiScopeError (None, msg))
 
   | _ -> None
 

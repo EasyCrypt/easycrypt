@@ -195,6 +195,7 @@ type pop_def =
   | POconcr of ptybindings * pty * pexpr
 
 type poperator = {
+  po_kind   : [`Op | `Const];
   po_name   : psymbol;
   po_tyvars : psymbol list option;
   po_def    : pop_def
