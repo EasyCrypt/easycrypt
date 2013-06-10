@@ -81,6 +81,8 @@
     "rnd"         , RND        ;        (* KW: tactic *)
     "bdhoare_deno", BDHOAREDENO;  
     "pr_bounded"  , PRBOUNDED  ;  
+    "pr_false"    , PRFALSE    ;  
+    "pr_or"       , PROR       ;  
     "bd_eq"       , BDEQ       ;  
 
     (* KW: tactic *) 

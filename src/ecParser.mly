@@ -218,7 +218,9 @@
 %token PRBOUNDED
 %token PRED
 %token PRINT
+%token PRFALSE
 %token PROOF
+%token PROR
 %token PROVER
 %token QUESTION
 %token RBOOL
@@ -1509,6 +1511,8 @@ phltactic:
 | HOARE {Phoare}
 | BDHOARE {Pbdhoare}
 | PRBOUNDED {Pprbounded}
+| PROR {Ppror}
+| PRFALSE {Pprfalse}
 | BDEQ {Pbdeq}
 ;
 

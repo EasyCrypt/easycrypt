@@ -210,6 +210,7 @@ val f_real_lt  : form -> form -> form
 
 val f_real_div   : form -> form -> form
 val f_real_sum   : form -> form -> form
+val f_real_sub   : form -> form -> form
 val f_real_prod  : form -> form -> form
 
 val fop_in_supp  : EcTypes.ty -> form

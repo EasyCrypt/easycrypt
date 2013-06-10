@@ -130,7 +130,13 @@ let process_call env side pre post g =
     let pre  = process_form penv hyps pre tbool in
     let post = process_form qenv hyps post tbool in
     t_hoare_call env pre post g
-  | FhoareS _, Some _ ->
+  | FbdHoareS bhs, None ->
+    let (_,f,_),_ = s_last_call "call" bhs.bhs_s in
+    let penv, qenv = EcEnv.Fun.hoareF f env in
+    let pre  = process_form penv hyps pre tbool in
+    let post = process_form qenv hyps post tbool in
+    t_bdHoare_call env pre post None g
+  | FbdHoareS _, Some _ | FhoareS _, Some _ ->
     cannot_apply "call" "side can only be given for prhl judgements"
   | FequivS es, None ->
     let (_,fl,_),(_,fr,_),_,_ = s_last_calls "call" es.es_sl es.es_sr in
@@ -450,25 +456,37 @@ let process_conseq env info (_, n as g) =
     [!t_pre; !t_post; t_use env an gs] (juc,n)
   
 let process_fun_abs env inv g =
+  let concl = get_concl g in
   let env' = EcEnv.Fun.inv_memenv env in
-  let inv = process_formula env' g inv in
-  t_equivF_abs env inv g
+  if is_equivS concl then
+    let inv = process_prhl_formula env' g inv in
+    t_equivF_abs env inv g
+  else if is_bdHoareS concl then
+    let inv = process_phl_formula env' g inv in
+    t_bdHoareF_abs env inv g
+  else if is_hoareS concl then
+    let inv = process_phl_formula env' g inv in
+    t_hoareF_abs env inv g
+  else
+    cannot_apply "fun" "equiv or probabilistic hoare triple was expected"
   
 let process_fun_upto env (bad, p, o) g =
   let env' = EcEnv.Fun.inv_memenv env in 
-  let p = process_formula env' g p in
+  let p = process_prhl_formula env' g p in
   let q = 
     match o with
     | None -> EcFol.f_true
-    | Some q -> process_formula env' g q in
+    | Some q -> process_prhl_formula env' g q in
   let bad = 
     let env =  EcEnv.Memory.push_active (EcFol.mhr,None) env in
-    process_formula env g bad in
+    process_prhl_formula env g bad in
   t_equivF_abs_upto env bad p q g
 
 
 let process_hoare_bd_hoare g = t_hoare_bd_hoare g
 let process_prbounded = t_prbounded
+let process_prfalse = t_prfalse
+let process_pror = t_pror
 let process_bdeq = t_bdeq
 
 
@@ -500,6 +518,8 @@ let process_phl loc env ptac g =
     | Pequivdeno info          -> process_equiv_deno env info
     | Phoare | Pbdhoare        -> process_hoare_bd_hoare
     | Pprbounded               -> process_prbounded
+    | Pprfalse                 -> process_prfalse env
+    | Ppror                    -> process_pror
     | Pbdeq                    -> process_bdeq
   in
     set_loc loc t g

@@ -43,3 +43,25 @@ proof.
   elim h2;clear h2;intros h2 h3.
   rewrite h1; rewrite h3;simplify;split.
 save.
+
+
+module type Adv = {
+  fun f() : unit
+}.
+
+
+module M(A:Adv) = {
+
+  fun g() : unit = {
+    A.f();
+  }
+
+}.
+
+
+lemma foo : forall (A<:Adv),
+  hoare [M(A).g : true ==> true]
+proof.
+intros A.
+fun.
+call true true.

@@ -321,6 +321,8 @@ type phltactic =
   | Phoare
   | Pbdhoare
   | Pprbounded
+  | Pprfalse
+  | Ppror
   | Pbdeq 
 
 and pinline_arg =

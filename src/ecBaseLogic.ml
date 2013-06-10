@@ -249,6 +249,8 @@ type rule_name =
   | RN_hl_deno      
   | RN_hl_hoare_bd_hoare      
   | RN_hl_prbounded      
+  | RN_hl_prfalse      
+  | RN_hl_pror
   | RN_hl_bdeq      
 
   | RN_bhl_rnd of (EcFol.form option * EcFol.form)

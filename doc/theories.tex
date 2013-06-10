@@ -238,10 +238,53 @@ module type RO_adv(O:RO) = {
 
 \subsection{(Possibilistic) Hoare Judgements}
 
+Interpretation:
+\begin{displaymath}
+\hoareS{c}{\pre}{\post}
+\quad\doteq\quad
+\forall m.~ \pre\,m \Rightarrow \range Q ([\![ c ]\!]\,m)
+\end{displaymath}
+%
+where $\range \varphi \mu \doteq \forall f.~ (\forall x.~ \varphi\,x
+\Rightarrow f\,x=0) \Rightarrow \mu\,f=0$
+
+
+
+
 \subsection{Probabilistic Hoare Judgements}
+
+Interpretation:
+\begin{displaymath}
+\bdHoareSle{c}{\pre}{\post}{\delta} 
+\quad\doteq\quad
+\forall m.~ \pre\,m \Rightarrow [\![ c ]\!]\,m\,\charfun_\post \leq
+\delta\,m
+\end{displaymath}
+
+Property?:
+\begin{displaymath}
+\hoareS{c}{\pre}{\post}
+\Leftrightarrow
+\bdHoareSeq{c}{\pre}{\neg\post}{0}
+\end{displaymath}
+
+Property?:
+\begin{displaymath}
+\hoareS{c}{\pre}{\post} \land \bdHoareSeq{c}{\pre}{\true}{1}
+\Leftrightarrow
+\bdHoareSeq{c}{\pre}{\post}{1}
+\end{displaymath}
+
 
 \subsection{Relational Hoare Judgements}
 
 \section{Requiring, Cloning and Realizing Theories\label{sec:cloning}}
 
-%%% Local Variables: %%% mode: latex %%% TeX-master: "easycrypt" %%% End:
+
+
+
+%%% Local Variables: 
+%%% mode: latex
+%%% TeX-master: "easycrypt"
+%%% End: 
+
