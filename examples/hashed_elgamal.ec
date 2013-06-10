@@ -219,13 +219,13 @@ proof.
   intros H; fun. 
   inline CPA(A).AO.init G1(A).AO.init RO.init CPA(A).S.kg CPA(A).S.enc.
   swap{1} 9 -5.
-  app 5 6 : 
+  seq 5 6 : 
     ((glob A){1} = (glob A){2} /\
      RO.m{1} = Map.empty /\ ARO.log{2} = Set.empty /\ ARO.log{1} = ARO.log{2} /\
      RO.m{1} = RO.m{2} /\ pk{1} = gx{2} /\ y{1} = y{2} /\ (G1.gxy = gx ^ y){2}).
   wp; *rnd; wp; skip; trivial.
 
-  app 2 2 : 
+  seq 2 2 : 
     ((glob A){1} = (glob A){2} /\ RO.m{1} = RO.m{2} /\
      pk{1} = gx{2} /\ y{1} = y{2} /\ b{1} = b{2} /\ (m0,m1){1} = (m0,m1){2} /\
      (G1.gxy = gx ^ y){2} /\ ARO.log{1} = ARO.log{2} /\
@@ -384,7 +384,7 @@ proof.
   inline SCDH_from_CPA(A).solve SCDH_from_CPA(A).AO.init G2(A).AO.init RO.init.
   swap{2} [5..6] -4.  
   rnd{1}; wp.  
-  app 9 8 : 
+  seq 9 8 : 
     ((glob A){1} = (glob A){2} /\ RO.m{1} = RO.m{2} /\ ARO.log{1} = ARO.log{2} /\
     c{1} = (gy, h){2} /\ G2.gxy{1} = g ^ (x * y){2} /\
     Set.card ARO.log{1} <= qH).
@@ -532,7 +532,7 @@ lemma Correctness :
   hoare [PKE_Correctness(Hashed_ElGamal(RO)).main : true ==> res].
 proof.
   fun; inline Hashed_ElGamal(RO).kg Hashed_ElGamal(RO).enc.
-  app 7 : (in_dom (g ^ (sk * y)) RO.m /\ 
+  seq 7 : (in_dom (g ^ (sk * y)) RO.m /\ 
            c = (g ^ y, (proj RO.m.[g ^ (sk * y)]) ^^ m)).
   inline RO.o; *(wp; rnd); skip; trivial.
   inline Hashed_ElGamal(RO).dec RO.o.

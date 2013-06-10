@@ -130,7 +130,7 @@ lemma DDH0_Hybrid0: forall (A <: LDDH_DISTINGUISHER {LDDH_Hyb, DH_distrs}),
 proof.
   intros A.
   fun.
-  app 2 1 :
+  seq 2 1 :
     (    (glob A){1} = (glob A){2} /\ LDDH_Hyb.i{1} = 0
      /\ LDDH_Hyb.O.c{1} = LDDH0.O.c{2} /\ LDDH0.O.c{2} = 0).
   wp.
@@ -147,10 +147,10 @@ proof.
   trivial.
   trivial.
   fun.
-  app 0 0 : (   LDDH_Hyb.i{1} = 0 /\ LDDH_Hyb.O.c{1} = LDDH0.O.c{2}
+  seq 0 0 : (   LDDH_Hyb.i{1} = 0 /\ LDDH_Hyb.O.c{1} = LDDH0.O.c{2}
              /\ LDDH_Hyb.O.c{1} >= 0).
     admit. (* sidestep Bug? above *)
-  app 1 1 : (   r{1} = None /\ r{1} = r{2} /\ LDDH_Hyb.i{1} = 0
+  seq 1 1 : (   r{1} = None /\ r{1} = r{2} /\ LDDH_Hyb.i{1} = 0
              /\ LDDH_Hyb.O.c{1} = LDDH0.O.c{2} /\ LDDH_Hyb.O.c{1} >= 0).
     wp.
     skip.
