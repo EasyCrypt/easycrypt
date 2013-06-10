@@ -1480,6 +1480,12 @@ let cfold_stmt env me olen zpr =
         error "left-values must be local variables")
     asgn;
 
+  List.iter
+    (fun (_, _, e) ->
+        if e_fv e <> Mid.empty || e_read env PV.empty e <> PV.empty then
+          error "right-values are not closed expression")
+    asgn;
+
   let wrs = is_write env EcPV.PV.empty tl1 in
   let asg = List.fold_left
               (fun pv (x, ty, _) -> EcPV.PV.add env x ty pv)

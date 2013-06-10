@@ -189,9 +189,8 @@ let rec m_fv fv mp =
   let fv = 
     match mp.m_top with 
     | `Abstract id -> EcIdent.fv_add id fv 
-    | `Concrete _ -> fv in
+    | `Concrete _  -> fv in
   List.fold_left m_fv fv mp.m_args 
-
 
 (* -------------------------------------------------------------------- *)
 type xpath = {
