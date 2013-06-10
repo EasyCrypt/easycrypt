@@ -36,7 +36,7 @@ type pty_r =
   | PTvar       of psymbol
   | PTapp       of pqsymbol * pty list
   | PTfun       of pty * pty
-and pty       = pty_r       located
+and pty = pty_r located
 
 type ptyannot_r = 
   | TVIunamed of pty list
@@ -210,18 +210,6 @@ type ppredicate = {
   pp_def    : ppred_def;
 }
 
-
-(* -------------------------------------------------------------------- *)
-type paxiom_kind = PAxiom | PLemma | PILemma
-
-type paxiom = {
-  pa_name    : psymbol;
-  pa_tyvars  : psymbol list option;
-  pa_vars    : pgtybindings option;  
-  pa_formula : pformula;
-  pa_kind    : paxiom_kind;
-}
-
 (* -------------------------------------------------------------------- *)
 type pprover_infos = {
   pprov_max : int option;
@@ -367,6 +355,17 @@ and ptactic_r =
 and ptactics = ptactic list        
 
 (* -------------------------------------------------------------------- *)
+type paxiom_kind = PAxiom | PLemma of ptactic option | PILemma
+
+type paxiom = {
+  pa_name    : psymbol;
+  pa_tyvars  : psymbol list option;
+  pa_vars    : pgtybindings option;  
+  pa_formula : pformula;
+  pa_kind    : paxiom_kind;
+}
+
+(* -------------------------------------------------------------------- *)
 type ident_spec = psymbol list
 
 type inv = (pformula, (pformula * pformula) * pformula option) EcAstlogic.g_inv
@@ -465,7 +464,7 @@ type global =
   | GthExport    of pqsymbol
   | GthClone     of theory_cloning
   | GthW3        of (string list * string * w3_renaming list)
-  | Gtactics     of ptactics
+  | Gtactics     of [`Proof | `Actual of ptactics]
   | Gprover_info of pprover_infos
   | Gcheckproof  of bool
   | Gsave        of EcLocation.t

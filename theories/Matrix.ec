@@ -19,7 +19,7 @@ pred (==) (M0 M1:'a matrix) =
     0 <= j => j < snd (size M0) =>
     M0.[(i,j)] = M1.[(i,j)].
 
-axiom extentionality: forall (M0 M1:'a matrix),
+axiom extensionality: forall (M0 M1:'a matrix),
   M0 == M1 => M0 = M1.
 
 (** Operators *)
@@ -89,10 +89,10 @@ axiom write_get: forall (M M':'a matrix) i j k l m n a b,
 lemma write_sub: forall (M M':'a matrix) i j,
   0 <= i => i + fst (size M') <= fst (size M) =>
   0 <= j => j + snd (size M') <= snd (size M) =>
-  sub (write M (i,j) M' (0,0) (size M')) (i,j) (size M') = M'
+  sub (write M (i,j) M' (0,0) (size M')) (i,j) (size M') = M'.
 proof.
 intros M M' i j i_0 i_bound j_0 j_bound;
-  apply (extentionality<:'a>
+  apply (extensionality<:'a>
            (sub (write M (i,j) M' (0,0) (size M')) (i,j) (size M'))
            M' _);
   trivial.
@@ -110,10 +110,10 @@ axiom transpose_get: forall (M:'a matrix) i j,
   (transpose M).[(i,j)] = M.[(j,i)].
 
 lemma transpose_idempotent: forall (M:'a matrix),
-  transpose (transpose M) = M
+  transpose (transpose M) = M.
 proof.
 intros M;
-  apply (extentionality<:'a> (transpose (transpose M)) M _);
+  apply (extensionality<:'a> (transpose (transpose M)) M _);
   cut ext: (size (transpose (transpose M)) = size M /\
             forall i j, 0 <= i => i < fst (size M) => 0 <= j => j < snd (size M) =>
               (transpose (transpose M)).[(i,j)] = M.[(i,j)]);
@@ -161,10 +161,10 @@ axiom column_get: forall (M:'a matrix) i j,
 
 lemma column_transpose_row: forall (M:'a matrix) i,
   0 <= i => i < snd (size M) =>
-  row M i = column (transpose M) i
+  row M i = column (transpose M) i.
 proof.
 intros M i i_0 i_bound;
-apply (Array.extentionality<:'a> (row M i) (column (transpose M) i) _).
+apply (Array.extensionality<:'a> (row M i) (column (transpose M) i) _).
   cut ext_eq: (Array.length (row M i) = fst (size M) /\
                Array.length (column (transpose M) i) = fst (size M) /\
                forall j, 0 <= j => j < fst (size M) =>

@@ -123,7 +123,7 @@ module ElGamal : Scheme = {
 
 (** First we prove that the scheme is valid *)
 
-lemma valid_ElGamal : hoare [ ValidScheme(ElGamal).main : true ==> res ]
+lemma valid_ElGamal : hoare [ ValidScheme(ElGamal).main : true ==> res ].
 proof.
   fun.
   inline ElGamal.kg ElGamal.enc ElGamal.dec.
@@ -253,7 +253,7 @@ module G2(A:Adv) = {
  
 equiv equiv1 (A<:Adv) :  
    CPA(ElGamal,A).main ~ DDH0(Inv(A)).main : 
-      (glob A){1}=(glob A){2} ==> res{1} = res{2}
+      (glob A){1}=(glob A){2} ==> res{1} = res{2}.
 proof.
  fun.
  inline ElGamal.kg ElGamal.enc Inv(A).inv.
@@ -282,14 +282,14 @@ save.
 
 lemma Pr1 (A<:Adv) &m : 
    Pr[CPA(ElGamal,A).main() @ &m : res] = 
-   Pr[DDH0(Inv(A)).main() @ &m : res]
+   Pr[DDH0(Inv(A)).main() @ &m : res].
 proof.
  equiv_deno (equiv1 (<:A));trivial.
 save.
 
 lemma Pr2 (A<:Adv) &m : 
    Pr[G1(A).main() @ &m : res] = 
-   Pr[DDH1(Inv(A)).main() @ &m : res]
+   Pr[DDH1(Inv(A)).main() @ &m : res].
 proof.
  equiv_deno (_: (glob A){1}=(glob A){2} ==> res{1} = res{2});try trivial.
   fun. inline{2} Inv(A).inv.
@@ -305,7 +305,7 @@ proof.
 save.
 
 lemma Fact3 (A<:Adv) &m : 
-  Pr[G1(A).main() @ &m : res] = Pr[G2(A).main() @ &m : res]
+  Pr[G1(A).main() @ &m : res] = Pr[G2(A).main() @ &m : res].
 proof.
  equiv_deno (_: (glob A){1}=(glob A){2} ==> res{1} = res{2});try trivial.
  fun. 
@@ -328,7 +328,7 @@ lemma Pr4_aux (A<:Adv) :
    (bd_hoare[A.a1 : true ==> true] = 1%r) =>
    (bd_hoare[A.a2 : true ==> true] = 1%r) =>
    bd_hoare [G2(A).main : true ==> res] <= (1%r / 2%r)
-(*   Pr[G2(A).main() @ &m : res] = 1%r / 2%r *)
+(*   Pr[G2(A).main() @ &m : res] = 1%r / 2%r *).
 proof.
  intros Ha1 Ha2.
  fun.
@@ -339,7 +339,7 @@ save.
 lemma Pr4 (A<:Adv) &m : 
    (bd_hoare[A.a1 : true ==> true] = 1%r) =>
    (bd_hoare[A.a2 : true ==> true] = 1%r) =>
-   Pr[G2(A).main() @ &m : res] = 1%r / 2%r
+   Pr[G2(A).main() @ &m : res] = 1%r / 2%r.
 proof.
  admit. (* TODO : how to use the previous lemma to do this *)
 save.
@@ -348,7 +348,7 @@ lemma Conclusion1 (A<:Adv) &m :
    (bd_hoare[A.a1 : true ==> true] = 1%r) =>
    (forall &m, bd_hoare[A.a2 : true ==> true] = 1%r) =>
  `| Pr[CPA(ElGamal, A).main() @ &m : res] - 1%r / 2%r | = 
- `| Pr[DDH0(Inv(A)).main() @ &m :res] - Pr[DDH1(Inv(A)).main() @ &m :res] |
+ `| Pr[DDH0(Inv(A)).main() @ &m :res] - Pr[DDH1(Inv(A)).main() @ &m :res] |.
 proof. 
   intros Ha1 Ha2.
   rewrite (Pr1 (<:A) &m).
@@ -362,7 +362,7 @@ lemma Conclusion (A<:Adv) &m :
    (bd_hoare[A.a2 : true ==> true] = 1%r) =>
    exists (I<:Inverter), 
    `| Pr[CPA(ElGamal, A).main() @ &m : res] - 1%r / 2%r | = 
-   `| Pr[DDH0(I).main() @ &m :res] - Pr[DDH1(I).main() @ &m :res] |
+   `| Pr[DDH0(I).main() @ &m :res] - Pr[DDH1(I).main() @ &m :res] |.
 proof.
   intros Ha1 Ha2.
   exists (<:Inv(A)).

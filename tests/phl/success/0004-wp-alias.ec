@@ -11,7 +11,7 @@ module N = {
   }
 }.
 
-lemma foo : hoare [N.f : true ==> res = 2 && N.P.x = 2 && M.x = 2]
+lemma foo : hoare [N.f : true ==> res = 2 && N.P.x = 2 && M.x = 2].
 proof.
  fun.
  wp.

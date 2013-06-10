@@ -19,7 +19,7 @@ module M = {
 }.
 
 lemma foo : hoare [M.f : (b1 => M.y=e1) && (b2 => M.y=e2) && (b1||b2) ==> 
-                         M.x=M.y ]
+                         M.x=M.y ].
 proof.
  fun.
  if; wp; skip;  trivial.

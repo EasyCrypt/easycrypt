@@ -9,7 +9,7 @@ module N = {
   module P = M
 }.
 
-lemma foo : hoare [N.P.f : true ==> res]
+lemma foo : hoare [N.P.f : true ==> res].
 proof.
  fun.
  skip.

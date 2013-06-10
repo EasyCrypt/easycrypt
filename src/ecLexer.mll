@@ -42,6 +42,7 @@
     "same"        , SAME       ;        (* KW: tactic *)
     "idtac"       , IDTAC      ;        (* KW: tactic *)
     "try"         , TRY        ;        (* KW: tactic *)
+    "by"          , BY         ;        (* KW: tactic *)
 
     "assumption"  , ASSUMPTION ;        (* KW: tactic *)
     "intros"      , INTROS     ;        (* KW: tactic *)
@@ -98,6 +99,7 @@
     "lemma"       , LEMMA      ;        (* KW: global *)
     "proof"       , PROOF      ;        (* KW: global *)
     "save"        , SAVE       ;        (* KW: global *)
+    "qed"         , QED        ;        (* KW: global *)
     "claim"       , CLAIM      ;        (* KW: global *)
     "drop"        , DROP       ;        (* KW: global *)
     "end"         , END        ;        (* KW: global *)

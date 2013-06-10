@@ -27,7 +27,7 @@ op eq(x y:'a):bool = x = y.
 pred (==)(m0, m1:'a multiset) = forall (x:'a),
   count m0 (eq x) = count m1 (eq x).
 
-axiom extentionality: forall (m0 m1:'a multiset),
+axiom extensionality: forall (m0 m1:'a multiset),
   m0 == m1 => m0 = m1.
 
 (* del *)
@@ -41,7 +41,7 @@ axiom del_nonempty: forall (x y:'a) xs,
 
 (* lemmas *)
 lemma count_pos: forall (xs:'a multiset) p,
-  0 <= count xs p
+  0 <= count xs p.
 proof.
 intros xs p.
 apply (induction<:'a> xs (lambda xs, 0 <= count xs p) _ _);
@@ -49,17 +49,25 @@ trivial.
 save.
 
 lemma card_add: forall (x:'a) xs,
-  count (add xs x) (lambda x, true) = 1 + count xs (lambda x, true)
+  count (add xs x) (lambda x, true) = 1 + count xs (lambda x, true).
 proof.
-intros x xs;
-apply (induction<:'a> xs (lambda xs, count (add xs x) (lambda x, true) = 1 + count xs (lambda x, true)) _ _);
+intros x xs; generalize x; clear x.
+apply (induction<:'a> xs 
+ (lambda xs, forall x, 
+  count (add xs x) (lambda x, true) = 1 + count xs (lambda x, true)) _ _).
+trivial.
+simplify; intros xs1 x H x1.
+rewrite (count_nonempty<:'a> x xs1 (lambda x, true)).
+rewrite (count_nonempty<:'a> x1 (add xs1 x) (lambda x, true)).
+rewrite (H x); simplify.
+generalize (count xs1 (lambda (x : 'a), true)).
 trivial.
 save.
 
 lemma add_commutative: forall (x y:'a) xs,
-  add (add xs x) y = add (add xs y) x
+  add (add xs x) y = add (add xs y) x.
 proof.
 intros x y xs;
-apply (extentionality<:'a> (add (add xs x) y) (add (add xs y) x) _);
+apply (extensionality<:'a> (add (add xs x) y) (add (add xs y) x) _);
 trivial.
 save.

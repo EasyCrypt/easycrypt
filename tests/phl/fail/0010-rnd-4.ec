@@ -18,7 +18,7 @@ module G4 = {
 }.
 
 (* Should not be provable *)
-equiv range_fwd : G3.f ~ G4.f : true ==> 1 <= G3.z{1} && G3.z{1} <= 2
+equiv range_fwd : G3.f ~ G4.f : true ==> 1 <= G3.z{1} && G3.z{1} <= 2.
 proof.
  fun.
  rnd.

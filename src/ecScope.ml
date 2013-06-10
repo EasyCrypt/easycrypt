@@ -156,7 +156,7 @@ type scope = {
   sc_loaded     : (EcEnv.ctheory_w3 * symbol list) Msym.t;
   sc_required   : symbol list;
   sc_pr_uc      : proof_uc list;
-  sc_options    : Options.options ref;
+  sc_options    : Options.options;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -168,7 +168,7 @@ let empty =
       sc_loaded     = Msym.empty;
       sc_required   = [];
       sc_pr_uc      = [];
-      sc_options    = ref (Options.init ());
+      sc_options    = Options.init ();
     }
 
 (* -------------------------------------------------------------------- *)
@@ -193,20 +193,19 @@ let goal (scope : scope) =
 
 (* -------------------------------------------------------------------- *)
 let verbose (scope : scope) =
-  match Notifier.verbose !(scope.sc_options) with
+  match Notifier.verbose scope.sc_options with
   | `ForLoading -> false
   | `Verbose b  -> b
 
 (* -------------------------------------------------------------------- *)
 let set_verbose (scope : scope) (b : bool) =
-  scope.sc_options := Notifier.set !(scope.sc_options) b;
-  scope
+  { scope with sc_options = Notifier.set scope.sc_options b }
 
 (* -------------------------------------------------------------------- *)
 let for_loading (scope : scope) =
   { empty with
       sc_loaded  = scope.sc_loaded;
-      sc_options = ref (Options.for_loading !(scope.sc_options)); }
+      sc_options = Options.for_loading scope.sc_options; }
 
 (* -------------------------------------------------------------------- *)
 let subscope (scope : scope) (name : symbol) =
@@ -218,7 +217,7 @@ let subscope (scope : scope) (name : symbol) =
     sc_loaded     = scope.sc_loaded;
     sc_required   = scope.sc_required;
     sc_pr_uc      = [];
-    sc_options    = ref (Options.for_subscope !(scope.sc_options));
+    sc_options    = Options.for_subscope scope.sc_options;
   }
 
 (* -------------------------------------------------------------------- *)
@@ -240,7 +239,7 @@ module Prover = struct
     s
 
   let mk_prover_info scope max time ns =
-    let dft = Prover_info.get !(scope.sc_options) in
+    let dft = Prover_info.get scope.sc_options in
     let time = odfl dft.EcProvers.prover_timelimit time in
     let time = if time < 1 then 1 else time in
     let provers = odfl dft.EcProvers.prover_names ns in
@@ -253,8 +252,7 @@ module Prover = struct
 
   let set_prover_info scope max time ns =
     let pi = mk_prover_info scope max time ns in
-      scope.sc_options := Prover_info.set !(scope.sc_options) pi;
-      scope
+      { scope with sc_options = Prover_info.set scope.sc_options pi }
 
   let set_all scope =
     let provers = Array.of_list (EcProvers.known_provers ()) in
@@ -287,12 +285,10 @@ module Prover = struct
     mk_prover_info scope max time ns
 
   let full_check scope =
-    scope.sc_options := Check_mode.full_check !(scope.sc_options);
-    scope
+    { scope with sc_options = Check_mode.full_check scope.sc_options }
 
   let check_proof scope b =
-    scope.sc_options := Check_mode.check_proof !(scope.sc_options) b;
-    scope
+    { scope with sc_options = Check_mode.check_proof scope.sc_options b }
 end
 
 (* -------------------------------------------------------------------- *)
@@ -312,7 +308,7 @@ module Tactics = struct
         (fst (process_logic_tacs (pi scope) env tacs (juc,[n])))
 
   let process scope tac =
-    if Check_mode.check !(scope.sc_options) then
+    if Check_mode.check scope.sc_options then
       let loc = match tac with | [] -> assert false | t::_ -> t.pl_loc in
       match scope.sc_pr_uc with
       | [] -> error loc NoCurrentGoal
@@ -594,7 +590,7 @@ module Ax = struct
       sc_pr_uc = puc :: scope.sc_pr_uc }
 
   let save scope loc =
-    if Check_mode.check !(scope.sc_options) then
+    if Check_mode.check scope.sc_options then
       match scope.sc_pr_uc with
       | [] -> EcHiLogic.error loc EcHiLogic.NoCurrentGoal
       | { puc_name = name; puc_jdg = juc } :: pucs ->
@@ -626,22 +622,30 @@ module Ax = struct
     let concl =
       EcFol.Fsubst.uni (EcUnify.UniEnv.close ue) concl in
     let tparams = EcUnify.UniEnv.tparams ue in
-    let check = Check_mode.check !(scope.sc_options) in
+    let check = Check_mode.check scope.sc_options in
+
     match ax.pa_kind with
     | PILemma when check ->
       let scope = start_lemma scope (unloc ax.pa_name) tparams concl in
       let scope = Tactics.process scope [tintro] in
       None, scope
-    | PLemma when check ->
+
+    | PLemma tc when check ->
+        let tc =
+          match tc with
+          | Some tc -> [tc]
+          | None    ->
+              let dtc = Plogic (Ptrivial empty_pprover) in
+                [tintro; { pl_loc = loc; pl_desc = dtc }]
+        in
+
         let scope = start_lemma scope (unloc ax.pa_name) tparams concl in
-        let scope =
-          Tactics.process scope
-            [tintro; { pl_loc = loc; pl_desc = Plogic (Ptrivial empty_pprover) }] in
-        let name, scope = save scope loc in
-        name, scope
+        let scope = Tactics.process scope tc in
+          save scope loc
+
     | _ ->
         let axd = { ax_tparams = tparams;
-                    ax_spec = Some concl;
-                    ax_kind = Axiom } in
+                    ax_spec    = Some concl;
+                    ax_kind    = Axiom } in
         Some (unloc ax.pa_name), bind scope (unloc ax.pa_name, axd)
 end

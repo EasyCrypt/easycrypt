@@ -1,1 +1,1 @@
-lemma l: forall x, x <=> x.
+lemma l: forall x, x <=> x by [].

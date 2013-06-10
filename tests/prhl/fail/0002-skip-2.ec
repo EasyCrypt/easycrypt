@@ -9,7 +9,7 @@ module M2 = {
   }
 }.
 
-lemma foo : equiv [M2.f ~ M1.g : true ==> true]
+lemma foo : equiv [M2.f ~ M1.g : true ==> true].
 proof.
   fun.
   skip.
