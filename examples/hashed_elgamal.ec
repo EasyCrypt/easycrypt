@@ -86,7 +86,7 @@ module PKE_CPA (S:PKE_Scheme, A:PKE_Adversary) = {
     b        = ${0,1};
     c       := S.enc(pk, b ? m1 : m0);
     b'      := A.guess(c);
-    return (b = b');
+    return (b' = b);
   } 
 }.
 
@@ -147,8 +147,8 @@ module SCDH (B:SCDH_Adversary) = {
 }.
 
 module type Adv (O:Oracle) = {
-  fun choose(pk:pkey)     : plaintext * plaintext 
-  fun guess(c:ciphertext) : bool                  
+  fun choose(pk:pkey)     : plaintext * plaintext { O.o }
+  fun guess(c:ciphertext) : bool { O.o } 
 }.
 
 module CPA (A_:Adv) = { 
@@ -171,7 +171,7 @@ module CPA (A_:Adv) = {
     b        = ${0,1};
     c       := S.enc(pk, b ? m1 : m0);
     b'      := A.guess(c);
-    return (b = b');
+    return (b' = b);
   }
 }. 
 
@@ -204,7 +204,7 @@ module G1 (A_:Adv) = {
     h = $uniform;
     c = (g ^ y, h ^^ (b ? m1 : m0));
     b' := A.guess(c);
-    return (b = b');
+    return (b' = b);
   }
 }.
 
@@ -243,7 +243,6 @@ proof.
      (forall (x:group), mem x ARO.log{2} <=> in_dom x RO.m{2})).
   trivial.
   trivial.
-  fun; inline RO.init; wp; skip; trivial.  
   fun; inline RO.o; wp; if.
   trivial.
   wp; rnd; wp; skip; trivial (* may timeout *).
@@ -260,21 +259,17 @@ proof.
   trivial.
   trivial.
 
-  intros O _ _; apply (H (<:O) _); assumption.
-
-  fun; inline RO.init; wp; skip; trivial.  
-
-  intros _ _; admit.
-  intros _.
-  admit. (* memory hr does not exist; bug? *)
+  intros O _; apply (H (<:O) _); assumption.
 
   fun; inline RO.o; wp; if.
   trivial.
   wp; rnd; wp; skip; trivial.
   wp; skip; trivial.
 
-  intros _ _; admit.
-  intros _; admit.
+  intros _ _; fun.
+  admit.
+  intros _; fun.
+  admit.
 
   inline RO.o; wp; rnd; wp; skip; trivial.
 save.
@@ -308,7 +303,7 @@ module G2 (A_:Adv) = {
     c = (g ^ y, h);
     b' := A.guess(c);
     b = ${0,1};
-    return (b = b');
+    return (b' = b);
   }
 }.
 
@@ -327,7 +322,6 @@ proof.
   fun (RO.m{1} = RO.m{2} /\ G1.gxy{1} = G2.gxy{2} /\ ARO.log{1} = ARO.log{2}).
   trivial.
   trivial.
-  fun; inline RO.init; wp; skip; trivial.
   fun; inline RO.o; wp; if.
   trivial.
   wp; rnd; wp; skip; trivial.
@@ -345,7 +339,6 @@ proof.
   fun (RO.m{1} = RO.m{2} /\ G1.gxy{1} = G2.gxy{2} /\ ARO.log{1} = ARO.log{2}).
   trivial. 
   trivial.
-  fun; inline RO.init; wp; skip; trivial.
   fun; inline RO.o; wp; if.
   trivial.
   wp; rnd; wp; skip; trivial.
@@ -405,7 +398,6 @@ proof.
     Set.card ARO.log{1} <= qH).
   trivial.
   trivial.
-  fun; inline RO.init; wp; skip; trivial.
   fun; inline RO.o; wp; if.
   trivial.
   wp; rnd; wp; skip; trivial.
@@ -420,7 +412,6 @@ proof.
   fun (RO.m{1} = RO.m{2} /\ ARO.log{1} = ARO.log{2} /\ Set.card ARO.log{1} <= qH).
   trivial.
   trivial.
-  fun; inline RO.init; wp; skip; trivial.
   fun; inline RO.o; wp; if.
   trivial.
   wp; rnd; wp; skip; trivial.
@@ -475,7 +466,11 @@ lemma Pr_G2 (A <: Adv {CPA, G1, G2, SCDH, RO, ARO, Hashed_ElGamal}) &m :
 proof.
   intros H.
   cut H1 : (bd_hoare[G2(A).main : true ==> res] = (1%r / 2%r)).
-  fun; rnd (1%r / 2%r) (lambda b, b = b'); simplify.
+  fun; rnd (1%r / 2%r) (lambda b, b' = b); simplify.
+  conseq (_ : true ==> true).
+  trivial.
+  intros &m1 _.
+  cut W : (mu {0,1} (Fun.cPeq b'{m1}) = 1%r / 2%r); [trivial | assumption].
   admit.
   bdhoare_deno H1; trivial.
 save.
@@ -487,8 +482,7 @@ lemma Pr_G2_SCDH (A <: Adv {CPA, G1, G2, SCDH, RO, ARO, Hashed_ElGamal}) &m :
   Pr[G2(A).main() @ &m : mem G2.gxy ARO.log] =
   Pr[SCDH(SCDH_from_CPA(A)).main() @ &m : res].
 proof.
-  intros H.
-  equiv_deno (G2_SCDH (<:A) _).
+  intros _; equiv_deno (G2_SCDH (<:A) _).
   assumption.
   trivial.
   trivial.
@@ -527,9 +521,9 @@ proof.
   exists (<:SCDH_from_CPA(A)).
   cut aux : (forall (x, y:real), x <= 1%r / 2%r + y => x - 1%r / 2%r <= y). 
   trivial.
-  apply (aux
-   Pr[CPA(A).main() @ &m : res]
-   Pr[SCDH(SCDH_from_CPA(A)).main() @ &m : res] _).
+  apply (aux 
+    Pr[CPA(A).main() @ &m : res] 
+    Pr[SCDH(SCDH_from_CPA(A)).main() @ &m : res] _).
   apply (Reduction (<:A) &m _).
   assumption.
 save.
