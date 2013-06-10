@@ -157,6 +157,7 @@
 %token COMMA
 %token COMPUTE
 %token CONSEQ
+%token CONST
 %token CUT
 %token DATATYPE
 %token DEBUG
@@ -1082,34 +1083,45 @@ tyvars_decl:
 | LBRACKET tyvars=tident* RBRACKET { Some tyvars }
 | empty { None }
 ;
-    
+
+%inline op_or_const:
+| OP    { `Op }
+| CONST { `Const }
+;
+
 operator:
-| OP x=op_ident tyvars=tyvars_decl COLON sty=loc(type_exp) {
-    { po_name   = x;
+| k=op_or_const x=op_ident tyvars=tyvars_decl COLON sty=loc(type_exp) {
+    { po_kind   = k;
+      po_name   = x;
       po_tyvars = tyvars;
       po_def    = POabstr sty; }
   }
 
-| OP x=op_ident tyvars=tyvars_decl COLON sty=loc(type_exp) EQ b=expr {
-    { po_name   = x;
+| k=op_or_const x=op_ident tyvars=tyvars_decl COLON sty=loc(type_exp) EQ b=expr {
+    { po_kind   = k;
+      po_name   = x;
       po_tyvars = tyvars;
       po_def    = POconcr ([], sty, b); }
   }
 
-| OP x=op_ident tyvars=tyvars_decl eq=loc(EQ) b=expr {
-    { po_name   = x;
+| k=op_or_const x=op_ident tyvars=tyvars_decl eq=loc(EQ) b=expr {
+    { po_kind   = k;
+      po_name   = x;
       po_tyvars = tyvars;
       po_def    = POconcr([], mk_loc eq.pl_loc PTunivar, b); }
   }
 
-| OP x=op_ident tyvars=tyvars_decl p=ptybindings eq=loc(EQ) b=expr {
-    { po_name   = x;
+| k=op_or_const x=op_ident tyvars=tyvars_decl p=ptybindings eq=loc(EQ) b=expr {
+    { po_kind   = k;
+      po_name   = x;
       po_tyvars = tyvars;
       po_def    = POconcr(p, mk_loc eq.pl_loc PTunivar, b); }
   }
-| OP x=op_ident tyvars=tyvars_decl p=ptybindings COLON codom=loc(type_exp)
+
+| k=op_or_const x=op_ident tyvars=tyvars_decl p=ptybindings COLON codom=loc(type_exp)
     EQ b=expr {
-    { po_name   = x;
+    { po_kind   = k;
+      po_name   = x;
       po_tyvars = tyvars;
       po_def    = POconcr(p, codom, b); }
   } 

@@ -8,7 +8,7 @@ require        Set.
 type ('a,'b) map = ('a,'b option) Map_why.map.
 
 (* empty, get and set: note that get returns an option *)
-op empty:('a,'b) map = Map_why.const None.
+op empty:('a,'b) map = Map_why.const_ None.
 op __get(m:('a,'b) map, x:'a): 'b option = Map_why.__get m x.
 op __set(m:('a,'b) map, x:'a, y:'b): ('a,'b) map = Map_why.__set m x (Some y).
 
@@ -92,7 +92,7 @@ lemma rng_empty: rng (empty<:'a,'b>) = Set.empty.
 proof.
   apply (Set.extensionality<:'b> (rng empty<:'a,'b>) Set.empty _).
   intros x.
-  rewrite (rng_def<:'a,'b> (Map_why.const None) x).
+  rewrite (rng_def<:'a,'b> (Map_why.const_ None) x).
   split; intros _; trivial.
 save.
 

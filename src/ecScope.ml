@@ -18,6 +18,21 @@ type action = {
 }
 
 (* -------------------------------------------------------------------- *)
+exception HiScopeError of EcLocation.t option * string
+
+let pp_hi_scope_error fmt exn =
+  match exn with
+  | HiScopeError (None  , s) ->
+      Format.fprintf fmt "%s" s
+
+  | HiScopeError (Some loc, s) ->
+      Format.fprintf fmt "%s: %s" (EcLocation.tostring loc) s
+
+  | _ -> raise exn
+
+let _ = EcPException.register pp_hi_scope_error
+
+(* -------------------------------------------------------------------- *)
 module type IOptions = sig
   type option
 
@@ -357,7 +372,20 @@ module Op = struct
     let tparams = EcUnify.UniEnv.tparams ue in
     let tyop    = EcDecl.mk_op tparams ty body in
 
-      bind scope (unloc op.po_name, tyop)
+    if op.po_kind = `Const then begin
+      let tue, ty, _ = EcUnify.UniEnv.freshen ue tparams None ty in
+      let tdom = EcUnify.UniEnv.fresh_uid tue in
+      let tcom = EcUnify.UniEnv.fresh_uid tue in
+      let tfun = EcTypes.tfun tdom tcom in
+
+        try
+          EcUnify.unify (env scope) tue ty tfun;
+          let msg = "this operator type is (unifiable) to an function type" in
+            raise (HiScopeError (Some loc, msg));
+        with EcUnify.UnificationFailure _ -> ()
+    end;
+
+    bind scope (unloc op.po_name, tyop)
 end
 
 (* -------------------------------------------------------------------- *)
