@@ -7,7 +7,7 @@ require import Int.
 require import Distr.
 require import Bool.
 require import Real.
-
+require import Pair.
 
 module type ARO = {
  fun h_a(x : bitstring) : bitstring
@@ -526,17 +526,81 @@ assumption.
 trivial.
 save.
 
-lemma sofar : 
-forall (A <: Adv {BR,BR2,BR3,CPA,CPA2,O}), 
+
+module type Inverter = {
+ fun i(pk : pkey, y : bitstring) : bitstring
+}.
+
+module OW(I :Inverter) ={
+ fun main() : bool ={
+  var x : bitstring;
+  var x' : bitstring;
+  var y : bitstring;
+  var pk : pkey;
+  var sk : skey;
+  x = $Dbitstring.dbitstring(l);
+  (pk,sk) = $keypairs;
+  x' := I.i(pk,(f pk x));
+  return (x = x');
+ }
+}.
+
+module BR_OW(A : Adv) : Inverter = {
+ module AO = A(O)
+ fun i(pk : pkey,y : bitstring) : bitstring ={
+  var m0 : bitstring;
+  var m1 : bitstring;
+  var h : bitstring;
+  var b : bool;
+  var x : bitstring;
+  O.init();
+  (m0,m1) := AO.a1(pk);
+  if (length m0 = k /\ length m1 = k) {
+   h = $Dbitstring.dbitstring(k); 
+   b := AO.a2(y || h);
+   x = proj (Map.find (lambda p,f pk (Pair.fst p) = y) O.mH);
+  }
+  return (x);
+ }
+}.
+
+lemma eq4 : forall (A <: Adv {BR3,CPA2,O,BR_OW}), 
 (forall (O <: ARO),
  bd_hoare[ O.h_a : true ==> true] = 1%r =>
  bd_hoare[ A(O).a2 : true ==> true] = 1%r) =>
-forall &m1 &m2, (glob A){m1} = (glob A){m2} => 
-Pr[CPA(BR,A).main() @ &m1: res] <=
-1%r/2%r +
-Pr[CPA2(BR3,A).main() @ &m2 : mem BR3.r O.sH]
+ equiv [ CPA2(BR3,A).main ~ OW(BR_OW(A)).main : 
+(glob A){1} = (glob A){2} ==> (mem BR3.r{1} O.sH{1} => res{2})]
 proof.
-intros A Hlossless &m1 &m2 Hglob.
-(* boring *)
-admit.
-save.
+intros A Hlossless.
+fun.
+rnd{1}.
+inline  BR_OW(A).i.
+app 4 6: (BR3.r{1} = x{2} /\ O.mH{1} = O.mH{2} /\ 
+          O.sH{1} = O.sH{2} /\ (glob A){1} = (glob A){2} /\
+          m0{1} = m0{2} /\ m1{1} = m1{2}). 
+call ((glob A){1} = (glob A){2} /\ p{1} = p{2} /\
+       O.mH{1} = O.mH{2} /\ O.sH{1} = O.sH{2})
+((glob A){1} = (glob A){2} /\
+       O.mH{1} = O.mH{2} /\ O.sH{1} = O.sH{2} /\ res{1} = res{2}).
+fun (O.mH{1} = O.mH{2} /\ O.sH{1} = O.sH{2}).
+trivial.
+trivial.
+fun.
+inline O.h.
+wp;rnd;wp;skip;trivial.
+inline CPA2(BR3, A).SO.init CPA2(BR3, A).SO.kg O.init.
+wp;rnd;wp;rnd;wp;skip;trivial.
+if.
+trivial.
+wp.
+call ((glob A){1} = (glob A){2} /\ c{1} = c{2} /\
+       O.mH{1} = O.mH{2} /\ O.sH{1} = O.sH{2})
+((glob A){1} = (glob A){2} /\
+       O.mH{1} = O.mH{2} /\ O.sH{1} = O.sH{2} /\ res{1} = res{2}).
+fun (O.mH{1} = O.mH{2} /\ O.sH{1} = O.sH{2}).
+trivial.
+trivial.
+fun.
+inline O.h.
+wp;rnd;wp;skip;trivial.
+
