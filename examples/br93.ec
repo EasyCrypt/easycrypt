@@ -165,12 +165,11 @@ module BR2(R : RO) : Scheme(R) = {
 
 lemma eq_except_dom : forall(x, y : 'a, m1, m2 : ('a,'b) map), 
  Map.eq_except m1 m2 x => x <> y => 
-(Map.in_dom y m1 <=> Map.in_dom y m2).
-
+(Map.in_dom y m1 <=> Map.in_dom y m2) by [].
 
 lemma eq_except_dom2 : forall(x, y : 'a, m1, m2 : ('a,'b) map), 
  Map.eq_except m1 m2 x => x <> y => 
-(!(Map.in_dom y m1) <=> !(Map.in_dom y m2)).
+(!(Map.in_dom y m1) <=> !(Map.in_dom y m2)) by [].
 
 
 lemma eq1 : forall (A <: Adv {BR,BR2,CPA,O}), 
@@ -179,7 +178,7 @@ lemma eq1 : forall (A <: Adv {BR,BR2,CPA,O}),
  bd_hoare[ A(O).a2 : true ==> true] = 1%r) =>
  equiv [ CPA(BR,A).main ~ CPA(BR2,A).main : 
 (glob A){1} = (glob A){2} ==>
- (!mem BR2.r O.sH){2} => res{1} = res{2}]
+ (!mem BR2.r O.sH){2} => res{1} = res{2}].
 proof.
  intros A HALossless.
  fun.
@@ -241,7 +240,7 @@ forall (A <: Adv {BR,BR2,CPA,O}),
  bd_hoare[ A(O).a2 : true ==> true] = 1%r) =>
 forall &m1 &m2, (glob A){m1} = (glob A){m2} =>
 Pr[CPA(BR,A).main() @ &m1: res] <=
-Pr[CPA(BR2,A).main() @ &m2 : res || mem BR2.r O.sH]
+Pr[CPA(BR2,A).main() @ &m2 : res || mem BR2.r O.sH].
 proof.
 intros A Hlossless &m1 &m2 Hglob.
 equiv_deno (_ : (glob A){1} = (glob A){2} ==>
@@ -258,13 +257,13 @@ forall (A <: Adv {BR,BR2,CPA,O}),
 forall &m,
 Pr[CPA(BR2,A).main() @ &m : res || mem BR2.r O.sH] <=
 Pr[CPA(BR2,A).main() @ &m : res ] + 
-Pr[CPA(BR2,A).main() @ &m :  mem BR2.r O.sH]
+Pr[CPA(BR2,A).main() @ &m :  mem BR2.r O.sH].
 proof.
 admit. (*wait for cesar *)
 save.
 
 lemma real_le_trans : forall(a, b, c : real),  
-      Real.(<=) a b => Real.(<=) b  c => a <= c.
+      Real.(<=) a b => Real.(<=) b  c => a <= c by [].
 
 lemma prob1_3 :
 forall (A <: Adv {BR,BR2,CPA,O}),
@@ -274,7 +273,7 @@ forall (A <: Adv {BR,BR2,CPA,O}),
 forall &m1 &m2, (glob A){m1} = (glob A){m2} =>
 Pr[CPA(BR,A).main() @ &m1: res] <=
 Pr[CPA(BR2,A).main() @ &m2 : res ] + 
-Pr[CPA(BR2,A).main() @ &m2 :  mem BR2.r O.sH]
+Pr[CPA(BR2,A).main() @ &m2 :  mem BR2.r O.sH].
 proof.
 intros A Hlossless &m1 &m2 Hglob.
 apply (real_le_trans 
@@ -320,7 +319,7 @@ lemma eq2 : forall (A <: Adv {BR2,BR3,CPA,O}),
  equiv [ CPA(BR2,A).main ~ CPA(BR3,A).main : 
 (glob A){1} = (glob A){2} ==>
  res{1} = res{2} /\ 
-O.sH{1} = O.sH{2} /\ BR2.r{1} = BR3.r{2}]
+O.sH{1} = O.sH{2} /\ BR2.r{1} = BR3.r{2}].
 proof.
 intros A Hlossless.
 fun.
@@ -369,7 +368,7 @@ forall (A <: Adv {BR2,BR3,CPA,O}),
  bd_hoare[ A(O).a2 : true ==> true] = 1%r) =>
 forall &m1 &m2, (glob A){m1} = (glob A){m2} => 
 Pr[CPA(BR2,A).main() @ &m1: res] =
-Pr[CPA(BR3,A).main() @ &m2 : res]
+Pr[CPA(BR3,A).main() @ &m2 : res].
 proof.
 intros A Hlossless &m1 &m2 Hglob.
 equiv_deno (_ : (glob A){1} = (glob A){2} ==> 
@@ -387,7 +386,7 @@ forall (A <: Adv {BR2,BR3,CPA,O}),
  bd_hoare[ A(O).a2 : true ==> true] = 1%r) =>
 forall &m1 &m2, (glob A){m1} = (glob A){m2} => 
 Pr[CPA(BR2,A).main() @ &m1: mem BR2.r O.sH] =
-Pr[CPA(BR3,A).main() @ &m2 : mem BR3.r O.sH]
+Pr[CPA(BR3,A).main() @ &m2 : mem BR3.r O.sH].
 proof.
 intros A Hlossless &m1 &m2 Hglob.
 equiv_deno (_ : (glob A){1} = (glob A){2} ==> 
@@ -435,7 +434,7 @@ lemma eq3 : forall (A <: Adv {BR3,CPA,CPA2,O}),
  equiv [ CPA(BR3,A).main ~ CPA2(BR3,A).main : 
 (glob A){1} = (glob A){2} ==>
  res{1} = res{2} /\ 
-O.sH{1} = O.sH{2} /\ BR3.r{1} = BR3.r{2}]
+O.sH{1} = O.sH{2} /\ BR3.r{1} = BR3.r{2}].
 proof.
 intros A Hlossless.
 fun.
@@ -479,7 +478,7 @@ lemma prob3_1 :
 (forall (O <: ARO),
  bd_hoare[ O.h_a : true ==> true] = 1%r =>
  bd_hoare[ A(O).a2 : true ==> true] = 1%r) =>
- bd_hoare[CPA2(BR3,A).main : true ==> res] = (1%r/2%r)
+ bd_hoare[CPA2(BR3,A).main : true ==> res] = (1%r/2%r).
 proof.
 intros A Hlossless.
 fun.
@@ -497,7 +496,7 @@ forall (A <: Adv {BR3,CPA,CPA2,O}),
  bd_hoare[ A(O).a2 : true ==> true] = 1%r) =>
 forall &m1 &m2, (glob A){m1} = (glob A){m2} => 
 Pr[CPA(BR3,A).main() @ &m1: res] =
-Pr[CPA2(BR3,A).main() @ &m2 : res]
+Pr[CPA2(BR3,A).main() @ &m2 : res].
 proof.
 intros A Hlossless &m1 &m2 Hglob.
 equiv_deno (_ : (glob A){1} = (glob A){2} ==> 
@@ -515,7 +514,7 @@ forall (A <: Adv {BR3,CPA,CPA2,O}),
  bd_hoare[ A(O).a2 : true ==> true] = 1%r) =>
 forall &m1 &m2, (glob A){m1} = (glob A){m2} => 
 Pr[CPA(BR3,A).main() @ &m1: mem BR3.r O.sH] =
-Pr[CPA2(BR3,A).main() @ &m2 : mem BR3.r O.sH]
+Pr[CPA2(BR3,A).main() @ &m2 : mem BR3.r O.sH].
 proof.
 intros A Hlossless &m1 &m2 Hglob.
 equiv_deno (_ : (glob A){1} = (glob A){2} ==> 
@@ -569,7 +568,7 @@ lemma eq4 : forall (A <: Adv {BR3,CPA2,O,BR_OW}),
  bd_hoare[ O.h_a : true ==> true] = 1%r =>
  bd_hoare[ A(O).a2 : true ==> true] = 1%r) =>
  equiv [ CPA2(BR3,A).main ~ OW(BR_OW(A)).main : 
-(glob A){1} = (glob A){2} ==> (mem BR3.r{1} O.sH{1} => res{2})]
+(glob A){1} = (glob A){2} ==> (mem BR3.r{1} O.sH{1} => res{2})].
 proof.
 intros A Hlossless.
 fun.
