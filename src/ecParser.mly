@@ -147,6 +147,7 @@
 %token CALL
 %token CASE
 %token CEQ
+%token CFOLD
 %token CHANGE
 %token CHECKPROOF
 %token CLAIM
@@ -1467,6 +1468,12 @@ phltactic:
 
 | SWAP info=plist1(loc(swap_info),COMMA)
     { Pswap info }
+
+| CFOLD s=side? c=codepos NOT n=NUM
+    { Pcfold (s, c, Some n) }
+
+| CFOLD s=side? c=codepos
+    { Pcfold (s, c, None) }
 
 | RND s=side? info=rnd_info
     { Prnd (s, info) }

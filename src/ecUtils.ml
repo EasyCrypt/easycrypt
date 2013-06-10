@@ -1,4 +1,9 @@
 (* -------------------------------------------------------------------- *)
+exception Unexpected
+
+let unexpected () = raise Unexpected
+
+(* -------------------------------------------------------------------- *)
 let tryexn (ignoreexn : exn -> bool) (f : unit -> 'a) =
   try  Some (f ())
   with e -> if ignoreexn e then None else raise e

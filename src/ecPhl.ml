@@ -1436,11 +1436,79 @@ let splitwhile_stmt b _env me i =
   | _ -> tacuerror "cannot find a while loop at given position"
 
 let t_splitwhile b env side cpos g =
-  let tr = fun side -> RN_hl_splitwhile (b,side, cpos) in
+  let tr = fun side -> RN_hl_splitwhile (b, side, cpos) in
     t_code_transform env side cpos tr (t_fold (splitwhile_stmt b)) g
 
 (* -------------------------------------------------------------------- *)
+let cfold_stmt env me olen zpr =
+  let error fmt =
+    Format.ksprintf (fun msg -> tacuerror "cfold: %s" msg) fmt
+  in
 
+  let (asgn, i, tl) =
+    match zpr.Zpr.z_tail with
+    | ({ i_node = Sasgn (lv, e) } as i) :: tl -> begin
+      let asgn =
+        match lv with
+        | LvMap _ -> error "left-value is a map assignment"
+        | LvVar (x, ty) -> [(x, ty, e)]
+        | LvTuple xs -> begin
+          match e.e_node with
+          | Etuple es -> List.map2 (fun (x, ty) e -> (x, ty, e)) xs es
+          | _ -> assert false
+        end
+      in
+        (asgn, i, tl)
+    end
+
+    | _ -> 
+        error "cannot find a left-value assignment at given position"
+  in
+
+  let (tl1, tl2) =
+    match olen with
+    | None      -> (tl, [])
+    | Some olen ->
+        if List.length tl < olen then
+          error "expecting at least %d instructions after assignment" olen;
+        List.take_n olen tl
+  in
+
+  List.iter
+    (fun (x, _, _) ->
+      if x.pv_kind <> PVloc then
+        error "left-values must be local variables")
+    asgn;
+
+  let wrs = is_write env EcPV.PV.empty tl1 in
+  let asg = List.fold_left
+              (fun pv (x, ty, _) -> EcPV.PV.add env x ty pv)
+              EcPV.PV.empty asgn
+  in
+
+  if not (EcPV.PV.disjoint env wrs asg) then
+    error "cannot cfold non read-only local variables";
+
+  let subst =
+    List.fold_left
+      (fun subst (x, _ty, e) ->
+         EcPV.PVM.add env x (fst me) e subst)
+      EcPV.PVM.empty asgn
+  in
+
+  let tl1 = PVM.issubst env (fst me) subst tl1 in
+
+  let zpr =
+    { zpr with Zpr.z_tail = tl1 @ (i :: tl2) }
+  in
+    (me, zpr, [])
+
+let t_cfold env side cpos olen g =
+  let tr = fun side -> RN_hl_cfold (side, cpos, olen) in
+  let cb = fun env _ me zpr -> cfold_stmt env me olen zpr in 
+    t_code_transform env side cpos tr (t_zip cb) g
+
+(* -------------------------------------------------------------------- *)
 let t_bdHoare_deno env pre post g =
   let concl = get_concl g in
   let cmp, f, bd =

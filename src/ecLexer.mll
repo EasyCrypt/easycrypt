@@ -68,6 +68,7 @@
     "case"        , CASE       ;        (* KW: tactic *)
     "rewrite"     , REWRITE    ;        (* KW: tactic *)
     "subst"       , SUBST      ;        (* KW: tactic *)
+    "cfold"       , CFOLD      ;        (* KW: tactic *)
     "field"       , FIELD      ;        (* KW: tactic *)
     "field_simplify", FIELDSIMP;        (* KW: tactic *)
 

@@ -299,6 +299,7 @@ type phltactic =
   | Prcond      of (bool option * bool * int)
   | Pcond       of tac_side
   | Pswap       of ((tac_side * swap_kind) located list)
+  | Pcfold      of (tac_side * codepos * int option)
   | Pinline     of pinline_arg
   | Pkill       of (tac_side * codepos * int option)
   | Prnd        of tac_side * pformula rnd_tac_info

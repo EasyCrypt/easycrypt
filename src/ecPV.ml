@@ -28,7 +28,7 @@ module PVM = struct
       else r
   end)
 
-  type subst = form M.t
+  type 'a subst = 'a M.t
 
   let empty = M.empty 
 
@@ -43,13 +43,13 @@ module PVM = struct
   let add_none env pv m f s =
     M.change (fun o -> if o = None then Some f else o) (pvm env pv m) s
 
-  let merge (s1:subst) (s2:subst) =
+  let merge (s1 : 'a subst) (s2 : 'a subst) =
     M.merge (fun _ o1 o2 -> if o2 = None then o1 else o2) s1 s2
 
   let find env pv m s =
     M.find (pvm env pv m) s
 
-  let subst env (s:subst) = 
+  let subst env (s : form subst) = 
     Hf.memo_rec 107 (fun aux f ->
       match f.f_node with
       | Fpvar(pv,m) -> 
@@ -62,15 +62,35 @@ module PVM = struct
       | FhoareF _ | FhoareS _ | FequivF _ | FequivS _ | Fpr _ -> assert false
       | _ -> EcFol.f_map (fun ty -> ty) aux f)
 
+  let rec esubst env me (s : expr subst) e =
+    match e.e_node with
+    | Evar pv -> (try find env pv me s with Not_found -> e)
+    | _ -> EcTypes.e_map (fun ty -> ty) (esubst env me s) e
+
+  let rec isubst env me (s : expr subst) (i : instr) =
+    let esubst = esubst env me s in
+    let ssubst = ssubst env me s in
+
+    match i.i_node with
+    | Sasgn  (lv, e)     -> i_asgn   (lv, esubst e)
+    | Srnd   (lv, e)     -> i_rnd    (lv, esubst e)
+    | Scall  (lv, f, es) -> i_call   (lv, f, List.map esubst es)
+    | Sif    (c, s1, s2) -> i_if     (esubst c, ssubst s1, ssubst s2)
+    | Swhile (e, stmt)   -> i_while  (esubst e, ssubst stmt)
+    | Sassert e          -> i_assert (esubst e)
+
+  and issubst env me (s : expr subst) (is : instr list) =
+    List.map (isubst env me s) is
+
+  and ssubst env me (s : expr subst) (st : stmt) =
+    stmt (issubst env me s st.s_node)
+
   let subst1 env pv m f = 
     let s = add env pv m f empty in
     subst env s
-      
 end
 
-  
 (* -------------------------------------------------------------------- *)
-
 module PV = struct 
   module M = EcMaps.Map.Make (struct
     (* We assume that the mpath are in normal form *)  
