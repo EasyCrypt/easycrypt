@@ -129,7 +129,6 @@
 %token ADD
 %token ADMIT
 %token ALIAS
-%token APP
 %token APPLY
 %token ARROW
 %token AS
@@ -241,6 +240,7 @@
 %token SAMPLE
 %token SAVE
 %token SEMICOLON
+%token SEQ
 %token SIMPLIFY
 %token SKIP
 %token SPLIT
@@ -1454,8 +1454,8 @@ phltactic:
 | FUN bad=sform p=sform q=sform? 
     { Pfun_upto(bad, p, q) }
 
-| APP d=tac_dir pos=code_position COLON p=sform f=app_bd_info
-   { Papp (d,pos, p,f) }
+| SEQ d=tac_dir pos=code_position COLON p=sform f=app_bd_info
+   { Papp (d, pos, p, f) }
 
 | WP n=code_position?
    { Pwp n }

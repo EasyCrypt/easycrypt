@@ -73,7 +73,7 @@
     "field_simplify", FIELDSIMP;        (* KW: tactic *)
 
     (* PHL: tactics *)
-    "app"         , APP        ;        (* KW: tactic *)
+    "seq"         , SEQ        ;        (* KW: tactic *)
     "wp"          , WP         ;        (* KW: tactic *)
     "skip"        , SKIP       ;        (* KW: tactic *)
     "call"        , CALL       ;        (* KW: tactic *)
