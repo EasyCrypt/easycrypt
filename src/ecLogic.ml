@@ -910,10 +910,10 @@ let t_assumption env g =
   let h = find_in_hyps env concl hyps in
   t_hyp env h g
     
-let t_progress env t_final g =
+let t_progress env tac g =
   let rec aux g = t_seq (t_simplify_nodelta env) aux0 g 
   and aux0 g = 
-    t_or (t_assumption env) aux1 g 
+    t_seq (t_try tac) aux1 g
   and aux1 g = 
     let hyps,concl = get_goal g in
     match concl.f_node with
@@ -927,8 +927,7 @@ let t_progress env t_final g =
     | Fapp({f_node = Fop(p,_)}, [f1;_]) when EcPath.p_equal p EcCoreLib.p_imp ->
       let id = LDecl.fresh_id hyps "H" in
       t_seq (t_intros_i env [id]) (aux2 id f1) g
-    | _ -> 
-      t_or (t_seq (t_split env) aux) t_final g
+    | _ -> t_try (t_seq (t_split env) aux) g
   and aux2 id f g = 
     let t1 = 
       match f.f_node with
