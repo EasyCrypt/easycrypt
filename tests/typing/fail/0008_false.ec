@@ -1,1 +1,1 @@
-lemma L : false.
+lemma L : false by [].

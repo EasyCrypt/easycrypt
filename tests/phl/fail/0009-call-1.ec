@@ -10,7 +10,7 @@ module M = {
 }.
 
 lemma foo : 
-  hoare [M.f : true ==> true]
+  hoare [M.f : true ==> true].
 proof.
  fun.
  call true true. 

@@ -1,3 +1,3 @@
-lemma foo : true
+lemma foo : true.
 proof.
  fun.

@@ -192,6 +192,9 @@ let rec process_swap1 env info g =
 let process_swap env info =
   t_lseq (List.map (process_swap1 env) info)
 
+let process_cfold env (side, cpos, olen) g =
+  t_cfold env side cpos olen g
+
 (* TODO move this *)
 let pat_all fs s =
   let rec aux_i i = 
@@ -491,6 +494,7 @@ let process_phl loc env ptac g =
     | Psplitwhile info         -> process_splitwhile env info
     | Pcall(side, (pre, post)) -> process_call env side pre post
     | Pswap info               -> process_swap env info
+    | Pcfold info              -> process_cfold env info
     | Pinline info             -> process_inline env info
     | Pkill info               -> process_kill env info
     | Palias info              -> process_alias env info

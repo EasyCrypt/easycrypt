@@ -14,7 +14,7 @@ module M1 = {
   }
 }.
 
-lemma test1 : hoare [M1.f : true ==> true]
+lemma test1 : hoare [M1.f : true ==> true].
 proof.
   fun.
   splitwhile (x<=5) : 3.
@@ -25,7 +25,7 @@ proof.
   wp; skip; trivial.
 save.
 
-lemma test2 : equiv [M1.f ~ M1.f : true ==> true]
+lemma test2 : equiv [M1.f ~ M1.f : true ==> true].
 proof.
   fun.
   splitwhile (x<=5) : {2} 3.

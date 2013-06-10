@@ -15,7 +15,8 @@ export Abs.
 theory Triangle.
 
   lemma triangular_inequality : forall (x:_,y:_,z:_),
-     `| x-y | <= `| x-z |  + `| y-z |.
+     `| x-y | <= `| x-z |  + `| y-z |
+  by [].
 
 end Triangle.
 

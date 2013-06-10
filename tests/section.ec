@@ -32,7 +32,7 @@ theory T.
 
  pred p (x1,x2:t,y1,y2:int) = x1 = x2 && y1 = y2. 
 
- lemma p_refl : forall (x:t,y:int), p(x,x,y,y). 
+ lemma p_refl : forall (x:t,y:int), p(x,x,y,y) by []. 
 
  axiom add_t_comm : forall (x,y:t), x + y = y + x. 
 

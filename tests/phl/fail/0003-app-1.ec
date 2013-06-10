@@ -7,7 +7,7 @@ module M = {
   }
 }.
 
-lemma foo : hoare [M.f : true ==> res = 1 /\ M.y = 1 ]
+lemma foo : hoare [M.f : true ==> res = 1 /\ M.y = 1 ].
 proof.
  fun.
  app 10 : (M.y = x).

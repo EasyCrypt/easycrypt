@@ -2,7 +2,7 @@ module M = {
   fun f (x:int) : int = { return x; }
 }.
 
-equiv foo1 : M.f ~ M.f : x{1} = x{1} ==> res{1} = res{1}
+equiv foo1 : M.f ~ M.f : x{1} = x{1} ==> res{1} = res{1}.
 proof.
  conseq (_ : x{1} = x{1} ==> res{1} = res{1}).
  intros &m1 &m2 h;apply h.
@@ -18,7 +18,7 @@ proof.
  fun;skip;intros &m1 &m2 h;apply h.
 save.
 
-equiv foo2 : M.f ~ M.f : x{1} = x{1} ==> res{1} = res{1}
+equiv foo2 : M.f ~ M.f : x{1} = x{1} ==> res{1} = res{1}.
 proof.
  fun.
  conseq (_ : x{1} = x{1} ==> x{1} = x{1}).

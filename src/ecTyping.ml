@@ -1609,16 +1609,19 @@ let transform_opt env ue pf tt =
             List.map2 doit1 args (fst fsig)
         in
         let memid = transmem env m in
-        let event = transf (EcEnv.Fun.prF fpath env) event in
-        f_pr memid fpath args event
+        let env = EcEnv.Fun.prF fpath env in
+        let event' = transf env event in
+        unify_or_fail env ue event.pl_loc event'.f_ty tbool;
+        f_pr memid fpath args event'
 
     | PFhoareF (pre, gp, post) ->
         let fpath = trans_gamepath env gp in
         let penv, qenv = EcEnv.Fun.hoareF fpath env in
-        let pre  = transf penv pre
-        and post = transf qenv post
-        in
-        f_hoareF pre fpath post
+        let pre'  = transf penv pre in
+        unify_or_fail penv ue pre.pl_loc pre'.f_ty tbool;
+        let post' = transf qenv post in
+        unify_or_fail qenv ue post.pl_loc post'.f_ty tbool;
+        f_hoareF pre' fpath post'
 
     | PFhoareS (pre, body, post) ->
         let symbols = ref Mstr.empty in
@@ -1633,30 +1636,36 @@ let transform_opt env ue pf tt =
         let clsubst = { EcTypes.e_subst_id with es_ty = su } in
         let stmt    = s_subst clsubst stmt in
         let (menv, env) = EcEnv.Fun.hoareS_anonym locals env in
-        let pre  = transf env pre in
-        let post = transf env post in
-        f_hoareS menv pre (EcModules.stmt (prelude @ stmt.s_node)) post
+        let pre' = transf env pre in
+        unify_or_fail env ue pre.pl_loc pre'.f_ty tbool;
+        let post' = transf env post in
+        unify_or_fail env ue post.pl_loc post'.f_ty tbool;
+        f_hoareS menv pre' (EcModules.stmt (prelude @ stmt.s_node)) post'
 
-    | PFBDhoareF (pre, gp, post, hcmp,bd) ->
+    | PFBDhoareF (pre, gp, post, hcmp, bd) ->
         let fpath = trans_gamepath env gp in
         let penv, qenv = EcEnv.Fun.hoareF fpath env in
-        let pre  = transf penv pre in
-        let post = transf qenv post in
+        let pre'  = transf penv pre in
+        unify_or_fail penv ue pre.pl_loc pre'.f_ty tbool;
+        let post' = transf qenv post in
+        unify_or_fail qenv ue post.pl_loc post'.f_ty tbool;
         let hcmp = 
           match hcmp with PFHle -> FHle | PFHeq -> FHeq | PFHge -> FHge
         in
         (* FIXME: check that there are not pvars in bd *)
-        let bd = transf env bd in
-        f_bdHoareF pre fpath post hcmp bd
+        let bd' = transf env bd in
+        unify_or_fail env ue bd.pl_loc bd'.f_ty treal;
+        f_bdHoareF pre' fpath post' hcmp bd'
 
-    | PFBDhoareS (pre, body, post, hcmp,bd) ->
+    | PFBDhoareS (pre, body, post, hcmp, bd) ->
         let symbols = ref Mstr.empty in
         let ue      = UE.create (Some []) in
         let hcmp = 
           match hcmp with PFHle -> FHle | PFHeq -> FHeq | PFHge -> FHge
         in
         (* FIXME: check that there are not pvars in bd *)
-        let bd = transf env bd in
+        let bd' = transf env bd in
+        unify_or_fail env ue bd.pl_loc bd'.f_ty treal;
         let (env, stmt, _re, prelude, locals) =
           let env = EcEnv.Fun.enter "$stmt" env in
             transbody ue symbols env tunit body (* FIXME: $stmt ? *)
@@ -1667,18 +1676,21 @@ let transform_opt env ue pf tt =
         let clsubst = { EcTypes.e_subst_id with es_ty = su } in
         let stmt    = s_subst clsubst stmt in
         let (menv, env) = EcEnv.Fun.hoareS_anonym locals env in
-        let pre  = transf env pre in
-        let post = transf env post in
-        f_bdHoareS menv pre (EcModules.stmt (prelude @ stmt.s_node)) post hcmp bd
-
+        let pre'  = transf env pre in
+        unify_or_fail env ue pre.pl_loc pre'.f_ty tbool;
+        let post' = transf env post in
+        unify_or_fail env ue post.pl_loc post'.f_ty tbool;
+        f_bdHoareS menv pre' (EcModules.stmt (prelude @ stmt.s_node)) post' hcmp bd'
 
     | PFequivF (pre, (gp1, gp2), post) ->
         let fpath1 = trans_gamepath env gp1 in
         let fpath2 = trans_gamepath env gp2 in
         let penv, qenv = EcEnv.Fun.equivF fpath1 fpath2 env in
-        let pre = transf penv pre in
-        let post = transf qenv post in
-        f_equivF pre fpath1 fpath2 post
+        let pre' = transf penv pre in
+        unify_or_fail penv ue pre.pl_loc pre'.f_ty tbool;
+        let post' = transf qenv post in
+        unify_or_fail qenv ue post.pl_loc post'.f_ty tbool;
+        f_equivF pre' fpath1 fpath2 post'
 
   and trans_fbind env ue decl = 
     let trans1 env (xs, pgty) =

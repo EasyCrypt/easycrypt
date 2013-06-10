@@ -2,7 +2,7 @@ module M = {
   fun f () : unit = { }
 }.
 
-lemma foo : hoare [M.f : true ==> true]
+lemma foo : hoare [M.f : true ==> true].
 proof.
  fun.
  skip.

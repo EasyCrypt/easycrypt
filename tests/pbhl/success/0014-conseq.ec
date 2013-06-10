@@ -4,7 +4,7 @@ module M = {
   fun f() : unit = {}
 }.
 
-lemma foo : bd_hoare [M.f : false ==> true] = 1%r
+lemma foo : bd_hoare [M.f : false ==> true] = 1%r.
 proof.
   conseq ( _: true ==> false).
   trivial.

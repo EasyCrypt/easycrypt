@@ -11,14 +11,14 @@ module M = {
   }
 }.
 
-lemma foo : hoare [M.f : true ==> res = 1 ]
+lemma foo : hoare [M.f : true ==> res = 1 ].
 proof.
  fun.
  wp.
  skip;intros _ _;split.
 save.
 
-lemma foo1 : hoare [M.f : true ==> res = 1 ]
+lemma foo1 : hoare [M.f : true ==> res = 1 ].
 proof.
  fun.
  wp 1.

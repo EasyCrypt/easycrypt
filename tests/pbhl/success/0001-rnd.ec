@@ -12,7 +12,7 @@ module M = {
   }
 }.
 
-lemma test: bd_hoare [ M.f : true ==> res] = (1%r/2%r)
+lemma test: bd_hoare [ M.f : true ==> res] = (1%r/2%r).
 proof.
 fun.
 rnd (1%r/2%r) (lambda (x:bool), x=y).
@@ -33,7 +33,7 @@ module F = {
   }
 }.
 
-lemma test2: bd_hoare [ F.f : true ==> res] = (1%r/2%r) proof.
+lemma test2: bd_hoare [ F.f : true ==> res] = (1%r/2%r). proof.
 fun.
 rnd (1%r) (lambda (x:bool), true).
 rnd (1%r/2%r) (lambda (x:bool), x).

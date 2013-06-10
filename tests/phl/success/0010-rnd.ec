@@ -10,7 +10,7 @@ module G = {
 }.
 
 lemma G_in_range:
-  hoare [ G.f : true ==> 0 <= res /\ res <= 10 ]
+  hoare [ G.f : true ==> 0 <= res /\ res <= 10 ].
 proof.
 fun;rnd;skip;trivial.
 save.
