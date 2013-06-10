@@ -356,7 +356,7 @@ let t_code_transform env side ?(bdhoare = false) cpos tr tx g =
         let pr, po   = hoare.bhs_pr, hoare.bhs_po in
         let (me, stmt, cs) = tx env cpos (pr, po) (hoare.bhs_m, hoare.bhs_s) in
         let concl = f_bdHoareS_r { hoare with bhs_m = me; bhs_s = stmt; } in
-          prove_goal_by (concl :: cs) (tr None) g
+          prove_goal_by (cs @ [concl]) (tr None) g
       else
         tacuerror "conclusion should be a hoare statement"
  end
@@ -372,7 +372,7 @@ let t_code_transform env side ?(bdhoare = false) cpos tr tx g =
         | true  -> f_equivS_r { es with es_ml = me; es_sl = stmt; }
         | false -> f_equivS_r { es with es_mr = me; es_sr = stmt; }
       in
-        prove_goal_by (concl :: cs) (tr (Some side)) g
+        prove_goal_by (cs @ [concl]) (tr (Some side)) g
 
 (* -------------------------------------------------------------------- *)
 (* -------------------------  Tactics --------------------------------- *)
