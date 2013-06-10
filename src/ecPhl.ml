@@ -1512,7 +1512,7 @@ let cfold_stmt env me olen zpr =
 let t_cfold env side cpos olen g =
   let tr = fun side -> RN_hl_cfold (side, cpos, olen) in
   let cb = fun env _ me zpr -> cfold_stmt env me olen zpr in 
-    t_code_transform env side cpos tr (t_zip cb) g
+    t_code_transform env ~bdhoare:true side cpos tr (t_zip cb) g
 
 (* -------------------------------------------------------------------- *)
 let t_bdHoare_deno env pre post g =
