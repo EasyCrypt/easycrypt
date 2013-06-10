@@ -10,7 +10,7 @@ module M2 = {
   fun m1_f (x : t) : t = {
     var r : t;
 
-    r := M1.f(x);
+    r  = M1.f(x);
     return r;
   }
 }.

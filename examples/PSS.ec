@@ -40,7 +40,7 @@ theory SignatureScheme.
     fun init():pkey = {
       var pk:pkey;
       S.init();
-      (pk,sk) := S.keygen();
+      (pk,sk)  = S.keygen();
       return pk; }
 
     fun wasQueried(m:bitstring):bool = { return mem m qs; }
@@ -50,7 +50,7 @@ theory SignatureScheme.
       if (cH < qH)
       {
         cH = cH + 1;
-        r := S.h(x);
+        r  = S.h(x);
       }
       return r;
     }
@@ -61,14 +61,14 @@ theory SignatureScheme.
       {
         cS = cS + 1;
         qs = add m qs;
-        r := S.sign(sk,m);
+        r  = S.sign(sk,m);
       }
       return r;
     }
 
     fun verify(pk:pkey, m:bitstring, s:bitstring):bool = {
       var b:bool;
-      b := S.verify(pk,m,s);
+      b  = S.verify(pk,m,s);
       return b;
     }
   }.
@@ -87,10 +87,10 @@ theory SignatureScheme.
       var s:bitstring;
       var forged:bool;
       var queried:bool;
-      pk := O.init();
-      (m,s) := A.a(pk);
-      forged := O.verify(pk,m,s);
-      queried := O.wasQueried(m);
+      pk  = O.init();
+      (m,s)  = A.a(pk);
+      forged  = O.verify(pk,m,s);
+      queried  = O.wasQueried(m);
       return forged /\ !queried;
     }
   }.
@@ -131,13 +131,13 @@ module PSS:SigScheme_ROM = {
 
   fun g1(x:bitstring):bitstring = {
     var r:bitstring;
-    r := g(x);
+    r  = g(x);
     return sub r 0 k0;
   }
 
   fun g2(x:bitstring):bitstring = {
     var r:bitstring;
-    r := g(x);
+    r  = g(x);
     return sub r k0 (k - k0 - k1 - 1);
   }
 
@@ -158,10 +158,10 @@ module PSS:SigScheme_ROM = {
     var y:bitstring;
 
     r = $Dbitstring.dbitstring(k0);
-    w := h(m || r);
-    rMask := g1(w);
+    w  = h(m || r);
+    rMask  = g1(w);
     maskedR = rMask ^^ r;
-    gamma := g2(w);
+    gamma  = g2(w);
     y = zeros(1) || w || maskedR || gamma;
     return (rsa' sk m); (* For fault injection, we will later refine this; we should make it a function so it can be reasoned about separately *)
   }
@@ -182,10 +182,10 @@ module PSS:SigScheme_ROM = {
     w = sub y 1 k1;
     maskedR = sub y (k1 + 1) k0;
     gamma = sub y (k1 + k0 + 1) (k - k1 - k0 - 1);
-    rMask := g1(w);
+    rMask  = g1(w);
     r = rMask ^^ maskedR;
-    w' := h(m || r);
-    gamma' := g2(w);
+    w'  = h(m || r);
+    gamma'  = g2(w);
     return (w = w' /\ gamma = gamma' /\ !b);
   }
 }.

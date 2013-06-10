@@ -41,7 +41,7 @@ module EF_Wrap_ROM(S:Scheme_ROM):EF_Oracles_ROM = {
   fun init():pkey = {
     var pk:pkey;
     S.init();
-    (pk,sk) := S.keygen();
+    (pk,sk)  = S.keygen();
     return pk;
   }
 
@@ -52,7 +52,7 @@ module EF_Wrap_ROM(S:Scheme_ROM):EF_Oracles_ROM = {
     if (cH < qH)
     {
       cH = cH + 1;
-      r := S.h(x);
+      r  = S.h(x);
     }
     return r;
   }
@@ -63,7 +63,7 @@ module EF_Wrap_ROM(S:Scheme_ROM):EF_Oracles_ROM = {
     {
       cS = cS + 1;
       qs = add m qs;
-      r := S.sign(sk,m);
+      r  = S.sign(sk,m);
     }
     return r;
   }
@@ -83,10 +83,10 @@ module EF_CMA(S:Scheme_ROM, Adv:Adversary_ROM) = {
     var s:bitstring;
     var forged:bool;
     var queried:bool;
-    pk := O.init();
-    (m,s) := A.a(pk);
-    forged := S.verify(pk,m,s);
-    queried := O.wasQueried(m);
+    pk  = O.init();
+    (m,s)  = A.a(pk);
+    forged  = S.verify(pk,m,s);
+    queried  = O.wasQueried(m);
     return forged /\ !queried;
   }
 }.

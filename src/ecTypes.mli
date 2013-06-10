@@ -154,6 +154,7 @@ val e_fv      : expr -> int EcIdent.Mid.t
 val e_ty      : expr -> ty
 
 (* -------------------------------------------------------------------- *)
+val e_tt       : expr
 val e_int      : int -> expr
 val e_local    : EcIdent.t -> ty -> expr
 val e_var      : prog_var -> ty -> expr

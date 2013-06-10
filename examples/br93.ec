@@ -74,11 +74,11 @@ module CPA(S : Scheme, A_ : Adv) = {
   var b' : bool;
   ARO.init();
   SO.init();
-  (pk,sk) := SO.kg();
-  (m0,m1) := A.a1(pk);
+  (pk,sk)  = SO.kg();
+  (m0,m1)  = A.a1(pk);
   b = $Dbool.dbool;
-  c := SO.enc(pk,b?m0:m1);
-  b':= A.a2(c);
+  c  = SO.enc(pk,b?m0:m1);
+  b' = A.a2(c);
   return b = b';
  } 
 }.
@@ -102,7 +102,7 @@ module BR(R : Oracle) : Scheme(R) = {
  
    fun enc(pk:pkey, m:plaintext): ciphertext = {
    var h : plaintext;
-   h := R.o(r);
+   h  = R.o(r);
    return ((f pk r) ||  Plaintext.(^^) m h);
  }
 }.
@@ -381,10 +381,10 @@ module CPA2(S : Scheme, A_ : Adv) = {
   var b' : bool;
   ARO.init();
   SO.init();
-  (pk,sk) := SO.kg();
-  (m0,m1) := A.a1(pk);
-  c := SO.enc(pk,b?m0:m1);
-  b':= A.a2(c);
+  (pk,sk)  = SO.kg();
+  (m0,m1)  = A.a1(pk);
+  c  = SO.enc(pk,b?m0:m1);
+  b' = A.a2(c);
   b = $Dbool.dbool;
   return b = b';
  } 
@@ -503,7 +503,7 @@ module OW(I :Inverter) ={
  var sk : skey;
   x = $uniform_rand;
   (pk,sk) = $keypairs;
-  x' := I.i(pk,(f pk x));
+  x'  = I.i(pk,(f pk x));
   return (x = x');
  }
 }.
@@ -518,9 +518,9 @@ module BR_OW(A_ : Adv) : Inverter = {
   var b : bool;
   var x : randomness;
   ARO.init();
-  (m0,m1) := A.a1(pk);
+  (m0,m1)  = A.a1(pk);
   h = $uniform; 
-  b := A.a2(y || h);
+  b  = A.a2(y || h);
   x = proj (Map.find (lambda p,f pk (Pair.fst p) = y) RO.m);
   return (x);
  }

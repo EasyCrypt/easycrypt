@@ -525,10 +525,16 @@ let transexp (env : EcEnv.env) (ue : EcUnify.unienv) e =
         let e2, ty2 = transexp penv pe2 in
         (e_let pt e1 e2, ty2)
 
-    | PEtuple es ->
+    | PEtuple es -> begin
         let tes = List.map (transexp env) es in
-        let es, tys = List.split tes in
-          (e_tuple es, ttuple tys)
+
+        match tes with
+        | []      -> (e_tt, EcTypes.tunit)
+        | [e, ty] -> (e, ty)
+        | _       ->
+            let es, tys = List.split tes in
+              (e_tuple es, ttuple tys)
+    end
 
     | PEif (pc, pe1, pe2) ->
       let c, tyc = transexp env pc in
@@ -1328,7 +1334,7 @@ and transinstr ue (env : EcEnv.env) (i : pinstr) =
         (fpath, args, fdef.f_sig.fs_ret)
   in
 
-  match i with
+  match i.pl_desc with
   | PSasgn (lvalue, rvalue) -> 
       let lvalue, lty = translvalue ue env lvalue in
       let rvalue, rty = transexp env ue rvalue in
@@ -1342,15 +1348,24 @@ and transinstr ue (env : EcEnv.env) (i : pinstr) =
       i_rnd(lvalue, rvalue)
 
   | PScall (None, name, args) ->
-      let (fpath, args, rty) = transcall name args in
+      let (fpath, args, rty) = transcall name (unloc args) in
       EcUnify.unify env ue tunit rty;
       i_call (None, fpath, args)
 
   | PScall (Some lvalue, name, args) ->
-      let lvalue, lty = translvalue ue env lvalue in
-      let (fpath, args, rty) = transcall name args in
-      EcUnify.unify env ue lty rty;
-      i_call (Some lvalue, fpath, args)
+      if EcEnv.Fun.lookup_opt (unloc name) env <> None then
+        let lvalue, lty = translvalue ue env lvalue in
+        let (fpath, args, rty) = transcall name (unloc args) in
+          EcUnify.unify env ue lty rty;
+          i_call (Some lvalue, fpath, args)
+      else
+        let fe   = mk_loc name.pl_loc (PEident (name, None)) in
+        let args = mk_loc args.pl_loc (PEtuple (unloc args)) in
+
+        let ope =
+          mk_loc (EcLocation.merge fe.pl_loc args.pl_loc) (PEapp (fe, [args]))
+        in
+          transinstr ue env (mk_loc i.pl_loc (PSasgn (lvalue, ope)))
 
   | PSif (e, s1, s2) ->
       let e, ety = transexp env ue e in

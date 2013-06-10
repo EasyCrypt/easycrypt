@@ -43,8 +43,8 @@ module DDH0 (D:DDH_DISTINGUISHER) = {
     var Z : group;
     var b : bool;
 
-    (X,Y,Z) := DH_distrs.sample_dh();
-    b := D.dist(X,Y,Z);
+    (X,Y,Z)  = DH_distrs.sample_dh();
+    b  = D.dist(X,Y,Z);
     
     return b;
   }     
@@ -58,8 +58,8 @@ module DDH1 (D:DDH_DISTINGUISHER) = {
     var Z : group;
     var b : bool;
 
-    (X,Y,Z) := DH_distrs.sample_random();
-    b := D.dist(X,Y,Z);
+    (X,Y,Z)  = DH_distrs.sample_random();
+    b  = D.dist(X,Y,Z);
     
     return b;
   }

@@ -7,7 +7,7 @@ fun f() : bool = {
 var c : bool;
 var r : bool;
 c = true;
-r := A.f();
+r  = A.f();
 return c = r;
 }
 }.
@@ -16,7 +16,7 @@ module M2(A:T) = {
 fun f() : bool = {
 var c : bool;
 var r : bool;
-r := A.f();
+r  = A.f();
 c = true;
 return c = r;
 }

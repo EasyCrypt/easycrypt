@@ -19,7 +19,7 @@ module type Adv = {
 module Test (A:Adv) = { 
   fun main(x:int) : int = { 
     var r : int;
-    r := A.a(x);
+    r  = A.a(x);
     return r;
   }
 }.
@@ -66,7 +66,7 @@ module G (B:Adv') = {
 
   fun main (x:int) : int = { 
     var r : int;
-    r := A1.a(x); 
+    r  = A1.a(x); 
     return r; 
   } 
 }.
@@ -95,7 +95,7 @@ save.
 module A' (O:IO) : Adv'(O) = { 
   fun a (x:int) : int = {
     var r : int;
-    r := O.h(x);
+    r  = O.h(x);
     return r;
   }
 }.
@@ -171,21 +171,21 @@ module CCA (H:Ihash, S:Ischeme, A:Iadv) = {
 
     fun hash (x:from) : to = { 
       var r : to;
-      r := H.hash(x);
+      r  = H.hash(x);
       hlog = x::hlog;
       return r;
     }
 
     fun dec1 (c:cipher) : message option = {
       var r : message option;
-      r := S.dec(sk, c);
+      r  = S.dec(sk, c);
       return r;
     }
 
     fun dec2 (c:cipher) : message option = {
       var r : message option;
       dec_log = c::dec_log;
-      r := S.dec(sk,c);
+      r  = S.dec(sk,c);
       return r;
     }      
   }
@@ -202,10 +202,10 @@ module CCA (H:Ihash, S:Ischeme, A:Iadv) = {
     H.init();
     hlog    = []
     dec_log = [];
-    (pk,sk) := S.gen();
-    (m1,m0) := A.a1(pk);
-    cs      := S.enc(pk, b ? m1 : m0);
-    b'      := A.a2(cs);
+    (pk,sk)  = S.gen();
+    (m1,m0)  = A.a1(pk);
+    cs       = S.enc(pk, b ? m1 : m0);
+    b'       = A.a2(cs);
     return b = b';
   }
     
