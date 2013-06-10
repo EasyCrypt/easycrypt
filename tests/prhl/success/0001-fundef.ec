@@ -18,7 +18,7 @@ module type T = {
 module M1(A:T) = {
   fun f() : bool = {
     var r : bool;
-    r := A.f();
+    r  = A.f();
     return r;
   }
 }.
@@ -26,7 +26,7 @@ module M1(A:T) = {
 module M2(A:T) = {
   fun f() : bool = {
     var r : bool;
-    r := A.f();
+    r  = A.f();
     return r;
   }
 }.

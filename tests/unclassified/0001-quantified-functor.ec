@@ -7,7 +7,7 @@ module G(X:I) = {
   fun f(): bool = {
     var b:bool;
     X.init(true);
-    b := X.get();
+    b  = X.get();
     return b;
   }
 }.

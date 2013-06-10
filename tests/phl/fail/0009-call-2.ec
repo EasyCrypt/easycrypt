@@ -9,7 +9,7 @@ module M = {
 
   fun g (w:int) : int = {
     var r : int;
-    r := f(w);
+    r  = f(w);
     return r;
   }
 }.

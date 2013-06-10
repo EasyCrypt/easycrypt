@@ -81,11 +81,11 @@ module PKE_CPA (S:PKE_Scheme, A:PKE_Adversary) = {
     var b  : bool;
     var b' : bool;
 
-    (pk,sk) := S.kg();
-    (m0,m1) := A.choose(pk);
+    (pk,sk)  = S.kg();
+    (m0,m1)  = A.choose(pk);
     b        = ${0,1};
-    c       := S.enc(pk, b ? m1 : m0);
-    b'      := A.guess(c);
+    c        = S.enc(pk, b ? m1 : m0);
+    b'       = A.guess(c);
     return (b' = b);
   } 
 }.
@@ -101,7 +101,7 @@ module Hashed_ElGamal (O:Oracle) : PKE_Scheme = {
     var y : int;
     var h : plaintext;
     y = $[0..q-1];
-    h := O.o(pk ^ y);
+    h  = O.o(pk ^ y);
     return (g ^ y, h ^^ m);
   }
 
@@ -110,7 +110,7 @@ module Hashed_ElGamal (O:Oracle) : PKE_Scheme = {
     var hm : bitstring;
     var h : bitstring;
     (gy, hm) = c; 
-    h := O.o(gy ^ sk);
+    h  = O.o(gy ^ sk);
     return h ^^ hm; 
   }
 }.
@@ -122,9 +122,9 @@ module PKE_Correctness (S:PKE_Scheme) = {
     var c  : ciphertext;
     var m' : plaintext;
 
-    (pk,sk) := S.kg();
-    c  := S.enc(pk, m);
-    m' := S.dec(sk, c); 
+    (pk,sk)  = S.kg();
+    c   = S.enc(pk, m);
+    m'  = S.dec(sk, c); 
     return (m' = m);
   }
 }.
@@ -141,7 +141,7 @@ module SCDH (B:SCDH_Adversary) = {
 
     x  = $[0..q-1]; 
     y  = $[0..q-1];
-    S := B.solve(g ^ x, g ^ y);
+    S  = B.solve(g ^ x, g ^ y);
     return (mem (g ^ (x * y)) S /\ Set.card S <= qH);
   }
 }.
@@ -166,11 +166,11 @@ module CPA (A_:Adv) = {
     var b' : bool;
 
     AO.init();
-    (pk,sk) := S.kg();
-    (m0,m1) := A.choose(pk);
+    (pk,sk)  = S.kg();
+    (m0,m1)  = A.choose(pk);
     b        = ${0,1};
-    c       := S.enc(pk, b ? m1 : m0);
-    b'      := A.guess(c);
+    c        = S.enc(pk, b ? m1 : m0);
+    b'       = A.guess(c);
     return (b' = b);
   }
 }. 
@@ -199,11 +199,11 @@ module G1 (A_:Adv) = {
    y = $[0..q-1];
     gx = g ^ x; 
     gxy = gx ^ y;
-    (m0,m1) := A.choose(gx);
+    (m0,m1)  = A.choose(gx);
     b = ${0,1};
     h = $uniform;
     c = (g ^ y, h ^^ (b ? m1 : m0));
-    b' := A.guess(c);
+    b'  = A.guess(c);
     return (b' = b);
   }
 }.
@@ -298,10 +298,10 @@ module G2 (A_:Adv) = {
     y = $[0..q-1];
     gx = g ^ x; 
     gxy = gx ^ y;
-    (m0,m1) := A.choose(gx);
+    (m0,m1)  = A.choose(gx);
     h = $uniform;
     c = (g ^ y, h);
-    b' := A.guess(c);
+    b'  = A.guess(c);
     b = ${0,1};
     return (b' = b);
   }
@@ -364,9 +364,9 @@ module SCDH_from_CPA (A_:Adv) : SCDH_Adversary = {
     var b' : bool;
 
     AO.init();
-    (m0,m1) := A.choose(gx);
+    (m0,m1)  = A.choose(gx);
     h = $uniform;
-    b' := A.guess((gy, h));
+    b'  = A.guess((gy, h));
     return ARO.log;
   }
 }.

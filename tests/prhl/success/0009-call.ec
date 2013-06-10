@@ -9,7 +9,7 @@ module M1 = {
 
   fun g (x:int) : int = {
     var r : int;
-    r := f(x);
+    r  = f(x);
     return r;
   }
 }.
@@ -24,7 +24,7 @@ module M2 = {
 
   fun g (w:int) : int = {
     var r : int;
-    r := f(w);
+    r  = f(w);
     return r;
   }
 }.

@@ -39,7 +39,7 @@ theory ROM.
       var y : to;
       if (Set.mem x log || Set.card log < qO) {
         log = Set.add x log;
-        y := RO.o(x); 
+        y  = RO.o(x); 
       }
       else { y = default; }
       return y;

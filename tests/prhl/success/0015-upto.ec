@@ -24,7 +24,7 @@ module RO = {
   fun hashA (x:int) : int = { 
     var r : int;
     logA  = add x logA;
-    r    := hash(x);
+    r     = hash(x);
     return r;
   }
 }.
@@ -40,8 +40,8 @@ module F1(A:Adv) = {
     var r : int;
     RO.mH    = Map.empty;
     RO.logA  = Set.empty;
-    h       := RO.hash(xs);
-    r       := A1.a(h);
+    h        = RO.hash(xs);
+    r        = A1.a(h);
     return r;
   }
 }.
@@ -57,7 +57,7 @@ module F2(A:Adv) = {
     RO.mH    = Map.empty;
     RO.logA  = Set.empty;
     h        = $[0..10];
-    r       := A1.a(h);
+    r        = A1.a(h);
     return r;
   }
 }.

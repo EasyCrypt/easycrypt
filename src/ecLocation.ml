@@ -48,6 +48,13 @@ let tostring (p : t) =
   in
     Printf.sprintf "%s: %s" p.loc_fname spos
 
+let merge (p1 : t) (p2 : t) =
+  { loc_fname = p1.loc_fname;
+    loc_start = min p1.loc_start p2.loc_start;
+    loc_end   = max p1.loc_end   p2.loc_end  ;
+    loc_bchar = min p1.loc_bchar p2.loc_bchar;
+    loc_echar = max p1.loc_echar p2.loc_echar; }
+
 (* -------------------------------------------------------------------- *)
 type 'a located = {
   pl_loc  : t;

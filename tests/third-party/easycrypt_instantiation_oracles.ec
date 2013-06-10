@@ -37,7 +37,7 @@ module Experiment(O1:Oracle, O2:Oracle, A:Adversary) = {
     (* Setup Phase *)
     O1.init(); O2.init();
     (* Adversary Call *)
-    b := A_.main();
+    b  = A_.main();
     return b;
   }
 }.
@@ -62,7 +62,7 @@ module F:Oracle = {
 
   fun o(x:t): group = {
     var y:group;
-    y := H.o(x);
+    y  = H.o(x);
     y = y ^ k;
     return y;
   }
