@@ -350,7 +350,7 @@ let t_code_transform env side ?(bdhoare = false) cpos tr tx g =
         let pr, po   = hoare.hs_pr, hoare.hs_po in
         let (me, stmt, cs) = tx env cpos (pr, po) (hoare.hs_m, hoare.hs_s) in
         let concl = f_hoareS_r { hoare with hs_m = me; hs_s = stmt; } in
-          prove_goal_by (concl :: cs) (tr None) g
+          prove_goal_by (cs @ [concl]) (tr None) g
       else if bdhoare && is_bdHoareS concl then
         let hoare    = destr_bdHoareS concl in
         let pr, po   = hoare.bhs_pr, hoare.bhs_po in
