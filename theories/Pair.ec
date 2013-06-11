@@ -18,6 +18,6 @@ theory Dprod.
   axiom mu_x_def: forall (d1:'a distr) (d2:'b distr) p, 
       mu_x (dprod d1 d2) p = mu_x d1 (fst p) * mu_x d2 (snd p).
 
-  axiom mu_weight: forall (d1:'a distr) (d2:'b distr), 
-     mu_weight (dprod d1 d2) = mu_weight d1 * mu_weight d2.
+  axiom weight_def: forall (d1:'a distr) (d2:'b distr), 
+     weight (dprod d1 d2) = weight d1 * weight d2.
 end Dprod.

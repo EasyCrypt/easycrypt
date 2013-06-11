@@ -28,7 +28,7 @@ axiom Set_ind: forall (P:('a set) cPred),
   (forall x S, !mem x S => P S => P (add x S)) =>
   forall S, P S.
 
-(* Extentional Equality *)
+(* Extensional Equality *)
 pred (==) (X1 X2:'a set) = forall (x:'a),
   mem x X1 <=> mem x X2.
 
@@ -113,6 +113,8 @@ axiom filter_cPeq_in: forall (x:'a) X,
 
 axiom filter_cPeq_card_in : forall (x:'a) X,
   mem x X => card (filter (cPeq x) X) = 1.
+
+axiom filter_cPtrue : forall (X:'a set), filter cPtrue X = X.
 
 lemma filter_subset: forall (P:'a cPred) X,
  filter P X <= X
@@ -342,61 +344,65 @@ theory Duni.
   axiom supp_def: forall (x:'a) X, in_supp x (duni X) <=> mem x X.
 
   axiom mu_def: forall (X:'a set) P, 
-    !is_empty X =>
-       mu (duni X) P = (card (filter P X))%r / (card X)%r. 
+    !is_empty X => mu (duni X) P = (card (filter P X))%r / (card X)%r. 
 
-  axiom mu_def_empty: forall (P:'a cPred), 
-      mu (duni empty) P = 0%r.
+  axiom mu_def_empty: forall (P:'a cPred), mu (duni empty) P = 0%r.
 
   axiom mu_x_def_in: forall (x:'a) X, 
     mem x X => mu_x (duni X) x = 1%r / (card X)%r. 
 
-  axiom mu_x_def_nin: forall (x:'a) X, 
+  axiom mu_x_def_notin: forall (x:'a) X, 
     !mem x X => mu_x (duni X) x = 0%r.
 
-  axiom mu_weight: forall (X:'a set), 
-     !is_empty X => mu_weight (duni X) = 1%r.
-
+  lemma weight_def: forall (X:'a set), 
+    weight (duni X) = if is_empty X then 0%r else 1%r.
+  proof.
+    intros X; case (is_empty X); intros H.
+    trivial. 
+    delta weight; simplify. 
+    rewrite (mu_def<:'a> X Fun.cPtrue _).
+    assumption.
+    rewrite (filter_cPtrue<:'a> X).
+    cut W: ((card X)%r <> 0%r); trivial.
+  qed.
 end Duni.
 
-(* Restriction of a distribution (sub-distribution) *)
+(** Restriction of a distribution (sub-distribution) *)
 theory Drestr.
   op drestr: 'a distr -> 'a set -> 'a distr.
  
   axiom supp_def: forall (x:'a) d X, 
-     in_supp x (drestr d X) <=> in_supp x d /\ !mem x X.
+    in_supp x (drestr d X) <=> in_supp x d /\ !mem x X.
   
   axiom mu_x_def_notin: forall (x:'a) d X, 
-    in_supp x d => !mem x X =>
-    mu_x (drestr d X) x = mu_x d x.
+    in_supp x d => !mem x X => mu_x (drestr d X) x = mu_x d x.
 
-  axiom mu_x_def_in: forall (x:'a) d X, 
-    in_supp x d => mem x X =>
-    mu_x (drestr d X) x = 0%r.
+  lemma mu_x_def_in: forall (x:'a) d X, 
+    in_supp x d => mem x X => mu_x (drestr d X) x = 0%r by [].
 
-  axiom mu_weight: forall (d:'a distr) X, 
-    mu_weight (drestr d X) = mu_weight d - mu d (cPmem X).
+  axiom weight_def: forall (d:'a distr) X, 
+    weight (drestr d X) = weight d - mu d (cPmem X).
 end Drestr.
 
-(* Scaled Restriction of a Distribution *)
+(** Scaled restriction of a distribution *)
 theory Dexcepted.
-  op (\) (d:'a distr,X:'a set): 'a distr =
-    Dscale.dscale (Drestr.drestr d X). 
+  op (\) (d:'a distr, X:'a set) : 'a distr = Dscale.dscale (Drestr.drestr d X).
 
-  lemma supp_def: forall (x:'a) d X,
-     (in_supp x (d \ X) => (in_supp x d /\ !mem x X)) /\
-     ((in_supp x d /\ !mem x X) => in_supp x (d \ X)).
+  lemma supp_def : forall (x:'a) d X,
+    (in_supp x (d \ X) => (in_supp x d /\ !mem x X)) /\
+    ((in_supp x d /\ !mem x X) => in_supp x (d \ X)).
   proof.
   intros d X x;split.
     intros in_supp;split;trivial.
     intros in_supp_nmem;trivial.
   save.
     
-  lemma mu_x_def: forall (x:'a) d X,
-     mu_x (d \ X) x = (in_supp x (d \ X)) ? mu_x d x / (mu_weight d - mu d (cPmem X)) : 0%r
+  lemma mu_x_def : forall (x:'a) d X,
+    mu_x (d \ X) x = 
+    (in_supp x (d \ X)) ? mu_x d x / (weight d - mu d (cPmem X)) : 0%r
   by [].
 
-  lemma mu_weight_def: forall (d:'a distr) X,
-    mu_weight (d \ X) = (mu_weight d = mu d (cPmem X)) ? 0%r : 1%r
+  lemma mu_weight_def : forall (d:'a distr) X,
+    weight (d \ X) = (weight d = mu d (cPmem X)) ? 0%r : 1%r
   by [].
 end Dexcepted.

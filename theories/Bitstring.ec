@@ -112,18 +112,27 @@ require import Distr.
 theory Dbitstring.
   op dbitstring: int -> bitstring distr.
 
-  axiom supp_def: forall (k:int, s:bitstring),
-    in_supp s (dbitstring k) <=> length s = k.
-
   axiom mu_x_def_in: forall (k:int, s:bitstring),
     length s = k => mu_x (dbitstring k) s = 1%r/(2^k)%r.
 
   axiom mu_x_def_other: forall (k:int, s:bitstring),
     length s <> k => mu_x (dbitstring k) s = 0%r.
 
-  axiom mu_weight_pos: forall (k:int), 0 <= k =>
-    mu_weight (dbitstring k) = 1%r.
+  lemma supp_def: forall (k:int, s:bitstring),
+    in_supp s (dbitstring k) <=> length s = k.
+  proof.
+    intros k s; delta in_supp mu; simplify; split; intros H.
+    trivial.
+    rewrite (mu_x_def_in k s _).
+    trivial.
+    cut H1: (0%r < (2 ^ k)%r); [trivial | ].
+    cut H2: (0%r < Real.one * inv (2 ^ k)%r).
+    rewrite <-(Real.Inverse (2 ^ k)%r _); trivial.
+    trivial.  
+  qed.     
 
-  axiom mu_weight_neg: forall (k:int), k < 0 =>
-    mu_weight (dbitstring k) = 0%r.
+  axiom weight_pos: forall (k:int), 0 <= k => weight (dbitstring k) = 1%r.
+
+  lemma mu_weight_neg: forall (k:int), k < 0 => weight (dbitstring k) = 0%r.
+
 end Dbitstring.

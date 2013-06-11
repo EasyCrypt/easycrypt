@@ -1,4 +1,4 @@
-require        Bool.
+require Bool.
 require import Int.
 
 op length: int.
@@ -106,12 +106,20 @@ require import Distr.
 
 (* Uniform distribution on fixed-length words *)
 theory Dword.
-  op dword: word distr.
+  op dword : word distr.
 
-  axiom supp_def: forall (w:word), in_supp w dword.
+  axiom mu_x_def : forall (w:word), mu_x dword w = 1%r / (2 ^ length)%r.
 
-  axiom mu_x_def: forall (w:word),
-    mu_x dword w = 1%r/(2^length)%r.
+  axiom lossless : weight dword = 1%r.
+  
+  lemma supp_def : forall (w:word), in_supp w dword.
+  proof.
+    intros w; delta in_supp; simplify.
+    rewrite (mu_x_def w).
+    cut H: (0%r < (2 ^ length)%r); [trivial | ].
+    cut H1: (0%r < Real.one * inv (2 ^ length)%r).
+    rewrite <-(Real.Inverse (2 ^ length)%r _); trivial.
+    trivial.  
+  qed.
 
-  axiom mu_weight_pos: mu_weight dword = 1%r.
 end Dword.
