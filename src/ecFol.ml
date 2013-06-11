@@ -1166,7 +1166,6 @@ let rec f_subst (s:f_subst) f =
       f_let lp' f1' f2'
   | Flocal id ->
       (try Mid.find id s.fs_loc with _ -> 
-        assert (not s.fs_freshen);
         let ty' = s.fs_ty f.f_ty in
         if f.f_ty == ty' then f else f_local id ty')
   | Fop(p,tys) ->
@@ -1275,7 +1274,11 @@ let f_subst_local x t =
 let f_subst_mem m1 m2 = 
   let s = f_bind_mem f_subst_id m1 m2 in
   fun f -> if Mid.mem m1 f.f_fv then f_subst s f else f
-  
+
+let f_subst_mod x mp =
+  let s = f_bind_mod f_subst_id x mp in
+  fun f -> if Mid.mem x f.f_fv then f_subst s f else f
+
 let f_subst s = 
   if is_subst_id s then identity
   else f_subst s 

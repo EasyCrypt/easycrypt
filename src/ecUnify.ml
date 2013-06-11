@@ -65,35 +65,44 @@ module UniEnv = struct
     ue.unidecl <- Suid.add uid ue.unidecl;
     tuni uid
 
-  let init_freshen ue params tvi = 
-    let ue = copy ue in
+  let freshen_ue ue params tvi = 
     let s = 
       match tvi with
       | None -> 
-          List.fold_left (fun s v -> Mid.add v (fresh_uid ue) s) 
+          List.fold_left
+            (fun s v -> Mid.add v (fresh_uid ue) s) 
             Mid.empty params 
+
       | Some (TVIunamed lt) ->
-          List.fold_left2 (fun s v t -> Mid.add v t s) Mid.empty params lt
-      | Some(TVInamed l) ->
-          List.fold_left (fun s v ->
+          List.fold_left2
+            (fun s v t -> Mid.add v t s) Mid.empty params lt
+
+      | Some (TVInamed l) ->
+          let for1 s v =
             let t = try List.assoc (EcIdent.name v) l with _ -> fresh_uid ue in
-            Mid.add v t s) Mid.empty params in
-    ue, Tvar.subst s
+              Mid.add v t s
+          in
+            List.fold_left for1 Mid.empty params
+    in
+      s
     
   let subst_tv subst params = 
     List.map (fun tv -> subst (tvar tv)) params
 
   let freshen ue params tvi ty = 
-    let ue, subst = init_freshen ue params tvi in
-    ue, subst ty, subst_tv subst params
+    let ue = copy ue in
+    let subst = Tvar.subst (freshen_ue ue params tvi) in
+      (ue, subst ty, subst_tv subst params)
 
   let freshendom ue params tvi dom = 
-    let ue, subst = init_freshen ue params tvi in
-    ue, List.map subst dom, subst_tv subst params
+    let ue = copy ue in
+    let subst = Tvar.subst (freshen_ue ue params tvi) in
+      (ue, List.map subst dom, subst_tv subst params)
 
   let freshensig ue params tvi (dom, codom) = 
-    let ue, subst = init_freshen ue params tvi in
-    ue, (List.map subst dom, subst codom), subst_tv subst params
+    let ue = copy ue in
+    let subst = Tvar.subst (freshen_ue ue params tvi) in
+      (ue, (List.map subst dom, subst codom), subst_tv subst params)
 
   let restore ~(dst:unienv) ~(src:unienv) =
     dst.unival <- src.unival;
@@ -126,7 +135,11 @@ module UniEnv = struct
           Muid.add id t
             (Muid.map (Tuni.subst1 (id, t)) uv)
 
-  let close (ue:unienv) =
+  let closed (ue : unienv) =
+    let diff = Muid.diff (fun _ _ _ -> None) ue.unidecl ue.unival in
+      Muid.is_empty diff
+
+  let close (ue : unienv) =
     let diff = Muid.diff (fun _ _ _ -> None) ue.unidecl ue.unival in
     if not (Muid.is_empty diff) then 
       raise (UninstanciateUni (fst (Muid.choose diff)));

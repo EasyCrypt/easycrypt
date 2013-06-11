@@ -5,7 +5,6 @@ open EcFol
 open EcEnv
 
 module PVM = struct
-
   type mem_sel = 
   | MSvar of prog_var
   | MSmod of EcPath.mpath (* Only abstract module *)
@@ -208,6 +207,5 @@ module PV = struct
       assert (disjoint_g env mp top) in
     M.iter check_v fv.pv;
     let check_m m = assert (disjoint_g env mp m) in
-    EcPath.Sm.iter check_m fv.glob 
-
+    EcPath.Sm.iter check_m fv.glob
 end
