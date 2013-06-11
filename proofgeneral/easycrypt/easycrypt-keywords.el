@@ -1,4 +1,4 @@
-; Generated on Mon Jun 10 18:53:10 2013
+; Generated on Tue Jun 11 16:51:19 2013
 
 (defvar easycrypt-dangerous-keywords '(
   "admit"
@@ -98,7 +98,7 @@
   "cfold"
   "field"
   "field_simplify"
-  "app"
+  "seq"
   "wp"
   "skip"
   "call"
