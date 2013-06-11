@@ -1287,6 +1287,13 @@ let _inline env hyps me sp s =
   let me, s = inline_s me sp s.s_node in
   me, stmt s 
 
+let t_inline_bdHoare env sp g =
+  let hyps,concl = get_goal g in
+  let hoare      = destr_bdHoareS concl in
+  let (me, stmt) = _inline env hyps hoare.bhs_m sp hoare.bhs_s in
+  let concl      = f_bdHoareS_r { hoare with bhs_m = me; bhs_s = stmt; } in
+  prove_goal_by [concl] (RN_hl_inline (None, sp)) g
+
 let t_inline_hoare env sp g =
   let hyps,concl = get_goal g in
   let hoare      = destr_hoareS concl in

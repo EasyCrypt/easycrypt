@@ -246,8 +246,15 @@ let rec process_inline_all env side fs g =
         else t_seq
                (t_inline_hoare env sp)
                (process_inline_all env side fs) g
+  | FbdHoareS bhs, None ->
+      let sp = pat_all fs bhs.bhs_s in
+      if   sp = []
+      then t_id None g
+      else t_seq
+        (t_inline_bdHoare env sp)
+        (process_inline_all env side fs) g
 
-  | _, _ -> assert false (* FIXME error message *)
+  | _, _ -> cannot_apply "inline" "Wrong parameters or phl/prhl judgement not found" 
   
 let pat_of_occs cond occs s =
   let occs = ref occs in
@@ -475,14 +482,14 @@ let process_fun_abs env inv g =
   
 let process_fun_upto env (bad, p, o) g =
   let env' = EcEnv.Fun.inv_memenv env in 
-  let p = process_prhl_formula env' g p in
+  let p = process_formula env' g p in
   let q = 
     match o with
     | None -> EcFol.f_true
-    | Some q -> process_prhl_formula env' g q in
+    | Some q -> process_formula env' g q in
   let bad = 
     let env =  EcEnv.Memory.push_active (EcFol.mhr,None) env in
-    process_prhl_formula env g bad in
+    process_formula env g bad in
   t_equivF_abs_upto env bad p q g
 
 
