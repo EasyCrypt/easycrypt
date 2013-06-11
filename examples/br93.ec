@@ -26,6 +26,10 @@ type plaintext = Plaintext.word.
 type ciphertext = Ciphertext.word.
 type randomness = Randomness.word.
 
+import Plaintext.
+import Ciphertext.
+import Randomness.
+
 type pkey.
 type skey.
 op keypairs: (pkey * skey) distr.
@@ -81,7 +85,7 @@ module CPA(S : Scheme, A_ : Adv) = {
 }.
 
 op (||) (x : randomness, y : plaintext) : ciphertext =
- Ciphertext.from_array ((Randomness.to_array x) || (Plaintext.to_array y)).
+ Ciphertext.from_array ((to_array x) || (to_array y)).
 
 module BR(R : Oracle) : Scheme(R) = {
  var r : randomness
@@ -98,7 +102,7 @@ module BR(R : Oracle) : Scheme(R) = {
  fun enc(pk:pkey, m:plaintext): ciphertext = {
   var h : plaintext;
   h  = R.o(r);
-  return ((f pk r) ||  Plaintext.(^^) m h);
+  return ((f pk r) ||   m ^^ h);
  }
 }.
 
@@ -120,7 +124,7 @@ module BR2(R : Oracle) : Scheme(R) = {
  fun enc(pk:pkey, m:plaintext): ciphertext = {
   var h : plaintext;
   h = $uniform; 
-  return ((f pk r) ||  Plaintext.(^^) m h);
+  return ((f pk r) || m ^^ h);
  }
 }.
 
@@ -224,7 +228,7 @@ proof.
  intros A Hlossless &m.
  equiv_deno (_ : (glob A){1} = (glob A){2} ==>
  !(mem BR2.r ARO.log){2} => res{1} = res{2}).
- apply (eq1(<:A)).
+ apply (eq1(<:A) _).
  assumption.
  trivial.
  trivial.
@@ -304,7 +308,7 @@ lemma eq2_enc :
  pk{1} = pk{2} /\ RO.m{1} = RO.m{2} /\ m{1} = m{2} /\ BR2.r{1} = BR3.r{2} ==>
  res{1} = res{2} /\ RO.m{1} = RO.m{2}].
  fun.
- rnd (lambda v, Plaintext.(^^) m{2} v)(lambda v, Plaintext.(^^) m{2} v);skip.
+ rnd (lambda v, m{2} ^^ v)(lambda v,m{2} ^^ v);skip.
  progress (trivial).
 save.
 
@@ -473,10 +477,6 @@ proof.
  cut H1 : (bd_hoare[CPA2(BR3,A).main : true ==> res] = (1%r / 2%r)).
  fun; rnd (1%r / 2%r) (lambda b, b = b'); simplify.
  admit.
- (* seq 5: (true).
- inline CPA2(BR3,A).SO.enc.
- wp. *)
- 
  bdhoare_deno H1; trivial.
 save.
 
