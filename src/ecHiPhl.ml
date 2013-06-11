@@ -361,8 +361,10 @@ let process_bdHoare_deno env info (_,n as g) =
         cmp, f, bd
       | Fapp({f_node = Fop(op,_)}, [bd;f]) when is_pr f 
           &&
-            (EcPath.p_equal op EcCoreLib.p_eq) ->
-        FHeq, f , bd
+          (EcPath.p_equal op EcCoreLib.p_eq || 
+             EcPath.p_equal op EcCoreLib.p_real_le ) ->
+        let cmp = if EcPath.p_equal op EcCoreLib.p_eq then FHeq else FHge in
+        cmp, f , bd
       | _ -> cannot_apply "bdHoare_deno" 
         "the conclusion is not a suitable Pr expression" in (* FIXME error message *) 
     let _,f,_,event = destr_pr f in
