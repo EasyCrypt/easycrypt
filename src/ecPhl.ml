@@ -1738,26 +1738,47 @@ let check_swap env s1 s2 =
   if not m1m2 then error ();
   if not m1r2 then error ()
 
+
+let swap_stmt env p1 p2 p3 s = 
+  let s = s.s_node in
+  let len = List.length s in
+  if not (1<= p1 && p1 < p2 && p2 <= p3 && p3 <= len) then
+    cannot_apply "swap" 
+      (Format.sprintf "invalid position, 1 <= %i < %i <= %i <= %i"
+         p1 p2 p3 len);
+  let hd,tl = List.take_n (p1-1) s in
+  let s12,tl = List.take_n (p2-p1) tl in
+  let s23,tl = List.take_n (p3-p2+1) tl in
+  check_swap env (stmt s12) (stmt s23);
+  stmt (List.flatten [hd;s23;s12;tl]) 
+
+let t_hoare_swap env p1 p2 p3 g =
+  let hyps, concl = get_goal g in
+  let hs    = destr_hoareS concl in
+  let env = tyenv_of_hyps env hyps in
+  let s = swap_stmt env p1 p2 p3 hs.hs_s in
+  let concl = f_hoareS_r {hs with hs_s = s } in
+  prove_goal_by [concl] (RN_hl_swap(None,p1,p2,p3)) g
+
+let t_bdHoare_swap env p1 p2 p3 g =
+  let hyps, concl = get_goal g in
+  let bhs    = destr_bdHoareS concl in
+  let env = tyenv_of_hyps env hyps in
+  let s = swap_stmt env p1 p2 p3 bhs.bhs_s in
+  let concl = f_bdHoareS_r {bhs with bhs_s = s } in
+  prove_goal_by [concl] (RN_hl_swap(None,p1,p2,p3)) g
+
 let t_equiv_swap env side p1 p2 p3 g =
-  let swap env s = 
-    let s = s.s_node in
-    let len = List.length s in
-    if not (1<= p1 && p1 < p2 && p2 <= p3 && p3 <= len) then
-      cannot_apply "swap" 
-        (Format.sprintf "invalid position, 1 <= %i < %i <= %i <= %i"
-           p1 p2 p3 len);
-    let hd,tl = List.take_n (p1-1) s in
-    let s12,tl = List.take_n (p2-p1) tl in
-    let s23,tl = List.take_n (p3-p2+1) tl in
-    check_swap env (stmt s12) (stmt s23);
-    stmt (List.flatten [hd;s23;s12;tl]) in
   let hyps, concl = get_goal g in
   let es    = destr_equivS concl in
   let env = tyenv_of_hyps env hyps in
   let sl,sr = 
-    if side then swap env es.es_sl, es.es_sr else es.es_sl, swap env es.es_sr in
+    if side 
+    then swap_stmt env p1 p2 p3 es.es_sl, es.es_sr 
+    else es.es_sl, swap_stmt env p1 p2 p3 es.es_sr 
+  in
   let concl = f_equivS_r {es with es_sl = sl; es_sr = sr } in
-  prove_goal_by [concl] (RN_hl_swap(side,p1,p2,p3)) g
+  prove_goal_by [concl] (RN_hl_swap(Some side,p1,p2,p3)) g
     
 (* -------------------------------------------------------------------- *)
 
