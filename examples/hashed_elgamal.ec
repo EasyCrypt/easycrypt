@@ -59,6 +59,7 @@ clone RandOrcl as RandOrcl_group with
 
 import RandOrcl_group.
 import ROM.
+import WRO_Set.
 
 module type PKE_Scheme = { 
   fun kg() : pkey * skey 
@@ -146,9 +147,9 @@ module SCDH (B:SCDH_Adversary) = {
   }
 }.
 
-module type Adv (O:Oracle) = {
-  fun choose(pk:pkey)     : plaintext * plaintext { O.o }
-  fun guess(c:ciphertext) : bool { O.o } 
+module type Adv (O:ARO) = {
+  fun choose(pk:pkey)     : plaintext * plaintext
+  fun guess(c:ciphertext) : bool
 }.
 
 module CPA (A_:Adv) = { 
@@ -209,7 +210,7 @@ module G1 (A_:Adv) = {
 }.
 
 lemma CPA_G1 (A <: Adv {CPA, G1, RO, ARO, Hashed_ElGamal}) :
-  (forall (O <: Oracle),
+  (forall (O <: ARO),
    bd_hoare[ O.o : true ==> true] = 1%r =>
    bd_hoare[ A(O).guess : true ==> true] = 1%r) =>
    equiv 
@@ -372,7 +373,7 @@ module SCDH_from_CPA (A_:Adv) : SCDH_Adversary = {
 }.
 
 lemma G2_SCDH (A <: Adv {CPA, G1, G2, SCDH, RO, ARO, Hashed_ElGamal}) :
-  (forall (O <: Oracle),
+  (forall (O <: ARO),
    bd_hoare[ O.o : true ==> true] = 1%r =>
    bd_hoare[ A(O).guess : true ==> true] = 1%r) =>
   equiv 
@@ -420,7 +421,7 @@ proof.
 save.
 
 lemma Pr_CPA_G1 (A <: Adv {CPA, G1, G2, SCDH, RO, ARO, Hashed_ElGamal}) &m : 
-  (forall (O <: Oracle),
+  (forall (O <: ARO),
    bd_hoare[ O.o : true ==> true] = 1%r =>
    bd_hoare[ A(O).guess : true ==> true] = 1%r) =>
   Pr[CPA(A).main() @ &m : res] <= 
@@ -434,7 +435,7 @@ proof.
 save.
 
 lemma Pr_G1_G1 (A <: Adv {CPA, G1, G2, SCDH, RO, ARO, Hashed_ElGamal}) &m : 
-  (forall (O <: Oracle),
+  (forall (O <: ARO),
    bd_hoare[ O.o : true ==> true] = 1%r =>
    bd_hoare[ A(O).guess : true ==> true] = 1%r) =>
   Pr[G1(A).main() @ &m : res \/ mem G1.gxy ARO.log] =
@@ -459,7 +460,7 @@ proof.
 save.
 
 lemma Pr_G2 (A <: Adv {CPA, G1, G2, SCDH, RO, ARO, Hashed_ElGamal}) &m : 
-  (forall (O <: Oracle),
+  (forall (O <: ARO),
    bd_hoare[ O.o : true ==> true] = 1%r =>
    bd_hoare[ A(O).guess : true ==> true] = 1%r) =>
   Pr[G2(A).main() @ &m : res] = 1%r / 2%r.
@@ -469,14 +470,14 @@ proof.
   fun; rnd (1%r / 2%r) (lambda b, b' = b); simplify.
   conseq (_ : true ==> true).
   trivial.
-  intros &m1 _.
+  intros &m1.
   cut W : (mu {0,1} (Fun.cPeq b'{m1}) = 1%r / 2%r); [trivial | assumption].
   admit.
   bdhoare_deno H1; trivial.
 save.
 
 lemma Pr_G2_SCDH (A <: Adv {CPA, G1, G2, SCDH, RO, ARO, Hashed_ElGamal}) &m : 
-  (forall (O <: Oracle),
+  (forall (O <: ARO),
    bd_hoare[ O.o : true ==> true] = 1%r =>
    bd_hoare[ A(O).guess : true ==> true] = 1%r) =>
   Pr[G2(A).main() @ &m : mem G2.gxy ARO.log] =
@@ -489,7 +490,7 @@ proof.
 save.
 
 lemma Reduction (A <: Adv {CPA, G1, G2, SCDH, RO, ARO, Hashed_ElGamal}) &m : 
-  (forall (O <: Oracle),
+  (forall (O <: ARO),
    bd_hoare[ O.o : true ==> true] = 1%r =>
    bd_hoare[ A(O).guess : true ==> true] = 1%r) =>
   Pr[CPA(A).main() @ &m : res] <=
@@ -510,7 +511,7 @@ proof.
 save.
 
 lemma Security (A <: Adv {CPA, G1, G2, SCDH, RO, ARO, Hashed_ElGamal}) &m :
-  (forall (O <: Oracle),
+  (forall (O <: ARO),
    bd_hoare[ O.o : true ==> true] = 1%r =>
    bd_hoare[ A(O).guess : true ==> true] = 1%r) =>
   exists (B<:SCDH_Adversary), 
@@ -524,8 +525,7 @@ proof.
   apply (aux 
     Pr[CPA(A).main() @ &m : res] 
     Pr[SCDH(SCDH_from_CPA(A)).main() @ &m : res] _).
-  apply (Reduction (<:A) &m _).
-  assumption.
+  apply (Reduction (<:A) &m _);assumption.
 save.
 
 lemma Correctness : 
