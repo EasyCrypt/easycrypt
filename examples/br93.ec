@@ -44,6 +44,7 @@ op default = Plaintext.zeros.
 
 import RandOrcl_BR.
 import ROM.
+import WRO_Set.
 
 module type Scheme(RO : Oracle) = {
  fun init(): unit 
@@ -51,9 +52,9 @@ module type Scheme(RO : Oracle) = {
  fun enc(pk:pkey, m:plaintext): ciphertext 
 }.
 
-module type Adv(ARO : Oracle)  = {
- fun a1 (p : pkey) : (plaintext * plaintext) {ARO.o}
- fun a2 (c : ciphertext) : bool {ARO.o}
+module type Adv(ARO : ARO)  = {
+ fun a1 (p : pkey) : (plaintext * plaintext)
+ fun a2 (c : ciphertext) : bool
 }.
 
 module CPA(S : Scheme, A_ : Adv) = {
@@ -145,7 +146,7 @@ proof.
 save.
 
 lemma eq1 : forall (A <: Adv {BR,BR2,CPA,RO,ARO}), 
-(forall (O <: Oracle),
+(forall (O <: ARO),
  bd_hoare[ O.o : true ==> true] = 1%r =>
  bd_hoare[ A(O).a2 : true ==> true] = 1%r) =>
  equiv [ CPA(BR,A).main ~ CPA(BR2,A).main : 
@@ -213,7 +214,7 @@ save.
 
 lemma prob1_1 :
  forall (A <: Adv {BR,BR2,CPA,RO,ARO}),
-(forall (O <: Oracle),
+(forall (O <: ARO),
  bd_hoare[ O.o : true ==> true] = 1%r =>
  bd_hoare[ A(O).a2 : true ==> true] = 1%r) =>
  forall &m ,
@@ -223,7 +224,7 @@ proof.
  intros A Hlossless &m.
  equiv_deno (_ : (glob A){1} = (glob A){2} ==>
  !(mem BR2.r ARO.log){2} => res{1} = res{2}).
- apply (eq1(<:A) _).
+ apply (eq1(<:A)).
  assumption.
  trivial.
  trivial.
@@ -260,7 +261,7 @@ lemma real_le_trans : forall(a, b, c : real),
 
 lemma prob1_3 :
  forall (A <: Adv {BR,BR2,CPA,RO,ARO}),
-(forall (O <: Oracle),
+(forall (O <: ARO),
  bd_hoare[ O.o : true ==> true] = 1%r =>
  bd_hoare[ A(O).a2 : true ==> true] = 1%r) =>
  forall &m,
@@ -308,7 +309,7 @@ lemma eq2_enc :
 save.
 
 lemma eq2 : forall (A <: Adv {BR2,BR3,CPA,RO,ARO}), 
-(forall (O <: Oracle),
+(forall (O <: ARO),
  bd_hoare[ O.o : true ==> true] = 1%r =>
  bd_hoare[ A(O).a2 : true ==> true] = 1%r) =>
  equiv [ CPA(BR2,A).main ~ CPA(BR3,A).main : 
@@ -356,7 +357,7 @@ save.
 
 lemma prob2_1 : 
  forall (A <: Adv {BR2,BR3,CPA,RO,ARO}), 
-(forall (O <: Oracle),
+(forall (O <: ARO),
  bd_hoare[ O.o : true ==> true] = 1%r =>
  bd_hoare[ A(O).a2 : true ==> true] = 1%r) =>
  forall &m,
@@ -374,7 +375,7 @@ save.
 
 lemma prob2_2 : 
  forall (A <: Adv {BR2,BR3,CPA,RO,ARO}), 
-(forall (O <: Oracle),
+(forall (O <: ARO),
  bd_hoare[ O.o : true ==> true] = 1%r =>
  bd_hoare[ A(O).a2 : true ==> true] = 1%r) =>
  forall &m,
@@ -414,7 +415,7 @@ module CPA2(S : Scheme, A_ : Adv) = {
 }.
 
 lemma eq3 : forall (A <: Adv {BR3,CPA,CPA2,RO,ARO}), 
-(forall (O <: Oracle),
+(forall (O <: ARO),
  bd_hoare[ O.o : true ==> true] = 1%r =>
  bd_hoare[ A(O).a2 : true ==> true] = 1%r) =>
  equiv [ CPA(BR3,A).main ~ CPA2(BR3,A).main : 
@@ -461,7 +462,7 @@ save.
 
 lemma prob3_1 : 
  forall (A <: Adv {CPA2,BR3,CPA,RO,ARO}), 
-(forall (O <: Oracle),
+(forall (O <: ARO),
  bd_hoare[ O.o : true ==> true] = 1%r =>
  bd_hoare[ A(O).a2 : true ==> true] = 1%r) =>
  forall &m,
@@ -482,7 +483,7 @@ save.
 
 lemma prob3_2 : 
  forall (A <: Adv {BR3,CPA,CPA2,RO,ARO}), 
-(forall (O <: Oracle),
+(forall (O <: ARO),
  bd_hoare[ O.o : true ==> true] = 1%r =>
  bd_hoare[ A(O).a2 : true ==> true] = 1%r) =>
  forall &m, 
@@ -500,7 +501,7 @@ save.
 
 lemma prob3_3 : 
  forall (A <: Adv {BR3,CPA,CPA2,RO,ARO}), 
-(forall (O <: Oracle),
+(forall (O <: ARO),
  bd_hoare[ O.o : true ==> true] = 1%r =>
  bd_hoare[ A(O).a2 : true ==> true] = 1%r) =>
  forall &m,
@@ -554,7 +555,7 @@ module BR_OW(A_ : Adv) : Inverter = {
 }.
 
 lemma eq4 : forall (A <: Adv {BR3,CPA2,RO,ARO,BR_OW}), 
-(forall (O <: Oracle),
+(forall (O <: ARO),
  bd_hoare[ O.o : true ==> true] = 1%r =>
  bd_hoare[ A(O).a2 : true ==> true] = 1%r) =>
  equiv [ CPA2(BR3,A).main ~ OW(BR_OW(A)).main : 
@@ -594,7 +595,7 @@ save.
 
 
 lemma Reduction (A <: Adv {CPA,CPA2, BR, BR2, BR3, OW, RO, ARO, BR_OW}) &m : 
-(forall (O <: Oracle),
+(forall (O <: ARO),
  bd_hoare[ O.o : true ==> true] = 1%r =>
  bd_hoare[ A(O).a2 : true ==> true] = 1%r) =>
 Pr[CPA(BR,A).main() @ &m : res] <=
@@ -631,7 +632,7 @@ save.
 
 
 lemma Conclusion (A <: Adv {CPA,CPA2, BR, BR2, BR3, OW, RO, ARO, BR_OW}) &m :
-(forall (O <: Oracle),
+(forall (O <: ARO),
  bd_hoare[ O.o : true ==> true] = 1%r =>
  bd_hoare[ A(O).a2 : true ==> true] = 1%r) =>
  exists (I<:Inverter), 
