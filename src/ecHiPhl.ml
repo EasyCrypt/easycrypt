@@ -461,14 +461,14 @@ let process_conseq env info (_, n as g) =
 let process_fun_abs env inv g =
   let concl = get_concl g in
   let env' = EcEnv.Fun.inv_memenv env in
-  if is_equivS concl then
-    let inv = process_prhl_formula env' g inv in
+  if is_equivF concl then
+    let inv = process_formula env' g inv in
     t_equivF_abs env inv g
-  else if is_bdHoareS concl then
-    let inv = process_phl_formula env' g inv in
+  else if is_bdHoareF concl then
+    let inv = process_formula env' g inv in
     t_bdHoareF_abs env inv g
-  else if is_hoareS concl then
-    let inv = process_phl_formula env' g inv in
+  else if is_hoareF concl then
+    let inv = process_formula env' g inv in
     t_hoareF_abs env inv g
   else
     cannot_apply "fun" "equiv or probabilistic hoare triple was expected"
