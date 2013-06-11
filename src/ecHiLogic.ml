@@ -508,7 +508,7 @@ let process_new_apply loc env pe g =
 
     | Some (`Module (mp, mt)),
       Some (`Forall (x, GTmodty (emt, restr), f)) ->
-        check_modtype_restr env mp mt emt restr;
+        check_modtype_restr lenv mp mt emt restr;
         (EcFol.f_subst_mod x mp f, `KnownMod (x, (mp, mt)))
 
     | _, _ -> invalid_arg ()
