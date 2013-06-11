@@ -58,9 +58,7 @@ module M(A:Adv) = {
 
 }.
 
-
-lemma foo : forall (A<:Adv),
-  hoare [M(A).g : true ==> true]
+lemma foo : forall (A<:Adv {M}), hoare [M(A).g : true ==> true].
 proof.
 intros A.
 fun.
