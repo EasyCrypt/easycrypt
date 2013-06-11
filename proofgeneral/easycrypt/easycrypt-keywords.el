@@ -1,4 +1,10 @@
-; Generated on Mon Jun 10 18:53:10 2013
+; Generated on Tue Jun 11 19:55:07 2013
+
+(defvar easycrypt-bytac-keywords '(
+  "assumption"
+  "trivial"
+  "by"
+))
 
 (defvar easycrypt-dangerous-keywords '(
   "admit"
@@ -70,15 +76,12 @@
   "same"
   "idtac"
   "try"
-  "by"
-  "assumption"
   "intros"
   "split"
   "left"
   "right"
   "elim"
   "apply"
-  "trivial"
   "progress"
   "cut"
   "generalize"
@@ -95,17 +98,22 @@
   "case"
   "rewrite"
   "subst"
-  "cfold"
   "field"
   "field_simplify"
-  "app"
+  "seq"
   "wp"
   "skip"
   "call"
   "rcondt"
   "rcondf"
   "swap"
+  "cfold"
   "rnd"
+  "bdhoare_deno"
+  "pr_bounded"
+  "pr_false"
+  "pr_or"
+  "bd_eq"
   "equiv_deno"
   "conseq"
   "inline"

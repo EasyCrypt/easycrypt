@@ -144,16 +144,37 @@
 (defconst easycrypt-indent-close-regexp
   (proof-regexp-alt (proof-ids-to-regexp easycrypt-keywords-indent-close) "\\s)"))
 
+(defface easycrypt-tactics-closing-face
+  (proof-face-specs
+   (:foreground "red")
+   (:foreground "red")
+   ())
+  "Face for names of closing tactics in proof scripts."
+  :group 'proof-faces)
+
+(defface easycrypt-tactics-dangerous-face
+  (proof-face-specs
+   (:background "red")
+   (:background "red")
+   ())
+  "Face for names of dangerous tactics in proof scripts."
+  :group 'proof-faces)
+
+(defconst easycrypt-tactics-closing-face 'easycrypt-tactics-closing-face)
+(defconst easycrypt-tactics-dangerous-face 'easycrypt-tactics-dangerous-face)
+
 (defvar easycrypt-font-lock-keywords
   (list
     (cons (proof-ids-to-regexp easycrypt-global-keywords)
-        'font-lock-keyword-face)
+          'font-lock-keyword-face)
     (cons (proof-ids-to-regexp easycrypt-tactic-keywords)
           'proof-tactics-name-face)
+    (cons (proof-ids-to-regexp easycrypt-bytac-keywords)
+          'easycrypt-tactics-closing-face)
     (cons (proof-ids-to-regexp easycrypt-dangerous-keywords)
-          'proof-tactics-name-face)
+          'easycrypt-tactics-dangerous-face)
     (cons (proof-ids-to-regexp easycrypt-prog-keywords)  
-        'font-lock-keyword-face)
+          'font-lock-keyword-face)
     (cons (concat easycrypt-operator-char-1234 "+")
           'font-lock-type-face)
     (cons easycrypt-other-symbols
