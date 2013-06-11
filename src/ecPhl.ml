@@ -728,7 +728,8 @@ let t_equiv_skip g =
   let concl = gen_mems [es.es_ml; es.es_mr] concl in
   prove_goal_by [concl] RN_hl_skip g
 
-let t_skip = t_hS_or_bhS_or_eS t_hoare_skip t_bdHoare_skip t_equiv_skip 
+let t_skip = 
+  t_hS_or_bhS_or_eS t_hoare_skip t_bdHoare_skip t_equiv_skip 
 
 (* -------------------------------------------------------------------- *)
 
@@ -1681,7 +1682,7 @@ let t_hoare_rcond b at_pos g =
   let hs = destr_hoareS concl in
   let m  = EcMemory.memory hs.hs_m in 
   let hd,e,s = gen_rcond b m at_pos hs.hs_s in
-  let concl1  = f_hoareS_r { hs with hs_s = hd; hs_po = e } in
+  let concl1  = f_hoareS_r { hs with (* hs_pr=pre1; *)hs_s = hd; hs_po = e } in
   let concl2  = f_hoareS_r { hs with hs_s = s } in
   prove_goal_by [concl1;concl2] (RN_hl_rcond (None, b,at_pos)) g  
 
@@ -1693,7 +1694,7 @@ let t_bdHoare_rcond b at_pos g =
   let bhs = destr_bdHoareS concl in
   let m  = EcMemory.memory bhs.bhs_m in 
   let hd,e,s = gen_rcond b m at_pos bhs.bhs_s in
-  let concl1  = f_bdHoareS_r { bhs with bhs_s = hd; bhs_po = e } in
+  let concl1  = f_bdHoareS_r { bhs with (* bhs_pr=pre1; *)bhs_s = hd; bhs_po = e } in
   let concl2  = f_bdHoareS_r { bhs with bhs_s = s } in
   prove_goal_by [concl1;concl2] (RN_hl_rcond (None, b,at_pos)) g  
 
@@ -1737,26 +1738,47 @@ let check_swap env s1 s2 =
   if not m1m2 then error ();
   if not m1r2 then error ()
 
+
+let swap_stmt env p1 p2 p3 s = 
+  let s = s.s_node in
+  let len = List.length s in
+  if not (1<= p1 && p1 < p2 && p2 <= p3 && p3 <= len) then
+    cannot_apply "swap" 
+      (Format.sprintf "invalid position, 1 <= %i < %i <= %i <= %i"
+         p1 p2 p3 len);
+  let hd,tl = List.take_n (p1-1) s in
+  let s12,tl = List.take_n (p2-p1) tl in
+  let s23,tl = List.take_n (p3-p2+1) tl in
+  check_swap env (stmt s12) (stmt s23);
+  stmt (List.flatten [hd;s23;s12;tl]) 
+
+let t_hoare_swap env p1 p2 p3 g =
+  let hyps, concl = get_goal g in
+  let hs    = destr_hoareS concl in
+  let env = tyenv_of_hyps env hyps in
+  let s = swap_stmt env p1 p2 p3 hs.hs_s in
+  let concl = f_hoareS_r {hs with hs_s = s } in
+  prove_goal_by [concl] (RN_hl_swap(None,p1,p2,p3)) g
+
+let t_bdHoare_swap env p1 p2 p3 g =
+  let hyps, concl = get_goal g in
+  let bhs    = destr_bdHoareS concl in
+  let env = tyenv_of_hyps env hyps in
+  let s = swap_stmt env p1 p2 p3 bhs.bhs_s in
+  let concl = f_bdHoareS_r {bhs with bhs_s = s } in
+  prove_goal_by [concl] (RN_hl_swap(None,p1,p2,p3)) g
+
 let t_equiv_swap env side p1 p2 p3 g =
-  let swap env s = 
-    let s = s.s_node in
-    let len = List.length s in
-    if not (1<= p1 && p1 < p2 && p2 <= p3 && p3 <= len) then
-      cannot_apply "swap" 
-        (Format.sprintf "invalid position, 1 <= %i < %i <= %i <= %i"
-           p1 p2 p3 len);
-    let hd,tl = List.take_n (p1-1) s in
-    let s12,tl = List.take_n (p2-p1) tl in
-    let s23,tl = List.take_n (p3-p2+1) tl in
-    check_swap env (stmt s12) (stmt s23);
-    stmt (List.flatten [hd;s23;s12;tl]) in
   let hyps, concl = get_goal g in
   let es    = destr_equivS concl in
   let env = tyenv_of_hyps env hyps in
   let sl,sr = 
-    if side then swap env es.es_sl, es.es_sr else es.es_sl, swap env es.es_sr in
+    if side 
+    then swap_stmt env p1 p2 p3 es.es_sl, es.es_sr 
+    else es.es_sl, swap_stmt env p1 p2 p3 es.es_sr 
+  in
   let concl = f_equivS_r {es with es_sl = sl; es_sr = sr } in
-  prove_goal_by [concl] (RN_hl_swap(side,p1,p2,p3)) g
+  prove_goal_by [concl] (RN_hl_swap(Some side,p1,p2,p3)) g
     
 (* -------------------------------------------------------------------- *)
 
@@ -1772,13 +1794,18 @@ let t_gen_cond env side e g =
   let m1,m2,h,h1,h2 = match LDecl.fresh_ids hyps ["&m";"&m";"_";"_";"_"] with
     | [m1;m2;h;h1;h2] -> m1,m2,h,h1,h2
     | _ -> assert false in
-  let t_introm = if side <> None then t_intros_i env [m1] else t_id None in
+  let t_introm = 
+    if side <> None then t_intros_i env [m1] else t_id None 
+  in
   let t_sub b g = 
     t_seq_subgoal (t_rcond side b 1)
       [ t_lseq [t_introm; t_skip;t_intros_i env ([m2;h]);
-                t_elim_hyp env h;
-                t_intros_i env [h1; h2]; t_hyp env h2];
-        t_id None] g in
+                t_or 
+                  (t_lseq [t_elim_hyp env h; t_intros_i env [h1; h2]; t_hyp env h2])
+                  (t_lseq [t_hyp env h])
+               ];
+        t_id None]
+      g in
   t_seq_subgoal (t_he_case e) [t_sub true; t_sub false] g
 
 let t_hoare_cond env g = 
@@ -2049,8 +2076,9 @@ let t_pror g =
   let concl = get_concl g in
   match concl.f_node with
     | Fapp({f_node=Fop(op1,_)},[{f_node=Fpr(m,f,ps,{f_node=Fapp({f_node=Fop(op2,_)},[p1;p2])})};bd])
-        when EcPath.p_equal op1 EcCoreLib.p_eq 
-          && EcPath.p_equal op2 EcCoreLib.p_or ->
+        when EcPath.p_equal op1 EcCoreLib.p_eq
+          && EcPath.p_equal op2 EcCoreLib.p_or
+      ->
       let pr1 = f_pr m f ps p1 in
       let pr2 = f_pr m f ps p2 in
       let pr12 = f_pr m f ps (f_and p1 p2) in
@@ -2059,7 +2087,7 @@ let t_pror g =
       let concl = f_eq pr bd in
       prove_goal_by [concl] RN_hl_pror g
     | _ -> 
-      cannot_apply "pr_op" "Pr[_ @ _ : _ && _ ] expression was expected"
+      cannot_apply "pr_op" "Pr[_ @ _ : _ \\/ _ ] expression was expected"
 
  
 

@@ -32,17 +32,13 @@ axiom from_array_get: forall bs i,
 lemma to_array_from_array: forall bs,
   from_array (to_array bs) = bs.
 proof.
-intros bs;
-  apply (extensionality<:bool> (from_array (to_array bs)) bs _);
-  trivial.
+intros bs; apply extensionality; trivial.
 save.
 
 lemma from_array_to_array: forall bs,
   to_array (from_array bs) = bs.
 proof.
-intros bs;
-  apply (Array.extensionality<:bool> (to_array (from_array bs)) bs _);
-  trivial.
+intros bs; apply Array.extensionality; trivial.
 save.
 
 (* Xor *)
@@ -74,9 +70,7 @@ axiom zeros_get: forall (l i:int),
 lemma xor_nilpotent: forall (bs:bitstring),
   bs ^^ bs = zeros (length bs).
 proof.
-intros bs;
-  apply (extensionality<:bool> (bs ^^ bs) (zeros (length bs)) _);
-  trivial.
+intros bs; apply extensionality; trivial.
 save.
 
 lemma xor_assoc : forall (x y z : bitstring), 
@@ -84,7 +78,7 @@ length(x) = length(y) => length(y) = length(z) =>
  (x ^^ y) ^^ z = x ^^ (y ^^ z).
 proof.
  intros x y z Hleq1 Hleq2.
- apply (extensionality<:bool>  ((x ^^ y) ^^ z) (x ^^ (y ^^ z)) _).
+ apply extensionality.
  delta (==);simplify.
  split;try trivial.
  delta (^^);simplify.
@@ -100,9 +94,7 @@ save.
 lemma xor_zeroes_neutral : forall (x : bitstring),
 x ^^ zeros(length(x)) = x.
 proof.
- intros x.
- apply (extensionality<:bool> (x^^ zeros(length x)) x _).
- trivial.
+ intros x; apply extensionality; trivial.
 save.
 
 require import Real.

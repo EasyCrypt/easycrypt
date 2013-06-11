@@ -1,9 +1,11 @@
 (* -------------------------------------------------------------------- *)
+open EcUidgen
 open EcParsetree
 open EcIdent
 open EcTypes
 open EcModules
 open EcFol
+open EcUnify
 
 (* -------------------------------------------------------------------- *)
 module Zipper : sig
@@ -102,4 +104,9 @@ end
 (* -------------------------------------------------------------------- *)
 exception MatchFailure
 
-val f_match : EcEnv.env -> form evmap -> ptn:form -> form -> form evmap
+val f_match :
+     EcEnv.env * EcBaseLogic.hyps
+  -> unienv * form evmap
+  -> ptn:form
+  -> form
+  -> unienv * ty Muid.t * form evmap

@@ -37,36 +37,31 @@ axiom xor_get: forall w0 w1 i,
 lemma xor_nilpotent: forall w,
   w ^^ w = zeros.
 proof.
-intros w;
-  apply (extensionality (w ^^ w) zeros _);
-  trivial.
+intros w; apply extensionality; trivial.
 save.
 
 lemma xor_commutative: forall w0 w1,
   w0 ^^ w1 = w1 ^^ w0.
 proof.
-intros w0 w1;
-  apply (extensionality (w0 ^^ w1) (w1 ^^ w0) _);
-  cut xorb_commute: (forall i, 0 <= i => i < length =>
-                      (w0 ^^ w1).[i] = (w1 ^^ w0).[i]);
-  trivial.
+intros w0 w1; apply extensionality.
+cut xorb_commute: (forall i, 0 <= i => i < length =>
+                    (w0 ^^ w1).[i] = (w1 ^^ w0).[i]);
+trivial.
 save.
 
 lemma xor_assoc : forall x y z, x ^^ (y ^^ z) = (x ^^ y) ^^ z.
 proof.
-  intros x y z.
-  apply (extensionality (x ^^ (y ^^ z)) ((x ^^ y) ^^ z) _).
+  intros x y z; apply extensionality.
   intros i Hge Hlt; trivial.
 save.
 
 lemma xor_zeros: forall w,
   w ^^ zeros = w.
 proof.
-intros w;
-  apply (extensionality (w ^^ zeros) w _);
-  cut xorb_zeros: (forall i, 0 <= i => i < length =>
-                    (w ^^ zeros).[i] = w.[i]);
-  trivial.
+intros w; apply extensionality.
+cut xorb_zeros: (forall i, 0 <= i => i < length =>
+                  (w ^^ zeros).[i] = w.[i]);
+trivial.
 save.
 
 (* TODO: Finish writing the conversions *)
@@ -88,17 +83,13 @@ lemma to_array_from_array: forall a,
   Array.length a = length =>
   to_array (from_array a) = a.
 proof.
-intros a Length;
-  apply (Array.extensionality<:bool> (to_array (from_array a)) a _);
-  trivial.
+intros a Length; apply Array.extensionality; trivial.
 save.
 
 lemma from_array_to_array: forall w,
   from_array (to_array w) = w.
 proof.
-intros w;
-  apply (extensionality (from_array (to_array w)) w _);
-  trivial.
+intros w; apply extensionality; trivial.
 save.
 
 require import Real.
