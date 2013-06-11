@@ -76,15 +76,6 @@ theory EuclDiv.
 end EuclDiv.
 export EuclDiv.
 
-(* Not sure we should use this one *)
-theory Power.
-  import why3 "int" "Power"
-    op "power" as "^".
-end Power.
-export Power.
-
-(* lemma test : forall (x:int), 0 <= x => 1 <= 2^x. *)
-
 theory Induction.
   axiom induction: forall (p:int -> bool),
     (p 0) =>
@@ -101,4 +92,22 @@ theory Induction.
       apply (Induction.induction (lambda i, forall k, k > 0 => k <= i => p k) _ _ i _);trivial.
   save.
 end Induction.
+
+(* Not sure we should use this one *)
+theory Power.
+  import why3 "int" "Power"
+    op "power" as "^".
+
+  lemma Power_pos : forall (x n:int), 0 <= n => 0 < x => 0 < x ^ n.
+  proof.
+    intros x n _ _.  
+    apply (Induction.induction (lambda n, 0 < x ^ n) _ _ n _).
+    trivial.
+    simplify; intros j _ _.
+    cut W: (x ^ j = x * (x ^ (j - 1))); trivial.
+    trivial.
+  qed.
+end Power.
+
+export Power.
 

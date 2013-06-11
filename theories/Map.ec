@@ -57,7 +57,10 @@ lemma upd_in_dom_neq: forall (m:('a,'b) map) x1 x2 y,
   x1 <> x2 => in_dom x2 m.[x1<-y] = in_dom x2 m
 by [].
 
-lemma dom_empty: dom (empty<:'a,'b>) = Set.empty by [].
+lemma dom_empty: dom (empty<:'a,'b>) = Set.empty<:'a>.
+proof.
+  apply (Set.extensionality<:'a> (dom empty<:'a,'b>) Set.empty _); trivial.
+qed.
 
 lemma in_dom_empty: forall x, !in_dom x empty<:'a, 'b> by [].
 
@@ -73,11 +76,11 @@ op rng: ('a,'b) map -> 'b Set.set.
 axiom rng_def: forall (m:('a,'b) map) y,
   Set.mem y (rng m) <=> (exists x, m.[x] = Some y).
 
-op in_rng(x:'b, m:('a,'b) map): bool = 
- Set.mem x (rng m).
+op in_rng(x:'b, m:('a,'b) map): bool = Set.mem x (rng m).
 
 (* Lemmas about range *)
-lemma upd_in_rng_eq: forall (m:('a,'b) map) x y1 y2, y1 = y2 => in_rng y1 (m.[x<-y2]) by [].
+lemma upd_in_rng_eq: 
+  forall (m:('a,'b) map) x y1 y2, y1 = y2 => in_rng y1 (m.[x<-y2]) by [].
 
 lemma in_dom_in_rng: forall (m:('a,'b) map) x,
   in_dom x m => in_rng (proj m.[x]) m.
@@ -102,7 +105,10 @@ proof.
   intros m x y H.
   apply Set.extensionality.
   intros z.
-  rewrite (rng_def<:'a,'b> m.[x <- y] z); split; intros _; trivial.
+  rewrite (Set.add_mem<:'b> z y (rng m)).  
+  rewrite (rng_def<:'a,'b> m.[x <- y] z); split; intros H1.
+  trivial.
+  elim H1; trivial.
 save.
 
 lemma upd_in_rng_neq: forall (m:('a,'b) map) x y1 y2,
@@ -246,8 +252,7 @@ lemma eqe_trans: forall (m1 m2 m3:('a,'b) map) x,
   eq_except m1 m3 x
 by [].
 
-lemma eqe_sym: forall (m:('a,'b) map) x,
-  eq_except m m x
+lemma eqe_refl: forall (m:('a,'b) map) x, eq_except m m x
 by [].
 
 lemma eqe_update_diff: forall (m1 m2:('a,'b) map) x1 x2 y,
