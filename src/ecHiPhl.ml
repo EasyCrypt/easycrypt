@@ -246,8 +246,15 @@ let rec process_inline_all env side fs g =
         else t_seq
                (t_inline_hoare env sp)
                (process_inline_all env side fs) g
+  | FbdHoareS bhs, None ->
+      let sp = pat_all fs bhs.bhs_s in
+      if   sp = []
+      then t_id None g
+      else t_seq
+        (t_inline_bdHoare env sp)
+        (process_inline_all env side fs) g
 
-  | _, _ -> assert false (* FIXME error message *)
+  | _, _ -> cannot_apply "inline" "Wrong parameters or phl/prhl judgement not found" 
   
 let pat_of_occs cond occs s =
   let occs = ref occs in
@@ -354,8 +361,10 @@ let process_bdHoare_deno env info (_,n as g) =
         cmp, f, bd
       | Fapp({f_node = Fop(op,_)}, [bd;f]) when is_pr f 
           &&
-            (EcPath.p_equal op EcCoreLib.p_eq) ->
-        FHeq, f , bd
+          (EcPath.p_equal op EcCoreLib.p_eq || 
+             EcPath.p_equal op EcCoreLib.p_real_le ) ->
+        let cmp = if EcPath.p_equal op EcCoreLib.p_eq then FHeq else FHge in
+        cmp, f , bd
       | _ -> cannot_apply "bdHoare_deno" 
         "the conclusion is not a suitable Pr expression" in (* FIXME error message *) 
     let _,f,_,event = destr_pr f in
@@ -475,14 +484,14 @@ let process_fun_abs env inv g =
   
 let process_fun_upto env (bad, p, o) g =
   let env' = EcEnv.Fun.inv_memenv env in 
-  let p = process_prhl_formula env' g p in
+  let p = process_formula env' g p in
   let q = 
     match o with
     | None -> EcFol.f_true
-    | Some q -> process_prhl_formula env' g q in
+    | Some q -> process_formula env' g q in
   let bad = 
     let env =  EcEnv.Memory.push_active (EcFol.mhr,None) env in
-    process_prhl_formula env g bad in
+    process_formula env g bad in
   t_equivF_abs_upto env bad p q g
 
 
