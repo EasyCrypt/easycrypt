@@ -64,9 +64,7 @@ lemma in_dom_empty: forall x, !in_dom x empty<:'a, 'b> by [].
 lemma dom_update: forall (m:('a,'b) map) x y,
   dom (m.[x <- y]) = Set.add x (dom m).
 proof.
-intros m x y;
-  apply (Set.extensionality<:'a> (dom (m.[x <- y])) (Set.add x (dom m)) _);
-  trivial.
+intros m x y; apply Set.extensionality; trivial.
 save.
 
 (** Formalization of map range *)
@@ -90,7 +88,7 @@ save.
 
 lemma rng_empty: rng (empty<:'a,'b>) = Set.empty.
 proof.
-  apply (Set.extensionality<:'b> (rng empty<:'a,'b>) Set.empty _).
+  apply Set.extensionality.
   intros x.
   rewrite (rng_def<:'a,'b> (Map_why.const_ None) x).
   split; intros _; trivial.
@@ -102,7 +100,7 @@ lemma rng_update_not_indom: forall (m:('a,'b) map) x y,
   !in_dom x m => rng (m.[x <- y]) = Set.add y (rng m).
 proof.
   intros m x y H.
-  apply (Set.extensionality<:'b> (rng (m.[x <- y])) (Set.add y (rng m)) _).
+  apply Set.extensionality.
   intros z.
   rewrite (rng_def<:'a,'b> m.[x <- y] z); split; intros _; trivial.
 save.
