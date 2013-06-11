@@ -1,24 +1,22 @@
-timeout 5.
-
 require import Int.
 require import Bool.
 require import Map.
 require import Set.
 require import Real.
-require import Logic.
+require Logic.
 require Word.
 require RandOrcl.
 
-op k : int.
+const k : int.
 
 clone Word as Bitstring with op length = k.
 
 type bitstring = Bitstring.word.
 type group.
 
-op g  : group.
-op q  : int.
-op qH : int.
+const g  : group.
+const q  : int.
+const qH : int.
 
 axiom q_pos  : 0 < q.
 axiom qH_pos : 0 < qH.
@@ -32,9 +30,9 @@ op (^) : group -> int -> group.
 
 op (^^) : bitstring -> bitstring -> bitstring = Bitstring.(^^).
 
-op zeros : bitstring = Bitstring.zeros.
-
 op uniform : bitstring distr = Bitstring.Dword.dword.
+
+const zeros : bitstring = Bitstring.zeros.
 
 axiom pow_mul : forall (x, y:int), (g ^ x) ^ y = g ^ (x * y).
 
@@ -42,7 +40,8 @@ lemma xor_absorb : forall (x:bitstring), x ^^ x = zeros by [].
 
 lemma xor_zeros : forall (x:bitstring), zeros ^^ x = x by [].
 
-lemma xor_assoc : forall (x, y, z:bitstring), x ^^ (y ^^ z) = (x ^^ y) ^^ z by [].
+lemma xor_assoc : forall (x, y, z:bitstring), x ^^ (y ^^ z) = (x ^^ y) ^^ z 
+by [].
 
 lemma uniform_total : forall (x:bitstring), Distr.in_supp x uniform by [].
 
@@ -81,11 +80,11 @@ module PKE_CPA (S:PKE_Scheme, A:PKE_Adversary) = {
     var b  : bool;
     var b' : bool;
 
-    (pk,sk)  = S.kg();
-    (m0,m1)  = A.choose(pk);
-    b        = ${0,1};
-    c        = S.enc(pk, b ? m1 : m0);
-    b'       = A.guess(c);
+    (pk,sk) = S.kg();
+    (m0,m1) = A.choose(pk);
+    b       = ${0,1};
+    c       = S.enc(pk, b ? m1 : m0);
+    b'      = A.guess(c);
     return (b' = b);
   } 
 }.
@@ -101,7 +100,7 @@ module Hashed_ElGamal (O:Oracle) : PKE_Scheme = {
     var y : int;
     var h : plaintext;
     y = $[0..q-1];
-    h  = O.o(pk ^ y);
+    h = O.o(pk ^ y);
     return (g ^ y, h ^^ m);
   }
 
@@ -110,7 +109,7 @@ module Hashed_ElGamal (O:Oracle) : PKE_Scheme = {
     var hm : bitstring;
     var h : bitstring;
     (gy, hm) = c; 
-    h  = O.o(gy ^ sk);
+    h        = O.o(gy ^ sk);
     return h ^^ hm; 
   }
 }.
@@ -122,9 +121,9 @@ module PKE_Correctness (S:PKE_Scheme) = {
     var c  : ciphertext;
     var m' : plaintext;
 
-    (pk,sk)  = S.kg();
-    c   = S.enc(pk, m);
-    m'  = S.dec(sk, c); 
+    (pk,sk) = S.kg();
+    c       = S.enc(pk, m);
+    m'      = S.dec(sk, c); 
     return (m' = m);
   }
 }.
@@ -139,10 +138,10 @@ module SCDH (B:SCDH_Adversary) = {
     var y : int;
     var S : group set;
 
-    x  = $[0..q-1]; 
-    y  = $[0..q-1];
-    S  = B.solve(g ^ x, g ^ y);
-    return (mem (g ^ (x * y)) S /\ Set.card S <= qH);
+    x = $[0..q-1]; 
+    y = $[0..q-1];
+    S = B.solve(g ^ x, g ^ y);
+    return (mem (g ^ (x * y)) S /\ card S <= qH);
   }
 }.
 
@@ -166,44 +165,44 @@ module CPA (A_:Adv) = {
     var b' : bool;
 
     AO.init();
-    (pk,sk)  = S.kg();
-    (m0,m1)  = A.choose(pk);
-    b        = ${0,1};
-    c        = S.enc(pk, b ? m1 : m0);
-    b'       = A.guess(c);
+    (pk,sk) = S.kg();
+    (m0,m1) = A.choose(pk);
+    b       = ${0,1};
+    c       = S.enc(pk, b ? m1 : m0);
+    b'      = A.guess(c);
     return (b' = b);
   }
 }. 
 
 module G1 (A_:Adv) = { 
-  module S = Hashed_ElGamal(RO)
+  module S  = Hashed_ElGamal(RO)
   module AO = ARO(RO)
-  module A = A_(AO)
+  module A  = A_(AO)
   
   var gxy : group
 
   fun main() : bool = {
-    var x : int;
-    var y : int;
+    var x  : int;
+    var y  : int;
     var gx : group;
     var m0 : plaintext;
     var m1 : plaintext;
-    var h : bitstring;
-    var z : bitstring;
+    var h  : bitstring;
+    var z  : bitstring;
     var b  : bool;
     var b' : bool;
-    var c : ciphertext;
+    var c  : ciphertext;
 
     AO.init();
-    x = $[0..q-1];
-   y = $[0..q-1];
-    gx = g ^ x; 
-    gxy = gx ^ y;
-    (m0,m1)  = A.choose(gx);
-    b = ${0,1};
-    h = $uniform;
-    c = (g ^ y, h ^^ (b ? m1 : m0));
-    b'  = A.guess(c);
+    x       = $[0..q-1];
+    y       = $[0..q-1];
+    gx      = g ^ x; 
+    gxy     = gx ^ y;
+    (m0,m1) = A.choose(gx);
+    b       = ${0,1};
+    h       = $uniform;
+    c       = (g ^ y, h ^^ (b ? m1 : m0));
+    b'      = A.guess(c);
     return (b' = b);
   }
 }.
@@ -245,7 +244,9 @@ proof.
   trivial.
   fun; inline RO.o; wp; if.
   trivial.
+  timeout 5.
   wp; rnd; wp; skip; trivial (* may timeout *).
+  timeout 2.
   wp; skip; trivial.
   skip; trivial.
 
@@ -267,10 +268,20 @@ proof.
   wp; skip; trivial.
 
   intros _ _; fun.
-  admit.
-  intros _; fun.
-  admit.
-
+  seq 0: (1 = 1).
+  skip; trivial.
+  if.
+  inline RO.o; wp.
+  rnd 1%r Fun.cPtrue.
+  wp; skip; trivial.
+  wp; skip; trivial.
+  
+  intros _; fun; if.
+  inline RO.o; wp.
+  rnd 1%r Fun.cPtrue.
+  wp; skip; trivial.
+  wp; skip; trivial.
+  
   inline RO.o; wp; rnd; wp; skip; trivial.
 save.
 
@@ -282,27 +293,27 @@ module G2 (A_:Adv) = {
   var gxy : group
 
   fun main() : bool = {
-    var x : int;
-    var y : int;
+    var x  : int;
+    var y  : int;
     var gx : group;
     var m0 : plaintext;
     var m1 : plaintext;
-    var h : bitstring;
-    var z : bitstring;
+    var h  : bitstring;
+    var z  : bitstring;
     var b  : bool;
     var b' : bool;
-    var c : ciphertext;
+    var c  : ciphertext;
 
     AO.init();
-    x = $[0..q-1];
-    y = $[0..q-1];
-    gx = g ^ x; 
-    gxy = gx ^ y;
+    x        = $[0..q-1];
+    y        = $[0..q-1];
+    gx       = g ^ x; 
+    gxy      = gx ^ y;
     (m0,m1)  = A.choose(gx);
-    h = $uniform;
-    c = (g ^ y, h);
-    b'  = A.guess(c);
-    b = ${0,1};
+    h        = $uniform;
+    c        = (g ^ y, h);
+    b'       = A.guess(c);
+    b        = ${0,1};
     return (b' = b);
   }
 }.
@@ -348,25 +359,25 @@ proof.
   *intros _; *split; [trivial | trivial | ].
   *intros _; *split; [trivial | trivial | ].
   *intros _; *split; [trivial | ].
-  intros _ res1 res2.   
-  elimT tuple2_ind res1; elimT tuple2_ind res2.
+  intros _ res1 res2.
+  elimT Logic.tuple2_ind res1; elimT Logic.tuple2_ind res2.
   *intros _; *split; trivial.
 save.
 
 module SCDH_from_CPA (A_:Adv) : SCDH_Adversary = {
   module AO = ARO(RO)
-  module A = A_(AO)
+  module A  = A_(AO)
 
   fun solve(gx:group, gy:group) : group set = {
     var m0 : plaintext;
     var m1 : plaintext;
-    var h : plaintext;
+    var h  : plaintext;
     var b' : bool;
 
     AO.init();
     (m0,m1)  = A.choose(gx);
-    h = $uniform;
-    b'  = A.guess((gy, h));
+    h        = $uniform;
+    b'       = A.guess((gy, h));
     return ARO.log;
   }
 }.
@@ -386,16 +397,14 @@ proof.
   rnd{1}; wp.  
   seq 9 8 : 
     ((glob A){1} = (glob A){2} /\ RO.m{1} = RO.m{2} /\ ARO.log{1} = ARO.log{2} /\
-    c{1} = (gy, h){2} /\ G2.gxy{1} = g ^ (x * y){2} /\
-    Set.card ARO.log{1} <= qH).
+    c{1} = (gy, h){2} /\ G2.gxy{1} = g ^ (x * y){2} /\ card ARO.log{1} <= qH).
   wp; rnd.
   call 
    ((glob A){1} = (glob A){2} /\ RO.m{1} = RO.m{2} /\ ARO.log{1} = ARO.log{2} /\
-    Set.card ARO.log{1} <= qH /\ pk{1} = pk{2})
+    card ARO.log{1} <= qH /\ pk{1} = pk{2})
    ((glob A){1} = (glob A){2} /\ RO.m{1} = RO.m{2} /\ ARO.log{1} = ARO.log{2} /\
-    Set.card ARO.log{1} <= qH /\ res{1} = res{2}).
-  fun (RO.m{1} = RO.m{2} /\ ARO.log{1} = ARO.log{2} /\ 
-    Set.card ARO.log{1} <= qH).
+    card ARO.log{1} <= qH /\ res{1} = res{2}).
+  fun (RO.m{1} = RO.m{2} /\ ARO.log{1} = ARO.log{2} /\ card ARO.log{1} <= qH).
   trivial.
   trivial.
   fun; inline RO.o; wp; if.
@@ -407,9 +416,9 @@ proof.
 
   call 
    ((glob A){1} = (glob A){2} /\ RO.m{1} = RO.m{2} /\ ARO.log{1} = ARO.log{2} /\
-    Set.card ARO.log{1} <= qH /\ c{1} = c{2})
-   (ARO.log{1} = ARO.log{2} /\ Set.card ARO.log{1} <= qH).
-  fun (RO.m{1} = RO.m{2} /\ ARO.log{1} = ARO.log{2} /\ Set.card ARO.log{1} <= qH).
+    card ARO.log{1} <= qH /\ c{1} = c{2})
+   (ARO.log{1} = ARO.log{2} /\ card ARO.log{1} <= qH).
+  fun (RO.m{1} = RO.m{2} /\ ARO.log{1} = ARO.log{2} /\ card ARO.log{1} <= qH).
   trivial.
   trivial.
   fun; inline RO.o; wp; if.
@@ -437,12 +446,36 @@ lemma Pr_G1_G1 (A <: Adv {CPA, G1, G2, SCDH, RO, ARO, Hashed_ElGamal}) &m :
   (forall (O <: Oracle),
    bd_hoare[ O.o : true ==> true] = 1%r =>
    bd_hoare[ A(O).guess : true ==> true] = 1%r) =>
-  Pr[G1(A).main() @ &m : res \/ mem G1.gxy ARO.log] =
+  Pr[G1(A).main() @ &m : res \/ mem G1.gxy ARO.log] <=
   Pr[G1(A).main() @ &m : res] + 
   Pr[G1(A).main() @ &m : mem G1.gxy ARO.log].
 proof.
   intros H. 
-  admit. (* union bound *)
+  apply (Real.Trans 
+    Pr[G1(A).main() @ &m : res \/ mem G1.gxy ARO.log]
+    (Pr[G1(A).main() @ &m : res] + 
+     Pr[G1(A).main() @ &m : mem G1.gxy ARO.log] -
+     Pr[G1(A).main() @ &m : res /\ mem G1.gxy ARO.log])
+    (Pr[G1(A).main() @ &m : res] + Pr[G1(A).main() @ &m : mem G1.gxy ARO.log]) 
+     _ _).
+  cut W: (forall (x y:real), x = y => x <= y).
+  trivial.
+  apply (W 
+    Pr[G1(A).main() @ &m : res \/ mem G1.gxy ARO.log]
+    (Pr[G1(A).main() @ &m : res{hr}] +
+     Pr[G1(A).main() @ &m : mem G1.gxy{hr} ARO.log{hr}] -
+     Pr[G1(A).main() @ &m : res{hr} /\ mem G1.gxy{hr} ARO.log{hr}]) _).
+  pr_or.
+  trivial.
+  cut W: (0%r <= Pr[G1(A).main() @ &m : res{hr} /\ mem G1.gxy{hr} ARO.log{hr}]).
+  trivial.
+  cut V: (forall (x y z:real), 0%r <= z => x + y - z <= x + y).
+  trivial.
+  apply (V 
+    Pr[G1(A).main() @ &m : res{hr}]
+    Pr[G1(A).main() @ &m : mem G1.gxy{hr} ARO.log{hr}]
+    Pr[G1(A).main() @ &m : res{hr} /\ mem G1.gxy{hr} ARO.log{hr}] _).
+  trivial.
 save.
 
 lemma Pr_G1_G2_res (A <: Adv {CPA, G1, G2, SCDH, RO, ARO, Hashed_ElGamal}) &m : 
@@ -469,7 +502,7 @@ proof.
   fun; rnd (1%r / 2%r) (lambda b, b' = b); simplify.
   conseq (_ : true ==> true).
   trivial.
-  intros &m1 _.
+  intros &m1.
   cut W : (mu {0,1} (Fun.cPeq b'{m1}) = 1%r / 2%r); [trivial | assumption].
   admit.
   bdhoare_deno H1; trivial.
