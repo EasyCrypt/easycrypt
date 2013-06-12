@@ -4,6 +4,121 @@
 \section{Installation}
 
 \section{Basic Example (Tutorial)}
+In this section we present a formalization of the proof of security
+against chosen plaintext attacks of a public key encryption scheme
+introduced by Bellare and Rogaway in 1993.
+
+This scheme is based on one-way trapdoor permutations and uses a
+random oracle. The proof of security follows by reduction: given an
+adversary against the chosen plaintext attack experiment that has
+access to the random oracle, there exists an inverter (making use of
+the adversary) that succeds in inverting the underlying trapdoor
+permutation with at least as much probability.
+
+While the proof of this scheme is not involved, it allows us to
+introduce several features of \EC both on the modelling and on
+the proving side.
+
+On the modelling side, we will describe how to define abstract operators
+and axioms; how to clone theories; how to define module types, modules
+and how to model adversaries as abstract procedures.
+
+On the proving side, we will explain how to perform reasoning up to
+failure; optimistic sampling and simple reasoning about probabilites
+of events in games.
+
+\subsection{Setting}
+We begin by introducing some basic concepts of cryptography and how we
+model them in \EC.
+
+\paragraph{Random oracles}
+A hash function in the random oracle is modelled as a consistent
+random function: new queries trigger samplings that are stored in a
+map; old queries trigger a map lookup.
+
+Adversaries normally have access to a wrapped version of the function
+that keeps track of the queries in a set and limits its number to a
+defined constant.
+
+In the \EC, a theory of random oracles is distributed as part of
+the standard library. The most basic form of random oracles, as it
+should be used in the definition of schemes is as follows:
+
+\begin{easycrypt}[label={lst:arrays}]{[Random Oracle]Basic definition of Random Oracle}
+type from.
+type to.
+
+op dsample : to distr. 
+op qO : int.           
+op default : to. 
+
+module type Oracle =
+{
+  fun init():unit
+  fun o(x:from):to
+}.
+
+theory ROM.
+  module RO:Oracle = {
+    var m : (from, to) map
+
+    fun init() : unit = {
+      m = empty;
+    }
+  
+    fun o(x:from) : to = {
+      var y : to;
+      y = $dsample;
+      if (!in_dom x m) m.[x] = y;
+      return proj (m.[x]);
+    }
+  }.
+end ROM.
+
+module type ARO = { fun o(x:from):to }.
+
+\end{easycrypt}
+% $ just for correct syntax highlighting
+This piece of code declares two abstract types \ec{from} and \ec{to}
+that represent the domain and codomain of the random oracle; a
+distribution \ec{dsample} of values of type \ec{to}, an integer
+\ec{qO} that represents a bound on the amount of calls allowed to an
+adversary and a default value \ec{default} that will be returned when
+an adversary querry fails.
+
+Afterwards, a module type \ec{Oracle} is defined that declares the
+interface that a random oracle will provide. Next, a module \ec{RO}
+implementing this interface is defined. It consists of a global
+variable \ec{m} that models the map of the random oracle; a function
+\ec{init} that initializes the map to \ec{empty} and the
+implementation of the actual oracle \ec{o}, that takes an argument
+\ec{x} of type \ec{from}, samples a value \ec{y} of type \ec{to},
+updates the value of the map in case it's necesary and finally returns the
+lookup of \ec{x} in the map \ec{m}.
+
+\ec{ARO} is a module type declaring the interface of the random oracle
+that will be provided to adversaries. According to the problem at hand
+we may want to limit the amounts of queries allowed, keep track of the
+set  or the sequence of queries performed. This functionalities can be
+combined in a seamless way making use of the definitions in the rest
+of the library. 
+
+This code is contained in file RandOrcl.ec. Each file defines a theory
+and theories can be cloned by making abstract operator definitions
+concrete. We will make use of cloning in order to define a Random
+Oracle of the appropriate type for the examples.
+
+
+
+\paragraph{Public key encryption}
+\paragraph{The \textsf{IND-CPA} experiment}
+\paragraph{One-way trapdoor permutations}
+\paragraph{The BR93 scheme}
+\paragraph{Security property}
+\subsection{Overview of the proof}
+
+\subsection{Easycrypt proof}
+
 
 %%% Local Variables: 
 %%% mode: latex
