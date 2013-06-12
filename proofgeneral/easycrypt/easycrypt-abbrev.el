@@ -1,7 +1,7 @@
 (require 'proof)
 (require 'easycrypt-syntax)
 
-(defpgdefault  menu-entries
+(defpgdefault menu-entries
   '(
     ["Use Three Panes" proof-three-window-toggle
       :style toggle
@@ -27,7 +27,5 @@
       :selected (and (boundp 'speedbar-frame) speedbar-frame)
       :help "Speedbar navigation window"]
 ))
-
-
 
 (provide 'easycrypt-abbrev)
