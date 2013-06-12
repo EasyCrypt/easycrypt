@@ -4,7 +4,10 @@ import why3 "bool" "Bool"
 lemma xorb_spec : forall b1 b2, b1 ^^ b2 <=> b1 = !b2
 by [].
 
-op xorb (b1 b2:bool) : bool = b1 ^^ b2.
+op xorb : bool -> bool -> bool = (^^).
+
+lemma xorb_associative : forall b1 b2 b3, (b1 ^^ b2) ^^ b3 = b1 ^^ (b2 ^^ b3)
+by [].
 
 require import Real. 
 require import Distr.
