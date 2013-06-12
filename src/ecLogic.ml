@@ -339,8 +339,8 @@ let t_rewrite_gen fpat env side f g =
     let x, body = fpat env hyps f concl in
     f_lambda [x,GTty f.f_ty] body in
   t_on_last
-    (t_apply_logic env p tys [AAform f1;AAform f2;AAform pred;AAnode;AAnode] g)
     (t_red env)
+    (t_apply_logic env p tys [AAform f1;AAform f2;AAform pred;AAnode;AAnode] g)
 
 let t_rewrite = t_rewrite_gen (pattern_form None)
 
@@ -531,7 +531,7 @@ let t_elim env f (juc,n) =
           let lemma = gen_eq_tuple_elim_lemma types in
           let proof = gen_eq_tuple_elim_proof env types in
           let gs = t_apply_form env lemma (args@[AAnode; AAnode]) (juc,n) in
-          t_on_first gs proof
+          t_on_first proof gs
         | _        -> aux_red f
       end
     | Fif(a1,a2,a3) ->
@@ -552,7 +552,7 @@ let t_elim env f (juc,n) =
 
 let t_elim_hyp env h g =
   let f = LDecl.lookup_hyp_by_id h (get_hyps g) in
-  t_on_first (t_elim env f g) (t_hyp env h)
+  t_on_first (t_hyp env h) (t_elim env f g)
 
 let t_or_intro b env g =
   let hyps, concl = get_goal g in
@@ -737,7 +737,7 @@ let t_split env g =
           let lemma = gen_split_tuple_lemma types in
           let proof = gen_split_tuple_proof env types in
           let gs = t_apply_form env lemma (args@nodes) g in
-          t_on_first gs proof
+          t_on_first proof gs
          | _ -> aux_red f
       end
     | Fif(f1,_f2,_f3) -> t_case env f1 g

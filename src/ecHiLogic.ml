@@ -239,7 +239,7 @@ let process_apply loc env pe (_,n as g) =
 let process_elim loc env pe (_,n as g) =
   let (juc,an), gs = process_mkn_apply process_formula env pe g in
   let (_,f) = get_node (juc, an) in
-  t_on_first (set_loc loc (t_elim env f) (juc,n)) (t_use env an gs)
+  t_on_first (t_use env an gs) (set_loc loc (t_elim env f) (juc,n))
 
 (* -------------------------------------------------------------------- *)
 let process_rewrite loc env (s,pe) (_,n as g) =
@@ -254,8 +254,9 @@ let process_trivial mkpv pi env g =
 (* -------------------------------------------------------------------- *)
 let process_cut name env phi g =
   let phi = process_formula env g phi in
-  t_on_last (t_cut env phi g)
+  t_on_last
     (process_intros env [lmap (fun x -> Some x) name])
+    (t_cut env phi g)
 
 (* -------------------------------------------------------------------- *)
 let process_generalize env l =

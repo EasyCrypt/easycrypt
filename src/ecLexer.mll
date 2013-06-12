@@ -37,21 +37,21 @@
     "hoare"       , HOARE      ;        (* KW: prog *)
     "bd_hoare"    , BDHOARE    ;        (* KW: prog *)
 
+    "try"         , TRY        ;        (* KW: tactical *)
+    "first"       , FIRST      ;        (* KW: tactical *)
+    "last"        , LAST       ;        (* KW: tactical *)
+    "do"          , DO         ;        (* KW: tactical *)
+
     "using"       , USING      ;        (* KW: tactic *)
     "compute"     , COMPUTE    ;        (* KW: tactic *)
     "same"        , SAME       ;        (* KW: tactic *)
     "idtac"       , IDTAC      ;        (* KW: tactic *)
-    "try"         , TRY        ;        (* KW: tactic *)
-    "by"          , BY         ;        (* KW: tactic *)
-
-    "assumption"  , ASSUMPTION ;        (* KW: tactic *)
     "intros"      , INTROS     ;        (* KW: tactic *)
     "split"       , SPLIT      ;        (* KW: tactic *)
     "left"        , LEFT       ;        (* KW: tactic *)
     "right"       , RIGHT      ;        (* KW: tactic *)
     "elim"        , ELIM       ;        (* KW: tactic *)
     "apply"       , APPLY      ;        (* KW: tactic *)
-    "trivial"     , TRIVIAL    ;        (* KW: tactic *)
     "progress"    , PROGRESS   ;        (* KW: tactic *)
     "cut"         , CUT        ;        (* KW: tactic *)
     "generalize"  , GENERALIZE ;        (* KW: tactic *)
@@ -68,9 +68,12 @@
     "case"        , CASE       ;        (* KW: tactic *)
     "rewrite"     , REWRITE    ;        (* KW: tactic *)
     "subst"       , SUBST      ;        (* KW: tactic *)
-    "cfold"       , CFOLD      ;        (* KW: tactic *)
     "field"       , FIELD      ;        (* KW: tactic *)
     "field_simplify", FIELDSIMP;        (* KW: tactic *)
+
+    "assumption"  , ASSUMPTION ;        (* KW: bytac *)
+    "trivial"     , TRIVIAL    ;        (* KW: bytac *)
+    "by"          , BY         ;        (* KW: bytac *)
 
     (* PHL: tactics *)
     "seq"         , SEQ        ;        (* KW: tactic *)
@@ -80,14 +83,14 @@
     "rcondt"      , RCONDT     ;        (* KW: tactic *)
     "rcondf"      , RCONDF     ;        (* KW: tactic *)
     "swap"        , SWAP       ;        (* KW: tactic *)
+    "cfold"       , CFOLD      ;        (* KW: tactic *)
     "rnd"         , RND        ;        (* KW: tactic *)
-    "bdhoare_deno", BDHOAREDENO;  
-    "pr_bounded"  , PRBOUNDED  ;  
-    "pr_false"    , PRFALSE    ;  
-    "pr_or"       , PROR       ;  
-    "bd_eq"       , BDEQ       ;  
+    "bdhoare_deno", BDHOAREDENO;        (* KW: tactic *)
+    "pr_bounded"  , PRBOUNDED  ;        (* KW: tactic *)
+    "pr_false"    , PRFALSE    ;        (* KW: tactic *)
+    "pr_or"       , PROR       ;        (* KW: tactic *)
+    "bd_eq"       , BDEQ       ;        (* KW: tactic *)
 
-    (* KW: tactic *) 
     "equiv_deno"  , EQUIVDENO  ;        (* KW: tactic *) 
     "conseq"      , CONSEQ     ;        (* KW: tactic *) 
     "inline"      , INLINE     ;        (* KW: tactic *)

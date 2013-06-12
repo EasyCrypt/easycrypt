@@ -112,7 +112,7 @@ module Theory : sig
 end
 
 module Tactics : sig
-  val process : scope -> ptactics -> scope
+  val process : scope -> ptactic list -> scope
 end
 
 module Prover : sig 

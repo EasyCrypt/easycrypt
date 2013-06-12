@@ -162,6 +162,7 @@
 %token DEBUG
 %token DELTA
 %token DLBRACKET
+%token DO
 %token DOT
 %token DOTDOT
 %token DROP
@@ -176,6 +177,7 @@
 %token EXIST
 %token EXPORT
 %token FINAL
+%token FIRST
 %token FISSION
 %token FUSION
 %token FORALL
@@ -196,6 +198,7 @@
 %token IOTA
 %token KILL
 %token LAMBDA
+%token LAST
 %token LBRACE
 %token LBRACKET
 %token LEFT
@@ -562,10 +565,12 @@ expr_u:
 ;
 
 %inline pty_varty:
-| x=ident+                        {
-   let loc = EcLocation.make $startpos $endpos in
-   (x, mk_loc loc PTunivar) }
-| x=ident+ COLON ty=loc(type_exp) { (x, ty) }
+| x=ident+
+   { let loc = EcLocation.make $startpos $endpos in
+       (x, mk_loc loc PTunivar) }
+
+| x=ident+ COLON ty=loc(type_exp)
+   { (x, ty) }
 ;
 
 ptybinding1:
@@ -1355,27 +1360,31 @@ codepos:
 
 tactic:
 | IDTAC
-    { Pidtac None }
+   { Pidtac None }
 
 | IDTAC s=STRING
-    { Pidtac (Some s) }
+   { Pidtac (Some s) }
 
-| STAR t=loc(tactic) { Prepeat t }
+| TRY t=loc(tactic)
+   { Ptry t }
 
-| NOT n=option(number) t=loc(tactic) { Pdo(n, t) }
+| DO n=NUM? NOT t=loc(tactic)
+   { Pdo (false, n, t) }
 
-| TRY t=loc(tactic) { Ptry t }
+| DO n=NUM? QUESTION t=loc(tactic)
+   { Pdo (true, n, t) }
 
 | LPAREN s=tactics RPAREN
    { Pseq s } 
 
 | ADMIT
-    { Padmit }
+   { Padmit }
 
 | CASE f=sform
    { Pcase f }
 
-| PROGRESS t=loc(tactic)? { Pprogress t }
+| PROGRESS t=loc(tactic)?
+   { Pprogress t }
 
 | x=logtactic
    { Plogic x }
@@ -1636,12 +1645,28 @@ tactics0:
 | x=loc(empty)  { Pseq [mk_loc x.pl_loc (Pidtac None)] }
 ;
 
-%inline tactics2: ts=plist1(tactic2, SEMICOLON) { ts };
-tsubgoal: LBRACKET ts=plist1(loc(tactics0), PIPE) RBRACKET { Psubgoal ts };
+%inline tactics2:
+| ts=plist1(tactic2, SEMICOLON) { ts }
+;
 
-tactic2: 
-| ts=loc(tsubgoal) { ts }
-| t=loc(tactic)    { t } 
+tsubgoal:
+| LBRACKET ts=plist1(loc(tactics0), PIPE) RBRACKET
+    { Psubtacs ts }
+
+| FIRST t=loc(tactic)
+    { Pfirst t }
+
+| LAST t=loc(tactic)
+    { Plast t }
+;
+
+tactic2_u:
+| t=tsubgoal { Psubgoal t }
+| t=tactic   { t }
+;
+
+tactic2:
+| t=loc(tactic2_u) { t }
 ;
 
 tactics_or_prf:

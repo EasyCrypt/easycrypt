@@ -35,39 +35,50 @@ let process_debug env =
     ignore (EcEnv.Mod.by_mpath p env)
 
 (* -------------------------------------------------------------------- *)
-let rec process_logic_tacs mkpv env (tacs:ptactics) (gs:goals) : goals =
+let process_progress (prtc, mkpv) env t =
+  let t = 
+    match t with 
+    | None   -> t_id None 
+    | Some t -> prtc mkpv env t
+  in
+    t_progress env t
+
+(* -------------------------------------------------------------------- *)
+let rec process_logic_tacs mkpv env tacs gs : goals =
   match tacs with
   | [] -> gs
+
   | {pl_desc = Psubgoal tacs1; pl_loc = loc } :: tacs2 ->
-      let gs =
-        set_loc loc
-          (t_subgoal (List.map (process_logic_tac mkpv env) tacs1)) gs in
-      process_logic_tacs mkpv env tacs2 gs
+      let gs = set_loc loc (process_subgoal mkpv env tacs1) gs in
+        process_logic_tacs mkpv env tacs2 gs
+
   | tac1 :: tacs2 ->
       let gs = t_on_goals (process_logic_tac mkpv env tac1) gs in
-      process_logic_tacs mkpv env tacs2 gs
+        process_logic_tacs mkpv env tacs2 gs
+
+(* -------------------------------------------------------------------- *)
+and process_subgoal mkpv env t gs =
+  match t with
+  | Psubtacs tacs ->
+      t_subgoal (List.map (process_logic_tac mkpv env) tacs) gs
+
+  | Pfirst t -> t_on_first (process_logic_tac mkpv env t) gs
+  | Plast  t -> t_on_last  (process_logic_tac mkpv env t) gs
 
 (* -------------------------------------------------------------------- *)
 and process_logic_tac mkpv env (tac:ptactic) (g:goal) : goals =
-  let loc = tac.pl_loc in
+  let myself = process_logic_tac in
+  let loc    = tac.pl_loc in
+
   let tac =
     match unloc tac with
     | Pidtac msg     -> t_id msg
-    | Prepeat t      -> t_repeat (process_logic_tac mkpv env t)
-    | Pdo (None,t)   -> 
-      let tac = (process_logic_tac mkpv env t) in
-      t_seq tac (t_repeat tac)
-    | Pdo (Some i, t) -> t_do i (process_logic_tac mkpv env t)
+    | Pdo (b, n, t)  -> t_do b n (process_logic_tac mkpv env t)
     | Ptry t         -> t_try (process_logic_tac mkpv env t)
-    | Pseq tacs      -> fun (juc,n) -> process_logic_tacs mkpv env tacs (juc,[n])
+    | Pseq tacs      -> fun (juc, n) -> process_logic_tacs mkpv env tacs (juc, [n])
     | Psubgoal _     -> assert false
-    | Pcase  i       -> process_case  loc env i
-    | Pprogress t    -> 
-      let t = 
-        match t with 
-        | None -> t_id None 
-        | Some t -> process_logic_tac mkpv env t in
-      t_progress env t
+    | Pcase  i       -> process_case loc env i
+    | Pprogress t    -> process_progress (myself, mkpv) env t
     | Padmit         -> t_admit
     | Pdebug         -> process_debug env; t_id None
     | Plogic t       -> process_logic mkpv loc env t
