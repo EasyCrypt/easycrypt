@@ -125,6 +125,7 @@ theory Dbitstring.
 
   axiom weight_pos: forall (k:int), 0 <= k => weight (dbitstring k) = 1%r.
 
-  lemma mu_weight_neg: forall (k:int), k < 0 => weight (dbitstring k) = 0%r.
+  (* TODO Santi: write a proof if you really think this is a lemma *) 
+  axiom mu_weight_neg: forall (k:int), k < 0 => weight (dbitstring k) = 0%r.
 
 end Dbitstring.
