@@ -346,7 +346,8 @@ type ptactic = ptactic_r located
 and ptactic_r = 
   | Pidtac      of string option
   | Pdo         of bool * int option * ptactic
-  | Ptry        of ptactic 
+  | Ptry        of ptactic
+  | Pby         of ptactic list
   | Psubgoal    of ptactics
   | Pseq        of ptactic list
   | Pcase       of pformula 

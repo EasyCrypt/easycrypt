@@ -453,3 +453,9 @@ let t_do b omax t g =
     doit 0 g
 
 let t_repeat t = t_do false None t
+
+let t_close t g =
+  match t g with
+  | (juc, []    ) -> (juc, [])
+  | (_  , i :: _) -> raise (StillOpenGoal i)
+

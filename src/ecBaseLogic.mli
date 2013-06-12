@@ -198,3 +198,5 @@ val t_repeat : tactic -> tactic
 val t_do     : bool -> int option -> tactic -> tactic
 val t_try    : tactic -> tactic
 val t_or     : tactic -> tactic -> tactic
+
+val t_close : tactic -> tactic

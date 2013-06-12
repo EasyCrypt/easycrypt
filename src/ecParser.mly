@@ -1368,6 +1368,9 @@ tactic:
 | TRY t=loc(tactic)
    { Ptry t }
 
+| BY t=tactics
+   { Pby t }
+
 | DO t=loc(tactic)
    { Pdo (true, None, t) }
 

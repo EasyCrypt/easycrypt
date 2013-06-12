@@ -75,6 +75,7 @@ and process_logic_tac mkpv env (tac:ptactic) (g:goal) : goals =
     | Pidtac msg     -> t_id msg
     | Pdo (b, n, t)  -> t_do b n (process_logic_tac mkpv env t)
     | Ptry t         -> t_try (process_logic_tac mkpv env t)
+    | Pby t          -> t_close (fun (juc, n) -> process_logic_tacs mkpv env t (juc, [n]))
     | Pseq tacs      -> fun (juc, n) -> process_logic_tacs mkpv env tacs (juc, [n])
     | Psubgoal _     -> assert false
     | Pcase  i       -> process_case loc env i
