@@ -23,6 +23,8 @@ val goal    : scope -> proof_uc option
 val verbose     : scope -> bool
 val set_verbose : scope -> bool -> scope
 
+val check_state : [`InProof | `InTop] -> string -> scope -> unit
+
 module Op : sig
   (* [add scope op] type-checks the given *parsed* operator [op] in
    * scope [scope], and add it to it. Raises [DuplicatedNameInContext]

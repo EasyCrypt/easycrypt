@@ -104,6 +104,8 @@ let notify scope msg =
 
 (* -------------------------------------------------------------------- *)
 let rec process_type (scope : EcScope.scope) (tyd : ptydecl located) =
+  EcScope.check_state `InTop "type" scope;
+
   let tyname = (tyd.pl_desc.pty_tyvars, tyd.pl_desc.pty_name) in
   let scope = 
     match tyd.pl_desc.pty_body with
@@ -119,26 +121,31 @@ and process_datatype (_scope : EcScope.scope) _ =
 
 (* -------------------------------------------------------------------- *)
 and process_module (scope : EcScope.scope) (x, m) =
+  EcScope.check_state `InTop "module" scope;
   EcScope.Mod.add scope x.pl_desc m
 
 (* -------------------------------------------------------------------- *)
 and process_interface (scope : EcScope.scope) (x, i) =
+  EcScope.check_state `InTop "interface" scope;
   EcScope.ModType.add scope x.pl_desc i
 
 (* -------------------------------------------------------------------- *)
 and process_operator (scope : EcScope.scope) (op : poperator located) =
+  EcScope.check_state `InTop "operator" scope;
   let scope = EcScope.Op.add scope op in
     notify scope "added operator: `%s'" (unloc op.pl_desc.po_name);
     scope
 
 (* -------------------------------------------------------------------- *)
 and process_predicate (scope : EcScope.scope) (p : ppredicate located) =
+  EcScope.check_state `InTop "predicate" scope;
   let scope = EcScope.Pred.add scope p in
     notify scope "added predicate: `%s'" (unloc p.pl_desc.pp_name);
     scope
 
 (* -------------------------------------------------------------------- *)
 and process_axiom (scope : EcScope.scope) (ax : paxiom located) =
+  EcScope.check_state `InTop "axiom" scope;
   let (name, scope) = EcScope.Ax.add scope ax in
     EcUtils.oiter name
       (fun x -> notify scope "added axiom: `%s'" x);
@@ -150,16 +157,20 @@ and process_claim (scope : EcScope.scope) _ =
 
 (* -------------------------------------------------------------------- *)
 and process_th_open (scope : EcScope.scope) name =
+  EcScope.check_state `InTop "theory" scope;
   EcScope.Theory.enter scope name
 
 (* -------------------------------------------------------------------- *)
 and process_th_close (scope : EcScope.scope) name =
+  EcScope.check_state `InTop "theory closing" scope;
   if (EcScope.name scope) <> name then
     failwith "invalid theory name";     (* FIXME *)
   snd (EcScope.Theory.exit scope)
 
 (* -------------------------------------------------------------------- *)
 and process_th_require ld scope (x, io) = 
+  EcScope.check_state `InTop "theory require" scope;
+
   let name  = x.pl_desc in
     match EcLoader.locate name ld with
     | None ->
@@ -190,18 +201,22 @@ and process_th_require ld scope (x, io) =
 
 (* -------------------------------------------------------------------- *)
 and process_th_import (scope : EcScope.scope) name =
+  EcScope.check_state `InTop "theory import" scope;
   EcScope.Theory.import scope name
 
 (* -------------------------------------------------------------------- *)
 and process_th_export (scope : EcScope.scope) name =
+  EcScope.check_state `InTop "theory export" scope;
   EcScope.Theory.export scope name
 
 (* -------------------------------------------------------------------- *)
 and process_th_clone (scope : EcScope.scope) thcl =
+  EcScope.check_state `InTop "theory cloning" scope;
   EcScope.Theory.clone scope thcl
 
 (* -------------------------------------------------------------------- *)
 and process_w3_import (scope : EcScope.scope) (p, f, r) =
+  EcScope.check_state `InTop "why3 import" scope;
   EcScope.Theory.import_w3 scope p f r
 
 (* -------------------------------------------------------------------- *)
