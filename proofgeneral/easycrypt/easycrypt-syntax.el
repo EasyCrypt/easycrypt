@@ -160,8 +160,17 @@
   "Face for names of dangerous tactics in proof scripts."
   :group 'proof-faces)
 
-(defconst easycrypt-tactics-closing-face 'easycrypt-tactics-closing-face)
+(defface easycrypt-tactics-tacticals-face
+  (proof-face-specs
+   (:foreground "dark green")
+   (:foreground "dark green")
+   ())
+  "Face for names of tacticals in proof scripts."
+  :group 'proof-faces)
+
+(defconst easycrypt-tactics-closing-face   'easycrypt-tactics-closing-face)
 (defconst easycrypt-tactics-dangerous-face 'easycrypt-tactics-dangerous-face)
+(defconst easycrypt-tactics-tacticals-face 'easycrypt-tactics-tacticals-face)
 
 (defvar easycrypt-font-lock-keywords
   (list
@@ -169,6 +178,8 @@
           'font-lock-keyword-face)
     (cons (proof-ids-to-regexp easycrypt-tactic-keywords)
           'proof-tactics-name-face)
+    (cons (proof-ids-to-regexp easycrypt-tactical-keywords)
+          'easycrypt-tactics-tacticals-face)
     (cons (proof-ids-to-regexp easycrypt-bytac-keywords)
           'easycrypt-tactics-closing-face)
     (cons (proof-ids-to-regexp easycrypt-dangerous-keywords)
