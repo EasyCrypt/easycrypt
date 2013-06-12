@@ -534,10 +534,10 @@ proof.
     (1%r / 2%r + Pr[SCDH(SCDH_from_CPA(A)).main() @ &m : res]) _ _).
   apply (Pr_CPA_G1 (<:A) &m _); assumption.
   rewrite (Pr_G1_G2_res (<:A) &m).
-  rewrite (Pr_G1_G1 (<:A) &m _); [assumption | ].
-  rewrite (Pr_G2 (<:A) &m _); [assumption | ].
+  rewrite (Pr_G1_G1 (<:A) &m _); first assumption.
+  rewrite (Pr_G2 (<:A) &m _); first assumption.
   rewrite (Pr_G1_G2_mem (<:A) &m).  
-  rewrite (Pr_G2_SCDH (<:A) &m _); [assumption | ].
+  rewrite (Pr_G2_SCDH (<:A) &m _); first assumption.
   apply Real.Refl.
 save.
 
