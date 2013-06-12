@@ -101,9 +101,13 @@ let _ = EcPException.register (fun fmt exn ->
 let tacerror error = raise (TacError error)
 
 let tacuerror fmt =
-  Format.ksprintf
-    (fun msg -> raise (TacError (User msg)))
-    fmt
+  let buf  = Buffer.create 127 in
+  let fbuf = Format.formatter_of_buffer buf in
+    Format.kfprintf
+      (fun _ ->
+         Format.pp_print_flush fbuf ();
+         raise (TacError (User (Buffer.contents buf))))
+      fbuf fmt
 
 let cannot_apply s1 s2 = tacerror (CanNotApply(s1,s2))
 
