@@ -326,7 +326,7 @@ module L = EcBaseLogic
 let pp_current_goal stream =
   let (_, scope, _) = !context in
 
-  match List.ohead (S.goal scope) with
+  match S.goal scope with
   | None -> ()
 
   | Some goal -> begin

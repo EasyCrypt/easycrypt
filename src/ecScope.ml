@@ -170,7 +170,7 @@ type scope = {
   sc_top        : scope option;
   sc_loaded     : (EcEnv.ctheory_w3 * symbol list) Msym.t;
   sc_required   : symbol list;
-  sc_pr_uc      : proof_uc list;
+  sc_pr_uc      : proof_uc option;
   sc_options    : Options.options;
 }
 
@@ -182,7 +182,7 @@ let empty =
       sc_top        = None;
       sc_loaded     = Msym.empty;
       sc_required   = [];
-      sc_pr_uc      = [];
+      sc_pr_uc      = None;
       sc_options    = Options.init ();
     }
 
@@ -231,7 +231,7 @@ let subscope (scope : scope) (name : symbol) =
     sc_top        = Some scope;
     sc_loaded     = scope.sc_loaded;
     sc_required   = scope.sc_required;
-    sc_pr_uc      = [];
+    sc_pr_uc      = None;
     sc_options    = Options.for_subscope scope.sc_options;
   }
 
@@ -325,13 +325,13 @@ module Tactics = struct
     if Check_mode.check scope.sc_options then
       let loc = match tac with | [] -> assert false | t::_ -> t.pl_loc in
       match scope.sc_pr_uc with
-      | [] -> error loc NoCurrentGoal
-      | puc :: pucs ->
+      | None -> error loc NoCurrentGoal
+      | Some puc ->
           let juc =
             process_logic scope scope.sc_env puc.puc_jdg loc tac
           in
             { scope with
-                sc_pr_uc = { puc with puc_jdg = juc } :: pucs }
+                sc_pr_uc = Some { puc with puc_jdg = juc } }
     else scope
 end
 
@@ -541,7 +541,7 @@ module Theory = struct
             scope.sc_name thname in
         failwith msg
       end;
-    if scope.sc_pr_uc <> [] then
+    if scope.sc_pr_uc <> None then
       let msg =
         Printf.sprintf
           "end-of-file while processing proof %s" scope.sc_name
@@ -608,19 +608,23 @@ module Ax = struct
    res
 
   let start_lemma scope name tparams concl =
-    let hyps = { EcBaseLogic.h_tvar = tparams;
-                 EcBaseLogic.h_local = []; } in
-    let puc = {
-      puc_name = name ;
-      puc_jdg = EcBaseLogic.open_juc (hyps, concl) } in
-    { scope with
-      sc_pr_uc = puc :: scope.sc_pr_uc }
+    match scope.sc_pr_uc with
+    | Some _ -> raise (HiScopeError (None, "a proof is in progress"))
+    | None   ->
+        let hyps = { EcBaseLogic.h_tvar  = tparams;
+                     EcBaseLogic.h_local = []; } in
+        let puc = {
+          puc_name = name ;
+          puc_jdg = EcBaseLogic.open_juc (hyps, concl)
+        } in
+
+        { scope with sc_pr_uc = Some puc }
 
   let save scope loc =
     if Check_mode.check scope.sc_options then
       match scope.sc_pr_uc with
-      | [] -> EcHiLogic.error loc EcHiLogic.NoCurrentGoal
-      | { puc_name = name; puc_jdg = juc } :: pucs ->
+      | None -> EcHiLogic.error loc EcHiLogic.NoCurrentGoal
+      | Some { puc_name = name; puc_jdg = juc } ->
           let pr = EcBaseLogic.close_juc juc in
           let hyps,concl = (EcBaseLogic.get_goal (juc,0)).EcBaseLogic.pj_decl in
           let tparams = hyps.EcBaseLogic.h_tvar in
@@ -628,7 +632,7 @@ module Ax = struct
           let axd = { ax_tparams = tparams;
                       ax_spec = Some concl;
                       ax_kind = Lemma (Some pr) } in
-          let scope = { scope with sc_pr_uc = pucs } in
+          let scope = { scope with sc_pr_uc = None } in
           Some name, bind scope (name, axd)
     else None, scope
 

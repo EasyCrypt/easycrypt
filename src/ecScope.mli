@@ -18,7 +18,7 @@ val path    : scope -> EcPath.path
 val name    : scope -> symbol
 val env     : scope -> EcEnv.env
 val attop   : scope -> bool
-val goal    : scope -> proof_uc list
+val goal    : scope -> proof_uc option
 
 val verbose     : scope -> bool
 val set_verbose : scope -> bool -> scope
