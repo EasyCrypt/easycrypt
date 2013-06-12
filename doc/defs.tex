@@ -17,8 +17,6 @@
 }
 
 
-
-
 % \newcounter{todos}\setcounter{todos}{1}
 % \newcommand{\TODO}[1]{%
 %   \textsf{\textcolor{red}{$^{[\thetodos]}$}}%
@@ -225,6 +223,7 @@
 \newcommand{\LH}{\gl{L}_H}
 \newcommand{\LD}{\gl{L}_\Dec}
 \newcommand{\cdef}{\gl{\gamma_\mathsf{def}}}
+\newcommand{\var}[1]{\ensuremath{\mathit{#1}} \xspace}
 
 %% Constants and operators
 % TODO: Update!
@@ -273,6 +272,8 @@
 \newcommand{\rawec}[2][]{\lstinline[language=easycrypt,#1]{#2}}
 \newcommand{\ec}[2][]{\lstinline[language=easycrypt,style=easycrypt-pretty,#1]{#2}}
 
+
+\def\createEasycrypt#1\relax{
 \lstdefinelanguage{easycrypt}{
   style=easycrypt-default,
 %  procnamekeys={op,pred,fun},
@@ -284,10 +285,15 @@
   morekeywords=[4]{while,if},
   morekeywords=[5]{theory,end},
   morekeywords=[6]{forall,exists,lambda},
+  morekeywords=[7]{#1},
 %  moredirectives={prover,print}, % Incomplete
   morecomment=[n][\itshape]{(*}{*)},
   morecomment=[n][\bfseries]{(**}{*)}
 }
+}
+
+\input{ambient}
+\expandafter\createEasycrypt \ambientKeywords \relax
 
 \lstdefinestyle{easycrypt-default}{
   columns=fullflexible,
@@ -302,7 +308,8 @@
   keywordstyle=[3]{\bfseries},
   keywordstyle=[4]{\bfseries},
   keywordstyle=[5]{\bfseries\color{OliveGreen}},
-  keywordstyle=[6]{\itshape\color{Blue}}
+  keywordstyle=[6]{\itshape\color{Blue}},
+  keywordstyle=[7]{\itshape\color{Red}}
 }
 
 \lstdefinestyle{easycrypt-pretty}{

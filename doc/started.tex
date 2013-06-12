@@ -5,8 +5,8 @@
 
 \section{Basic Example (Tutorial)}
 In this section we present a formalization of the proof of security
-against chosen plaintext attacks of a public key encryption scheme
-introduced by Bellare and Rogaway in 1993.
+against chosen plaintext attacks of a public-key encryption scheme
+introduced by Bellare and Rogaway in 1993\cite{br93}.
 
 This scheme is based on one-way trapdoor permutations and uses a
 random oracle. The proof of security follows by reduction: given an
@@ -32,26 +32,18 @@ We begin by introducing some basic concepts of cryptography and how we
 model them in \EC.
 
 \paragraph{Random oracles}
-A hash function in the random oracle is modelled as a consistent
-random function: new queries trigger samplings that are stored in a
-map; old queries trigger a map lookup.
+A hash function in the random oracle model is a consistent random
+function: new queries trigger samplings that are stored in a map; old
+queries trigger a map lookup. 
 
-Adversaries normally have access to a wrapped version of the function
-that keeps track of the queries in a set and limits its number to a
-defined constant.
+The following piece of code defines a signature for random oracles and
+an implementation between arbitrary types \ec{from} and \ec{to},
+sampling values from distribution \ec{dsample}.
 
-In the \EC, a theory of random oracles is distributed as part of
-the standard library. The most basic form of random oracles, as it
-should be used in the definition of schemes is as follows:
-
-\begin{easycrypt}[label={lst:arrays}]{[Random Oracle]Basic definition of Random Oracle}
+\begin{easycrypt}[label={lst:rndorcl}]{}
 type from.
 type to.
-
-op dsample : to distr. 
-op qO : int.           
-op default : to. 
-
+const dsample : to distr. 
 module type Oracle =
 {
   fun init():unit
@@ -74,43 +66,108 @@ theory ROM.
     }
   }.
 end ROM.
-
-module type ARO = { fun o(x:from):to }.
-
 \end{easycrypt}
 % $ just for correct syntax highlighting
-This piece of code declares two abstract types \ec{from} and \ec{to}
-that represent the domain and codomain of the random oracle; a
-distribution \ec{dsample} of values of type \ec{to}, an integer
-\ec{qO} that represents a bound on the amount of calls allowed to an
-adversary and a default value \ec{default} that will be returned when
-an adversary querry fails.
 
-Afterwards, a module type \ec{Oracle} is defined that declares the
-interface that a random oracle will provide. Next, a module \ec{RO}
-implementing this interface is defined. It consists of a global
-variable \ec{m} that models the map of the random oracle; a function
-\ec{init} that initializes the map to \ec{empty} and the
-implementation of the actual oracle \ec{o}, that takes an argument
-\ec{x} of type \ec{from}, samples a value \ec{y} of type \ec{to},
-updates the value of the map in case it's necesary and finally returns the
-lookup of \ec{x} in the map \ec{m}.
+The module \ec{RO} consists of a global variable \ec{m} that models
+the map of the random oracle; a function \ec{init} that initializes
+the map to \ec{empty} and the implementation of the actual oracle
+\ec{o}, that takes an argument \ec{x} of type \ec{from}, samples a
+value \ec{y} of type \ec{to}, updates the value of the map in case
+it's necesary and finally returns the lookup of \ec{x} in the map
+\ec{m}.
+
+Adversaries are normally given restricted access to the oracle, in the
+sense that the amount of calls allowed is bounded. Moreover, we keep
+track of the queries triggered by the adversary. This increased
+functionality is provided in \EC through the following definitions
+
+\begin{easycrypt}[label={lst:wrappedrndorcl}]{}
+ module type ARO = {fun o_a (x : from) : to}. 
+
+ theory SetBoundedRO.
+ const qO : int.
+ const dv : to.
+ module SetBoundedRO (O : Oracle) ={
+  var s : from set
+  var cO : int
+  fun init() : unit={
+   O.init();
+   s = Set.empty;
+   cO = 0;
+  }
+  fun o_a(x : from) : to ={
+   var y : to = dv;
+   if (cO < qO) {
+    s = Set.add x s;cO = cO + 1;
+    y = O.o(x);
+   }
+   return y;
+  }
+ }.
+ end SetBoundedRO.
+\end{easycrypt}
 
 \ec{ARO} is a module type declaring the interface of the random oracle
-that will be provided to adversaries. According to the problem at hand
-we may want to limit the amounts of queries allowed, keep track of the
-set  or the sequence of queries performed. This functionalities can be
-combined in a seamless way making use of the definitions in the rest
-of the library. 
+that will be provided to adversaries. We rely on two constants:
+\ec{qO} represents the bound on the amount of calls and \ec{dv} the
+default value to be returned in case the bound has been reached. The
+module \ec{SetBoundedRO}, defines the wrapped version of oracle
+\ec{O}.  This module uses the set \ec{s} to keep track of the calls
+performed and counter \ec{cO} to keep track of the amount of queries
+performed so far. The \ec{init} function initializes the values
+appropriately and the \ec{o_a} function implements the desired checks:
+if the adversary has not reached the bound, we update the set, the
+counter and forward the call to the underlying oracle \ec{O};
+otherwise the default value is returned.
+ 
+\paragraph{Public-key encryption}
+A public-key encryption scheme consists of a triple of algorithms
+$(\KG,\Enc,\Dec)$:
 
-This code is contained in file RandOrcl.ec. Each file defines a theory
-and theories can be cloned by making abstract operator definitions
-concrete. We will make use of cloning in order to define a Random
-Oracle of the appropriate type for the examples.
+\begin{description}
+\item[Key Generation] 
+  The key generation algorithm $\KG$ produces a pair of keys $(pk,sk)$;
+  $pk$ is a \emph{public-key} used for encryption, $sk$ is
+  a \emph{secret-key} used for decryption;
 
+\item[Encryption] 
+  Given a public-key $pk$ and a message $m$, $\Enc_{pk}(m)$ outputs a
+  ciphertext $c$;
 
+\item[Decryption] 
+  Given a secret-key $sk$ and a ciphertext $c$, $\Dec_{sk}(c)$ outputs
+  either message $m$ or a distinguished value $\bot$ denoting failure.
+\end{description}
+%
+We require that for pairs of keys $(pk,sk)$ generated by $\KG$,
+$\Dec_{sk}(\Enc_{pk}(m))= m$ holds for any message $m$. 
 
-\paragraph{Public key encryption}
+In \EC, we model public-key encryption schemes in the following way
+\begin{easycrypt}[label={lst:enc_scheme}]{}
+theory Enc.
+ type pkey.
+ type skey.
+ type message.
+ type cipher.
+
+ module type Scheme(RO : Oracle) = {
+  fun init(): unit 
+  fun kg() : (pkey * skey)
+  fun enc(pk:pkey, m:message) : cipher
+  fun dec(sk:pkey, c:cipher) : message
+ }.
+end Enc.
+\end{easycrypt}
+First of all, we declare the necesary types: \ec{pkey} and \ec{skey}
+for public and secret keys and \ec{message} and \ec{cipher} for
+message and ciphertext. Afterwards, we declare the interface of an
+encryption scheme, that consists of an initialization function
+\ec{init}, a key generation algorithm \ec{kg}, an encryption function
+\ec{enc} and a decryption function \ec{dec}. Note that we are actually
+modelling the particular class of encryption schemes that use at most
+one random oracle.
+
 \paragraph{The \textsf{IND-CPA} experiment}
 \paragraph{One-way trapdoor permutations}
 \paragraph{The BR93 scheme}
