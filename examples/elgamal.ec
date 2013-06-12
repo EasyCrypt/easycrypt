@@ -264,7 +264,7 @@ proof.
  wp;rnd.
  call (pk{1} = pk{2} /\ (glob A){1} = (glob A){2}) (res{1}=res{2} /\ (glob A){1} = (glob A){2}).
  fun true;try (simplify;split).
- wp; *rnd;skip. simplify;trivial. 
+ wp; do rnd; skip. simplify; trivial. 
 
 (* Just to test tactic *)
 (* intros &m1 &m2 Heq.
@@ -301,7 +301,7 @@ proof.
   call (pk{1} = pk{2} /\ (glob A){1} = (glob A){2}) 
              (res{1}=res{2} /\ (glob A){1} = (glob A){2}).
     fun true;try (simplify;split).
-  wp;*rnd;skip;trivial. 
+  wp;do rnd;skip;trivial. 
 save.
 
 lemma Fact3 (A<:Adv) &m : 
@@ -319,7 +319,7 @@ proof.
  call (pk{1} = pk{2} /\ (glob A){1} = (glob A){2}) 
              (res{1}=res{2} /\ (glob A){1} = (glob A){2}).
    fun true;try (simplify;split).
- wp;*rnd;skip; progress trivial.
+ wp;do rnd;skip; progress; trivial.
 save.
 
 require import Real.
@@ -368,4 +368,3 @@ proof.
   exists (<:Inv(A)).
   apply (Conclusion1 (<:A) &m _ _);assumption.
 save.
-

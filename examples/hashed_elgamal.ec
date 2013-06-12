@@ -223,7 +223,7 @@ proof.
     ((glob A){1} = (glob A){2} /\
      RO.m{1} = Map.empty /\ ARO.log{2} = Set.empty /\ ARO.log{1} = ARO.log{2} /\
      RO.m{1} = RO.m{2} /\ pk{1} = gx{2} /\ y{1} = y{2} /\ (G1.gxy = gx ^ y){2}).
-  wp; *rnd; wp; skip; trivial.
+  wp; do rnd; wp; skip; trivial.
 
   seq 2 2 : 
     ((glob A){1} = (glob A){2} /\ RO.m{1} = RO.m{2} /\
@@ -245,9 +245,7 @@ proof.
   trivial.
   fun; inline RO.o; wp; if.
   trivial.
-  timeout 5.
-  wp; rnd; wp; skip; trivial (* may timeout *).
-  timeout 2.
+  wp; rnd; wp; skip; progress; trivial (* may timeout *).
   wp; skip; trivial.
   skip; trivial.
 
@@ -356,13 +354,13 @@ proof.
   wp; rnd; wp; skip; trivial.
   wp; skip; trivial.
 
-  wp; *rnd; wp; skip.
-  *intros _; *split; [trivial | trivial | ].
-  *intros _; *split; [trivial | trivial | ].
-  *intros _; *split; [trivial | ].
+  wp; do rnd; wp; skip.
+  do intros _; do split; [trivial | trivial | ].
+  do intros _; do split; [trivial | trivial | ].
+  do intros _; do split; [trivial | ].
   intros _ res1 res2.
   elimT Logic.tuple2_ind res1; elimT Logic.tuple2_ind res2.
-  *intros _; *split; trivial.
+  do intros _; do split; trivial.
 save.
 
 module SCDH_from_CPA (A_:Adv) : SCDH_Adversary = {
@@ -413,7 +411,7 @@ proof.
   wp; rnd; wp; skip; trivial.
   wp; skip; trivial.
 
-  wp; *rnd; wp; skip; trivial.
+  wp; do rnd; wp; skip; trivial.
 
   call 
    ((glob A){1} = (glob A){2} /\ RO.m{1} = RO.m{2} /\ ARO.log{1} = ARO.log{2} /\
@@ -535,8 +533,8 @@ proof.
     Pr[G1(A).main() @ &m : res \/ mem G1.gxy ARO.log] 
     (1%r / 2%r + Pr[SCDH(SCDH_from_CPA(A)).main() @ &m : res]) _ _).
   apply (Pr_CPA_G1 (<:A) &m _); assumption.
-  rewrite (Pr_G1_G1 (<:A) &m _); [assumption | ].
   rewrite (Pr_G1_G2_res (<:A) &m).
+  rewrite (Pr_G1_G1 (<:A) &m _); [assumption | ].
   rewrite (Pr_G2 (<:A) &m _); [assumption | ].
   rewrite (Pr_G1_G2_mem (<:A) &m).  
   rewrite (Pr_G2_SCDH (<:A) &m _); [assumption | ].
@@ -567,7 +565,7 @@ proof.
   fun; inline Hashed_ElGamal(RO).kg Hashed_ElGamal(RO).enc.
   seq 7 : (in_dom (g ^ (sk * y)) RO.m /\ 
            c = (g ^ y, (proj RO.m.[g ^ (sk * y)]) ^^ m)).
-  inline RO.o; *(wp; rnd); skip; trivial.
+  inline RO.o; do (wp; rnd); skip; trivial.
   inline Hashed_ElGamal(RO).dec RO.o.
   wp; rnd; wp; skip; trivial.
 save.
