@@ -26,7 +26,7 @@ lemma main:
   equiv [OneSided.main ~ OneSided.main2: true ==> OneSided.x{1} = OneSided.x{2}].
 proof.
 fun;
-app 1 0: (OneSided.x{1} = 0);[ | wp;skip;trivial ].
+seq 1 0: (OneSided.x{1} = 0);[ | wp;skip;trivial ].
 call {1} (true) (OneSided.x = 0);[ apply bar | intros _;skip;trivial ].
 save.
 

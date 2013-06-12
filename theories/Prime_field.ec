@@ -103,7 +103,7 @@ theory Dgf_q.
   axiom mu_x_def_in: forall (s:gf_q),
     mu_x dgf_q s = 1%r/q%r.
 
-  axiom mu_weight_pos: mu_weight dgf_q = 1%r.
+  axiom lossless: weight dgf_q = 1%r.
 
 end Dgf_q.
 

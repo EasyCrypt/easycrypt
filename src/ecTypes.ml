@@ -365,17 +365,14 @@ and expr_node =
   | Etuple of expr list                    (* tuple constructor     *)
   | Eif    of expr * expr * expr           (* _ ? _ : _             *)
 
-
-
 (* -------------------------------------------------------------------- *)
 let e_equal   = ((==) : expr -> expr -> bool)
 let e_hash    = fun e -> e.e_tag
 let e_compare = fun e1 e2 -> e_hash e1 - e_hash e2
 let e_fv e    = e.e_fv 
-let e_ty e = e.e_ty
+let e_ty e    = e.e_ty
 
 (* -------------------------------------------------------------------- *)
-
 let lp_fv = function
   | LSymbol (id,_) -> Sid.singleton id
   | LTuple ids -> 
@@ -385,7 +382,7 @@ let pv_fv pv = EcPath.x_fv Mid.empty pv.pv_name
 
 let fv_node = function 
   | Eint _ | Eop _ -> Mid.empty
-  | Evar v   -> pv_fv v 
+  | Evar v    -> pv_fv v 
   | Elocal id -> fv_singleton id 
   | Eapp(f,args) ->
     List.fold_left (fun s e -> fv_union s (e_fv e)) (e_fv f) args
@@ -466,24 +463,26 @@ module Hexpr = Why3.Hashcons.Make (struct
     | Eif (c, e1, e2) ->
         Why3.Hashcons.combine2
           (e_hash c) (e_hash e1) (e_hash e2)
+
     | Elam(b,e) ->
-      Why3.Hashcons.combine (e_hash e) (b_hash b) 
+        Why3.Hashcons.combine (e_hash e) (b_hash b) 
           
-  let tag n e = { e with e_tag = n;
-                  e_fv = fv_node e.e_node }
+  let tag n e = { e with e_tag = n; e_fv = fv_node e.e_node; }
 end)
 
 (* -------------------------------------------------------------------- *)
 let mk_expr e ty =
   Hexpr.hashcons { e_node = e; e_tag = -1; e_fv = fv_node e; e_ty = ty }
 
-let e_int   i       = mk_expr (Eint i) tint
-let e_local x ty    = mk_expr (Elocal x) ty
-let e_var   x ty    = mk_expr (Evar x) ty
-let e_op x targs ty = mk_expr (Eop (x, targs)) ty
-let e_let pt e1 e2  = mk_expr (Elet (pt, e1, e2)) e2.e_ty
-let e_tuple es      = mk_expr (Etuple es) (ttuple (List.map e_ty es))
-let e_if   c e1 e2  = mk_expr (Eif (c, e1, e2)) e2.e_ty
+let e_tt            = mk_expr (Eop (EcCoreLib.p_tt, [])) tunit
+let e_int           = fun i -> mk_expr (Eint i) tint
+let e_local         = fun x ty -> mk_expr (Elocal x) ty
+let e_var           = fun x ty -> mk_expr (Evar x) ty
+let e_op            = fun x targs ty -> mk_expr (Eop (x, targs)) ty
+let e_let           = fun pt e1 e2 -> mk_expr (Elet (pt, e1, e2)) e2.e_ty
+let e_tuple         = fun es -> mk_expr (Etuple es) (ttuple (List.map e_ty es))
+let e_if            = fun c e1 e2 -> mk_expr (Eif (c, e1, e2)) e2.e_ty
+
 let e_lam b e =
   if b = [] then e
   else 

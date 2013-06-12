@@ -3,63 +3,59 @@ require export Fun.
 require import Int.
 require import Real.
 
-op caract (p:'a cPred, x : 'a) : real = 
-   if p x then 1%r else 0%r.
+op charfun (p:'a cPred, x:'a) : real = if p x then 1%r else 0%r.
 
-(** Core axioms and definitions on mu *)
-axiom mu_bounded: forall (d:'a distr) (P:'a cPred), 
-  0%r <= mu d P && mu d P <= 1%r .
+op mu_x(d:'a distr, x) : real = mu d (cPeq x).
 
-axiom mu_false: forall (d:'a distr),
-  mu d cPfalse = 0%r. 
+op weight(d:'a distr) : real = mu d cPtrue.
 
-axiom mu_incl: forall P1 P2 (d:'a distr),
-  cPincl P1 P2 => mu d P1 <= mu d P2.
+op in_supp (x, d:'a distr) : bool = 0%r < mu_x d x.
 
-op mu_weight(d:'a distr): real = mu d cPtrue.
+(** Axioms *)
+axiom mu_bounded : forall (d:'a distr, p:'a cPred), 
+  0%r <= mu d p /\ mu d p <= 1%r.
 
-op mu_x(d:'a distr, x): real = mu d (cPeq x).
+axiom mu_false : forall (d:'a distr), mu d cPfalse = 0%r.
 
-(** Support *)
-op in_supp (x, d:'a distr): bool = mu_x d x <> 0%r.
+axiom mu_or : forall (d:'a distr, p, q:'a cPred), 
+  mu d (cPor p q) = mu d p + mu d q - mu d (cPand p q).
+
+axiom mu_sub : forall (d:'a distr, p, q:'a cPred), p <= q => mu d p <= mu d q.
 
 (** Lemmas *)
-lemma mu_weight_0 : forall (d:'a distr),
-  (mu_weight d = 0%r => forall P, mu d P = 0%r) /\
-  ((forall P, mu d P = 0%r) => mu_weight d = 0 %r).
+lemma mu_disjoint : forall (d:'a distr, p, q:'a cPred),
+  (cPand p q <= cPfalse) => mu d (cPor p q) = mu d p + mu d q
+by [].
+
+lemma mu_not : forall (d:'a distr, p:'a cPred), 
+  mu d (cPnot p) = mu d cPtrue - mu d p.
 proof.
-intros d;split.
-  intros H P;cut upper_bound: (mu d P <= mu d cPtrue);
-  [ apply (mu_incl<:'a> P cPtrue d _);trivial |
-    trivial ].
-  trivial.
-save.
+  intros d p.
+  cut H: (forall (x y z:real), x + z = y => x = y - z); [trivial | ].
+  apply (H (mu d (cPnot p)) (mu d cPtrue) (mu d p) _).
+  cut H1: (mu d cPtrue = mu d (cPor (cPnot p) p)); trivial.
+qed.
 
-(* Unit Distribution *)
+lemma mu_weight_0 : forall (d:'a distr),
+  weight d = 0%r => forall p, mu d p = 0%r
+by [].
+
+(** Point distribution *)
 theory Dunit.
-  op dunit: 'a -> 'a distr.
+  op dunit : 'a -> 'a distr.
 
-  axiom mu_def_in: forall x (P:'a cPred),
-    P x => mu (dunit x) P = 1%r.
+  axiom mu_def_in : forall (x:'a, p:'a cPred), p x => mu (dunit x) p = 1%r.
 
-  axiom mu_def_notin: forall x (P:'a cPred), 
-    !P x => mu (dunit x) P = 0%r.
+  lemma mu_def_notin : 
+    forall (x:'a, p:'a cPred), !p x => mu (dunit x) p = 0%r by [].
+ 
+  lemma mu_x_def_eq : forall (x:'a), mu_x (dunit x) x = 1%r by [].
 
-  lemma mu_x_def_eq: forall (x:'a),
-    mu_x (dunit x) x = 1%r
-  by [].
+  lemma mu_x_def_neq : forall (x y:'a), x <> y => mu_x (dunit x) y = 0%r by [].
 
-  lemma mu_x_def_neq: forall (x y:'a),
-    x <> y => mu_x (dunit x) y = 0%r
-  by [].
+  lemma supp_def : forall (x y:'a), in_supp x (dunit y) <=> x = y by [].
 
-  lemma supp_def: forall (x1 x2:'a), 
-    in_supp x1 (dunit x2) <=> x1 = x2
-  by [].
-
-  lemma mu_weight: forall (x:'a),
-     mu_weight (dunit x) = 1%r
-  by [].
+  lemma lossless : forall (x:'a), weight (dunit x) = 1%r by [].
 end Dunit.
 
 (** FIXME/ TODO 
@@ -68,56 +64,63 @@ end Dunit.
  * i.e as in Dunit
 *)
 
-(* Uniform distribution on (closed) integer intervals *)
+(** Uniform distribution on (closed) integer intervals *)
 theory Dinter.
-  op dinter: int -> int -> int distr.
+  op dinter : int -> int -> int distr.
 
-  axiom supp_def: forall i j x,
+  axiom supp_def : forall (i j x:int),
     in_supp x (dinter i j) <=> i <= x /\ x <= j.
 
-  axiom mu_x_def_in: forall i j x,
+  (* We could use sums to generalize this:
+  axiom mu_x_def : forall (i j:int) (p:int cPred),
+    mu (dinter i j) p = (sum i j p)%r / (j - i + 1)%r.
+  *)
+
+  axiom mu_x_def_in : forall (i j x:int),
     in_supp x (dinter i j) =>
     mu_x (dinter i j) x = 1%r / (j - i + 1)%r.
 
-  axiom mu_x_def_nin: forall (i j x:int),
-    !in_supp x (dinter i j) =>  mu_x (dinter i j) x = 0%r.
+  axiom mu_x_def_notin: forall (i j x:int),
+    !in_supp x (dinter i j) => mu_x (dinter i j) x = 0%r.
 
-  axiom mu_weight_le: forall (i j:int), i <= j =>
-    mu_weight (dinter i j) = 1%r.
- 
-  axiom mu_weight_gt: forall (i j:int), j < i =>
-    mu_weight (dinter i j) = 0%r.
+  axiom weight_def : forall (i j:int), 
+    weight (dinter i j) = if i <= j then 1%r else 0%r.
 end Dinter.
 
-(* Normalization of a sub-distribution *)
+(** Normalization of a sub-distribution *)
 theory Dscale.
-  op dscale: 'a distr -> 'a distr.
+  op dscale : 'a distr -> 'a distr.
 
-  axiom supp_def: forall (d:'a distr) x,
+  axiom supp_def : forall (d:'a distr, x:'a),
     in_supp x (dscale d) <=> in_supp x d.
 
-  axiom mu_x_def_0: forall (d:'a distr, x:'a),
-    mu_weight d = 0%r => 
-    mu_x (dscale d) x = 0%r.
+  axiom mu_x_def_0: forall (d:'a distr),
+    weight d = 0%r =>
+    forall (p:'a cPred), mu (dscale d) p = 0%r.
 
-  axiom mu_x_def_diff: forall (d:'a distr, x:'a),
-    mu_weight d <> 0%r =>
-    mu_x (dscale d) x = mu_x d x / mu_weight d.  
+  axiom mu_x_def_pos : forall (d:'a distr),
+    0%r < weight d =>
+    forall (p:'a cPred), mu (dscale d) p = mu d p / weight d.  
 
-  axiom mu_weight_0 : forall (d:'a distr),
-    mu_weight d = 0%r => 
-    mu_weight (dscale d) = 0%r.
+  lemma weight_0 : forall (d:'a distr),
+    weight d = 0%r => weight (dscale d) = 0%r
+  by [].
 
-  axiom mu_weight_1 : forall (d:'a distr),
-    mu_weight d <> 0%r => 
-    mu_weight (dscale d) = 1%r.
+  lemma weight_pos : forall (d:'a distr),
+    0%r < weight d => weight (dscale d) = 1%r.
+  proof.
+   intros d H.
+   delta weight; simplify.
+   rewrite (mu_x_def_pos<:'a> d _ cPtrue); trivial.
+  qed.
+  
 end Dscale.
 
 (* Laplacian *) (* TODO: This is drafty! *)
 theory Dlap.
-  op dlap: int -> real -> int distr.
+  op dlap : int -> real -> int distr.
 
-  axiom in_supp: forall mean scale x, 
+  axiom in_supp : forall mean scale x, 
     0%r <= scale => in_supp x (dlap mean scale).
 
 (*
@@ -127,8 +130,8 @@ theory Dlap.
       (1%r / (2%r*scale))
     * real.exp( -! (| x%r - mean%r|)) / scale. 
 *)
-  axiom mu_weight: forall mean scale, 
-    0%r <= scale => mu_weight (dlap mean scale) = 1%r.
+  axiom lossless: forall mean scale, 
+    0%r <= scale => weight (dlap mean scale) = 1%r.
 
 (* x = $dlap(x1,s)   ~ x = $dlap(0,s) + x1 : ={x1,s} ==> ={x}. *)
 end Dlap.

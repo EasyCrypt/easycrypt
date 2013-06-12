@@ -48,9 +48,8 @@ type plpattern_r =
   | LPTuple  of psymbol list
 and plpattern = plpattern_r located
 
-
 type ptybinding  = psymbol list * pty
-and ptybindings = ptybinding list
+and  ptybindings = ptybinding list
 
 and pexpr_r =
   | PEint      of int                               (* int. literal       *)
@@ -59,26 +58,28 @@ and pexpr_r =
   | PElet      of plpattern * pexpr * pexpr         (* let binding        *)
   | PEtuple    of pexpr list                        (* tuple constructor  *)
   | PEif       of pexpr * pexpr * pexpr             (* _ ? _ : _          *)
-  | PElambda   of ptybindings * pexpr
-and pexpr     = pexpr_r     located
+  | PElambda   of ptybindings * pexpr               (* lambda abstraction *)
+
+and pexpr = pexpr_r located
 
 (* -------------------------------------------------------------------- *)
-
 type plvalue_r =
   | PLvSymbol of pqsymbol
   | PLvTuple  of pqsymbol list
   | PLvMap    of pqsymbol * ptyannot option * pexpr
-and plvalue   = plvalue_r   located
 
-type pinstr =
+and plvalue = plvalue_r located
+
+type pinstr_r =
   | PSasgn   of plvalue * pexpr
   | PSrnd    of plvalue * pexpr
-  | PScall   of plvalue option * pqsymbol * pexpr list
+  | PScall   of plvalue option * pqsymbol * (pexpr list) located
   | PSif     of pexpr * pstmt * pstmt
   | PSwhile  of pexpr * pstmt
   | PSassert of pexpr
 
-and pstmt = pinstr list
+and pinstr = pinstr_r located
+and pstmt  = pinstr list
 
 (* -------------------------------------------------------------------- *)
 type pmodule_type = pqsymbol 
@@ -195,6 +196,7 @@ type pop_def =
   | POconcr of ptybindings * pty * pexpr
 
 type poperator = {
+  po_kind   : [`Op | `Const];
   po_name   : psymbol;
   po_tyvars : psymbol list option;
   po_def    : pop_def
@@ -294,7 +296,7 @@ type phltactic =
   | Pfission    of (tac_side * codepos * (int * (int * int)))
   | Pfusion     of (tac_side * codepos * (int * (int * int)))
   | Punroll     of (tac_side * codepos)
-  | Psplitwhile  of (pexpr * tac_side * codepos )
+  | Psplitwhile of (pexpr * tac_side * codepos )
   | Pcall       of tac_side * (pformula * pformula)
   | Prcond      of (bool option * bool * int)
   | Pcond       of tac_side
@@ -310,6 +312,8 @@ type phltactic =
   | Phoare
   | Pbdhoare
   | Pprbounded
+  | Pprfalse
+  | Ppror
   | Pbdeq 
 
 and pinline_arg =

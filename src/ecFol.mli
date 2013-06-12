@@ -210,6 +210,7 @@ val f_real_lt  : form -> form -> form
 
 val f_real_div   : form -> form -> form
 val f_real_sum   : form -> form -> form
+val f_real_sub   : form -> form -> form
 val f_real_prod  : form -> form -> form
 
 val fop_in_supp  : EcTypes.ty -> form
@@ -322,6 +323,8 @@ val f_subst   : f_subst -> form -> form
 
 val f_subst_local : EcIdent.t -> form -> form -> form 
 val f_subst_mem   : EcIdent.t -> EcIdent.t -> form -> form 
+val f_subst_mod   : EcIdent.t -> EcPath.mpath -> form -> form 
+
 module Fsubst :
   sig
     val uni : EcTypes.ty EcUidgen.Muid.t -> form -> form

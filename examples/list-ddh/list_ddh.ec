@@ -39,7 +39,7 @@ module LDDH0(A : LDDH_DISTINGUISHER) = {
       r = None;
 
       if (c < q_t) {
-        t := DH_distrs.sample_dh();
+        t  = DH_distrs.sample_dh();
         r = Some(t);
         c = c + 1;
       }
@@ -51,7 +51,7 @@ module LDDH0(A : LDDH_DISTINGUISHER) = {
   fun main() : bool = {
     var b : bool;
     O.c = 0;
-    b := AD.dist();
+    b  = AD.dist();
     return b;
   }
 }.
@@ -68,7 +68,7 @@ module LDDH1(A : LDDH_DISTINGUISHER) = {
       var r : (group * group * group) option;
       r = None;
       if (c < q_t) {
-        t := DH_distrs.sample_random();
+        t  = DH_distrs.sample_random();
         r = Some(t);
         c = c + 1;
       }
@@ -80,7 +80,7 @@ module LDDH1(A : LDDH_DISTINGUISHER) = {
   fun main() : bool = {
     var b : bool;
     O.c = 0;
-    b := AD.dist();
+    b  = AD.dist();
     return b;
   }  
 }.
@@ -101,9 +101,9 @@ module LDDH_Hyb(A : LDDH_DISTINGUISHER) = {
 
       if (c < q_t) {
         if (c < i) {
-          t  := DH_distrs.sample_random();
+          t   = DH_distrs.sample_random();
         } else {
-          t := DH_distrs.sample_dh();
+          t  = DH_distrs.sample_dh();
         }
         r = Some(t);
         c = c + 1;
@@ -118,7 +118,7 @@ module LDDH_Hyb(A : LDDH_DISTINGUISHER) = {
     var b : bool;
     i = ia;
     O.c = 0;
-    b := AD.dist();
+    b  = AD.dist();
     return b;
   }  
 }.
@@ -130,7 +130,7 @@ lemma DDH0_Hybrid0: forall (A <: LDDH_DISTINGUISHER {LDDH_Hyb, DH_distrs}),
 proof.
   intros A.
   fun.
-  app 2 1 :
+  seq 2 1 :
     (    (glob A){1} = (glob A){2} /\ LDDH_Hyb.i{1} = 0
      /\ LDDH_Hyb.O.c{1} = LDDH0.O.c{2} /\ LDDH0.O.c{2} = 0).
   wp.
@@ -147,10 +147,10 @@ proof.
   trivial.
   trivial.
   fun.
-  app 0 0 : (   LDDH_Hyb.i{1} = 0 /\ LDDH_Hyb.O.c{1} = LDDH0.O.c{2}
+  seq 0 0 : (   LDDH_Hyb.i{1} = 0 /\ LDDH_Hyb.O.c{1} = LDDH0.O.c{2}
              /\ LDDH_Hyb.O.c{1} >= 0).
     admit. (* sidestep Bug? above *)
-  app 1 1 : (   r{1} = None /\ r{1} = r{2} /\ LDDH_Hyb.i{1} = 0
+  seq 1 1 : (   r{1} = None /\ r{1} = r{2} /\ LDDH_Hyb.i{1} = 0
              /\ LDDH_Hyb.O.c{1} = LDDH0.O.c{2} /\ LDDH_Hyb.O.c{1} >= 0).
     wp.
     skip.

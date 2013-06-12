@@ -101,7 +101,7 @@ let _ = EcPException.register (fun fmt exn ->
 let tacerror error = raise (TacError error)
 
 let tacuerror fmt =
-  Printf.ksprintf
+  Format.ksprintf
     (fun msg -> raise (TacError (User msg)))
     fmt
 

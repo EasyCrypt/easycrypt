@@ -289,68 +289,73 @@ end
 exception MatchFailure
 
 (* Rigid unification, don't cross binders *)
-let rec f_match env (ev : form evmap) ptn subject =
-  match ptn.f_node, subject.f_node with
-  | Flocal x1, Flocal x2 when id_equal x1 x2 -> ev
+let f_match (env, hyps) ue ev ptn subject =
+  let ue = EcUnify.UniEnv.copy ue in
+  let ev = let Ev ev = ev in ref ev in
 
-  | Flocal x, _ -> begin
-      let Ev ev = ev in
-        match Mid.find_opt x ev with
+  let rec doit ptn subject =
+    match ptn.f_node, subject.f_node with
+    | Flocal x1, Flocal x2 when id_equal x1 x2 -> ()
+  
+    | Flocal x, _ -> begin
+        match Mid.find_opt x !ev with
         | None ->
             raise MatchFailure
 
         | Some None ->
-            Ev (Mid.add x (Some subject) ev)
+            ev := Mid.add x (Some subject) !ev
 
         | Some (Some a) -> begin
-            let hyps = { h_tvar = []; h_local = []; } in
-              if not (EcReduction.is_alpha_eq env hyps subject a) then
-                raise MatchFailure;
-              Ev ev
+            if not (EcReduction.is_alpha_eq env hyps subject a) then
+              raise MatchFailure
         end
-  end
-
-  | Fpvar (pv1, m1), Fpvar (pv2, m2) ->
-      let pv1 = EcEnv.NormMp.norm_pvar env pv1 in
-      let pv2 = EcEnv.NormMp.norm_pvar env pv2 in
-        if not (EcTypes.pv_equal pv1 pv2) then
+    end
+  
+    | Fpvar (pv1, m1), Fpvar (pv2, m2) ->
+        let pv1 = EcEnv.NormMp.norm_pvar env pv1 in
+        let pv2 = EcEnv.NormMp.norm_pvar env pv2 in
+          if not (EcTypes.pv_equal pv1 pv2) then
+            raise MatchFailure;
+          if not (EcMemory.mem_equal m1 m2) then
+            raise MatchFailure
+  
+    | Fif (c1, t1, e1), Fif (c2, t2, e2) ->
+        List.iter2 doit [c1; t1; e1] [c2; t2; e2]
+  
+    | Fint i1, Fint i2 ->
+        if i1 <> i2 then raise MatchFailure
+  
+    | Fapp (f1, fs1), Fapp (f2, fs2) ->
+        if List.length fs1 <> List.length fs2 then
           raise MatchFailure;
-        if not (EcMemory.mem_equal m1 m2) then
+        List.iter2 doit (f1::fs1) (f2::fs2)
+  
+    | Fop (op1, tys1), Fop (op2, tys2) -> begin
+        if not (EcPath.p_equal op1 op2) then
           raise MatchFailure;
-        ev
+        try  List.iter2 (EcUnify.unify env ue) tys1 tys2
+        with EcUnify.UnificationFailure _ -> raise MatchFailure
+    end
+  
+    | Fglob (mp1, me1), Fglob (mp2, me2) ->
+        let mp1 = EcEnv.NormMp.norm_mpath env mp1 in
+        let mp2 = EcEnv.NormMp.norm_mpath env mp2 in
+          if not (EcPath.m_equal mp1 mp2) then
+            raise MatchFailure;
+          if not (EcMemory.mem_equal me1 me2) then
+            raise MatchFailure
+  
+    | _, _ -> raise MatchFailure
 
-  | Fif (c1, t1, e1), Fif (c2, t2, e2) ->
-      List.fold_left2 (f_match env) ev [c1; t1; e1] [c2; t2; e2]
+  in
+    doit ptn subject; (ue, Ev !ev)
 
-  | Fint i1, Fint i2 ->
-      if i1 <> i2 then raise MatchFailure;
-      ev
-
-  | Fapp (f1, fs1), Fapp (f2, fs2) ->
-      if List.length fs1 <> List.length fs2 then
-        raise MatchFailure;
-      List.fold_left2 (f_match env) ev (f1::fs1) (f2::fs2)
-
-  | Fop (op1, tys1), Fop (op2, tys2) ->
-      if not (EcPath.p_equal op1 op2) then
-        raise MatchFailure;
-      if not (List.all2 (EcReduction.equal_type env) tys1 tys2) then
-        raise MatchFailure;
-      ev
-
-  | Fglob (mp1, me1), Fglob (mp2, me2) ->
-      let mp1 = EcEnv.NormMp.norm_mpath env mp1 in
-      let mp2 = EcEnv.NormMp.norm_mpath env mp2 in
-        if not (EcPath.m_equal mp1 mp2) then
-          raise MatchFailure;
-        if not (EcMemory.mem_equal me1 me2) then
-          raise MatchFailure;
-        ev
-
-  | _, _ -> raise MatchFailure
-
-let f_match env ev ~ptn subject =
-  let Ev ev = f_match env ev ptn subject in
+let f_match (env, hyps) (ue, ev) ~ptn subject =
+  let (ue, Ev ev) = f_match (env, hyps) ue ev ptn subject in
     if not (Mid.for_all (fun _ x -> x <> None) ev) then
       raise MatchFailure;
-    Ev ev
+    let clue =
+      try  EcUnify.UniEnv.close ue
+      with EcUnify.UninstanciateUni _ -> raise MatchFailure
+    in
+      (ue, clue, Ev ev)

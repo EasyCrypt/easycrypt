@@ -10,4 +10,4 @@ module M = {
 lemma foo : hoare [M.f : true ==> res = 1 /\ M.y = 1 ].
 proof.
  fun.
- app 1 : (M.y = z).
+ seq 1 : (M.y = z).

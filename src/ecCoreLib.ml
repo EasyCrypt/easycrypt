@@ -38,6 +38,7 @@ let id_le        = "<="
 let id_lt        = "<"
 
 let id_sum         = "+"
+let id_sub         = "-"
 let id_prod        = "*"
 let id_div         = "/"
 
@@ -84,6 +85,7 @@ let _Real id     = EcPath.pqname p_Real id
 let p_real_le    = _Real id_le
 let p_real_lt    = _Real id_lt   
 let p_real_sum    = _Real id_sum
+let p_real_sub    = _Real id_sub
 let p_real_prod   = _Real id_prod
 let p_real_div    = _Real id_div   
 

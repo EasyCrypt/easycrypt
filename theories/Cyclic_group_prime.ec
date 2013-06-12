@@ -34,7 +34,7 @@ theory Dgroup.
   axiom mu_x_def_in: forall (s:group),
     mu_x dgroup s = 1%r/q%r.
 
-  axiom mu_weight_pos: mu_weight dgroup = 1%r.
+  axiom lossless: weight dgroup = 1%r.
 
 end Dgroup.
 

@@ -457,18 +457,24 @@ module MC = struct
       end
 
       | IPIdent (id, None) ->
-        Some (env.env_current, EcIdent.name id) (* PY : check this *)
+          Some (env.env_current, EcIdent.name id)
 
       | IPIdent (m, Some p) ->
           let prefix = EcPath.prefix p in
-          let name = EcPath.basename p in
+          let name   = EcPath.basename p in
             omap
               (Mip.find_opt (IPIdent (m, prefix)) env.env_comps)
               (fun mc -> (mc, name))
     in
-      match obind mcx (fun (mc, x) -> MMsym.last x (proj mc)) with
-      | None     -> None
-      | Some obj -> Some (_params_of_ipath p env, snd obj)
+
+    let lookup (mc, x) =
+      List.filter
+        (fun (ip, _) -> IPathC.compare ip p = 0)
+        (MMsym.all x (proj mc))
+    in
+      match omap mcx lookup with
+      | None | Some [] -> None
+      | Some (obj :: _) -> Some (_params_of_ipath p env, snd obj)
 
   (* ------------------------------------------------------------------ *)
   let path_of_qn (top : EcPath.path) (qn : symbol list) =
@@ -1512,10 +1518,10 @@ module NormMp = struct
       end
     end
 
-  let rec add_uses env rm us mp = 
-    let mp = norm_mpath env mp in
+  let rec add_uses env rm us mp =
+    let mp  = norm_mpath env mp in
     let top = EcPath.m_functor mp in
-    let us = 
+    let us  =
       if EcPath.Sm.mem top rm then us 
       else
         let us = 

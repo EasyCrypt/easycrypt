@@ -69,9 +69,9 @@ module ValidScheme(S:Scheme) = {
     var c  : ciphertext;
     var d  : plaintext;
 
-    (sk,pk) := S.kg();
-    c       := S.enc(pk, m);
-    d       := S.dec(sk, c); 
+    (sk,pk)  = S.kg();
+    c        = S.enc(pk, m);
+    d        = S.dec(sk, c); 
 
     return (m = d);
   }
@@ -87,11 +87,11 @@ module CPA (S:Scheme, A:Adv) = {
     var b  : bool;
     var b' : bool;
 
-    (sk,pk) := S.kg();
-    (m0,m1) := A.a1(pk);
+    (sk,pk)  = S.kg();
+    (m0,m1)  = A.a1(pk);
     b        = ${0,1};
-    c       := S.enc(pk, b ? m1 : m0);
-    b'      := A.a2(c);
+    c        = S.enc(pk, b ? m1 : m0);
+    b'       = A.a2(c);
  
     return (b = b');
   } 
@@ -153,7 +153,7 @@ module DDH0 (I:Inverter) = {
 
     x  = $[0..q-1];
     y  = $[0..q-1];
-    d := I.inv(g^x, g^y, g^(x*y));
+    d  = I.inv(g^x, g^y, g^(x*y));
 
     return d;
   }     
@@ -169,7 +169,7 @@ module DDH1(I:Inverter) = {
     x  = $[0..q-1];
     y  = $[0..q-1];
     z  = $[0..q-1]; 
-    d := I.inv(g^x, g^y, g^z);
+    d  = I.inv(g^x, g^y, g^z);
 
     return d;
   }     
@@ -183,10 +183,10 @@ module Inv (A:Adv) : Inverter = {
     var b : bool;
     var b' : bool;
  
-    (m0, m1) := A.a1(gx);
+    (m0, m1)  = A.a1(gx);
     b         = ${0,1};
     c         = (gy, gz * (b ? m1 : m0));
-    b'       := A.a2(c);
+    b'        = A.a2(c);
     return (b = b');
   }
 }.
@@ -210,12 +210,12 @@ module G1(A:Adv) = {
     y         = $[0..q-1];
     gx        = g^x;
     gy        = g^y;
-    (m0, m1) := A.a1 (gx);
+    (m0, m1)  = A.a1 (gx);
     b         = ${0,1};
     z         = $[0..q-1];
     gz        = g^z;
     c         = (gy, gz * (b ? m1 : m0) );
-    b'       := A.a2 (c);
+    b'        = A.a2 (c);
 
     return (b = b');
   }
@@ -240,11 +240,11 @@ module G2(A:Adv) = {
     y         = $[0..q-1];
     gx        = g^x;
     gy        = g^y;
-    (m0, m1) := A.a1(gx);
+    (m0, m1)  = A.a1(gx);
     z         = $[0..q-1];
     gz        = g^z;
     c         = (gy, gz); 
-    b'        := A.a2 (c);
+    b'         = A.a2 (c);
     b         = ${0,1};
 
     return (b = b');

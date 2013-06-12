@@ -1,4 +1,5 @@
 require import Int.
+require import Real.
 
 module M = {
   fun f(x : int, y : int) : int = {
@@ -14,7 +15,7 @@ module M = {
   }
 }.
 
-lemma h : hoare[M.g : a = a ==> res = res].
+lemma h : bd_hoare[M.g : a = a ==> res = res] = 1%r.
 proof.
   fun; inline M.f. wp; skip; trivial.
 save.

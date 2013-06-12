@@ -73,7 +73,7 @@
     "field_simplify", FIELDSIMP;        (* KW: tactic *)
 
     (* PHL: tactics *)
-    "app"         , APP        ;        (* KW: tactic *)
+    "seq"         , SEQ        ;        (* KW: tactic *)
     "wp"          , WP         ;        (* KW: tactic *)
     "skip"        , SKIP       ;        (* KW: tactic *)
     "call"        , CALL       ;        (* KW: tactic *)
@@ -83,6 +83,8 @@
     "rnd"         , RND        ;        (* KW: tactic *)
     "bdhoare_deno", BDHOAREDENO;  
     "pr_bounded"  , PRBOUNDED  ;  
+    "pr_false"    , PRFALSE    ;  
+    "pr_or"       , PROR       ;  
     "bd_eq"       , BDEQ       ;  
 
     (* KW: tactic *) 
@@ -108,6 +110,7 @@
     "export"      , EXPORT     ;        (* KW: global *)
     "module"      , MODULE     ;        (* KW: global *)
     "of"          , OF         ;        (* KW: global *)
+    "const"       , CONST      ;        (* KW: global *)
     "op"          , OP         ;        (* KW: global *)
     "pred"        , PRED       ;        (* KW: global *)
     "require"     , REQUIRE    ;        (* KW: global *)

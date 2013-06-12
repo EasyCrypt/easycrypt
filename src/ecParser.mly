@@ -129,7 +129,6 @@
 %token ADD
 %token ADMIT
 %token ALIAS
-%token APP
 %token APPLY
 %token ARROW
 %token AS
@@ -157,6 +156,7 @@
 %token COMMA
 %token COMPUTE
 %token CONSEQ
+%token CONST
 %token CUT
 %token DATATYPE
 %token DEBUG
@@ -220,7 +220,9 @@
 %token PRBOUNDED
 %token PRED
 %token PRINT
+%token PRFALSE
 %token PROOF
+%token PROR
 %token PROVER
 %token QED
 %token QUESTION
@@ -240,6 +242,7 @@
 %token SAMPLE
 %token SAVE
 %token SEMICOLON
+%token SEQ
 %token SIMPLIFY
 %token SKIP
 %token SPLIT
@@ -462,37 +465,35 @@ sexpr_u:
    { peset (EcLocation.make $startpos $endpos) ti se e1 e2 }
 
 | TICKPIPE ti=tvars_app? e=expr PIPE 
-    { peapp_symb e.pl_loc EcCoreLib.s_abs ti [e] }
-
-| LPAREN es=plist2(expr, COMMA) RPAREN
-   { PEtuple es }
-
-| LPAREN e=expr_u RPAREN
-   { e }
+   { peapp_symb e.pl_loc EcCoreLib.s_abs ti [e] }
 
 | LBRACKET ti=tvars_app? es=loc(plist0(expr, SEMICOLON)) RBRACKET  
    { unloc (pelist es.pl_loc ti es.pl_desc) } 
 
 | LBRACKET ti=tvars_app? e1=expr op=loc(DOTDOT) e2=expr RBRACKET
-    { let id =
-        PEident (mk_loc op.pl_loc EcCoreLib.s_dinter, ti)
-      in
-        PEapp(mk_loc op.pl_loc id, [e1; e2]) }
+   { let id =
+       PEident (mk_loc op.pl_loc EcCoreLib.s_dinter, ti)
+     in
+       PEapp(mk_loc op.pl_loc id, [e1; e2]) }
+
+| LPAREN es=plist0(expr, COMMA) RPAREN
+   { PEtuple es }
 
 | r=loc(RBOOL)
-    { PEident (mk_loc r.pl_loc EcCoreLib.s_dbool, None) }
+   { PEident (mk_loc r.pl_loc EcCoreLib.s_dbool, None) }
 ;
 
 expr_u:
 | e=sexpr_u { e }
 
-| e=sexpr args=sexpr+ { PEapp (e, args) }
+| e=sexpr args=sexpr+
+    { PEapp (e, args) }
 
 | op=loc(NOT) ti=tvars_app? e=expr
-   { peapp_symb op.pl_loc "!" ti [e] }
+    { peapp_symb op.pl_loc "!" ti [e] }
 
 | op=loc(binop) ti=tvars_app? e=expr %prec prec_prefix_op
-   { peapp_symb op.pl_loc op.pl_desc ti [e] } 
+    { peapp_symb op.pl_loc op.pl_desc ti [e] } 
 
 | e1=expr op=loc(OP1) ti=tvars_app? e2=expr 
     { peapp_symb op.pl_loc op.pl_desc ti [e1; e2] }
@@ -717,7 +718,7 @@ form_u:
 
 | FORALL pd=pgtybindings COMMA e=form { PFforall (pd, e) }
 | EXIST  pd=pgtybindings COMMA e=form { PFexists (pd, e) }
-| LAMBDA pd=ptybindings COMMA e=form { PFlambda (pd, e) }
+| LAMBDA pd=ptybindings  COMMA e=form { PFlambda (pd, e) }
 
 | r=loc(RBOOL) TILD e=sform
     { let id  = PFident (mk_loc r.pl_loc EcCoreLib.s_dbitstring, None) in
@@ -819,22 +820,27 @@ lvalue_u:
 ;
 
 base_instr:
-| x=lvalue EQ e=expr
-    { PSasgn (x, e) }
-
 | x=lvalue EQ SAMPLE e=expr
-    { PSrnd(x,e) }
+    { PSrnd (x, e) }
 
+| x=lvalue EQ e=expr
+    { let islow = function 'a'..'z' -> true | _ -> false in
+      let islow = fun s -> s <> "" && islow s.[0] in
 
-(* -------------------------------------------------------------------- *)
-| x=lvalue CEQ f=qident LPAREN es=plist0(expr, COMMA) RPAREN 
-    { PScall (Some x, f, es) } 
+        match unloc e with
+        | PEapp ( { pl_desc = PEident (({ pl_desc = (_, fx) } as f), None) },
+                 [{ pl_desc = PEtuple es; pl_loc = les; }])
+            when islow fx ->
+          begin
+            PScall (Some x, f, mk_loc les es)
+          end
+        | _ -> PSasgn (x, e) }
 
-| f=qident LPAREN es=plist0(expr, COMMA) RPAREN
+| f=qident LPAREN es=loc(plist0(expr, COMMA)) RPAREN
     { PScall (None, f, es) }
 
 | ASSERT LPAREN c=expr RPAREN 
-     { PSassert c }
+    { PSassert c }
 ;
 
 instr:
@@ -852,11 +858,14 @@ instr:
 ;
 
 block:
-| i=base_instr SEMICOLON { [i] }
-| stmt=brace(stmt)       { stmt }
+| i=loc(base_instr) SEMICOLON
+    { [i] }
+
+| stmt=brace(stmt)
+   { stmt }
 ;
 
-stmt: aout=instr* { aout }
+stmt: aout=loc(instr)* { aout }
 
 (* -------------------------------------------------------------------- *)
 (* Module definition                                                    *)
@@ -875,8 +884,11 @@ loc_decl:
 ;
 
 ret_stmt:
-| RETURN e=expr SEMICOLON { Some e }
-| empty                       { None }
+| RETURN e=expr SEMICOLON
+    { Some e }
+
+| empty
+    { None }
 ;
 
 fun_def_body:
@@ -1082,34 +1094,45 @@ tyvars_decl:
 | LBRACKET tyvars=tident* RBRACKET { Some tyvars }
 | empty { None }
 ;
-    
+
+%inline op_or_const:
+| OP    { `Op }
+| CONST { `Const }
+;
+
 operator:
-| OP x=op_ident tyvars=tyvars_decl COLON sty=loc(type_exp) {
-    { po_name   = x;
+| k=op_or_const x=op_ident tyvars=tyvars_decl COLON sty=loc(type_exp) {
+    { po_kind   = k;
+      po_name   = x;
       po_tyvars = tyvars;
       po_def    = POabstr sty; }
   }
 
-| OP x=op_ident tyvars=tyvars_decl COLON sty=loc(type_exp) EQ b=expr {
-    { po_name   = x;
+| k=op_or_const x=op_ident tyvars=tyvars_decl COLON sty=loc(type_exp) EQ b=expr {
+    { po_kind   = k;
+      po_name   = x;
       po_tyvars = tyvars;
       po_def    = POconcr ([], sty, b); }
   }
 
-| OP x=op_ident tyvars=tyvars_decl eq=loc(EQ) b=expr {
-    { po_name   = x;
+| k=op_or_const x=op_ident tyvars=tyvars_decl eq=loc(EQ) b=expr {
+    { po_kind   = k;
+      po_name   = x;
       po_tyvars = tyvars;
       po_def    = POconcr([], mk_loc eq.pl_loc PTunivar, b); }
   }
 
-| OP x=op_ident tyvars=tyvars_decl p=ptybindings eq=loc(EQ) b=expr {
-    { po_name   = x;
+| k=op_or_const x=op_ident tyvars=tyvars_decl p=ptybindings eq=loc(EQ) b=expr {
+    { po_kind   = k;
+      po_name   = x;
       po_tyvars = tyvars;
       po_def    = POconcr(p, mk_loc eq.pl_loc PTunivar, b); }
   }
-| OP x=op_ident tyvars=tyvars_decl p=ptybindings COLON codom=loc(type_exp)
+
+| k=op_or_const x=op_ident tyvars=tyvars_decl p=ptybindings COLON codom=loc(type_exp)
     EQ b=expr {
-    { po_name   = x;
+    { po_kind   = k;
+      po_name   = x;
       po_tyvars = tyvars;
       po_def    = POconcr(p, codom, b); }
   } 
@@ -1442,8 +1465,8 @@ phltactic:
 | FUN bad=sform p=sform q=sform? 
     { Pfun_upto(bad, p, q) }
 
-| APP d=tac_dir pos=code_position COLON p=sform f=app_bd_info
-   { Papp (d,pos, p,f) }
+| SEQ d=tac_dir pos=code_position COLON p=sform f=app_bd_info
+   { Papp (d, pos, p, f) }
 
 | WP n=code_position?
    { Pwp n }
@@ -1530,6 +1553,8 @@ phltactic:
 | HOARE {Phoare}
 | BDHOARE {Pbdhoare}
 | PRBOUNDED {Pprbounded}
+| PROR {Ppror}
+| PRFALSE {Pprfalse}
 | BDEQ {Pbdeq}
 ;
 

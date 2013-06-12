@@ -238,7 +238,7 @@ type rule_name =
   | RN_hl_unroll    of bool option * codepos
   | RN_hl_splitwhile of EcTypes.expr *  bool option * codepos
   | RN_hl_call      of bool option * EcFol.form * EcFol.form
-  | RN_hl_swap      of bool * int * int * int
+  | RN_hl_swap      of bool option * int * int * int
   | RN_hl_cfold     of bool option * codepos * int option
   | RN_hl_inline    of bool option * s_pat 
   | RN_hl_kill      of bool option * codepos * int option
@@ -250,6 +250,8 @@ type rule_name =
   | RN_hl_deno      
   | RN_hl_hoare_bd_hoare      
   | RN_hl_prbounded      
+  | RN_hl_prfalse      
+  | RN_hl_pror
   | RN_hl_bdeq      
 
   | RN_bhl_rnd of (EcFol.form option * EcFol.form)

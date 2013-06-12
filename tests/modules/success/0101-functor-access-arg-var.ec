@@ -8,6 +8,6 @@ module M(X : I) = {
   var y : t
 
   fun init() : unit = {
-    y := X.f();
+    y  = X.f();
   }
 }.

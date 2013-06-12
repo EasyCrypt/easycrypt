@@ -32,17 +32,13 @@ axiom from_array_get: forall bs i,
 lemma to_array_from_array: forall bs,
   from_array (to_array bs) = bs.
 proof.
-intros bs;
-  apply (extensionality<:bool> (from_array (to_array bs)) bs _);
-  trivial.
+intros bs; apply extensionality; trivial.
 save.
 
 lemma from_array_to_array: forall bs,
   to_array (from_array bs) = bs.
 proof.
-intros bs;
-  apply (Array.extensionality<:bool> (to_array (from_array bs)) bs _);
-  trivial.
+intros bs; apply Array.extensionality; trivial.
 save.
 
 (* Xor *)
@@ -74,9 +70,7 @@ axiom zeros_get: forall (l i:int),
 lemma xor_nilpotent: forall (bs:bitstring),
   bs ^^ bs = zeros (length bs).
 proof.
-intros bs;
-  apply (extensionality<:bool> (bs ^^ bs) (zeros (length bs)) _);
-  trivial.
+intros bs; apply extensionality; trivial.
 save.
 
 lemma xor_assoc : forall (x y z : bitstring), 
@@ -84,7 +78,7 @@ length(x) = length(y) => length(y) = length(z) =>
  (x ^^ y) ^^ z = x ^^ (y ^^ z).
 proof.
  intros x y z Hleq1 Hleq2.
- apply (extensionality<:bool>  ((x ^^ y) ^^ z) (x ^^ (y ^^ z)) _).
+ apply extensionality.
  delta (==);simplify.
  split;try trivial.
  delta (^^);simplify.
@@ -100,9 +94,7 @@ save.
 lemma xor_zeroes_neutral : forall (x : bitstring),
 x ^^ zeros(length(x)) = x.
 proof.
- intros x.
- apply (extensionality<:bool> (x^^ zeros(length x)) x _).
- trivial.
+ intros x; apply extensionality; trivial.
 save.
 
 require import Real.
@@ -112,18 +104,27 @@ require import Distr.
 theory Dbitstring.
   op dbitstring: int -> bitstring distr.
 
-  axiom supp_def: forall (k:int, s:bitstring),
-    in_supp s (dbitstring k) <=> length s = k.
-
   axiom mu_x_def_in: forall (k:int, s:bitstring),
     length s = k => mu_x (dbitstring k) s = 1%r/(2^k)%r.
 
   axiom mu_x_def_other: forall (k:int, s:bitstring),
     length s <> k => mu_x (dbitstring k) s = 0%r.
 
-  axiom mu_weight_pos: forall (k:int), 0 <= k =>
-    mu_weight (dbitstring k) = 1%r.
+  lemma supp_def: forall (k:int, s:bitstring),
+    in_supp s (dbitstring k) <=> length s = k.
+  proof.
+    intros k s; delta in_supp mu; simplify; split; intros H.
+    trivial.
+    rewrite (mu_x_def_in k s _).
+    trivial.
+    cut H1: (0%r < (2 ^ k)%r); [trivial | ].
+    cut H2: (0%r < Real.one * inv (2 ^ k)%r).
+    rewrite <-(Real.Inverse (2 ^ k)%r _); trivial.
+    trivial.  
+  qed.     
 
-  axiom mu_weight_neg: forall (k:int), k < 0 =>
-    mu_weight (dbitstring k) = 0%r.
+  axiom weight_pos: forall (k:int), 0 <= k => weight (dbitstring k) = 1%r.
+
+  lemma mu_weight_neg: forall (k:int), k < 0 => weight (dbitstring k) = 0%r.
+
 end Dbitstring.

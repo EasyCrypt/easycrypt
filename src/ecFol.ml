@@ -625,50 +625,39 @@ let fop_int_lt = f_op EcCoreLib.p_int_lt [] (tfun tint (tfun tint ty_bool))
 let fop_real_le = f_op EcCoreLib.p_real_le [] (tfun treal (tfun treal ty_bool))
 let fop_real_lt = f_op EcCoreLib.p_real_lt [] (tfun treal (tfun treal ty_bool))
 let fop_real_sum = f_op EcCoreLib.p_real_sum [] (tfun treal (tfun treal treal))
+let fop_real_sub = f_op EcCoreLib.p_real_sub [] (tfun treal (tfun treal treal))
 let fop_real_prod = f_op EcCoreLib.p_real_prod [] (tfun treal (tfun treal treal))
 let fop_real_div = f_op EcCoreLib.p_real_div [] (tfun treal (tfun treal treal))
 
-let f_int_le f1 f2 = 
+let f_int_binop op f1 f2 = 
   if ty_equal f1.f_ty tint then 
-    f_app fop_int_le [f1;f2] ty_bool
+    f_app op [f1;f2] ty_bool
   else 
     assert false (* FIXME *)
 
-let f_int_lt f1 f2 = 
-  if ty_equal f1.f_ty tint then 
-    f_app fop_int_lt [f1;f2] ty_bool
-  else 
-    assert false (* FIXME *)
+let f_int_le = f_int_binop fop_int_le
+let f_int_lt = f_int_binop fop_int_lt
 
-let f_real_le f1 f2 = 
+let f_real_cmp cmp f1 f2 = 
   if ty_equal f1.f_ty treal then 
-    f_app fop_real_le [f1;f2] ty_bool
+    f_app cmp [f1;f2] ty_bool
   else 
     assert false (* FIXME *)
 
-let f_real_lt f1 f2 = 
-  if ty_equal f1.f_ty treal then 
-    f_app fop_real_lt [f1;f2] ty_bool
-  else 
-    assert false (* FIXME *)
+let f_real_le = f_real_cmp fop_real_le
+let f_real_lt = f_real_cmp fop_real_lt
 
-let f_real_sum f1 f2 =
+let f_real_binop op f1 f2 =
   if ty_equal f1.f_ty treal && ty_equal f2.f_ty treal then
-    f_app fop_real_sum [f1;f2] ty_real
+    f_app op [f1;f2] ty_real
   else 
     assert false (* FIXME *)
 
-let f_real_prod f1 f2 =
-  if ty_equal f1.f_ty treal && ty_equal f2.f_ty treal then
-    f_app fop_real_prod [f1;f2] ty_real
-  else 
-    assert false (* FIXME *)
+let f_real_sum = f_real_binop fop_real_sum
+let f_real_sub = f_real_binop fop_real_sub
+let f_real_prod = f_real_binop fop_real_prod
+let f_real_div = f_real_binop fop_real_div
 
-let f_real_div f1 f2 =
-  if ty_equal f1.f_ty treal && ty_equal f2.f_ty treal && not (f_equal f2 f_r0) then
-    f_app fop_real_div [f1;f2] ty_real
-  else 
-    assert false (* FIXME *)
 
 let rec gcd a b = if b = 0 then a else gcd b (a mod b)
 
@@ -1177,7 +1166,6 @@ let rec f_subst (s:f_subst) f =
       f_let lp' f1' f2'
   | Flocal id ->
       (try Mid.find id s.fs_loc with _ -> 
-        assert (not s.fs_freshen);
         let ty' = s.fs_ty f.f_ty in
         if f.f_ty == ty' then f else f_local id ty')
   | Fop(p,tys) ->
@@ -1286,7 +1274,11 @@ let f_subst_local x t =
 let f_subst_mem m1 m2 = 
   let s = f_bind_mem f_subst_id m1 m2 in
   fun f -> if Mid.mem m1 f.f_fv then f_subst s f else f
-  
+
+let f_subst_mod x mp =
+  let s = f_bind_mod f_subst_id x mp in
+  fun f -> if Mid.mem x f.f_fv then f_subst s f else f
+
 let f_subst s = 
   if is_subst_id s then identity
   else f_subst s 
