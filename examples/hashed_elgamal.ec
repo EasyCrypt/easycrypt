@@ -36,17 +36,20 @@ const zeros : bitstring = Bitstring.zeros.
 
 axiom pow_mul : forall (x, y:int), (g ^ x) ^ y = g ^ (x * y).
 
-lemma xor_absorb : forall (x:bitstring), x ^^ x = zeros by [].
+lemma xor_absorb : forall (x:bitstring), x ^^ x = zeros 
+by [].
 
-lemma xor_zeros : forall (x:bitstring), zeros ^^ x = x by [].
+lemma xor_zeros : forall (x:bitstring), zeros ^^ x = x 
+by [].
 
 lemma xor_assoc : forall (x, y, z:bitstring), x ^^ (y ^^ z) = (x ^^ y) ^^ z 
 by [].
 
-lemma uniform_total : forall (x:bitstring), Distr.in_supp x uniform by [].
+lemma uniform_total : forall (x:bitstring), Distr.in_supp x uniform 
+by [].
 
 lemma uniform_spec : 
-  forall (x y:bitstring), Distr.mu_x uniform x = Distr.mu_x uniform y
+  forall (x y:bitstring), Distr.mu_x uniform x = Distr.mu_x uniform y 
 by [].
  
 clone RandOrcl as RandOrcl_group with 
@@ -56,9 +59,9 @@ clone RandOrcl as RandOrcl_group with
   op qO = qH,
   op default = zeros.
 
-import RandOrcl_group.
-import ROM.
-import WRO_Set.
+export RandOrcl_group.
+export ROM.
+export WRO_Set.
 
 module type PKE_Scheme = { 
   fun kg() : pkey * skey 
@@ -267,16 +270,13 @@ proof.
   wp; skip; trivial.
 
   intros _ _; fun.
-  seq 0: (1 = 1).
-  skip; trivial.
-  if.
-  inline RO.o; wp.
+  if; inline RO.o; wp.
   rnd 1%r Fun.cPtrue.
   wp; skip; trivial.
   wp; skip; trivial.
   
-  intros _; fun; if.
-  inline RO.o; wp.
+  intros _; fun.
+  if; inline RO.o; wp.
   rnd 1%r Fun.cPtrue.
   wp; skip; trivial.
   wp; skip; trivial.
@@ -285,9 +285,9 @@ proof.
 save.
 
 module G2 (A_:Adv) = { 
-  module S = Hashed_ElGamal(RO)
+  module S  = Hashed_ElGamal(RO)
   module AO = ARO(RO)
-  module A = A_(AO)
+  module A  = A_(AO)
   
   var gxy : group
 
@@ -459,22 +459,12 @@ proof.
      _ _).
   cut W: (forall (x y:real), x = y => x <= y).
   trivial.
-  apply (W 
-    Pr[G1(A).main() @ &m : res \/ mem G1.gxy ARO.log]
-    (Pr[G1(A).main() @ &m : res{hr}] +
-     Pr[G1(A).main() @ &m : mem G1.gxy{hr} ARO.log{hr}] -
-     Pr[G1(A).main() @ &m : res{hr} /\ mem G1.gxy{hr} ARO.log{hr}]) _).
+  apply W.
   pr_or.
-  trivial.
-  cut W: (0%r <= Pr[G1(A).main() @ &m : res{hr} /\ mem G1.gxy{hr} ARO.log{hr}]).
   trivial.
   cut V: (forall (x y z:real), 0%r <= z => x + y - z <= x + y).
   trivial.
-  apply (V 
-    Pr[G1(A).main() @ &m : res{hr}]
-    Pr[G1(A).main() @ &m : mem G1.gxy{hr} ARO.log{hr}]
-    Pr[G1(A).main() @ &m : res{hr} /\ mem G1.gxy{hr} ARO.log{hr}] _).
-  trivial.
+  apply V; trivial.
 save.
 
 lemma Pr_G1_G2_res (A <: Adv {CPA, G1, G2, SCDH, RO, ARO, Hashed_ElGamal}) &m : 
@@ -499,8 +489,7 @@ proof.
   intros H.
   cut H1 : (bd_hoare[G2(A).main : true ==> res] = (1%r / 2%r)).
   fun; rnd (1%r / 2%r) (lambda b, b' = b); simplify.
-  conseq (_ : true ==> true).
-  trivial.
+  conseq (_ : _ ==> true).
   intros &m1.
   cut W : (mu {0,1} (Fun.cPeq b'{m1}) = 1%r / 2%r); [trivial | assumption].
   admit.
@@ -529,13 +518,17 @@ lemma Reduction (A <: Adv {CPA, G1, G2, SCDH, RO, ARO, Hashed_ElGamal}) &m :
 proof. 
   intros H.  
   apply (Real.Trans 
-    Pr[CPA(A).main() @ &m : res] 
-    Pr[G1(A).main() @ &m : res \/ mem G1.gxy ARO.log] 
+    Pr[CPA(A).main() @ &m : res]
+    Pr[G1(A).main() @ &m : res \/ mem G1.gxy ARO.log]
     (1%r / 2%r + Pr[SCDH(SCDH_from_CPA(A)).main() @ &m : res]) _ _).
   apply (Pr_CPA_G1 (<:A) &m _); assumption.
+  apply (Real.Trans
+    Pr[G1(A).main() @ &m : res \/ mem G1.gxy ARO.log]
+    (Pr[G1(A).main() @ &m : res] + Pr[G1(A).main() @ &m : mem G1.gxy ARO.log])
+    (1%r / 2%r + Pr[SCDH(SCDH_from_CPA(A)).main() @ &m : res]) _ _).
+  apply (Pr_G1_G1 (<:A) &m _); first assumption.
   rewrite (Pr_G1_G2_res (<:A) &m).
-  rewrite (Pr_G1_G1 (<:A) &m _); first assumption.
-  rewrite (Pr_G2 (<:A) &m _); first assumption.
+  rewrite (Pr_G2 (<:A) &m _); first assumption. 
   rewrite (Pr_G1_G2_mem (<:A) &m).  
   rewrite (Pr_G2_SCDH (<:A) &m _); first assumption.
   apply Real.Refl.
@@ -545,18 +538,15 @@ lemma Security (A <: Adv {CPA, G1, G2, SCDH, RO, ARO, Hashed_ElGamal}) &m :
   (forall (O <: ARO),
    bd_hoare[ O.o : true ==> true] = 1%r =>
    bd_hoare[ A(O).guess : true ==> true] = 1%r) =>
-  exists (B<:SCDH_Adversary), 
+  exists (B <: SCDH_Adversary), 
     Pr[CPA(A).main() @ &m : res] - 1%r / 2%r <= 
-    Pr[SCDH(SCDH_from_CPA(A)).main() @ &m : res].
+    Pr[SCDH(B).main() @ &m : res].
 proof.
   intros H.
-  exists (<:SCDH_from_CPA(A)).
+  exists (<: SCDH_from_CPA(A)).
   cut aux : (forall (x, y:real), x <= 1%r / 2%r + y => x - 1%r / 2%r <= y). 
   trivial.
-  apply (aux 
-    Pr[CPA(A).main() @ &m : res] 
-    Pr[SCDH(SCDH_from_CPA(A)).main() @ &m : res] _).
-  apply (Reduction (<:A) &m _);assumption.
+  apply aux; apply (Reduction (<:A) &m _); assumption.
 save.
 
 lemma Correctness : 
