@@ -17,8 +17,6 @@
   :type  'string
   :group 'easycrypt-config)
 
-(defconst easycrypt-shell-init-cmd "require import Logic. ")
-
 ;; ======== Configuration of generic modes ========
 
 (defun easycrypt-config ()
@@ -68,8 +66,6 @@
   ; Silent/verbose mode for batch processing
   (setq proof-shell-start-silent-cmd "pragma silent. "
         proof-shell-stop-silent-cmd  "pragma verbose. ")
-
-  ;; (setq proof-shell-init-cmd easycrypt-shell-init-cmd)
 
   (easycrypt-init-syntax-table)
   ;; we can cope with nested comments
