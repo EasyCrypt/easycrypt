@@ -294,6 +294,8 @@
 %left OP3 STAR
 %left OP4 
 
+%right SEMICOLON
+
 %nonassoc prec_prefix_op
 
 %type <EcParsetree.global EcLocation.located> global
@@ -1642,17 +1644,18 @@ code_position:
 ;
 
 tactics:
-| t=loc(tactic)                        { [t] }
-| t=loc(tactic) SEMICOLON ts=tactics2  { t::ts }
+| t=loc(tactic) %prec SEMICOLON { [t] }
+| t=loc(tactic) SEMICOLON ts=tactics2  { t:: (List.rev ts) }
 ;
 
 tactics0:
-| ts=tactics    { Pseq ts } 
-| x=loc(empty)  { Pseq [mk_loc x.pl_loc (Pidtac None)] }
+| ts=tactics   { Pseq ts } 
+| x=loc(empty) { Pseq [mk_loc x.pl_loc (Pidtac None)] }
 ;
 
-%inline tactics2:
-| ts=plist1(tactic2, SEMICOLON) { ts }
+tactics2:
+| t=tactic2 { [t] }
+| ts=tactics2 SEMICOLON t=tactic2 { t :: ts }
 ;
 
 tsubgoal:
