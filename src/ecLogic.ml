@@ -26,7 +26,6 @@ type tac_error =
   | UnknownIntros         of form
   | UnknownSplit          of form
   | UnknownRewrite        of form
-  | LogicRequired
   | CannotClearConcl      of EcIdent.t * form
   | CannotReconizeElimT
   | TooManyArgument
@@ -57,8 +56,6 @@ let pp_tac_error fmt error =
     Format.fprintf fmt "Do not known how to split %a" (PE.pp_form env) f
   | UnknownRewrite f ->
     Format.fprintf fmt "Do not known how to rewrite %a" (PE.pp_form env) f
-  | LogicRequired ->
-    Format.fprintf fmt "Require import Logic first"
   | CannotClearConcl(id,_) ->
     Format.fprintf fmt "Cannot clear %s, it is used in the conclusion"
       (EcIdent.name id)
@@ -306,8 +303,8 @@ let gen_t_apply_hyp do_arg env id args (juc ,n as g) =
 let t_apply_hyp = gen_t_apply_hyp (fun _ _ _ a -> a)
 
 let check_logic env p =
-  try ignore (EcEnv.Ax.by_path p env) with _ ->
-    tacerror LogicRequired
+  try  ignore (EcEnv.Ax.by_path p env)
+  with EcEnv.LookupFailure _ -> assert false
 
 let t_apply_logic env p tyargs args g =
   check_logic env p;
@@ -669,7 +666,6 @@ let t_elimT env f p g =
 let t_case env f g =
   check_logic env p_case_eq_bool;
   t_elimT env f p_case_eq_bool g
-
 
 let prove_goal_by sub_gs rule (juc,n as g) =
   let hyps,_ = get_goal g in
