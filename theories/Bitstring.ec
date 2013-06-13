@@ -95,6 +95,8 @@ proof.
  rewrite (map2_get<:bool,bool,bool> x y Bool.xorb i _ _ _);
   [trivial | trivial | trivial | ].
  rewrite (map2_get<:bool,bool,bool> x (map2 Bool.xorb y z)  Bool.xorb i _ _ _);
+  [trivial | trivial | trivial | ].
+ rewrite (map2_get<:bool,bool,bool> y z Bool.xorb i _ _ _);
  trivial.
 save.
 
