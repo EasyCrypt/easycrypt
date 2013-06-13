@@ -200,3 +200,5 @@ val t_try    : tactic -> tactic
 val t_or     : tactic -> tactic -> tactic
 
 val t_close : tactic -> tactic
+
+val t_rotate : [`Left | `Right] -> goals -> goals

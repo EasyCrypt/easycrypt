@@ -1664,6 +1664,12 @@ tsubgoal:
 
 | LAST t=loc(tactic)
     { Plast t }
+
+| FIRST LAST
+    { Protate `Left }
+
+| LAST FIRST
+    { Protate `Right }
 ;
 
 tactic2_u:

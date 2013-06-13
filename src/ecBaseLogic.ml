@@ -265,27 +265,26 @@ and rule_arg =
 
 
 type rule = {
-    pr_name : rule_name;
-    pr_hyps : rule_arg list
-  }
+  pr_name : rule_name;
+  pr_hyps : rule_arg list
+}
 
 type l_decl = hyps * form
 
 type pre_judgment = {
-    pj_decl : l_decl;
-    pj_rule : (bool * rule) option;
-  }
+  pj_decl : l_decl;
+  pj_rule : (bool * rule) option;
+}
 
 type judgment_uc = {
-    juc_count  : int;
-    juc_map    : pre_judgment Mint.t;
-  }
+  juc_count : int;
+  juc_map   : pre_judgment Mint.t;
+}
 
 type judgment = judgment_uc
 
-type goals = judgment_uc * int list
-type goal = judgment_uc * int 
-
+type goals  = judgment_uc * int list
+type goal   = judgment_uc * int 
 type tactic = goal -> goals 
 
 let new_goal juc decl =
@@ -459,3 +458,9 @@ let t_close t g =
   | (juc, []    ) -> (juc, [])
   | (_  , i :: _) -> raise (StillOpenGoal i)
 
+let t_rotate mode (j, ns) =
+  let mrev = match mode with `Left -> identity | `Right -> List.rev in
+
+  match mrev ns with
+  | []      -> (j, ns)
+  | n :: ns -> (j, mrev (ns @ [n]))

@@ -361,6 +361,7 @@ and ptactics =
   | Psubtacs of ptactic list
   | Pfirst   of ptactic
   | Plast    of ptactic
+  | Protate  of [`Left | `Right]
 
 (* -------------------------------------------------------------------- *)
 type paxiom_kind = PAxiom | PLemma of ptactic option | PILemma

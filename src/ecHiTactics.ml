@@ -65,6 +65,8 @@ and process_subgoal mkpv env t gs =
   | Pfirst t -> t_on_first (process_logic_tac mkpv env t) gs
   | Plast  t -> t_on_last  (process_logic_tac mkpv env t) gs
 
+  | Protate d -> t_rotate d gs
+
 (* -------------------------------------------------------------------- *)
 and process_logic_tac mkpv env (tac:ptactic) (g:goal) : goals =
   let myself = process_logic_tac in

@@ -345,14 +345,12 @@ let pp_current_goal stream =
   | None -> ()
 
   | Some goal -> begin
-      let juc = goal.S.puc_jdg in
+      let juc, ns = goal.S.puc_jdg in
       let ppe = EcPrinting.PPEnv.ofenv (S.env scope) in
-      try
-        let n = List.length (snd (L.find_all_goals juc)) in
-        let g = get_goal (L.get_first_goal juc) in
-          EcPrinting.pp_goal ppe stream (n, g)
-      with L.NotAnOpenGoal _ -> 
-        Format.fprintf stream "No more goals\n%!"
+
+      match List.ohead ns with
+      | None   -> Format.fprintf stream "No more goals\n%!"
+      | Some n -> EcPrinting.pp_goal ppe stream (List.length ns, get_goal (juc, n))
   end
 
 let pp_maybe_current_goal stream =

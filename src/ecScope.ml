@@ -170,7 +170,7 @@ end
 (* -------------------------------------------------------------------- *)
 type proof_uc = {
   puc_name : string;
-  puc_jdg :  EcBaseLogic.judgment_uc;
+  puc_jdg  : EcBaseLogic.judgment_uc * int list;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -334,22 +334,23 @@ module Tactics = struct
 
   let pi scope pi = Prover.mk_prover_info scope pi
 
-  let process_logic scope env juc loc tacs =
-    let (juc,n) =
-      try get_first_goal juc
-      with _ -> error loc NoCurrentGoal
-    in
-      EcBaseLogic.upd_done
-        (fst (process_logic_tacs (pi scope) env tacs (juc,[n])))
+  let process_logic scope env (juc, ns) loc tacs =
+    match ns with
+    | []      -> error loc NoCurrentGoal
+    | n :: ns ->
+
+      let juc = process_logic_tacs (pi scope) env tacs (juc, [n]) in
+      let juc = fstmap EcBaseLogic.upd_done juc in
+      let juc = (fst juc, (snd juc) @ ns) in
+
+      sndmap (List.filter (List.mem^~ (snd (find_all_goals (fst juc))))) juc
 
   let process scope tac =
     if Check_mode.check scope.sc_options then begin
       check_state `InProof "proof script" scope;
       let loc = (oget (List.ohead tac)).pl_loc in
       let puc = oget scope.sc_pr_uc in
-      let juc =
-        process_logic scope scope.sc_env puc.puc_jdg loc tac
-      in
+      let juc = process_logic scope scope.sc_env puc.puc_jdg loc tac in
         { scope with sc_pr_uc = Some { puc with puc_jdg = juc } }
     end else scope
 end
@@ -655,7 +656,7 @@ module Ax = struct
                  EcBaseLogic.h_local = []; } in
     let puc = {
       puc_name = name ;
-      puc_jdg = EcBaseLogic.open_juc (hyps, concl)
+      puc_jdg  = (EcBaseLogic.open_juc (hyps, concl), [0])
     } in
 
     { scope with sc_pr_uc = Some puc }
@@ -663,7 +664,7 @@ module Ax = struct
   let save scope _loc =
     if Check_mode.check scope.sc_options then begin
       check_state `InProof "save" scope;
-      let { puc_name = name; puc_jdg = juc } = oget scope.sc_pr_uc in
+      let { puc_name = name; puc_jdg = (juc, _) } = oget scope.sc_pr_uc in
         let pr = EcBaseLogic.close_juc juc in
         let hyps,concl = (EcBaseLogic.get_goal (juc,0)).EcBaseLogic.pj_decl in
         let tparams = hyps.EcBaseLogic.h_tvar in
