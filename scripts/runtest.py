@@ -10,6 +10,39 @@ class Object(object):
         self.__dict__.update(kw)
 
 # --------------------------------------------------------------------
+class ANSIColor(object):
+    BLACK, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN, WHITE = range(8)
+
+    @staticmethod
+    def _hascolors():
+        if not hasattr(sys.stdout, "isatty"):
+            return False
+        if not sys.stdout.isatty():
+            return False
+
+        try:
+            import curses
+
+            curses.setupterm()
+            return curses.tigetnum("colors") > 2
+        except:
+            return False
+
+    @staticmethod
+    def color(txt, color):
+        if ANSIColor.hascolors:
+            return "\x1b[1;%dm%s\x1b[0m" % (30+color, txt)
+        return txt
+
+ANSIColor.hascolors = ANSIColor._hascolors()
+
+def red  (txt): return ANSIColor.color(txt, ANSIColor.RED  )
+def green(txt): return ANSIColor.color(txt, ANSIColor.GREEN)
+
+def rcolor(txt, b):
+    return (green if b else red)(txt)
+
+# --------------------------------------------------------------------
 def _options():
     from optparse import OptionParser
 
@@ -140,7 +173,8 @@ def _run_test(config, options):
     timestamp = time.time() - timestamp
     success   = (bool(status) != bool(config.isvalid))
 
-    logging.info("result for `%s': success: %s" % (config.filename, success))
+    logging.info("result for `%s': success: %s" % (config.filename,
+                                                   rcolor(success, success)))
 
     return Object(success = success  ,
                   config  = config   ,
@@ -196,7 +230,7 @@ def _main():
 
     errors = [x for x in result if not x.success]
 
-    logging.info("# of failed scripts: %d" % (len(errors,)))
+    logging.info(red("# of failed scripts: %d" % (len(errors,))))
     if errors:
         logging.info("--- BEGIN FAILING SCRIPTS ---")
         for error in errors:
