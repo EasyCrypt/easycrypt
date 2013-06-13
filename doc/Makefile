@@ -25,6 +25,7 @@ index: $(INDFILES)
 
 final: $(FILES) $(INDFILES) $(BBLFILE)
 	$(TEX) $(MAIN).tex
+	$(TEX) $(MAIN).tex
 
 clean:
 	rm -f *.aux *.out *.blg *.bbl *.log *.dvi *.toc *.idx *.ilg *.ind *.lof *.synctex.gz $(MAIN).pdf *~
