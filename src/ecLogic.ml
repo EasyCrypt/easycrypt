@@ -26,7 +26,6 @@ type tac_error =
   | UnknownIntros         of form
   | UnknownSplit          of form
   | UnknownRewrite        of form
-  | LogicRequired
   | CannotClearConcl      of EcIdent.t * form
   | CannotReconizeElimT
   | TooManyArgument
@@ -57,8 +56,6 @@ let pp_tac_error fmt error =
     Format.fprintf fmt "Do not known how to split %a" (PE.pp_form env) f
   | UnknownRewrite f ->
     Format.fprintf fmt "Do not known how to rewrite %a" (PE.pp_form env) f
-  | LogicRequired ->
-    Format.fprintf fmt "Require import Logic first"
   | CannotClearConcl(id,_) ->
     Format.fprintf fmt "Cannot clear %s, it is used in the conclusion"
       (EcIdent.name id)
@@ -101,9 +98,13 @@ let _ = EcPException.register (fun fmt exn ->
 let tacerror error = raise (TacError error)
 
 let tacuerror fmt =
-  Format.ksprintf
-    (fun msg -> raise (TacError (User msg)))
-    fmt
+  let buf  = Buffer.create 127 in
+  let fbuf = Format.formatter_of_buffer buf in
+    Format.kfprintf
+      (fun _ ->
+         Format.pp_print_flush fbuf ();
+         raise (TacError (User (Buffer.contents buf))))
+      fbuf fmt
 
 let cannot_apply s1 s2 = tacerror (CanNotApply(s1,s2))
 
@@ -302,8 +303,8 @@ let gen_t_apply_hyp do_arg env id args (juc ,n as g) =
 let t_apply_hyp = gen_t_apply_hyp (fun _ _ _ a -> a)
 
 let check_logic env p =
-  try ignore (EcEnv.Ax.by_path p env) with _ ->
-    tacerror LogicRequired
+  try  ignore (EcEnv.Ax.by_path p env)
+  with EcEnv.LookupFailure _ -> assert false
 
 let t_apply_logic env p tyargs args g =
   check_logic env p;
@@ -339,8 +340,8 @@ let t_rewrite_gen fpat env side f g =
     let x, body = fpat env hyps f concl in
     f_lambda [x,GTty f.f_ty] body in
   t_on_last
-    (t_apply_logic env p tys [AAform f1;AAform f2;AAform pred;AAnode;AAnode] g)
     (t_red env)
+    (t_apply_logic env p tys [AAform f1;AAform f2;AAform pred;AAnode;AAnode] g)
 
 let t_rewrite = t_rewrite_gen (pattern_form None)
 
@@ -531,7 +532,7 @@ let t_elim env f (juc,n) =
           let lemma = gen_eq_tuple_elim_lemma types in
           let proof = gen_eq_tuple_elim_proof env types in
           let gs = t_apply_form env lemma (args@[AAnode; AAnode]) (juc,n) in
-          t_on_first gs proof
+          t_on_first proof gs
         | _        -> aux_red f
       end
     | Fif(a1,a2,a3) ->
@@ -552,7 +553,7 @@ let t_elim env f (juc,n) =
 
 let t_elim_hyp env h g =
   let f = LDecl.lookup_hyp_by_id h (get_hyps g) in
-  t_on_first (t_elim env f g) (t_hyp env h)
+  t_on_first (t_hyp env h) (t_elim env f g)
 
 let t_or_intro b env g =
   let hyps, concl = get_goal g in
@@ -666,7 +667,6 @@ let t_case env f g =
   check_logic env p_case_eq_bool;
   t_elimT env f p_case_eq_bool g
 
-
 let prove_goal_by sub_gs rule (juc,n as g) =
   let hyps,_ = get_goal g in
   let add_sgoal (juc,ns) sg = 
@@ -737,7 +737,7 @@ let t_split env g =
           let lemma = gen_split_tuple_lemma types in
           let proof = gen_split_tuple_proof env types in
           let gs = t_apply_form env lemma (args@nodes) g in
-          t_on_first gs proof
+          t_on_first proof gs
          | _ -> aux_red f
       end
     | Fif(f1,_f2,_f3) -> t_case env f1 g

@@ -553,7 +553,7 @@ let t_hoareF_abs env inv g =
   let env' = tyenv_of_hyps env hyps in
   let pre, post, sg = hoareF_abs_spec env' hf.hf_f inv in
   let tac g' = prove_goal_by sg (RN_hl_fun_abs inv) g' in
-  t_on_last (t_hoareF_conseq env pre post g) tac
+  t_on_last tac (t_hoareF_conseq env pre post g)
 
 let bdHoareF_abs_spec env f inv = 
   let f = EcEnv.NormMp.norm_xpath env f in
@@ -580,7 +580,7 @@ let t_bdHoareF_abs env inv g =
     | FHeq when f_equal bhf.bhf_bd f_r1 -> 
       let pre, post, sg = bdHoareF_abs_spec env' bhf.bhf_f inv in
       let tac g' = prove_goal_by sg (RN_hl_fun_abs inv) g' in
-      t_on_last (t_bdHoareF_conseq env pre post g) tac
+      t_on_last tac (t_bdHoareF_conseq env pre post g)
     | _ ->
       cannot_apply "fun" "expected \"= 1\" as bound"
 
@@ -623,7 +623,7 @@ let t_equivF_abs env inv g =
   let env' = tyenv_of_hyps env hyps in
   let pre, post, sg = equivF_abs_spec env' ef.ef_fl ef.ef_fr inv in
   let tac g' = prove_goal_by sg (RN_hl_fun_abs inv) g' in
-  t_on_last (t_equivF_conseq env pre post g) tac
+  t_on_last tac (t_equivF_conseq env pre post g)
 
 let equivF_abs_upto env fl fr bad invP invQ = 
   let fl,topl,fr,topr = check_adv env fl fr in
@@ -693,7 +693,7 @@ let t_equivF_abs_upto env bad invP invQ g =
   let env' = tyenv_of_hyps env hyps in
   let pre, post, sg = equivF_abs_upto env' ef.ef_fl ef.ef_fr bad invP invQ in
   let tac g' = prove_goal_by sg (RN_hl_fun_upto(bad,invP,invQ)) g' in
-  t_on_last (t_equivF_conseq env pre post g) tac
+  t_on_last tac (t_equivF_conseq env pre post g)
 
 (* -------------------------------------------------------------------- *)  
 let t_hoare_skip g =

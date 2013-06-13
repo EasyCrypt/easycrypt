@@ -70,7 +70,14 @@ axiom zeros_get: forall (l i:int),
 lemma xor_nilpotent: forall (bs:bitstring),
   bs ^^ bs = zeros (length bs).
 proof.
-intros bs; apply extensionality; trivial.
+  intros bs; apply extensionality.
+  delta (==); simplify; split; first trivial.
+  intros i i_pos i_upbd.
+  delta (^^); simplify.
+  rewrite (zeros_get (length bs) i _ _ _);
+    [trivial | trivial | trivial | ].
+  rewrite (map2_get<:bool,bool,bool> bs bs Bool.xorb i _ _ _);
+    trivial.
 save.
 
 lemma xor_assoc : forall (x y z : bitstring), 
@@ -84,17 +91,25 @@ proof.
  delta (^^);simplify.
  intros i H H0.
  rewrite (map2_get<:bool,bool,bool> (map2 Bool.xorb x y) z Bool.xorb i _ _ _);
-try trivial.
+  [trivial | trivial | trivial | ].
  rewrite (map2_get<:bool,bool,bool> x y Bool.xorb i _ _ _);
-try trivial.
+  [trivial | trivial | trivial | ].
  rewrite (map2_get<:bool,bool,bool> x (map2 Bool.xorb y z)  Bool.xorb i _ _ _);
-try trivial.
+  [trivial | trivial | trivial | ].
+ rewrite (map2_get<:bool,bool,bool> y z Bool.xorb i _ _ _);
+ trivial.
 save.
 
 lemma xor_zeroes_neutral : forall (x : bitstring),
 x ^^ zeros(length(x)) = x.
 proof.
- intros x; apply extensionality; trivial.
+ intros x; apply extensionality.
+ delta (==); simplify; split; first trivial.
+ intros i i_pos i_upbd; delta (^^); simplify.
+ rewrite (map2_get<:bool,bool,bool> x (zeros (length x)) Bool.xorb i _ _ _);
+  [trivial | trivial | trivial | ].
+ rewrite (zeros_get (length x) i _ _ _);
+ trivial.
 save.
 
 require import Real.
@@ -125,6 +140,7 @@ theory Dbitstring.
 
   axiom weight_pos: forall (k:int), 0 <= k => weight (dbitstring k) = 1%r.
 
-  lemma mu_weight_neg: forall (k:int), k < 0 => weight (dbitstring k) = 0%r.
+  (* TODO Santi: write a proof if you really think this is a lemma *) 
+  axiom mu_weight_neg: forall (k:int), k < 0 => weight (dbitstring k) = 0%r.
 
 end Dbitstring.

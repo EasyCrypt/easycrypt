@@ -32,6 +32,16 @@ let pp_hi_scope_error fmt exn =
 
 let _ = EcPException.register pp_hi_scope_error
 
+let hierror ?loc fmt =
+  let buf  = Buffer.create 127 in
+  let bfmt = Format.formatter_of_buffer buf in
+
+    Format.kfprintf
+      (fun _ ->
+         Format.pp_print_flush bfmt ();
+         raise (HiScopeError (loc, Buffer.contents buf)))
+      bfmt fmt
+
 (* -------------------------------------------------------------------- *)
 module type IOptions = sig
   type option
@@ -160,7 +170,7 @@ end
 (* -------------------------------------------------------------------- *)
 type proof_uc = {
   puc_name : string;
-  puc_jdg :  EcBaseLogic.judgment_uc;
+  puc_jdg  : EcBaseLogic.judgment_uc * int list;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -170,7 +180,7 @@ type scope = {
   sc_top        : scope option;
   sc_loaded     : (EcEnv.ctheory_w3 * symbol list) Msym.t;
   sc_required   : symbol list;
-  sc_pr_uc      : proof_uc list;
+  sc_pr_uc      : proof_uc option;
   sc_options    : Options.options;
 }
 
@@ -182,7 +192,7 @@ let empty =
       sc_top        = None;
       sc_loaded     = Msym.empty;
       sc_required   = [];
-      sc_pr_uc      = [];
+      sc_pr_uc      = None;
       sc_options    = Options.init ();
     }
 
@@ -205,6 +215,17 @@ let attop (scope : scope) =
 (* -------------------------------------------------------------------- *)
 let goal (scope : scope) =
   scope.sc_pr_uc
+
+(* -------------------------------------------------------------------- *)
+let check_state mode action (scope : scope) =
+  match mode with
+  | `InProof when scope.sc_pr_uc = None ->
+      hierror "cannot process [%s] outside a proof script" action
+
+  | `InTop when scope.sc_pr_uc <> None ->
+      hierror "cannot process [%s] inside a proof script" action
+
+  | _ -> ()
 
 (* -------------------------------------------------------------------- *)
 let verbose (scope : scope) =
@@ -231,7 +252,7 @@ let subscope (scope : scope) (name : symbol) =
     sc_top        = Some scope;
     sc_loaded     = scope.sc_loaded;
     sc_required   = scope.sc_required;
-    sc_pr_uc      = [];
+    sc_pr_uc      = None;
     sc_options    = Options.for_subscope scope.sc_options;
   }
 
@@ -313,26 +334,25 @@ module Tactics = struct
 
   let pi scope pi = Prover.mk_prover_info scope pi
 
-  let process_logic scope env juc loc tacs =
-    let (juc,n) =
-      try get_first_goal juc
-      with _ -> error loc NoCurrentGoal
-    in
-      EcBaseLogic.upd_done
-        (fst (process_logic_tacs (pi scope) env tacs (juc,[n])))
+  let process_logic scope env (juc, ns) loc tacs =
+    match ns with
+    | []      -> error loc NoCurrentGoal
+    | n :: ns ->
+
+      let juc = process_logic_tacs (pi scope) env tacs (juc, [n]) in
+      let juc = fstmap EcBaseLogic.upd_done juc in
+      let juc = (fst juc, (snd juc) @ ns) in
+
+      sndmap (List.filter (List.mem^~ (snd (find_all_goals (fst juc))))) juc
 
   let process scope tac =
-    if Check_mode.check scope.sc_options then
-      let loc = match tac with | [] -> assert false | t::_ -> t.pl_loc in
-      match scope.sc_pr_uc with
-      | [] -> error loc NoCurrentGoal
-      | puc :: pucs ->
-          let juc =
-            process_logic scope scope.sc_env puc.puc_jdg loc tac
-          in
-            { scope with
-                sc_pr_uc = { puc with puc_jdg = juc } :: pucs }
-    else scope
+    if Check_mode.check scope.sc_options then begin
+      check_state `InProof "proof script" scope;
+      let loc = (oget (List.ohead tac)).pl_loc in
+      let puc = oget scope.sc_pr_uc in
+      let juc = process_logic scope scope.sc_env puc.puc_jdg loc tac in
+        { scope with sc_pr_uc = Some { puc with puc_jdg = juc } }
+    end else scope
 end
 
 (* -------------------------------------------------------------------- *)
@@ -344,10 +364,12 @@ module Op = struct
   module TT = EcTyping
 
   let bind (scope : scope) ((x, op) : _ * operator) =
+    assert (scope.sc_pr_uc = None);
     { scope with
         sc_env = EcEnv.Op.bind x op scope.sc_env; }
 
   let add (scope : scope) (op : poperator located) =
+    assert (scope.sc_pr_uc = None);
     let op = op.pl_desc and loc = op.pl_loc in
     let ue = TT.ue_for_decl scope.sc_env (loc, op.po_tyvars) in
     let tp = TT.tp_relax in
@@ -381,7 +403,7 @@ module Op = struct
         try
           EcUnify.unify (env scope) tue ty tfun;
           let msg = "this operator type is (unifiable) to an function type" in
-            raise (HiScopeError (Some loc, msg));
+            hierror ~loc "%s" msg
         with EcUnify.UnificationFailure _ -> ()
     end;
 
@@ -393,6 +415,7 @@ module Pred = struct
   module TT = EcTyping
 
   let add (scope : scope) (op : ppredicate located) =
+    assert (scope.sc_pr_uc = None);
     let op = op.pl_desc and loc = op.pl_loc in
     let ue     = TT.ue_for_decl scope.sc_env (loc, op.pp_tyvars) in
     let tp     = TT.tp_relax in
@@ -423,10 +446,12 @@ module Ty = struct
   open EcTyping
 
   let bind (scope : scope) ((x, tydecl) : (_ * tydecl)) =
+    assert (scope.sc_pr_uc = None);
     { scope with
         sc_env = EcEnv.Ty.bind x tydecl scope.sc_env; }
 
   let add (scope : scope) info =
+    assert (scope.sc_pr_uc = None);
     let (args, name) = info.pl_desc and loc = info.pl_loc in
     let ue     = ue_for_decl scope.sc_env (loc, Some args) in
     let tydecl = {
@@ -436,6 +461,7 @@ module Ty = struct
       bind scope (unloc name, tydecl)
 
   let define (scope : scope) info body =
+    assert (scope.sc_pr_uc = None);
     let (args, name) = info.pl_desc and loc = info.pl_loc in
     let ue     = ue_for_decl scope.sc_env (loc, Some args) in
     let body   = transty tp_tydecl scope.sc_env ue body in
@@ -449,21 +475,25 @@ end
 (* -------------------------------------------------------------------- *)
 module Mod = struct
   let bind (scope : scope) (m : module_expr) =
+    assert (scope.sc_pr_uc = None);
     { scope with
         sc_env = EcEnv.Mod.bind m.me_name m scope.sc_env; }
 
   let add (scope : scope) (name : symbol) m =
+    assert (scope.sc_pr_uc = None);
     let m = EcTyping.transmod scope.sc_env name m in
-    bind scope m
+      bind scope m
 end
 
 (* -------------------------------------------------------------------- *)
 module ModType = struct
   let bind (scope : scope) ((x, tysig) : _ * module_sig) =
+    assert (scope.sc_pr_uc = None);
     { scope with
         sc_env = EcEnv.ModTy.bind x tysig scope.sc_env; }
 
   let add (scope : scope) (name : symbol) (i : pmodule_sig) =
+    assert (scope.sc_pr_uc = None);
     let tysig = EcTyping.transmodsig scope.sc_env name i in
       bind scope (name, tysig)
 end
@@ -476,15 +506,18 @@ module Theory = struct
 
   (* ------------------------------------------------------------------ *)
   let bind (scope : scope) ((x, cth) : _ * EcEnv.ctheory_w3) =
+    assert (scope.sc_pr_uc = None);
     { scope with
         sc_env = EcEnv.Theory.bind x cth scope.sc_env; }
 
   (* ------------------------------------------------------------------ *)
   let required (scope : scope) (name : symbol) =
+    assert (scope.sc_pr_uc = None);
     List.exists (fun x -> x = name) scope.sc_required
 
   (* ------------------------------------------------------------------ *)
   let enter (scope : scope) (name : symbol) =
+    assert (scope.sc_pr_uc = None);
     subscope scope name
 
   (* ------------------------------------------------------------------ *)
@@ -515,18 +548,21 @@ module Theory = struct
 
   (* ------------------------------------------------------------------ *)
   let exit (scope : scope) =
+    assert (scope.sc_pr_uc = None);
     let ((cth, required), name, scope) = exit_r scope in
     let scope = List.fold_right require_loaded required scope in
       (name, bind scope (name, cth))
 
   (* ------------------------------------------------------------------ *)
   let import (scope : scope) (name : qsymbol) =
+    assert (scope.sc_pr_uc = None);
     let path = fst (EcEnv.Theory.lookup name scope.sc_env) in
     { scope with
         sc_env = EcEnv.Theory.import path scope.sc_env }
 
   (* ------------------------------------------------------------------ *)
   let export (scope : scope) (name : qsymbol) =
+    assert (scope.sc_pr_uc = None);
     let path = fst (EcEnv.Theory.lookup name scope.sc_env) in
     { scope with
       sc_env = EcEnv.Theory.export path scope.sc_env }
@@ -541,7 +577,7 @@ module Theory = struct
             scope.sc_name thname in
         failwith msg
       end;
-    if scope.sc_pr_uc <> [] then
+    if scope.sc_pr_uc <> None then
       let msg =
         Printf.sprintf
           "end-of-file while processing proof %s" scope.sc_name
@@ -550,6 +586,8 @@ module Theory = struct
 
   (* -------------------------------------------------------------------- *)
   let require (scope : scope) (name : symbol) loader =
+    assert (scope.sc_pr_uc = None);
+
     if required scope name then
       scope
     else
@@ -570,6 +608,8 @@ module Theory = struct
 
   (* ------------------------------------------------------------------ *)
   let clone (scope : scope) (thcl : theory_cloning) =
+    assert (scope.sc_pr_uc = None);
+
     let (name, nth) = EcThCloning.clone scope.sc_env thcl in
       { scope with
           sc_env =
@@ -577,6 +617,8 @@ module Theory = struct
 
   (* ------------------------------------------------------------------ *)
   let import_w3 scope dir file renaming =
+    assert (scope.sc_pr_uc = None);
+
     let mk_renaming (l,k,s) =
       let k =
         match k with
@@ -601,6 +643,8 @@ module Ax = struct
   module TT = EcTyping
 
   let bind (scope : scope) ((x, ax) : _ * axiom) =
+    assert (scope.sc_pr_uc = None);
+
    let res =
     { scope with
         sc_env  = EcEnv.Ax.bind x ax scope.sc_env; }
@@ -608,31 +652,34 @@ module Ax = struct
    res
 
   let start_lemma scope name tparams concl =
-    let hyps = { EcBaseLogic.h_tvar = tparams;
+    let hyps = { EcBaseLogic.h_tvar  = tparams;
                  EcBaseLogic.h_local = []; } in
     let puc = {
       puc_name = name ;
-      puc_jdg = EcBaseLogic.open_juc (hyps, concl) } in
-    { scope with
-      sc_pr_uc = puc :: scope.sc_pr_uc }
+      puc_jdg  = (EcBaseLogic.open_juc (hyps, concl), [0])
+    } in
 
-  let save scope loc =
-    if Check_mode.check scope.sc_options then
-      match scope.sc_pr_uc with
-      | [] -> EcHiLogic.error loc EcHiLogic.NoCurrentGoal
-      | { puc_name = name; puc_jdg = juc } :: pucs ->
-          let pr = EcBaseLogic.close_juc juc in
-          let hyps,concl = (EcBaseLogic.get_goal (juc,0)).EcBaseLogic.pj_decl in
-          let tparams = hyps.EcBaseLogic.h_tvar in
-          assert (hyps.EcBaseLogic.h_local = []);
-          let axd = { ax_tparams = tparams;
-                      ax_spec = Some concl;
-                      ax_kind = Lemma (Some pr) } in
-          let scope = { scope with sc_pr_uc = pucs } in
-          Some name, bind scope (name, axd)
+    { scope with sc_pr_uc = Some puc }
+
+  let save scope _loc =
+    if Check_mode.check scope.sc_options then begin
+      check_state `InProof "save" scope;
+      let { puc_name = name; puc_jdg = (juc, _) } = oget scope.sc_pr_uc in
+        let pr = EcBaseLogic.close_juc juc in
+        let hyps,concl = (EcBaseLogic.get_goal (juc,0)).EcBaseLogic.pj_decl in
+        let tparams = hyps.EcBaseLogic.h_tvar in
+        assert (hyps.EcBaseLogic.h_local = []);
+        let axd = { ax_tparams = tparams;
+                    ax_spec = Some concl;
+                    ax_kind = Lemma (Some pr) } in
+        let scope = { scope with sc_pr_uc = None } in
+        Some name, bind scope (name, axd)
+    end
     else None, scope
 
   let add (scope : scope) (ax : paxiom located) =
+    assert (scope.sc_pr_uc = None);
+
     let loc = ax.pl_loc and ax = ax.pl_desc in
     let ue = TT.ue_for_decl scope.sc_env (loc, ax.pa_tyvars) in
     let pconcl, tintro = 
@@ -646,8 +693,7 @@ module Ax = struct
           vs in
         pconcl, { pl_loc=loc; pl_desc = Plogic (Pintro (List.flatten vs)) } in
     let concl = TT.transformula scope.sc_env ue pconcl in
-    let concl =
-      EcFol.Fsubst.uni (EcUnify.UniEnv.close ue) concl in
+    let concl = EcFol.Fsubst.uni (EcUnify.UniEnv.close ue) concl in
     let tparams = EcUnify.UniEnv.tparams ue in
     let check = Check_mode.check scope.sc_options in
 

@@ -16,12 +16,11 @@
   (with-current-buffer proof-script-buffer
   (span-at (- (proof-unprocessed-begin) 1) 'type)))
 
-;; The prompt format is [\d+]
 (defun easycrypt-last-prompt-info (s)
-  "Extract the information from de prompt."
+  "Extract the information from prompt."
   (let ((lastprompt (or s (error "no prompt"))))
      (when (string-match "\\[\\([0-9]+\\)]" lastprompt)
-        (list (string-to-number (match-string 1 lastprompt))))))
+           (list (string-to-number (match-string 1 lastprompt))))))
 
 (defun easycrypt-last-prompt-info-safe ()
   "Take from `proof-shell-last-prompt' the last information in the prompt."
@@ -44,7 +43,6 @@
 
 (defun easycrypt-find-and-forget (span)
   (let ((span-staten (easycrypt-get-span-statenum span)))
-     (list
-        (format "undo %s." (int-to-string span-staten)))))
+       (list (format "undo %s." (int-to-string span-staten)))))
 
 (provide 'easycrypt-hooks)

@@ -183,8 +183,8 @@ type tactic = goal -> goals
 
 val t_id : string option -> tactic
 
-val t_on_first : goals -> tactic -> goals
-val t_on_last  : goals -> tactic -> goals
+val t_on_first : tactic -> goals -> goals
+val t_on_last  : tactic -> goals -> goals
 
 val t_subgoal  : tactic list -> goals -> goals
 val t_on_goals : tactic -> goals -> goals
@@ -195,6 +195,10 @@ val t_seq  : tactic -> tactic -> tactic
 val t_lseq : tactic list -> tactic
 
 val t_repeat : tactic -> tactic
-val t_do     : int -> tactic -> tactic
+val t_do     : bool -> int option -> tactic -> tactic
 val t_try    : tactic -> tactic
 val t_or     : tactic -> tactic -> tactic
+
+val t_close : tactic -> tactic
+
+val t_rotate : [`Left | `Right] -> goals -> goals

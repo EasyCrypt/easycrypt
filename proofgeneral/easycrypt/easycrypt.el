@@ -6,31 +6,26 @@
 (add-to-list 'hs-special-modes-alist
   '(easycrypt-mode "{" "}" "/[*/]" nil nil))
 
-;(add-hook 'easycrypt-mode-hook 'hs-minor-mode)
-
 (defcustom easycrypt-prog-name "easycrypt -emacs"
   "*Name of program to run EasyCrypt."
-  :type 'file
+  :type  'file
   :group 'easycrypt)
 
 (defcustom easycrypt-web-page
-  "http://www.easycrypt.info"
+  "http://www.easycrypt.info/"
   "URL of web page for EasyCrypt."
-  :type 'string
+  :type  'string
   :group 'easycrypt-config)
 
-(defconst easycrypt-shell-init-cmd "require import Logic. ")
-
-;;
 ;; ======== Configuration of generic modes ========
-;;
 
 (defun easycrypt-config ()
   "Configure Proof General scripting for EasyCrypt."
   (easycrypt-init-output-syntax-table)
   
   (setq  proof-terminal-string                 easycrypt-terminal-string)
-  (setq  proof-script-command-end-regexp       easycrypt-end-command-regexp)
+  (setq  proof-script-command-end-regexp       easycrypt-command-end-regexp)
+
   (setq  proof-script-comment-start            "(*"
          proof-script-comment-end              "*)")
   
@@ -40,19 +35,16 @@
 
   (set (make-local-variable 'comment-quote-nested) nil)
 
-
   ;; For func-menu and finding goal...save regions
-  (setq  proof-goal-command-p                  'easycrypt-goal-command-p
-         proof-save-command-regexp             "save"
-            proof-really-save-command-p           'easycrypt-save-command-p
-         proof-goal-with-hole-regexp           easycrypt-named-entity-regexp
-         proof-goal-with-hole-result           1
+  (setq  proof-save-command-regexp             easycrypt-proof-save-regexp
+         proof-really-save-command-p           'easycrypt-save-command-p
          proof-save-with-hole-regexp           nil
-         proof-script-imenu-generic-expression easycrypt-generic-expression)
-         ;imenu-syntax-alist-                   easycrypt-script-syntax-table-alist)
-  
-  (setq  proof-goal-command                    "equiv %s:"
-         proof-save-command                    "save") 
+         proof-goal-command-p                  'easycrypt-goal-command-p
+         proof-goal-with-hole-regexp           easycrypt-goal-command-regexp
+         proof-goal-with-hole-result           1)
+
+  (setq  proof-goal-command                    "lemma %s: ."
+         proof-save-command                    "qed.")
   
   (setq  proof-prog-name                       easycrypt-prog-name
          proof-assistant-home-page             easycrypt-web-page)
@@ -66,7 +58,6 @@
   (setq  proof-indent-enclose-offset   (- proof-indent)
          proof-indent-open-offset     0
          proof-indent-close-offset    0
-         ;proof-indent-inner-regexp    easycrypt-indent-inner-regexp
          proof-indent-any-regexp      easycrypt-indent-any-regexp
          proof-indent-enclose-regexp  easycrypt-indent-enclose-regexp
          proof-indent-open-regexp     easycrypt-indent-open-regexp
@@ -75,8 +66,6 @@
   ; Silent/verbose mode for batch processing
   (setq proof-shell-start-silent-cmd "pragma silent. "
         proof-shell-stop-silent-cmd  "pragma verbose. ")
-
-  ;; (setq proof-shell-init-cmd easycrypt-shell-init-cmd)
 
   (easycrypt-init-syntax-table)
   ;; we can cope with nested comments
@@ -88,22 +77,18 @@
 (defun easycrypt-shell-config ()
   "Configure Proof General shell for EasyCrypt."
   (easycrypt-init-output-syntax-table)
-  (setq  proof-shell-auto-terminate-commands     easycrypt-terminal-string)
-  (setq  proof-shell-eager-annotation-start      "^\\[info\\]")
-  (setq  proof-shell-strip-crs-from-input        nil)
-  (setq  proof-shell-annotated-prompt-regexp     "^\\[[0-9]+\\]>")
-  (setq  proof-shell-clear-goals-regexp
-         easycrypt-shell-proof-completed-regexp)
-  (setq  proof-shell-proof-completed-regexp 
-         easycrypt-shell-proof-completed-regexp)
-  (setq  proof-shell-error-regexp  easycrypt-error-regexp)
-  (setq  proof-shell-truncate-before-error nil)
-  (setq  proof-shell-start-goals-regexp          "^Current")
-  (setq  proof-shell-end-goals-regexp nil)  ; up to next prompt
-  (setq  proof-shell-font-lock-keywords 
-         easycrypt-font-lock-keywords))
+  (setq  proof-shell-auto-terminate-commands    easycrypt-terminal-string)
+  (setq  proof-shell-eager-annotation-start     "^\\[info\\]")
+  (setq  proof-shell-strip-crs-from-input       nil)
+  (setq  proof-shell-annotated-prompt-regexp    "^\\[[0-9]+\\]>")
+  (setq  proof-shell-clear-goals-regexp         easycrypt-shell-proof-completed-regexp)
+  (setq  proof-shell-proof-completed-regexp     easycrypt-shell-proof-completed-regexp)
+  (setq  proof-shell-error-regexp               easycrypt-error-regexp)
+  (setq  proof-shell-truncate-before-error      nil)
+  (setq  proof-shell-start-goals-regexp         "^Current")
+  (setq  proof-shell-end-goals-regexp           nil)  ; up to next prompt
+  (setq  proof-shell-font-lock-keywords         easycrypt-font-lock-keywords))
 
-;;
 ;; ======== Defining the derived modes ========
 ;;
 ;; The derived modes set the variables, then call the
@@ -164,8 +149,9 @@
                 (goto-char (+ (proof-unprocessed-begin) 1)))
             (easycrypt-advance-until-command)
              (goto-char (+ (point) pos))
-             (span-make-self-removing-span (point) (+ (point) lgth)
-                                                     'face 'proof-script-highlight-error-face))))))
+             (span-make-self-removing-span
+               (point) (+ (point) lgth)
+               'face 'proof-script-highlight-error-face))))))
 
 (defun easycrypt-highlight-error-hook ()
   (easycrypt-highlight-error ))

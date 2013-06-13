@@ -467,23 +467,30 @@ let pp_if_form (ppe : PPEnv.t) pp_sub outer fmt (b, e1, e2) =
     maybe_paren outer e_bin_prio_if pp fmt (b, e1, e2)
 
 (* -------------------------------------------------------------------- *)
+let pp_tuple mode (ppe : PPEnv.t) pp_sub fmt es =
+  let prth =
+    match mode, es with
+    | `ForBinding, [_] -> false
+    | `ForBinding, _   -> true
+    | `ForTuple  , _   -> true
+  in
+
+  let pp fmt = pp_list ",@ " (pp_sub ppe (min_op_prec, `NonAssoc)) fmt es in
+  let pp fmt = Format.fprintf fmt "@[<hov 0>%t@]" pp in
+
+    pp_maybe_paren prth (fun fmt () -> pp fmt) fmt ()
+
+(* -------------------------------------------------------------------- *)
 let pp_let (ppe : PPEnv.t) pp_sub outer fmt (pt, e1, e2) =
   let pp fmt (pt, e1, e2) =
     let ids    = lp_ids pt in
     let subppe = PPEnv.add_locals ppe ids in
       Format.fprintf fmt "@[<hov 0>let %a =@;<1 2>@[%a@]@ in@ %a@]"
-        (pp_list ", " (pp_local ppe)) ids
+        (pp_tuple `ForBinding ppe (fun ppe _ -> pp_local ppe)) ids
         (pp_sub ppe (e_bin_prio_letin, `NonAssoc)) e1
         (pp_sub subppe (e_bin_prio_letin, `NonAssoc)) e2
   in
     maybe_paren outer e_bin_prio_letin pp fmt (pt, e1, e2)
-
-(* -------------------------------------------------------------------- *)
-let pp_tuple (ppe : PPEnv.t) pp_sub fmt es =
-  let pp fmt =
-    pp_list ",@ " (pp_sub ppe (min_op_prec, `NonAssoc)) fmt es
-  in
-    Format.fprintf fmt "(@[<hov 0>%t@])" pp
 
 (* -------------------------------------------------------------------- *)
 let pp_app (ppe : PPEnv.t) (pp_first, pp_sub) outer fmt (e, args) =
@@ -682,7 +689,7 @@ let pp_expr (ppe : PPEnv.t) fmt (e : expr) =
         pp_if3 ppe pp_expr outer fmt (c, e1, e2)
 
     | Etuple es ->
-        pp_tuple ppe pp_expr fmt es
+        pp_tuple `ForTuple ppe pp_expr fmt es
 
     | Eapp ({e_node = Eop (op, tys) }, args) ->
         pp_opapp ppe pp_expr outer fmt (op, tys, args)
@@ -877,7 +884,7 @@ let rec pp_form_r (ppe : PPEnv.t) outer fmt f =
         pp_app ppe (pp_form_r, pp_form_r) outer fmt (e, args)
       
   | Ftuple args ->
-      pp_tuple ppe pp_form_r fmt args
+      pp_tuple `ForTuple ppe pp_form_r fmt args
       
   | FhoareF hf ->
     Format.fprintf fmt "hoare[@[<hov 2>@ %a :@ @[%a ==>@ %a@]@]]"
@@ -906,7 +913,7 @@ let rec pp_form_r (ppe : PPEnv.t) outer fmt f =
       (pp_form ppe) es.es_po
 
   | Fglob (mp, me) ->
-    Format.fprintf fmt "(glob %a){%a}" (pp_topmod ppe) mp (pp_local ppe) me
+    Format.fprintf fmt "(glob %a){%a}" (pp_topmod ppe) mp (pp_mem ppe) me
 
   | Fpr (m,f,args,ev) ->
     Format.fprintf fmt "Pr[@[%a(@[%a@]) @@ %a :@ %a@]]"

@@ -2,26 +2,17 @@
 (require 'easycrypt-keywords)
 (require 'easycrypt-hooks)
 
-;; Check me
-(defconst easycrypt-keywords-proof-goal 
-  '("equiv [^auto]"))
+(defconst easycrypt-id "[A-Za-z_]+")
 
-(defconst easycrypt-keywords-proof-save
-  '("save"))
+(defconst easycrypt-terminal-string    ".")
+(defconst easycrypt-command-end-regexp "[^\\.]\\.\\(\\s \\|\n\\|$\\)")
 
-(defconst easycrypt-keywords-code-open
-  '("{" ))
+(defconst easycrypt-keywords-proof-goal '("lemma" "equiv" "hoare"))
+(defconst easycrypt-keywords-proof-save '("save" "qed"))
 
-(defconst easycrypt-keywords-code-close
-  '("}" )) 
-
-(defconst easycrypt-keywords-code-end
-  '(";;" ";")) 
-
-(defconst easycrypt-keywords-index
-  '( "type" "op" "pop" "cnst" "game" "adversary" "claim" "equiv"))
-
-;; End check me
+(defconst easycrypt-keywords-code-open  '("{"))
+(defconst easycrypt-keywords-code-close '("}")) 
+(defconst easycrypt-keywords-code-end   '(";"))
 
 (defvar easycrypt-other-symbols "\\(\\.\\.\\|\\[\\]\\)")
 
@@ -33,49 +24,26 @@
 (defvar easycrypt-operator-char-1234
   (concat "\\(" easycrypt-operator-char-1
           "\\|" easycrypt-operator-char-2
-			 "\\|" easycrypt-operator-char-3
-			 "\\|" easycrypt-operator-char-4 "\\)"))
+		  "\\|" easycrypt-operator-char-3
+		  "\\|" easycrypt-operator-char-4
+          "\\)"))
 
-(defconst easycrypt-id "[A-Za-z_]+")
-(defconst easycrypt-terminal-string ".")
+(defconst easycrypt-proof-save-regexp
+  (concat "^\\(" (proof-ids-to-regexp easycrypt-keywords-proof-save) "\\)\\b"))
 
-;; For imenu
-(defconst  easycrypt-keywords-imenu
-  (append 
-	  easycrypt-keywords-index))
-
-(defconst  easycrypt-entity-regexp
-  (concat "\\(" (proof-ids-to-regexp easycrypt-keywords-imenu) "\\)"))
-
-(defconst  easycrypt-named-regexp
-  (concat "\\s *\\(" easycrypt-id "\\)\\s *"))
-
-(defconst  easycrypt-named-entity-regexp
-  (concat easycrypt-entity-regexp
-    "\\ *"
-    easycrypt-named-regexp
-    "\\ *[:=]"))
-
-(defconst  easycrypt-generic-expression
-  (mapcar  (lambda (kw)
-    (list 
-      (capitalize kw)
-      (concat "\\ *" kw "\\ +\\([A-Za-z0-9_]+\\)\\ *[:=]")
-      1))
-    easycrypt-keywords-imenu))
+(defconst easycrypt-goal-command-regexp
+  (concat "^\\(?:" (proof-ids-to-regexp easycrypt-keywords-proof-goal) "\\)"
+          "\\s-+\\(\\sw+\\)"))
 
 (defun easycrypt-save-command-p (span str)
-  "Decide whether argument is a Save command or not"
-  (and (proof-string-match-safe "save" (or (span-property span 'cmd) ""))
-       (if (= easycrypt-last-but-one-proofdepth 1) t nil)))
+  "Decide whether argument is a [save|qed] command or not"
+  (let ((txt (or (span-property span 'cmd) "")))
+       (proof-string-match-safe easycrypt-proof-save-regexp txt)))
 
 (defun easycrypt-goal-command-p (span)
-  "Is SPAN a goal?  Decide by matching with `'equiv .... [^auto]'"
-  (and (proof-string-match-safe "equiv" (or (span-property span 'cmd) ""))
-       (or (proof-string-match-safe "[^auto]" (or (span-property span 'cmd) ""))
-           (proof-string-match-safe "eager" (or (span-property span 'cmd) "")))))
-
-(defconst easycrypt-end-command-regexp "[^\\.]\\.\\(\\s \\|\n\\|$\\)")
+  "Is SPAN a goal start?"
+  (let ((txt (or (span-property span 'cmd) "")))
+       (proof-string-match-safe easycrypt-goal-command-regexp txt)))
 
 (defun easycrypt-init-output-syntax-table ()
   "Set appropriate values for syntax table for EasyCrypt output."
@@ -95,13 +63,12 @@
   (modify-syntax-entry ?\[ "(]")
   (modify-syntax-entry ?\] ")["))
 
-;
 ;; ----- regular expressions
 
 (defvar easycrypt-error-regexp "^\\[error-[0-9]+-[0-9]+\\]\\|^anomaly"
   "A regexp indicating that the EasyCrypt process has identified an error.")
 
-(defvar easycrypt-shell-proof-completed-regexp "QED"
+(defvar easycrypt-shell-proof-completed-regexp "No more goals"
   "*Regular expression indicating that the proof has been completed.")
 
 (defconst easycrypt-any-command-regexp
@@ -132,9 +99,6 @@
 (defconst easycrypt-indent-any-regexp
   (proof-regexp-alt easycrypt-any-command-regexp "\\s(" "\\s)"))
     
-(defconst easycrypt-indent-inner-regexp
-  (proof-regexp-alt "[{}[]()]"))
-
 (defconst easycrypt-indent-enclose-regexp
   (proof-regexp-alt (proof-ids-to-regexp easycrypt-keywords-indent-enclose) "\\s)"))
 
@@ -160,25 +124,28 @@
   "Face for names of dangerous tactics in proof scripts."
   :group 'proof-faces)
 
-(defconst easycrypt-tactics-closing-face 'easycrypt-tactics-closing-face)
+(defface easycrypt-tactics-tacticals-face
+  (proof-face-specs
+   (:foreground "dark green")
+   (:foreground "dark green")
+   ())
+  "Face for names of tacticals in proof scripts."
+  :group 'proof-faces)
+
+(defconst easycrypt-tactics-closing-face   'easycrypt-tactics-closing-face)
 (defconst easycrypt-tactics-dangerous-face 'easycrypt-tactics-dangerous-face)
+(defconst easycrypt-tactics-tacticals-face 'easycrypt-tactics-tacticals-face)
 
 (defvar easycrypt-font-lock-keywords
   (list
-    (cons (proof-ids-to-regexp easycrypt-global-keywords)
-          'font-lock-keyword-face)
-    (cons (proof-ids-to-regexp easycrypt-tactic-keywords)
-          'proof-tactics-name-face)
-    (cons (proof-ids-to-regexp easycrypt-bytac-keywords)
-          'easycrypt-tactics-closing-face)
-    (cons (proof-ids-to-regexp easycrypt-dangerous-keywords)
-          'easycrypt-tactics-dangerous-face)
-    (cons (proof-ids-to-regexp easycrypt-prog-keywords)  
-          'font-lock-keyword-face)
-    (cons (concat easycrypt-operator-char-1234 "+")
-          'font-lock-type-face)
-    (cons easycrypt-other-symbols
-          'font-lock-type-face)))
+    (cons (proof-ids-to-regexp easycrypt-global-keywords)    'font-lock-keyword-face)
+    (cons (proof-ids-to-regexp easycrypt-tactic-keywords)    'proof-tactics-name-face)
+    (cons (proof-ids-to-regexp easycrypt-tactical-keywords)  'easycrypt-tactics-tacticals-face)
+    (cons (proof-ids-to-regexp easycrypt-bytac-keywords)     'easycrypt-tactics-closing-face)
+    (cons (proof-ids-to-regexp easycrypt-dangerous-keywords) 'easycrypt-tactics-dangerous-face)
+    (cons (proof-ids-to-regexp easycrypt-prog-keywords)      'font-lock-keyword-face)
+    (cons (concat easycrypt-operator-char-1234 "+")          'font-lock-type-face)
+    (cons easycrypt-other-symbols                            'font-lock-type-face)))
 
 (defun easycrypt-init-syntax-table ()
   "Set appropriate values for syntax table in current buffer."

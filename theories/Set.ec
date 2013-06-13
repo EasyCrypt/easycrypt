@@ -379,8 +379,10 @@ theory Dexcepted.
     
   lemma mu_x_def : forall (x:'a) d X,
     mu_x (d \ X) x = 
-    (in_supp x (d \ X)) ? mu_x d x / (weight d - mu d (cPmem X)) : 0%r
-  by [].
+    (in_supp x (d \ X)) ? mu_x d x / (weight d - mu d (cPmem X)) : 0%r.
+  proof.
+    intros x d X; delta (\); last trivial.
+  qed.
 
   lemma mu_weight_def : forall (d:'a distr) X,
     weight (d \ X) = (weight d = mu d (cPmem X)) ? 0%r : 1%r

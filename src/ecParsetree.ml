@@ -345,11 +345,11 @@ type ptactic = ptactic_r located
 
 and ptactic_r = 
   | Pidtac      of string option
-  | Prepeat     of ptactic  
-  | Pdo         of int option * ptactic (* None means do 1 then repeat *)
-  | Ptry        of ptactic 
+  | Pdo         of bool * int option * ptactic
+  | Ptry        of ptactic
+  | Pby         of ptactic list
   | Psubgoal    of ptactics
-  | Pseq        of ptactics
+  | Pseq        of ptactic list
   | Pcase       of pformula 
   | Plogic      of logtactic
   | PPhl        of phltactic
@@ -357,7 +357,11 @@ and ptactic_r =
   | Padmit
   | Pdebug
 
-and ptactics = ptactic list        
+and ptactics =
+  | Psubtacs of ptactic list
+  | Pfirst   of ptactic
+  | Plast    of ptactic
+  | Protate  of [`Left | `Right]
 
 (* -------------------------------------------------------------------- *)
 type paxiom_kind = PAxiom | PLemma of ptactic option | PILemma
@@ -469,7 +473,7 @@ type global =
   | GthExport    of pqsymbol
   | GthClone     of theory_cloning
   | GthW3        of (string list * string * w3_renaming list)
-  | Gtactics     of [`Proof | `Actual of ptactics]
+  | Gtactics     of [`Proof | `Actual of ptactic list]
   | Gprover_info of pprover_infos
   | Gcheckproof  of bool
   | Gsave        of EcLocation.t

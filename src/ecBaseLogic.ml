@@ -1,3 +1,4 @@
+open EcUtils
 open EcParsetree
 open EcUtils
 open EcMaps
@@ -264,27 +265,26 @@ and rule_arg =
 
 
 type rule = {
-    pr_name : rule_name;
-    pr_hyps : rule_arg list
-  }
+  pr_name : rule_name;
+  pr_hyps : rule_arg list
+}
 
 type l_decl = hyps * form
 
 type pre_judgment = {
-    pj_decl : l_decl;
-    pj_rule : (bool * rule) option;
-  }
+  pj_decl : l_decl;
+  pj_rule : (bool * rule) option;
+}
 
 type judgment_uc = {
-    juc_count  : int;
-    juc_map    : pre_judgment Mint.t;
-  }
+  juc_count : int;
+  juc_map   : pre_judgment Mint.t;
+}
 
 type judgment = judgment_uc
 
-type goals = judgment_uc * int list
-type goal = judgment_uc * int 
-
+type goals  = judgment_uc * int list
+type goal   = judgment_uc * int 
 type tactic = goal -> goals 
 
 let new_goal juc decl =
@@ -404,36 +404,63 @@ let t_on_nth t n (juc,ln) =
   let juc,ln = t (juc,n) in
   juc, List.rev_append r (List.append ln l)
         
-let t_on_first (_,ln as gs) t = 
+let t_on_first t (_,ln as gs) =
   assert (ln <> []);
   t_on_nth t 0 gs 
         
-let t_on_last (_,ln as gs) t = 
+let t_on_last t (_,ln as gs) =
   assert (ln <> []);
   t_on_nth t (List.length ln - 1) gs 
 
 let t_seq_subgoal t lt g = t_subgoal lt (t g)
 
+let t_try_base t g =
+  (* FIXME: catch only tactics releated exceptions *)
+  try `Success (t g) with e -> `Failure e
+
 let t_try t g =
-  try t g 
-  with _ (* FIXME catch only some exception ? *) -> 
-    t_id None g
+  match t_try_base t g with
+  | `Failure _ -> t_id None g
+  | `Success g -> g
 
 let t_or t1 t2 g = 
-  try t1 g 
-  with _ (* FIXME catch only some exception ? *) -> 
-    t2 g
+  match t_try_base t1 g with
+  | `Failure _ -> t2 g
+  | `Success g -> g
 
-let t_repeat t g =
-  let rec aux g =
-    let r = try Some (t g) with _ -> None in
-    match r with 
+let t_do b omax t g =
+  let max = max (odfl max_int omax) 0 in
+
+  let rec doit i g =
+    let r = if i < max then Some (t_try_base t g) else None in
+
+    match r with
     | None -> t_id None g
-    | Some (juc, ln) ->
-      t_subgoal (List.map (fun _ -> aux) ln) (juc,ln) in
-  aux g
 
-let rec t_do n t =
-  if n <= 0 then t_id None
-  else t_seq t (t_do (n-1) t)
+    | Some (`Failure e) ->
+        let fail =
+          match b, omax with
+          | false, _      -> false
+          | true , None   -> i < 1
+          | true , Some m -> i < m
+        in
+          if fail then raise e else t_id None g
 
+    | Some (`Success (juc, ln)) -> 
+        t_subgoal (List.map (fun _ -> doit (i+1)) ln) (juc, ln)
+  in
+    doit 0 g
+
+let t_repeat t = t_do false None t
+
+let t_close t g =
+  match t g with
+  | (juc, []    ) -> (juc, [])
+  | (_  , i :: _) -> raise (StillOpenGoal i)
+
+let t_rotate mode (j, ns) =
+  let mrev = match mode with `Left -> identity | `Right -> List.rev in
+
+  match mrev ns with
+  | []      -> (j, ns)
+  | n :: ns -> (j, mrev (ns @ [n]))

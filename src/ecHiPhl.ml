@@ -392,7 +392,7 @@ let process_bdHoare_deno env info (_,n as g) =
     let (_,f) = get_node (juc,an) in
     let bhf = destr_bdHoareF f in
     bhf.bhf_pr, bhf.bhf_po in
-  t_on_first (t_bdHoare_deno env pre post (juc,n)) (t_use env an gs)
+  t_on_first (t_use env an gs) (t_bdHoare_deno env pre post (juc,n))
 
 let process_equiv_deno env info (_,n as g) = 
   let process_cut env g (pre,post) = 
@@ -414,7 +414,7 @@ let process_equiv_deno env info (_,n as g) =
     let (_,f) = get_node (juc,an) in
     let ef = destr_equivF f in
     ef.ef_pr, ef.ef_po in
-  t_on_first (t_equiv_deno env pre post (juc,n)) (t_use env an gs)
+  t_on_first (t_use env an gs) (t_equiv_deno env pre post (juc,n))
 
 let process_conseq env info (_, n as g) =
   let t_pre = ref (t_id None) and t_post = ref (t_id None) in

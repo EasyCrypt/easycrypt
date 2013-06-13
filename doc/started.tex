@@ -3,7 +3,368 @@
 \chapter{Getting Started}
 \section{Installation}
 
-\section{Basic Example (Tutorial)}
+\section{Basic Example (Tutorial)\label{sec:tutorial}}
+In this section we present a formalization of the proof of security
+against chosen plaintext attacks of a public-key encryption scheme
+introduced by \citet{br93}.
+
+This scheme is based on one-way trapdoor permutations and uses a
+random oracle. The proof of security follows by reduction: given an
+adversary against the chosen plaintext attack experiment that has
+access to the random oracle, there exists an inverter (making use of
+the adversary) that succeds in inverting the underlying trapdoor
+permutation with at least as much probability.
+
+While the proof of this scheme is not involved, it allows us to
+introduce several features of \EC both on the modelling and on
+the proving side.
+
+On the modelling side, we will describe how to define abstract operators
+and axioms; how to clone theories; how to define module types, modules
+and how to model adversaries as abstract procedures.
+
+On the proving side, we will explain how to perform reasoning up to
+failure; optimistic sampling and simple reasoning about probabilites
+of events in games.
+
+\subsection{Setting}
+We begin by introducing some basic concepts of cryptography and how we
+model them in \EC.
+
+\paragraph{Bitstrings}
+As part of its standard library, \EC provides a theory of fixed-length
+bitstrings coined \ec{Word}. For the purpose of this example, we will
+need bitstrings of three different lengths, \ec{k} for messages, \ec{l}
+for randomness and \ec{n} for ciphers; such that \ec{k + l = n}. The
+following piece of code declares three integer constants and states
+the desired property as an axiom, clones the theories with appropriate
+lengths and defines synonyms for the types.
+
+\begin{easycrypt}[label={lst:word}]{}
+const k : int. (* length of message *)
+const l : int. (* length of randmness *)
+const n : int. (* length of cipher *)
+axiom lengths : k + l = n.
+
+clone Word as Plaintext with op length = k.
+clone Word as Ciphertext with op length = n.
+clone Word as Randomness with op length = l.
+
+type plaintext = Plaintext.word.
+type ciphertext = Ciphertext.word.
+type randomness = Randomness.word.
+
+import Plaintext.
+import Ciphertext.
+import Randomness.
+\end{easycrypt}
+
+The \ec{import} keyword allows us to ommit the qualified names when
+they can be inferred from the context. 
+
+We will be interested in sampling from uniform distributions of types
+\ec{randomness} and \ec{plaintext}. This is defined in the standard
+library, but we define shortcuts to them as follows
+
+\begin{easycrypt}[label={lst:samplebs}]{}
+op uniform_rand : randomness distr = Randomness.Dword.dword.
+op uniform_plaintext : plaintext distr = Plaintext.Dword.dword.
+\end{easycrypt}
+
+\paragraph{Random oracles}
+A hash function in the random oracle model is a consistent random
+function: new queries trigger samplings that are stored in a map; old
+queries trigger a map lookup. 
+
+The following piece of code defines a signature for random oracles and
+an implementation between  types \ec{randomness} and
+\ec{plaintext} as defined above.
+
+\begin{easycrypt}[label={lst:rndorcl}]{}
+module type Oracle =
+{
+  fun init():unit
+  fun o(x:randomness):plaintext
+}.
+
+theory ROM.
+  module RO:Oracle = {
+    var m : (randomness, plaintext) map
+
+    fun init() : unit = {
+      m = Map.empty;
+    }
+  
+    fun o(x:randomness) : plaintext = {
+      var y : plaintext;
+      y = $uniform_plaintext;
+      if (!in_dom x m) m.[x] = y;
+      return proj (m.[x]);
+    }
+  }.
+end ROM.
+\end{easycrypt}
+% $ just for correct syntax highlighting
+
+The module \ec{RO} consists of a global variable \ec{m} that models
+the map of the random oracle; a function \ec{init} that initializes
+the map to \ec{empty} and the implementation of the actual oracle
+\ec{o}, that takes an argument \ec{x} of type \ec{randomness}, samples a
+value \ec{y} of type \ec{plaintext}, updates the value of the map in case
+it's necesary and finally returns the lookup of \ec{x} in the map
+\ec{m}.
+
+Adversaries are normally given restricted access to the oracle, in the
+sense that the amount of calls allowed is bounded. Moreover, we keep
+track of the queries triggered by the adversary. This increased
+functionality is provided in \EC through the following definitions
+
+\begin{easycrypt}[label={lst:wrappedrndorcl}]{}
+ module type ARO = {fun o_a (x : randomness) : plaintext}. 
+ 
+ const qO : int.
+ module SetBoundedRO (O : Oracle) ={
+  var s : randomness set
+  var cO : int
+  fun init() : unit={
+   O.init();
+   s = Set.empty;
+   cO = 0;
+  }
+  fun o_a(x : randomness) : plaintext ={
+   var y : plaintext = Plaintext.zeros;
+   if (cO < qO) {
+    s = Set.add x s;cO = cO + 1;
+    y = O.o(x);
+   }
+   return y;
+  }
+ }.
+\end{easycrypt}
+
+\ec{ARO} is a module type declaring the interface of the random oracle
+that will be provided to adversaries. We rely a constant \ec{qO} that
+represents the bound on the amount of calls. The module
+\ec{SetBoundedRO}, defines the wrapped version of oracle \ec{O}.  This
+module uses the set \ec{s} to keep track of the calls performed and
+counter \ec{cO} to keep track of the amount of queries performed so
+far. The \ec{init} function initializes the values appropriately and
+the \ec{o_a} function implements the desired checks: if the adversary
+has not reached the bound, we update the set, the counter and forward
+the call to the underlying oracle \ec{O}; otherwise the default value
+is returned.
+
+\paragraph{One-way trapdoor permutations}
+Trapdoor permutations are functions that are ``easy'' to compute, but
+hard to invert without knowing a secret key. Formally, a family
+of trapdoor permutations on a type \ec{T} is a triple of algorithms
+$(\KG,f,f^{-1})$ such that for any pair of keys $(pk,sk)$ output by
+$\KG$, $f_{pk}$ and $f^{-1}_{sk}$ are permutations on
+\ec{T} and inverse of each other. 
+
+In these case, we are interested in trapdoor permutations on type
+\ec{randomness}. In \EC we model them as follows
+\begin{easycrypt}[label={lst:owf}]{}
+type pkey.
+type skey.
+const keypairs: (pkey * skey) distr.
+
+pred valid_keys : (pkey * skey).
+
+axiom kg_valid : forall (pk : pkey, sk : skey), 
+in_supp (pk,sk) keypairs => valid_keys(pk,sk).
+
+op f : pkey -> randomness -> randomness.
+op finv : skey -> randomness -> randomness.
+
+
+axiom finvof : forall(pk : pkey, sk : skey, x : randomness),
+ valid_keys(pk,sk) => finv sk (f pk x) = x.
+
+axiom fofinv : forall(pk : pkey, sk : skey, x : randomness),
+ valid_keys(pk,sk) => f pk (finv sk x) = x.
+\end{easycrypt}
+First, we declare two types \ec{pkey} and \ec{skey} that represent
+public and secret keys respectively. We then declare a distribution
+\ec{keypairs} that will be used by the $\KG$ algorithm to produce fresh
+keys. We then declare an abstract predicate that will model when two
+keys are matching and specify that all the pairs of keys that can be
+sampled from \ec{keypairs} are matching. Afterwards, we declare \ec{f}
+and \ec{finv} with the appropriate type and we state the axioms saying
+that one is inverse of eachother for valid key pairs.
+ 
+\paragraph{Public-key encryption}
+A public-key encryption scheme consists of a triple of algorithms
+$(\KG,\Enc,\Dec)$:
+
+\begin{description}
+\item[Key Generation] 
+  The key generation algorithm $\KG$ produces a pair of keys $(pk,sk)$;
+  $pk$ is a \emph{public-key} used for encryption, $sk$ is
+  a \emph{secret-key} used for decryption;
+
+\item[Encryption] 
+  Given a public-key $pk$ and a message $m$, $\Enc_{pk}(m)$ outputs a
+  ciphertext $c$;
+
+\item[Decryption] 
+  Given a secret-key $sk$ and a ciphertext $c$, $\Dec_{sk}(c)$ outputs
+  either message $m$ or a distinguished value $\bot$ denoting failure.
+\end{description}
+%
+We require that for pairs of keys $(pk,sk)$ generated by $\KG$,
+$\Dec_{sk}(\Enc_{pk}(m))= m$ holds for any message $m$. 
+
+In \EC, we model public-key encryption schemes in the following way
+\begin{easycrypt}[label={lst:enc_scheme}]{}
+ module type Scheme(RO : Oracle) = {
+  fun kg() : (pkey * skey)
+  fun enc(pk:pkey, m:plaintext) : ciphertext
+  fun dec(sk:pkey, c:ciphertext) : plaintext
+ }.
+\end{easycrypt}
+First of all, we declare the necesary types: \ec{pkey} and \ec{skey}
+for public and secret keys and \ec{message} and \ec{cipher} for
+message and ciphertext. Afterwards, we declare the interface of an
+encryption scheme, that consists of a key generation algorithm
+\ec{kg}, an encryption function \ec{enc} and a decryption function
+\ec{dec}. Note that we are actually modelling the particular class of
+encryption schemes that use at most one random oracle.
+
+\paragraph{The BR93 scheme}
+The scheme we consider defines encryption as 
+$\Enc_{pk}(m) = f_{pk}(r) \concat m \xor H(r)$, where $r$ is a
+randomly sampled value and $H(r)$ denotes the result of a hash oracle
+call with value $r$.
+
+ In easycrypt we model the encryption scheme as an instance of our
+ \ec{Scheme} signature as follows
+
+\begin{easycrypt}[label={lst:br93}]{}
+op (||) (x : randomness, y : plaintext) : ciphertext =
+ Ciphertext.from_array ((to_array x) || (to_array y)).
+
+op projRand(c : ciphertext) : randomness =
+ Randomness.from_array (sub (to_array c) 0 l).
+
+op projPlain(c : ciphertext) : plaintext =
+ Plaintext.from_array (sub (to_array c) l k).
+
+lemma projRand_c : forall (r : randomness,p : plaintext),
+projRand((r || p)) = r by [].
+
+lemma projPlain_c : forall (r : randomness,p : plaintext),
+projPlain((r || p)) = p by [].
+
+lemma proj_merge : forall(c : ciphertext),
+(projRand c || projPlain c) = c.
+
+ module BR(R : Oracle) : Scheme(R) = {
+ var r : randomness
+ 
+ fun kg():(pkey * skey) = {
+  var pk, sk:(pkey * skey);
+  (pk,sk) = $keypairs;
+  return (pk,sk);
+ }
+ 
+ fun enc(pk:pkey, m:plaintext): ciphertext = {
+  var h : plaintext;
+  r = $uniform_rand; 
+  h  = R.o(r);
+  return (f pk r ||   m ^^ h);
+ }
+ 
+ fun dec(sk:skey, c : ciphertext) : plaintext = {
+  var h : plaintext;
+  h = R.o(finv sk (projRand c));
+  return (projPlain c ^^ h);
+ }
+}.
+\end{easycrypt}
+First, we define a concatenation operation with the appropriate
+type. In doing so, we make use of the array library, in particular,
+the concat operation \ec{||}. Note that we have to insert the
+appropriate cast functions that allows us to move from boolean arrays
+to bitstrings of fixed size. We then define some useful lemmas (we
+ommit the proofs for conciseness).
+
+Afterwards, we define the module \ec{BR}, that makes use of a random
+oracle \ec{R} and has type \ec{Scheme(R)}. This module defines the
+required operations in the \ec{Scheme} signature. \ec{kg} samples a
+pair of keys and returns them. \ec{enc} takes a public key \ec{pk} and
+a plaintext \ec{m} and encrypts by samplying a random value \ec{r},
+querying the oracle with this value and applying \ec{f} to \ec{pk} and
+\ec{r} and appending it to the xor of result of the hash call and the
+message. Decryption is defined by projecting the first part of \ec{c}
+and applying \ec{finv} with \ec{sk} to it to recover the
+randomness. Afterwards, we query the oracle with the randomness and
+xor the result with the second part of \ec{c}.
+
+\paragraph{The \textsf{IND-CPA} experiment}
+The CPA experiment can be described in \EC as follows:
+
+\begin{easycrypt}[label={lst:cpa}]{}
+module type Adv (R : ARO) = { 
+ fun a1(pk : pkey) : plaintext * plaintext
+ fun a2(c : ciphertext) : bool
+}.
+
+module CPA (S : Scheme, A_: Adv) ={
+ module AO = SetBoundedRO(RO)
+ module SO = S(RO)
+ module A = A_(AO)
+  fun main(): bool = {
+  var pk:pkey;
+  var sk:skey;
+  var m0 : plaintext;
+  var m1 : plaintext;
+  var c : ciphertext;
+  var b : bool;
+  var b' : bool;
+  AO.init();
+  (pk,sk)  = SO.kg();
+  (m0,m1)  = A.a1(pk);
+  b = $Dbool.dbool;
+  c  = SO.enc(pk,b?m0:m1);
+  b' = A.a2(c);
+  return b = b';
+ }
+}.
+\end{easycrypt}
+%$ 
+We start by declaring a module type for the adversary. This interface
+establishes that an adversary has to provide two functions. The
+function \ec{a1} corresponds to the first round of the CPA game in
+which the adverasay is given a public key \ec{pk} and produces two
+plaintext of its choice. The function \ec{a2} corresponds to the
+second phase, in which the adversary is presented with a challenge
+ciphertext \ec{c} and he has to determine (by producing a boolean)
+which plaintext was encrypted.
+
+The module \ec{CPA} is parametrized by an adversary \ec{A_} and a
+scheme \ec{S}. Note however, that in order to use these modules we
+have to instantiate them with a random oracle. However, we will not
+use the same oracle for both: for the encryption we use the bare
+random oracle \ec{RO}, but for the adversary we first define \ec{AO},
+a wrapped version of the oracle that provides the increased
+functionality mentioned previously, and then we instantiate \ec{A_}
+with it.
+
+The function \ec{main} defines the CPA experiment. We initialize the
+adversary oracle, and we call the key generation algorithm and obtain
+\ec{pk} and \ec{sk}. Then we provide \ec{a1} with the public key and get
+two plaintext \ec{m0} and \ec{m1}. We proceed by sampling a random bit
+and we encrypt either \ec{m0} or \ec{m1} according to its value and we
+call \ec{a2} with this ciphertext as argument and obtain a boolean
+\ec{b'}. The experiment returns true if the adversary manages to
+establish the value of \ec{b}, {\em i.e.} it returns \ec{b=b'}.
+
+\paragraph{Security property}
+\subsection{Overview of the proof}
+
+\subsection{Easycrypt proof}
+
 
 %%% Local Variables: 
 %%% mode: latex

@@ -1,4 +1,4 @@
-; Generated on Tue Jun 11 19:57:23 2013
+; Generated on Wed Jun 12 10:43:47 2013
 
 (defvar easycrypt-bytac-keywords '(
   "assumption"
@@ -75,7 +75,6 @@
   "compute"
   "same"
   "idtac"
-  "try"
   "intros"
   "split"
   "left"
@@ -123,6 +122,13 @@
   "unroll"
   "splitwhile"
   "kill"
+))
+
+(defvar easycrypt-tactical-keywords '(
+  "try"
+  "first"
+  "last"
+  "do"
 ))
 
 (provide 'easycrypt-keywords)
