@@ -213,8 +213,8 @@ axiom write_get: forall (dst src:'x array) (dOff sOff l i:int),
   0 <= dOff => 0 <= sOff => 0 <= l =>
   dOff + l <= length dst =>
   sOff + l <= length src =>
-  (0 <= i => i < dOff => (write dst dOff src sOff l).[i] = dst.[i]) &&
-  (dOff <= i => i < dOff + l => (write dst dOff src sOff l).[i] = src.[i - dOff + sOff]) &&
+  (0 <= i => i < dOff => (write dst dOff src sOff l).[i] = dst.[i]) /\
+  (dOff <= i => i < dOff + l => (write dst dOff src sOff l).[i] = src.[i - dOff + sOff]) /\
   (dOff + l <= i => i < length dst => (write dst dOff src sOff l).[i] = dst.[i]).
 
 (* init *)
