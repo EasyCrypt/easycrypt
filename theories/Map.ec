@@ -232,8 +232,12 @@ save.
 
 (** extensional equality *)
 pred (==) (m1 m2:('a,'b) map) = (* TODO : Why we use in_dom here ? *)
-  (forall x, in_dom x m1 <=> in_dom x m2) &&
+  (forall x, in_dom x m1 <=> in_dom x m2) /\
   (forall x, in_dom x m1 => m1.[x] = m2.[x]).
+
+lemma eq_ext_alt: forall (m1 m2:('a,'b) map),
+  m1 == m2 <=> forall x, m1.[x] = m2.[x]
+by [].
 
 axiom extensionality: forall (m1 m2:('a,'b) map),
   m1 == m2 => m1 = m2.
