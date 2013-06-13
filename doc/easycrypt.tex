@@ -1,6 +1,7 @@
 \documentclass[a4paper,notitlepage]{book}
 
 \usepackage{multicol}
+\usepackage[authoryear,longnamesfirst,round]{natbib}
 \usepackage{multind}
 \usepackage{xspace}
 \usepackage{mdframed}
@@ -53,6 +54,10 @@
 \input{libs}
 % Examples
 \input{examples}
+
+\addcontentsline{toc}{chapter}{References}
+\bibliographystyle{plainnat}
+\bibliography{references}
 
 \part{Language Reference (Pierre-Yves)}
 
