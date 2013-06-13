@@ -6,6 +6,12 @@ README
 config/_tags
 config/myocamlbuild.ml
 
+# documentation
+doc/Makefile
+doc/*.sty
+doc/*.bib
+doc/*.tex
+
 # proofgeneral
 proofgeneral/Makefile
 proofgeneral/proof-site.patch
