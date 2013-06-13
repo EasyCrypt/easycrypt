@@ -9,7 +9,11 @@ config/myocamlbuild.ml
 # proofgeneral
 proofgeneral/Makefile
 proofgeneral/proof-site.patch
+proofgeneral/pg-4.2.patch
+proofgeneral/emacs.local.rc
 proofgeneral/easycrypt/*.el
+proofgeneral/config/emacs.rc.in
+proofgeneral/scripts/find-emacs
 
 # EasyCrypt sources
 src/*.ml
@@ -29,3 +33,4 @@ scripts/runtest.py
 scripts/distribution.py
 scripts/keywords.py
 scripts/ec-build-toolchain
+scripts/activate-toolchain.sh
