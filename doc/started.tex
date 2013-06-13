@@ -6,7 +6,7 @@
 \section{Basic Example (Tutorial)}
 In this section we present a formalization of the proof of security
 against chosen plaintext attacks of a public-key encryption scheme
-introduced by Bellare and Rogaway in 1993\cite{br93}.
+introduced by \citet{br93}.
 
 This scheme is based on one-way trapdoor permutations and uses a
 random oracle. The proof of security follows by reduction: given an
@@ -218,7 +218,6 @@ $\Dec_{sk}(\Enc_{pk}(m))= m$ holds for any message $m$.
 In \EC, we model public-key encryption schemes in the following way
 \begin{easycrypt}[label={lst:enc_scheme}]{}
  module type Scheme(RO : Oracle) = {
-  fun init(): unit 
   fun kg() : (pkey * skey)
   fun enc(pk:pkey, m:plaintext) : ciphertext
   fun dec(sk:pkey, c:ciphertext) : plaintext
@@ -227,23 +226,139 @@ In \EC, we model public-key encryption schemes in the following way
 First of all, we declare the necesary types: \ec{pkey} and \ec{skey}
 for public and secret keys and \ec{message} and \ec{cipher} for
 message and ciphertext. Afterwards, we declare the interface of an
-encryption scheme, that consists of an initialization function
-\ec{init}, a key generation algorithm \ec{kg}, an encryption function
-\ec{enc} and a decryption function \ec{dec}. Note that we are actually
-modelling the particular class of encryption schemes that use at most
-one random oracle.
+encryption scheme, that consists of a key generation algorithm
+\ec{kg}, an encryption function \ec{enc} and a decryption function
+\ec{dec}. Note that we are actually modelling the particular class of
+encryption schemes that use at most one random oracle.
 
 \paragraph{The BR93 scheme}
+The scheme we consider defines encryption as 
+$\Enc_{pk}(m) = f_{pk}(r) \concat m \xor H(r)$, where $r$ is a
+randomly sampled value and $H(r)$ denotes the result of a hash oracle
+call with value $r$.
 
+ In easycrypt we model the encryption scheme as an instance of our
+ \ec{Scheme} signature as follows
 
+\begin{easycrypt}[label={lst:br93}]{}
+op (||) (x : randomness, y : plaintext) : ciphertext =
+ Ciphertext.from_array ((to_array x) || (to_array y)).
+
+op projRand(c : ciphertext) : randomness =
+ Randomness.from_array (sub (to_array c) 0 l).
+
+op projPlain(c : ciphertext) : plaintext =
+ Plaintext.from_array (sub (to_array c) l k).
+
+lemma projRand_c : forall (r : randomness,p : plaintext),
+projRand((r || p)) = r by [].
+
+lemma projPlain_c : forall (r : randomness,p : plaintext),
+projPlain((r || p)) = p by [].
+
+lemma proj_merge : forall(c : ciphertext),
+(projRand c || projPlain c) = c.
+
+ module BR(R : Oracle) : Scheme(R) = {
+ var r : randomness
+ 
+ fun kg():(pkey * skey) = {
+  var pk, sk:(pkey * skey);
+  (pk,sk) = $keypairs;
+  return (pk,sk);
+ }
+ 
+ fun enc(pk:pkey, m:plaintext): ciphertext = {
+  var h : plaintext;
+  r = $uniform_rand; 
+  h  = R.o(r);
+  return (f pk r ||   m ^^ h);
+ }
+ 
+ fun dec(sk:skey, c : ciphertext) : plaintext = {
+  var h : plaintext;
+  h = R.o(finv sk (projRand c));
+  return (projPlain c ^^ h);
+ }
+}.
+\end{easycrypt}
+First, we define a concatenation operation with the appropriate
+type. In doing so, we make use of the array library, in particular,
+the concat operation \ec{||}. Note that we have to insert the
+appropriate cast functions that allows us to move from boolean arrays
+to bitstrings of fixed size. We then define some useful lemmas (we
+ommit the proofs for conciseness).
+
+Afterwards, we define the module \ec{BR}, that makes use of a random
+oracle \ec{R} and has type \ec{Scheme(R)}. This module defines the
+required operations in the \ec{Scheme} signature. \ec{kg} samples a
+pair of keys and returns them. \ec{enc} takes a public key \ec{pk} and
+a plaintext \ec{m} and encrypts by samplying a random value \ec{r},
+querying the oracle with this value and applying \ec{f} to \ec{pk} and
+\ec{r} and appending it to the xor of result of the hash call and the
+message. Decryption is defined by projecting the first part of \ec{c}
+and applying \ec{finv} with \ec{sk} to it to recover the
+randomness. Afterwards, we query the oracle with the randomness and
+xor the result with the second part of \ec{c}.
 
 \paragraph{The \textsf{IND-CPA} experiment}
 The CPA experiment can be described in \EC as follows:
 
-\begin{easycrypt}[label={lst:enc_scheme}]{}
+\begin{easycrypt}[label={lst:cpa}]{}
+module type Adv (R : ARO) = { 
+ fun a1(pk : pkey) : plaintext * plaintext
+ fun a2(c : ciphertext) : bool
+}.
 
+module CPA (S : Scheme, A_: Adv) ={
+ module AO = SetBoundedRO(RO)
+ module SO = S(RO)
+ module A = A_(AO)
+  fun main(): bool = {
+  var pk:pkey;
+  var sk:skey;
+  var m0 : plaintext;
+  var m1 : plaintext;
+  var c : ciphertext;
+  var b : bool;
+  var b' : bool;
+  AO.init();
+  (pk,sk)  = SO.kg();
+  (m0,m1)  = A.a1(pk);
+  b = $Dbool.dbool;
+  c  = SO.enc(pk,b?m0:m1);
+  b' = A.a2(c);
+  return b = b';
+ }
+}.
 \end{easycrypt}
+%$ 
+We start by declaring a module type for the adversary. This interface
+establishes that an adversary has to provide two functions. The
+function \ec{a1} corresponds to the first round of the CPA game in
+which the adverasay is given a public key \ec{pk} and produces two
+plaintext of its choice. The function \ec{a2} corresponds to the
+second phase, in which the adversary is presented with a challenge
+ciphertext \ec{c} and he has to determine (by producing a boolean)
+which plaintext was encrypted.
 
+The module \ec{CPA} is parametrized by an adversary \ec{A_} and a
+scheme \ec{S}. Note however, that in order to use these modules we
+have to instantiate them with a random oracle. However, we will not
+use the same oracle for both: for the encryption we use the bare
+random oracle \ec{RO}, but for the adversary we first define \ec{AO},
+a wrapped version of the oracle that provides the increased
+functionality mentioned previously, and then we instantiate \ec{A_}
+with it.
+
+The function \ec{main} defines the CPA experiment. We initialize the
+adversary oracle, and we call the key generation algorithm and obtain
+\ec{pk} and \ec{sk}. Then we provide \ec{a1} with the public key and get
+two plaintext \ec{m0} and \ec{m1}. We proceed by sampling a random bit
+and we encrypt either \ec{m0} or \ec{m1} according to its value and we
+call \ec{a2} with this ciphertext as argument and obtain a boolean
+\ec{b'}. The experiment returns true if the adversary manages to
+establish the value of \ec{b}, {\em i.e.} it returns \ec{b=b'}.
 
 \paragraph{Security property}
 \subsection{Overview of the proof}
