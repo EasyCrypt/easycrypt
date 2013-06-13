@@ -21,6 +21,10 @@ and ty_node =
   | Tconstr of EcPath.path * ty list
   | Tfun    of ty * ty
 
+module Mty : Map.S with type key = ty
+module Sty : Set.S with module M = Map.MakeBase(Mty)
+module Hty : EcMaps.EHashtbl.S with type key = ty
+
 type dom = ty list
 
 val ty_equal : ty -> ty -> bool
@@ -150,6 +154,7 @@ val e_fv      : expr -> int EcIdent.Mid.t
 val e_ty      : expr -> ty
 
 (* -------------------------------------------------------------------- *)
+val e_tt       : expr
 val e_int      : int -> expr
 val e_local    : EcIdent.t -> ty -> expr
 val e_var      : prog_var -> ty -> expr

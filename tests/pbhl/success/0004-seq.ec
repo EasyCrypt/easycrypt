@@ -11,10 +11,10 @@ module M = {
   }
 }.
 
-lemma test : bd_hoare [M.f : true ==> M.x /\ M.y ] [=] [1%r/4%r]
+lemma test : bd_hoare [M.f : true ==> M.x /\ M.y ] = (1%r/4%r).
 proof.
  fun.
- app 1 : (M.y) (1%r/2%r).
+ seq 1 : (M.y) (1%r/2%r).
  rnd (1%r/2%r) (lambda (x:bool),x=true).
  skip; trivial.
  rnd (1%r/2%r) (lambda (x:bool),x=true).
@@ -31,10 +31,10 @@ module M2 = {
   }
 }.
 
-lemma test2 : bd_hoare [M2.f : true ==> M2.x /\ M2.y ] [<=] [1%r/2%r]
+lemma test2 : bd_hoare [M2.f : true ==> M2.x /\ M2.y ] <= (1%r/2%r).
 proof.
  fun.
- app 1 : (M2.y) .
+ seq 1 : (M2.y) .
  wp; skip; trivial.
  rnd (1%r/2%r) (lambda (x:bool),x=true).
  wp; skip; trivial.
@@ -50,13 +50,15 @@ module M3 = {
   }
 }.
 
-lemma test3 : bd_hoare [M3.f : true ==> M3.x /\ M3.y ] [<=] [1%r/2%r]
+lemma test3 : bd_hoare [M3.f : true ==> M3.x /\ M3.y ] <= (1%r/2%r).
 proof.
  fun.
- app>> 1 : (M3.x) .
- rnd (1%r/2%r) (lambda (x:bool),x=true).
- skip; trivial.
- wp; skip; trivial.
+ seq 1 : (M3.x) (1%r/2%r) (1%r) (1%r/2%r) (0%r) .
+ rnd (1%r/2%r) (lambda (x:bool),x=true);skip; trivial.
+ wp; pr_bounded; trivial. 
+ rnd (1%r/2%r) (lambda (x:bool),x=false);skip; trivial.
+ bd_eq; hoare; [wp; skip; trivial | trivial].
+ trivial.
 save.
 
 
@@ -75,6 +77,6 @@ module M2 = {
 lemma foo : bd_hoare [M.f : true ==> M.x /\ M.y ] [<=] [1%r/2%r]
 proof.
  fun.
- app>> 1 : (M.y) (1%r/2%r).
+ seq>> 1 : (M.y) (1%r/2%r).
 *)
 

@@ -8,7 +8,7 @@ exception TopError of EcLocation.t * exn
 val toperror_of_exn : ?gloc:EcLocation.t -> exn -> exn
 
 (* -------------------------------------------------------------------- *)
-val addidir : string -> unit
+val addidir : ?system:bool -> string -> unit
 
 (* -------------------------------------------------------------------- *)
 type notifier = string -> unit

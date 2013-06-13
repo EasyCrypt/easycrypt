@@ -52,8 +52,10 @@ val p_int_lt     : path
 val p_real_le    : path
 val p_real_lt    : path
 
+val p_real_sum     : path
+val p_real_sub     : path
 val p_real_prod    : path
-val p_real_div    : path
+val p_real_div     : path
 
 val p_in_supp    : path
 val p_mu       : path
@@ -88,4 +90,4 @@ val p_rewrite_iff_l : path
 val p_rewrite_iff_r : path 
 
 val p_case_eq_bool  : path 
-val p_eq_tuple_intro : int -> path
+val p_tuple_ind      : int -> path

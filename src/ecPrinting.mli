@@ -7,8 +7,6 @@ module PPEnv : sig
   type t
 
   val ofenv : EcEnv.env -> t
-
-  val tyvar : t -> ident -> symbol
 end
 
 (* -------------------------------------------------------------------- *)

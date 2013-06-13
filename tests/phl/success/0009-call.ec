@@ -9,14 +9,14 @@ module M = {
 
   fun g (x:int) : int = {
     var r : int;
-    r := f(x);
+    r  = f(x);
     return r;
   }
 }.
 
 lemma foo : 
   forall (xi zi:int),
-  hoare [M.g : M.z=zi /\ x = xi ==> res = 3 /\ M.z = zi /\ M.y = xi]
+  hoare [M.g : M.z=zi /\ x = xi ==> res = 3 /\ M.z = zi /\ M.y = xi].
 proof.
   intros xi zi;fun.
   call (x=xi) (res = 3 /\ M.y = xi).

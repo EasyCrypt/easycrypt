@@ -38,7 +38,7 @@ module M = {
   }
 }.
 
-lemma L : equiv[M.f ~ M.g : true ==> true]
+lemma L : equiv[M.f ~ M.g : true ==> true].
 proof.
   fun.
   fission {1} 1.3!2 @ 1, 2.

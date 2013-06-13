@@ -4,11 +4,13 @@ open EcLocation
 open EcParsetree
 
 (* -------------------------------------------------------------------- *)
+exception HiScopeError of EcLocation.t option * string
+
 type scope
 
 type proof_uc = {
   puc_name : string;
-  puc_jdg :  EcBaseLogic.judgment_uc;
+  puc_jdg  : EcBaseLogic.judgment_uc * int list;
 }
 
 val empty   : scope
@@ -16,10 +18,12 @@ val path    : scope -> EcPath.path
 val name    : scope -> symbol
 val env     : scope -> EcEnv.env
 val attop   : scope -> bool
-val goal    : scope -> proof_uc list
+val goal    : scope -> proof_uc option
 
 val verbose     : scope -> bool
 val set_verbose : scope -> bool -> scope
+
+val check_state : [`InProof | `InTop] -> string -> scope -> unit
 
 module Op : sig
   (* [add scope op] type-checks the given *parsed* operator [op] in
@@ -110,7 +114,7 @@ module Theory : sig
 end
 
 module Tactics : sig
-  val process : scope -> ptactics -> scope
+  val process : scope -> ptactic list -> scope
 end
 
 module Prover : sig 

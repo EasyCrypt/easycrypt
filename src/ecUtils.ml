@@ -1,4 +1,9 @@
 (* -------------------------------------------------------------------- *)
+exception Unexpected
+
+let unexpected () = raise Unexpected
+
+(* -------------------------------------------------------------------- *)
 let tryexn (ignoreexn : exn -> bool) (f : unit -> 'a) =
   try  Some (f ())
   with e -> if ignoreexn e then None else raise e
@@ -19,6 +24,10 @@ let (^~) f = fun x y -> f y x
 
 let (-|) (f : 'a -> 'b) (g : 'c -> 'a) =
   fun x -> f (g x)
+
+(* -------------------------------------------------------------------- *)
+let copy (x : 'a) : 'a =
+  Obj.obj (Obj.dup (Obj.repr x))
 
 (* -------------------------------------------------------------------- *)
 let proj3_1 (x, _, _) = x

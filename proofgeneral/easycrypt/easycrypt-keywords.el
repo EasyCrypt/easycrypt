@@ -1,4 +1,10 @@
-; Generated on Mon Jun  3 09:49:11 2013
+; Generated on Wed Jun 12 10:43:47 2013
+
+(defvar easycrypt-bytac-keywords '(
+  "assumption"
+  "trivial"
+  "by"
+))
 
 (defvar easycrypt-dangerous-keywords '(
   "admit"
@@ -9,6 +15,7 @@
   "lemma"
   "proof"
   "save"
+  "qed"
   "claim"
   "drop"
   "end"
@@ -16,6 +23,7 @@
   "export"
   "module"
   "of"
+  "const"
   "op"
   "pred"
   "require"
@@ -67,17 +75,13 @@
   "compute"
   "same"
   "idtac"
-  "try"
-  "assumption"
   "intros"
   "split"
-  "field"
-  "field_simplify"
   "left"
   "right"
   "elim"
   "apply"
-  "trivial"
+  "progress"
   "cut"
   "generalize"
   "clear"
@@ -93,14 +97,22 @@
   "case"
   "rewrite"
   "subst"
-  "app"
+  "field"
+  "field_simplify"
+  "seq"
   "wp"
   "skip"
   "call"
   "rcondt"
   "rcondf"
   "swap"
+  "cfold"
   "rnd"
+  "bdhoare_deno"
+  "pr_bounded"
+  "pr_false"
+  "pr_or"
+  "bd_eq"
   "equiv_deno"
   "conseq"
   "inline"
@@ -109,6 +121,14 @@
   "fusion"
   "unroll"
   "splitwhile"
+  "kill"
+))
+
+(defvar easycrypt-tactical-keywords '(
+  "try"
+  "first"
+  "last"
+  "do"
 ))
 
 (provide 'easycrypt-keywords)

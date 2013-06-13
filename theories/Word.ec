@@ -1,4 +1,4 @@
-require        Bool.
+require Bool.
 require import Int.
 
 op length: int.
@@ -13,7 +13,7 @@ pred (==)(w0, w1:word) = forall i,
   0 <= i => i < length =>
   w0.[i] = w1.[i].
 
-axiom extentionality: forall w0 w1,
+axiom extensionality: forall w0 w1,
   w0 == w1 => w0 = w1.
 
 (* set *)
@@ -35,31 +35,33 @@ axiom xor_get: forall w0 w1 i,
   (w0 ^^ w1).[i] = Bool.xorb w0.[i] w1.[i].
 
 lemma xor_nilpotent: forall w,
-  w ^^ w = zeros
+  w ^^ w = zeros.
 proof.
-intros w;
-  apply (extentionality (w ^^ w) zeros _);
-  trivial.
+intros w; apply extensionality; trivial.
 save.
 
 lemma xor_commutative: forall w0 w1,
-  w0 ^^ w1 = w1 ^^ w0
+  w0 ^^ w1 = w1 ^^ w0.
 proof.
-intros w0 w1;
-  apply (extentionality (w0 ^^ w1) (w1 ^^ w0) _);
-  cut xorb_commute: (forall i, 0 <= i => i < length =>
-                      (w0 ^^ w1).[i] = (w1 ^^ w0).[i]);
-  trivial.
+intros w0 w1; apply extensionality.
+cut xorb_commute: (forall i, 0 <= i => i < length =>
+                    (w0 ^^ w1).[i] = (w1 ^^ w0).[i]);
+trivial.
+save.
+
+lemma xor_assoc : forall x y z, x ^^ (y ^^ z) = (x ^^ y) ^^ z.
+proof.
+  intros x y z; apply extensionality.
+  intros i Hge Hlt; trivial.
 save.
 
 lemma xor_zeros: forall w,
-  w ^^ zeros = w
+  w ^^ zeros = w.
 proof.
-intros w;
-  apply (extentionality (w ^^ zeros) w _);
-  cut xorb_zeros: (forall i, 0 <= i => i < length =>
-                    (w ^^ zeros).[i] = w.[i]);
-  trivial.
+intros w; apply extensionality.
+cut xorb_zeros: (forall i, 0 <= i => i < length =>
+                  (w ^^ zeros).[i] = w.[i]);
+trivial.
 save.
 
 (* TODO: Finish writing the conversions *)
@@ -79,19 +81,15 @@ axiom from_array_get: forall a i,
 
 lemma to_array_from_array: forall a,
   Array.length a = length =>
-  to_array (from_array a) = a
+  to_array (from_array a) = a.
 proof.
-intros a Length;
-  apply (Array.extentionality<:bool> (to_array (from_array a)) a _);
-  trivial.
+intros a Length; apply Array.extensionality; trivial.
 save.
 
 lemma from_array_to_array: forall w,
-  from_array (to_array w) = w
+  from_array (to_array w) = w.
 proof.
-intros w;
-  apply (extentionality (from_array (to_array w)) w _);
-  trivial.
+intros w; apply extensionality; trivial.
 save.
 
 require import Real.
@@ -99,12 +97,20 @@ require import Distr.
 
 (* Uniform distribution on fixed-length words *)
 theory Dword.
-  op dword: word distr.
+  op dword : word distr.
 
-  axiom supp_def: forall (w:word), in_supp w dword.
+  axiom mu_x_def : forall (w:word), mu_x dword w = 1%r / (2 ^ length)%r.
 
-  axiom mu_x_def: forall (w:word),
-    mu_x dword w = 1%r/(2^length)%r.
+  axiom lossless : weight dword = 1%r.
+  
+  lemma supp_def : forall (w:word), in_supp w dword.
+  proof.
+    intros w; delta in_supp; simplify.
+    rewrite (mu_x_def w).
+    cut H: (0%r < (2 ^ length)%r); [trivial | ].
+    cut H1: (0%r < Real.one * inv (2 ^ length)%r).
+    rewrite <-(Real.Inverse (2 ^ length)%r _); trivial.
+    trivial.  
+  qed.
 
-  axiom mu_weight_pos: mu_weight dword = 1%r.
 end Dword.

@@ -12,9 +12,6 @@ let _ =
   (* Initialize why3 engine *)
   EcProvers.initialize !options.o_why3;
 
-  (* Initialize the proof mode *)
-  EcCommands.full_check !options.o_full_check !options.o_max_prover !options.o_provers;
-
   (* Initialize load path *)
   begin
     let theories =
@@ -35,13 +32,21 @@ let _ =
             List.fold_left Filename.concat mydir
               [Filename.parent_dir_name; "lib"; "easycrypt"; "theories"]
     in
-      EcCommands.addidir theories
+      EcCommands.addidir ~system:true theories
   end;
 
+  List.iter EcCommands.addidir !options.o_idirs;
   oiter !options.o_input
     (fun input ->
       EcCommands.addidir (Filename.dirname input));
-  List.iter EcCommands.addidir !options.o_idirs;
+  if !options.o_emacs then
+    EcCommands.addidir Filename.current_dir_name;
+
+  (* Force loading of prelude here *)
+  ignore (EcCommands.current () : EcScope.scope);
+
+  (* Initialize the proof mode *)
+  EcCommands.full_check !options.o_full_check !options.o_max_prover !options.o_provers;
 
   (* Initialize I/O + interaction module *)
   let terminal =

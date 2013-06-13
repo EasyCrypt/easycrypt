@@ -9,7 +9,7 @@
 
    Available at http://gallium.inria.fr/~fpottier/menhir/
 
- * Why3  (= 0.80)
+ * Why3 (= 0.81)
 
    Available at http://why3.lri.fr/
 
@@ -22,7 +22,7 @@
 
    Available at http://extunix.forge.ocamlcore.org/
 
- * GNU Emacs (>= 0.23)
+ * GNU Emacs (>= 23.3)
 
    Available at http://www.gnu.org/software/emacs/
 

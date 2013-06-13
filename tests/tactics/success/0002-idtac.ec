@@ -1,4 +1,4 @@
-lemma l: true
+lemma l: true.
 proof.
 idtac.
 trivial.

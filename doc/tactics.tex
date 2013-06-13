@@ -1,39 +1,31 @@
 % !TeX root = easycrypt.tex
 \chapter{Writing Proofs}
+%% TODO (Francois): For index, rather than \texttt, use \rawec and make a class of keywords for tactics and tacticals
 
-\section{First-Order Tactics}
+\section{Ambient Logic (Guillaume)}
+  \ambientDesc%prints the description of all tactics see ambient.tex
+  %to modify them
 
-\subsection{The \texttt{case} tactic}
+\section{Program Logics (C\'esar)}
+
+\subsection{Reasoning about random samplings: the \rawec{rnd} tactic}
 %
+\subsubsection{Hoare Logic}
+\index{hoare}{Program Reasoning!rnd@\rawec{rnd}}
 
-\subsection{The \texttt{unfold} tactic}
-%
-
-\subsection{The \texttt{simplify} tactic}
-%
-
-\subsection{The \texttt{trivial} tactic}
-%
-
-\section{Probabilistic Hoare logic}
-
-
-
-\section{Bounded probabilistic Hoare logic}
-
-\subsection{The \texttt{rnd} tactic}
-%
+\subsubsection{Probabilistic Hoare Logic}
+\index{phl}{Program Reasoning!rnd@\rawec{rnd}}
 \Syntax 
 \verb+rnd+ (\textit{formula} $|$ \_ ) (\textit{formula} $|$ \_ )
 
 \Description
 the first optional parameter $p$ is a computable predicate (i.e., \verb+'a cPred+)
-(i.e., \verb+'a -> bool+ ). Assume $d$ of type \verb+A Distr.distr+:
+(i.e., \verb+'a -> bool+ ). Assume $d$ of type \verb+A Distr.distr+. 
 \begin{displaymath}
 \begin{array}{c}
   \infrule{
-    \bdHoareSeq{c}{\pre}{\mu\, d\, p \leq f \land 
-      (\forall v\in A.~ \post\subst{x}{v} \Leftrightarrow p\, v)}{1} 
+    \hoareS{c}{\pre}{\mu\, d\, p \leq f \land 
+      (\forall v\in \mathsf{support}(d).~ \post\subst{x}{v} \Rightarrow p\, v)}
   }{
     \bdHoareSle{c;\Rand{x}{d}}{\pre}{\post}{f}
   }\left[\verb+rnd+\ p\right]
@@ -43,37 +35,51 @@ the first optional parameter $p$ is a computable predicate (i.e., \verb+'a cPred
 If $p$ is not given then the tool attempts to build it from $\post$
 (not implemented yet).
 
-For judgments bounded by $(=,\geq)$ the tactic additionally accepts as second parameter a real
-number $g$ representing a bound:
+For lower-bounded and exact probabilistic judgments the tactic
+additionally accepts an optional parameter $g$ of type \verb+real+
+representing a bound:
 \begin{displaymath}
   \infrule{
     \bdHoareSge{c}{\pre}{\mu\, d\, p \geq g \land 
-      (\forall v\in A.~ \post\subst{x}{v} \Leftrightarrow p\, v)}{\frac{f}{g}} 
+      (\forall v\in \mathsf{support}(d).~ p\, v \Rightarrow \post\subst{x}{v} )}{\frac{f}{g}} 
   }{
     \bdHoareSge{c;\Rand{x}{d}}{\pre}{\post}{f}
   }\left[\verb+rnd+\ p\ g\right]
-\\[4ex]
 \end{displaymath}
+%
+\begin{displaymath}
+  \infrule{
+    \bdHoareSeq{c}{\pre}{\mu\, d\, p = g \land 
+      (\forall v\in \mathsf{support}(d).~ p\, v \Leftrightarrow \post\subst{x}{v} )}{\frac{f}{g}} 
+  }{
+    \bdHoareSeq{c;\Rand{x}{d}}{\pre}{\post}{f}
+  }\left[\verb+rnd+\ p\ g\right]
+\end{displaymath}
+%
 If $g$ is not given then $g=f$ in the rule.
 
-\subsection{The \texttt{app} tactic}
+\subsubsection{Relational Hoare Logic}
+\index{prhl}{Program Reasoning!rnd@\rawec{rnd}}
+
+\subsection{Reasoning about sequential composition: the \rawec{seq} tactic}
 %
+\subsubsection{Hoare Logic}
+\index{hoare}{Program Reasoning!seq@\rawec{seq}}
+
+\subsubsection{Probabilistic Hoare Logic}
+\index{phl}{Program Reasoning!seq@\rawec{seq}}
 \Syntax 
-\verb+app+ \verb+[>>|<<]+ \textit{num} \textit{formula} [\textit{formula}]
+\verb+app+ \verb+[>>|<<]+ \textit{num} \textit{formula} (
+[\textit{formula} \verb+|+ \textit{formula} \textit{formula}
+\textit{formula} \textit{formula}]
 
 \Description
 Direction \verb+<<+ by default.
 The first formula is the intermediate predicate.
-Assume $s_2$ is at program position $n$:
-\begin{displaymath}
-  \infrule{
-    \bdHoareSeq{s1}{P}{R}{1} \qquad \bdHoareSle{s2}{R}{Q}{f}
-  }{
-    \bdHoareSle{s1;s2}{P}{Q}{f}
-  }\left[\verb+app+\ n\ R\right]
-\end{displaymath}
+Assume $s_2$ is at program position $n$.
 
-The following is a generalization but not implemented:
+For upper bounded judgments, the most general variant of the
+\verb+app+ rule (i.e., when four bounds are given as parameters) implements the following rule:
 \begin{displaymath}
   \infrule{
     \begin{array}{c}
@@ -87,9 +93,29 @@ The following is a generalization but not implemented:
     \bdHoareSle{s1;s2}{P}{Q}{f}
   }
 \end{displaymath}
+%
+If no argument is given then the following rule is applied:
+\begin{displaymath}
+  \infrule{
+    \hoareS{s1}{P}{R} \qquad \bdHoareSle{s2}{R}{Q}{f}
+  }{
+    \bdHoareSle{s1;s2}{P}{Q}{f}
+  }\left[\verb+app+\ n\ R\right]
+\end{displaymath}
+%
+\warningbox{Which, if preferred, can be rewritten to:}
+\begin{displaymath}
+  \infrule{
+    \hoareS{s1}{P}{\lambda m. \Prm{s_2}{m}{Q}\leq f} \qquad 
+  }{
+    \bdHoareSle{s1;s2}{P}{Q}{f}
+  }\left[\verb+app+\ n\ R\right]
+\end{displaymath}
 
 
-The second parameter (optional) is a real number representing a bound (only supported for $=$ and $\geq$).
+
+For lower bounded and exact judgments, the app tactic implements the following rules
+
 \begin{displaymath}
 \begin{array}{c}
   \infrule{
@@ -105,11 +131,20 @@ The second parameter (optional) is a real number representing a bound (only supp
   }\left[\verb+app>>+\ n\ R\ g\right]
 \end{array}
 \end{displaymath}
+%
+The second parameter (optional) is a real number representing a bound (only supported for $=$ and $\geq$).
+%
 Similar rules hold for $=$. If the parameter $g$ is not given then
 $g=f$ in the rule. 
 
-\subsection{The \texttt{if} tactic}
+\subsubsection{Relational Hoare Logic}
+\index{prhl}{Program Reasoning!seq@\rawec{seq}}
+
+\subsection{Reasoning about conditionals: the \rawec{if} tactic}
 %
+\subsubsection{Hoare and Probabilistic Hoare Logic}
+\index{hoare}{Program Reasoning!if@\rawec{if}}
+\index{phl}{Program Reasoning!if@\rawec{if}}
 (similar to probabilistic Hoare \verb+if+ tactic)
 \begin{displaymath}
 \begin{array}{c}
@@ -124,8 +159,16 @@ $g=f$ in the rule.
 \end{displaymath}
 Similar rules hold for $=,\geq$.
 
-\subsection{The \texttt{wp} tactic}
+\subsubsection{Relational Hoare Logic}
+\index{prhl}{Program Reasoning!if@\rawec{if}}
+
+\subsection{Computing weakest preconditions: the \rawec{wp} tactic}
 %
+\subsubsection{Hoare Logic}
+\index{hoare}{Program Reasoning!wp@\rawec{wp}}
+
+\subsubsection{Probabilistic Hoare Logic}
+\index{phl}{Program Reasoning!wp@\rawec{wp}}
 \Syntax \verb+wp+
 
 \Description
@@ -141,17 +184,390 @@ composition rule, we have:
 \end{displaymath}
 Similar rules hold for $=,\geq$.
 
+\subsubsection{Relational Hoare Logic}
+\index{prhl}{Program Reasoning!wp@\rawec{wp}}
 
-\subsection{The \texttt{skip} tactic}
+\subsection{Concluding proofs of programs: the \rawec{skip} tactic}
+\index{hoare}{Program Reasoning!skip@\rawec{skip}}
+\index{phl}{Program Reasoning!skip@\rawec{skip}}
+\index{prhl}{Program Reasoning!skip@\rawec{skip}}
 %
 
-\subsection{The \texttt{condt,condf} tactic}
+\subsection{Simplifying conditionals: the \rawec{condt,condf} tactic}
+%
+\subsubsection{Probabilistic Hoare Logic}
+\index{tactics}{probabilistic Hoare logic!condt@\rawec{condt}}
+\index{tactics}{probabilistic Hoare logic!condf@\rawec{condf}}
+
+\subsection{Reasoning about abstract adversaries: the \rawec{fun} tactic}
+
+\subsubsection{Relational Hoare Logic}
+
+\Syntax \verb+fun+ formula
+
+\Description
+The formula given as parameter represents the general oracle
+invariant. 
+
+The tactic implements the following rule:
+\begin{displaymath}
+\infrule{
+  \begin{array}{c}
+    \pre \Rightarrow \chi \land \glob_A = \glob_B \land \vec{p}_A=\vec{p}_B
+    \\[.5ex]
+    \chi\land\glob_A=\glob_B\land\result_A=\result_B\Rightarrow\post
+    \\ 
+    \equivF{O_i}{O_i'}{\chi\land
+      \vec{p}_{O_i}=\vec{p}_{O'_i}}{\chi\land \result_{o_i}=\result_{o'_i}}
+  \end{array}
+}{
+  \equivF{A}{B}{\pre}{\post}
+} [\verb+call+~\chi]
+\end{displaymath}
+%
+where $\vec{p}_f$ represent the formal parameters of a function
+(abstract adversary or oracle) $f$, $\result_f$ represents the result of
+a function (abstract adversary or oracle) $f$, $\left\{O_i\right\}_{i=0}^k$ and
+$\left\{O'_i\right\}_{i=0}^k$ are the oracles of the abstract adversaries $A$ and
+$B$, $\glob_A$ and $\glob_B$ represent the global state of the abstract
+adversaries $A$ and $B$, ...
+
+\subsubsection{Probabilistic Hoare Logic}
+\begin{displaymath}
+\infrule{
+  \begin{array}{c}
+    \pre \Rightarrow \chi  \qquad 
+    \chi \Leftrightarrow\post
+    \\[.5ex]
+    \bdHoareSeq{O_i}{\chi}{\chi}{1}
+  \end{array}
+}{
+  \bdHoareSeq{A}{\pre}{\post}{1}
+} [\verb+call+~\chi]
+\end{displaymath}
+
+\subsubsection{Hoare Logic}
+\begin{displaymath}
+\infrule{
+  \begin{array}{c}
+    \pre \Rightarrow \chi  \qquad 
+    \chi \Rightarrow\post
+    \\[.5ex]
+    \hoareS{O_i}{\chi}{\chi}
+  \end{array}
+}{
+  \hoareS{A}{\pre}{\post}
+} [\verb+call+~\chi]
+\end{displaymath}
+
+\subsection{Weakening judgements: The \rawec{conseq} rule}
+
+\Syntax \verb+conseq+ \textit{formula} \textit{formula}
+\subsubsection{Hoare Logic}
+
+\begin{displaymath}
+\infrule{
+  \hoareS{c}{\pre'}{\post'} \qquad \pre\Rightarrow\pre' \qquad  \post'\Rightarrow\post
+}{
+  \hoareS{c}{\pre}{\post}
+}\left[\verb+conseq+~ \pre'~ \post' \right]
+\end{displaymath}
+
+\subsubsection{Probabilistic Hoare Logic}
+\begin{displaymath}
+\infrule{
+  \bdHoareSle{c}{\pre'}{\post'}{\delta} \qquad \pre\Rightarrow\pre' \qquad  \post\Rightarrow\post'
+}{
+  \bdHoareSle{c}{\pre}{\post}{\delta}
+}\left[\verb+conseq+~ \pre'~ \post' \right]
+\end{displaymath}
+
+\begin{displaymath}
+\infrule{
+  \bdHoareSeq{c}{\pre'}{\post'}{\delta} \qquad \pre\Rightarrow\pre' \qquad  \post\Leftrightarrow\post'
+}{
+  \bdHoareSeq{c}{\pre}{\post}{\delta}
+}\left[\verb+conseq+~ \pre'~ \post' \right]
+\end{displaymath}
+
+\begin{displaymath}
+\infrule{
+  \bdHoareSge{c}{\pre'}{\post'}{\delta} \qquad \pre\Rightarrow\pre' \qquad  \post'\Rightarrow\post
+}{
+  \bdHoareSge{c}{\pre}{\post}{\delta}
+}\left[\verb+conseq+~ \pre'~ \post' \right]
+\end{displaymath}
+
+\warningbox{(changing the bound is not yet implemented)}
+
+\subsubsection{Relational Hoare Logic}
+
+\begin{displaymath}
+\infrule{
+  \equivF{c_1}{c_2}{\pre'}{\post'} \qquad \pre\Rightarrow\pre' \qquad  \post'\Rightarrow\post
+}{
+  \equivF{c_1}{c_2}{\pre}{\post}
+}\left[\verb+conseq+~ \pre'~ \post' \right]
+\end{displaymath}
+
+
+\subsection{Reasoning about function calls: the \rawec{call} tactic}
+%
+\subsubsection{Hoare Logic}
+\index{hoare}{Program Reasoning!call@\rawec{call}}
+\Syntax \verb+call+ formula formula
+\Description
+
+Let $p$ stand for the formal parameters of function $f$, $\result_f$
+the result variable of function $f$, and $\vec{m}$ the set of
+variables modifiable by $f$.
+\begin{displaymath}
+  \infrule{
+    \begin{array}{c}
+      \hoareS{c}{\pre}{\pre_f\subst{\vec{p}}{\vec{y}} \land
+        \forall v.~ \forall \vec{z}.~ 
+        \post_f\subst{\result_f}{v}\subst{\vec{m}}{\vec{z}}
+        \Rightarrow \post\subst{x}{v}\subst{\vec{m}}{\vec{z}}
+      }
+      \\[.5ex]
+      \hoareS{f}{\pre_f}{\post_f}
+    \end{array}
+  }{
+    \hoareS{c;\Call{x}{f}{\vec{y}}}{\pre}{\post}
+  }\left[\verb+call+~ \pre_f~ \post_f \right]
+\end{displaymath}
+
+
+
+\subsubsection{Probabilistic Hoare Logic}
+\index{phl}{probabilistic Hoare logic!call@\rawec{call}}
+
+\Syntax \verb+call+ formula formula [formula]
+
+\Description
+
+Let $p$ stand for the formal parameters of function $f$, $\result_f$
+the result variable of function $f$, and $\vec{m}$ the set of
+variables modifiable by $f$.
+\begin{displaymath}
+  \infrule{
+    \begin{array}{c}
+      \hoareS{c}{\pre}{\pre_f\subst{\vec{p}}{\vec{y}} \land
+        \forall v.~ \forall \vec{z}.~ 
+        \post_f\subst{\result_f}{v}\subst{\vec{m}}{\vec{z}}
+        \Rightarrow \post\subst{x}{v}\subst{\vec{m}}{\vec{z}}
+      }
+      \\[.5ex]
+      \bdHoareSle{f}{\pre_f}{\post_f}{\delta}
+    \end{array}
+  }{
+    \bdHoareSle{c;\Call{x}{f}{\vec{y}}}{\pre}{\post}{\delta}
+  } \left[\verb+call+~ \pre_f~ \post_f \right]
+\end{displaymath}
+
+\begin{displaymath}
+  \infrule{
+    \begin{array}{c}
+      \bdHoareSeq{c}{\pre}{\pre_f\subst{\vec{p}}{\vec{y}} \land
+        \forall v.~ \forall \vec{z}.~ 
+        \post_f\subst{\result_f}{v}\subst{\vec{m}}{\vec{z}}
+        \Rightarrow \post\subst{x}{v}\subst{\vec{m}}{\vec{z}}}{\frac{\delta}{\delta'}}
+    \\[.5ex]
+    \bdHoareSeq{f}{\pre_f}{\post_f}{\delta'}
+  \end{array}
+  }{
+    \bdHoareSeq{c;\Call{x}{f}{\vec{y}}}{\pre}{\post}{\delta}
+  } \left[\verb+call+~ \pre_f~ \post_f~ \delta' \right]
+\end{displaymath}
+
+\begin{displaymath}
+  \infrule{
+    \begin{array}{c}
+      \bdHoareSge{c}{\pre}{\pre_f\subst{\vec{p}}{\vec{y}} \land
+        \forall v.~ \forall \vec{z}.~ 
+        \post_f\subst{\result_f}{v}\subst{\vec{m}}{\vec{z}}
+        \Rightarrow \post\subst{x}{v}\subst{\vec{m}}{\vec{z}}}
+      {\frac{\delta}{\delta'}}
+    \\[.5ex]
+    \bdHoareSge{f}{\pre_f}{\post_f}{\delta'}
+  \end{array}
+  }{
+    \bdHoareSge{c;\Call{x}{f}{\vec{y}}}{\pre}{\post}{\delta}
+  } \left[\verb+call+~ \pre_f~ \post_f ~\delta' \right]
+\end{displaymath}
+
+If no parameter is given for the lower-bounded and exact judgements
+then $\delta'=1$.
+
+\warningbox{New tactics, needs structuring.}
+
+\subsection{: the \rawec{hoare,hoare\_bd,pr\_bounded,bd\_eq}}
+
+\subsubsection{Possibilistic and probabilistic Hoare Logic}
+\Syntax \verb+hoare+, \verb+hoare_bd+
+allows to switch between possibilistic and probabilistic logics
+according to these rules:
+\begin{displaymath}
+\begin{array}{cc}
+\infrule{
+  \hoareS{c}{\pre}{\neg \post} \quad f = 0
+}{
+  \bdHoareSeq{c}{\pre}{\post}{f}
+}
+&
+\infrule{
+  \bdHoareSeq{c}{\pre}{\neg\post}{0}
+}{
+  \hoareS{c}{\pre}{\post}
+}
+\end{array}
+\end{displaymath}
+
+\Syntax \verb+pr_bounded+
+discharges goals by applying trivial probability properties:
+\begin{displaymath}
+\begin{array}{cc}
+\infrule{
+}{
+  \bdHoareSle{c}{\pre}{\post}{1}
+}
+&
+\infrule{
+}{
+  \bdHoareSge{c}{\pre}{\post}{0}
+}
+% \\[3ex]
+% \infrule{
+% }{
+%   \Prm{c}{m}{\post} \leq 1
+% }
+% &
+% \infrule{
+% }{
+%   \Prm{c}{m}{\post} \geq 0
+% }
+\end{array}
+\end{displaymath}
+
+\Syntax \verb+bd_eq+
+\begin{displaymath}
+\begin{array}{cc}
+\infrule{
+  \bdHoareSeq{c}{\pre}{\post}{f}
+}{
+  \bdHoareSle{c}{\pre}{\post}{f}
+}
+&
+\infrule{
+  \bdHoareSeq{c}{\pre}{\post}{f}
+}{
+  \bdHoareSge{c}{\pre}{\post}{f}
+}
+\end{array}
+\end{displaymath}
+
+
+\subsection{\rawec{Denot} tactics}
+%
+\subsubsection{Probabilistic Hoare Logic}
+
+\begin{displaymath}
+\infrule{
+    \pre 
+    \qquad 
+    \chi\Rightarrow\post 
+    \qquad 
+    \bdHoareSle{f}{\pre}{\post}{\delta}
+}{
+  \Prm{c}{m}{\chi} \leq \delta
+}\left[\verb+hoare_deno+\ \pre\ \post\right]
+\end{displaymath}
+
+\begin{displaymath}
+\infrule{
+    \pre 
+    \qquad 
+    \post\Leftrightarrow \chi 
+    \qquad 
+    \bdHoareSeq{f}{\pre}{\post}{\delta}
+}{
+  \Prm{c}{m}{\chi} = \delta
+}\left[\verb+hoare_deno+\ \pre\ \post\right]
+\end{displaymath}
+
+\begin{displaymath}
+\infrule{
+    \pre 
+    \qquad 
+    \post\Rightarrow\chi
+    \qquad 
+    \bdHoareSge{f}{\pre}{\post}{\delta}
+}{
+  \delta \leq \Prm{c}{m}{\chi}
+}\left[\verb+hoare_deno+\ \pre\ \post\right]
+\end{displaymath}
+
+
+\subsubsection{Relational Hoare Logic}
+
+\begin{displaymath}
+\infrule{
+  \equivF{c_1}{c_2}{\pre}{\post} 
+  \qquad
+  \pre
+  \qquad
+  \post \Rightarrow \chi_1 \Rightarrow \chi_2
+}{
+  \Prm{c_1}{m_1}{\chi_1} \leq \Prm{c_2}{m_2}{\chi_2}
+}\left[\verb+deno+\ \pre\ \post\right]
+\end{displaymath}
+
+\begin{displaymath}
+\infrule{
+  \equivF{c_1}{c_2}{\pre}{\post} 
+  \qquad
+  \pre
+  \qquad
+  \post \Rightarrow (\chi_1 \Leftrightarrow \chi_2)
+}{
+  \Prm{c_1}{m_1}{\chi_1} = \Prm{c_2}{m_2}{\chi_2}
+}\left[\verb+deno+\ \pre\ \post\right]
+\end{displaymath}
+
+
+\subsection{Some \textsf{Pr} tactics: \rawec{pr\_false},
+  \rawec{pr\_or}}
+
+\begin{displaymath}
+\infrule{
+  \false \Rightarrow \post
+}{
+  \Prm{c}{m}{\post} = 0
+}
+\end{displaymath}
+
+\begin{displaymath}
+\infrule{
+\Prm{c}{m}{\pre} \land
+  \Prm{c}{m}{\post} \land \Prm{c}{m}{\pre \wedge \post} = \delta
+}{
+  \Prm{c}{m}{\pre \vee \post} = \delta
+}
+\end{displaymath}
+
+
+\subsection{The \rawec{inline} tactic}
+%
+
+\subsection{The \rawec{swap} tactic}
 %
 
 
-%***** NOT IMPLEMENTED 
+\subsection{Reasoning about loops: the \rawec{while} tactic}
+%
+\subsubsection{Probabilistic Hoare Logic}
+\index{phl}{Program Reasoning!while@\rawec{while}}
 
-\subsection{The \texttt{while} tactic}
 \Syntax \verb+while+ \textit{formula} \textit{formula} 
 [\textit{formula} \textit{formula}]
 %
@@ -225,21 +641,8 @@ and the folowing one for exact judgments (=):
 There is no appropriate rule for $(\leq)$.
 
 
-\subsection{The \texttt{call} tactic}
-%
 
-
-\subsection{The \texttt{inline} tactic}
-%
-
-\subsection{The \texttt{swap} tactic}
-%
-
-
-\section{Relational probabilistic Hoare logic}
-
-
-\section{Combination of Tactics}
+\section{Tacticals}
 
 
 \section{Automated Tactics}

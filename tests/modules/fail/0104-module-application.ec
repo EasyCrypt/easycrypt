@@ -5,7 +5,7 @@ module type Adv = {
 module Test (A:Adv) = { 
   fun main(x:int) : int = { 
     var r : int;
-    r := A.a(x);
+    r  = A.a(x);
     return r;
   }
 }.

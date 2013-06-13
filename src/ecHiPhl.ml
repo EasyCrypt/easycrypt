@@ -39,22 +39,32 @@ let process_phl_formula = process_phl_form tbool
 
 let process_prhl_formula = process_prhl_form tbool
 
-let process_app env dir k phi bd_opt g =
+let process_phl_bd_info env g bd_info = match bd_info with
+  | PAppNone -> AppNone
+  | PAppSingle f -> AppSingle (process_phl_form treal env g f)
+  | PAppMult(f1,f2,f3,f4) ->
+    let f1 = process_phl_form treal env g f1 in
+    let f2 = process_phl_form treal env g f2 in
+    let f3 = process_phl_form treal env g f3 in
+    let f4 = process_phl_form treal env g f4 in
+    AppMult(f1,f2,f3,f4)
+
+let process_app env dir k phi bd_info g =
   let concl = get_concl g in
-  match k, bd_opt with
-    | Single i, None when is_hoareS concl ->
+  match k, bd_info with
+    | Single i, PAppNone when is_hoareS concl ->
       let phi = process_phl_formula env g phi in
       t_hoare_app i phi g
     | Single i, _ when is_bdHoareS concl ->
       let phi = process_phl_formula env g phi in
-      let bd_opt = omap bd_opt (process_phl_form treal env g) in
-      t_bdHoare_app dir i phi bd_opt g
-    | Double(i,j), None ->
+      let bd_info = process_phl_bd_info env g bd_info in
+      t_bdHoare_app dir i phi bd_info g
+    | Double(i,j), PAppNone ->
       let phi = process_prhl_formula env g phi in
       t_equiv_app (i,j) phi g
-    | Single _, None ->
+    | Single _, PAppNone ->
       cannot_apply "app" "wrong position parameter"
-    | _, Some _ ->
+    | _, _ ->
       cannot_apply "app" "optional bound parameter not supported"
 
 let process_while env phi vrnt_opt info g =
@@ -120,7 +130,13 @@ let process_call env side pre post g =
     let pre  = process_form penv hyps pre tbool in
     let post = process_form qenv hyps post tbool in
     t_hoare_call env pre post g
-  | FhoareS _, Some _ ->
+  | FbdHoareS bhs, None ->
+    let (_,f,_),_ = s_last_call "call" bhs.bhs_s in
+    let penv, qenv = EcEnv.Fun.hoareF f env in
+    let pre  = process_form penv hyps pre tbool in
+    let post = process_form qenv hyps post tbool in
+    t_bdHoare_call env pre post None g
+  | FbdHoareS _, Some _ | FhoareS _, Some _ ->
     cannot_apply "call" "side can only be given for prhl judgements"
   | FequivS es, None ->
     let (_,fl,_),(_,fr,_),_,_ = s_last_calls "call" es.es_sl es.es_sr in
@@ -149,38 +165,55 @@ let process_cond env side g =
         if is_hoareS concl then t_hoare_cond env g else t_bdHoare_cond env g
   else cannot_apply "cond" "the conclusion is not a hoare or a equiv goal"
 
+let stmt_length side concl = 
+  match concl.f_node, side with
+    | FhoareS hs, None -> List.length hs.hs_s.s_node
+    | FbdHoareS bhs, None -> List.length bhs.bhs_s.s_node
+    | FequivS es, Some side -> 
+      List.length (if side then es.es_sl.s_node else es.es_sr.s_node)
+    | _ -> cannot_apply "stmt_length" "a phl/pbhl/prhl judgement was expected"
+
 let rec process_swap1 env info g =
   let side,pos = info.pl_desc in
-  match side with
-  | None ->
-    t_seq (process_swap1 env {info with pl_desc = (Some true, pos)})
-      (process_swap1 env {info with pl_desc = (Some false, pos)}) g
-  | Some side ->
-    let tac =
-      match pos with
-      | SKbase(p1,p2,p3) -> t_equiv_swap env side p1 p2 p3
-      | SKmove p ->
-        if 0 < p then t_equiv_swap env side 1 2 (p+1)
-        else if p < 0 then
-          let concl = get_concl g in
-          let es = set_loc info.pl_loc destr_equivS concl in
-          let s = if side then es.es_sl else es.es_sr in
-          let len = List.length s.s_node in
-          t_equiv_swap env side (len+p) len len
-        else (* p = 0 *) t_id None
-      | SKmovei(i,p) ->
-        if 0 < p then t_equiv_swap env side i (i+1) (i+p)
-        else if p < 0 then t_equiv_swap env side (i+p) i i
-        else (* p = 0 *) t_id None
-      | SKmoveinter(i1,i2,p) ->
-        if 0 < p then t_equiv_swap env side i1 (i2+1) (i2+p)
-        else if p < 0 then t_equiv_swap env side (i1+p) i1 i2
-        else (* p = 0 *) t_id None
-    in
-    set_loc info.pl_loc tac g
+  let concl = get_concl g in
+  let p1, p2, p3 = match pos with
+    | SKbase(p1,p2,p3) -> p1, p2, p3
+    | SKmove p ->
+      if 0 < p then 1, 2, p+1
+      else if p < 0 then
+        let len = stmt_length side concl in
+        len+p, len, len
+      else (* p = 0 *) 0,0,0
+    | SKmovei(i,p) ->
+      if 0 < p then i, i+1, i+p
+      else if p < 0 then i+p, i, i
+      else (* p = 0 *) 0,0,0
+    | SKmoveinter(i1,i2,p) ->
+      if 0 < p then i1, i2+1, i2+p
+      else if p < 0 then i1+p, i1, i2
+      else (* p = 0 *) 0,0,0
+  in
+  let tac =
+    if p1 = 0 then t_id None else
+      match side with
+        | None when is_hoareS concl ->
+          t_hoare_swap env p1 p2 p3
+        | None when is_bdHoareS concl ->
+          t_bdHoare_swap env p1 p2 p3
+        | None ->
+          t_seq (process_swap1 env {info with pl_desc = (Some true, pos)})
+            (process_swap1 env {info with pl_desc = (Some false, pos)})
+        | Some side ->
+          t_equiv_swap env side p1 p2 p3
+  in
+  set_loc info.pl_loc tac g
+
 
 let process_swap env info =
   t_lseq (List.map (process_swap1 env) info)
+
+let process_cfold env (side, cpos, olen) g =
+  t_cfold env side cpos olen g
 
 (* TODO move this *)
 let pat_all fs s =
@@ -227,8 +260,15 @@ let rec process_inline_all env side fs g =
         else t_seq
                (t_inline_hoare env sp)
                (process_inline_all env side fs) g
+  | FbdHoareS bhs, None ->
+      let sp = pat_all fs bhs.bhs_s in
+      if   sp = []
+      then t_id None g
+      else t_seq
+        (t_inline_bdHoare env sp)
+        (process_inline_all env side fs) g
 
-  | _, _ -> assert false (* FIXME error message *)
+  | _, _ -> cannot_apply "inline" "Wrong parameters or phl/prhl judgement not found" 
   
 let pat_of_occs cond occs s =
   let occs = ref occs in
@@ -298,6 +338,9 @@ let process_inline env infos g =
 
   | `ByPattern _ -> failwith "not-implemented"
 
+let process_kill env (side, cpos, len) g =
+  t_kill env side cpos len g
+
 let process_alias env (side, cpos, id) g =
   t_alias env side cpos id g
 
@@ -319,6 +362,38 @@ let process_rnd side env tac_info g =
       t_equiv_rnd side env bij_info g
     | _ -> cannot_apply "rnd" "unexpected instruction or wrong arguments"
 
+(* César says: too much code repetition w.r.t. ecPhl *)
+let process_bdHoare_deno env info (_,n as g) = 
+  let process_cut env g (pre,post) = 
+    let hyps,concl = get_goal g in
+    let cmp, f, bd =
+      match concl.f_node with
+      | Fapp({f_node = Fop(op,_)}, [f;bd]) when is_pr f &&
+          (EcPath.p_equal op EcCoreLib.p_eq || 
+             EcPath.p_equal op EcCoreLib.p_real_le ) ->
+        let cmp = if EcPath.p_equal op EcCoreLib.p_eq then FHeq else FHle in
+        cmp, f, bd
+      | Fapp({f_node = Fop(op,_)}, [bd;f]) when is_pr f 
+          &&
+          (EcPath.p_equal op EcCoreLib.p_eq || 
+             EcPath.p_equal op EcCoreLib.p_real_le ) ->
+        let cmp = if EcPath.p_equal op EcCoreLib.p_eq then FHeq else FHge in
+        cmp, f , bd
+      | _ -> cannot_apply "bdHoare_deno" 
+        "the conclusion is not a suitable Pr expression" in (* FIXME error message *) 
+    let _,f,_,event = destr_pr f in
+    let penv, qenv = EcEnv.Fun.hoareF f env in
+    let pre  = omap_dfl pre  f_true (fun p -> process_form penv hyps p tbool) in
+    let post = omap_dfl post event  (fun p -> process_form qenv hyps p tbool) in
+    f_bdHoareF pre f post cmp bd 
+  in
+  let (juc,an), gs = process_mkn_apply process_cut env info g in
+  let pre,post =
+    let (_,f) = get_node (juc,an) in
+    let bhf = destr_bdHoareF f in
+    bhf.bhf_pr, bhf.bhf_po in
+  t_on_first (t_use env an gs) (t_bdHoare_deno env pre post (juc,n))
+
 let process_equiv_deno env info (_,n as g) = 
   let process_cut env g (pre,post) = 
     let hyps,concl = get_goal g in
@@ -331,6 +406,7 @@ let process_equiv_deno env info (_,n as g) =
     let _,fr,_,_ = destr_pr f2 in
     let penv, qenv = EcEnv.Fun.equivF fl fr env in
     let pre  = omap_dfl pre  f_true (fun p -> process_form penv hyps p tbool) in
+    (* FIXME: Benjamin : below: put a better default event instead of f_true *)
     let post = omap_dfl post f_true (fun p -> process_form qenv hyps p tbool) in
     f_equivF pre fl fr post in
   let (juc,an), gs = process_mkn_apply process_cut env info g in
@@ -338,7 +414,7 @@ let process_equiv_deno env info (_,n as g) =
     let (_,f) = get_node (juc,an) in
     let ef = destr_equivF f in
     ef.ef_pr, ef.ef_po in
-  t_on_first (t_equiv_deno env pre post (juc,n)) (t_use env an gs)
+  t_on_first (t_use env an gs) (t_equiv_deno env pre post (juc,n))
 
 let process_conseq env info (_, n as g) =
   let t_pre = ref (t_id None) and t_post = ref (t_id None) in
@@ -366,6 +442,14 @@ let process_conseq env info (_, n as g) =
         let env = EcEnv.Memory.push_active hs.hs_m env in
         tac1, env, env, hs.hs_pr, hs.hs_po,
         (fun pre post -> f_hoareS_r { hs with hs_pr = pre; hs_po = post })
+      | FbdHoareF bhf ->
+        let penv, qenv = EcEnv.Fun.hoareF bhf.bhf_f env in
+        tac1, penv, qenv, bhf.bhf_pr, bhf.bhf_po, 
+        (fun pre post -> f_bdHoareF pre bhf.bhf_f post bhf.bhf_cmp bhf.bhf_bd)
+      | FbdHoareS bhs ->
+        let env = EcEnv.Memory.push_active bhs.bhs_m env in
+        tac1, env, env, bhs.bhs_pr, bhs.bhs_po,
+        (fun pre post -> f_bdHoareS_r { bhs with bhs_pr = pre; bhs_po = post })
       | FequivF ef ->
         let penv, qenv = EcEnv.Fun.equivF ef.ef_fl ef.ef_fr env in
         tac2, penv, qenv, ef.ef_pr, ef.ef_po,
@@ -374,7 +458,7 @@ let process_conseq env info (_, n as g) =
         let env = EcEnv.Memory.push_all [es.es_ml; es.es_mr] env in
         tac2, env, env, es.es_pr, es.es_po,
         (fun pre post -> f_equivS_r { es with es_pr = pre; es_po = post }) 
-      | _ -> assert false (* FIXME error message *)
+      | _ -> tacuerror "cannot apply conseq rule, not a phl/prhl judgement"
     in
     let pre = match pre with
       | None -> t_pre := tac; gpre 
@@ -389,6 +473,8 @@ let process_conseq env info (_, n as g) =
     match f.f_node with
     | FhoareF hf -> t_hoareF_conseq env hf.hf_pr hf.hf_po
     | FhoareS hs -> t_hoareS_conseq env hs.hs_pr hs.hs_po
+    | FbdHoareF hf -> t_bdHoareF_conseq env hf.bhf_pr hf.bhf_po
+    | FbdHoareS hs -> t_bdHoareS_conseq env hs.bhs_pr hs.bhs_po
     | FequivF ef -> t_equivF_conseq env ef.ef_pr ef.ef_po
     | FequivS es -> t_equivS_conseq env es.es_pr es.es_po 
     | _ -> assert false (* FIXME error message *) in
@@ -396,9 +482,19 @@ let process_conseq env info (_, n as g) =
     [!t_pre; !t_post; t_use env an gs] (juc,n)
   
 let process_fun_abs env inv g =
+  let concl = get_concl g in
   let env' = EcEnv.Fun.inv_memenv env in
-  let inv = process_formula env' g inv in
-  t_equivF_abs env inv g
+  if is_equivF concl then
+    let inv = process_formula env' g inv in
+    t_equivF_abs env inv g
+  else if is_bdHoareF concl then
+    let inv = process_formula env' g inv in
+    t_bdHoareF_abs env inv g
+  else if is_hoareF concl then
+    let inv = process_formula env' g inv in
+    t_hoareF_abs env inv g
+  else
+    cannot_apply "fun" "equiv or probabilistic hoare triple was expected"
   
 let process_fun_upto env (bad, p, o) g =
   let env' = EcEnv.Fun.inv_memenv env in 
@@ -411,7 +507,15 @@ let process_fun_upto env (bad, p, o) g =
     let env =  EcEnv.Memory.push_active (EcFol.mhr,None) env in
     process_formula env g bad in
   t_equivF_abs_upto env bad p q g
-    
+
+
+let process_hoare_bd_hoare g = t_hoare_bd_hoare g
+let process_prbounded = t_prbounded
+let process_prfalse = t_prfalse
+let process_pror = t_pror
+let process_bdeq = t_bdeq
+
+
 (* -------------------------------------------------------------------- *)
 let process_phl loc env ptac g =
   let t =
@@ -431,10 +535,18 @@ let process_phl loc env ptac g =
     | Psplitwhile info         -> process_splitwhile env info
     | Pcall(side, (pre, post)) -> process_call env side pre post
     | Pswap info               -> process_swap env info
+    | Pcfold info              -> process_cfold env info
     | Pinline info             -> process_inline env info
+    | Pkill info               -> process_kill env info
     | Palias info              -> process_alias env info
     | Prnd (side, info)        -> process_rnd side env info
     | Pconseq info             -> process_conseq env info
+    | Pbdhoaredeno info        -> process_bdHoare_deno env info
     | Pequivdeno info          -> process_equiv_deno env info
+    | Phoare | Pbdhoare        -> process_hoare_bd_hoare
+    | Pprbounded               -> process_prbounded
+    | Pprfalse                 -> process_prfalse env
+    | Ppror                    -> process_pror
+    | Pbdeq                    -> process_bdeq
   in
     set_loc loc t g

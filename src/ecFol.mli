@@ -27,6 +27,7 @@ type binding =  (EcIdent.t * gty) list
 
 type hoarecmp = FHle | FHeq | FHge
 
+
 type form = private { 
   f_node : f_node;
   f_ty   : ty; 
@@ -103,6 +104,9 @@ and bdHoareS = {
   bhs_bd  : form;
 }
 
+type app_bd_info = AppNone | AppSingle of form
+                   | AppMult of (form * form * form * form)
+
 
 (* -------------------------------------------------------------------- *)
 val gty_equal : gty  -> gty -> bool
@@ -113,7 +117,7 @@ val f_fv      : form -> int Mid.t
 val f_ty      : form -> EcTypes.ty
 
 module Mf : Map.S with type key = form
-module Sf : Mf.Set with type elt = form 
+module Sf : Set.S with module M = Map.MakeBase(Mf)
 module Hf : EHashtbl.S with type key = form
 
 (* -------------------------------------------------------------------- *)
@@ -204,7 +208,10 @@ val f_int_lt  : form -> form -> form
 val f_real_le : form -> form -> form
 val f_real_lt  : form -> form -> form
 
-val f_real_div  : form -> form -> form
+val f_real_div   : form -> form -> form
+val f_real_sum   : form -> form -> form
+val f_real_sub   : form -> form -> form
+val f_real_prod  : form -> form -> form
 
 val fop_in_supp  : EcTypes.ty -> form
 val f_in_supp    : form -> form -> form
@@ -237,32 +244,37 @@ val f_imps_simpl : form list -> form -> form
 val f_iff_simpl  : form -> form -> form
 val f_eq_simpl   : form -> form -> form
 
-val f_real_div_simpl  : form -> form -> form
+val f_real_sum_simpl   : form -> form -> form
+val f_real_prod_simpl  : form -> form -> form
+val f_real_div_simpl   : form -> form -> form
 
 (* -------------------------------------------------------------------- *)
 
 exception DestrError of string
 
-val destr_local    : form -> EcIdent.t 
-val destr_tuple    : form -> form list
-val destr_and      : form -> form * form
-val destr_or       : form -> form * form
-val destr_imp      : form -> form * form
-val destr_iff      : form -> form * form
-val destr_eq       : form -> form * form
-val destr_let1     : form -> EcIdent.t * ty * form * form
-val destr_forall1  : form -> EcIdent.t * gty * form
-val destr_exists1  : form -> EcIdent.t * gty * form
-val destr_equivF   : form -> equivF
-val destr_equivS   : form -> equivS
-val destr_hoareF   : form -> hoareF
-val destr_hoareS   : form -> hoareS
-val destr_bdHoareF : form -> bdHoareF
-val destr_bdHoareS : form -> bdHoareS
-val destr_pr       : form -> memory * EcPath.xpath * form list * form (* hr *) 
-val destr_programS : bool option -> form -> memenv * stmt
+val destr_local     : form -> EcIdent.t 
+val destr_tuple     : form -> form list
+val destr_and       : form -> form * form
+val destr_or        : form -> form * form
+val destr_imp       : form -> form * form
+val destr_iff       : form -> form * form
+val destr_eq        : form -> form * form
+val destr_eq_or_iff : form -> form * form
+val destr_let1      : form -> EcIdent.t * ty * form * form
+val destr_forall1   : form -> EcIdent.t * gty * form
+val destr_exists1   : form -> EcIdent.t * gty * form
+val destr_equivF    : form -> equivF
+val destr_equivS    : form -> equivS
+val destr_hoareF    : form -> hoareF
+val destr_hoareS    : form -> hoareS
+val destr_bdHoareF  : form -> bdHoareF
+val destr_bdHoareS  : form -> bdHoareS
+val destr_pr        : form -> memory * EcPath.xpath * form list * form (* hr *) 
+val destr_programS  : bool option -> form -> memenv * stmt
+
 
 val is_tuple  : form -> bool
+val is_op_and : EcPath.path -> bool
 val is_and    : form -> bool
 val is_or     : form -> bool
 val is_imp    : form -> bool
@@ -271,6 +283,7 @@ val is_forall : form -> bool
 val is_exists : form -> bool
 val is_let1   : form -> bool
 val is_eq     : form -> bool
+val is_eq_or_iff : form -> bool
 val is_local  : form -> bool 
 val is_equivF  : form -> bool
 val is_equivS  : form -> bool
@@ -310,6 +323,8 @@ val f_subst   : f_subst -> form -> form
 
 val f_subst_local : EcIdent.t -> form -> form -> form 
 val f_subst_mem   : EcIdent.t -> EcIdent.t -> form -> form 
+val f_subst_mod   : EcIdent.t -> EcPath.mpath -> form -> form 
+
 module Fsubst :
   sig
     val uni : EcTypes.ty EcUidgen.Muid.t -> form -> form

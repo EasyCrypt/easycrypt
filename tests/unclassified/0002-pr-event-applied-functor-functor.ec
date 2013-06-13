@@ -13,7 +13,7 @@ module G(X:I) : J = {
   fun f(): bool = {
     var b:bool;
     X.init(true);
-    b := X.get();
+    b  = X.get();
     return b;
   }
 }.

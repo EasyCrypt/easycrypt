@@ -35,7 +35,7 @@ let forsym (um : uidmap) (x : symbol) =
 let uid_equal x y = x == y
 
 module Muid = Mint
-module Suid = Sint
+module Suid = Set.MakeOfMap(Muid)
 
 (* -------------------------------------------------------------------- *)
 module NameGen = struct

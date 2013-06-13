@@ -4,7 +4,9 @@
 .PHONY: all install install-soft uninstall local run-local
 
 PGROOT ?= /usr/share/emacs/site-lisp/ProofGeneral
+EMACS  ?= $(shell ./scripts/find-emacs)
 
+# --------------------------------------------------------------------
 all:
 	@echo "Type '$(MAKE) install' for installing ec-mode"
 
@@ -44,15 +46,21 @@ local:
 	cd _local; \
 	     curl -O $(PGURL) \
 	  && tar -xof ProofGeneral-$(PGVER).tgz \
+	  && if [ -e $(CURDIR)/pg-$(PGVER).patch ]; then \
+           (    cd $(CURDIR)/_local/ProofGeneral-$(PGVER) \
+             && patch -t -p1 < $(CURDIR)/pg-$(PGVER).patch;  ); \
+         fi \
 	  || exit 1
 	$(MAKE) PGROOT=$(CURDIR)/_local/ProofGeneral-$(PGVER) install-soft
-	$(MAKE) -C $(CURDIR)/_local/ProofGeneral-$(PGVER) clean
-	$(MAKE) -C $(CURDIR)/_local/ProofGeneral-$(PGVER)
+	$(MAKE) EMACS=$(EMACS) -C $(CURDIR)/_local/ProofGeneral-$(PGVER) clean
+	$(MAKE) EMACS=$(EMACS) -C $(CURDIR)/_local/ProofGeneral-$(PGVER)
 	sed -e s/@VERSION@/$(PGVER)/g config/emacs.rc.in > \
 	  $(CURDIR)/_local/emacs.rc
 
 run-local:
-	emacs -q \
+	$(EMACS) \
 	  --execute '(load-file "_local/emacs.rc")' \
+	  --execute '(load-file "$(CURDIR)/emacs.local.rc")' \
 	  --execute '(cd "$(CURDIR)/..")' \
-	  --execute '(setq easycrypt-prog-name "$(CURDIR)/../ec.native -emacs -I /home/strub/Projects/GCircuits/proof")'
+	  --execute '(setq easycrypt-prog-name "$(CURDIR)/../ec.native -emacs -I /home/strub/Projects/GCircuits/proof")' \
+	  --no-init-file

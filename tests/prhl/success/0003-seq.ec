@@ -8,10 +8,10 @@ module M = {
 }.
 
 equiv foo : M.f ~ M.f : true ==> res{1} = res{2} /\ res{1} = 1 /\ M.y{1} = 1 
-                                 /\ M.y{2} = 1  
+                                 /\ M.y{2} = 1.  
 proof.
   fun.
-  app 1 1 : (M.y{1} = x{1} /\ M.y{2} = x{2}).
+  seq 1 1 : (M.y{1} = x{1} /\ M.y{2} = x{2}).
   admit.
   admit.
 save.

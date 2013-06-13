@@ -83,7 +83,7 @@ module IPathC = struct
 end
 
 module Mip = EcMaps.Map.Make(IPathC)
-module Sip = Mip.Set
+module Sip = EcMaps.Set.MakeOfMap(Mip)
 
 (* -------------------------------------------------------------------- *)
 type varbind = {
@@ -457,18 +457,24 @@ module MC = struct
       end
 
       | IPIdent (id, None) ->
-        Some (env.env_current, EcIdent.name id) (* PY : check this *)
+          Some (env.env_current, EcIdent.name id)
 
       | IPIdent (m, Some p) ->
           let prefix = EcPath.prefix p in
-          let name = EcPath.basename p in
+          let name   = EcPath.basename p in
             omap
               (Mip.find_opt (IPIdent (m, prefix)) env.env_comps)
               (fun mc -> (mc, name))
     in
-      match obind mcx (fun (mc, x) -> MMsym.last x (proj mc)) with
-      | None     -> None
-      | Some obj -> Some (_params_of_ipath p env, snd obj)
+
+    let lookup (mc, x) =
+      List.filter
+        (fun (ip, _) -> IPathC.compare ip p = 0)
+        (MMsym.all x (proj mc))
+    in
+      match omap mcx lookup with
+      | None | Some [] -> None
+      | Some (obj :: _) -> Some (_params_of_ipath p env, snd obj)
 
   (* ------------------------------------------------------------------ *)
   let path_of_qn (top : EcPath.path) (qn : symbol list) =
@@ -1161,7 +1167,7 @@ module Var = struct
     | None -> begin
       match p.EcPath.x_sub.EcPath.p_node with
       | EcPath.Pqname ({ p_node = EcPath.Psymbol f }, x) -> begin
-        let mp = EcPath.m_functor p.EcPath.x_top in
+        let mp = EcPath.mpath p.EcPath.x_top.EcPath.m_top [] in
         let fp = EcPath.xpath_fun mp f in
         let f  = Fun.by_xpath_r ~susp:true ~spsc fp env in
           try
@@ -1373,8 +1379,26 @@ module Mod = struct
         env_rb   = rb @ env.env_rb;
         env_item = CTh_module me :: env.env_item }
 
-  let bind_local name modty restr env =
+  let me_of_mt env name modty restr = 
     let modsig =
+      let modsig =
+        match
+          omap
+            (MC.by_path
+               (fun mc -> mc.mc_modsigs)
+               (IPPath modty.mt_name) env)
+            check_not_suspended
+        with
+        | None -> lookup_error (`Path modty.mt_name)
+        | Some x -> x
+      in
+      EcSubst.subst_modsig
+        ~params:(List.map fst modty.mt_params) EcSubst.empty modsig
+    in
+    module_expr_of_module_sig name modty modsig restr
+    
+  let bind_local name modty restr env =
+(*    let modsig =
       let modsig =
         match
           omap
@@ -1389,7 +1413,8 @@ module Mod = struct
         EcSubst.subst_modsig
           ~params:(List.map fst modty.mt_params) EcSubst.empty modsig
     in
-    let me    = module_expr_of_module_sig name modty modsig restr in
+    let me    = module_expr_of_module_sig name modty modsig restr in *)
+    let me = me_of_mt env name modty restr in
     let path  = IPIdent (name, None) in
     let comps = MC.mc_of_module_param name me in
 
@@ -1493,10 +1518,10 @@ module NormMp = struct
       end
     end
 
-  let rec add_uses env rm us mp = 
-    let mp = norm_mpath env mp in
+  let rec add_uses env rm us mp =
+    let mp  = norm_mpath env mp in
     let top = EcPath.m_functor mp in
-    let us = 
+    let us  =
       if EcPath.Sm.mem top rm then us 
       else
         let us = 
@@ -1527,7 +1552,8 @@ module NormMp = struct
     | ME_Structure ms ->
         (* FIXME: What to do with the module parameter *)
       let sx = 
-        EcPath.Mx.fold (fun x ty l -> f_pvar (pv_glob x) ty m :: l) 
+        EcPath.Mx.fold (fun x ty l -> 
+          f_pvar (pv_glob x) ty m :: l) 
           ms.ms_vars [] in
       f_tuple sx, ms.ms_uses
     | _ -> assert false
@@ -1555,6 +1581,13 @@ module NormMp = struct
     | Tglob mp' -> not (EcPath.m_equal mp mp')
     | _ -> true
 
+  let norm_ty env = 
+    EcTypes.Hty.memo_rec 107 (
+      fun aux ty ->
+        match ty.ty_node with
+        | Tglob mp -> norm_tglob env mp
+        | _ -> ty_map aux ty) 
+    
   let norm_form env =
     let norm_xp = EcPath.Hx.memo 107 (norm_xpath env) in
     let norm_pv pv =
@@ -1563,11 +1596,27 @@ module NormMp = struct
       then pv
       else EcTypes.pv p pv.pv_kind 
     in
+    let norm_ty : ty -> ty = norm_ty env in
 
+    let norm_gty (id,gty) = 
+      let gty = 
+        match gty with
+        | GTty ty -> GTty (norm_ty ty)
+        | GTmodty (mt,restr) ->
+          GTmodty(mt, Sm.fold (fun mp r -> Sm.add (norm_mpath env mp) r) restr Sm.empty)
+        | GTmem None -> GTmem None
+        | GTmem (Some mt) -> 
+          let me = EcMemory.empty_local id (norm_xp (EcMemory.lmt_xpath mt)) in
+          let me = Msym.fold (fun id ty me ->
+            EcMemory.bind id (norm_ty ty) me) (EcMemory.lmt_bindings mt) me  in
+          GTmem (snd me) in
+      id,gty in
+                
     let norm_form =
       EcFol.Hf.memo_rec 107 (fun aux f ->
         match f.f_node with
-        | Fquant(q,bd,f) ->               (* FIXME: norm module_type *)
+        | Fquant(q,bd,f) ->     
+          let bd = List.map norm_gty bd in
           f_quant q bd (aux f)
 
         | Fpvar(p,m) ->
@@ -1576,7 +1625,7 @@ module NormMp = struct
             f_pvar p' f.f_ty m
 
         | Fglob(p,m) -> norm_glob env m p
-          
+
         | FhoareF hf ->
           let pre' = aux hf.hf_pr and p' = norm_xp hf.hf_f
           and post' = aux hf.hf_po in
@@ -1601,7 +1650,7 @@ module NormMp = struct
           if p == p' && args == args' && e == e' then f else
           f_pr m p' args' e'
 
-        | _ -> EcFol.f_map (fun ty -> ty) aux f) in
+        | _ -> EcFol.f_map norm_ty aux f) in
     norm_form
 
   let norm_op env op =
@@ -2077,6 +2126,7 @@ let norm_l_decl env (hyps,concl) =
   ({ hyps with h_local = lhyps}, concl)
 
 let check_goal env pi ld =
+  
   let ld = (norm_l_decl env ld) in
-  let res = EcWhy3.check_goal env.env_w3 pi ld in
+  let res = EcWhy3.check_goal (Mod.me_of_mt env) env.env_w3 pi ld in
   res

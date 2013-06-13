@@ -37,8 +37,10 @@ let id_eq        = "="
 let id_le        = "<="
 let id_lt        = "<"
 
+let id_sum         = "+"
+let id_sub         = "-"
 let id_prod        = "*"
-let id_div        = "/"
+let id_div         = "/"
 
 let id_in_supp   = "in_supp"
 let id_mu        = "mu"
@@ -82,8 +84,10 @@ let _Real id     = EcPath.pqname p_Real id
 
 let p_real_le    = _Real id_le
 let p_real_lt    = _Real id_lt   
+let p_real_sum    = _Real id_sum
+let p_real_sub    = _Real id_sub
 let p_real_prod   = _Real id_prod
-let p_real_div   = _Real id_div   
+let p_real_div    = _Real id_div   
 
 let id_Distr     = "Distr"
 let p_Distr      = EcPath.pqname p_top id_Distr
@@ -126,8 +130,8 @@ let p_rewrite_iff_r = _Logic "rewrite_iff_r"
 
 let p_case_eq_bool  = _Logic "case_eq_bool"
 
-let p_eq_tuple_intro n = 
+let p_tuple_ind n = 
   if 2 <= n && n <= 9 then
-    let name = Format.sprintf "eq_tuple%i_intro" n in
+    let name = Format.sprintf "tuple%i_ind" n in
     _Logic name
   else raise Not_found

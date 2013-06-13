@@ -36,11 +36,12 @@ val add_ax : env -> EcPath.path -> EcDecl.axiom -> env * rebinding
 val add_mod_exp :
     env -> EcPath.path -> EcModules.module_expr -> env * rebinding
 
-val add_mod_sig :
-    env -> EcPath.path -> EcModules.module_sig -> env * rebinding
+
 
 
 
 (*****************************************************************************)
 
-val check_goal : env -> EcProvers.prover_infos -> EcBaseLogic.l_decl -> bool
+val check_goal : 
+  (EcIdent.t -> EcModules.module_type -> EcPath.Sm.t -> EcModules.module_expr) ->
+  env -> EcProvers.prover_infos -> EcBaseLogic.l_decl -> bool

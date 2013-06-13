@@ -42,8 +42,8 @@ type axiom_kind =
 
 type axiom = {
   ax_tparams : EcIdent.t list;
-  ax_spec   : EcFol.form option;
-  ax_kind   : axiom_kind
+  ax_spec    : EcFol.form option;
+  ax_kind    : axiom_kind;
 }
 
 val ax_dump : axiom -> dnode

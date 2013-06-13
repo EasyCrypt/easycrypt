@@ -61,6 +61,7 @@ type tyerror =
 | InvalidModType       of modtyp_error
 | InvalidMem           of symbol * mem_error
 | OnlyModParamAreOracle of qsymbol
+
 exception TyError of EcLocation.t * EcEnv.env * tyerror
 
 let tyerror loc env e = raise (TyError (loc, env, e))
@@ -512,10 +513,16 @@ let transexp (env : EcEnv.env) (ue : EcUnify.unienv) e =
         let e2, ty2 = transexp penv pe2 in
         (e_let pt e1 e2, ty2)
 
-    | PEtuple es ->
+    | PEtuple es -> begin
         let tes = List.map (transexp env) es in
-        let es, tys = List.split tes in
-          (e_tuple es, ttuple tys)
+
+        match tes with
+        | []      -> (e_tt, EcTypes.tunit)
+        | [e, ty] -> (e, ty)
+        | _       ->
+            let es, tys = List.split tes in
+              (e_tuple es, ttuple tys)
+    end
 
     | PEif (pc, pe1, pe2) ->
       let c, tyc = transexp env pc in
@@ -697,9 +704,6 @@ let sig_of_mt env (mt:module_type) =
       Tys_function(s,{oi_calls = List.filter keep_info oi.oi_calls }) in
   { mis_params = params;
     mis_body   = List.map do1 items }
-
-  
-
 
 let rec check_sig_cnv mode (env:EcEnv.env) (sin:module_sig) (sout:module_sig) = 
   (* Check parameters for compatibility. Parameters names may be
@@ -916,7 +920,7 @@ let rec trans_msymbol (env : EcEnv.env) (msymb : pmsymbol located) =
 let rec transmod (env : EcEnv.env) (x : symbol) (me : pmodule_expr) =
   match me.pl_desc with
   | Pm_ident m -> 
-    let (mp,_sig) = trans_msymbol env {pl_desc = m; pl_loc = me.pl_loc} in
+    let (mp, _sig) = trans_msymbol env {pl_desc = m; pl_loc = me.pl_loc} in
     let params = _sig.mis_params in
     if params <> [] then (* FIXME do it only for internal module *)
       tyerror me.pl_loc env (InvalidModAppl MAE_WrongArgCount);
@@ -956,6 +960,13 @@ let rec transmod (env : EcEnv.env) (x : symbol) (me : pmodule_expr) =
 
   | Pm_struct st ->
     let res = transstruct env x st in
+(*    let sig_ = res.me_sig in
+    Format.printf "module %s : @." x;
+    List.iter (fun (Tys_function(fs,call)) ->
+      Format.printf "   fun %s { " fs.fs_name;
+      List.iter (fun x -> Format.printf "%s " (EcPath.x_tostring x))
+        call.oi_calls;
+      Format.printf "}@.") sig_.mis_body; *)
     res
 
 (* -------------------------------------------------------------------- *)
@@ -969,8 +980,7 @@ and transstruct (env : EcEnv.env) (x : symbol) (st : pstructure) =
   in
 
   (* Check structure items, extending environment initially with
-   * structure arguments, and then with previously checked items.
-   *)
+   * structure arguments, and then with previously checked items. *)
   let env0 = EcEnv.Mod.enter x stparams env in
   let (envi, items) =
     let tydecl1 (x, obj) =
@@ -988,31 +998,41 @@ and transstruct (env : EcEnv.env) (x : symbol) (st : pstructure) =
   in
   let items = List.map snd items in
   let mroot = EcEnv.mroot envi in
-  let top = EcPath.m_functor mroot in
+  let top   = EcPath.m_functor mroot in
+
   let mparams = 
     List.fold_left (fun rm mp -> EcPath.Sm.add mp rm) 
       EcPath.Sm.empty mroot.EcPath.m_args in
+
   let rm = EcPath.Sm.add top mparams in
+
   (* Generate structure signature *)
   let tymod =
+    let mparams = 
+      List.fold_left (fun mparams (id,_) ->
+        Sm.add (EcPath.mident id) mparams) Sm.empty stparams in 
     let tymod1 = function
-      | MI_Module   _  -> None
-      | MI_Variable _v -> None           (* Some (Tys_variable v)  *)
-      | MI_Function f  -> 
-        let calls = 
+      | MI_Module   _ -> None
+      | MI_Variable _ -> None           (* Some (Tys_variable v)  *)
+      | MI_Function f -> 
+        let all_calls = 
           match f.f_def with
           | FBdef def ->
             let rec f_call c f =
               let f = EcEnv.NormMp.norm_xpath envi f in
-              let top = EcPath.m_functor f.EcPath.x_top in
-              let c = 
-                if EcPath.Sm.mem top mparams then EcPath.Sx.add f c else c in
-              match (EcEnv.Fun.by_xpath f envi).f_def with
-              | FBdef def -> List.fold_left f_call c def.f_uses.us_calls 
-              | FBabs oi -> List.fold_left f_call c oi.oi_calls in
+              if EcPath.Sx.mem f c then c
+              else 
+                let c = EcPath.Sx.add f c in
+                match (EcEnv.Fun.by_xpath f envi).f_def with
+                | FBdef def -> List.fold_left f_call c def.f_uses.us_calls 
+                | FBabs oi  -> List.fold_left f_call c oi.oi_calls in
             List.fold_left f_call EcPath.Sx.empty def.f_uses.us_calls 
           | FBabs _ -> assert false in
-        Some (Tys_function (f.f_sig, {oi_calls  = EcPath.Sx.elements calls; }))
+        let filter f = 
+          let ftop = EcPath.m_functor f.EcPath.x_top in
+          Sm.mem ftop mparams in
+        let calls = List.filter filter (EcPath.Sx.elements all_calls) in
+        Some (Tys_function (f.f_sig, {oi_calls  = calls }))
     in
 
     let sigitems = List.pmap tymod1 items in
@@ -1042,10 +1062,8 @@ and transstruct (env : EcEnv.env) (x : symbol) (st : pstructure) =
       check_sig_mt_cnv env0 _sig aty
   in
   List.iter check1 st.ps_signature;
-  (* Construct structure representation *)
 
-  (* TODO : PY : it is strange to have the module parameter in the path of the
-                 variable *)
+  (* Computes used variables / calls *)
   let vars = 
     List.fold_left (fun vs item ->
       match item with
@@ -1056,21 +1074,21 @@ and transstruct (env : EcEnv.env) (x : symbol) (st : pstructure) =
         | _ -> vs 
         end 
       | MI_Variable x ->
-        let mp = EcEnv.mroot env in
+        let mp = EcEnv.mroot env0 in
         let xp  = EcPath.xpath mp (EcPath.psymbol x.v_name) in
         EcPath.Mx.add xp x.v_type vs
       | MI_Function _ -> vs) EcPath.Mx.empty items in
 
-   let rec uses us items = 
+   let rec uses us items =
     List.fold_left (fun us item ->
       match item with
       | MI_Module me ->
         begin match me.me_body with
         | ME_Structure ms -> EcPath.Sm.union us ms.ms_uses 
-        | ME_Alias mp -> EcEnv.NormMp.add_uses envi rm us mp 
-        | ME_Decl _ -> assert false
+        | ME_Alias     mp -> EcEnv.NormMp.add_uses envi rm us mp
+        | ME_Decl      _  -> assert false
         end
-      | MI_Variable _ -> us
+      | MI_Variable _  -> us
       | MI_Function fd ->
         begin match fd.f_def with
         | FBdef fdef ->
@@ -1085,6 +1103,9 @@ and transstruct (env : EcEnv.env) (x : symbol) (st : pstructure) =
         | FBabs _ -> assert false
         end) us items in
   let uses = uses EcPath.Sm.empty items in
+
+  (* Construct structure representation *)
+  let me =
     { me_name  = x;
       me_body  = 
         ME_Structure 
@@ -1093,6 +1114,8 @@ and transstruct (env : EcEnv.env) (x : symbol) (st : pstructure) =
             ms_uses = uses };
       me_comps = items;
       me_sig   = tymod; }
+  in
+    me
   
 (* -------------------------------------------------------------------- *)
 and transstruct1 (env : EcEnv.env) (st : pstructure_item) =
@@ -1303,7 +1326,7 @@ and transinstr ue (env : EcEnv.env) (i : pinstr) =
         (fpath, args, fdef.f_sig.fs_ret)
   in
 
-  match i with
+  match i.pl_desc with
   | PSasgn (lvalue, rvalue) -> 
       let lvalue, lty = translvalue ue env lvalue in
       let rvalue, rty = transexp env ue rvalue in
@@ -1317,15 +1340,24 @@ and transinstr ue (env : EcEnv.env) (i : pinstr) =
       i_rnd(lvalue, rvalue)
 
   | PScall (None, name, args) ->
-      let (fpath, args, rty) = transcall name args in
+      let (fpath, args, rty) = transcall name (unloc args) in
       EcUnify.unify env ue tunit rty;
       i_call (None, fpath, args)
 
   | PScall (Some lvalue, name, args) ->
-      let lvalue, lty = translvalue ue env lvalue in
-      let (fpath, args, rty) = transcall name args in
-      EcUnify.unify env ue lty rty;
-      i_call (Some lvalue, fpath, args)
+      if EcEnv.Fun.lookup_opt (unloc name) env <> None then
+        let lvalue, lty = translvalue ue env lvalue in
+        let (fpath, args, rty) = transcall name (unloc args) in
+          EcUnify.unify env ue lty rty;
+          i_call (Some lvalue, fpath, args)
+      else
+        let fe   = mk_loc name.pl_loc (PEident (name, None)) in
+        let args = mk_loc args.pl_loc (PEtuple (unloc args)) in
+
+        let ope =
+          mk_loc (EcLocation.merge fe.pl_loc args.pl_loc) (PEapp (fe, [args]))
+        in
+          transinstr ue env (mk_loc i.pl_loc (PSasgn (lvalue, ope)))
 
   | PSif (e, s1, s2) ->
       let e, ety = transexp env ue e in
@@ -1389,39 +1421,6 @@ and translvalue ue (env : EcEnv.env) lvalue =
       | [_] ->                          (* FIXME: dubious *)
           let esig = Tuni.subst_dom (EcUnify.UniEnv.asmap ue) esig in
             tyerror x.pl_loc env (UnknownVarOrOp (name, esig))
-
-
-
-
-(*let transmod (env : EcEnv.env) (x : symbol) (me : pmodule_expr) =
-  let me = transmod env x me in
-  begin match me.me_body with
-  | ME_Alias mp -> check_mod_app_disjoint env mp
-  | ME_Structure ms ->
-    let rec check_item env = function
-      | MI_Module me ->
-        begin match me.me_body with
-        | ME_Alias mp -> 
-          check_mod_app_disjoint env mp;
-        | ME_Structure ms ->
-          check_struct env me.me_name ms 
-        | ME_Decl _ -> assert false
-        end;
-        EcEnv.bind1 (me.me_name, `Module me)
-      | MI_Variable v -> 
-        EcEnv.bind1 (v.v_name, `Variable(PVglob,v.v_type)) env
-      | MI_Function f ->
-        EcEnv.bind1 (f.f_name,`Function f) env
-    and check_struct env x ms =
-      
-    
-  | _ -> ()
-  end;
-  me
-*)
-
-
-  
 
 (* -------------------------------------------------------------------- *)
 let trans_gamepath (env : EcEnv.env) gp =
@@ -1584,16 +1583,19 @@ let transform_opt env ue pf tt =
             List.map2 doit1 args (fst fsig)
         in
         let memid = transmem env m in
-        let event = transf (EcEnv.Fun.prF fpath env) event in
-        f_pr memid fpath args event
+        let env = EcEnv.Fun.prF fpath env in
+        let event' = transf env event in
+        unify_or_fail env ue event.pl_loc event'.f_ty tbool;
+        f_pr memid fpath args event'
 
     | PFhoareF (pre, gp, post) ->
         let fpath = trans_gamepath env gp in
         let penv, qenv = EcEnv.Fun.hoareF fpath env in
-        let pre  = transf penv pre
-        and post = transf qenv post
-        in
-        f_hoareF pre fpath post
+        let pre'  = transf penv pre in
+        unify_or_fail penv ue pre.pl_loc pre'.f_ty tbool;
+        let post' = transf qenv post in
+        unify_or_fail qenv ue post.pl_loc post'.f_ty tbool;
+        f_hoareF pre' fpath post'
 
     | PFhoareS (pre, body, post) ->
         let symbols = ref Mstr.empty in
@@ -1608,30 +1610,36 @@ let transform_opt env ue pf tt =
         let clsubst = { EcTypes.e_subst_id with es_ty = su } in
         let stmt    = s_subst clsubst stmt in
         let (menv, env) = EcEnv.Fun.hoareS_anonym locals env in
-        let pre  = transf env pre in
-        let post = transf env post in
-        f_hoareS menv pre (EcModules.stmt (prelude @ stmt.s_node)) post
+        let pre' = transf env pre in
+        unify_or_fail env ue pre.pl_loc pre'.f_ty tbool;
+        let post' = transf env post in
+        unify_or_fail env ue post.pl_loc post'.f_ty tbool;
+        f_hoareS menv pre' (EcModules.stmt (prelude @ stmt.s_node)) post'
 
-    | PFBDhoareF (pre, gp, post, hcmp,bd) ->
+    | PFBDhoareF (pre, gp, post, hcmp, bd) ->
         let fpath = trans_gamepath env gp in
         let penv, qenv = EcEnv.Fun.hoareF fpath env in
-        let pre  = transf penv pre in
-        let post = transf qenv post in
+        let pre'  = transf penv pre in
+        unify_or_fail penv ue pre.pl_loc pre'.f_ty tbool;
+        let post' = transf qenv post in
+        unify_or_fail qenv ue post.pl_loc post'.f_ty tbool;
         let hcmp = 
           match hcmp with PFHle -> FHle | PFHeq -> FHeq | PFHge -> FHge
         in
         (* FIXME: check that there are not pvars in bd *)
-        let bd = transf env bd in
-        f_bdHoareF pre fpath post hcmp bd
+        let bd' = transf env bd in
+        unify_or_fail env ue bd.pl_loc bd'.f_ty treal;
+        f_bdHoareF pre' fpath post' hcmp bd'
 
-    | PFBDhoareS (pre, body, post, hcmp,bd) ->
+    | PFBDhoareS (pre, body, post, hcmp, bd) ->
         let symbols = ref Mstr.empty in
         let ue      = UE.create (Some []) in
         let hcmp = 
           match hcmp with PFHle -> FHle | PFHeq -> FHeq | PFHge -> FHge
         in
         (* FIXME: check that there are not pvars in bd *)
-        let bd = transf env bd in
+        let bd' = transf env bd in
+        unify_or_fail env ue bd.pl_loc bd'.f_ty treal;
         let (env, stmt, _re, prelude, locals) =
           let env = EcEnv.Fun.enter "$stmt" env in
             transbody ue symbols env tunit body (* FIXME: $stmt ? *)
@@ -1642,18 +1650,21 @@ let transform_opt env ue pf tt =
         let clsubst = { EcTypes.e_subst_id with es_ty = su } in
         let stmt    = s_subst clsubst stmt in
         let (menv, env) = EcEnv.Fun.hoareS_anonym locals env in
-        let pre  = transf env pre in
-        let post = transf env post in
-        f_bdHoareS menv pre (EcModules.stmt (prelude @ stmt.s_node)) post hcmp bd
-
+        let pre'  = transf env pre in
+        unify_or_fail env ue pre.pl_loc pre'.f_ty tbool;
+        let post' = transf env post in
+        unify_or_fail env ue post.pl_loc post'.f_ty tbool;
+        f_bdHoareS menv pre' (EcModules.stmt (prelude @ stmt.s_node)) post' hcmp bd'
 
     | PFequivF (pre, (gp1, gp2), post) ->
         let fpath1 = trans_gamepath env gp1 in
         let fpath2 = trans_gamepath env gp2 in
         let penv, qenv = EcEnv.Fun.equivF fpath1 fpath2 env in
-        let pre = transf penv pre in
-        let post = transf qenv post in
-        f_equivF pre fpath1 fpath2 post
+        let pre' = transf penv pre in
+        unify_or_fail penv ue pre.pl_loc pre'.f_ty tbool;
+        let post' = transf qenv post in
+        unify_or_fail qenv ue post.pl_loc post'.f_ty tbool;
+        f_equivF pre' fpath1 fpath2 post'
 
   and trans_fbind env ue decl = 
     let trans1 env (xs, pgty) =

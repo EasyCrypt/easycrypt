@@ -34,8 +34,8 @@ val tolist      : path -> symbol list
 val p_size      : path -> int
 
 (* -------------------------------------------------------------------- *)
-module Mp : Map.S  with type key = path
-module Sp : Mp.Set with type elt = path
+module Mp : Map.S with type key = path
+module Sp : Set.S with module M = Map.MakeBase(Mp)
 module Hp : EcMaps.EHashtbl.S with type key = path
 
 (* -------------------------------------------------------------------- *)
@@ -93,13 +93,13 @@ val m_tostring : mpath -> string
 val x_tostring : xpath -> string
 
 (* -------------------------------------------------------------------- *)
-module Mm : Map.S  with type key = mpath
-module Sm : Mm.Set with type elt = mpath
+module Mm : Map.S with type key = mpath
+module Sm : Set.S with module M = Map.MakeBase(Mm)
 module Hm : EcMaps.EHashtbl.S with type key = mpath
 
 (* -------------------------------------------------------------------- *)
-module Mx : Map.S  with type key = xpath
-module Sx : Mx.Set with type elt = xpath
+module Mx : Map.S with type key = xpath
+module Sx : Set.S with module M = Map.MakeBase(Mx)
 module Hx : EcMaps.EHashtbl.S with type key = xpath
 
 (* -------------------------------------------------------------------- *)

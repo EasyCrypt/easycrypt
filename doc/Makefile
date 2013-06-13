@@ -1,21 +1,15 @@
-TEX=pdflatex
-IDX=makeindex
-MAIN=easycrypt
+# -*- Makefile -*-
 
-FILES= *.tex
+# --------------------------------------------------------------------
+.PHONY: all easycrypt.pdf clean
 
-PDF= $(MAIN).pdf
+LATEXMK = latexmk -bibtex -e '$$clean_ext = "brf";'
 
-all: $(PDF) 
+all: easycrypt.pdf
 
-$(PDF): $(FILES)
-	pdflatex $(MAIN).tex 
+easycrypt.pdf:
+	$(LATEXMK) -pdf easycrypt
 
 clean:
-	rm -f *.aux *.out *.blg *.bbl *.log *.dvi *.toc *.idx *.ilg *.ind *.lof $(MAIN).pdf *~
-
-scratch:
-	$(TEX) $(MAIN)
-	$(IDX) $(MAIN)
-	$(TEX) $(MAIN)
-	$(TEX) $(MAIN)
+	$(LATEXMK) -c easycrypt
+	rm -f easycrypt.pdf

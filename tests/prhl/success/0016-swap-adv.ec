@@ -7,7 +7,7 @@ fun f() : bool = {
 var c : bool;
 var r : bool;
 c = true;
-r := A.f();
+r  = A.f();
 return c = r;
 }
 }.
@@ -16,7 +16,7 @@ module M2(A:T) = {
 fun f() : bool = {
 var c : bool;
 var r : bool;
-r := A.f();
+r  = A.f();
 c = true;
 return c = r;
 }
@@ -24,7 +24,7 @@ return c = r;
 
 lemma test :
 forall (A<:T),
-equiv [M1(A).f ~ M2(A).f : true ==> res{1} = res{2}]
+equiv [M1(A).f ~ M2(A).f : true ==> res{1} = res{2}].
 proof.
 intros A.
 fun.

@@ -43,12 +43,13 @@ lemma list_case :
   forall (p: 'a list -> bool, l:'a list), 
     (l = [] => p []) => 
     (forall x l', l = x :: l' => p (x :: l')) =>
-    p l.
+    p l
+by [].
 
-lemma nil_cons: forall (x:'a) xs, x::xs <> [].
+lemma nil_cons: forall (x:'a) xs, x::xs <> [] by [].
 
 lemma destruct_list: forall (xs:'a list),
-  xs = [] \/ (exists (y:'a) ys, xs = y::ys)
+  xs = [] \/ (exists (y:'a) ys, xs = y::ys).
 proof.
  intros xs.
  elimT list_case xs.
@@ -59,7 +60,8 @@ proof.
 save.
 
 lemma hd_tl_decomp: forall (xs:'a list),
-  xs <> [] => (hd xs)::(tl xs) = xs.
+  xs <> [] => (hd xs)::(tl xs) = xs
+by [].
 
 (** Derived Operators *)
 (* mem: membership test *)
@@ -68,9 +70,9 @@ op (* local *) f_mem(x:'a,y,b): bool = x = y \/ b.
 op mem (x:'a): 'a list -> bool = 
   fold_right (f_mem x) false.
 
-lemma mem_nil : forall (x : 'a), mem x [] = false.
+lemma mem_nil : forall (x : 'a), mem x [] = false by [].
 lemma mem_cons : forall(x y : 'a, xs : 'a list), 
- mem y (x::xs) = (x = y \/ mem y xs)
+ mem y (x::xs) = (x = y \/ mem y xs).
 proof.
  intros x y xs.
  simplify mem.
@@ -81,11 +83,11 @@ proof.
  trivial.
 save.
 
-lemma mem_eq: forall (x:'a) xs, mem x (x::xs).
-lemma mem_cons_mon : forall (x y:'a) xs, mem y xs => mem y (x::xs).
-lemma mem_not_nil: forall (y:'a) xs, mem y xs => xs <> [].
-lemma mem_hd: forall (xs:'a list), xs <> [] => mem (hd xs) xs.
-lemma not_mem_empty: forall (xs:'a list), xs = [] <=> (forall x, !mem x xs).
+lemma mem_eq: forall (x:'a) xs, mem x (x::xs) by [].
+lemma mem_cons_mon : forall (x y:'a) xs, mem y xs => mem y (x::xs) by [].
+lemma mem_not_nil: forall (y:'a) xs, mem y xs => xs <> [] by [].
+lemma mem_hd: forall (xs:'a list), xs <> [] => mem (hd xs) xs by [].
+lemma not_mem_empty: forall (xs:'a list), xs = [] <=> (forall x, !mem x xs) by [].
 
 (* length *)
 op (* local *) f_length(x:'a, b): int = 1 + b.
@@ -93,11 +95,12 @@ op (* local *) f_length(x:'a, b): int = 1 + b.
 (*(lambda x, lambda y, 1 + y)*)
 op length (xs:'a list): int = fold_right f_length 0 xs.
 
-lemma length_nil: length<:'a> [] = 0.
+lemma length_nil: length<:'a> [] = 0 by [].
 lemma length_cons: forall (x:'a) xs, 
-  length (x::xs) = 1 + length xs.
+  length (x::xs) = 1 + length xs
+by [].
 
-lemma length_non_neg: forall (xs:'a list), 0 <= length xs
+lemma length_non_neg: forall (xs:'a list), 0 <= length xs.
 proof.
  intros xs.
  elimT list_ind xs.
@@ -109,11 +112,12 @@ proof.
 save.
 
 lemma length_cons_S : forall (xs:'a list, x: 'a), 
- length (x::xs) = 1 + length xs.
+ length (x::xs) = 1 + length xs
+by [].
 
-lemma length_cons_nz : forall (xs:'a list, x: 'a), length (x::xs) <> 0.
+lemma length_cons_nz : forall (xs:'a list, x: 'a), length (x::xs) <> 0 by [].
 
-lemma length_z_nil : forall(xs:'a list), length xs = 0 => xs = []
+lemma length_z_nil : forall(xs:'a list), length xs = 0 => xs = [].
 proof.
 intros xs.
 elimT list_ind xs;trivial.
@@ -124,50 +128,54 @@ save.
 
 op (++) (xs ys: 'a list) : 'a list = fold_right (::) ys xs.
 
-lemma app_nil: forall (ys:'a list), [] ++ ys = ys.
-lemma app_cons: forall (x:'a) xs ys, (x::xs) ++ ys = x::(xs ++ ys).
+lemma app_nil: forall (ys:'a list), [] ++ ys = ys by [].
+lemma app_cons: forall (x:'a) xs ys, (x::xs) ++ ys = x::(xs ++ ys) by [].
 
-lemma app_nil_right: forall (xs:'a list), xs ++ [] = xs
+lemma app_nil_right: forall (xs:'a list), xs ++ [] = xs.
 proof.
 intros xs;elimT list_ind xs;trivial.
 save.
 
 lemma app_assoc : forall(xs ys zs:'a list),
-  (xs ++ ys) ++ zs = xs ++ (ys ++ zs)
+  (xs ++ ys) ++ zs = xs ++ (ys ++ zs).
 proof.
 intros xs;elimT list_ind xs;trivial.
 save.
 
 lemma length_app: forall (xs ys:'a list), 
-  length (xs ++ ys) = length xs + length ys
+  length (xs ++ ys) = length xs + length ys.
 proof.
 intros xs;elimT list_ind xs;trivial.
 save.
 
 lemma length_app_comm: forall (xs ys:'a list), 
-  length (xs ++ ys) =  length (ys ++ xs).
+  length (xs ++ ys) =  length (ys ++ xs)
+by [].
 
 lemma mem_app: forall (y:'a) xs ys,
-  (mem y xs \/ mem y ys) = mem y (xs ++ ys)
+  (mem y xs \/ mem y ys) = mem y (xs ++ ys).
 proof.
 intros y xs ys;elimT list_ind xs;trivial.
 save.
 
 lemma mem_app_comm: forall (y:'a) xs ys,
-  mem y (xs ++ ys) = mem y (ys ++ xs).
+  mem y (xs ++ ys) = mem y (ys ++ xs)
+by [].
 
 (* Liftings from a' Pred to ('a list) Pred *)
 pred all (p :'a cPred,xs) = forall x, mem x xs => p x.
 pred any (p:'a cPred,xs) = exists x, mem x xs /\ p x.
 
-lemma all_empty: forall (p:'a cPred),  all p [].
-lemma any_empty: forall (p:'a cPred), !any p [].
+lemma all_empty: forall (p:'a cPred),  all p [] by [].
+lemma any_empty: forall (p:'a cPred), !any p [] by [].
 
 lemma all_app: forall (p:'a cPred) xs ys,
-  all p (xs ++ ys) = (all p xs /\ all p ys).
+  all p (xs ++ ys) = (all p xs /\ all p ys)
+by [].
 
 lemma any_app: forall (p:'a cPred) xs ys,
-  any p (xs ++ ys) = (any p xs \/ any p ys).
+  any p (xs ++ ys) = (any p xs \/ any p ys)
+by [].
 
 (* forallb *)
 op (* local *) f_forallb (p:'a -> bool, x, r): bool = 
@@ -181,7 +189,7 @@ op existsb(p:'a -> bool, xs): bool =
   fold_right (f_existsb p) false xs.
 
 lemma eq_forallb_all: forall (p:'a -> bool) xs,
-  all p xs <=> forallb p xs
+  all p xs <=> forallb p xs.
 proof.
  intros p xs;elimT list_ind xs.
   trivial.
@@ -192,7 +200,7 @@ proof.
 save.
 
 lemma eq_existsb_any: forall (p:'a -> bool) xs,
- any p xs <=> existsb p xs
+ any p xs <=> existsb p xs.
 proof.
  intros p xs;elimT list_ind xs.
   trivial.
@@ -212,10 +220,11 @@ op filter(p:'a cPred): 'a list -> 'a list =
   fold_right (f_filter p) [].
 
 lemma filter_nil: forall (p:'a cPred),
-  filter p [] = [].
+  filter p [] = []
+by [].
 lemma filter_cons: forall (p:'a cPred) x xs,
   filter p (x::xs) = let rest = filter p xs in
-                     if p x then x::rest else rest
+                     if p x then x::rest else rest.
 proof.
  intros p x xs.
  simplify filter.
@@ -227,7 +236,7 @@ proof.
 save.
 
 lemma filter_mem: forall (x:'a) xs p,
-  mem x (filter p xs) = (mem x xs /\ p x)
+  mem x (filter p xs) = (mem x xs /\ p x).
 proof.
  intros x xs P.
  elimT list_ind xs.
@@ -244,38 +253,41 @@ proof.
 save.
 
 lemma filter_app: forall (xs ys:'a list) p,
-  filter p (xs ++ ys) = (filter p xs) ++ (filter p ys)
+  filter p (xs ++ ys) = (filter p xs) ++ (filter p ys).
 proof.
  intros xs.
  elimT list_ind xs;trivial.
 save.
 
 lemma filter_length: forall (xs:'a list) p,
-  length (filter p xs) <= length xs
+  length (filter p xs) <= length xs.
 proof.
  intros xs.
  elimT list_ind xs;trivial.
 save.
 
 lemma filter_all: forall (xs:'a list) p,
-  all p (filter p xs).
+  all p (filter p xs)
+by [].
 
 lemma filter_imp: forall (p q:'a cPred) xs,
   (forall x, p x => q x) => 
-   forall x, mem x (filter p xs) => mem x (filter q xs).
+   forall x, mem x (filter p xs) => mem x (filter q xs)
+by [].
 
 (* map *)
 op (* local *) f_map(f:'a -> 'b, x, xs): 'b list = (f x)::xs.
 op map(f:'a -> 'b): 'a list -> 'b list = fold_right (f_map f) [].
 
-lemma map_nil: forall (f: 'a -> 'b), map f [] = [].
+lemma map_nil: forall (f: 'a -> 'b), map f [] = [] by [].
 lemma map_cons: forall (f: 'a -> 'b) x xs, 
-  map f (x::xs) = (f x)::(map f xs).
+  map f (x::xs) = (f x)::(map f xs)
+by [].
 
 pred (* local *) P_map_in(f:'a -> 'b, xs) = 
   forall x, mem x xs => mem (f x) (map f xs).
 lemma map_in: forall (x:'a) xs (f:'a -> 'b), 
-  mem x xs => mem (f x) (map f xs)
+  mem x xs => mem (f x) (map f xs).
 proof.
  intros x xs f.
  elimT list_ind xs;trivial.
@@ -284,21 +296,21 @@ save.
 
 lemma map_o: forall xs (f:'a -> 'b) (g:'b -> 'c) (h:'a -> 'c),
   (forall x, g (f x) = h x) => 
-  map g (map f xs) = map h xs
+  map g (map f xs) = map h xs.
 proof.
  intros xs f g h compose.
  elimT list_ind xs;trivial.
 save.
 
 lemma map_length: forall (xs:'a list, f:'a -> 'b), 
-  length xs = length (map f xs)
+  length xs = length (map f xs).
 proof.
  intros xs f.
  elimT list_ind xs;trivial.
 save.
 
 lemma map_app : forall xs ys (f:'a -> 'b),
-  map f (xs ++ ys) = map f xs ++ map f ys
+  map f (xs ++ ys) = map f xs ++ map f ys.
 proof.
  intros xs ys f.
  elimT list_ind xs;trivial.
@@ -306,7 +318,7 @@ save.
 
 lemma map_ext: forall xs (f g:'a -> 'b),
   (forall x, f x = g x) =>
-  map f xs = map g xs
+  map f xs = map g xs.
 proof.
  intros xs f g H.
  elimT list_ind xs.
@@ -325,7 +337,7 @@ op (*local*) e_nth (y, n:int): 'a = y.
 op nth (xs:'a list): 'a -> int -> 'a = fold_right f_nth e_nth xs.
 
 lemma nth_in_or_dv_aux: forall(xs:'a list) dv n, 0 <= n =>
-  mem (nth xs dv n) xs \/ nth xs dv n = dv
+  mem (nth xs dv n) xs \/ nth xs dv n = dv.
 proof.
  intros xs.
  elimT list_ind xs.

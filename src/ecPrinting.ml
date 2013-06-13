@@ -43,14 +43,24 @@ module PPEnv = struct
     | None   -> ppe
     | Some m -> enter ppe (EcMemory.xpath m)
 
-
   let add_local ppe =
+    let in_active_mem name =
+      let env = ppe.ppe_env in
+
+      match EcEnv.Memory.get_active env with
+      | None -> false
+      | Some mid ->
+          let mem = oget (EcEnv.Memory.byid mid env) in
+            EcMemory.lookup name mem <> None
+    in
+
     let inuse name =
       let env = ppe.ppe_env in
          (Ssym.mem name ppe.ppe_inuse)
       || (EcEnv.Mod.sp_lookup_opt      ([], name) env <> None)
       || (EcEnv.Var.lookup_local_opt        name  env <> None)
       || (EcEnv.Var.lookup_progvar_opt ([], name) env <> None)
+      || (in_active_mem name)
     in
 
     fun id ->
@@ -163,9 +173,18 @@ module PPEnv = struct
     let (nm, x) = P.toqsymbol mty.mt_name in
     let (nm, x) = shorten (List.rev nm) ([], x) in
 
+    let isfunctor =
+      List.all2 EcPath.m_equal
+	(List.map (fun (x, _) -> EcPath.mident x) mty.mt_params)
+	mty.mt_args
+    in
+
     let msymb =
-        (List.map (fun x -> (x, [])) nm)
-      @ [(x, List.flatten (List.map (mod_symb ppe) mty.mt_args))]
+      match isfunctor with
+      | true  -> (List.map (fun x -> (x, [])) nm) @ [(x, [])]
+      | false ->
+           (List.map (fun x -> (x, [])) nm)
+         @ [(x, List.flatten (List.map (mod_symb ppe) mty.mt_args))]
     in
       msymb
 
@@ -276,6 +295,16 @@ let pp_local (ppe : PPEnv.t) fmt x =
   Format.fprintf fmt "%s" (PPEnv.local_symb ppe x)
 
 (* -------------------------------------------------------------------- *)
+let pp_mem (ppe : PPEnv.t) fmt x =
+  let x = Format.sprintf "%s" (PPEnv.local_symb ppe x) in
+  let x =
+    if   x <> "" && x.[0] = '&'
+    then String.sub x 1 (String.length x - 1)
+    else x
+  in
+    Format.fprintf fmt "%s" x
+
+(* -------------------------------------------------------------------- *)
 let rec pp_type_r ppe btuple fmt ty =
   match ty.ty_node with
   | Tglob m -> Format.fprintf fmt "(glob %a)" (pp_topmod ppe) m
@@ -322,7 +351,7 @@ let string_of_assoc = function
 let string_of_fixity = function
   | `Prefix  -> "prefix"
   | `Postfix -> "postfix"
-  | `Infix a -> Printf.sprintf "index[%s]" (string_of_assoc a)
+  | `Infix a -> Printf.sprintf "infix[%s]" (string_of_assoc a)
 
 let string_of_oprec ((i, f) : opprec) =
   Printf.sprintf "%s @ %d" (string_of_fixity f) i
@@ -339,6 +368,8 @@ let maybe_paren (outer, side) inner pp =
       | `Prefix      , `Right    -> true
       | `Infix `Left , `Left     -> (pi = po) && (fo = `Infix `Left )
       | `Infix `Right, `Right    -> (pi = po) && (fo = `Infix `Right)
+      | `Infix `Left , `ILeft    -> (pi = po) && (fo = `Infix `Left )
+      | `Infix `Right, `IRight   -> (pi = po) && (fo = `Infix `Right)
       | _            , `NonAssoc -> (pi = po) && (fi = fo)
       | _            , _         -> false
   in
@@ -358,9 +389,9 @@ let e_bin_prio_op2    = (40, `Infix `Left)
 let e_bin_prio_op3    = (50, `Infix `Left)
 let e_bin_prio_op4    = (60, `Infix `Left)
 
-let e_uni_prio_not    =  26
+let e_uni_prio_not    = 10000
 let e_uni_prio_uminus = 500
-let appprio           = (10000, `Infix `Left)
+let e_app_prio        = (10000, `Infix `Left)
 let e_get_prio        = (20000, `Infix `Left)
 
 let min_op_prec = (-1     , `Infix `NonAssoc)
@@ -436,20 +467,52 @@ let pp_if_form (ppe : PPEnv.t) pp_sub outer fmt (b, e1, e2) =
     maybe_paren outer e_bin_prio_if pp fmt (b, e1, e2)
 
 (* -------------------------------------------------------------------- *)
+let pp_tuple mode (ppe : PPEnv.t) pp_sub fmt es =
+  let prth =
+    match mode, es with
+    | `ForBinding, [_] -> false
+    | `ForBinding, _   -> true
+    | `ForTuple  , _   -> true
+  in
+
+  let pp fmt = pp_list ",@ " (pp_sub ppe (min_op_prec, `NonAssoc)) fmt es in
+  let pp fmt = Format.fprintf fmt "@[<hov 0>%t@]" pp in
+
+    pp_maybe_paren prth (fun fmt () -> pp fmt) fmt ()
+
+(* -------------------------------------------------------------------- *)
 let pp_let (ppe : PPEnv.t) pp_sub outer fmt (pt, e1, e2) =
   let pp fmt (pt, e1, e2) =
     let ids    = lp_ids pt in
     let subppe = PPEnv.add_locals ppe ids in
       Format.fprintf fmt "@[<hov 0>let %a =@;<1 2>@[%a@]@ in@ %a@]"
-        (pp_list ", " (pp_local ppe)) ids
+        (pp_tuple `ForBinding ppe (fun ppe _ -> pp_local ppe)) ids
         (pp_sub ppe (e_bin_prio_letin, `NonAssoc)) e1
         (pp_sub subppe (e_bin_prio_letin, `NonAssoc)) e2
   in
     maybe_paren outer e_bin_prio_letin pp fmt (pt, e1, e2)
 
 (* -------------------------------------------------------------------- *)
-let pp_tuple (ppe : PPEnv.t) pp_sub es =
-  pp_paren (pp_list ",@ " (pp_sub ppe (min_op_prec, `NonAssoc))) es
+let pp_app (ppe : PPEnv.t) (pp_first, pp_sub) outer fmt (e, args) =
+  match args with
+  | [] ->
+      pp_first ppe outer fmt e
+
+  | _ ->
+    let rec doit fmt args =
+      match args with
+      | [] ->
+          pp_first ppe (e_app_prio, `ILeft) fmt e
+
+      | a :: args ->
+          Format.fprintf fmt "%a@ %a"
+            doit args (pp_sub ppe (e_app_prio, `IRight)) a
+    in
+
+    let pp fmt () =
+      Format.fprintf fmt "@[<hov 2>%a@]" doit (List.rev args)
+    in
+      maybe_paren outer e_app_prio pp fmt ()
 
 (* -------------------------------------------------------------------- *)
 let pp_opname fmt (nm, op) = 
@@ -467,12 +530,8 @@ let pp_opapp (ppe : PPEnv.t) pp_sub outer fmt (op, _tvi, es) =
 
   let pp_as_std_op fmt =
     let pp_stdapp fmt =
-      match es with
-      | [] -> pp_opname fmt (nm, opname)
-      | _  ->
-        Format.fprintf fmt "@[<hov 2>%a@ %a@]"
-          pp_opname (nm, opname)
-          (pp_list "@ " (pp_sub ppe (appprio, `NonAssoc))) es
+      let pp_subs = ((fun _ _ -> pp_opname), pp_sub) in
+        pp_app ppe pp_subs outer fmt ((nm, opname), es)
     in
 
     let (pp, prio) =
@@ -486,7 +545,7 @@ let pp_opapp (ppe : PPEnv.t) pp_sub outer fmt (op, _tvi, es) =
               Format.fprintf fmt "`|%a|"
                 (pp_sub ppe (min_op_prec, `NonAssoc)) e
             in
-              (pp, appprio)
+              (pp, e_app_prio)
 
         | "__get", [e1; e2] ->
             let pp fmt =
@@ -506,9 +565,9 @@ let pp_opapp (ppe : PPEnv.t) pp_sub outer fmt (op, _tvi, es) =
               (pp, e_get_prio)
 
         | _ ->
-            (pp_stdapp, if es = [] then max_op_prec else min_op_prec)
+            (pp_stdapp, max_op_prec)
       else 
-        (pp_stdapp, if es = [] then max_op_prec else min_op_prec)
+        (pp_stdapp, max_op_prec)
     in
       maybe_paren outer prio (fun fmt () -> pp fmt) fmt
 
@@ -521,7 +580,7 @@ let pp_opapp (ppe : PPEnv.t) pp_sub outer fmt (op, _tvi, es) =
         | Some opprio  ->
           let opprio = (opprio, `Prefix) in
           let pp fmt =
-            Format.fprintf fmt "@[%s@ %a@]" opname
+            Format.fprintf fmt "@[%s%a@]" opname
               (pp_sub ppe (opprio, `NonAssoc)) e in
           let pp fmt =
             maybe_paren outer opprio (fun fmt () -> pp fmt) fmt
@@ -630,15 +689,13 @@ let pp_expr (ppe : PPEnv.t) fmt (e : expr) =
         pp_if3 ppe pp_expr outer fmt (c, e1, e2)
 
     | Etuple es ->
-        pp_tuple ppe pp_expr fmt es
+        pp_tuple `ForTuple ppe pp_expr fmt es
 
     | Eapp ({e_node = Eop (op, tys) }, args) ->
         pp_opapp ppe pp_expr outer fmt (op, tys, args)
 
-    | Eapp (e, args) -> 
-        Format.fprintf fmt "@[<hov 2>%a@]"
-          (pp_list "@ " (pp_expr ppe (max_op_prec, `NonAssoc)))
-          (e :: args)
+    | Eapp (e, args) ->
+        pp_app ppe (pp_expr, pp_expr) outer fmt (e, args)
 
     | Elet (pt, e1, e2) ->
         pp_let ppe pp_expr outer fmt (pt, e1, e2)
@@ -661,7 +718,8 @@ let pp_lvalue (ppe : PPEnv.t) fmt lv =
       pp_pv ppe fmt p
 
   | LvTuple ps ->
-      pp_paren (pp_list ", " (pp_pv ppe)) fmt (List.map fst ps)
+      Format.fprintf fmt "@[<hov 2>%a@]"
+        (pp_paren (pp_list ",@ " (pp_pv ppe))) (List.map fst ps)
 
   | LvMap (_, x, e, _) ->
       Format.fprintf fmt "%a[%a]"
@@ -729,7 +787,6 @@ let string_of_quant = function
   | Llambda -> "lambda"
 
 (* -------------------------------------------------------------------- *)
-  
 let pp_binding (ppe : PPEnv.t) (xs, ty) =
   match ty with
   | GTty ty ->
@@ -769,17 +826,17 @@ let rec pp_bindings_aux ppe bds =
         (ppe, fun fmt -> Format.fprintf fmt "%t@ %t" pp1 pp2)
 
 let rec pp_bindings ppe bds = 
-  let rec merge (xs,gty) bds = 
+  let rec merge (xs, gty) bds = 
     match bds with
     | [] -> [List.rev xs, gty]
-    | (x,gty') :: bds ->
+    | (x, gty') :: bds ->
         if   EcFol.gty_equal gty gty'
         then merge (x::xs, gty) bds
-        else (List.rev xs,gty) :: merge ([x], gty') bds
+        else (List.rev xs, gty) :: merge ([x], gty') bds
   in
   match bds with
   | [] -> pp_bindings_aux ppe []
-  | (x,gty)::bds -> pp_bindings_aux ppe (merge ([x], gty) bds)
+  | (x, gty) :: bds -> pp_bindings_aux ppe (merge ([x], gty) bds)
 
 (* -------------------------------------------------------------------- *)
 let string_of_hcmp = function
@@ -795,10 +852,15 @@ let rec pp_form_r (ppe : PPEnv.t) outer fmt f =
   | Flocal id ->
       pp_local ppe fmt id
       
-  | Fpvar (x, i) ->
+  | Fpvar (x, i) -> begin
       let ppe = PPEnv.enter_by_memid ppe i in
-        Format.fprintf fmt "%a{%a}" (pp_pv ppe) x (pp_local ppe) i
-    
+        match EcEnv.Memory.get_active ppe.PPEnv.ppe_env with
+        | Some i' when EcMemory.mem_equal i i' ->
+            Format.fprintf fmt "%a" (pp_pv ppe) x
+        | _ ->
+            Format.fprintf fmt "%a{%a}" (pp_pv ppe) x (pp_mem ppe) i
+  end
+
   | Fquant (q, bd, f) ->
       let (subppe, pp) = pp_bindings ppe bd in
       let pp fmt () = 
@@ -819,12 +881,10 @@ let rec pp_form_r (ppe : PPEnv.t) outer fmt f =
       pp_opapp ppe pp_form_r outer fmt (p, tys, args)
       
   | Fapp (e, args) ->
-      pp_list "@ "
-        (pp_form_r ppe (max_op_prec, `NonAssoc)) fmt
-        (e :: args)
+        pp_app ppe (pp_form_r, pp_form_r) outer fmt (e, args)
       
   | Ftuple args ->
-      pp_tuple ppe pp_form_r fmt args
+      pp_tuple `ForTuple ppe pp_form_r fmt args
       
   | FhoareF hf ->
     Format.fprintf fmt "hoare[@[<hov 2>@ %a :@ @[%a ==>@ %a@]@]]"
@@ -853,7 +913,7 @@ let rec pp_form_r (ppe : PPEnv.t) outer fmt f =
       (pp_form ppe) es.es_po
 
   | Fglob (mp, me) ->
-    Format.fprintf fmt "(glob %a){%a}" (pp_topmod ppe) mp (pp_local ppe) me
+    Format.fprintf fmt "(glob %a){%a}" (pp_topmod ppe) mp (pp_mem ppe) me
 
   | Fpr (m,f,args,ev) ->
     Format.fprintf fmt "Pr[@[%a(@[%a@]) @@ %a :@ %a@]]"
@@ -869,6 +929,7 @@ let rec pp_form_r (ppe : PPEnv.t) outer fmt f =
       (pp_form ppe) hf.bhf_po
       (string_of_hcmp hf.bhf_cmp)
       (pp_form_r ppe (max_op_prec,`NonAssoc)) hf.bhf_bd 
+
   | FbdHoareS hs ->
     Format.fprintf fmt "bd_hoare[@[<hov 2>@ %a :@ @[%a ==>@ %a@]@]] %s %a"
       (pp_stmt_for_form ppe) hs.bhs_s
@@ -1248,7 +1309,9 @@ let pp_hoareF (ppe : PPEnv.t) fmt hf =
 let pp_hoareS (ppe : PPEnv.t) fmt hs =
   let ppe =
     { ppe with
-        PPEnv.ppe_env = EcEnv.Memory.push hs.hs_m ppe.PPEnv.ppe_env }
+        PPEnv.ppe_env =
+          EcEnv.Memory.set_active (fst hs.hs_m)
+            (EcEnv.Memory.push hs.hs_m ppe.PPEnv.ppe_env) }
   in
 
   let ppnode = collect2_s hs.hs_s.s_node [] in
@@ -1267,8 +1330,8 @@ let pp_hoareS (ppe : PPEnv.t) fmt hs =
 
 (* -------------------------------------------------------------------- *)
 let string_of_hrcmp = function
-  | FHle -> "[=]"
-  | FHeq -> "[<=]"
+  | FHle -> "[<=]"
+  | FHeq -> "[=]"
   | FHge -> "[>=]"
 
 (* -------------------------------------------------------------------- *)
@@ -1284,7 +1347,9 @@ let pp_bdhoareF (ppe : PPEnv.t) fmt hf =
 let pp_bdhoareS (ppe : PPEnv.t) fmt hs =
   let ppe =
     { ppe with
-        PPEnv.ppe_env = EcEnv.Memory.push hs.bhs_m ppe.PPEnv.ppe_env }
+        PPEnv.ppe_env =
+          EcEnv.Memory.set_active (fst hs.bhs_m)
+            (EcEnv.Memory.push hs.bhs_m ppe.PPEnv.ppe_env) }
   in
 
   let ppnode = collect2_s hs.bhs_s.s_node [] in

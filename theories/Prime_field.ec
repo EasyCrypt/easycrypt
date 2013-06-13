@@ -56,19 +56,24 @@ axiom gf_q_distr: forall (x y z:gf_q),
 
 (** Lemmas *)
 lemma gf_q_mult_zero: forall (x:gf_q),
-  x * gf_q0 = gf_q0.
+  x * gf_q0 = gf_q0
+by [].
 
 lemma gf_q_minus: forall (x:gf_q),
-  (x - x) = gf_q0.
+  (x - x) = gf_q0
+by [].
 
 lemma gf_q_minus_minus: forall (x:gf_q),
-  neg(neg x) = x.
+  neg(neg x) = x
+by [].
 
 lemma gf_q_mult_minus: forall (x y:gf_q),
-  (neg x) * y = neg (x * y).
+  (neg x) * y = neg (x * y)
+by [].
 
 lemma gf_q_minus_distr: forall (x y z:gf_q),
-  x * (y - z) = x * y - x * z.
+  x * (y - z) = x * y - x * z
+by [].
 
 
 (** conversion between int and gf_q *)
@@ -98,7 +103,7 @@ theory Dgf_q.
   axiom mu_x_def_in: forall (s:gf_q),
     mu_x dgf_q s = 1%r/q%r.
 
-  axiom mu_weight_pos: mu_weight dgf_q = 1%r.
+  axiom lossless: weight dgf_q = 1%r.
 
 end Dgf_q.
 

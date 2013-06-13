@@ -36,7 +36,7 @@ type pty_r =
   | PTvar       of psymbol
   | PTapp       of pqsymbol * pty list
   | PTfun       of pty * pty
-and pty       = pty_r       located
+and pty = pty_r located
 
 type ptyannot_r = 
   | TVIunamed of pty list
@@ -48,9 +48,8 @@ type plpattern_r =
   | LPTuple  of psymbol list
 and plpattern = plpattern_r located
 
-
 type ptybinding  = psymbol list * pty
-and ptybindings = ptybinding list
+and  ptybindings = ptybinding list
 
 and pexpr_r =
   | PEint      of int                               (* int. literal       *)
@@ -59,26 +58,28 @@ and pexpr_r =
   | PElet      of plpattern * pexpr * pexpr         (* let binding        *)
   | PEtuple    of pexpr list                        (* tuple constructor  *)
   | PEif       of pexpr * pexpr * pexpr             (* _ ? _ : _          *)
-  | PElambda   of ptybindings * pexpr
-and pexpr     = pexpr_r     located
+  | PElambda   of ptybindings * pexpr               (* lambda abstraction *)
+
+and pexpr = pexpr_r located
 
 (* -------------------------------------------------------------------- *)
-
 type plvalue_r =
   | PLvSymbol of pqsymbol
   | PLvTuple  of pqsymbol list
   | PLvMap    of pqsymbol * ptyannot option * pexpr
-and plvalue   = plvalue_r   located
 
-type pinstr =
+and plvalue = plvalue_r located
+
+type pinstr_r =
   | PSasgn   of plvalue * pexpr
   | PSrnd    of plvalue * pexpr
-  | PScall   of plvalue option * pqsymbol * pexpr list
+  | PScall   of plvalue option * pqsymbol * (pexpr list) located
   | PSif     of pexpr * pstmt * pstmt
   | PSwhile  of pexpr * pstmt
   | PSassert of pexpr
 
-and pstmt = pinstr list
+and pinstr = pinstr_r located
+and pstmt  = pinstr list
 
 (* -------------------------------------------------------------------- *)
 type pmodule_type = pqsymbol 
@@ -195,6 +196,7 @@ type pop_def =
   | POconcr of ptybindings * pty * pexpr
 
 type poperator = {
+  po_kind   : [`Op | `Const];
   po_name   : psymbol;
   po_tyvars : psymbol list option;
   po_def    : pop_def
@@ -208,18 +210,6 @@ type ppredicate = {
   pp_name   : psymbol;
   pp_tyvars : psymbol list option;
   pp_def    : ppred_def;
-}
-
-
-(* -------------------------------------------------------------------- *)
-type paxiom_kind = PAxiom | PLemma | PILemma
-
-type paxiom = {
-  pa_name    : psymbol;
-  pa_tyvars  : psymbol list option;
-  pa_vars    : pgtybindings option;  
-  pa_formula : pformula;
-  pa_kind    : paxiom_kind;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -288,27 +278,43 @@ and pspattern = unit
 
 type codepos = int * ((int * codepos) option)
 
+(* AppSingle are optional for bounded Phl judgments
+   AppMult is required by most general rule for upper bounded Phl
+   AppNone is required for the rest of judgments 
+*)
+type p_app_bd_info = PAppNone | PAppSingle of pformula 
+                   | PAppMult of (pformula * pformula * pformula * pformula)
+
 type phltactic = 
   | Pfun_def  
   | Pfun_abs    of pformula
   | Pfun_upto   of (pformula * pformula * pformula option)
   | Pskip
-  | Papp        of (bool * int doption * pformula * pformula option)
+  | Papp        of (bool * int doption * pformula * p_app_bd_info)
   | Pwp         of int doption option 
   | Pwhile      of (pformula * pformula option * (pformula * pformula) option)
   | Pfission    of (tac_side * codepos * (int * (int * int)))
   | Pfusion     of (tac_side * codepos * (int * (int * int)))
   | Punroll     of (tac_side * codepos)
-  | Psplitwhile  of (pexpr * tac_side * codepos )
+  | Psplitwhile of (pexpr * tac_side * codepos )
   | Pcall       of tac_side * (pformula * pformula)
   | Prcond      of (bool option * bool * int)
   | Pcond       of tac_side
   | Pswap       of ((tac_side * swap_kind) located list)
+  | Pcfold      of (tac_side * codepos * int option)
   | Pinline     of pinline_arg
+  | Pkill       of (tac_side * codepos * int option)
   | Prnd        of tac_side * pformula rnd_tac_info
   | Palias      of (tac_side * codepos * psymbol option)
   | Pconseq     of cfpattern
-  | Pequivdeno  of cfpattern
+  | Pbdhoaredeno  of cfpattern
+  | Pequivdeno    of cfpattern
+  | Phoare
+  | Pbdhoare
+  | Pprbounded
+  | Pprfalse
+  | Ppror
+  | Pbdeq 
 
 and pinline_arg =
   [ `ByName    of tac_side * (pgamepath list * int list option)
@@ -330,7 +336,7 @@ type logtactic =
   | Pgeneralize of pformula list
   | Pclear      of psymbol list
   | Prewrite    of (bool * ffpattern)
-  | Psubst      of psymbol list
+  | Psubst      of pformula list
   | Psimplify   of preduction 
   | Pchange     of pformula
   | PelimT      of (pformula * pqsymbol)
@@ -339,18 +345,34 @@ type ptactic = ptactic_r located
 
 and ptactic_r = 
   | Pidtac      of string option
-  | Prepeat     of ptactic  
-  | Pdo         of int option * ptactic (* None means do 1 then repeat *)
-  | Ptry        of ptactic 
+  | Pdo         of bool * int option * ptactic
+  | Ptry        of ptactic
+  | Pby         of ptactic list
   | Psubgoal    of ptactics
-  | Pseq        of ptactics
+  | Pseq        of ptactic list
   | Pcase       of pformula 
   | Plogic      of logtactic
   | PPhl        of phltactic
+  | Pprogress   of ptactic option
   | Padmit
   | Pdebug
 
-and ptactics = ptactic list        
+and ptactics =
+  | Psubtacs of ptactic list
+  | Pfirst   of ptactic
+  | Plast    of ptactic
+  | Protate  of [`Left | `Right]
+
+(* -------------------------------------------------------------------- *)
+type paxiom_kind = PAxiom | PLemma of ptactic option | PILemma
+
+type paxiom = {
+  pa_name    : psymbol;
+  pa_tyvars  : psymbol list option;
+  pa_vars    : pgtybindings option;  
+  pa_formula : pformula;
+  pa_kind    : paxiom_kind;
+}
 
 (* -------------------------------------------------------------------- *)
 type ident_spec = psymbol list
@@ -451,7 +473,7 @@ type global =
   | GthExport    of pqsymbol
   | GthClone     of theory_cloning
   | GthW3        of (string list * string * w3_renaming list)
-  | Gtactics     of ptactics
+  | Gtactics     of [`Proof | `Actual of ptactic list]
   | Gprover_info of pprover_infos
   | Gcheckproof  of bool
   | Gsave        of EcLocation.t
