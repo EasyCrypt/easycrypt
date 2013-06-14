@@ -18,7 +18,7 @@ val lmt_bindings : local_memtype -> EcTypes.ty Msym.t
 val mt_equal    : memtype -> memtype -> bool
 val mt_xpath    : memtype -> EcPath.xpath
 val mt_bindings : memtype -> EcTypes.ty Msym.t
-
+val mt_fv       : memtype -> int EcIdent.Mid.t
 (* -------------------------------------------------------------------- *)
 type memenv = memory * memtype
 

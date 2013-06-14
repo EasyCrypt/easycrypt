@@ -10,6 +10,7 @@ open EcIdent
 (* -------------------------------------------------------------------- *)
 type ty = private {
   ty_node : ty_node;
+  ty_fv   : int Mid.t;
   ty_tag  : int 
 }
 
