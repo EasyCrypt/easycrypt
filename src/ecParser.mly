@@ -1296,7 +1296,17 @@ intro_pattern_1:
 ;
 
 intro_pattern:
-| x=loc(intro_pattern_1) { IPCore x }
+| x=loc(intro_pattern_1)
+   { IPCore x }
+
+| LBRACKET RBRACKET
+   { IPCase [] }
+
+| LBRACKET ip=intro_pattern+ RBRACKET
+   { IPCase [ip] }
+
+| LBRACKET ip=plist2(intro_pattern*, PIPE) RBRACKET
+   { IPCase ip }
 ;
 
 fpattern_head(F):
@@ -1664,17 +1674,18 @@ tactic_chain:
 | LBRACKET ts=plist1(loc(tactics0), PIPE) RBRACKET
     { Psubtacs (List.map mk_core_tactic ts) }
 
-| FIRST t=tactic
-    { Pfirst t }
+| FIRST t=tactic { Pfirst (t, 1) }
+| LAST  t=tactic { Plast  (t, 1) }
 
-| LAST t=tactic
-    { Plast t }
+| FIRST n=NUM t=tactic { Pfirst (t, n) }
+| LAST  n=NUM t=tactic { Plast  (t, n) }
 
-| FIRST LAST
-    { Protate `Left }
+| FIRST LAST  { Protate (`Left , 1) }
+| LAST  FIRST { Protate (`Right, 1) }
 
-| LAST FIRST
-    { Protate `Right }
+| FIRST n=NUM LAST  { Protate (`Left , n) }
+| LAST  n=NUM FIRST { Protate (`Right, n) }
+
 ;
 
 subtactic:

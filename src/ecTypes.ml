@@ -9,6 +9,7 @@ open EcUidgen
 (* -------------------------------------------------------------------- *)
 type ty = {
   ty_node : ty_node;
+  ty_fv   : int EcIdent.Mid.t; (* only ident appearing in path *)
   ty_tag  : int;
 }
 
@@ -58,12 +59,24 @@ module Hsty = Why3.Hashcons.Make (struct
       Why3.Hashcons.combine_list ty_hash p.p_tag tl
     | Tfun    (t1,t2) ->
       Why3.Hashcons.combine (ty_hash t1) (ty_hash t2)
-          
-  let tag n ty = { ty with ty_tag = n }
+        
+  let fv = function
+    | Tglob m        -> EcPath.m_fv Mid.empty m
+    | Tunivar _      -> Mid.empty
+    | Tvar    _     -> Mid.empty
+    | Ttuple  tl     -> 
+      List.fold_left (fun s a -> fv_union s a.ty_fv) Mid.empty tl
+    | Tconstr (_,tl) -> 
+      List.fold_left (fun s a -> fv_union s a.ty_fv) Mid.empty tl
+    | Tfun    (t1,t2) ->
+      fv_union t1.ty_fv t2.ty_fv 
+
+  let tag n ty = { ty with ty_tag = n; ty_fv = fv ty.ty_node }
       
 end)
 
-let mk_ty node =  Hsty.hashcons { ty_node = node; ty_tag = -1 }
+let mk_ty node =  
+  Hsty.hashcons { ty_node = node; ty_tag = -1; ty_fv = Mid.empty }
 
 module MSHty = EcMaps.MakeMSH(struct 
   type t = ty
@@ -381,7 +394,9 @@ let lp_fv = function
 let pv_fv pv = EcPath.x_fv Mid.empty pv.pv_name
 
 let fv_node = function 
-  | Eint _ | Eop _ -> Mid.empty
+  | Eint _ -> Mid.empty
+  | Eop (_, tys) -> 
+      List.fold_left (fun s a -> fv_union s a.ty_fv) Mid.empty tys
   | Evar v    -> pv_fv v 
   | Elocal id -> fv_singleton id 
   | Eapp(f,args) ->
@@ -467,12 +482,14 @@ module Hexpr = Why3.Hashcons.Make (struct
     | Elam(b,e) ->
         Why3.Hashcons.combine (e_hash e) (b_hash b) 
           
-  let tag n e = { e with e_tag = n; e_fv = fv_node e.e_node; }
+  let tag n e = 
+    let fv = fv_union (fv_node e.e_node) e.e_ty.ty_fv in
+    { e with e_tag = n; e_fv = fv; }
 end)
 
 (* -------------------------------------------------------------------- *)
 let mk_expr e ty =
-  Hexpr.hashcons { e_node = e; e_tag = -1; e_fv = fv_node e; e_ty = ty }
+  Hexpr.hashcons { e_node = e; e_tag = -1; e_fv = Mid.empty; e_ty = ty }
 
 let e_tt            = mk_expr (Eop (EcCoreLib.p_tt, [])) tunit
 let e_int           = fun i -> mk_expr (Eint i) tint

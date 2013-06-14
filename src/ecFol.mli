@@ -17,6 +17,8 @@ type gty =
   | GTmem   of EcMemory.memtype
 
 val destr_gty : gty -> EcTypes.ty
+val gty_equal : gty  -> gty -> bool
+val gty_fv    : gty -> int Mid.t
 
 type quantif = 
   | Lforall
@@ -109,7 +111,7 @@ type app_bd_info = AppNone | AppSingle of form
 
 
 (* -------------------------------------------------------------------- *)
-val gty_equal : gty  -> gty -> bool
+
 val f_equal   : form -> form -> bool
 val f_compare : form -> form -> int
 val f_hash    : form -> int 

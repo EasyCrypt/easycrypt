@@ -28,7 +28,7 @@ val error : EcLocation.t -> tac_error -> 'a
 type pprovers = EcParsetree.pprover_infos -> EcProvers.prover_infos
 
 (* -------------------------------------------------------------------- *)
-val process_form : EcEnv.env -> hyps -> pformula -> ty -> form
+val process_form : EcEnv.env -> EcEnv.LDecl.hyps -> pformula -> ty -> form
 val process_formula  : EcEnv.env -> goal -> pformula -> form
 
 val process_mkn_apply :
@@ -39,4 +39,5 @@ val process_mkn_apply :
   -> goal * int list
 
 (* -------------------------------------------------------------------- *)
-val process_logic : pprovers -> EcLocation.t -> EcEnv.env -> logtactic -> goal -> goals
+val process_logic  : pprovers -> EcLocation.t -> EcEnv.env -> logtactic -> goal -> goals
+val process_intros : EcEnv.env -> intropattern -> goal -> goals

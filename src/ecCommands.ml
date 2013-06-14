@@ -356,7 +356,10 @@ let pp_current_goal stream =
 
       match List.ohead ns with
       | None   -> Format.fprintf stream "No more goals\n%!"
-      | Some n -> EcPrinting.pp_goal ppe stream (List.length ns, get_goal (juc, n))
+      | Some n -> 
+        let hyps, concl = get_goal (juc, n) in
+        let g = EcEnv.LDecl.tohyps hyps, concl in
+        EcPrinting.pp_goal ppe stream (List.length ns, g)
   end
 
 let pp_maybe_current_goal stream =

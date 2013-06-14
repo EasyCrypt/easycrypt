@@ -14,7 +14,7 @@ open EcReduction
 open EcEctoField
 
 type pre_judgment = {
-  pj_decl : l_decl;
+  pj_decl : LDecl.hyps * form;
   pj_rule : (bool * int rule) option;
 }
 
@@ -107,7 +107,7 @@ let close_juc juc =
       | Some (_,r) ->
         { pr_name = r.pr_name;
           pr_hyps = List.map close_arg r.pr_hyps } in
-    { j_decl = hyps, concl;
+    { j_decl = LDecl.tohyps hyps, concl;
       j_rule = rule }
   and close_arg = function
     | RA_form f -> RA_form f
@@ -157,14 +157,17 @@ let t_on_nth t n (juc,ln) =
   let r,n,l = try List.split_n n ln with _ -> assert false in
   let juc,ln = t (juc,n) in
   juc, List.rev_append r (List.append ln l)
-        
-let t_on_first t (_,ln as gs) =
-  assert (ln <> []);
-  t_on_nth t 0 gs 
-        
-let t_on_last t (_,ln as gs) =
-  assert (ln <> []);
-  t_on_nth t (List.length ln - 1) gs 
+
+let t_on_firsts t i (juc, ln) =
+  let (ln1, ln2) = List.take_n i ln in
+  sndmap (List.append^~ ln2) (t_on_goals t (juc, ln1))
+
+let t_on_lasts t i (juc, ln) =
+  let (ln1, ln2) = List.take_n (max 0 (List.length ln - i)) ln in
+  sndmap (List.append ln1) (t_on_goals t (juc, ln2))
+
+let t_on_first t g = t_on_firsts t 1 g
+let t_on_last  t g = t_on_lasts  t 1 g
 
 let t_seq_subgoal t lt g = t_subgoal lt (t g)
 
@@ -212,13 +215,11 @@ let t_close t g =
   | (juc, []    ) -> (juc, [])
   | (_  , i :: _) -> raise (StillOpenGoal i)
 
-let t_rotate mode (j, ns) =
+let t_rotate mode sz (juc, ns) =
   let mrev = match mode with `Left -> identity | `Right -> List.rev in
+  let sz   = if ns = [] then 0 else (max 0 sz) mod List.length ns in
 
-  match mrev ns with
-  | []      -> (j, ns)
-  | n :: ns -> (j, mrev (ns @ [n]))
-
+  let (hd, tl) = List.take_n sz (mrev ns) in (juc, mrev (tl @ hd))
 
 (* -------------------------------------------------------------------- *)
 let get_node  g = (get_pj g).pj_decl
@@ -238,7 +239,7 @@ type tac_error =
   | CannotReconizeElimT
   | TooManyArgument
   | NoHypToSubst          of EcIdent.t option
-  | CannotProve           of l_decl
+  | CannotProve           of (LDecl.hyps * form)
   | InvalNumOfTactic      of int * int
   | NotPhl                of bool option
   | NoSkipStmt
@@ -407,6 +408,7 @@ let t_clear ids (juc,n as g) =
   upd_rule rule (juc,n)
 
 let tyenv_of_hyps env hyps =
+  let hyps = LDecl.tohyps hyps in
   let add env (id,k) =
     match k with
     | LD_var (ty,_) -> EcEnv.Var.bind_local id ty env
@@ -437,6 +439,8 @@ type app_arg =
   | AAmem  of EcIdent.t
   | AAmp   of EcPath.mpath * EcModules.module_sig 
   | AAnode
+
+type 'a app_arg_cb = EcEnv.env -> LDecl.hyps -> gty option -> 'a -> app_arg
 
 let check_arg do_arg env hyps s x gty a =
   let a = do_arg env hyps (Some gty) a in
@@ -850,7 +854,7 @@ let t_elimT env f p g =
           | _, GTty ty, _ -> ty
           | _             -> raise Not_found
         with _ -> tacerror (CannotReconizeElimT) in
-      let ue = EcUnify.UniEnv.create (Some hyps.h_tvar) in
+      let ue = EcUnify.UniEnv.create (Some (LDecl.tohyps hyps).h_tvar) in
       let (ue, tpred,tys) =
         EcUnify.UniEnv.freshen ue ax.EcDecl.ax_tparams None tpred in
       EcUnify.unify env ue tpred (tfun f.f_ty tbool);
@@ -961,7 +965,7 @@ let t_subst_gen env x h side g =
   let hyps,concl = get_goal g in
   let f = LDecl.lookup_hyp_by_id h hyps in
   let hhyps,_,_ =
-    List.find_split (fun (id, _) -> EcIdent.id_equal x id) hyps.h_local in
+    List.find_split (fun (id, _) -> EcIdent.id_equal x id) (LDecl.tohyps hyps).h_local in
   let rec gen fv hhyps =
     match hhyps with
     | [] -> ([], [], concl)
@@ -1009,7 +1013,7 @@ let is_subst_eq env hyps x (hid,lk) =
 
 let t_subst1_loc env x g =
   let hyps = get_hyps g in
-  match List.pick (is_subst_eq env hyps x) hyps.h_local with
+  match List.pick (is_subst_eq env hyps x) (LDecl.tohyps hyps).h_local with
   | None -> tacerror (NoHypToSubst x)
   | Some(h, x, side) ->
     t_subst_gen env x h side g
@@ -1037,7 +1041,7 @@ let t_subst_pv_gen env h side g =
       match lk with
       | LD_hyp _ -> not (EcIdent.id_equal h id) 
       | LD_var (_, Some _) -> true
-      | _ -> false) (List.rev hyps.h_local) in
+      | _ -> false) (List.rev (LDecl.tohyps hyps).h_local) in
   let to_gen = List.map fst to_gen in
   let to_intros =
     List.map (fun id -> { pl_loc = EcLocation._dummy; pl_desc = id }) to_gen in
@@ -1088,7 +1092,7 @@ let is_subst_pv_eq env hyps fx (hid,lk) =
 
 let t_subst1_pv env fx g =
   let hyps = get_hyps g in
-  match List.pick (is_subst_pv_eq env hyps fx) hyps.h_local with
+  match List.pick (is_subst_pv_eq env hyps fx) (LDecl.tohyps hyps).h_local with
   | None -> assert false (* FIXME error message *)
   | Some(h, _x, side) ->
     t_subst_pv_gen env h side g
@@ -1112,7 +1116,7 @@ let find_in_hyps env f hyps =
       let _, f' = LDecl.get_hyp k in
       check_conv env hyps f f'; true
     with _ -> false in
-  fst (List.find test hyps.h_local)
+  fst (List.find test (LDecl.tohyps hyps).h_local)
 
 let t_assumption env g = 
   let hyps,concl = get_goal g in

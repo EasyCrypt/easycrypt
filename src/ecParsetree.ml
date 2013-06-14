@@ -322,6 +322,7 @@ and pinline_arg =
 
 type intropattern1 =
   | IPCore of (symbol option) located
+  | IPCase of intropattern list
 
 and intropattern = intropattern1 list
 
@@ -369,9 +370,9 @@ and ptactic = {
 
 and ptactic_chain =
   | Psubtacs of ptactic list
-  | Pfirst   of ptactic
-  | Plast    of ptactic
-  | Protate  of [`Left | `Right]
+  | Pfirst   of ptactic * int
+  | Plast    of ptactic * int
+  | Protate  of [`Left | `Right] * int
 
 (* -------------------------------------------------------------------- *)
 type paxiom_kind = PAxiom | PLemma of ptactic option | PILemma
