@@ -10,7 +10,12 @@ let _ =
   options := EcOptions.parse ();
 
   (* Initialize why3 engine *)
-  EcProvers.initialize !options.o_why3;
+  try  EcProvers.initialize !options.o_why3
+  with e -> begin
+    Format.eprintf
+      "cannot initialize Why3 engine: %a@."
+      EcPException.exn_printer e
+  end;
 
   (* Initialize load path *)
   begin
