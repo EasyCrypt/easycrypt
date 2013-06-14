@@ -109,6 +109,8 @@
   let mk_fpattern kind args =
     { fp_kind = kind;
       fp_args = args; }
+
+  let mk_core_tactic t = { pt_core = t; pt_intros = []; }
 %}
 
 %token <EcSymbols.symbol> LIDENT
@@ -1200,7 +1202,7 @@ axiom:
 | LEMMA d=lemma_decl
     { mk_axiom d PILemma }
 
-| LEMMA d=lemma_decl BY t=loc(tactic)
+| LEMMA d=lemma_decl BY t=tactic
     { mk_axiom d (PLemma (Some t)) }
 
 | LEMMA d=lemma_decl BY LBRACKET RBRACKET
@@ -1209,7 +1211,7 @@ axiom:
 | EQUIV x=ident pd=pgtybindings? COLON p=loc(equiv_body)
     { mk_axiom (x, None, pd, p) PILemma }
 
-| EQUIV x=ident pd=pgtybindings? COLON p=loc(equiv_body) BY t=loc(tactic)
+| EQUIV x=ident pd=pgtybindings? COLON p=loc(equiv_body) BY t=tactic
     { mk_axiom (x, None, pd, p) (PLemma (Some t)) }
 
 | EQUIV x=ident pd=pgtybindings? COLON p=loc(equiv_body) BY LBRACKET RBRACKET
@@ -1286,11 +1288,15 @@ tselect:
 (* -------------------------------------------------------------------- *)
 (* tactic                                                               *)
 
-intro_pattern:
+intro_pattern_1:
 | UNDERSCORE { None }
 | s=LIDENT   { Some s }
 | s=UIDENT   { Some s }
 | s=MIDENT   { Some s }
+;
+
+intro_pattern:
+| x=loc(intro_pattern_1) { IPCore x }
 ;
 
 fpattern_head(F):
@@ -1348,7 +1354,6 @@ conseq:
 | f1=form LONGARROW f2=form     { Some f1, Some f2 }
 ;
 
-
 tac_dir: 
 | BACKS {  true }
 | FWDS  { false }
@@ -1360,50 +1365,78 @@ codepos:
 | c=CPOS { c }
 ;
 
-tactic:
-| IDTAC
-   { Pidtac None }
-
-| IDTAC s=STRING
-   { Pidtac (Some s) }
-
-| TRY t=loc(tactic)
-   { Ptry t }
-
-| BY t=tactics
-   { Pby t }
-
-| DO t=loc(tactic)
-   { Pdo (true, None, t) }
-
-| DO n=NUM? NOT t=loc(tactic)
-   { Pdo (false, n, t) }
-
-| DO n=NUM? QUESTION t=loc(tactic)
-   { Pdo (true, n, t) }
-
-| LPAREN s=tactics RPAREN
-   { Pseq s } 
-
-| ADMIT
-   { Padmit }
-
-| CASE f=sform
-   { Pcase f }
-
-| PROGRESS t=loc(tactic)?
-   { Pprogress t }
-
-| x=logtactic
-   { Plogic x }
-
-| x=phltactic
-   { PPhl x }
-
-(* DEBUG *)
-| DEBUG
-    { Pdebug }
+code_position:
+| n=number { Single n }
+| n1=number n2=number { Double (n1, n2) } 
 ;
+
+while_tac_info : 
+| inv=sform
+    { (inv, None, None) }
+| inv=sform vrnt=sform 
+    { (inv, Some vrnt, None) }
+| inv=sform vrnt=sform bd=sform n_iter=sform
+    { (inv, Some vrnt, Some (bd, n_iter)) }
+
+rnd_info:
+| e1=sform e2=sform 
+    { Some e1, Some e2 }
+| e=sform UNDERSCORE 
+    { Some e, None }
+| UNDERSCORE e=sform 
+    { None, Some e }
+| empty
+    {None, None }
+;
+
+swap_info:
+| s=side? p=swap_pos { s,p }
+;
+
+swap_pos:
+| i1=number i2=number i3=number
+    { SKbase (i1, i2, i3) }
+
+| p=int
+    { SKmove p }
+
+| i1=number p=int
+    { SKmovei (i1, p) }
+
+| LBRACKET i1=number DOTDOT i2=number RBRACKET p=int
+    { SKmoveinter (i1, i2, p) }
+;
+
+int:
+| n=number { n }
+| loc(MINUS) n=number { -n }
+;
+
+side:
+| LBRACE n=number RBRACE {
+   match n with
+   | 1 -> true
+   | 2 -> false
+   | _ -> error
+              (EcLocation.make $startpos $endpos)
+              (Some "variable side must be 1 or 2")
+ }
+;
+
+occurences:
+| p=paren(NUM+) {
+    if List.mem 0 p then
+      error
+        (EcLocation.make $startpos $endpos)
+        (Some "`0' is not a valid occurence");
+    p
+  }
+;
+
+app_bd_info:
+  | empty { PAppNone }
+  | f=sform { PAppSingle f }
+  | f1=sform f2=sform g1=sform g2=sform { PAppMult (f1,f2,g1,g2) }
 
 logtactic:
 | ASSUMPTION
@@ -1421,7 +1454,7 @@ logtactic:
 | TRIVIAL pi=prover_info
    { Ptrivial pi }
 
-| INTROS a=loc(intro_pattern)+
+| INTROS a=intro_pattern*
    { Pintro a }
 
 | SPLIT
@@ -1466,11 +1499,6 @@ logtactic:
 | CUT n=ident COLON p=sform
    { Pcut (n, p) }
 ;
-
-app_bd_info:
-  | empty { PAppNone }
-  | f=sform { PAppSingle f }
-  | f1=sform f2=sform g1=sform g2=sform { PAppMult (f1,f2,g1,g2) }
 
 phltactic:
 | FUN
@@ -1575,97 +1603,71 @@ phltactic:
 | BDEQ {Pbdeq}
 ;
 
-while_tac_info : 
-| inv=sform
-    { (inv, None, None) }
-| inv=sform vrnt=sform 
-    { (inv, Some vrnt, None) }
-| inv=sform vrnt=sform bd=sform n_iter=sform
-    { (inv, Some vrnt, Some (bd, n_iter)) }
+tactic_core_r:
+| IDTAC
+   { Pidtac None }
 
-rnd_info:
-| e1=sform e2=sform 
-    { Some e1, Some e2 }
-| e=sform UNDERSCORE 
-    { Some e, None }
-| UNDERSCORE e=sform 
-    { None, Some e }
-| empty
-    {None, None }
+| IDTAC s=STRING
+   { Pidtac (Some s) }
+
+| TRY t=tactic_core
+   { Ptry t }
+
+| BY t=tactics
+   { Pby t }
+
+| DO t=tactic_core
+   { Pdo (true, None, t) }
+
+| DO n=NUM? NOT t=tactic_core
+   { Pdo (false, n, t) }
+
+| DO n=NUM? QUESTION t=tactic_core
+   { Pdo (true, n, t) }
+
+| LPAREN s=tactics RPAREN
+   { Pseq s } 
+
+| ADMIT
+   { Padmit }
+
+| CASE f=sform
+   { Pcase f }
+
+| PROGRESS t=tactic_core?
+   { Pprogress t }
+
+| x=logtactic
+   { Plogic x }
+
+| x=phltactic
+   { PPhl x }
+
+(* DEBUG *)
+| DEBUG
+    { Pdebug }
 ;
 
-swap_info:
-| s=side? p=swap_pos { s,p }
+%inline tactic_core:
+| x=loc(tactic_core_r) { x }
 ;
 
-swap_pos:
-| i1=number i2=number i3=number
-    { SKbase (i1, i2, i3) }
+tactic:
+| t=tactic_core
+    { mk_core_tactic t }
 
-| p=int
-    { SKmove p }
-
-| i1=number p=int
-    { SKmovei (i1, p) }
-
-| LBRACKET i1=number DOTDOT i2=number RBRACKET p=int
-    { SKmoveinter (i1, i2, p) }
+| t=tactic_core IMPL ip=intro_pattern+
+    { { pt_core = t; pt_intros = ip; } }
 ;
 
-int:
-| n=number { n }
-| loc(MINUS) n=number { -n }
-;
-
-side:
-| LBRACE n=number RBRACE {
-   match n with
-   | 1 -> true
-   | 2 -> false
-   | _ -> error
-              (EcLocation.make $startpos $endpos)
-              (Some "variable side must be 1 or 2")
- }
-;
-
-occurences:
-| p=paren(NUM+) {
-    if List.mem 0 p then
-      error
-        (EcLocation.make $startpos $endpos)
-        (Some "`0' is not a valid occurence");
-    p
-  }
-;
-
-code_position:
-| n=number { Single n }
-| n1=number n2=number { Double (n1, n2) } 
-;
-
-tactics:
-| t=loc(tactic) %prec SEMICOLON { [t] }
-| t=loc(tactic) SEMICOLON ts=tactics2  { t:: (List.rev ts) }
-;
-
-tactics0:
-| ts=tactics   { Pseq ts } 
-| x=loc(empty) { Pseq [mk_loc x.pl_loc (Pidtac None)] }
-;
-
-tactics2:
-| t=tactic2 { [t] }
-| ts=tactics2 SEMICOLON t=tactic2 { t :: ts }
-;
-
-tsubgoal:
+tactic_chain:
 | LBRACKET ts=plist1(loc(tactics0), PIPE) RBRACKET
-    { Psubtacs ts }
+    { Psubtacs (List.map mk_core_tactic ts) }
 
-| FIRST t=loc(tactic)
+| FIRST t=tactic
     { Pfirst t }
 
-| LAST t=loc(tactic)
+| LAST t=tactic
     { Plast t }
 
 | FIRST LAST
@@ -1675,14 +1677,27 @@ tsubgoal:
     { Protate `Right }
 ;
 
-tactic2_u:
-| t=tsubgoal { Psubgoal t }
-| t=tactic   { t }
+subtactic:
+| t=loc(tactic_chain)
+    { mk_core_tactic (mk_loc t.pl_loc (Psubgoal (unloc t))) }
+
+| t=tactic
+    { t }
 ;
 
-tactic2:
-| t=loc(tactic2_u) { t }
+subtactics:
+| t=subtactic { [t] }
+| ts=subtactics SEMICOLON t=subtactic { t :: ts }
 ;
+
+tactics:
+| t=tactic %prec SEMICOLON { [t] }
+| t=tactic SEMICOLON ts=subtactics { t :: (List.rev ts) }
+;
+
+tactics0:
+| ts=tactics   { Pseq ts } 
+| x=loc(empty) { Pseq [mk_core_tactic (mk_loc x.pl_loc (Pidtac None))] }
 
 tactics_or_prf:
 | t=tactics { `Actual t }

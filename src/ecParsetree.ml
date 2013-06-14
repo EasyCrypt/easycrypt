@@ -320,10 +320,15 @@ and pinline_arg =
   [ `ByName    of tac_side * (pgamepath list * int list option)
   | `ByPattern of pipattern ]
 
+type intropattern1 =
+  | IPCore of (symbol option) located
+
+and intropattern = intropattern1 list
+
 type logtactic =
   | Passumption of (pqsymbol option * ptyannot option)
   | Ptrivial    of pprover_infos
-  | Pintro      of (symbol option) located list
+  | Pintro      of intropattern
   | Psplit                        
   | Pfield		of (pformula * pformula * pformula * pformula * pformula * pformula * pformula)
   | Pfieldsimp	of (pformula * pformula * pformula * pformula * pformula * pformula * pformula)
@@ -341,23 +346,28 @@ type logtactic =
   | Pchange     of pformula
   | PelimT      of (pformula * pqsymbol)
 
-type ptactic = ptactic_r located
-
-and ptactic_r = 
+type ptactic_core_r =
   | Pidtac      of string option
-  | Pdo         of bool * int option * ptactic
-  | Ptry        of ptactic
+  | Pdo         of bool * int option * ptactic_core
+  | Ptry        of ptactic_core
   | Pby         of ptactic list
-  | Psubgoal    of ptactics
   | Pseq        of ptactic list
   | Pcase       of pformula 
   | Plogic      of logtactic
   | PPhl        of phltactic
-  | Pprogress   of ptactic option
+  | Pprogress   of ptactic_core option
+  | Psubgoal    of ptactic_chain
   | Padmit
   | Pdebug
 
-and ptactics =
+and ptactic_core = ptactic_core_r located
+
+and ptactic = {
+  pt_core   : ptactic_core;
+  pt_intros : intropattern;
+}
+
+and ptactic_chain =
   | Psubtacs of ptactic list
   | Pfirst   of ptactic
   | Plast    of ptactic

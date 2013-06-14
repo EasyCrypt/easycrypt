@@ -122,8 +122,8 @@ let process_assumption loc env (pq, tvi) g =
 
 (* -------------------------------------------------------------------- *)
 let process_intros env pis =
-  let mk_id s = EcIdent.create (odfl "_" s) in
-    t_intros env (List.map (lmap mk_id) pis)
+  let mk_id (IPCore s) = lmap (fun s -> EcIdent.create (odfl "_" s)) s in
+    t_intros env (List.map mk_id pis)
 
 (* -------------------------------------------------------------------- *)
 let process_elim_arg env hyps oty a =
@@ -255,7 +255,7 @@ let process_trivial mkpv pi env g =
 let process_cut name env phi g =
   let phi = process_formula env g phi in
   t_on_last
-    (process_intros env [lmap (fun x -> Some x) name])
+    (process_intros env [IPCore (lmap (fun x -> Some x) name)])
     (t_cut env phi g)
 
 (* -------------------------------------------------------------------- *)
