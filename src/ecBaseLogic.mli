@@ -132,30 +132,38 @@ type rule_name =
 
   | RN_bhl_rnd of (EcFol.form option * EcFol.form)
 
-and rule_arg = 
+type 'a rule_arg = 
   | RA_form of EcFol.form             (* formula             *)
   | RA_id   of EcIdent.t              (* local ident         *)
   | RA_mp   of EcPath.mpath           (* module              *)
-  | RA_node of int                    (* sub-derivation      *)
+  | RA_node of 'a                     (* sub-derivation      *)
 
-type rule = {
+type 'a rule = {
     pr_name : rule_name;
-    pr_hyps : rule_arg list
+    pr_hyps : 'a rule_arg list
   }
 
 type l_decl = hyps * form
 
-type pre_judgment = {
+type judgment = {
+  j_decl : l_decl;
+  j_rule : judgment rule
+}
+
+
+
+
+(* Moved to ecLogic *)
+
+(*type pre_judgment = {
     pj_decl : l_decl;
-    pj_rule : (bool * rule) option;
+    pj_rule : (bool * int rule) option;
   }
 
 type judgment_uc = {
     juc_count  : int;
     juc_map    : pre_judgment Mint.t;
   }
-
-type judgment = judgment_uc
 
 (* -------------------------------------------------------------------- *)
 type goals = judgment_uc * int list
@@ -168,13 +176,13 @@ val get_first_goal : judgment_uc -> goal
 
 val new_goal : judgment_uc -> l_decl -> goal
 
-val upd_rule : rule -> goal -> goals
-val upd_rule_done : rule -> goal -> goals
+val upd_rule : int rule -> goal -> goals
+val upd_rule_done : int rule -> goal -> goals
 
 val upd_done : judgment_uc -> judgment_uc
 
 val open_juc  : l_decl -> judgment_uc
-val close_juc : judgment_uc -> judgment_uc
+val close_juc : judgment_uc -> judgment
 
 val find_all_goals : judgment_uc -> goals
 
@@ -202,3 +210,4 @@ val t_or     : tactic -> tactic -> tactic
 val t_close : tactic -> tactic
 
 val t_rotate : [`Left | `Right] -> goals -> goals
+*)
