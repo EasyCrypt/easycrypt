@@ -36,6 +36,17 @@ op keypairs: (pkey * skey) distr.
 op f : pkey -> randomness -> randomness.
 op finv : skey -> randomness -> randomness.
 
+pred valid_keys : (pkey * skey).
+
+axiom kg_valid : forall (pk : pkey, sk : skey), 
+in_supp (pk,sk) keypairs => valid_keys(pk,sk).
+
+axiom finvof : forall(pk : pkey, sk : skey, x : randomness),
+ valid_keys(pk,sk) => finv sk (f pk x) = x.
+
+axiom fofinv : forall(pk : pkey, sk : skey, x : randomness),
+ valid_keys(pk,sk) => f pk (finv sk x) = x.
+
 op uniform : plaintext distr = Plaintext.Dword.dword.
 op uniform_rand : randomness distr = Randomness.Dword.dword.
 
@@ -51,14 +62,13 @@ import ROM.
 import WRO_Set.
 
 module type Scheme(RO : Oracle) = {
- fun init(): unit 
  fun kg() : (pkey * skey)
  fun enc(pk:pkey, m:plaintext): ciphertext 
 }.
 
 module type Adv(ARO : ARO)  = {
- fun a1 (p : pkey) : (plaintext * plaintext)
- fun a2 (c : ciphertext) : bool
+ fun a1 (p : pkey) : (plaintext * plaintext) {ARO.o} 
+ fun a2 (c : ciphertext) : bool {ARO.o}
 }.
 
 module CPA(S : Scheme, A_ : Adv) = {
@@ -90,9 +100,6 @@ op (||) (x : randomness, y : plaintext) : ciphertext =
 module BR(R : Oracle) : Scheme(R) = {
  var r : randomness
  
- fun init() : unit = {
-  r = $uniform_rand; 
- }
  fun kg():(pkey * skey) = {
   var pk, sk:(pkey * skey);
   (pk,sk) = $keypairs;
@@ -101,6 +108,7 @@ module BR(R : Oracle) : Scheme(R) = {
  
  fun enc(pk:pkey, m:plaintext): ciphertext = {
   var h : plaintext;
+  r = $uniform_rand; 
   h  = R.o(r);
   return ((f pk r) ||   m ^^ h);
  }
@@ -148,6 +156,7 @@ proof.
  inline RO.o.
  wp;rnd;wp;skip;progress(try trivial).
 save.
+
 
 lemma eq1 : forall (A <: Adv {BR,BR2,CPA,RO,ARO}), 
 (forall (O <: ARO),
@@ -559,7 +568,7 @@ lemma eq4 : forall (A <: Adv {BR3,CPA2,RO,ARO,BR_OW}),
  bd_hoare[ O.o : true ==> true] = 1%r =>
  bd_hoare[ A(O).a2 : true ==> true] = 1%r) =>
  equiv [ CPA2(BR3,A).main ~ OW(BR_OW(A)).main : 
- (glob A){1} = (glob A){2} ==> (mem BR3.r{1} ARO.log{1} => res{2})].
+ (glob A){1} = (glob A){2} ==> (mem BR3.r{1} ARO.log{1} => res{2}) /\ ARO.log{1} = Set.empty].
 proof.
  intros A Hlossless.
  fun.
@@ -590,7 +599,8 @@ call ((glob A){1} = (glob A){2} /\ p{1} = p{2} /\
  if;[trivial|inline RO.o;wp;rnd |];wp;skip;progress(try trivial).
  inline CPA2(BR3, A).SO.init CPA2(BR3, A).ARO.init RO.init CPA2(BR3, A).SO.kg 
  BR_OW(A).ARO.init.
- wp;!2 rnd;wp;skip;progress(try trivial).
+ wp;rnd;rnd;wp;skip;progress(idtac).
+trivial.
 save.
 
 
@@ -651,3 +661,4 @@ proof.
   assumption.
 save.
 
+lemma a : false by [].
