@@ -3,6 +3,7 @@ open EcSymbols
 open EcParsetree
 open EcTypes
 open EcFol
+open EcLogic
 open EcBaseLogic
 
 (* -------------------------------------------------------------------- *)
@@ -27,7 +28,7 @@ val error : EcLocation.t -> tac_error -> 'a
 type pprovers = EcParsetree.pprover_infos -> EcProvers.prover_infos
 
 (* -------------------------------------------------------------------- *)
-val process_form : EcEnv.env -> hyps -> pformula -> ty -> form
+val process_form : EcEnv.env -> EcEnv.LDecl.hyps -> pformula -> ty -> form
 val process_formula  : EcEnv.env -> goal -> pformula -> form
 
 val process_mkn_apply :

@@ -10,7 +10,7 @@ type scope
 
 type proof_uc = {
   puc_name : string;
-  puc_jdg  : EcBaseLogic.judgment_uc * int list;
+  puc_jdg  : EcLogic.judgment_uc * int list;
 }
 
 val empty   : scope

@@ -1,7 +1,7 @@
 (* -------------------------------------------------------------------- *)
 open EcParsetree
 open EcFol
-open EcBaseLogic
+open EcLogic
 
 (* -------------------------------------------------------------------- *)
 val process_phl_formula  : EcEnv.env -> goal -> pformula -> form
