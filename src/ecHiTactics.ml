@@ -18,13 +18,13 @@ let process_case loc env pf g =
   let concl = get_concl g in
   match concl.f_node with
   | FhoareS _ ->
-    let f = process_phl_formula env g pf in
+    let f = process_phl_formula g pf in
     EcPhl.t_hoare_case f g
   | FequivS _ ->
-    let f = process_prhl_formula env g pf in
+    let f = process_prhl_formula g pf in
     EcPhl.t_equiv_case f g
   | _ ->
-    let f = process_formula env g pf in
+    let f = process_formula g pf in
     t_seq (set_loc loc (t_case env f))
       (t_simplify env EcReduction.betaiota_red) g
 

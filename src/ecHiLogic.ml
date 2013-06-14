@@ -127,9 +127,9 @@ let process_intros env pis =
     t_intros env (List.map mk_id pis)
 
 (* -------------------------------------------------------------------- *)
-let process_elim_arg env hyps oty a =
+let process_elim_arg _env hyps oty a =
   let ue  = EcUnify.UniEnv.create (Some (LDecl.tohyps hyps).h_tvar) in
-  let env = tyenv_of_hyps env hyps in
+  let env = LDecl.toenv hyps in
   match a.pl_desc, oty with
   | EA_form pf, Some (GTty ty) ->
     let ff = TT.transform env ue pf ty in
@@ -151,20 +151,19 @@ let process_elim_arg env hyps oty a =
     error a.pl_loc UnderscoreExpected
 
 (* -------------------------------------------------------------------- *)
-let process_form_opt env hyps pf oty =
-  let env = tyenv_of_hyps env hyps in
+let process_form_opt hyps pf oty =
   let ue  = EcUnify.UniEnv.create (Some (LDecl.tohyps hyps).h_tvar) in
-  let ff  = TT.transform_opt env ue pf oty in
+  let ff  = TT.transform_opt (LDecl.toenv hyps) ue pf oty in
   EcFol.Fsubst.uni (EcUnify.UniEnv.close ue) ff
 
 (* -------------------------------------------------------------------- *)
-let process_form env hyps pf ty =
-  process_form_opt env hyps pf (Some ty)
+let process_form hyps pf ty =
+  process_form_opt hyps pf (Some ty)
 
 (* -------------------------------------------------------------------- *)
-let process_formula env g pf =
+let process_formula g pf =
   let hyps = get_hyps g in
-    process_form env hyps pf tbool
+  process_form hyps pf tbool
 
 (* -------------------------------------------------------------------- *)
 let process_mkn_apply process_cut env pe (juc, _ as g) = 
@@ -192,7 +191,7 @@ let process_mkn_apply process_cut env pe (juc, _ as g) =
 
 (* -------------------------------------------------------------------- *)
 let process_apply loc env pe (_,n as g) =
-  let (juc, an), gs = process_mkn_apply process_formula env pe g in
+  let (juc, an), gs = process_mkn_apply (fun _ -> process_formula) env pe g in
     try
       set_loc loc (t_use env an gs) (juc,n)
     with tope ->
@@ -238,14 +237,14 @@ let process_apply loc env pe (_,n as g) =
 
 (* -------------------------------------------------------------------- *)
 let process_elim loc env pe (_,n as g) =
-  let (juc,an), gs = process_mkn_apply process_formula env pe g in
+  let (juc,an), gs = process_mkn_apply (fun _ -> process_formula) env pe g in
   let (_,f) = get_node (juc, an) in
   t_on_first (t_use env an gs) (set_loc loc (t_elim env f) (juc,n))
 
 (* -------------------------------------------------------------------- *)
 let process_rewrite loc env (s,pe) (_,n as g) =
   set_loc loc (t_rewrite_node env 
-                 (process_mkn_apply process_formula env pe g) s) n
+                 (process_mkn_apply (fun _ -> process_formula) env pe g) s) n
 
 (* -------------------------------------------------------------------- *)
 let process_trivial mkpv pi env g =
@@ -254,7 +253,7 @@ let process_trivial mkpv pi env g =
 
 (* -------------------------------------------------------------------- *)
 let process_cut name env phi g =
-  let phi = process_formula env g phi in
+  let phi = process_formula g phi in
   t_on_last
     (process_intros env [IPCore (lmap (fun x -> Some x) name)])
     (t_cut env phi g)
@@ -268,7 +267,7 @@ let process_generalize env l =
       let id = fst (LDecl.lookup s hyps) in
       t_generalize_hyp env id g
     | _ ->
-      let f = process_form_opt env hyps pf None in
+      let f = process_form_opt hyps pf None in
       t_generalize_form None env f g in
   t_lseq (List.rev_map pr1 l)
 
@@ -288,7 +287,7 @@ let process_exists env fs g =
 
 (* -------------------------------------------------------------------- *)
 let process_change env pf g =
-  let f = process_formula env g pf in
+  let f = process_formula g pf in
   set_loc pf.pl_loc (t_change env f) g
 
 (* -------------------------------------------------------------------- *)
@@ -325,7 +324,7 @@ let process_simplify env ri g =
 (* -------------------------------------------------------------------- *)
 let process_elimT loc env (pf,qs) g =
   let p = set_loc qs.pl_loc (EcEnv.Ax.lookup_path qs.pl_desc) env in
-  let f = process_form_opt env (get_hyps g) pf None in
+  let f = process_form_opt (get_hyps g) pf None in
   t_seq (set_loc loc (t_elimT env f p))
     (t_simplify env EcReduction.beta_red) g
 
@@ -335,49 +334,49 @@ let process_subst loc env ri g =
   else
     let hyps = get_hyps g in
     let totac ps =
-      let f = process_form_opt env hyps ps None in
+      let f = process_form_opt hyps ps None in
       try t_subst1 env (Some f) 
       with _ -> assert false (* FIXME error message *) in
     let tacs = List.map totac ri in
     set_loc loc (t_lseq tacs) g
 
 (* -------------------------------------------------------------------- *)
-let process_field (p,t,i,m,z,o,e) env g =
+let process_field (p,t,i,m,z,o,e) _env g =
   let (hyps,concl) = get_goal g in
     (match concl.f_node with
       | Fapp(eq',[arg1;arg2]) ->
         let ty = f_ty arg1 in
-        let eq = process_form env hyps e (tfun ty (tfun ty tbool)) in
+        let eq = process_form hyps e (tfun ty (tfun ty tbool)) in
         if (f_equal eq eq' ) then
-          let p' = process_form env hyps p (tfun ty (tfun ty ty)) in 
-          let t' = process_form env hyps t (tfun ty (tfun ty ty)) in 
-          let i' = process_form env hyps i (tfun ty ty) in 
-          let m' = process_form env hyps m (tfun ty ty) in 
-          let z' = process_form env hyps z ty in 
-          let o' = process_form env hyps o ty in 
+          let p' = process_form hyps p (tfun ty (tfun ty ty)) in 
+          let t' = process_form hyps t (tfun ty (tfun ty ty)) in 
+          let i' = process_form hyps i (tfun ty ty) in 
+          let m' = process_form hyps m (tfun ty ty) in 
+          let z' = process_form hyps z ty in 
+          let o' = process_form hyps o ty in 
           t_field (p',t',i',m',z',o',eq) (arg1,arg2) g
         else
           cannot_apply "field" "the eq doesn't coincide"
       | _ -> cannot_apply "field" "Think more about the goal")
 
-let process_field_simp (p,t,i,m,z,o,e) env g =
+let process_field_simp (p,t,i,m,z,o,e) _env g =
   let (hyps,concl) = get_goal g in
     (match concl.f_node with
       | Fapp(_,arg1 :: _) ->
         let ty = f_ty arg1 in
-        let e' = process_form env hyps e (tfun ty (tfun ty tbool)) in 
-        let p' = process_form env hyps p (tfun ty (tfun ty ty)) in 
-        let t' = process_form env hyps t (tfun ty (tfun ty ty)) in 
-        let i' = process_form env hyps i (tfun ty ty) in 
-        let m' = process_form env hyps m (tfun ty ty) in 
-        let z' = process_form env hyps z ty in 
-        let o' = process_form env hyps o ty in 
+        let e' = process_form hyps e (tfun ty (tfun ty tbool)) in 
+        let p' = process_form hyps p (tfun ty (tfun ty ty)) in 
+        let t' = process_form hyps t (tfun ty (tfun ty ty)) in 
+        let i' = process_form hyps i (tfun ty ty) in 
+        let m' = process_form hyps m (tfun ty ty) in 
+        let z' = process_form hyps z ty in 
+        let o' = process_form hyps o ty in 
         t_field_simp (p',t',i',m',z',o',e') concl g
       | _ -> cannot_apply "field_simplify" "Think more about the goal")
 
 (* -------------------------------------------------------------------- *)
-let trans_apply_arg (env, hyps) ue arg =
-  let env = tyenv_of_hyps env hyps in
+let trans_apply_arg (_env, hyps) ue arg =
+  let env = LDecl.toenv hyps in
 
   match unloc arg with
   | EA_form fp ->
@@ -415,8 +414,8 @@ let rec destruct_product (env, hyps) fp =
   end
 
 (* -------------------------------------------------------------------- *)
-let process_named_apply _loc (env, hyps) (fp, tvi) =
-  let env = tyenv_of_hyps env hyps in
+let process_named_apply _loc (_env, hyps) (fp, tvi) =
+  let env = LDecl.toenv hyps in
 
   let (p, typ, ax) =
     match unloc fp with
@@ -465,7 +464,7 @@ let process_named_apply _loc (env, hyps) (fp, tvi) =
 (* -------------------------------------------------------------------- *)
 let process_new_apply loc env pe g =
   let (hyps, fp) = (get_hyps g, get_concl g) in
-  let lenv = tyenv_of_hyps env hyps in
+  let lenv = LDecl.toenv hyps in
 
   let (p, typarams, ue, ax) =
     match pe.fp_kind with
@@ -473,7 +472,7 @@ let process_new_apply loc env pe g =
         process_named_apply loc (env, hyps) (fp, tyargs)
 
     | FPCut fp ->
-        let fp = process_formula env g fp in
+        let fp = process_formula g fp in
         let ue = EcUnify.UniEnv.create (Some (LDecl.tohyps hyps).h_tvar) in
           (`Cut fp, [], ue, fp)
   in

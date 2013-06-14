@@ -406,16 +406,6 @@ let t_clear ids (juc,n as g) =
   let rule = { pr_name = RN_clear ids; pr_hyps = [RA_node n1] } in
   upd_rule rule (juc,n)
 
-let tyenv_of_hyps env hyps =
-  let hyps = LDecl.tohyps hyps in
-  let add env (id,k) =
-    match k with
-    | LD_var (ty,_) -> EcEnv.Var.bind_local id ty env
-    | LD_mem mt     -> EcEnv.Memory.push (id,mt) env
-    | LD_modty (i,r)    -> EcEnv.Mod.bind_local id i r env
-    | LD_hyp   _    -> env in
-  List.fold_left add env hyps.h_local
-
 let check_modtype_restr env mp mt i restr = 
   EcTyping.check_sig_mt_cnv env mt i;
   let restr = EcEnv.NormMp.norm_restr env restr in
@@ -448,16 +438,16 @@ let check_arg do_arg env hyps s x gty a =
   | GTmem _   , AAmem m ->
       f_bind_mem s x m, RA_id m
   | GTmodty (emt, restr), AAmp (mp, mt)  ->
-    let env = tyenv_of_hyps env hyps in
+    let env = (LDecl.toenv hyps) in
     check_modtype_restr env mp mt emt restr;
     f_bind_mod s x mp, RA_mp mp
   | _ -> assert false (* FIXME error message *)
 
-let mkn_apply do_arg env (juc,n) args =
+let mkn_apply do_arg _env (juc,n) args =
   if args = [] then (juc,n), []
   else
     let hyps,concl = get_node (juc,n) in
-    let env = tyenv_of_hyps env hyps in
+    let env = LDecl.toenv hyps in
     let check_arg = check_arg do_arg env hyps in
     let rec check_apply juc s ras f args =
       match args with
@@ -792,7 +782,7 @@ let t_generalize_form name env f g =
 
 let t_generalize_hyps env ids g =
   let hyps,concl = get_goal g in
-  let env1 = tyenv_of_hyps env hyps in
+  let env1 = LDecl.toenv hyps in
   let rec aux (s:f_subst) ids = 
     match ids with
     | [] -> f_subst s concl, [], []
@@ -922,7 +912,7 @@ let t_exists = gen_t_exists (fun _ _ _ a -> a)
 
 let t_split env g =
   let hyps, concl = get_goal g in
-  let env0 = tyenv_of_hyps env hyps in
+  let env0 = LDecl.toenv hyps in
   let rec aux f =
     match f.f_node with
     | Fop(p,_) when EcPath.p_equal p p_true ->
@@ -1017,10 +1007,10 @@ let t_subst1_loc env x g =
 
 (* Substitution of f1 = Fpvar(pv,m) | Fglob(mp,m) *)
 
-let pattern_pv env hyps f1 f =
+let pattern_pv _env hyps f1 f =
   let x = EcIdent.create "x" in
   let fx = EcFol.f_local x f1.f_ty in
-  let env = tyenv_of_hyps env hyps in
+  let env = LDecl.toenv hyps in
   let f1 = EcEnv.NormMp.norm_form env f1 in
   let subst = 
     match f1.f_node with

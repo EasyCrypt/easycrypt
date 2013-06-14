@@ -16,7 +16,7 @@ module TT = EcTyping
 module UE = EcUnify.UniEnv
 
 (* -------------------------------------------------------------------- *)
-let process_phl_form ty env g phi =
+let process_phl_form ty g phi =
   let hyps, concl = get_goal g in
   let m = 
     try 
@@ -26,41 +26,41 @@ let process_phl_form ty env g phi =
       let hs = set_loc phi.pl_loc destr_bdHoareS concl in
       hs.bhs_m
   in
-  let env = EcEnv.Memory.push_active m env in
-  process_form env hyps phi ty
+  let hyps = LDecl.push_active m hyps in
+  process_form hyps phi ty
 
-let process_prhl_form ty env g phi =
+let process_prhl_form ty g phi =
   let hyps, concl = get_goal g in
   let es = set_loc phi.pl_loc destr_equivS concl in
-  let env = EcEnv.Memory.push_all [es.es_ml; es.es_mr] env in
-  process_form env hyps phi ty
+  let hyps = LDecl.push_all [es.es_ml; es.es_mr] hyps in
+  process_form hyps phi ty
 
 let process_phl_formula = process_phl_form tbool
 
 let process_prhl_formula = process_prhl_form tbool
 
-let process_phl_bd_info env g bd_info = match bd_info with
+let process_phl_bd_info _env g bd_info = match bd_info with
   | PAppNone -> AppNone
-  | PAppSingle f -> AppSingle (process_phl_form treal env g f)
+  | PAppSingle f -> AppSingle (process_phl_form treal g f)
   | PAppMult(f1,f2,f3,f4) ->
-    let f1 = process_phl_form treal env g f1 in
-    let f2 = process_phl_form treal env g f2 in
-    let f3 = process_phl_form treal env g f3 in
-    let f4 = process_phl_form treal env g f4 in
+    let f1 = process_phl_form treal g f1 in
+    let f2 = process_phl_form treal g f2 in
+    let f3 = process_phl_form treal g f3 in
+    let f4 = process_phl_form treal g f4 in
     AppMult(f1,f2,f3,f4)
 
 let process_app env dir k phi bd_info g =
   let concl = get_concl g in
   match k, bd_info with
     | Single i, PAppNone when is_hoareS concl ->
-      let phi = process_phl_formula env g phi in
+      let phi = process_phl_formula g phi in
       t_hoare_app i phi g
     | Single i, _ when is_bdHoareS concl ->
-      let phi = process_phl_formula env g phi in
+      let phi = process_phl_formula g phi in
       let bd_info = process_phl_bd_info env g bd_info in
       t_bdHoare_app dir i phi bd_info g
     | Double(i,j), PAppNone ->
-      let phi = process_prhl_formula env g phi in
+      let phi = process_prhl_formula g phi in
       t_equiv_app (i,j) phi g
     | Single _, PAppNone ->
       cannot_apply "app" "wrong position parameter"
@@ -72,22 +72,22 @@ let process_while env phi vrnt_opt info g =
   if is_hoareS concl then
     match vrnt_opt,info with
       | None, None ->
-        t_hoare_while env (process_phl_formula env g phi) g
+        t_hoare_while env (process_phl_formula g phi) g
       | _ -> cannot_apply "while" "wrong arguments"
   else if is_bdHoareS concl then
     match vrnt_opt,info with
       | Some vrnt, info ->
         t_bdHoare_while env 
-          (process_phl_formula env g phi) 
-          (process_phl_form tint env g vrnt) 
-          (omap info (fun (bd,i) -> process_phl_form treal env g bd,
-            process_phl_form tint env g i))
+          (process_phl_formula g phi) 
+          (process_phl_form tint g vrnt) 
+          (omap info (fun (bd,i) -> process_phl_form treal g bd,
+            process_phl_form tint g i))
           g
       | _ -> cannot_apply "while" "wrong arguments"
   else if is_equivS concl then
     match vrnt_opt,info with
       | None, None ->
-        t_equiv_while env (process_prhl_formula env g phi) g
+        t_equiv_while env (process_prhl_formula g phi) g
       | _ -> cannot_apply "while" "wrong arguments"
   else cannot_apply "while" "the conclusion is not a hoare or a equiv"
 
@@ -100,13 +100,13 @@ let process_fusion env (side, cpos, infos) g =
 let process_unroll env (side, cpos) g =
   t_unroll env side cpos g
 
-let process_exp env hyps e oty =
-  let env = tyenv_of_hyps env hyps in
+let process_exp hyps e oty =
+  let env = LDecl.toenv hyps in
   let ue  = EcUnify.UniEnv.create (Some (LDecl.tohyps hyps).h_tvar) in
   let e   = TT.transexpcast env ue oty e in
     EcTypes.e_uni (EcUnify.UniEnv.close ue) e
 
-let process_phl_exp env side e ty g =
+let process_phl_exp side e ty g =
   let (hyps, concl) = get_goal g in
 
   let (m, _) =
@@ -114,11 +114,11 @@ let process_phl_exp env side e ty g =
     with _ -> tacuerror "conclusion not of the right form"
   in
 
-  let env = EcEnv.Memory.push_active m env in
-    process_exp env hyps e ty
+  let hyps = LDecl.push_active m hyps in
+  process_exp hyps e ty
 
 let process_splitwhile env (b, side, cpos) g =
-  let b = process_phl_exp env side b tbool g in
+  let b = process_phl_exp side b tbool g in
     t_splitwhile b env side cpos g
 
 let process_call env side pre post g =
@@ -126,31 +126,30 @@ let process_call env side pre post g =
   match concl.f_node, side with
   | FhoareS hs, None ->
     let (_,f,_),_ = s_last_call "call" hs.hs_s in
-    let penv, qenv = EcEnv.Fun.hoareF f env in
-    let pre  = process_form penv hyps pre tbool in
-    let post = process_form qenv hyps post tbool in
+    let penv, qenv = LDecl.hoareF f hyps in
+    let pre  = process_form penv pre tbool in
+    let post = process_form qenv post tbool in
     t_hoare_call env pre post g
   | FbdHoareS bhs, None ->
     let (_,f,_),_ = s_last_call "call" bhs.bhs_s in
-    let penv, qenv = EcEnv.Fun.hoareF f env in
-    let pre  = process_form penv hyps pre tbool in
-    let post = process_form qenv hyps post tbool in
+    let penv, qenv = LDecl.hoareF f hyps in
+    let pre  = process_form penv pre tbool in
+    let post = process_form qenv post tbool in
     t_bdHoare_call env pre post None g
   | FbdHoareS _, Some _ | FhoareS _, Some _ ->
     cannot_apply "call" "side can only be given for prhl judgements"
   | FequivS es, None ->
     let (_,fl,_),(_,fr,_),_,_ = s_last_calls "call" es.es_sl es.es_sr in
-    let env' = tyenv_of_hyps env hyps in
-    let penv, qenv = EcEnv.Fun.equivF fl fr env' in
-    let pre  = process_form penv hyps pre tbool in
-    let post = process_form qenv hyps post tbool in
+    let penv, qenv = LDecl.equivF fl fr hyps in
+    let pre  = process_form penv pre tbool in
+    let post = process_form qenv post tbool in
     t_equiv_call env pre post g
   | FequivS es, Some side ->
     let fstmt = match side with true -> es.es_sl | false -> es.es_sr in
     let (_,f,_),_ = s_last_call "call" fstmt in
-    let penv, qenv = EcEnv.Fun.hoareF f env in
-    let pre  = process_form penv hyps pre tbool in
-    let post = process_form qenv hyps post tbool in
+    let penv, qenv = LDecl.hoareF f hyps in
+    let pre  = process_form penv pre tbool in
+    let post = process_form qenv post tbool in
     t_equiv_call1 env side pre post g
   | _ -> cannot_apply "call" "the conclusion is not a hoare or a equiv"
 
@@ -325,7 +324,7 @@ let process_inline env infos g =
   match infos with
   | `ByName (side, (fs, occs)) -> begin
       let hyps = get_hyps g in
-      let env' = tyenv_of_hyps env hyps in
+      let env' = LDecl.toenv hyps in
       let fs = 
         List.fold_left (fun fs f ->
           let f = EcTyping.trans_gamepath env' f in
@@ -349,11 +348,11 @@ let process_rnd side env tac_info g =
   match side, tac_info with 
     | None, (None, None) when is_hoareS concl -> t_hoare_rnd env g
     | None, (opt_bd, opt_event) when is_bdHoareS concl ->
-      let opt_bd = omap opt_bd (process_phl_form treal env g)  in
-      let event ty = omap opt_event (process_phl_form (tfun ty tbool) env g) in
+      let opt_bd = omap opt_bd (process_phl_form treal g)  in
+      let event ty = omap opt_event (process_phl_form (tfun ty tbool) g) in
       t_bd_hoare_rnd env (opt_bd,event) g
     | _ when is_equivS concl ->
-      let process_form f ty1 ty2 = process_prhl_form (tfun ty1 ty2) env g f in
+      let process_form f ty1 ty2 = process_prhl_form (tfun ty1 ty2) g f in
       let bij_info = match tac_info with
         | None,None -> None, None
         | Some f, None | None, Some f -> Some (process_form f), None
@@ -364,7 +363,7 @@ let process_rnd side env tac_info g =
 
 (* César says: too much code repetition w.r.t. ecPhl *)
 let process_bdHoare_deno env info (_,n as g) = 
-  let process_cut env g (pre,post) = 
+  let process_cut _env g (pre,post) = 
     let hyps,concl = get_goal g in
     let cmp, f, bd =
       match concl.f_node with
@@ -382,9 +381,9 @@ let process_bdHoare_deno env info (_,n as g) =
       | _ -> cannot_apply "bdHoare_deno" 
         "the conclusion is not a suitable Pr expression" in (* FIXME error message *) 
     let _,f,_,event = destr_pr f in
-    let penv, qenv = EcEnv.Fun.hoareF f env in
-    let pre  = omap_dfl pre  f_true (fun p -> process_form penv hyps p tbool) in
-    let post = omap_dfl post event  (fun p -> process_form qenv hyps p tbool) in
+    let penv, qenv = LDecl.hoareF f hyps in
+    let pre  = omap_dfl pre  f_true (fun p -> process_form penv p tbool) in
+    let post = omap_dfl post event  (fun p -> process_form qenv p tbool) in
     f_bdHoareF pre f post cmp bd 
   in
   let (juc,an), gs = process_mkn_apply process_cut env info g in
@@ -395,7 +394,7 @@ let process_bdHoare_deno env info (_,n as g) =
   t_on_first (t_use env an gs) (t_bdHoare_deno env pre post (juc,n))
 
 let process_equiv_deno env info (_,n as g) = 
-  let process_cut env g (pre,post) = 
+  let process_cut _env g (pre,post) = 
     let hyps,concl = get_goal g in
     let _op, f1, f2 =
       match concl.f_node with
@@ -404,10 +403,10 @@ let process_equiv_deno env info (_,n as g) =
       | _ -> cannot_apply "equiv_deno" "" in (* FIXME error message *) 
     let _,fl,_,_ = destr_pr f1 in
     let _,fr,_,_ = destr_pr f2 in
-    let penv, qenv = EcEnv.Fun.equivF fl fr env in
-    let pre  = omap_dfl pre  f_true (fun p -> process_form penv hyps p tbool) in
+    let penv, qenv = LDecl.equivF fl fr hyps in
+    let pre  = omap_dfl pre  f_true (fun p -> process_form penv p tbool) in
     (* FIXME: Benjamin : below: put a better default event instead of f_true *)
-    let post = omap_dfl post f_true (fun p -> process_form qenv hyps p tbool) in
+    let post = omap_dfl post f_true (fun p -> process_form qenv p tbool) in
     f_equivF pre fl fr post in
   let (juc,an), gs = process_mkn_apply process_cut env info g in
   let pre,post =
@@ -430,42 +429,42 @@ let process_conseq env info (_, n as g) =
       | [m1;m2;h] -> m1,m2,h
       | _ -> assert false in
     t_seq (t_intros_i env [m1;m2;h]) (t_hyp env h) g in
-  let process_cut env g (pre,post) =
+  let process_cut _env g (pre,post) =
     let hyps,concl = get_goal g in        
     let tac, penv, qenv, gpre, gpost, fmake = 
       match concl.f_node with
       | FhoareF hf ->
-        let penv, qenv = EcEnv.Fun.hoareF hf.hf_f env in
+        let penv, qenv = LDecl.hoareF hf.hf_f hyps in
         tac1, penv, qenv, hf.hf_pr, hf.hf_po, 
         (fun pre post -> f_hoareF pre hf.hf_f post)
       | FhoareS hs ->
-        let env = EcEnv.Memory.push_active hs.hs_m env in
+        let env = LDecl.push_active hs.hs_m hyps in
         tac1, env, env, hs.hs_pr, hs.hs_po,
         (fun pre post -> f_hoareS_r { hs with hs_pr = pre; hs_po = post })
       | FbdHoareF bhf ->
-        let penv, qenv = EcEnv.Fun.hoareF bhf.bhf_f env in
+        let penv, qenv = LDecl.hoareF bhf.bhf_f hyps in
         tac1, penv, qenv, bhf.bhf_pr, bhf.bhf_po, 
         (fun pre post -> f_bdHoareF pre bhf.bhf_f post bhf.bhf_cmp bhf.bhf_bd)
       | FbdHoareS bhs ->
-        let env = EcEnv.Memory.push_active bhs.bhs_m env in
+        let env = LDecl.push_active bhs.bhs_m hyps in
         tac1, env, env, bhs.bhs_pr, bhs.bhs_po,
         (fun pre post -> f_bdHoareS_r { bhs with bhs_pr = pre; bhs_po = post })
       | FequivF ef ->
-        let penv, qenv = EcEnv.Fun.equivF ef.ef_fl ef.ef_fr env in
+        let penv, qenv = LDecl.equivF ef.ef_fl ef.ef_fr hyps in
         tac2, penv, qenv, ef.ef_pr, ef.ef_po,
         (fun pre post -> f_equivF pre ef.ef_fl ef.ef_fr post)
       | FequivS es -> 
-        let env = EcEnv.Memory.push_all [es.es_ml; es.es_mr] env in
+        let env = LDecl.push_all [es.es_ml; es.es_mr] hyps in
         tac2, env, env, es.es_pr, es.es_po,
         (fun pre post -> f_equivS_r { es with es_pr = pre; es_po = post }) 
       | _ -> tacuerror "cannot apply conseq rule, not a phl/prhl judgement"
     in
     let pre = match pre with
       | None -> t_pre := tac; gpre 
-      | Some pre ->  process_form penv hyps pre tbool in
+      | Some pre ->  process_form penv pre tbool in
     let post = match post with
       | None -> t_post := tac; gpost 
-      | Some post ->  process_form qenv hyps post tbool in
+      | Some post ->  process_form qenv post tbool in
     fmake pre post in
   let (juc,an), gs = process_mkn_apply process_cut env info g in
   let t_conseq = 
@@ -482,30 +481,31 @@ let process_conseq env info (_, n as g) =
     [!t_pre; !t_post; t_use env an gs] (juc,n)
   
 let process_fun_abs env inv g =
-  let concl = get_concl g in
-  let env' = EcEnv.Fun.inv_memenv env in
+  let hyps,concl = get_goal g in
+  let env' = LDecl.inv_memenv hyps in
   if is_equivF concl then
-    let inv = process_formula env' g inv in
+    let inv = process_form env' inv tbool in
     t_equivF_abs env inv g
   else if is_bdHoareF concl then
-    let inv = process_formula env' g inv in
+    let inv = process_form env' inv tbool in
     t_bdHoareF_abs env inv g
   else if is_hoareF concl then
-    let inv = process_formula env' g inv in
+    let inv = process_form env' inv tbool in
     t_hoareF_abs env inv g
   else
     cannot_apply "fun" "equiv or probabilistic hoare triple was expected"
   
 let process_fun_upto env (bad, p, o) g =
-  let env' = EcEnv.Fun.inv_memenv env in 
-  let p = process_formula env' g p in
+  let hyps = get_hyps g in
+  let env' = LDecl.inv_memenv hyps in 
+  let p = process_form env' p tbool in
   let q = 
     match o with
     | None -> EcFol.f_true
-    | Some q -> process_formula env' g q in
+    | Some q -> process_form env' q tbool in
   let bad = 
-    let env =  EcEnv.Memory.push_active (EcFol.mhr,None) env in
-    process_formula env g bad in
+    let env' =  LDecl.push_active (EcFol.mhr,None) hyps in
+    process_form env' bad tbool in
   t_equivF_abs_upto env bad p q g
 
 
