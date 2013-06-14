@@ -343,11 +343,11 @@ lemma Pr4 (A<:Adv) &m :
    Pr[G2(A).main() @ &m : res] = 1%r / 2%r.
 proof.
  intros Ha1 Ha2.
- bdhoare_deno (_: true ==> _); last split.
+ bdhoare_deno (_: true ==> _); last trivial.
  apply (Pr4_aux(<:A) _ _).
-  apply Ha1.
-  apply Ha2.
- split.
+  assumption.
+  assumption.
+ trivial.
 save.
 
 lemma Conclusion1 (A<:Adv) &m : 
