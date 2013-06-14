@@ -241,8 +241,9 @@ let pp_path fmt p =
 
 (* -------------------------------------------------------------------- *)
 let pp_topmod ppe fmt p =
+(*  Format.fprintf fmt "%s" (EcPath.m_tostring p) *)
   Format.fprintf fmt "%a"
-    EcSymbols.pp_msymbol (PPEnv.mod_symb ppe p)
+    EcSymbols.pp_msymbol (PPEnv.mod_symb ppe p) 
 
 (* -------------------------------------------------------------------- *)
 let pp_tyvar ppe fmt x =
@@ -263,6 +264,7 @@ let pp_funname (ppe : PPEnv.t) fmt p =
 
 (* -------------------------------------------------------------------- *)
 let pp_pv (ppe : PPEnv.t) fmt p =
+(*  Format.fprintf fmt "%s" (EcPath.x_tostring p.pv_name) *)
   let k = p.pv_kind in
   let p = p.pv_name in
 

@@ -48,6 +48,11 @@ module PVM = struct
   let find env pv m s =
     M.find (pvm env pv m) s
 
+  let check_binding m s = 
+    M.iter (fun (_,m') f ->
+      assert (not(EcIdent.id_equal m m') && 
+              not (EcIdent.Mid.mem m f.f_fv))) s
+
   let subst env (s : form subst) = 
     Hf.memo_rec 107 (fun aux f ->
       match f.f_node with
@@ -58,7 +63,28 @@ module PVM = struct
         if f_equal f f' then
           (try M.find (MSmod mp,m) s with Not_found -> f)
         else aux f'
-      | FhoareF _ | FhoareS _ | FequivF _ | FequivS _ | Fpr _ -> assert false
+      | FequivF _ ->
+        check_binding EcFol.mleft s;
+        check_binding EcFol.mright s;
+        EcFol.f_map (fun ty -> ty) aux f
+      | FequivS es ->
+        check_binding (fst es.es_ml) s;
+        check_binding (fst es.es_mr) s;
+        EcFol.f_map (fun ty -> ty) aux f
+      | FhoareF _ | FbdHoareF _ ->
+        check_binding EcFol.mhr s;
+        EcFol.f_map (fun ty -> ty) aux f
+      | FhoareS hs ->
+        check_binding (fst hs.hs_m) s;
+        EcFol.f_map (fun ty -> ty) aux f
+      | FbdHoareS hs -> 
+        check_binding (fst hs.bhs_m) s;
+        EcFol.f_map (fun ty -> ty) aux f
+      | Fpr(m,_,_,_) ->
+        check_binding EcFol.mhr s;
+        check_binding m s;
+        EcFol.f_map (fun ty -> ty) aux f
+
       | _ -> EcFol.f_map (fun ty -> ty) aux f)
 
   let rec esubst env me (s : expr subst) e =
@@ -199,13 +225,4 @@ module PV = struct
     assert (check modi.glob topm);
     assert (check topvg topm)
       
-  let check_depend env fv mp = 
-    (* FIXME error message *)
-    let check_v v _ty =
-      assert (is_glob v);
-      let top = EcPath.m_functor v.pv_name.EcPath.x_top in
-      assert (disjoint_g env mp top) in
-    M.iter check_v fv.pv;
-    let check_m m = assert (disjoint_g env mp m) in
-    EcPath.Sm.iter check_m fv.glob
 end

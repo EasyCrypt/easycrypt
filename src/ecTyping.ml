@@ -973,7 +973,7 @@ let rec transmod (env : EcEnv.env) (x : symbol) (me : pmodule_expr) =
 
   | Pm_struct st ->
     let res = transstruct env x st in
-(*    let sig_ = res.me_sig in
+(*   let sig_ = res.me_sig in
     Format.printf "module %s : @." x;
     List.iter (fun (Tys_function(fs,call)) ->
       Format.printf "   fun %s { " fs.fs_name;

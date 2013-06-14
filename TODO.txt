@@ -1,30 +1,25 @@
+Discussion la semaine prochaine:
+  - Pressentation du code (important pour les developpeurs)
+  - Reviews de theories
+  - Reviews des tactics elementaires
+  - Reviews des tactics utilisateurs
+
 Verifier les fonction add dans ecEnv.
 
 Printer :
-  x[y] --> x.[y]
-  Notation x T.(==) y invalid.
-  Les variables binded doivent etre renomees pour pas avoir de clash avec
-  les hyp
 
 Parser  : 
-+  introduire une notation looslessA : 
++  introduire une notation looslessA A.f : 
     (forall (O<:O),  bd_hoare [O.hashA : true ==> true] [=] [1%r] => 
       bd_hoare [A(O).a : true ==> true] [=] [1%r]).
-
-
-+ could be greate to allow the following syntaxe :
-  lemma foo (x:int) : concl 
-  proof.
-  a short cut for 
-  lemma foo : forall (x:int), concl
-  proof.
-    intros x.
 
 
 Message d'erreur:
 (* rewrite (Set.add_mem F2.xs{m2} x{m2} RO.logA{m2}). *)
 (* FIXME error message *)  
  
+
+
 * Pierre-Yves
 
 - reprendre la partie module -> finir la partie typage
@@ -36,26 +31,21 @@ Message d'erreur:
 * Benjamin
 
 tactic :
- concl := (x1,x2) = (y1,y2) --> x1 = y1
-                                x2 = y2
-  split 
 
  add tactic like : intros \ for intros H;clear H.
 
+ Deplacer le module PV et PVM dans un fichier separer avant (ecLogic.ml)
+ Permet de faire subst avec des pv.
 
   + tactic phl/prhl 
-    -
     - eqobs_in
     - not_modify
     - hoare -> equiv
-    - inlining
     - derandomize
-    - call for adversary
     - rename trivial into prover 
     - use trivial for more sofisticated tactic:
           simplify; intuition; subst; try split;prover  
     - subst should also works for program variable.
-
 
   + tactic
     - set 
