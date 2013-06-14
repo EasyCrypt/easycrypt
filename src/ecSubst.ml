@@ -86,8 +86,8 @@ let subst_variable (s : _subst) (x : variable) =
 let subst_fun_uses (s : _subst) (u : uses) =
   let x_subst = EcPath.x_subst s.s_fmp in
   let calls  = List.map x_subst u.us_calls
-  and reads  = Sx.fold (fun p m -> Sx.add (x_subst p) m) Sx.empty u.us_reads
-  and writes = Sx.fold (fun p m -> Sx.add (x_subst p) m) Sx.empty u.us_writes in
+  and reads  = Sx.fold (fun p m -> Sx.add (x_subst p) m) u.us_reads Sx.empty
+  and writes = Sx.fold (fun p m -> Sx.add (x_subst p) m) u.us_writes Sx.empty in
 
     { us_calls = calls; us_reads = reads; us_writes = writes; }
 
