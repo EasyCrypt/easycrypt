@@ -334,25 +334,28 @@ module Tactics = struct
 
   let pi scope pi = Prover.mk_prover_info scope pi
 
-  let process_logic scope env (juc, ns) loc tacs =
+  let process_tactic_on_goal scope env (juc, ns) loc tacs =
     match ns with
     | []      -> error loc NoCurrentGoal
     | n :: ns ->
 
-      let juc = process_logic_tacs (pi scope) env tacs (juc, [n]) in
+      let juc = process_tactics (pi scope) env tacs (juc, [n]) in
       let juc = fstmap EcBaseLogic.upd_done juc in
       let juc = (fst juc, (snd juc) @ ns) in
 
       sndmap (List.filter (List.mem^~ (snd (find_all_goals (fst juc))))) juc
 
-  let process scope tac =
+  let process (scope : scope) (tac : ptactic list) =
     if Check_mode.check scope.sc_options then begin
       check_state `InProof "proof script" scope;
-      let loc = (oget (List.ohead tac)).pl_loc in
+      let loc = (oget (List.ohead tac)).pt_core.pl_loc in
       let puc = oget scope.sc_pr_uc in
-      let juc = process_logic scope scope.sc_env puc.puc_jdg loc tac in
+      let juc = process_tactic_on_goal scope scope.sc_env puc.puc_jdg loc tac in
         { scope with sc_pr_uc = Some { puc with puc_jdg = juc } }
     end else scope
+
+  let process_core (scope : scope) (ts : ptactic_core list) =
+    process scope (List.map (fun t -> { pt_core = t; pt_intros = []; }) ts)
 end
 
 (* -------------------------------------------------------------------- *)
@@ -684,12 +687,12 @@ module Ax = struct
     let ue = TT.ue_for_decl scope.sc_env (loc, ax.pa_tyvars) in
     let pconcl, tintro = 
       match ax.pa_vars with
-      | None -> 
+      | None ->
         ax.pa_formula, { pl_loc = loc; pl_desc = Pidtac None } 
       | Some vs -> 
         let pconcl = { pl_loc = loc; pl_desc = PFforall(vs, ax.pa_formula) } in
         let vs = List.map (fun (ids,_) -> 
-          List.map (fun x -> {pl_desc = Some x.pl_desc; pl_loc = x.pl_loc}) ids)
+          List.map (fun x -> IPCore {pl_desc = Some x.pl_desc; pl_loc = x.pl_loc}) ids)
           vs in
         pconcl, { pl_loc=loc; pl_desc = Plogic (Pintro (List.flatten vs)) } in
     let concl = TT.transformula scope.sc_env ue pconcl in
@@ -699,9 +702,9 @@ module Ax = struct
 
     match ax.pa_kind with
     | PILemma when check ->
-      let scope = start_lemma scope (unloc ax.pa_name) tparams concl in
-      let scope = Tactics.process scope [tintro] in
-      None, scope
+        let scope = start_lemma scope (unloc ax.pa_name) tparams concl in
+        let scope = Tactics.process_core scope [tintro] in
+          None, scope
 
     | PLemma tc when check ->
         let tc =
@@ -709,7 +712,9 @@ module Ax = struct
           | Some tc -> [tc]
           | None    ->
               let dtc = Plogic (Ptrivial empty_pprover) in
-                [tintro; { pl_loc = loc; pl_desc = dtc }]
+              let dtc = [tintro; { pl_loc = loc; pl_desc = dtc }] in
+              let dtc = List.map (fun t -> { pt_core = t; pt_intros = []; }) dtc in
+                dtc
         in
 
         let scope = start_lemma scope (unloc ax.pa_name) tparams concl in

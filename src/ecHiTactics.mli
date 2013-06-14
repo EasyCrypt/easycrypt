@@ -2,7 +2,7 @@
 open EcSymbols
 
 (* -------------------------------------------------------------------- *)
-val process_logic_tacs :
+val process_tactics :
      EcHiLogic.pprovers
   -> EcEnv.env
   -> EcParsetree.ptactic list
