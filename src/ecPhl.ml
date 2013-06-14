@@ -1011,9 +1011,10 @@ let subst_args_call env m f =
   List.fold_right2 (fun v e s ->
     PVM.add_none env (pv_loc f v.v_name) m (form_of_expr m e) s)
   
-let t_hoare_call env fpre fpost g =
+let t_hoare_call _env fpre fpost g =
   (* FIXME : check the well formess of the pre and the post ? *)
-  let concl = get_concl g in
+  let hyps,concl = get_goal g in
+  let env = LDecl.toenv hyps in
   let hs = destr_hoareS concl in
   let (lp,f,args),s = s_last_call "call" hs.hs_s in
   let m = EcMemory.memory hs.hs_m in
