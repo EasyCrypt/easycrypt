@@ -241,8 +241,9 @@ let pp_path fmt p =
 
 (* -------------------------------------------------------------------- *)
 let pp_topmod ppe fmt p =
+(*  Format.fprintf fmt "%s" (EcPath.m_tostring p) *)
   Format.fprintf fmt "%a"
-    EcSymbols.pp_msymbol (PPEnv.mod_symb ppe p)
+    EcSymbols.pp_msymbol (PPEnv.mod_symb ppe p) 
 
 (* -------------------------------------------------------------------- *)
 let pp_tyvar ppe fmt x =

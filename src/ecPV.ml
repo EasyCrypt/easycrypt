@@ -225,13 +225,4 @@ module PV = struct
     assert (check modi.glob topm);
     assert (check topvg topm)
       
-  let check_depend env fv mp = 
-    (* FIXME error message *)
-    let check_v v _ty =
-      assert (is_glob v);
-      let top = EcPath.m_functor v.pv_name.EcPath.x_top in
-      assert (disjoint_g env mp top) in
-    M.iter check_v fv.pv;
-    let check_m m = assert (disjoint_g env mp m) in
-    EcPath.Sm.iter check_m fv.glob
 end

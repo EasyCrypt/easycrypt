@@ -517,25 +517,47 @@ let t_fun_def env g =
      - ensure that oracle do not write the adversary state
  *)
 
-let check_adv env fl fr = 
-  let fl = EcEnv.NormMp.norm_xpath env fl in
-  let fr = EcEnv.NormMp.norm_xpath env fr in
-  let subl = fl.EcPath.x_sub in
-  let subr = fr.EcPath.x_sub in
-  let topl = EcPath.m_functor fl.EcPath.x_top in
-  let topr = EcPath.m_functor fr.EcPath.x_top in
-  assert (EcPath.p_equal subl subr && EcPath.m_equal topl topr);  
-  fl,topl,fr,topr
-                                               (* FIXME error message *)
 
-
+let check_depend env fv mp = 
+    let restr = 
+      match (EcEnv.Mod.by_mpath mp env).me_body with
+      | EcModules.ME_Decl(_,restr) -> restr 
+      | _ -> assert false in
+    let check_v v _ = 
+      assert (is_glob v);
+      let top = EcPath.m_functor v.pv_name.EcPath.x_top in
+      if not (EcPath.Sm.mem top restr) then
+        let ppe = EcPrinting.PPEnv.ofenv env in
+        EcLogic.tacuerror "The module %a can write %a (add restriction %a)"
+          (EcPrinting.pp_topmod ppe) mp
+          (EcPrinting.pp_pv ppe) v
+          (EcPrinting.pp_topmod ppe) top in        
+    PV.M.iter check_v fv.PV.pv;
+    let check_m mp' = 
+      if not (EcPath.Sm.mem mp' restr) then 
+        let restr' = 
+          match (EcEnv.Mod.by_mpath mp' env).me_body with
+          | EcModules.ME_Decl(_,restr') -> restr' 
+          | _ -> assert false in
+        if not (EcPath.Sm.mem mp restr') then 
+          let ppe = EcPrinting.PPEnv.ofenv env in
+          EcLogic.tacuerror 
+            "The module %a can write %a (add restriction %a to %a, or %a to %a)"
+            (EcPrinting.pp_topmod ppe) mp
+            (EcPrinting.pp_topmod ppe) mp'
+            (EcPrinting.pp_topmod ppe) mp
+            (EcPrinting.pp_topmod ppe) mp' 
+            (EcPrinting.pp_topmod ppe) mp'
+            (EcPrinting.pp_topmod ppe) mp
+    in            
+    EcPath.Sm.iter check_m fv.PV.glob
 
 let hoareF_abs_spec env f inv = 
   let f = EcEnv.NormMp.norm_xpath env f in
   let top = EcPath.m_functor f.EcPath.x_top in
   let m = mhr in
   let fv = PV.fv env m inv in
-  PV.check_depend env fv top;
+  check_depend env fv top;
   (* TODO check there is only global variable *)
   let def = EcEnv.Fun.by_xpath f env in
   let oi = 
@@ -560,7 +582,7 @@ let bdHoareF_abs_spec env f inv =
   let top = EcPath.m_functor f.EcPath.x_top in
   let m = mhr in
   let fv = PV.fv env m inv in
-  PV.check_depend env fv top;
+  check_depend env fv top;
   (* TODO check there is only global variable *)
   let def = EcEnv.Fun.by_xpath f env in
   let oi = 
@@ -585,13 +607,24 @@ let t_bdHoareF_abs env inv g =
       cannot_apply "fun" "expected \"= 1\" as bound"
 
  
+let check_adv env fl fr = 
+  let fl = EcEnv.NormMp.norm_xpath env fl in
+  let fr = EcEnv.NormMp.norm_xpath env fr in
+  let subl = fl.EcPath.x_sub in
+  let subr = fr.EcPath.x_sub in
+  let topl = EcPath.m_functor fl.EcPath.x_top in
+  let topr = EcPath.m_functor fr.EcPath.x_top in
+  assert (EcPath.p_equal subl subr && EcPath.m_equal topl topr);  
+  fl,topl,fr,topr
+                                               (* FIXME error message *)
+
 let equivF_abs_spec env fl fr inv = 
   let fl,topl,fr,topr = check_adv env fl fr in
   let ml, mr = mleft, mright in
   let fvl = PV.fv env ml inv in
   let fvr = PV.fv env mr inv in
-  PV.check_depend env fvl topl;
-  PV.check_depend env fvr topr;
+  check_depend env fvl topl;
+  check_depend env fvr topr;
   (* TODO check there is only global variable *)
   let defl, defr = EcEnv.Fun.by_xpath fl env, EcEnv.Fun.by_xpath fr env in
   let oil, oir = 
@@ -632,8 +665,8 @@ let equivF_abs_upto env fl fr bad invP invQ =
   let allinv = f_ands [bad2; invP; invQ] in
   let fvl = PV.fv env ml allinv in
   let fvr = PV.fv env mr allinv in
-  PV.check_depend env fvl topl;
-  PV.check_depend env fvr topr;
+  check_depend env fvl topl;
+  check_depend env fvr topr;
   (* TODO check there is only global variable *)
   let defl, defr = EcEnv.Fun.by_xpath fl env, EcEnv.Fun.by_xpath fr env in
   let oil, oir = 
