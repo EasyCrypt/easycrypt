@@ -368,6 +368,7 @@ let t_intros env ids (juc,n as g) =
   let add_local s id x gty =
     let id   = id.pl_desc in
     let name = EcIdent.name id in
+    let gty = gty_subst s gty in
     match gty with
     | GTty ty ->
         if name <> "_" && not (EcIo.is_sym_ident name) then
@@ -404,7 +405,7 @@ let t_intros env ids (juc,n as g) =
       else if is_let1 concl then
         let x,ty,e1,concl = destr_let1 concl in
         let s = f_bind_local s x (f_local id.pl_desc ty) in
-        let hyps = add_ld id (LD_var (ty, Some (f_subst s e1))) hyps in
+        let hyps = add_ld id (LD_var (s.fs_ty ty, Some (f_subst s e1))) hyps in
         check_intros hyps ids' s concl
       else if s == f_subst_id then
         match h_red_opt full_red env hyps concl with
