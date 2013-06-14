@@ -150,7 +150,12 @@ type judgment = {
   j_rule : judgment rule
 }
 
-type pre_judgment = {
+
+
+
+(* Moved to ecLogic *)
+
+(*type pre_judgment = {
     pj_decl : l_decl;
     pj_rule : (bool * int rule) option;
   }
@@ -205,3 +210,4 @@ val t_or     : tactic -> tactic -> tactic
 val t_close : tactic -> tactic
 
 val t_rotate : [`Left | `Right] -> goals -> goals
+*)

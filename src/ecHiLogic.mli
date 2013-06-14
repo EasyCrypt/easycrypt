@@ -3,6 +3,7 @@ open EcSymbols
 open EcParsetree
 open EcTypes
 open EcFol
+open EcLogic
 open EcBaseLogic
 
 (* -------------------------------------------------------------------- *)

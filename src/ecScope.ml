@@ -170,7 +170,7 @@ end
 (* -------------------------------------------------------------------- *)
 type proof_uc = {
   puc_name : string;
-  puc_jdg  : EcBaseLogic.judgment_uc * int list;
+  puc_jdg  : EcLogic.judgment_uc * int list;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -328,7 +328,7 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Tactics = struct
-  open EcBaseLogic
+  open EcLogic
   open EcHiLogic
   open EcHiTactics
 
@@ -340,7 +340,7 @@ module Tactics = struct
     | n :: ns ->
 
       let juc = process_tactics (pi scope) env tacs (juc, [n]) in
-      let juc = fstmap EcBaseLogic.upd_done juc in
+      let juc = fstmap EcLogic.upd_done juc in
       let juc = (fst juc, (snd juc) @ ns) in
 
       sndmap (List.filter (List.mem^~ (snd (find_all_goals (fst juc))))) juc
@@ -659,7 +659,7 @@ module Ax = struct
                  EcBaseLogic.h_local = []; } in
     let puc = {
       puc_name = name ;
-      puc_jdg  = (EcBaseLogic.open_juc (hyps, concl), [0])
+      puc_jdg  = (EcLogic.open_juc (hyps, concl), [0])
     } in
 
     { scope with sc_pr_uc = Some puc }
@@ -668,8 +668,8 @@ module Ax = struct
     if Check_mode.check scope.sc_options then begin
       check_state `InProof "save" scope;
       let { puc_name = name; puc_jdg = (juc, _) } = oget scope.sc_pr_uc in
-        let pr = EcBaseLogic.close_juc juc in
-        let hyps,concl = (EcBaseLogic.get_goal (juc,0)).EcBaseLogic.pj_decl in
+        let pr = EcLogic.close_juc juc in
+        let hyps,concl = (EcLogic.get_pj (juc,0)).EcLogic.pj_decl in
         let tparams = hyps.EcBaseLogic.h_tvar in
         assert (hyps.EcBaseLogic.h_local = []);
         let axd = { ax_tparams = tparams;
