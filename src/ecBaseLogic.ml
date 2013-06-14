@@ -257,31 +257,34 @@ type rule_name =
 
   | RN_bhl_rnd of (EcFol.form option * EcFol.form)
 
-and rule_arg = 
+type 'a rule_arg = 
   | RA_form of EcFol.form             (* formula             *)
   | RA_id   of EcIdent.t              (* local ident         *)
   | RA_mp   of EcPath.mpath           (* module              *)
-  | RA_node of int                    (* sub-derivation      *)
+  | RA_node of 'a                    (* sub-derivation      *)
 
 
-type rule = {
+type 'a rule = {
   pr_name : rule_name;
-  pr_hyps : rule_arg list
+  pr_hyps : 'a rule_arg list
 }
 
 type l_decl = hyps * form
 
+type judgment = {
+  j_decl : l_decl;
+  j_rule : judgment rule
+}
+
 type pre_judgment = {
   pj_decl : l_decl;
-  pj_rule : (bool * rule) option;
+  pj_rule : (bool * int rule) option;
 }
 
 type judgment_uc = {
   juc_count : int;
   juc_map   : pre_judgment Mint.t;
 }
-
-type judgment = judgment_uc
 
 type goals  = judgment_uc * int list
 type goal   = judgment_uc * int 
@@ -358,9 +361,23 @@ let find_all_goals juc =
   juc, List.rev (aux [] 0)
 
 let close_juc juc =
-  let juc = upd_done juc in
-  try let (_,n) = get_first_goal juc in raise (StillOpenGoal n) 
-  with (NotAnOpenGoal None) -> juc
+  let rec close n = 
+    let pj = get_goal (juc,n) in
+    let hyps,concl = pj.pj_decl in
+    let rule = 
+      match pj.pj_rule with
+      | None -> raise (StillOpenGoal n)
+      | Some (_,r) ->
+        { pr_name = r.pr_name;
+          pr_hyps = List.map close_arg r.pr_hyps } in
+    { j_decl = hyps, concl;
+      j_rule = rule }
+  and close_arg = function
+    | RA_form f -> RA_form f
+    | RA_id id  -> RA_id id
+    | RA_mp mp  -> RA_mp mp
+    | RA_node n -> RA_node (close n) in
+  close 0
 
 let upd_rule d pr (juc,n as g) = 
   let pj = get_open_goal g in
