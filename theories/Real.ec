@@ -34,6 +34,11 @@ theory PowerInt.
 end PowerInt.
 export PowerInt.
 
+theory Square.
+  import why3 "real" "Square"
+    op "sqrt" as "sqrt".
+end Square.
+export Square.
 
 op exp : real -> real.
 (* TODO : add axioms*)
