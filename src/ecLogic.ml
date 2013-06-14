@@ -212,13 +212,12 @@ let t_close t g =
   | (juc, []    ) -> (juc, [])
   | (_  , i :: _) -> raise (StillOpenGoal i)
 
-let t_rotate mode (j, ns) =
+let t_rotate mode _ (j, ns) =
   let mrev = match mode with `Left -> identity | `Right -> List.rev in
 
   match mrev ns with
   | []      -> (j, ns)
   | n :: ns -> (j, mrev (ns @ [n]))
-
 
 (* -------------------------------------------------------------------- *)
 let get_node  g = (get_pj g).pj_decl
@@ -438,6 +437,8 @@ type app_arg =
   | AAmem  of EcIdent.t
   | AAmp   of EcPath.mpath * EcModules.module_sig 
   | AAnode
+
+type 'a app_arg_cb = EcEnv.env -> LDecl.hyps -> gty option -> 'a -> app_arg
 
 let check_arg do_arg env hyps s x gty a =
   let a = do_arg env hyps (Some gty) a in
