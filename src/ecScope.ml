@@ -169,8 +169,9 @@ end
 
 (* -------------------------------------------------------------------- *)
 type proof_uc = {
-  puc_name : string;
-  puc_jdg  : EcLogic.judgment_uc * int list;
+  puc_name   : string;
+  puc_jdg    : EcLogic.judgment_uc * int list;
+  puc_strict : bool option;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -345,17 +346,31 @@ module Tactics = struct
 
       sndmap (List.filter (List.mem^~ (snd (find_all_goals (fst juc))))) juc
 
-  let process (scope : scope) (tac : ptactic list) =
+  let process ?(mark = false) (scope : scope) (tac : ptactic list) =
     if Check_mode.check scope.sc_options then begin
       check_state `InProof "proof script" scope;
       let loc = (oget (List.ohead tac)).pt_core.pl_loc in
       let puc = oget scope.sc_pr_uc in
       let juc = process_tactic_on_goal scope scope.sc_env puc.puc_jdg loc tac in
-        { scope with sc_pr_uc = Some { puc with puc_jdg = juc } }
+      let puc = { puc with puc_jdg = juc; } in
+      let puc = { puc with puc_strict =
+                             if mark then Some (odfl false puc.puc_strict)
+                                     else puc.puc_strict }
+      in
+        { scope with sc_pr_uc = Some puc; }
     end else scope
 
-  let process_core (scope : scope) (ts : ptactic_core list) =
-    process scope (List.map (fun t -> { pt_core = t; pt_intros = []; }) ts)
+  let process_core ?mark (scope : scope) (ts : ptactic_core list) =
+    process ?mark scope (List.map (fun t -> { pt_core = t; pt_intros = []; }) ts)
+
+  let proof (scope : scope) (strict : bool) =
+    if Check_mode.check scope.sc_options then begin
+      check_state `InProof "proof script" scope;
+      let puc = oget scope.sc_pr_uc in
+        if puc.puc_strict <> None then
+          hierror "[proof] can only be used at beginning of a proof script";
+        { scope with sc_pr_uc = Some { puc with puc_strict = Some strict; } }
+    end else scope
 end
 
 (* -------------------------------------------------------------------- *)
@@ -657,8 +672,9 @@ module Ax = struct
   let start_lemma scope name tparams concl =
     let hyps = EcEnv.LDecl.init scope.sc_env tparams in
     let puc = {
-      puc_name = name ;
-      puc_jdg  = (EcLogic.open_juc (hyps, concl), [0])
+      puc_name   = name;
+      puc_jdg    = (EcLogic.open_juc (hyps, concl), [0]);
+      puc_strict = None;
     } in
 
     { scope with sc_pr_uc = Some puc }
@@ -703,7 +719,7 @@ module Ax = struct
     match ax.pa_kind with
     | PILemma when check ->
         let scope = start_lemma scope (unloc ax.pa_name) tparams concl in
-        let scope = Tactics.process_core scope [tintro] in
+        let scope = Tactics.process_core ~mark:false scope [tintro] in
           None, scope
 
     | PLemma tc when check ->
@@ -718,7 +734,7 @@ module Ax = struct
         in
 
         let scope = start_lemma scope (unloc ax.pa_name) tparams concl in
-        let scope = Tactics.process scope tc in
+        let scope = Tactics.process ~mark:false scope tc in
           save scope loc
 
     | _ ->

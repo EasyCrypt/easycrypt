@@ -484,7 +484,7 @@ type global =
   | GthExport    of pqsymbol
   | GthClone     of theory_cloning
   | GthW3        of (string list * string * w3_renaming list)
-  | Gtactics     of [`Proof | `Actual of ptactic list]
+  | Gtactics     of [`Proof of bool | `Actual of ptactic list]
   | Gprover_info of pprover_infos
   | Gcheckproof  of bool
   | Gsave        of EcLocation.t

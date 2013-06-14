@@ -223,7 +223,7 @@ and process_w3_import (scope : EcScope.scope) (p, f, r) =
 and process_tactics (scope : EcScope.scope) t = 
   match t with
   | `Actual t -> EcScope.Tactics.process scope t
-  | `Proof    -> scope (* FIXME: check that we are at the beginning of proof script*)
+  | `Proof  b -> EcScope.Tactics.proof   scope b
 
 (* -------------------------------------------------------------------- *)
 and process_save (scope : EcScope.scope) loc =
