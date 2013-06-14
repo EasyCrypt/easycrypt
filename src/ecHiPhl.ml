@@ -102,7 +102,7 @@ let process_unroll env (side, cpos) g =
 
 let process_exp env hyps e oty =
   let env = tyenv_of_hyps env hyps in
-  let ue  = EcUnify.UniEnv.create (Some hyps.h_tvar) in
+  let ue  = EcUnify.UniEnv.create (Some (LDecl.tohyps hyps).h_tvar) in
   let e   = TT.transexpcast env ue oty e in
     EcTypes.e_uni (EcUnify.UniEnv.close ue) e
 

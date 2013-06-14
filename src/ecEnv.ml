@@ -2113,24 +2113,6 @@ let bindall (items : (symbol * ebinding) list) (env : env) =
   List.fold_left ((^~) bind1) env items
 
 (* -------------------------------------------------------------------- *)
-let norm_l_decl env (hyps,concl) =
-  let norm = NormMp.norm_form env in
-  let onh (x,lk) =
-    match lk with
-    | LD_var (ty,o) -> x, LD_var (ty, omap o norm)
-    | LD_mem _ -> x, lk
-    | LD_modty _ -> x, lk
-    | LD_hyp f -> x, LD_hyp (norm f) in
-  let concl = norm concl in
-  let lhyps = List.map onh hyps.h_local in
-  ({ hyps with h_local = lhyps}, concl)
-
-let check_goal env pi ld =
-  
-  let ld = (norm_l_decl env ld) in
-  let res = EcWhy3.check_goal (Mod.me_of_mt env) env.env_w3 pi ld in
-  res
-
 
 module LDecl = struct
   open EcIdent
@@ -2278,4 +2260,58 @@ module LDecl = struct
       LD_modty(p',r')
     | LD_hyp f -> LD_hyp (f_subst s f)
 
+  type hyps = {
+    le_hyps : EcBaseLogic.hyps
+  }
+
+  let tohyps lenv = lenv.le_hyps
+  let init env tparams = 
+    { le_hyps = { h_tvar = tparams; h_local = [] }; }
+
+  let add_local x k h = 
+    { le_hyps = add_local x k (tohyps h) }
+
+  let lookup s h = lookup s (tohyps h)
+
+  let reducible_var x h = reducible_var x (tohyps h)
+    
+  let reduce_var x h = reduce_var x (tohyps h)
+
+  let lookup_var s h = lookup_var s (tohyps h)
+
+  let lookup_by_id x h = lookup_by_id x (tohyps h)
+
+  let lookup_hyp_by_id x h = lookup_hyp_by_id x (tohyps h)
+
+  let has_hyp s h = has_hyp s (tohyps h)
+  let lookup_hyp s h = lookup_hyp s (tohyps h)
+
+  let has_symbol s h = has_symbol s (tohyps h)
+
+  let fresh_id  h s = fresh_id (tohyps h) s 
+  let fresh_ids h ls = fresh_ids (tohyps h) ls
+
+  let clear sid h = { 
+    le_hyps = clear sid (tohyps h)
+  }
+
 end
+
+(* -------------------------------------------------------------------- *)
+let norm_l_decl env (hyps,concl) =
+  let norm = NormMp.norm_form env in
+  let onh (x,lk) =
+    match lk with
+    | LD_var (ty,o) -> x, LD_var (ty, omap o norm)
+    | LD_mem _ -> x, lk
+    | LD_modty _ -> x, lk
+    | LD_hyp f -> x, LD_hyp (norm f) in
+  let concl = norm concl in
+  let lhyps = List.map onh hyps.h_local in
+  ({ hyps with h_local = lhyps}, concl)
+
+let check_goal env pi (hyps,concl) =
+  let ld = LDecl.tohyps hyps, concl in
+  let ld = (norm_l_decl env ld) in
+  let res = EcWhy3.check_goal (Mod.me_of_mt env) env.env_w3 pi ld in
+  res

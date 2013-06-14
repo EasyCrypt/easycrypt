@@ -74,7 +74,7 @@ let error loc e = EcLocation.locate_error loc (TacError e)
 
 (* -------------------------------------------------------------------- *)
 let process_tyargs env hyps tvi =
-  let ue = EcUnify.UniEnv.create (Some hyps.h_tvar) in
+  let ue = EcUnify.UniEnv.create (Some (LDecl.tohyps hyps).h_tvar) in
     omap tvi (TT.transtvi env ue)
 
 (* -------------------------------------------------------------------- *)
@@ -128,7 +128,7 @@ let process_intros env pis =
 
 (* -------------------------------------------------------------------- *)
 let process_elim_arg env hyps oty a =
-  let ue  = EcUnify.UniEnv.create (Some hyps.h_tvar) in
+  let ue  = EcUnify.UniEnv.create (Some (LDecl.tohyps hyps).h_tvar) in
   let env = tyenv_of_hyps env hyps in
   match a.pl_desc, oty with
   | EA_form pf, Some (GTty ty) ->
@@ -153,7 +153,7 @@ let process_elim_arg env hyps oty a =
 (* -------------------------------------------------------------------- *)
 let process_form_opt env hyps pf oty =
   let env = tyenv_of_hyps env hyps in
-  let ue  = EcUnify.UniEnv.create (Some hyps.h_tvar) in
+  let ue  = EcUnify.UniEnv.create (Some (LDecl.tohyps hyps).h_tvar) in
   let ff  = TT.transform_opt env ue pf oty in
   EcFol.Fsubst.uni (EcUnify.UniEnv.close ue) ff
 
@@ -433,7 +433,7 @@ let process_named_apply _loc (env, hyps) (fp, tvi) =
     end
   in
 
-  let ue  = EcUnify.UniEnv.create (Some hyps.h_tvar) in
+  let ue  = EcUnify.UniEnv.create (Some (LDecl.tohyps hyps).h_tvar) in
   let tvi = omap tvi (TT.transtvi env ue) in
 
   begin
@@ -474,7 +474,7 @@ let process_new_apply loc env pe g =
 
     | FPCut fp ->
         let fp = process_formula env g fp in
-        let ue = EcUnify.UniEnv.create (Some hyps.h_tvar) in
+        let ue = EcUnify.UniEnv.create (Some (LDecl.tohyps hyps).h_tvar) in
           (`Cut fp, [], ue, fp)
   in
 

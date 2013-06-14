@@ -276,11 +276,10 @@ val import_w3_dir :
   -> EcWhy3.renaming_decl
   -> env * ctheory_item list
 
-(* -------------------------------------------------------------------- *)
-val check_goal : env -> EcProvers.prover_infos -> EcBaseLogic.l_decl -> bool
 
 (* -------------------------------------------------------------------- *)
 open EcBaseLogic
+
 module LDecl : sig
   type error = 
     | UnknownSymbol   of EcSymbols.symbol 
@@ -292,6 +291,10 @@ module LDecl : sig
     | DuplicateSymbol of EcSymbols.symbol
 
   exception Ldecl_error of error
+
+  type hyps
+  val init : env -> EcIdent.t list -> hyps
+  val tohyps : hyps -> EcBaseLogic.hyps
 
   val add_local : EcIdent.t -> local_kind -> hyps -> hyps
 
@@ -317,3 +320,6 @@ module LDecl : sig
 
   val ld_subst : EcFol.f_subst -> local_kind -> local_kind
 end
+
+(* -------------------------------------------------------------------- *)
+val check_goal : env -> EcProvers.prover_infos -> LDecl.hyps * form -> bool

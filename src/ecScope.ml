@@ -655,8 +655,7 @@ module Ax = struct
    res
 
   let start_lemma scope name tparams concl =
-    let hyps = { EcBaseLogic.h_tvar  = tparams;
-                 EcBaseLogic.h_local = []; } in
+    let hyps = EcEnv.LDecl.init scope.sc_env tparams in
     let puc = {
       puc_name = name ;
       puc_jdg  = (EcLogic.open_juc (hyps, concl), [0])
@@ -670,6 +669,7 @@ module Ax = struct
       let { puc_name = name; puc_jdg = (juc, _) } = oget scope.sc_pr_uc in
         let pr = EcLogic.close_juc juc in
         let hyps,concl = (EcLogic.get_pj (juc,0)).EcLogic.pj_decl in
+        let hyps = EcEnv.LDecl.tohyps hyps in
         let tparams = hyps.EcBaseLogic.h_tvar in
         assert (hyps.EcBaseLogic.h_local = []);
         let axd = { ax_tparams = tparams;
