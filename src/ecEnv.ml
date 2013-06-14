@@ -1267,6 +1267,7 @@ module Var = struct
      List.fold_left
        (fun env (name, ty) -> bind_local name ty env)
        env bindings
+
 end
 
 (* -------------------------------------------------------------------- *)
@@ -2231,20 +2232,6 @@ module LDecl = struct
       hyps := add_local id (LD_var(tbool,None)) !hyps;
       id) s
 
-  let clear ids hyps = 
-    let fv_lk = function
-      | LD_var (_,Some f) | LD_hyp f -> f.f_fv
-      | _ -> Mid.empty in
-    let check (id,lk) = 
-      if EcIdent.Sid.mem id ids then false
-      else
-        let fv = fv_lk lk in
-        if Mid.set_disjoint ids fv then true
-        else 
-          let inter = Mid.set_inter ids fv in
-          error (CanNotClear(Sid.choose inter, id)) in
-    { hyps with h_local = List.filter check hyps.h_local }
-
   let ld_subst s ld = 
     match ld with
     | LD_var (ty, body) ->
@@ -2261,15 +2248,60 @@ module LDecl = struct
     | LD_hyp f -> LD_hyp (f_subst s f)
 
   type hyps = {
-    le_hyps : EcBaseLogic.hyps
+    le_initial_env : env;
+    le_env         : env;
+    le_hyps        : EcBaseLogic.hyps;
   }
 
   let tohyps lenv = lenv.le_hyps
+  let toenv  lenv = lenv.le_env
+
   let init env tparams = 
-    { le_hyps = { h_tvar = tparams; h_local = [] }; }
+    { le_initial_env = env; 
+      le_env         = env;
+      le_hyps        = { h_tvar = tparams; h_local = [] }; }
+
+  let add_local_env x k env = 
+    match k with
+    | LD_var (ty,_)  -> Var.bind_local x ty  env
+    | LD_mem mt      -> Memory.push (x,mt)   env
+    | LD_modty (i,r) -> Mod.bind_local x i r env
+    | LD_hyp   _     -> env
 
   let add_local x k h = 
-    { le_hyps = add_local x k (tohyps h) }
+    let nhyps = add_local x k (tohyps h) in
+    let env = h.le_env in
+    let nenv = add_local_env x k env in
+    { le_initial_env = h.le_initial_env;
+      le_env         = nenv;
+      le_hyps        = nhyps }
+
+  let clear ids lenv = 
+    let fv_lk = function
+      | LD_var (ty,None)   -> ty.ty_fv 
+      | LD_var (ty,Some f) -> fv_union ty.ty_fv f.f_fv
+      | LD_mem mt -> EcMemory.mt_fv mt 
+      | LD_hyp f -> f.f_fv
+      | LD_modty(_,r) ->
+        EcPath.Sm.fold (fun mp fv -> EcPath.m_fv fv mp) r EcIdent.Mid.empty in
+    let check (id,lk) = 
+      if EcIdent.Sid.mem id ids then false
+      else
+        let fv = fv_lk lk in
+        if Mid.set_disjoint ids fv then true
+        else 
+          let inter = Mid.set_inter ids fv in
+          error (CanNotClear(Sid.choose inter, id)) in
+    let hyps = lenv.le_hyps in
+    let nhyps = { hyps with h_local = List.filter check hyps.h_local } in
+    let nenv = 
+      List.fold_left (fun env (x,k) -> add_local_env x k env)
+        lenv.le_initial_env (List.rev nhyps.h_local) in
+    { le_initial_env = lenv.le_initial_env;
+      le_env         = nenv;
+      le_hyps        = nhyps; }
+
+
 
   let lookup s h = lookup s (tohyps h)
 
@@ -2290,10 +2322,6 @@ module LDecl = struct
 
   let fresh_id  h s = fresh_id (tohyps h) s 
   let fresh_ids h ls = fresh_ids (tohyps h) ls
-
-  let clear sid h = { 
-    le_hyps = clear sid (tohyps h)
-  }
 
 end
 
