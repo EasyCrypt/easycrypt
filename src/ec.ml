@@ -14,7 +14,8 @@ let _ =
   with e -> begin
     Format.eprintf
       "cannot initialize Why3 engine: %a@."
-      EcPException.exn_printer e
+      EcPException.exn_printer e;
+    exit 1
   end;
 
   (* Initialize load path *)
