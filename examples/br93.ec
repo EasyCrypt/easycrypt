@@ -36,16 +36,11 @@ op keypairs: (pkey * skey) distr.
 op f : pkey -> randomness -> randomness.
 op finv : skey -> randomness -> randomness.
 
-pred valid_keys : (pkey * skey).
-
-axiom kg_valid : forall (pk : pkey, sk : skey), 
-in_supp (pk,sk) keypairs => valid_keys(pk,sk).
-
 axiom finvof : forall(pk : pkey, sk : skey, x : randomness),
- valid_keys(pk,sk) => finv sk (f pk x) = x.
+ in_supp (pk,sk) keypairs => finv sk (f pk x) = x.
 
 axiom fofinv : forall(pk : pkey, sk : skey, x : randomness),
- valid_keys(pk,sk) => f pk (finv sk x) = x.
+ in_supp (pk,sk) keypairs => f pk (finv sk x) = x.
 
 op uniform : plaintext distr = Plaintext.Dword.dword.
 op uniform_rand : randomness distr = Randomness.Dword.dword.
@@ -62,6 +57,7 @@ import ROM.
 import WRO_Set.
 
 module type Scheme(RO : Oracle) = {
+ fun init() : unit
  fun kg() : (pkey * skey)
  fun enc(pk:pkey, m:plaintext): ciphertext 
 }.
@@ -99,7 +95,10 @@ op (||) (x : randomness, y : plaintext) : ciphertext =
 
 module BR(R : Oracle) : Scheme(R) = {
  var r : randomness
- 
+ fun init() : unit = {
+  r = $uniform_rand; 
+ }
+
  fun kg():(pkey * skey) = {
   var pk, sk:(pkey * skey);
   (pk,sk) = $keypairs;
@@ -108,7 +107,6 @@ module BR(R : Oracle) : Scheme(R) = {
  
  fun enc(pk:pkey, m:plaintext): ciphertext = {
   var h : plaintext;
-  r = $uniform_rand; 
   h  = R.o(r);
   return ((f pk r) ||   m ^^ h);
  }
@@ -154,7 +152,7 @@ lemma eq1_enc :
 proof.
  fun.
  inline RO.o.
- wp;rnd;wp;skip;progress(try trivial).
+ wp;rnd;wp;skip;progress;trivial.
 save.
 
 
@@ -175,27 +173,25 @@ proof.
 ((!mem BR2.r ARO.log){2} => res{1} = res{2}).
  fun (mem BR2.r ARO.log) 
  (ARO.log{1} = ARO.log{2} /\ eq_except RO.m{1} RO.m{2} BR2.r{2}).
-progress(try trivial).
-progress(try trivial).
+progress;trivial.
+progress;trivial.
 assumption.
  fun.
  if;[trivial| |wp;skip;trivial].
- inline RO.o;wp;rnd;wp;skip;progress(try trivial).
+ inline RO.o;wp;rnd;wp;skip;progress;trivial.
  intros &m H. fun. 
- seq 0: (3 = 3). (* fix this *)
- skip;trivial.
  if.
  inline RO.o.
  wp.
- rnd 1%r cPtrue;wp;skip;progress(trivial).
- wp;skip;progress(trivial).
+ rnd 1%r cPtrue;wp;skip;progress;trivial.
+ wp;skip;progress;trivial.
 
  intros &m. fun. 
  if.
  inline RO.o.
  wp.
- rnd 1%r cPtrue;wp;skip;progress(trivial).
- wp;skip;progress(trivial).
+ rnd 1%r cPtrue;wp;skip;progress;trivial.
+ wp;skip;progress;trivial.
  (* don't know how to use the spec I proved already *)
  (* call (pk{1} = pk{2} /\ RO.m{1} = RO.m{2} /\ m{1} = m{2} /\  *)
  (*      BR.r{1} = BR2.r{2} /\ !in_dom BR2.r{2} RO.m{2}) *)
@@ -213,15 +209,17 @@ call (p{1} = p{2} /\ (glob A){1} = (glob A){2} /\
  (forall (x : randomness), mem x ARO.log{2} <=> in_dom x RO.m{2})).
   fun ( ARO.log{1} = ARO.log{2} /\
   RO.m{1} = RO.m{2} /\ 
- (forall (x : randomness), mem x ARO.log{2} <=> in_dom x RO.m{2}));try trivial.
+ (forall (x : randomness), mem x ARO.log{2} <=> in_dom x RO.m{2})).
+  trivial.
+  trivial.
   fun.
   if;[trivial| |wp;skip;trivial].
-  inline RO.o;wp;rnd;wp;skip;progress(try trivial).
+  inline RO.o;wp;rnd;wp;skip;progress;trivial.
   inline CPA(BR,A).SO.kg CPA(BR2,A).SO.kg.
   wp;rnd.
   inline CPA(BR,A).ARO.init CPA(BR,A).SO.init RO.init
   CPA(BR2,A).ARO.init CPA(BR2,A).SO.init RO.init.
-  rnd;wp;skip;progress(try trivial).
+  rnd;wp;skip;progress;trivial.
 save.
 
 
@@ -288,7 +286,7 @@ proof.
  Pr[CPA(BR2,A).main() @ &m : res \/ mem BR2.r ARO.log]
  (Pr[CPA(BR2,A).main() @ &m : res] + 
   Pr[CPA(BR2,A).main() @ &m : mem BR2.r ARO.log]) _ _).
-   apply (prob1_1 (<:A) _ &m );try trivial;assumption.
+   apply (prob1_1 (<:A) _ &m );try assumption;trivial.
    apply (prob1_2 (<:A) &m).
 save.
 
@@ -318,7 +316,7 @@ lemma eq2_enc :
  res{1} = res{2} /\ RO.m{1} = RO.m{2}].
  fun.
  rnd (lambda v, m{2} ^^ v)(lambda v,m{2} ^^ v);skip.
- progress (trivial).
+ progress;trivial.
 save.
 
 lemma eq2 : forall (A <: Adv {BR2,BR3,CPA,RO,ARO}), 
@@ -364,7 +362,7 @@ proof.
 
  inline CPA(BR2, A).SO.init CPA(BR2, A).SO.kg CPA(BR2, A).ARO.init RO.init 
  CPA(BR3, A).SO.init CPA(BR3, A).SO.kg CPA(BR3, A).ARO.init.
- wp;rnd;wp;rnd;wp;skip;progress (try trivial).
+ wp;rnd;wp;rnd;wp;skip;progress;trivial.
 save.
 
 
@@ -451,7 +449,6 @@ proof.
  inline RO.o.
  wp;rnd;wp;skip;trivial.
  wp;skip;trivial.
- (* cannot use spec eq2_enc *)
  inline CPA(BR3, A).SO.enc CPA2(BR3, A).SO.enc.
  wp.
  swap{2} -2.
@@ -470,7 +467,7 @@ proof.
 
  inline CPA2(BR3, A).SO.init CPA2(BR3, A).SO.kg CPA2(BR3, A).ARO.init RO.init 
  CPA(BR3, A).SO.init CPA(BR3, A).SO.kg CPA(BR3, A).ARO.init.
- wp;rnd;wp;rnd;wp;skip;progress (try trivial).
+ wp;rnd;wp;rnd;wp;skip;progress;trivial.
 save.
 
 lemma prob3_1 : 
@@ -563,44 +560,81 @@ module BR_OW(A_ : Adv) : Inverter = {
  }
 }.
 
+
+lemma f_iny :
+forall (x, y : randomness, pk: pkey, sk : skey), 
+in_supp (pk,sk) keypairs  =>
+f pk x = f pk y => x = y.
+proof.
+ intros x y pk sk Hsupp Heqf.
+ rewrite <- (finvof pk sk x _);first trivial.
+ rewrite <- (finvof pk sk y _);first trivial.
+ rewrite Heqf.
+ trivial.
+save.
+
+
 lemma eq4 : forall (A <: Adv {BR3,CPA2,RO,ARO,BR_OW}), 
 (forall (O <: ARO),
  bd_hoare[ O.o : true ==> true] = 1%r =>
  bd_hoare[ A(O).a2 : true ==> true] = 1%r) =>
  equiv [ CPA2(BR3,A).main ~ OW(BR_OW(A)).main : 
- (glob A){1} = (glob A){2} ==> (mem BR3.r{1} ARO.log{1} => res{2}) /\ ARO.log{1} = Set.empty].
+ (glob A){1} = (glob A){2} ==> (mem BR3.r{1} ARO.log{1} => res{2})].
 proof.
  intros A Hlossless.
  fun.
  rnd{1}.
  inline  BR_OW(A).i.
- wp.
-call ((glob A){1} = (glob A){2} /\ c{1} = c{2} /\
- RO.m{1} = RO.m{2} /\ ARO.log{1} = ARO.log{2})
-((glob A){1} = (glob A){2} /\
+ inline CPA2(BR3, A).SO.init CPA2(BR3, A).ARO.init RO.init CPA2(BR3, A).SO.kg 
+ BR_OW(A).ARO.init.
+ inline CPA2(BR3,A).SO.enc.
+ seq 11 9:
+ (pk{1} = pk{2} /\ sk{1} = sk{2} /\ pk0{2} = pk{2} /\ 
+  in_supp (pk{2},sk{2}) keypairs /\
+(glob A){1} = (glob A){2}  /\
+ RO.m{1} = RO.m{2} /\ ARO.log{1} = ARO.log{2} /\ dom RO.m{1} = ARO.log{1} /\ 
+ BR3.r{1} = x{2} /\ y0{2} = f pk{2} x{2}).
+ call ((glob A){1} = (glob A){2} /\ c{1} = c{2} /\
+ RO.m{1} = RO.m{2} /\ ARO.log{1} = ARO.log{2} /\ dom RO.m{1} = ARO.log{1})
+((glob A){1} = (glob A){2} /\ dom RO.m{1} = ARO.log{1} /\
  RO.m{1} = RO.m{2} /\ ARO.log{1} = ARO.log{2} /\ res{1} = res{2}).
- fun (RO.m{1} = RO.m{2} /\ ARO.log{1} = ARO.log{2}).
+ fun (RO.m{1} = RO.m{2} /\ ARO.log{1} = ARO.log{2} /\ dom RO.m{1} = ARO.log{1}).
  trivial.
  trivial.
  fun.
- if;[trivial|inline RO.o;wp;rnd |];wp;skip;progress(try trivial).
- inline CPA2(BR3,A).SO.enc.
+ if;[trivial|inline RO.o;wp;rnd |];wp;skip;progress;trivial.
  wp.
  rnd.
  wp.
 call ((glob A){1} = (glob A){2} /\ p{1} = p{2} /\
- RO.m{1} = RO.m{2} /\ ARO.log{1} = ARO.log{2})
-((glob A){1} = (glob A){2} /\
+ RO.m{1} = RO.m{2} /\ ARO.log{1} = ARO.log{2}  /\ dom RO.m{1} = ARO.log{1})
+((glob A){1} = (glob A){2}  /\ dom RO.m{1} = ARO.log{1} /\
  RO.m{1} = RO.m{2} /\ ARO.log{1} = ARO.log{2} /\ res{1} = res{2}).
- fun (RO.m{1} = RO.m{2} /\ ARO.log{1} = ARO.log{2}).
+ fun (RO.m{1} = RO.m{2} /\ ARO.log{1} = ARO.log{2}  /\ dom RO.m{1} = ARO.log{1}).
  trivial.
  trivial.
  fun.
- if;[trivial|inline RO.o;wp;rnd |];wp;skip;progress(try trivial).
- inline CPA2(BR3, A).SO.init CPA2(BR3, A).ARO.init RO.init CPA2(BR3, A).SO.kg 
- BR_OW(A).ARO.init.
- wp;rnd;rnd;wp;skip;progress(idtac).
-trivial.
+ if;[trivial|inline RO.o;wp;rnd |];wp;skip;progress;trivial.
+ wp;rnd;rnd;wp;skip.
+ progress;trivial.
+wp;skip.
+progress.
+elim (find_some2<:from,to>
+      (lambda (p : (from * to)), f pk{2} (fst p) = f pk{2} x{2})
+      RO.m{2}
+      x{2} _).
+split;trivial.
+intros x2 Hfind.
+rewrite Hfind.
+elim (find_some1<:from,to>
+      (lambda (p : (from * to)), f pk{2} (fst p) = f pk{2} x{2})
+      RO.m{2}
+      x2 _).
+assumption.
+delta;simplify.
+intros Hin_dom Hf.
+rewrite (proj_def<:from> x2).
+apply (f_iny x{2} x2 pk{2} sk{2} _ _);trivial.
 save.
 
 
@@ -660,5 +694,3 @@ proof.
   apply (Reduction (<:A) &m _).
   assumption.
 save.
-
-lemma a : false by [].
