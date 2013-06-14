@@ -1674,11 +1674,11 @@ tactic_chain:
 | LBRACKET ts=plist1(loc(tactics0), PIPE) RBRACKET
     { Psubtacs (List.map mk_core_tactic ts) }
 
-| FIRST t=tactic
-    { Pfirst t }
+| FIRST t=tactic { Pfirst (t, 1) }
+| LAST  t=tactic { Plast  (t, 1) }
 
-| LAST t=tactic
-    { Plast t }
+| FIRST n=NUM t=tactic { Pfirst (t, n) }
+| LAST  n=NUM t=tactic { Plast  (t, n) }
 
 | FIRST LAST  { Protate (`Left , 1) }
 | LAST  FIRST { Protate (`Right, 1) }

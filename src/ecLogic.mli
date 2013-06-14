@@ -82,6 +82,9 @@ val t_id : string option -> tactic
 val t_on_first : tactic -> goals -> goals
 val t_on_last  : tactic -> goals -> goals
 
+val t_on_firsts : tactic -> int -> goals -> goals
+val t_on_lasts  : tactic -> int -> goals -> goals
+
 val t_subgoal  : tactic list -> goals -> goals
 val t_on_goals : tactic -> goals -> goals
 

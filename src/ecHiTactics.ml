@@ -52,10 +52,10 @@ let rec process_tactics mkpv env (tacs : ptactic list) (gs : goals) : goals =
 (* -------------------------------------------------------------------- *)
 and process_tactic_chain mkpv env (t : ptactic_chain) (gs : goals) : goals =
   match t with
-  | Psubtacs tacs   -> t_subgoal  (List.map (process_tactic1 mkpv env) tacs) gs
-  | Pfirst   t      -> t_on_first (process_tactic1 mkpv env t) gs
-  | Plast    t      -> t_on_last  (process_tactic1 mkpv env t) gs
-  | Protate  (d, i) -> t_rotate   d i gs
+  | Psubtacs tacs   -> t_subgoal   (List.map (process_tactic1 mkpv env) tacs) gs
+  | Pfirst   (t, i) -> t_on_firsts (process_tactic1 mkpv env t) i gs
+  | Plast    (t, i) -> t_on_lasts  (process_tactic1 mkpv env t) i gs
+  | Protate  (d, i) -> t_rotate    d i gs
 
 (* -------------------------------------------------------------------- *)
 and process_tactic mkpv env (tac : ptactic) (gs : goals) : goals =

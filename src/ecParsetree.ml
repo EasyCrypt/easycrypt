@@ -370,8 +370,8 @@ and ptactic = {
 
 and ptactic_chain =
   | Psubtacs of ptactic list
-  | Pfirst   of ptactic
-  | Plast    of ptactic
+  | Pfirst   of ptactic * int
+  | Plast    of ptactic * int
   | Protate  of [`Left | `Right] * int
 
 (* -------------------------------------------------------------------- *)

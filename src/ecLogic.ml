@@ -157,14 +157,17 @@ let t_on_nth t n (juc,ln) =
   let r,n,l = try List.split_n n ln with _ -> assert false in
   let juc,ln = t (juc,n) in
   juc, List.rev_append r (List.append ln l)
-        
-let t_on_first t (_,ln as gs) =
-  assert (ln <> []);
-  t_on_nth t 0 gs 
-        
-let t_on_last t (_,ln as gs) =
-  assert (ln <> []);
-  t_on_nth t (List.length ln - 1) gs 
+
+let t_on_firsts t i (juc, ln) =
+  let (ln1, ln2) = List.take_n i ln in
+  sndmap (List.append^~ ln2) (t_on_goals t (juc, ln1))
+
+let t_on_lasts t i (juc, ln) =
+  let (ln1, ln2) = List.take_n (max 0 (List.length ln - i)) ln in
+  sndmap (List.append ln1) (t_on_goals t (juc, ln2))
+
+let t_on_first t g = t_on_firsts t 1 g
+let t_on_last  t g = t_on_lasts  t 1 g
 
 let t_seq_subgoal t lt g = t_subgoal lt (t g)
 
