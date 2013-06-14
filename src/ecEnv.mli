@@ -278,3 +278,42 @@ val import_w3_dir :
 
 (* -------------------------------------------------------------------- *)
 val check_goal : env -> EcProvers.prover_infos -> EcBaseLogic.l_decl -> bool
+
+(* -------------------------------------------------------------------- *)
+open EcBaseLogic
+module LDecl : sig
+  type error = 
+    | UnknownSymbol   of EcSymbols.symbol 
+    | UnknownIdent    of EcIdent.t
+    | NotAVariable    of EcIdent.t
+    | NotAHypothesis  of EcIdent.t
+    | CanNotClear     of EcIdent.t * EcIdent.t
+    | DuplicateIdent  of EcIdent.t
+    | DuplicateSymbol of EcSymbols.symbol
+
+  exception Ldecl_error of error
+
+  val add_local : EcIdent.t -> local_kind -> hyps -> hyps
+
+  val lookup : symbol -> hyps -> l_local
+
+  val reducible_var : EcIdent.t -> hyps -> bool
+  val reduce_var    : EcIdent.t -> hyps -> form
+  val lookup_var    : symbol -> hyps -> EcIdent.t * ty
+
+  val lookup_by_id     : EcIdent.t -> hyps -> local_kind
+  val lookup_hyp_by_id : EcIdent.t -> hyps -> form
+
+  val has_hyp : symbol -> hyps -> bool
+  val lookup_hyp : symbol -> hyps -> EcIdent.t * form
+  val get_hyp : EcIdent.t * local_kind -> EcIdent.t * form
+
+  val has_symbol : symbol -> hyps -> bool
+
+  val fresh_id  : hyps -> symbol -> EcIdent.t
+  val fresh_ids : hyps -> symbol list -> EcIdent.t list
+
+  val clear : EcIdent.Sid.t -> hyps -> hyps
+
+  val ld_subst : EcFol.f_subst -> local_kind -> local_kind
+end

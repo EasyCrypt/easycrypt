@@ -6,7 +6,7 @@ open EcLocation
 open EcTypes
 open EcModules
 open EcFol
-
+open EcEnv
 open EcBaseLogic
 open EcLogic
 open EcHiLogic

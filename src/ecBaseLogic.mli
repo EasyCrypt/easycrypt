@@ -29,7 +29,8 @@ type hyps = {
 }
 
 (* -------------------------------------------------------------------- *)
-module LDecl : sig
+(* Moved to EcEnv *)
+(*module LDecl : sig
   type error = 
     | UnknownSymbol   of EcSymbols.symbol 
     | UnknownIdent    of EcIdent.t
@@ -65,6 +66,7 @@ module LDecl : sig
 
   val ld_subst : EcFol.f_subst -> local_kind -> local_kind
 end
+*)
 
 (* -------------------------------------------------------------------- *)
 type tac_pos = int EcParsetree.doption

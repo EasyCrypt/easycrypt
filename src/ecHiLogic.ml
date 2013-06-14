@@ -10,6 +10,7 @@ open EcFol
 
 open EcMetaProg
 open EcBaseLogic
+open EcEnv
 open EcLogic
 open EcPhl
 
