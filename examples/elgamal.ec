@@ -327,12 +327,13 @@ require import Real.
 lemma Pr4_aux (A<:Adv) :
    (bd_hoare[A.a1 : true ==> true] = 1%r) =>
    (bd_hoare[A.a2 : true ==> true] = 1%r) =>
-   bd_hoare [G2(A).main : true ==> res] <= (1%r / 2%r)
+   bd_hoare [G2(A).main : true ==> res] = (1%r / 2%r)
 (*   Pr[G2(A).main() @ &m : res] = 1%r / 2%r *).
 proof.
  intros Ha1 Ha2.
  fun.
- rnd (1%r / 2%r) (lambda b,  b = b'). 
+ rnd (1%r / 2%r) (lambda (b:bool), b = b').
+ simplify.
  admit.
 save.
 
@@ -341,7 +342,12 @@ lemma Pr4 (A<:Adv) &m :
    (bd_hoare[A.a2 : true ==> true] = 1%r) =>
    Pr[G2(A).main() @ &m : res] = 1%r / 2%r.
 proof.
- admit. (* TODO : how to use the previous lemma to do this *)
+ intros Ha1 Ha2.
+ bdhoare_deno (_: true ==> _); last split.
+ apply (Pr4_aux(<:A) _ _).
+  apply Ha1.
+  apply Ha2.
+ split.
 save.
 
 lemma Conclusion1 (A<:Adv) &m : 
