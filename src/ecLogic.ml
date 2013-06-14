@@ -212,12 +212,11 @@ let t_close t g =
   | (juc, []    ) -> (juc, [])
   | (_  , i :: _) -> raise (StillOpenGoal i)
 
-let t_rotate mode _ (j, ns) =
+let t_rotate mode sz (juc, ns) =
   let mrev = match mode with `Left -> identity | `Right -> List.rev in
+  let sz   = if ns = [] then 0 else (max 0 sz) mod List.length ns in
 
-  match mrev ns with
-  | []      -> (j, ns)
-  | n :: ns -> (j, mrev (ns @ [n]))
+  let (hd, tl) = List.take_n sz (mrev ns) in (juc, mrev (tl @ hd))
 
 (* -------------------------------------------------------------------- *)
 let get_node  g = (get_pj g).pj_decl

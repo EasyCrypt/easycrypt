@@ -1680,11 +1680,12 @@ tactic_chain:
 | LAST t=tactic
     { Plast t }
 
-| FIRST n=NUM? LAST
-    { Protate (`Left, odfl 1 n) }
+| FIRST LAST  { Protate (`Left , 1) }
+| LAST  FIRST { Protate (`Right, 1) }
 
-| LAST n=NUM? FIRST
-    { Protate (`Right, odfl 1 n) }
+| FIRST n=NUM LAST  { Protate (`Left , n) }
+| LAST  n=NUM FIRST { Protate (`Right, n) }
+
 ;
 
 subtactic:
