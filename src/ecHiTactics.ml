@@ -29,10 +29,7 @@ let process_case loc env pf g =
       (t_simplify env EcReduction.betaiota_red) g
 
 (* -------------------------------------------------------------------- *)
-let process_debug env =
-  let l = fun x -> EcLocation.mk_loc EcLocation._dummy x in
-  let (p, _) = EcTyping.trans_msymbol env (l [(l "M", Some [l [(l "K", None)]])]) in
-    ignore (EcEnv.Mod.by_mpath p env)
+let process_debug _env (juc, n) = (juc, [n])
 
 (* -------------------------------------------------------------------- *)
 let process_progress (prtc, mkpv) env t =
