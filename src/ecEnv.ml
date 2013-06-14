@@ -2265,7 +2265,7 @@ module LDecl = struct
   }
 
   let tohyps lenv = lenv.le_hyps
-  let init env tparams = 
+  let init _env tparams = 
     { le_hyps = { h_tvar = tparams; h_local = [] }; }
 
   let add_local x k h = 
