@@ -72,8 +72,6 @@ val close_juc : judgment_uc -> judgment
 
 val find_all_goals : judgment_uc -> goals
 
-val tyenv_of_hyps :  EcEnv.env -> LDecl.hyps -> EcEnv.env
-
 val find_in_hyps : EcEnv.env -> form -> LDecl.hyps -> EcIdent.t
 
 (* -------------------------------------------------------------------- *)

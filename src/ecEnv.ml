@@ -2323,6 +2323,24 @@ module LDecl = struct
   let fresh_id  h s = fresh_id (tohyps h) s 
   let fresh_ids h ls = fresh_ids (tohyps h) ls
 
+
+  let push_active m lenv = 
+    { lenv with le_env = Memory.push_active m lenv.le_env }
+
+  let push_all l lenv = 
+    { lenv with le_env = Memory.push_all l lenv.le_env }
+
+  let hoareF xp lenv = 
+     let env1, env2 = Fun.hoareF xp lenv.le_env in
+    { lenv with le_env = env1}, {lenv with le_env = env2 }
+
+  let equivF xp1 xp2 lenv = 
+    let env1, env2 = Fun.equivF xp1 xp2 lenv.le_env in
+    { lenv with le_env = env1}, {lenv with le_env = env2 }
+
+  let inv_memenv lenv = 
+    { lenv with le_env = Fun.inv_memenv lenv.le_env }
+
 end
 
 (* -------------------------------------------------------------------- *)

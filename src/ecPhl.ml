@@ -381,10 +381,10 @@ let t_code_transform env side ?(bdhoare = false) cpos tr tx g =
 let conseq_cond pre post spre spost = 
   f_imp pre spre, f_imp spost post
  
-let t_hoareF_conseq env pre post g =
+let t_hoareF_conseq _env pre post g =
   let hyps,concl = get_goal g in
   let hf = destr_hoareF concl in
-  let env = tyenv_of_hyps env hyps in
+  let env = LDecl.toenv hyps in
   let mpr,mpo = EcEnv.Fun.hoareF_memenv hf.hf_f env in
   let cond1, cond2 = conseq_cond hf.hf_pr hf.hf_po pre post in
   let concl1 = gen_mems [mpr] cond1 in
@@ -401,10 +401,10 @@ let t_hoareS_conseq _env pre post g =
   let concl3 = f_hoareS_r { hs with hs_pr = pre; hs_po = post } in
   prove_goal_by [concl1; concl2; concl3] (RN_hl_conseq) g
 
-let t_bdHoareF_conseq env pre post g =
+let t_bdHoareF_conseq _env pre post g =
   let hyps,concl = get_goal g in
   let bhf = destr_bdHoareF concl in
-  let env = tyenv_of_hyps env hyps in
+  let env = LDecl.toenv hyps in
   let mpr,mpo = EcEnv.Fun.hoareF_memenv bhf.bhf_f env in
   let cond1, cond2 = conseq_cond bhf.bhf_pr bhf.bhf_po pre post in
   let cond2 = match bhf.bhf_cmp with
@@ -431,10 +431,10 @@ let t_bdHoareS_conseq _env pre post g =
   let concl3 = f_bdHoareS_r { bhs with bhs_pr = pre; bhs_po = post } in
   prove_goal_by [concl1; concl2; concl3] (RN_hl_conseq) g
 
-let t_equivF_conseq env pre post g =
+let t_equivF_conseq _env pre post g =
   let hyps,concl = get_goal g in
   let ef = destr_equivF concl in
-  let env = tyenv_of_hyps env hyps in
+  let env = LDecl.toenv hyps in
   let (mprl,mprr),(mpol,mpor) = EcEnv.Fun.equivF_memenv ef.ef_fl ef.ef_fr env in
   let cond1, cond2 = conseq_cond ef.ef_pr ef.ef_po pre post in
   let concl1 = gen_mems [mprl;mprr] cond1 in
@@ -572,7 +572,7 @@ let hoareF_abs_spec env f inv =
 let t_hoareF_abs env inv g = 
   let hyps, concl = get_goal g in
   let hf = destr_hoareF concl in
-  let env' = tyenv_of_hyps env hyps in
+  let env' = LDecl.toenv hyps in
   let pre, post, sg = hoareF_abs_spec env' hf.hf_f inv in
   let tac g' = prove_goal_by sg (RN_hl_fun_abs inv) g' in
   t_on_last tac (t_hoareF_conseq env pre post g)
@@ -597,7 +597,7 @@ let bdHoareF_abs_spec env f inv =
 let t_bdHoareF_abs env inv g = 
   let hyps, concl = get_goal g in
   let bhf = destr_bdHoareF concl in
-  let env' = tyenv_of_hyps env hyps in
+  let env' = LDecl.toenv hyps in
   match bhf.bhf_cmp with
     | FHeq when f_equal bhf.bhf_bd f_r1 -> 
       let pre, post, sg = bdHoareF_abs_spec env' bhf.bhf_f inv in
@@ -653,7 +653,7 @@ let equivF_abs_spec env fl fr inv =
 let t_equivF_abs env inv g = 
   let hyps, concl = get_goal g in
   let ef = destr_equivF concl in
-  let env' = tyenv_of_hyps env hyps in
+  let env' = LDecl.toenv hyps in
   let pre, post, sg = equivF_abs_spec env' ef.ef_fl ef.ef_fr inv in
   let tac g' = prove_goal_by sg (RN_hl_fun_abs inv) g' in
   t_on_last tac (t_equivF_conseq env pre post g)
@@ -723,7 +723,7 @@ let equivF_abs_upto env fl fr bad invP invQ =
 let t_equivF_abs_upto env bad invP invQ g = 
   let hyps, concl = get_goal g in
   let ef = destr_equivF concl in
-  let env' = tyenv_of_hyps env hyps in
+  let env' = LDecl.toenv hyps in
   let pre, post, sg = equivF_abs_upto env' ef.ef_fl ef.ef_fr bad invP invQ in
   let tac g' = prove_goal_by sg (RN_hl_fun_upto(bad,invP,invQ)) g' in
   t_on_last tac (t_equivF_conseq env pre post g)
@@ -974,9 +974,9 @@ let t_bdHoare_while env inv vrnt info g =
     | _ ->
       cannot_apply "while" "not implemented"
 
-let t_equiv_while env inv g =
+let t_equiv_while _env inv g =
   let (hyps, concl) = get_goal g in
-  let env1 = tyenv_of_hyps env hyps in
+  let env1 = LDecl.toenv hyps in
   let es = destr_equivS concl in
   let (el,cl), (er,cr), sl, sr = s_last_whiles "while" es.es_sl es.es_sr in
   let ml = EcMemory.memory es.es_ml in
@@ -1011,9 +1011,10 @@ let subst_args_call env m f =
   List.fold_right2 (fun v e s ->
     PVM.add_none env (pv_loc f v.v_name) m (form_of_expr m e) s)
   
-let t_hoare_call env fpre fpost g =
+let t_hoare_call _env fpre fpost g =
   (* FIXME : check the well formess of the pre and the post ? *)
-  let concl = get_concl g in
+  let hyps,concl = get_goal g in
+  let env = LDecl.toenv hyps in
   let hs = destr_hoareS concl in
   let (lp,f,args),s = s_last_call "call" hs.hs_s in
   let m = EcMemory.memory hs.hs_m in
@@ -1089,10 +1090,10 @@ let t_bdHoare_call env fpre fpost opt_bd g =
 
       
 
-let t_equiv_call env fpre fpost g =
+let t_equiv_call _env fpre fpost g =
   (* FIXME : check the well formess of the pre and the post ? *)
   let hyps, concl = get_goal g in
-  let env = tyenv_of_hyps env hyps in
+  let env = LDecl.toenv hyps in
   let es = destr_equivS concl in
   let (lpl,fl,argsl),(lpr,fr,argsr),sl,sr = 
     s_last_calls "call" es.es_sl es.es_sr in
@@ -1244,8 +1245,8 @@ let _inline_freshen me v =
     else
       (EcMemory.bind v.v_name v.v_type me, v.v_name)
 
-let _inline env hyps me sp s =
-  let env = tyenv_of_hyps env hyps in
+let _inline _env hyps me sp s =
+  let env = LDecl.toenv hyps in
   let module P = EcPath in
 
   let inline1 me lv p args = 
@@ -1781,26 +1782,26 @@ let swap_stmt env p1 p2 p3 s =
   check_swap env (stmt s12) (stmt s23);
   stmt (List.flatten [hd;s23;s12;tl]) 
 
-let t_hoare_swap env p1 p2 p3 g =
+let t_hoare_swap _env p1 p2 p3 g =
   let hyps, concl = get_goal g in
   let hs    = destr_hoareS concl in
-  let env = tyenv_of_hyps env hyps in
+  let env = LDecl.toenv hyps in
   let s = swap_stmt env p1 p2 p3 hs.hs_s in
   let concl = f_hoareS_r {hs with hs_s = s } in
   prove_goal_by [concl] (RN_hl_swap(None,p1,p2,p3)) g
 
-let t_bdHoare_swap env p1 p2 p3 g =
+let t_bdHoare_swap _env p1 p2 p3 g =
   let hyps, concl = get_goal g in
   let bhs    = destr_bdHoareS concl in
-  let env = tyenv_of_hyps env hyps in
+  let env = LDecl.toenv hyps in
   let s = swap_stmt env p1 p2 p3 bhs.bhs_s in
   let concl = f_bdHoareS_r {bhs with bhs_s = s } in
   prove_goal_by [concl] (RN_hl_swap(None,p1,p2,p3)) g
 
-let t_equiv_swap env side p1 p2 p3 g =
+let t_equiv_swap _env side p1 p2 p3 g =
   let hyps, concl = get_goal g in
   let es    = destr_equivS concl in
-  let env = tyenv_of_hyps env hyps in
+  let env = LDecl.toenv hyps in
   let sl,sr = 
     if side 
     then swap_stmt env p1 p2 p3 es.es_sl, es.es_sr 

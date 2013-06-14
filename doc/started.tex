@@ -183,6 +183,25 @@ axiom finvof : forall(pk : pkey, sk : skey, x : randomness),
 
 axiom fofinv : forall(pk : pkey, sk : skey, x : randomness),
  valid_keys(pk,sk) => f pk (finv sk x) = x.
+
+module type Inverter = {
+ fun i(pk : pkey, y : randomness) : randomness
+}.
+
+module OW(I :Inverter) ={
+ fun main() : bool ={
+ var x : randomness;
+ var x' : randomness;
+ var y : randomness;
+ var pk : pkey;
+ var sk : skey;
+  x = $uniform_rand;
+  (pk,sk) = $keypairs;
+  x'  = I.i(pk,(f pk x));
+  return (x = x');
+ }
+}.
+
 \end{easycrypt}
 First, we declare two types \ec{pkey} and \ec{skey} that represent
 public and secret keys respectively. We then declare a distribution
@@ -193,6 +212,14 @@ sampled from \ec{keypairs} are matching. Afterwards, we declare \ec{f}
 and \ec{finv} with the appropriate type and we state the axioms saying
 that one is inverse of eachother for valid key pairs.
  
+The module \ec{OW} is defined by declaring an interface corresponding
+to the inverter, which comprises a function that given a challenge
+value and a public key returns a guess for the pre-image of the
+challenge. The OW experiment is then defined. First, we sample a value
+\ec{x} and a pair of keys \ec{pk} and \ec{sk} and we provide the
+inverter with \ec{f pk x}. The inverter returns a value \ec{x'} and
+the experiment succeds if \ec{x = x'}.
+
 \paragraph{Public-key encryption}
 A public-key encryption scheme consists of a triple of algorithms
 $(\KG,\Enc,\Dec)$:
@@ -361,6 +388,51 @@ call \ec{a2} with this ciphertext as argument and obtain a boolean
 establish the value of \ec{b}, {\em i.e.} it returns \ec{b=b'}.
 
 \paragraph{Security property}
+We are interested in proving that for any adversary \ec{A} against CPA,
+that manages to win with probability $P$, there exists a inverter
+I that manages to win the one-way experiment with probability $Q$ such
+that $| P - \frac{1}{2} |\leq Q$. The intuition is that an adversary
+that constantly returns \ec{true} wins with probability
+$\frac{1}{2}$. What we are measuring is essentially how much better
+can an adversary do, and we are bounding it in terms of the
+probability of suceeding in the one-way experiment.
+
+This property is formalized in \EC as follows:
+\begin{easycrypt}[label={lst:cpa}]{}
+lemma Conclusion (A <: Adv {CPA,CPA2, BR, BR2, BR3, OW, RO, ARO, BR_OW}) &m :
+(forall (O <: ARO),
+ bd_hoare[ O.o : true ==> true] = 1%r =>
+ bd_hoare[ A(O).a2 : true ==> true] = 1%r) =>
+ exists (I<:Inverter), 
+Pr[CPA(BR,A).main() @ &m : res] - 1%r / 2%r <= 
+Pr[OW(I).main() @ &m : res].
+\end{easycrypt}
+
+The lemma \ec{Conclusion} is parametrized by an adversary \ec{A}. The
+annotations \ec{\{CPA,CPA2, BR, BR2, BR3, OW, RO, ARO, BR_OW\}} are
+memory access restrctions: essentially, the adversary cannot access
+the memories of these modules directly---only through oracle
+calls. The next parameter of the lemma is a memory \ec{m}. Next, we
+have one hypothesis that states that if the wrapped version of the
+random oracle terminates with probability $1$, so does the
+adversary. The \ec{\%r} next to constants establishes that they should
+be interpreted as real values. The existential quantification binds a
+module \ec{I} of type \ec{Inverter}. The expression
+\ec{Pr[CPA(BR,A).main() @ &m : res]} denotes the probability of the
+event \ec{res} in the distribution obtained after executing the
+\ec{main} function of module \ec{CPA}, instantiated with the module
+\ec{BR} and the parametrized adversary $A$ in initial memory
+\ec{m}. Similarly, the expression \ec{Pr[OW(BR_OW(A)).main() @ &m :
+  res]} denotes the probability of the event \ec{res} in the
+distribution obtained after executing the \ec{main} function of module
+\ec{OW}, instantiated with the existentially quantified module \ec{I},
+in initial memory \ec{m}. These two expressions are of type real and
+the \ec{<=} real less or equal operator.
+
+The rest of the tutorial is devoted to introducing and explaining the
+reasoning principles of \EC required to establih this property.
+%TODO: put forward pointers to françois' and guillaume's section
+
 \subsection{Overview of the proof}
 
 \subsection{Easycrypt proof}
