@@ -590,7 +590,9 @@ call ((glob A){1} = (glob A){2} /\ p{1} = p{2} /\
  if;[trivial|inline RO.o;wp;rnd |];wp;skip;progress(try trivial).
  inline CPA2(BR3, A).SO.init CPA2(BR3, A).ARO.init RO.init CPA2(BR3, A).SO.kg 
  BR_OW(A).ARO.init.
- wp;!2 rnd;wp;skip;progress(try trivial).
+ wp;do 2! rnd;wp;skip;progress(try trivial).
+  (* Missing invariant along the lines of "mem x log1 => mem x m1" *)
+  admit.
 save.
 
 
