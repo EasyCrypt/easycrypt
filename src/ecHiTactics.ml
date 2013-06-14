@@ -52,20 +52,15 @@ let rec process_tactics mkpv env (tacs : ptactic list) (gs : goals) : goals =
 (* -------------------------------------------------------------------- *)
 and process_tactic_chain mkpv env (t : ptactic_chain) (gs : goals) : goals =
   match t with
-  | Psubtacs tacs -> t_subgoal  (List.map (process_tactic1 mkpv env) tacs) gs
-  | Pfirst   t    -> t_on_first (process_tactic1 mkpv env t) gs
-  | Plast    t    -> t_on_last  (process_tactic1 mkpv env t) gs
-  | Protate  d    -> t_rotate   d gs
+  | Psubtacs tacs   -> t_subgoal  (List.map (process_tactic1 mkpv env) tacs) gs
+  | Pfirst   t      -> t_on_first (process_tactic1 mkpv env t) gs
+  | Plast    t      -> t_on_last  (process_tactic1 mkpv env t) gs
+  | Protate  (d, i) -> t_rotate   d i gs
 
 (* -------------------------------------------------------------------- *)
 and process_tactic mkpv env (tac : ptactic) (gs : goals) : goals =
-  let dointros pis =
-    let mk_id (IPCore s) = lmap (fun s -> EcIdent.create (odfl "_" s)) s in
-      t_intros env (List.map mk_id pis)
-  in
-
   let gs = process_tactic_core mkpv env tac.pt_core gs in
-  let gs = t_on_goals (dointros tac.pt_intros) gs in
+  let gs = t_on_goals (EcHiLogic.process_intros env tac.pt_intros) gs in
     gs
 
 (* -------------------------------------------------------------------- *)
@@ -86,7 +81,7 @@ and process_tactic_core mkpv env (tac : ptactic_core) (gs : goals) : goals =
     | Pcase  i       -> `One (process_case loc env i)
     | Pprogress t    -> `One (process_progress (process_tactic_core1, mkpv) env t)
     | Padmit         -> `One (t_admit)
-    | Pdebug         -> `One (process_debug env; t_id None)
+    | Pdebug         -> `One (process_debug env)
     | Plogic t       -> `One (process_logic mkpv loc env t)
     | PPhl tac       -> `One (EcHiPhl.process_phl loc env tac)
     | Psubgoal tc    -> `All (process_tactic_chain mkpv env tc)
