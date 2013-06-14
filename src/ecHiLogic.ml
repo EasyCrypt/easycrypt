@@ -122,9 +122,31 @@ let process_assumption loc env (pq, tvi) g =
       | _ -> process_global loc env (pq,tvi) g
 
 (* -------------------------------------------------------------------- *)
-let process_intros env pis =
-  let mk_id (IPCore s) = lmap (fun s -> EcIdent.create (odfl "_" s)) s in
-    t_intros env (List.map mk_id pis)
+let process_intros env pis (juc, n) =
+  let mk_id s = lmap (fun s -> EcIdent.create (odfl "_" s)) s in
+
+  let rec collect acc core pis =
+    match pis, core with
+    | [], [] -> acc
+    | [], _  -> `Core (List.rev core) :: acc
+
+    | IPCore x :: pis, _  -> collect acc (x :: core) pis
+    | IPCase x :: pis, [] -> collect (`Case x :: acc) [] pis
+    | IPCase x :: pis, _  ->
+        let acc = `Core (List.rev core) :: acc in
+        let acc = `Case x :: acc in
+          collect acc [] pis
+  in
+
+  let rec dointro pis gs =
+    List.fold_left
+      (fun gs ip ->
+        match ip with
+        | `Core ids -> t_on_goals (t_intros env (List.map mk_id ids)) gs
+        | `Case _   -> assert false)
+      gs pis
+  in
+    dointro (List.rev (collect [] [] pis)) (juc, [n])
 
 (* -------------------------------------------------------------------- *)
 let process_elim_arg _env hyps oty a =

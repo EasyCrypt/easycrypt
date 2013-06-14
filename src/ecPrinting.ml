@@ -148,12 +148,12 @@ module PPEnv = struct
     in
     let msymb =
         (List.map (fun x -> (x, [])) nm)
-      @ [(x, List.flatten (List.map (mod_symb ppe) mp.P.m_args))]
+      @ [(x, List.map (mod_symb ppe) mp.P.m_args)]
       @ (List.map (fun x -> (x, [])) (odfl [] (omap p2 P.tolist)))
     in
       msymb
 
-  let rec modtype_symb (ppe : t) mty =
+  let rec modtype_symb (ppe : t) mty : EcSymbols.msymbol =
     let exists sm =
       match EcEnv.ModTy.lookup_opt sm ppe.ppe_env with
       | None -> false
@@ -184,7 +184,7 @@ module PPEnv = struct
       | true  -> (List.map (fun x -> (x, [])) nm) @ [(x, [])]
       | false ->
            (List.map (fun x -> (x, [])) nm)
-         @ [(x, List.flatten (List.map (mod_symb ppe) mty.mt_args))]
+         @ [(x, List.map (mod_symb ppe) mty.mt_args)]
     in
       msymb
 

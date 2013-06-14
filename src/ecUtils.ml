@@ -30,6 +30,13 @@ let copy (x : 'a) : 'a =
   Obj.obj (Obj.dup (Obj.repr x))
 
 (* -------------------------------------------------------------------- *)
+type 'a tuple3 = 'a * 'a * 'a
+type 'a tuple4 = 'a * 'a * 'a * 'a
+type 'a tuple5 = 'a * 'a * 'a * 'a * 'a
+type 'a tuple6 = 'a * 'a * 'a * 'a * 'a * 'a
+type 'a tuple7 = 'a * 'a * 'a * 'a * 'a * 'a * 'a
+
+(* -------------------------------------------------------------------- *)
 let proj3_1 (x, _, _) = x
 let proj3_2 (_, x, _) = x
 let proj3_3 (_, _, x) = x

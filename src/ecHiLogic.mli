@@ -39,4 +39,5 @@ val process_mkn_apply :
   -> goal * int list
 
 (* -------------------------------------------------------------------- *)
-val process_logic : pprovers -> EcLocation.t -> EcEnv.env -> logtactic -> goal -> goals
+val process_logic  : pprovers -> EcLocation.t -> EcEnv.env -> logtactic -> goal -> goals
+val process_intros : EcEnv.env -> intropattern -> goal -> goals
