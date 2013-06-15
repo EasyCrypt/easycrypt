@@ -302,7 +302,9 @@ let initial () =
   let prelude = (mk_loc _dummy "prelude", Some true) in
   let loader  = EcLoader.forsys loader in
   let scope   = EcScope.empty in
-  let scope   = process_th_require loader scope prelude in
+  let scope   = if   !options.o_boot
+                then scope
+                else process_th_require loader scope prelude in
     scope
 
 (* -------------------------------------------------------------------- *)
