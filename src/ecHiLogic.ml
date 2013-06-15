@@ -73,16 +73,17 @@ let _ = EcPException.register (fun fmt exn ->
 let error loc e = EcLocation.locate_error loc (TacError e)
 
 (* -------------------------------------------------------------------- *)
-let process_tyargs env hyps tvi =
+let process_tyargs hyps tvi =
   let ue = EcUnify.UniEnv.create (Some (LDecl.tohyps hyps).h_tvar) in
-    omap tvi (TT.transtvi env ue)
+    omap tvi (TT.transtvi (LDecl.toenv hyps) ue)
 
 (* -------------------------------------------------------------------- *)
-let process_instanciate env hyps ({pl_desc = pq; pl_loc = loc} ,tvi) =
+let process_instanciate hyps ({pl_desc = pq; pl_loc = loc} ,tvi) =
+  let env = LDecl.toenv hyps in
   let (p, ax) =
     try EcEnv.Ax.lookup pq env
     with _ -> error loc (UnknownAxiom pq) in
-  let args = process_tyargs env hyps tvi in
+  let args = process_tyargs hyps tvi in
   let args =
     match ax.EcDecl.ax_tparams, args with
     | [], None -> []
@@ -99,30 +100,30 @@ let process_instanciate env hyps ({pl_desc = pq; pl_loc = loc} ,tvi) =
   p,args
 
 (* -------------------------------------------------------------------- *)
-let process_global loc env tvi g =
+let process_global loc tvi g =
   let hyps = get_hyps g in
-  let p, tyargs = process_instanciate env hyps tvi in
-  set_loc loc t_glob env p tyargs g
+  let p, tyargs = process_instanciate hyps tvi in
+  set_loc loc t_glob p tyargs g
 
 (* -------------------------------------------------------------------- *)
-let process_assumption loc env (pq, tvi) g =
+let process_assumption loc (pq, tvi) g =
   let hyps,concl = get_goal g in
   match pq with
   | None ->
       if (tvi <> None) then error loc BadTyinstance;
       let h  =
-        try find_in_hyps env concl hyps
+        try find_in_hyps concl hyps
         with _ -> assert false in
-      t_hyp env h g
+      t_hyp h g
   | Some pq ->
       match unloc pq with
       | ([],ps) when LDecl.has_hyp ps hyps ->
           if (tvi <> None) then error pq.pl_loc BadTyinstance;
-          set_loc loc (t_hyp env (fst (LDecl.lookup_hyp ps hyps))) g
-      | _ -> process_global loc env (pq,tvi) g
+          set_loc loc (t_hyp (fst (LDecl.lookup_hyp ps hyps))) g
+      | _ -> process_global loc (pq,tvi) g
 
 (* -------------------------------------------------------------------- *)
-let process_intros env pis (juc, n) =
+let process_intros pis (juc, n) =
   let mk_id s = lmap (fun s -> EcIdent.create (odfl "_" s)) s in
 
   let rec collect acc core pis =
@@ -142,14 +143,14 @@ let process_intros env pis (juc, n) =
     List.fold_left
       (fun gs ip ->
         match ip with
-        | `Core ids -> t_on_goals (t_intros env (List.map mk_id ids)) gs
+        | `Core ids -> t_on_goals (t_intros (List.map mk_id ids)) gs
         | `Case _   -> assert false)
       gs pis
   in
     dointro (List.rev (collect [] [] pis)) (juc, [n])
 
 (* -------------------------------------------------------------------- *)
-let process_elim_arg _env hyps oty a =
+let process_elim_arg hyps oty a =
   let ue  = EcUnify.UniEnv.create (Some (LDecl.tohyps hyps).h_tvar) in
   let env = LDecl.toenv hyps in
   match a.pl_desc, oty with
@@ -188,7 +189,7 @@ let process_formula g pf =
   process_form hyps pf tbool
 
 (* -------------------------------------------------------------------- *)
-let process_mkn_apply process_cut env pe (juc, _ as g) = 
+let process_mkn_apply process_cut pe (juc, _ as g) = 
   let hyps = get_hyps g in
   let args = pe.fp_args in
   let (juc,fn), fgs =
@@ -200,22 +201,22 @@ let process_mkn_apply process_cut env pe (juc, _ as g) =
         let id,_ = LDecl.lookup_hyp ps hyps in
         mkn_hyp juc hyps id, []
       | _ ->
-        let p,tys = process_instanciate env hyps (pq,tvi) in
-        mkn_glob env juc hyps p tys, []
+        let p,tys = process_instanciate hyps (pq,tvi) in
+        mkn_glob juc hyps p tys, []
       end
     | FPCut pf ->
-      let f = process_cut env g pf in
+      let f = process_cut g pf in
       let juc, fn = new_goal juc (hyps, f) in
       (juc,fn), [fn]
   in
-  let (juc,an), ags = mkn_apply process_elim_arg env (juc,fn) args in
+  let (juc,an), ags = mkn_apply process_elim_arg (juc,fn) args in
   (juc,an), fgs@ags
 
 (* -------------------------------------------------------------------- *)
-let process_apply loc env pe (_,n as g) =
-  let (juc, an), gs = process_mkn_apply (fun _ -> process_formula) env pe g in
+let process_apply loc pe (_,n as g) =
+  let (juc, an), gs = process_mkn_apply process_formula pe g in
     try
-      set_loc loc (t_use env an gs) (juc,n)
+      set_loc loc (t_use an gs) (juc,n)
     with tope ->
       let (_, tp) = (get_node (juc, n)) in
 
@@ -229,11 +230,11 @@ let process_apply loc env pe (_,n as g) =
         let ty = match gty with GTty ty -> ty | _ -> raise tope in
 
         try
+          let env,hyps,_ = get_goal_e g in
           let ev = EV.of_idents (List.map fst ((x, ty) :: ids)) in
           let _, _, ev =
-            EcMetaProg.f_match (env, get_hyps g) (EcUnify.UniEnv.create None, ev) ~ptn:fp tp
+            EcMetaProg.f_match hyps (EcUnify.UniEnv.create None, ev) ~ptn:fp tp
           in
-
           let (s, ras) =
             List.map_fold
               (fun s (x, xty) ->
@@ -244,12 +245,12 @@ let process_apply loc env pe (_,n as g) =
           in
 
           let concl     = f_subst s fp in
-          let (juc, n1) = new_goal juc (get_hyps g, concl) in
+          let (juc, n1) = new_goal juc (hyps, concl) in
           let rule      = { pr_name = RN_apply; pr_hyps = RA_node an :: ras } in
           let juc, _    = upd_rule rule (juc, n1) in
           let ns        = List.pmap (function RA_node n -> Some n | _ -> None) ras in
 
-            (set_loc loc (t_use env n1 (gs @ ns))) (juc, n)
+            (set_loc loc (t_use n1 (gs @ ns))) (juc, n)
 
         with MatchFailure ->
           doit ((x, ty) :: ids) fp
@@ -258,39 +259,39 @@ let process_apply loc env pe (_,n as g) =
         doit [] (snd (get_node (juc, an)))
 
 (* -------------------------------------------------------------------- *)
-let process_elim loc env pe (_,n as g) =
-  let (juc,an), gs = process_mkn_apply (fun _ -> process_formula) env pe g in
+let process_elim loc pe (_,n as g) =
+  let (juc,an), gs = process_mkn_apply process_formula pe g in
   let (_,f) = get_node (juc, an) in
-  t_on_first (t_use env an gs) (set_loc loc (t_elim env f) (juc,n))
+  t_on_first (t_use an gs) (set_loc loc (t_elim f) (juc,n))
 
 (* -------------------------------------------------------------------- *)
-let process_rewrite loc env (s,pe) (_,n as g) =
-  set_loc loc (t_rewrite_node env 
-                 (process_mkn_apply (fun _ -> process_formula) env pe g) s) n
+let process_rewrite loc (s,pe) (_,n as g) =
+  set_loc loc (t_rewrite_node  
+                 (process_mkn_apply process_formula pe g) s) n
 
 (* -------------------------------------------------------------------- *)
-let process_trivial mkpv pi env g =
+let process_trivial mkpv pi g =
   let pi = mkpv pi in
-  t_seq (t_simplify_nodelta env) (t_trivial pi env) g
+  t_seq (t_simplify_nodelta) (t_trivial pi) g
 
 (* -------------------------------------------------------------------- *)
-let process_cut name env phi g =
+let process_cut name phi g =
   let phi = process_formula g phi in
   t_on_last
-    (process_intros env [IPCore (lmap (fun x -> Some x) name)])
-    (t_cut env phi g)
+    (process_intros [IPCore (lmap (fun x -> Some x) name)])
+    (t_cut phi g)
 
 (* -------------------------------------------------------------------- *)
-let process_generalize env l =
+let process_generalize l =
   let pr1 pf g =
     let hyps = get_hyps g in
     match pf.pl_desc with
     | PFident({pl_desc = ([],s)},None) when LDecl.has_symbol s hyps ->
       let id = fst (LDecl.lookup s hyps) in
-      t_generalize_hyp env id g
+      t_generalize_hyp id g
     | _ ->
       let f = process_form_opt hyps pf None in
-      t_generalize_form None env f g in
+      t_generalize_form None f g in
   t_lseq (List.rev_map pr1 l)
 
 (* -------------------------------------------------------------------- *)
@@ -304,17 +305,17 @@ let process_clear l g =
   t_clear ids g
 
 (* -------------------------------------------------------------------- *)
-let process_exists env fs g =
-  gen_t_exists process_elim_arg env fs g
+let process_exists fs g =
+  gen_t_exists process_elim_arg fs g
 
 (* -------------------------------------------------------------------- *)
-let process_change env pf g =
+let process_change pf g =
   let f = process_formula g pf in
-  set_loc pf.pl_loc (t_change env f) g
+  set_loc pf.pl_loc (t_change f) g
 
 (* -------------------------------------------------------------------- *)
-let process_simplify env ri g =
-  let hyps = get_hyps g in
+let process_simplify ri g =
+  let env,hyps,_ = get_goal_e g in
   let delta_p, delta_h =
     match ri.pdelta with
     | None -> None, None
@@ -341,29 +342,30 @@ let process_simplify env ri g =
     EcReduction.logic   = ri.plogic; 
     EcReduction.modpath = ri.pmodpath;
   } in
-  t_simplify env ri g
+  t_simplify ri g
 
 (* -------------------------------------------------------------------- *)
-let process_elimT loc env (pf,qs) g =
+let process_elimT loc (pf,qs) g =
+  let env,hyps,_ = get_goal_e g in
   let p = set_loc qs.pl_loc (EcEnv.Ax.lookup_path qs.pl_desc) env in
-  let f = process_form_opt (get_hyps g) pf None in
-  t_seq (set_loc loc (t_elimT env f p))
-    (t_simplify env EcReduction.beta_red) g
+  let f = process_form_opt hyps pf None in
+  t_seq (set_loc loc (t_elimT f p))
+    (t_simplify EcReduction.beta_red) g
 
 (* -------------------------------------------------------------------- *)
-let process_subst loc env ri g =
-  if ri = [] then t_subst_all env g
+let process_subst loc ri g =
+  if ri = [] then t_subst_all g
   else
     let hyps = get_hyps g in
     let totac ps =
       let f = process_form_opt hyps ps None in
-      try t_subst1 env (Some f) 
+      try t_subst1 (Some f) 
       with _ -> assert false (* FIXME error message *) in
     let tacs = List.map totac ri in
     set_loc loc (t_lseq tacs) g
 
 (* -------------------------------------------------------------------- *)
-let process_field (p,t,i,m,z,o,e) _env g =
+let process_field (p,t,i,m,z,o,e) g =
   let (hyps,concl) = get_goal g in
     (match concl.f_node with
       | Fapp(eq',[arg1;arg2]) ->
@@ -381,7 +383,7 @@ let process_field (p,t,i,m,z,o,e) _env g =
           cannot_apply "field" "the eq doesn't coincide"
       | _ -> cannot_apply "field" "Think more about the goal")
 
-let process_field_simp (p,t,i,m,z,o,e) _env g =
+let process_field_simp (p,t,i,m,z,o,e) g =
   let (hyps,concl) = get_goal g in
     (match concl.f_node with
       | Fapp(_,arg1 :: _) ->
@@ -397,7 +399,7 @@ let process_field_simp (p,t,i,m,z,o,e) _env g =
       | _ -> cannot_apply "field_simplify" "Think more about the goal")
 
 (* -------------------------------------------------------------------- *)
-let trans_apply_arg (_env, hyps) ue arg =
+let trans_apply_arg hyps ue arg =
   let env = LDecl.toenv hyps in
 
   match unloc arg with
@@ -417,7 +419,7 @@ let trans_apply_arg (_env, hyps) ue arg =
       None
 
 (* -------------------------------------------------------------------- *)
-let rec destruct_product (env, hyps) fp =
+let rec destruct_product hyps fp =
   let module P = EcPath      in
   let module C = EcCoreLib   in
   let module R = EcReduction in
@@ -430,13 +432,13 @@ let rec destruct_product (env, hyps) fp =
       Some (`Forall (x, t, EcFol.f_forall bd f))
 
   | _ -> begin
-    match R.h_red_opt R.full_red env hyps fp with
+    match R.h_red_opt R.full_red hyps fp with
     | None   -> None
-    | Some f -> destruct_product (env, hyps) f
+    | Some f -> destruct_product hyps f
   end
 
 (* -------------------------------------------------------------------- *)
-let process_named_apply _loc (_env, hyps) (fp, tvi) =
+let process_named_apply _loc hyps (fp, tvi) =
   let env = LDecl.toenv hyps in
 
   let (p, typ, ax) =
@@ -484,14 +486,14 @@ let process_named_apply _loc (_env, hyps) (fp, tvi) =
     (p, typ, ue, ax)
 
 (* -------------------------------------------------------------------- *)
-let process_new_apply loc env pe g =
+let process_new_apply loc pe g =
   let (hyps, fp) = (get_hyps g, get_concl g) in
-  let lenv = LDecl.toenv hyps in
+  let env = LDecl.toenv hyps in
 
   let (p, typarams, ue, ax) =
     match pe.fp_kind with
     | FPNamed (fp, tyargs) ->
-        process_named_apply loc (env, hyps) (fp, tyargs)
+        process_named_apply loc hyps (fp, tyargs)
 
     | FPCut fp ->
         let fp = process_formula g fp in
@@ -500,12 +502,12 @@ let process_new_apply loc env pe g =
   in
 
   let args = pe.fp_args in
-  let args = List.map (trans_apply_arg (env, hyps) ue) args in
+  let args = List.map (trans_apply_arg hyps ue) args in
 
   let check_arg f arg =
     let invalid_arg () = tacuerror "invalid argument to apply" in
 
-    match arg, destruct_product (env, hyps) f with
+    match arg, destruct_product hyps f with
     | None, Some (`Imp (f1, f2)) ->
         (f2, `SideCond f1)
 
@@ -519,7 +521,7 @@ let process_new_apply loc env pe g =
     | Some (`Form tp),
       Some (`Forall (x, GTty ty, f)) -> begin
         try
-          EcUnify.unify lenv ue tp.f_ty ty;
+          EcUnify.unify env ue tp.f_ty ty;
           (EcFol.f_subst_local x tp f, `KnownVar (x, tp))
         with EcUnify.UnificationFailure _ ->
           invalid_arg ()
@@ -531,7 +533,7 @@ let process_new_apply loc env pe g =
 
     | Some (`Module (mp, mt)),
       Some (`Forall (x, GTmodty (emt, restr), f)) ->
-        check_modtype_restr lenv mp mt emt restr;
+        check_modtype_restr env mp mt emt restr;
         (EcFol.f_subst_mod x mp f, `KnownMod (x, (mp, mt)))
 
     | _, _ -> invalid_arg ()
@@ -547,9 +549,9 @@ let process_new_apply loc env pe g =
       in
         List.fold_right forid ids EV.empty
     in
-      try  (ax, ids, EcMetaProg.f_match (env, hyps) (ue, ev) ax fp);
+      try  (ax, ids, EcMetaProg.f_match hyps (ue, ev) ax fp);
       with MatchFailure ->
-        match destruct_product (env, hyps) ax with
+        match destruct_product hyps ax with
         | None   -> tacuerror "in apply, cannot find instance"
         | Some _ ->
             let (ax, id) = check_arg ax None in
@@ -568,7 +570,7 @@ let process_new_apply loc env pe g =
       | false ->
           let closedax = Fsubst.uni (EcUnify.UniEnv.close ue) ax in
 
-          if EcReduction.is_conv lenv hyps closedax fp then begin
+          if EcReduction.is_conv hyps closedax fp then begin
             (ax, ids, (ue, EcUnify.UniEnv.close ue, EV.empty))
           end else
             instanciate (ax, ids)
@@ -589,36 +591,36 @@ let process_new_apply loc env pe g =
 
     match p with
     | `Global p ->
-          gen_t_apply_glob (fun _ _ _ x -> x) env p typarams args g
+          gen_t_apply_glob (fun _ _ x -> x) p typarams args g
 
     | `Local  x -> 
         assert (typarams = []);
-        gen_t_apply_hyp (fun _ _ _ x -> x) env x args g
+        gen_t_apply_hyp (fun _ _ x -> x) x args g
 
     | `Cut fc ->
         assert (typarams = []);
-        gen_t_apply_form (fun _ _ _ x -> x) env
+        gen_t_apply_form (fun _ _ x -> x)
           (Fsubst.uni (EcUnify.UniEnv.close ue) fc) args g
 
 (* -------------------------------------------------------------------- *)
-let process_logic mkpv loc env t =
+let process_logic mkpv loc t =
   match t with
-  | Passumption pq -> process_assumption loc env pq
-  | Ptrivial pi    -> process_trivial mkpv pi env
-  | Pintro pi      -> process_intros env pi
-  | Psplit         -> t_split env
-  | Pfield st      -> process_field st env
-  | Pfieldsimp st  -> process_field_simp st env 
-  | Pexists fs     -> process_exists env fs
-  | Pleft          -> t_left env
-  | Pright         -> t_right env
-  | Pelim pe       -> process_elim  loc env pe
-  | Papply pe      -> process_new_apply loc env pe
-  | Pcut (name,phi)-> process_cut name env phi
-  | Pgeneralize l  -> process_generalize env l
+  | Passumption pq -> process_assumption loc pq
+  | Ptrivial pi    -> process_trivial mkpv pi
+  | Pintro pi      -> process_intros pi
+  | Psplit         -> t_split
+  | Pfield st      -> process_field st
+  | Pfieldsimp st  -> process_field_simp st
+  | Pexists fs     -> process_exists fs
+  | Pleft          -> t_left
+  | Pright         -> t_right
+  | Pelim pe       -> process_elim loc pe
+  | Papply pe      -> process_new_apply loc pe
+  | Pcut (name,phi)-> process_cut name phi
+  | Pgeneralize l  -> process_generalize l
   | Pclear l       -> process_clear l
-  | Prewrite ri    -> process_rewrite loc env ri
-  | Psubst   ri    -> process_subst loc env ri
-  | Psimplify ri   -> process_simplify env ri
-  | Pchange pf     -> process_change env pf
-  | PelimT i       -> process_elimT loc env i
+  | Prewrite ri    -> process_rewrite loc ri
+  | Psubst   ri    -> process_subst loc ri
+  | Psimplify ri   -> process_simplify ri
+  | Pchange pf     -> process_change pf
+  | PelimT i       -> process_elimT loc i

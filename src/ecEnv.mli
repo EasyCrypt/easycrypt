@@ -331,4 +331,4 @@ module LDecl : sig
 end
 
 (* -------------------------------------------------------------------- *)
-val check_goal : env -> EcProvers.prover_infos -> LDecl.hyps * form -> bool
+val check_goal : EcProvers.prover_infos -> LDecl.hyps * form -> bool

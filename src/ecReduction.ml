@@ -281,8 +281,8 @@ let h_red_opt ri env hyps f =
   try Some (h_red ri env hyps f)
   with NotReducible -> None
 
-let check_alpha_equal ri env hyps f1 f2 = 
-(*FIXME:  let env = tyenv_of_hyps env hyps in *)
+let check_alpha_equal ri hyps f1 f2 = 
+  let env = LDecl.toenv hyps in
   let exn = IncompatibleForm (env, (f1, f2)) in
   let error () = raise exn in
   let ensure t = if not t then error () in
@@ -456,15 +456,21 @@ let check_alpha_equal ri env hyps f1 f2 =
 let check_alpha_eq = check_alpha_equal no_red
 let check_conv     = check_alpha_equal full_red
 
-let is_alpha_eq env hyps f1 f2 = 
-  try check_alpha_eq env hyps f1 f2; true
+let is_alpha_eq hyps f1 f2 = 
+  try check_alpha_eq hyps f1 f2; true
   with _ -> false
 
-let is_conv env hyps f1 f2 = 
-  try check_conv env hyps f1 f2; true
+let is_conv hyps f1 f2 = 
+  try check_conv hyps f1 f2; true
   with _ -> false
 
-let rec simplify ri env hyps f = 
-  let f' = try h_red ri env hyps f with NotReducible -> f in
-  if f == f' then f_map (fun ty -> ty) (simplify ri env hyps) f
-  else simplify ri env hyps f'
+let h_red ri hyps f = 
+   h_red ri (LDecl.toenv hyps) hyps f 
+
+let h_red_opt ri hyps f = h_red_opt ri (LDecl.toenv hyps) hyps f 
+
+let rec simplify ri hyps f = 
+  let f' = try h_red ri hyps f with NotReducible -> f in
+  if f == f' then f_map (fun ty -> ty) (simplify ri hyps) f
+  else simplify ri hyps f'
+

@@ -334,12 +334,12 @@ module Tactics = struct
 
   let pi scope pi = Prover.mk_prover_info scope pi
 
-  let process_tactic_on_goal scope env (juc, ns) loc tacs =
+  let process_tactic_on_goal scope (juc, ns) loc tacs =
     match ns with
     | []      -> error loc NoCurrentGoal
     | n :: ns ->
 
-      let juc = process_tactics (pi scope) env tacs (juc, [n]) in
+      let juc = process_tactics (pi scope) tacs (juc, [n]) in
       let juc = fstmap EcLogic.upd_done juc in
       let juc = (fst juc, (snd juc) @ ns) in
 
@@ -350,7 +350,7 @@ module Tactics = struct
       check_state `InProof "proof script" scope;
       let loc = (oget (List.ohead tac)).pt_core.pl_loc in
       let puc = oget scope.sc_pr_uc in
-      let juc = process_tactic_on_goal scope scope.sc_env puc.puc_jdg loc tac in
+      let juc = process_tactic_on_goal scope puc.puc_jdg loc tac in
         { scope with sc_pr_uc = Some { puc with puc_jdg = juc } }
     end else scope
 

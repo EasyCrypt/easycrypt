@@ -54,11 +54,13 @@ val tacuerror    : ('a, Format.formatter, unit, 'b) format4 -> 'a
 val set_loc : EcLocation.t -> ('a -> 'b) -> 'a -> 'b
 
 (* -------------------------------------------------------------------- *)
-val get_goal  : goal -> LDecl.hyps * form
-val get_concl : goal -> form
-val get_hyps  : goal -> LDecl.hyps
-val get_node  : goal -> LDecl.hyps * form
-val get_pj    : goal -> pre_judgment
+val get_pj     : goal -> pre_judgment
+val get_goal   : goal -> LDecl.hyps * form
+val get_goal_e : goal -> env * LDecl.hyps * form
+val get_concl  : goal -> form
+val get_hyps   : goal -> LDecl.hyps
+val get_node   : goal -> LDecl.hyps * form
+
 
 val new_goal : judgment_uc -> LDecl.hyps * form -> goal
 
@@ -72,7 +74,7 @@ val close_juc : judgment_uc -> judgment
 
 val find_all_goals : judgment_uc -> goals
 
-val find_in_hyps : EcEnv.env -> form -> LDecl.hyps -> EcIdent.t
+val find_in_hyps : form -> LDecl.hyps -> EcIdent.t
 
 (* -------------------------------------------------------------------- *)
 val t_id : string option -> tactic
@@ -111,50 +113,50 @@ type app_arg =
   | AAmp   of EcPath.mpath * EcModules.module_sig 
   | AAnode
 
-type 'a app_arg_cb = EcEnv.env -> LDecl.hyps -> gty option -> 'a -> app_arg
+type 'a app_arg_cb = LDecl.hyps -> gty option -> 'a -> app_arg
 
-val t_hyp : EcEnv.env -> EcIdent.t -> tactic
+val t_hyp : EcIdent.t -> tactic
 
-val t_generalize_hyp  : EcEnv.env -> EcIdent.t -> tactic
-val t_generalize_form : symbol option -> EcEnv.env -> form -> tactic
+val t_generalize_hyp  : EcIdent.t -> tactic
+val t_generalize_form : symbol option -> form -> tactic
 
-val t_intros_i : EcEnv.env -> EcIdent.t list -> tactic
-val t_intros   : EcEnv.env -> EcIdent.t located list -> tactic
+val t_intros_i : EcIdent.t list -> tactic
+val t_intros   : EcIdent.t located list -> tactic
 
-val t_elim_hyp : EcEnv.env -> EcIdent.t -> tactic
-val t_elim     : EcEnv.env -> form -> tactic
+val t_elim_hyp : EcIdent.t -> tactic
+val t_elim     : form -> tactic
 
-val t_elimT : EcEnv.env -> form -> EcPath.path -> tactic
+val t_elimT : form -> EcPath.path -> tactic
 
-val t_case : EcEnv.env -> form -> tactic
+val t_case : form -> tactic
 
-val t_rewrite_hyp  : EcEnv.env -> bool -> EcIdent.t -> app_arg list -> tactic
-val t_rewrite_node : EcEnv.env -> goal * int list -> bool -> int -> goals
+val t_rewrite_hyp  : bool -> EcIdent.t -> app_arg list -> tactic
+val t_rewrite_node : goal * int list -> bool -> int -> goals
 
-val t_simplify : EcEnv.env -> reduction_info -> tactic
-val t_simplify_nodelta : EcEnv.env -> tactic
+val t_simplify : reduction_info -> tactic
+val t_simplify_nodelta : tactic
 
-val t_split : EcEnv.env -> tactic
+val t_split : tactic
 
-val t_left  : EcEnv.env -> tactic
-val t_right : EcEnv.env -> tactic
+val t_left  : tactic
+val t_right : tactic
 
-val t_trivial : EcProvers.prover_infos -> EcEnv.env -> tactic
+val t_trivial : EcProvers.prover_infos -> tactic
 
-val t_cut : EcEnv.env -> form -> tactic
+val t_cut : form -> tactic
 
 val t_clear : EcIdent.Sid.t -> tactic
 
-val t_glob : EcEnv.env -> EcPath.path -> EcTypes.ty list -> tactic
+val t_glob : EcPath.path -> EcTypes.ty list -> tactic
 
-val t_use : EcEnv.env -> int -> 'a -> goal -> judgment_uc * 'a
+val t_use : int -> 'a -> goal -> judgment_uc * 'a
 
-val t_change : EcEnv.env -> form -> tactic
+val t_change : form -> tactic
 
-val t_subst_all : EcEnv.env -> tactic
-val t_subst1    : EcEnv.env -> form option -> tactic
+val t_subst_all : tactic
+val t_subst1    : form option -> tactic
 
-val t_progress : EcEnv.env -> tactic -> tactic
+val t_progress : tactic -> tactic
 
 val t_field      : form tuple7 -> form * form -> tactic
 val t_field_simp : form tuple7 -> form -> tactic
@@ -163,19 +165,19 @@ val t_admit : tactic
 
 (* -------------------------------------------------------------------- *)
 val gen_t_apply_hyp : 
-     'a app_arg_cb -> EcEnv.env -> EcIdent.t -> 'a list -> tactic
+     'a app_arg_cb -> EcIdent.t -> 'a list -> tactic
 
 val gen_t_apply_glob :
-     'a app_arg_cb -> EcEnv.env -> EcPath.path -> EcTypes.ty list
+     'a app_arg_cb -> EcPath.path -> EcTypes.ty list
   -> 'a list -> tactic
 
 val gen_t_apply_form :
-     'a app_arg_cb -> EcEnv.env -> form -> 'a list -> tactic
+     'a app_arg_cb -> form -> 'a list -> tactic
 
-val gen_t_exists : 'a app_arg_cb -> EcEnv.env -> 'a list -> tactic
+val gen_t_exists : 'a app_arg_cb -> 'a list -> tactic
 
 (* -------------------------------------------------------------------- *)
 val mkn_hyp  : judgment_uc -> LDecl.hyps -> EcIdent.t -> goal
-val mkn_glob : EcEnv.env -> judgment_uc -> LDecl.hyps -> EcPath.path -> EcTypes.ty list -> goal
+val mkn_glob : judgment_uc -> LDecl.hyps -> EcPath.path -> EcTypes.ty list -> goal
 
-val mkn_apply : 'a app_arg_cb -> EcEnv.env -> goal -> 'a list -> goal * int list
+val mkn_apply : 'a app_arg_cb -> goal -> 'a list -> goal * int list

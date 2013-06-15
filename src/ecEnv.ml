@@ -2356,8 +2356,9 @@ let norm_l_decl env (hyps,concl) =
   let lhyps = List.map onh hyps.h_local in
   ({ hyps with h_local = lhyps}, concl)
 
-let check_goal env pi (hyps,concl) =
+let check_goal pi (hyps,concl) =
+  let env = LDecl.toenv hyps in
   let ld = LDecl.tohyps hyps, concl in
-  let ld = (norm_l_decl env ld) in
+  let ld = norm_l_decl env ld in
   let res = EcWhy3.check_goal (Mod.me_of_mt env) env.env_w3 pi ld in
   res
