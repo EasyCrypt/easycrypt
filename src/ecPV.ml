@@ -132,6 +132,9 @@ module PV = struct
     { pv = M.empty;
       glob = EcPath.Sm.empty }
 
+  let is_empty pv = 
+    M.is_empty pv.pv && EcPath.Sm.is_empty pv.glob
+
   let add env pv ty fv = 
     { fv with pv = M.add (NormMp.norm_pvar env pv) ty fv.pv }
 
@@ -185,6 +188,17 @@ module PV = struct
       | FequivF _ | FequivS _ | Fpr _ -> assert false 
     in
     aux empty f
+
+  let pp env fmt fv =
+    let ppe = EcPrinting.PPEnv.ofenv env in
+    let vs,gs = elements fv in
+    let pp_vs fmt (pv,_) = EcPrinting.pp_pv ppe fmt pv in
+    if gs = [] then 
+      Format.fprintf fmt "@[%a@]"
+        (EcPrinting.pp_list ",@ " pp_vs) vs
+    else Format.fprintf fmt "@[%a,@ %a@]"
+      (EcPrinting.pp_list ",@ " pp_vs) vs
+      (EcPrinting.pp_list ",@ " (EcPrinting.pp_topmod ppe)) gs
 
   let disjoint_g env mp1 mp2 = 
     let me1, me2 = EcEnv.Mod.by_mpath mp1 env, EcEnv.Mod.by_mpath mp2 env in

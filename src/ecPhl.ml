@@ -1716,14 +1716,16 @@ let t_rcond side b at_pos g =
 let check_swap env s1 s2 = 
   let m1,m2 = s_write env s1, s_write env s2 in
   let r1,r2 = s_read env s1, s_read env s2 in
-  let m2r1 = PV.disjoint env m2 r1 in
-  let m1m2 = PV.disjoint env m1 m2 in
-  let m1r2 = PV.disjoint env m1 r2 in
-  let error () = (* FIXME : better error message *)
-    cannot_apply "swap" "the two statements are not independent" in
-  if not m2r1 then error ();
-  if not m1m2 then error ();
-  if not m1r2 then error ()
+  let m2r1 = PV.diff env m2 r1 in
+  let m1m2 = PV.diff env m1 m2 in
+  let m1r2 = PV.diff env m1 r2 in
+  let error s1 s2 d = 
+    EcLogic.tacuerror 
+      "cannot swap : the two statement are not independants, the first statement can %s %a which can be %s by the second"
+      s1 (PV.pp env) d s2 in
+  if not (PV.is_empty m2r1) then error "read" "write" m2r1;
+  if not (PV.is_empty m1m2) then error "write" "write" m1m2;
+  if not (PV.is_empty m1r2) then error "write" "read" m1r2
 
 
 let swap_stmt env p1 p2 p3 s = 
