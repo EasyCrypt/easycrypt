@@ -1,4 +1,5 @@
 open EcIdent
+open EcPath
 open EcTypes
 open EcModules
 open EcFol
@@ -35,12 +36,65 @@ module PVM = struct
     let pv = EcEnv.NormMp.norm_pvar env pv in 
     (MSvar pv, m)
 
-  let add env pv m f s = M.add (pvm env pv m) f s 
+  let get_restr env mp = 
+    match (EcEnv.Mod.by_mpath mp env).me_body with
+    | EcModules.ME_Decl(_,restr) -> restr 
+    | _ -> assert false 
+    
+  let check_pv env pv1 m s = 
+    let pv = EcEnv.NormMp.norm_pvar env pv1 in 
+    if is_glob pv then begin 
+      let top = EcPath.m_functor pv.pv_name.x_top in
+      let check1 k _ = 
+        match k with 
+        | (MSmod mp, m') when EcIdent.id_equal m m' ->
+          let restr = get_restr env mp in
+          if not (Sm.mem top restr) then
+            let ppe = EcPrinting.PPEnv.ofenv env in
+            EcBaseLogic.tacuerror 
+              "The module %a can write %a (add restriction %a)"
+              (EcPrinting.pp_topmod ppe) mp
+              (EcPrinting.pp_pv ppe) pv1
+              (EcPrinting.pp_topmod ppe) top
+        | _ -> () in
+      M.iter check1 s
+    end;
+    (MSvar pv, m)
+    
+  let add env pv m f s = 
+    let pv = check_pv env pv m s in
+    M.add pv f s 
 
-  let add_glob _env mp m f s = M.add (MSmod mp, m) f s
-
-  let add_none env pv m f s =
-    M.change (fun o -> if o = None then Some f else o) (pvm env pv m) s
+  let add_glob env mp m f s = 
+    let restr = get_restr env mp in
+    let check1 k _ = 
+      match k with 
+      | (MSvar pv, m') when EcIdent.id_equal m m' ->
+        let top = EcPath.m_functor pv.pv_name.x_top in
+        if not (Sm.mem top restr) then
+          let ppe = EcPrinting.PPEnv.ofenv env in
+          EcBaseLogic.tacuerror 
+            "The module %a can write %a (add restriction %a)"
+            (EcPrinting.pp_topmod ppe) mp
+            (EcPrinting.pp_pv ppe) pv
+            (EcPrinting.pp_topmod ppe) top
+      | (MSmod mp', m') when EcIdent.id_equal m m' ->
+        if not (EcPath.m_equal mp mp') then
+          if not (Sm.mem mp' restr) then
+            let restr' = get_restr env mp' in
+            if not (Sm.mem mp restr') then 
+              let ppe = EcPrinting.PPEnv.ofenv env in
+              EcBaseLogic.tacuerror 
+                "The module %a can write %a (add restriction %a to %a, or %a to %a)"
+                (EcPrinting.pp_topmod ppe) mp
+                (EcPrinting.pp_topmod ppe) mp'
+                (EcPrinting.pp_topmod ppe) mp
+                (EcPrinting.pp_topmod ppe) mp' 
+                (EcPrinting.pp_topmod ppe) mp'
+                (EcPrinting.pp_topmod ppe) mp 
+      | _ -> () in 
+    M.iter check1 s;
+    M.add (MSmod mp, m) f s
 
   let merge (s1 : 'a subst) (s2 : 'a subst) =
     M.merge (fun _ o1 o2 -> if o2 = None then o1 else o2) s1 s2

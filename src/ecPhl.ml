@@ -170,7 +170,7 @@ let lv_subst env m lv f =
   | LvTuple vs ->
       let add (pv,t) (ids,s) = 
         let id = id_of_pv pv in
-        let s = PVM.add_none env pv m (f_local id t) s in
+        let s = PVM.add env pv m (f_local id t) s in
         ((id,t)::ids, s) in
       let ids,s = List.fold_right add vs ([],PVM.empty) in
       (LTuple ids, f), s
@@ -966,7 +966,7 @@ let wp_asgn_call env m lv res post =
 
 let subst_args_call env m f =
   List.fold_right2 (fun v e s ->
-    PVM.add_none env (pv_loc f v.v_name) m (form_of_expr m e) s)
+    PVM.add env (pv_loc f v.v_name) m (form_of_expr m e) s)
   
 let t_hoare_call fpre fpost g =
   (* FIXME : check the well formess of the pre and the post ? *)
