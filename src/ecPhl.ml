@@ -2,6 +2,7 @@
 open EcParsetree
 open EcUtils
 open EcIdent
+open EcPath
 open EcCoreLib
 open EcTypes
 open EcFol
@@ -511,19 +512,32 @@ let check_depend env fv mp =
     in            
     EcPath.Sm.iter check_m fv.PV.glob
 
-let hoareF_abs_spec env f inv = 
-  let f = EcEnv.NormMp.norm_xpath env f in
+let abstract_info env f1 = 
+  let f = EcEnv.NormMp.norm_xpath env f1 in
   let top = EcPath.m_functor f.EcPath.x_top in
+  let def = EcEnv.Fun.by_xpath f env in
+  let oi = 
+    match def.f_def with
+    | FBabs oi -> oi
+    | _ -> 
+      let ppe = EcPrinting.PPEnv.ofenv env in
+      if EcPath.x_equal f1 f then 
+        EcLogic.tacuerror "The function %a should be abstract"
+          (EcPrinting.pp_funname ppe) f1
+      else 
+        EcLogic.tacuerror 
+          "The function %a, which reduce to %a, should be abstract"
+          (EcPrinting.pp_funname ppe) f1
+          (EcPrinting.pp_funname ppe) f in
+  top, f, oi, def.f_sig
+
+(* FIXME add equality of global, parameters and res *)
+let hoareF_abs_spec env f inv = 
+  let top, _, oi, _fsig = abstract_info env f in
   let m = mhr in
   let fv = PV.fv env m inv in
   check_depend env fv top;
   (* TODO check there is only global variable *)
-  let def = EcEnv.Fun.by_xpath f env in
-  let oi = 
-    match def.f_def with
-      | FBabs oi -> oi
-      | _ -> assert false (* FIXME error message *)
-  in
   let ospec o = f_hoareF inv o inv in
   let sg = List.map ospec oi.oi_calls in
   inv, inv, sg
@@ -535,19 +549,13 @@ let t_hoareF_abs inv g =
   let tac g' = prove_goal_by sg (RN_hl_fun_abs inv) g' in
   t_on_last tac (t_hoareF_conseq pre post g)
 
+(* FIXME add equality of global, parameters and res,
+   lossless of adversary *)
 let bdHoareF_abs_spec env f inv = 
-  let f = EcEnv.NormMp.norm_xpath env f in
-  let top = EcPath.m_functor f.EcPath.x_top in
+  let top,_,oi,_fsig = abstract_info env f in
   let m = mhr in
   let fv = PV.fv env m inv in
   check_depend env fv top;
-  (* TODO check there is only global variable *)
-  let def = EcEnv.Fun.by_xpath f env in
-  let oi = 
-    match def.f_def with
-      | FBabs oi -> oi
-      | _ -> assert false (* FIXME error message *)
-  in
   let ospec o = f_bdHoareF inv o inv FHeq f_r1 in
   let sg = List.map ospec oi.oi_calls in
   inv, inv, sg
@@ -563,32 +571,32 @@ let t_bdHoareF_abs inv g =
     | _ ->
       cannot_apply "fun" "expected \"= 1\" as bound"
 
- 
-let check_adv env fl fr = 
-  let fl = EcEnv.NormMp.norm_xpath env fl in
-  let fr = EcEnv.NormMp.norm_xpath env fr in
-  let subl = fl.EcPath.x_sub in
-  let subr = fr.EcPath.x_sub in
-  let topl = EcPath.m_functor fl.EcPath.x_top in
-  let topr = EcPath.m_functor fr.EcPath.x_top in
-  assert (EcPath.p_equal subl subr && EcPath.m_equal topl topr);  
-  fl,topl,fr,topr
-                                               (* FIXME error message *)
+let abstract_info2 env fl' fr' =
+  let topl, fl, oil, sigl = abstract_info env fl' in
+  let topr, fr, oir, sigr = abstract_info env fr' in
+  let fl1 = EcPath.xpath topl fl.x_sub in
+  let fr1 = EcPath.xpath topr fr.x_sub in
+  if not (EcPath.x_equal fl1 fr1) then
+    let ppe = EcPrinting.PPEnv.ofenv env in
+    EcLogic.tacuerror 
+      "function %a reduce to %a and %a reduce to %a, %a and %a should be equal"
+      (EcPrinting.pp_funname ppe) fl'
+      (EcPrinting.pp_funname ppe) fl1
+      (EcPrinting.pp_funname ppe) fr'
+      (EcPrinting.pp_funname ppe) fr1
+      (EcPrinting.pp_funname ppe) fl1
+      (EcPrinting.pp_funname ppe) fr1
+  else 
+    topl, fl, oil, sigl, topr, fr, oir, sigr
 
 let equivF_abs_spec env fl fr inv = 
-  let fl,topl,fr,topr = check_adv env fl fr in
+  let topl, fl, oil,sigl, topr, fr, oir,sigr = abstract_info2 env fl fr in
   let ml, mr = mleft, mright in
   let fvl = PV.fv env ml inv in
   let fvr = PV.fv env mr inv in
   check_depend env fvl topl;
   check_depend env fvr topr;
   (* TODO check there is only global variable *)
-  let defl, defr = EcEnv.Fun.by_xpath fl env, EcEnv.Fun.by_xpath fr env in
-  let oil, oir = 
-    match defl.f_def, defr.f_def with
-    | FBabs oil, FBabs oir -> oil, oir
-    | _ -> assert false (* FIXME error message *)
-  in
   let ospec o_l o_r = 
     let fo_l = EcEnv.Fun.by_xpath o_l env in
     let fo_r = EcEnv.Fun.by_xpath o_r env in
@@ -600,8 +608,8 @@ let equivF_abs_spec env fl fr inv =
     f_equivF pre o_l o_r post in
   let sg = List.map2 ospec oil.oi_calls oir.oi_calls in
   let eq_params = 
-    f_eqparams fl defl.f_sig.fs_params ml fr defr.f_sig.fs_params mr in
-  let eq_res = f_eqres fl defl.f_sig.fs_ret ml fr defr.f_sig.fs_ret mr in
+    f_eqparams fl sigl.fs_params ml fr sigr.fs_params mr in
+  let eq_res = f_eqres fl sigl.fs_ret ml fr sigr.fs_ret mr in
   let eqglob = f_eqglob topl ml topr mr in
   let pre = f_ands [eq_params; eqglob; inv] in
   let post = f_ands [eq_res; eqglob; inv] in
@@ -615,7 +623,7 @@ let t_equivF_abs inv g =
   t_on_last tac (t_equivF_conseq pre post g)
 
 let equivF_abs_upto env fl fr bad invP invQ = 
-  let fl,topl,fr,topr = check_adv env fl fr in
+  let topl, fl, oil,sigl, topr, fr, oir,sigr = abstract_info2 env fl fr in
   let ml, mr = mleft, mright in
   let bad2 = f_subst_mem mhr mr bad in
   let allinv = f_ands [bad2; invP; invQ] in
@@ -624,12 +632,6 @@ let equivF_abs_upto env fl fr bad invP invQ =
   check_depend env fvl topl;
   check_depend env fvr topr;
   (* TODO check there is only global variable *)
-  let defl, defr = EcEnv.Fun.by_xpath fl env, EcEnv.Fun.by_xpath fr env in
-  let oil, oir = 
-    match defl.f_def, defr.f_def with
-    | FBabs oil, FBabs oir -> oil, oir
-    | _ -> assert false (* FIXME error message *)
-  in
   let eqglob = f_eqglob topl ml topr mr in
   let egP    = f_and eqglob invP in
   let ospec o_l o_r = 
@@ -670,8 +672,8 @@ let equivF_abs_upto env fl fr bad invP invQ =
     f_forall bd (f_imps hyps concl) in
   let sg = lossless_a :: sg in
   let eq_params = 
-    f_eqparams fl defl.f_sig.fs_params ml fr defr.f_sig.fs_params mr in
-  let eq_res = f_eqres fl defl.f_sig.fs_ret ml fr defr.f_sig.fs_ret mr in
+    f_eqparams fl sigl.fs_params ml fr sigr.fs_params mr in
+  let eq_res = f_eqres fl sigl.fs_ret ml fr sigr.fs_ret mr in
   let pre = f_if bad2 invQ (f_and eq_params egP) in
   let post = f_if bad2 invQ (f_and eq_res egP) in
   pre, post, sg
