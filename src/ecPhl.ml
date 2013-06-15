@@ -147,7 +147,6 @@ let id_of_mp mp =
 
 let generalize_mod env m modi f =
   let fv = PV.fv env m f in
-  PV.check env modi fv;
   let elts,glob = PV.elements modi in
   let create (pv,ty) = id_of_pv pv, GTty ty in
   let b = List.map create elts in
@@ -1716,9 +1715,9 @@ let t_rcond side b at_pos g =
 let check_swap env s1 s2 = 
   let m1,m2 = s_write env s1, s_write env s2 in
   let r1,r2 = s_read env s1, s_read env s2 in
-  let m2r1 = PV.diff env m2 r1 in
-  let m1m2 = PV.diff env m1 m2 in
-  let m1r2 = PV.diff env m1 r2 in
+  let m2r1 = PV.inter env m2 r1 in
+  let m1m2 = PV.inter env m1 m2 in
+  let m1r2 = PV.inter env m1 r2 in
   let error s1 s2 d = 
     EcLogic.tacuerror 
       "cannot swap : the two statement are not independants, the first statement can %s %a which can be %s by the second"
