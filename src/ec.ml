@@ -39,6 +39,7 @@ let _ =
             List.fold_left Filename.concat mydir
               [Filename.parent_dir_name; "lib"; "easycrypt"; "theories"]
     in
+      EcCommands.addidir ~system:true (Filename.concat theories "prelude");
       EcCommands.addidir ~system:true theories
   end;
 

@@ -25,9 +25,9 @@ CHECKARGS    := $(ECARGS) -I theories
 CHECKLIBARGS := $(CHECKARGS) -p Eprover -p Alt-Ergo -p Z3
 
 OKTESTS = \
+	  --ok-dir=tests/theories/success \
 	  --ok-dir=tests/typing/success   \
 	  --ok-dir=tests/modules/success  \
-	  --ok-dir=tests/theories/success \
 	  --ok-dir=tests/third-party      \
 	  --ok-dir=tests/unclassified     \
 	  --ok-dir=tests/tactics/success  \
@@ -53,6 +53,8 @@ CHECKLIBS = \
 	./scripts/runtest.py           \
 	  --bin=./ec.native            \
 	  --bin-args="$(CHECKLIBARGS)" \
+	  --ok-dir=theories/prelude    \
+	  --extra-args="-boot"         \
 	  --ok-dir=theories            \
 	  --xunit=libresults.xml
 
