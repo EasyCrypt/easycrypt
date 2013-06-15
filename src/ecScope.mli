@@ -9,8 +9,9 @@ exception HiScopeError of EcLocation.t option * string
 type scope
 
 type proof_uc = {
-  puc_name : string;
-  puc_jdg  : EcLogic.judgment_uc * int list;
+  puc_name   : string;
+  puc_jdg    : EcLogic.judgment_uc * int list;
+  puc_strict : bool option;
 }
 
 val empty   : scope
@@ -114,7 +115,8 @@ module Theory : sig
 end
 
 module Tactics : sig
-  val process : scope -> ptactic list -> scope
+  val process : ?mark:bool -> scope -> ptactic list -> scope
+  val proof   : scope -> bool -> scope
 end
 
 module Prover : sig 

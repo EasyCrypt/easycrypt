@@ -681,7 +681,7 @@ lemma Conclusion (A <: Adv {CPA,CPA2, BR, BR2, BR3, OW, RO, ARO, BR_OW}) &m :
  bd_hoare[ A(O).a2 : true ==> true] = 1%r) =>
  exists (I<:Inverter), 
 Pr[CPA(BR,A).main() @ &m : res] - 1%r / 2%r <= 
-Pr[OW(BR_OW(A)).main() @ &m : res].
+Pr[OW(I).main() @ &m : res].
 proof.
  intros H.
  exists (<:BR_OW(A)).

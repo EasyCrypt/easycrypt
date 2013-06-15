@@ -252,6 +252,7 @@
 %token SKIP
 %token SPLIT
 %token SPLITWHILE
+%token STRICT
 %token FIELD
 %token FIELDSIMP
 %token STAR
@@ -1711,8 +1712,9 @@ tactics0:
 | x=loc(empty) { Pseq [mk_core_tactic (mk_loc x.pl_loc (Pidtac None))] }
 
 tactics_or_prf:
-| t=tactics { `Actual t }
-| PROOF     { `Proof }
+| t=tactics    { `Actual t    }
+| PROOF        { `Proof false }
+| PROOF STRICT { `Proof true  }
 ;
 
 (* -------------------------------------------------------------------- *)
