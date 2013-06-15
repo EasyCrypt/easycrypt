@@ -1,3 +1,4 @@
+(* -------------------------------------------------------------------- *)
 open EcIdent
 open EcPath
 open EcTypes
@@ -5,6 +6,7 @@ open EcModules
 open EcFol
 open EcEnv
 
+(* -------------------------------------------------------------------- *)
 module PVM = struct
   type mem_sel = 
   | MSvar of prog_var
@@ -293,5 +295,4 @@ module PV = struct
     assert (check modi.glob topv);
     assert (check modi.glob topm);
     assert (check topvg topm)
-      
 end
