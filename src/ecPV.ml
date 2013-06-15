@@ -97,6 +97,7 @@ module PVM = struct
     M.add (MSmod mp, m) f s
 
   let merge (s1 : 'a subst) (s2 : 'a subst) =
+    (* TODO : should we check alias as in add_xxx *)
     M.merge (fun _ o1 o2 -> if o2 = None then o1 else o2) s1 s2
 
   let find env pv m s =
