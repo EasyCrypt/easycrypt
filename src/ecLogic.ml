@@ -233,95 +233,15 @@ let get_hyps  g = fst (get_goal g)
 let get_concl g = snd (get_goal g)
 
 (* -------------------------------------------------------------------- *)
-type tac_error =
-  | UnknownAx             of EcPath.path
-  | NotAHypothesis        of EcIdent.t
-  | UnknownElims          of form
-  | UnknownIntros         of form
-  | UnknownSplit          of form
-  | UnknownRewrite        of form
-  | CannotClearConcl      of EcIdent.t * form
-  | CannotReconizeElimT
-  | TooManyArgument
-  | NoHypToSubst          of EcIdent.t option
-  | CannotProve           of (LDecl.hyps * form)
-  | InvalNumOfTactic      of int * int
-  | NotPhl                of bool option
-  | NoSkipStmt
-  | InvalidCodePosition   of string*int*int*int
-  | CanNotApply           of string * string
-  | InvalidName           of string
-  | User                  of string
 
-exception TacError of tac_error
+let tacerror = EcBaseLogic.tacerror 
 
-let pp_tac_error fmt error =
-  let env = PE.PPEnv.ofenv EcEnv.initial in (* FIXME *)
-  match error with
-  | UnknownAx p ->
-      Format.fprintf fmt "Unknown axiom/lemma %a" PE.pp_path p
-  | NotAHypothesis id ->
-      Format.fprintf fmt "Unknown hypothesis %s" (EcIdent.name id)
-  | UnknownElims f ->
-    Format.fprintf fmt "Do not known what to eliminate in %a" (PE.pp_form env) f
-  | UnknownIntros f ->
-    Format.fprintf fmt "Do not known what to introduce in %a" (PE.pp_form env) f
-  | UnknownSplit f ->
-    Format.fprintf fmt "Do not known how to split %a" (PE.pp_form env) f
-  | UnknownRewrite f ->
-    Format.fprintf fmt "Do not known how to rewrite %a" (PE.pp_form env) f
-  | CannotClearConcl(id,_) ->
-    Format.fprintf fmt "Cannot clear %s, it is used in the conclusion"
-      (EcIdent.name id)
-  | CannotReconizeElimT ->
-    Format.fprintf fmt "Cannot reconize the elimination lemma"
-  | TooManyArgument ->
-    Format.fprintf fmt "Too many arguments in the application"
-  | NoHypToSubst (Some id) ->
-    Format.fprintf fmt "Cannot find non recursive equation on %s"
-      (EcIdent.name id)
-  | NoHypToSubst None ->
-    Format.fprintf fmt "Cannot find non recursive equation to substitute"
-  | CannotProve _ ->
-    Format.fprintf fmt "Cannot prove current goal"
-  | InvalNumOfTactic (i1,i2) ->
-    Format.fprintf fmt "Invalid number of tactics: %i given, %i expected" i2 i1
-  | NoSkipStmt ->
-    Format.fprintf fmt "Cannot apply skip rule"
-  | NotPhl b ->
-    let s =
-      match b with
-      | None -> "phl/prhl"
-      | Some true -> "phl"
-      | Some false -> "prhl" in
-    Format.fprintf fmt "The conclusion does not end by a %s judgment" s
-  | InvalidCodePosition (msg,k,lb,up) ->
-    Format.fprintf fmt "%s: Invalid code line number %i, expected in [%i,%i]" msg k lb up
-  | CanNotApply(s1,s2) ->
-    Format.fprintf fmt "Can not apply %s tactic:@\n %s" s1 s2
-  | InvalidName x ->
-    Format.fprintf fmt "Invalid name for this kind of object: %s" x
-  | User msg ->
-    Format.fprintf fmt "%s" msg
+let tacuerror = EcBaseLogic.tacuerror
 
-let _ = EcPException.register (fun fmt exn ->
-  match exn with
-  | TacError error -> pp_tac_error fmt error
-  | _ -> raise exn)
+let cannot_apply s1 s2 = 
+  tacuerror "Can not apply %s tactic:@\n %s" s1 s2
 
-let tacerror error = raise (TacError error)
-
-let tacuerror fmt =
-  let buf  = Buffer.create 127 in
-  let fbuf = Format.formatter_of_buffer buf in
-    Format.kfprintf
-      (fun _ ->
-         Format.pp_print_flush fbuf ();
-         raise (TacError (User (Buffer.contents buf))))
-      fbuf fmt
-
-let cannot_apply s1 s2 = tacerror (CanNotApply(s1,s2))
-
+(* -------------------------------------------------------------------- *)
 let t_subgoal lt gs =
   try
     t_subgoal lt gs
@@ -403,13 +323,24 @@ let t_trivial pi g =
   if EcEnv.check_goal pi goal then
     let rule = { pr_name = RN_prover (); pr_hyps = [] } in
     upd_rule_done rule g
-  else tacerror (CannotProve goal)
+  else tacuerror "Cannot prove current goal"
+
 
 let t_clear ids (juc,n as g) =
+  let pp_id fmt id = Format.fprintf fmt "%s" (EcIdent.name id) in
   let hyps,concl = get_goal g in
-  if not (Mid.set_disjoint ids concl.f_fv) then
-    tacerror (CannotClearConcl(Sid.choose (Mid.set_inter ids concl.f_fv), concl));
-  let hyps = LDecl.clear ids hyps in
+  if not (Mid.set_disjoint ids concl.f_fv) then begin
+    let elts = Sid.elements (Mid.set_inter ids concl.f_fv) in
+    tacuerror 
+      "Cannot clear %a, %s used in the conclusion"
+      (EcPrinting.pp_list ",@ " pp_id) elts
+      (if List.length elts = 1 then "it is" else "they are")
+  end;
+  let hyps = 
+    try LDecl.clear ids hyps 
+    with LDecl.Ldecl_error (LDecl.CanNotClear(id1,id2)) ->
+      tacuerror "Cannot clear %a it is used in %a"
+        pp_id id1 pp_id id2 in
   let juc,n1 = new_goal juc (hyps,concl) in
   let rule = { pr_name = RN_clear ids; pr_hyps = [RA_node n1] } in
   upd_rule rule (juc,n)
@@ -538,7 +469,9 @@ let t_rewrite_gen fpat side f g =
     else
       match h_red_opt full_red hyps f with
       | Some f -> find_rewrite f
-      | None   -> tacerror (UnknownRewrite f) in
+      | None   -> 
+        let ppe = EcPrinting.PPEnv.ofenv (LDecl.toenv hyps) in
+        tacuerror "Do not known how to rewrite %a" (EcPrinting.pp_form ppe) f in
   let (f1,f2),eq = find_rewrite f in
   let p,tys =
     if eq then (if side then p_rewrite_l else p_rewrite_r), [f1.f_ty]
@@ -617,7 +550,10 @@ let t_intros ids (juc,n as g) =
         check_intros hyps ids' s concl
       else if s == f_subst_id then
         match h_red_opt full_red hyps concl with
-        | None -> tacerror (UnknownIntros concl)
+        | None -> 
+          let ppe = EcPrinting.PPEnv.ofenv (LDecl.toenv hyps) in
+          tacuerror "Do not known what to introduce in %a"
+            (EcPrinting.pp_form ppe) concl
         | Some concl -> check_intros hyps ids s concl
       else check_intros hyps ids f_subst_id (f_subst s concl) in
   let hyps, concl = check_intros hyps ids f_subst_id concl in
@@ -757,7 +693,10 @@ let t_elim f (juc,n) =
   and aux_red f =
     match h_red_opt full_red hyps f with
     | Some f -> aux f
-    | _ -> tacerror (UnknownElims f) in
+    | _ -> 
+      let ppe = EcPrinting.PPEnv.ofenv (LDecl.toenv hyps) in
+      tacuerror 
+        "Do not known what to eliminate in %a" (EcPrinting.pp_form ppe) f in
   aux f
 
 let t_elim_hyp h g =
@@ -777,7 +716,9 @@ let t_or_intro b g =
     | _ ->
       match h_red_opt full_red hyps f with
       | Some f -> aux f
-      | None -> tacerror (UnknownSplit f) in
+      | None ->
+        let ppe = EcPrinting.PPEnv.ofenv (LDecl.toenv hyps) in
+        tacuerror "Do not known how to split %a" (EcPrinting.pp_form ppe) f in
   aux concl
 
 let t_left  = t_or_intro true
@@ -842,7 +783,7 @@ let t_elimT f p g =
 
   let env = LDecl.toenv hyps in
   match ax.EcDecl.ax_spec with
-  | None -> tacerror (CannotReconizeElimT)
+  | None -> tacuerror "Cannot reconize the elimination lemma"
   | Some fax ->
     let tys =
       let tpred =
@@ -850,7 +791,7 @@ let t_elimT f p g =
           match destr_forall1 fax with
           | _, GTty ty, _ -> ty
           | _             -> raise Not_found
-        with _ -> tacerror (CannotReconizeElimT) in
+        with _ -> tacuerror "Cannot reconize the elimination lemma" in
       let ue = EcUnify.UniEnv.create (Some (LDecl.tohyps hyps).h_tvar) in
       let (ue, tpred,tys) =
         EcUnify.UniEnv.freshen ue ax.EcDecl.ax_tparams None tpred in
@@ -869,7 +810,8 @@ let t_elimT f p g =
         AAform f::aa
       else
         let aa,fax = skip_imp [] fax in
-        if not (is_forall fax) then tacerror (CannotReconizeElimT);
+        if not (is_forall fax) then 
+          tacuerror "Cannot reconize the elimination lemma";
         List.rev_append aa [AAform f] in
     t_apply_glob p tys (AAform pf::aa) g
 
@@ -911,7 +853,10 @@ let gen_t_exists do_arg fs (juc,n as g) =
         let concl = f_subst s concl in
         match h_red_opt full_red hyps concl with
         | Some f -> aux f_subst_id ras fs f
-        | None -> tacerror (UnknownSplit concl) in
+        | None -> 
+          let ppe = EcPrinting.PPEnv.ofenv (LDecl.toenv hyps) in
+          tacuerror "Do not known how to split %a" 
+            (EcPrinting.pp_form ppe) concl in
   let args,concl = aux f_subst_id [] fs concl in
   let (juc,n1) = new_goal juc (hyps,concl) in
   let rule =
@@ -955,7 +900,10 @@ let t_split g =
   and aux_red f =
     match h_red_opt full_red hyps f with
     | Some f -> aux f
-    | None -> tacerror (UnknownSplit f) in
+    | None -> 
+      let ppe = EcPrinting.PPEnv.ofenv (LDecl.toenv hyps) in
+      tacuerror "Do not known how to split %a"
+        (EcPrinting.pp_form ppe) f in
   aux concl
 
 let t_subst_gen x h side g =
@@ -1011,7 +959,12 @@ let is_subst_eq hyps x (hid,lk) =
 let t_subst1_loc x g =
   let hyps = get_hyps g in
   match List.pick (is_subst_eq hyps x) (LDecl.tohyps hyps).h_local with
-  | None -> tacerror (NoHypToSubst x)
+  | None -> 
+    begin match x with
+    | None -> tacuerror "Cannot find non recursive equation to substitute"
+    | Some id -> 
+      tacuerror "Cannot find non recursive equation on %s" (EcIdent.name id)
+    end
   | Some(h, x, side) ->
     t_subst_gen x h side g
 

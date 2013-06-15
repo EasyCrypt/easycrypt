@@ -128,3 +128,59 @@ type judgment = {
   j_rule : judgment rule
 }
 
+(* -------------------------------------------------------------------- *)
+
+type tac_error =
+  | UnknownAx             of EcPath.path
+  | NotAHypothesis        of EcIdent.t
+  | TooManyArgument
+  | InvalNumOfTactic      of int * int
+  | NotPhl                of bool option
+  | NoSkipStmt
+  | InvalidCodePosition   of string*int*int*int
+  | InvalidName           of string
+  | User                  of string
+
+exception TacError of tac_error
+
+let pp_tac_error fmt error =
+  match error with
+  | UnknownAx p ->
+      Format.fprintf fmt "Unknown axiom/lemma %s" (EcPath.tostring p)
+  | NotAHypothesis id ->
+      Format.fprintf fmt "Unknown hypothesis %s" (EcIdent.name id)
+  | TooManyArgument ->
+    Format.fprintf fmt "Too many arguments in the application"
+  | InvalNumOfTactic (i1,i2) ->
+    Format.fprintf fmt "Invalid number of tactics: %i given, %i expected" i2 i1
+  | NotPhl b ->
+    let s =
+      match b with
+      | None -> "phl/prhl"
+      | Some true -> "phl"
+      | Some false -> "prhl" in
+    Format.fprintf fmt "The conclusion does not end by a %s judgment" s
+  | InvalidCodePosition (msg,k,lb,up) ->
+    Format.fprintf fmt "%s: Invalid code line number %i, expected in [%i,%i]" msg k lb up
+  | NoSkipStmt ->
+    Format.fprintf fmt "Cannot apply skip rule"
+  | InvalidName x ->
+    Format.fprintf fmt "Invalid name for this kind of object: %s" x
+  | User msg ->
+    Format.fprintf fmt "%s" msg
+
+let _ = EcPException.register (fun fmt exn ->
+  match exn with
+  | TacError error -> pp_tac_error fmt error
+  | _ -> raise exn)
+
+let tacerror error = raise (TacError error)
+
+let tacuerror fmt =
+  let buf  = Buffer.create 127 in
+  let fbuf = Format.formatter_of_buffer buf in
+    Format.kfprintf
+      (fun _ ->
+         Format.pp_print_flush fbuf ();
+         raise (TacError (User (Buffer.contents buf))))
+      fbuf fmt

@@ -25,30 +25,9 @@ type goal   = judgment_uc * int
 type tactic = goal -> goals 
 
 (* -------------------------------------------------------------------- *)
-type tac_error =
-  | UnknownAx             of EcPath.path
-  | NotAHypothesis        of EcIdent.t
-  | UnknownElims          of form
-  | UnknownIntros         of form
-  | UnknownSplit          of form
-  | UnknownRewrite        of form
-  | CannotClearConcl      of EcIdent.t * form
-  | CannotReconizeElimT
-  | TooManyArgument
-  | NoHypToSubst          of EcIdent.t option
-  | CannotProve           of (LDecl.hyps * form)
-  | InvalNumOfTactic      of int * int
-  | NotPhl                of bool option
-  | NoSkipStmt
-  | InvalidCodePosition   of string * int * int * int
-  | CanNotApply           of string * string
-  | InvalidName           of string
-  | User                  of string
-
-exception TacError of tac_error
 
 val cannot_apply : string -> string -> 'a
-val tacerror     : tac_error -> 'a
+val tacerror     : EcBaseLogic.tac_error -> 'a
 val tacuerror    : ('a, Format.formatter, unit, 'b) format4 -> 'a
 
 val set_loc : EcLocation.t -> ('a -> 'b) -> 'a -> 'b

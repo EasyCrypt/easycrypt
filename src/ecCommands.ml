@@ -20,7 +20,7 @@ exception TopError of EcLocation.t * exn
 let rec toperror_of_exn ?gloc exn =
   match exn with
   | TyError  (loc, _, _) -> Some (loc, exn)
-  | TacError _           -> Some (odfl _dummy gloc, exn)
+  | EcBaseLogic.TacError _           -> Some (odfl _dummy gloc, exn)
   | ParseError (loc, _)  -> Some (loc, exn)
 
   | LocError (loc, e)    -> begin

@@ -111,3 +111,21 @@ type judgment = {
   j_decl : l_decl;
   j_rule : judgment rule
 }
+
+(* -------------------------------------------------------------------- *)
+type tac_error =
+  | UnknownAx             of EcPath.path
+  | NotAHypothesis        of EcIdent.t
+  | TooManyArgument
+  | InvalNumOfTactic      of int * int
+  | NotPhl                of bool option
+  | NoSkipStmt
+  | InvalidCodePosition   of string*int*int*int
+  | InvalidName           of string
+  | User                  of string
+
+exception TacError of tac_error
+
+val tacerror     : tac_error -> 'a
+val tacuerror    : ('a, Format.formatter, unit, 'b) format4 -> 'a
+
