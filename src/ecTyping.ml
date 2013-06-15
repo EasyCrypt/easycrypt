@@ -1181,7 +1181,7 @@ and transstruct1 (env : EcEnv.env) (st : pstructure_item) =
       let clsubst = { EcTypes.e_subst_id with es_ty = su } in
       let stmt    = s_subst clsubst stmt
       and result  = omap result (e_subst clsubst) in
-      let stmt    = EcModules.stmt (prelude @ stmt.s_node) in
+      let stmt    = EcModules.stmt (List.flatten prelude @ stmt.s_node) in
 
       (* Computes reads/writes/calls *)
       let uses = ofold result ((^~) se_inuse) (s_inuse stmt) in
@@ -1216,57 +1216,54 @@ and transbody ue symbols (env : EcEnv.env) retty pbody =
     let mpath = oget (EcEnv.xroot !env) in
 
     (* Type-check local variables / check for dups *)
-    let add_local (xs, pty, init) =
-      List.iter (fundef_add_symbol !env symbols) xs;
+    let add_local local =
+      List.iter (fundef_add_symbol !env symbols) (snd local.pfl_names);
 
-      let ty     = transty tp_uni !env ue pty in
-      let xsvars =
-        match xs with
-        | [_] -> [ty]
-        | _   -> List.map (fun _ -> UE.fresh_uid ue) xs in
-      let init   =
-        let check_init pinit =
-          let (init, initty) = transexp !env ue pinit in
-            unify_or_fail !env ue pinit.pl_loc ty initty;
-            init
-        in
-          omap init check_init
+      let xs     = snd local.pfl_names in
+      let mode   = fst local.pfl_names in
+      let init   = omap local.pfl_init (fst -| transexp !env ue) in
+      let ty     = omap local.pfl_type (transty tp_uni !env ue) in
+
+      let ty =
+        match ty, init with
+        | None   , None   -> assert false
+        | Some ty, None   -> ty
+        | None   , Some e -> e.e_ty
+        | Some ty, Some e -> begin
+            let loc =  (oget local.pfl_init).pl_loc in
+              unify_or_fail !env ue loc ty e.e_ty; ty
+        end
       in
-        begin
-          let xsty =
-            match xsvars with
-            | [ty] -> ty
-            | _    -> ttuple xsvars
-          in
-            unify_or_fail !env ue pty.pl_loc ty xsty
-        end;
 
-        env := begin
-          let topr = fun x xty -> (unloc x, `Variable (PVloc, xty)) in
-            EcEnv.bindall (List.map2 topr xs xsvars) !env
-        end;
+      let xsvars = List.map (fun _ -> UE.fresh_uid ue) xs in
 
-        let mylocals =
-          List.map2
-            (fun x xty ->
-               let x = unloc x in
-                 ({ v_name  = x; v_type  = xty   }, 
-                  pv_loc mpath x,
-                  xty, pty.pl_loc))
-            xs xsvars
-        in
+      begin
+        match mode with
+        | `Single -> List.iter (fun a -> EcUnify.unify !env ue a ty) xsvars
+        | `Tuple  -> unify_or_fail !env ue _dummy ty (ttuple xsvars)
+      end;
 
-        locals :=
-           List.rev_append
-            (List.map (fun (v, _, _, pl) -> (v, pl)) mylocals)
-            !locals;
+      env := begin
+        let topr = fun x xty -> (unloc x, `Variable (PVloc, xty)) in
+          EcEnv.bindall (List.map2 topr xs xsvars) !env
+      end;
 
-        oiter init
-          (fun init ->
-            let iasgn =
-              List.map (fun (_, v, xty, _) -> (v, xty)) mylocals
-            in
-               prelude := (iasgn, init, pty.pl_loc) :: !prelude)
+      let mylocals =
+        List.map2
+          (fun { pl_desc = x; pl_loc = loc; } xty ->
+            ({ v_name = x; v_type = xty }, pv_loc mpath x, xty, loc))
+          xs xsvars
+      in
+
+      locals :=
+         List.rev_append
+          (List.map (fun (v, _, _, pl) -> (v, pl)) mylocals)
+          !locals;
+
+      oiter init
+        (fun init ->
+          let iasgn = List.map (fun (_, v, xty, _) -> (v, xty)) mylocals in
+            prelude := ((mode, iasgn), init, _dummy) :: !prelude)
     in
 
     List.iter add_local pbody.pfb_locals;
@@ -1301,7 +1298,7 @@ and fundef_check_decl subst_uni env (decl, loc) =
   { decl with
       v_type = fundef_check_type subst_uni env (decl.v_type, loc) }
 
-and fundef_check_iasgn subst_uni env (pl, init, loc) =
+and fundef_check_iasgn subst_uni env ((mode, pl), init, loc) =
   let pl =
     List.map
       (fun (p, ty) ->
@@ -1309,14 +1306,15 @@ and fundef_check_iasgn subst_uni env (pl, init, loc) =
       pl
   in
   let pl =
-    match pl with
-    | [xty] -> LvVar xty
-    | xtys  -> LvTuple xtys
+    match mode with
+    | `Single -> List.map (fun xty -> LvVar xty) pl
+    | `Tuple  -> [LvTuple pl]
   in
 
   let clsubst = { EcTypes.e_subst_id with es_ty = subst_uni } in
+  let init    = e_subst clsubst init in
 
-    i_asgn (pl, e_subst clsubst init)
+    List.map (fun lv -> i_asgn (lv, init)) pl
 
 (* -------------------------------------------------------------------- *)
 and transstmt ue (env : EcEnv.env) (stmt : pstmt) : stmt =
@@ -1627,7 +1625,7 @@ let transform_opt env ue pf tt =
         unify_or_fail env ue pre.pl_loc pre'.f_ty tbool;
         let post' = transf env post in
         unify_or_fail env ue post.pl_loc post'.f_ty tbool;
-        f_hoareS menv pre' (EcModules.stmt (prelude @ stmt.s_node)) post'
+        f_hoareS menv pre' (EcModules.stmt (List.flatten prelude @ stmt.s_node)) post'
 
     | PFBDhoareF (pre, gp, post, hcmp, bd) ->
         let fpath = trans_gamepath env gp in
@@ -1667,7 +1665,7 @@ let transform_opt env ue pf tt =
         unify_or_fail env ue pre.pl_loc pre'.f_ty tbool;
         let post' = transf env post in
         unify_or_fail env ue post.pl_loc post'.f_ty tbool;
-        f_bdHoareS menv pre' (EcModules.stmt (prelude @ stmt.s_node)) post' hcmp bd'
+        f_bdHoareS menv pre' (EcModules.stmt (List.flatten prelude @ stmt.s_node)) post' hcmp bd'
 
     | PFequivF (pre, (gp1, gp2), post) ->
         let fpath1 = trans_gamepath env gp1 in
