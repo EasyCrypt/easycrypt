@@ -124,8 +124,7 @@ type tac_error =
   | InvalidName           of string
   | User                  of string
 
-exception TacError of tac_error
+exception TacError of bool * tac_error
 
-val tacerror     : tac_error -> 'a
-val tacuerror    : ('a, Format.formatter, unit, 'b) format4 -> 'a
-
+val tacerror  : ?catchable:bool -> tac_error -> 'a
+val tacuerror : ?catchable:bool -> ('a, Format.formatter, unit, 'b) format4 -> 'a

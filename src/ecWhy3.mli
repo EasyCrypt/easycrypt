@@ -36,11 +36,8 @@ val add_ax : env -> EcPath.path -> EcDecl.axiom -> env * rebinding
 val add_mod_exp :
     env -> EcPath.path -> EcModules.module_expr -> env * rebinding
 
-
-
-
-
 (*****************************************************************************)
+exception CanNotTranslate of string
 
 val check_goal : 
   (EcIdent.t -> EcModules.module_type -> EcPath.Sm.t -> EcModules.module_expr) ->
