@@ -112,8 +112,9 @@ let process_assumption loc (pq, tvi) g =
   | None ->
       if (tvi <> None) then error loc BadTyinstance;
       let h  =
-        try find_in_hyps concl hyps
-        with _ -> assert false in
+        try  find_in_hyps concl hyps
+        with Not_found -> tacuerror "no assumptions"
+      in
       t_hyp h g
   | Some pq ->
       match unloc pq with
