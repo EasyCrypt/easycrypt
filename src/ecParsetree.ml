@@ -178,6 +178,7 @@ and pformula_r =
   | PFexists of pgtybindings * pformula
   | PFlambda of ptybindings * pformula
   | PFglob   of pmsymbol located 
+  | PFeqveq  of pqsymbol list
 
   (* for claims *)
   | PFhoareS   of pformula * pfunction_body * pformula

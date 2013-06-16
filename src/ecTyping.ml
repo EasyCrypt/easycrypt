@@ -1520,7 +1520,20 @@ let transform_opt env ue pf tt =
           transf (EcEnv.Memory.set_active me env) f
       end
 
-    | PFapp ({pl_desc = PFident({ pl_desc = name; pl_loc = loc }, tvi)}, es) ->
+    | PFeqveq xs ->
+        let lookup me x =
+          match EcEnv.Var.lookup_progvar_opt ~side:me (unloc x) env with
+          | None -> tyerror x.pl_loc env (UnknownVarOrOp (unloc x, []))
+          | Some (x, ty) -> f_pvar x ty me
+        in
+
+        let xs1 = List.map (lookup EcFol.mleft ) xs in
+        let xs2 = List.map (lookup EcFol.mright) xs in
+        let eqs = List.map2 (fun x1 x2 -> f_eq x1 x2) xs1 xs2 in
+
+        EcFol.f_ands eqs
+
+    | PFapp ({pl_desc = PFident ({ pl_desc = name; pl_loc = loc }, tvi)}, es) ->
         let tvi  = omap tvi (transtvi env ue) in  
         let es   = List.map (transf env) es in
         let esig = List.map EcFol.f_ty es in 
