@@ -24,7 +24,7 @@ ECARGS   ?=
 CHECK     = scripts/runtest.py config/tests.config
 
 # --------------------------------------------------------------------
-.PHONY: all build byte native tests check check-xunit tags
+.PHONY: all build byte native tests check check-xunit examples tags
 .PHONY: clean install uninstall dist distcheck why3
 .PHONY: pg toolchain update-toolchain %.ml %.mli %.inferred.mli
 
@@ -55,6 +55,9 @@ uninstall:
 	-@rmdir $(DESTDIR)$(PREFIX)/lib/easycrypt
 
 tests: check
+
+examples:
+	$(CHECK) examples
 
 check: ec.native
 	$(CHECK) prelude theories unit
