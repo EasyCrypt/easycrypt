@@ -146,7 +146,12 @@ lemma map_cons: forall (f:'a -> 'b) xs,
 
 (* card *)
 axiom card_empty: card<:'a> empty = 0.
-axiom card_rm: forall (x:'a) S, mem x S => card S = 1 + card(rm x S).
+
+lemma card_rm: forall (x:'a) S, mem x S => card S = 1 + card(rm x S).
+proof.
+  intros=> a S in_a_S; rewrite <- (add_rm<:'a> a S _); first assumption.
+  rewrite (add_card<:'a> a (rm a S) _); first by apply rm_mem.
+  
 
 pred (* local *) cP_card_pos (X:'a set) = 0 <= card X.
 lemma card_pos: forall (X:'a set), 0 <= card X.
@@ -229,7 +234,7 @@ pred (* local *) cP_subset_union(X:'a set) = forall Y,
 lemma subset_union2: forall (X Y:'a set),
   X <= Y => exists Z, Y = union X Z.
 proof.
-intros X;cut H0: (cP_subset_union X).
+intros X; cut H0: (cP_subset_union X).
   apply (induction cP_subset_union).
     trivial.
     intros x S H H0;cut H1: (forall Y, (add x S) <= Y => (exists Z, Y = union (add x S) Z)).

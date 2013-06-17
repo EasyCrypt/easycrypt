@@ -256,6 +256,7 @@
 %token STRICT
 %token FIELD
 %token FIELDSIMP
+%token SMT
 %token STAR
 %token SUBST
 %token SWAP
@@ -264,7 +265,6 @@
 %token TICKPIPE
 %token TILD
 %token TIMEOUT
-%token TRIVIAL
 %token PROGRESS
 %token TRY
 %token TYPE
@@ -1482,8 +1482,8 @@ logtactic:
 | CLEAR l=ident+
    { Pclear l }
 
-| TRIVIAL pi=prover_info
-   { Ptrivial pi }
+| SMT pi=prover_info
+   { Psmt pi }
 
 | INTROS a=intro_pattern*
    { Pintro a }
