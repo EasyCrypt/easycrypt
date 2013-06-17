@@ -16,10 +16,10 @@ proof.
  fun.
  seq 1 : (M.y) (1%r/2%r).
  rnd (1%r/2%r) (lambda (x:bool),x=true).
- skip; trivial.
+ skip; smt.
  rnd (1%r/2%r) (lambda (x:bool),x=true).
  skip.
- trivial.
+ smt.
 save.
 
 module M2 = {
@@ -35,9 +35,9 @@ lemma test2 : bd_hoare [M2.f : true ==> M2.x /\ M2.y ] <= (1%r/2%r).
 proof.
  fun.
  seq 1 : (M2.y) .
- wp; skip; trivial.
+ wp; skip; smt.
  rnd (1%r/2%r) (lambda (x:bool),x=true).
- wp; skip; trivial.
+ wp; skip; smt.
 save.
 
 
@@ -54,11 +54,11 @@ lemma test3 : bd_hoare [M3.f : true ==> M3.x /\ M3.y ] <= (1%r/2%r).
 proof.
  fun.
  seq 1 : (M3.x) (1%r/2%r) (1%r) (1%r/2%r) (0%r) .
- rnd (1%r/2%r) (lambda (x:bool),x=true);skip; trivial.
- wp; pr_bounded; trivial. 
- rnd (1%r/2%r) (lambda (x:bool),x=false);skip; trivial.
- bd_eq; hoare; [wp; skip; trivial | trivial].
- trivial.
+ rnd (1%r/2%r) (lambda (x:bool),x=true);skip; smt.
+ wp; pr_bounded; smt. 
+ rnd (1%r/2%r) (lambda (x:bool),x=false);skip; smt.
+ bd_eq; hoare; [wp; skip; smt | smt].
+ smt.
 save.
 
 

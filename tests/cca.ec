@@ -43,7 +43,7 @@ proof.
  fun true;try (simplify;split).
  skip;simplify. (* Il y a un bug : les variables sont des fois avec les
                    arguments des foncteurs d'autres fois non *)
- trivial.
+ smt.
 save.
 
 module type IO = { 
@@ -86,10 +86,10 @@ intros A.
  fun.
  call (x{1} = x{2} /\ (glob A){1} = (glob A){2} /\ true) 
       (res{1} = res{2} /\ (glob A){1} = (glob A){2} /\ true).
- fun true;try trivial.
+ fun true;try smt.
  fun.
- skip;trivial.
- skip;trivial.
+ skip;smt.
+ skip;smt.
 save.
 
 module A' (O:IO) : Adv'(O) = { 
@@ -116,8 +116,8 @@ proof.
  equiv_deno (_ : x{1} = x{2} /\ (glob A'){1} = (glob A'){2} ==> 
                  res{1} = res{2} /\  (glob A'){1} = (glob A'){2}).
  apply foo1.
- simplify;trivial.
- trivial.
+ simplify;smt.
+ smt.
 save.
 
 (*

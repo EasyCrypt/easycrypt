@@ -20,8 +20,8 @@ proof.
   fun.
   while (x<=y) (y-x).
   intros z.
-  wp; skip; trivial.
-  wp; skip; trivial.
+  wp; skip; smt.
+  wp; skip; smt.
 save.
 
 

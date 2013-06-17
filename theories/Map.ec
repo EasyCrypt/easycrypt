@@ -32,7 +32,7 @@ lemma upd_comm: forall (m : ('a,'b) map) x1 x2 y1 y2,
 proof.
 intros m x1 x2 y1 y2 x1_neq_x2;
   cut ext_eq: (forall (a:'a), m.[x1 <- y1].[x2 <- y2].[a] = m.[x2 <- y2].[x1 <- y1].[a]);
-  trivial.
+  smt.
 save.
 
 (** Formalization of map domain *)
@@ -59,7 +59,7 @@ by [].
 
 lemma dom_empty: dom (empty<:'a,'b>) = Set.empty<:'a>.
 proof.
-  apply (Set.extensionality<:'a> (dom empty<:'a,'b>) Set.empty _); trivial.
+  apply (Set.extensionality<:'a> (dom empty<:'a,'b>) Set.empty _); smt.
 qed.
 
 lemma in_dom_empty: forall x, !in_dom x empty<:'a, 'b> by [].
@@ -67,7 +67,7 @@ lemma in_dom_empty: forall x, !in_dom x empty<:'a, 'b> by [].
 lemma dom_update: forall (m:('a,'b) map) x y,
   dom (m.[x <- y]) = Set.add x (dom m).
 proof.
-intros m x y; apply Set.extensionality; trivial.
+intros m x y; apply Set.extensionality; smt.
 save.
 
 (** Formalization of map range *)
@@ -86,7 +86,7 @@ lemma in_dom_in_rng: forall (m:('a,'b) map) x,
   in_dom x m => in_rng (proj m.[x]) m.
 proof.
 intros m x Hdom.
-cut Hx : (m.[x] = Some (proj(m.[x])));trivial.
+cut Hx : (m.[x] = Some (proj(m.[x])));smt.
 save.
 
 lemma rng_empty: rng (empty<:'a,'b>) = Set.empty.
@@ -94,7 +94,7 @@ proof.
   apply Set.extensionality.
   intros x.
   rewrite (rng_def<:'a,'b> (Map_why.const_ None) x).
-  split; intros _; trivial.
+  split; intros _; smt.
 save.
 
 lemma in_rng_empty: forall x, !in_rng x empty<:'a, 'b> by [].
@@ -107,8 +107,8 @@ proof.
   intros z.
   rewrite (Set.add_mem<:'b> z y (rng m)).  
   rewrite (rng_def<:'a,'b> m.[x <- y] z); split; intros H1.
-  trivial.
-  elim H1; trivial.
+  smt.
+  elim H1; smt.
 save.
 
 lemma upd_in_rng_neq: forall (m:('a,'b) map) x y1 y2,
@@ -156,10 +156,10 @@ cut H1: (find P m.[x<-y] = None => false).
   intros Hfnone;cut H1: (find P m = None).
     apply (find_none2<:'a,'b> P m _).
       intros z Hz;cut Heq: (z = x => !P (z, proj m.[z])).
-        trivial.
-        cut Hneq: (z <> x => !P (z, proj m.[z]));trivial.
-      trivial.
-  trivial.
+        smt.
+        cut Hneq: (z <> x => !P (z, proj m.[z]));smt.
+      smt.
+  smt.
 save.
 
 lemma find_some_upd2: forall (P:('a * 'b) cPred) m x y, 
@@ -172,10 +172,10 @@ lemma find_some_upd3: forall (P:('a * 'b) cPred) m x y,
   find P m.[x <- y] <> None.
 proof.
 intros P m x y H H0;cut H1: (exists v, find P m = Some v).
-  trivial.
+  smt.
   elim H1;intros v Hfind_v;cut H3: (exists v, find P m.[x<-y] = Some v).
-    apply (find_some2<:'a,'b> P m.[x<-y] v _);trivial.
-  trivial.
+    apply (find_some2<:'a,'b> P m.[x<-y] v _);smt.
+  smt.
 save.
 
 lemma find_none_upd1: forall (P:('a * 'b) cPred) m x y,
@@ -190,16 +190,16 @@ lemma find_none_upd2: forall (P:('a * 'b) cPred) m x y,
   find P m.[x<-y] = Some x.
 proof.
 intros P m x y H H1;cut Hnone: (forall x', in_dom x' m => !P (x',proj m.[x'])).
-  intros x' Hxindom;trivial.
+  intros x' Hxindom;smt.
   cut Hsuff: (exists x', find P m.[x<-y] = Some x').
-    trivial.
+    smt.
     elim Hsuff;intros x' Hfind;cut Hindom: (in_dom x' m.[x<-y]). 
-      trivial. 
+      smt. 
       cut HP: (P (x',proj m.[x<-y].[x']) = true).
-        trivial.
+        smt.
         cut Hor: (x = x' \/ in_dom x' m).
-          trivial.
-          elim Hor;intros Heq;trivial.
+          smt.
+          elim Hor;intros Heq;smt.
 save.
 
 (** remove *)
@@ -226,8 +226,8 @@ lemma rm_find: forall (P:('a * 'b) cPred) m x y,
 proof.
 intros P m x y Hfind Hneq;
 cut H: (in_dom y m /\ P (y,proj (m.[y])) = true).
-  trivial.
-  cut H': (in_dom y (rm x m) /\ P (y,proj ((rm x m).[y])) = true);trivial.
+  smt.
+  cut H': (in_dom y (rm x m) /\ P (y,proj ((rm x m).[y])) = true);smt.
 save.
 
 (** extensional equality *)
@@ -282,10 +282,10 @@ lemma eq_except_def: forall (m1 m2:('a,'b) map) x,
   exists z, m1.[x<-z] = m2.
 proof.
 intros m1 m2 x x_in_dom_m2 m1_eq_except_m2_x;
-cut H: (exists z, m2.[x] = Some z);[ trivial | idtac ].
+cut H: (exists z, m2.[x] = Some z);[ smt | idtac ].
 elim H;intros z m2_z.
-cut eq_except: (m2 = m1.[x <- z]);[ idtac | trivial ].
-apply (eq_except_eq<:'a,'b> m2 m1 x z _ _ _);trivial.
+cut eq_except: (m2 = m1.[x <- z]);[ idtac | smt ].
+apply (eq_except_eq<:'a,'b> m2 m1 x z _ _ _);smt.
 save.
 *)
 (** Disjointness of maps *)

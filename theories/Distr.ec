@@ -31,9 +31,9 @@ lemma mu_not : forall (d:'a distr, p:'a cPred),
   mu d (cPnot p) = mu d cPtrue - mu d p.
 proof.
   intros d p.
-  cut H: (forall (x y z:real), x + z = y => x = y - z); [trivial | ].
+  cut H: (forall (x y z:real), x + z = y => x = y - z); [smt | ].
   apply (H (mu d (cPnot p)) (mu d cPtrue) (mu d p) _).
-  cut H1: (mu d cPtrue = mu d (cPor (cPnot p) p)); trivial.
+  cut H1: (mu d cPtrue = mu d (cPor (cPnot p) p)); smt.
 qed.
 
 lemma mu_weight_0 : forall (d:'a distr),
@@ -111,7 +111,7 @@ theory Dscale.
   proof.
    intros d H.
    delta weight; simplify.
-   rewrite (mu_x_def_pos<:'a> d _ cPtrue); trivial.
+   rewrite (mu_x_def_pos<:'a> d _ cPtrue); smt.
   qed.
   
 end Dscale.

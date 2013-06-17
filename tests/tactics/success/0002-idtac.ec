@@ -1,5 +1,5 @@
 lemma l: true.
 proof.
 idtac.
-trivial.
+smt.
 save.

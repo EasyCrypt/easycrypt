@@ -19,10 +19,10 @@ proof.
   fun.
   splitwhile (x<=5) : 3.
   while (x<=y).
-  wp; skip; trivial.
+  wp; skip; smt.
   while (x<=y).
-  wp; skip; trivial.
-  wp; skip; trivial.
+  wp; skip; smt.
+  wp; skip; smt.
 save.
 
 lemma test2 : equiv [M1.f ~ M1.f : true ==> true].

@@ -32,13 +32,13 @@ axiom from_array_get: forall bs i,
 lemma to_array_from_array: forall bs,
   from_array (to_array bs) = bs.
 proof.
-intros bs; apply extensionality; trivial.
+intros bs; apply extensionality; smt.
 save.
 
 lemma from_array_to_array: forall bs,
   to_array (from_array bs) = bs.
 proof.
-intros bs; apply Array.extensionality; trivial.
+intros bs; apply Array.extensionality; smt.
 save.
 
 (* Xor *)
@@ -71,13 +71,13 @@ lemma xor_nilpotent: forall (bs:bitstring),
   bs ^^ bs = zeros (length bs).
 proof.
   intros bs; apply extensionality.
-  delta (==); simplify; split; first trivial.
+  delta (==); simplify; split; first smt.
   intros i i_pos i_upbd.
   delta (^^); simplify.
   rewrite (zeros_get (length bs) i _ _ _);
-    [trivial | trivial | trivial | ].
+    [smt | smt | smt | ].
   rewrite (map2_get<:bool,bool,bool> bs bs Bool.xorb i _ _ _);
-    trivial.
+    smt.
 save.
 
 lemma xor_assoc : forall (x y z : bitstring), 
@@ -87,29 +87,29 @@ proof.
  intros x y z Hleq1 Hleq2.
  apply extensionality.
  delta (==);simplify.
- split;try trivial.
+ split;try smt.
  delta (^^);simplify.
  intros i H H0.
  rewrite (map2_get<:bool,bool,bool> (map2 Bool.xorb x y) z Bool.xorb i _ _ _);
-  [trivial | trivial | trivial | ].
+  [smt | smt | smt | ].
  rewrite (map2_get<:bool,bool,bool> x y Bool.xorb i _ _ _);
-  [trivial | trivial | trivial | ].
+  [smt | smt | smt | ].
  rewrite (map2_get<:bool,bool,bool> x (map2 Bool.xorb y z)  Bool.xorb i _ _ _);
-  [trivial | trivial | trivial | ].
+  [smt | smt | smt | ].
  rewrite (map2_get<:bool,bool,bool> y z Bool.xorb i _ _ _);
- trivial.
+ smt.
 save.
 
 lemma xor_zeroes_neutral : forall (x : bitstring),
 x ^^ zeros(length(x)) = x.
 proof.
  intros x; apply extensionality.
- delta (==); simplify; split; first trivial.
+ delta (==); simplify; split; first smt.
  intros i i_pos i_upbd; delta (^^); simplify.
  rewrite (map2_get<:bool,bool,bool> x (zeros (length x)) Bool.xorb i _ _ _);
-  [trivial | trivial | trivial | ].
+  [smt | smt | smt | ].
  rewrite (zeros_get (length x) i _ _ _);
- trivial.
+ smt.
 save.
 
 require import Real.
@@ -129,13 +129,13 @@ theory Dbitstring.
     in_supp s (dbitstring k) <=> length s = k.
   proof.
     intros k s; delta in_supp mu; simplify; split; intros H.
-    trivial.
+    smt.
     rewrite (mu_x_def_in k s _).
-    trivial.
-    cut H1: (0%r < (2 ^ k)%r); [trivial | ].
+    smt.
+    cut H1: (0%r < (2 ^ k)%r); [smt | ].
     cut H2: (0%r < Real.one * inv (2 ^ k)%r).
-    rewrite <-(Real.Inverse (2 ^ k)%r _); trivial.
-    trivial.  
+    rewrite <-(Real.Inverse (2 ^ k)%r _); smt.
+    smt.  
   qed.     
 
   axiom weight_pos: forall (k:int), 0 <= k => weight (dbitstring k) = 1%r.
