@@ -74,16 +74,14 @@ module CPA(S : Scheme, A_ : Adv) = {
   fun main(): bool = {
   var pk:pkey;
   var sk:skey;
-  var m0 : plaintext;
-  var m1 : plaintext;
+  var m0, m1 : plaintext;
   var c : ciphertext;
-  var b : bool;
-  var b' : bool;
+  var b,b' : bool;
   ARO.init();
   SO.init();
   (pk,sk)  = SO.kg();
   (m0,m1)  = A.a1(pk);
-  b = $Dbool.dbool;
+  b = {0,1};
   c  = SO.enc(pk,b?m0:m1);
   b' = A.a2(c);
   return b = b';
