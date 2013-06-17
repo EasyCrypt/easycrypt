@@ -100,7 +100,7 @@ module BR(R : Oracle) : Scheme(R) = {
  }
 
  fun kg():(pkey * skey) = {
-  var pk, sk:(pkey * skey);
+  var (pk, sk): pkey * skey;
   (pk,sk) = $keypairs;
   return (pk,sk);
  }
@@ -122,7 +122,7 @@ module BR2(R : Oracle) : Scheme(R) = {
  }
 
  fun kg():(pkey * skey) = {
-  var pk, sk:(pkey * skey);
+  var (pk, sk): (pkey * skey);
   (pk,sk) = $keypairs;
   return (pk,sk);
  }
@@ -298,7 +298,7 @@ module BR3(R : Oracle) : Scheme(R) = {
  }
 
    fun kg():(pkey * skey) = {
-   var pk, sk:(pkey * skey);
+   var (pk, sk): (pkey * skey);
   (pk,sk) = $keypairs;
    return (pk,sk);
  }

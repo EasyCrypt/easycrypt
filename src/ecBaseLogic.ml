@@ -51,9 +51,7 @@ type i_pat =
   | IPpat
   | IPif of s_pat * s_pat
   | IPwhile of s_pat 
-and s_pat = (int * i_pat) list        
-        (* the int represent the number of instruction to skip) *)
-
+and s_pat = (int (* index of targetted instr. *) * i_pat) list
 
 type rnd_tac_info = form EcParsetree.rnd_tac_info
 
@@ -69,7 +67,6 @@ type rule_name =
   | RN_intros       of EcIdent.t list 
   | RN_exists_elim  
   | RN_exists_intro 
-(*| RN_tuple_intro  of EcIdent.t list *)
   | RN_conv    
 	(* Field & Ring*)
   | RN_field 
@@ -115,7 +112,6 @@ type 'a rule_arg =
   | RA_mp   of EcPath.mpath           (* module              *)
   | RA_node of 'a                    (* sub-derivation      *)
 
-
 type 'a rule = {
   pr_name : rule_name;
   pr_hyps : 'a rule_arg list
@@ -129,7 +125,6 @@ type judgment = {
 }
 
 (* -------------------------------------------------------------------- *)
-
 type tac_error =
   | UnknownAx             of EcPath.path
   | NotAHypothesis        of EcIdent.t
@@ -141,7 +136,7 @@ type tac_error =
   | InvalidName           of string
   | User                  of string
 
-exception TacError of tac_error
+exception TacError of bool * tac_error
 
 let pp_tac_error fmt error =
   match error with
@@ -171,16 +166,17 @@ let pp_tac_error fmt error =
 
 let _ = EcPException.register (fun fmt exn ->
   match exn with
-  | TacError error -> pp_tac_error fmt error
+  | TacError (_, error) -> pp_tac_error fmt error
   | _ -> raise exn)
 
-let tacerror error = raise (TacError error)
+let tacerror ?(catchable = true) error =
+  raise (TacError (catchable, error))
 
-let tacuerror fmt =
+let tacuerror ?(catchable = true) fmt =
   let buf  = Buffer.create 127 in
   let fbuf = Format.formatter_of_buffer buf in
     Format.kfprintf
       (fun _ ->
          Format.pp_print_flush fbuf ();
-         raise (TacError (User (Buffer.contents buf))))
+         raise (TacError (catchable, User (Buffer.contents buf))))
       fbuf fmt

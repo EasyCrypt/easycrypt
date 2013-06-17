@@ -140,12 +140,12 @@ module SCDH (B:SCDH_Adversary) = {
   fun main() : bool = {
     var x : int;
     var y : int;
-    var S : group set;
+    var s : group set;
 
     x = $[0..q-1]; 
     y = $[0..q-1];
-    S = B.solve(g ^ x, g ^ y);
-    return (mem (g ^ (x * y)) S /\ card S <= qH);
+    s = B.solve(g ^ x, g ^ y);
+    return (mem (g ^ (x * y)) s /\ card s <= qH);
   }
 }.
 

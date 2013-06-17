@@ -27,8 +27,8 @@ type tactic = goal -> goals
 (* -------------------------------------------------------------------- *)
 
 val cannot_apply : string -> string -> 'a
-val tacerror     : EcBaseLogic.tac_error -> 'a
-val tacuerror    : ('a, Format.formatter, unit, 'b) format4 -> 'a
+val tacerror     : ?catchable:bool -> EcBaseLogic.tac_error -> 'a
+val tacuerror    : ?catchable:bool -> ('a, Format.formatter, unit, 'b) format4 -> 'a
 
 val set_loc : EcLocation.t -> ('a -> 'b) -> 'a -> 'b
 

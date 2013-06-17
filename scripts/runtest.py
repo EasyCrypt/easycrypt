@@ -1,8 +1,8 @@
 #! /usr/bin/env python
 
 # --------------------------------------------------------------------
-import sys, os, errno, shutil, itertools, logging, subprocess as sp
-import time, datetime, socket
+import sys, os, errno, re, glob, shutil, itertools, logging
+import subprocess as sp, time, datetime, socket
 
 # --------------------------------------------------------------------
 class Object(object):
@@ -44,27 +44,10 @@ def rcolor(txt, b):
 
 # --------------------------------------------------------------------
 def _options():
+    import ConfigParser as cp
     from optparse import OptionParser
 
-    def extra_args_callback(option, opt_str, value, parser):
-        if len(parser.values.dirs) == 0:
-            parser.error('no active scenario for --extra-args')
-        parser.values.dirs[-1].extra.append(value)
-
-    def dir_args_callback(option, opt_str, value, parser):
-        x = Object(src = value, valid = None, extra = [])
-
-        if opt_str == '--ok-dir': x.valid = True
-        if opt_str == '--ko-dir': x.valid = False
-
-        parser.values.dirs.append(x)
-
     parser = OptionParser()
-
-    parser.add_option(
-        '', '--bin',
-        help    = 'path to EasyCrypt binary',
-        default = 'ec.byte')
 
     parser.add_option(
         '', '--bin-args',
@@ -74,56 +57,43 @@ def _options():
         help    = 'append ARGS to EasyCrypt command (cumulative)')
 
     parser.add_option(
-        '', '--extra-args',
-        action   = 'callback',
-        metavar  = 'ARGS',
-        type     = 'string',
-        dest     = 'dirs',
-        default  = [],
-        nargs    = 1,
-        callback = extra_args_callback,
-        help     = 'append ARGS to EasyCrypt command (cumulative) for last scenarioa')
-
-    parser.add_option(
-        '', '--ok-dir',
-        action   = 'callback',
-        callback = dir_args_callback,
-        metavar  = 'DIR',
-        type     = 'string',
-        dest     = 'dirs',
-        nargs    = 1,
-        help     = 'path to directory containing *valid* EasyCrypt scripts (cumulative)')
-
-    parser.add_option(
-        '', '--ko-dir',
-        action   = 'callback',
-        callback = dir_args_callback,
-        metavar  = 'DIR',
-        type     = 'string',
-        dest     = 'dirs',
-        nargs    = 1,
-        help     = 'path to directory containing *invalid* EasyCrypt scripts (cumulative)')
-
-    parser.add_option(
         '', '--xunit',
         action  = 'store',
         default = None,
         metavar = 'FILE',
         help    = 'dump result to FILE using xUnit format')
 
-    (options, args) = parser.parse_args()
+    (cmdopt, args) = parser.parse_args()
 
-    if len(args) != 0:
-        parser.error('this program does not take arguments')
+    if len(args) < 1:
+        parser.error('this program takes at least one argument')
 
-    if not options.dirs:
-        parser.error('no path to directory containing EasyCrypt scripts given')
+    options = Object(scenarios = dict())
+    options.xunit = cmdopt.xunit
 
-    options.bin_args = \
-        list(itertools.chain(*[x.split() for x in options.bin_args]))
+    defaults = dict(args = '', exclude = '', okdirs = '', kodirs = '')
 
-    for d in options.dirs:
-        d.extra = list(itertools.chain(*[x.split() for x in d.extra]))
+    config = cp.SafeConfigParser(defaults)
+    config.read(args[0])
+
+    options.bin     = config.get('default', 'bin')
+    options.args    = config.get('default', 'args').split()
+    options.targets = args[1:]
+
+    if cmdopt.bin_args:
+        options.args.extend(cmdopt.bin_args)
+
+    for test in [x for x in config.sections() if x.startswith('test-')]:
+        scenario = Object()
+        scenario.args    = config.get(test, 'args').split()
+        scenario.okdirs  = config.get(test, 'okdirs')
+        scenario.kodirs  = config.get(test, 'kodirs')
+        scenario.exclude = config.get(test, 'exclude').split()
+        options.scenarios[test[5:]] = scenario
+
+    for x in options.targets:
+        if x not in options.scenarios:
+            parser.error('unknown scenario: %s' % (x,))
 
     return options
 
@@ -189,12 +159,10 @@ def _run_test(config, options):
     logging.info("running ec on `%s' [valid: %s]" % \
                      (config.filename, config.isvalid))
 
-    if config.extrargs:
-        logging.info("extra arguments: %r" % (config.extrargs,))
-
     timestamp = time.time()
     try:
-        command = [options.bin] + options.bin_args + config.extrargs + [config.filename]
+        command = [options.bin] + options.args + config.args + [config.filename]
+        logging.info('command: %s' % (' '.join(command)))
         process = sp.Popen(command, stdout = sp.PIPE, stderr = sp.PIPE)
 
         try:
@@ -241,13 +209,30 @@ def _main():
         def config(filename):
             return Object(isvalid  = obj.valid,
                           group    = obj.src,
-                          extrargs = obj.extra,
+                          args     = obj.args,
                           filename = os.path.normpath(os.path.join(obj.src, x)))
 
         return [config(x) for x in scripts]
 
+    def gather_for_scenario(scenario):
+        def expand(dirs):
+            dirs = re.split(r'\s+', dirs)
+            dirs = [glob.glob(x) for x in dirs]
+            dirs = list(itertools.chain.from_iterable(dirs))
+            return dirs
+
+        dirs = []
+        dirs.extend([Object(src = x, valid = True , args = scenario.args) \
+                         for x in expand(scenario.okdirs)])
+        dirs.extend([Object(src = x, valid = False, args = scenario.args) \
+                         for x in expand(scenario.kodirs)])
+        dirs = [x for x in dirs if x.src not in scenario.exclude]
+        dirs = map(lambda x : gather(x), dirs)
+        return list(itertools.chain.from_iterable(dirs))
+
     def gatherall():
-        dirs = map(lambda x : gather(x), options.dirs)
+        dirs = [options.scenarios[x] for x in options.targets]
+        dirs = map(lambda x : gather_for_scenario(x), dirs)
         return list(itertools.chain.from_iterable(dirs))
 
     allscripts = gatherall()

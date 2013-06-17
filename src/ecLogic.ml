@@ -172,8 +172,14 @@ let t_on_last  t g = t_on_lasts  t 1 g
 let t_seq_subgoal t lt g = t_subgoal lt (t g)
 
 let t_try_base t g =
-  (* FIXME: catch only tactics releated exceptions *)
-  try `Success (t g) with e -> `Failure e
+  let rec is_user_error = function
+    | TacError (true, _) -> true
+    | LocError (_, e)    -> is_user_error e
+    | _ -> false
+  in
+ 
+  try  `Success (t g)
+  with e when is_user_error e -> `Failure e
 
 let t_try t g =
   match t_try_base t g with
@@ -233,7 +239,6 @@ let get_hyps  g = fst (get_goal g)
 let get_concl g = snd (get_goal g)
 
 (* -------------------------------------------------------------------- *)
-
 let tacerror = EcBaseLogic.tacerror 
 
 let tacuerror = EcBaseLogic.tacuerror
@@ -320,11 +325,13 @@ let t_glob p tys (juc,n as g) =
 
 let t_trivial pi g =
   let goal = get_goal g in
-  if EcEnv.check_goal pi goal then
-    let rule = { pr_name = RN_prover (); pr_hyps = [] } in
-    upd_rule_done rule g
-  else tacuerror "Cannot prove current goal"
-
+  try
+    if EcEnv.check_goal pi goal then
+      let rule = { pr_name = RN_prover (); pr_hyps = [] } in
+        upd_rule_done rule g
+    else tacuerror "cannot prove goal"
+  with EcWhy3.CanNotTranslate _ ->
+    tacuerror "cannot prove goal"
 
 let t_clear ids (juc,n as g) =
   let pp_id fmt id = Format.fprintf fmt "%s" (EcIdent.name id) in
@@ -1044,7 +1051,7 @@ let is_subst_pv_eq hyps fx (hid,lk) =
 let t_subst1_pv fx g =
   let hyps = get_hyps g in
   match List.pick (is_subst_pv_eq hyps fx) (LDecl.tohyps hyps).h_local with
-  | None -> assert false (* FIXME error message *)
+  | None -> tacuerror "subst"           (* FIXME: error message *)
   | Some(h, _x, side) ->
     t_subst_pv_gen h side g
 
@@ -1056,7 +1063,7 @@ let t_subst1 fx g =
     match fx.f_node with
     | Flocal id -> t_subst1_loc (Some id) g
     | (Fpvar _ | Fglob _) -> t_subst1_pv (Some fx) g
-    | _ -> assert false (* FIXME error message *)
+    | _ -> tacuerror "subst1"           (* FIXME: error message *)
 
 let t_subst_all =
   t_repeat (t_subst1 None)
