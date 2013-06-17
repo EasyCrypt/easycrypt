@@ -1107,7 +1107,7 @@ let t_equiv_call1 side fpre fpost g =
   let fsig = (Fun.by_xpath f env).f_sig in
 
   (* The function satisfies its specification *)
-  let fconcl = f_hoareF fpre f fpost in
+  let fconcl = f_bdHoareF fpre f fpost FHeq f_r1 in
 
   (* WP *)
   let pvres  = pv_res f in
