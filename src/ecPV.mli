@@ -9,28 +9,19 @@ open EcFol
 
 (* -------------------------------------------------------------------- *)
 module PVM : sig
-  type mem_sel = 
-  | MSvar of prog_var
-  | MSmod of EcPath.mpath (* Only abstract module *)
-
+ 
   type 'a subst
 
   val empty : 'a subst
-
-  val pvm : env -> prog_var -> 'a -> mem_sel * 'a
 
   val add : env -> prog_var -> EcIdent.t -> 'a -> 'a subst -> 'a subst
 
   val add_glob : env -> mpath -> EcIdent.t -> 'a -> 'a subst -> 'a subst
 
-  val merge : 'a subst -> 'a subst -> 'a subst
-
   val find : env -> prog_var -> memory -> 'a subst -> 'a
 
-  val check_pv      : env -> prog_var -> EcIdent.t -> 'a subst -> mem_sel * EcIdent.t
-  val check_binding : EcIdent.t -> form subst -> unit
-
   val subst   : env -> form  subst -> form  -> form
+
   val esubst  : env -> memory -> expr subst -> expr  -> expr
   val isubst  : env -> memory -> expr subst -> instr -> instr
   val issubst : env -> memory -> expr subst -> instr list -> instr list

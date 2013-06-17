@@ -137,62 +137,69 @@ let s_last_asserts st = s_lasts destr_assert (last_error "n assert" st)
 (* -------------------------------  Wp -------------------------------- *)
 (* -------------------------------------------------------------------- *)
 
-let id_of_pv pv = 
-  EcIdent.create (EcPath.basename pv.pv_name.EcPath.x_sub) 
+let add_side name m = 
+  let name = 
+    if EcIdent.id_equal m mleft then name ^ "_L" 
+    else if EcIdent.id_equal m mright then name ^ "_R"
+    else name in
+  EcIdent.create name       
 
-let id_of_mp mp = 
-  match mp.EcPath.m_top with
-  | `Abstract id -> EcIdent.fresh id
-  | _ -> assert false 
+let id_of_pv pv m =
+  add_side (EcPath.basename pv.pv_name.EcPath.x_sub) m 
+
+
+let id_of_mp mp m = 
+  let name = 
+    match mp.EcPath.m_top with
+    | `Abstract id -> EcIdent.name id 
+    | _ -> assert false in
+  add_side name m
 
 let generalize_mod env m modi f =
-  let fv = PV.fv env m f in
   let elts,glob = PV.elements modi in
-  let create (pv,ty) = id_of_pv pv, GTty ty in
+  let create (pv,ty) = id_of_pv pv m, GTty ty in
   let b = List.map create elts in
   let s = List.fold_left2 (fun s (pv,ty) (id, _) ->
     PVM.add env pv m (f_local id ty) s) PVM.empty elts b in
-  let create mp = id_of_mp mp, GTty (tglob mp) in
+  let create mp = id_of_mp mp m, GTty (tglob mp) in
   let b' = List.map create glob in
   let s = List.fold_left2 (fun s mp (id,_) ->
     PVM.add_glob env mp m (f_local id (tglob mp)) s) s glob b' in
   let f = PVM.subst env s f in
   f_forall_simpl (b'@b) f
 
-
-let lv_subst env m lv f =
+let lv_subst m lv f =
   match lv with
   | LvVar(pv,t) ->
-      let id = id_of_pv pv in 
-      let s = PVM.add env pv m (f_local id t) PVM.empty in
-      (LSymbol (id,t), f), s
+    let id = id_of_pv pv m in 
+    (LSymbol (id,t), f), [pv,m,f_local id t]
   | LvTuple vs ->
-      let add (pv,t) (ids,s) = 
-        let id = id_of_pv pv in
-        let s = PVM.add env pv m (f_local id t) s in
-        ((id,t)::ids, s) in
-      let ids,s = List.fold_right add vs ([],PVM.empty) in
-      (LTuple ids, f), s
+    let ids = List.map (fun (pv,t) -> id_of_pv pv m, t) vs in
+    let s = List.map2 (fun (pv,_) (id,t) -> pv,m,f_local id t) vs ids in
+    (LTuple ids, f), s
   | LvMap((p,tys),pv,e,ty) ->
-      let id = id_of_pv pv in 
-      let s = PVM.add env pv m (f_local id ty) PVM.empty in
-      let set = f_op p tys ty in
-      let f = f_app set [f_pvar pv ty m; form_of_expr m e; f] ty in
-      (LSymbol (id,ty), f), s
+    let id = id_of_pv pv m in 
+    let set = f_op p tys ty in
+    let f = f_app set [f_pvar pv ty m; form_of_expr m e; f] ty in
+    (LSymbol (id,ty), f), [pv,m,f_local id ty]
       
-let wp_asgn_aux env m lv e (_let,s,f) =
-  let lpe, se = lv_subst env m lv (form_of_expr m e) in
-  let subst = PVM.subst env se in
-  let _let = List.map (fun (lp,f) -> lp, subst f) _let in
-  let s = PVM.merge se s in
-  (lpe::_let, s,f)
+let wp_asgn_aux m lv e (lets,f) =
+  let let1 = lv_subst m lv (form_of_expr m e) in
+  (let1::lets,f)
 
 exception HLerror
 
-let mk_let env (_let,s,f) = 
-  f_lets_simpl _let (PVM.subst env s f)
+let mk_let env (lets,f) = 
+  let rec aux s lets = 
+    match lets with
+    | [] -> PVM.subst env s f 
+    | ((lp,f1), toadd) :: lets ->
+      let f1 = PVM.subst env s f1 in
+      let s = 
+        List.fold_left (fun s (pv,m,fp) -> PVM.add env pv m fp s) s toadd in
+      f_let_simpl lp f1 (aux s lets) in
+  if lets = [] then f else aux PVM.empty lets 
   
-
 exception No_wp
 
 (* wp functions operates only over assignments and conditional statements.
@@ -209,7 +216,7 @@ let rec wp_stmt env m (stmt: EcModules.instr list) letsf =
 and wp_instr env m i letsf = 
   match i.i_node with
   | Sasgn (lv,e) ->
-      wp_asgn_aux env m lv e letsf
+      wp_asgn_aux m lv e letsf
   | Sif (e,s1,s2) -> 
       let r1,letsf1 = wp_stmt env m (List.rev s1.s_node) letsf in
       let r2,letsf2 = wp_stmt env m (List.rev s2.s_node) letsf in
@@ -217,12 +224,12 @@ and wp_instr env m i letsf =
         let post1 = mk_let env letsf1 in 
         let post2 = mk_let env letsf2 in
         let post  = f_if (form_of_expr m e) post1 post2 in
-        [], PVM.empty, post
+        [], post
       else raise No_wp
   | _ -> raise No_wp
 
 let wp env m s post = 
-  let r,letsf = wp_stmt env m (List.rev s.s_node) ([],PVM.empty,post) in
+  let r,letsf = wp_stmt env m (List.rev s.s_node) ([],post) in
   List.rev r, mk_let env letsf 
 
 
@@ -232,9 +239,8 @@ let wp env m s post =
 (*   mk_let env letsf *)
 
 let subst_form_lv env m lv t f =
-  let lpe, se = lv_subst env m lv t in
-  let s = PVM.merge se PVM.empty in
-  mk_let env ([lpe], s,f)
+  let lets = lv_subst m lv t in
+  mk_let env ([lets],f)
 
 (* -------------------------------------------------------------------- *)
 (* ----------------------  Auxiliary functions  ----------------------- *)
@@ -960,8 +966,8 @@ let wp_asgn_call env m lv res post =
   match lv with
   | None -> post
   | Some lv ->
-    let lpe,se = lv_subst env m lv res in
-    mk_let env ([lpe],se,post)
+    let lets = lv_subst m lv res in
+    mk_let env ([lets],post)
 
 let subst_args_call env m f =
   List.fold_right2 (fun v e s ->
