@@ -10,12 +10,12 @@ type ovkind =
 | OVK_Predicate
 
 type clone_error =
-| CE_DupOverride    of ovkind * symbol
-| CE_UnkOverride    of ovkind * symbol
-| CE_CrtOverride    of ovkind * symbol
-| CE_TypeArgMism    of ovkind * symbol
-| CE_OpIncompatible of symbol
-| CE_PrIncompatible of symbol
+| CE_DupOverride    of ovkind * qsymbol
+| CE_UnkOverride    of ovkind * qsymbol
+| CE_CrtOverride    of ovkind * qsymbol
+| CE_TypeArgMism    of ovkind * qsymbol
+| CE_OpIncompatible of qsymbol
+| CE_PrIncompatible of qsymbol
 
 exception CloneError of EcEnv.env * clone_error
 
