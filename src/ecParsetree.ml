@@ -486,10 +486,10 @@ type global =
   | Gprint       of pprint
   | GthOpen      of psymbol
   | GthClose     of psymbol
-  | GthRequire   of (psymbol * bool option) (* true = export, false = import *)
+  | GthRequire   of (psymbol * [`Import|`Export] option)
   | GthImport    of pqsymbol
   | GthExport    of pqsymbol
-  | GthClone     of theory_cloning
+  | GthClone     of (theory_cloning * [`Import|`Export] option)
   | GthW3        of (string list * string * w3_renaming list)
   | Gtactics     of [`Proof of bool | `Actual of ptactic list]
   | Gprover_info of pprover_infos

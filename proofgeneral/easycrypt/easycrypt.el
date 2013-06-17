@@ -17,7 +17,8 @@
   :type  'string
   :group 'easycrypt-config)
 
-;; ======== Configuration of generic modes ========
+;; --------------------------------------------------------------------
+;; Generic mode
 
 (defun easycrypt-config ()
   "Configure Proof General scripting for EasyCrypt."
@@ -31,7 +32,8 @@
   
   ;; For undo
   (setq  proof-find-and-forget-fn              'easycrypt-find-and-forget
-         proof-completed-proof-behaviour       nil)
+         proof-completed-proof-behaviour       nil
+         proof-non-undoables-regexp            easycrypt-non-undoables-regexp)
 
   (set (make-local-variable 'comment-quote-nested) nil)
 
@@ -80,7 +82,7 @@
   (setq  proof-shell-auto-terminate-commands    easycrypt-terminal-string)
   (setq  proof-shell-eager-annotation-start     "^\\[info\\]")
   (setq  proof-shell-strip-crs-from-input       nil)
-  (setq  proof-shell-annotated-prompt-regexp    "^\\[[0-9]+\\]>")
+  (setq  proof-shell-annotated-prompt-regexp    "^\\[[0-9]+|\\sw+\\]>")
   (setq  proof-shell-clear-goals-regexp         easycrypt-shell-proof-completed-regexp)
   (setq  proof-shell-proof-completed-regexp     easycrypt-shell-proof-completed-regexp)
   (setq  proof-shell-error-regexp               easycrypt-error-regexp)
@@ -89,10 +91,8 @@
   (setq  proof-shell-end-goals-regexp           nil)  ; up to next prompt
   (setq  proof-shell-font-lock-keywords         easycrypt-font-lock-keywords))
 
-;; ======== Defining the derived modes ========
-;;
-;; The derived modes set the variables, then call the
-;; <mode>-config-done function to complete configuration.
+;; --------------------------------------------------------------------
+;; Derived modes
 
 (define-derived-mode easycrypt-mode proof-mode
   "EasyCrypt script" nil
@@ -154,12 +154,28 @@
                'face 'proof-script-highlight-error-face))))))
 
 (defun easycrypt-highlight-error-hook ()
-  (easycrypt-highlight-error ))
+  (easycrypt-highlight-error))
 
+(add-hook 'proof-shell-handle-error-or-interrupt-hook
+          'easycrypt-highlight-error-hook t)
+
+;; --------------------------------------------------------------------
+;; Check mode related commands
+(defun easycrypt-cmode-check ()
+  "Set EasyCrypt in check mode."
+  (interactive)
+  (proof-shell-invisible-command "pragma check."))
+
+(defun easycrypt-cmode-weak-check ()
+  "Set EasyCrypt in weak-check mode."
+  (interactive)
+  (proof-shell-invisible-command "pragma nocheck."))
+
+;; --------------------------------------------------------------------
+;; 3-window pane layout hack
 (add-hook
   'proof-activate-scripting-hook
   '(lambda () (when proof-three-window-enable (proof-layout-windows))))
 
-(add-hook 'proof-shell-handle-error-or-interrupt-hook 'easycrypt-highlight-error-hook t)
-
+;; --------------------------------------------------------------------
 (provide 'easycrypt)

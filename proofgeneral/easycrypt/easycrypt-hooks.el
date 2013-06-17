@@ -2,6 +2,19 @@
 (require 'proof)
 
 (defvar easycrypt-last-but-one-statenum 0)
+(defvar easycrypt-proof-weak-mode nil)
+
+;; Proof mode
+(defun easycrypt-proof-weak-mode-toggle ()
+  "Toggle EasyCrypt check mode."
+  (interactive)
+  (cond
+     (easycrypt-proof-weak-mode
+        (proof-shell-invisible-cmd-get-result "pragma check"))
+     (t (proof-shell-invisible-cmd-get-result "pragma nocheck")))
+  (if
+      (eq 'error proof-shell-last-output-kind)
+      (message "Failed to set proof mode")))
 
 ;; Function for set or get the information in the span
 (defsubst easycrypt-get-span-statenum (span)
@@ -19,8 +32,9 @@
 (defun easycrypt-last-prompt-info (s)
   "Extract the information from prompt."
   (let ((lastprompt (or s (error "no prompt"))))
-     (when (string-match "\\[\\([0-9]+\\)]" lastprompt)
-           (list (string-to-number (match-string 1 lastprompt))))))
+     (when (string-match "\\[\\([0-9]+\\)|\\(\\sw+\\)\\]" lastprompt)
+           (list (string-to-number (match-string 1 lastprompt))
+                 (if (equal (match-string 2 lastprompt) "nocheck") t nil)))))
 
 (defun easycrypt-last-prompt-info-safe ()
   "Take from `proof-shell-last-prompt' the last information in the prompt."
@@ -32,11 +46,12 @@
      ;; infos = prompt infos of the very last prompt
      ;; sp    = last locked span, which we want to fill with prompt infos
      (let ((sp    (if proof-script-buffer (proof-last-locked-span)))
-           (infos (or (easycrypt-last-prompt-info-safe) '(0))))
+           (infos (or (easycrypt-last-prompt-info-safe) '(0 t))))
 
        (unless (or (not sp) (easycrypt-get-span-statenum sp))
          (easycrypt-set-span-statenum sp easycrypt-last-but-one-statenum))
        (setq easycrypt-last-but-one-statenum (car infos))
+       (setq easycrypt-proof-weak-mode (car (cdr infos)))
      )))
 
 (add-hook 'proof-state-change-hook 'easycrypt-set-state-infos)

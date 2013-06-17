@@ -1243,13 +1243,16 @@ axiom:
 (* -------------------------------------------------------------------- *)
 (* Theory interactive manipulation                                      *)
 
-theory_open    : THEORY  x=uident  { x }
-theory_close   : END     x=uident  { x }
+theory_open  : THEORY  x=uident  { x }
+theory_close : END     x=uident  { x }
+
+import_flag:
+| IMPORT { `Import }
+| EXPORT { `Export }
+;
 
 theory_require : 
-| REQUIRE x=uident { x, None }
-| REQUIRE IMPORT x=uident { x, Some false }
-| REQUIRE EXPORT x=uident { x, Some true }
+| REQUIRE ip=import_flag? x=uident { (x, ip) }
 ;
 
 theory_import: IMPORT x=uqident { x }
@@ -1742,15 +1745,21 @@ tactics_or_prf:
 (* Theory cloning                                                       *)
 
 theory_clone:
-| CLONE x=uqident cw=clone_with?
-   { { pthc_base = x;
-       pthc_name = None;
-       pthc_ext  = EcUtils.odfl [] cw; } }
+| CLONE ip=import_flag? x=uqident cw=clone_with?
+   { let oth =
+       { pthc_base = x;
+         pthc_name = None;
+         pthc_ext  = EcUtils.odfl [] cw; }
+     in
+       (oth, ip) }
 
-| CLONE x=uqident AS y=uident cw=clone_with?
-   { { pthc_base = x;
-       pthc_name = Some y;
-       pthc_ext  = EcUtils.odfl [] cw; } }
+| CLONE ip=import_flag? x=uqident AS y=uident cw=clone_with?
+   { let oth =
+       { pthc_base = x;
+         pthc_name = Some y;
+         pthc_ext  = EcUtils.odfl [] cw; }
+     in
+       (oth, ip) }
 ;
 
 clone_with:
