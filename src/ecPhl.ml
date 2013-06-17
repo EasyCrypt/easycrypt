@@ -619,21 +619,20 @@ let equivF_abs_spec env fl fr inv =
   let fvr = PV.fv env mr inv in
   check_depend env fvl topl;
   check_depend env fvr topr;
-  (* TODO check there is only global variable *)
+  let eqglob = f_eqglob topl ml topr mr in
   let ospec o_l o_r = 
     let fo_l = EcEnv.Fun.by_xpath o_l env in
     let fo_r = EcEnv.Fun.by_xpath o_r env in
     let eq_params = 
       f_eqparams o_l fo_l.f_sig.fs_params ml o_r fo_r.f_sig.fs_params mr in
     let eq_res = f_eqres o_l fo_l.f_sig.fs_ret ml o_r fo_r.f_sig.fs_ret mr in
-    let pre = EcFol.f_and eq_params inv in
-    let post = EcFol.f_and eq_res inv in
+    let pre = EcFol.f_ands [eq_params;eqglob;inv] in
+    let post = EcFol.f_ands [eq_res;eqglob;inv] in
     f_equivF pre o_l o_r post in
   let sg = List.map2 ospec oil.oi_calls oir.oi_calls in
   let eq_params = 
     f_eqparams fl sigl.fs_params ml fr sigr.fs_params mr in
   let eq_res = f_eqres fl sigl.fs_ret ml fr sigr.fs_ret mr in
-  let eqglob = f_eqglob topl ml topr mr in
   let pre = f_ands [eq_params; eqglob; inv] in
   let post = f_ands [eq_res; eqglob; inv] in
   pre, post, sg
@@ -656,15 +655,14 @@ let equivF_abs_upto env fl fr bad invP invQ =
   check_depend env fvr topr;
   (* TODO check there is only global variable *)
   let eqglob = f_eqglob topl ml topr mr in
-  let egP    = f_and eqglob invP in
   let ospec o_l o_r = 
     let fo_l = EcEnv.Fun.by_xpath o_l env in
     let fo_r = EcEnv.Fun.by_xpath o_r env in
     let eq_params = 
       f_eqparams o_l fo_l.f_sig.fs_params ml o_r fo_r.f_sig.fs_params mr in
     let eq_res = f_eqres o_l fo_l.f_sig.fs_ret ml o_r fo_r.f_sig.fs_ret mr in
-    let pre = EcFol.f_ands [EcFol.f_not bad2; eq_params; egP] in
-    let post = EcFol.f_if bad2 invQ (f_and eq_res egP) in
+    let pre = EcFol.f_ands [EcFol.f_not bad2; eq_params;eqglob;invP] in
+    let post = EcFol.f_if bad2 invQ (f_ands [eq_res;eqglob;invP]) in
     let cond1 = f_equivF pre o_l o_r post in
     let cond2 =
       let q = f_subst_mem ml EcFol.mhr invQ in
@@ -681,8 +679,8 @@ let equivF_abs_upto env fl fr bad invP invQ =
   let eq_params = 
     f_eqparams fl sigl.fs_params ml fr sigr.fs_params mr in
   let eq_res = f_eqres fl sigl.fs_ret ml fr sigr.fs_ret mr in
-  let pre = f_if bad2 invQ (f_and eq_params egP) in
-  let post = f_if bad2 invQ (f_and eq_res egP) in
+  let pre = f_if bad2 invQ (f_ands [eq_params;eqglob;invP]) in
+  let post = f_if bad2 invQ (f_ands [eq_res;eqglob;invP]) in
   pre, post, sg
 
 let t_equivF_abs_upto bad invP invQ g = 
