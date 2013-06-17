@@ -22,7 +22,7 @@ INSTALL  := scripts/install-sh
 # --------------------------------------------------------------------
 XUNITOUT ?= xunit.xml
 ECARGS   ?=
-CHECK     = scripts/runtest.py config/tests.config
+CHECK     = scripts/runtest.py --bin-args="$(ECARGS)" config/tests.config
 
 # --------------------------------------------------------------------
 .PHONY: all build byte native tests check check-xunit examples tags
