@@ -540,13 +540,12 @@ let abstract_info env f1 =
           (EcPrinting.pp_funname ppe) f in
   top, f, oi, def.f_sig
 
-(* FIXME add equality of global, parameters and res *)
+
 let hoareF_abs_spec env f inv = 
   let top, _, oi, _fsig = abstract_info env f in
   let m = mhr in
   let fv = PV.fv env m inv in
   check_depend env fv top;
-  (* TODO check there is only global variable *)
   let ospec o = f_hoareF inv o inv in
   let sg = List.map ospec oi.oi_calls in
   inv, inv, sg
@@ -558,8 +557,23 @@ let t_hoareF_abs inv g =
   let tac g' = prove_goal_by sg (RN_hl_fun_abs inv) g' in
   t_on_last tac (t_hoareF_conseq pre post g)
 
-(* FIXME add equality of global, parameters and res,
-   lossless of adversary *)
+let lossless_hyps env top sub = 
+  let sig_ = (EcEnv.Mod.by_mpath top env).me_sig in
+  let bd = 
+    List.map (fun (id,mt) -> id,GTmodty(mt,EcPath.Sm.empty))
+      sig_.mis_params in               (* Should we put restriction here *)
+  let args = List.map (fun (id,_) -> EcPath.mident id) sig_.mis_params in
+  let concl = 
+    f_losslessF (EcPath.xpath (EcPath.m_apply top args) sub ) in
+  let calls = 
+    let name = EcPath.basename sub in
+    let Tys_function(_,oi) = 
+      List.find (fun (Tys_function(fs,_)) -> fs.fs_name = name)
+        sig_.mis_body in
+    oi.oi_calls in
+  let hyps = List.map f_losslessF calls in
+  f_forall bd (f_imps hyps concl) 
+
 let bdHoareF_abs_spec env f inv = 
   let top,_,oi,_fsig = abstract_info env f in
   let m = mhr in
@@ -567,7 +581,7 @@ let bdHoareF_abs_spec env f inv =
   check_depend env fv top;
   let ospec o = f_bdHoareF inv o inv FHeq f_r1 in
   let sg = List.map ospec oi.oi_calls in
-  inv, inv, sg
+  inv, inv, lossless_hyps env top f.x_sub :: sg
 
 let t_bdHoareF_abs inv g = 
   let env,_,concl = get_goal_e g in
@@ -662,23 +676,7 @@ let equivF_abs_upto env fl fr bad invP invQ =
     [cond1;cond2;cond3] in
   let sg = List.map2 ospec oil.oi_calls oir.oi_calls in
   let sg = List.flatten sg in
-  let lossless_a = 
-    let sig_ = (EcEnv.Mod.by_mpath topl env).me_sig in
-    let bd = 
-      List.map (fun (id,mt) -> id,GTmodty(mt,EcPath.Sm.empty))
-        sig_.mis_params in               (* Should we put restriction here *)
-    let args = List.map (fun (id,_) -> EcPath.mident id) sig_.mis_params in
-    let sub = fl.EcPath.x_sub in
-    let concl = 
-      f_losslessF (EcPath.xpath (EcPath.m_apply topl args) sub ) in
-    let calls = 
-      let name = EcPath.basename sub in
-      let Tys_function(_,oi) = 
-        List.find (fun (Tys_function(fs,_)) -> fs.fs_name = name)
-          sig_.mis_body in
-      oi.oi_calls in
-    let hyps = List.map f_losslessF calls in
-    f_forall bd (f_imps hyps concl) in
+  let lossless_a = lossless_hyps env topl fl.x_sub in
   let sg = lossless_a :: sg in
   let eq_params = 
     f_eqparams fl sigl.fs_params ml fr sigr.fs_params mr in
