@@ -1438,6 +1438,14 @@ module Mod = struct
   let enter name params env =
     let env = enter (`Module params) name env in
       bind_locals params env
+
+  let add_mod_binding bd env = 
+    let do1 env (x,gty) =
+      match gty with
+      | GTmodty (p,r) -> bind_local x p r env
+      | _ -> env in
+    List.fold_left do1 env bd
+
 end
 
 (* -------------------------------------------------------------------- *)
