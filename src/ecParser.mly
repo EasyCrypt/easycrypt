@@ -726,7 +726,7 @@ form_u:
 | c=form QUESTION e1=form COLON e2=form %prec OP2
     { PFif (c, e1, e2) }
 
-| EQ LBRACE xs=qident_or_res+ RBRACE
+| EQ LBRACE xs=plist1(qident_or_res, COMMA) RBRACE
     { PFeqveq xs }
 
 | IF c=form THEN e1=form ELSE e2=form
