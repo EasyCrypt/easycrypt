@@ -10,6 +10,8 @@
 (defconst easycrypt-keywords-proof-goal '("lemma" "equiv" "hoare"))
 (defconst easycrypt-keywords-proof-save '("save" "qed"))
 
+(defconst easycrypt-non-undoables-regexp "^pragma\\b")
+
 (defconst easycrypt-keywords-code-open  '("{"))
 (defconst easycrypt-keywords-code-close '("}")) 
 (defconst easycrypt-keywords-code-end   '(";"))

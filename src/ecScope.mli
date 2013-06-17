@@ -6,13 +6,19 @@ open EcParsetree
 (* -------------------------------------------------------------------- *)
 exception HiScopeError of EcLocation.t option * string
 
+val hierror : ?loc:EcLocation.t -> ('a, Format.formatter, unit, 'b) format4 -> 'a
+
+(* -------------------------------------------------------------------- *)
 type scope
 
 type proof_uc = {
   puc_name   : string;
-  puc_jdg    : EcLogic.judgment_uc * int list;
-  puc_strict : bool option;
+  puc_jdg    : proof_state;
 }
+
+and proof_state =
+| PSCheck   of (EcLogic.judgment_uc * int list)
+| PSNoCheck of (EcIdent.t list * EcFol.form)
 
 val empty   : scope
 val path    : scope -> EcPath.path
@@ -20,6 +26,7 @@ val name    : scope -> symbol
 val env     : scope -> EcEnv.env
 val attop   : scope -> bool
 val goal    : scope -> proof_uc option
+val xgoal   : scope -> (bool option * proof_uc) option
 
 val verbose     : scope -> bool
 val set_verbose : scope -> bool -> scope
@@ -27,53 +34,30 @@ val set_verbose : scope -> bool -> scope
 val check_state : [`InProof | `InTop] -> string -> scope -> unit
 
 module Op : sig
-  (* [add scope op] type-checks the given *parsed* operator [op] in
-   * scope [scope], and add it to it. Raises [DuplicatedNameInContext]
-   * if a type with given name already exists. *)
   val add : scope -> poperator located -> scope
 end
 
 module Pred : sig
-  (* [add scope op] type-checks the given *parsed* operator [op] in
-   * scope [scope], and add it to it. Raises [DuplicatedNameInContext]
-   * if a type with given name already exists. *)
   val add : scope -> ppredicate located -> scope
 end
 
 module Ax : sig
-  (* [add scope op] type-checks the given *parsed* operator [op] in
-   * scope [scope], and add it to it. Raises [DuplicatedNameInContext]
-   * if an axiom with given name already exists. *)
-  val add  : scope -> paxiom located -> string option * scope
+  type mode = [`WeakCheck | `Check]
+
+  val add  : scope -> mode -> paxiom located -> string option * scope
   val save : scope -> EcLocation.t -> string option * scope
 end
 
 module Ty : sig
-  (* [add scope t] adds an abstract type with name [t] to scope
-   * [scope]. Raises [DuplicatedNameInContext] if a type with
-   * given name already exists. *)
   val add : scope -> (psymbol list * psymbol) located -> scope
-
-  (* [define scope t body] adds a defined type with name [t] and body
-   * [body] to scope [scope]. Can raise any exception triggered by the
-   * type-checker or [DuplicatedNameInContext] in case a type with name
-   * [t] already exists *)
   val define : scope -> (psymbol list * psymbol) located -> pty -> scope
 end
 
 module Mod : sig
-  (* [add scope x m i] check the module [m] and add it to the scope
-   * [scope] with name [x]. Can raise any exception triggered by the
-   * type-checker or [DuplicatedNameInContext] in case a module with
-   * name [x] already exists *)
   val add : scope -> symbol -> pmodule_expr -> scope
 end
 
 module ModType : sig
-  (* [add scope x i] checks the module type [i] and add it to the
-   * scope [scope] with name [x]. Can raise any exception triggered by
-   * the type-checker or [DuplicatedNameInContext] in case a module
-   * type with name [x] already exists *)
   val add : scope -> symbol -> pmodule_sig -> scope
 end
 
@@ -115,8 +99,8 @@ module Theory : sig
 end
 
 module Tactics : sig
-  val process : ?mark:bool -> scope -> ptactic list -> scope
-  val proof   : scope -> bool -> scope
+  val process : scope -> Ax.mode -> ptactic list -> scope
+  val proof   : scope -> Ax.mode -> bool -> scope
 end
 
 module Prover : sig 

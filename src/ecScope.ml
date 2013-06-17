@@ -170,9 +170,12 @@ end
 (* -------------------------------------------------------------------- *)
 type proof_uc = {
   puc_name   : string;
-  puc_jdg    : EcLogic.judgment_uc * int list;
-  puc_strict : bool option;
+  puc_jdg    : proof_state;
 }
+
+and proof_state =
+| PSCheck   of (EcLogic.judgment_uc * int list)
+| PSNoCheck of (EcIdent.t list * EcFol.form)
 
 (* -------------------------------------------------------------------- *)
 type scope = {
@@ -181,7 +184,7 @@ type scope = {
   sc_top        : scope option;
   sc_loaded     : (EcEnv.ctheory_w3 * symbol list) Msym.t;
   sc_required   : symbol list;
-  sc_pr_uc      : proof_uc option;
+  sc_pr_uc      : (bool option * proof_uc) option;
   sc_options    : Options.options;
 }
 
@@ -215,6 +218,10 @@ let attop (scope : scope) =
 
 (* -------------------------------------------------------------------- *)
 let goal (scope : scope) =
+  omap scope.sc_pr_uc snd
+
+(* -------------------------------------------------------------------- *)
+let xgoal (scope : scope) =
   scope.sc_pr_uc
 
 (* -------------------------------------------------------------------- *)
@@ -335,42 +342,75 @@ module Tactics = struct
 
   let pi scope pi = Prover.mk_prover_info scope pi
 
-  let process_tactic_on_goal scope (juc, ns) loc tacs =
+  let proof (scope : scope) mode (strict : bool) =
+    check_state `InProof "proof script" scope;
+
+    let (m, puc) = oget scope.sc_pr_uc in
+    let (m, puc) =
+      match m with
+      | None when not strict && mode = `WeakCheck -> begin
+          match puc.puc_jdg with
+          | PSNoCheck _ -> (false, puc)
+          | PSCheck (juc, _) ->
+              let hyps, concl = (EcLogic.get_pj (juc, 0)).EcLogic.pj_decl in
+              let hyps    = EcEnv.LDecl.tohyps hyps in
+              let tparams = hyps.EcBaseLogic.h_tvar in
+              let puc     = { puc with puc_jdg = PSNoCheck (tparams, concl) } in
+                (false, puc)
+      end
+  
+      | None   -> (strict, puc)
+      | Some _ -> hierror "[proof] can only be used at beginning of a proof script"
+    in
+      { scope with sc_pr_uc = Some (Some m, puc) }
+
+  let process_tactic_on_goal hitenv (juc, ns) loc tacs =
     match ns with
     | []      -> error loc NoCurrentGoal
     | n :: ns ->
-
-      let juc = process_tactics (pi scope) tacs (juc, [n]) in
+      let juc = process_tactics hitenv tacs (juc, [n]) in
       let juc = fstmap EcLogic.upd_done juc in
       let juc = (fst juc, (snd juc) @ ns) in
 
       sndmap (List.filter (List.mem^~ (snd (find_all_goals (fst juc))))) juc
 
-  let process ?(mark = false) (scope : scope) (tac : ptactic list) =
-    if Check_mode.check scope.sc_options then begin
-      check_state `InProof "proof script" scope;
-      let loc = (oget (List.ohead tac)).pt_core.pl_loc in
-      let puc = oget scope.sc_pr_uc in
-      let juc = process_tactic_on_goal scope puc.puc_jdg loc tac in
-      let puc = { puc with puc_jdg = juc; } in
-      let puc = { puc with puc_strict =
-                             if mark then Some (odfl false puc.puc_strict)
-                                     else puc.puc_strict }
-      in
-        { scope with sc_pr_uc = Some puc; }
-    end else scope
+  let process_r mark mode (scope : scope) (tac : ptactic list) =
+    check_state `InProof "proof script" scope;
 
-  let process_core ?mark (scope : scope) (ts : ptactic_core list) =
-    process ?mark scope (List.map (fun t -> { pt_core = t; pt_intros = []; }) ts)
+    let scope =
+      if   mark && fst (oget scope.sc_pr_uc) = None
+      then proof scope mode false
+      else scope
+    in
 
-  let proof (scope : scope) (strict : bool) =
-    if Check_mode.check scope.sc_options then begin
-      check_state `InProof "proof script" scope;
-      let puc = oget scope.sc_pr_uc in
-        if puc.puc_strict <> None then
-          hierror "[proof] can only be used at beginning of a proof script";
-        { scope with sc_pr_uc = Some { puc with puc_strict = Some strict; } }
-    end else scope
+    let (m, puc) = oget scope.sc_pr_uc in
+
+    match puc.puc_jdg with
+    | PSNoCheck _ -> scope
+    | PSCheck juc ->
+        let loc = (oget (List.ohead tac)).pt_core.pl_loc in
+
+        let htmode =
+          match m, mode with
+          | Some true , `WeakCheck -> `Admit
+          | _         , `WeakCheck ->  hierror "cannot weak-check a non-strict proof script"
+          | Some true , `Check     -> `Strict
+          | Some false, `Check     -> `Standard
+          | _         , `Check     -> `Strict
+        in
+
+        let hitenv = { hte_provers = pi scope; hte_smtmode = htmode; } in
+
+        let juc = process_tactic_on_goal hitenv juc loc tac in
+        let puc = { puc with puc_jdg = PSCheck juc; } in
+          { scope with sc_pr_uc = Some (m, puc); }
+
+  let process_core mark mode (scope : scope) (ts : ptactic_core list) =
+    let ts = List.map (fun t -> { pt_core = t; pt_intros = []; }) ts in
+      process_r mark mode scope ts
+
+  let process scope mode tac =
+    process_r true mode scope tac
 end
 
 (* -------------------------------------------------------------------- *)
@@ -660,84 +700,101 @@ module Ax = struct
 
   module TT = EcTyping
 
+  type mode = [`WeakCheck | `Check]
+
+  (* ------------------------------------------------------------------ *)
   let bind (scope : scope) ((x, ax) : _ * axiom) =
     assert (scope.sc_pr_uc = None);
+    { scope with sc_env = EcEnv.Ax.bind x ax scope.sc_env; }
 
-   let res =
-    { scope with
-        sc_env  = EcEnv.Ax.bind x ax scope.sc_env; }
-      in
-   res
+  (* ------------------------------------------------------------------ *)
+  let start_lemma scope check name tparams concl =
+    let puc =
+      match check with
+      | false -> PSNoCheck (tparams, concl)
+      | true  ->
+          let hyps = EcEnv.LDecl.init scope.sc_env tparams in
+            PSCheck (EcLogic.open_juc (hyps, concl), [0])
+    in 
+    let puc = { puc_name = name; puc_jdg = puc; } in
+      { scope with sc_pr_uc = Some (None, puc) }
 
-  let start_lemma scope name tparams concl =
-    let hyps = EcEnv.LDecl.init scope.sc_env tparams in
-    let puc = {
-      puc_name   = name;
-      puc_jdg    = (EcLogic.open_juc (hyps, concl), [0]);
-      puc_strict = None;
-    } in
-
-    { scope with sc_pr_uc = Some puc }
-
+  (* ------------------------------------------------------------------ *)
   let save scope _loc =
-    if Check_mode.check scope.sc_options then begin
-      check_state `InProof "save" scope;
-      let { puc_name = name; puc_jdg = (juc, _) } = oget scope.sc_pr_uc in
-        let pr = EcLogic.close_juc juc in
-        let hyps,concl = (EcLogic.get_pj (juc,0)).EcLogic.pj_decl in
-        let hyps = EcEnv.LDecl.tohyps hyps in
-        let tparams = hyps.EcBaseLogic.h_tvar in
-        assert (hyps.EcBaseLogic.h_local = []);
-        let axd = { ax_tparams = tparams;
-                    ax_spec = Some concl;
-                    ax_kind = Lemma (Some pr) } in
-        let scope = { scope with sc_pr_uc = None } in
-        Some name, bind scope (name, axd)
-    end
-    else None, scope
+    check_state `InProof "save" scope;
 
-  let add (scope : scope) (ax : paxiom located) =
+    let (_, puc) = oget scope.sc_pr_uc in
+    let (tparams, concl, proof) =
+      match puc.puc_jdg with
+      | PSCheck (juc, _) ->
+          let proof = EcLogic.close_juc juc in
+          let hyps, concl = (EcLogic.get_pj (juc, 0)).EcLogic.pj_decl in
+          let hyps = EcEnv.LDecl.tohyps hyps in
+          let tparams = hyps.EcBaseLogic.h_tvar in
+            assert (hyps.EcBaseLogic.h_local = []);
+            (tparams, concl, Lemma (Some proof))
+
+      | PSNoCheck (tparams, concl) ->
+          (tparams, concl, Axiom)
+    in
+    let axd = { ax_tparams = tparams;
+                ax_spec    = Some concl;
+                ax_kind    = proof }
+    in
+    let scope = { scope with sc_pr_uc = None } in
+      (Some puc.puc_name, bind scope (puc.puc_name, axd))
+
+  (* ------------------------------------------------------------------ *)
+  let add (scope : scope) mode (ax : paxiom located) =
     assert (scope.sc_pr_uc = None);
 
     let loc = ax.pl_loc and ax = ax.pl_desc in
-    let ue = TT.ue_for_decl scope.sc_env (loc, ax.pa_tyvars) in
-    let pconcl, tintro = 
+    let ue  = TT.ue_for_decl scope.sc_env (loc, ax.pa_tyvars) in
+
+    let (pconcl, tintro) =
       match ax.pa_vars with
-      | None ->
-        ax.pa_formula, { pl_loc = loc; pl_desc = Pidtac None } 
+      | None    -> (ax.pa_formula, [])
       | Some vs -> 
-        let pconcl = { pl_loc = loc; pl_desc = PFforall(vs, ax.pa_formula) } in
-        let vs = List.map (fun (ids,_) -> 
-          List.map (fun x -> IPCore {pl_desc = Some x.pl_desc; pl_loc = x.pl_loc}) ids)
-          vs in
-        pconcl, { pl_loc=loc; pl_desc = Plogic (Pintro (List.flatten vs)) } in
-    let concl = TT.transformula scope.sc_env ue pconcl in
-    let concl = EcFol.Fsubst.uni (EcUnify.UniEnv.close ue) concl in
+          let pconcl = { pl_loc = loc; pl_desc = PFforall (vs, ax.pa_formula) } in
+            (pconcl, List.flatten (List.map fst vs))
+    in
+
+    let tintro =
+      List.map
+        (fun x -> IPCore (mk_loc x.pl_loc (Some x.pl_desc)))
+        tintro in
+    let tintro = mk_loc loc (Plogic (Pintro tintro)) in
+
+    let concl   = TT.transformula scope.sc_env ue pconcl in
+    let concl   = EcFol.Fsubst.uni (EcUnify.UniEnv.close ue) concl in
     let tparams = EcUnify.UniEnv.tparams ue in
-    let check = Check_mode.check scope.sc_options in
+    let check   = Check_mode.check scope.sc_options in
 
     match ax.pa_kind with
-    | PILemma when check ->
-        let scope = start_lemma scope (unloc ax.pa_name) tparams concl in
-        let scope = Tactics.process_core ~mark:false scope [tintro] in
+    | PILemma ->
+        let scope = start_lemma scope check (unloc ax.pa_name) tparams concl in
+        let scope = Tactics.process_core false `Check scope [tintro] in
           None, scope
 
-    | PLemma tc when check ->
+    | PLemma tc ->
+        let scope = start_lemma scope check (unloc ax.pa_name) tparams concl in
+        let scope = Tactics.process_core false `Check scope [tintro] in
+        let scope = Tactics.proof scope mode (if tc = None then true else false) in
+
         let tc =
           match tc with
           | Some tc -> [tc]
           | None    ->
               let dtc = Plogic (Ptrivial empty_pprover) in
-              let dtc = [tintro; { pl_loc = loc; pl_desc = dtc }] in
+              let dtc = [{ pl_loc = loc; pl_desc = dtc }] in
               let dtc = List.map (fun t -> { pt_core = t; pt_intros = []; }) dtc in
                 dtc
         in
 
-        let scope = start_lemma scope (unloc ax.pa_name) tparams concl in
-        let scope = Tactics.process ~mark:false scope tc in
+        let scope = Tactics.process_r false mode scope tc in
           save scope loc
 
-    | _ ->
+    | PAxiom ->
         let axd = { ax_tparams = tparams;
                     ax_spec    = Some concl;
                     ax_kind    = Axiom } in

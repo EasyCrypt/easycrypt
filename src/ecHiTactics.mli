@@ -3,7 +3,7 @@ open EcSymbols
 
 (* -------------------------------------------------------------------- *)
 val process_tactics :
-     EcHiLogic.pprovers
+     EcHiLogic.hitenv
   -> EcParsetree.ptactic list
   -> EcLogic.goals
   -> EcLogic.goals
