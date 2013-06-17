@@ -8,12 +8,14 @@ theory T.
   end U.
 
   theory V.
-    op myop : U.t.
+    theory S.
+      op myop : U.t.
+    end S.
   end V.
 end T.
 
 clone T as W with
-  type U.t    = int,
-  op   V.myop = 0.
+  type U.t      = int,
+  op   V.S.myop = 0.
 
-op i : bool = W.V.myop = 1.
+op i : bool = W.V.S.myop = 1.
