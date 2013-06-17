@@ -489,7 +489,11 @@ let check_depend env fv mp =
       | EcModules.ME_Decl(_,restr) -> restr 
       | _ -> assert false in
     let check_v v _ = 
-      assert (is_glob v);
+      if is_loc v then begin
+        let ppe = EcPrinting.PPEnv.ofenv env in
+        EcLogic.tacuerror "only global variable can be used in inv, %a is local"
+          (EcPrinting.pp_pv ppe) v
+      end;
       let top = EcPath.m_functor v.pv_name.EcPath.x_top in
       if not (EcPath.Sm.mem top restr) then
         let ppe = EcPrinting.PPEnv.ofenv env in
