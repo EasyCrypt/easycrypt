@@ -36,6 +36,7 @@
     "equiv"       , EQUIV      ;        (* KW: prog *)
     "hoare"       , HOARE      ;        (* KW: prog *)
     "bd_hoare"    , BDHOARE    ;        (* KW: prog *)
+    "islossless"  , LOSSLESS   ;        (* KW: prog *)
 
     "try"         , TRY        ;        (* KW: tactical *)
     "first"       , FIRST      ;        (* KW: tactical *)

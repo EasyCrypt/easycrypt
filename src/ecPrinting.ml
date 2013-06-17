@@ -394,6 +394,7 @@ let e_bin_prio_op3    = (50, `Infix `Left)
 let e_bin_prio_op4    = (60, `Infix `Left)
 
 let e_uni_prio_not    = 10000
+let e_uni_prio_lsless = 10000
 let e_uni_prio_uminus = 500
 let e_app_prio        = (10000, `Infix `Left)
 let e_get_prio        = (20000, `Infix `Left)
@@ -881,7 +882,29 @@ let rec try_pp_form_eqveq (ppe : PPEnv.t) _outer fmt f =
 
   match collect [] f with
   | None     -> false
-  | Some pvs -> Format.fprintf fmt "={@[<hov 2>%a@]}" (pp_list ",@ " pp_msymbol) pvs; true
+  | Some pvs ->
+      Format.fprintf fmt "={@[<hov 2>%a@]}" (pp_list ",@ " pp_msymbol) pvs;
+      true
+
+and try_pp_lossless (ppe : PPEnv.t) outer fmt f =
+  match EcFol.is_bdHoareF f with
+  | false -> false
+  | true  ->
+      let hbd  = EcFol.destr_bdHoareF f in
+      let isls =
+           EcFol.f_equal EcFol.f_true hbd.bhf_pr
+        && EcFol.f_equal EcFol.f_true hbd.bhf_po
+        && EcFol.f_equal EcFol.f_r1   hbd.bhf_bd
+        && hbd.bhf_cmp = EcFol.FHeq
+      in
+        match isls with
+        | false -> false
+        | true  ->
+            let prio = (e_uni_prio_lsless, `Prefix) in
+            let pp fmt () =
+              Format.fprintf fmt "islossless %a" (pp_funname ppe) hbd.bhf_f
+            in
+              maybe_paren outer prio pp fmt (); true
 
 and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
   match f.f_node with
@@ -978,7 +1001,7 @@ and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
       (pp_form_r ppe (max_op_prec,`NonAssoc)) hs.bhs_bd 
 
 and pp_form_r (ppe : PPEnv.t) outer fmt f =
-  let printers = [try_pp_form_eqveq] in
+  let printers = [try_pp_form_eqveq; try_pp_lossless] in
 
   match List.findopt (fun pp -> pp ppe outer fmt f) printers with
   | Some _ -> ()
