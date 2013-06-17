@@ -1,8 +1,8 @@
 #! /usr/bin/env python
 
 # --------------------------------------------------------------------
-import sys, os, errno, shutil, itertools, logging, subprocess as sp
-import time, datetime, socket
+import sys, os, errno, re, glob, shutil, itertools, logging
+import subprocess as sp, time, datetime, socket
 
 # --------------------------------------------------------------------
 class Object(object):
@@ -44,14 +44,10 @@ def rcolor(txt, b):
 
 # --------------------------------------------------------------------
 def _options():
+    import ConfigParser as cp
     from optparse import OptionParser
 
     parser = OptionParser()
-
-    parser.add_option(
-        '', '--bin',
-        help    = 'path to EasyCrypt binary',
-        default = 'ec.byte')
 
     parser.add_option(
         '', '--bin-args',
@@ -61,36 +57,43 @@ def _options():
         help    = 'append ARGS to EasyCrypt command (cumulative)')
 
     parser.add_option(
-        '', '--ok-dir',
-        action  = 'append',
-        metavar = 'LOG',
-        default = [],
-        help    = 'path to directory containing *valid* EasyCrypt scripts (cumulative)')
-
-    parser.add_option(
-        '', '--ko-dir',
-        action  = 'append',
-        metavar = 'DIR',
-        default = [],
-        help    = 'path to directory containing *invalid* EasyCrypt scripts (cumulative)')
-
-    parser.add_option(
         '', '--xunit',
         action  = 'store',
         default = None,
         metavar = 'FILE',
         help    = 'dump result to FILE using xUnit format')
 
-    (options, args) = parser.parse_args()
+    (cmdopt, args) = parser.parse_args()
 
-    if len(args) != 0:
-        parser.error('this program does not take arguments')
+    if len(args) < 1:
+        parser.error('this program takes at least one argument')
 
-    if not options.ko_dir and not options.ok_dir:
-        parser.error('no path to directory containing EasyCrypt scripts given')
+    options = Object(scenarios = dict())
+    options.xunit = cmdopt.xunit
 
-    options.bin_args = \
-        list(itertools.chain(*[x.split() for x in options.bin_args]))
+    defaults = dict(args = '', exclude = '', okdirs = '', kodirs = '')
+
+    config = cp.SafeConfigParser(defaults)
+    config.read(args[0])
+
+    options.bin     = config.get('default', 'bin')
+    options.args    = config.get('default', 'args').split()
+    options.targets = args[1:]
+
+    if cmdopt.bin_args:
+        options.args.extend(cmdopt.bin_args)
+
+    for test in [x for x in config.sections() if x.startswith('test-')]:
+        scenario = Object()
+        scenario.args    = config.get(test, 'args').split()
+        scenario.okdirs  = config.get(test, 'okdirs')
+        scenario.kodirs  = config.get(test, 'kodirs')
+        scenario.exclude = config.get(test, 'exclude').split()
+        options.scenarios[test[5:]] = scenario
+
+    for x in options.targets:
+        if x not in options.scenarios:
+            parser.error('unknown scenario: %s' % (x,))
 
     return options
 
@@ -158,7 +161,8 @@ def _run_test(config, options):
 
     timestamp = time.time()
     try:
-        command = [options.bin] + options.bin_args + [config.filename]
+        command = [options.bin] + options.args + config.args + [config.filename]
+        logging.info('command: %s' % (' '.join(command)))
         process = sp.Popen(command, stdout = sp.PIPE, stderr = sp.PIPE)
 
         try:
@@ -192,27 +196,44 @@ def _main():
         format = '%(asctime)-15s - %(levelname)s - %(message)s')
 
     # ------------------------------------------------------------------
-    def gather(dirname, isvalid):
-        logging.debug("gathering scripts in `%s'" % (dirname,))
+    def gather(obj):
+        logging.debug("gathering scripts in `%s'" % (obj.src,))
         try:
-            scripts = os.listdir(dirname)
+            scripts = os.listdir(obj.src)
         except OSError, e:
-            logging.warning("cannot scan `%s': %s" % (dirname, e))
+            logging.warning("cannot scan `%s': %s" % (obj.src, e))
             return []
         scripts = sorted([x for x in scripts if x.endswith('.ec')])
-        logging.debug("%.4d script(s) found in `%s'" % (len(scripts), dirname))
+        logging.debug("%.4d script(s) found in `%s'" % (len(scripts), obj.src))
 
         def config(filename):
-            return Object(isvalid  = isvalid,
-                          group    = dirname,
-                          filename = os.path.normpath(os.path.join(dirname, x)))
+            return Object(isvalid  = obj.valid,
+                          group    = obj.src,
+                          args     = obj.args,
+                          filename = os.path.normpath(os.path.join(obj.src, x)))
 
         return [config(x) for x in scripts]
 
+    def gather_for_scenario(scenario):
+        def expand(dirs):
+            dirs = re.split(r'\s+', dirs)
+            dirs = [glob.glob(x) for x in dirs]
+            dirs = list(itertools.chain.from_iterable(dirs))
+            return dirs
+
+        dirs = []
+        dirs.extend([Object(src = x, valid = True , args = scenario.args) \
+                         for x in expand(scenario.okdirs)])
+        dirs.extend([Object(src = x, valid = False, args = scenario.args) \
+                         for x in expand(scenario.kodirs)])
+        dirs = [x for x in dirs if x.src not in scenario.exclude]
+        dirs = map(lambda x : gather(x), dirs)
+        return list(itertools.chain.from_iterable(dirs))
+
     def gatherall():
-        oks = map(lambda x : gather(x, True ), options.ok_dir)
-        kos = map(lambda x : gather(x, False), options.ko_dir)
-        return list(itertools.chain.from_iterable(oks + kos))
+        dirs = [options.scenarios[x] for x in options.targets]
+        dirs = map(lambda x : gather_for_scenario(x), dirs)
+        return list(itertools.chain.from_iterable(dirs))
 
     allscripts = gatherall()
 

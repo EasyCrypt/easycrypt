@@ -2,6 +2,7 @@
 open EcParsetree
 open EcUtils
 open EcIdent
+open EcPath
 open EcCoreLib
 open EcTypes
 open EcFol
@@ -35,26 +36,6 @@ let rec f_write env w f =
     List.fold_left (f_write env) w fdef.f_uses.us_calls
 
 (* computes the program variables occurring free in f with memory m *)
-let rec free_pv_form m env f = 
-  let fv = free_pv_form m env in
-  match f.f_node with
-  | Fpvar (pv,m') when m=m' -> PV.add env pv f.f_ty PV.empty
-  | Fquant (_,_,f) 
-    -> fv f
-  | Fif (f1,f2,f3) 
-    -> PV.union env (fv f1) (PV.union env (fv f2) (fv f3))
-  | Flet (_,f1,f2)
-    -> PV.union env (fv f1) (fv f2)
-  | Fapp (f,fs) 
-    -> List.fold_left (fun s f -> PV.union env (fv f) s) (fv f) fs
-  | Ftuple fs 
-    -> List.fold_left (fun s f -> PV.union env (fv f) s) PV.empty fs
-  | Fint _ | Flocal _ | Fglob _ | Fop _ | Fpvar _ 
-    -> PV.empty
-  | FhoareF _ | FhoareS _
-  | FbdHoareF _ | FbdHoareS _
-  | FequivF _ | FequivS _
-  | Fpr _ -> assert false (* FIXME: extend if necessary *)
 
 let lp_write env w lp = 
   let add w (pv,ty) = PV.add env pv ty w in
@@ -156,82 +137,69 @@ let s_last_asserts st = s_lasts destr_assert (last_error "n assert" st)
 (* -------------------------------  Wp -------------------------------- *)
 (* -------------------------------------------------------------------- *)
 
-let id_of_pv pv = 
-  EcIdent.create (EcPath.basename pv.pv_name.EcPath.x_sub) 
+let add_side name m = 
+  let name = 
+    if EcIdent.id_equal m mleft then name ^ "_L" 
+    else if EcIdent.id_equal m mright then name ^ "_R"
+    else name in
+  EcIdent.create name       
 
-let id_of_mp mp = 
-  match mp.EcPath.m_top with
-  | `Abstract id -> EcIdent.fresh id
-  | _ -> assert false 
+let id_of_pv pv m =
+  add_side (EcPath.basename pv.pv_name.EcPath.x_sub) m 
+
+
+let id_of_mp mp m = 
+  let name = 
+    match mp.EcPath.m_top with
+    | `Abstract id -> EcIdent.name id 
+    | _ -> assert false in
+  add_side name m
 
 let generalize_mod env m modi f =
-  let fv = PV.fv env m f in
-  PV.check env modi fv;
   let elts,glob = PV.elements modi in
-  let create (pv,ty) = id_of_pv pv, GTty ty in
+  let create (pv,ty) = id_of_pv pv m, GTty ty in
   let b = List.map create elts in
   let s = List.fold_left2 (fun s (pv,ty) (id, _) ->
     PVM.add env pv m (f_local id ty) s) PVM.empty elts b in
-  let create mp = id_of_mp mp, GTty (tglob mp) in
+  let create mp = id_of_mp mp m, GTty (tglob mp) in
   let b' = List.map create glob in
   let s = List.fold_left2 (fun s mp (id,_) ->
     PVM.add_glob env mp m (f_local id (tglob mp)) s) s glob b' in
   let f = PVM.subst env s f in
   f_forall_simpl (b'@b) f
 
-
-let lv_subst env m lv f =
+let lv_subst m lv f =
   match lv with
   | LvVar(pv,t) ->
-      let id = id_of_pv pv in 
-      let s = PVM.add env pv m (f_local id t) PVM.empty in
-      (LSymbol (id,t), f), s
+    let id = id_of_pv pv m in 
+    (LSymbol (id,t), f), [pv,m,f_local id t]
   | LvTuple vs ->
-      let add (pv,t) (ids,s) = 
-        let id = id_of_pv pv in
-        let s = PVM.add_none env pv m (f_local id t) s in
-        ((id,t)::ids, s) in
-      let ids,s = List.fold_right add vs ([],PVM.empty) in
-      (LTuple ids, f), s
+    let ids = List.map (fun (pv,t) -> id_of_pv pv m, t) vs in
+    let s = List.map2 (fun (pv,_) (id,t) -> pv,m,f_local id t) vs ids in
+    (LTuple ids, f), s
   | LvMap((p,tys),pv,e,ty) ->
-      let id = id_of_pv pv in 
-      let s = PVM.add env pv m (f_local id ty) PVM.empty in
-      let set = f_op p tys ty in
-      let f = f_app set [f_pvar pv ty m; form_of_expr m e; f] ty in
-      (LSymbol (id,ty), f), s
+    let id = id_of_pv pv m in 
+    let set = f_op p tys ty in
+    let f = f_app set [f_pvar pv ty m; form_of_expr m e; f] ty in
+    (LSymbol (id,ty), f), [pv,m,f_local id ty]
       
-let wp_asgn_aux env m lv e (_let,s,f) =
-  let lpe, se = lv_subst env m lv (form_of_expr m e) in
-  let subst = PVM.subst env se in
-  let _let = List.map (fun (lp,f) -> lp, subst f) _let in
-  let s = PVM.merge se s in
-  (lpe::_let, s,f)
+let wp_asgn_aux m lv e (lets,f) =
+  let let1 = lv_subst m lv (form_of_expr m e) in
+  (let1::lets,f)
 
 exception HLerror
 
-let mk_let env (_let,s,f) = 
-  f_lets_simpl _let (PVM.subst env s f)
+let mk_let env (lets,f) = 
+  let rec aux s lets = 
+    match lets with
+    | [] -> PVM.subst env s f 
+    | ((lp,f1), toadd) :: lets ->
+      let f1 = PVM.subst env s f1 in
+      let s = 
+        List.fold_left (fun s (pv,m,fp) -> PVM.add env pv m fp s) s toadd in
+      f_let_simpl lp f1 (aux s lets) in
+  if lets = [] then f else aux PVM.empty lets 
   
-let wp_asgn1 env m s post =
-  let r = List.rev s.s_node in
-  match r with
-  | {i_node = Sasgn(lv,e) } :: r' -> 
-      let letsf = wp_asgn_aux env m lv e ([],PVM.empty,post) in
-      rstmt r', mk_let env letsf
-  | _ -> raise HLerror
-
-let wp_asgn env m s post = 
-  let r = List.rev s.s_node in
-  let rec aux r letsf = 
-    match r with 
-    | [] -> [], letsf 
-    | { i_node = Sasgn (lv,e) } :: r -> aux r (wp_asgn_aux env m lv e letsf) 
-    | _ -> r, letsf in
-  let (r',letsf) = aux r ([],PVM.empty, post) in
-  if r == r' then s, post
-  else 
-    rstmt r', mk_let env letsf
-
 exception No_wp
 
 (* wp functions operates only over assignments and conditional statements.
@@ -248,7 +216,7 @@ let rec wp_stmt env m (stmt: EcModules.instr list) letsf =
 and wp_instr env m i letsf = 
   match i.i_node with
   | Sasgn (lv,e) ->
-      wp_asgn_aux env m lv e letsf
+      wp_asgn_aux m lv e letsf
   | Sif (e,s1,s2) -> 
       let r1,letsf1 = wp_stmt env m (List.rev s1.s_node) letsf in
       let r2,letsf2 = wp_stmt env m (List.rev s2.s_node) letsf in
@@ -256,12 +224,12 @@ and wp_instr env m i letsf =
         let post1 = mk_let env letsf1 in 
         let post2 = mk_let env letsf2 in
         let post  = f_if (form_of_expr m e) post1 post2 in
-        [], PVM.empty, post
+        [], post
       else raise No_wp
   | _ -> raise No_wp
 
 let wp env m s post = 
-  let r,letsf = wp_stmt env m (List.rev s.s_node) ([],PVM.empty,post) in
+  let r,letsf = wp_stmt env m (List.rev s.s_node) ([],post) in
   List.rev r, mk_let env letsf 
 
 
@@ -271,9 +239,8 @@ let wp env m s post =
 (*   mk_let env letsf *)
 
 let subst_form_lv env m lv t f =
-  let lpe, se = lv_subst env m lv t in
-  let s = PVM.merge se PVM.empty in
-  mk_let env ([lpe], s,f)
+  let lets = lv_subst m lv t in
+  mk_let env ([lets],f)
 
 (* -------------------------------------------------------------------- *)
 (* ----------------------  Auxiliary functions  ----------------------- *)
@@ -336,21 +303,21 @@ let t_zip f env cpos prpo (state, s) =
       (me, Zpr.zip zpr, gs)
   with Zpr.InvalidCPos -> tacuerror "invalid code position"
 
-let t_code_transform env side ?(bdhoare = false) cpos tr tx g =
+let t_code_transform side ?(bdhoare = false) cpos tr tx g =
   match side with
   | None -> begin
-      let _, concl = get_goal g in
+      let hyps, concl = get_goal g in
 
       if is_hoareS concl then
         let hoare    = destr_hoareS concl in
         let pr, po   = hoare.hs_pr, hoare.hs_po in
-        let (me, stmt, cs) = tx env cpos (pr, po) (hoare.hs_m, hoare.hs_s) in
+        let (me, stmt, cs) = tx hyps cpos (pr, po) (hoare.hs_m, hoare.hs_s) in
         let concl = f_hoareS_r { hoare with hs_m = me; hs_s = stmt; } in
           prove_goal_by (cs @ [concl]) (tr None) g
       else if bdhoare && is_bdHoareS concl then
         let hoare    = destr_bdHoareS concl in
         let pr, po   = hoare.bhs_pr, hoare.bhs_po in
-        let (me, stmt, cs) = tx env cpos (pr, po) (hoare.bhs_m, hoare.bhs_s) in
+        let (me, stmt, cs) = tx hyps cpos (pr, po) (hoare.bhs_m, hoare.bhs_s) in
         let concl = f_bdHoareS_r { hoare with bhs_m = me; bhs_s = stmt; } in
           prove_goal_by (cs @ [concl]) (tr None) g
       else
@@ -358,11 +325,11 @@ let t_code_transform env side ?(bdhoare = false) cpos tr tx g =
  end
 
   | Some side ->
-      let _, concl  = get_goal g in
+      let hyps, concl  = get_goal g in
       let es        = destr_equivS concl in
       let pre, post = es.es_pr, es.es_po in
       let me, stmt     = if side then (es.es_ml, es.es_sl) else (es.es_mr, es.es_sr) in
-      let me, stmt, cs = tx env cpos (pre, post) (me, stmt) in
+      let me, stmt, cs = tx hyps cpos (pre, post) (me, stmt) in
       let concl =
         match side with
         | true  -> f_equivS_r { es with es_ml = me; es_sl = stmt; }
@@ -381,10 +348,9 @@ let t_code_transform env side ?(bdhoare = false) cpos tr tx g =
 let conseq_cond pre post spre spost = 
   f_imp pre spre, f_imp spost post
  
-let t_hoareF_conseq env pre post g =
-  let hyps,concl = get_goal g in
+let t_hoareF_conseq pre post g =
+  let env,_,concl = get_goal_e g in
   let hf = destr_hoareF concl in
-  let env = tyenv_of_hyps env hyps in
   let mpr,mpo = EcEnv.Fun.hoareF_memenv hf.hf_f env in
   let cond1, cond2 = conseq_cond hf.hf_pr hf.hf_po pre post in
   let concl1 = gen_mems [mpr] cond1 in
@@ -392,7 +358,7 @@ let t_hoareF_conseq env pre post g =
   let concl3 = f_hoareF pre hf.hf_f post in
   prove_goal_by [concl1; concl2; concl3] (RN_hl_conseq) g  
     
-let t_hoareS_conseq _env pre post g =
+let t_hoareS_conseq pre post g =
   let concl = get_concl g in
   let hs = destr_hoareS concl in
   let cond1, cond2 = conseq_cond hs.hs_pr hs.hs_po pre post in
@@ -401,10 +367,9 @@ let t_hoareS_conseq _env pre post g =
   let concl3 = f_hoareS_r { hs with hs_pr = pre; hs_po = post } in
   prove_goal_by [concl1; concl2; concl3] (RN_hl_conseq) g
 
-let t_bdHoareF_conseq env pre post g =
-  let hyps,concl = get_goal g in
+let t_bdHoareF_conseq pre post g =
+  let env,_,concl = get_goal_e g in
   let bhf = destr_bdHoareF concl in
-  let env = tyenv_of_hyps env hyps in
   let mpr,mpo = EcEnv.Fun.hoareF_memenv bhf.bhf_f env in
   let cond1, cond2 = conseq_cond bhf.bhf_pr bhf.bhf_po pre post in
   let cond2 = match bhf.bhf_cmp with
@@ -417,7 +382,7 @@ let t_bdHoareF_conseq env pre post g =
   let concl3 = f_bdHoareF pre bhf.bhf_f post bhf.bhf_cmp bhf.bhf_bd in
   prove_goal_by [concl1; concl2; concl3] (RN_hl_conseq) g  
 
-let t_bdHoareS_conseq _env pre post g =
+let t_bdHoareS_conseq pre post g =
   let concl = get_concl g in
   let bhs = destr_bdHoareS concl in
   let cond1, cond2 = conseq_cond bhs.bhs_pr bhs.bhs_po pre post in
@@ -431,18 +396,18 @@ let t_bdHoareS_conseq _env pre post g =
   let concl3 = f_bdHoareS_r { bhs with bhs_pr = pre; bhs_po = post } in
   prove_goal_by [concl1; concl2; concl3] (RN_hl_conseq) g
 
-let t_equivF_conseq env pre post g =
-  let hyps,concl = get_goal g in
+let t_equivF_conseq pre post g =
+  let env,_,concl = get_goal_e g in
   let ef = destr_equivF concl in
-  let env = tyenv_of_hyps env hyps in
-  let (mprl,mprr),(mpol,mpor) = EcEnv.Fun.equivF_memenv ef.ef_fl ef.ef_fr env in
+  let (mprl,mprr),(mpol,mpor) = 
+    EcEnv.Fun.equivF_memenv ef.ef_fl ef.ef_fr env in
   let cond1, cond2 = conseq_cond ef.ef_pr ef.ef_po pre post in
   let concl1 = gen_mems [mprl;mprr] cond1 in
   let concl2 = gen_mems [mpol;mpor] cond2 in
   let concl3 = f_equivF pre ef.ef_fl ef.ef_fr post in
   prove_goal_by [concl1; concl2; concl3] (RN_hl_conseq) g  
 
-let t_equivS_conseq _env pre post g =
+let t_equivS_conseq pre post g =
   let concl = get_concl g in
   let es = destr_equivS concl in
   let cond1, cond2 = conseq_cond es.es_pr es.es_po pre post in
@@ -453,8 +418,8 @@ let t_equivS_conseq _env pre post g =
  
 (* -------------------------------------------------------------------- *)
 
-let t_hoareF_fun_def env g = 
-  let concl = get_concl g in
+let t_hoareF_fun_def g = 
+  let env,_,concl = get_goal_e g in
   let hf = destr_hoareF concl in
   let memenv, fdef, env = Fun.hoareS hf.hf_f env in (* FIXME catch exception *)
   let m = EcMemory.memory memenv in
@@ -466,10 +431,10 @@ let t_hoareF_fun_def env g =
   let concl' = f_hoareS memenv hf.hf_pr fdef.f_body post in
   prove_goal_by [concl'] RN_hl_fun_def g
 
-let t_bdHoareF_fun_def env g = 
-  let concl = get_concl g in
+let t_bdHoareF_fun_def g = 
+  let env,_,concl = get_goal_e g in
   let bhf = destr_bdHoareF concl in
-  let memenv, fdef, env = Fun.hoareS bhf.bhf_f env in (* FIXME catch exception *)
+  let memenv, fdef, env = Fun.hoareS bhf.bhf_f env in(* FIXME catch exception *)
   let m = EcMemory.memory memenv in
   let fres = 
     match fdef.f_ret with
@@ -480,8 +445,8 @@ let t_bdHoareF_fun_def env g =
   prove_goal_by [concl'] RN_hl_fun_def g
 
 
-let t_equivF_fun_def env g = 
-  let concl = get_concl g in
+let t_equivF_fun_def g = 
+  let env,_,concl = get_goal_e g in
   let ef = destr_equivF concl in
   let memenvl,fdefl,memenvr,fdefr,env = Fun.equivS ef.ef_fl ef.ef_fr env in 
                                 (* FIXME catch exception *)
@@ -503,11 +468,11 @@ let t_equivF_fun_def env g =
   prove_goal_by [concl'] RN_hl_fun_def g
 
 
-let t_fun_def env g =
+let t_fun_def g =
   let concl = get_concl g in
-  if is_hoareF concl then t_hoareF_fun_def env g
-  else if is_bdHoareF concl then t_bdHoareF_fun_def env g
-  else if is_equivF concl then t_equivF_fun_def env g
+  if is_hoareF concl then t_hoareF_fun_def g
+  else if is_bdHoareF concl then t_bdHoareF_fun_def g
+  else if is_equivF concl then t_equivF_fun_def g
   else tacerror (NotPhl None)
 
   
@@ -524,7 +489,11 @@ let check_depend env fv mp =
       | EcModules.ME_Decl(_,restr) -> restr 
       | _ -> assert false in
     let check_v v _ = 
-      assert (is_glob v);
+      if is_loc v then begin
+        let ppe = EcPrinting.PPEnv.ofenv env in
+        EcLogic.tacuerror "only global variable can be used in inv, %a is local"
+          (EcPrinting.pp_pv ppe) v
+      end;
       let top = EcPath.m_functor v.pv_name.EcPath.x_top in
       if not (EcPath.Sm.mem top restr) then
         let ppe = EcPrinting.PPEnv.ofenv env in
@@ -552,114 +521,131 @@ let check_depend env fv mp =
     in            
     EcPath.Sm.iter check_m fv.PV.glob
 
-let hoareF_abs_spec env f inv = 
-  let f = EcEnv.NormMp.norm_xpath env f in
+let abstract_info env f1 = 
+  let f = EcEnv.NormMp.norm_xpath env f1 in
   let top = EcPath.m_functor f.EcPath.x_top in
-  let m = mhr in
-  let fv = PV.fv env m inv in
-  check_depend env fv top;
-  (* TODO check there is only global variable *)
   let def = EcEnv.Fun.by_xpath f env in
   let oi = 
     match def.f_def with
-      | FBabs oi -> oi
-      | _ -> assert false (* FIXME error message *)
-  in
+    | FBabs oi -> oi
+    | _ -> 
+      let ppe = EcPrinting.PPEnv.ofenv env in
+      if EcPath.x_equal f1 f then 
+        EcLogic.tacuerror "The function %a should be abstract"
+          (EcPrinting.pp_funname ppe) f1
+      else 
+        EcLogic.tacuerror 
+          "The function %a, which reduce to %a, should be abstract"
+          (EcPrinting.pp_funname ppe) f1
+          (EcPrinting.pp_funname ppe) f in
+  top, f, oi, def.f_sig
+
+
+let hoareF_abs_spec env f inv = 
+  let top, _, oi, _fsig = abstract_info env f in
+  let m = mhr in
+  let fv = PV.fv env m inv in
+  check_depend env fv top;
   let ospec o = f_hoareF inv o inv in
   let sg = List.map ospec oi.oi_calls in
   inv, inv, sg
 
-let t_hoareF_abs env inv g = 
-  let hyps, concl = get_goal g in
+let t_hoareF_abs inv g = 
+  let env,_,concl = get_goal_e g in
   let hf = destr_hoareF concl in
-  let env' = tyenv_of_hyps env hyps in
-  let pre, post, sg = hoareF_abs_spec env' hf.hf_f inv in
+  let pre, post, sg = hoareF_abs_spec env hf.hf_f inv in
   let tac g' = prove_goal_by sg (RN_hl_fun_abs inv) g' in
-  t_on_last tac (t_hoareF_conseq env pre post g)
+  t_on_last tac (t_hoareF_conseq pre post g)
+
+let lossless_hyps env top sub = 
+  let sig_ = (EcEnv.Mod.by_mpath top env).me_sig in
+  let bd = 
+    List.map (fun (id,mt) -> id,GTmodty(mt,EcPath.Sm.empty))
+      sig_.mis_params in               (* Should we put restriction here *)
+  let args = List.map (fun (id,_) -> EcPath.mident id) sig_.mis_params in
+  let concl = 
+    f_losslessF (EcPath.xpath (EcPath.m_apply top args) sub ) in
+  let calls = 
+    let name = EcPath.basename sub in
+    let Tys_function(_,oi) = 
+      List.find (fun (Tys_function(fs,_)) -> fs.fs_name = name)
+        sig_.mis_body in
+    oi.oi_calls in
+  let hyps = List.map f_losslessF calls in
+  f_forall bd (f_imps hyps concl) 
 
 let bdHoareF_abs_spec env f inv = 
-  let f = EcEnv.NormMp.norm_xpath env f in
-  let top = EcPath.m_functor f.EcPath.x_top in
+  let top,_,oi,_fsig = abstract_info env f in
   let m = mhr in
   let fv = PV.fv env m inv in
   check_depend env fv top;
-  (* TODO check there is only global variable *)
-  let def = EcEnv.Fun.by_xpath f env in
-  let oi = 
-    match def.f_def with
-      | FBabs oi -> oi
-      | _ -> assert false (* FIXME error message *)
-  in
   let ospec o = f_bdHoareF inv o inv FHeq f_r1 in
   let sg = List.map ospec oi.oi_calls in
-  inv, inv, sg
+  inv, inv, lossless_hyps env top f.x_sub :: sg
 
-let t_bdHoareF_abs env inv g = 
-  let hyps, concl = get_goal g in
+let t_bdHoareF_abs inv g = 
+  let env,_,concl = get_goal_e g in
   let bhf = destr_bdHoareF concl in
-  let env' = tyenv_of_hyps env hyps in
   match bhf.bhf_cmp with
     | FHeq when f_equal bhf.bhf_bd f_r1 -> 
-      let pre, post, sg = bdHoareF_abs_spec env' bhf.bhf_f inv in
+      let pre, post, sg = bdHoareF_abs_spec env bhf.bhf_f inv in
       let tac g' = prove_goal_by sg (RN_hl_fun_abs inv) g' in
-      t_on_last tac (t_bdHoareF_conseq env pre post g)
+      t_on_last tac (t_bdHoareF_conseq pre post g)
     | _ ->
       cannot_apply "fun" "expected \"= 1\" as bound"
 
- 
-let check_adv env fl fr = 
-  let fl = EcEnv.NormMp.norm_xpath env fl in
-  let fr = EcEnv.NormMp.norm_xpath env fr in
-  let subl = fl.EcPath.x_sub in
-  let subr = fr.EcPath.x_sub in
-  let topl = EcPath.m_functor fl.EcPath.x_top in
-  let topr = EcPath.m_functor fr.EcPath.x_top in
-  assert (EcPath.p_equal subl subr && EcPath.m_equal topl topr);  
-  fl,topl,fr,topr
-                                               (* FIXME error message *)
+let abstract_info2 env fl' fr' =
+  let topl, fl, oil, sigl = abstract_info env fl' in
+  let topr, fr, oir, sigr = abstract_info env fr' in
+  let fl1 = EcPath.xpath topl fl.x_sub in
+  let fr1 = EcPath.xpath topr fr.x_sub in
+  if not (EcPath.x_equal fl1 fr1) then
+    let ppe = EcPrinting.PPEnv.ofenv env in
+    EcLogic.tacuerror 
+      "function %a reduce to %a and %a reduce to %a, %a and %a should be equal"
+      (EcPrinting.pp_funname ppe) fl'
+      (EcPrinting.pp_funname ppe) fl1
+      (EcPrinting.pp_funname ppe) fr'
+      (EcPrinting.pp_funname ppe) fr1
+      (EcPrinting.pp_funname ppe) fl1
+      (EcPrinting.pp_funname ppe) fr1
+  else 
+    topl, fl, oil, sigl, topr, fr, oir, sigr
 
 let equivF_abs_spec env fl fr inv = 
-  let fl,topl,fr,topr = check_adv env fl fr in
+  let topl, fl, oil,sigl, topr, fr, oir,sigr = abstract_info2 env fl fr in
   let ml, mr = mleft, mright in
   let fvl = PV.fv env ml inv in
   let fvr = PV.fv env mr inv in
   check_depend env fvl topl;
   check_depend env fvr topr;
-  (* TODO check there is only global variable *)
-  let defl, defr = EcEnv.Fun.by_xpath fl env, EcEnv.Fun.by_xpath fr env in
-  let oil, oir = 
-    match defl.f_def, defr.f_def with
-    | FBabs oil, FBabs oir -> oil, oir
-    | _ -> assert false (* FIXME error message *)
-  in
+  let eqglob = f_eqglob topl ml topr mr in
   let ospec o_l o_r = 
     let fo_l = EcEnv.Fun.by_xpath o_l env in
     let fo_r = EcEnv.Fun.by_xpath o_r env in
     let eq_params = 
       f_eqparams o_l fo_l.f_sig.fs_params ml o_r fo_r.f_sig.fs_params mr in
     let eq_res = f_eqres o_l fo_l.f_sig.fs_ret ml o_r fo_r.f_sig.fs_ret mr in
-    let pre = EcFol.f_and eq_params inv in
-    let post = EcFol.f_and eq_res inv in
+    let pre = EcFol.f_ands [eq_params;eqglob;inv] in
+    let post = EcFol.f_ands [eq_res;eqglob;inv] in
     f_equivF pre o_l o_r post in
   let sg = List.map2 ospec oil.oi_calls oir.oi_calls in
   let eq_params = 
-    f_eqparams fl defl.f_sig.fs_params ml fr defr.f_sig.fs_params mr in
-  let eq_res = f_eqres fl defl.f_sig.fs_ret ml fr defr.f_sig.fs_ret mr in
-  let eqglob = f_eqglob topl ml topr mr in
+    f_eqparams fl sigl.fs_params ml fr sigr.fs_params mr in
+  let eq_res = f_eqres fl sigl.fs_ret ml fr sigr.fs_ret mr in
   let pre = f_ands [eq_params; eqglob; inv] in
   let post = f_ands [eq_res; eqglob; inv] in
   pre, post, sg
 
-let t_equivF_abs env inv g = 
-  let hyps, concl = get_goal g in
+let t_equivF_abs inv g = 
+  let env,_,concl = get_goal_e g in
   let ef = destr_equivF concl in
-  let env' = tyenv_of_hyps env hyps in
-  let pre, post, sg = equivF_abs_spec env' ef.ef_fl ef.ef_fr inv in
+  let pre, post, sg = equivF_abs_spec env ef.ef_fl ef.ef_fr inv in
   let tac g' = prove_goal_by sg (RN_hl_fun_abs inv) g' in
-  t_on_last tac (t_equivF_conseq env pre post g)
+  t_on_last tac (t_equivF_conseq pre post g)
 
 let equivF_abs_upto env fl fr bad invP invQ = 
-  let fl,topl,fr,topr = check_adv env fl fr in
+  let topl, fl, oil,sigl, topr, fr, oir,sigr = abstract_info2 env fl fr in
   let ml, mr = mleft, mright in
   let bad2 = f_subst_mem mhr mr bad in
   let allinv = f_ands [bad2; invP; invQ] in
@@ -668,22 +654,15 @@ let equivF_abs_upto env fl fr bad invP invQ =
   check_depend env fvl topl;
   check_depend env fvr topr;
   (* TODO check there is only global variable *)
-  let defl, defr = EcEnv.Fun.by_xpath fl env, EcEnv.Fun.by_xpath fr env in
-  let oil, oir = 
-    match defl.f_def, defr.f_def with
-    | FBabs oil, FBabs oir -> oil, oir
-    | _ -> assert false (* FIXME error message *)
-  in
   let eqglob = f_eqglob topl ml topr mr in
-  let egP    = f_and eqglob invP in
   let ospec o_l o_r = 
     let fo_l = EcEnv.Fun.by_xpath o_l env in
     let fo_r = EcEnv.Fun.by_xpath o_r env in
     let eq_params = 
       f_eqparams o_l fo_l.f_sig.fs_params ml o_r fo_r.f_sig.fs_params mr in
     let eq_res = f_eqres o_l fo_l.f_sig.fs_ret ml o_r fo_r.f_sig.fs_ret mr in
-    let pre = EcFol.f_ands [EcFol.f_not bad2; eq_params; egP] in
-    let post = EcFol.f_if bad2 invQ (f_and eq_res egP) in
+    let pre = EcFol.f_ands [EcFol.f_not bad2; eq_params;eqglob;invP] in
+    let post = EcFol.f_if bad2 invQ (f_ands [eq_res;eqglob;invP]) in
     let cond1 = f_equivF pre o_l o_r post in
     let cond2 =
       let q = f_subst_mem ml EcFol.mhr invQ in
@@ -695,38 +674,21 @@ let equivF_abs_upto env fl fr bad invP invQ =
     [cond1;cond2;cond3] in
   let sg = List.map2 ospec oil.oi_calls oir.oi_calls in
   let sg = List.flatten sg in
-  let lossless_a = 
-    let sig_ = (EcEnv.Mod.by_mpath topl env).me_sig in
-    let bd = 
-      List.map (fun (id,mt) -> id,GTmodty(mt,EcPath.Sm.empty))
-        sig_.mis_params in               (* Should we put restriction here *)
-    let args = List.map (fun (id,_) -> EcPath.mident id) sig_.mis_params in
-    let sub = fl.EcPath.x_sub in
-    let concl = 
-      f_losslessF (EcPath.xpath (EcPath.m_apply topl args) sub ) in
-    let calls = 
-      let name = EcPath.basename sub in
-      let Tys_function(_,oi) = 
-        List.find (fun (Tys_function(fs,_)) -> fs.fs_name = name)
-          sig_.mis_body in
-      oi.oi_calls in
-    let hyps = List.map f_losslessF calls in
-    f_forall bd (f_imps hyps concl) in
+  let lossless_a = lossless_hyps env topl fl.x_sub in
   let sg = lossless_a :: sg in
   let eq_params = 
-    f_eqparams fl defl.f_sig.fs_params ml fr defr.f_sig.fs_params mr in
-  let eq_res = f_eqres fl defl.f_sig.fs_ret ml fr defr.f_sig.fs_ret mr in
-  let pre = f_if bad2 invQ (f_and eq_params egP) in
-  let post = f_if bad2 invQ (f_and eq_res egP) in
+    f_eqparams fl sigl.fs_params ml fr sigr.fs_params mr in
+  let eq_res = f_eqres fl sigl.fs_ret ml fr sigr.fs_ret mr in
+  let pre = f_if bad2 invQ (f_ands [eq_params;eqglob;invP]) in
+  let post = f_if bad2 invQ (f_ands [eq_res;eqglob;invP]) in
   pre, post, sg
 
-let t_equivF_abs_upto env bad invP invQ g = 
-  let hyps, concl = get_goal g in
+let t_equivF_abs_upto bad invP invQ g = 
+  let env,_,concl = get_goal_e g in
   let ef = destr_equivF concl in
-  let env' = tyenv_of_hyps env hyps in
-  let pre, post, sg = equivF_abs_upto env' ef.ef_fl ef.ef_fr bad invP invQ in
+  let pre, post, sg = equivF_abs_upto env ef.ef_fl ef.ef_fr bad invP invQ in
   let tac g' = prove_goal_by sg (RN_hl_fun_upto(bad,invP,invQ)) g' in
-  t_on_last tac (t_equivF_conseq env pre post g)
+  t_on_last tac (t_equivF_conseq pre post g)
 
 (* -------------------------------------------------------------------- *)  
 let t_hoare_skip g =
@@ -865,8 +827,8 @@ let check_wp_progress msg i s remain =
         (Format.sprintf "remaining %i instruction%s" len 
            (if len = 1 then "" else "s"))
 
-let t_hoare_wp env i g =
-  let concl = get_concl g in
+let t_hoare_wp i g =
+  let env,_,concl = get_goal_e g in
   let hs = destr_hoareS concl in
   let s_hd,s_wp = s_split_o "wp" i hs.hs_s in
   let s_wp,post = 
@@ -876,15 +838,15 @@ let t_hoare_wp env i g =
   let concl = f_hoareS_r { hs with hs_s = s; hs_po = post} in
   prove_goal_by [concl] (RN_hl_wp (Single i)) g
 
-let t_bdHoare_wp env i g =
-  let concl = get_concl g in
+let t_bdHoare_wp i g =
+  let env,_,concl = get_goal_e g in
   let bhs = destr_bdHoareS concl in
   let s_hd,s_wp = s_split_o "wp" i bhs.bhs_s in
   let s_wp = EcModules.stmt s_wp in
 
   let m = EcMemory.memory bhs.bhs_m in
 
-  let fv_bd = free_pv_form m env bhs.bhs_bd in
+  let fv_bd = PV.fv env m bhs.bhs_bd in
   let modi = s_write env s_wp in
 
   if not (PV.disjoint env fv_bd modi) then 
@@ -898,8 +860,8 @@ let t_bdHoare_wp env i g =
   prove_goal_by [concl] (RN_hl_wp (Single i)) g
 
 
-let t_equiv_wp env ij g = 
-  let concl = get_concl g in
+let t_equiv_wp ij g = 
+  let env,_,concl = get_goal_e g in
   let es = destr_equivS concl in
   let i = omap ij fst and j = omap ij snd in
   let s_hdl,s_wpl = s_split_o "wp" i es.es_sl in
@@ -916,16 +878,17 @@ let t_equiv_wp env ij g =
   prove_goal_by [concl] (RN_hl_wp (Double(i,j))) g
 
 
-let t_wp env k = match k with
-  | None -> t_hS_or_bhS_or_eS (t_hoare_wp env None) (t_bdHoare_wp env None) (t_equiv_wp env None)
-  | Some (Single i) -> t_hS_or_bhS (t_hoare_wp env (Some i)) (t_bdHoare_wp env (Some i))
-  | Some (Double(i,j)) -> t_equiv_wp env (Some (i,j))
+let t_wp k = match k with
+  | None -> 
+    t_hS_or_bhS_or_eS (t_hoare_wp None) (t_bdHoare_wp None) (t_equiv_wp None)
+  | Some (Single i) -> t_hS_or_bhS (t_hoare_wp (Some i)) (t_bdHoare_wp (Some i))
+  | Some (Double(i,j)) -> t_equiv_wp (Some (i,j))
 
 
 (* -------------------------------------------------------------------- *)
   
-let t_hoare_while env inv g =
-  let concl = get_concl g in
+let t_hoare_while inv g =
+  let env, _, concl = get_goal_e g in
   let hs = destr_hoareS concl in
   let ((e,c),s) = s_last_while "while" hs.hs_s in
   let m = EcMemory.memory hs.hs_m in
@@ -942,8 +905,8 @@ let t_hoare_while env inv g =
   let concl = f_hoareS_r { hs with hs_s = s; hs_po=post} in
   prove_goal_by [b_concl;concl] (RN_hl_while (inv,None,None)) g
 
-let t_bdHoare_while env inv vrnt info g =
-  let concl = get_concl g in
+let t_bdHoare_while inv vrnt info g =
+  let env, _, concl = get_goal_e g in
   let bhs = destr_bdHoareS concl in
   let ((e,c),s) = s_last_while "while" bhs.bhs_s in
   let m = EcMemory.memory bhs.bhs_m in
@@ -974,9 +937,8 @@ let t_bdHoare_while env inv vrnt info g =
     | _ ->
       cannot_apply "while" "not implemented"
 
-let t_equiv_while env inv g =
-  let (hyps, concl) = get_goal g in
-  let env1 = tyenv_of_hyps env hyps in
+let t_equiv_while inv g =
+  let env,_,concl = get_goal_e g in
   let es = destr_equivS concl in
   let (el,cl), (er,cr), sl, sr = s_last_whiles "while" es.es_sl es.es_sr in
   let ml = EcMemory.memory es.es_ml in
@@ -990,10 +952,10 @@ let t_equiv_while env inv g =
   let b_concl = f_equivS es.es_ml es.es_mr b_pre cl cr b_post in
       (* the wp of the while *)
   let post = f_imps_simpl [f_not_simpl el;f_not_simpl er; inv] es.es_po in
-  let modil = s_write env1 cl in
-  let modir = s_write env1 cr in
-  let post = generalize_mod env1 mr modir post in
-  let post = generalize_mod env1 ml modil post in
+  let modil = s_write env cl in
+  let modir = s_write env cr in
+  let post = generalize_mod env mr modir post in
+  let post = generalize_mod env ml modil post in
   let post = f_and_simpl inv post in
   let concl = f_equivS_r {es with es_sl = sl; es_sr = sr; es_po = post} in
   prove_goal_by [b_concl; concl] (RN_hl_while (inv,None,None)) g 
@@ -1004,16 +966,16 @@ let wp_asgn_call env m lv res post =
   match lv with
   | None -> post
   | Some lv ->
-    let lpe,se = lv_subst env m lv res in
-    mk_let env ([lpe],se,post)
+    let lets = lv_subst m lv res in
+    mk_let env ([lets],post)
 
 let subst_args_call env m f =
   List.fold_right2 (fun v e s ->
-    PVM.add_none env (pv_loc f v.v_name) m (form_of_expr m e) s)
+    PVM.add env (pv_loc f v.v_name) m (form_of_expr m e) s)
   
-let t_hoare_call env fpre fpost g =
+let t_hoare_call fpre fpost g =
   (* FIXME : check the well formess of the pre and the post ? *)
-  let concl = get_concl g in
+  let env,_,concl = get_goal_e g in
   let hs = destr_hoareS concl in
   let (lp,f,args),s = s_last_call "call" hs.hs_s in
   let m = EcMemory.memory hs.hs_m in
@@ -1035,9 +997,9 @@ let t_hoare_call env fpre fpost g =
   prove_goal_by [f_concl;concl] (RN_hl_call (None, fpre, fpost)) g
 
 
-let t_bdHoare_call env fpre fpost opt_bd g =
+let t_bdHoare_call fpre fpost opt_bd g =
   (* FIXME : check the well formess of the pre and the post ? *)
-  let concl = get_concl g in
+  let env,_,concl = get_goal_e g in
   let bhs = destr_bdHoareS concl in
   let (lp,f,args),s = s_last_call "call" bhs.bhs_s in
   let m = EcMemory.memory bhs.bhs_m in
@@ -1089,10 +1051,9 @@ let t_bdHoare_call env fpre fpost opt_bd g =
 
       
 
-let t_equiv_call env fpre fpost g =
+let t_equiv_call fpre fpost g =
   (* FIXME : check the well formess of the pre and the post ? *)
-  let hyps, concl = get_goal g in
-  let env = tyenv_of_hyps env hyps in
+  let env,_,concl = get_goal_e g in
   let es = destr_equivS concl in
   let (lpl,fl,argsl),(lpr,fr,argsr),sl,sr = 
     s_last_calls "call" es.es_sl es.es_sr in
@@ -1128,8 +1089,8 @@ let t_equiv_call env fpre fpost g =
   let concl = f_equivS_r { es with es_sl = sl; es_sr = sr; es_po=post} in
   prove_goal_by [f_concl;concl] (RN_hl_call (None, fpre, fpost)) g
 
-let t_equiv_call1 env side fpre fpost g =
-  let concl = get_concl g in
+let t_equiv_call1 side fpre fpost g =
+  let env,_,concl = get_goal_e g in
   let equiv = destr_equivS concl in
 
   let (me, stmt) =
@@ -1142,7 +1103,7 @@ let t_equiv_call1 env side fpre fpost g =
   let fsig = (Fun.by_xpath f env).f_sig in
 
   (* The function satisfies its specification *)
-  let fconcl = f_hoareF fpre f fpost in
+  let fconcl = f_bdHoareF fpre f fpost FHeq f_r1 in
 
   (* WP *)
   let pvres  = pv_res f in
@@ -1168,7 +1129,7 @@ let t_equiv_call1 env side fpre fpost g =
 
 (* --------------------------------------------------------------------- *)
 
-let t_hoare_equiv _env p q p1 q1 p2 q2 g =
+let t_hoare_equiv p q p1 q1 p2 q2 g =
   let concl = get_concl g in
   let es = destr_equivS concl in
   let s1 = f_bind_mem f_subst_id mhr (fst es.es_ml) in
@@ -1244,8 +1205,8 @@ let _inline_freshen me v =
     else
       (EcMemory.bind v.v_name v.v_type me, v.v_name)
 
-let _inline env hyps me sp s =
-  let env = tyenv_of_hyps env hyps in
+let _inline hyps me sp s =
+  let env = LDecl.toenv hyps in
   let module P = EcPath in
 
   let inline1 me lv p args = 
@@ -1317,36 +1278,37 @@ let _inline env hyps me sp s =
   let me, s = inline_s me sp s.s_node in
   me, stmt s 
 
-let t_inline_bdHoare env sp g =
+let t_inline_bdHoare sp g =
   let hyps,concl = get_goal g in
   let hoare      = destr_bdHoareS concl in
-  let (me, stmt) = _inline env hyps hoare.bhs_m sp hoare.bhs_s in
+  let (me, stmt) = _inline hyps hoare.bhs_m sp hoare.bhs_s in
   let concl      = f_bdHoareS_r { hoare with bhs_m = me; bhs_s = stmt; } in
   prove_goal_by [concl] (RN_hl_inline (None, sp)) g
 
-let t_inline_hoare env sp g =
+let t_inline_hoare sp g =
   let hyps,concl = get_goal g in
   let hoare      = destr_hoareS concl in
-  let (me, stmt) = _inline env hyps hoare.hs_m sp hoare.hs_s in
+  let (me, stmt) = _inline hyps hoare.hs_m sp hoare.hs_s in
   let concl      = f_hoareS_r { hoare with hs_m = me; hs_s = stmt; } in
   prove_goal_by [concl] (RN_hl_inline (None, sp)) g
 
-let t_inline_equiv env side sp g =
-  let hyps, concl = get_goal g in
+let t_inline_equiv side sp g =
+  let hyps,concl = get_goal g in
   let equiv = destr_equivS concl in
   let concl =
     match side with
     | true  ->
-      let (me, stmt) = _inline env hyps equiv.es_ml sp equiv.es_sl in
+      let (me, stmt) = _inline hyps equiv.es_ml sp equiv.es_sl in
       f_equivS_r { equiv with es_ml = me; es_sl = stmt; }
     | false ->
-      let (me, stmt) = _inline env hyps equiv.es_mr sp equiv.es_sr in
+      let (me, stmt) = _inline hyps equiv.es_mr sp equiv.es_sr in
       f_equivS_r { equiv with es_mr = me; es_sr = stmt; }
   in
   prove_goal_by [concl] (RN_hl_inline (Some side, sp)) g
 
 (* -------------------------------------------------------------------- *)
-let t_kill env side cpos olen g =
+let t_kill side cpos olen g =
+  let env = LDecl.toenv (get_hyps g) in
   let kill_stmt _env (_, po) me zpr =
     let error fmt =
       Format.ksprintf
@@ -1364,7 +1326,8 @@ let t_kill env side cpos olen g =
     in
 
     let ks_wr = is_write env PV.empty ks in
-    let po_rd = free_pv_form (fst me) env po in
+    (* TODO Benj : check the usage of po_rd *)
+    let po_rd = PV.fv env (fst me) po in
 
     List.iteri
       (fun i is ->
@@ -1383,10 +1346,10 @@ let t_kill env side cpos olen g =
   in
 
   let tr = fun side -> RN_hl_kill (side, cpos, olen) in
-    t_code_transform env side ~bdhoare:true cpos tr (t_zip kill_stmt) g
+    t_code_transform side ~bdhoare:true cpos tr (t_zip kill_stmt) g
 
 (* -------------------------------------------------------------------- *)
-let alias_stmt id _env me i =
+let alias_stmt id _ me i =
   match i.i_node with
   | Srnd (lv, e) ->
       let id       = odfl "x" (omap id EcLocation.unloc) in
@@ -1400,9 +1363,9 @@ let alias_stmt id _env me i =
   | _ ->
       tacuerror "cannot create an alias for that kind of instruction"
 
-let t_alias env side cpos id g =
+let t_alias side cpos id g =
   let tr = fun side -> RN_hl_alias (side, cpos) in
-    t_code_transform env side cpos tr (t_fold (alias_stmt id)) g
+  t_code_transform side cpos tr (t_fold (alias_stmt id)) g
 
 (* -------------------------------------------------------------------- *)
 let check_fission_independence env b init c1 c2 c3 =
@@ -1464,10 +1427,10 @@ let fission_stmt (il, (d1, d2)) env me zpr =
 
     (me, { zpr with Zpr.z_head = hd; Zpr.z_tail = fis @ tl }, [])
 
-let t_fission env side cpos infos g =
+let t_fission side cpos infos g =
   let tr = fun side -> RN_hl_fission (side, cpos, infos) in
-  let cb = fun env _ me zpr -> fission_stmt infos env me zpr in
-    t_code_transform env side cpos tr (t_zip cb) g
+  let cb = fun hyps _ me zpr -> fission_stmt infos (LDecl.toenv hyps) me zpr in
+    t_code_transform side cpos tr (t_zip cb) g
 
 (* -------------------------------------------------------------------- *)
 let fusion_stmt (il, (d1, d2)) env me zpr =
@@ -1514,20 +1477,20 @@ let fusion_stmt (il, (d1, d2)) env me zpr =
 
     (me, { zpr with Zpr.z_head = hd; Zpr.z_tail = fus @ tl; }, [])
 
-let t_fusion env side cpos infos g =
+let t_fusion side cpos infos g =
   let tr = fun side -> RN_hl_fusion (side, cpos, infos) in
-  let cb = fun env _ me zpr -> fusion_stmt infos env me zpr in
-    t_code_transform env side cpos tr (t_zip cb) g
+  let cb = fun hyps _ me zpr -> fusion_stmt infos (LDecl.toenv hyps) me zpr in
+    t_code_transform side cpos tr (t_zip cb) g
 
 (* -------------------------------------------------------------------- *)
-let unroll_stmt _env me i =
+let unroll_stmt _ me i =
   match i.i_node with
   | Swhile (e, sw) -> (me, [i_if (e, sw, stmt []); i])
   | _ -> tacuerror "cannot find a while loop at given position"
 
-let t_unroll env side cpos g =
+let t_unroll side cpos g =
   let tr = fun side -> RN_hl_unroll (side, cpos) in
-    t_code_transform env side cpos tr (t_fold unroll_stmt) g
+    t_code_transform side cpos tr (t_fold unroll_stmt) g
 
 (* -------------------------------------------------------------------- *)
 let splitwhile_stmt b _env me i =
@@ -1539,9 +1502,9 @@ let splitwhile_stmt b _env me i =
 
   | _ -> tacuerror "cannot find a while loop at given position"
 
-let t_splitwhile b env side cpos g =
+let t_splitwhile b side cpos g =
   let tr = fun side -> RN_hl_splitwhile (b, side, cpos) in
-    t_code_transform env side cpos tr (t_fold (splitwhile_stmt b)) g
+    t_code_transform side cpos tr (t_fold (splitwhile_stmt b)) g
 
 (* -------------------------------------------------------------------- *)
 let cfold_stmt env me olen zpr =
@@ -1613,14 +1576,14 @@ let cfold_stmt env me olen zpr =
   in
     (me, zpr, [])
 
-let t_cfold env side cpos olen g =
+let t_cfold side cpos olen g =
   let tr = fun side -> RN_hl_cfold (side, cpos, olen) in
-  let cb = fun env _ me zpr -> cfold_stmt env me olen zpr in 
-    t_code_transform env ~bdhoare:true side cpos tr (t_zip cb) g
+  let cb = fun hyps _ me zpr -> cfold_stmt (LDecl.toenv hyps) me olen zpr in 
+    t_code_transform ~bdhoare:true side cpos tr (t_zip cb) g
 
 (* -------------------------------------------------------------------- *)
-let t_bdHoare_deno env pre post g =
-  let concl = get_concl g in
+let t_bdHoare_deno pre post g =
+  let env,_,concl = get_goal_e g in
   let cmp, f, bd, concl_post =
     match concl.f_node with
     | Fapp({f_node = Fop(op,_)}, [f;bd]) when is_pr f &&
@@ -1654,8 +1617,8 @@ let t_bdHoare_deno env pre post g =
   prove_goal_by [concl_e;concl_pr;concl_po] RN_hl_deno g  
 
 
-let t_equiv_deno env pre post g =
-  let concl = get_concl g in
+let t_equiv_deno pre post g =
+  let env, _, concl = get_goal_e g in
   let cmp, f1, f2 =
     match concl.f_node with
     | Fapp({f_node = Fop(op,_)}, [f1;f2]) when is_pr f1 && is_pr f2 &&
@@ -1758,14 +1721,16 @@ let t_rcond side b at_pos g =
 let check_swap env s1 s2 = 
   let m1,m2 = s_write env s1, s_write env s2 in
   let r1,r2 = s_read env s1, s_read env s2 in
-  let m2r1 = PV.disjoint env m2 r1 in
-  let m1m2 = PV.disjoint env m1 m2 in
-  let m1r2 = PV.disjoint env m1 r2 in
-  let error () = (* FIXME : better error message *)
-    cannot_apply "swap" "the two statements are not independent" in
-  if not m2r1 then error ();
-  if not m1m2 then error ();
-  if not m1r2 then error ()
+  let m2r1 = PV.inter env m2 r1 in
+  let m1m2 = PV.inter env m1 m2 in
+  let m1r2 = PV.inter env m1 r2 in
+  let error s1 s2 d = 
+    EcLogic.tacuerror 
+      "cannot swap : the two statement are not independants, the first statement can %s %a which can be %s by the second"
+      s1 (PV.pp env) d s2 in
+  if not (PV.is_empty m2r1) then error "read" "write" m2r1;
+  if not (PV.is_empty m1m2) then error "write" "write" m1m2;
+  if not (PV.is_empty m1r2) then error "write" "read" m1r2
 
 
 let swap_stmt env p1 p2 p3 s = 
@@ -1781,26 +1746,23 @@ let swap_stmt env p1 p2 p3 s =
   check_swap env (stmt s12) (stmt s23);
   stmt (List.flatten [hd;s23;s12;tl]) 
 
-let t_hoare_swap env p1 p2 p3 g =
-  let hyps, concl = get_goal g in
+let t_hoare_swap p1 p2 p3 g =
+  let env,_,concl = get_goal_e g in
   let hs    = destr_hoareS concl in
-  let env = tyenv_of_hyps env hyps in
   let s = swap_stmt env p1 p2 p3 hs.hs_s in
   let concl = f_hoareS_r {hs with hs_s = s } in
   prove_goal_by [concl] (RN_hl_swap(None,p1,p2,p3)) g
 
-let t_bdHoare_swap env p1 p2 p3 g =
-  let hyps, concl = get_goal g in
+let t_bdHoare_swap p1 p2 p3 g =
+  let env,_,concl = get_goal_e g in
   let bhs    = destr_bdHoareS concl in
-  let env = tyenv_of_hyps env hyps in
   let s = swap_stmt env p1 p2 p3 bhs.bhs_s in
   let concl = f_bdHoareS_r {bhs with bhs_s = s } in
   prove_goal_by [concl] (RN_hl_swap(None,p1,p2,p3)) g
 
-let t_equiv_swap env side p1 p2 p3 g =
-  let hyps, concl = get_goal g in
+let t_equiv_swap side p1 p2 p3 g =
+  let env,_,concl = get_goal_e g in
   let es    = destr_equivS concl in
-  let env = tyenv_of_hyps env hyps in
   let sl,sr = 
     if side 
     then swap_stmt env p1 p2 p3 es.es_sl, es.es_sr 
@@ -1818,38 +1780,38 @@ let s_first_if s =
     try destr_if i with Not_found -> 
       cannot_apply "if" "the first instruction should be a if"
 
-let t_gen_cond env side e g =
+let t_gen_cond side e g =
   let hyps = get_hyps g in
   let m1,m2,h,h1,h2 = match LDecl.fresh_ids hyps ["&m";"&m";"_";"_";"_"] with
     | [m1;m2;h;h1;h2] -> m1,m2,h,h1,h2
     | _ -> assert false in
   let t_introm = 
-    if side <> None then t_intros_i env [m1] else t_id None 
+    if side <> None then t_intros_i [m1] else t_id None 
   in
   let t_sub b g = 
     t_seq_subgoal (t_rcond side b 1)
-      [ t_lseq [t_introm; t_skip;t_intros_i env ([m2;h]);
+      [ t_lseq [t_introm; t_skip;t_intros_i ([m2;h]);
                 t_or 
-                  (t_lseq [t_elim_hyp env h; t_intros_i env [h1; h2]; t_hyp env h2])
-                  (t_lseq [t_hyp env h])
+                  (t_lseq [t_elim_hyp h; t_intros_i [h1; h2]; t_hyp h2])
+                  (t_lseq [t_hyp h])
                ];
         t_id None]
       g in
   t_seq_subgoal (t_he_case e) [t_sub true; t_sub false] g
 
-let t_hoare_cond env g = 
+let t_hoare_cond g = 
   let concl = get_concl g in
   let hs = destr_hoareS concl in 
   let (e,_,_) = s_first_if hs.hs_s in
-  t_gen_cond env None (form_of_expr (EcMemory.memory hs.hs_m) e) g
+  t_gen_cond None (form_of_expr (EcMemory.memory hs.hs_m) e) g
 
-let t_bdHoare_cond env g = 
+let t_bdHoare_cond g = 
   let concl = get_concl g in
   let bhs = destr_bdHoareS concl in 
   let (e,_,_) = s_first_if bhs.bhs_s in
-  t_gen_cond env None (form_of_expr (EcMemory.memory bhs.bhs_m) e) g
+  t_gen_cond None (form_of_expr (EcMemory.memory bhs.bhs_m) e) g
 
-let rec t_equiv_cond env side g =
+let rec t_equiv_cond side g =
   let hyps,concl = get_goal g in
   let es = destr_equivS concl in
   match side with
@@ -1861,7 +1823,7 @@ let rec t_equiv_cond env side g =
       else
         let (e,_,_) = s_first_if es.es_sr in
         form_of_expr (EcMemory.memory es.es_mr) e in
-    t_gen_cond env side e g
+    t_gen_cond side e g
   | None -> 
       let el,_,_ = s_first_if es.es_sl in
       let er,_,_ = s_first_if es.es_sr in
@@ -1873,18 +1835,18 @@ let rec t_equiv_cond env side g =
         | [hiff;m1;m2;h;h1;h2] -> hiff,m1,m2,h,h1,h2 
         | _ -> assert false in
       let t_aux = 
-        t_lseq [t_intros_i env [m1];
+        t_lseq [t_intros_i [m1];
                 t_skip;
-                t_intros_i env [m2;h];
-                t_elim_hyp env h;
-                t_intros_i env [h1;h2];
-                t_seq_subgoal (t_rewrite_hyp env false hiff 
+                t_intros_i [m2;h];
+                t_elim_hyp h;
+                t_intros_i [h1;h2];
+                t_seq_subgoal (t_rewrite_hyp false hiff 
                                  [AAmem m1;AAmem m2;AAnode])
-                  [t_hyp env h1; t_hyp env h2]] in
-      t_seq_subgoal (t_cut env fiff)
+                  [t_hyp h1; t_hyp h2]] in
+      t_seq_subgoal (t_cut fiff)
         [ t_id None;
-          t_seq (t_intros_i env [hiff])
-            (t_seq_subgoal (t_equiv_cond env (Some true))
+          t_seq (t_intros_i [hiff])
+            (t_seq_subgoal (t_equiv_cond (Some true))
                [t_seq_subgoal (t_equiv_rcond false true  1) 
                    [t_aux; t_clear (Sid.singleton hiff)];
                 t_seq_subgoal (t_equiv_rcond false false 1) 
@@ -1897,8 +1859,8 @@ let (===) = f_eq
 let (==>) = f_imp
 let (&&&) = f_anda
 
-let t_hoare_rnd env g =
-  let concl = get_concl g in
+let t_hoare_rnd g =
+  let env,_,concl = get_goal_e g in
   let hs = destr_hoareS concl in
   let (lv,distr),s= s_last_rnd "rnd" hs.hs_s in
   (* FIXME: exception when not rnds found *)
@@ -1912,8 +1874,8 @@ let t_hoare_rnd env g =
   let concl = f_hoareS_r {hs with hs_s=s; hs_po=post} in
   prove_goal_by [concl] RN_hl_hoare_rnd g
 
-let wp_equiv_disj_rnd side env g =
-  let concl = get_concl g in
+let wp_equiv_disj_rnd side g =
+  let env,_,concl = get_goal_e g in
   let es = destr_equivS concl in
   let m,s = 
     if side then es.es_ml, es.es_sl 
@@ -1935,8 +1897,8 @@ let wp_equiv_disj_rnd side env g =
   in
   prove_goal_by [concl] RN_hl_hoare_rnd g
 
-let wp_equiv_rnd env (f,finv) g =
-  let concl = get_concl g in
+let wp_equiv_rnd (f,finv) g =
+  let env,_,concl = get_goal_e g in
   let es = destr_equivS concl in
   let (lvL,muL),(lvR,muR),sl',sr'= s_last_rnds "rnd" es.es_sl es.es_sr in
   (* FIXME: exception when not rnds found *)
@@ -1966,26 +1928,26 @@ let wp_equiv_rnd env (f,finv) g =
   let concl = f_equivS_r {es with es_sl=sl'; es_sr=sr'; es_po=post} in
   prove_goal_by [concl] (RN_hl_equiv_rnd ((Some tf, Some tfinv))) g
 
-let t_equiv_rnd side env bij_info = 
+let t_equiv_rnd side bij_info =
   match side with
-    | Some side -> wp_equiv_disj_rnd side env 
-    | None  ->
-      let f,finv =  match bij_info with 
-        | Some f, Some finv ->  f, finv
-        | Some bij, None | None, Some bij -> bij, bij
-        | None, None -> 
-          let z_id = EcIdent.create "z" in
-          let z = f_local z_id in
-          let bij = fun tyL tyR -> f_lambda [z_id,GTty tyR] (z tyL) in 
+  | Some side -> wp_equiv_disj_rnd side
+  | None  ->
+    let f,finv =  match bij_info with 
+      | Some f, Some finv ->  f, finv
+      | Some bij, None | None, Some bij -> bij, bij
+      | None, None -> 
+        let z_id = EcIdent.create "z" in
+        let z = f_local z_id in
+        let bij = fun tyL tyR -> f_lambda [z_id,GTty tyR] (z tyL) in 
           (* TODO Cezar : Can it be not well typed: normally tyL and tyR should
              be equal.
              I propose to replace tyL by tyR
-            *)
-          bij, bij
-      in wp_equiv_rnd env (f, finv) 
+          *)
+        bij, bij
+    in wp_equiv_rnd (f, finv) 
 
-let t_bd_hoare_rnd env (opt_bd,opt_event) g =
-  let concl = get_concl g in
+let t_bd_hoare_rnd (opt_bd,opt_event) g =
+  let env,_,concl = get_goal_e g in
   let bhs = destr_bdHoareS concl in
   let (lv,distr),s = s_last_rnd "bd_hoare_rnd" bhs.bhs_s in
   let ty_distr = proj_distr_ty (e_ty distr) in
@@ -2074,8 +2036,8 @@ let t_prbounded g =
   in
   prove_goal_by [cond] RN_hl_prbounded g
 
-let t_prfalse env g = 
-  let concl = get_concl g in
+let t_prfalse g = 
+  let env,_, concl = get_goal_e g in
   let f,ev,bd =
     match concl.f_node with
       | Fapp ({f_node = Fop(op,_)}, [f;bd]) when is_pr f &&

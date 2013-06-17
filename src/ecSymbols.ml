@@ -4,7 +4,7 @@ open EcMaps
 (* -------------------------------------------------------------------- *)
 type symbol  = string
 type qsymbol = symbol list * symbol
-type msymbol = (symbol * msymbol) list
+type msymbol = (symbol * msymbol list) list
 
 let equal : symbol -> symbol -> bool = (=)
 let compare : symbol -> symbol -> int = Pervasives.compare
@@ -83,7 +83,7 @@ let rec string_of_qsymbol = function
 let rec pp_qsymbol fmt qn =
   Format.fprintf fmt "%s" (string_of_qsymbol qn)
 
-let rec string_of_msymbol ?(top = true) (mx : msymbol) =
+let rec string_of_msymbol (mx : msymbol) =
   match mx with
   | [] ->
       ""
@@ -91,14 +91,14 @@ let rec string_of_msymbol ?(top = true) (mx : msymbol) =
   | [(x, [])] ->
       x
 
-  | [(x, a)] ->
-      Printf.sprintf "%s(%s)" x (string_of_msymbol ~top:false a)
+  | [(x, args)] ->
+      Printf.sprintf "%s(%s)"
+        x (String.concat ", " (List.map string_of_msymbol args))
 
   | nm :: x ->
-      Printf.sprintf "%s%s%s"
-        (string_of_msymbol ~top [nm])
-        (if top then "." else ", ")
-        (string_of_msymbol ~top:true x)
+      Printf.sprintf "%s.%s"
+        (string_of_msymbol [nm])
+        (string_of_msymbol x)
 
 let pp_msymbol fmt x =
   Format.fprintf fmt "%s" (string_of_msymbol x)

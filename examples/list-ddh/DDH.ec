@@ -38,13 +38,13 @@ module DH_distrs = {
 
 module DDH0 (D:DDH_DISTINGUISHER) = { 
   fun main() : bool = {
-    var X : group;
-    var Y : group;
-    var Z : group;
+    var x : group;
+    var y : group;
+    var z : group;
     var b : bool;
 
-    (X,Y,Z)  = DH_distrs.sample_dh();
-    b  = D.dist(X,Y,Z);
+    (x,y,z)  = DH_distrs.sample_dh();
+    b  = D.dist(x,y,z);
     
     return b;
   }     
@@ -53,13 +53,13 @@ module DDH0 (D:DDH_DISTINGUISHER) = {
 
 module DDH1 (D:DDH_DISTINGUISHER) = { 
   fun main() : bool = {
-    var X : group;
-    var Y : group;
-    var Z : group;
+    var x : group;
+    var y : group;
+    var z : group;
     var b : bool;
 
-    (X,Y,Z)  = DH_distrs.sample_random();
-    b  = D.dist(X,Y,Z);
+    (x,y,z)  = DH_distrs.sample_random();
+    b  = D.dist(x,y,z);
     
     return b;
   }

@@ -20,7 +20,7 @@ exception TopError of EcLocation.t * exn
 let rec toperror_of_exn ?gloc exn =
   match exn with
   | TyError  (loc, _, _) -> Some (loc, exn)
-  | TacError _           -> Some (odfl _dummy gloc, exn)
+  | EcBaseLogic.TacError _ -> Some (odfl _dummy gloc, exn)
   | ParseError (loc, _)  -> Some (loc, exn)
 
   | LocError (loc, e)    -> begin
@@ -223,7 +223,7 @@ and process_w3_import (scope : EcScope.scope) (p, f, r) =
 and process_tactics (scope : EcScope.scope) t = 
   match t with
   | `Actual t -> EcScope.Tactics.process scope t
-  | `Proof    -> scope (* FIXME: check that we are at the beginning of proof script*)
+  | `Proof  b -> EcScope.Tactics.proof   scope b
 
 (* -------------------------------------------------------------------- *)
 and process_save (scope : EcScope.scope) loc =
@@ -302,7 +302,9 @@ let initial () =
   let prelude = (mk_loc _dummy "prelude", Some true) in
   let loader  = EcLoader.forsys loader in
   let scope   = EcScope.empty in
-  let scope   = process_th_require loader scope prelude in
+  let scope   = if   !options.o_boot
+                then scope
+                else process_th_require loader scope prelude in
     scope
 
 (* -------------------------------------------------------------------- *)

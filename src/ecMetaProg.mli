@@ -105,7 +105,7 @@ end
 exception MatchFailure
 
 val f_match :
-     EcEnv.env * EcEnv.LDecl.hyps
+     EcEnv.LDecl.hyps
   -> unienv * form evmap
   -> ptn:form
   -> form

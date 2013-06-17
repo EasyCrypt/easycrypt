@@ -104,6 +104,7 @@
     "axiom"       , AXIOM      ;        (* KW: global *)
     "lemma"       , LEMMA      ;        (* KW: global *)
     "proof"       , PROOF      ;        (* KW: global *)
+    "strict"      , STRICT     ;        (* KW: global *)
     "save"        , SAVE       ;        (* KW: global *)
     "qed"         , QED        ;        (* KW: global *)
     "claim"       , CLAIM      ;        (* KW: global *)

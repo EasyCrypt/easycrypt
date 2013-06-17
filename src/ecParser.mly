@@ -252,6 +252,7 @@
 %token SKIP
 %token SPLIT
 %token SPLITWHILE
+%token STRICT
 %token FIELD
 %token FIELDSIMP
 %token STAR
@@ -592,6 +593,11 @@ ptybindings:
 %inline sform: x=loc(sform_u) { x }
 %inline  form: x=loc( form_u) { x }
 
+qident_or_res:
+| x=qident   { x }
+| x=loc(RES) { mk_loc x.pl_loc ([], "res") }
+;
+
 sform_u:
 | n=number
    { PFint n }
@@ -600,7 +606,7 @@ sform_u:
    { PFident (mk_loc x.pl_loc ([], "res"), None) }
 
 | x=qident_pbinop ti=tvars_app?
-   { PFident (x,ti) }
+   { PFident (x, ti) }
 
 | se=sform op=loc(FROM_INT)
    { let id = PFident(mk_loc op.pl_loc EcCoreLib.s_from_int, None) in
@@ -718,10 +724,13 @@ form_u:
     { pfapp_symb op.pl_loc "*" ti [e1; e2] }
 
 | c=form QUESTION e1=form COLON e2=form %prec OP2
-   { PFif (c, e1, e2) }
+    { PFif (c, e1, e2) }
+
+| EQ LBRACE xs=qident_or_res+ RBRACE
+    { PFeqveq xs }
 
 | IF c=form THEN e1=form ELSE e2=form
-   { PFif (c, e1, e2) }
+    { PFif (c, e1, e2) }
 
 | LET p=lpattern EQ e1=form IN e2=form { PFlet (p, e1, e2) }
 
@@ -884,12 +893,25 @@ var_decl:
    { (xs, ty) }
 ;
 
-loc_decl:
-| VAR xs=plist1(ident, COMMA) COLON ty=loc(type_exp) SEMICOLON
-     { (xs, ty, None  ) }
+loc_decl_names:
+| x=plist1(lident, COMMA) { (`Single, x) }
 
-| VAR xs=plist1(ident, COMMA) COLON ty=loc(type_exp) EQ e=expr SEMICOLON
-     { (xs, ty, Some e) }
+| LPAREN x=plist2(lident, COMMA) RPAREN { (`Tuple, x) }
+;
+
+loc_decl_r:
+| VAR x=loc_decl_names COLON ty=loc(type_exp)
+    { { pfl_names = x; pfl_type = Some ty; pfl_init = None; } }
+
+| VAR x=loc_decl_names COLON ty=loc(type_exp) EQ e=expr
+    { { pfl_names = x; pfl_type = Some ty; pfl_init = Some e; } }
+
+| VAR x=loc_decl_names EQ e=expr
+    { { pfl_names = x; pfl_type = None; pfl_init = Some e; } }
+;
+
+loc_decl:
+| x=loc_decl_r SEMICOLON { x }
 ;
 
 ret_stmt:
@@ -1296,7 +1318,17 @@ intro_pattern_1:
 ;
 
 intro_pattern:
-| x=loc(intro_pattern_1) { IPCore x }
+| x=loc(intro_pattern_1)
+   { IPCore x }
+
+| LBRACKET RBRACKET
+   { IPCase [] }
+
+| LBRACKET ip=intro_pattern+ RBRACKET
+   { IPCase [ip] }
+
+| LBRACKET ip=plist2(intro_pattern*, PIPE) RBRACKET
+   { IPCase ip }
 ;
 
 fpattern_head(F):
@@ -1664,17 +1696,18 @@ tactic_chain:
 | LBRACKET ts=plist1(loc(tactics0), PIPE) RBRACKET
     { Psubtacs (List.map mk_core_tactic ts) }
 
-| FIRST t=tactic
-    { Pfirst t }
+| FIRST t=tactic { Pfirst (t, 1) }
+| LAST  t=tactic { Plast  (t, 1) }
 
-| LAST t=tactic
-    { Plast t }
+| FIRST n=NUM t=tactic { Pfirst (t, n) }
+| LAST  n=NUM t=tactic { Plast  (t, n) }
 
-| FIRST LAST
-    { Protate `Left }
+| FIRST LAST  { Protate (`Left , 1) }
+| LAST  FIRST { Protate (`Right, 1) }
 
-| LAST FIRST
-    { Protate `Right }
+| FIRST n=NUM LAST  { Protate (`Left , n) }
+| LAST  n=NUM FIRST { Protate (`Right, n) }
+
 ;
 
 subtactic:
@@ -1700,8 +1733,9 @@ tactics0:
 | x=loc(empty) { Pseq [mk_core_tactic (mk_loc x.pl_loc (Pidtac None))] }
 
 tactics_or_prf:
-| t=tactics { `Actual t }
-| PROOF     { `Proof }
+| t=tactics    { `Actual t    }
+| PROOF        { `Proof false }
+| PROOF STRICT { `Proof true  }
 ;
 
 (* -------------------------------------------------------------------- *)

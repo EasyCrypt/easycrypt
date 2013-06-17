@@ -295,6 +295,7 @@ module LDecl : sig
   type hyps
   val init : env -> EcIdent.t list -> hyps
   val tohyps : hyps -> EcBaseLogic.hyps
+  val toenv  : hyps -> env
 
   val add_local : EcIdent.t -> local_kind -> hyps -> hyps
 
@@ -319,7 +320,15 @@ module LDecl : sig
   val clear : EcIdent.Sid.t -> hyps -> hyps
 
   val ld_subst : EcFol.f_subst -> local_kind -> local_kind
+
+  val push_all    : memenv list -> hyps -> hyps
+  val push_active : memenv -> hyps -> hyps
+
+  val hoareF : xpath -> hyps -> hyps * hyps
+  val equivF : xpath -> xpath -> hyps -> hyps * hyps
+  val inv_memenv : hyps -> hyps 
+
 end
 
 (* -------------------------------------------------------------------- *)
-val check_goal : env -> EcProvers.prover_infos -> LDecl.hyps * form -> bool
+val check_goal : EcProvers.prover_infos -> LDecl.hyps * form -> bool

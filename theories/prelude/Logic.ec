@@ -69,7 +69,7 @@ lemma if_intro : forall (a bt bf : bool),
   (a => bt) => (!a => bf) => if a then bt else bf
 by [].
 
-
+lemma absurd : forall (a b : bool), (!a => !b) => b => a by [].
  
 lemma rewrite_l : forall (x1 x2:'a) (p:'a -> bool),
   x1 = x2 => p x2 => p x1
