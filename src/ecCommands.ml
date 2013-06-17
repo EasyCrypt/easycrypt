@@ -197,9 +197,9 @@ and process_th_require ld scope (x, io) =
 
         let scope = EcScope.Theory.require scope name loader in
           match io with
-          | None       -> scope
-          | Some true  -> process_th_export scope ([], name)
-          | Some false -> process_th_import scope ([], name)
+          | None         -> scope
+          | Some `Export -> process_th_export scope ([], name)
+          | Some `Import -> process_th_import scope ([], name)
 
 (* -------------------------------------------------------------------- *)
 and process_th_import (scope : EcScope.scope) name =
@@ -212,9 +212,13 @@ and process_th_export (scope : EcScope.scope) name =
   EcScope.Theory.export scope name
 
 (* -------------------------------------------------------------------- *)
-and process_th_clone (scope : EcScope.scope) thcl =
+and process_th_clone (scope : EcScope.scope) (thcl, io) =
   EcScope.check_state `InTop "theory cloning" scope;
-  EcScope.Theory.clone scope thcl
+  let (name, scope) = EcScope.Theory.clone scope thcl in
+    match io with
+    | None         -> scope
+    | Some `Export -> process_th_export scope ([], name)
+    | Some `Import -> process_th_import scope ([], name)
 
 (* -------------------------------------------------------------------- *)
 and process_w3_import (scope : EcScope.scope) (p, f, r) =
@@ -319,7 +323,7 @@ let addidir ?system (idir : string) =
 
 (* -------------------------------------------------------------------- *)
 let initial () =
-  let prelude = (mk_loc _dummy "prelude", Some true) in
+  let prelude = (mk_loc _dummy "prelude", Some `Export) in
   let loader  = EcLoader.forsys loader in
   let scope   = EcScope.empty in
   let scope   = if   !options.o_boot

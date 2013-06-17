@@ -669,9 +669,8 @@ module Theory = struct
     assert (scope.sc_pr_uc = None);
 
     let (name, nth) = EcThCloning.clone scope.sc_env thcl in
-      { scope with
-          sc_env =
-            EcEnv.Theory.bind name nth scope.sc_env; }
+    let scope = { scope with sc_env = EcEnv.Theory.bind name nth scope.sc_env; } in
+      (name, scope)
 
   (* ------------------------------------------------------------------ *)
   let import_w3 scope dir file renaming =
