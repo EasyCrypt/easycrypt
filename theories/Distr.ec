@@ -5,7 +5,7 @@ require import Real.
 
 op charfun (p:'a cPred, x:'a) : real = if p x then 1%r else 0%r.
 
-op mu_x(d:'a distr, x) : real = mu d (cPeq x).
+op mu_x(d:'a distr, x) : real = mu d ((=) x).
 
 op weight(d:'a distr) : real = mu d cPtrue.
 
@@ -20,25 +20,47 @@ axiom mu_false : forall (d:'a distr), mu d cPfalse = 0%r.
 axiom mu_or : forall (d:'a distr, p, q:'a cPred), 
   mu d (cPor p q) = mu d p + mu d q - mu d (cPand p q).
 
-axiom mu_sub : forall (d:'a distr, p, q:'a cPred), p <= q => mu d p <= mu d q.
+axiom mu_sub : forall (d:'a distr, p, q:'a cPred),
+  p <= q => mu d p <= mu d q.
+
+pred (==)(d d':'a distr) =
+  (forall x, mu_x d x = mu_x d' x).
+
+axiom mu_extensional : forall (d d':'a distr), (* breaks Lib.extensionality, but not mu_property *)
+  d == d' <=> d = d'.
 
 (** Lemmas *)
 lemma mu_disjoint : forall (d:'a distr, p, q:'a cPred),
-  (cPand p q <= cPfalse) => mu d (cPor p q) = mu d p + mu d q
+  (cPand p q <= cPfalse) =>
+  mu d (cPor p q) = mu d p + mu d q
 by [].
 
 lemma mu_not : forall (d:'a distr, p:'a cPred), 
   mu d (cPnot p) = mu d cPtrue - mu d p.
 proof.
-  intros d p.
-  cut H: (forall (x y z:real), x + z = y => x = y - z); [trivial | ].
-  apply (H (mu d (cPnot p)) (mu d cPtrue) (mu d p) _).
-  cut H1: (mu d cPtrue = mu d (cPor (cPnot p) p)); trivial.
+  intros d p;
+  cut H: (forall (x y z:real), x = y - z <=> x + z = y); first trivial.
+  rewrite <- (H (mu d (cPnot p)) (mu d cPtrue) (mu d p));
+  rewrite (_:cPtrue = cPor (cPnot p) p); trivial.
 qed.
 
 lemma mu_weight_0 : forall (d:'a distr),
   weight d = 0%r => forall p, mu d p = 0%r
 by [].
+
+(** Empty distribution *)
+theory Dempty.
+  op dempty : 'a distr.
+
+  axiom mu_def : forall (p:'a cPred), mu dempty p = 0%r.
+
+  lemma unique : forall (d:'a distr),
+    weight d = 0%r <=> d = dempty.
+  proof.
+  intros d; split; last trivial.
+  intros weight_0; rewrite <- (mu_extensional<:'a> d dempty); trivial.
+  qed.
+end Dempty.
 
 (** Point distribution *)
 theory Dunit.
