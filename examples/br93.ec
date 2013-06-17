@@ -157,12 +157,15 @@ save.
 lemma eq1 : forall (A <: Adv {BR,BR2,CPA,RO,ARO}), 
 (forall (O <: ARO),
  bd_hoare[ O.o : true ==> true] = 1%r =>
+ bd_hoare[ A(O).a1 : true ==> true] = 1%r) =>
+(forall (O <: ARO),
+ bd_hoare[ O.o : true ==> true] = 1%r =>
  bd_hoare[ A(O).a2 : true ==> true] = 1%r) =>
  equiv [ CPA(BR,A).main ~ CPA(BR2,A).main : 
 (glob A){1} = (glob A){2} ==>
  (!mem BR2.r ARO.log){2} => res{1} = res{2}].
 proof.
- intros A HALossless.
+ intros A HALossless1 HALossless2.
  fun.
  call ((!mem BR2.r ARO.log){2} => 
  ARO.log{1} = ARO.log{2} /\ ARO.log{1} = ARO.log{2} /\
@@ -225,15 +228,19 @@ lemma prob1_1 :
  forall (A <: Adv {BR,BR2,CPA,RO,ARO}),
 (forall (O <: ARO),
  bd_hoare[ O.o : true ==> true] = 1%r =>
+ bd_hoare[ A(O).a1 : true ==> true] = 1%r) =>
+(forall (O <: ARO),
+ bd_hoare[ O.o : true ==> true] = 1%r =>
  bd_hoare[ A(O).a2 : true ==> true] = 1%r) =>
  forall &m ,
 Pr[CPA(BR,A).main() @ &m: res] <=
 Pr[CPA(BR2,A).main() @ &m : res \/ mem BR2.r ARO.log].
 proof.
- intros A Hlossless &m.
+ intros A Hlossless1 Hlossless2 &m.
  equiv_deno (_ : (glob A){1} = (glob A){2} ==>
  !(mem BR2.r ARO.log){2} => res{1} = res{2}).
- apply (eq1(<:A) _).
+ apply (eq1(<:A) _ _).
+ assumption.
  assumption.
  trivial.
  trivial.
@@ -272,20 +279,23 @@ lemma prob1_3 :
  forall (A <: Adv {BR,BR2,CPA,RO,ARO}),
 (forall (O <: ARO),
  bd_hoare[ O.o : true ==> true] = 1%r =>
+ bd_hoare[ A(O).a1 : true ==> true] = 1%r) =>
+(forall (O <: ARO),
+ bd_hoare[ O.o : true ==> true] = 1%r =>
  bd_hoare[ A(O).a2 : true ==> true] = 1%r) =>
  forall &m,
 Pr[CPA(BR,A).main() @ &m: res] <=
 Pr[CPA(BR2,A).main() @ &m : res ] + 
 Pr[CPA(BR2,A).main() @ &m :  mem BR2.r ARO.log].
 proof.
- intros A Hlossless &m.
+ intros A Hlossless1 Hlossless2 &m.
  apply (real_le_trans 
  Pr[CPA(BR,A).main() @ &m: res] 
  Pr[CPA(BR2,A).main() @ &m : res \/ mem BR2.r ARO.log]
  (Pr[CPA(BR2,A).main() @ &m : res] + 
   Pr[CPA(BR2,A).main() @ &m : mem BR2.r ARO.log]) _ _).
-   apply (prob1_1 (<:A) _ &m );try assumption;trivial.
-   apply (prob1_2 (<:A) &m).
+   apply (prob1_1 (<:A) _ _ &m );try assumption;trivial.
+   apply (prob1_2 (<:A)  &m).
 save.
 
 
@@ -320,13 +330,16 @@ save.
 lemma eq2 : forall (A <: Adv {BR2,BR3,CPA,RO,ARO}), 
 (forall (O <: ARO),
  bd_hoare[ O.o : true ==> true] = 1%r =>
+ bd_hoare[ A(O).a1 : true ==> true] = 1%r) =>
+(forall (O <: ARO),
+ bd_hoare[ O.o : true ==> true] = 1%r =>
  bd_hoare[ A(O).a2 : true ==> true] = 1%r) =>
  equiv [ CPA(BR2,A).main ~ CPA(BR3,A).main : 
  (glob A){1} = (glob A){2} ==>
  res{1} = res{2} /\ 
   ARO.log{1} = ARO.log{2} /\ BR2.r{1} = BR3.r{2}].
 proof.
- intros A Hlossless.
+ intros A Hlossless1 Hlossless2.
  fun.
  call (ARO.log{1} = ARO.log{2} /\ RO.m{1} = RO.m{2} /\ 
  c{1} = c{2} /\ (glob A){1} = (glob A){2})
@@ -368,15 +381,19 @@ lemma prob2_1 :
  forall (A <: Adv {BR2,BR3,CPA,RO,ARO}), 
 (forall (O <: ARO),
  bd_hoare[ O.o : true ==> true] = 1%r =>
+ bd_hoare[ A(O).a1 : true ==> true] = 1%r) =>
+(forall (O <: ARO),
+ bd_hoare[ O.o : true ==> true] = 1%r =>
  bd_hoare[ A(O).a2 : true ==> true] = 1%r) =>
  forall &m,
 Pr[CPA(BR2,A).main() @ &m: res] =
 Pr[CPA(BR3,A).main() @ &m : res].
 proof.
- intros A Hlossless &m.
+ intros A Hlossless1 Hlossless2 &m.
  equiv_deno (_ : (glob A){1} = (glob A){2} ==> 
  res{1} = res{2} /\ ARO.log{1} = ARO.log{2} /\ BR2.r{1} = BR3.r{2}).
- apply (eq2(<:A) _).
+ apply (eq2(<:A) _ _).
+ assumption.
  assumption.
  trivial.
  trivial.
@@ -386,15 +403,19 @@ lemma prob2_2 :
  forall (A <: Adv {BR2,BR3,CPA,RO,ARO}), 
 (forall (O <: ARO),
  bd_hoare[ O.o : true ==> true] = 1%r =>
+ bd_hoare[ A(O).a1 : true ==> true] = 1%r) =>
+(forall (O <: ARO),
+ bd_hoare[ O.o : true ==> true] = 1%r =>
  bd_hoare[ A(O).a2 : true ==> true] = 1%r) =>
  forall &m,
 Pr[CPA(BR2,A).main() @ &m: mem BR2.r ARO.log] =
 Pr[CPA(BR3,A).main() @ &m : mem BR3.r ARO.log].
 proof.
- intros A Hlossless &m.
+ intros A Hlossless1 Hlossless2 &m.
  equiv_deno (_ : (glob A){1} = (glob A){2} ==> 
  res{1} = res{2} /\ ARO.log{1} = ARO.log{2} /\ BR2.r{1} = BR3.r{2}).
- apply (eq2(<:A) _).
+ apply (eq2(<:A) _ _).
+ assumption.
  assumption.
  trivial.
  trivial.
@@ -426,13 +447,16 @@ module CPA2(S : Scheme, A_ : Adv) = {
 lemma eq3 : forall (A <: Adv {BR3,CPA,CPA2,RO,ARO}), 
 (forall (O <: ARO),
  bd_hoare[ O.o : true ==> true] = 1%r =>
+ bd_hoare[ A(O).a1 : true ==> true] = 1%r) =>
+(forall (O <: ARO),
+ bd_hoare[ O.o : true ==> true] = 1%r =>
  bd_hoare[ A(O).a2 : true ==> true] = 1%r) =>
  equiv [ CPA(BR3,A).main ~ CPA2(BR3,A).main : 
  (glob A){1} = (glob A){2} ==>
  res{1} = res{2} /\ 
   ARO.log{1} = ARO.log{2} /\ BR3.r{1} = BR3.r{2}].
 proof.
- intros A Hlossless.
+ intros A Hlossless1 Hlossless2.
  fun.
  swap{2} -1.
  call (ARO.log{1} = ARO.log{2} /\ RO.m{1} = RO.m{2} /\ 
@@ -468,19 +492,53 @@ proof.
  wp;rnd;wp;rnd;wp;skip;progress;trivial.
 save.
 
+axiom keypair_lossless : mu keypairs cPtrue = 1%r.
+ 
 lemma prob3_1 : 
  forall (A <: Adv {CPA2,BR3,CPA,RO,ARO}), 
+(forall (O <: ARO),
+ bd_hoare[ O.o : true ==> true] = 1%r =>
+ bd_hoare[ A(O).a1 : true ==> true] = 1%r) =>
+(forall (O <: ARO),
+ bd_hoare[ O.o : true ==> true] = 1%r =>
+ bd_hoare[ A(O).a2 : true ==> true] = 1%r) =>
 (forall (O <: ARO),
  bd_hoare[ O.o : true ==> true] = 1%r =>
  bd_hoare[ A(O).a2 : true ==> true] = 1%r) =>
  forall &m,
 Pr[CPA2(BR3,A).main()  @ &m : res] = 1%r / 2%r.
 proof.
- intros A Hlossless.
+ intros A Hlossless1 Hlossless2.
  intros &m.
  cut H1 : (bd_hoare[CPA2(BR3,A).main : true ==> res] = (1%r / 2%r)).
  fun; rnd (1%r / 2%r) (lambda b, b = b'); simplify.
- admit.
+ call (true) (true).
+ fun (true).
+ trivial.
+ trivial.
+ assumption.
+ fun.
+ if.
+ inline RO.o;wp;rnd 1%r (cPtrue);wp;skip;trivial.
+ wp;skip;trivial.
+ inline CPA2(BR3,A).SO.enc;wp;rnd 1%r (cPtrue);wp.
+ call (true) (true).
+ fun (true).
+ trivial.
+ trivial.
+ assumption.
+ fun.
+ if.
+ inline RO.o;wp;rnd 1%r (cPtrue);wp;skip;trivial.
+ wp;skip;trivial.
+ inline CPA2(BR3,A).SO.kg CPA2(BR3,A).SO.init CPA2(BR3,A).ARO.init RO.init.
+ wp;rnd 1%r (cPtrue);rnd 1%r (cPtrue);wp;skip;progress.
+ trivial.
+ trivial.
+ trivial.
+ rewrite (Dbool.mu_def  (lambda b, b = result)).
+ case (result);delta charfun;simplify;trivial.
+ intros &m1. 
  bdhoare_deno H1; trivial.
 save.
 
@@ -489,15 +547,19 @@ lemma prob3_2 :
  forall (A <: Adv {BR3,CPA,CPA2,RO,ARO}), 
 (forall (O <: ARO),
  bd_hoare[ O.o : true ==> true] = 1%r =>
+ bd_hoare[ A(O).a1 : true ==> true] = 1%r) =>
+(forall (O <: ARO),
+ bd_hoare[ O.o : true ==> true] = 1%r =>
  bd_hoare[ A(O).a2 : true ==> true] = 1%r) =>
  forall &m, 
 Pr[CPA(BR3,A).main() @ &m: res] =
 Pr[CPA2(BR3,A).main() @ &m : res].
 proof.
- intros A Hlossless &m.
+ intros A Hlossless1 Hlossless2 &m.
  equiv_deno (_ : (glob A){1} = (glob A){2} ==> 
  res{1} = res{2} /\ ARO.log{1} = ARO.log{2} /\ BR3.r{1} = BR3.r{2}).
- apply (eq3(<:A) _).
+ apply (eq3(<:A) _ _).
+ assumption.
  assumption.
  trivial.
  trivial.
@@ -507,15 +569,19 @@ lemma prob3_3 :
  forall (A <: Adv {BR3,CPA,CPA2,RO,ARO}), 
 (forall (O <: ARO),
  bd_hoare[ O.o : true ==> true] = 1%r =>
+ bd_hoare[ A(O).a1 : true ==> true] = 1%r) =>
+(forall (O <: ARO),
+ bd_hoare[ O.o : true ==> true] = 1%r =>
  bd_hoare[ A(O).a2 : true ==> true] = 1%r) =>
  forall &m,
 Pr[CPA(BR3,A).main() @ &m: mem BR3.r ARO.log] =
 Pr[CPA2(BR3,A).main() @ &m : mem BR3.r ARO.log].
 proof.
- intros A Hlossless &m.
+ intros A Hlossless1 Hlossless2 &m.
  equiv_deno (_ : (glob A){1} = (glob A){2} ==> 
  res{1} = res{2} /\ ARO.log{1} = ARO.log{2} /\ BR3.r{1} = BR3.r{2}).
- apply (eq3(<:A) _).
+ apply (eq3(<:A) _ _).
+ assumption.
  assumption.
  trivial.
  trivial.
@@ -575,11 +641,14 @@ save.
 lemma eq4 : forall (A <: Adv {BR3,CPA2,RO,ARO}), 
 (forall (O <: ARO),
  bd_hoare[ O.o : true ==> true] = 1%r =>
+ bd_hoare[ A(O).a1 : true ==> true] = 1%r) =>
+(forall (O <: ARO),
+ bd_hoare[ O.o : true ==> true] = 1%r =>
  bd_hoare[ A(O).a2 : true ==> true] = 1%r) =>
  equiv [ CPA2(BR3,A).main ~ OW(BR_OW(A)).main : 
  (glob A){1} = (glob A){2} ==> (mem BR3.r{1} ARO.log{1} => res{2})].
 proof.
- intros A Hlossless.
+ intros A Hlossless1 Hlossless2.
  fun.
  rnd{1}.
  inline  BR_OW(A).i.
@@ -639,41 +708,39 @@ save.
 lemma Reduction (A <: Adv {CPA,CPA2, BR, BR2, BR3, OW, RO, ARO}) &m : 
 (forall (O <: ARO),
  bd_hoare[ O.o : true ==> true] = 1%r =>
+ bd_hoare[ A(O).a1 : true ==> true] = 1%r) =>
+(forall (O <: ARO),
+ bd_hoare[ O.o : true ==> true] = 1%r =>
  bd_hoare[ A(O).a2 : true ==> true] = 1%r) =>
 Pr[CPA(BR,A).main() @ &m : res] <=
  1%r / 2%r + Pr[OW(BR_OW(A)).main() @ &m : res].
- intros Hlossless.
+ intros Hlossless1 Hlossless2.
  apply (real_le_trans 
  (Pr[CPA(BR, A).main() @ &m : res])
  (Pr[CPA(BR2,A).main() @ &m : res ] + 
   Pr[CPA(BR2,A).main() @ &m : mem BR2.r ARO.log])
  (1%r / 2%r + Pr[OW(BR_OW(A)).main() @ &m : res]) _ _).
-  apply (prob1_3(<:A) _ &m).
-  assumption.
-  rewrite (prob2_1(<:A) _ &m).
-  assumption.
-  rewrite (prob2_2(<:A) _ &m).
-  assumption.
-  rewrite (prob3_2(<:A) _ &m).
-  assumption.
-  rewrite (prob3_3(<:A) _ &m).
-  assumption.
-  rewrite (prob3_1(<:A) _ &m).
-  assumption.
+  apply (prob1_3(<:A) _ _ &m);try assumption.
+  rewrite (prob2_1(<:A) _ _ &m);try assumption.
+  rewrite (prob2_2(<:A) _ _ &m);try assumption.
+  rewrite (prob3_2(<:A) _ _ &m);try assumption.
+  rewrite (prob3_3(<:A) _ _ &m);try assumption.
+  rewrite (prob3_1(<:A) _ _ _ &m);try assumption.
   cut aux: (forall (a b c : real), b <= c => a + b <= a + c).
   trivial.
   apply (aux (1%r/2%r) (Pr[CPA2(BR3,A).main() @ &m : mem BR3.r ARO.log])
  Pr[OW(BR_OW(A)).main() @ &m : res] _).
   equiv_deno (_ : (glob A){1} = (glob A){2} ==> 
   mem BR3.r{1} ARO.log{1} => res{2}).
-  apply (eq4(<:A) _).
-  assumption.
+  apply (eq4(<:A) _ _);try assumption.
   trivial.
   trivial.
 save.
 
-
 lemma Conclusion (A <: Adv {CPA,CPA2, BR, BR2, BR3, OW, RO, ARO}) &m :
+(forall (O <: ARO),
+ bd_hoare[ O.o : true ==> true] = 1%r =>
+ bd_hoare[ A(O).a1 : true ==> true] = 1%r) =>
 (forall (O <: ARO),
  bd_hoare[ O.o : true ==> true] = 1%r =>
  bd_hoare[ A(O).a2 : true ==> true] = 1%r) =>
@@ -681,7 +748,7 @@ lemma Conclusion (A <: Adv {CPA,CPA2, BR, BR2, BR3, OW, RO, ARO}) &m :
 Pr[CPA(BR,A).main() @ &m : res] - 1%r / 2%r <= 
 Pr[OW(I).main() @ &m : res].
 proof.
- intros H.
+ intros Hlossless1 Hlossless2.
  exists (<:BR_OW(A)).
  cut aux : 
 (forall (x, y:real), x <= 1%r / 2%r + y => x - 1%r / 2%r  <= y). 
@@ -689,6 +756,5 @@ proof.
  apply (aux
  Pr[CPA(BR,A).main() @ &m : res]
  Pr[OW(BR_OW(A)).main() @ &m : res] _).
-  apply (Reduction (<:A) &m _).
-  assumption.
+  apply (Reduction (<:A) &m _ _);assumption.
 save.
