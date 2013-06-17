@@ -81,7 +81,7 @@ module CPA(S : Scheme, A_ : Adv) = {
   SO.init();
   (pk,sk)  = SO.kg();
   (m0,m1)  = A.a1(pk);
-  b = {0,1};
+  b = ${0,1}; 
   c  = SO.enc(pk,b?m0:m1);
   b' = A.a2(c);
   return b = b';
@@ -572,7 +572,7 @@ proof.
 save.
 
 
-lemma eq4 : forall (A <: Adv {BR3,CPA2,RO,ARO,BR_OW}), 
+lemma eq4 : forall (A <: Adv {BR3,CPA2,RO,ARO}), 
 (forall (O <: ARO),
  bd_hoare[ O.o : true ==> true] = 1%r =>
  bd_hoare[ A(O).a2 : true ==> true] = 1%r) =>
@@ -636,7 +636,7 @@ apply (f_iny x{2} x2 pk{2} sk{2} _ _);trivial.
 save.
 
 
-lemma Reduction (A <: Adv {CPA,CPA2, BR, BR2, BR3, OW, RO, ARO, BR_OW}) &m : 
+lemma Reduction (A <: Adv {CPA,CPA2, BR, BR2, BR3, OW, RO, ARO}) &m : 
 (forall (O <: ARO),
  bd_hoare[ O.o : true ==> true] = 1%r =>
  bd_hoare[ A(O).a2 : true ==> true] = 1%r) =>
@@ -673,7 +673,7 @@ Pr[CPA(BR,A).main() @ &m : res] <=
 save.
 
 
-lemma Conclusion (A <: Adv {CPA,CPA2, BR, BR2, BR3, OW, RO, ARO, BR_OW}) &m :
+lemma Conclusion (A <: Adv {CPA,CPA2, BR, BR2, BR3, OW, RO, ARO}) &m :
 (forall (O <: ARO),
  bd_hoare[ O.o : true ==> true] = 1%r =>
  bd_hoare[ A(O).a2 : true ==> true] = 1%r) =>
