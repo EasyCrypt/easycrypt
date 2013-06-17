@@ -110,7 +110,10 @@ module PVM = struct
   let check_binding m s = 
     assert (not (Mid.mem m s.s_pv) && not (Mid.mem m s.s_gl))
 
-  let subst env (s : form subst) = 
+  let has_mod b = 
+    List.exists (fun (_,gty) -> match gty with GTmodty _ -> true | _ -> false) b
+
+  let rec subst env (s : form subst) = 
     Hf.memo_rec 107 (fun aux f ->
       match f.f_node with
       | Fpvar(pv,m) -> 
@@ -140,6 +143,11 @@ module PVM = struct
       | Fpr(m,_,_,_) ->
         check_binding EcFol.mhr s;
         check_binding m s;
+        EcFol.f_map (fun ty -> ty) aux f
+      | Fquant(_,b,f) ->
+        let aux = 
+          if has_mod b then subst (Mod.add_mod_binding b env) s
+          else aux in
         EcFol.f_map (fun ty -> ty) aux f
 
       | _ -> EcFol.f_map (fun ty -> ty) aux f)
