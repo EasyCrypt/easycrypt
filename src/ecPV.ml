@@ -144,7 +144,7 @@ module PVM = struct
         check_binding EcFol.mhr s;
         check_binding m s;
         EcFol.f_map (fun ty -> ty) aux f
-      | Fquant(_,b,f) ->
+      | Fquant(q,b,f1) ->
         let aux = 
           if has_mod b then subst (Mod.add_mod_binding b env) s
           else aux in
