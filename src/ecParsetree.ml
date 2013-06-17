@@ -179,6 +179,7 @@ and pformula_r =
   | PFlambda of ptybindings * pformula
   | PFglob   of pmsymbol located 
   | PFeqveq  of pqsymbol list
+  | PFlsless of pgamepath
 
   (* for claims *)
   | PFhoareS   of pformula * pfunction_body * pformula
@@ -450,7 +451,7 @@ type w3_renaming =
 type theory_cloning = {
   pthc_base : pqsymbol;
   pthc_name : psymbol option;
-  pthc_ext  : (psymbol * theory_override) list;
+  pthc_ext  : (pqsymbol * theory_override) list;
 }
 
 and theory_override =

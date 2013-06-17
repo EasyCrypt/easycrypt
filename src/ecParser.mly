@@ -209,6 +209,7 @@
 %token LET
 %token LOGIC
 %token LONGARROW
+%token LOSSLESS
 %token LPAREN
 %token MINUS
 %token MODPATH
@@ -364,7 +365,7 @@ uqident:
 | x=loc(_oident) { x }
 ;
 
-qident_pbinop:
+qoident:
 | x=oident
     { pqsymb_of_psymb x }
 
@@ -457,7 +458,7 @@ sexpr_u:
 | n=number
    { PEint n }
 
-| x=qident_pbinop ti=tvars_app?
+| x=qoident ti=tvars_app?
    { PEident (x, ti) }
 
 | se=sexpr op=loc(FROM_INT)
@@ -605,7 +606,7 @@ sform_u:
 | x=loc(RES)
    { PFident (mk_loc x.pl_loc ([], "res"), None) }
 
-| x=qident_pbinop ti=tvars_app?
+| x=qoident ti=tvars_app?
    { PFident (x, ti) }
 
 | se=sform op=loc(FROM_INT)
@@ -745,16 +746,16 @@ form_u:
 
 | BDHOARE 
     LBRACKET mp=loc(fident) COLON pre=form LONGARROW post=form  RBRACKET
-    cmp = hoare_bd_cmp
-    bd=sform
+      cmp=hoare_bd_cmp bd=sform
 	{ PFBDhoareF (pre, mp, post, cmp, bd) }
 
 | BDHOARE 
-    LBRACKET s=fun_def_body COLON pre=form LONGARROW post=form  RBRACKET
-    cmp = hoare_bd_cmp
-    bd=sform
+    LBRACKET s=fun_def_body COLON pre=form LONGARROW post=form RBRACKET
+      cmp=hoare_bd_cmp bd=sform
 	{ PFBDhoareS (pre, s, post, cmp, bd) }
 
+| LOSSLESS mp=loc(fident)
+    { PFlsless mp }
 ;
 
 hoare_bd_cmp :
@@ -1116,11 +1117,6 @@ op_tydom:
    { tys  }
 ;
 
-op_ident:
-| x=ident       { x }
-| x=loc(PBINOP) { x }
-;
-
 tyvars_decl:
 | LBRACKET tyvars=tident* RBRACKET { Some tyvars }
 | empty { None }
@@ -1132,35 +1128,35 @@ tyvars_decl:
 ;
 
 operator:
-| k=op_or_const x=op_ident tyvars=tyvars_decl COLON sty=loc(type_exp) {
+| k=op_or_const x=oident tyvars=tyvars_decl COLON sty=loc(type_exp) {
     { po_kind   = k;
       po_name   = x;
       po_tyvars = tyvars;
       po_def    = POabstr sty; }
   }
 
-| k=op_or_const x=op_ident tyvars=tyvars_decl COLON sty=loc(type_exp) EQ b=expr {
+| k=op_or_const x=oident tyvars=tyvars_decl COLON sty=loc(type_exp) EQ b=expr {
     { po_kind   = k;
       po_name   = x;
       po_tyvars = tyvars;
       po_def    = POconcr ([], sty, b); }
   }
 
-| k=op_or_const x=op_ident tyvars=tyvars_decl eq=loc(EQ) b=expr {
+| k=op_or_const x=oident tyvars=tyvars_decl eq=loc(EQ) b=expr {
     { po_kind   = k;
       po_name   = x;
       po_tyvars = tyvars;
       po_def    = POconcr([], mk_loc eq.pl_loc PTunivar, b); }
   }
 
-| k=op_or_const x=op_ident tyvars=tyvars_decl p=ptybindings eq=loc(EQ) b=expr {
+| k=op_or_const x=oident tyvars=tyvars_decl p=ptybindings eq=loc(EQ) b=expr {
     { po_kind   = k;
       po_name   = x;
       po_tyvars = tyvars;
       po_def    = POconcr(p, mk_loc eq.pl_loc PTunivar, b); }
   }
 
-| k=op_or_const x=op_ident tyvars=tyvars_decl p=ptybindings COLON codom=loc(type_exp)
+| k=op_or_const x=oident tyvars=tyvars_decl p=ptybindings COLON codom=loc(type_exp)
     EQ b=expr {
     { po_kind   = k;
       po_name   = x;
@@ -1170,17 +1166,17 @@ operator:
 ;
 
 predicate:
-| PRED x = op_ident
+| PRED x = oident
    { { pp_name = x;
        pp_tyvars = None;
        pp_def = PPabstr []; } }
 
-| PRED x = op_ident tyvars=tyvars_decl COLON sty = op_tydom
+| PRED x = oident tyvars=tyvars_decl COLON sty = op_tydom
    { { pp_name = x;
        pp_tyvars = tyvars;
        pp_def = PPabstr sty; } }
 
-| PRED x = op_ident tyvars=tyvars_decl p=ptybindings EQ f=form
+| PRED x = oident tyvars=tyvars_decl p=ptybindings EQ f=form
    { { pp_name = x;
        pp_tyvars = tyvars;
        pp_def = PPconcr(p,f); } } 
@@ -1358,19 +1354,19 @@ fpattern(F):
 ;
 
 simplify_arg: 
-| DELTA l=qident_pbinop* { `Delta l }
-| ZETA            { `Zeta }
-| IOTA            { `Iota }
-| BETA            { `Beta }
-| LOGIC           { `Logic }
-| MODPATH         { `ModPath }
+| DELTA l=qoident* { `Delta l }
+| ZETA             { `Zeta }
+| IOTA             { `Iota }
+| BETA             { `Beta }
+| LOGIC            { `Logic }
+| MODPATH          { `ModPath }
 ;
 
 simplify:
-| l=simplify_arg+    { l }
-| SIMPLIFY           { simplify_red }
-| SIMPLIFY l=qident_pbinop+ { `Delta l  :: simplify_red  }
-| SIMPLIFY DELTA     { `Delta [] :: simplify_red }
+| l=simplify_arg+     { l }
+| SIMPLIFY            { simplify_red }
+| SIMPLIFY l=qoident+ { `Delta l  :: simplify_red  }
+| SIMPLIFY DELTA      { `Delta [] :: simplify_red }
 ;
 
 rwside:
@@ -1767,10 +1763,10 @@ clone_with:
 ;
 
 clone_override:
-| TYPE ps=typarams x=ident EQ t=loc(type_exp)
+| TYPE ps=typarams x=qident EQ t=loc(type_exp)
    { (x, PTHO_Type (ps, t)) }
 
-| OP x=op_ident tyvars=tyvars_decl COLON sty=loc(type_exp) EQ e=expr
+| OP x=qoident tyvars=tyvars_decl COLON sty=loc(type_exp) EQ e=expr
    { let ov = {
        opov_tyvars = tyvars;
        opov_args   = [];
@@ -1779,7 +1775,7 @@ clone_override:
      } in
        (x, PTHO_Op ov) }
 
-| OP x=op_ident tyvars=tyvars_decl eq=loc(EQ) e=expr
+| OP x=qoident tyvars=tyvars_decl eq=loc(EQ) e=expr
    { let ov = {
        opov_tyvars = tyvars;
        opov_args   = [];
@@ -1788,7 +1784,7 @@ clone_override:
      } in
        (x, PTHO_Op ov) }
 
-| OP x=op_ident tyvars=tyvars_decl p=ptybindings eq=loc(EQ) e=expr
+| OP x=qoident tyvars=tyvars_decl p=ptybindings eq=loc(EQ) e=expr
    { let ov = {
        opov_tyvars = tyvars;
        opov_args   = p;
@@ -1797,7 +1793,7 @@ clone_override:
      } in
        (x, PTHO_Op ov) }
 
-| PRED x=op_ident tyvars=tyvars_decl p=ptybindings EQ f=form
+| PRED x=qoident tyvars=tyvars_decl p=ptybindings EQ f=form
    { let ov = {
        prov_tyvars = tyvars;
        prov_args   = p;
@@ -1805,7 +1801,7 @@ clone_override:
      } in
        (x, PTHO_Pred ov) }
 
-| PRED x=op_ident tyvars=tyvars_decl EQ f=form
+| PRED x=qoident tyvars=tyvars_decl EQ f=form
    { let ov = {
        prov_tyvars = tyvars;
        prov_args   = [];
