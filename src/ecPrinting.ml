@@ -881,7 +881,7 @@ let rec try_pp_form_eqveq (ppe : PPEnv.t) _outer fmt f =
 
   match collect [] f with
   | None     -> false
-  | Some pvs -> Format.fprintf fmt "={%a}" (pp_list "@ " pp_msymbol) pvs; true
+  | Some pvs -> Format.fprintf fmt "={@[<hov 2>%a@]}" (pp_list ",@ " pp_msymbol) pvs; true
 
 and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
   match f.f_node with
