@@ -1091,7 +1091,12 @@ module Fun = struct
     let meml  = EcMemory.empty_local EcFol.mleft xpath in
     let memr  = EcMemory.empty_local EcFol.mright xpath in
     Memory.push_all [meml;memr] env
-    
+
+  let inv_memenv1 env = 
+    let path  = mroot env in
+    let xpath = EcPath.xpath_fun path "" in (* dummy value *)
+    let mem  = EcMemory.empty_local EcFol.mhr xpath in
+    Memory.push_active mem env
 
   let prF path env =
     let fun_ = by_xpath path env in
@@ -2348,6 +2353,9 @@ module LDecl = struct
 
   let inv_memenv lenv = 
     { lenv with le_env = Fun.inv_memenv lenv.le_env }
+
+  let inv_memenv1 lenv = 
+    { lenv with le_env = Fun.inv_memenv1 lenv.le_env }
 
 end
 
