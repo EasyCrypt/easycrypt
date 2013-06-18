@@ -141,10 +141,8 @@ save.
 
 
 lemma eq1 : forall (A <: Adv {M,RO,ARO}), 
-(forall (O <: ARO),
- islossless O.o =>  islossless A(O).a1) =>
-(forall (O <: ARO),
- islossless O.o =>  islossless A(O).a2) =>
+(forall (O <: ARO), islossless O.o =>  islossless A(O).a1) =>
+(forall (O <: ARO), islossless O.o =>  islossless A(O).a2) =>
  equiv [ CPA(BR,A).main ~ CPA(BR2,A).main : 
 (glob A){1} = (glob A){2} ==>
  (!mem M.r ARO.log){2} => ={res}].
@@ -181,15 +179,10 @@ save.
 
 lemma prob1_1 :
  forall (A <: Adv {M,RO,ARO}),
-(forall (O <: ARO),
- islossless O.o =>
- islossless A(O).a1) =>
-(forall (O <: ARO),
- islossless O.o =>
- islossless A(O).a2) =>
- forall &m ,
-Pr[CPA(BR,A).main() @ &m: res] <=
-Pr[CPA(BR2,A).main() @ &m : res \/ mem M.r ARO.log].
+(forall (O <: ARO), islossless O.o => islossless A(O).a1) =>
+(forall (O <: ARO), islossless O.o => islossless A(O).a2) =>
+ forall &m , Pr[CPA(BR,A).main() @ &m: res] <=
+             Pr[CPA(BR2,A).main() @ &m : res \/ mem M.r ARO.log].
 proof.
  intros A Hlossless1 Hlossless2 &m.
  equiv_deno (_ : (glob A){1} = (glob A){2} ==>
@@ -226,16 +219,11 @@ lemma real_le_trans : forall(a, b, c : real),
 
 lemma prob1_3 :
  forall (A <: Adv {M,RO,ARO}),
-(forall (O <: ARO),
- islossless O.o =>
- islossless A(O).a1) =>
-(forall (O <: ARO),
- islossless O.o =>
- islossless A(O).a2) =>
- forall &m,
-Pr[CPA(BR,A).main() @ &m: res] <=
-Pr[CPA(BR2,A).main() @ &m : res ] + 
-Pr[CPA(BR2,A).main() @ &m :  mem M.r ARO.log].
+(forall (O <: ARO), islossless O.o => islossless A(O).a1) =>
+(forall (O <: ARO), islossless O.o => islossless A(O).a2) =>
+ forall &m, Pr[CPA(BR,A).main() @ &m: res] <=
+             Pr[CPA(BR2,A).main() @ &m : res ] + 
+             Pr[CPA(BR2,A).main() @ &m :  mem M.r ARO.log].
 proof.
  intros A Hlossless1 Hlossless2 &m.
  apply (real_le_trans _
@@ -461,12 +449,8 @@ save.
 
 
 lemma eq4 : forall (A <: Adv {M,RO,ARO}), 
-(forall (O <: ARO),
- islossless O.o =>
- islossless A(O).a1) =>
-(forall (O <: ARO),
- islossless O.o =>
- islossless A(O).a2) =>
+(forall (O <: ARO), islossless O.o => islossless A(O).a1) =>
+(forall (O <: ARO), islossless O.o => islossless A(O).a2) =>
  equiv [ CPA2(BR3,A).main ~ OW(BR_OW(A)).main : 
  (glob A){1} = (glob A){2} ==> (mem M.r{1} ARO.log{1} => res{2})].
 proof.
@@ -540,20 +524,14 @@ proof.
 save.
 
 lemma Conclusion (A <: Adv {M,RO,ARO}) &m :
-(forall (O <: ARO),
- islossless O.o =>
- islossless A(O).a1) =>
-(forall (O <: ARO),
- islossless O.o =>
- islossless A(O).a2) =>
- exists (I<:Inverter), 
-Pr[CPA(BR,A).main() @ &m : res] - 1%r / 2%r <= 
-Pr[OW(I).main() @ &m : res].
+(forall (O <: ARO), islossless O.o => islossless A(O).a1) =>
+(forall (O <: ARO), islossless O.o => islossless A(O).a2) =>
+exists (I<:Inverter), Pr[CPA(BR,A).main() @ &m : res] - 1%r / 2%r <= 
+                      Pr[OW(I).main() @ &m : res].
 proof.
  intros Hlossless1 Hlossless2;exists (<:BR_OW(A)).
  cut aux : 
-(forall (x, y:real), x <= 1%r / 2%r + y => x - 1%r / 2%r  <= y). 
- smt.
+ (forall (x, y:real), x <= 1%r / 2%r + y => x - 1%r / 2%r  <= y);first smt.
  apply (aux _ _ _).
  apply (Reduction (<:A) &m _ _);assumption.
 save.
