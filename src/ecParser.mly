@@ -209,6 +209,7 @@
 %token LET
 %token LOGIC
 %token LONGARROW
+%token LOSSLESS
 %token LPAREN
 %token MINUS
 %token MODPATH
@@ -745,16 +746,16 @@ form_u:
 
 | BDHOARE 
     LBRACKET mp=loc(fident) COLON pre=form LONGARROW post=form  RBRACKET
-    cmp = hoare_bd_cmp
-    bd=sform
+      cmp=hoare_bd_cmp bd=sform
 	{ PFBDhoareF (pre, mp, post, cmp, bd) }
 
 | BDHOARE 
-    LBRACKET s=fun_def_body COLON pre=form LONGARROW post=form  RBRACKET
-    cmp = hoare_bd_cmp
-    bd=sform
+    LBRACKET s=fun_def_body COLON pre=form LONGARROW post=form RBRACKET
+      cmp=hoare_bd_cmp bd=sform
 	{ PFBDhoareS (pre, s, post, cmp, bd) }
 
+| LOSSLESS mp=loc(fident)
+    { PFlsless mp }
 ;
 
 hoare_bd_cmp :
