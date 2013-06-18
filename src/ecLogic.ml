@@ -177,8 +177,7 @@ let t_try_base t g =
     | LocError (_, e)    -> is_user_error e
     | _ -> false
   in
- 
-  try  `Success (t g)
+  try `Success (t g)
   with e when is_user_error e -> `Failure e
 
 let t_try t g =
@@ -415,8 +414,8 @@ let mkn_apply do_arg (juc,n) args =
         else 
           let f = f_subst s f in
           match h_red_opt full_red hyps f with
-          | None -> tacerror TooManyArgument
-          | Some f ->  check_apply juc f_subst_id ras f args in
+          | None -> tacerror TooManyArguments
+          | Some f -> check_apply juc f_subst_id ras f args in
     let juc, ras, concl = check_apply juc f_subst_id [] concl args in
     let (juc,n1) = new_goal juc (hyps,concl) in
     let rule = { pr_name = RN_apply; pr_hyps = RA_node n :: ras} in

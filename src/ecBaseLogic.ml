@@ -96,6 +96,7 @@ type rule_name =
   | RN_hl_hoare_rnd
   | RN_hl_equiv_rnd of rnd_tac_info
   | RN_hl_conseq 
+  | RN_hl_exfalso 
   | RN_hl_hoare_equiv 
   | RN_hl_deno      
   | RN_hl_hoare_bd_hoare      
@@ -128,10 +129,11 @@ type judgment = {
 type tac_error =
   | UnknownAx             of EcPath.path
   | NotAHypothesis        of EcIdent.t
-  | TooManyArgument
+  | TooManyArguments
   | InvalNumOfTactic      of int * int
   | NotPhl                of bool option
   | NoSkipStmt
+  | InvalidExfalso
   | InvalidCodePosition   of string*int*int*int
   | InvalidName           of string
   | User                  of string
@@ -141,10 +143,10 @@ exception TacError of bool * tac_error
 let pp_tac_error fmt error =
   match error with
   | UnknownAx p ->
-      Format.fprintf fmt "Unknown axiom/lemma %s" (EcPath.tostring p)
+    Format.fprintf fmt "Unknown axiom/lemma %s" (EcPath.tostring p)
   | NotAHypothesis id ->
-      Format.fprintf fmt "Unknown hypothesis %s" (EcIdent.name id)
-  | TooManyArgument ->
+    Format.fprintf fmt "Unknown hypothesis %s" (EcIdent.name id)
+  | TooManyArguments ->
     Format.fprintf fmt "Too many arguments in the application"
   | InvalNumOfTactic (i1,i2) ->
     Format.fprintf fmt "Invalid number of tactics: %i given, %i expected" i2 i1
@@ -159,6 +161,8 @@ let pp_tac_error fmt error =
     Format.fprintf fmt "%s: Invalid code line number %i, expected in [%i,%i]" msg k lb up
   | NoSkipStmt ->
     Format.fprintf fmt "Cannot apply skip rule"
+  | InvalidExfalso ->
+    Format.fprintf fmt "Cannot apply exfalso: pre-condition is not false"   
   | InvalidName x ->
     Format.fprintf fmt "Invalid name for this kind of object: %s" x
   | User msg ->
