@@ -741,12 +741,12 @@ let t_bdHoare_skip g =
   let concl = get_concl g in
   let bhs = destr_bdHoareS concl in
   if bhs.bhs_s.s_node <> [] then tacerror NoSkipStmt;
-  if (bhs.bhs_cmp <> FHeq && bhs.bhs_cmp <> FHge) ||
-     not (f_equal bhs.bhs_bd f_r1) then
+  if (bhs.bhs_cmp <> FHeq && bhs.bhs_cmp <> FHge) then
     cannot_apply "skip" "bound must be \">= 1\"";
+  let eq_to_one = f_eq bhs.bhs_bd f_r1 in
   let concl = f_imp bhs.bhs_pr bhs.bhs_po in
   let concl = gen_mems [bhs.bhs_m] concl in
-  prove_goal_by [concl] RN_hl_skip g
+  prove_goal_by [eq_to_one;concl] RN_hl_skip g
 
 let t_equiv_skip g =
   let concl = get_concl g in

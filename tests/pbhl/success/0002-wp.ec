@@ -16,8 +16,7 @@ module M = {
     return x;
   }
 }.
-lemma test : bd_hoare [M.f : true ==> res = 1 ] [>=] [1%r].
-proof.
+lemma test : bd_hoare [M.f : true ==> res = 1 ] >= 1%r.
  fun.
  wp.
  skip;intros _ _;split.
@@ -34,8 +33,8 @@ module M2 = {
     return z=y;
   }
 }.
-lemma test2: bd_hoare [ M2.f : b ==> res] [=] [1%r/2%r]. 
-proof.
+
+lemma test2: bd_hoare [ M2.f : b ==> res] = (1%r/2%r). 
 fun.
 wp.
 rnd (1%r/2%r) (lambda (x:bool), x=y).
@@ -53,7 +52,8 @@ module M3 = {
     return x;
   }
 }.
-lemma test3: bd_hoare [ M3.f : true ==> res=b] [>=] [1%r]. 
+
+lemma test3: bd_hoare [ M3.f : true ==> res=b] >= 1%r. 
 proof.
 fun.
 wp.
