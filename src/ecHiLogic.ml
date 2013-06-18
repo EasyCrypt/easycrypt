@@ -76,10 +76,10 @@ let _ = EcPException.register (fun fmt exn ->
 let error loc e = EcLocation.locate_error loc (TacError e)
 
 (* -------------------------------------------------------------------- *)
-let process_trivial (juc, n) =
+let process_trivial ((juc, n) as g) =
   match t_progress (t_id None) (juc, n) with
   | (juc, []) -> (juc, [])
-  | (juc, _ ) -> (juc, [n])
+  | (_  , _ ) -> t_id None g
 
 (* -------------------------------------------------------------------- *)
 let process_tyargs hyps tvi =
