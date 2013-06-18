@@ -22,6 +22,12 @@ let _ = EcPException.register (fun fmt exn ->
         (PE.pp_form (PE.PPEnv.ofenv env)) f1
         (PE.pp_form (PE.PPEnv.ofenv env)) f2
 
+  | IncompatibleType (env, (t1, t2)) ->
+      Format.fprintf fmt
+        "the type %a is not compatible with %a\n%!"
+        (PE.pp_type (PE.PPEnv.ofenv env)) t1
+        (PE.pp_type (PE.PPEnv.ofenv env)) t2
+
   | _ -> raise exn)
       
 (* -------------------------------------------------------------------- *)     
@@ -212,13 +218,13 @@ let rec h_red ri env hyps f =
   match f.f_node with
   | Flocal x -> reduce_local ri hyps x 
   | Flet(LSymbol(x,_), e1, e2) when ri.zeta ->
-    let s = f_bind_local f_subst_id x e1 in
-    f_subst s e2
+    let s = Fsubst.f_bind_local Fsubst.f_subst_id x e1 in
+    Fsubst.f_subst s e2
   | Flet(LTuple ids, { f_node = Ftuple es }, e2) when ri.iota ->
     let s = 
-      List.fold_left2 (fun s (x,_) e1 -> f_bind_local s x e1) 
-        f_subst_id ids es in
-    f_subst s e2
+      List.fold_left2 (fun s (x,_) e1 -> Fsubst.f_bind_local s x e1) 
+        Fsubst.f_subst_id ids es in
+    Fsubst.f_subst s e2
   | Fglob(mp,m) when ri.modpath ->
     let f' = EcEnv.NormMp.norm_glob env m mp in
     if f_equal f f' then raise NotReducible
@@ -297,7 +303,8 @@ let check_alpha_equal ri hyps f1 f2 =
     check_ty env subst ty1 ty2;
     env, 
     if id_equal x1 x2 then subst 
-    else f_bind_local subst x2 (f_local x1 ty1) in
+    else Fsubst.f_bind_local subst x2 (f_local x1 ty1) in
+
   let check_lpattern env subst lp1 lp2 = 
     match lp1, lp2 with
     | LSymbol xt1, LSymbol xt2 -> add_local (env, subst) xt1 xt2 
@@ -316,22 +323,22 @@ let check_alpha_equal ri hyps f1 f2 =
     | _, _ -> error () in
   (* TODO all declaration in env, do it also in add local *)
   let check_binding (env, subst) (x1,gty1) (x2,gty2) = 
-    let gty2 = gty_subst subst gty2 in
+    let gty2 = Fsubst.gty_subst subst gty2 in
     match gty1, gty2 with
     | GTty ty1, GTty ty2 -> 
       ensure (equal_type env ty1 ty2);
       env, 
-      if id_equal x1 x2 then subst else f_bind_local subst x2 (f_local x1 ty1)
+      if id_equal x1 x2 then subst else Fsubst.f_bind_local subst x2 (f_local x1 ty1)
     | GTmodty (p1,r1) , GTmodty(p2,r2) -> 
       ensure (ModTy.mod_type_equiv env p1 p2 && EcPath.Sm.equal r1 r2);
       Mod.bind_local x1 p1 r1 env, 
       if id_equal x1 x2 then subst 
-      else f_bind_mod subst x2 (EcPath.mident x1)
+      else Fsubst.f_bind_mod subst x2 (EcPath.mident x1)
     | GTmem   me1, GTmem me2  -> 
       check_memtype env me1 me2;
       env, 
       if id_equal x1 x2 then subst 
-      else f_bind_mem subst x2 x1 
+      else Fsubst.f_bind_mem subst x2 x1 
     | _, _ -> error () in
   let check_bindings env subst bd1 bd2 =
     List.fold_left2 check_binding (env,subst) bd1 bd2 in
@@ -358,7 +365,7 @@ let check_alpha_equal ri hyps f1 f2 =
     ensure (s_equal_norm env s1 s2) in
 
   let rec aux1 env subst f1 f2 = 
-    if is_subst_id subst && f_equal f1 f2 then () 
+    if Fsubst.is_subst_id subst && f_equal f1 f2 then () 
     else match f1.f_node, f2.f_node with
       
     | Fquant(q1,bd1,f1'), Fquant(q2,bd2,f2') when 
@@ -454,7 +461,7 @@ let check_alpha_equal ri hyps f1 f2 =
         | Some f2 -> aux env subst f1 f2
         | None -> raise e
   in
-  aux env f_subst_id f1 f2
+  aux env Fsubst.f_subst_id f1 f2
 
 let check_alpha_eq = check_alpha_equal no_red
 let check_conv     = check_alpha_equal full_red
