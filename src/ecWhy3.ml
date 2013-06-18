@@ -17,6 +17,184 @@ module Mx   = EcPath.Mx
 module Msym = EcSymbols.Msym
 
 (* ----------------------------------------------------------------------*)
+module Talpha = struct 
+
+  type t = Term.vsymbol list * Term.term
+
+  let vs_rename_alpha c h vs = incr c; Term.Mvs.add vs !c h
+
+  let vl_rename_alpha c h vl = List.fold_left (vs_rename_alpha c) h vl
+
+  let rec pat_rename_alpha c h p = match p.Term.pat_node with
+    | Term.Pvar v -> vs_rename_alpha c h v
+    | Term.Pas (p, v) -> pat_rename_alpha c (vs_rename_alpha c h v) p
+    | Term.Por (p, _) -> pat_rename_alpha c h p
+    | _ -> Term.pat_fold (pat_rename_alpha c) h p
+
+  let w3_ty_compare t1 t2 = Ty.ty_hash t1 - Ty.ty_hash t2
+  let w3_ls_compare l1 l2 = Term.ls_hash l1 - Term.ls_hash l2
+
+  let rec list_compare c l1 l2 =
+    match l1, l2 with
+    | [], [] -> 0
+    | [], _ -> -1
+    | _, [] -> 1
+    | x1::l1, x2::l2 ->
+      let cx = c x1 x2 in
+      if cx = 0 then list_compare c l1 l2
+      else cx
+
+  let option_compare c o1 o2 = 
+    match o1, o2 with
+    | None, None -> 0
+    | None, _ -> -1
+    | _, None -> 1
+    | Some x1, Some x2 -> c x1 x2
+      
+  let rec pat_compare_alpha p1 p2 =
+    if Term.pat_equal p1 p2 then 0
+    else
+      let ct = w3_ty_compare p1.Term.pat_ty p2.Term.pat_ty in
+      if ct = 0 then
+        match p1.Term.pat_node, p2.Term.pat_node with
+        | Term.Pwild, Term.Pwild -> 0
+        | Term.Pwild, _ -> -1
+        | _, Term.Pwild -> 1
+        | Term.Pvar _, Term.Pvar _ -> 0
+        | Term.Pvar _, _ -> -1
+        | _, Term.Pvar _ -> 1
+        | Term.Papp (f1, l1), Term.Papp (f2, l2) ->
+          let cf = w3_ls_compare f1 f2 in
+          if cf = 0 then  list_compare pat_compare_alpha l1 l2
+          else cf
+        | Term.Papp _, _ -> -1
+        | _, Term.Papp _ -> 1
+        | Term.Pas (p1, _), Term.Pas (p2, _) -> pat_compare_alpha p1 p2
+        | Term.Pas _, _ -> -1
+        | _, Term.Pas _ -> 1
+        | Term.Por (p1, q1), Term.Por (p2, q2) ->
+          let cp = pat_compare_alpha p1 p2 in
+          if cp = 0 then pat_compare_alpha q1 q2
+          else cp
+      else ct
+        
+  let rec t_compare_alpha c1 c2 m1 m2 t1 t2 =
+    if Term.t_equal t1 t2 then 0 
+    else 
+      let ct = option_compare w3_ty_compare t1.Term.t_ty t2.Term.t_ty in
+      if ct = 0 then
+        match t1.Term.t_node, t2.Term.t_node with
+        | Term.Tvar v1, Term.Tvar v2 ->
+          if Term.Mvs.mem v1 m1 then
+            if Term.Mvs.mem v2 m2 then Term.Mvs.find v1 m1 - Term.Mvs.find v2 m2
+            else 1
+          else if Term.Mvs.mem v2 m2 then -1
+          else Term.vs_hash v1 - Term.vs_hash v2
+        | Term.Tvar _, _ -> -1
+        | _, Term.Tvar _ -> 1
+        | Term.Tconst c1, Term.Tconst c2 -> Pervasives.compare c1 c2
+        | Term.Tconst _, _ -> -1
+        | _, Term.Tconst _ -> 1
+        | Term.Tapp (f1,l1), Term.Tapp (f2,l2) ->
+          let cf = w3_ls_compare f1 f2 in
+          if cf = 0 then  list_compare (t_compare_alpha c1 c2 m1 m2) l1 l2
+          else cf
+        | Term.Tapp _, _ -> -1
+        | _, Term.Tapp _ -> 1
+        | Term.Tif (f1,t1,e1), Term.Tif (f2,t2,e2) ->
+          let cf = t_compare_alpha c1 c2 m1 m2 f1 f2 in
+          if cf = 0 then
+            let ct = t_compare_alpha c1 c2 m1 m2 t1 t2 in
+            if ct = 0 then t_compare_alpha c1 c2 m1 m2 e1 e2
+            else ct
+          else cf 
+        | Term.Tif _, _ -> -1
+        | _, Term.Tif _ -> 1
+        | Term.Tlet (t1,b1), Term.Tlet (t2,b2) ->
+          let ct = t_compare_alpha c1 c2 m1 m2 t1 t2 in
+          if ct = 0 then
+            let u1,e1 = Term.t_open_bound b1 in
+            let u2,e2 = Term.t_open_bound b2 in
+            let m1 = vs_rename_alpha c1 m1 u1 in
+            let m2 = vs_rename_alpha c2 m2 u2 in
+            t_compare_alpha c1 c2 m1 m2 e1 e2
+          else ct 
+        | Term.Tlet _, _ -> -1
+        | _, Term.Tlet _ -> 1
+        | Term.Tcase (t1,bl1), Term.Tcase (t2,bl2) ->
+          let ct = t_compare_alpha c1 c2 m1 m2 t1 t2 in
+          if ct = 0 then
+            let br_compare b1 b2 =
+              let p1,e1 = Term.t_open_branch b1 in
+              let p2,e2 = Term.t_open_branch b2 in
+              let cp = pat_compare_alpha p1 p2 in
+              if cp = 0 then
+                let m1 = pat_rename_alpha c1 m1 p1 in
+                let m2 = pat_rename_alpha c2 m2 p2 in
+                t_compare_alpha c1 c2 m1 m2 e1 e2
+              else cp
+            in
+            list_compare br_compare bl1 bl2
+          else ct
+        | Term.Tcase _, _ -> -1
+        | _, Term.Tcase _ -> 1
+        | Term.Teps b1, Term.Teps b2 ->
+          let u1,e1 = Term.t_open_bound b1 in
+          let u2,e2 = Term.t_open_bound b2 in
+          let m1 = vs_rename_alpha c1 m1 u1 in
+          let m2 = vs_rename_alpha c2 m2 u2 in
+          t_compare_alpha c1 c2 m1 m2 e1 e2
+        | Term.Teps _, _ -> -1
+        | _, Term.Teps _ -> 1
+        | Term.Tquant (q1, b1), Term.Tquant (q2,b2) ->
+          let cq = Pervasives.compare q1 q2 in
+          if cq = 0 then
+            let cv v1 v2 =  w3_ty_compare v1.Term.vs_ty v2.Term.vs_ty in 
+            let vl1,_,e1 = Term.t_open_quant b1 in
+            let vl2,_,e2 = Term.t_open_quant b2 in
+            let cty = list_compare cv vl1 vl2 in
+            if cty = 0 then 
+              let m1 = vl_rename_alpha c1 m1 vl1 in
+              let m2 = vl_rename_alpha c2 m2 vl2 in
+              t_compare_alpha c1 c2 m1 m2 e1 e2
+            else cty
+          else cq 
+        | Term.Tquant _, _ -> -1
+        | _, Term.Tquant _ -> 1
+        | Term.Tbinop (o1,f1,g1), Term.Tbinop (o2,f2,g2) ->
+          let co = Pervasives.compare o1 o2 in
+          if co = 0 then
+            let cf = t_compare_alpha c1 c2 m1 m2 f1 f2 in
+            if cf = 0 then t_compare_alpha c1 c2 m1 m2 g1 g2
+            else cf 
+          else co 
+        | Term.Tbinop _, _ -> -1
+        | _, Term.Tbinop _ -> 1
+        | Term.Tnot f1, Term.Tnot f2 -> t_compare_alpha c1 c2 m1 m2 f1 f2
+        | Term.Tnot _, _ -> -1
+        | _, Term.Tnot _ -> 1
+        | Term.Ttrue, Term.Ttrue -> 0
+        | Term.Ttrue, _ -> -1
+        | _, Term.Ttrue -> 1
+        | Term.Tfalse, Term.Tfalse -> 0
+      else ct
+
+  let compare (vl1,e1) (vl2,e2) =
+    let c1 = ref (-1) in
+    let c2 = ref (-1) in
+    let cv v1 v2 =  w3_ty_compare v1.Term.vs_ty v2.Term.vs_ty in 
+    let cty = list_compare cv vl1 vl2 in
+    if cty = 0 then 
+      let m1 = vl_rename_alpha c1 Term.Mvs.empty vl1 in
+      let m2 = vl_rename_alpha c2 Term.Mvs.empty vl2 in
+      t_compare_alpha c1 c2 m1 m2 e1 e2
+    else cty 
+
+end
+
+module Mta = EcMaps.Map.Make(Talpha)
+
+(* ----------------------------------------------------------------------*)
 type env = {
     logic_task : Task.task;
     env_ty  : Ty.tysymbol Mp.t;
@@ -28,6 +206,7 @@ type env = {
     env_tv  : Ty.ty Mid.t;
     env_id  : Term.term Mid.t;
     env_w3  : (EcPath.path * Ty.tvsymbol list) Ident.Mid.t;
+    env_lam : Term.term Mta.t;
   }
 
 let w3_ls_true = Term.fs_bool_true
@@ -230,6 +409,7 @@ let empty = {
     env_tv      = Mid.empty;
     env_id      = Mid.empty;
     env_w3      = Ident.Mid.empty;
+    env_lam     = Mta.empty;
   }
 
 (* ---------------------------------------------------------------------- *)
@@ -263,7 +443,7 @@ type rebinding_item =
   | RBmp  of EcPath.mpath * Term.lsymbol
   | RBxpf  of EcPath.xpath * Term.lsymbol
   | RBxpv  of EcPath.xpath * Term.lsymbol
-  | RBfun of Decl.decl (* Decl.decl *) * Decl.decl
+  | RBfun of Decl.decl * Decl.decl * Talpha.t * Term.term 
 
 type rebinding = rebinding_item list
 
@@ -392,11 +572,13 @@ let rebind_item env = function
   | RBmp(p,ls)      -> add_mp env p ls
   | RBxpv(p,ls)     -> add_xpv env p ls
   | RBxpf(p,ls)     -> add_xpf env p ls
-  | RBfun(decl,(*decls,*)sdecl) ->
+  | RBfun(decl,sdecl, k, t) ->
       let task =
         List.fold_left add_decl_with_tuples
           env.logic_task [decl(*;decls*);sdecl] in
-      { env with logic_task = task }
+      { env with 
+        env_lam = Mta.add k t env.env_lam;
+        logic_task = task }
 
 let rebind = List.fold_left rebind_item
 
@@ -1184,39 +1366,44 @@ let trans_form env f =
   and trans_form_b f = force_bool (trans_form f)
 
   and trans_lambda vs body =
+    try Mta.find (vs,body) !env.env_lam 
+    with Not_found ->
     (* We compute the free variable of the lambda *)
-    let fv     =
-      List.fold_left (fun s x -> Term.Mvs.remove x s)
-        body.Term.t_vars vs in
-    let fv_ids = Term.Mvs.keys fv in
-    let tfv = List.map (fun v -> v.Term.vs_ty) fv_ids in
-    let tvs = List.map (fun v -> v.Term.vs_ty) vs in
-    let codom = if body.Term.t_ty = None then Ty.ty_bool else oget body.Term.t_ty in
-    (* We create the symbol corresponding to the lambda *)
-    let lam_sym = Ident.id_fresh "unamed_lambda" in 
-    let flam_sym = 
-      Term.create_fsymbol lam_sym tfv 
-        (List.fold_right Ty.ty_func tvs codom) in
-    let decl_sym = Decl.create_param_decl flam_sym in
-    (* We create the spec *)
-    let fvargs   = List.map Term.t_var fv_ids in
-    let vsargs   = List.map Term.t_var vs in
-    let flam_app = 
-      Term.t_app_infer flam_sym fvargs in
-    let flam_fullapp = 
-      List.fold_left Term.t_func_app flam_app vsargs in
-    let concl = 
-      if body.Term.t_ty = None then Term.t_iff (force_prop flam_fullapp) body
-      else Term.t_equ flam_fullapp body in
-    let spec = Term.t_forall_close (fv_ids@vs) [] concl in
-    let spec_sym = Decl.create_prsymbol (Ident.id_fresh "unamed_lambda_spec") in
-    let decl_spec = Decl.create_prop_decl Decl.Paxiom spec_sym spec in
-    rb := RBfun(decl_sym,decl_spec) :: !rb;
-    env := { !env with
-             logic_task =
-             List.fold_left add_decl_with_tuples !env.logic_task
-               [decl_sym;decl_spec] };
-    flam_app in
+      let fv     =
+        List.fold_left (fun s x -> Term.Mvs.remove x s)
+          body.Term.t_vars vs in
+      let fv_ids = Term.Mvs.keys fv in
+      let tfv = List.map (fun v -> v.Term.vs_ty) fv_ids in
+      let tvs = List.map (fun v -> v.Term.vs_ty) vs in
+      let codom = 
+        if body.Term.t_ty = None then Ty.ty_bool else oget body.Term.t_ty in
+      (* We create the symbol corresponding to the lambda *)
+      let lam_sym = Ident.id_fresh "unamed_lambda" in 
+      let flam_sym = 
+        Term.create_fsymbol lam_sym tfv 
+          (List.fold_right Ty.ty_func tvs codom) in
+      let decl_sym = Decl.create_param_decl flam_sym in
+      (* We create the spec *)
+      let fvargs   = List.map Term.t_var fv_ids in
+      let vsargs   = List.map Term.t_var vs in
+      let flam_app = 
+        Term.t_app_infer flam_sym fvargs in
+      let flam_fullapp = 
+        List.fold_left Term.t_func_app flam_app vsargs in
+      let concl = 
+        if body.Term.t_ty = None then Term.t_iff (force_prop flam_fullapp) body
+        else Term.t_equ flam_fullapp body in
+      let spec = Term.t_forall_close (fv_ids@vs) [] concl in
+      let spec_sym = 
+        Decl.create_prsymbol (Ident.id_fresh "unamed_lambda_spec") in
+      let decl_spec = Decl.create_prop_decl Decl.Paxiom spec_sym spec in
+      rb := RBfun(decl_sym,decl_spec, (vs,body), flam_app) :: !rb;
+      env := { !env with
+        env_lam = Mta.add (vs,body) flam_app !env.env_lam;
+        logic_task =
+          List.fold_left add_decl_with_tuples !env.logic_task
+            [decl_sym;decl_spec] };
+      flam_app in
 
   let f = trans_form f in
   !env, !rb, f
