@@ -1368,6 +1368,13 @@ let pp_post (ppe : PPEnv.t) fmt post =
 
 (* -------------------------------------------------------------------- *)
 let pp_hoareF (ppe : PPEnv.t) fmt hf =
+  let ppe =
+    let m = EcMemory.empty_local EcFol.mhr hf.hf_f in
+      { ppe with PPEnv.ppe_env =
+          EcEnv.Memory.set_active (fst m)
+            (EcEnv.Memory.push m ppe.PPEnv.ppe_env) }
+  in
+
   Format.fprintf fmt "%a@\n%!" (pp_pre ppe) hf.hf_pr;
   Format.fprintf fmt "    %a@\n%!" (pp_funname ppe) hf.hf_f;
   Format.fprintf fmt "@\n%a%!" (pp_post ppe) hf.hf_po
@@ -1403,6 +1410,13 @@ let string_of_hrcmp = function
 
 (* -------------------------------------------------------------------- *)
 let pp_bdhoareF (ppe : PPEnv.t) fmt hf =
+  let ppe =
+    let m = EcMemory.empty_local EcFol.mhr hf.bhf_f in
+      { ppe with PPEnv.ppe_env =
+          EcEnv.Memory.set_active (fst m)
+            (EcEnv.Memory.push m ppe.PPEnv.ppe_env) }
+  in
+
   let scmp = string_of_hrcmp hf.bhf_cmp in
 
   Format.fprintf fmt "%a@\n%!" (pp_pre ppe) hf.bhf_pr;
