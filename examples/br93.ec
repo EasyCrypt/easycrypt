@@ -152,11 +152,9 @@ save.
 
 lemma eq1 : forall (A <: Adv {M,RO,ARO}), 
 (forall (O <: ARO),
- bd_hoare[ O.o : true ==> true] = 1%r =>
- bd_hoare[ A(O).a1 : true ==> true] = 1%r) =>
+ islossless O.o =>  islossless A(O).a1) =>
 (forall (O <: ARO),
- bd_hoare[ O.o : true ==> true] = 1%r =>
- bd_hoare[ A(O).a2 : true ==> true] = 1%r) =>
+ islossless O.o =>  islossless A(O).a2) =>
  equiv [ CPA(BR,A).main ~ CPA(BR2,A).main : 
 (glob A){1} = (glob A){2} ==>
  (!mem M.r ARO.log){2} => ={res}].
