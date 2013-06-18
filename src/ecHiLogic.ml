@@ -76,6 +76,12 @@ let _ = EcPException.register (fun fmt exn ->
 let error loc e = EcLocation.locate_error loc (TacError e)
 
 (* -------------------------------------------------------------------- *)
+let process_trivial (juc, n) =
+  match t_progress (t_id None) (juc, n) with
+  | (juc, []) -> (juc, [])
+  | (juc, _ ) -> (juc, [n])
+
+(* -------------------------------------------------------------------- *)
 let process_tyargs hyps tvi =
   let ue = EcUnify.UniEnv.create (Some (LDecl.tohyps hyps).h_tvar) in
     omap tvi (TT.transtvi (LDecl.toenv hyps) ue)
@@ -137,9 +143,16 @@ let process_intros pis (juc, n) =
 
     | IPCore x :: pis, _  -> collect acc (x :: core) pis
     | IPCase x :: pis, [] -> collect (`Case x :: acc) [] pis
+    | IPDone   :: pis, [] -> collect (`Done   :: acc) [] pis
+
     | IPCase x :: pis, _  ->
         let acc = `Core (List.rev core) :: acc in
         let acc = `Case x :: acc in
+          collect acc [] pis
+
+    | IPDone :: pis, _  ->
+        let acc = `Core (List.rev core) :: acc in
+        let acc = `Done :: acc in
           collect acc [] pis
   in
 
@@ -148,6 +161,7 @@ let process_intros pis (juc, n) =
       (fun gs ip ->
         match ip with
         | `Core ids -> t_on_goals (t_intros (List.map mk_id ids)) gs
+        | `Done     -> t_on_goals process_trivial gs
         | `Case _   -> assert false)
       gs pis
   in
@@ -274,13 +288,13 @@ let process_rewrite loc (s,pe) (_,n as g) =
                  (process_mkn_apply process_formula pe g) s) n
 
 (* -------------------------------------------------------------------- *)
-let process_trivial hitenv pi g =
+let process_smt hitenv pi g =
   let pi = hitenv.hte_provers pi in
 
   match hitenv.hte_smtmode with
   | `Admit    -> t_admit g
-  | `Standard -> t_seq (t_simplify_nodelta) (t_trivial false pi) g
-  | `Strict   -> t_seq (t_simplify_nodelta) (t_trivial true  pi) g
+  | `Standard -> t_seq (t_simplify_nodelta) (t_smt false pi) g
+  | `Strict   -> t_seq (t_simplify_nodelta) (t_smt true  pi) g
 
 (* -------------------------------------------------------------------- *)
 let process_cut name phi g =
@@ -614,7 +628,7 @@ let process_new_apply loc pe g =
 let process_logic hitenv loc t =
   match t with
   | Passumption pq -> process_assumption loc pq
-  | Ptrivial pi    -> process_trivial hitenv pi
+  | Psmt pi        -> process_smt hitenv pi
   | Pintro pi      -> process_intros pi
   | Psplit         -> t_split
   | Pfield st      -> process_field st
@@ -622,6 +636,7 @@ let process_logic hitenv loc t =
   | Pexists fs     -> process_exists fs
   | Pleft          -> t_left
   | Pright         -> t_right
+  | Ptrivial       -> process_trivial
   | Pelim pe       -> process_elim loc pe
   | Papply pe      -> process_new_apply loc pe
   | Pcut (name,phi)-> process_cut name phi

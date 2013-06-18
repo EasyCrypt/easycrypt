@@ -135,7 +135,7 @@ proof.
      /\ LDDH_Hyb.O.c{1} = LDDH0.O.c{2} /\ LDDH0.O.c{2} = 0).
   wp.
   skip.
-  trivial.
+  smt.
   call (   (glob A){1} = (glob A){2} /\ LDDH_Hyb.i{1} = 0
         /\ LDDH_Hyb.O.c{1} = LDDH0.O.c{2} /\ LDDH0.O.c{2} = 0)
        (res{1} = res{2}).
@@ -144,8 +144,8 @@ proof.
      Note that I cannot add LDDH_Hyb to restriction above. *)
 (*  fun (LDDH_Hyb.i{1} = 0 /\ LDDH_Hyb.O.c{1} = LDDH0.O.c{2} /\ LDDH0.O.c{1} >= 0). *)
   fun (LDDH_Hyb.i{1} = 0). 
-  trivial.
-  trivial.
+  smt.
+  smt.
   fun.
   seq 0 0 : (   LDDH_Hyb.i{1} = 0 /\ LDDH_Hyb.O.c{1} = LDDH0.O.c{2}
              /\ LDDH_Hyb.O.c{1} >= 0).
@@ -154,13 +154,13 @@ proof.
              /\ LDDH_Hyb.O.c{1} = LDDH0.O.c{2} /\ LDDH_Hyb.O.c{1} >= 0).
     wp.
     skip.
-    trivial.
+    smt.
   if.
-    trivial.
+    smt.
   rcondf {1} 1.
     intros &m.
     skip.
-    trivial.
+    smt.
   wp.
   call (true) (res{1} = res{2}).
   fun.
@@ -169,13 +169,13 @@ proof.
   rnd.
   skip.
   simplify.
-  trivial.
+  smt.
   skip.
-  trivial.
+  smt.
   skip.
-  trivial.
+  smt.
   skip.
-  trivial.
+  smt.
 save.
 
 

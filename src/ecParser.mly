@@ -251,11 +251,13 @@
 %token SEQ
 %token SIMPLIFY
 %token SKIP
+%token SLASHSLASH
 %token SPLIT
 %token SPLITWHILE
 %token STRICT
 %token FIELD
 %token FIELDSIMP
+%token SMT
 %token STAR
 %token SUBST
 %token SWAP
@@ -1328,6 +1330,9 @@ intro_pattern:
 
 | LBRACKET ip=plist2(intro_pattern*, PIPE) RBRACKET
    { IPCase ip }
+
+| SLASHSLASH
+   { IPDone }
 ;
 
 fpattern_head(F):
@@ -1482,8 +1487,11 @@ logtactic:
 | CLEAR l=ident+
    { Pclear l }
 
-| TRIVIAL pi=prover_info
-   { Ptrivial pi }
+| TRIVIAL
+   { Ptrivial }
+
+| SMT pi=prover_info
+   { Psmt pi }
 
 | INTROS a=intro_pattern*
    { Pintro a }

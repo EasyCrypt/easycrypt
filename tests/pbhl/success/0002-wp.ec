@@ -40,7 +40,7 @@ fun.
 wp.
 rnd (1%r/2%r) (lambda (x:bool), x=y).
 skip.
-intros _ n; split; [trivial|trivial].
+intros _ n; split; [smt|smt].
 save.
 
 
@@ -58,7 +58,7 @@ proof.
 fun.
 wp.
 rnd 1%r (lambda x, true) .
-skip; trivial.
+skip; smt.
 save.
 
 

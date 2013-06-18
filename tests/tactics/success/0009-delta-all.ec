@@ -6,5 +6,5 @@ proof.
 intros b.
 delta.
 beta.
-trivial.
+smt.
 save.

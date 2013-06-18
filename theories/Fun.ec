@@ -36,4 +36,4 @@ lemma cPor_def :
 
 lemma excluded_middle: forall (p: 'a cPred),
   cPor (cPnot p) p = cPtrue
-by (intros p; apply extensionality; trivial).
+by (intros p; apply extensionality; smt).

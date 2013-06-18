@@ -323,7 +323,7 @@ let t_glob p tys (juc,n as g) =
   let juc, nh = mkn_glob juc hyps p tys in
   use_node juc nh n, []
 
-let t_trivial strict pi g =
+let t_smt strict pi g =
   let error = tacuerror ~catchable:(not strict) in
 
   let goal = get_goal g in

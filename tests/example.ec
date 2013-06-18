@@ -74,10 +74,10 @@ proof.
  assumption l_admit <:'a>.
 save.
 
-(* trivial *)
-lemma l_trivial : forall (x:'a), x = x.
+(* smt *)
+lemma l_smt : forall (x:'a), x = x.
 proof.
-  trivial.
+  smt.
 save.
 
 (* Simplification
@@ -102,7 +102,7 @@ save.
 lemma l_simplify_beta : forall (x:int), (lambda y , y = y) x
 proof.
   beta.
-  trivial.
+  smt.
 save.
 
 lemma l_simplify_iota : forall (x y:int), 
@@ -473,10 +473,10 @@ lemma mylist_or :
     l = nil \/ exists x l', l = cons x l'.
 proof.
  intros l; elimT mylistcase l.
- intros _;left;trivial.
+ intros _;left;smt.
  intros x l' heq; right.   
  exists x, l'.
- trivial.
+ smt.
 save.
 
 op length : 'a mylist -> int.

@@ -5,7 +5,7 @@ module M = {
 lemma foo : hoare [M.f : false ==> true].
 proof.
   conseq ( _: true ==> false).
-  trivial.
-  trivial.
+  smt.
+  smt.
   admit.
 save.

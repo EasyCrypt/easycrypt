@@ -6,5 +6,5 @@ proof.
 delta.
 beta.
 logic.
-trivial.
+smt.
 save.

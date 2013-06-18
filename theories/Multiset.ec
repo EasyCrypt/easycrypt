@@ -45,7 +45,7 @@ lemma count_pos: forall (xs:'a multiset) p,
 proof.
 intros xs p.
 apply (induction<:'a> xs (lambda xs, 0 <= count xs p) _ _);
-trivial.
+smt.
 save.
 
 lemma card_add: forall (x:'a) xs,
@@ -55,13 +55,13 @@ intros x xs; generalize x; clear x.
 apply (induction<:'a> xs 
  (lambda xs, forall x, 
   count (add xs x) (lambda x, true) = 1 + count xs (lambda x, true)) _ _).
-trivial.
+smt.
 simplify; intros xs1 x H x1.
 rewrite (count_nonempty<:'a> x xs1 (lambda x, true)).
 rewrite (count_nonempty<:'a> x1 (add xs1 x) (lambda x, true)).
 rewrite (H x); simplify.
 generalize (count xs1 (lambda (x : 'a), true)).
-trivial.
+smt.
 save.
 
 lemma add_commutative: forall (x y:'a) xs,
@@ -69,5 +69,5 @@ lemma add_commutative: forall (x y:'a) xs,
 proof.
 intros x y xs;
 apply (extensionality<:'a> (add (add xs x) y) (add (add xs y) x) _);
-trivial.
+smt.
 save.
