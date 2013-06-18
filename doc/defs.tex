@@ -273,6 +273,7 @@
 \newcommand{\rawec}[2][]{\lstinline[language=easycrypt,#1]{#2}}
 \newcommand{\ec}[2][]{\lstinline[language=easycrypt,style=easycrypt-pretty,#1]{#2}}
 
+\newcommand{\ecimport}[4][]{\lstinputlisting[language=easycrypt,linerange=#4,caption=#2,#1]{#3}}
 
 \def\createEasycrypt#1\relax{
 \lstdefinelanguage{easycrypt}{
@@ -302,6 +303,10 @@
   frame=tb,
   xleftmargin=.1\textwidth,
   xrightmargin=.1\textwidth,
+  rangebeginprefix={(**\ begin\ },
+  rangeendprefix={(**\ end\ },
+  rangesuffix={\ *)},
+  includerangemarker=false,
   basicstyle=\small\sffamily,
   identifierstyle={},
   keywordstyle=[1]{\itshape\color{OliveGreen}},
@@ -316,9 +321,9 @@
 \lstdefinestyle{easycrypt-pretty}{
     basicstyle=\small\sffamily,
     literate={:=}{{$\mathrel{\gets}$}}1
-              {<=}{{$\binop{\leq}$}}1
-              {>=}{{$\geq$}}1
-              {<>}{{$\neq$}}1
+              {<=}{{$\mathrel{\leq}$}}1
+              {>=}{{$\mathrel{\geq}$}}1
+              {<>}{{$\mathrel{\neq}$}}1
               {=\$}{{$\stackrel{\$}{\gets}$}}1
               {forall}{{$\forall$}}1
               {exists}{{$\exists$}}1
@@ -331,6 +336,7 @@
               {'a}{{$\alpha\,$}}1
               {'b}{{$\beta\,$}}1
               {'c}{{$\gamma\,$}}1
+              {'t}{{$\tau\,$}}1
               {'x}{{$\chi\,$}}1
               {lambda}{{$\lambda\,$}}1
 }

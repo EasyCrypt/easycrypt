@@ -36,11 +36,13 @@
     "equiv"       , EQUIV      ;        (* KW: prog *)
     "hoare"       , HOARE      ;        (* KW: prog *)
     "bd_hoare"    , BDHOARE    ;        (* KW: prog *)
+    "islossless"  , LOSSLESS   ;        (* KW: prog *)
 
     "try"         , TRY        ;        (* KW: tactical *)
     "first"       , FIRST      ;        (* KW: tactical *)
     "last"        , LAST       ;        (* KW: tactical *)
     "do"          , DO         ;        (* KW: tactical *)
+    "strict"      , STRICT     ;        (* KW: tactical *)
 
     "using"       , USING      ;        (* KW: tactic *)
     "compute"     , COMPUTE    ;        (* KW: tactic *)
@@ -104,7 +106,6 @@
     "axiom"       , AXIOM      ;        (* KW: global *)
     "lemma"       , LEMMA      ;        (* KW: global *)
     "proof"       , PROOF      ;        (* KW: global *)
-    "strict"      , STRICT     ;        (* KW: global *)
     "save"        , SAVE       ;        (* KW: global *)
     "qed"         , QED        ;        (* KW: global *)
     "claim"       , CLAIM      ;        (* KW: global *)

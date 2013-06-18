@@ -22,9 +22,11 @@ val current : unit -> EcScope.scope
 
 (* -------------------------------------------------------------------- *)
 val full_check : bool -> int -> string list option -> unit
-val process : EcParsetree.global located -> unit
-val undo : int -> unit
+val process    : EcParsetree.global located -> unit
+
+val undo : int  -> unit
 val uuid : unit -> int
+val mode : unit -> string
 
 (* -------------------------------------------------------------------- *)
 val pp_current_goal : Format.formatter -> unit

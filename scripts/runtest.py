@@ -81,7 +81,9 @@ def _options():
     options.targets = args[1:]
 
     if cmdopt.bin_args:
-        options.args.extend(cmdopt.bin_args)
+        print cmdopt.bin_args
+        options.args.extend(itertools.chain.from_iterable( \
+          x.split() for x in cmdopt.bin_args))
 
     for test in [x for x in config.sections() if x.startswith('test-')]:
         scenario = Object()
@@ -162,7 +164,7 @@ def _run_test(config, options):
     timestamp = time.time()
     try:
         command = [options.bin] + options.args + config.args + [config.filename]
-        logging.info('command: %s' % (' '.join(command)))
+        logging.info('command: %r' % (command,))
         process = sp.Popen(command, stdout = sp.PIPE, stderr = sp.PIPE)
 
         try:

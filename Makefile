@@ -16,12 +16,13 @@ PREFIX   ?= /usr/local
 VERSION  ?= $(shell date '+%F')
 DISTDIR  := easycrypt-$(VERSION)
 THEORIES := $(wildcard theories/*.ec)
+PRELUDE  := $(wildcard theories/prelude/*.ec)
 INSTALL  := scripts/install-sh
 
 # --------------------------------------------------------------------
 XUNITOUT ?= xunit.xml
 ECARGS   ?=
-CHECK     = scripts/runtest.py config/tests.config
+CHECK     = scripts/runtest.py --bin-args="$(ECARGS)" config/tests.config
 
 # --------------------------------------------------------------------
 .PHONY: all build byte native tests check check-xunit examples tags
@@ -47,10 +48,14 @@ install: ec.native
 	$(INSTALL) -m 0755 -T ec.native $(DESTDIR)$(PREFIX)/bin/easycrypt
 	$(INSTALL) -m 0755 -d $(DESTDIR)$(PREFIX)/lib/easycrypt/theories
 	$(INSTALL) -m 0644 -t $(DESTDIR)$(PREFIX)/lib/easycrypt/theories $(THEORIES)
+	$(INSTALL) -m 0755 -d $(DESTDIR)$(PREFIX)/lib/easycrypt/theories/prelude
+	$(INSTALL) -m 0644 -t $(DESTDIR)$(PREFIX)/lib/easycrypt/theories/prelude $(PRELUDE)
 
 uninstall:
 	rm -f $(DESTDIR)$(PREFIX)/bin/easycrypt
+	rm -f $(patsubst %,$(DESTDIR)$(PREFIX)/lib/easycrypt/%,$(PRELUDE))
 	rm -f $(patsubst %,$(DESTDIR)$(PREFIX)/lib/easycrypt/%,$(THEORIES))
+	-@rmdir $(DESTDIR)$(PREFIX)/lib/easycrypt/theories/prelude
 	-@rmdir $(DESTDIR)$(PREFIX)/lib/easycrypt/theories
 	-@rmdir $(DESTDIR)$(PREFIX)/lib/easycrypt
 

@@ -14,12 +14,12 @@ type ovkind =
 | OVK_Predicate
 
 type clone_error =
-| CE_DupOverride    of ovkind * symbol
-| CE_UnkOverride    of ovkind * symbol
-| CE_CrtOverride    of ovkind * symbol
-| CE_TypeArgMism    of ovkind * symbol
-| CE_OpIncompatible of symbol
-| CE_PrIncompatible of symbol
+| CE_DupOverride    of ovkind * qsymbol
+| CE_UnkOverride    of ovkind * qsymbol
+| CE_CrtOverride    of ovkind * qsymbol
+| CE_TypeArgMism    of ovkind * qsymbol
+| CE_OpIncompatible of qsymbol
+| CE_PrIncompatible of qsymbol
 
 exception CloneError of EcEnv.env * clone_error
 
@@ -39,25 +39,27 @@ let pp_clone_error fmt _env error =
   match error with
   | CE_DupOverride (kd, x) ->
       msg "the %s `%s' is instantiate twice"
-        (string_of_ovkind kd) x
+        (string_of_ovkind kd) (string_of_qsymbol x)
 
   | CE_UnkOverride (kd, x) ->
       msg "unknown %s `%s'"
-        (string_of_ovkind kd) x
+        (string_of_ovkind kd) (string_of_qsymbol x)
 
   | CE_CrtOverride (kd, x) ->
       msg "cannot instantiate the _concrete_ %s `%s'"
-        (string_of_ovkind kd) x
+        (string_of_ovkind kd) (string_of_qsymbol x)
 
   | CE_TypeArgMism (kd, x) ->
       msg "type argument mismatch for %s `%s'"
-        (string_of_ovkind kd) x
+        (string_of_ovkind kd) (string_of_qsymbol x)
 
   | CE_OpIncompatible x ->
-      msg "operator `%s' body is not compatible with its declaration" x
+      msg "operator `%s' body is not compatible with its declaration"
+        (string_of_qsymbol x)
 
   | CE_PrIncompatible x ->
-      msg "predicate `%s' body is not compatible with its declaration" x
+      msg "predicate `%s' body is not compatible with its declaration"
+        (string_of_qsymbol x)
 
 let () =
   let pp fmt exn =
@@ -72,13 +74,26 @@ type evclone = {
   evc_types : (ty_override located) Msym.t;
   evc_ops   : (op_override located) Msym.t;
   evc_preds : (pr_override located) Msym.t;
+  evc_ths   : evclone Msym.t;
 }
 
 let evc_empty = {
   evc_types = Msym.empty;
   evc_ops   = Msym.empty;
   evc_preds = Msym.empty;
+  evc_ths   = Msym.empty;
 }
+
+let rec evc_update (upt : evclone -> evclone) (nm : symbol list) (evc : evclone) =
+  match nm with
+  | []      -> upt evc
+  | x :: nm ->
+      let ths =
+        Msym.change
+          (fun sub -> Some (evc_update upt nm (odfl evc_empty sub)))
+          x evc.evc_ths
+      in
+        { evc with evc_ths = ths }
 
 (* -------------------------------------------------------------------- *)
 exception Incompatible
@@ -111,54 +126,66 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
   let subst = EcSubst.add_path EcSubst.empty opath npath in
 
   let ovrds =
-    let do1 evc (x, ovrd) =
-      let { pl_loc = l; pl_desc = x; } = x in
+    let do1 evc ({ pl_loc = l; pl_desc = ((nm, x) as name) }, ovrd) =
+      let xpath = EcPath.pappend opath (EcPath.fromqsymbol name) in
+
         match ovrd with
         | PTHO_Type tyd -> begin
-            if Msym.mem x evc.evc_types then
-              clone_error scenv (CE_DupOverride (OVK_Type, x));
-            match EcEnv.Ty.by_path_opt (EcPath.pqname opath x) scenv with
+            match EcEnv.Ty.by_path_opt xpath scenv with
             | None ->
-                clone_error scenv (CE_UnkOverride (OVK_Type, x));
+                clone_error scenv (CE_UnkOverride (OVK_Type, name));
             | Some { EcDecl.tyd_type = Some _ } ->
-                clone_error scenv (CE_CrtOverride (OVK_Type, x));
+                clone_error scenv (CE_CrtOverride (OVK_Type, name));
             | Some refty ->
                 if List.length refty.tyd_params <> List.length (fst tyd) then
-                  clone_error scenv (CE_TypeArgMism (OVK_Type, x));
+                  clone_error scenv (CE_TypeArgMism (OVK_Type, name))
           end;
-          { evc with evc_types = Msym.add x (mk_loc l tyd) evc.evc_types }
+          evc_update
+            (fun evc ->
+               if Msym.mem x evc.evc_types then
+                 clone_error scenv (CE_DupOverride (OVK_Type, name));
+              { evc with evc_types = Msym.add x (mk_loc l tyd) evc.evc_types })
+            nm evc
 
         | PTHO_Op opd -> begin
-            if Msym.mem x evc.evc_ops then
-              clone_error scenv (CE_DupOverride (OVK_Operator, x));
-            match EcEnv.Op.by_path_opt (EcPath.pqname opath x) scenv with
+            match EcEnv.Op.by_path_opt xpath scenv with
             | None
             | Some { op_kind = OB_pred _ } ->
-                clone_error scenv (CE_UnkOverride (OVK_Operator, x));
+                clone_error scenv (CE_UnkOverride (OVK_Operator, name));
             | Some { op_kind = OB_oper (Some _) } ->
-                clone_error scenv (CE_CrtOverride (OVK_Operator, x));
+                clone_error scenv (CE_CrtOverride (OVK_Operator, name));
             | _ -> ()
           end;
-          { evc with evc_ops = Msym.add x (mk_loc l opd) evc.evc_ops }
+          evc_update
+            (fun evc ->
+               if Msym.mem x evc.evc_ops then
+                 clone_error scenv (CE_DupOverride (OVK_Operator, name));
+              { evc with evc_ops = Msym.add x (mk_loc l opd) evc.evc_ops })
+            nm evc
 
         | PTHO_Pred pr -> begin
-            if Msym.mem x evc.evc_preds then
-              clone_error scenv (CE_DupOverride (OVK_Predicate, x));
-            match EcEnv.Op.by_path_opt (EcPath.pqname opath x) scenv with
+            match EcEnv.Op.by_path_opt xpath scenv with
             | None
             | Some { op_kind = OB_oper _ } ->
-                clone_error scenv (CE_UnkOverride (OVK_Predicate, x));
+                clone_error scenv (CE_UnkOverride (OVK_Predicate, name));
             | Some { op_kind = OB_pred (Some _) } ->
-                clone_error scenv (CE_CrtOverride (OVK_Predicate, x));
+                clone_error scenv (CE_CrtOverride (OVK_Predicate, name));
             | _ -> ()
           end;
-          { evc with evc_preds = Msym.add x (mk_loc l pr) evc.evc_preds }
+          evc_update
+            (fun evc ->
+               if Msym.mem x evc.evc_preds then
+                 clone_error scenv (CE_DupOverride (OVK_Predicate, name));
+              { evc with evc_preds = Msym.add x (mk_loc l pr) evc.evc_preds })
+            nm evc
     in
       List.fold_left do1 evc_empty thcl.pthc_ext
   in
 
   let nth =
-    let ovr1 scenv item =
+    let rec ovr1 prefix ovrds scenv item =
+      let xpath x = EcPath.pappend opath (EcPath.fromqsymbol (prefix, x)) in
+
       match item with
       | CTh_type (x, otyd) -> begin
           match Msym.find_opt x ovrds.evc_types with
@@ -205,14 +232,14 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
               in
 
               let (reftyvars, refty) =
-                let refop = EcEnv.Op.by_path (EcPath.pqname opath x) scenv in
+                let refop = EcEnv.Op.by_path (xpath x) scenv in
                 let refop = EcSubst.subst_op subst refop in
                   (refop.op_tparams, refop.op_ty)
               and (newtyvars, newty) =
                 (newop.op_tparams, newop.op_ty)
               in
                 if not (ty_compatible scenv (reftyvars, refty) (newtyvars, newty)) then
-                  clone_error scenv (CE_OpIncompatible x);
+                  clone_error scenv (CE_OpIncompatible (prefix, x));
                 EcEnv.Op.bind x newop scenv
       end
 
@@ -241,14 +268,14 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
               in
 
               let (reftyvars, refty) =
-                let refpr = EcEnv.Op.by_path (EcPath.pqname opath x) scenv in
+                let refpr = EcEnv.Op.by_path (xpath x) scenv in
                 let refpr = EcSubst.subst_op subst refpr in
                   (refpr.op_tparams, refpr.op_ty)
               and (newtyvars, newty) =
                 (newpr.op_tparams, newpr.op_ty)
               in
                 if not (ty_compatible scenv (reftyvars, refty) (newtyvars, newty)) then
-                  clone_error scenv (CE_OpIncompatible x);
+                  clone_error scenv (CE_OpIncompatible (prefix, x));
                 EcEnv.Op.bind x newpr scenv
         end
 
@@ -264,14 +291,29 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
       | CTh_module me ->
           EcEnv.Mod.bind me.me_name (EcSubst.subst_module subst me) scenv
 
-      | CTh_theory (x, cth) ->
-          EcEnv.Theory.bindx x (EcSubst.subst_ctheory subst cth) scenv
+      | CTh_theory (x, cth) -> begin
+        match Msym.find_opt x ovrds.evc_ths with
+        | None ->
+            EcEnv.Theory.bindx x (EcSubst.subst_ctheory subst cth) scenv
+  
+        | Some subovrds ->
+            let nth =
+              let subscenv = EcEnv.Theory.enter name scenv in
+              let subscenv =
+                List.fold_left
+                  (ovr1 (prefix @ [x]) subovrds)
+                  subscenv cth.cth_struct
+              in
+                EcEnv.ctheory_of_ctheory_w3 (EcEnv.Theory.close subscenv)
+            in
+              EcEnv.Theory.bindx x nth scenv
+      end
 
       | CTh_export p ->               (* FIXME: subst in p? *)
           EcEnv.Theory.export p scenv
     in
       let scenv = EcEnv.Theory.enter name scenv in
-      let scenv = List.fold_left ovr1 scenv oth.cth_struct in
+      let scenv = List.fold_left (ovr1 [] ovrds) scenv oth.cth_struct in
         EcEnv.Theory.close scenv
   in
     (name, nth)

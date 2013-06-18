@@ -1642,6 +1642,10 @@ let transform_opt env ue pf tt =
         unify_or_fail env ue bd.pl_loc bd'.f_ty treal;
         f_bdHoareF pre' fpath post' hcmp bd'
 
+    | PFlsless gp ->
+        let fpath = trans_gamepath env gp in
+          f_losslessF fpath
+
     | PFBDhoareS (pre, body, post, hcmp, bd) ->
         let symbols = ref Mstr.empty in
         let ue      = UE.create (Some []) in

@@ -51,7 +51,7 @@ object(self)
         startpos <- lexbuf.L.lex_curr_p.L.pos_cnum
     end;
 
-    Printf.printf "[%d]>\n%!" (EcCommands.uuid ());
+    Printf.printf "[%d|%s]>\n%!" (EcCommands.uuid ()) (EcCommands.mode ());
     EcIo.parse iparser
 
   method notice ~(immediate:bool) (msg : string) =
@@ -92,7 +92,7 @@ object
   method interactive = true
 
   method next =
-    Printf.printf "[%d]>\n%!" (EcCommands.uuid ());
+    Printf.printf "[%d|%s]>\n%!" (EcCommands.uuid ()) (EcCommands.mode ());
     EcIo.drain iparser;
     EcIo.parse iparser
 

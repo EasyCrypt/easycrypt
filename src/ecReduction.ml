@@ -208,7 +208,6 @@ let reduce_op ri env p tys =
   | Some s when Sp.mem p s -> Op.reduce env p tys 
   | _ -> raise NotReducible
 
-(* FIXME add reduction for glob *)
 let rec h_red ri env hyps f = 
   match f.f_node with
   | Flocal x -> reduce_local ri hyps x 
@@ -255,7 +254,9 @@ let rec h_red ri env hyps f =
     else f' 
   | Fquant(Lforall,b,f1) ->
     begin 
-      try f_forall_simpl b (h_red ri env hyps f1)
+      try 
+        let env = Mod.add_mod_binding b env in
+        f_forall_simpl b (h_red ri env hyps f1)
       with NotReducible ->
         let f' = f_forall_simpl b f1 in
         if f_equal f f' then raise NotReducible
@@ -263,7 +264,9 @@ let rec h_red ri env hyps f =
     end
   | Fquant(Lexists,b,f1) ->
     begin 
-      try f_exists_simpl b (h_red ri env hyps f1)
+      try 
+        let env = Mod.add_mod_binding b env in
+        f_exists_simpl b (h_red ri env hyps f1)
       with NotReducible ->
         let f' = f_exists_simpl b f1 in
         if f_equal f f' then raise NotReducible

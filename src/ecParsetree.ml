@@ -179,6 +179,7 @@ and pformula_r =
   | PFlambda of ptybindings * pformula
   | PFglob   of pmsymbol located 
   | PFeqveq  of pqsymbol list
+  | PFlsless of pgamepath
 
   (* for claims *)
   | PFhoareS   of pformula * pfunction_body * pformula
@@ -450,7 +451,7 @@ type w3_renaming =
 type theory_cloning = {
   pthc_base : pqsymbol;
   pthc_name : psymbol option;
-  pthc_ext  : (psymbol * theory_override) list;
+  pthc_ext  : (pqsymbol * theory_override) list;
 }
 
 and theory_override =
@@ -486,10 +487,10 @@ type global =
   | Gprint       of pprint
   | GthOpen      of psymbol
   | GthClose     of psymbol
-  | GthRequire   of (psymbol * bool option) (* true = export, false = import *)
+  | GthRequire   of (psymbol * [`Import|`Export] option)
   | GthImport    of pqsymbol
   | GthExport    of pqsymbol
-  | GthClone     of theory_cloning
+  | GthClone     of (theory_cloning * [`Import|`Export] option)
   | GthW3        of (string list * string * w3_renaming list)
   | Gtactics     of [`Proof of bool | `Actual of ptactic list]
   | Gprover_info of pprover_infos

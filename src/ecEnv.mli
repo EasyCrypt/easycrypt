@@ -164,6 +164,9 @@ module Mod : sig
   val enter : symbol -> (EcIdent.t * module_type) list -> env -> env
   val bind_local : EcIdent.t -> module_type -> EcPath.Sm.t -> env -> env
 
+  (* Only bind module, ie no memory and no local variable *)
+  val add_mod_binding : EcFol.binding -> env -> env
+
   val add : mpath -> env -> env
 end
 

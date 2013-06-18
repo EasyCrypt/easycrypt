@@ -323,15 +323,17 @@ let t_glob p tys (juc,n as g) =
   let juc, nh = mkn_glob juc hyps p tys in
   use_node juc nh n, []
 
-let t_trivial pi g =
+let t_trivial strict pi g =
+  let error = tacuerror ~catchable:(not strict) in
+
   let goal = get_goal g in
   try
     if EcEnv.check_goal pi goal then
       let rule = { pr_name = RN_prover (); pr_hyps = [] } in
         upd_rule_done rule g
-    else tacuerror "cannot prove goal"
+    else error "cannot prove goal"
   with EcWhy3.CanNotTranslate _ ->
-    tacuerror "cannot prove goal"
+    error "cannot prove goal"
 
 let t_clear ids (juc,n as g) =
   let pp_id fmt id = Format.fprintf fmt "%s" (EcIdent.name id) in

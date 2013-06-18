@@ -53,7 +53,8 @@ corresponding libraries, and are discussed further in
 Chapter~\ref{chap:libraries}.
 
 \subsubsection*{The \rawec{unit} type}
-The \rawec{unit} type contains a unique element \rawec{tt}.
+The \rawec{unit} type contains a unique element \rawec{tt}. It is \emph{not}
+equal to the empty tuple type in \EC.
 
 \subsubsection*{The \rawec{bool} type: termination, operators and predicates}
 In \EC, booleans are used not only to represent binary program variables, but
@@ -74,7 +75,7 @@ predicate symbols, and therefore cannot be used to define operators. All other
 boolean function symbols are defined as operators and can be used in any
 context. They include logical conjunction and disjunction (\rawec{/\\} and
 \rawec{\\\/}), short-circuiting conjunction and disjunction (\rawec{\&\&} and
-\rawec{\|\|}), and xor (\rawec{\^\^}).
+\rawec{\|\|}), and xor (\rawec{+} or \rawec{\^\^}).
 
 \subsubsection*{The \rawec{int} type}
 The \rawec{int} type represents mathematical integers. It is possible to
@@ -82,7 +83,7 @@ directly write constants between $0$ and $2^{62} - 1$ (non-negative OCaml
 integers). The unary negation operator is denoted \rawec{-!}, and all arithmetic
 and comparison operators use standard notations (\rawec{+}, \rawec{-},
 \rawec{*}, \rawec{/}, \rawec{\%}, \rawec{^}, \rawec{=}, \rawec{<}, \rawec{<=},
-\rawec{>}, \rawec{>=}...). It may be necessary to import the integer library
+\rawec{>}, \rawec{>=} \ldots). It may be necessary to import the integer library
 (\rawec{require import Int.}) to have access to these operators. Since this type
 is identified with the \WhyThree type of integers, all \WhyThree lemmas on it
 can be used by the SMT solvers, but may not be accessible by name for use in
@@ -92,28 +93,48 @@ interactive proofs.
 The \rawec{real} type represents real numbers. Integer variables and constants
 can be cast to reals by suffixing them with a \rawec{\%r}. Basic operations and
 comparisons are defined, with standard notations, on real numbers. Here again,
-it may be necessary to import the library to put the real operators in scope.
-This type is also identified with the \WhyThree type of reals, but SMT solvers
-often have very limited support for real numbers and will often fail to prove
-seemingly trivial results.
+it may be necessary to import the library (using \rawec{require import Real.})
+to put the real operators in scope. This type is also identified with the
+\WhyThree type of reals, but SMT solvers often have very limited support for
+real numbers and will often fail to prove seemingly trivial results.
 %
 We will be working on enriching the library of lemmas available in this theory
 to allow more complex interactive proofs.
 
 \warningbox{Note that \rawec{(1/2)\%r} and \rawec{1\%r/2\%r} are very different
-expressions. The former evaluates to $0$ (the division is integer division, and
-the cast is applied to the result) whereas the latter evaluates to $0.5$ (the
-division is division in the real numbers). Eventually, we will introduce
-notations for scoping that should allow less cluttered real expressions.}
+expressions. The former evaluates to $0$ (the division is in $\mathbb{Z}$, and
+the result ($0$) is interpreted in $\mathbb{R}$) whereas the latter evaluates to
+$0.5$ (the operands are interpreted and the operator is applied in
+$\mathbb{R}$). Eventually, we will introduce notations for scoping that should
+allow less cluttered real expressions.}
 
 \subsection{Types}
-\subsubsection*{Abstract types}
+From these base types, many more can be built. \EC allows the user to declare
+ (polymorphic) abstract types, and combine existing types into tuple types or
+function types.
+
+Types are declared using the \rawec{type} keyword followed by an identifier and,
+if desired, an \rawec{=} sign and a concrete definition. Listing~\ref{lst:types}
+declares a polymorphic abstract \rawec{multiset} type, and (rather daftly)
+defines naturals as multisets of units.
+
+\begin{easycrypt}[label={lst:types}]{Declaring and applying polymorphic types}
+type 'a multiset.
+type nat = unit multiset.
+\end{easycrypt}
 
 \subsubsection*{Tuple types}
+Given two types $\tau$ and $\tau'$, one can easily define the type of pairs of
+elements of $\tau$ and $\tau'$ as $\left(\tau * \tau'\right)$. More generally,
+the product can be iterated to produce tuple types of arbitrary arity.
+
+\warningbox{Types $\left(\tau * \tau' * \tau''\right)$,
+$\left(\left(\tau *\tau'\right) * \tau''\right)$ and
+$\left(\tau * \left(\tau' * \tau''\right)\right)$ are distinct.}
 
 \subsubsection*{Function types}
 
-\subsubsection*{Polymorphism}
+\subsubsection*{A note on polymorphism}
 
 
 \subsection{Operators}
@@ -198,12 +219,24 @@ notations for scoping that should allow less cluttered real expressions.}
 
 \section{Describing Distributions\label{sec:distributions}}
 
-\EC offers support for user-defined distributions. Distributions are defined by
-formally defining their density function, represented by the built-in operator
-\rawec{op mu: 'a distr -> ('a -> bool) -> real.} For example, the uniform
-distribution on booleans is defined, in the standard library, as displayed in
-Listing~\ref{lst:dbool}, where \rawec{caract P x} is \rawec{1\%r} if \rawec{P}
-holds on \rawec{x} and \rawec{0\%r} otherwise.
+%%%% From Gilles:
+\EC features a polymorphic type \rawec{'a distr} of \emph{discrete
+sub-distributions} over a base type \rawec{'a}. The primary operation over
+sub-distributions is the function \rawec{op mu: 'a distr -> ('a -> bool) ->
+real.} which measures the probability of an event. The function is assumed to
+satisfy the basic axioms of probability sub-distributions:
+\begin{itemize}
+\item probabilities lie in the unit interval;
+\item the probability of the union of events is equal to the sum of
+  their probabilities, minus the sum of their intersection;
+\item probabilities are monotonic with respect to event inclusion.
+\end{itemize}
+
+Sub-distributions are introduced axiomatically, and no well-formedness checks
+are performed. For example, the uniform distribution on booleans is defined, in
+the standard library, as displayed in Listing~\ref{lst:dbool}, where
+\rawec{caract P x} is \rawec{1\%r} if \rawec{P} holds on \rawec{x} and
+\rawec{0\%r} otherwise.
 
 \begin{easycrypt}[label={lst:dbool}]{[Uniform Boolean distribution]Defining the uniform distribution on booleans}
 op dbool: bool distr.
@@ -213,6 +246,27 @@ axiom mu_def: forall (P:bool -> bool),
     (1%r/2%r) * caract P true +
     (1%r/2%r) * caract P false.
 \end{easycrypt}
+
+The standard library on distributions, discussed further in
+Chapter~\ref{chap:libraries}, introduces several auxiliary quantities on
+distributions that are useful in probability computations and for defining more
+complex distributions that are difficult, or impossible, to describe purely
+using \rawec{mu}. The definitions of these quantities is shown in
+Listing~\ref{lst:mu_aux}.
+
+\begin{easycrypt}[label={lst:mu_aux}]{Auxiliary operators on distributions}
+op mu_x(d:'a distr, x:'a) = mu d (lambda x', x = x').
+op mu_weight(d:'a distr) = mu d (lambda x, true).
+op in_supp(d:'a distr, x:'a) = mu d (lambda x', x = x') > 0%r.
+\end{easycrypt}
+
+\subsection{Old Stuff}
+\EC offers support for user-defined distributions. Distributions are defined by
+formally defining their density function, represented by the built-in operator
+\rawec{op mu: 'a distr -> ('a -> bool) -> real.} For example, the uniform
+distribution on booleans is defined, in the standard library, as displayed in
+Listing~\ref{lst:dbool}, where \rawec{caract P x} is \rawec{1\%r} if \rawec{P}
+holds on \rawec{x} and \rawec{0\%r} otherwise.
 
 It may not always be this easy to define distributions. More examples of
 user-provided definitions, and some distribution transformers that make it

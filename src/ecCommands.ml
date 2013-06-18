@@ -9,10 +9,11 @@ open EcLogic
 
 (* -------------------------------------------------------------------- *)
 type pragma = {
-  pm_verbose : bool; (* true => display goal after each command *)
+  pm_verbose : bool; (* true  => display goal after each command *)
+  pm_check   : bool; (* false => don't check proof scripts *)
 }
 
-let pragma = ref { pm_verbose = true; }
+let pragma = ref { pm_verbose = true; pm_check = true; }
 
 (* -------------------------------------------------------------------- *)
 exception TopError of EcLocation.t * exn
@@ -146,7 +147,8 @@ and process_predicate (scope : EcScope.scope) (p : ppredicate located) =
 (* -------------------------------------------------------------------- *)
 and process_axiom (scope : EcScope.scope) (ax : paxiom located) =
   EcScope.check_state `InTop "axiom" scope;
-  let (name, scope) = EcScope.Ax.add scope ax in
+  let mode = if (!pragma).pm_check then `Check else `WeakCheck in
+  let (name, scope) = EcScope.Ax.add scope mode ax in
     EcUtils.oiter name
       (fun x -> notify scope "added axiom: `%s'" x);
     scope
@@ -195,9 +197,9 @@ and process_th_require ld scope (x, io) =
 
         let scope = EcScope.Theory.require scope name loader in
           match io with
-          | None       -> scope
-          | Some true  -> process_th_export scope ([], name)
-          | Some false -> process_th_import scope ([], name)
+          | None         -> scope
+          | Some `Export -> process_th_export scope ([], name)
+          | Some `Import -> process_th_import scope ([], name)
 
 (* -------------------------------------------------------------------- *)
 and process_th_import (scope : EcScope.scope) name =
@@ -210,9 +212,13 @@ and process_th_export (scope : EcScope.scope) name =
   EcScope.Theory.export scope name
 
 (* -------------------------------------------------------------------- *)
-and process_th_clone (scope : EcScope.scope) thcl =
+and process_th_clone (scope : EcScope.scope) (thcl, io) =
   EcScope.check_state `InTop "theory cloning" scope;
-  EcScope.Theory.clone scope thcl
+  let (name, scope) = EcScope.Theory.clone scope thcl in
+    match io with
+    | None         -> scope
+    | Some `Export -> process_th_export scope ([], name)
+    | Some `Import -> process_th_import scope ([], name)
 
 (* -------------------------------------------------------------------- *)
 and process_w3_import (scope : EcScope.scope) (p, f, r) =
@@ -221,9 +227,11 @@ and process_w3_import (scope : EcScope.scope) (p, f, r) =
 
 (* -------------------------------------------------------------------- *)
 and process_tactics (scope : EcScope.scope) t = 
+  let mode = if (!pragma.pm_check) then `Check else `WeakCheck in
+
   match t with
-  | `Actual t -> EcScope.Tactics.process scope t
-  | `Proof  b -> EcScope.Tactics.proof   scope b
+  | `Actual t -> EcScope.Tactics.process scope mode t
+  | `Proof  b -> EcScope.Tactics.proof   scope mode b
 
 (* -------------------------------------------------------------------- *)
 and process_save (scope : EcScope.scope) loc =
@@ -244,52 +252,68 @@ and process_checkproof scope b =
 
 (* -------------------------------------------------------------------- *)
 and process_pragma (scope : EcScope.scope) opt =
+  let check mode =
+    match EcScope.xgoal scope with
+    | Some (Some false, _) ->
+        EcScope.hierror "pragma [check|nocheck] in non-strict proof script";
+    | _ -> pragma := { !pragma with pm_check = mode }
+  in
+
   begin
     match unloc opt with
-    | "silent"  -> pragma := { !pragma with pm_verbose = false }
-    | "verbose" -> pragma := { !pragma with pm_verbose = true  }
-    | _         -> ()
-  end; scope
+    | "silent"   -> pragma := { !pragma with pm_verbose = false }
+    | "verbose"  -> pragma := { !pragma with pm_verbose = true  }
+    | "check"    -> check true
+    | "nocheck"  -> check false
+
+    | _          -> ()
+  end
 
 (* -------------------------------------------------------------------- *)
 and process (ld : EcLoader.ecloader) (scope : EcScope.scope) g =
   let loc = g.pl_loc in
 
   let scope =
-    match g.pl_desc with
-    | Gtype      t    -> process_type       scope  (mk_loc loc t)
-    | Gdatatype  t    -> process_datatype   scope  (mk_loc loc t)
-    | Gmodule    m    -> process_module     scope  m
-    | Ginterface i    -> process_interface  scope  i
-    | Goperator  o    -> process_operator   scope  (mk_loc loc o)
-    | Gpredicate p    -> process_predicate  scope  (mk_loc loc p)
-    | Gaxiom     a    -> process_axiom      scope  (mk_loc loc a)
-    | Gclaim     c    -> process_claim      scope  c
-    | GthOpen    name -> process_th_open    scope  name.pl_desc
-    | GthClose   name -> process_th_close   scope  name.pl_desc
-    | GthRequire name -> process_th_require ld scope name
-    | GthImport  name -> process_th_import  scope  name.pl_desc
-    | GthExport  name -> process_th_export  scope  name.pl_desc
-    | GthClone   thcl -> process_th_clone   scope  thcl
-    | GthW3      a    -> process_w3_import  scope  a
-    | Gprint     p    -> process_print      scope  p; scope
-    | Gtactics   t    -> process_tactics    scope  t
-    | Gprover_info pi -> process_proverinfo scope  pi
-    | Gcheckproof b   -> process_checkproof scope  b
-    | Gsave      loc  -> process_save       scope  loc
-    | Gpragma    opt  -> process_pragma     scope opt
+    match
+      match g.pl_desc with
+      | Gtype      t    -> `Fct   (fun scope -> process_type       scope  (mk_loc loc t))
+      | Gdatatype  t    -> `Fct   (fun scope -> process_datatype   scope  (mk_loc loc t))
+      | Gmodule    m    -> `Fct   (fun scope -> process_module     scope  m)
+      | Ginterface i    -> `Fct   (fun scope -> process_interface  scope  i)
+      | Goperator  o    -> `Fct   (fun scope -> process_operator   scope  (mk_loc loc o))
+      | Gpredicate p    -> `Fct   (fun scope -> process_predicate  scope  (mk_loc loc p))
+      | Gaxiom     a    -> `Fct   (fun scope -> process_axiom      scope  (mk_loc loc a))
+      | Gclaim     c    -> `Fct   (fun scope -> process_claim      scope  c)
+      | GthOpen    name -> `Fct   (fun scope -> process_th_open    scope  name.pl_desc)
+      | GthClose   name -> `Fct   (fun scope -> process_th_close   scope  name.pl_desc)
+      | GthRequire name -> `Fct   (fun scope -> process_th_require ld scope name)
+      | GthImport  name -> `Fct   (fun scope -> process_th_import  scope  name.pl_desc)
+      | GthExport  name -> `Fct   (fun scope -> process_th_export  scope  name.pl_desc)
+      | GthClone   thcl -> `Fct   (fun scope -> process_th_clone   scope  thcl)
+      | GthW3      a    -> `Fct   (fun scope -> process_w3_import  scope  a)
+      | Gprint     p    -> `Fct   (fun scope -> process_print      scope  p; scope)
+      | Gtactics   t    -> `Fct   (fun scope -> process_tactics    scope  t)
+      | Gprover_info pi -> `Fct   (fun scope -> process_proverinfo scope  pi)
+      | Gcheckproof b   -> `Fct   (fun scope -> process_checkproof scope  b)
+      | Gsave      loc  -> `Fct   (fun scope -> process_save       scope  loc)
+      | Gpragma    opt  -> `State (fun scope -> process_pragma     scope  opt)
+    with
+    | `Fct   f -> Some (f scope)
+    | `State f -> f scope; None
   in
     begin
-      try
-        ignore (Sys.getenv "ECDEBUG");
-        EcEnv.dump EcDebug.initial (EcScope.env scope)
-      with Not_found -> ()
+      oiter scope
+        (fun scope ->
+          try
+            ignore (Sys.getenv "ECDEBUG");
+            EcEnv.dump EcDebug.initial (EcScope.env scope)
+          with Not_found -> ())
     end;
     scope
 
 (* -------------------------------------------------------------------- *)
 and process_internal ld scope g =
-  process ld scope g
+  odfl scope (process ld scope g)
 
 (* -------------------------------------------------------------------- *)
 let loader  = EcLoader.create ()
@@ -299,7 +323,7 @@ let addidir ?system (idir : string) =
 
 (* -------------------------------------------------------------------- *)
 let initial () =
-  let prelude = (mk_loc _dummy "prelude", Some true) in
+  let prelude = (mk_loc _dummy "prelude", Some `Export) in
   let loader  = EcLoader.forsys loader in
   let scope   = EcScope.empty in
   let scope   = if   !options.o_boot
@@ -327,6 +351,12 @@ let uuid () : int =
   let (idx, _, _) = !context in idx
 
 (* -------------------------------------------------------------------- *)
+let mode () : string =
+  match (!pragma).pm_check with
+  | true  -> "check"
+  | false -> "nocheck"
+
+(* -------------------------------------------------------------------- *)
 let undo (olduuid : int) =
   if olduuid < (uuid ()) then
     begin
@@ -339,8 +369,9 @@ let undo (olduuid : int) =
 (* -------------------------------------------------------------------- *)
 let process (g : global located) =
   let (idx, lazy scope, stack) = !context in
-  let newscope = process loader scope g in
-    context := (idx+1, lazy newscope, scope :: stack)
+    match process loader scope g with
+    | None -> ()
+    | Some newscope -> context := (idx+1, lazy newscope, scope :: stack)
 
 (* -------------------------------------------------------------------- *)
 module S = EcScope
@@ -350,19 +381,18 @@ let pp_current_goal stream =
   let (_, lazy scope, _) = !context in
 
   match S.goal scope with
-  | None -> ()
+  | None
+  | Some { S.puc_jdg = S.PSNoCheck _ } -> ()
 
-  | Some goal -> begin
-      let juc, ns = goal.S.puc_jdg in
+  | Some { S.puc_jdg = S.PSCheck (juc, ns) } ->
       let ppe = EcPrinting.PPEnv.ofenv (S.env scope) in
 
       match List.ohead ns with
-      | None   -> Format.fprintf stream "No more goals\n%!"
+      | None   -> Format.fprintf stream "No more goals@\n%!"
       | Some n -> 
         let hyps, concl = get_goal (juc, n) in
         let g = EcEnv.LDecl.tohyps hyps, concl in
         EcPrinting.pp_goal ppe stream (List.length ns, g)
-  end
 
 let pp_maybe_current_goal stream =
   match (!pragma).pm_verbose with
