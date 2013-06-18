@@ -34,14 +34,14 @@ model them in \EC.
 \paragraph{Bitstrings}
 As part of its standard library, \EC provides a theory of fixed-length
 bitstrings coined \ec{Word}. For the purpose of this example, we will
-need bitstrings of three different lengths, \ec{k} for messages, \ec{l}
-for randomness and \ec{n} for ciphers; such that \ec{k + l = n}. The
-following piece of code declares three integer constants and states
-the desired property as an axiom, clones the theories with appropriate
-lengths and defines synonyms for the types.
+need bitstrings of three different lengths, \ec{k} for messages,
+\ec{l} for randomness and \ec{n} for ciphers; such that \ec{k + l =
+  n}. The following piece of code declares three integer constants,
+states the desired relationship between them as an axiom, clones the
+theories (see Section~\ref{sec:cloning} for details on cloning) with
+appropriate lengths and defines synonyms for the types.
 
 \ecimport{ }{../examples/br93_tutorial.ec}{bitstrings}
-
 
 The \ec{import} keyword allows us to ommit the qualified names when
 they can be inferred from the context. 
@@ -52,7 +52,6 @@ the standard library, but we define shortcuts to them as follows
 
 \ecimport{ }{../examples/br93_tutorial.ec}{distributions}
 
-The inner workings of cloning are provided in 
 
 \paragraph{Random oracles}
 A hash function in the random oracle model is a consistent random
@@ -259,6 +258,39 @@ reasoning principles of \EC required to establih this property.
 %TODO: put forward pointers to françois' and guillaume's section
 
 \subsection{Overview of the proof}
+The proof proceeds by defining a sequence of transformation starting
+on the initial game and proving a relationship between probabilities
+of events of interests in each of these games. Each of these steps is
+justified by reasoning in terms of probabilistic relational hoare
+logic (pRHL for short).
+
+The proof of the BR93 encryption scheme hinges on the following
+sequence of games:
+\begin{enumerate}
+\item The first transformation we apply is to replace the call to the
+  hash oracle in the encryption by a fresh randomly sampled value. The
+  obtained encryption expression is $\Enc2_{pk}(m) = f_{pk}(r) \concat
+  m \xor r'$. We can show that the results of the encryption are
+  observationally equivalent and that the resulting maps of the random
+  oracle differ only in the query for value \ec{r}, provided that
+  query done by the original encryption is fresh, therefore, if the
+  adversary did not query \ec{r} to the random oracle.
+
+\item Next, we modify the encryption scheme once again and replace the
+  occurrence of $m\xor r'$ by $r'$ and we obtain $\Enc2_{pk}(m) =
+  f_{pk}(r) \concat r'$. This step is justified by means of optimistic
+  sampling: $\Rand{r}{\bitstring{k};\Ass{v}{r\xor x}}$ and
+  $\Rand{v}{\bitstring{k}}$ yield the same distribution of values of
+  $v$.
+
+\item  Note that at this point, the encryption algorithm does not depend on
+  its input $m$ anymore. In particular, in the \ec{CPA} game, this
+  means that the challenge \ec{c} that the adversary receives in the
+  second round, does not depend on the bit \ec{b} anymore. We exploit
+  this fact and at this point we modify de \ec{CPA} game by pushing
+  the sampling of \ec{b} to the bottom of \ec{main}. At this point,
+  the probability of \ec{b = b'} is exactly $\frac{1}{2}$
+\end{enumerate}
 
 \subsection{Easycrypt proof}
 

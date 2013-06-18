@@ -18,17 +18,13 @@ axiom l_pos : 0 <= k.
 
 axiom sizes : k + l = n.
 
-clone Word as Plaintext with op length = k.
-clone Word as Ciphertext with op length = n.
-clone Word as Randomness with op length = l.
+clone import Word as Plaintext with op length = k.
+clone import Word as Ciphertext with op length = n.
+clone import Word as Randomness with op length = l.
 
 type plaintext = Plaintext.word.
 type ciphertext = Ciphertext.word.
 type randomness = Randomness.word.
-
-import Plaintext.
-import Ciphertext.
-import Randomness.
 (** end bitstrings *)
 
 
