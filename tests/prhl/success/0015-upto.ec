@@ -1,6 +1,8 @@
 require import Distr.
 require import Set.
 require import Map.
+require import Int.
+
 module type O = { 
   fun hashA (x:int) : int 
 }.
@@ -62,6 +64,13 @@ module F2(A:Adv) = {
   }
 }.
 
+
+
+(* false?? *)
+axiom d_inter_lossless : mu [0..10] (lambda (x1 : int), 0 <= x1 /\ x1 <= 10) = 1%r.
+
+
+
 lemma foo : forall (A<:Adv{RO,F1,F2}), 
   (forall (O<:O),  
       bd_hoare [O.hashA : true ==> true] = 1%r => 
@@ -77,14 +86,29 @@ proof.
        ( (!mem F2.xs RO.logA){2} => res{1} = res{2} ).
     fun (mem F2.xs RO.logA)
       (RO.logA{1} = RO.logA{2} /\ F1.xs{1} = F2.xs{2} /\
-       eq_except RO.mH{1} RO.mH{2} F2.xs{2}) 
+       eq_except RO.mH{1} RO.mH{2} F2.xs{2})
       (F1.xs{1} = F2.xs{2}); try (trivial).
       apply Hlossless.
       fun; inline RO.hash;wp;rnd;wp;skip;simplify;trivial.
 
     (* Hoare goal *)
-    admit.
-    admit.
+    intros &2 h.
+    fun.
+    inline RO.hash.
+    wp.
+    rnd (1%r) (lambda (x:int), 0 <= x /\ x <= 10) .
+    wp; skip.
+    intros &hr h2.
+    split;[apply d_inter_lossless; trivial| trivial].
+    (* *)
+    intros &1.
+    fun.
+    inline RO.hash.
+    wp.
+    rnd (1%r) (lambda (x:int), 0 <= x /\ x <= 10) .
+    wp;skip;intros &hr _.
+    split; [apply d_inter_lossless; trivial | trivial].    
+
   inline RO.hash;wp;rnd;wp;skip;simplify;trivial.
 save.
 
