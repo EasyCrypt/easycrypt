@@ -198,35 +198,31 @@ let add_call (u : uses) p : uses =
   { u with us_calls = p :: u.us_calls }
 
 let add_read (u : uses) p : uses =
-  { u with us_reads = Sx.add p u.us_reads }
+  if is_glob p then 
+    { u with us_reads = Sx.add p.pv_name u.us_reads }
+  else u 
 
 let add_write (u : uses) p : uses =
-  { u with us_writes = Sx.add p u.us_writes }
-
-let norm_uses (env : EcEnv.env) (u : uses) =
-  let norm map =
-    Sx.fold
-      (fun p map -> Sx.add (EcEnv.NormMp.norm_xpath env p) map)
-      Sx.empty map
-  in
-    (norm (Sx.of_list u.us_calls), (norm u.us_reads, norm u.us_writes))
+  if is_glob p then
+    { u with us_writes = Sx.add p.pv_name u.us_writes }
+  else u
 
 let (i_inuse, s_inuse, se_inuse) =
   let rec lv_inuse (map : uses) (lv : lvalue) =
     match lv with
     | LvVar (p,_) ->
-        add_write map p.pv_name
+        add_write map p
 
     | LvTuple ps ->
         List.fold_left
-          (fun map (p, _) -> add_write map p.pv_name)
+          (fun map (p, _) -> add_write map p)
           map ps
 
     | LvMap (_, p, e, _) ->
       (* Maps are not modified in place but feed to a mutator
          operator that returns the augmented map and assigning the
          result to [p]. Hence the [`Read | `Write] flag. *)
-      let map = add_write (add_read map p.pv_name) p.pv_name in
+      let map = add_write (add_read map p) p in
       let map = se_inuse map e in
         map
 
