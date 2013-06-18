@@ -121,6 +121,8 @@ let p_ora_intro_r   = _Logic "ora_intro_r"
 let p_iff_intro     = _Logic "iff_intro"
 let p_if_intro      = _Logic "if_intro"
 let p_eq_refl       = _Logic "eq_refl"
+let p_eq_trans      = _Logic "eq_trans"
+let p_fcongr        = _Logic "fcongr"
 
 let p_rewrite_l     = _Logic "rewrite_l"
 let p_rewrite_r     = _Logic "rewrite_r"

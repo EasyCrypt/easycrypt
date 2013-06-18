@@ -82,6 +82,26 @@ let process_trivial ((juc, n) as g) =
   | (_  , _ ) -> t_id None g
 
 (* -------------------------------------------------------------------- *)
+let process_congr g =
+  let (hyps, concl) = get_goal g in
+
+  if not (EcFol.is_eq concl) then
+    tacuerror "congr: goal must be an equality";
+
+  let (f1, f2) = EcFol.destr_eq concl in
+
+  match f1.f_node, f2.f_node with
+  | Fapp (o1, a1), Fapp (o2, a2)
+      when    EcReduction.is_alpha_eq hyps o1 o2
+           && List.length a1 = List.length a2 ->
+    t_congr o1 ((List.combine a1 a2), f1.f_ty) g
+
+  | _, _ when EcReduction.is_alpha_eq hyps f1 f2 ->
+    t_congr f1 ([], f1.f_ty) g
+
+  | _, _ -> tacuerror "congr: no congruence"
+
+(* -------------------------------------------------------------------- *)
 let process_tyargs hyps tvi =
   let ue = EcUnify.UniEnv.create (Some (LDecl.tohyps hyps).h_tvar) in
     omap tvi (TT.transtvi (LDecl.toenv hyps) ue)
@@ -650,6 +670,7 @@ let process_logic hitenv loc t =
   | Pexists fs     -> process_exists fs
   | Pleft          -> t_left
   | Pright         -> t_right
+  | Pcongr         -> process_congr
   | Ptrivial       -> process_trivial
   | Pelim pe       -> process_elim loc pe
   | Papply pe      -> process_new_apply loc pe

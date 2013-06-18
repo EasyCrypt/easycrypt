@@ -25,7 +25,6 @@ type goal   = judgment_uc * int
 type tactic = goal -> goals 
 
 (* -------------------------------------------------------------------- *)
-
 val cannot_apply : string -> string -> 'a
 val tacerror     : ?catchable:bool -> EcBaseLogic.tac_error -> 'a
 val tacuerror    : ?catchable:bool -> ('a, Format.formatter, unit, 'b) format4 -> 'a
@@ -39,9 +38,7 @@ val get_goal_e : goal -> env * LDecl.hyps * form
 val get_concl  : goal -> form
 val get_hyps   : goal -> LDecl.hyps
 val get_node   : goal -> LDecl.hyps * form
-
-
-val new_goal : judgment_uc -> LDecl.hyps * form -> goal
+val new_goal   : judgment_uc -> LDecl.hyps * form -> goal
 
 val upd_rule : int rule -> goal -> goals
 val upd_rule_done : int rule -> goal -> goals
@@ -120,6 +117,8 @@ val t_split : tactic
 
 val t_left  : tactic
 val t_right : tactic
+
+val t_congr : form -> (form * form) list * EcTypes.ty -> tactic
 
 val t_smt : bool -> EcProvers.prover_infos -> tactic
 

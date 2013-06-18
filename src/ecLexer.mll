@@ -56,6 +56,7 @@
     "apply"       , APPLY      ;        (* KW: tactic *)
     "progress"    , PROGRESS   ;        (* KW: tactic *)
     "trivial"     , TRIVIAL    ;        (* KW: tactic *)
+    "congr"       , CONGR      ;        (* KW: tactic *)
     "cut"         , CUT        ;        (* KW: tactic *)
     "generalize"  , GENERALIZE ;        (* KW: tactic *)
     "clear"       , CLEAR      ;        (* KW: tactic *)

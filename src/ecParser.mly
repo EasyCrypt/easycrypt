@@ -157,6 +157,7 @@
 %token COLON
 %token COMMA
 %token COMPUTE
+%token CONGR
 %token CONSEQ
 %token EXFALSO
 %token CONST
@@ -179,14 +180,16 @@
 %token EQUIVDENO
 %token EXIST
 %token EXPORT
+%token FIELD
+%token FIELDSIMP
 %token FINAL
 %token FIRST
 %token FISSION
-%token FUSION
 %token FORALL
-%token FWDS
 %token FROM_INT
 %token FUN
+%token FUSION
+%token FWDS
 %token GENERALIZE 
 %token GLOB
 %token HOARE
@@ -226,8 +229,9 @@
 %token PRAGMA
 %token PRBOUNDED
 %token PRED
-%token PRINT
 %token PRFALSE
+%token PRINT
+%token PROGRESS
 %token PROOF
 %token PROR
 %token PROVER
@@ -253,13 +257,11 @@
 %token SIMPLIFY
 %token SKIP
 %token SLASHSLASH
+%token SMT
 %token SPLIT
 %token SPLITWHILE
-%token STRICT
-%token FIELD
-%token FIELDSIMP
-%token SMT
 %token STAR
+%token STRICT
 %token SUBST
 %token SWAP
 %token THEN
@@ -268,7 +270,6 @@
 %token TILD
 %token TIMEOUT
 %token TRIVIAL
-%token PROGRESS
 %token TRY
 %token TYPE
 %token UNDERSCORE
@@ -1487,6 +1488,9 @@ logtactic:
 
 | CLEAR l=ident+
    { Pclear l }
+
+| CONGR
+   { Pcongr }
 
 | TRIVIAL
    { Ptrivial }

@@ -347,6 +347,7 @@ type logtactic =
   | Pleft                         
   | Pright                        
   | Ptrivial
+  | Pcongr
   | Pelim       of ffpattern 
   | Papply      of ffpattern
   | Pcut        of (psymbol * pformula)

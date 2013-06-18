@@ -26,7 +26,7 @@ type quantif =
   | Lexists
   | Llambda
 
-type binding =  (EcIdent.t * gty) list
+type binding = (EcIdent.t * gty) list
 
 type hoarecmp = FHle | FHeq | FHge
 
