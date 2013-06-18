@@ -38,9 +38,9 @@ lemma foo1 : hoare [M1.f : true ==> res = (10,10)].
 proof.
  fun.
  while (x=1).   
- wp;skip.
- intros _ h.
- elim h;intros h1 _; assumption h1.
+   wp;skip.
+   intros _ h.
+   elim h;intros h1 _; assumption h1.
  wp;skip.
  intros _ _;split.
  split .

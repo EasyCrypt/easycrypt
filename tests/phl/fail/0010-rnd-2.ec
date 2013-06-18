@@ -27,7 +27,7 @@ proof.
  rnd (lambda z, 1 - z).
  wp.
  skip.
- trivial.
+ smt.
 
 
 

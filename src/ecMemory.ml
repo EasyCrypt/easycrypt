@@ -19,6 +19,12 @@ type local_memtype = {
 
 type memtype = local_memtype option
 
+let mt_fv = function
+  | None -> EcIdent.Mid.empty
+  | Some lmt ->
+    let fv = EcPath.x_fv EcIdent.Mid.empty lmt.mt_path in
+    Msym.fold (fun _ ty fv -> EcIdent.fv_union fv ty.ty_fv) lmt.mt_vars fv 
+
 
 let lmt_equal mt1 mt2 =   
   EcPath.x_equal mt1.mt_path mt2.mt_path &&

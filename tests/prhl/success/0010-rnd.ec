@@ -21,7 +21,7 @@ proof.
 fun.
 rnd.
 skip.
-trivial.
+smt.
 save.
 
 
@@ -39,7 +39,7 @@ module G' = {
 equiv test' : G'.f ~ G'.f : true ==> 0 <= res{1} /\ res{1} <= 10.
 proof.
 fun.
-rnd; skip; trivial.
+rnd; skip; smt.
 save.
 
 
@@ -66,7 +66,7 @@ proof.
  fun.
  rnd (lambda z, z + 1) (lambda z, z - 1).
  skip.
- trivial.
+ smt.
 save.
 
 
@@ -124,7 +124,7 @@ proof.
  rnd (lambda x, f x) (lambda x, finv x).
  skip.
  intros &1 &2 _ x y.
- split;[ split;[ split;trivial | trivial ] | trivial ].
+ split;[ split;[ split;smt | smt ] | smt ].
 save.
 
 
@@ -136,7 +136,7 @@ proof.
  rnd (lambda x, f x) (lambda x, finv x ).
  skip.
  intros &1 &2 _ x y.
- split;[ split;[ split;trivial | trivial ] | trivial ].
+ split;[ split;[ split;smt | smt ] | smt ].
 save.
 
 
@@ -155,7 +155,7 @@ proof.
 fun.
  rnd{1}.
  rnd{2}.
- skip;trivial.
+ skip;smt.
 save.
 
 

@@ -16,48 +16,16 @@ PREFIX   ?= /usr/local
 VERSION  ?= $(shell date '+%F')
 DISTDIR  := easycrypt-$(VERSION)
 THEORIES := $(wildcard theories/*.ec)
+PRELUDE  := $(wildcard theories/prelude/*.ec)
 INSTALL  := scripts/install-sh
 
 # --------------------------------------------------------------------
-XUNITOUT     ?= xunit.xml
-ECARGS       ?=
-CHECKARGS    := $(ECARGS) -I theories
-CHECKLIBARGS := $(CHECKARGS) -p Eprover -p Alt-Ergo -p Z3
-
-OKTESTS = \
-	  --ok-dir=tests/typing/success   \
-	  --ok-dir=tests/modules/success  \
-	  --ok-dir=tests/theories/success \
-	  --ok-dir=tests/third-party      \
-	  --ok-dir=tests/unclassified     \
-	  --ok-dir=tests/tactics/success  \
-	  --ok-dir=tests/phl/success      \
-	  --ok-dir=tests/prhl/success     
-
-KOTESTS = \
-	  --ko-dir=tests/typing/fail      \
-	  --ko-dir=tests/modules/fail     \
-	  --ko-dir=tests/theories/fail    \
-	  --ko-dir=tests/tactics/fail     \
-	  --ko-dir=tests/phl/fail         \
-	  --ko-dir=tests/prhl/fail       
-
-THTESTS = --ok-dir=theories
-
-CHECK = \
-	./scripts/runtest.py              \
-	  --bin=./ec.native               \
-	  --bin-args="$(CHECKARGS)"       
-
-CHECKLIBS = \
-	./scripts/runtest.py           \
-	  --bin=./ec.native            \
-	  --bin-args="$(CHECKLIBARGS)" \
-	  --ok-dir=theories            \
-	  --xunit=libresults.xml
+XUNITOUT ?= xunit.xml
+ECARGS   ?=
+CHECK     = scripts/runtest.py --bin-args="$(ECARGS)" config/tests.config
 
 # --------------------------------------------------------------------
-.PHONY: all build byte native check check-xunit tags
+.PHONY: all build byte native tests check check-xunit examples tags
 .PHONY: clean install uninstall dist distcheck why3
 .PHONY: pg toolchain update-toolchain %.ml %.mli %.inferred.mli
 
@@ -80,24 +48,30 @@ install: ec.native
 	$(INSTALL) -m 0755 -T ec.native $(DESTDIR)$(PREFIX)/bin/easycrypt
 	$(INSTALL) -m 0755 -d $(DESTDIR)$(PREFIX)/lib/easycrypt/theories
 	$(INSTALL) -m 0644 -t $(DESTDIR)$(PREFIX)/lib/easycrypt/theories $(THEORIES)
+	$(INSTALL) -m 0755 -d $(DESTDIR)$(PREFIX)/lib/easycrypt/theories/prelude
+	$(INSTALL) -m 0644 -t $(DESTDIR)$(PREFIX)/lib/easycrypt/theories/prelude $(PRELUDE)
 
 uninstall:
 	rm -f $(DESTDIR)$(PREFIX)/bin/easycrypt
+	rm -f $(patsubst %,$(DESTDIR)$(PREFIX)/lib/easycrypt/%,$(PRELUDE))
 	rm -f $(patsubst %,$(DESTDIR)$(PREFIX)/lib/easycrypt/%,$(THEORIES))
+	-@rmdir $(DESTDIR)$(PREFIX)/lib/easycrypt/theories/prelude
 	-@rmdir $(DESTDIR)$(PREFIX)/lib/easycrypt/theories
 	-@rmdir $(DESTDIR)$(PREFIX)/lib/easycrypt
 
-tests: ec.native
-	$(CHECK) $(OKTESTS) $(KOTESTS)
+tests: check
+
+examples:
+	$(CHECK) examples
 
 check: ec.native
-	$(CHECK) $(THTESTS) $(OKTESTS) $(KOTESTS)
-
-checklibs: ec.native
-	$(CHECKLIBS)
+	$(CHECK) prelude theories unit
 
 check-xunit: ec.native
-	$(CHECK) $(THTESTS) $(OKTESTS) $(KOTESTS) --xunit="$(XUNITOUT)"
+	$(CHECK) --xunit="$(XUNITOUT)" prelude theories unit
+
+checklibs: ec.native
+	$(CHECK) --xunit=libresults.xml prelude theories
 
 clean:
 	$(OCAMLBUILD) -clean

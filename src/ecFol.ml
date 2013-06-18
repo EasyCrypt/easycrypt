@@ -198,6 +198,12 @@ let eqs_equal es1 es2 =
   && EcMemory.me_equal es1.es_ml es2.es_ml
   && EcMemory.me_equal es1.es_mr es2.es_mr 
 
+let gty_fv = function
+  | GTty ty -> ty.ty_fv
+  | GTmodty(_,r) ->
+    EcPath.Sm.fold (fun mp fv -> EcPath.m_fv fv mp) r EcIdent.Mid.empty
+  | GTmem mt -> EcMemory.mt_fv mt
+
 (* -------------------------------------------------------------------- *)
 module Hsform = Why3.Hashcons.Make (struct
   type t = form
@@ -332,7 +338,9 @@ module Hsform = Why3.Hashcons.Make (struct
   let fv_mlr = Sid.add mleft (Sid.singleton mright)
 
   let fv_node = function
-    | Fint _  | Fop _ -> Mid.empty
+    | Fint _  -> Mid.empty
+    | Fop (_, tys) -> 
+      List.fold_left (fun s a -> fv_union s a.ty_fv) Mid.empty tys
     | Fpvar (pv,m) ->
       let fv = fv_add m Mid.empty in
       EcPath.x_fv fv pv.pv_name
@@ -341,7 +349,8 @@ module Hsform = Why3.Hashcons.Make (struct
       EcPath.m_fv fv mp
     | Flocal id -> fv_singleton id 
     | Fquant(_,b,f) -> 
-        List.fold_left (fun s (id,_) -> Mid.remove id s) (f_fv f) b 
+      let do1 fv (id,ty) = fv_union (gty_fv ty) (Mid.remove id fv) in
+      List.fold_left do1 (f_fv f) b 
     | Fif(f1,f2,f3) -> 
         fv_union (f_fv f1) (fv_union (f_fv f2) (f_fv f3))
     | Flet(lp, f1, f2) ->
@@ -382,8 +391,9 @@ module Hsform = Why3.Hashcons.Make (struct
         List.fold_left (fun s f -> fv_union s (f_fv f))
           (fv_add m fv) args
   
-  let tag n f = { f with f_tag = n;
-                  f_fv = fv_node f.f_node }
+  let tag n f = 
+    let fv = fv_union (fv_node f.f_node) f.f_ty.ty_fv in
+    { f with f_tag = n;f_fv = fv }
 end)
 
 (* -------------------------------------------------------------------- *)

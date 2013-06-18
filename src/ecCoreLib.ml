@@ -6,7 +6,7 @@ let s_cons = "::"
 let s_abs  = "__abs"
 
 (* -------------------------------------------------------------------- *)
-let s_dbool      = (["<top>"; "Bool"; "Dbool"     ], "dbool")
+let s_dbool      = (["<top>"; "Bool" ; "Dbool"     ], "dbool")
 let s_dbitstring = (["<top>"; "Distr"; "Dbitstring"], "dbitstring")
 let s_dinter     = (["<top>"; "Distr"; "Dinter"    ], "dinter")
 let s_from_int   = (["<top>"; "Real" ; "FromInt"   ], "from_int")
@@ -46,9 +46,8 @@ let id_in_supp   = "in_supp"
 let id_mu        = "mu"
 let id_mu_x      = "mu_x"
 
-
-let p_top        = EcPath.psymbol id_top
-let p_Pervasive  = EcPath.pqname p_top id_Pervasive
+let p_top         = EcPath.psymbol id_top
+let p_Pervasive   = EcPath.pqname p_top id_Pervasive
 let _Pervasive id = EcPath.pqname p_Pervasive id
 
 let p_unit       = _Pervasive id_unit

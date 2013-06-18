@@ -1,35 +1,20 @@
 % !TeX root = easycrypt.tex
 \chapter{Writing Proofs}
-
-\section{Ambient Logic (Guillaume)}
-
 %% TODO (Francois): For index, rather than \texttt, use \rawec and make a class of keywords for tactics and tacticals
 
-\subsection{The \texttt{case} tactic}
-\index{ambient}{case@\texttt{case}}
-%
-
-\subsection{The \texttt{unfold} tactic}
-\index{ambient}{unfold@\texttt{unfold}}
-%
-
-\subsection{The \texttt{simplify} tactic}
-\index{ambient}{simplify@\texttt{simplify}}
-%
-
-\subsection{The \texttt{trivial} tactic}
-\index{ambient}{trivial@\texttt{trivial}}
-%
+\section{Ambient Logic (Guillaume)}
+  \ambientDesc%prints the description of all tactics see ambient.tex
+  %to modify them
 
 \section{Program Logics (C\'esar)}
 
-\subsection{Reasoning about random samplings: the \texttt{rnd} tactic}
+\subsection{Reasoning about random samplings: the \rawec{rnd} tactic}
 %
 \subsubsection{Hoare Logic}
-\index{hoare}{Program Reasoning!rnd@\texttt{rnd}}
+\index{hoare}{Program Reasoning!rnd@\rawec{rnd}}
 
 \subsubsection{Probabilistic Hoare Logic}
-\index{phl}{Program Reasoning!rnd@\texttt{rnd}}
+\index{phl}{Program Reasoning!rnd@\rawec{rnd}}
 \Syntax 
 \verb+rnd+ (\textit{formula} $|$ \_ ) (\textit{formula} $|$ \_ )
 
@@ -74,15 +59,15 @@ representing a bound:
 If $g$ is not given then $g=f$ in the rule.
 
 \subsubsection{Relational Hoare Logic}
-\index{prhl}{Program Reasoning!rnd@\texttt{rnd}}
+\index{prhl}{Program Reasoning!rnd@\rawec{rnd}}
 
-\subsection{Reasoning about sequential composition: the \texttt{seq} tactic}
+\subsection{Reasoning about sequential composition: the \rawec{seq} tactic}
 %
 \subsubsection{Hoare Logic}
-\index{hoare}{Program Reasoning!seq@\texttt{seq}}
+\index{hoare}{Program Reasoning!seq@\rawec{seq}}
 
 \subsubsection{Probabilistic Hoare Logic}
-\index{phl}{Program Reasoning!seq@\texttt{seq}}
+\index{phl}{Program Reasoning!seq@\rawec{seq}}
 \Syntax 
 \verb+app+ \verb+[>>|<<]+ \textit{num} \textit{formula} (
 [\textit{formula} \verb+|+ \textit{formula} \textit{formula}
@@ -153,13 +138,13 @@ Similar rules hold for $=$. If the parameter $g$ is not given then
 $g=f$ in the rule. 
 
 \subsubsection{Relational Hoare Logic}
-\index{prhl}{Program Reasoning!seq@\texttt{seq}}
+\index{prhl}{Program Reasoning!seq@\rawec{seq}}
 
-\subsection{Reasoning about conditionals: the \texttt{if} tactic}
+\subsection{Reasoning about conditionals: the \rawec{if} tactic}
 %
 \subsubsection{Hoare and Probabilistic Hoare Logic}
-\index{hoare}{Program Reasoning!if@\texttt{if}}
-\index{phl}{Program Reasoning!if@\texttt{if}}
+\index{hoare}{Program Reasoning!if@\rawec{if}}
+\index{phl}{Program Reasoning!if@\rawec{if}}
 (similar to probabilistic Hoare \verb+if+ tactic)
 \begin{displaymath}
 \begin{array}{c}
@@ -175,15 +160,15 @@ $g=f$ in the rule.
 Similar rules hold for $=,\geq$.
 
 \subsubsection{Relational Hoare Logic}
-\index{prhl}{Program Reasoning!if@\texttt{if}}
+\index{prhl}{Program Reasoning!if@\rawec{if}}
 
-\subsection{Computing weakest preconditions: the \texttt{wp} tactic}
+\subsection{Computing weakest preconditions: the \rawec{wp} tactic}
 %
 \subsubsection{Hoare Logic}
-\index{hoare}{Program Reasoning!wp@\texttt{wp}}
+\index{hoare}{Program Reasoning!wp@\rawec{wp}}
 
 \subsubsection{Probabilistic Hoare Logic}
-\index{phl}{Program Reasoning!wp@\texttt{wp}}
+\index{phl}{Program Reasoning!wp@\rawec{wp}}
 \Syntax \verb+wp+
 
 \Description
@@ -200,21 +185,21 @@ composition rule, we have:
 Similar rules hold for $=,\geq$.
 
 \subsubsection{Relational Hoare Logic}
-\index{prhl}{Program Reasoning!wp@\texttt{wp}}
+\index{prhl}{Program Reasoning!wp@\rawec{wp}}
 
-\subsection{Concluding proofs of programs: the \texttt{skip} tactic}
-\index{hoare}{Program Reasoning!skip@\texttt{skip}}
-\index{phl}{Program Reasoning!skip@\texttt{skip}}
-\index{prhl}{Program Reasoning!skip@\texttt{skip}}
+\subsection{Concluding proofs of programs: the \rawec{skip} tactic}
+\index{hoare}{Program Reasoning!skip@\rawec{skip}}
+\index{phl}{Program Reasoning!skip@\rawec{skip}}
+\index{prhl}{Program Reasoning!skip@\rawec{skip}}
 %
 
-\subsection{Simplifying conditionals: the \texttt{condt,condf} tactic}
+\subsection{Simplifying conditionals: the \rawec{condt,condf} tactic}
 %
 \subsubsection{Probabilistic Hoare Logic}
-\index{tactics}{probabilistic Hoare logic!condt@\texttt{condt}}
-\index{tactics}{probabilistic Hoare logic!condf@\texttt{condf}}
+\index{tactics}{probabilistic Hoare logic!condt@\rawec{condt}}
+\index{tactics}{probabilistic Hoare logic!condf@\rawec{condf}}
 
-\subsection{Reasoning about abstract adversaries: the \texttt{fun} tactic}
+\subsection{Reasoning about abstract adversaries: the \rawec{fun} tactic}
 
 \subsubsection{Relational Hoare Logic}
 
@@ -275,7 +260,7 @@ adversaries $A$ and $B$, ...
 } [\verb+fun+~\chi]
 \end{displaymath}
 
-\subsection{Weakening judgements: The \texttt{conseq} rule}
+\subsection{Weakening judgements: The \rawec{conseq} rule}
 
 \Syntax \verb+conseq+ \textit{formula} \textit{formula}
 \subsubsection{Hoare Logic}
@@ -326,10 +311,10 @@ adversaries $A$ and $B$, ...
 \end{displaymath}
 
 
-\subsection{Reasoning about function calls: the \texttt{call} tactic}
+\subsection{Reasoning about function calls: the \rawec{call} tactic}
 %
 \subsubsection{Hoare Logic}
-\index{hoare}{Program Reasoning!call@\texttt{call}}
+\index{hoare}{Program Reasoning!call@\rawec{call}}
 \Syntax \verb+call+ formula formula
 \Description
 
@@ -355,7 +340,7 @@ variables modifiable by $f$.
 
 
 \subsubsection{Probabilistic Hoare Logic}
-\index{phl}{probabilistic Hoare logic!call@\texttt{call}}
+\index{phl}{probabilistic Hoare logic!call@\rawec{call}}
 
 \Syntax \verb+call+ formula formula [formula]
 
@@ -416,7 +401,7 @@ then $\delta'=1$.
 
 \warningbox{New tactics, needs structuring.}
 
-\subsection{: the \texttt{hoare,hoare\_bd,pr\_bounded,bd\_eq}}
+\subsection{: the \rawec{hoare,hoare\_bd,pr\_bounded,bd\_eq}}
 
 \subsubsection{Possibilistic and probabilistic Hoare Logic}
 \Syntax \verb+hoare+, \verb+hoare_bd+
@@ -482,7 +467,7 @@ discharges goals by applying trivial probability properties:
 \end{displaymath}
 
 
-\subsection{\texttt{Denot} tactics}
+\subsection{\rawec{Denot} tactics}
 %
 \subsubsection{Probabilistic Hoare Logic}
 
@@ -550,8 +535,8 @@ discharges goals by applying trivial probability properties:
 \end{displaymath}
 
 
-\subsection{Some \textsf{Pr} tactics: \texttt{pr\_false},
-  \texttt{pr\_or}}
+\subsection{Some \textsf{Pr} tactics: \rawec{pr\_false},
+  \rawec{pr\_or}}
 
 \begin{displaymath}
 \infrule{
@@ -571,10 +556,10 @@ discharges goals by applying trivial probability properties:
 \end{displaymath}
 
 
-\subsection{The \texttt{inline} tactic}
+\subsection{The \rawec{inline} tactic}
 %
 
-\subsection{The \texttt{swap} tactic}
+\subsection{The \rawec{swap} tactic}
 %
 \Syntax \verb+swap+ [\textit{side}] \textit{swap\_pos}
 
@@ -610,10 +595,10 @@ backwards, and [\verb+swap+ $[i_1:i_2]$ $k$] moves the instructions
 between positions $i_1$ and $i_2$.
 
 
-\subsection{Reasoning about loops: the \texttt{while} tactic}
+\subsection{Reasoning about loops: the \rawec{while} tactic}
 %
 \subsubsection{Probabilistic Hoare Logic}
-\index{phl}{Program Reasoning!while@\texttt{while}}
+\index{phl}{Program Reasoning!while@\rawec{while}}
 
 \Syntax \verb+while+ \textit{formula} \textit{formula} 
 [\textit{formula} \textit{formula}]

@@ -4,7 +4,10 @@ import why3 "bool" "Bool"
 lemma xorb_spec : forall b1 b2, b1 ^^ b2 <=> b1 = !b2
 by [].
 
-op xorb (b1 b2:bool) : bool = b1 ^^ b2.
+op xorb : bool -> bool -> bool = (^^).
+
+lemma xorb_associative : forall b1 b2 b3, (b1 ^^ b2) ^^ b3 = b1 ^^ (b2 ^^ b3)
+by [].
 
 require import Real. 
 require import Distr.
@@ -20,16 +23,16 @@ theory Dbool.
   lemma supp_def : forall (b:bool), in_supp b dbool.
   proof.
     intros b; delta in_supp mu_x beta.
-    rewrite (mu_def (cPeq b)).
-    delta; simplify; trivial.
+    rewrite (mu_def ((=) b)).
+    delta; simplify; smt.
   qed.
   
   lemma mu_x_def : forall (b:bool), mu_x dbool b = 1%r / 2%r.
   proof.
     intros b.
     delta mu_x; simplify.
-    rewrite (mu_def (cPeq b)).
-    delta; simplify; trivial.
+    rewrite (mu_def ((=) b)).
+    delta; simplify; smt.
   qed.
 
   lemma lossless : weight dbool = 1%r by [].

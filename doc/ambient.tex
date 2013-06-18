@@ -1,0 +1,43 @@
+% !TeX root = easycrypt.tex
+
+%TODO:
+%mot clef : ident typeinstance
+
+\newcommand{\ambientKeywords}{}
+\newcommand{\ambientDesc}{}
+
+\newcommand{\addAmbient}[3]{
+
+  \expandafter\def\expandafter\ambientKeywords\expandafter{\ambientKeywords,#1}
+
+  \expandafter\def\expandafter\ambientDesc\expandafter{\ambientDesc
+    \index{ambient}{#1@\rawec{#1}}
+    \Syntax \rawec{#1} #2
+    \Description #3
+  }
+}
+
+\addAmbient{idtac}{}{TODO}
+\addAmbient{intros}{}{TODO}
+\addAmbient{split}{}{TODO}
+\addAmbient{left}{}{TODO}
+\addAmbient{right}{}{TODO}
+\addAmbient{elim}{}{TODO}
+\addAmbient{apply}{}{TODO}
+\addAmbient{progress}{}{TODO}
+\addAmbient{cut}{}{TODO}
+\addAmbient{generalize}{}{TODO}
+\addAmbient{clear}{}{TODO}
+\addAmbient{simplify}{}{TODO}
+\addAmbient{delta}{}{TODO}
+\addAmbient{zeta}{}{TODO}
+\addAmbient{beta}{}{TODO}
+\addAmbient{iota}{}{TODO}
+\addAmbient{logic}{}{TODO}
+\addAmbient{change}{}{TODO}
+\addAmbient{elimT}{}{TODO}
+\addAmbient{case}{}{TODO}
+\addAmbient{rewrite}{}{TODO}
+\addAmbient{subst}{}{TODO}
+\addAmbient{field}{}{TODO}
+\addAmbient{fieldsimplify}{}{TODO}

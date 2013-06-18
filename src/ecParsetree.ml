@@ -31,11 +31,11 @@ type pmsymbol = (psymbol * ((pmsymbol located) list) option) list
 (* -------------------------------------------------------------------- *)
 type pty_r =
   | PTunivar
-  | PTtuple     of pty list
-  | PTnamed     of pqsymbol
-  | PTvar       of psymbol
-  | PTapp       of pqsymbol * pty list
-  | PTfun       of pty * pty
+  | PTtuple  of pty list
+  | PTnamed  of pqsymbol
+  | PTvar    of psymbol
+  | PTapp    of pqsymbol * pty list
+  | PTfun    of pty * pty
 and pty = pty_r located
 
 type ptyannot_r = 
@@ -52,13 +52,13 @@ type ptybinding  = psymbol list * pty
 and  ptybindings = ptybinding list
 
 and pexpr_r =
-  | PEint      of int                               (* int. literal       *)
-  | PEident    of pqsymbol * ptyannot option        (* symbol             *)
-  | PEapp      of pexpr * pexpr list                (* op. application    *)
-  | PElet      of plpattern * pexpr * pexpr         (* let binding        *)
-  | PEtuple    of pexpr list                        (* tuple constructor  *)
-  | PEif       of pexpr * pexpr * pexpr             (* _ ? _ : _          *)
-  | PElambda   of ptybindings * pexpr               (* lambda abstraction *)
+  | PEint    of int                               (* int. literal       *)
+  | PEident  of pqsymbol * ptyannot option        (* symbol             *)
+  | PEapp    of pexpr * pexpr list                (* op. application    *)
+  | PElet    of plpattern * pexpr * pexpr         (* let binding        *)
+  | PEtuple  of pexpr list                        (* tuple constructor  *)
+  | PEif     of pexpr * pexpr * pexpr             (* _ ? _ : _          *)
+  | PElambda of ptybindings * pexpr               (* lambda abstraction *)
 
 and pexpr = pexpr_r located
 
@@ -131,9 +131,15 @@ and pstructure_item =
   | Pst_alias of (psymbol * pqsymbol)
 
 and pfunction_body = {
-  pfb_locals : (psymbol list * pty * pexpr option) list;
+  pfb_locals : pfunction_local list;
   pfb_body   : pstmt;
   pfb_return : pexpr option;
+}
+
+and pfunction_local = {
+  pfl_names : [`Single|`Tuple] * (psymbol list);
+  pfl_type  : pty   option;
+  pfl_init  : pexpr option;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -172,6 +178,8 @@ and pformula_r =
   | PFexists of pgtybindings * pformula
   | PFlambda of ptybindings * pformula
   | PFglob   of pmsymbol located 
+  | PFeqveq  of pqsymbol list
+  | PFlsless of pgamepath
 
   (* for claims *)
   | PFhoareS   of pformula * pfunction_body * pformula
@@ -320,16 +328,24 @@ and pinline_arg =
   [ `ByName    of tac_side * (pgamepath list * int list option)
   | `ByPattern of pipattern ]
 
+type intropattern1 =
+  | IPCore of (symbol option) located
+  | IPCase of intropattern list
+  | IPDone
+
+and intropattern = intropattern1 list
+
 type logtactic =
   | Passumption of (pqsymbol option * ptyannot option)
-  | Ptrivial    of pprover_infos
-  | Pintro      of (symbol option) located list
+  | Psmt        of pprover_infos
+  | Pintro      of intropattern
   | Psplit                        
   | Pfield		of (pformula * pformula * pformula * pformula * pformula * pformula * pformula)
   | Pfieldsimp	of (pformula * pformula * pformula * pformula * pformula * pformula * pformula)
   | Pexists     of fpattern_arg located list 
   | Pleft                         
   | Pright                        
+  | Ptrivial
   | Pelim       of ffpattern 
   | Papply      of ffpattern
   | Pcut        of (psymbol * pformula)
@@ -341,25 +357,32 @@ type logtactic =
   | Pchange     of pformula
   | PelimT      of (pformula * pqsymbol)
 
-type ptactic = ptactic_r located
-
-and ptactic_r = 
+type ptactic_core_r =
   | Pidtac      of string option
-  | Pdo         of bool * int option * ptactic
-  | Ptry        of ptactic 
-  | Psubgoal    of ptactics
+  | Pdo         of bool * int option * ptactic_core
+  | Ptry        of ptactic_core
+  | Pby         of ptactic list
   | Pseq        of ptactic list
   | Pcase       of pformula 
   | Plogic      of logtactic
   | PPhl        of phltactic
-  | Pprogress   of ptactic option
+  | Pprogress   of ptactic_core option
+  | Psubgoal    of ptactic_chain
   | Padmit
   | Pdebug
 
-and ptactics =
+and ptactic_core = ptactic_core_r located
+
+and ptactic = {
+  pt_core   : ptactic_core;
+  pt_intros : intropattern;
+}
+
+and ptactic_chain =
   | Psubtacs of ptactic list
-  | Pfirst   of ptactic
-  | Plast    of ptactic
+  | Pfirst   of ptactic * int
+  | Plast    of ptactic * int
+  | Protate  of [`Left | `Right] * int
 
 (* -------------------------------------------------------------------- *)
 type paxiom_kind = PAxiom | PLemma of ptactic option | PILemma
@@ -430,7 +453,7 @@ type w3_renaming =
 type theory_cloning = {
   pthc_base : pqsymbol;
   pthc_name : psymbol option;
-  pthc_ext  : (psymbol * theory_override) list;
+  pthc_ext  : (pqsymbol * theory_override) list;
 }
 
 and theory_override =
@@ -466,12 +489,12 @@ type global =
   | Gprint       of pprint
   | GthOpen      of psymbol
   | GthClose     of psymbol
-  | GthRequire   of (psymbol * bool option) (* true = export, false = import *)
+  | GthRequire   of (psymbol * [`Import|`Export] option)
   | GthImport    of pqsymbol
   | GthExport    of pqsymbol
-  | GthClone     of theory_cloning
+  | GthClone     of (theory_cloning * [`Import|`Export] option)
   | GthW3        of (string list * string * w3_renaming list)
-  | Gtactics     of [`Proof | `Actual of ptactic list]
+  | Gtactics     of [`Proof of bool | `Actual of ptactic list]
   | Gprover_info of pprover_infos
   | Gcheckproof  of bool
   | Gsave        of EcLocation.t

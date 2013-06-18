@@ -17,8 +17,6 @@
 }
 
 
-
-
 % \newcounter{todos}\setcounter{todos}{1}
 % \newcommand{\TODO}[1]{%
 %   \textsf{\textcolor{red}{$^{[\thetodos]}$}}%
@@ -80,6 +78,7 @@
 \newcommand{\CIL}{\textsf{CIL}\xspace}
 \newcommand{\pWHILE}{\textsf{p}\textsc{While}\xspace}
 \newcommand{\Why}{\textsf{Why}\xspace}
+\newcommand{\WhyThree}{\textsf{Why3}\xspace}
 \newcommand{\altergo}{\textsf{alt-ergo}\xspace}
 \newcommand{\simplify}{\textsf{Simplify}\xspace}
 
@@ -225,6 +224,7 @@
 \newcommand{\LH}{\gl{L}_H}
 \newcommand{\LD}{\gl{L}_\Dec}
 \newcommand{\cdef}{\gl{\gamma_\mathsf{def}}}
+\newcommand{\var}[1]{\ensuremath{\mathit{#1}} \xspace}
 
 %% Constants and operators
 % TODO: Update!
@@ -273,6 +273,9 @@
 \newcommand{\rawec}[2][]{\lstinline[language=easycrypt,#1]{#2}}
 \newcommand{\ec}[2][]{\lstinline[language=easycrypt,style=easycrypt-pretty,#1]{#2}}
 
+\newcommand{\ecimport}[4][]{\lstinputlisting[language=easycrypt,linerange=#4,caption=#2,#1]{#3}}
+
+\def\createEasycrypt#1\relax{
 \lstdefinelanguage{easycrypt}{
   style=easycrypt-default,
 %  procnamekeys={op,pred,fun},
@@ -284,10 +287,15 @@
   morekeywords=[4]{while,if},
   morekeywords=[5]{theory,end},
   morekeywords=[6]{forall,exists,lambda},
+  morekeywords=[7]{#1},
 %  moredirectives={prover,print}, % Incomplete
   morecomment=[n][\itshape]{(*}{*)},
   morecomment=[n][\bfseries]{(**}{*)}
 }
+}
+
+\input{ambient}
+\expandafter\createEasycrypt \ambientKeywords \relax
 
 \lstdefinestyle{easycrypt-default}{
   columns=fullflexible,
@@ -295,6 +303,10 @@
   frame=tb,
   xleftmargin=.1\textwidth,
   xrightmargin=.1\textwidth,
+  rangebeginprefix={(**\ begin\ },
+  rangeendprefix={(**\ end\ },
+  rangesuffix={\ *)},
+  includerangemarker=false,
   basicstyle=\small\sffamily,
   identifierstyle={},
   keywordstyle=[1]{\itshape\color{OliveGreen}},
@@ -302,15 +314,16 @@
   keywordstyle=[3]{\bfseries},
   keywordstyle=[4]{\bfseries},
   keywordstyle=[5]{\bfseries\color{OliveGreen}},
-  keywordstyle=[6]{\itshape\color{Blue}}
+  keywordstyle=[6]{\itshape\color{Blue}},
+  keywordstyle=[7]{\itshape\color{Red}}
 }
 
 \lstdefinestyle{easycrypt-pretty}{
     basicstyle=\small\sffamily,
     literate={:=}{{$\mathrel{\gets}$}}1
-              {<=}{{$\binop{\leq}$}}1
-              {>=}{{$\geq$}}1
-              {<>}{{$\neq$}}1
+              {<=}{{$\mathrel{\leq}$}}1
+              {>=}{{$\mathrel{\geq}$}}1
+              {<>}{{$\mathrel{\neq}$}}1
               {=\$}{{$\stackrel{\$}{\gets}$}}1
               {forall}{{$\forall$}}1
               {exists}{{$\exists$}}1
@@ -323,6 +336,7 @@
               {'a}{{$\alpha\,$}}1
               {'b}{{$\beta\,$}}1
               {'c}{{$\gamma\,$}}1
+              {'t}{{$\tau\,$}}1
               {'x}{{$\chi\,$}}1
               {lambda}{{$\lambda\,$}}1
 }

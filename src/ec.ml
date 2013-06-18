@@ -10,10 +10,14 @@ let _ =
   options := EcOptions.parse ();
 
   (* Initialize why3 engine *)
-  EcProvers.initialize !options.o_why3;
-
-  (* Initialize the proof mode *)
-  EcCommands.full_check !options.o_full_check !options.o_max_prover !options.o_provers;
+  begin
+    try  EcProvers.initialize !options.o_why3
+    with e ->
+      Format.eprintf
+        "cannot initialize Why3 engine: %a@."
+        EcPException.exn_printer e;
+      exit 1
+  end;
 
   (* Initialize load path *)
   begin
@@ -35,7 +39,8 @@ let _ =
             List.fold_left Filename.concat mydir
               [Filename.parent_dir_name; "lib"; "easycrypt"; "theories"]
     in
-      EcCommands.addidir theories
+      EcCommands.addidir ~system:true (Filename.concat theories "prelude");
+      EcCommands.addidir ~system:true theories
   end;
 
   List.iter EcCommands.addidir !options.o_idirs;
@@ -44,6 +49,12 @@ let _ =
       EcCommands.addidir (Filename.dirname input));
   if !options.o_emacs then
     EcCommands.addidir Filename.current_dir_name;
+
+  (* Force loading of prelude here *)
+  ignore (EcCommands.current () : EcScope.scope);
+
+  (* Initialize the proof mode *)
+  EcCommands.full_check !options.o_full_check !options.o_max_prover !options.o_provers;
 
   (* Initialize I/O + interaction module *)
   let terminal =

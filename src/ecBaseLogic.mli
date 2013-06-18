@@ -29,44 +29,6 @@ type hyps = {
 }
 
 (* -------------------------------------------------------------------- *)
-module LDecl : sig
-  type error = 
-    | UnknownSymbol   of EcSymbols.symbol 
-    | UnknownIdent    of EcIdent.t
-    | NotAVariable    of EcIdent.t
-    | NotAHypothesis  of EcIdent.t
-    | CanNotClear     of EcIdent.t * EcIdent.t
-    | DuplicateIdent  of EcIdent.t
-    | DuplicateSymbol of EcSymbols.symbol
-
-  exception Ldecl_error of error
-
-  val add_local : EcIdent.t -> local_kind -> hyps -> hyps
-
-  val lookup : symbol -> hyps -> l_local
-
-  val reducible_var : EcIdent.t -> hyps -> bool
-  val reduce_var    : EcIdent.t -> hyps -> form
-  val lookup_var    : symbol -> hyps -> EcIdent.t * ty
-
-  val lookup_by_id     : EcIdent.t -> hyps -> local_kind
-  val lookup_hyp_by_id : EcIdent.t -> hyps -> form
-
-  val has_hyp : symbol -> hyps -> bool
-  val lookup_hyp : symbol -> hyps -> EcIdent.t * form
-  val get_hyp : EcIdent.t * local_kind -> EcIdent.t * form
-
-  val has_symbol : symbol -> hyps -> bool
-
-  val fresh_id  : hyps -> symbol -> EcIdent.t
-  val fresh_ids : hyps -> symbol list -> EcIdent.t list
-
-  val clear : EcIdent.Sid.t -> hyps -> hyps
-
-  val ld_subst : EcFol.f_subst -> local_kind -> local_kind
-end
-
-(* -------------------------------------------------------------------- *)
 type tac_pos = int EcParsetree.doption
 
 type i_pat =
@@ -132,69 +94,37 @@ type rule_name =
 
   | RN_bhl_rnd of (EcFol.form option * EcFol.form)
 
-and rule_arg = 
+type 'a rule_arg = 
   | RA_form of EcFol.form             (* formula             *)
   | RA_id   of EcIdent.t              (* local ident         *)
   | RA_mp   of EcPath.mpath           (* module              *)
-  | RA_node of int                    (* sub-derivation      *)
+  | RA_node of 'a                     (* sub-derivation      *)
 
-type rule = {
+type 'a rule = {
     pr_name : rule_name;
-    pr_hyps : rule_arg list
+    pr_hyps : 'a rule_arg list
   }
 
 type l_decl = hyps * form
 
-type pre_judgment = {
-    pj_decl : l_decl;
-    pj_rule : (bool * rule) option;
-  }
-
-type judgment_uc = {
-    juc_count  : int;
-    juc_map    : pre_judgment Mint.t;
-  }
-
-type judgment = judgment_uc
+type judgment = {
+  j_decl : l_decl;
+  j_rule : judgment rule
+}
 
 (* -------------------------------------------------------------------- *)
-type goals = judgment_uc * int list
-type goal  = judgment_uc * int 
+type tac_error =
+  | UnknownAx             of EcPath.path
+  | NotAHypothesis        of EcIdent.t
+  | TooManyArgument
+  | InvalNumOfTactic      of int * int
+  | NotPhl                of bool option
+  | NoSkipStmt
+  | InvalidCodePosition   of string*int*int*int
+  | InvalidName           of string
+  | User                  of string
 
-val get_goal      : goal -> pre_judgment
-val get_open_goal : goal -> pre_judgment
+exception TacError of bool * tac_error
 
-val get_first_goal : judgment_uc -> goal
-
-val new_goal : judgment_uc -> l_decl -> goal
-
-val upd_rule : rule -> goal -> goals
-val upd_rule_done : rule -> goal -> goals
-
-val upd_done : judgment_uc -> judgment_uc
-
-val open_juc  : l_decl -> judgment_uc
-val close_juc : judgment_uc -> judgment_uc
-
-val find_all_goals : judgment_uc -> goals
-
-(* -------------------------------------------------------------------- *)
-type tactic = goal -> goals
-
-val t_id : string option -> tactic
-
-val t_on_first : tactic -> goals -> goals
-val t_on_last  : tactic -> goals -> goals
-
-val t_subgoal  : tactic list -> goals -> goals
-val t_on_goals : tactic -> goals -> goals
-
-val t_seq_subgoal : tactic -> tactic list -> tactic
-
-val t_seq  : tactic -> tactic -> tactic
-val t_lseq : tactic list -> tactic
-
-val t_repeat : tactic -> tactic
-val t_do     : bool -> int option -> tactic -> tactic
-val t_try    : tactic -> tactic
-val t_or     : tactic -> tactic -> tactic
+val tacerror  : ?catchable:bool -> tac_error -> 'a
+val tacuerror : ?catchable:bool -> ('a, Format.formatter, unit, 'b) format4 -> 'a

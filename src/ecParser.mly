@@ -109,6 +109,8 @@
   let mk_fpattern kind args =
     { fp_kind = kind;
       fp_args = args; }
+
+  let mk_core_tactic t = { pt_core = t; pt_intros = []; }
 %}
 
 %token <EcSymbols.symbol> LIDENT
@@ -207,6 +209,7 @@
 %token LET
 %token LOGIC
 %token LONGARROW
+%token LOSSLESS
 %token LPAREN
 %token MINUS
 %token MODPATH
@@ -248,10 +251,13 @@
 %token SEQ
 %token SIMPLIFY
 %token SKIP
+%token SLASHSLASH
 %token SPLIT
 %token SPLITWHILE
+%token STRICT
 %token FIELD
 %token FIELDSIMP
+%token SMT
 %token STAR
 %token SUBST
 %token SWAP
@@ -293,6 +299,8 @@
 %right ARROW
 %left OP3 STAR
 %left OP4 
+
+%right SEMICOLON
 
 %nonassoc prec_prefix_op
 
@@ -359,7 +367,7 @@ uqident:
 | x=loc(_oident) { x }
 ;
 
-qident_pbinop:
+qoident:
 | x=oident
     { pqsymb_of_psymb x }
 
@@ -452,7 +460,7 @@ sexpr_u:
 | n=number
    { PEint n }
 
-| x=qident_pbinop ti=tvars_app?
+| x=qoident ti=tvars_app?
    { PEident (x, ti) }
 
 | se=sexpr op=loc(FROM_INT)
@@ -588,6 +596,11 @@ ptybindings:
 %inline sform: x=loc(sform_u) { x }
 %inline  form: x=loc( form_u) { x }
 
+qident_or_res:
+| x=qident   { x }
+| x=loc(RES) { mk_loc x.pl_loc ([], "res") }
+;
+
 sform_u:
 | n=number
    { PFint n }
@@ -595,8 +608,8 @@ sform_u:
 | x=loc(RES)
    { PFident (mk_loc x.pl_loc ([], "res"), None) }
 
-| x=qident_pbinop ti=tvars_app?
-   { PFident (x,ti) }
+| x=qoident ti=tvars_app?
+   { PFident (x, ti) }
 
 | se=sform op=loc(FROM_INT)
    { let id = PFident(mk_loc op.pl_loc EcCoreLib.s_from_int, None) in
@@ -714,10 +727,13 @@ form_u:
     { pfapp_symb op.pl_loc "*" ti [e1; e2] }
 
 | c=form QUESTION e1=form COLON e2=form %prec OP2
-   { PFif (c, e1, e2) }
+    { PFif (c, e1, e2) }
+
+| EQ LBRACE xs=plist1(qident_or_res, COMMA) RBRACE
+    { PFeqveq xs }
 
 | IF c=form THEN e1=form ELSE e2=form
-   { PFif (c, e1, e2) }
+    { PFif (c, e1, e2) }
 
 | LET p=lpattern EQ e1=form IN e2=form { PFlet (p, e1, e2) }
 
@@ -732,16 +748,16 @@ form_u:
 
 | BDHOARE 
     LBRACKET mp=loc(fident) COLON pre=form LONGARROW post=form  RBRACKET
-    cmp = hoare_bd_cmp
-    bd=sform
+      cmp=hoare_bd_cmp bd=sform
 	{ PFBDhoareF (pre, mp, post, cmp, bd) }
 
 | BDHOARE 
-    LBRACKET s=fun_def_body COLON pre=form LONGARROW post=form  RBRACKET
-    cmp = hoare_bd_cmp
-    bd=sform
+    LBRACKET s=fun_def_body COLON pre=form LONGARROW post=form RBRACKET
+      cmp=hoare_bd_cmp bd=sform
 	{ PFBDhoareS (pre, s, post, cmp, bd) }
 
+| LOSSLESS mp=loc(fident)
+    { PFlsless mp }
 ;
 
 hoare_bd_cmp :
@@ -880,12 +896,25 @@ var_decl:
    { (xs, ty) }
 ;
 
-loc_decl:
-| VAR xs=plist1(ident, COMMA) COLON ty=loc(type_exp) SEMICOLON
-     { (xs, ty, None  ) }
+loc_decl_names:
+| x=plist1(lident, COMMA) { (`Single, x) }
 
-| VAR xs=plist1(ident, COMMA) COLON ty=loc(type_exp) EQ e=expr SEMICOLON
-     { (xs, ty, Some e) }
+| LPAREN x=plist2(lident, COMMA) RPAREN { (`Tuple, x) }
+;
+
+loc_decl_r:
+| VAR x=loc_decl_names COLON ty=loc(type_exp)
+    { { pfl_names = x; pfl_type = Some ty; pfl_init = None; } }
+
+| VAR x=loc_decl_names COLON ty=loc(type_exp) EQ e=expr
+    { { pfl_names = x; pfl_type = Some ty; pfl_init = Some e; } }
+
+| VAR x=loc_decl_names EQ e=expr
+    { { pfl_names = x; pfl_type = None; pfl_init = Some e; } }
+;
+
+loc_decl:
+| x=loc_decl_r SEMICOLON { x }
 ;
 
 ret_stmt:
@@ -1090,11 +1119,6 @@ op_tydom:
    { tys  }
 ;
 
-op_ident:
-| x=ident       { x }
-| x=loc(PBINOP) { x }
-;
-
 tyvars_decl:
 | LBRACKET tyvars=tident* RBRACKET { Some tyvars }
 | empty { None }
@@ -1106,35 +1130,35 @@ tyvars_decl:
 ;
 
 operator:
-| k=op_or_const x=op_ident tyvars=tyvars_decl COLON sty=loc(type_exp) {
+| k=op_or_const x=oident tyvars=tyvars_decl COLON sty=loc(type_exp) {
     { po_kind   = k;
       po_name   = x;
       po_tyvars = tyvars;
       po_def    = POabstr sty; }
   }
 
-| k=op_or_const x=op_ident tyvars=tyvars_decl COLON sty=loc(type_exp) EQ b=expr {
+| k=op_or_const x=oident tyvars=tyvars_decl COLON sty=loc(type_exp) EQ b=expr {
     { po_kind   = k;
       po_name   = x;
       po_tyvars = tyvars;
       po_def    = POconcr ([], sty, b); }
   }
 
-| k=op_or_const x=op_ident tyvars=tyvars_decl eq=loc(EQ) b=expr {
+| k=op_or_const x=oident tyvars=tyvars_decl eq=loc(EQ) b=expr {
     { po_kind   = k;
       po_name   = x;
       po_tyvars = tyvars;
       po_def    = POconcr([], mk_loc eq.pl_loc PTunivar, b); }
   }
 
-| k=op_or_const x=op_ident tyvars=tyvars_decl p=ptybindings eq=loc(EQ) b=expr {
+| k=op_or_const x=oident tyvars=tyvars_decl p=ptybindings eq=loc(EQ) b=expr {
     { po_kind   = k;
       po_name   = x;
       po_tyvars = tyvars;
       po_def    = POconcr(p, mk_loc eq.pl_loc PTunivar, b); }
   }
 
-| k=op_or_const x=op_ident tyvars=tyvars_decl p=ptybindings COLON codom=loc(type_exp)
+| k=op_or_const x=oident tyvars=tyvars_decl p=ptybindings COLON codom=loc(type_exp)
     EQ b=expr {
     { po_kind   = k;
       po_name   = x;
@@ -1144,17 +1168,17 @@ operator:
 ;
 
 predicate:
-| PRED x = op_ident
+| PRED x = oident
    { { pp_name = x;
        pp_tyvars = None;
        pp_def = PPabstr []; } }
 
-| PRED x = op_ident tyvars=tyvars_decl COLON sty = op_tydom
+| PRED x = oident tyvars=tyvars_decl COLON sty = op_tydom
    { { pp_name = x;
        pp_tyvars = tyvars;
        pp_def = PPabstr sty; } }
 
-| PRED x = op_ident tyvars=tyvars_decl p=ptybindings EQ f=form
+| PRED x = oident tyvars=tyvars_decl p=ptybindings EQ f=form
    { { pp_name = x;
        pp_tyvars = tyvars;
        pp_def = PPconcr(p,f); } } 
@@ -1198,7 +1222,7 @@ axiom:
 | LEMMA d=lemma_decl
     { mk_axiom d PILemma }
 
-| LEMMA d=lemma_decl BY t=loc(tactic)
+| LEMMA d=lemma_decl BY t=tactic
     { mk_axiom d (PLemma (Some t)) }
 
 | LEMMA d=lemma_decl BY LBRACKET RBRACKET
@@ -1207,7 +1231,7 @@ axiom:
 | EQUIV x=ident pd=pgtybindings? COLON p=loc(equiv_body)
     { mk_axiom (x, None, pd, p) PILemma }
 
-| EQUIV x=ident pd=pgtybindings? COLON p=loc(equiv_body) BY t=loc(tactic)
+| EQUIV x=ident pd=pgtybindings? COLON p=loc(equiv_body) BY t=tactic
     { mk_axiom (x, None, pd, p) (PLemma (Some t)) }
 
 | EQUIV x=ident pd=pgtybindings? COLON p=loc(equiv_body) BY LBRACKET RBRACKET
@@ -1217,13 +1241,16 @@ axiom:
 (* -------------------------------------------------------------------- *)
 (* Theory interactive manipulation                                      *)
 
-theory_open    : THEORY  x=uident  { x }
-theory_close   : END     x=uident  { x }
+theory_open  : THEORY  x=uident  { x }
+theory_close : END     x=uident  { x }
+
+import_flag:
+| IMPORT { `Import }
+| EXPORT { `Export }
+;
 
 theory_require : 
-| REQUIRE x=uident { x, None }
-| REQUIRE IMPORT x=uident { x, Some false }
-| REQUIRE EXPORT x=uident { x, Some true }
+| REQUIRE ip=import_flag? x=uident { (x, ip) }
 ;
 
 theory_import: IMPORT x=uqident { x }
@@ -1284,11 +1311,28 @@ tselect:
 (* -------------------------------------------------------------------- *)
 (* tactic                                                               *)
 
-intro_pattern:
+intro_pattern_1:
 | UNDERSCORE { None }
 | s=LIDENT   { Some s }
 | s=UIDENT   { Some s }
 | s=MIDENT   { Some s }
+;
+
+intro_pattern:
+| x=loc(intro_pattern_1)
+   { IPCore x }
+
+| LBRACKET RBRACKET
+   { IPCase [] }
+
+| LBRACKET ip=intro_pattern+ RBRACKET
+   { IPCase [ip] }
+
+| LBRACKET ip=plist2(intro_pattern*, PIPE) RBRACKET
+   { IPCase ip }
+
+| SLASHSLASH
+   { IPDone }
 ;
 
 fpattern_head(F):
@@ -1315,19 +1359,19 @@ fpattern(F):
 ;
 
 simplify_arg: 
-| DELTA l=qident_pbinop* { `Delta l }
-| ZETA            { `Zeta }
-| IOTA            { `Iota }
-| BETA            { `Beta }
-| LOGIC           { `Logic }
-| MODPATH         { `ModPath }
+| DELTA l=qoident* { `Delta l }
+| ZETA             { `Zeta }
+| IOTA             { `Iota }
+| BETA             { `Beta }
+| LOGIC            { `Logic }
+| MODPATH          { `ModPath }
 ;
 
 simplify:
-| l=simplify_arg+    { l }
-| SIMPLIFY           { simplify_red }
-| SIMPLIFY l=qident_pbinop+ { `Delta l  :: simplify_red  }
-| SIMPLIFY DELTA     { `Delta [] :: simplify_red }
+| l=simplify_arg+     { l }
+| SIMPLIFY            { simplify_red }
+| SIMPLIFY l=qoident+ { `Delta l  :: simplify_red  }
+| SIMPLIFY DELTA      { `Delta [] :: simplify_red }
 ;
 
 rwside:
@@ -1346,7 +1390,6 @@ conseq:
 | f1=form LONGARROW f2=form     { Some f1, Some f2 }
 ;
 
-
 tac_dir: 
 | BACKS {  true }
 | FWDS  { false }
@@ -1358,47 +1401,78 @@ codepos:
 | c=CPOS { c }
 ;
 
-tactic:
-| IDTAC
-   { Pidtac None }
-
-| IDTAC s=STRING
-   { Pidtac (Some s) }
-
-| TRY t=loc(tactic)
-   { Ptry t }
-
-| DO t=loc(tactic)
-   { Pdo (true, None, t) }
-
-| DO n=NUM? NOT t=loc(tactic)
-   { Pdo (false, n, t) }
-
-| DO n=NUM? QUESTION t=loc(tactic)
-   { Pdo (true, n, t) }
-
-| LPAREN s=tactics RPAREN
-   { Pseq s } 
-
-| ADMIT
-   { Padmit }
-
-| CASE f=sform
-   { Pcase f }
-
-| PROGRESS t=loc(tactic)?
-   { Pprogress t }
-
-| x=logtactic
-   { Plogic x }
-
-| x=phltactic
-   { PPhl x }
-
-(* DEBUG *)
-| DEBUG
-    { Pdebug }
+code_position:
+| n=number { Single n }
+| n1=number n2=number { Double (n1, n2) } 
 ;
+
+while_tac_info : 
+| inv=sform
+    { (inv, None, None) }
+| inv=sform vrnt=sform 
+    { (inv, Some vrnt, None) }
+| inv=sform vrnt=sform bd=sform n_iter=sform
+    { (inv, Some vrnt, Some (bd, n_iter)) }
+
+rnd_info:
+| e1=sform e2=sform 
+    { Some e1, Some e2 }
+| e=sform UNDERSCORE 
+    { Some e, None }
+| UNDERSCORE e=sform 
+    { None, Some e }
+| empty
+    {None, None }
+;
+
+swap_info:
+| s=side? p=swap_pos { s,p }
+;
+
+swap_pos:
+| i1=number i2=number i3=number
+    { SKbase (i1, i2, i3) }
+
+| p=int
+    { SKmove p }
+
+| i1=number p=int
+    { SKmovei (i1, p) }
+
+| LBRACKET i1=number DOTDOT i2=number RBRACKET p=int
+    { SKmoveinter (i1, i2, p) }
+;
+
+int:
+| n=number { n }
+| loc(MINUS) n=number { -n }
+;
+
+side:
+| LBRACE n=number RBRACE {
+   match n with
+   | 1 -> true
+   | 2 -> false
+   | _ -> error
+              (EcLocation.make $startpos $endpos)
+              (Some "variable side must be 1 or 2")
+ }
+;
+
+occurences:
+| p=paren(NUM+) {
+    if List.mem 0 p then
+      error
+        (EcLocation.make $startpos $endpos)
+        (Some "`0' is not a valid occurence");
+    p
+  }
+;
+
+app_bd_info:
+  | empty { PAppNone }
+  | f=sform { PAppSingle f }
+  | f1=sform f2=sform g1=sform g2=sform { PAppMult (f1,f2,g1,g2) }
 
 logtactic:
 | ASSUMPTION
@@ -1413,10 +1487,13 @@ logtactic:
 | CLEAR l=ident+
    { Pclear l }
 
-| TRIVIAL pi=prover_info
-   { Ptrivial pi }
+| TRIVIAL
+   { Ptrivial }
 
-| INTROS a=loc(intro_pattern)+
+| SMT pi=prover_info
+   { Psmt pi }
+
+| INTROS a=intro_pattern*
    { Pintro a }
 
 | SPLIT
@@ -1461,11 +1538,6 @@ logtactic:
 | CUT n=ident COLON p=sform
    { Pcut (n, p) }
 ;
-
-app_bd_info:
-  | empty { PAppNone }
-  | f=sform { PAppSingle f }
-  | f1=sform f2=sform g1=sform g2=sform { PAppMult (f1,f2,g1,g2) }
 
 phltactic:
 | FUN
@@ -1570,126 +1642,128 @@ phltactic:
 | BDEQ {Pbdeq}
 ;
 
-while_tac_info : 
-| inv=sform
-    { (inv, None, None) }
-| inv=sform vrnt=sform 
-    { (inv, Some vrnt, None) }
-| inv=sform vrnt=sform bd=sform n_iter=sform
-    { (inv, Some vrnt, Some (bd, n_iter)) }
+tactic_core_r:
+| IDTAC
+   { Pidtac None }
 
-rnd_info:
-| e1=sform e2=sform 
-    { Some e1, Some e2 }
-| e=sform UNDERSCORE 
-    { Some e, None }
-| UNDERSCORE e=sform 
-    { None, Some e }
-| empty
-    {None, None }
+| IDTAC s=STRING
+   { Pidtac (Some s) }
+
+| TRY t=tactic_core
+   { Ptry t }
+
+| BY t=tactics
+   { Pby t }
+
+| DO t=tactic_core
+   { Pdo (true, None, t) }
+
+| DO n=NUM? NOT t=tactic_core
+   { Pdo (false, n, t) }
+
+| DO n=NUM? QUESTION t=tactic_core
+   { Pdo (true, n, t) }
+
+| LPAREN s=tactics RPAREN
+   { Pseq s } 
+
+| ADMIT
+   { Padmit }
+
+| CASE f=sform
+   { Pcase f }
+
+| PROGRESS t=tactic_core?
+   { Pprogress t }
+
+| x=logtactic
+   { Plogic x }
+
+| x=phltactic
+   { PPhl x }
+
+(* DEBUG *)
+| DEBUG
+    { Pdebug }
 ;
 
-swap_info:
-| s=side? p=swap_pos { s,p }
+%inline tactic_core:
+| x=loc(tactic_core_r) { x }
 ;
 
-swap_pos:
-| i1=number i2=number i3=number
-    { SKbase (i1, i2, i3) }
+tactic:
+| t=tactic_core
+    { mk_core_tactic t }
 
-| p=int
-    { SKmove p }
-
-| i1=number p=int
-    { SKmovei (i1, p) }
-
-| LBRACKET i1=number DOTDOT i2=number RBRACKET p=int
-    { SKmoveinter (i1, i2, p) }
+| t=tactic_core IMPL ip=intro_pattern+
+    { { pt_core = t; pt_intros = ip; } }
 ;
 
-int:
-| n=number { n }
-| loc(MINUS) n=number { -n }
+tactic_chain:
+| LBRACKET ts=plist1(loc(tactics0), PIPE) RBRACKET
+    { Psubtacs (List.map mk_core_tactic ts) }
+
+| FIRST t=tactic { Pfirst (t, 1) }
+| LAST  t=tactic { Plast  (t, 1) }
+
+| FIRST n=NUM t=tactic { Pfirst (t, n) }
+| LAST  n=NUM t=tactic { Plast  (t, n) }
+
+| FIRST LAST  { Protate (`Left , 1) }
+| LAST  FIRST { Protate (`Right, 1) }
+
+| FIRST n=NUM LAST  { Protate (`Left , n) }
+| LAST  n=NUM FIRST { Protate (`Right, n) }
+
 ;
 
-side:
-| LBRACE n=number RBRACE {
-   match n with
-   | 1 -> true
-   | 2 -> false
-   | _ -> error
-              (EcLocation.make $startpos $endpos)
-              (Some "variable side must be 1 or 2")
- }
+subtactic:
+| t=loc(tactic_chain)
+    { mk_core_tactic (mk_loc t.pl_loc (Psubgoal (unloc t))) }
+
+| t=tactic
+    { t }
 ;
 
-occurences:
-| p=paren(NUM+) {
-    if List.mem 0 p then
-      error
-        (EcLocation.make $startpos $endpos)
-        (Some "`0' is not a valid occurence");
-    p
-  }
-;
-
-code_position:
-| n=number { Single n }
-| n1=number n2=number { Double (n1, n2) } 
+subtactics:
+| t=subtactic { [t] }
+| ts=subtactics SEMICOLON t=subtactic { t :: ts }
 ;
 
 tactics:
-| t=loc(tactic)                        { [t] }
-| t=loc(tactic) SEMICOLON ts=tactics2  { t::ts }
+| t=tactic %prec SEMICOLON { [t] }
+| t=tactic SEMICOLON ts=subtactics { t :: (List.rev ts) }
 ;
 
 tactics0:
-| ts=tactics    { Pseq ts } 
-| x=loc(empty)  { Pseq [mk_loc x.pl_loc (Pidtac None)] }
-;
-
-%inline tactics2:
-| ts=plist1(tactic2, SEMICOLON) { ts }
-;
-
-tsubgoal:
-| LBRACKET ts=plist1(loc(tactics0), PIPE) RBRACKET
-    { Psubtacs ts }
-
-| FIRST t=loc(tactic)
-    { Pfirst t }
-
-| LAST t=loc(tactic)
-    { Plast t }
-;
-
-tactic2_u:
-| t=tsubgoal { Psubgoal t }
-| t=tactic   { t }
-;
-
-tactic2:
-| t=loc(tactic2_u) { t }
-;
+| ts=tactics   { Pseq ts } 
+| x=loc(empty) { Pseq [mk_core_tactic (mk_loc x.pl_loc (Pidtac None))] }
 
 tactics_or_prf:
-| t=tactics { `Actual t }
-| PROOF     { `Proof }
+| t=tactics    { `Actual t    }
+| PROOF        { `Proof false }
+| PROOF STRICT { `Proof true  }
 ;
 
 (* -------------------------------------------------------------------- *)
 (* Theory cloning                                                       *)
 
 theory_clone:
-| CLONE x=uqident cw=clone_with?
-   { { pthc_base = x;
-       pthc_name = None;
-       pthc_ext  = EcUtils.odfl [] cw; } }
+| CLONE ip=import_flag? x=uqident cw=clone_with?
+   { let oth =
+       { pthc_base = x;
+         pthc_name = None;
+         pthc_ext  = EcUtils.odfl [] cw; }
+     in
+       (oth, ip) }
 
-| CLONE x=uqident AS y=uident cw=clone_with?
-   { { pthc_base = x;
-       pthc_name = Some y;
-       pthc_ext  = EcUtils.odfl [] cw; } }
+| CLONE ip=import_flag? x=uqident AS y=uident cw=clone_with?
+   { let oth =
+       { pthc_base = x;
+         pthc_name = Some y;
+         pthc_ext  = EcUtils.odfl [] cw; }
+     in
+       (oth, ip) }
 ;
 
 clone_with:
@@ -1697,10 +1771,10 @@ clone_with:
 ;
 
 clone_override:
-| TYPE ps=typarams x=ident EQ t=loc(type_exp)
+| TYPE ps=typarams x=qident EQ t=loc(type_exp)
    { (x, PTHO_Type (ps, t)) }
 
-| OP x=op_ident tyvars=tyvars_decl COLON sty=loc(type_exp) EQ e=expr
+| OP x=qoident tyvars=tyvars_decl COLON sty=loc(type_exp) EQ e=expr
    { let ov = {
        opov_tyvars = tyvars;
        opov_args   = [];
@@ -1709,7 +1783,7 @@ clone_override:
      } in
        (x, PTHO_Op ov) }
 
-| OP x=op_ident tyvars=tyvars_decl eq=loc(EQ) e=expr
+| OP x=qoident tyvars=tyvars_decl eq=loc(EQ) e=expr
    { let ov = {
        opov_tyvars = tyvars;
        opov_args   = [];
@@ -1718,7 +1792,7 @@ clone_override:
      } in
        (x, PTHO_Op ov) }
 
-| OP x=op_ident tyvars=tyvars_decl p=ptybindings eq=loc(EQ) e=expr
+| OP x=qoident tyvars=tyvars_decl p=ptybindings eq=loc(EQ) e=expr
    { let ov = {
        opov_tyvars = tyvars;
        opov_args   = p;
@@ -1727,7 +1801,7 @@ clone_override:
      } in
        (x, PTHO_Op ov) }
 
-| PRED x=op_ident tyvars=tyvars_decl p=ptybindings EQ f=form
+| PRED x=qoident tyvars=tyvars_decl p=ptybindings EQ f=form
    { let ov = {
        prov_tyvars = tyvars;
        prov_args   = p;
@@ -1735,7 +1809,7 @@ clone_override:
      } in
        (x, PTHO_Pred ov) }
 
-| PRED x=op_ident tyvars=tyvars_decl EQ f=form
+| PRED x=qoident tyvars=tyvars_decl EQ f=form
    { let ov = {
        prov_tyvars = tyvars;
        prov_args   = [];

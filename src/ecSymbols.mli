@@ -4,7 +4,7 @@ open EcMaps
 (* -------------------------------------------------------------------- *)
 type symbol  = string
 type qsymbol = symbol list * symbol
-type msymbol = (symbol * msymbol) list
+type msymbol = (symbol * msymbol list) list
 
 (* -------------------------------------------------------------------- *)
 val equal : symbol -> symbol -> bool

@@ -21,7 +21,7 @@ trivial.
 simplify.
 intros &hr.
 rewrite (Dbool.mu_def  (lambda (x : bool), x = y{hr})).
-trivial.
+smt.
 save.
 
 module F = {
@@ -39,6 +39,7 @@ fun.
 rnd (1%r) (lambda (x:bool), true).
 rnd (1%r/2%r) (lambda (x:bool), x).
 skip.
+(* <<<<<<< HEAD *)
 trivial.
 simplify.
 rewrite (Dbool.mu_def  (lambda (x : bool), true)).
@@ -101,6 +102,9 @@ intros H1.
 apply H1.
 trivial.
 trivial.
+(* ======= *)
+smt.
+(* >>>>>>> 8d6399d16b9a22a735b5d0027bd9f51eee968177 *)
 save.
 
 (* not required in previous case?? *)

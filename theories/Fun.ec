@@ -33,3 +33,7 @@ lemma cPand_def :
 
 lemma cPor_def : 
   forall (p q:'a cPred) (x:'a), cPor p q x <=> (p x \/ q x) by [].
+
+lemma excluded_middle: forall (p: 'a cPred),
+  cPor (cPnot p) p = cPtrue
+by (intros p; apply extensionality; smt).

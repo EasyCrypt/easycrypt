@@ -6,5 +6,5 @@ lemma l: forall x1,
   x3 = x1 + x1 + x1 + x1.
 proof.
 intros x1 x2 x3. (* FIXME: printing of let hyp *)
-trivial.
+smt.
 save.

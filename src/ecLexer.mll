@@ -36,11 +36,13 @@
     "equiv"       , EQUIV      ;        (* KW: prog *)
     "hoare"       , HOARE      ;        (* KW: prog *)
     "bd_hoare"    , BDHOARE    ;        (* KW: prog *)
+    "islossless"  , LOSSLESS   ;        (* KW: prog *)
 
     "try"         , TRY        ;        (* KW: tactical *)
     "first"       , FIRST      ;        (* KW: tactical *)
     "last"        , LAST       ;        (* KW: tactical *)
     "do"          , DO         ;        (* KW: tactical *)
+    "strict"      , STRICT     ;        (* KW: tactical *)
 
     "using"       , USING      ;        (* KW: tactic *)
     "compute"     , COMPUTE    ;        (* KW: tactic *)
@@ -53,6 +55,7 @@
     "elim"        , ELIM       ;        (* KW: tactic *)
     "apply"       , APPLY      ;        (* KW: tactic *)
     "progress"    , PROGRESS   ;        (* KW: tactic *)
+    "trivial"     , TRIVIAL    ;        (* KW: tactic *)
     "cut"         , CUT        ;        (* KW: tactic *)
     "generalize"  , GENERALIZE ;        (* KW: tactic *)
     "clear"       , CLEAR      ;        (* KW: tactic *)
@@ -72,7 +75,7 @@
     "field_simplify", FIELDSIMP;        (* KW: tactic *)
 
     "assumption"  , ASSUMPTION ;        (* KW: bytac *)
-    "trivial"     , TRIVIAL    ;        (* KW: bytac *)
+    "smt"         , SMT        ;        (* KW: bytac *)
     "by"          , BY         ;        (* KW: bytac *)
 
     (* PHL: tactics *)
@@ -269,6 +272,8 @@ rule main = parse
 
   | "-" { MINUS }
   | "+" { ADD }
+
+  | "//" { SLASHSLASH }
 
   | op1 as s  { OP1 s }
   | op2 as s  { OP2 s }

@@ -124,7 +124,7 @@ module LDDH_Hyb(A : LDDH_DISTINGUISHER) = {
 }.
 
 
-lemma DDH0_Hybrid0: forall (A <: LDDH_DISTINGUISHER {LDDH_Hyb, DH_distrs}),
+lemma DDH0_Hybrid0: forall (A <: LDDH_DISTINGUISHER {LDDH_Hyb, DH_distrs, LDDH0}),
   equiv [ LDDH_Hyb(A).main ~ LDDH0(A).main :
      ((glob A){1} = (glob A){2}) /\ ia{1} = 0 ==> res{1} = res{2} ].
 proof.
@@ -135,17 +135,17 @@ proof.
      /\ LDDH_Hyb.O.c{1} = LDDH0.O.c{2} /\ LDDH0.O.c{2} = 0).
   wp.
   skip.
-  trivial.
+  smt.
   call (   (glob A){1} = (glob A){2} /\ LDDH_Hyb.i{1} = 0
         /\ LDDH_Hyb.O.c{1} = LDDH0.O.c{2} /\ LDDH0.O.c{2} = 0)
        (res{1} = res{2}).
   (* Bug? Adversary A not allowed to touch O.c since the restriction wrt. LDDH_Hyb
      should also account for the inner module LDDH_Hyb.O.
-     Note that I cannot add LDDH_Hyb to restriction above. 
-  fun (LDDH_Hyb.i{1} = 0 /\ LDDH_Hyb.O.c{1} = LDDH0.O.c{2} /\ LDDH0.O.c >= 0). *)
-  fun (LDDH_Hyb.i{1} = 0).
-  trivial.
-  trivial.
+     Note that I cannot add LDDH_Hyb to restriction above. *)
+(*  fun (LDDH_Hyb.i{1} = 0 /\ LDDH_Hyb.O.c{1} = LDDH0.O.c{2} /\ LDDH0.O.c{1} >= 0). *)
+  fun (LDDH_Hyb.i{1} = 0). 
+  smt.
+  smt.
   fun.
   seq 0 0 : (   LDDH_Hyb.i{1} = 0 /\ LDDH_Hyb.O.c{1} = LDDH0.O.c{2}
              /\ LDDH_Hyb.O.c{1} >= 0).
@@ -154,13 +154,13 @@ proof.
              /\ LDDH_Hyb.O.c{1} = LDDH0.O.c{2} /\ LDDH_Hyb.O.c{1} >= 0).
     wp.
     skip.
-    trivial.
+    smt.
   if.
-    trivial.
+    smt.
   rcondf {1} 1.
     intros &m.
     skip.
-    trivial.
+    smt.
   wp.
   call (true) (res{1} = res{2}).
   fun.
@@ -169,13 +169,13 @@ proof.
   rnd.
   skip.
   simplify.
-  trivial.
+  smt.
   skip.
-  trivial.
+  smt.
   skip.
-  trivial.
+  smt.
   skip.
-  trivial.
+  smt.
 save.
 
 

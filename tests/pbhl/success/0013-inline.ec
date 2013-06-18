@@ -17,5 +17,5 @@ module M = {
 
 lemma h : bd_hoare[M.g : a = a ==> res = res] = 1%r.
 proof.
-  fun; inline M.f. wp; skip; trivial.
+  fun; inline M.f. wp; skip; smt.
 save.

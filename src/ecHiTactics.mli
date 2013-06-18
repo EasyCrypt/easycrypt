@@ -2,9 +2,8 @@
 open EcSymbols
 
 (* -------------------------------------------------------------------- *)
-val process_logic_tacs :
-     EcHiLogic.pprovers
-  -> EcEnv.env
+val process_tactics :
+     EcHiLogic.hitenv
   -> EcParsetree.ptactic list
-  -> EcBaseLogic.goals
-  -> EcBaseLogic.goals
+  -> EcLogic.goals
+  -> EcLogic.goals

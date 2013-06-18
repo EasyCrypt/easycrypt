@@ -15,15 +15,16 @@ consider small variants of a theory without having to create a new one from
 scratch, or to consider concrete implementation details only when necessary for
 the proof.
 
+% TODO: adapt depending on what I actually end up doing
 We illustrate each of the basic concepts with commented excerpts from the
 standard library distributed with \EC. The standard library is documented
 further in Chapter~\ref{chap:libraries}.
 
 \section{Types and Operators\label{sec:types}}
 
-At the core of any \EC specification is a set of types and functional operators
-on those types. Types are \emph{non-empty} sets of values, and operators are
-\emph{mathematical} functions between them.
+At the core of any \EC specification is a collection of types and functional
+operators on those types. Formally, \EC types are \emph{non-empty} sets of
+values, and operators are \emph{mathematical} functions between them.
 
 \warningbox{Currently, the easiest way to define types and operators is to
 declare them abstractly and specify them using axioms. It is \emph{very}
@@ -31,86 +32,211 @@ important for the consistency of the logical context to remember that types are
 \emph{always} assumed to be non-empty, and that operators are functionals
 (total, deterministic and side-effect free) when writing such definitions.}
 
-\subsection{Basic Usage}
-The following \EC code declares an abstract type of polymorphic arrays, equipped
-with a length operator (whose result is never negative), an indexing operator
-and extensional equality.
+The \EC type system supports polymorphic, higher-order types: the type of lists
+can be declared independently of the type of their contents, and operators can
+take and return other operators.
 
-\begin{easycrypt}[label={lst:arrays}]{[Polymorphic arrays]A type for polymorphic arrays}
-type 'a array.
+\subsection{Built-Ins}
+The language is equipped with a few built-in types\footnote{This is only to
+bridge our language with \WhyThree's logic and avoid the introduction of
+indirection layers in the proof obligations sent to the SMT solvers: all these
+built-in types could in theory be defined in \EC itself.}:
+\begin{itemize}
+\item the \rawec{unit} type,
+\item the \rawec{bool} type of booleans,
+\item the \rawec{int} type of arithmetic integers (in $\mathbb{Z}$),
+\item the \rawec{real} type of real numbers (in $\mathbb{R}$).
+\end{itemize}
 
-op length: 'x array -> int.
-axiom length_pos: forall (xs:'x array), 0 <= length xs.
+Some symbols are defined, declared or imported from \WhyThree in the
+corresponding libraries, and are discussed further in
+Chapter~\ref{chap:libraries}.
 
-op "_.[_]": 'x array -> int -> 'x.
+\subsubsection*{The \rawec{unit} type}
+The \rawec{unit} type contains a unique element \rawec{tt}. It is \emph{not}
+equal to the empty tuple type in \EC.
 
-pred (==)(xs0:'x array, xs1:'x array) =
-  length xs0 = length xs1 /\
-  forall i, 0 <= i => i < length xs0 => xs0.[i] = xs1.[i].
+\subsubsection*{The \rawec{bool} type: termination, operators and predicates}
+In \EC, booleans are used not only to represent binary program variables, but
+also to type logical formulas. The \rawec{bool} type is therefore equipped with
+symbols for universal and existential quantification, implication, logical and
+short-circuiting conjunction and disjunction and xor. However, since the program
+logic assumes that expressions are terminating, we need to restrict the class of
+boolean formulas that can be used when defining operators and writing programs.
+To this effect, we consider two distinct classes of functional symbols:
+\emph{predicates}, that may not be computable in general, and cannot be used to
+write programs (although they can be used to specify them), and
+\emph{operators}, that are computable and can be used for defining predicates
+and other operators, and to write programs.
 
-axiom extensionality: forall (xs0 xs1:'x array),
-  xs0 == xs1 => xs0 = xs1.
+Universal and existential quantification (\rawec{forall} and \rawec{exists}),
+implication (\rawec{=>}) and equivalence (\rawec{<=>}) are internally defined as
+predicate symbols, and therefore cannot be used to define operators. All other
+boolean function symbols are defined as operators and can be used in any
+context. They include logical conjunction and disjunction (\rawec{/\\} and
+\rawec{\\\/}), short-circuiting conjunction and disjunction (\rawec{\&\&} and
+\rawec{\|\|}), and xor (\rawec{+} or \rawec{\^\^}).
+
+\subsubsection*{The \rawec{int} type}
+The \rawec{int} type represents mathematical integers. It is possible to
+directly write constants between $0$ and $2^{62} - 1$ (non-negative OCaml
+integers). The unary negation operator is denoted \rawec{-!}, and all arithmetic
+and comparison operators use standard notations (\rawec{+}, \rawec{-},
+\rawec{*}, \rawec{/}, \rawec{\%}, \rawec{^}, \rawec{=}, \rawec{<}, \rawec{<=},
+\rawec{>}, \rawec{>=} \ldots). It may be necessary to import the integer library
+(\rawec{require import Int.}) to have access to these operators. Since this type
+is identified with the \WhyThree type of integers, all \WhyThree lemmas on it
+can be used by the SMT solvers, but may not be accessible by name for use in
+interactive proofs.
+
+\subsubsection*{The \rawec{real} type}
+The \rawec{real} type represents real numbers. Integer variables and constants
+can be cast to reals by suffixing them with a \rawec{\%r}. Basic operations and
+comparisons are defined, with standard notations, on real numbers. Here again,
+it may be necessary to import the library (using \rawec{require import Real.})
+to put the real operators in scope. This type is also identified with the
+\WhyThree type of reals, but SMT solvers often have very limited support for
+real numbers and will often fail to prove seemingly trivial results.
+%
+We will be working on enriching the library of lemmas available in this theory
+to allow more complex interactive proofs.
+
+\warningbox{Note that \rawec{(1/2)\%r} and \rawec{1\%r/2\%r} are very different
+expressions. The former evaluates to $0$ (the division is in $\mathbb{Z}$, and
+the result ($0$) is interpreted in $\mathbb{R}$) whereas the latter evaluates to
+$0.5$ (the operands are interpreted and the operator is applied in
+$\mathbb{R}$). Eventually, we will introduce notations for scoping that should
+allow less cluttered real expressions.}
+
+\subsection{Types}
+From these base types, many more can be built. \EC allows the user to declare
+ (polymorphic) abstract types, and combine existing types into tuple types or
+function types.
+
+Types are declared using the \rawec{type} keyword followed by an identifier and,
+if desired, an \rawec{=} sign and a concrete definition. Listing~\ref{lst:types}
+declares a polymorphic abstract \rawec{multiset} type, and (rather daftly)
+defines naturals as multisets of units.
+
+\begin{easycrypt}[label={lst:types}]{Declaring and applying polymorphic types}
+type 'a multiset.
+type nat = unit multiset.
 \end{easycrypt}
 
-The language of operators and predicates is functional in style, and
-comma-separated lists of parameters are in fact currified, in this context, to
-yield functional symbols that can be partially applied. (For example, the infix
-extensional equality predicate \ec{(==)} defined in Listing~\ref{lst:arrays} has
-type \ec{'x array -> 'x array -> bool}.)
+\subsubsection*{Tuple types}
+Given two types $\tau$ and $\tau'$, one can easily define the type of pairs of
+elements of $\tau$ and $\tau'$ as $\left(\tau * \tau'\right)$. More generally,
+the product can be iterated to produce tuple types of arbitrary arity.
 
-Special syntax is used to introduce two hard-coded mixfix operators (generally
-considered to correspond to set and get operations on various types). The
-``\rawec[literate={\_}{{$\cdot$}}1]{_.[_]}'' operator (named \emph{get}
-throughout this manual) is hard-coded as a binary operator. The
-``\rawec[literate={_}{{$\cdot$}}1]{_.[_<-_]}'' operator (not yet encountered,
-and named \emph{set} in the rest of this manual) is hard-coded as a ternary
-operator. In addition, a constant operator ``\rawec{[]}'' can be defined, and
-will often be referred to as the \emph{empty} constant, depending on its type
-and the current scope.
+\warningbox{Types $\left(\tau * \tau' * \tau''\right)$,
+$\left(\left(\tau *\tau'\right) * \tau''\right)$ and
+$\left(\tau * \left(\tau' * \tau''\right)\right)$ are distinct.}
 
-Infix operators are declared between parentheses, and can be used either in
-infix syntax using the symbol itself (for example, \rawec{x == y}), or in prefix
-syntax using their parenthesized form (for example, \rawec{(==) x y}).
+\subsubsection*{Function types}
 
-As illustrated in the definition of the extensional equality predicate, type
-annotations are optional when types can be inferred.
+\subsubsection*{A note on polymorphism}
 
-\warningbox{One could expect the type annotations in the \rawec{extensionality}
-axiom to be optional. However, they are currently required so that the type
-variable can be instantiated.}
 
-\subsection{Higher-Order Operators}
-Operators can be higher-order. For example, the code sample shown in
-Listing~\ref{lst:init_arrays} illustrates how one can axiomatically specify an
-operator which creates a fresh array and initializes its elements with
-index-dependent values. We illustrate its usage by defining an operator
-\ec{init} that, given an integer $n$, produces the array containing integers $0$
-through $n$, in ascending order.
+\subsection{Operators}
 
-\begin{easycrypt}[label={lst:init_arrays}]{[Index-dependent array initializer]An operator initializing an array with index-dependent values}
-op init: (int -> 'x) -> int -> 'x array.
+\subsection{Predicates, Axioms and Ambient Lemmas}
 
-axiom init_length: forall (f:int -> 'x) l,
-  0 <= l => length (init f l) = l.
-
-axiom init_get: forall (f:int -> 'x) l i,
-  0 <= l => 0 <= i => i < l =>
-  (init f l).[i] = f i.
-
-op first_ints n = init (lambda i, i) n.
-\end{easycrypt}
-
-The \rawec{lambda} notation works as expected. The argument types can be
-specified where necessary. Equality on lambda terms is extensional.
+% TODO: redistribute the following
+%
+%The following \EC code (Listing~\ref{lst:bitstrings}) declares an abstract type of bitstrings, equipped
+%with a length operator (whose result is never negative) and an infix addition
+%operator that enjoys interesting properties both with respect to length and by
+%itself.
+%
+%\begin{easycrypt}[label={lst:bitstrings}]{[A type for bitstrings]A core type for bitstrings}
+%type bitstring.
+%
+%op length: bitstring -> int.
+%axiom length_pos: forall bs, 0 <= length bs.
+%
+%op (+): bitstring -> bitstring -> bitstring.
+%axiom length_xor: forall b0 b1,
+%  length b0 = length b1 => length (b0 + b1) = length b0.
+%axiom xor_associative: forall b0 b1 b2,
+%  (b0 + b1) + b2 = b0 + (b1 + b2).
+%axiom xor_commutative: forall b0 b1, b0 + b1 = b1 + b0.
+%\end{easycrypt}
+%
+%\subsubsection{Types}
+%\EC expressions are equipped with polymorphic, higher-order types, that can be declared abstractly (as in Listing~\ref{lst:bitstrings}), or given concrete definitions, depending on the needs of the proof.
+%
+%
+%\warningbox{One could expect the type annotations in the \rawec{extensionality}
+%axiom to be optional. However, they are currently required so that the type
+%variable can be instantiated.}
+%
+%\subsubsection{Operators}
+%The language of operators and predicates is functional in style, and
+%comma-separated lists of parameters are in fact currified, in this context, to
+%yield functional symbols that can be partially applied. (For example, the infix
+%extensional equality predicate \ec{(==)} defined in Listing~\ref{lst:arrays} has
+%type \ec{'x array -> 'x array -> bool}.)
+%
+%\paragraph{Mixfix operators}
+%Special syntax is used to introduce two hard-coded mixfix operators (generally
+%considered to correspond to set and get operations on various types). The
+%``\rawec[literate={\_}{{$\cdot$}}1]{_.[_]}'' operator (named \emph{get}
+%throughout this manual) is hard-coded as a binary operator. The
+%``\rawec[literate={_}{{$\cdot$}}1]{_.[_<-_]}'' operator (not yet encountered,
+%and named \emph{set} in the rest of this manual) is hard-coded as a ternary
+%operator. In addition, a constant operator ``\rawec{[]}'' can be defined, and
+%will often be referred to as the \emph{empty} constant, depending on its type
+%and the current scope.
+%
+%\paragraph{Infix operators}
+%Infix operators are declared between parentheses, and can be used either in
+%infix syntax using the symbol itself (for example, \rawec{x == y}), or in prefix
+%syntax using their parenthesized form (for example, \rawec{(==) x y}).
+%
+%\subsection{Higher-Order Operators}
+%Operators can be higher-order. For example, the code sample shown in
+%Listing~\ref{lst:init_arrays} illustrates how one can axiomatically specify an
+%operator which creates a fresh array and initializes its elements with
+%index-dependent values. We illustrate its usage by defining an operator
+%\ec{init} that, given an integer $n$, produces the array containing integers $0$
+%through $n$, in ascending order.
+%
+%\begin{easycrypt}[label={lst:init_arrays}]{[Index-dependent array initializer]An operator initializing an array with index-dependent values}
+%op init: (int -> 'x) -> int -> 'x array.
+%
+%axiom init_length: forall (f:int -> 'x) l,
+%  0 <= l => length (init f l) = l.
+%
+%axiom init_get: forall (f:int -> 'x) l i,
+%  0 <= l => 0 <= i => i < l =>
+%  (init f l).[i] = f i.
+%
+%op first_ints n = init (lambda i, i) n.
+%\end{easycrypt}
+%
+%The \rawec{lambda} notation works as expected. The argument types can be
+%specified where necessary. Equality on lambda terms is extensional.
 
 \section{Describing Distributions\label{sec:distributions}}
 
-\EC offers support for user-defined distributions. Distributions are defined by
-formally defining their density function, represented by the built-in operator
-\rawec{op mu: 'a distr -> ('a -> bool) -> real.} For example, the uniform
-distribution on booleans is defined, in the standard library, as displayed in
-Listing~\ref{lst:dbool}, where \rawec{caract P x} is \rawec{1\%r} if \rawec{P}
-holds on \rawec{x} and \rawec{0\%r} otherwise.
+%%%% From Gilles:
+\EC features a polymorphic type \rawec{'a distr} of \emph{discrete
+sub-distributions} over a base type \rawec{'a}. The primary operation over
+sub-distributions is the function \rawec{op mu: 'a distr -> ('a -> bool) ->
+real.} which measures the probability of an event. The function is assumed to
+satisfy the basic axioms of probability sub-distributions:
+\begin{itemize}
+\item probabilities lie in the unit interval;
+\item the probability of the union of events is equal to the sum of
+  their probabilities, minus the sum of their intersection;
+\item probabilities are monotonic with respect to event inclusion.
+\end{itemize}
+
+Sub-distributions are introduced axiomatically, and no well-formedness checks
+are performed. For example, the uniform distribution on booleans is defined, in
+the standard library, as displayed in Listing~\ref{lst:dbool}, where
+\rawec{caract P x} is \rawec{1\%r} if \rawec{P} holds on \rawec{x} and
+\rawec{0\%r} otherwise.
 
 \begin{easycrypt}[label={lst:dbool}]{[Uniform Boolean distribution]Defining the uniform distribution on booleans}
 op dbool: bool distr.
@@ -120,6 +246,27 @@ axiom mu_def: forall (P:bool -> bool),
     (1%r/2%r) * caract P true +
     (1%r/2%r) * caract P false.
 \end{easycrypt}
+
+The standard library on distributions, discussed further in
+Chapter~\ref{chap:libraries}, introduces several auxiliary quantities on
+distributions that are useful in probability computations and for defining more
+complex distributions that are difficult, or impossible, to describe purely
+using \rawec{mu}. The definitions of these quantities is shown in
+Listing~\ref{lst:mu_aux}.
+
+\begin{easycrypt}[label={lst:mu_aux}]{Auxiliary operators on distributions}
+op mu_x(d:'a distr, x:'a) = mu d (lambda x', x = x').
+op mu_weight(d:'a distr) = mu d (lambda x, true).
+op in_supp(d:'a distr, x:'a) = mu d (lambda x', x = x') > 0%r.
+\end{easycrypt}
+
+\subsection{Old Stuff}
+\EC offers support for user-defined distributions. Distributions are defined by
+formally defining their density function, represented by the built-in operator
+\rawec{op mu: 'a distr -> ('a -> bool) -> real.} For example, the uniform
+distribution on booleans is defined, in the standard library, as displayed in
+Listing~\ref{lst:dbool}, where \rawec{caract P x} is \rawec{1\%r} if \rawec{P}
+holds on \rawec{x} and \rawec{0\%r} otherwise.
 
 It may not always be this easy to define distributions. More examples of
 user-provided definitions, and some distribution transformers that make it
@@ -233,6 +380,8 @@ module type RO_adv(O:RO) = {
 \end{easycrypt}
 
 \section{Lemmas and Judgements}
+
+\warningbox{Note that we use different implication symbols. $\Rightarrow$ is implication in the ambient logic (corresponding to the \rawec{=>} predicate), whereas $\Longrightarrow$ is used to express contracts on functions.\footnote{From Francois: it may be worth considering the use of another arrow symbol (for example $\Rrightarrow$) for contracts.}}
 
 \subsection{Ambient Lemmas}
 

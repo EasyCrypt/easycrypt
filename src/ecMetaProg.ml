@@ -289,9 +289,10 @@ end
 exception MatchFailure
 
 (* Rigid unification, don't cross binders *)
-let f_match (env, hyps) ue ev ptn subject =
+let f_match hyps ue ev ptn subject =
   let ue = EcUnify.UniEnv.copy ue in
   let ev = let Ev ev = ev in ref ev in
+  let env = EcEnv.LDecl.toenv hyps in
 
   let rec doit ptn subject =
     match ptn.f_node, subject.f_node with
@@ -306,7 +307,7 @@ let f_match (env, hyps) ue ev ptn subject =
             ev := Mid.add x (Some subject) !ev
 
         | Some (Some a) -> begin
-            if not (EcReduction.is_alpha_eq env hyps subject a) then
+            if not (EcReduction.is_alpha_eq hyps subject a) then
               raise MatchFailure
         end
     end
@@ -350,8 +351,8 @@ let f_match (env, hyps) ue ev ptn subject =
   in
     doit ptn subject; (ue, Ev !ev)
 
-let f_match (env, hyps) (ue, ev) ~ptn subject =
-  let (ue, Ev ev) = f_match (env, hyps) ue ev ptn subject in
+let f_match hyps (ue, ev) ~ptn subject =
+  let (ue, Ev ev) = f_match hyps ue ev ptn subject in
     if not (Mid.for_all (fun _ x -> x <> None) ev) then
       raise MatchFailure;
     let clue =

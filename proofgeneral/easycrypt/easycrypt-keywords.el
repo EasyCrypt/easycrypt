@@ -1,8 +1,8 @@
-; Generated on Wed Jun 12 10:43:47 2013
+; Generated on Tue Jun 18 10:46:45 2013
 
 (defvar easycrypt-bytac-keywords '(
   "assumption"
-  "trivial"
+  "smt"
   "by"
 ))
 
@@ -68,6 +68,7 @@
   "equiv"
   "hoare"
   "bd_hoare"
+  "islossless"
 ))
 
 (defvar easycrypt-tactic-keywords '(
@@ -82,6 +83,7 @@
   "elim"
   "apply"
   "progress"
+  "trivial"
   "cut"
   "generalize"
   "clear"
@@ -129,6 +131,7 @@
   "first"
   "last"
   "do"
+  "strict"
 ))
 
 (provide 'easycrypt-keywords)

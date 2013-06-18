@@ -1,54 +1,119 @@
+(* -------------------------------------------------------------------- *)
+open EcUtils
 open EcIdent
+open EcPath
 open EcTypes
 open EcModules
 open EcFol
 open EcEnv
 
+(* -------------------------------------------------------------------- *)
 module PVM = struct
-  type mem_sel = 
-  | MSvar of prog_var
-  | MSmod of EcPath.mpath (* Only abstract module *)
-      
-  module M = EcMaps.Map.Make(struct
+
+  module Mnpv = EcMaps.Map.Make(struct
     (* We assume that the mpath are in normal form *) 
- 
-    type t = mem_sel * EcMemory.memory
-
-    let ms_compare ms1 ms2 = 
-      match ms1, ms2 with
-      | MSvar v1, MSvar v2 -> pv_compare_p v1 v2
-      | MSmod m1, MSmod m2 -> EcPath.m_compare m1 m2
-      | MSvar _, MSmod _ -> -1
-      | MSmod _, MSvar _ -> 1
-
-    let compare (p1,m1) (p2,m2) = 
-      let r = EcIdent.id_compare m1 m2 in
-      if r = 0 then ms_compare p1 p2 
-      else r
+     type t = prog_var 
+    let compare = pv_compare_p 
   end)
 
-  type 'a subst = 'a M.t
+  type 'a subst = {
+    s_pv : 'a Mnpv.t Mid.t; 
+    s_gl : 'a Mm.t Mid.t;  (* only abstract module *)
+  }
 
-  let empty = M.empty 
+  let empty = { s_pv = Mid.empty; s_gl = Mid.empty }
 
-  let pvm env pv m = 
-    let pv = EcEnv.NormMp.norm_pvar env pv in 
-    (MSvar pv, m)
+  let pvm = EcEnv.NormMp.norm_pvar
 
-  let add env pv m f s = M.add (pvm env pv m) f s 
+  let get_restr env mp = 
+    match (EcEnv.Mod.by_mpath mp env).me_body with
+    | EcModules.ME_Decl(_,restr) -> restr 
+    | _ -> assert false 
 
-  let add_glob _env mp m f s = M.add (MSmod mp, m) f s
+  let check_npv_mp env npv top mp restr = 
+    if not (Sm.mem top restr) then
+      let ppe = EcPrinting.PPEnv.ofenv env in
+      EcBaseLogic.tacuerror 
+        "The module %a can write %a (add restriction %a)"
+        (EcPrinting.pp_topmod ppe) mp
+        (EcPrinting.pp_pv ppe) npv
+        (EcPrinting.pp_topmod ppe) top
+    
+  let check_npv env npv m s = 
+    if is_glob npv then 
+      match Mid.find_opt m s.s_gl with
+      | None -> ()
+      | Some s_gl ->
+        let top = EcPath.m_functor npv.pv_name.x_top in
+        let check1 mp _ = 
+          let restr = get_restr env mp in
+          check_npv_mp env npv top mp restr in
+        Mm.iter check1 s_gl
 
-  let add_none env pv m f s =
-    M.change (fun o -> if o = None then Some f else o) (pvm env pv m) s
-
-  let merge (s1 : 'a subst) (s2 : 'a subst) =
-    M.merge (fun _ o1 o2 -> if o2 = None then o1 else o2) s1 s2
+  let add env pv m f s = 
+    let pv = pvm env pv in
+    check_npv env pv m s;
+    { s with s_pv = 
+        Mid.change (fun om -> 
+          Some (Mnpv.add pv f (odfl Mnpv.empty om))) m s.s_pv }
 
   let find env pv m s =
-    M.find (pvm env pv m) s
+    let pv = pvm env pv in
+    try Mnpv.find pv (Mid.find m s.s_pv)
+    with Not_found ->
+      check_npv env pv m s;
+      raise Not_found 
 
-  let subst env (s : form subst) = 
+  let check_mp_mp env mp restr mp' = 
+    if not (EcPath.m_equal mp mp') && not (Sm.mem mp' restr) then
+      let restr' = get_restr env mp' in
+      if not (Sm.mem mp restr') then 
+        let ppe = EcPrinting.PPEnv.ofenv env in
+        EcBaseLogic.tacuerror 
+          "The module %a can write %a (add restriction %a to %a, or %a to %a)"
+          (EcPrinting.pp_topmod ppe) mp
+          (EcPrinting.pp_topmod ppe) mp'
+          (EcPrinting.pp_topmod ppe) mp
+          (EcPrinting.pp_topmod ppe) mp' 
+          (EcPrinting.pp_topmod ppe) mp'
+          (EcPrinting.pp_topmod ppe) mp 
+
+  let check_glob env mp m s =
+    let restr = get_restr env mp in
+    begin match Mid.find_opt m s.s_pv with
+    | None -> ()
+    | Some mpv ->
+      let check npv _ =
+        if is_glob npv then 
+          let top = EcPath.m_functor npv.pv_name.x_top in
+          check_npv_mp env npv top mp restr in
+      Mnpv.iter check mpv
+    end;
+    begin match Mid.find_opt m s.s_gl with
+    | None -> ()
+    | Some mg ->
+      let check mp' _ = check_mp_mp env mp restr mp' in
+      Mm.iter check mg
+    end
+
+  let add_glob env mp m f s = 
+    check_glob env mp m s;
+    { s with s_gl = 
+        Mid.change (fun om -> Some (Mm.add mp f (odfl Mm.empty om))) m s.s_gl } 
+
+  let find_glob env mp m s =
+    try Mm.find mp (Mid.find m s.s_gl)
+    with Not_found ->
+      check_glob env mp m s;
+      raise Not_found 
+
+  let check_binding m s = 
+    assert (not (Mid.mem m s.s_pv) && not (Mid.mem m s.s_gl))
+
+  let has_mod b = 
+    List.exists (fun (_,gty) -> match gty with GTmodty _ -> true | _ -> false) b
+
+  let rec subst env (s : form subst) = 
     Hf.memo_rec 107 (fun aux f ->
       match f.f_node with
       | Fpvar(pv,m) -> 
@@ -56,9 +121,35 @@ module PVM = struct
       | Fglob(mp,m) ->
         let f' = EcEnv.NormMp.norm_glob env m mp in
         if f_equal f f' then
-          (try M.find (MSmod mp,m) s with Not_found -> f)
+          (try find_glob env mp m s with Not_found -> f)
         else aux f'
-      | FhoareF _ | FhoareS _ | FequivF _ | FequivS _ | Fpr _ -> assert false
+      | FequivF _ ->
+        check_binding EcFol.mleft s;
+        check_binding EcFol.mright s;
+        EcFol.f_map (fun ty -> ty) aux f
+      | FequivS es ->
+        check_binding (fst es.es_ml) s;
+        check_binding (fst es.es_mr) s;
+        EcFol.f_map (fun ty -> ty) aux f
+      | FhoareF _ | FbdHoareF _ ->
+        check_binding EcFol.mhr s;
+        EcFol.f_map (fun ty -> ty) aux f
+      | FhoareS hs ->
+        check_binding (fst hs.hs_m) s;
+        EcFol.f_map (fun ty -> ty) aux f
+      | FbdHoareS hs -> 
+        check_binding (fst hs.bhs_m) s;
+        EcFol.f_map (fun ty -> ty) aux f
+      | Fpr(m,_,_,_) ->
+        check_binding EcFol.mhr s;
+        check_binding m s;
+        EcFol.f_map (fun ty -> ty) aux f
+      | Fquant(q,b,f1) ->
+        let f1 = 
+          if has_mod b then subst (Mod.add_mod_binding b env) s f1
+          else aux f1 in
+        f_quant q b f1 
+
       | _ -> EcFol.f_map (fun ty -> ty) aux f)
 
   let rec esubst env me (s : expr subst) e =
@@ -105,6 +196,9 @@ module PV = struct
   let empty = 
     { pv = M.empty;
       glob = EcPath.Sm.empty }
+
+  let is_empty pv = 
+    M.is_empty pv.pv && EcPath.Sm.is_empty pv.glob
 
   let add env pv ty fv = 
     { fv with pv = M.add (NormMp.norm_pvar env pv) ty fv.pv }
@@ -160,6 +254,17 @@ module PV = struct
     in
     aux empty f
 
+  let pp env fmt fv =
+    let ppe = EcPrinting.PPEnv.ofenv env in
+    let vs,gs = elements fv in
+    let pp_vs fmt (pv,_) = EcPrinting.pp_pv ppe fmt pv in
+    if gs = [] then 
+      Format.fprintf fmt "@[%a@]"
+        (EcPrinting.pp_list ",@ " pp_vs) vs
+    else Format.fprintf fmt "@[%a,@ %a@]"
+      (EcPrinting.pp_list ",@ " pp_vs) vs
+      (EcPrinting.pp_list ",@ " (EcPrinting.pp_topmod ppe)) gs
+
   let disjoint_g env mp1 mp2 = 
     let me1, me2 = EcEnv.Mod.by_mpath mp1 env, EcEnv.Mod.by_mpath mp2 env in
     match me1.me_body, me2.me_body with
@@ -198,14 +303,4 @@ module PV = struct
     assert (check modi.glob topv);
     assert (check modi.glob topm);
     assert (check topvg topm)
-      
-  let check_depend env fv mp = 
-    (* FIXME error message *)
-    let check_v v _ty =
-      assert (is_glob v);
-      let top = EcPath.m_functor v.pv_name.EcPath.x_top in
-      assert (disjoint_g env mp top) in
-    M.iter check_v fv.pv;
-    let check_m m = assert (disjoint_g env mp m) in
-    EcPath.Sm.iter check_m fv.glob
 end
