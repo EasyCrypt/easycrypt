@@ -55,6 +55,7 @@
     "elim"        , ELIM       ;        (* KW: tactic *)
     "apply"       , APPLY      ;        (* KW: tactic *)
     "progress"    , PROGRESS   ;        (* KW: tactic *)
+    "trivial"     , TRIVIAL    ;        (* KW: tactic *)
     "cut"         , CUT        ;        (* KW: tactic *)
     "generalize"  , GENERALIZE ;        (* KW: tactic *)
     "clear"       , CLEAR      ;        (* KW: tactic *)
@@ -271,6 +272,8 @@ rule main = parse
 
   | "-" { MINUS }
   | "+" { ADD }
+
+  | "//" { SLASHSLASH }
 
   | op1 as s  { OP1 s }
   | op2 as s  { OP2 s }

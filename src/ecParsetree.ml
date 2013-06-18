@@ -331,6 +331,7 @@ and pinline_arg =
 type intropattern1 =
   | IPCore of (symbol option) located
   | IPCase of intropattern list
+  | IPDone
 
 and intropattern = intropattern1 list
 
@@ -344,6 +345,7 @@ type logtactic =
   | Pexists     of fpattern_arg located list 
   | Pleft                         
   | Pright                        
+  | Ptrivial
   | Pelim       of ffpattern 
   | Papply      of ffpattern
   | Pcut        of (psymbol * pformula)
