@@ -329,7 +329,8 @@ module LDecl : sig
 
   val hoareF : xpath -> hyps -> hyps * hyps
   val equivF : xpath -> xpath -> hyps -> hyps * hyps
-  val inv_memenv : hyps -> hyps 
+  val inv_memenv  : hyps -> hyps 
+  val inv_memenv1 : hyps -> hyps 
 
 end
 

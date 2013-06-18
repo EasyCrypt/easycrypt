@@ -202,7 +202,7 @@ let mk_let env (lets,f) =
   
 exception No_wp
 
-(* wp functions operates only over assignments and conditional statements.
+(* wp functions operate only over assignments and conditional statements.
    Any weakening on this restriction may break the soundness of bounded hoare logic 
 *)
 let rec wp_stmt env m (stmt: EcModules.instr list) letsf = 
@@ -415,7 +415,45 @@ let t_equivS_conseq pre post g =
   let concl2 = gen_mems [es.es_ml;es.es_mr] cond2 in
   let concl3 = f_equivS_r { es with es_pr = pre; es_po = post } in
   prove_goal_by [concl1; concl2; concl3] (RN_hl_conseq) g
- 
+
+(* -------------------------------------------------------------------- *)
+
+let t_hoareF_exfalso g =
+  let concl = get_concl g in
+  let hf = destr_hoareF concl in
+  if hf.hf_pr <> f_false then tacerror InvalidExfalso;
+  prove_goal_by [] (RN_hl_exfalso) g
+
+let t_hoareS_exfalso g =
+  let concl = get_concl g in
+  let hs = destr_hoareS concl in
+  if hs.hs_pr <> f_false then tacerror InvalidExfalso;
+  prove_goal_by [] (RN_hl_exfalso) g
+
+let t_bdHoareF_exfalso g =
+  let concl = get_concl g in
+  let bhf = destr_bdHoareF concl in
+  if bhf.bhf_pr <> f_false then tacerror InvalidExfalso;
+  prove_goal_by [] (RN_hl_exfalso) g
+
+let t_bdHoareS_exfalso g =
+  let concl = get_concl g in
+  let bhs = destr_bdHoareS concl in
+  if bhs.bhs_pr <> f_false then tacerror InvalidExfalso;
+  prove_goal_by [] (RN_hl_exfalso) g
+
+let t_equivF_exfalso g =
+  let concl = get_concl g in
+  let ef = destr_equivF concl in
+  if ef.ef_pr <> f_false then tacerror InvalidExfalso;
+  prove_goal_by [] (RN_hl_exfalso) g
+
+let t_equivS_exfalso g =
+  let concl = get_concl g in
+  let es = destr_equivS concl in
+  if es.es_pr <> f_false then tacerror InvalidExfalso;
+  prove_goal_by [] (RN_hl_exfalso) g
+
 (* -------------------------------------------------------------------- *)
 
 let t_hoareF_fun_def g = 
@@ -564,7 +602,7 @@ let lossless_hyps env top sub =
       sig_.mis_params in               (* Should we put restriction here *)
   let args = List.map (fun (id,_) -> EcPath.mident id) sig_.mis_params in
   let concl = 
-    f_losslessF (EcPath.xpath (EcPath.m_apply top args) sub ) in
+    f_losslessF (EcPath.xpath (EcPath.m_apply top args) sub) in
   let calls = 
     let name = EcPath.basename sub in
     let Tys_function(_,oi) = 
@@ -647,7 +685,7 @@ let t_equivF_abs inv g =
 let equivF_abs_upto env fl fr bad invP invQ = 
   let topl, fl, oil,sigl, topr, fr, oir,sigr = abstract_info2 env fl fr in
   let ml, mr = mleft, mright in
-  let bad2 = f_subst_mem mhr mr bad in
+  let bad2 = Fsubst.f_subst_mem mhr mr bad in
   let allinv = f_ands [bad2; invP; invQ] in
   let fvl = PV.fv env ml allinv in
   let fvr = PV.fv env mr allinv in
@@ -665,10 +703,10 @@ let equivF_abs_upto env fl fr bad invP invQ =
     let post = EcFol.f_if bad2 invQ (f_ands [eq_res;eqglob;invP]) in
     let cond1 = f_equivF pre o_l o_r post in
     let cond2 =
-      let q = f_subst_mem ml EcFol.mhr invQ in
+      let q = Fsubst.f_subst_mem ml EcFol.mhr invQ in
       f_forall [mr,GTmem None] (f_imp bad2 (f_bdHoareF q o_l q FHeq f_r1)) in
     let cond3 = 
-      let q = f_subst_mem mr EcFol.mhr invQ in
+      let q = Fsubst.f_subst_mem mr EcFol.mhr invQ in
       let bq = f_and bad q in
       f_forall [ml,GTmem None] (f_bdHoareF bq o_r bq FHeq f_r1) in
     [cond1;cond2;cond3] in
@@ -1111,14 +1149,14 @@ let t_equiv_call1 side fpre fpost g =
   let fres   = f_local vres fsig.fs_ret in
   let post   = wp_asgn_call env me lp fres equiv.es_po in
   let subst  = PVM.add env pvres me fres PVM.empty in
-  let msubst = EcFol.f_bind_mem EcFol.f_subst_id EcFol.mhr me in
-  let fpost  = PVM.subst env subst (f_subst msubst fpost) in
+  let msubst = Fsubst.f_bind_mem Fsubst.f_subst_id EcFol.mhr me in
+  let fpost  = PVM.subst env subst (Fsubst.f_subst msubst fpost) in
   let modi   = f_write env f in
   let post   = f_imp_simpl fpost post in
   let post   = generalize_mod env me modi post in
   let spre   = PVM.empty in
   let spre   = subst_args_call env me f fsig.fs_params args spre in
-  let post   = f_anda_simpl (PVM.subst env spre (f_subst msubst fpre)) post in
+  let post   = f_anda_simpl (PVM.subst env spre (Fsubst.f_subst msubst fpre)) post in
   let concl  =
     match side with
     | true  -> { equiv with es_sl = fstmt; es_po = post; }
@@ -1132,14 +1170,14 @@ let t_equiv_call1 side fpre fpost g =
 let t_hoare_equiv p q p1 q1 p2 q2 g =
   let concl = get_concl g in
   let es = destr_equivS concl in
-  let s1 = f_bind_mem f_subst_id mhr (fst es.es_ml) in
-  let s2 = f_bind_mem f_subst_id mhr (fst es.es_mr) in
+  let s1 = Fsubst.f_bind_mem Fsubst.f_subst_id mhr (fst es.es_ml) in
+  let s2 = Fsubst.f_bind_mem Fsubst.f_subst_id mhr (fst es.es_mr) in
   let concl1 = 
     gen_mems [es.es_ml;es.es_mr] 
-      (f_imp es.es_pr (f_and p (f_and (f_subst s1 p1) (f_subst s2 p2)))) in
+      (f_imp es.es_pr (f_and p (f_and (Fsubst.f_subst s1 p1) (Fsubst.f_subst s2 p2)))) in
   let concl2 = 
     gen_mems [es.es_ml;es.es_mr]
-      (f_imps [q;f_subst s1 q1;f_subst s2 q2] es.es_po) in
+      (f_imps [q;Fsubst.f_subst s1 q1;Fsubst.f_subst s2 q2] es.es_po) in
   let concl3 = 
     f_hoareS (mhr,snd es.es_ml) p1 es.es_sl q1 in
   let concl4 = 
@@ -1607,11 +1645,11 @@ let t_bdHoare_deno pre post g =
   let sargs = 
     List.fold_left2 (fun s v a -> PVM.add env (pv_loc f v.v_name) mhr a s)
       PVM.empty fun_.f_sig.fs_params args in
-  let smem = f_bind_mem f_subst_id mhr m in
-  let concl_pr  = f_subst smem (PVM.subst env sargs pre) in
+  let smem = Fsubst.f_bind_mem Fsubst.f_subst_id mhr m in
+  let concl_pr  = Fsubst.f_subst smem (PVM.subst env sargs pre) in
   (* building the substitution for the post *)
-  let smem_ = f_bind_mem f_subst_id mhr mhr in 
-  let ev   = f_subst smem_ ev in
+  let smem_ = Fsubst.f_bind_mem Fsubst.f_subst_id mhr mhr in 
+  let ev   = Fsubst.f_subst smem_ ev in
   let me = EcEnv.Fun.actmem_post mhr f fun_ in
   let concl_po = gen_mems [me] (concl_post ev) in
   prove_goal_by [concl_e;concl_pr;concl_po] RN_hl_deno g  
@@ -1640,12 +1678,12 @@ let t_equiv_deno pre post g =
     List.fold_left2 (fun s v a -> PVM.add env (pv_loc fl v.v_name) mleft a s)
       sargs funl.f_sig.fs_params argsl in
   let smem = 
-    f_bind_mem (f_bind_mem f_subst_id mright mr) mleft ml in
-  let concl_pr  = f_subst smem (PVM.subst env sargs pre) in
+    Fsubst.f_bind_mem (Fsubst.f_bind_mem Fsubst.f_subst_id mright mr) mleft ml in
+  let concl_pr  = Fsubst.f_subst smem (PVM.subst env sargs pre) in
   (* building the substitution for the post *)
-  let smeml = f_bind_mem f_subst_id mhr mleft in 
-  let smemr = f_bind_mem f_subst_id mhr mright in
-  let evl   = f_subst smeml evl and evr = f_subst smemr evr in
+  let smeml = Fsubst.f_bind_mem Fsubst.f_subst_id mhr mleft in 
+  let smemr = Fsubst.f_bind_mem Fsubst.f_subst_id mhr mright in
+  let evl   = Fsubst.f_subst smeml evl and evr = Fsubst.f_subst smemr evr in
   let cmp   = if cmp then f_iff else f_imp in 
   let mel = EcEnv.Fun.actmem_post mleft fl funl in
   let mer = EcEnv.Fun.actmem_post mright fr funr in
@@ -1699,10 +1737,10 @@ let t_equiv_rcond side b at_pos g =
   let hd,e,s = gen_rcond b EcFol.mhr at_pos s in 
   let mo' = EcIdent.create "&m" in
   let s1 = 
-    f_bind_mem 
-      (f_bind_mem f_subst_id (EcMemory.memory m) EcFol.mhr)
+    Fsubst.f_bind_mem 
+      (Fsubst.f_bind_mem Fsubst.f_subst_id (EcMemory.memory m) EcFol.mhr)
       (EcMemory.memory mo) mo' in
-  let pre1  = f_subst s1 es.es_pr in
+  let pre1  = Fsubst.f_subst s1 es.es_pr in
   let concl1 = 
     gen_mems [mo', EcMemory.memtype mo] 
       (f_hoareS (EcFol.mhr,EcMemory.memtype m) pre1 hd e) in
@@ -2007,7 +2045,6 @@ let t_bd_hoare_rnd (opt_bd,opt_event) g =
         let post = bounded_distr &&& post_equiv_event in
         f_bdHoareS_r {bhs with bhs_s=s; bhs_po=post; bhs_bd=EcFol.f_r1} 
   in
-
   prove_goal_by [concl] (RN_bhl_rnd (opt_bd,event) ) g
 
 
@@ -2056,8 +2093,8 @@ let t_prfalse g =
   let is_zero = f_real_le bd f_r0 in
 
   (* the event is false *)
-  let smem_ = f_bind_mem f_subst_id mhr mhr in 
-  let ev   = f_subst smem_ ev in
+  let smem_ = Fsubst.f_bind_mem Fsubst.f_subst_id mhr mhr in 
+  let ev   = Fsubst.f_subst smem_ ev in
   let fun_ = EcEnv.Fun.by_xpath f env in
   let me = EcEnv.Fun.actmem_post mhr f fun_ in
   let concl_po = gen_mems [me] (f_imp f_false ev) in
@@ -2080,11 +2117,8 @@ let t_pror g =
     | _ -> 
       cannot_apply "pr_op" "Pr[_ @ _ : _ \\/ _ ] expression was expected"
 
- 
-
-let t_bdeq g = 
+ let t_bdeq g = 
   let concl = get_concl g in
   let bhs = destr_bdHoareS concl in 
   let concl = f_bdHoareS_r {bhs with bhs_cmp=FHeq } in
   prove_goal_by [concl] RN_hl_prbounded g
-  
