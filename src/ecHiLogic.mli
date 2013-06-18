@@ -41,5 +41,6 @@ val process_mkn_apply :
   -> goal * int list
 
 (* -------------------------------------------------------------------- *)
-val process_logic  : hitenv -> EcLocation.t -> logtactic -> goal -> goals
-val process_intros : intropattern -> goal -> goals
+val process_logic   : hitenv -> EcLocation.t -> logtactic -> goal -> goals
+val process_intros  : intropattern -> goal -> goals
+val process_trivial : goal -> goals
