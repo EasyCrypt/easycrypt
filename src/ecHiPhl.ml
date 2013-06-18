@@ -486,18 +486,20 @@ let process_conseq info (_, n as g) =
   
 let process_fun_abs inv g =
   let hyps,concl = get_goal g in
-  let env' = LDecl.inv_memenv hyps in
   if is_equivF concl then
+    let env' = LDecl.inv_memenv hyps in
     let inv = process_form env' inv tbool in
     t_equivF_abs inv g
-  else if is_bdHoareF concl then
-    let inv = process_form env' inv tbool in
-    t_bdHoareF_abs inv g
-  else if is_hoareF concl then
-    let inv = process_form env' inv tbool in
-    t_hoareF_abs inv g
-  else
-    cannot_apply "fun" "equiv or probabilistic hoare triple was expected"
+  else 
+    let env' = LDecl.inv_memenv1 hyps in
+    if is_bdHoareF concl then
+      let inv = process_form env' inv tbool in
+      t_bdHoareF_abs inv g
+    else if is_hoareF concl then
+      let inv = process_form env' inv tbool in
+      t_hoareF_abs inv g
+    else
+      cannot_apply "fun" "equiv or probabilistic hoare triple was expected"
   
 let process_fun_upto (bad, p, o) g =
   let hyps = get_hyps g in
