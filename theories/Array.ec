@@ -144,19 +144,19 @@ axiom map2_get: forall (xs:'x array, ys:'y array, f:'x -> 'y -> 'z, i:int),
 lemma empty_append_fst: forall (xs:'x array),
   (xs || empty) = xs.
 proof.
-intros xs;  apply extensionality; trivial.
+intros xs;  apply extensionality; smt.
 save.
 
 lemma empty_append_snd: forall (xs:'x array),
   (empty || xs) = xs.
 proof.
-intros xs;  apply extensionality; trivial.
+intros xs;  apply extensionality; smt.
 save.
 
 lemma sub_append_full : forall (xs:'x array),
   sub xs 0 (length xs) = xs.
 proof.  
-intros xs; apply extensionality; trivial.
+intros xs; apply extensionality; smt.
 save.
 
 lemma sub_append_fst: forall (xs0 xs1:'x array),
@@ -175,31 +175,29 @@ delta.
 beta.
 split.
   rewrite (append_length<:'x> (sub xs i l1) (sub xs l1 l2)).
-  rewrite (sub_length<:'x> xs i l1 _ _ _); trivial.
+  rewrite (sub_length<:'x> xs i l1 _ _ _); smt.
     (* *)
   intros j j_pos j_bounded.
   generalize j_bounded.
     rewrite (append_length<:'x> (sub xs i l1) (sub xs l1 l2)).
-    rewrite (sub_length<:'x> xs i l1 _ _ _); [trivial|trivial|trivial|].
-    rewrite (sub_length<:'x> xs l1 l2 _ _ _); [trivial|trivial|trivial|].
+    rewrite (sub_length<:'x> xs i l1 _ _ _); [smt|smt|smt|].
+    rewrite (sub_length<:'x> xs l1 l2 _ _ _); [smt|smt|smt|].
     intros j_bounded_.
     case (j<l1).
-    elim (append_get<:'x> (sub xs i l1) ( sub xs l1 l2) j) .
+    elim (append_get<:'x> (sub xs i l1) (sub xs l1 l2) j) .
     intros H _ _.
-    cut j_bounded__ : (j < length (sub xs i l1)). trivial.
-    rewrite (H _ _);[trivial|trivial|].
-    rewrite (sub_get<:'x> xs i (l1+l2) j _ _ _ _ _);
-      [trivial|trivial|trivial|trivial|trivial|].
-    rewrite (sub_get<:'x> xs i l1 j _ _ _ _ _); trivial.
+    cut j_bounded__ : (j < length (sub xs i l1)); first smt.
+    rewrite (H _ _); [smt|smt|].
+    rewrite (sub_get<:'x> xs i (l1+l2) j _ _ _ _ _); [smt|smt|smt|smt|smt|].
+    rewrite (sub_get<:'x> xs i l1 j _ _ _ _ _); smt.
     (* *)
     intros j_geq_l1.
-    elim (append_get<:'x> (sub xs i l1) ( sub xs l1 l2) j) .
+    elim (append_get<:'x> (sub xs i l1) (sub xs l1 l2) j) .
     intros _ H.
-    rewrite (H _ _); [trivial|trivial|].
-    rewrite (sub_length<:'x> xs i l1 _ _ _);[trivial|trivial|trivial|].
-    rewrite (sub_get<:'x> xs l1 l2 (j-l1) _ _ _ _ _);
-      [trivial|trivial|trivial|trivial|trivial|].
-    rewrite (sub_get<:'x> xs i (l1+l2) j _ _ _ _ _); trivial.
+    rewrite (H _ _); [smt|smt|].
+    rewrite (sub_length<:'x> xs i l1 _ _ _);[smt|smt|smt|].
+    rewrite (sub_get<:'x> xs l1 l2 (j-l1) _ _ _ _ _); [smt|smt|smt|smt|smt|].
+    rewrite (sub_get<:'x> xs i (l1+l2) j _ _ _ _ _); smt.
 save.
 
 lemma sub_append_snd: forall (xs0 xs1:'x array),
