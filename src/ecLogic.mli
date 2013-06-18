@@ -100,6 +100,7 @@ val t_generalize_hyp  : EcIdent.t -> tactic
 val t_generalize_form : symbol option -> form -> tactic
 
 val t_intros_i : EcIdent.t list -> tactic
+val t_intros_1 : EcIdent.t list -> goal -> goal
 val t_intros   : EcIdent.t located list -> tactic
 
 val t_elim_hyp : EcIdent.t -> tactic

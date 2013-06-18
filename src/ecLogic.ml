@@ -577,6 +577,11 @@ let t_intros_i ids g =
     (List.map (fun id -> {pl_desc = id; pl_loc = EcLocation._dummy}) ids)
     g
 
+let t_intros_1 ids g =
+  match t_intros_i ids g with
+  | (juc, [n]) -> (juc, n)
+  | _ -> assert false
+
 let createVarForBinding t =
   let v = EcIdent.create "_" in ((v, GTty t),EcFol.f_local v t)
 

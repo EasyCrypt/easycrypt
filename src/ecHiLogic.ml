@@ -136,36 +136,50 @@ let process_assumption loc (pq, tvi) g =
 let process_intros pis (juc, n) =
   let mk_id s = lmap (fun s -> EcIdent.create (odfl "_" s)) s in
 
+  let elim_top g =
+    let h       = EcIdent.create "_" in
+    let (g, an) = EcLogic.t_intros_1 [h] g in
+    let (g, n)  = mkn_hyp g (get_hyps (g, an)) h in
+    let f       = snd (get_node (g, n)) in
+      t_on_goals
+        (t_clear (EcIdent.Sid.of_list [h]))
+        (t_on_first (t_use n []) (t_elim f (g, an)))
+  in
+
   let rec collect acc core pis =
     match pis, core with
     | [], [] -> acc
     | [], _  -> `Core (List.rev core) :: acc
 
     | IPCore x :: pis, _  -> collect acc (x :: core) pis
-    | IPCase x :: pis, [] -> collect (`Case x :: acc) [] pis
-    | IPDone   :: pis, [] -> collect (`Done   :: acc) [] pis
-
-    | IPCase x :: pis, _  ->
-        let acc = `Core (List.rev core) :: acc in
-        let acc = `Case x :: acc in
-          collect acc [] pis
-
-    | IPDone :: pis, _  ->
+    | IPDone   :: pis, [] -> collect (`Done :: acc) [] pis
+    | IPDone   :: pis, _  ->
         let acc = `Core (List.rev core) :: acc in
         let acc = `Done :: acc in
           collect acc [] pis
+
+    | IPCase x :: pis, core  -> begin
+        let x   = List.map (collect [] []) x in
+          match core with
+          | [] -> collect (`Case x :: acc) [] pis
+          | _  -> collect (`Case x :: `Core (List.rev core) :: acc) [] pis
+    end
   in
 
-  let rec dointro pis gs =
+  let rec dointro pis (gs : goals) =
     List.fold_left
       (fun gs ip ->
         match ip with
         | `Core ids -> t_on_goals (t_intros (List.map mk_id ids)) gs
         | `Done     -> t_on_goals process_trivial gs
-        | `Case _   -> assert false)
+        | `Case pis ->
+            let t gs = t_subgoal (List.map dointro1 pis) (elim_top gs) in
+              t_on_goals t gs)
       gs pis
-  in
-    dointro (List.rev (collect [] [] pis)) (juc, [n])
+
+  and dointro1 pis (juc, n) = dointro pis (juc, [n]) in
+
+    dointro1 (List.rev (collect [] [] pis)) (juc, n)
 
 (* -------------------------------------------------------------------- *)
 let process_elim_arg hyps oty a =
