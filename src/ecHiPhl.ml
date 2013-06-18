@@ -421,65 +421,53 @@ let process_equiv_deno info (_,n as g) =
 
 let process_conseq info (_, n as g) =
   let t_pre = ref (t_id None) and t_post = ref (t_id None) in
-  let tac1 g =
-    let hyps = get_hyps g in
-    let m, h = match LDecl.fresh_ids hyps ["&m";"H"] with
-      | [m;h] -> m,h
-      | _ -> assert false in
-    t_seq (t_intros_i [m;h]) (t_hyp h) g in
-  let tac2 g =
-    let hyps = get_hyps g in
-    let m1,m2, h = match LDecl.fresh_ids hyps ["&m";"&m";"H"] with
-      | [m1;m2;h] -> m1,m2,h
-      | _ -> assert false in
-    t_seq (t_intros_i [m1;m2;h]) (t_hyp h) g in
   let process_cut g (pre,post) =
     let hyps,concl = get_goal g in        
-    let tac, penv, qenv, gpre, gpost, fmake = 
+    let penv, qenv, gpre, gpost, fmake = 
       match concl.f_node with
       | FhoareF hf ->
         let penv, qenv = LDecl.hoareF hf.hf_f hyps in
-        tac1, penv, qenv, hf.hf_pr, hf.hf_po, 
+        penv, qenv, hf.hf_pr, hf.hf_po, 
         (fun pre post -> f_hoareF pre hf.hf_f post)
       | FhoareS hs ->
         let env = LDecl.push_active hs.hs_m hyps in
-        tac1, env, env, hs.hs_pr, hs.hs_po,
+        env, env, hs.hs_pr, hs.hs_po,
         (fun pre post -> f_hoareS_r { hs with hs_pr = pre; hs_po = post })
       | FbdHoareF bhf ->
         let penv, qenv = LDecl.hoareF bhf.bhf_f hyps in
-        tac1, penv, qenv, bhf.bhf_pr, bhf.bhf_po, 
+        penv, qenv, bhf.bhf_pr, bhf.bhf_po, 
         (fun pre post -> f_bdHoareF pre bhf.bhf_f post bhf.bhf_cmp bhf.bhf_bd)
       | FbdHoareS bhs ->
         let env = LDecl.push_active bhs.bhs_m hyps in
-        tac1, env, env, bhs.bhs_pr, bhs.bhs_po,
+        env, env, bhs.bhs_pr, bhs.bhs_po,
         (fun pre post -> f_bdHoareS_r { bhs with bhs_pr = pre; bhs_po = post })
       | FequivF ef ->
         let penv, qenv = LDecl.equivF ef.ef_fl ef.ef_fr hyps in
-        tac2, penv, qenv, ef.ef_pr, ef.ef_po,
+        penv, qenv, ef.ef_pr, ef.ef_po,
         (fun pre post -> f_equivF pre ef.ef_fl ef.ef_fr post)
       | FequivS es -> 
         let env = LDecl.push_all [es.es_ml; es.es_mr] hyps in
-        tac2, env, env, es.es_pr, es.es_po,
+        env, env, es.es_pr, es.es_po,
         (fun pre post -> f_equivS_r { es with es_pr = pre; es_po = post }) 
       | _ -> tacuerror "cannot apply conseq rule, not a phl/prhl judgement"
     in
     let pre = match pre with
-      | None -> t_pre := tac; gpre 
-      | Some pre ->  process_form penv pre tbool in
+      | None -> t_pre := t_progress (t_id None); gpre 
+      | Some pre -> process_form penv pre tbool in
     let post = match post with
-      | None -> t_post := tac; gpost 
-      | Some post ->  process_form qenv post tbool in
+      | None -> t_post := t_progress (t_id None); gpost 
+      | Some post -> process_form qenv post tbool in
     fmake pre post in
   let (juc,an), gs = process_mkn_apply process_cut info g in
   let t_conseq = 
     let (_,f) = get_node (juc,an) in
     match f.f_node with
-    | FhoareF hf -> t_hoareF_conseq hf.hf_pr hf.hf_po
-    | FhoareS hs -> t_hoareS_conseq hs.hs_pr hs.hs_po
+    | FhoareF hf   -> t_hoareF_conseq hf.hf_pr hf.hf_po
+    | FhoareS hs   -> t_hoareS_conseq hs.hs_pr hs.hs_po
     | FbdHoareF hf -> t_bdHoareF_conseq hf.bhf_pr hf.bhf_po
     | FbdHoareS hs -> t_bdHoareS_conseq hs.bhs_pr hs.bhs_po
-    | FequivF ef -> t_equivF_conseq ef.ef_pr ef.ef_po
-    | FequivS es -> t_equivS_conseq es.es_pr es.es_po 
+    | FequivF ef   -> t_equivF_conseq ef.ef_pr ef.ef_po
+    | FequivS es   -> t_equivS_conseq es.es_pr es.es_po 
     | _ -> assert false (* FIXME error message *) in
   t_seq_subgoal t_conseq
     [!t_pre; !t_post; t_use an gs] (juc,n)
