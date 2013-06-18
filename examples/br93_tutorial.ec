@@ -107,15 +107,15 @@ module OW(I :Inverter) ={
 }.
 (** end one_way *)
 
-(* begin scheme *)
+(** begin scheme *)
  module type Scheme(R : Oracle) = {
  fun kg() : (pkey * skey)
   fun enc(pk:pkey, m:plaintext) : ciphertext
   fun dec(sk:skey, c:ciphertext) : plaintext
  }.
-(* end scheme *) 
+(** end scheme *) 
 
-(* begin br93 *)
+(** begin br93 *)
 op (||) (x : randomness, y : plaintext) : ciphertext =
  Ciphertext.from_array ((to_array x) || (to_array y)).
 
@@ -186,7 +186,7 @@ save.
   return (projPlain c ^^ h);
  }
 }.
-(* end br93 *)
+(** end br93 *)
 module Correct (S : Scheme) ={
  module SE = S(RO)
  fun main() : bool ={
@@ -218,7 +218,7 @@ proof.
 save.
 
 
-(* begin cpa *)
+(** begin cpa *)
 module type Adv (R : ARO) = { 
  fun a1(pk : pkey) : plaintext * plaintext
  fun a2(c : ciphertext) : bool
@@ -244,7 +244,7 @@ module CPA (S : Scheme, A_: Adv) ={
   return b = b';
  }
 }.
-(* end cpa *)
+(** end cpa *)
 
 (* First step: replace the call to the hash oracle when computing the cipher  *)
 (*             by a randomly sampled value. Intuitively, an adversary can only*)
