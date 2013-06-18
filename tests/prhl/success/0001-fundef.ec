@@ -39,8 +39,8 @@ proof.
   fun.
   call ((glob A){1} = (glob A){2}) (res{1}=res{2}).
   fun true.
-  trivial.
-  trivial.
+  smt.
+  smt.
   skip.
-  trivial.
+  smt.
 save.

@@ -78,13 +78,13 @@ proof.
     fun (mem F2.xs RO.logA)
       (RO.logA{1} = RO.logA{2} /\ F1.xs{1} = F2.xs{2} /\
        eq_except RO.mH{1} RO.mH{2} F2.xs{2}) 
-      (F1.xs{1} = F2.xs{2}); try (trivial).
+      (F1.xs{1} = F2.xs{2}); try (smt).
       apply Hlossless.
-      fun; inline RO.hash;wp;rnd;wp;skip;simplify;trivial.
+      fun; inline RO.hash;wp;rnd;wp;skip;simplify;smt.
 
     (* Hoare goal *)
     admit.
     admit.
-  inline RO.hash;wp;rnd;wp;skip;simplify;trivial.
+  inline RO.hash;wp;rnd;wp;skip;simplify;smt.
 save.
 

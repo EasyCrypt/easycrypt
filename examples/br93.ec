@@ -146,7 +146,7 @@ lemma eq1_enc :
 proof.
  fun.
  inline RO.o.
- wp;rnd;wp;skip;progress;trivial.
+ wp;rnd;wp;skip;progress;smt.
 save.
 
 
@@ -167,18 +167,18 @@ proof.
       ((!mem M.r ARO.log){2} => ={res}).
  fun (mem M.r ARO.log) 
      (={ARO.log} /\ eq_except RO.m{1} RO.m{2} M.r{2});
-      [trivial|trivial|assumption| | |].
+      [smt|smt|assumption| | |].
  fun.
- if;[trivial| |wp;skip;trivial].
- inline RO.o;wp;rnd;wp;skip;progress;trivial.
+ if;[smt| |wp;skip;smt].
+ inline RO.o;wp;rnd;wp;skip;progress;smt.
  intros &m H. fun. 
  if.
- inline RO.o;wp;rnd 1%r cPtrue;wp;skip;progress;trivial.
- wp;skip;progress;trivial.
+ inline RO.o;wp;rnd 1%r cPtrue;wp;skip;progress;smt.
+ wp;skip;progress;smt.
  intros &m;fun;if.
  inline RO.o.
- wp;rnd 1%r cPtrue;wp;skip;progress;trivial.
- wp;skip;progress;trivial.
+ wp;rnd 1%r cPtrue;wp;skip;progress;smt.
+ wp;skip;progress;smt.
  (* this is a bug *)
  call (pk{1} = pk{2} /\ RO.m{1} = RO.m{2} /\ m{1} = m{2} /\
       M.r{1} = M.r{2})
@@ -197,16 +197,16 @@ proof.
  fun ( ARO.log{1} = ARO.log{2} /\
   RO.m{1} = RO.m{2} /\ 
  (forall (x : randomness), mem x ARO.log{2} <=> in_dom x RO.m{2})).
-  trivial.
-  trivial.
+  smt.
+  smt.
   fun.
-  if;[trivial| |wp;skip;trivial].
-  inline RO.o;wp;rnd;wp;skip;progress;trivial.
+  if;[smt| |wp;skip;smt].
+  inline RO.o;wp;rnd;wp;skip;progress;smt.
   inline CPA(BR,A).SO.kg CPA(BR2,A).SO.kg.
   wp;rnd.
   inline CPA(BR,A).ARO.init CPA(BR,A).SO.init RO.init
   CPA(BR2,A).ARO.init CPA(BR2,A).SO.init RO.init.
-  rnd;wp;skip;progress;try trivial.
+  rnd;wp;skip;progress;try smt.
 save.
 
 
@@ -228,8 +228,8 @@ proof.
  apply (eq1(<:A) _ _).
  assumption.
  assumption.
- trivial.
- trivial.
+ smt.
+ smt.
 save.
 
 
@@ -245,15 +245,15 @@ cut H:
 (Pr[CPA(BR2,A).main() @ &m : res \/ mem M.r ARO.log] =
  Pr[CPA(BR2,A).main() @ &m : res] +  Pr[CPA(BR2,A).main() @ &m : mem M.r ARO.log] -
  Pr[CPA(BR2,A).main() @ &m : res /\ mem M.r ARO.log]).
-pr_or;trivial.
+pr_or;smt.
 rewrite H.
 cut Hge:(0%r <= (Pr[CPA(BR2,A).main() @ &m : res /\ mem M.r ARO.log])).
-trivial.
+smt.
 generalize Hge.
 generalize (Pr[CPA(BR2,A).main() @ &m : res /\ mem M.r ARO.log]).
 generalize (Pr[CPA(BR2,A).main() @ &m : res]).
 generalize (Pr[CPA(BR2,A).main() @ &m : mem M.r ARO.log]).
-trivial.
+smt.
 save.
 
 lemma real_le_trans : forall(a, b, c : real),  
@@ -275,7 +275,7 @@ proof.
  intros A Hlossless1 Hlossless2 &m.
  apply (real_le_trans _
          Pr[CPA(BR2,A).main() @ &m : res \/ mem M.r ARO.log] _ _ _).
- apply (prob1_1 (<:A) _ _ &m );try assumption;trivial.
+ apply (prob1_1 (<:A) _ _ &m );try assumption;smt.
  apply (prob1_2 (<:A)  &m).
 save.
 
@@ -307,7 +307,7 @@ lemma eq2_enc :
 proof.
  fun.
  rnd (lambda v, m{2} ^^ v)(lambda v,m{2} ^^ v);skip.
- progress;trivial.
+ progress;smt.
 save.
 
 lemma eq2 : forall (A <: Adv {BR2,BR3,RO,ARO}), 
@@ -329,13 +329,13 @@ proof.
 (ARO.log{1} = ARO.log{2} /\ RO.m{1} = RO.m{2} /\ 
  res{1} = res{2}).
  fun ((ARO.log{1} = ARO.log{2} /\ RO.m{1} = RO.m{2})).
- trivial.
- trivial.
+ smt.
+ smt.
  fun.
- if;[trivial| |].
+ if;[smt| |].
  inline RO.o.
- wp;rnd;wp;skip;trivial.
- wp;skip;trivial.
+ wp;rnd;wp;skip;smt.
+ wp;skip;smt.
  call (pk{1} = pk{2} /\ RO.m{1} = RO.m{2} /\ m{1} = m{2} /\ M.r{1} = M.r{2})
       (res{1} = res{2} /\ RO.m{1} = RO.m{2}).
  apply eq2_enc.
@@ -345,15 +345,15 @@ proof.
 (ARO.log{1} = ARO.log{2} /\ RO.m{1} = RO.m{2} /\ 
  res{1} = res{2}/\ (glob A){1} = (glob A){2}).
  fun ((ARO.log{1} = ARO.log{2} /\ RO.m{1} = RO.m{2})).
- trivial.
- trivial.
+ smt.
+ smt.
  fun.
- if;[trivial| |wp;skip;trivial].
+ if;[smt| |wp;skip;smt].
  inline RO.o.
- wp;rnd;wp;skip;trivial.
+ wp;rnd;wp;skip;smt.
  inline CPA(BR2, A).SO.init CPA(BR2, A).SO.kg CPA(BR2, A).ARO.init RO.init 
         CPA(BR3, A).SO.init CPA(BR3, A).SO.kg CPA(BR3, A).ARO.init.
- wp;rnd;wp;rnd;wp;skip;progress;trivial.
+ wp;rnd;wp;rnd;wp;skip;progress;smt.
 save.
 
 lemma prob2_1 : 
@@ -374,8 +374,8 @@ proof.
  apply (eq2(<:A) _ _).
  assumption.
  assumption.
- trivial.
- trivial.
+ smt.
+ smt.
 save.
 
 lemma prob2_2 : 
@@ -396,8 +396,8 @@ proof.
  apply (eq2(<:A) _ _).
  assumption.
  assumption.
- trivial.
- trivial.
+ smt.
+ smt.
 save.
 
 
@@ -445,13 +445,13 @@ proof.
 (ARO.log{1} = ARO.log{2} /\ RO.m{1} = RO.m{2} /\ 
  res{1} = res{2}).
  fun ((ARO.log{1} = ARO.log{2} /\ RO.m{1} = RO.m{2})).
- trivial.
- trivial.
+ smt.
+ smt.
  fun.
- if;[trivial| |].
+ if;[smt| |].
  inline RO.o.
- wp;rnd;wp;skip;trivial.
- wp;skip;trivial.
+ wp;rnd;wp;skip;smt.
+ wp;skip;smt.
  inline CPA(BR3, A).SO.enc CPA2(BR3, A).SO.enc.
  wp.
  swap{2} -2.
@@ -461,16 +461,16 @@ proof.
 (ARO.log{1} = ARO.log{2} /\ RO.m{1} = RO.m{2} /\ 
  res{1} = res{2}/\ (glob A){1} = (glob A){2}).
  fun ((ARO.log{1} = ARO.log{2} /\ RO.m{1} = RO.m{2})).
- trivial.
- trivial.
+ smt.
+ smt.
  fun.
- if;[trivial| |wp;skip;trivial].
+ if;[smt| |wp;skip;smt].
  inline RO.o.
- wp;rnd;wp;skip;trivial.
+ wp;rnd;wp;skip;smt.
 
  inline CPA2(BR3, A).SO.init CPA2(BR3, A).SO.kg CPA2(BR3, A).ARO.init RO.init 
          CPA(BR3, A).SO.init CPA(BR3, A).SO.kg CPA(BR3, A).ARO.init.
- wp;rnd;wp;rnd;wp;skip;progress;trivial.
+ wp;rnd;wp;rnd;wp;skip;progress;smt.
 save.
 
 lemma prob3_1 : 
@@ -493,32 +493,32 @@ proof.
  fun; rnd (1%r / 2%r) (lambda b, b = b'); simplify.
  call (true) (true).
  fun (true).
- trivial.
- trivial.
+ smt.
+ smt.
  assumption.
  fun.
  if.
- inline RO.o;wp;rnd 1%r (cPtrue);wp;skip;trivial.
- wp;skip;trivial.
+ inline RO.o;wp;rnd 1%r (cPtrue);wp;skip;smt.
+ wp;skip;smt.
  inline CPA2(BR3,A).SO.enc;wp;rnd 1%r (cPtrue);wp.
  call (true) (true).
  fun (true).
- trivial.
- trivial.
+ smt.
+ smt.
  assumption.
  fun.
  if.
- inline RO.o;wp;rnd 1%r (cPtrue);wp;skip;trivial.
- wp;skip;trivial.
+ inline RO.o;wp;rnd 1%r (cPtrue);wp;skip;smt.
+ wp;skip;smt.
  inline CPA2(BR3,A).SO.kg CPA2(BR3,A).SO.init CPA2(BR3,A).ARO.init RO.init.
  wp;rnd 1%r (cPtrue);rnd 1%r (cPtrue);wp;skip;progress.
- trivial.
- trivial.
- trivial.
+ smt.
+ smt.
+ smt.
  rewrite (Dbool.mu_def  (lambda b, b = result)).
- case (result);delta charfun;simplify;trivial.
+ case (result);delta charfun;simplify;smt.
  intros &m1. 
- bdhoare_deno H1; trivial.
+ bdhoare_deno H1; smt.
 save.
 
 
@@ -540,8 +540,8 @@ proof.
  apply (eq3(<:A) _ _).
  assumption.
  assumption.
- trivial.
- trivial.
+ smt.
+ smt.
 save.
 
 lemma prob3_3 : 
@@ -562,8 +562,8 @@ proof.
  apply (eq3(<:A) _ _).
  assumption.
  assumption.
- trivial.
- trivial.
+ smt.
+ smt.
 save.
 
 
@@ -610,10 +610,10 @@ in_supp (pk,sk) keypairs  =>
 f pk x = f pk y => x = y.
 proof.
  intros x y pk sk Hsupp Heqf.
- rewrite <- (finvof pk sk x _);first trivial.
- rewrite <- (finvof pk sk y _);first trivial.
+ rewrite <- (finvof pk sk x _);first smt.
+ rewrite <- (finvof pk sk y _);first smt.
  rewrite Heqf.
- trivial.
+ smt.
 save.
 
 
@@ -645,10 +645,10 @@ proof.
 ((glob A){1} = (glob A){2} /\ dom RO.m{1} = ARO.log{1} /\
  RO.m{1} = RO.m{2} /\ ARO.log{1} = ARO.log{2} /\ res{1} = res{2}).
  fun (RO.m{1} = RO.m{2} /\ ARO.log{1} = ARO.log{2} /\ dom RO.m{1} = ARO.log{1}).
- trivial.
- trivial.
+ smt.
+ smt.
  fun.
- if;[trivial|inline RO.o;wp;rnd |];wp;skip;progress;trivial.
+ if;[smt|inline RO.o;wp;rnd |];wp;skip;progress;smt.
  wp.
  rnd.
  wp.
@@ -657,19 +657,19 @@ call ((glob A){1} = (glob A){2} /\ p{1} = p{2} /\
 ((glob A){1} = (glob A){2}  /\ dom RO.m{1} = ARO.log{1} /\
  RO.m{1} = RO.m{2} /\ ARO.log{1} = ARO.log{2} /\ res{1} = res{2}).
  fun (RO.m{1} = RO.m{2} /\ ARO.log{1} = ARO.log{2}  /\ dom RO.m{1} = ARO.log{1}).
- trivial.
- trivial.
+ smt.
+ smt.
  fun.
- if;[trivial|inline RO.o;wp;rnd |];wp;skip;progress;trivial.
+ if;[smt|inline RO.o;wp;rnd |];wp;skip;progress;smt.
  wp;rnd;rnd;wp;skip.
- progress;trivial.
+ progress;smt.
 wp;skip.
 progress.
 elim (find_some2<:from,to>
       (lambda (p : (from * to)), f pk{2} (fst p) = f pk{2} x{2})
       RO.m{2}
       x{2} _).
-split;trivial.
+split;smt.
 intros x2 Hfind.
 rewrite Hfind.
 elim (find_some1<:from,to>
@@ -680,7 +680,7 @@ assumption.
 delta;simplify.
 intros Hin_dom Hf.
 rewrite (proj_def<:from> x2).
-apply (f_iny x{2} x2 pk{2} sk{2} _ _);trivial.
+apply (f_iny x{2} x2 pk{2} sk{2} _ _);smt.
 save.
 
 
@@ -706,14 +706,14 @@ Pr[CPA(BR,A).main() @ &m : res] <=
   rewrite (prob3_3(<:A) _ _ &m);try assumption.
   rewrite (prob3_1(<:A) _ _ _ &m);try assumption.
   cut aux: (forall (a b c : real), b <= c => a + b <= a + c).
-  trivial.
+  smt.
   apply (aux (1%r/2%r) (Pr[CPA2(BR3,A).main() @ &m : mem M.r ARO.log])
  Pr[OW(BR_OW(A)).main() @ &m : res] _).
   equiv_deno (_ : (glob A){1} = (glob A){2} ==> 
   mem M.r{1} ARO.log{1} => res{2}).
   apply (eq4(<:A) _ _);try assumption.
-  trivial.
-  trivial.
+  smt.
+  smt.
 save.
 
 lemma Conclusion (A <: Adv {CPA,CPA2, BR, BR2, BR3, OW, RO, ARO}) &m :
@@ -731,7 +731,7 @@ proof.
  exists (<:BR_OW(A)).
  cut aux : 
 (forall (x, y:real), x <= 1%r / 2%r + y => x - 1%r / 2%r  <= y). 
- trivial.
+ smt.
  apply (aux
  Pr[CPA(BR,A).main() @ &m : res]
  Pr[OW(BR_OW(A)).main() @ &m : res] _).

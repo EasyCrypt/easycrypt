@@ -81,7 +81,6 @@ def _options():
     options.targets = args[1:]
 
     if cmdopt.bin_args:
-        print cmdopt.bin_args
         options.args.extend(itertools.chain.from_iterable( \
           x.split() for x in cmdopt.bin_args))
 

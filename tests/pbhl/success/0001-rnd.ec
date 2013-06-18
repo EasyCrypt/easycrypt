@@ -18,9 +18,9 @@ fun.
 rnd (1%r/2%r) (lambda (x:bool), x=y).
 skip.
 simplify.
-(* trivial. *) (* some bug *)
+(* smt. *) (* some bug *)
 intros &hr.
-trivial.
+smt.
 save.
 
 module F = {
@@ -38,6 +38,6 @@ fun.
 rnd (1%r) (lambda (x:bool), true).
 rnd (1%r/2%r) (lambda (x:bool), x).
 skip.
-trivial.
+smt.
 save.
 

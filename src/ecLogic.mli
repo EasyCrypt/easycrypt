@@ -120,7 +120,7 @@ val t_split : tactic
 val t_left  : tactic
 val t_right : tactic
 
-val t_trivial : bool -> EcProvers.prover_infos -> tactic
+val t_smt : bool -> EcProvers.prover_infos -> tactic
 
 val t_cut : form -> tactic
 

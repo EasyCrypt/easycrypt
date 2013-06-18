@@ -274,13 +274,13 @@ let process_rewrite loc (s,pe) (_,n as g) =
                  (process_mkn_apply process_formula pe g) s) n
 
 (* -------------------------------------------------------------------- *)
-let process_trivial hitenv pi g =
+let process_smt hitenv pi g =
   let pi = hitenv.hte_provers pi in
 
   match hitenv.hte_smtmode with
   | `Admit    -> t_admit g
-  | `Standard -> t_seq (t_simplify_nodelta) (t_trivial false pi) g
-  | `Strict   -> t_seq (t_simplify_nodelta) (t_trivial true  pi) g
+  | `Standard -> t_seq (t_simplify_nodelta) (t_smt false pi) g
+  | `Strict   -> t_seq (t_simplify_nodelta) (t_smt true  pi) g
 
 (* -------------------------------------------------------------------- *)
 let process_cut name phi g =
@@ -614,7 +614,7 @@ let process_new_apply loc pe g =
 let process_logic hitenv loc t =
   match t with
   | Passumption pq -> process_assumption loc pq
-  | Ptrivial pi    -> process_trivial hitenv pi
+  | Psmt pi        -> process_smt hitenv pi
   | Pintro pi      -> process_intros pi
   | Psplit         -> t_split
   | Pfield st      -> process_field st

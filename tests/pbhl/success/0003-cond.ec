@@ -25,7 +25,7 @@ lemma foo : bd_hoare [M.f : (b1 => M.y=e1) && (b2 => M.y=e2) && (b1||b2) ==>
                          M.x=M.y ] [=] [1%r].
 proof.
  fun.
- if; wp; skip; trivial.
+ if; wp; skip; smt.
 save.
 
 

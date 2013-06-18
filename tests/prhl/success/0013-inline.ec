@@ -19,5 +19,5 @@ proof.
   fun.
   inline {1} M.f.
   inline {2} M.f.
-  wp; skip; trivial.
+  wp; skip; smt.
 save.

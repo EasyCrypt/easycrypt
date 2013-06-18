@@ -24,7 +24,7 @@ theory Dbool.
   proof.
     intros b; delta in_supp mu_x beta.
     rewrite (mu_def ((=) b)).
-    delta; simplify; trivial.
+    delta; simplify; smt.
   qed.
   
   lemma mu_x_def : forall (b:bool), mu_x dbool b = 1%r / 2%r.
@@ -32,7 +32,7 @@ theory Dbool.
     intros b.
     delta mu_x; simplify.
     rewrite (mu_def ((=) b)).
-    delta; simplify; trivial.
+    delta; simplify; smt.
   qed.
 
   lemma lossless : weight dbool = 1%r by [].

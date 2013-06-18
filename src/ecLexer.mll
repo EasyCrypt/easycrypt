@@ -74,7 +74,7 @@
     "field_simplify", FIELDSIMP;        (* KW: tactic *)
 
     "assumption"  , ASSUMPTION ;        (* KW: bytac *)
-    "trivial"     , TRIVIAL    ;        (* KW: bytac *)
+    "smt"         , SMT        ;        (* KW: bytac *)
     "by"          , BY         ;        (* KW: bytac *)
 
     (* PHL: tactics *)

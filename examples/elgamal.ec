@@ -264,7 +264,7 @@ proof.
  wp;rnd.
  call (pk{1} = pk{2} /\ (glob A){1} = (glob A){2}) (res{1}=res{2} /\ (glob A){1} = (glob A){2}).
  fun true;try (simplify;split).
- wp; do rnd; skip. simplify; trivial. 
+ wp; do rnd; skip. simplify; smt. 
 
 (* Just to test tactic *)
 (* intros &m1 &m2 Heq.
@@ -274,7 +274,7 @@ proof.
  elimT tuple2_ind rR.
  intros a b _;simplify.
  intros b1 _;split.
- trivial.
+ smt.
  intros _ r1L r2L A0 A2 H;elim H;clear H;intros H1 H2.
  subst;simplify.
  split. *)
@@ -284,14 +284,14 @@ lemma Pr1 (A<:Adv) &m :
    Pr[CPA(ElGamal,A).main() @ &m : res] = 
    Pr[DDH0(Inv(A)).main() @ &m : res].
 proof.
- equiv_deno (equiv1 (<:A));trivial.
+ equiv_deno (equiv1 (<:A));smt.
 save.
 
 lemma Pr2 (A<:Adv) &m : 
    Pr[G1(A).main() @ &m : res] = 
    Pr[DDH1(Inv(A)).main() @ &m : res].
 proof.
- equiv_deno (_: (glob A){1}=(glob A){2} ==> res{1} = res{2});try trivial.
+ equiv_deno (_: (glob A){1}=(glob A){2} ==> res{1} = res{2});try smt.
   fun. inline{2} Inv(A).inv.
   swap{1} 7 -4;wp.
   call (c{1} = c{2} /\ (glob A){1} = (glob A){2})
@@ -301,13 +301,13 @@ proof.
   call (pk{1} = pk{2} /\ (glob A){1} = (glob A){2}) 
              (res{1}=res{2} /\ (glob A){1} = (glob A){2}).
     fun true;try (simplify;split).
-  wp;do rnd;skip;trivial. 
+  wp;do rnd;skip;smt. 
 save.
 
 lemma Fact3 (A<:Adv) &m : 
   Pr[G1(A).main() @ &m : res] = Pr[G2(A).main() @ &m : res].
 proof.
- equiv_deno (_: (glob A){1}=(glob A){2} ==> res{1} = res{2});try trivial.
+ equiv_deno (_: (glob A){1}=(glob A){2} ==> res{1} = res{2});try smt.
  fun. 
  swap{2} 10 -4;wp.
  call (c{1} = c{2} /\ (glob A){1} = (glob A){2})
@@ -319,7 +319,7 @@ proof.
  call (pk{1} = pk{2} /\ (glob A){1} = (glob A){2}) 
              (res{1}=res{2} /\ (glob A){1} = (glob A){2}).
    fun true;try (simplify;split).
- wp;do rnd;skip; progress; trivial.
+ wp;do rnd;skip; progress; smt.
 save.
 
 require import Real.
@@ -343,11 +343,11 @@ lemma Pr4 (A<:Adv) &m :
    Pr[G2(A).main() @ &m : res] = 1%r / 2%r.
 proof.
  intros Ha1 Ha2.
- bdhoare_deno (_: true ==> _); last trivial.
+ bdhoare_deno (_: true ==> _); last smt.
  apply (Pr4_aux(<:A) _ _).
   assumption.
   assumption.
- trivial.
+ smt.
 save.
 
 lemma Conclusion1 (A<:Adv) &m : 
@@ -360,7 +360,7 @@ proof.
   rewrite (Pr1 (<:A) &m).
   rewrite <- (Pr4 (<:A) &m _ _);try assumption.
   rewrite <- (Fact3 (<:A) &m).
-  rewrite (Pr2 (<:A) &m);trivial.
+  rewrite (Pr2 (<:A) &m);smt.
 save.
 
 lemma Conclusion (A<:Adv) &m :

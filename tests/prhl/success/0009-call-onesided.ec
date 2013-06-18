@@ -19,15 +19,15 @@ module OneSided = {
 lemma bar:
   hoare [OneSided.init: true ==> OneSided.x =  0].
 proof.
-fun;wp;skip;trivial.
+fun;wp;skip;smt.
 save.
 
 lemma main:
   equiv [OneSided.main ~ OneSided.main2: true ==> OneSided.x{1} = OneSided.x{2}].
 proof.
 fun;
-seq 1 0: (OneSided.x{1} = 0);[ | wp;skip;trivial ].
-call {1} (true) (OneSided.x = 0);[ apply bar | intros _;skip;trivial ].
+seq 1 0: (OneSided.x{1} = 0);[ | wp;skip;smt ].
+call {1} (true) (OneSided.x = 0);[ apply bar | intros _;skip;smt ].
 save.
 
 module Framing = {
@@ -49,8 +49,8 @@ lemma frame:
 proof.
 fun.
   call{1} (true) (true).
-    fun;wp;skip;trivial.
+    fun;wp;skip;smt.
   intros _;call{2} (true) (true).
-    fun;wp;skip;trivial.
-  intros _;wp;skip;trivial.
+    fun;wp;skip;smt.
+  intros _;wp;skip;smt.
 save.

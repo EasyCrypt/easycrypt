@@ -226,7 +226,7 @@ proof.
     ((glob A){1} = (glob A){2} /\
      RO.m{1} = Map.empty /\ ARO.log{2} = Set.empty /\ ARO.log{1} = ARO.log{2} /\
      RO.m{1} = RO.m{2} /\ pk{1} = gx{2} /\ y{1} = y{2} /\ (G1.gxy = gx ^ y){2}).
-  wp; do rnd; wp; skip; trivial.
+  wp; do rnd; wp; skip; smt.
 
   seq 2 2 : 
     ((glob A){1} = (glob A){2} /\ RO.m{1} = RO.m{2} /\
@@ -244,13 +244,13 @@ proof.
   fun 
     (RO.m{1} = RO.m{2} /\ ARO.log{1} = ARO.log{2} /\
      (forall (x:group), mem x ARO.log{2} <=> in_dom x RO.m{2})).
-  trivial.
-  trivial.
+  smt.
+  smt.
   fun; inline RO.o; wp; if.
-  trivial.
-  wp; rnd; wp; skip; progress; trivial (* may timeout *).
-  wp; skip; trivial.
-  skip; trivial.
+  smt.
+  wp; rnd; wp; skip; progress; smt (* may timeout *).
+  wp; skip; smt.
+  skip; smt.
 
   call 
     ((!mem G1.gxy ARO.log){2} =>
@@ -259,29 +259,29 @@ proof.
     ((!mem G1.gxy ARO.log){2} => res{1} = res{2} /\ ARO.log{1} = ARO.log{2}).
   fun (mem G1.gxy ARO.log) 
      (ARO.log{1} = ARO.log{2} /\ Map.eq_except RO.m{1} RO.m{2} G1.gxy{2}).
-  trivial.
-  trivial.
+  smt.
+  smt.
 
   intros O _; apply (H (<:O) _); assumption.
 
   fun; inline RO.o; wp; if.
-  trivial.
-  wp; rnd; wp; skip; trivial.
-  wp; skip; trivial.
+  smt.
+  wp; rnd; wp; skip; smt.
+  wp; skip; smt.
 
   intros _ _; fun.
   if; inline RO.o; wp.
   rnd 1%r Fun.cPtrue.
-  wp; skip; trivial.
-  wp; skip; trivial.
+  wp; skip; smt.
+  wp; skip; smt.
   
   intros _; fun.
   if; inline RO.o; wp.
   rnd 1%r Fun.cPtrue.
-  wp; skip; trivial.
-  wp; skip; trivial.
+  wp; skip; smt.
+  wp; skip; smt.
   
-  inline RO.o; wp; rnd; wp; skip; trivial.
+  inline RO.o; wp; rnd; wp; skip; smt.
 save.
 
 module G2 (A_:Adv) = { 
@@ -330,12 +330,12 @@ proof.
      ARO.log{1} = ARO.log{2} /\ RO.m{1} = RO.m{2} /\ c{1} = c{2}) 
     (res{1} = res{2} /\ G1.gxy{1} = G2.gxy{2} /\ ARO.log{1} = ARO.log{2}).
   fun (RO.m{1} = RO.m{2} /\ G1.gxy{1} = G2.gxy{2} /\ ARO.log{1} = ARO.log{2}).
-  trivial.
-  trivial.
+  smt.
+  smt.
   fun; inline RO.o; wp; if.
-  trivial.
-  wp; rnd; wp; skip; trivial.
-  wp; skip; trivial.
+  smt.
+  wp; rnd; wp; skip; smt.
+  wp; skip; smt.
 
   wp.
   rnd (lambda h, h ^^ if b{1} then m1{1} else m0{1}) 
@@ -347,20 +347,20 @@ proof.
     (res{1} = res{2} /\ (glob A){1} = (glob A){2} /\ 
      G1.gxy{1} = G2.gxy{2} /\ ARO.log{1} = ARO.log{2} /\ RO.m{1} = RO.m{2}).
   fun (RO.m{1} = RO.m{2} /\ G1.gxy{1} = G2.gxy{2} /\ ARO.log{1} = ARO.log{2}).
-  trivial. 
-  trivial.
+  smt. 
+  smt.
   fun; inline RO.o; wp; if.
-  trivial.
-  wp; rnd; wp; skip; trivial.
-  wp; skip; trivial.
+  smt.
+  wp; rnd; wp; skip; smt.
+  wp; skip; smt.
 
   wp; do rnd; wp; skip.
-  do intros _; do split; [trivial | trivial | ].
-  do intros _; do split; [trivial | trivial | ].
-  do intros _; do split; [trivial | ].
+  do intros _; do split; [smt | smt | ].
+  do intros _; do split; [smt | smt | ].
+  do intros _; do split; [smt | ].
   intros _ res1 res2.
   elimT Logic.tuple2_ind res1; elimT Logic.tuple2_ind res2.
-  do intros _; do split; trivial.
+  do intros _; do split; smt.
 save.
 
 module SCDH_from_CPA (A_:Adv) : SCDH_Adversary = {
@@ -404,27 +404,27 @@ proof.
    ((glob A){1} = (glob A){2} /\ RO.m{1} = RO.m{2} /\ ARO.log{1} = ARO.log{2} /\
     card ARO.log{1} <= qH /\ res{1} = res{2}).
   fun (RO.m{1} = RO.m{2} /\ ARO.log{1} = ARO.log{2} /\ card ARO.log{1} <= qH).
-  trivial.
-  trivial.
+  smt.
+  smt.
   fun; inline RO.o; wp; if.
-  trivial.
-  wp; rnd; wp; skip; trivial.
-  wp; skip; trivial.
+  smt.
+  wp; rnd; wp; skip; smt.
+  wp; skip; smt.
 
-  wp; do rnd; wp; skip; trivial.
+  wp; do rnd; wp; skip; smt.
 
   call 
    ((glob A){1} = (glob A){2} /\ RO.m{1} = RO.m{2} /\ ARO.log{1} = ARO.log{2} /\
     card ARO.log{1} <= qH /\ c{1} = c{2})
    (ARO.log{1} = ARO.log{2} /\ card ARO.log{1} <= qH).
   fun (RO.m{1} = RO.m{2} /\ ARO.log{1} = ARO.log{2} /\ card ARO.log{1} <= qH).
-  trivial.
-  trivial.
+  smt.
+  smt.
   fun; inline RO.o; wp; if.
-  trivial.
-  wp; rnd; wp; skip; trivial.
-  wp; skip; trivial.
-  skip; trivial.
+  smt.
+  wp; rnd; wp; skip; smt.
+  wp; skip; smt.
+  skip; smt.
 save.
 
 lemma Pr_CPA_G1 (A <: Adv {CPA, G1, G2, SCDH, RO, ARO, Hashed_ElGamal}) &m : 
@@ -437,8 +437,8 @@ proof.
   intros H.
   equiv_deno (CPA_G1 (<:A) _).
   assumption.
-  trivial.
-  trivial.
+  smt.
+  smt.
 save.
 
 lemma Pr_G1_G1 (A <: Adv {CPA, G1, G2, SCDH, RO, ARO, Hashed_ElGamal}) &m : 
@@ -458,26 +458,26 @@ proof.
     (Pr[G1(A).main() @ &m : res] + Pr[G1(A).main() @ &m : mem G1.gxy ARO.log]) 
      _ _).
   cut W: (forall (x y:real), x = y => x <= y).
-  trivial.
+  smt.
   apply W.
   pr_or.
-  trivial.
+  smt.
   cut V: (forall (x y z:real), 0%r <= z => x + y - z <= x + y).
-  trivial.
-  apply V; trivial.
+  smt.
+  apply V; smt.
 save.
 
 lemma Pr_G1_G2_res (A <: Adv {CPA, G1, G2, SCDH, RO, ARO, Hashed_ElGamal}) &m : 
   Pr[G1(A).main() @ &m : res] = Pr[G2(A).main() @ &m : res].
 proof.
-  equiv_deno (G1_G2 (<:A)); trivial.
+  equiv_deno (G1_G2 (<:A)); smt.
 save.
 
 lemma Pr_G1_G2_mem (A <: Adv {CPA, G1, G2, SCDH, RO, ARO, Hashed_ElGamal}) &m : 
   Pr[G1(A).main() @ &m : mem G1.gxy ARO.log] = 
   Pr[G2(A).main() @ &m : mem G2.gxy ARO.log].
 proof.
-  equiv_deno (G1_G2 (<:A)); trivial.
+  equiv_deno (G1_G2 (<:A)); smt.
 save.
 
 lemma Pr_G2 (A <: Adv {CPA, G1, G2, SCDH, RO, ARO, Hashed_ElGamal}) &m : 
@@ -491,9 +491,9 @@ proof.
   fun; rnd (1%r / 2%r) (lambda b, b' = b); simplify.
   conseq (_ : _ ==> true).
   intros &m1.
-  cut W : (mu {0,1} (Fun.cPeq b'{m1}) = 1%r / 2%r); [trivial | assumption].
+  cut W : (mu {0,1} (Fun.cPeq b'{m1}) = 1%r / 2%r); [smt | assumption].
   admit.
-  bdhoare_deno H1; trivial.
+  bdhoare_deno H1; smt.
 save.
 
 lemma Pr_G2_SCDH (A <: Adv {CPA, G1, G2, SCDH, RO, ARO, Hashed_ElGamal}) &m : 
@@ -505,8 +505,8 @@ lemma Pr_G2_SCDH (A <: Adv {CPA, G1, G2, SCDH, RO, ARO, Hashed_ElGamal}) &m :
 proof.
   intros _; equiv_deno (G2_SCDH (<:A) _).
   assumption.
-  trivial.
-  trivial.
+  smt.
+  smt.
 save.
 
 lemma Reduction (A <: Adv {CPA, G1, G2, SCDH, RO, ARO, Hashed_ElGamal}) &m : 
@@ -545,7 +545,7 @@ proof.
   intros H.
   exists (<: SCDH_from_CPA(A)).
   cut aux : (forall (x, y:real), x <= 1%r / 2%r + y => x - 1%r / 2%r <= y). 
-  trivial.
+  smt.
   apply aux; apply (Reduction (<:A) &m _); assumption.
 save.
 
@@ -555,7 +555,7 @@ proof.
   fun; inline Hashed_ElGamal(RO).kg Hashed_ElGamal(RO).enc.
   seq 7 : (in_dom (g ^ (sk * y)) RO.m /\ 
            c = (g ^ y, (proj RO.m.[g ^ (sk * y)]) ^^ m)).
-  inline RO.o; do (wp; rnd); skip; trivial.
+  inline RO.o; do (wp; rnd); skip; smt.
   inline Hashed_ElGamal(RO).dec RO.o.
-  wp; rnd; wp; skip; trivial.
+  wp; rnd; wp; skip; smt.
 save.
