@@ -202,7 +202,7 @@ let mk_let env (lets,f) =
   
 exception No_wp
 
-(* wp functions operates only over assignments and conditional statements.
+(* wp functions operate only over assignments and conditional statements.
    Any weakening on this restriction may break the soundness of bounded hoare logic 
 *)
 let rec wp_stmt env m (stmt: EcModules.instr list) letsf = 
@@ -415,7 +415,45 @@ let t_equivS_conseq pre post g =
   let concl2 = gen_mems [es.es_ml;es.es_mr] cond2 in
   let concl3 = f_equivS_r { es with es_pr = pre; es_po = post } in
   prove_goal_by [concl1; concl2; concl3] (RN_hl_conseq) g
- 
+
+(* -------------------------------------------------------------------- *)
+
+let t_hoareF_exfalso g =
+  let concl = get_concl g in
+  let hf = destr_hoareF concl in
+  if hf.hf_pr <> f_false then tacerror InvalidExfalso;
+  prove_goal_by [] (RN_hl_exfalso) g
+
+let t_hoareS_exfalso g =
+  let concl = get_concl g in
+  let hs = destr_hoareS concl in
+  if hs.hs_pr <> f_false then tacerror InvalidExfalso;
+  prove_goal_by [] (RN_hl_exfalso) g
+
+let t_bdHoareF_exfalso g =
+  let concl = get_concl g in
+  let bhf = destr_bdHoareF concl in
+  if bhf.bhf_pr <> f_false then tacerror InvalidExfalso;
+  prove_goal_by [] (RN_hl_exfalso) g
+
+let t_bdHoareS_exfalso g =
+  let concl = get_concl g in
+  let bhs = destr_bdHoareS concl in
+  if bhs.bhs_pr <> f_false then tacerror InvalidExfalso;
+  prove_goal_by [] (RN_hl_exfalso) g
+
+let t_equivF_exfalso g =
+  let concl = get_concl g in
+  let ef = destr_equivF concl in
+  if ef.ef_pr <> f_false then tacerror InvalidExfalso;
+  prove_goal_by [] (RN_hl_exfalso) g
+
+let t_equivS_exfalso g =
+  let concl = get_concl g in
+  let es = destr_equivS concl in
+  if es.es_pr <> f_false then tacerror InvalidExfalso;
+  prove_goal_by [] (RN_hl_exfalso) g
+
 (* -------------------------------------------------------------------- *)
 
 let t_hoareF_fun_def g = 
@@ -564,7 +602,7 @@ let lossless_hyps env top sub =
       sig_.mis_params in               (* Should we put restriction here *)
   let args = List.map (fun (id,_) -> EcPath.mident id) sig_.mis_params in
   let concl = 
-    f_losslessF (EcPath.xpath (EcPath.m_apply top args) sub ) in
+    f_losslessF (EcPath.xpath (EcPath.m_apply top args) sub) in
   let calls = 
     let name = EcPath.basename sub in
     let Tys_function(_,oi) = 
@@ -2007,7 +2045,6 @@ let t_bd_hoare_rnd (opt_bd,opt_event) g =
         let post = bounded_distr &&& post_equiv_event in
         f_bdHoareS_r {bhs with bhs_s=s; bhs_po=post; bhs_bd=EcFol.f_r1} 
   in
-
   prove_goal_by [concl] (RN_bhl_rnd (opt_bd,event) ) g
 
 
@@ -2080,11 +2117,8 @@ let t_pror g =
     | _ -> 
       cannot_apply "pr_op" "Pr[_ @ _ : _ \\/ _ ] expression was expected"
 
- 
-
-let t_bdeq g = 
+ let t_bdeq g = 
   let concl = get_concl g in
   let bhs = destr_bdHoareS concl in 
   let concl = f_bdHoareS_r {bhs with bhs_cmp=FHeq } in
   prove_goal_by [concl] RN_hl_prbounded g
-  

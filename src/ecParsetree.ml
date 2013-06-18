@@ -315,6 +315,7 @@ type phltactic =
   | Prnd        of tac_side * pformula rnd_tac_info
   | Palias      of (tac_side * codepos * psymbol option)
   | Pconseq     of cfpattern
+  | Pexfalso
   | Pbdhoaredeno  of cfpattern
   | Pequivdeno    of cfpattern
   | Phoare

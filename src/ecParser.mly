@@ -158,6 +158,7 @@
 %token COMMA
 %token COMPUTE
 %token CONSEQ
+%token EXFALSO
 %token CONST
 %token CUT
 %token DATATYPE
@@ -1632,6 +1633,9 @@ phltactic:
 
 | CONSEQ info=fpattern(conseq)
     { Pconseq info }
+
+| EXFALSO
+    { Pexfalso }
 
 (* basic pr based tacs *)
 | HOARE {Phoare}

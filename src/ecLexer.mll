@@ -95,7 +95,8 @@
     "bd_eq"       , BDEQ       ;        (* KW: tactic *)
 
     "equiv_deno"  , EQUIVDENO  ;        (* KW: tactic *) 
-    "conseq"      , CONSEQ     ;        (* KW: tactic *) 
+    "conseq"      , CONSEQ     ;        (* KW: tactic *)
+    "exfalso"     , EXFALSO    ;        (* KW: tactic *)
     "inline"      , INLINE     ;        (* KW: tactic *)
     "alias"       , ALIAS      ;        (* KW: tactic *)
     "fission"     , FISSION    ;        (* KW: tactic *)
