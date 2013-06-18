@@ -3,7 +3,6 @@ require import Real.
 require import Distr.
 require import Bool.
 
-
 module M = { 
   
   fun f() : bool = { 
@@ -29,7 +28,6 @@ module M2 = {
   }
 }.
 
-
 lemma foo2 : bd_hoare [M2.f : true ==> false] <= 1%r.
   conseq ( _: true ==> res<=2).
   smt.
@@ -38,7 +36,6 @@ lemma foo2 : bd_hoare [M2.f : true ==> false] <= 1%r.
   pr_bounded. 
   smt.
 save.
-
 
 lemma foo3 : bd_hoare [M2.f : true ==> true] >= (1%r/2%r).
   conseq ( _: true ==> res=2).
@@ -54,5 +51,10 @@ lemma foo3 : bd_hoare [M2.f : true ==> true] >= (1%r/2%r).
 *)
 save.
 
-
-
+lemma bug_15920 : bd_hoare [M2.f : true ==> false] <= 1%r.
+  conseq ( _: true ==> _).
+  smt.
+  fun.
+  pr_bounded. 
+  smt.
+save.
