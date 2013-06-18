@@ -76,7 +76,7 @@ let e_subst_of_subst (s:_subst) =
     es_loc     = Mid.empty; }
 
 let f_subst_of_subst (s:_subst) = 
-  f_subst_init true s.s_s.sb_modules s.s_sty
+  Fsubst.f_subst_init true s.s_s.sb_modules s.s_sty
 
 (* -------------------------------------------------------------------- *)
 let subst_variable (s : _subst) (x : variable) =
@@ -266,7 +266,7 @@ let subst_op_kind (s : _subst) (kind : operator_kind) =
       OB_oper (Some body)
   | OB_pred (Some body) ->   
       let s = f_subst_of_subst s in
-      let body  = EcFol.f_subst s body in
+      let body  = Fsubst.f_subst s body in
       OB_pred (Some body) 
   | _ -> kind
 
@@ -289,7 +289,7 @@ let subst_ax (s : _subst) (ax : axiom) =
     | None -> None
     | Some f -> 
         let s = f_subst_of_subst s in
-        Some (EcFol.f_subst s f) in
+        Some (Fsubst.f_subst s f) in
   let kind   = 
     match ax.ax_kind with
     | Axiom   -> Axiom

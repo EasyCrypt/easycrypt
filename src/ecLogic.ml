@@ -384,13 +384,13 @@ let check_arg do_arg hyps s x gty a =
   match gty, a with
   | GTty ty  , AAform f ->
       check_type (LDecl.toenv hyps) ty f.f_ty; (* FIXME error message *)
-      f_bind_local s x f, RA_form f
+      Fsubst.f_bind_local s x f, RA_form f
   | GTmem _   , AAmem m ->
-      f_bind_mem s x m, RA_id m
+      Fsubst.f_bind_mem s x m, RA_id m
   | GTmodty (emt, restr), AAmp (mp, mt)  ->
     let env = (LDecl.toenv hyps) in
     check_modtype_restr env mp mt emt restr;
-    f_bind_mod s x mp, RA_mp mp
+    Fsubst.f_bind_mod s x mp, RA_mp mp
   | _ -> assert false (* FIXME error message *)
 
 let mkn_apply do_arg (juc,n) args =
@@ -400,7 +400,7 @@ let mkn_apply do_arg (juc,n) args =
     let check_arg = check_arg do_arg hyps in
     let rec check_apply juc s ras f args =
       match args with
-      | [] -> juc, List.rev ras, f_subst s f
+      | [] -> juc, List.rev ras, Fsubst.f_subst s f
       | a :: args' ->
         if is_forall f then 
           let (x,gty,f') = destr_forall1 f in
@@ -410,14 +410,14 @@ let mkn_apply do_arg (juc,n) args =
           let (f1,f2) = destr_imp f in
           let a = do_arg hyps None a in
           assert (a = AAnode); (* FIXME error message *)
-          let juc, n = new_goal juc (hyps, f_subst s f1) in
+          let juc, n = new_goal juc (hyps, Fsubst.f_subst s f1) in
           check_apply juc s (RA_node n :: ras) f2 args' 
         else 
-          let f = f_subst s f in
+          let f = Fsubst.f_subst s f in
           match h_red_opt full_red hyps f with
           | None -> tacerror TooManyArgument
-          | Some f ->  check_apply juc f_subst_id ras f args in
-    let juc, ras, concl = check_apply juc f_subst_id [] concl args in
+          | Some f ->  check_apply juc Fsubst.f_subst_id ras f args in
+    let juc, ras, concl = check_apply juc Fsubst.f_subst_id [] concl args in
     let (juc,n1) = new_goal juc (hyps,concl) in
     let rule = { pr_name = RN_apply; pr_hyps = RA_node n :: ras} in
     let juc, _ = upd_rule rule (juc,n1) in
@@ -458,7 +458,6 @@ let t_apply_logic p tyargs args g =
   check_logic (LDecl.toenv (get_hyps g)) p;
   t_apply_glob p tyargs args g
   
-
 let pattern_form name hyps f1 f =
   let x = EcIdent.create (odfl "x" name) in
   let fx = EcFol.f_local x f1.f_ty in
@@ -518,22 +517,22 @@ let t_intros ids (juc,n as g) =
   let add_local s id x gty =
     let id   = id.pl_desc in
     let name = EcIdent.name id in
-    let gty = gty_subst s gty in
+    let gty  = Fsubst.gty_subst s gty in
     match gty with
     | GTty ty ->
         if name <> "_" && not (EcIo.is_sym_ident name) then
           tacerror (InvalidName name);
-        LD_var(ty,None), f_bind_local s x (f_local id ty)
+        LD_var(ty,None), Fsubst.f_bind_local s x (f_local id ty)
 
     | GTmem me ->
         if name <> "_" && not (EcIo.is_mem_ident name) then
           tacerror (InvalidName name);
-        LD_mem me, f_bind_mem s x id
+        LD_mem me, Fsubst.f_bind_mem s x id
 
     | GTmodty (i,r) ->
         if name <> "_" && not (EcIo.is_mod_ident name) then
           tacerror (InvalidName name);
-        LD_modty (i,r), f_bind_mod s x (EcPath.mident id)
+        LD_modty (i,r), Fsubst.f_bind_mod s x (EcPath.mident id)
   in
 
   let add_ld id ld hyps =
@@ -541,7 +540,7 @@ let t_intros ids (juc,n as g) =
 
   let rec check_intros hyps ids s concl =
     match ids with
-    | [] -> hyps, f_subst s concl
+    | [] -> hyps, Fsubst.f_subst s concl
     | id::ids' ->
       if is_forall concl then
         let (x,gty,concl) = destr_forall1 concl in
@@ -550,22 +549,22 @@ let t_intros ids (juc,n as g) =
         check_intros hyps ids' s concl
       else if is_imp concl then
         let f1, f2 = destr_imp concl in
-        let hyps = add_ld id (LD_hyp (f_subst s f1)) hyps in
+        let hyps = add_ld id (LD_hyp (Fsubst.f_subst s f1)) hyps in
         check_intros hyps ids' s f2
-      else if is_let1 concl then
+      else if is_let concl then
         let x,ty,e1,concl = destr_let1 concl in
-        let s = f_bind_local s x (f_local id.pl_desc ty) in
-        let hyps = add_ld id (LD_var (s.fs_ty ty, Some (f_subst s e1))) hyps in
+        let s = Fsubst.f_bind_local s x (f_local id.pl_desc ty) in
+        let hyps = add_ld id (LD_var (s.fs_ty ty, Some (Fsubst.f_subst s e1))) hyps in
         check_intros hyps ids' s concl
-      else if s == f_subst_id then
+      else if s == Fsubst.f_subst_id then
         match h_red_opt full_red hyps concl with
         | None -> 
           let ppe = EcPrinting.PPEnv.ofenv (LDecl.toenv hyps) in
           tacuerror "Do not known what to introduce in %a"
             (EcPrinting.pp_form ppe) concl
         | Some concl -> check_intros hyps ids s concl
-      else check_intros hyps ids f_subst_id (f_subst s concl) in
-  let hyps, concl = check_intros hyps ids f_subst_id concl in
+      else check_intros hyps ids Fsubst.f_subst_id (Fsubst.f_subst s concl) in
+  let hyps, concl = check_intros hyps ids Fsubst.f_subst_id concl in
   let (juc,n1) = new_goal juc (hyps,concl) in
   let ids = List.map unloc ids in
   let rule = { pr_name = RN_intros ids; pr_hyps = [RA_node n1]} in
@@ -749,12 +748,12 @@ let t_generalize_hyps ids g =
   let env1 = LDecl.toenv hyps in
   let rec aux (s:f_subst) ids = 
     match ids with
-    | [] -> f_subst s concl, [], []
+    | [] -> Fsubst.f_subst s concl, [], []
     | id::ids ->
       match LDecl.ld_subst s (LDecl.lookup_by_id id hyps) with
       | LD_var (ty,body) ->
         let x = EcIdent.fresh id in
-        let s = EcFol.f_bind_local s id (f_local x ty) in
+        let s = Fsubst.f_bind_local s id (f_local x ty) in
         let ff,args,lt = aux s ids in
         begin match body with
         | None -> 
@@ -764,12 +763,12 @@ let t_generalize_hyps ids g =
         end
       | LD_mem mt ->
         let x = EcIdent.fresh id in
-        let s = EcFol.f_bind_mem s id x in
+        let s = Fsubst.f_bind_mem s id x in
         let ff, args, lt = aux s ids in
         f_forall [x, GTmem mt] ff, AAmem id :: args, lt
       | LD_modty (mt,r) -> 
         let x = EcIdent.fresh id in
-        let s = EcFol.f_bind_mod s id (EcPath.mident x) in
+        let s = Fsubst.f_bind_mod s id (EcPath.mident x) in
         let mp = EcPath.mident id in
         let sig_ = (EcEnv.Mod.by_mpath mp env1).EcModules.me_sig in
         let ff, args, lt = aux s ids in
@@ -777,7 +776,7 @@ let t_generalize_hyps ids g =
       | LD_hyp f ->
         let ff, args, lt = aux s ids in
         f_imp f ff, AAnode :: args, t_hyp id :: lt in
-  let ff, args, lt = aux f_subst_id ids in
+  let ff, args, lt = aux Fsubst.f_subst_id ids in
   t_seq_subgoal (t_apply_form ff args) (t_id None :: lt) g
 
 let t_generalize_hyp id g = t_generalize_hyps [id] g
@@ -857,21 +856,21 @@ let gen_t_exists do_arg fs (juc,n as g) =
   let hyps,concl = get_goal g in
   let rec aux s ras fs concl =
     match fs with
-    | [] -> ras, (f_subst s concl)
+    | [] -> ras, (Fsubst.f_subst s concl)
     | f::fs' ->
       if is_exists concl then
         let (x,gty,concl) = destr_exists1 concl in
         let s, a = check_arg do_arg hyps s x gty f in
         aux s (a::ras) fs' concl
       else
-        let concl = f_subst s concl in
+        let concl = Fsubst.f_subst s concl in
         match h_red_opt full_red hyps concl with
-        | Some f -> aux f_subst_id ras fs f
+        | Some f -> aux Fsubst.f_subst_id ras fs f
         | None -> 
           let ppe = EcPrinting.PPEnv.ofenv (LDecl.toenv hyps) in
           tacuerror "Do not known how to split %a" 
             (EcPrinting.pp_form ppe) concl in
-  let args,concl = aux f_subst_id [] fs concl in
+  let args,concl = aux Fsubst.f_subst_id [] fs concl in
   let (juc,n1) = new_goal juc (hyps,concl) in
   let rule =
     {pr_name = RN_exists_intro; pr_hyps = List.rev_append args [RA_node n1] } in

@@ -272,11 +272,11 @@ let process_apply loc pe (_,n as g) =
               (fun s (x, xty) ->
                  let xf = EV.doget x ev in
                    EcReduction.check_type env xty xf.f_ty;
-                   (f_bind_local s x xf, RA_form xf))
-              f_subst_id (List.rev ((x, ty) :: ids))
+                   (Fsubst.f_bind_local s x xf, RA_form xf))
+              Fsubst.f_subst_id (List.rev ((x, ty) :: ids))
           in
 
-          let concl     = f_subst s fp in
+          let concl     = Fsubst.f_subst s fp in
           let (juc, n1) = new_goal juc (hyps, concl) in
           let rule      = { pr_name = RN_apply; pr_hyps = RA_node an :: ras } in
           let juc, _    = upd_rule rule (juc, n1) in
@@ -558,19 +558,19 @@ let process_new_apply loc pe g =
       Some (`Forall (x, GTty ty, f)) -> begin
         try
           EcUnify.unify env ue tp.f_ty ty;
-          (EcFol.f_subst_local x tp f, `KnownVar (x, tp))
+          (Fsubst.f_subst_local x tp f, `KnownVar (x, tp))
         with EcUnify.UnificationFailure _ ->
           invalid_arg ()
     end
 
     | Some (`Memory m),
       Some (`Forall (x, GTmem _, f)) ->
-        (EcFol.f_subst_mem x m f, `KnownMem (x, m))
+        (Fsubst.f_subst_mem x m f, `KnownMem (x, m))
 
     | Some (`Module (mp, mt)),
       Some (`Forall (x, GTmodty (emt, restr), f)) ->
         check_modtype_restr env mp mt emt restr;
-        (EcFol.f_subst_mod x mp f, `KnownMod (x, (mp, mt)))
+        (Fsubst.f_subst_mod x mp f, `KnownMod (x, (mp, mt)))
 
     | _, _ -> invalid_arg ()
 
