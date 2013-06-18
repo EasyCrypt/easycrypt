@@ -1072,7 +1072,7 @@ module Fsubst = struct
   let add_bindings = List.map_fold add_binding
      
   (* ------------------------------------------------------------------ *)
-  let rec f_subst s fp = let f = fp in
+  let rec f_subst s fp =
     match fp.f_node with
     | Fquant (q, b, f) ->
         let s, b' = add_bindings s b in
