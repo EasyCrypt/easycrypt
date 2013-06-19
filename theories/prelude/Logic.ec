@@ -105,8 +105,8 @@ lemma neqF_iff : forall (x:bool), (x = false) <=> !x by [].
 
 lemma fcongr :
   forall (f : 'a -> 'b) (x1 x2 : 'a),
-    x1 = x2 => f x1 = f x2.
-proof. by intros=> f x1 x2 eq_x; rewrite eq_x. qed.
+    x1 = x2 => f x1 = f x2
+by [].
 
 lemma tuple2_ind : 
   forall 
