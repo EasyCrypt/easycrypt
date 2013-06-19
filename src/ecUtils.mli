@@ -129,6 +129,8 @@ module List : sig
 
   val find_split : ('a -> bool) -> 'a list -> 'a list * 'a * 'a list
 
+  val mapi : (int -> 'a -> 'b) -> 'a list -> 'b list
+
   val map_fold : ('a -> 'b -> 'a * 'c) -> 'a -> 'b list -> 'a * 'c list
 
   val map_combine : ('a -> 'c) -> ('b -> 'd) -> 'a list -> 'b list -> ('c * 'd) list

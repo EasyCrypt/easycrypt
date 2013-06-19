@@ -330,6 +330,14 @@ module List = struct
       | x::l -> if f x then r, x, l else aux (x::r) l in
     aux [] l
  
+  let mapi (f : int -> 'a -> 'b) =
+    let rec doit n xs =
+      match xs with
+      | [] -> []
+      | x :: xs -> let x = f n x in x :: (doit (n+1) xs)
+    in
+      fun (xs : 'a list) -> doit 0 xs
+
   let map_fold (f : 'a -> 'b -> 'a * 'c) (a : 'a) (xs : 'b list) =
     let a = ref a in
     let f b = 
