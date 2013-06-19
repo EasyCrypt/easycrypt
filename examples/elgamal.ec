@@ -358,8 +358,8 @@ lemma Conclusion1 (A<:Adv) &m :
 proof. 
   intros Ha1 Ha2.
   rewrite (Pr1 (<:A) &m).
-  rewrite <- (Pr4 (<:A) &m _ _);try assumption.
-  rewrite <- (Fact3 (<:A) &m).
+  rewrite -(Pr4 (<:A) &m _ _);try assumption.
+  rewrite -(Fact3 (<:A) &m).
   rewrite (Pr2 (<:A) &m);smt.
 save.
 

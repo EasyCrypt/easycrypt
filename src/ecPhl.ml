@@ -741,12 +741,11 @@ let t_bdHoare_skip g =
   let concl = get_concl g in
   let bhs = destr_bdHoareS concl in
   if bhs.bhs_s.s_node <> [] then tacerror NoSkipStmt;
-  if (bhs.bhs_cmp <> FHeq && bhs.bhs_cmp <> FHge) then
-    cannot_apply "skip" "bound must be \">= 1\"";
-  let eq_to_one = f_eq bhs.bhs_bd f_r1 in
+  if (bhs.bhs_bd <> f_r1 || (bhs.bhs_cmp <> FHeq && bhs.bhs_cmp <> FHge)) then
+    cannot_apply "skip" "expected \">= 1\" as bound";
   let concl = f_imp bhs.bhs_pr bhs.bhs_po in
   let concl = gen_mems [bhs.bhs_m] concl in
-  prove_goal_by [eq_to_one;concl] RN_hl_skip g
+  prove_goal_by [concl] RN_hl_skip g
 
 let t_equiv_skip g =
   let concl = get_concl g in
@@ -1828,13 +1827,12 @@ let t_gen_cond side e g =
   in
   let t_sub b g = 
     t_seq_subgoal (t_rcond side b 1)
-      [ t_lseq [t_introm; t_skip;t_intros_i ([m2;h]);
-                t_or 
-                  (t_lseq [t_elim_hyp h; t_intros_i [h1; h2]; t_hyp h2])
-                  (t_lseq [t_hyp h])
-               ];
-        t_id None]
-      g in
+      [t_lseq [t_introm; t_skip; t_try (t_intros_i [m2;h]);
+               t_or  
+                 (t_lseq [t_elim_hyp h; t_intros_i [h1;h2]; t_hyp h2])
+                 (t_hyp h)
+              ];
+       t_id None] g in
   t_seq_subgoal (t_he_case e) [t_sub true; t_sub false] g
 
 let t_hoare_cond g = 
@@ -1846,6 +1844,8 @@ let t_hoare_cond g =
 let t_bdHoare_cond g = 
   let concl = get_concl g in
   let bhs = destr_bdHoareS concl in 
+  if (bhs.bhs_bd <> f_r1 || (bhs.bhs_cmp <> FHeq && bhs.bhs_cmp <> FHge)) then
+    cannot_apply "if" "expected \">= 1\" as bound";
   let (e,_,_) = s_first_if bhs.bhs_s in
   t_gen_cond None (form_of_expr (EcMemory.memory bhs.bhs_m) e) g
 

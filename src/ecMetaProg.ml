@@ -369,6 +369,37 @@ type ptnpos = [`Select | `Sub of ptnpos] Mint.t
 exception InvalidPosition
 
 module FPosition = struct
+  let select test =
+    let rec doit1 fp =
+      if   test fp
+      then Some `Select
+      else begin
+        let subp =
+          match fp.f_node with
+          | Fquant (_, _, f)   -> doit [f]
+          | Fif    (c, f1, f2) -> doit [c; f1; f2]
+          | Fapp   (f, fs)     -> doit (f :: fs)
+          | Ftuple fs          -> doit fs
+          | Flet   (_, f1, f2) -> doit [f1; f2]
+  
+          | _ -> None
+        in
+          omap subp (fun p -> `Sub p)
+      end
+
+    and doit fps =
+      let fps = List.mapi (fun i fp -> omap (doit1 fp) (fun p -> (i, p))) fps in
+      let fps = List.pmap identity fps in
+        match fps with
+        | [] -> None
+        | _  -> Some (Mint.of_list fps)
+
+    in
+      fun fp ->
+        match doit [fp] with
+        | None   -> Mint.empty
+        | Some p -> Mint.singleton 0 (`Sub p)
+
   let occurences =
     let rec doit1 n p =
       match p with

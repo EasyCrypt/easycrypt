@@ -317,9 +317,15 @@ let process_elim loc pe (_,n as g) =
   t_on_first (t_use an gs) (set_loc loc (t_elim f) (juc,n))
 
 (* -------------------------------------------------------------------- *)
-let process_rewrite loc (s,pe) (_,n as g) =
-  set_loc loc (t_rewrite_node  
-                 (process_mkn_apply process_formula pe g) s) n
+let process_rewrite =
+  let doall args =
+    let do1 (s, pe) g =
+      t_rewrite_node (process_mkn_apply process_formula pe g) s (snd g)
+    in
+      t_lseq (List.map do1 args)
+  in
+
+  fun loc args -> set_loc loc (doall args)
 
 (* -------------------------------------------------------------------- *)
 let process_smt hitenv pi g =

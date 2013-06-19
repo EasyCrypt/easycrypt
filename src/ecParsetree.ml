@@ -336,6 +336,8 @@ type intropattern1 =
 
 and intropattern = intropattern1 list
 
+type rewrite_arg = bool * ffpattern
+
 type logtactic =
   | Passumption of (pqsymbol option * ptyannot option)
   | Psmt        of pprover_infos
@@ -353,7 +355,7 @@ type logtactic =
   | Pcut        of (psymbol * pformula)
   | Pgeneralize of pformula list
   | Pclear      of psymbol list
-  | Prewrite    of (bool * ffpattern)
+  | Prewrite    of rewrite_arg list
   | Psubst      of pformula list
   | Psimplify   of preduction 
   | Pchange     of pformula

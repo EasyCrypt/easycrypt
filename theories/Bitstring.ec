@@ -134,7 +134,7 @@ theory Dbitstring.
     smt.
     cut H1: (0%r < (2 ^ k)%r); [smt | ].
     cut H2: (0%r < Real.one * inv (2 ^ k)%r).
-    rewrite <-(Real.Inverse (2 ^ k)%r _); smt.
+    rewrite -(Real.Inverse (2 ^ k)%r _); smt.
     smt.  
   qed.     
 
