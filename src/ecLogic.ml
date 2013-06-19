@@ -202,9 +202,9 @@ let t_do b omax t g =
     | Some (`Failure e) ->
         let fail =
           match b, omax with
-          | false, _      -> false
-          | true , None   -> i < 1
-          | true , Some m -> i < m
+          | `Maybe, _      -> false
+          | `All  , None   -> i < 1
+          | `All  , Some m -> i < m
         in
           if fail then raise e else t_id None g
 
@@ -213,7 +213,7 @@ let t_do b omax t g =
   in
     doit 0 g
 
-let t_repeat t = t_do false None t
+let t_repeat t = t_do `Maybe None t
 
 let t_close t g =
   match t g with
@@ -469,6 +469,7 @@ let pattern_form name hyps f1 f =
   x, body
 
 let t_rewrite_gen fpat side f g = 
+  let side = match side with `Normal -> true | `Reverse -> false in
   let hyps,concl = get_goal g in
   let rec find_rewrite f =
     if is_eq f then destr_eq f, true
@@ -648,7 +649,7 @@ let gen_eq_tuple_elim_proof types =
     t_seq_subgoal
       (t_apply_form (pred rvars locCF) (List.map (fun _ -> AAnode) types))
       ((
-        t_lseq [t_rewrite_hyp false h1 [];
+        t_lseq [t_rewrite_hyp `Normal h1 [];
         t_apply_hyp h2 [];
         t_apply_logic p_true_intro [] []]
       )::(List.map (fun _ -> t_reflex) types))
@@ -668,7 +669,7 @@ let gen_split_tuple_lemma types =
 let gen_split_tuple_proof types =
   let introVars = List.map (fun _ -> EcIdent.create "_") (types@types) in
   let introHyps = List.map (fun _ -> EcIdent.create "_") types in
-  let rews = List.map (fun h -> t_rewrite_hyp true h []) introHyps in
+  let rews = List.map (fun h -> t_rewrite_hyp `Reverse h []) introHyps in
   t_seq (t_lseq ((t_intros_i (introVars@introHyps))::rews)) t_reflex
 
 let t_elim f (juc,n) =
@@ -969,10 +970,10 @@ let is_subst_eq hyps x (hid,lk) =
     if is_eq_or_iff f then
       let f1, f2 = destr_eq_or_iff f in
       match cansubst_eq hyps x f1 f2 with
-      | Some id -> Some(hid, id,true)
+      | Some id -> Some(hid, id,`Normal)
       | None ->
         match cansubst_eq hyps x f2 f1 with
-        | Some id -> Some(hid, id,false)
+        | Some id -> Some(hid, id,`Reverse)
         | None -> None
     else None
   | _ -> None
@@ -987,7 +988,7 @@ let t_subst1_loc x g =
       tacuerror "Cannot find non recursive equation on %s" (EcIdent.name id)
     end
   | Some(h, x, side) ->
-    t_subst_gen x h side g
+      t_subst_gen x h side g
 
 (* Substitution of f1 = Fpvar(pv,m) | Fglob(mp,m) *)
 
@@ -1054,10 +1055,10 @@ let is_subst_pv_eq hyps fx (hid,lk) =
     if is_eq_or_iff f then
       let f1, f2 = destr_eq_or_iff f in
       match cansubst_pv_eq hyps fx f1 f2 with
-      | Some id -> Some(hid, id,true)
+      | Some id -> Some(hid, id,`Normal)
       | None ->
         match cansubst_pv_eq hyps fx f2 f1 with
-        | Some id -> Some(hid, id,false)
+        | Some id -> Some(hid, id,`Reverse)
         | None -> None
     else None
   | _ -> None

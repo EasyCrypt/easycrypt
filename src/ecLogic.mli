@@ -2,6 +2,7 @@
 open EcMaps
 open EcUtils
 open EcSymbols
+open EcParsetree
 open EcModules
 open EcLocation
 open EcReduction
@@ -70,7 +71,7 @@ val t_seq  : tactic -> tactic -> tactic
 val t_lseq : tactic list -> tactic
 
 val t_repeat : tactic -> tactic
-val t_do     : bool -> int option -> tactic -> tactic
+val t_do     : [`All | `Maybe] -> int option -> tactic -> tactic
 val t_try    : tactic -> tactic
 val t_or     : tactic -> tactic -> tactic
 
@@ -107,8 +108,8 @@ val t_elimT : form -> EcPath.path -> tactic
 
 val t_case : form -> tactic
 
-val t_rewrite_hyp  : bool -> EcIdent.t -> app_arg list -> tactic
-val t_rewrite_node : goal * int list -> bool -> int -> goals
+val t_rewrite_hyp  : rwside -> EcIdent.t -> app_arg list -> tactic
+val t_rewrite_node : goal * int list -> rwside -> int -> goals
 
 val t_simplify : reduction_info -> tactic
 val t_simplify_nodelta : tactic

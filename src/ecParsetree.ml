@@ -198,7 +198,6 @@ and pgty =
 | PGTY_Mem
 
 (* -------------------------------------------------------------------- *)
-
 type pop_def =
   | POabstr of pty
   | POconcr of ptybindings * pty * pexpr
@@ -336,7 +335,13 @@ type intropattern1 =
 
 and intropattern = intropattern1 list
 
-type rewrite_arg = bool * ffpattern
+type trepeat = [`All | `Maybe] * int option
+
+type rwarg =
+  | RWDone
+  | RWRw of (rwside * trepeat option * ffpattern)
+
+and rwside   = [`Normal | `Reverse]
 
 type logtactic =
   | Passumption of (pqsymbol option * ptyannot option)
@@ -355,7 +360,7 @@ type logtactic =
   | Pcut        of (psymbol * pformula)
   | Pgeneralize of pformula list
   | Pclear      of psymbol list
-  | Prewrite    of rewrite_arg list
+  | Prewrite    of rwarg list
   | Psubst      of pformula list
   | Psimplify   of preduction 
   | Pchange     of pformula
@@ -363,7 +368,7 @@ type logtactic =
 
 type ptactic_core_r =
   | Pidtac      of string option
-  | Pdo         of bool * int option * ptactic_core
+  | Pdo         of trepeat * ptactic_core
   | Ptry        of ptactic_core
   | Pby         of ptactic list
   | Pseq        of ptactic list

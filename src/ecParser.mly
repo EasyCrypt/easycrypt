@@ -1366,8 +1366,21 @@ fpattern(F):
    { mk_fpattern hd args }
 ;
 
-rewrite_arg:
-| s=rwside fp=fpattern(form) { (s, fp) }
+rwside:
+| MINUS { `Reverse }
+| empty { `Normal  }
+;
+
+rwrepeat:
+| NOT            { (`All  , None  ) }
+| QUESTION       { (`Maybe, None  ) }
+| n=NUM NOT      { (`All  , Some n) }
+| n=NUM QUESTION { (`Maybe, Some n) }
+;
+
+rwarg:
+| SLASHSLASH { RWDone }
+| s=rwside r=rwrepeat? fp=fpattern(form) { RWRw (s, r, fp) }
 ;
 
 simplify_arg: 
@@ -1384,11 +1397,6 @@ simplify:
 | SIMPLIFY            { simplify_red }
 | SIMPLIFY l=qoident+ { `Delta l  :: simplify_red  }
 | SIMPLIFY DELTA      { `Delta [] :: simplify_red }
-;
-
-rwside:
-| MINUS { false }
-| empty { true }
 ;
 
 conseq:
@@ -1543,7 +1551,7 @@ logtactic:
 | CHANGE f=sform
    { Pchange f }
 
-| REWRITE a=rewrite_arg+
+| REWRITE a=rwarg+
    { Prewrite a }
 
 | SUBST l=sform*
@@ -1673,13 +1681,13 @@ tactic_core_r:
    { Pby t }
 
 | DO t=tactic_core
-   { Pdo (true, None, t) }
+   { Pdo ((`All, None), t) }
 
 | DO n=NUM? NOT t=tactic_core
-   { Pdo (false, n, t) }
+   { Pdo ((`All, n), t) }
 
 | DO n=NUM? QUESTION t=tactic_core
-   { Pdo (true, n, t) }
+   { Pdo ((`Maybe, n), t) }
 
 | LPAREN s=tactics RPAREN
    { Pseq s } 

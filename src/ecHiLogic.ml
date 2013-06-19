@@ -319,8 +319,19 @@ let process_elim loc pe (_,n as g) =
 (* -------------------------------------------------------------------- *)
 let process_rewrite =
   let doall args =
-    let do1 (s, pe) g =
-      t_rewrite_node (process_mkn_apply process_formula pe g) s (snd g)
+    let do1 arg g =
+      match arg with
+      | RWDone -> process_trivial g
+
+      | RWRw (s, r, pe) -> begin
+          let doit ((_, n) as g) =
+            t_rewrite_node
+              (process_mkn_apply process_formula pe g) s n
+          in
+            match r with
+            | None -> doit g
+            | Some (b, n) -> t_do b n doit g
+      end
     in
       t_lseq (List.map do1 args)
   in
