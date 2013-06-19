@@ -179,7 +179,7 @@ let lv_subst m lv f =
     (LTuple ids, f), s
   | LvMap((p,tys),pv,e,ty) ->
     let id = id_of_pv pv m in 
-    let set = f_op p tys ty in
+    let set = f_op p tys (toarrow [ty; e.e_ty; f.f_ty] ty) in
     let f = f_app set [f_pvar pv ty m; form_of_expr m e; f] ty in
     (LSymbol (id,ty), f), [pv,m,f_local id ty]
       
