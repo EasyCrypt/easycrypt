@@ -1101,7 +1101,7 @@ let t_assumption g =
     
 let t_progress tac g =
   let rec aux g = t_seq t_simplify_nodelta aux0 g 
-  and aux0 g = 
+  and aux0 g =
     t_seq (t_try tac) aux1 g
   and aux1 g = 
     let hyps,concl = get_goal g in

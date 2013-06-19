@@ -11,7 +11,6 @@ type memory = EcIdent.t
 let mem_equal = EcIdent.id_equal
 
 (* -------------------------------------------------------------------- *)
-
 type local_memtype = {
   mt_path : EcPath.xpath;
   mt_vars : ty Msym.t
@@ -46,9 +45,8 @@ let mt_xpath = function
 let mt_bindings = function
   | None -> assert false
   | Some mt -> lmt_bindings mt
+
 (* -------------------------------------------------------------------- *)
-
-
 type memenv = memory * memtype 
 
 let me_equal (m1,mt1) (m2,mt2) = 

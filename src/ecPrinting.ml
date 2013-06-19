@@ -41,7 +41,11 @@ module PPEnv = struct
   let enter_by_memid ppe id =
     match EcEnv.Memory.byid id ppe.ppe_env with
     | None   -> ppe
-    | Some m -> enter ppe (EcMemory.xpath m)
+    | Some m -> begin
+      match snd m with
+      | None   -> ppe
+      | Some _ -> enter ppe (EcMemory.xpath m)
+    end
 
   let add_local ppe =
     let in_active_mem name =

@@ -79,8 +79,8 @@ let error loc e = EcLocation.locate_error loc (TacError e)
 let process_trivial ((juc, n) as g) =
   let t =
     t_seq
-      (t_try t_assumption)
       (t_progress (t_id None))
+      (t_try t_assumption)
   in
     match t (juc, n) with
     | (juc, []) -> (juc, [])
