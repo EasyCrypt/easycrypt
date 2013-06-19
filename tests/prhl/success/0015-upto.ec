@@ -99,7 +99,8 @@ proof.
     rnd (1%r) (lambda (x:int), 0 <= x /\ x <= 10) .
     wp; skip.
     intros &hr h2.
-    split;[apply d_inter_lossless; trivial| trivial].
+    split; first apply d_inter_lossless.
+    smt.
     (* *)
     intros &1.
     fun.
@@ -107,8 +108,8 @@ proof.
     wp.
     rnd (1%r) (lambda (x:int), 0 <= x /\ x <= 10) .
     wp;skip;intros &hr _.
-    split; [apply d_inter_lossless; trivial | trivial].    
+    split; first apply d_inter_lossless.
+    smt.
 
   inline RO.hash;wp;rnd;wp;skip;simplify;smt.
 save.
-

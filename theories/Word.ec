@@ -109,7 +109,7 @@ theory Dword.
     rewrite (mu_x_def w).
     cut H: (0%r < (2 ^ length)%r); [smt | ].
     cut H1: (0%r < Real.one * inv (2 ^ length)%r).
-    rewrite <-(Real.Inverse (2 ^ length)%r _); smt.
+    rewrite -(Real.Inverse (2 ^ length)%r _); smt.
     smt.  
   qed.
 

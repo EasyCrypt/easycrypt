@@ -1,7 +1,5 @@
 (* prime fields GF(q) for q prime *)
 require import Int.
-require import Distr.
-require import Real.
 
 (* the order of field is a prime q *)
 op q: int.
@@ -53,7 +51,6 @@ axiom gf_q_mult_inv: forall (x:gf_q),
 
 axiom gf_q_distr: forall (x y z:gf_q),
   x * (y + z) = x * y + x * z.
-
 (** Lemmas *)
 lemma gf_q_mult_zero: forall (x:gf_q),
   x * gf_q0 = gf_q0
@@ -95,6 +92,9 @@ axiom i_to_gf_inverse: forall (x:gf_q),
   i_to_gf_q (gf_q_to_i x) = x.
 
 theory Dgf_q.
+  require import Distr.
+  require import Real.
+
   op dgf_q: gf_q distr.
 
   axiom supp_def: forall (s:gf_q),

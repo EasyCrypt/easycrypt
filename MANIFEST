@@ -29,6 +29,7 @@ src/*.mll
 
 # EasyCrypt theories
 theories/*.ec
+theories/prelude/*.ec
 
 # EasyCrypt tests files
 find:tests:*.ec

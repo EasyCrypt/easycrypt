@@ -49,6 +49,6 @@ proof.
  intros &m x0.
  equiv_deno lequiv.
  split.
- intros &m1 &m2 H1 H2; rewrite <-H1;apply H2.
+ intros &m1 &m2 H1 H2; rewrite -H1;apply H2.
 save.
 
