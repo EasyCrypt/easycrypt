@@ -265,52 +265,6 @@ let process_mkn_apply process_cut pe (juc, _ as g) =
   (juc,an), fgs@ags
 
 (* -------------------------------------------------------------------- *)
-let process_apply loc pe (_,n as g) =
-  let (juc, an), gs = process_mkn_apply process_formula pe g in
-    try
-      set_loc loc (t_use an gs) (juc,n)
-    with tope ->
-      let (_, tp) = (get_node (juc, n)) in
-
-      let rec doit ids fp =
-        let (x, gty, fp) =
-          match is_forall fp with
-          | true  -> destr_forall1 fp
-          | false -> raise tope
-        in
-
-        let ty = match gty with GTty ty -> ty | _ -> raise tope in
-
-        try
-          let env,hyps,_ = get_goal_e g in
-          let ev = EV.of_idents (List.map fst ((x, ty) :: ids)) in
-          let _, _, ev =
-            EcMetaProg.f_match hyps (EcUnify.UniEnv.create None, ev) ~ptn:fp tp
-          in
-          let (s, ras) =
-            List.map_fold
-              (fun s (x, xty) ->
-                 let xf = EV.doget x ev in
-                   EcReduction.check_type env xty xf.f_ty;
-                   (Fsubst.f_bind_local s x xf, RA_form xf))
-              Fsubst.f_subst_id (List.rev ((x, ty) :: ids))
-          in
-
-          let concl     = Fsubst.f_subst s fp in
-          let (juc, n1) = new_goal juc (hyps, concl) in
-          let rule      = { pr_name = RN_apply; pr_hyps = RA_node an :: ras } in
-          let juc, _    = upd_rule rule (juc, n1) in
-          let ns        = List.pmap (function RA_node n -> Some n | _ -> None) ras in
-
-            (set_loc loc (t_use n1 (gs @ ns))) (juc, n)
-
-        with MatchFailure ->
-          doit ((x, ty) :: ids) fp
-
-      in
-        doit [] (snd (get_node (juc, an)))
-
-(* -------------------------------------------------------------------- *)
 let process_elim loc pe (_,n as g) =
   let (juc,an), gs = process_mkn_apply process_formula pe g in
   let (_,f) = get_node (juc, an) in
@@ -559,7 +513,7 @@ let process_named_apply _loc hyps (fp, tvi) =
     (p, typ, ue, ax)
 
 (* -------------------------------------------------------------------- *)
-let process_new_apply loc pe g =
+let process_apply loc pe g =
   let (hyps, fp) = (get_hyps g, get_concl g) in
   let env = LDecl.toenv hyps in
 
@@ -690,7 +644,7 @@ let process_logic hitenv loc t =
   | Pcongr         -> process_congr
   | Ptrivial       -> process_trivial
   | Pelim pe       -> process_elim loc pe
-  | Papply pe      -> process_new_apply loc pe
+  | Papply pe      -> process_apply loc pe
   | Pcut (name,phi)-> process_cut name phi
   | Pgeneralize l  -> process_generalize l
   | Pclear l       -> process_clear l
