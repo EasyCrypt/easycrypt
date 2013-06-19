@@ -1931,11 +1931,16 @@ module Theory = struct
         match item with
         | CTh_type     (x, ty) -> EcWhy3.add_ty w3env (xpath x) ty
         | CTh_operator (x, op) -> EcWhy3.add_op w3env (xpath x) op
-        | CTh_axiom    (x, ax) -> EcWhy3.add_ax w3env (xpath x) ax
         | CTh_modtype  (_, _)  -> (w3env, [])
         | CTh_module   me      -> EcWhy3.add_mod_exp w3env (xpath me.me_name) me
         | CTh_export   _       -> (w3env, [])
         | CTh_theory (x, th)   -> compile (xpath x) w3env th
+
+        | CTh_axiom (x, ax) -> begin
+          match ax.ax_scope with
+          | `Local  -> (w3env, [])
+          | `Global -> EcWhy3.add_ax w3env (xpath x) ax
+        end
 
     and compile path w3env cth =
       let (w3env, rb) =
