@@ -1531,7 +1531,7 @@ let sform_of_op (op, ty) args =
 
   | _ -> SFop ((op, ty), args)
 
-let sform_of_form fp =
+let rec sform_of_form fp =
   match fp.f_node with
   | Fint   i      -> SFint   i
   | Flocal x      -> SFlocal x
@@ -1541,6 +1541,10 @@ let sform_of_form fp =
   | Fif    (c, f1, f2)  -> SFif    (c, f1, f2)
   | Flet   (lv, f1, f2) -> SFlet   (lv, f1, f2)
   | Ftuple fs           -> SFtuple fs
+
+  | Fquant (_, [ ]  , f) -> sform_of_form f
+  | Fquant (q, [b]  , f) -> SFquant (q, b, f)
+  | Fquant (q, b::bs, f) -> SFquant (q, b, f_quant q bs f)
 
   | FhoareF   hf -> SFhoareF   hf
   | FhoareS   hs -> SFhoareS   hs
