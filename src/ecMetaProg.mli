@@ -1,4 +1,5 @@
 (* -------------------------------------------------------------------- *)
+open EcMaps
 open EcUidgen
 open EcParsetree
 open EcIdent
@@ -110,3 +111,14 @@ val f_match :
   -> ptn:form
   -> form
   -> unienv * ty Muid.t * form evmap
+
+(* -------------------------------------------------------------------- *)
+type ptnpos = [`Select | `Sub of ptnpos] Mint.t
+
+exception InvalidPosition
+
+module FPosition : sig
+  val occurences : ptnpos -> int
+  val filter : Sint.t -> ptnpos -> ptnpos
+  val topattern : ptnpos -> form -> EcIdent.t * form
+end

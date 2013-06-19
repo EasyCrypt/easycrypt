@@ -19,11 +19,20 @@ val (-|) : ('a -> 'b) -> ('c -> 'a) -> 'c -> 'b
 val copy : 'a -> 'a
 
 (* -------------------------------------------------------------------- *)
+type 'a tuple0 = unit
+type 'a tuple1 = 'a
+type 'a tuple2 = 'a * 'a
 type 'a tuple3 = 'a * 'a * 'a
 type 'a tuple4 = 'a * 'a * 'a * 'a
 type 'a tuple5 = 'a * 'a * 'a * 'a * 'a
 type 'a tuple6 = 'a * 'a * 'a * 'a * 'a * 'a
 type 'a tuple7 = 'a * 'a * 'a * 'a * 'a * 'a * 'a
+
+(* -------------------------------------------------------------------- *)
+val as_seq0 : 'a list -> 'a tuple0
+val as_seq1 : 'a list -> 'a tuple1
+val as_seq2 : 'a list -> 'a tuple2
+val as_seq3 : 'a list -> 'a tuple3
 
 (* -------------------------------------------------------------------- *)
 val proj3_1 : 'a * 'b * 'c -> 'a
@@ -147,6 +156,8 @@ module List : sig
   val smart_map : ('a -> 'a) -> 'a list -> 'a list
 
   val smart_map_fold : ('a -> 'b -> 'a * 'b) -> 'a -> 'b list -> 'a * 'b list
+
+  val sum : int list -> int
 end
 
 (* -------------------------------------------------------------------- *)
