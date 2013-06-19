@@ -116,6 +116,7 @@
     "end"         , END        ;        (* KW: global *)
     "import"      , IMPORT     ;        (* KW: global *)
     "export"      , EXPORT     ;        (* KW: global *)
+    "local"       , LOCAL      ;	(* KW: global *)
     "module"      , MODULE     ;        (* KW: global *)
     "of"          , OF         ;        (* KW: global *)
     "const"       , CONST      ;        (* KW: global *)

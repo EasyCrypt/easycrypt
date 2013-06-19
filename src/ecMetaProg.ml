@@ -4,8 +4,10 @@
 
 (* -------------------------------------------------------------------- *)
 open EcUtils
+open EcMaps
 open EcIdent
 open EcParsetree
+open EcEnv
 open EcTypes
 open EcModules
 open EcFol
@@ -360,3 +362,99 @@ let f_match hyps (ue, ev) ~ptn subject =
       with EcUnify.UninstanciateUni _ -> raise MatchFailure
     in
       (ue, clue, Ev ev)
+
+(* -------------------------------------------------------------------- *)
+type ptnpos = [`Select | `Sub of ptnpos] Mint.t
+
+exception InvalidPosition
+
+module FPosition = struct
+  let occurences =
+    let rec doit1 n p =
+      match p with
+      | `Select -> n+1
+      | `Sub p  -> doit n p
+
+    and doit n (ps : ptnpos) =
+      Mint.fold (fun _ p n -> doit1 n p) ps n
+
+    in
+      fun p -> doit 0 p
+
+  let filter (s : Sint.t) =
+    let rec doit1 n p =
+      match p with
+      | `Select -> (n+1, if Sint.mem n s then None else Some `Select)
+      | `Sub p  -> begin
+          match doit n p with
+          | (n, sub) when Mint.is_empty sub -> (n, None)
+          | (n, sub) -> (n, Some (`Sub sub))
+      end
+
+    and doit n (ps : ptnpos) =
+      Mint.mapi_filter_fold (fun _ p n -> doit1 n p) ps n
+
+    in
+      fun p -> snd (doit 0 p)
+
+  let topattern (p : ptnpos) (f : form) =
+    let x = EcIdent.create "p" in
+  
+    let rec doit1 p fp =
+      match p with
+      | `Select -> f_local x fp.f_ty
+      | `Sub p  -> begin
+          match fp.f_node with
+          | Flocal _ -> raise InvalidPosition
+          | Fpvar  _ -> raise InvalidPosition
+          | Fglob  _ -> raise InvalidPosition
+          | Fop    _ -> raise InvalidPosition
+          | Fint   _ -> raise InvalidPosition
+  
+          | Fquant (q, b, f) ->
+              let f' = as_seq1 (doit p [f]) in
+                FSmart.f_quant (fp, (q, b, f)) (q, b, f')
+  
+          | Fif (c, f1, f2)  ->
+              let (c', f1', f2') = as_seq3 (doit p [c; f1; f2]) in
+                FSmart.f_if (fp, (c, f1, f2)) (c', f1', f2')
+  
+          | Fapp (f, fs) -> begin
+              match doit p fs with
+              | [] -> assert false
+              | f' :: fs' ->
+                  FSmart.f_app (fp, (f, fs, fp.f_ty)) (f', fs', fp.f_ty)
+          end
+  
+          | Ftuple fs ->
+              let fs' = doit p fs in
+                FSmart.f_tuple (fp, fs) fs'
+  
+          | Flet (lv, f1, f2) ->
+              let (f1', f2') = as_seq2 (doit p [f1; f2]) in
+                FSmart.f_let (fp, (lv, f1, f2)) (lv, f1', f2')
+  
+          | FhoareF   _ -> raise InvalidPosition
+          | FhoareS   _ -> raise InvalidPosition
+          | FbdHoareF _ -> raise InvalidPosition
+          | FbdHoareS _ -> raise InvalidPosition
+          | FequivF   _ -> raise InvalidPosition
+          | FequivS   _ -> raise InvalidPosition
+          | Fpr       _ -> raise InvalidPosition
+      end
+  
+    and doit ps fps =
+      match Mint.is_empty ps with
+      | true  -> fps
+      | false ->
+          let imin = fst (Mint.min_binding ps)
+          and imax = fst (Mint.max_binding ps) in
+          if imin < 0 || imax >= List.length fps then
+            raise InvalidPosition;
+          let fps = List.mapi (fun i x -> (x, Mint.find_opt i ps)) fps in
+          let fps = List.map (function (f, None) -> f | (f, Some p) -> doit1 p f) fps in
+            fps
+  
+    in
+      (x, as_seq1 (doit p [f]))
+end

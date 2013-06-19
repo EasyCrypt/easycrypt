@@ -131,7 +131,7 @@ and subst_modsig ?params (s : _subst) (comps : module_sig) =
                   add_module s a (EcPath.mident a'), decl)
               s.s_s comps.mis_params
           in
-            fstmap _subst_of_subst aout
+            fst_map _subst_of_subst aout
     end
 
   | Some params ->
@@ -142,7 +142,7 @@ and subst_modsig ?params (s : _subst) (comps : module_sig) =
                 add_module s a (EcPath.mident a'), decl)
             s.s_s (List.combine comps.mis_params params)
         in
-          fstmap _subst_of_subst aout
+          fst_map _subst_of_subst aout
   in
 
   let comps =
@@ -153,7 +153,7 @@ and subst_modsig ?params (s : _subst) (comps : module_sig) =
 
 (* -------------------------------------------------------------------- *)
 and subst_modtype (s : _subst) (modty : module_type) =
-  { mt_params = List.map (sndmap (subst_modtype s)) modty.mt_params;
+  { mt_params = List.map (snd_map (subst_modtype s)) modty.mt_params;
     mt_name   = s.s_p modty.mt_name;
     mt_args   = List.map s.s_fmp modty.mt_args; }
 
@@ -296,8 +296,9 @@ let subst_ax (s : _subst) (ax : axiom) =
     | Lemma _ -> Lemma None
   in
     { ax_tparams = params;
-      ax_spec   = spec  ;
-      ax_kind   = kind  ; }
+      ax_spec    = spec;
+      ax_kind    = kind;
+      ax_scope   = ax.ax_scope; }
 
 (* -------------------------------------------------------------------- *)
 (* SUBSTITUTION OVER THEORIES *)

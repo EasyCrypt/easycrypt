@@ -170,6 +170,7 @@ end
 (* -------------------------------------------------------------------- *)
 type proof_uc = {
   puc_name   : string;
+  puc_scope  : [`Global | `Local];
   puc_jdg    : proof_state;
 }
 
@@ -369,10 +370,10 @@ module Tactics = struct
     | []      -> error loc NoCurrentGoal
     | n :: ns ->
       let juc = process_tactics hitenv tacs (juc, [n]) in
-      let juc = fstmap EcLogic.upd_done juc in
+      let juc = fst_map EcLogic.upd_done juc in
       let juc = (fst juc, (snd juc) @ ns) in
 
-      sndmap (List.filter (List.mem^~ (snd (find_all_goals (fst juc))))) juc
+      snd_map (List.filter (List.mem^~ (snd (find_all_goals (fst juc))))) juc
 
   let process_r mark mode (scope : scope) (tac : ptactic list) =
     check_state `InProof "proof script" scope;
@@ -707,7 +708,7 @@ module Ax = struct
     { scope with sc_env = EcEnv.Ax.bind x ax scope.sc_env; }
 
   (* ------------------------------------------------------------------ *)
-  let start_lemma scope check name tparams concl =
+  let start_lemma scope check name axsc tparams concl =
     let puc =
       match check with
       | false -> PSNoCheck (tparams, concl)
@@ -715,7 +716,7 @@ module Ax = struct
           let hyps = EcEnv.LDecl.init scope.sc_env tparams in
             PSCheck (EcLogic.open_juc (hyps, concl), [0])
     in 
-    let puc = { puc_name = name; puc_jdg = puc; } in
+    let puc = { puc_name = name; puc_jdg = puc; puc_scope = axsc; } in
       { scope with sc_pr_uc = Some (None, puc) }
 
   (* ------------------------------------------------------------------ *)
@@ -738,7 +739,8 @@ module Ax = struct
     in
     let axd = { ax_tparams = tparams;
                 ax_spec    = Some concl;
-                ax_kind    = proof }
+                ax_kind    = proof;
+		ax_scope   = puc.puc_scope; }
     in
     let scope = { scope with sc_pr_uc = None } in
       (Some puc.puc_name, bind scope (puc.puc_name, axd))
@@ -771,12 +773,12 @@ module Ax = struct
 
     match ax.pa_kind with
     | PILemma ->
-        let scope = start_lemma scope check (unloc ax.pa_name) tparams concl in
+        let scope = start_lemma scope check (unloc ax.pa_name) ax.pa_scope tparams concl in
         let scope = Tactics.process_core false `Check scope [tintro] in
           None, scope
 
     | PLemma tc ->
-        let scope = start_lemma scope check (unloc ax.pa_name) tparams concl in
+        let scope = start_lemma scope check (unloc ax.pa_name) ax.pa_scope tparams concl in
         let scope = Tactics.process_core false `Check scope [tintro] in
         let scope = Tactics.proof scope mode (if tc = None then true else false) in
 
@@ -796,6 +798,7 @@ module Ax = struct
     | PAxiom ->
         let axd = { ax_tparams = tparams;
                     ax_spec    = Some concl;
-                    ax_kind    = Axiom } in
+                    ax_kind    = Axiom;
+		    ax_scope   = ax.pa_scope; } in
         Some (unloc ax.pa_name), bind scope (unloc ax.pa_name, axd)
 end

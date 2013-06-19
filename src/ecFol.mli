@@ -241,6 +241,7 @@ module FSmart : sig
   type a_let   = lpattern * form * form
   type a_op    = EcPath.path * ty list * ty
   type a_tuple = form list
+  type a_app   = form * form list * ty
 
   val f_local : (form * a_local) -> a_local -> form
   val f_pvar  : (form * a_pvar ) -> a_pvar  -> form
@@ -249,6 +250,7 @@ module FSmart : sig
   val f_let   : (form * a_let  ) -> a_let   -> form
   val f_op    : (form * a_op   ) -> a_op    -> form
   val f_tuple : (form * a_tuple) -> a_tuple -> form
+  val f_app   : (form * a_app  ) -> a_app   -> form
 end
 
 (* -------------------------------------------------------------------- *)

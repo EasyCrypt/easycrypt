@@ -1057,7 +1057,7 @@ let pp_opdecl_pr (ppe : PPEnv.t) fmt (x, ts, ty, op) =
             | Fquant (Llambda, vds, f) -> (vds, f)
             | _ -> ([], f) in
 
-          let vds = List.map (sndmap EcFol.destr_gty) vds in
+          let vds = List.map (snd_map EcFol.destr_gty) vds in
             (pp_locbinds ppe vds, f)
         in
           Format.fprintf fmt "%t = %a" pp_vds (pp_form subppe) f
