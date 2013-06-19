@@ -395,7 +395,7 @@ lemma l_rewrite : forall (x y:'a), (false => x = y) => x = y => y = x.
 proof.
  intros x y h1 h2.
  rewrite h2.       (* hypothesis, or lemma *)
- rewrite <- (h1 _).  (* application of a hypothesis, or lemma *)
+ rewrite -(h1 _).  (* application of a hypothesis, or lemma *)
 admit.
  rewrite (_:x = y).  (* forumula *)
 admit.
