@@ -77,9 +77,14 @@ let error loc e = EcLocation.locate_error loc (TacError e)
 
 (* -------------------------------------------------------------------- *)
 let process_trivial ((juc, n) as g) =
-  match t_progress (t_id None) (juc, n) with
-  | (juc, []) -> (juc, [])
-  | (_  , _ ) -> t_id None g
+  let t =
+    t_seq
+      (t_try t_assumption)
+      (t_progress (t_id None))
+  in
+    match t (juc, n) with
+    | (juc, []) -> (juc, [])
+    | (_  , _ ) -> t_id None g
 
 (* -------------------------------------------------------------------- *)
 let process_congr g =
@@ -265,52 +270,6 @@ let process_mkn_apply process_cut pe (juc, _ as g) =
   (juc,an), fgs@ags
 
 (* -------------------------------------------------------------------- *)
-let process_apply loc pe (_,n as g) =
-  let (juc, an), gs = process_mkn_apply process_formula pe g in
-    try
-      set_loc loc (t_use an gs) (juc,n)
-    with tope ->
-      let (_, tp) = (get_node (juc, n)) in
-
-      let rec doit ids fp =
-        let (x, gty, fp) =
-          match is_forall fp with
-          | true  -> destr_forall1 fp
-          | false -> raise tope
-        in
-
-        let ty = match gty with GTty ty -> ty | _ -> raise tope in
-
-        try
-          let env,hyps,_ = get_goal_e g in
-          let ev = EV.of_idents (List.map fst ((x, ty) :: ids)) in
-          let _, _, ev =
-            EcMetaProg.f_match hyps (EcUnify.UniEnv.create None, ev) ~ptn:fp tp
-          in
-          let (s, ras) =
-            List.map_fold
-              (fun s (x, xty) ->
-                 let xf = EV.doget x ev in
-                   EcReduction.check_type env xty xf.f_ty;
-                   (Fsubst.f_bind_local s x xf, RA_form xf))
-              Fsubst.f_subst_id (List.rev ((x, ty) :: ids))
-          in
-
-          let concl     = Fsubst.f_subst s fp in
-          let (juc, n1) = new_goal juc (hyps, concl) in
-          let rule      = { pr_name = RN_apply; pr_hyps = RA_node an :: ras } in
-          let juc, _    = upd_rule rule (juc, n1) in
-          let ns        = List.pmap (function RA_node n -> Some n | _ -> None) ras in
-
-            (set_loc loc (t_use n1 (gs @ ns))) (juc, n)
-
-        with MatchFailure ->
-          doit ((x, ty) :: ids) fp
-
-      in
-        doit [] (snd (get_node (juc, an)))
-
-(* -------------------------------------------------------------------- *)
 let process_elim loc pe (_,n as g) =
   let (juc,an), gs = process_mkn_apply process_formula pe g in
   let (_,f) = get_node (juc, an) in
@@ -319,8 +278,19 @@ let process_elim loc pe (_,n as g) =
 (* -------------------------------------------------------------------- *)
 let process_rewrite =
   let doall args =
-    let do1 (s, pe) g =
-      t_rewrite_node (process_mkn_apply process_formula pe g) s (snd g)
+    let do1 arg g =
+      match arg with
+      | RWDone -> process_trivial g
+
+      | RWRw (s, r, pe) -> begin
+          let doit ((_, n) as g) =
+            t_rewrite_node
+              (process_mkn_apply process_formula pe g) s n
+          in
+            match r with
+            | None -> doit g
+            | Some (b, n) -> t_do b n doit g
+      end
     in
       t_lseq (List.map do1 args)
   in
@@ -482,17 +452,11 @@ let trans_apply_arg hyps ue arg =
 
 (* -------------------------------------------------------------------- *)
 let rec destruct_product hyps fp =
-  let module P = EcPath      in
-  let module C = EcCoreLib   in
   let module R = EcReduction in
 
-  match fp.f_node with
-  | Fapp ({f_node = Fop(p, _)}, [f1; f2]) when P.p_equal p C.p_imp ->
-      Some (`Imp (f1, f2))
-
-  | Fquant (Lforall, (x, t) :: bd, f) ->
-      Some (`Forall (x, t, EcFol.f_forall bd f))
-
+  match EcFol.sform_of_form fp with
+  | SFquant (Lforall, (x, t), f) -> Some (`Forall (x, t, f))
+  | SFimp (f1, f2) -> Some (`Imp (f1, f2))
   | _ -> begin
     match R.h_red_opt R.full_red hyps fp with
     | None   -> None
@@ -548,9 +512,45 @@ let process_named_apply _loc hyps (fp, tvi) =
     (p, typ, ue, ax)
 
 (* -------------------------------------------------------------------- *)
-let process_new_apply loc pe g =
-  let (hyps, fp) = (get_hyps g, get_concl g) in
+let check_apply_arg hyps ue f arg =
   let env = LDecl.toenv hyps in
+
+  let invalid_arg () = tacuerror "invalid argument to apply" in
+
+  match arg, destruct_product hyps f with
+  | None, Some (`Imp (f1, f2)) ->
+      (f2, `SideCond f1)
+
+  | None, Some (`Forall (x, gty, f)) -> begin
+      match gty with
+      | GTmodty _  -> tacuerror "cannot infer module"
+      | GTmem   _  -> tacuerror "cannot infer memory"
+      | GTty    ty -> (f, `UnknownVar (x, ty))
+  end
+
+  | Some (`Form tp),
+    Some (`Forall (x, GTty ty, f)) -> begin
+      try
+        EcUnify.unify env ue tp.f_ty ty;
+        (Fsubst.f_subst_local x tp f, `KnownVar (x, tp))
+      with EcUnify.UnificationFailure _ ->
+        invalid_arg ()
+  end
+
+  | Some (`Memory m),
+    Some (`Forall (x, GTmem _, f)) ->
+      (Fsubst.f_subst_mem x m f, `KnownMem (x, m))
+
+  | Some (`Module (mp, mt)),
+    Some (`Forall (x, GTmodty (emt, restr), f)) ->
+      check_modtype_restr env mp mt emt restr;
+      (Fsubst.f_subst_mod x mp f, `KnownMod (x, (mp, mt)))
+
+  | _, _ -> invalid_arg ()
+
+(* -------------------------------------------------------------------- *)
+let process_apply loc pe g =
+  let (hyps, fp) = (get_hyps g, get_concl g) in
 
   let (p, typarams, ue, ax) =
     match pe.fp_kind with
@@ -566,42 +566,6 @@ let process_new_apply loc pe g =
   let args = pe.fp_args in
   let args = List.map (trans_apply_arg hyps ue) args in
 
-  let check_arg f arg =
-    let invalid_arg () = tacuerror "invalid argument to apply" in
-
-    match arg, destruct_product hyps f with
-    | None, Some (`Imp (f1, f2)) ->
-        (f2, `SideCond f1)
-
-    | None, Some (`Forall (x, gty, f)) -> begin
-        match gty with
-        | GTmodty _  -> tacuerror "cannot infer module"
-        | GTmem   _  -> tacuerror "cannot infer memory"
-        | GTty    ty -> (f, `UnknownVar (x, ty))
-    end
-
-    | Some (`Form tp),
-      Some (`Forall (x, GTty ty, f)) -> begin
-        try
-          EcUnify.unify env ue tp.f_ty ty;
-          (Fsubst.f_subst_local x tp f, `KnownVar (x, tp))
-        with EcUnify.UnificationFailure _ ->
-          invalid_arg ()
-    end
-
-    | Some (`Memory m),
-      Some (`Forall (x, GTmem _, f)) ->
-        (Fsubst.f_subst_mem x m f, `KnownMem (x, m))
-
-    | Some (`Module (mp, mt)),
-      Some (`Forall (x, GTmodty (emt, restr), f)) ->
-        check_modtype_restr env mp mt emt restr;
-        (Fsubst.f_subst_mod x mp f, `KnownMod (x, (mp, mt)))
-
-    | _, _ -> invalid_arg ()
-
-  in
-
   let rec instanciate (ax, ids) =
     let ev =
       let forid id ev =
@@ -616,11 +580,13 @@ let process_new_apply loc pe g =
         match destruct_product hyps ax with
         | None   -> tacuerror "in apply, cannot find instance"
         | Some _ ->
-            let (ax, id) = check_arg ax None in
+            let (ax, id) = check_apply_arg hyps ue ax None in
               instanciate (ax, id :: ids)
   in
 
-  let (ax, ids) = snd_map List.rev (List.map_fold check_arg ax args) in
+  let (ax, ids) =
+    snd_map List.rev (List.map_fold (check_apply_arg hyps ue) ax args)
+  in
 
   let (_, ids, (_, tue, ev)) =
     let is_not_fully_instantiate =
@@ -679,7 +645,7 @@ let process_logic hitenv loc t =
   | Pcongr         -> process_congr
   | Ptrivial       -> process_trivial
   | Pelim pe       -> process_elim loc pe
-  | Papply pe      -> process_new_apply loc pe
+  | Papply pe      -> process_apply loc pe
   | Pcut (name,phi)-> process_cut name phi
   | Pgeneralize l  -> process_generalize l
   | Pclear l       -> process_clear l

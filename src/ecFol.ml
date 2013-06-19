@@ -59,7 +59,7 @@ and f_node =
   | FequivF of equivF (* $left,$right / $left,$right *)
   | FequivS of equivS (* $left,$right / $left,$right *)
 
-  | Fpr     of memory * EcPath.xpath * form list * form (* hr *)
+  | Fpr of pr (* hr *)
 
 and equivF = { 
   ef_pr : form;
@@ -102,6 +102,8 @@ and bdHoareS = {
   bhs_cmp : hoarecmp;
   bhs_bd  : form;
 }
+
+and pr = memory * EcPath.xpath * form list * form
 
 type app_bd_info =
 | AppNone
@@ -1483,6 +1485,82 @@ let is_logical_op op =
   match op_kind op with
   | OK_not | OK_and _ | OK_or _ | OK_imp | OK_iff | OK_eq -> true
   | _ -> false
+
+(* -------------------------------------------------------------------- *)
+type sform =
+  | SFint   of int
+  | SFlocal of EcIdent.t
+  | SFpvar  of EcTypes.prog_var * memory
+  | SFglob  of EcPath.mpath * memory 
+
+  | SFif    of form * form * form
+  | SFlet   of lpattern * form * form
+  | SFtuple of form list
+
+  | SFquant of quantif * (EcIdent.t * gty) * form
+  | SFtrue
+  | SFfalse
+  | SFnot   of form
+  | SFand   of bool * (form * form)
+  | SFor    of bool * (form * form)
+  | SFimp   of form * form
+  | SFiff   of form * form
+  | SFeq    of form * form
+  | SFop    of (EcPath.path * ty list) * (form list)
+
+  | SFhoareF   of hoareF
+  | SFhoareS   of hoareS
+  | SFbdHoareF of bdHoareF
+  | SFbdHoareS of bdHoareS
+  | SFequivF   of equivF
+  | SFequivS   of equivS
+  | SFpr       of pr
+
+  | SFother of form
+
+let sform_of_op (op, ty) args =
+  match op_kind op, args with
+  | OK_true , [] -> SFtrue
+  | OK_false, [] -> SFfalse
+  | OK_not  , [f] -> SFnot f
+  | OK_and b, [f1; f2] -> SFand (b, (f1, f2))
+  | OK_or  b, [f1; f2] -> SFor  (b, (f1, f2))
+  | OK_imp  , [f1; f2] -> SFimp (f1, f2)
+  | OK_iff  , [f1; f2] -> SFiff (f1, f2)
+  | OK_eq   , [f1; f2] -> SFeq  (f1, f2)
+
+  | _ -> SFop ((op, ty), args)
+
+let rec sform_of_form fp =
+  match fp.f_node with
+  | Fint   i      -> SFint   i
+  | Flocal x      -> SFlocal x
+  | Fpvar (x, me) -> SFpvar  (x, me)
+  | Fglob (m, me) -> SFglob  (m, me)
+
+  | Fif    (c, f1, f2)  -> SFif    (c, f1, f2)
+  | Flet   (lv, f1, f2) -> SFlet   (lv, f1, f2)
+  | Ftuple fs           -> SFtuple fs
+
+  | Fquant (_, [ ]  , f) -> sform_of_form f
+  | Fquant (q, [b]  , f) -> SFquant (q, b, f)
+  | Fquant (q, b::bs, f) -> SFquant (q, b, f_quant q bs f)
+
+  | FhoareF   hf -> SFhoareF   hf
+  | FhoareS   hs -> SFhoareS   hs
+  | FbdHoareF hf -> SFbdHoareF hf
+  | FbdHoareS hs -> SFbdHoareS hs
+  | FequivF   ef -> SFequivF   ef
+  | FequivS   es -> SFequivS   es
+  | Fpr       pr -> SFpr       pr
+
+  | Fop (op, ty) ->
+      sform_of_op (op, ty) []
+
+  | Fapp ({ f_node = Fop (op, ty) }, args) ->
+      sform_of_op (op, ty) args
+
+  | _ -> SFother fp
 
 (* -------------------------------------------------------------------- *)
 let f_check_uni f =  

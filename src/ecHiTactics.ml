@@ -73,18 +73,18 @@ and process_tactic_core mkpv (tac : ptactic_core) (gs : goals) : goals =
 
   let tac =
     match unloc tac with
-    | Pidtac msg     -> `One (t_id msg)
-    | Pdo (b, n, t)  -> `One (t_do b n (process_tactic_core1 mkpv t))
-    | Ptry t         -> `One (t_try (process_tactic_core1 mkpv t))
-    | Pby t          -> `One (process_by mkpv t)
-    | Pseq tacs      -> `One (fun (juc, n) -> process_tactics mkpv tacs (juc, [n]))
-    | Pcase  i       -> `One (process_case loc i)
-    | Pprogress t    -> `One (process_progress (process_tactic_core1, mkpv) t)
-    | Padmit         -> `One (t_admit)
-    | Pdebug         -> `One (process_debug)
-    | Plogic t       -> `One (process_logic mkpv loc t)
-    | PPhl tac       -> `One (EcHiPhl.process_phl loc tac)
-    | Psubgoal tc    -> `All (process_tactic_chain mkpv tc)
+    | Pidtac msg      -> `One (t_id msg)
+    | Pdo ((b, n), t) -> `One (t_do b n (process_tactic_core1 mkpv t))
+    | Ptry t          -> `One (t_try (process_tactic_core1 mkpv t))
+    | Pby t           -> `One (process_by mkpv t)
+    | Pseq tacs       -> `One (fun (juc, n) -> process_tactics mkpv tacs (juc, [n]))
+    | Pcase  i        -> `One (process_case loc i)
+    | Pprogress t     -> `One (process_progress (process_tactic_core1, mkpv) t)
+    | Padmit          -> `One (t_admit)
+    | Pdebug          -> `One (process_debug)
+    | Plogic t        -> `One (process_logic mkpv loc t)
+    | PPhl tac        -> `One (EcHiPhl.process_phl loc tac)
+    | Psubgoal tc     -> `All (process_tactic_chain mkpv tc)
   in
 
   let tac = match tac with `One t -> t_on_goals t | `All t -> t in
