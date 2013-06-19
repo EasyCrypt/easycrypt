@@ -159,10 +159,6 @@ lemma rm_card: forall (x:'a) X,
   card(rm x X) <= card X
 by [].
 
-lemma card_non_empty: forall (x:'a) X,
-  mem x X => card X = 1 + card (rm x X)
-by [].
-
 pred (* local *) cP_is_empty_card(X:'a set) = card X = 0 => is_empty X.
 lemma is_empty_card: forall (X:'a set),
   card X = 0 => is_empty X. 
