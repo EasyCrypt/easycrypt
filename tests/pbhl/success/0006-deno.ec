@@ -17,6 +17,6 @@ lemma test : forall &m, Pr[M.f() @ &m : res ] = 1%r/2%r.
 proof.
 intros &m.
 bdhoare_deno (_ : true ==> _ );
-[fun;rnd (1%r/2%r) (lambda (x:bool), x);skip; trivial|trivial|trivial].
+[fun;rnd (1%r/2%r) (lambda (x:bool), x);skip; smt|smt|smt].
 save.
 

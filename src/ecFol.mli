@@ -1,5 +1,6 @@
 (* -------------------------------------------------------------------- *)
 open EcDebug
+open EcUtils
 open EcMaps
 open EcIdent
 open EcTypes
@@ -25,10 +26,9 @@ type quantif =
   | Lexists
   | Llambda
 
-type binding =  (EcIdent.t * gty) list
+type binding = (EcIdent.t * gty) list
 
 type hoarecmp = FHle | FHeq | FHge
-
 
 type form = private { 
   f_node : f_node;
@@ -78,8 +78,8 @@ and equivS = {
 
 and hoareF = { 
   hf_pr  : form;
-  hf_f    : EcPath.xpath;
-  hf_po : form;
+  hf_f   : EcPath.xpath;
+  hf_po  : form;
 }
 
 and hoareS = {
@@ -106,12 +106,12 @@ and bdHoareS = {
   bhs_bd  : form;
 }
 
-type app_bd_info = AppNone | AppSingle of form
-                   | AppMult of (form * form * form * form)
-
+type app_bd_info =
+| AppNone
+| AppSingle of form
+| AppMult   of (form * form * form * form)
 
 (* -------------------------------------------------------------------- *)
-
 val f_equal   : form -> form -> bool
 val f_compare : form -> form -> int
 val f_hash    : form -> int 
@@ -128,75 +128,83 @@ val f_dump : form -> dnode
 (* -------------------------------------------------------------------- *)
 val mk_form : f_node -> EcTypes.ty -> form
 
+(* soft-constructors - common leaves *)
 val f_local : EcIdent.t -> EcTypes.ty -> form
 val f_pvar  : EcTypes.prog_var -> EcTypes.ty -> memory -> form
 val f_pvloc : EcPath.xpath -> EcModules.variable -> memory -> form
 val f_glob  : EcPath.mpath -> memory -> form
-val f_true : form
-val f_false : form
-val f_bool : bool -> form
 
-val f_tt  : form
-
-val f_int : int -> form
-
-val f_real_of_int : form -> form
-val f_rint        : int -> form
-val f_r0          : form
-val f_r1          : form
-
-
-val f_op : EcPath.path -> EcTypes.ty list -> EcTypes.ty -> form
-val f_app : form -> form list -> EcTypes.ty -> form
-
-val f_tuple : form list -> form
-val f_if : form -> form -> form -> form
-val f_let : EcTypes.lpattern -> form -> form -> form
-val f_quant : quantif -> binding -> form -> form
+(* soft-constructors - common formulas constructors *)
+val f_op     : EcPath.path -> EcTypes.ty list -> EcTypes.ty -> form
+val f_app    : form -> form list -> EcTypes.ty -> form
+val f_tuple  : form list -> form
+val f_if     : form -> form -> form -> form
+val f_let    : EcTypes.lpattern -> form -> form -> form
+val f_quant  : quantif -> binding -> form -> form
 val f_exists : binding -> form -> form
 val f_forall : binding -> form -> form
 val f_lambda : binding -> form -> form
 
+(* soft-constructors - unit *)
+val f_tt : form
+
+(* soft-constructors - bool *)
+val f_bool  : bool -> form
+val f_true  : form
+val f_false : form
+
+(* soft-constructors - numbers *)
+val f_int  : int -> form
+val f_rint : int -> form
+
+val f_real_of_int : form -> form
+
+val f_r0 : form
+val f_r1 : form
+
+(* soft-constructors - hoare *)
 val f_hoareF   : form -> EcPath.xpath -> form -> form 
 val f_hoareS   : memenv -> form -> EcModules.stmt -> form -> form 
 val f_hoareS_r : hoareS -> form
-val f_bdHoareF   : form -> EcPath.xpath -> form -> 
-  hoarecmp -> form -> form 
-val f_losslessF  : EcPath.xpath -> form
-val f_bdHoareS   : memenv -> form -> EcModules.stmt -> form -> 
-  hoarecmp -> form -> form 
+
+(* soft-constructors - bd hoare *)
+val f_bdHoareF   : form -> EcPath.xpath -> form -> hoarecmp -> form -> form 
+val f_bdHoareS   : memenv -> form -> EcModules.stmt -> form -> hoarecmp -> form -> form 
 val f_bdHoareS_r : bdHoareS -> form
+val f_losslessF  : EcPath.xpath -> form
+
+(* soft-constructors - equiv *)
 val f_equivF   : form -> EcPath.xpath -> EcPath.xpath -> form -> form 
-val f_equivS   : 
- memenv -> memenv -> form -> EcModules.stmt -> EcModules.stmt -> form -> form
+val f_equivS   : memenv -> memenv -> form -> EcModules.stmt -> EcModules.stmt -> form -> form
 val f_equivS_r : equivS -> form
-val f_pr       : memory -> EcPath.xpath -> form list -> form -> form
 
-val fop_not : form
-val f_not : form -> form
+(* soft-constructors - PR *)
+val f_pr : memory -> EcPath.xpath -> form list -> form -> form
 
-val fop_and : form
-val f_and   : form -> form -> form
-val f_ands  : form list -> form
-
+(* soft-constructors - boolean operators *)
+val fop_not  : form
+val fop_and  : form
 val fop_anda : form
-val f_anda   : form -> form -> form
+val fop_or   : form
+val fop_ora  : form
+val fop_imp  : form
+val fop_iff  : form
+val fop_eq   : EcTypes.ty -> form
 
-val fop_or  : form
-val f_or    : form -> form -> form
+val f_not  : form -> form
+val f_and  : form -> form -> form
+val f_ands : form list -> form
+val f_anda : form -> form -> form
+val f_or   : form -> form -> form
+val f_ors  : form list -> form
+val f_ora  : form -> form -> form
+val f_imp  : form -> form -> form
+val f_imps : form list -> form -> form
+val f_iff  : form -> form -> form
 
-val fop_ora : form
-val f_ora   : form -> form -> form
+val f_eq  : form -> form -> form
+val f_eqs : form list -> form list -> form
 
-val fop_imp : form
-val f_imp   : form -> form -> form
-val f_imps  : form list -> form -> form
-val fop_iff : form
-val f_iff   : form -> form -> form
-
-val fop_eq     : EcTypes.ty -> form
-val f_eq       : form -> form -> form
-val f_eqs      : form list -> form list -> form
 val f_eqparams : EcPath.xpath -> variable list -> memory ->
                  EcPath.xpath -> variable list -> memory -> form
 val f_eqres    : EcPath.xpath -> EcTypes.ty -> memory ->
@@ -204,34 +212,56 @@ val f_eqres    : EcPath.xpath -> EcTypes.ty -> memory ->
 val f_eqglob   : EcPath.mpath -> memory -> 
                  EcPath.mpath -> memory -> form 
 
+(* soft-constructors - ordering *)
 val f_int_le : form -> form -> form
-val f_int_lt  : form -> form -> form
+val f_int_lt : form -> form -> form
 
 val f_real_le : form -> form -> form
-val f_real_lt  : form -> form -> form
+val f_real_lt : form -> form -> form
 
-val f_real_div   : form -> form -> form
-val f_real_sum   : form -> form -> form
-val f_real_sub   : form -> form -> form
-val f_real_prod  : form -> form -> form
+val f_real_div  : form -> form -> form
+val f_real_sum  : form -> form -> form
+val f_real_sub  : form -> form -> form
+val f_real_prod : form -> form -> form
 
-val fop_in_supp  : EcTypes.ty -> form
-val f_in_supp    : form -> form -> form
+(* soft constructors - distributions *)
+val fop_in_supp : EcTypes.ty -> form
+val fop_mu_x    : EcTypes.ty -> form
 
-val fop_mu_x  : EcTypes.ty -> form
-val f_mu  : form -> form -> form
-val f_mu_x  : form -> form -> form
+val f_in_supp : form -> form -> form
+val f_mu      : form -> form -> form
+val f_mu_x    : form -> form -> form
 
 (* -------------------------------------------------------------------- *)
+module FSmart : sig
+  type a_local = EcIdent.t * ty
+  type a_pvar  = prog_var * ty * memory
+  type a_quant = quantif * binding * form
+  type a_if    = form tuple3
+  type a_let   = lpattern * form * form
+  type a_op    = EcPath.path * ty list * ty
+  type a_tuple = form list
+
+  val f_local : (form * a_local) -> a_local -> form
+  val f_pvar  : (form * a_pvar ) -> a_pvar  -> form
+  val f_quant : (form * a_quant) -> a_quant -> form
+  val f_if    : (form * a_if   ) -> a_if    -> form
+  val f_let   : (form * a_let  ) -> a_let   -> form
+  val f_op    : (form * a_op   ) -> a_op    -> form
+  val f_tuple : (form * a_tuple) -> a_tuple -> form
+end
+
+(* -------------------------------------------------------------------- *)
+(* WARNING : this function should be use only in a context ensuring
+ * that the quantified variables can be instanciated *)
+
 val f_if_simpl   : form -> form -> form -> form
 val f_let_simpl  : EcTypes.lpattern -> form -> form -> form
 val f_lets_simpl : (EcTypes.lpattern * form) list -> form -> form
 
-(* WARNING : this function should be use only in a context ensuring that the
-   quantified variables can be instanciated *)
-val f_forall_simpl : binding -> form -> form
-val f_exists_simpl : binding -> form -> form
-val f_app_simpl    : form -> form list -> EcTypes.ty -> form
+val f_forall_simpl  : binding -> form -> form
+val f_exists_simpl  : binding -> form -> form
+val f_app_simpl     : form -> form list -> EcTypes.ty -> form
 val f_betared_simpl : binding -> form -> form list -> form
 
 val f_not_simpl  : form -> form
@@ -246,12 +276,11 @@ val f_imps_simpl : form list -> form -> form
 val f_iff_simpl  : form -> form -> form
 val f_eq_simpl   : form -> form -> form
 
-val f_real_sum_simpl   : form -> form -> form
-val f_real_prod_simpl  : form -> form -> form
-val f_real_div_simpl   : form -> form -> form
+val f_real_sum_simpl  : form -> form -> form
+val f_real_prod_simpl : form -> form -> form
+val f_real_div_simpl  : form -> form -> form
 
 (* -------------------------------------------------------------------- *)
-
 exception DestrError of string
 
 val destr_local     : form -> EcIdent.t 
@@ -274,28 +303,27 @@ val destr_bdHoareS  : form -> bdHoareS
 val destr_pr        : form -> memory * EcPath.xpath * form list * form (* hr *) 
 val destr_programS  : bool option -> form -> memenv * stmt
 
+val is_tuple   : form -> bool
+val is_and     : form -> bool
+val is_or      : form -> bool
+val is_imp     : form -> bool
+val is_iff     : form -> bool
+val is_forall  : form -> bool
+val is_exists  : form -> bool
+val is_let     : form -> bool
+val is_eq      : form -> bool
+val is_local   : form -> bool 
+val is_equivF   : form -> bool
+val is_equivS   : form -> bool
+val is_hoareF   : form -> bool
+val is_hoareS   : form -> bool
+val is_bdHoareF : form -> bool
+val is_bdHoareS : form -> bool
+val is_pr       : form -> bool
 
-val is_tuple  : form -> bool
-val is_op_and : EcPath.path -> bool
-val is_and    : form -> bool
-val is_or     : form -> bool
-val is_imp    : form -> bool
-val is_iff    : form -> bool
-val is_forall : form -> bool
-val is_exists : form -> bool
-val is_let1   : form -> bool
-val is_eq     : form -> bool
 val is_eq_or_iff : form -> bool
-val is_local  : form -> bool 
-val is_equivF  : form -> bool
-val is_equivS  : form -> bool
-val is_hoareF  : form -> bool
-val is_hoareS  : form -> bool
-val is_bdHoareF  : form -> bool
-val is_bdHoareS  : form -> bool
-val is_pr      : form -> bool
 
-
+(* -------------------------------------------------------------------- *)
 val f_map : (EcTypes.ty -> EcTypes.ty) -> (form -> form) -> form -> form
 
 (* -------------------------------------------------------------------- *)
@@ -308,34 +336,31 @@ type f_subst = private {
   fs_ty      : ty -> ty;
 }
 
-val f_subst_id : f_subst
-val is_subst_id : f_subst -> bool
-val f_subst_init : 
-  bool -> EcPath.mpath Mid.t -> ty_subst -> f_subst
-  
-val add_locals : f_subst -> (EcIdent.t * EcTypes.ty) list -> 
-  f_subst * (EcIdent.t * EcTypes.ty) list
+module Fsubst : sig
+  val f_subst_id  : f_subst
+  val is_subst_id : f_subst -> bool
 
-val f_bind_local : f_subst -> EcIdent.t -> form -> f_subst
-val f_bind_mem   : f_subst -> EcIdent.t -> EcIdent.t -> f_subst
-val f_bind_mod   : f_subst -> EcIdent.t -> EcPath.mpath -> f_subst
+  val f_subst_init : bool -> EcPath.mpath Mid.t -> ty_subst -> f_subst
 
-val gty_subst : f_subst -> gty -> gty
-val f_subst   : f_subst -> form -> form 
+  val f_bind_local : f_subst -> EcIdent.t -> form -> f_subst
+  val f_bind_mem   : f_subst -> EcIdent.t -> EcIdent.t -> f_subst
+  val f_bind_mod   : f_subst -> EcIdent.t -> EcPath.mpath -> f_subst
 
-val f_subst_local : EcIdent.t -> form -> form -> form 
-val f_subst_mem   : EcIdent.t -> EcIdent.t -> form -> form 
-val f_subst_mod   : EcIdent.t -> EcPath.mpath -> form -> form 
+  val gty_subst : f_subst -> gty -> gty
+  val f_subst   : f_subst -> form -> form 
 
-module Fsubst :
-  sig
-    val uni : EcTypes.ty EcUidgen.Muid.t -> form -> form
-    val subst_tvar : EcTypes.ty EcIdent.Mid.t -> form -> form
-  end
+  val f_subst_local : EcIdent.t -> form -> form -> form 
+  val f_subst_mem   : EcIdent.t -> EcIdent.t -> form -> form 
+  val f_subst_mod   : EcIdent.t -> EcPath.mpath -> form -> form 
 
-(* return true is the formula does not contain type variable unification *)
+  val uni : EcTypes.ty EcUidgen.Muid.t -> form -> form
+  val subst_tvar : EcTypes.ty EcIdent.Mid.t -> form -> form
+end
+
+(* Checks that the input formula does not contain any unification variables *)
 val f_check_uni : form -> bool
 
+(* -------------------------------------------------------------------- *)
 val form_of_expr : EcMemory.memory -> EcTypes.expr -> form
 
 type op_kind = 
@@ -351,3 +376,6 @@ type op_kind =
 
 val op_kind       : EcPath.path -> op_kind
 val is_logical_op : EcPath.path -> bool
+
+val is_op_and : EcPath.path -> bool
+val is_op_or  : EcPath.path -> bool

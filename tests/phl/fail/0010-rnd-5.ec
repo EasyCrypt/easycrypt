@@ -23,4 +23,4 @@ proof.
  fun.
  rnd.
  skip.
- trivial.
+ smt.

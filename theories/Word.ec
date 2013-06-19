@@ -37,7 +37,7 @@ axiom xor_get: forall w0 w1 i,
 lemma xor_nilpotent: forall w,
   w ^^ w = zeros.
 proof.
-intros w; apply extensionality; trivial.
+intros w; apply extensionality; smt.
 save.
 
 lemma xor_commutative: forall w0 w1,
@@ -46,13 +46,13 @@ proof.
 intros w0 w1; apply extensionality.
 cut xorb_commute: (forall i, 0 <= i => i < length =>
                     (w0 ^^ w1).[i] = (w1 ^^ w0).[i]);
-trivial.
+smt.
 save.
 
 lemma xor_assoc : forall x y z, x ^^ (y ^^ z) = (x ^^ y) ^^ z.
 proof.
   intros x y z; apply extensionality.
-  intros i Hge Hlt; trivial.
+  intros i Hge Hlt; smt.
 save.
 
 lemma xor_zeros: forall w,
@@ -61,7 +61,7 @@ proof.
 intros w; apply extensionality.
 cut xorb_zeros: (forall i, 0 <= i => i < length =>
                   (w ^^ zeros).[i] = w.[i]);
-trivial.
+smt.
 save.
 
 (* TODO: Finish writing the conversions *)
@@ -83,13 +83,13 @@ lemma to_array_from_array: forall a,
   Array.length a = length =>
   to_array (from_array a) = a.
 proof.
-intros a Length; apply Array.extensionality; trivial.
+intros a Length; apply Array.extensionality; smt.
 save.
 
 lemma from_array_to_array: forall w,
   from_array (to_array w) = w.
 proof.
-intros w; apply extensionality; trivial.
+intros w; apply extensionality; smt.
 save.
 
 require import Real.
@@ -107,10 +107,10 @@ theory Dword.
   proof.
     intros w; delta in_supp; simplify.
     rewrite (mu_x_def w).
-    cut H: (0%r < (2 ^ length)%r); [trivial | ].
+    cut H: (0%r < (2 ^ length)%r); [smt | ].
     cut H1: (0%r < Real.one * inv (2 ^ length)%r).
-    rewrite <-(Real.Inverse (2 ^ length)%r _); trivial.
-    trivial.  
+    rewrite <-(Real.Inverse (2 ^ length)%r _); smt.
+    smt.  
   qed.
 
 end Dword.

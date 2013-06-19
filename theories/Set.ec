@@ -68,7 +68,7 @@ axiom add_card: forall (x:'a) X,
 lemma mem_add: forall (x:'a) X,
   mem x X => X = add x X.
 proof.
-intros x X x_in_X; apply extensionality; trivial.
+intros x X x_in_X; apply extensionality; smt.
 save.
 
 lemma add_subset: forall (x:'a) X,
@@ -99,11 +99,11 @@ by [].
 
 lemma rm_add: forall (x:'a) (xs:'a set),
   !(mem x xs) =>
-  rm x (add x xs) = xs by (intros x xs h;apply extensionality;delta (==);trivial).
+  rm x (add x xs) = xs by (intros x xs h;apply extensionality;delta (==);smt).
 
 lemma add_rm: forall (x:'a) (xs:'a set),
   (mem x xs) =>
-  (add x (rm x xs)) = xs by (intros x xs h;apply extensionality;delta (==);trivial).
+  (add x (rm x xs)) = xs by (intros x xs h;apply extensionality;delta (==);smt).
 
 theory Induction.
 
@@ -117,11 +117,11 @@ lemma induction: forall (P:('a set) cPred),
   (forall x S, !mem x S => P S => P (add x S)) =>
   forall S, P S.
 intros P empt hyp S.
-cut lem : ((S <> empty) => P S);last trivial.
+cut lem : ((S <> empty) => P S);last smt.
 elimT induction_det S;first (simplify;split).
 intros S0 x h nempty.
-rewrite <- (add_rm<:'a> x S0 _);first trivial.
-apply hyp;trivial.
+rewrite <- (add_rm<:'a> x S0 _);first smt.
+apply hyp;smt.
 save.
 
 end Induction.
@@ -152,7 +152,7 @@ pred (* local *) cP_card_pos (X:'a set) = 0 <= card X.
 lemma card_pos: forall (X:'a set), 0 <= card X.
 proof.
 intros X;cut IH: (cP_card_pos X);
-  [apply (induction cP_card_pos) | idtac]; trivial.
+  [apply (induction cP_card_pos) | idtac]; smt.
 save.
 
 lemma rm_card: forall (x:'a) X,
@@ -168,7 +168,7 @@ lemma is_empty_card: forall (X:'a set),
   card X = 0 => is_empty X. 
 proof.
 intros X;cut IH: (cP_is_empty_card X);
-  [apply (induction cP_is_empty_card) | idtac]; trivial.
+  [apply (induction cP_is_empty_card) | idtac]; smt.
 save.
 
 (* singleton *)
@@ -204,19 +204,19 @@ axiom union_mem: forall (x:'a) X Y,
 lemma union_empty: forall (X:'a set),
   union X empty = X.
 proof.
-intros X; apply extensionality; trivial.
+intros X; apply extensionality; smt.
 save.
 
 lemma union_comm: forall (X Y:'a set),
   union X Y = union Y X.
 proof.
-intros X Y; apply extensionality; intros x; trivial.
+intros X Y; apply extensionality; intros x; smt.
 save.
 
 lemma union_add: forall (x:'a) X Y,
   add x (union X Y) = union (add x X) Y.
 proof.
-intros x X Y; apply extensionality; intros y;trivial.
+intros x X Y; apply extensionality; intros y;smt.
 save.
 
 lemma subset_union1: forall (X Y:'a set),
@@ -229,19 +229,19 @@ pred (* local *) cP_subset_union(X:'a set) = forall Y,
 lemma subset_union2: forall (X Y:'a set),
   X <= Y => exists Z, Y = union X Z.
 proof.
-intros X;cut H0: (cP_subset_union X).
+intros X; cut H0: (cP_subset_union X).
   apply (induction cP_subset_union).
-    trivial.
+    smt.
     intros x S H H0;cut H1: (forall Y, (add x S) <= Y => (exists Z, Y = union (add x S) Z)).
       intros Y H1;cut H2 : (S <= Y).
-        trivial.
+        smt.
         cut H3: (forall Y, S <= Y => exists Z, Y = union S Z).
-          trivial.
+          smt.
           cut H4: (exists Z, Y = union S Z).
             apply (H3 Y _); assumption.
-            elim H4;intros Z H5;trivial.
-      trivial.
-  trivial.
+            elim H4;intros Z H5;smt.
+      smt.
+  smt.
 save.
 
 pred (* local *) cP_union_card1(X:'a set) = forall Y,
@@ -250,7 +250,7 @@ lemma union_card1: forall (X Y:'a set),
   card (union X Y) <= card (X) + card(Y).
 proof.
 intros X;cut H: (cP_union_card1 X);
-  [apply (induction cP_union_card1) | idtac]; trivial.
+  [apply (induction cP_union_card1) | idtac]; smt.
 save.
 
 pred (* local *) cP_union_card2(Y:'a set) = forall (X:'a set),
@@ -260,24 +260,24 @@ lemma union_card2: forall (Y X:'a set),
 proof. 
 intros Y;cut H: (cP_union_card2 Y).
 apply (induction cP_union_card2).
-  trivial.
+  smt.
   intros x S H H1;cut H0 : (forall X, card X <= card (union X (add x S))).
     intros X;cut H2: (card X <= card (union X S)).
-      trivial.
+      smt.
       cut H3: (card (union X S) <= card (union X (add x S))).
-        cut H4: (card (union X (add x S)) = card (add x (union X S)));trivial.
-        trivial.
-    trivial.
-  trivial.
+        cut H4: (card (union X (add x S)) = card (add x (union X S)));smt.
+        smt.
+    smt.
+  smt.
 save.
 
 lemma subset_card: forall (X Y:'a set),
   X <= Y => (card X) <= (card Y).
 proof.
 intros X Y H;cut H0: (exists Z, Y = union X Z).
-  trivial.
+  smt.
   elim H0;intros Z H1;cut H2: (card X <= card (union X Z));
-    trivial.
+    smt.
 save.
 
 (* intersection *)
@@ -287,32 +287,32 @@ axiom inter_mem: forall (x:'a) X Y,
 lemma inter_empty: forall (X:'a set),
   inter X empty = empty.
 proof.
-intros X; apply extensionality; trivial.
+intros X; apply extensionality; smt.
 save.
 
 lemma inter_comm: forall (X Y:'a set),
   inter X Y = inter Y X.
 proof.
-intros X Y; apply extensionality; trivial.
+intros X Y; apply extensionality; smt.
 save.
 
 lemma inter_add: forall (x:'a) X Y,
   add x (inter X Y) = inter (add x X) (add x Y).
 proof.
 intros x X Y; apply extensionality.
-cut ext: (forall y, mem y (add x (inter X Y)) = mem y (inter (add x X) (add x Y))); trivial.
+cut ext: (forall y, mem y (add x (inter X Y)) = mem y (inter (add x X) (add x Y))); smt.
 save.
 
 lemma inter_add2: forall (x:'a) X Y,
   mem x Y => add x (inter X Y) = inter (add x X)  Y.
 proof.
-intros x X Y x_in_Y; apply extensionality; trivial.
+intros x X Y x_in_Y; apply extensionality; smt.
 save.
 
 lemma inter_add3: forall (x:'a) X Y,
   !mem x Y => (inter X Y) = inter (add x X) Y.
 proof.
-intros x X Y x_nin_Y; apply extensionality; trivial.
+intros x X Y x_nin_Y; apply extensionality; smt.
 save.
 
 lemma subset_inter: forall (X Y:'a set),
@@ -331,29 +331,29 @@ lemma card_union_inter: forall (X Y:'a set),
 proof. 
 intros X;cut IH: (cP_union_inter X).
   apply (induction cP_union_inter).
-    trivial.
+    smt.
     intros x S H H0;cut H1: (forall Y, card (union (add x S) Y) + card (inter (add x S) Y) =
                                          card (add x S) + card Y).
       intros Y;cut H8: (card (union S Y) + card (inter S Y) = card S + card Y).
-        trivial.
+        smt.
         cut H2: (mem x Y => card(union (add x S) Y) + card (inter (add x S) Y) = card (add x S) + card Y).
           intros H3;cut H4: (card (add x (inter S Y)) = card (inter (add x S) Y)).
-            cut H5: (add x (inter S Y) = (inter (add x S) Y));trivial.
+            cut H5: (add x (inter S Y) = (inter (add x S) Y));smt.
             cut H5: (!mem x (inter S Y)).
-              trivial.
+              smt.
               cut H6: (card (inter (add x S) Y) = 1 + card (inter S Y)).
-                trivial.
-                cut H7: (card (add x S) = 1 + card S);trivial.
+                smt.
+                cut H7: (card (add x S) = 1 + card S);smt.
           cut H3: (!mem x Y => card (union (add x S) Y) + card (inter (add x S) Y) =
                                  card (add x S) + card Y).
             intros H4;cut H5: (card (inter S Y) = card (inter (add x S) Y)).
-              trivial.
+              smt.
               cut H6: (!mem x (union S Y)).
-                trivial.
-                cut H7: (card (union (add x S) Y) = 1 + card (union S Y));trivial.
-      trivial.
-    trivial.
-  trivial.
+                smt.
+                cut H7: (card (union (add x S) Y) = 1 + card (union S Y));smt.
+      smt.
+    smt.
+  smt.
 save.
 
 require import Real.
@@ -380,12 +380,12 @@ theory Duni.
     weight (duni X) = if is_empty X then 0%r else 1%r.
   proof.
     intros X; case (is_empty X); intros H.
-    trivial. 
+    smt. 
     delta weight; simplify. 
     rewrite (mu_def<:'a> X Fun.cPtrue _).
     assumption.
     rewrite (filter_cPtrue<:'a> X).
-    cut W: ((card X)%r <> 0%r); trivial.
+    cut W: ((card X)%r <> 0%r); smt.
   qed.
 end Duni.
 
@@ -415,15 +415,15 @@ theory Dexcepted.
     ((in_supp x d /\ !mem x X) => in_supp x (d \ X)).
   proof.
   intros d X x;split.
-    intros in_supp;split;trivial.
-    intros in_supp_nmem;trivial.
+    intros in_supp;split;smt.
+    intros in_supp_nmem;smt.
   save.
     
   lemma mu_x_def : forall (x:'a) d X,
     mu_x (d \ X) x = 
     (in_supp x (d \ X)) ? mu_x d x / (weight d - mu d (cPmem X)) : 0%r.
   proof.
-    intros x d X; delta (\); last trivial.
+    intros x d X; delta (\); last smt.
   qed.
 
   lemma mu_weight_def : forall (d:'a distr) X,

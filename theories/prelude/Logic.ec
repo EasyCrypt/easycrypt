@@ -93,12 +93,20 @@ lemma case_eq_bool : forall (P:bool -> bool, x:bool),
    P x
 by [].
 
-lemma eq_refl : forall (x:'a), x = x by [].
+lemma eq_refl  : forall (x:'a), x = x by [].
+lemma eq_sym   : forall (x y : 'a), x = y => y = x by [].
+lemma eq_trans : forall (x y z : 'a), x = y => y = z => x = z by [].
+
 lemma eqT  : forall (x:bool), x => (x = true) by [].
 lemma neqF : forall (x:bool), !x => (x = false) by [].
 
 lemma eqT_iff : forall (x:bool), (x = true) <=> x by [].
 lemma neqF_iff : forall (x:bool), (x = false) <=> !x by [].
+
+lemma fcongr :
+  forall (f : 'a -> 'b) (x1 x2 : 'a),
+    x1 = x2 => f x1 = f x2.
+proof. by intros=> f x1 x2 eq_x; rewrite eq_x. qed.
 
 lemma tuple2_ind : 
   forall 

@@ -88,8 +88,8 @@ theory Induction.
         (forall i, 0 <= i => p i).
     proof.
       intros p hyp i iVal.
-      cut temp : (forall k, k > 0 => k <= i => p k);[|trivial].
-      apply (Induction.induction (lambda i, forall k, k > 0 => k <= i => p k) _ _ i _);trivial.
+      cut temp : (forall k, k > 0 => k <= i => p k);[|smt].
+      apply (Induction.induction (lambda i, forall k, k > 0 => k <= i => p k) _ _ i _);smt.
   save.
 end Induction.
 
@@ -102,10 +102,10 @@ theory Power.
   proof.
     intros x n _ _.  
     apply (Induction.induction (lambda n, 0 < x ^ n) _ _ n _).
-    trivial.
+    smt.
     simplify; intros j _ _.
-    cut W: (x ^ j = x * (x ^ (j - 1))); trivial.
-    trivial.
+    cut W: (x ^ j = x * (x ^ (j - 1))); smt.
+    smt.
   qed.
 end Power.
 

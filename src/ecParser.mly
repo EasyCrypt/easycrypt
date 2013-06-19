@@ -157,7 +157,9 @@
 %token COLON
 %token COMMA
 %token COMPUTE
+%token CONGR
 %token CONSEQ
+%token EXFALSO
 %token CONST
 %token CUT
 %token DATATYPE
@@ -178,14 +180,16 @@
 %token EQUIVDENO
 %token EXIST
 %token EXPORT
+%token FIELD
+%token FIELDSIMP
 %token FINAL
 %token FIRST
 %token FISSION
-%token FUSION
 %token FORALL
-%token FWDS
 %token FROM_INT
 %token FUN
+%token FUSION
+%token FWDS
 %token GENERALIZE 
 %token GLOB
 %token HOARE
@@ -225,8 +229,9 @@
 %token PRAGMA
 %token PRBOUNDED
 %token PRED
-%token PRINT
 %token PRFALSE
+%token PRINT
+%token PROGRESS
 %token PROOF
 %token PROR
 %token PROVER
@@ -251,12 +256,12 @@
 %token SEQ
 %token SIMPLIFY
 %token SKIP
+%token SLASHSLASH
+%token SMT
 %token SPLIT
 %token SPLITWHILE
-%token STRICT
-%token FIELD
-%token FIELDSIMP
 %token STAR
+%token STRICT
 %token SUBST
 %token SWAP
 %token THEN
@@ -265,7 +270,6 @@
 %token TILD
 %token TIMEOUT
 %token TRIVIAL
-%token PROGRESS
 %token TRY
 %token TYPE
 %token UNDERSCORE
@@ -1328,6 +1332,9 @@ intro_pattern:
 
 | LBRACKET ip=plist2(intro_pattern*, PIPE) RBRACKET
    { IPCase ip }
+
+| SLASHSLASH
+   { IPDone }
 ;
 
 fpattern_head(F):
@@ -1482,8 +1489,14 @@ logtactic:
 | CLEAR l=ident+
    { Pclear l }
 
-| TRIVIAL pi=prover_info
-   { Ptrivial pi }
+| CONGR
+   { Pcongr }
+
+| TRIVIAL
+   { Ptrivial }
+
+| SMT pi=prover_info
+   { Psmt pi }
 
 | INTROS a=intro_pattern*
    { Pintro a }
@@ -1625,6 +1638,9 @@ phltactic:
 | CONSEQ info=fpattern(conseq)
     { Pconseq info }
 
+| EXFALSO
+    { Pexfalso }
+
 (* basic pr based tacs *)
 | HOARE {Phoare}
 | BDHOARE {Pbdhoare}
@@ -1695,11 +1711,11 @@ tactic_chain:
 | LBRACKET ts=plist1(loc(tactics0), PIPE) RBRACKET
     { Psubtacs (List.map mk_core_tactic ts) }
 
-| FIRST t=tactic { Pfirst (t, 1) }
-| LAST  t=tactic { Plast  (t, 1) }
+| FIRST t=loc(tactics) { Pfirst (mk_core_tactic (mk_loc t.pl_loc (Pseq (unloc t))), 1) }
+| LAST  t=loc(tactics) { Plast  (mk_core_tactic (mk_loc t.pl_loc (Pseq (unloc t))), 1) }
 
-| FIRST n=NUM t=tactic { Pfirst (t, n) }
-| LAST  n=NUM t=tactic { Plast  (t, n) }
+| FIRST n=NUM t=loc(tactics) { Pfirst (mk_core_tactic (mk_loc t.pl_loc (Pseq (unloc t))), n) }
+| LAST  n=NUM t=loc(tactics) { Plast  (mk_core_tactic (mk_loc t.pl_loc (Pseq (unloc t))), n) }
 
 | FIRST LAST  { Protate (`Left , 1) }
 | LAST  FIRST { Protate (`Right, 1) }

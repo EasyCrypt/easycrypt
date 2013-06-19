@@ -222,7 +222,7 @@ The tactic implements the following rule:
   \end{array}
 }{
   \equivF{A}{B}{\pre}{\post}
-} [\verb+call+~\chi]
+} [\verb+fun+~\chi]
 \end{displaymath}
 %
 where $\vec{p}_f$ represent the formal parameters of a function
@@ -243,7 +243,7 @@ adversaries $A$ and $B$, ...
   \end{array}
 }{
   \bdHoareSeq{A}{\pre}{\post}{1}
-} [\verb+call+~\chi]
+} [\verb+fun+~\chi]
 \end{displaymath}
 
 \subsubsection{Hoare Logic}
@@ -257,7 +257,7 @@ adversaries $A$ and $B$, ...
   \end{array}
 }{
   \hoareS{A}{\pre}{\post}
-} [\verb+call+~\chi]
+} [\verb+fun+~\chi]
 \end{displaymath}
 
 \subsection{Weakening judgements: The \rawec{conseq} rule}
@@ -561,6 +561,38 @@ discharges goals by applying trivial probability properties:
 
 \subsection{The \rawec{swap} tactic}
 %
+\Syntax \verb+swap+ [\textit{side}] \textit{swap\_pos}
+
+\textbf{where:} 
+\begin{tabular}[t]{l}
+  \textit{swap\_pos} ::= 
+  \textit{n} \textit{n} \textit{n} $\mid$ \textit{n} \textit{z} $\mid$ [\textit{n}:\textit{n}] \textit{z}
+  \\
+  $n$ a natural number
+  \\
+  $z$ an integer number
+\end{tabular}
+  
+
+The tactic [\verb+swap+ $p_1$ $p_2$ $p_3$] swaps the code between
+positions $p_1$ and $p_2$ with the code between positions $p_2$ and
+$p_3$. That is, assuming that $c_1$ and $c_2$ are syntactically
+independent, that $c_1$ is between positions $p_1$ and $p_2$ and that
+$c_2$ is between positions $p_2$ and $p_3$, the tactic implements the
+following rule:
+\begin{displaymath}
+\infrule{
+  \hoareS{c;c_2;c_1;c_3}{\pre}{\post}
+}{
+  \hoareS{c;c_1;c_2;c_3}{\pre}{\post}
+} [\verb+swap+\ p_1\ p_2\ p_3]
+\end{displaymath}
+
+If $k$ is positive (negative) then [\verb+swap+ $k$] moves the first
+(last) instruction $k$ positions forwards (backwards). Similarly,
+[\verb+swap+ $i$ $k$] moves the $i^{th}$ instruction forwards or
+backwards, and [\verb+swap+ $[i_1:i_2]$ $k$] moves the instructions
+between positions $i_1$ and $i_2$.
 
 
 \subsection{Reasoning about loops: the \rawec{while} tactic}

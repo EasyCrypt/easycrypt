@@ -53,10 +53,10 @@ lemma destruct_list: forall (xs:'a list),
 proof.
  intros xs.
  elimT list_case xs.
-  intros H;left;trivial.
+  intros H;left;smt.
 
   intros y ys H;right.
-  exists y;exists ys;trivial.
+  exists y;exists ys;smt.
 save.
 
 lemma hd_tl_decomp: forall (xs:'a list),
@@ -78,9 +78,9 @@ proof.
  simplify mem.
  cut H: (fold_right (f_mem y) false (x :: xs) = 
    f_mem y x (fold_right (f_mem y) false xs)).
- trivial.
+ smt.
  rewrite H.
- trivial.
+ smt.
 save.
 
 lemma mem_eq: forall (x:'a) xs, mem x (x::xs) by [].
@@ -104,11 +104,11 @@ lemma length_non_neg: forall (xs:'a list), 0 <= length xs.
 proof.
  intros xs.
  elimT list_ind xs.
- simplify length; trivial.
+ simplify length; smt.
  intros y ys IHys.
  cut H1 : (length (y :: ys) = 1 + length ys).
-  trivial.
- rewrite H1;trivial.
+  smt.
+ rewrite H1;smt.
 save.
 
 lemma length_cons_S : forall (xs:'a list, x: 'a), 
@@ -120,7 +120,7 @@ lemma length_cons_nz : forall (xs:'a list, x: 'a), length (x::xs) <> 0 by [].
 lemma length_z_nil : forall(xs:'a list), length xs = 0 => xs = [].
 proof.
 intros xs.
-elimT list_ind xs;trivial.
+elimT list_ind xs;smt.
 save.
 
 
@@ -133,19 +133,19 @@ lemma app_cons: forall (x:'a) xs ys, (x::xs) ++ ys = x::(xs ++ ys) by [].
 
 lemma app_nil_right: forall (xs:'a list), xs ++ [] = xs.
 proof.
-intros xs;elimT list_ind xs;trivial.
+intros xs;elimT list_ind xs;smt.
 save.
 
 lemma app_assoc : forall(xs ys zs:'a list),
   (xs ++ ys) ++ zs = xs ++ (ys ++ zs).
 proof.
-intros xs;elimT list_ind xs;trivial.
+intros xs;elimT list_ind xs;smt.
 save.
 
 lemma length_app: forall (xs ys:'a list), 
   length (xs ++ ys) = length xs + length ys.
 proof.
-intros xs;elimT list_ind xs;trivial.
+intros xs;elimT list_ind xs;smt.
 save.
 
 lemma length_app_comm: forall (xs ys:'a list), 
@@ -155,7 +155,7 @@ by [].
 lemma mem_app: forall (y:'a) xs ys,
   (mem y xs \/ mem y ys) = mem y (xs ++ ys).
 proof.
-intros y xs ys;elimT list_ind xs;trivial.
+intros y xs ys;elimT list_ind xs;smt.
 save.
 
 lemma mem_app_comm: forall (y:'a) xs ys,
@@ -192,25 +192,25 @@ lemma eq_forallb_all: forall (p:'a -> bool) xs,
   all p xs <=> forallb p xs.
 proof.
  intros p xs;elimT list_ind xs.
-  trivial.
+  smt.
   intros y ys H.
   cut H1: ((p y /\ all p ys) <=> (p y /\ forallb p ys)).
-  trivial.
-  split;trivial.
+  smt.
+  split;smt.
 save.
 
 lemma eq_existsb_any: forall (p:'a -> bool) xs,
  any p xs <=> existsb p xs.
 proof.
  intros p xs;elimT list_ind xs.
-  trivial.
+  smt.
   intros y ys H.
   split.
    simplify any;intros H1;elim H1;clear H1.
    intros x HmemP;elim HmemP;clear HmemP;intros Hmem Hp.
-   cut Hor: (x = y \/ mem x ys);trivial.
+   cut Hor: (x = y \/ mem x ys);smt.
 
-   trivial. 
+   smt. 
 save.
 
 (* filter *)
@@ -231,8 +231,8 @@ proof.
  cut Heq : 
   (fold_right (f_filter p) __nil (x :: xs) = 
    (f_filter p x (fold_right (f_filter p) __nil xs))).
-  trivial.
-  trivial.
+  smt.
+  smt.
 save.
 
 lemma filter_mem: forall (x:'a) xs p,
@@ -240,30 +240,30 @@ lemma filter_mem: forall (x:'a) xs p,
 proof.
  intros x xs P.
  elimT list_ind xs.
- trivial.
+ smt.
  intros y ys H.
  case (P y); intros Hp.
  cut Heq: (filter P (y::ys) = y :: filter P ys).
-  trivial. 
- rewrite Heq;trivial.
+  smt. 
+ rewrite Heq;smt.
  cut Heq: (filter P (y::ys) = filter P ys).
-  trivial.
+  smt.
  rewrite Heq.
- trivial.
+ smt.
 save.
 
 lemma filter_app: forall (xs ys:'a list) p,
   filter p (xs ++ ys) = (filter p xs) ++ (filter p ys).
 proof.
  intros xs.
- elimT list_ind xs;trivial.
+ elimT list_ind xs;smt.
 save.
 
 lemma filter_length: forall (xs:'a list) p,
   length (filter p xs) <= length xs.
 proof.
  intros xs.
- elimT list_ind xs;trivial.
+ elimT list_ind xs;smt.
 save.
 
 lemma filter_all: forall (xs:'a list) p,
@@ -290,7 +290,7 @@ lemma map_in: forall (x:'a) xs (f:'a -> 'b),
   mem x xs => mem (f x) (map f xs).
 proof.
  intros x xs f.
- elimT list_ind xs;trivial.
+ elimT list_ind xs;smt.
 save.
 
 
@@ -299,21 +299,21 @@ lemma map_o: forall xs (f:'a -> 'b) (g:'b -> 'c) (h:'a -> 'c),
   map g (map f xs) = map h xs.
 proof.
  intros xs f g h compose.
- elimT list_ind xs;trivial.
+ elimT list_ind xs;smt.
 save.
 
 lemma map_length: forall (xs:'a list, f:'a -> 'b), 
   length xs = length (map f xs).
 proof.
  intros xs f.
- elimT list_ind xs;trivial.
+ elimT list_ind xs;smt.
 save.
 
 lemma map_app : forall xs ys (f:'a -> 'b),
   map f (xs ++ ys) = map f xs ++ map f ys.
 proof.
  intros xs ys f.
- elimT list_ind xs;trivial.
+ elimT list_ind xs;smt.
 save.
 
 lemma map_ext: forall xs (f g:'a -> 'b),
@@ -322,13 +322,13 @@ lemma map_ext: forall xs (f g:'a -> 'b),
 proof.
  intros xs f g H.
  elimT list_ind xs.
- trivial.
+ smt.
  intros x' xs' IH.
  rewrite (map_cons<:'b, 'a> f x' xs').
  rewrite (map_cons<:'b, 'a> g x' xs').
  rewrite IH.
  rewrite (H x').
- trivial.
+ smt.
 save.
 
 op (*local*) f_nth (x, r:'a -> int -> 'a, y, n): 'a =
@@ -341,14 +341,14 @@ lemma nth_in_or_dv_aux: forall(xs:'a list) dv n, 0 <= n =>
 proof.
  intros xs.
  elimT list_ind xs.
-  trivial.
+  smt.
   
   clear xs;intros x xs H dv n H1.
   case (n = 0);intros Hn.
-    rewrite Hn;trivial.
+    rewrite Hn;smt.
     
   elim (H dv (n-1) _).
-   trivial.
-   trivial.
-   trivial.
+   smt.
+   smt.
+   smt.
 save.

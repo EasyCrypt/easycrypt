@@ -15,4 +15,4 @@ proof.
  fun.
  rnd (lambda z, z-1) , (lambda z, z+1).
  skip. 
- trivial.  
+ smt.  

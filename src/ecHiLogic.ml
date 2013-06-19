@@ -76,6 +76,32 @@ let _ = EcPException.register (fun fmt exn ->
 let error loc e = EcLocation.locate_error loc (TacError e)
 
 (* -------------------------------------------------------------------- *)
+let process_trivial ((juc, n) as g) =
+  match t_progress (t_id None) (juc, n) with
+  | (juc, []) -> (juc, [])
+  | (_  , _ ) -> t_id None g
+
+(* -------------------------------------------------------------------- *)
+let process_congr g =
+  let (hyps, concl) = get_goal g in
+
+  if not (EcFol.is_eq concl) then
+    tacuerror "congr: goal must be an equality";
+
+  let (f1, f2) = EcFol.destr_eq concl in
+
+  match f1.f_node, f2.f_node with
+  | Fapp (o1, a1), Fapp (o2, a2)
+      when    EcReduction.is_alpha_eq hyps o1 o2
+           && List.length a1 = List.length a2 ->
+    t_congr o1 ((List.combine a1 a2), f1.f_ty) g
+
+  | _, _ when EcReduction.is_alpha_eq hyps f1 f2 ->
+    t_congr f1 ([], f1.f_ty) g
+
+  | _, _ -> tacuerror "congr: no congruence"
+
+(* -------------------------------------------------------------------- *)
 let process_tyargs hyps tvi =
   let ue = EcUnify.UniEnv.create (Some (LDecl.tohyps hyps).h_tvar) in
     omap tvi (TT.transtvi (LDecl.toenv hyps) ue)
@@ -130,28 +156,50 @@ let process_assumption loc (pq, tvi) g =
 let process_intros pis (juc, n) =
   let mk_id s = lmap (fun s -> EcIdent.create (odfl "_" s)) s in
 
+  let elim_top g =
+    let h       = EcIdent.create "_" in
+    let (g, an) = EcLogic.t_intros_1 [h] g in
+    let (g, n)  = mkn_hyp g (get_hyps (g, an)) h in
+    let f       = snd (get_node (g, n)) in
+      t_on_goals
+        (t_clear (EcIdent.Sid.of_list [h]))
+        (t_on_first (t_use n []) (t_elim f (g, an)))
+  in
+
   let rec collect acc core pis =
     match pis, core with
     | [], [] -> acc
     | [], _  -> `Core (List.rev core) :: acc
 
     | IPCore x :: pis, _  -> collect acc (x :: core) pis
-    | IPCase x :: pis, [] -> collect (`Case x :: acc) [] pis
-    | IPCase x :: pis, _  ->
+    | IPDone   :: pis, [] -> collect (`Done :: acc) [] pis
+    | IPDone   :: pis, _  ->
         let acc = `Core (List.rev core) :: acc in
-        let acc = `Case x :: acc in
+        let acc = `Done :: acc in
           collect acc [] pis
+
+    | IPCase x :: pis, core  -> begin
+        let x   = List.map (collect [] []) x in
+          match core with
+          | [] -> collect (`Case x :: acc) [] pis
+          | _  -> collect (`Case x :: `Core (List.rev core) :: acc) [] pis
+    end
   in
 
-  let rec dointro pis gs =
+  let rec dointro pis (gs : goals) =
     List.fold_left
       (fun gs ip ->
         match ip with
         | `Core ids -> t_on_goals (t_intros (List.map mk_id ids)) gs
-        | `Case _   -> assert false)
+        | `Done     -> t_on_goals process_trivial gs
+        | `Case pis ->
+            let t gs = t_subgoal (List.map dointro1 pis) (elim_top gs) in
+              t_on_goals t gs)
       gs pis
-  in
-    dointro (List.rev (collect [] [] pis)) (juc, [n])
+
+  and dointro1 pis (juc, n) = dointro pis (juc, [n]) in
+
+    dointro1 (List.rev (collect [] [] pis)) (juc, n)
 
 (* -------------------------------------------------------------------- *)
 let process_elim_arg hyps oty a =
@@ -244,11 +292,11 @@ let process_apply loc pe (_,n as g) =
               (fun s (x, xty) ->
                  let xf = EV.doget x ev in
                    EcReduction.check_type env xty xf.f_ty;
-                   (f_bind_local s x xf, RA_form xf))
-              f_subst_id (List.rev ((x, ty) :: ids))
+                   (Fsubst.f_bind_local s x xf, RA_form xf))
+              Fsubst.f_subst_id (List.rev ((x, ty) :: ids))
           in
 
-          let concl     = f_subst s fp in
+          let concl     = Fsubst.f_subst s fp in
           let (juc, n1) = new_goal juc (hyps, concl) in
           let rule      = { pr_name = RN_apply; pr_hyps = RA_node an :: ras } in
           let juc, _    = upd_rule rule (juc, n1) in
@@ -274,13 +322,13 @@ let process_rewrite loc (s,pe) (_,n as g) =
                  (process_mkn_apply process_formula pe g) s) n
 
 (* -------------------------------------------------------------------- *)
-let process_trivial hitenv pi g =
+let process_smt hitenv pi g =
   let pi = hitenv.hte_provers pi in
 
   match hitenv.hte_smtmode with
   | `Admit    -> t_admit g
-  | `Standard -> t_seq (t_simplify_nodelta) (t_trivial false pi) g
-  | `Strict   -> t_seq (t_simplify_nodelta) (t_trivial true  pi) g
+  | `Standard -> t_seq (t_simplify_nodelta) (t_smt false pi) g
+  | `Strict   -> t_seq (t_simplify_nodelta) (t_smt true  pi) g
 
 (* -------------------------------------------------------------------- *)
 let process_cut name phi g =
@@ -530,19 +578,19 @@ let process_new_apply loc pe g =
       Some (`Forall (x, GTty ty, f)) -> begin
         try
           EcUnify.unify env ue tp.f_ty ty;
-          (EcFol.f_subst_local x tp f, `KnownVar (x, tp))
+          (Fsubst.f_subst_local x tp f, `KnownVar (x, tp))
         with EcUnify.UnificationFailure _ ->
           invalid_arg ()
     end
 
     | Some (`Memory m),
       Some (`Forall (x, GTmem _, f)) ->
-        (EcFol.f_subst_mem x m f, `KnownMem (x, m))
+        (Fsubst.f_subst_mem x m f, `KnownMem (x, m))
 
     | Some (`Module (mp, mt)),
       Some (`Forall (x, GTmodty (emt, restr), f)) ->
         check_modtype_restr env mp mt emt restr;
-        (EcFol.f_subst_mod x mp f, `KnownMod (x, (mp, mt)))
+        (Fsubst.f_subst_mod x mp f, `KnownMod (x, (mp, mt)))
 
     | _, _ -> invalid_arg ()
 
@@ -614,7 +662,7 @@ let process_new_apply loc pe g =
 let process_logic hitenv loc t =
   match t with
   | Passumption pq -> process_assumption loc pq
-  | Ptrivial pi    -> process_trivial hitenv pi
+  | Psmt pi        -> process_smt hitenv pi
   | Pintro pi      -> process_intros pi
   | Psplit         -> t_split
   | Pfield st      -> process_field st
@@ -622,6 +670,8 @@ let process_logic hitenv loc t =
   | Pexists fs     -> process_exists fs
   | Pleft          -> t_left
   | Pright         -> t_right
+  | Pcongr         -> process_congr
+  | Ptrivial       -> process_trivial
   | Pelim pe       -> process_elim loc pe
   | Papply pe      -> process_new_apply loc pe
   | Pcut (name,phi)-> process_cut name phi

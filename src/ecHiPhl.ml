@@ -421,84 +421,121 @@ let process_equiv_deno info (_,n as g) =
 
 let process_conseq info (_, n as g) =
   let t_pre = ref (t_id None) and t_post = ref (t_id None) in
-  let tac1 g =
-    let hyps = get_hyps g in
-    let m, h = match LDecl.fresh_ids hyps ["&m";"H"] with
-      | [m;h] -> m,h
-      | _ -> assert false in
-    t_seq (t_intros_i [m;h]) (t_hyp h) g in
-  let tac2 g =
-    let hyps = get_hyps g in
-    let m1,m2, h = match LDecl.fresh_ids hyps ["&m";"&m";"H"] with
-      | [m1;m2;h] -> m1,m2,h
-      | _ -> assert false in
-    t_seq (t_intros_i [m1;m2;h]) (t_hyp h) g in
   let process_cut g (pre,post) =
     let hyps,concl = get_goal g in        
-    let tac, penv, qenv, gpre, gpost, fmake = 
+    let penv, qenv, gpre, gpost, fmake = 
       match concl.f_node with
       | FhoareF hf ->
         let penv, qenv = LDecl.hoareF hf.hf_f hyps in
-        tac1, penv, qenv, hf.hf_pr, hf.hf_po, 
+        penv, qenv, hf.hf_pr, hf.hf_po, 
         (fun pre post -> f_hoareF pre hf.hf_f post)
       | FhoareS hs ->
         let env = LDecl.push_active hs.hs_m hyps in
-        tac1, env, env, hs.hs_pr, hs.hs_po,
+        env, env, hs.hs_pr, hs.hs_po,
         (fun pre post -> f_hoareS_r { hs with hs_pr = pre; hs_po = post })
       | FbdHoareF bhf ->
         let penv, qenv = LDecl.hoareF bhf.bhf_f hyps in
-        tac1, penv, qenv, bhf.bhf_pr, bhf.bhf_po, 
+        penv, qenv, bhf.bhf_pr, bhf.bhf_po, 
         (fun pre post -> f_bdHoareF pre bhf.bhf_f post bhf.bhf_cmp bhf.bhf_bd)
       | FbdHoareS bhs ->
         let env = LDecl.push_active bhs.bhs_m hyps in
-        tac1, env, env, bhs.bhs_pr, bhs.bhs_po,
+        env, env, bhs.bhs_pr, bhs.bhs_po,
         (fun pre post -> f_bdHoareS_r { bhs with bhs_pr = pre; bhs_po = post })
       | FequivF ef ->
         let penv, qenv = LDecl.equivF ef.ef_fl ef.ef_fr hyps in
-        tac2, penv, qenv, ef.ef_pr, ef.ef_po,
+        penv, qenv, ef.ef_pr, ef.ef_po,
         (fun pre post -> f_equivF pre ef.ef_fl ef.ef_fr post)
       | FequivS es -> 
         let env = LDecl.push_all [es.es_ml; es.es_mr] hyps in
-        tac2, env, env, es.es_pr, es.es_po,
+        env, env, es.es_pr, es.es_po,
         (fun pre post -> f_equivS_r { es with es_pr = pre; es_po = post }) 
       | _ -> tacuerror "cannot apply conseq rule, not a phl/prhl judgement"
     in
     let pre = match pre with
-      | None -> t_pre := tac; gpre 
-      | Some pre ->  process_form penv pre tbool in
+      | None -> t_pre := t_progress (t_id None); gpre 
+      | Some pre -> process_form penv pre tbool in
     let post = match post with
-      | None -> t_post := tac; gpost 
-      | Some post ->  process_form qenv post tbool in
+      | None -> t_post := t_progress (t_id None); gpost 
+      | Some post -> process_form qenv post tbool in
     fmake pre post in
   let (juc,an), gs = process_mkn_apply process_cut info g in
   let t_conseq = 
     let (_,f) = get_node (juc,an) in
     match f.f_node with
-    | FhoareF hf -> t_hoareF_conseq hf.hf_pr hf.hf_po
-    | FhoareS hs -> t_hoareS_conseq hs.hs_pr hs.hs_po
+    | FhoareF hf   -> t_hoareF_conseq hf.hf_pr hf.hf_po
+    | FhoareS hs   -> t_hoareS_conseq hs.hs_pr hs.hs_po
     | FbdHoareF hf -> t_bdHoareF_conseq hf.bhf_pr hf.bhf_po
     | FbdHoareS hs -> t_bdHoareS_conseq hs.bhs_pr hs.bhs_po
-    | FequivF ef -> t_equivF_conseq ef.ef_pr ef.ef_po
-    | FequivS es -> t_equivS_conseq es.es_pr es.es_po 
+    | FequivF ef   -> t_equivF_conseq ef.ef_pr ef.ef_po
+    | FequivS es   -> t_equivS_conseq es.es_pr es.es_po 
     | _ -> assert false (* FIXME error message *) in
   t_seq_subgoal t_conseq
     [!t_pre; !t_post; t_use an gs] (juc,n)
   
 let process_fun_abs inv g =
   let hyps,concl = get_goal g in
-  let env' = LDecl.inv_memenv hyps in
   if is_equivF concl then
+    let env' = LDecl.inv_memenv hyps in
     let inv = process_form env' inv tbool in
     t_equivF_abs inv g
+  else 
+    let env' = LDecl.inv_memenv1 hyps in
+    if is_bdHoareF concl then
+      let inv = process_form env' inv tbool in
+      t_bdHoareF_abs inv g
+    else if is_hoareF concl then
+      let inv = process_form env' inv tbool in
+      t_hoareF_abs inv g
+    else
+      cannot_apply "fun" "equiv or probabilistic hoare triple was expected"
+
+let process_exfalso g =
+  let concl = get_concl g in
+  let t_trivial = t_progress (t_id None) in
+  if is_hoareF concl then   
+    let hf = destr_hoareF concl in
+    t_or 
+      (t_hoareF_exfalso)
+      (t_seq_subgoal 
+         (t_hoareF_conseq f_false hf.hf_po) 
+         [t_id None; t_trivial; t_hoareF_exfalso]) g
+  else if is_hoareS concl then
+    let hs = destr_hoareS concl in
+    t_or 
+      (t_hoareS_exfalso)
+      (t_seq_subgoal 
+         (t_hoareS_conseq f_false hs.hs_po) 
+         [t_id None; t_trivial; t_hoareS_exfalso]) g
   else if is_bdHoareF concl then
-    let inv = process_form env' inv tbool in
-    t_bdHoareF_abs inv g
-  else if is_hoareF concl then
-    let inv = process_form env' inv tbool in
-    t_hoareF_abs inv g
-  else
-    cannot_apply "fun" "equiv or probabilistic hoare triple was expected"
-  
+    let bhf = destr_bdHoareF concl in
+    t_or 
+      (t_bdHoareF_exfalso)
+      (t_seq_subgoal 
+         (t_bdHoareF_conseq f_false bhf.bhf_po) 
+         [t_id None; t_trivial; t_bdHoareF_exfalso]) g
+  else if is_bdHoareS concl then
+    let bhs = destr_bdHoareS concl in
+    t_or 
+      (t_bdHoareS_exfalso)
+      (t_seq_subgoal 
+         (t_bdHoareS_conseq f_false bhs.bhs_po) 
+         [t_id None; t_trivial; t_bdHoareS_exfalso]) g
+  else if is_equivF concl then
+    let ef = destr_equivF concl in
+    t_or 
+      (t_equivF_exfalso)
+      (t_seq_subgoal 
+         (t_equivF_conseq f_false ef.ef_po) 
+         [t_id None; t_trivial; t_equivF_exfalso]) g
+  else if is_equivS concl then
+    let es = destr_equivS concl in
+    t_or 
+      (t_equivS_exfalso)
+      (t_seq_subgoal 
+         (t_equivS_conseq f_false es.es_po) 
+         [t_id None; t_trivial; t_equivS_exfalso]) g
+  else assert false
+ 
 let process_fun_upto (bad, p, o) g =
   let hyps = get_hyps g in
   let env' = LDecl.inv_memenv hyps in 
@@ -508,7 +545,7 @@ let process_fun_upto (bad, p, o) g =
     | None -> EcFol.f_true
     | Some q -> process_form env' q tbool in
   let bad = 
-    let env' =  LDecl.push_active (EcFol.mhr,None) hyps in
+    let env' = LDecl.push_active (EcFol.mhr,None) hyps in
     process_form env' bad tbool in
   t_equivF_abs_upto bad p q g
 
@@ -524,33 +561,34 @@ let process_bdeq = t_bdeq
 let process_phl loc ptac g =
   let t =
     match ptac with
-    | Pfun_def                 -> EcPhl.t_fun_def
-    | Pfun_abs f               -> process_fun_abs f
-    | Pfun_upto info           -> process_fun_upto info 
-    | Pskip                    -> EcPhl.t_skip
-    | Papp (dir, k, phi, f)    -> process_app dir k phi f
-    | Pwp  k                   -> t_wp k
-    | Prcond (side, b, i)      -> t_rcond side b i
-    | Pcond side               -> process_cond side
-    | Pwhile (phi, vopt, info) -> process_while phi vopt info
-    | Pfission info            -> process_fission info
-    | Pfusion info             -> process_fusion info
-    | Punroll info             -> process_unroll info
-    | Psplitwhile info         -> process_splitwhile info
-    | Pcall(side, (pre, post)) -> process_call side pre post
-    | Pswap info               -> process_swap info
-    | Pcfold info              -> process_cfold info
-    | Pinline info             -> process_inline info
-    | Pkill info               -> process_kill info
-    | Palias info              -> process_alias info
-    | Prnd (side, info)        -> process_rnd side info
-    | Pconseq info             -> process_conseq info
-    | Pbdhoaredeno info        -> process_bdHoare_deno info
-    | Pequivdeno info          -> process_equiv_deno info
-    | Phoare | Pbdhoare        -> process_hoare_bd_hoare
-    | Pprbounded               -> process_prbounded
-    | Pprfalse                 -> process_prfalse
-    | Ppror                    -> process_pror
-    | Pbdeq                    -> process_bdeq
+    | Pfun_def                  -> EcPhl.t_fun_def
+    | Pfun_abs f                -> process_fun_abs f
+    | Pfun_upto info            -> process_fun_upto info 
+    | Pskip                     -> EcPhl.t_skip
+    | Papp (dir, k, phi, f)     -> process_app dir k phi f
+    | Pwp k                     -> t_wp k
+    | Prcond (side, b, i)       -> t_rcond side b i
+    | Pcond side                -> process_cond side
+    | Pwhile (phi, vopt, info)  -> process_while phi vopt info
+    | Pfission info             -> process_fission info
+    | Pfusion info              -> process_fusion info
+    | Punroll info              -> process_unroll info
+    | Psplitwhile info          -> process_splitwhile info
+    | Pcall (side, (pre, post)) -> process_call side pre post
+    | Pswap info                -> process_swap info
+    | Pcfold info               -> process_cfold info
+    | Pinline info              -> process_inline info
+    | Pkill info                -> process_kill info
+    | Palias info               -> process_alias info
+    | Prnd (side, info)         -> process_rnd side info
+    | Pconseq info              -> process_conseq info
+    | Pexfalso                  -> process_exfalso
+    | Pbdhoaredeno info         -> process_bdHoare_deno info
+    | Pequivdeno info           -> process_equiv_deno info
+    | Phoare | Pbdhoare         -> process_hoare_bd_hoare
+    | Pprbounded                -> process_prbounded
+    | Pprfalse                  -> process_prfalse
+    | Ppror                     -> process_pror
+    | Pbdeq                     -> process_bdeq
   in
     set_loc loc t g

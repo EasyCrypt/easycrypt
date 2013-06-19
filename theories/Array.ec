@@ -45,7 +45,7 @@ axiom empty_length: length (empty<:'x>) = 0.
 lemma empty_unique: forall (xs:'x array),
   length(xs) = 0 => xs = empty.
 proof.
-intros xs H; apply extensionality; trivial.
+intros xs H; apply extensionality; smt.
 save.
 
 (* cons *)
@@ -95,7 +95,7 @@ axiom sub_length: forall (xs:'x array) (s l:int),
 
 axiom sub_get: forall (xs:'x array) (s l i:int),
   0 <= s => 0 <= l => s + l <= length xs =>
-  0 <= i => i <= l =>
+  0 <= i => i < l =>
   (sub xs s l).[i] = xs.[i + s].
 
 (* fold_left *)
@@ -141,16 +141,69 @@ axiom map2_get: forall (xs:'x array, ys:'y array, f:'x -> 'y -> 'z, i:int),
   (map2 f xs ys).[i] = f (xs.[i]) (ys.[i]).
 
 (* lemmas *)
-lemma sub_append_fst: forall (xs0 xs1:'x array),
-  sub (xs0 || xs1) 0 (length(xs0)) = xs0.
+lemma empty_append_fst: forall (xs:'x array),
+  (xs || empty) = xs.
 proof.
-intros xs0 xs1; apply extensionality; trivial.
+intros xs;  apply extensionality; smt.
+save.
+
+lemma empty_append_snd: forall (xs:'x array),
+  (empty || xs) = xs.
+proof.
+intros xs;  apply extensionality; smt.
+save.
+
+lemma sub_append_full : forall (xs:'x array),
+  sub xs 0 (length xs) = xs.
+proof.  
+intros xs; apply extensionality; smt.
+save.
+
+lemma sub_append_fst: forall (xs0 xs1:'x array),
+  sub (xs0 || xs1) 0 (length xs0) = xs0.
+proof.
+intros xs0 xs1; apply extensionality; smt.
+save.
+
+lemma sub_append_sub: forall (xs:'x array, i l1 l2:int),
+  0 <= i => 0 <= l1 => 0 <= l2 => i+l1+l2 <= length xs =>
+  (sub xs i l1 || sub xs (i+l1) l2) = sub xs i (l1+l2).
+proof.
+intros xs i l1 l2 i_pos l1_pos l2_pos i_l1_l2_bounded.
+apply extensionality.
+delta.
+beta.
+split.
+  rewrite (append_length<:'x> (sub xs i l1) (sub xs l1 l2)).
+  rewrite (sub_length<:'x> xs i l1 _ _ _); smt.
+    (* *)
+  intros j j_pos j_bounded.
+  generalize j_bounded.
+    rewrite (append_length<:'x> (sub xs i l1) (sub xs l1 l2)).
+    rewrite (sub_length<:'x> xs i l1 _ _ _); [smt|smt|smt|].
+    rewrite (sub_length<:'x> xs l1 l2 _ _ _); [smt|smt|smt|].
+    intros j_bounded_.
+    case (j<l1).
+    elim (append_get<:'x> (sub xs i l1) (sub xs l1 l2) j) .
+    intros H _ _.
+    cut j_bounded__ : (j < length (sub xs i l1)); first smt.
+    rewrite (H _ _); [smt|smt|].
+    rewrite (sub_get<:'x> xs i (l1+l2) j _ _ _ _ _); [smt|smt|smt|smt|smt|].
+    rewrite (sub_get<:'x> xs i l1 j _ _ _ _ _); smt.
+    (* *)
+    intros j_geq_l1.
+    elim (append_get<:'x> (sub xs i l1) (sub xs l1 l2) j) .
+    intros _ H.
+    rewrite (H _ _); [smt|smt|].
+    rewrite (sub_length<:'x> xs i l1 _ _ _);[smt|smt|smt|].
+    rewrite (sub_get<:'x> xs l1 l2 (j-l1) _ _ _ _ _); [smt|smt|smt|smt|smt|].
+    rewrite (sub_get<:'x> xs i (l1+l2) j _ _ _ _ _); smt.
 save.
 
 lemma sub_append_snd: forall (xs0 xs1:'x array),
   sub (xs0 || xs1) (length xs0) (length xs1) = xs1.
 proof.
-intros xs0 xs1; apply extensionality; trivial.
+intros xs0 xs1; apply extensionality; smt.
 save.
 
 (* Induction Principle *)
@@ -170,20 +223,20 @@ lemma fold_length: forall (xs:'x array),
 proof.
 intros xs.
 apply (induction<:'x> (lambda xs', fold_left (lambda x n, n + 1) xs' 0 = length xs') _ _ xs).
-trivial.
+smt.
 simplify.
 intros x xs' IH.
-cut length_def:(length (x::xs') = length xs' + 1); [ trivial | rewrite length_def;rewrite <- IH ].
-cut sub_eq:(sub (x::xs') 1 (length (x::xs') - 1) = xs');[ apply extensionality; trivial | ].
+cut length_def:(length (x::xs') = length xs' + 1); [ smt | rewrite length_def;rewrite <- IH ].
+cut sub_eq:(sub (x::xs') 1 (length (x::xs') - 1) = xs');[ apply extensionality; smt | ].
 cut fold_def:(fold_left (lambda x n, n + 1) xs' 0 = fold_left (lambda x n, n + 1) (sub (x::xs') 1 (length (x::xs') - 1)) 0);[ rewrite sub_eq | ].
 apply (fold_left_deterministic<:int,'x> (lambda x n, n + 1) (lambda x n, n + 1) 0 0 xs' xs' _ _).
   apply (Fun.extensionality<:int -> int,'x> (lambda x n, n + 1) (lambda x n, n + 1) _).
   delta beta.
   intros x'. apply Fun.extensionality.
-  delta beta. trivial.
-trivial.
+  delta beta. smt.
+smt.
 rewrite fold_def;clear fold_def.
-apply (fold_left_ind<:int,'x> (lambda x n, n + 1) 0 (x::xs') _);trivial.
+apply (fold_left_ind<:int,'x> (lambda x n, n + 1) 0 (x::xs') _);smt.
 save.
 
 (*********************************)
@@ -236,5 +289,5 @@ lemma write_append: forall (dst src:'x array),
   write dst 0 src 0 (length src) = (src || (sub dst (length src) (length dst - length src))).
 proof.
 intros dst src H; apply extensionality.
-delta beta;split;trivial.
+delta beta;split;smt.
 save.

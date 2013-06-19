@@ -8,5 +8,5 @@ proof.
   beta.
   delta iff.
   beta.
-  trivial.
+  smt.
 save.

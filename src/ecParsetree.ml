@@ -315,6 +315,7 @@ type phltactic =
   | Prnd        of tac_side * pformula rnd_tac_info
   | Palias      of (tac_side * codepos * psymbol option)
   | Pconseq     of cfpattern
+  | Pexfalso
   | Pbdhoaredeno  of cfpattern
   | Pequivdeno    of cfpattern
   | Phoare
@@ -331,12 +332,13 @@ and pinline_arg =
 type intropattern1 =
   | IPCore of (symbol option) located
   | IPCase of intropattern list
+  | IPDone
 
 and intropattern = intropattern1 list
 
 type logtactic =
   | Passumption of (pqsymbol option * ptyannot option)
-  | Ptrivial    of pprover_infos
+  | Psmt        of pprover_infos
   | Pintro      of intropattern
   | Psplit                        
   | Pfield		of (pformula * pformula * pformula * pformula * pformula * pformula * pformula)
@@ -344,6 +346,8 @@ type logtactic =
   | Pexists     of fpattern_arg located list 
   | Pleft                         
   | Pright                        
+  | Ptrivial
+  | Pcongr
   | Pelim       of ffpattern 
   | Papply      of ffpattern
   | Pcut        of (psymbol * pformula)

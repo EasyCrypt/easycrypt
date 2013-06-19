@@ -16,5 +16,5 @@ module M = {
 
 lemma h : hoare[M.g : a = a ==> res = res].
 proof.
-  fun; inline M.f. wp; skip; trivial.
+  fun; inline M.f. wp; skip; smt.
 save.
