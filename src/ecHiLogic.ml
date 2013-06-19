@@ -614,7 +614,7 @@ let process_new_apply loc pe g =
               instanciate (ax, id :: ids)
   in
 
-  let (ax, ids) = sndmap List.rev (List.map_fold check_arg ax args) in
+  let (ax, ids) = snd_map List.rev (List.map_fold check_arg ax args) in
 
   let (_, ids, (_, tue, ev)) =
     let is_not_fully_instantiate =

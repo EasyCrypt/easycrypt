@@ -961,7 +961,7 @@ let preid id =
   Ident.id_fresh (EcIdent.name id)
 
 let str_p p =
-  Ident.id_fresh (EcUtils.String.map (fun c -> if c = '.' then '_' else c) p)
+  Ident.id_fresh (String.map (fun c -> if c = '.' then '_' else c) p)
 
 
 let preid_p p = str_p (EcPath.tostring p)

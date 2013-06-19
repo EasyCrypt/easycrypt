@@ -420,7 +420,7 @@ let fd_hash f =
 
 (* -------------------------------------------------------------------- *)
 let rec mty_subst sp sm mty =
-  let mt_params = List.map (sndmap (mty_subst sp sm)) mty.mt_params in
+  let mt_params = List.map (snd_map (mty_subst sp sm)) mty.mt_params in
   let mt_name   = sp mty.mt_name in
   let mt_args   = List.map sm mty.mt_args in
   { mt_params; mt_name; mt_args; }

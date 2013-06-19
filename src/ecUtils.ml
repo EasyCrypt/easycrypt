@@ -4,6 +4,10 @@ exception Unexpected
 let unexpected () = raise Unexpected
 
 (* -------------------------------------------------------------------- *)
+type 'a eq  = 'a -> 'a -> bool
+type 'a cmp = 'a -> 'a -> int
+
+(* -------------------------------------------------------------------- *)
 let tryexn (ignoreexn : exn -> bool) (f : unit -> 'a) =
   try  Some (f ())
   with e -> if ignoreexn e then None else raise e
@@ -58,53 +62,6 @@ let opt_equal (f : 'a -> 'a -> bool) o1 o2 =
   | _      , _       -> false
 
 (* -------------------------------------------------------------------- *)
-module type IFlag = sig
-  type flag
-
-  val toint : flag -> int               (* \in {0..31} *)
-end
-
-module type IFlags = sig
-  type flag
-  type t
-
-  val null      : t
-  val singleton : flag -> t
-  val fromlist  : flag list -> t
-  val add       : flag -> t -> t
-  val have      : flag -> t -> bool
-  val included  : t -> t -> bool
-  val equal     : t -> t -> bool
-end
-
-module Flags(X : IFlag) : IFlags
-  with type flag = X.flag
-= struct
-  type flag = X.flag
-  type t    = Flags of int
-
-  let null = Flags 0
-
-  let add (e : flag) (Flags f : t) =
-    Flags (f lor (1 lsl (X.toint e)))
-
-  let singleton (e : flag) =
-    add e null
-
-  let fromlist (es : flag list) =
-    List.fold_left ((^~) add) null es
-
-  let have (e : flag) (Flags f : t) =
-    (f land (1 lsl (X.toint e))) != 0
-
-  let included (Flags fin) (Flags fout) =
-    (lnot fin) land fout == 0
-
-  let equal (Flags fin) (Flags fout) =
-    fin == fout
-end
-
-(* -------------------------------------------------------------------- *)
 let none = None
 let some = fun x -> Some x
 
@@ -156,10 +113,6 @@ let oall2 f x y =
   | Some x, Some y -> f x y
   | None  , None   -> true
   | _     , _      -> false 
-
-(* -------------------------------------------------------------------- *)
-let fstmap f (x, y) = (f x, y)
-let sndmap f (x, y) = (x, f y)
 
 (* -------------------------------------------------------------------- *)
 module Counter : sig
@@ -422,31 +375,10 @@ module List = struct
       r := a; c in
     let l = smart_map f xs in
     !r, l
-
 end
 
 (* -------------------------------------------------------------------- *)
-module Parray : sig 
-  type 'a t
-
-  val empty : 'a t
-  val get : 'a t -> int -> 'a
-  val length : 'a t -> int 
-  val of_list : 'a list -> 'a t
-  val to_list : 'a t -> 'a list
-  val of_array : 'a array -> 'a t
-  val init : int -> (int -> 'a) -> 'a t
-  val map : ('a -> 'b) -> 'a t -> 'b t
-  val fmap : ('a -> 'b) -> 'a list -> 'b t
-  val fold_left : ('a -> 'b -> 'a) -> 'a -> 'b t -> 'a
-  val fold_right : ('b -> 'a -> 'a) -> 'b t -> 'a -> 'a
-  val fold_left2 : ('a -> 'b -> 'c -> 'a) -> 'a -> 'b t -> 'c t -> 'a
-  val iter : ('a -> unit) -> 'a t -> unit 
-  val iter2 : ('a -> 'b -> unit) -> 'a t -> 'b t -> unit
-  val split : ('a * 'b) t -> ('a t * 'b t)
-  val exists : ('a -> bool) -> 'a t -> bool
-  val for_all : ('a -> bool) -> 'a t -> bool
-end = struct
+module Parray = struct
   type 'a t = 'a array
 
   include Array

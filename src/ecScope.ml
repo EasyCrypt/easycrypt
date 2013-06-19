@@ -369,10 +369,10 @@ module Tactics = struct
     | []      -> error loc NoCurrentGoal
     | n :: ns ->
       let juc = process_tactics hitenv tacs (juc, [n]) in
-      let juc = fstmap EcLogic.upd_done juc in
+      let juc = fst_map EcLogic.upd_done juc in
       let juc = (fst juc, (snd juc) @ ns) in
 
-      sndmap (List.filter (List.mem^~ (snd (find_all_goals (fst juc))))) juc
+      snd_map (List.filter (List.mem^~ (snd (find_all_goals (fst juc))))) juc
 
   let process_r mark mode (scope : scope) (tac : ptactic list) =
     check_state `InProof "proof script" scope;

@@ -160,11 +160,11 @@ let t_on_nth t n (juc,ln) =
 
 let t_on_firsts t i (juc, ln) =
   let (ln1, ln2) = List.take_n i ln in
-  sndmap (List.append^~ ln2) (t_on_goals t (juc, ln1))
+  snd_map (List.append^~ ln2) (t_on_goals t (juc, ln1))
 
 let t_on_lasts t i (juc, ln) =
   let (ln1, ln2) = List.take_n (max 0 (List.length ln - i)) ln in
-  sndmap (List.append ln1) (t_on_goals t (juc, ln2))
+  snd_map (List.append ln1) (t_on_goals t (juc, ln2))
 
 let t_on_first t g = t_on_firsts t 1 g
 let t_on_last  t g = t_on_lasts  t 1 g
