@@ -37,7 +37,7 @@ type form = private {
   f_tag  : int;
 }
 
-and f_node = 
+and f_node =
   | Fquant  of quantif * binding * form
   | Fif     of form * form * form
   | Flet    of lpattern * form * form
@@ -58,7 +58,7 @@ and f_node =
   | FequivF of equivF (* $left,$right / $left,$right *)
   | FequivS of equivS (* $left,$right / $left,$right *)
 
-  | Fpr     of memory * EcPath.xpath * form list * form (* hr *)
+  | Fpr     of pr (* hr *)
 
 and equivF = { 
   ef_pr : form;
@@ -105,6 +105,8 @@ and bdHoareS = {
   bhs_cmp : hoarecmp;
   bhs_bd  : form;
 }
+
+and pr = memory * EcPath.xpath * form list * form
 
 type app_bd_info =
 | AppNone
@@ -381,3 +383,40 @@ val is_logical_op : EcPath.path -> bool
 
 val is_op_and : EcPath.path -> bool
 val is_op_or  : EcPath.path -> bool
+
+(* -------------------------------------------------------------------- *)
+(* Structured formulas - allows to get more information on the top-level
+ * structure of a formula via direct pattern matching *)
+
+type sform =
+  | SFint   of int
+  | SFlocal of EcIdent.t
+  | SFpvar  of EcTypes.prog_var * memory
+  | SFglob  of EcPath.mpath * memory 
+
+  | SFif    of form * form * form
+  | SFlet   of lpattern * form * form
+  | SFtuple of form list
+
+  | SFquant of quantif * (EcIdent.t * gty) * form
+  | SFtrue
+  | SFfalse
+  | SFnot   of form
+  | SFand   of bool * (form * form)
+  | SFor    of bool * (form * form)
+  | SFimp   of form * form
+  | SFiff   of form * form
+  | SFeq    of form * form
+  | SFop    of (EcPath.path * ty list) * (form list)
+
+  | SFhoareF   of hoareF
+  | SFhoareS   of hoareS
+  | SFbdHoareF of bdHoareF
+  | SFbdHoareS of bdHoareS
+  | SFequivF   of equivF
+  | SFequivS   of equivS
+  | SFpr       of pr
+
+  | SFother of form
+
+val sform_of_form : form -> sform
