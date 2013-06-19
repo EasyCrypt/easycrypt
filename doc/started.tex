@@ -269,15 +269,19 @@ sequence of games:
 \begin{enumerate}
 \item The first transformation we apply is to replace the call to the
   hash oracle in the encryption by a fresh randomly sampled value. The
-  obtained encryption expression is $\Enc2_{pk}(m) = f_{pk}(r) \concat
+  obtained encryption expression is $\Enc^2_{pk}(m) = f_{pk}(r) \concat
   m \xor r'$. We can show that the results of the encryption are
   observationally equivalent and that the resulting maps of the random
   oracle differ only in the query for value \ec{r}, provided that
   query done by the original encryption is fresh, therefore, if the
-  adversary did not query \ec{r} to the random oracle.
+  adversary did not query \ec{r} to the random oracle. Hence, we bound
+  the probability of \ec{b=b'} in the intitial game, in terms of the
+  probability of winning in the second game, plus the probability of
+  the event \ec{mem M.r ARO.s}, which means that the adversary was
+  able to query \ec{r} to the random oracle.
 
 \item Next, we modify the encryption scheme once again and replace the
-  occurrence of $m\xor r'$ by $r'$ and we obtain $\Enc2_{pk}(m) =
+  occurrence of $m\xor r'$ by $r'$ and we obtain $\Enc^3_{pk}(m) =
   f_{pk}(r) \concat r'$. This step is justified by means of optimistic
   sampling: $\Rand{r}{\bitstring{k};\Ass{v}{r\xor x}}$ and
   $\Rand{v}{\bitstring{k}}$ yield the same distribution of values of
@@ -289,7 +293,17 @@ sequence of games:
   second round, does not depend on the bit \ec{b} anymore. We exploit
   this fact and at this point we modify de \ec{CPA} game by pushing
   the sampling of \ec{b} to the bottom of \ec{main}. At this point,
-  the probability of \ec{b = b'} is exactly $\frac{1}{2}$
+  the probability of \ec{b = b'} is exactly $\frac{1}{2}$.
+
+\item We show that if the adversary manages to query \ec{r} to the
+  random oracle, he can invert the one way function, since the only
+  occurrence of \ec{r} in the cipher is as argument to the one way
+  function. In doing so, we construct an inverter that receives a
+  challenge \ec{y} and a public key, runs the first phase of the
+  adversary, samples a value \ec{r'} and calls the second phase of the
+  adversary with argument \ec{y || r'}. Afterwards, we go through
+  the sets of queries performed by the adversary and look for $x$
+  s.t. \ec{f pk x = y}. If we succeed, we return x.
 \end{enumerate}
 
 \subsection{Easycrypt proof}
