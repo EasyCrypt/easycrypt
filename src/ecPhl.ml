@@ -1208,15 +1208,15 @@ lossless c2
 let t_hoare_case f g =
   let concl = get_concl g in
   let hs = destr_hoareS concl in
-  let concl1 = f_hoareS_r { hs with hs_pr = f_and hs.hs_pr f } in
-  let concl2 = f_hoareS_r { hs with hs_pr = f_and hs.hs_pr (f_not f) } in
+  let concl1 = f_hoareS_r { hs with hs_pr = f_and_simpl hs.hs_pr f } in
+  let concl2 = f_hoareS_r { hs with hs_pr = f_and_simpl hs.hs_pr (f_not f) } in
   prove_goal_by [concl1;concl2] (RN_hl_case f) g
 
 let t_bdHoare_case f g =
   let concl = get_concl g in
   let bhs = destr_bdHoareS concl in
-  let concl1 = f_bdHoareS_r { bhs with bhs_pr = f_and bhs.bhs_pr f } in
-  let concl2 = f_bdHoareS_r { bhs with bhs_pr = f_and bhs.bhs_pr (f_not f) } in
+  let concl1 = f_bdHoareS_r { bhs with bhs_pr = f_and_simpl bhs.bhs_pr f } in
+  let concl2 = f_bdHoareS_r { bhs with bhs_pr = f_and_simpl bhs.bhs_pr (f_not f) } in
   prove_goal_by [concl1;concl2] (RN_hl_case f) g
 
 let t_equiv_case f g = 
@@ -1825,7 +1825,7 @@ let t_gen_cond side e g =
   in
   let t_sub b g = 
     t_seq_subgoal (t_rcond side b 1)
-      [t_lseq [t_introm; t_skip; t_try (t_intros_i [m2;h]);
+      [t_lseq [t_introm; t_skip; t_intros_i [m2;h];
                t_or  
                  (t_lseq [t_elim_hyp h; t_intros_i [h1;h2]; t_hyp h2])
                  (t_hyp h)
@@ -1842,8 +1842,6 @@ let t_hoare_cond g =
 let t_bdHoare_cond g = 
   let concl = get_concl g in
   let bhs = destr_bdHoareS concl in 
-  if (bhs.bhs_bd <> f_r1 || (bhs.bhs_cmp <> FHeq && bhs.bhs_cmp <> FHge)) then
-    cannot_apply "if" "expected \">= 1\" as bound";
   let (e,_,_) = s_first_if bhs.bhs_s in
   t_gen_cond None (form_of_expr (EcMemory.memory bhs.bhs_m) e) g
 
