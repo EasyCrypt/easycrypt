@@ -158,7 +158,7 @@ call with value $r$.
  In easycrypt we model the encryption scheme as an instance of our
  \ec{Scheme} signature as follows
 
-\ecimport{ }{../examples/br93_tutorial.ec}{br93}
+\ecimport[morecomment={[is]{proof.}{qed.}}]{ }{../examples/br93_tutorial.ec}{br93}
 
 First, we define a concatenation operation with the appropriate
 type. In doing so, we make use of the array library, in particular,
@@ -221,33 +221,25 @@ $\frac{1}{2}$. What we are measuring is essentially how much better
 can an adversary do, and we are bounding it in terms of the
 probability of suceeding in the one-way experiment.
 
-This property is formalized in \EC as follows:
-\begin{easycrypt}[label={lst:cpa}]{}
-lemma Conclusion :
-forall (A <: Adv {Rnd, RO}) &m :
-(forall (O <: ARO),  islossless O.o => islossless A(O).a1) =>
-(forall (O <: ARO),  islossless O.o => islossless A(O).a2) =>
- exists (I<:Inverter), 
-Pr[CPA(BR,A).main() @ &m : res] - 1%r / 2%r <= 
-Pr[OW(I).main() @ &m : res].
-\end{easycrypt}
+This property is formalized in \EC as follows
+
+\ecimport{ }{../examples/br93_tutorial.ec}{conclusion}
 
 The lemma \ec{Conclusion} is parametrized by an adversary \ec{A}. The
-annotations \ec{\{CPA,CPA2, BR, BR2, BR3, OW, RO, ARO, BR_OW\}} are
-memory access restrctions: essentially, the adversary cannot access
-the memories of these modules directly---only through oracle
-calls. The next parameter of the lemma is a memory \ec{m}. Next, we
-have one hypothesis that states that if the wrapped version of the
-random oracle terminates with probability $1$, so does the
-adversary. The \ec{\%r} next to constants establishes that they should
-be interpreted as real values. The existential quantification binds a
-module \ec{I} of type \ec{Inverter}. The expression
-\ec{Pr[CPA(BR,A).main() @ &m : res]} denotes the probability of the
-event \ec{res} in the distribution obtained after executing the
-\ec{main} function of module \ec{CPA}, instantiated with the module
-\ec{BR} and the parametrized adversary $A$ in initial memory
-\ec{m}. Similarly, the expression \ec{Pr[OW(BR_OW(A)).main() @ &m :
-  res]} denotes the probability of the event \ec{res} in the
+annotations \ec{\{Rand, RO\}} are memory access restrctions:
+essentially, the adversary cannot access the memories of these modules
+directly---only through oracle calls. The next parameter of the lemma
+is a memory \ec{m}. Next, we have one hypothesis that states that if
+the wrapped version of the random oracle terminates with probability
+$1$, so does the adversary. The \ec{\%r} next to constants establishes
+that they should be interpreted as real values. The existential
+quantification binds a module \ec{I} of type \ec{Inverter}. The
+expression \ec{Pr[CPA(BR,A).main() @ &m : res]} denotes the
+probability of the event \ec{res} in the distribution obtained after
+executing the \ec{main} function of module \ec{CPA}, instantiated with
+the module \ec{BR} and the parametrized adversary $A$ in initial
+memory \ec{m}. Similarly, the expression \ec{Pr[OW(BR_OW(A)).main() @
+  &m : res]} denotes the probability of the event \ec{res} in the
 distribution obtained after executing the \ec{main} function of module
 \ec{OW}, instantiated with the existentially quantified module \ec{I},
 in initial memory \ec{m}. These two expressions are of type real and
@@ -307,7 +299,71 @@ sequence of games:
 \end{enumerate}
 
 \subsection{Easycrypt proof}
+In this section, we describe thoroughly the proof, as it is done in
+easycrypt. We present intermediate games, and formally define the
+relationships between them.
 
+\paragraph{Reasoning up to failure: replacing \ec{H(r)} by fresh \ec{h}}
+As mentioned above, the first step of the proof is to remove the hash
+call in the encryption scheme and replace it by a randomly sampled
+value. We define \ec{BR2} then, as follows
+
+\ecimport{ }{../examples/br93_tutorial.ec}{br2}
+
+Now, the question that arises is: when will an adversary be able to
+distiguish \ec{h = H(r)} and \ec{h = $uniform_plain}? %$
+If the query in the original scheme is fresh, it means that it will be
+a randomly sampled value and in this case, the two values above are
+indistinguishable. We formalize this reasoning step in pRHL as follows
+
+\ecimport{ }{../examples/br93_tutorial.ec}{eq1enc}
+
+The precondition states that when we run both encryptions with equal
+arguments \ec{pk, m} and in inital states that coincide in the value
+of \ec{RO.m}; if the value \ec{Rnd.r} has not been queried to
+\ec{RO.m} on the right execution, the results coincide, the values of
+\ec{Rnd.r} coincide and the mappings \ec{RO.m} are equal except in
+\ec{Rnd.r}.
+
+The proof proceeds by making use of a sequence of tactics. Among them
+we have
+\begin{itemize}
+\item \ec{fun}: when called in a pRHL goal with two concrete
+  procedures (such as in this case), it expands their definition. 
+\item \ec{inline}: it expects a function identifier and inlines the
+  calls in the current goal. In this case, it is used to inline the
+  definition of RO.o in the current goal.
+\item \ec{wp}: implements relational weakest precondition.
+\item \ec{rnd}: implements the pRHL rule for random samplings.
+\item \ec{skip}: allows to reduce the validity of the current
+  judgement to the validity of a logical entailment between pre and
+  post condition when the programs are ``empty''.
+\item \ec{smt}: calls smt solvers in order to decide on the validity
+  of a formula.
+\end{itemize} 
+For a detailed explanation of the tactics see Chapter (writting proofs).
+
+At the point where the encryption scheme is called
+within the CPA game, we know that all the values queried to the random
+oracle correspond to adversary queries. Hence, the call is fresh if
+the adversary has not queried this value. On the other hand, after the
+encryption is called, we know that the oracle maps are equal, except
+in the value of \ec{Rand.r}. Therefore, if the adversary in the second
+round queries the hash oracle with \ec{Rand.r}, he manages to
+distinguish between the two. To sum up, the behaviour is equivalent
+except if the adversary manages to query \ec{Rand.r} either in the
+first phase or in the second one. We formalize this reasoning in
+easycrypt as follows
+
+\ecimport{ }{../examples/br93_tutorial.ec}{eq1}
+
+\paragraph{Optmistic sampling: replacing \ec{m ^^ r} by \ec{r}}
+
+\paragraph{Code movement: sampling \ec{b} at the end}
+
+\paragraph{Reasoning about probabilities}
+
+\paragraph{Constructing the inverter}
 
 %%% Local Variables: 
 %%% mode: latex

@@ -57,6 +57,22 @@ lemma local or_intro_r : forall (a b : bool),
   b => a \/ b
 by [].
 
+lemma local orA : forall (a b c : bool),
+  ((a \/ b) \/ c) = (a \/ (b \/ c))
+by [].
+
+lemma local andA : forall (a b c : bool),
+  ((a /\ b) /\ c) = (a /\ (b /\ c))
+by [].
+
+lemma local orDand : forall (a b c : bool),
+  ((a \/ b) /\ c) = ((a /\ c) \/ (b /\ c))
+by [].
+
+lemma local andDor : forall (a b c : bool),
+  ((a /\ b) \/ c) = ((a \/ c) /\ (b \/ c))
+by [].
+
 lemma local ora_intro_r : forall (a b : bool),
   (!a => b) => a || b
 by [].
