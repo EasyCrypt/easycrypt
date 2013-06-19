@@ -447,17 +447,11 @@ let trans_apply_arg hyps ue arg =
 
 (* -------------------------------------------------------------------- *)
 let rec destruct_product hyps fp =
-  let module P = EcPath      in
-  let module C = EcCoreLib   in
   let module R = EcReduction in
 
-  match fp.f_node with
-  | Fapp ({f_node = Fop(p, _)}, [f1; f2]) when P.p_equal p C.p_imp ->
-      Some (`Imp (f1, f2))
-
-  | Fquant (Lforall, (x, t) :: bd, f) ->
-      Some (`Forall (x, t, EcFol.f_forall bd f))
-
+  match EcFol.sform_of_form fp with
+  | SFquant (Lforall, (x, t), f) -> Some (`Forall (x, t, f))
+  | SFimp (f1, f2) -> Some (`Imp (f1, f2))
   | _ -> begin
     match R.h_red_opt R.full_red hyps fp with
     | None   -> None
@@ -513,9 +507,45 @@ let process_named_apply _loc hyps (fp, tvi) =
     (p, typ, ue, ax)
 
 (* -------------------------------------------------------------------- *)
+let check_apply_arg hyps ue f arg =
+  let env = LDecl.toenv hyps in
+
+  let invalid_arg () = tacuerror "invalid argument to apply" in
+
+  match arg, destruct_product hyps f with
+  | None, Some (`Imp (f1, f2)) ->
+      (f2, `SideCond f1)
+
+  | None, Some (`Forall (x, gty, f)) -> begin
+      match gty with
+      | GTmodty _  -> tacuerror "cannot infer module"
+      | GTmem   _  -> tacuerror "cannot infer memory"
+      | GTty    ty -> (f, `UnknownVar (x, ty))
+  end
+
+  | Some (`Form tp),
+    Some (`Forall (x, GTty ty, f)) -> begin
+      try
+        EcUnify.unify env ue tp.f_ty ty;
+        (Fsubst.f_subst_local x tp f, `KnownVar (x, tp))
+      with EcUnify.UnificationFailure _ ->
+        invalid_arg ()
+  end
+
+  | Some (`Memory m),
+    Some (`Forall (x, GTmem _, f)) ->
+      (Fsubst.f_subst_mem x m f, `KnownMem (x, m))
+
+  | Some (`Module (mp, mt)),
+    Some (`Forall (x, GTmodty (emt, restr), f)) ->
+      check_modtype_restr env mp mt emt restr;
+      (Fsubst.f_subst_mod x mp f, `KnownMod (x, (mp, mt)))
+
+  | _, _ -> invalid_arg ()
+
+(* -------------------------------------------------------------------- *)
 let process_apply loc pe g =
   let (hyps, fp) = (get_hyps g, get_concl g) in
-  let env = LDecl.toenv hyps in
 
   let (p, typarams, ue, ax) =
     match pe.fp_kind with
@@ -531,42 +561,6 @@ let process_apply loc pe g =
   let args = pe.fp_args in
   let args = List.map (trans_apply_arg hyps ue) args in
 
-  let check_arg f arg =
-    let invalid_arg () = tacuerror "invalid argument to apply" in
-
-    match arg, destruct_product hyps f with
-    | None, Some (`Imp (f1, f2)) ->
-        (f2, `SideCond f1)
-
-    | None, Some (`Forall (x, gty, f)) -> begin
-        match gty with
-        | GTmodty _  -> tacuerror "cannot infer module"
-        | GTmem   _  -> tacuerror "cannot infer memory"
-        | GTty    ty -> (f, `UnknownVar (x, ty))
-    end
-
-    | Some (`Form tp),
-      Some (`Forall (x, GTty ty, f)) -> begin
-        try
-          EcUnify.unify env ue tp.f_ty ty;
-          (Fsubst.f_subst_local x tp f, `KnownVar (x, tp))
-        with EcUnify.UnificationFailure _ ->
-          invalid_arg ()
-    end
-
-    | Some (`Memory m),
-      Some (`Forall (x, GTmem _, f)) ->
-        (Fsubst.f_subst_mem x m f, `KnownMem (x, m))
-
-    | Some (`Module (mp, mt)),
-      Some (`Forall (x, GTmodty (emt, restr), f)) ->
-        check_modtype_restr env mp mt emt restr;
-        (Fsubst.f_subst_mod x mp f, `KnownMod (x, (mp, mt)))
-
-    | _, _ -> invalid_arg ()
-
-  in
-
   let rec instanciate (ax, ids) =
     let ev =
       let forid id ev =
@@ -581,11 +575,13 @@ let process_apply loc pe g =
         match destruct_product hyps ax with
         | None   -> tacuerror "in apply, cannot find instance"
         | Some _ ->
-            let (ax, id) = check_arg ax None in
+            let (ax, id) = check_apply_arg hyps ue ax None in
               instanciate (ax, id :: ids)
   in
 
-  let (ax, ids) = snd_map List.rev (List.map_fold check_arg ax args) in
+  let (ax, ids) =
+    snd_map List.rev (List.map_fold (check_apply_arg hyps ue) ax args)
+  in
 
   let (_, ids, (_, tue, ev)) =
     let is_not_fully_instantiate =
