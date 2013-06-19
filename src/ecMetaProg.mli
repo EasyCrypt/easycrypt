@@ -118,6 +118,7 @@ type ptnpos = [`Select | `Sub of ptnpos] Mint.t
 exception InvalidPosition
 
 module FPosition : sig
+  val select : (form -> bool) -> form -> ptnpos
   val occurences : ptnpos -> int
   val filter : Sint.t -> ptnpos -> ptnpos
   val topattern : ptnpos -> form -> EcIdent.t * form
