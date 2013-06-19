@@ -136,6 +136,7 @@ val t_change : form -> tactic
 val t_subst_all : tactic
 val t_subst1    : form option -> tactic
 
+val t_assumption : tactic
 val t_progress : tactic -> tactic
 
 val t_field      : form tuple7 -> form * form -> tactic
