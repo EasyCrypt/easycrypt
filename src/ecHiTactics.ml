@@ -17,9 +17,9 @@ open EcHiPhl
 let process_case loc pf g =
   let concl = get_concl g in
   match concl.f_node with
-  | FhoareS _ ->
+  | FhoareS _ | FbdHoareS _ ->
     let f = process_phl_formula g pf in
-    EcPhl.t_hoare_case f g
+    EcPhl.t_he_case f g
   | FequivS _ ->
     let f = process_prhl_formula g pf in
     EcPhl.t_equiv_case f g
