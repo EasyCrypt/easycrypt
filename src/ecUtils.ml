@@ -34,11 +34,20 @@ let copy (x : 'a) : 'a =
   Obj.obj (Obj.dup (Obj.repr x))
 
 (* -------------------------------------------------------------------- *)
+type 'a tuple0 = unit
+type 'a tuple1 = 'a
+type 'a tuple2 = 'a * 'a
 type 'a tuple3 = 'a * 'a * 'a
 type 'a tuple4 = 'a * 'a * 'a * 'a
 type 'a tuple5 = 'a * 'a * 'a * 'a * 'a
 type 'a tuple6 = 'a * 'a * 'a * 'a * 'a * 'a
 type 'a tuple7 = 'a * 'a * 'a * 'a * 'a * 'a * 'a
+
+(* -------------------------------------------------------------------- *)
+let as_seq0 = function [] -> () | _ -> assert false
+let as_seq1 = function [x] -> x | _ -> assert false
+let as_seq2 = function [x1; x2] -> (x1, x2) | _ -> assert false
+let as_seq3 = function [x1; x2; x3] -> (x1, x2, x3) | _ -> assert false
 
 (* -------------------------------------------------------------------- *)
 let proj3_1 (x, _, _) = x
@@ -321,6 +330,14 @@ module List = struct
       | x::l -> if f x then r, x, l else aux (x::r) l in
     aux [] l
  
+  let mapi (f : int -> 'a -> 'b) =
+    let rec doit n xs =
+      match xs with
+      | [] -> []
+      | x :: xs -> let x = f n x in x :: (doit (n+1) xs)
+    in
+      fun (xs : 'a list) -> doit 0 xs
+
   let map_fold (f : 'a -> 'b -> 'a * 'c) (a : 'a) (xs : 'b list) =
     let a = ref a in
     let f b = 
@@ -375,6 +392,8 @@ module List = struct
       r := a; c in
     let l = smart_map f xs in
     !r, l
+
+  let sum xs = List.fold_left (+) 0 xs
 end
 
 (* -------------------------------------------------------------------- *)

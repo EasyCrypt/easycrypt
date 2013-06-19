@@ -785,6 +785,7 @@ module FSmart = struct
   type a_let   = lpattern * form * form
   type a_op    = EcPath.path * ty list * ty
   type a_tuple = form list
+  type a_app   = form * form list * ty
 
   let f_local (fp, (x, ty)) (x', ty') =
     if   false && x == x' && ty == ty'

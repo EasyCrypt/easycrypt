@@ -1366,6 +1366,10 @@ fpattern(F):
    { mk_fpattern hd args }
 ;
 
+rewrite_arg:
+| s=rwside fp=fpattern(form) { (s, fp) }
+;
+
 simplify_arg: 
 | DELTA l=qoident* { `Delta l }
 | ZETA             { `Zeta }
@@ -1383,9 +1387,8 @@ simplify:
 ;
 
 rwside:
-| LEFTARROW { false }
-| ARROW     { true }
-| empty     { true }
+| MINUS { false }
+| empty { true }
 ;
 
 conseq:
@@ -1540,8 +1543,8 @@ logtactic:
 | CHANGE f=sform
    { Pchange f }
 
-| REWRITE s=rwside e=fpattern(form)
-   { Prewrite (s, e) }
+| REWRITE a=rewrite_arg+
+   { Prewrite a }
 
 | SUBST l=sform*
    { Psubst l }

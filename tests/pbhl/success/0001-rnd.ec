@@ -145,8 +145,8 @@ assumption.
 intros _ v0 v0_in_supp.
 split.
 intros H.
-rewrite <- H.
-rewrite <- Hv.
+rewrite -H.
+rewrite -Hv.
 
 cut Trivial : (sub a k1 k2 = sub a (0+k1) k2).
 trivial.
@@ -156,7 +156,7 @@ trivial.
 trivial.
 trivial.
 trivial.
-rewrite <- length_a.
+rewrite -length_a.
 rewrite (sub_append_full<:bool> a). 
 split.
 intros H.
