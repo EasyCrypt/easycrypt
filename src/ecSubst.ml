@@ -296,8 +296,9 @@ let subst_ax (s : _subst) (ax : axiom) =
     | Lemma _ -> Lemma None
   in
     { ax_tparams = params;
-      ax_spec   = spec  ;
-      ax_kind   = kind  ; }
+      ax_spec    = spec;
+      ax_kind    = kind;
+      ax_scope   = ax.ax_scope; }
 
 (* -------------------------------------------------------------------- *)
 (* SUBSTITUTION OVER THEORIES *)

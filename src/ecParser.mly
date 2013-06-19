@@ -71,8 +71,9 @@
   let pflist loc ti (es : pformula    list) : pformula    = 
     List.fold_right (fun e1 e2 -> pf_cons loc ti e1 e2) es (pf_nil loc ti)
 
-  let mk_axiom (x, ty, vd, f) k = 
-    { pa_name    = x ; 
+  let mk_axiom ?(o = `Global) (x, ty, vd, f) k = 
+    { pa_name    = x ;
+      pa_scope   = o ;
       pa_tyvars  = ty;
       pa_vars    = vd;
       pa_formula = f ; 
@@ -211,6 +212,7 @@
 %token LEFTARROW
 %token LEMMA
 %token LET
+%token LOCAL
 %token LOGIC
 %token LONGARROW
 %token LOSSLESS
@@ -1217,18 +1219,22 @@ lemma_decl :
 | x=ident tyvars=tyvars_decl pd=pgtybindings? COLON f=form { x,tyvars,pd,f }
 ;
 
+local:
+| LOCAL { `Local  }
+| empty { `Global }
+
 axiom:
 | AXIOM d=lemma_decl 
     { mk_axiom d PAxiom }
 
-| LEMMA d=lemma_decl
-    { mk_axiom d PILemma }
+| LEMMA o=local d=lemma_decl
+    { mk_axiom ~o d PILemma }
 
-| LEMMA d=lemma_decl BY t=tactic
-    { mk_axiom d (PLemma (Some t)) }
+| LEMMA o=local d=lemma_decl BY t=tactic
+    { mk_axiom ~o d (PLemma (Some t)) }
 
-| LEMMA d=lemma_decl BY LBRACKET RBRACKET
-    { mk_axiom d (PLemma None) }
+| LEMMA o=local d=lemma_decl BY LBRACKET RBRACKET
+    { mk_axiom ~o d (PLemma None) }
 
 | EQUIV x=ident pd=pgtybindings? COLON p=loc(equiv_body)
     { mk_axiom (x, None, pd, p) PILemma }

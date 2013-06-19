@@ -1847,14 +1847,16 @@ module Ax = struct
 
   let bind name ax env =
     let env = MC.bind_axiom name ax env in
-    let (w3, rb) =
-      EcWhy3.add_ax env.env_w3
-        (EcPath.pqname (root env) name)
-        (NormMp.norm_ax env ax) in
-    { env with
-      env_w3   = w3;
-      env_rb   = rb @ env.env_rb;
-      env_item = CTh_axiom (name, ax) :: env.env_item }
+    let env = { env with env_item = CTh_axiom (name, ax) :: env.env_item } in
+
+    match ax.ax_scope with
+    | `Local  -> env
+    | `Global ->
+        let (w3, rb) =
+          EcWhy3.add_ax env.env_w3
+            (EcPath.pqname (root env) name)
+            (NormMp.norm_ax env ax) in
+        { env with env_w3 = w3; env_rb = rb @ env.env_rb; }
 
   let rebind name ax env =
     MC.bind_axiom name ax env

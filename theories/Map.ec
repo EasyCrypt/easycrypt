@@ -117,7 +117,6 @@ lemma upd_in_rng_neq: forall (m:('a,'b) map) x y1 y2,
   in_rng y1 m.[x<-y2]
 by [].
 
-
 (** find *) (* TODO: the axiomatization appears to be upside-down *)
 op find: ('a * 'b) cPred -> ('a,'b) map -> 'a option.
 

@@ -12,8 +12,9 @@ val hierror : ?loc:EcLocation.t -> ('a, Format.formatter, unit, 'b) format4 -> '
 type scope
 
 type proof_uc = {
-  puc_name   : string;
-  puc_jdg    : proof_state;
+  puc_name  : string;
+  puc_scope : [`Global | `Local];
+  puc_jdg   : proof_state;
 }
 
 and proof_state =
