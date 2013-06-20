@@ -16,5 +16,5 @@ fun ((glob O2){1} = (glob O2){2});try progress.
 Works with fun ((glob A){1} = (glob A){2}).
 Do we want to add this automatically?
 *)
-fun (true);progress.
+fun ((glob A){1} = (glob A){2}); progress.
 save.
