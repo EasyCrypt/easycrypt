@@ -37,7 +37,8 @@ let rec equal_type env t1 t2 =
   | Tunivar uid1, Tunivar uid2 -> EcUidgen.uid_equal uid1 uid2
   | Tvar i1, Tvar i2 -> i1 = i2
   | Ttuple lt1, Ttuple lt2 ->
-      List.for_all2 (equal_type env) lt1 lt2
+        List.length lt1 = List.length lt2
+     && List.all2 (equal_type env) lt1 lt2
   | Tfun(t1,t2), Tfun(t1',t2') ->
       equal_type env t1 t1' && equal_type env t2 t2'
   
@@ -47,9 +48,12 @@ let rec equal_type env t1 t2 =
     equal_type env t1 (EcEnv.NormMp.norm_tglob env mp)
 
   | Tconstr(p1,lt1), Tconstr(p2,lt2) when EcPath.p_equal p1 p2 ->
-      List.for_all2 (equal_type env) lt1 lt2 || 
-      (Ty.defined p1 env &&
-       equal_type env (Ty.unfold p1 lt1 env) (Ty.unfold p2 lt2 env))
+    let b =
+         List.length lt1 = List.length lt2
+      && List.for_all2 (equal_type env) lt1 lt2
+    in
+      b || (   Ty.defined p1 env
+            && equal_type env (Ty.unfold p1 lt1 env) (Ty.unfold p2 lt2 env))
   | Tconstr(p1,lt1), _ when Ty.defined p1 env ->
       equal_type env (Ty.unfold p1 lt1 env) t2
   | _, Tconstr(p2,lt2) when Ty.defined p2 env ->
