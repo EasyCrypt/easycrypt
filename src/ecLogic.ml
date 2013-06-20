@@ -1036,12 +1036,12 @@ let cansubst_pv_eq hyps fx f1 f2 =
       | Fpvar(pv,m) ->
         let f2 = simplify {no_red with delta_h = None} hyps f2 in
         let fv = EcPV.PV.fv env m f2 in
-        if EcPV.PV.mem_pv pv fv then None
+        if EcPV.PV.mem_pv env pv fv then None
         else Some f1'
       | Fglob(mp,m) -> 
         let f2 = simplify {no_red with delta_h = None} hyps f2 in
         let fv = EcPV.PV.fv env m f2 in
-        if EcPV.PV.mem_glob mp fv then None
+        if EcPV.PV.mem_glob env mp fv then None
         else Some f1'
       | _ -> None
     else None in

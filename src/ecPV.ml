@@ -219,8 +219,7 @@ module PVM = struct
 end
 
 (* -------------------------------------------------------------------- *)
-(* TODO set the type pv_fv abstract *)
-(* TODO use the module Mpv instead *)
+
 module PV = struct 
   module M = EcMaps.Map.Make (struct
     (* We assume that the mpath are in normal form *)  
@@ -228,7 +227,7 @@ module PV = struct
     let compare = pv_compare_p
   end)
 
-  type pv_fv = 
+  type t = 
     { pv : ty M.t;         (* The key are in normal form *)
       glob : EcPath.Sm.t;  (* The set of abstract module *)
     }
@@ -249,28 +248,28 @@ module PV = struct
   let remove env pv fv =
     { fv with pv = M.remove (NormMp.norm_pvar env pv) fv.pv }
 
-  let union _env fv1 fv2 =
+  let union fv1 fv2 =
     { pv = M.merge (fun _ o1 o2 -> if o2 = None then o1 else o2) fv1.pv fv2.pv;
       glob = EcPath.Sm.union fv1.glob fv2.glob }
 
-  let disjoint _env fv1 fv2 = 
+  let disjoint fv1 fv2 = 
     M.set_disjoint fv1.pv fv2.pv &&
       (* FIXME not suffisant use disjoint_g *)
       EcPath.Sm.disjoint fv1.glob fv2.glob
 
-  let diff _env fv1 fv2 = 
+  let diff fv1 fv2 = 
     { pv = M.set_diff fv1.pv fv2.pv;
       glob = EcPath.Sm.diff fv1.glob fv2.glob }
 
-  let inter _env fv1 fv2 = 
+  let inter fv1 fv2 = 
     { pv = M.set_inter fv1.pv fv2.pv;
       glob = EcPath.Sm.inter fv1.glob fv2.glob }
 
   let elements fv = M.bindings fv.pv, EcPath.Sm.elements fv.glob (* FIXME *)
 
-  let mem_pv pv fv = M.mem pv fv.pv 
+  let mem_pv env pv fv = M.mem (NormMp.norm_pvar env pv) fv.pv 
 
-  let mem_glob mp fv = EcPath.Sm.mem mp fv.glob
+  let mem_glob env mp fv = EcPath.Sm.mem (NormMp.norm_mpath env mp) fv.glob
 
   let fv env m f =
     let rec aux fv f = 
@@ -322,25 +321,4 @@ module PV = struct
       EcPath.Sm.disjoint us1 us2 
     | _, _ -> assert false 
       
-  let check env modi fv = 
-    let not_gen = diff env fv modi in 
-    let mk_topv s = 
-      M.fold (fun x _ topv ->
-        if is_loc x then topv 
-        else
-          let x=x.pv_name in
-          let top = EcPath.m_functor x.EcPath.x_top in
-          EcPath.Sm.add top topv) s EcPath.Sm.empty in
-    let topv = mk_topv not_gen.pv in
-    let topvg = mk_topv modi.pv in
-    let topm = not_gen.glob in
-    
-    let check s1 s2 = 
-      EcPath.Sm.for_all (fun mp1 ->
-        EcPath.Sm.for_all (fun mp2 -> disjoint_g env mp1 mp2) s1) s2 in
-
-    (* FIXME error message *)
-    assert (check modi.glob topv);
-    assert (check modi.glob topm);
-    assert (check topvg topm)
 end

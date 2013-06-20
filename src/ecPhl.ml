@@ -521,7 +521,8 @@ let t_fun_def g =
  *)
 
 
-let check_depend env fv mp = 
+let check_depend _env _fv _mp = ()
+(*
     let restr = 
       match (EcEnv.Mod.by_mpath mp env).me_body with
       | EcModules.ME_Decl(_,restr) -> restr 
@@ -558,7 +559,7 @@ let check_depend env fv mp =
             (EcPrinting.pp_topmod ppe) mp
     in            
     EcPath.Sm.iter check_m fv.PV.glob
-
+*)
 let abstract_info env f1 = 
   let f = EcEnv.NormMp.norm_xpath env f1 in
   let top = EcPath.m_functor f.EcPath.x_top in
@@ -886,7 +887,7 @@ let t_bdHoare_wp i g =
   let fv_bd = PV.fv env m bhs.bhs_bd in
   let modi = s_write env s_wp in
 
-  if not (PV.disjoint env fv_bd modi) then 
+  if not (PV.disjoint fv_bd modi) then 
     cannot_apply "wp" "Not_implemented: bound is modified by the statement";
 
   let s_wp,post = 
@@ -1370,13 +1371,13 @@ let t_kill side cpos olen g =
     List.iteri
       (fun i is ->
          let is_rd = is_read env PV.empty is in
-           if not (PV.disjoint env ks_wr is_rd) then
+           if not (PV.disjoint ks_wr is_rd) then
              match i with
              | 0 -> error "code writes variables used by the current block"
              | _ -> error "code writes variables used by the %dth parent block" i)
       (Zpr.after ~strict:false { zpr with Zpr.z_tail = tl; });
 
-    if not (PV.disjoint env ks_wr po_rd) then
+    if not (PV.disjoint ks_wr po_rd) then
       error "code writes variables used by the post-condition";
 
     let kslconcl = EcFol.f_bdHoareS me f_true (stmt ks) f_true FHeq f_r1 in
@@ -1407,25 +1408,26 @@ let t_alias side cpos id g =
 
 (* -------------------------------------------------------------------- *)
 let check_fission_independence env b init c1 c2 c3 =
+  (* TODO improve error message, see swap *)
   let check_disjoint s1 s2 = 
-    if not (PV.M.set_disjoint s1 s2) then
+    if not (PV.disjoint s1 s2) then
       tacuerror "in loop-fission, independence check failed"
   in
 
-  let fv_b    = (e_read   env PV.empty b   ).PV.pv in
-  let rd_init = (is_read  env PV.empty init).PV.pv in
-  let wr_init = (is_write env PV.empty init).PV.pv in
-  let rd_c1   = (is_read  env PV.empty c1  ).PV.pv in
-  let rd_c2   = (is_read  env PV.empty c2  ).PV.pv in
-  let rd_c3   = (is_read  env PV.empty c3  ).PV.pv in
-  let wr_c1   = (is_write env PV.empty c1  ).PV.pv in
-  let wr_c2   = (is_write env PV.empty c2  ).PV.pv in
-  let wr_c3   = (is_write env PV.empty c3  ).PV.pv in
+  let fv_b    = e_read   env PV.empty b    in
+  let rd_init = is_read  env PV.empty init in
+  let wr_init = is_write env PV.empty init in
+  let rd_c1   = is_read  env PV.empty c1   in
+  let rd_c2   = is_read  env PV.empty c2   in
+  let rd_c3   = is_read  env PV.empty c3   in
+  let wr_c1   = is_write env PV.empty c1   in
+  let wr_c2   = is_write env PV.empty c2   in
+  let wr_c3   = is_write env PV.empty c3   in
 
   check_disjoint rd_c1 wr_c2;
   check_disjoint rd_c2 wr_c1;
   List.iter (check_disjoint fv_b) [wr_c1; wr_c2];
-  check_disjoint fv_b (PV.M.set_diff wr_c3 wr_init);
+  check_disjoint fv_b (PV.diff wr_c3 wr_init);
    List.iter (check_disjoint rd_init) [wr_init; wr_c1; wr_c3];
   List.iter (check_disjoint rd_c3) [wr_c1; wr_c2]
 
@@ -1594,7 +1596,7 @@ let cfold_stmt env me olen zpr =
               EcPV.PV.empty asgn
   in
 
-  if not (EcPV.PV.disjoint env wrs asg) then
+  if not (EcPV.PV.disjoint wrs asg) then
     tacuerror "cannot cfold non read-only local variables";
 
   let subst =
@@ -1753,9 +1755,9 @@ let t_rcond side b at_pos g =
 let check_swap env s1 s2 = 
   let m1,m2 = s_write env s1, s_write env s2 in
   let r1,r2 = s_read env s1, s_read env s2 in
-  let m2r1 = PV.inter env m2 r1 in
-  let m1m2 = PV.inter env m1 m2 in
-  let m1r2 = PV.inter env m1 r2 in
+  let m2r1 = PV.inter m2 r1 in
+  let m1m2 = PV.inter m1 m2 in
+  let m1r2 = PV.inter m1 r2 in
   let error s1 s2 d = 
     EcLogic.tacuerror 
       "cannot swap : the two statement are not independants, the first statement can %s %a which can be %s by the second"

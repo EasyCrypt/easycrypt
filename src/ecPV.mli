@@ -43,38 +43,31 @@ end
 
 (* -------------------------------------------------------------------- *)
 module PV : sig
-  module M : EcMaps.Map.S with type key = prog_var
+ 
+  type t 
 
-  type pv_fv = private {
-    pv   : ty M.t;                    (* The key are in normal form *)
-    glob : EcPath.Sm.t;               (* The set of abstract module *)
-  }
+  val empty : t
 
-  val empty : pv_fv
+  val is_empty : t -> bool
 
-  val is_empty : pv_fv -> bool
+  val add      : env -> prog_var -> ty -> t -> t
+  val add_glob : env -> mpath -> t -> t
 
-  val add      : env -> prog_var -> ty -> pv_fv -> pv_fv
-  val add_glob : env -> mpath -> pv_fv -> pv_fv
+  val remove : env -> prog_var -> t -> t
 
-  val remove : env -> prog_var -> pv_fv -> pv_fv
+  val union : t -> t -> t
+  val diff  : t -> t -> t
+  val inter : t -> t -> t
 
-  val union : env -> pv_fv -> pv_fv -> pv_fv
-  val diff  : env -> pv_fv -> pv_fv -> pv_fv
-  val inter : env -> pv_fv -> pv_fv -> pv_fv
+  val disjoint : t -> t -> bool
 
-  val disjoint : env -> pv_fv -> pv_fv -> bool
+  val elements : t -> (prog_var * ty) list * mpath list
 
-  val elements : pv_fv -> (prog_var * ty) list * mpath list
+  val mem_pv   : env -> prog_var -> t -> bool
+  val mem_glob : env -> mpath -> t -> bool
 
-  val mem_pv   : prog_var -> pv_fv -> bool
-  val mem_glob : mpath -> pv_fv -> bool
+  val fv : env -> EcIdent.t -> form -> t
 
-  val fv : env -> EcIdent.t -> form -> pv_fv
+  val pp : env -> Format.formatter -> t -> unit
 
-  val pp : env -> Format.formatter -> pv_fv -> unit
-
-  val disjoint_g : env -> mpath -> mpath -> bool
-
-  val check : env -> pv_fv -> pv_fv -> unit
 end
