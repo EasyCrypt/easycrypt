@@ -40,28 +40,31 @@ let _ = EcPException.register (fun fmt exn ->
   | _ -> raise exn)
 
 
+let pvm = EcEnv.NormMp.norm_pvar
+
+let get_restr env mp = 
+  match (EcEnv.Mod.by_mpath mp env).me_body with
+  | EcModules.ME_Decl(_,restr) -> restr 
+  | _ -> assert false 
+
+let uerror env c = 
+  EcBaseLogic.tacuerror "%a" (pp_alias_clash env) c
+
 module Mnpv = 
   EcMaps.Map.Make(struct
-     (* We assume that the mpath are in normal form *) 
+    (* We assume that the mpath are in normal form *) 
     type t = prog_var 
     let compare = pv_compare_p 
   end)
-
+    
 module Mpv = struct
   type ('a, 'b) t = 
     { s_pv : 'a Mnpv.t; 
       s_gl : 'b Mm.t;  (* only abstract module *)
     } 
-
+      
   let empty = { s_pv = Mnpv.empty; s_gl = Mm.empty }
-
-  let pvm = EcEnv.NormMp.norm_pvar
-
-  let get_restr env mp = 
-    match (EcEnv.Mod.by_mpath mp env).me_body with
-    | EcModules.ME_Decl(_,restr) -> restr 
-    | _ -> assert false 
-
+    
   let check_npv_mp env npv top mp restr = 
     if not (Sm.mem top restr) then 
       raise (AliasClash (env,AC_concrete_abstract(mp,npv,top)))
@@ -149,9 +152,6 @@ module PVM = struct
     match (EcEnv.Mod.by_mpath mp env).me_body with
     | EcModules.ME_Decl(_,restr) -> restr 
     | _ -> assert false 
-
-  let uerror env c = 
-    EcBaseLogic.tacuerror "%a" (pp_alias_clash env) c
     
   let add env pv m f s = 
     try Mid.change (fun o -> Some (Mpv.add env pv f (odfl Mpv.empty o))) m s
@@ -221,67 +221,59 @@ end
 (* -------------------------------------------------------------------- *)
 
 module PV = struct 
-  module M = EcMaps.Map.Make (struct
-    (* We assume that the mpath are in normal form *)  
-    type t = prog_var 
-    let compare = pv_compare_p
-  end)
 
-  type t = 
-    { pv : ty M.t;         (* The key are in normal form *)
-      glob : EcPath.Sm.t;  (* The set of abstract module *)
-    }
+  type t =  
+    { s_pv : ty Mnpv.t; 
+      s_gl : Sm.t;  (* only abstract module *)
+    } 
 
-  let empty = 
-    { pv = M.empty;
-      glob = EcPath.Sm.empty }
+  let empty = { s_pv = Mnpv.empty; s_gl = Sm.empty }
 
-  let is_empty pv = 
-    M.is_empty pv.pv && EcPath.Sm.is_empty pv.glob
+  let is_empty fv = Mnpv.is_empty fv.s_pv && Sm.is_empty fv.s_gl
 
   let add env pv ty fv = 
-    { fv with pv = M.add (NormMp.norm_pvar env pv) ty fv.pv }
+    { fv with s_pv = Mnpv.add (pvm env pv) ty fv.s_pv }
 
-  let add_glob env mp fv =
-    { fv with glob = EcPath.Sm.add (NormMp.norm_mpath env mp) fv.glob}
-
-  let remove env pv fv =
-    { fv with pv = M.remove (NormMp.norm_pvar env pv) fv.pv }
-
+  let add_glob env mp fv = 
+    let f = NormMp.norm_glob env mhr mp in
+    let rec aux fv f = 
+      match f.f_node with
+      | Ftuple fs -> List.fold_left aux fv fs
+      | Fpvar(pv,_) -> 
+        { fv with s_pv = Mnpv.add (pvm env pv) f.f_ty fv.s_pv }
+      | Fglob(mp,_) ->
+        { fv with s_gl = Sm.add mp fv.s_gl}
+      | _ -> assert false in
+    aux fv f
+      
+  let remove env pv fv = 
+    { fv with s_pv = Mnpv.remove (pvm env pv) fv.s_pv }
+      
+  let mem_pv env pv fv = Mnpv.mem (pvm env pv) fv.s_pv 
+    
+  (* We assume that mp is an abstract functor *)
+  let mem_glob env mp fv = 
+    ignore (get_restr env mp);
+    Sm.mem mp fv.s_gl
+    
   let union fv1 fv2 =
-    { pv = M.merge (fun _ o1 o2 -> if o2 = None then o1 else o2) fv1.pv fv2.pv;
-      glob = EcPath.Sm.union fv1.glob fv2.glob }
+    { s_pv = Mnpv.merge 
+        (fun _ o1 o2 -> if o2 = None then o1 else o2) fv1.s_pv fv2.s_pv;
+      s_gl = Sm.union fv1.s_gl fv2.s_gl }
 
-  let disjoint fv1 fv2 = 
-    M.set_disjoint fv1.pv fv2.pv &&
-      (* FIXME not suffisant use disjoint_g *)
-      EcPath.Sm.disjoint fv1.glob fv2.glob
-
-  let diff fv1 fv2 = 
-    { pv = M.set_diff fv1.pv fv2.pv;
-      glob = EcPath.Sm.diff fv1.glob fv2.glob }
-
-  let inter fv1 fv2 = 
-    { pv = M.set_inter fv1.pv fv2.pv;
-      glob = EcPath.Sm.inter fv1.glob fv2.glob }
-
-  let elements fv = M.bindings fv.pv, EcPath.Sm.elements fv.glob (* FIXME *)
-
-  let mem_pv env pv fv = M.mem (NormMp.norm_pvar env pv) fv.pv 
-
-  let mem_glob env mp fv = EcPath.Sm.mem (NormMp.norm_mpath env mp) fv.glob
+  let elements fv = Mnpv.bindings fv.s_pv, Sm.elements fv.s_gl
 
   let fv env m f =
     let rec aux fv f = 
       match f.f_node with
-      | Fquant(_,_,f1) -> aux fv f1
+      | Fquant(_,_,f1) -> aux fv f1 (* FIXME *)
       | Fif(f1,f2,f3) -> aux (aux (aux fv f1) f2) f3
       | Flet(_,f1,f2) -> aux (aux fv f1) f2
       | Fpvar(x,m') -> 
         if EcIdent.id_equal m m' then add env x f.f_ty fv else fv
       | Fglob (mp,m') ->
         if EcIdent.id_equal m m' then 
-          let f' = EcEnv.NormMp.norm_glob env m mp in
+          let f' = NormMp.norm_glob env m mp in
           if f_equal f f' then add_glob env mp fv
           else aux fv f'
         else fv
@@ -304,21 +296,55 @@ module PV = struct
       (EcPrinting.pp_list ",@ " pp_vs) vs
       (EcPrinting.pp_list ",@ " (EcPrinting.pp_topmod ppe)) gs
 
-  let disjoint_g env mp1 mp2 = 
-    let me1, me2 = EcEnv.Mod.by_mpath mp1 env, EcEnv.Mod.by_mpath mp2 env in
-    match me1.me_body, me2.me_body with
-    | ME_Decl(_,nu1), ME_Decl(_,nu2) ->
-      EcPath.Sm.mem mp2 nu1 || EcPath.Sm.mem mp1 nu2
-    | ME_Decl(_,nu1), ME_Structure ms2 ->
-      EcPath.Sm.mem mp2 nu1 &&
-        EcPath.Sm.for_all (fun m -> EcPath.Sm.mem m nu1) ms2.ms_uses
-    | ME_Structure ms1, ME_Decl(_,nu2) ->
-      EcPath.Sm.mem mp1 nu2 &&
-        EcPath.Sm.for_all (fun m -> EcPath.Sm.mem m nu2) ms1.ms_uses
-    | ME_Structure ms1, ME_Structure ms2 ->
-      let us1 = EcPath.Sm.add mp1 ms1.ms_uses in
-      let us2 = EcPath.Sm.add mp2 ms2.ms_uses in
-      EcPath.Sm.disjoint us1 us2 
-    | _, _ -> assert false 
-      
+  let check_depend env fv mp = 
+    try
+      let restr = get_restr env mp in
+      let check_v v _ = 
+        if is_loc v then begin
+          let ppe = EcPrinting.PPEnv.ofenv env in
+          EcBaseLogic.tacuerror 
+            "only global variable can be used in inv, %a is local"
+            (EcPrinting.pp_pv ppe) v
+        end;
+        let top = EcPath.m_functor v.pv_name.x_top in
+        if not (Sm.mem top restr) then
+          raise (AliasClash (env,AC_concrete_abstract(mp,v,top))) in
+      Mnpv.iter check_v fv.s_pv;
+      let check_m mp' = 
+        if not (Sm.mem mp' restr) then 
+          let restr' = get_restr env mp' in
+          if not (Sm.mem mp restr') then 
+            raise (AliasClash(env,AC_abstract_abstract(mp,mp')))
+      in            
+      Sm.iter check_m fv.s_gl
+    with AliasClash (env,c) -> uerror env c
+
+  let diff fv1 fv2 = 
+    { s_pv = Mnpv.set_diff fv1.s_pv fv2.s_pv;
+      s_gl = Sm.diff fv1.s_gl fv2.s_gl }
+
+  let interdep env fv1 fv2 = 
+    let test_pv pv _ = 
+      Mnpv.mem pv fv2.s_pv || 
+        (is_glob pv && 
+           let top = EcPath.m_functor pv.pv_name.x_top in
+           let check1 mp = 
+             let restr = get_restr env mp in
+             Sm.mem top restr in
+           Sm.exists check1 fv2.s_gl) in
+    let test_mp mp = 
+      let restr = get_restr env mp in
+      let test_pv pv _ = 
+        is_glob pv && 
+          let top = EcPath.m_functor pv.pv_name.x_top in
+          Sm.mem top restr in
+      let test_mp mp' = Sm.mem mp' restr || Sm.mem mp (get_restr env mp') in
+      Mnpv.exists test_pv fv2.s_pv || Sm.exists test_mp fv2.s_gl in
+
+    { s_pv = Mnpv.filter test_pv fv1.s_pv;
+      s_gl = Sm.filter test_mp fv1.s_gl }
+
+  let indep env fv1 fv2 = 
+    is_empty (interdep env fv1 fv2)
+    
 end

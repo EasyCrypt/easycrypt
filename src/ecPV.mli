@@ -53,21 +53,21 @@ module PV : sig
   val add      : env -> prog_var -> ty -> t -> t
   val add_glob : env -> mpath -> t -> t
 
-  val remove : env -> prog_var -> t -> t
+  val remove   : env -> prog_var -> t -> t
 
-  val union : t -> t -> t
-  val diff  : t -> t -> t
-  val inter : t -> t -> t
+  val diff     : t -> t -> t
 
-  val disjoint : t -> t -> bool
+  val interdep : env -> t -> t -> t
+  val indep    : env -> t -> t -> bool
+  val check_depend : env -> t -> mpath -> unit
 
   val elements : t -> (prog_var * ty) list * mpath list
 
   val mem_pv   : env -> prog_var -> t -> bool
   val mem_glob : env -> mpath -> t -> bool
 
-  val fv : env -> EcIdent.t -> form -> t
+  val fv       : env -> EcIdent.t -> form -> t
 
-  val pp : env -> Format.formatter -> t -> unit
+  val pp       : env -> Format.formatter -> t -> unit
 
 end

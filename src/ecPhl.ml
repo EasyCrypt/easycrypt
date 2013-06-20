@@ -521,45 +521,6 @@ let t_fun_def g =
  *)
 
 
-let check_depend _env _fv _mp = ()
-(*
-    let restr = 
-      match (EcEnv.Mod.by_mpath mp env).me_body with
-      | EcModules.ME_Decl(_,restr) -> restr 
-      | _ -> assert false in
-    let check_v v _ = 
-      if is_loc v then begin
-        let ppe = EcPrinting.PPEnv.ofenv env in
-        EcLogic.tacuerror "only global variable can be used in inv, %a is local"
-          (EcPrinting.pp_pv ppe) v
-      end;
-      let top = EcPath.m_functor v.pv_name.EcPath.x_top in
-      if not (EcPath.Sm.mem top restr) then
-        let ppe = EcPrinting.PPEnv.ofenv env in
-        EcLogic.tacuerror "The module %a can write %a (add restriction %a)"
-          (EcPrinting.pp_topmod ppe) mp
-          (EcPrinting.pp_pv ppe) v
-          (EcPrinting.pp_topmod ppe) top in        
-    PV.M.iter check_v fv.PV.pv;
-    let check_m mp' = 
-      if not (EcPath.Sm.mem mp' restr) then 
-        let restr' = 
-          match (EcEnv.Mod.by_mpath mp' env).me_body with
-          | EcModules.ME_Decl(_,restr') -> restr' 
-          | _ -> assert false in
-        if not (EcPath.Sm.mem mp restr') then 
-          let ppe = EcPrinting.PPEnv.ofenv env in
-          EcLogic.tacuerror 
-            "The module %a can write %a (add restriction %a to %a, or %a to %a)"
-            (EcPrinting.pp_topmod ppe) mp
-            (EcPrinting.pp_topmod ppe) mp'
-            (EcPrinting.pp_topmod ppe) mp
-            (EcPrinting.pp_topmod ppe) mp' 
-            (EcPrinting.pp_topmod ppe) mp'
-            (EcPrinting.pp_topmod ppe) mp
-    in            
-    EcPath.Sm.iter check_m fv.PV.glob
-*)
 let abstract_info env f1 = 
   let f = EcEnv.NormMp.norm_xpath env f1 in
   let top = EcPath.m_functor f.EcPath.x_top in
@@ -584,7 +545,7 @@ let hoareF_abs_spec env f inv =
   let top, _, oi, _fsig = abstract_info env f in
   let m = mhr in
   let fv = PV.fv env m inv in
-  check_depend env fv top;
+  PV.check_depend env fv top;
   let ospec o = f_hoareF inv o inv in
   let sg = List.map ospec oi.oi_calls in
   inv, inv, sg
@@ -617,7 +578,7 @@ let bdHoareF_abs_spec env f inv =
   let top,_,oi,_fsig = abstract_info env f in
   let m = mhr in
   let fv = PV.fv env m inv in
-  check_depend env fv top;
+  PV.check_depend env fv top;
   let ospec o = f_bdHoareF inv o inv FHeq f_r1 in
   let sg = List.map ospec oi.oi_calls in
   inv, inv, lossless_hyps env top f.x_sub :: sg
@@ -656,8 +617,8 @@ let equivF_abs_spec env fl fr inv =
   let ml, mr = mleft, mright in
   let fvl = PV.fv env ml inv in
   let fvr = PV.fv env mr inv in
-  check_depend env fvl topl;
-  check_depend env fvr topr;
+  PV.check_depend env fvl topl;
+  PV.check_depend env fvr topr;
   let eqglob = f_eqglob topl ml topr mr in
   let ospec o_l o_r = 
     let fo_l = EcEnv.Fun.by_xpath o_l env in
@@ -690,8 +651,8 @@ let equivF_abs_upto env fl fr bad invP invQ =
   let allinv = f_ands [bad2; invP; invQ] in
   let fvl = PV.fv env ml allinv in
   let fvr = PV.fv env mr allinv in
-  check_depend env fvl topl;
-  check_depend env fvr topr;
+  PV.check_depend env fvl topl;
+  PV.check_depend env fvr topr;
   (* TODO check there is only global variable *)
   let eqglob = f_eqglob topl ml topr mr in
   let ospec o_l o_r = 
@@ -887,7 +848,7 @@ let t_bdHoare_wp i g =
   let fv_bd = PV.fv env m bhs.bhs_bd in
   let modi = s_write env s_wp in
 
-  if not (PV.disjoint fv_bd modi) then 
+  if not (PV.indep env fv_bd modi) then 
     cannot_apply "wp" "Not_implemented: bound is modified by the statement";
 
   let s_wp,post = 
@@ -1371,13 +1332,13 @@ let t_kill side cpos olen g =
     List.iteri
       (fun i is ->
          let is_rd = is_read env PV.empty is in
-           if not (PV.disjoint ks_wr is_rd) then
+           if not (PV.indep env ks_wr is_rd) then
              match i with
              | 0 -> error "code writes variables used by the current block"
              | _ -> error "code writes variables used by the %dth parent block" i)
       (Zpr.after ~strict:false { zpr with Zpr.z_tail = tl; });
 
-    if not (PV.disjoint ks_wr po_rd) then
+    if not (PV.indep env ks_wr po_rd) then
       error "code writes variables used by the post-condition";
 
     let kslconcl = EcFol.f_bdHoareS me f_true (stmt ks) f_true FHeq f_r1 in
@@ -1410,7 +1371,7 @@ let t_alias side cpos id g =
 let check_fission_independence env b init c1 c2 c3 =
   (* TODO improve error message, see swap *)
   let check_disjoint s1 s2 = 
-    if not (PV.disjoint s1 s2) then
+    if not (PV.indep env s1 s2) then
       tacuerror "in loop-fission, independence check failed"
   in
 
@@ -1596,7 +1557,7 @@ let cfold_stmt env me olen zpr =
               EcPV.PV.empty asgn
   in
 
-  if not (EcPV.PV.disjoint wrs asg) then
+  if not (EcPV.PV.indep env wrs asg) then
     tacuerror "cannot cfold non read-only local variables";
 
   let subst =
@@ -1755,9 +1716,10 @@ let t_rcond side b at_pos g =
 let check_swap env s1 s2 = 
   let m1,m2 = s_write env s1, s_write env s2 in
   let r1,r2 = s_read env s1, s_read env s2 in
-  let m2r1 = PV.inter m2 r1 in
-  let m1m2 = PV.inter m1 m2 in
-  let m1r2 = PV.inter m1 r2 in
+  (* FIXME it is not suffisant *)
+  let m2r1 = PV.interdep env m2 r1 in
+  let m1m2 = PV.interdep env m1 m2 in
+  let m1r2 = PV.interdep env m1 r2 in
   let error s1 s2 d = 
     EcLogic.tacuerror 
       "cannot swap : the two statement are not independants, the first statement can %s %a which can be %s by the second"
