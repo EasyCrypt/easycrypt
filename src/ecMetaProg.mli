@@ -122,6 +122,8 @@ module FPosition : sig
 
   val is_empty : ptnpos -> bool
 
+  val tostring : ptnpos -> string
+
   val select : (form -> bool) -> form -> ptnpos
 
   val occurences : ptnpos -> int

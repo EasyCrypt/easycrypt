@@ -1378,9 +1378,15 @@ rwrepeat:
 | n=NUM QUESTION { (`Maybe, Some n) }
 ;
 
+rwocc:
+| LBRACE x=NUM+ RBRACE { x }
+;
+
 rwarg:
 | SLASHSLASH { RWDone }
-| s=rwside r=rwrepeat? fp=fpattern(form) { RWRw (s, r, fp) }
+
+| s=rwside r=rwrepeat? o=rwocc? fp=fpattern(form)
+    { RWRw (s, r, omap o EcMaps.Sint.of_list, fp) }
 ;
 
 simplify_arg: 

@@ -276,28 +276,6 @@ let process_elim loc pe (_,n as g) =
   t_on_first (t_use an gs) (set_loc loc (t_elim f) (juc,n))
 
 (* -------------------------------------------------------------------- *)
-let process_rewrite =
-  let doall args =
-    let do1 arg g =
-      match arg with
-      | RWDone -> process_trivial g
-
-      | RWRw (s, r, pe) -> begin
-          let doit ((_, n) as g) =
-            t_rewrite_node
-              (process_mkn_apply process_formula pe g) s n
-          in
-            match r with
-            | None -> doit g
-            | Some (b, n) -> t_do b n doit g
-      end
-    in
-      t_lseq (List.map do1 args)
-  in
-
-  fun loc args -> set_loc loc (doall args)
-
-(* -------------------------------------------------------------------- *)
 let process_smt hitenv pi g =
   let pi = hitenv.hte_provers pi in
 
@@ -608,7 +586,7 @@ let concretize_pterm (tue, ev) ids fp =
         | `SideCond _            -> subst)
       Fsubst.f_subst_id ids
   in
-    Fsubst.f_subst subst fp
+    Fsubst.f_subst subst (Fsubst.uni tue fp)
 
 (* -------------------------------------------------------------------- *)
 let process_apply loc pe g =
@@ -665,14 +643,14 @@ let process_apply loc pe g =
 exception RwMatchFound of EcUnify.unienv * ty EcUidgen.Muid.t * form evmap
 
 let process_rewrite1 loc ri g =
-  let (hyps, concl) = get_goal g in
-
   match ri with
   | RWDone ->
       process_trivial g
 
-  | RWRw (s, r, pe) ->
+  | RWRw (s, r, o, pe) ->
       let do1 g =
+        let (hyps, concl) = get_goal g in
+
         let (p, typs, ue, ax) = process_pterm loc hyps pe in
         let args = List.map (trans_pterm_argument hyps ue) pe.fp_args in
         let ((_ax, ids), (_mode, (f1, f2))) =
@@ -691,7 +669,7 @@ let process_rewrite1 loc ri g =
           in
             find_rewrite_pattern (check_pterm_arguments hyps ue ax args)
         in
-  
+
         let fp = match s with `Normal -> f1 | `Reverse -> f2 in
   
         let (_ue, tue, ev) =
@@ -712,18 +690,38 @@ let process_rewrite1 loc ri g =
   
         let args = concretize_pterm_arguments (tue, ev) ids in
         let typs = List.map (Tuni.subst tue) typs in
-  
+        let fp   = concretize_pterm (tue, ev) ids fp in
+
+        let cpos =
+          let test tp = EcReduction.is_alpha_eq hyps fp tp in
+            FPosition.select test concl
+        in
+
+        assert (not (FPosition.is_empty cpos));
+
+        let cpos =
+          match o with
+          | None   -> cpos
+          | Some o ->
+            let (min, max) = (Sint.min_elt o, Sint.max_elt o) in
+              if min < 1 || max > FPosition.occurences cpos then
+                tacuerror "invalid occurence selector";
+              FPosition.filter o cpos
+        in
+
+        let fpat _ _ _ = FPosition.topattern cpos concl in
+
         match p with
         | `Global x ->
-            t_rewrite_glob s x typs args g
+            t_rewrite_glob ~fpat s x typs args g
   
         | `Local x ->
             assert (typs = []);
-            t_rewrite_hyp s x args g
+            t_rewrite_hyp ~fpat s x args g
   
         | `Cut fc ->
             assert (typs = []);
-            t_rewrite_form s fc args g
+            t_rewrite_form ~fpat s fc args g
 
       in
         match r with

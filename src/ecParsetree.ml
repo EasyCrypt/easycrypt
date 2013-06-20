@@ -1,4 +1,5 @@
 (* -------------------------------------------------------------------- *)
+open EcMaps
 open EcSymbols
 open EcLocation
 open EcUtils
@@ -339,7 +340,7 @@ type trepeat = [`All | `Maybe] * int option
 
 type rwarg =
   | RWDone
-  | RWRw of (rwside * trepeat option * ffpattern)
+  | RWRw of (rwside * trepeat option * Sint.t option * ffpattern)
 
 and rwside   = [`Normal | `Reverse]
 
