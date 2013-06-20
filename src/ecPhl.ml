@@ -1546,16 +1546,13 @@ let t_splitwhile b side cpos g =
 
 (* -------------------------------------------------------------------- *)
 let cfold_stmt env me olen zpr =
-  let error fmt =
-    Format.ksprintf (fun msg -> tacuerror "cfold: %s" msg) fmt
-  in
 
   let (asgn, i, tl) =
     match zpr.Zpr.z_tail with
     | ({ i_node = Sasgn (lv, e) } as i) :: tl -> begin
       let asgn =
         match lv with
-        | LvMap _ -> error "left-value is a map assignment"
+        | LvMap _ -> tacuerror "left-value is a map assignment"
         | LvVar (x, ty) -> [(x, ty, e)]
         | LvTuple xs -> begin
           match e.e_node with
@@ -1567,7 +1564,7 @@ let cfold_stmt env me olen zpr =
     end
 
     | _ -> 
-        error "cannot find a left-value assignment at given position"
+        tacuerror "cannot find a left-value assignment at given position"
   in
 
   let (tl1, tl2) =
@@ -1575,20 +1572,20 @@ let cfold_stmt env me olen zpr =
     | None      -> (tl, [])
     | Some olen ->
         if List.length tl < olen then
-          error "expecting at least %d instructions after assignment" olen;
+          tacuerror "expecting at least %d instructions after assignment" olen;
         List.take_n olen tl
   in
 
   List.iter
     (fun (x, _, _) ->
       if x.pv_kind <> PVloc then
-        error "left-values must be local variables")
+        tacuerror "left-values must be local variables")
     asgn;
 
   List.iter
     (fun (_, _, e) ->
         if e_fv e <> Mid.empty || e_read env PV.empty e <> PV.empty then
-          error "right-values are not closed expression")
+          tacuerror "right-values are not closed expression")
     asgn;
 
   let wrs = is_write env EcPV.PV.empty tl1 in
@@ -1598,16 +1595,16 @@ let cfold_stmt env me olen zpr =
   in
 
   if not (EcPV.PV.disjoint env wrs asg) then
-    error "cannot cfold non read-only local variables";
+    tacuerror "cannot cfold non read-only local variables";
 
   let subst =
     List.fold_left
       (fun subst (x, _ty, e) ->
-         EcPV.PVM.add env x (fst me) e subst)
-      EcPV.PVM.empty asgn
+         Mpv.add env x e subst)
+      Mpv.empty asgn
   in
 
-  let tl1 = PVM.issubst env (fst me) subst tl1 in
+  let tl1 = Mpv.issubst env subst tl1 in
 
   let zpr =
     { zpr with Zpr.z_tail = tl1 @ (i :: tl2) }
@@ -2113,14 +2110,19 @@ let t_pror g =
     | _ -> 
       cannot_apply "pr_op" "Pr[_ @ _ : _ \\/ _ ] expression was expected"
 
- let t_bdeq g = 
+let t_bdeq g = 
   let concl = get_concl g in
   let bhs = destr_bdHoareS concl in 
   let concl = f_bdHoareS_r {bhs with bhs_cmp=FHeq } in
   prove_goal_by [concl] RN_hl_prbounded g
-
+    
 (* -------------------------------------------------------------------- *)
+
 (*
+module PV2 = struct 
+  type t = form PVM.t 
+
+
 let eqobs_in env fun_spec (notmodl, notmodr) c1 c2 eqo = 
   let rec s_eqobs_in rsl rsr fhyps eqo = 
     match rsl, rsr with
@@ -2151,5 +2153,6 @@ let eqobs_in env fun_spec (notmodl, notmodr) c1 c2 eqo =
     | None -> rstmt rs, fhyps, eqo
     | Some (fhyps,eqo) -> s_eqobs_in env notmod rs' fhyps eqo
 and i_eqobs_in env notmod
-*)    
+    
 
+*)
