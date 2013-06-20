@@ -60,10 +60,7 @@ lemma mem_nil: forall (x:'a), !(mem x []) by [].
 lemma mem_cons: forall (y x:'a) xs,
   mem y (x::xs) = ((y = x) \/ mem y xs).
 proof strict.
-intros=> y x xs.
-delta mem; beta;
-rewrite (fold_right_cons<:bool,'a> (lambda x intl, y = x \/ intl) false x xs);
-beta; smt.
+by intros=> y x xs; delta mem; beta; smt.
 qed.
 
 (* Lemmas *)
@@ -148,9 +145,7 @@ op forallb(p:'a cPred) = fold_right (lambda x r, (p x) /\ r) true.
 lemma forallb_nil: forall (p:'a cPred), forallb p [] by [].
 lemma forallb_cons: forall (p:'a cPred) x xs, forallb p (x::xs) = ((p x) /\ forallb p xs).
 proof strict.
-intros=> p x xs;
-delta forallb; beta;
-by rewrite (fold_right_cons<:bool,'a> (lambda x r, p x /\ r) true x xs).
+by intros=> p x xs; delta forallb; beta; smt.
 qed.
 
 lemma forallb_eq_all: forall (p:'a cPred) xs, all p xs <=> forallb p xs.
@@ -177,9 +172,7 @@ op existsb (p:'a cPred) = fold_right (lambda x r, (p x) \/ r) false.
 lemma existsb_nil: forall (p:'a cPred), !(existsb p []) by [].
 lemma existsb_cons: forall (p:'a cPred) x xs, existsb p (x::xs) = ((p x) \/ existsb p xs).
 proof strict.
-intros=> p x xs;
-delta existsb; beta;
-by rewrite (fold_right_cons<:bool,'a> (lambda x r, p x \/ r) false x xs).
+by intros=> p x xs; delta existsb; beta; smt.
 qed.
 
 lemma existsb_eq_any: forall (p:'a cPred) xs, any p xs <=> existsb p xs.
@@ -198,9 +191,7 @@ lemma filter_cons: forall (p:'a cPred) x xs,
   filter p (x::xs) = let rest = filter p xs in
                      if p x then x::rest else rest.
 proof strict.
-intros=> p x xs;
-delta filter; beta;
-by rewrite (fold_right_cons<:'a list,'a> (lambda x' r, if p x' then x'::r else r) [] x xs).
+by intros=> p x xs; delta filter; beta; smt.
 qed.
 
 (* Lemmas *)
@@ -300,14 +291,14 @@ lemma nth_neg: forall (xs:'a list) n, n < 0 => nth xs n = None.
 proof strict.
 intros=> xs; elimT list_ind xs; first smt.
 clear xs; intros=> x xs IH n n_neg.
-by rewrite (nth_consN<:'a> x xs n _) ?(IH (n - 1) _); smt.
+by rewrite nth_consN 1?IH; smt.
 qed.
 
 lemma nth_geq_len: forall (xs:'a list) n, length xs <= n => nth xs n = None.
 proof strict.
 intros=> xs; elimT list_ind xs; first smt.
 clear xs; intros=> x xs IH n n_len.
-rewrite (nth_consN<:'a> x xs n _) ?(IH (n - 1) _); smt.
+by rewrite nth_consN 1?IH; smt.
 qed.
 
 (** nth_default *)

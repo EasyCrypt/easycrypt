@@ -113,13 +113,20 @@ val f_match :
   -> unienv * ty Muid.t * form evmap
 
 (* -------------------------------------------------------------------- *)
-type ptnpos = [`Select | `Sub of ptnpos] Mint.t
+type ptnpos = private [`Select | `Sub of ptnpos] Mint.t
 
 exception InvalidPosition
 
 module FPosition : sig
+  val empty : ptnpos
+
+  val is_empty : ptnpos -> bool
+
   val select : (form -> bool) -> form -> ptnpos
+
   val occurences : ptnpos -> int
+
   val filter : Sint.t -> ptnpos -> ptnpos
+
   val topattern : ptnpos -> form -> EcIdent.t * form
 end

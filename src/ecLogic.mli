@@ -109,6 +109,8 @@ val t_elimT : form -> EcPath.path -> tactic
 val t_case : form -> tactic
 
 val t_rewrite_hyp  : rwside -> EcIdent.t -> app_arg list -> tactic
+val t_rewrite_glob : rwside -> EcPath.path -> EcTypes.ty list -> app_arg list -> tactic
+val t_rewrite_form : rwside -> form -> app_arg list -> tactic
 val t_rewrite_node : goal * int list -> rwside -> int -> goals
 
 val t_simplify : reduction_info -> tactic

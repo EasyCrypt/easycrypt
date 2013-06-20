@@ -306,11 +306,17 @@ let f_match hyps ue ev ptn subject =
             raise MatchFailure
 
         | Some None ->
-            ev := Mid.add x (Some subject) !ev
+          begin
+            try  EcUnify.unify env ue ptn.f_ty subject.f_ty
+            with EcUnify.UnificationFailure _ -> raise MatchFailure;
+          end;
+          ev := Mid.add x (Some subject) !ev
 
         | Some (Some a) -> begin
             if not (EcReduction.is_alpha_eq hyps subject a) then
-              raise MatchFailure
+              raise MatchFailure;
+            try  EcUnify.unify env ue ptn.f_ty subject.f_ty
+            with EcUnify.UnificationFailure _ -> raise MatchFailure
         end
     end
   
@@ -348,7 +354,14 @@ let f_match hyps ue ev ptn subject =
           if not (EcMemory.mem_equal me1 me2) then
             raise MatchFailure
   
-    | _, _ -> raise MatchFailure
+    | Ftuple fs1, Ftuple fs2 ->
+        if List.length fs1 <> List.length fs2 then
+          raise MatchFailure;
+        List.iter2 doit fs1 fs2
+
+    | _, _ ->
+        if not (EcReduction.is_alpha_eq hyps ptn subject) then
+          raise MatchFailure
 
   in
     doit ptn subject; (ue, Ev !ev)
@@ -369,6 +382,10 @@ type ptnpos = [`Select | `Sub of ptnpos] Mint.t
 exception InvalidPosition
 
 module FPosition = struct
+  let empty : ptnpos = Mint.empty
+
+  let is_empty (p : ptnpos) = Mint.is_empty p
+
   let select test =
     let rec doit1 fp =
       if   test fp
