@@ -34,26 +34,25 @@ op uniform : bitstring distr = Bitstring.Dword.dword.
 
 const zeros : bitstring = Bitstring.zeros.
 
-axiom pow_mul : forall (x, y:int), (g ^ x) ^ y = g ^ (x * y).
+axiom pow_mul (x, y:int) : (g ^ x) ^ y = g ^ (x * y).
 
-lemma xor_absorb : forall (x:bitstring), x ^^ x = zeros 
+lemma xor_absorb (x:bitstring) : x ^^ x = zeros 
 by [].
 
-lemma xor_zeros : forall (x:bitstring), zeros ^^ x = x 
+lemma xor_zeros (x:bitstring) : zeros ^^ x = x 
 by [].
 
-lemma xor_assoc : forall (x, y, z:bitstring), x ^^ (y ^^ z) = (x ^^ y) ^^ z 
+lemma xor_assoc (x, y, z:bitstring) : x ^^ (y ^^ z) = (x ^^ y) ^^ z 
 by [].
 
-lemma uniform_total : forall (x:bitstring), Distr.in_supp x uniform 
+lemma uniform_total (x:bitstring) : Distr.in_supp x uniform 
 by [].
 
-lemma uniform_spec : 
-  forall (x y:bitstring), Distr.mu_x uniform x = Distr.mu_x uniform y 
+lemma uniform_spec (x, y:bitstring) : Distr.mu_x uniform x = Distr.mu_x uniform y 
 by [].
- 
+
 clone RandOrcl as RandOrcl_group with 
-  type from = group, 
+  type from = group,
   type to = bitstring,
   op dsample = uniform,
   op qO = qH,
@@ -208,7 +207,7 @@ lemma CPA_G1 (A <: Adv {CPA, G1, RO, ARO, Hashed_ElGamal}) :
   [ CPA(A).main ~ G1(A).main : 
     (glob A){1} = (glob A){2} ==> !(mem G1.gxy ARO.log){2} => ={res} ].
 proof.
-  intros H1 H2; fun. 
+  intros _ _; fun. 
   inline CPA(A).AO.init G1(A).AO.init RO.init CPA(A).S.kg CPA(A).S.enc.
   swap{1} 9 -5.
   seq 5 6 : 
@@ -350,7 +349,7 @@ lemma G2_SCDH (A <: Adv {CPA, G1, G2, SCDH, RO, ARO, Hashed_ElGamal}) :
     (glob A){1} = (glob A){2} ==> 
     (mem G2.gxy ARO.log){1} = res{2} /\ card ARO.log{1} <= qH ].
 proof.
-  intros H1 H2; fun.
+  intros _ _; fun.
   inline SCDH_from_CPA(A).solve SCDH_from_CPA(A).AO.init G2(A).AO.init RO.init.
   swap{2} [5..6] -4.  
   rnd{1}; wp.  
@@ -390,7 +389,7 @@ lemma Pr_CPA_G1 (A <: Adv {CPA, G1, G2, SCDH, RO, ARO, Hashed_ElGamal}) &m :
   Pr[CPA(A).main() @ &m : res] <=
   Pr[G1(A).main() @ &m : res \/ mem G1.gxy ARO.log]. 
 proof.
-  intros H1 H2.
+  intros _ _.
   equiv_deno (CPA_G1 (<:A) _ _).
   assumption.
   assumption.
@@ -404,11 +403,10 @@ lemma Pr_G1_G1 (A <: Adv {CPA, G1, G2, SCDH, RO, ARO, Hashed_ElGamal}) &m :
   Pr[G1(A).main() @ &m : res \/ mem G1.gxy ARO.log] <=
   Pr[G1(A).main() @ &m : res] + Pr[G1(A).main() @ &m : mem G1.gxy ARO.log].
 proof.
-  intros H1 H2. 
-  apply (Real.Trans 
+  intros _ _. 
+  apply (Trans 
     Pr[G1(A).main() @ &m : res \/ mem G1.gxy ARO.log]
-    (Pr[G1(A).main() @ &m : res] + 
-     Pr[G1(A).main() @ &m : mem G1.gxy ARO.log] -
+    (Pr[G1(A).main() @ &m : res] + Pr[G1(A).main() @ &m : mem G1.gxy ARO.log] -
      Pr[G1(A).main() @ &m : res /\ mem G1.gxy ARO.log])
     (Pr[G1(A).main() @ &m : res] + Pr[G1(A).main() @ &m : mem G1.gxy ARO.log]) 
      _ _).
@@ -442,7 +440,7 @@ lemma Pr_G2 (A <: Adv {CPA, G1, G2, SCDH, RO, ARO, Hashed_ElGamal}) &m :
   (forall (O <: ARO), islossless O.o => islossless A(O).guess) =>
   Pr[G2(A).main() @ &m : res] = 1%r / 2%r.
 proof.
-  intros H1 H2.
+  intros _ _.
   bdhoare_deno (_ : true ==> _); [ | trivial | trivial ].
   fun; rnd (1%r / 2%r) ((=) b').
   call (true) (true).
@@ -482,22 +480,17 @@ lemma Reduction (A <: Adv {CPA, G1, G2, SCDH, RO, ARO, Hashed_ElGamal}) &m :
   Pr[CPA(A).main() @ &m : res] <=
   1%r / 2%r + Pr[SCDH(SCDH_from_CPA(A)).main() @ &m : res].
 proof. 
-  intros H1 H2.  
-  apply (Real.Trans 
-    Pr[CPA(A).main() @ &m : res]
-    Pr[G1(A).main() @ &m : res \/ mem G1.gxy ARO.log]
-    (1%r / 2%r + Pr[SCDH(SCDH_from_CPA(A)).main() @ &m : res]) _ _).
-  by apply (Pr_CPA_G1 (<:A) &m _ _); assumption.
-  apply (Real.Trans
-    Pr[G1(A).main() @ &m : res \/ mem G1.gxy ARO.log]
-    (Pr[G1(A).main() @ &m : res] + Pr[G1(A).main() @ &m : mem G1.gxy ARO.log])
-    (1%r / 2%r + Pr[SCDH(SCDH_from_CPA(A)).main() @ &m : res]) _ _).
-  by apply (Pr_G1_G1 (<:A) &m _ _); try assumption.
+  intros _ _.
+  apply (Trans _ Pr[G1(A).main() @ &m : res \/ mem G1.gxy ARO.log]).
+  by apply (Pr_CPA_G1 (<:A) &m); assumption.
+  apply (Trans _
+    (Pr[G1(A).main() @ &m : res] + Pr[G1(A).main() @ &m : mem G1.gxy ARO.log])).
+  by apply (Pr_G1_G1 (<:A) &m); try assumption.
   rewrite (Pr_G1_G2_res (<:A) &m).
-  rewrite (Pr_G2 (<:A) &m _ _); try assumption. 
+  rewrite (Pr_G2 (<:A) &m); try assumption. 
   rewrite (Pr_G1_G2_mem (<:A) &m).  
-  rewrite (Pr_G2_SCDH (<:A) &m _ _); try assumption.
-  by apply Real.Refl.
+  rewrite (Pr_G2_SCDH (<:A) &m); try assumption.
+  by apply Refl.
 qed.
 
 lemma Security (A <: Adv {CPA, G1, G2, SCDH, RO, ARO, Hashed_ElGamal}) &m :
@@ -506,20 +499,16 @@ lemma Security (A <: Adv {CPA, G1, G2, SCDH, RO, ARO, Hashed_ElGamal}) &m :
   exists (B <: SCDH_Adversary), 
     Pr[CPA(A).main() @ &m : res] - 1%r / 2%r <= Pr[SCDH(B).main() @ &m : res].
 proof.
-  intros H1 H2.
+  intros _ _.
   exists (<: SCDH_from_CPA(A)).
-  cut W : (forall (x, y:real), x <= 1%r / 2%r + y => x - 1%r / 2%r <= y). 
-  smt.
-  by apply W; apply (Reduction (<:A) &m _ _); assumption.
+  cut W : (forall (x y z : real), x <= z + y => x - z <= y); first smt.
+  by apply W; apply (Reduction (<:A) &m); assumption.
 qed.
 
 lemma Correctness : 
   hoare [PKE_Correctness(Hashed_ElGamal(RO)).main : true ==> res].
 proof.
-  fun; inline Hashed_ElGamal(RO).kg Hashed_ElGamal(RO).enc.
-  seq 7 :
-   (in_dom (g ^ (sk * y)) RO.m /\ c = (g ^ y, (proj RO.m.[g ^ (sk * y)]) ^^ m)).
-  by inline RO.o; do (wp; rnd); skip; smt.
-  inline Hashed_ElGamal(RO).dec RO.o.
-  by wp; rnd; wp; skip; smt.
+  fun.
+  inline Hashed_ElGamal(RO).kg Hashed_ElGamal(RO).enc Hashed_ElGamal(RO).dec RO.o.
+  do (wp; rnd); skip; smt.
 qed.
