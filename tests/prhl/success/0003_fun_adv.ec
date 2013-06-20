@@ -12,5 +12,9 @@ lemma test : forall (O2<:O) (A<:Adv{O2}),
 proof.
 intros O2 A.
 fun ((glob O2){1} = (glob O2){2});try progress.
-fun true;progress.
+(*
+Works with fun ((glob A){1} = (glob A){2}).
+Do we want to add this automatically?
+*)
+fun (true);progress.
 save.

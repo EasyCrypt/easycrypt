@@ -1,4 +1,5 @@
 require import Int.
+require import Real.
 
 module OneSided = {
   var x:int
@@ -17,7 +18,9 @@ module OneSided = {
 }.
 
 lemma bar:
-  hoare [OneSided.init: true ==> OneSided.x =  0].
+  (* "hoare [OneSided.init: true ==> OneSided.x =  0]" wouldn't work,
+     Hoare judgments guarantee only partial correctness *)
+  bd_hoare [OneSided.init: true ==> OneSided.x =  0] = 1%r.
 proof.
 fun;wp;skip;smt.
 save.
