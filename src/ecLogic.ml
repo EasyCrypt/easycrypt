@@ -468,6 +468,8 @@ let pattern_form name hyps f1 f =
       f in
   x, body
 
+type dofpattern = LDecl.hyps -> form -> form -> (EcIdent.t * form)
+
 let t_rewrite_gen fpat side f g = 
   let side = match side with `Normal -> true | `Reverse -> false in
   let hyps,concl = get_goal g in
@@ -494,15 +496,25 @@ let t_rewrite_gen fpat side f g =
 
 let t_rewrite = t_rewrite_gen (pattern_form None)
 
-let t_rewrite_node ((juc,an), gs) side n =
+let t_rewrite_node ?(fpat = pattern_form None) ((juc,an), gs) side n =
   let (_,f) = get_node (juc, an) in
-  t_seq_subgoal (t_rewrite side f)
+  t_seq_subgoal (t_rewrite_gen fpat side f)
     [t_use an gs;t_id None] (juc,n)
 
-let t_rewrite_hyp side id args (juc,n as g) =
+let t_rewrite_hyp ?fpat side id args (juc,n as g) =
   let hyps = get_hyps g in
   let g' = mkn_hyp juc hyps id in
-  t_rewrite_node (mkn_apply (fun _ _ a -> a) g' args) side n
+  t_rewrite_node ?fpat (mkn_apply (fun _ _ a -> a) g' args) side n
+
+let t_rewrite_glob ?fpat side p tys args (juc,n as g) =
+  let hyps = get_hyps g in
+  let g' = mkn_glob juc hyps p tys in
+  t_rewrite_node ?fpat (mkn_apply (fun _ _ a -> a) g' args) side n
+
+let t_rewrite_form ?fpat side fp args (juc,n as g) =
+  let hyps = get_hyps g in
+  let g' = new_goal juc (hyps, fp) in
+  t_rewrite_node ?fpat (mkn_apply (fun _ _ a -> a) g' args) side n
 
 let t_cut f g =
   let concl = get_concl g in
@@ -649,7 +661,7 @@ let gen_eq_tuple_elim_proof types =
     t_seq_subgoal
       (t_apply_form (pred rvars locCF) (List.map (fun _ -> AAnode) types))
       ((
-        t_lseq [t_rewrite_hyp `Normal h1 [];
+        t_lseq [t_rewrite_hyp `Reverse h1 [];
         t_apply_hyp h2 [];
         t_apply_logic p_true_intro [] []]
       )::(List.map (fun _ -> t_reflex) types))

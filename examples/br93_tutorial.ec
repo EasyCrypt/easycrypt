@@ -295,8 +295,7 @@ call
                   /\ (glob A){1} = (glob A){2}))
       ((!mem Rnd.r RO.s){2} => ={res}).
 fun (mem Rnd.r RO.s) 
-    (={RO.s} /\ eq_except RO.m{1} RO.m{2} Rnd.r{2});
-                         [smt|smt| assumption | | |].
+    (={RO.s} /\ eq_except RO.m{1} RO.m{2} Rnd.r{2});[smt|smt|assumption| | |].
 fun;inline RO.o;if;[smt | wp;rnd | ];wp;skip;progress;smt.
 intros &m2 H;fun;if;[inline RO.o;wp;rnd 1%r (cPtrue)| ];
                                      wp;skip;progress;smt.
@@ -313,11 +312,36 @@ call (={RO.m,RO.s,pk} /\ (glob A){1} = (glob A){2}
      (={RO.m,RO.s,res} /\ (glob A){1} = (glob A){2} 
                       /\ dom RO.m{2} = RO.s{2}).
 fun (={RO.m,RO.s} /\ dom RO.m{2} = RO.s{2});[smt | smt | ].
-
 fun;inline RO.o;if;[smt | wp;rnd | ];wp;skip;progress;smt.
 inline CPA(BR,A).SO.kg RO.init CPA(BR2,A).SO.kg;wp;rnd;wp;skip;progress;smt.
-save.
+qed.
 (** end eq1 *)
+
+
+lemma real_le_trans : forall(a, b, c : real),  
+ Real.(<=) a b => Real.(<=) b  c => a <= c by [].
+
+(** begin prob1 *)
+lemma prob1_1 :
+ forall (A <: Adv {Rnd,RO}),
+(forall (O <: ARO), islossless O.o_a => islossless A(O).a1) =>
+(forall (O <: ARO), islossless O.o_a => islossless A(O).a2) =>
+ forall &m , Pr[CPA(BR,A).main() @ &m: res] <=
+             Pr[CPA(BR2,A).main() @ &m : res] +
+             Pr[CPA(BR2,A).main() @ &m : mem Rnd.r RO.s].
+proof.
+ intros A Hlossless1 Hlossless2 &m.
+ apply (real_le_trans _  
+        Pr[CPA(BR2,A).main() @ &m : res \/ mem Rnd.r RO.s] _).
+ equiv_deno (_ : (glob A){1} = (glob A){2} ==>
+ !(mem Rnd.r RO.s){2} => res{1} = res{2});
+   [ apply (eq1(<:A) _ _);try assumption| |];smt.
+ cut H:
+ (Pr[CPA(BR2,A).main() @ &m : res \/ mem Rnd.r RO.s] =
+  Pr[CPA(BR2,A).main() @ &m : res] +  Pr[CPA(BR2,A).main() @ &m : mem Rnd.r RO.s] -
+  Pr[CPA(BR2,A).main() @ &m : res /\ mem Rnd.r RO.s]);[pr_or|];smt.
+save.
+(** end prob1 *)
 
 
  module BR3(R : Oracle) : Scheme(R)= {
@@ -344,10 +368,32 @@ save.
 equiv eq2_enc : 
 BR2(RO).enc ~ BR3(RO).enc : 
 ={pk,m,RO.m} ==> 
-={res,Rnd.r,RO.m}.
+={res,Rnd.r,RO.m}
+by
+(fun;rnd (lambda v, m{2} ^^ v)(lambda v,m{2} ^^ v);rnd;skip;progress;smt).
+
+
+lemma eq2 : forall (A <: Adv {RO,Rnd}), 
+(forall (R<:ARO), islossless R.o_a => islossless A(R).a1) =>
+(forall (R<:ARO), islossless R.o_a => islossless A(R).a2) =>
+equiv [ CPA(BR2,A).main ~ CPA(BR3,A).main : 
+(glob A){1} = (glob A){2} ==>  ={res,Rnd.r,RO.s}].
 proof.
-fun;rnd (lambda v, m{2} ^^ v)(lambda v,m{2} ^^ v);rnd;skip;progress;smt.
-save.
+intros A Hll1 Hll2;fun.
+call (={Rnd.r,RO.s,RO.m,c} /\ (glob A){1} = (glob A){2}) 
+     (={Rnd.r,RO.s,RO.m,res} /\ (glob A){1} = (glob A){2}).
+fun (={Rnd.r,RO.s,RO.m});[smt|smt|].
+fun;if;[smt|inline RO.o;wp;rnd|];wp;skip;progress;smt.
+call (={pk,m,RO.m}) (={res,Rnd.r,RO.m}).
+apply eq2_enc.
+rnd.
+call (={RO.s,RO.m,pk} /\ (glob A){1} = (glob A){2}) 
+     (={RO.s,RO.m,res} /\ (glob A){1} = (glob A){2}).
+fun (={RO.s,RO.m});[smt|smt|].
+fun;if;[smt|inline RO.o;wp;rnd|];wp;skip;progress;smt.
+inline RO.init CPA(BR2,A).SO.kg CPA(BR3,A).SO.kg.
+wp;rnd;wp;skip;progress;smt.
+qed.
 
 (** begin conclusion *)
 lemma Conclusion :
