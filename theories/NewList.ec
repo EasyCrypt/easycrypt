@@ -300,16 +300,15 @@ lemma nth_neg: forall (xs:'a list) n, n < 0 => nth xs n = None.
 proof strict.
 intros=> xs; elimT list_ind xs; first smt.
 clear xs; intros=> x xs IH n n_neg.
-rewrite (nth_consN<:'a> x xs n _) (IH (n - 1) _); smt.
+by rewrite (nth_consN<:'a> x xs n _) ?(IH (n - 1) _); smt.
 qed.
 
 lemma nth_geq_len: forall (xs:'a list) n, length xs <= n => nth xs n = None.
 proof strict.
 intros=> xs; elimT list_ind xs; first smt.
 clear xs; intros=> x xs IH n n_len.
-rewrite (nth_consN<:'a> x xs n _) (IH (n - 1) _); smt.
+rewrite (nth_consN<:'a> x xs n _) ?(IH (n - 1) _); smt.
 qed.
-
 
 (** nth_default *)
 op nth_default (xs:'a list) (dv:'a) n =

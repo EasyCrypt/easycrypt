@@ -170,34 +170,7 @@ lemma sub_append_sub: forall (xs:'x array, i l1 l2:int),
   (sub xs i l1 || sub xs (i+l1) l2) = sub xs i (l1+l2).
 proof.
 intros xs i l1 l2 i_pos l1_pos l2_pos i_l1_l2_bounded.
-apply extensionality.
-delta.
-beta.
-split.
-  rewrite (append_length<:'x> (sub xs i l1) (sub xs l1 l2)).
-  rewrite (sub_length<:'x> xs i l1 _ _ _); smt.
-    (* *)
-  intros j j_pos j_bounded.
-  generalize j_bounded.
-    rewrite (append_length<:'x> (sub xs i l1) (sub xs l1 l2)).
-    rewrite (sub_length<:'x> xs i l1 _ _ _); [smt|smt|smt|].
-    rewrite (sub_length<:'x> xs l1 l2 _ _ _); [smt|smt|smt|].
-    intros j_bounded_.
-    case (j<l1).
-    elim (append_get<:'x> (sub xs i l1) (sub xs l1 l2) j) .
-    intros H _ _.
-    cut j_bounded__ : (j < length (sub xs i l1)); first smt.
-    rewrite (H _ _); [smt|smt|].
-    rewrite (sub_get<:'x> xs i (l1+l2) j _ _ _ _ _); [smt|smt|smt|smt|smt|].
-    rewrite (sub_get<:'x> xs i l1 j _ _ _ _ _); smt.
-    (* *)
-    intros j_geq_l1.
-    elim (append_get<:'x> (sub xs i l1) (sub xs l1 l2) j) .
-    intros _ H.
-    rewrite (H _ _); [smt|smt|].
-    rewrite (sub_length<:'x> xs i l1 _ _ _);[smt|smt|smt|].
-    rewrite (sub_get<:'x> xs l1 l2 (j-l1) _ _ _ _ _); [smt|smt|smt|smt|smt|].
-    rewrite (sub_get<:'x> xs i (l1+l2) j _ _ _ _ _); smt.
+apply extensionality; smt.
 save.
 
 lemma sub_append_snd: forall (xs0 xs1:'x array),

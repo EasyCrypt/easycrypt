@@ -90,12 +90,7 @@ cut Hx : (m.[x] = Some (proj(m.[x])));smt.
 save.
 
 lemma rng_empty: rng (empty<:'a,'b>) = Set.empty.
-proof.
-  apply Set.extensionality.
-  intros x.
-  rewrite (rng_def<:'a,'b> (Map_why.const_ None) x).
-  split; intros _; smt.
-save.
+proof. by apply Set.extensionality=> x; split=> _; smt. save.
 
 lemma in_rng_empty: forall x, !in_rng x empty<:'a, 'b> by [].
 
