@@ -80,16 +80,15 @@ lemma length_cons: forall (x:'a) xs, length (x::xs) = 1 + length xs by [].
 (* Lemmas *)
 lemma length_nneg: forall (xs:'a list), 0 <= length xs.
 proof strict.
-intros=> xs.
-elimT list_ind xs; first smt.
-  intros=> x xs' len_xs'_nneg; rewrite (length_cons<:'a> x xs'); smt.
+intros=> xs; elimT list_ind xs; first smt.
+by intros=> x xs' len_xs'_nneg; rewrite length_cons; smt.
 qed.
 
 lemma length_cons_pos: forall (x:'a) xs, 0 < length (x::xs) by [].
 
 lemma length0_nil: forall (xs:'a list), length xs = 0 => xs = [].
 proof strict.
-intros=> xs; elimT list_ind xs; [trivial | smt].
+intros=> xs; elimT list_ind xs=> //; smt.
 qed.
 
 (** append *)
@@ -104,19 +103,19 @@ lemma appCcons: forall (x:'a) xs ys, (x::xs) ++ ys = x::(xs ++ ys) by [].
 
 lemma app_nilR: forall (xs:'a list), xs ++ [] = xs.
 proof strict.
-intros=> xs; elimT list_ind xs; smt.
+by intros=> xs; elimT list_ind xs; smt.
 qed.
 
 lemma appA: forall (xs ys zs:'a list),
   (xs ++ ys) ++ zs = xs ++ (ys ++ zs).
 proof strict.
-intros=> xs ys zs; elimT list_ind xs; smt.
+by intros=> xs ys zs; elimT list_ind xs; smt.
 qed.
 
 lemma length_app: forall (xs ys:'a list),
   length (xs ++ ys) = length xs + length ys.
 proof strict.
-intros=> xs ys; elimT list_ind xs; smt.
+by intros=> xs ys; elimT list_ind xs; smt.
 qed.
 
 lemma mem_app: forall (y:'a) xs ys,
@@ -124,8 +123,7 @@ lemma mem_app: forall (y:'a) xs ys,
 proof strict.
 intros=> y xs ys; elimT list_ind xs; first smt.
 intros=> x xs' IH.
-  by rewrite (appCcons<:'a> x xs' ys) (mem_cons<:'a> y x xs') (mem_cons<:'a> y x (xs' ++ ys))
-             (orA (y = x) (mem y xs') (mem y ys)) IH.
+by rewrite appCcons 2!mem_cons orA IH.
 qed.
 
 (** all *)
@@ -151,8 +149,7 @@ qed.
 lemma forallb_eq_all: forall (p:'a cPred) xs, all p xs <=> forallb p xs.
 proof strict.
 intros=> p xs; elimT list_ind xs; first smt.
-intros=> y ys IH;
-by rewrite (all_cons<:'a> p y ys) (forallb_cons<:'a> p y ys) IH.
+by intros=> y ys IH; rewrite all_cons forallb_cons IH.
 qed.
 
 (** any *)
@@ -178,8 +175,7 @@ qed.
 lemma existsb_eq_any: forall (p:'a cPred) xs, any p xs <=> existsb p xs.
 proof strict.
 intros=> p xs; elimT list_ind xs; first smt.
-intros=> y ys IH;
-by rewrite (any_cons<:'a> p y ys) (existsb_cons<:'a> p y ys) IH.
+by intros=> y ys IH; rewrite any_cons existsb_cons IH.
 qed.
 
 (** filter *)
@@ -196,33 +192,32 @@ qed.
 
 (* Lemmas *)
 lemma filter_consT: forall (p:'a cPred) x xs,
-  p x => filter p (x::xs) = x::(filter p xs) by [].
+  p x => filter p (x::xs) = x::(filter p xs)
+by [].
 
 lemma filter_consF: forall (p:'a cPred) x xs,
-  !(p x) => filter p (x::xs) = filter p xs by [].
+  !(p x) => filter p (x::xs) = filter p xs
+by [].
 
 lemma filter_mem: forall (p:'a cPred) x xs,
   mem x (filter p xs) = (mem x xs /\ p x).
 proof strict.
 intros=> p x xs; elimT list_ind xs; first smt.
-intros=> x' xs' IH; case (p x'); intros=> p_x'.
-  by rewrite (filter_consT<:'a> p x' xs' _) //
-             (mem_cons<:'a> x x' (filter p xs')) (mem_cons<:'a> x x' xs'); smt.
-
-  by rewrite (filter_consF<:'a> p x' xs' _) //
-             (mem_cons<:'a> x x' xs'); smt.
+intros=> x' xs' IH; case (p x')=> p_x'.
+  by rewrite filter_consT // 2!mem_cons; smt.
+  by rewrite filter_consF // mem_cons;smt.
 qed.
 
 lemma filter_app: forall (p:'a cPred) xs ys,
   filter p (xs ++ ys) = filter p xs ++ filter p ys.
 proof strict.
-intros=> p xs ys; elimT list_ind xs; smt.
+by intros=> p xs ys; elimT list_ind xs; smt.
 qed.
 
 lemma length_filter: forall (p:'a cPred) xs,
   length (filter p xs) <= length xs.
 proof strict.
-intros=> p xs; elimT list_ind xs; smt.
+by intros=> p xs; elimT list_ind xs; smt.
 qed.
 
 lemma all_filter: forall (p:'a cPred) xs,
@@ -246,26 +241,26 @@ by [].
 (* Lemmas *)
 lemma map_in: forall (f:'a -> 'b) x xs,
   mem x xs => mem (f x) (map f xs).
-intros=> f x xs; elimT list_ind xs; smt.
+by intros=> f x xs; elimT list_ind xs; smt.
 qed.
 
 lemma mapO: forall (f:'a -> 'b) (g:'b -> 'c) (h:'a -> 'c) xs,
   (forall x, g (f x) = h x) =>
   map g (map f xs) = map h xs.
 proof strict.
-intros=> f g h xs fOg; elimT list_ind xs; smt.
+by intros=> f g h xs fOg; elimT list_ind xs; smt.
 qed.
 
 lemma map_app: forall (f:'a -> 'b) xs ys,
   map f (xs ++ ys) = map f xs ++ map f ys.
 proof strict.
-intros f xs ys; elimT list_ind xs; smt.
+by intros f xs ys; elimT list_ind xs; smt.
 qed.
 
 lemma length_map: forall (f:'a -> 'b) xs,
   length (map f xs) = length xs.
 proof strict.
-intros f xs; elimT list_ind xs; smt.
+by intros f xs; elimT list_ind xs; smt.
 qed.
 
 (** nth *)
@@ -278,7 +273,6 @@ op nth (xs:'a list) =
 
 
 (* Direct inductive definition *)
-(* TODO: Extend Logic.ec with all the logic rules we need for full interactive proofs. *)
 lemma nth_nil: forall n, nth<:'a> [] n = None by [].
 lemma nth_cons0: forall (x:'a) xs,
   nth (x::xs) 0 = Some x by [].
@@ -290,15 +284,13 @@ lemma nth_consN: forall (x:'a) xs n,
 lemma nth_neg: forall (xs:'a list) n, n < 0 => nth xs n = None.
 proof strict.
 intros=> xs; elimT list_ind xs; first smt.
-clear xs; intros=> x xs IH n n_neg.
-by rewrite nth_consN 1?IH; smt.
+by clear xs=> x xs IH n n_neg; rewrite nth_consN 1?IH; smt.
 qed.
 
 lemma nth_geq_len: forall (xs:'a list) n, length xs <= n => nth xs n = None.
 proof strict.
 intros=> xs; elimT list_ind xs; first smt.
-clear xs; intros=> x xs IH n n_len.
-by rewrite nth_consN 1?IH; smt.
+by clear xs=> x xs IH n n_len; rewrite nth_consN 1?IH; smt.
 qed.
 
 (** nth_default *)
