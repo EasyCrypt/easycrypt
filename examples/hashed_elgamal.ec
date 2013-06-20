@@ -100,13 +100,13 @@ module Hashed_ElGamal (O:Oracle) : Scheme = {
     return (g ^ y, h ^^ m);
   }
 
-  fun dec(sk:skey, c:ciphertext) : plaintext = {
+  fun dec(sk:skey, c:ciphertext) : plaintext option = {
     var gy : group;
     var h, hm : bitstring;
 
     (gy, hm) = c; 
     h = O.o(gy ^ sk);
-    return h ^^ hm; 
+    return Some (h ^^ hm); 
   }
 }.
 
@@ -488,15 +488,6 @@ proof.
   by apply W; apply (Reduction (<:A) &m); assumption.
 qed.
 
-lemma Correctness : 
-  hoare [Correctness(Hashed_ElGamal(RO), RO).main : true ==> res].
-proof.
-  fun; inline Hashed_ElGamal(RO).kg Hashed_ElGamal(RO).enc.
-  inline Hashed_ElGamal(RO).kg Hashed_ElGamal(RO).enc Hashed_ElGamal(RO).dec 
-    RO.o RO.init.
-  do (wp; rnd); wp; skip; progress; smt.
-qed.
-
 
 (** Composing reduction from CPA to SCDH with reduction from SCDH to CDH *)
 lemma Security_CDH 
@@ -517,4 +508,14 @@ proof.
   assumption.
   apply SCDH.mult_inv_le_r; first smt.
   assumption.
+qed.
+
+
+lemma Correctness : 
+  hoare [Correctness(Hashed_ElGamal(RO), RO).main : true ==> res].
+proof.
+  fun.
+  inline Hashed_ElGamal(RO).kg Hashed_ElGamal(RO).enc Hashed_ElGamal(RO).dec. 
+  inline RO.o RO.init.
+  do (wp; rnd); wp; skip; progress; smt.
 qed.
