@@ -386,6 +386,19 @@ module FPosition = struct
 
   let is_empty (p : ptnpos) = Mint.is_empty p
 
+  let rec tostring (p : ptnpos) =
+    let items = Mint.bindings p in
+    let items =
+      List.map
+        (fun (i, p) -> Printf.sprintf "%d[%s]" i (tostring1 p))
+        items
+    in
+      String.concat ", " items
+
+  and tostring1 = function
+    | `Select -> "-"
+    | `Sub p -> tostring p
+
   let select test =
     let rec doit1 fp =
       if   test fp
@@ -415,7 +428,7 @@ module FPosition = struct
       fun fp ->
         match doit [fp] with
         | None   -> Mint.empty
-        | Some p -> Mint.singleton 0 (`Sub p)
+        | Some p -> p
 
   let occurences =
     let rec doit1 n p =
@@ -432,7 +445,7 @@ module FPosition = struct
   let filter (s : Sint.t) =
     let rec doit1 n p =
       match p with
-      | `Select -> (n+1, if Sint.mem n s then None else Some `Select)
+      | `Select -> (n+1, if Sint.mem n s then Some `Select else None)
       | `Sub p  -> begin
           match doit n p with
           | (n, sub) when Mint.is_empty sub -> (n, None)
@@ -443,10 +456,10 @@ module FPosition = struct
       Mint.mapi_filter_fold (fun _ p n -> doit1 n p) ps n
 
     in
-      fun p -> snd (doit 0 p)
+      fun p -> snd (doit 1 p)
 
   let topattern (p : ptnpos) (f : form) =
-    let x = EcIdent.create "p" in
+    let x = EcIdent.create "_p" in
   
     let rec doit1 p fp =
       match p with
@@ -468,7 +481,7 @@ module FPosition = struct
                 FSmart.f_if (fp, (c, f1, f2)) (c', f1', f2')
   
           | Fapp (f, fs) -> begin
-              match doit p fs with
+              match doit p (f :: fs) with
               | [] -> assert false
               | f' :: fs' ->
                   FSmart.f_app (fp, (f, fs, fp.f_ty)) (f', fs', fp.f_ty)
