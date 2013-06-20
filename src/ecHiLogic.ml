@@ -431,7 +431,7 @@ let process_field_simp (p,t,i,m,z,o,e) g =
       | _ -> cannot_apply "field_simplify" "Think more about the goal")
 
 (* -------------------------------------------------------------------- *)
-let trans_apply_arg hyps ue arg =
+let trans_pterm_argument hyps ue arg =
   let env = LDecl.toenv hyps in
 
   match unloc arg with
@@ -464,7 +464,7 @@ let rec destruct_product hyps fp =
   end
 
 (* -------------------------------------------------------------------- *)
-let process_named_apply _loc hyps (fp, tvi) =
+let process_named_pterm _loc hyps (fp, tvi) =
   let env = LDecl.toenv hyps in
 
   let (p, typ, ax) =
@@ -512,7 +512,18 @@ let process_named_apply _loc hyps (fp, tvi) =
     (p, typ, ue, ax)
 
 (* -------------------------------------------------------------------- *)
-let check_apply_arg hyps ue f arg =
+let process_pterm loc hyps pe =
+  match pe.fp_kind with
+  | FPNamed (fp, tyargs) ->
+      process_named_pterm loc hyps (fp, tyargs)
+
+  | FPCut fp ->
+      let fp = process_form hyps fp tbool in
+      let ue = EcUnify.UniEnv.create (Some (LDecl.tohyps hyps).h_tvar) in
+        (`Cut fp, [], ue, fp)
+
+(* -------------------------------------------------------------------- *)
+let check_pterm_argument hyps ue f arg =
   let env = LDecl.toenv hyps in
 
   let invalid_arg () = tacuerror "invalid argument to apply" in
@@ -549,22 +560,24 @@ let check_apply_arg hyps ue f arg =
   | _, _ -> invalid_arg ()
 
 (* -------------------------------------------------------------------- *)
+let concretize_pterm_arguments (tue, ev) ids =
+  let do1 = function
+    | `KnownMod   (_, (mp, mt)) -> EcLogic.AAmp   (mp, mt)
+    | `KnownMem   (_, mem)      -> EcLogic.AAmem  mem
+    | `KnownVar   (_, tp)       -> EcLogic.AAform (Fsubst.uni tue tp)
+    | `SideCond   _             -> EcLogic.AAnode
+    | `UnknownVar (x, _)        -> EcLogic.AAform (Fsubst.uni tue (EV.doget x ev))
+  in
+    List.rev (List.map do1 ids)
+
+(* -------------------------------------------------------------------- *)
 let process_apply loc pe g =
   let (hyps, fp) = (get_hyps g, get_concl g) in
 
-  let (p, typarams, ue, ax) =
-    match pe.fp_kind with
-    | FPNamed (fp, tyargs) ->
-        process_named_apply loc hyps (fp, tyargs)
-
-    | FPCut fp ->
-        let fp = process_formula g fp in
-        let ue = EcUnify.UniEnv.create (Some (LDecl.tohyps hyps).h_tvar) in
-          (`Cut fp, [], ue, fp)
-  in
+  let (p, typarams, ue, ax) = process_pterm loc hyps pe in
 
   let args = pe.fp_args in
-  let args = List.map (trans_apply_arg hyps ue) args in
+  let args = List.map (trans_pterm_argument hyps ue) args in
 
   let rec instanciate (ax, ids) =
     let ev =
@@ -580,12 +593,14 @@ let process_apply loc pe g =
         match destruct_product hyps ax with
         | None   -> tacuerror "in apply, cannot find instance"
         | Some _ ->
-            let (ax, id) = check_apply_arg hyps ue ax None in
+            let (ax, id) = check_pterm_argument hyps ue ax None in
               instanciate (ax, id :: ids)
   in
 
   let (ax, ids) =
-    snd_map List.rev (List.map_fold (check_apply_arg hyps ue) ax args)
+    snd_map
+      List.rev
+      (List.map_fold (check_pterm_argument hyps ue) ax args)
   in
 
   let (_, ids, (_, tue, ev)) =
@@ -604,16 +619,7 @@ let process_apply loc pe g =
             instanciate (ax, ids)
   in
 
-  let args =
-    let do1 = function
-      | `KnownMod   (_, (mp, mt)) -> EcLogic.AAmp   (mp, mt)
-      | `KnownMem   (_, mem)      -> EcLogic.AAmem  mem
-      | `KnownVar   (_, tp)       -> EcLogic.AAform (Fsubst.uni tue tp)
-      | `SideCond   _             -> EcLogic.AAnode
-      | `UnknownVar (x, _)        -> EcLogic.AAform (Fsubst.uni tue (EV.doget x ev))
-    in
-      List.rev (List.map do1 ids)
-  in
+  let args = concretize_pterm_arguments (tue, ev) ids in
 
   let typarams = List.map (Tuni.subst tue) typarams in
 
