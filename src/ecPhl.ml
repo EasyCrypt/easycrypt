@@ -21,13 +21,14 @@ let get_abs_functor f =
   | `Abstract _ -> EcPath.mpath (f.EcPath.m_top) []
   | _ -> assert false
 
-let rec f_write env w f =
+let rec f_write ?(except_fs=Sx.empty) env w f =
   let f = NormMp.norm_xpath env f in
   let func = Fun.by_xpath f env in
   match func.f_def with
   | FBabs oi ->
     let mp = get_abs_functor f in
-    List.fold_left (f_write env) (PV.add_glob env mp w) oi.oi_calls
+    List.fold_left (fun w o -> if Sx.mem o except_fs then w else f_write env w o)
+      (PV.add_glob env mp w) oi.oi_calls
   | FBdef fdef ->
     let add x w = 
       let vb = Var.by_xpath x env in
@@ -44,17 +45,19 @@ let lp_write env w lp =
   | LvTuple pvs -> List.fold_left add w pvs 
   | LvMap ((_p,_tys),pv,_,ty) -> add w (pv,ty) 
 
-let rec is_write env w s = List.fold_left (i_write env) w s
+let rec is_write ?(except_fs=Sx.empty) env w s = 
+  List.fold_left (i_write ~except_fs env) w s
 
-and s_write env w s = is_write env w s.s_node
+and s_write ?(except_fs=Sx.empty) env w s = 
+  is_write ~except_fs env w s.s_node
 
-and i_write env w i = 
+and i_write ?(except_fs=Sx.empty) env w i = 
   match i.i_node with
   | Sasgn (lp,_) -> lp_write env w lp
   | Srnd (lp,_) -> lp_write env w lp
   | Scall(lp,f,_) -> 
     let w  = match lp with None -> w | Some lp -> lp_write env w lp in    
-    f_write env w f 
+    f_write ~except_fs env w f 
   | Sif (_,s1,s2) -> s_write env (s_write env w s1) s2
   | Swhile (_,s) -> s_write env w s
   | Sassert _ -> w 
@@ -100,9 +103,9 @@ and i_read env r i =
   | Swhile (e,s) -> s_read env (e_read env r e) s
   | Sassert e -> e_read env r e
 
-let f_write env f = f_write env PV.empty f
-let f_read  env f = f_read  env PV.empty f
-let s_write env s = s_write env PV.empty s
+let f_write ?(except_fs=Sx.empty) env f = f_write ~except_fs env PV.empty f
+let f_read  env f = f_read env PV.empty f
+let s_write ?(except_fs=Sx.empty) env s = s_write ~except_fs env PV.empty s
 let s_read  env s = s_read  env PV.empty s
 
 (* -------------------------------------------------------------------- *)
@@ -1754,6 +1757,115 @@ let t_rcond side b at_pos g =
     | None when is_bdHoareS concl -> t_bdHoare_rcond b at_pos g
     | None -> t_hoare_rcond b at_pos g
     | Some side -> t_equiv_rcond side b at_pos g
+
+(* -------------------------------------------------------------------- *)
+
+(* FAILURE EVENT LEMMA  *)
+
+(* in EcPath.mli: *)
+
+
+
+(* takes an xpath, returns xpath set *)
+let callable_oracles_f env os f =
+  let f = NormMp.norm_xpath env f in
+  let func = Fun.by_xpath f env in
+  match func.f_def with
+    | FBabs oi ->
+      List.fold_left (fun s o -> EcPath.Sx.add o s) os oi.oi_calls
+  | FBdef fdef ->
+    List.fold_left (fun s o -> EcPath.Sx.add o s) 
+      os fdef.f_uses.us_calls
+
+let rec callable_oracles_s env os s =
+  callable_oracles_is env os s.s_node
+and callable_oracles_is env os is = 
+  List.fold_left (callable_oracles_i env) os is
+and callable_oracles_i env os i = 
+  match i.i_node with
+    | Scall(_,f,_) -> callable_oracles_f env os f
+    | Sif (_,s1,s2) -> callable_oracles_s env (callable_oracles_s env os s1) s2
+    | Swhile (_,s) -> callable_oracles_s env os s
+    | Sasgn _ | Srnd _ | Sassert _ -> os 
+
+let callable_oracles_stmt env = callable_oracles_s env EcPath.Sx.empty
+
+let t_failure_event at_pos cntr delta q f_event some_p g =
+  let env,_,concl = get_goal_e g in
+  match concl.f_node with
+    | Fapp ({f_node=Fop(op,_)},[pr;bd]) when is_pr pr 
+        && EcPath.p_equal op EcCoreLib.p_real_le ->
+      let (m,f,_args,ev) = destr_pr pr in
+      let m = match Memory.byid m env with 
+        | Some m -> m 
+        | None -> cannot_apply "fel" "Cannot find memory (bug?)"
+      in
+      let memenv, fdef, env_ = 
+        try Fun.hoareS f env
+        with _ -> 
+          cannot_apply "fel" "not applicable to abstract functions"
+      in
+      let s_hd,s_tl = s_split "fel" at_pos fdef.f_body in
+      let os = callable_oracles_stmt env (stmt s_tl) in
+      (* check that bad event is only modified in oracles *)
+      let fv = PV.fv env mhr f_event in
+      if not (PV.disjoint env (s_write ~except_fs:os env (stmt s_tl)) (fv) ) then
+        cannot_apply "fel" "fail event is modified outside oracles";
+      (* subgoal on the bounds *)
+      let bound_goal = 
+        let v1 = f_real_of_int (f_int_prod q (f_int_sub q (f_int 1))) in
+        (* let v2 = f_real_of_int (f_int_pow (f_int 2) (f_int_sum l (f_int 1))) in *)
+        let v = f_real_prod v1 delta  in
+        f_real_le v bd
+      in
+      (* we must quantify over memories *)
+      let mo = EcIdent.create "&m" in
+      let post_goal = 
+        let subst = Fsubst.f_bind_mem Fsubst.f_subst_id mhr mo in
+        let p = f_imp ev (f_and f_event (f_int_le cntr q)) in
+        let p = Fsubst.f_subst subst p in
+        gen_mems [mo, EcMemory.memtype m] p 
+      in
+      (* not fail and cntr=0 holds at designated program point *)
+      let init_goal = 
+        let p = f_and (f_not f_event) (f_eq cntr (f_int 0)) in
+        f_hoareS memenv f_true (stmt s_hd) p
+      in
+      let oracle_goal o = 
+        let not_F_to_F_goal = 
+          let bound = f_real_prod (f_real_of_int cntr) delta in
+          let pre = f_not f_event in
+          let post = f_event in
+          f_bdHoareF pre o post FHle bound
+        in
+        let old_cntr_id = EcIdent.create "c" in
+        let old_b_id = EcIdent.create "b" in
+        let old_cntr = f_local old_cntr_id tint in
+        let old_b = f_local old_b_id tbool in
+        let cntr_decr_goal = 
+          let pre  = f_and some_p (f_eq old_cntr cntr) in
+          let post = f_int_lt old_cntr cntr in
+          f_forall_simpl [old_cntr_id,GTty tint] 
+            (f_hoareF pre o post)
+        in
+        let cntr_stable_goal =
+          let pre  = f_ands [f_not some_p;f_eq f_event old_b;f_eq cntr old_cntr] in
+          let post = f_ands [f_eq f_event old_b;f_eq cntr old_cntr] in
+          f_forall_simpl [old_b_id,GTty tbool; old_cntr_id,GTty tint] 
+            (f_hoareF pre o post)
+        in
+        [not_F_to_F_goal;cntr_decr_goal;cntr_stable_goal]
+      in
+      let os_goals = List.concat (List.map oracle_goal (Sx.elements os)) in
+      prove_goal_by ([bound_goal;post_goal;init_goal]@os_goals) 
+        (RN_hl_fel (cntr,delta,q,f_event,some_p) )  g
+    | _ -> 
+      cannot_apply "failure event lemma" 
+        "A goal of the form Pr[ _ ] <= _ was expected"
+
+
+
+
 
 (* -------------------------------------------------------------------- *)
 let check_swap env s1 s2 = 

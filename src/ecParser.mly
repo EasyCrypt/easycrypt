@@ -179,6 +179,7 @@
 %token EQUIVDENO
 %token EXIST
 %token EXPORT
+%token FEL
 %token FINAL
 %token FIRST
 %token FISSION
@@ -1636,6 +1637,9 @@ phltactic:
 
 | EXFALSO
     { Pexfalso }
+
+| FEL at_pos=NUM cntr=sform delta=sform q=sform f_event=sform some_p=sform
+   {Pfel (at_pos,(cntr,delta,q,f_event,some_p))}
 
 (* basic pr based tacs *)
 | HOARE {Phoare}
