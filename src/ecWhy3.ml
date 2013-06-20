@@ -1366,6 +1366,7 @@ let trans_form env f =
   and trans_form_b f = force_bool (trans_form f)
 
   and trans_lambda vs body =
+    (* TODO how to share lambda with free variable *)
     try Mta.find (vs,body) !env.env_lam 
     with Not_found ->
     (* We compute the free variable of the lambda *)

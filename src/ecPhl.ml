@@ -1126,6 +1126,7 @@ let t_equiv_call fpre fpost g =
   let concl = f_equivS_r { es with es_sl = sl; es_sr = sr; es_po=post} in
   prove_goal_by [f_concl;concl] (RN_hl_call (None, fpre, fpost)) g
 
+(* TODO generalize the rule for any lossless statement *)
 let t_equiv_call1 side fpre fpost g =
   let env,_,concl = get_goal_e g in
   let equiv = destr_equivS concl in
@@ -1711,19 +1712,16 @@ let t_hoare_rcond b at_pos g =
   let hs = destr_hoareS concl in
   let m  = EcMemory.memory hs.hs_m in 
   let hd,e,s = gen_rcond b m at_pos hs.hs_s in
-  let concl1  = f_hoareS_r { hs with (* hs_pr=pre1; *)hs_s = hd; hs_po = e } in
+  let concl1  = f_hoareS_r { hs with hs_s = hd; hs_po = e } in
   let concl2  = f_hoareS_r { hs with hs_s = s } in
   prove_goal_by [concl1;concl2] (RN_hl_rcond (None, b,at_pos)) g  
 
 let t_bdHoare_rcond b at_pos g = 
-  (* TODO: generalize the rule using assume *)
-  if at_pos <> 1 then
-    cannot_apply "rcond" "position must be 1 in bounded Hoare judgments";
   let concl = get_concl g in
   let bhs = destr_bdHoareS concl in
   let m  = EcMemory.memory bhs.bhs_m in 
   let hd,e,s = gen_rcond b m at_pos bhs.bhs_s in
-  let concl1  = f_bdHoareS_r { bhs with (* bhs_pr=pre1; *)bhs_s = hd; bhs_po = e } in
+  let concl1  = f_hoareS bhs.bhs_m bhs.bhs_pr hd e in
   let concl2  = f_bdHoareS_r { bhs with bhs_s = s } in
   prove_goal_by [concl1;concl2] (RN_hl_rcond (None, b,at_pos)) g  
 
@@ -1827,7 +1825,7 @@ let t_gen_cond side e g =
   in
   let t_sub b g = 
     t_seq_subgoal (t_rcond side b 1)
-      [t_lseq [t_introm; t_skip; t_try (t_intros_i [m2;h]);
+      [t_lseq [t_introm; t_skip; t_intros_i [m2;h];
                t_or  
                  (t_lseq [t_elim_hyp h; t_intros_i [h1;h2]; t_hyp h2])
                  (t_hyp h)
@@ -1844,8 +1842,6 @@ let t_hoare_cond g =
 let t_bdHoare_cond g = 
   let concl = get_concl g in
   let bhs = destr_bdHoareS concl in 
-  if (bhs.bhs_bd <> f_r1 || (bhs.bhs_cmp <> FHeq && bhs.bhs_cmp <> FHge)) then
-    cannot_apply "if" "expected \">= 1\" as bound";
   let (e,_,_) = s_first_if bhs.bhs_s in
   t_gen_cond None (form_of_expr (EcMemory.memory bhs.bhs_m) e) g
 
@@ -2122,3 +2118,38 @@ let t_pror g =
   let bhs = destr_bdHoareS concl in 
   let concl = f_bdHoareS_r {bhs with bhs_cmp=FHeq } in
   prove_goal_by [concl] RN_hl_prbounded g
+
+(* -------------------------------------------------------------------- *)
+(*
+let eqobs_in env fun_spec (notmodl, notmodr) c1 c2 eqo = 
+  let rec s_eqobs_in rsl rsr fhyps eqo = 
+    match rsl, rsr with
+    | Sasgn(lvl,_)::rsl, _ when not(inl_eqs lvl eqo) && not(in_notmodl lvl) ->
+      s_eqobs_in rsl rsr fhyps eqo 
+    | _, Sasgn(lvr,_)::rsr when not(inr_eqs lvr eqo) && not(in_notmodr lvr) ->
+      s_eqobs_in rsl rsr fhyps eqo 
+    (* TODO add the same for lossless random *)
+    | [], _ -> [], rsr, fhyps, eqo
+    | _, [] -> rsl, [], fhyps, eqo
+    | il::rsl', ir::rsr' ->
+      match i_eqobs_in il ir fhyps eqo with
+      | Some (fhyps,eqi) -> s_eqobs_in rsl' rsr' fhyps eqo 
+      | _ -> rsl, rsr, fhyps, eqo
+  and i_eqobs_in il ir fhyps eqo = 
+    match il, ir with
+    | Sasgn(lvl,el), Sasgn(lvr,er) | Srnd(lvl,el), Srnd(lvr,er) ->
+    | Scall(lvl,fl,argsl), Scall(lvr,fr,argsr) ->
+    | Sif(el,stl,sfl), Sif(er,str,sfr) ->
+    | Swhile(el,stl,sfl), Sif(er,str,sfr) ->
+  | Swhile  of EcTypes.expr * stmt
+  | Sassert of EcTypes.expr
+        
+
+  | [],  -> [], fhyps, eqo 
+  | i::rs' ->
+    match i_eqobs_in env notmod i fhyps eqo with
+    | None -> rstmt rs, fhyps, eqo
+    | Some (fhyps,eqo) -> s_eqobs_in env notmod rs' fhyps eqo
+and i_eqobs_in env notmod
+*)    
+
