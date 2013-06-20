@@ -643,14 +643,14 @@ let process_apply loc pe g =
 exception RwMatchFound of EcUnify.unienv * ty EcUidgen.Muid.t * form evmap
 
 let process_rewrite1 loc ri g =
-  let (hyps, concl) = get_goal g in
-
   match ri with
   | RWDone ->
       process_trivial g
 
   | RWRw (s, r, o, pe) ->
       let do1 g =
+        let (hyps, concl) = get_goal g in
+
         let (p, typs, ue, ax) = process_pterm loc hyps pe in
         let args = List.map (trans_pterm_argument hyps ue) pe.fp_args in
         let ((_ax, ids), (_mode, (f1, f2))) =
