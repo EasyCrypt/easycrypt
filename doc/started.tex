@@ -357,6 +357,156 @@ easycrypt as follows
 
 \ecimport{ }{../examples/br93_tutorial.ec}{eq1}
 
+Upon starting the proof, after \ec{intros A Hll1 Hll2;fun}, we have
+the following goal
+
+%formatting needs to be fixed
+\begin{easycrypt}{ }{\label{ec:proof1}}
+Current goal
+
+Type variables: <none>
+
+A : Adv{RO, Rnd}
+Hll1: forall (R <: ARO), islossless R.o_a => islossless A(R).a1
+Hll2: forall (R <: ARO), islossless R.o_a => islossless A(R).a2
+--------------------------------------
+&1 (left ) : CPA(BR, A).main
+&2 (right) : CPA(BR2, A).main
+
+pre = (glob A){1} = (glob A){2}
+
+RO.init()                                              (1)  RO.init()                       
+(pk, sk) := CPA(BR, A).SO.kg()             (2)  (pk, sk) := CPA(BR2, A).SO.kg() 
+(m0, m1) := CPA(BR, A).A.a1(pk)         (3)  (m0, m1) := CPA(BR2, A).A.a1(pk)
+b =$ {0,1}                                           (4)  b =$ {0,1}                      
+c := CPA(BR, A).SO.enc(pk,                 (5)  c := CPA(BR2, A).SO.enc(pk,     
+                       b ? m0 : m1)                                                    b ? m0 : m1)                  
+b' := CPA(BR, A).A.a2(c)                      (6)  b' := CPA(BR2, A).A.a2(c)       
+
+post = !(mem Rnd.r{2} RO.s{2}) => (b{1} = b'{1}) = (b{2} = b'{2})
+
+\end{easycrypt}
+
+The strategy we apply is the following:
+\begin{itemize}
+\item Before the second adversary call at the line 6, we know that the
+  postcondition of \ec{enc} holds. Then, we use precondition
+
+\ec{(!mem Rnd.r RO.s){2} => (={RO.s,c} /\\  eq_except RO.m{1} RO.m{2} Rnd.r{2}
+                  /\\ (glob A){1} = (glob A){2})}
+
+and postcondition \ec{((!mem Rnd.r RO.s){2} => ={res})}
+
+In order to prove this specification, we use \ec{fun} with two
+arguments:
+\begin{itemize}
+  \item The first one is a failure event $F$, in this case \ec{mem Rnd.r
+      RO.s}.
+    \item The second one, is an invariant $I$, in this case 
+      \ec{(={RO.s} /\\ eq_except RO.m{1} RO.m{2} Rnd.r{2})}.
+\end{itemize}
+The idea is that the invariant will hold, as long as the failure event
+doesn't. This tactic generates the following proof obligations:
+\begin{itemize}
+\item a logical entailment of the form $P \Rightarrow \textsf{ if } F
+  \textsf{ then true else } I$, where $P$ is the precondition
+  (discharged by \ec{smt};
+
+\item a logical entailment of the form $(\lnot F \Rightarrow
+  I)\Rightarrow Q$, where $Q$ is the postcondition (discharged by
+  \ec{smt});
+
+\item losslessness of the adversary, assuming losslessness of the
+  oracles he has access to (in our case this is an assumption);
+
+\item a pRHL judgement for each of the oracles the adversary has
+  access to, with precondition $!F \land I \land =\{\mathsf{args}\}$
+  and postcondition $!F \Rightarrow (I \land=\{\mathsf{res}\})$;
+
+\item losslessness of the oracles the adversary has access to,
+  assuming $F$ holds in the initial state;
+
+\item preservation of $F$ for all the oracles the adversary has access
+  to (a bounded probabilistic hoare logic judgement with precondition
+  $F$ and postcondition $F$ and probability 1).
+\end{itemize}
+For a more detailes account of reasoning up to failure, we refer the
+reader to Section (upto bad section).
+
+
+\item For the call to the encryption scheme in line 5, we use the
+  specification we established previously. This is done using
+  \ec{call} with the same spec, and then applying the lemma
+  \ec{eq_enc1}.
+
+\item The random samplings of b in line 5 are handled using the
+  \ec{rnd} tactic. This ensures that the values are considered equal. 
+
+\item For the first adversary call in line 4, we provide a
+  specification. For the precondition we use
+ \ec{(={RO.m,RO.s,pk} /\\ (glob A){1} = (glob A){2} /\\ dom RO.m{2} =
+   RO.s{2})}, and for the postcondition, the same formula, except that
+ we require equality on \ec{res} rather than in the argument
+ \ec{pk}. We prove this specification using \ec{fun} with invariant
+ (I) defined as \ec{(={RO.m,RO.s} /\\ dom RO.m{2} = RO.s{2})}. This
+ tactic generates the following proof obligations:
+\begin{itemize}
+\item a logical entaliment of the form $P \Rightarrow I \land
+  (\mathsf{glob}\;A)\{1\} = (\mathsf{glob}\;A)\{2\} \land
+  =\{\mathsf{args}\}$, where $P$ is the precondition,
+  $\mathsf{glob}\;A$ represents the global variables of adversary
+  \ec{A} (all the state variables in all the modules, except those
+  modules to which access is explcitly restricted in the annotations)
+  and $\mathsf{args}$ represents the arguments of the adversary;
+\item a logical entailment of the form $I \land
+  (\mathsf{glob}\;A)\{1\} = (\mathsf{glob}\;A) \land =\{\mathsf{res}\}
+  \Rightarrow Q$, where $\mathsf{res}$ is the result of the adversary
+  and $Q$ is the postcondition;
+\item a pRHL judgement for each of the oracles the adversary has
+  access to, with precondition $I \land =\{\mathsf{args}\}$ and
+  postcondition $I \land =\{\mathsf{res}\}$.
+ \end{itemize} 
+For a more detailed account of the rule for adversary calls, we refer
+the reader to Section(call for adversaries).
+\item It remains to prove that the code before the call in line 3
+  establishes the precondition. This is done by inlining the code and
+  using \ec{wp} and \ec{rnd} when necessary. 
+
+\item Once we have two empty programs, we use \ec{skip} to reduce the
+  validity of the judgement to the validity of a logic formula. Then
+  we apply \ec{progress}, which implements a simplification strategy
+  for formulas, and we discharge the resulting goals using the
+  \ec{smt} tactic, which interfaces with smt solvers and concludes the
+  proof. 
+\end{itemize}
+From the pRHL judgement we have just proved, we can conclude the
+following property
+
+\ecimport{ }{../examples/br93_tutorial.ec}{prob1}
+
+The proof proceeds by transitivity:
+\begin{itemize}
+\item First, we prove 
+
+\ec{Pr[CPA(BR,A).main() @ &m : res] <=
+Pr[CPA(BR2,A).main() @ &m : res \\/ mem Rnd.r RO.s]},
+using our pRHL proof and the tactic \ec{equiv_deno}.
+
+\item Next, we prove
+
+\ec{Pr[CPA(BR2,A).main() @ &m : res \\/ mem Rnd.r RO.s] <=} 
+
+\ec{Pr[CPA(BR2,A).main() @ &m : res]} +
+
+\ec{Pr[CPA(BR2,A).main() @ &m : mem Rnd.r RO.s]}
+
+using the tactic \ec{pr_or}, that implements the following reasoning
+principle:
+\ec{Pr[ f() @ &m : a \\/ b]} =  \ec{Pr[ f() @ &m : a]} + \ec{Pr[ f() @
+  &m : b]} - \ec{Pr[ f() @ &m : a /\\ b]} 
+ 
+\end{itemize}
+
 \paragraph{Optmistic sampling: replacing \ec{m ^^ r} by \ec{r}}
 
 \paragraph{Code movement: sampling \ec{b} at the end}
