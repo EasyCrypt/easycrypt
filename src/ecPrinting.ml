@@ -41,7 +41,13 @@ module PPEnv = struct
   let enter_by_memid ppe id =
     match EcEnv.Memory.byid id ppe.ppe_env with
     | None   -> ppe
-    | Some m -> enter ppe (EcMemory.xpath m)
+    | Some m -> begin
+      match snd m with
+      | None   -> ppe
+      | Some _ ->
+          let ppe = enter ppe (EcMemory.xpath m) in
+            { ppe with ppe_env = EcEnv.Memory.set_active (fst m) ppe.ppe_env }
+    end
 
   let add_local ppe =
     let in_active_mem name =
@@ -562,7 +568,7 @@ let pp_opapp (ppe : PPEnv.t) pp_sub outer fmt (op, _tvi, es) =
 
         | "__set", [e1; e2; e3] ->
             let pp fmt =
-              Format.fprintf fmt "@[%a.[%a <- %a]@]"
+              Format.fprintf fmt "@[<hov 2>%a.[%a <-@ %a]@]"
                 (pp_sub ppe (e_get_prio , `Left    )) e1
                 (pp_sub ppe (min_op_prec, `NonAssoc)) e2
                 (pp_sub ppe (min_op_prec, `NonAssoc)) e3
@@ -915,11 +921,11 @@ and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
       pp_local ppe fmt id
       
   | Fpvar (x, i) -> begin
-      let ppe = PPEnv.enter_by_memid ppe i in
         match EcEnv.Memory.get_active ppe.PPEnv.ppe_env with
         | Some i' when EcMemory.mem_equal i i' ->
             Format.fprintf fmt "%a" (pp_pv ppe) x
         | _ ->
+          let ppe = PPEnv.enter_by_memid ppe i in
             Format.fprintf fmt "%a{%a}" (pp_pv ppe) x (pp_mem ppe) i
   end
 
@@ -1501,10 +1507,21 @@ let pp_goal (ppe : PPEnv.t) fmt (n, (hyps, concl)) =
     let ppe = PPEnv.add_local ppe id
     and dk fmt =
         match k with
-        | EcBaseLogic.LD_var (ty, _body) -> pp_type ppe fmt ty
-        | EcBaseLogic.LD_mem _           -> Format.fprintf fmt "memory"
-        | EcBaseLogic.LD_modty (p, sm)   -> pp_modtype ppe fmt (p, sm)
-        | EcBaseLogic.LD_hyp f           -> pp_form ppe fmt f
+        | EcBaseLogic.LD_var (ty, _body) ->
+            pp_type ppe fmt ty
+
+        | EcBaseLogic.LD_mem None ->
+            Format.fprintf fmt "memory"
+
+        | EcBaseLogic.LD_mem (Some m) ->
+            Format.fprintf fmt "memory <%a>"
+              (pp_funname ppe) (EcMemory.lmt_xpath m)
+
+        | EcBaseLogic.LD_modty (p, sm) ->
+            pp_modtype ppe fmt (p, sm)
+
+        | EcBaseLogic.LD_hyp f ->
+            pp_form ppe fmt f
     in
     let pp fmt =
       Format.fprintf fmt "%-.2s: @[<hov 2>%t@]@\n%!" (EcIdent.name id) dk

@@ -179,7 +179,7 @@ let lv_subst m lv f =
     (LTuple ids, f), s
   | LvMap((p,tys),pv,e,ty) ->
     let id = id_of_pv pv m in 
-    let set = f_op p tys ty in
+    let set = f_op p tys (toarrow [ty; e.e_ty; f.f_ty] ty) in
     let f = f_app set [f_pvar pv ty m; form_of_expr m e; f] ty in
     (LSymbol (id,ty), f), [pv,m,f_local id ty]
       
@@ -1126,6 +1126,7 @@ let t_equiv_call fpre fpost g =
   let concl = f_equivS_r { es with es_sl = sl; es_sr = sr; es_po=post} in
   prove_goal_by [f_concl;concl] (RN_hl_call (None, fpre, fpost)) g
 
+(* TODO generalize the rule for any lossless statement *)
 let t_equiv_call1 side fpre fpost g =
   let env,_,concl = get_goal_e g in
   let equiv = destr_equivS concl in
@@ -1207,15 +1208,15 @@ lossless c2
 let t_hoare_case f g =
   let concl = get_concl g in
   let hs = destr_hoareS concl in
-  let concl1 = f_hoareS_r { hs with hs_pr = f_and_simpl hs.hs_pr f } in
-  let concl2 = f_hoareS_r { hs with hs_pr = f_and_simpl hs.hs_pr (f_not f) } in
+  let concl1 = f_hoareS_r { hs with hs_pr = f_and hs.hs_pr f } in
+  let concl2 = f_hoareS_r { hs with hs_pr = f_and hs.hs_pr (f_not f) } in
   prove_goal_by [concl1;concl2] (RN_hl_case f) g
 
 let t_bdHoare_case f g =
   let concl = get_concl g in
   let bhs = destr_bdHoareS concl in
-  let concl1 = f_bdHoareS_r { bhs with bhs_pr = f_and_simpl bhs.bhs_pr f } in
-  let concl2 = f_bdHoareS_r { bhs with bhs_pr = f_and_simpl bhs.bhs_pr (f_not f) } in
+  let concl1 = f_bdHoareS_r { bhs with bhs_pr = f_and bhs.bhs_pr f } in
+  let concl2 = f_bdHoareS_r { bhs with bhs_pr = f_and bhs.bhs_pr (f_not f) } in
   prove_goal_by [concl1;concl2] (RN_hl_case f) g
 
 let t_equiv_case f g = 
@@ -1711,19 +1712,16 @@ let t_hoare_rcond b at_pos g =
   let hs = destr_hoareS concl in
   let m  = EcMemory.memory hs.hs_m in 
   let hd,e,s = gen_rcond b m at_pos hs.hs_s in
-  let concl1  = f_hoareS_r { hs with (* hs_pr=pre1; *)hs_s = hd; hs_po = e } in
+  let concl1  = f_hoareS_r { hs with hs_s = hd; hs_po = e } in
   let concl2  = f_hoareS_r { hs with hs_s = s } in
   prove_goal_by [concl1;concl2] (RN_hl_rcond (None, b,at_pos)) g  
 
 let t_bdHoare_rcond b at_pos g = 
-  (* TODO: generalize the rule using assume *)
-  if at_pos <> 1 then
-    cannot_apply "rcond" "position must be 1 in bounded Hoare judgments";
   let concl = get_concl g in
   let bhs = destr_bdHoareS concl in
   let m  = EcMemory.memory bhs.bhs_m in 
   let hd,e,s = gen_rcond b m at_pos bhs.bhs_s in
-  let concl1  = f_bdHoareS_r { bhs with (* bhs_pr=pre1; *)bhs_s = hd; bhs_po = e } in
+  let concl1  = f_hoareS bhs.bhs_m bhs.bhs_pr hd e in
   let concl2  = f_bdHoareS_r { bhs with bhs_s = s } in
   prove_goal_by [concl1;concl2] (RN_hl_rcond (None, b,at_pos)) g  
 
@@ -2122,3 +2120,38 @@ let t_pror g =
   let bhs = destr_bdHoareS concl in 
   let concl = f_bdHoareS_r {bhs with bhs_cmp=FHeq } in
   prove_goal_by [concl] RN_hl_prbounded g
+
+(* -------------------------------------------------------------------- *)
+(*
+let eqobs_in env fun_spec (notmodl, notmodr) c1 c2 eqo = 
+  let rec s_eqobs_in rsl rsr fhyps eqo = 
+    match rsl, rsr with
+    | Sasgn(lvl,_)::rsl, _ when not(inl_eqs lvl eqo) && not(in_notmodl lvl) ->
+      s_eqobs_in rsl rsr fhyps eqo 
+    | _, Sasgn(lvr,_)::rsr when not(inr_eqs lvr eqo) && not(in_notmodr lvr) ->
+      s_eqobs_in rsl rsr fhyps eqo 
+    (* TODO add the same for lossless random *)
+    | [], _ -> [], rsr, fhyps, eqo
+    | _, [] -> rsl, [], fhyps, eqo
+    | il::rsl', ir::rsr' ->
+      match i_eqobs_in il ir fhyps eqo with
+      | Some (fhyps,eqi) -> s_eqobs_in rsl' rsr' fhyps eqo 
+      | _ -> rsl, rsr, fhyps, eqo
+  and i_eqobs_in il ir fhyps eqo = 
+    match il, ir with
+    | Sasgn(lvl,el), Sasgn(lvr,er) | Srnd(lvl,el), Srnd(lvr,er) ->
+    | Scall(lvl,fl,argsl), Scall(lvr,fr,argsr) ->
+    | Sif(el,stl,sfl), Sif(er,str,sfr) ->
+    | Swhile(el,stl,sfl), Sif(er,str,sfr) ->
+  | Swhile  of EcTypes.expr * stmt
+  | Sassert of EcTypes.expr
+        
+
+  | [],  -> [], fhyps, eqo 
+  | i::rs' ->
+    match i_eqobs_in env notmod i fhyps eqo with
+    | None -> rstmt rs, fhyps, eqo
+    | Some (fhyps,eqo) -> s_eqobs_in env notmod rs' fhyps eqo
+and i_eqobs_in env notmod
+*)    
+

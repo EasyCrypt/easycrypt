@@ -805,7 +805,7 @@ let t_elimT f p g =
 
   let env = LDecl.toenv hyps in
   match ax.EcDecl.ax_spec with
-  | None -> tacuerror "Cannot reconize the elimination lemma"
+  | None -> tacuerror "Cannot recognize elimination lemma"
   | Some fax ->
     let tys =
       let tpred =
@@ -813,7 +813,7 @@ let t_elimT f p g =
           match destr_forall1 fax with
           | _, GTty ty, _ -> ty
           | _             -> raise Not_found
-        with _ -> tacuerror "Cannot reconize the elimination lemma" in
+        with _ -> tacuerror "Cannot recognize the elimination lemma" in
       let ue = EcUnify.UniEnv.create (Some (LDecl.tohyps hyps).h_tvar) in
       let (ue, tpred,tys) =
         EcUnify.UniEnv.freshen ue ax.EcDecl.ax_tparams None tpred in
@@ -833,7 +833,7 @@ let t_elimT f p g =
       else
         let aa,fax = skip_imp [] fax in
         if not (is_forall fax) then 
-          tacuerror "Cannot reconize the elimination lemma";
+          tacuerror "Cannot recognize elimination lemma";
         List.rev_append aa [AAform f] in
     t_apply_glob p tys (AAform pf::aa) g
 
@@ -1101,7 +1101,7 @@ let t_assumption g =
     
 let t_progress tac g =
   let rec aux g = t_seq t_simplify_nodelta aux0 g 
-  and aux0 g = 
+  and aux0 g =
     t_seq (t_try tac) aux1 g
   and aux1 g = 
     let hyps,concl = get_goal g in
