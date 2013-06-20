@@ -504,6 +504,16 @@ let t_rewrite_hyp side id args (juc,n as g) =
   let g' = mkn_hyp juc hyps id in
   t_rewrite_node (mkn_apply (fun _ _ a -> a) g' args) side n
 
+let t_rewrite_glob side p tys args (juc,n as g) =
+  let hyps = get_hyps g in
+  let g' = mkn_glob juc hyps p tys in
+  t_rewrite_node (mkn_apply (fun _ _ a -> a) g' args) side n
+
+let t_rewrite_form side fp args (juc,n as g) =
+  let hyps = get_hyps g in
+  let g' = new_goal juc (hyps, fp) in
+  t_rewrite_node (mkn_apply (fun _ _ a -> a) g' args) side n
+
 let t_cut f g =
   let concl = get_concl g in
   t_apply_logic p_cut_lemma [] [AAform f;AAform concl;AAnode;AAnode] g
