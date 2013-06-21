@@ -1724,9 +1724,9 @@ let check_swap env s1 s2 =
     EcLogic.tacuerror 
       "cannot swap : the two statement are not independants, the first statement can %s %a which can be %s by the second"
       s1 (PV.pp env) d s2 in
-  if not (PV.is_empty m2r1) then error "read" "write" m2r1;
-  if not (PV.is_empty m1m2) then error "write" "write" m1m2;
-  if not (PV.is_empty m1r2) then error "write" "read" m1r2
+  if not (PV.is_empty m2r1) then error "read" "written" m2r1;
+  if not (PV.is_empty m1m2) then error "written" "written" m1m2;
+  if not (PV.is_empty m1r2) then error "written" "read" m1r2
 
 
 let swap_stmt env p1 p2 p3 s = 
@@ -2082,41 +2082,4 @@ let t_bdeq g =
     
 (* -------------------------------------------------------------------- *)
 
-(*
-module PV2 = struct 
-  type t = form PVM.t 
 
-
-let eqobs_in env fun_spec (notmodl, notmodr) c1 c2 eqo = 
-  let rec s_eqobs_in rsl rsr fhyps eqo = 
-    match rsl, rsr with
-    | Sasgn(lvl,_)::rsl, _ when not(inl_eqs lvl eqo) && not(in_notmodl lvl) ->
-      s_eqobs_in rsl rsr fhyps eqo 
-    | _, Sasgn(lvr,_)::rsr when not(inr_eqs lvr eqo) && not(in_notmodr lvr) ->
-      s_eqobs_in rsl rsr fhyps eqo 
-    (* TODO add the same for lossless random *)
-    | [], _ -> [], rsr, fhyps, eqo
-    | _, [] -> rsl, [], fhyps, eqo
-    | il::rsl', ir::rsr' ->
-      match i_eqobs_in il ir fhyps eqo with
-      | Some (fhyps,eqi) -> s_eqobs_in rsl' rsr' fhyps eqo 
-      | _ -> rsl, rsr, fhyps, eqo
-  and i_eqobs_in il ir fhyps eqo = 
-    match il, ir with
-    | Sasgn(lvl,el), Sasgn(lvr,er) | Srnd(lvl,el), Srnd(lvr,er) ->
-    | Scall(lvl,fl,argsl), Scall(lvr,fr,argsr) ->
-    | Sif(el,stl,sfl), Sif(er,str,sfr) ->
-    | Swhile(el,stl,sfl), Sif(er,str,sfr) ->
-  | Swhile  of EcTypes.expr * stmt
-  | Sassert of EcTypes.expr
-        
-
-  | [],  -> [], fhyps, eqo 
-  | i::rs' ->
-    match i_eqobs_in env notmod i fhyps eqo with
-    | None -> rstmt rs, fhyps, eqo
-    | Some (fhyps,eqo) -> s_eqobs_in env notmod rs' fhyps eqo
-and i_eqobs_in env notmod
-    
-
-*)
