@@ -56,9 +56,7 @@ theory Ring.
     r1 = r2.
   proof strict.
   intros=> r r1 r2; split=> r1_r2; last by congr=> //.
-  cut subr: (((r1 + r) = (r2 + r)) <=> ((r1 + r) + --r = (r2 + r) + --r));
-    last by generalize r1_r2; rewrite subr 2!addrA addNr 2!addr0.
-    by split=> args_eq //; congr=> //.
+  by rewrite -addr0 -(addr0 r2) -(addNr r) -2!addrA -r1_r2.
   qed.
 
   lemma addrI: forall r r1 r2,
@@ -85,18 +83,15 @@ theory BooleanRing.
   lemma neg_is_id: forall r,
     r + r = zero.
   proof strict.
-  intros=> r.
-  rewrite -(addIr (r + r)) add0r. rewrite -4!(mulK r).
-  cut addN_r_r: ((r + r) * (r + r) = r + r); first by apply mulK=> //.
-  by generalize addN_r_r; rewrite mulDradd mulrDadd mulK -{3}(add0r (r + r)) addIr.
+  by intros=> r;
+     rewrite -(addIr (r + r)) add0r -(mulK r) -{1 2}mulrDadd -mulDradd 2!mulK.
   qed.
 
   lemma mulrC: forall r1 r2,
     r1 * r2 = r2 * r1.
   proof strict.
   intros=> r1 r2;
-  cut mulK_r1_r2 : ((r1 + r2) * (r1 + r2) = (r1 + r2)); first by apply mulK.
-  by generalize mulK_r1_r2; rewrite mulDradd 2!mulrDadd 2!mulK addrA addrI -addrA
-                                    -{4}(add0r r2) addIr -(neg_is_id (r2 * r1)) addIr.
+  by rewrite -(addIr (r2 * r1)) neg_is_id -(addIr r2) (add0r r2) addrA -(addrI r1) -addrA
+             -{1}(mulK r1) -{3}(mulK r2) -2!mulrDadd -mulDradd mulK.
   qed.
 end BooleanRing.
