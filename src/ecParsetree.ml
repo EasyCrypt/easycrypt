@@ -167,7 +167,7 @@ type phoarecmp = PFHle | PFHeq | PFHge
 
 type pformula  = pformula_r located
 
-and pformula_r = 
+and pformula_r =
   | PFint    of int
   | PFtuple  of pformula list
   | PFident  of pqsymbol * ptyannot option
@@ -240,7 +240,6 @@ type 'a fpattern_kind =
 type fpattern_arg = 
   | EA_form of pformula
   | EA_mem  of pmemory
-  | EA_mp   of pmsymbol
   | EA_none 
 
 type 'a fpattern = { 
@@ -318,6 +317,8 @@ type phltactic =
   | Pexfalso
   | Pbdhoaredeno  of cfpattern
   | Pequivdeno    of cfpattern
+  | PPr           of pformula * pformula
+  | Pfel          of int * (pformula * pformula * pformula * pformula * pformula)
   | Phoare
   | Pbdhoare
   | Pprbounded

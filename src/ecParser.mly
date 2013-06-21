@@ -146,6 +146,7 @@
 %token BDHOAREDENO
 %token BETA 
 %token BY
+%token BYPR
 %token CALL
 %token CASE
 %token CEQ
@@ -181,6 +182,7 @@
 %token EQUIVDENO
 %token EXIST
 %token EXPORT
+%token FEL
 %token FIELD
 %token FIELDSIMP
 %token FINAL
@@ -631,11 +633,8 @@ sform_u:
 | TICKPIPE ti=tvars_app? e =form PIPE 
     { pfapp_symb e.pl_loc EcCoreLib.s_abs ti [e] }
 
-| LPAREN es=plist2(form, COMMA) RPAREN
-   { PFtuple es }
-
-| LPAREN e=form_u RPAREN
-   { e }
+| LPAREN fs=plist0(form, COMMA) RPAREN
+   { PFtuple fs }
 
 | LBRACKET ti=tvars_app? es=loc(plist0(form, SEMICOLON)) RBRACKET
    { (pflist es.pl_loc ti es.pl_desc).pl_desc }
@@ -1355,7 +1354,6 @@ fpattern_arg:
 | UNDERSCORE   { EA_none }
 | f=sform      { EA_form f }
 | s=mident     { EA_mem s }
-| LPAREN LTCOLON x=mod_qident RPAREN { EA_mp x }
 ;
 
 fpattern(F):
@@ -1663,6 +1661,11 @@ phltactic:
 
 | EXFALSO
     { Pexfalso }
+
+| BYPR f1=sform f2=sform { PPr(f1,f2) }
+
+| FEL at_pos=NUM cntr=sform delta=sform q=sform f_event=sform some_p=sform
+   {Pfel (at_pos,(cntr,delta,q,f_event,some_p))}
 
 (* basic pr based tacs *)
 | HOARE {Phoare}

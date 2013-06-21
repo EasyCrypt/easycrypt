@@ -1,7 +1,7 @@
 require import Bool.
 require import Int.
 require import Option.
-require import NewList.
+require import List.
 
 type pkey.
 type skey.

@@ -345,21 +345,62 @@ let process_field_simp (p,t,i,m,z,o,e) g =
       | _ -> cannot_apply "field_simplify" "Think more about the goal")
 
 (* -------------------------------------------------------------------- *)
+let rec pmsymbol_of_pform fp : pmsymbol option =
+  match unloc fp with
+  | PFident ({ pl_desc = (nm, x); pl_loc = loc }, _) when EcIo.is_mod_ident x ->
+      Some (List.map (fun nm1 -> (mk_loc loc nm1, None)) (nm @ [x]))
+
+  | PFapp ({ pl_desc = PFident ({ pl_desc = (nm, x); pl_loc = loc }, _) },
+           [{ pl_desc = PFtuple args; }]) -> begin
+
+    let mod_ = List.map (fun nm1 -> (mk_loc loc nm1, None)) nm in
+    let args =
+      List.map
+        (fun a -> omap (pmsymbol_of_pform a) (mk_loc a.pl_loc))
+        args
+    in
+
+      match List.exists (fun x -> x = None) args with
+      | true  -> None
+      | false ->
+          let args = List.map (fun a -> oget a) args in
+            Some (mod_ @ [mk_loc loc x, Some args])
+  end
+
+  | PFtuple [fp] -> pmsymbol_of_pform fp
+
+  | _ -> None
+
 let trans_pterm_argument hyps ue arg =
   let env = LDecl.toenv hyps in
 
   match unloc arg with
-  | EA_form fp ->
-      let fp = TT.transform_opt env ue fp None in
-        Some (`Form fp)
+  | EA_form fp -> begin
+      let ff =
+        try  `Form (TT.transform_opt env ue fp None)
+        with TT.TyError _ as e -> `Error e
+      in
+
+      let mm =
+        match pmsymbol_of_pform fp with
+        | None    -> `Error None
+        | Some mp ->
+            try
+              let (mp, mt) = TT.trans_msymbol env (mk_loc arg.pl_loc mp) in
+                `Mod (mp, mt)
+            with TT.TyError _ as e -> `Error (Some e)
+      in
+
+      match ff, mm with
+      | `Error e, `Error _ -> raise e
+      | `Form  f, `Mod   m -> Some (`FormOrMod (Some f, Some m))
+      | `Form  f, `Error _ -> Some (`FormOrMod (Some f, None  ))
+      | `Error _, `Mod   m -> Some (`FormOrMod (None  , Some m))
+  end
       
   | EA_mem mem ->
       let mem = TT.transmem env mem in
         Some (`Memory mem)
-
-  | EA_mp mp ->
-      let (mp, mt) = TT.trans_msymbol env (mk_loc arg.pl_loc mp) in
-        Some (`Module (mp, mt))
 
   | EA_none ->
       None
@@ -441,6 +482,10 @@ let check_pterm_arg_for_ty hyps ty arg =
   let ue  = EcUnify.UniEnv.create (Some (LDecl.tohyps hyps).h_tvar) in
   let env = LDecl.toenv hyps in
 
+  let error () = 
+    tacuerror ~loc:arg.pl_loc "invalid argument type"
+  in
+
   match arg.pl_desc, ty with
   | EA_form pf, Some (GTty ty) ->
       let ff = TT.transform env ue pf ty in
@@ -449,15 +494,18 @@ let check_pterm_arg_for_ty hyps ty arg =
   | EA_mem mem, Some (GTmem _) ->
       AAmem (TT.transmem env mem)
 
-
   | EA_none, None ->
       AAnode
 
-  | EA_mp mp , Some (GTmodty _) ->
-      let (mp, mt) = TT.trans_msymbol env (mk_loc arg.pl_loc mp) in
-        AAmp (mp, mt)
+  | EA_form fp, Some (GTmodty _) -> begin
+    match pmsymbol_of_pform fp with
+    | None    -> error ()
+    | Some mp ->
+        let (mp, mt) = TT.trans_msymbol env (mk_loc arg.pl_loc mp) in
+          AAmp (mp, mt)
+  end
 
-  | _, _ -> tacuerror ~loc:arg.pl_loc "invalid argument type"
+  | _, _ -> error ()
 
 (* -------------------------------------------------------------------- *)
 let check_pterm_argument hyps ue f arg =
@@ -476,7 +524,7 @@ let check_pterm_argument hyps ue f arg =
       | GTty    ty -> (f, `UnknownVar (x, ty))
   end
 
-  | Some (`Form tp),
+  | Some (`FormOrMod (Some tp, _)),
     Some (`Forall (x, GTty ty, f)) -> begin
       try
         EcUnify.unify env ue tp.f_ty ty;
@@ -489,7 +537,7 @@ let check_pterm_argument hyps ue f arg =
     Some (`Forall (x, GTmem _, f)) ->
       (Fsubst.f_subst_mem x m f, `KnownMem (x, m))
 
-  | Some (`Module (mp, mt)),
+  | Some (`FormOrMod (_, Some (mp, mt))),
     Some (`Forall (x, GTmodty (emt, restr), f)) ->
       check_modtype_restr env mp mt emt restr;
       (Fsubst.f_subst_mod x mp f, `KnownMod (x, (mp, mt)))
