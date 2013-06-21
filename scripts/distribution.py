@@ -45,12 +45,26 @@ def _find(dirname, glob):
 
 # --------------------------------------------------------------------
 def _expand(x):
-    findm = re.search(r'^find:(.*?):(.*$)$', x)
-    if findm is not None:
-        return list(_find(findm.group(1), findm.group(2)))
+    if re.search('^.+:', x) is not None:
+        findm = re.search(r'^find:(.*?):(.*$)$', x)
+        if findm is not None:
+            return list(_find(findm.group(1), findm.group(2)))
+        return []
+
     if not hasattr(glob, 'has_magic') or glob.has_magic(x):
         return glob.glob(x)
     return [x]
+
+# --------------------------------------------------------------------
+def _exclude(x):
+    exclm = re.search('^exclude:(.+)$', x)
+    if exclm is not None:
+        exclm = exclm.group(1)
+        if not hasattr(glob, 'has_magic') or glob.has_magic(exclm):
+            return glob.glob(exclm)
+        return [exclm]
+
+    return []
 
 # --------------------------------------------------------------------
 def _main():
@@ -61,11 +75,19 @@ def _main():
     distdir  = sys.argv[1]
     manifest = sys.argv[2]
 
-    manifest = open(manifest, 'r').readlines()
-    manifest = [re.sub('#.*$', '', x).strip() for x in manifest]
-    manifest = [x for x in manifest if x]
+    contents = open(manifest, 'r').readlines()
+    contents = [re.sub('#.*$', '', x).strip() for x in contents]
+    contents = [x for x in contents if x]
+
+    exclude  = contents
+    exclude  = list(it.chain(*[_exclude(x) for x in exclude]))
+    exclude  = set([os.path.normpath(x) for x in exclude])
+
+    manifest = contents
     manifest = list(it.chain(*[_expand(x) for x in manifest]))
     manifest = [os.path.normpath(x) for x in manifest]
+    manifest = [x for x in manifest if x not in exclude]
+
     noaccess = [x for x in manifest if not os.access(x, os.F_OK)]
 
     if noaccess:
