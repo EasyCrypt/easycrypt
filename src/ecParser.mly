@@ -145,6 +145,7 @@
 %token BDHOAREDENO
 %token BETA 
 %token BY
+%token BYPR
 %token CALL
 %token CASE
 %token CEQ
@@ -1637,6 +1638,8 @@ phltactic:
 
 | EXFALSO
     { Pexfalso }
+
+| BYPR f1=sform f2=sform { PPr(f1,f2) }
 
 | FEL at_pos=NUM cntr=sform delta=sform q=sform f_event=sform some_p=sform
    {Pfel (at_pos,(cntr,delta,q,f_event,some_p))}

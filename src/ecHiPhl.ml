@@ -541,13 +541,23 @@ let process_fun_upto (bad, p, o) g =
     process_form env' bad tbool in
   t_equivF_abs_upto bad p q g
 
+let process_ppr (phi1,phi2) g =
+  let hyps,concl = get_goal g in
+  let ef = destr_equivF concl in
+
+  let _penv,qenv = LDecl.equivF ef.ef_fl ef.ef_fr hyps in
+
+  let phi1 = process_form qenv phi1 tbool in
+  let phi2 = process_form qenv phi2 tbool in
+  t_ppr phi1 phi2 g
+
 let process_fel at_pos (cntr, delta, q, f_event, some_p) g = 
   let hyps,concl = get_goal g in
   (* let hyps = LDecl.inv_memenv hyps in  *)
 
   (* code duplication from t_failure *)
   let f = match concl.f_node with
-    | Fapp ({f_node=Fop(op,_)},[pr;bd]) when is_pr pr 
+    | Fapp ({f_node=Fop(op,_)},[pr;_]) when is_pr pr 
         && EcPath.p_equal op EcCoreLib.p_real_le ->
       let (_,f,_,_) = destr_pr pr in
       f
@@ -600,6 +610,7 @@ let process_phl loc ptac g =
     | Pconseq info              -> process_conseq info
     | Pexfalso                  -> process_exfalso
     | Pbdhoaredeno info         -> process_bdHoare_deno info
+    | PPr (phi1,phi2)           -> process_ppr (phi1,phi2)
     | Pfel (at_pos,info)        -> process_fel at_pos info
     | Pequivdeno info           -> process_equiv_deno info
     | Phoare | Pbdhoare         -> process_hoare_bd_hoare

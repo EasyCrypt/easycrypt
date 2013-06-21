@@ -1098,9 +1098,12 @@ module Fun = struct
     let mem  = EcMemory.empty_local EcFol.mhr xpath in
     Memory.push_active mem env
 
-  let prF path env =
+  let prF_memenv m path env =
     let fun_ = by_xpath path env in
-    let post = actmem_post EcFol.mhr path fun_ in
+    actmem_post m path fun_ 
+
+  let prF path env =
+    let post = prF_memenv EcFol.mhr path env in
     Memory.push_active post env
 
   let hoareF_memenv path env = 
