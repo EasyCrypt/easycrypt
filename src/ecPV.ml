@@ -341,15 +341,16 @@ module PV = struct
            let top = EcPath.m_functor pv.pv_name.x_top in
            let check1 mp = 
              let restr = get_restr env mp in
-             Sm.mem top restr in
+             not (Sm.mem top restr) in
            Sm.exists check1 fv2.s_gl) in
     let test_mp mp = 
       let restr = get_restr env mp in
       let test_pv pv _ = 
         is_glob pv && 
           let top = EcPath.m_functor pv.pv_name.x_top in
-          Sm.mem top restr in
-      let test_mp mp' = Sm.mem mp' restr || Sm.mem mp (get_restr env mp') in
+          not (Sm.mem top restr) in
+      let test_mp mp' = 
+        not (Sm.mem mp' restr || Sm.mem mp (get_restr env mp')) in
       Mnpv.exists test_pv fv2.s_pv || Sm.exists test_mp fv2.s_gl in
 
     { s_pv = Mnpv.filter test_pv fv1.s_pv;
