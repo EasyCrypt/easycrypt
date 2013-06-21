@@ -337,7 +337,9 @@ let pv_glob x =
     else EcPath.xpath (EcPath.m_functor top) x.EcPath.x_sub in
   { pv_name = x; pv_kind = PVglob }
 
-let pv x k = { pv_name = x; pv_kind = k }
+let pv x k = 
+  if k = PVglob then pv_glob x 
+  else { pv_name = x; pv_kind = k }
 
 (* -------------------------------------------------------------------- *)
 type lpattern =
