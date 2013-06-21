@@ -14,7 +14,7 @@ const l : int.
 const n : int. 
 
 axiom k_pos : 0 <= k.
-axiom l_pos : 0 <= k.
+axiom l_pos : 0 <= l.
 
 axiom sizes : k + l = n.
 
@@ -105,7 +105,7 @@ module OW(I :Inverter) ={
 
 (** begin scheme *)
  module type Scheme(R : Oracle) = {
- fun kg() : (pkey * skey)
+  fun kg() : (pkey * skey)
   fun enc(pk:pkey, m:plaintext) : ciphertext
   fun dec(sk:skey, c:ciphertext) : plaintext
  }.
@@ -340,10 +340,10 @@ proof.
  (Pr[CPA(BR2,A).main() @ &m : res \/ mem Rnd.r RO.s] =
   Pr[CPA(BR2,A).main() @ &m : res] +  Pr[CPA(BR2,A).main() @ &m : mem Rnd.r RO.s] -
   Pr[CPA(BR2,A).main() @ &m : res /\ mem Rnd.r RO.s]);[pr_or|];smt.
-save.
+qed.
 (** end prob1 *)
 
-
+(** begin br3 *)
  module BR3(R : Oracle) : Scheme(R)= {
   fun kg() : (pkey * skey) = {
    var (pk, sk) :pkey * skey;
@@ -364,13 +364,22 @@ save.
   return (projPlain c ^^ h);
  }
 }.
+(** end br3 *)
 
+(** begin eq2enc *)
 equiv eq2_enc : 
 BR2(RO).enc ~ BR3(RO).enc : 
 ={pk,m,RO.m} ==> 
-={res,Rnd.r,RO.m}
-by
-(fun;rnd (lambda v, m{2} ^^ v)(lambda v,m{2} ^^ v);rnd;skip;progress;smt).
+={res,Rnd.r,RO.m}.
+proof.
+  fun.
+  rnd (lambda v, m{2} ^^ v)(lambda v, m{2} ^^ v).
+  rnd.
+  skip;progress;smt.
+qed.
+(** end eq2enc *)
+
+(* (fun;rnd (lambda v, m{2} ^^ v)(lambda v,m{2} ^^ v);rnd;skip;progress;smt). *)
 
 
 lemma eq2 : forall (A <: Adv {RO,Rnd}), 
@@ -392,7 +401,7 @@ call (={RO.s,RO.m,pk} /\ (glob A){1} = (glob A){2})
 fun (={RO.s,RO.m});[smt|smt|].
 fun;if;[smt|inline RO.o;wp;rnd|];wp;skip;progress;smt.
 inline RO.init CPA(BR2,A).SO.kg CPA(BR3,A).SO.kg.
-wp;rnd;wp;skip;progress;smt.
+wp;rnd;wp;skip;progress.
 qed.
 
 (** begin conclusion *)
