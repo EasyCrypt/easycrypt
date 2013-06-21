@@ -264,26 +264,37 @@ module PV = struct
   let elements fv = Mnpv.bindings fv.s_pv, Sm.elements fv.s_gl
 
   let fv env m f =
-    let rec aux fv f = 
+
+    let remove b fv = 
+      let do1 fv (id,gty) = 
+        match gty with
+        | GTmodty _ -> { fv with s_gl = Sm.remove (EcPath.mident id) fv.s_gl }
+        | _ -> fv in
+      List.fold_left do1 fv b in
+
+    let rec aux env fv f = 
       match f.f_node with
-      | Fquant(_,_,f1) -> aux fv f1 (* FIXME *)
-      | Fif(f1,f2,f3) -> aux (aux (aux fv f1) f2) f3
-      | Flet(_,f1,f2) -> aux (aux fv f1) f2
+      | Fquant(_,b,f1) -> 
+        let env = Mod.add_mod_binding b env in
+        let fv1 = aux env fv f1 in
+        remove b fv1 
+      | Fif(f1,f2,f3) -> aux env (aux env (aux env fv f1) f2) f3
+      | Flet(_,f1,f2) -> aux env (aux env fv f1) f2
       | Fpvar(x,m') -> 
         if EcIdent.id_equal m m' then add env x f.f_ty fv else fv
       | Fglob (mp,m') ->
         if EcIdent.id_equal m m' then 
           let f' = NormMp.norm_glob env m mp in
           if f_equal f f' then add_glob env mp fv
-          else aux fv f'
+          else aux env fv f'
         else fv
       | Fint _ | Flocal _ | Fop _ -> fv
-      | Fapp(e, es) -> List.fold_left aux (aux fv e) es
-      | Ftuple es   -> List.fold_left aux fv es
+      | Fapp(e, es) -> List.fold_left (aux env) (aux env fv e) es
+      | Ftuple es   -> List.fold_left (aux env) fv es
       | FhoareF _  | FhoareS _ | FbdHoareF _  | FbdHoareS _ 
       | FequivF _ | FequivS _ | Fpr _ -> assert false 
     in
-    aux empty f
+    aux env empty f
 
   let pp env fmt fv =
     let ppe = EcPrinting.PPEnv.ofenv env in
@@ -330,15 +341,16 @@ module PV = struct
            let top = EcPath.m_functor pv.pv_name.x_top in
            let check1 mp = 
              let restr = get_restr env mp in
-             Sm.mem top restr in
+             not (Sm.mem top restr) in
            Sm.exists check1 fv2.s_gl) in
     let test_mp mp = 
       let restr = get_restr env mp in
       let test_pv pv _ = 
         is_glob pv && 
           let top = EcPath.m_functor pv.pv_name.x_top in
-          Sm.mem top restr in
-      let test_mp mp' = Sm.mem mp' restr || Sm.mem mp (get_restr env mp') in
+          not (Sm.mem top restr) in
+      let test_mp mp' = 
+        not (Sm.mem mp' restr || Sm.mem mp (get_restr env mp')) in
       Mnpv.exists test_pv fv2.s_pv || Sm.exists test_mp fv2.s_gl in
 
     { s_pv = Mnpv.filter test_pv fv1.s_pv;
