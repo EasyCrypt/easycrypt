@@ -277,8 +277,7 @@ proof.
  fun;if;[smt|inline RO.o;wp;rnd |];wp;skip;progress;smt.
  inline  CPA2(BR2, A).SO.kg CPA2(BR2, A).ARO.init 
          CPA(BR2, A).SO.kg CPA(BR2, A).ARO.init RO.init.
-admit.
-(* do 2!(wp;);wp;skip;progress;smt. *)
+ wp;rnd;wp;skip;progress;smt.
 save.
 
 lemma prob2_1 : 
@@ -300,8 +299,8 @@ proof.
  fun;if;[inline RO.o;wp;rnd 1%r (cPtrue)|];wp;skip;smt.
  inline CPA2(BR2,A).SO.kg CPA2(BR2,A).ARO.init RO.init.
  wp;rnd 1%r (cPtrue);wp;skip;progress;[smt|smt|smt|].
- rewrite (Dbool.mu_def (lambda b, b = result0)).
- case (result0);delta charfun;simplify;smt.
+ rewrite (Dbool.mu_def _).
+ case (result);delta charfun;simplify;smt.
  bdhoare_deno H1; smt.
 save.
 
@@ -402,7 +401,8 @@ proof.
  (={RO.m,ARO.log,res} /\ (glob A){1} = (glob A){2} /\ dom RO.m{1} = ARO.log{1}).
  fun (={RO.m,ARO.log} /\ dom RO.m{1} = ARO.log{1});[smt|smt|].
  fun;if;[smt|inline RO.o;wp;rnd |];wp;skip;progress;smt.
- wp;rnd;swap{1} -7;wp.
+ wp;rnd.
+swap{1} -3;wp.
  call (={p,RO.m,ARO.log} /\ (glob A){1} = (glob A){2} /\ dom RO.m{1} = ARO.log{1})
       (={res,RO.m,ARO.log} /\ (glob A){1} = (glob A){2}  /\ dom RO.m{1} = ARO.log{1}).
  fun (={RO.m,ARO.log}  /\ dom RO.m{1} = ARO.log{1});[smt|smt|].
