@@ -303,12 +303,16 @@ module PV = struct
     let pp_gl fmt mp = 
       Format.fprintf fmt "(glob %a)" (EcPrinting.pp_topmod ppe) mp in
         
-    Format.fprintf fmt "@[%a%(%)%a@]" (EcPrinting.pp_list ",@ " pp_vs) vs
-      (if vs = [] || gs = [] then "" else ",@ ")
-      (EcPrinting.pp_list ",@ " pp_gl) gs
-    
-
-      
+    begin
+      if vs = [] || gs = [] then
+        Format.fprintf fmt "@[%a%a@]"
+          (EcPrinting.pp_list ",@ " pp_vs) vs
+          (EcPrinting.pp_list ",@ " pp_gl) gs
+      else
+        Format.fprintf fmt "@[%a,@ %a@]"
+          (EcPrinting.pp_list ",@ " pp_vs) vs
+          (EcPrinting.pp_list ",@ " pp_gl) gs
+    end
 
   let check_depend env fv mp = 
     try
