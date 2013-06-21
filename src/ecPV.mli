@@ -10,7 +10,8 @@ open EcFol
 (* -------------------------------------------------------------------- *)
 module Mpv : sig 
   type ('a,'b) t
-   val empty : ('a,'b) t
+
+  val empty : ('a,'b) t
 
   val add : env -> prog_var -> 'a -> ('a,'b) t -> ('a,'b) t
 
@@ -25,7 +26,6 @@ module Mpv : sig
 end 
 
 module PVM : sig
- 
   type subst
 
   val empty : subst
@@ -43,7 +43,6 @@ end
 
 (* -------------------------------------------------------------------- *)
 module PV : sig
- 
   type t 
 
   val empty : t
@@ -52,9 +51,7 @@ module PV : sig
 
   val add      : env -> prog_var -> ty -> t -> t
   val add_glob : env -> mpath -> t -> t
-
   val remove   : env -> prog_var -> t -> t
-
   val diff     : t -> t -> t
 
   val interdep : env -> t -> t -> t
@@ -66,8 +63,7 @@ module PV : sig
   val mem_pv   : env -> prog_var -> t -> bool
   val mem_glob : env -> mpath -> t -> bool
 
-  val fv       : env -> EcIdent.t -> form -> t
+  val fv : env -> EcIdent.t -> form -> t
 
-  val pp       : env -> Format.formatter -> t -> unit
-
+  val pp : env -> Format.formatter -> t -> unit
 end

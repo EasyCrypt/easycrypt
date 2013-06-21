@@ -1766,7 +1766,7 @@ let t_failure_event at_pos cntr delta q f_event some_p g =
       let os = callable_oracles_stmt env (stmt s_tl) in
       (* check that bad event is only modified in oracles *)
       let fv = PV.fv env mhr f_event in
-      if not (PV.disjoint env (s_write ~except_fs:os env (stmt s_tl)) (fv) ) then
+      if not (PV.indep env (s_write ~except_fs:os env (stmt s_tl)) (fv) ) then
         cannot_apply "fel" "fail event is modified outside oracles";
       (* subgoal on the bounds *)
       let bound_goal = 

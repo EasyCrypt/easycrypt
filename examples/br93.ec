@@ -236,12 +236,12 @@ Pr[CPA(BR,A).main() @ &m: res] <=
 1%r/2%r + Pr[CPA2(BR2,A).main() @ &m : mem M.r ARO.log].
 proof.
  intros A &m Hlossless1 Hlossless2.
- rewrite -(prob1_1(<:A) _ _ &m);[assumption | assumption | ].
+ rewrite -(prob1_1 A _ _ &m);[assumption | assumption | ].
  apply (real_le_trans _ 
              Pr[CPA2(BR2,A).main() @ &m : res \/ mem M.r ARO.log] _).
  equiv_deno (_ : (glob A){1} = (glob A){2} ==>
  !(mem M.r ARO.log){2} => res{1} = res{2});
-   [ apply (eq1(<:A) _ _);try assumption| |];smt.
+   [ apply (eq1 A _ _);try assumption| |];smt.
  cut H:
  (Pr[CPA2(BR2,A).main() @ &m : res \/ mem M.r ARO.log] =
   Pr[CPA2(BR2,A).main() @ &m : res] +  Pr[CPA2(BR2,A).main() @ &m : mem M.r ARO.log] -
@@ -354,12 +354,12 @@ proof.
  intros Hlossless1 Hlossless2.
  apply (real_le_trans _  
                (1%r/2%r + Pr[CPA2(BR2,A).main() @ &m : mem M.r ARO.log]) _).
- apply (prob1_2(<:A) &m _ _ );assumption.
+ apply (prob1_2 A &m _ _ );assumption.
  cut H: (Pr[CPA2(BR2,A).main() @ &m : mem M.r ARO.log] <=
          Pr[OW(BR_OW(A)).main() @ &m : res]).
  equiv_deno (_ : (glob A){1} = (glob A){2} ==>
  (mem M.r ARO.log){1} => res{2});trivial.
- apply (eq2(<:A));assumption.
+ apply (eq2 A);assumption.
  by smt.
 save.
 
@@ -369,9 +369,9 @@ lemma Conclusion (A <: Adv {M,RO,ARO}) &m :
 exists (I<:Inverter), Pr[CPA(BR,A).main() @ &m : res] - 1%r / 2%r <= 
                       Pr[OW(I).main() @ &m : res].
 proof.
- intros Hlossless1 Hlossless2;exists (<:BR_OW(A)).
+ intros Hlossless1 Hlossless2;exists (BR_OW(A)).
  cut aux : 
  (forall (x, y:real), x <= 1%r / 2%r + y => x - 1%r / 2%r  <= y);first smt.
  apply (aux _ _ _).
- apply (Reduction (<:A) &m _ _);assumption.
+ apply (Reduction A &m _ _);assumption.
 save.
