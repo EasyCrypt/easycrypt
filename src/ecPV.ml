@@ -300,12 +300,15 @@ module PV = struct
     let ppe = EcPrinting.PPEnv.ofenv env in
     let vs,gs = elements fv in
     let pp_vs fmt (pv,_) = EcPrinting.pp_pv ppe fmt pv in
-    if gs = [] then 
-      Format.fprintf fmt "@[%a@]"
-        (EcPrinting.pp_list ",@ " pp_vs) vs
-    else Format.fprintf fmt "@[%a,@ %a@]"
-      (EcPrinting.pp_list ",@ " pp_vs) vs
-      (EcPrinting.pp_list ",@ " (EcPrinting.pp_topmod ppe)) gs
+    let pp_gl fmt mp = 
+      Format.fprintf fmt "(glob %a)" (EcPrinting.pp_topmod ppe) mp in
+        
+    Format.fprintf fmt "@[%a%(%)%a@]" (EcPrinting.pp_list ",@ " pp_vs) vs
+      (if vs = [] || gs = [] then "" else ",@ ")
+      (EcPrinting.pp_list ",@ " pp_gl) gs
+    
+
+      
 
   let check_depend env fv mp = 
     try
