@@ -207,30 +207,6 @@ let process_intros pis (juc, n) =
     dointro1 (List.rev (collect [] [] pis)) (juc, n)
 
 (* -------------------------------------------------------------------- *)
-let process_elim_arg hyps oty a =
-  let ue  = EcUnify.UniEnv.create (Some (LDecl.tohyps hyps).h_tvar) in
-  let env = LDecl.toenv hyps in
-  match a.pl_desc, oty with
-  | EA_form pf, Some (GTty ty) ->
-    let ff = TT.transform env ue pf ty in
-    AAform (EcFol.Fsubst.uni (EcUnify.UniEnv.close ue) ff)
-  | _, Some (GTty _) ->
-    error a.pl_loc FormulaExpected
-  | EA_mem mem, Some (GTmem _) ->
-    AAmem (TT.transmem env mem)
-  | _, Some (GTmem _)->
-    error a.pl_loc MemoryExpected
-  | EA_none, None ->
-    AAnode
-  | EA_mp mp , Some (GTmodty _) ->
-    let (mp, mt) = TT.trans_msymbol env (mk_loc a.pl_loc mp) in
-      AAmp (mp, mt)
-  | _, Some (GTmodty _) ->
-    error a.pl_loc ModuleExpected
-  | _, None ->
-    error a.pl_loc UnderscoreExpected
-
-(* -------------------------------------------------------------------- *)
 let process_form_opt hyps pf oty =
   let ue  = EcUnify.UniEnv.create (Some (LDecl.tohyps hyps).h_tvar) in
   let ff  = TT.transform_opt (LDecl.toenv hyps) ue pf oty in
@@ -241,32 +217,8 @@ let process_form hyps pf ty =
   process_form_opt hyps pf (Some ty)
 
 (* -------------------------------------------------------------------- *)
-let process_formula g pf =
-  process_form (get_hyps g) pf tbool
-
-(* -------------------------------------------------------------------- *)
-let process_mkn_apply process_cut pe (juc, _ as g) = 
-  let hyps = get_hyps g in
-  let args = pe.fp_args in
-  let (juc,fn), fgs =
-    match pe.fp_kind with
-    | FPNamed (pq,tvi) ->
-      begin match unloc pq with
-      | ([],ps) when LDecl.has_hyp ps hyps ->
-        (* FIXME warning if tvi is not None *)
-        let id,_ = LDecl.lookup_hyp ps hyps in
-        mkn_hyp juc hyps id, []
-      | _ ->
-        let p,tys = process_instanciate hyps (pq,tvi) in
-        mkn_glob juc hyps p tys, []
-      end
-    | FPCut pf ->
-      let f = process_cut g pf in
-      let juc, fn = new_goal juc (hyps, f) in
-      (juc,fn), [fn]
-  in
-  let (juc,an), ags = mkn_apply process_elim_arg (juc,fn) args in
-  (juc,an), fgs@ags
+let process_formula hyps pf =
+  process_form hyps pf tbool
 
 (* -------------------------------------------------------------------- *)
 let process_smt hitenv pi g =
@@ -279,7 +231,7 @@ let process_smt hitenv pi g =
 
 (* -------------------------------------------------------------------- *)
 let process_cut name phi g =
-  let phi = process_formula g phi in
+  let phi = process_formula (get_hyps g) phi in
   t_on_last
     (process_intros [IPCore (lmap (fun x -> Some x) name)])
     (t_cut phi g)
@@ -306,15 +258,6 @@ let process_clear l g =
     else error ps.pl_loc (UnknownHypSymbol s) in
   let ids = EcIdent.Sid.of_list (List.map toid l) in
   t_clear ids g
-
-(* -------------------------------------------------------------------- *)
-let process_exists fs g =
-  gen_t_exists process_elim_arg fs g
-
-(* -------------------------------------------------------------------- *)
-let process_change pf g =
-  let f = process_formula g pf in
-  set_loc pf.pl_loc (t_change f) g
 
 (* -------------------------------------------------------------------- *)
 let process_simplify ri g =
@@ -483,15 +426,38 @@ let process_named_pterm _loc hyps (fp, tvi) =
     (p, typ, ue, ax)
 
 (* -------------------------------------------------------------------- *)
-let process_pterm loc hyps pe =
+let process_pterm loc prcut hyps pe =
   match pe.fp_kind with
   | FPNamed (fp, tyargs) ->
       process_named_pterm loc hyps (fp, tyargs)
 
   | FPCut fp ->
-      let fp = process_form hyps fp tbool in
+      let fp = prcut fp in
       let ue = EcUnify.UniEnv.create (Some (LDecl.tohyps hyps).h_tvar) in
         (`Cut fp, [], ue, fp)
+
+(* -------------------------------------------------------------------- *)
+let check_pterm_arg_for_ty hyps ty arg =
+  let ue  = EcUnify.UniEnv.create (Some (LDecl.tohyps hyps).h_tvar) in
+  let env = LDecl.toenv hyps in
+
+  match arg.pl_desc, ty with
+  | EA_form pf, Some (GTty ty) ->
+      let ff = TT.transform env ue pf ty in
+        AAform (EcFol.Fsubst.uni (EcUnify.UniEnv.close ue) ff)
+
+  | EA_mem mem, Some (GTmem _) ->
+      AAmem (TT.transmem env mem)
+
+
+  | EA_none, None ->
+      AAnode
+
+  | EA_mp mp , Some (GTmodty _) ->
+      let (mp, mt) = TT.trans_msymbol env (mk_loc arg.pl_loc mp) in
+        AAmp (mp, mt)
+
+  | _, _ -> tacuerror ~loc:arg.pl_loc "invalid argument type"
 
 (* -------------------------------------------------------------------- *)
 let check_pterm_argument hyps ue f arg =
@@ -582,9 +548,37 @@ let concretize_pterm (tue, ev) ids fp =
     Fsubst.f_subst subst (Fsubst.uni tue fp)
 
 (* -------------------------------------------------------------------- *)
+let process_mkn_apply prcut pe ((juc, _) as g) = 
+  let hyps = get_hyps g in
+
+  let (p, typs, ue, ax) = process_pterm _dummy prcut hyps pe in
+  let args = List.map (trans_pterm_argument hyps ue) pe.fp_args in
+  let (_ax, ids) = check_pterm_arguments hyps ue ax args in
+
+  let (tue, ev) =
+    if not (can_concretize_pterm_arguments (ue, EV.empty) ids) then
+      tacuerror "cannot find instance";
+    (EcUnify.UniEnv.close ue, EV.empty)
+  in
+
+  let args = concretize_pterm_arguments (tue, ev) ids in
+  let typs = List.map (Tuni.subst tue) typs in
+
+  let ((juc, fn), fgs) =
+    match p with
+    | `Local  x -> (mkn_hyp  juc hyps x, [])
+    | `Global x -> (mkn_glob juc hyps x typs, [])
+    | `Cut    x -> let (juc, fn) = new_goal juc (hyps, x) in ((juc, fn), [fn])
+  in
+
+  let (juc, an), ags = mkn_apply (fun _ _ a -> a) (juc, fn) args in
+
+    ((juc, an), fgs @ ags)
+
+(* -------------------------------------------------------------------- *)
 let process_apply loc pe g =
   let (hyps, fp) = (get_hyps g, get_concl g) in
-  let (p, typs, ue, ax) = process_pterm loc hyps pe in
+  let (p, typs, ue, ax) = process_pterm loc (process_formula hyps) hyps pe in
   let args = List.map (trans_pterm_argument hyps ue) pe.fp_args in
   let (ax, ids) = check_pterm_arguments hyps ue ax args in
 
@@ -644,7 +638,7 @@ let process_rewrite1 loc ri g =
       let do1 g =
         let (hyps, concl) = get_goal g in
 
-        let (p, typs, ue, ax) = process_pterm loc hyps pe in
+        let (p, typs, ue, ax) = process_pterm loc (process_formula hyps) hyps pe in
         let args = List.map (trans_pterm_argument hyps ue) pe.fp_args in
         let ((_ax, ids), (_mode, (f1, f2))) =
           let rec find_rewrite_pattern (ax, ids) =
@@ -726,33 +720,20 @@ let process_rewrite loc ri g =
   set_loc loc (t_lseq (List.map (process_rewrite1 loc) ri)) g
 
 (* -------------------------------------------------------------------- *)
-let process_elim loc pe ((juc, n) as g) =
-  let hyps = get_hyps g in
-
-  let (p, typs, ue, ax) = process_pterm loc hyps pe in
-  let args = List.map (trans_pterm_argument hyps ue) pe.fp_args in
-  let (_ax, ids) = check_pterm_arguments hyps ue ax args in
-
-  let (tue, ev) =
-    if not (can_concretize_pterm_arguments (ue, EV.empty) ids) then
-      tacuerror "in elim, cannot find instance";
-    (EcUnify.UniEnv.close ue, EV.empty)
-  in
-
-  let args = concretize_pterm_arguments (tue, ev) ids in
-  let typs = List.map (Tuni.subst tue) typs in
-
-  let (juc, fn) =
-    match p with
-    | `Local  x -> mkn_hyp  juc hyps x
-    | `Global x -> mkn_glob juc hyps x typs
-    | `Cut    x -> new_goal juc (hyps, x)
-  in
-
-  let ((juc, an), gs) = mkn_apply (fun _ _ a -> a) (juc, fn) args in
+let process_elim loc pe ((_, n) as g) =
+  let ((juc, an), gs) = process_mkn_apply (process_formula (get_hyps g)) pe g in
   let (_, f) = get_node (juc, an) in
 
     t_on_first (t_use an gs) (set_loc loc (t_elim f) (juc, n))
+
+(* -------------------------------------------------------------------- *)
+let process_exists fs g =
+  gen_t_exists check_pterm_arg_for_ty fs g
+
+(* -------------------------------------------------------------------- *)
+let process_change pf g =
+  let f = process_formula (get_hyps g) pf in
+  set_loc pf.pl_loc (t_change f) g
 
 (* -------------------------------------------------------------------- *)
 let process_logic hitenv loc t =
