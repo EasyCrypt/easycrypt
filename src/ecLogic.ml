@@ -160,11 +160,11 @@ let t_on_nth t n (juc,ln) =
 
 let t_on_firsts t i (juc, ln) =
   let (ln1, ln2) = List.take_n i ln in
-  sndmap (List.append^~ ln2) (t_on_goals t (juc, ln1))
+  snd_map (List.append^~ ln2) (t_on_goals t (juc, ln1))
 
 let t_on_lasts t i (juc, ln) =
   let (ln1, ln2) = List.take_n (max 0 (List.length ln - i)) ln in
-  sndmap (List.append ln1) (t_on_goals t (juc, ln2))
+  snd_map (List.append ln1) (t_on_goals t (juc, ln2))
 
 let t_on_first t g = t_on_firsts t 1 g
 let t_on_last  t g = t_on_lasts  t 1 g
@@ -202,9 +202,9 @@ let t_do b omax t g =
     | Some (`Failure e) ->
         let fail =
           match b, omax with
-          | false, _      -> false
-          | true , None   -> i < 1
-          | true , Some m -> i < m
+          | `Maybe, _      -> false
+          | `All  , None   -> i < 1
+          | `All  , Some m -> i < m
         in
           if fail then raise e else t_id None g
 
@@ -213,7 +213,7 @@ let t_do b omax t g =
   in
     doit 0 g
 
-let t_repeat t = t_do false None t
+let t_repeat t = t_do `Maybe None t
 
 let t_close t g =
   match t g with
@@ -468,7 +468,10 @@ let pattern_form name hyps f1 f =
       f in
   x, body
 
+type dofpattern = LDecl.hyps -> form -> form -> (EcIdent.t * form)
+
 let t_rewrite_gen fpat side f g = 
+  let side = match side with `Normal -> true | `Reverse -> false in
   let hyps,concl = get_goal g in
   let rec find_rewrite f =
     if is_eq f then destr_eq f, true
@@ -493,15 +496,25 @@ let t_rewrite_gen fpat side f g =
 
 let t_rewrite = t_rewrite_gen (pattern_form None)
 
-let t_rewrite_node ((juc,an), gs) side n =
+let t_rewrite_node ?(fpat = pattern_form None) ((juc,an), gs) side n =
   let (_,f) = get_node (juc, an) in
-  t_seq_subgoal (t_rewrite side f)
+  t_seq_subgoal (t_rewrite_gen fpat side f)
     [t_use an gs;t_id None] (juc,n)
 
-let t_rewrite_hyp side id args (juc,n as g) =
+let t_rewrite_hyp ?fpat side id args (juc,n as g) =
   let hyps = get_hyps g in
   let g' = mkn_hyp juc hyps id in
-  t_rewrite_node (mkn_apply (fun _ _ a -> a) g' args) side n
+  t_rewrite_node ?fpat (mkn_apply (fun _ _ a -> a) g' args) side n
+
+let t_rewrite_glob ?fpat side p tys args (juc,n as g) =
+  let hyps = get_hyps g in
+  let g' = mkn_glob juc hyps p tys in
+  t_rewrite_node ?fpat (mkn_apply (fun _ _ a -> a) g' args) side n
+
+let t_rewrite_form ?fpat side fp args (juc,n as g) =
+  let hyps = get_hyps g in
+  let g' = new_goal juc (hyps, fp) in
+  t_rewrite_node ?fpat (mkn_apply (fun _ _ a -> a) g' args) side n
 
 let t_cut f g =
   let concl = get_concl g in
@@ -592,6 +605,15 @@ let t_reflex g =
   let (f,_) = destr_eq concl in
   t_apply_logic p_eq_refl [f.f_ty] [AAform f] g
 
+let t_transitivity f g =
+  let concl = snd (get_goal g) in
+  let (f1, f2) = destr_eq concl in
+    t_apply_logic
+      p_eq_trans [f.f_ty]
+      (  (List.map (fun f -> AAform f) [f1; f; f2])
+       @ (List.create 2 AAnode))
+      g
+
 (* Use to create two set of vars of a list of types*)
 let parseType create types =
   let parse ty =
@@ -639,7 +661,7 @@ let gen_eq_tuple_elim_proof types =
     t_seq_subgoal
       (t_apply_form (pred rvars locCF) (List.map (fun _ -> AAnode) types))
       ((
-        t_lseq [t_rewrite_hyp false h1 [];
+        t_lseq [t_rewrite_hyp `Reverse h1 [];
         t_apply_hyp h2 [];
         t_apply_logic p_true_intro [] []]
       )::(List.map (fun _ -> t_reflex) types))
@@ -659,7 +681,7 @@ let gen_split_tuple_lemma types =
 let gen_split_tuple_proof types =
   let introVars = List.map (fun _ -> EcIdent.create "_") (types@types) in
   let introHyps = List.map (fun _ -> EcIdent.create "_") types in
-  let rews = List.map (fun h -> t_rewrite_hyp true h []) introHyps in
+  let rews = List.map (fun h -> t_rewrite_hyp `Reverse h []) introHyps in
   t_seq (t_lseq ((t_intros_i (introVars@introHyps))::rews)) t_reflex
 
 let t_elim f (juc,n) =
@@ -795,7 +817,7 @@ let t_elimT f p g =
 
   let env = LDecl.toenv hyps in
   match ax.EcDecl.ax_spec with
-  | None -> tacuerror "Cannot reconize the elimination lemma"
+  | None -> tacuerror "Cannot recognize elimination lemma"
   | Some fax ->
     let tys =
       let tpred =
@@ -803,7 +825,7 @@ let t_elimT f p g =
           match destr_forall1 fax with
           | _, GTty ty, _ -> ty
           | _             -> raise Not_found
-        with _ -> tacuerror "Cannot reconize the elimination lemma" in
+        with _ -> tacuerror "Cannot recognize the elimination lemma" in
       let ue = EcUnify.UniEnv.create (Some (LDecl.tohyps hyps).h_tvar) in
       let (ue, tpred,tys) =
         EcUnify.UniEnv.freshen ue ax.EcDecl.ax_tparams None tpred in
@@ -823,7 +845,7 @@ let t_elimT f p g =
       else
         let aa,fax = skip_imp [] fax in
         if not (is_forall fax) then 
-          tacuerror "Cannot reconize the elimination lemma";
+          tacuerror "Cannot recognize elimination lemma";
         List.rev_append aa [AAform f] in
     t_apply_glob p tys (AAform pf::aa) g
 
@@ -960,10 +982,10 @@ let is_subst_eq hyps x (hid,lk) =
     if is_eq_or_iff f then
       let f1, f2 = destr_eq_or_iff f in
       match cansubst_eq hyps x f1 f2 with
-      | Some id -> Some(hid, id,true)
+      | Some id -> Some(hid, id,`Normal)
       | None ->
         match cansubst_eq hyps x f2 f1 with
-        | Some id -> Some(hid, id,false)
+        | Some id -> Some(hid, id,`Reverse)
         | None -> None
     else None
   | _ -> None
@@ -978,7 +1000,7 @@ let t_subst1_loc x g =
       tacuerror "Cannot find non recursive equation on %s" (EcIdent.name id)
     end
   | Some(h, x, side) ->
-    t_subst_gen x h side g
+      t_subst_gen x h side g
 
 (* Substitution of f1 = Fpvar(pv,m) | Fglob(mp,m) *)
 
@@ -1026,12 +1048,12 @@ let cansubst_pv_eq hyps fx f1 f2 =
       | Fpvar(pv,m) ->
         let f2 = simplify {no_red with delta_h = None} hyps f2 in
         let fv = EcPV.PV.fv env m f2 in
-        if EcPV.PV.mem_pv pv fv then None
+        if EcPV.PV.mem_pv env pv fv then None
         else Some f1'
       | Fglob(mp,m) -> 
         let f2 = simplify {no_red with delta_h = None} hyps f2 in
         let fv = EcPV.PV.fv env m f2 in
-        if EcPV.PV.mem_glob mp fv then None
+        if EcPV.PV.mem_glob env mp fv then None
         else Some f1'
       | _ -> None
     else None in
@@ -1045,10 +1067,10 @@ let is_subst_pv_eq hyps fx (hid,lk) =
     if is_eq_or_iff f then
       let f1, f2 = destr_eq_or_iff f in
       match cansubst_pv_eq hyps fx f1 f2 with
-      | Some id -> Some(hid, id,true)
+      | Some id -> Some(hid, id,`Normal)
       | None ->
         match cansubst_pv_eq hyps fx f2 f1 with
-        | Some id -> Some(hid, id,false)
+        | Some id -> Some(hid, id,`Reverse)
         | None -> None
     else None
   | _ -> None
@@ -1082,13 +1104,16 @@ let find_in_hyps f hyps =
   fst (List.find test (LDecl.tohyps hyps).h_local)
 
 let t_assumption g = 
-  let hyps,concl = get_goal g in
-  let h = find_in_hyps concl hyps in
-  t_hyp h g
+  let (hyps, concl) = get_goal g in
+  let myh =
+    try  find_in_hyps concl hyps
+    with Not_found -> tacuerror "no assumption"
+  in
+    t_hyp myh g
     
 let t_progress tac g =
   let rec aux g = t_seq t_simplify_nodelta aux0 g 
-  and aux0 g = 
+  and aux0 g =
     t_seq (t_try tac) aux1 g
   and aux1 g = 
     let hyps,concl = get_goal g in
@@ -1122,6 +1147,33 @@ let t_progress tac g =
     t_seq t1 aux g in
   aux g
 
-  
-  
-  
+(* -------------------------------------------------------------------- *)
+let t_congr f (args, ty) g =
+  let rec doit args ty g =
+    match args with
+    | [] -> t_reflex g
+
+    | (a1, a2) :: args->
+        let aty  = a1.f_ty in
+        let m1   = f_app f (List.rev_map fst args) (tfun aty ty) in
+        let m2   = f_app f (List.rev_map snd args) (tfun aty ty) in
+        let tcgr = t_apply_logic EcCoreLib.p_fcongr
+                     [ty; aty]
+                     [AAform m1; AAform a1; AAform a2; AAnode] in
+
+        let tsub g =
+          let fx   = EcIdent.create "f" in
+          let fty  = tfun aty ty in
+          let body = f_app (f_local fx fty) [a2] ty in
+          let lam  = EcFol.f_lambda [(fx, GTty fty)] body in
+            t_subgoal
+              [doit args fty]
+              (t_apply_logic EcCoreLib.p_fcongr
+                 [ty; fty]
+                 [AAform lam; AAform m1; AAform m2; AAnode] g)
+        in
+          t_subgoal
+            [tcgr; tsub]
+            (t_transitivity (EcFol.f_app m1 [a2] ty) g)
+  in
+    t_on_goals (t_try t_assumption) (doit (List.rev args) ty g)

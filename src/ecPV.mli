@@ -8,62 +8,66 @@ open EcEnv
 open EcFol
 
 (* -------------------------------------------------------------------- *)
+module Mpv : sig 
+  type ('a,'b) t
+   val empty : ('a,'b) t
+
+  val add : env -> prog_var -> 'a -> ('a,'b) t -> ('a,'b) t
+
+  val add_glob : env -> mpath -> 'b -> ('a,'b) t -> ('a,'b) t
+
+  val find : env -> prog_var -> ('a,'b) t -> 'a
+
+  val find_glob : env -> mpath -> ('a,'b) t -> 'b
+
+  val issubst : env -> (expr, unit) t -> instr list -> instr list
+
+end 
+
 module PVM : sig
  
-  type 'a subst
+  type subst
 
-  val empty : 'a subst
+  val empty : subst
 
-  val add : env -> prog_var -> EcIdent.t -> 'a -> 'a subst -> 'a subst
+  val add : env -> prog_var -> EcIdent.t -> form -> subst -> subst
 
-  val add_glob : env -> mpath -> EcIdent.t -> 'a -> 'a subst -> 'a subst
+  val add_glob : env -> mpath -> EcIdent.t -> form -> subst -> subst
 
-  val find : env -> prog_var -> memory -> 'a subst -> 'a
+  val find : env -> prog_var -> memory -> subst -> form
 
-  val subst   : env -> form  subst -> form  -> form
-
-  val esubst  : env -> memory -> expr subst -> expr  -> expr
-  val isubst  : env -> memory -> expr subst -> instr -> instr
-  val issubst : env -> memory -> expr subst -> instr list -> instr list
-  val ssubst  : env -> memory -> expr subst -> stmt  -> stmt
+  val subst   : env -> subst -> form  -> form
 
   val subst1  : env -> prog_var -> EcIdent.t -> form -> form -> form
 end
 
 (* -------------------------------------------------------------------- *)
 module PV : sig
-  module M : EcMaps.Map.S with type key = prog_var
+ 
+  type t 
 
-  type pv_fv = private {
-    pv   : ty M.t;                    (* The key are in normal form *)
-    glob : EcPath.Sm.t;               (* The set of abstract module *)
-  }
+  val empty : t
 
-  val empty : pv_fv
+  val is_empty : t -> bool
 
-  val is_empty : pv_fv -> bool
+  val add      : env -> prog_var -> ty -> t -> t
+  val add_glob : env -> mpath -> t -> t
 
-  val add      : env -> prog_var -> ty -> pv_fv -> pv_fv
-  val add_glob : env -> mpath -> pv_fv -> pv_fv
+  val remove   : env -> prog_var -> t -> t
 
-  val remove : env -> prog_var -> pv_fv -> pv_fv
+  val diff     : t -> t -> t
 
-  val union : env -> pv_fv -> pv_fv -> pv_fv
-  val diff  : env -> pv_fv -> pv_fv -> pv_fv
-  val inter : env -> pv_fv -> pv_fv -> pv_fv
+  val interdep : env -> t -> t -> t
+  val indep    : env -> t -> t -> bool
+  val check_depend : env -> t -> mpath -> unit
 
-  val disjoint : env -> pv_fv -> pv_fv -> bool
+  val elements : t -> (prog_var * ty) list * mpath list
 
-  val elements : pv_fv -> (prog_var * ty) list * mpath list
+  val mem_pv   : env -> prog_var -> t -> bool
+  val mem_glob : env -> mpath -> t -> bool
 
-  val mem_pv   : prog_var -> pv_fv -> bool
-  val mem_glob : mpath -> pv_fv -> bool
+  val fv       : env -> EcIdent.t -> form -> t
 
-  val fv : env -> EcIdent.t -> form -> pv_fv
+  val pp       : env -> Format.formatter -> t -> unit
 
-  val pp : env -> Format.formatter -> pv_fv -> unit
-
-  val disjoint_g : env -> mpath -> mpath -> bool
-
-  val check : env -> pv_fv -> pv_fv -> unit
 end

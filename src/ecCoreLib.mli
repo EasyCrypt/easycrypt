@@ -87,7 +87,8 @@ val p_ora_intro_r : path
 val p_iff_intro   : path 
 val p_if_intro    : path 
 val p_eq_refl     : path
-
+val p_eq_trans    : path
+val p_fcongr      : path
 
 val p_rewrite_l     : path 
 val p_rewrite_r     : path 

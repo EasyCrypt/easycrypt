@@ -22,9 +22,6 @@ type quantif =
 
 type binding = (EcIdent.t * gty) list
 
-let mstd   = EcIdent.create "&std"
-let mpre   = EcIdent.create "&pre"
-let mpost  = EcIdent.create "&post"
 let mhr    = EcIdent.create "&hr"
 let mleft  = EcIdent.create "&1"
 let mright = EcIdent.create "&2"
@@ -51,15 +48,15 @@ and f_node =
   | Ftuple  of form list
 
   | FhoareF of hoareF (* $hr / $hr *)
-  | FhoareS of hoareS (* $hr  / $hr   *)
+  | FhoareS of hoareS 
 
   | FbdHoareF of bdHoareF (* $hr / $hr *)
-  | FbdHoareS of bdHoareS (* $hr  / $hr   *)
+  | FbdHoareS of bdHoareS 
 
   | FequivF of equivF (* $left,$right / $left,$right *)
-  | FequivS of equivS (* $left,$right / $left,$right *)
+  | FequivS of equivS 
 
-  | Fpr     of memory * EcPath.xpath * form list * form (* hr *)
+  | Fpr of pr (* hr *)
 
 and equivF = { 
   ef_pr : form;
@@ -102,6 +99,8 @@ and bdHoareS = {
   bhs_cmp : hoarecmp;
   bhs_bd  : form;
 }
+
+and pr = memory * EcPath.xpath * form list * form
 
 type app_bd_info =
 | AppNone
@@ -370,8 +369,8 @@ module Hsform = Why3.Hashcons.Make (struct
           fv_union (f_fv f1) fv2
 
     | FhoareF hf ->
-        let fv = fv_union (Mid.remove mpre (f_fv hf.hf_pr)) 
-          (Mid.remove mpost (f_fv hf.hf_po)) in
+        let fv = fv_union (Mid.remove mhr (f_fv hf.hf_pr)) 
+          (Mid.remove mhr (f_fv hf.hf_po)) in
         EcPath.x_fv fv hf.hf_f
 
     | FhoareS hs ->
@@ -381,8 +380,8 @@ module Hsform = Why3.Hashcons.Make (struct
 
     | FbdHoareF bhf ->
         let fv = fv_union
-          (Mid.remove mpre  (f_fv bhf.bhf_pr)) 
-          (Mid.remove mpost (f_fv bhf.bhf_po)) in
+          (Mid.remove mhr  (f_fv bhf.bhf_pr)) 
+          (Mid.remove mhr (f_fv bhf.bhf_po)) in
         let fv = EcPath.x_fv fv bhf.bhf_f in
           fv_union (f_fv bhf.bhf_bd) fv
 
@@ -405,7 +404,7 @@ module Hsform = Why3.Hashcons.Make (struct
                          (EcModules.s_fv es.es_sr))
 
     | Fpr (m,mp,args,event) ->
-        let fve = Mid.remove mpost (f_fv event) in
+        let fve = Mid.remove mhr (f_fv event) in
         let fv  = EcPath.x_fv fve mp in
           List.fold_left (fun s f -> fv_union s (f_fv f)) (fv_add m fv) args
   
@@ -799,6 +798,7 @@ module FSmart = struct
   type a_let   = lpattern * form * form
   type a_op    = EcPath.path * ty list * ty
   type a_tuple = form list
+  type a_app   = form * form list * ty
 
   let f_local (fp, (x, ty)) (x', ty') =
     if   false && x == x' && ty == ty'
@@ -1195,7 +1195,7 @@ module Fsubst = struct
               es_sl = sl'; es_sr = sr'; }
 
     | Fpr (m, mp, args, e) ->
-        assert (not (Mid.mem mpost s.fs_mem));
+        assert (not (Mid.mem mhr s.fs_mem));
         let m'    = Mid.find_def m m s.fs_mem in
         let mp'   = EcPath.x_substm s.fs_sty.ts_p s.fs_mp mp in
         let args' = List.smart_map (f_subst s) args in
@@ -1496,6 +1496,82 @@ let is_logical_op op =
   match op_kind op with
   | OK_not | OK_and _ | OK_or _ | OK_imp | OK_iff | OK_eq -> true
   | _ -> false
+
+(* -------------------------------------------------------------------- *)
+type sform =
+  | SFint   of int
+  | SFlocal of EcIdent.t
+  | SFpvar  of EcTypes.prog_var * memory
+  | SFglob  of EcPath.mpath * memory 
+
+  | SFif    of form * form * form
+  | SFlet   of lpattern * form * form
+  | SFtuple of form list
+
+  | SFquant of quantif * (EcIdent.t * gty) * form
+  | SFtrue
+  | SFfalse
+  | SFnot   of form
+  | SFand   of bool * (form * form)
+  | SFor    of bool * (form * form)
+  | SFimp   of form * form
+  | SFiff   of form * form
+  | SFeq    of form * form
+  | SFop    of (EcPath.path * ty list) * (form list)
+
+  | SFhoareF   of hoareF
+  | SFhoareS   of hoareS
+  | SFbdHoareF of bdHoareF
+  | SFbdHoareS of bdHoareS
+  | SFequivF   of equivF
+  | SFequivS   of equivS
+  | SFpr       of pr
+
+  | SFother of form
+
+let sform_of_op (op, ty) args =
+  match op_kind op, args with
+  | OK_true , [] -> SFtrue
+  | OK_false, [] -> SFfalse
+  | OK_not  , [f] -> SFnot f
+  | OK_and b, [f1; f2] -> SFand (b, (f1, f2))
+  | OK_or  b, [f1; f2] -> SFor  (b, (f1, f2))
+  | OK_imp  , [f1; f2] -> SFimp (f1, f2)
+  | OK_iff  , [f1; f2] -> SFiff (f1, f2)
+  | OK_eq   , [f1; f2] -> SFeq  (f1, f2)
+
+  | _ -> SFop ((op, ty), args)
+
+let rec sform_of_form fp =
+  match fp.f_node with
+  | Fint   i      -> SFint   i
+  | Flocal x      -> SFlocal x
+  | Fpvar (x, me) -> SFpvar  (x, me)
+  | Fglob (m, me) -> SFglob  (m, me)
+
+  | Fif    (c, f1, f2)  -> SFif    (c, f1, f2)
+  | Flet   (lv, f1, f2) -> SFlet   (lv, f1, f2)
+  | Ftuple fs           -> SFtuple fs
+
+  | Fquant (_, [ ]  , f) -> sform_of_form f
+  | Fquant (q, [b]  , f) -> SFquant (q, b, f)
+  | Fquant (q, b::bs, f) -> SFquant (q, b, f_quant q bs f)
+
+  | FhoareF   hf -> SFhoareF   hf
+  | FhoareS   hs -> SFhoareS   hs
+  | FbdHoareF hf -> SFbdHoareF hf
+  | FbdHoareS hs -> SFbdHoareS hs
+  | FequivF   ef -> SFequivF   ef
+  | FequivS   es -> SFequivS   es
+  | Fpr       pr -> SFpr       pr
+
+  | Fop (op, ty) ->
+      sform_of_op (op, ty) []
+
+  | Fapp ({ f_node = Fop (op, ty) }, args) ->
+      sform_of_op (op, ty) args
+
+  | _ -> SFother fp
 
 (* -------------------------------------------------------------------- *)
 let f_check_uni f =  

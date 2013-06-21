@@ -71,8 +71,9 @@
   let pflist loc ti (es : pformula    list) : pformula    = 
     List.fold_right (fun e1 e2 -> pf_cons loc ti e1 e2) es (pf_nil loc ti)
 
-  let mk_axiom (x, ty, vd, f) k = 
-    { pa_name    = x ; 
+  let mk_axiom ?(o = `Global) (x, ty, vd, f) k = 
+    { pa_name    = x ;
+      pa_scope   = o ;
       pa_tyvars  = ty;
       pa_vars    = vd;
       pa_formula = f ; 
@@ -158,6 +159,7 @@
 %token COLON
 %token COMMA
 %token COMPUTE
+%token CONGR
 %token CONSEQ
 %token EXFALSO
 %token CONST
@@ -181,14 +183,16 @@
 %token EXIST
 %token EXPORT
 %token FEL
+%token FIELD
+%token FIELDSIMP
 %token FINAL
 %token FIRST
 %token FISSION
-%token FUSION
 %token FORALL
-%token FWDS
 %token FROM_INT
 %token FUN
+%token FUSION
+%token FWDS
 %token GENERALIZE 
 %token GLOB
 %token HOARE
@@ -210,6 +214,7 @@
 %token LEFTARROW
 %token LEMMA
 %token LET
+%token LOCAL
 %token LOGIC
 %token LONGARROW
 %token LOSSLESS
@@ -228,8 +233,9 @@
 %token PRAGMA
 %token PRBOUNDED
 %token PRED
-%token PRINT
 %token PRFALSE
+%token PRINT
+%token PROGRESS
 %token PROOF
 %token PROR
 %token PROVER
@@ -255,13 +261,11 @@
 %token SIMPLIFY
 %token SKIP
 %token SLASHSLASH
+%token SMT
 %token SPLIT
 %token SPLITWHILE
-%token STRICT
-%token FIELD
-%token FIELDSIMP
-%token SMT
 %token STAR
+%token STRICT
 %token SUBST
 %token SWAP
 %token THEN
@@ -270,7 +274,6 @@
 %token TILD
 %token TIMEOUT
 %token TRIVIAL
-%token PROGRESS
 %token TRY
 %token TYPE
 %token UNDERSCORE
@@ -1218,18 +1221,22 @@ lemma_decl :
 | x=ident tyvars=tyvars_decl pd=pgtybindings? COLON f=form { x,tyvars,pd,f }
 ;
 
+local:
+| LOCAL { `Local  }
+| empty { `Global }
+
 axiom:
 | AXIOM d=lemma_decl 
     { mk_axiom d PAxiom }
 
-| LEMMA d=lemma_decl
-    { mk_axiom d PILemma }
+| LEMMA o=local d=lemma_decl
+    { mk_axiom ~o d PILemma }
 
-| LEMMA d=lemma_decl BY t=tactic
-    { mk_axiom d (PLemma (Some t)) }
+| LEMMA o=local d=lemma_decl BY t=tactic
+    { mk_axiom ~o d (PLemma (Some t)) }
 
-| LEMMA d=lemma_decl BY LBRACKET RBRACKET
-    { mk_axiom d (PLemma None) }
+| LEMMA o=local d=lemma_decl BY LBRACKET RBRACKET
+    { mk_axiom ~o d (PLemma None) }
 
 | EQUIV x=ident pd=pgtybindings? COLON p=loc(equiv_body)
     { mk_axiom (x, None, pd, p) PILemma }
@@ -1361,6 +1368,29 @@ fpattern(F):
    { mk_fpattern hd args }
 ;
 
+rwside:
+| MINUS { `Reverse }
+| empty { `Normal  }
+;
+
+rwrepeat:
+| NOT            { (`All  , None  ) }
+| QUESTION       { (`Maybe, None  ) }
+| n=NUM NOT      { (`All  , Some n) }
+| n=NUM QUESTION { (`Maybe, Some n) }
+;
+
+rwocc:
+| LBRACE x=NUM+ RBRACE { x }
+;
+
+rwarg:
+| SLASHSLASH { RWDone }
+
+| s=rwside r=rwrepeat? o=rwocc? fp=fpattern(form)
+    { RWRw (s, r, omap o EcMaps.Sint.of_list, fp) }
+;
+
 simplify_arg: 
 | DELTA l=qoident* { `Delta l }
 | ZETA             { `Zeta }
@@ -1375,12 +1405,6 @@ simplify:
 | SIMPLIFY            { simplify_red }
 | SIMPLIFY l=qoident+ { `Delta l  :: simplify_red  }
 | SIMPLIFY DELTA      { `Delta [] :: simplify_red }
-;
-
-rwside:
-| LEFTARROW { false }
-| ARROW     { true }
-| empty     { true }
 ;
 
 conseq:
@@ -1490,6 +1514,9 @@ logtactic:
 | CLEAR l=ident+
    { Pclear l }
 
+| CONGR
+   { Pcongr }
+
 | TRIVIAL
    { Ptrivial }
 
@@ -1532,8 +1559,8 @@ logtactic:
 | CHANGE f=sform
    { Pchange f }
 
-| REWRITE s=rwside e=fpattern(form)
-   { Prewrite (s, e) }
+| REWRITE a=rwarg+
+   { Prewrite a }
 
 | SUBST l=sform*
    { Psubst l }
@@ -1667,13 +1694,13 @@ tactic_core_r:
    { Pby t }
 
 | DO t=tactic_core
-   { Pdo (true, None, t) }
+   { Pdo ((`All, None), t) }
 
 | DO n=NUM? NOT t=tactic_core
-   { Pdo (false, n, t) }
+   { Pdo ((`All, n), t) }
 
 | DO n=NUM? QUESTION t=tactic_core
-   { Pdo (true, n, t) }
+   { Pdo ((`Maybe, n), t) }
 
 | LPAREN s=tactics RPAREN
    { Pseq s } 

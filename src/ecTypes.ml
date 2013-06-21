@@ -359,6 +359,14 @@ let lp_hash = function
   | LSymbol x -> idty_hash x
   | LTuple lx -> Why3.Hashcons.combine_list idty_hash 0 lx
 
+let lp_ids = function
+  | LSymbol (id,_) -> [id] 
+  | LTuple ids -> List.map fst ids
+
+let lp_bind = function
+  | LSymbol b -> [b] 
+  | LTuple b -> b
+
 (* -------------------------------------------------------------------- *)
 type expr = {
   e_node : expr_node;
@@ -518,9 +526,6 @@ let e_app x args ty =
     | _ -> mk_expr (Eapp (x, args)) ty
 
 (* -------------------------------------------------------------------- *)
-let lp_ids = function
-  | LSymbol (id,_) -> [id] 
-  | LTuple ids -> List.map fst ids
 
 let e_map fty fe e =
   match e.e_node with 

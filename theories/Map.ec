@@ -90,12 +90,7 @@ cut Hx : (m.[x] = Some (proj(m.[x])));smt.
 save.
 
 lemma rng_empty: rng (empty<:'a,'b>) = Set.empty.
-proof.
-  apply Set.extensionality.
-  intros x.
-  rewrite (rng_def<:'a,'b> (Map_why.const_ None) x).
-  split; intros _; smt.
-save.
+proof. by apply Set.extensionality=> x; split=> _; smt. save.
 
 lemma in_rng_empty: forall x, !in_rng x empty<:'a, 'b> by [].
 
@@ -114,9 +109,18 @@ save.
 lemma upd_in_rng_neq: forall (m:('a,'b) map) x y1 y2,
   in_rng y1 m =>
   (!in_dom x m \/ m.[x] <> Some y1) =>
-  in_rng y1 m.[x<-y2]
-by [].
+  in_rng y1 m.[x<-y2].
+proof.
+  intros=> m x y1 y2; delta in_rng; simplify.
+  intros=> y1_in_m [x_notin_m|mx_neq_y1].
+    rewrite rng_update_not_indom // Set.add_mem.
+    by left; assumption.
 
+    generalize y1_in_m; rewrite rng_def=> [y my_eq_y1].
+    rewrite rng_def; exists y; case (x = y).
+      intros=> eq_xy; smt.
+      by intros=> ne_xy; rewrite get_upd_neq.
+qed.
 
 (** find *) (* TODO: the axiomatization appears to be upside-down *)
 op find: ('a * 'b) cPred -> ('a,'b) map -> 'a option.
@@ -231,13 +235,7 @@ cut H: (in_dom y m /\ P (y,proj (m.[y])) = true).
 save.
 
 (** extensional equality *)
-pred (==) (m1 m2:('a,'b) map) = (* TODO : Why we use in_dom here ? *)
-  (forall x, in_dom x m1 <=> in_dom x m2) /\
-  (forall x, in_dom x m1 => m1.[x] = m2.[x]).
-
-lemma eq_ext_alt: forall (m1 m2:('a,'b) map),
-  m1 == m2 <=> forall x, m1.[x] = m2.[x]
-by [].
+pred (==) (m1 m2:('a,'b) map) = forall x, m1.[x] = m2.[x].
 
 axiom extensionality: forall (m1 m2:('a,'b) map),
   m1 == m2 => m1 = m2.

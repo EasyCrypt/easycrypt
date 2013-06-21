@@ -1,4 +1,5 @@
 (* -------------------------------------------------------------------- *)
+open EcMaps
 open EcSymbols
 open EcLocation
 open EcUtils
@@ -198,7 +199,6 @@ and pgty =
 | PGTY_Mem
 
 (* -------------------------------------------------------------------- *)
-
 type pop_def =
   | POabstr of pty
   | POconcr of ptybindings * pty * pexpr
@@ -338,6 +338,14 @@ type intropattern1 =
 
 and intropattern = intropattern1 list
 
+type trepeat = [`All | `Maybe] * int option
+
+type rwarg =
+  | RWDone
+  | RWRw of (rwside * trepeat option * Sint.t option * ffpattern)
+
+and rwside   = [`Normal | `Reverse]
+
 type logtactic =
   | Passumption of (pqsymbol option * ptyannot option)
   | Psmt        of pprover_infos
@@ -349,12 +357,13 @@ type logtactic =
   | Pleft                         
   | Pright                        
   | Ptrivial
+  | Pcongr
   | Pelim       of ffpattern 
   | Papply      of ffpattern
   | Pcut        of (psymbol * pformula)
   | Pgeneralize of pformula list
   | Pclear      of psymbol list
-  | Prewrite    of (bool * ffpattern)
+  | Prewrite    of rwarg list
   | Psubst      of pformula list
   | Psimplify   of preduction 
   | Pchange     of pformula
@@ -362,7 +371,7 @@ type logtactic =
 
 type ptactic_core_r =
   | Pidtac      of string option
-  | Pdo         of bool * int option * ptactic_core
+  | Pdo         of trepeat * ptactic_core
   | Ptry        of ptactic_core
   | Pby         of ptactic list
   | Pseq        of ptactic list
@@ -392,6 +401,7 @@ type paxiom_kind = PAxiom | PLemma of ptactic option | PILemma
 
 type paxiom = {
   pa_name    : psymbol;
+  pa_scope   : [`Global | `Local];
   pa_tyvars  : psymbol list option;
   pa_vars    : pgtybindings option;  
   pa_formula : pformula;

@@ -39,9 +39,7 @@ lemma mu_not : forall (d:'a distr, p:'a cPred),
   mu d (cPnot p) = mu d cPtrue - mu d p.
 proof.
   intros d p;
-  cut H: (forall (x y z:real), x = y - z <=> x + z = y); first smt.
-  rewrite <- (H (mu d (cPnot p)) (mu d cPtrue) (mu d p));
-  rewrite (_:cPtrue = cPor (cPnot p) p); smt.
+  by cut H: (forall (x y z:real), x = y - z <=> x + z = y); smt.
 qed.
 
 lemma mu_weight_0 : forall (d:'a distr),
@@ -58,7 +56,7 @@ theory Dempty.
     weight d = 0%r <=> d = dempty.
   proof.
   intros d; split; last smt.
-  intros weight_0; rewrite <- (mu_extensional<:'a> d dempty); smt.
+  intros weight_0; rewrite -(mu_extensional<:'a> d dempty); smt.
   qed.
 end Dempty.
 

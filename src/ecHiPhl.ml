@@ -390,7 +390,7 @@ let process_bdHoare_deno info (_,n as g) =
     let post = omap_dfl post event  (fun p -> process_form qenv p tbool) in
     f_bdHoareF pre f post cmp bd 
   in
-  let (juc,an), gs = process_mkn_apply process_cut info g in
+  let (juc,an), gs = process_mkn_apply (process_cut g) info g in
   let pre,post =
     let (_,f) = get_node (juc,an) in
     let bhf = destr_bdHoareF f in
@@ -412,7 +412,7 @@ let process_equiv_deno info (_,n as g) =
     (* FIXME: Benjamin : below: put a better default event instead of f_true *)
     let post = omap_dfl post f_true (fun p -> process_form qenv p tbool) in
     f_equivF pre fl fr post in
-  let (juc,an), gs = process_mkn_apply process_cut info g in
+  let (juc,an), gs = process_mkn_apply (process_cut g) info g in
   let pre,post =
     let (_,f) = get_node (juc,an) in
     let ef = destr_equivF f in
@@ -458,7 +458,7 @@ let process_conseq info (_, n as g) =
       | None -> t_post := t_progress (t_id None); gpost 
       | Some post -> process_form qenv post tbool in
     fmake pre post in
-  let (juc,an), gs = process_mkn_apply process_cut info g in
+  let (juc,an), gs = process_mkn_apply (process_cut g) info g in
   let t_conseq = 
     let (_,f) = get_node (juc,an) in
     match f.f_node with

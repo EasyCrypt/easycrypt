@@ -4,8 +4,10 @@
 
 (* -------------------------------------------------------------------- *)
 open EcUtils
+open EcMaps
 open EcIdent
 open EcParsetree
+open EcEnv
 open EcTypes
 open EcModules
 open EcFol
@@ -304,11 +306,17 @@ let f_match hyps ue ev ptn subject =
             raise MatchFailure
 
         | Some None ->
-            ev := Mid.add x (Some subject) !ev
+          begin
+            try  EcUnify.unify env ue ptn.f_ty subject.f_ty
+            with EcUnify.UnificationFailure _ -> raise MatchFailure;
+          end;
+          ev := Mid.add x (Some subject) !ev
 
         | Some (Some a) -> begin
             if not (EcReduction.is_alpha_eq hyps subject a) then
-              raise MatchFailure
+              raise MatchFailure;
+            try  EcUnify.unify env ue ptn.f_ty subject.f_ty
+            with EcUnify.UnificationFailure _ -> raise MatchFailure
         end
     end
   
@@ -346,7 +354,14 @@ let f_match hyps ue ev ptn subject =
           if not (EcMemory.mem_equal me1 me2) then
             raise MatchFailure
   
-    | _, _ -> raise MatchFailure
+    | Ftuple fs1, Ftuple fs2 ->
+        if List.length fs1 <> List.length fs2 then
+          raise MatchFailure;
+        List.iter2 doit fs1 fs2
+
+    | _, _ ->
+        if not (EcReduction.is_alpha_eq hyps ptn subject) then
+          raise MatchFailure
 
   in
     doit ptn subject; (ue, Ev !ev)
@@ -360,3 +375,147 @@ let f_match hyps (ue, ev) ~ptn subject =
       with EcUnify.UninstanciateUni _ -> raise MatchFailure
     in
       (ue, clue, Ev ev)
+
+(* -------------------------------------------------------------------- *)
+type ptnpos = [`Select | `Sub of ptnpos] Mint.t
+
+exception InvalidPosition
+
+module FPosition = struct
+  let empty : ptnpos = Mint.empty
+
+  let is_empty (p : ptnpos) = Mint.is_empty p
+
+  let rec tostring (p : ptnpos) =
+    let items = Mint.bindings p in
+    let items =
+      List.map
+        (fun (i, p) -> Printf.sprintf "%d[%s]" i (tostring1 p))
+        items
+    in
+      String.concat ", " items
+
+  and tostring1 = function
+    | `Select -> "-"
+    | `Sub p -> tostring p
+
+  let select test =
+    let rec doit1 fp =
+      if   test fp
+      then Some `Select
+      else begin
+        let subp =
+          match fp.f_node with
+          | Fquant (_, _, f)   -> doit [f]
+          | Fif    (c, f1, f2) -> doit [c; f1; f2]
+          | Fapp   (f, fs)     -> doit (f :: fs)
+          | Ftuple fs          -> doit fs
+          | Flet   (_, f1, f2) -> doit [f1; f2]
+  
+          | _ -> None
+        in
+          omap subp (fun p -> `Sub p)
+      end
+
+    and doit fps =
+      let fps = List.mapi (fun i fp -> omap (doit1 fp) (fun p -> (i, p))) fps in
+      let fps = List.pmap identity fps in
+        match fps with
+        | [] -> None
+        | _  -> Some (Mint.of_list fps)
+
+    in
+      fun fp ->
+        match doit [fp] with
+        | None   -> Mint.empty
+        | Some p -> p
+
+  let occurences =
+    let rec doit1 n p =
+      match p with
+      | `Select -> n+1
+      | `Sub p  -> doit n p
+
+    and doit n (ps : ptnpos) =
+      Mint.fold (fun _ p n -> doit1 n p) ps n
+
+    in
+      fun p -> doit 0 p
+
+  let filter (s : Sint.t) =
+    let rec doit1 n p =
+      match p with
+      | `Select -> (n+1, if Sint.mem n s then Some `Select else None)
+      | `Sub p  -> begin
+          match doit n p with
+          | (n, sub) when Mint.is_empty sub -> (n, None)
+          | (n, sub) -> (n, Some (`Sub sub))
+      end
+
+    and doit n (ps : ptnpos) =
+      Mint.mapi_filter_fold (fun _ p n -> doit1 n p) ps n
+
+    in
+      fun p -> snd (doit 1 p)
+
+  let topattern (p : ptnpos) (f : form) =
+    let x = EcIdent.create "_p" in
+  
+    let rec doit1 p fp =
+      match p with
+      | `Select -> f_local x fp.f_ty
+      | `Sub p  -> begin
+          match fp.f_node with
+          | Flocal _ -> raise InvalidPosition
+          | Fpvar  _ -> raise InvalidPosition
+          | Fglob  _ -> raise InvalidPosition
+          | Fop    _ -> raise InvalidPosition
+          | Fint   _ -> raise InvalidPosition
+  
+          | Fquant (q, b, f) ->
+              let f' = as_seq1 (doit p [f]) in
+                FSmart.f_quant (fp, (q, b, f)) (q, b, f')
+  
+          | Fif (c, f1, f2)  ->
+              let (c', f1', f2') = as_seq3 (doit p [c; f1; f2]) in
+                FSmart.f_if (fp, (c, f1, f2)) (c', f1', f2')
+  
+          | Fapp (f, fs) -> begin
+              match doit p (f :: fs) with
+              | [] -> assert false
+              | f' :: fs' ->
+                  FSmart.f_app (fp, (f, fs, fp.f_ty)) (f', fs', fp.f_ty)
+          end
+  
+          | Ftuple fs ->
+              let fs' = doit p fs in
+                FSmart.f_tuple (fp, fs) fs'
+  
+          | Flet (lv, f1, f2) ->
+              let (f1', f2') = as_seq2 (doit p [f1; f2]) in
+                FSmart.f_let (fp, (lv, f1, f2)) (lv, f1', f2')
+  
+          | FhoareF   _ -> raise InvalidPosition
+          | FhoareS   _ -> raise InvalidPosition
+          | FbdHoareF _ -> raise InvalidPosition
+          | FbdHoareS _ -> raise InvalidPosition
+          | FequivF   _ -> raise InvalidPosition
+          | FequivS   _ -> raise InvalidPosition
+          | Fpr       _ -> raise InvalidPosition
+      end
+  
+    and doit ps fps =
+      match Mint.is_empty ps with
+      | true  -> fps
+      | false ->
+          let imin = fst (Mint.min_binding ps)
+          and imax = fst (Mint.max_binding ps) in
+          if imin < 0 || imax >= List.length fps then
+            raise InvalidPosition;
+          let fps = List.mapi (fun i x -> (x, Mint.find_opt i ps)) fps in
+          let fps = List.map (function (f, None) -> f | (f, Some p) -> doit1 p f) fps in
+            fps
+  
+    in
+      (x, as_seq1 (doit p [f]))
+end

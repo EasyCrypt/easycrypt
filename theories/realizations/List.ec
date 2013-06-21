@@ -7,11 +7,13 @@ import why3 "list" "List"
    op "Nil" as "__nil";
    op "Cons" as "::".
 
-(* Induction Principle *)
-axiom list_ind: forall (P:('a list) cPred),
-  (P []) =>
-  (forall x xs, P xs => P (x::xs)) =>
-  (forall ys, P ys).
+(*** Axiomatic Definitions *)
+(** Fold *)
+op fold_right: ('a -> 'b -> 'b) -> 'b -> 'a list -> 'b.
+axiom fold_right_nil: forall (f:'a -> 'b -> 'b) (e:'b),
+  fold_right f  e [] = e.
+axiom fold_right_cons: forall (f:'a -> 'b -> 'b) (e:'b) x xs,
+  fold_right f e (x::xs) = f x (fold_right f e xs).
 
 (** Destructors (partially specified) *)
 (* Head *)
@@ -21,6 +23,12 @@ axiom hd_def: forall (x:'a) xs, hd (x::xs) = x.
 (* Tail *)
 op tl: 'a list -> 'a list.
 axiom tl_def: forall (x:'a) xs, tl (x::xs) = xs.
+
+(* Induction Principle *)
+axiom list_ind: forall (P:('a list) cPred),
+  (P []) =>
+  (forall x xs, P xs => P (x::xs)) =>
+  (forall ys, P ys).
 
 (*** General Lemmas *)
 (** List case analysis *)
@@ -43,19 +51,17 @@ lemma hd_tl_cons: forall (xs:'a list),
   xs <> [] => (hd xs)::(tl xs) = xs
 by [].
 
-(*** Operator Specifications *)
-(** Fold *)
-op fold_right:('a -> 'b -> 'b) -> 'b -> 'a list -> 'b.
-axiom fold_right_nil: forall (f:'a -> 'b -> 'b) (e:'b),
-  fold_right f  e [] = e.
-axiom fold_right_cons: forall (f:'a -> 'b -> 'b) (e:'b) x xs,
-  fold_right f e (x::xs) = f x (fold_right f e xs).
-
+(*** Derived Constructions *)
 (** mem *)
-op mem:'a -> 'a list -> bool.
-axiom mem_nil: forall (x:'a), !(mem x []).
-axiom mem_cons: forall (y x:'a) xs,
+op mem(x:'a) = fold_right (lambda y intl, (x = y) \/ intl) false.
+
+(* Direct inductive definition *)
+lemma mem_nil: forall (x:'a), !(mem x []) by [].
+lemma mem_cons: forall (y x:'a) xs,
   mem y (x::xs) = ((y = x) \/ mem y xs).
+proof strict.
+by intros=> y x xs; delta mem; beta; smt.
+qed.
 
 (* Lemmas *)
 lemma mem_eq: forall (x:'a) xs, mem x (x::xs) by [].
@@ -64,10 +70,12 @@ lemma mem_hd: forall (xs:'a list), xs <> [] => mem (hd xs) xs by [].
 lemma nil_nmem: forall (xs:'a list), xs = [] <=> (forall x, !mem x xs) by [].
 
 (*** length *)
-op length:'a list -> int.
+op length = fold_right (lambda (x:'a) l, l + 1) 0.
 op __abs:'a list -> int  = length. (* notation *)
-axiom length_nil: length<:'a> [] = 0.
-axiom length_cons: forall (x:'a) xs, length (x::xs) = 1 + length xs.
+
+(* Direct inductive definition *)
+lemma length_nil: length<:'a> [] = 0 by [].
+lemma length_cons: forall (x:'a) xs, length (x::xs) = 1 + length xs by [].
 
 (* Lemmas *)
 lemma length_nneg: forall (xs:'a list), 0 <= length xs.
@@ -84,9 +92,11 @@ intros=> xs; elimT list_ind xs=> //; smt.
 qed.
 
 (** append *)
-op (++):'a list -> 'a list -> 'a list.
-axiom app_nil: forall (ys:'a list), [] ++ ys = ys.
-axiom app_cons: forall (x:'a) xs ys, (x::xs) ++ ys = x::(xs ++ ys).
+op (++)(xs ys:'a list): 'a list = fold_right (::) ys xs.
+
+(* Direct inductive definition *)
+lemma app_nil: forall (ys:'a list), [] ++ ys = ys by [].
+lemma app_cons: forall (x:'a) xs ys, (x::xs) ++ ys = x::(xs ++ ys) by [].
 
 (* Lemmas *)
 lemma appCcons: forall (x:'a) xs ys, (x::xs) ++ ys = x::(xs ++ ys) by [].
@@ -127,12 +137,15 @@ lemma all_cons: forall (p:'a cPred) x xs, all p (x::xs) = ((p x) /\ all p xs) by
 lemma all_app: forall (p:'a cPred) xs ys, all p (xs ++ ys) = (all p xs /\ all p ys) by [].
 
 (** forallb *)
-op forallb:'a cPred -> 'a list -> bool.
-axiom forallb_nil: forall (p:'a cPred), forallb p [].
-axiom forallb_cons: forall (p:'a cPred) x xs,
-  forallb p (x::xs) = ((p x) /\ forallb p xs).
+op forallb(p:'a cPred) = fold_right (lambda x r, (p x) /\ r) true.
 
-(* Lemmas *)
+(* Direct inductive definition *)
+lemma forallb_nil: forall (p:'a cPred), forallb p [] by [].
+lemma forallb_cons: forall (p:'a cPred) x xs, forallb p (x::xs) = ((p x) /\ forallb p xs).
+proof strict.
+by intros=> p x xs; delta forallb; beta; smt.
+qed.
+
 lemma forallb_eq_all: forall (p:'a cPred) xs, all p xs <=> forallb p xs.
 proof strict.
 intros=> p xs; elimT list_ind xs; first smt.
@@ -150,12 +163,15 @@ lemma any_cons: forall (p:'a cPred) x xs, any p (x::xs) = ((p x) \/ any p xs) by
 lemma any_app: forall (p:'a cPred) xs ys, any p (xs ++ ys) = (any p xs \/ any p ys) by [].
 
 (** existsb *)
-op existsb:'a cPred -> 'a list -> bool.
-axiom existsb_nil: forall (p:'a cPred), !(existsb p []).
-axiom existsb_cons: forall (p:'a cPred) x xs,
-  existsb p (x::xs) = ((p x) \/ existsb p xs).
+op existsb (p:'a cPred) = fold_right (lambda x r, (p x) \/ r) false.
 
-(* Lemmas *)
+(* Direct inductive definition *)
+lemma existsb_nil: forall (p:'a cPred), !(existsb p []) by [].
+lemma existsb_cons: forall (p:'a cPred) x xs, existsb p (x::xs) = ((p x) \/ existsb p xs).
+proof strict.
+by intros=> p x xs; delta existsb; beta; smt.
+qed.
+
 lemma existsb_eq_any: forall (p:'a cPred) xs, any p xs <=> existsb p xs.
 proof strict.
 intros=> p xs; elimT list_ind xs; first smt.
@@ -163,11 +179,16 @@ by intros=> y ys IH; rewrite any_cons existsb_cons IH.
 qed.
 
 (** filter *)
-op filter:'a cPred -> 'a list -> 'a list.
-axiom filter_nil: forall (p:'a cPred), filter p [] = [].
-axiom filter_cons: forall (p:'a cPred) x xs,
+op filter (p:'a cPred) = fold_right (lambda x r, if p x then x::r else r) [].
+
+(* Direct inductive definition *)
+lemma filter_nil: forall (p:'a cPred), filter p [] = [] by [].
+lemma filter_cons: forall (p:'a cPred) x xs,
   filter p (x::xs) = let rest = filter p xs in
                      if p x then x::rest else rest.
+proof strict.
+by intros=> p x xs; delta filter; beta; smt.
+qed.
 
 (* Lemmas *)
 lemma filter_consT: forall (p:'a cPred) x xs,
@@ -209,10 +230,13 @@ lemma filter_imp: forall (p q:'a cPred) xs,
 by [].
 
 (** map *)
-op map:('a -> 'b) -> 'a list -> 'b list.
-axiom map_nil: forall (f:'a -> 'b), map f [] = [].
-axiom map_cons: forall (f:'a -> 'b) x xs,
-  map f (x::xs) = (f x)::(map f xs).
+op map (f:'a -> 'b) = fold_right (lambda x xs, (f x  )::xs) [].
+
+(* Direct inductive definition *)
+lemma map_nil: forall (f:'a -> 'b), map f [] = [] by [].
+lemma map_cons: forall (f:'a -> 'b) x xs,
+  map f (x::xs) = (f x)::(map f xs)
+by [].
 
 (* Lemmas *)
 lemma map_in: forall (f:'a -> 'b) x xs,
@@ -242,15 +266,19 @@ qed.
 (** nth *)
 require import Option.
 require import Pair.
-op nth:'a list -> int -> 'a option.
+op nth (xs:'a list) =
+  fold_right (lambda (x:'a) (r:'a option -> int -> 'a option) (y:'a option) (n:int),
+                if n = 0 then Some x else (r y (n - 1)))
+             (lambda y n, y) xs None.
+
 
 (* Direct inductive definition *)
-axiom nth_nil: forall n, nth<:'a> [] n = None.
-axiom nth_cons0: forall (x:'a) xs,
-  nth (x::xs) 0 = Some x.
-axiom nth_consN: forall (x:'a) xs n,
+lemma nth_nil: forall n, nth<:'a> [] n = None by [].
+lemma nth_cons0: forall (x:'a) xs,
+  nth (x::xs) 0 = Some x by [].
+lemma nth_consN: forall (x:'a) xs n,
   0 <> n =>
-  nth (x::xs) n = nth xs (n - 1).
+  nth (x::xs) n = nth xs (n - 1) by [].
 
 (* Lemmas *)
 lemma nth_neg: forall (xs:'a list) n, n < 0 => nth xs n = None.

@@ -2,6 +2,7 @@
 open EcMaps
 open EcUtils
 open EcSymbols
+open EcParsetree
 open EcModules
 open EcLocation
 open EcReduction
@@ -25,7 +26,6 @@ type goal   = judgment_uc * int
 type tactic = goal -> goals 
 
 (* -------------------------------------------------------------------- *)
-
 val cannot_apply : string -> string -> 'a
 val tacerror     : ?catchable:bool -> EcBaseLogic.tac_error -> 'a
 val tacuerror    : ?catchable:bool -> ('a, Format.formatter, unit, 'b) format4 -> 'a
@@ -39,9 +39,7 @@ val get_goal_e : goal -> env * LDecl.hyps * form
 val get_concl  : goal -> form
 val get_hyps   : goal -> LDecl.hyps
 val get_node   : goal -> LDecl.hyps * form
-
-
-val new_goal : judgment_uc -> LDecl.hyps * form -> goal
+val new_goal   : judgment_uc -> LDecl.hyps * form -> goal
 
 val upd_rule : int rule -> goal -> goals
 val upd_rule_done : int rule -> goal -> goals
@@ -73,7 +71,7 @@ val t_seq  : tactic -> tactic -> tactic
 val t_lseq : tactic list -> tactic
 
 val t_repeat : tactic -> tactic
-val t_do     : bool -> int option -> tactic -> tactic
+val t_do     : [`All | `Maybe] -> int option -> tactic -> tactic
 val t_try    : tactic -> tactic
 val t_or     : tactic -> tactic -> tactic
 
@@ -110,8 +108,12 @@ val t_elimT : form -> EcPath.path -> tactic
 
 val t_case : form -> tactic
 
-val t_rewrite_hyp  : bool -> EcIdent.t -> app_arg list -> tactic
-val t_rewrite_node : goal * int list -> bool -> int -> goals
+type dofpattern = LDecl.hyps -> form -> form -> (EcIdent.t * form)
+
+val t_rewrite_hyp  : ?fpat:dofpattern -> rwside -> EcIdent.t -> app_arg list -> tactic
+val t_rewrite_glob : ?fpat:dofpattern -> rwside -> EcPath.path -> EcTypes.ty list -> app_arg list -> tactic
+val t_rewrite_form : ?fpat:dofpattern -> rwside -> form -> app_arg list -> tactic
+val t_rewrite_node : ?fpat:dofpattern -> goal * int list -> rwside -> int -> goals
 
 val t_simplify : reduction_info -> tactic
 val t_simplify_nodelta : tactic
@@ -120,6 +122,8 @@ val t_split : tactic
 
 val t_left  : tactic
 val t_right : tactic
+
+val t_congr : form -> (form * form) list * EcTypes.ty -> tactic
 
 val t_smt : bool -> EcProvers.prover_infos -> tactic
 
@@ -136,6 +140,7 @@ val t_change : form -> tactic
 val t_subst_all : tactic
 val t_subst1    : form option -> tactic
 
+val t_assumption : tactic
 val t_progress : tactic -> tactic
 
 val t_field      : form tuple7 -> form * form -> tactic
