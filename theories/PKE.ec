@@ -76,6 +76,7 @@ module CCA (S:Scheme, A:Adversary, I:Init) = {
 
     I.init();
     log = [];
+    guess = false;
     (pk, sk) = S.kg();
     (m0, m1) = A.choose(pk);
     b        = ${0,1};
