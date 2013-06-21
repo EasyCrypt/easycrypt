@@ -242,8 +242,7 @@ let process_form hyps pf ty =
 
 (* -------------------------------------------------------------------- *)
 let process_formula g pf =
-  let hyps = get_hyps g in
-  process_form hyps pf tbool
+  process_form (get_hyps g) pf tbool
 
 (* -------------------------------------------------------------------- *)
 let process_mkn_apply process_cut pe (juc, _ as g) = 
@@ -268,12 +267,6 @@ let process_mkn_apply process_cut pe (juc, _ as g) =
   in
   let (juc,an), ags = mkn_apply process_elim_arg (juc,fn) args in
   (juc,an), fgs@ags
-
-(* -------------------------------------------------------------------- *)
-let process_elim loc pe (_,n as g) =
-  let (juc,an), gs = process_mkn_apply process_formula pe g in
-  let (_,f) = get_node (juc, an) in
-  t_on_first (t_use an gs) (set_loc loc (t_elim f) (juc,n))
 
 (* -------------------------------------------------------------------- *)
 let process_smt hitenv pi g =
@@ -628,7 +621,7 @@ let process_apply loc pe g =
 
     match p with
     | `Global p ->
-          gen_t_apply_glob (fun _ _ x -> x) p typs args g
+        gen_t_apply_glob (fun _ _ x -> x) p typs args g
 
     | `Local x -> 
         assert (typs = []);
@@ -729,8 +722,37 @@ let process_rewrite1 loc ri g =
         | Some (b, n) -> t_do b n do1 g
 
 (* -------------------------------------------------------------------- *)
-let process_new_rewrite loc ri g =
+let process_rewrite loc ri g =
   set_loc loc (t_lseq (List.map (process_rewrite1 loc) ri)) g
+
+(* -------------------------------------------------------------------- *)
+let process_elim loc pe ((juc, n) as g) =
+  let hyps = get_hyps g in
+
+  let (p, typs, ue, ax) = process_pterm loc hyps pe in
+  let args = List.map (trans_pterm_argument hyps ue) pe.fp_args in
+  let (_ax, ids) = check_pterm_arguments hyps ue ax args in
+
+  let (tue, ev) =
+    if not (can_concretize_pterm_arguments (ue, EV.empty) ids) then
+      tacuerror "in elim, cannot find instance";
+    (EcUnify.UniEnv.close ue, EV.empty)
+  in
+
+  let args = concretize_pterm_arguments (tue, ev) ids in
+  let typs = List.map (Tuni.subst tue) typs in
+
+  let (juc, fn) =
+    match p with
+    | `Local  x -> mkn_hyp  juc hyps x
+    | `Global x -> mkn_glob juc hyps x typs
+    | `Cut    x -> new_goal juc (hyps, x)
+  in
+
+  let ((juc, an), gs) = mkn_apply (fun _ _ a -> a) (juc, fn) args in
+  let (_, f) = get_node (juc, an) in
+
+    t_on_first (t_use an gs) (set_loc loc (t_elim f) (juc, n))
 
 (* -------------------------------------------------------------------- *)
 let process_logic hitenv loc t =
@@ -751,7 +773,7 @@ let process_logic hitenv loc t =
   | Pcut (name,phi)-> process_cut name phi
   | Pgeneralize l  -> process_generalize l
   | Pclear l       -> process_clear l
-  | Prewrite ri    -> process_new_rewrite loc ri
+  | Prewrite ri    -> process_rewrite loc ri
   | Psubst   ri    -> process_subst loc ri
   | Psimplify ri   -> process_simplify ri
   | Pchange pf     -> process_change pf
