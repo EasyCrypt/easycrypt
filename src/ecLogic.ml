@@ -661,7 +661,7 @@ let gen_eq_tuple_elim_proof types =
     t_seq_subgoal
       (t_apply_form (pred rvars locCF) (List.map (fun _ -> AAnode) types))
       ((
-        t_lseq [t_rewrite_hyp `Normal h1 [];
+        t_lseq [t_rewrite_hyp `Reverse h1 [];
         t_apply_hyp h2 [];
         t_apply_logic p_true_intro [] []]
       )::(List.map (fun _ -> t_reflex) types))
@@ -1048,12 +1048,12 @@ let cansubst_pv_eq hyps fx f1 f2 =
       | Fpvar(pv,m) ->
         let f2 = simplify {no_red with delta_h = None} hyps f2 in
         let fv = EcPV.PV.fv env m f2 in
-        if EcPV.PV.mem_pv pv fv then None
+        if EcPV.PV.mem_pv env pv fv then None
         else Some f1'
       | Fglob(mp,m) -> 
         let f2 = simplify {no_red with delta_h = None} hyps f2 in
         let fv = EcPV.PV.fv env m f2 in
-        if EcPV.PV.mem_glob mp fv then None
+        if EcPV.PV.mem_glob env mp fv then None
         else Some f1'
       | _ -> None
     else None in

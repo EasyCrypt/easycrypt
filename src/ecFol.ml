@@ -22,9 +22,6 @@ type quantif =
 
 type binding = (EcIdent.t * gty) list
 
-let mstd   = EcIdent.create "&std"
-let mpre   = EcIdent.create "&pre"
-let mpost  = EcIdent.create "&post"
 let mhr    = EcIdent.create "&hr"
 let mleft  = EcIdent.create "&1"
 let mright = EcIdent.create "&2"
@@ -51,13 +48,13 @@ and f_node =
   | Ftuple  of form list
 
   | FhoareF of hoareF (* $hr / $hr *)
-  | FhoareS of hoareS (* $hr  / $hr   *)
+  | FhoareS of hoareS 
 
   | FbdHoareF of bdHoareF (* $hr / $hr *)
-  | FbdHoareS of bdHoareS (* $hr  / $hr   *)
+  | FbdHoareS of bdHoareS 
 
   | FequivF of equivF (* $left,$right / $left,$right *)
-  | FequivS of equivS (* $left,$right / $left,$right *)
+  | FequivS of equivS 
 
   | Fpr of pr (* hr *)
 
@@ -372,8 +369,8 @@ module Hsform = Why3.Hashcons.Make (struct
           fv_union (f_fv f1) fv2
 
     | FhoareF hf ->
-        let fv = fv_union (Mid.remove mpre (f_fv hf.hf_pr)) 
-          (Mid.remove mpost (f_fv hf.hf_po)) in
+        let fv = fv_union (Mid.remove mhr (f_fv hf.hf_pr)) 
+          (Mid.remove mhr (f_fv hf.hf_po)) in
         EcPath.x_fv fv hf.hf_f
 
     | FhoareS hs ->
@@ -383,8 +380,8 @@ module Hsform = Why3.Hashcons.Make (struct
 
     | FbdHoareF bhf ->
         let fv = fv_union
-          (Mid.remove mpre  (f_fv bhf.bhf_pr)) 
-          (Mid.remove mpost (f_fv bhf.bhf_po)) in
+          (Mid.remove mhr  (f_fv bhf.bhf_pr)) 
+          (Mid.remove mhr (f_fv bhf.bhf_po)) in
         let fv = EcPath.x_fv fv bhf.bhf_f in
           fv_union (f_fv bhf.bhf_bd) fv
 
@@ -407,7 +404,7 @@ module Hsform = Why3.Hashcons.Make (struct
                          (EcModules.s_fv es.es_sr))
 
     | Fpr (m,mp,args,event) ->
-        let fve = Mid.remove mpost (f_fv event) in
+        let fve = Mid.remove mhr (f_fv event) in
         let fv  = EcPath.x_fv fve mp in
           List.fold_left (fun s f -> fv_union s (f_fv f)) (fv_add m fv) args
   
@@ -1184,7 +1181,7 @@ module Fsubst = struct
               es_sl = sl'; es_sr = sr'; }
 
     | Fpr (m, mp, args, e) ->
-        assert (not (Mid.mem mpost s.fs_mem));
+        assert (not (Mid.mem mhr s.fs_mem));
         let m'    = Mid.find_def m m s.fs_mem in
         let mp'   = EcPath.x_substm s.fs_sty.ts_p s.fs_mp mp in
         let args' = List.smart_map (f_subst s) args in

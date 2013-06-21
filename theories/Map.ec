@@ -109,8 +109,18 @@ save.
 lemma upd_in_rng_neq: forall (m:('a,'b) map) x y1 y2,
   in_rng y1 m =>
   (!in_dom x m \/ m.[x] <> Some y1) =>
-  in_rng y1 m.[x<-y2]
-by [].
+  in_rng y1 m.[x<-y2].
+proof.
+  intros=> m x y1 y2; delta in_rng; simplify.
+  intros=> y1_in_m [x_notin_m|mx_neq_y1].
+    rewrite rng_update_not_indom // Set.add_mem.
+    by left; assumption.
+
+    generalize y1_in_m; rewrite rng_def=> [y my_eq_y1].
+    rewrite rng_def; exists y; case (x = y).
+      intros=> eq_xy; smt.
+      by intros=> ne_xy; rewrite get_upd_neq.
+qed.
 
 (** find *) (* TODO: the axiomatization appears to be upside-down *)
 op find: ('a * 'b) cPred -> ('a,'b) map -> 'a option.
