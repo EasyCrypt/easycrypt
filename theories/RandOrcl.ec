@@ -87,7 +87,7 @@ theory WRO_Set.
 end WRO_Set.
 
 theory WRO_List.
-  require import NewList.
+  require import List.
   module ARO(R:Oracle):Oracle = {
     var log:from list
 

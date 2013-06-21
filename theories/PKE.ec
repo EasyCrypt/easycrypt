@@ -1,7 +1,7 @@
 require import Bool.
 require import Int.
 require import Option.
-require import NewList.
+require import List.
 
 type pkey.
 type skey.
@@ -76,6 +76,7 @@ module CCA (S:Scheme, A:Adversary, I:Init) = {
 
     I.init();
     log = [];
+    guess = false;
     (pk, sk) = S.kg();
     (m0, m1) = A.choose(pk);
     b        = ${0,1};

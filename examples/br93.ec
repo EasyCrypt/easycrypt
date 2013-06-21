@@ -300,8 +300,8 @@ proof.
  fun;if;[inline RO.o;wp;rnd 1%r (cPtrue)|];wp;skip;smt.
  inline CPA2(BR2,A).SO.kg CPA2(BR2,A).ARO.init RO.init.
  wp;rnd 1%r (cPtrue);wp;skip;progress;[smt|smt|smt|].
- rewrite (Dbool.mu_def (lambda b, b = result0)).
- case (result0);delta charfun;simplify;smt.
+ rewrite Dbool.mu_def.
+ case (result);delta charfun;simplify;smt.
  bdhoare_deno H1; smt.
 save.
 
