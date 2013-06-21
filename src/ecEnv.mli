@@ -78,6 +78,8 @@ module Fun : sig
 
   (* ------------------------------------------------------------------ *)
   (* FIXME: what are these functions for? *)
+  val prF_memenv : EcMemory.memory -> xpath -> env -> memenv
+
   val prF : xpath -> env -> env
 
   val hoareF_memenv : xpath -> env -> memenv * memenv

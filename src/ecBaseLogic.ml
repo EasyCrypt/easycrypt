@@ -104,6 +104,7 @@ type rule_name =
   | RN_hl_prfalse      
   | RN_hl_pror
   | RN_hl_bdeq      
+  | RN_hl_fel       of (form * form * form * form * form)
 
   | RN_bhl_rnd of (EcFol.form option * EcFol.form)
 

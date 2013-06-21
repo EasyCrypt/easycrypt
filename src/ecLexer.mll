@@ -94,6 +94,8 @@
     "pr_false"    , PRFALSE    ;        (* KW: tactic *)
     "pr_or"       , PROR       ;        (* KW: tactic *)
     "bd_eq"       , BDEQ       ;        (* KW: tactic *)
+    "bypr"        , BYPR       ;        (* KW: tactic *)
+    "fel"         , FEL        ;        (* KW: tactic *)
 
     "equiv_deno"  , EQUIVDENO  ;        (* KW: tactic *) 
     "conseq"      , CONSEQ     ;        (* KW: tactic *)

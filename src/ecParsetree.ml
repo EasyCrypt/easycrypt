@@ -317,6 +317,8 @@ type phltactic =
   | Pexfalso
   | Pbdhoaredeno  of cfpattern
   | Pequivdeno    of cfpattern
+  | PPr           of pformula * pformula
+  | Pfel          of int * (pformula * pformula * pformula * pformula * pformula)
   | Phoare
   | Pbdhoare
   | Pprbounded
