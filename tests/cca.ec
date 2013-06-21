@@ -105,7 +105,7 @@ lemma foo1 :
            x{1} = x{2} /\ (glob A'){1} = (glob A'){2} ==> 
            res{1} = res{2} /\  (glob A'){1} = (glob A'){2} ].
 proof.
- apply (foo' (<:A')).
+ apply (foo' (A')).
 save.
 
 

@@ -1488,8 +1488,13 @@ let transform_opt env ue pf tt =
     | PFint n ->
         f_int n
 
-    | PFtuple args ->
-        f_tuple (List.map (transf env) args)
+    | PFtuple args -> begin
+        let args = List.map (transf env) args in
+          match args with
+          | []  -> f_tt
+          | [f] -> f
+          | fs  -> f_tuple fs
+    end
 
     | PFident ({ pl_desc = name;pl_loc = loc }, tvi) -> 
         let tvi = omap tvi (transtvi env ue) in

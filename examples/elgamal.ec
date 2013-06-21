@@ -284,7 +284,7 @@ lemma Pr1 (A<:Adv) &m :
    Pr[CPA(ElGamal,A).main() @ &m : res] = 
    Pr[DDH0(Inv(A)).main() @ &m : res].
 proof.
- equiv_deno (equiv1 (<:A));smt.
+ equiv_deno (equiv1 (A));smt.
 save.
 
 lemma Pr2 (A<:Adv) &m : 
@@ -344,7 +344,7 @@ lemma Pr4 (A<:Adv) &m :
 proof.
  intros Ha1 Ha2.
  bdhoare_deno (_: true ==> _); last smt.
- apply (Pr4_aux(<:A) _ _).
+ apply (Pr4_aux(A) _ _).
   assumption.
   assumption.
  smt.
@@ -357,10 +357,10 @@ lemma Conclusion1 (A<:Adv) &m :
  `| Pr[DDH0(Inv(A)).main() @ &m :res] - Pr[DDH1(Inv(A)).main() @ &m :res] |.
 proof. 
   intros Ha1 Ha2.
-  rewrite (Pr1 (<:A) &m).
-  rewrite -(Pr4 (<:A) &m _ _);try assumption.
-  rewrite -(Fact3 (<:A) &m).
-  rewrite (Pr2 (<:A) &m);smt.
+  rewrite (Pr1 (A) &m).
+  rewrite -(Pr4 (A) &m _ _);try assumption.
+  rewrite -(Fact3 (A) &m).
+  rewrite (Pr2 (A) &m);smt.
 save.
 
 lemma Conclusion (A<:Adv) &m :
@@ -371,6 +371,6 @@ lemma Conclusion (A<:Adv) &m :
    `| Pr[DDH0(I).main() @ &m :res] - Pr[DDH1(I).main() @ &m :res] |.
 proof.
   intros Ha1 Ha2.
-  exists (<:Inv(A)).
-  apply (Conclusion1 (<:A) &m _ _);assumption.
+  exists (Inv(A)).
+  apply (Conclusion1 (A) &m _ _);assumption.
 save.

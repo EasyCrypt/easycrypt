@@ -335,7 +335,7 @@ proof.
         Pr[CPA(BR2,A).main() @ &m : res \/ mem Rnd.r RO.s] _).
  equiv_deno (_ : (glob A){1} = (glob A){2} ==>
  !(mem Rnd.r RO.s){2} => res{1} = res{2});
-   [ apply (eq1(<:A) _ _);try assumption| |];smt.
+   [ apply (eq1(A) _ _);try assumption| |];smt.
  cut H:
  (Pr[CPA(BR2,A).main() @ &m : res \/ mem Rnd.r RO.s] =
   Pr[CPA(BR2,A).main() @ &m : res] +  Pr[CPA(BR2,A).main() @ &m : mem Rnd.r RO.s] -

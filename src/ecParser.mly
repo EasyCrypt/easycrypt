@@ -631,11 +631,8 @@ sform_u:
 | TICKPIPE ti=tvars_app? e =form PIPE 
     { pfapp_symb e.pl_loc EcCoreLib.s_abs ti [e] }
 
-| LPAREN es=plist2(form, COMMA) RPAREN
-   { PFtuple es }
-
-| LPAREN e=form_u RPAREN
-   { e }
+| LPAREN fs=plist0(form, COMMA) RPAREN
+   { PFtuple fs }
 
 | LBRACKET ti=tvars_app? es=loc(plist0(form, SEMICOLON)) RBRACKET
    { (pflist es.pl_loc ti es.pl_desc).pl_desc }
@@ -1355,7 +1352,6 @@ fpattern_arg:
 | UNDERSCORE   { EA_none }
 | f=sform      { EA_form f }
 | s=mident     { EA_mem s }
-| LPAREN LTCOLON x=mod_qident RPAREN { EA_mp x }
 ;
 
 fpattern(F):

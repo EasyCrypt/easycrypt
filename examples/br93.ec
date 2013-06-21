@@ -189,7 +189,7 @@ proof.
  intros A Hlossless1 Hlossless2 &m.
  equiv_deno (_ : (glob A){1} = (glob A){2} ==>
  !(mem M.r ARO.log){2} => res{1} = res{2});
-   [ apply (eq1(<:A) _ _);try assumption| |];smt.
+   [ apply (eq1(A) _ _);try assumption| |];smt.
 save.
 
 
@@ -230,8 +230,8 @@ proof.
  intros A Hlossless1 Hlossless2 &m.
  apply (real_le_trans _
          Pr[CPA(BR2,A).main() @ &m : res \/ mem M.r ARO.log] _ _ _).
- apply (prob1_1 (<:A) _ _ &m );try assumption;smt.
- apply (prob1_2 (<:A)  &m).
+ apply (prob1_1 (A) _ _ &m );try assumption;smt.
+ apply (prob1_2 (A)  &m).
 save.
 
 (* Step 2: modify the cpa game so the sampling of b is done at the end *)
@@ -300,11 +300,9 @@ proof.
  fun;if;[inline RO.o;wp;rnd 1%r (cPtrue)|];wp;skip;smt.
  inline CPA2(BR2,A).SO.kg CPA2(BR2,A).ARO.init RO.init.
  wp;rnd 1%r (cPtrue);wp;skip;progress;[smt|smt|smt|].
- rewrite (Dbool.mu_def (lambda b, b = result0)).
- case (result0);delta charfun;simplify;smt.
+ rewrite Dbool.mu_def; case (result);delta charfun;simplify;smt.
  bdhoare_deno H1; smt.
 save.
-
 
 lemma prob2_2 : 
  forall (A <: Adv {M,RO,ARO}), 
@@ -314,7 +312,7 @@ lemma prob2_2 :
 proof.
  intros A Hlossless1 Hlossless2 &m.
  equiv_deno (_ : (glob A){1} = (glob A){2} ==> ={res,ARO.log,M.r});[|smt|smt].
- apply (eq2(<:A) _ _); assumption.
+ apply (eq2(A) _ _); assumption.
 save.
 
 lemma prob2_3 : 
@@ -326,7 +324,7 @@ lemma prob2_3 :
 proof.
  intros A Hlossless1 Hlossless2 &m.
  equiv_deno (_ : (glob A){1} = (glob A){2} ==> ={res,ARO.log,M.r});[|smt|smt].
- apply (eq2(<:A) _ _);assumption.
+ apply (eq2(A) _ _);assumption.
 save.
 
 
@@ -437,17 +435,17 @@ proof.
  apply (real_le_trans _
  (Pr[CPA(BR2,A).main() @ &m : res ] + 
   Pr[CPA(BR2,A).main() @ &m : mem M.r ARO.log]) _ _ _).
-  apply (prob1_3(<:A) _ _ &m);try assumption.
-  rewrite (prob2_2(<:A) _ _ &m);try assumption.
-  rewrite (prob2_3(<:A) _ _ &m);try assumption.
-  rewrite (prob2_1(<:A) _ _ &m);try assumption.
+  apply (prob1_3(A) _ _ &m);try assumption.
+  rewrite (prob2_2(A) _ _ &m);try assumption.
+  rewrite (prob2_3(A) _ _ &m);try assumption.
+  rewrite (prob2_1(A) _ _ &m);try assumption.
   cut aux: (forall (a b c : real), b <= c => a + b <= a + c).
   smt.
   apply (aux (1%r/2%r) (Pr[CPA2(BR2,A).main() @ &m : mem M.r ARO.log])
   Pr[OW(BR_OW(A)).main() @ &m : res] _).
   equiv_deno (_ : (glob A){1} = (glob A){2} ==> 
   mem M.r{1} ARO.log{1} => res{2});[|smt|smt].
-  apply (eq3(<:A) _ _);assumption.
+  apply (eq3(A) _ _);assumption.
 save.
 
 lemma Conclusion (A <: Adv {M,RO,ARO}) &m :
@@ -456,9 +454,9 @@ lemma Conclusion (A <: Adv {M,RO,ARO}) &m :
 exists (I<:Inverter), Pr[CPA(BR,A).main() @ &m : res] - 1%r / 2%r <= 
                       Pr[OW(I).main() @ &m : res].
 proof.
- intros Hlossless1 Hlossless2;exists (<:BR_OW(A)).
+ intros Hlossless1 Hlossless2;exists (BR_OW(A)).
  cut aux : 
  (forall (x, y:real), x <= 1%r / 2%r + y => x - 1%r / 2%r  <= y);first smt.
  apply (aux _ _ _).
- apply (Reduction (<:A) &m _ _);assumption.
+ apply (Reduction (A) &m _ _);assumption.
 save.
