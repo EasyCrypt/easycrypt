@@ -24,7 +24,7 @@ let process_case loc pf g =
     let f = process_prhl_formula g pf in
     EcPhl.t_equiv_case f g
   | _ ->
-    let f = process_formula g pf in
+    let f = process_formula (get_hyps g) pf in
     t_seq (set_loc loc (t_case f))
       (t_simplify EcReduction.betaiota_red) g
 

@@ -32,10 +32,10 @@ type hitenv = {
 
 (* -------------------------------------------------------------------- *)
 val process_form    : EcEnv.LDecl.hyps -> pformula -> ty -> form
-val process_formula : goal -> pformula -> form
+val process_formula : EcEnv.LDecl.hyps -> pformula -> form
 
 val process_mkn_apply :
-     (goal -> 'a -> form)
+     ('a -> form)
   -> 'a fpattern
   -> goal
   -> goal * int list
