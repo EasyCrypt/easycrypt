@@ -133,108 +133,13 @@ module BR2(R : Oracle) : Scheme(R) = {
 
 lemma eq1_enc :
  equiv [ BR(RO).enc ~ BR2(RO).enc : 
-={pk,RO.m,m} ==>
+={pk,RO.m} ==>
 !in_dom M.r{2} RO.m{2} => (={res} /\ eq_except RO.m{1} RO.m{2} M.r{2}) ].
 proof.
  fun;inline RO.o.
- wp;rnd (lambda v, m{2} ^^ v)(lambda v,m{2} ^^ v).
+ wp;rnd (lambda v, m{1} ^^ v)(lambda v,m{1} ^^ v).
  wp;rnd;skip;progress;smt.
 save.
-
-
-lemma eq1 : forall (A <: Adv {M,RO,ARO}), 
-(forall (O <: ARO), islossless O.o =>  islossless A(O).a1) =>
-(forall (O <: ARO), islossless O.o =>  islossless A(O).a2) =>
- equiv [ CPA(BR,A).main ~ CPA(BR2,A).main : 
-(glob A){1} = (glob A){2} ==>
- (!mem M.r ARO.log){2} => ={res}].
-proof.
- intros A HALossless1 HALossless2.
- fun.
- call ((!mem M.r ARO.log){2} => 
-       (={ARO.log,c} /\  eq_except RO.m{1} RO.m{2}  M.r{2} 
-                     /\ (glob A){1} = (glob A){2}))
-      ((!mem M.r ARO.log){2} => ={res}).
- fun (mem M.r ARO.log) 
-     (={ARO.log} /\ eq_except RO.m{1} RO.m{2} M.r{2});
-      [smt|smt|assumption| | |].
- fun;if;[smt|inline RO.o;wp;rnd|];wp;skip;progress;smt.
- intros &m H;fun;if;[inline RO.o;wp;rnd 1%r cPtrue|];wp;skip;progress;smt.
- intros &m;fun;if;[inline RO.o;wp;rnd 1%r cPtrue|];wp;skip;progress;smt.
- call (={pk,RO.m,m})
-      (!in_dom M.r{2} RO.m{2} =>
-       (={res} /\ eq_except RO.m{1} RO.m{2} M.r{2})).
- apply (eq1_enc).
- rnd.
- call (={p,ARO.log,RO.m} /\ (glob A){1} = (glob A){2} /\
- (forall (x : randomness), mem x ARO.log{2} <=> in_dom x RO.m{2}))
-(={res,ARO.log,RO.m} /\ (glob A){1} = (glob A){2} /\
- (forall (x : randomness), mem x ARO.log{2} <=> in_dom x RO.m{2})).
- fun ( ={RO.m,ARO.log} /\
- (forall (x : randomness), mem x ARO.log{2} <=> in_dom x RO.m{2}));[smt|smt|].
-  fun;if;[smt|inline RO.o;wp;rnd|];wp;skip;progress;smt.
-  inline CPA(BR,A).SO.kg CPA(BR2,A).SO.kg.
-  inline CPA(BR,A).ARO.init CPA(BR2,A).ARO.init RO.init;wp;rnd;wp;skip.
-  progress;smt.
-save.
-
-
-lemma prob1_1 :
- forall (A <: Adv {M,RO,ARO}),
-(forall (O <: ARO), islossless O.o => islossless A(O).a1) =>
-(forall (O <: ARO), islossless O.o => islossless A(O).a2) =>
- forall &m , Pr[CPA(BR,A).main() @ &m: res] <=
-             Pr[CPA(BR2,A).main() @ &m : res \/ mem M.r ARO.log].
-proof.
- intros A Hlossless1 Hlossless2 &m.
- equiv_deno (_ : (glob A){1} = (glob A){2} ==>
- !(mem M.r ARO.log){2} => res{1} = res{2});
-   [ apply (eq1(<:A) _ _);try assumption| |];smt.
-save.
-
-
-lemma prob1_2 :
- forall (A <: Adv {M,RO,ARO}),
- forall &m,
-Pr[CPA(BR2,A).main() @ &m : res \/ mem M.r ARO.log] <=
-Pr[CPA(BR2,A).main() @ &m : res ] + 
-Pr[CPA(BR2,A).main() @ &m :  mem M.r ARO.log].
-proof.
- intros A &m.
- cut H:
- (Pr[CPA(BR2,A).main() @ &m : res \/ mem M.r ARO.log] =
-  Pr[CPA(BR2,A).main() @ &m : res] +  Pr[CPA(BR2,A).main() @ &m : mem M.r ARO.log] -
-  Pr[CPA(BR2,A).main() @ &m : res /\ mem M.r ARO.log]).
- pr_or;smt.
- rewrite H.
- cut Hge:(0%r <= (Pr[CPA(BR2,A).main() @ &m : res /\ mem M.r ARO.log])).
- smt.
- generalize Hge.
- generalize (Pr[CPA(BR2,A).main() @ &m : res /\ mem M.r ARO.log]).
- generalize (Pr[CPA(BR2,A).main() @ &m : res]).
- generalize (Pr[CPA(BR2,A).main() @ &m : mem M.r ARO.log]).
- smt.
-save.
-
-lemma real_le_trans : forall(a, b, c : real),  
- Real.(<=) a b => Real.(<=) b  c => a <= c by [].
-
-lemma prob1_3 :
- forall (A <: Adv {M,RO,ARO}),
-(forall (O <: ARO), islossless O.o => islossless A(O).a1) =>
-(forall (O <: ARO), islossless O.o => islossless A(O).a2) =>
- forall &m, Pr[CPA(BR,A).main() @ &m: res] <=
-             Pr[CPA(BR2,A).main() @ &m : res ] + 
-             Pr[CPA(BR2,A).main() @ &m :  mem M.r ARO.log].
-proof.
- intros A Hlossless1 Hlossless2 &m.
- apply (real_le_trans _
-         Pr[CPA(BR2,A).main() @ &m : res \/ mem M.r ARO.log] _ _ _).
- apply (prob1_1 (<:A) _ _ &m );try assumption;smt.
- apply (prob1_2 (<:A)  &m).
-save.
-
-(* Step 2: modify the cpa game so the sampling of b is done at the end *)
 
 module CPA2(S : Scheme, A_ : Adv) = {
  module ARO = ARO(RO)
@@ -249,39 +154,57 @@ module CPA2(S : Scheme, A_ : Adv) = {
   ARO.init();
   (pk,sk)  = SO.kg();
   (m0,m1)  = A.a1(pk);
-  c  = SO.enc(pk,b?m0:m1);
+  c  = SO.enc(pk,m0);
   b' = A.a2(c);
   b = ${0,1}; 
   return b = b';
  } 
 }.
 
-lemma eq2 : forall (A <: Adv {M,RO,ARO}), 
-(forall (O <: ARO), islossless O.o => islossless A(O).a1) =>
-(forall (O <: ARO), islossless O.o => islossless A(O).a2) =>
- equiv [ CPA(BR2,A).main ~ CPA2(BR2,A).main : 
- (glob A){1} = (glob A){2} ==> ={res,ARO.log,M.r}].
+
+lemma eq1 : forall (A <: Adv {M,RO,ARO}), 
+(forall (O <: ARO), islossless O.o =>  islossless A(O).a1) =>
+(forall (O <: ARO), islossless O.o =>  islossless A(O).a2) =>
+ equiv [ CPA(BR,A).main ~ CPA2(BR2,A).main : 
+(glob A){1} = (glob A){2} ==>
+ (!mem M.r ARO.log){2} => ={res}].
 proof.
- intros A Hlossless1 Hlossless2.
+ intros A HALossless1 HALossless2.
  fun.
- swap{2} -1.
- call (={ARO.log,RO.m,M.r,c} /\ (glob A){1} = (glob A){2})
-      (={ARO.log,RO.m,M.r,res} /\ (glob A){1} = (glob A){2}).
- fun (={ARO.log,RO.m,M.r});[smt|smt|].
- fun;if;[smt|inline RO.o;wp;rnd |];wp;skip;progress;smt.
- inline CPA(BR2, A).SO.enc CPA2(BR2, A).SO.enc.
- swap{2} -3;do 3!(wp;rnd);wp.
- call (={ARO.log,RO.m,p} /\ (glob A){1} = (glob A){2})
-      (={ARO.log,RO.m,res} /\ (glob A){1} = (glob A){2}).
- fun (={ARO.log,RO.m});[smt|smt|].
- fun;if;[smt|inline RO.o;wp;rnd |];wp;skip;progress;smt.
- inline  CPA2(BR2, A).SO.kg CPA2(BR2, A).ARO.init 
-         CPA(BR2, A).SO.kg CPA(BR2, A).ARO.init RO.init.
-admit.
-(* do 2!(wp;);wp;skip;progress;smt. *)
+swap{2} -2.
+ call ((!mem M.r ARO.log){2} => 
+       (={ARO.log,c} /\  eq_except RO.m{1} RO.m{2}  M.r{2} 
+                     /\ (glob A){1} = (glob A){2}))
+      ((!mem M.r ARO.log){2} => ={res}).
+ fun (mem M.r ARO.log) 
+     (={ARO.log} /\ eq_except RO.m{1} RO.m{2} M.r{2});
+      [smt|smt|assumption| | |].
+ fun;if;[smt|inline RO.o;wp;rnd|];wp;skip;progress;smt.
+ intros &m H;fun;if;[inline RO.o;wp;rnd 1%r cPtrue|];wp;skip;progress;smt.
+ intros &m;fun;if;[inline RO.o;wp;rnd 1%r cPtrue|];wp;skip;progress;smt.
+ call (={pk,RO.m})
+      (!in_dom M.r{2} RO.m{2} =>
+       (={res} /\ eq_except RO.m{1} RO.m{2} M.r{2})).
+ apply (eq1_enc).
+ rnd.
+ call (={p,ARO.log,RO.m} /\ (glob A){1} = (glob A){2} /\
+ (forall (x : randomness), mem x ARO.log{2} <=> in_dom x RO.m{2}))
+(={res,ARO.log,RO.m} /\ (glob A){1} = (glob A){2} /\
+ (forall (x : randomness), mem x ARO.log{2} <=> in_dom x RO.m{2})).
+ fun ( ={RO.m,ARO.log} /\
+ (forall (x : randomness), mem x ARO.log{2} <=> in_dom x RO.m{2}));[smt|smt|].
+  fun;if;[smt|inline RO.o;wp;rnd|];wp;skip;progress;smt.
+  inline CPA(BR,A).SO.kg CPA2(BR2,A).SO.kg.
+  inline CPA(BR,A).ARO.init CPA2(BR2,A).ARO.init RO.init;wp;rnd;wp;skip.
+  progress;smt.
 save.
 
-lemma prob2_1 : 
+
+lemma real_le_trans : forall(a, b, c : real),  
+ Real.(<=) a b => Real.(<=) b  c => a <= c by [].
+
+
+lemma prob1_1 : 
  forall (A <: Adv {M,RO,ARO}), 
 (forall (O <: ARO), islossless O.o => islossless A(O).a1) =>
 (forall (O <: ARO), islossless O.o => islossless A(O).a2) =>
@@ -305,30 +228,25 @@ proof.
  bdhoare_deno H1; smt.
 save.
 
-
-lemma prob2_2 : 
- forall (A <: Adv {M,RO,ARO}), 
+lemma prob1_2 :
+ forall (A <: Adv {M,RO,ARO}) &m,
 (forall (O <: ARO), islossless O.o => islossless A(O).a1) =>
 (forall (O <: ARO), islossless O.o => islossless A(O).a2) =>
- forall &m, Pr[CPA(BR2,A).main() @ &m: res] = Pr[CPA2(BR2,A).main() @ &m : res].
+Pr[CPA(BR,A).main() @ &m: res] <=
+1%r/2%r + Pr[CPA2(BR2,A).main() @ &m : mem M.r ARO.log].
 proof.
- intros A Hlossless1 Hlossless2 &m.
- equiv_deno (_ : (glob A){1} = (glob A){2} ==> ={res,ARO.log,M.r});[|smt|smt].
- apply (eq2(<:A) _ _); assumption.
+ intros A &m Hlossless1 Hlossless2.
+ rewrite -(prob1_1(<:A) _ _ &m);[assumption | assumption | ].
+ apply (real_le_trans _ 
+             Pr[CPA2(BR2,A).main() @ &m : res \/ mem M.r ARO.log] _).
+ equiv_deno (_ : (glob A){1} = (glob A){2} ==>
+ !(mem M.r ARO.log){2} => res{1} = res{2});
+   [ apply (eq1(<:A) _ _);try assumption| |];smt.
+ cut H:
+ (Pr[CPA2(BR2,A).main() @ &m : res \/ mem M.r ARO.log] =
+  Pr[CPA2(BR2,A).main() @ &m : res] +  Pr[CPA2(BR2,A).main() @ &m : mem M.r ARO.log] -
+  Pr[CPA2(BR2,A).main() @ &m : res /\ mem M.r ARO.log]);[pr_or|];smt.
 save.
-
-lemma prob2_3 : 
- forall (A <: Adv {M,RO,ARO}), 
-(forall (O <: ARO), islossless O.o => islossless A(O).a1) =>
-(forall (O <: ARO), islossless O.o => islossless A(O).a2) =>
- forall &m, Pr[CPA(BR2,A).main() @ &m: mem M.r ARO.log] =
-            Pr[CPA2(BR2,A).main() @ &m : mem M.r ARO.log].
-proof.
- intros A Hlossless1 Hlossless2 &m.
- equiv_deno (_ : (glob A){1} = (glob A){2} ==> ={res,ARO.log,M.r});[|smt|smt].
- apply (eq2(<:A) _ _);assumption.
-save.
-
 
 module type Inverter = {
  fun i(pk : pkey, y : randomness) : randomness
@@ -379,7 +297,7 @@ proof.
 save.
 
 
-lemma eq3 : forall (A <: Adv {M,RO,ARO}), 
+lemma eq2 : forall (A <: Adv {M,RO,ARO}), 
 (forall (O <: ARO), islossless O.o => islossless A(O).a1) =>
 (forall (O <: ARO), islossless O.o => islossless A(O).a2) =>
  equiv [ CPA2(BR2,A).main ~ OW(BR_OW(A)).main : 
@@ -424,7 +342,7 @@ assumption.
 delta;simplify.
 intros Hin_dom Hf.
 rewrite (proj_def<:from> x2).
-apply (f_iny x{2} x2 pk{2} sk{2} _ _);smt.
+apply (f_iny _ _ pk{2} sk{2} _ _);smt.
 save.
 
 
@@ -434,20 +352,15 @@ lemma Reduction (A <: Adv {M,RO,ARO}) &m :
 Pr[CPA(BR,A).main() @ &m : res] <= 1%r / 2%r + Pr[OW(BR_OW(A)).main() @ &m : res].
 proof.
  intros Hlossless1 Hlossless2.
- apply (real_le_trans _
- (Pr[CPA(BR2,A).main() @ &m : res ] + 
-  Pr[CPA(BR2,A).main() @ &m : mem M.r ARO.log]) _ _ _).
-  apply (prob1_3(<:A) _ _ &m);try assumption.
-  rewrite (prob2_2(<:A) _ _ &m);try assumption.
-  rewrite (prob2_3(<:A) _ _ &m);try assumption.
-  rewrite (prob2_1(<:A) _ _ &m);try assumption.
-  cut aux: (forall (a b c : real), b <= c => a + b <= a + c).
-  smt.
-  apply (aux (1%r/2%r) (Pr[CPA2(BR2,A).main() @ &m : mem M.r ARO.log])
-  Pr[OW(BR_OW(A)).main() @ &m : res] _).
-  equiv_deno (_ : (glob A){1} = (glob A){2} ==> 
-  mem M.r{1} ARO.log{1} => res{2});[|smt|smt].
-  apply (eq3(<:A) _ _);assumption.
+ apply (real_le_trans _  
+               (1%r/2%r + Pr[CPA2(BR2,A).main() @ &m : mem M.r ARO.log]) _).
+ apply (prob1_2(<:A) &m _ _ );assumption.
+ cut H: (Pr[CPA2(BR2,A).main() @ &m : mem M.r ARO.log] <=
+         Pr[OW(BR_OW(A)).main() @ &m : res]).
+ equiv_deno (_ : (glob A){1} = (glob A){2} ==>
+ (mem M.r ARO.log){1} => res{2});trivial.
+ apply (eq2(<:A));assumption.
+ by smt.
 save.
 
 lemma Conclusion (A <: Adv {M,RO,ARO}) &m :
