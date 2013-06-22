@@ -252,11 +252,11 @@ type ffpattern = pformula fpattern
 type cfpattern = (pformula option * pformula option) fpattern
 
 type preduction = {
-  pbeta   : bool;
-  pdelta  : pqsymbol list option;
-  pzeta   : bool;   (* remove let *)
-  piota   : bool;   (* remove case *)
-  plogic  : bool;   (* perform logical simplification *)
+  pbeta    : bool;
+  pdelta   : pqsymbol list option;
+  pzeta    : bool;   (* remove let *)
+  piota    : bool;   (* remove case *)
+  plogic   : bool;   (* perform logical simplification *)
   pmodpath : bool;   (* normalize modpath *)
 }
 
@@ -333,7 +333,8 @@ and pinline_arg =
 type intropattern1 =
   | IPCore of (symbol option) located
   | IPCase of intropattern list
-  | IPDone
+  | IPDone of bool
+  | IPSimplify
 
 and intropattern = intropattern1 list
 

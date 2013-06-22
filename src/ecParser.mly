@@ -260,7 +260,9 @@
 %token SEQ
 %token SIMPLIFY
 %token SKIP
+%token SLASHEQ
 %token SLASHSLASH
+%token SLASHSLASHEQ
 %token SMT
 %token SPLIT
 %token SPLITWHILE
@@ -1339,7 +1341,13 @@ intro_pattern:
    { IPCase ip }
 
 | SLASHSLASH
-   { IPDone }
+   { IPDone false }
+
+| SLASHSLASHEQ
+   { IPDone true }
+
+| SLASHEQ
+   { IPSimplify }
 ;
 
 fpattern_head(F):

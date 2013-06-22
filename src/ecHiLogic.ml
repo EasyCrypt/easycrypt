@@ -169,26 +169,41 @@ let process_intros ?(cf = true) pis (juc, n) =
       t_on_goals
         (t_clear (EcIdent.Sid.of_list [h]))
         (t_on_first (t_use n []) (t_elim f (g, an)))
+
+  and simplify g =
+    let ri = {
+      EcReduction.beta    = true;
+      EcReduction.delta_p = None;
+      EcReduction.delta_h = None;
+      EcReduction.zeta    = true;
+      EcReduction.iota    = true;
+      EcReduction.logic   = false; 
+      EcReduction.modpath = false;
+    } in
+      t_simplify ri g
   in
 
   let rec collect acc core pis =
-    match pis, core with
-    | [], [] -> acc
-    | [], _  -> `Core (List.rev core) :: acc
+    let maybe_core () =
+      match core with
+      | [] -> acc
+      | _  -> `Core (List.rev core) :: acc
+    in
 
-    | IPCore x :: pis, _  -> collect acc (x :: core) pis
-    | IPDone   :: pis, [] -> collect (`Done :: acc) [] pis
-    | IPDone   :: pis, _  ->
-        let acc = `Core (List.rev core) :: acc in
-        let acc = `Done :: acc in
-          collect acc [] pis
+    match pis with
+    | [] -> maybe_core ()
 
-    | IPCase x :: pis, core  -> begin
-        let x   = List.map (collect [] []) x in
-          match core with
-          | [] -> collect (`Case x :: acc) [] pis
-          | _  -> collect (`Case x :: `Core (List.rev core) :: acc) [] pis
-    end
+    | IPCore x :: pis -> collect acc (x :: core) pis
+
+    | IPDone b :: pis ->
+        collect (`Done b :: maybe_core ()) [] pis
+
+    | IPSimplify :: pis ->
+        collect (`Simpl :: maybe_core ()) [] pis
+
+    | IPCase x :: pis ->
+        let x = List.map (collect [] []) x in
+          collect (`Case x :: maybe_core ()) [] pis
   in
 
   let rec dointro nointro pis (gs : goals) =
@@ -196,8 +211,20 @@ let process_intros ?(cf = true) pis (juc, n) =
       List.fold_left
         (fun (nointro, gs) ip ->
           match ip with
-          | `Core ids -> (false  , t_on_goals (t_intros (List.map mk_id ids)) gs)
-          | `Done     -> (nointro, t_on_goals process_trivial gs)
+          | `Core ids ->
+              (false, t_on_goals (t_intros (List.map mk_id ids)) gs)
+
+          | `Done b   ->
+              let t =
+                match b with
+                | true  -> t_seq simplify process_trivial
+                | false -> process_trivial
+              in
+                (nointro, t_on_goals t gs)
+
+          | `Simpl ->
+              (nointro, t_on_goals simplify gs)
+
           | `Case pis ->
               let gs =
                 match nointro && not cf with

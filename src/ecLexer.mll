@@ -278,7 +278,9 @@ rule main = parse
   | "-" { MINUS }
   | "+" { ADD }
 
-  | "//" { SLASHSLASH }
+  | "//"  { SLASHSLASH }
+  | "/="  { SLASHEQ }
+  | "//=" { SLASHSLASHEQ }
 
   | op1 as s  { OP1 s }
   | op2 as s  { OP2 s }
