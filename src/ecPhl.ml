@@ -1837,8 +1837,8 @@ let check_swap env s1 s2 =
       "cannot swap : the two statement are not independants, the first statement can %s %a which can be %s by the second"
       s1 (PV.pp env) d s2 in
   if not (PV.is_empty m2r1) then error "read" "written" m2r1;
-  if not (PV.is_empty m1m2) then error "written" "written" m1m2;
-  if not (PV.is_empty m1r2) then error "written" "read" m1r2
+  if not (PV.is_empty m1m2) then error "write" "written" m1m2;
+  if not (PV.is_empty m1r2) then error "write" "read" m1r2
 
 
 let swap_stmt env p1 p2 p3 s = 
