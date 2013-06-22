@@ -1947,7 +1947,7 @@ let rec t_equiv_cond side g =
                 t_intros_i [m2;h];
                 t_elim_hyp h;
                 t_intros_i [h1;h2];
-                t_seq_subgoal (t_rewrite_hyp `Reverse hiff 
+                t_seq_subgoal (t_rewrite_hyp `RtoL hiff 
                                  [AAmem m1;AAmem m2;AAnode])
                   [t_hyp h1; t_hyp h2]] in
       t_seq_subgoal (t_cut fiff)

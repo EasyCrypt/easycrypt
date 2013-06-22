@@ -748,7 +748,7 @@ let process_rewrite1 loc ri g =
             find_rewrite_pattern (check_pterm_arguments hyps ue ax args)
         in
 
-        let fp = match s with `Normal -> f1 | `Reverse -> f2 in
+        let fp = match s with `LtoR -> f1 | `RtoL -> f2 in
   
         let (_ue, tue, ev) =
           let ev = evmap_of_pterm_arguments ids in

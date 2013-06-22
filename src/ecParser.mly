@@ -1373,8 +1373,8 @@ fpattern(F):
 ;
 
 rwside:
-| MINUS { `Reverse }
-| empty { `Normal  }
+| MINUS { `RtoL }
+| empty { `LtoR }
 ;
 
 rwrepeat:

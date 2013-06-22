@@ -344,7 +344,7 @@ type rwarg =
   | RWDone
   | RWRw of (rwside * trepeat option * Sint.t option * ffpattern)
 
-and rwside   = [`Normal | `Reverse]
+and rwside   = [`LtoR | `RtoL]
 
 type logtactic =
   | Passumption of (pqsymbol option * ptyannot option)
