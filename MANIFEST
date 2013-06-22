@@ -31,6 +31,10 @@ src/*.mll
 theories/*.ec
 theories/prelude/*.ec
 
+# EasyCrypt examples
+examples/*.ec
+examples/list-ddh/*.ec
+
 # EasyCrypt tests files
 find:tests:*.ec
 
