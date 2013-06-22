@@ -59,8 +59,14 @@ and process_tactic_chain mkpv (t : ptactic_chain) (gs : goals) : goals =
 
 (* -------------------------------------------------------------------- *)
 and process_tactic mkpv (tac : ptactic) (gs : goals) : goals =
+  let cf =
+    match unloc tac.pt_core with
+    | Plogic (Pintro _ | Prewrite _) | Pidtac _ -> true
+    | _ -> false
+  in
+
   let gs = process_tactic_core mkpv tac.pt_core gs in
-  let gs = t_on_goals (EcHiLogic.process_intros tac.pt_intros) gs in
+  let gs = t_on_goals (EcHiLogic.process_intros ~cf tac.pt_intros) gs in
     gs
 
 (* -------------------------------------------------------------------- *)

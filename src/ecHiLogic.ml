@@ -158,7 +158,7 @@ let process_assumption loc (pq, tvi) g =
       | _ -> process_global loc (pq,tvi) g
 
 (* -------------------------------------------------------------------- *)
-let process_intros pis (juc, n) =
+let process_intros ?(cf = true) pis (juc, n) =
   let mk_id s = lmap (fun s -> EcIdent.create (odfl "_" s)) s in
 
   let elim_top g =
@@ -191,20 +191,29 @@ let process_intros pis (juc, n) =
     end
   in
 
-  let rec dointro pis (gs : goals) =
-    List.fold_left
-      (fun gs ip ->
-        match ip with
-        | `Core ids -> t_on_goals (t_intros (List.map mk_id ids)) gs
-        | `Done     -> t_on_goals process_trivial gs
-        | `Case pis ->
-            let t gs = t_subgoal (List.map dointro1 pis) (elim_top gs) in
-              t_on_goals t gs)
-      gs pis
+  let rec dointro nointro pis (gs : goals) =
+    let (_, gs) =
+      List.fold_left
+        (fun (nointro, gs) ip ->
+          match ip with
+          | `Core ids -> (false  , t_on_goals (t_intros (List.map mk_id ids)) gs)
+          | `Done     -> (nointro, t_on_goals process_trivial gs)
+          | `Case pis ->
+              let gs =
+                match nointro && not cf with
+                | true  -> t_subgoal (List.map (dointro1 false) pis) gs
+                | false ->
+                    let t gs = t_subgoal (List.map (dointro1 false) pis) (elim_top gs) in
+                      t_on_goals t gs
+              in
+                (false, gs))
+        (nointro, gs) pis
+    in
+      gs
 
-  and dointro1 pis (juc, n) = dointro pis (juc, [n]) in
+  and dointro1 nointro pis (juc, n) = dointro nointro pis (juc, [n]) in
 
-    dointro1 (List.rev (collect [] [] pis)) (juc, n)
+    dointro1 true (List.rev (collect [] [] pis)) (juc, n)
 
 (* -------------------------------------------------------------------- *)
 let process_form_opt hyps pf oty =

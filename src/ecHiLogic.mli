@@ -42,5 +42,5 @@ val process_mkn_apply :
 
 (* -------------------------------------------------------------------- *)
 val process_logic   : hitenv -> EcLocation.t -> logtactic -> goal -> goals
-val process_intros  : intropattern -> goal -> goals
+val process_intros  : ?cf:bool -> intropattern -> goal -> goals
 val process_trivial : goal -> goals
