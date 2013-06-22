@@ -202,9 +202,16 @@ let process_intros ?(cf = true) pis (juc, n) =
               let gs =
                 match nointro && not cf with
                 | true  -> t_subgoal (List.map (dointro1 false) pis) gs
-                | false ->
-                    let t gs = t_subgoal (List.map (dointro1 false) pis) (elim_top gs) in
-                      t_on_goals t gs
+                | false -> begin
+                    match pis with
+                    | [] -> t_on_goals elim_top gs
+                    | _  ->
+                        let t gs =
+                          t_subgoal
+                            (List.map (dointro1 false) pis) (elim_top gs)
+                        in
+                          t_on_goals t gs
+                end
               in
                 (false, gs))
         (nointro, gs) pis
