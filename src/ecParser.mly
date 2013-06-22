@@ -1340,6 +1340,12 @@ intro_pattern:
 | LBRACKET ip=plist2(intro_pattern*, PIPE) RBRACKET
    { IPCase ip }
 
+| o=rwocc? ARROW
+   { IPRw (omap o EcMaps.Sint.of_list, `LtoR) }
+
+| o=rwocc? LEFTARROW
+   { IPRw (omap o EcMaps.Sint.of_list, `RtoL) }
+
 | SLASHSLASH
    { IPDone false }
 

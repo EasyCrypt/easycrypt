@@ -298,6 +298,7 @@ module LDecl : sig
   exception Ldecl_error of error
 
   type hyps
+
   val init : env -> EcIdent.t list -> hyps
   val tohyps : hyps -> EcBaseLogic.hyps
   val toenv  : hyps -> env

@@ -330,21 +330,23 @@ and pinline_arg =
   [ `ByName    of tac_side * (pgamepath list * int list option)
   | `ByPattern of pipattern ]
 
-type intropattern1 =
-  | IPCore of (symbol option) located
-  | IPCase of intropattern list
-  | IPDone of bool
-  | IPSimplify
-
-and intropattern = intropattern1 list
-
 type trepeat = [`All | `Maybe] * int option
 
 type rwarg =
   | RWDone
-  | RWRw of (rwside * trepeat option * Sint.t option * ffpattern)
+  | RWRw of (rwside * trepeat option * rwocc * ffpattern)
 
-and rwside   = [`LtoR | `RtoL]
+and rwside = [`LtoR | `RtoL]
+and rwocc  = Sint.t option
+
+type intropattern1 =
+  | IPCore of (symbol option) located
+  | IPCase of intropattern list
+  | IPRw   of (rwocc * rwside)
+  | IPDone of bool
+  | IPSimplify
+
+and intropattern = intropattern1 list
 
 type logtactic =
   | Passumption of (pqsymbol option * ptyannot option)
