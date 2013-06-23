@@ -792,6 +792,9 @@ let process_intros ?(cf = true) pis (juc, n) =
     | IPSimplify :: pis ->
         collect (`Simpl :: maybe_core ()) [] pis
 
+    | IPClear xs :: pis ->
+        collect (`Clear xs :: maybe_core ()) [] pis
+
     | IPCase x :: pis ->
         let x = List.map (collect [] []) x in
           collect (`Case x :: maybe_core ()) [] pis
@@ -818,6 +821,9 @@ let process_intros ?(cf = true) pis (juc, n) =
 
           | `Simpl ->
               (nointro, t_on_goals simplify gs)
+
+          | `Clear xs ->
+              (nointro, t_on_goals (process_clear xs) gs)
 
           | `Case pis ->
               let gs =

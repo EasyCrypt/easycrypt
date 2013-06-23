@@ -340,10 +340,11 @@ and rwside = [`LtoR | `RtoL]
 and rwocc  = Sint.t option
 
 type intropattern1 =
-  | IPCore of (symbol option) located
-  | IPCase of intropattern list
-  | IPRw   of (rwocc * rwside)
-  | IPDone of bool
+  | IPCore  of (symbol option) located
+  | IPCase  of intropattern list
+  | IPRw    of (rwocc * rwside)
+  | IPClear of psymbol list
+  | IPDone  of bool
   | IPSimplify
 
 and intropattern = intropattern1 list
