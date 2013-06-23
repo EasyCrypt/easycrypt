@@ -26,6 +26,8 @@ type hitenv = {
   hte_smtmode : [`Admit | `Strict | `Standard];
 }
 
+type engine = ptactic_core -> tactic
+
 (* -------------------------------------------------------------------- *)
 type tac_error =
   | UnknownHypSymbol of symbol
@@ -86,6 +88,12 @@ let process_trivial ((juc, n) as g) =
     match t (juc, n) with
     | (juc, []) -> (juc, [])
     | (_  , _ ) -> t_id None g
+
+(* -------------------------------------------------------------------- *)
+let process_done g =
+  match process_trivial g with
+  | (_, []) as g -> g
+  | _ -> tacuerror "[by]: cannot close goals"
 
 (* -------------------------------------------------------------------- *)
 let process_congr g =
@@ -850,12 +858,18 @@ let process_intros ?(cf = true) pis (juc, n) =
     dointro1 true (List.rev (collect [] [] pis)) (juc, n)
 
 (* -------------------------------------------------------------------- *)
-let process_cut ip phi g =
+let process_cut (engine : engine) ip phi t g =
   let phi = process_formula (get_hyps g) phi in
-    t_on_last (process_intros [ip]) (t_cut phi g)
+  let g   = t_cut phi g in
+  let g   =
+    match t with
+    | None   -> g
+    | Some t -> t_on_first (engine t) g
+  in
+    t_on_last (process_intros [ip]) g
 
 (* -------------------------------------------------------------------- *)
-let process_logic hitenv loc t =
+let process_logic (engine, hitenv) loc t =
   match t with
   | Passumption pq -> process_assumption loc pq
   | Psmt pi        -> process_smt hitenv pi
@@ -870,7 +884,7 @@ let process_logic hitenv loc t =
   | Ptrivial       -> process_trivial
   | Pelim pe       -> process_elim loc pe
   | Papply pe      -> process_apply loc pe
-  | Pcut (ip, phi) -> process_cut ip phi
+  | Pcut (ip, f, t)-> process_cut engine ip f t
   | Pgeneralize l  -> process_generalize l
   | Pclear l       -> process_clear l
   | Prewrite ri    -> process_rewrite loc ri

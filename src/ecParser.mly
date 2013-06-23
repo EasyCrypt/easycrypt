@@ -1577,7 +1577,10 @@ logtactic:
    { Psubst l }
 
 | CUT ip=intro_pattern COLON p=form %prec prec_bellow_IMPL
-   { Pcut (ip, p) }
+   { Pcut (ip, p, None) }
+
+| CUT ip=intro_pattern COLON p=form BY t=tactic_core
+   { Pcut (ip, p, Some t) }
 ;
 
 phltactic:

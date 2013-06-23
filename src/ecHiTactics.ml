@@ -76,6 +76,7 @@ and process_tactic1 mkpv (tac : ptactic) ((juc, n) : goal) : goals =
 (* -------------------------------------------------------------------- *)
 and process_tactic_core mkpv (tac : ptactic_core) (gs : goals) : goals =
   let loc = tac.pl_loc in
+  let eng = process_tactic_core1 mkpv in
 
   let tac =
     match unloc tac with
@@ -88,7 +89,7 @@ and process_tactic_core mkpv (tac : ptactic_core) (gs : goals) : goals =
     | Pprogress t     -> `One (process_progress (process_tactic_core1, mkpv) t)
     | Padmit          -> `One (t_admit)
     | Pdebug          -> `One (process_debug)
-    | Plogic t        -> `One (process_logic mkpv loc t)
+    | Plogic t        -> `One (process_logic (eng, mkpv) loc t)
     | PPhl tac        -> `One (EcHiPhl.process_phl loc tac)
     | Psubgoal tc     -> `All (process_tactic_chain mkpv tc)
   in
@@ -104,8 +105,4 @@ and process_tactic_core1 mkpv (tac : ptactic_core) ((juc, n) : goal) : goals =
 (* -------------------------------------------------------------------- *)
 and process_by mkpv t (juc, n) =
   let gs = process_tactics mkpv t (juc, [n]) in
-  let gs = t_on_goals EcHiLogic.process_trivial gs in
-
-    match gs with
-    | (_, []) -> gs
-    | _ -> tacuerror "[by]: cannot close on goals"
+    t_on_goals EcHiLogic.process_done gs

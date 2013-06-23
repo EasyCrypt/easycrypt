@@ -362,7 +362,7 @@ type logtactic =
   | Pcongr
   | Pelim       of ffpattern 
   | Papply      of ffpattern
-  | Pcut        of (intropattern1 * pformula)
+  | Pcut        of (intropattern1 * pformula * ptactic_core option)
   | Pgeneralize of pformula list
   | Pclear      of psymbol list
   | Prewrite    of rwarg list
@@ -371,7 +371,7 @@ type logtactic =
   | Pchange     of pformula
   | PelimT      of (pformula * pqsymbol)
 
-type ptactic_core_r =
+and ptactic_core_r =
   | Pidtac      of string option
   | Pdo         of trepeat * ptactic_core
   | Ptry        of ptactic_core
