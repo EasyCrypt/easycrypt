@@ -850,11 +850,9 @@ let process_intros ?(cf = true) pis (juc, n) =
     dointro1 true (List.rev (collect [] [] pis)) (juc, n)
 
 (* -------------------------------------------------------------------- *)
-let process_cut name phi g =
+let process_cut ip phi g =
   let phi = process_formula (get_hyps g) phi in
-  t_on_last
-    (process_intros [IPCore (lmap (fun x -> Some x) name)])
-    (t_cut phi g)
+    t_on_last (process_intros [ip]) (t_cut phi g)
 
 (* -------------------------------------------------------------------- *)
 let process_logic hitenv loc t =
@@ -872,7 +870,7 @@ let process_logic hitenv loc t =
   | Ptrivial       -> process_trivial
   | Pelim pe       -> process_elim loc pe
   | Papply pe      -> process_apply loc pe
-  | Pcut (name,phi)-> process_cut name phi
+  | Pcut (ip, phi) -> process_cut ip phi
   | Pgeneralize l  -> process_generalize l
   | Pclear l       -> process_clear l
   | Prewrite ri    -> process_rewrite loc ri

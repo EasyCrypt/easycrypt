@@ -295,6 +295,7 @@
 %nonassoc COMMA ELSE
 
 %nonassoc IN
+%nonassoc prec_bellow_IMPL
 %right IMPL IFF
 %right OR 
 %right AND 
@@ -1575,8 +1576,8 @@ logtactic:
 | SUBST l=sform*
    { Psubst l }
 
-| CUT n=ident COLON p=sform
-   { Pcut (n, p) }
+| CUT ip=intro_pattern COLON p=form %prec prec_bellow_IMPL
+   { Pcut (ip, p) }
 ;
 
 phltactic:
