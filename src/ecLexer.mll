@@ -118,7 +118,7 @@
     "end"         , END        ;        (* KW: global *)
     "import"      , IMPORT     ;        (* KW: global *)
     "export"      , EXPORT     ;        (* KW: global *)
-    "local"       , LOCAL      ;	(* KW: global *)
+    "local"       , LOCAL      ;        (* KW: global *)
     "module"      , MODULE     ;        (* KW: global *)
     "of"          , OF         ;        (* KW: global *)
     "const"       , CONST      ;        (* KW: global *)
@@ -190,7 +190,7 @@ let mident = '&'  (lident | number)
 let op_char_1    = ['=' '<' '>']
 let op_char_2    = ['+' '-']
 let op_char_3    = ['*' '/' '%' '\\']
-let op_char_4    = ['!' '$' '&' '?' '@' '^' ':' '|' '#']
+let op_char_4    = ['!' '$' '&' '?' '@' '^' '|' '#']
 let op_char_34   = op_char_3 | op_char_4
 let op_char_234  = op_char_2 | op_char_34
 let op_char_1234 = op_char_1 | op_char_234
@@ -198,7 +198,7 @@ let op_char_1234 = op_char_1 | op_char_234
 let op1 = op_char_1234* op_char_1 op_char_1234*
 let op2 = op_char_234*  op_char_2 op_char_234+
 let op3 = op_char_34*   op_char_3 op_char_34*
-let op4 = op_char_4+
+let op4 = op_char_4+ | ':'+
 
 let binop = 
   op1 | op2 | op3 | op4 | '+' | '-' |
