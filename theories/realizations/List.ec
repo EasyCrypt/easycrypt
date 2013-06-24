@@ -68,6 +68,7 @@ qed.
 
 (* Lemmas *)
 lemma mem_eq: forall (x:'a) xs, mem x (x::xs) by [].
+lemma mem_neq: forall (x y:'a) xs, x <> y => mem x (y::xs) = mem x xs by [].
 lemma memM_cons : forall (x y:'a) xs, mem y xs => mem y (x::xs) by [].
 lemma mem_hd: forall (xs:'a list), xs <> [] => mem (hd xs) xs by [].
 lemma nil_nmem: forall (xs:'a list), xs = [] <=> (forall x, !mem x xs) by [].
@@ -265,6 +266,20 @@ lemma length_map: forall (f:'a -> 'b) xs,
 proof strict.
 by intros f xs; elimT list_ind xs; smt.
 qed.
+
+(** unique *)
+require import Pair.
+op unique_f (x':'a) (s:bool * 'a list) =
+  let (b',xs') = s in
+  (b' /\ !mem x' xs',x'::xs').
+op unique (xs:'a list): bool =
+  fst (fold_right unique_f (true,[]) xs).
+
+(* Direct inductive definition *)
+lemma unique_nil: unique<:'a> [] by [].
+(* TODO: this is true, but I'm having trouble with the proof. *)
+axiom unique_cons: forall (x:'a) xs,
+  unique (x::xs) = (unique xs /\ !mem x xs).
 
 (** nth *)
 require import Option.

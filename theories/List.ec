@@ -242,6 +242,16 @@ proof strict.
 by intros f xs; elimT list_ind xs; smt.
 qed.
 
+(** unique *)
+op unique:'a list -> bool.
+
+(* Direct inductive definition *)
+axiom unique_nil: unique<:'a> [].
+axiom unique_cons: forall (x:'a) xs, unique (x::xs) = unique xs /\ !mem x xs.
+
+(* Lemmas *)
+  (* TODO *)
+
 (** nth *)
 require import Option.
 require import Pair.
