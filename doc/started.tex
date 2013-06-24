@@ -334,7 +334,11 @@ we have
   calls in the current goal. In this case, it is used to inline the
   definition of RO.o in the current goal.
 \item \ec{wp}: implements relational weakest precondition.
-\item \ec{rnd}: implements the pRHL rule for random samplings.
+\item \ec{rnd}: implements the pRHL rule for random samplings. It
+  takes a bijection (in the form of two functions $f$ and $g$) and ensures that
+  the result of the random sampling on the left side is equal to $f$
+  of the random sampling of the right side. When we ommit paramenters,
+  the bijection is the identity.
 \item \ec{skip}: allows to reduce the validity of the current
   judgement to the validity of a logical entailment between pre and
   post condition when the programs are ``empty''.
@@ -361,7 +365,7 @@ Upon starting the proof, after \ec{intros A Hll1 Hll2;fun}, we have
 the following goal
 
 %formatting needs to be fixed
-\begin{easycrypt}{ }{\label{ec:proof1}}
+\begin{easycrypt}[columns=fullflexible]{ }{\label{ec:proof1}}
 Current goal
 
 Type variables: <none>
@@ -375,13 +379,13 @@ Hll2: forall (R <: ARO), islossless R.o_a => islossless A(R).a2
 
 pre = (glob A){1} = (glob A){2}
 
-RO.init()                                              (1)  RO.init()                       
-(pk, sk) := CPA(BR, A).SO.kg()             (2)  (pk, sk) := CPA(BR2, A).SO.kg() 
-(m0, m1) := CPA(BR, A).A.a1(pk)         (3)  (m0, m1) := CPA(BR2, A).A.a1(pk)
-b =$ {0,1}                                           (4)  b =$ {0,1}                      
-c := CPA(BR, A).SO.enc(pk,                 (5)  c := CPA(BR2, A).SO.enc(pk,     
-                       b ? m0 : m1)                                                    b ? m0 : m1)                  
-b' := CPA(BR, A).A.a2(c)                      (6)  b' := CPA(BR2, A).A.a2(c)       
+RO.init()                                       (1)  RO.init()                       
+(pk, sk) := CPA(BR, A).SO.kg()      (2)  (pk, sk) := CPA(BR2, A).SO.kg() 
+(m0, m1) := CPA(BR, A).A.a1(pk)  (3)  (m0, m1) := CPA(BR2, A).A.a1(pk)
+b =$ {0,1}                                    (4)  b =$ {0,1}                      
+c := CPA(BR, A).SO.enc(pk,          (5)  c := CPA(BR2, A).SO.enc(pk,     
+                       b ? m0 : m1)                                             b ? m0 : m1)                  
+b' := CPA(BR, A).A.a2(c)               (6)  b' := CPA(BR2, A).A.a2(c)       
 
 post = !(mem Rnd.r{2} RO.s{2}) => (b{1} = b'{1}) = (b{2} = b'{2})
 
@@ -503,15 +507,82 @@ using our pRHL proof and the tactic \ec{equiv_deno}.
 using the tactic \ec{pr_or}, that implements the following reasoning
 principle:
 \ec{Pr[ f() @ &m : a \\/ b]} =  \ec{Pr[ f() @ &m : a]} + \ec{Pr[ f() @
-  &m : b]} - \ec{Pr[ f() @ &m : a /\\ b]} 
+  &m : b]} - \ec{Pr[ f() @ &m : a /\\ b]}.
  
 \end{itemize}
 
-\paragraph{Optmistic sampling: replacing \ec{m ^^ r} by \ec{r}}
+\paragraph{Optmistic sampling: replacing \ec{m \^\^ r'} by \ec{r'}}
+The second step of the proof consists on modifying again the
+computation of the ciphertext. In this case, instead of computing the
+$\xor$ of the message $m$ with the randomly sampled value $r'$, we
+directly place $r'$ in that position. This transformation is defined
+as follows
+\ecimport{ }{../examples/br93_tutorial.ec}{br3}
+
+We can prove that the results of the two versions of the encryption
+are indistinguishable resorting to optimistic sampling. The following
+easycrypt script shows the desired property
+
+\ecimport{ }{../examples/br93_tutorial.ec}{eq2enc}
+
+The specification states that when the two versions of the encryption
+function are called with equal arguments and in two states where the
+maps associated to the random oracle are equal, the functions yield
+the same result and produce states where the maps of the oracle are
+equal and the randomness is equal.  
+
+The key reasoning step is embodied by the tactic \ec{rnd (lambda v, v
+  \^\^ m) (lambda v, v\^\^ m)}. In its most general form, the \ec{rnd}
+tactic takes a bijection, represented as a pair of functions inverse
+from eachother. When the arguments are ommitted, the identity function
+is used as bijection. This tactic implments the pRHL rule for random
+assignments shown in (Reference to Reasoning about random samplings)
+and in this case, it allows us to conclude that ${h\{2\} = m\{1\} \xor
+  h\{1\}}$.
+
+Using this specification for \ec{enc}, we can conclude this step as
+follows
+\ecimport{ }{../examples/br93_tutorial.ec}{eq2}
+
+Note that here we have the same code on both sides, operating on the
+same state. The only difference is in the code for encryption, that we
+already proved yields equal results. Hence, all the invariants we are
+use consist of equalities on variables on both sides. 
+
+Once more, using our pRHL logic judgements, we conclude a property on
+the probabilities of th events we are interested in as follows
+
+\ecimport{ }{../examples/br93_tutorial.ec}{prob2}
+
+
+
+
 
 \paragraph{Code movement: sampling \ec{b} at the end}
+At this point, the encryption function does not depend on the input
+message anymore. We take advantage of this fact and modify the CPA
+game to sample the bit \ec{b} at the bottom of the game; hence making
+explicit that the adversary cannot gain any information regarding its
+value by inspecting the cipher. The \ec{CPA2} game is defined as
+follows
+\ecimport{ }{../examples/br93_tutorial.ec}{cpa2}
 
-\paragraph{Reasoning about probabilities}
+Again, we are interested in showing the equivalence of the events of
+interest. In easycrypt we carry out this step in the following way
+\ecimport{ }{../examples/br93_tutorial.ec}{eq3}
+
+The key step in this case, is \ec{swap{2} -2}. This tactic moves the
+last instruction of the second game \ec{b = $\{0,1\}} %$
+up by two instructions. After this, we have the exact same code on
+both sides, so we conclude the proof using a serie of invariants that
+consists of equalities on variables on both states; as done in the
+previous step. 
+
+At this point we can prove the following result on probabilities
+\ecimport{ }{../examples/br93_tutorial.ec}{prob3}
+
+Explain the bd_hoare reasoning
+
 
 \paragraph{Constructing the inverter}
 
