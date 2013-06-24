@@ -400,25 +400,29 @@ module FPosition = struct
     | `Sub p -> tostring p
 
   let select test =
-    let rec doit1 fp =
-      if   test fp
+    let rec doit1 ctxt fp =
+      if   test ctxt fp
       then Some `Select
       else begin
         let subp =
           match fp.f_node with
-          | Fquant (_, _, f)   -> doit [f]
-          | Fif    (c, f1, f2) -> doit [c; f1; f2]
-          | Fapp   (f, fs)     -> doit (f :: fs)
-          | Ftuple fs          -> doit fs
-          | Flet   (_, f1, f2) -> doit [f1; f2]
+          | Fif    (c, f1, f2) -> doit ctxt [c; f1; f2]
+          | Fapp   (f, fs)     -> doit ctxt (f :: fs)
+          | Ftuple fs          -> doit ctxt fs
+          | Flet   (_, f1, f2) -> doit ctxt [f1; f2]
+
+          | Fquant (_, b, f) ->
+            let xs   = List.pmap (function (x, GTty _) -> Some x | _ -> None) b in
+            let ctxt = List.fold_left ((^~) Sid.add) ctxt xs in
+              doit ctxt [f]
   
           | _ -> None
         in
           omap subp (fun p -> `Sub p)
       end
 
-    and doit fps =
-      let fps = List.mapi (fun i fp -> omap (doit1 fp) (fun p -> (i, p))) fps in
+    and doit ctxt fps =
+      let fps = List.mapi (fun i fp -> omap (doit1 ctxt fp) (fun p -> (i, p))) fps in
       let fps = List.pmap identity fps in
         match fps with
         | [] -> None
@@ -426,7 +430,7 @@ module FPosition = struct
 
     in
       fun fp ->
-        match doit [fp] with
+        match doit Sid.empty [fp] with
         | None   -> Mint.empty
         | Some p -> p
 

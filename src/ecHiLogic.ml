@@ -659,10 +659,13 @@ let process_rewrite1_core (s, o) (p, typs, ue, ax) args g =
   let (_ue, tue, ev) =
     let ev = evmap_of_pterm_arguments ids in
 
-    let trymatch tp =
+    let trymatch bds tp =
       try
-        let (ue, tue, ev) = f_match hyps (ue, ev) ~ptn:fp tp in
-          raise (RwMatchFound (ue, tue, ev))
+        if not (Mid.set_disjoint bds tp.f_fv) then
+          false
+        else
+          let (ue, tue, ev) = f_match hyps (ue, ev) ~ptn:fp tp in
+            raise (RwMatchFound (ue, tue, ev))
       with MatchFailure -> false
     in
 
@@ -677,7 +680,7 @@ let process_rewrite1_core (s, o) (p, typs, ue, ax) args g =
   let fp   = concretize_pterm (tue, ev) ids fp in
 
   let cpos =
-    let test tp = EcReduction.is_alpha_eq hyps fp tp in
+    let test _ tp = EcReduction.is_alpha_eq hyps fp tp in
       FPosition.select test concl
   in
 

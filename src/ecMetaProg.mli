@@ -124,7 +124,7 @@ module FPosition : sig
 
   val tostring : ptnpos -> string
 
-  val select : (form -> bool) -> form -> ptnpos
+  val select : (Sid.t -> form -> bool) -> form -> ptnpos
 
   val occurences : ptnpos -> int
 
