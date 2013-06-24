@@ -291,8 +291,8 @@ in_supp (pk,sk) keypairs  =>
 f pk x = f pk y => x = y.
 proof.
  intros x y pk sk Hsupp Heqf.
- rewrite -(finvof pk sk x _);first smt.
- rewrite -(finvof pk sk y _);first smt.
+ rewrite -(finvof pk sk _ _);first smt.
+ rewrite -(finvof pk sk _ _);first smt.
  rewrite Heqf;smt.
 save.
 
