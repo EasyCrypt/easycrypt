@@ -167,7 +167,7 @@ type phoarecmp = PFHle | PFHeq | PFHge
 
 type pformula  = pformula_r located
 
-and pformula_r = 
+and pformula_r =
   | PFint    of int
   | PFtuple  of pformula list
   | PFident  of pqsymbol * ptyannot option
@@ -240,7 +240,6 @@ type 'a fpattern_kind =
 type fpattern_arg = 
   | EA_form of pformula
   | EA_mem  of pmemory
-  | EA_mp   of pmsymbol
   | EA_none 
 
 type 'a fpattern = { 
@@ -253,11 +252,11 @@ type ffpattern = pformula fpattern
 type cfpattern = (pformula option * pformula option) fpattern
 
 type preduction = {
-  pbeta   : bool;
-  pdelta  : pqsymbol list option;
-  pzeta   : bool;   (* remove let *)
-  piota   : bool;   (* remove case *)
-  plogic  : bool;   (* perform logical simplification *)
+  pbeta    : bool;
+  pdelta   : pqsymbol list option;
+  pzeta    : bool;   (* remove let *)
+  piota    : bool;   (* remove case *)
+  plogic   : bool;   (* perform logical simplification *)
   pmodpath : bool;   (* normalize modpath *)
 }
 
@@ -318,6 +317,8 @@ type phltactic =
   | Pexfalso
   | Pbdhoaredeno  of cfpattern
   | Pequivdeno    of cfpattern
+  | PPr           of pformula * pformula
+  | Pfel          of int * (pformula * pformula * pformula * pformula * pformula)
   | Phoare
   | Pbdhoare
   | Pprbounded
@@ -329,20 +330,24 @@ and pinline_arg =
   [ `ByName    of tac_side * (pgamepath list * int list option)
   | `ByPattern of pipattern ]
 
-type intropattern1 =
-  | IPCore of (symbol option) located
-  | IPCase of intropattern list
-  | IPDone
-
-and intropattern = intropattern1 list
-
 type trepeat = [`All | `Maybe] * int option
 
 type rwarg =
   | RWDone
-  | RWRw of (rwside * trepeat option * Sint.t option * ffpattern)
+  | RWRw of (rwside * trepeat option * rwocc * ffpattern)
 
-and rwside   = [`Normal | `Reverse]
+and rwside = [`LtoR | `RtoL]
+and rwocc  = Sint.t option
+
+type intropattern1 =
+  | IPCore  of (symbol option) located
+  | IPCase  of intropattern list
+  | IPRw    of (rwocc * rwside)
+  | IPClear of psymbol list
+  | IPDone  of bool
+  | IPSimplify
+
+and intropattern = intropattern1 list
 
 type logtactic =
   | Passumption of (pqsymbol option * ptyannot option)
@@ -358,7 +363,7 @@ type logtactic =
   | Pcongr
   | Pelim       of ffpattern 
   | Papply      of ffpattern
-  | Pcut        of (psymbol * pformula)
+  | Pcut        of (intropattern1 * pformula * ptactic_core option)
   | Pgeneralize of pformula list
   | Pclear      of psymbol list
   | Prewrite    of rwarg list
@@ -367,7 +372,7 @@ type logtactic =
   | Pchange     of pformula
   | PelimT      of (pformula * pqsymbol)
 
-type ptactic_core_r =
+and ptactic_core_r =
   | Pidtac      of string option
   | Pdo         of trepeat * ptactic_core
   | Ptry        of ptactic_core

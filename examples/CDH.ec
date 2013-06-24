@@ -116,7 +116,7 @@ theory Set_CDH.
       Pr[CDH.CDH(B).main() @ &m : res]. 
   proof.
     intros n_pos.
-    exists (<: CDH_from_SCDH(A)).
+    exists (CDH_from_SCDH(A)).
     bdhoare_deno (_ : true ==> _); [ | trivial | trivial ].
     fun; inline CDH_from_SCDH(A).solve.
     seq 6 : (nth i s = g ^ (x * y)) 1%r.

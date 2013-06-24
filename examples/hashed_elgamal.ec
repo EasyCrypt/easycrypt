@@ -364,7 +364,7 @@ lemma Pr_CPA_G1 (A <: Adv {CPA, G1, G2, SCDH.SCDH, RO, ARO, Hashed_ElGamal}) &m 
   Pr[G1(A).main() @ &m : res \/ mem G1.gxy ARO.log]. 
 proof.
   intros _ _.
-  equiv_deno (CPA_G1 (<:A) _ _).
+  equiv_deno (CPA_G1 (A) _ _).
   assumption.
   assumption.
   smt.
@@ -394,7 +394,7 @@ qed.
 lemma Pr_G1_G2_res (A <: Adv {CPA, G1, G2, SCDH.SCDH, RO, ARO, Hashed_ElGamal}) &m : 
   Pr[G1(A).main() @ &m : res] = Pr[G2(A).main() @ &m : res].
 proof.
-  equiv_deno (G1_G2 (<:A)); smt.
+  equiv_deno (G1_G2 (A)); smt.
 qed.
 
 
@@ -402,7 +402,7 @@ lemma Pr_G1_G2_mem (A <: Adv {CPA, G1, G2, SCDH.SCDH, RO, ARO, Hashed_ElGamal}) 
   Pr[G1(A).main() @ &m : mem G1.gxy ARO.log] = 
   Pr[G2(A).main() @ &m : mem G2.gxy ARO.log].
 proof.
-  equiv_deno (G1_G2 (<:A)); smt.
+  equiv_deno (G1_G2 (A)); smt.
 qed.
 
 
@@ -447,7 +447,7 @@ lemma Pr_G2_SCDH (A <: Adv {CPA, G1, G2, SCDH.SCDH, RO, ARO, Hashed_ElGamal}) &m
   Pr[SCDH.SCDH(SCDH_from_CPA(A)).main() @ &m : res].
 proof.
   intros _ _.
-  equiv_deno (G2_SCDH (<:A) _ _).
+  equiv_deno (G2_SCDH (A) _ _).
   assumption.
   assumption.
   trivial.
@@ -463,14 +463,14 @@ lemma Reduction (A <: Adv {CPA, G1, G2, SCDH.SCDH, RO, ARO, Hashed_ElGamal}) &m 
 proof. 
   intros _ _.  
   apply (Trans _ Pr[G1(A).main() @ &m : res \/ mem G1.gxy ARO.log]).
-  by apply (Pr_CPA_G1 (<:A) &m); assumption.
+  by apply (Pr_CPA_G1 (A) &m); assumption.
   apply (Trans _
     (Pr[G1(A).main() @ &m : res] + Pr[G1(A).main() @ &m : mem G1.gxy ARO.log])).
-  by apply (Pr_G1_G1 (<:A) &m); try assumption.
-  rewrite (Pr_G1_G2_res (<:A) &m).
-  rewrite (Pr_G2 (<:A) &m); try assumption. 
-  rewrite (Pr_G1_G2_mem (<:A) &m).  
-  rewrite (Pr_G2_SCDH (<:A) &m); try assumption.
+  by apply (Pr_G1_G1 (A) &m); try assumption.
+  rewrite (Pr_G1_G2_res (A) &m).
+  rewrite (Pr_G2 (A) &m); try assumption. 
+  rewrite (Pr_G1_G2_mem (A) &m).  
+  rewrite (Pr_G2_SCDH (A) &m); try assumption.
   by apply Refl.
 qed.
 
@@ -483,9 +483,9 @@ lemma Security (A <: Adv {CPA, G1, G2, SCDH.SCDH, RO, ARO, Hashed_ElGamal}) &m :
     Pr[SCDH.SCDH(B).main() @ &m : res].
 proof.
   intros _ _.
-  exists (<: SCDH_from_CPA(A)).
+  exists ( SCDH_from_CPA(A)).
   cut W : (forall (x y z : real), x <= z + y => x - z <= y); first smt.
-  by apply W; apply (Reduction (<:A) &m); assumption.
+  by apply W; apply (Reduction (A) &m); assumption.
 qed.
 
 
@@ -499,11 +499,11 @@ lemma Security_CDH
     <= qH%r * Pr[CDH.CDH(B).main() @ &m : res].
 proof.
   intros _ _.
-  elim (Security (<:A) &m _ _); try assumption.
+  elim (Security (A) &m _ _); try assumption.
   intros B _.
-  elim (SCDH.Reduction (<:B) &m _); first smt.
+  elim (SCDH.Reduction (B) &m _); first smt.
   intros C _.
-  exists (<:C).
+  exists (C).
   apply (Trans _ Pr[SCDH.SCDH(B).main() @ &m : res]).
   assumption.
   apply SCDH.mult_inv_le_r; first smt.

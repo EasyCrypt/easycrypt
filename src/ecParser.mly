@@ -146,6 +146,7 @@
 %token BDHOAREDENO
 %token BETA 
 %token BY
+%token BYPR
 %token CALL
 %token CASE
 %token CEQ
@@ -181,6 +182,7 @@
 %token EQUIVDENO
 %token EXIST
 %token EXPORT
+%token FEL
 %token FIELD
 %token FIELDSIMP
 %token FINAL
@@ -258,7 +260,9 @@
 %token SEQ
 %token SIMPLIFY
 %token SKIP
+%token SLASHEQ
 %token SLASHSLASH
+%token SLASHSLASHEQ
 %token SMT
 %token SPLIT
 %token SPLITWHILE
@@ -291,6 +295,7 @@
 %nonassoc COMMA ELSE
 
 %nonassoc IN
+%nonassoc prec_bellow_IMPL
 %right IMPL IFF
 %right OR 
 %right AND 
@@ -631,11 +636,8 @@ sform_u:
 | TICKPIPE ti=tvars_app? e =form PIPE 
     { pfapp_symb e.pl_loc EcCoreLib.s_abs ti [e] }
 
-| LPAREN es=plist2(form, COMMA) RPAREN
-   { PFtuple es }
-
-| LPAREN e=form_u RPAREN
-   { e }
+| LPAREN fs=plist0(form, COMMA) RPAREN
+   { PFtuple fs }
 
 | LBRACKET ti=tvars_app? es=loc(plist0(form, SEMICOLON)) RBRACKET
    { (pflist es.pl_loc ti es.pl_desc).pl_desc }
@@ -1339,8 +1341,23 @@ intro_pattern:
 | LBRACKET ip=plist2(intro_pattern*, PIPE) RBRACKET
    { IPCase ip }
 
+| o=rwocc? ARROW
+   { IPRw (omap o EcMaps.Sint.of_list, `LtoR) }
+
+| o=rwocc? LEFTARROW
+   { IPRw (omap o EcMaps.Sint.of_list, `RtoL) }
+
+| LBRACE xs=lident+ RBRACE
+   { IPClear xs }
+
 | SLASHSLASH
-   { IPDone }
+   { IPDone false }
+
+| SLASHSLASHEQ
+   { IPDone true }
+
+| SLASHEQ
+   { IPSimplify }
 ;
 
 fpattern_head(F):
@@ -1355,7 +1372,6 @@ fpattern_arg:
 | UNDERSCORE   { EA_none }
 | f=sform      { EA_form f }
 | s=mident     { EA_mem s }
-| LPAREN LTCOLON x=mod_qident RPAREN { EA_mp x }
 ;
 
 fpattern(F):
@@ -1367,8 +1383,8 @@ fpattern(F):
 ;
 
 rwside:
-| MINUS { `Reverse }
-| empty { `Normal  }
+| MINUS { `RtoL }
+| empty { `LtoR }
 ;
 
 rwrepeat:
@@ -1563,8 +1579,11 @@ logtactic:
 | SUBST l=sform*
    { Psubst l }
 
-| CUT n=ident COLON p=sform
-   { Pcut (n, p) }
+| CUT ip=intro_pattern COLON p=form %prec prec_bellow_IMPL
+   { Pcut (ip, p, None) }
+
+| CUT ip=intro_pattern COLON p=form BY t=tactic_core
+   { Pcut (ip, p, Some t) }
 ;
 
 phltactic:
@@ -1663,6 +1682,11 @@ phltactic:
 
 | EXFALSO
     { Pexfalso }
+
+| BYPR f1=sform f2=sform { PPr(f1,f2) }
+
+| FEL at_pos=NUM cntr=sform delta=sform q=sform f_event=sform some_p=sform
+   {Pfel (at_pos,(cntr,delta,q,f_event,some_p))}
 
 (* basic pr based tacs *)
 | HOARE {Phoare}

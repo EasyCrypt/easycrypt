@@ -1,6 +1,7 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open EcMaps
+open EcIdent
 open EcLocation
 open EcSymbols
 open EcParsetree
@@ -24,6 +25,8 @@ type hitenv = {
   hte_provers : EcParsetree.pprover_infos -> EcProvers.prover_infos;
   hte_smtmode : [`Admit | `Strict | `Standard];
 }
+
+type engine = ptactic_core -> tactic
 
 (* -------------------------------------------------------------------- *)
 type tac_error =
@@ -87,6 +90,12 @@ let process_trivial ((juc, n) as g) =
     | (_  , _ ) -> t_id None g
 
 (* -------------------------------------------------------------------- *)
+let process_done g =
+  match process_trivial g with
+  | (_, []) as g -> g
+  | _ -> tacuerror "[by]: cannot close goals"
+
+(* -------------------------------------------------------------------- *)
 let process_congr g =
   let (hyps, concl) = get_goal g in
 
@@ -107,8 +116,12 @@ let process_congr g =
   | _, _ -> tacuerror "congr: no congruence"
 
 (* -------------------------------------------------------------------- *)
+let unienv_of_hyps hyps =
+  EcUnify.UniEnv.create (Some (LDecl.tohyps hyps).h_tvar)
+
+(* -------------------------------------------------------------------- *)
 let process_tyargs hyps tvi =
-  let ue = EcUnify.UniEnv.create (Some (LDecl.tohyps hyps).h_tvar) in
+  let ue = unienv_of_hyps hyps in
     omap tvi (TT.transtvi (LDecl.toenv hyps) ue)
 
 (* -------------------------------------------------------------------- *)
@@ -158,57 +171,8 @@ let process_assumption loc (pq, tvi) g =
       | _ -> process_global loc (pq,tvi) g
 
 (* -------------------------------------------------------------------- *)
-let process_intros pis (juc, n) =
-  let mk_id s = lmap (fun s -> EcIdent.create (odfl "_" s)) s in
-
-  let elim_top g =
-    let h       = EcIdent.create "_" in
-    let (g, an) = EcLogic.t_intros_1 [h] g in
-    let (g, n)  = mkn_hyp g (get_hyps (g, an)) h in
-    let f       = snd (get_node (g, n)) in
-      t_on_goals
-        (t_clear (EcIdent.Sid.of_list [h]))
-        (t_on_first (t_use n []) (t_elim f (g, an)))
-  in
-
-  let rec collect acc core pis =
-    match pis, core with
-    | [], [] -> acc
-    | [], _  -> `Core (List.rev core) :: acc
-
-    | IPCore x :: pis, _  -> collect acc (x :: core) pis
-    | IPDone   :: pis, [] -> collect (`Done :: acc) [] pis
-    | IPDone   :: pis, _  ->
-        let acc = `Core (List.rev core) :: acc in
-        let acc = `Done :: acc in
-          collect acc [] pis
-
-    | IPCase x :: pis, core  -> begin
-        let x   = List.map (collect [] []) x in
-          match core with
-          | [] -> collect (`Case x :: acc) [] pis
-          | _  -> collect (`Case x :: `Core (List.rev core) :: acc) [] pis
-    end
-  in
-
-  let rec dointro pis (gs : goals) =
-    List.fold_left
-      (fun gs ip ->
-        match ip with
-        | `Core ids -> t_on_goals (t_intros (List.map mk_id ids)) gs
-        | `Done     -> t_on_goals process_trivial gs
-        | `Case pis ->
-            let t gs = t_subgoal (List.map dointro1 pis) (elim_top gs) in
-              t_on_goals t gs)
-      gs pis
-
-  and dointro1 pis (juc, n) = dointro pis (juc, [n]) in
-
-    dointro1 (List.rev (collect [] [] pis)) (juc, n)
-
-(* -------------------------------------------------------------------- *)
 let process_form_opt hyps pf oty =
-  let ue  = EcUnify.UniEnv.create (Some (LDecl.tohyps hyps).h_tvar) in
+  let ue  = unienv_of_hyps hyps in
   let ff  = TT.transform_opt (LDecl.toenv hyps) ue pf oty in
   EcFol.Fsubst.uni (EcUnify.UniEnv.close ue) ff
 
@@ -228,13 +192,6 @@ let process_smt hitenv pi g =
   | `Admit    -> t_admit g
   | `Standard -> t_seq (t_simplify_nodelta) (t_smt false pi) g
   | `Strict   -> t_seq (t_simplify_nodelta) (t_smt true  pi) g
-
-(* -------------------------------------------------------------------- *)
-let process_cut name phi g =
-  let phi = process_formula (get_hyps g) phi in
-  t_on_last
-    (process_intros [IPCore (lmap (fun x -> Some x) name)])
-    (t_cut phi g)
 
 (* -------------------------------------------------------------------- *)
 let process_generalize l =
@@ -345,21 +302,62 @@ let process_field_simp (p,t,i,m,z,o,e) g =
       | _ -> cannot_apply "field_simplify" "Think more about the goal")
 
 (* -------------------------------------------------------------------- *)
+let rec pmsymbol_of_pform fp : pmsymbol option =
+  match unloc fp with
+  | PFident ({ pl_desc = (nm, x); pl_loc = loc }, _) when EcIo.is_mod_ident x ->
+      Some (List.map (fun nm1 -> (mk_loc loc nm1, None)) (nm @ [x]))
+
+  | PFapp ({ pl_desc = PFident ({ pl_desc = (nm, x); pl_loc = loc }, _) },
+           [{ pl_desc = PFtuple args; }]) -> begin
+
+    let mod_ = List.map (fun nm1 -> (mk_loc loc nm1, None)) nm in
+    let args =
+      List.map
+        (fun a -> omap (pmsymbol_of_pform a) (mk_loc a.pl_loc))
+        args
+    in
+
+      match List.exists (fun x -> x = None) args with
+      | true  -> None
+      | false ->
+          let args = List.map (fun a -> oget a) args in
+            Some (mod_ @ [mk_loc loc x, Some args])
+  end
+
+  | PFtuple [fp] -> pmsymbol_of_pform fp
+
+  | _ -> None
+
 let trans_pterm_argument hyps ue arg =
   let env = LDecl.toenv hyps in
 
   match unloc arg with
-  | EA_form fp ->
-      let fp = TT.transform_opt env ue fp None in
-        Some (`Form fp)
+  | EA_form fp -> begin
+      let ff =
+        try  `Form (TT.transform_opt env ue fp None)
+        with TT.TyError _ as e -> `Error e
+      in
+
+      let mm =
+        match pmsymbol_of_pform fp with
+        | None    -> `Error None
+        | Some mp ->
+            try
+              let (mp, mt) = TT.trans_msymbol env (mk_loc arg.pl_loc mp) in
+                `Mod (mp, mt)
+            with TT.TyError _ as e -> `Error (Some e)
+      in
+
+      match ff, mm with
+      | `Error e, `Error _ -> raise e
+      | `Form  f, `Mod   m -> Some (`FormOrMod (Some f, Some m))
+      | `Form  f, `Error _ -> Some (`FormOrMod (Some f, None  ))
+      | `Error _, `Mod   m -> Some (`FormOrMod (None  , Some m))
+  end
       
   | EA_mem mem ->
       let mem = TT.transmem env mem in
         Some (`Memory mem)
-
-  | EA_mp mp ->
-      let (mp, mt) = TT.trans_msymbol env (mk_loc arg.pl_loc mp) in
-        Some (`Module (mp, mt))
 
   | EA_none ->
       None
@@ -396,7 +394,7 @@ let process_named_pterm _loc hyps (fp, tvi) =
     end
   in
 
-  let ue  = EcUnify.UniEnv.create (Some (LDecl.tohyps hyps).h_tvar) in
+  let ue  = unienv_of_hyps hyps in
   let tvi = omap tvi (TT.transtvi env ue) in
 
   begin
@@ -433,13 +431,17 @@ let process_pterm loc prcut hyps pe =
 
   | FPCut fp ->
       let fp = prcut fp in
-      let ue = EcUnify.UniEnv.create (Some (LDecl.tohyps hyps).h_tvar) in
+      let ue = unienv_of_hyps hyps in
         (`Cut fp, [], ue, fp)
 
 (* -------------------------------------------------------------------- *)
 let check_pterm_arg_for_ty hyps ty arg =
-  let ue  = EcUnify.UniEnv.create (Some (LDecl.tohyps hyps).h_tvar) in
+  let ue  = unienv_of_hyps hyps in
   let env = LDecl.toenv hyps in
+
+  let error () = 
+    tacuerror ~loc:arg.pl_loc "invalid argument type"
+  in
 
   match arg.pl_desc, ty with
   | EA_form pf, Some (GTty ty) ->
@@ -449,15 +451,18 @@ let check_pterm_arg_for_ty hyps ty arg =
   | EA_mem mem, Some (GTmem _) ->
       AAmem (TT.transmem env mem)
 
-
   | EA_none, None ->
       AAnode
 
-  | EA_mp mp , Some (GTmodty _) ->
-      let (mp, mt) = TT.trans_msymbol env (mk_loc arg.pl_loc mp) in
-        AAmp (mp, mt)
+  | EA_form fp, Some (GTmodty _) -> begin
+    match pmsymbol_of_pform fp with
+    | None    -> error ()
+    | Some mp ->
+        let (mp, mt) = TT.trans_msymbol env (mk_loc arg.pl_loc mp) in
+          AAmp (mp, mt)
+  end
 
-  | _, _ -> tacuerror ~loc:arg.pl_loc "invalid argument type"
+  | _, _ -> error ()
 
 (* -------------------------------------------------------------------- *)
 let check_pterm_argument hyps ue f arg =
@@ -476,7 +481,7 @@ let check_pterm_argument hyps ue f arg =
       | GTty    ty -> (f, `UnknownVar (x, ty))
   end
 
-  | Some (`Form tp),
+  | Some (`FormOrMod (Some tp, _)),
     Some (`Forall (x, GTty ty, f)) -> begin
       try
         EcUnify.unify env ue tp.f_ty ty;
@@ -489,7 +494,7 @@ let check_pterm_argument hyps ue f arg =
     Some (`Forall (x, GTmem _, f)) ->
       (Fsubst.f_subst_mem x m f, `KnownMem (x, m))
 
-  | Some (`Module (mp, mt)),
+  | Some (`FormOrMod (_, Some (mp, mt))),
     Some (`Forall (x, GTmodty (emt, restr), f)) ->
       check_modtype_restr env mp mt emt restr;
       (Fsubst.f_subst_mod x mp f, `KnownMod (x, (mp, mt)))
@@ -629,6 +634,80 @@ let process_apply loc pe g =
 (* -------------------------------------------------------------------- *)
 exception RwMatchFound of EcUnify.unienv * ty EcUidgen.Muid.t * form evmap
 
+let process_rewrite1_core (s, o) (p, typs, ue, ax) args g =
+  let (hyps, concl) = get_goal g in
+
+  let ((_ax, ids), (_mode, (f1, f2))) =
+    let rec find_rewrite_pattern (ax, ids) =
+      match EcFol.sform_of_form ax with
+      | EcFol.SFeq  (f1, f2) -> ((ax, ids), (`Eq, (f1, f2)))
+      | EcFol.SFiff (f1, f2) -> ((ax, ids), (`Ev, (f1, f2)))
+      | _ -> begin
+        match destruct_product hyps ax with
+        | None -> tacuerror "not an equation to rewrite"
+        | Some _ ->
+            let (ax, id) = check_pterm_argument hyps ue ax None in
+              find_rewrite_pattern (ax, id :: ids)
+      end
+
+    in
+      find_rewrite_pattern (check_pterm_arguments hyps ue ax args)
+  in
+
+  let fp = match s with `LtoR -> f1 | `RtoL -> f2 in
+
+  let (_ue, tue, ev) =
+    let ev = evmap_of_pterm_arguments ids in
+
+    let trymatch tp =
+      try
+        let (ue, tue, ev) = f_match hyps (ue, ev) ~ptn:fp tp in
+          raise (RwMatchFound (ue, tue, ev))
+      with MatchFailure -> false
+    in
+
+    try
+      ignore (FPosition.select trymatch concl);
+      tacuerror "cannot find an occurence for rewriting"
+    with RwMatchFound (ue, tue, ev) -> (ue, tue, ev)
+  in
+
+  let args = concretize_pterm_arguments (tue, ev) ids in
+  let typs = List.map (Tuni.subst tue) typs in
+  let fp   = concretize_pterm (tue, ev) ids fp in
+
+  let cpos =
+    let test tp = EcReduction.is_alpha_eq hyps fp tp in
+      FPosition.select test concl
+  in
+
+  assert (not (FPosition.is_empty cpos));
+
+  let cpos =
+    match o with
+    | None   -> cpos
+    | Some o ->
+      let (min, max) = (Sint.min_elt o, Sint.max_elt o) in
+        if min < 1 || max > FPosition.occurences cpos then
+          tacuerror "invalid occurence selector";
+        FPosition.filter o cpos
+  in
+
+  let fpat _ _ _ = FPosition.topattern cpos concl in
+
+  match p with
+  | `Global x ->
+      t_rewrite_glob ~fpat s x typs args g
+
+  | `Local x ->
+      assert (typs = []);
+      t_rewrite_hyp ~fpat s x args g
+
+  | `Cut fc ->
+      assert (typs = []);
+      t_rewrite_form ~fpat s fc args g
+
+(* -------------------------------------------------------------------- *)
 let process_rewrite1 loc ri g =
   match ri with
   | RWDone ->
@@ -636,79 +715,12 @@ let process_rewrite1 loc ri g =
 
   | RWRw (s, r, o, pe) ->
       let do1 g =
-        let (hyps, concl) = get_goal g in
+        let hyps = get_hyps g in
 
         let (p, typs, ue, ax) = process_pterm loc (process_formula hyps) hyps pe in
         let args = List.map (trans_pterm_argument hyps ue) pe.fp_args in
-        let ((_ax, ids), (_mode, (f1, f2))) =
-          let rec find_rewrite_pattern (ax, ids) =
-            match EcFol.sform_of_form ax with
-            | EcFol.SFeq  (f1, f2) -> ((ax, ids), (`Eq, (f1, f2)))
-            | EcFol.SFiff (f1, f2) -> ((ax, ids), (`Ev, (f1, f2)))
-            | _ -> begin
-              match destruct_product hyps ax with
-              | None -> tacuerror "not an equation to rewrite"
-              | Some _ ->
-                  let (ax, id) = check_pterm_argument hyps ue ax None in
-                    find_rewrite_pattern (ax, id :: ids)
-            end
-  
-          in
-            find_rewrite_pattern (check_pterm_arguments hyps ue ax args)
-        in
 
-        let fp = match s with `Normal -> f1 | `Reverse -> f2 in
-  
-        let (_ue, tue, ev) =
-          let ev = evmap_of_pterm_arguments ids in
-  
-          let trymatch tp =
-            try
-              let (ue, tue, ev) = f_match hyps (ue, ev) ~ptn:fp tp in
-                raise (RwMatchFound (ue, tue, ev))
-            with MatchFailure -> false
-          in
-  
-          try
-            ignore (FPosition.select trymatch concl);
-            tacuerror "cannot find an occurence for rewriting"
-          with RwMatchFound (ue, tue, ev) -> (ue, tue, ev)
-        in
-  
-        let args = concretize_pterm_arguments (tue, ev) ids in
-        let typs = List.map (Tuni.subst tue) typs in
-        let fp   = concretize_pterm (tue, ev) ids fp in
-
-        let cpos =
-          let test tp = EcReduction.is_alpha_eq hyps fp tp in
-            FPosition.select test concl
-        in
-
-        assert (not (FPosition.is_empty cpos));
-
-        let cpos =
-          match o with
-          | None   -> cpos
-          | Some o ->
-            let (min, max) = (Sint.min_elt o, Sint.max_elt o) in
-              if min < 1 || max > FPosition.occurences cpos then
-                tacuerror "invalid occurence selector";
-              FPosition.filter o cpos
-        in
-
-        let fpat _ _ _ = FPosition.topattern cpos concl in
-
-        match p with
-        | `Global x ->
-            t_rewrite_glob ~fpat s x typs args g
-  
-        | `Local x ->
-            assert (typs = []);
-            t_rewrite_hyp ~fpat s x args g
-  
-        | `Cut fc ->
-            assert (typs = []);
-            t_rewrite_form ~fpat s fc args g
+          process_rewrite1_core (s, o) (p, typs, ue, ax) args g
 
       in
         match r with
@@ -735,8 +747,135 @@ let process_change pf g =
   let f = process_formula (get_hyps g) pf in
   set_loc pf.pl_loc (t_change f) g
 
+
 (* -------------------------------------------------------------------- *)
-let process_logic hitenv loc t =
+let process_intros ?(cf = true) pis (juc, n) =
+  let mk_id s = lmap (fun s -> EcIdent.create (odfl "_" s)) s in
+
+  let elim_top g =
+    let h       = EcIdent.create "_" in
+    let (g, an) = EcLogic.t_intros_1 [h] g in
+    let (g, n)  = mkn_hyp g (get_hyps (g, an)) h in
+    let f       = snd (get_node (g, n)) in
+      t_on_goals
+        (t_clear (EcIdent.Sid.of_list [h]))
+        (t_on_first (t_use n []) (t_elim f (g, an)))
+
+  and simplify g =
+    let ri = {
+      EcReduction.beta    = true;
+      EcReduction.delta_p = None;
+      EcReduction.delta_h = None;
+      EcReduction.zeta    = true;
+      EcReduction.iota    = true;
+      EcReduction.logic   = false; 
+      EcReduction.modpath = false;
+    } in
+      t_simplify ri g
+  in
+
+  let rec collect acc core pis =
+    let maybe_core () =
+      match core with
+      | [] -> acc
+      | _  -> `Core (List.rev core) :: acc
+    in
+
+    match pis with
+    | [] -> maybe_core ()
+
+    | IPCore x :: pis -> collect acc (x :: core) pis
+
+    | IPDone b :: pis ->
+        collect (`Done b :: maybe_core ()) [] pis
+
+    | IPSimplify :: pis ->
+        collect (`Simpl :: maybe_core ()) [] pis
+
+    | IPClear xs :: pis ->
+        collect (`Clear xs :: maybe_core ()) [] pis
+
+    | IPCase x :: pis ->
+        let x = List.map (collect [] []) x in
+          collect (`Case x :: maybe_core ()) [] pis
+
+    | IPRw x :: pis ->
+        collect (`Rw x :: maybe_core ()) [] pis
+  in
+
+  let rec dointro nointro pis (gs : goals) =
+    let (_, gs) =
+      List.fold_left
+        (fun (nointro, gs) ip ->
+          match ip with
+          | `Core ids ->
+              (false, t_on_goals (t_intros (List.map mk_id ids)) gs)
+
+          | `Done b   ->
+              let t =
+                match b with
+                | true  -> t_seq simplify process_trivial
+                | false -> process_trivial
+              in
+                (nointro, t_on_goals t gs)
+
+          | `Simpl ->
+              (nointro, t_on_goals simplify gs)
+
+          | `Clear xs ->
+              (nointro, t_on_goals (process_clear xs) gs)
+
+          | `Case pis ->
+              let gs =
+                match nointro && not cf with
+                | true  -> t_subgoal (List.map (dointro1 false) pis) gs
+                | false -> begin
+                    match pis with
+                    | [] -> t_on_goals elim_top gs
+                    | _  ->
+                        let t gs =
+                          t_subgoal
+                            (List.map (dointro1 false) pis) (elim_top gs)
+                        in
+                          t_on_goals t gs
+                end
+              in
+                (false, gs)
+
+          | `Rw (o, s) ->
+              let t g =
+                let h  = EcIdent.create "_" in
+
+                let rwt g =
+                  let ue = unienv_of_hyps (get_hyps g) in
+                  let eq = LDecl.lookup_hyp_by_id h (get_hyps g) in
+                    process_rewrite1_core (s, o) (`Local h, [], ue, eq) [] g
+                in
+                  t_lseq [t_intros_i [h]; rwt; t_clear (Sid.singleton h)] g
+              in
+                (false, t_on_goals t gs))
+
+        (nointro, gs) pis
+    in
+      gs
+
+  and dointro1 nointro pis (juc, n) = dointro nointro pis (juc, [n]) in
+
+    dointro1 true (List.rev (collect [] [] pis)) (juc, n)
+
+(* -------------------------------------------------------------------- *)
+let process_cut (engine : engine) ip phi t g =
+  let phi = process_formula (get_hyps g) phi in
+  let g   = t_cut phi g in
+  let g   =
+    match t with
+    | None   -> g
+    | Some t -> t_on_first (engine t) g
+  in
+    t_on_last (process_intros [ip]) g
+
+(* -------------------------------------------------------------------- *)
+let process_logic (engine, hitenv) loc t =
   match t with
   | Passumption pq -> process_assumption loc pq
   | Psmt pi        -> process_smt hitenv pi
@@ -751,7 +890,7 @@ let process_logic hitenv loc t =
   | Ptrivial       -> process_trivial
   | Pelim pe       -> process_elim loc pe
   | Papply pe      -> process_apply loc pe
-  | Pcut (name,phi)-> process_cut name phi
+  | Pcut (ip, f, t)-> process_cut engine ip f t
   | Pgeneralize l  -> process_generalize l
   | Pclear l       -> process_clear l
   | Prewrite ri    -> process_rewrite loc ri

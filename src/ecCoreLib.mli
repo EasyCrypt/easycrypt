@@ -52,6 +52,11 @@ val p_int_lt     : path
 val p_real_le    : path
 val p_real_lt    : path
 
+val p_int_prod   : path
+val p_int_sum    : path
+val p_int_sub    : path
+val p_int_pow    : path
+
 val p_real_sum     : path
 val p_real_sub     : path
 val p_real_prod    : path

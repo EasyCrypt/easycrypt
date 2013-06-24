@@ -78,6 +78,8 @@ module Fun : sig
 
   (* ------------------------------------------------------------------ *)
   (* FIXME: what are these functions for? *)
+  val prF_memenv : EcMemory.memory -> xpath -> env -> memenv
+
   val prF : xpath -> env -> env
 
   val hoareF_memenv : xpath -> env -> memenv * memenv
@@ -296,6 +298,7 @@ module LDecl : sig
   exception Ldecl_error of error
 
   type hyps
+
   val init : env -> EcIdent.t list -> hyps
   val tohyps : hyps -> EcBaseLogic.hyps
   val toenv  : hyps -> env

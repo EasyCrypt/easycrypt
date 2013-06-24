@@ -218,6 +218,11 @@ val f_eqglob   : EcPath.mpath -> memory ->
 val f_int_le : form -> form -> form
 val f_int_lt : form -> form -> form
 
+val f_int_prod : form -> form -> form
+val f_int_sum  : form -> form -> form
+val f_int_sub  : form -> form -> form
+val f_int_pow  : form -> form -> form
+
 val f_real_le : form -> form -> form
 val f_real_lt : form -> form -> form
 

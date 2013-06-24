@@ -41,6 +41,7 @@ let id_sum         = "+"
 let id_sub         = "-"
 let id_prod        = "*"
 let id_div         = "/"
+let id_pow         = "^"
 
 let id_in_supp   = "in_supp"
 let id_mu        = "mu"
@@ -76,6 +77,11 @@ let _Int id      = EcPath.pqname p_Int id
 
 let p_int_le     = _Int  id_le
 let p_int_lt     = _Int  id_lt
+
+let p_int_sum    = _Int id_sum
+let p_int_sub    = _Int id_sub
+let p_int_prod   = _Int id_prod
+let p_int_pow    = _Int id_pow   
 
 let id_Real      = "Real"
 let p_Real       = EcPath.pqname p_top id_Real

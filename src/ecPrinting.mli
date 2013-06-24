@@ -37,6 +37,8 @@ val pp_axiom    : PPEnv.t -> (EcPath.path * EcDecl.axiom         ) pp
 val pp_theory   : PPEnv.t -> (EcPath.path * EcTheory.ctheory     ) pp
 val pp_modtype  : PPEnv.t -> (EcModules.module_type * EcPath.Sm.t) pp
 
+val pp_mem : PPEnv.t -> EcIdent.t pp
+
 val pp_tyvar : PPEnv.t -> EcIdent.t pp
 val pp_path  : EcPath.path pp
 

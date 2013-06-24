@@ -94,6 +94,8 @@
     "pr_false"    , PRFALSE    ;        (* KW: tactic *)
     "pr_or"       , PROR       ;        (* KW: tactic *)
     "bd_eq"       , BDEQ       ;        (* KW: tactic *)
+    "bypr"        , BYPR       ;        (* KW: tactic *)
+    "fel"         , FEL        ;        (* KW: tactic *)
 
     "equiv_deno"  , EQUIVDENO  ;        (* KW: tactic *) 
     "conseq"      , CONSEQ     ;        (* KW: tactic *)
@@ -116,7 +118,7 @@
     "end"         , END        ;        (* KW: global *)
     "import"      , IMPORT     ;        (* KW: global *)
     "export"      , EXPORT     ;        (* KW: global *)
-    "local"       , LOCAL      ;	(* KW: global *)
+    "local"       , LOCAL      ;        (* KW: global *)
     "module"      , MODULE     ;        (* KW: global *)
     "of"          , OF         ;        (* KW: global *)
     "const"       , CONST      ;        (* KW: global *)
@@ -188,7 +190,7 @@ let mident = '&'  (lident | number)
 let op_char_1    = ['=' '<' '>']
 let op_char_2    = ['+' '-']
 let op_char_3    = ['*' '/' '%' '\\']
-let op_char_4    = ['!' '$' '&' '?' '@' '^' ':' '|' '#']
+let op_char_4    = ['!' '$' '&' '?' '@' '^' '|' '#']
 let op_char_34   = op_char_3 | op_char_4
 let op_char_234  = op_char_2 | op_char_34
 let op_char_1234 = op_char_1 | op_char_234
@@ -196,7 +198,7 @@ let op_char_1234 = op_char_1 | op_char_234
 let op1 = op_char_1234* op_char_1 op_char_1234*
 let op2 = op_char_234*  op_char_2 op_char_234+
 let op3 = op_char_34*   op_char_3 op_char_34*
-let op4 = op_char_4+
+let op4 = op_char_4+ | ':'+
 
 let binop = 
   op1 | op2 | op3 | op4 | '+' | '-' |
@@ -276,7 +278,9 @@ rule main = parse
   | "-" { MINUS }
   | "+" { ADD }
 
-  | "//" { SLASHSLASH }
+  | "//"  { SLASHSLASH }
+  | "/="  { SLASHEQ }
+  | "//=" { SLASHSLASHEQ }
 
   | op1 as s  { OP1 s }
   | op2 as s  { OP2 s }
