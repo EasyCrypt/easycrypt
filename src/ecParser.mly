@@ -297,7 +297,7 @@
 %nonassoc COMMA ELSE
 
 %nonassoc IN
-%nonassoc prec_bellow_IMPL
+%nonassoc prec_below_IMPL
 %right IMPL IFF
 %right OR 
 %right AND 
@@ -311,9 +311,12 @@
 %left OP3 STAR
 %left OP4 
 
+%nonassoc LBRACE
+
 %right SEMICOLON
 
 %nonassoc prec_prefix_op
+%nonassoc prec_tactic
 
 %type <EcParsetree.global EcLocation.located> global
 %type <EcParsetree.prog> prog
@@ -610,6 +613,7 @@ ptybindings:
 %inline sform: x=sform_r(none) { x }
 %inline  form: x=form_r (none) { x }
 
+%inline sform_h: x=loc(sform_u(hole)) { x }
 %inline  form_h: x=loc( form_u(hole)) { x }
 
 %inline hole: UNDERSCORE { PFhole; }
@@ -1418,6 +1422,10 @@ rwarg:
     { RWRw (s, r, omap o EcMaps.Sint.of_list, fp) }
 ;
 
+genpattern:
+| o=rwocc? l=sform_h %prec prec_tactic { (omap o EcMaps.Sint.of_list, l) }
+;
+
 simplify_arg: 
 | DELTA l=qoident* { `Delta l }
 | ZETA             { `Zeta }
@@ -1535,7 +1543,7 @@ logtactic:
 | ASSUMPTION p=qident tvi=tvars_app?
    { Passumption (Some p, tvi) } 
 
-| GENERALIZE l=sform+
+| GENERALIZE l=genpattern+
    { Pgeneralize l } 
 
 | CLEAR l=ident+
@@ -1592,13 +1600,13 @@ logtactic:
 | SUBST l=sform*
    { Psubst l }
 
-| CUT ip=intro_pattern COLON p=form %prec prec_bellow_IMPL
+| CUT ip=intro_pattern COLON p=form %prec prec_below_IMPL
    { Pcut (ip, p, None) }
 
 | CUT ip=intro_pattern COLON p=form BY t=tactic_core
    { Pcut (ip, p, Some t) }
 
-| POSE o=rwocc? x=lident CEQ p=form_h %prec prec_bellow_IMPL
+| POSE o=rwocc? x=lident CEQ p=form_h %prec prec_below_IMPL
    { Ppose (x, omap o EcMaps.Sint.of_list, p) }
 ;
 

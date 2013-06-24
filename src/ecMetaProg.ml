@@ -385,6 +385,7 @@ let f_match hyps (ue, ev) ~ptn subject =
 type ptnpos = [`Select | `Sub of ptnpos] Mint.t
 
 exception InvalidPosition
+exception InvalidOccurence
 
 module FPosition = struct
   let empty : ptnpos = Mint.empty
@@ -466,6 +467,22 @@ module FPosition = struct
 
     in
       fun p -> snd (doit 1 p)
+
+  let select_form hyps o p target =
+    let cpos =
+      let test _ tp = EcReduction.is_alpha_eq hyps p tp in
+        select test target
+    in
+
+    assert (not (is_empty cpos));
+
+    match o with
+    | None   -> cpos
+    | Some o ->
+      let (min, max) = (Sint.min_elt o, Sint.max_elt o) in
+        if min < 1 || max > occurences cpos then
+          raise InvalidOccurence;
+        filter o cpos
 
   let topattern ?x (p : ptnpos) (f : form) =
     let x = match x with None -> EcIdent.create "_p" | Some x -> x in
