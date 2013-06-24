@@ -1476,9 +1476,10 @@ let trans_topmsymbol env gp =
   let (mp,_) = trans_msymbol env gp in
   let top = EcPath.m_functor mp in
   let mp = EcPath.m_apply top mp.EcPath.m_args in
-  mp 
+  mp
 
-let transform_opt env ue pf tt =
+(* -------------------------------------------------------------------- *)
+let trans_form_or_pattern env (ps, ue) pf tt =
   let rec transf env f = 
     match f.pl_desc with
     | PFhole -> assert false
@@ -1739,11 +1740,15 @@ let transform_opt env ue pf tt =
   let f = transf env pf in
   oiter tt (unify_or_fail env ue pf.pl_loc f.f_ty); 
   f
-  
-(* -------------------------------------------------------------------- *)
-let transform env ue pf ty =
-  transform_opt env ue pf (Some ty)
 
 (* -------------------------------------------------------------------- *)
-let transformula env ue pf = 
-  transform env ue pf tbool
+let trans_form_opt env ue pf oty =
+  trans_form_or_pattern env (None, ue) pf oty
+
+(* -------------------------------------------------------------------- *)
+let trans_form env ue pf ty =
+  trans_form_opt env ue pf (Some ty)
+
+(* -------------------------------------------------------------------- *)
+let trans_prop env ue pf = 
+  trans_form env ue pf tbool

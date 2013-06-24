@@ -168,6 +168,7 @@ type phoarecmp = PFHle | PFHeq | PFHge
 type pformula  = pformula_r located
 
 and pformula_r =
+  | PFhole
   | PFint    of int
   | PFtuple  of pformula list
   | PFident  of pqsymbol * ptyannot option

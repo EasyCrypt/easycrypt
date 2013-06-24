@@ -484,7 +484,7 @@ module Pred = struct
         List.map (TT.transty tp scope.sc_env ue) ptys, None
       | PPconcr(bd,pe) ->
         let env, xs = TT.transbinding scope.sc_env ue bd in
-        let body = TT.transformula env ue pe in
+        let body = TT.trans_prop env ue pe in
         let dom = List.map snd xs in
         let xs = List.map (fun (x,ty) -> x, EcFol.GTty ty) xs in
         let lam = EcFol.f_lambda xs body in
@@ -766,7 +766,7 @@ module Ax = struct
         tintro in
     let tintro = mk_loc loc (Plogic (Pintro tintro)) in
 
-    let concl   = TT.transformula scope.sc_env ue pconcl in
+    let concl   = TT.trans_prop scope.sc_env ue pconcl in
     let concl   = EcFol.Fsubst.uni (EcUnify.UniEnv.close ue) concl in
     let tparams = EcUnify.UniEnv.tparams ue in
     let check   = Check_mode.check scope.sc_options in

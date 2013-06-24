@@ -173,7 +173,7 @@ let process_assumption loc (pq, tvi) g =
 (* -------------------------------------------------------------------- *)
 let process_form_opt hyps pf oty =
   let ue  = unienv_of_hyps hyps in
-  let ff  = TT.transform_opt (LDecl.toenv hyps) ue pf oty in
+  let ff  = TT.trans_form_opt (LDecl.toenv hyps) ue pf oty in
   EcFol.Fsubst.uni (EcUnify.UniEnv.close ue) ff
 
 (* -------------------------------------------------------------------- *)
@@ -334,7 +334,7 @@ let trans_pterm_argument hyps ue arg =
   match unloc arg with
   | EA_form fp -> begin
       let ff =
-        try  `Form (TT.transform_opt env ue fp None)
+        try  `Form (TT.trans_form_opt env ue fp None)
         with TT.TyError _ as e -> `Error e
       in
 
@@ -445,7 +445,7 @@ let check_pterm_arg_for_ty hyps ty arg =
 
   match arg.pl_desc, ty with
   | EA_form pf, Some (GTty ty) ->
-      let ff = TT.transform env ue pf ty in
+      let ff = TT.trans_form env ue pf ty in
         AAform (EcFol.Fsubst.uni (EcUnify.UniEnv.close ue) ff)
 
   | EA_mem mem, Some (GTmem _) ->
