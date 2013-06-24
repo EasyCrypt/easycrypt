@@ -339,9 +339,10 @@ type rwarg =
 
 and rwside = [`LtoR | `RtoL]
 and rwocc  = Sint.t option
+and renaming = [`withRename | `noRename]
 
 type intropattern1 =
-  | IPCore  of (symbol option) located
+  | IPCore  of ((symbol*renaming) option) located
   | IPCase  of intropattern list
   | IPRw    of (rwocc * rwside)
   | IPClear of psymbol list

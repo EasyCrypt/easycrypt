@@ -759,7 +759,20 @@ let process_change pf g =
 
 (* -------------------------------------------------------------------- *)
 let process_intros ?(cf = true) pis (juc, n) =
-  let mk_id s = lmap (fun s -> EcIdent.create (odfl "_" s)) s in
+  
+  let mk_intro ids g =
+    let (juc, n) = List.fold_left
+      (fun g s -> let gs = t_intros
+        [lmap (function None -> EcIdent.create "_" | Some s ->
+        (match snd s with
+          | `noRename -> EcIdent.create (fst s)
+          | `withRename -> LDecl.fresh_id (fst (get_goal g)) (fst s)
+        ) ) s] g in
+        (match gs with
+          | (juc, [n]) -> (juc, n)
+          | _ -> assert false)
+      ) g ids in
+    (juc, [n]) in
 
   let elim_top g =
     let h       = EcIdent.create "_" in
@@ -818,7 +831,7 @@ let process_intros ?(cf = true) pis (juc, n) =
         (fun (nointro, gs) ip ->
           match ip with
           | `Core ids ->
-              (false, t_on_goals (t_intros (List.map mk_id ids)) gs)
+              (false, t_on_goals (mk_intro ids) gs)
 
           | `Done b   ->
               let t =

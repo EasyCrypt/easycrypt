@@ -1334,11 +1334,17 @@ tselect:
 (* -------------------------------------------------------------------- *)
 (* tactic                                                               *)
 
+
+intro_pattern_1_name:
+| s=LIDENT   { s }
+| s=UIDENT   { s }
+| s=MIDENT   { s }
+;
+
 intro_pattern_1:
 | UNDERSCORE { None }
-| s=LIDENT   { Some s }
-| s=UIDENT   { Some s }
-| s=MIDENT   { Some s }
+| s=intro_pattern_1_name {Some (s, `noRename)}
+| s=intro_pattern_1_name QUESTION {Some (s, `withRename)}
 ;
 
 intro_pattern:
