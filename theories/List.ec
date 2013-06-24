@@ -247,7 +247,7 @@ op unique:'a list -> bool.
 
 (* Direct inductive definition *)
 axiom unique_nil: unique<:'a> [].
-axiom unique_cons: forall (x:'a) xs, unique (x::xs) = unique xs /\ !mem x xs.
+axiom unique_cons: forall (x:'a) xs, unique (x::xs) = (unique xs /\ !mem x xs).
 
 (* Lemmas *)
   (* TODO *)
