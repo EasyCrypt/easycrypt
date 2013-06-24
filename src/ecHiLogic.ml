@@ -884,7 +884,7 @@ let process_cut (engine : engine) ip phi t g =
     t_on_last (process_intros [ip]) g
 
 (* -------------------------------------------------------------------- *)
-let process_pose loc xsym p g =
+let process_pose loc xsym o p g =
   let (hyps, concl) = get_goal g in
   let env = LDecl.toenv hyps in
   let (ps, ue) = (ref Mid.empty, unienv_of_hyps hyps) in
@@ -915,6 +915,16 @@ let process_pose loc xsym p g =
   in
 
   assert (not (FPosition.is_empty cpos));
+
+  let cpos =
+    match o with
+    | None   -> cpos
+    | Some o ->
+      let (min, max) = (Sint.min_elt o, Sint.max_elt o) in
+        if min < 1 || max > FPosition.occurences cpos then
+          tacuerror "invalid occurence selector";
+        FPosition.filter o cpos
+  in
 
   let (x, letin) = FPosition.topattern ~x:(EcIdent.create (unloc xsym)) cpos concl in
   let letin = EcFol.f_let1 x p letin in
@@ -947,4 +957,4 @@ let process_logic (engine, hitenv) loc t =
   | Psimplify ri   -> process_simplify ri
   | Pchange pf     -> process_change pf
   | PelimT i       -> process_elimT loc i
-  | Ppose (x, p)   -> process_pose loc x p
+  | Ppose (x, o, p)-> process_pose loc x o p

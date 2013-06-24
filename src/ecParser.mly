@@ -1598,8 +1598,8 @@ logtactic:
 | CUT ip=intro_pattern COLON p=form BY t=tactic_core
    { Pcut (ip, p, Some t) }
 
-| POSE x=lident CEQ p=form_h %prec prec_bellow_IMPL
-   { Ppose (x, p) }
+| POSE o=rwocc? x=lident CEQ p=form_h %prec prec_bellow_IMPL
+   { Ppose (x, omap o EcMaps.Sint.of_list, p) }
 ;
 
 phltactic:
