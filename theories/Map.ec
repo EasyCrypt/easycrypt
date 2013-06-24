@@ -123,26 +123,26 @@ proof.
 qed.
 
 (** find *) (* TODO: the axiomatization appears to be upside-down *)
-op find: ('a * 'b) cPred -> ('a,'b) map -> 'a option.
+op find: ('a * 'b) cpred -> ('a,'b) map -> 'a option.
 
-axiom find_none1: forall (P:('a * 'b) cPred) m,
+axiom find_none1: forall (P:('a * 'b) cpred) m,
   find P m = None =>
   (forall x, in_dom x m => !P (x,proj (m.[x]))).
 
-lemma find_none1_aux: forall (P:('a * 'b) cPred) m x,
+lemma find_none1_aux: forall (P:('a * 'b) cpred) m x,
   find P m = None =>
   in_dom x m => !P (x,proj (m.[x]))
 by [].
 
-axiom find_none2: forall (P:('a * 'b) cPred) m,
+axiom find_none2: forall (P:('a * 'b) cpred) m,
   (forall x, in_dom x m => !P (x,proj (m.[x]))) =>
   find P m = None.
 
-axiom find_some1: forall (P:('a * 'b) cPred) m x,
+axiom find_some1: forall (P:('a * 'b) cpred) m x,
   find P m = Some x =>
   in_dom x m /\ P (x,proj (m.[x])).
 
-axiom find_some2: forall (P:('a * 'b) cPred) m x1,
+axiom find_some2: forall (P:('a * 'b) cpred) m x1,
   (in_dom x1 m /\ P (x1,proj (m.[x1]))) =>
   (exists x2, find P m = Some x2).
 
@@ -151,7 +151,7 @@ lemma find_empty: forall P,
   find<:'a,'b> P empty = None
 by [].
 
-lemma find_some_upd1: forall (P:('a * 'b) cPred) m x y, 
+lemma find_some_upd1: forall (P:('a * 'b) cpred) m x y, 
   find P m <> None => !in_dom x m =>
   find P m.[x<-y] <> None.
 proof.
@@ -166,11 +166,11 @@ cut H1: (find P m.[x<-y] = None => false).
   smt.
 save.
 
-lemma find_some_upd2: forall (P:('a * 'b) cPred) m x y, 
+lemma find_some_upd2: forall (P:('a * 'b) cpred) m x y, 
   P (x,y) => find P m.[x <- y] <> None
 by [].
 
-lemma find_some_upd3: forall (P:('a * 'b) cPred) m x y, 
+lemma find_some_upd3: forall (P:('a * 'b) cpred) m x y, 
   find P m <> None =>
   find P m <> Some x =>
   find P m.[x <- y] <> None.
@@ -182,13 +182,13 @@ intros P m x y H H0;cut H1: (exists v, find P m = Some v).
   smt.
 save.
 
-lemma find_none_upd1: forall (P:('a * 'b) cPred) m x y,
+lemma find_none_upd1: forall (P:('a * 'b) cpred) m x y,
   find P m = None =>
   !P (x,y) =>
   find P m.[x<-y] = None
 by [].
 
-lemma find_none_upd2: forall (P:('a * 'b) cPred) m x y,
+lemma find_none_upd2: forall (P:('a * 'b) cpred) m x y,
   find P m = None =>
   P (x,y) = true =>
   find P m.[x<-y] = Some x.
@@ -224,7 +224,7 @@ lemma rm_val: forall x y (m:('a,'b) map),
   m.[y] = (rm x m).[y]
 by [].
 
-lemma rm_find: forall (P:('a * 'b) cPred) m x y,
+lemma rm_find: forall (P:('a * 'b) cpred) m x y,
   find P m = Some y => x <> y =>
   find P (rm x m) <> None.
 proof.

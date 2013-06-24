@@ -210,7 +210,7 @@ theory Duni.
   axiom mu_x_nin: forall (x:'a) X, 
     !mem x X => mu_x (duni X) x = 0%r.
 
-  axiom mu_empty: forall (P:'a cPred), mu (duni empty) P = 0%r.
+  axiom mu_empty: forall (P:'a cpred), mu (duni empty) P = 0%r.
 
   axiom duni_weight: forall (X:'a set), 
     weight (duni X) = if X = empty then 0%r else 1%r.
@@ -219,40 +219,40 @@ end Duni.
 
 (*** WARNING: I am not completely sure which ones of the following make sense as operators on infinite sets. Their inclusion requires quite a bit of discussion. *)
 (** all *)
-op all:'a cPred -> 'a set -> bool.
-axiom all_def: forall (p:'a cPred) X,
+op all:'a cpred -> 'a set -> bool.
+axiom all_def: forall (p:'a cpred) X,
   all p X <=> (forall x, mem x X => p x).
 
 (** any *)
-op any:'a cPred -> 'a set -> bool.
-axiom any_def: forall (p:'a cPred) X,
+op any:'a cpred -> 'a set -> bool.
+axiom any_def: forall (p:'a cpred) X,
   any p X <=> (exists x, mem x X /\ p x).
 
 (** filter *)
-op filter:'a cPred -> 'a set -> 'a set.
-axiom mem_filter: forall x (p:'a cPred) X,
+op filter:'a cpred -> 'a set -> 'a set.
+axiom mem_filter: forall x (p:'a cpred) X,
   mem x (filter p X) <=> (mem x X /\ p x).
 
-lemma filter_cPtrue: forall (X:'a set),
-  filter cPtrue X = X.
+lemma filter_cpTrue: forall (X:'a set),
+  filter cpTrue X = X.
 proof strict.
 by intros=> X; apply set_ext; smt.
 qed.
 
-lemma filter_cPeq_in: forall (x:'a) X,
-  mem x X => filter (cPeq x) X = single x.
+lemma filter_cpEq_in: forall (x:'a) X,
+  mem x X => filter (cpEq x) X = single x.
 proof strict.
 by intros=> x X x_in_X; apply set_ext; smt.
 qed.
 
-lemma leq_filter: forall (p:'a cPred) X,
+lemma leq_filter: forall (p:'a cpred) X,
   filter p X <= X
 by [].
 
 
 
 (** induction (finite sets only) *)
-axiom set_ind: forall (p:('a set) cPred),
+axiom set_ind: forall (p:('a set) cpred),
   p empty =>
   (forall x S, !mem x S => p S => p (add x S)) =>
   forall S, p S.

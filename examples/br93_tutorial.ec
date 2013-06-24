@@ -83,7 +83,7 @@ axiom finvof : forall(pk : pkey, sk : skey, x : randomness),
 axiom fofinv : forall(pk : pkey, sk : skey, x : randomness),
  in_supp (pk,sk) keypairs => f pk (finv sk x) = x.
 
-axiom keypair_lossless : mu keypairs cPtrue = 1%r.
+axiom keypair_lossless : mu keypairs cpTrue = 1%r.
 
 module type Inverter = {
  fun i(pk : pkey, y : randomness) : randomness
@@ -153,7 +153,7 @@ elim (append_get<:bool> (to_array (projRand c))
           (Plaintext.to_array (projPlain c)) i).
 intros H1 H2.
 case (i < l);intros H3;first smt.
-rewrite (H2 _ _); smt.
+rewrite H2; smt.
 qed.
 
 module Rnd ={
@@ -298,9 +298,9 @@ call
 fun (mem Rnd.r RO.s) 
     (={RO.s} /\ eq_except RO.m{1} RO.m{2} Rnd.r{2});[smt|smt|assumption| | |].
 fun;inline RO.o;if;[smt | wp;rnd | ];wp;skip;progress;smt.
-intros &m2 H;fun;if;[inline RO.o;wp;rnd 1%r (cPtrue)| ];
+intros &m2 H;fun;if;[inline RO.o;wp;rnd 1%r (cpTrue)| ];
                                      wp;skip;progress;smt.
-intros &m1;fun;if;[inline RO.o;wp;rnd 1%r (cPtrue)| ];
+intros &m1;fun;if;[inline RO.o;wp;rnd 1%r (cpTrue)| ];
                                      wp;skip;progress;smt.
 call 
 (={pk,m,RO.m}) 
@@ -496,13 +496,13 @@ proof.
  fun; rnd (1%r / 2%r) (lambda b, b = b'); simplify.
  call (true) (true).
  fun (true);[smt|smt|assumption|].
- fun;if;[inline RO.o;wp;rnd 1%r (cPtrue)|];wp;skip;smt.
- inline CPA2(BR3,A).SO.enc;do 2! (wp;rnd 1%r (cPtrue));wp.
+ fun;if;[inline RO.o;wp;rnd 1%r (cpTrue)|];wp;skip;smt.
+ inline CPA2(BR3,A).SO.enc;do 2! (wp;rnd 1%r (cpTrue));wp.
  call (true) (true).
  fun (true);[smt|smt|assumption|].
- fun;if;[inline RO.o;wp;rnd 1%r (cPtrue)|];wp;skip;smt.
+ fun;if;[inline RO.o;wp;rnd 1%r (cpTrue)|];wp;skip;smt.
  inline CPA2(BR3,A).SO.kg RO.init.
- wp;rnd 1%r (cPtrue);wp;skip;progress;[smt|smt|smt|].
+ wp;rnd 1%r (cpTrue);wp;skip;progress;[smt|smt|smt|].
  rewrite Dbool.mu_def.
  case (result);delta charfun;simplify;smt.
  bdhoare_deno Hbd; smt.
@@ -530,9 +530,9 @@ save.
 
 (** begin conclusion *)
 lemma Conclusion :
-forall (A <: Adv {Rnd, RO}) &m :
-(forall (O <: ARO),  islossless O.o => islossless A(O).a1) =>
-(forall (O <: ARO),  islossless O.o => islossless A(O).a2) =>
+forall (A <: Adv {Rnd, RO}) &m,
+(forall (O <: ARO),  islossless O.o_a => islossless A(O).a1) =>
+(forall (O <: ARO),  islossless O.o_a => islossless A(O).a2) =>
  exists (I<:Inverter), 
 Pr[CPA(BR,A).main() @ &m : res] - 1%r / 2%r <= 
 Pr[OW(I).main() @ &m : res].
