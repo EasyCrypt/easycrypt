@@ -62,6 +62,7 @@ type tyerror =
 | InvalidMem           of symbol * mem_error
 | FunNotInModParam     of qsymbol
 | NoActiveMemory
+| PatternNotAllowed
 
 exception TyError of EcLocation.t * EcEnv.env * tyerror
 
@@ -160,6 +161,9 @@ let pp_tyerror fmt env error =
   | NoActiveMemory ->
       msg "no active memory at this point"
 
+  | PatternNotAllowed ->
+      msg "pattern not allowed here"
+
 let () =
   let pp fmt exn =
     match exn with
@@ -168,6 +172,9 @@ let () =
     | _ -> raise exn
   in
     EcPException.register pp
+
+(* -------------------------------------------------------------------- *)
+type ptnmap = ty EcIdent.Mid.t ref
 
 (* -------------------------------------------------------------------- *)
 module UE = EcUnify.UniEnv
@@ -1482,7 +1489,14 @@ let trans_topmsymbol env gp =
 let trans_form_or_pattern env (ps, ue) pf tt =
   let rec transf env f = 
     match f.pl_desc with
-    | PFhole -> assert false
+    | PFhole -> begin
+      match ps with
+      | None    -> tyerror f.pl_loc env PatternNotAllowed
+      | Some ps ->
+        let x  = EcIdent.create "_p" in
+        let ty = UE.fresh_uid ue in
+          ps := Mid.add x ty !ps; f_local x ty
+    end
 
     | PFglob gp ->
         let mp = trans_topmsymbol env gp in
@@ -1752,3 +1766,7 @@ let trans_form env ue pf ty =
 (* -------------------------------------------------------------------- *)
 let trans_prop env ue pf = 
   trans_form env ue pf tbool
+
+(* -------------------------------------------------------------------- *)
+let trans_pattern env (ps, ue) pf =
+  trans_form_or_pattern env (Some ps, ue) pf None
