@@ -285,6 +285,11 @@ module EV = struct
     match get x m with
     | Some (`Set a) -> a
     | _ -> assert false
+
+  let fold (f : ident -> 'a -> 'b -> 'b) (Ev ev) state =
+    Mid.fold
+      (fun x t s -> match t with Some t -> f x t s | None -> s)
+      ev state
 end
 
 (* -------------------------------------------------------------------- *)
@@ -462,8 +467,8 @@ module FPosition = struct
     in
       fun p -> snd (doit 1 p)
 
-  let topattern (p : ptnpos) (f : form) =
-    let x = EcIdent.create "_p" in
+  let topattern ?x (p : ptnpos) (f : form) =
+    let x = match x with None -> EcIdent.create "_p" | Some x -> x in
   
     let rec doit1 p fp =
       match p with

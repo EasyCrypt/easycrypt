@@ -538,6 +538,12 @@ let concretize_pterm_arguments (tue, ev) ids =
     List.rev (List.map do1 ids)
 
 (* -------------------------------------------------------------------- *)
+let concretize_form (tue, ev) f =
+  let s = Fsubst.f_subst_init false Mid.empty { ty_subst_id with ts_u = tue } in
+  let s = EV.fold (fun x f s -> Fsubst.f_bind_local s x f) ev s in
+    Fsubst.f_subst s f
+
+(* -------------------------------------------------------------------- *)
 let concretize_pterm (tue, ev) ids fp =
   let subst =
     List.fold_left
@@ -878,7 +884,44 @@ let process_cut (engine : engine) ip phi t g =
     t_on_last (process_intros [ip]) g
 
 (* -------------------------------------------------------------------- *)
-let process_pose _loc _x _p _g = assert false
+let process_pose loc xsym p g =
+  let (hyps, concl) = get_goal g in
+  let env = LDecl.toenv hyps in
+  let (ps, ue) = (ref Mid.empty, unienv_of_hyps hyps) in
+  let p = TT.trans_pattern env (ps, ue) p in
+  let ev = EV.of_idents (Mid.keys !ps) in
+
+  let (_ue, tue, ev) =
+    let trymatch bds tp =
+      try
+        if not (Mid.set_disjoint bds tp.f_fv) then
+          false
+        else
+          let (ue, tue, ev) = f_match hyps (ue, ev) ~ptn:p tp in
+            raise (RwMatchFound (ue, tue, ev))
+      with MatchFailure -> false
+    in
+
+    try
+      ignore (FPosition.select trymatch concl);
+      tacuerror "cannot find an occurence for [pose]"
+    with RwMatchFound (ue, tue, ev) -> (ue, tue, ev)
+  in
+
+  let p = concretize_form (tue, ev) p in
+  let cpos =
+    let test _ tp = EcReduction.is_alpha_eq hyps p tp in
+      FPosition.select test concl
+  in
+
+  assert (not (FPosition.is_empty cpos));
+
+  let (x, letin) = FPosition.topattern ~x:(EcIdent.create (unloc xsym)) cpos concl in
+  let letin = EcFol.f_let1 x p letin in
+
+    set_loc loc
+      (t_seq (t_change letin) (t_intros [mk_loc xsym.pl_loc x]))
+      g
 
 (* -------------------------------------------------------------------- *)
 let process_logic (engine, hitenv) loc t =

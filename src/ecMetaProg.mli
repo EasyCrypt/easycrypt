@@ -100,6 +100,7 @@ module EV : sig
   val add   : ident -> 'a evmap -> 'a evmap
   val get   : ident -> 'a evmap -> [`Unset | `Set of 'a] option
   val doget : ident -> 'a evmap -> 'a
+  val fold  : (ident -> 'a -> 'b -> 'b) -> 'a evmap -> 'b -> 'b
 end
 
 (* -------------------------------------------------------------------- *)
@@ -130,5 +131,5 @@ module FPosition : sig
 
   val filter : Sint.t -> ptnpos -> ptnpos
 
-  val topattern : ptnpos -> form -> EcIdent.t * form
+  val topattern : ?x:EcIdent.t -> ptnpos -> form -> EcIdent.t * form
 end
