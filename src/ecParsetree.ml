@@ -199,6 +199,12 @@ and pgty =
 | PGTY_ModTy of pmodule_type_restr
 | PGTY_Mem
 
+let rec pf_ident f =
+  match unloc f with
+  | PFident ({ pl_desc = ([], x) }, _) -> Some x
+  | PFtuple [f] -> pf_ident f
+  | _ -> None
+
 (* -------------------------------------------------------------------- *)
 type pop_def =
   | POabstr of pty
@@ -366,7 +372,7 @@ type logtactic =
   | Pelim       of ffpattern 
   | Papply      of ffpattern
   | Pcut        of (intropattern1 * pformula * ptactic_core option)
-  | Pgeneralize of pformula list
+  | Pgeneralize of (rwocc * pformula) list
   | Pclear      of psymbol list
   | Prewrite    of rwarg list
   | Psubst      of pformula list

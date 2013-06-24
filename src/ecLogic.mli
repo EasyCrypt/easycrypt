@@ -92,10 +92,12 @@ type app_arg =
 
 type 'a app_arg_cb = LDecl.hyps -> gty option -> 'a -> app_arg
 
+type dofpattern = LDecl.hyps -> form -> form -> (EcIdent.t * form)
+
 val t_hyp : EcIdent.t -> tactic
 
 val t_generalize_hyp  : EcIdent.t -> tactic
-val t_generalize_form : symbol option -> form -> tactic
+val t_generalize_form : ?fpat:dofpattern -> symbol option -> form -> tactic
 
 val t_intros_i : EcIdent.t list -> tactic
 val t_intros_1 : EcIdent.t list -> goal -> goal
@@ -107,8 +109,6 @@ val t_elim     : form -> tactic
 val t_elimT : form -> EcPath.path -> tactic
 
 val t_case : form -> tactic
-
-type dofpattern = LDecl.hyps -> form -> form -> (EcIdent.t * form)
 
 val t_rewrite_hyp  : ?fpat:dofpattern -> rwside -> EcIdent.t -> app_arg list -> tactic
 val t_rewrite_glob : ?fpat:dofpattern -> rwside -> EcPath.path -> EcTypes.ty list -> app_arg list -> tactic

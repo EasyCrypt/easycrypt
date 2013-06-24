@@ -757,9 +757,14 @@ let t_or_intro b g =
 let t_left  = t_or_intro true
 let t_right = t_or_intro false
 
-let t_generalize_form name f g =
+let t_generalize_form ?fpat name f g =
+  let fpat =
+    match fpat with
+    | None -> pattern_form name
+    | Some fpat -> fpat
+  in
   let hyps,concl = get_goal g in
-  let x,body = pattern_form name hyps f concl in
+  let x,body = fpat hyps f concl in
   let ff = f_forall [x,GTty f.f_ty] body in
   t_apply_form ff [AAform f] g
 

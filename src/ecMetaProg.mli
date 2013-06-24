@@ -5,6 +5,7 @@ open EcParsetree
 open EcIdent
 open EcTypes
 open EcModules
+open EcEnv
 open EcFol
 open EcUnify
 
@@ -117,6 +118,7 @@ val f_match :
 type ptnpos = private [`Select | `Sub of ptnpos] Mint.t
 
 exception InvalidPosition
+exception InvalidOccurence
 
 module FPosition : sig
   val empty : ptnpos
@@ -127,9 +129,12 @@ module FPosition : sig
 
   val select : (Sid.t -> form -> bool) -> form -> ptnpos
 
+  val select_form : LDecl.hyps -> Sint.t option -> form -> form -> ptnpos
+
   val occurences : ptnpos -> int
 
   val filter : Sint.t -> ptnpos -> ptnpos
 
   val topattern : ?x:EcIdent.t -> ptnpos -> form -> EcIdent.t * form
+
 end
