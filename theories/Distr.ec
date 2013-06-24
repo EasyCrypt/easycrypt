@@ -3,43 +3,44 @@ require export Fun.
 require import Int.
 require import Real.
 
-op charfun (p:'a cPred, x:'a) : real = if p x then 1%r else 0%r.
+op charfun (p:'a cpred, x:'a) : real = if p x then 1%r else 0%r.
 
 op mu_x(d:'a distr, x) : real = mu d ((=) x).
 
-op weight(d:'a distr) : real = mu d cPtrue.
+op weight(d:'a distr) : real = mu d cpTrue.
 
 op in_supp (x, d:'a distr) : bool = 0%r < mu_x d x.
 
 (** Axioms *)
-axiom mu_bounded : forall (d:'a distr, p:'a cPred), 
+axiom mu_bounded : forall (d:'a distr, p:'a cpred), 
   0%r <= mu d p /\ mu d p <= 1%r.
 
-axiom mu_false : forall (d:'a distr), mu d cPfalse = 0%r.
+axiom mu_false : forall (d:'a distr), mu d cpFalse = 0%r.
 
-axiom mu_or : forall (d:'a distr, p, q:'a cPred), 
-  mu d (cPor p q) = mu d p + mu d q - mu d (cPand p q).
+axiom mu_or : forall (d:'a distr, p, q:'a cpred), 
+  mu d (cpOr p q) = mu d p + mu d q - mu d (cpAnd p q).
 
-axiom mu_sub : forall (d:'a distr, p, q:'a cPred),
+axiom mu_sub : forall (d:'a distr, p, q:'a cpred),
   p <= q => mu d p <= mu d q.
 
 pred (==)(d d':'a distr) =
   (forall x, mu_x d x = mu_x d' x).
 
-axiom mu_extensional : forall (d d':'a distr), (* breaks Lib.extensionality, but not mu_property *)
+axiom mu_ext : forall (d d':'a distr),
   d == d' <=> d = d'.
 
 (** Lemmas *)
-lemma mu_disjoint : forall (d:'a distr, p, q:'a cPred),
-  (cPand p q <= cPfalse) =>
-  mu d (cPor p q) = mu d p + mu d q
+lemma mu_disjoint : forall (d:'a distr, p, q:'a cpred),
+  (cpAnd p q <= cpFalse) =>
+  mu d (cpOr p q) = mu d p + mu d q
 by [].
 
-lemma mu_not : forall (d:'a distr, p:'a cPred), 
-  mu d (cPnot p) = mu d cPtrue - mu d p.
+lemma mu_not : forall (d:'a distr, p:'a cpred), 
+  mu d (cpNot p) = mu d cpTrue - mu d p.
 proof.
   intros d p;
-  by cut H: (forall (x y z:real), x = y - z <=> x + z = y); smt.
+  cut H: (forall (x y z:real), x = y - z <=> x + z = y); first smt.
+  rewrite H; smt.
 qed.
 
 lemma mu_weight_0 : forall (d:'a distr),
@@ -50,13 +51,13 @@ by [].
 theory Dempty.
   op dempty : 'a distr.
 
-  axiom mu_def : forall (p:'a cPred), mu dempty p = 0%r.
+  axiom mu_def : forall (p:'a cpred), mu dempty p = 0%r.
 
   lemma unique : forall (d:'a distr),
     weight d = 0%r <=> d = dempty.
   proof.
   intros d; split; last smt.
-  intros weight_0; rewrite -(mu_extensional<:'a> d dempty); smt.
+  intros weight_0; rewrite -(mu_ext<:'a> d dempty); smt.
   qed.
 end Dempty.
 
@@ -64,10 +65,10 @@ end Dempty.
 theory Dunit.
   op dunit : 'a -> 'a distr.
 
-  axiom mu_def_in : forall (x:'a, p:'a cPred), p x => mu (dunit x) p = 1%r.
+  axiom mu_def_in : forall (x:'a, p:'a cpred), p x => mu (dunit x) p = 1%r.
 
   lemma mu_def_notin : 
-    forall (x:'a, p:'a cPred), !p x => mu (dunit x) p = 0%r by [].
+    forall (x:'a, p:'a cpred), !p x => mu (dunit x) p = 0%r by [].
  
   lemma mu_x_def_eq : forall (x:'a), mu_x (dunit x) x = 1%r by [].
 
@@ -116,11 +117,11 @@ theory Dscale.
 
   axiom mu_x_def_0: forall (d:'a distr),
     weight d = 0%r =>
-    forall (p:'a cPred), mu (dscale d) p = 0%r.
+    forall (p:'a cpred), mu (dscale d) p = 0%r.
 
   axiom mu_x_def_pos : forall (d:'a distr),
     0%r < weight d =>
-    forall (p:'a cPred), mu (dscale d) p = mu d p / weight d.  
+    forall (p:'a cpred), mu (dscale d) p = mu d p / weight d.  
 
   lemma weight_0 : forall (d:'a distr),
     weight d = 0%r => weight (dscale d) = 0%r
@@ -131,9 +132,9 @@ theory Dscale.
   proof.
    intros d H.
    delta weight; simplify.
-   rewrite (mu_x_def_pos<:'a> d _ cPtrue); smt.
-  qed.
-  
+   rewrite (mu_x_def_pos<:'a> d _ cpTrue); first smt.
+   cut ->: mu d cpTrue = weight d; smt. (* TODO: add lemmas in Real.ec to avoid unstable smt here *)
+  qed.  
 end Dscale.
 
 (* Laplacian *) (* TODO: This is drafty! *)
