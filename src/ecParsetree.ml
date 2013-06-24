@@ -372,6 +372,7 @@ type logtactic =
   | Psimplify   of preduction 
   | Pchange     of pformula
   | PelimT      of (pformula * pqsymbol)
+  | Ppose       of (psymbol * pformula)
 
 and ptactic_core_r =
   | Pidtac      of string option

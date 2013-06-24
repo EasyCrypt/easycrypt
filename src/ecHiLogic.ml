@@ -878,6 +878,9 @@ let process_cut (engine : engine) ip phi t g =
     t_on_last (process_intros [ip]) g
 
 (* -------------------------------------------------------------------- *)
+let process_pose _loc _x _p _g = assert false
+
+(* -------------------------------------------------------------------- *)
 let process_logic (engine, hitenv) loc t =
   match t with
   | Passumption pq -> process_assumption loc pq
@@ -901,3 +904,4 @@ let process_logic (engine, hitenv) loc t =
   | Psimplify ri   -> process_simplify ri
   | Pchange pf     -> process_change pf
   | PelimT i       -> process_elimT loc i
+  | Ppose (x, p)   -> process_pose loc x p

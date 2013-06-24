@@ -230,6 +230,7 @@
 %token ON
 %token OP
 %token PIPE
+%token POSE
 %token PR
 %token PRAGMA
 %token PRBOUNDED
@@ -259,7 +260,6 @@
 %token SAVE
 %token SEMICOLON
 %token SEQ
-%token SET
 %token SIMPLIFY
 %token SKIP
 %token SLASHEQ
@@ -1598,8 +1598,8 @@ logtactic:
 | CUT ip=intro_pattern COLON p=form BY t=tactic_core
    { Pcut (ip, p, Some t) }
 
-| SET x=lident CEQ form_h %prec prec_bellow_IMPL
-   { assert false }
+| POSE x=lident CEQ p=form_h %prec prec_bellow_IMPL
+   { Ppose (x, p) }
 ;
 
 phltactic:

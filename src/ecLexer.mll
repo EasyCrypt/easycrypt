@@ -68,7 +68,7 @@
     "rewrite"     , REWRITE    ;        (* KW: tactic *)
     "right"       , RIGHT      ;        (* KW: tactic *)
     "same"        , SAME       ;        (* KW: tactic *)
-    "set"         , SET        ;        (* KW: tactic *)
+    "pose"        , POSE       ;        (* KW: tactic *)
     "simplify"    , SIMPLIFY   ;        (* KW: tactic *)
     "split"       , SPLIT      ;        (* KW: tactic *)
     "subst"       , SUBST      ;        (* KW: tactic *)
