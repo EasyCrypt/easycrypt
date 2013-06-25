@@ -1416,7 +1416,14 @@ rwocc:
 ;
 
 rwarg:
-| SLASHSLASH { RWDone }
+| SLASHSLASH
+    { RWDone false }
+
+| SLASHSLASHEQ
+    { RWDone true  }
+
+| SLASHEQ
+   { RWSimpl }
 
 | s=rwside r=rwrepeat? o=rwocc? fp=fpattern(form)
     { RWRw (s, r, omap o EcMaps.Sint.of_list, fp) }

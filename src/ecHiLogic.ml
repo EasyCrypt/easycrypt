@@ -699,8 +699,12 @@ let process_rewrite1_core (s, o) (p, typs, ue, ax) args g =
 (* -------------------------------------------------------------------- *)
 let process_rewrite1 loc ri g =
   match ri with
-  | RWDone ->
-      process_trivial g
+  | RWDone b ->
+      let t = if b then t_simplify_nodelta else (t_id None) in
+        t_seq t process_trivial g
+
+  | RWSimpl ->
+      t_simplify_nodelta g
 
   | RWRw (s, r, o, pe) ->
       let do1 g =

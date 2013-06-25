@@ -340,8 +340,9 @@ and pinline_arg =
 type trepeat = [`All | `Maybe] * int option
 
 type rwarg =
-  | RWDone
-  | RWRw of (rwside * trepeat option * rwocc * ffpattern)
+  | RWRw    of (rwside * trepeat option * rwocc * ffpattern)
+  | RWDone  of bool
+  | RWSimpl
 
 and rwside = [`LtoR | `RtoL]
 and rwocc  = Sint.t option
