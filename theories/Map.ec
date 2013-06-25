@@ -276,15 +276,18 @@ by [].
 lemma splitm_set: forall (m m1 m2:('a,'b) map) x v,
   splitm m m1 m2 =>
   !in_dom x m2 =>
-  splitm m.[x <- v] m1.[x <- v] m2
-by [].
+  splitm m.[x <- v] m1.[x <- v] m2.
+proof strict.
+by intros=> m m1 m2 x v splitm_m x_nin_m2; delta splitm beta;
+   progress; smt.
+qed.
 
 lemma splitm_rm: forall (m m1 m2:('a,'b) map) x,
   splitm m m1 m2 =>
   !in_dom x m2 =>
   splitm (rm x m) (rm x m1) m2.
 proof strict.
-by intros=> m m1 m2 x splitm_m x_nin_dom_m2; delta splitm beta;
+by intros=> m m1 m2 x splitm_m x_nin_m2; delta splitm beta;
    progress; smt.
 qed.
 
