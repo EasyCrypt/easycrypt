@@ -508,23 +508,7 @@ proof.
  bdhoare_deno Hbd; smt.
  rewrite Hleq //.
 save.
-(** end eq3 *)
-
-(** begin prob2 *)
-lemma prob2 : forall (A <: Adv {RO,Rnd}) &m,
-(forall (R<:ARO), islossless R.o_a => islossless A(R).a1) =>
-(forall (R<:ARO), islossless R.o_a => islossless A(R).a2) =>
-Pr[CPA(BR2,A).main() @ &m : res] = Pr[CPA(BR3,A).main() @ &m : res] /\
-(Pr[CPA(BR2,A).main() @ &m : mem Rnd.r RO.s] = 
-Pr[CPA(BR3,A).main() @ &m : mem Rnd.r RO.s]).
-proof.
- intros => A &m H1 H2.
-split;
- (equiv_deno (_ : (glob A){1} = (glob A){2} ==> ={res,Rnd.r,RO.s});
-  [apply (eq2 A);assumption|trivial| smt]).
-save.
-
-
+(** end prob3 *)
 
 
 

@@ -521,7 +521,7 @@ as follows
 
 We can prove that the results of the two versions of the encryption
 are indistinguishable resorting to optimistic sampling. The following
-easycrypt script shows the desired property
+\EC script shows the desired property
 
 \ecimport{ }{../examples/br93_tutorial.ec}{eq2enc}
 
@@ -568,7 +568,7 @@ follows
 \ecimport{ }{../examples/br93_tutorial.ec}{cpa2}
 
 Again, we are interested in showing the equivalence of the events of
-interest. In easycrypt we carry out this step in the following way
+interest. In \EC we carry out this step in the following way
 \ecimport{ }{../examples/br93_tutorial.ec}{eq3}
 
 The key step in this case, is \ec{swap{2} -2}. This tactic moves the
@@ -581,7 +581,46 @@ previous step.
 At this point we can prove the following result on probabilities
 \ecimport{ }{../examples/br93_tutorial.ec}{prob3}
 
-Explain the bd_hoare reasoning
+The proof consists of three steps:
+\begin{itemize}
+\item \ec{Pr[CPA(BR3,A).main() @ &m : res] = Pr[CPA2(BR3,A).main() @
+    &m : res]} 
+\item \ec{Pr[CPA(BR3,A).main() @ &m : mem Rnd.r RO.s] = Pr[CPA2(BR3,A).main() @
+    &m : mem Rnd.r RO.s]}
+\item \ec{Pr[CPA2(BR3,A).main() @  &m : res] = 1\%r/2\%r}
+\end{itemize}
+The first two are proved, as usual, relying on the previously proved
+pRHL judgement and in \ec{equiv_deno}. The last one relies on bounded
+probabilistic Hoare logic. This logic allows us to reason regarding
+bounds of events in our probabilistic language. In particular, in this
+case we show that the probability of \ec{b = b'} in a game where \ec{b}
+is sampled at the end is $\frac{1}{2}$. This proof is relatively
+straightforward and consists of two parts:
+\begin{itemize}
+\item Showing that all the code before the sampling of \ec{b} is
+  lossless, {\em i.e.} terminates with probability 1;
+\item showing that a program that consists uniquely of the sampling of
+  a boolean \ec{b} yields a distribution where the event \ec{b = true}
+  and \ec{b = false} have probability $\frac{1}{2}$.
+\end{itemize}
+
+For the first part, we do the same kind of reasoning as when we did
+reasoning up to failure. Basically, we have to show that the program
+terminates unconditionally. In doing so, we show that all function
+calls are lossless: concrete calls are handled by inlining and
+adversaries are handeled using our losslessness hypotheses.
+
+For the second part, the key step is the use of the \ec{rnd (1\%r /
+  2\%r) (lambda b, b = b')}. This tactic takes a bound and an event
+(depending on the value sampled), consumes the random sampling and
+produces the following goal
+
+
+\ec{mu \{0,1\} (lambda (b0 : bool), b0 = CPA2(BR3, A).main.b') = 1\%r / 2\%r},
+
+where \ec{mu} is an axiomatized that measures the probability of an
+event in a distribution. In our case, we conclude by relying on the
+definition of the \ec{\{0,1\}} distribution.
 
 
 \paragraph{Constructing the inverter}
