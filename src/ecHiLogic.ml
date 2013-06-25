@@ -761,7 +761,9 @@ let process_intros ?(cf = true) pis (juc, n) =
   let elim_top g =
     let h       = EcIdent.create "_" in
     let (g, an) = EcLogic.t_intros_1 [h] g in
-    let (g, n)  = mkn_hyp g (get_hyps (g, an)) h in
+    let (g, n)  =
+      try  mkn_hyp g (get_hyps (g, an)) h
+      with LDecl.Ldecl_error _ -> tacuerror "nothing to elim" in
     let f       = snd (get_node (g, n)) in
       t_on_goals
         (t_clear (EcIdent.Sid.of_list [h]))
