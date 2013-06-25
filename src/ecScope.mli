@@ -13,7 +13,7 @@ type scope
 
 type proof_uc = {
   puc_name  : string;
-  puc_scope : [`Global | `Local];
+  puc_exsmt : bool;
   puc_jdg   : proof_state;
 }
 

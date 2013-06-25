@@ -1,9 +1,9 @@
 (** Extensional equality for functions *)
 pred (==) (f g:'a -> 'b) = forall x, f x = g x.
 
-lemma local eq_refl: forall (X:'a -> 'b), X == X by [].
-lemma local eq_symm: forall (X Y:'a -> 'b), X == Y => Y == X by [].
-lemma local eq_tran: forall (X Y Z:'a -> 'b), X == Y => Y == Z => X == Z by [].
+lemma nosmt eq_refl: forall (X:'a -> 'b), X == X by [].
+lemma nosmt eq_symm: forall (X Y:'a -> 'b), X == Y => Y == X by [].
+lemma nosmt eq_tran: forall (X Y Z:'a -> 'b), X == Y => Y == Z => X == Z by [].
 
 axiom fun_ext: forall (f g:'a -> 'b), f == g => f = g.
 
@@ -11,11 +11,11 @@ axiom fun_ext: forall (f g:'a -> 'b), f == g => f = g.
 type 'a cpred = 'a -> bool.
 pred (<=) (p q:'a cpred) = forall (a:'a), p a => q a.
 
-lemma local leq_refl: forall (X:'a cpred), X <= X by [].
-lemma local leq_asym: forall (X Y:'a cpred),
+lemma nosmt leq_refl: forall (X:'a cpred), X <= X by [].
+lemma nosmt leq_asym: forall (X Y:'a cpred),
   X <= Y => Y <= X => X = Y
 by (intros=> X Y X_leq_Y Y_leq_X; apply fun_ext; smt).
-lemma local leq_tran: forall (X Y Z:'a cpred), X <= Y => Y <= Z => X <= Z by [].
+lemma nosmt leq_tran: forall (X Y Z:'a cpred), X <= Y => Y <= Z => X <= Z by [].
 
 pred (>=) (p q:'a cpred) = q <= p.
 pred (<)  (p q:'a cpred) = p <= q /\ p <> q.

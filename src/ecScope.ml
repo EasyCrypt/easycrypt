@@ -170,7 +170,7 @@ end
 (* -------------------------------------------------------------------- *)
 type proof_uc = {
   puc_name   : string;
-  puc_scope  : [`Global | `Local];
+  puc_exsmt  : bool;
   puc_jdg    : proof_state;
 }
 
@@ -708,7 +708,7 @@ module Ax = struct
     { scope with sc_env = EcEnv.Ax.bind x ax scope.sc_env; }
 
   (* ------------------------------------------------------------------ *)
-  let start_lemma scope check name axsc tparams concl =
+  let start_lemma scope ~exsmt check name tparams concl =
     let puc =
       match check with
       | false -> PSNoCheck (tparams, concl)
@@ -716,7 +716,7 @@ module Ax = struct
           let hyps = EcEnv.LDecl.init scope.sc_env tparams in
             PSCheck (EcLogic.open_juc (hyps, concl), [0])
     in 
-    let puc = { puc_name = name; puc_jdg = puc; puc_scope = axsc; } in
+    let puc = { puc_name = name; puc_jdg = puc; puc_exsmt = exsmt; } in
       { scope with sc_pr_uc = Some (None, puc) }
 
   (* ------------------------------------------------------------------ *)
@@ -740,7 +740,7 @@ module Ax = struct
     let axd = { ax_tparams = tparams;
                 ax_spec    = Some concl;
                 ax_kind    = proof;
-		ax_scope   = puc.puc_scope; }
+                ax_exsmt   = puc.puc_exsmt; }
     in
     let scope = { scope with sc_pr_uc = None } in
       (Some puc.puc_name, bind scope (puc.puc_name, axd))
@@ -773,12 +773,12 @@ module Ax = struct
 
     match ax.pa_kind with
     | PILemma ->
-        let scope = start_lemma scope check (unloc ax.pa_name) ax.pa_scope tparams concl in
+        let scope = start_lemma scope ~exsmt:ax.pa_exsmt check (unloc ax.pa_name) tparams concl in
         let scope = Tactics.process_core false `Check scope [tintro] in
           None, scope
 
     | PLemma tc ->
-        let scope = start_lemma scope check (unloc ax.pa_name) ax.pa_scope tparams concl in
+        let scope = start_lemma scope ~exsmt:ax.pa_exsmt check (unloc ax.pa_name) tparams concl in
         let scope = Tactics.process_core false `Check scope [tintro] in
         let scope = Tactics.proof scope mode (if tc = None then true else false) in
 
@@ -799,6 +799,7 @@ module Ax = struct
         let axd = { ax_tparams = tparams;
                     ax_spec    = Some concl;
                     ax_kind    = Axiom;
-		    ax_scope   = ax.pa_scope; } in
-        Some (unloc ax.pa_name), bind scope (unloc ax.pa_name, axd)
+                    ax_exsmt   = ax.pa_exsmt; }
+        in
+          Some (unloc ax.pa_name), bind scope (unloc ax.pa_name, axd)
 end

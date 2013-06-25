@@ -1852,9 +1852,9 @@ module Ax = struct
     let env = MC.bind_axiom name ax env in
     let env = { env with env_item = CTh_axiom (name, ax) :: env.env_item } in
 
-    match ax.ax_scope with
-    | `Local  -> env
-    | `Global ->
+    match ax.ax_exsmt with
+    | false -> env
+    | true  ->
         let (w3, rb) =
           EcWhy3.add_ax env.env_w3
             (EcPath.pqname (root env) name)
@@ -1940,9 +1940,9 @@ module Theory = struct
         | CTh_theory (x, th)   -> compile (xpath x) w3env th
 
         | CTh_axiom (x, ax) -> begin
-          match ax.ax_scope with
-          | `Local  -> (w3env, [])
-          | `Global -> EcWhy3.add_ax w3env (xpath x) ax
+          match ax.ax_exsmt with
+          | false -> (w3env, [])
+          | true  -> EcWhy3.add_ax w3env (xpath x) ax
         end
 
     and compile path w3env cth =

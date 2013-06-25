@@ -414,7 +414,7 @@ type paxiom_kind = PAxiom | PLemma of ptactic option | PILemma
 
 type paxiom = {
   pa_name    : psymbol;
-  pa_scope   : [`Global | `Local];
+  pa_exsmt   : bool;
   pa_tyvars  : psymbol list option;
   pa_vars    : pgtybindings option;  
   pa_formula : pformula;

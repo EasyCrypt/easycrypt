@@ -15,9 +15,9 @@ op mem:'a -> 'a set -> bool.
 pred (==) (X1 X2:'a set) = forall x, mem x X1 <=> mem x X2.
 
 (* Extension is an equivalence relation *)
-lemma local eq_refl: forall (X:'a set), X == X by [].
-lemma local eq_symm: forall (X Y:'a set), X == Y => Y == X by [].
-lemma local eq_tran: forall (X Y Z:'a set), X == Y => Y == Z => X == Z by [].
+lemma nosmt eq_refl: forall (X:'a set), X == X by [].
+lemma nosmt eq_symm: forall (X Y:'a set), X == Y => Y == X by [].
+lemma nosmt eq_tran: forall (X Y Z:'a set), X == Y => Y == Z => X == Z by [].
 
 (* And we can use it as equality *)
 axiom set_ext: forall (X1 X2:'a set), X1 == X2 => X1 = X2.
