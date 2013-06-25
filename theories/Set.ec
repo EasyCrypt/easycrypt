@@ -308,7 +308,9 @@ save.
 lemma inter_add3: forall (x:'a) X Y,
   !mem x Y => (inter X Y) = inter (add x X) Y.
 proof.
-intros x X Y x_nin_Y; apply extensionality; smt.
+intros x X Y x_nin_Y; apply extensionality;
+  delta (==) beta=> x'; rewrite 2!inter_mem;
+  case (x = x'); smt.
 save.
 
 lemma subset_inter: forall (X Y:'a set),

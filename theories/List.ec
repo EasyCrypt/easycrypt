@@ -2,32 +2,42 @@ require import Logic.
 require import Int.
 require import Fun.
 
-(** Type Definition is imported from Why3 *)
+(*** Type Definition is imported from Why3 *)
 import why3 "list" "List"
    op "Nil" as "__nil";
    op "Cons" as "::".
 
-(* Induction Principle *)
-axiom list_ind: forall (P:('a list) cpred),
-  (P []) =>
-  (forall x xs, P xs => P (x::xs)) =>
-  (forall ys, P ys).
+(*** Recursion and Induction Principles *)
+(** Recursion principle *)
+op list_rect: 'b -> ('a -> 'a list -> 'b -> 'b) -> 'a list -> 'b.
+axiom list_rect_nil: forall v f,
+  list_rect<:'b,'a> v f [] = v.
+axiom list_rect_cons: forall v f x xs,
+  list_rect<:'b,'a> v f (x::xs) = f x xs (list_rect v f xs).
 
-(** Destructors (partially specified) *)
-(* Head *)
+(** Induction principle. *)
+(* We cannot prove it from list_rect because
+   types and terms are disjoint. *)
+axiom list_ind: forall (p:('a list) cpred),
+  p [] =>
+  (forall x xs, p xs => p (x::xs)) =>
+  (forall xs, p xs).
+
+(*** Destructors (partially specified) *)
+(** Head *)
 op hd: 'a list -> 'a.
 axiom hd_cons: forall (x:'a) xs, hd (x::xs) = x.
 
-(* Tail *)
+(** Tail *)
 op tl: 'a list -> 'a list.
 axiom tl_cons: forall (x:'a) xs, tl (x::xs) = xs.
 
 (*** General Lemmas *)
 (** List case analysis *)
-lemma list_case: forall (p: 'a list -> bool, l:'a list), 
-    (l = [] => p []) => 
-    (forall x l', l = x::l' => p (x::l')) =>
-    p l
+lemma list_case: forall (p: 'a list cpred), 
+    p [] => 
+    (forall x l, p (x::l)) =>
+    (forall l, p l)
 by [].
 
 (** Constructor Disjointness *)
@@ -244,8 +254,6 @@ qed.
 
 (** unique *)
 op unique:'a list -> bool.
-
-(* Direct inductive definition *)
 axiom unique_nil: unique<:'a> [].
 axiom unique_cons: forall (x:'a) xs, unique (x::xs) = (unique xs /\ !mem x xs).
 
@@ -255,9 +263,8 @@ axiom unique_cons: forall (x:'a) xs, unique (x::xs) = (unique xs /\ !mem x xs).
 (** nth *)
 require import Option.
 require import Pair.
-op nth:'a list -> int -> 'a option.
 
-(* Direct inductive definition *)
+op nth:'a list -> int -> 'a option.
 axiom nth_nil: forall n, nth<:'a> [] n = None.
 axiom nth_cons0: forall (x:'a) xs,
   nth (x::xs) 0 = Some x.

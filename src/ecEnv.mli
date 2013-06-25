@@ -286,7 +286,7 @@ val import_w3_dir :
 open EcBaseLogic
 
 module LDecl : sig
-  type error = 
+  type error =
     | UnknownSymbol   of EcSymbols.symbol 
     | UnknownIdent    of EcIdent.t
     | NotAVariable    of EcIdent.t

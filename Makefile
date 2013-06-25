@@ -69,6 +69,9 @@ tests: check
 examples:
 	$(CHECK) examples
 
+fullcheck: ec.native
+	$(CHECK) prelude theories realized examples unit
+
 check: ec.native
 	$(CHECK) prelude theories realized unit
 
@@ -80,6 +83,7 @@ checklibs: ec.native
 
 clean:
 	$(OCAMLBUILD) -clean
+	rm -f ec.native ec.byte
 	set -e; for i in $(CONFIG); do [ \! -h "$$i" ] || rm -f "$$i"; done
 
 tags:

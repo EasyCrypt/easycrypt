@@ -699,8 +699,12 @@ let process_rewrite1_core (s, o) (p, typs, ue, ax) args g =
 (* -------------------------------------------------------------------- *)
 let process_rewrite1 loc ri g =
   match ri with
-  | RWDone ->
-      process_trivial g
+  | RWDone b ->
+      let t = if b then t_simplify_nodelta else (t_id None) in
+        t_seq t process_trivial g
+
+  | RWSimpl ->
+      t_simplify_nodelta g
 
   | RWRw (s, r, o, pe) ->
       let do1 g =
@@ -757,7 +761,9 @@ let process_intros ?(cf = true) pis (juc, n) =
   let elim_top g =
     let h       = EcIdent.create "_" in
     let (g, an) = EcLogic.t_intros_1 [h] g in
-    let (g, n)  = mkn_hyp g (get_hyps (g, an)) h in
+    let (g, n)  =
+      try  mkn_hyp g (get_hyps (g, an)) h
+      with LDecl.Ldecl_error _ -> tacuerror "nothing to elim" in
     let f       = snd (get_node (g, n)) in
       t_on_goals
         (t_clear (EcIdent.Sid.of_list [h]))
