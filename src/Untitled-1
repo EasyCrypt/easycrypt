@@ -1,0 +1,14 @@
+Liste demandes :
+
+- a = $d1;b = $d2 ~ (a, b) = $Pair d1 d2;
+- partial module application
+- while one sided
+- while tactic reordonate loop
+- for i in X for j in Y = for j in Y for i in X
+- SP
+- stronger Cfold
+- let tactic
+- terminason proof automatic
+- alias for invariant
+- Mean
+- Not
