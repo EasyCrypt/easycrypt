@@ -1297,7 +1297,8 @@ module Mod = struct
     { mis_params = [];
       mis_body   =
         List.map
-          (function Tys_function(s, _) -> Tys_function(s, {oi_calls = []}))
+          (function Tys_function(s, oi) -> 
+            Tys_function(s, {oi_calls = []; oi_in = oi.oi_in }))
           sig_.mis_body }
 
   let unsuspend (i, args) (spi, params) me =

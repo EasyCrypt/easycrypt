@@ -639,7 +639,7 @@ and transmodsig_body (env : EcEnv.env) (sa : Sm.t)
         let resty = transty_for_decl env f.pfd_tyresult in
           if not (List.uniq (List.map fst f.pfd_tyargs)) then
             raise (DuplicatedArgumentsName f);
-        let calls = 
+        let uin, calls = 
           match f.pfd_uses with
           | None -> 
             let do_one mp calls = 
@@ -649,9 +649,9 @@ and transmodsig_body (env : EcEnv.env) (sa : Sm.t)
                 let fs = List.map (fun (Tys_function(fsig,_)) ->
                   EcPath.xpath_fun mp fsig.fs_name) sig_.mis_body in
                 fs@calls in
-            Sm.fold do_one sa []
-          | Some pfd_uses ->
-            List.map (fun name -> 
+            true, Sm.fold do_one sa []
+          | Some (uin, pfd_uses) ->
+            uin, List.map (fun name -> 
               let f, _ = lookup_fun env name in
               let p = f.EcPath.x_top in
               if not (Sm.mem p sa) then 
@@ -664,9 +664,7 @@ and transmodsig_body (env : EcEnv.env) (sa : Sm.t)
              fs_params = tyargs;
              fs_ret    = resty; },
            { oi_calls = calls;
-             (*oi_reads = Sx.empty;
-             oi_writes = Sx.empty; *)
-             })
+             oi_in    = uin; })
   in
 
   let items = List.map transsig1 is in
@@ -906,7 +904,8 @@ let rec trans_msymbol (env : EcEnv.env) (msymb : pmsymbol located) =
     let body = EcSubst.subst_modsig_body subst mod_expr.me_sig.mis_body in
     let body = 
       List.map 
-        (fun (Tys_function(s,_)) -> Tys_function(s,{oi_calls = []})) body in
+        (fun (Tys_function(s,oi)) -> 
+          Tys_function(s,{oi_calls = []; oi_in = oi.oi_in})) body in
     let mp = EcPath.mpath top_path args in
     (mp, {mis_params = []; mis_body = body})
 
@@ -944,7 +943,8 @@ let rec transmod (env : EcEnv.env) (x : symbol) (me : pmodule_expr) =
           mis_params = [];
           mis_body   = 
             let rm_oi = function 
-              | Tys_function (fsig,_) -> Tys_function(fsig, {oi_calls = []}) in
+              | Tys_function (fsig,oi) -> 
+                Tys_function(fsig, {oi_calls = []; oi_in = oi.oi_in}) in
             let body = List.map rm_oi mef.me_sig.mis_body in
             EcSubst.subst_modsig_body subst body;
         };
@@ -1026,7 +1026,7 @@ and transstruct (env : EcEnv.env) (x : symbol) (st : pstructure) =
           let ftop = EcPath.m_functor f.EcPath.x_top in
           Sm.mem ftop mparams in
         let calls = List.filter filter (EcPath.Sx.elements all_calls) in
-        Some (Tys_function (f.f_sig, {oi_calls  = calls }))
+        Some (Tys_function (f.f_sig, {oi_calls  = calls; oi_in = true }))
     in
 
     let sigitems = List.pmap tymod1 items in
@@ -1051,7 +1051,8 @@ and transstruct (env : EcEnv.env) (x : symbol) (st : pstructure) =
       let _sig = 
         { mis_params = [];
           mis_body = List.map 
-            (fun (Tys_function(s,_)) -> Tys_function(s,{oi_calls = []}))
+            (fun (Tys_function(s,oi)) -> 
+              Tys_function(s,{oi_calls = []; oi_in = oi.oi_in}))
             tymod.mis_body } in
       check_sig_mt_cnv env0 _sig aty
   in

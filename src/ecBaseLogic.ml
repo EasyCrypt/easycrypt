@@ -107,6 +107,7 @@ type rule_name =
   | RN_hl_fel       of (form * form * form * form * form)
 
   | RN_bhl_rnd of (EcFol.form option * EcFol.form)
+  | RN_eqobs_in
 
 type 'a rule_arg = 
   | RA_form of EcFol.form             (* formula             *)

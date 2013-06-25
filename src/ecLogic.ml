@@ -391,6 +391,7 @@ let check_arg do_arg hyps s x gty a =
   | GTmodty (emt, restr), AAmp (mp, mt)  ->
     let env = (LDecl.toenv hyps) in
     check_modtype_restr env mp mt emt restr;
+    EcPV.check_module_in env mp emt;
     Fsubst.f_bind_mod s x mp, RA_mp mp
   | _ -> assert false (* FIXME error message *)
 

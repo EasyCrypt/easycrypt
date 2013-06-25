@@ -109,7 +109,7 @@ and pfunction_decl = {
   pfd_name     : psymbol;
   pfd_tyargs   : (psymbol * pty) list;
   pfd_tyresult : pty;
-  pfd_uses     : (pqsymbol list) option;
+  pfd_uses     : (bool * pqsymbol list) option;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -325,6 +325,7 @@ type phltactic =
   | Pprfalse
   | Ppror
   | Pbdeq 
+  | Peqobs_in  of (pformula * pformula * pformula)
 
 and pinline_arg =
   [ `ByName    of tac_side * (pgamepath list * int list option)
