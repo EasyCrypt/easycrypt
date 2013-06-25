@@ -865,8 +865,8 @@ and i_eqobs_in_refl env i eqo =
 
   | Sassert e -> add_eqs_refl env eqo e
 
-and eqobs_inF_refl env f eqo = 
-  let f = NormMp.norm_xpath env f in
+and eqobs_inF_refl env f' eqo = 
+  let f = NormMp.norm_xpath env f' in
   let ffun = Fun.by_xpath f env in
   match ffun.f_def with
   | FBdef fdef ->
@@ -879,8 +879,12 @@ and eqobs_inF_refl env f eqo =
     let params = 
       List.fold_left (fun fv v -> PV.add env (pv_loc f v.v_name) v.v_type fv)
         PV.empty ffun.f_sig.fs_params in
-    assert (PV.subset local params); (* FIXME error message *)
-    PV.global eqi 
+    if PV.subset local params then PV.global eqi 
+    else
+      let diff = PV.diff local params in 
+      let ppe = EcPrinting.PPEnv.ofenv env in
+      EcBaseLogic.tacuerror "In function %a, %a are used before being initialized"
+        (EcPrinting.pp_funname ppe) f' (PV.pp env) diff
 
   | FBabs oi -> 
     let do1 eqo o = PV.union (eqobs_inF_refl env o eqo) eqo in
@@ -906,9 +910,12 @@ let check_module_in env mp mt =
   let check = function
     | Tys_function(fs,oi) ->
       let f = EcPath.xpath_fun mp fs.fs_name in
-      let eqi = eqobs_inF_refl env f global in
+      let eqi = eqobs_inF_refl env f global in      
+      if not (oi.oi_in) && not (Mnpv.is_empty eqi.PV.s_pv) then
+        let ppe = EcPrinting.PPEnv.ofenv env in
+        EcBaseLogic.tacuerror "The function %a should initialize %a"
+          (EcPrinting.pp_funname ppe) f (PV.pp env) eqi in
       
-      if not (oi.oi_in) then assert (Mnpv.is_empty eqi.PV.s_pv) in
   List.iter check sig_.mis_body
 
 
