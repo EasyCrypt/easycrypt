@@ -1748,6 +1748,26 @@ module ModTy = struct
 
   let has_mod_type (env : env) (dst : module_type list) (src : module_type) =
     List.exists (mod_type_equiv env src) dst
+
+  let sig_of_mt env (mt:module_type) = 
+    let sig_ = by_path mt.mt_name env in
+    let subst = 
+      List.fold_left2 (fun s (x1,_) a ->
+        EcSubst.add_module s x1 a) EcSubst.empty sig_.mis_params mt.mt_args in
+    let items =
+      EcSubst.subst_modsig_body subst sig_.mis_body in
+    let params = mt.mt_params in
+    let keep = 
+      List.fold_left (fun k (x,_) ->
+        EcPath.Sm.add (EcPath.mident x) k) EcPath.Sm.empty params in
+    let keep_info f = 
+      EcPath.Sm.mem (f.EcPath.x_top) keep in
+    let do1 = function
+      | Tys_function(s,oi) ->
+        Tys_function(s,{oi_calls = List.filter keep_info oi.oi_calls;
+                        oi_in = oi.oi_in}) in
+    { mis_params = params;
+      mis_body   = List.map do1 items }
 end
 
 (* -------------------------------------------------------------------- *)

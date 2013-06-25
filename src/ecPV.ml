@@ -56,7 +56,9 @@ module Mnpv =
     type t = prog_var 
     let compare = pv_compare_p 
   end)
-    
+
+module Snpv = EcMaps.Set.MakeOfMap(Mnpv)    
+
 module Mpv = struct
   type ('a, 'b) t = 
     { s_pv : 'a Mnpv.t; 
@@ -230,6 +232,17 @@ module PV = struct
   let empty = { s_pv = Mnpv.empty; s_gl = Sm.empty }
 
   let is_empty fv = Mnpv.is_empty fv.s_pv && Sm.is_empty fv.s_gl
+
+  let global fv = 
+    { fv with s_pv = Mnpv.filter (fun pv _ -> is_glob pv) fv.s_pv }
+
+  let local fv = 
+    { s_pv = Mnpv.filter (fun pv _ -> is_loc pv) fv.s_pv;
+      s_gl = Sm.empty }
+
+  let subset fv1 fv2 = 
+    Mnpv.submap (fun _ _ _ -> true) fv1.s_pv fv2.s_pv &&
+      Sm.subset fv1.s_gl fv2.s_gl
 
   let add env pv ty fv = 
     { fv with s_pv = Mnpv.add (pvm env pv) ty fv.s_pv }

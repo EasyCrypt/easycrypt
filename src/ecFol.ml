@@ -406,7 +406,7 @@ module Hsform = Why3.Hashcons.Make (struct
     | Fpr (m,mp,args,event) ->
         let fve = Mid.remove mhr (f_fv event) in
         let fv  = EcPath.x_fv fve mp in
-          List.fold_left (fun s f -> fv_union s (f_fv f)) (fv_add m fv) args
+        List.fold_left (fun s f -> fv_union s (f_fv f)) (fv_add m fv) args
   
   let tag n f = 
     let fv = fv_union (fv_node f.f_node) f.f_ty.ty_fv in

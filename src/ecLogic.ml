@@ -180,6 +180,8 @@ let t_try_base t g =
   try `Success (t g)
   with e when is_user_error e -> `Failure e
 
+let t_fail _g = tacuerror "FAIL TACTIC"
+
 let t_try t g =
   match t_try_base t g with
   | `Failure _ -> t_id None g
@@ -1177,3 +1179,10 @@ let t_congr f (args, ty) g =
             (t_transitivity (EcFol.f_app m1 [a2] ty) g)
   in
     t_on_goals (t_try t_assumption) (doit (List.rev args) ty g)
+
+
+(* -------------------------------------------------------------------- *)
+
+let t_trivial = 
+  t_or (t_lseq [t_progress (t_id None); t_assumption;t_fail])
+    (t_id None)

@@ -111,6 +111,7 @@ module List : sig
 
   val index :  'a -> 'a list -> int option
 
+  val uniqf : ('a -> 'a -> bool) -> 'a list -> bool
   val uniq : 'a list -> bool
 
   val take_n : int -> 'a list -> 'a list

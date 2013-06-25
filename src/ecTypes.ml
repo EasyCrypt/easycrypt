@@ -695,6 +695,15 @@ let e_mapty onty =
 
 let e_uni (uidmap : ty Muid.t) = e_mapty (Tuni.subst uidmap)
 
+let is_var e = 
+  match e.e_node with
+  | Evar _ -> true
+  | _ -> false
+
+let destr_var e = 
+   match e.e_node with
+  | Evar pv -> pv
+  | _ -> assert false
 
 (* -------------------------------------------------------------------- *)
 module Dump = struct
