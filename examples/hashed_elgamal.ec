@@ -199,11 +199,11 @@ proof.
   by wp; skip; smt.
 
   intros _ _; fun; if; inline RO.o; wp.
-  by rnd 1%r Fun.cPtrue; wp; skip; smt.
+  by rnd 1%r Fun.cpTrue; wp; skip; smt.
   by wp; skip; smt.
   
   intros _; fun; if; inline RO.o; wp.
-  by rnd 1%r Fun.cPtrue; wp; skip; smt.
+  by rnd 1%r Fun.cpTrue; wp; skip; smt.
   by wp; skip; smt.
   
   by inline RO.o; wp; rnd; wp; skip; smt.
@@ -409,7 +409,7 @@ qed.
 lemma islossless_AO : islossless ARO(RO).o.
 proof.
   fun; inline ARO(RO).o RO.o; wp; if; wp.
-  by rnd 1%r Fun.cPtrue; wp; skip; smt.
+  by rnd 1%r Fun.cpTrue; wp; skip; smt.
   by skip; trivial.
 qed.
 
@@ -429,14 +429,14 @@ proof.
   by trivial.
   assumption.
   by apply islossless_AO.
-  wp; rnd 1%r Fun.cPtrue; call (true) (true).
+  wp; rnd 1%r Fun.cpTrue; call (true) (true).
 
   fun (true).
   by trivial.
   by trivial.
   assumption.
   by apply islossless_AO.
-  by wp; do rnd 1%r Fun.cPtrue; inline G2(A).AO.init RO.init; wp; skip; smt.
+  by wp; do rnd 1%r Fun.cpTrue; inline G2(A).AO.init RO.init; wp; skip; smt.
 qed.
 
 
@@ -517,5 +517,7 @@ proof.
   fun.
   inline Hashed_ElGamal(RO).kg Hashed_ElGamal(RO).enc Hashed_ElGamal(RO).dec. 
   inline RO.o RO.init.
-  do (wp; rnd); wp; skip; progress; smt.
+  do (wp; rnd); wp; skip; progress; [smt | | smt | smt].
+    cut ->: g ^ y ^ sk0 = g ^ sk0 ^ y; first smt.
+    rewrite Map.get_upd_eq proj_def; smt.
 qed.

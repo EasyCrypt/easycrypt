@@ -173,7 +173,7 @@ let process_assumption loc (pq, tvi) g =
 (* -------------------------------------------------------------------- *)
 let process_form_opt hyps pf oty =
   let ue  = unienv_of_hyps hyps in
-  let ff  = TT.transform_opt (LDecl.toenv hyps) ue pf oty in
+  let ff  = TT.trans_form_opt (LDecl.toenv hyps) ue pf oty in
   EcFol.Fsubst.uni (EcUnify.UniEnv.close ue) ff
 
 (* -------------------------------------------------------------------- *)
@@ -192,19 +192,6 @@ let process_smt hitenv pi g =
   | `Admit    -> t_admit g
   | `Standard -> t_seq (t_simplify_nodelta) (t_smt false pi) g
   | `Strict   -> t_seq (t_simplify_nodelta) (t_smt true  pi) g
-
-(* -------------------------------------------------------------------- *)
-let process_generalize l =
-  let pr1 pf g =
-    let hyps = get_hyps g in
-    match pf.pl_desc with
-    | PFident({pl_desc = ([],s)},None) when LDecl.has_symbol s hyps ->
-      let id = fst (LDecl.lookup s hyps) in
-      t_generalize_hyp id g
-    | _ ->
-      let f = process_form_opt hyps pf None in
-      t_generalize_form None f g in
-  t_lseq (List.rev_map pr1 l)
 
 (* -------------------------------------------------------------------- *)
 let process_clear l g =
@@ -334,7 +321,7 @@ let trans_pterm_argument hyps ue arg =
   match unloc arg with
   | EA_form fp -> begin
       let ff =
-        try  `Form (TT.transform_opt env ue fp None)
+        try  `Form (TT.trans_form_opt env ue fp None)
         with TT.TyError _ as e -> `Error e
       in
 
@@ -374,6 +361,24 @@ let rec destruct_product hyps fp =
     | None   -> None
     | Some f -> destruct_product hyps f
   end
+
+(* -------------------------------------------------------------------- *)
+exception RwMatchFound of EcUnify.unienv * ty EcUidgen.Muid.t * form evmap
+
+let try_match hyps (ue, ev) p form =
+  let trymatch bds tp =
+    try
+      if not (Mid.set_disjoint bds tp.f_fv) then
+        false
+      else
+        let (ue, tue, ev) = f_match hyps (ue, ev) ~ptn:p tp in
+          raise (RwMatchFound (ue, tue, ev))
+    with MatchFailure -> false
+  in
+
+  try
+    ignore (FPosition.select trymatch form); None
+  with RwMatchFound (ue, tue, ev) -> Some (ue, tue, ev)
 
 (* -------------------------------------------------------------------- *)
 let process_named_pterm _loc hyps (fp, tvi) =
@@ -445,7 +450,7 @@ let check_pterm_arg_for_ty hyps ty arg =
 
   match arg.pl_desc, ty with
   | EA_form pf, Some (GTty ty) ->
-      let ff = TT.transform env ue pf ty in
+      let ff = TT.trans_form env ue pf ty in
         AAform (EcFol.Fsubst.uni (EcUnify.UniEnv.close ue) ff)
 
   | EA_mem mem, Some (GTmem _) ->
@@ -536,6 +541,12 @@ let concretize_pterm_arguments (tue, ev) ids =
     | `UnknownVar (x, _)        -> EcLogic.AAform (Fsubst.uni tue (EV.doget x ev))
   in
     List.rev (List.map do1 ids)
+
+(* -------------------------------------------------------------------- *)
+let concretize_form (tue, ev) f =
+  let s = Fsubst.f_subst_init false Mid.empty { ty_subst_id with ts_u = tue } in
+  let s = EV.fold (fun x f s -> Fsubst.f_bind_local s x f) ev s in
+    Fsubst.f_subst s f
 
 (* -------------------------------------------------------------------- *)
 let concretize_pterm (tue, ev) ids fp =
@@ -632,8 +643,6 @@ let process_apply loc pe g =
           (Fsubst.uni (EcUnify.UniEnv.close ue) fc) args g
 
 (* -------------------------------------------------------------------- *)
-exception RwMatchFound of EcUnify.unienv * ty EcUidgen.Muid.t * form evmap
-
 let process_rewrite1_core (s, o) (p, typs, ue, ax) args g =
   let (hyps, concl) = get_goal g in
 
@@ -659,17 +668,9 @@ let process_rewrite1_core (s, o) (p, typs, ue, ax) args g =
   let (_ue, tue, ev) =
     let ev = evmap_of_pterm_arguments ids in
 
-    let trymatch tp =
-      try
-        let (ue, tue, ev) = f_match hyps (ue, ev) ~ptn:fp tp in
-          raise (RwMatchFound (ue, tue, ev))
-      with MatchFailure -> false
-    in
-
-    try
-      ignore (FPosition.select trymatch concl);
-      tacuerror "cannot find an occurence for rewriting"
-    with RwMatchFound (ue, tue, ev) -> (ue, tue, ev)
+    match try_match hyps (ue, ev) fp concl with
+    | None   -> tacuerror "cannot find an occurence for [pose]"
+    | Some x -> x
   in
 
   let args = concretize_pterm_arguments (tue, ev) ids in
@@ -677,20 +678,8 @@ let process_rewrite1_core (s, o) (p, typs, ue, ax) args g =
   let fp   = concretize_pterm (tue, ev) ids fp in
 
   let cpos =
-    let test tp = EcReduction.is_alpha_eq hyps fp tp in
-      FPosition.select test concl
-  in
-
-  assert (not (FPosition.is_empty cpos));
-
-  let cpos =
-    match o with
-    | None   -> cpos
-    | Some o ->
-      let (min, max) = (Sint.min_elt o, Sint.max_elt o) in
-        if min < 1 || max > FPosition.occurences cpos then
-          tacuerror "invalid occurence selector";
-        FPosition.filter o cpos
+    try  FPosition.select_form hyps o fp concl
+    with InvalidOccurence -> tacuerror "invalid occurence selector"
   in
 
   let fpat _ _ _ = FPosition.topattern cpos concl in
@@ -750,7 +739,20 @@ let process_change pf g =
 
 (* -------------------------------------------------------------------- *)
 let process_intros ?(cf = true) pis (juc, n) =
-  let mk_id s = lmap (fun s -> EcIdent.create (odfl "_" s)) s in
+  
+  let mk_intro ids g =
+    let (juc, n) = List.fold_left
+      (fun g s -> let gs = t_intros
+        [lmap (function None -> EcIdent.create "_" | Some s ->
+        (match snd s with
+          | `noRename -> EcIdent.create (fst s)
+          | `withRename -> LDecl.fresh_id (fst (get_goal g)) (fst s)
+        ) ) s] g in
+        (match gs with
+          | (juc, [n]) -> (juc, n)
+          | _ -> assert false)
+      ) g ids in
+    (juc, [n]) in
 
   let elim_top g =
     let h       = EcIdent.create "_" in
@@ -809,7 +811,7 @@ let process_intros ?(cf = true) pis (juc, n) =
         (fun (nointro, gs) ip ->
           match ip with
           | `Core ids ->
-              (false, t_on_goals (t_intros (List.map mk_id ids)) gs)
+              (false, t_on_goals (mk_intro ids) gs)
 
           | `Done b   ->
               let t =
@@ -875,6 +877,75 @@ let process_cut (engine : engine) ip phi t g =
     t_on_last (process_intros [ip]) g
 
 (* -------------------------------------------------------------------- *)
+let process_pose loc xsym o p g =
+  let (hyps, concl) = get_goal g in
+  let env = LDecl.toenv hyps in
+  let (ps, ue) = (ref Mid.empty, unienv_of_hyps hyps) in
+  let p = TT.trans_pattern env (ps, ue) p in
+  let ev = EV.of_idents (Mid.keys !ps) in
+
+  let (_ue, tue, ev) =
+    match try_match hyps (ue, ev) p concl with
+    | None   -> tacuerror "cannot find an occurence for [pose]"
+    | Some x -> x
+  in
+
+  let p    = concretize_form (tue, ev) p in
+  let cpos =
+    try  FPosition.select_form hyps o p concl
+    with InvalidOccurence -> tacuerror "invalid occurence selector"
+  in
+
+  let (x, letin) = FPosition.topattern ~x:(EcIdent.create (unloc xsym)) cpos concl in
+  let letin = EcFol.f_let1 x p letin in
+
+    set_loc loc
+      (t_seq (t_change letin) (t_intros [mk_loc xsym.pl_loc x]))
+      g
+
+(* -------------------------------------------------------------------- *)
+let process_generalize l =
+  let pr1 (occ, pf) g =
+    let hyps = get_hyps g in
+    match pf.pl_desc with
+    | PFident ({pl_desc = ([], s)}, None)
+        when occ = None && LDecl.has_symbol s hyps
+        ->
+      let id = fst (LDecl.lookup s hyps) in
+        t_seq (t_generalize_hyp id) (t_clear (Sid.singleton id)) g
+
+    | _ ->
+      let (hyps, concl) = get_goal g in
+      let env = LDecl.toenv hyps in
+      let (ps, ue) = (ref Mid.empty, unienv_of_hyps hyps) in
+      let p = TT.trans_pattern env (ps, ue) pf in
+      let ev = EV.of_idents (Mid.keys !ps) in
+    
+      let (_ue, tue, ev) =
+        match try_match hyps (ue, ev) p concl with
+        | None   -> tacuerror "cannot find an occurence for [generalize]"
+        | Some x -> x
+      in
+    
+      let p    = concretize_form (tue, ev) p in
+      let cpos =
+        try  FPosition.select_form hyps occ p concl
+        with InvalidOccurence -> tacuerror "invalid occurence selector"
+      in
+
+      let name =
+        match EcParsetree.pf_ident pf with
+        | None   -> EcIdent.create "x"
+        | Some x -> EcIdent.create x
+      in
+
+      let fpat _ _ _ = FPosition.topattern ~x:name cpos concl in
+        t_generalize_form ~fpat None p g
+
+  in
+    t_lseq (List.rev_map pr1 l)
+
+(* -------------------------------------------------------------------- *)
 let process_logic (engine, hitenv) loc t =
   match t with
   | Passumption pq -> process_assumption loc pq
@@ -898,3 +969,4 @@ let process_logic (engine, hitenv) loc t =
   | Psimplify ri   -> process_simplify ri
   | Pchange pf     -> process_change pf
   | PelimT i       -> process_elimT loc i
+  | Ppose (x, o, p)-> process_pose loc x o p

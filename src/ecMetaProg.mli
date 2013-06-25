@@ -5,6 +5,7 @@ open EcParsetree
 open EcIdent
 open EcTypes
 open EcModules
+open EcEnv
 open EcFol
 open EcUnify
 
@@ -100,6 +101,7 @@ module EV : sig
   val add   : ident -> 'a evmap -> 'a evmap
   val get   : ident -> 'a evmap -> [`Unset | `Set of 'a] option
   val doget : ident -> 'a evmap -> 'a
+  val fold  : (ident -> 'a -> 'b -> 'b) -> 'a evmap -> 'b -> 'b
 end
 
 (* -------------------------------------------------------------------- *)
@@ -116,6 +118,7 @@ val f_match :
 type ptnpos = private [`Select | `Sub of ptnpos] Mint.t
 
 exception InvalidPosition
+exception InvalidOccurence
 
 module FPosition : sig
   val empty : ptnpos
@@ -124,11 +127,14 @@ module FPosition : sig
 
   val tostring : ptnpos -> string
 
-  val select : (form -> bool) -> form -> ptnpos
+  val select : (Sid.t -> form -> bool) -> form -> ptnpos
+
+  val select_form : LDecl.hyps -> Sint.t option -> form -> form -> ptnpos
 
   val occurences : ptnpos -> int
 
   val filter : Sint.t -> ptnpos -> ptnpos
 
-  val topattern : ptnpos -> form -> EcIdent.t * form
+  val topattern : ?x:EcIdent.t -> ptnpos -> form -> EcIdent.t * form
+
 end

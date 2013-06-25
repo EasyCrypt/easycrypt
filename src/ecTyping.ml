@@ -60,7 +60,9 @@ type tyerror =
 | InvalidModAppl       of modapp_error
 | InvalidModType       of modtyp_error
 | InvalidMem           of symbol * mem_error
-| OnlyModParamAreOracle of qsymbol
+| FunNotInModParam     of qsymbol
+| NoActiveMemory
+| PatternNotAllowed
 
 exception TyError of EcLocation.t * EcEnv.env * tyerror
 
@@ -152,9 +154,15 @@ let pp_tyerror fmt env error =
   | InvalidMem (name, MAE_IsConcrete) ->
       msg "the memory %s must be abstract" name
 
-  | OnlyModParamAreOracle name ->
+  | FunNotInModParam name ->
       msg "the function %a is not provided by a module parameter"
         pp_qsymbol name
+
+  | NoActiveMemory ->
+      msg "no active memory at this point"
+
+  | PatternNotAllowed ->
+      msg "pattern not allowed here"
 
 let () =
   let pp fmt exn =
@@ -164,6 +172,9 @@ let () =
     | _ -> raise exn
   in
     EcPException.register pp
+
+(* -------------------------------------------------------------------- *)
+type ptnmap = ty EcIdent.Mid.t ref
 
 (* -------------------------------------------------------------------- *)
 module UE = EcUnify.UniEnv
@@ -639,7 +650,7 @@ and transmodsig_body (env : EcEnv.env) (sa : Sm.t)
               let f, _ = lookup_fun env name in
               let p = f.EcPath.x_top in
               if not (Sm.mem p sa) then 
-                tyerror name.pl_loc env (OnlyModParamAreOracle name.pl_desc);
+                tyerror name.pl_loc env (FunNotInModParam name.pl_desc);
               f
             )
               pfd_uses in
@@ -1459,18 +1470,29 @@ let trans_topmsymbol env gp =
   let (mp,_) = trans_msymbol env gp in
   let top = EcPath.m_functor mp in
   let mp = EcPath.m_apply top mp.EcPath.m_args in
-  mp 
+  mp
 
-let transform_opt env ue pf tt =
+(* -------------------------------------------------------------------- *)
+let trans_form_or_pattern env (ps, ue) pf tt =
   let rec transf env f = 
     match f.pl_desc with
+    | PFhole -> begin
+      match ps with
+      | None    -> tyerror f.pl_loc env PatternNotAllowed
+      | Some ps ->
+        let x  = EcIdent.create "_p" in
+        let ty = UE.fresh_uid ue in
+          ps := Mid.add x ty !ps; f_local x ty
+    end
+
     | PFglob gp ->
-      let mp = trans_topmsymbol env gp in
-      let me =  
-        match EcEnv.Memory.current env with
-        | None -> assert false (* FIXME error message *)
-        | Some me -> EcMemory.memory me in
-      f_glob mp me
+        let mp = trans_topmsymbol env gp in
+        let me =  
+          match EcEnv.Memory.current env with
+          | None -> tyerror f.pl_loc env NoActiveMemory
+          | Some me -> EcMemory.memory me
+        in
+          f_glob mp me
       
     | PFint n ->
         f_int n
@@ -1743,11 +1765,19 @@ let transform_opt env ue pf tt =
   let f = transf env pf in
   oiter tt (unify_or_fail env ue pf.pl_loc f.f_ty); 
   f
-  
-(* -------------------------------------------------------------------- *)
-let transform env ue pf ty =
-  transform_opt env ue pf (Some ty)
 
 (* -------------------------------------------------------------------- *)
-let transformula env ue pf = 
-  transform env ue pf tbool
+let trans_form_opt env ue pf oty =
+  trans_form_or_pattern env (None, ue) pf oty
+
+(* -------------------------------------------------------------------- *)
+let trans_form env ue pf ty =
+  trans_form_opt env ue pf (Some ty)
+
+(* -------------------------------------------------------------------- *)
+let trans_prop env ue pf = 
+  trans_form env ue pf tbool
+
+(* -------------------------------------------------------------------- *)
+let trans_pattern env (ps, ue) pf =
+  trans_form_or_pattern env (Some ps, ue) pf None

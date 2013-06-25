@@ -334,7 +334,6 @@ module LDecl : sig
   val equivF : xpath -> xpath -> hyps -> hyps * hyps
   val inv_memenv  : hyps -> hyps 
   val inv_memenv1 : hyps -> hyps 
-
 end
 
 (* -------------------------------------------------------------------- *)

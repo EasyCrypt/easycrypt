@@ -83,6 +83,7 @@ axiom finvof : forall(pk : pkey, sk : skey, x : randomness),
 axiom fofinv : forall(pk : pkey, sk : skey, x : randomness),
  in_supp (pk,sk) keypairs => f pk (finv sk x) = x.
 
+axiom keypair_lossless : mu keypairs cpTrue = 1%r.
 
 module type Inverter = {
  fun i(pk : pkey, y : randomness) : randomness
@@ -152,7 +153,7 @@ elim (append_get<:bool> (to_array (projRand c))
           (Plaintext.to_array (projPlain c)) i).
 intros H1 H2.
 case (i < l);intros H3;first smt.
-rewrite (H2 _ _); smt.
+rewrite H2; smt.
 qed.
 
 module Rnd ={
@@ -297,9 +298,9 @@ call
 fun (mem Rnd.r RO.s) 
     (={RO.s} /\ eq_except RO.m{1} RO.m{2} Rnd.r{2});[smt|smt|assumption| | |].
 fun;inline RO.o;if;[smt | wp;rnd | ];wp;skip;progress;smt.
-intros &m2 H;fun;if;[inline RO.o;wp;rnd 1%r (cPtrue)| ];
+intros &m2 H;fun;if;[inline RO.o;wp;rnd 1%r (cpTrue)| ];
                                      wp;skip;progress;smt.
-intros &m1;fun;if;[inline RO.o;wp;rnd 1%r (cPtrue)| ];
+intros &m1;fun;if;[inline RO.o;wp;rnd 1%r (cpTrue)| ];
                                      wp;skip;progress;smt.
 call 
 (={pk,m,RO.m}) 
@@ -379,9 +380,8 @@ proof.
 qed.
 (** end eq2enc *)
 
-(* (fun;rnd (lambda v, m{2} ^^ v)(lambda v,m{2} ^^ v);rnd;skip;progress;smt). *)
 
-
+(** begin eq2 *)
 lemma eq2 : forall (A <: Adv {RO,Rnd}), 
 (forall (R<:ARO), islossless R.o_a => islossless A(R).a1) =>
 (forall (R<:ARO), islossless R.o_a => islossless A(R).a2) =>
@@ -403,12 +403,120 @@ fun;if;[smt|inline RO.o;wp;rnd|];wp;skip;progress;smt.
 inline RO.init CPA(BR2,A).SO.kg CPA(BR3,A).SO.kg.
 wp;rnd;wp;skip;progress.
 qed.
+(** end eq2 *)
+
+
+(** begin prob2 *)
+lemma prob2 : forall (A <: Adv {RO,Rnd}) &m,
+(forall (R<:ARO), islossless R.o_a => islossless A(R).a1) =>
+(forall (R<:ARO), islossless R.o_a => islossless A(R).a2) =>
+Pr[CPA(BR2,A).main() @ &m : res] + Pr[CPA(BR2,A).main() @ &m : mem Rnd.r RO.s] = 
+Pr[CPA(BR3,A).main() @ &m : res] + Pr[CPA(BR3,A).main() @ &m : mem Rnd.r RO.s].
+proof.
+ intros => A &m H1 H2.
+cut H: (Pr[CPA(BR2,A).main() @ &m : res] = Pr[CPA(BR3,A).main() @ &m : res] /\
+(Pr[CPA(BR2,A).main() @ &m : mem Rnd.r RO.s] = 
+Pr[CPA(BR3,A).main() @ &m : mem Rnd.r RO.s])).
+
+split;
+ (equiv_deno (_ : (glob A){1} = (glob A){2} ==> ={res,Rnd.r,RO.s});
+  [apply (eq2 A);assumption|trivial| smt]).
+elim H => Heq1 Heq2;rewrite Heq1 Heq2 //.
+save.
+(** end prob2 *)
+
+ 
+(** begin cpa2 *)
+module CPA2 (S : Scheme, A_: Adv) ={
+ module SO = S(RO)
+ module A = A_(RO)
+  fun main(): bool = {
+  var pk:pkey;
+  var sk:skey;
+  var m0 : plaintext;
+  var m1 : plaintext;
+  var c : ciphertext;
+  var b : bool;
+  var b' : bool;
+  RO.init();
+  (pk,sk)  = SO.kg();
+  (m0,m1)  = A.a1(pk);
+  c  = SO.enc(pk,m0);
+  b' = A.a2(c);
+  b = ${0,1};
+  return b = b';
+ }
+}.
+(** end cpa2 *)
+
+(** begin eq3 *)
+lemma eq3 : forall (A <: Adv {RO,Rnd}), 
+(forall (R<:ARO), islossless R.o_a => islossless A(R).a1) =>
+(forall (R<:ARO), islossless R.o_a => islossless A(R).a2) =>
+equiv [ CPA(BR3,A).main ~ CPA2(BR3,A).main : 
+(glob A){1} = (glob A){2} ==>  ={res,Rnd.r,RO.s}].
+proof.
+ intros => A Hloss1 Hloss2.
+ fun.
+ swap{2} -2. 
+ call (={Rnd.r,RO.s,RO.m,c} /\ (glob A){1} = (glob A){2})
+      (={Rnd.r,RO.s,RO.m,res} /\ (glob A){1} = (glob A){2}).
+ fun (={Rnd.r,RO.s,RO.m});[smt|smt|].
+ fun;if;[smt|inline RO.o;wp;rnd|];wp;skip;progress;smt.
+ inline CPA(BR3,A).SO.enc CPA2(BR3,A).SO.enc.
+ do 3! (wp;rnd).
+ call (={RO.s,RO.m,pk} /\ (glob A){1} = (glob A){2})
+      (={RO.s,RO.m,res} /\ (glob A){1} = (glob A){2}).
+ fun (={RO.s,RO.m});[smt|smt|].
+ fun;if;[smt|inline RO.o;wp;rnd|];wp;skip;progress;smt.
+ inline RO.init CPA(BR3,A).SO.kg CPA2(BR3,A).SO.kg.
+ wp;rnd;wp;skip;progress.      
+qed.
+(** end eq3 *)
+
+(** begin prob3 *)
+lemma prob3 : 
+ forall (A <: Adv {RO,Rnd}) &m,
+(forall (R<:ARO), islossless R.o_a => islossless A(R).a1) =>
+(forall (R<:ARO), islossless R.o_a => islossless A(R).a2) =>
+Pr[CPA(BR3,A).main() @ &m : res] + Pr[CPA(BR3,A).main() @ &m : mem Rnd.r RO.s] =
+1%r/2%r + Pr[CPA2(BR3,A).main() @ &m : mem Rnd.r RO.s].
+proof.
+ intros => A &m H1 H2.
+ cut H:
+ (Pr[CPA(BR3,A).main() @ &m : res] = Pr[CPA2(BR3,A).main() @ &m : res] /\
+ (Pr[CPA(BR3,A).main() @ &m : mem Rnd.r RO.s] = 
+ Pr[CPA2(BR3,A).main() @ &m : mem Rnd.r RO.s])).
+ split;
+ (equiv_deno (_ : (glob A){1} = (glob A){2} ==> ={res,Rnd.r,RO.s});
+  [apply (eq3 A);assumption|trivial| smt]).
+  elim H => Heq1 Heq2;rewrite Heq1 Heq2 //.
+ cut Hleq:  (Pr[CPA2(BR3,A).main() @ &m : res] = 1%r/2%r).
+ cut Hbd : (bd_hoare[CPA2(BR3,A).main : true ==> res] = (1%r / 2%r)).
+ fun; rnd (1%r / 2%r) (lambda b, b = b'); simplify.
+ call (true) (true).
+ fun (true);[smt|smt|assumption|].
+ fun;if;[inline RO.o;wp;rnd 1%r (cpTrue)|];wp;skip;smt.
+ inline CPA2(BR3,A).SO.enc;do 2! (wp;rnd 1%r (cpTrue));wp.
+ call (true) (true).
+ fun (true);[smt|smt|assumption|].
+ fun;if;[inline RO.o;wp;rnd 1%r (cpTrue)|];wp;skip;smt.
+ inline CPA2(BR3,A).SO.kg RO.init.
+ wp;rnd 1%r (cpTrue);wp;skip;progress;[smt|smt|smt|].
+ rewrite Dbool.mu_def.
+ case (result);delta charfun;simplify;smt.
+ bdhoare_deno Hbd; smt.
+ rewrite Hleq //.
+save.
+(** end prob3 *)
+
+
 
 (** begin conclusion *)
 lemma Conclusion :
-forall (A <: Adv {Rnd, RO}) &m :
-(forall (O <: ARO),  islossless O.o => islossless A(O).a1) =>
-(forall (O <: ARO),  islossless O.o => islossless A(O).a2) =>
+forall (A <: Adv {Rnd, RO}) &m,
+(forall (O <: ARO),  islossless O.o_a => islossless A(O).a1) =>
+(forall (O <: ARO),  islossless O.o_a => islossless A(O).a2) =>
  exists (I<:Inverter), 
 Pr[CPA(BR,A).main() @ &m : res] - 1%r / 2%r <= 
 Pr[OW(I).main() @ &m : res].

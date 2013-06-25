@@ -10,7 +10,7 @@ theory Fset.
     op "cardinal" as "#";
     op "subset" as "<=".
 
-  op cPmem (s:'a set) (x:'a) = mem x s.
+  op cpMem (s:'a set) (x:'a) = mem x s.
  
 end Fset.
 
@@ -22,12 +22,12 @@ theory MapFilter.
   import Fset.
 
   (** { x | x in U and p(x) } *)
-  op filter : 'a cPred -> 'a set -> 'a set.
+  op filter : 'a cpred -> 'a set -> 'a set.
 
-  axiom filter_def (p:'a cPred) (s:'a set) (x:'a) : 
+  axiom filter_def (p:'a cpred) (s:'a set) (x:'a) : 
     mem x (filter p s) <=> p x /\ mem x s.
 
-  lemma filter_true (s:'a set) : filter cPtrue s = s
+  lemma filter_true (s:'a set) : filter cpTrue s = s
   by (apply extensionality; smt).
 
   (** { f x | x in U } *)
@@ -102,7 +102,7 @@ theory Duni.
   axiom mu_def : forall (X:'a set) P, 
     !is_empty X => mu (duni X) P = (#filter P X)%r / (#X)%r. 
 
-  axiom mu_def_empty : forall (P:'a cPred), mu (duni empty) P = 0%r.
+  axiom mu_def_empty : forall (P:'a cpred), mu (duni empty) P = 0%r.
  
   axiom mu_x_def_in : forall (x:'a) X, 
     mem x X => mu_x (duni X) x = 1%r / (#X)%r. 
@@ -118,7 +118,7 @@ theory Duni.
     apply extensionality; smt.
     smt.
     delta weight; simplify. 
-    rewrite (mu_def<:'a> X Fun.cPtrue _).
+    rewrite (mu_def<:'a> X Fun.cpTrue _).
     assumption.
     rewrite (filter_true<:'a> X).
     cut W : ((#X)%r <> 0%r); smt.
@@ -146,7 +146,7 @@ theory Drestr.
     in_supp x d => mem x X => mu_x (drestr d X) x = 0%r by [].
 
   axiom weight_def : forall (d:'a distr) X, 
-    weight (drestr d X) = weight d - mu d (cPmem X).
+    weight (drestr d X) = weight d - mu d (cpMem X).
 
 end Drestr.
 
@@ -169,13 +169,13 @@ theory Dexcepted.
     
   lemma mu_x_def : forall (x:'a) d X,
     mu_x (d \ X) x = 
-    (in_supp x (d \ X)) ? mu_x d x / (weight d - mu d (cPmem X)) : 0%r.
+    (in_supp x (d \ X)) ? mu_x d x / (weight d - mu d (cpMem X)) : 0%r.
   proof.
     intros x d X; delta (\); last smt.
   qed.
 
   lemma weight_def : forall (d:'a distr) X,
-    weight (d \ X) = (weight d = mu d (cPmem X)) ? 0%r : 1%r
+    weight (d \ X) = (weight d = mu d (cpMem X)) ? 0%r : 1%r
   by [].
 
 end Dexcepted.

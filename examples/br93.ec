@@ -43,7 +43,7 @@ axiom finvof : forall(pk : pkey, sk : skey, x : randomness),
 axiom fofinv : forall(pk : pkey, sk : skey, x : randomness),
  in_supp (pk,sk) keypairs => f pk (finv sk x) = x.
 
-axiom keypair_lossless : mu keypairs cPtrue = 1%r.
+axiom keypair_lossless : mu keypairs cpTrue = 1%r.
 
 op uniform : plaintext distr = Plaintext.Dword.dword.
 op uniform_rand : randomness distr = Randomness.Dword.dword.
@@ -180,8 +180,8 @@ swap{2} -2.
      (={ARO.log} /\ eq_except RO.m{1} RO.m{2} M.r{2});
       [smt|smt|assumption| | |].
  fun;if;[smt|inline RO.o;wp;rnd|];wp;skip;progress;smt.
- intros &m H;fun;if;[inline RO.o;wp;rnd 1%r cPtrue|];wp;skip;progress;smt.
- intros &m;fun;if;[inline RO.o;wp;rnd 1%r cPtrue|];wp;skip;progress;smt.
+ intros &m H;fun;if;[inline RO.o;wp;rnd 1%r cpTrue|];wp;skip;progress;smt.
+ intros &m;fun;if;[inline RO.o;wp;rnd 1%r cpTrue|];wp;skip;progress;smt.
  call (={pk,RO.m})
       (!in_dom M.r{2} RO.m{2} =>
        (={res} /\ eq_except RO.m{1} RO.m{2} M.r{2})).
@@ -216,13 +216,13 @@ proof.
  fun; rnd (1%r / 2%r) (lambda b, b = b'); simplify.
  call (true) (true).
  fun (true);[smt|smt|assumption|].
- fun;if;[inline RO.o;wp;rnd 1%r (cPtrue)|];wp;skip;smt.
- inline CPA2(BR2,A).SO.enc;do 2! (wp;rnd 1%r (cPtrue));wp.
+ fun;if;[inline RO.o;wp;rnd 1%r (cpTrue)|];wp;skip;smt.
+ inline CPA2(BR2,A).SO.enc;do 2! (wp;rnd 1%r (cpTrue));wp.
  call (true) (true).
  fun (true);[smt|smt|assumption|].
- fun;if;[inline RO.o;wp;rnd 1%r (cPtrue)|];wp;skip;smt.
+ fun;if;[inline RO.o;wp;rnd 1%r (cpTrue)|];wp;skip;smt.
  inline CPA2(BR2,A).SO.kg CPA2(BR2,A).ARO.init RO.init.
- wp;rnd 1%r (cPtrue);wp;skip;progress;[smt|smt|smt|].
+ wp;rnd 1%r (cpTrue);wp;skip;progress;[smt|smt|smt|].
  rewrite Dbool.mu_def.
  case (result);delta charfun;simplify;smt.
  bdhoare_deno H1; smt.
@@ -291,8 +291,8 @@ in_supp (pk,sk) keypairs  =>
 f pk x = f pk y => x = y.
 proof.
  intros x y pk sk Hsupp Heqf.
- rewrite -(finvof pk sk x _);first smt.
- rewrite -(finvof pk sk y _);first smt.
+ rewrite -(finvof pk sk _ _);first smt.
+ rewrite -(finvof pk sk _ _);first smt.
  rewrite Heqf;smt.
 save.
 

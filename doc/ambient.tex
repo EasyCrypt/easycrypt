@@ -1,43 +1,295 @@
 % !TeX root = easycrypt.tex
 
-%TODO:
-%mot clef : ident typeinstance
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% DEFS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \newcommand{\ambientKeywords}{}
-\newcommand{\ambientDesc}{}
 
-\newcommand{\addAmbient}[3]{
+\newcommand{\tacname}{Error tacname}
+\newcommand{\vtacname}{Error tacname}
 
+\newcommand{\makeAmbient}[3]{
   \expandafter\def\expandafter\ambientKeywords\expandafter{\ambientKeywords,#1}
-
-  \expandafter\def\expandafter\ambientDesc\expandafter{\ambientDesc
-    \index{ambient}{#1@\rawec{#1}}
-    \Syntax \rawec{#1} #2
-    \Description #3
-  }
+  \renewcommand{\tacname}{\rawec{#1}}
+  \renewcommand{\vtacname}{#1}
+  \index{ambient}{#1@\rawec{#1}}
+  \subsubsection{#1}
+  \Syntax \rawec{#1} #2
+  \Description #3
+  \renewcommand{\tacname}{Error tacname}
+  \renewcommand{\vtacname}{Error tacname}
 }
 
-\addAmbient{idtac}{}{TODO}
-\addAmbient{intros}{}{TODO}
-\addAmbient{split}{}{TODO}
-\addAmbient{left}{}{TODO}
-\addAmbient{right}{}{TODO}
-\addAmbient{elim}{}{TODO}
-\addAmbient{apply}{}{TODO}
-\addAmbient{progress}{}{TODO}
-\addAmbient{cut}{}{TODO}
-\addAmbient{generalize}{}{TODO}
-\addAmbient{clear}{}{TODO}
-\addAmbient{simplify}{}{TODO}
-\addAmbient{delta}{}{TODO}
-\addAmbient{zeta}{}{TODO}
-\addAmbient{beta}{}{TODO}
-\addAmbient{iota}{}{TODO}
-\addAmbient{logic}{}{TODO}
-\addAmbient{change}{}{TODO}
-\addAmbient{elimT}{}{TODO}
-\addAmbient{case}{}{TODO}
-\addAmbient{rewrite}{}{TODO}
-\addAmbient{subst}{}{TODO}
-\addAmbient{field}{}{TODO}
-\addAmbient{fieldsimplify}{}{TODO}
+\newcommand{\ambientLambda}{}
+\newcommand{\addLambda}[3]{
+  \expandafter\def\expandafter\ambientLambda\expandafter{\ambientLambda\makeAmbient{#1}{#2}{#3}}
+}
+\newcommand{\ambientLogic}{}
+\newcommand{\addLogic}[3]{
+  \expandafter\def\expandafter\ambientLogic\expandafter{\ambientLogic\makeAmbient{#1}{#2}{#3}}
+}
+\newcommand{\ambientAuto}{}
+\newcommand{\addAuto}[3]{
+  \expandafter\def\expandafter\ambientAuto\expandafter{\ambientAuto\makeAmbient{#1}{#2}{#3}}
+}
+\newcommand{\ambientOther}{}
+\newcommand{\addOther}[3]{
+  \expandafter\def\expandafter\ambientOther\expandafter{\ambientOther\makeAmbient{#1}{#2}{#3}}
+}
+
+
+\newcommand{\example}[6]%proof,context,goal
+{
+\vspace*{3ex}
+\begin{tabular}{ccc}
+\parbox{100pt}{#1} & {\expandafter\rawec\expandafter{#3 #4.}} & \parbox{100pt}{#5} \\
+\cline{0-0} \cline{3-3} {\ec{#2}} & ~ & {\ec{#6}} \\
+\end{tabular}\\
+}
+
+\newcommand{\env}[2]{\ec{#1 : #2}\\}
+
+\newcommand{\tacarg}[2]{($#1$:\var{#2})}
+
+\newcommand{\refdef}[1]{\emph{#1}(\ref{#1})}
+
+\newcommand{\ambientDesc}{
+  \subsection{Generalities}
+    \subsubsection{judgements}\label{judgements} TODO
+    \subsubsection{variables}\label{variables} TODO
+    \subsubsection{context}\label{context} TODO
+    \subsubsection{scope}\label{scope} TODO
+    \subsubsection{environment}\label{environment} TODO
+    \subsubsection{convertible}\label{convertible} This notion apply to two terms, they are convertible if they have the same normal form
+      for lambda calculus. You can see it as making a \emph{TODO:simplify} and testing equality. It is automatically computed by easycrypt when needed.
+      It will be denoted $\equiv$.
+  \subsection{Lambda calculus}
+    The tactics of this section correspond to lambda calculus reduction. It will find a redex, reduce it
+    and do it again until there is no more redex. You can chain tactics by separating them with space and it
+    will act as a new tactic that search for the redex of the two tactics and reduce them and do it again.
+    \ambientLambda
+  \subsection{Logic}
+    \ambientLogic
+  \subsection{Automatic}
+    \ambientAuto
+  \subsection{Others}
+    \ambientOther
+}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% LAMBDA
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%beta
+\addLambda{beta}{}{Apply all possible beta-reduction}
+
+%iota
+\addLambda{iota}{}{Reduce let tuple and if}
+
+%zeta
+\addLambda{zeta}{}{Reduce let}
+
+%logic
+\addLambda{logic}{}{Do logical simplification}
+
+%delta
+\addLambda{delta}{\tacarg{name}{ident}*}{Replace all occurence of all the specify $name$ by their values if no $name$ is  specify it replaces all possible names.}
+
+%simplify
+\addLambda{simplify}{\tacarg{name}{ident}|\var{delta}?}{Compute the normal form by applying the previous tactics in the given order and it applys delta if delta is specify and just delta names if namess is specify}
+
+%congr
+\addLambda{congr}{}{If the current goal is a function equality of arity $n$, it replaces this goal by $n$ new goals corresponfin to the argument equality.\\
+You must be aware that this tactics will transform your goal in a stronger one.}
+
+%pose
+\addLambda{pose}{TODO}{TODO}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% LOGIC
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%Tactics working only on the goal
+
+%change
+\addLogic{change}{\tacarg{f}{formula}}{This tactics permits to change the current goal to f.
+\begin{displaymath}
+  \infrule{G \equiv F ~ ~ ~ F}{G}
+\end{displaymath}}
+
+%split
+\addLogic{split}{}
+{\tacname{} tactic permits to do several things :
+\begin{itemize}
+  \item end a proof when you just have a term \refdef{convertible} to true.
+  \item end a proof when you just have an equality between two terms that are \refdef{convertible}.
+  \item replace a iff by the direct and indirect implication.
+  \item replace an and statement by two goals : the left side and the right side.
+  \item replace a n-tuple equality by n equality of the component.
+\end{itemize}
+\begin{displaymath}
+  \infrule{a \equiv true}{a}
+  ~~~~~~
+  \infrule{a \equiv b}{a = b}
+  ~~~~~~
+  \infrule{\Gamma \vdash A \Rightarrow B ~ ~ ~ \Gamma \vdash B \Rightarrow A}{\Gamma \vdash A \Leftrightarrow B}
+  ~~~~~~
+  \infrule{\Gamma \vdash A ~ ~ ~ \Gamma \vdash B}{\Gamma \vdash A \land B}
+  ~~~~~~
+  \infrule{\Gamma \vdash a_1 = b_1  ~ ~ ~ ...  ~ ~ ~ \Gamma \vdash a_n = b_n}{\Gamma \vdash (a_1, ..., a_n) = (b_1, ..., b_n)}
+  ~~~~~~
+\end{displaymath}
+}
+
+%left
+\addLogic{left}{}{This tactic permits to prove a or statement by proving only the left side. You must be aware that this tactics will transform your goal in a stronger one.
+\begin{displaymath}
+  \infrule{\Gamma \vdash A}{\Gamma \vdash A \lor B}
+\end{displaymath}}
+
+%right
+\addLogic{right}{}{This tactic permits to prove a or statement by proving only the right side. You must be aware that this tactics will transform your goal in a stronger one.
+\begin{displaymath}
+  \infrule{\Gamma \vdash B}{\Gamma \vdash A \lor B}
+\end{displaymath}}
+
+%generalize
+\addLogic{generalize}{\tacarg{C}{formula}}{
+You must be aware that this tactics will transform your goal in a stronger one.
+\begin{displaymath}
+  \infrule{\Gamma \vdash C ~ ~ ~ \Gamma \vdash \forall x, G[C <- x]}{\Gamma \vdash G}
+\end{displaymath}}
+
+%case
+\addLogic{case}{\tacarg{F}{formula}}{This tactic creates two subgoals, one where \emph{f} is true and an other where \emph{f} is false.
+\begin{displaymath}
+  \infrule{\Gamma \vdash f => G ~ ~ ~ \Gamma \vdash \neg f => G}{\Gamma \vdash G}
+\end{displaymath}}
+
+
+
+%Tactics working with the env
+
+%assumption
+\addLogic{assumption}{\tacarg{h}{ident}?}{It close the current goal by checking you have it in your context up to \refdef{conversion}. If you don't specify
+\emph{h} it test all the \refdef{judgement} present in the context, else it just tests \emph{h}
+\begin{displaymath}
+  \infrule{H \equiv G}{\Gamma,h:H \vdash G}
+\end{displaymath}}
+
+%intros
+\addLogic
+{intros}
+{\tacarg{x}{\_|ident}}
+{This tactics permits to remove of your goal : a forall, the left side af an application or a let assignement by pushing it into your \refdef{context}.
+Easycrypt checks that x is not already present in the \refdef{environment}.
+\begin{displaymath}
+  \infrule{\Gamma,x = a \vdash G(x)}{\Gamma \vdash let x = a in G(x)}
+  ~~~~~~
+  \infrule{\Gamma,x \vdash G(x)}{\Gamma \vdash \forall x, G(x)}
+  ~~~~~~
+  \infrule{\Gamma,H \vdash G}{\Gamma \vdash H => G}
+  ~~~~~~
+\end{displaymath}
+
+\example
+{}{forall (x y:int), x = 3 => x = 3}
+{\vtacname}{a b hyp1}
+{
+\env{a}{int}
+\env{b}{int}
+\env{h1}{a=3}
+}
+{b = 3}
+}
+
+%cut
+\addLogic{cut}{\tacarg{h}{ident} : \tacarg{C}{formula}}{It will ask you to first prove the lemma and then push it into your \refdef{context}.
+\begin{displaymath}
+  \infrule{\Gamma \vdash C ~ \Gamma,C \vdash G}{\Gamma \vdash G}
+\end{displaymath}}
+
+%elim
+\addLogic{elim}{\tacarg{h}{ident}}{This tactics take as argument the name of a \refdef{judgment} from the \refdef{context} or the \refdef{scope}.
+\begin{displaymath}
+  \infrule{\Gamma, h:A \land B \vdash A \Rightarrow B \Rightarrow G}{\Gamma, h:A \land B \vdash G}
+  ~~~~~~
+  \infrule{\Gamma, h:\exists x, A(x) \vdash \forall x, A(x) \rightarrow G}{\Gamma, h:\exists x, A \vdash G}
+\end{displaymath}\\
+\begin{displaymath}
+  \infrule{\Gamma, h:(a_1, ..., a_n) = (b_1, ..., b_n) \vdash a_1 = b_1 \Rightarrow ... \Rightarrow a_n = b_n \Rightarrow G}{\Gamma, h:(a_1, ..., a_n) = (b_1, ..., b_n) \vdash G}
+\end{displaymath}}
+
+%clear
+\addLogic{clear}{\tacarg{h}{ident}?}{It removes the judgement $h$ from the context
+\begin{displaymath}
+  \infrule{\Gamma \vdash G}{\Gamma,h:H \vdash G}
+\end{displaymath}}
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% AUTO
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%smt
+\addLogic{smt}{TODO}{This tactic send your current goal to provers.\\
+\warningbox{Some judgements can't be converted see \ref{smtProgram} TODO} }
+
+%apply
+\addLogic{apply}{TODO}{Apply a lemma in order to prove the current goal TODO}
+
+%rewrite
+\addAuto{rewrite}{TODO}{Rewrite an expression in your goal according to a lemma TODO}
+
+%elimT
+\addAuto{elimT}{TODO}{Apply an induction princple to your current goal TODO}
+
+%subst
+\addAuto{subst}{\tacarg{x}{ident}?}{Find a value for var \emph{x} in the hypothesis, subsitute it everywhere and remove it. If \emph{x} is not specify
+it does it for all variable. TODO}
+
+%progress
+\addAuto{progress}{TODO}{Split all you hypothesis, make all subsitution possible and then split your goal and do it again on all subgoals. It
+permits to easly break a big judgements in smaller one TODO}
+
+%trivial
+\addAuto{trivial}{TODO}{TODO}
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% OTHER
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%idtac
+\addOther
+{idtac}
+{\tacarg{x}{string}}
+{TODO\\
+\example
+{env}{formula(env)}
+{\vtacname}{}
+{env}{formula(env)}
+}
+
+%same
+\addOther{same}{}{TODO}
+
+%modpath
+\addOther{modpath}{}{TODO}
+
+%using
+\addOther{using}{}{TODO}
+
+%compute
+\addOther{compute}{}{TODO}
+
+%field
+\addOther{field}{}{TODO}
+
+%fieldsimplify
+\addOther{fieldsimplify}{}{TODO}
