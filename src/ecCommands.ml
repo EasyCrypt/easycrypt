@@ -121,9 +121,9 @@ and process_datatype (_scope : EcScope.scope) _ =
   failwith "not-implemented-yet"
 
 (* -------------------------------------------------------------------- *)
-and process_module (scope : EcScope.scope) (x, m) =
+and process_module (scope : EcScope.scope) m =
   EcScope.check_state `InTop "module" scope;
-  EcScope.Mod.add scope x.pl_desc m
+  EcScope.Mod.add scope m
 
 (* -------------------------------------------------------------------- *)
 and process_interface (scope : EcScope.scope) (x, i) =

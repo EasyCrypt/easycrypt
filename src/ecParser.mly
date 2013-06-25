@@ -71,9 +71,13 @@
   let pflist loc ti (es : pformula    list) : pformula    = 
     List.fold_right (fun e1 e2 -> pf_cons loc ti e1 e2) es (pf_nil loc ti)
 
-  let mk_axiom ?(exsmt = true) (x, ty, vd, f) k = 
+  let mk_moddef ?flag name body =
+    { pm_name = name; pm_body = body; pm_flag = flag; }
+
+  let mk_axiom ?(local = false) ?(exsmt = true) (x, ty, vd, f) k = 
     { pa_name    = x;
       pa_exsmt   = exsmt;
+      pa_local   = local;
       pa_tyvars  = ty;
       pa_vars    = vd;
       pa_formula = f; 
@@ -259,6 +263,7 @@
 %token SAME
 %token SAMPLE
 %token SAVE
+%token SECTION
 %token SEMICOLON
 %token SEQ
 %token SIMPLIFY
@@ -289,6 +294,7 @@
 %token WHILE
 %token WHY3
 %token WITH
+%token WITNESS
 %token WP
 %token ZETA 
 
@@ -971,7 +977,7 @@ mod_item:
     { Pst_var v }
 
 | m=mod_def
-    { let (x, m) = m in Pst_mod (x, m) }
+    { Pst_mod m }
 
 | FUN decl=fun_decl EQ body=fun_def_body
     { Pst_fun (decl, body) }
@@ -995,7 +1001,12 @@ mod_body:
     { `Struct stt }
 ;
 
-mod_def:
+mod_flag:
+| LOCAL   { `Local   }
+| WITNESS { `Witness }
+;
+
+mod_def_r:
 | MODULE x=uident p=mod_params? t=mod_aty? EQ body=loc(mod_body)
     { let p = EcUtils.odfl [] p in
         match body.pl_desc with
@@ -1006,10 +1017,15 @@ mod_def:
              if t <> None then
                error (EcLocation.make $startpos $endpos)
                  (Some "cannot bind module type to module alias"); 
-             (x, mk_loc body.pl_loc (Pm_ident m))
+             mk_moddef x (mk_loc body.pl_loc (Pm_ident m))
 
         | `Struct st ->
-             (x, mk_loc body.pl_loc (mk_mod ?modtypes:t p st)) }
+             mk_moddef x (mk_loc body.pl_loc (mk_mod ?modtypes:t p st)) }
+;
+
+mod_def:
+| m=mod_def_r { m }
+| f=mod_flag m=mod_def_r { { m with pm_flag = Some f; } }
 ;
 
 mod_params:
@@ -1247,23 +1263,23 @@ axiom:
 | AXIOM d=lemma_decl 
     { mk_axiom d PAxiom }
 
-| LEMMA o=nosmt d=lemma_decl
-    { mk_axiom ~exsmt:o d PILemma }
+| l=boption(LOCAL) LEMMA o=nosmt d=lemma_decl
+    { mk_axiom ~local:l ~exsmt:o d PILemma }
 
-| LEMMA o=nosmt d=lemma_decl BY t=tactic
-    { mk_axiom ~exsmt:o d (PLemma (Some t)) }
+| l=boption(LOCAL) LEMMA o=nosmt d=lemma_decl BY t=tactic
+    { mk_axiom ~local:l ~exsmt:o d (PLemma (Some t)) }
 
-| LEMMA o=nosmt d=lemma_decl BY LBRACKET RBRACKET
-    { mk_axiom ~exsmt:o d (PLemma None) }
+| l=boption(LOCAL) LEMMA o=nosmt d=lemma_decl BY LBRACKET RBRACKET
+    { mk_axiom ~local:l ~exsmt:o d (PLemma None) }
 
-| EQUIV x=ident pd=pgtybindings? COLON p=loc(equiv_body(none))
-    { mk_axiom (x, None, pd, p) PILemma }
+| l=boption(LOCAL) EQUIV x=ident pd=pgtybindings? COLON p=loc(equiv_body(none))
+    { mk_axiom ~local:l (x, None, pd, p) PILemma }
 
-| EQUIV x=ident pd=pgtybindings? COLON p=loc(equiv_body(none)) BY t=tactic
-    { mk_axiom (x, None, pd, p) (PLemma (Some t)) }
+| l=boption(LOCAL) EQUIV x=ident pd=pgtybindings? COLON p=loc(equiv_body(none)) BY t=tactic
+    { mk_axiom ~local:l (x, None, pd, p) (PLemma (Some t)) }
 
-| EQUIV x=ident pd=pgtybindings? COLON p=loc(equiv_body(none)) BY LBRACKET RBRACKET
-    { mk_axiom (x, None, pd, p) (PLemma None) }
+| l=boption(LOCAL) EQUIV x=ident pd=pgtybindings? COLON p=loc(equiv_body(none)) BY LBRACKET RBRACKET
+    { mk_axiom ~local:l (x, None, pd, p) (PLemma None) }
 ;
 
 (* -------------------------------------------------------------------- *)
@@ -1271,6 +1287,9 @@ axiom:
 
 theory_open  : THEORY  x=uident  { x }
 theory_close : END     x=uident  { x }
+
+section_open  : SECTION     { () }
+section_close : END SECTION { () }
 
 import_flag:
 | IMPORT { `Import }
@@ -1957,6 +1976,8 @@ global_:
 | theory_export    { GthExport    $1 }
 | theory_clone     { GthClone     $1 }
 | theory_w3        { GthW3        $1 }
+| section_open     { GsctOpen        }
+| section_close    { GsctClose       }
 | mod_def          { Gmodule      $1 }
 | sig_def          { Ginterface   $1 }
 | type_decl_or_def { Gtype        $1 }

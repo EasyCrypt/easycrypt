@@ -43,7 +43,6 @@
     "last"        , LAST       ;        (* KW: tactical *)
     "do"          , DO         ;        (* KW: tactical *)
     "strict"      , STRICT     ;        (* KW: tactical *)
-
     
     (* Lambda tactics *)
     "beta"        , BETA       ;        (* KW: tactic *)
@@ -130,6 +129,7 @@
     "import"      , IMPORT     ;        (* KW: global *)
     "export"      , EXPORT     ;        (* KW: global *)
     "local"       , LOCAL      ;        (* KW: global *)
+    "witness"     , WITNESS    ;        (* KW: global *)
     "nosmt"       , NOSMT      ;        (* KW: global *)
     "module"      , MODULE     ;        (* KW: global *)
     "of"          , OF         ;        (* KW: global *)
@@ -137,6 +137,7 @@
     "op"          , OP         ;        (* KW: global *)
     "pred"        , PRED       ;        (* KW: global *)
     "require"     , REQUIRE    ;        (* KW: global *)
+    "section"     , SECTION    ;        (* KW: global *)
     "theory"      , THEORY     ;        (* KW: global *)
     "type"        , TYPE       ;        (* KW: global *)
     "datatype"    , DATATYPE   ;        (* KW: global *)
