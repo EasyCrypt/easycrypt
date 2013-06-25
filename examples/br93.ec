@@ -3,6 +3,7 @@ require import Array.
 require import Bitstring.
 require import Map.
 require import Set.
+require import ISet.
 require import Int.
 require import Distr.
 require import Bool.
@@ -279,7 +280,7 @@ module BR_OW(A_ : Adv) : Inverter = {
   (m0,m1)  = A.a1(pk);
   h = $uniform; 
   b  = A.a2(y || h);
-  x = proj (Map.find (lambda p,f pk (Pair.fst p) = y) RO.m);
+  x = Option.proj (Map.find (lambda p0 p1,f pk p0 = y) RO.m);
    return (x);
  }
 }.
@@ -313,35 +314,34 @@ proof.
  seq 11 9:
  (={pk,sk,RO.m,ARO.log} /\ pk0{2} = pk{2} /\ 
   in_supp (pk{2},sk{2}) keypairs /\
-(glob A){1} = (glob A){2}  /\ dom RO.m{1} = ARO.log{1} /\ 
+(glob A){1} = (glob A){2}  /\ (forall x, in_dom x RO.m{1} = mem x ARO.log{1}) /\
  M.r{1} = x{2} /\ y0{2} = f pk{2} x{2}).
  call 
- (={c,RO.m,ARO.log} /\ (glob A){1} = (glob A){2} /\ dom RO.m{1} = ARO.log{1})
- (={RO.m,ARO.log,res} /\ (glob A){1} = (glob A){2} /\ dom RO.m{1} = ARO.log{1}).
- fun (={RO.m,ARO.log} /\ dom RO.m{1} = ARO.log{1});[smt|smt|].
+ (={c,RO.m,ARO.log} /\ (glob A){1} = (glob A){2} /\ (forall x, in_dom x RO.m{1} = mem x ARO.log{1}))
+ (={RO.m,ARO.log,res} /\ (glob A){1} = (glob A){2} /\ (forall x, in_dom x RO.m{1} = mem x ARO.log{1})).
+ fun (={RO.m,ARO.log} /\ (forall x, in_dom x RO.m{1} = mem x ARO.log{1}));[smt|smt|].
  fun;if;[smt|inline RO.o;wp;rnd |];wp;skip;progress;smt.
  wp;rnd;swap{1} -7;wp.
- call (={p,RO.m,ARO.log} /\ (glob A){1} = (glob A){2} /\ dom RO.m{1} = ARO.log{1})
-      (={res,RO.m,ARO.log} /\ (glob A){1} = (glob A){2}  /\ dom RO.m{1} = ARO.log{1}).
- fun (={RO.m,ARO.log}  /\ dom RO.m{1} = ARO.log{1});[smt|smt|].
+ call (={p,RO.m,ARO.log} /\ (glob A){1} = (glob A){2} /\ (forall x, in_dom x RO.m{1} = mem x ARO.log{1}))
+      (={res,RO.m,ARO.log} /\ (glob A){1} = (glob A){2}  /\ (forall x, in_dom x RO.m{1} = mem x ARO.log{1})).
+ fun (={RO.m,ARO.log}  /\ (forall x, in_dom x RO.m{1} = mem x ARO.log{1}));[smt|smt|].
  fun;if;[smt|inline RO.o;wp;rnd |];wp;skip;progress;smt.
  do 2! (wp;rnd);skip;progress;try smt.
 wp;skip;progress.
-elim (find_some2<:from,to>
-      (lambda (p : (from * to)), f pk{2} (fst p) = f pk{2} x{2})
+elim (find_in
+      (lambda (p0:randomness) (p1:to), f pk{2} p0 = f pk{2} x{2})
       RO.m{2}
-      x{2} _).
-split;smt.
+      _); first exists x{2}; split;smt.
 intros x2 Hfind.
 rewrite Hfind.
-elim (find_some1<:from,to>
-      (lambda (p : (from * to)), f pk{2} (fst p) = f pk{2} x{2})
+elim (find_cor
+      (lambda (p0:randomness) (p1:to), f pk{2} p0 = f pk{2} x{2})
       RO.m{2}
       x2 _).
 assumption.
 delta;simplify.
 intros Hin_dom Hf.
-rewrite (proj_def<:from> x2).
+rewrite (Option.proj_def<:from> x2).
 apply (f_iny _ _ pk{2} sk{2} _ _);smt.
 save.
 

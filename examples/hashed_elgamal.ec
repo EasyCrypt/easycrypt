@@ -100,13 +100,13 @@ module Hashed_ElGamal (O:Oracle) : Scheme = {
     return (g ^ y, h ^^ m);
   }
 
-  fun dec(sk:skey, c:ciphertext) : plaintext option = {
+  fun dec(sk:skey, c:ciphertext) : plaintext Option.option = {
     var gy : group;
     var h, hm : bitstring;
 
     (gy, hm) = c; 
     h = O.o(gy ^ sk);
-    return Some (h ^^ hm); 
+    return Option.Some (h ^^ hm); 
   }
 }.
 
@@ -519,5 +519,5 @@ proof.
   inline RO.o RO.init.
   do (wp; rnd); wp; skip; progress; [smt | | smt | smt].
     cut ->: g ^ y ^ sk0 = g ^ sk0 ^ y; first smt.
-    rewrite Map.get_upd_eq proj_def; smt.
+    rewrite Map.get_setE Option.proj_def; smt.
 qed.

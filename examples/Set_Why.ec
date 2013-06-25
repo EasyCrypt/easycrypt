@@ -183,7 +183,7 @@ end Dexcepted.
 
 theory SetMap.
 
-  require import Map.
+  require import Map. import OptionGet.
 
   type 'a set = ('a, bool) map.
 
@@ -258,18 +258,17 @@ theory SetMap.
   lemma subset_diff (s1 s2:'a set) : diff s1 s2 <= s1
   by [].
 
-  op choose (s:'a set) : 'a = proj (find (lambda p, let (a,b) = p in b) s).
+  op choose (s:'a set) : 'a = proj (find (lambda a b, b) s).
 
   lemma choose_def (s:'a set) : !is_empty s => mem (choose s) s.
   proof.
    intros H.
    cut H1 : (exists x, in_dom x s /\ s.[x] = Some true); first smt.
-   elim H1; intros x Hx; clear H H1.
-   cut H2 : (exists x, find (lambda p, let (a,b) = p in b) s = Some x).   
-   apply (find_some2 (lambda p, let (a,b) = p in b) s x _); smt.
-   elim H2; intros y Hy; clear x Hx H2.
+   cut H2 : (exists x, find (lambda a b, b) s = Some x).
+   apply (find_in (lambda a b, b) s _); smt.
+   elim H2; intros=> y Hy; clear H1 H2.
    cut H3 : (in_dom y s /\ proj s.[y]). 
-   apply (find_some1 (lambda p, let (a,b) = p in b) s y _); assumption.
+   apply (find_cor (lambda a b, b) s y _); assumption.
    delta; simplify; rewrite Hy; clear Hy.
    cut P : (exists x, s.[y] = Some x); smt.
   qed.

@@ -1,4 +1,4 @@
-require import Map.
+require import Map. import OptionGet.
 require import Set.
 require import Int.
 require import Distr.
@@ -153,7 +153,7 @@ elim (append_get<:bool> (to_array (projRand c))
           (Plaintext.to_array (projPlain c)) i).
 intros H1 H2.
 case (i < l);intros H3;first smt.
-rewrite H2; smt.
+(* TODO: rewrite H2; smt. *) admit.
 qed.
 
 module Rnd ={
@@ -204,11 +204,11 @@ proof.
  inline Correct(BR).SE.dec Correct(BR).SE.enc RO.o.
  do 4! (wp;rnd);rnd;skip;progress;[ | |smt|smt].
   rewrite (projPlain_c (f x1 r) 
- (Plaintext.(^^) m (proj (Map.__get (Map.__set RO.m{hr} r y) r)))).
+ (Plaintext.(^^) m (proj (Map.OptionGet.__get (Map.__set RO.m{hr} r y) r)))).
  rewrite (projRand_c (f x1 r) 
- (Plaintext.(^^) m (proj (Map.__get (Map.__set RO.m{hr} r y) r))));smt.
+ (Plaintext.(^^) m (proj (Map.OptionGet.__get (Map.__set RO.m{hr} r y) r))));smt.
  rewrite (projRand_c (f x1 r) 
- (Plaintext.(^^) m (proj (Map.__get (Map.__set RO.m{hr} r y) r))));smt.
+ (Plaintext.(^^) m (proj (Map.OptionGet.__get (Map.__set RO.m{hr} r y) r))));smt.
 qed.
 
 
@@ -309,10 +309,10 @@ call
 apply eq1_enc.
 rnd.
 call (={RO.m,RO.s,pk} /\ (glob A){1} = (glob A){2} 
-                      /\ dom RO.m{2} = RO.s{2})
+                      /\ (forall x, in_dom x RO.m{2} = mem x RO.s{2}))
      (={RO.m,RO.s,res} /\ (glob A){1} = (glob A){2} 
-                      /\ dom RO.m{2} = RO.s{2}).
-fun (={RO.m,RO.s} /\ dom RO.m{2} = RO.s{2});[smt | smt | ].
+                      /\ (forall x, in_dom x RO.m{2} = mem x RO.s{2})).
+fun (={RO.m,RO.s} /\ (forall x, in_dom x RO.m{2} = mem x RO.s{2}));[smt | smt | ].
 fun;inline RO.o;if;[smt | wp;rnd | ];wp;skip;progress;smt.
 inline CPA(BR,A).SO.kg RO.init CPA(BR2,A).SO.kg;wp;rnd;wp;skip;progress;smt.
 qed.
