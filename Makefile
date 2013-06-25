@@ -69,6 +69,9 @@ tests: check
 examples:
 	$(CHECK) examples
 
+fullcheck: ec.native
+	$(CHECK) prelude theories realized examples unit
+
 check: ec.native
 	$(CHECK) prelude theories realized unit
 
