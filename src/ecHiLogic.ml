@@ -745,18 +745,34 @@ let process_change pf g =
 let process_intros ?(cf = true) pis (juc, n) =
   
   let mk_intro ids g =
-    let (juc, n) = List.fold_left
-      (fun g s -> let gs = t_intros
-        [lmap (function None -> EcIdent.create "_" | Some s ->
-        (match snd s with
-          | `noRename -> EcIdent.create (fst s)
-          | `withRename -> LDecl.fresh_id (fst (get_goal g)) (fst s)
-        ) ) s] g in
-        (match gs with
-          | (juc, [n]) -> (juc, n)
-          | _ -> assert false)
-      ) g ids in
-    (juc, [n]) in
+    let hyps = ref (fst (get_goal g)) in
+    let form = ref (snd (get_goal g)) in
+    t_intros (List.map (fun s ->
+      let rec destruct fp =
+        let module R = EcReduction in
+        match EcFol.sform_of_form fp with
+        | SFquant (Lforall, (x, _), newF) -> (EcIdent.name x, newF)
+        | SFlet (LSymbol(x,_), _, newF) -> (EcIdent.name x, newF)
+        | SFimp (_, newF) -> ("H", newF)
+        | _ -> begin
+          match R.h_red_opt R.full_red !hyps fp with
+         (*When you call this function it must be already checked that you
+           can do an intro*)
+          | None   -> assert false
+          | Some f -> destruct f
+        end
+      in
+      let name, newF = destruct !form in
+      let id = (lmap (function
+        | `noName -> EcIdent.create "_"
+        | `findName -> LDecl.fresh_id !hyps name
+        | `noRename s -> EcIdent.create s
+        | `withRename s -> LDecl.fresh_id !hyps s
+      ) s) in
+      hyps := LDecl.add_local id.pl_desc (LD_var(tbool,None)) !hyps;
+      form := newF;
+      id) ids) g
+  in
 
   let elim_top g =
     let h       = EcIdent.create "_" in

@@ -1366,9 +1366,10 @@ intro_pattern_1_name:
 ;
 
 intro_pattern_1:
-| UNDERSCORE { None }
-| s=intro_pattern_1_name {Some (s, `noRename)}
-| s=intro_pattern_1_name QUESTION {Some (s, `withRename)}
+| UNDERSCORE { `noName }
+| QUESTION { `findName }
+| s=intro_pattern_1_name {`noRename s}
+| s=intro_pattern_1_name NOT {`withRename s}
 ;
 
 intro_pattern:
