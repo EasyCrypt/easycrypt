@@ -16,6 +16,7 @@ PREFIX   ?= /usr/local
 VERSION  ?= $(shell date '+%F')
 DISTDIR  := easycrypt-$(VERSION)
 THEORIES := $(wildcard theories/*.ec)
+REALIZED := $(wildcard theories/realizations/*.ec)
 PRELUDE  := $(wildcard theories/prelude/*.ec)
 INSTALL  := scripts/install-sh
 
@@ -50,12 +51,16 @@ install: ec.native
 	$(INSTALL) -m 0644 -t $(DESTDIR)$(PREFIX)/lib/easycrypt/theories $(THEORIES)
 	$(INSTALL) -m 0755 -d $(DESTDIR)$(PREFIX)/lib/easycrypt/theories/prelude
 	$(INSTALL) -m 0644 -t $(DESTDIR)$(PREFIX)/lib/easycrypt/theories/prelude $(PRELUDE)
+	$(INSTALL) -m 0755 -d $(DESTDIR)$(PREFIX)/lib/easycrypt/theories/realizations
+	$(INSTALL) -m 0644 -t $(DESTDIR)$(PREFIX)/lib/easycrypt/theories/realizations $(REALIZED)
 
 uninstall:
 	rm -f $(DESTDIR)$(PREFIX)/bin/easycrypt
 	rm -f $(patsubst %,$(DESTDIR)$(PREFIX)/lib/easycrypt/%,$(PRELUDE))
+	rm -f $(patsubst %,$(DESTDIR)$(PREFIX)/lib/easycrypt/%,$(REALIZED))
 	rm -f $(patsubst %,$(DESTDIR)$(PREFIX)/lib/easycrypt/%,$(THEORIES))
 	-@rmdir $(DESTDIR)$(PREFIX)/lib/easycrypt/theories/prelude
+	-@rmdir $(DESTDIR)$(PREFIX)/lib/easycrypt/theories/realizations
 	-@rmdir $(DESTDIR)$(PREFIX)/lib/easycrypt/theories
 	-@rmdir $(DESTDIR)$(PREFIX)/lib/easycrypt
 
@@ -65,13 +70,13 @@ examples:
 	$(CHECK) examples
 
 check: ec.native
-	$(CHECK) prelude theories unit
+	$(CHECK) prelude theories realized unit
 
 check-xunit: ec.native
-	$(CHECK) --xunit="$(XUNITOUT)" prelude theories unit
+	$(CHECK) --xunit="$(XUNITOUT)" prelude theories realized unit
 
 checklibs: ec.native
-	$(CHECK) --xunit=libresults.xml prelude theories
+	$(CHECK) --xunit=libresults.xml prelude theories realized
 
 clean:
 	$(OCAMLBUILD) -clean

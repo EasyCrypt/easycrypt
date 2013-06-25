@@ -498,23 +498,22 @@ let t_rewrite = t_rewrite_gen (pattern_form None)
 
 let t_rewrite_node ?(fpat = pattern_form None) ((juc,an), gs) side n =
   let (_,f) = get_node (juc, an) in
-  t_seq_subgoal (t_rewrite_gen fpat side f)
-    [t_use an gs;t_id None] (juc,n)
+  t_seq_subgoal (t_rewrite_gen fpat side f) [t_use an gs;t_id None] (juc,n)
 
 let t_rewrite_hyp ?fpat side id args (juc,n as g) =
-  let hyps = get_hyps g in
-  let g' = mkn_hyp juc hyps id in
-  t_rewrite_node ?fpat (mkn_apply (fun _ _ a -> a) g' args) side n
+  let g = mkn_hyp juc (get_hyps g) id in
+  t_rewrite_node ?fpat (mkn_apply (fun _ _ a -> a) g args) side n
 
 let t_rewrite_glob ?fpat side p tys args (juc,n as g) =
-  let hyps = get_hyps g in
-  let g' = mkn_glob juc hyps p tys in
-  t_rewrite_node ?fpat (mkn_apply (fun _ _ a -> a) g' args) side n
+  let g = mkn_glob juc (get_hyps g) p tys in
+  t_rewrite_node ?fpat (mkn_apply (fun _ _ a -> a) g args) side n
 
-let t_rewrite_form ?fpat side fp args (juc,n as g) =
-  let hyps = get_hyps g in
-  let g' = new_goal juc (hyps, fp) in
-  t_rewrite_node ?fpat (mkn_apply (fun _ _ a -> a) g' args) side n
+let t_rewrite_form ?fpat side fp args (juc, n as g) =
+  let (juc, fn) = new_goal juc (get_hyps g, fp) in
+  let g = mkn_apply (fun _ _ a -> a) (juc, fn) args in
+  let g = t_rewrite_node ?fpat g side n
+  in
+    snd_map (fun ns -> fn :: ns) g
 
 let t_cut f g =
   let concl = get_concl g in
@@ -758,9 +757,14 @@ let t_or_intro b g =
 let t_left  = t_or_intro true
 let t_right = t_or_intro false
 
-let t_generalize_form name f g =
+let t_generalize_form ?fpat name f g =
+  let fpat =
+    match fpat with
+    | None -> pattern_form name
+    | Some fpat -> fpat
+  in
   let hyps,concl = get_goal g in
-  let x,body = pattern_form name hyps f concl in
+  let x,body = fpat hyps f concl in
   let ff = f_forall [x,GTty f.f_ty] body in
   t_apply_form ff [AAform f] g
 

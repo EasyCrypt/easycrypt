@@ -168,6 +168,7 @@ type phoarecmp = PFHle | PFHeq | PFHge
 type pformula  = pformula_r located
 
 and pformula_r =
+  | PFhole
   | PFint    of int
   | PFtuple  of pformula list
   | PFident  of pqsymbol * ptyannot option
@@ -197,6 +198,12 @@ and pgty =
 | PGTY_Type  of pty
 | PGTY_ModTy of pmodule_type_restr
 | PGTY_Mem
+
+let rec pf_ident f =
+  match unloc f with
+  | PFident ({ pl_desc = ([], x) }, _) -> Some x
+  | PFtuple [f] -> pf_ident f
+  | _ -> None
 
 (* -------------------------------------------------------------------- *)
 type pop_def =
@@ -338,9 +345,10 @@ type rwarg =
 
 and rwside = [`LtoR | `RtoL]
 and rwocc  = Sint.t option
+and renaming = [`withRename | `noRename]
 
 type intropattern1 =
-  | IPCore  of (symbol option) located
+  | IPCore  of ((symbol*renaming) option) located
   | IPCase  of intropattern list
   | IPRw    of (rwocc * rwside)
   | IPClear of psymbol list
@@ -364,13 +372,14 @@ type logtactic =
   | Pelim       of ffpattern 
   | Papply      of ffpattern
   | Pcut        of (intropattern1 * pformula * ptactic_core option)
-  | Pgeneralize of pformula list
+  | Pgeneralize of (rwocc * pformula) list
   | Pclear      of psymbol list
   | Prewrite    of rwarg list
   | Psubst      of pformula list
   | Psimplify   of preduction 
   | Pchange     of pformula
   | PelimT      of (pformula * pqsymbol)
+  | Ppose       of (psymbol * rwocc * pformula)
 
 and ptactic_core_r =
   | Pidtac      of string option

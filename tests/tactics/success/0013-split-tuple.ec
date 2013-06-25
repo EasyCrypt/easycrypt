@@ -1,5 +1,3 @@
-require Logic.
-
 lemma foo2 : forall (x1 y1:'a1) (x2 y2:'a2),
    x1 = y1 =>
    x2 = y2 =>

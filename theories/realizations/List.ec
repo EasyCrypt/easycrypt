@@ -18,14 +18,14 @@ axiom fold_right_cons: forall (f:'a -> 'b -> 'b) (e:'b) x xs,
 (** Destructors (partially specified) *)
 (* Head *)
 op hd: 'a list -> 'a.
-axiom hd_def: forall (x:'a) xs, hd (x::xs) = x.
+axiom hd_cons: forall (x:'a) xs, hd (x::xs) = x.
 
 (* Tail *)
 op tl: 'a list -> 'a list.
-axiom tl_def: forall (x:'a) xs, tl (x::xs) = xs.
+axiom tl_cons: forall (x:'a) xs, tl (x::xs) = xs.
 
 (* Induction Principle *)
-axiom list_ind: forall (P:('a list) cPred),
+axiom list_ind: forall (P:('a list) cpred),
   (P []) =>
   (forall x xs, P xs => P (x::xs)) =>
   (forall ys, P ys).
@@ -48,8 +48,11 @@ by [].
 
 (** A lemma on hd and tail *)
 lemma hd_tl_cons: forall (xs:'a list),
-  xs <> [] => (hd xs)::(tl xs) = xs
-by [].
+  xs <> [] => (hd xs)::(tl xs) = xs.
+proof strict.
+by intros=> xs; elimT list_ind xs=> // x xs' IH h {h};
+   rewrite hd_cons tl_cons=> //.
+qed.
 
 (*** Derived Constructions *)
 (** mem *)
@@ -65,6 +68,7 @@ qed.
 
 (* Lemmas *)
 lemma mem_eq: forall (x:'a) xs, mem x (x::xs) by [].
+lemma mem_neq: forall (x y:'a) xs, x <> y => mem x (y::xs) = mem x xs by [].
 lemma memM_cons : forall (x y:'a) xs, mem y xs => mem y (x::xs) by [].
 lemma mem_hd: forall (xs:'a list), xs <> [] => mem (hd xs) xs by [].
 lemma nil_nmem: forall (xs:'a list), xs = [] <=> (forall x, !mem x xs) by [].
@@ -127,63 +131,63 @@ by rewrite appCcons 2!mem_cons orA IH.
 qed.
 
 (** all *)
-pred all(p:'a cPred) xs = forall x, mem x xs => p x.
+pred all(p:'a cpred) xs = forall x, mem x xs => p x.
 
 (* Direct inductive definition *)
-lemma all_nil: forall (p:'a cPred), all p [] by [].
-lemma all_cons: forall (p:'a cPred) x xs, all p (x::xs) = ((p x) /\ all p xs) by [].
+lemma all_nil: forall (p:'a cpred), all p [] by [].
+lemma all_cons: forall (p:'a cpred) x xs, all p (x::xs) = ((p x) /\ all p xs) by [].
 
 (* Lemmas *)
-lemma all_app: forall (p:'a cPred) xs ys, all p (xs ++ ys) = (all p xs /\ all p ys) by [].
+lemma all_app: forall (p:'a cpred) xs ys, all p (xs ++ ys) = (all p xs /\ all p ys) by [].
 
 (** forallb *)
-op forallb(p:'a cPred) = fold_right (lambda x r, (p x) /\ r) true.
+op forallb(p:'a cpred) = fold_right (lambda x r, (p x) /\ r) true.
 
 (* Direct inductive definition *)
-lemma forallb_nil: forall (p:'a cPred), forallb p [] by [].
-lemma forallb_cons: forall (p:'a cPred) x xs, forallb p (x::xs) = ((p x) /\ forallb p xs).
+lemma forallb_nil: forall (p:'a cpred), forallb p [] by [].
+lemma forallb_cons: forall (p:'a cpred) x xs, forallb p (x::xs) = ((p x) /\ forallb p xs).
 proof strict.
 by intros=> p x xs; delta forallb; beta; smt.
 qed.
 
-lemma forallb_eq_all: forall (p:'a cPred) xs, all p xs <=> forallb p xs.
+lemma forallb_eq_all: forall (p:'a cpred) xs, all p xs <=> forallb p xs.
 proof strict.
 intros=> p xs; elimT list_ind xs; first smt.
 by intros=> y ys IH; rewrite all_cons forallb_cons IH.
 qed.
 
 (** any *)
-pred any (p:'a cPred) xs = exists x, mem x xs /\ p x.
+pred any (p:'a cpred) xs = exists x, mem x xs /\ p x.
 
 (* Direct inductive definition *)
-lemma any_nil: forall (p:'a cPred), !(any p []) by [].
-lemma any_cons: forall (p:'a cPred) x xs, any p (x::xs) = ((p x) \/ any p xs) by [].
+lemma any_nil: forall (p:'a cpred), !(any p []) by [].
+lemma any_cons: forall (p:'a cpred) x xs, any p (x::xs) = ((p x) \/ any p xs) by [].
 
 (* Lemmas *)
-lemma any_app: forall (p:'a cPred) xs ys, any p (xs ++ ys) = (any p xs \/ any p ys) by [].
+lemma any_app: forall (p:'a cpred) xs ys, any p (xs ++ ys) = (any p xs \/ any p ys) by [].
 
 (** existsb *)
-op existsb (p:'a cPred) = fold_right (lambda x r, (p x) \/ r) false.
+op existsb (p:'a cpred) = fold_right (lambda x r, (p x) \/ r) false.
 
 (* Direct inductive definition *)
-lemma existsb_nil: forall (p:'a cPred), !(existsb p []) by [].
-lemma existsb_cons: forall (p:'a cPred) x xs, existsb p (x::xs) = ((p x) \/ existsb p xs).
+lemma existsb_nil: forall (p:'a cpred), !(existsb p []) by [].
+lemma existsb_cons: forall (p:'a cpred) x xs, existsb p (x::xs) = ((p x) \/ existsb p xs).
 proof strict.
 by intros=> p x xs; delta existsb; beta; smt.
 qed.
 
-lemma existsb_eq_any: forall (p:'a cPred) xs, any p xs <=> existsb p xs.
+lemma existsb_eq_any: forall (p:'a cpred) xs, any p xs <=> existsb p xs.
 proof strict.
 intros=> p xs; elimT list_ind xs; first smt.
 by intros=> y ys IH; rewrite any_cons existsb_cons IH.
 qed.
 
 (** filter *)
-op filter (p:'a cPred) = fold_right (lambda x r, if p x then x::r else r) [].
+op filter (p:'a cpred) = fold_right (lambda x r, if p x then x::r else r) [].
 
 (* Direct inductive definition *)
-lemma filter_nil: forall (p:'a cPred), filter p [] = [] by [].
-lemma filter_cons: forall (p:'a cPred) x xs,
+lemma filter_nil: forall (p:'a cpred), filter p [] = [] by [].
+lemma filter_cons: forall (p:'a cpred) x xs,
   filter p (x::xs) = let rest = filter p xs in
                      if p x then x::rest else rest.
 proof strict.
@@ -191,15 +195,15 @@ by intros=> p x xs; delta filter; beta; smt.
 qed.
 
 (* Lemmas *)
-lemma filter_consT: forall (p:'a cPred) x xs,
+lemma filter_consT: forall (p:'a cpred) x xs,
   p x => filter p (x::xs) = x::(filter p xs)
 by [].
 
-lemma filter_consF: forall (p:'a cPred) x xs,
+lemma filter_consF: forall (p:'a cpred) x xs,
   !(p x) => filter p (x::xs) = filter p xs
 by [].
 
-lemma filter_mem: forall (p:'a cPred) x xs,
+lemma filter_mem: forall (p:'a cpred) x xs,
   mem x (filter p xs) = (mem x xs /\ p x).
 proof strict.
 intros=> p x xs; elimT list_ind xs; first smt.
@@ -208,23 +212,23 @@ intros=> x' xs' IH; case (p x')=> p_x'.
   by rewrite filter_consF // mem_cons;smt.
 qed.
 
-lemma filter_app: forall (p:'a cPred) xs ys,
+lemma filter_app: forall (p:'a cpred) xs ys,
   filter p (xs ++ ys) = filter p xs ++ filter p ys.
 proof strict.
 by intros=> p xs ys; elimT list_ind xs; smt.
 qed.
 
-lemma length_filter: forall (p:'a cPred) xs,
+lemma length_filter: forall (p:'a cpred) xs,
   length (filter p xs) <= length xs.
 proof strict.
 by intros=> p xs; elimT list_ind xs; smt.
 qed.
 
-lemma all_filter: forall (p:'a cPred) xs,
+lemma all_filter: forall (p:'a cpred) xs,
   all p (filter p xs)
 by [].
 
-lemma filter_imp: forall (p q:'a cPred) xs,
+lemma filter_imp: forall (p q:'a cpred) xs,
   p <= q =>
   forall x, mem x (filter p xs) => mem x (filter q xs)
 by [].
@@ -262,6 +266,20 @@ lemma length_map: forall (f:'a -> 'b) xs,
 proof strict.
 by intros f xs; elimT list_ind xs; smt.
 qed.
+
+(** unique *)
+require import Pair.
+op unique_f (x':'a) (s:bool * 'a list) =
+  let (b',xs') = s in
+  (b' /\ !mem x' xs',x'::xs').
+op unique (xs:'a list): bool =
+  fst (fold_right unique_f (true,[]) xs).
+
+(* Direct inductive definition *)
+lemma unique_nil: unique<:'a> [] by [].
+(* TODO: this is true, but I'm having trouble with the proof. *)
+axiom unique_cons: forall (x:'a) xs,
+  unique (x::xs) = (unique xs /\ !mem x xs).
 
 (** nth *)
 require import Option.
