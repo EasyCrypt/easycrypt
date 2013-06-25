@@ -46,6 +46,7 @@ type tyerror =
 | InvalidModType       of modtyp_error
 | InvalidMem           of symbol * mem_error
 | OnlyModParamAreOracle of qsymbol
+| LvTupleNotUniq
 
 exception TyError of EcLocation.t * EcEnv.env * tyerror
 

@@ -61,6 +61,7 @@ type tyerror =
 | InvalidModType       of modtyp_error
 | InvalidMem           of symbol * mem_error
 | OnlyModParamAreOracle of qsymbol
+| LvTupleNotUniq
 
 exception TyError of EcLocation.t * EcEnv.env * tyerror
 
@@ -106,12 +107,14 @@ let pp_tyerror fmt env error =
       msg "incompatible type\n";
       msg "expecting: %a" pp_type ty1;
       msg "      got: %a" pp_type ty2
-
+  | LvTupleNotUniq ->
+    msg "Cannot assign twice a variable in a left pattern"
   | UnknownVarOrOp (name, tys) -> begin
       match tys with
       | [] -> msg "unknown variable or constant: `%a'" pp_qsymbol name
       | _  -> msg "unknown operator `%a' for signature (%a)"
                 pp_qsymbol name (EcPrinting.pp_list " *@ " pp_type) tys
+      
   end
 
   | MultipleOpMatch (name, _) ->
@@ -695,24 +698,6 @@ let tysig_item_kind = function
 (*  | Tys_variable _ -> `Variable *)
   | Tys_function _ -> `Function
   
-let sig_of_mt env (mt:module_type) = 
-  let sig_ = EcEnv.ModTy.by_path mt.mt_name env in
-  let subst = 
-    List.fold_left2 (fun s (x1,_) a ->
-      EcSubst.add_module s x1 a) EcSubst.empty sig_.mis_params mt.mt_args in
-  let items =
-    EcSubst.subst_modsig_body subst sig_.mis_body in
-  let params = mt.mt_params in
-  let keep = 
-    List.fold_left (fun k (x,_) ->
-      EcPath.Sm.add (EcPath.mident x) k) EcPath.Sm.empty params in
-  let keep_info f = 
-    EcPath.Sm.mem (f.EcPath.x_top) keep in
-  let do1 = function
-    | Tys_function(s,oi) ->
-      Tys_function(s,{oi_calls = List.filter keep_info oi.oi_calls }) in
-  { mis_params = params;
-    mis_body   = List.map do1 items }
 
 let rec check_sig_cnv mode (env:EcEnv.env) (sin:module_sig) (sout:module_sig) = 
   (* Check parameters for compatibility. Parameters names may be
@@ -773,8 +758,8 @@ let rec check_sig_cnv mode (env:EcEnv.env) (sin:module_sig) (sout:module_sig) =
           let icalls = norm oin in
           let ocalls = norm oout in
           match mode with
-          | `Sub ->Sx.subset icalls ocalls
-          | `Eq  -> Sx.equal icalls ocalls
+          | `Sub -> Sx.subset icalls ocalls
+          | `Eq  -> Sx.equal  icalls ocalls
         in
         if not (flcmp ()) then
           tymod_cnv_failure (E_TyModCnv_MismatchFunSig fin.fs_name);
@@ -821,12 +806,12 @@ let rec check_sig_cnv mode (env:EcEnv.env) (sin:module_sig) (sout:module_sig) =
     end
 
 and check_modtype_cnv env (tyin:module_type) (tyout:module_type) = 
-  let sin = sig_of_mt env tyin in
-  let sout = sig_of_mt env tyout in
+  let sin = EcEnv.ModTy.sig_of_mt env tyin in
+  let sout = EcEnv.ModTy.sig_of_mt env tyout in
   check_sig_cnv `Eq env sin sout
 
 let check_sig_mt_cnv env sin tyout = 
-  let sout = sig_of_mt env tyout in
+  let sout = EcEnv.ModTy.sig_of_mt env tyout in
   check_sig_cnv `Sub env sin sout
 
 (* -------------------------------------------------------------------- *)
@@ -1400,6 +1385,8 @@ and translvalue ue (env : EcEnv.env) lvalue =
 
   | PLvTuple xs -> 
       let xs = List.map (trans_pv env) xs in
+      if not (List.uniqf (EcReduction.pv_equal_norm env) (List.map fst xs)) then
+        tyerror lvalue.pl_loc env LvTupleNotUniq;
       let ty = ttuple (List.map snd xs) in
       (LvTuple xs, ty)
 
