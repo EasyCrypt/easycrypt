@@ -191,6 +191,7 @@ module CoreSection : sig
   val items_of_locals : locals -> EcTheory.ctheory_item list
 
   val is_local : [`Lemma | `Module] -> path -> locals -> bool
+  val is_mp_local : mpath -> locals -> bool
 
   type t
 
@@ -205,6 +206,9 @@ module CoreSection : sig
 
   val path  : t -> path
   val opath : t -> path option
+
+  val locals  : t -> locals
+  val olocals : t -> locals option
 
   val addlocal : [`Lemma | `Module] -> path -> t -> t
   val additem  : EcTheory.ctheory_item -> t -> t
@@ -229,6 +233,14 @@ end = struct
       | `Module -> lc.lc_modules
     in
       Sp.mem p set
+
+  let rec is_mp_local mp (lc : locals) =
+    let toplocal =
+      match mp.m_top with
+      | `Abstract _ -> false
+      | `Concrete (p, _) -> is_local `Module p lc
+    in
+      toplocal || (List.exists (is_mp_local^~ lc) mp.m_args)
 
   let elocals (env : EcEnv.env) : locals =
     { lc_env     = env;
@@ -260,6 +272,14 @@ end = struct
 
   let opath (cs : t) =
     try Some (path cs) with NoSectionOpened -> None
+
+  let locals (cs : t) : locals =
+    match cs with
+    | [] -> raise NoSectionOpened
+    | ec :: _ -> ec
+
+  let olocals (cs : t) =
+    try Some (locals cs) with NoSectionOpened -> None
 
   let onactive (f : locals -> locals) (cs : t) =
     match cs with
@@ -651,19 +671,45 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Mod = struct
-  let bind (scope : scope) (m : module_expr) =
+  let bind (scope : scope) (local : bool) (m : module_expr) =
     assert (scope.sc_pr_uc = None);
     let scope =
       { scope with
           sc_env = EcEnv.Mod.bind m.me_name m scope.sc_env; }
     in
     let scope = maybe_add_to_section scope (EcTheory.CTh_module m) in
+    let scope =
+      match local with
+      | false -> scope
+      | true  ->
+        let mpath = EcPath.pqname (path scope) m.me_name in
+        let ec = CoreSection.addlocal `Module mpath scope.sc_section in
+          { scope with sc_section = ec }
+    in
       scope
 
-  let add (scope : scope) (name : symbol) m =
+  let add (scope : scope) (ptm : ptopmodule) =
     assert (scope.sc_pr_uc = None);
-    let m = EcTyping.transmod scope.sc_env name m in
-      bind scope m
+
+    if ptm.ptm_local && not (CoreSection.in_section scope.sc_section) then
+      hierror "cannot declare a local module outside of a section";
+
+    let (name, m) = ptm.ptm_def in
+    let m = EcTyping.transmod scope.sc_env (unloc name) m in
+
+    if not ptm.ptm_local then begin
+      match CoreSection.olocals scope.sc_section with
+      | None -> ()
+      | Some locals ->
+          match m.me_body with
+          | ME_Structure _ -> ()
+          | ME_Decl _ -> ()
+          | ME_Alias mp ->
+              if CoreSection.is_mp_local mp locals then
+                hierror "an alias to a local module must be declared as local"
+    end;
+
+      bind scope ptm.ptm_local m
 end
 
 (* -------------------------------------------------------------------- *)
@@ -993,7 +1039,7 @@ module Section = struct
           | T.CTh_module me ->
             let mep = EcPath.pqname (path scope) me.me_name in
               if not (CoreSection.is_local `Module mep locals) then
-                Mod.bind scope me
+                Mod.bind scope false me
               else
                 scope
 

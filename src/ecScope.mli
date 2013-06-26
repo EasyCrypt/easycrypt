@@ -60,7 +60,7 @@ module Ty : sig
 end
 
 module Mod : sig
-  val add : scope -> symbol -> pmodule_expr -> scope
+  val add : scope -> ptopmodule -> scope
 end
 
 module ModType : sig
