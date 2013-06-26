@@ -291,10 +291,10 @@ equiv [ CPA(BR,A).main ~ CPA(BR2,A).main :
 proof.
 intros A Hll1 Hll2;fun.
 call
-((!mem Rnd.r RO.s){2} => 
+( _ : (!mem Rnd.r RO.s){2} => 
        (={RO.s,c} /\  eq_except RO.m{1} RO.m{2} Rnd.r{2}
-                  /\ (glob A){1} = (glob A){2}))
-      ((!mem Rnd.r RO.s){2} => ={res}).
+                  /\ (glob A){1} = (glob A){2})
+      ==> (!mem Rnd.r RO.s){2} => ={res}).
 fun (mem Rnd.r RO.s) 
     (={RO.s} /\ eq_except RO.m{1} RO.m{2} Rnd.r{2});[smt|smt|assumption| | |].
 fun;inline RO.o;if;[smt | wp;rnd | ];wp;skip;progress;smt.
@@ -303,14 +303,14 @@ intros &m2 H;fun;if;[inline RO.o;wp;rnd 1%r (cpTrue)| ];
 intros &m1;fun;if;[inline RO.o;wp;rnd 1%r (cpTrue)| ];
                                      wp;skip;progress;smt.
 call 
-(={pk,m,RO.m}) 
-(!in_dom Rnd.r{2} RO.m{2} => 
+( _ : ={pk,m,RO.m} ==> 
+!in_dom Rnd.r{2} RO.m{2} => 
       (={res,Rnd.r} /\ eq_except RO.m{1} RO.m{2} Rnd.r{2})).
 apply eq1_enc.
 rnd.
-call (={RO.m,RO.s,pk} /\ (glob A){1} = (glob A){2} 
-                      /\ (forall x, in_dom x RO.m{2} = mem x RO.s{2}))
-     (={RO.m,RO.s,res} /\ (glob A){1} = (glob A){2} 
+call (_ : ={RO.m,RO.s,pk} /\ (glob A){1} = (glob A){2} 
+                      /\ (forall x, in_dom x RO.m{2} = mem x RO.s{2}) ==>
+     ={RO.m,RO.s,res} /\ (glob A){1} = (glob A){2} 
                       /\ (forall x, in_dom x RO.m{2} = mem x RO.s{2})).
 fun (={RO.m,RO.s} /\ (forall x, in_dom x RO.m{2} = mem x RO.s{2}));[smt | smt | ].
 fun;inline RO.o;if;[smt | wp;rnd | ];wp;skip;progress;smt.
@@ -389,15 +389,15 @@ equiv [ CPA(BR2,A).main ~ CPA(BR3,A).main :
 (glob A){1} = (glob A){2} ==>  ={res,Rnd.r,RO.s}].
 proof.
 intros A Hll1 Hll2;fun.
-call (={Rnd.r,RO.s,RO.m,c} /\ (glob A){1} = (glob A){2}) 
-     (={Rnd.r,RO.s,RO.m,res} /\ (glob A){1} = (glob A){2}).
+call ( _ : ={Rnd.r,RO.s,RO.m,c} /\ (glob A){1} = (glob A){2} ==>
+     ={Rnd.r,RO.s,RO.m,res} /\ (glob A){1} = (glob A){2}).
 fun (={Rnd.r,RO.s,RO.m});[smt|smt|].
 fun;if;[smt|inline RO.o;wp;rnd|];wp;skip;progress;smt.
-call (={pk,m,RO.m}) (={res,Rnd.r,RO.m}).
+call (_ : ={pk,m,RO.m} ==> ={res,Rnd.r,RO.m}).
 apply eq2_enc.
 rnd.
-call (={RO.s,RO.m,pk} /\ (glob A){1} = (glob A){2}) 
-     (={RO.s,RO.m,res} /\ (glob A){1} = (glob A){2}).
+call (_ : ={RO.s,RO.m,pk} /\ (glob A){1} = (glob A){2} ==>
+     ={RO.s,RO.m,res} /\ (glob A){1} = (glob A){2}).
 fun (={RO.s,RO.m});[smt|smt|].
 fun;if;[smt|inline RO.o;wp;rnd|];wp;skip;progress;smt.
 inline RO.init CPA(BR2,A).SO.kg CPA(BR3,A).SO.kg.
@@ -459,14 +459,14 @@ proof.
  intros => A Hloss1 Hloss2.
  fun.
  swap{2} -2. 
- call (={Rnd.r,RO.s,RO.m,c} /\ (glob A){1} = (glob A){2})
-      (={Rnd.r,RO.s,RO.m,res} /\ (glob A){1} = (glob A){2}).
+ call (_ : ={Rnd.r,RO.s,RO.m,c} /\ (glob A){1} = (glob A){2} ==>
+      ={Rnd.r,RO.s,RO.m,res} /\ (glob A){1} = (glob A){2}).
  fun (={Rnd.r,RO.s,RO.m});[smt|smt|].
  fun;if;[smt|inline RO.o;wp;rnd|];wp;skip;progress;smt.
  inline CPA(BR3,A).SO.enc CPA2(BR3,A).SO.enc.
  do 3! (wp;rnd).
- call (={RO.s,RO.m,pk} /\ (glob A){1} = (glob A){2})
-      (={RO.s,RO.m,res} /\ (glob A){1} = (glob A){2}).
+ call (_ : ={RO.s,RO.m,pk} /\ (glob A){1} = (glob A){2} ==>
+      ={RO.s,RO.m,res} /\ (glob A){1} = (glob A){2}).
  fun (={RO.s,RO.m});[smt|smt|].
  fun;if;[smt|inline RO.o;wp;rnd|];wp;skip;progress;smt.
  inline RO.init CPA(BR3,A).SO.kg CPA2(BR3,A).SO.kg.
@@ -494,11 +494,11 @@ proof.
  cut Hleq:  (Pr[CPA2(BR3,A).main() @ &m : res] = 1%r/2%r).
  cut Hbd : (bd_hoare[CPA2(BR3,A).main : true ==> res] = (1%r / 2%r)).
  fun; rnd (1%r / 2%r) (lambda b, b = b'); simplify.
- call (true) (true).
+ call (_ : true ==> true).
  fun (true);[smt|smt|assumption|].
  fun;if;[inline RO.o;wp;rnd 1%r (cpTrue)|];wp;skip;smt.
  inline CPA2(BR3,A).SO.enc;do 2! (wp;rnd 1%r (cpTrue));wp.
- call (true) (true).
+ call (_ : true ==> true).
  fun (true);[smt|smt|assumption|].
  fun;if;[inline RO.o;wp;rnd 1%r (cpTrue)|];wp;skip;smt.
  inline CPA2(BR3,A).SO.kg RO.init.

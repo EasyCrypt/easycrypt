@@ -189,7 +189,7 @@ let process_call side info (_, n as g) =
       penv, fun inv -> bdHoare_call_spec inv inv f bhs.bhs_cmp bhs.bhs_bd None
     | FequivS es ->
       let (_,fl,_),(_,fr,_),_,_ = s_last_calls "call" es.es_sl es.es_sr in
-      let penv = LDecl.inv_memenv1 hyps in
+      let penv = LDecl.inv_memenv hyps in
       let env = LDecl.toenv hyps in
       penv, fun inv ->
         if is_abstract fl env then 
