@@ -305,14 +305,16 @@ type codepos = int * ((int * codepos) option)
 type p_app_bd_info = PAppNone | PAppSingle of pformula 
                    | PAppMult of (pformula * pformula * pformula * pformula)
 
+type tac_dir = Backs | Fwds
+ 
 type phltactic = 
   | Pfun_def  
   | Pfun_abs    of pformula
   | Pfun_upto   of (pformula * pformula * pformula option)
   | Pskip
-  | Papp        of (bool * int doption * pformula * p_app_bd_info)
+  | Papp        of (tac_dir * int doption * pformula * p_app_bd_info)
   | Pwp         of int doption option 
-  | Pwhile      of (pformula * pformula option * (pformula * pformula) option)
+  | Pwhile      of tac_side * (pformula * pformula option * (pformula * pformula) option)
   | Pfission    of (tac_side * codepos * (int * (int * int)))
   | Pfusion     of (tac_side * codepos * (int * (int * int)))
   | Punroll     of (tac_side * codepos)

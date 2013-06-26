@@ -1483,9 +1483,9 @@ conseq:
 ;
 
 tac_dir: 
-| BACKS {  true }
-| FWDS  { false }
-| empty {  true }
+| BACKS { Backs }
+| FWDS  { Fwds }
+| empty { Backs }
 ;
 
 codepos:
@@ -1659,8 +1659,8 @@ phltactic:
 | SKIP
     { Pskip }
 
-| WHILE info=while_tac_info
-    { Pwhile info }
+| WHILE s=side? info=while_tac_info
+    { Pwhile (s,info) }
 
 | CALL s=side? pre=sform post=sform
     { Pcall (s, (pre, post)) }

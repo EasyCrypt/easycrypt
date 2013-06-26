@@ -663,14 +663,14 @@ let t_hoare_app i phi g =
   let s1,s2 = s_split "app" i hs.hs_s in
   let a = f_hoareS_r { hs with hs_s = stmt s1; hs_po = phi }  in
   let b = f_hoareS_r { hs with hs_pr = phi; hs_s = stmt s2 } in
-  prove_goal_by [a;b] (RN_hl_append (true,Single i,phi,AppNone)) g
+  prove_goal_by [a;b] (RN_hl_append (Backs,Single i,phi,AppNone)) g
 
 let t_bdHoare_app dir i phi bd_info g =
   let concl = get_concl g in
   let bhs = destr_bdHoareS concl in
   let s1,s2 = s_split "app" i bhs.bhs_s in
   match bd_info, bhs.bhs_cmp with
-    | AppNone, FHle when dir ->
+    | AppNone, FHle when dir=Backs ->
       let a = f_hoareS bhs.bhs_m bhs.bhs_pr (stmt s1) phi in
       let b = f_bdHoareS_r { bhs with bhs_pr = phi; bhs_s = stmt s2} in
       prove_goal_by [a;b] (RN_hl_append (dir, Single i,phi,bd_info)) g
@@ -682,7 +682,7 @@ let t_bdHoare_app dir i phi bd_info g =
       let bd_g = f_real_le (f_real_sum (f_real_prod f1 f2) (f_real_prod g1 g2)) bhs.bhs_bd in
       prove_goal_by [a1;b1;a2;b2;bd_g] (RN_hl_append (dir, Single i,phi,bd_info)) g
 
-    | _, FHle when not dir -> 
+    | _, FHle when dir <>Backs -> 
       cannot_apply "app" 
         "forward direction not supported with upper bounded Hoare judgments "
       
@@ -692,7 +692,7 @@ let t_bdHoare_app dir i phi bd_info g =
 
     | AppSingle bd, FHeq | AppSingle bd, FHge ->
       let bd1,bd2,cmp1,cmp2 = 
-        if dir then f_real_div_simpl bhs.bhs_bd bd, bd, bhs.bhs_cmp, bhs.bhs_cmp
+        if dir=Backs then f_real_div_simpl bhs.bhs_bd bd, bd, bhs.bhs_cmp, bhs.bhs_cmp
         else bd, f_real_div_simpl bhs.bhs_bd bd, bhs.bhs_cmp, bhs.bhs_cmp
       in
       let a = f_bdHoareS_r { bhs with bhs_s = stmt s1; bhs_po = phi; 
@@ -703,7 +703,7 @@ let t_bdHoare_app dir i phi bd_info g =
 
     | AppNone, _ -> 
       let bd1,bd2,cmp1,cmp2 = 
-        if dir then f_r1, bhs.bhs_bd, FHeq, bhs.bhs_cmp
+        if dir=Backs then f_r1, bhs.bhs_bd, FHeq, bhs.bhs_cmp
         else bhs.bhs_bd, f_r1, bhs.bhs_cmp, FHeq
       in
       let a = f_bdHoareS_r { bhs with bhs_s = stmt s1; bhs_po = phi; 
@@ -725,7 +725,7 @@ let t_equiv_app (i,j) phi g =
   let sr1,sr2 = s_split "app" j es.es_sr in
   let a = f_equivS_r {es with es_sl=stmt sl1; es_sr=stmt sr1; es_po=phi} in
   let b = f_equivS_r {es with es_pr=phi; es_sl=stmt sl2; es_sr=stmt sr2} in
-  prove_goal_by [a;b] (RN_hl_append (true,Double (i,j), phi,AppNone)) g
+  prove_goal_by [a;b] (RN_hl_append (Backs,Double (i,j), phi,AppNone)) g
 
   
 (* -------------------------------------------------------------------- *)
@@ -851,6 +851,39 @@ let t_bdHoare_while inv vrnt info g =
       prove_goal_by [b_concl;concl] (RN_hl_while (inv,Some vrnt, info)) g
     | _ ->
       cannot_apply "while" "not implemented"
+
+let t_equiv_while_disj side vrnt inv g =
+  let env, _, concl = get_goal_e g in
+  let es = destr_equivS concl in
+  let s,m_side,m_other = if side then es.es_sl, es.es_ml, es.es_mr 
+    else es.es_sr, es.es_mr, es.es_ml in
+  let ((e,c),s) = s_last_while "while" s in
+  let e = form_of_expr (EcMemory.memory m_side) e in
+  (* the body preserve the invariant and variant decreases *)
+  let k_id = EcIdent.create "z" in
+  let k = f_local k_id tint in
+  let vrnt_eq_k = f_eq vrnt k in
+  let vrnt_lt_k = f_int_lt vrnt k in
+  let m_other' = EcIdent.create "&m",EcMemory.memtype m_other in
+  let smem = Fsubst.f_bind_mem Fsubst.f_subst_id (EcMemory.memory m_side) mhr in
+  let smem = Fsubst.f_bind_mem smem (EcMemory.memory m_other) (EcMemory.memory m_other') in
+  let b_pre  = f_and_simpl (f_and_simpl inv e) vrnt_eq_k in
+  let b_pre = Fsubst.f_subst smem b_pre in
+  let b_post = f_and_simpl inv vrnt_lt_k in
+  let b_post = Fsubst.f_subst smem b_post in
+  let b_concl = f_bdHoareS (mhr,EcMemory.memtype m_side) b_pre c b_post FHeq f_r1 in 
+  let b_concl = f_forall_simpl [(k_id,GTty tint)] b_concl in
+  let b_concl = gen_mems [m_other'] b_concl in
+      (* the wp of the while *)
+  let post = f_imps_simpl [f_not_simpl e; inv] es.es_po in
+  let term_condition = f_imps_simpl [inv;f_int_le vrnt (f_int 0)] (f_not_simpl e) in
+  let post = f_and term_condition post in
+  let modi = s_write env c in
+  let post = generalize_mod env (EcMemory.memory m_side) modi post in
+  let post = f_and_simpl inv post in
+  let concl = if side then f_equivS_r { es with es_sl = s; es_po=post}
+    else f_equivS_r { es with es_sr = s; es_po=post} in
+  prove_goal_by [b_concl;concl] (RN_hl_while (inv,Some vrnt, None)) g
 
 let t_equiv_while inv g =
   let env,_,concl = get_goal_e g in
@@ -1524,8 +1557,9 @@ let t_bdHoare_deno pre post g =
   let smem = Fsubst.f_bind_mem Fsubst.f_subst_id mhr m in
   let concl_pr  = Fsubst.f_subst smem (PVM.subst env sargs pre) in
   (* building the substitution for the post *)
-  let smem_ = Fsubst.f_bind_mem Fsubst.f_subst_id mhr mhr in 
-  let ev   = Fsubst.f_subst smem_ ev in
+  (* FIXME: *)
+  (* let smem_ = Fsubst.f_bind_mem Fsubst.f_subst_id mhr mhr in  *)
+  (* let ev   = Fsubst.f_subst smem_ ev in *)
   let me = EcEnv.Fun.actmem_post mhr f fun_ in
   let concl_po = gen_mems [me] (concl_post ev) in
   prove_goal_by [concl_e;concl_pr;concl_po] RN_hl_deno g  
@@ -1670,7 +1704,7 @@ let t_failure_event at_pos cntr delta q f_event some_p g =
         | Some m -> m 
         | None -> cannot_apply "fel" "Cannot find memory (bug?)"
       in
-      let memenv, fdef, env_ = 
+      let memenv, fdef, _env = 
         try Fun.hoareS f env
         with _ -> 
           cannot_apply "fel" "not applicable to abstract functions"
