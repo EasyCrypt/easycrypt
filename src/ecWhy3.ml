@@ -878,8 +878,8 @@ let import_w3_pr rn path (env,rb,z as envld) k pr t =
       let ax = {
         ax_tparams = Wtvm.tparams tvm; (* FIXME assert unicity of string *)
         ax_spec = spec;
-        ax_kind = if k = Decl.Plemma then assert false (*FIXME Lemma *) else Axiom;
-        ax_exsmt = true; } in
+        ax_kind = if k = Decl.Plemma then `Lemma else `Axiom;
+        ax_nosmt = false; } in
       let p = EcPath.pqname path eid in
       let env = add_w3_pr env p pr in
       let rb  = rbadd_w3_pr rb p pr in

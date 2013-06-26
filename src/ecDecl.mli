@@ -36,15 +36,13 @@ val mk_pred : EcIdent.t list -> ty list -> form option -> operator
 val op_dump : operator -> dnode
 
 (* -------------------------------------------------------------------- *)
-type axiom_kind = 
-  | Axiom 
-  | Lemma of EcBaseLogic.judgment option (* None means cloned lemma *)
+type axiom_kind = [`Axiom | `Lemma]
 
 type axiom = {
   ax_tparams : EcIdent.t list;
   ax_spec    : EcFol.form option;
   ax_kind    : axiom_kind;
-  ax_exsmt   : bool;
+  ax_nosmt   : bool;
 }
 
 val ax_dump : axiom -> dnode

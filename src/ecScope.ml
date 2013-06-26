@@ -170,35 +170,113 @@ end
 (* -------------------------------------------------------------------- *)
 type proof_uc = {
   puc_name   : string;
-  puc_exsmt  : bool;
   puc_jdg    : proof_state;
+  puc_flags  : pucflags
 }
 
 and proof_state =
 | PSCheck   of (EcLogic.judgment_uc * int list)
 | PSNoCheck of (EcIdent.t list * EcFol.form)
 
+and pucflags = {
+  puc_nosmt : bool;
+  puc_local : bool;
+}
+
 (* -------------------------------------------------------------------- *)
 module CoreSection : sig
+  type locals
+
+  val env_of_locals   : locals -> EcEnv.env
+  val items_of_locals : locals -> EcTheory.ctheory_item list
+
+  val is_local : [`Lemma | `Module] -> path -> locals -> bool
+
   type t
 
   exception NoSectionOpened
 
   val initial : t
 
-  val enter : t -> t
-  val exit  : t -> t
-end = struct
-  type t = int
+  val in_section : t -> bool
 
+  val enter : EcEnv.env -> t -> t
+  val exit  : t -> locals * t
+
+  val path  : t -> path
+  val opath : t -> path option
+
+  val addlocal : [`Lemma | `Module] -> path -> t -> t
+  val additem  : EcTheory.ctheory_item -> t -> t
+end = struct
   exception NoSectionOpened
 
-  let initial : t = 0
+  type locals = {
+    lc_env     : EcEnv.env;
+    lc_lemmas  : Sp.t;
+    lc_modules : Sp.t;
+    lc_items   : EcTheory.ctheory_item list;
+  }
 
-  let enter (x : t) : t = (x+1)
+  let env_of_locals (lc : locals) = lc.lc_env
 
-  let exit (x : t) : t =
-    if x <= 0 then raise NoSectionOpened else (x-1)
+  let items_of_locals (lc : locals) = lc.lc_items
+
+  let is_local who p (lc : locals) =
+    let set =
+      match who with
+      | `Lemma  -> lc.lc_lemmas
+      | `Module -> lc.lc_modules
+    in
+      Sp.mem p set
+
+  let elocals (env : EcEnv.env) : locals =
+    { lc_env     = env;
+      lc_lemmas  = Sp.empty;
+      lc_modules = Sp.empty;
+      lc_items   = []; }
+
+  type t = locals list
+
+  let initial : t = []
+
+  let in_section (cs : t) =
+    match cs with [] -> false | _ -> true
+
+  let enter (env : EcEnv.env) (cs : t) : t =
+    match List.ohead cs with
+    | None   -> [elocals env]
+    | Some x -> {x with lc_env = env; lc_items = []; } :: cs
+
+  let exit (cs : t) =
+    match cs with
+    | [] -> raise NoSectionOpened
+    | ec :: cs -> ({ ec with lc_items = List.rev ec.lc_items }, cs)
+
+  let path (cs : t) : path =
+    match cs with
+    | [] -> raise NoSectionOpened
+    | ec :: _ -> EcEnv.root ec.lc_env
+
+  let opath (cs : t) =
+    try Some (path cs) with NoSectionOpened -> None
+
+  let onactive (f : locals -> locals) (cs : t) =
+    match cs with
+    | []      -> raise NoSectionOpened
+    | c :: cs -> (f c) :: cs
+
+  let addlocal who (p : path) (cs : t) : t =
+    let doit ec =
+      match who with
+      | `Lemma  -> { ec with lc_lemmas  = Sp.add p ec.lc_lemmas  }
+      | `Module -> { ec with lc_modules = Sp.add p ec.lc_modules }
+    in
+      onactive doit cs
+
+  let additem item (cs : t) : t =
+    let doit ec = { ec with lc_items = item :: ec.lc_items } in
+      onactive doit cs
 end
 
 (* -------------------------------------------------------------------- *)
@@ -290,6 +368,18 @@ let subscope (scope : scope) (name : symbol) =
     sc_options    = Options.for_subscope scope.sc_options;
     sc_section    = scope.sc_section;
   }
+
+(* -------------------------------------------------------------------- *)
+let maybe_add_to_section scope item =
+  match CoreSection.opath scope.sc_section with
+  | None    -> scope
+  | Some sp -> begin
+      match EcPath.p_equal sp (EcEnv.root scope.sc_env) with
+      | false -> scope
+      | true  ->
+        let ec = CoreSection.additem item scope.sc_section in
+          { scope with sc_section = ec }
+  end
 
 (* -------------------------------------------------------------------- *)
 module Prover = struct
@@ -450,8 +540,9 @@ module Op = struct
 
   let bind (scope : scope) ((x, op) : _ * operator) =
     assert (scope.sc_pr_uc = None);
-    { scope with
-        sc_env = EcEnv.Op.bind x op scope.sc_env; }
+    let scope = { scope with sc_env = EcEnv.Op.bind x op scope.sc_env } in
+    let scope = maybe_add_to_section scope (EcTheory.CTh_operator (x, op)) in
+      scope
 
   let add (scope : scope) (op : poperator located) =
     assert (scope.sc_pr_uc = None);
@@ -532,8 +623,9 @@ module Ty = struct
 
   let bind (scope : scope) ((x, tydecl) : (_ * tydecl)) =
     assert (scope.sc_pr_uc = None);
-    { scope with
-        sc_env = EcEnv.Ty.bind x tydecl scope.sc_env; }
+    let scope = { scope with sc_env = EcEnv.Ty.bind x tydecl scope.sc_env; } in
+    let scope = maybe_add_to_section scope (EcTheory.CTh_type (x, tydecl)) in
+      scope
 
   let add (scope : scope) info =
     assert (scope.sc_pr_uc = None);
@@ -561,8 +653,12 @@ end
 module Mod = struct
   let bind (scope : scope) (m : module_expr) =
     assert (scope.sc_pr_uc = None);
-    { scope with
-        sc_env = EcEnv.Mod.bind m.me_name m scope.sc_env; }
+    let scope =
+      { scope with
+          sc_env = EcEnv.Mod.bind m.me_name m scope.sc_env; }
+    in
+    let scope = maybe_add_to_section scope (EcTheory.CTh_module m) in
+      scope
 
   let add (scope : scope) (name : symbol) m =
     assert (scope.sc_pr_uc = None);
@@ -574,8 +670,12 @@ end
 module ModType = struct
   let bind (scope : scope) ((x, tysig) : _ * module_sig) =
     assert (scope.sc_pr_uc = None);
-    { scope with
-        sc_env = EcEnv.ModTy.bind x tysig scope.sc_env; }
+    let scope = 
+      { scope with
+          sc_env = EcEnv.ModTy.bind x tysig scope.sc_env; }
+    in
+    let scope = maybe_add_to_section scope (EcTheory.CTh_modtype (x, tysig)) in
+      scope
 
   let add (scope : scope) (name : symbol) (i : pmodule_sig) =
     assert (scope.sc_pr_uc = None);
@@ -592,8 +692,12 @@ module Theory = struct
   (* ------------------------------------------------------------------ *)
   let bind (scope : scope) ((x, cth) : _ * EcEnv.ctheory_w3) =
     assert (scope.sc_pr_uc = None);
-    { scope with
-        sc_env = EcEnv.Theory.bind x cth scope.sc_env; }
+    let scope =
+      { scope with
+          sc_env = EcEnv.Theory.bind x cth scope.sc_env; }
+    in
+      maybe_add_to_section scope
+        (EcTheory.CTh_theory (x, EcEnv.ctheory_of_ctheory_w3 cth))
 
   (* ------------------------------------------------------------------ *)
   let required (scope : scope) (name : symbol) =
@@ -625,10 +729,18 @@ module Theory = struct
     match scope.sc_top with
     | None     -> raise TopScope
     | Some sup ->
-        let cth    = EcEnv.Theory.close scope.sc_env in
-        let loaded = scope.sc_loaded in
+        begin
+          match CoreSection.opath scope.sc_section with
+          | None -> ()
+          | Some sp ->
+              if p_equal sp (EcEnv.root scope.sc_env) then
+                hierror "cannot close a theory with active sessions";
+        end;
+        let cth      = EcEnv.Theory.close scope.sc_env in
+        let loaded   = scope.sc_loaded in
+        let section  = scope.sc_section in
         let required = scope.sc_required in
-        let sup = { sup with sc_loaded = loaded } in
+        let sup = { sup with sc_loaded = loaded; sc_section = section; } in
           ((cth, required), scope.sc_name, sup)
 
   (* ------------------------------------------------------------------ *)
@@ -650,7 +762,7 @@ module Theory = struct
     assert (scope.sc_pr_uc = None);
     let path = fst (EcEnv.Theory.lookup name scope.sc_env) in
     { scope with
-      sc_env = EcEnv.Theory.export path scope.sc_env }
+        sc_env = EcEnv.Theory.export path scope.sc_env }
 
   (* ------------------------------------------------------------------ *)
   let check_end_required scope thname =
@@ -695,6 +807,9 @@ module Theory = struct
   let clone (scope : scope) (thcl : theory_cloning) =
     assert (scope.sc_pr_uc = None);
 
+    if CoreSection.in_section scope.sc_section then
+      hierror "cannot clone a theory while a section is active";
+
     let (name, nth) = EcThCloning.clone scope.sc_env thcl in
     let scope = { scope with sc_env = EcEnv.Theory.bind name nth scope.sc_env; } in
       (name, scope)
@@ -702,6 +817,9 @@ module Theory = struct
   (* ------------------------------------------------------------------ *)
   let import_w3 scope dir file renaming =
     assert (scope.sc_pr_uc = None);
+
+    if CoreSection.in_section scope.sc_section then
+      hierror "cannot import a Why3 theory while a section is active";
 
     let mk_renaming (l,k,s) =
       let k =
@@ -729,12 +847,22 @@ module Ax = struct
   type mode = [`WeakCheck | `Check]
 
   (* ------------------------------------------------------------------ *)
-  let bind (scope : scope) ((x, ax) : _ * axiom) =
+  let bind (scope : scope) local ((x, ax) : _ * axiom) =
     assert (scope.sc_pr_uc = None);
-    { scope with sc_env = EcEnv.Ax.bind x ax scope.sc_env; }
+    let scope = { scope with sc_env = EcEnv.Ax.bind x ax scope.sc_env; } in
+    let scope = maybe_add_to_section scope (EcTheory.CTh_axiom (x, ax)) in
+    let scope =
+      match local with
+      | false -> scope
+      | true  ->
+        let axpath = EcPath.pqname (path scope) x in
+        let ec = CoreSection.addlocal `Lemma axpath scope.sc_section in
+          { scope with sc_section = ec }
+    in
+      scope
 
   (* ------------------------------------------------------------------ *)
-  let start_lemma scope ~exsmt check name tparams concl =
+  let start_lemma scope axflags check name tparams concl =
     let puc =
       match check with
       | false -> PSNoCheck (tparams, concl)
@@ -742,7 +870,7 @@ module Ax = struct
           let hyps = EcEnv.LDecl.init scope.sc_env tparams in
             PSCheck (EcLogic.open_juc (hyps, concl), [0])
     in 
-    let puc = { puc_name = name; puc_jdg = puc; puc_exsmt = exsmt; } in
+    let puc = { puc_name = name; puc_jdg = puc; puc_flags = axflags; } in
       { scope with sc_pr_uc = Some (None, puc) }
 
   (* ------------------------------------------------------------------ *)
@@ -750,26 +878,27 @@ module Ax = struct
     check_state `InProof "save" scope;
 
     let (_, puc) = oget scope.sc_pr_uc in
-    let (tparams, concl, proof) =
+    let (tparams, concl, kind) =
       match puc.puc_jdg with
       | PSCheck (juc, _) ->
-          let proof = EcLogic.close_juc juc in
+          ignore (EcLogic.close_juc juc);
           let hyps, concl = (EcLogic.get_pj (juc, 0)).EcLogic.pj_decl in
           let hyps = EcEnv.LDecl.tohyps hyps in
           let tparams = hyps.EcBaseLogic.h_tvar in
             assert (hyps.EcBaseLogic.h_local = []);
-            (tparams, concl, Lemma (Some proof))
+            (tparams, concl, `Lemma)
 
       | PSNoCheck (tparams, concl) ->
-          (tparams, concl, Axiom)
+          (tparams, concl, `Axiom)
     in
     let axd = { ax_tparams = tparams;
                 ax_spec    = Some concl;
-                ax_kind    = proof;
-                ax_exsmt   = puc.puc_exsmt; }
+                ax_kind    = kind;
+                ax_nosmt   = puc.puc_flags.puc_nosmt; }
     in
     let scope = { scope with sc_pr_uc = None } in
-      (Some puc.puc_name, bind scope (puc.puc_name, axd))
+    let scope = bind scope puc.puc_flags.puc_local (puc.puc_name, axd) in
+      (Some puc.puc_name, scope)
 
   (* ------------------------------------------------------------------ *)
   let add (scope : scope) mode (ax : paxiom located) =
@@ -777,6 +906,9 @@ module Ax = struct
 
     let loc = ax.pl_loc and ax = ax.pl_desc in
     let ue  = TT.ue_for_decl scope.sc_env (loc, ax.pa_tyvars) in
+
+    if ax.pa_local && not (CoreSection.in_section scope.sc_section) then
+      hierror "cannot declare a local lemma outside of a section";
 
     let (pconcl, tintro) =
       match ax.pa_vars with
@@ -792,19 +924,20 @@ module Ax = struct
         tintro in
     let tintro = mk_loc loc (Plogic (Pintro tintro)) in
 
-    let concl   = TT.trans_prop scope.sc_env ue pconcl in
-    let concl   = EcFol.Fsubst.uni (EcUnify.UniEnv.close ue) concl in
-    let tparams = EcUnify.UniEnv.tparams ue in
-    let check   = Check_mode.check scope.sc_options in
+    let concl    = TT.trans_prop scope.sc_env ue pconcl in
+    let concl    = EcFol.Fsubst.uni (EcUnify.UniEnv.close ue) concl in
+    let tparams  = EcUnify.UniEnv.tparams ue in
+    let check    = Check_mode.check scope.sc_options in
+    let pucflags = { puc_nosmt = ax.pa_nosmt; puc_local = ax.pa_local; } in
 
     match ax.pa_kind with
     | PILemma ->
-        let scope = start_lemma scope ~exsmt:ax.pa_exsmt check (unloc ax.pa_name) tparams concl in
+        let scope = start_lemma scope pucflags check (unloc ax.pa_name) tparams concl in
         let scope = Tactics.process_core false `Check scope [tintro] in
           None, scope
 
     | PLemma tc ->
-        let scope = start_lemma scope ~exsmt:ax.pa_exsmt check (unloc ax.pa_name) tparams concl in
+        let scope = start_lemma scope pucflags check (unloc ax.pa_name) tparams concl in
         let scope = Tactics.process_core false `Check scope [tintro] in
         let scope = Tactics.proof scope mode (if tc = None then true else false) in
 
@@ -824,21 +957,62 @@ module Ax = struct
     | PAxiom ->
         let axd = { ax_tparams = tparams;
                     ax_spec    = Some concl;
-                    ax_kind    = Axiom;
-                    ax_exsmt   = ax.pa_exsmt; }
+                    ax_kind    = `Axiom;
+                    ax_nosmt   = ax.pa_nosmt; }
         in
-          Some (unloc ax.pa_name), bind scope (unloc ax.pa_name, axd)
+          Some (unloc ax.pa_name),
+          bind scope pucflags.puc_local (unloc ax.pa_name, axd)
 end
 
 (* -------------------------------------------------------------------- *)
 module Section = struct
+  module T = EcTheory
+
   let enter (scope : scope) =
     assert (scope.sc_pr_uc = None);
-    { scope with sc_section = CoreSection.enter scope.sc_section }
+    { scope with
+        sc_section = CoreSection.enter scope.sc_env scope.sc_section }
 
   let exit (scope : scope) =
-    try
-      { scope with sc_section = CoreSection.exit scope.sc_section }
-    with CoreSection.NoSectionOpened ->
-      hierror "no section to close"
+    match CoreSection.opath scope.sc_section with
+    | None -> hierror "no section to close"
+    | Some sp ->
+        if not (p_equal sp (EcEnv.root (scope.sc_env))) then
+          hierror "cannot close a section containing pending theories";
+        let (locals, osc) = CoreSection.exit scope.sc_section in
+        let oenv   = CoreSection.env_of_locals locals in
+        let oitems = CoreSection.items_of_locals locals in
+        let scope  = { scope with sc_env = oenv; sc_section = osc; } in
+
+        let rec bind1 scope item =
+          match item with
+          | T.CTh_type     (x, ty) -> Ty.bind scope (x, ty)
+          | T.CTh_operator (x, op) -> Op.bind scope (x, op)
+          | T.CTh_modtype  (x, mt) -> ModType.bind scope (x, mt)
+
+          | T.CTh_module me ->
+            let mep = EcPath.pqname (path scope) me.me_name in
+              if not (CoreSection.is_local `Module mep locals) then
+                Mod.bind scope me
+              else
+                scope
+
+          | T.CTh_axiom (x, ax) ->
+            let axp = EcPath.pqname (path scope) x in
+              if not (CoreSection.is_local `Lemma axp locals) then
+                Ax.bind scope false (x, ax)
+              else
+                scope
+
+          | T.CTh_export p ->
+              { scope with sc_env = EcEnv.Theory.export p scope.sc_env }
+
+          | T.CTh_theory (x, th) ->
+              let scope = Theory.enter scope x in
+              let scope = List.fold_left bind1 scope th.EcTheory.cth_struct in
+              let _, scope = Theory.exit scope in
+                scope
+        in
+
+        List.fold_left bind1 scope oitems
 end

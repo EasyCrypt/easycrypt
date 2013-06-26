@@ -71,13 +71,13 @@
   let pflist loc ti (es : pformula    list) : pformula    = 
     List.fold_right (fun e1 e2 -> pf_cons loc ti e1 e2) es (pf_nil loc ti)
 
-  let mk_axiom ?(local = false) ?(exsmt = true) (x, ty, vd, f) k = 
+  let mk_axiom ?(local = false) ?(nosmt = false) (x, ty, vd, f) k = 
     { pa_name    = x;
-      pa_exsmt   = exsmt;
       pa_tyvars  = ty;
       pa_vars    = vd;
       pa_formula = f; 
       pa_kind    = k;
+      pa_nosmt   = nosmt;
       pa_local   = local; }
 
   let str_and b = if b then "&&" else "/\\"
@@ -1246,8 +1246,8 @@ lemma_decl :
 ;
 
 nosmt:
-| NOSMT { false }
-| empty { true  }
+| NOSMT { true  }
+| empty { false }
 ;
 
 local:
@@ -1257,16 +1257,16 @@ local:
 
 axiom:
 | l=local AXIOM o=nosmt d=lemma_decl 
-    { mk_axiom ~local:l ~exsmt:o d PAxiom }
+    { mk_axiom ~local:l ~nosmt:o d PAxiom }
 
 | l=local LEMMA o=nosmt d=lemma_decl
-    { mk_axiom ~local:l ~exsmt:o d PILemma }
+    { mk_axiom ~local:l ~nosmt:o d PILemma }
 
 | l=local LEMMA o=nosmt d=lemma_decl BY t=tactic
-    { mk_axiom ~local:l ~exsmt:o d (PLemma (Some t)) }
+    { mk_axiom ~local:l ~nosmt:o d (PLemma (Some t)) }
 
 | l=local LEMMA o=nosmt d=lemma_decl BY LBRACKET RBRACKET
-    { mk_axiom ~local:l ~exsmt:o d (PLemma None) }
+    { mk_axiom ~local:l ~nosmt:o d (PLemma None) }
 
 | l=local EQUIV x=ident pd=pgtybindings? COLON p=loc(equiv_body(none))
     { mk_axiom ~local:l (x, None, pd, p) PILemma }
