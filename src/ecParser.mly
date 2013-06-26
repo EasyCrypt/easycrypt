@@ -1489,9 +1489,9 @@ call_info:
  | bad=form COMMA p=form COMMA q=form    { CI_upto (bad,p,Some q) }
 
 tac_dir: 
-| BACKS {  true }
-| FWDS  { false }
-| empty {  true }
+| BACKS { Backs }
+| FWDS  { Fwds }
+| empty { Backs }
 ;
 
 codepos:
@@ -1665,8 +1665,8 @@ phltactic:
 | SKIP
     { Pskip }
 
-| WHILE info=while_tac_info
-    { Pwhile info }
+| WHILE s=side? info=while_tac_info
+    { Pwhile (s,info) }
 
 | CALL s=side? info=fpattern(call_info) 
     { Pcall (s, info) }
