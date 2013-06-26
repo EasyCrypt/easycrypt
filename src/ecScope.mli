@@ -55,7 +55,7 @@ module Ty : sig
 end
 
 module Mod : sig
-  val add : scope -> pmodule -> scope
+  val add : scope -> symbol -> pmodule_expr -> scope
 end
 
 module ModType : sig
@@ -97,6 +97,11 @@ module Theory : sig
 
   (* FIXME: DOC *)
   val import_w3 : scope -> string list -> string -> w3_renaming list -> scope
+end
+
+module Section : sig
+  val enter : scope -> scope
+  val exit  : scope -> scope
 end
 
 module Tactics : sig
