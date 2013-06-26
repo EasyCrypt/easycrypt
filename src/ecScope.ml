@@ -185,6 +185,8 @@ and pucflags = {
 
 (* -------------------------------------------------------------------- *)
 module CoreSection : sig
+  open EcFol
+
   type locals
 
   val env_of_locals   : locals -> EcEnv.env
@@ -192,6 +194,11 @@ module CoreSection : sig
 
   val is_local : [`Lemma | `Module] -> path -> locals -> bool
   val is_mp_local : mpath -> locals -> bool
+
+  val use_local_instr  : instr -> locals -> bool
+  val use_local_stmt   : stmt  -> locals -> bool
+  val use_local_form   : form  -> locals -> bool
+  val use_local_module : module_expr -> locals -> bool
 
   type t
 
@@ -241,6 +248,206 @@ end = struct
       | `Concrete (p, _) -> is_local `Module p lc
     in
       toplocal || (List.exists (is_mp_local^~ lc) mp.m_args)
+
+  let is_mp_set_local mp (lc : locals) =
+    Sm.exists (is_mp_local^~ lc) mp
+
+  let rec use_local_ty (ty : ty) (lc : locals) =
+    match ty.ty_node with
+    | Tunivar _        -> false
+    | Tvar    _        -> false
+    | Tglob mp         -> is_mp_local mp lc
+    | Ttuple tys       -> List.exists (use_local_ty^~ lc) tys
+    | Tconstr (_, tys) -> List.exists (use_local_ty^~ lc) tys
+    | Tfun (ty1, ty2)  -> List.exists (use_local_ty^~ lc) [ty1; ty2]
+
+  let use_local_pv (pv : prog_var) (lc : locals) =
+    is_mp_local pv.pv_name.x_top lc
+
+  let use_local_lp (lp : lpattern) (lc : locals) =
+    match lp with
+    | LSymbol (_, ty) -> use_local_ty ty lc
+    | LTuple  xs      -> List.exists (fun (_, ty) -> use_local_ty ty lc) xs
+
+  let rec use_local_expr (e : expr) (lc : locals) =
+    let uselc = use_local_expr^~ lc in
+
+    let fornode () =
+      match e.e_node with
+      | Eint   _            -> false
+      | Elocal _            -> false
+      | Evar   _            -> false
+      | Elam   (xs, e)      -> List.exists (fun (_, ty) -> use_local_ty ty lc) xs || uselc e
+      | Eop    (_, tys)     -> List.exists (use_local_ty^~ lc) tys
+      | Eapp   (e, es)      -> List.exists uselc (e :: es)
+      | Elet   (lp, e1, e2) -> use_local_lp lp lc || List.exists uselc [e1; e2]
+      | Etuple es           -> List.exists uselc es
+      | Eif    (e1, e2, e3) -> List.exists uselc [e1; e2; e3]
+    in
+      use_local_ty e.e_ty lc || fornode ()
+
+  let use_local_lv (lv : lvalue) (lc : locals) =
+    let for1 (pv, ty) = use_local_pv pv lc && use_local_ty ty lc in
+
+      match lv with
+      | LvVar   pv  -> for1 pv
+      | LvTuple pvs -> List.exists for1 pvs
+
+      | LvMap ((_, pty), pv, e, ty) ->
+            List.exists (use_local_ty^~ lc) pty
+         || use_local_ty    ty lc
+         || use_local_pv    pv lc
+         || use_local_expr   e lc
+
+  let rec use_local_instr (i : instr) (lc : locals) =
+    match i.i_node with
+    | Sasgn   _ -> false
+    | Srnd    _ -> false
+    | Sassert _ -> false
+
+    | Scall (_, f, _) -> is_mp_local f.x_top lc
+    | Sif (_, s1, s2) -> List.exists (use_local_stmt^~ lc) [s1; s2]
+    | Swhile (_, s)   -> use_local_stmt s lc
+
+  and use_local_stmt (s : stmt) (lc : locals) =
+    List.exists (use_local_instr^~ lc) s.s_node
+
+  let use_local_lcmem m lc =
+       is_mp_local (EcMemory.lmt_xpath m).x_top lc
+    || Msym.exists (fun _ ty -> use_local_ty ty lc) (EcMemory.lmt_bindings m)
+
+  let use_local_memenv (m : EcMemory.memenv) (lc : locals) =
+    match snd m with
+    | None    -> false
+    | Some lm -> use_local_lcmem lm lc
+
+  let rec use_local_modty mty lc =
+       List.exists (fun (_, mty) -> use_local_modty mty lc) mty.mt_params
+    || List.exists (is_mp_local^~ lc) mty.mt_args
+
+  let use_local_binding b (lc : locals) =
+    match b with
+    | EcFol.GTty    ty        -> use_local_ty ty lc
+    | EcFol.GTmodty (mty, sm) -> use_local_modty mty lc || is_mp_set_local sm lc
+    | EcFol.GTmem   None      -> false
+    | EcFol.GTmem   (Some m)  -> use_local_lcmem m lc
+
+  let use_local_bindings b lc =
+    List.exists (fun (_, b) -> use_local_binding b lc) b
+
+  let rec use_local_form (f : EcFol.form) (lc : locals) =
+    let uselc = use_local_form^~ lc in
+
+    let rec fornode () =
+      match f.EcFol.f_node with
+      | EcFol.Fint      _            -> false
+      | EcFol.Flocal    _            -> false
+      | EcFol.Fquant    (_, b, f)    -> use_local_bindings b lc || uselc f
+      | EcFol.Fif       (f1, f2, f3) -> List.exists uselc [f1; f2; f3]
+      | EcFol.Flet      (_, f1, f2)  -> List.exists uselc [f1; f2]
+      | EcFol.Fop       (_, ty)      -> List.exists (use_local_ty^~ lc) ty
+      | EcFol.Fapp      (f, fs)      -> List.exists uselc (f :: fs)
+      | EcFol.Ftuple    fs           -> List.exists uselc fs
+      | EcFol.Fpvar     (pv, _)      -> use_local_pv  pv  lc
+      | EcFol.Fglob     (mp, _)      -> is_mp_local   mp  lc
+      | EcFol.FhoareF   hf           -> use_local_hf  hf  lc
+      | EcFol.FhoareS   hs           -> use_local_hs  hs  lc
+      | EcFol.FequivF   ef           -> use_local_ef  ef  lc
+      | EcFol.FequivS   es           -> use_local_es  es  lc
+      | EcFol.FbdHoareS bhs          -> use_local_bhs bhs lc
+      | EcFol.FbdHoareF bhf          -> use_local_bhf bhf lc
+      | EcFol.Fpr       pr           -> use_local_pr  pr  lc
+
+    and use_local_hf hf lc =
+         use_local_form hf.EcFol.hf_pr lc
+      || use_local_form hf.EcFol.hf_po lc
+      || is_mp_local hf.EcFol.hf_f.x_top lc
+
+    and use_local_hs hs lc =
+         use_local_form hs.EcFol.hs_pr lc
+      || use_local_form hs.EcFol.hs_po lc
+      || use_local_stmt hs.EcFol.hs_s lc
+      || use_local_memenv hs.EcFol.hs_m lc
+
+    and use_local_ef ef lc =
+         use_local_form ef.EcFol.ef_pr lc
+      || use_local_form ef.EcFol.ef_po lc
+      || is_mp_local ef.EcFol.ef_fl.x_top lc
+      || is_mp_local ef.EcFol.ef_fr.x_top lc
+
+    and use_local_es es lc =
+         use_local_form es.EcFol.es_pr lc
+      || use_local_form es.EcFol.es_po lc
+      || use_local_stmt es.EcFol.es_sl lc
+      || use_local_stmt es.EcFol.es_sr lc
+      || use_local_memenv es.EcFol.es_ml lc
+      || use_local_memenv es.EcFol.es_mr lc
+
+    and use_local_bhf bhf lc =
+         use_local_form bhf.EcFol.bhf_pr lc
+      || use_local_form bhf.EcFol.bhf_po lc
+      || use_local_form bhf.EcFol.bhf_bd lc
+      || is_mp_local bhf.EcFol.bhf_f.x_top lc
+
+    and use_local_bhs bhs lc =
+         use_local_form bhs.EcFol.bhs_pr lc
+      || use_local_form bhs.EcFol.bhs_po lc
+      || use_local_form bhs.EcFol.bhs_bd lc
+      || use_local_stmt bhs.EcFol.bhs_s lc
+      || use_local_memenv bhs.EcFol.bhs_m lc
+
+    and use_local_pr (_, xp, fs, f) lc =
+         is_mp_local xp.x_top lc
+      || List.exists (use_local_form^~ lc) (f :: fs)
+
+    in
+      use_local_ty f.EcFol.f_ty lc || fornode ()
+
+  let rec use_local_module (me : module_expr) (lc : locals) =
+    match me.me_body with
+    | ME_Alias     mp   -> is_mp_local       mp lc
+    | ME_Structure st   -> use_local_mstruct st lc
+    | ME_Decl (mty, sm) -> use_local_mdecl (mty, sm) lc
+
+  and use_local_mdecl dc lc =
+       use_local_modty (fst dc) lc
+    || Sm.exists (is_mp_local^~ lc) (snd dc)
+
+  and use_local_mstruct st lc =
+    List.exists (use_local_mstruct1^~ lc) st.ms_body
+
+  and use_local_mstruct1 item lc =
+    match item with
+    | MI_Module   me -> use_local_module me lc
+    | MI_Variable x  -> use_local_ty x.v_type lc
+    | MI_Function f  -> use_local_fun f lc
+
+  and use_local_fun fun_ lc =
+       use_local_fun_sig  fun_.f_sig lc
+    || use_local_fun_body fun_.f_def lc
+
+  and use_local_fun_sig fsig lc =
+       List.exists (fun v -> use_local_ty v.v_type lc) fsig.fs_params
+    || use_local_ty fsig.fs_ret lc
+
+  and use_local_fun_body fbody lc =
+    match fbody with
+    | FBdef fdef -> use_local_fun_def fdef lc
+    | FBabs oi   -> use_local_fun_oi  oi   lc
+
+  and use_local_fun_def fdef lc =
+       List.exists (fun v -> use_local_ty v.v_type lc) fdef.f_locals
+    || use_local_stmt fdef.f_body lc
+    || odfl false (omap fdef.f_ret (use_local_expr^~ lc))
+    || use_local_uses fdef.f_uses lc
+
+  and use_local_uses uses lc =
+       List.exists (fun x -> is_mp_local x.x_top lc) uses.us_calls
+    || Sx.exists (fun x -> is_mp_local x.x_top lc) uses.us_reads
+    || Sx.exists (fun x -> is_mp_local x.x_top lc) uses.us_writes
+
+  and use_local_fun_oi oi lc =
+    List.exists (fun x -> is_mp_local x.x_top lc) oi.oi_calls
 
   let elocals (env : EcEnv.env) : locals =
     { lc_env     = env;
@@ -701,12 +908,8 @@ module Mod = struct
       match CoreSection.olocals scope.sc_section with
       | None -> ()
       | Some locals ->
-          match m.me_body with
-          | ME_Structure _ -> ()
-          | ME_Decl _ -> ()
-          | ME_Alias mp ->
-              if CoreSection.is_mp_local mp locals then
-                hierror "an alias to a local module must be declared as local"
+          if CoreSection.use_local_module m locals then
+            hierror "this module use local modules and must be declared as local"
     end;
 
       bind scope ptm.ptm_local m
@@ -975,6 +1178,14 @@ module Ax = struct
     let tparams  = EcUnify.UniEnv.tparams ue in
     let check    = Check_mode.check scope.sc_options in
     let pucflags = { puc_nosmt = ax.pa_nosmt; puc_local = ax.pa_local; } in
+
+    if not ax.pa_local then begin
+      match CoreSection.olocals scope.sc_section with
+      | None -> ()
+      | Some locals ->
+          if CoreSection.use_local_form concl locals then
+            hierror "this lemma uses local modules and must be declared as local"
+    end;
 
     match ax.pa_kind with
     | PILemma ->
