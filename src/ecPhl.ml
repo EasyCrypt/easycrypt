@@ -706,11 +706,12 @@ let t_bdHoare_skip g =
   let concl = get_concl g in
   let bhs = destr_bdHoareS concl in
   if bhs.bhs_s.s_node <> [] then tacerror NoSkipStmt;
-  if (bhs.bhs_bd <> f_r1 || (bhs.bhs_cmp <> FHeq && bhs.bhs_cmp <> FHge)) then
-    cannot_apply "skip" "expected \">= 1\" as bound";
+  if (bhs.bhs_cmp <> FHeq && bhs.bhs_cmp <> FHge) then
+    cannot_apply "skip" "bound must be \">= 1\"";
+  let eq_to_one = f_eq bhs.bhs_bd f_r1 in
   let concl = f_imp bhs.bhs_pr bhs.bhs_po in
   let concl = gen_mems [bhs.bhs_m] concl in
-  prove_goal_by [concl] RN_hl_skip g
+  prove_goal_by [eq_to_one;concl] RN_hl_skip g
 
 let t_equiv_skip g =
   let concl = get_concl g in
@@ -1771,7 +1772,6 @@ let t_failure_event at_pos cntr delta q f_event some_p g =
       (* subgoal on the bounds *)
       let bound_goal = 
         let v1 = f_real_of_int (f_int_prod q (f_int_sub q (f_int 1))) in
-        (* let v2 = f_real_of_int (f_int_pow (f_int 2) (f_int_sum l (f_int 1))) in *)
         let v = f_real_prod v1 delta  in
         f_real_le v bd
       in

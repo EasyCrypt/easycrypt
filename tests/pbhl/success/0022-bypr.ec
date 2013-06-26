@@ -34,26 +34,11 @@ module Test' = {
 
 lemma test' : forall &m (a:bitstring), length a = k1+k2 => Pr[Test.test() @ &m : a=res]=1%r/(2^(k1+k2))%r.
 intros &m a length_a.
-bdhoare_deno (_ : (true) ==> (a=res)).
+bdhoare_deno (_ : (true) ==> (a=res)); [|trivial|trivial].
 fun.
-rnd (1%r/(2 ^ (k1 + k2))%r) (=a).
-skip.
-trivial.
-simplify.
-(* rewrite (Dbitstring.mu_x_def_in (k1+k2) a _). *)
-(* trivial. *)
-cut H : (mu_x (Dbitstring.dbitstring (k1+k2)) a = 1%r/(2^(k1+k2))%r).
-apply (Dbitstring.mu_x_def_in (k1+k2) a _).
-assumption.
-generalize H.
-delta mu_x.
-delta cPeq.
-simplify.
-intros H1.
-apply H1.
-trivial.
-trivial.
+rnd (1%r/(2 ^ (k1 + k2))%r) (=a);skip;smt.
 save.
+
 
 (* not required in previous case?? *)
 axiom k1_pos : 0<= k1.
@@ -62,16 +47,14 @@ axiom k2_pos : 0<= k2.
 
 lemma test'' : forall &m (a:bitstring), length a = k1+k2 => Pr[Test'.test() @ &m : a=res]=1%r/(2^(k1+k2))%r.
 intros &m a length_a.
-bdhoare_deno (_ : (true) ==> (a=res)).
+bdhoare_deno (_ : (true) ==> (a=res));[|trivial|trivial].
 fun.
 rnd (1%r/(2 ^ (k2))%r) (=sub a k1 k2).
 rnd (1%r/(2 ^ (k1))%r) (=sub a 0 k1).
 simplify.
-skip.
-(* cut pow_distr :  ((2 ^ k2)%r * (2 ^ k1)%r = (2 ^ (k2+k1))%r). *) (* BUG *)
 cut pow_distr :  ((2 ^ k2)%r * (2 ^ k1)%r = (2 ^ (k1+k2))%r).
 smt.
-rewrite pow_distr.
+rewrite <- pow_distr.
 cut test :  (forall (x:real), x<>0%r => x/x = 1%r).
 smt.
 smt.
