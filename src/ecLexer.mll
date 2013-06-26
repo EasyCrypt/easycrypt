@@ -92,6 +92,7 @@
     (* PHL: tactics *)
     "seq"         , SEQ        ;        (* KW: tactic *)
     "wp"          , WP         ;        (* KW: tactic *)
+    "eqobs_in"    , EQOBSIN    ;        (* KW: tactic *)
     "skip"        , SKIP       ;        (* KW: tactic *)
     "call"        , CALL       ;        (* KW: tactic *)
     "rcondt"      , RCONDT     ;        (* KW: tactic *)

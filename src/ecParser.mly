@@ -296,6 +296,7 @@
 %token WITH
 %token WITNESS
 %token WP
+%token EQOBSIN
 %token ZETA 
 
 %token <string> OP1 OP2 OP3 OP4
@@ -1089,20 +1090,15 @@ signature_item:
 ;
 
 ifun_decl:
-| x=lident pd=param_decl COLON ty=loc(type_exp)
-    { { pfd_name     = x   ;
-        pfd_tyargs   = pd  ;
-        pfd_tyresult = ty  ;
-        pfd_uses     = None; }
-    }
-
-| x=lident pd=param_decl COLON ty=loc(type_exp) us=brace(qident*)
-    { { pfd_name     = x      ;
-        pfd_tyargs   = pd     ;
-        pfd_tyresult = ty     ;
-        pfd_uses     = Some us; }
+| x=lident pd=param_decl COLON ty=loc(type_exp) us=brace(oracle_info)?
+    { { pfd_name     = x ;
+        pfd_tyargs   = pd;
+        pfd_tyresult = ty;
+        pfd_uses     = us; }
     }
 ;
+oracle_info:
+| i=STAR? qs=qident* { i=None, qs }
 
 ivar_decl:
 | x=lident COLON ty=loc(type_exp)
@@ -1366,9 +1362,10 @@ intro_pattern_1_name:
 ;
 
 intro_pattern_1:
-| UNDERSCORE { None }
-| s=intro_pattern_1_name {Some (s, `noRename)}
-| s=intro_pattern_1_name QUESTION {Some (s, `withRename)}
+| UNDERSCORE { `noName }
+| QUESTION { `findName }
+| s=intro_pattern_1_name {`noRename s}
+| s=intro_pattern_1_name NOT {`withRename s}
 ;
 
 intro_pattern:
@@ -1744,7 +1741,7 @@ phltactic:
 
 | FEL at_pos=NUM cntr=sform delta=sform q=sform f_event=sform some_p=sform
    {Pfel (at_pos,(cntr,delta,q,f_event,some_p))}
-
+| EQOBSIN f1=sform f2=sform f3=sform {Peqobs_in (f1,f2,f3) }
 (* basic pr based tacs *)
 | HOARE {Phoare}
 | BDHOARE {Pbdhoare}

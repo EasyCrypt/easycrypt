@@ -60,6 +60,7 @@ type tyerror =
 | InvalidModAppl       of modapp_error
 | InvalidModType       of modtyp_error
 | InvalidMem           of symbol * mem_error
+| LvTupleNotUniq
 | FunNotInModParam     of qsymbol
 | NoActiveMemory
 | PatternNotAllowed
@@ -108,12 +109,14 @@ let pp_tyerror fmt env error =
       msg "incompatible type\n";
       msg "expecting: %a" pp_type ty1;
       msg "      got: %a" pp_type ty2
-
+  | LvTupleNotUniq ->
+    msg "Cannot assign twice a variable in a left pattern"
   | UnknownVarOrOp (name, tys) -> begin
       match tys with
       | [] -> msg "unknown variable or constant: `%a'" pp_qsymbol name
       | _  -> msg "unknown operator `%a' for signature (%a)"
                 pp_qsymbol name (EcPrinting.pp_list " *@ " pp_type) tys
+      
   end
 
   | MultipleOpMatch (name, _) ->
@@ -647,7 +650,7 @@ and transmodsig_body (env : EcEnv.env) (sa : Sm.t)
         let resty = transty_for_decl env f.pfd_tyresult in
           if not (List.uniq (List.map fst f.pfd_tyargs)) then
             raise (DuplicatedArgumentsName f);
-        let calls = 
+        let uin, calls = 
           match f.pfd_uses with
           | None -> 
             let do_one mp calls = 
@@ -657,9 +660,9 @@ and transmodsig_body (env : EcEnv.env) (sa : Sm.t)
                 let fs = List.map (fun (Tys_function(fsig,_)) ->
                   EcPath.xpath_fun mp fsig.fs_name) sig_.mis_body in
                 fs@calls in
-            Sm.fold do_one sa []
-          | Some pfd_uses ->
-            List.map (fun name -> 
+            true, Sm.fold do_one sa []
+          | Some (uin, pfd_uses) ->
+            uin, List.map (fun name -> 
               let f, _ = lookup_fun env name in
               let p = f.EcPath.x_top in
               if not (Sm.mem p sa) then 
@@ -672,9 +675,7 @@ and transmodsig_body (env : EcEnv.env) (sa : Sm.t)
              fs_params = tyargs;
              fs_ret    = resty; },
            { oi_calls = calls;
-             (*oi_reads = Sx.empty;
-             oi_writes = Sx.empty; *)
-             })
+             oi_in    = uin; })
   in
 
   let items = List.map transsig1 is in
@@ -706,24 +707,6 @@ let tysig_item_kind = function
 (*  | Tys_variable _ -> `Variable *)
   | Tys_function _ -> `Function
   
-let sig_of_mt env (mt:module_type) = 
-  let sig_ = EcEnv.ModTy.by_path mt.mt_name env in
-  let subst = 
-    List.fold_left2 (fun s (x1,_) a ->
-      EcSubst.add_module s x1 a) EcSubst.empty sig_.mis_params mt.mt_args in
-  let items =
-    EcSubst.subst_modsig_body subst sig_.mis_body in
-  let params = mt.mt_params in
-  let keep = 
-    List.fold_left (fun k (x,_) ->
-      EcPath.Sm.add (EcPath.mident x) k) EcPath.Sm.empty params in
-  let keep_info f = 
-    EcPath.Sm.mem (f.EcPath.x_top) keep in
-  let do1 = function
-    | Tys_function(s,oi) ->
-      Tys_function(s,{oi_calls = List.filter keep_info oi.oi_calls }) in
-  { mis_params = params;
-    mis_body   = List.map do1 items }
 
 let rec check_sig_cnv mode (env:EcEnv.env) (sin:module_sig) (sout:module_sig) = 
   (* Check parameters for compatibility. Parameters names may be
@@ -784,8 +767,8 @@ let rec check_sig_cnv mode (env:EcEnv.env) (sin:module_sig) (sout:module_sig) =
           let icalls = norm oin in
           let ocalls = norm oout in
           match mode with
-          | `Sub ->Sx.subset icalls ocalls
-          | `Eq  -> Sx.equal icalls ocalls
+          | `Sub -> Sx.subset icalls ocalls
+          | `Eq  -> Sx.equal  icalls ocalls
         in
         if not (flcmp ()) then
           tymod_cnv_failure (E_TyModCnv_MismatchFunSig fin.fs_name);
@@ -832,12 +815,12 @@ let rec check_sig_cnv mode (env:EcEnv.env) (sin:module_sig) (sout:module_sig) =
     end
 
 and check_modtype_cnv env (tyin:module_type) (tyout:module_type) = 
-  let sin = sig_of_mt env tyin in
-  let sout = sig_of_mt env tyout in
+  let sin = EcEnv.ModTy.sig_of_mt env tyin in
+  let sout = EcEnv.ModTy.sig_of_mt env tyout in
   check_sig_cnv `Eq env sin sout
 
 let check_sig_mt_cnv env sin tyout = 
-  let sout = sig_of_mt env tyout in
+  let sout = EcEnv.ModTy.sig_of_mt env tyout in
   check_sig_cnv `Sub env sin sout
 
 (* -------------------------------------------------------------------- *)
@@ -932,7 +915,8 @@ let rec trans_msymbol (env : EcEnv.env) (msymb : pmsymbol located) =
     let body = EcSubst.subst_modsig_body subst mod_expr.me_sig.mis_body in
     let body = 
       List.map 
-        (fun (Tys_function(s,_)) -> Tys_function(s,{oi_calls = []})) body in
+        (fun (Tys_function(s,oi)) -> 
+          Tys_function(s,{oi_calls = []; oi_in = oi.oi_in})) body in
     let mp = EcPath.mpath top_path args in
     (mp, {mis_params = []; mis_body = body})
 
@@ -973,7 +957,8 @@ let rec transmod (env : EcEnv.env) (me : pmodule) =
           mis_params = [];
           mis_body   = 
             let rm_oi = function 
-              | Tys_function (fsig,_) -> Tys_function(fsig, {oi_calls = []}) in
+              | Tys_function (fsig,oi) -> 
+                Tys_function(fsig, {oi_calls = []; oi_in = oi.oi_in}) in
             let body = List.map rm_oi mef.me_sig.mis_body in
             EcSubst.subst_modsig_body subst body;
         };
@@ -1048,7 +1033,7 @@ and transstruct (env : EcEnv.env) (x : symbol) (st : pstructure) =
           let ftop = EcPath.m_functor f.EcPath.x_top in
           Sm.mem ftop mparams in
         let calls = List.filter filter (EcPath.Sx.elements all_calls) in
-        Some (Tys_function (f.f_sig, {oi_calls  = calls }))
+        Some (Tys_function (f.f_sig, {oi_calls  = calls; oi_in = true }))
     in
 
     let sigitems = List.pmap tymod1 items in
@@ -1073,7 +1058,8 @@ and transstruct (env : EcEnv.env) (x : symbol) (st : pstructure) =
       let _sig = 
         { mis_params = [];
           mis_body = List.map 
-            (fun (Tys_function(s,_)) -> Tys_function(s,{oi_calls = []}))
+            (fun (Tys_function(s,oi)) -> 
+              Tys_function(s,{oi_calls = []; oi_in = oi.oi_in}))
             tymod.mis_body } in
       check_sig_mt_cnv env0 _sig aty
   in
@@ -1407,6 +1393,8 @@ and translvalue ue (env : EcEnv.env) lvalue =
 
   | PLvTuple xs -> 
       let xs = List.map (trans_pv env) xs in
+      if not (List.uniqf (EcReduction.pv_equal_norm env) (List.map fst xs)) then
+        tyerror lvalue.pl_loc env LvTupleNotUniq;
       let ty = ttuple (List.map snd xs) in
       (LvTuple xs, ty)
 

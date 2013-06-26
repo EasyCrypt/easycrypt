@@ -810,6 +810,38 @@ and the folowing one for exact judgments (=):
 There is no appropriate rule for $(\leq)$.
 
 
+\subsection{Failure Event Lemma: the \rawec{fel} tactic}
+%
+\subsubsection{This rule is not associated to any logic but relies
+  both on Hoare Logic and probabilistic Hoare Logic}
+
+The following rule describes the application of the tactic
+$\verb+fel+\ k\ q\ c\ \delta\ F\ P$.  Assume $f$ is defined and
+$c_1,c_2$ stands for the splitting of its body at position $k$. Let
+$\left\{O_i\right\}_{i=0}^k$ stand for all oracles accessed by any
+adversary called at $c_2$. Assume that variables in $F$ can at most be
+modified by $\left\{O_i\right\}_{i=0}^k$.
+ 
+\begin{displaymath}
+\infrule{
+  \begin{array}{c}
+    \left\{
+    \begin{array}{l}
+      \bdHoareSle{O_i}{\neg F}{F}{c \delta} \\
+      \forall c_0,\ \hoareS{O_i}{P\land c=c_0}{c_0 < c} \\
+      \forall c_0 f_0,\ \hoareS{O_i}{\neg P\land F=f_0 \land c=c_0}{F=f_0 \land c=c_0} \\
+    \end{array}\right\}_{i=0}^k\\[5ex]
+    \forall m', (\varphi \Rightarrow F \land c\leq q) 
+    \qquad 
+    q \delta \leq \epsilon 
+    \qquad
+    \hoareS{c_1}{\true}{\neg F \land c=0}
+  \end{array}
+}{
+  \Prm{f}{m}{\varphi} \leq \epsilon  
+} \left[\verb+fel+\ k\ q\ c\ \delta\ F\ P\right]
+\end{displaymath}
+
 
 \section{Tacticals}
 
