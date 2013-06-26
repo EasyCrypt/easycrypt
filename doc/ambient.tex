@@ -55,25 +55,25 @@
 \newcommand{\refdef}[1]{\emph{#1}(\ref{#1})}
 
 \newcommand{\ambientDesc}{
-  \subsection{Generalities}
-    \subsubsection{judgements}\label{judgements} TODO
-    \subsubsection{variables}\label{variables} TODO
-    \subsubsection{context}\label{context} TODO
-    \subsubsection{scope}\label{scope} TODO
-    \subsubsection{environment}\label{environment} TODO
-    \subsubsection{convertible}\label{convertible} This notion apply to two terms, they are convertible if they have the same normal form
-      for lambda calculus. You can see it as making a \emph{TODO:simplify} and testing equality. It is automatically computed by easycrypt when needed.
-      It will be denoted $\equiv$.
-  \subsection{Lambda calculus}
+\subsection{Generalities}
+
+The ambient logic is based on a higher-order logic. TODO
+
+\subsubsection{convertible}\label{convertible}
+
+\subsection{Lambda calculus}
     The tactics of this section correspond to lambda calculus reduction. It will find a redex, reduce it
     and do it again until there is no more redex. You can chain tactics by separating them with space and it
     will act as a new tactic that search for the redex of the two tactics and reduce them and do it again.
     \ambientLambda
-  \subsection{Logic}
+
+\subsection{Logic}
     \ambientLogic
-  \subsection{Automatic}
+
+\subsection{Automatic}
     \ambientAuto
-  \subsection{Others}
+
+\subsection{Others}
     \ambientOther
 }
 

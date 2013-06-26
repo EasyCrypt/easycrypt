@@ -108,12 +108,42 @@ For instance, Figure~\ref{fig:LJproof} gives a proof of
         (b_1 \Rightarrow b_2) \Rightarrow b_1 \Rightarrow b_2$}
 \end{figure}
 
+\bigskip
+
+The \EC proof engine helps the user building such proof. At each step
+of the proof building, the system presents to the user the set of goals
+that has to be proved. The user can then \emph{apply} a tactic to one of
+them, each tactic corresponding to a deduction rule. If the conclusion
+of the rule corresponding to the applied tactic matches the goal to witch
+it is applied, the proof engine replaces it with the set of the
+premises of the applied rule - the subgoals. This application may generate
+no, one or several subgoals depending on the rule. This process is repeated
+iteratively, up to the point where no goals remain.
+
 \section{Ambient Logic (Guillaume)}
 
-\ambientDesc%prints the description of all tactics see ambient.tex
-  %to modify them
+\begin{center}
+\begin{tabular}{l@{$\quad$}l@{$\quad$}ll}
+{\rawec{(lambda (x : t), phi1)\ phi2}} & $\rightarrow_\beta$ &
+  \multicolumn{2}{@{}l}{{\rawec{phi2} \{\rawec{x} $\leftarrow$ \rawec{phi1}\}}}\\
+{\rawec{if (true) \{ phi1 \} else \{ phi2 \}}} & $\rightarrow_\iota$ &
+  {\rawec{phi1}}\\
+{\rawec{if (false) \{ phi1 \} else \{ phi2 \}}} & $\rightarrow_\iota$ &
+  \multicolumn{2}{@{}l}{{\rawec{phi2}}}\\
+{\rawec{let (x1, ..., xn) = (phi1, ..., phin) in phi}} & $\rightarrow_\iota$ &
+  \multicolumn{2}{@{}l}{{\rawec{phi} \{ \rawec{x1, ..., xn} $\leftarrow$ \rawec{phi1, ..., phin} \}}}\\
+{\rawec{let x = phi1 in phi2}} & $\rightarrow_\zeta$ &
+  \multicolumn{2}{@{}l}{{\rawec{phi2} \{ \rawec{x} $\leftarrow$ \rawec{phi1} \}}}\\
+{\rawec{o}} & $\rightarrow_\delta^{\Env,\Gamma}$ &
+  {\rawec{e}} & if {\rawec{op o := e}} $\in \Env$\\
+{\rawec{x}} & $\rightarrow_\delta^{\Env,\Gamma}$ &
+  {\rawec{phi}} & if {\rawec{x := phi}} $\in \Gamma$\\
+\end{tabular}
+\end{center}
 
-\section{Program Logics (C\'esar)}
+\ambientDesc
+
+\section{Program Logics (César)}
 
 \subsection{Reasoning about random samplings: the \rawec{rnd} tactic}
 %
