@@ -1482,6 +1482,11 @@ conseq:
 | f1=form LONGARROW f2=form     { Some f1, Some f2 }
 ;
 
+call_info: 
+ | f1=form LONGARROW f2=form     { CI_spec (f1, f2) }
+ | f=form                        { CI_inv  f }
+ | bad=form COMMA p=form COMMA q=form?    { CI_upto (bad,p,q) }
+
 tac_dir: 
 | BACKS {  true }
 | FWDS  { false }
@@ -1662,8 +1667,8 @@ phltactic:
 | WHILE info=while_tac_info
     { Pwhile info }
 
-| CALL s=side? pre=sform post=sform
-    { Pcall (s, (pre, post)) }
+| CALL s=side? info=fpattern(call_info) 
+    { Pcall (s, info) }
 
 | RCONDT s=side? i=number
     { Prcond (s, true, i) }

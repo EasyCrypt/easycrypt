@@ -13,4 +13,4 @@ lemma foo :
   hoare [M.f : true ==> true].
 proof.
  fun.
- call true true. 
+ call ( _ : true ==> true). 

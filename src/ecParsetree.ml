@@ -302,6 +302,11 @@ and pspattern = unit
 
 type codepos = int * ((int * codepos) option)
 
+type call_info = 
+  | CI_spec of (pformula * pformula)
+  | CI_inv  of pformula
+  | CI_upto of (pformula * pformula * pformula option)
+  
 (* AppSingle are optional for bounded Phl judgments
    AppMult is required by most general rule for upper bounded Phl
    AppNone is required for the rest of judgments 
@@ -321,7 +326,7 @@ type phltactic =
   | Pfusion     of (tac_side * codepos * (int * (int * int)))
   | Punroll     of (tac_side * codepos)
   | Psplitwhile of (pexpr * tac_side * codepos )
-  | Pcall       of tac_side * (pformula * pformula)
+  | Pcall       of tac_side * call_info fpattern 
   | Prcond      of (bool option * bool * int)
   | Pcond       of tac_side
   | Pswap       of ((tac_side * swap_kind) located list)

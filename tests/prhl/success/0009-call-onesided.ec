@@ -30,7 +30,7 @@ lemma main:
 proof.
 fun;
 seq 1 0: (OneSided.x{1} = 0);[ | wp;skip;smt ].
-call {1} (true) (OneSided.x = 0);[ apply bar | intros _;skip;smt ].
+call {1} ( _ : true ==> OneSided.x = 0);[ apply bar | intros _;skip;smt ].
 save.
 
 module Framing = {
@@ -51,9 +51,9 @@ lemma frame:
   equiv [Framing.main ~ Framing.main: true ==> Framing.y{1} = Framing.y{2} /\ Framing.y{1} = 0].
 proof.
 fun.
-  call{1} (true) (true).
+  call{1} (_ : true ==> true).
     fun;wp;skip;smt.
-  intros _;call{2} (true) (true).
+  intros _;call{2} (_ : true ==> true).
     fun;wp;skip;smt.
   intros _;wp;skip;smt.
 save.
