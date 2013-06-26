@@ -1,59 +1,82 @@
+(*** Base Logic Rules *)
+(** cut *)
 lemma nosmt cut_lemma : forall (a b: bool), a => (a => b) => b by [].
 
-lemma nosmt false_elim : forall (c : bool), false => c by [].
+(** false *)
+lemma nosmt falseE : forall (c : bool), false => c by [].
 
-lemma nosmt and_elim : forall (a b c:bool), 
+(** true *)
+lemma nosmt trueI : true by [].
+
+(** case *)
+lemma nosmt bool_case_eq : forall (p:bool -> bool) (x:bool),
+   (x => p true) =>
+   (!x => p false) =>
+   p x
+by [].
+
+lemma nosmt bool_case : forall (p:bool -> bool),
+  (p true) =>
+  (p false) =>
+  (forall x, p x)
+by [].
+
+(** boolean rewriting *)
+(* the two implications will soon become obsolete as we become able to use views *)
+lemma nosmt eqT  : forall (x:bool), x => (x = true) by [].
+lemma nosmt neqF : forall (x:bool), !x => (x = false) by [].
+
+lemma nosmt rewrite_eqT : forall (x:bool), (x = true) <=> x by [].
+lemma nosmt rewrite_neqF : forall (x:bool), (x = false) <=> !x by [].
+
+lemma nosmt neq_def: forall (x:bool), (x => false) <=> !x by [].
+
+(** absurd *)
+lemma nosmt absurd : forall (a b : bool), (!a => !b) => b => a by [].
+
+(** and *)
+lemma nosmt andE : forall (a b c:bool), 
     (a /\ b) => (a => b => c) => c
 by [].
 
-lemma nosmt and_proj_l : forall (a b:bool),
+lemma nosmt andEl : forall (a b:bool),
     (a /\ b) => a
 by [].
 
-lemma nosmt and_proj_r : forall (a b:bool),
+lemma nosmt andEr : forall (a b:bool),
     (a /\ b) => b
 by [].
 
-lemma nosmt anda_elim : forall (a b c:bool),
-    (a && b) => (a => b => c) => c
-by [].
-
-lemma nosmt or_elim : forall (a b c:bool), 
-    (a \/ b) => (a => c) => (b => c) => c
-by [].
-
-lemma nosmt ora_elim : forall (a b c:bool),
-    (a || b) => (a => c) => (!a => b => c) => c
-by [].
-
-lemma nosmt iff_elim : forall (a b c:bool),
-  (a <=> b) => ((a => b) => (b => a) => c) => c
-by [].
-
-lemma nosmt if_elim : forall (a bt bf c: bool), 
-  (if a then bt else bf) =>
-  (a => bt => c) => (!a => bf => c) => c
-by [].
-
-lemma nosmt true_intro : true by [].
-
-lemma nosmt and_intro : forall (a b : bool), 
+lemma nosmt andI : forall (a b : bool), 
    a => b => (a /\ b)
 by [].
 
-lemma nosmt anda_intro : forall (a b : bool),
-   a => (a => b) => (a && b)
+lemma nosmt andA : forall (a b c : bool),
+  ((a /\ b) /\ c) = (a /\ (b /\ c))
 by [].
 
-lemma nosmt or_intro_l : forall (a b : bool),
+lemma nosmt andC : forall (a b:bool),
+  (a /\ b) = (b /\ a)
+by [].
+
+lemma nosmt andT : forall (b:bool),
+  (b /\ true) = b
+by [].
+
+lemma nosmt andF : forall (b:bool),
+  (b /\ false) = false
+by [].
+
+(** or *)
+lemma nosmt orE : forall (a b c:bool), 
+    (a \/ b) => (a => c) => (b => c) => c
+by [].
+
+lemma nosmt orIl : forall (a b : bool),
   a => a \/ b
 by [].
 
-lemma nosmt ora_intro_l : forall (a b : bool),
-  a => a || b
-by [].
-
-lemma nosmt or_intro_r : forall (a b : bool),
+lemma nosmt orIr : forall (a b : bool),
   b => a \/ b
 by [].
 
@@ -61,10 +84,19 @@ lemma nosmt orA : forall (a b c : bool),
   ((a \/ b) \/ c) = (a \/ (b \/ c))
 by [].
 
-lemma nosmt andA : forall (a b c : bool),
-  ((a /\ b) /\ c) = (a /\ (b /\ c))
+lemma nosmt orC : forall (a b : bool),
+  (a \/ b) = (b \/ a)
 by [].
 
+lemma nosmt orT : forall (b : bool),
+  (b \/ true) = true
+by [].
+
+lemma nosmt orF : forall (b : bool),
+  (b \/ false) = b
+by [].
+
+(** Distributivity and/or *)
 lemma nosmt orDand : forall (a b c : bool),
   ((a \/ b) /\ c) = ((a /\ c) \/ (b /\ c))
 by [].
@@ -73,20 +105,64 @@ lemma nosmt andDor : forall (a b c : bool),
   ((a /\ b) \/ c) = ((a \/ c) /\ (b \/ c))
 by [].
 
-lemma nosmt ora_intro_r : forall (a b : bool),
+(** anda *)
+lemma nosmt andaE : forall (a b c:bool),
+    (a && b) => (a => b => c) => c
+by [].
+
+lemma nosmt andaEl : forall (a b:bool),
+  (a && b) => a
+by [].
+
+lemma nosmt andaEr : forall (a b:bool),
+  (a && b) => (a => b)
+by [].
+
+lemma nosmt andaI : forall (a b : bool),
+   a => (a => b) => (a && b)
+by [].
+
+lemma nosmt anda_and : forall (a b:bool),
+  (a && b) <=> (a /\ b)
+by [].
+
+(** ora *)
+lemma nosmt oraE : forall (a b c:bool),
+    (a || b) => (a => c) => (!a => b => c) => c
+by [].
+
+lemma nosmt oraIl : forall (a b : bool),
+  a => a || b
+by [].
+
+lemma nosmt oraIr : forall (a b : bool),
   (!a => b) => a || b
 by [].
 
-lemma nosmt iff_intro : forall (a b : bool),
+lemma nosmt ora_or : forall (a b:bool),
+  (a || b) <=> (a \/ b)
+by [].
+
+(** iff *)
+lemma nosmt iffE : forall (a b c:bool),
+  (a <=> b) => ((a => b) => (b => a) => c) => c
+by [].
+
+lemma nosmt iffI : forall (a b : bool),
   (a => b) => (b => a) => (a <=> b)
 by [].
 
-lemma nosmt if_intro : forall (a bt bf : bool),
+(** if *)
+lemma nosmt ifE : forall (a bt bf c: bool), 
+  (if a then bt else bf) =>
+  (a => bt => c) => (!a => bf => c) => c
+by [].
+
+lemma nosmt ifI : forall (a bt bf : bool),
   (a => bt) => (!a => bf) => if a then bt else bf
 by [].
 
-lemma nosmt absurd : forall (a b : bool), (!a => !b) => b => a by [].
- 
+(** congruence and rewriting *)
 lemma nosmt rewrite_l : forall (x1 x2:'a) (p:'a -> bool),
   x1 = x2 => p x2 => p x1
 by [].
@@ -103,27 +179,21 @@ lemma nosmt rewrite_iff_r : forall (x1 x2:bool) (p:bool -> bool),
   (x1 <=> x2) => p x1 => p x2
 by [].
 
-lemma nosmt case_eq_bool : forall (P:bool -> bool, x:bool),
-   (x => P true) =>
-   (!x => P false) =>
-   P x
-by [].
-
-lemma nosmt eq_refl  : forall (x:'a), x = x by [].
-lemma nosmt eq_sym   : forall (x y : 'a), x = y => y = x by [].
-lemma nosmt eq_trans : forall (x y z : 'a), x = y => y = z => x = z by [].
-
-lemma nosmt eqT  : forall (x:bool), x => (x = true) by [].
-lemma nosmt neqF : forall (x:bool), !x => (x = false) by [].
-
-lemma nosmt eqT_iff : forall (x:bool), (x = true) <=> x by [].
-lemma nosmt neqF_iff : forall (x:bool), (x = false) <=> !x by [].
-
 lemma nosmt fcongr :
   forall (f : 'a -> 'b) (x1 x2 : 'a),
     x1 = x2 => f x1 = f x2
 by [].
 
+lemma nosmt rewrite_if: forall (f:'a -> 'b) b x1 x2,
+  f (if b then x1 else x2) = (if b then f x1 else f x2)
+by [].
+
+(** equality *)
+lemma nosmt eq_refl  : forall (x:'a), x = x by [].
+lemma nosmt eq_sym   : forall (x y : 'a), x = y => y = x by [].
+lemma nosmt eq_trans : forall (x y z : 'a), x = y => y = z => x = z by [].
+
+(** tuples *) 
 lemma nosmt tuple2_ind : 
   forall 
     (p: ('a1*'a2) -> bool) 

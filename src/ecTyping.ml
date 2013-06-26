@@ -921,16 +921,13 @@ let rec trans_msymbol (env : EcEnv.env) (msymb : pmsymbol located) =
     (mp, {mis_params = []; mis_body = body})
 
 (* -------------------------------------------------------------------- *)
-let rec transmod (env : EcEnv.env) (me : pmodule) =
-  let loc = me.pm_body.pl_loc in
-  let x   = unloc me.pm_name in
-
-  match unloc me.pm_body with
+let rec transmod (env : EcEnv.env) (x : symbol) (me : pmodule_expr) =
+  match me.pl_desc with
   | Pm_ident m -> 
-    let (mp, _sig) = trans_msymbol env { pl_desc = m; pl_loc = loc } in
+    let (mp, _sig) = trans_msymbol env {pl_desc = m; pl_loc = me.pl_loc} in
     let params = _sig.mis_params in
     if params <> [] then (* FIXME do it only for internal module *)
-      tyerror loc env (InvalidModAppl MAE_WrongArgCount);
+      tyerror me.pl_loc env (InvalidModAppl MAE_WrongArgCount);
     (* FIXME Normally this is the expected code: but 
        I think that by_mpath is buggy :
     
@@ -940,7 +937,7 @@ let rec transmod (env : EcEnv.env) (me : pmodule) =
     | `Concrete(_, Some _) 
     | _ when mp.EcPath.m_args = [] ->
       let me = EcEnv.Mod.by_mpath mp env in
-      { me with me_name = x; me_body  = ME_Alias mp; }
+      { me with me_name  = x; me_body  = ME_Alias mp; }
     | _ -> 
       let mpf = EcPath.mpath mp.EcPath.m_top [] in
       let mef = EcEnv.Mod.by_mpath mpf env in
@@ -967,8 +964,15 @@ let rec transmod (env : EcEnv.env) (me : pmodule) =
     end 
 
   | Pm_struct st ->
-      let res = transstruct env x st in
-        res
+    let res = transstruct env x st in
+(*   let sig_ = res.me_sig in
+    Format.printf "module %s : @." x;
+    List.iter (fun (Tys_function(fs,call)) ->
+      Format.printf "   fun %s { " fs.fs_name;
+      List.iter (fun x -> Format.printf "%s " (EcPath.x_tostring x))
+        call.oi_calls;
+      Format.printf "}@.") sig_.mis_body; *)
+    res
 
 (* -------------------------------------------------------------------- *)
 and transstruct (env : EcEnv.env) (x : symbol) (st : pstructure) =
@@ -1122,9 +1126,9 @@ and transstruct (env : EcEnv.env) (x : symbol) (st : pstructure) =
 (* -------------------------------------------------------------------- *)
 and transstruct1 (env : EcEnv.env) (st : pstructure_item) =
   match st with
-  | Pst_mod me ->
-    let mod_ = transmod env me in
-      [(unloc me.pm_name, MI_Module mod_)]
+  | Pst_mod ({ pl_desc = m }, me) ->
+    let me = transmod env m me in
+    [(m, MI_Module me)]
 
   | Pst_var (xs, ty) ->
       let ty = transty_for_decl env ty in
@@ -1533,11 +1537,23 @@ let trans_form_or_pattern env (ps, ue) pf tt =
           | None -> tyerror x.pl_loc env (UnknownVarOrOp (unloc x, []))
           | Some (x, ty) -> f_pvar x ty me
         in
-
-        let xs1 = List.map (lookup EcFol.mleft ) xs in
-        let xs2 = List.map (lookup EcFol.mright) xs in
-        let eqs = List.map2 (fun x1 x2 -> f_eq x1 x2) xs1 xs2 in
-
+        let check_mem loc me = 
+          match EcEnv.Memory.byid me env with
+          | None -> tyerror loc env NoActiveMemory (* FIXME error message *)
+          | Some _ -> () in
+        let do1 = function
+          | GVvar x ->
+            let x1 = lookup EcFol.mleft x in
+            let x2 = lookup EcFol.mright x in
+            f_eq x1 x2
+          | GVglob gp ->
+            let mp = trans_topmsymbol env gp in
+            check_mem gp.pl_loc EcFol.mleft;
+            check_mem gp.pl_loc EcFol.mright;
+            let x1 = f_glob mp EcFol.mleft in
+            let x2 = f_glob mp EcFol.mright in
+            f_eq x1 x2 in
+        let eqs = List.map do1 xs in
         EcFol.f_ands eqs
 
     | PFapp ({pl_desc = PFident ({ pl_desc = name; pl_loc = loc }, tvi)}, es) ->

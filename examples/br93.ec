@@ -172,28 +172,16 @@ lemma eq1 : forall (A <: Adv {M,RO,ARO}),
 proof.
  intros A HALossless1 HALossless2.
  fun.
-swap{2} -2.
- call ((!mem M.r ARO.log){2} => 
-       (={ARO.log,c} /\  eq_except RO.m{1} RO.m{2}  M.r{2} 
-                     /\ (glob A){1} = (glob A){2}))
-      ((!mem M.r ARO.log){2} => ={res}).
- fun (mem M.r ARO.log) 
-     (={ARO.log} /\ eq_except RO.m{1} RO.m{2} M.r{2});
-      [smt|smt|assumption| | |].
+ swap{2} -2.
+ call (_ : (mem M.r ARO.log), 
+           (={ARO.log} /\ eq_except RO.m{1} RO.m{2} M.r{2})).
  fun;if;[smt|inline RO.o;wp;rnd|];wp;skip;progress;smt.
  intros &m H;fun;if;[inline RO.o;wp;rnd 1%r cpTrue|];wp;skip;progress;smt.
  intros &m;fun;if;[inline RO.o;wp;rnd 1%r cpTrue|];wp;skip;progress;smt.
- call (={pk,RO.m})
-      (!in_dom M.r{2} RO.m{2} =>
-       (={res} /\ eq_except RO.m{1} RO.m{2} M.r{2})).
- apply (eq1_enc).
+ call eq1_enc.
  rnd.
- call (={p,ARO.log,RO.m} /\ (glob A){1} = (glob A){2} /\
- (forall (x : randomness), mem x ARO.log{2} <=> in_dom x RO.m{2}))
-(={res,ARO.log,RO.m} /\ (glob A){1} = (glob A){2} /\
+ call  (_: ={RO.m,ARO.log} /\
  (forall (x : randomness), mem x ARO.log{2} <=> in_dom x RO.m{2})).
- fun ( ={RO.m,ARO.log} /\
- (forall (x : randomness), mem x ARO.log{2} <=> in_dom x RO.m{2}));[smt|smt|].
   fun;if;[smt|inline RO.o;wp;rnd|];wp;skip;progress;smt.
   inline CPA(BR,A).SO.kg CPA2(BR2,A).SO.kg.
   inline CPA(BR,A).ARO.init CPA2(BR2,A).ARO.init RO.init;wp;rnd;wp;skip.
@@ -215,12 +203,10 @@ proof.
  intros &m.
  cut H1 : (bd_hoare[CPA2(BR2,A).main : true ==> res] = (1%r / 2%r)).
  fun; rnd (1%r / 2%r) (lambda b, b = b'); simplify.
- call (true) (true).
- fun (true);[smt|smt|assumption|].
+ call ( _ :true);try assumption.
  fun;if;[inline RO.o;wp;rnd 1%r (cpTrue)|];wp;skip;smt.
  inline CPA2(BR2,A).SO.enc;do 2! (wp;rnd 1%r (cpTrue));wp.
- call (true) (true).
- fun (true);[smt|smt|assumption|].
+ call (_ : true);try assumption.
  fun;if;[inline RO.o;wp;rnd 1%r (cpTrue)|];wp;skip;smt.
  inline CPA2(BR2,A).SO.kg CPA2(BR2,A).ARO.init RO.init.
  wp;rnd 1%r (cpTrue);wp;skip;progress;[smt|smt|smt|].
@@ -316,35 +302,30 @@ proof.
   in_supp (pk{2},sk{2}) keypairs /\
 (glob A){1} = (glob A){2}  /\ (forall x, in_dom x RO.m{1} = mem x ARO.log{1}) /\
  M.r{1} = x{2} /\ y0{2} = f pk{2} x{2}).
- call 
- (={c,RO.m,ARO.log} /\ (glob A){1} = (glob A){2} /\ (forall x, in_dom x RO.m{1} = mem x ARO.log{1}))
- (={RO.m,ARO.log,res} /\ (glob A){1} = (glob A){2} /\ (forall x, in_dom x RO.m{1} = mem x ARO.log{1})).
- fun (={RO.m,ARO.log} /\ (forall x, in_dom x RO.m{1} = mem x ARO.log{1}));[smt|smt|].
+
+ call (_ : ={RO.m,ARO.log} /\ (forall x, in_dom x RO.m{1} = mem x ARO.log{1})).
  fun;if;[smt|inline RO.o;wp;rnd |];wp;skip;progress;smt.
  wp;rnd;swap{1} -7;wp.
- call (={p,RO.m,ARO.log} /\ (glob A){1} = (glob A){2} /\ (forall x, in_dom x RO.m{1} = mem x ARO.log{1}))
-      (={res,RO.m,ARO.log} /\ (glob A){1} = (glob A){2}  /\ (forall x, in_dom x RO.m{1} = mem x ARO.log{1})).
- fun (={RO.m,ARO.log}  /\ (forall x, in_dom x RO.m{1} = mem x ARO.log{1}));[smt|smt|].
+ call (_: ={RO.m,ARO.log}  /\ (forall x, in_dom x RO.m{1} = mem x ARO.log{1})).
  fun;if;[smt|inline RO.o;wp;rnd |];wp;skip;progress;smt.
  do 2! (wp;rnd);skip;progress;try smt.
-wp;skip;progress.
-elim (find_in
+ wp;skip;progress.
+ elim (find_in
       (lambda (p0:randomness) (p1:to), f pk{2} p0 = f pk{2} x{2})
       RO.m{2}
       _); first exists x{2}; split;smt.
-intros x2 Hfind.
-rewrite Hfind.
-elim (find_cor
+ intros x2 Hfind.
+ rewrite Hfind.
+ elim (find_cor
       (lambda (p0:randomness) (p1:to), f pk{2} p0 = f pk{2} x{2})
       RO.m{2}
       x2 _).
-assumption.
-delta;simplify.
-intros Hin_dom Hf.
-rewrite (Option.proj_def<:from> x2).
-apply (f_iny _ _ pk{2} sk{2} _ _);smt.
+ assumption.
+ delta;simplify.
+ intros Hin_dom Hf.
+ rewrite (Option.proj_def<:from> x2).
+ apply (f_iny _ _ pk{2} sk{2} _ _);smt.
 save.
-
 
 lemma Reduction (A <: Adv {M,RO,ARO}) &m : 
 (forall (O <: ARO), islossless O.o => islossless A(O).a1) =>

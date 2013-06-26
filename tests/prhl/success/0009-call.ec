@@ -35,7 +35,7 @@ lemma foo :
         ==> res{1} = res{2} /\ M1.z{1} = M2.z{2} /\ M1.y{1} = M2.y{2}].
 proof.
   fun.
-  call (x{1}=w{2}) (res{1} = res{2} /\ M1.y{1} = M2.y{2}).
+  call (_ : x{1}=w{2} ==> res{1} = res{2} /\ M1.y{1} = M2.y{2}).
     fun;wp;skip.
     intros &m1 &m2 h;simplify;assumption.
   skip.
@@ -62,7 +62,7 @@ lemma foo1 : forall (A<:Adv {M}), hoare [M(A).g : true ==> true].
 proof.
 intros A.
 fun.
-call true true.
+call (_ : true ==> true).
 fun true;progress.
 skip;progress.
 save.

@@ -52,7 +52,7 @@ axiom mod_bound :
 axiom mul_div : forall (g1 g2:group), (g1 * g2) / g1 = g2.
 
 module type Adv = { 
-  fun a1(pk:pkey)      : plaintext * plaintext 
+  fun a1(pk:pkey)      : plaintext * plaintext {*}
   fun a2(c:ciphertext) : bool                  
 }.
 
@@ -79,13 +79,10 @@ module ValidScheme(S:Scheme) = {
 
 module CPA (S:Scheme, A:Adv) = {
   fun main() : bool = {
-    var sk : skey;
-    var pk : pkey;
-    var m0 : plaintext;
-    var m1 : plaintext;
-    var c  : ciphertext;
-    var b  : bool;
-    var b' : bool;
+    var (sk,pk) : skey * pkey;
+    var m0,m1   : plaintext;
+    var c       : ciphertext;
+    var b,b'    : bool;
 
     (sk,pk)  = S.kg();
     (m0,m1)  = A.a1(pk);
@@ -111,9 +108,7 @@ module ElGamal : Scheme = {
   }
 
   fun dec(sk:skey, c:ciphertext) : plaintext = {
-    var gxy : group;
-    var gy  : group;
-    var gxym : group;
+    var gxy,gy,gxym : group;
     (gy, gxym) = c;
     gxy        = gy ^ sk;
     return gxym / gxy;
@@ -139,7 +134,7 @@ proof.
   rewrite (mul_div (g ^ (x * y)) (m{m1}));split.
 save.
 
-(* No we try to prove IND-CPA security *)
+(* No we prove IND-CPA security *)
 
 module type Inverter = { 
   fun inv (gx:group, gy:group, gz:group) : bool
@@ -147,8 +142,7 @@ module type Inverter = {
 
 module DDH0 (I:Inverter) = { 
   fun main() : bool = {
-    var x : int;
-    var y : int;
+    var x,y : int;
     var d : bool;
 
     x  = $[0..q-1];
@@ -161,9 +155,7 @@ module DDH0 (I:Inverter) = {
 
 module DDH1(I:Inverter) = {
   fun main() : bool = {
-    var x : int;
-    var y : int;
-    var z : int;
+    var x,y,z : int;
     var d : bool;
 
     x  = $[0..q-1];
@@ -177,11 +169,9 @@ module DDH1(I:Inverter) = {
 
 module Inv (A:Adv) : Inverter = { 
   fun inv (gx:group, gy:group, gz:group) : bool = {
-    var m0 : plaintext;
-    var m1 : plaintext; 
-    var c : ciphertext;
-    var b : bool;
-    var b' : bool;
+    var m0,m1 : plaintext;
+    var c     : ciphertext;
+    var b,b'  : bool;
  
     (m0, m1)  = A.a1(gx);
     b         = ${0,1};
@@ -193,18 +183,11 @@ module Inv (A:Adv) : Inverter = {
 
 module G1(A:Adv) = { 
   fun main() : bool = {
-    var x : int;
-    var y : int;
-    var z : int;
-    var gx : group;
-    var gy : group;
-    var gz : group;
-    var d  : bool;
-    var b  : bool;
-    var b' : bool;
-    var m0 : plaintext;
-    var m1 : plaintext;
-    var c : ciphertext;
+    var x,y,z    : int;
+    var gx,gy,gz : group;
+    var d,b,b'   : bool;
+    var m0,m1    : plaintext;
+    var c        : ciphertext;
  
     x         = $[0..q-1];
     y         = $[0..q-1];
@@ -223,17 +206,10 @@ module G1(A:Adv) = {
 
 module G2(A:Adv) = {
   fun main () : bool = { 
-    var x : int;
-    var y : int;
-    var z : int;
-    var gx : group;
-    var gy : group;
-    var gz : group;
-    var d  : bool;
-    var b  : bool;
-    var b' : bool;
-    var m0 : plaintext;
-    var m1 : plaintext;
+    var x,y,z    : int;
+    var gx,gy,gz : group;
+    var d,b,b'   : bool;
+    var m0,m1    : plaintext;
     var c : ciphertext;
   
     x         = $[0..q-1];
@@ -251,19 +227,23 @@ module G2(A:Adv) = {
   }
 }.
  
+equiv equiv1_A2 (A<:Adv) : A.a2 ~ A.a2 : ={c, glob A} ==> ={res, glob A}.
+proof.
+  fun true;trivial.
+save.
+
 equiv equiv1 (A<:Adv) :  
    CPA(ElGamal,A).main ~ DDH0(Inv(A)).main : 
-      (glob A){1}=(glob A){2} ==> res{1} = res{2}.
+      true ==> res{1} = res{2}.
 proof.
  fun.
  inline ElGamal.kg ElGamal.enc Inv(A).inv.
  wp.
- call (c{1} = c{2} /\ (glob A){1} = (glob A){2}) (res{1}=res{2} /\ (glob A){1} = (glob A){2}).
- fun true;try (simplify;split).
+(* call (_: ={c, glob A} ==> ={res, glob A}). *)
+ call (equiv1_A2 A).
  swap{1} 7 -5. 
  wp;rnd.
- call (pk{1} = pk{2} /\ (glob A){1} = (glob A){2}) (res{1}=res{2} /\ (glob A){1} = (glob A){2}).
- fun true;try (simplify;split).
+ call (_ : true).
  wp; do rnd; skip. simplify; smt. 
 
 (* Just to test tactic *)
@@ -284,40 +264,33 @@ lemma Pr1 (A<:Adv) &m :
    Pr[CPA(ElGamal,A).main() @ &m : res] = 
    Pr[DDH0(Inv(A)).main() @ &m : res].
 proof.
- equiv_deno (equiv1 (A));smt.
+ equiv_deno (equiv1 (A)); by trivial.
 save.
 
 lemma Pr2 (A<:Adv) &m : 
    Pr[G1(A).main() @ &m : res] = 
    Pr[DDH1(Inv(A)).main() @ &m : res].
 proof.
- equiv_deno (_: (glob A){1}=(glob A){2} ==> res{1} = res{2});try smt.
+ equiv_deno (_: true ==> ={res});trivial.
   fun. inline{2} Inv(A).inv.
   swap{1} 7 -4;wp.
-  call (c{1} = c{2} /\ (glob A){1} = (glob A){2})
-      (res{1}=res{2} /\ (glob A){1} = (glob A){2}).
-    fun true;try (simplify;split).
+  call (equiv1_A2 A).
   wp;rnd.
-  call (pk{1} = pk{2} /\ (glob A){1} = (glob A){2}) 
-             (res{1}=res{2} /\ (glob A){1} = (glob A){2}).
-    fun true;try (simplify;split).
-  wp;do rnd;skip;smt. 
+  call (_ : true).
+  wp;do rnd;skip;by trivial. 
 save.
 
 lemma Fact3 (A<:Adv) &m : 
   Pr[G1(A).main() @ &m : res] = Pr[G2(A).main() @ &m : res].
 proof.
- equiv_deno (_: (glob A){1}=(glob A){2} ==> res{1} = res{2});try smt.
+ equiv_deno (_: true ==> ={res});try trivial.
  fun. 
  swap{2} 10 -4;wp.
- call (c{1} = c{2} /\ (glob A){1} = (glob A){2})
-      (res{1}=res{2} /\ (glob A){1} = (glob A){2}).
-    fun true;try (simplify;split).
+ call (equiv1_A2 A).
  wp; rnd (lambda (z:int), (z + log(if b then m1 else m0){2}) %% q)
      (lambda (z:int), (z - log(if b then m1 else m0){2}) %% q).
  wp;rnd;simplify.
- call (pk{1} = pk{2} /\ (glob A){1} = (glob A){2}) 
-             (res{1}=res{2} /\ (glob A){1} = (glob A){2}).
+ call ( _ : ={pk} ==> ={res,glob A}).
    fun true;try (simplify;split).
  wp;do rnd;skip; progress; smt.
 save.
@@ -325,52 +298,54 @@ save.
 require import Real.
 
 lemma Pr4_aux (A<:Adv) :
-   (bd_hoare[A.a1 : true ==> true] = 1%r) =>
-   (bd_hoare[A.a2 : true ==> true] = 1%r) =>
-   bd_hoare [G2(A).main : true ==> res] = (1%r / 2%r)
-(*   Pr[G2(A).main() @ &m : res] = 1%r / 2%r *).
+   (islossless A.a1) => (islossless A.a2) =>
+   bd_hoare [G2(A).main : true ==> res] = (1%r / 2%r).
 proof.
  intros Ha1 Ha2.
  fun.
- rnd (1%r / 2%r) (lambda (b:bool), b = b').
- simplify.
- admit.
+ rnd (1%r / 2%r) (= b').
+ conseq  (_ : ==> true) .
+ intros &m;progress.
+ apply (Dbool.mu_x_def (b'{m})).
+ call ( _ : true ==> true);try assumption.
+ cut H1 : mu [0..Int.(-) q 1] Fun.cpTrue = 1%r by smt.
+ wp; rnd (1%r) Fun.cpTrue.
+ conseq (_ : _ ==> true);[assumption | ].
+ call (_ : true ==> true);[assumption | ].
+ wp; rnd (1%r) Fun.cpTrue.
+ conseq (_ : _ ==> true);[trivial | ].
+ rnd (1%r) Fun.cpTrue.
+ conseq (_ : _ ==> true);[trivial | ].
+ skip;trivial.
 save.
 
 lemma Pr4 (A<:Adv) &m : 
-   (bd_hoare[A.a1 : true ==> true] = 1%r) =>
-   (bd_hoare[A.a2 : true ==> true] = 1%r) =>
+   (islossless A.a1) => (islossless A.a2) =>
    Pr[G2(A).main() @ &m : res] = 1%r / 2%r.
 proof.
  intros Ha1 Ha2.
- bdhoare_deno (_: true ==> _); last smt.
- apply (Pr4_aux(A) _ _).
-  assumption.
-  assumption.
- smt.
+ bdhoare_deno (Pr4_aux A _ _);trivial.
 save.
 
 lemma Conclusion1 (A<:Adv) &m : 
-   (bd_hoare[A.a1 : true ==> true] = 1%r) =>
-   (forall &m, bd_hoare[A.a2 : true ==> true] = 1%r) =>
+   (islossless A.a1) => (islossless A.a2) =>
  `| Pr[CPA(ElGamal, A).main() @ &m : res] - 1%r / 2%r | = 
  `| Pr[DDH0(Inv(A)).main() @ &m :res] - Pr[DDH1(Inv(A)).main() @ &m :res] |.
 proof. 
   intros Ha1 Ha2.
-  rewrite (Pr1 (A) &m).
-  rewrite -(Pr4 (A) &m _ _);try assumption.
-  rewrite -(Fact3 (A) &m).
-  rewrite (Pr2 (A) &m);smt.
+  rewrite (Pr1 A &m).
+  rewrite -(Pr4 A &m _ _);try assumption.
+  rewrite -(Fact3 A &m).
+  rewrite (Pr2 A &m);smt.
 save.
 
 lemma Conclusion (A<:Adv) &m :
-   (bd_hoare[A.a1 : true ==> true] = 1%r) =>
-   (bd_hoare[A.a2 : true ==> true] = 1%r) =>
+   (islossless A.a1) => (islossless A.a2) =>
    exists (I<:Inverter), 
    `| Pr[CPA(ElGamal, A).main() @ &m : res] - 1%r / 2%r | = 
    `| Pr[DDH0(I).main() @ &m :res] - Pr[DDH1(I).main() @ &m :res] |.
 proof.
   intros Ha1 Ha2.
   exists (Inv(A)).
-  apply (Conclusion1 (A) &m _ _);assumption.
+  apply (Conclusion1 A &m _ _);assumption.
 save.

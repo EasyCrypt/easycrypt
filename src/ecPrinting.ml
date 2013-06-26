@@ -869,7 +869,20 @@ let rec try_pp_form_eqveq (ppe : PPEnv.t) _outer fmt f =
       let pv1 = msymbol_of_pv (PPEnv.enter_by_memid ppe EcFol.mleft ) x1 in
       let pv2 = msymbol_of_pv (PPEnv.enter_by_memid ppe EcFol.mright) x2 in
   
-        if pv1 = pv2 then Some pv1 else None
+      if pv1 = pv2 then Some (`Var pv1) else None
+
+    | Fapp ({ f_node = Fop (op, _) },
+            [{ f_node = Fglob (x1, me1) };
+             { f_node = Fglob (x2, me2) }])
+        when (EcPath.p_equal op EcCoreLib.p_eq)
+          && (EcMemory.mem_equal me1 EcFol.mleft )
+          && (EcMemory.mem_equal me2 EcFol.mright)
+        ->
+  
+      let pv1 = (PPEnv.mod_symb ppe x1) in
+      let pv2 = (PPEnv.mod_symb ppe x2) in
+  
+      if pv1 = pv2 then Some (`Glob pv1) else None
 
   | _ -> None
 
@@ -889,8 +902,11 @@ let rec try_pp_form_eqveq (ppe : PPEnv.t) _outer fmt f =
   match collect [] f with
   | None     -> false
   | Some pvs ->
-      Format.fprintf fmt "={@[<hov 2>%a@]}" (pp_list ",@ " pp_msymbol) pvs;
-      true
+    let pp_msymbol fmt = function
+      | `Var  ms -> pp_msymbol fmt ms
+      | `Glob ms -> Format.fprintf fmt "glob %a" pp_msymbol ms in
+    Format.fprintf fmt "={@[<hov 2>%a@]}" (pp_list ",@ " pp_msymbol) pvs;
+    true
 
 and try_pp_lossless (ppe : PPEnv.t) outer fmt f =
   match EcFol.is_bdHoareF f with
@@ -1081,8 +1097,8 @@ let pp_opdecl (ppe : PPEnv.t) fmt (x, op) =
 
 (* -------------------------------------------------------------------- *)
 let string_of_axkind = function
-  | Axiom   -> "axiom"
-  | Lemma _ -> "lemma"
+  | `Axiom -> "axiom"
+  | `Lemma -> "lemma"
 
 let pp_axiom (ppe : PPEnv.t) fmt (x, ax) =
   let basename = P.basename x in

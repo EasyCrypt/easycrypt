@@ -72,7 +72,7 @@ fel 1 (O.counter) bd qO (O.bad) (O.counter < qO).
 smt.
 (* *)
 trivial.
-call true (!O.bad /\ O.counter = 0);
+call ( _ : true ==> !O.bad /\ O.counter = 0);
   [fun;wp; skip; trivial| skip; trivial].
 (* with probability reasoning *)
   admit.

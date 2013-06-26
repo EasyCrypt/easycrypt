@@ -169,30 +169,13 @@ proof.
      (forall x, mem x ARO.log <=> in_dom x RO.m){2}).
 
   rnd.
-  call 
-    ((glob A){1} = (glob A){2} /\ ={ARO.log, RO.m, pk} /\
-     (forall x, mem x ARO.log <=> in_dom x RO.m){2})
-    ((glob A){1} = (glob A){2} /\ ={ARO.log, RO.m, res} /\
-     (forall x, mem x ARO.log <=> in_dom x RO.m){2}).
-
-  fun (={RO.m, ARO.log} /\ (forall x, mem x ARO.log <=> in_dom x RO.m){2}).
-  smt.
-  smt.
-
+  call (_ : ={RO.m, ARO.log} /\ (forall x, mem x ARO.log <=> in_dom x RO.m){2}).
   fun; inline RO.o; wp; if; first smt.
   by wp; rnd; wp; skip; progress; smt (* may timeout *).
   by wp; skip; smt.
   by skip; smt.
 
-  call 
-    ((!mem G1.gxy ARO.log){2} => 
-     (glob A){1} = (glob A){2} /\ ={c, ARO.log} /\ 
-     eq_except RO.m{1} RO.m{2} G1.gxy{2})
-    ((!mem G1.gxy ARO.log){2} => ={res, ARO.log}).
-  fun (mem G1.gxy ARO.log) (={ARO.log} /\ eq_except RO.m{1} RO.m{2} G1.gxy{2}).
-  smt.
-  smt.
-  assumption.
+  call (_ : (mem G1.gxy ARO.log), (={ARO.log} /\ eq_except RO.m{1} RO.m{2} G1.gxy{2})).
 
   fun; inline RO.o; wp; if; first smt.
   by wp; rnd; wp; skip; smt.
@@ -248,12 +231,7 @@ proof.
   fun.
   inline G1(A).AO.init G2(A).AO.init RO.init.
   swap{2} 11 -3.
-  call  
-    ((glob A){1} = (glob A){2} /\ ={ARO.log, RO.m, c} /\ G1.gxy{1} = G2.gxy{2})
-    (={ARO.log, res} /\ G1.gxy{1} = G2.gxy{2}).
-  fun (={ARO.log, RO.m} /\ G1.gxy{1} = G2.gxy{2}).
-  smt.
-  smt.
+  call (_ : ={ARO.log, RO.m} /\ G1.gxy{1} = G2.gxy{2}).
 
   fun; inline RO.o; wp; if; first smt.
   by wp; rnd; wp; skip; smt.
@@ -262,18 +240,12 @@ proof.
   rnd (lambda h, h ^^ if b then m1 else m0){1}
       (lambda h, h ^^ if b then m1 else m0){1}.
   rnd.
-  call  
-   ((glob A){1} = (glob A){2} /\ ={ARO.log, RO.m, pk} /\ G1.gxy{1} = G2.gxy{2})
-   ((glob A){1} = (glob A){2} /\ ={ARO.log, RO.m, res} /\ G1.gxy{1} = G2.gxy{2}).
-  fun (={ARO.log, RO.m} /\ G1.gxy{1} = G2.gxy{2}).
-  smt. 
-  smt.
+  call ( _ : ={ARO.log, RO.m} /\ G1.gxy{1} = G2.gxy{2}).
   fun; inline RO.o; wp; if; first smt.
   by wp; rnd; wp; skip; smt.
   by wp; skip; smt.
   by wp; do rnd; wp; skip; progress; smt.
 qed.
-
 
 module SCDH_from_CPA (A_:Adv) : SCDH.Adversary = {
   module AO = ARO(RO)
@@ -331,24 +303,13 @@ proof.
     ((glob A){1} = (glob A){2} /\ ={ARO.log, RO.m} /\
     c{1} = (gy, h){2} /\ G2.gxy{1} = g ^ (x * y){2} /\ #ARO.log{1} <= qH).
   wp; rnd.
-  call 
-   ((glob A){1} = (glob A){2} /\ ={ARO.log, RO.m, pk} /\ #ARO.log{1} <= qH)
-   ((glob A){1} = (glob A){2} /\ ={ARO.log, RO.m, res} /\ #ARO.log{1} <= qH).
-  fun (={ARO.log, RO.m} /\ #ARO.log{1} <= qH).
-  smt.
-  smt.
+  call ( _ : ={ARO.log, RO.m} /\ #ARO.log{1} <= qH).
   fun; inline RO.o; wp; if; first smt.
   by wp; rnd; wp; skip; smt.
   by wp; skip; smt.
   by wp; do rnd; wp; skip; smt.
 
-  call 
-   ((glob A){1} = (glob A){2} /\ RO.m{1} = RO.m{2} /\ ARO.log{1} = ARO.log{2} /\
-    #ARO.log{1} <= qH /\ c{1} = c{2})
-   (ARO.log{1} = ARO.log{2} /\ #ARO.log{1} <= qH).
-  fun (RO.m{1} = RO.m{2} /\ ARO.log{1} = ARO.log{2} /\ #ARO.log{1} <= qH).
-  smt.
-  smt.
+  call ( _ : RO.m{1} = RO.m{2} /\ ARO.log{1} = ARO.log{2} /\ #ARO.log{1} <= qH).
 
   fun; inline RO.o; wp; if; first smt.
   by wp; rnd; wp; skip; smt.
@@ -364,11 +325,7 @@ lemma Pr_CPA_G1 (A <: Adv {CPA, G1, G2, SCDH.SCDH, RO, ARO, Hashed_ElGamal}) &m 
   Pr[G1(A).main() @ &m : res \/ mem G1.gxy ARO.log]. 
 proof.
   intros _ _.
-  equiv_deno (CPA_G1 (A) _ _).
-  assumption.
-  assumption.
-  smt.
-  smt.
+  equiv_deno (CPA_G1 (A) _ _);try assumption; try smt.
 qed.
 
 
@@ -422,18 +379,12 @@ proof.
   intros _ _.
   bdhoare_deno (_ : true ==> _); [ | trivial | trivial ].
   fun; rnd (1%r / 2%r) ((=) b').
-  call (true) (true).
+  call (_ : true).
 
-  fun (true).
-  by trivial.
-  by trivial.
   assumption.
   by apply islossless_AO.
-  wp; rnd 1%r Fun.cpTrue; call (true) (true).
+  wp; rnd 1%r Fun.cpTrue; call (_ : true).
 
-  fun (true).
-  by trivial.
-  by trivial.
   assumption.
   by apply islossless_AO.
   by wp; do rnd 1%r Fun.cpTrue; inline G2(A).AO.init RO.init; wp; skip; smt.
@@ -447,11 +398,7 @@ lemma Pr_G2_SCDH (A <: Adv {CPA, G1, G2, SCDH.SCDH, RO, ARO, Hashed_ElGamal}) &m
   Pr[SCDH.SCDH(SCDH_from_CPA(A)).main() @ &m : res].
 proof.
   intros _ _.
-  equiv_deno (G2_SCDH (A) _ _).
-  assumption.
-  assumption.
-  trivial.
-  trivial.
+  equiv_deno (G2_SCDH (A) _ _); try assumption;trivial.
 qed.
 
 
@@ -473,7 +420,6 @@ proof.
   rewrite (Pr_G2_SCDH (A) &m); try assumption.
   by apply Refl.
 qed.
-
 
 lemma Security (A <: Adv {CPA, G1, G2, SCDH.SCDH, RO, ARO, Hashed_ElGamal}) &m :
   (forall (O <: ARO), islossless O.o => islossless A(O).choose) =>

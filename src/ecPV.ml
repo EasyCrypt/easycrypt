@@ -435,7 +435,8 @@ let rec f_read env r f =
   match func.f_def with
   | FBabs oi ->
     let mp = get_abs_functor f in
-    List.fold_left (f_read env) (PV.add_glob env mp r) oi.oi_calls
+    let r = if oi.oi_in then (PV.add_glob env mp r) else r in
+    List.fold_left (f_read env) r oi.oi_calls
   | FBdef fdef ->
     let add x r = 
       let vb = Var.by_xpath x env in

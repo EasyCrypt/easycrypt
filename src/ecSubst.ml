@@ -291,16 +291,12 @@ let subst_ax (s : _subst) (ax : axiom) =
     | None -> None
     | Some f -> 
         let s = f_subst_of_subst s in
-        Some (Fsubst.f_subst s f) in
-  let kind   = 
-    match ax.ax_kind with
-    | Axiom   -> Axiom
-    | Lemma _ -> Lemma None
+        Some (Fsubst.f_subst s f)
   in
-    { ax_tparams = params;
+     { ax_tparams = params;
       ax_spec    = spec;
-      ax_kind    = kind;
-      ax_exsmt   = ax.ax_exsmt; }
+      ax_kind    = ax.ax_kind;
+      ax_nosmt   = ax.ax_nosmt; }
 
 (* -------------------------------------------------------------------- *)
 (* SUBSTITUTION OVER THEORIES *)

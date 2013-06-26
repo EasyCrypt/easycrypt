@@ -71,17 +71,14 @@
   let pflist loc ti (es : pformula    list) : pformula    = 
     List.fold_right (fun e1 e2 -> pf_cons loc ti e1 e2) es (pf_nil loc ti)
 
-  let mk_moddef ?flag name body =
-    { pm_name = name; pm_body = body; pm_flag = flag; }
-
-  let mk_axiom ?(local = false) ?(exsmt = true) (x, ty, vd, f) k = 
+  let mk_axiom ?(local = false) ?(nosmt = false) (x, ty, vd, f) k = 
     { pa_name    = x;
-      pa_exsmt   = exsmt;
-      pa_local   = local;
       pa_tyvars  = ty;
       pa_vars    = vd;
       pa_formula = f; 
-      pa_kind    = k; }
+      pa_kind    = k;
+      pa_nosmt   = nosmt;
+      pa_local   = local; }
 
   let str_and b = if b then "&&" else "/\\"
   let str_or  b = if b then "||" else "\\/"
@@ -116,6 +113,9 @@
       fp_args = args; }
 
   let mk_core_tactic t = { pt_core = t; pt_intros = []; }
+
+  let mk_topmod ~local def =
+    { ptm_def = def; ptm_local = local; }
 %}
 
 %token <EcSymbols.symbol> LIDENT
@@ -294,7 +294,6 @@
 %token WHILE
 %token WHY3
 %token WITH
-%token WITNESS
 %token WP
 %token EQOBSIN
 %token ZETA 
@@ -627,10 +626,10 @@ ptybindings:
 %inline hole: UNDERSCORE { PFhole; }
 %inline none: IMPOSSIBLE { assert false; }
 
-qident_or_res:
-| x=qident   { x }
-| x=loc(RES) { mk_loc x.pl_loc ([], "res") }
-;
+qident_or_res_or_glob:
+| x=qident   { GVvar x }
+| x=loc(RES) { GVvar (mk_loc x.pl_loc ([], "res")) }
+| GLOB mp=loc(mod_qident) { GVglob mp }
 
 sform_u(P):
 | x=P 
@@ -760,7 +759,7 @@ form_u(P):
 | c=form_r(P) QUESTION e1=form_r(P) COLON e2=form_r(P) %prec OP2
     { PFif (c, e1, e2) }
 
-| EQ LBRACE xs=plist1(qident_or_res, COMMA) RBRACE
+| EQ LBRACE xs=plist1(qident_or_res_or_glob, COMMA) RBRACE
     { PFeqveq xs }
 
 | IF c=form_r(P) THEN e1=form_r(P) ELSE e2=form_r(P)
@@ -978,7 +977,7 @@ mod_item:
     { Pst_var v }
 
 | m=mod_def
-    { Pst_mod m }
+    { let (x, m) = m in Pst_mod (x, m) }
 
 | FUN decl=fun_decl EQ body=fun_def_body
     { Pst_fun (decl, body) }
@@ -1002,12 +1001,7 @@ mod_body:
     { `Struct stt }
 ;
 
-mod_flag:
-| LOCAL   { `Local   }
-| WITNESS { `Witness }
-;
-
-mod_def_r:
+mod_def:
 | MODULE x=uident p=mod_params? t=mod_aty? EQ body=loc(mod_body)
     { let p = EcUtils.odfl [] p in
         match body.pl_desc with
@@ -1018,15 +1012,15 @@ mod_def_r:
              if t <> None then
                error (EcLocation.make $startpos $endpos)
                  (Some "cannot bind module type to module alias"); 
-             mk_moddef x (mk_loc body.pl_loc (Pm_ident m))
+             (x, mk_loc body.pl_loc (Pm_ident m))
 
         | `Struct st ->
-             mk_moddef x (mk_loc body.pl_loc (mk_mod ?modtypes:t p st)) }
+             (x, mk_loc body.pl_loc (mk_mod ?modtypes:t p st)) }
 ;
 
-mod_def:
-| m=mod_def_r { m }
-| f=mod_flag m=mod_def_r { { m with pm_flag = Some f; } }
+top_mod_def:
+| x=mod_def       { mk_topmod ~local:false x }
+| LOCAL x=mod_def { mk_topmod ~local:true  x }
 ;
 
 mod_params:
@@ -1252,29 +1246,35 @@ lemma_decl :
 ;
 
 nosmt:
-| NOSMT { false }
-| empty { true  }
+| NOSMT { true  }
+| empty { false }
+;
+
+local:
+| LOCAL { true  }
+| empty { false }
+;
 
 axiom:
-| AXIOM d=lemma_decl 
-    { mk_axiom d PAxiom }
+| l=local AXIOM o=nosmt d=lemma_decl 
+    { mk_axiom ~local:l ~nosmt:o d PAxiom }
 
-| l=boption(LOCAL) LEMMA o=nosmt d=lemma_decl
-    { mk_axiom ~local:l ~exsmt:o d PILemma }
+| l=local LEMMA o=nosmt d=lemma_decl
+    { mk_axiom ~local:l ~nosmt:o d PILemma }
 
-| l=boption(LOCAL) LEMMA o=nosmt d=lemma_decl BY t=tactic
-    { mk_axiom ~local:l ~exsmt:o d (PLemma (Some t)) }
+| l=local LEMMA o=nosmt d=lemma_decl BY t=tactic
+    { mk_axiom ~local:l ~nosmt:o d (PLemma (Some t)) }
 
-| l=boption(LOCAL) LEMMA o=nosmt d=lemma_decl BY LBRACKET RBRACKET
-    { mk_axiom ~local:l ~exsmt:o d (PLemma None) }
+| l=local LEMMA o=nosmt d=lemma_decl BY LBRACKET RBRACKET
+    { mk_axiom ~local:l ~nosmt:o d (PLemma None) }
 
-| l=boption(LOCAL) EQUIV x=ident pd=pgtybindings? COLON p=loc(equiv_body(none))
+| l=local EQUIV x=ident pd=pgtybindings? COLON p=loc(equiv_body(none))
     { mk_axiom ~local:l (x, None, pd, p) PILemma }
 
-| l=boption(LOCAL) EQUIV x=ident pd=pgtybindings? COLON p=loc(equiv_body(none)) BY t=tactic
+| l=local EQUIV x=ident pd=pgtybindings? COLON p=loc(equiv_body(none)) BY t=tactic
     { mk_axiom ~local:l (x, None, pd, p) (PLemma (Some t)) }
 
-| l=boption(LOCAL) EQUIV x=ident pd=pgtybindings? COLON p=loc(equiv_body(none)) BY LBRACKET RBRACKET
+| l=local EQUIV x=ident pd=pgtybindings? COLON p=loc(equiv_body(none)) BY LBRACKET RBRACKET
     { mk_axiom ~local:l (x, None, pd, p) (PLemma None) }
 ;
 
@@ -1482,6 +1482,12 @@ conseq:
 | f1=form LONGARROW f2=form     { Some f1, Some f2 }
 ;
 
+call_info: 
+ | f1=form LONGARROW f2=form             { CI_spec (f1, f2) }
+ | f=form                                { CI_inv  f }
+ | bad=form COMMA p=form                 { CI_upto (bad,p,None) }
+ | bad=form COMMA p=form COMMA q=form    { CI_upto (bad,p,Some q) }
+
 tac_dir: 
 | BACKS { Backs }
 | FWDS  { Fwds }
@@ -1662,8 +1668,8 @@ phltactic:
 | WHILE s=side? info=while_tac_info
     { Pwhile (s,info) }
 
-| CALL s=side? pre=sform post=sform
-    { Pcall (s, (pre, post)) }
+| CALL s=side? info=fpattern(call_info) 
+    { Pcall (s, info) }
 
 | RCONDT s=side? i=number
     { Prcond (s, true, i) }
@@ -1975,7 +1981,7 @@ global_:
 | theory_w3        { GthW3        $1 }
 | section_open     { GsctOpen        }
 | section_close    { GsctClose       }
-| mod_def          { Gmodule      $1 }
+| top_mod_def      { Gmodule      $1 }
 | sig_def          { Ginterface   $1 }
 | type_decl_or_def { Gtype        $1 }
 | datatype_def     { Gdatatype    $1 }

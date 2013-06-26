@@ -46,7 +46,7 @@ equiv foo1 (A<:T{MM}) : MM(A).f ~ MM(A).f :
 proof.
  fun.
  while (x{1} = x{2} /\ i{1} = i{2} /\ (glob A){1} = (glob A){2} ).
-   call ((glob A){1} = (glob A){2}) ((glob A){1} = (glob A){2}).
+   call (_ : (glob A){1} = (glob A){2} ==> (glob A){1} = (glob A){2}).
    fun true; try progress.
    wp;skip;progress.
 

@@ -143,10 +143,11 @@ and pfunction_local = {
   pfl_init  : pexpr option;
 }
 
-and pmodule = {
-  pm_name : psymbol;
-  pm_body : pmodule_expr;
-  pm_flag : [`Local | `Witness] option;
+and pmodule = (psymbol * pmodule_expr)
+
+and ptopmodule = {
+  ptm_def   : pmodule;
+  ptm_local : bool;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -171,6 +172,10 @@ type pmemory   = psymbol
 
 type phoarecmp = PFHle | PFHeq | PFHge
 
+type glob_or_var = 
+  | GVglob of pmsymbol located 
+  | GVvar  of pqsymbol
+
 type pformula  = pformula_r located
 
 and pformula_r =
@@ -186,7 +191,7 @@ and pformula_r =
   | PFexists of pgtybindings * pformula
   | PFlambda of ptybindings * pformula
   | PFglob   of pmsymbol located 
-  | PFeqveq  of pqsymbol list
+  | PFeqveq  of glob_or_var list
   | PFlsless of pgamepath
 
   (* for claims *)
@@ -298,6 +303,11 @@ and pspattern = unit
 
 type codepos = int * ((int * codepos) option)
 
+type call_info = 
+  | CI_spec of (pformula * pformula)
+  | CI_inv  of pformula
+  | CI_upto of (pformula * pformula * pformula option)
+  
 (* AppSingle are optional for bounded Phl judgments
    AppMult is required by most general rule for upper bounded Phl
    AppNone is required for the rest of judgments 
@@ -319,7 +329,7 @@ type phltactic =
   | Pfusion     of (tac_side * codepos * (int * (int * int)))
   | Punroll     of (tac_side * codepos)
   | Psplitwhile of (pexpr * tac_side * codepos )
-  | Pcall       of tac_side * (pformula * pformula)
+  | Pcall       of tac_side * call_info fpattern 
   | Prcond      of (bool option * bool * int)
   | Pcond       of tac_side
   | Pswap       of ((tac_side * swap_kind) located list)
@@ -424,12 +434,12 @@ type paxiom_kind = PAxiom | PLemma of ptactic option | PILemma
 
 type paxiom = {
   pa_name    : psymbol;
-  pa_exsmt   : bool;
-  pa_local   : bool;
   pa_tyvars  : psymbol list option;
   pa_vars    : pgtybindings option;  
   pa_formula : pformula;
   pa_kind    : paxiom_kind;
+  pa_nosmt   : bool;
+  pa_local   : bool;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -515,7 +525,7 @@ and pr_override = {
 
 (* -------------------------------------------------------------------- *)
 type global =
-  | Gmodule      of pmodule
+  | Gmodule      of ptopmodule
   | Ginterface   of (psymbol * pmodule_sig)
   | Goperator    of poperator
   | Gpredicate   of ppredicate
