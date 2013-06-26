@@ -538,9 +538,9 @@ module Mod = struct
     { scope with
         sc_env = EcEnv.Mod.bind m.me_name m scope.sc_env; }
 
-  let add (scope : scope) m =
+  let add (scope : scope) (name : symbol) m =
     assert (scope.sc_pr_uc = None);
-    let m = EcTyping.transmod scope.sc_env m in
+    let m = EcTyping.transmod scope.sc_env name m in
       bind scope m
 end
 
