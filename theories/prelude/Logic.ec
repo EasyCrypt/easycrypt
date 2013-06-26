@@ -184,6 +184,10 @@ lemma nosmt fcongr :
     x1 = x2 => f x1 = f x2
 by [].
 
+lemma nosmt rewrite_if: forall (f:'a -> 'b) b x1 x2,
+  f (if b then x1 else x2) = (if b then f x1 else f x2)
+by [].
+
 (** equality *)
 lemma nosmt eq_refl  : forall (x:'a), x = x by [].
 lemma nosmt eq_sym   : forall (x y : 'a), x = y => y = x by [].

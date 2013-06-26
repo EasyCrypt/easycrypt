@@ -71,7 +71,8 @@ axiom mem_cons: forall (y x:'a) xs,
   mem y (x::xs) = ((y = x) \/ mem y xs).
 
 (* Lemmas *)
-lemma mem_eq: forall (x:'a) xs, mem x (x::xs) by [].
+lemma mem_consE: forall (x:'a) xs, mem x (x::xs) by [].
+lemma mem_consNE: forall (x y:'a) xs, x <> y => mem y (x::xs) = mem y xs by [].
 lemma memM_cons : forall (x y:'a) xs, mem y xs => mem y (x::xs) by [].
 lemma mem_hd: forall (xs:'a list), xs <> [] => mem (hd xs) xs by [].
 lemma nil_nmem: forall (xs:'a list), xs = [] <=> (forall x, !mem x xs) by [].
@@ -291,3 +292,110 @@ op nth_default (xs:'a list) (dv:'a) n =
   if (r <> None)
   then proj r
   else dv.
+
+(** count *)
+op count:'a -> 'a list -> int.
+axiom count_nil: forall (x:'a), count x [] = 0.
+axiom count_cons: forall (x y:'a) xs,
+  count y (x::xs) = count y xs + if (x = y) then 1 else 0.
+
+(* Lemmas *)
+lemma nosmt count_consE: forall (x:'a) xs, count x (x::xs) = 1 + count x xs by [].
+lemma nosmt count_consNE: forall (x y:'a) xs, x <> y => count y (x::xs) = count y xs by [].
+
+lemma count_nneg: forall (x:'a) (xs:'a list),
+  0 <= count x xs.
+proof strict.
+intros=> x xs; generalize x; elimT list_ind xs=> x {xs}.
+  by rewrite count_nil; smt. (* reflexivity of Int.(<=) *)
+  intros=> xs IH x'; rewrite count_cons; smt. (* 0 <= x => 0 <= y => 0 <= y + x *)
+qed.
+
+lemma count_mem: forall (x:'a) (xs:'a list),
+  0 <> count x xs <=> mem x xs.
+proof strict.
+intros=> x xs; generalize x; elimT list_ind xs=> x {xs}.
+  rewrite count_nil; simplify; apply mem_nil.
+  intros=> xs IH x'; rewrite count_cons; smt.
+qed.
+
+(** rm *)
+op rm:'a -> 'a list -> 'a list.
+axiom rm_nil: forall (x:'a), rm x [] = [].
+axiom rm_cons: forall (y x:'a) xs, rm y (x::xs) = ((x = y) ? xs : (x::rm y xs)).
+
+(* Lemmas *)
+lemma nosmt rm_consE: forall (x:'a) xs, rm x (x::xs) = xs by [].
+lemma nosmt rm_consNE: forall (x y:'a) xs, x <> y => rm y (x::xs) = x::(rm y xs) by [].
+
+lemma count_rm_in: forall (x:'a) (xs:'a list),
+  mem x xs =>
+  count x (rm x xs) = count x xs - 1.
+proof strict.
+intros=> x xs; generalize x; elimT list_ind xs=> x {xs}.
+  apply absurd=> _; apply mem_nil.
+  intros=> xs IH y x'; rewrite rm_cons (rewrite_if (count y)); smt.
+qed.
+
+lemma count_rm_nin: forall (x:'a) (xs:'a list),
+  !mem x xs =>
+  count x (rm x xs) = count x xs.
+proof strict.
+intros=> x xs; generalize x; elimT list_ind xs=> x {xs}.
+  intros=> h {h}; rewrite rm_nil //.
+  intros=> xs IH x'; rewrite mem_cons; smt.
+qed.
+
+lemma count_rm_neq: forall (x y:'a) (xs:'a list),
+  y <> x =>
+  count x (rm y xs) = count x xs.
+proof strict.
+intros=> x y xs; elimT list_ind xs=> {xs}.
+  rewrite rm_nil //.
+  intros=> x' xs IH x_y; smt.
+qed.
+
+(** Equality up to permutation *)
+pred (<->) (xs xs':'a list) =
+  forall (x:'a), count x xs = count x xs'.
+
+lemma perm_refl: forall (xs:'a list), xs <-> xs by [].
+lemma perm_symm: forall (xs ys:'a list), xs <-> ys => ys <-> xs by [].
+lemma perm_trans: forall (ys xs zs:'a list), xs <-> ys => ys <-> zs => xs <-> zs by [].
+
+lemma perm_cons: forall x (xs ys:'a list),
+  xs <-> ys =>
+  (x::xs) <-> (x::ys)
+by [].
+
+lemma perm_rm: forall x (xs ys:'a list),
+  xs <-> ys =>
+  (rm x xs) <-> (rm x ys).
+proof strict.
+intros=> x xs ys; case (mem x xs).
+  intros=> x_in_xs xs_ys; cut x_in_ys: mem x ys; first by rewrite -count_mem -(xs_ys x) count_mem //.
+    delta (<->) beta=> x'; case (x = x')=> x_x'.
+      subst x'; rewrite count_rm_in // count_rm_in // xs_ys //.
+      rewrite count_rm_neq // count_rm_neq // xs_ys //.
+  intros=> x_nin_xs xs_ys; cut x_nin_ys: !mem x ys; first by rewrite -count_mem -(xs_ys x) count_mem //.
+    delta (<->) beta=> x'; case (x = x')=> x_x'.
+      subst x'; rewrite count_rm_nin // count_rm_nin // xs_ys //.
+      rewrite count_rm_neq // count_rm_neq // xs_ys //.
+qed.
+
+lemma foldCA: forall (f:'a -> 'a -> 'a) (z x:'a) (xs:'a list),
+  (forall x y, f x y = f y x) =>
+  (forall x y z, f x (f y z) = f (f x y) z) =>
+  mem x xs =>
+  fold_right f z xs = f x (fold_right f z (rm x xs)).
+proof strict.
+intros=> f z x xs; elimT list_ind xs=> {xs}; first smt.
+  intros=> x' xs IH fC fA x_in_xs; case (x' = x)=> x_x'.
+    subst x'; rewrite fold_right_cons rm_consE //.
+    generalize x_in_xs; rewrite mem_consNE // => x_in_xs.
+    rewrite rm_consNE // fold_right_cons fold_right_cons IH.
+      intros=> a b; apply fC.
+      intros=> a b c; apply fA.
+      trivial.
+    rewrite fA (fC x' x) -fA //. 
+qed.
