@@ -1,12 +1,149 @@
 % !TeX root = easycrypt.tex
-\chapter{Writing Proofs}
+
 %% TODO (Francois): For index, rather than \texttt, use \rawec and make a class of keywords for tactics and tacticals
 
-\section{Ambient Logic (Guillaume)}
-  \ambientDesc%prints the description of all tactics see ambient.tex
-  %to modify them
+\chapter{Writing Proofs}
 
-\section{Program Logics (C\'esar)}
+\EC comes with a proof engine that allows to state, in the \EC
+underneath formalism, properties about the user defined programs
+and to prove them.
+%
+Proofs are built interactively, starting from final goal, by applying
+\emph{tactics} that transform a goal (the property we want to prove)
+to a set of subsequent goals (the subgoals) s.t. the latter logical
+implies the former.
+%
+This process is repeated iteratively up to the point where all the
+subgoals are trivial and can be solved by the system.
+
+This chapter is about the description of this proof engine, and is
+structured as follow. We first define the notion of goals and show
+how it relates to the \EC formalism. We then introduce the notion
+of tactics as logically valid goal transformers. Finally, a listing
+of all the existing tactics, along with their detailed descriptions,
+is given.
+
+\section{The proof engine}
+
+The proof engine deals with \emph{judgments} or \emph{goals} of the form
+$\Env; \Gamma \vdash \phi$ where $\Env$ is the (global) environments,
+$\Gamma$ is a set of local facts and $\phi$ is the formula we want
+to prove. Here is an example of such a judgment:
+
+\begin{center}
+$\Int; x, y , z: \tint, x \le y \vdash x + z \le y + z$.
+\end{center}
+
+It states that in the \emph{environment} ($\Env$) solely composed of the
+theory $\Int$, having three local variables $x, y, z$ of type $\tint$ along
+with the fact $x \le y$ (the \emph{context} $\Gamma$), we are interested
+in proving $x + z \le y + z$.
+
+\medskip
+
+On top on this, a set of \emph{deduction rules} is given. They
+describe how one can derive a judgment $\Env; \Gamma \vdash \phi$ given
+that a set of prerequisites (or \emph{premises}) are fulfilled. The general
+form of such a rule is given as follow:
+
+\begin{displaymath}
+ \infrule{A_1 \cdots A_n}{\Env; \Gamma \vdash \phi}
+\end{displaymath}
+
+It has to be read as: \emph{given that $A_1 \cdots A_n$ are derivable, then
+so is $\Env, \Gamma \vdash \phi$}. We give three examples of such deduction
+rules:
+
+\begin{displaymath}
+ \infrule
+         {\Env; \Gamma \vdash \phi_1 \quad
+          \Env; \Gamma \vdash \phi_1 \Rightarrow \phi_2}
+         {\Env; \Gamma \vdash \phi_2}
+         {\rname{MP}}
+ \quad\quad
+ \infrule
+         {\Env; \Gamma, \phi_1 \vdash \phi_2}
+         {\Env; \Gamma \vdash \phi_1 \Rightarrow \phi_2}
+         {\rname{$\Rightarrow$-I}}
+ \quad\quad
+ \infrule{ }{\Env; \Gamma, \phi, \Delta \vdash \phi}{\rname{Ax}}
+\end{displaymath}
+
+The first, the \emph{modus ponens}, states that one can derive
+$\Env; \Gamma \vdash \phi_2$ given that $\Env; \Gamma \vdash \phi_1
+\Rightarrow \phi_2$ and $\Env; \Gamma \vdash \phi_1$ are derivable.
+%
+The next provides a way for deriving $\phi_1 \Rightarrow \phi_2$ from
+a derivation of $\phi_2$, but with a context augmented by $\phi_1$.
+%
+The last states that $\Env; \Gamma, \phi, \Delta \vdash \phi$ is derivable as-is.
+
+\medskip
+
+Combining these deduction rules, it is possible to build a tree rooted by
+a judgment $\Env; \Gamma \vdash \phi$ and with leaves composed of deduction
+rules with no premises (as the third one in the previous example). Such a
+tree forms a \emph{proof} of $\Env; \Gamma \vdash \phi$.
+%
+For instance, Figure~\ref{fig:LJproof} gives a proof of
+%
+\begin{center}
+ $\Env; b_1, b_2 : \tbool \vdash (b_1 \Rightarrow b_2) \Rightarrow b_1 \Rightarrow b_2$
+\end{center}
+
+\begin{figure}
+  \begin{displaymath}
+    \infrule
+      {\infrule{ }{\Env; b_1, b_2 : \tbool, b_1 \Rightarrow b_2, b_1 \vdash b_1 \Rightarrow b_2} \quad
+       \infrule{ }{\Env; b_1, b_2 : \tbool, b_1 \Rightarrow b_2, b_1 \vdash b_1}}
+      {\infrule
+        {\Env; b_1, b_2 : \tbool, b_1 \Rightarrow b_2, b_1 \vdash b_2}
+        {\infrule
+           {\Env; b_1, b_2 : \tbool, b_1 \Rightarrow b_2 \vdash b_1 \Rightarrow b_2}
+           {\Env; b_1, b_2 : \tbool \vdash (b_1 \Rightarrow b_2) \Rightarrow b_1 \Rightarrow b_2}}}
+  \end{displaymath}
+
+  \caption{\label{fig:LJproof} Proof tree of
+    $\Env; b_1, b_2 : \tbool \vdash
+        (b_1 \Rightarrow b_2) \Rightarrow b_1 \Rightarrow b_2$}
+\end{figure}
+
+\bigskip
+
+The \EC proof engine helps the user building such proof. At each step
+of the proof building, the system presents to the user the set of goals
+that has to be proved. The user can then \emph{apply} a tactic to one of
+them, each tactic corresponding to a deduction rule. If the conclusion
+of the rule corresponding to the applied tactic matches the goal to witch
+it is applied, the proof engine replaces it with the set of the
+premises of the applied rule - the subgoals. This application may generate
+no, one or several subgoals depending on the rule. This process is repeated
+iteratively, up to the point where no goals remain.
+
+\section{Ambient Logic (Guillaume)}
+
+\begin{center}
+\begin{tabular}{l@{$\quad$}l@{$\quad$}ll}
+{\rawec{(lambda (x : t), phi1)\ phi2}} & $\rightarrow_\beta$ &
+  \multicolumn{2}{@{}l}{{\rawec{phi2} \{\rawec{x} $\leftarrow$ \rawec{phi1}\}}}\\
+{\rawec{if (true) \{ phi1 \} else \{ phi2 \}}} & $\rightarrow_\iota$ &
+  {\rawec{phi1}}\\
+{\rawec{if (false) \{ phi1 \} else \{ phi2 \}}} & $\rightarrow_\iota$ &
+  \multicolumn{2}{@{}l}{{\rawec{phi2}}}\\
+{\rawec{let (x1, ..., xn) = (phi1, ..., phin) in phi}} & $\rightarrow_\iota$ &
+  \multicolumn{2}{@{}l}{{\rawec{phi} \{ \rawec{x1, ..., xn} $\leftarrow$ \rawec{phi1, ..., phin} \}}}\\
+{\rawec{let x = phi1 in phi2}} & $\rightarrow_\zeta$ &
+  \multicolumn{2}{@{}l}{{\rawec{phi2} \{ \rawec{x} $\leftarrow$ \rawec{phi1} \}}}\\
+{\rawec{o}} & $\rightarrow_\delta^{\Env,\Gamma}$ &
+  {\rawec{e}} & if {\rawec{op o := e}} $\in \Env$\\
+{\rawec{x}} & $\rightarrow_\delta^{\Env,\Gamma}$ &
+  {\rawec{phi}} & if {\rawec{x := phi}} $\in \Gamma$\\
+\end{tabular}
+\end{center}
+
+\ambientDesc
+
+\section{Program Logics (César)}
 
 \subsection{Reasoning about random samplings: the \rawec{rnd} tactic}
 %
@@ -672,6 +809,38 @@ and the folowing one for exact judgments (=):
 
 There is no appropriate rule for $(\leq)$.
 
+
+\subsection{Failure Event Lemma: the \rawec{fel} tactic}
+%
+\subsubsection{This rule is not associated to any logic but relies
+  both on Hoare Logic and probabilistic Hoare Logic}
+
+The following rule describes the application of the tactic
+$\verb+fel+\ k\ q\ c\ \delta\ F\ P$.  Assume $f$ is defined and
+$c_1,c_2$ stands for the splitting of its body at position $k$. Let
+$\left\{O_i\right\}_{i=0}^k$ stand for all oracles accessed by any
+adversary called at $c_2$. Assume that variables in $F$ can at most be
+modified by $\left\{O_i\right\}_{i=0}^k$.
+ 
+\begin{displaymath}
+\infrule{
+  \begin{array}{c}
+    \left\{
+    \begin{array}{l}
+      \bdHoareSle{O_i}{\neg F}{F}{c \delta} \\
+      \forall c_0,\ \hoareS{O_i}{P\land c=c_0}{c_0 < c} \\
+      \forall c_0 f_0,\ \hoareS{O_i}{\neg P\land F=f_0 \land c=c_0}{F=f_0 \land c=c_0} \\
+    \end{array}\right\}_{i=0}^k\\[5ex]
+    \forall m', (\varphi \Rightarrow F \land c\leq q) 
+    \qquad 
+    q \delta \leq \epsilon 
+    \qquad
+    \hoareS{c_1}{\true}{\neg F \land c=0}
+  \end{array}
+}{
+  \Prm{f}{m}{\varphi} \leq \epsilon  
+} \left[\verb+fel+\ k\ q\ c\ \delta\ F\ P\right]
+\end{displaymath}
 
 
 \section{Tacticals}

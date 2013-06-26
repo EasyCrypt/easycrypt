@@ -583,6 +583,38 @@ let process_pror = t_pror
 let process_bdeq = t_bdeq
 
 
+
+
+let process_eqobs_in (glob,loc,inv) g = 
+  let glob = process_prhl_formula g glob in
+  let loc = process_prhl_formula g loc in
+  let inv = process_prhl_formula g inv in
+  let env, _, concl = get_goal_e g in
+  let es = destr_equivS concl in
+  let ml, mr = fst es.es_ml, fst es.es_mr in
+  (* TODO check glob for glob and inv *)
+  let eqglob = EcPV.Mpv2.of_form env ml mr glob in
+  let eqloc  = EcPV.Mpv2.of_form env ml mr loc in
+  let eqs = EcPV.Mpv2.union eqglob eqloc in
+  let post = EcPV.Mpv2.to_form ml mr eqs inv in
+  let pre = es.es_pr in
+  let t_pre = 
+    let h = EcIdent.create "_" in
+    t_seq (t_intros_i [EcIdent.create "_";EcIdent.create "_"; h])
+      (t_hyp h) in
+  t_seq_subgoal (t_equivS_conseq pre post)
+    [ t_pre;
+      t_trivial;
+      t_eqobs_inS (fun _ _ _ _ -> raise Not_found) eqs inv ]
+
+     g
+(*
+  
+*)  
+
+  
+  
+
 (* -------------------------------------------------------------------- *)
 let process_phl loc ptac g =
   let t =
@@ -618,5 +650,6 @@ let process_phl loc ptac g =
     | Pprfalse                  -> process_prfalse
     | Ppror                     -> process_pror
     | Pbdeq                     -> process_bdeq
+    | Peqobs_in info            -> process_eqobs_in info
   in
     set_loc loc t g

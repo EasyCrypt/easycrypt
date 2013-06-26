@@ -1,130 +1,196 @@
-lemma local cut_lemma : forall (a b: bool), a => (a => b) => b by [].
+(*** Base Logic Rules *)
+(** cut *)
+lemma nosmt cut_lemma : forall (a b: bool), a => (a => b) => b by [].
 
-lemma local false_elim : forall (c : bool), false => c by [].
+(** false *)
+lemma nosmt falseE : forall (c : bool), false => c by [].
 
-lemma local and_elim : forall (a b c:bool), 
+(** true *)
+lemma nosmt trueI : true by [].
+
+(** case *)
+lemma nosmt bool_case_eq : forall (p:bool -> bool) (x:bool),
+   (x => p true) =>
+   (!x => p false) =>
+   p x
+by [].
+
+lemma nosmt bool_case : forall (p:bool -> bool),
+  (p true) =>
+  (p false) =>
+  (forall x, p x)
+by [].
+
+(** boolean rewriting *)
+(* the two implications will soon become obsolete as we become able to use views *)
+lemma nosmt eqT  : forall (x:bool), x => (x = true) by [].
+lemma nosmt neqF : forall (x:bool), !x => (x = false) by [].
+
+lemma nosmt rewrite_eqT : forall (x:bool), (x = true) <=> x by [].
+lemma nosmt rewrite_neqF : forall (x:bool), (x = false) <=> !x by [].
+
+lemma nosmt neq_def: forall (x:bool), (x => false) <=> !x by [].
+
+(** absurd *)
+lemma nosmt absurd : forall (a b : bool), (!a => !b) => b => a by [].
+
+(** and *)
+lemma nosmt andE : forall (a b c:bool), 
     (a /\ b) => (a => b => c) => c
 by [].
 
-lemma local and_proj_l : forall (a b:bool),
+lemma nosmt andEl : forall (a b:bool),
     (a /\ b) => a
 by [].
 
-lemma local and_proj_r : forall (a b:bool),
+lemma nosmt andEr : forall (a b:bool),
     (a /\ b) => b
 by [].
 
-lemma local anda_elim : forall (a b c:bool),
-    (a && b) => (a => b => c) => c
+lemma nosmt andI : forall (a b : bool), 
+   a => b => (a /\ b)
 by [].
 
-lemma local or_elim : forall (a b c:bool), 
+lemma nosmt andA : forall (a b c : bool),
+  ((a /\ b) /\ c) = (a /\ (b /\ c))
+by [].
+
+lemma nosmt andC : forall (a b:bool),
+  (a /\ b) = (b /\ a)
+by [].
+
+lemma nosmt andT : forall (b:bool),
+  (b /\ true) = b
+by [].
+
+lemma nosmt andF : forall (b:bool),
+  (b /\ false) = false
+by [].
+
+(** or *)
+lemma nosmt orE : forall (a b c:bool), 
     (a \/ b) => (a => c) => (b => c) => c
 by [].
 
-lemma local ora_elim : forall (a b c:bool),
+lemma nosmt orIl : forall (a b : bool),
+  a => a \/ b
+by [].
+
+lemma nosmt orIr : forall (a b : bool),
+  b => a \/ b
+by [].
+
+lemma nosmt orA : forall (a b c : bool),
+  ((a \/ b) \/ c) = (a \/ (b \/ c))
+by [].
+
+lemma nosmt orC : forall (a b : bool),
+  (a \/ b) = (b \/ a)
+by [].
+
+lemma nosmt orT : forall (b : bool),
+  (b \/ true) = true
+by [].
+
+lemma nosmt orF : forall (b : bool),
+  (b \/ false) = b
+by [].
+
+(** Distributivity and/or *)
+lemma nosmt orDand : forall (a b c : bool),
+  ((a \/ b) /\ c) = ((a /\ c) \/ (b /\ c))
+by [].
+
+lemma nosmt andDor : forall (a b c : bool),
+  ((a /\ b) \/ c) = ((a \/ c) /\ (b \/ c))
+by [].
+
+(** anda *)
+lemma nosmt andaE : forall (a b c:bool),
+    (a && b) => (a => b => c) => c
+by [].
+
+lemma nosmt andaEl : forall (a b:bool),
+  (a && b) => a
+by [].
+
+lemma nosmt andaEr : forall (a b:bool),
+  (a && b) => (a => b)
+by [].
+
+lemma nosmt andaI : forall (a b : bool),
+   a => (a => b) => (a && b)
+by [].
+
+lemma nosmt anda_and : forall (a b:bool),
+  (a && b) <=> (a /\ b)
+by [].
+
+(** ora *)
+lemma nosmt oraE : forall (a b c:bool),
     (a || b) => (a => c) => (!a => b => c) => c
 by [].
 
-lemma local iff_elim : forall (a b c:bool),
+lemma nosmt oraIl : forall (a b : bool),
+  a => a || b
+by [].
+
+lemma nosmt oraIr : forall (a b : bool),
+  (!a => b) => a || b
+by [].
+
+lemma nosmt ora_or : forall (a b:bool),
+  (a || b) <=> (a \/ b)
+by [].
+
+(** iff *)
+lemma nosmt iffE : forall (a b c:bool),
   (a <=> b) => ((a => b) => (b => a) => c) => c
 by [].
 
-lemma local if_elim : forall (a bt bf c: bool), 
+lemma nosmt iffI : forall (a b : bool),
+  (a => b) => (b => a) => (a <=> b)
+by [].
+
+(** if *)
+lemma nosmt ifE : forall (a bt bf c: bool), 
   (if a then bt else bf) =>
   (a => bt => c) => (!a => bf => c) => c
 by [].
 
-lemma local true_intro : true by [].
-
-lemma local and_intro : forall (a b : bool), 
-   a => b => (a /\ b)
-by [].
-
-lemma local anda_intro : forall (a b : bool),
-   a => (a => b) => (a && b)
-by [].
-
-lemma local or_intro_l : forall (a b : bool),
-  a => a \/ b
-by [].
-
-lemma local ora_intro_l : forall (a b : bool),
-  a => a || b
-by [].
-
-lemma local or_intro_r : forall (a b : bool),
-  b => a \/ b
-by [].
-
-lemma local orA : forall (a b c : bool),
-  ((a \/ b) \/ c) = (a \/ (b \/ c))
-by [].
-
-lemma local andA : forall (a b c : bool),
-  ((a /\ b) /\ c) = (a /\ (b /\ c))
-by [].
-
-lemma local orDand : forall (a b c : bool),
-  ((a \/ b) /\ c) = ((a /\ c) \/ (b /\ c))
-by [].
-
-lemma local andDor : forall (a b c : bool),
-  ((a /\ b) \/ c) = ((a \/ c) /\ (b \/ c))
-by [].
-
-lemma local ora_intro_r : forall (a b : bool),
-  (!a => b) => a || b
-by [].
-
-lemma local iff_intro : forall (a b : bool),
-  (a => b) => (b => a) => (a <=> b)
-by [].
-
-lemma local if_intro : forall (a bt bf : bool),
+lemma nosmt ifI : forall (a bt bf : bool),
   (a => bt) => (!a => bf) => if a then bt else bf
 by [].
 
-lemma local absurd : forall (a b : bool), (!a => !b) => b => a by [].
- 
-lemma local rewrite_l : forall (x1 x2:'a) (p:'a -> bool),
+(** congruence and rewriting *)
+lemma nosmt rewrite_l : forall (x1 x2:'a) (p:'a -> bool),
   x1 = x2 => p x2 => p x1
 by [].
 
-lemma local rewrite_r : forall (x1 x2:'a) (p:'a -> bool),
+lemma nosmt rewrite_r : forall (x1 x2:'a) (p:'a -> bool),
   x1 = x2 => p x1 => p x2
 by [].
 
-lemma local rewrite_iff_l : forall (x1 x2:bool) (p:bool -> bool),
+lemma nosmt rewrite_iff_l : forall (x1 x2:bool) (p:bool -> bool),
   (x1 <=> x2) => p x2 => p x1
 by [].
 
-lemma local rewrite_iff_r : forall (x1 x2:bool) (p:bool -> bool),
+lemma nosmt rewrite_iff_r : forall (x1 x2:bool) (p:bool -> bool),
   (x1 <=> x2) => p x1 => p x2
 by [].
 
-lemma local case_eq_bool : forall (P:bool -> bool, x:bool),
-   (x => P true) =>
-   (!x => P false) =>
-   P x
-by [].
-
-lemma local eq_refl  : forall (x:'a), x = x by [].
-lemma local eq_sym   : forall (x y : 'a), x = y => y = x by [].
-lemma local eq_trans : forall (x y z : 'a), x = y => y = z => x = z by [].
-
-lemma local eqT  : forall (x:bool), x => (x = true) by [].
-lemma local neqF : forall (x:bool), !x => (x = false) by [].
-
-lemma local eqT_iff : forall (x:bool), (x = true) <=> x by [].
-lemma local neqF_iff : forall (x:bool), (x = false) <=> !x by [].
-
-lemma local fcongr :
+lemma nosmt fcongr :
   forall (f : 'a -> 'b) (x1 x2 : 'a),
     x1 = x2 => f x1 = f x2
 by [].
 
-lemma local tuple2_ind : 
+(** equality *)
+lemma nosmt eq_refl  : forall (x:'a), x = x by [].
+lemma nosmt eq_sym   : forall (x y : 'a), x = y => y = x by [].
+lemma nosmt eq_trans : forall (x y z : 'a), x = y => y = z => x = z by [].
+
+(** tuples *) 
+lemma nosmt tuple2_ind : 
   forall 
     (p: ('a1*'a2) -> bool) 
     (t:'a1*'a2),
@@ -133,7 +199,7 @@ lemma local tuple2_ind :
     p t
 by [].
 
-lemma local tuple3_ind : 
+lemma nosmt tuple3_ind : 
   forall 
     (p: ('a1*'a2*'a3) -> bool) 
     (t:'a1*'a2*'a3),
@@ -142,7 +208,7 @@ lemma local tuple3_ind :
     p t
 by [].
 
-lemma local tuple4_ind : 
+lemma nosmt tuple4_ind : 
   forall 
     (p: ('a1*'a2*'a3*'a4) -> bool) 
     (t:'a1*'a2*'a3*'a4),
@@ -151,7 +217,7 @@ lemma local tuple4_ind :
     p t
 by [].
 
-lemma local tuple5_ind : 
+lemma nosmt tuple5_ind : 
   forall 
     (p: ('a1*'a2*'a3*'a4*'a5) -> bool) 
     (t:'a1*'a2*'a3*'a4*'a5),
@@ -160,7 +226,7 @@ lemma local tuple5_ind :
     p t
 by [].
 
-lemma local tuple6_ind : 
+lemma nosmt tuple6_ind : 
   forall 
     (p: ('a1*'a2*'a3*'a4*'a5*'a6) -> bool) 
     (t:'a1*'a2*'a3*'a4*'a5*'a6),
@@ -169,7 +235,7 @@ lemma local tuple6_ind :
     p t
 by [].
 
-lemma local tuple7_ind : 
+lemma nosmt tuple7_ind : 
   forall 
     (p: ('a1*'a2*'a3*'a4*'a5*'a6*'a7) -> bool) 
     (t:'a1*'a2*'a3*'a4*'a5*'a6*'a7),
@@ -178,7 +244,7 @@ lemma local tuple7_ind :
     p t
 by [].
 
-lemma local tuple8_ind :
+lemma nosmt tuple8_ind :
   forall 
     (p: ('a1*'a2*'a3*'a4*'a5*'a6*'a7*'a8) -> bool) 
     (t:'a1*'a2*'a3*'a4*'a5*'a6*'a7*'a8),
@@ -187,7 +253,7 @@ lemma local tuple8_ind :
     p t
 by [].
 
-lemma local tuple9_ind :
+lemma nosmt tuple9_ind :
   forall 
     (p: ('a1*'a2*'a3*'a4*'a5*'a6*'a7*'a8*'a9) -> bool) 
     (t:'a1*'a2*'a3*'a4*'a5*'a6*'a7*'a8*'a9),

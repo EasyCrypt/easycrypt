@@ -291,10 +291,12 @@ module List = struct
     in
       all2 (xs, ys)
 
-  let rec uniq (xs : 'a list) =
+  let rec uniqf (f : 'a -> 'a -> bool) (xs : 'a list) =
     match xs with
       | []      -> true
-      | x :: xs -> (not (List.mem x xs)) && (uniq xs)
+      | x :: xs -> (not (List.exists (f x) xs)) && (uniqf f xs)
+
+  let uniq l = uniqf (=) l
 
   let assoc_eq eq (x : 'a) (xs : ('a * 'b) list) =
     snd (List.find (fun (x',_) -> eq x x') xs) 

@@ -13,7 +13,7 @@ type scope
 
 type proof_uc = {
   puc_name  : string;
-  puc_scope : [`Global | `Local];
+  puc_exsmt : bool;
   puc_jdg   : proof_state;
 }
 
@@ -97,6 +97,11 @@ module Theory : sig
 
   (* FIXME: DOC *)
   val import_w3 : scope -> string list -> string -> w3_renaming list -> scope
+end
+
+module Section : sig
+  val enter : scope -> scope
+  val exit  : scope -> scope
 end
 
 module Tactics : sig

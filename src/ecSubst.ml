@@ -94,7 +94,9 @@ let subst_fun_uses (s : _subst) (u : uses) =
 (* -------------------------------------------------------------------- *)
 let subst_oracle_info (s:_subst) (x:oracle_info) = 
   let x_subst = EcPath.x_subst s.s_fmp in
-    { oi_calls  = List.map x_subst x.oi_calls; }
+    { oi_calls  = List.map x_subst x.oi_calls;
+      oi_in     = x.oi_in;
+    }
 
 (* -------------------------------------------------------------------- *)
 let subst_funsig (s : _subst) (funsig : funsig) =
@@ -298,7 +300,7 @@ let subst_ax (s : _subst) (ax : axiom) =
     { ax_tparams = params;
       ax_spec    = spec;
       ax_kind    = kind;
-      ax_scope   = ax.ax_scope; }
+      ax_exsmt   = ax.ax_exsmt; }
 
 (* -------------------------------------------------------------------- *)
 (* SUBSTITUTION OVER THEORIES *)

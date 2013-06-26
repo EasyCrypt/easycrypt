@@ -99,8 +99,8 @@ type module_type = {                   (* Always in eta-normal form *)
 
 type oracle_info = {
   oi_calls  : xpath list; (* The list of oracle that can be called *)
-(*  oi_reads  : Sx.t;   (* The list of global prog var of the outside word *)
-  oi_writes : Sx.t;     (* that can be read only or read and write *) *)
+  oi_in     : bool; (* true if equality of global is required to ensure
+                       equality of res and global *)
 }
 
 type module_sig_body_item =

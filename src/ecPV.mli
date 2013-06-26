@@ -67,3 +67,31 @@ module PV : sig
 
   val pp : env -> Format.formatter -> t -> unit
 end
+
+val s_write  : ?except_fs:EcPath.Sx.t -> env -> stmt -> PV.t
+val is_write : ?except_fs:EcPath.Sx.t -> env -> PV.t -> instr list -> PV.t
+val f_write  : ?except_fs:EcPath.Sx.t -> env -> EcPath.xpath -> PV.t
+
+val e_read   : env -> PV.t -> expr -> PV.t
+val s_read   : env -> stmt -> PV.t
+val is_read  : env -> PV.t -> instr list -> PV.t 
+val f_read   : env -> EcPath.xpath -> PV.t
+
+module Mpv2 : sig
+  type t 
+  val to_form : EcIdent.t -> EcIdent.t -> t -> form -> form
+  val of_form : env -> EcIdent.t -> EcIdent.t -> form -> t
+  val union   : t -> t -> t
+end
+
+val eqobs_in :
+  env ->
+  (env -> form * PV.t * PV.t ->
+   EcPath.xpath -> EcPath.xpath -> Mpv2.t -> Mpv2.t * 'a) ->
+  stmt ->
+  stmt ->
+  Mpv2.t ->
+  form * PV.t * PV.t ->
+  stmt * stmt * 'a list * Mpv2.t
+
+val check_module_in : env -> mpath -> module_type -> unit

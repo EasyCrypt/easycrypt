@@ -45,6 +45,7 @@ type tyerror =
 | InvalidModAppl       of modapp_error
 | InvalidModType       of modtyp_error
 | InvalidMem           of symbol * mem_error
+| LvTupleNotUniq
 | FunNotInModParam     of qsymbol
 | NoActiveMemory
 | PatternNotAllowed

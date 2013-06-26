@@ -187,6 +187,7 @@ module ModTy : sig
 
   val mod_type_equiv : env -> module_type -> module_type -> bool
   val has_mod_type : env -> module_type list -> module_type -> bool
+  val sig_of_mt :  env -> module_type -> module_sig
 end
 
 (* -------------------------------------------------------------------- *)

@@ -1,335 +1,316 @@
 require        Map_why.
-
 require import Fun.
-require export Option.
-require        Set.
+require        Option.
+require        ISet.
 
-(** Type and Core definitions *)
-type ('a,'b) map = ('a,'b option) Map_why.map.
+(** Definitions and core lemmas *)
+type ('a,'b) map = ('a,'b Option.option) Map_why.map.
 
-(* empty, get and set: note that get returns an option *)
-op empty:('a,'b) map = Map_why.const_ None.
-op __get(m:('a,'b) map, x:'a): 'b option = Map_why.__get m x.
-op __set(m:('a,'b) map, x:'a, y:'b): ('a,'b) map = Map_why.__set m x (Some y).
+op empty:('a,'b) map = Map_why.const_ Option.None.
+op get (m:('a,'b) map) (x:'a): 'b Option.option = Map_why.__get m x.
+op __set (m:('a,'b) map) (x:'a) (y:'b): ('a,'b) map = Map_why.__set m x (Option.Some y).
 
-(* Some basic lemmas *)
-lemma get_upd_eq: forall (m:('a,'b) map) x v,
+theory OptionGet.
+  require export Option.
+  op __get (m:('a,'b) map): 'a -> 'b option = get m.
+end OptionGet.
+import OptionGet.
+
+pred (==) (m1 m2:('a,'b) map) =
+  forall (x:'a), m1.[x] = m2.[x].
+
+lemma map_ext: forall (m1 m2:('a,'b) map),
+  m1 == m2 => m1 = m2
+by [].
+
+lemma get_setE: forall (m:('a,'b) map) x v,
   m.[x <- v].[x] = Some v
 by [].
 
-lemma get_upd_neq: forall (m:('a,'b) map) x y v,
+lemma get_setNE: forall (x:'a) (v:'b) (m:('a,'b) map) y,
   x <> y => m.[x <- v].[y] = m.[y]
 by [].
 
-lemma get_upd_case: forall (m:('a,'b) map) x y v1 v2,
-  (y = x => v1 = v2) =>
-  (y <> x => m.[y] = Some v2) =>
-  m.[x <- v1].[y] = Some v2
+lemma get_set: forall (m:('a,'b) map) x v y,
+  (y <> x => m.[y] = Some v) =>
+  m.[x <- v].[y] = Some v
 by [].
 
-lemma upd_comm: forall (m : ('a,'b) map) x1 x2 y1 y2,
-  x1 <> x2 => m.[x1 <- y1].[x2 <- y2] = m.[x2 <- y2].[x1 <- y1].
-proof.
-intros m x1 x2 y1 y2 x1_neq_x2;
-  cut ext_eq: (forall (a:'a), m.[x1 <- y1].[x2 <- y2].[a] = m.[x2 <- y2].[x1 <- y1].[a]);
-  smt.
-save.
+lemma set_setE: forall (m:('a,'b) map) x v w,
+  m.[x <- v].[x <- w] = m.[x <- w]
+by [].
 
-(** Formalization of map domain *)
+lemma set_setNE: forall (m:('a,'b) map) x y v w,
+  x <> y => m.[x <- v].[y <- w] = m.[y <- w].[x <- v]
+by [].
 
-op in_dom(x:'a, m:('a,'b) map): bool = m.[x] <> None.
+(** Domain *)
+op in_dom (x:'a) (m:('a,'b) map) = m.[x] <> None.
 
-op dom : ('a,'b) map -> 'a Set.set.
-
+op dom:('a,'b) map -> 'a ISet.set.
 axiom dom_def: forall (m:('a,'b) map) x,
-  Set.mem x (dom m) <=> m.[x] <> None.
-
-lemma dom_in_dom : forall  (m:('a,'b) map) x,
-  in_dom x m <=> Set.mem x (dom m)
-by [].
-
-(* Lemma about dom and in_dom *)
-lemma upd_in_dom_eq: forall (m:('a,'b) map) x y,
-  in_dom x (m.[x<-y])
-by [].
-
-lemma upd_in_dom_neq: forall (m:('a,'b) map) x1 x2 y,
-  x1 <> x2 => in_dom x2 m.[x1<-y] = in_dom x2 m
-by [].
-
-lemma dom_empty: dom (empty<:'a,'b>) = Set.empty<:'a>.
-proof.
-  apply (Set.extensionality<:'a> (dom empty<:'a,'b>) Set.empty _); smt.
-qed.
-
-lemma in_dom_empty: forall x, !in_dom x empty<:'a, 'b> by [].
-
-lemma dom_update: forall (m:('a,'b) map) x y,
-  dom (m.[x <- y]) = Set.add x (dom m).
-proof.
-intros m x y; apply Set.extensionality; smt.
-save.
-
-(** Formalization of map range *)
-op rng: ('a,'b) map -> 'b Set.set.
-
-axiom rng_def: forall (m:('a,'b) map) y,
-  Set.mem y (rng m) <=> (exists x, m.[x] = Some y).
-
-op in_rng(x:'b, m:('a,'b) map): bool = Set.mem x (rng m).
-
-(* Lemmas about range *)
-lemma upd_in_rng_eq: 
-  forall (m:('a,'b) map) x y1 y2, y1 = y2 => in_rng y1 (m.[x<-y2]) by [].
-
-lemma in_dom_in_rng: forall (m:('a,'b) map) x,
-  in_dom x m => in_rng (proj m.[x]) m.
-proof.
-intros m x Hdom.
-cut Hx : (m.[x] = Some (proj(m.[x])));smt.
-save.
-
-lemma rng_empty: rng (empty<:'a,'b>) = Set.empty.
-proof. by apply Set.extensionality=> x; split=> _; smt. save.
-
-lemma in_rng_empty: forall x, !in_rng x empty<:'a, 'b> by [].
-
-lemma rng_update_not_indom: forall (m:('a,'b) map) x y,
-  !in_dom x m => rng (m.[x <- y]) = Set.add y (rng m).
-proof.
-  intros m x y H.
-  apply Set.extensionality.
-  intros z.
-  rewrite (Set.add_mem<:'b> z y (rng m)).  
-  rewrite (rng_def<:'a,'b> m.[x <- y] z); split; intros H1.
-  smt.
-  elim H1; smt.
-save.
-
-lemma upd_in_rng_neq: forall (m:('a,'b) map) x y1 y2,
-  in_rng y1 m =>
-  (!in_dom x m \/ m.[x] <> Some y1) =>
-  in_rng y1 m.[x<-y2].
-proof.
-  intros=> m x y1 y2; delta in_rng; simplify.
-  intros=> y1_in_m [x_notin_m|mx_neq_y1].
-    rewrite rng_update_not_indom // Set.add_mem.
-    by left; assumption.
-
-    generalize y1_in_m; rewrite rng_def=> [y my_eq_y1].
-    rewrite rng_def; exists y; case (x = y).
-      intros=> eq_xy; smt.
-      by intros=> ne_xy; rewrite get_upd_neq.
-qed.
-
-(** find *) (* TODO: the axiomatization appears to be upside-down *)
-op find: ('a * 'b) cpred -> ('a,'b) map -> 'a option.
-
-axiom find_none1: forall (P:('a * 'b) cpred) m,
-  find P m = None =>
-  (forall x, in_dom x m => !P (x,proj (m.[x]))).
-
-lemma find_none1_aux: forall (P:('a * 'b) cpred) m x,
-  find P m = None =>
-  in_dom x m => !P (x,proj (m.[x]))
-by [].
-
-axiom find_none2: forall (P:('a * 'b) cpred) m,
-  (forall x, in_dom x m => !P (x,proj (m.[x]))) =>
-  find P m = None.
-
-axiom find_some1: forall (P:('a * 'b) cpred) m x,
-  find P m = Some x =>
-  in_dom x m /\ P (x,proj (m.[x])).
-
-axiom find_some2: forall (P:('a * 'b) cpred) m x1,
-  (in_dom x1 m /\ P (x1,proj (m.[x1]))) =>
-  (exists x2, find P m = Some x2).
+  ISet.mem x (dom m) <=> in_dom x m.
 
 (* Lemmas *)
-lemma find_empty: forall P,
-  find<:'a,'b> P empty = None
+lemma dom_empty: dom empty<:'a,'b> = ISet.empty<:'a>.
+proof strict.
+by apply ISet.set_ext; smt.
+qed.
+
+lemma in_dom_setE: forall (x:'a) (m:('a,'b) map) v,
+  in_dom x m.[x <- v]
 by [].
 
-lemma find_some_upd1: forall (P:('a * 'b) cpred) m x y, 
-  find P m <> None => !in_dom x m =>
-  find P m.[x<-y] <> None.
-proof.
-intros P m x y H H0;
-cut H1: (find P m.[x<-y] = None => false).
-  intros Hfnone;cut H1: (find P m = None).
-    apply (find_none2<:'a,'b> P m _).
-      intros z Hz;cut Heq: (z = x => !P (z, proj m.[z])).
-        smt.
-        cut Hneq: (z <> x => !P (z, proj m.[z]));smt.
-      smt.
-  smt.
-save.
-
-lemma find_some_upd2: forall (P:('a * 'b) cpred) m x y, 
-  P (x,y) => find P m.[x <- y] <> None
+lemma in_dom_setNE: forall (x:'a) (m:('a,'b) map) y v,
+  x <> y =>
+  in_dom x m.[y <- v] = in_dom x m
 by [].
 
-lemma find_some_upd3: forall (P:('a * 'b) cpred) m x y, 
-  find P m <> None =>
-  find P m <> Some x =>
-  find P m.[x <- y] <> None.
-proof.
-intros P m x y H H0;cut H1: (exists v, find P m = Some v).
-  smt.
-  elim H1;intros v Hfind_v;cut H3: (exists v, find P m.[x<-y] = Some v).
-    apply (find_some2<:'a,'b> P m.[x<-y] v _);smt.
-  smt.
-save.
+lemma in_dom_empty: forall x, !(in_dom x empty<:'a,'b>) by [].
 
-lemma find_none_upd1: forall (P:('a * 'b) cpred) m x y,
-  find P m = None =>
-  !P (x,y) =>
-  find P m.[x<-y] = None
+lemma dom_set: forall (m:('a,'b) map) x v,
+  dom m.[x <- v] = ISet.add x (dom m).
+proof strict.
+intros=> m x v;
+apply ISet.set_ext; delta ISet.(==); beta=> x'.
+rewrite ISet.mem_add 2!dom_def.
+case (x' = x) => x_x'; last by rewrite in_dom_setNE.
+  by subst x'; split => _; [trivial | apply in_dom_setE].
+qed.
+
+(** Range *)
+op rng: ('a,'b) map -> 'b ISet.set.
+axiom rng_def: forall (m:('a,'b) map) v,
+  ISet.mem v (rng m) <=> (exists x, m.[x] = Some v).
+
+op in_rng (x:'b) (m:('a,'b) map) = ISet.mem x (rng m).
+
+(* Lemmas *)
+lemma in_rng_setE: forall (m:('a,'b) map) x v, in_rng v m.[x <- v] by [].
+
+lemma rng_empty: rng empty<:'a,'b> = ISet.empty.
+proof strict.
+by apply ISet.set_ext; delta ISet.(==); beta=> v;
+   rewrite rng_def; smt.
+qed.
+
+lemma in_rng_empty: forall (v:'b), !(in_rng v empty<:'a,'b>) by [].
+
+lemma nin_dom_rng_set: forall (x:'a) m (v:'b),
+  !(in_dom x m) =>
+  rng (m.[x <- v]) = ISet.add v (rng m).
+proof strict.
+intros=> x m v x_in_dom_m.
+apply ISet.set_ext; delta ISet.(==); beta=> v'.
+rewrite ISet.mem_add rng_def; split=> in_rng; first smt.
+  elim in_rng; clear in_rng; rewrite 1?rng_def=> in_rng; last smt.
+  elim in_rng; clear in_rng => x0 in_rng; exists x0; smt.
+qed.
+
+lemma in_rng_setNE_in_rng: forall (v:'b) (m:('a,'b) map) x v',
+  v <> v' =>
+  in_rng v m.[x <- v'] =>
+  in_rng v m.
+proof strict.
+intros=> v m x v' v_neq_v';
+delta in_rng beta; rewrite 2!rng_def=> v_in_rng_set;
+elim v_in_rng_set=> {v_in_rng_set} x' get_set;
+cut x_neq_x':x' <> x.
+  generalize get_set; apply absurd; simplify=> x_x'; subst x'; rewrite get_setE; smt. (* TODO: Injectivity lemma *)
+  generalize get_set; rewrite get_setNE; first smt.
+    intros=> m_x'_v; exists x'=> //.
+qed.
+
+lemma in_rng_setNE: forall (v:'b) (m:('a,'b) map) x v',
+  in_rng v m =>
+  (!in_dom x m \/ m.[x] <> Some v) =>
+  in_rng v m.[x <- v'].
+proof strict.
+delta in_rng beta;
+intros=> v m x v';
+rewrite 2!rng_def;
+intros=> v_in_rng_m in_dom_or_neq;
+elim in_dom_or_neq; smt.
+qed.
+
+
+(** General lemmas on rng and dom *)
+lemma onto_rng: forall (m:('a,'b) map) v,
+  in_rng v m => exists x, in_dom x m /\ m.[x] = Some v
 by [].
 
-lemma find_none_upd2: forall (P:('a * 'b) cpred) m x y,
-  find P m = None =>
-  P (x,y) = true =>
-  find P m.[x<-y] = Some x.
-proof.
-intros P m x y H H1;cut Hnone: (forall x', in_dom x' m => !P (x',proj m.[x'])).
-  intros x' Hxindom;smt.
-  cut Hsuff: (exists x', find P m.[x<-y] = Some x').
-    smt.
-    elim Hsuff;intros x' Hfind;cut Hindom: (in_dom x' m.[x<-y]). 
-      smt. 
-      cut HP: (P (x',proj m.[x<-y].[x']) = true).
-        smt.
-        cut Hor: (x = x' \/ in_dom x' m).
-          smt.
-          elim Hor;intros Heq;smt.
-save.
+lemma map_fun: forall (m:('a,'b) map) x,
+  in_dom x m => exists v, in_rng v m /\ m.[x] = Some v.
+proof strict.
+delta in_dom beta;
+intros=> m x x_in_m; exists (proj m.[x]); split; last smt.
+  delta in_rng beta; rewrite rng_def; exists x; smt.
+qed.
 
-(** remove *)
-op rm (x:'a,m:('a,'b) map): ('a,'b) map =
- Map_why.__set m x None.
+(** find *)
+op find: ('a -> 'b cpred) -> ('a,'b) map -> 'a option.
 
-(* Lemma *)
-lemma rm_not_in_dom: forall (m:('a,'b) map) x, !in_dom x (rm x m) by [].
+axiom find_nin: forall (p:'a -> 'b cpred) m,
+  (forall x, in_dom x m => !(p x (proj m.[x]))) =>
+  find p m = None.
 
-lemma rm_upd: forall (m:('a,'b) map) x, !in_dom x m => rm x m = m by [].
+axiom find_in: forall (p:'a -> 'b cpred) (m:('a,'b) map),
+  (exists x, in_dom x m /\ p x (proj m.[x])) =>
+  (exists x, find p m = Some x).
 
-lemma rm_rest_dom: forall x y (m:('a,'b) map),
-  x <> y => in_dom y (rm x m) = in_dom y m
+axiom find_cor: forall (p:'a -> 'b cpred) m x,
+  find p m = Some x =>
+  in_dom x m /\ p x (proj m.[x]).
+
+(* Lemmas *)
+lemma find_none: forall (p:'a -> 'b cpred) m,
+  find p m = None <=>
+  (forall x, in_dom x m => !(p x (proj m.[x])))
 by [].
 
-lemma rm_val: forall x y (m:('a,'b) map),
-  x <> y => in_dom y m =>
-  m.[y] = (rm x m).[y]
+lemma find_some: forall (p:'a -> 'b cpred) m,
+  (exists x, find p m = Some x) <=>
+  (exists x, in_dom x m /\ p x (proj m.[x]))
 by [].
 
-lemma rm_find: forall (P:('a * 'b) cpred) m x y,
-  find P m = Some y => x <> y =>
-  find P (rm x m) <> None.
-proof.
-intros P m x y Hfind Hneq;
-cut H: (in_dom y m /\ P (y,proj (m.[y])) = true).
-  smt.
-  cut H': (in_dom y (rm x m) /\ P (y,proj ((rm x m).[y])) = true);smt.
-save.
+lemma find_empty: forall (p:'a -> 'b cpred),
+  find p empty = None
+by [].
 
-(** extensional equality *)
-pred (==) (m1 m2:('a,'b) map) = forall x, m1.[x] = m2.[x].
+(** rm *)
+op rm (x:'a) (m:('a,'b) map) = Map_why.__set m x None.
 
-axiom extensionality: forall (m1 m2:('a,'b) map),
-  m1 == m2 => m1 = m2.
+(* Lemmas *)
+lemma rm_nin_dom: forall (x:'a) (m:('a,'b) map),
+  !(in_dom x (rm x m))
+by [].
 
-(** equal except *)
-pred eq_except(m1 m2:('a,'b) map, x) =
+lemma rm_set: forall (x:'a) (m:('a,'b) map),
+  !(in_dom x m) => rm x m = m
+by [].
+
+lemma dom_rm: forall x (m:('a,'b) map),
+  dom (rm x m) = ISet.rm x (dom m).
+proof strict.
+intros=> x m; apply ISet.set_ext;
+delta ISet.(==); beta=> x0; split; last smt.
+case (x0 = x)=> x0_x.
+  subst x0; apply absurd=> nconcl; rewrite dom_def; apply rm_nin_dom.
+
+  case (ISet.mem x (dom m)); last smt.
+    rewrite dom_def ISet.mem_rm_neq //; smt.
+qed.
+
+(** eq_except*)
+pred eq_except (m1 m2:('a,'b) map) x =
   forall y, x <> y => m1.[y] = m2.[y].
 
+(* Lemmas *)
+lemma eqe_refl: forall (m:('a,'b) map) x,
+  eq_except m m x
+by [].
+
 lemma eqe_symm: forall (m1 m2:('a,'b) map) x,
-  eq_except m1 m2 x = eq_except m2 m1 x
+  eq_except m1 m2 x => eq_except m2 m1 x
 by [].
 
 lemma eqe_trans: forall (m1 m2 m3:('a,'b) map) x,
+  eq_except m1 m2 x => eq_except m2 m3 x => eq_except m1 m3 x
+by [].
+
+lemma eqe_set: forall (m1 m2:('a,'b) map) x x' y,
   eq_except m1 m2 x =>
-  eq_except m2 m3 x =>
-  eq_except m1 m3 x
+  eq_except m1.[x' <- y] m2.[x' <- y] x
 by [].
 
-lemma eqe_refl: forall (m:('a,'b) map) x, eq_except m m x
-by [].
-
-lemma eqe_update_diff: forall (m1 m2:('a,'b) map) x1 x2 y,
-  eq_except m1 m2 x1 => 
-  eq_except m1.[x2 <- y] m2.[x2 <- y]  x1
-by [].
-
-lemma eqe_update_same: forall (m1 m2:('a,'b) map) x y,
-  eq_except m1 m2 x => eq_except m1.[x<-y] m2 x
-by [].
-
-lemma eq_except_eq: forall (m1 m2:('a,'b) map) x z,
-  eq_except m1 m2 x => 
-  m1.[x] = Some z =>
-  m1 = m2.[x <- z]
-by [].
-
-(*
-(* Alternative Definition *)
-lemma eq_except_def: forall (m1 m2:('a,'b) map) x,
-  in_dom x m2 =>
+lemma eqe_eq: forall (m1 m2:('a,'b) map) x,
   eq_except m1 m2 x =>
-  exists z, m1.[x<-z] = m2.
-proof.
-intros m1 m2 x x_in_dom_m2 m1_eq_except_m2_x;
-cut H: (exists z, m2.[x] = Some z);[ smt | idtac ].
-elim H;intros z m2_z.
-cut eq_except: (m2 = m1.[x <- z]);[ idtac | smt ].
-apply (eq_except_eq<:'a,'b> m2 m1 x z _ _ _);smt.
-save.
-*)
-(** Disjointness of maps *)
-pred disj(m1 m2:('a,'b) map) = forall x,
-  !in_dom x m1 \/ !in_dom x m2.
+  m1.[x] <> None =>
+  m1 = m2.[x <- proj m1.[x]].
+proof strict.
+intros=> m1 m2 x eqe m1_x_nnone;
+apply map_ext; delta (==) beta=> x';
+cut m1_x_some: exists z, m1.[x] = Some z.
+  generalize m1_x_nnone; apply absurd; simplify; smt.
+elim m1_x_some=> {m1_x_some} z m1_x_some; rewrite m1_x_some proj_def; smt.
+qed.
 
-lemma disj_comm: forall (m1 m2:('a,'b) map),
+(** disj *)
+pred disj (m1 m2:('a,'b) map) =
+  forall x, !in_dom x m1 \/ !in_dom x m2.
+
+lemma disjC: forall (m1 m2:('a,'b) map),
   disj m1 m2 <=> disj m2 m1
 by [].
 
-lemma disj_empty: forall (m:('a,'b) map),
-  disj m empty
+lemma disj0m: forall (m:('a,'b) map),
+  disj empty m
 by [].
 
-lemma disj_upd: forall (m1 m2:('a,'b) map) x y,
-  disj m1 m2 => !in_dom x m1 =>
-  disj m1 m2.[x<-y]
+lemma disj_set: forall (m1 m2:('a,'b) map) x v,
+  disj m1 m2 =>
+  !in_dom x m2 =>
+  disj m1.[x <- v] m2
 by [].
 
 lemma disj_rm: forall (m1 m2:('a,'b) map) x,
-  disj m1 m2 => disj (rm x m1) m2
+  disj m1 m2 =>
+  disj (rm x m1) m2
 by [].
 
-(** Split a map in two maps *)
-pred split_map(m m1 m2:('a,'b) map) =
- disj m1 m2 /\
- (forall x, in_dom x m <=> (in_dom x m1 \/ in_dom x m2)) /\
- (forall x, in_dom x m1 => m.[x] = m1.[x]) /\
- (forall x, in_dom x m2 => m.[x] = m2.[x]).
+(** split *)
+pred splitm(m m1 m2:('a,'b) map) =
+  disj m1 m2 /\
+  (forall x, in_dom x m <=> (in_dom x m1 \/ in_dom x m2)) /\
+  (forall x, in_dom x m1 => m.[x] = m1.[x]) /\
+  (forall x, in_dom x m2 => m.[x] = m2.[x]).
 
-lemma split_map_empty: forall (m:('a,'b) map),
-  split_map m m empty
+lemma splitm_empty: forall (m:('a,'b) map),
+  splitm m m empty
 by [].
 
-lemma split_map_comm: forall (m m1 m2:('a,'b) map),
-  split_map m m1 m2 = split_map m m2 m1
-by []. 
-
-lemma split_map_upd: forall (m m1 m2:('a,'b) map) x y,
- split_map m m1 m2 =>
- !in_dom x m2 =>
- split_map m.[x<-y] m1.[x<-y] m2
+lemma splitmC: forall (m m1 m2:('a,'b) map),
+  splitm m m1 m2 <=> splitm m m2 m1
 by [].
 
-lemma split_map_rm: forall (m m1 m2:('a,'b) map) x,
- split_map m m1 m2 => 
- !in_dom x m2 => 
- split_map (rm x m) (rm x m1) m2
-by [].
+lemma splitm_set: forall (m m1 m2:('a,'b) map) x v,
+  splitm m m1 m2 =>
+  !in_dom x m2 =>
+  splitm m.[x <- v] m1.[x <- v] m2.
+proof strict.
+by intros=> m m1 m2 x v splitm_m x_nin_m2; delta splitm beta;
+   progress; smt.
+qed.
+
+lemma splitm_rm: forall (m m1 m2:('a,'b) map) x,
+  splitm m m1 m2 =>
+  !in_dom x m2 =>
+  splitm (rm x m) (rm x m1) m2.
+proof strict.
+by intros=> m m1 m2 x splitm_m x_nin_m2; delta splitm beta;
+   progress; smt.
+qed.
+
+(** pre *)
+pred pre (p:'a -> bool) (m:('a,'b) map) =
+  forall x, in_dom x m => p x.
+
+(** post *)
+pred post (p:'b -> bool) (m:('a,'b) map) =
+  forall x, in_dom x m => p (proj m.[x]).
+
+lemma post_rng: forall p (m:('a,'b) map),
+  post p m <=> forall v, in_rng v m => p v.
+proof strict.
+intros=> p m; split; smt.
+qed.
+
+(* TODO: the lemmas might need wrapped for ease of use *)
+theory DefaultGet.
+  op __get (m:('a,'b) map) (dv:'b) (x:'a): 'b =
+    let r = get m x in if (r <> None) then proj r else dv.
+end DefaultGet.
+
+theory PartialGet.
+  op __get (m:('a,'b) map) (x:'a): 'b = proj (get m x).
+end PartialGet.

@@ -1,6 +1,6 @@
 require import Distr.
 require import Set.
-require import Map.
+require import Map. import OptionGet.
 require import Int.
 
 module type O = { 
@@ -98,6 +98,7 @@ proof.
     wp.
     rnd (1%r) (lambda (x:int), 0 <= x /\ x <= 10) .
     wp; skip.
+    trivial.
     intros &hr h2.
     split; first apply d_inter_lossless.
     smt.
@@ -107,7 +108,9 @@ proof.
     inline RO.hash.
     wp.
     rnd (1%r) (lambda (x:int), 0 <= x /\ x <= 10) .
-    wp;skip;intros &hr _.
+    wp;skip.
+    trivial.
+    intros &hr _.
     split; first apply d_inter_lossless.
     smt.
 

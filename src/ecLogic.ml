@@ -180,6 +180,8 @@ let t_try_base t g =
   try `Success (t g)
   with e when is_user_error e -> `Failure e
 
+let t_fail _g = tacuerror "FAIL TACTIC"
+
 let t_try t g =
   match t_try_base t g with
   | `Failure _ -> t_id None g
@@ -389,6 +391,7 @@ let check_arg do_arg hyps s x gty a =
   | GTmodty (emt, restr), AAmp (mp, mt)  ->
     let env = (LDecl.toenv hyps) in
     check_modtype_restr env mp mt emt restr;
+    EcPV.check_module_in env mp emt;
     Fsubst.f_bind_mod s x mp, RA_mp mp
   | _ -> assert false (* FIXME error message *)
 
@@ -1181,3 +1184,10 @@ let t_congr f (args, ty) g =
             (t_transitivity (EcFol.f_app m1 [a2] ty) g)
   in
     t_on_goals (t_try t_assumption) (doit (List.rev args) ty g)
+
+
+(* -------------------------------------------------------------------- *)
+
+let t_trivial = 
+  t_or (t_lseq [t_progress (t_id None); t_assumption;t_fail])
+    (t_id None)

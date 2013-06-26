@@ -15,98 +15,6 @@ open EcMetaProg
 
 module Zpr = EcMetaProg.Zipper
 
-let get_abs_functor f = 
-  let f = f.EcPath.x_top in
-  match f.EcPath.m_top with
-  | `Abstract _ -> EcPath.mpath (f.EcPath.m_top) []
-  | _ -> assert false
-
-let rec f_write ?(except_fs=Sx.empty) env w f =
-  let f = NormMp.norm_xpath env f in
-  let func = Fun.by_xpath f env in
-  match func.f_def with
-  | FBabs oi ->
-    let mp = get_abs_functor f in
-    List.fold_left (fun w o -> if Sx.mem o except_fs then w else f_write env w o)
-      (PV.add_glob env mp w) oi.oi_calls
-  | FBdef fdef ->
-    let add x w = 
-      let vb = Var.by_xpath x env in
-      PV.add env (pv_glob x) vb.vb_type w in
-    let w = EcPath.Sx.fold add fdef.f_uses.us_writes w in
-    List.fold_left (f_write env) w fdef.f_uses.us_calls
-
-(* computes the program variables occurring free in f with memory m *)
-
-let lp_write env w lp = 
-  let add w (pv,ty) = PV.add env pv ty w in
-  match lp with
-  | LvVar pvt -> add w pvt 
-  | LvTuple pvs -> List.fold_left add w pvs 
-  | LvMap ((_p,_tys),pv,_,ty) -> add w (pv,ty) 
-
-let rec is_write ?(except_fs=Sx.empty) env w s = 
-  List.fold_left (i_write ~except_fs env) w s
-
-and s_write ?(except_fs=Sx.empty) env w s = 
-  is_write ~except_fs env w s.s_node
-
-and i_write ?(except_fs=Sx.empty) env w i = 
-  match i.i_node with
-  | Sasgn (lp,_) -> lp_write env w lp
-  | Srnd (lp,_) -> lp_write env w lp
-  | Scall(lp,f,_) -> 
-    let w  = match lp with None -> w | Some lp -> lp_write env w lp in    
-    f_write ~except_fs env w f 
-  | Sif (_,s1,s2) -> s_write env (s_write env w s1) s2
-  | Swhile (_,s) -> s_write env w s
-  | Sassert _ -> w 
-    
-let rec f_read env r f = 
-  let f = NormMp.norm_xpath env f in
-  let func = Fun.by_xpath f env in
-  match func.f_def with
-  | FBabs oi ->
-    let mp = get_abs_functor f in
-    List.fold_left (f_read env) (PV.add_glob env mp r) oi.oi_calls
-  | FBdef fdef ->
-    let add x r = 
-      let vb = Var.by_xpath x env in
-      PV.add env (pv_glob x) vb.vb_type r in
-    let r = EcPath.Sx.fold add fdef.f_uses.us_reads r in
-    List.fold_left (f_read env) r fdef.f_uses.us_calls
-
-let rec e_read env r e = 
-  match e.e_node with
-  | Evar pv -> PV.add env pv e.e_ty r
-  | _ -> e_fold (e_read env) r e
-
-let lp_read env r lp = 
-  match lp with
-  | LvVar _ -> r
-  | LvTuple _ -> r
-  | LvMap ((_,_),pv,e,ty) -> e_read env (PV.add env pv ty r) e
-
-let rec is_read env w s = List.fold_left (i_read env) w s
-
-and s_read env w s = is_read env w s.s_node
-
-and i_read env r i = 
-  match i.i_node with
-  | Sasgn (lp,e) -> e_read env (lp_read env r lp) e
-  | Srnd (lp,e)  -> e_read env (lp_read env r lp) e 
-  | Scall(lp,f,es) -> 
-    let r = List.fold_left (e_read env) r es in
-    let r  = match lp with None -> r | Some lp -> lp_read env r lp in
-    f_read env r f 
-  | Sif (e,s1,s2) -> s_read env (s_read env (e_read env r e) s1) s2
-  | Swhile (e,s) -> s_read env (e_read env r e) s
-  | Sassert e -> e_read env r e
-
-let f_write ?(except_fs=Sx.empty) env f = f_write ~except_fs env PV.empty f
-let f_read  env f = f_read env PV.empty f
-let s_write ?(except_fs=Sx.empty) env s = s_write ~except_fs env PV.empty s
-let s_read  env s = s_read  env PV.empty s
 
 (* -------------------------------------------------------------------- *)
 
@@ -615,6 +523,23 @@ let abstract_info2 env fl' fr' =
   else 
     topl, fl, oil, sigl, topr, fr, oir, sigr
 
+let check_wr env needed top o_l o_r = 
+  if not needed then 
+    let wl,wr = f_write env o_l, f_write env o_r in
+    let rl,rr = f_read env o_l, f_read env o_r in
+    let error f msg = 
+      let ppe = EcPrinting.PPEnv.ofenv env in
+      EcLogic.tacuerror "The function %a should not %s variables of %a"
+        (EcPrinting.pp_funname ppe) f msg
+        (EcPrinting.pp_topmod ppe) top in
+    if PV.mem_glob env top rl then error o_l "read";
+    if PV.mem_glob env top rr then error o_r "read";
+    if PV.mem_glob env top wl then error o_l "write";
+    if PV.mem_glob env top wr then error o_r "write"
+     
+        
+        
+    
 let equivF_abs_spec env fl fr inv = 
   let topl, fl, oil,sigl, topr, fr, oir,sigr = abstract_info2 env fl fr in
   let ml, mr = mleft, mright in
@@ -623,20 +548,24 @@ let equivF_abs_spec env fl fr inv =
   PV.check_depend env fvl topl;
   PV.check_depend env fvr topr;
   let eqglob = f_eqglob topl ml topr mr in
+  let lpre = if oil.oi_in then [eqglob;inv] else [inv] in
   let ospec o_l o_r = 
+    check_wr env oil.oi_in topl o_l o_r;
     let fo_l = EcEnv.Fun.by_xpath o_l env in
     let fo_r = EcEnv.Fun.by_xpath o_r env in
     let eq_params = 
       f_eqparams o_l fo_l.f_sig.fs_params ml o_r fo_r.f_sig.fs_params mr in
     let eq_res = f_eqres o_l fo_l.f_sig.fs_ret ml o_r fo_r.f_sig.fs_ret mr in
-    let pre = EcFol.f_ands [eq_params;eqglob;inv] in
-    let post = EcFol.f_ands [eq_res;eqglob;inv] in
+    (* TODO : Did we really want this eqglob, or just that oracle do not 
+              modify glob ? *)  
+    let pre = EcFol.f_ands (eq_params::lpre) in
+    let post = EcFol.f_ands (eq_res::lpre) in
     f_equivF pre o_l o_r post in
   let sg = List.map2 ospec oil.oi_calls oir.oi_calls in
   let eq_params = 
     f_eqparams fl sigl.fs_params ml fr sigr.fs_params mr in
   let eq_res = f_eqres fl sigl.fs_ret ml fr sigr.fs_ret mr in
-  let pre = f_ands [eq_params; eqglob; inv] in
+  let pre = f_ands (eq_params::lpre) in
   let post = f_ands [eq_res; eqglob; inv] in
   pre, post, sg
 
@@ -658,14 +587,16 @@ let equivF_abs_upto env fl fr bad invP invQ =
   PV.check_depend env fvr topr;
   (* TODO check there is only global variable *)
   let eqglob = f_eqglob topl ml topr mr in
+  let lpre = if oil.oi_in then [eqglob;invP] else [invP] in
   let ospec o_l o_r = 
+    check_wr env oil.oi_in topl o_l o_r;
     let fo_l = EcEnv.Fun.by_xpath o_l env in
     let fo_r = EcEnv.Fun.by_xpath o_r env in
     let eq_params = 
       f_eqparams o_l fo_l.f_sig.fs_params ml o_r fo_r.f_sig.fs_params mr in
     let eq_res = f_eqres o_l fo_l.f_sig.fs_ret ml o_r fo_r.f_sig.fs_ret mr in
-    let pre = EcFol.f_ands [EcFol.f_not bad2; eq_params;eqglob;invP] in
-    let post = EcFol.f_if bad2 invQ (f_ands [eq_res;eqglob;invP]) in
+    let pre = EcFol.f_ands (EcFol.f_not bad2 :: eq_params :: lpre) in
+    let post = EcFol.f_if_simpl bad2 invQ (f_ands (eq_res::lpre)) in
     let cond1 = f_equivF pre o_l o_r post in
     let cond2 =
       let q = Fsubst.f_subst_mem ml EcFol.mhr invQ in
@@ -682,8 +613,8 @@ let equivF_abs_upto env fl fr bad invP invQ =
   let eq_params = 
     f_eqparams fl sigl.fs_params ml fr sigr.fs_params mr in
   let eq_res = f_eqres fl sigl.fs_ret ml fr sigr.fs_ret mr in
-  let pre = f_if bad2 invQ (f_ands [eq_params;eqglob;invP]) in
-  let post = f_if bad2 invQ (f_ands [eq_res;eqglob;invP]) in
+  let pre = f_if_simpl bad2 invQ (f_ands (eq_params::lpre)) in
+  let post = f_if_simpl bad2 invQ (f_ands [eq_res;eqglob;invP]) in
   pre, post, sg
 
 let t_equivF_abs_upto bad invP invQ g = 
@@ -706,11 +637,12 @@ let t_bdHoare_skip g =
   let concl = get_concl g in
   let bhs = destr_bdHoareS concl in
   if bhs.bhs_s.s_node <> [] then tacerror NoSkipStmt;
-  if (bhs.bhs_bd <> f_r1 || (bhs.bhs_cmp <> FHeq && bhs.bhs_cmp <> FHge)) then
-    cannot_apply "skip" "expected \">= 1\" as bound";
+  if (bhs.bhs_cmp <> FHeq && bhs.bhs_cmp <> FHge) then
+    cannot_apply "skip" "bound must be \">= 1\"";
+  let eq_to_one = f_eq bhs.bhs_bd f_r1 in
   let concl = f_imp bhs.bhs_pr bhs.bhs_po in
   let concl = gen_mems [bhs.bhs_m] concl in
-  prove_goal_by [concl] RN_hl_skip g
+  prove_goal_by [eq_to_one;concl] RN_hl_skip g
 
 let t_equiv_skip g =
   let concl = get_concl g in
@@ -1757,7 +1689,7 @@ let t_failure_event at_pos cntr delta q f_event some_p g =
         | Some m -> m 
         | None -> cannot_apply "fel" "Cannot find memory (bug?)"
       in
-      let memenv, fdef, env_ = 
+      let memenv, fdef, _env = 
         try Fun.hoareS f env
         with _ -> 
           cannot_apply "fel" "not applicable to abstract functions"
@@ -1771,7 +1703,6 @@ let t_failure_event at_pos cntr delta q f_event some_p g =
       (* subgoal on the bounds *)
       let bound_goal = 
         let v1 = f_real_of_int (f_int_prod q (f_int_sub q (f_int 1))) in
-        (* let v2 = f_real_of_int (f_int_pow (f_int 2) (f_int_sum l (f_int 1))) in *)
         let v = f_real_prod v1 delta  in
         f_real_le v bd
       in
@@ -2243,3 +2174,38 @@ let t_bdeq g =
 (* -------------------------------------------------------------------- *)
 
 
+let t_eqobs_inS finfo eqo inv g =
+  let env, hyps, concl = get_goal_e g in
+  let es = destr_equivS concl in
+  let ml, mr = fst es.es_ml, fst es.es_mr in
+  (* TODO check that inv contains only global *)
+  let ifvl = PV.fv env ml inv in
+  let ifvr = PV.fv env mr inv in
+  let sl,sr,sg,eqi = 
+    EcPV.eqobs_in env (fun env _ f1 f2 eqo -> finfo env f1 f2 eqo) 
+      es.es_sl es.es_sr eqo (inv,ifvl, ifvr) in
+  let post = Mpv2.to_form ml mr eqo inv in
+  if not (EcReduction.is_alpha_eq hyps post es.es_po) then
+    tacuerror "eqobs_in can not be apply";
+  let pre = Mpv2.to_form ml mr eqi inv in
+  let concl = 
+    f_equivS es.es_ml es.es_mr es.es_pr sl sr pre in
+  prove_goal_by (sg@[concl]) RN_eqobs_in g
+
+(*
+let t_eqobs_inF finfo eqo inv g =
+  let env,hyps,concl = get_goal_e g in
+  let ef = destr_equivF concl in
+  let fl = NormMp.norm_xpath env ef.ef_fl in
+  let fr = NormMp.norm_xpath env ef.ef_fr in
+  match Fun.by_xpath fl env, Fun.by_xpath fr env with
+  | FBabs _, FBabs _ ->
+    t_equivF_abs (Mpv2.to_post mleft mright eqo inv) g
+  | F 
+*)    
+    
+    
+
+
+
+  

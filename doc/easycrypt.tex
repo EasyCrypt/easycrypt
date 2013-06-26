@@ -1,5 +1,7 @@
 \documentclass[a4paper,notitlepage]{book}
 
+\usepackage[utf8]{inputenc}
+
 \usepackage{multicol}
 \usepackage[authoryear,longnamesfirst,round]{natbib}
 \usepackage{multind}
@@ -10,6 +12,8 @@
 \usepackage{infer}
 \usepackage[pagebackref,colorlinks=true,linkcolor=black,linktoc=all,citecolor=blue]{hyperref}
 \usepackage[usenames,dvipsnames]{xcolor}
+
+\newcommand{\rname}[1]{[\textsc{#1}]}
 
 \makeindex{easycrypt}
 \makeindex{ambient}

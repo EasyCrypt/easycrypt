@@ -71,13 +71,14 @@
   let pflist loc ti (es : pformula    list) : pformula    = 
     List.fold_right (fun e1 e2 -> pf_cons loc ti e1 e2) es (pf_nil loc ti)
 
-  let mk_axiom ?(o = `Global) (x, ty, vd, f) k = 
-    { pa_name    = x ;
-      pa_scope   = o ;
+  let mk_axiom ?(local = false) ?(exsmt = true) (x, ty, vd, f) k = 
+    { pa_name    = x;
+      pa_exsmt   = exsmt;
       pa_tyvars  = ty;
       pa_vars    = vd;
-      pa_formula = f ; 
-      pa_kind    = k ; }
+      pa_formula = f; 
+      pa_kind    = k;
+      pa_local   = local; }
 
   let str_and b = if b then "&&" else "/\\"
   let str_or  b = if b then "||" else "\\/"
@@ -112,6 +113,9 @@
       fp_args = args; }
 
   let mk_core_tactic t = { pt_core = t; pt_intros = []; }
+
+  let mk_topmod ~local def =
+    { ptm_def = def; ptm_local = local; }
 %}
 
 %token <EcSymbols.symbol> LIDENT
@@ -224,6 +228,7 @@
 %token MODPATH
 %token MODULE
 %token NE
+%token NOSMT
 %token NOT
 %token OF
 %token OFF
@@ -258,6 +263,7 @@
 %token SAME
 %token SAMPLE
 %token SAVE
+%token SECTION
 %token SEMICOLON
 %token SEQ
 %token SIMPLIFY
@@ -289,6 +295,7 @@
 %token WHY3
 %token WITH
 %token WP
+%token EQOBSIN
 %token ZETA 
 
 %token <string> OP1 OP2 OP3 OP4
@@ -1011,6 +1018,11 @@ mod_def:
              (x, mk_loc body.pl_loc (mk_mod ?modtypes:t p st)) }
 ;
 
+top_mod_def:
+| x=mod_def       { mk_topmod ~local:false x }
+| LOCAL x=mod_def { mk_topmod ~local:true  x }
+;
+
 mod_params:
 | LPAREN a=plist1(sig_param, COMMA) RPAREN  { a }
 ;
@@ -1072,20 +1084,15 @@ signature_item:
 ;
 
 ifun_decl:
-| x=lident pd=param_decl COLON ty=loc(type_exp)
-    { { pfd_name     = x   ;
-        pfd_tyargs   = pd  ;
-        pfd_tyresult = ty  ;
-        pfd_uses     = None; }
-    }
-
-| x=lident pd=param_decl COLON ty=loc(type_exp) us=brace(qident*)
-    { { pfd_name     = x      ;
-        pfd_tyargs   = pd     ;
-        pfd_tyresult = ty     ;
-        pfd_uses     = Some us; }
+| x=lident pd=param_decl COLON ty=loc(type_exp) us=brace(oracle_info)?
+    { { pfd_name     = x ;
+        pfd_tyargs   = pd;
+        pfd_tyresult = ty;
+        pfd_uses     = us; }
     }
 ;
+oracle_info:
+| i=STAR? qs=qident* { i=None, qs }
 
 ivar_decl:
 | x=lident COLON ty=loc(type_exp)
@@ -1238,31 +1245,37 @@ lemma_decl :
 | x=ident tyvars=tyvars_decl pd=pgtybindings? COLON f=form { x,tyvars,pd,f }
 ;
 
+nosmt:
+| NOSMT { false }
+| empty { true  }
+;
+
 local:
-| LOCAL { `Local  }
-| empty { `Global }
+| LOCAL { true  }
+| empty { false }
+;
 
 axiom:
-| AXIOM d=lemma_decl 
-    { mk_axiom d PAxiom }
+| l=local AXIOM o=nosmt d=lemma_decl 
+    { mk_axiom ~local:l ~exsmt:o d PAxiom }
 
-| LEMMA o=local d=lemma_decl
-    { mk_axiom ~o d PILemma }
+| l=local LEMMA o=nosmt d=lemma_decl
+    { mk_axiom ~local:l ~exsmt:o d PILemma }
 
-| LEMMA o=local d=lemma_decl BY t=tactic
-    { mk_axiom ~o d (PLemma (Some t)) }
+| l=local LEMMA o=nosmt d=lemma_decl BY t=tactic
+    { mk_axiom ~local:l ~exsmt:o d (PLemma (Some t)) }
 
-| LEMMA o=local d=lemma_decl BY LBRACKET RBRACKET
-    { mk_axiom ~o d (PLemma None) }
+| l=local LEMMA o=nosmt d=lemma_decl BY LBRACKET RBRACKET
+    { mk_axiom ~local:l ~exsmt:o d (PLemma None) }
 
-| EQUIV x=ident pd=pgtybindings? COLON p=loc(equiv_body(none))
-    { mk_axiom (x, None, pd, p) PILemma }
+| l=local EQUIV x=ident pd=pgtybindings? COLON p=loc(equiv_body(none))
+    { mk_axiom ~local:l (x, None, pd, p) PILemma }
 
-| EQUIV x=ident pd=pgtybindings? COLON p=loc(equiv_body(none)) BY t=tactic
-    { mk_axiom (x, None, pd, p) (PLemma (Some t)) }
+| l=local EQUIV x=ident pd=pgtybindings? COLON p=loc(equiv_body(none)) BY t=tactic
+    { mk_axiom ~local:l (x, None, pd, p) (PLemma (Some t)) }
 
-| EQUIV x=ident pd=pgtybindings? COLON p=loc(equiv_body(none)) BY LBRACKET RBRACKET
-    { mk_axiom (x, None, pd, p) (PLemma None) }
+| l=local EQUIV x=ident pd=pgtybindings? COLON p=loc(equiv_body(none)) BY LBRACKET RBRACKET
+    { mk_axiom ~local:l (x, None, pd, p) (PLemma None) }
 ;
 
 (* -------------------------------------------------------------------- *)
@@ -1270,6 +1283,9 @@ axiom:
 
 theory_open  : THEORY  x=uident  { x }
 theory_close : END     x=uident  { x }
+
+section_open  : SECTION     { () }
+section_close : END SECTION { () }
 
 import_flag:
 | IMPORT { `Import }
@@ -1346,9 +1362,10 @@ intro_pattern_1_name:
 ;
 
 intro_pattern_1:
-| UNDERSCORE { None }
-| s=intro_pattern_1_name {Some (s, `noRename)}
-| s=intro_pattern_1_name QUESTION {Some (s, `withRename)}
+| UNDERSCORE { `noName }
+| QUESTION { `findName }
+| s=intro_pattern_1_name {`noRename s}
+| s=intro_pattern_1_name NOT {`withRename s}
 ;
 
 intro_pattern:
@@ -1724,7 +1741,7 @@ phltactic:
 
 | FEL at_pos=NUM cntr=sform delta=sform q=sform f_event=sform some_p=sform
    {Pfel (at_pos,(cntr,delta,q,f_event,some_p))}
-
+| EQOBSIN f1=sform f2=sform f3=sform {Peqobs_in (f1,f2,f3) }
 (* basic pr based tacs *)
 | HOARE {Phoare}
 | BDHOARE {Pbdhoare}
@@ -1956,7 +1973,9 @@ global_:
 | theory_export    { GthExport    $1 }
 | theory_clone     { GthClone     $1 }
 | theory_w3        { GthW3        $1 }
-| mod_def          { Gmodule      $1 }
+| section_open     { GsctOpen        }
+| section_close    { GsctClose       }
+| top_mod_def      { Gmodule      $1 }
 | sig_def          { Ginterface   $1 }
 | type_decl_or_def { Gtype        $1 }
 | datatype_def     { Gdatatype    $1 }
