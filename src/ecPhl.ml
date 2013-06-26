@@ -58,7 +58,6 @@ let add_side name m =
 let id_of_pv pv m =
   add_side (EcPath.basename pv.pv_name.EcPath.x_sub) m 
 
-
 let id_of_mp mp m = 
   let name = 
     match mp.EcPath.m_top with

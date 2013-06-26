@@ -1454,7 +1454,6 @@ module Mod = struct
       | GTmodty (p,r) -> bind_local x p r env
       | _ -> env in
     List.fold_left do1 env bd
-
 end
 
 (* -------------------------------------------------------------------- *)

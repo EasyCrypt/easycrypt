@@ -104,10 +104,8 @@ type oracle_info = {
 }
 
 type module_sig_body_item =
-(*  | Tys_variable of variable *)
-  | Tys_function of funsig * oracle_info
-           (* oracle_info contain only function provided by the 
-              module parameters *)
+(* oracle_info contain only function provided by the module parameters *)
+| Tys_function of funsig * oracle_info
 
 type module_sig_body = module_sig_body_item list
 
@@ -131,8 +129,8 @@ type function_def = {
 }
 
 type function_body =
-| FBdef of function_def
-| FBabs of oracle_info
+  | FBdef of function_def
+  | FBabs of oracle_info
 
 type function_ = {
   f_name   : symbol;
@@ -141,13 +139,11 @@ type function_ = {
 }
 
 (* -------------------------------------------------------------------- *)
-
 type module_expr = {
-  me_name      : symbol;
-  me_body      : module_body;
-  me_comps     : module_comps;
-  me_sig       : module_sig; 
-(*  me_types     : module_type list; *)
+  me_name  : symbol;
+  me_body  : module_body;
+  me_comps : module_comps;
+  me_sig   : module_sig; 
 }
 
 and module_body =
