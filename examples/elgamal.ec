@@ -227,6 +227,11 @@ module G2(A:Adv) = {
   }
 }.
  
+equiv equiv1_A2 (A<:Adv) : A.a2 ~ A.a2 : ={c, glob A} ==> ={res, glob A}.
+proof.
+  fun true;trivial.
+save.
+
 equiv equiv1 (A<:Adv) :  
    CPA(ElGamal,A).main ~ DDH0(Inv(A)).main : 
       true ==> res{1} = res{2}.
@@ -234,12 +239,11 @@ proof.
  fun.
  inline ElGamal.kg ElGamal.enc Inv(A).inv.
  wp.
- call (={c} /\ (glob A){1} = (glob A){2}) (={res} /\ (glob A){1} = (glob A){2}).
- fun true;try (simplify;split).
+(* call (_: ={c, glob A} ==> ={res, glob A}). *)
+ call (equiv1_A2 A).
  swap{1} 7 -5. 
  wp;rnd.
- call (={pk}) (={res} /\ (glob A){1} = (glob A){2}).
- fun true;try (simplify;split).
+ call (_ : true).
  wp; do rnd; skip. simplify; smt. 
 
 (* Just to test tactic *)
@@ -270,12 +274,9 @@ proof.
  equiv_deno (_: true ==> ={res});trivial.
   fun. inline{2} Inv(A).inv.
   swap{1} 7 -4;wp.
-  call (={c} /\ (glob A){1} = (glob A){2})
-      (={res} /\ (glob A){1} = (glob A){2}).
-    fun true;try (simplify;split).
+  call (equiv1_A2 A).
   wp;rnd.
-  call (={pk}) (={res} /\ (glob A){1} = (glob A){2}).
-    fun true;try (simplify;split).
+  call (_ : true).
   wp;do rnd;skip;by trivial. 
 save.
 
@@ -285,13 +286,11 @@ proof.
  equiv_deno (_: true ==> ={res});try trivial.
  fun. 
  swap{2} 10 -4;wp.
- call (={c} /\ (glob A){1} = (glob A){2})
-      (={res} /\ (glob A){1} = (glob A){2}).
-    fun true;try (simplify;split).
+ call (equiv1_A2 A).
  wp; rnd (lambda (z:int), (z + log(if b then m1 else m0){2}) %% q)
      (lambda (z:int), (z - log(if b then m1 else m0){2}) %% q).
  wp;rnd;simplify.
- call (={pk}) (={res} /\ (glob A){1} = (glob A){2}).
+ call ( _ : ={pk} ==> ={res,glob A}).
    fun true;try (simplify;split).
  wp;do rnd;skip; progress; smt.
 save.
@@ -308,21 +307,15 @@ proof.
  conseq  (_ : ==> true) .
  intros &m;progress.
  apply (Dbool.mu_x_def (b'{m})).
- call (true) (true).
- apply Ha2.
- wp.
+ call ( _ : true ==> true);try assumption.
+ cut H1 : mu [0..Int.(-) q 1] Fun.cpTrue = 1%r by smt.
+ wp; rnd (1%r) Fun.cpTrue.
+ conseq (_ : _ ==> true);[assumption | ].
+ call (_ : true ==> true);[assumption | ].
+ wp; rnd (1%r) Fun.cpTrue.
+ conseq (_ : _ ==> true);[trivial | ].
  rnd (1%r) Fun.cpTrue.
- conseq (_ : _ ==> true).
- smt.
- call (true) (true).
- apply Ha1.
- wp.
- rnd (1%r) Fun.cpTrue.
- conseq (_ : _ ==> true).
- smt.
- rnd (1%r) Fun.cpTrue.
- conseq (_ : _ ==> true).
- smt.
+ conseq (_ : _ ==> true);[trivial | ].
  skip;trivial.
 save.
 

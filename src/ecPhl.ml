@@ -931,6 +931,21 @@ let t_hoare_call fpre fpost g =
   prove_goal_by [f_concl;concl] (RN_hl_call (None, fpre, fpost)) g
 
 
+let bdHoare_call_spec fpre fpost f cmp bd opt_bd = 
+  match cmp, opt_bd with
+  | FHle, Some _ -> cannot_apply "call" 
+    "optional bound parameter not allowed for upper-bounded judgements"
+  | FHle, None -> 
+    f_bdHoareF fpre f fpost FHle bd 
+  | FHeq, Some bd ->
+    f_bdHoareF fpre f fpost FHeq bd 
+  | FHeq, None -> 
+    f_bdHoareF fpre f fpost FHeq bd 
+  | FHge, Some bd -> 
+    f_bdHoareF fpre f fpost FHge bd 
+  | FHge, None -> 
+    f_bdHoareF fpre f fpost FHge bd 
+  
 let t_bdHoare_call fpre fpost opt_bd g =
   (* FIXME : check the well formess of the pre and the post ? *)
   let env,_,concl = get_goal_e g in
@@ -952,34 +967,20 @@ let t_bdHoare_call fpre fpost opt_bd g =
   let post = f_anda_simpl (PVM.subst env spre fpre) post in
 
   (* most of the above code is duplicated from t_hoare_call *)
-
-  let f_concl,concl = match bhs.bhs_cmp, opt_bd with
-    | FHle, Some _ -> cannot_apply "call" 
-      "optional bound parameter not allowed for upper-bounded judgements"
-    | FHle, None -> 
-      let f_concl =  f_bdHoareF fpre f fpost FHle bhs.bhs_bd in
-      let concl = f_hoareS bhs.bhs_m bhs.bhs_pr s post in
-      f_concl,concl
+  let f_concl = bdHoare_call_spec fpre fpost f bhs.bhs_cmp bhs.bhs_bd opt_bd in
+  let concl = match bhs.bhs_cmp, opt_bd with
+    | FHle, None -> f_hoareS bhs.bhs_m bhs.bhs_pr s post 
     | FHeq, Some bd ->
-      let f_concl = f_bdHoareF fpre f fpost FHeq bd in
-      let concl = f_bdHoareS_r { bhs with bhs_s = s; bhs_po=post; 
-        bhs_bd=f_real_div bhs.bhs_bd bd} in
-      f_concl,concl
+      f_bdHoareS_r 
+        { bhs with bhs_s = s; bhs_po=post; bhs_bd=f_real_div bhs.bhs_bd bd} 
     | FHeq, None -> 
-      let f_concl = f_bdHoareF fpre f fpost FHeq bhs.bhs_bd in
-      let concl = f_bdHoareS_r { bhs with bhs_s = s; bhs_po=post; 
-        bhs_bd=f_r1 } in
-      f_concl,concl
+      f_bdHoareS_r { bhs with bhs_s = s; bhs_po=post; bhs_bd=f_r1 } 
     | FHge, Some bd -> 
-      let f_concl = f_bdHoareF fpre f fpost FHge bd in
-      let concl = f_bdHoareS_r { bhs with bhs_s = s; bhs_po=post; 
-        bhs_bd=f_real_div bhs.bhs_bd bd} in
-      f_concl,concl
+      f_bdHoareS_r 
+        { bhs with bhs_s = s; bhs_po=post; bhs_bd=f_real_div bhs.bhs_bd bd} 
     | FHge, None -> 
-      let f_concl = f_bdHoareF fpre f fpost FHge bhs.bhs_bd in
-      let concl = f_bdHoareS_r { bhs with bhs_s = s; bhs_po=post; 
-        bhs_cmp=FHeq; bhs_bd=f_r1} in
-      f_concl,concl
+      f_bdHoareS_r { bhs with bhs_s = s; bhs_po=post; bhs_cmp=FHeq; bhs_bd=f_r1}
+    | _, _ -> assert false
   in
   prove_goal_by [f_concl;concl] (RN_hl_call (None, fpre, fpost)) g
 

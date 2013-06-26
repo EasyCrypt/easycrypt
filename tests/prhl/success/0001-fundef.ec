@@ -37,7 +37,7 @@ lemma test :
 proof.
   intros A.
   fun.
-  call ((glob A){1} = (glob A){2}) (res{1}=res{2}).
+  call (_ : (glob A){1} = (glob A){2} ==> res{1}=res{2}).
   fun true.
   smt.
   smt.

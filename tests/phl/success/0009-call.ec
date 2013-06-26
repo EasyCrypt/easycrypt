@@ -19,7 +19,7 @@ lemma foo :
   hoare [M.g : M.z=zi /\ x = xi ==> res = 3 /\ M.z = zi /\ M.y = xi].
 proof.
   intros xi zi;fun.
-  call (x=xi) (res = 3 /\ M.y = xi).
+  call ( _ : x = xi ==> res = 3 /\ M.y = xi).
     fun;wp;skip.
     intros &m _;subst;simplify;split.
   skip.
