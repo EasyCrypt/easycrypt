@@ -178,8 +178,8 @@ def _run_test(config, options):
     timestamp = time.time() - timestamp
     success   = (bool(status) != bool(config.isvalid))
 
-    logging.info("result for `%s': success: %s" % (config.filename,
-                                                   rcolor(success, success)))
+    logging.info("result for `%s': success: %s" % \
+                     (config.filename, rcolor(success, success)))
 
     return Object(success = success  ,
                   config  = config   ,
@@ -251,8 +251,9 @@ def _main():
         result.append(_run_test(config, options))
 
     errors = [x for x in result if not x.success]
+    nerrs  = len(errors)
 
-    logging.info(red("# of failed scripts: %d" % (len(errors,))))
+    logging.info(rcolor("# of failed scripts: %d" % (nerrs,), nerrs == 0))
     if errors:
         logging.info("--- BEGIN FAILING SCRIPTS ---")
         for error in errors:

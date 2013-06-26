@@ -107,12 +107,12 @@ lemma add_rm: forall (x:'a) (xs:'a set),
 
 theory Induction.
 
-axiom induction_det: forall (P:('a set) cPred),
+axiom induction_det: forall (P:('a set) cpred),
   P empty =>
   (forall S, let x = pick S in P (rm x S) => P S) =>
   forall S, P S.
 
-lemma induction: forall (P:('a set) cPred),
+lemma induction: forall (P:('a set) cpred),
   P empty =>
   (forall x S, !mem x S => P S => P (add x S)) =>
   forall S, P S.
@@ -173,23 +173,23 @@ lemma singleton_card: forall (x:'a),
 by [].
 
 (* filter *)
-op filter: 'a cPred -> 'a set -> 'a set.
+op filter: 'a cpred -> 'a set -> 'a set.
 
 axiom filter_mem: forall (x:'a) P X,
   mem x (filter P X) <=> (mem x X /\ P x).
 
-axiom filter_card: forall (P:'a cPred) X, 
-  card (filter P X) = card X - card (filter (cPnot P) X). 
+axiom filter_card: forall (P:'a cpred) X, 
+  card (filter P X) = card X - card (filter (cpNot P) X). 
 
 axiom filter_cPeq_in: forall (x:'a) X,
-  mem x X => filter (cPeq x) X = singleton x.
+  mem x X => filter (cpEq x) X = singleton x.
 
 axiom filter_cPeq_card_in : forall (x:'a) X,
-  mem x X => card (filter (cPeq x) X) = 1.
+  mem x X => card (filter (cpEq x) X) = 1.
 
-axiom filter_cPtrue : forall (X:'a set), filter cPtrue X = X.
+axiom filter_cPtrue : forall (X:'a set), filter cpTrue X = X.
 
-lemma filter_subset: forall (P:'a cPred) X,
+lemma filter_subset: forall (P:'a cpred) X,
  filter P X <= X
 by [].
 
@@ -308,7 +308,9 @@ save.
 lemma inter_add3: forall (x:'a) X Y,
   !mem x Y => (inter X Y) = inter (add x X) Y.
 proof.
-intros x X Y x_nin_Y; apply extensionality; smt.
+intros x X Y x_nin_Y; apply extensionality;
+  delta (==) beta=> x'; rewrite 2!inter_mem;
+  case (x = x'); smt.
 save.
 
 lemma subset_inter: forall (X Y:'a set),
@@ -364,7 +366,7 @@ theory Duni.
   axiom mu_def: forall (X:'a set) P, 
     !is_empty X => mu (duni X) P = (card (filter P X))%r / (card X)%r. 
 
-  axiom mu_def_empty: forall (P:'a cPred), mu (duni empty) P = 0%r.
+  axiom mu_def_empty: forall (P:'a cpred), mu (duni empty) P = 0%r.
 
   axiom mu_x_def_in: forall (x:'a) X, 
     mem x X => mu_x (duni X) x = 1%r / (card X)%r. 
@@ -378,7 +380,7 @@ theory Duni.
     intros X; case (is_empty X); intros H.
     smt. 
     delta weight; simplify. 
-    rewrite (mu_def<:'a> X Fun.cPtrue _).
+    rewrite (mu_def<:'a> X Fun.cpTrue _).
     assumption.
     rewrite (filter_cPtrue<:'a> X).
     cut W: ((card X)%r <> 0%r); smt.

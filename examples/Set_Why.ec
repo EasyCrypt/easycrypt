@@ -10,7 +10,7 @@ theory Fset.
     op "cardinal" as "#";
     op "subset" as "<=".
 
-  op cPmem (s:'a set) (x:'a) = mem x s.
+  op cpMem (s:'a set) (x:'a) = mem x s.
  
 end Fset.
 
@@ -22,12 +22,12 @@ theory MapFilter.
   import Fset.
 
   (** { x | x in U and p(x) } *)
-  op filter : 'a cPred -> 'a set -> 'a set.
+  op filter : 'a cpred -> 'a set -> 'a set.
 
-  axiom filter_def (p:'a cPred) (s:'a set) (x:'a) : 
+  axiom filter_def (p:'a cpred) (s:'a set) (x:'a) : 
     mem x (filter p s) <=> p x /\ mem x s.
 
-  lemma filter_true (s:'a set) : filter cPtrue s = s
+  lemma filter_true (s:'a set) : filter cpTrue s = s
   by (apply extensionality; smt).
 
   (** { f x | x in U } *)
@@ -102,7 +102,7 @@ theory Duni.
   axiom mu_def : forall (X:'a set) P, 
     !is_empty X => mu (duni X) P = (#filter P X)%r / (#X)%r. 
 
-  axiom mu_def_empty : forall (P:'a cPred), mu (duni empty) P = 0%r.
+  axiom mu_def_empty : forall (P:'a cpred), mu (duni empty) P = 0%r.
  
   axiom mu_x_def_in : forall (x:'a) X, 
     mem x X => mu_x (duni X) x = 1%r / (#X)%r. 
@@ -118,7 +118,7 @@ theory Duni.
     apply extensionality; smt.
     smt.
     delta weight; simplify. 
-    rewrite (mu_def<:'a> X Fun.cPtrue _).
+    rewrite (mu_def<:'a> X Fun.cpTrue _).
     assumption.
     rewrite (filter_true<:'a> X).
     cut W : ((#X)%r <> 0%r); smt.
@@ -146,7 +146,7 @@ theory Drestr.
     in_supp x d => mem x X => mu_x (drestr d X) x = 0%r by [].
 
   axiom weight_def : forall (d:'a distr) X, 
-    weight (drestr d X) = weight d - mu d (cPmem X).
+    weight (drestr d X) = weight d - mu d (cpMem X).
 
 end Drestr.
 
@@ -169,13 +169,13 @@ theory Dexcepted.
     
   lemma mu_x_def : forall (x:'a) d X,
     mu_x (d \ X) x = 
-    (in_supp x (d \ X)) ? mu_x d x / (weight d - mu d (cPmem X)) : 0%r.
+    (in_supp x (d \ X)) ? mu_x d x / (weight d - mu d (cpMem X)) : 0%r.
   proof.
     intros x d X; delta (\); last smt.
   qed.
 
   lemma weight_def : forall (d:'a distr) X,
-    weight (d \ X) = (weight d = mu d (cPmem X)) ? 0%r : 1%r
+    weight (d \ X) = (weight d = mu d (cpMem X)) ? 0%r : 1%r
   by [].
 
 end Dexcepted.
@@ -183,7 +183,7 @@ end Dexcepted.
 
 theory SetMap.
 
-  require import Map.
+  require import Map. import OptionGet.
 
   type 'a set = ('a, bool) map.
 
@@ -258,18 +258,17 @@ theory SetMap.
   lemma subset_diff (s1 s2:'a set) : diff s1 s2 <= s1
   by [].
 
-  op choose (s:'a set) : 'a = proj (find (lambda p, let (a,b) = p in b) s).
+  op choose (s:'a set) : 'a = proj (find (lambda a b, b) s).
 
   lemma choose_def (s:'a set) : !is_empty s => mem (choose s) s.
   proof.
    intros H.
    cut H1 : (exists x, in_dom x s /\ s.[x] = Some true); first smt.
-   elim H1; intros x Hx; clear H H1.
-   cut H2 : (exists x, find (lambda p, let (a,b) = p in b) s = Some x).   
-   apply (find_some2 (lambda p, let (a,b) = p in b) s x _); smt.
-   elim H2; intros y Hy; clear x Hx H2.
+   cut H2 : (exists x, find (lambda a b, b) s = Some x).
+   apply (find_in (lambda a b, b) s _); smt.
+   elim H2; intros=> y Hy; clear H1 H2.
    cut H3 : (in_dom y s /\ proj s.[y]). 
-   apply (find_some1 (lambda p, let (a,b) = p in b) s y _); assumption.
+   apply (find_cor (lambda a b, b) s y _); assumption.
    delta; simplify; rewrite Hy; clear Hy.
    cut P : (exists x, s.[y] = Some x); smt.
   qed.

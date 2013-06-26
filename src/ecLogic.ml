@@ -471,7 +471,7 @@ let pattern_form name hyps f1 f =
 type dofpattern = LDecl.hyps -> form -> form -> (EcIdent.t * form)
 
 let t_rewrite_gen fpat side f g = 
-  let side = match side with `Normal -> true | `Reverse -> false in
+  let side = match side with `LtoR -> true | `RtoL -> false in
   let hyps,concl = get_goal g in
   let rec find_rewrite f =
     if is_eq f then destr_eq f, true
@@ -498,23 +498,22 @@ let t_rewrite = t_rewrite_gen (pattern_form None)
 
 let t_rewrite_node ?(fpat = pattern_form None) ((juc,an), gs) side n =
   let (_,f) = get_node (juc, an) in
-  t_seq_subgoal (t_rewrite_gen fpat side f)
-    [t_use an gs;t_id None] (juc,n)
+  t_seq_subgoal (t_rewrite_gen fpat side f) [t_use an gs;t_id None] (juc,n)
 
 let t_rewrite_hyp ?fpat side id args (juc,n as g) =
-  let hyps = get_hyps g in
-  let g' = mkn_hyp juc hyps id in
-  t_rewrite_node ?fpat (mkn_apply (fun _ _ a -> a) g' args) side n
+  let g = mkn_hyp juc (get_hyps g) id in
+  t_rewrite_node ?fpat (mkn_apply (fun _ _ a -> a) g args) side n
 
 let t_rewrite_glob ?fpat side p tys args (juc,n as g) =
-  let hyps = get_hyps g in
-  let g' = mkn_glob juc hyps p tys in
-  t_rewrite_node ?fpat (mkn_apply (fun _ _ a -> a) g' args) side n
+  let g = mkn_glob juc (get_hyps g) p tys in
+  t_rewrite_node ?fpat (mkn_apply (fun _ _ a -> a) g args) side n
 
-let t_rewrite_form ?fpat side fp args (juc,n as g) =
-  let hyps = get_hyps g in
-  let g' = new_goal juc (hyps, fp) in
-  t_rewrite_node ?fpat (mkn_apply (fun _ _ a -> a) g' args) side n
+let t_rewrite_form ?fpat side fp args (juc, n as g) =
+  let (juc, fn) = new_goal juc (get_hyps g, fp) in
+  let g = mkn_apply (fun _ _ a -> a) (juc, fn) args in
+  let g = t_rewrite_node ?fpat g side n
+  in
+    snd_map (fun ns -> fn :: ns) g
 
 let t_cut f g =
   let concl = get_concl g in
@@ -661,7 +660,7 @@ let gen_eq_tuple_elim_proof types =
     t_seq_subgoal
       (t_apply_form (pred rvars locCF) (List.map (fun _ -> AAnode) types))
       ((
-        t_lseq [t_rewrite_hyp `Reverse h1 [];
+        t_lseq [t_rewrite_hyp `RtoL h1 [];
         t_apply_hyp h2 [];
         t_apply_logic p_true_intro [] []]
       )::(List.map (fun _ -> t_reflex) types))
@@ -681,7 +680,7 @@ let gen_split_tuple_lemma types =
 let gen_split_tuple_proof types =
   let introVars = List.map (fun _ -> EcIdent.create "_") (types@types) in
   let introHyps = List.map (fun _ -> EcIdent.create "_") types in
-  let rews = List.map (fun h -> t_rewrite_hyp `Reverse h []) introHyps in
+  let rews = List.map (fun h -> t_rewrite_hyp `RtoL h []) introHyps in
   t_seq (t_lseq ((t_intros_i (introVars@introHyps))::rews)) t_reflex
 
 let t_elim f (juc,n) =
@@ -758,9 +757,14 @@ let t_or_intro b g =
 let t_left  = t_or_intro true
 let t_right = t_or_intro false
 
-let t_generalize_form name f g =
+let t_generalize_form ?fpat name f g =
+  let fpat =
+    match fpat with
+    | None -> pattern_form name
+    | Some fpat -> fpat
+  in
   let hyps,concl = get_goal g in
-  let x,body = pattern_form name hyps f concl in
+  let x,body = fpat hyps f concl in
   let ff = f_forall [x,GTty f.f_ty] body in
   t_apply_form ff [AAform f] g
 
@@ -982,10 +986,10 @@ let is_subst_eq hyps x (hid,lk) =
     if is_eq_or_iff f then
       let f1, f2 = destr_eq_or_iff f in
       match cansubst_eq hyps x f1 f2 with
-      | Some id -> Some(hid, id,`Normal)
+      | Some id -> Some(hid, id,`LtoR)
       | None ->
         match cansubst_eq hyps x f2 f1 with
-        | Some id -> Some(hid, id,`Reverse)
+        | Some id -> Some(hid, id,`RtoL)
         | None -> None
     else None
   | _ -> None
@@ -1067,10 +1071,10 @@ let is_subst_pv_eq hyps fx (hid,lk) =
     if is_eq_or_iff f then
       let f1, f2 = destr_eq_or_iff f in
       match cansubst_pv_eq hyps fx f1 f2 with
-      | Some id -> Some(hid, id,`Normal)
+      | Some id -> Some(hid, id,`LtoR)
       | None ->
         match cansubst_pv_eq hyps fx f2 f1 with
-        | Some id -> Some(hid, id,`Reverse)
+        | Some id -> Some(hid, id,`RtoL)
         | None -> None
     else None
   | _ -> None

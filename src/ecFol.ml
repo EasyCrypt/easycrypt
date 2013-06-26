@@ -453,9 +453,13 @@ let f_tuple args =
   | [x] -> x
   | _ -> mk_form (Ftuple args) (ttuple (List.map f_ty args))
 
-let f_if f1 f2 f3 = mk_form (Fif(f1,f2,f3)) f2.f_ty 
+let f_if f1 f2 f3 =
+  mk_form (Fif (f1, f2, f3)) f2.f_ty 
 
-let f_let q f1 f2 = mk_form (Flet(q,f1,f2)) f2.f_ty (* FIXME rename binding *)
+let f_let q f1 f2 =
+  mk_form (Flet (q, f1, f2)) f2.f_ty (* FIXME rename binding *)
+
+let f_let1 x f1 f2 = f_let (LSymbol (x, f1.f_ty)) f1 f2
 
 let destr_gty = function 
   | GTty ty -> ty 

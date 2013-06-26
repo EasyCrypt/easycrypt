@@ -13,7 +13,7 @@ type scope
 
 type proof_uc = {
   puc_name  : string;
-  puc_scope : [`Global | `Local];
+  puc_exsmt : bool;
   puc_jdg   : proof_state;
 }
 
@@ -55,7 +55,7 @@ module Ty : sig
 end
 
 module Mod : sig
-  val add : scope -> symbol -> pmodule_expr -> scope
+  val add : scope -> pmodule -> scope
 end
 
 module ModType : sig

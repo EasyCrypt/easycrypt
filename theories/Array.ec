@@ -203,9 +203,9 @@ cut length_def:(length (x::xs') = length xs' + 1); [ smt | rewrite length_def;re
 cut sub_eq:(sub (x::xs') 1 (length (x::xs') - 1) = xs');[ apply extensionality; smt | ].
 cut fold_def:(fold_left (lambda x n, n + 1) xs' 0 = fold_left (lambda x n, n + 1) (sub (x::xs') 1 (length (x::xs') - 1)) 0);[ rewrite sub_eq | ].
 apply (fold_left_deterministic<:int,'x> (lambda x n, n + 1) (lambda x n, n + 1) 0 0 xs' xs' _ _).
-  apply (Fun.extensionality<:int -> int,'x> (lambda x n, n + 1) (lambda x n, n + 1) _).
+  apply (Fun.fun_ext<:int -> int,'x> (lambda x n, n + 1) (lambda x n, n + 1) _).
   delta beta.
-  intros x'. apply Fun.extensionality.
+  intros x'. apply Fun.fun_ext.
   delta beta. smt.
 smt.
 rewrite fold_def;clear fold_def.

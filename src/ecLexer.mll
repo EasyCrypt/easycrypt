@@ -43,37 +43,47 @@
     "last"        , LAST       ;        (* KW: tactical *)
     "do"          , DO         ;        (* KW: tactical *)
     "strict"      , STRICT     ;        (* KW: tactical *)
-
-    "using"       , USING      ;        (* KW: tactic *)
-    "compute"     , COMPUTE    ;        (* KW: tactic *)
-    "same"        , SAME       ;        (* KW: tactic *)
-    "idtac"       , IDTAC      ;        (* KW: tactic *)
-    "intros"      , INTROS     ;        (* KW: tactic *)
+    
+    (* Lambda tactics *)
+    "beta"        , BETA       ;        (* KW: tactic *)
+    "iota"        , IOTA       ;        (* KW: tactic *)
+    "zeta"        , ZETA       ;        (* KW: tactic *)
+    "logic"       , LOGIC      ;        (* KW: tactic *)
+    "delta"       , DELTA      ;        (* KW: tactic *)
+    "simplify"    , SIMPLIFY   ;        (* KW: tactic *)
+    "congr"       , CONGR      ;        (* KW: tactic *)
+    
+    (* Logic tactics *)
+    "change"      , CHANGE     ;        (* KW: tactic *)
     "split"       , SPLIT      ;        (* KW: tactic *)
     "left"        , LEFT       ;        (* KW: tactic *)
     "right"       , RIGHT      ;        (* KW: tactic *)
-    "elim"        , ELIM       ;        (* KW: tactic *)
-    "apply"       , APPLY      ;        (* KW: tactic *)
-    "progress"    , PROGRESS   ;        (* KW: tactic *)
-    "trivial"     , TRIVIAL    ;        (* KW: tactic *)
-    "congr"       , CONGR      ;        (* KW: tactic *)
-    "cut"         , CUT        ;        (* KW: tactic *)
     "generalize"  , GENERALIZE ;        (* KW: tactic *)
-    "clear"       , CLEAR      ;        (* KW: tactic *)
-    "simplify"    , SIMPLIFY   ;        (* KW: tactic *)
-    "delta"       , DELTA      ;        (* KW: tactic *)
-    "zeta"        , ZETA       ;        (* KW: tactic *)
-    "beta"        , BETA       ;        (* KW: tactic *)
-    "iota"        , IOTA       ;        (* KW: tactic *)
-    "logic"       , LOGIC      ;        (* KW: tactic *)
-    "modpath"     , MODPATH    ;        (* KW: tactic *)
-    "change"      , CHANGE     ;        (* KW: tactic *)
-    "elimT"       , ELIMT      ;        (* KW: tactic *)
     "case"        , CASE       ;        (* KW: tactic *)
+    
+    "intros"      , INTROS     ;        (* KW: tactic *)
+    "pose"        , POSE       ;        (* KW: tactic *)
+    "cut"         , CUT        ;        (* KW: tactic *)
+    "elim"        , ELIM       ;        (* KW: tactic *)
+    "clear"       , CLEAR      ;        (* KW: tactic *)
+    
+    (* Auto tactics *)
+    "apply"       , APPLY      ;        (* KW: tactic *)
     "rewrite"     , REWRITE    ;        (* KW: tactic *)
     "subst"       , SUBST      ;        (* KW: tactic *)
+    "elimT"       , ELIMT      ;        (* KW: tactic *)
+    "progress"    , PROGRESS   ;        (* KW: tactic *)
+    "trivial"     , TRIVIAL    ;        (* KW: tactic *)
+    
+    (* Other tactics *)
+    "idtac"       , IDTAC      ;        (* KW: tactic *)
+    "same"        , SAME       ;        (* KW: tactic *)
+    "modpath"     , MODPATH    ;        (* KW: tactic *)
+    "using"       , USING      ;        (* KW: tactic *)
+    "compute"     , COMPUTE    ;        (* KW: tactic *)
     "field"       , FIELD      ;        (* KW: tactic *)
     "field_simplify", FIELDSIMP;        (* KW: tactic *)
+
 
     "assumption"  , ASSUMPTION ;        (* KW: bytac *)
     "smt"         , SMT        ;        (* KW: bytac *)
@@ -118,13 +128,16 @@
     "end"         , END        ;        (* KW: global *)
     "import"      , IMPORT     ;        (* KW: global *)
     "export"      , EXPORT     ;        (* KW: global *)
-    "local"       , LOCAL      ;	(* KW: global *)
+    "local"       , LOCAL      ;        (* KW: global *)
+    "witness"     , WITNESS    ;        (* KW: global *)
+    "nosmt"       , NOSMT      ;        (* KW: global *)
     "module"      , MODULE     ;        (* KW: global *)
     "of"          , OF         ;        (* KW: global *)
     "const"       , CONST      ;        (* KW: global *)
     "op"          , OP         ;        (* KW: global *)
     "pred"        , PRED       ;        (* KW: global *)
     "require"     , REQUIRE    ;        (* KW: global *)
+    "section"     , SECTION    ;        (* KW: global *)
     "theory"      , THEORY     ;        (* KW: global *)
     "type"        , TYPE       ;        (* KW: global *)
     "datatype"    , DATATYPE   ;        (* KW: global *)
@@ -190,7 +203,7 @@ let mident = '&'  (lident | number)
 let op_char_1    = ['=' '<' '>']
 let op_char_2    = ['+' '-']
 let op_char_3    = ['*' '/' '%' '\\']
-let op_char_4    = ['!' '$' '&' '?' '@' '^' ':' '|' '#']
+let op_char_4    = ['!' '$' '&' '?' '@' '^' '|' '#']
 let op_char_34   = op_char_3 | op_char_4
 let op_char_234  = op_char_2 | op_char_34
 let op_char_1234 = op_char_1 | op_char_234
@@ -198,7 +211,7 @@ let op_char_1234 = op_char_1 | op_char_234
 let op1 = op_char_1234* op_char_1 op_char_1234*
 let op2 = op_char_234*  op_char_2 op_char_234+
 let op3 = op_char_34*   op_char_3 op_char_34*
-let op4 = op_char_4+
+let op4 = op_char_4+ | ':'+
 
 let binop = 
   op1 | op2 | op3 | op4 | '+' | '-' |
@@ -278,7 +291,9 @@ rule main = parse
   | "-" { MINUS }
   | "+" { ADD }
 
-  | "//" { SLASHSLASH }
+  | "//"  { SLASHSLASH }
+  | "/="  { SLASHEQ }
+  | "//=" { SLASHSLASHEQ }
 
   | op1 as s  { OP1 s }
   | op2 as s  { OP2 s }

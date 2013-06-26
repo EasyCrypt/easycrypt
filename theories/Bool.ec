@@ -14,10 +14,9 @@ require import Distr.
 
 (** Uniform distribution on booleans *)
 theory Dbool.
-
   op dbool : bool distr.
 
-  axiom mu_def : forall (p:bool cPred), 
+  axiom mu_def : forall (p:bool cpred), 
     mu dbool p = (1%r / 2%r) * charfun p true + (1%r / 2%r) * charfun p false.
  
   lemma supp_def : forall (b:bool), in_supp b dbool.

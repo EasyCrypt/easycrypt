@@ -41,6 +41,9 @@ val process_mkn_apply :
   -> goal * int list
 
 (* -------------------------------------------------------------------- *)
-val process_logic   : hitenv -> EcLocation.t -> logtactic -> goal -> goals
-val process_intros  : intropattern -> goal -> goals
-val process_trivial : goal -> goals
+type engine = ptactic_core -> tactic
+
+val process_logic   : engine * hitenv -> EcLocation.t -> logtactic -> tactic
+val process_intros  : ?cf:bool -> intropattern -> goal -> goals
+val process_trivial : tactic
+val process_done    : tactic

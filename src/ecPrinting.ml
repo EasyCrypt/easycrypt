@@ -1507,8 +1507,12 @@ let pp_goal (ppe : PPEnv.t) fmt (n, (hyps, concl)) =
     let ppe = PPEnv.add_local ppe id
     and dk fmt =
         match k with
-        | EcBaseLogic.LD_var (ty, _body) ->
+        | EcBaseLogic.LD_var (ty, None) ->
             pp_type ppe fmt ty
+
+        | EcBaseLogic.LD_var (ty, Some body) ->
+	    Format.fprintf fmt "%a@ := %a"
+              (pp_type ppe) ty (pp_form ppe) body
 
         | EcBaseLogic.LD_mem None ->
             Format.fprintf fmt "memory"

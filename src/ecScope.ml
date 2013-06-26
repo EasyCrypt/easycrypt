@@ -170,7 +170,7 @@ end
 (* -------------------------------------------------------------------- *)
 type proof_uc = {
   puc_name   : string;
-  puc_scope  : [`Global | `Local];
+  puc_exsmt  : bool;
   puc_jdg    : proof_state;
 }
 
@@ -484,7 +484,7 @@ module Pred = struct
         List.map (TT.transty tp scope.sc_env ue) ptys, None
       | PPconcr(bd,pe) ->
         let env, xs = TT.transbinding scope.sc_env ue bd in
-        let body = TT.transformula env ue pe in
+        let body = TT.trans_prop env ue pe in
         let dom = List.map snd xs in
         let xs = List.map (fun (x,ty) -> x, EcFol.GTty ty) xs in
         let lam = EcFol.f_lambda xs body in
@@ -538,9 +538,9 @@ module Mod = struct
     { scope with
         sc_env = EcEnv.Mod.bind m.me_name m scope.sc_env; }
 
-  let add (scope : scope) (name : symbol) m =
+  let add (scope : scope) m =
     assert (scope.sc_pr_uc = None);
-    let m = EcTyping.transmod scope.sc_env name m in
+    let m = EcTyping.transmod scope.sc_env m in
       bind scope m
 end
 
@@ -708,7 +708,7 @@ module Ax = struct
     { scope with sc_env = EcEnv.Ax.bind x ax scope.sc_env; }
 
   (* ------------------------------------------------------------------ *)
-  let start_lemma scope check name axsc tparams concl =
+  let start_lemma scope ~exsmt check name tparams concl =
     let puc =
       match check with
       | false -> PSNoCheck (tparams, concl)
@@ -716,7 +716,7 @@ module Ax = struct
           let hyps = EcEnv.LDecl.init scope.sc_env tparams in
             PSCheck (EcLogic.open_juc (hyps, concl), [0])
     in 
-    let puc = { puc_name = name; puc_jdg = puc; puc_scope = axsc; } in
+    let puc = { puc_name = name; puc_jdg = puc; puc_exsmt = exsmt; } in
       { scope with sc_pr_uc = Some (None, puc) }
 
   (* ------------------------------------------------------------------ *)
@@ -740,7 +740,7 @@ module Ax = struct
     let axd = { ax_tparams = tparams;
                 ax_spec    = Some concl;
                 ax_kind    = proof;
-		ax_scope   = puc.puc_scope; }
+                ax_exsmt   = puc.puc_exsmt; }
     in
     let scope = { scope with sc_pr_uc = None } in
       (Some puc.puc_name, bind scope (puc.puc_name, axd))
@@ -762,23 +762,23 @@ module Ax = struct
 
     let tintro =
       List.map
-        (fun x -> IPCore (mk_loc x.pl_loc (Some x.pl_desc)))
+        (fun x -> IPCore (mk_loc x.pl_loc (`noRename x.pl_desc)))
         tintro in
     let tintro = mk_loc loc (Plogic (Pintro tintro)) in
 
-    let concl   = TT.transformula scope.sc_env ue pconcl in
+    let concl   = TT.trans_prop scope.sc_env ue pconcl in
     let concl   = EcFol.Fsubst.uni (EcUnify.UniEnv.close ue) concl in
     let tparams = EcUnify.UniEnv.tparams ue in
     let check   = Check_mode.check scope.sc_options in
 
     match ax.pa_kind with
     | PILemma ->
-        let scope = start_lemma scope check (unloc ax.pa_name) ax.pa_scope tparams concl in
+        let scope = start_lemma scope ~exsmt:ax.pa_exsmt check (unloc ax.pa_name) tparams concl in
         let scope = Tactics.process_core false `Check scope [tintro] in
           None, scope
 
     | PLemma tc ->
-        let scope = start_lemma scope check (unloc ax.pa_name) ax.pa_scope tparams concl in
+        let scope = start_lemma scope ~exsmt:ax.pa_exsmt check (unloc ax.pa_name) tparams concl in
         let scope = Tactics.process_core false `Check scope [tintro] in
         let scope = Tactics.proof scope mode (if tc = None then true else false) in
 
@@ -799,6 +799,7 @@ module Ax = struct
         let axd = { ax_tparams = tparams;
                     ax_spec    = Some concl;
                     ax_kind    = Axiom;
-		    ax_scope   = ax.pa_scope; } in
-        Some (unloc ax.pa_name), bind scope (unloc ax.pa_name, axd)
+                    ax_exsmt   = ax.pa_exsmt; }
+        in
+          Some (unloc ax.pa_name), bind scope (unloc ax.pa_name, axd)
 end

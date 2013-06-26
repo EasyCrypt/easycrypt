@@ -1,39 +1,45 @@
 (** Extensional equality for functions *)
 pred (==) (f g:'a -> 'b) = forall x, f x = g x.
 
-axiom extensionality: forall (f g:'a -> 'b), f == g => f = g.
+lemma nosmt eq_refl: forall (X:'a -> 'b), X == X by [].
+lemma nosmt eq_symm: forall (X Y:'a -> 'b), X == Y => Y == X by [].
+lemma nosmt eq_tran: forall (X Y Z:'a -> 'b), X == Y => Y == Z => X == Z by [].
+
+axiom fun_ext: forall (f g:'a -> 'b), f == g => f = g.
 
 (** Computable predicates *)
-type 'a cPred = 'a -> bool.
+type 'a cpred = 'a -> bool.
+pred (<=) (p q:'a cpred) = forall (a:'a), p a => q a.
 
-pred (<=) (p q:'a cPred) = forall (a:'a), p a => q a.
+lemma nosmt leq_refl: forall (X:'a cpred), X <= X by [].
+lemma nosmt leq_asym: forall (X Y:'a cpred),
+  X <= Y => Y <= X => X = Y
+by (intros=> X Y X_leq_Y Y_leq_X; apply fun_ext; smt).
+lemma nosmt leq_tran: forall (X Y Z:'a cpred), X <= Y => Y <= Z => X <= Z by [].
+
+pred (>=) (p q:'a cpred) = q <= p.
+pred (<)  (p q:'a cpred) = p <= q /\ p <> q.
+pred (>)  (p q:'a cpred) = p >= q /\ p <> q.
 
 (** Operators on predicates *)
-op cPtrue(x:'a) : bool = true.
+op cpTrue (x:'a) : bool = true.
+op cpFalse (x:'a) : bool = false.
+op cpEq (x:'a) : 'a -> bool = (=) x.
 
-op cPfalse(x:'a) : bool = false.
-
-op cPnot(p:'a cPred, x:'a) : bool = !p x.
-
-op cPand(p q:'a cPred, x:'a) : bool = p x /\ q x.
-
-op cPor(p q:'a cPred, x:'a) : bool = p x \/ q x.
-
-op cPeq(x y:'a) : bool = x = y.
+op cpNot(p:'a cpred, x:'a) : bool = !p x.
+op cpAnd(p q:'a cpred, x:'a) : bool = p x /\ q x.
+op cpOr(p q:'a cpred, x:'a) : bool = p x \/ q x.
 
 (** Lemmas *)
-lemma cPtrue_def : forall (x:'a), cPtrue x by []. 
+lemma cpTrue_true : forall (x:'a), cpTrue x by [].
+lemma cpFalse_false : forall (x:'a), !cpFalse x by [].
 
-lemma cPfalse_def : forall (x:'a), !cPfalse x by []. 
+lemma cpNot_not : forall (p:'a cpred) x, cpNot p x <=> !p x by [].
+lemma cpAnd_and :
+  forall (p q:'a cpred) (x:'a), cpAnd p q x <=> (p x /\ q x) by [].
+lemma cpOr_or :
+  forall (p q:'a cpred) (x:'a), cpOr p q x <=> (p x \/ q x) by [].
 
-lemma cPnot_def : forall (p:'a cPred) x, cPnot p x <=> !p x by []. 
-
-lemma cPand_def : 
-  forall (p q:'a cPred) (x:'a), cPand p q x <=> (p x /\ q x) by [].
-
-lemma cPor_def : 
-  forall (p q:'a cPred) (x:'a), cPor p q x <=> (p x \/ q x) by [].
-
-lemma excluded_middle: forall (p: 'a cPred),
-  cPor (cPnot p) p = cPtrue
-by (intros p; apply extensionality; smt).
+lemma cpEM: forall (p: 'a cpred),
+  cpOr (cpNot p) p = cpTrue
+by (intros p; apply fun_ext; smt).

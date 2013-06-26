@@ -286,7 +286,7 @@ val import_w3_dir :
 open EcBaseLogic
 
 module LDecl : sig
-  type error = 
+  type error =
     | UnknownSymbol   of EcSymbols.symbol 
     | UnknownIdent    of EcIdent.t
     | NotAVariable    of EcIdent.t
@@ -298,6 +298,7 @@ module LDecl : sig
   exception Ldecl_error of error
 
   type hyps
+
   val init : env -> EcIdent.t list -> hyps
   val tohyps : hyps -> EcBaseLogic.hyps
   val toenv  : hyps -> env
@@ -333,7 +334,6 @@ module LDecl : sig
   val equivF : xpath -> xpath -> hyps -> hyps * hyps
   val inv_memenv  : hyps -> hyps 
   val inv_memenv1 : hyps -> hyps 
-
 end
 
 (* -------------------------------------------------------------------- *)

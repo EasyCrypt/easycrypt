@@ -31,8 +31,20 @@ src/*.mll
 theories/*.ec
 theories/prelude/*.ec
 
+# EasyCrypt examples
+examples/*.ec
+examples/list-ddh/*.ec
+
 # EasyCrypt tests files
-find:tests:*.ec
+find:tests/modules:*.ec
+find:tests/pbhl:*.ec
+find:tests/phl:*.ec
+find:tests/prhl:*.ec
+find:tests/tactics:*.ec
+find:tests/theories:*.ec
+find:tests/third-party:*.ec
+find:tests/typing:*.ec
+find:tests/unclassified:*.ec
 
 # Build scripts
 scripts/install-sh

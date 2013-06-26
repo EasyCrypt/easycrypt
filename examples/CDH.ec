@@ -88,7 +88,7 @@ theory Set_CDH.
   (** Naive reduction to CDH *)
 
   (* Useful lemmas on reals, maybe move to Real.ec *)
-  lemma local le_compat_r (w x y: real) : 0%r < w => x * w <= y * w => x <= y 
+  lemma nosmt le_compat_r (w x y: real) : 0%r < w => x * w <= y * w => x <= y 
   by [].
 
   lemma inv_le (x y:real) : 0%r < x => 0%r < y => y <= x => inv x <= inv y.
@@ -101,7 +101,7 @@ theory Set_CDH.
     rewrite (Inverse x _); smt.
   qed.
 
-  lemma local div_le (x y:real) : 
+  lemma nosmt div_le (x y:real) : 
     0%r < x => 0%r < y => y <= x => 1%r / x <= 1%r / y 
   by [].
 
