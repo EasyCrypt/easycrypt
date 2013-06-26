@@ -171,6 +171,10 @@ type pmemory   = psymbol
 
 type phoarecmp = PFHle | PFHeq | PFHge
 
+type glob_or_var = 
+  | GVglob of pmsymbol located 
+  | GVvar  of pqsymbol
+
 type pformula  = pformula_r located
 
 and pformula_r =
@@ -186,7 +190,7 @@ and pformula_r =
   | PFexists of pgtybindings * pformula
   | PFlambda of ptybindings * pformula
   | PFglob   of pmsymbol located 
-  | PFeqveq  of pqsymbol list
+  | PFeqveq  of glob_or_var list
   | PFlsless of pgamepath
 
   (* for claims *)

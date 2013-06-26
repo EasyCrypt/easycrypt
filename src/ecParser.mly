@@ -627,10 +627,10 @@ ptybindings:
 %inline hole: UNDERSCORE { PFhole; }
 %inline none: IMPOSSIBLE { assert false; }
 
-qident_or_res:
-| x=qident   { x }
-| x=loc(RES) { mk_loc x.pl_loc ([], "res") }
-;
+qident_or_res_or_glob:
+| x=qident   { GVvar x }
+| x=loc(RES) { GVvar (mk_loc x.pl_loc ([], "res")) }
+| GLOB mp=loc(mod_qident) { GVglob mp }
 
 sform_u(P):
 | x=P 
@@ -760,7 +760,7 @@ form_u(P):
 | c=form_r(P) QUESTION e1=form_r(P) COLON e2=form_r(P) %prec OP2
     { PFif (c, e1, e2) }
 
-| EQ LBRACE xs=plist1(qident_or_res, COMMA) RBRACE
+| EQ LBRACE xs=plist1(qident_or_res_or_glob, COMMA) RBRACE
     { PFeqveq xs }
 
 | IF c=form_r(P) THEN e1=form_r(P) ELSE e2=form_r(P)
