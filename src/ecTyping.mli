@@ -93,7 +93,7 @@ val trans_pattern  : EcEnv.env -> (ptnmap * EcUnify.unienv) -> pformula -> EcFol
 (* -------------------------------------------------------------------- *)
 val transmodsig   : EcEnv.env -> symbol -> pmodule_sig  -> module_sig
 val transmodtype  : EcEnv.env -> pmodule_type -> module_type * module_sig
-val transmod      : EcEnv.env -> pmodule -> module_expr
+val transmod      : EcEnv.env -> symbol -> pmodule_expr -> module_expr
 val trans_msymbol : EcEnv.env -> pmsymbol located -> mpath * module_sig
 val trans_gamepath : EcEnv.env -> pgamepath -> xpath 
 

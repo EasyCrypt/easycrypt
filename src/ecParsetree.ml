@@ -143,10 +143,11 @@ and pfunction_local = {
   pfl_init  : pexpr option;
 }
 
-and pmodule = {
-  pm_name : psymbol;
-  pm_body : pmodule_expr;
-  pm_flag : [`Local | `Witness] option;
+and pmodule = (psymbol * pmodule_expr)
+
+and ptopmodule = {
+  ptm_def   : pmodule;
+  ptm_local : bool;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -431,12 +432,12 @@ type paxiom_kind = PAxiom | PLemma of ptactic option | PILemma
 
 type paxiom = {
   pa_name    : psymbol;
-  pa_exsmt   : bool;
-  pa_local   : bool;
   pa_tyvars  : psymbol list option;
   pa_vars    : pgtybindings option;  
   pa_formula : pformula;
   pa_kind    : paxiom_kind;
+  pa_nosmt   : bool;
+  pa_local   : bool;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -522,7 +523,7 @@ and pr_override = {
 
 (* -------------------------------------------------------------------- *)
 type global =
-  | Gmodule      of pmodule
+  | Gmodule      of ptopmodule
   | Ginterface   of (psymbol * pmodule_sig)
   | Goperator    of poperator
   | Gpredicate   of ppredicate

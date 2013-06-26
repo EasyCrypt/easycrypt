@@ -1097,8 +1097,8 @@ let pp_opdecl (ppe : PPEnv.t) fmt (x, op) =
 
 (* -------------------------------------------------------------------- *)
 let string_of_axkind = function
-  | Axiom   -> "axiom"
-  | Lemma _ -> "lemma"
+  | `Axiom -> "axiom"
+  | `Lemma -> "lemma"
 
 let pp_axiom (ppe : PPEnv.t) fmt (x, ax) =
   let basename = P.basename x in

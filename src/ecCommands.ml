@@ -226,6 +226,16 @@ and process_w3_import (scope : EcScope.scope) (p, f, r) =
   EcScope.Theory.import_w3 scope p f r
 
 (* -------------------------------------------------------------------- *)
+and process_sct_open (scope : EcScope.scope) =
+  EcScope.check_state `InTop "section opening" scope;
+  EcScope.Section.enter scope
+
+(* -------------------------------------------------------------------- *)
+and process_sct_close (scope : EcScope.scope) =
+  EcScope.check_state `InTop "section closing" scope;
+  EcScope.Section.exit scope
+
+(* -------------------------------------------------------------------- *)
 and process_tactics (scope : EcScope.scope) t = 
   let mode = if (!pragma.pm_check) then `Check else `WeakCheck in
 
@@ -290,6 +300,8 @@ and process (ld : EcLoader.ecloader) (scope : EcScope.scope) g =
       | GthImport  name -> `Fct   (fun scope -> process_th_import  scope  name.pl_desc)
       | GthExport  name -> `Fct   (fun scope -> process_th_export  scope  name.pl_desc)
       | GthClone   thcl -> `Fct   (fun scope -> process_th_clone   scope  thcl)
+      | GsctOpen        -> `Fct   (fun scope -> process_sct_open   scope)
+      | GsctClose       -> `Fct   (fun scope -> process_sct_close  scope)
       | GthW3      a    -> `Fct   (fun scope -> process_w3_import  scope  a)
       | Gprint     p    -> `Fct   (fun scope -> process_print      scope  p; scope)
       | Gtactics   t    -> `Fct   (fun scope -> process_tactics    scope  t)

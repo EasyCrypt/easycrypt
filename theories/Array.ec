@@ -218,11 +218,9 @@ save.
 op __set: 'x array -> int -> 'x -> 'x array.
 
 axiom set_length: forall (xs:'x array, i:int, x:'x),
-  0 <= i => i < length xs =>
   length (xs.[i <- x]) = length xs.
 
 axiom set_get: forall (xs:'x array) (i j:int) (x:'x),
-  0 <= i => i < length xs =>
   0 <= j => j < length xs =>
   xs.[i <- x].[j] = (i = j) ? x : xs.[j].
 

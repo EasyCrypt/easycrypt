@@ -749,9 +749,7 @@ let process_intros ?(cf = true) pis (juc, n) =
         | SFimp (_, newF) -> ("H", newF)
         | _ -> begin
           match R.h_red_opt R.full_red !hyps fp with
-         (*When you call this function it must be already checked that you
-           can do an intro*)
-          | None   -> assert false
+          | None   -> ("_", f_true)
           | Some f -> destruct f
         end
       in

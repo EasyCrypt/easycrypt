@@ -54,20 +54,18 @@ let op_dump (op : operator) =
      opkind_dump op.op_kind]
 
 (* -------------------------------------------------------------------- *)
-type axiom_kind = 
-  | Axiom 
-  | Lemma of EcBaseLogic.judgment option
+type axiom_kind = [`Axiom | `Lemma]
 
 type axiom = {
   ax_tparams : EcIdent.t list;
   ax_spec    : EcFol.form option;
   ax_kind    : axiom_kind;
-  ax_exsmt   : bool;
+  ax_nosmt   : bool;
 }
 
 let string_of_ax_kind = function
-  | Axiom   -> "axiom"
-  | Lemma _ -> "lemma"
+  | `Axiom -> "axiom"
+  | `Lemma -> "lemma"
 
 let ax_dump (ax : axiom) =
   let params = List.map EcIdent.tostring ax.ax_tparams in
