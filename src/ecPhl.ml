@@ -596,7 +596,7 @@ let equivF_abs_upto env fl fr bad invP invQ =
       f_eqparams o_l fo_l.f_sig.fs_params ml o_r fo_r.f_sig.fs_params mr in
     let eq_res = f_eqres o_l fo_l.f_sig.fs_ret ml o_r fo_r.f_sig.fs_ret mr in
     let pre = EcFol.f_ands (EcFol.f_not bad2 :: eq_params :: lpre) in
-    let post = EcFol.f_if bad2 invQ (f_ands (eq_res::lpre)) in
+    let post = EcFol.f_if_simpl bad2 invQ (f_ands (eq_res::lpre)) in
     let cond1 = f_equivF pre o_l o_r post in
     let cond2 =
       let q = Fsubst.f_subst_mem ml EcFol.mhr invQ in
@@ -613,8 +613,8 @@ let equivF_abs_upto env fl fr bad invP invQ =
   let eq_params = 
     f_eqparams fl sigl.fs_params ml fr sigr.fs_params mr in
   let eq_res = f_eqres fl sigl.fs_ret ml fr sigr.fs_ret mr in
-  let pre = f_if bad2 invQ (f_ands (eq_params::lpre)) in
-  let post = f_if bad2 invQ (f_ands [eq_res;eqglob;invP]) in
+  let pre = f_if_simpl bad2 invQ (f_ands (eq_params::lpre)) in
+  let post = f_if_simpl bad2 invQ (f_ands [eq_res;eqglob;invP]) in
   pre, post, sg
 
 let t_equivF_abs_upto bad invP invQ g = 
