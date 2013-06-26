@@ -139,6 +139,7 @@
     "pred"        , PRED       ;        (* KW: global *)
     "require"     , REQUIRE    ;        (* KW: global *)
     "theory"      , THEORY     ;        (* KW: global *)
+    "section"     , SECTION    ;        (* KW: global *)
     "type"        , TYPE       ;        (* KW: global *)
     "datatype"    , DATATYPE   ;        (* KW: global *)
     "print"       , PRINT      ;        (* KW: global *)

@@ -179,14 +179,38 @@ and proof_state =
 | PSNoCheck of (EcIdent.t list * EcFol.form)
 
 (* -------------------------------------------------------------------- *)
+module CoreSection : sig
+  type t
+
+  exception NoSectionOpened
+
+  val initial : t
+
+  val enter : t -> t
+  val exit  : t -> t
+end = struct
+  type t = int
+
+  exception NoSectionOpened
+
+  let initial : t = 0
+
+  let enter (x : t) : t = (x+1)
+
+  let exit (x : t) : t =
+    if x <= 0 then raise NoSectionOpened else (x-1)
+end
+
+(* -------------------------------------------------------------------- *)
 type scope = {
-  sc_name       : symbol;
-  sc_env        : EcEnv.env;
-  sc_top        : scope option;
-  sc_loaded     : (EcEnv.ctheory_w3 * symbol list) Msym.t;
-  sc_required   : symbol list;
-  sc_pr_uc      : (bool option * proof_uc) option;
-  sc_options    : Options.options;
+  sc_name     : symbol;
+  sc_env      : EcEnv.env;
+  sc_top      : scope option;
+  sc_loaded   : (EcEnv.ctheory_w3 * symbol list) Msym.t;
+  sc_required : symbol list;
+  sc_pr_uc    : (bool option * proof_uc) option;
+  sc_options  : Options.options;
+  sc_section  : CoreSection.t;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -199,6 +223,7 @@ let empty =
       sc_required   = [];
       sc_pr_uc      = None;
       sc_options    = Options.init ();
+      sc_section    = CoreSection.initial;
     }
 
 (* -------------------------------------------------------------------- *)
@@ -263,6 +288,7 @@ let subscope (scope : scope) (name : symbol) =
     sc_required   = scope.sc_required;
     sc_pr_uc      = None;
     sc_options    = Options.for_subscope scope.sc_options;
+    sc_section    = scope.sc_section;
   }
 
 (* -------------------------------------------------------------------- *)
@@ -802,4 +828,17 @@ module Ax = struct
                     ax_exsmt   = ax.pa_exsmt; }
         in
           Some (unloc ax.pa_name), bind scope (unloc ax.pa_name, axd)
+end
+
+(* -------------------------------------------------------------------- *)
+module Section = struct
+  let enter (scope : scope) =
+    assert (scope.sc_pr_uc = None);
+    { scope with sc_section = CoreSection.enter scope.sc_section }
+
+  let exit (scope : scope) =
+    try
+      { scope with sc_section = CoreSection.exit scope.sc_section }
+    with CoreSection.NoSectionOpened ->
+      hierror "no section to close"
 end

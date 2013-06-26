@@ -99,6 +99,11 @@ module Theory : sig
   val import_w3 : scope -> string list -> string -> w3_renaming list -> scope
 end
 
+module Section : sig
+  val enter : scope -> scope
+  val exit  : scope -> scope
+end
+
 module Tactics : sig
   val process : scope -> Ax.mode -> ptactic list -> scope
   val proof   : scope -> Ax.mode -> bool -> scope

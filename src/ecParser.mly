@@ -71,13 +71,14 @@
   let pflist loc ti (es : pformula    list) : pformula    = 
     List.fold_right (fun e1 e2 -> pf_cons loc ti e1 e2) es (pf_nil loc ti)
 
-  let mk_axiom ?(exsmt = true) (x, ty, vd, f) k = 
+  let mk_axiom ?(local = false) ?(exsmt = true) (x, ty, vd, f) k = 
     { pa_name    = x;
       pa_exsmt   = exsmt;
       pa_tyvars  = ty;
       pa_vars    = vd;
       pa_formula = f; 
-      pa_kind    = k; }
+      pa_kind    = k;
+      pa_local   = local; }
 
   let str_and b = if b then "&&" else "/\\"
   let str_or  b = if b then "||" else "\\/"
@@ -112,6 +113,9 @@
       fp_args = args; }
 
   let mk_core_tactic t = { pt_core = t; pt_intros = []; }
+
+  let mk_topmod ~local def =
+    { ptm_def = def; ptm_local = local; }
 %}
 
 %token <EcSymbols.symbol> LIDENT
@@ -259,6 +263,7 @@
 %token SAME
 %token SAMPLE
 %token SAVE
+%token SECTION
 %token SEMICOLON
 %token SEQ
 %token SIMPLIFY
@@ -1013,6 +1018,11 @@ mod_def:
              (x, mk_loc body.pl_loc (mk_mod ?modtypes:t p st)) }
 ;
 
+top_mod_def:
+| x=mod_def       { mk_topmod ~local:false x }
+| LOCAL x=mod_def { mk_topmod ~local:true  x }
+;
+
 mod_params:
 | LPAREN a=plist1(sig_param, COMMA) RPAREN  { a }
 ;
@@ -1238,28 +1248,34 @@ lemma_decl :
 nosmt:
 | NOSMT { false }
 | empty { true  }
+;
+
+local:
+| LOCAL { true  }
+| empty { false }
+;
 
 axiom:
-| AXIOM d=lemma_decl 
-    { mk_axiom d PAxiom }
+| l=local AXIOM o=nosmt d=lemma_decl 
+    { mk_axiom ~local:l ~exsmt:o d PAxiom }
 
-| LEMMA o=nosmt d=lemma_decl
-    { mk_axiom ~exsmt:o d PILemma }
+| l=local LEMMA o=nosmt d=lemma_decl
+    { mk_axiom ~local:l ~exsmt:o d PILemma }
 
-| LEMMA o=nosmt d=lemma_decl BY t=tactic
-    { mk_axiom ~exsmt:o d (PLemma (Some t)) }
+| l=local LEMMA o=nosmt d=lemma_decl BY t=tactic
+    { mk_axiom ~local:l ~exsmt:o d (PLemma (Some t)) }
 
-| LEMMA o=nosmt d=lemma_decl BY LBRACKET RBRACKET
-    { mk_axiom ~exsmt:o d (PLemma None) }
+| l=local LEMMA o=nosmt d=lemma_decl BY LBRACKET RBRACKET
+    { mk_axiom ~local:l ~exsmt:o d (PLemma None) }
 
-| EQUIV x=ident pd=pgtybindings? COLON p=loc(equiv_body(none))
-    { mk_axiom (x, None, pd, p) PILemma }
+| l=local EQUIV x=ident pd=pgtybindings? COLON p=loc(equiv_body(none))
+    { mk_axiom ~local:l (x, None, pd, p) PILemma }
 
-| EQUIV x=ident pd=pgtybindings? COLON p=loc(equiv_body(none)) BY t=tactic
-    { mk_axiom (x, None, pd, p) (PLemma (Some t)) }
+| l=local EQUIV x=ident pd=pgtybindings? COLON p=loc(equiv_body(none)) BY t=tactic
+    { mk_axiom ~local:l (x, None, pd, p) (PLemma (Some t)) }
 
-| EQUIV x=ident pd=pgtybindings? COLON p=loc(equiv_body(none)) BY LBRACKET RBRACKET
-    { mk_axiom (x, None, pd, p) (PLemma None) }
+| l=local EQUIV x=ident pd=pgtybindings? COLON p=loc(equiv_body(none)) BY LBRACKET RBRACKET
+    { mk_axiom ~local:l (x, None, pd, p) (PLemma None) }
 ;
 
 (* -------------------------------------------------------------------- *)
@@ -1267,6 +1283,9 @@ axiom:
 
 theory_open  : THEORY  x=uident  { x }
 theory_close : END     x=uident  { x }
+
+section_open  : SECTION     { () }
+section_close : END SECTION { () }
 
 import_flag:
 | IMPORT { `Import }
@@ -1954,7 +1973,9 @@ global_:
 | theory_export    { GthExport    $1 }
 | theory_clone     { GthClone     $1 }
 | theory_w3        { GthW3        $1 }
-| mod_def          { Gmodule      $1 }
+| section_open     { GsctOpen        }
+| section_close    { GsctClose       }
+| top_mod_def      { Gmodule      $1 }
 | sig_def          { Ginterface   $1 }
 | type_decl_or_def { Gtype        $1 }
 | datatype_def     { Gdatatype    $1 }

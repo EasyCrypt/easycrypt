@@ -126,7 +126,7 @@ and pstructure = {
 }
 
 and pstructure_item =
-  | Pst_mod   of (psymbol * pmodule_expr)
+  | Pst_mod   of pmodule
   | Pst_var   of (psymbol list * pty)
   | Pst_fun   of (pfunction_decl * pfunction_body)
   | Pst_alias of (psymbol * pqsymbol)
@@ -141,6 +141,13 @@ and pfunction_local = {
   pfl_names : [`Single|`Tuple] * (psymbol list);
   pfl_type  : pty   option;
   pfl_init  : pexpr option;
+}
+
+and pmodule = (psymbol * pmodule_expr)
+
+and ptopmodule = {
+  ptm_def   : pmodule;
+  ptm_local : bool;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -421,6 +428,7 @@ type paxiom = {
   pa_vars    : pgtybindings option;  
   pa_formula : pformula;
   pa_kind    : paxiom_kind;
+  pa_local   : bool;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -506,7 +514,7 @@ and pr_override = {
 
 (* -------------------------------------------------------------------- *)
 type global =
-  | Gmodule      of (psymbol * pmodule_expr)
+  | Gmodule      of ptopmodule
   | Ginterface   of (psymbol * pmodule_sig)
   | Goperator    of poperator
   | Gpredicate   of ppredicate
@@ -522,6 +530,8 @@ type global =
   | GthExport    of pqsymbol
   | GthClone     of (theory_cloning * [`Import|`Export] option)
   | GthW3        of (string list * string * w3_renaming list)
+  | GsctOpen
+  | GsctClose
   | Gtactics     of [`Proof of bool | `Actual of ptactic list]
   | Gprover_info of pprover_infos
   | Gcheckproof  of bool
