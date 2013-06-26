@@ -1,5 +1,5 @@
 require import Int.
-require import Map.
+require import Map. import OptionGet.
 
 type from.
 type to.

@@ -60,8 +60,10 @@ type tyerror =
 | InvalidModAppl       of modapp_error
 | InvalidModType       of modtyp_error
 | InvalidMem           of symbol * mem_error
-| OnlyModParamAreOracle of qsymbol
 | LvTupleNotUniq
+| FunNotInModParam     of qsymbol
+| NoActiveMemory
+| PatternNotAllowed
 
 exception TyError of EcLocation.t * EcEnv.env * tyerror
 
@@ -155,9 +157,15 @@ let pp_tyerror fmt env error =
   | InvalidMem (name, MAE_IsConcrete) ->
       msg "the memory %s must be abstract" name
 
-  | OnlyModParamAreOracle name ->
+  | FunNotInModParam name ->
       msg "the function %a is not provided by a module parameter"
         pp_qsymbol name
+
+  | NoActiveMemory ->
+      msg "no active memory at this point"
+
+  | PatternNotAllowed ->
+      msg "pattern not allowed here"
 
 let () =
   let pp fmt exn =
@@ -167,6 +175,9 @@ let () =
     | _ -> raise exn
   in
     EcPException.register pp
+
+(* -------------------------------------------------------------------- *)
+type ptnmap = ty EcIdent.Mid.t ref
 
 (* -------------------------------------------------------------------- *)
 module UE = EcUnify.UniEnv
@@ -655,7 +666,7 @@ and transmodsig_body (env : EcEnv.env) (sa : Sm.t)
               let f, _ = lookup_fun env name in
               let p = f.EcPath.x_top in
               if not (Sm.mem p sa) then 
-                tyerror name.pl_loc env (OnlyModParamAreOracle name.pl_desc);
+                tyerror name.pl_loc env (FunNotInModParam name.pl_desc);
               f
             )
               pfd_uses in
@@ -910,13 +921,16 @@ let rec trans_msymbol (env : EcEnv.env) (msymb : pmsymbol located) =
     (mp, {mis_params = []; mis_body = body})
 
 (* -------------------------------------------------------------------- *)
-let rec transmod (env : EcEnv.env) (x : symbol) (me : pmodule_expr) =
-  match me.pl_desc with
+let rec transmod (env : EcEnv.env) (me : pmodule) =
+  let loc = me.pm_body.pl_loc in
+  let x   = unloc me.pm_name in
+
+  match unloc me.pm_body with
   | Pm_ident m -> 
-    let (mp, _sig) = trans_msymbol env {pl_desc = m; pl_loc = me.pl_loc} in
+    let (mp, _sig) = trans_msymbol env { pl_desc = m; pl_loc = loc } in
     let params = _sig.mis_params in
     if params <> [] then (* FIXME do it only for internal module *)
-      tyerror me.pl_loc env (InvalidModAppl MAE_WrongArgCount);
+      tyerror loc env (InvalidModAppl MAE_WrongArgCount);
     (* FIXME Normally this is the expected code: but 
        I think that by_mpath is buggy :
     
@@ -926,7 +940,7 @@ let rec transmod (env : EcEnv.env) (x : symbol) (me : pmodule_expr) =
     | `Concrete(_, Some _) 
     | _ when mp.EcPath.m_args = [] ->
       let me = EcEnv.Mod.by_mpath mp env in
-      { me with me_name  = x; me_body  = ME_Alias mp; }
+      { me with me_name = x; me_body  = ME_Alias mp; }
     | _ -> 
       let mpf = EcPath.mpath mp.EcPath.m_top [] in
       let mef = EcEnv.Mod.by_mpath mpf env in
@@ -953,15 +967,8 @@ let rec transmod (env : EcEnv.env) (x : symbol) (me : pmodule_expr) =
     end 
 
   | Pm_struct st ->
-    let res = transstruct env x st in
-(*   let sig_ = res.me_sig in
-    Format.printf "module %s : @." x;
-    List.iter (fun (Tys_function(fs,call)) ->
-      Format.printf "   fun %s { " fs.fs_name;
-      List.iter (fun x -> Format.printf "%s " (EcPath.x_tostring x))
-        call.oi_calls;
-      Format.printf "}@.") sig_.mis_body; *)
-    res
+      let res = transstruct env x st in
+        res
 
 (* -------------------------------------------------------------------- *)
 and transstruct (env : EcEnv.env) (x : symbol) (st : pstructure) =
@@ -1115,9 +1122,9 @@ and transstruct (env : EcEnv.env) (x : symbol) (st : pstructure) =
 (* -------------------------------------------------------------------- *)
 and transstruct1 (env : EcEnv.env) (st : pstructure_item) =
   match st with
-  | Pst_mod ({ pl_desc = m }, me) ->
-    let me = transmod env m me in
-    [(m, MI_Module me)]
+  | Pst_mod me ->
+    let mod_ = transmod env me in
+      [(unloc me.pm_name, MI_Module mod_)]
 
   | Pst_var (xs, ty) ->
       let ty = transty_for_decl env ty in
@@ -1460,18 +1467,29 @@ let trans_topmsymbol env gp =
   let (mp,_) = trans_msymbol env gp in
   let top = EcPath.m_functor mp in
   let mp = EcPath.m_apply top mp.EcPath.m_args in
-  mp 
+  mp
 
-let transform_opt env ue pf tt =
+(* -------------------------------------------------------------------- *)
+let trans_form_or_pattern env (ps, ue) pf tt =
   let rec transf env f = 
     match f.pl_desc with
+    | PFhole -> begin
+      match ps with
+      | None    -> tyerror f.pl_loc env PatternNotAllowed
+      | Some ps ->
+        let x  = EcIdent.create "_p" in
+        let ty = UE.fresh_uid ue in
+          ps := Mid.add x ty !ps; f_local x ty
+    end
+
     | PFglob gp ->
-      let mp = trans_topmsymbol env gp in
-      let me =  
-        match EcEnv.Memory.current env with
-        | None -> assert false (* FIXME error message *)
-        | Some me -> EcMemory.memory me in
-      f_glob mp me
+        let mp = trans_topmsymbol env gp in
+        let me =  
+          match EcEnv.Memory.current env with
+          | None -> tyerror f.pl_loc env NoActiveMemory
+          | Some me -> EcMemory.memory me
+        in
+          f_glob mp me
       
     | PFint n ->
         f_int n
@@ -1720,11 +1738,19 @@ let transform_opt env ue pf tt =
   let f = transf env pf in
   oiter tt (unify_or_fail env ue pf.pl_loc f.f_ty); 
   f
-  
-(* -------------------------------------------------------------------- *)
-let transform env ue pf ty =
-  transform_opt env ue pf (Some ty)
 
 (* -------------------------------------------------------------------- *)
-let transformula env ue pf = 
-  transform env ue pf tbool
+let trans_form_opt env ue pf oty =
+  trans_form_or_pattern env (None, ue) pf oty
+
+(* -------------------------------------------------------------------- *)
+let trans_form env ue pf ty =
+  trans_form_opt env ue pf (Some ty)
+
+(* -------------------------------------------------------------------- *)
+let trans_prop env ue pf = 
+  trans_form env ue pf tbool
+
+(* -------------------------------------------------------------------- *)
+let trans_pattern env (ps, ue) pf =
+  trans_form_or_pattern env (Some ps, ue) pf None

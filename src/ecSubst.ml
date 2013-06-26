@@ -300,7 +300,7 @@ let subst_ax (s : _subst) (ax : axiom) =
     { ax_tparams = params;
       ax_spec    = spec;
       ax_kind    = kind;
-      ax_scope   = ax.ax_scope; }
+      ax_exsmt   = ax.ax_exsmt; }
 
 (* -------------------------------------------------------------------- *)
 (* SUBSTITUTION OVER THEORIES *)

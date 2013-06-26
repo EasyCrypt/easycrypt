@@ -45,8 +45,10 @@ type tyerror =
 | InvalidModAppl       of modapp_error
 | InvalidModType       of modtyp_error
 | InvalidMem           of symbol * mem_error
-| OnlyModParamAreOracle of qsymbol
 | LvTupleNotUniq
+| FunNotInModParam     of qsymbol
+| NoActiveMemory
+| PatternNotAllowed
 
 exception TyError of EcLocation.t * EcEnv.env * tyerror
 
@@ -80,17 +82,21 @@ val transexp : EcEnv.env -> EcUnify.unienv -> pexpr -> expr * ty
 val transexpcast : EcEnv.env -> EcUnify.unienv -> ty -> pexpr -> expr
 
 (* -------------------------------------------------------------------- *)
-val transmem     : EcEnv.env -> EcSymbols.symbol located -> EcIdent.t
-val transformula : EcEnv.env -> EcUnify.unienv -> pformula -> EcFol.form 
-val transform    : EcEnv.env -> EcUnify.unienv -> pformula -> ty -> EcFol.form
-val transform_opt: EcEnv.env -> EcUnify.unienv -> pformula -> ty option -> EcFol.form
+type ptnmap = ty EcIdent.Mid.t ref
+
+val transmem       : EcEnv.env -> EcSymbols.symbol located -> EcIdent.t
+val trans_form_opt : EcEnv.env -> EcUnify.unienv -> pformula -> ty option -> EcFol.form
+val trans_form     : EcEnv.env -> EcUnify.unienv -> pformula -> ty -> EcFol.form
+val trans_prop     : EcEnv.env -> EcUnify.unienv -> pformula -> EcFol.form
+val trans_pattern  : EcEnv.env -> (ptnmap * EcUnify.unienv) -> pformula -> EcFol.form
 
 (* -------------------------------------------------------------------- *)
 val transmodsig   : EcEnv.env -> symbol -> pmodule_sig  -> module_sig
 val transmodtype  : EcEnv.env -> pmodule_type -> module_type * module_sig
-val transmod      : EcEnv.env -> symbol -> pmodule_expr -> module_expr
+val transmod      : EcEnv.env -> pmodule -> module_expr
 val trans_msymbol : EcEnv.env -> pmsymbol located -> mpath * module_sig
 val trans_gamepath : EcEnv.env -> pgamepath -> xpath 
+
 (* -------------------------------------------------------------------- *)
 
 val check_sig_mt_cnv : EcEnv.env -> module_sig -> module_type -> unit 

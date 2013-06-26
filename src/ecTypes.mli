@@ -51,6 +51,7 @@ val toarrow    : ty list -> ty -> ty
 val ty_dump  : ty -> EcDebug.dnode
 exception FoundUnivar
 val ty_check_uni : ty -> unit
+
 (* -------------------------------------------------------------------- *)
 type ty_subst = {
   ts_p  : EcPath.path -> EcPath.path;
