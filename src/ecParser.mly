@@ -1483,9 +1483,10 @@ conseq:
 ;
 
 call_info: 
- | f1=form LONGARROW f2=form     { CI_spec (f1, f2) }
- | f=form                        { CI_inv  f }
- | bad=form COMMA p=form COMMA q=form?    { CI_upto (bad,p,q) }
+ | f1=form LONGARROW f2=form             { CI_spec (f1, f2) }
+ | f=form                                { CI_inv  f }
+ | bad=form COMMA p=form                 { CI_upto (bad,p,None) }
+ | bad=form COMMA p=form COMMA q=form    { CI_upto (bad,p,Some q) }
 
 tac_dir: 
 | BACKS {  true }
