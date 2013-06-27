@@ -341,6 +341,17 @@ axiom rm_cons: forall (y x:'a) xs, rm y (x::xs) = ((x = y) ? xs : (x::rm y xs)).
 lemma nosmt rm_consE: forall (x:'a) xs, rm x (x::xs) = xs by [].
 lemma nosmt rm_consNE: forall (x y:'a) xs, x <> y => rm y (x::xs) = x::(rm y xs) by [].
 
+lemma length_rm: forall (x:'a) xs,
+  mem x xs =>
+  length (rm x xs) = length xs - 1.
+proof strict.
+intros=> x xs; elimT list_ind xs=> {xs}.
+  by apply absurd=> h {h}; apply mem_nil.
+  intros=> x' xs IH x_in_xs; rewrite length_cons; case (x' = x)=> x_x'.
+    by subst x'; rewrite rm_consE; smt.
+    by generalize x_in_xs; rewrite mem_consNE // rm_consNE // length_cons=> x_in_xs; rewrite IH //; smt.
+qed.
+
 lemma count_rm_in: forall (x:'a) (xs:'a list),
   mem x xs =>
   count x (rm x xs) = count x xs - 1.
@@ -440,4 +451,29 @@ intros=> f z xs; elimT list_ind xs=> {xs}.
       rewrite (IH (rm x ys))=> //.
         by intros=> a b; apply fC.
         by intros=> a b c; apply fA.
+qed.
+
+(** Properties of unique lists up to permutation *)
+lemma perm_unique: forall (xs ys:'a list),
+  xs <-> ys =>
+  unique xs =>
+  unique ys
+by [].
+
+lemma cons_nin: forall (x:'a) (xs ys:'a list),
+  unique ys =>
+  x::xs <-> ys =>
+  !mem x xs
+by [].
+
+lemma perm_length: forall (xs ys:'a list),
+  xs <-> ys =>
+  length xs = length ys.
+proof strict.
+intros=> xs; elimT list_ind xs=> {xs}.
+  smt.
+  intros=> x xs IH ys xs_ys.
+    rewrite length_cons (IH (rm x ys)).
+      by rewrite -(rm_consE x xs); apply perm_rm=> //. (* This should become a lemma *)
+      by rewrite length_rm; smt.
 qed.
