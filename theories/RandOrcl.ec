@@ -1,4 +1,5 @@
 require import Int.
+require import Fun.
 require import Map. import OptionGet.
 
 type from.
@@ -33,6 +34,17 @@ theory ROM.
       return proj (m.[x]);
     }
   }.
+
+  lemma lossless_init : islossless RO.init.
+  proof. fun;wp;skip;trivial. qed.
+
+  lemma lossless_o : mu dsample cpTrue = 1%r => islossless RO.o.
+  proof. 
+   intros Hs;fun;wp;simplify. 
+   rnd 1%r cpTrue;skip; first by trivial.
+   by apply Hs.
+  qed.
+
 end ROM.
 
 (* Wrappers for use by an adversary:
@@ -60,6 +72,7 @@ theory WRO_Int.
       return r;
     }
   }.
+  
 end WRO_Int.
 
 theory WRO_Set.
@@ -84,6 +97,28 @@ theory WRO_Set.
       return r;
     }
   }.
+
+  lemma lossless_init : 
+     forall (R<:Oracle), islossless R.init =>
+      bd_hoare [ ARO(R).init : true ==> true] = 1%r.  (* islossless ARO(R).init : parse error*) 
+  proof. intros R HR;fun;wp;call HR;skip;by trivial. qed.
+
+  lemma lossless_o : 
+     forall (R<:Oracle), islossless R.o =>
+      bd_hoare [ ARO(R).o : true ==> true] = 1%r.  
+  proof. 
+    intros R HR;fun;wp.
+    if.
+      call HR;wp;skip;by trivial.
+    wp;skip;by trivial.
+  save.
+
+  lemma RO_lossless_init : islossless ARO(ROM.RO).init.
+  proof. apply (lossless_init ROM.RO);apply ROM.lossless_init. qed.
+
+  lemma RO_lossless_o : mu dsample cpTrue = 1%r => islossless ARO(ROM.RO).o.
+  proof. intros Hs;apply (lossless_o ROM.RO);apply ROM.lossless_o;apply Hs. qed.
+
 end WRO_Set.
 
 theory WRO_List.

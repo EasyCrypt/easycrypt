@@ -138,7 +138,7 @@ lemma eq1_enc :
 !in_dom M.r{2} RO.m{2} => (={res} /\ eq_except RO.m{1} RO.m{2} M.r{2}) ].
 proof.
  fun;inline RO.o.
- wp;rnd (lambda v, m{1} ^^ v)(lambda v,m{1} ^^ v).
+ wp;rnd (^^ m{1}) (^^ m{1}).
  wp;rnd;skip;progress;smt.
 save.
 
@@ -158,25 +158,31 @@ module CPA2(S : Scheme, A_ : Adv) = {
   c  = SO.enc(pk,m0);
   b' = A.a2(c);
   b = ${0,1}; 
-  return b = b';
+  return b' = b;
  } 
 }.
 
+lemma lossless_ARO_init : islossless ARO(RO).init.
+proof. apply RO_lossless_init. qed.
+
+lemma lossless_ARO_o : islossless ARO(RO).o.
+proof. 
+  apply RO_lossless_o;apply Plaintext.Dword.lossless. 
+qed.
 
 lemma eq1 : forall (A <: Adv {M,RO,ARO}), 
-(forall (O <: ARO), islossless O.o =>  islossless A(O).a1) =>
 (forall (O <: ARO), islossless O.o =>  islossless A(O).a2) =>
  equiv [ CPA(BR,A).main ~ CPA2(BR2,A).main : 
 (glob A){1} = (glob A){2} ==>
  (!mem M.r ARO.log){2} => ={res}].
 proof.
- intros A HALossless1 HALossless2.
+ intros A HALossless2.
  fun.
  swap{2} -2.
  call (_ : (mem M.r ARO.log), 
            (={ARO.log} /\ eq_except RO.m{1} RO.m{2} M.r{2})).
  fun;if;[smt|inline RO.o;wp;rnd|];wp;skip;progress;smt.
- intros &m H;fun;if;[inline RO.o;wp;rnd 1%r cpTrue|];wp;skip;progress;smt.
+ intros _ _;apply lossless_ARO_o.
  intros &m;fun;if;[inline RO.o;wp;rnd 1%r cpTrue|];wp;skip;progress;smt.
  call eq1_enc.
  rnd.
@@ -188,10 +194,14 @@ proof.
   progress;smt.
 save.
 
+lemma foo1 : forall (b:bool), mu {0,1} (= b) = 1%r / 2%r.
+proof. intros b; apply (Bool.Dbool.mu_x_def b). save. 
 
-lemma real_le_trans : forall(a, b, c : real),  
- Real.(<=) a b => Real.(<=) b  c => a <= c by [].
+lemma foo2 : mu uniform_rand cpTrue = 1%r.
+proof. apply Randomness.Dword.lossless. save.
 
+lemma foo3 : mu uniform cpTrue = 1%r.
+proof. apply Plaintext.Dword.lossless. save.
 
 lemma prob1_1 : 
  forall (A <: Adv {M,RO,ARO}), 
@@ -201,19 +211,31 @@ lemma prob1_1 :
 proof.
  intros A Hlossless1 Hlossless2.
  intros &m.
- cut H1 : (bd_hoare[CPA2(BR2,A).main : true ==> res] = (1%r / 2%r)).
- fun; rnd (1%r / 2%r) (lambda b, b = b'); simplify.
- call ( _ :true);try assumption.
- fun;if;[inline RO.o;wp;rnd 1%r (cpTrue)|];wp;skip;smt.
- inline CPA2(BR2,A).SO.enc;do 2! (wp;rnd 1%r (cpTrue));wp.
- call (_ : true);try assumption.
- fun;if;[inline RO.o;wp;rnd 1%r (cpTrue)|];wp;skip;smt.
- inline CPA2(BR2,A).SO.kg CPA2(BR2,A).ARO.init RO.init.
- wp;rnd 1%r (cpTrue);wp;skip;progress;[smt|smt|smt|].
- rewrite Dbool.mu_def.
- case (result);delta charfun;simplify;smt.
- bdhoare_deno H1; smt.
+ bdhoare_deno (_ : true ==> res); trivial.
+   fun.
+   rnd (1%r / 2%r) (= b').
+   conseq ( _ : ==> true).
+(*    apply (Bool.Dbool.mu_x_def (CPA2(BR2,A).main.b'{hr})). (* parse error *) *) 
+(*   generalize  (CPA2(BR2,A).main.b'{hr}).  (* parse error *) *)
+     progress;apply foo1.
+   call ( _ :true); first by assumption.
+    apply lossless_ARO_o.   
+   inline CPA2(BR2,A).SO.enc;do 2! (wp;rnd 1%r (cpTrue));wp.
+   (* rewrite foo2. cannot find an occurence for [pose] *)
+   conseq ( _ : ==> true).
+     rewrite foo2; rewrite foo3;progress.
+   call (_ : true);try assumption.
+     apply lossless_ARO_o.  
+   inline CPA2(BR2,A).SO.kg.
+   wp;rnd 1%r (cpTrue);wp.
+   conseq ( _ : ==> true).
+     progress;apply keypair_lossless. 
+   call lossless_ARO_init;skip;trivial.
 save.
+
+(* TODO remove this *)
+lemma real_le_trans : forall(a b c : real),  
+  a <= b => b <= c => a <= c by []. 
 
 lemma prob1_2 :
  forall (A <: Adv {M,RO,ARO}) &m,
@@ -226,13 +248,11 @@ proof.
  rewrite -(prob1_1 A _ _ &m);[assumption | assumption | ].
  apply (real_le_trans _ 
              Pr[CPA2(BR2,A).main() @ &m : res \/ mem M.r ARO.log] _).
- equiv_deno (_ : (glob A){1} = (glob A){2} ==>
- !(mem M.r ARO.log){2} => res{1} = res{2});
-   [ apply (eq1 A _ _);try assumption| |];smt.
+ equiv_deno (eq1 A _);try assumption;progress;smt.
  cut H:
  (Pr[CPA2(BR2,A).main() @ &m : res \/ mem M.r ARO.log] =
   Pr[CPA2(BR2,A).main() @ &m : res] +  Pr[CPA2(BR2,A).main() @ &m : mem M.r ARO.log] -
-  Pr[CPA2(BR2,A).main() @ &m : res /\ mem M.r ARO.log]);[pr_or|];smt.
+  Pr[CPA2(BR2,A).main() @ &m : res /\ mem M.r ARO.log]);[pr_or;trivial | smt].
 save.
 
 module type Inverter = {
@@ -282,7 +302,6 @@ proof.
  rewrite -(finvof pk sk _ _);first smt.
  rewrite Heqf;smt.
 save.
-
 
 lemma eq2 : forall (A <: Adv {M,RO,ARO}), 
 (forall (O <: ARO), islossless O.o => islossless A(O).a1) =>

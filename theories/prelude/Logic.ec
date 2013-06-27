@@ -29,7 +29,7 @@ lemma nosmt neqF : forall (x:bool), !x => (x = false) by [].
 lemma nosmt rewrite_eqT : forall (x:bool), (x = true) <=> x by [].
 lemma nosmt rewrite_neqF : forall (x:bool), (x = false) <=> !x by [].
 
-lemma nosmt neq_def: forall (x:bool), (x => false) <=> !x by [].
+lemma nosmt not_def: forall (x:bool), (x => false) <=> !x by [].
 
 (** absurd *)
 lemma nosmt absurd : forall (b a : bool), (!a => !b) => b => a by [].
