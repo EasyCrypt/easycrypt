@@ -8,6 +8,12 @@ open EcDecl
 open EcModules
 
 (* -------------------------------------------------------------------- *)
+type tymod_cnv_failure =
+| E_TyModCnv_ParamCountMismatch
+| E_TyModCnv_ParamTypeMismatch of EcIdent.t
+| E_TyModCnv_MissingComp       of symbol
+| E_TyModCnv_MismatchFunSig    of symbol
+
 type modapp_error =
 | MAE_WrongArgPosition
 | MAE_WrongArgCount
@@ -37,6 +43,7 @@ type tyerror =
 | NonUnitFunWithoutReturn
 | UnitFunWithReturn
 | TypeMismatch         of (ty * ty) * (ty * ty)
+| TypeModMismatch      of tymod_cnv_failure
 | UnknownVarOrOp       of qsymbol * ty list
 | MultipleOpMatch      of qsymbol * ty list
 | UnknownModName       of qsymbol
