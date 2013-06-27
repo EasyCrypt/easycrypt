@@ -25,16 +25,14 @@ let rec toperror_of_exn ?gloc exn =
   | ParseError (loc, _)  -> Some (loc, exn)
 
   | LocError (loc, e)    -> begin
-      let gloc =
-        if loc == EcLocation._dummy then gloc else Some loc
-      in
+      let gloc = if EcLocation.isdummy loc then gloc else Some loc in
       match toperror_of_exn ?gloc e with
       | None -> Some (loc, e)
       | Some (loc, e) -> Some (loc, e)
     end
 
   | TopError (loc, e) ->
-      let gloc =  if loc == EcLocation._dummy then gloc else Some loc in
+      let gloc = if EcLocation.isdummy loc then gloc else Some loc in
         Some (odfl _dummy gloc, e)
 
   | EcScope.HiScopeError (loc, msg) ->
