@@ -8,6 +8,12 @@ open EcDecl
 open EcModules
 
 (* -------------------------------------------------------------------- *)
+type tymod_cnv_failure =
+| E_TyModCnv_ParamCountMismatch
+| E_TyModCnv_ParamTypeMismatch of EcIdent.t
+| E_TyModCnv_MissingComp       of symbol
+| E_TyModCnv_MismatchFunSig    of symbol
+
 type modapp_error =
 | MAE_WrongArgPosition
 | MAE_WrongArgCount
@@ -33,7 +39,11 @@ type tyerror =
 | DuplicatedTyVar
 | DuplicatedLocal      of symbol
 | NonLinearPattern
+| LvNonLinear
+| NonUnitFunWithoutReturn
+| UnitFunWithReturn
 | TypeMismatch         of (ty * ty) * (ty * ty)
+| TypeModMismatch      of tymod_cnv_failure
 | UnknownVarOrOp       of qsymbol * ty list
 | MultipleOpMatch      of qsymbol * ty list
 | UnknownModName       of qsymbol
@@ -45,7 +55,6 @@ type tyerror =
 | InvalidModAppl       of modapp_error
 | InvalidModType       of modtyp_error
 | InvalidMem           of symbol * mem_error
-| LvTupleNotUniq
 | FunNotInModParam     of qsymbol
 | NoActiveMemory
 | PatternNotAllowed
@@ -98,5 +107,4 @@ val trans_msymbol : EcEnv.env -> pmsymbol located -> mpath * module_sig
 val trans_gamepath : EcEnv.env -> pgamepath -> xpath 
 
 (* -------------------------------------------------------------------- *)
-
 val check_sig_mt_cnv : EcEnv.env -> module_sig -> module_type -> unit 

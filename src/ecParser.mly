@@ -674,7 +674,7 @@ sform_u(P):
 | EQUIV LBRACKET eb=equiv_body(P) RBRACKET { eb }
 
 | HOARE LBRACKET
-    s=fun_def_body
+    s=loc(fun_def_body)
     COLON pre=form_r(P) LONGARROW post=form_r(P)
   RBRACKET
 	{ PFhoareS (pre, s, post) }
@@ -683,7 +683,6 @@ sform_u(P):
     mp=loc(fident) args=paren(plist0(sform_r(P), COMMA)) AT pn=mident
     COLON event=form_r(P)
   RBRACKET
-
     { PFprob (mp, args, pn, event) }
 
 | r=loc(RBOOL)
@@ -777,12 +776,16 @@ form_u(P):
         PFapp (mk_loc loc id, [e]) }
 
 | BDHOARE 
-    LBRACKET mp=loc(fident) COLON pre=form_r(P) LONGARROW post=form_r(P)  RBRACKET
+    LBRACKET mp=loc(fident) COLON
+      pre=form_r(P) LONGARROW post=form_r(P)
+    RBRACKET
       cmp=hoare_bd_cmp bd=sform_r(P)
 	{ PFBDhoareF (pre, mp, post, cmp, bd) }
 
 | BDHOARE 
-    LBRACKET s=fun_def_body COLON pre=form_r(P) LONGARROW post=form_r(P) RBRACKET
+    LBRACKET s=loc(fun_def_body) COLON
+      pre=form_r(P) LONGARROW post=form_r(P)
+    RBRACKET
       cmp=hoare_bd_cmp bd=sform_r(P)
 	{ PFBDhoareS (pre, s, post, cmp, bd) }
 
@@ -933,13 +936,13 @@ loc_decl_names:
 ;
 
 loc_decl_r:
-| VAR x=loc_decl_names COLON ty=loc(type_exp)
+| VAR x=loc(loc_decl_names) COLON ty=loc(type_exp)
     { { pfl_names = x; pfl_type = Some ty; pfl_init = None; } }
 
-| VAR x=loc_decl_names COLON ty=loc(type_exp) EQ e=expr
+| VAR x=loc(loc_decl_names) COLON ty=loc(type_exp) EQ e=expr
     { { pfl_names = x; pfl_type = Some ty; pfl_init = Some e; } }
 
-| VAR x=loc_decl_names EQ e=expr
+| VAR x=loc(loc_decl_names) EQ e=expr
     { { pfl_names = x; pfl_type = None; pfl_init = Some e; } }
 ;
 
@@ -990,14 +993,10 @@ mod_item:
 (* Modules                                                              *)
 
 mod_body:
-(*| m=qident
-    { `App (m, []) }
+| m=mod_qident
+    { `App m }
 
-| m=qident LPAREN a=plist1(qident, COMMA) RPAREN
-    { `App (m, a) } *)
-| m=mod_qident { `App m }
-
-| LBRACE stt=mod_item* RBRACE
+| LBRACE stt=loc(mod_item)* RBRACE
     { `Struct stt }
 ;
 
@@ -1076,9 +1075,6 @@ sig_param:
 ;
 
 signature_item:
-| VAR decl=ivar_decl
-    { `VariableDecl decl }
-
 | FUN decl=ifun_decl
     { `FunctionDecl decl }
 ;
@@ -1091,12 +1087,9 @@ ifun_decl:
         pfd_uses     = us; }
     }
 ;
+
 oracle_info:
 | i=STAR? qs=qident* { i=None, qs }
-
-ivar_decl:
-| x=lident COLON ty=loc(type_exp)
-    { { pvd_name = x; pvd_type = ty } }
 ;
 
 (* -------------------------------------------------------------------- *)
