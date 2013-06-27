@@ -124,6 +124,13 @@ module PPEnv = struct
     in
       p_shorten exists p
 
+  let th_symb (ppe : t) p = 
+    let exists sm = 
+      try  EcPath.p_equal (EcEnv.Theory.lookup_path sm ppe.ppe_env) p
+      with EcEnv.LookupFailure _ -> false
+    in
+      p_shorten exists p
+
   let rec mod_symb (ppe : t) mp : EcSymbols.msymbol =
     let (nm, x, p2) =
       match mp.P.m_top with
@@ -1093,7 +1100,7 @@ let pp_typedecl (ppe : PPEnv.t) fmt (x, tyd) =
     | Some ty -> Format.fprintf fmt " =@ %a" (pp_type_r ppe false) ty
 
   in
-    Format.fprintf fmt "%t%t.@\n" pp_prelude pp_body
+    Format.fprintf fmt "@[%t%t.@]" pp_prelude pp_body
 
 (* -------------------------------------------------------------------- *)
 let pp_tyvarannot (ppe : PPEnv.t) fmt ids =
@@ -1120,9 +1127,9 @@ let pp_opdecl_pr (ppe : PPEnv.t) fmt (x, ts, ty, op) =
           let vds = List.map (snd_map EcFol.destr_gty) vds in
             (pp_locbinds ppe vds, f)
         in
-          Format.fprintf fmt "%t = %a" pp_vds (pp_form subppe) f
+          Format.fprintf fmt "%t =@,%a" pp_vds (pp_form subppe) f
   in
-    Format.fprintf fmt "pred %s%a%t.@\n"
+    Format.fprintf fmt "@[<hov 2>pred %s%a%t.@]"
       basename (pp_tyvarannot ppe) ts pp_body
 
 let pp_opdecl_op (ppe : PPEnv.t) fmt (x, ts, ty, op) =
@@ -1142,9 +1149,9 @@ let pp_opdecl_op (ppe : PPEnv.t) fmt (x, ts, ty, op) =
 
           (pp_locbinds ppe vds, e)
         in
-          Format.fprintf fmt "%t = %a" pp_vds (pp_expr subppe) e
+          Format.fprintf fmt "%t =@,%a" pp_vds (pp_expr subppe) e
   in
-  Format.fprintf fmt "op %s%a%t.@\n"
+  Format.fprintf fmt "@[<hov 2>op %s%a%t.@]"
     basename (pp_tyvarannot ppe) ts pp_body
 
 
@@ -1173,7 +1180,7 @@ let pp_axiom (ppe : PPEnv.t) fmt (x, ax) =
         Format.fprintf fmt "%s <%a>" basename
           (pp_list ",@ " (pp_tyvar ppe)) ts
   in
-    Format.fprintf fmt "%s %t : %t.@\n"
+    Format.fprintf fmt "@[<hov 2>%s %t :@,%t.@]"
       (string_of_axkind ax.ax_kind) pp_name pp_spec
 
 (* -------------------------------------------------------------------- *)
@@ -1607,4 +1614,117 @@ let pp_goal (ppe : PPEnv.t) fmt (n, (hyps, concl)) =
     end
 
 (* -------------------------------------------------------------------- *)
-let pp_theory _ _ _ = ()
+let pp_mod_params ppe bms = 
+  let pp_mp ppe (id,mt) = 
+    let ppe1 = PPEnv.add_local ppe id in
+    let pp fmt = 
+      Format.fprintf fmt "%a : %a" (pp_local ppe1) id 
+        EcSymbols.pp_msymbol (PPEnv.modtype_symb ppe mt) in
+    ppe1, pp
+  in
+  let rec aux ppe bms = 
+    match bms with
+    | [] -> (ppe, fun _ -> ())
+    | [bm] -> 
+      let ppe, pp = pp_mp ppe bm in
+      (ppe, fun fmt -> Format.fprintf fmt "%t" pp)
+    | bm::bms ->
+      let ppe, pp1 = pp_mp ppe bm in
+      let ppe, pp2 = aux ppe bms in
+      (ppe, fun fmt -> Format.fprintf fmt "%t,@,%t" pp1 pp2) in
+  let (ppe,pp) = aux ppe bms in
+  (ppe, fun fmt -> if bms = [] then () else Format.fprintf fmt "@[(%t)@]" pp)
+
+let pp_pvdecl ppe fmt v =
+  Format.fprintf fmt "%s : %a" v.v_name (pp_type ppe) v.v_type
+
+let pp_funsig ppe fmt fs = 
+  Format.fprintf fmt "@[<hov 2>fun %s(%a) :@, %a@]"
+    fs.fs_name 
+    (pp_list ",@," (pp_pvdecl ppe)) fs.fs_params
+    (pp_type ppe) fs.fs_ret
+
+let pp_orclinfo ppe fmt oi = 
+  Format.fprintf fmt "{%s%a}"
+    (if oi.oi_in then "" else "* ")
+    (pp_list ",@," (pp_funname ppe)) oi.oi_calls
+  
+let pp_sigitem ppe fmt (Tys_function(fs,oi)) =
+  Format.fprintf fmt "@[%a@ %a@]"
+    (pp_funsig ppe) fs (pp_orclinfo ppe) oi
+
+let pp_modsig ppe fmt (p,ms) = 
+  let (ppe,pp) = pp_mod_params ppe ms.mis_params in
+  Format.fprintf fmt "@[<v>module type %s%t = {@,  @[<v>%a@]@,}@]"
+    (EcPath.basename p) pp
+    (pp_list "@,@," (pp_sigitem ppe)) ms.mis_body
+
+let rec pp_modexp ppe fmt me = 
+  let (ppe,pp) = pp_mod_params ppe me.me_sig.mis_params in 
+  Format.fprintf fmt "@[module %s%t =%a@]"
+    me.me_name pp 
+    (pp_modbody ppe) me.me_body 
+and pp_modbody ppe fmt = function
+  | ME_Alias mp -> Format.fprintf fmt "@,%a" (pp_topmod ppe) mp
+  | ME_Structure ms -> 
+    Format.fprintf fmt " {@,  @[<v>%a@]@,}"
+      (pp_list "@,@," (pp_moditem ppe)) ms.ms_body 
+  | ME_Decl (mt,restr) ->
+    Format.fprintf fmt "@,%a" (pp_modtype ppe) (mt,restr)
+and pp_moditem ppe fmt = function
+  | MI_Module me -> pp_modexp ppe fmt me
+  | MI_Variable v -> Format.fprintf fmt "@[<hov 2>var %a@]" (pp_pvdecl ppe) v
+  | MI_Function f -> 
+    let pp_fundef ppe fmt = function
+      | FBdef def ->
+        Format.fprintf fmt "%a@,%s@,%a" (* FIXME *)
+          (pp_list "@," (fun fmt->Format.fprintf fmt "@[<hov 2>var %a@]" (pp_pvdecl ppe)))
+          def.f_locals
+          "STMT"
+          (fun fmt o -> if o = None then () else (pp_expr ppe fmt (oget o)))
+          def.f_ret
+          
+      | _ -> Format.fprintf fmt "?ABSTRACT?" in
+      
+    Format.fprintf fmt "@[<v>%a = {@,  @[<v>%a@]@,}@]"
+      (pp_funsig ppe) f.f_sig 
+      (pp_fundef ppe) f.f_def 
+
+let pp_modexp ppe fmt me = 
+  Format.fprintf fmt "%a." (pp_modexp ppe) me 
+
+let rec pp_theory ppe (fmt:Format.formatter) (path, cth) = 
+  let basename = EcPath.basename path in
+  let pp_clone fmt desc = 
+    match desc with
+    | EcTheory.CTh_struct _ -> ()
+    | EcTheory.CTh_clone cthc ->
+      Format.fprintf fmt "(* clone %a as %s *)@,"
+        EcSymbols.pp_qsymbol (PPEnv.th_symb ppe cthc.EcTheory.cthc_base)
+        basename in
+  Format.fprintf fmt "@[<v>%atheory %s.@,@,  @[<v>%a@]@,@,end %s.@]"
+    pp_clone cth.EcTheory.cth_desc 
+    basename
+    (pp_list "@,@," (pp_th_item ppe path)) cth.EcTheory.cth_struct
+    basename
+    
+ and pp_th_item ppe (p:EcPath.path) fmt = function
+  | EcTheory.CTh_type(id,ty) ->
+    pp_typedecl ppe fmt (EcPath.pqname p id,ty)
+  | EcTheory.CTh_operator(id,op) ->
+    pp_opdecl ppe fmt (EcPath.pqname p id, op)
+  | EcTheory.CTh_axiom(id,ax) ->
+    pp_axiom ppe fmt (EcPath.pqname p id, ax)
+  | EcTheory.CTh_modtype(id,ms) ->
+    pp_modsig ppe fmt (EcPath.pqname p id, ms)
+  | EcTheory.CTh_module me -> 
+    pp_modexp ppe fmt me
+  | EcTheory.CTh_theory(id,cth) -> 
+    pp_theory ppe fmt (EcPath.pqname p id, cth)
+  | EcTheory.CTh_export p ->
+    (* Fixme should not use a pp_list, it should be a fold *)
+    Format.fprintf fmt "export %a."  
+      EcSymbols.pp_qsymbol (PPEnv.th_symb ppe p)
+
+  
+
