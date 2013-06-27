@@ -376,6 +376,16 @@ lemma perm_refl: forall (xs:'a list), xs <-> xs by [].
 lemma perm_symm: forall (xs ys:'a list), xs <-> ys => ys <-> xs by [].
 lemma perm_trans: forall (ys xs zs:'a list), xs <-> ys => ys <-> zs => xs <-> zs by [].
 
+lemma perm_nil: forall (xs:'a list),
+  xs <-> [] =>
+  xs = [].
+proof strict.
+intros=> xs; delta (<->) beta=> xs_nil;
+cut h: forall (x:'a), count x xs = 0.
+  by intros=> x; rewrite -(count_nil x) xs_nil //.
+  smt. (* TODO: Add lemmas to count *)
+qed.
+
 lemma perm_cons: forall x (xs ys:'a list),
   xs <-> ys =>
   (x::xs) <-> (x::ys)
@@ -419,13 +429,15 @@ lemma fold_perm: forall (f:'a -> 'a -> 'a) (z:'a) (xs ys:'a list),
   xs <-> ys =>
   fold_right f z xs = fold_right f z ys.
 proof strict.
-intros=> f z xs; elimT list_ind xs=> {xs}; first smt.
-intros=> x xs IH ys fC fA xs_ys; rewrite fold_right_cons (foldCA _ _ x ys).
-  intros=> a b; apply fC.
-  intros=> a b c; apply fA.
-  rewrite -count_mem -xs_ys; smt.
-congr=> //; cut rm_xs_ys: xs <-> rm x ys; first smt.
-  rewrite (IH (rm x ys))=> //.
-    intros=> a b; apply fC.
-    intros=> a b c; apply fA.
+intros=> f z xs; elimT list_ind xs=> {xs}.
+  by intros=> ys fC fA nil_ys; rewrite (perm_nil ys); [apply perm_symm=> // | trivial ].
+  intros=> x xs IH ys fC fA xs_ys; rewrite fold_right_cons (foldCA _ _ x ys).
+       by intros=> a b; apply fC.
+       by intros=> a b c; apply fA.
+       by rewrite -count_mem -xs_ys; smt.
+     congr=> //; cut rm_xs_ys: xs <-> rm x ys;
+       first by rewrite -(rm_consE x xs); apply perm_rm=> //.
+      rewrite (IH (rm x ys))=> //.
+        by intros=> a b; apply fC.
+        by intros=> a b c; apply fA.
 qed.
