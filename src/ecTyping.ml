@@ -644,49 +644,50 @@ let rec transmodsig (env : EcEnv.env) (name : symbol) (modty : pmodule_sig) =
 (* -------------------------------------------------------------------- *)
 and transmodsig_body (env : EcEnv.env) (sa : Sm.t)
     (is : pmodule_sig_struct_body) =
-  let transsig1 = function
-    | `VariableDecl _x -> assert false (* Not implemented for the moment *)
-(*        let name  = x.pvd_name.pl_desc in
-        let type_ = transty_nothing env x.pvd_type in
-          Tys_variable { v_name = name; v_type = type_ } *)
+  let transsig1 (`FunctionDecl f) =
+    let name   = f.pfd_name in
+    let tyargs =
+      List.map                          (* FIXME: continuation *)
+        (fun (x, ty) -> { v_name = x.pl_desc; 
+                          v_type = transty_for_decl env ty})
+        f.pfd_tyargs
+    in
+    let resty = transty_for_decl env f.pfd_tyresult in
 
-    | `FunctionDecl f ->
-        let name   = f.pfd_name in
-        let tyargs =
-          List.map                      (* FIXME: continuation *)
-            (fun (x, ty) -> { v_name = x.pl_desc; 
-                              v_type = transty_for_decl env ty})
-            f.pfd_tyargs
+    if not (List.uniq (List.map fst f.pfd_tyargs)) then
+      raise (DuplicatedArgumentsName f);
+
+    let (uin, calls) =
+      match f.pfd_uses with
+      | None -> 
+        let do_one mp calls = 
+          let sig_ = (EcEnv.Mod.by_mpath mp env).me_sig in
+            if sig_.mis_params <> [] then calls
+            else
+              let fs = List.map (fun (Tys_function (fsig, _)) ->
+                EcPath.xpath_fun mp fsig.fs_name) sig_.mis_body
+              in
+                fs@calls
         in
-        let resty = transty_for_decl env f.pfd_tyresult in
-          if not (List.uniq (List.map fst f.pfd_tyargs)) then
-            raise (DuplicatedArgumentsName f);
-        let uin, calls = 
-          match f.pfd_uses with
-          | None -> 
-            let do_one mp calls = 
-              let sig_ = (EcEnv.Mod.by_mpath mp env).me_sig in
-              if sig_.mis_params <> [] then calls
-              else 
-                let fs = List.map (fun (Tys_function(fsig,_)) ->
-                  EcPath.xpath_fun mp fsig.fs_name) sig_.mis_body in
-                fs@calls in
-            true, Sm.fold do_one sa []
-          | Some (uin, pfd_uses) ->
-            uin, List.map (fun name -> 
-              let f, _ = lookup_fun env name in
-              let p = f.EcPath.x_top in
-              if not (Sm.mem p sa) then 
-                tyerror name.pl_loc env (FunNotInModParam name.pl_desc);
-              f
-            )
-              pfd_uses in
-        Tys_function
-          ({ fs_name   = name.pl_desc;
-             fs_params = tyargs;
-             fs_ret    = resty; },
-           { oi_calls = calls;
-             oi_in    = uin; })
+          (true, Sm.fold do_one sa [])
+
+      | Some (uin, pfd_uses) ->
+        uin, List.map (fun name -> 
+          let f = fst (lookup_fun env name) in
+          let p = f.EcPath.x_top in
+          if not (Sm.mem p sa) then 
+            tyerror name.pl_loc env (FunNotInModParam name.pl_desc);
+          f
+        )
+          pfd_uses
+    in
+
+    let sig_ = { fs_name   = name.pl_desc;
+                 fs_params = tyargs;
+                 fs_ret    = resty; }
+    and oi = { oi_calls = calls; oi_in = uin; } in
+      Tys_function (sig_, oi)
+
   in
 
   let items = List.map transsig1 is in
@@ -702,7 +703,6 @@ type tymod_cnv_failure =
 | E_TyModCnv_ParamCountMismatch
 | E_TyModCnv_ParamTypeMismatch of EcIdent.t
 | E_TyModCnv_MissingComp       of symbol
-| E_TyModCnv_MismatchVarType   of symbol
 | E_TyModCnv_MismatchFunSig    of symbol
 
 exception TymodCnvFailure of tymod_cnv_failure
@@ -711,13 +711,10 @@ let tymod_cnv_failure e =
   raise (TymodCnvFailure e)
 
 let tysig_item_name = function
-(*  | Tys_variable {v_name = x } -> x *)
-  | Tys_function (f,_)      -> f.fs_name
+  | Tys_function (f, _) -> f.fs_name
 
 let tysig_item_kind = function
-(*  | Tys_variable _ -> `Variable *)
   | Tys_function _ -> `Function
-  
 
 let rec check_sig_cnv mode (env:EcEnv.env) (sin:module_sig) (sout:module_sig) = 
   (* Check parameters for compatibility. Parameters names may be
@@ -744,11 +741,6 @@ let rec check_sig_cnv mode (env:EcEnv.env) (sin:module_sig) (sout:module_sig) =
   and tout = EcSubst.subst_modsig_body bsubst sout.mis_body in
 
   let check_item_compatible =
-    (* let check_var_compatible vdin vdout = 
-       assert (vdin.v_name = vdout.v_name);
-       if not (EcReduction.equal_type env vdin.v_type vdout.v_type) then
-       tymod_cnv_failure (E_TyModCnv_MismatchVarType vdin.v_name) in *)
-    
     let check_fun_compatible (fin,oin) (fout,oout) =
       assert (fin.fs_name = fout.fs_name);
       (* We currently reject function with compatible signatures but
@@ -974,16 +966,7 @@ let rec transmod (env : EcEnv.env) (x : symbol) (me : pmodule_expr) =
       res
     end 
 
-  | Pm_struct st ->
-    let res = transstruct env x st in
-(*   let sig_ = res.me_sig in
-    Format.printf "module %s : @." x;
-    List.iter (fun (Tys_function(fs,call)) ->
-      Format.printf "   fun %s { " fs.fs_name;
-      List.iter (fun x -> Format.printf "%s " (EcPath.x_tostring x))
-        call.oi_calls;
-      Format.printf "}@.") sig_.mis_body; *)
-    res
+  | Pm_struct st -> transstruct env x st
 
 (* -------------------------------------------------------------------- *)
 and transstruct (env : EcEnv.env) (x : symbol) (st : pstructure) =
@@ -1069,7 +1052,7 @@ and transstruct (env : EcEnv.env) (x : symbol) (st : pstructure) =
         (* Now we check the signature *)
         check_sig_mt_cnv env tymod aty 
       end
-    else (* In that case we check the applyed signature *)
+    else (* In that case we check the applied signature *)
       let _sig = 
         { mis_params = [];
           mis_body = List.map 

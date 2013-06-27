@@ -96,7 +96,6 @@ and pmodule_sig_struct = {
 and pmodule_sig_struct_body = pmodule_sig_item list
 
 and pmodule_sig_item = [
-  | `VariableDecl of pvariable_decl
   | `FunctionDecl of pfunction_decl
 ]
 

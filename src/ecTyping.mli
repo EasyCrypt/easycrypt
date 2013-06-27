@@ -100,5 +100,4 @@ val trans_msymbol : EcEnv.env -> pmsymbol located -> mpath * module_sig
 val trans_gamepath : EcEnv.env -> pgamepath -> xpath 
 
 (* -------------------------------------------------------------------- *)
-
 val check_sig_mt_cnv : EcEnv.env -> module_sig -> module_type -> unit 
