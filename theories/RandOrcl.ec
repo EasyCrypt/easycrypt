@@ -44,7 +44,6 @@ theory ROM.
    rnd 1%r cpTrue;skip; first by trivial.
    by apply Hs.
   qed.
-
 end ROM.
 
 (* Wrappers for use by an adversary:
@@ -72,7 +71,6 @@ theory WRO_Int.
       return r;
     }
   }.
-  
 end WRO_Int.
 
 theory WRO_Set.
@@ -98,15 +96,15 @@ theory WRO_Set.
     }
   }.
 
-  lemma lossless_init : 
+  lemma lossless_init :
      forall (R<:Oracle), islossless R.init =>
-      bd_hoare [ ARO(R).init : true ==> true] = 1%r.  (* islossless ARO(R).init : parse error*) 
+      islossless ARO(R).init.
   proof. intros R HR;fun;wp;call HR;skip;by trivial. qed.
 
-  lemma lossless_o : 
+  lemma lossless_o :
      forall (R<:Oracle), islossless R.o =>
-      bd_hoare [ ARO(R).o : true ==> true] = 1%r.  
-  proof. 
+      islossless ARO(R).o.
+  proof.
     intros R HR;fun;wp.
     if.
       call HR;wp;skip;by trivial.
@@ -118,7 +116,6 @@ theory WRO_Set.
 
   lemma RO_lossless_o : mu dsample cpTrue = 1%r => islossless ARO(ROM.RO).o.
   proof. intros Hs;apply (lossless_o ROM.RO);apply ROM.lossless_o;apply Hs. qed.
-
 end WRO_Set.
 
 theory WRO_List.
