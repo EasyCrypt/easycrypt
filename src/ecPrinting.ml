@@ -827,8 +827,17 @@ let pp_binding (ppe : PPEnv.t) (xs, ty) =
       in
         (tenv1, pp)
 
-  | GTmem _ ->
-      let tenv1  = PPEnv.add_locals ppe xs in
+  | GTmem m ->
+      let tenv1 = PPEnv.add_locals ppe xs in
+      let tenv1 =
+        match m with
+        | None   -> tenv1
+        | Some m ->
+            let xp = EcMemory.lmt_xpath m in
+              List.fold_left
+                (fun tenv1 x -> PPEnv.create_and_push_mem tenv1 (x, xp))
+                tenv1 xs
+      in
       let pp fmt =
         Format.fprintf fmt "%a" (pp_list "@ " (pp_local tenv1)) xs
       in
@@ -1508,14 +1517,20 @@ let pp_goal (ppe : PPEnv.t) fmt (n, (hyps, concl)) =
   let ppe = PPEnv.add_locals ppe hyps.EcBaseLogic.h_tvar in
 
   let pp_hyp ppe (id, k) = 
-    let ppe = PPEnv.add_local ppe id
+    let ppe =
+      let ppe = PPEnv.add_local ppe id in
+        match k with
+        | EcBaseLogic.LD_mem (Some m) ->
+          PPEnv.create_and_push_mem ppe (id, EcMemory.lmt_xpath m)
+        | _ -> ppe
+
     and dk fmt =
         match k with
         | EcBaseLogic.LD_var (ty, None) ->
             pp_type ppe fmt ty
 
         | EcBaseLogic.LD_var (ty, Some body) ->
-	    Format.fprintf fmt "%a@ := %a"
+            Format.fprintf fmt "%a@ := %a"
               (pp_type ppe) ty (pp_form ppe) body
 
         | EcBaseLogic.LD_mem None ->
