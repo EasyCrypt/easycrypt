@@ -32,9 +32,6 @@ module PPEnv = struct
       ppe_locals = Mid.empty;
       ppe_inuse  = Ssym.empty; }
 
-  let tyvar (_ : t) x =
-    EcIdent.tostring x
-
   let enter ppe scope =
     { ppe with ppe_scope = Some scope; }
 
@@ -202,6 +199,11 @@ module PPEnv = struct
           match EcEnv.Var.lookup_local_opt name ppe.ppe_env with
           | Some (id, _) when EcIdent.id_equal id x -> name
           | _ -> EcIdent.name x
+
+  let tyvar (ppe : t) x =
+    match Mid.find_opt x ppe.ppe_locals with
+    | None   -> EcIdent.tostring x
+    | Some x -> x
 end
 
 (* -------------------------------------------------------------------- *)
@@ -1519,6 +1521,8 @@ let pp_equivS (ppe : PPEnv.t) fmt es =
 let goalline = String.make 72 '-'
 
 let pp_goal (ppe : PPEnv.t) fmt (n, (hyps, concl)) =
+  let ppe = PPEnv.add_locals ppe hyps.EcBaseLogic.h_tvar in
+
   let pp_hyp ppe (id, k) = 
     let ppe = PPEnv.add_local ppe id
     and dk fmt =
