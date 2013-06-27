@@ -23,6 +23,12 @@ module Mx = EcPath.Mx
 module Mid = EcIdent.Mid
 
 (* -------------------------------------------------------------------- *)
+type tymod_cnv_failure =
+| E_TyModCnv_ParamCountMismatch
+| E_TyModCnv_ParamTypeMismatch of EcIdent.t
+| E_TyModCnv_MissingComp       of symbol
+| E_TyModCnv_MismatchFunSig    of symbol
+
 type modapp_error =
 | MAE_WrongArgPosition
 | MAE_WrongArgCount
@@ -52,6 +58,7 @@ type tyerror =
 | NonUnitFunWithoutReturn
 | UnitFunWithReturn
 | TypeMismatch         of (ty * ty) * (ty * ty)
+| TypeModMismatch      of tymod_cnv_failure
 | UnknownVarOrOp       of qsymbol * ty list
 | MultipleOpMatch      of qsymbol * ty list
 | UnknownModName       of qsymbol
@@ -72,6 +79,23 @@ exception TyError of EcLocation.t * EcEnv.env * tyerror
 let tyerror loc env e = raise (TyError (loc, env, e))
 
 (* -------------------------------------------------------------------- *)
+let pp_cnv_failure fmt _env error =
+  let msg x = Format.fprintf fmt x in
+
+  match error with
+  | E_TyModCnv_ParamCountMismatch ->
+      msg "not the same number of module arguments"
+
+  | E_TyModCnv_ParamTypeMismatch x ->
+      msg "the module argument `%s' does not have the expected type"
+        (EcIdent.name x)
+
+  | E_TyModCnv_MissingComp x ->
+      msg "the item `%s' is missing" x
+
+  | E_TyModCnv_MismatchFunSig x ->
+      msg "the item `%s' does not have a compatible kind/type" x
+
 let pp_tyerror fmt env error =
   let msg x = Format.fprintf fmt x in
 
@@ -121,6 +145,10 @@ let pp_tyerror fmt env error =
       msg "  @[<hov 2> %a@]@\n" pp_type ty2;
       msg "but is expected to have type@\n";
       msg "  @[<hov 2> %a@]" pp_type ty1
+
+  | TypeModMismatch err ->
+      msg "this module body does not meet its interface:@\n";
+      msg "  @[<hov 2>%t@]" (fun fmt -> pp_cnv_failure fmt env err)
 
   | UnknownVarOrOp (name, tys) -> begin
       match tys with
@@ -592,7 +620,6 @@ exception DuplicatedArgumentsName of pfunction_decl
 
 (* -------------------------------------------------------------------- *)
 let name_of_sigitem = function
-  | `VariableDecl v -> v.pvd_name
   | `FunctionDecl f -> f.pfd_name
 
 (* -------------------------------------------------------------------- *)
@@ -699,12 +726,6 @@ and transmodsig_body (env : EcEnv.env) (sa : Sm.t)
       items
 
 (* -------------------------------------------------------------------- *)
-type tymod_cnv_failure =
-| E_TyModCnv_ParamCountMismatch
-| E_TyModCnv_ParamTypeMismatch of EcIdent.t
-| E_TyModCnv_MissingComp       of symbol
-| E_TyModCnv_MismatchFunSig    of symbol
-
 exception TymodCnvFailure of tymod_cnv_failure
 
 let tymod_cnv_failure e =
@@ -734,8 +755,7 @@ let rec check_sig_cnv mode (env:EcEnv.env) (sin:module_sig) (sout:module_sig) =
   in
   (* Check for body inclusion (w.r.t the parameters names substitution).
    * This includes:
-   * - Variables / functions inclusion with equal signatures +
-   *   included use modifiers.
+   * - functions inclusion with equal signatures + included use modifiers.
    *)
   let tin  = sin.mis_body 
   and tout = EcSubst.subst_modsig_body bsubst sout.mis_body in
@@ -907,7 +927,8 @@ let rec trans_msymbol (env : EcEnv.env) (msymb : pmsymbol located) =
     List.iter2
       (fun (_, p) (_, a) ->
         try check_sig_mt_cnv env a p
-        with _ -> tyerror loc env (InvalidModAppl MAE_InvalidArgType))
+        with TymodCnvFailure _ ->
+          tyerror loc env (InvalidModAppl MAE_InvalidArgType))
       params args;
     let args = List.map fst args in
     let subst = 
@@ -1050,18 +1071,20 @@ and transstruct (env : EcEnv.env) (x : symbol) (st : pstructure) =
           tyerror loc env
             (InvalidModType MTE_FunSigDoesNotRepeatArgNames);
         (* Now we check the signature *)
-        check_sig_mt_cnv env tymod aty 
+        try  check_sig_mt_cnv env tymod aty
+        with TymodCnvFailure err -> tyerror loc env (TypeModMismatch err)
       end
     else (* In that case we check the applied signature *)
-      let _sig = 
+      let sig_ = 
         { mis_params = [];
           mis_body = List.map 
             (fun (Tys_function(s,oi)) -> 
-              Tys_function(s,{oi_calls = []; oi_in = oi.oi_in}))
+              Tys_function (s, { oi_calls = []; oi_in = oi.oi_in }))
             tymod.mis_body } in
-      check_sig_mt_cnv env0 _sig aty
+      try  check_sig_mt_cnv env0 sig_ aty
+      with TymodCnvFailure err -> tyerror loc env0 (TypeModMismatch err)
   in
-  List.iter check1 st.ps_signature;
+    List.iter check1 st.ps_signature;
 
   (* Computes used variables / calls *)
   let vars = 
