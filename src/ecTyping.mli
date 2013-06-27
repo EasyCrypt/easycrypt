@@ -33,6 +33,9 @@ type tyerror =
 | DuplicatedTyVar
 | DuplicatedLocal      of symbol
 | NonLinearPattern
+| LvNonLinear
+| NonUnitFunWithoutReturn
+| UnitFunWithReturn
 | TypeMismatch         of (ty * ty) * (ty * ty)
 | UnknownVarOrOp       of qsymbol * ty list
 | MultipleOpMatch      of qsymbol * ty list
@@ -45,7 +48,6 @@ type tyerror =
 | InvalidModAppl       of modapp_error
 | InvalidModType       of modtyp_error
 | InvalidMem           of symbol * mem_error
-| LvTupleNotUniq
 | FunNotInModParam     of qsymbol
 | NoActiveMemory
 | PatternNotAllowed

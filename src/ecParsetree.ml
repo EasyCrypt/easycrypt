@@ -121,7 +121,7 @@ and pmodule_expr = pmodule_expr_r located
 
 and pstructure = {
   ps_params    : (psymbol * pmodule_type) list;
-  ps_body      : pstructure_item list;
+  ps_body      : pstructure_item located list;
   ps_signature : ((pqsymbol * psymbol list) located) list;
 }
 
@@ -138,7 +138,7 @@ and pfunction_body = {
 }
 
 and pfunction_local = {
-  pfl_names : [`Single|`Tuple] * (psymbol list);
+  pfl_names : ([`Single|`Tuple] * (psymbol list)) located;
   pfl_type  : pty   option;
   pfl_init  : pexpr option;
 }
@@ -195,11 +195,11 @@ and pformula_r =
   | PFlsless of pgamepath
 
   (* for claims *)
-  | PFhoareS   of pformula * pfunction_body * pformula
+  | PFhoareS   of pformula * pfunction_body located * pformula
   | PFhoareF   of pformula * pgamepath * pformula
   | PFequivF   of pformula * (pgamepath * pgamepath) * pformula
   | PFprob     of pgamepath * (pformula list) * pmemory * pformula
-  | PFBDhoareS of pformula * pfunction_body * pformula * phoarecmp * pformula
+  | PFBDhoareS of pformula * pfunction_body located * pformula * phoarecmp * pformula
   | PFBDhoareF of pformula * pgamepath * pformula * phoarecmp * pformula
 
 and pgtybinding  = psymbol list * pgty
