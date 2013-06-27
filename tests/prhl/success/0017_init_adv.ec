@@ -29,10 +29,11 @@ lemma foo3 : forall (A<:Adv),
   equiv[G(A).main ~ G(A).main : true ==> ={res} && (glob A){1} = (glob A){2}].
 intros A.
 fun.
-call (={x} /\ (glob A){1} = (glob A){2}) (={res} /\ (glob A){1} = (glob A){2}).
+call (_ : ={x} /\ (glob A){1} = (glob A){2} ==>
+         ={res} /\ (glob A){1} = (glob A){2}).
 fun true;[trivial | trivial | ].
 fun;skip;trivial.
-call (true) (={res} /\ (glob A){1} = (glob A){2}).
+call (_ : true ==> ={res} /\ (glob A){1} = (glob A){2}).
 fun true;try skip;trivial.
 skip;trivial.
 save.

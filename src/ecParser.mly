@@ -71,13 +71,13 @@
   let pflist loc ti (es : pformula    list) : pformula    = 
     List.fold_right (fun e1 e2 -> pf_cons loc ti e1 e2) es (pf_nil loc ti)
 
-  let mk_axiom ?(local = false) ?(exsmt = true) (x, ty, vd, f) k = 
+  let mk_axiom ?(local = false) ?(nosmt = false) (x, ty, vd, f) k = 
     { pa_name    = x;
-      pa_exsmt   = exsmt;
       pa_tyvars  = ty;
       pa_vars    = vd;
       pa_formula = f; 
       pa_kind    = k;
+      pa_nosmt   = nosmt;
       pa_local   = local; }
 
   let str_and b = if b then "&&" else "/\\"
@@ -626,10 +626,10 @@ ptybindings:
 %inline hole: UNDERSCORE { PFhole; }
 %inline none: IMPOSSIBLE { assert false; }
 
-qident_or_res:
-| x=qident   { x }
-| x=loc(RES) { mk_loc x.pl_loc ([], "res") }
-;
+qident_or_res_or_glob:
+| x=qident   { GVvar x }
+| x=loc(RES) { GVvar (mk_loc x.pl_loc ([], "res")) }
+| GLOB mp=loc(mod_qident) { GVglob mp }
 
 sform_u(P):
 | x=P 
@@ -759,7 +759,7 @@ form_u(P):
 | c=form_r(P) QUESTION e1=form_r(P) COLON e2=form_r(P) %prec OP2
     { PFif (c, e1, e2) }
 
-| EQ LBRACE xs=plist1(qident_or_res, COMMA) RBRACE
+| EQ LBRACE xs=plist1(qident_or_res_or_glob, COMMA) RBRACE
     { PFeqveq xs }
 
 | IF c=form_r(P) THEN e1=form_r(P) ELSE e2=form_r(P)
@@ -1246,8 +1246,8 @@ lemma_decl :
 ;
 
 nosmt:
-| NOSMT { false }
-| empty { true  }
+| NOSMT { true  }
+| empty { false }
 ;
 
 local:
@@ -1257,16 +1257,16 @@ local:
 
 axiom:
 | l=local AXIOM o=nosmt d=lemma_decl 
-    { mk_axiom ~local:l ~exsmt:o d PAxiom }
+    { mk_axiom ~local:l ~nosmt:o d PAxiom }
 
 | l=local LEMMA o=nosmt d=lemma_decl
-    { mk_axiom ~local:l ~exsmt:o d PILemma }
+    { mk_axiom ~local:l ~nosmt:o d PILemma }
 
 | l=local LEMMA o=nosmt d=lemma_decl BY t=tactic
-    { mk_axiom ~local:l ~exsmt:o d (PLemma (Some t)) }
+    { mk_axiom ~local:l ~nosmt:o d (PLemma (Some t)) }
 
 | l=local LEMMA o=nosmt d=lemma_decl BY LBRACKET RBRACKET
-    { mk_axiom ~local:l ~exsmt:o d (PLemma None) }
+    { mk_axiom ~local:l ~nosmt:o d (PLemma None) }
 
 | l=local EQUIV x=ident pd=pgtybindings? COLON p=loc(equiv_body(none))
     { mk_axiom ~local:l (x, None, pd, p) PILemma }
@@ -1482,10 +1482,16 @@ conseq:
 | f1=form LONGARROW f2=form     { Some f1, Some f2 }
 ;
 
+call_info: 
+ | f1=form LONGARROW f2=form             { CI_spec (f1, f2) }
+ | f=form                                { CI_inv  f }
+ | bad=form COMMA p=form                 { CI_upto (bad,p,None) }
+ | bad=form COMMA p=form COMMA q=form    { CI_upto (bad,p,Some q) }
+
 tac_dir: 
-| BACKS {  true }
-| FWDS  { false }
-| empty {  true }
+| BACKS { Backs }
+| FWDS  { Fwds }
+| empty { Backs }
 ;
 
 codepos:
@@ -1659,11 +1665,11 @@ phltactic:
 | SKIP
     { Pskip }
 
-| WHILE info=while_tac_info
-    { Pwhile info }
+| WHILE s=side? info=while_tac_info
+    { Pwhile (s,info) }
 
-| CALL s=side? pre=sform post=sform
-    { Pcall (s, (pre, post)) }
+| CALL s=side? info=fpattern(call_info) 
+    { Pcall (s, info) }
 
 | RCONDT s=side? i=number
     { Prcond (s, true, i) }

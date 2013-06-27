@@ -172,6 +172,10 @@ type pmemory   = psymbol
 
 type phoarecmp = PFHle | PFHeq | PFHge
 
+type glob_or_var = 
+  | GVglob of pmsymbol located 
+  | GVvar  of pqsymbol
+
 type pformula  = pformula_r located
 
 and pformula_r =
@@ -187,7 +191,7 @@ and pformula_r =
   | PFexists of pgtybindings * pformula
   | PFlambda of ptybindings * pformula
   | PFglob   of pmsymbol located 
-  | PFeqveq  of pqsymbol list
+  | PFeqveq  of glob_or_var list
   | PFlsless of pgamepath
 
   (* for claims *)
@@ -299,6 +303,11 @@ and pspattern = unit
 
 type codepos = int * ((int * codepos) option)
 
+type call_info = 
+  | CI_spec of (pformula * pformula)
+  | CI_inv  of pformula
+  | CI_upto of (pformula * pformula * pformula option)
+  
 (* AppSingle are optional for bounded Phl judgments
    AppMult is required by most general rule for upper bounded Phl
    AppNone is required for the rest of judgments 
@@ -306,19 +315,21 @@ type codepos = int * ((int * codepos) option)
 type p_app_bd_info = PAppNone | PAppSingle of pformula 
                    | PAppMult of (pformula * pformula * pformula * pformula)
 
+type tac_dir = Backs | Fwds
+ 
 type phltactic = 
   | Pfun_def  
   | Pfun_abs    of pformula
   | Pfun_upto   of (pformula * pformula * pformula option)
   | Pskip
-  | Papp        of (bool * int doption * pformula * p_app_bd_info)
+  | Papp        of (tac_dir * int doption * pformula * p_app_bd_info)
   | Pwp         of int doption option 
-  | Pwhile      of (pformula * pformula option * (pformula * pformula) option)
+  | Pwhile      of tac_side * (pformula * pformula option * (pformula * pformula) option)
   | Pfission    of (tac_side * codepos * (int * (int * int)))
   | Pfusion     of (tac_side * codepos * (int * (int * int)))
   | Punroll     of (tac_side * codepos)
   | Psplitwhile of (pexpr * tac_side * codepos )
-  | Pcall       of tac_side * (pformula * pformula)
+  | Pcall       of tac_side * call_info fpattern 
   | Prcond      of (bool option * bool * int)
   | Pcond       of tac_side
   | Pswap       of ((tac_side * swap_kind) located list)
@@ -423,11 +434,11 @@ type paxiom_kind = PAxiom | PLemma of ptactic option | PILemma
 
 type paxiom = {
   pa_name    : psymbol;
-  pa_exsmt   : bool;
   pa_tyvars  : psymbol list option;
   pa_vars    : pgtybindings option;  
   pa_formula : pformula;
   pa_kind    : paxiom_kind;
+  pa_nosmt   : bool;
   pa_local   : bool;
 }
 

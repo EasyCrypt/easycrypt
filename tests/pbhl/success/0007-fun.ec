@@ -24,12 +24,12 @@ lemma foo : forall (A<:Adv),
   hoare [M(A).g : true ==> true].
 intros A.
 fun.
-call true true.
+call ( _ : true ==> true).
 
 
 lemma foo : forall (A<:Adv),
   bd_hoare [M(A).g : true ==> true] = 1%r.
 intros A.
 fun.
-call true true.
+call ( _ : true ==> true).
 

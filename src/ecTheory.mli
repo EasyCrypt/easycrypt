@@ -50,7 +50,6 @@ and ctheory_override =
 (* -------------------------------------------------------------------- *)
 val cth_dump : ctheory -> dnode
 
-
 (* -------------------------------------------------------------------- *)
 val module_comps_of_module_sig_comps:
   module_sig_body -> module_item list

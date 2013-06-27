@@ -61,7 +61,8 @@ and process_tactic_chain mkpv (t : ptactic_chain) (gs : goals) : goals =
 and process_tactic mkpv (tac : ptactic) (gs : goals) : goals =
   let cf =
     match unloc tac.pt_core with
-    | Plogic (Pintro _ | Prewrite _) | Pidtac _ -> true
+    | Plogic (Pintro _ | Prewrite _ | Pgeneralize _ )
+    | Pidtac _ -> true
     | _ -> false
   in
 

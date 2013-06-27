@@ -80,16 +80,11 @@ lemma foo : forall (A<:Adv{RO,F1,F2}),
      (!mem F2.xs RO.logA){2} => res{1} = res{2}].
 proof.
   intros A Hlossless;fun.
-  call ( _ : (!mem F2.xs RO.logA){2} /\ h{1} = h{2} /\ (glob A){1} = (glob A){2} /\
-         F1.xs{1} = F2.xs{2} /\
-         RO.logA{1} = RO.logA{2} /\ eq_except RO.mH{1} RO.mH{2} F2.xs{2} ==>
-        (!mem F2.xs RO.logA){2} => res{1} = res{2} ).
-    fun (mem F2.xs RO.logA)
-      (RO.logA{1} = RO.logA{2} /\ F1.xs{1} = F2.xs{2} /\
-       eq_except RO.mH{1} RO.mH{2} F2.xs{2}) 
-      (F1.xs{1} = F2.xs{2}); try (smt).
-      apply Hlossless.
-      fun; inline RO.hash;wp;rnd;wp;skip;simplify;smt.
+  call (_ : mem F2.xs RO.logA ,
+            (RO.logA{1} = RO.logA{2} /\ F1.xs{1} = F2.xs{2} /\
+            eq_except RO.mH{1} RO.mH{2} F2.xs{2}),  
+            (F1.xs{1} = F2.xs{2})).
+    fun; inline RO.hash;wp;rnd;wp;skip;simplify;smt.
 
     (* Hoare goal *)
     intros &2 h.

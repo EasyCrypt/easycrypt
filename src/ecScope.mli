@@ -12,14 +12,19 @@ val hierror : ?loc:EcLocation.t -> ('a, Format.formatter, unit, 'b) format4 -> '
 type scope
 
 type proof_uc = {
-  puc_name  : string;
-  puc_exsmt : bool;
-  puc_jdg   : proof_state;
+  puc_name   : string;
+  puc_jdg    : proof_state;
+  puc_flags  : pucflags
 }
 
 and proof_state =
 | PSCheck   of (EcLogic.judgment_uc * int list)
 | PSNoCheck of (EcIdent.t list * EcFol.form)
+
+and pucflags = {
+  puc_nosmt : bool;
+  puc_local : bool;
+}
 
 val empty   : scope
 val path    : scope -> EcPath.path
@@ -55,7 +60,7 @@ module Ty : sig
 end
 
 module Mod : sig
-  val add : scope -> symbol -> pmodule_expr -> scope
+  val add : scope -> ptopmodule -> scope
 end
 
 module ModType : sig

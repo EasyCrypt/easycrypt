@@ -303,7 +303,6 @@ let m_subst (sp : path -> path) (sm : mpath EcIdent.Mid.t) =
   else m_subst sp sm
 
 (* -------------------------------------------------------------------- *)
-
 let x_subst (sm : mpath -> mpath) = 
   if sm == identity then identity 
   else fun x -> 
@@ -313,4 +312,3 @@ let x_subst (sm : mpath -> mpath) =
 
 let x_substm sp sm = 
   x_subst (m_subst sp sm)
-
