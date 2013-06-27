@@ -1075,9 +1075,6 @@ sig_param:
 ;
 
 signature_item:
-| VAR decl=ivar_decl
-    { `VariableDecl decl }
-
 | FUN decl=ifun_decl
     { `FunctionDecl decl }
 ;
@@ -1090,12 +1087,9 @@ ifun_decl:
         pfd_uses     = us; }
     }
 ;
+
 oracle_info:
 | i=STAR? qs=qident* { i=None, qs }
-
-ivar_decl:
-| x=lident COLON ty=loc(type_exp)
-    { { pvd_name = x; pvd_type = ty } }
 ;
 
 (* -------------------------------------------------------------------- *)
