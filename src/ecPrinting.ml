@@ -1125,8 +1125,28 @@ let pp_opdecl_pr (ppe : PPEnv.t) fmt (x, ts, ty, op) =
     Format.fprintf fmt "pred %s%a%t.@\n"
       basename (pp_tyvarannot ppe) ts pp_body
 
-let pp_opdecl_op (_ppe : PPEnv.t) _fmt (_x, _ts, _ty, _op) =
-  assert false
+let pp_opdecl_op (ppe : PPEnv.t) fmt (x, ts, ty, op) =
+  let basename = P.basename x in
+  
+  let pp_body fmt =
+    match op with
+    | None ->
+        Format.fprintf fmt " : %a" (pp_type_r ppe false) ty
+
+    | Some e ->
+        let ((subppe, pp_vds), e) =
+          let (vds, e) =
+            match e.e_node with
+            | Elam(vds, e) -> (vds, e)
+            | _ -> ([], e) in
+
+          (pp_locbinds ppe vds, e)
+        in
+          Format.fprintf fmt "%t = %a" pp_vds (pp_expr subppe) e
+  in
+  Format.fprintf fmt "op %s%a%t.@\n"
+    basename (pp_tyvarannot ppe) ts pp_body
+
 
 let pp_opdecl (ppe : PPEnv.t) fmt (x, op) =
   match op.op_kind with
