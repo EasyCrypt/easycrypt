@@ -250,10 +250,12 @@ let init_tparams (s : _subst) params params' =
         Mid.empty params params' in
     let sty = 
       { ty_subst_id with 
-        ts_p  = s.s_p;
-        ts_mp = s.s_fmp;
-        ts_v  = styv; } in
-    { s with s_sty = sty; s_ty = EcTypes.ty_subst sty } 
+          ts_def = s.s_sty.ts_def;
+          ts_p   = s.s_p;
+          ts_mp  = s.s_fmp;
+          ts_v   = styv; }
+    in
+      { s with s_sty = sty; s_ty = EcTypes.ty_subst sty } 
 
 let subst_tydecl (s : _subst) (tyd : tydecl) =
   let params' = List.map EcIdent.fresh tyd.tyd_params in
@@ -281,9 +283,9 @@ let subst_op_kind (s : _subst) (kind : operator_kind) =
 (* -------------------------------------------------------------------- *)
 let subst_op (s : _subst) (op : operator) =
   let tparams = List.map EcIdent.fresh op.op_tparams in
-  let sty    = init_tparams s op.op_tparams tparams in
-  let ty     = sty.s_ty op.op_ty in
-  let kind   = subst_op_kind sty op.op_kind in
+  let sty     = init_tparams s op.op_tparams tparams in
+  let ty      = sty.s_ty op.op_ty in
+  let kind    = subst_op_kind sty op.op_kind in
   { op_tparams = tparams;
     op_ty      = ty   ;
     op_kind   = kind  ; }
@@ -300,9 +302,9 @@ let subst_ax (s : _subst) (ax : axiom) =
         Some (Fsubst.f_subst s f)
   in
      { ax_tparams = params;
-      ax_spec    = spec;
-      ax_kind    = ax.ax_kind;
-      ax_nosmt   = ax.ax_nosmt; }
+       ax_spec    = spec;
+       ax_kind    = ax.ax_kind;
+       ax_nosmt   = ax.ax_nosmt; }
 
 (* -------------------------------------------------------------------- *)
 (* SUBSTITUTION OVER THEORIES *)
