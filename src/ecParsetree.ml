@@ -507,7 +507,7 @@ and theory_override =
 | PTHO_Op   of op_override
 | PTHO_Pred of pr_override
 
-and ty_override = psymbol list * pty
+and ty_override = psymbol list * pty * [`Alias | `Inline]
 
 and op_override = {
   opov_tyvars : psymbol list option;

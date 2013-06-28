@@ -1880,7 +1880,10 @@ clone_with:
 
 clone_override:
 | TYPE ps=typarams x=qident EQ t=loc(type_exp)
-   { (x, PTHO_Type (ps, t)) }
+   { (x, PTHO_Type (ps, t, `Alias)) }
+
+| TYPE ps=typarams x=qident LEFTARROW t=loc(type_exp)
+   { (x, PTHO_Type (ps, t, `Inline)) }
 
 | OP x=qoident tyvars=tyvars_decl COLON sty=loc(type_exp) EQ e=expr
    { let ov = {

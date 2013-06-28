@@ -67,19 +67,19 @@ let process_pr fmt scope p =
   match p with 
   | Pr_ty qs ->
       let (x, ty) = EcEnv.Ty.lookup qs.pl_desc env in
-          EcPrinting.pp_typedecl ppe fmt (x, ty)
+      Format.fprintf fmt "%a@." (EcPrinting.pp_typedecl ppe) (x, ty)
         
   | Pr_op qs | Pr_pr qs ->
       let (x, op) = EcEnv.Op.lookup qs.pl_desc env in
-        EcPrinting.pp_opdecl ppe fmt (x, op)
+      Format.fprintf fmt "%a@." (EcPrinting.pp_opdecl ppe) (x, op)
         
   | Pr_th qs ->
       let (p, th) = EcEnv.Theory.lookup qs.pl_desc env in
-        EcPrinting.pp_theory ppe fmt (p, th)
+      Format.fprintf fmt "%a@." (EcPrinting.pp_theory ppe) (p, th)
 
   | Pr_ax qs ->
       let (p, ax) = EcEnv.Ax.lookup qs.pl_desc env in
-        EcPrinting.pp_axiom ppe fmt (p, ax)
+      Format.fprintf fmt "%a@." (EcPrinting.pp_axiom ppe) (p, ax)
 
 let process_print scope p = 
   process_pr Format.std_formatter scope p
