@@ -389,7 +389,7 @@ module type RO_adv(O:RO) = {
 
 Interpretation:
 \begin{displaymath}
-\hoareS{c}{\pre}{\post}
+\Hoare{c}{\pre}{\post}
 \quad\doteq\quad
 \forall m.~ \pre\,m \Rightarrow \range Q ([\![ c ]\!]\,m)
 \end{displaymath}
@@ -404,7 +404,7 @@ where $\range \varphi \mu \doteq \forall f.~ (\forall x.~ \varphi\,x
 
 Interpretation:
 \begin{displaymath}
-\bdHoareSle{c}{\pre}{\post}{\delta} 
+\HoareLe{c}{\pre}{\post}{\delta} 
 \quad\doteq\quad
 \forall m.~ \pre\,m \Rightarrow [\![ c ]\!]\,m\,\charfun_\post \leq
 \delta\,m
@@ -412,16 +412,16 @@ Interpretation:
 
 Property?:
 \begin{displaymath}
-\hoareS{c}{\pre}{\post}
+\Hoare{c}{\pre}{\post}
 \Leftrightarrow
-\bdHoareSeq{c}{\pre}{\neg\post}{0}
+\HoareEq{c}{\pre}{\neg\post}{0}
 \end{displaymath}
 
 Property?:
 \begin{displaymath}
-\hoareS{c}{\pre}{\post} \land \bdHoareSeq{c}{\pre}{\true}{1}
+\Hoare{c}{\pre}{\post} \land \HoareEq{c}{\pre}{\true}{1}
 \Leftrightarrow
-\bdHoareSeq{c}{\pre}{\post}{1}
+\HoareEq{c}{\pre}{\post}{1}
 \end{displaymath}
 
 
