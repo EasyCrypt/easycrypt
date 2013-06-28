@@ -24,13 +24,15 @@ exception InconsistentSubst
 (* -------------------------------------------------------------------- *)
 type subst = {
   sb_modules : EcPath.mpath Mid.t;
-  sb_path    : EcPath.path  Mp.t;
+  sb_path    : EcPath.path Mp.t;
+  sb_tydef   : (EcIdent.t list * ty) Mp.t;
 }
 
 (* -------------------------------------------------------------------- *)
 let empty : subst = {
   sb_modules = Mid.empty;
   sb_path    = Mp.empty;
+  sb_tydef   = Mp.empty;
 }
 
 let is_empty s = 
@@ -47,6 +49,10 @@ let add_path (s : subst) ~src ~dst =
   assert (Mp.find_opt src s.sb_path = None);
   { s with sb_path = Mp.add src dst s.sb_path }
 
+let add_tydef (s : subst) p (ids, ty) =
+  assert (Mp.find_opt p s.sb_tydef = None);
+  { s with sb_tydef = Mp.add p (ids, ty) s.sb_tydef }
+
 (* -------------------------------------------------------------------- *)
 type _subst = {
   s_s   : subst;
@@ -57,15 +63,15 @@ type _subst = {
 }
 
 let _subst_of_subst s = 
-  let sp = EcPath.p_subst s.sb_path in
-  let sm = EcPath.Hm.memo 107 (EcPath.m_subst sp s.sb_modules) in
-  let sty = { ty_subst_id with ts_p = sp; ts_mp = sm } in
-  let st = EcTypes.ty_subst sty in
-  { s_s   = s;
-    s_p   = sp;
-    s_fmp = sm;
-    s_sty = sty;
-    s_ty  = st; }
+  let sp  = EcPath.p_subst s.sb_path in
+  let sm  = EcPath.Hm.memo 107 (EcPath.m_subst sp s.sb_modules) in
+  let sty = { ty_subst_id with ts_p = sp; ts_mp = sm; ts_def = s.sb_tydef; } in
+  let st  = EcTypes.ty_subst sty in
+    { s_s   = s;
+      s_p   = sp;
+      s_fmp = sm;
+      s_sty = sty;
+      s_ty  = st; }
 
 let e_subst_of_subst (s:_subst) = 
   { es_freshen = true;
