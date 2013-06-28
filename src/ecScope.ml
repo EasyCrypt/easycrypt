@@ -986,7 +986,7 @@ module Mod = struct
     let name  = EcIdent.create (unloc m.ptmd_name) in
     let scope =
       { scope with
-          sc_env = EcEnv.Mod.bind_local
+          sc_env = EcEnv.Mod.declare_local
             name tysig (Sm.of_list restr) scope.sc_env;
           sc_section = CoreSection.addabstract
             name scope.sc_section }

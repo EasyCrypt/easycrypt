@@ -1536,7 +1536,7 @@ let add_mod_exp_mp env mp me =
     !env, !rb
 
 let add_mod_exp env p me = add_mod_exp_mp env (mpath_crt p [] None) me
-
+  
 let check_w3_formula pi task f =
   let pr   = Decl.create_prsymbol (Ident.id_fresh "goal") in
   let decl = Decl.create_prop_decl Decl.Pgoal pr f in
@@ -1545,15 +1545,30 @@ let check_w3_formula pi task f =
 
 exception CanNotProve of axiom
 
+let trans_tv env id = 
+  let ts = Ty.create_tysymbol (preid id) [] None in
+  let decl = Decl.create_ty_decl ts in
+  { env with
+    env_tv = Mid.add id (Ty.ty_app ts []) env.env_tv;
+    logic_task = add_decl_with_tuples env.logic_task decl }
+  
+let add_abs_mod me_of_mt env id mt restr =
+  let me = me_of_mt id mt restr in
+  let env = trans_tv env id in
+        (* represent the type of the glob memory of the module *)
+  let ty = Mid.find id env.env_tv in
+  let vty = ty_var ty in
+  let ls = Term.create_fsymbol (preid id) [] vty in
+  let decl = Decl.create_param_decl ls in
+  let env = 
+    { env with env_id = Mid.add id (t_app ls [] vty) env.env_id;
+      logic_task = add_decl_with_tuples env.logic_task decl } in
+  let nenv,_ = add_mod_exp_mp env (EcPath.mident id) me in
+  nenv
+
 let check_goal me_of_mt env pi (hyps, concl) =
   let env = ref env in
-  let trans_tv id =
-    let ts = Ty.create_tysymbol (preid id) [] None in
-    let decl = Decl.create_ty_decl ts in
-    env := 
-      { !env with
-        env_tv = Mid.add id (Ty.ty_app ts []) !env.env_tv;
-        logic_task = add_decl_with_tuples !env.logic_task decl } in
+  let trans_tv id = env := trans_tv !env id in
 
   let trans_hyp (id,ld) =
     try 
@@ -1589,17 +1604,7 @@ let check_goal me_of_mt env pi (hyps, concl) =
             logic_task = add_decl_with_tuples env0.logic_task decl }
           
       | LD_modty (mt,restr) ->
-        let me = me_of_mt id mt restr in
-        trans_tv id; (* represent the type of the glob memory of the module *)
-        let ty = Mid.find id !env.env_tv in
-        let vty = ty_var ty in
-        let ls = Term.create_fsymbol (preid id) [] vty in
-        let decl = Decl.create_param_decl ls in
-        env := 
-          { !env with env_id = Mid.add id (t_app ls [] vty) !env.env_id;
-            logic_task = add_decl_with_tuples !env.logic_task decl };
-        let nenv,_ = add_mod_exp_mp !env (EcPath.mident id) me in
-        env := nenv 
+        env := add_abs_mod me_of_mt !env id mt restr
     with CanNotTranslate _ -> ()
   in
   List.iter trans_tv hyps.h_tvar;

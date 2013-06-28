@@ -1423,6 +1423,11 @@ module Mod = struct
     in
       env
 
+  let declare_local id modty restr env =
+    let env = bind_local id modty restr env in
+    let w3 = EcWhy3.add_abs_mod (me_of_mt env) env.env_w3 id modty restr in
+    { env with env_w3 = w3 }
+
   let bind_locals bindings env =
     List.fold_left
       (fun env (name, me) -> bind_local name me EcPath.Sm.empty env)
