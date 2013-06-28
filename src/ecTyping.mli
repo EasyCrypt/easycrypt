@@ -58,6 +58,7 @@ type tyerror =
 | FunNotInModParam     of qsymbol
 | NoActiveMemory
 | PatternNotAllowed
+| UnknownScope         of qsymbol
 
 exception TyError of EcLocation.t * EcEnv.env * tyerror
 
@@ -100,11 +101,13 @@ val trans_prop     : EcEnv.env -> EcUnify.unienv -> pformula -> EcFol.form
 val trans_pattern  : EcEnv.env -> (ptnmap * EcUnify.unienv) -> pformula -> EcFol.form
 
 (* -------------------------------------------------------------------- *)
-val transmodsig   : EcEnv.env -> symbol -> pmodule_sig  -> module_sig
-val transmodtype  : EcEnv.env -> pmodule_type -> module_type * module_sig
-val transmod      : EcEnv.env -> symbol -> pmodule_expr -> module_expr
-val trans_msymbol : EcEnv.env -> pmsymbol located -> mpath * module_sig
-val trans_gamepath : EcEnv.env -> pgamepath -> xpath 
+val transmodsig  : EcEnv.env -> symbol -> pmodule_sig  -> module_sig
+val transmodtype : EcEnv.env -> pmodule_type -> module_type * module_sig
+val transmod     : EcEnv.env -> symbol -> pmodule_expr -> module_expr
+
+val trans_topmsymbol : EcEnv.env -> pmsymbol located -> mpath
+val trans_msymbol    : EcEnv.env -> pmsymbol located -> mpath * module_sig
+val trans_gamepath   : EcEnv.env -> pgamepath -> xpath 
 
 (* -------------------------------------------------------------------- *)
 val check_sig_mt_cnv : EcEnv.env -> module_sig -> module_type -> unit 
