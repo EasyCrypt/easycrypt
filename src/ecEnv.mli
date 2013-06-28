@@ -202,6 +202,7 @@ module NormMp : sig
   val norm_glob  : env -> EcMemory.memory -> mpath -> EcFol.form 
   val norm_tglob : env -> mpath -> EcTypes.ty 
   val tglob_reducible : env -> mpath -> bool
+  val is_abstract_fun : xpath -> env -> bool
 end
 
 (* -------------------------------------------------------------------- *)

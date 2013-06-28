@@ -2216,7 +2216,42 @@ let t_bdeq g =
     
 (* -------------------------------------------------------------------- *)
 
-
+(* Remark for adversary case we assume that inv do not contain the
+   equality of glob *)
+let mk_inv_spec env inv fl fr = 
+  if NormMp.is_abstract_fun fl env then 
+    let topl,_,oil,sigl, topr, _, _,sigr = abstract_info2 env fl fr in
+    let ml, mr = mleft, mright in
+    let eqglob = f_eqglob topl ml topr mr in
+    let lpre = if oil.oi_in then [eqglob;inv] else [inv] in
+    let eq_params = 
+      f_eqparams fl sigl.fs_params ml fr sigr.fs_params mr in
+    let eq_res = f_eqres fl sigl.fs_ret ml fr sigr.fs_ret mr in
+    let pre = f_ands (eq_params::lpre) in
+    let post = f_ands [eq_res; eqglob; inv] in
+    f_equivF pre fl fr post
+  else
+    let defl = EcEnv.Fun.by_xpath fl env in
+    let defr = EcEnv.Fun.by_xpath fr env in
+    let sigl, sigr = defl.f_sig, defr.f_sig in
+    let testty = 
+      List.all2 (fun v1 v2 -> EcReduction.equal_type env v1.v_type v2.v_type)
+        sigl.fs_params sigr.fs_params && 
+        EcReduction.equal_type env sigl.fs_ret sigr.fs_ret 
+    in
+    if not testty then 
+      cannot_apply "call" 
+        "the two functions should have the same signature";
+    let ml, mr = EcFol.mleft, EcFol.mright in
+    let eq_params = 
+      f_eqparams fl sigl.fs_params ml fr sigr.fs_params mr in
+    let eq_res = f_eqres fl sigl.fs_ret ml fr sigr.fs_ret mr in
+    let pre = f_and eq_params inv in
+    let post = f_and eq_res inv in
+    f_equivF pre fl fr post
+  
+  
+ 
 let t_eqobs_inS finfo eqo inv g =
   let env, hyps, concl = get_goal_e g in
   let es = destr_equivS concl in

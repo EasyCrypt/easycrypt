@@ -1678,6 +1678,13 @@ module NormMp = struct
 
   let norm_ax env ax =
     { ax with ax_spec = omap ax.ax_spec (norm_form env) }
+
+  let is_abstract_fun f env = 
+    let f = norm_xpath env f in
+    match (Fun.by_xpath f env).f_def with
+    | FBabs _ -> true 
+    | _ -> false 
+
 end
 
 (* -------------------------------------------------------------------- *)
