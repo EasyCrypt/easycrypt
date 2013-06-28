@@ -287,3 +287,13 @@ by (intros=> x X x_in_X; apply set_ext; smt).
 lemma leq_filter: forall (p:'a cpred) (X:'a set),
   filter p X <= X
 by [].
+
+(* fold *)
+op fold_right : ('a -> 'b -> 'b) -> 'b -> 'a set -> 'b.
+
+axiom fold_nil: forall (f:'a -> 'b -> 'b) (e:'b),
+  fold_right f e empty = e.
+
+axiom fold_rm: forall (f:'a -> 'b -> 'b) (e:'b) xs,
+  let x = pick xs in
+    fold_right f e xs = f x (fold_right f e (rm x xs)).
