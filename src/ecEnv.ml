@@ -293,7 +293,7 @@ module MC = struct
     let prefix =
       let prefix_of_mtop = function
         | `Concrete (p1, _) -> Some p1
-        | `Abstract _ -> None
+        | `Local _ -> None
       in
         match env.env_scope.ec_scope with
         | `Theory   -> None
@@ -368,7 +368,7 @@ module MC = struct
     let prefix =
       let prefix_of_mtop = function
         | `Concrete (p1, _) -> Some p1
-        | `Abstract _ -> None
+        | `Local _ -> None
       in
         match env.env_scope.ec_scope with
         | `Theory   -> None
@@ -713,7 +713,7 @@ module MC = struct
            let p2 = EcPath.pqoname p2 me.me_name in
              mc_of_module_r (p1, mpath.EcPath.m_args, Some p2) me
 
-       | `Abstract _ -> assert false
+       | `Local _ -> assert false
     end
 
     | `Fun _ -> assert false
@@ -955,7 +955,7 @@ end
 (* -------------------------------------------------------------------- *)
 let ipath_of_mpath_opt (p : mpath_top) =
   match p with
-  | `Abstract i ->
+  | `Local i ->
       IPIdent (i, None)
 
   | `Concrete (p1, p2) ->
@@ -964,7 +964,7 @@ let ipath_of_mpath_opt (p : mpath_top) =
 
 let ipath_of_mpath (p : mpath) =
   match p.EcPath.m_top with
-  | `Abstract i ->
+  | `Local i ->
       (IPIdent (i, None), (0, p.EcPath.m_args))
 
   | `Concrete (p1, p2) ->
@@ -1343,7 +1343,7 @@ module Mod = struct
                 assert ((params = []) || ((spi+1) = EcPath.p_size p));
                 ((if args = [] then [] else o.me_sig.mis_params), true)
         
-            | `Abstract _m ->
+            | `Local _m ->
                 assert ((params = []) || spi = 0);
                 ((if args = [] then [] else o.me_sig.mis_params), true)
           in
@@ -1358,7 +1358,7 @@ module Mod = struct
 
   let lookup qname (env : env) =
     let (((_, _a), p), x) = MC.lookup_mod qname env in
-    (* FIXME : Ca c'est bizare quand on fait des foncteurs *)
+    (* FIXME : this test is dubious for functors lookup *)
 (*      if a <> [] then
         raise (LookupFailure (`QSymbol qname)); *)
       (p, x)
@@ -1408,22 +1408,6 @@ module Mod = struct
     module_expr_of_module_sig name modty modsig restr
     
   let bind_local name modty restr env =
-(*    let modsig =
-      let modsig =
-        match
-          omap
-            (MC.by_path
-               (fun mc -> mc.mc_modsigs)
-               (IPPath modty.mt_name) env)
-            check_not_suspended
-        with
-        | None -> lookup_error (`Path modty.mt_name)
-        | Some x -> x
-      in
-        EcSubst.subst_modsig
-          ~params:(List.map fst modty.mt_params) EcSubst.empty modsig
-    in
-    let me    = module_expr_of_module_sig name modty modsig restr in *)
     let me = me_of_mt env name modty restr in
     let path  = IPIdent (name, None) in
     let comps = MC.mc_of_module_param name me in
@@ -1521,7 +1505,7 @@ module NormMp = struct
       norm_mpath env p
     | _ -> begin
       match p.EcPath.m_top with
-      | `Abstract _
+      | `Local _
       | `Concrete (_, None) -> p
         
       | `Concrete (p1, Some p2) -> begin
@@ -1529,7 +1513,7 @@ module NormMp = struct
         let pr   = EcPath.mpath_crt p1 p.EcPath.m_args (EcPath.prefix p2) in
         let pr   = norm_mpath env pr in
         match pr.EcPath.m_top with
-        | `Abstract _ -> p
+        | `Local _ -> p
         | `Concrete (p1, p2) ->
           EcPath.mpath_crt p1 pr.EcPath.m_args (Some (EcPath.pqoname p2 name))
       end
@@ -1579,7 +1563,7 @@ module NormMp = struct
     let mp = norm_mpath env mp in
     let gtop = 
       match mp.EcPath.m_top with
-      | `Abstract _ -> f_glob (EcPath.mpath mp.EcPath.m_top []) m
+      | `Local _ -> f_glob (EcPath.mpath mp.EcPath.m_top []) m
       | `Concrete(p,_) -> 
         let top = EcPath.mpath (`Concrete(p,None)) mp.EcPath.m_args in
         let sx,us = globals env m top in
@@ -1600,6 +1584,7 @@ module NormMp = struct
 
   let norm_ty env = 
     EcTypes.Hty.memo_rec 107 (
+
       fun aux ty ->
         match ty.ty_node with
         | Tglob mp -> norm_tglob env mp

@@ -987,13 +987,13 @@ let trans_tv env id =
 let trans_tglob env mp = 
   assert (mp.EcPath.m_args = []); (* tglob should have been normalized *)
   match mp.EcPath.m_top with
-  | `Abstract id -> (try Mid.find id env.env_tv with _ -> assert false)
+  | `Local id -> (try Mid.find id env.env_tv with _ -> assert false)
   | _ -> assert false (* tglob should have been normalized *)
 
 let trans_glob env mp = 
   assert (mp.EcPath.m_args = []); (* tglob should have been normalized *)
   match mp.EcPath.m_top with
-  | `Abstract id -> 
+  | `Local id -> 
     (try Mid.find id env.env_id with _ -> 
       Format.printf "trans_glob %s@." (EcIdent.tostring id);
       assert false)
@@ -1048,7 +1048,7 @@ let rm_mp_args mp =
 
 let is_top_mp mp = 
   match mp.EcPath.m_top with
-  | `Abstract _ | `Concrete(_,None) -> true
+  | `Local _ | `Concrete(_,None) -> true
   | `Concrete (_, Some _) -> false
 
 let rec trans_mod env mp =
@@ -1490,7 +1490,7 @@ let add_ax env path ax =
 let add_mod_exp_mp env mp me =
   assert (mp.EcPath.m_args = []);
   assert (match mp.EcPath.m_top with
-  | `Abstract _ | `Concrete(_, None) -> true
+  | `Local _ | `Concrete(_, None) -> true
   | _ -> false);
 
   let is_alias = function ME_Alias _ -> true | _ -> false in

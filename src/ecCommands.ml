@@ -124,6 +124,11 @@ and process_module (scope : EcScope.scope) m =
   EcScope.Mod.add scope m
 
 (* -------------------------------------------------------------------- *)
+and process_declare (scope : EcScope.scope) m =
+  EcScope.check_state `InTop "module" scope;
+  EcScope.Mod.declare scope m
+
+(* -------------------------------------------------------------------- *)
 and process_interface (scope : EcScope.scope) (x, i) =
   EcScope.check_state `InTop "interface" scope;
   EcScope.ModType.add scope x.pl_desc i
@@ -287,6 +292,7 @@ and process (ld : EcLoader.ecloader) (scope : EcScope.scope) g =
       | Gtype      t    -> `Fct   (fun scope -> process_type       scope  (mk_loc loc t))
       | Gdatatype  t    -> `Fct   (fun scope -> process_datatype   scope  (mk_loc loc t))
       | Gmodule    m    -> `Fct   (fun scope -> process_module     scope  m)
+      | Gdeclare   m    -> `Fct   (fun scope -> process_declare    scope  m)
       | Ginterface i    -> `Fct   (fun scope -> process_interface  scope  i)
       | Goperator  o    -> `Fct   (fun scope -> process_operator   scope  (mk_loc loc o))
       | Gpredicate p    -> `Fct   (fun scope -> process_predicate  scope  (mk_loc loc p))

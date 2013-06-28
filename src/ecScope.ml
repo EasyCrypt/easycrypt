@@ -9,6 +9,7 @@ open EcTypes
 open EcDecl
 open EcModules
 
+module Sid  = EcIdent.Sid
 module Mid  = EcIdent.Mid
 module MSym = EcSymbols.Msym
 
@@ -195,8 +196,12 @@ module CoreSection : sig
   val is_local : [`Lemma | `Module] -> path -> locals -> bool
   val is_mp_local : mpath -> locals -> bool
 
-  val use_local_form   : form  -> locals -> bool
-  val use_local_module : module_expr -> locals -> bool
+  val form_use_local : form  -> locals -> bool
+  val module_use_local_or_abs : module_expr -> locals -> bool
+
+  val abstracts : locals -> EcIdent.t list * Sid.t
+
+  val generalize : locals -> form -> form
 
   type t
 
@@ -215,16 +220,18 @@ module CoreSection : sig
   val locals  : t -> locals
   val olocals : t -> locals option
 
-  val addlocal : [`Lemma | `Module] -> path -> t -> t
-  val additem  : EcTheory.ctheory_item -> t -> t
+  val addlocal    : [`Lemma | `Module] -> path -> t -> t
+  val additem     : EcTheory.ctheory_item -> t -> t
+  val addabstract : EcIdent.t -> t -> t
 end = struct
   exception NoSectionOpened
 
   type locals = {
-    lc_env     : EcEnv.env;
-    lc_lemmas  : Sp.t;
-    lc_modules : Sp.t;
-    lc_items   : EcTheory.ctheory_item list;
+    lc_env       : EcEnv.env;
+    lc_lemmas    : Sp.t;
+    lc_modules   : Sp.t;
+    lc_abstracts : EcIdent.t list * Sid.t;
+    lc_items     : EcTheory.ctheory_item list;
   }
 
   let env_of_locals (lc : locals) = lc.lc_env
@@ -242,8 +249,16 @@ end = struct
   let rec is_mp_local mp (lc : locals) =
     let toplocal =
       match mp.m_top with
-      | `Abstract _ -> false
+      | `Local _ -> false
       | `Concrete (p, _) -> is_local `Module p lc
+    in
+      toplocal || (List.exists (is_mp_local^~ lc) mp.m_args)
+
+  let rec is_mp_abstract mp (lc : locals) =
+    let toplocal =
+      match mp.m_top with
+      | `Concrete _ -> false
+      | `Local i -> Sid.mem i (snd lc.lc_abstracts)
     in
       toplocal || (List.exists (is_mp_local^~ lc) mp.m_args)
 
@@ -452,19 +467,32 @@ end = struct
     if is_mp_local mp lc then
       raise UseLocal
 
-  let use_local_form f lc =
+  let check_use_local_or_abd lc mp =
+    if is_mp_local mp lc || is_mp_abstract mp lc then
+      raise UseLocal
+
+  let form_use_local f lc =
     try  on_mpath_form (check_use_local lc) f; false
     with UseLocal -> true
 
-  let use_local_module m lc =
+  let module_use_local_or_abs m lc =
     try  on_mpath_module (check_use_local lc) m; false
     with UseLocal -> true
 
+  let abstracts lc = lc.lc_abstracts
+
+  let generalize lc (f : EcFol.form) =
+    let mods = Sid.of_list (fst lc.lc_abstracts) in
+      if   Mid.set_disjoint mods f.EcFol.f_fv
+      then f
+      else assert false
+
   let elocals (env : EcEnv.env) : locals =
-    { lc_env     = env;
-      lc_lemmas  = Sp.empty;
-      lc_modules = Sp.empty;
-      lc_items   = []; }
+    { lc_env       = env;
+      lc_lemmas    = Sp.empty;
+      lc_modules   = Sp.empty;
+      lc_abstracts = ([], Sid.empty);
+      lc_items     = []; }
 
   type t = locals list
 
@@ -475,13 +503,23 @@ end = struct
 
   let enter (env : EcEnv.env) (cs : t) : t =
     match List.ohead cs with
-    | None   -> [elocals env]
-    | Some x -> {x with lc_env = env; lc_items = []; } :: cs
+    | None    -> [elocals env]
+    | Some ec ->
+      let ec =
+        { ec with
+            lc_items = [];
+            lc_abstracts = ([], snd ec.lc_abstracts);
+            lc_env = env; }
+      in
+        ec :: cs
 
   let exit (cs : t) =
     match cs with
     | [] -> raise NoSectionOpened
-    | ec :: cs -> ({ ec with lc_items = List.rev ec.lc_items }, cs)
+    | ec :: cs ->
+        ({ ec with lc_items     = List.rev ec.lc_items;
+                   lc_abstracts = fst_map List.rev ec.lc_abstracts; },
+         cs)
 
   let path (cs : t) : path =
     match cs with
@@ -514,6 +552,17 @@ end = struct
 
   let additem item (cs : t) : t =
     let doit ec = { ec with lc_items = item :: ec.lc_items } in
+      onactive doit cs
+
+  let addabstract id (cs : t) : t =
+    let doit ec =
+      match Sid.mem id (snd ec.lc_abstracts) with
+      | true  -> ec
+      | false ->
+          let (ids, set) = ec.lc_abstracts in
+          let (ids, set) = (id :: ids, Sid.add id set) in
+            { ec with lc_abstracts = (ids, set) }
+    in
       onactive doit cs
 end
 
@@ -851,7 +900,6 @@ module Pred = struct
     let tyop    = EcDecl.mk_pred tparams dom body in
 
       Op.bind scope (unloc op.pp_name, tyop)
-
 end
 
 (* -------------------------------------------------------------------- *)
@@ -889,6 +937,8 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Mod = struct
+  module TT = EcTyping
+
   let bind (scope : scope) (local : bool) (m : module_expr) =
     assert (scope.sc_pr_uc = None);
     let scope =
@@ -913,17 +963,35 @@ module Mod = struct
       hierror "cannot declare a local module outside of a section";
 
     let (name, m) = ptm.ptm_def in
-    let m = EcTyping.transmod scope.sc_env (unloc name) m in
+    let m = TT.transmod scope.sc_env (unloc name) m in
 
     if not ptm.ptm_local then begin
       match CoreSection.olocals scope.sc_section with
       | None -> ()
       | Some locals ->
-          if CoreSection.use_local_module m locals then
-            hierror "this module use local modules and must be declared as local"
+          if CoreSection.module_use_local_or_abs m locals then
+            hierror "this module use local/abstracts modules and must be declared as local";
+          
     end;
 
       bind scope ptm.ptm_local m
+
+  let declare (scope : scope) m =
+    if not (CoreSection.in_section scope.sc_section) then
+      hierror "cannot declare an abstract module outside of a module";
+
+    let modty = m.ptmd_modty in
+    let tysig = fst (TT.transmodtype scope.sc_env (fst modty)) in
+    let restr = List.map (TT.trans_topmsymbol scope.sc_env) (snd modty) in
+    let name  = EcIdent.create (unloc m.ptmd_name) in
+    let scope =
+      { scope with
+          sc_env = EcEnv.Mod.bind_local
+            name tysig (Sm.of_list restr) scope.sc_env;
+          sc_section = CoreSection.addabstract
+            name scope.sc_section }
+    in
+      scope
 end
 
 (* -------------------------------------------------------------------- *)
@@ -1194,7 +1262,7 @@ module Ax = struct
       match CoreSection.olocals scope.sc_section with
       | None -> ()
       | Some locals ->
-          if CoreSection.use_local_form concl locals then
+          if CoreSection.form_use_local concl locals then
             hierror "this lemma uses local modules and must be declared as local"
     end;
 
@@ -1268,7 +1336,9 @@ module Section = struct
           | T.CTh_axiom (x, ax) ->
             let axp = EcPath.pqname (path scope) x in
               if not (CoreSection.is_local `Lemma axp locals) then
-                Ax.bind scope false (x, ax)
+                Ax.bind scope false
+                  (x, { ax with ax_spec =
+                          omap ax.ax_spec (CoreSection.generalize locals) })
               else
                 scope
 

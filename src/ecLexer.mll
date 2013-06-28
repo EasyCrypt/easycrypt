@@ -131,6 +131,7 @@
     "import"      , IMPORT     ;        (* KW: global *)
     "export"      , EXPORT     ;        (* KW: global *)
     "local"       , LOCAL      ;        (* KW: global *)
+    "declare"     , DECLARE    ;        (* KW: global *)
     "nosmt"       , NOSMT      ;        (* KW: global *)
     "module"      , MODULE     ;        (* KW: global *)
     "of"          , OF         ;        (* KW: global *)

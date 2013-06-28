@@ -905,7 +905,7 @@ let rec trans_msymbol (env : EcEnv.env) (msymb : pmsymbol located) =
           assert false;
         (mod_expr.me_sig.mis_params, true)
 
-    | `Abstract _m ->
+    | `Local _m ->
         if (params <> []) || spi <> 0 then
           assert false;
         (mod_expr.me_sig.mis_params, true)
@@ -1756,10 +1756,7 @@ let trans_form_or_pattern env (ps, ue) pf tt =
   
         | PGTY_ModTy(mi,restr) ->
           let (mi, _) = transmodtype env mi in
-          let restr = 
-            List.fold_left (fun r m -> 
-              EcPath.Sm.add (trans_topmsymbol env m) r) EcPath.Sm.empty restr in
-
+          let restr = EcPath.Sm.of_list (List.map (trans_topmsymbol env) restr) in
           let ty = GTmodty (mi, restr) in
           let add1 env x = 
             let x = EcIdent.create x.pl_desc in

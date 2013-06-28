@@ -134,7 +134,7 @@ module PPEnv = struct
   let rec mod_symb (ppe : t) mp : EcSymbols.msymbol =
     let (nm, x, p2) =
       match mp.P.m_top with
-      | `Abstract x ->
+      | `Local x ->
           let name =
             match Mid.find_opt x ppe.ppe_locals with
             | Some name -> name

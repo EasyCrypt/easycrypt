@@ -61,7 +61,7 @@ let id_of_pv pv m =
 let id_of_mp mp m = 
   let name = 
     match mp.EcPath.m_top with
-    | `Abstract id -> EcIdent.name id 
+    | `Local id -> EcIdent.name id 
     | _ -> assert false in
   add_side name m
 
