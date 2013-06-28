@@ -16,6 +16,7 @@ val make      : position -> position -> t
 val of_lexbuf : lexbuf -> t
 val tostring  : t -> string
 val merge     : t -> t -> t
+val isdummy   : t -> bool
 
 (* -------------------------------------------------------------------- *)
 type 'a located = {

@@ -88,7 +88,6 @@ type funsig = {
 }
 
 (* -------------------------------------------------------------------- *)
-
 (* An oracle in a function provided by a module parameter of a functor *)
 
 type module_type = {                   (* Always in eta-normal form *)
@@ -97,10 +96,13 @@ type module_type = {                   (* Always in eta-normal form *)
   mt_args   : EcPath.mpath list;
 }
 
+(* [oi_calls]: The list of oracle that can be called
+ * [oi_in]: true if equality of globals is required to ensure
+ * equality of result and globals
+*)
 type oracle_info = {
-  oi_calls  : xpath list; (* The list of oracle that can be called *)
-  oi_in     : bool; (* true if equality of global is required to ensure
-                       equality of res and global *)
+  oi_calls : xpath list;
+  oi_in    : bool;
 }
 
 type module_sig_body_item =
@@ -151,19 +153,23 @@ and module_body =
   | ME_Structure   of module_structure
   | ME_Decl        of module_type * EcPath.Sm.t 
 
+(* [ms_vars]: the set of global variables declared by the module and
+ * all it submodules.
+ * 
+ * [ms_uses]: the set of external top-level modules used by the module
+ * We ensure that these paths lead to defined modules (i.e having
+ * ME_structure as body)
+ *)
 and module_structure = {
-  ms_body   : module_item list;
-  ms_vars   : ty Mx.t; (* The set of global variables declared by the
-                          module and it submodules *)
-  ms_uses : Sm.t; (* The set of external top-level modules used by the module.
-                     It is an invariant that those modules are defined 
-                     (i.e are ME_structure). *)
+  ms_body : module_item list;
+  ms_vars : ty Mx.t;
+  ms_uses : Sm.t;
 }
 
 and module_item =
-  | MI_Module   of module_expr
-  | MI_Variable of variable
-  | MI_Function of function_
+| MI_Module   of module_expr
+| MI_Variable of variable
+| MI_Function of function_
 
 and module_comps = module_comps_item list
 
@@ -173,8 +179,7 @@ and module_comps_item = module_item
 val fd_equal : function_def -> function_def -> bool
 val fd_hash  : function_def -> int
 
-val mty_subst : 
-  (path -> path) -> (mpath -> mpath) ->  module_type -> module_type
+val mty_subst : (path -> path) -> (mpath -> mpath) -> module_type -> module_type
 
 val mty_equal : module_type -> module_type -> bool
 val mty_hash  : module_type -> int

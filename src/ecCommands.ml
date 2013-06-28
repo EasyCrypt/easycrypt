@@ -25,16 +25,14 @@ let rec toperror_of_exn ?gloc exn =
   | ParseError (loc, _)  -> Some (loc, exn)
 
   | LocError (loc, e)    -> begin
-      let gloc =
-        if loc == EcLocation._dummy then gloc else Some loc
-      in
+      let gloc = if EcLocation.isdummy loc then gloc else Some loc in
       match toperror_of_exn ?gloc e with
       | None -> Some (loc, e)
       | Some (loc, e) -> Some (loc, e)
     end
 
   | TopError (loc, e) ->
-      let gloc =  if loc == EcLocation._dummy then gloc else Some loc in
+      let gloc = if EcLocation.isdummy loc then gloc else Some loc in
         Some (odfl _dummy gloc, e)
 
   | EcScope.HiScopeError (loc, msg) ->
@@ -69,19 +67,19 @@ let process_pr fmt scope p =
   match p with 
   | Pr_ty qs ->
       let (x, ty) = EcEnv.Ty.lookup qs.pl_desc env in
-          EcPrinting.pp_typedecl ppe fmt (x, ty)
+      Format.fprintf fmt "%a@." (EcPrinting.pp_typedecl ppe) (x, ty)
         
   | Pr_op qs | Pr_pr qs ->
       let (x, op) = EcEnv.Op.lookup qs.pl_desc env in
-        EcPrinting.pp_opdecl ppe fmt (x, op)
+      Format.fprintf fmt "%a@." (EcPrinting.pp_opdecl ppe) (x, op)
         
   | Pr_th qs ->
       let (p, th) = EcEnv.Theory.lookup qs.pl_desc env in
-        EcPrinting.pp_theory ppe fmt (p, th)
+      Format.fprintf fmt "%a@." (EcPrinting.pp_theory ppe) (p, th)
 
   | Pr_ax qs ->
       let (p, ax) = EcEnv.Ax.lookup qs.pl_desc env in
-        EcPrinting.pp_axiom ppe fmt (p, ax)
+      Format.fprintf fmt "%a@." (EcPrinting.pp_axiom ppe) (p, ax)
 
 let process_print scope p = 
   process_pr Format.std_formatter scope p
@@ -124,6 +122,11 @@ and process_datatype (_scope : EcScope.scope) _ =
 and process_module (scope : EcScope.scope) m =
   EcScope.check_state `InTop "module" scope;
   EcScope.Mod.add scope m
+
+(* -------------------------------------------------------------------- *)
+and process_declare (scope : EcScope.scope) m =
+  EcScope.check_state `InTop "module" scope;
+  EcScope.Mod.declare scope m
 
 (* -------------------------------------------------------------------- *)
 and process_interface (scope : EcScope.scope) (x, i) =
@@ -289,6 +292,7 @@ and process (ld : EcLoader.ecloader) (scope : EcScope.scope) g =
       | Gtype      t    -> `Fct   (fun scope -> process_type       scope  (mk_loc loc t))
       | Gdatatype  t    -> `Fct   (fun scope -> process_datatype   scope  (mk_loc loc t))
       | Gmodule    m    -> `Fct   (fun scope -> process_module     scope  m)
+      | Gdeclare   m    -> `Fct   (fun scope -> process_declare    scope  m)
       | Ginterface i    -> `Fct   (fun scope -> process_interface  scope  i)
       | Goperator  o    -> `Fct   (fun scope -> process_operator   scope  (mk_loc loc o))
       | Gpredicate p    -> `Fct   (fun scope -> process_predicate  scope  (mk_loc loc p))

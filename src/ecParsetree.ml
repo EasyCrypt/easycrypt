@@ -60,6 +60,7 @@ and pexpr_r =
   | PEtuple  of pexpr list                        (* tuple constructor  *)
   | PEif     of pexpr * pexpr * pexpr             (* _ ? _ : _          *)
   | PElambda of ptybindings * pexpr               (* lambda abstraction *)
+  | PEscope  of pqsymbol * pexpr                  (* scope selection    *)
 
 and pexpr = pexpr_r located
 
@@ -84,8 +85,9 @@ and pstmt  = pinstr list
 
 (* -------------------------------------------------------------------- *)
 type pmodule_type = pqsymbol 
+type pmodule_type_restr = pqsymbol * pmsymbol located list
 
-and pmodule_sig =
+type pmodule_sig =
   | Pmty_struct of pmodule_sig_struct
 
 and pmodule_sig_struct = {
@@ -96,7 +98,6 @@ and pmodule_sig_struct = {
 and pmodule_sig_struct_body = pmodule_sig_item list
 
 and pmodule_sig_item = [
-  | `VariableDecl of pvariable_decl
   | `FunctionDecl of pfunction_decl
 ]
 
@@ -121,7 +122,7 @@ and pmodule_expr = pmodule_expr_r located
 
 and pstructure = {
   ps_params    : (psymbol * pmodule_type) list;
-  ps_body      : pstructure_item list;
+  ps_body      : pstructure_item located list;
   ps_signature : ((pqsymbol * psymbol list) located) list;
 }
 
@@ -138,7 +139,7 @@ and pfunction_body = {
 }
 
 and pfunction_local = {
-  pfl_names : [`Single|`Tuple] * (psymbol list);
+  pfl_names : ([`Single|`Tuple] * (psymbol list)) located;
   pfl_type  : pty   option;
   pfl_init  : pexpr option;
 }
@@ -148,6 +149,11 @@ and pmodule = (psymbol * pmodule_expr)
 and ptopmodule = {
   ptm_def   : pmodule;
   ptm_local : bool;
+}
+
+and pdeclmodule = {
+  ptmd_name  : psymbol;
+  ptmd_modty : pmodule_type_restr;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -165,8 +171,6 @@ type pdatatype = {
 }
 
 (* -------------------------------------------------------------------- *)
-type pmodule_type_restr = pqsymbol * pmsymbol located list
-
 type pgamepath = (pmsymbol * psymbol) located
 type pmemory   = psymbol
 
@@ -193,13 +197,14 @@ and pformula_r =
   | PFglob   of pmsymbol located 
   | PFeqveq  of glob_or_var list
   | PFlsless of pgamepath
+  | PFscope  of pqsymbol * pformula
 
   (* for claims *)
-  | PFhoareS   of pformula * pfunction_body * pformula
+  | PFhoareS   of pformula * pfunction_body located * pformula
   | PFhoareF   of pformula * pgamepath * pformula
   | PFequivF   of pformula * (pgamepath * pgamepath) * pformula
   | PFprob     of pgamepath * (pformula list) * pmemory * pformula
-  | PFBDhoareS of pformula * pfunction_body * pformula * phoarecmp * pformula
+  | PFBDhoareS of pformula * pfunction_body located * pformula * phoarecmp * pformula
   | PFBDhoareF of pformula * pgamepath * pformula * phoarecmp * pformula
 
 and pgtybinding  = psymbol list * pgty
@@ -508,7 +513,7 @@ and theory_override =
 | PTHO_Op   of op_override
 | PTHO_Pred of pr_override
 
-and ty_override = psymbol list * pty
+and ty_override = psymbol list * pty * [`Alias | `Inline]
 
 and op_override = {
   opov_tyvars : psymbol list option;
@@ -526,6 +531,7 @@ and pr_override = {
 (* -------------------------------------------------------------------- *)
 type global =
   | Gmodule      of ptopmodule
+  | Gdeclare     of pdeclmodule
   | Ginterface   of (psymbol * pmodule_sig)
   | Goperator    of poperator
   | Gpredicate   of ppredicate

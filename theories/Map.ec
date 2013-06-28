@@ -57,14 +57,17 @@ proof strict.
 by apply ISet.set_ext; smt.
 qed.
 
-lemma in_dom_setE: forall (x:'a) (m:('a,'b) map) v,
+lemma nosmt in_dom_setE: forall (x:'a) (m:('a,'b) map) v,
   in_dom x m.[x <- v]
 by [].
 
-lemma in_dom_setNE: forall (x:'a) (m:('a,'b) map) y v,
+lemma nosmt in_dom_setNE: forall (x:'a) (m:('a,'b) map) y v,
   x <> y =>
   in_dom x m.[y <- v] = in_dom x m
 by [].
+
+lemma in_dom_set: forall (x:'a) (m:('a,'b) map) y v,
+  in_dom x m.[y <- v] = in_dom x m \/ x = y by [].
 
 lemma in_dom_empty: forall x, !(in_dom x empty<:'a,'b>) by [].
 

@@ -385,7 +385,7 @@ end
 let get_abs_functor f = 
   let f = f.EcPath.x_top in
   match f.EcPath.m_top with
-  | `Abstract _ -> EcPath.mpath (f.EcPath.m_top) []
+  | `Local _ -> EcPath.mpath (f.EcPath.m_top) []
   | _ -> assert false
 
 let rec f_write ?(except_fs=Sx.empty) env w f =
@@ -499,7 +499,7 @@ module Mpv2 = struct
     if not (EcPath.m_equal mp1 mp2) then assert false;
     if not (mp1.m_args = []) then assert false;
     begin match mp1.m_top with
-    | `Abstract _ -> ()
+    | `Local _ -> ()
     | _ -> assert false
     end;
     { eqs with s_gl = Sm.add mp1 eqs.s_gl }

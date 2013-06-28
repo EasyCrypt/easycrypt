@@ -130,14 +130,14 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
       let xpath = EcPath.pappend opath (EcPath.fromqsymbol name) in
 
         match ovrd with
-        | PTHO_Type tyd -> begin
+        | PTHO_Type ((tyargs, _, _) as tyd) -> begin
             match EcEnv.Ty.by_path_opt xpath scenv with
             | None ->
                 clone_error scenv (CE_UnkOverride (OVK_Type, name));
             | Some { EcDecl.tyd_type = Some _ } ->
                 clone_error scenv (CE_CrtOverride (OVK_Type, name));
             | Some refty ->
-                if List.length refty.tyd_params <> List.length (fst tyd) then
+                if List.length refty.tyd_params <> List.length tyargs then
                   clone_error scenv (CE_TypeArgMism (OVK_Type, name))
           end;
           evc_update
@@ -183,34 +183,43 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
   in
 
   let nth =
-    let rec ovr1 prefix ovrds scenv item =
+    let rec ovr1 prefix ovrds (subst, scenv) item =
       let xpath x = EcPath.pappend opath (EcPath.fromqsymbol (prefix, x)) in
 
       match item with
       | CTh_type (x, otyd) -> begin
           match Msym.find_opt x ovrds.evc_types with
           | None ->
-              EcEnv.Ty.bind x (EcSubst.subst_tydecl subst otyd) scenv
+              (subst, EcEnv.Ty.bind x (EcSubst.subst_tydecl subst otyd) scenv)
 
-          | Some { pl_desc = (nargs, ntyd) } ->
-              (* Already checked:
-               *   1. type is abstract
-               *   2. type argument count are equal *)
+          | Some { pl_desc = (nargs, ntyd, mode) } -> begin
+            (* Already checked:
+             *   1. type is abstract
+             *   2. type argument count are equal *)
               let nargs = List.map (EcIdent.create -| unloc) nargs in
               let ue    = EcUnify.UniEnv.create (Some nargs) in
               let ntyd  = EcTyping.transty EcTyping.tp_tydecl scenv ue ntyd in
 
-              let binding =
-                { tyd_params = nargs;
-                  tyd_type   = Some ntyd; }
-              in
-                EcEnv.Ty.bind x binding scenv
+              match mode with
+              | `Alias ->
+                  let binding =
+                    { tyd_params = nargs;
+                      tyd_type   = Some ntyd; }
+                  in
+                    (subst, EcEnv.Ty.bind x binding scenv)
+
+              | `Inline ->
+                  let subst = 
+                    EcSubst.add_tydef subst (xpath x) (nargs, ntyd)
+                  in
+                    (subst, scenv)
+          end
       end
 
       | CTh_operator (x, ({ op_kind = OB_oper None } as oopd)) -> begin
           match Msym.find_opt x ovrds.evc_ops with
           | None ->
-              EcEnv.Op.bind x (EcSubst.subst_op subst oopd) scenv
+              (subst, EcEnv.Op.bind x (EcSubst.subst_op subst oopd) scenv)
 
           | Some { pl_desc = opov; pl_loc = loc; } ->
               let newop =
@@ -240,13 +249,13 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
               in
                 if not (ty_compatible scenv (reftyvars, refty) (newtyvars, newty)) then
                   clone_error scenv (CE_OpIncompatible (prefix, x));
-                EcEnv.Op.bind x newop scenv
+                (subst, EcEnv.Op.bind x newop scenv)
       end
 
       | CTh_operator (x, ({ op_kind = OB_pred None} as oopr)) -> begin
           match Msym.find_opt x ovrds.evc_preds with
           | None ->
-              EcEnv.Op.bind x (EcSubst.subst_op subst oopr) scenv
+              (subst, EcEnv.Op.bind x (EcSubst.subst_op subst oopr) scenv)
 
           | Some { pl_desc = prov; pl_loc = loc; } ->
               let newpr =
@@ -276,44 +285,44 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
               in
                 if not (ty_compatible scenv (reftyvars, refty) (newtyvars, newty)) then
                   clone_error scenv (CE_OpIncompatible (prefix, x));
-                EcEnv.Op.bind x newpr scenv
+                (subst, EcEnv.Op.bind x newpr scenv)
         end
 
       | CTh_operator (x, oopd) ->
-          EcEnv.Op.bind x (EcSubst.subst_op subst oopd) scenv
+          (subst, EcEnv.Op.bind x (EcSubst.subst_op subst oopd) scenv)
 
       | CTh_axiom (x, ax) ->
-          EcEnv.Ax.bind x (EcSubst.subst_ax subst ax) scenv
+          (subst, EcEnv.Ax.bind x (EcSubst.subst_ax subst ax) scenv)
 
       | CTh_modtype (x, modty) ->
-          EcEnv.ModTy.bind x (EcSubst.subst_modsig subst modty) scenv
+          (subst, EcEnv.ModTy.bind x (EcSubst.subst_modsig subst modty) scenv)
 
       | CTh_module me ->
-          EcEnv.Mod.bind me.me_name (EcSubst.subst_module subst me) scenv
+          (subst, EcEnv.Mod.bind me.me_name (EcSubst.subst_module subst me) scenv)
 
       | CTh_theory (x, cth) -> begin
         match Msym.find_opt x ovrds.evc_ths with
         | None ->
-            EcEnv.Theory.bindx x (EcSubst.subst_ctheory subst cth) scenv
+            (subst, EcEnv.Theory.bindx x (EcSubst.subst_ctheory subst cth) scenv)
   
         | Some subovrds ->
-            let nth =
+            let (subst, nth) =
               let subscenv = EcEnv.Theory.enter name scenv in
-              let subscenv =
+              let (subst, subscenv) =
                 List.fold_left
                   (ovr1 (prefix @ [x]) subovrds)
-                  subscenv cth.cth_struct
+                  (subst, subscenv) cth.cth_struct
               in
-                EcEnv.ctheory_of_ctheory_w3 (EcEnv.Theory.close subscenv)
+                (subst, EcEnv.ctheory_of_ctheory_w3 (EcEnv.Theory.close subscenv))
             in
-              EcEnv.Theory.bindx x nth scenv
+              (subst, EcEnv.Theory.bindx x nth scenv)
       end
 
       | CTh_export p ->               (* FIXME: subst in p? *)
-          EcEnv.Theory.export p scenv
+          (subst, EcEnv.Theory.export p scenv)
     in
       let scenv = EcEnv.Theory.enter name scenv in
-      let scenv = List.fold_left (ovr1 [] ovrds) scenv oth.cth_struct in
+      let _, scenv = List.fold_left (ovr1 [] ovrds) (subst, scenv) oth.cth_struct in
         EcEnv.Theory.close scenv
   in
     (name, nth)

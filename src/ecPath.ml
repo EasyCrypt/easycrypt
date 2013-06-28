@@ -98,6 +98,15 @@ let prefix p =
   | Psymbol _ -> None
   | Pqname (p, _) -> Some p
 
+let rec isprefix p q =
+  if   p_equal p q
+  then true
+  else begin
+    match prefix q with
+    | None -> false
+    | Some q -> isprefix p q
+  end
+
 let rec rootname p = 
   match p.p_node with 
   | Psymbol x     -> x
@@ -116,14 +125,14 @@ type mpath = {
 }
 
 and mpath_top =
-[ | `Abstract of ident
+[ | `Local of ident
   | `Concrete of path * path option ]
 
 let m_equal   = ((==) : mpath -> mpath -> bool)
 
 let mt_equal mt1 mt2 = 
   match mt1, mt2 with
-  | `Abstract id1, `Abstract id2 -> EcIdent.id_equal id1 id2
+  | `Local id1, `Local id2 -> EcIdent.id_equal id1 id2
   | `Concrete(p1, o1), `Concrete(p2, o2) ->
     p_equal p1 p2 && oall2 p_equal o1 o2
   | _, _ -> false 
@@ -140,7 +149,7 @@ module Hsmpath = Why3.Hashcons.Make (struct
   let hash m = 
     let hash = 
       match m.m_top with
-      | `Abstract id -> EcIdent.id_hash id
+      | `Local id -> EcIdent.id_hash id
       | `Concrete(p, o) -> 
         ofold o (fun s h -> Why3.Hashcons.combine h (p_hash s))
           (p_hash p) in
@@ -162,7 +171,7 @@ module Hm = MPath.H
 let mpath p args =
   Hsmpath.hashcons { m_top = p; m_args = args; m_tag = -1; }
 
-let mpath_abs id args = mpath (`Abstract id) args
+let mpath_abs id args = mpath (`Local id) args
 let mident id = mpath_abs id []
 
 let mpath_crt p args sp = mpath (`Concrete(p,sp)) args
@@ -188,7 +197,7 @@ let m_functor mp =
 let rec m_fv fv mp = 
   let fv = 
     match mp.m_top with 
-    | `Abstract id -> EcIdent.fv_add id fv 
+    | `Local id -> EcIdent.fv_add id fv 
     | `Concrete _  -> fv in
   List.fold_left m_fv fv mp.m_args 
 
@@ -243,7 +252,7 @@ let xqname x s = xpath x.x_top (pqname x.x_sub s)
 let rec m_tostring (m : mpath) = 
   let top, sub = 
     match m.m_top with
-    | `Abstract id -> (EcIdent.tostring id, "")
+    | `Local id -> (EcIdent.tostring id, "")
 
     | `Concrete (p, sub) ->
       let strsub = 
@@ -290,7 +299,7 @@ let rec m_subst (sp : path -> path) (sm : mpath EcIdent.Mid.t) m =
     let top = if p == p' then m.m_top else `Concrete(p',sub) in
     if m.m_top == top && m.m_args == args then m else 
       mpath top args 
-  | `Abstract id ->
+  | `Local id ->
     try 
       let m' = EcIdent.Mid.find id sm in
       m_apply m' args 

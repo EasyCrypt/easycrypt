@@ -8,6 +8,12 @@ open EcDecl
 open EcModules
 
 (* -------------------------------------------------------------------- *)
+type tymod_cnv_failure =
+| E_TyModCnv_ParamCountMismatch
+| E_TyModCnv_ParamTypeMismatch of EcIdent.t
+| E_TyModCnv_MissingComp       of symbol
+| E_TyModCnv_MismatchFunSig    of symbol
+
 type modapp_error =
 | MAE_WrongArgPosition
 | MAE_WrongArgCount
@@ -33,7 +39,11 @@ type tyerror =
 | DuplicatedTyVar
 | DuplicatedLocal      of symbol
 | NonLinearPattern
+| LvNonLinear
+| NonUnitFunWithoutReturn
+| UnitFunWithReturn
 | TypeMismatch         of (ty * ty) * (ty * ty)
+| TypeModMismatch      of tymod_cnv_failure
 | UnknownVarOrOp       of qsymbol * ty list
 | MultipleOpMatch      of qsymbol * ty list
 | UnknownModName       of qsymbol
@@ -45,10 +55,10 @@ type tyerror =
 | InvalidModAppl       of modapp_error
 | InvalidModType       of modtyp_error
 | InvalidMem           of symbol * mem_error
-| LvTupleNotUniq
 | FunNotInModParam     of qsymbol
 | NoActiveMemory
 | PatternNotAllowed
+| UnknownScope         of qsymbol
 
 exception TyError of EcLocation.t * EcEnv.env * tyerror
 
@@ -91,12 +101,13 @@ val trans_prop     : EcEnv.env -> EcUnify.unienv -> pformula -> EcFol.form
 val trans_pattern  : EcEnv.env -> (ptnmap * EcUnify.unienv) -> pformula -> EcFol.form
 
 (* -------------------------------------------------------------------- *)
-val transmodsig   : EcEnv.env -> symbol -> pmodule_sig  -> module_sig
-val transmodtype  : EcEnv.env -> pmodule_type -> module_type * module_sig
-val transmod      : EcEnv.env -> symbol -> pmodule_expr -> module_expr
-val trans_msymbol : EcEnv.env -> pmsymbol located -> mpath * module_sig
-val trans_gamepath : EcEnv.env -> pgamepath -> xpath 
+val transmodsig  : EcEnv.env -> symbol -> pmodule_sig  -> module_sig
+val transmodtype : EcEnv.env -> pmodule_type -> module_type * module_sig
+val transmod     : EcEnv.env -> symbol -> pmodule_expr -> module_expr
+
+val trans_topmsymbol : EcEnv.env -> pmsymbol located -> mpath
+val trans_msymbol    : EcEnv.env -> pmsymbol located -> mpath * module_sig
+val trans_gamepath   : EcEnv.env -> pgamepath -> xpath 
 
 (* -------------------------------------------------------------------- *)
-
 val check_sig_mt_cnv : EcEnv.env -> module_sig -> module_type -> unit 

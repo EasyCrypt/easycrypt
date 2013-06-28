@@ -169,13 +169,6 @@ let process_call side info (_, n as g) =
         f_bdHoareF pre f post FHeq f_r1
     | _ -> cannot_apply "call" "the conclusion is not a hoare or a equiv" in
 
-  (* TODO move this into EcEnv.Fun *)
-  let is_abstract f env = 
-    let f = NormMp.norm_xpath env f in
-    match (Fun.by_xpath f env).f_def with
-    | FBabs _ -> true 
-    | _ -> false in 
-
   let process_inv side g = 
     if side <> None then
       cannot_apply "call" "can not specify side for call with invariant";
@@ -193,38 +186,8 @@ let process_call side info (_, n as g) =
       let (_,fl,_),(_,fr,_),_,_ = s_last_calls "call" es.es_sl es.es_sr in
       let penv = LDecl.inv_memenv hyps in
       let env = LDecl.toenv hyps in
-      penv, fun inv ->
-        if is_abstract fl env then 
-          let topl,_,oil,sigl, topr, _, _,sigr = abstract_info2 env fl fr in
-          let ml, mr = mleft, mright in
-          let eqglob = f_eqglob topl ml topr mr in
-          let lpre = if oil.oi_in then [eqglob;inv] else [inv] in
-          let eq_params = 
-            f_eqparams fl sigl.fs_params ml fr sigr.fs_params mr in
-          let eq_res = f_eqres fl sigl.fs_ret ml fr sigr.fs_ret mr in
-          let pre = f_ands (eq_params::lpre) in
-          let post = f_ands [eq_res; eqglob; inv] in
-          f_equivF pre fl fr post
-        else
-          let defl = EcEnv.Fun.by_xpath fl env in
-          let defr = EcEnv.Fun.by_xpath fr env in
-          let sigl, sigr = defl.f_sig, defr.f_sig in
-          let testty = 
-            List.all2 (fun v1 v2 -> equal_type env v1.v_type v2.v_type)
-              sigl.fs_params sigr.fs_params && 
-            equal_type env sigl.fs_ret sigr.fs_ret 
-          in
-          if not testty then 
-            cannot_apply "call" 
-              "the two functions should have the same signature";
-          let ml, mr = EcFol.mleft, EcFol.mright in
-          let eq_params = 
-            f_eqparams fl sigl.fs_params ml fr sigr.fs_params mr in
-          let eq_res = f_eqres fl sigl.fs_ret ml fr sigr.fs_ret mr in
-          let pre = f_and eq_params inv in
-          let post = f_and eq_res inv in
-          f_equivF pre fl fr post
-      | _ -> cannot_apply "call" "the conclusion is not a hoare or a equiv" in
+      penv, fun inv -> EcPhl.mk_inv_spec env inv fl fr
+    | _ -> cannot_apply "call" "the conclusion is not a hoare or a equiv" in
 
 
   let process_upto side info g = 
@@ -252,13 +215,13 @@ let process_call side info (_, n as g) =
     let env, _, concl = get_goal_e g in
     match concl.f_node with
     | FhoareF h ->
-      if is_abstract h.hf_f env then t_hoareF_abs inv g
+      if NormMp.is_abstract_fun h.hf_f env then t_hoareF_abs inv g
       else t_hoareF_fun_def g
     | FbdHoareF h ->
-       if is_abstract h.bhf_f env then t_bdHoareF_abs inv g
+       if NormMp.is_abstract_fun h.bhf_f env then t_bdHoareF_abs inv g
       else t_bdHoareF_fun_def g
     | FequivF e ->
-       if is_abstract e.ef_fl env then t_equivF_abs inv g
+       if NormMp.is_abstract_fun e.ef_fl env then t_equivF_abs inv g
       else t_equivF_fun_def g
     | _ -> assert false in
 

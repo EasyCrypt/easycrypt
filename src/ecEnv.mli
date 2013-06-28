@@ -166,6 +166,9 @@ module Mod : sig
   val enter : symbol -> (EcIdent.t * module_type) list -> env -> env
   val bind_local : EcIdent.t -> module_type -> EcPath.Sm.t -> env -> env
 
+  val declare_local : EcIdent.t -> module_type -> EcPath.Sm.t -> env -> env
+  val add_restr_to_locals : EcPath.path -> env -> env
+
   (* Only bind module, ie no memory and no local variable *)
   val add_mod_binding : EcFol.binding -> env -> env
 
@@ -202,6 +205,7 @@ module NormMp : sig
   val norm_glob  : env -> EcMemory.memory -> mpath -> EcFol.form 
   val norm_tglob : env -> mpath -> EcTypes.ty 
   val tglob_reducible : env -> mpath -> bool
+  val is_abstract_fun : xpath -> env -> bool
 end
 
 (* -------------------------------------------------------------------- *)

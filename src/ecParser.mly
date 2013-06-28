@@ -170,6 +170,7 @@
 %token CUT
 %token DATATYPE
 %token DEBUG
+%token DECLARE
 %token DELTA
 %token DLBRACKET
 %token DO
@@ -234,6 +235,7 @@
 %token OFF
 %token ON
 %token OP
+%token PCENT
 %token PIPE
 %token POSE
 %token PR
@@ -478,6 +480,9 @@ tyvar_annot:
 %inline  expr: x=loc( expr_u) { x };
 
 sexpr_u:
+| e=sexpr PCENT p=qident
+   { PEscope (p, e) }
+
 | n=number
    { PEint n }
 
@@ -635,6 +640,9 @@ sform_u(P):
 | x=P 
    { x }
 
+| f=sform_r(P) PCENT p=qident
+   { PFscope (p, f) }
+
 | n=number
    { PFint n }
 
@@ -674,7 +682,7 @@ sform_u(P):
 | EQUIV LBRACKET eb=equiv_body(P) RBRACKET { eb }
 
 | HOARE LBRACKET
-    s=fun_def_body
+    s=loc(fun_def_body)
     COLON pre=form_r(P) LONGARROW post=form_r(P)
   RBRACKET
 	{ PFhoareS (pre, s, post) }
@@ -683,7 +691,6 @@ sform_u(P):
     mp=loc(fident) args=paren(plist0(sform_r(P), COMMA)) AT pn=mident
     COLON event=form_r(P)
   RBRACKET
-
     { PFprob (mp, args, pn, event) }
 
 | r=loc(RBOOL)
@@ -777,12 +784,16 @@ form_u(P):
         PFapp (mk_loc loc id, [e]) }
 
 | BDHOARE 
-    LBRACKET mp=loc(fident) COLON pre=form_r(P) LONGARROW post=form_r(P)  RBRACKET
+    LBRACKET mp=loc(fident) COLON
+      pre=form_r(P) LONGARROW post=form_r(P)
+    RBRACKET
       cmp=hoare_bd_cmp bd=sform_r(P)
 	{ PFBDhoareF (pre, mp, post, cmp, bd) }
 
 | BDHOARE 
-    LBRACKET s=fun_def_body COLON pre=form_r(P) LONGARROW post=form_r(P) RBRACKET
+    LBRACKET s=loc(fun_def_body) COLON
+      pre=form_r(P) LONGARROW post=form_r(P)
+    RBRACKET
       cmp=hoare_bd_cmp bd=sform_r(P)
 	{ PFBDhoareS (pre, s, post, cmp, bd) }
 
@@ -933,13 +944,13 @@ loc_decl_names:
 ;
 
 loc_decl_r:
-| VAR x=loc_decl_names COLON ty=loc(type_exp)
+| VAR x=loc(loc_decl_names) COLON ty=loc(type_exp)
     { { pfl_names = x; pfl_type = Some ty; pfl_init = None; } }
 
-| VAR x=loc_decl_names COLON ty=loc(type_exp) EQ e=expr
+| VAR x=loc(loc_decl_names) COLON ty=loc(type_exp) EQ e=expr
     { { pfl_names = x; pfl_type = Some ty; pfl_init = Some e; } }
 
-| VAR x=loc_decl_names EQ e=expr
+| VAR x=loc(loc_decl_names) EQ e=expr
     { { pfl_names = x; pfl_type = None; pfl_init = Some e; } }
 ;
 
@@ -990,14 +1001,10 @@ mod_item:
 (* Modules                                                              *)
 
 mod_body:
-(*| m=qident
-    { `App (m, []) }
+| m=mod_qident
+    { `Alias m }
 
-| m=qident LPAREN a=plist1(qident, COMMA) RPAREN
-    { `App (m, a) } *)
-| m=mod_qident { `App m }
-
-| LBRACE stt=mod_item* RBRACE
+| LBRACE stt=loc(mod_item)* RBRACE
     { `Struct stt }
 ;
 
@@ -1005,7 +1012,7 @@ mod_def:
 | MODULE x=uident p=mod_params? t=mod_aty? EQ body=loc(mod_body)
     { let p = EcUtils.odfl [] p in
         match body.pl_desc with
-        | `App m ->
+        | `Alias m ->
              if p <> [] then
                error (EcLocation.make $startpos $endpos)
                  (Some "cannot parameterized module alias");
@@ -1019,8 +1026,16 @@ mod_def:
 ;
 
 top_mod_def:
-| x=mod_def       { mk_topmod ~local:false x }
-| LOCAL x=mod_def { mk_topmod ~local:true  x }
+| x=mod_def
+    { mk_topmod ~local:false x }
+
+| LOCAL x=mod_def
+    { mk_topmod ~local:true  x }
+;
+
+top_mod_decl:
+| DECLARE MODULE x=uident COLON t=mod_type_restr
+    { { ptmd_name = x; ptmd_modty = t; } }
 ;
 
 mod_params:
@@ -1044,8 +1059,11 @@ mod_aty1:
 ;
 
 %inline mod_type_restr:
-| x = qident { (x,[]) }
-| x = qident LBRACE restr=plist1(loc(mod_qident),COMMA) RBRACE { (x,restr) }
+| x = qident
+    { (x, []) }
+
+| x = qident LBRACE restr=plist1(loc(mod_qident), COMMA) RBRACE
+    { (x, restr) }
 ;
 
 sig_def:
@@ -1076,9 +1094,6 @@ sig_param:
 ;
 
 signature_item:
-| VAR decl=ivar_decl
-    { `VariableDecl decl }
-
 | FUN decl=ifun_decl
     { `FunctionDecl decl }
 ;
@@ -1091,12 +1106,9 @@ ifun_decl:
         pfd_uses     = us; }
     }
 ;
+
 oracle_info:
 | i=STAR? qs=qident* { i=None, qs }
-
-ivar_decl:
-| x=lident COLON ty=loc(type_exp)
-    { { pvd_name = x; pvd_type = ty } }
 ;
 
 (* -------------------------------------------------------------------- *)
@@ -1887,7 +1899,10 @@ clone_with:
 
 clone_override:
 | TYPE ps=typarams x=qident EQ t=loc(type_exp)
-   { (x, PTHO_Type (ps, t)) }
+   { (x, PTHO_Type (ps, t, `Alias)) }
+
+| TYPE ps=typarams x=qident LEFTARROW t=loc(type_exp)
+   { (x, PTHO_Type (ps, t, `Inline)) }
 
 | OP x=qoident tyvars=tyvars_decl COLON sty=loc(type_exp) EQ e=expr
    { let ov = {
@@ -1982,6 +1997,7 @@ global_:
 | section_open     { GsctOpen        }
 | section_close    { GsctClose       }
 | top_mod_def      { Gmodule      $1 }
+| top_mod_decl     { Gdeclare     $1 }
 | sig_def          { Ginterface   $1 }
 | type_decl_or_def { Gtype        $1 }
 | datatype_def     { Gdatatype    $1 }
