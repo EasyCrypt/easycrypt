@@ -125,13 +125,10 @@ let module_comps_of_module_sig_comps (comps : module_sig_body) =
     List.map onitem comps
 
 (* -------------------------------------------------------------------- *)
-let module_expr_of_module_sig (name : EcIdent.t) mp (tymod : module_sig) 
-    (restr : EcPath.Sm.t) =
-
+let module_expr_of_module_sig name mp tymod restr =
   let tycomps = module_comps_of_module_sig_comps tymod.mis_body in
 
     { me_name  = EcIdent.name name;
-      me_body  = ME_Decl (mp,restr);
+      me_body  = ME_Decl (mp, restr);
       me_comps = tycomps;
-      me_sig   = tymod;
-      (* me_types = [mp]; *) }
+      me_sig   = tymod; }

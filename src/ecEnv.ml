@@ -15,6 +15,7 @@ open EcBaseLogic
 module Ssym = EcSymbols.Ssym
 module Msym = EcSymbols.Msym
 module Mp   = EcPath.Mp
+module Sid  = EcIdent.Sid
 module Mid  = EcIdent.Mid
 
 (* -------------------------------------------------------------------- *)
@@ -123,9 +124,10 @@ type preenv = {
   env_locals   : (EcIdent.t * EcTypes.ty) MMsym.t;
   env_memories : EcMemory.memenv MMsym.t;
   env_actmem   : EcMemory.memory option;
+  env_modlcs   : Sid.t;                 (* declared modules *)
   env_w3       : EcWhy3.env;
-  env_rb       : EcWhy3.rebinding;        (* in reverse order *)
-  env_item     : ctheory_item list        (* in reverse order *)
+  env_rb       : EcWhy3.rebinding;      (* in reverse order *)
+  env_item     : ctheory_item list      (* in reverse order *)
 }
 
 and escope = {
@@ -217,6 +219,7 @@ let empty =
       env_locals   = MMsym.empty;
       env_memories = MMsym.empty;
       env_actmem   = None;
+      env_modlcs   = Sid.empty;
       env_w3       = EcWhy3.empty;
       env_rb       = [];
       env_item     = [];
@@ -1425,8 +1428,34 @@ module Mod = struct
 
   let declare_local id modty restr env =
     let env = bind_local id modty restr env in
-    let w3 = EcWhy3.add_abs_mod (me_of_mt env) env.env_w3 id modty restr in
-    { env with env_w3 = w3 }
+    let w3  = EcWhy3.add_abs_mod (me_of_mt env) env.env_w3 id modty restr in
+      { env with
+          env_w3     = w3;
+          env_modlcs = Sid.add id env.env_modlcs; }
+
+  let add_restr_to_locals p env =
+    let p = EcPath.mpath_crt p [] None in
+
+    let update_id id mods =
+      let update me =
+        match me.me_body with
+        | ME_Decl (mt, restr) -> { me with me_body = ME_Decl (mt, Sm.add p restr) }
+        | _ -> me
+      in
+        MMsym.map_at
+          (List.map
+             (fun (ip, me) ->
+                 if   ip = IPIdent (id, None)
+                 then (ip, update me)
+                 else (ip, me)))
+          (EcIdent.name id) mods
+    in
+      { env with env_current =
+          { env.env_current
+              with mc_modules =
+                Sid.fold update_id env.env_modlcs
+                  env.env_current.mc_modules; }
+      }
 
   let bind_locals bindings env =
     List.fold_left
@@ -1440,9 +1469,10 @@ module Mod = struct
   let add_mod_binding bd env = 
     let do1 env (x,gty) =
       match gty with
-      | GTmodty (p,r) -> bind_local x p r env
-      | _ -> env in
-    List.fold_left do1 env bd
+      | GTmodty (p, r) -> bind_local x p r env
+      | _ -> env
+    in
+      List.fold_left do1 env bd
 end
 
 (* -------------------------------------------------------------------- *)

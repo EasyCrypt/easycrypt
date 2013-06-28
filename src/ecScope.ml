@@ -959,7 +959,9 @@ module Mod = struct
       | true  ->
         let mpath = EcPath.pqname (path scope) m.me_name in
         let ec = CoreSection.addlocal `Module mpath scope.sc_section in
-          { scope with sc_section = ec }
+          { scope with
+              sc_section = ec;
+              sc_env = EcEnv.Mod.add_restr_to_locals mpath scope.sc_env; }
     in
       scope
 
