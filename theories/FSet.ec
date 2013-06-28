@@ -73,7 +73,7 @@ axiom mem_empty: forall (x:'a), !(mem x empty).
 
 lemma elems_empty: elems<:'a> empty = [].
 proof strict.
-by rewrite nil_nmem=> x; rewrite -List.count_mem not_not;
+by rewrite nil_nmem=> x; rewrite -List.count_mem nnot;
    apply Logic.eq_sym; rewrite count_nmem; apply mem_empty.
 qed.
 
