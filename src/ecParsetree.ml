@@ -84,8 +84,9 @@ and pstmt  = pinstr list
 
 (* -------------------------------------------------------------------- *)
 type pmodule_type = pqsymbol 
+type pmodule_type_restr = pqsymbol * pmsymbol located list
 
-and pmodule_sig =
+type pmodule_sig =
   | Pmty_struct of pmodule_sig_struct
 
 and pmodule_sig_struct = {
@@ -149,6 +150,11 @@ and ptopmodule = {
   ptm_local : bool;
 }
 
+and pdeclmodule = {
+  ptmd_name  : psymbol;
+  ptmd_modty : pmodule_type_restr;
+}
+
 (* -------------------------------------------------------------------- *)
 type ptydecl = {
   pty_name   : psymbol;
@@ -164,8 +170,6 @@ type pdatatype = {
 }
 
 (* -------------------------------------------------------------------- *)
-type pmodule_type_restr = pqsymbol * pmsymbol located list
-
 type pgamepath = (pmsymbol * psymbol) located
 type pmemory   = psymbol
 
@@ -525,6 +529,7 @@ and pr_override = {
 (* -------------------------------------------------------------------- *)
 type global =
   | Gmodule      of ptopmodule
+  | Gdeclare     of pdeclmodule
   | Ginterface   of (psymbol * pmodule_sig)
   | Goperator    of poperator
   | Gpredicate   of ppredicate

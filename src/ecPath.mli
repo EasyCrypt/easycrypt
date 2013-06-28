@@ -46,7 +46,7 @@ type mpath = private {
 }
 
 and mpath_top =
-[ | `Abstract of ident
+[ | `Local of ident
   | `Concrete of path * path option ]
 
 (* -------------------------------------------------------------------- *)

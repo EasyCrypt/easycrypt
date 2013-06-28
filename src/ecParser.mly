@@ -170,6 +170,7 @@
 %token CUT
 %token DATATYPE
 %token DEBUG
+%token DECLARE
 %token DELTA
 %token DLBRACKET
 %token DO
@@ -994,7 +995,7 @@ mod_item:
 
 mod_body:
 | m=mod_qident
-    { `App m }
+    { `Alias m }
 
 | LBRACE stt=loc(mod_item)* RBRACE
     { `Struct stt }
@@ -1004,7 +1005,7 @@ mod_def:
 | MODULE x=uident p=mod_params? t=mod_aty? EQ body=loc(mod_body)
     { let p = EcUtils.odfl [] p in
         match body.pl_desc with
-        | `App m ->
+        | `Alias m ->
              if p <> [] then
                error (EcLocation.make $startpos $endpos)
                  (Some "cannot parameterized module alias");
@@ -1018,8 +1019,16 @@ mod_def:
 ;
 
 top_mod_def:
-| x=mod_def       { mk_topmod ~local:false x }
-| LOCAL x=mod_def { mk_topmod ~local:true  x }
+| x=mod_def
+    { mk_topmod ~local:false x }
+
+| LOCAL x=mod_def
+    { mk_topmod ~local:true  x }
+;
+
+top_mod_decl:
+| DECLARE MODULE x=uident COLON t=mod_type_restr
+    { { ptmd_name = x; ptmd_modty = t; } }
 ;
 
 mod_params:
@@ -1043,8 +1052,11 @@ mod_aty1:
 ;
 
 %inline mod_type_restr:
-| x = qident { (x,[]) }
-| x = qident LBRACE restr=plist1(loc(mod_qident),COMMA) RBRACE { (x,restr) }
+| x = qident
+    { (x, []) }
+
+| x = qident LBRACE restr=plist1(loc(mod_qident), COMMA) RBRACE
+    { (x, restr) }
 ;
 
 sig_def:
@@ -1978,6 +1990,7 @@ global_:
 | section_open     { GsctOpen        }
 | section_close    { GsctClose       }
 | top_mod_def      { Gmodule      $1 }
+| top_mod_decl     { Gdeclare     $1 }
 | sig_def          { Ginterface   $1 }
 | type_decl_or_def { Gtype        $1 }
 | datatype_def     { Gdatatype    $1 }
