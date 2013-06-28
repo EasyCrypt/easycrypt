@@ -73,6 +73,7 @@ type tyerror =
 | FunNotInModParam     of qsymbol
 | NoActiveMemory
 | PatternNotAllowed
+| UnknownScope         of qsymbol
 
 exception TyError of EcLocation.t * EcEnv.env * tyerror
 
@@ -95,6 +96,22 @@ let pp_cnv_failure fmt _env error =
 
   | E_TyModCnv_MismatchFunSig x ->
       msg "the item `%s' does not have a compatible kind/type" x
+
+let pp_modappl_error fmt error =
+  let msg x = Format.fprintf fmt x in
+
+  match error with
+  | MAE_WrongArgPosition ->
+      msg "wrong arguments position"
+
+  | MAE_WrongArgCount ->
+      msg "wrong number of arguments"
+
+  | MAE_InvalidArgType ->
+      msg "arguments do not match required interfaces"
+
+  | MAE_AccesSubModFunctor ->
+      msg "cannot access a sub-module of a partially applied functor"
 
 let pp_tyerror fmt env error =
   let msg x = Format.fprintf fmt x in
@@ -179,16 +196,8 @@ let pp_tyerror fmt env error =
   | InvalidFunAppl FAE_WrongArgCount ->
       msg "invalid function application: wrong number of arguments"
 
-  | InvalidModAppl MAE_WrongArgPosition ->
-      msg "invalid module application: wrong arguments position"
-
-  | InvalidModAppl MAE_WrongArgCount ->
-      msg "invalid module application: wrong number of arguments"
-
-  | InvalidModAppl MAE_InvalidArgType ->
-      msg "invalid module application: arguments do not match required interfaces"
-  | InvalidModAppl MAE_AccesSubModFunctor ->
-    msg "invalid module application: can not access to a sub-module of a partially applied functor"
+  | InvalidModAppl err ->
+      msg "invalid module application:@ %a" pp_modappl_error err
 
   | InvalidModType MTE_FunSigDoesNotRepeatArgNames ->
       msg "applied argument names must repeat functor argument names"
@@ -205,6 +214,9 @@ let pp_tyerror fmt env error =
 
   | PatternNotAllowed ->
       msg "pattern not allowed here"
+
+  | UnknownScope sc ->
+      msg "unknown scope: `%a'" pp_qsymbol sc
 
 let () =
   let pp fmt exn =
@@ -342,14 +354,22 @@ let select_pv env side name ue tvi psig =
         select pvs
     with EcEnv.LookupFailure _ -> []
 
-let gen_select_op ~actonly ~pred (fpv, fop, flc) tvi env name ue psig =
-  match select_local env name with
-  | Some(id, ty) -> 
-      if tvi <> None then assert false; (* FIXME error message *)
+let gen_select_op ~actonly ~pred (fpv, fop, flc) opsc tvi env name ue psig =
+  match (if tvi = None then select_local env name else None) with
+  | Some (id, ty) ->
       [ flc (id, ty, ue) ]
 
   | None ->
       let ops = EcUnify.select_op pred tvi env name ue psig in
+      let ops =
+        match opsc with
+        | None -> ops
+        | Some opsc ->
+            List.filter
+              (fun ((p, _), _, _) ->
+                  EcPath.isprefix opsc (oget (EcPath.prefix p)))
+              ops
+      in
       let me, pvs =
         match EcEnv.Memory.get_active env, actonly with
         | None, true -> (None, [])
@@ -357,17 +377,19 @@ let gen_select_op ~actonly ~pred (fpv, fop, flc) tvi env name ue psig =
       in
         (List.map (fpv me) pvs) @ (List.map fop ops)
 
-let select_exp_op env name ue tvi psig =
+let select_exp_op env opsc name ue tvi psig =
   let ppv = (fun _ (pv, ty, ue) -> (e_var pv ty, ty, ue))
   and pop = (fun ((op, tys), ty, ue) -> (e_op op tys ty, ty, ue))
   and flc = (fun (id, ty, ue) -> (e_local id ty, ty, ue)) in
-    gen_select_op ~actonly:false ~pred:false (ppv, pop, flc) tvi env name ue psig 
+    gen_select_op ~actonly:false ~pred:false (ppv, pop, flc)
+      opsc tvi env name ue psig 
 
-let select_form_op env name ue tvi psig =
+let select_form_op env opsc name ue tvi psig =
   let ppv = (fun me (pv, ty, ue) -> (f_pvar pv ty (oget me), ue))
   and pop = (fun ((op, tys), ty, ue) -> (f_op op tys ty, ue))
   and flc = (fun (id, ty, ue) -> (f_local id ty, ue)) in
-    gen_select_op ~actonly:true ~pred:true (ppv, pop, flc) tvi env name ue psig 
+    gen_select_op ~actonly:true ~pred:true (ppv, pop, flc)
+      opsc tvi env name ue psig 
 
 (* -------------------------------------------------------------------- *)
 type typolicy = {
@@ -519,15 +541,16 @@ let transbinding env ue bd =
   env, bd
 
 let transexp (env : EcEnv.env) (ue : EcUnify.unienv) e =
-  let rec transexp (env : EcEnv.env) (e : pexpr) =
+  let rec transexp_r (osc : EcPath.path option) (env : EcEnv.env) (e : pexpr) =
     let loc = e.pl_loc in
+    let transexp = transexp_r osc in
 
     match e.pl_desc with
     | PEint i -> (e_int i, tint)
 
     | PEident ({ pl_desc = name }, tvi) -> 
         let tvi = omap tvi (transtvi env ue) in
-        let ops = select_exp_op env name ue tvi [] in
+        let ops = select_exp_op env osc name ue tvi [] in
         begin match ops with
         | [] -> tyerror loc env (UnknownVarOrOp (name, []))
 
@@ -539,11 +562,19 @@ let transexp (env : EcEnv.env) (ue : EcUnify.unienv) e =
             op, ty
         end
 
+    | PEscope (popsc, e) ->
+        let opsc =
+          match EcEnv.Theory.lookup_opt (unloc popsc) env with
+          | None -> tyerror popsc.pl_loc env (UnknownScope (unloc popsc))
+          | Some opsc -> fst opsc
+        in
+          transexp_r (Some opsc) env e
+
     | PEapp ({pl_desc = PEident({ pl_desc = name; pl_loc = loc }, tvi)}, es) ->
         let tvi  = omap tvi (transtvi env ue) in  
         let es   = List.map (transexp env) es in
         let esig = snd (List.split es) in
-        let ops  = select_exp_op env name ue tvi esig in
+        let ops  = select_exp_op env osc name ue tvi esig in
         begin match ops with
         | [] ->
           let esig = Tuni.subst_dom (EcUnify.UniEnv.asmap ue) esig in
@@ -605,7 +636,7 @@ let transexp (env : EcEnv.env) (ue : EcUnify.unienv) e =
           (e_lam xs e, ty)
 
   in
-    transexp env e
+    transexp_r None env e
 
 let transexpcast (env : EcEnv.env) (ue : EcUnify.unienv) t e =
   let (e', t') = transexp env ue e in
@@ -1436,7 +1467,7 @@ and translvalue ue (env : EcEnv.env) lvalue =
       let e, ety = transexp env ue e in
       let name =  ([],EcCoreLib.s_set) in
       let esig = [xty; ety; codomty] in
-      let ops = select_exp_op env name ue tvi esig in
+      let ops = select_exp_op env None name ue tvi esig in
 
       match ops with
       | [] ->
@@ -1502,7 +1533,9 @@ let trans_topmsymbol env gp =
 
 (* -------------------------------------------------------------------- *)
 let trans_form_or_pattern env (ps, ue) pf tt =
-  let rec transf env f = 
+  let rec transf_r opsc env f =
+    let transf = transf_r opsc in
+
     match f.pl_desc with
     | PFhole -> begin
       match ps with
@@ -1512,6 +1545,14 @@ let trans_form_or_pattern env (ps, ue) pf tt =
         let ty = UE.fresh_uid ue in
           ps := Mid.add x ty !ps; f_local x ty
     end
+
+    | PFscope (popsc, f) ->
+        let opsc =
+          match EcEnv.Theory.lookup_opt (unloc popsc) env with
+          | None -> tyerror popsc.pl_loc env (UnknownScope (unloc popsc))
+          | Some opsc -> fst opsc
+        in
+          transf_r (Some opsc) env f
 
     | PFglob gp ->
         let mp = trans_topmsymbol env gp in
@@ -1535,7 +1576,7 @@ let trans_form_or_pattern env (ps, ue) pf tt =
 
     | PFident ({ pl_desc = name;pl_loc = loc }, tvi) -> 
         let tvi = omap tvi (transtvi env ue) in
-        let ops = select_form_op env name ue tvi [] in
+        let ops = select_form_op env opsc name ue tvi [] in
         begin match ops with
         | [] ->
             tyerror loc env (UnknownVarOrOp (name, []))
@@ -1587,7 +1628,7 @@ let trans_form_or_pattern env (ps, ue) pf tt =
         let tvi  = omap tvi (transtvi env ue) in  
         let es   = List.map (transf env) es in
         let esig = List.map EcFol.f_ty es in 
-        let ops  = select_form_op env name ue tvi esig in
+        let ops  = select_form_op env opsc name ue tvi esig in
           begin match ops with
           | [] ->
               let esig = Tuni.subst_dom (EcUnify.UniEnv.asmap ue) esig in
@@ -1775,7 +1816,7 @@ let trans_form_or_pattern env (ps, ue) pf tt =
     env, List.flatten bd
   in
 
-  let f = transf env pf in
+  let f = transf_r None env pf in
     oiter tt (unify_or_fail env ue pf.pl_loc ~expct:f.f_ty); f
 
 (* -------------------------------------------------------------------- *)

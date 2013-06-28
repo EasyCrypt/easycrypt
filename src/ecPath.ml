@@ -98,6 +98,15 @@ let prefix p =
   | Psymbol _ -> None
   | Pqname (p, _) -> Some p
 
+let rec isprefix p q =
+  if   p_equal p q
+  then true
+  else begin
+    match prefix q with
+    | None -> false
+    | Some q -> isprefix p q
+  end
+
 let rec rootname p = 
   match p.p_node with 
   | Psymbol x     -> x

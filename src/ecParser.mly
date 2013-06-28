@@ -235,6 +235,7 @@
 %token OFF
 %token ON
 %token OP
+%token PCENT
 %token PIPE
 %token POSE
 %token PR
@@ -479,6 +480,9 @@ tyvar_annot:
 %inline  expr: x=loc( expr_u) { x };
 
 sexpr_u:
+| e=sexpr PCENT p=qident
+   { PEscope (p, e) }
+
 | n=number
    { PEint n }
 
@@ -635,6 +639,9 @@ qident_or_res_or_glob:
 sform_u(P):
 | x=P 
    { x }
+
+| f=sform_r(P) PCENT p=qident
+   { PFscope (p, f) }
 
 | n=number
    { PFint n }
