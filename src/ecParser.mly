@@ -307,13 +307,15 @@
 
 %nonassoc IN
 %nonassoc prec_below_IMPL
-%right IMPL IFF
-%right OR 
-%right AND 
-
+%right    IMPL
+%nonassoc IFF
+%right    OR 
+%right    AND 
 %nonassoc NOT
-%left EQ NE OP1 GT GE LE
 
+%nonassoc EQ NE
+
+%left OP1 GT GE LE
 %right QUESTION
 %left OP2 MINUS ADD
 %right ARROW
