@@ -2249,9 +2249,7 @@ let mk_inv_spec env inv fl fr =
     let pre = f_and eq_params inv in
     let post = f_and eq_res inv in
     f_equivF pre fl fr post
-  
-  
- 
+   
 let t_eqobs_inS finfo eqo inv g =
   let env, hyps, concl = get_goal_e g in
   let es = destr_equivS concl in
@@ -2260,8 +2258,9 @@ let t_eqobs_inS finfo eqo inv g =
   let ifvl = PV.fv env ml inv in
   let ifvr = PV.fv env mr inv in
   let sl,sr,sg,eqi = 
-    EcPV.eqobs_in env (fun env _ f1 f2 eqo -> finfo env f1 f2 eqo) 
+    EcPV.eqobs_in env finfo 
       es.es_sl es.es_sr eqo (inv,ifvl, ifvr) in
+  Format.printf "got %n subgoals@." (List.length sg);
   let post = Mpv2.to_form ml mr eqo inv in
   if not (EcReduction.is_alpha_eq hyps post es.es_po) then
     tacuerror "eqobs_in can not be apply";
@@ -2270,6 +2269,57 @@ let t_eqobs_inS finfo eqo inv g =
     f_equivS es.es_ml es.es_mr es.es_pr sl sr pre in
   prove_goal_by (sg@[concl]) RN_eqobs_in g
 
+let rec eqobs_inF eqg env (inv,_,_ as inve) fl fr eqo =
+  let nfl = NormMp.norm_xpath env fl in
+  let nfr = NormMp.norm_xpath env fl in
+  let defl = Fun.by_xpath nfl env in
+  let defr = Fun.by_xpath nfr env in
+  match defl.f_def, defr.f_def with
+  | FBabs oi, FBabs _ -> 
+    if not (Mpv2.subset eqo eqg) then raise EqObsInError;
+    let top = EcPath.m_functor nfl.EcPath.x_top in
+    let ieqg = Mpv2.remove_glob top eqg in
+    let peqg = if oi.oi_in then eqg else ieqg in
+    let inv = Mpv2.to_form mleft mright ieqg inv in
+    peqg, mk_inv_spec env inv fl fr
+  | FBdef funl, FBdef funr -> 
+    begin 
+      try
+        let sigl, sigr = defl.f_sig, defr.f_sig in
+        let testty = 
+          List.all2 (fun v1 v2 -> 
+            EcReduction.equal_type env v1.v_type v2.v_type)
+            sigl.fs_params sigr.fs_params && 
+            EcReduction.equal_type env sigl.fs_ret sigr.fs_ret 
+        in
+        if not testty then raise EqObsInError;
+        let eqo = 
+          match funl.f_ret, funr.f_ret with
+          | None, None -> eqo
+          | Some el, Some er -> add_eqs env eqo el er 
+          | _, _ -> raise EqObsInError in
+        let sl, sr, _, eqi = 
+          eqobs_in env (eqobs_inF eqg) funl.f_body funr.f_body eqo inve in
+        if sl.s_node <> [] || sr.s_node <> [] then raise EqObsInError;
+        let geqi = 
+          List.fold_left2 (fun eqi vl vr ->
+            Mpv2.remove env (pv_loc nfl vl.v_name) (pv_loc nfr vr.v_name) eqi) 
+           eqi  sigl.fs_params sigr.fs_params in
+        Mpv2.check_glob geqi;
+        let ml, mr = EcFol.mleft, EcFol.mright in
+        let eq_params = 
+          f_eqparams fl sigl.fs_params ml fr sigr.fs_params mr in
+        let eq_res = f_eqres fl sigl.fs_ret ml fr sigr.fs_ret mr in
+        let pre = f_and eq_params (Mpv2.to_form ml mr geqi inv) in
+        let post = f_and eq_res (Mpv2.to_form ml mr eqo inv) in
+        geqi, f_equivF pre fl fr post
+      with EqObsInError ->
+        if not (Mpv2.subset eqo eqg) then raise EqObsInError;
+        let inv = Mpv2.to_form mleft mright eqg inv in
+        eqg, mk_inv_spec env inv fl fr
+    end
+  | _, _ -> raise EqObsInError 
+ 
 (*
 let t_eqobs_inF finfo eqo inv g =
   let env,hyps,concl = get_goal_e g in

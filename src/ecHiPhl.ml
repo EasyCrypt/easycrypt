@@ -703,17 +703,17 @@ let process_bdeq = t_bdeq
 
 
 
-let process_eqobs_in (glob,loc,inv) g = 
-  let glob = process_prhl_formula g glob in
-  let loc = process_prhl_formula g loc in
+let process_eqobs_in (ginv,gother,inv) g = 
+  let ginv = process_prhl_formula g ginv in
+  let gother = process_prhl_formula g gother in
   let inv = process_prhl_formula g inv in
   let env, _, concl = get_goal_e g in
   let es = destr_equivS concl in
   let ml, mr = fst es.es_ml, fst es.es_mr in
   (* TODO check glob for glob and inv *)
-  let eqglob = EcPV.Mpv2.of_form env ml mr glob in
-  let eqloc  = EcPV.Mpv2.of_form env ml mr loc in
-  let eqs = EcPV.Mpv2.union eqglob eqloc in
+  let eqinv = EcPV.Mpv2.of_form env ml mr ginv in
+  let eqother  = EcPV.Mpv2.of_form env ml mr gother in
+  let eqs = EcPV.Mpv2.union eqinv eqother in
   let post = EcPV.Mpv2.to_form ml mr eqs inv in
   let pre = es.es_pr in
   let t_pre = 
@@ -723,8 +723,9 @@ let process_eqobs_in (glob,loc,inv) g =
   t_seq_subgoal (t_equivS_conseq pre post)
     [ t_pre;
       t_trivial;
-      t_eqobs_inS (fun _ _ _ _ -> raise Not_found) eqs inv ]
-
+      fun g -> 
+        t_on_last (t_try (t_seq EcPhl.t_skip t_trivial))
+          (t_eqobs_inS (EcPhl.eqobs_inF eqinv) eqs inv g) ]
      g
 (*
   
