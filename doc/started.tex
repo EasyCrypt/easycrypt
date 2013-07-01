@@ -51,6 +51,20 @@ prevent you from performing a global install of ProofGeneral's \EC mode. We
 cannot, however, guarantee that we will solve all configuration problems that
 may arise from doing so.
 
+\paragraph{Locally installing the ProofGeneral files}
+From the main folder, run \texttt{make -C proofgeneral local} to download the
+latest version of ProofGeneral and compile it, along with the relevant \EC files
+for your installed version of emacs.
+
+\paragraph{Running \EC in interactive mode}
+From the main folder, run \texttt{make pg \&} to start up a new instance of emacs
+using the local install of ProofGeneral.
+
+\subsection{Bug reporting}
+Please use the GForge tracker
+(\url{https://gforge.inria.fr/tracker/?group_id=2622}, requires an account at
+GForge) to report bugs and unsightly behaviours.
+
 \section{Basic Example (Tutorial)\label{sec:tutorial}}
 In this section we present a formalization of the proof of security
 against chosen plaintext attacks of a public-key encryption scheme
