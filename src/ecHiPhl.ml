@@ -169,13 +169,6 @@ let process_call side info (_, n as g) =
         f_bdHoareF pre f post FHeq f_r1
     | _ -> cannot_apply "call" "the conclusion is not a hoare or a equiv" in
 
-  (* TODO move this into EcEnv.Fun *)
-  let is_abstract f env = 
-    let f = NormMp.norm_xpath env f in
-    match (Fun.by_xpath f env).f_def with
-    | FBabs _ -> true 
-    | _ -> false in 
-
   let process_inv side g = 
     if side <> None then
       cannot_apply "call" "can not specify side for call with invariant";
@@ -193,38 +186,8 @@ let process_call side info (_, n as g) =
       let (_,fl,_),(_,fr,_),_,_ = s_last_calls "call" es.es_sl es.es_sr in
       let penv = LDecl.inv_memenv hyps in
       let env = LDecl.toenv hyps in
-      penv, fun inv ->
-        if is_abstract fl env then 
-          let topl,_,oil,sigl, topr, _, _,sigr = abstract_info2 env fl fr in
-          let ml, mr = mleft, mright in
-          let eqglob = f_eqglob topl ml topr mr in
-          let lpre = if oil.oi_in then [eqglob;inv] else [inv] in
-          let eq_params = 
-            f_eqparams fl sigl.fs_params ml fr sigr.fs_params mr in
-          let eq_res = f_eqres fl sigl.fs_ret ml fr sigr.fs_ret mr in
-          let pre = f_ands (eq_params::lpre) in
-          let post = f_ands [eq_res; eqglob; inv] in
-          f_equivF pre fl fr post
-        else
-          let defl = EcEnv.Fun.by_xpath fl env in
-          let defr = EcEnv.Fun.by_xpath fr env in
-          let sigl, sigr = defl.f_sig, defr.f_sig in
-          let testty = 
-            List.all2 (fun v1 v2 -> equal_type env v1.v_type v2.v_type)
-              sigl.fs_params sigr.fs_params && 
-            equal_type env sigl.fs_ret sigr.fs_ret 
-          in
-          if not testty then 
-            cannot_apply "call" 
-              "the two functions should have the same signature";
-          let ml, mr = EcFol.mleft, EcFol.mright in
-          let eq_params = 
-            f_eqparams fl sigl.fs_params ml fr sigr.fs_params mr in
-          let eq_res = f_eqres fl sigl.fs_ret ml fr sigr.fs_ret mr in
-          let pre = f_and eq_params inv in
-          let post = f_and eq_res inv in
-          f_equivF pre fl fr post
-      | _ -> cannot_apply "call" "the conclusion is not a hoare or a equiv" in
+      penv, fun inv -> EcPhl.mk_inv_spec env inv fl fr
+    | _ -> cannot_apply "call" "the conclusion is not a hoare or a equiv" in
 
 
   let process_upto side info g = 
@@ -252,13 +215,13 @@ let process_call side info (_, n as g) =
     let env, _, concl = get_goal_e g in
     match concl.f_node with
     | FhoareF h ->
-      if is_abstract h.hf_f env then t_hoareF_abs inv g
+      if NormMp.is_abstract_fun h.hf_f env then t_hoareF_abs inv g
       else t_hoareF_fun_def g
     | FbdHoareF h ->
-       if is_abstract h.bhf_f env then t_bdHoareF_abs inv g
+       if NormMp.is_abstract_fun h.bhf_f env then t_bdHoareF_abs inv g
       else t_bdHoareF_fun_def g
     | FequivF e ->
-       if is_abstract e.ef_fl env then t_equivF_abs inv g
+       if NormMp.is_abstract_fun e.ef_fl env then t_equivF_abs inv g
       else t_equivF_fun_def g
     | _ -> assert false in
 
@@ -582,7 +545,7 @@ let process_equiv_deno info (_,n as g) =
     ef.ef_pr, ef.ef_po in
   t_on_first (t_use an gs) (t_equiv_deno pre post (juc,n))
 
-let process_conseq info (_, n as g) =
+let process_conseq notmod info (_, n as g) =
   let t_pre = ref (t_id None) and t_post = ref (t_id None) in
   let process_cut g (pre,post) =
     let hyps,concl = get_goal g in        
@@ -629,8 +592,12 @@ let process_conseq info (_, n as g) =
     | FhoareS hs   -> t_hoareS_conseq hs.hs_pr hs.hs_po
     | FbdHoareF hf -> t_bdHoareF_conseq hf.bhf_pr hf.bhf_po
     | FbdHoareS hs -> t_bdHoareS_conseq hs.bhs_pr hs.bhs_po
-    | FequivF ef   -> t_equivF_conseq ef.ef_pr ef.ef_po
-    | FequivS es   -> t_equivS_conseq es.es_pr es.es_po 
+    | FequivF ef   -> 
+      if notmod then t_equivF_conseq_nm ef.ef_pr ef.ef_po
+      else t_equivF_conseq ef.ef_pr ef.ef_po
+    | FequivS es   -> 
+      if notmod then t_equivS_conseq_nm es.es_pr es.es_po 
+      else t_equivS_conseq es.es_pr es.es_po 
     | _ -> assert false (* FIXME error message *) in
   t_seq_subgoal t_conseq
     [!t_pre; !t_post; t_use an gs] (juc,n)
@@ -740,17 +707,17 @@ let process_bdeq = t_bdeq
 
 
 
-let process_eqobs_in (glob,loc,inv) g = 
-  let glob = process_prhl_formula g glob in
-  let loc = process_prhl_formula g loc in
+let process_eqobs_in (ginv,gother,inv) g = 
+  let ginv = process_prhl_formula g ginv in
+  let gother = process_prhl_formula g gother in
   let inv = process_prhl_formula g inv in
   let env, _, concl = get_goal_e g in
   let es = destr_equivS concl in
   let ml, mr = fst es.es_ml, fst es.es_mr in
   (* TODO check glob for glob and inv *)
-  let eqglob = EcPV.Mpv2.of_form env ml mr glob in
-  let eqloc  = EcPV.Mpv2.of_form env ml mr loc in
-  let eqs = EcPV.Mpv2.union eqglob eqloc in
+  let eqinv = EcPV.Mpv2.of_form env ml mr ginv in
+  let eqother  = EcPV.Mpv2.of_form env ml mr gother in
+  let eqs = EcPV.Mpv2.union eqinv eqother in
   let post = EcPV.Mpv2.to_form ml mr eqs inv in
   let pre = es.es_pr in
   let t_pre = 
@@ -760,8 +727,9 @@ let process_eqobs_in (glob,loc,inv) g =
   t_seq_subgoal (t_equivS_conseq pre post)
     [ t_pre;
       t_trivial;
-      t_eqobs_inS (fun _ _ _ _ -> raise Not_found) eqs inv ]
-
+      fun g -> 
+        t_on_last (t_try (t_seq EcPhl.t_skip t_trivial))
+          (t_eqobs_inS (EcPhl.eqobs_inF eqinv) eqs inv g) ]
      g
 (*
   
@@ -794,7 +762,7 @@ let process_phl loc ptac g =
     | Pkill info                -> process_kill info
     | Palias info               -> process_alias info
     | Prnd (side, info)         -> process_rnd side info
-    | Pconseq info              -> process_conseq info
+    | Pconseq (nm,info)         -> process_conseq nm info
     | Pexfalso                  -> process_exfalso
     | Pbdhoaredeno info         -> process_bdHoare_deno info
     | PPr (phi1,phi2)           -> process_ppr (phi1,phi2)

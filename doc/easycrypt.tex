@@ -8,12 +8,11 @@
 \usepackage{xspace}
 \usepackage{mdframed}
 \usepackage[procnames]{listings}
-\usepackage{amssymb,dsfont}
+\usepackage{amssymb,dsfont,stmaryrd}
 \usepackage{infer}
 \usepackage[pagebackref,colorlinks=true,linkcolor=black,linktoc=all,citecolor=blue]{hyperref}
 \usepackage[usenames,dvipsnames]{xcolor}
 
-\newcommand{\rname}[1]{[\textsc{#1}]}
 
 \makeindex{easycrypt}
 \makeindex{ambient}
@@ -23,17 +22,6 @@
 
 \input{defs}
 
-\newcommand{\EC}{\textsc{EasyCrypt}\xspace}
-\newcommand{\ECversion}{0.$\beta$\xspace}
-
-% Judgements
-\newcommand{\pRHL}{\mathsf{pRHL}\xspace}
-\newcommand{\hoareS}[3]{\left[{#1}:{#2}\Longrightarrow{#3}\right]}
-\newcommand{\equivF}[4]{\left[{#1}\sim{#2}:{#3}\Longrightarrow{#4}\right]}
-\newcommand{\bdHoareS}[5]{{\hoareS{#1}{#2}{#3}}\,{#4}\,{#5}}
-\newcommand{\bdHoareSle}[4]{\bdHoareS{#1}{#2}{#3}{\leq}{#4}}
-\newcommand{\bdHoareSeq}[4]{\bdHoareS{#1}{#2}{#3}{=}{#4}}
-\newcommand{\bdHoareSge}[4]{\bdHoareS{#1}{#2}{#3}{\geq}{#4}}
 
 \lstset{numberbychapter=false} %% Set to true if chapter numbering is desired
 

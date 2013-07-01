@@ -61,6 +61,7 @@ end
 
 module Mod : sig
   val add : scope -> ptopmodule -> scope
+  val declare : scope -> pdeclmodule -> scope
 end
 
 module ModType : sig

@@ -55,6 +55,9 @@ let merge (p1 : t) (p2 : t) =
     loc_bchar = min p1.loc_bchar p2.loc_bchar;
     loc_echar = max p1.loc_echar p2.loc_echar; }
 
+let isdummy (p : t) =
+  p.loc_bchar < 0 || p.loc_echar < 0
+
 (* -------------------------------------------------------------------- *)
 type 'a located = {
   pl_loc  : t;

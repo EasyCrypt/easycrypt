@@ -60,19 +60,19 @@ module Hsty = Why3.Hashcons.Make (struct
     | Tfun    (t1,t2) ->
       Why3.Hashcons.combine (ty_hash t1) (ty_hash t2)
         
-  let fv = function
-    | Tglob m        -> EcPath.m_fv Mid.empty m
-    | Tunivar _      -> Mid.empty
-    | Tvar    _     -> Mid.empty
-    | Ttuple  tl     -> 
-      List.fold_left (fun s a -> fv_union s a.ty_fv) Mid.empty tl
-    | Tconstr (_,tl) -> 
-      List.fold_left (fun s a -> fv_union s a.ty_fv) Mid.empty tl
-    | Tfun    (t1,t2) ->
-      fv_union t1.ty_fv t2.ty_fv 
+  let fv ty =
+    let union ex =
+      List.fold_left (fun s a -> fv_union s (ex a)) Mid.empty in
 
-  let tag n ty = { ty with ty_tag = n; ty_fv = fv ty.ty_node }
-      
+    match ty with
+    | Tglob m          -> EcPath.m_fv Mid.empty m
+    | Tunivar _        -> Mid.empty
+    | Tvar    _        -> Mid.empty
+    | Ttuple  tys      -> union (fun a -> a.ty_fv) tys
+    | Tconstr (_, tys) -> union (fun a -> a.ty_fv) tys
+    | Tfun    (t1, t2) -> union (fun a -> a.ty_fv) [t1; t2]
+
+  let tag n ty = { ty with ty_tag = n; ty_fv = fv ty.ty_node; }
 end)
 
 let mk_ty node =  
@@ -136,21 +136,34 @@ let rec ty_dump (ty : ty) =
       dnode "Tfun" [ty_dump ty1; ty_dump ty2]
 
 (* -------------------------------------------------------------------- *)
+module TySmart = struct
+  let tglob (ty, mp) (mp') =
+    if mp == mp' then ty else tglob mp'
+
+  let ttuple (ty, tys) (tys') =
+    if tys == tys' then ty else ttuple tys'
+
+  let tconstr (ty, (lp, tys)) (lp', tys') =
+    if lp == lp' && tys == tys' then ty else tconstr lp' tys'
+
+  let tfun (ty, (t1, t2)) (t1', t2') =
+    if t1 == t1' && t2 == t2' then ty else tfun t1' t2'
+end
+
+(* -------------------------------------------------------------------- *)
 let ty_map f t = 
   match t.ty_node with 
   | Tglob _ | Tunivar _ | Tvar _ -> t
+
   | Ttuple lty -> 
+      TySmart.ttuple (t, lty) (List.smart_map f lty)
+
+  | Tconstr (p, lty) -> 
       let lty' = List.smart_map f lty in
-      if lty == lty' then t else
-      ttuple lty'
-  | Tconstr(p, lty) -> 
-      let lty' = List.smart_map f lty in
-      if lty == lty' then t else
-      tconstr p lty'
-  | Tfun(t1,t2) -> 
-      let t1' = f t1 and t2' = f t2 in
-      if t1 == t1' && t2 == t2' then t else
-      tfun t1' t2'
+        TySmart.tconstr (t, (p, lty)) (p, lty')
+
+  | Tfun (t1, t2) -> 
+      TySmart.tfun (t, (t1, t2)) (f t1, f t2)
 
 let ty_fold f s ty = 
   match ty.ty_node with 
@@ -182,47 +195,52 @@ let rec ty_check_uni t =
 
 (* -------------------------------------------------------------------- *)
 type ty_subst = {
-    ts_p  : EcPath.path -> EcPath.path;
-    ts_mp : EcPath.mpath -> EcPath.mpath;
-    ts_u  : ty Muid.t;
-    ts_v  : ty Mid.t;
-  }
+  ts_p   : EcPath.path -> EcPath.path;
+  ts_mp  : EcPath.mpath -> EcPath.mpath;
+  ts_def : (EcIdent.t list * ty) EcPath.Mp.t;
+  ts_u   : ty Muid.t;
+  ts_v   : ty Mid.t;
+}
 
 let ty_subst_id = 
-  { ts_p  = identity;
-    ts_mp = identity;
-    ts_u  = Muid.empty;
-    ts_v  = Mid.empty }
+  { ts_p   = identity;
+    ts_mp  = identity;
+    ts_def = Mp.empty;
+    ts_u   = Muid.empty;
+    ts_v   = Mid.empty; }
 
 let is_ty_subst_id s = 
-  s.ts_p == identity && s.ts_mp == identity &&
-    Muid.is_empty s.ts_u && Mid.is_empty s.ts_v
+     s.ts_p == identity
+  && s.ts_mp == identity
+  && Mp.is_empty s.ts_def
+  && Muid.is_empty s.ts_u
+  && Mid.is_empty s.ts_v
 
-let ty_subst s =
+let rec ty_subst s =
   if is_ty_subst_id s then identity
   else
     Hty.memo_rec 107 (fun aux ty ->
       match ty.ty_node with 
-      | Tglob m -> 
-        let m' = s.ts_mp m in
-        if m == m' then ty else
-          tglob m'
-      | Tunivar id -> 
-        odfl ty (Muid.find_opt id s.ts_u) 
-      | Tvar id    -> odfl ty (Mid.find_opt  id s.ts_v)
-      | Ttuple lty -> 
-        let lty' = List.smart_map aux lty in
-        if lty == lty' then ty else
-          ttuple lty'
-      | Tconstr(p, lty) -> 
-        let lty' = List.smart_map aux lty in
-        let p' = s.ts_p p in
-        if p == p' && lty == lty' then ty else
-          tconstr p' lty'
-      | Tfun(t1,t2) -> 
-        let t1' = aux t1 and t2' = aux t2 in
-        if t1 == t1' && t2 == t2' then ty else
-          tfun t1' t2')
+      | Tglob m       -> TySmart.tglob (ty, m) (s.ts_mp m)
+      | Tunivar id    -> odfl ty (Muid.find_opt id s.ts_u) 
+      | Tvar id       -> odfl ty (Mid.find_opt  id s.ts_v)
+      | Ttuple lty    -> TySmart.ttuple (ty, lty) (List.smart_map aux lty)
+      | Tfun (t1, t2) -> TySmart.tfun (ty, (t1, t2)) (aux t1, aux t2)
+
+      | Tconstr(p, lty) -> begin
+        match Mp.find_opt p s.ts_def with
+        | None -> 
+            let p'   = s.ts_p p in
+            let lty' = List.smart_map aux lty in
+              TySmart.tconstr (ty, (p, lty)) (p', lty')
+
+        | Some (args, body) ->
+            let s =
+              try  Mid.of_list (List.combine args (List.map aux lty))
+              with Failure _ -> assert false
+            in
+              ty_subst { ty_subst_id with ts_v = s; } body
+      end)
 
 module Tuni = struct
   let subst1 ((id, t) : uid * ty) =
@@ -321,9 +339,9 @@ let string_of_pvar (p : prog_var) =
     (EcPath.x_tostring p.pv_name)
     (string_of_pvar_kind p.pv_kind)
 
-(* Important : global variables are never suspended, local are 
-   since they contain the path of the function. *)
-   
+(* Notice: global variables are never suspended, local are since they
+ * contain the path of the function. *)
+    
 let pv_loc f s = 
   { pv_name = EcPath.xqname f s;
     pv_kind = PVloc }
@@ -335,7 +353,7 @@ let pv_glob x =
   let x = 
     if top.EcPath.m_args = [] then x
     else EcPath.xpath (EcPath.m_functor top) x.EcPath.x_sub in
-  { pv_name = x; pv_kind = PVglob }
+    { pv_name = x; pv_kind = PVglob }
 
 let pv x k = 
   if k = PVglob then pv_glob x 
@@ -403,22 +421,22 @@ let lp_fv = function
 
 let pv_fv pv = EcPath.x_fv Mid.empty pv.pv_name
 
-let fv_node = function 
-  | Eint _ -> Mid.empty
-  | Eop (_, tys) -> 
-      List.fold_left (fun s a -> fv_union s a.ty_fv) Mid.empty tys
-  | Evar v    -> pv_fv v 
-  | Elocal id -> fv_singleton id 
-  | Eapp(f,args) ->
-    List.fold_left (fun s e -> fv_union s (e_fv e)) (e_fv f) args
-  | Elet(lp,e1,e2) ->
-    fv_union (e_fv e1) (fv_diff (e_fv e2) (lp_fv lp))
-  | Etuple es ->
-    List.fold_left (fun s e -> fv_union s (e_fv e)) Mid.empty es
-  | Eif(e1,e2,e3) ->
-      fv_union (e_fv e1) (fv_union (e_fv e2) (e_fv e3))
-  | Elam(b,e) ->
-    List.fold_left (fun s (id,_) -> Mid.remove id s) (e_fv e) b
+let fv_node e =
+  let union ex =
+    List.fold_left (fun s e -> fv_union s (ex e)) Mid.empty in
+
+  match e with
+  | Eint _            -> Mid.empty
+  | Eop (_, tys)      -> union (fun a -> a.ty_fv) tys
+  | Evar v            -> pv_fv v 
+  | Elocal id         -> fv_singleton id 
+  | Eapp (e, es)      -> union e_fv (e :: es)
+  | Elet (lp, e1, e2) -> fv_union (e_fv e1) (fv_diff (e_fv e2) (lp_fv lp))
+  | Etuple es         -> union e_fv es
+  | Eif (e1, e2, e3)  -> union e_fv [e1; e2; e3]
+  | Elam (b, e)       -> List.fold_left
+                           (fun s (id, _) -> Mid.remove id s)
+                           (e_fv e) b
 
 (* -------------------------------------------------------------------- *)
 module Hexpr = Why3.Hashcons.Make (struct 
@@ -494,21 +512,21 @@ module Hexpr = Why3.Hashcons.Make (struct
           
   let tag n e = 
     let fv = fv_union (fv_node e.e_node) e.e_ty.ty_fv in
-    { e with e_tag = n; e_fv = fv; }
+      { e with e_tag = n; e_fv = fv; }
 end)
 
 (* -------------------------------------------------------------------- *)
 let mk_expr e ty =
   Hexpr.hashcons { e_node = e; e_tag = -1; e_fv = Mid.empty; e_ty = ty }
 
-let e_tt            = mk_expr (Eop (EcCoreLib.p_tt, [])) tunit
-let e_int           = fun i -> mk_expr (Eint i) tint
-let e_local         = fun x ty -> mk_expr (Elocal x) ty
-let e_var           = fun x ty -> mk_expr (Evar x) ty
-let e_op            = fun x targs ty -> mk_expr (Eop (x, targs)) ty
-let e_let           = fun pt e1 e2 -> mk_expr (Elet (pt, e1, e2)) e2.e_ty
-let e_tuple         = fun es -> mk_expr (Etuple es) (ttuple (List.map e_ty es))
-let e_if            = fun c e1 e2 -> mk_expr (Eif (c, e1, e2)) e2.e_ty
+let e_tt    = mk_expr (Eop (EcCoreLib.p_tt, [])) tunit
+let e_int   = fun i -> mk_expr (Eint i) tint
+let e_local = fun x ty -> mk_expr (Elocal x) ty
+let e_var   = fun x ty -> mk_expr (Evar x) ty
+let e_op    = fun x targs ty -> mk_expr (Eop (x, targs)) ty
+let e_let   = fun pt e1 e2 -> mk_expr (Elet (pt, e1, e2)) e2.e_ty
+let e_tuple = fun es -> mk_expr (Etuple es) (ttuple (List.map e_ty es))
+let e_if    = fun c e1 e2 -> mk_expr (Eif (c, e1, e2)) e2.e_ty
 
 let e_lam b e =
   if b = [] then e
@@ -528,7 +546,6 @@ let e_app x args ty =
     | _ -> mk_expr (Eapp (x, args)) ty
 
 (* -------------------------------------------------------------------- *)
-
 let e_map fty fe e =
   match e.e_node with 
   | Eint _
@@ -568,7 +585,6 @@ let e_map fty fe e =
     let e1' = fe e1 in
     if b == b' && e1 == e1' then e else
     e_lam b' e1'
-    
 
 let rec e_fold fe state e =
   match e.e_node with

@@ -39,25 +39,29 @@ val tfun    : ty -> ty -> ty
 val tglob   : EcPath.mpath -> ty 
 
 (* -------------------------------------------------------------------- *)
-val tunit      : ty
-val tbool      : ty
-val tint       : ty
-val treal      : ty
-val tdistr     : ty -> ty
-val tcpred     : ty -> ty
-val toarrow    : ty list -> ty -> ty
+val tunit   : ty
+val tbool   : ty
+val tint    : ty
+val treal   : ty
+val tdistr  : ty -> ty
+val tcpred  : ty -> ty
+val toarrow : ty list -> ty -> ty
 
 (* -------------------------------------------------------------------- *)
 val ty_dump  : ty -> EcDebug.dnode
+
+(* -------------------------------------------------------------------- *)
 exception FoundUnivar
+
 val ty_check_uni : ty -> unit
 
 (* -------------------------------------------------------------------- *)
 type ty_subst = {
-  ts_p  : EcPath.path -> EcPath.path;
-  ts_mp : EcPath.mpath -> EcPath.mpath;
-  ts_u  : ty Muid.t;
-  ts_v  : ty Mid.t;
+  ts_p   : EcPath.path  -> EcPath.path;
+  ts_mp  : EcPath.mpath -> EcPath.mpath;
+  ts_def : (EcIdent.t list * ty) EcPath.Mp.t;
+  ts_u   : ty Muid.t;
+  ts_v   : ty Mid.t;
 }
 
 val ty_subst_id    : ty_subst

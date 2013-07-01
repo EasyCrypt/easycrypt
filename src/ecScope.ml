@@ -9,6 +9,7 @@ open EcTypes
 open EcDecl
 open EcModules
 
+module Sid  = EcIdent.Sid
 module Mid  = EcIdent.Mid
 module MSym = EcSymbols.Msym
 
@@ -195,10 +196,12 @@ module CoreSection : sig
   val is_local : [`Lemma | `Module] -> path -> locals -> bool
   val is_mp_local : mpath -> locals -> bool
 
-  val use_local_instr  : instr -> locals -> bool
-  val use_local_stmt   : stmt  -> locals -> bool
-  val use_local_form   : form  -> locals -> bool
-  val use_local_module : module_expr -> locals -> bool
+  val form_use_local : form  -> locals -> bool
+  val module_use_local_or_abs : module_expr -> locals -> bool
+
+  val abstracts : locals -> (EcIdent.t * (module_type * Sm.t)) list * Sid.t
+
+  val generalize : locals -> form -> form
 
   type t
 
@@ -217,16 +220,18 @@ module CoreSection : sig
   val locals  : t -> locals
   val olocals : t -> locals option
 
-  val addlocal : [`Lemma | `Module] -> path -> t -> t
-  val additem  : EcTheory.ctheory_item -> t -> t
+  val addlocal    : [`Lemma | `Module] -> path -> t -> t
+  val additem     : EcTheory.ctheory_item -> t -> t
+  val addabstract : EcIdent.t -> (module_type * Sm.t) -> t -> t
 end = struct
   exception NoSectionOpened
 
   type locals = {
-    lc_env     : EcEnv.env;
-    lc_lemmas  : Sp.t;
-    lc_modules : Sp.t;
-    lc_items   : EcTheory.ctheory_item list;
+    lc_env       : EcEnv.env;
+    lc_lemmas    : Sp.t;
+    lc_modules   : Sp.t;
+    lc_abstracts : (EcIdent.t * (module_type * Sm.t)) list * Sid.t;
+    lc_items     : EcTheory.ctheory_item list;
   }
 
   let env_of_locals (lc : locals) = lc.lc_env
@@ -244,216 +249,257 @@ end = struct
   let rec is_mp_local mp (lc : locals) =
     let toplocal =
       match mp.m_top with
-      | `Abstract _ -> false
+      | `Local _ -> false
       | `Concrete (p, _) -> is_local `Module p lc
     in
       toplocal || (List.exists (is_mp_local^~ lc) mp.m_args)
 
-  let is_mp_set_local mp (lc : locals) =
-    Sm.exists (is_mp_local^~ lc) mp
+  let rec is_mp_abstract mp (lc : locals) =
+    let toplocal =
+      match mp.m_top with
+      | `Concrete _ -> false
+      | `Local i -> Sid.mem i (snd lc.lc_abstracts)
+    in
+      toplocal || (List.exists (is_mp_local^~ lc) mp.m_args)
 
-  let rec use_local_ty (ty : ty) (lc : locals) =
+  let rec on_mpath_ty cb (ty : ty) =
     match ty.ty_node with
-    | Tunivar _        -> false
-    | Tvar    _        -> false
-    | Tglob mp         -> is_mp_local mp lc
-    | Ttuple tys       -> List.exists (use_local_ty^~ lc) tys
-    | Tconstr (_, tys) -> List.exists (use_local_ty^~ lc) tys
-    | Tfun (ty1, ty2)  -> List.exists (use_local_ty^~ lc) [ty1; ty2]
+    | Tunivar _        -> ()
+    | Tvar    _        -> ()
+    | Tglob mp         -> cb mp
+    | Ttuple tys       -> List.iter (on_mpath_ty cb) tys
+    | Tconstr (_, tys) -> List.iter (on_mpath_ty cb) tys
+    | Tfun (ty1, ty2)  -> List.iter (on_mpath_ty cb) [ty1; ty2]
 
-  let use_local_pv (pv : prog_var) (lc : locals) =
-    is_mp_local pv.pv_name.x_top lc
+  let on_mpath_pv cb (pv : prog_var)=
+    cb pv.pv_name.x_top
 
-  let use_local_lp (lp : lpattern) (lc : locals) =
+  let on_mpath_lp cb (lp : lpattern) =
     match lp with
-    | LSymbol (_, ty) -> use_local_ty ty lc
-    | LTuple  xs      -> List.exists (fun (_, ty) -> use_local_ty ty lc) xs
+    | LSymbol (_, ty) -> on_mpath_ty cb ty
+    | LTuple  xs      -> List.iter (fun (_, ty) -> on_mpath_ty cb ty) xs
 
-  let rec use_local_expr (e : expr) (lc : locals) =
-    let uselc = use_local_expr^~ lc in
+  let rec on_mpath_expr cb (e : expr) =
+    let cbrec = on_mpath_expr cb in
 
     let fornode () =
       match e.e_node with
-      | Eint   _            -> false
-      | Elocal _            -> false
-      | Evar   _            -> false
-      | Elam   (xs, e)      -> List.exists (fun (_, ty) -> use_local_ty ty lc) xs || uselc e
-      | Eop    (_, tys)     -> List.exists (use_local_ty^~ lc) tys
-      | Eapp   (e, es)      -> List.exists uselc (e :: es)
-      | Elet   (lp, e1, e2) -> use_local_lp lp lc || List.exists uselc [e1; e2]
-      | Etuple es           -> List.exists uselc es
-      | Eif    (e1, e2, e3) -> List.exists uselc [e1; e2; e3]
+      | Eint   _            -> ()
+      | Elocal _            -> ()
+      | Evar   _            -> ()
+      | Eop    (_, tys)     -> List.iter (on_mpath_ty cb) tys
+      | Eapp   (e, es)      -> List.iter cbrec (e :: es)
+      | Elet   (lp, e1, e2) -> on_mpath_lp cb lp; List.iter cbrec [e1; e2]
+      | Etuple es           -> List.iter cbrec es
+      | Eif    (e1, e2, e3) -> List.iter cbrec [e1; e2; e3]
+      | Elam   (xs, e)      ->
+          List.iter (fun (_, ty) -> on_mpath_ty cb ty) xs;
+          cbrec e
     in
-      use_local_ty e.e_ty lc || fornode ()
+      on_mpath_ty cb e.e_ty;  fornode ()
 
-  let use_local_lv (lv : lvalue) (lc : locals) =
-    let for1 (pv, ty) = use_local_pv pv lc && use_local_ty ty lc in
+  let on_mpath_lv cb (lv : lvalue) =
+    let for1 (pv, ty) = on_mpath_pv cb pv; on_mpath_ty cb ty in
 
       match lv with
       | LvVar   pv  -> for1 pv
-      | LvTuple pvs -> List.exists for1 pvs
+      | LvTuple pvs -> List.iter for1 pvs
 
       | LvMap ((_, pty), pv, e, ty) ->
-            List.exists (use_local_ty^~ lc) pty
-         || use_local_ty    ty lc
-         || use_local_pv    pv lc
-         || use_local_expr   e lc
+          List.iter (on_mpath_ty cb) pty;
+          on_mpath_ty   cb ty;
+          on_mpath_pv   cb pv;
+          on_mpath_expr cb e
 
-  let rec use_local_instr (i : instr) (lc : locals) =
+  let rec on_mpath_instr cb (i : instr)=
     match i.i_node with
-    | Sasgn   _ -> false
-    | Srnd    _ -> false
-    | Sassert _ -> false
+    | Sasgn   _ -> ()
+    | Srnd    _ -> ()
+    | Sassert _ -> ()
 
-    | Scall (_, f, _) -> is_mp_local f.x_top lc
-    | Sif (_, s1, s2) -> List.exists (use_local_stmt^~ lc) [s1; s2]
-    | Swhile (_, s)   -> use_local_stmt s lc
+    | Scall (_, f, _) -> cb f.x_top
+    | Sif (_, s1, s2) -> List.iter (on_mpath_stmt cb) [s1; s2]
+    | Swhile (_, s)   -> on_mpath_stmt cb s
 
-  and use_local_stmt (s : stmt) (lc : locals) =
-    List.exists (use_local_instr^~ lc) s.s_node
+  and on_mpath_stmt cb (s : stmt) =
+    List.iter (on_mpath_instr cb) s.s_node
 
-  let use_local_lcmem m lc =
-       is_mp_local (EcMemory.lmt_xpath m).x_top lc
-    || Msym.exists (fun _ ty -> use_local_ty ty lc) (EcMemory.lmt_bindings m)
+  let on_mpath_lcmem cb m =
+      cb (EcMemory.lmt_xpath m).x_top;
+      Msym.iter (fun _ ty -> on_mpath_ty cb ty) (EcMemory.lmt_bindings m)
 
-  let use_local_memenv (m : EcMemory.memenv) (lc : locals) =
+  let on_mpath_memenv cb (m : EcMemory.memenv) =
     match snd m with
-    | None    -> false
-    | Some lm -> use_local_lcmem lm lc
+    | None    -> ()
+    | Some lm -> on_mpath_lcmem cb lm
 
-  let rec use_local_modty mty lc =
-       List.exists (fun (_, mty) -> use_local_modty mty lc) mty.mt_params
-    || List.exists (is_mp_local^~ lc) mty.mt_args
+  let rec on_mpath_modty cb mty =
+    List.iter (fun (_, mty) -> on_mpath_modty cb mty) mty.mt_params;
+    List.iter cb mty.mt_args
 
-  let use_local_binding b (lc : locals) =
+  let on_mpath_binding cb b =
     match b with
-    | EcFol.GTty    ty        -> use_local_ty ty lc
-    | EcFol.GTmodty (mty, sm) -> use_local_modty mty lc || is_mp_set_local sm lc
-    | EcFol.GTmem   None      -> false
-    | EcFol.GTmem   (Some m)  -> use_local_lcmem m lc
+    | EcFol.GTty    ty        -> on_mpath_ty cb ty
+    | EcFol.GTmodty (mty, sm) -> on_mpath_modty cb mty; Sm.iter cb sm
+    | EcFol.GTmem   None      -> ()
+    | EcFol.GTmem   (Some m)  -> on_mpath_lcmem cb m
 
-  let use_local_bindings b lc =
-    List.exists (fun (_, b) -> use_local_binding b lc) b
+  let on_mpath_bindings cb b =
+    List.iter (fun (_, b) -> on_mpath_binding cb b) b
 
-  let rec use_local_form (f : EcFol.form) (lc : locals) =
-    let uselc = use_local_form^~ lc in
+  let rec on_mpath_form cb (f : EcFol.form) =
+    let cbrec = on_mpath_form cb in
 
     let rec fornode () =
       match f.EcFol.f_node with
-      | EcFol.Fint      _            -> false
-      | EcFol.Flocal    _            -> false
-      | EcFol.Fquant    (_, b, f)    -> use_local_bindings b lc || uselc f
-      | EcFol.Fif       (f1, f2, f3) -> List.exists uselc [f1; f2; f3]
-      | EcFol.Flet      (_, f1, f2)  -> List.exists uselc [f1; f2]
-      | EcFol.Fop       (_, ty)      -> List.exists (use_local_ty^~ lc) ty
-      | EcFol.Fapp      (f, fs)      -> List.exists uselc (f :: fs)
-      | EcFol.Ftuple    fs           -> List.exists uselc fs
-      | EcFol.Fpvar     (pv, _)      -> use_local_pv  pv  lc
-      | EcFol.Fglob     (mp, _)      -> is_mp_local   mp  lc
-      | EcFol.FhoareF   hf           -> use_local_hf  hf  lc
-      | EcFol.FhoareS   hs           -> use_local_hs  hs  lc
-      | EcFol.FequivF   ef           -> use_local_ef  ef  lc
-      | EcFol.FequivS   es           -> use_local_es  es  lc
-      | EcFol.FbdHoareS bhs          -> use_local_bhs bhs lc
-      | EcFol.FbdHoareF bhf          -> use_local_bhf bhf lc
-      | EcFol.Fpr       pr           -> use_local_pr  pr  lc
+      | EcFol.Fint      _            -> ()
+      | EcFol.Flocal    _            -> ()
+      | EcFol.Fquant    (_, b, f)    -> on_mpath_bindings cb b; cbrec f
+      | EcFol.Fif       (f1, f2, f3) -> List.iter cbrec [f1; f2; f3]
+      | EcFol.Flet      (_, f1, f2)  -> List.iter cbrec [f1; f2]
+      | EcFol.Fop       (_, ty)      -> List.iter (on_mpath_ty cb) ty
+      | EcFol.Fapp      (f, fs)      -> List.iter cbrec (f :: fs)
+      | EcFol.Ftuple    fs           -> List.iter cbrec fs
+      | EcFol.Fpvar     (pv, _)      -> on_mpath_pv  cb pv
+      | EcFol.Fglob     (mp, _)      -> cb mp
+      | EcFol.FhoareF   hf           -> on_mpath_hf  cb hf
+      | EcFol.FhoareS   hs           -> on_mpath_hs  cb hs
+      | EcFol.FequivF   ef           -> on_mpath_ef  cb ef
+      | EcFol.FequivS   es           -> on_mpath_es  cb es
+      | EcFol.FbdHoareS bhs          -> on_mpath_bhs cb bhs
+      | EcFol.FbdHoareF bhf          -> on_mpath_bhf cb bhf
+      | EcFol.Fpr       pr           -> on_mpath_pr  cb pr
 
-    and use_local_hf hf lc =
-         use_local_form hf.EcFol.hf_pr lc
-      || use_local_form hf.EcFol.hf_po lc
-      || is_mp_local hf.EcFol.hf_f.x_top lc
+    and on_mpath_hf cb hf =
+      on_mpath_form cb hf.EcFol.hf_pr;
+      on_mpath_form cb hf.EcFol.hf_po;
+      cb hf.EcFol.hf_f.x_top
 
-    and use_local_hs hs lc =
-         use_local_form hs.EcFol.hs_pr lc
-      || use_local_form hs.EcFol.hs_po lc
-      || use_local_stmt hs.EcFol.hs_s lc
-      || use_local_memenv hs.EcFol.hs_m lc
+    and on_mpath_hs cb hs =
+      on_mpath_form cb hs.EcFol.hs_pr;
+      on_mpath_form cb hs.EcFol.hs_po;
+      on_mpath_stmt cb hs.EcFol.hs_s;
+      on_mpath_memenv cb hs.EcFol.hs_m
 
-    and use_local_ef ef lc =
-         use_local_form ef.EcFol.ef_pr lc
-      || use_local_form ef.EcFol.ef_po lc
-      || is_mp_local ef.EcFol.ef_fl.x_top lc
-      || is_mp_local ef.EcFol.ef_fr.x_top lc
+    and on_mpath_ef cb ef =
+      on_mpath_form cb ef.EcFol.ef_pr;
+      on_mpath_form cb ef.EcFol.ef_po;
+      cb ef.EcFol.ef_fl.x_top;
+      cb ef.EcFol.ef_fr.x_top
 
-    and use_local_es es lc =
-         use_local_form es.EcFol.es_pr lc
-      || use_local_form es.EcFol.es_po lc
-      || use_local_stmt es.EcFol.es_sl lc
-      || use_local_stmt es.EcFol.es_sr lc
-      || use_local_memenv es.EcFol.es_ml lc
-      || use_local_memenv es.EcFol.es_mr lc
+    and on_mpath_es cb es =
+      on_mpath_form cb es.EcFol.es_pr;
+      on_mpath_form cb es.EcFol.es_po;
+      on_mpath_stmt cb es.EcFol.es_sl;
+      on_mpath_stmt cb es.EcFol.es_sr;
+      on_mpath_memenv cb es.EcFol.es_ml;
+      on_mpath_memenv cb es.EcFol.es_mr
 
-    and use_local_bhf bhf lc =
-         use_local_form bhf.EcFol.bhf_pr lc
-      || use_local_form bhf.EcFol.bhf_po lc
-      || use_local_form bhf.EcFol.bhf_bd lc
-      || is_mp_local bhf.EcFol.bhf_f.x_top lc
+    and on_mpath_bhf cb bhf =
+      on_mpath_form cb bhf.EcFol.bhf_pr;
+      on_mpath_form cb bhf.EcFol.bhf_po;
+      on_mpath_form cb bhf.EcFol.bhf_bd;
+      cb bhf.EcFol.bhf_f.x_top
 
-    and use_local_bhs bhs lc =
-         use_local_form bhs.EcFol.bhs_pr lc
-      || use_local_form bhs.EcFol.bhs_po lc
-      || use_local_form bhs.EcFol.bhs_bd lc
-      || use_local_stmt bhs.EcFol.bhs_s lc
-      || use_local_memenv bhs.EcFol.bhs_m lc
+    and on_mpath_bhs cb bhs =
+      on_mpath_form cb bhs.EcFol.bhs_pr;
+      on_mpath_form cb bhs.EcFol.bhs_po;
+      on_mpath_form cb bhs.EcFol.bhs_bd;
+      on_mpath_stmt cb bhs.EcFol.bhs_s;
+      on_mpath_memenv cb bhs.EcFol.bhs_m
 
-    and use_local_pr (_, xp, fs, f) lc =
-         is_mp_local xp.x_top lc
-      || List.exists (use_local_form^~ lc) (f :: fs)
+    and on_mpath_pr cb (_, xp, fs, f) =
+      cb xp.x_top;
+      List.iter (on_mpath_form cb) (f :: fs)
 
     in
-      use_local_ty f.EcFol.f_ty lc || fornode ()
+      on_mpath_ty cb f.EcFol.f_ty; fornode ()
 
-  let rec use_local_module (me : module_expr) (lc : locals) =
+  let rec on_mpath_module cb (me : module_expr) =
     match me.me_body with
-    | ME_Alias     mp   -> is_mp_local       mp lc
-    | ME_Structure st   -> use_local_mstruct st lc
-    | ME_Decl (mty, sm) -> use_local_mdecl (mty, sm) lc
+    | ME_Alias     mp   -> cb mp
+    | ME_Structure st   -> on_mpath_mstruct cb st
+    | ME_Decl (mty, sm) -> on_mpath_mdecl cb (mty, sm)
 
-  and use_local_mdecl dc lc =
-       use_local_modty (fst dc) lc
-    || Sm.exists (is_mp_local^~ lc) (snd dc)
+  and on_mpath_mdecl cb dc =
+    on_mpath_modty cb (fst dc);
+    Sm.iter cb (snd dc)
 
-  and use_local_mstruct st lc =
-    List.exists (use_local_mstruct1^~ lc) st.ms_body
+  and on_mpath_mstruct cb st =
+    List.iter (on_mpath_mstruct1 cb) st.ms_body
 
-  and use_local_mstruct1 item lc =
+  and on_mpath_mstruct1 cb item =
     match item with
-    | MI_Module   me -> use_local_module me lc
-    | MI_Variable x  -> use_local_ty x.v_type lc
-    | MI_Function f  -> use_local_fun f lc
+    | MI_Module   me -> on_mpath_module cb me
+    | MI_Variable x  -> on_mpath_ty cb x.v_type
+    | MI_Function f  -> on_mpath_fun cb f
 
-  and use_local_fun fun_ lc =
-       use_local_fun_sig  fun_.f_sig lc
-    || use_local_fun_body fun_.f_def lc
+  and on_mpath_fun cb fun_ =
+    on_mpath_fun_sig  cb fun_.f_sig;
+    on_mpath_fun_body cb fun_.f_def
 
-  and use_local_fun_sig fsig lc =
-       List.exists (fun v -> use_local_ty v.v_type lc) fsig.fs_params
-    || use_local_ty fsig.fs_ret lc
+  and on_mpath_fun_sig cb fsig =
+    List.iter (fun v -> on_mpath_ty cb v.v_type) fsig.fs_params;
+    on_mpath_ty cb fsig.fs_ret
 
-  and use_local_fun_body fbody lc =
+  and on_mpath_fun_body cb fbody =
     match fbody with
-    | FBdef fdef -> use_local_fun_def fdef lc
-    | FBabs oi   -> use_local_fun_oi  oi   lc
+    | FBdef fdef -> on_mpath_fun_def cb fdef
+    | FBabs oi   -> on_mpath_fun_oi  cb oi
 
-  and use_local_fun_def fdef lc =
-       List.exists (fun v -> use_local_ty v.v_type lc) fdef.f_locals
-    || use_local_stmt fdef.f_body lc
-    || odfl false (omap fdef.f_ret (use_local_expr^~ lc))
-    || use_local_uses fdef.f_uses lc
+  and on_mpath_fun_def cb fdef =
+    List.iter (fun v -> on_mpath_ty cb v.v_type) fdef.f_locals;
+    on_mpath_stmt cb fdef.f_body;
+    oiter fdef.f_ret (on_mpath_expr cb);
+    on_mpath_uses cb fdef.f_uses
 
-  and use_local_uses uses lc =
-       List.exists (fun x -> is_mp_local x.x_top lc) uses.us_calls
-    || Sx.exists (fun x -> is_mp_local x.x_top lc) uses.us_reads
-    || Sx.exists (fun x -> is_mp_local x.x_top lc) uses.us_writes
+  and on_mpath_uses cb uses =
+    List.iter (fun x -> cb x.x_top) uses.us_calls;
+    Sx.iter   (fun x -> cb x.x_top) uses.us_reads;
+    Sx.iter   (fun x -> cb x.x_top) uses.us_writes
 
-  and use_local_fun_oi oi lc =
-    List.exists (fun x -> is_mp_local x.x_top lc) oi.oi_calls
+  and on_mpath_fun_oi cb oi =
+    List.iter (fun x -> cb x.x_top) oi.oi_calls
+
+  exception UseLocal
+
+  let check_use_local lc mp =
+    if is_mp_local mp lc then
+      raise UseLocal
+
+  let check_use_local_or_abd lc mp =
+    if is_mp_local mp lc || is_mp_abstract mp lc then
+      raise UseLocal
+
+  let form_use_local f lc =
+    try  on_mpath_form (check_use_local lc) f; false
+    with UseLocal -> true
+
+  let module_use_local_or_abs m lc =
+    try  on_mpath_module (check_use_local lc) m; false
+    with UseLocal -> true
+
+  let abstracts lc = lc.lc_abstracts
+
+  let generalize lc (f : EcFol.form) =
+    let mods = Sid.of_list (List.map fst (fst lc.lc_abstracts)) in
+      if   Mid.set_disjoint mods f.EcFol.f_fv
+      then f
+      else begin
+        List.fold_right
+          (fun (x, (mty, rt)) f ->
+             match Mid.mem x f.EcFol.f_fv with
+             | false -> f
+             | true  -> EcFol.f_forall [(x, EcFol.GTmodty (mty, rt))] f)
+          (fst lc.lc_abstracts) f
+      end
 
   let elocals (env : EcEnv.env) : locals =
-    { lc_env     = env;
-      lc_lemmas  = Sp.empty;
-      lc_modules = Sp.empty;
-      lc_items   = []; }
+    { lc_env       = env;
+      lc_lemmas    = Sp.empty;
+      lc_modules   = Sp.empty;
+      lc_abstracts = ([], Sid.empty);
+      lc_items     = []; }
 
   type t = locals list
 
@@ -464,13 +510,23 @@ end = struct
 
   let enter (env : EcEnv.env) (cs : t) : t =
     match List.ohead cs with
-    | None   -> [elocals env]
-    | Some x -> {x with lc_env = env; lc_items = []; } :: cs
+    | None    -> [elocals env]
+    | Some ec ->
+      let ec =
+        { ec with
+            lc_items = [];
+            lc_abstracts = ([], snd ec.lc_abstracts);
+            lc_env = env; }
+      in
+        ec :: cs
 
   let exit (cs : t) =
     match cs with
     | [] -> raise NoSectionOpened
-    | ec :: cs -> ({ ec with lc_items = List.rev ec.lc_items }, cs)
+    | ec :: cs ->
+        ({ ec with lc_items     = List.rev ec.lc_items;
+                   lc_abstracts = fst_map List.rev ec.lc_abstracts; },
+         cs)
 
   let path (cs : t) : path =
     match cs with
@@ -503,6 +559,17 @@ end = struct
 
   let additem item (cs : t) : t =
     let doit ec = { ec with lc_items = item :: ec.lc_items } in
+      onactive doit cs
+
+  let addabstract id mt (cs : t) : t =
+    let doit ec =
+      match Sid.mem id (snd ec.lc_abstracts) with
+      | true  -> assert false
+      | false ->
+          let (ids, set) = ec.lc_abstracts in
+          let (ids, set) = ((id, mt) :: ids, Sid.add id set) in
+            { ec with lc_abstracts = (ids, set) }
+    in
       onactive doit cs
 end
 
@@ -840,7 +907,6 @@ module Pred = struct
     let tyop    = EcDecl.mk_pred tparams dom body in
 
       Op.bind scope (unloc op.pp_name, tyop)
-
 end
 
 (* -------------------------------------------------------------------- *)
@@ -878,6 +944,8 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Mod = struct
+  module TT = EcTyping
+
   let bind (scope : scope) (local : bool) (m : module_expr) =
     assert (scope.sc_pr_uc = None);
     let scope =
@@ -891,7 +959,9 @@ module Mod = struct
       | true  ->
         let mpath = EcPath.pqname (path scope) m.me_name in
         let ec = CoreSection.addlocal `Module mpath scope.sc_section in
-          { scope with sc_section = ec }
+          { scope with
+              sc_section = ec;
+              sc_env = EcEnv.Mod.add_restr_to_locals mpath scope.sc_env; }
     in
       scope
 
@@ -902,17 +972,35 @@ module Mod = struct
       hierror "cannot declare a local module outside of a section";
 
     let (name, m) = ptm.ptm_def in
-    let m = EcTyping.transmod scope.sc_env (unloc name) m in
+    let m = TT.transmod scope.sc_env (unloc name) m in
 
     if not ptm.ptm_local then begin
       match CoreSection.olocals scope.sc_section with
       | None -> ()
       | Some locals ->
-          if CoreSection.use_local_module m locals then
-            hierror "this module use local modules and must be declared as local"
+          if CoreSection.module_use_local_or_abs m locals then
+            hierror "this module use local/abstracts modules and must be declared as local";
+          
     end;
 
       bind scope ptm.ptm_local m
+
+  let declare (scope : scope) m =
+    if not (CoreSection.in_section scope.sc_section) then
+      hierror "cannot declare an abstract module outside of a module";
+
+    let modty = m.ptmd_modty in
+    let tysig = fst (TT.transmodtype scope.sc_env (fst modty)) in
+    let restr = List.map (TT.trans_topmsymbol scope.sc_env) (snd modty) in
+    let name  = EcIdent.create (unloc m.ptmd_name) in
+    let scope =
+      { scope with
+          sc_env = EcEnv.Mod.declare_local
+            name tysig (Sm.of_list restr) scope.sc_env;
+          sc_section = CoreSection.addabstract
+            name (tysig, (Sm.of_list restr)) scope.sc_section }
+    in
+      scope
 end
 
 (* -------------------------------------------------------------------- *)
@@ -1183,7 +1271,7 @@ module Ax = struct
       match CoreSection.olocals scope.sc_section with
       | None -> ()
       | Some locals ->
-          if CoreSection.use_local_form concl locals then
+          if CoreSection.form_use_local concl locals then
             hierror "this lemma uses local modules and must be declared as local"
     end;
 
@@ -1257,7 +1345,9 @@ module Section = struct
           | T.CTh_axiom (x, ax) ->
             let axp = EcPath.pqname (path scope) x in
               if not (CoreSection.is_local `Lemma axp locals) then
-                Ax.bind scope false (x, ax)
+                Ax.bind scope false
+                  (x, { ax with ax_spec =
+                          omap ax.ax_spec (CoreSection.generalize locals) })
               else
                 scope
 

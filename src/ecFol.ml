@@ -1330,7 +1330,9 @@ let f_let_simpl lp f1 f2 =
           else (((id,ty),f1)::d,s)) ([],Mid.empty) ids fs in
       List.fold_left (fun f2 (id,f1) -> f_let (LSymbol id) f1 f2)
         (Fsubst.subst_locals s f2) d
-  | LTuple _, _ -> f_let lp f1 f2 
+  | LTuple ids, _ ->
+    if List.for_all (fun (id,_) -> Mid.find_def 0 id (f_fv f2) = 0) ids then f2
+    else f_let lp f1 f2 
 
 let f_lets_simpl =
   (* FIXME : optimize this *)

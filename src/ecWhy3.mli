@@ -1,5 +1,6 @@
 (* -------------------------------------------------------------------- *)
 open EcSymbols
+open EcModules
 
 type env
 
@@ -34,11 +35,15 @@ val add_op :
 val add_ax : env -> EcPath.path -> EcDecl.axiom -> env * rebinding
 
 val add_mod_exp :
-    env -> EcPath.path -> EcModules.module_expr -> env * rebinding
+    env -> EcPath.path -> module_expr -> env * rebinding
+
+val add_abs_mod : 
+  (EcIdent.t -> module_type -> EcPath.Sm.t -> module_expr) ->
+env -> EcIdent.t -> module_type -> EcPath.Sm.t -> env 
 
 (*****************************************************************************)
 exception CanNotTranslate of string
 
 val check_goal : 
-  (EcIdent.t -> EcModules.module_type -> EcPath.Sm.t -> EcModules.module_expr) ->
+  (EcIdent.t -> module_type -> EcPath.Sm.t -> module_expr) ->
   env -> EcProvers.prover_infos -> EcBaseLogic.l_decl -> bool

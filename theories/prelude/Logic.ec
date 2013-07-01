@@ -26,13 +26,26 @@ by [].
 lemma nosmt eqT  : forall (x:bool), x => (x = true) by [].
 lemma nosmt neqF : forall (x:bool), !x => (x = false) by [].
 
-lemma nosmt rewrite_eqT : forall (x:bool), (x = true) <=> x by [].
-lemma nosmt rewrite_neqF : forall (x:bool), (x = false) <=> !x by [].
+lemma nosmt rw_eqT : forall (x:bool), (x = true) <=> x by [].
+lemma nosmt rw_neqF : forall (x:bool), (x = false) <=> !x by [].
 
-lemma nosmt neq_def: forall (x:bool), (x => false) <=> !x by [].
+lemma nosmt not_def: forall (x:bool), (x => false) <=> !x by [].
+lemma nosmt nnot: forall (x:bool), (!(!x)) = x by [].
+
+lemma nosmt nor : forall (a b:bool), (!a /\ !b) => !(a \/ b) by [].
+lemma nosmt nand: forall (a b:bool), (!a \/ !b) => !(a /\ b) by [].
+
+lemma nosmt rw_nand: forall (a b:bool), (!a) \/ (!b) <=> !(a /\ b) by [].
+lemma nosmt rw_nor : forall (a b:bool), (!a) /\ (!b) <=> !(a \/ b) by [].
+
+lemma nosmt for_ex: forall (p:'a -> bool), !(exists (x:'a), !p x) => forall (x:'a), p x by [].
+lemma nosmt ex_for: forall (p:'a -> bool), !(forall (x:'a), !p x) => exists (x:'a), p x by [].
+
+lemma nosmt nexists: forall (p:'a -> bool), (forall (x:'a), !p x) => !exists (x:'a), p x by [].
+lemma nosmt nforall: exists (p:'a -> bool), (exists (x:'a), !p x) => !forall (x:'a), p x by [].
 
 (** absurd *)
-lemma nosmt absurd : forall (a b : bool), (!a => !b) => b => a by [].
+lemma nosmt absurd : forall (b a : bool), (!a => !b) => b => a by [].
 
 (** and *)
 lemma nosmt andE : forall (a b c:bool), 
