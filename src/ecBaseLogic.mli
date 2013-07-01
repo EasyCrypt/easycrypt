@@ -96,6 +96,8 @@ type rule_name =
 
   | RN_bhl_rnd of (EcFol.form option * EcFol.form)
   | RN_eqobs_in 
+  | RN_notmod
+
 type 'a rule_arg = 
   | RA_form of EcFol.form             (* formula             *)
   | RA_id   of EcIdent.t              (* local ident         *)

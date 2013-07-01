@@ -328,6 +328,58 @@ let t_equivS_conseq pre post g =
 
 (* -------------------------------------------------------------------- *)
 
+let t_equivF_notmod post g = 
+  let env,hyps,concl = get_goal_e g in
+  let ef = destr_equivF concl in
+  let fl, fr = ef.ef_fl, ef.ef_fr in
+  let (mprl,mprr),(mpol,mpor) = Fun.equivF_memenv fl fr env in
+  let fsigl = (Fun.by_xpath fl env).f_sig in
+  let fsigr = (Fun.by_xpath fr env).f_sig in
+  let pvresl = pv_res fl and pvresr = pv_res fr in
+  let vresl = LDecl.fresh_id hyps "result_L" in
+  let vresr = LDecl.fresh_id hyps "result_R" in
+  let fresl = f_local vresl fsigl.fs_ret in
+  let fresr = f_local vresr fsigr.fs_ret in
+  let ml, mr = fst mpol, fst mpor in
+  let s = PVM.add env pvresl ml fresl (PVM.add env pvresr mr fresr PVM.empty) in
+  let cond = f_imp post ef.ef_po in
+  let cond  = PVM.subst env s cond in 
+  let modil, modir = f_write env fl, f_write env fr in
+  let cond = generalize_mod env mr modir cond in
+  let cond = generalize_mod env ml modil cond in
+  assert (fst mprl = ml && fst mprr = mr);
+  let cond1 = gen_mems [mprl; mprr] (f_imp ef.ef_pr cond) in
+  let cond2 = f_equivF ef.ef_pr fl fr post in
+  prove_goal_by [cond1;cond2] RN_notmod g
+
+let t_equivS_notmod post g = 
+  let env,_,concl = get_goal_e g in
+  let es = destr_equivS concl in
+  let sl, sr = es.es_sl, es.es_sr in
+  let ml, mr = fst es.es_ml, fst es.es_mr in
+  let cond = f_imp post es.es_po in
+  let modil, modir = s_write env sl, s_write env sr in
+  let cond = generalize_mod env mr modir cond in
+  let cond = generalize_mod env ml modil cond in
+  let cond1 = gen_mems [es.es_ml; es.es_mr] (f_imp es.es_pr cond) in
+  let cond2 = f_equivS_r {es with es_po = post} in
+  prove_goal_by [cond1;cond2] RN_notmod g
+  
+let t_equivF_conseq_nm pre post g = 
+  t_seq_subgoal (t_equivF_notmod post)
+    [ t_id None;
+      t_seq_subgoal (t_equivF_conseq pre post)
+       [t_id None; t_trivial; t_id None] ] g
+
+let t_equivS_conseq_nm pre post g = 
+  t_seq_subgoal (t_equivS_notmod post)
+    [ t_id None;
+      t_seq_subgoal (t_equivS_conseq pre post)
+       [t_id None; t_trivial; t_id None] ] g
+
+
+(* -------------------------------------------------------------------- *)
+
 let t_hoareF_exfalso g =
   let concl = get_concl g in
   let hf = destr_hoareF concl in
@@ -2248,9 +2300,7 @@ let mk_inv_spec env inv fl fr =
     let pre = f_and eq_params inv in
     let post = f_and eq_res inv in
     f_equivF pre fl fr post
-  
-  
- 
+   
 let t_eqobs_inS finfo eqo inv g =
   let env, hyps, concl = get_goal_e g in
   let es = destr_equivS concl in
@@ -2259,7 +2309,7 @@ let t_eqobs_inS finfo eqo inv g =
   let ifvl = PV.fv env ml inv in
   let ifvr = PV.fv env mr inv in
   let sl,sr,sg,eqi = 
-    EcPV.eqobs_in env (fun env _ f1 f2 eqo -> finfo env f1 f2 eqo) 
+    EcPV.eqobs_in env finfo 
       es.es_sl es.es_sr eqo (inv,ifvl, ifvr) in
   let post = Mpv2.to_form ml mr eqo inv in
   if not (EcReduction.is_alpha_eq hyps post es.es_po) then
@@ -2269,6 +2319,72 @@ let t_eqobs_inS finfo eqo inv g =
     f_equivS es.es_ml es.es_mr es.es_pr sl sr pre in
   prove_goal_by (sg@[concl]) RN_eqobs_in g
 
+let rec eqobs_inF eqg env (inv,_,_ as inve) fl fr eqo =
+  let nfl = NormMp.norm_xpath env fl in
+  let nfr = NormMp.norm_xpath env fl in
+  let defl = Fun.by_xpath nfl env in
+  let defr = Fun.by_xpath nfr env in
+  match defl.f_def, defr.f_def with
+  | FBabs oil, FBabs oir -> 
+    begin 
+      let top = EcPath.m_functor nfl.EcPath.x_top in
+      try (* Try to infer the good invariant for oracle *)
+        let eqo = Mpv2.remove_glob top eqo in
+        let rec aux eqo = 
+          let eqi = 
+            List.fold_left2 
+              (fun eqo o_l o_r -> fst (eqobs_inF eqg env inve o_l o_r eqo))
+              eqo oil.oi_calls oir.oi_calls in
+          if Mpv2.subset eqi eqo then eqo else aux eqi in
+        let ieqg = aux eqo in
+        let peqg = if oil.oi_in then Mpv2.add_glob env top top ieqg else ieqg in
+        let inv = Mpv2.to_form mleft mright ieqg inv in
+        peqg, mk_inv_spec env inv fl fr
+      with EqObsInError ->
+        if not (Mpv2.subset eqo eqg) then raise EqObsInError;
+        let ieqg = Mpv2.remove_glob top eqg in
+        let peqg = if oil.oi_in then eqg else ieqg in
+        let inv = Mpv2.to_form mleft mright ieqg inv in
+        peqg, mk_inv_spec env inv fl fr
+    end
+  | FBdef funl, FBdef funr -> 
+    begin 
+      try
+        let sigl, sigr = defl.f_sig, defr.f_sig in
+        let testty = 
+          List.all2 (fun v1 v2 -> 
+            EcReduction.equal_type env v1.v_type v2.v_type)
+            sigl.fs_params sigr.fs_params && 
+            EcReduction.equal_type env sigl.fs_ret sigr.fs_ret 
+        in
+        if not testty then raise EqObsInError;
+        let eqo = 
+          match funl.f_ret, funr.f_ret with
+          | None, None -> eqo
+          | Some el, Some er -> add_eqs env eqo el er 
+          | _, _ -> raise EqObsInError in
+        let sl, sr, _, eqi = 
+          eqobs_in env (eqobs_inF eqg) funl.f_body funr.f_body eqo inve in
+        if sl.s_node <> [] || sr.s_node <> [] then raise EqObsInError;
+        let geqi = 
+          List.fold_left2 (fun eqi vl vr ->
+            Mpv2.remove env (pv_loc nfl vl.v_name) (pv_loc nfr vr.v_name) eqi) 
+           eqi  sigl.fs_params sigr.fs_params in
+        Mpv2.check_glob geqi;
+        let ml, mr = EcFol.mleft, EcFol.mright in
+        let eq_params = 
+          f_eqparams fl sigl.fs_params ml fr sigr.fs_params mr in
+        let eq_res = f_eqres fl sigl.fs_ret ml fr sigr.fs_ret mr in
+        let pre = f_and eq_params (Mpv2.to_form ml mr geqi inv) in
+        let post = f_and eq_res (Mpv2.to_form ml mr eqo inv) in
+        geqi, f_equivF pre fl fr post
+      with EqObsInError ->
+        if not (Mpv2.subset eqo eqg) then raise EqObsInError;
+        let inv = Mpv2.to_form mleft mright eqg inv in
+        eqg, mk_inv_spec env inv fl fr
+    end
+  | _, _ -> raise EqObsInError 
+ 
 (*
 let t_eqobs_inF finfo eqo inv g =
   let env,hyps,concl = get_goal_e g in
