@@ -1751,8 +1751,8 @@ phltactic:
 | BDHOAREDENO info=fpattern(conseq)
     { Pbdhoaredeno info }
 
-| CONSEQ info=fpattern(conseq)
-    { Pconseq info }
+| CONSEQ nm=STAR? info=fpattern(conseq)
+    { Pconseq (nm<>None, info) }
 
 | EXFALSO
     { Pexfalso }

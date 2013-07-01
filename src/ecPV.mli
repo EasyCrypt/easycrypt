@@ -77,12 +77,25 @@ val s_read   : env -> stmt -> PV.t
 val is_read  : env -> PV.t -> instr list -> PV.t 
 val f_read   : env -> EcPath.xpath -> PV.t
 
+exception EqObsInError
+
 module Mpv2 : sig
   type t 
   val to_form : EcIdent.t -> EcIdent.t -> t -> form -> form
   val of_form : env -> EcIdent.t -> EcIdent.t -> form -> t
   val union   : t -> t -> t
+  val subset   : t -> t -> bool
+
+  val remove : EcEnv.env -> EcTypes.prog_var -> EcTypes.prog_var -> t -> t
+  (* remove_glob mp t, mp should be a top abstract functor *)
+  val remove_glob : mpath -> t -> t
+  val add_glob : EcEnv.env -> mpath -> mpath -> t -> t
+
+  val check_glob : t -> unit 
 end
+
+val add_eqs : EcEnv.env -> Mpv2.t -> EcTypes.expr -> EcTypes.expr -> Mpv2.t
+
 
 val eqobs_in :
   env ->

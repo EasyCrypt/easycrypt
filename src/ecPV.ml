@@ -476,6 +476,8 @@ let f_read  env f = f_read env PV.empty f
 let s_write ?(except_fs=Sx.empty) env s = s_write ~except_fs env PV.empty s
 let s_read  env s = s_read  env PV.empty s
 
+exception EqObsInError
+
 module Mpv2 = struct 
 
   type t =
@@ -516,6 +518,14 @@ module Mpv2 = struct
           let s = Snpv.remove pv2 s in
           if Snpv.is_empty s then None else Some (s,ty))
           pv1 eqs.s_pv }
+
+  let remove_glob mp eqs = 
+    begin match mp.m_top with
+    | `Local _ -> ()
+    | _ -> assert false
+    end;
+    { eqs with
+      s_gl = Sm.remove mp eqs.s_gl }
     
   let union eqs1 eqs2 =
     { s_pv = 
@@ -623,9 +633,14 @@ module Mpv2 = struct
       | _ -> raise Not_found in
     aux f {s_pv = Mnpv.empty; s_gl = Sm.empty}
 
+  let check_glob eqs = 
+    Mnpv.iter (fun pv (s,_)-> 
+      if is_loc pv || Snpv.exists is_loc s then raise EqObsInError)
+      eqs.s_pv
+
 end
 
-exception EqObsInError
+
 
 let enter_local env local ids1 ids2 = 
   try 
@@ -663,19 +678,14 @@ let rec add_eqs env local eqs e1 e2 : Mpv2.t =
     List.fold_left2 (add_eqs env local) eqs [e1;t1;f1] [e2;t2;f2]
   | _, _ -> raise EqObsInError
 
-
+let add_eqs env eqs e1 e2 =  add_eqs env Mid.empty eqs e1 e2
+  
 (* Invariant ifvl,ifvr = PV.fv env ml inv, PV.fv env mr inv *)
 let eqobs_in env fun_spec c1 c2 eqo (inv,ifvl,ifvr) =
 
-  let add_eqs eqs e1 e2 = add_eqs env Mid.empty eqs e1 e2 in
+  let add_eqs eqs e1 e2 = add_eqs env eqs e1 e2 in
 
   let rev st = List.rev st.s_node in
-
-  let check_glob eqs = 
-    Mnpv.iter (fun pvl (s,_) ->
-      if is_loc pvl then raise EqObsInError 
-      else Snpv.iter (fun pvr -> if is_loc pvr then raise EqObsInError) s)
-      eqs.Mpv2.s_pv in
 
   let check pv fv _eqs = 
     if PV.mem_pv env pv fv then raise EqObsInError;
@@ -762,7 +772,7 @@ let eqobs_in env fun_spec c1 c2 eqo (inv,ifvl,ifvr) =
   and i_eqobs_in il ir fhyps (eqo:Mpv2.t) = 
     match il.i_node, ir.i_node with
     | Sasgn(lvl,el), Sasgn(lvr,er) | Srnd(lvl,el), Srnd(lvr,er) ->
-      [], add_eqs (remove lvl lvr eqo) el er 
+      fhyps, add_eqs (remove lvl lvr eqo) el er 
 
     | Scall(lvl,fl,argsl), Scall(lvr,fr,argsr) 
       when List.length argsl = List.length argsr -> 
@@ -770,8 +780,8 @@ let eqobs_in env fun_spec c1 c2 eqo (inv,ifvl,ifvr) =
       let modl, modr = f_write env fl, f_write env fr in
       let eqnm = Mpv2.split_nmod modl modr eqo in
       let outf = Mpv2.split_mod  modl modr eqo in
-      check_glob outf;
-      (* TODO : ensure that generalize mod can be applied here *)
+      Mpv2.check_glob outf;
+      (* TODO : ensure that generalize mod can be applied here ? *)
       let inf, fhyp = 
         try fun_spec env (inv,ifvl,ifvr) fl fr outf 
         with Not_found -> raise EqObsInError in
