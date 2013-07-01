@@ -224,6 +224,16 @@ axiom set_get: forall (xs:'x array) (i j:int) (x:'x),
   0 <= j => j < length xs =>
   xs.[i <- x].[j] = (i = j) ? x : xs.[j].
 
+lemma set_setE: forall a (b c:'a) x,
+  x.[a <- b].[a <- c] = x.[a <- c].
+proof strict.
+intros=> a b c x; apply extensionality; split; first by rewrite !set_length //.
+  intros=> i i_pos; rewrite 2!set_length=> i_bnd; rewrite set_get ?set_length //.
+  case (a = i)=> a_i.
+    by subst a; rewrite set_get //.
+    by do 2! rewrite set_get // (neqF (a = i)) // /=.
+qed.
+
 (* write: array -> offset -> array -> offset -> length -> array *)
 op write: 'x array -> int -> 'x array -> int -> int -> 'x array.
 
@@ -262,3 +272,4 @@ proof.
 intros dst src H; apply extensionality.
 delta beta;split;smt.
 save.
+
