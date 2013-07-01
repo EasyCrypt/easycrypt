@@ -2198,15 +2198,14 @@ let wp_equiv_rnd (f,finv) g =
   let tfinv = finv tyR tyL in
   let f t = f_app tf  [t] tyR in
   let finv t = f_app tfinv [t] tyL in
-  let supp_cond1 = (f_in_supp x muL) ==> 
-    ((f_mu_x muL x) === (f_mu_x muR (f x))) in
-  let supp_cond2 = (f_in_supp y muR) ==> (f_in_supp (finv y) muL) in
-  let inv_cond1 =  (f_in_supp x muL) ==> ((finv (f x)) === x) in
-  let inv_cond2 =  (f_in_supp y muR) ==> ((f (finv y)) === y) in
+  let supp_cond1 =  ((f_mu_x muL x) === (f_mu_x muR (f x))) in
+  let supp_cond2 =  f_in_supp (finv y) muL in
+  let inv_cond1 =   (finv (f x)) === x in
+  let inv_cond2 =   (f (finv y)) === y in
   let post = subst_form_lv env (EcMemory.memory es.es_ml) lvL x es.es_po in
   let post = subst_form_lv env (EcMemory.memory es.es_mr) lvR (f x) post in
-  let post = (f_in_supp x muL) ==> post in
   let post = supp_cond1 &&& supp_cond2 &&& inv_cond1 &&& inv_cond2 &&& post in
+  let post = (f_in_supp x muL) ==> ((f_in_supp y muR) ==> post) in
   let post = f_forall_simpl [(x_id,GTty tyL);(y_id,GTty tyR)] post in
   let concl = f_equivS_r {es with es_sl=sl'; es_sr=sr'; es_po=post} in
   prove_goal_by [concl] (RN_hl_equiv_rnd ((Some tf, Some tfinv))) g
