@@ -341,7 +341,7 @@ type phltactic =
   | Pkill       of (tac_side * codepos * int option)
   | Prnd        of tac_side * pformula rnd_tac_info
   | Palias      of (tac_side * codepos * psymbol option)
-  | Pconseq     of cfpattern
+  | Pconseq     of bool * cfpattern
   | Pexfalso
   | Pbdhoaredeno  of cfpattern
   | Pequivdeno    of cfpattern

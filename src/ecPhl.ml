@@ -328,6 +328,58 @@ let t_equivS_conseq pre post g =
 
 (* -------------------------------------------------------------------- *)
 
+let t_equivF_notmod post g = 
+  let env,hyps,concl = get_goal_e g in
+  let ef = destr_equivF concl in
+  let fl, fr = ef.ef_fl, ef.ef_fr in
+  let (mprl,mprr),(mpol,mpor) = Fun.equivF_memenv fl fr env in
+  let fsigl = (Fun.by_xpath fl env).f_sig in
+  let fsigr = (Fun.by_xpath fr env).f_sig in
+  let pvresl = pv_res fl and pvresr = pv_res fr in
+  let vresl = LDecl.fresh_id hyps "result_L" in
+  let vresr = LDecl.fresh_id hyps "result_R" in
+  let fresl = f_local vresl fsigl.fs_ret in
+  let fresr = f_local vresr fsigr.fs_ret in
+  let ml, mr = fst mpol, fst mpor in
+  let s = PVM.add env pvresl ml fresl (PVM.add env pvresr mr fresr PVM.empty) in
+  let cond = f_imp post ef.ef_po in
+  let cond  = PVM.subst env s cond in 
+  let modil, modir = f_write env fl, f_write env fr in
+  let cond = generalize_mod env mr modir cond in
+  let cond = generalize_mod env ml modil cond in
+  assert (fst mprl = ml && fst mprr = mr);
+  let cond1 = gen_mems [mprl; mprr] (f_imp ef.ef_pr cond) in
+  let cond2 = f_equivF ef.ef_pr fl fr post in
+  prove_goal_by [cond1;cond2] RN_notmod g
+
+let t_equivS_notmod post g = 
+  let env,_,concl = get_goal_e g in
+  let es = destr_equivS concl in
+  let sl, sr = es.es_sl, es.es_sr in
+  let ml, mr = fst es.es_ml, fst es.es_mr in
+  let cond = f_imp post es.es_po in
+  let modil, modir = s_write env sl, s_write env sr in
+  let cond = generalize_mod env mr modir cond in
+  let cond = generalize_mod env ml modil cond in
+  let cond1 = gen_mems [es.es_ml; es.es_mr] (f_imp es.es_pr cond) in
+  let cond2 = f_equivS_r {es with es_po = post} in
+  prove_goal_by [cond1;cond2] RN_notmod g
+  
+let t_equivF_conseq_nm pre post g = 
+  t_seq_subgoal (t_equivF_notmod post)
+    [ t_id None;
+      t_seq_subgoal (t_equivF_conseq pre post)
+       [t_id None; t_trivial; t_id None] ] g
+
+let t_equivS_conseq_nm pre post g = 
+  t_seq_subgoal (t_equivS_notmod post)
+    [ t_id None;
+      t_seq_subgoal (t_equivS_conseq pre post)
+       [t_id None; t_trivial; t_id None] ] g
+
+
+(* -------------------------------------------------------------------- *)
+
 let t_hoareF_exfalso g =
   let concl = get_concl g in
   let hf = destr_hoareF concl in

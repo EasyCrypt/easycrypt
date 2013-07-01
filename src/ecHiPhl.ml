@@ -545,7 +545,7 @@ let process_equiv_deno info (_,n as g) =
     ef.ef_pr, ef.ef_po in
   t_on_first (t_use an gs) (t_equiv_deno pre post (juc,n))
 
-let process_conseq info (_, n as g) =
+let process_conseq notmod info (_, n as g) =
   let t_pre = ref (t_id None) and t_post = ref (t_id None) in
   let process_cut g (pre,post) =
     let hyps,concl = get_goal g in        
@@ -592,8 +592,12 @@ let process_conseq info (_, n as g) =
     | FhoareS hs   -> t_hoareS_conseq hs.hs_pr hs.hs_po
     | FbdHoareF hf -> t_bdHoareF_conseq hf.bhf_pr hf.bhf_po
     | FbdHoareS hs -> t_bdHoareS_conseq hs.bhs_pr hs.bhs_po
-    | FequivF ef   -> t_equivF_conseq ef.ef_pr ef.ef_po
-    | FequivS es   -> t_equivS_conseq es.es_pr es.es_po 
+    | FequivF ef   -> 
+      if notmod then t_equivF_conseq_nm ef.ef_pr ef.ef_po
+      else t_equivF_conseq ef.ef_pr ef.ef_po
+    | FequivS es   -> 
+      if notmod then t_equivS_conseq_nm es.es_pr es.es_po 
+      else t_equivS_conseq es.es_pr es.es_po 
     | _ -> assert false (* FIXME error message *) in
   t_seq_subgoal t_conseq
     [!t_pre; !t_post; t_use an gs] (juc,n)
@@ -758,7 +762,7 @@ let process_phl loc ptac g =
     | Pkill info                -> process_kill info
     | Palias info               -> process_alias info
     | Prnd (side, info)         -> process_rnd side info
-    | Pconseq info              -> process_conseq info
+    | Pconseq (nm,info)         -> process_conseq nm info
     | Pexfalso                  -> process_exfalso
     | Pbdhoaredeno info         -> process_bdHoare_deno info
     | PPr (phi1,phi2)           -> process_ppr (phi1,phi2)
