@@ -2260,7 +2260,6 @@ let t_eqobs_inS finfo eqo inv g =
   let sl,sr,sg,eqi = 
     EcPV.eqobs_in env finfo 
       es.es_sl es.es_sr eqo (inv,ifvl, ifvr) in
-  Format.printf "got %n subgoals@." (List.length sg);
   let post = Mpv2.to_form ml mr eqo inv in
   if not (EcReduction.is_alpha_eq hyps post es.es_po) then
     tacuerror "eqobs_in can not be apply";
@@ -2275,13 +2274,28 @@ let rec eqobs_inF eqg env (inv,_,_ as inve) fl fr eqo =
   let defl = Fun.by_xpath nfl env in
   let defr = Fun.by_xpath nfr env in
   match defl.f_def, defr.f_def with
-  | FBabs oi, FBabs _ -> 
-    if not (Mpv2.subset eqo eqg) then raise EqObsInError;
-    let top = EcPath.m_functor nfl.EcPath.x_top in
-    let ieqg = Mpv2.remove_glob top eqg in
-    let peqg = if oi.oi_in then eqg else ieqg in
-    let inv = Mpv2.to_form mleft mright ieqg inv in
-    peqg, mk_inv_spec env inv fl fr
+  | FBabs oil, FBabs oir -> 
+    begin 
+      let top = EcPath.m_functor nfl.EcPath.x_top in
+      try (* Try to infer the good invariant for oracle *)
+        let eqo = Mpv2.remove_glob top eqo in
+        let rec aux eqo = 
+          let eqi = 
+            List.fold_left2 
+              (fun eqo o_l o_r -> fst (eqobs_inF eqg env inve o_l o_r eqo))
+              eqo oil.oi_calls oir.oi_calls in
+          if Mpv2.subset eqi eqo then eqo else aux eqi in
+        let ieqg = aux eqo in
+        let peqg = if oil.oi_in then Mpv2.add_glob env top top ieqg else ieqg in
+        let inv = Mpv2.to_form mleft mright ieqg inv in
+        peqg, mk_inv_spec env inv fl fr
+      with EqObsInError ->
+        if not (Mpv2.subset eqo eqg) then raise EqObsInError;
+        let ieqg = Mpv2.remove_glob top eqg in
+        let peqg = if oil.oi_in then eqg else ieqg in
+        let inv = Mpv2.to_form mleft mright ieqg inv in
+        peqg, mk_inv_spec env inv fl fr
+    end
   | FBdef funl, FBdef funr -> 
     begin 
       try

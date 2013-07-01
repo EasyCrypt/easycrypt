@@ -89,6 +89,7 @@ module Mpv2 : sig
   val remove : EcEnv.env -> EcTypes.prog_var -> EcTypes.prog_var -> t -> t
   (* remove_glob mp t, mp should be a top abstract functor *)
   val remove_glob : mpath -> t -> t
+  val add_glob : EcEnv.env -> mpath -> mpath -> t -> t
 
   val check_glob : t -> unit 
 end
