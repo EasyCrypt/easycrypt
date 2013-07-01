@@ -1596,7 +1596,7 @@ module NormMp = struct
 
       (* Section abstract modules *)
     | ME_Decl _ ->
-        (f_tuple [], Sm.empty)
+        (f_glob (EcPath.m_functor mp) m, Sm.empty)
 
     | ME_Alias _ ->
         assert false
@@ -1605,9 +1605,9 @@ module NormMp = struct
     let mp = norm_mpath env mp in
     let gtop = 
       match mp.EcPath.m_top with
-      | `Local _ -> f_glob (EcPath.mpath mp.EcPath.m_top []) m
-      | `Concrete(p,_) -> 
-        let top = EcPath.mpath (`Concrete(p,None)) mp.EcPath.m_args in
+      | `Local _ -> f_glob (EcPath.m_functor mp) m
+      | `Concrete(p, _) -> 
+        let top = EcPath.m_functor mp in
         let sx,us = globals env m top in
         let us = 
           List.map (fun mp -> fst (globals env m mp)) (EcPath.Sm.elements us) in
