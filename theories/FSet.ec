@@ -136,9 +136,35 @@ axiom mem_rm_eq: forall (x:'a) (X:'a set),
 axiom mem_rm_neq: forall (x x':'a) (X:'a set),
   x <> x' => mem x (rm x' X) = mem x X.
 
+lemma mem_rm: forall (x x':'a) (X:'a set),
+  mem x (rm x' X) = (mem x X /\ x' <> x).
+intros ? ? ?.
+case (x'=x)=> ?.
+rewrite H.
+cut -> : mem x (rm x X) = false;first apply neqF;apply mem_rm_eq.
+by trivial.
+simplify.
+apply mem_rm_neq.
+rewrite (_:(x = x') = (x' = x));first case (x=x')=> ?;[rewrite (eq_sym x)|rewrite -(neqF (x'=x))];trivial.
+by trivial.
+save.
+
+lemma mem_rm1: forall (x x':'a) (X:'a set),
+  mem x (rm x' X) => mem x X by [].
+
+lemma mem_rm2: forall (x x':'a) (X:'a set),
+  mem x (rm x' X) => x <> x' by [].
+
+
+lemma rm_nin_id: forall (x:'a) (X:'a set),
+  !(mem x X) => X = rm x X
+by (intros=> x X x_nin_X; apply set_ext; smt).
+
 lemma elems_rm: forall (x:'a) (X:'a set),
   elems (rm x X) <-> rm x (elems X)
 by [].
+
+lemma rm_leq: forall (x:'a) (X:'a set), rm x X <= X by [].
 
 lemma rm_add_eq: forall (x:'a) X,
   rm x (add x X) = rm x X
@@ -289,11 +315,92 @@ lemma leq_filter: forall (p:'a cpred) (X:'a set),
 by [].
 
 (* fold *)
-op fold_right : ('a -> 'b -> 'b) -> 'b -> 'a set -> 'b.
+op fold : ('a -> 'b -> 'b) -> 'b -> 'a set -> 'b.
 
-axiom fold_nil: forall (f:'a -> 'b -> 'b) (e:'b),
-  fold_right f e empty = e.
+axiom fold_empty: forall (f:'a -> 'b -> 'b) (e:'b),
+  fold f e empty = e.
 
-axiom fold_rm: forall (f:'a -> 'b -> 'b) (e:'b) xs,
-  let x = pick xs in
-    fold_right f e xs = f x (fold_right f e (rm x xs)).
+axiom fold_rm_pick: forall (f:'a -> 'b -> 'b) (e:'b) xs,
+    fold f e xs = f (pick xs) (fold f e (rm (pick xs) xs)).
+
+axiom foldCA: forall (x:'a) (f:'a -> 'a -> 'a) (z:'a) (xs:'a set),
+  (forall x y, f x y = f y x) =>
+  (forall x y z, f x (f y z) = f (f x y) z) =>
+  mem x xs =>
+  fold f z xs = f x (fold f z (rm x xs)).
+
+
+(* map *)
+op img : ('a -> 'b) -> 'a set -> 'b set.
+axiom img_def: forall (y:'b) (f:'a -> 'b) (xs:'a set),
+  mem y (img f xs) <=> exists x, f x = y /\ mem x xs.
+
+lemma mem_img : forall (x:'a) (f:'a -> 'b) (xs:'a set),
+  mem x xs => mem (f x) (img f xs)
+by (intros=> ? ? ?;rewrite (img_def (f x))=> ?;exists x => //).  
+
+lemma img_empty : forall (f:'a -> 'b),
+  (img f empty) = empty.
+intros ?.
+rewrite -empty_nmem => y.
+cut ? : !(exists x, (lambda x, f x = y /\ mem x empty) x);first apply (nexists (lambda x, f x = y /\ mem x empty) _)=> x;beta;apply nand;right;apply mem_empty.
+generalize H.
+apply absurd.
+simplify.
+elim (img_def y f empty).
+intros ? ?;assumption.
+save.
+
+lemma img_rm : forall (f:'a -> 'b) (xs:'a set) (x:'a),
+  img f (rm x xs) = (if (forall x', mem x' xs => f x = f x' => x = x') then rm (f x) (img f xs) else img f xs).
+intros ? ? ?.
+apply set_ext=> y.
+rewrite img_def.
+
+case (forall (x' : 'a), mem x' xs => f x = f x' => x = x')=> ?.
+
+rewrite mem_rm.
+rewrite img_def.
+
+split.
+
+intros=> [a];intros => [h1 h2];split;first exists a;split;[ |apply (mem_rm1 _ x)];trivial.
+by cut ? : !(x = a);[
+rewrite rw_eq_sym;apply (mem_rm2 _ _ xs);assumption h2|
+generalize H0;rewrite -h1;apply absurd;simplify;apply H;apply (mem_rm1 _ x);trivial].
+
+intros=> [h h1];generalize h=>[a];intros => [h2 h3];exists a;split;trivial.
+rewrite mem_rm;split;first trivial.
+by cut ? : !(f x = f a);[rewrite h2|generalize H0;apply absurd;simplify=> ->];trivial.
+
+
+rewrite img_def.
+
+split.
+
+by intros=> [a];intros=> [h1 h2];exists a;(split;last apply (mem_rm1 _ x));trivial.
+
+intros=> [a];intros=> [h1 h2].
+
+cut [b] : (exists (x' : 'a), !(mem x' xs => f x = f x' => x = x'));first (apply (ex_for (lambda x',
+!(mem x' xs => f x = f x' => x = x')) _));apply H.
+clear H.
+rewrite (rw_imp (mem b xs)).
+rewrite (rw_imp (f x = f b)).
+rewrite -rw_nor.
+rewrite -rw_nor.
+simplify.
+intros=> [? ?];generalize H0;intros=> [? ?].
+
+case (a=x)=> ?.
+  exists b.
+  split.
+    by rewrite -H0 -h1;congr;rewrite rw_eq_sym;apply H2.
+    by (rewrite mem_rm_neq;first rewrite rw_eq_sym);trivial.
+  exists a.
+  split.
+    apply h1.
+    rewrite mem_rm_neq.    
+      apply H2.
+      apply h2.
+save.
