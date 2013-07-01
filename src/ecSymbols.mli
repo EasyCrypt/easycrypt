@@ -22,6 +22,7 @@ module MMsym : sig
   val last   : symbol -> 'a t -> 'a option
   val all    : symbol -> 'a t -> 'a list
   val fold   : (symbol -> 'a list -> 'b -> 'b) -> 'a t -> 'b -> 'b
+  val map_at : ('a list -> 'a list) -> symbol -> 'a t -> 'a t
 
   val dump :
        name:string

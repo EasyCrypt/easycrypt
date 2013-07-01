@@ -199,7 +199,7 @@ module CoreSection : sig
   val form_use_local : form  -> locals -> bool
   val module_use_local_or_abs : module_expr -> locals -> bool
 
-  val abstracts : locals -> EcIdent.t list * Sid.t
+  val abstracts : locals -> (EcIdent.t * (module_type * Sm.t)) list * Sid.t
 
   val generalize : locals -> form -> form
 
@@ -222,7 +222,7 @@ module CoreSection : sig
 
   val addlocal    : [`Lemma | `Module] -> path -> t -> t
   val additem     : EcTheory.ctheory_item -> t -> t
-  val addabstract : EcIdent.t -> t -> t
+  val addabstract : EcIdent.t -> (module_type * Sm.t) -> t -> t
 end = struct
   exception NoSectionOpened
 
@@ -230,7 +230,7 @@ end = struct
     lc_env       : EcEnv.env;
     lc_lemmas    : Sp.t;
     lc_modules   : Sp.t;
-    lc_abstracts : EcIdent.t list * Sid.t;
+    lc_abstracts : (EcIdent.t * (module_type * Sm.t)) list * Sid.t;
     lc_items     : EcTheory.ctheory_item list;
   }
 
@@ -482,10 +482,17 @@ end = struct
   let abstracts lc = lc.lc_abstracts
 
   let generalize lc (f : EcFol.form) =
-    let mods = Sid.of_list (fst lc.lc_abstracts) in
+    let mods = Sid.of_list (List.map fst (fst lc.lc_abstracts)) in
       if   Mid.set_disjoint mods f.EcFol.f_fv
       then f
-      else assert false
+      else begin
+        List.fold_right
+          (fun (x, (mty, rt)) f ->
+             match Mid.mem x f.EcFol.f_fv with
+             | false -> f
+             | true  -> EcFol.f_forall [(x, EcFol.GTmodty (mty, rt))] f)
+          (fst lc.lc_abstracts) f
+      end
 
   let elocals (env : EcEnv.env) : locals =
     { lc_env       = env;
@@ -554,13 +561,13 @@ end = struct
     let doit ec = { ec with lc_items = item :: ec.lc_items } in
       onactive doit cs
 
-  let addabstract id (cs : t) : t =
+  let addabstract id mt (cs : t) : t =
     let doit ec =
       match Sid.mem id (snd ec.lc_abstracts) with
-      | true  -> ec
+      | true  -> assert false
       | false ->
           let (ids, set) = ec.lc_abstracts in
-          let (ids, set) = (id :: ids, Sid.add id set) in
+          let (ids, set) = ((id, mt) :: ids, Sid.add id set) in
             { ec with lc_abstracts = (ids, set) }
     in
       onactive doit cs
@@ -952,7 +959,9 @@ module Mod = struct
       | true  ->
         let mpath = EcPath.pqname (path scope) m.me_name in
         let ec = CoreSection.addlocal `Module mpath scope.sc_section in
-          { scope with sc_section = ec }
+          { scope with
+              sc_section = ec;
+              sc_env = EcEnv.Mod.add_restr_to_locals mpath scope.sc_env; }
     in
       scope
 
@@ -989,7 +998,7 @@ module Mod = struct
           sc_env = EcEnv.Mod.declare_local
             name tysig (Sm.of_list restr) scope.sc_env;
           sc_section = CoreSection.addabstract
-            name scope.sc_section }
+            name (tysig, (Sm.of_list restr)) scope.sc_section }
     in
       scope
 end

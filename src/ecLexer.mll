@@ -274,6 +274,7 @@ rule main = parse
   | ';'  { SEMICOLON }
   | ':'  { COLON }
   | '?'  { QUESTION }
+  | '%'  { PCENT }
   | "*"  { STAR }
   | "$"  { SAMPLE }
   | "|"  { PIPE }

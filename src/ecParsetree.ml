@@ -60,6 +60,7 @@ and pexpr_r =
   | PEtuple  of pexpr list                        (* tuple constructor  *)
   | PEif     of pexpr * pexpr * pexpr             (* _ ? _ : _          *)
   | PElambda of ptybindings * pexpr               (* lambda abstraction *)
+  | PEscope  of pqsymbol * pexpr                  (* scope selection    *)
 
 and pexpr = pexpr_r located
 
@@ -196,6 +197,7 @@ and pformula_r =
   | PFglob   of pmsymbol located 
   | PFeqveq  of glob_or_var list
   | PFlsless of pgamepath
+  | PFscope  of pqsymbol * pformula
 
   (* for claims *)
   | PFhoareS   of pformula * pfunction_body located * pformula

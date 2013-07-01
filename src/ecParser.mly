@@ -235,6 +235,7 @@
 %token OFF
 %token ON
 %token OP
+%token PCENT
 %token PIPE
 %token POSE
 %token PR
@@ -306,13 +307,15 @@
 
 %nonassoc IN
 %nonassoc prec_below_IMPL
-%right IMPL IFF
-%right OR 
-%right AND 
-
+%right    IMPL
+%nonassoc IFF
+%right    OR 
+%right    AND 
 %nonassoc NOT
-%left EQ NE OP1 GT GE LE
 
+%nonassoc EQ NE
+
+%left OP1 GT GE LE
 %right QUESTION
 %left OP2 MINUS ADD
 %right ARROW
@@ -479,6 +482,9 @@ tyvar_annot:
 %inline  expr: x=loc( expr_u) { x };
 
 sexpr_u:
+| e=sexpr PCENT p=qident
+   { PEscope (p, e) }
+
 | n=number
    { PEint n }
 
@@ -635,6 +641,9 @@ qident_or_res_or_glob:
 sform_u(P):
 | x=P 
    { x }
+
+| f=sform_r(P) PCENT p=qident
+   { PFscope (p, f) }
 
 | n=number
    { PFint n }

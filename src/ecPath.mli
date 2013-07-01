@@ -29,6 +29,7 @@ val toqsymbol   : path -> qsymbol
 val fromqsymbol : qsymbol -> path
 val basename    : path -> symbol
 val prefix      : path -> path option
+val isprefix    : path -> path -> bool
 val rootname    : path -> symbol
 val tolist      : path -> symbol list 
 val p_size      : path -> int

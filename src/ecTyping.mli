@@ -58,6 +58,7 @@ type tyerror =
 | FunNotInModParam     of qsymbol
 | NoActiveMemory
 | PatternNotAllowed
+| UnknownScope         of qsymbol
 
 exception TyError of EcLocation.t * EcEnv.env * tyerror
 

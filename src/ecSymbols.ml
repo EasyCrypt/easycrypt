@@ -27,6 +27,7 @@ module MMsym : sig
   val last   : symbol -> 'a t -> 'a option
   val all    : symbol -> 'a t -> 'a list
   val fold   : (symbol -> 'a list -> 'b -> 'b) -> 'a t -> 'b -> 'b
+  val map_at : ('a list -> 'a list) -> symbol -> 'a t -> 'a t
 
   val dump :
        name:string
@@ -53,6 +54,14 @@ end = struct
     EcUtils.odfl [] (Msym.find_opt x m)
 
   let fold f m x = Msym.fold f m x
+
+  let map_at f (x : symbol) (m : 'a t) =
+    Msym.change
+      (fun v ->
+        match f (EcUtils.odfl [] v) with
+        | [] -> None
+        | v  -> Some v)
+      x m
 
   let dump ~name valuepp pp (m : 'a t) =
     let keyprinter k v =
