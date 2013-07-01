@@ -1,5 +1,3 @@
-theory Monoide.
-
 type t.
 
 op (+) : t -> t -> t.
@@ -16,12 +14,11 @@ theory SumSet.
 
   require import FSet.
 
-  
-axiom foldCA_f: forall (x:'a) (ope:'b -> 'b -> 'b) (f:'a -> 'b) (z:'b) (xs:'a set),
-  (forall x y, ope x y = ope y x) =>
-  (forall x y z, ope x (ope y z) = ope (ope x y) z) =>
-  mem x xs =>
-  fold (lambda x s, ope s (f x)) z xs = ope (f x) (fold (lambda x s, ope s (f x)) z (rm x xs)).
+  axiom foldCA_f: forall (x:'a) (ope:'b -> 'b -> 'b) (f:'a -> 'b) (z:'b) (xs:'a set),
+    (forall x y, ope x y = ope y x) =>
+    (forall x y z, ope x (ope y z) = ope (ope x y) z) =>
+    mem x xs =>
+    fold (lambda x s, ope s (f x)) z xs = ope (f x) (fold (lambda x s, ope s (f x)) z (rm x xs)).
 
   op sum(f:'a -> t, s:'a set) : t =
     fold (lambda x s, s + (f x)) Z s.
@@ -141,5 +138,3 @@ theory NatMul.
     by rewrite -compI //.
   save.
 end NatMul.
-
-end Monoide.
