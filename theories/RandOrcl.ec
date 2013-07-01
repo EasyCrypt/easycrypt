@@ -116,6 +116,31 @@ theory WRO_Set.
 
   lemma RO_lossless_o : mu dsample cpTrue = 1%r => islossless ARO(ROM.RO).o.
   proof. intros Hs;apply (lossless_o ROM.RO);apply ROM.lossless_o;apply Hs. qed.
+
+  lemma log_stable : forall r (RO<:Oracle{ARO}), 
+      islossless RO.o =>
+      bd_hoare[ ARO(RO).o :Set.mem r ARO.log ==> Set.mem r ARO.log ] = 1%r.
+  proof.
+   intros r RO Ho; fun;(if;first call Ho);wp;skip;progress smt.
+  qed.
+
+  lemma RO_log_stable : forall r,
+     mu dsample cpTrue = 1%r => 
+     bd_hoare[ ARO(ROM.RO).o :Set.mem r ARO.log ==> Set.mem r ARO.log ] = 1%r.
+  proof.
+   intros r Hs;apply (log_stable r ROM.RO); apply ROM.lossless_o;trivial.
+  qed.
+
+  lemma RO_upto_o : forall r, 
+      equiv [ARO(ROM.RO).o ~ ARO(ROM.RO).o : 
+      !mem r ARO.log{2} /\ ={x, ARO.log} /\ eq_except ROM.RO.m{1} ROM.RO.m{2} r ==>
+      !mem r ARO.log{2} =>
+        ={res, ARO.log} /\ eq_except ROM.RO.m{1} ROM.RO.m{2} r].
+  proof.
+    intros r.
+    fun;if;[smt|inline ROM.RO.o;wp;rnd|];wp;skip;progress;smt.
+  save.
+
 end WRO_Set.
 
 theory WRO_List.
