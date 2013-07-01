@@ -414,6 +414,7 @@ let maybe_paren (outer, side) inner pp =
 (* -------------------------------------------------------------------- *)
 let e_bin_prio_lambda = ( 5, `Prefix)
 let e_bin_prio_impl   = (10, `Infix `Right)
+let e_bin_prio_iff    = (12, `NonAssoc)
 let e_bin_prio_if     = (15, `Prefix)
 let e_bin_prio_if3    = (17, `Infix `NonAssoc)
 let e_bin_prio_letin  = (19, `Prefix)
@@ -425,7 +426,7 @@ let e_bin_prio_op2    = (40, `Infix `Left)
 let e_bin_prio_op3    = (50, `Infix `Left)
 let e_bin_prio_op4    = (60, `Infix `Left)
 
-let e_uni_prio_not    = 10000
+let e_uni_prio_not    = 26
 let e_uni_prio_lsless = 10000
 let e_uni_prio_uminus = 500
 let e_app_prio        = (10000, `Infix `Left)
@@ -438,7 +439,7 @@ let max_op_prec = (max_int, `Infix `NonAssoc)
 let priority_of_binop name =
   match EcIo.lex_single_token name with
   | Some EP.IMPL  -> Some e_bin_prio_impl
-  | Some EP.IFF   -> Some e_bin_prio_impl
+  | Some EP.IFF   -> Some e_bin_prio_iff
   | Some(EP.OR _) -> Some e_bin_prio_or
   | Some(EP.AND _)-> Some e_bin_prio_and
   | Some EP.EQ    -> Some e_bin_prio_eq
@@ -614,10 +615,11 @@ let pp_opapp (ppe : PPEnv.t) pp_sub outer fmt (op, _tvi, es) =
       if nm = [] then
         begin match priority_of_unop opname with
         | None -> None
-        | Some opprio  ->
-          let opprio = (opprio, `Prefix) in
+        | Some bopprio ->
+          let opprio = (bopprio, `Prefix) in
           let pp fmt =
-            Format.fprintf fmt "@[%s%a@]" opname
+            Format.fprintf fmt "@[%s%s%a@]" opname
+              (if bopprio < e_uni_prio_uminus then " " else "")
               (pp_sub ppe (opprio, `NonAssoc)) e in
           let pp fmt =
             maybe_paren outer opprio (fun fmt () -> pp fmt) fmt

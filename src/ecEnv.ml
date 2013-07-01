@@ -1583,24 +1583,31 @@ module NormMp = struct
     then pv
     else EcTypes.pv p pv.pv_kind 
 
-  let globals env m mp = 
+  let globals env m mp =
     match (Mod.by_mpath mp env).me_body with
     | ME_Structure ms ->
         (* FIXME: What to do with the module parameter *)
-      let sx = 
-        EcPath.Mx.fold (fun x ty l -> 
-          f_pvar (pv_glob x) ty m :: l) 
-          ms.ms_vars [] in
-      f_tuple sx, ms.ms_uses
-    | _ -> assert false
+        let sx =
+          EcPath.Mx.fold (fun x ty l -> 
+            f_pvar (pv_glob x) ty m :: l) 
+            ms.ms_vars []
+        in
+          (f_tuple sx, ms.ms_uses)
+
+      (* Section abstract modules *)
+    | ME_Decl _ ->
+        (f_glob (EcPath.m_functor mp) m, Sm.empty)
+
+    | ME_Alias _ ->
+        assert false
 
   let rec norm_glob env m mp = 
     let mp = norm_mpath env mp in
     let gtop = 
       match mp.EcPath.m_top with
-      | `Local _ -> f_glob (EcPath.mpath mp.EcPath.m_top []) m
-      | `Concrete(p,_) -> 
-        let top = EcPath.mpath (`Concrete(p,None)) mp.EcPath.m_args in
+      | `Local _ -> f_glob (EcPath.m_functor mp) m
+      | `Concrete(p, _) -> 
+        let top = EcPath.m_functor mp in
         let sx,us = globals env m top in
         let us = 
           List.map (fun mp -> fst (globals env m mp)) (EcPath.Sm.elements us) in

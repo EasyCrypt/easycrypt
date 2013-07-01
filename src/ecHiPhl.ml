@@ -545,7 +545,7 @@ let process_equiv_deno info (_,n as g) =
     ef.ef_pr, ef.ef_po in
   t_on_first (t_use an gs) (t_equiv_deno pre post (juc,n))
 
-let process_conseq info (_, n as g) =
+let process_conseq notmod info (_, n as g) =
   let t_pre = ref (t_id None) and t_post = ref (t_id None) in
   let process_cut g (pre,post) =
     let hyps,concl = get_goal g in        
@@ -592,8 +592,12 @@ let process_conseq info (_, n as g) =
     | FhoareS hs   -> t_hoareS_conseq hs.hs_pr hs.hs_po
     | FbdHoareF hf -> t_bdHoareF_conseq hf.bhf_pr hf.bhf_po
     | FbdHoareS hs -> t_bdHoareS_conseq hs.bhs_pr hs.bhs_po
-    | FequivF ef   -> t_equivF_conseq ef.ef_pr ef.ef_po
-    | FequivS es   -> t_equivS_conseq es.es_pr es.es_po 
+    | FequivF ef   -> 
+      if notmod then t_equivF_conseq_nm ef.ef_pr ef.ef_po
+      else t_equivF_conseq ef.ef_pr ef.ef_po
+    | FequivS es   -> 
+      if notmod then t_equivS_conseq_nm es.es_pr es.es_po 
+      else t_equivS_conseq es.es_pr es.es_po 
     | _ -> assert false (* FIXME error message *) in
   t_seq_subgoal t_conseq
     [!t_pre; !t_post; t_use an gs] (juc,n)
@@ -703,17 +707,17 @@ let process_bdeq = t_bdeq
 
 
 
-let process_eqobs_in (glob,loc,inv) g = 
-  let glob = process_prhl_formula g glob in
-  let loc = process_prhl_formula g loc in
+let process_eqobs_in (ginv,gother,inv) g = 
+  let ginv = process_prhl_formula g ginv in
+  let gother = process_prhl_formula g gother in
   let inv = process_prhl_formula g inv in
   let env, _, concl = get_goal_e g in
   let es = destr_equivS concl in
   let ml, mr = fst es.es_ml, fst es.es_mr in
   (* TODO check glob for glob and inv *)
-  let eqglob = EcPV.Mpv2.of_form env ml mr glob in
-  let eqloc  = EcPV.Mpv2.of_form env ml mr loc in
-  let eqs = EcPV.Mpv2.union eqglob eqloc in
+  let eqinv = EcPV.Mpv2.of_form env ml mr ginv in
+  let eqother  = EcPV.Mpv2.of_form env ml mr gother in
+  let eqs = EcPV.Mpv2.union eqinv eqother in
   let post = EcPV.Mpv2.to_form ml mr eqs inv in
   let pre = es.es_pr in
   let t_pre = 
@@ -723,8 +727,9 @@ let process_eqobs_in (glob,loc,inv) g =
   t_seq_subgoal (t_equivS_conseq pre post)
     [ t_pre;
       t_trivial;
-      t_eqobs_inS (fun _ _ _ _ -> raise Not_found) eqs inv ]
-
+      fun g -> 
+        t_on_last (t_try (t_seq EcPhl.t_skip t_trivial))
+          (t_eqobs_inS (EcPhl.eqobs_inF eqinv) eqs inv g) ]
      g
 (*
   
@@ -757,7 +762,7 @@ let process_phl loc ptac g =
     | Pkill info                -> process_kill info
     | Palias info               -> process_alias info
     | Prnd (side, info)         -> process_rnd side info
-    | Pconseq info              -> process_conseq info
+    | Pconseq (nm,info)         -> process_conseq nm info
     | Pexfalso                  -> process_exfalso
     | Pbdhoaredeno info         -> process_bdHoare_deno info
     | PPr (phi1,phi2)           -> process_ppr (phi1,phi2)
