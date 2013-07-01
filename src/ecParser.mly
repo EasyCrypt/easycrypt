@@ -1754,6 +1754,8 @@ phltactic:
 | CONSEQ nm=STAR? info=fpattern(conseq)
     { Pconseq (nm<>None, info) }
 
+| ELIM STAR { Phr_exists_elim }
+| EXIST STAR l=plist1(sform,COMMA) { Phr_exists_intro l }
 | EXFALSO
     { Pexfalso }
 
