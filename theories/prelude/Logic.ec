@@ -42,7 +42,7 @@ lemma nosmt for_ex: forall (p:'a -> bool), !(exists (x:'a), !p x) => forall (x:'
 lemma nosmt ex_for: forall (p:'a -> bool), !(forall (x:'a), !p x) => exists (x:'a), p x by [].
 
 lemma nosmt nexists: forall (p:'a -> bool), (forall (x:'a), !p x) => !exists (x:'a), p x by [].
-lemma nosmt nforall: exists (p:'a -> bool), (exists (x:'a), !p x) => !forall (x:'a), p x by [].
+lemma nosmt nforall: forall (p:'a -> bool), (exists (x:'a), !p x) => !forall (x:'a), p x by [].
 
 (** absurd *)
 lemma nosmt absurd : forall (b a : bool), (!a => !b) => b => a by [].
@@ -201,10 +201,14 @@ lemma nosmt rewrite_if: forall (f:'a -> 'b) b x1 x2,
   f (if b then x1 else x2) = (if b then f x1 else f x2)
 by [].
 
+lemma nosmt rw_imp   : forall (x y : bool), (x => y) = ((!x)\/y) by [].
+
 (** equality *)
 lemma nosmt eq_refl  : forall (x:'a), x = x by [].
 lemma nosmt eq_sym   : forall (x y : 'a), x = y => y = x by [].
 lemma nosmt eq_trans : forall (x y z : 'a), x = y => y = z => x = z by [].
+
+lemma nosmt rw_eq_sym   : forall (x y : 'a), (x = y) = (y = x) by [].
 
 (** tuples *) 
 lemma nosmt tuple2_ind : 
