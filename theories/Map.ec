@@ -67,7 +67,7 @@ lemma nosmt in_dom_setNE: forall (x:'a) (m:('a,'b) map) y v,
 by [].
 
 lemma in_dom_set: forall (x:'a) (m:('a,'b) map) y v,
-  in_dom x m.[y <- v] = in_dom x m \/ x = y by [].
+  in_dom x m.[y <- v] = (in_dom x m \/ x = y) by [].
 
 lemma in_dom_empty: forall x, !(in_dom x empty<:'a,'b>) by [].
 

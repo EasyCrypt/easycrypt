@@ -31,6 +31,7 @@ type hitenv = {
 }
 
 (* -------------------------------------------------------------------- *)
+val process_form_opt : EcEnv.LDecl.hyps -> pformula -> ty option -> form
 val process_form    : EcEnv.LDecl.hyps -> pformula -> ty -> form
 val process_formula : EcEnv.LDecl.hyps -> pformula -> form
 

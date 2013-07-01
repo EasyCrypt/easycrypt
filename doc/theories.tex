@@ -20,6 +20,33 @@ We illustrate each of the basic concepts with commented excerpts from the
 standard library distributed with \EC. The standard library is documented
 further in Chapter~\ref{chap:libraries}.
 
+\section{The \EC Expression Language}
+
+At the core of any \EC specification is a collection of types and functional
+operators on those types, that create and extend a rich language of expressions
+for use in cryptographic games. Informally, \EC types can be seen as
+\emph{non-empty} sets, and operators are \emph{mathematical} functions between
+them.
+%
+The reader familiar with polymorphic lambda-calculus~\cite{} may skip forward to
+Section~\ref{sec:ec-specifics}.
+
+\subsection{A quick overview}
+Following this analogy and standard functional programming notation, we write
+denote with \ec{f : 'a -> 'b}  the fact that \ec{f} is a function from
+type \ec{'a} to type \ec{'b}. Given function \ec{f} above, and an
+\ec{x : 'a}, we denote with \ec{f x} the value (of type \ec{'b})
+resulting from applying \ec{f} to \ec{x}.
+
+Functions expecting several arguments take their arguments separated by spaces.
+For example, the logarithm base 2 of an integer \ec{n} would be denoted
+\ec{log 2 n}, where the type of \ec{log} is
+\ec{log: int -> int -> int}. For now, the reader unfamiliar with functional
+languages should just read this type as the type of functions that take two
+integers and return an integer.
+
+
+
 \section{Types and Operators\label{sec:types}}
 
 At the core of any \EC specification is a collection of types and functional
@@ -139,7 +166,7 @@ $\left(\tau * \left(\tau' * \tau''\right)\right)$ are distinct.}
 
 \subsection{Operators}
 
-\subsection{Predicates, Axioms and Ambient Lemmas}
+\subsection{Predicates, Axioms and Ambient Lemmas\label{sec:ec-specifics}}
 
 % TODO: redistribute the following
 %
@@ -229,7 +256,9 @@ satisfy the basic axioms of probability sub-distributions:
 \item probabilities lie in the unit interval;
 \item the probability of the union of events is equal to the sum of
   their probabilities, minus the sum of their intersection;
-\item probabilities are monotonic with respect to event inclusion.
+\item probabilities are monotonic with respect to event inclusion;
+\item two sub-distributions over the same base type are equal if and only if
+  they are equal on each of the elements in the base type.
 \end{itemize}
 
 Sub-distributions are introduced axiomatically, and no well-formedness checks
@@ -241,10 +270,10 @@ the standard library, as displayed in Listing~\ref{lst:dbool}, where
 \begin{easycrypt}[label={lst:dbool}]{[Uniform Boolean distribution]Defining the uniform distribution on booleans}
 op dbool: bool distr.
 
-axiom mu_def: forall (P:bool -> bool), 
-  mu dbool P =
-    (1%r/2%r) * caract P true +
-    (1%r/2%r) * caract P false.
+axiom mu_def: forall (p:bool -> bool), 
+  mu dbool p =
+    (1%r/2%r) * caract p true +
+    (1%r/2%r) * caract p false.
 \end{easycrypt}
 
 The standard library on distributions, discussed further in
@@ -252,12 +281,20 @@ Chapter~\ref{chap:libraries}, introduces several auxiliary quantities on
 distributions that are useful in probability computations and for defining more
 complex distributions that are difficult, or impossible, to describe purely
 using \rawec{mu}. The definitions of these quantities is shown in
-Listing~\ref{lst:mu_aux}.
+Listing~\ref{lst:mu_aux}, where \rawec{cPtrue} is the constantly true predicate.
+Note the use of partial application to the equality operator when defining
+\rawec{mu_x}.
 
 \begin{easycrypt}[label={lst:mu_aux}]{Auxiliary operators on distributions}
-op mu_x(d:'a distr, x:'a) = mu d (lambda x', x = x').
-op mu_weight(d:'a distr) = mu d (lambda x, true).
-op in_supp(d:'a distr, x:'a) = mu d (lambda x', x = x') > 0%r.
+op mu_x(d:'a distr, x:'a) = mu d ((=) x).
+op mu_weight(d:'a distr) = mu d cPtrue.
+op in_supp(x:'a, d:'a distr) = 0%r < mu_x d x.
+\end{easycrypt}
+
+With these auxiliary operators, it is in fact fairly easy to check that the simple axiom from Listing~\ref{lst:dbool} does indeed define a distribution, by proving the following lemma, which is discharged automatically by the SMT solvers.
+
+\begin{easycrypt}[]{}
+lemma lossless : weight dbool = 1%r.
 \end{easycrypt}
 
 \subsection{Old Stuff}
@@ -389,7 +426,7 @@ module type RO_adv(O:RO) = {
 
 Interpretation:
 \begin{displaymath}
-\hoareS{c}{\pre}{\post}
+\Hoare{c}{\pre}{\post}
 \quad\doteq\quad
 \forall m.~ \pre\,m \Rightarrow \range Q ([\![ c ]\!]\,m)
 \end{displaymath}
@@ -404,7 +441,7 @@ where $\range \varphi \mu \doteq \forall f.~ (\forall x.~ \varphi\,x
 
 Interpretation:
 \begin{displaymath}
-\bdHoareSle{c}{\pre}{\post}{\delta} 
+\HoareLe{c}{\pre}{\post}{\delta} 
 \quad\doteq\quad
 \forall m.~ \pre\,m \Rightarrow [\![ c ]\!]\,m\,\charfun_\post \leq
 \delta\,m
@@ -412,16 +449,16 @@ Interpretation:
 
 Property?:
 \begin{displaymath}
-\hoareS{c}{\pre}{\post}
+\Hoare{c}{\pre}{\post}
 \Leftrightarrow
-\bdHoareSeq{c}{\pre}{\neg\post}{0}
+\HoareEq{c}{\pre}{\neg\post}{0}
 \end{displaymath}
 
 Property?:
 \begin{displaymath}
-\hoareS{c}{\pre}{\post} \land \bdHoareSeq{c}{\pre}{\true}{1}
+\Hoare{c}{\pre}{\post} \land \HoareEq{c}{\pre}{\true}{1}
 \Leftrightarrow
-\bdHoareSeq{c}{\pre}{\post}{1}
+\HoareEq{c}{\pre}{\post}{1}
 \end{displaymath}
 
 

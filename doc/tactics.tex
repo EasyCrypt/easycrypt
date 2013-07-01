@@ -143,12 +143,28 @@ iteratively, up to the point where no goals remain.
 
 \ambientDesc
 
-\section{Program Logics (César)}
+\section{Program Transformation Tactics}
+
+TODO: inline, swap, unroll, splitwhile, fusion, fission, condt, condf, 
+
+\section{Program Logics Tactics}
 
 \subsection{Reasoning about random samplings: the \rawec{rnd} tactic}
 %
 \subsubsection{Hoare Logic}
 \index{hoare}{Program Reasoning!rnd@\rawec{rnd}}
+
+\Description
+
+Assume $d:A\, \verb+distr+$...
+
+\begin{displaymath}
+\infrule{
+  \Hoare{c}{\pre}{\forall z:A,in\_supp\,z\,d \Rightarrow \post\subst{x}{z}}
+}{
+  \Hoare{c;\Rand{x}{d}}{\pre}{\post}
+}
+\end{displaymath}
 
 \subsubsection{Probabilistic Hoare Logic}
 \index{phl}{Program Reasoning!rnd@\rawec{rnd}}
@@ -161,10 +177,10 @@ the first optional parameter $p$ is a computable predicate (i.e., \verb+'a cPred
 \begin{displaymath}
 \begin{array}{c}
   \infrule{
-    \hoareS{c}{\pre}{\mu\, d\, p \leq f \land 
+    \Hoare{c}{\pre}{\mu\, d\, p \leq f \land 
       (\forall v\in \mathsf{support}(d).~ \post\subst{x}{v} \Rightarrow p\, v)}
   }{
-    \bdHoareSle{c;\Rand{x}{d}}{\pre}{\post}{f}
+    \HoareLe{c;\Rand{x}{d}}{\pre}{\post}{f}
   }\left[\verb+rnd+\ p\right]
 \\[4ex]
 \end{array}
@@ -177,19 +193,19 @@ additionally accepts an optional parameter $g$ of type \verb+real+
 representing a bound:
 \begin{displaymath}
   \infrule{
-    \bdHoareSge{c}{\pre}{\mu\, d\, p \geq g \land 
+    \HoareGe{c}{\pre}{\mu\, d\, p \geq g \land 
       (\forall v\in \mathsf{support}(d).~ p\, v \Rightarrow \post\subst{x}{v} )}{\frac{f}{g}} 
   }{
-    \bdHoareSge{c;\Rand{x}{d}}{\pre}{\post}{f}
+    \HoareGe{c;\Rand{x}{d}}{\pre}{\post}{f}
   }\left[\verb+rnd+\ p\ g\right]
 \end{displaymath}
 %
 \begin{displaymath}
   \infrule{
-    \bdHoareSeq{c}{\pre}{\mu\, d\, p = g \land 
+    \HoareEq{c}{\pre}{\mu\, d\, p = g \land 
       (\forall v\in \mathsf{support}(d).~ p\, v \Leftrightarrow \post\subst{x}{v} )}{\frac{f}{g}} 
   }{
-    \bdHoareSeq{c;\Rand{x}{d}}{\pre}{\post}{f}
+    \HoareEq{c;\Rand{x}{d}}{\pre}{\post}{f}
   }\left[\verb+rnd+\ p\ g\right]
 \end{displaymath}
 %
@@ -198,98 +214,242 @@ If $g$ is not given then $g=f$ in the rule.
 \subsubsection{Relational Hoare Logic}
 \index{prhl}{Program Reasoning!rnd@\rawec{rnd}}
 
+\Syntax \verb+rnd+[\textit{side}] [\textit{bij\_info}]
+where
+\textit{bij\_info} is either
+\begin{itemize}
+  \item \textit{form} \textit{form}
+  \item \textit{form} \_
+\end{itemize}
+
+
+\Description
+
+The logical rule implemented by the \verb+rnd+ tactic depends on the
+the optional parameter \textit{side}. If a left/right side flag is
+provided then the one-sided logical rule for random sampling is
+applied. If missing, then the two-sided rule for random assignment is
+considered.
+%
+
+\paragraph*{Two-sided application.} 
+In this case case, the \verb+rnd+ tactic takes as parameter a
+representation of a bijective function. 
+
+When two formulae are provided as the \textit{bij\_info} parameter,
+they are verified to be a bijective function and its inverse. If only
+one function is given then it is required to be an involution, and
+lastly if no argument is given then the identity function is assumed.
+
+The description of the rule below assumes that a bijective function
+$f$ and its inverse is provided and generates according verification
+conditions. Furthermore, it requires the following type constraints
+for some types \verb+'a+ and \verb+'b+: 
+\begin{itemize}
+\item $d_1:\verb+'a distr+$,
+\item $d_2:\verb+'b distr+$, $f:\verb+'a+\to\verb+'b+$,
+\item $f^{-1}:\verb+'b+\to\verb+'a+$, 
+\item ...
+\end{itemize}
+
+\begin{displaymath}
+\infrule{
+  \Equiv{c_1}{c_2}{\pre} 
+  { \forall z,z',in\_supp \,z\,d_1\Rightarrow in\_supp \,z'\,d_2\Rightarrow
+    \begin{array}{l}
+      (\mu\,d_1\,\charfun_{\{z\}}=\mu\,d_2\,\charfun_{\{f\,z\}} ) 
+      \land \\
+      (in\_supp\,d_1\,(f^{-1}\,z'))
+      \land \\
+      (f^{-1}\,(f\,z)=z)
+      \land \\
+      (f\,(f^{-1}\,z')=z')
+      \land \\
+      (\post\subst{x_1}{z}\subst{x_2}{f\,z})
+    \end{array}
+  }
+}{
+  \Equiv{c_1;\Rand{x_1}{d_1}}{c_2;\Rand{x_2}{d_2}}{\pre}{\post}
+}
+\end{displaymath}
+
+\paragraph*{Two-sided application.} 
+The logical rule implemented when the optional parameter \textit{side}
+is used is similar to the random sampling rule for Hoare judgements:
+
+
+\begin{displaymath}
+\infrule{
+  \Equiv{c}{c'}{\pre}{\forall z:A,in\_supp\,z\,d \Rightarrow \post\subst{x}{z}}
+}{
+  \Equiv{c;\Rand{x}{d}}{c'}{\pre}{\post}
+}
+\end{displaymath}
+
+
 \subsection{Reasoning about sequential composition: the \rawec{seq} tactic}
 %
 \subsubsection{Hoare Logic}
 \index{hoare}{Program Reasoning!seq@\rawec{seq}}
 
+\Syntax 
+\verb+app+ \textit{codepos} \textit{formula} 
+
+\Description
+
+\Description
+Applies the Hoare Logic rule for sequential composition:
+$$
+\infrule{\Hoare{c}{\post}{\post'} \quad
+         \Hoare{c'}{\post'}{\post''}}
+        {\Hoare{c;c'}{\post}{\post''}}
+$$
+The application of tactic \verb+app k p+ defines $c$ as the first
+\verb+k+ instructions of the statement $c;c'$ and $\post'$ as
+\verb+p+.
+
+
 \subsubsection{Probabilistic Hoare Logic}
 \index{phl}{Program Reasoning!seq@\rawec{seq}}
 \Syntax 
-\verb+app+ \verb+[>>|<<]+ \textit{num} \textit{formula} (
+\verb+app+ \verb+[>>|<<]+ \textit{codepos} \textit{formula} (
 [\textit{formula} \verb+|+ \textit{formula} \textit{formula}
 \textit{formula} \textit{formula}]
 
 \Description
-Direction \verb+<<+ by default.
-The first formula is the intermediate predicate.
-Assume $s_2$ is at program position $n$.
+The application of the \verb+seq+ tactic is more complicated when
+dealing with Probabilistic Hoare Logic judgements. 
 
+The direction parameter is accepted for \emph{lower-bounded} and \emph{exact}
+judgments. The direction \verb+<<+ is assumed by default (as it is globally).
+The first formula represents the intermediate predicate that must hold
+at the splitting program point.
+
+In the following, the rule descriptions assume that $n$ indicates the
+program position of statement $s_2$.
+
+\paragraph*{Upper bounded judgements.}
 For upper bounded judgments, the most general variant of the
 \verb+app+ rule (i.e., when four bounds are given as parameters) implements the following rule:
 \begin{displaymath}
   \infrule{
     \begin{array}{c}
-      \bdHoareSle{s1}{P}{R}{f_1} \qquad \bdHoareSle{s2}{R}{Q}{f_2}
+      \HoareLe{s1}{P}{R}{f_1} \qquad \HoareLe{s2}{R}{Q}{f_2}
       \\
-      \bdHoareSle{s1}{P}{R}{g_1} \qquad \bdHoareSle{s2}{R}{Q}{g_2}
+      \HoareLe{s1}{P}{R}{g_1} \qquad \HoareLe{s2}{R}{Q}{g_2}
       \\
       f_1 f_2 + g_1 g_2 \leq f 
     \end{array}
   }{
-    \bdHoareSle{s1;s2}{P}{Q}{f}
+    \HoareLe{s1;s2}{P}{Q}{f}
   }
 \end{displaymath}
 %
 If no argument is given then the following rule is applied:
 \begin{displaymath}
   \infrule{
-    \hoareS{s1}{P}{R} \qquad \bdHoareSle{s2}{R}{Q}{f}
+    \Hoare{s1}{P}{R} \qquad \HoareLe{s2}{R}{Q}{f}
   }{
-    \bdHoareSle{s1;s2}{P}{Q}{f}
+    \HoareLe{s1;s2}{P}{Q}{f}
   }\left[\verb+app+\ n\ R\right]
 \end{displaymath}
 %
-\warningbox{Which, if preferred, can be rewritten to:}
-\begin{displaymath}
-  \infrule{
-    \hoareS{s1}{P}{\lambda m. \Prm{s_2}{m}{Q}\leq f} \qquad 
-  }{
-    \bdHoareSle{s1;s2}{P}{Q}{f}
-  }\left[\verb+app+\ n\ R\right]
-\end{displaymath}
+% \warningbox{Which, if preferred, can be rewritten to:}
+% \begin{displaymath}
+%   \infrule{
+%     \Hoare{s1}{P}{\lambda m. \Prm{s_2}{m}{Q}\leq f} \qquad 
+%   }{
+%     \HoareLe{s1;s2}{P}{Q}{f}
+%   }\left[\verb+app+\ n\ R\right]
+% \end{displaymath}
 
+Single bound parameters are not accepted for upper-bounded judgements.
 
+\paragraph*{Lower-bounded and exact  judgements.}
 
-For lower bounded and exact judgments, the app tactic implements the following rules
+The application of the \verb+seq+ tactic have similar regardless of
+lower or exact bounds. 
+
+The second optional parameter of type $\verb+real+$ represents a
+probability bound (only supported for $=$ and $\geq$), and the
+optional direction parameter indicates whether this bound is to be
+applied to the first or second half of the split statement.
 
 \begin{displaymath}
 \begin{array}{c}
   \infrule{
-    \bdHoareSge{s1}{P}{R}{f/g} \qquad \bdHoareSge{s2}{R}{Q}{g}
+    \HoareGe{s1}{P}{R}{f/g} \qquad \HoareGe{s2}{R}{Q}{g}
   }{
-    \bdHoareSge{s1;s2}{P}{Q}{f}
+    \HoareGe{s1;s2}{P}{Q}{f}
   }\left[\verb+app+\ n\ R\ g\right]
 \\[4ex]
   \infrule{
-    \bdHoareSge{s1}{P}{R}{g} \qquad \bdHoareSge{s2}{R}{Q}{f/g}
+    \HoareGe{s1}{P}{R}{g} \qquad \HoareGe{s2}{R}{Q}{f/g}
   }{
-    \bdHoareSge{s1;s2}{P}{Q}{f}
+    \HoareGe{s1;s2}{P}{Q}{f}
   }\left[\verb+app>>+\ n\ R\ g\right]
 \end{array}
 \end{displaymath}
 %
-The second parameter (optional) is a real number representing a bound (only supported for $=$ and $\geq$).
 %
-Similar rules hold for $=$. If the parameter $g$ is not given then
-$g=f$ in the rule. 
+Similar rules hold for $=$. If the bound parameter $g$ is not given then
+$g$ is defined as $f$ in the above rule description.
 
 \subsubsection{Relational Hoare Logic}
 \index{prhl}{Program Reasoning!seq@\rawec{seq}}
 
+\Syntax
+\verb+app+ \textit{codepos} \textit{form}
+
+\Description
+Applies the RHL rule for sequential composition:
+$$
+\infrule{\Equiv{c_1}{c_2}{\post}{\post'} \quad
+         \Equiv{c_1'}{c_2'}{\post'}{\post''}}
+        {\Equiv{c_1;c_1'}{c_2;c_2'}{\post}{\post''}}[\textrm{R-Seq}]
+$$
+The application of tactic \verb+app m n p+ defines $c_1$ as the first
+\verb+m+ instructions of the program on the left-hand side and $c_2$ as
+the first \verb+n+ instructions of the program on the right-hand side
+and $\post'$ as \verb+p+.
+
+
+
 \subsection{Reasoning about conditionals: the \rawec{if} tactic}
 %
-\subsubsection{Hoare and Probabilistic Hoare Logic}
+
+\subsubsection{Hoare Logic}
 \index{hoare}{Program Reasoning!if@\rawec{if}}
 \index{phl}{Program Reasoning!if@\rawec{if}}
-(similar to probabilistic Hoare \verb+if+ tactic)
+
+Applies the following rule for conditional statements. It expects a
+conditional statement at the first program position.
 \begin{displaymath}
 \begin{array}{c}
   \infrule{
-    \bdHoareSle{c_1}{\pre \land b}{\post}{f}\qquad
-    \bdHoareSle{c_2}{\pre \land \neg b}{\post}{f}
+    \Hoare{c_1}{\pre \land b}{\post}\qquad
+    \Hoare{c_2}{\pre \land \neg b}{\post}
   }{
-    \bdHoareSle{\Cond{b}{c_1}{c_2}}{\pre}{\post}{f}
+    \Hoare{\Cond{b}{c_1}{c_2}}{\pre}{\post}
+  }\left[\verb+if+ \right] 
+\\[4ex]
+\end{array}
+\end{displaymath}
+
+
+\subsubsection{Hoare and Probabilistic Hoare Logic}
+\index{hoare}{Program Reasoning!if@\rawec{if}}
+\index{phl}{Program Reasoning!if@\rawec{if}}
+
+Applies the following rule for conditional statements. It expects a
+conditional statement at the first program position.
+\begin{displaymath}
+\begin{array}{c}
+  \infrule{
+    \HoareLe{c_1}{\pre \land b}{\post}{f}\qquad
+    \HoareLe{c_2}{\pre \land \neg b}{\post}{f}
+  }{
+    \HoareLe{\Cond{b}{c_1}{c_2}}{\pre}{\post}{f}
   }\left[\verb+if+ \right] 
 \\[4ex]
 \end{array}
@@ -299,24 +459,79 @@ Similar rules hold for $=,\geq$.
 \subsubsection{Relational Hoare Logic}
 \index{prhl}{Program Reasoning!if@\rawec{if}}
 
+\Syntax \verb+if+ [\textit{side}]
+
+\Description Applies the pRHL rule for conditional.
+If the \textit{side} argument is given then the corresponding
+one side rule is used, else the two side rule is used.
+The \verb+if+ tactic expects a conditional as first instruction. 
+\begin{center}
+\begin{tabular}{c|c}
+Syntax & Rule \\
+\hline\\
+\verb+if{1}+ &
+$
+\infrule{\Equiv{c_1;c}{c'}{\pre \land e\sidel}{\post}
+        \quad \Equiv{c_2;c}{c'}{\pre \land \neg e\sidel}{\post}}
+        {\Equiv{\Cond{e}{c_1}{c_2};c}{c'}{\pre}{\post}}
+$\\
+\\\hline\\
+\verb+if{2}+ &
+$
+\infrule{\Equiv{c'}{c_1;c}{\pre \land e\sider}{\post}
+        \quad \Equiv{c'}{c_2;c}{\pre \land \neg e\sider}{\post}}
+        {\Equiv{c'}{\Cond{e}{c_1}{c_2};c}{\pre}{\post}}
+$\\
+\\\hline\\
+\verb+if+ &
+$
+\infrule{
+ \begin{array}{c}
+   \vdash \pre \Rightarrow e\sidel = e'\sider \\
+   \Equiv{c_1;c}{c'_1;c'}{\pre \land e\sidel \land e'\sider}{\post}\\
+   \Equiv{c_2;c}{c'_2;c'}{\pre \land \neg e\sidel \land \neg e'\sider}{\post}
+ \end{array}
+}{\Equiv{\Cond{e}{c_1}{c_2};c}
+        {\Cond{e'}{c'_1}{c'_2};c'}
+        {\pre}{\post}}
+$\\
+\end{tabular}
+\end{center}
+
+
 \subsection{Computing weakest preconditions: the \rawec{wp} tactic}
 %
+
+\Syntax \verb+wp+ [\textit{codepos}]
+
+\Description The \verb+wp+ tactic computes the weakest-precondition of
+deterministic, loop and procedure-call free program fragments
+(i.e. deterministic assignments and conditionals).  If the op code
+position parameter is not provided, The tactic processes instructions
+bottom-up until a random sampling, a loop or a function call is
+reached. The computation of the weakest precondition over a
+conditional instruction is only possible if its branches do not
+contain random samplings, while loops nor function calls.
+
+The optional code position parameter \textit{pos} restricts the range
+of instructions that may be affected by the tactic invocation. 
+See \ref{???} for a description of its syntax.
+
+
+\Example
+
+
 \subsubsection{Hoare Logic}
 \index{hoare}{Program Reasoning!wp@\rawec{wp}}
 
 \subsubsection{Probabilistic Hoare Logic}
 \index{phl}{Program Reasoning!wp@\rawec{wp}}
-\Syntax \verb+wp+
 
-\Description
-Assuming \verb+wp+ complete (weakest) and $c$ is straight-line code,
-$\bdHoareSeq{c}{\mathsf{wp}(c,\post)}{\post}{1}$, plus sequential
-composition rule, we have:
 \begin{displaymath}
   \infrule{
-    \bdHoareSle{c_1}{\pre }{\mathsf{wp}(c_2,\post)}{f}
+    \HoareLe{c_1}{\pre }{\mathsf{wp}(c_2,\post)}{f}
   }{
-    \bdHoareSle{c_1;c_2}{\pre}{\post}{f}
+    \HoareLe{c_1;c_2}{\pre}{\post}{f}
   }\left[\verb+wp+ \right] 
 \end{displaymath}
 Similar rules hold for $=,\geq$.
@@ -354,11 +569,11 @@ The tactic implements the following rule:
     \\[.5ex]
     \chi\land\glob_A=\glob_B\land\result_A=\result_B\Rightarrow\post
     \\ 
-    \equivF{O_i}{O_i'}{\chi\land
+    \Equiv{O_i}{O_i'}{\chi\land
       \vec{p}_{O_i}=\vec{p}_{O'_i}}{\chi\land \result_{o_i}=\result_{o'_i}}
   \end{array}
 }{
-  \equivF{A}{B}{\pre}{\post}
+  \Equiv{A}{B}{\pre}{\post}
 } [\verb+fun+~\chi]
 \end{displaymath}
 %
@@ -376,10 +591,10 @@ adversaries $A$ and $B$, ...
     \pre \Rightarrow \chi  \qquad 
     \chi \Leftrightarrow\post
     \\[.5ex]
-    \bdHoareSeq{O_i}{\chi}{\chi}{1}
+    \HoareEq{O_i}{\chi}{\chi}{1}
   \end{array}
 }{
-  \bdHoareSeq{A}{\pre}{\post}{1}
+  \HoareEq{A}{\pre}{\post}{1}
 } [\verb+fun+~\chi]
 \end{displaymath}
 
@@ -390,10 +605,10 @@ adversaries $A$ and $B$, ...
     \pre \Rightarrow \chi  \qquad 
     \chi \Rightarrow\post
     \\[.5ex]
-    \hoareS{O_i}{\chi}{\chi}
+    \Hoare{O_i}{\chi}{\chi}
   \end{array}
 }{
-  \hoareS{A}{\pre}{\post}
+  \Hoare{A}{\pre}{\post}
 } [\verb+fun+~\chi]
 \end{displaymath}
 
@@ -404,34 +619,34 @@ adversaries $A$ and $B$, ...
 
 \begin{displaymath}
 \infrule{
-  \hoareS{c}{\pre'}{\post'} \qquad \pre\Rightarrow\pre' \qquad  \post'\Rightarrow\post
+  \Hoare{c}{\pre'}{\post'} \qquad \pre\Rightarrow\pre' \qquad  \post'\Rightarrow\post
 }{
-  \hoareS{c}{\pre}{\post}
+  \Hoare{c}{\pre}{\post}
 }\left[\verb+conseq+~ \pre'~ \post' \right]
 \end{displaymath}
 
 \subsubsection{Probabilistic Hoare Logic}
 \begin{displaymath}
 \infrule{
-  \bdHoareSle{c}{\pre'}{\post'}{\delta} \qquad \pre\Rightarrow\pre' \qquad  \post\Rightarrow\post'
+  \HoareLe{c}{\pre'}{\post'}{\delta} \qquad \pre\Rightarrow\pre' \qquad  \post\Rightarrow\post'
 }{
-  \bdHoareSle{c}{\pre}{\post}{\delta}
+  \HoareLe{c}{\pre}{\post}{\delta}
 }\left[\verb+conseq+~ \pre'~ \post' \right]
 \end{displaymath}
 
 \begin{displaymath}
 \infrule{
-  \bdHoareSeq{c}{\pre'}{\post'}{\delta} \qquad \pre\Rightarrow\pre' \qquad  \post\Leftrightarrow\post'
+  \HoareEq{c}{\pre'}{\post'}{\delta} \qquad \pre\Rightarrow\pre' \qquad  \post\Leftrightarrow\post'
 }{
-  \bdHoareSeq{c}{\pre}{\post}{\delta}
+  \HoareEq{c}{\pre}{\post}{\delta}
 }\left[\verb+conseq+~ \pre'~ \post' \right]
 \end{displaymath}
 
 \begin{displaymath}
 \infrule{
-  \bdHoareSge{c}{\pre'}{\post'}{\delta} \qquad \pre\Rightarrow\pre' \qquad  \post'\Rightarrow\post
+  \HoareGe{c}{\pre'}{\post'}{\delta} \qquad \pre\Rightarrow\pre' \qquad  \post'\Rightarrow\post
 }{
-  \bdHoareSge{c}{\pre}{\post}{\delta}
+  \HoareGe{c}{\pre}{\post}{\delta}
 }\left[\verb+conseq+~ \pre'~ \post' \right]
 \end{displaymath}
 
@@ -441,9 +656,9 @@ adversaries $A$ and $B$, ...
 
 \begin{displaymath}
 \infrule{
-  \equivF{c_1}{c_2}{\pre'}{\post'} \qquad \pre\Rightarrow\pre' \qquad  \post'\Rightarrow\post
+  \Equiv{c_1}{c_2}{\pre'}{\post'} \qquad \pre\Rightarrow\pre' \qquad  \post'\Rightarrow\post
 }{
-  \equivF{c_1}{c_2}{\pre}{\post}
+  \Equiv{c_1}{c_2}{\pre}{\post}
 }\left[\verb+conseq+~ \pre'~ \post' \right]
 \end{displaymath}
 
@@ -461,16 +676,16 @@ variables modifiable by $f$.
 \begin{displaymath}
   \infrule{
     \begin{array}{c}
-      \hoareS{c}{\pre}{\pre_f\subst{\vec{p}}{\vec{y}} \land
+      \Hoare{c}{\pre}{\pre_f\subst{\vec{p}}{\vec{y}} \land
         \forall v.~ \forall \vec{z}.~ 
         \post_f\subst{\result_f}{v}\subst{\vec{m}}{\vec{z}}
         \Rightarrow \post\subst{x}{v}\subst{\vec{m}}{\vec{z}}
       }
       \\[.5ex]
-      \hoareS{f}{\pre_f}{\post_f}
+      \Hoare{f}{\pre_f}{\post_f}
     \end{array}
   }{
-    \hoareS{c;\Call{x}{f}{\vec{y}}}{\pre}{\post}
+    \Hoare{c;\Call{x}{f}{\vec{y}}}{\pre}{\post}
   }\left[\verb+call+~ \pre_f~ \post_f \right]
 \end{displaymath}
 
@@ -489,47 +704,47 @@ variables modifiable by $f$.
 \begin{displaymath}
   \infrule{
     \begin{array}{c}
-      \hoareS{c}{\pre}{\pre_f\subst{\vec{p}}{\vec{y}} \land
+      \Hoare{c}{\pre}{\pre_f\subst{\vec{p}}{\vec{y}} \land
         \forall v.~ \forall \vec{z}.~ 
         \post_f\subst{\result_f}{v}\subst{\vec{m}}{\vec{z}}
         \Rightarrow \post\subst{x}{v}\subst{\vec{m}}{\vec{z}}
       }
       \\[.5ex]
-      \bdHoareSle{f}{\pre_f}{\post_f}{\delta}
+      \HoareLe{f}{\pre_f}{\post_f}{\delta}
     \end{array}
   }{
-    \bdHoareSle{c;\Call{x}{f}{\vec{y}}}{\pre}{\post}{\delta}
+    \HoareLe{c;\Call{x}{f}{\vec{y}}}{\pre}{\post}{\delta}
   } \left[\verb+call+~ \pre_f~ \post_f \right]
 \end{displaymath}
 
 \begin{displaymath}
   \infrule{
     \begin{array}{c}
-      \bdHoareSeq{c}{\pre}{\pre_f\subst{\vec{p}}{\vec{y}} \land
+      \HoareEq{c}{\pre}{\pre_f\subst{\vec{p}}{\vec{y}} \land
         \forall v.~ \forall \vec{z}.~ 
         \post_f\subst{\result_f}{v}\subst{\vec{m}}{\vec{z}}
         \Rightarrow \post\subst{x}{v}\subst{\vec{m}}{\vec{z}}}{\frac{\delta}{\delta'}}
     \\[.5ex]
-    \bdHoareSeq{f}{\pre_f}{\post_f}{\delta'}
+    \HoareEq{f}{\pre_f}{\post_f}{\delta'}
   \end{array}
   }{
-    \bdHoareSeq{c;\Call{x}{f}{\vec{y}}}{\pre}{\post}{\delta}
+    \HoareEq{c;\Call{x}{f}{\vec{y}}}{\pre}{\post}{\delta}
   } \left[\verb+call+~ \pre_f~ \post_f~ \delta' \right]
 \end{displaymath}
 
 \begin{displaymath}
   \infrule{
     \begin{array}{c}
-      \bdHoareSge{c}{\pre}{\pre_f\subst{\vec{p}}{\vec{y}} \land
+      \HoareGe{c}{\pre}{\pre_f\subst{\vec{p}}{\vec{y}} \land
         \forall v.~ \forall \vec{z}.~ 
         \post_f\subst{\result_f}{v}\subst{\vec{m}}{\vec{z}}
         \Rightarrow \post\subst{x}{v}\subst{\vec{m}}{\vec{z}}}
       {\frac{\delta}{\delta'}}
     \\[.5ex]
-    \bdHoareSge{f}{\pre_f}{\post_f}{\delta'}
+    \HoareGe{f}{\pre_f}{\post_f}{\delta'}
   \end{array}
   }{
-    \bdHoareSge{c;\Call{x}{f}{\vec{y}}}{\pre}{\post}{\delta}
+    \HoareGe{c;\Call{x}{f}{\vec{y}}}{\pre}{\post}{\delta}
   } \left[\verb+call+~ \pre_f~ \post_f ~\delta' \right]
 \end{displaymath}
 
@@ -547,15 +762,15 @@ according to these rules:
 \begin{displaymath}
 \begin{array}{cc}
 \infrule{
-  \hoareS{c}{\pre}{\neg \post} \quad f = 0
+  \Hoare{c}{\pre}{\neg \post} \quad f = 0
 }{
-  \bdHoareSeq{c}{\pre}{\post}{f}
+  \HoareEq{c}{\pre}{\post}{f}
 }
 &
 \infrule{
-  \bdHoareSeq{c}{\pre}{\neg\post}{0}
+  \HoareEq{c}{\pre}{\neg\post}{0}
 }{
-  \hoareS{c}{\pre}{\post}
+  \Hoare{c}{\pre}{\post}
 }
 \end{array}
 \end{displaymath}
@@ -566,12 +781,12 @@ discharges goals by applying trivial probability properties:
 \begin{array}{cc}
 \infrule{
 }{
-  \bdHoareSle{c}{\pre}{\post}{1}
+  \HoareLe{c}{\pre}{\post}{1}
 }
 &
 \infrule{
 }{
-  \bdHoareSge{c}{\pre}{\post}{0}
+  \HoareGe{c}{\pre}{\post}{0}
 }
 % \\[3ex]
 % \infrule{
@@ -590,15 +805,15 @@ discharges goals by applying trivial probability properties:
 \begin{displaymath}
 \begin{array}{cc}
 \infrule{
-  \bdHoareSeq{c}{\pre}{\post}{f}
+  \HoareEq{c}{\pre}{\post}{f}
 }{
-  \bdHoareSle{c}{\pre}{\post}{f}
+  \HoareLe{c}{\pre}{\post}{f}
 }
 &
 \infrule{
-  \bdHoareSeq{c}{\pre}{\post}{f}
+  \HoareEq{c}{\pre}{\post}{f}
 }{
-  \bdHoareSge{c}{\pre}{\post}{f}
+  \HoareGe{c}{\pre}{\post}{f}
 }
 \end{array}
 \end{displaymath}
@@ -614,7 +829,7 @@ discharges goals by applying trivial probability properties:
     \qquad 
     \chi\Rightarrow\post 
     \qquad 
-    \bdHoareSle{f}{\pre}{\post}{\delta}
+    \HoareLe{f}{\pre}{\post}{\delta}
 }{
   \Prm{c}{m}{\chi} \leq \delta
 }\left[\verb+hoare_deno+\ \pre\ \post\right]
@@ -626,7 +841,7 @@ discharges goals by applying trivial probability properties:
     \qquad 
     \post\Leftrightarrow \chi 
     \qquad 
-    \bdHoareSeq{f}{\pre}{\post}{\delta}
+    \HoareEq{f}{\pre}{\post}{\delta}
 }{
   \Prm{c}{m}{\chi} = \delta
 }\left[\verb+hoare_deno+\ \pre\ \post\right]
@@ -638,7 +853,7 @@ discharges goals by applying trivial probability properties:
     \qquad 
     \post\Rightarrow\chi
     \qquad 
-    \bdHoareSge{f}{\pre}{\post}{\delta}
+    \HoareGe{f}{\pre}{\post}{\delta}
 }{
   \delta \leq \Prm{c}{m}{\chi}
 }\left[\verb+hoare_deno+\ \pre\ \post\right]
@@ -649,7 +864,7 @@ discharges goals by applying trivial probability properties:
 
 \begin{displaymath}
 \infrule{
-  \equivF{c_1}{c_2}{\pre}{\post} 
+  \Equiv{c_1}{c_2}{\pre}{\post} 
   \qquad
   \pre
   \qquad
@@ -661,7 +876,7 @@ discharges goals by applying trivial probability properties:
 
 \begin{displaymath}
 \infrule{
-  \equivF{c_1}{c_2}{\pre}{\post} 
+  \Equiv{c_1}{c_2}{\pre}{\post} 
   \qquad
   \pre
   \qquad
@@ -719,9 +934,9 @@ $c_2$ is between positions $p_2$ and $p_3$, the tactic implements the
 following rule:
 \begin{displaymath}
 \infrule{
-  \hoareS{c;c_2;c_1;c_3}{\pre}{\post}
+  \Hoare{c;c_2;c_1;c_3}{\pre}{\post}
 }{
-  \hoareS{c;c_1;c_2;c_3}{\pre}{\post}
+  \Hoare{c;c_1;c_2;c_3}{\pre}{\post}
 } [\verb+swap+\ p_1\ p_2\ p_3]
 \end{displaymath}
 
@@ -734,6 +949,13 @@ between positions $i_1$ and $i_2$.
 
 \subsection{Reasoning about loops: the \rawec{while} tactic}
 %
+\subsubsection{Hoare Logic}
+
+\Syntax
+
+\Description
+
+
 \subsubsection{Probabilistic Hoare Logic}
 \index{phl}{Program Reasoning!while@\rawec{while}}
 
@@ -757,34 +979,36 @@ that may be modified by $c$.
 \begin{displaymath}
   \infrule{
     \begin{array}{c}
-    \bdHoareSge{c'}{\pre }{\chi \land 
+    \HoareGe{c'}{\pre }{\chi \land 
       \forall M.~ (\chi \land 0 \leq e \Rightarrow \neg b)  \land
       \chi \land \neg b \Rightarrow \post}{f} 
     \\[.5ex]
-    \forall k.~ \bdHoareSeq{c}{\chi \land b \land e = k}{\chi \land e
+    \forall k.~ \HoareEq{c}{\chi \land b \land e = k}{\chi \land e
       < k}{1}
   \end{array}
 }{
-    \bdHoareSge{c';\While{b}{c}}{\pre}{\post}{f}
+    \HoareGe{c';\While{b}{c}}{\pre}{\post}{f}
   }\left[\verb+while+\ \chi\ e \right] 
 \end{displaymath}
 Similarly for (=).
+
+\warningbox{The following variants are not implemented}
 
 For an arbitrary bound $g$ the following rule generalizes the one
 above for lower bounded judgments:
 \begin{displaymath}
   \infrule{
     \begin{array}{c}
-    \bdHoareSge{c'}{\pre }{\chi \land e \leq n \land 
+    \HoareGe{c'}{\pre }{\chi \land e \leq n \land 
       \forall M.~ (\chi \land 0 \leq e \Rightarrow \neg b) 
       \land (\chi \land \neg b \Rightarrow \post)}{\frac{f}{g^n}} 
     \\[.5ex]
-    \bdHoareSge{c}{\chi \land b}{\chi}{g}
+    \HoareGe{c}{\chi \land b}{\chi}{g}
     \\[.5ex]
-    \forall k.~ \bdHoareSeq{c}{\chi \land b \land e = k}{e<k}{1}
+    \forall k.~ \HoareEq{c}{\chi \land b \land e = k}{e<k}{1}
   \end{array}
 }{
-    \bdHoareSge{c';\While{b}{c}}{\pre}{\post}{f}
+    \HoareGe{c';\While{b}{c}}{\pre}{\post}{f}
   }\left[\verb+while+\ \chi\ e\ g\ n \right] 
 \end{displaymath}
 
@@ -792,29 +1016,105 @@ and the folowing one for exact judgments (=):
 \begin{displaymath}
   \infrule{
     \begin{array}{c}
-    \bdHoareSge{c'}{\pre }{\chi \land e = n \land 
+    \HoareGe{c'}{\pre }{\chi \land e = n \land 
       \forall M.~ (\chi\Rightarrow (0\leq e \Leftrightarrow \neg b)) 
         \land (\chi \land \neg b \Rightarrow \post)}
       {\frac{f}{g^n}}
     \\[.5ex]
-    \bdHoareSge{c}{\chi \land b}{\chi}{g}
+    \HoareGe{c}{\chi \land b}{\chi}{g}
     \\[.5ex]
-    \forall k.~ \bdHoareSeq{c}{\chi \land b \land e = k}{e=k-1}{1}
+    \forall k.~ \HoareEq{c}{\chi \land b \land e = k}{e=k-1}{1}
   \end{array}
 }{
-    \bdHoareSge{c';\While{b}{c}}{\pre}{\post}{f}
+    \HoareGe{c';\While{b}{c}}{\pre}{\post}{f}
   }\left[\verb+while+\ \chi\ e\ g\ n \right] 
 \end{displaymath}
-
 
 There is no appropriate rule for $(\leq)$.
 
 
-\subsection{Failure Event Lemma: the \rawec{fel} tactic}
-%
-\subsubsection{This rule is not associated to any logic but relies
-  both on Hoare Logic and probabilistic Hoare Logic}
+\subsubsection{Relational Hoare Logic}
 
+\Syntax  \verb+while+ [\textit{side}] \textit{form} [\textit{form}]
+
+\Description This tactic applies the pRHL verification rules for
+loops:
+\begin{itemize}
+\item the optional argument \textit{side} can be either \verb+{1}+ or
+  \verb+{2}+ to indicate the application of one-sided versions of the
+  rule. If missing, the two-sided rule for loops is considered.
+\item the first \textit{form} argument is mandatory and is used as
+  loop invariant. It can refer to variables in both the left and right
+  programs.
+\item the optional parameter \textit{form} is required (and accepted
+  only) in the one-sided application of the rule. This parameter
+  corresponds to the decreasing variant expression used to prove loop
+  termination.
+\end{itemize}
+
+
+
+\paragraph{Two-sided version.}
+%
+\Syntax \verb+while+ \textit{form} 
+%
+\Description Applies the two-sided RHL rule for while loops, using the
+\textit{form} parameter as loop invariant. This tactic requires that
+the last instruction of both left and right statements are while loops.
+In the rule, $M$ refers to the variables that may be modified by the
+loop bodies.
+
+\begin{displaymath}
+\infrule{ 
+  \begin{array}{c}
+    \Equiv{c_2}{c'_2}{I \land e\sidel \land e'\sider}{I \land  e\sidel = e'\sider}\\
+    \Equiv{c_1}{c'_1}{\pre}{ I \land e\sidel = e'\sider \land 
+      \forall M, (I \land \neg e\sidel \land \neg e'\sider \Rightarrow \post)}
+  \end{array}
+}{
+  \Equiv{c_1;\While{e}{c_2}}{c'_1;\While{e'}{c'_1}}{\pre}{\post}
+}
+\end{displaymath}
+
+\paragraph{One-sided version.}
+
+\Syntax \verb+while+ \textit{side} \textit{form} \textit{form} 
+
+\Description Applies the one-sided pRHL rule for while loops, using
+the first parameter \textit{form} as loop invariant and the second
+parameter \textit{form} as a decreasing \textit{variant}
+expression. The variant is used to verify the loop termination. The
+one-sided rule are described below. Only the left (\verb+{1}+) variant
+is shown; the right (\verb+{2}+) variant is symmetric. The expressions
+$\forall X,~\varphi$ and $\exists X,~\varphi$ denote, respectively,
+universal and existential quantification over the set of variables $X$
+modified in the loop body $c$.
+
+\begin{displaymath}
+\infrule{
+  \begin{array}{c}
+    \vdash I \land v \leq b \Rightarrow \neg e  \\
+    \Equiv{c}{\Skip}{b=B \land v=C \land e \land I }{b=B \land v<C \land I} \\
+    \Equiv{c_1}{c_2}{\pre}{I \land \forall X, (I \land \neg e
+      \Rightarrow \post)}
+  \end{array}
+}{
+  \Equiv{c_1;\While{e}{c}}{c_2}{\pre}{\post}
+}
+\end{displaymath}
+
+\subsection{Reasoning with function invocation: the \rawec{call}
+  tactic}
+
+\subsubsection{Hoare Logic}
+
+\subsubsection{Probabilistic Hoare Logic}
+
+\subsubsection{Relational Hoare Logic}
+
+
+\subsection{Reasoning with \emph{failure events}: the \rawec{fel} tactic}
+%
 The following rule describes the application of the tactic
 $\verb+fel+\ k\ q\ c\ \delta\ F\ P$.  Assume $f$ is defined and
 $c_1,c_2$ stands for the splitting of its body at position $k$. Let
@@ -827,15 +1127,15 @@ modified by $\left\{O_i\right\}_{i=0}^k$.
   \begin{array}{c}
     \left\{
     \begin{array}{l}
-      \bdHoareSle{O_i}{\neg F}{F}{c \delta} \\
-      \forall c_0,\ \hoareS{O_i}{P\land c=c_0}{c_0 < c} \\
-      \forall c_0,\ \forall f_0,\ \hoareS{O_i}{\neg P\land F=f_0 \land c=c_0}{F=f_0 \land c=c_0} \\
+      \HoareLe{O_i}{\neg F}{F}{c \delta} \\
+      \forall c_0,\ \Hoare{O_i}{P\land c=c_0}{c_0 < c} \\
+      \forall c_0,\ \forall f_0,\ \Hoare{O_i}{\neg P\land F=f_0 \land c=c_0}{F=f_0 \land c=c_0} \\
     \end{array}\right\}_{i=0}^k\\[5ex]
     \forall m', (\varphi \Rightarrow F \land c\leq q) 
     \qquad 
     q (q-1) \delta \leq \epsilon 
     \qquad
-    \hoareS{c_1}{\true}{\neg F \land c=0}
+    \Hoare{c_1}{\true}{\neg F \land c=0}
   \end{array}
 }{
   \Prm{f}{m}{\varphi} \leq \epsilon  
@@ -852,7 +1152,67 @@ modified by $\left\{O_i\right\}_{i=0}^k$.
   \forall m_1,\ \forall m_2,\ 
   \Prm{f_1}{m_1}{\varphi_1} = \Prm{f_2}{m_2}{\varphi_2}
 }{
-  \equivF{f_1}{f_2}{\pre}{\post}
+  \Equiv{f_1}{f_2}{\pre}{\post}
+}
+\end{displaymath}
+
+
+\subsection{Loop reordering}
+
+\Syntax 
+
+\Description 
+An invocation of 
+$$\left[\verb+reordering+\ i\ (p_{w_1},p_{\mathsf{incr}_1})\
+  (p_{w_2},p_{\mathsf{incr}_2})\ \mathcal{I}\ \varolessthan\ (f,f^{-1})\right]$$
+%
+where $i$ is the iteration expression, $p_{w_1},p_{w_2}$ indicates the
+position of the while loops and
+$p_{\mathsf{incr}_1},p_{\mathsf{incr}_2}$ the position of the $d$
+statement increasing $i$, $b$ only depends on $i$, $c$ does not modify
+$i$, $\mathcal{I}:\verb+'a+\to \verb+Bool+$, $\varolessthan:
+\verb+'a+\to\verb+'a+\to\verb+Bool+$, $f:\verb+'a+\to\verb+'a+$
+
+ implements the following rule
+%
+\begin{displaymath}
+\infrule{
+\begin{array}{c}
+  \Equiv{c_1}{c_2}{\pre}{\varphi \land \left| 
+      \begin{array}{l}
+        (\mathcal{I}\,i \Rightarrow\forall j,~\mathcal{I}\,j
+        \Rightarrow i<j) \land  
+      \\
+      \varphi \land
+      \\
+      \forall j.~\neg\mathcal{I}\,j\Rightarrow \neg\,j \land
+      \\
+      \forall M.~ (\varphi\Rightarrow Q) \land
+    \end{array}
+    \right.
+  }
+  \\
+  \mbox{$f$ bijection on $\mathcal{I}$}
+  \\
+  \forall z_1\,z_2\Equiv
+  {c\subst{i}{f\,z_1};c\subst{i}{f\,z_2}}
+  {c\subst{i}{f\,z_2};c\subst{i}{f\,z_1}}
+  {
+    \begin{array}{l}
+      \mathcal{I}\,z_1 \land \mathcal{I}\,z_2 \land z_1\varolessthan
+      z_2 
+      \\ 
+      \land f\, z_2\varolessthan f\, z_1\land \varphi
+    \end{array}
+  }
+  {\varphi}
+  \\
+  \Equiv{c}{c}
+  {\mathcal{I}\,i \land i\sidel=i\sider \land \varphi}
+  {\varphi}
+\end{array}
+}{
+\Equiv{c_1;\While{b}{(c(i);d)}}{c_2;\While{b}{(c(f\,i);d)}}{\pre}{\post}
 }
 \end{displaymath}
 

@@ -326,6 +326,15 @@ let t_equivS_conseq pre post g =
   let concl3 = f_equivS_r { es with es_pr = pre; es_po = post } in
   prove_goal_by [concl1; concl2; concl3] (RN_hl_conseq) g
 
+let t_hr_conseq pre post g = 
+  match (get_concl g).f_node with 
+  | FhoareF _   -> t_hoareF_conseq pre post g
+  | FhoareS _   -> t_hoareS_conseq pre post g
+  | FbdHoareF _ -> t_bdHoareF_conseq pre post g
+  | FbdHoareS _ -> t_bdHoareS_conseq pre post g
+  | FequivF _   -> t_equivF_conseq pre post g
+  | FequivS _   -> t_equivS_conseq pre post g
+  | _           -> tacerror (NotPhl None)
 (* -------------------------------------------------------------------- *)
 
 let t_equivF_notmod post g = 
@@ -343,10 +352,15 @@ let t_equivF_notmod post g =
   let ml, mr = fst mpol, fst mpor in
   let s = PVM.add env pvresl ml fresl (PVM.add env pvresr mr fresr PVM.empty) in
   let cond = f_imp post ef.ef_po in
-  let cond  = PVM.subst env s cond in 
+  let cond = PVM.subst env s cond in 
   let modil, modir = f_write env fl, f_write env fr in
   let cond = generalize_mod env mr modir cond in
   let cond = generalize_mod env ml modil cond in
+  let cond = 
+    f_forall_simpl
+      [(vresl, GTty fsigl.fs_ret);
+       (vresr, GTty fsigr.fs_ret)]
+      cond in
   assert (fst mprl = ml && fst mprr = mr);
   let cond1 = gen_mems [mprl; mprr] (f_imp ef.ef_pr cond) in
   let cond2 = f_equivF ef.ef_pr fl fr post in
@@ -364,56 +378,192 @@ let t_equivS_notmod post g =
   let cond1 = gen_mems [es.es_ml; es.es_mr] (f_imp es.es_pr cond) in
   let cond2 = f_equivS_r {es with es_po = post} in
   prove_goal_by [cond1;cond2] RN_notmod g
-  
-let t_equivF_conseq_nm pre post g = 
-  t_seq_subgoal (t_equivF_notmod post)
-    [ t_id None;
-      t_seq_subgoal (t_equivF_conseq pre post)
-       [t_id None; t_trivial; t_id None] ] g
 
-let t_equivS_conseq_nm pre post g = 
-  t_seq_subgoal (t_equivS_notmod post)
+let gen_conseq_nm tnm tc pre post = 
+  t_seq_subgoal (tnm post)
     [ t_id None;
-      t_seq_subgoal (t_equivS_conseq pre post)
-       [t_id None; t_trivial; t_id None] ] g
+      t_seq_subgoal (tc pre post)
+        [t_id None; t_trivial; t_id None] ]
+  
+let t_equivF_conseq_nm = 
+  gen_conseq_nm t_equivF_notmod t_equivF_conseq 
+
+let t_equivS_conseq_nm = 
+  gen_conseq_nm t_equivS_notmod t_equivS_conseq
+
+let t_hoareF_notmod post g = 
+  let env,hyps,concl = get_goal_e g in
+  let hf = destr_hoareF concl in
+  let f = hf.hf_f in
+  let mpr,mpo = Fun.hoareF_memenv f env in
+  let fsig = (Fun.by_xpath f env).f_sig in
+  let pvres = pv_res f in
+  let vres = LDecl.fresh_id hyps "result" in
+  let fres = f_local vres fsig.fs_ret in
+  let m    = fst mpo in
+  let s = PVM.add env pvres m fres PVM.empty in
+  let cond = f_imp post hf.hf_po in
+  let cond = PVM.subst env s cond in 
+  let modi = f_write env f in
+  let cond = generalize_mod env m modi cond in
+  let cond = 
+    f_forall_simpl [(vres, GTty fsig.fs_ret)] cond in
+  assert (fst mpr = m);
+  let cond1 = gen_mems [mpr] (f_imp hf.hf_pr cond) in
+  let cond2 = f_hoareF hf.hf_pr f post in
+  prove_goal_by [cond1;cond2] RN_notmod g
+
+let t_hoareS_notmod post g = 
+  let env,_,concl = get_goal_e g in
+  let hs = destr_hoareS concl in
+  let s = hs.hs_s in
+  let m = fst hs.hs_m in
+  let cond = f_imp post hs.hs_po in
+  let modi = s_write env s in
+  let cond = generalize_mod env m modi cond in
+  let cond1 = gen_mems [hs.hs_m] (f_imp hs.hs_pr cond) in
+  let cond2 = f_hoareS_r {hs with hs_po = post} in
+  prove_goal_by [cond1;cond2] RN_notmod g
+
+let t_hoareF_conseq_nm = 
+  gen_conseq_nm t_hoareF_notmod t_hoareF_conseq 
+
+let t_hoareS_conseq_nm = 
+  gen_conseq_nm t_hoareS_notmod t_hoareS_conseq
+
+let t_bdHoareF_notmod post g = 
+  let env,hyps,concl = get_goal_e g in
+  let hf = destr_bdHoareF concl in
+  let f = hf.bhf_f in
+  let mpr,mpo = Fun.hoareF_memenv f env in
+  let fsig = (Fun.by_xpath f env).f_sig in
+  let pvres = pv_res f in
+  let vres = LDecl.fresh_id hyps "result" in
+  let fres = f_local vres fsig.fs_ret in
+  let m    = fst mpo in
+  let s = PVM.add env pvres m fres PVM.empty in
+  let cond = f_imp post hf.bhf_po in
+  let cond = PVM.subst env s cond in 
+  let modi = f_write env f in
+  let cond = generalize_mod env m modi cond in
+  let cond = 
+    f_forall_simpl [(vres, GTty fsig.fs_ret)] cond in
+  assert (fst mpr = m);
+  let cond1 = gen_mems [mpr] (f_imp hf.bhf_pr cond) in
+  let cond2 = f_bdHoareF hf.bhf_pr f post hf.bhf_cmp hf.bhf_bd in
+  prove_goal_by [cond1;cond2] RN_notmod g
+
+let t_bdHoareS_notmod post g = 
+  let env,_,concl = get_goal_e g in
+  let hs = destr_bdHoareS concl in
+  let s = hs.bhs_s in
+  let m = fst hs.bhs_m in
+  let cond = f_imp post hs.bhs_po in
+  let modi = s_write env s in
+  let cond = generalize_mod env m modi cond in
+  let cond1 = gen_mems [hs.bhs_m] (f_imp hs.bhs_pr cond) in
+  let cond2 = f_bdHoareS_r {hs with bhs_po = post} in
+  prove_goal_by [cond1;cond2] RN_notmod g
+
+let t_bdHoareF_conseq_nm = 
+  gen_conseq_nm t_bdHoareF_notmod t_bdHoareF_conseq 
+
+let t_bdHoareS_conseq_nm = 
+  gen_conseq_nm t_bdHoareS_notmod t_bdHoareS_conseq
 
 
 (* -------------------------------------------------------------------- *)
 
-let t_hoareF_exfalso g =
-  let concl = get_concl g in
-  let hf = destr_hoareF concl in
-  if hf.hf_pr <> f_false then tacerror InvalidExfalso;
-  prove_goal_by [] (RN_hl_exfalso) g
+let get_pre f = 
+  match f.f_node with
+  | FhoareF hf   -> hf.hf_pr
+  | FhoareS hs   -> hs.hs_pr
+  | FbdHoareF hf -> hf.bhf_pr
+  | FbdHoareS hs -> hs.bhs_pr
+  | FequivF ef   -> ef.ef_pr
+  | FequivS es   -> es.es_pr
+  | _            -> tacerror (NotPhl None)
 
-let t_hoareS_exfalso g =
-  let concl = get_concl g in
-  let hs = destr_hoareS concl in
-  if hs.hs_pr <> f_false then tacerror InvalidExfalso;
-  prove_goal_by [] (RN_hl_exfalso) g
+let get_post f = 
+  match f.f_node with
+  | FhoareF hf   -> hf.hf_po
+  | FhoareS hs   -> hs.hs_po
+  | FbdHoareF hf -> hf.bhf_po
+  | FbdHoareS hs -> hs.bhs_po
+  | FequivF ef   -> ef.ef_po
+  | FequivS es   -> es.es_po
+  | _            -> tacerror (NotPhl None)
 
-let t_bdHoareF_exfalso g =
-  let concl = get_concl g in
-  let bhf = destr_bdHoareF concl in
-  if bhf.bhf_pr <> f_false then tacerror InvalidExfalso;
-  prove_goal_by [] (RN_hl_exfalso) g
+let set_pre pre f = 
+  match f.f_node with
+ | FhoareF hf   -> f_hoareF pre hf.hf_f hf.hf_po
+ | FhoareS hs   -> f_hoareS_r { hs with hs_pr = pre} 
+ | FbdHoareF hf -> f_bdHoareF pre hf.bhf_f hf.bhf_po hf.bhf_cmp hf.bhf_bd
+ | FbdHoareS hs -> f_bdHoareS_r { hs with bhs_pr = pre}
+ | FequivF ef   -> f_equivF pre ef.ef_fl ef.ef_fr ef.ef_po
+ | FequivS es   -> f_equivS_r { es with es_pr = pre }
+ | _            -> tacerror (NotPhl None)
 
-let t_bdHoareS_exfalso g =
+let t_hr_exists_elim g = 
   let concl = get_concl g in
-  let bhs = destr_bdHoareS concl in
-  if bhs.bhs_pr <> f_false then tacerror InvalidExfalso;
-  prove_goal_by [] (RN_hl_exfalso) g
+  let pre = get_pre concl in
+  let bd, pre = destr_exists pre in
+  (* TODO check that bd is not bind in the post *)
+  let concl = f_forall bd (set_pre pre concl) in
+  prove_goal_by [concl] RN_hl_exists_elim g
 
-let t_equivF_exfalso g =
-  let concl = get_concl g in
-  let ef = destr_equivF concl in
-  if ef.ef_pr <> f_false then tacerror InvalidExfalso;
-  prove_goal_by [] (RN_hl_exfalso) g
+let get_to_gen side f = 
+  let do_side m = 
+    if side then 
+      if EcIdent.id_equal m mleft then true 
+      else (assert (EcIdent.id_equal m mright); false)
+    else (assert (EcIdent.id_equal m mhr); true) in
+  match f.f_node with
+  | Fpvar(pv,m) -> 
+    let id = id_of_pv pv m in
+    (id, do_side m, f_pvar pv f.f_ty, f)
+  | Fglob(mp,m) ->
+    assert (
+      if side then EcIdent.id_equal m mleft || EcIdent.id_equal m mright
+      else EcIdent.id_equal m mhr);
+    let id = id_of_mp mp m in
+    (id, do_side m, f_glob mp, f)
+  | _ -> tacuerror "global memory or variable expected"
 
-let t_equivS_exfalso g =
+let get_to_gens side fs = 
+  List.map (get_to_gen side) fs
+
+let t_hr_exists_intro fs g = 
+  let hyps, concl = get_goal g in 
+  let pre = get_pre concl in
+  let post = get_post concl in
+  let side = is_equivS concl || is_equivF concl in
+  let gen = get_to_gens side fs in
+  let eqs = List.map (fun (id,_,_,f) -> f_eq (f_local id f.f_ty) f) gen in
+  let bd = List.map (fun (id,_,_,f) -> id, GTty f.f_ty) gen in
+  let pre = f_exists bd (f_and (f_ands eqs) pre) in
+  let ms = 
+    if side then LDecl.fresh_ids hyps ["&ml";"&mr";"H"] 
+    else LDecl.fresh_ids hyps ["&m";"H"] in
+  let h = List.hd (List.rev ms) in
+  let args = 
+    let ml = List.hd ms in
+    let mr = if side then List.hd (List.tl ms) else ml in
+    let do1 (_,side,mk,_) = 
+      AAform (mk (if side then ml else mr)) in
+    List.map do1 gen in
+  t_seq_subgoal (t_hr_conseq pre post)
+    [ t_lseq [ t_intros_i ms;
+               gen_t_exists (fun _ _ f -> f) args; 
+               t_hyp h ];
+      t_trivial; t_id None] g
+
+(* -------------------------------------------------------------------- *)
+
+let t_hr_exfalso g = 
   let concl = get_concl g in
-  let es = destr_equivS concl in
-  if es.es_pr <> f_false then tacerror InvalidExfalso;
+  let pre = get_pre concl in
+  if pre <> f_false then tacerror InvalidExfalso;
   prove_goal_by [] (RN_hl_exfalso) g
 
 (* -------------------------------------------------------------------- *)
@@ -2048,15 +2198,14 @@ let wp_equiv_rnd (f,finv) g =
   let tfinv = finv tyR tyL in
   let f t = f_app tf  [t] tyR in
   let finv t = f_app tfinv [t] tyL in
-  let supp_cond1 = (f_in_supp x muL) ==> 
-    ((f_mu_x muL x) === (f_mu_x muR (f x))) in
-  let supp_cond2 = (f_in_supp y muR) ==> (f_in_supp (finv y) muL) in
-  let inv_cond1 =  (f_in_supp x muL) ==> ((finv (f x)) === x) in
-  let inv_cond2 =  (f_in_supp y muR) ==> ((f (finv y)) === y) in
+  let supp_cond1 =  ((f_mu_x muL x) === (f_mu_x muR (f x))) in
+  let supp_cond2 =  f_in_supp (finv y) muL in
+  let inv_cond1 =   (finv (f x)) === x in
+  let inv_cond2 =   (f (finv y)) === y in
   let post = subst_form_lv env (EcMemory.memory es.es_ml) lvL x es.es_po in
   let post = subst_form_lv env (EcMemory.memory es.es_mr) lvR (f x) post in
-  let post = (f_in_supp x muL) ==> post in
   let post = supp_cond1 &&& supp_cond2 &&& inv_cond1 &&& inv_cond2 &&& post in
+  let post = (f_in_supp x muL) ==> ((f_in_supp y muR) ==> post) in
   let post = f_forall_simpl [(x_id,GTty tyL);(y_id,GTty tyR)] post in
   let concl = f_equivS_r {es with es_sl=sl'; es_sr=sr'; es_po=post} in
   prove_goal_by [concl] (RN_hl_equiv_rnd ((Some tf, Some tfinv))) g

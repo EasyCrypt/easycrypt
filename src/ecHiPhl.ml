@@ -588,17 +588,25 @@ let process_conseq notmod info (_, n as g) =
   let t_conseq = 
     let (_,f) = get_node (juc,an) in
     match f.f_node with
-    | FhoareF hf   -> t_hoareF_conseq hf.hf_pr hf.hf_po
-    | FhoareS hs   -> t_hoareS_conseq hs.hs_pr hs.hs_po
-    | FbdHoareF hf -> t_bdHoareF_conseq hf.bhf_pr hf.bhf_po
-    | FbdHoareS hs -> t_bdHoareS_conseq hs.bhs_pr hs.bhs_po
+    | FhoareF hf   -> 
+      if notmod then t_hoareF_conseq_nm hf.hf_pr hf.hf_po
+      else t_hoareF_conseq hf.hf_pr hf.hf_po
+    | FhoareS hs   -> 
+      if notmod then t_hoareS_conseq_nm hs.hs_pr hs.hs_po
+      else t_hoareS_conseq hs.hs_pr hs.hs_po
+    | FbdHoareF hf ->
+      if notmod then t_bdHoareF_conseq_nm hf.bhf_pr hf.bhf_po
+      else t_bdHoareF_conseq hf.bhf_pr hf.bhf_po
+    | FbdHoareS hs -> 
+      if notmod then t_bdHoareS_conseq_nm hs.bhs_pr hs.bhs_po
+      else t_bdHoareS_conseq hs.bhs_pr hs.bhs_po
     | FequivF ef   -> 
       if notmod then t_equivF_conseq_nm ef.ef_pr ef.ef_po
       else t_equivF_conseq ef.ef_pr ef.ef_po
     | FequivS es   -> 
       if notmod then t_equivS_conseq_nm es.es_pr es.es_po 
       else t_equivS_conseq es.es_pr es.es_po 
-    | _ -> assert false (* FIXME error message *) in
+    | _ -> tacuerror "cannot apply conseq rule, not a phl/prhl judgement" in
   t_seq_subgoal t_conseq
     [!t_pre; !t_post; t_use an gs] (juc,n)
   
@@ -617,51 +625,9 @@ let process_fun_abs inv g =
 
 let process_exfalso g =
   let concl = get_concl g in
-  let t_trivial = t_progress (t_id None) in
-  if is_hoareF concl then   
-    let hf = destr_hoareF concl in
-    t_or 
-      (t_hoareF_exfalso)
-      (t_seq_subgoal 
-         (t_hoareF_conseq f_false hf.hf_po) 
-         [t_id None; t_trivial; t_hoareF_exfalso]) g
-  else if is_hoareS concl then
-    let hs = destr_hoareS concl in
-    t_or 
-      (t_hoareS_exfalso)
-      (t_seq_subgoal 
-         (t_hoareS_conseq f_false hs.hs_po) 
-         [t_id None; t_trivial; t_hoareS_exfalso]) g
-  else if is_bdHoareF concl then
-    let bhf = destr_bdHoareF concl in
-    t_or 
-      (t_bdHoareF_exfalso)
-      (t_seq_subgoal 
-         (t_bdHoareF_conseq f_false bhf.bhf_po) 
-         [t_id None; t_trivial; t_bdHoareF_exfalso]) g
-  else if is_bdHoareS concl then
-    let bhs = destr_bdHoareS concl in
-    t_or 
-      (t_bdHoareS_exfalso)
-      (t_seq_subgoal 
-         (t_bdHoareS_conseq f_false bhs.bhs_po) 
-         [t_id None; t_trivial; t_bdHoareS_exfalso]) g
-  else if is_equivF concl then
-    let ef = destr_equivF concl in
-    t_or 
-      (t_equivF_exfalso)
-      (t_seq_subgoal 
-         (t_equivF_conseq f_false ef.ef_po) 
-         [t_id None; t_trivial; t_equivF_exfalso]) g
-  else if is_equivS concl then
-    let es = destr_equivS concl in
-    t_or 
-      (t_equivS_exfalso)
-      (t_seq_subgoal 
-         (t_equivS_conseq f_false es.es_po) 
-         [t_id None; t_trivial; t_equivS_exfalso]) g
-  else assert false
- 
+  t_or (t_hr_exfalso)
+    (t_seq_subgoal (t_hr_conseq f_false (get_post concl))
+        [t_id None; t_trivial; t_hr_exfalso ]) g
 
 let process_ppr (phi1,phi2) g =
   let hyps,concl = get_goal g in
@@ -704,8 +670,19 @@ let process_prfalse = t_prfalse
 let process_pror = t_pror
 let process_bdeq = t_bdeq
 
-
-
+let process_exists_intro fs g = 
+  let hyps,concl = get_goal g in
+  let penv = 
+    match concl.f_node with
+    | FhoareF hf -> fst (LDecl.hoareF hf.hf_f hyps)
+    | FhoareS hs -> LDecl.push_active hs.hs_m hyps 
+    | FbdHoareF bhf ->fst (LDecl.hoareF bhf.bhf_f hyps) 
+    | FbdHoareS bhs -> LDecl.push_active bhs.bhs_m hyps 
+    | FequivF ef -> fst (LDecl.equivF ef.ef_fl ef.ef_fr hyps)
+    | FequivS es -> LDecl.push_all [es.es_ml; es.es_mr] hyps 
+    | _ -> tacuerror "cannot apply conseq rule, not a phl/prhl judgement" in  
+  let fs = List.map (fun f -> process_form_opt penv f None) fs in
+  t_hr_exists_intro fs g 
 
 let process_eqobs_in (ginv,gother,inv) g = 
   let ginv = process_prhl_formula g ginv in
@@ -763,6 +740,8 @@ let process_phl loc ptac g =
     | Palias info               -> process_alias info
     | Prnd (side, info)         -> process_rnd side info
     | Pconseq (nm,info)         -> process_conseq nm info
+    | Phr_exists_elim           -> t_hr_exists_elim
+    | Phr_exists_intro fs       -> process_exists_intro fs
     | Pexfalso                  -> process_exfalso
     | Pbdhoaredeno info         -> process_bdHoare_deno info
     | PPr (phi1,phi2)           -> process_ppr (phi1,phi2)

@@ -327,14 +327,19 @@ let t_glob p tys (juc,n as g) =
 let t_smt strict pi g =
   let error = tacuerror ~catchable:(not strict) in
 
-  let goal = get_goal g in
-  try
-    if EcEnv.check_goal pi goal then
-      let rule = { pr_name = RN_prover (); pr_hyps = [] } in
-        upd_rule_done rule g
-    else error "cannot prove goal"
-  with EcWhy3.CanNotTranslate _ ->
-    error "cannot prove goal"
+  let _,concl as goal = get_goal g in
+  match concl.f_node with
+    | FequivF _ | FequivS _ | FhoareF _ | FhoareS _ | FbdHoareF _  | FbdHoareS _ -> 
+      tacuerror 
+        "Cannot process program judgement, use skip tactic first"
+    | _ ->
+        try
+          if EcEnv.check_goal pi goal then
+            let rule = { pr_name = RN_prover (); pr_hyps = [] } in
+            upd_rule_done rule g
+          else error "cannot prove goal"
+        with EcWhy3.CanNotTranslate _ ->
+          error "cannot prove goal"
 
 let t_clear ids (juc,n as g) =
   let pp_id fmt id = Format.fprintf fmt "%s" (EcIdent.name id) in
