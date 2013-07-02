@@ -30,10 +30,10 @@ module G (A:Adv) = {
 
 equiv foo (A<:Adv {O} ) : G(A).main ~ G(A).main : ={x,O.m,O.l} ==> ={res,O.m,O.l}.
 fun.
-eqobs_in true (={O.m,O.l,x}) true.
+eqobs_in true true (={O.m,O.l,x}).
 save.
 
 equiv foo1 (A<:Adv {O} ) : G(A).main ~ G(A).main : ={x,O.m,O.l,glob A} ==> ={res,O.m,glob A}.
 fun.
-eqobs_in true (={O.m,glob A,x,O.l}) true.
+eqobs_in true true (={O.m,glob A,x,O.l}).
 save.
