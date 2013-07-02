@@ -123,8 +123,8 @@ proof.
  fun.
  rnd (lambda x, f x) (lambda x, finv x).
  skip.
- intros &1 &2 _ x y.
- split;[ split;[ split;smt | smt ] | smt ].
+ intros &1 &2 _ x y H1 H2.
+ simplify; split;[ split;[ split;smt | smt ] | smt ].
 save.
 
 
@@ -135,8 +135,8 @@ proof.
  fun.
  rnd (lambda x, f x) (lambda x, finv x ).
  skip.
- intros &1 &2 _ x y.
- split;[ split;[ split;smt | smt ] | smt ].
+ intros &1 &2 _ x y H1 H2.
+ simplify. split;[ split;[ split;smt | smt ] | smt ].
 save.
 
 
