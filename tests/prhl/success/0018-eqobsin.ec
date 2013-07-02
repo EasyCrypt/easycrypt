@@ -11,7 +11,7 @@ module M = {
 
 equiv test : M.f ~ M.f : ={z,M.w,M.y} ==> ={M.x,M.y,res}.
 fun.
-eqobs_in true (={M.x,M.y,z}) true.
+eqobs_in (={M.x,M.y,z}).
 save.
 
 module M0 = { 
@@ -30,7 +30,7 @@ module M0 = {
 equiv test0 : M.f ~ M0.f : M.w{1} = M0.w{2} /\ M.y{1} = M0.y{2} /\ ={z}  ==> 
                 M.x{1} = M0.x{2} /\ M.y{1} = M0.y{2} /\ ={res}.
 fun.
-eqobs_in true (M.x{1} = M0.x{2} /\ M.y{1} = M0.y{2} /\ ={z}) true.
+eqobs_in (M.x{1} = M0.x{2} /\ M.y{1} = M0.y{2} /\ ={z}).
 save.
 
 module M1 = { 
@@ -49,7 +49,7 @@ module M1 = {
 equiv test1 : M.f ~ M1.f : M.w{1} = M1.w{2} /\ M.y{1} = M1.y{2} /\ ={z}  ==> 
                 M.x{1} = M1.x{2} /\ M.y{1} = M1.y{2} /\ ={res}.
 fun.
-eqobs_in true (M.x{1} = M1.x{2} /\ M.y{1} = M1.y{2} /\ ={z}) true.
+eqobs_in (M.x{1} = M1.x{2} /\ M.y{1} = M1.y{2} /\ ={z}).
 save.
 
   
