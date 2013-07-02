@@ -709,6 +709,18 @@ let destr_forall1 f =
   | Fquant(Lforall,(x,t)::bd,p) -> x,t,f_forall bd p 
   | _ -> destr_error "forall"
 
+let destr_forall f = 
+  match f.f_node with
+  | Fquant(Lforall,bd,p) -> bd, p 
+  | _ -> destr_error "forall"
+
+let decompose_forall f = 
+  match f.f_node with
+  | Fquant(Lforall,bd,p) -> bd, p 
+  | _ -> [], f
+
+  
+
 let destr_exists1 f = 
   match f.f_node with
   | Fquant(Lexists,(x,t)::bd,p) -> x,t,f_exists bd p 
