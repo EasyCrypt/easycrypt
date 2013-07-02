@@ -130,6 +130,29 @@ intros=> x xs' IH.
 by rewrite appCcons 2!mem_cons orA IH.
 qed.
 
+(** rev *)
+op rev: 'a list -> 'a list.
+axiom rev_nil: rev<:'a> [] = [].
+axiom rev_cons: forall (x:'a) xs, rev (x::xs) = (rev xs) ++ (x::[]).
+
+(* Lemmas *)
+lemma rev_app: forall (xs ys:'a list),
+  rev (xs ++ ys) = (rev ys) ++ (rev xs).
+proof strict.
+intros=> xs; elimT list_ind xs=> {xs}.
+  by intros=> ys; rewrite rev_nil app_nil app_nilR //.
+  by intros=> x xs IH ys; rewrite appCcons 2!rev_cons -appA IH //.
+qed.
+
+lemma rev_rev: forall (xs:'a list),
+  rev (rev xs) = xs.
+proof strict.
+intros=> xs; elimT list_ind xs=> {xs}.
+  by rewrite 2!rev_nil //.
+  by intros=> x xs IH; rewrite rev_cons rev_app IH rev_cons
+                               rev_nil app_nil appCcons app_nil //.
+qed.
+
 (** all *)
 pred all(p:'a cpred) xs = forall x, mem x xs => p x.
 
@@ -379,28 +402,29 @@ intros=> x y xs; elimT list_ind xs=> {xs}.
   intros=> x' xs IH x_y; smt.
 qed.
 
-(** Equality up to permutation *)
-pred (<->) (xs xs':'a list) =
-  forall (x:'a), count x xs = count x xs'.
+theory PermutationLists.
+  (** Equality up to permutation *)
+  pred (<->) (xs xs':'a list) =
+    forall (x:'a), count x xs = count x xs'.
 
-lemma perm_refl: forall (xs:'a list), xs <-> xs by [].
-lemma perm_symm: forall (xs ys:'a list), xs <-> ys => ys <-> xs by [].
-lemma perm_trans: forall (ys xs zs:'a list), xs <-> ys => ys <-> zs => xs <-> zs by [].
+  lemma perm_refl: forall (xs:'a list), xs <-> xs by [].
+  lemma perm_symm: forall (xs ys:'a list), xs <-> ys => ys <-> xs by [].
+  lemma perm_trans: forall (ys xs zs:'a list), xs <-> ys => ys <-> zs => xs <-> zs by [].
 
-lemma perm_nil: forall (xs:'a list),
-  xs <-> [] =>
-  xs = [].
-proof strict.
-intros=> xs; delta (<->) beta=> xs_nil;
-cut h: forall (x:'a), count x xs = 0.
-  by intros=> x; rewrite -(count_nil x) xs_nil //.
-  smt. (* TODO: Add lemmas to count *)
-qed.
+  lemma perm_nil: forall (xs:'a list),
+    xs <-> [] =>
+    xs = [].
+  proof strict.
+  intros=> xs; delta (<->) beta=> xs_nil;
+  cut h: forall (x:'a), count x xs = 0.
+    by intros=> x; rewrite -(count_nil x) xs_nil //.
+    smt. (* TODO: Add lemmas to count *)
+  qed.
 
-lemma perm_cons: forall x (xs ys:'a list),
-  xs <-> ys =>
-  (x::xs) <-> (x::ys)
-by [].
+  lemma perm_cons: forall x (xs ys:'a list),
+    xs <-> ys =>
+    (x::xs) <-> (x::ys)
+  by [].
 
 lemma perm_rm: forall x (xs ys:'a list),
   xs <-> ys =>
@@ -477,3 +501,4 @@ intros=> xs; elimT list_ind xs=> {xs}.
       by rewrite -(rm_consE x xs); apply perm_rm=> //. (* This should become a lemma *)
       by rewrite length_rm; smt.
 qed.
+end PermutationLists.
