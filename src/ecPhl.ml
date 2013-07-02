@@ -567,10 +567,16 @@ let t_hr_exfalso g =
   prove_goal_by [] (RN_hl_exfalso) g
 
 (* -------------------------------------------------------------------- *)
+let check_concrete env f = 
+  if NormMp.is_abstract_fun f env then
+    let ppe = EcPrinting.PPEnv.ofenv env in
+    tacuerror "The function %a is abstract, it should be concrete"
+      (EcPrinting.pp_funname ppe) f 
 
 let t_hoareF_fun_def g = 
   let env,_,concl = get_goal_e g in
   let hf = destr_hoareF concl in
+  check_concrete env hf.hf_f;
   let memenv, fdef, env = Fun.hoareS hf.hf_f env in (* FIXME catch exception *)
   let m = EcMemory.memory memenv in
   let fres = 
@@ -584,6 +590,7 @@ let t_hoareF_fun_def g =
 let t_bdHoareF_fun_def g = 
   let env,_,concl = get_goal_e g in
   let bhf = destr_bdHoareF concl in
+  check_concrete env bhf.bhf_f;
   let memenv, fdef, env = Fun.hoareS bhf.bhf_f env in(* FIXME catch exception *)
   let m = EcMemory.memory memenv in
   let fres = 
@@ -594,12 +601,11 @@ let t_bdHoareF_fun_def g =
   let concl' = f_bdHoareS memenv bhf.bhf_pr fdef.f_body post bhf.bhf_cmp bhf.bhf_bd  in
   prove_goal_by [concl'] RN_hl_fun_def g
 
-
 let t_equivF_fun_def g = 
   let env,_,concl = get_goal_e g in
   let ef = destr_equivF concl in
-  let memenvl,fdefl,memenvr,fdefr,env = Fun.equivS ef.ef_fl ef.ef_fr env in 
-                                (* FIXME catch exception *)
+  check_concrete env ef.ef_fl; check_concrete env ef.ef_fr;
+  let memenvl,fdefl,memenvr,fdefr,env = Fun.equivS ef.ef_fl ef.ef_fr env in
   let ml, mr = EcMemory.memory memenvl, EcMemory.memory memenvr in
   let fresl = 
     match fdefl.f_ret with
