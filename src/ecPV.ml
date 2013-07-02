@@ -688,21 +688,24 @@ let eqobs_in env fun_spec c1 c2 eqo (inv,ifvl,ifvr) =
   let rev st = List.rev st.s_node in
 
   let check pv fv _eqs = 
-    if PV.mem_pv env pv fv then raise EqObsInError;
-    try 
-      if is_glob pv then
-        let pv = pvm env pv in
-        let top = EcPath.m_functor pv.pv_name.x_top in
-        let check1 mp = 
-          let restr = get_restr env mp in
-          Mpv.check_npv_mp env pv top mp restr in
-  (*      Sm.iter check1 eqs.Mpv2.s_gl; *) (* Not needed *)
-        Sm.iter check1 fv.PV.s_gl
-    with _ -> raise EqObsInError in
+    if PV.mem_pv env pv fv then false 
+    else 
+      try 
+        if is_glob pv then begin
+          let pv = pvm env pv in
+          let top = EcPath.m_functor pv.pv_name.x_top in
+          let check1 mp = 
+            let restr = get_restr env mp in
+            Mpv.check_npv_mp env pv top mp restr in
+        (*      Sm.iter check1 eqs.Mpv2.s_gl; *) (* Not needed *)
+          Sm.iter check1 fv.PV.s_gl
+        end;
+        true
+      with _ -> false in
 
   let check_not_l lvl eqo =
     let aux (pv,_) =
-      check pv ifvl eqo;
+      check pv ifvl eqo &&
       not (Mpv2.mem_pv_l env pv eqo) in
     match lvl with
     | LvVar xl   -> aux xl
@@ -711,7 +714,7 @@ let eqobs_in env fun_spec c1 c2 eqo (inv,ifvl,ifvr) =
 
   let check_not_r lvr eqo =
     let aux (pv,_) =
-      check pv ifvr eqo;
+      check pv ifvr eqo && 
       not (Mpv2.mem_pv_r env pv eqo) in
     match lvr with
     | LvVar xr   -> aux xr
@@ -722,8 +725,8 @@ let eqobs_in env fun_spec c1 c2 eqo (inv,ifvl,ifvr) =
     (* TODO : ensure that the invariant is not modified *)
     let aux eqs (pvl,tyl) (pvr,tyr) = 
       if EcReduction.equal_type env tyl tyr then begin
-        check pvl ifvl eqs;
-        check pvr ifvr eqs;
+        if not (check pvl ifvl eqs && check pvr ifvr eqs) then
+          raise EqObsInError;
         Mpv2.remove env pvl pvr eqs
       end else raise EqObsInError in
 
@@ -746,15 +749,15 @@ let eqobs_in env fun_spec c1 c2 eqo (inv,ifvl,ifvr) =
   let rec s_eqobs_in rsl rsr fhyps (eqo:Mpv2.t) = 
     match rsl, rsr with
     | { i_node = Sasgn(LvVar (xl,_), el)}::rsl, _ when is_var el ->
-      check xl ifvl eqo;
-      let x = destr_var el in
-      s_eqobs_in rsl rsr fhyps (Mpv2.subst_l env xl x eqo)
+      if check xl ifvl eqo then
+        let x = destr_var el in
+        s_eqobs_in rsl rsr fhyps (Mpv2.subst_l env xl x eqo)
+      else rsl, rsr, fhyps, eqo
     | _, { i_node = Sasgn(LvVar (xr,_), er)} :: rsr when is_var er ->
-      check xr ifvr eqo;
-      let x = destr_var er in
-      s_eqobs_in rsl rsr fhyps (Mpv2.subst_r env xr x eqo)
-
-
+      if check xr ifvr eqo then 
+        let x = destr_var er in
+        s_eqobs_in rsl rsr fhyps (Mpv2.subst_r env xr x eqo)
+      else rsl, rsr, fhyps, eqo
     | {i_node = Sasgn(lvl,_)} ::rsl, _ when check_not_l lvl eqo ->
       s_eqobs_in rsl rsr fhyps eqo 
     | _, {i_node = Sasgn(lvr,_)}::rsr when check_not_r lvr eqo ->
