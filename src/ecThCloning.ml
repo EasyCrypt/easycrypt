@@ -222,35 +222,41 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
               (subst, EcEnv.Op.bind x (EcSubst.subst_op subst oopd) scenv)
 
           | Some { pl_desc = opov; pl_loc = loc; } ->
-              let newop =
-                let ue = EcTyping.ue_for_decl scenv (loc, opov.opov_tyvars) in
-                let tp = EcTyping.tp_relax in
-                let (ty, body) =
-                  let env     = scenv in
-                  let codom   = EcTyping.transty tp env ue opov.opov_retty in 
-                  let env, xs = EcTyping.transbinding env ue opov.opov_args in
-                  let body    = EcTyping.transexpcast env ue codom opov.opov_body in
-                  let lam     = EcTypes.e_lam xs body in
-                    (lam.EcTypes.e_ty, Some lam)
-                in
-                let uni     = EcTypes.Tuni.subst (EcUnify.UniEnv.close ue) in
-                let body    = omap body (EcTypes.e_mapty uni) in
-                let ty      = uni ty in
-                let tparams = EcUnify.UniEnv.tparams ue in
-                  mk_op tparams ty body
-              in
+            let (newop, subst, dobind) =
+              match opov with
+              | `OpDef opov ->
+                  let ue = EcTyping.ue_for_decl scenv (loc, opov.opov_tyvars) in
+                  let tp = EcTyping.tp_relax in
+                  let (ty, body) =
+                    let env     = scenv in
+                    let codom   = EcTyping.transty tp env ue opov.opov_retty in 
+                    let env, xs = EcTyping.transbinding env ue opov.opov_args in
+                    let body    = EcTyping.transexpcast env ue codom opov.opov_body in
+                    let lam     = EcTypes.e_lam xs body in
+                      (lam.EcTypes.e_ty, Some lam)
+                  in
+                  let uni     = EcTypes.Tuni.subst (EcUnify.UniEnv.close ue) in
+                  let body    = omap body (EcTypes.e_mapty uni) in
+                  let ty      = uni ty in
+                  let tparams = EcUnify.UniEnv.tparams ue in
+                    (mk_op tparams ty body, subst, true)
 
-              let (reftyvars, refty) =
-                let refop = EcEnv.Op.by_path (xpath x) scenv in
-                let refop = EcSubst.subst_op subst refop in
-                  (refop.op_tparams, refop.op_ty)
-              and (newtyvars, newty) =
-                (newop.op_tparams, newop.op_ty)
-              in
-                if not (ty_compatible scenv (reftyvars, refty) (newtyvars, newty)) then
-                  clone_error scenv (CE_OpIncompatible (prefix, x));
-                (subst, EcEnv.Op.bind x newop scenv)
-      end
+              | `OpInline newop ->
+                  let (newpath, newop) = EcEnv.Op.lookup (unloc newop) scenv in
+                    (newop, EcSubst.add_path subst (xpath x) newpath, false)
+            in
+
+            let (reftyvars, refty) =
+              let refop = EcEnv.Op.by_path (xpath x) scenv in
+              let refop = EcSubst.subst_op subst refop in
+                (refop.op_tparams, refop.op_ty)
+            and (newtyvars, newty) =
+              (newop.op_tparams, newop.op_ty)
+            in
+              if not (ty_compatible scenv (reftyvars, refty) (newtyvars, newty)) then
+                clone_error scenv (CE_OpIncompatible (prefix, x));
+              (subst, if dobind then EcEnv.Op.bind x newop scenv else scenv)
+          end
 
       | CTh_operator (x, ({ op_kind = OB_pred None} as oopr)) -> begin
           match Msym.find_opt x ovrds.evc_preds with

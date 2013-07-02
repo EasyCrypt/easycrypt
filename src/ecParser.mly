@@ -1908,6 +1908,9 @@ clone_override:
 | TYPE ps=typarams x=qident LEFTARROW t=loc(type_exp)
    { (x, PTHO_Type (ps, t, `Inline)) }
 
+| OP x=qoident LEFTARROW y=qoident
+   { (x, PTHO_Op (`OpInline y)) }
+
 | OP x=qoident tyvars=tyvars_decl COLON sty=loc(type_exp) EQ e=expr
    { let ov = {
        opov_tyvars = tyvars;
@@ -1915,7 +1918,7 @@ clone_override:
        opov_retty  = sty;
        opov_body   = e;
      } in
-       (x, PTHO_Op ov) }
+       (x, PTHO_Op (`OpDef ov)) }
 
 | OP x=qoident tyvars=tyvars_decl eq=loc(EQ) e=expr
    { let ov = {
@@ -1924,7 +1927,7 @@ clone_override:
        opov_retty  = mk_loc eq.pl_loc PTunivar;
        opov_body   = e;
      } in
-       (x, PTHO_Op ov) }
+       (x, PTHO_Op (`OpDef ov)) }
 
 | OP x=qoident tyvars=tyvars_decl p=ptybindings eq=loc(EQ) e=expr
    { let ov = {
@@ -1933,7 +1936,7 @@ clone_override:
        opov_retty  = mk_loc eq.pl_loc PTunivar;
        opov_body   = e;
      } in
-       (x, PTHO_Op ov) }
+       (x, PTHO_Op (`OpDef ov)) }
 
 | PRED x=qoident tyvars=tyvars_decl p=ptybindings EQ f=form
    { let ov = {
