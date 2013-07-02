@@ -52,7 +52,7 @@ module G (A:Adv) = {
   }
 }.
 
-equiv foo (A<:Adv {O} ) : G(A).main ~ G(A).main : ={x,O.m} ==> ={res,O.m}.
+equiv foo (A<:Adv {O} ) : G(A).main ~ G(A).main : ={x,O.m,glob A} ==> ={res,O.m}.
 fun.
 eqobs_in (={O.m}) (={x}) true.
 fun (={O.m}).    
@@ -78,7 +78,7 @@ fun (={O.m}).
 fun.
  eqobs_in (={O.m}) true true.
 fun.
- eqobs_in (={O.m,glob A}) true true.
+ eqobs_in (={O.m}) true true.
 fun (={O.m}).
 trivial.
 trivial.
