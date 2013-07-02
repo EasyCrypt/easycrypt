@@ -18,11 +18,7 @@ module M = {
 
 equiv test : M.main ~ M.main : ={M.m,w} ==> ={M.m,res}.
 fun.
-eqobs_in (={M.m}) (={w}) true.
-fun.
-eqobs_in (={M.m}) true true.
-fun.
-eqobs_in (={M.m}) (={x}) true.
+eqobs_in true (={M.m, w}) true.
 save.
 
 module type Orcl = {
@@ -54,36 +50,12 @@ module G (A:Adv) = {
 
 equiv foo (A<:Adv {O} ) : G(A).main ~ G(A).main : ={x,O.m,glob A} ==> ={res,O.m}.
 fun.
-eqobs_in (={O.m}) (={x}) true.
-fun (={O.m}).    
- trivial.
- trivial.
-fun.
- eqobs_in (={O.m}) true true.
-fun.
- eqobs_in (={O.m}) true true.
-fun (={O.m}).
-trivial.
-trivial.
-fun.
-eqobs_in (={O.m}) true true.
+eqobs_in true (={O.m, x}) true.
 save.
 
 equiv foo1 (A<:Adv {O} ) : G(A).main ~ G(A).main : ={x,O.m,glob A} ==> ={res,O.m,glob A}.
 fun.
-eqobs_in (={O.m,glob A}) (={x}) true.
-fun (={O.m}).    
- trivial.
- trivial.
-fun.
- eqobs_in (={O.m}) true true.
-fun.
- eqobs_in (={O.m}) true true.
-fun (={O.m}).
-trivial.
-trivial.
-fun.
-eqobs_in (={O.m}) true true.
+eqobs_in true (={O.m,glob A, x}) true.
 save.
 
 

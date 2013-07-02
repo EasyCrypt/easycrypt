@@ -37,40 +37,10 @@ module G (A:Adv) = {
 equiv foo (A<:Adv {O} ) : G(A).main ~ G(A).main : ={x,O.m,O.l} ==> ={res,O.m,O.l}.
 fun.
 eqobs_in true (={O.m,O.l,x}) true.
-fun (={O.m}).    
- trivial.
- trivial.
-fun.
- eqobs_in true (={O.m}) true.
-fun.
- eqobs_in (={O.m}) true true.
-fun.
- eqobs_in (={O.l,O.m}) true true.
-fun (={O.l,O.m}).
-trivial.
-trivial.
-fun.
-eqobs_in (={O.l,O.m}) true true.
-fun.
-eqobs_in (={O.l,O.m}) true true.
 save.
 
-equiv foo1 (A<:Adv {O} ) : G(A).main ~ G(A).main : ={x,O.m,O.l,glob A} ==> ={res,O.m,glob A}.
+equiv foo1 (A<:Adv {O} ) : G(A).main ~ G(A).main : ={x,O.m,O.l} ==> ={res,O.m,glob A}.
 fun.
 eqobs_in true (={O.m,glob A,x,O.l}) true.
-fun (={O.m}).    
- trivial.
- trivial.
-fun.
- eqobs_in (={O.m}) true true.
-fun.
- eqobs_in (={O.m}) true true.
-fun. eqobs_in true (={O.l,O.m}) true.
-fun (={O.l,O.m}).
-trivial.
-trivial.
-conseq * (_ : ={x,O.m} ==> ={res,O.m} );trivial.
-fun. eqobs_in (={O.m}) true true.
-fun. eqobs_in (={O.m, O.l}) true true.
 save.
 
