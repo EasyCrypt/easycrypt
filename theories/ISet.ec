@@ -205,26 +205,17 @@ lemma leq_filter: forall (p:'a cpred) X,
   filter p X <= X
 by [].
 
-theory Duni.
-  require import Distr.
-  (** We recall notations from Distr.ec used here:
-      - U denotes a uniformity axiom or lemma,
-      - in_d denotes a support membership test,
-      - d_x is the weight of x in d,
-      - weight_d is the weight of the constantly true predicate in d. *)
-  op duni: 'a set -> 'a distr.
+theory Finite.
+  require        FSet.
 
-  axiom in_duni: forall (x:'a) X, in_supp x (duni X) <=> mem x X.
+  pred (==) (X:'a set) (Y:'a FSet.set) =
+    forall (x:'a), mem x X <=> FSet.mem x Y.
 
-  axiom duniU: forall (X:'a set) x y,
-    mem x X => mem y X =>
-    mu_x (duni X) x = mu_x (duni X) y.
+  pred finite (X:'a set) = exists (X':'a FSet.set), X == X'.
 
-  axiom duni_x_nin: forall (x:'a) X, 
-    !mem x X => mu_x (duni X) x = 0%r.
+  op toFSet: 'a set -> 'a FSet.set.
+  axiom toFSet_cor: forall (X:'a set),
+    finite X => X == toFSet X.
 
-  axiom mu_empty: forall (P:'a cpred), mu (duni empty) P = 0%r.
-
-  axiom weight_duni: forall (X:'a set),
-    weight (duni X) = if X = empty then 0%r else 1%r.
-end Duni.
+  (* We should then show that all set operations correspond as expected *)
+end Finite.
