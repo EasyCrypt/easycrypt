@@ -684,47 +684,53 @@ let process_exists_intro fs g =
   let fs = List.map (fun f -> process_form_opt penv f None) fs in
   t_hr_exists_intro fs g 
 
-let process_eqobs_in (ginv,gother,inv) g = 
-  let ginv = process_prhl_formula g ginv in
-  let gother = process_prhl_formula g gother in
-  let inv = process_prhl_formula g inv in
-  let env, _, concl = get_goal_e g in
-  let es = destr_equivS concl in
-  let ml, mr = fst es.es_ml, fst es.es_mr in
-  (* TODO check glob for glob and inv *)
-  let eqinv = EcPV.Mpv2.of_form env ml mr ginv in
-  let eqother  = EcPV.Mpv2.of_form env ml mr gother in
-  let eqs = EcPV.Mpv2.union eqinv eqother in
+let process_eqobs_in (geq', ginv, eqs') g = 
+  let env, hyps, concl = get_goal_e g in
+  let ienv = LDecl.inv_memenv hyps in
+  let ml, mr, eenv = 
+    match concl.f_node with
+    | FequivS es ->
+      fst es.es_ml, fst es.es_mr, LDecl.push_all [es.es_ml; es.es_mr] hyps 
+    | _ -> tacuerror "The goal should be an equiv on statements." in
+ 
+  let geq = omap_dfl geq' f_true (fun f -> process_form ienv f tbool) in
+  let ginv = omap_dfl ginv f_true (fun f -> process_form ienv f tbool) in
+  let eqs = process_form eenv eqs' tbool in
+   
+  let toeq ml mr f = 
+    try EcPV.Mpv2.of_form env ml mr f 
+    with _ -> 
+      let ppe = EcPrinting.PPEnv.ofenv env in
+      tacuerror "can not reconize %a as a set of equality" 
+        (EcPrinting.pp_form ppe) f in
+  let geq = toeq mleft mright geq in
+  let eqs = set_loc eqs'.pl_loc (toeq ml mr) eqs in
 
-  let t_pre = 
-    let h = EcIdent.create "_" in
-    t_seq (t_intros_i [EcIdent.create "_";EcIdent.create "_"; h])
-      (t_hyp h) in
   let log = ref Mf.empty in
-
+ 
   let t_eqobs onF eqs g =
     let concl = get_concl g in
     let es = destr_equivS concl in
     let ml, mr = fst es.es_ml, fst es.es_mr in
-    let post = EcPV.Mpv2.to_form ml mr eqs inv in
+    let post = EcPV.Mpv2.to_form ml mr eqs ginv in
     let pre = es.es_pr in
     t_seq_subgoal 
       (t_equivS_conseq pre post)
-      [ t_pre;
+      [ t_trivial;
         t_trivial;
         (fun g -> 
           t_on_last (t_try (t_seq EcPhl.t_skip t_trivial))
-            (t_eqobs_inS onF eqs inv g))] 
+            (t_eqobs_inS onF eqs ginv g))] 
       g in
-
-  ignore (t_eqobs (EcPhl.eqobs_inF log eqinv) eqs g);
-
+ 
+  ignore (t_eqobs (EcPhl.eqobs_inF log geq) eqs g);
+  
   let tocut = 
     Mf.fold (fun spec eori l ->
       match eori with
       | EORI_unknown None -> spec :: l
       | _ -> l) !log [] in
-
+ 
   let rec t_cut_spec l g = 
     match l with
     | [] -> t_id None g
@@ -735,24 +741,28 @@ let process_eqobs_in (ginv,gother,inv) g =
       t_seq_subgoal (t_cut spec)
         [ t_id None;
           t_seq (t_intros_i [id]) (t_cut_spec l)] g in
-
+ 
   let t_rec g = 
     let concl = get_concl g in
     match Mf.find_opt concl !log with
     | Some (EORI_adv geq) ->
-      let gs = t_equivF_abs (EcPV.Mpv2.to_form mleft mright geq inv) g in
+      let gs = t_equivF_abs (EcPV.Mpv2.to_form mleft mright geq ginv) g in
       t_on_firsts t_trivial 2 gs 
     | Some (EORI_fun eqs) ->
       t_seq t_equivF_fun_def
-        (t_eqobs (EcPhl.eqobs_inF (ref Mf.empty) eqinv) eqs) g 
+        (t_eqobs (EcPhl.eqobs_inF (ref Mf.empty) geq) eqs) g 
     | Some (EORI_unknown (Some id)) ->
       t_hyp id g
-    | _ -> t_fail g in
+    | _ -> 
+      let ppe = EcPrinting.PPEnv.ofenv env in
+      Format.printf "form = %a@." 
+        (EcPrinting.pp_form ppe) concl;
+      t_fail g in
   
   t_on_last 
-    (t_seq (t_eqobs (EcPhl.eqobs_inF  (ref Mf.empty) eqinv) eqs)
+    (t_seq (t_eqobs (EcPhl.eqobs_inF (ref Mf.empty) geq) eqs)
        (t_repeat t_rec))
-    (t_cut_spec tocut g)
+    (t_cut_spec tocut g) 
   
 
 (* -------------------------------------------------------------------- *)

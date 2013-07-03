@@ -1763,7 +1763,7 @@ phltactic:
 
 | FEL at_pos=NUM cntr=sform delta=sform q=sform f_event=sform some_p=sform
    {Pfel (at_pos,(cntr,delta,q,f_event,some_p))}
-| EQOBSIN f1=sform f2=sform f3=sform {Peqobs_in (f1,f2,f3) }
+| EQOBSIN info=eqobs_in {Peqobs_in info}
 (* basic pr based tacs *)
 | HOARE {Phoare}
 | BDHOARE {Pbdhoare}
@@ -1771,6 +1771,12 @@ phltactic:
 | PROR {Ppror}
 | PRFALSE {Pprfalse}
 | BDEQ {Pbdeq}
+;
+
+eqobs_in:
+| f3=sform                    { (None   , None   , f3) }
+| f1=sform f3=sform           { (Some f1, None   , f3) } 
+| f1=sform f2=sform f3=sform  { (Some f1, Some f2, f3) }
 ;
 
 tactic_core_r:
