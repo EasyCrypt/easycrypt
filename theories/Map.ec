@@ -129,13 +129,10 @@ lemma in_rng_setNE: forall (v:'b) (m:('a,'b) map) x v',
   (!in_dom x m \/ m.[x] <> Some v) =>
   in_rng v m.[x <- v'].
 proof strict.
-delta in_rng beta;
-intros=> v m x v';
-rewrite 2!rng_def;
-intros=> v_in_rng_m in_dom_or_neq;
-elim in_dom_or_neq; smt.
+delta in_rng beta=> v m x v';
+rewrite 2!rng_def=> v_in_rng_m in_dom_or_neq;
+elim v_in_rng_m=> x' m_x'_some; exists x'; rewrite get_setNE //; smt.
 qed.
-
 
 (** General lemmas on rng and dom *)
 lemma onto_rng: forall (m:('a,'b) map) v,

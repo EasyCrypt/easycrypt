@@ -1,6 +1,6 @@
 require import Int.
 require import Fun.
-require import Map. import OptionGet.
+require import Map.
 
 type from.
 type to.
