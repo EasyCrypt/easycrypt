@@ -10,6 +10,7 @@ let s_dbool      = (["<top>"; "Bool" ; "Dbool"     ], "dbool")
 let s_dbitstring = (["<top>"; "Distr"; "Dbitstring"], "dbitstring")
 let s_dinter     = (["<top>"; "Distr"; "Dinter"    ], "dinter")
 let s_from_int   = (["<top>"; "Real" ; "FromInt"   ], "from_int")
+let s_fset       = (["<top>"; "FSet" ], "set")
 
 (* -------------------------------------------------------------------- *)
 let id_top       = "<top>"
@@ -37,7 +38,7 @@ let id_eq        = "="
 let id_le        = "<="
 let id_lt        = "<"
 
-let id_sum         = "+"
+let id_add         = "+"
 let id_sub         = "-"
 let id_prod        = "*"
 let id_div         = "/"
@@ -59,6 +60,7 @@ let p_int        = _Pervasive id_int
 let p_real       = _Pervasive id_real
 let p_distr      = _Pervasive id_distr
 let p_cpred      = _Pervasive id_cpred
+let p_fset       = EcPath.fromqsymbol s_fset
 let p_from_int   = EcPath.fromqsymbol s_from_int
 
 let p_true       = _Pervasive id_true
@@ -79,10 +81,13 @@ let _Int id      = EcPath.pqname p_Int id
 let p_int_le     = _Int  id_le
 let p_int_lt     = _Int  id_lt
 
-let p_int_sum    = _Int id_sum
+let p_int_add    = _Int id_add
 let p_int_sub    = _Int id_sub
 let p_int_prod   = _Int id_prod
 let p_int_pow    = _Int id_pow   
+
+let p_int_intval = EcPath.fromqsymbol (["<top>"; "Sum"], "intval" )
+let p_int_sum    = EcPath.fromqsymbol (["<top>"; "Sum"], "int_sum")
 
 let id_Real      = "Real"
 let p_Real       = EcPath.pqname p_top id_Real
@@ -90,7 +95,7 @@ let _Real id     = EcPath.pqname p_Real id
 
 let p_real_le    = _Real id_le
 let p_real_lt    = _Real id_lt   
-let p_real_sum    = _Real id_sum
+let p_real_add    = _Real id_add
 let p_real_sub    = _Real id_sub
 let p_real_prod   = _Real id_prod
 let p_real_div    = _Real id_div   

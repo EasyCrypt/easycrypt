@@ -914,7 +914,7 @@ let t_bdHoare_app dir i phi bd_info g =
       let b1 = f_bdHoareS_r { bhs with bhs_pr = phi; bhs_s = stmt s2; bhs_bd=f2} in
       let a2 = f_bdHoareS_r { bhs with bhs_po = f_not phi; bhs_s = stmt s1; bhs_bd=g1}  in
       let b2 = f_bdHoareS_r { bhs with bhs_pr = f_not phi; bhs_s = stmt s2; bhs_bd=g2} in
-      let bd_g = f_real_le (f_real_sum (f_real_prod f1 f2) (f_real_prod g1 g2)) bhs.bhs_bd in
+      let bd_g = f_real_le (f_real_add (f_real_prod f1 f2) (f_real_prod g1 g2)) bhs.bhs_bd in
       prove_goal_by [a1;b1;a2;b2;bd_g] (RN_hl_append (dir, Single i,phi,bd_info)) g
 
     | _, FHle when dir <>Backs -> 
@@ -996,11 +996,11 @@ let t_bdHoare_wp i g =
 
   let m = EcMemory.memory bhs.bhs_m in
 
-  let fv_bd = PV.fv env m bhs.bhs_bd in
-  let modi = s_write env s_wp in
+  (* let fv_bd = PV.fv env m bhs.bhs_bd in *)
+  (* let modi = s_write env s_wp in *)
 
-  if not (PV.indep env fv_bd modi) then 
-    cannot_apply "wp" "Not_implemented: bound is modified by the statement";
+  (* if not (PV.indep env fv_bd modi) then  *)
+  (*   cannot_apply "wp" "Not_implemented: bound is modified by the statement"; *)
 
   let s_wp,post = 
     wp env m s_wp bhs.bhs_po in
@@ -1930,7 +1930,7 @@ and callable_oracles_i env os i =
 
 let callable_oracles_stmt env = callable_oracles_s env EcPath.Sx.empty
 
-let t_failure_event at_pos cntr delta q f_event some_p g =
+let t_failure_event at_pos cntr ash q f_event some_p g =
   let env,_,concl = get_goal_e g in
   match concl.f_node with
     | Fapp ({f_node=Fop(op,_)},[pr;bd]) when is_pr pr 
@@ -1949,12 +1949,12 @@ let t_failure_event at_pos cntr delta q f_event some_p g =
       let os = callable_oracles_stmt env (stmt s_tl) in
       (* check that bad event is only modified in oracles *)
       let fv = PV.fv env mhr f_event in
-      if not (PV.indep env (s_write ~except_fs:os env (stmt s_tl)) (fv) ) then
-        cannot_apply "fel" "fail event is modified outside oracles";
+      (* if not (PV.indep env (s_write ~except_fs:os env (stmt s_tl)) (fv) ) then *)
+      (*   cannot_apply "fel" "fail event is modified outside oracles"; *)
       (* subgoal on the bounds *)
       let bound_goal = 
-        let v1 = f_real_of_int (f_int_prod q (f_int_sub q (f_int 1))) in
-        let v = f_real_prod v1 delta  in
+        let intval = f_int_intval (f_int 0) (f_int_sub q (f_int 1)) in
+        let v = f_int_sum ash intval treal  in
         f_real_le v bd
       in
       (* we must quantify over memories *)
@@ -1972,7 +1972,7 @@ let t_failure_event at_pos cntr delta q f_event some_p g =
       in
       let oracle_goal o = 
         let not_F_to_F_goal = 
-          let bound = f_real_prod (f_real_of_int cntr) delta in
+          let bound = f_app_simpl ash [cntr] treal in
           let pre = f_not f_event in
           let post = f_event in
           f_bdHoareF pre o post FHle bound
@@ -1997,7 +1997,7 @@ let t_failure_event at_pos cntr delta q f_event some_p g =
       in
       let os_goals = List.concat (List.map oracle_goal (Sx.elements os)) in
       prove_goal_by ([bound_goal;post_goal;init_goal]@os_goals) 
-        (RN_hl_fel (cntr,delta,q,f_event,some_p) )  g
+        (RN_hl_fel (cntr,ash,q,f_event,some_p) )  g
     | _ -> 
       cannot_apply "failure event lemma" 
         "A goal of the form Pr[ _ ] <= _ was expected"
@@ -2409,7 +2409,7 @@ let t_pror g =
       let pr1 = f_pr m f ps p1 in
       let pr2 = f_pr m f ps p2 in
       let pr12 = f_pr m f ps (f_and p1 p2) in
-      let pr = f_real_sum pr1 pr2 in
+      let pr = f_real_add pr1 pr2 in
       let pr = f_real_sub pr pr12 in
       let concl = f_eq pr bd in
       prove_goal_by [concl] RN_hl_pror g

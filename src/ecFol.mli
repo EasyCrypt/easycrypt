@@ -220,15 +220,22 @@ val f_int_le : form -> form -> form
 val f_int_lt : form -> form -> form
 
 val f_int_prod : form -> form -> form
-val f_int_sum  : form -> form -> form
+val f_int_add  : form -> form -> form
 val f_int_sub  : form -> form -> form
 val f_int_pow  : form -> form -> form
+
+val f_int_intval : form -> form -> form
+  (* in "f_int f interval ty" 
+     f : represents function from int to ty
+     interval: has type (tint tfset)
+  *)
+val f_int_sum : form -> form -> EcTypes.ty -> form
 
 val f_real_le : form -> form -> form
 val f_real_lt : form -> form -> form
 
 val f_real_div  : form -> form -> form
-val f_real_sum  : form -> form -> form
+val f_real_add  : form -> form -> form
 val f_real_sub  : form -> form -> form
 val f_real_prod : form -> form -> form
 
@@ -287,7 +294,7 @@ val f_imps_simpl : form list -> form -> form
 val f_iff_simpl  : form -> form -> form
 val f_eq_simpl   : form -> form -> form
 
-val f_real_sum_simpl  : form -> form -> form
+val f_real_add_simpl  : form -> form -> form
 val f_real_prod_simpl : form -> form -> form
 val f_real_div_simpl  : form -> form -> form
 
