@@ -19,5 +19,6 @@ end TO.
 
 section.
 
-  local module A : Orcl {O1}.
+  declare module A : Orcl {TO.O1}.
  
+end section.
