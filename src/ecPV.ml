@@ -122,14 +122,20 @@ module Mpv = struct
     | Evar pv -> (try find env pv s with Not_found -> e)
     | _ -> EcTypes.e_map (fun ty -> ty) (esubst env s) e
 
+  let lvsubst env (s : esubst) lv =
+    match lv with
+    | LvVar   _ -> lv
+    | LvTuple _ -> lv
+    | LvMap (m, pv, e, ty) -> LvMap (m, pv, esubst env s e, ty)
+
   let rec isubst env (s : esubst) (i : instr) =
     let esubst = esubst env s in
     let ssubst = ssubst env s in
 
     match i.i_node with
-    | Sasgn  (lv, e)     -> i_asgn   (lv, esubst e)
-    | Srnd   (lv, e)     -> i_rnd    (lv, esubst e)
-    | Scall  (lv, f, es) -> i_call   (lv, f, List.map esubst es)
+    | Sasgn  (lv, e)     -> i_asgn   (lvsubst env s lv, esubst e)
+    | Srnd   (lv, e)     -> i_rnd    (lvsubst env s lv, esubst e)
+    | Scall  (lv, f, es) -> i_call   (omap lv (lvsubst env s), f, List.map esubst es)
     | Sif    (c, s1, s2) -> i_if     (esubst c, ssubst s1, ssubst s2)
     | Swhile (e, stmt)   -> i_while  (esubst e, ssubst stmt)
     | Sassert e          -> i_assert (esubst e)
@@ -143,7 +149,6 @@ module Mpv = struct
 end
 
 module PVM = struct
-
   type subst = (form, form) Mpv.t Mid.t
 
   let empty = Mid.empty 

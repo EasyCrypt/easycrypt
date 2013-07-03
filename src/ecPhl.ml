@@ -1694,7 +1694,6 @@ let t_splitwhile b side cpos g =
 
 (* -------------------------------------------------------------------- *)
 let cfold_stmt env me olen zpr =
-
   let (asgn, i, tl) =
     match zpr.Zpr.z_tail with
     | ({ i_node = Sasgn (lv, e) } as i) :: tl -> begin
@@ -1747,8 +1746,7 @@ let cfold_stmt env me olen zpr =
 
   let subst =
     List.fold_left
-      (fun subst (x, _ty, e) ->
-         Mpv.add env x e subst)
+      (fun subst (x, _ty, e) ->  Mpv.add env x e subst)
       Mpv.empty asgn
   in
 
