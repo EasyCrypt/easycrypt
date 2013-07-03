@@ -14,7 +14,7 @@ theory OptionGet.
   require export Option.
   op __get (m:('a,'b) map): 'a -> 'b option = get m.
 end OptionGet.
-import OptionGet.
+export OptionGet.
 
 pred (==) (m1 m2:('a,'b) map) =
   forall (x:'a), m1.[x] = m2.[x].
@@ -304,13 +304,3 @@ lemma post_rng: forall p (m:('a,'b) map),
 proof strict.
 intros=> p m; split; smt.
 qed.
-
-(* TODO: the lemmas might need wrapped for ease of use *)
-theory DefaultGet.
-  op __get (m:('a,'b) map) (dv:'b) (x:'a): 'b =
-    let r = get m x in if (r <> None) then proj r else dv.
-end DefaultGet.
-
-theory PartialGet.
-  op __get (m:('a,'b) map) (x:'a): 'b = proj (get m x).
-end PartialGet.
