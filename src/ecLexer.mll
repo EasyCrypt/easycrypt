@@ -215,9 +215,12 @@ let op2 = op_char_234*  op_char_2 op_char_234+
 let op3 = op_char_34*   op_char_3 op_char_34*
 let op4 = op_char_4+ | ':'+
 
+let uniop = '+' | '-' | '!' | op1
+
 let binop = 
   op1 | op2 | op3 | op4 | '+' | '-' |
-  '!' | "&&" | "/\\" | "||" | "\\/" | "=>" | "<=>" | '>' | "="
+  "&&" | "/\\" | "||" | "\\/" | "=>" | "<=>" | "=" |
+  '>' | '<' | ">=" | "<="
 
 (* -------------------------------------------------------------------- *)
 rule main = parse
@@ -233,6 +236,7 @@ rule main = parse
 
   | "(*" binop "*)" { main lexbuf }
   | '(' blank* (binop as s) blank* ')' { PBINOP s }
+  | '[' blank* (uniop as s) blank* ']' { PUNIOP (Printf.sprintf "[%s]" s) }
 
   | "(*" { comment lexbuf; main lexbuf }
   | "\"" { STRING (Buffer.contents (string (Buffer.create 0) lexbuf)) }
@@ -269,7 +273,6 @@ rule main = parse
   | '['  { LBRACKET }
   | ']'  { RBRACKET }
   | "<:" { LTCOLON }
-  | ">"  { GT }
   | ','  { COMMA }
   | ';'  { SEMICOLON }
   | ':'  { COLON }
@@ -288,8 +291,10 @@ rule main = parse
   | "="  { EQ }
   | "<>" { NE }
 
-  | "<="  { LE }
+  | ">"   { GT }
+  | "<"   { LT }
   | ">="  { GE }
+  | "<="  { LE }
 
   | "-" { MINUS }
   | "+" { ADD }

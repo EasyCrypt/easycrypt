@@ -972,7 +972,7 @@ module Mod = struct
       hierror "cannot declare a local module outside of a section";
 
     let (name, m) = ptm.ptm_def in
-    let m = TT.transmod scope.sc_env (unloc name) m in
+    let m = TT.transmod scope.sc_env ~internal:false (unloc name) m in
 
     if not ptm.ptm_local then begin
       match CoreSection.olocals scope.sc_section with

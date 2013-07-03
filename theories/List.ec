@@ -40,6 +40,16 @@ lemma list_case: forall (p: 'a list cpred),
     (forall l, p l)
 by [].
 
+lemma list_case_eq: forall (p: 'a list cpred) (l:'a list),
+    (l = [] => p l) =>
+    (forall x l', l = x::l' => p l) =>
+    p l.
+intros=> p l.
+elimT list_case l => //.
+intros=> x l' _ h.
+apply (h x l').
+qed.
+
 (** Constructor Disjointness *)
 lemma nil_neq_cons: forall (x:'a) xs, [] <> x::xs by [].
 
@@ -441,21 +451,42 @@ intros=> x xs ys; case (mem x xs).
       rewrite count_rm_neq // count_rm_neq // xs_ys //.
 qed.
 
+lemma foldC: forall (x:'a) (f:'a -> 'b -> 'b) (z:'b) (xs:'a list),
+    (forall a b X, f a (f b X) = f b (f a X)) =>
+    mem x xs =>
+    fold_right f z xs = f x (fold_right f z (rm x xs)).
+proof strict.
+intros=> x f z xs C; elimT list_ind xs=> {xs}; first smt.
+  intros=> x' xs IH.
+  rewrite fold_right_cons.
+  case (x' = x)=> x_x';first subst x';rewrite rm_consE //.
+  rewrite mem_consNE=> // x_in_xs.
+  by rewrite rm_consNE // fold_right_cons IH // C //.
+qed.
+
 lemma foldCA: forall (f:'a -> 'a -> 'a) (z x:'a) (xs:'a list),
   (forall x y, f x y = f y x) =>
   (forall x y z, f x (f y z) = f (f x y) z) =>
   mem x xs =>
   fold_right f z xs = f x (fold_right f z (rm x xs)).
 proof strict.
-intros=> f z x xs; elimT list_ind xs=> {xs}; first smt.
-  intros=> x' xs IH fC fA x_in_xs; case (x' = x)=> x_x'.
-    subst x'; rewrite fold_right_cons rm_consE //.
-    generalize x_in_xs; rewrite mem_consNE // => x_in_xs.
-    rewrite rm_consNE // fold_right_cons fold_right_cons IH.
-      intros=> a b; apply fC.
-      intros=> a b c; apply fA.
-      trivial.
-    rewrite fA (fC x' x) -fA //. 
+intros f z x xs C A.
+apply foldC=> a b c.
+rewrite A (C a) -A //.
+qed.
+
+lemma fold_permC: forall (f:'a -> 'b -> 'b) (z:'b) (xs ys:'a list),
+  (forall a b X, f a (f b X) = f b (f a X)) =>
+  xs <-> ys =>
+  fold_right f z xs = fold_right f z ys.
+proof strict.
+intros=> f z xs ys C;generalize ys; elimT list_ind xs=> {xs}.
+  by intros=> ys nil_ys; rewrite (perm_nil ys); [apply perm_symm=> // | trivial ].
+  intros=> x xs IH ys xs_ys; rewrite fold_right_cons (foldC x _ _ ys); first assumption.
+  rewrite -count_mem -xs_ys; smt.
+     congr=> //; cut rm_xs_ys: xs <-> rm x ys;
+       first by rewrite -(rm_consE x xs); apply perm_rm=> //.
+      rewrite (IH (rm x ys))=> //.
 qed.
 
 lemma fold_perm: forall (f:'a -> 'a -> 'a) (z:'a) (xs ys:'a list),
@@ -464,17 +495,9 @@ lemma fold_perm: forall (f:'a -> 'a -> 'a) (z:'a) (xs ys:'a list),
   xs <-> ys =>
   fold_right f z xs = fold_right f z ys.
 proof strict.
-intros=> f z xs; elimT list_ind xs=> {xs}.
-  by intros=> ys fC fA nil_ys; rewrite (perm_nil ys); [apply perm_symm=> // | trivial ].
-  intros=> x xs IH ys fC fA xs_ys; rewrite fold_right_cons (foldCA _ _ x ys).
-       by intros=> a b; apply fC.
-       by intros=> a b c; apply fA.
-       by rewrite -count_mem -xs_ys; smt.
-     congr=> //; cut rm_xs_ys: xs <-> rm x ys;
-       first by rewrite -(rm_consE x xs); apply perm_rm=> //.
-      rewrite (IH (rm x ys))=> //.
-        by intros=> a b; apply fC.
-        by intros=> a b c; apply fA.
+intros f z x xs C A.
+apply fold_permC=> a b c.
+rewrite A (C a) -A //.
 qed.
 
 (** Properties of unique lists up to permutation *)

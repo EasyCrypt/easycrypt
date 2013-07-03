@@ -60,9 +60,12 @@ type tyerror =
 | PatternNotAllowed
 | UnknownScope         of qsymbol
 
+exception TymodCnvFailure of tymod_cnv_failure
 exception TyError of EcLocation.t * EcEnv.env * tyerror
 
 val tyerror : EcLocation.t -> EcEnv.env -> tyerror -> 'a
+
+val pp_cnv_failure :  Format.formatter -> EcEnv.env -> tymod_cnv_failure -> unit
 
 (* -------------------------------------------------------------------- *)
 type typolicy
@@ -103,7 +106,7 @@ val trans_pattern  : EcEnv.env -> (ptnmap * EcUnify.unienv) -> pformula -> EcFol
 (* -------------------------------------------------------------------- *)
 val transmodsig  : EcEnv.env -> symbol -> pmodule_sig  -> module_sig
 val transmodtype : EcEnv.env -> pmodule_type -> module_type * module_sig
-val transmod     : EcEnv.env -> symbol -> pmodule_expr -> module_expr
+val transmod     : EcEnv.env -> internal:bool -> symbol -> pmodule_expr -> module_expr
 
 val trans_topmsymbol : EcEnv.env -> pmsymbol located -> mpath
 val trans_msymbol    : EcEnv.env -> pmsymbol located -> mpath * module_sig

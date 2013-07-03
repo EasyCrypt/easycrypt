@@ -8,9 +8,9 @@ theory Ring.
 
   (** Ring addition *)
   const zero: ring.
-  op ( + ): ring -> ring -> ring.
-  op (-- ): ring -> ring.
-  op ( - ) r1 r2 = r1 + --r2.
+  op ( + ) : ring -> ring -> ring.
+  op [ - ] : ring -> ring.
+  op ( - ) r1 r2 = r1 + -r2.
 
   axiom addrA: forall r1 r2 r3,
     (r1 + r2) + r3 = r1 + (r2 + r3).
@@ -22,7 +22,7 @@ theory Ring.
     zero + r = r.
 
   axiom addNr: forall r,
-    r + --r = zero.
+    r + -r = zero.
 
   (** Ring multiplication *)
   const one: ring.
@@ -48,7 +48,7 @@ theory Ring.
   by (intros=> r; rewrite addrC; apply add0r).
 
   lemma addrN: forall r,
-    --r + r = zero
+    -r + r = zero
   by (intros=> r; rewrite addrC; apply addNr).
 
   lemma addIr: forall r r1 r2,

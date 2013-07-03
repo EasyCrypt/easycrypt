@@ -3,7 +3,7 @@ require import Logic.
 import why3 "int" "Int" 
   (* Il y a un bug dans ecScope il refuse d'avoir deux operateurs avec des 
      types different et la meme syntaxe *)
-  op "prefix -" as "-!".
+  op "prefix -" as "[-]".
 
 theory Abs.
 

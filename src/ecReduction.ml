@@ -239,7 +239,7 @@ let rec h_red ri env hyps f =
     else f_pvar pv' f.f_ty m
   | Flet(lp,f1,f2) -> f_let lp (h_red ri env hyps f1) f2 
   | Fapp({f_node = Fquant(Llambda,bds,body)}, args) when ri.beta -> 
-    f_betared_simpl bds body args
+    f_betared_simpl bds body args f.f_ty
   | Fapp({f_node = Fop(p,_)} as fo, args)
       when ri.logic && is_logical_op p ->
     let f' = 
