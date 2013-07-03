@@ -473,21 +473,10 @@ let priority_of_binop name =
 (* -------------------------------------------------------------------- *)
 let priority_of_unop name =
   match EcIo.lex_single_token name with
-  | Some EP.NOT   -> Some e_uni_prio_not
-  | Some EP.EQ    -> Some e_uni_prio_uminus
-  | Some(EP.AND _)-> Some e_uni_prio_uminus  
-  | Some(EP.OR _) -> Some e_uni_prio_uminus  
-  | Some EP.STAR  -> Some e_uni_prio_uminus  
-  | Some EP.ADD   -> Some e_uni_prio_uminus  
-  | Some EP.MINUS -> Some e_uni_prio_uminus  
-  | Some EP.GT    -> Some e_uni_prio_uminus  
-  | Some EP.GE    -> Some e_uni_prio_uminus  
-  | Some EP.LE    -> Some e_uni_prio_uminus  
-  | Some EP.OP1 _ -> Some e_uni_prio_uminus 
-  | Some EP.OP2 _ -> Some e_uni_prio_uminus
-  | Some EP.OP3 _ -> Some e_uni_prio_uminus
-  | Some EP.OP4 _ -> Some e_uni_prio_uminus
-  | _             -> None
+  | Some EP.NOT      -> Some e_uni_prio_not
+  | Some EP.PUNIOP _ -> Some e_uni_prio_uminus
+
+  | _  -> None
 
 (* -------------------------------------------------------------------- *)
 let is_unop name = 
@@ -567,12 +556,12 @@ let pp_app (ppe : PPEnv.t) (pp_first, pp_sub) outer fmt (e, args) =
 
 (* -------------------------------------------------------------------- *)
 let pp_opname fmt (nm, op) = 
-  let op = 
-    if is_unbinop op then 
-      if op.[0] = '*' || op.[String.length op - 1] = '*' then 
-        Format.sprintf "( %s )" op
+  let op =
+    if is_binop op then begin
+      if op.[0] = '*' || op.[String.length op - 1] = '*'
+      then Format.sprintf "( %s )" op
       else Format.sprintf "(%s)" op
-    else op
+    end else op
   in
     EcSymbols.pp_qsymbol fmt (nm, op)
 
@@ -631,6 +620,10 @@ let pp_opapp (ppe : PPEnv.t) t_ty pp_sub outer fmt (pred, op, tvi, es) =
         | None -> None
         | Some bopprio ->
           let opprio = (bopprio, `Prefix) in
+          let opname =
+            match Str.string_match (Str.regexp "^\\[.+\\]$") opname 0 with
+            | true  -> String.sub opname 1 (String.length opname - 2)
+            | false -> opname in
           let pp fmt =
             Format.fprintf fmt "@[%s%s%a@]" opname
               (if bopprio < e_uni_prio_uminus then " " else "")
