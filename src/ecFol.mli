@@ -239,6 +239,7 @@ val fop_mu_x    : EcTypes.ty -> form
 val f_in_supp : form -> form -> form
 val f_mu      : form -> form -> form
 val f_mu_x    : form -> form -> form
+val f_weight  : EcTypes.ty -> form -> form
 
 (* -------------------------------------------------------------------- *)
 module FSmart : sig

@@ -2180,6 +2180,7 @@ let wp_equiv_disj_rnd side g =
   let post = subst_form_lv env (EcMemory.memory m) lv x es.es_po in
   let post = (f_in_supp x distr) ==> post in
   let post = f_forall_simpl [(x_id,GTty ty_distr)] post in
+  let post = f_anda (f_eq (f_weight ty_distr distr) f_r1) post in
   let concl = 
     if side then f_equivS_r {es with es_sl=s; es_po=post} 
     else  f_equivS_r {es with es_sr=s; es_po=post} 
