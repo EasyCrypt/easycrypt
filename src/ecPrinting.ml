@@ -432,6 +432,7 @@ let e_bin_prio_letin  = (19, `Prefix)
 let e_bin_prio_or     = (20, `Infix `Right)
 let e_bin_prio_and    = (25, `Infix `Right)
 let e_bin_prio_eq     = (27, `Infix `NonAssoc)
+let e_bin_prio_order  = (29, `NonAssoc)
 let e_bin_prio_op1    = (30, `Infix `Left)
 let e_bin_prio_op2    = (40, `Infix `Left)
 let e_bin_prio_op3    = (50, `Infix `Left)
@@ -455,9 +456,10 @@ let priority_of_binop name =
   | Some(EP.AND _)-> Some e_bin_prio_and
   | Some EP.EQ    -> Some e_bin_prio_eq
   | Some EP.NE    -> Some e_bin_prio_eq
-  | Some EP.GT    -> Some e_bin_prio_op1
-  | Some EP.GE    -> Some e_bin_prio_op1
-  | Some EP.LE    -> Some e_bin_prio_op1
+  | Some EP.GT    -> Some e_bin_prio_order
+  | Some EP.GE    -> Some e_bin_prio_order
+  | Some EP.LT    -> Some e_bin_prio_order
+  | Some EP.LE    -> Some e_bin_prio_order
   | Some EP.OP1 _ -> Some e_bin_prio_op1
   | Some EP.OP2 _ -> Some e_bin_prio_op2
   | Some EP.ADD   -> Some e_bin_prio_op2
