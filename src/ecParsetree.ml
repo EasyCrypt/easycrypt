@@ -357,7 +357,7 @@ type phltactic =
   | Pprfalse
   | Ppror
   | Pbdeq 
-  | Peqobs_in  of (pformula * pformula * pformula)
+  | Peqobs_in  of (pformula option * pformula option * pformula option)
 
 and pinline_arg =
   [ `ByName    of tac_side * (pgamepath list * int list option)
@@ -517,7 +517,12 @@ and theory_override =
 
 and ty_override = psymbol list * pty * [`Alias | `Inline]
 
-and op_override = {
+and op_override = [
+| `OpDef    of op_override_def
+| `OpInline of pqsymbol
+]
+
+and op_override_def = {
   opov_tyvars : psymbol list option;
   opov_args   : ptybinding list;
   opov_retty  : pty;

@@ -239,6 +239,7 @@ val fop_mu_x    : EcTypes.ty -> form
 val f_in_supp : form -> form -> form
 val f_mu      : form -> form -> form
 val f_mu_x    : form -> form -> form
+val f_weight  : EcTypes.ty -> form -> form
 
 (* -------------------------------------------------------------------- *)
 module FSmart : sig
@@ -303,6 +304,8 @@ val destr_eq        : form -> form * form
 val destr_eq_or_iff : form -> form * form
 val destr_let1      : form -> EcIdent.t * ty * form * form
 val destr_forall1   : form -> EcIdent.t * gty * form
+val destr_forall    : form -> binding * form
+val decompose_forall: form -> binding * form 
 val destr_exists1   : form -> EcIdent.t * gty * form
 val destr_exists    : form -> binding * form
 val destr_equivF    : form -> equivF

@@ -1381,8 +1381,9 @@ and transinstr ue (env : EcEnv.env) (i : pinstr) =
       let args =
         List.map2
           (fun a {v_type = ty} ->
+            let loc = a.pl_loc in
             let a, aty = transexp env ue a in
-              EcUnify.unify env ue aty ty; a)
+            unify_or_fail env ue loc ~expct:ty aty; a)
           args fdef.f_sig.fs_params
       in
         (fpath, args, fdef.f_sig.fs_ret)
@@ -1390,56 +1391,59 @@ and transinstr ue (env : EcEnv.env) (i : pinstr) =
 
   match i.pl_desc with
   | PSasgn (lvalue, rvalue) -> 
-      let lvalue, lty = translvalue ue env lvalue in
-      let rvalue, rty = transexp env ue rvalue in
-      EcUnify.unify env ue lty rty;
-      i_asgn (lvalue, rvalue)
+    let loc = rvalue.pl_loc in
+    let lvalue, lty = translvalue ue env lvalue in
+    let rvalue, rty = transexp env ue rvalue in
+    unify_or_fail env ue loc ~expct:lty rty;
+    i_asgn (lvalue, rvalue)
 
   | PSrnd(lvalue, rvalue) -> 
-      let lvalue, lty = translvalue ue env lvalue in
-      let rvalue, rty = transexp env ue rvalue in
-      EcUnify.unify env ue (tdistr lty) rty;
-      i_rnd(lvalue, rvalue)
+    let loc = rvalue.pl_loc in
+    let lvalue, lty = translvalue ue env lvalue in
+    let rvalue, rty = transexp env ue rvalue in
+    unify_or_fail env ue loc ~expct:(tdistr lty) rty;
+    i_rnd(lvalue, rvalue)
 
   | PScall (None, name, args) ->
-      let (fpath, args, rty) = transcall name (unloc args) in
-      EcUnify.unify env ue tunit rty;
-      i_call (None, fpath, args)
+    let (fpath, args, rty) = transcall name (unloc args) in
+    unify_or_fail env ue i.pl_loc ~expct:tunit rty;
+    i_call (None, fpath, args)
 
   | PScall (Some lvalue, name, args) ->
-      if EcEnv.Fun.lookup_opt (unloc name) env <> None then
-        let lvalue, lty = translvalue ue env lvalue in
-        let (fpath, args, rty) = transcall name (unloc args) in
-          EcUnify.unify env ue lty rty;
-          i_call (Some lvalue, fpath, args)
-      else
-        let fe   = mk_loc name.pl_loc (PEident (name, None)) in
-        let args = mk_loc args.pl_loc (PEtuple (unloc args)) in
-
-        let ope =
-          mk_loc (EcLocation.merge fe.pl_loc args.pl_loc) (PEapp (fe, [args]))
-        in
-          transinstr ue env (mk_loc i.pl_loc (PSasgn (lvalue, ope)))
+    if EcEnv.Fun.lookup_opt (unloc name) env <> None then
+      let lvalue, lty = translvalue ue env lvalue in
+      let (fpath, args, rty) = transcall name (unloc args) in
+      unify_or_fail env ue name.pl_loc ~expct:lty rty;
+      i_call (Some lvalue, fpath, args)
+    else
+      let fe   = mk_loc name.pl_loc (PEident (name, None)) in
+      let args = mk_loc args.pl_loc (PEtuple (unloc args)) in
+      
+      let ope =
+        mk_loc (EcLocation.merge fe.pl_loc args.pl_loc) (PEapp (fe, [args]))
+      in
+      transinstr ue env (mk_loc i.pl_loc (PSasgn (lvalue, ope)))
 
   | PSif (e, s1, s2) ->
-      let e, ety = transexp env ue e in
-      let s1 = transstmt ue env s1 in
-      let s2 = transstmt ue env s2 in
-  
-        EcUnify.unify env ue ety tbool;
-        i_if (e, s1, s2)
+    let loc = e.pl_loc in
+    let e, ety = transexp env ue e in
+    let s1 = transstmt ue env s1 in
+    let s2 = transstmt ue env s2 in
+    unify_or_fail env ue loc ~expct:tbool ety;
+    i_if (e, s1, s2)
 
   | PSwhile (e, body) ->
-      let e, ety = transexp env ue e in
-      let body = transstmt ue env body in
-
-        EcUnify.unify env ue ety tbool;
-        i_while (e, body)
+    let loc = e.pl_loc in
+    let e, ety = transexp env ue e in
+    let body = transstmt ue env body in
+    unify_or_fail env ue loc ~expct:tbool ety;
+    i_while (e, body)
 
   | PSassert e ->
-     let e, ety = transexp env ue e in 
-       EcUnify.unify env ue ety tbool;
-       i_assert e
+    let loc = e.pl_loc in
+    let e, ety = transexp env ue e in 
+    unify_or_fail env ue loc ~expct:tbool ety;
+    i_assert e
 
 (* -------------------------------------------------------------------- *)
 and trans_pv env { pl_desc = x; pl_loc = loc } = 

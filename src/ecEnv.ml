@@ -1606,7 +1606,7 @@ module NormMp = struct
     let gtop = 
       match mp.EcPath.m_top with
       | `Local _ -> f_glob (EcPath.m_functor mp) m
-      | `Concrete(p, _) -> 
+      | `Concrete _ -> 
         let top = EcPath.m_functor mp in
         let sx,us = globals env m top in
         let us = 

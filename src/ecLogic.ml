@@ -386,6 +386,7 @@ type app_arg =
 type 'a app_arg_cb = LDecl.hyps -> gty option -> 'a -> app_arg
 
 let check_arg do_arg hyps s x gty a =
+  let gty = Fsubst.gty_subst s gty in
   let a = do_arg hyps (Some gty) a in
   match gty, a with
   | GTty ty  , AAform f ->

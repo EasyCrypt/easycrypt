@@ -1,6 +1,6 @@
 require import Int.
 require import Fun.
-require import List.
+require import List. import PermutationLists.
 
 type 'a set.
 
@@ -13,6 +13,8 @@ axiom unique_elems: forall (X:'a set),
 op mem:'a -> 'a set -> bool.
 axiom mem_def (x:'a) (X:'a set):
   mem x (elems X) <=> mem x X.
+
+op cpMem(X:'a set): 'a cpred = lambda x, mem x X.
 
 lemma count_mem (x:'a) (X:'a set):
   (count x (elems X) = 1) <=> mem x X
@@ -167,8 +169,13 @@ by [].
 lemma rm_leq: forall (x:'a) (X:'a set), rm x X <= X by [].
 
 lemma rm_add_eq: forall (x:'a) X,
-  rm x (add x X) = rm x X
-by (intros=> x X; apply set_ext; smt).
+  rm x (add x X) = rm x X.
+proof strict.
+intros=> x X; apply set_ext=> x';
+rewrite 2!mem_rm mem_add orDand (rw_eq_sym x' x);
+cut ->: (x = x' /\ !x = x') = false; first by case (x = x')=> h /= //.
+by trivial.
+qed.
 
 lemma rm_add_neq: forall (x x':'a) X,
   x <> x' => rm x (add x' X) = add x' (rm x X).
@@ -215,6 +222,12 @@ axiom card_def: forall (X:'a set),
   card X = length (elems X).
 
 lemma card_empty: card empty<:'a> = 0 by [].
+
+lemma card_nempty: forall (X:'a set),
+  X <> empty => 0 < card X.
+proof strict.
+intros=> X nempty; cut h: exists x, mem x X; smt.
+qed.
 
 lemma card_add_in: forall (x:'a) (X:'a set),
   mem x X => card (add x X) = card X
@@ -404,3 +417,78 @@ case (a=x)=> ?.
       apply H2.
       apply h2.
 save.
+
+require import Real.
+require import Distr.
+
+(* Uniform distribution on a (finite) set *)
+theory Duni.
+  op duni: 'a set -> 'a distr.
+
+  axiom supp_def: forall (x:'a) X, in_supp x (duni X) <=> mem x X.
+
+  axiom mu_def: forall (X:'a set) P, 
+    !X = empty => mu (duni X) P = (card (filter P X))%r / (card X)%r. 
+
+  axiom mu_def_empty: forall (P:'a cpred), mu (duni empty) P = 0%r.
+
+  axiom mu_x_def_in: forall (x:'a) (X:'a set), 
+    mem x X => mu_x (duni X) x = 1%r / (card X)%r. 
+
+  axiom mu_x_def_notin: forall (x:'a) (X:'a set), 
+    !mem x X => mu_x (duni X) x = 0%r.
+
+  lemma weight_def: forall (X:'a set), 
+    weight (duni X) = if X = empty then 0%r else 1%r.
+  proof.
+    intros X; case (X = empty); intros H.
+    smt. 
+    delta weight; simplify. 
+    rewrite (mu_def<:'a> X Fun.cpTrue _).
+    assumption.
+    rewrite (filter_cpTrue<:'a> X).
+    cut W: ((card X)%r <> 0%r); smt.
+  qed.
+end Duni.
+
+(** Restriction of a distribution (sub-distribution) *)
+theory Drestr.
+  op drestr: 'a distr -> 'a set -> 'a distr.
+ 
+  axiom supp_def: forall (x:'a) d X, 
+    in_supp x (drestr d X) <=> in_supp x d /\ !mem x X.
+  
+  axiom mu_x_def_notin: forall (x:'a) d (X:'a set), 
+    in_supp x d => !mem x X => mu_x (drestr d X) x = mu_x d x.
+
+  lemma mu_x_def_in: forall (x:'a) d (X:'a set), 
+    in_supp x d => mem x X => mu_x (drestr d X) x = 0%r by [].
+
+  axiom weight_def: forall (d:'a distr) X, 
+    weight (drestr d X) = weight d - mu d (cpMem X).
+end Drestr.
+
+(** Scaled restriction of a distribution *)
+theory Dexcepted.
+  op (\) (d:'a distr, X:'a set) : 'a distr = Dscale.dscale (Drestr.drestr d X).
+
+  lemma supp_def : forall (x:'a) d X,
+    (in_supp x (d \ X) => (in_supp x d /\ !mem x X)) /\
+    ((in_supp x d /\ !mem x X) => in_supp x (d \ X)).
+  proof.
+  intros d X x;split.
+    intros in_supp;split;smt.
+    intros in_supp_nmem;smt.
+  save.
+    
+  lemma mu_x_def : forall (x:'a) d X,
+    mu_x (d \ X) x = 
+    (in_supp x (d \ X)) ? mu_x d x / (weight d - mu d (cpMem X)) : 0%r.
+  proof.
+    intros x d X; delta (\) beta; smt.
+  qed.
+
+  lemma mu_weight_def : forall (d:'a distr) X,
+    weight (d \ X) = (weight d = mu d (cpMem X)) ? 0%r : 1%r
+  by [].
+end Dexcepted.

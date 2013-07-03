@@ -46,6 +46,7 @@ let id_pow         = "^"
 let id_in_supp   = "in_supp"
 let id_mu        = "mu"
 let id_mu_x      = "mu_x"
+let id_weight    = "weight"
 
 let p_top         = EcPath.psymbol id_top
 let p_Pervasive   = EcPath.pqname p_top id_Pervasive
@@ -101,7 +102,7 @@ let _Distr id    = EcPath.pqname p_Distr id
 let p_in_supp    = _Distr id_in_supp
 let p_mu         = _Pervasive id_mu
 let p_mu_x       = _Distr id_mu_x
-
+let p_weight     = _Distr id_weight
 
 let p_Logic         = EcPath.pqname p_top "Logic" 
 let _Logic    id    = EcPath.pqname p_Logic id

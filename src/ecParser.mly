@@ -1763,7 +1763,7 @@ phltactic:
 
 | FEL at_pos=NUM cntr=sform delta=sform q=sform f_event=sform some_p=sform
    {Pfel (at_pos,(cntr,delta,q,f_event,some_p))}
-| EQOBSIN f1=sform f2=sform f3=sform {Peqobs_in (f1,f2,f3) }
+| EQOBSIN info=eqobs_in {Peqobs_in info}
 (* basic pr based tacs *)
 | HOARE {Phoare}
 | BDHOARE {Pbdhoare}
@@ -1771,6 +1771,13 @@ phltactic:
 | PROR {Ppror}
 | PRFALSE {Pprfalse}
 | BDEQ {Pbdeq}
+;
+
+eqobs_in:
+| empty                              { (None   , None   , None) }
+| COLON f3=sform                     { (None   , None   , Some f3)   }
+| f1=sform COLON f3=sform?           { (Some f1, None   , f3)   } 
+| f1=sform f2=sform COLON f3=sform?  { (Some f1, Some f2, f3)   }
 ;
 
 tactic_core_r:
@@ -1908,6 +1915,9 @@ clone_override:
 | TYPE ps=typarams x=qident LEFTARROW t=loc(type_exp)
    { (x, PTHO_Type (ps, t, `Inline)) }
 
+| OP x=qoident LEFTARROW y=qoident
+   { (x, PTHO_Op (`OpInline y)) }
+
 | OP x=qoident tyvars=tyvars_decl COLON sty=loc(type_exp) EQ e=expr
    { let ov = {
        opov_tyvars = tyvars;
@@ -1915,7 +1925,7 @@ clone_override:
        opov_retty  = sty;
        opov_body   = e;
      } in
-       (x, PTHO_Op ov) }
+       (x, PTHO_Op (`OpDef ov)) }
 
 | OP x=qoident tyvars=tyvars_decl eq=loc(EQ) e=expr
    { let ov = {
@@ -1924,7 +1934,7 @@ clone_override:
        opov_retty  = mk_loc eq.pl_loc PTunivar;
        opov_body   = e;
      } in
-       (x, PTHO_Op ov) }
+       (x, PTHO_Op (`OpDef ov)) }
 
 | OP x=qoident tyvars=tyvars_decl p=ptybindings eq=loc(EQ) e=expr
    { let ov = {
@@ -1933,7 +1943,7 @@ clone_override:
        opov_retty  = mk_loc eq.pl_loc PTunivar;
        opov_body   = e;
      } in
-       (x, PTHO_Op ov) }
+       (x, PTHO_Op (`OpDef ov)) }
 
 | PRED x=qoident tyvars=tyvars_decl p=ptybindings EQ f=form
    { let ov = {

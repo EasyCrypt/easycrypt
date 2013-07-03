@@ -567,10 +567,16 @@ let t_hr_exfalso g =
   prove_goal_by [] (RN_hl_exfalso) g
 
 (* -------------------------------------------------------------------- *)
+let check_concrete env f = 
+  if NormMp.is_abstract_fun f env then
+    let ppe = EcPrinting.PPEnv.ofenv env in
+    tacuerror "The function %a is abstract, it should be concrete"
+      (EcPrinting.pp_funname ppe) f 
 
 let t_hoareF_fun_def g = 
   let env,_,concl = get_goal_e g in
   let hf = destr_hoareF concl in
+  check_concrete env hf.hf_f;
   let memenv, fdef, env = Fun.hoareS hf.hf_f env in (* FIXME catch exception *)
   let m = EcMemory.memory memenv in
   let fres = 
@@ -584,6 +590,7 @@ let t_hoareF_fun_def g =
 let t_bdHoareF_fun_def g = 
   let env,_,concl = get_goal_e g in
   let bhf = destr_bdHoareF concl in
+  check_concrete env bhf.bhf_f;
   let memenv, fdef, env = Fun.hoareS bhf.bhf_f env in(* FIXME catch exception *)
   let m = EcMemory.memory memenv in
   let fres = 
@@ -594,12 +601,11 @@ let t_bdHoareF_fun_def g =
   let concl' = f_bdHoareS memenv bhf.bhf_pr fdef.f_body post bhf.bhf_cmp bhf.bhf_bd  in
   prove_goal_by [concl'] RN_hl_fun_def g
 
-
 let t_equivF_fun_def g = 
   let env,_,concl = get_goal_e g in
   let ef = destr_equivF concl in
-  let memenvl,fdefl,memenvr,fdefr,env = Fun.equivS ef.ef_fl ef.ef_fr env in 
-                                (* FIXME catch exception *)
+  check_concrete env ef.ef_fl; check_concrete env ef.ef_fr;
+  let memenvl,fdefl,memenvr,fdefr,env = Fun.equivS ef.ef_fl ef.ef_fr env in
   let ml, mr = EcMemory.memory memenvl, EcMemory.memory memenvr in
   let fresl = 
     match fdefl.f_ret with
@@ -2174,6 +2180,7 @@ let wp_equiv_disj_rnd side g =
   let post = subst_form_lv env (EcMemory.memory m) lv x es.es_po in
   let post = (f_in_supp x distr) ==> post in
   let post = f_forall_simpl [(x_id,GTty ty_distr)] post in
+  let post = f_anda (f_eq (f_weight ty_distr distr) f_r1) post in
   let concl = 
     if side then f_equivS_r {es with es_sl=s; es_po=post} 
     else  f_equivS_r {es with es_sr=s; es_po=post} 
@@ -2469,33 +2476,39 @@ let t_eqobs_inS finfo eqo inv g =
     f_equivS es.es_ml es.es_mr es.es_pr sl sr pre in
   prove_goal_by (sg@[concl]) RN_eqobs_in g
 
-let rec eqobs_inF eqg env (inv,_,_ as inve) fl fr eqo =
+type eqobs_in_rec_info = 
+  | EORI_adv of Mpv2.t
+  | EORI_fun of Mpv2.t
+  | EORI_unknown of EcIdent.t option
+ 
+let rec eqobs_inF log eqg env (inv,_,_ as inve) fl fr eqo =
   let nfl = NormMp.norm_xpath env fl in
-  let nfr = NormMp.norm_xpath env fl in
+  let nfr = NormMp.norm_xpath env fr in
   let defl = Fun.by_xpath nfl env in
   let defr = Fun.by_xpath nfr env in
   match defl.f_def, defr.f_def with
   | FBabs oil, FBabs oir -> 
     begin 
       let top = EcPath.m_functor nfl.EcPath.x_top in
-      try (* Try to infer the good invariant for oracle *)
-        let eqo = Mpv2.remove_glob top eqo in
-        let rec aux eqo = 
-          let eqi = 
-            List.fold_left2 
-              (fun eqo o_l o_r -> fst (eqobs_inF eqg env inve o_l o_r eqo))
-              eqo oil.oi_calls oir.oi_calls in
-          if Mpv2.subset eqi eqo then eqo else aux eqi in
-        let ieqg = aux eqo in
-        let peqg = if oil.oi_in then Mpv2.add_glob env top top ieqg else ieqg in
-        let inv = Mpv2.to_form mleft mright ieqg inv in
-        peqg, mk_inv_spec env inv fl fr
-      with EqObsInError ->
-        if not (Mpv2.subset eqo eqg) then raise EqObsInError;
-        let ieqg = Mpv2.remove_glob top eqg in
-        let peqg = if oil.oi_in then eqg else ieqg in
-        let inv = Mpv2.to_form mleft mright ieqg inv in
-        peqg, mk_inv_spec env inv fl fr
+      let ieqg = 
+        try (* Try to infer the good invariant for oracle *)
+          let eqo = Mpv2.remove_glob top eqo in
+          let rec aux eqo = 
+            let eqi = 
+              List.fold_left2 
+                (fun eqo o_l o_r -> 
+                  fst (eqobs_inF log eqg env inve o_l o_r eqo))
+                eqo oil.oi_calls oir.oi_calls in
+            if Mpv2.subset eqi eqo then eqo else aux eqi in
+          aux eqo 
+        with EqObsInError ->
+          if not (Mpv2.subset eqo eqg) then raise EqObsInError;
+          Mpv2.remove_glob top eqg in
+      let peqg = if oil.oi_in then Mpv2.add_glob env top top ieqg else ieqg in
+      let inv = Mpv2.to_form mleft mright ieqg inv in
+      let spec = mk_inv_spec env inv fl fr in
+      log := Mf.add spec (EORI_adv ieqg) !log;
+      peqg, spec
     end
   | FBdef funl, FBdef funr -> 
     begin 
@@ -2513,8 +2526,8 @@ let rec eqobs_inF eqg env (inv,_,_ as inve) fl fr eqo =
           | None, None -> eqo
           | Some el, Some er -> add_eqs env eqo el er 
           | _, _ -> raise EqObsInError in
-        let sl, sr, _, eqi = 
-          eqobs_in env (eqobs_inF eqg) funl.f_body funr.f_body eqo inve in
+        let sl, sr, _, eqi =
+          eqobs_in env (eqobs_inF log eqg) funl.f_body funr.f_body eqo inve in
         if sl.s_node <> [] || sr.s_node <> [] then raise EqObsInError;
         let geqi = 
           List.fold_left2 (fun eqi vl vr ->
@@ -2527,27 +2540,19 @@ let rec eqobs_inF eqg env (inv,_,_ as inve) fl fr eqo =
         let eq_res = f_eqres fl sigl.fs_ret ml fr sigr.fs_ret mr in
         let pre = f_and eq_params (Mpv2.to_form ml mr geqi inv) in
         let post = f_and eq_res (Mpv2.to_form ml mr eqo inv) in
-        geqi, f_equivF pre fl fr post
+        let spec = f_equivF pre fl fr post in 
+        log := Mf.add spec (EORI_fun eqo) !log;
+        geqi, spec
       with EqObsInError ->
         if not (Mpv2.subset eqo eqg) then raise EqObsInError;
         let inv = Mpv2.to_form mleft mright eqg inv in
-        eqg, mk_inv_spec env inv fl fr
+        let spec = mk_inv_spec env inv fl fr in
+        log := Mf.add spec (EORI_unknown None) !log;
+        eqg, spec
     end
   | _, _ -> raise EqObsInError 
  
-(*
-let t_eqobs_inF finfo eqo inv g =
-  let env,hyps,concl = get_goal_e g in
-  let ef = destr_equivF concl in
-  let fl = NormMp.norm_xpath env ef.ef_fl in
-  let fr = NormMp.norm_xpath env ef.ef_fr in
-  match Fun.by_xpath fl env, Fun.by_xpath fr env with
-  | FBabs _, FBabs _ ->
-    t_equivF_abs (Mpv2.to_post mleft mright eqo inv) g
-  | F 
-*)    
-    
-    
+
 
 
 

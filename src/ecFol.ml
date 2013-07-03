@@ -642,6 +642,9 @@ let f_in_supp f1 f2 = f_app (fop_in_supp f1.f_ty) [f1; f2] ty_bool
 let f_mu_x    f1 f2 = f_app (fop_mu_x f2.f_ty) [f1; f2] ty_real
 let f_mu      f1 f2 = f_app (fop_mu (proj_distr_ty f1.f_ty)) [f1; f2] ty_real
 
+let fop_weight ty = f_op EcCoreLib.p_weight [ty] (tfun (tdistr ty) treal)
+let f_weight ty d = f_app (fop_weight ty) [d] treal
+
 (* -------------------------------------------------------------------- *)
 exception DestrError of string
 
@@ -708,6 +711,18 @@ let destr_forall1 f =
   match f.f_node with
   | Fquant(Lforall,(x,t)::bd,p) -> x,t,f_forall bd p 
   | _ -> destr_error "forall"
+
+let destr_forall f = 
+  match f.f_node with
+  | Fquant(Lforall,bd,p) -> bd, p 
+  | _ -> destr_error "forall"
+
+let decompose_forall f = 
+  match f.f_node with
+  | Fquant(Lforall,bd,p) -> bd, p 
+  | _ -> [], f
+
+  
 
 let destr_exists1 f = 
   match f.f_node with

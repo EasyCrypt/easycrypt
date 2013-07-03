@@ -28,36 +28,22 @@ module G (A:Adv) = {
   }
 }.
 
-equiv foo (A<:Adv {O} ) : G(A).main ~ G(A).main : ={x,O.m,O.l} ==> ={res,O.m,O.l}.
+equiv foo_0 (A<:Adv {O} ) : G(A).main ~ G(A).main : ={x,O.m,O.l} ==> ={res,O.m,O.l}.
 fun.
-eqobs_in (={O.m,O.l}) (={x}) true.
-fun (={O.m}).    
- trivial.
- trivial.
-fun.
- eqobs_in true (={O.m}) true.
-fun.
- eqobs_in (={O.m}) true true.
-fun (={O.m}).
-trivial.
-trivial.
-fun.
-eqobs_in (={O.m}) true true.
+eqobs_in true true : (={O.m,O.l,x}).
 save.
 
-equiv foo1 (A<:Adv {O} ) : G(A).main ~ G(A).main : ={x,O.m,O.l,glob A} ==> ={res,O.m,glob A}.
+equiv foo_1 (A<:Adv {O} ) : G(A).main ~ G(A).main : ={x,O.m,O.l} ==> ={res,O.m,O.l}.
 fun.
-eqobs_in (={O.m,glob A}) (={x,O.l}) true.
-fun (={O.m}).    
- trivial.
- trivial.
+eqobs_in.
+save.
+
+equiv foo1_0 (A<:Adv {O} ) : G(A).main ~ G(A).main : ={x,O.m,O.l,glob A} ==> ={res,O.m,glob A}.
 fun.
- eqobs_in (={O.m}) true true.
+eqobs_in true true : (={O.m,glob A,x,O.l}).
+save.
+
+equiv foo1_1 (A<:Adv {O} ) : G(A).main ~ G(A).main : ={x,O.m,O.l,glob A} ==> ={res,O.m,glob A}.
 fun.
- eqobs_in (={O.m}) true true.
-fun (={O.m}).
-trivial.
-trivial.
-fun.
-eqobs_in (={O.m}) true true.
+eqobs_in.
 save.

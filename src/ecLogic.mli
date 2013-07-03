@@ -55,6 +55,7 @@ val find_in_hyps : form -> LDecl.hyps -> EcIdent.t
 
 (* -------------------------------------------------------------------- *)
 val t_id : string option -> tactic
+val t_fail : tactic
 
 val t_on_first : tactic -> goals -> goals
 val t_on_last  : tactic -> goals -> goals

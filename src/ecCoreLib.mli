@@ -63,8 +63,9 @@ val p_real_prod    : path
 val p_real_div     : path
 
 val p_in_supp    : path
-val p_mu       : path
+val p_mu         : path
 val p_mu_x       : path
+val p_weight     : path
 
 val p_cut_lemma  : path
 val p_false_elim : path
