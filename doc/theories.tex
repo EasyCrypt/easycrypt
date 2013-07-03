@@ -32,23 +32,29 @@ The reader familiar with polymorphic lambda-calculus~\cite{} may skip forward to
 Section~\ref{sec:ec-specifics}.
 
 \subsection{A quick overview}
-Following this analogy and standard functional programming notation, we write
-denote with \ec{f : 'a -> 'b}  the fact that \ec{f} is a function from
-type \ec{'a} to type \ec{'b}. Given function \ec{f} above, and an
-\ec{x : 'a}, we denote with \ec{f x} the value (of type \ec{'b})
-resulting from applying \ec{f} to \ec{x}.
+Following the set-based analogy and standard functional programming notation, we
+denote with \ec{f : 'a -> 'b} the fact that \ec{f} is a function from
+type \ec{'a} to type \ec{'b}. (Note the similarity with
+$f \in \alpha \rightarrow \beta$.) Given function \ec{f} typed as above, and an
+\ec{x : 'a}, we denote with \ec{f x} the value (of type \ec{'b}) resulting from
+applying \ec{f} to \ec{x}.
 
-Functions expecting several arguments take their arguments separated by spaces.
+Functions expecting several arguments take them separated by spaces.
 For example, the logarithm base 2 of an integer \ec{n} would be denoted
 \ec{log 2 n}, where the type of \ec{log} is
 \ec{log: int -> int -> int}. For now, the reader unfamiliar with functional
 languages should just read this type as the type of functions that take two
-integers and return an integer.
+integer arguments and return an integer.
+
+Were \ec{log} given the type \ec{log: (int * int) -> int}, the expression
+above would be written \ec{log (2,n)}. \ec{('a * 'b)} is the type of pairs
+of elements of \ec{'a} and \ec{'b}, and the type \ec{(int * int) -> int} should
+therefore be read as the type of functions that take, as their
+\emph{only argument}, a pair of integers, and return an integer.
 
 
 
 \section{Types and Operators\label{sec:types}}
-
 At the core of any \EC specification is a collection of types and functional
 operators on those types. Formally, \EC types are \emph{non-empty} sets of
 values, and operators are \emph{mathematical} functions between them.

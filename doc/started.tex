@@ -1,7 +1,7 @@
 % !TeX root = easycrypt.tex
 
 \chapter{Getting Started}
-\section{Installation}
+\section{Installing and running \EC}
 A nightly build of \EC is available from \url{http://ci.easycrypt.info/nightly}
 and contains several scripts facilitating installation on Mac and Debian-based
 Linux distributions. Windows is currently not supported, even via Cygwin.
@@ -31,7 +31,8 @@ Our core libraries make use of three SMT solvers: Z3~\cite{}, Alt-Ergo~\cite{}
 and Eprover~\cite{}, that have complementary strengths and weaknesses. We
 recommend that any user of \EC have at least those three solvers installed and
 configured, and expect that other solvers will often be required for specific
-cases.
+cases. Once installed, provers should be detected by \WhyThree using
+\texttt{why3config --detect}.
 
 \paragraph{Debian-based Linux distributions}
 We have set up a ppa containing up to date binary versions of the provers we
@@ -106,7 +107,7 @@ appropriate lengths and defines synonyms for the types.
 \ecimport{ }{../examples/br93_tutorial.ec}{bitstrings}
 
 The \ec{import} keyword allows us to ommit the qualified names when
-they can be inferred from the context. 
+they can be inferred from the lexical scope and typing context. 
 
 We will be interested in sampling from uniform distributions of types
 \ec{randomness} and \ec{plaintext}. These distributions are defined in
@@ -142,10 +143,10 @@ map to \ec{empty} and the set to \ec{empty}, a function \ec{o} that
 models the actual oracle and a function that models the adversary
 version. The former takes an argument \ec{x} of type \ec{randomness},
 samples a value \ec{y} of type \ec{plaintext}, updates the value of
-the map in case it's necesary and finally returns the lookup of \ec{x}
+the map when necesary and finally returns the lookup of \ec{x}
 in the map \ec{m}. The latter checks that the adversary has not
 exceeded the amount of calls as prescribed by \ec{qO}; and if this is
-the case, records the query in \ec{s}, calls \ec{o} and retunrs its
+the case, records the query in \ec{s}, calls \ec{o} and returns its
 result; otherwise, it returns a bitstring consisting of zeros.
 
 
@@ -157,7 +158,7 @@ $(\KG,f,f^{-1})$ such that for any pair of keys $(pk,sk)$ output by
 $\KG$, $f_{pk}$ and $f^{-1}_{sk}$ are permutations on
 \ec{T} and inverse of each other. 
 
-In these case, we are interested in trapdoor permutations on type
+In this case, we are interested in trapdoor permutations on type
 \ec{randomness}. In \EC we model them as follows
 
 \ecimport{ }{../examples/br93_tutorial.ec}{one_way}
@@ -170,6 +171,7 @@ keys are matching and specify that all the pairs of keys that can be
 sampled from \ec{keypairs} are matching. Afterwards, we declare \ec{f}
 and \ec{finv} with the appropriate type and we state the axioms saying
 that one is inverse of eachother for valid key pairs.
+%% TODO (Francois -> JuanMa): you are missing the "matching keys" axiom
  
 The module \ec{OW} is defined by declaring an interface corresponding
 to the inverter, which comprises a function that given a challenge
