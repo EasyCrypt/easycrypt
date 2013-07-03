@@ -324,17 +324,19 @@ let t_glob p tys (juc,n as g) =
   let juc, nh = mkn_glob juc hyps p tys in
   use_node juc nh n, []
 
-let t_smt strict pi g =
+let t_smt ~strict ~usehyps pi g =
   let error = tacuerror ~catchable:(not strict) in
 
   let _,concl as goal = get_goal g in
   match concl.f_node with
-    | FequivF _ | FequivS _ | FhoareF _ | FhoareS _ | FbdHoareF _  | FbdHoareS _ -> 
-      tacuerror 
-        "Cannot process program judgement, use skip tactic first"
+    | FequivF   _  | FequivS   _
+    | FhoareF   _  | FhoareS   _
+    | FbdHoareF _  | FbdHoareS _ -> 
+      tacuerror "Cannot process program judgement, use skip tactic first"
+
     | _ ->
         try
-          if EcEnv.check_goal pi goal then
+          if EcEnv.check_goal ~usehyps pi goal then
             let rule = { pr_name = RN_prover (); pr_hyps = [] } in
             upd_rule_done rule g
           else error "cannot prove goal"
@@ -360,8 +362,14 @@ let t_clear ids (juc,n as g) =
   let rule = { pr_name = RN_clear ids; pr_hyps = [RA_node n1] } in
   upd_rule rule (juc,n)
 
-let check_modtype_restr env mp mt i restr = 
-  EcTyping.check_sig_mt_cnv env mt i;
+let check_modtype_restr env mp mt i restr =
+  begin
+    try  EcTyping.check_sig_mt_cnv env mt i
+    with EcTyping.TymodCnvFailure e ->
+      Format.eprintf "%t@\n%!"
+        (fun fmt -> EcTyping.pp_cnv_failure fmt env e);
+      assert false
+  end;
   let restr = EcEnv.NormMp.norm_restr env restr in
   let us = EcEnv.NormMp.top_uses env mp in
   let check u = 

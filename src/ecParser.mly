@@ -11,6 +11,11 @@
   let pqsymb_of_symb loc x : pqsymbol =
     mk_loc loc ([], x)
 
+  let isordering (nm, x) =
+    match nm, x with
+    | ([], ("<" | ">" | "<=" | ">=")) -> true
+    | _ -> false
+
   let mk_mod ?(modtypes = []) params body = Pm_struct {
     ps_params    = params;
     ps_signature = modtypes;
@@ -36,7 +41,7 @@
     mk_loc loc (PFident (pqsymb_of_symb loc s, ti))
 
   let peapp_symb loc s ti es = 
-    PEapp(mk_peid_symb loc s ti, es)
+    PEapp (mk_peid_symb loc s ti, es)
 
   let peget loc ti e1 e2    = 
     peapp_symb loc EcCoreLib.s_get ti [e1;e2]
@@ -59,7 +64,7 @@
   let pe_cons loc ti e1 e2 = 
     mk_loc loc (peapp_symb loc EcCoreLib.s_cons ti [e1; e2])
       
-  let pelist loc ti (es : pexpr    list) : pexpr    = 
+  let pelist loc ti (es : pexpr list) : pexpr = 
     List.fold_right (fun e1 e2 -> pe_cons loc ti e1 e2) es (pe_nil loc ti)
 
   let pf_nil loc ti = 
@@ -122,6 +127,7 @@
 %token <EcSymbols.symbol> UIDENT
 %token <EcSymbols.symbol> TIDENT
 %token <EcSymbols.symbol> MIDENT
+%token <EcSymbols.symbol> PUNIOP
 %token <EcSymbols.symbol> PBINOP
 
 %token <int> NUM
@@ -301,7 +307,7 @@
 %token ZETA 
 
 %token <string> OP1 OP2 OP3 OP4
-%token LTCOLON GT GE LE
+%token LTCOLON GT LT GE LE
 
 %nonassoc COMMA ELSE
 
@@ -315,7 +321,10 @@
 
 %nonassoc EQ NE
 
-%left OP1 GT GE LE
+%nonassoc prec_below_order
+
+%left GT LT GE LE
+%left OP1
 %right QUESTION
 %left OP2 MINUS ADD
 %right ARROW
@@ -326,7 +335,6 @@
 
 %right SEMICOLON
 
-%nonassoc prec_prefix_op
 %nonassoc prec_tactic
 
 %type <EcParsetree.global EcLocation.located> global
@@ -385,6 +393,7 @@ uqident:
 %inline _oident:
 | x=LIDENT { x }
 | x=UIDENT { x }
+| x=PUNIOP { x }
 | x=PBINOP { x }
 ;
 
@@ -422,21 +431,17 @@ fident:
 ;
 
 (* -------------------------------------------------------------------- *)
-%inline binop:
-| EQ      { "=" }
-| x=AND   { str_and x }
-| x=OR    { str_or  x }
-| STAR    { "*" }
-| GT      { ">" }
-| GE      { ">=" }
-| LE      { "<=" }
-| ADD     { "+" }
-| MINUS   { "-" }
-| x=OP1   { x   }
-| x=OP2   { x   }
-| x=OP3   { x   }
-| x=OP4   { x   }
+%inline ordering_op:
+| GT { ">"  }
+| LT { "<"  }
+| GE { ">=" }
+| LE { "<=" }
 ;
+
+%inline uniop:
+| x=OP1 { Printf.sprintf "[%s]" x }
+| ADD   { "[+]" }
+| MINUS { "[-]" }
 
 (* -------------------------------------------------------------------- *)
 pside_:
@@ -531,20 +536,14 @@ expr_u:
 | op=loc(NOT) ti=tvars_app? e=expr
     { peapp_symb op.pl_loc "!" ti [e] }
 
-| op=loc(binop) ti=tvars_app? e=expr %prec prec_prefix_op
+| op=loc(uniop) ti=tvars_app? e=expr
     { peapp_symb op.pl_loc op.pl_desc ti [e] } 
+
+| e=expr_chained_orderings %prec prec_below_order
+   { fst e }
 
 | e1=expr op=loc(OP1) ti=tvars_app? e2=expr 
     { peapp_symb op.pl_loc op.pl_desc ti [e1; e2] }
-
-| e1=expr op=loc(GT) ti=tvars_app? e2=expr  
-    { peapp_symb op.pl_loc ">" ti [e1; e2] }
-
-| e1=expr op=loc(LE) ti=tvars_app? e2=expr
-    { peapp_symb op.pl_loc "<=" ti [e1; e2] }
-
-| e1=expr op=loc(GE) ti=tvars_app? e2=expr
-    { peapp_symb op.pl_loc ">=" ti [e1; e2] }
 
 | e1=expr op=loc(EQ) ti=tvars_app? e2=expr
     { peapp_symb op.pl_loc "=" ti [e1; e2] }
@@ -598,6 +597,26 @@ expr_u:
         PEapp (mk_loc loc id, [e]) }
 
 | LAMBDA pd=ptybindings COMMA e=expr { PElambda (pd, e) } 
+;
+
+expr_ordering:
+| e1=expr op=loc(ordering_op) ti=tvars_app? e2=expr
+    { (op, ti, e1, e2) }
+;
+
+expr_chained_orderings:
+| e=expr_ordering
+    { let (op, ti, e1, e2) = e in
+        (peapp_symb op.pl_loc (unloc op) ti [e1; e2], e2) }
+
+| e1=loc(expr_chained_orderings) op=loc(ordering_op) ti=tvars_app? e2=expr
+    { let (lce1, (e1, le)) = (e1.pl_loc, unloc e1) in
+      let loc = EcLocation.make $startpos $endpos in
+        (peapp_symb loc (str_and true) None
+           [EcLocation.mk_loc lce1 e1;
+            EcLocation.mk_loc loc
+              (peapp_symb op.pl_loc (unloc op) ti [le; e2])],
+         e2) }
 ;
 
 %inline pty_varty:
@@ -713,20 +732,14 @@ form_u(P):
 | op=loc(NOT) ti=tvars_app? e=form_r(P) 
     { pfapp_symb  op.pl_loc "!" ti [e] }
 
-| op=loc(binop) ti=tvars_app? e=form_r(P) %prec prec_prefix_op
+| op=loc(uniop) ti=tvars_app? e=form_r(P)
    { pfapp_symb op.pl_loc op.pl_desc ti [e] } 
 
 | e1=form_r(P) op=loc(OP1) ti=tvars_app? e2=form_r(P)
     { pfapp_symb op.pl_loc op.pl_desc ti [e1; e2] } 
 
-| e1=form_r(P) op=loc(GT) ti=tvars_app? e2=form_r(P)
-    { pfapp_symb op.pl_loc ">" ti [e1; e2] } 
-
-| e1=form_r(P) op=loc(LE) ti=tvars_app? e2=form_r(P)
-    { pfapp_symb op.pl_loc "<=" ti [e1; e2] } 
-
-| e1=form_r(P) op=loc(GE) ti=tvars_app? e2=form_r(P)
-    { pfapp_symb op.pl_loc ">=" ti [e1; e2] } 
+| f=form_chained_orderings(P) %prec prec_below_order
+    { fst f }
 
 | e1=form_r(P) op=loc(EQ) ti=tvars_app? e2=form_r(P)
     { pfapp_symb op.pl_loc "=" ti [e1; e2] }
@@ -801,6 +814,26 @@ form_u(P):
 
 | LOSSLESS mp=loc(fident)
     { PFlsless mp }
+;
+
+form_ordering(P):
+| f1=form_r(P) op=loc(ordering_op) ti=tvars_app? f2=form_r(P)
+    { (op, ti, f1, f2) }
+;
+
+form_chained_orderings(P):
+| f=form_ordering(P)
+    { let (op, ti, f1, f2) = f in
+        (pfapp_symb op.pl_loc (unloc op) ti [f1; f2], f2) }
+
+| f1=loc(form_chained_orderings(P)) op=loc(ordering_op) ti=tvars_app? f2=form_r(P)
+    { let (lcf1, (f1, le)) = (f1.pl_loc, unloc f1) in
+      let loc = EcLocation.make $startpos $endpos in
+        (pfapp_symb loc (str_and true) None
+           [EcLocation.mk_loc lcf1 f1;
+            EcLocation.mk_loc loc
+              (pfapp_symb op.pl_loc (unloc op) ti [le; f2])],
+         f2) }
 ;
 
 hoare_bd_cmp :
@@ -1605,8 +1638,8 @@ logtactic:
 | TRIVIAL
    { Ptrivial }
 
-| SMT pi=prover_info
-   { Psmt pi }
+| SMT db=lident? pi=prover_info
+   { Psmt (db, pi) }
 
 | INTROS a=intro_pattern*
    { Pintro a }

@@ -117,10 +117,21 @@ module PPEnv = struct
     in
       p_shorten exists p
 
-  let op_symb (ppe : t) p =
+  let op_symb (ppe : t) p info =
+    let lookup = 
+      match info with
+      | None -> fun sm -> EcEnv.Op.lookup_path sm ppe.ppe_env
+      | Some (pred,typ,dom) ->
+        let tvi = Some (EcUnify.UniEnv.TVIunamed typ) in
+        fun sm ->
+          let ue = EcUnify.UniEnv.create None in
+          match  EcUnify.select_op pred tvi ppe.ppe_env sm ue dom with
+          | [(p1,_), _, _] -> p1
+          | _ -> raise (EcEnv.LookupFailure (`QSymbol sm)) in
+        
     let exists sm =
-      try  EcPath.p_equal (EcEnv.Op.lookup_path sm ppe.ppe_env) p
-      with EcEnv.LookupFailure _ -> false
+        try  EcPath.p_equal (lookup sm) p
+        with EcEnv.LookupFailure _ -> false
     in
       p_shorten exists p
 
@@ -421,6 +432,7 @@ let e_bin_prio_letin  = (19, `Prefix)
 let e_bin_prio_or     = (20, `Infix `Right)
 let e_bin_prio_and    = (25, `Infix `Right)
 let e_bin_prio_eq     = (27, `Infix `NonAssoc)
+let e_bin_prio_order  = (29, `NonAssoc)
 let e_bin_prio_op1    = (30, `Infix `Left)
 let e_bin_prio_op2    = (40, `Infix `Left)
 let e_bin_prio_op3    = (50, `Infix `Left)
@@ -444,9 +456,10 @@ let priority_of_binop name =
   | Some(EP.AND _)-> Some e_bin_prio_and
   | Some EP.EQ    -> Some e_bin_prio_eq
   | Some EP.NE    -> Some e_bin_prio_eq
-  | Some EP.GT    -> Some e_bin_prio_op1
-  | Some EP.GE    -> Some e_bin_prio_op1
-  | Some EP.LE    -> Some e_bin_prio_op1
+  | Some EP.GT    -> Some e_bin_prio_order
+  | Some EP.GE    -> Some e_bin_prio_order
+  | Some EP.LT    -> Some e_bin_prio_order
+  | Some EP.LE    -> Some e_bin_prio_order
   | Some EP.OP1 _ -> Some e_bin_prio_op1
   | Some EP.OP2 _ -> Some e_bin_prio_op2
   | Some EP.ADD   -> Some e_bin_prio_op2
@@ -460,21 +473,10 @@ let priority_of_binop name =
 (* -------------------------------------------------------------------- *)
 let priority_of_unop name =
   match EcIo.lex_single_token name with
-  | Some EP.NOT   -> Some e_uni_prio_not
-  | Some EP.EQ    -> Some e_uni_prio_uminus
-  | Some(EP.AND _)-> Some e_uni_prio_uminus  
-  | Some(EP.OR _) -> Some e_uni_prio_uminus  
-  | Some EP.STAR  -> Some e_uni_prio_uminus  
-  | Some EP.ADD   -> Some e_uni_prio_uminus  
-  | Some EP.MINUS -> Some e_uni_prio_uminus  
-  | Some EP.GT    -> Some e_uni_prio_uminus  
-  | Some EP.GE    -> Some e_uni_prio_uminus  
-  | Some EP.LE    -> Some e_uni_prio_uminus  
-  | Some EP.OP1 _ -> Some e_uni_prio_uminus 
-  | Some EP.OP2 _ -> Some e_uni_prio_uminus
-  | Some EP.OP3 _ -> Some e_uni_prio_uminus
-  | Some EP.OP4 _ -> Some e_uni_prio_uminus
-  | _             -> None
+  | Some EP.NOT      -> Some e_uni_prio_not
+  | Some EP.PUNIOP _ -> Some e_uni_prio_uminus
+
+  | _  -> None
 
 (* -------------------------------------------------------------------- *)
 let is_unop name = 
@@ -554,17 +556,18 @@ let pp_app (ppe : PPEnv.t) (pp_first, pp_sub) outer fmt (e, args) =
 
 (* -------------------------------------------------------------------- *)
 let pp_opname fmt (nm, op) = 
-  let op = 
-    if is_unbinop op then 
-      if op.[0] = '*' || op.[String.length op - 1] = '*' then 
-        Format.sprintf "( %s )" op
+  let op =
+    if is_binop op then begin
+      if op.[0] = '*' || op.[String.length op - 1] = '*'
+      then Format.sprintf "( %s )" op
       else Format.sprintf "(%s)" op
-    else op
+    end else op
   in
     EcSymbols.pp_qsymbol fmt (nm, op)
 
-let pp_opapp (ppe : PPEnv.t) pp_sub outer fmt (op, _tvi, es) =
-  let (nm, opname) = PPEnv.op_symb ppe op in
+let pp_opapp (ppe : PPEnv.t) t_ty pp_sub outer fmt (pred, op, tvi, es) =
+  let (nm, opname) = 
+    PPEnv.op_symb ppe op (Some (pred, tvi, List.map t_ty es)) in
 
   let pp_as_std_op fmt =
     let pp_stdapp fmt =
@@ -617,6 +620,10 @@ let pp_opapp (ppe : PPEnv.t) pp_sub outer fmt (op, _tvi, es) =
         | None -> None
         | Some bopprio ->
           let opprio = (bopprio, `Prefix) in
+          let opname =
+            match Str.string_match (Str.regexp "^\\[.+\\]$") opname 0 with
+            | true  -> String.sub opname 1 (String.length opname - 2)
+            | false -> opname in
           let pp fmt =
             Format.fprintf fmt "@[%s%s%a@]" opname
               (if bopprio < e_uni_prio_uminus then " " else "")
@@ -686,6 +693,28 @@ let pp_opapp (ppe : PPEnv.t) pp_sub outer fmt (op, _tvi, es) =
                     try_pp_as_uniop; 
                     try_pp_as_binop])) fmt ()
 
+(* -------------------------------------------------------------------- *)
+let pp_chained_orderings (ppe : PPEnv.t) t_ty pp_sub outer fmt (f, fs) =
+  match fs with
+  | [] -> pp_sub ppe outer fmt f
+  | _  ->
+    Format.fprintf fmt "@[%t%t@]"
+      (fun fmt -> pp_sub ppe (e_bin_prio_order, `Left) fmt f)
+      (fun fmt ->
+        ignore (List.fold_left
+          (fun fe (op, tvi, f) ->
+            let (nm, opname) =
+              PPEnv.op_symb ppe op (Some (true, tvi, [t_ty fe; t_ty f]))
+            in
+              Format.fprintf fmt " %t@ %a"
+                (fun fmt ->
+                  match nm with
+                  | [] -> Format.fprintf fmt "%s" opname
+                  | _  -> pp_opname fmt (nm, opname))
+                (pp_sub ppe (e_bin_prio_order, `Right)) f;
+              f)
+          f fs))
+
 (* --------------------------------------------------------------------  *)
 let pp_locbind (ppe : PPEnv.t) (x, ty) =
   let tenv1  = PPEnv.add_local ppe x in
@@ -709,46 +738,98 @@ let rec pp_locbinds ppe vs =
         (ppe, fun fmt -> Format.fprintf fmt "%t@ %t" pp1 pp2)
 
 (* -------------------------------------------------------------------- *)
-let pp_expr (ppe : PPEnv.t) fmt (e : expr) =
-  let rec pp_expr (ppe : PPEnv.t) outer fmt (e : expr) =
-    match e.e_node with
-    | Eint i ->
-        Format.fprintf fmt "%d" i
-
-    | Evar x ->
-        pp_pv ppe fmt x
-
-    | Elocal x ->
-        pp_local ppe fmt x
-
-    | Eop (op, tys) ->
-        pp_opapp ppe pp_expr outer fmt (op, tys, [])
-
-    | Eif (c, e1, e2) ->
-        pp_if3 ppe pp_expr outer fmt (c, e1, e2)
-
-    | Etuple es ->
-        pp_tuple `ForTuple ppe pp_expr fmt es
-
-    | Eapp ({e_node = Eop (op, tys) }, args) ->
-        pp_opapp ppe pp_expr outer fmt (op, tys, args)
-
-    | Eapp (e, args) ->
-        pp_app ppe (pp_expr, pp_expr) outer fmt (e, args)
-
-    | Elet (pt, e1, e2) ->
-        pp_let ppe pp_expr outer fmt (pt, e1, e2)
-
-    | Elam (vardecls, e) ->
-        let (subppe, pp) = pp_locbinds ppe vardecls in
-        let pp fmt () =
-          Format.fprintf fmt "@[<hov 2>lambda %t,@ %a@]"
-            pp (pp_expr subppe (min_op_prec, `NonAssoc)) e
-        in
-          maybe_paren outer e_bin_prio_lambda pp fmt ()
-
+let rec try_pp_expr_chained_orderings (ppe : PPEnv.t) outer fmt e =
+  let isordering op =
+    match EcIo.lex_single_token (EcPath.basename op) with
+    | Some (EP.LE | EP.LT | EP.GE | EP.GT) -> true
+    | _ -> false
   in
-    pp_expr ppe (min_op_prec, `NonAssoc) fmt e
+
+  let rec collect acc le e =
+    match e.e_node with
+    | Eapp ({ e_node = Eop (op, []) }, [e1; e2])
+        when EcPath.p_equal op EcCoreLib.p_anda
+      -> begin
+        match e2.e_node with
+        | Eapp ({ e_node = Eop (op, tvi) }, [i1; i2])
+            when isordering op
+          -> begin
+            match le with
+            | None ->
+                collect ((op, tvi, i2) :: acc) (Some i1) e1
+            | Some le when EcTypes.e_equal i2 le ->
+                collect ((op, tvi, i2) :: acc) (Some i1) e1
+            | _ -> None
+          end
+
+        | _ -> None
+    end
+
+    | Eapp ({ e_node = Eop (op, tvi) }, [i1; i2])
+        when isordering op
+      -> begin
+        match le with
+        | None ->
+            Some (i1, ((op, tvi, i2) :: acc))
+        | Some le when EcTypes.e_equal i2 le ->
+            Some (i1, ((op, tvi, i2) :: acc))
+        | _ -> None
+      end
+
+    | _ -> None
+  in
+    match collect [] None e with
+    | None | Some (_, ([] | [_])) -> false
+    | Some (e, es) ->
+        pp_chained_orderings ppe e_ty pp_expr_r outer fmt (e, es);
+        true
+
+and pp_expr_core_r (ppe : PPEnv.t) outer fmt (e : expr) =
+  match e.e_node with
+  | Eint i ->
+      Format.fprintf fmt "%d" i
+
+  | Evar x ->
+      pp_pv ppe fmt x
+
+  | Elocal x ->
+      pp_local ppe fmt x
+
+  | Eop (op, tys) ->
+      pp_opapp ppe e_ty pp_expr_r outer fmt (false, op, tys, [])
+
+  | Eif (c, e1, e2) ->
+      pp_if3 ppe pp_expr_r outer fmt (c, e1, e2)
+
+  | Etuple es ->
+      pp_tuple `ForTuple ppe pp_expr_r fmt es
+
+  | Eapp ({e_node = Eop (op, tys) }, args) ->
+      pp_opapp ppe e_ty pp_expr_r outer fmt (false, op, tys, args)
+
+  | Eapp (e, args) ->
+      pp_app ppe (pp_expr_r, pp_expr_r) outer fmt (e, args)
+
+  | Elet (pt, e1, e2) ->
+      pp_let ppe pp_expr_r outer fmt (pt, e1, e2)
+
+  | Elam (vardecls, e) ->
+      let (subppe, pp) = pp_locbinds ppe vardecls in
+      let pp fmt () =
+        Format.fprintf fmt "@[<hov 2>lambda %t,@ %a@]"
+          pp (pp_expr_r subppe (min_op_prec, `NonAssoc)) e
+      in
+        maybe_paren outer e_bin_prio_lambda pp fmt ()
+
+and pp_expr_r (ppe : PPEnv.t) outer fmt e =
+  let printers = [try_pp_expr_chained_orderings] in
+
+  match List.findopt (fun pp -> pp ppe outer fmt e) printers with
+  | Some _ -> ()
+  | None   -> pp_expr_core_r ppe outer fmt e
+
+and pp_expr ppe fmt e =
+  pp_expr_r ppe (min_op_prec, `NonAssoc) fmt e
 
 (* -------------------------------------------------------------------- *)
 let pp_lvalue (ppe : PPEnv.t) fmt lv =
@@ -894,12 +975,10 @@ let string_of_hcmp = function
 
 let rec try_pp_form_eqveq (ppe : PPEnv.t) _outer fmt f =
   let rec collect1 f =
-    match f.f_node with
-    | Fapp ({ f_node = Fop (op, _) },
-            [{ f_node = Fpvar (x1, me1) };
-             { f_node = Fpvar (x2, me2) }])
-        when (EcPath.p_equal op EcCoreLib.p_eq)
-          && (EcMemory.mem_equal me1 EcFol.mleft )
+    match sform_of_form f with
+    | SFeq ({ f_node = Fpvar (x1, me1) },
+            { f_node = Fpvar (x2, me2) })
+        when (EcMemory.mem_equal me1 EcFol.mleft )
           && (EcMemory.mem_equal me2 EcFol.mright)
         ->
   
@@ -908,11 +987,9 @@ let rec try_pp_form_eqveq (ppe : PPEnv.t) _outer fmt f =
   
       if pv1 = pv2 then Some (`Var pv1) else None
 
-    | Fapp ({ f_node = Fop (op, _) },
-            [{ f_node = Fglob (x1, me1) };
-             { f_node = Fglob (x2, me2) }])
-        when (EcPath.p_equal op EcCoreLib.p_eq)
-          && (EcMemory.mem_equal me1 EcFol.mleft )
+    | SFeq ({ f_node = Fglob (x1, me1) },
+            { f_node = Fglob (x2, me2) })
+        when (EcMemory.mem_equal me1 EcFol.mleft )
           && (EcMemory.mem_equal me2 EcFol.mright)
         ->
   
@@ -944,6 +1021,48 @@ let rec try_pp_form_eqveq (ppe : PPEnv.t) _outer fmt f =
       | `Glob ms -> Format.fprintf fmt "glob %a" pp_msymbol ms in
     Format.fprintf fmt "={@[<hov 2>%a@]}" (pp_list ",@ " pp_msymbol) pvs;
     true
+
+and try_pp_chained_orderings (ppe : PPEnv.t) outer fmt f =
+  let isordering op =
+    match EcIo.lex_single_token (EcPath.basename op) with
+    | Some (EP.LE | EP.LT | EP.GE | EP.GT) -> true
+    | _ -> false
+  in
+
+  let rec collect acc le f =
+    match sform_of_form f with
+    | SFand (true, (f1, f2)) -> begin
+        match f2.f_node with
+        | Fapp ({ f_node = Fop (op, tvi) }, [i1; i2])
+            when isordering op
+          -> begin
+            match le with
+            | None ->
+                collect ((op, tvi, i2) :: acc) (Some i1) f1
+            | Some le when EcFol.f_equal i2 le ->
+                collect ((op, tvi, i2) :: acc) (Some i1) f1
+            | _ -> None
+          end
+
+        | _ -> None
+    end
+
+    | SFop ((op, tvi), [i1; i2]) when isordering op -> begin
+        match le with
+        | None ->
+            Some (i1, ((op, tvi, i2) :: acc))
+        | Some le when EcFol.f_equal i2 le ->
+            Some (i1, ((op, tvi, i2) :: acc))
+        | _ -> None
+      end
+
+    | _ -> None
+  in
+    match collect [] None f with
+    | None | Some (_, ([] | [_])) -> false
+    | Some (f, fs) ->
+        pp_chained_orderings ppe f_ty pp_form_r outer fmt (f, fs);
+        true
 
 and try_pp_lossless (ppe : PPEnv.t) outer fmt f =
   match EcFol.is_bdHoareF f with
@@ -996,10 +1115,10 @@ and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
       pp_let ppe pp_form_r outer fmt (lp, f1, f2)
       
   | Fop (op, tvi) ->
-      pp_opapp ppe pp_form_r outer fmt (op, tvi, [])
+      pp_opapp ppe f_ty pp_form_r outer fmt (true, op, tvi, [])
 
   | Fapp ({f_node = Fop (p, tys)}, args) ->
-      pp_opapp ppe pp_form_r outer fmt (p, tys, args)
+      pp_opapp ppe f_ty pp_form_r outer fmt (true, p, tys, args)
 
   | Fapp (e, args) ->
       pp_app ppe (pp_form_r, pp_form_r) outer fmt (e, args)
@@ -1070,7 +1189,11 @@ and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
         (pp_form ppe) ev
 
 and pp_form_r (ppe : PPEnv.t) outer fmt f =
-  let printers = [try_pp_form_eqveq; try_pp_lossless] in
+  let printers =
+    [try_pp_form_eqveq;
+     try_pp_chained_orderings;
+     try_pp_lossless]
+  in
 
   match List.findopt (fun pp -> pp ppe outer fmt f) printers with
   | Some _ -> ()
@@ -1129,7 +1252,7 @@ let pp_opdecl_pr (ppe : PPEnv.t) fmt (x, ts, ty, op) =
           let vds = List.map (snd_map EcFol.destr_gty) vds in
             (pp_locbinds ppe vds, f)
         in
-          Format.fprintf fmt "%t =@,%a" pp_vds (pp_form subppe) f
+          Format.fprintf fmt "%t =@ %a" pp_vds (pp_form subppe) f
   in
     Format.fprintf fmt "@[<hov 2>pred %s%a%t.@]"
       basename (pp_tyvarannot ppe) ts pp_body
@@ -1151,7 +1274,7 @@ let pp_opdecl_op (ppe : PPEnv.t) fmt (x, ts, ty, op) =
 
           (pp_locbinds ppe vds, e)
         in
-          Format.fprintf fmt "%t =@,%a" pp_vds (pp_expr subppe) e
+          Format.fprintf fmt "%t =@ %a" pp_vds (pp_expr subppe) e
   in
   Format.fprintf fmt "@[<hov 2>op %s%a%t.@]"
     basename (pp_tyvarannot ppe) ts pp_body

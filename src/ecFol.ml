@@ -1376,19 +1376,21 @@ let f_lets_simpl =
 let rec f_app_simpl f args ty = 
   if args = [] then f 
   else match f.f_node,args with
-    | Fquant (Llambda, bds,f), args -> f_betared_simpl Fsubst.f_subst_id bds f args
+    | Fquant (Llambda, bds,f), args -> 
+      f_betared_simpl Fsubst.f_subst_id bds f args ty
     | Fapp(f',args'),_ -> mk_form (Fapp(f', args'@args)) ty
     | _ -> mk_form (Fapp(f,args)) ty 
 
-and f_betared_simpl subst bds f args =
+and f_betared_simpl subst bds f args ty =
   match bds, args with
   | (x,GTty _)::bds, arg :: args ->
-    f_betared_simpl (Fsubst.f_bind_local subst x arg) bds f args 
+    f_betared_simpl (Fsubst.f_bind_local subst x arg) bds f args ty
   | (_,_)::_, _ :: _ -> assert false
   | _, [] -> f_lambda bds (Fsubst.f_subst subst f) 
-  | [], _ -> f_app_simpl (Fsubst.f_subst subst f) args f.f_ty
+  | [], _ -> f_app_simpl (Fsubst.f_subst subst f) args ty
 
-let f_betared_simpl bds f args = f_betared_simpl Fsubst.f_subst_id bds f args
+let f_betared_simpl bds f args ty = 
+  f_betared_simpl Fsubst.f_subst_id bds f args ty
 
 let f_forall_simpl b f = 
   let b = List.filter (fun (id,_) -> Mid.mem id (f_fv f)) b in

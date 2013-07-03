@@ -972,7 +972,7 @@ module Mod = struct
       hierror "cannot declare a local module outside of a section";
 
     let (name, m) = ptm.ptm_def in
-    let m = TT.transmod scope.sc_env (unloc name) m in
+    let m = TT.transmod scope.sc_env ~internal:false (unloc name) m in
 
     if not ptm.ptm_local then begin
       match CoreSection.olocals scope.sc_section with
@@ -1290,7 +1290,7 @@ module Ax = struct
           match tc with
           | Some tc -> [tc]
           | None    ->
-              let dtc = Plogic (Psmt empty_pprover) in
+              let dtc = Plogic (Psmt (None, empty_pprover)) in
               let dtc = [{ pl_loc = loc; pl_desc = dtc }] in
               let dtc = List.map (fun t -> { pt_core = t; pt_intros = []; }) dtc in
                 dtc

@@ -249,6 +249,7 @@ module Op : sig
   val bind : symbol -> operator -> env -> env
 
   val all : (operator -> bool) -> qsymbol -> env -> (path * t) list
+
   val reducible : env -> path -> bool
   val reduce    : env -> path -> ty list -> form
 end
@@ -342,4 +343,6 @@ module LDecl : sig
 end
 
 (* -------------------------------------------------------------------- *)
-val check_goal : EcProvers.prover_infos -> LDecl.hyps * form -> bool
+val check_goal :
+  usehyps:bool -> EcProvers.prover_infos ->
+    LDecl.hyps * form -> bool

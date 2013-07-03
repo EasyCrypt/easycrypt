@@ -249,10 +249,7 @@ proof.
  apply (real_le_trans _ 
              Pr[CPA2(BR2,A).main() @ &m : res \/ mem M.r ARO.log] _).
  equiv_deno (eq1 A _);try assumption;progress;smt.
- cut H:
- (Pr[CPA2(BR2,A).main() @ &m : res \/ mem M.r ARO.log] =
-  Pr[CPA2(BR2,A).main() @ &m : res] +  Pr[CPA2(BR2,A).main() @ &m : mem M.r ARO.log] -
-  Pr[CPA2(BR2,A).main() @ &m : res /\ mem M.r ARO.log]);[pr_or;trivial | smt].
+ pr_or.  smt.
 save.
 
 module type Inverter = {
@@ -327,8 +324,8 @@ proof.
  wp;rnd;swap{1} -7;wp.
  call (_: ={RO.m,ARO.log}  /\ (forall x, in_dom x RO.m{1} = mem x ARO.log{1})).
  fun;if;[smt|inline RO.o;wp;rnd |];wp;skip;progress;smt.
- do 2! (wp;rnd);skip;progress;try smt.
- wp;skip;progress.
+ do 2! (wp;rnd);skip;progress;smt.
+ wp;skip;progress;first smt.
  elim (find_in
       (lambda (p0:randomness) (p1:to), f pk{2} p0 = f pk{2} x{2})
       RO.m{2}

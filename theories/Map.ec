@@ -14,7 +14,7 @@ theory OptionGet.
   require export Option.
   op __get (m:('a,'b) map): 'a -> 'b option = get m.
 end OptionGet.
-import OptionGet.
+export OptionGet.
 
 pred (==) (m1 m2:('a,'b) map) =
   forall (x:'a), m1.[x] = m2.[x].
@@ -129,13 +129,10 @@ lemma in_rng_setNE: forall (v:'b) (m:('a,'b) map) x v',
   (!in_dom x m \/ m.[x] <> Some v) =>
   in_rng v m.[x <- v'].
 proof strict.
-delta in_rng beta;
-intros=> v m x v';
-rewrite 2!rng_def;
-intros=> v_in_rng_m in_dom_or_neq;
-elim in_dom_or_neq; smt.
+delta in_rng beta=> v m x v';
+rewrite 2!rng_def=> v_in_rng_m in_dom_or_neq;
+elim v_in_rng_m=> x' m_x'_some; exists x'; rewrite get_setNE //; smt.
 qed.
-
 
 (** General lemmas on rng and dom *)
 lemma onto_rng: forall (m:('a,'b) map) v,
@@ -307,13 +304,3 @@ lemma post_rng: forall p (m:('a,'b) map),
 proof strict.
 intros=> p m; split; smt.
 qed.
-
-(* TODO: the lemmas might need wrapped for ease of use *)
-theory DefaultGet.
-  op __get (m:('a,'b) map) (dv:'b) (x:'a): 'b =
-    let r = get m x in if (r <> None) then proj r else dv.
-end DefaultGet.
-
-theory PartialGet.
-  op __get (m:('a,'b) map) (x:'a): 'b = proj (get m x).
-end PartialGet.
