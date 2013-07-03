@@ -117,10 +117,21 @@ module PPEnv = struct
     in
       p_shorten exists p
 
-  let op_symb (ppe : t) p =
+  let op_symb (ppe : t) p info =
+    let lookup = 
+      match info with
+      | None -> fun sm -> EcEnv.Op.lookup_path sm ppe.ppe_env
+      | Some (pred,typ,dom) ->
+        let tvi = Some (EcUnify.UniEnv.TVIunamed typ) in
+        fun sm ->
+          let ue = EcUnify.UniEnv.create None in
+          match  EcUnify.select_op pred tvi ppe.ppe_env sm ue dom with
+          | [(p1,_), _, _] -> p1
+          | _ -> raise (EcEnv.LookupFailure (`QSymbol sm)) in
+        
     let exists sm =
-      try  EcPath.p_equal (EcEnv.Op.lookup_path sm ppe.ppe_env) p
-      with EcEnv.LookupFailure _ -> false
+        try  EcPath.p_equal (lookup sm) p
+        with EcEnv.LookupFailure _ -> false
     in
       p_shorten exists p
 
@@ -563,8 +574,9 @@ let pp_opname fmt (nm, op) =
   in
     EcSymbols.pp_qsymbol fmt (nm, op)
 
-let pp_opapp (ppe : PPEnv.t) pp_sub outer fmt (op, _tvi, es) =
-  let (nm, opname) = PPEnv.op_symb ppe op in
+let pp_opapp (ppe : PPEnv.t) t_ty pp_sub outer fmt (pred, op, tvi, es) =
+  let (nm, opname) = 
+    PPEnv.op_symb ppe op (Some (pred, tvi, List.map t_ty es)) in
 
   let pp_as_std_op fmt =
     let pp_stdapp fmt =
@@ -722,7 +734,7 @@ let pp_expr (ppe : PPEnv.t) fmt (e : expr) =
         pp_local ppe fmt x
 
     | Eop (op, tys) ->
-        pp_opapp ppe pp_expr outer fmt (op, tys, [])
+        pp_opapp ppe e_ty pp_expr outer fmt (false, op, tys, [])
 
     | Eif (c, e1, e2) ->
         pp_if3 ppe pp_expr outer fmt (c, e1, e2)
@@ -731,7 +743,7 @@ let pp_expr (ppe : PPEnv.t) fmt (e : expr) =
         pp_tuple `ForTuple ppe pp_expr fmt es
 
     | Eapp ({e_node = Eop (op, tys) }, args) ->
-        pp_opapp ppe pp_expr outer fmt (op, tys, args)
+        pp_opapp ppe e_ty pp_expr outer fmt (false, op, tys, args)
 
     | Eapp (e, args) ->
         pp_app ppe (pp_expr, pp_expr) outer fmt (e, args)
@@ -996,10 +1008,10 @@ and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
       pp_let ppe pp_form_r outer fmt (lp, f1, f2)
       
   | Fop (op, tvi) ->
-      pp_opapp ppe pp_form_r outer fmt (op, tvi, [])
+      pp_opapp ppe f_ty pp_form_r outer fmt (true, op, tvi, [])
 
   | Fapp ({f_node = Fop (p, tys)}, args) ->
-      pp_opapp ppe pp_form_r outer fmt (p, tys, args)
+      pp_opapp ppe f_ty pp_form_r outer fmt (true, p, tys, args)
 
   | Fapp (e, args) ->
       pp_app ppe (pp_form_r, pp_form_r) outer fmt (e, args)
