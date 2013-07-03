@@ -2402,19 +2402,48 @@ let t_prfalse g =
 let t_pror g = 
   let concl = get_concl g in
   match concl.f_node with
-    | Fapp({f_node=Fop(op1,_)},[{f_node=Fpr(m,f,ps,{f_node=Fapp({f_node=Fop(op2,_)},[p1;p2])})};bd])
-        when EcPath.p_equal op1 EcCoreLib.p_eq
-          && EcPath.p_equal op2 EcCoreLib.p_or
-      ->
-      let pr1 = f_pr m f ps p1 in
-      let pr2 = f_pr m f ps p2 in
-      let pr12 = f_pr m f ps (f_and p1 p2) in
-      let pr = f_real_sum pr1 pr2 in
-      let pr = f_real_sub pr pr12 in
-      let concl = f_eq pr bd in
-      prove_goal_by [concl] RN_hl_pror g
-    | _ -> 
-      cannot_apply "pr_op" "Pr[_ @ _ : _ \\/ _ ] expression was expected"
+  | Fapp({f_node=Fop(op1,_)}, [{f_node=Fpr(m,f,ps,ev)}; bd]) ->
+    if EcPath.p_equal op1 EcCoreLib.p_eq then 
+      if is_or ev then
+        let p1, p2 = destr_or ev in
+        let pr1 = f_pr m f ps p1 in
+        let pr2 = f_pr m f ps p2 in
+        let pr12 = f_pr m f ps (f_and p1 p2) in
+        let pr = f_real_sum pr1 pr2 in
+        let pr = f_real_sub pr pr12 in
+        let concl = f_eq pr bd in
+        prove_goal_by [concl] RN_hl_pror g
+      else assert false
+    else assert false
+  | _ -> 
+    cannot_apply "pr_op" "Pr[_ @ _ : _ \\/ _ ] expression was expected"
+      
+exception Found of form
+    
+let t_pror g =
+  let concl = get_concl g in
+  let select1 sid f = 
+    match f.f_node with
+    | Fpr(_,_,_,ev) -> 
+      if is_or ev && Mid.set_disjoint f.f_fv sid then raise (Found f) else false
+    | _ -> false in
+  let torw = 
+    try ignore (EcMetaProg.FPosition.select select1 concl);
+        tacuerror "can not find a pattern of the form Pr[_ @ _ : _ \\/ _]"
+    with Found f -> f in
+  let cut = 
+    let m,f,args,ev = destr_pr torw in
+    let p1,p2 = destr_or ev in
+    let pr1 = f_pr m f args p1 in
+    let pr2 = f_pr m f args p2 in
+    let pr12 = f_pr m f args (f_and p1 p2) in
+    let pr = f_real_sum pr1 pr2 in
+    let pr = f_real_sub pr pr12 in
+    f_eq torw pr in
+  t_seq_subgoal 
+    (t_rewrite_form `LtoR cut [])
+    [ t_seq t_pror t_trivial;
+      t_id None] g
 
 let t_bdeq g = 
   let concl = get_concl g in
