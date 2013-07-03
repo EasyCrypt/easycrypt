@@ -390,8 +390,8 @@ type logtactic =
   | Psmt        of (string located option * pprover_infos)
   | Pintro      of intropattern
   | Psplit                        
-  | Pfield		of (pformula * pformula * pformula * pformula * pformula * pformula * pformula)
-  | Pfieldsimp	of (pformula * pformula * pformula * pformula * pformula * pformula * pformula)
+  | Pfield      of pformula tuple7
+  | Pfieldsimp  of pformula tuple7
   | Pexists     of fpattern_arg located list 
   | Pleft                         
   | Pright                        
