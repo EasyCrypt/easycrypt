@@ -319,11 +319,9 @@ type funsig = {
 }
 
 (* -------------------------------------------------------------------- *)
-
 type oracle_info = {
-  oi_calls  : xpath list; (* The list of oracle that can be called *)
-  oi_in     : bool; (* true if equality of global is required to ensure
-                       equality of res and global *)
+  oi_calls : xpath list;
+  oi_in    : bool;
 }
 
 type module_type = {
@@ -333,8 +331,7 @@ type module_type = {
 }
 
 type module_sig_body_item =
-(*  | Tys_variable of variable *)
-  | Tys_function of funsig * oracle_info
+| Tys_function of funsig * oracle_info
 
 type module_sig_body = module_sig_body_item list
 
