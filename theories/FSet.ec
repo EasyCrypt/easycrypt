@@ -46,6 +46,14 @@ lemma nosmt eq_tran: forall (X Y Z:'a set), X == Y => Y == Z => X == Z by [].
 (* And we can use it as equality *)
 axiom set_ext: forall (X1 X2:'a set), X1 == X2 => X1 = X2.
 
+lemma elems_eq : forall (s t:'a set),
+  elems s = elems t <=> s = t.
+intros=> s t.
+(split=> h;
+first apply set_ext=> x;rewrite - !mem_def);
+rewrite h //.
+qed.
+
 (** Inclusion *)
 pred (<=) (X1 X2:'a set) = forall x, mem x X1 => mem x X2.
 
@@ -161,6 +169,13 @@ lemma mem_rm2: forall (x x':'a) (X:'a set),
 lemma rm_nin_id: forall (x:'a) (X:'a set),
   !(mem x X) => X = rm x X
 by (intros=> x X x_nin_X; apply set_ext; smt).
+
+lemma rm_rmE : forall x y (xs:'a set), rm x (rm y xs) = rm y (rm x xs).
+proof strict.
+intros=> x y xs.
+apply set_ext=> a.
+rewrite ! mem_rm ! andA (andC (! y = a)) //.
+save.
 
 lemma elems_rm: forall (x:'a) (X:'a set),
   elems (rm x X) <-> rm x (elems X)
@@ -336,12 +351,39 @@ axiom fold_empty: forall (f:'a -> 'b -> 'b) (e:'b),
 axiom fold_rm_pick: forall (f:'a -> 'b -> 'b) (e:'b) xs,
     fold f e xs = f (pick xs) (fold f e (rm (pick xs) xs)).
 
-axiom foldCA: forall (x:'a) (f:'a -> 'a -> 'a) (z:'a) (xs:'a set),
-  (forall x y, f x y = f y x) =>
-  (forall x y z, f x (f y z) = f (f x y) z) =>
-  mem x xs =>
-  fold f z xs = f x (fold f z (rm x xs)).
+lemma fold_set_list:
+  forall (f:'a -> 'b -> 'b) (e:'b) xs,
+    (forall a b X, f a (f b X) = f b (f a X)) =>
+      fold f e xs = List.fold_right f e (elems xs).
+intros=> f e xs C.
+elimT set_comp xs;
+  first by rewrite fold_empty elems_empty fold_right_nil //.
+intros s nempty Hind.
+elimT list_case_eq (elems s);
+  first by apply absurd=> _;rewrite -elems_empty elems_eq //.
+intros=> x l' h.
+cut xval : pick s = x;first rewrite pick_def h hd_cons //.
+subst x.
+rewrite h fold_rm_pick fold_right_cons Hind //.
+congr => //.
+apply fold_permC;first assumption.
+rewrite (_:l' = rm (pick s) (elems s)).
+rewrite h rm_cons //.
+apply elems_rm.
+save.
 
+lemma foldC: forall (x:'a) (f:'a -> 'b -> 'b) (z:'b) (xs:'a set),
+  (forall a b X, f a (f b X) = f b (f a X)) =>
+    mem x xs =>
+    fold f z xs = f x (fold f z (rm x xs)).
+intros=> ? ? ? ? C M.
+rewrite ! fold_set_list;first 2 assumption.
+rewrite (foldC x f z (elems xs));first assumption.
+rewrite mem_def //.
+rewrite (fold_permC f z (elems (rm x xs)) (rm x (elems xs))) //;
+  first assumption.
+apply elems_rm.
+save.
 
 (* map *)
 op img : ('a -> 'b) -> 'a set -> 'b set.

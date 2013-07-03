@@ -14,12 +14,6 @@ theory SumSet.
 
   require import FSet.
 
-  axiom foldCA_f: forall (x:'a) (ope:'b -> 'b -> 'b) (f:'a -> 'b) (z:'b) (xs:'a set),
-    (forall x y, ope x y = ope y x) =>
-    (forall x y z, ope x (ope y z) = ope (ope x y) z) =>
-    mem x xs =>
-    fold (lambda x s, ope s (f x)) z xs = ope (f x) (fold (lambda x s, ope s (f x)) z (rm x xs)).
-
   op sum(f:'a -> t, s:'a set) : t =
     fold (lambda x s, s + (f x)) Z s.
 
@@ -34,8 +28,10 @@ theory SumSet.
   proof strict.
     simplify sum.
     intros ? ? ? ?.
-    by apply (foldCA_f x (+) f Z s _ _ _);[apply C|apply A|trivial].
-  save.
+    rewrite (foldC x (lambda x s, s + (f x))) // /=.
+      by intros=> a b X;rewrite -A (C (f b)) A //.
+      by rewrite C //.
+  qed.
 
   lemma sum_add :
     forall (f:'a -> t) (s:'a set) (x:'a),
@@ -117,9 +113,9 @@ theory NatMul.
   
   op ( * ) : int -> t -> t.
 
-  axiom compZ : forall (x:t), 0*x = Z.
+  axiom MulZ : forall (x:t), 0*x = Z.
 
-  axiom compI : forall n (x:t), n*x = x + (n-1)*x.
+  axiom MulI : forall n (x:t), n*x = x + (n-1)*x.
 
   lemma sum_const : forall (k:t) (f:'a->t) (s:'a set),
     (forall (x:'a), mem x s => f x = k) =>
@@ -129,12 +125,12 @@ theory NatMul.
     pose xs := s.
     cut lem : xs <= s => sum f xs = (card xs)*k;last apply lem;delta xs;apply leq_refl.
     elimT set_comp xs;first rewrite sum_nil card_empty=> ?;
-      first rewrite compZ //.
+      first rewrite MulZ //.
     intros ? ? ? ?.
     rewrite (sum_rm _ _ (pick s0));first apply mem_pick;by trivial.
     rewrite H1;first apply (leq_tran _ s0);[apply rm_leq|by trivial].
     rewrite H;first apply H2;apply mem_pick;by trivial.
     rewrite card_rm_in;first apply mem_pick;by trivial.
-    by rewrite -compI //.
+    by rewrite -MulI //.
   save.
 end NatMul.
