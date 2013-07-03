@@ -301,7 +301,7 @@
 %token ZETA 
 
 %token <string> OP1 OP2 OP3 OP4
-%token LTCOLON GT GE LE
+%token LTCOLON GT LT GE LE
 
 %nonassoc COMMA ELSE
 
@@ -315,7 +315,8 @@
 
 %nonassoc EQ NE
 
-%left OP1 GT GE LE
+%nonassoc GT LT GE LE
+%left OP1
 %right QUESTION
 %left OP2 MINUS ADD
 %right ARROW
@@ -426,16 +427,17 @@ fident:
 | EQ      { "=" }
 | x=AND   { str_and x }
 | x=OR    { str_or  x }
-| STAR    { "*" }
-| GT      { ">" }
+| STAR    { "*"  }
+| GT      { ">"  }
+| LT      { "<"  }
 | GE      { ">=" }
 | LE      { "<=" }
-| ADD     { "+" }
-| MINUS   { "-" }
-| x=OP1   { x   }
-| x=OP2   { x   }
-| x=OP3   { x   }
-| x=OP4   { x   }
+| ADD     { "+"  }
+| MINUS   { "-"  }
+| x=OP1   { x    }
+| x=OP2   { x    }
+| x=OP3   { x    }
+| x=OP4   { x    }
 ;
 
 (* -------------------------------------------------------------------- *)
@@ -536,6 +538,9 @@ expr_u:
 
 | e1=expr op=loc(OP1) ti=tvars_app? e2=expr 
     { peapp_symb op.pl_loc op.pl_desc ti [e1; e2] }
+
+| e1=expr op=loc(LT) ti=tvars_app? e2=expr  
+    { peapp_symb op.pl_loc "<" ti [e1; e2] }
 
 | e1=expr op=loc(GT) ti=tvars_app? e2=expr  
     { peapp_symb op.pl_loc ">" ti [e1; e2] }
@@ -718,6 +723,9 @@ form_u(P):
 
 | e1=form_r(P) op=loc(OP1) ti=tvars_app? e2=form_r(P)
     { pfapp_symb op.pl_loc op.pl_desc ti [e1; e2] } 
+
+| e1=form_r(P) op=loc(LT) ti=tvars_app? e2=form_r(P)
+    { pfapp_symb op.pl_loc ">" ti [e1; e2] } 
 
 | e1=form_r(P) op=loc(GT) ti=tvars_app? e2=form_r(P)
     { pfapp_symb op.pl_loc ">" ti [e1; e2] } 

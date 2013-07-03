@@ -269,7 +269,6 @@ rule main = parse
   | '['  { LBRACKET }
   | ']'  { RBRACKET }
   | "<:" { LTCOLON }
-  | ">"  { GT }
   | ','  { COMMA }
   | ';'  { SEMICOLON }
   | ':'  { COLON }
@@ -288,8 +287,10 @@ rule main = parse
   | "="  { EQ }
   | "<>" { NE }
 
-  | "<="  { LE }
+  | ">"   { GT }
+  | "<"   { LT }
   | ">="  { GE }
+  | "<="  { LE }
 
   | "-" { MINUS }
   | "+" { ADD }
