@@ -217,5 +217,43 @@ theory Finite.
   axiom toFSet_cor: forall (X:'a set),
     finite X => X == toFSet X.
 
+  op fromFSet: 'a FSet.set -> 'a set.
+  axiom fromFSet_cor: forall (X:'a FSet.set),
+    fromFSet X == X.
+
+  lemma finite_fromFSet: forall (X:'a FSet.set),
+    finite (fromFSet X)
+  by (intros=> X; exists X; apply fromFSet_cor).
+
+  lemma toFSetI: forall (X Y:'a set),
+    finite X => finite Y =>
+    toFSet X = toFSet Y => X = Y.
+  proof strict.
+  by intros=> X Y fX fY eq_toFSet; apply set_ext=> x;
+     rewrite 2?toFSet_cor // eq_toFSet //.
+  qed.
+
+  lemma fromFSetI: forall (X Y:'a FSet.set),
+    fromFSet X = fromFSet Y => X = Y.
+  proof strict.
+  by intros=> X Y eq_fromFSet; apply FSet.set_ext=> x;
+     rewrite -2!fromFSet_cor eq_fromFSet //.
+  qed.
+
+  lemma toFSet_fromFSet: forall (X:'a FSet.set),
+    toFSet (fromFSet X) = X.
+  proof strict.
+  by intros=> X; apply FSet.set_ext=> x;
+     rewrite -toFSet_cor ?fromFSet_cor //; apply finite_fromFSet.
+  qed.
+
+  lemma fromFSet_toFSet: forall (X:'a set),
+    finite X =>
+    fromFSet (toFSet X) = X.
+  proof strict.
+  by intros=> X fX; apply set_ext=> x;
+     rewrite fromFSet_cor toFSet_cor //.
+  qed.
+
   (* We should then show that all set operations correspond as expected *)
 end Finite.
