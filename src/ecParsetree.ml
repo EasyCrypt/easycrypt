@@ -387,7 +387,7 @@ and intropattern = intropattern1 list
 
 type logtactic =
   | Passumption of (pqsymbol option * ptyannot option)
-  | Psmt        of pprover_infos
+  | Psmt        of (string located option * pprover_infos)
   | Pintro      of intropattern
   | Psplit                        
   | Pfield		of (pformula * pformula * pformula * pformula * pformula * pformula * pformula)

@@ -1638,8 +1638,8 @@ logtactic:
 | TRIVIAL
    { Ptrivial }
 
-| SMT pi=prover_info
-   { Psmt pi }
+| SMT db=lident? pi=prover_info
+   { Psmt (db, pi) }
 
 | INTROS a=intro_pattern*
    { Pintro a }
