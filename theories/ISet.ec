@@ -205,26 +205,55 @@ lemma leq_filter: forall (p:'a cpred) X,
   filter p X <= X
 by [].
 
-theory Duni.
-  require import Distr.
-  (** We recall notations from Distr.ec used here:
-      - U denotes a uniformity axiom or lemma,
-      - in_d denotes a support membership test,
-      - d_x is the weight of x in d,
-      - weight_d is the weight of the constantly true predicate in d. *)
-  op duni: 'a set -> 'a distr.
+theory Finite.
+  require        FSet.
 
-  axiom in_duni: forall (x:'a) X, in_supp x (duni X) <=> mem x X.
+  pred (==) (X:'a set) (Y:'a FSet.set) =
+    forall (x:'a), mem x X <=> FSet.mem x Y.
 
-  axiom duniU: forall (X:'a set) x y,
-    mem x X => mem y X =>
-    mu_x (duni X) x = mu_x (duni X) y.
+  pred finite (X:'a set) = exists (X':'a FSet.set), X == X'.
 
-  axiom duni_x_nin: forall (x:'a) X, 
-    !mem x X => mu_x (duni X) x = 0%r.
+  op toFSet: 'a set -> 'a FSet.set.
+  axiom toFSet_cor: forall (X:'a set),
+    finite X => X == toFSet X.
 
-  axiom mu_empty: forall (P:'a cpred), mu (duni empty) P = 0%r.
+  op fromFSet: 'a FSet.set -> 'a set.
+  axiom fromFSet_cor: forall (X:'a FSet.set),
+    fromFSet X == X.
 
-  axiom weight_duni: forall (X:'a set),
-    weight (duni X) = if X = empty then 0%r else 1%r.
-end Duni.
+  lemma finite_fromFSet: forall (X:'a FSet.set),
+    finite (fromFSet X)
+  by (intros=> X; exists X; apply fromFSet_cor).
+
+  lemma toFSetI: forall (X Y:'a set),
+    finite X => finite Y =>
+    toFSet X = toFSet Y => X = Y.
+  proof strict.
+  by intros=> X Y fX fY eq_toFSet; apply set_ext=> x;
+     rewrite 2?toFSet_cor // eq_toFSet //.
+  qed.
+
+  lemma fromFSetI: forall (X Y:'a FSet.set),
+    fromFSet X = fromFSet Y => X = Y.
+  proof strict.
+  by intros=> X Y eq_fromFSet; apply FSet.set_ext=> x;
+     rewrite -2!fromFSet_cor eq_fromFSet //.
+  qed.
+
+  lemma toFSet_fromFSet: forall (X:'a FSet.set),
+    toFSet (fromFSet X) = X.
+  proof strict.
+  by intros=> X; apply FSet.set_ext=> x;
+     rewrite -toFSet_cor ?fromFSet_cor //; apply finite_fromFSet.
+  qed.
+
+  lemma fromFSet_toFSet: forall (X:'a set),
+    finite X =>
+    fromFSet (toFSet X) = X.
+  proof strict.
+  by intros=> X fX; apply set_ext=> x;
+     rewrite fromFSet_cor toFSet_cor //.
+  qed.
+
+  (* We should then show that all set operations correspond as expected *)
+end Finite.

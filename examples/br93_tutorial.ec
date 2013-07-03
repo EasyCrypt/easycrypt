@@ -1,4 +1,4 @@
-require import Map. import OptionGet.
+require import Map.
 require import Set.
 require import Int.
 require import Distr.
@@ -129,10 +129,10 @@ proof.
  delta;simplify;smt.
 qed.
 lemma projPlain_eq : forall (c : ciphertext, i : int),
- 0 <= i => i < k => (projPlain c).[i] = c.[l + i].
+ l <= i => i < k + l => (projPlain c).[i - l] = c.[i].
 proof.
- intros c i Hgz Hlel.
- delta;simplify;smt.
+ intros c i Hgz Hlel;
+ delta; simplify; smt.
 qed.
 lemma projRand_c : forall (r : randomness,p : plaintext),
 projRand((r || p)) = r by [].
@@ -153,7 +153,11 @@ proof.
              (Plaintext.to_array (projPlain c)) i).
  intros H1 H2.
  case (i<l);intros H3;first smt.
- rewrite H2;smt.
+ rewrite H2; first 2 smt.
+ cut ->: (to_array (projPlain c)).[i - length (to_array (projRand c))] =
+           (projPlain c).[i - length (to_array (projRand c))]; first smt.
+ cut ->: length (to_array (projRand c)) = l; first smt.
+ rewrite projPlain_eq=> //; first 2 smt.
 qed.
 
 module Rnd ={
