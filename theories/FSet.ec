@@ -335,8 +335,13 @@ lemma filter_cpTrue: forall (X:'a set),
 by (intros=> X; apply set_ext; smt).
 
 lemma filter_cpEq_in: forall (x:'a) (X:'a set),
-  mem x X => filter (cpEq x) X = single x
-by (intros=> x X x_in_X; apply set_ext; smt).
+  mem x X => filter (cpEq x) X = single x.
+proof strict.
+intros=> x X x_in_X; apply set_ext=> x';
+rewrite mem_filter; delta cpEq beta; case (x = x').
+  by intros=> <-; simplify; split=> _ //; apply mem_single_eq.
+  by rewrite rw_eq_sym => x_x'; simplify; apply mem_single_neq=> //.
+qed.
 
 lemma leq_filter: forall (p:'a cpred) (X:'a set),
   filter p X <= X
