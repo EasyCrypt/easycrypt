@@ -1143,7 +1143,7 @@ let pp_opdecl_pr (ppe : PPEnv.t) fmt (x, ts, ty, op) =
           let vds = List.map (snd_map EcFol.destr_gty) vds in
             (pp_locbinds ppe vds, f)
         in
-          Format.fprintf fmt "%t =@,%a" pp_vds (pp_form subppe) f
+          Format.fprintf fmt "%t =@ %a" pp_vds (pp_form subppe) f
   in
     Format.fprintf fmt "@[<hov 2>pred %s%a%t.@]"
       basename (pp_tyvarannot ppe) ts pp_body
@@ -1165,7 +1165,7 @@ let pp_opdecl_op (ppe : PPEnv.t) fmt (x, ts, ty, op) =
 
           (pp_locbinds ppe vds, e)
         in
-          Format.fprintf fmt "%t =@,%a" pp_vds (pp_expr subppe) e
+          Format.fprintf fmt "%t =@ %a" pp_vds (pp_expr subppe) e
   in
   Format.fprintf fmt "@[<hov 2>op %s%a%t.@]"
     basename (pp_tyvarannot ppe) ts pp_body
