@@ -64,7 +64,7 @@
   let pe_cons loc ti e1 e2 = 
     mk_loc loc (peapp_symb loc EcCoreLib.s_cons ti [e1; e2])
       
-  let pelist loc ti (es : pexpr    list) : pexpr    = 
+  let pelist loc ti (es : pexpr list) : pexpr = 
     List.fold_right (fun e1 e2 -> pe_cons loc ti e1 e2) es (pe_nil loc ti)
 
   let pf_nil loc ti = 
@@ -127,6 +127,7 @@
 %token <EcSymbols.symbol> UIDENT
 %token <EcSymbols.symbol> TIDENT
 %token <EcSymbols.symbol> MIDENT
+%token <EcSymbols.symbol> PUNIOP
 %token <EcSymbols.symbol> PBINOP
 
 %token <int> NUM
@@ -332,7 +333,6 @@
 
 %right SEMICOLON
 
-%nonassoc prec_prefix_op
 %nonassoc prec_tactic
 
 %type <EcParsetree.global EcLocation.located> global
@@ -391,6 +391,7 @@ uqident:
 %inline _oident:
 | x=LIDENT { x }
 | x=UIDENT { x }
+| x=PUNIOP { x }
 | x=PBINOP { x }
 ;
 
@@ -428,29 +429,17 @@ fident:
 ;
 
 (* -------------------------------------------------------------------- *)
-%inline binop:
-| EQ      { "=" }
-| x=AND   { str_and x }
-| x=OR    { str_or  x }
-| STAR    { "*"  }
-| GT      { ">"  }
-| LT      { "<"  }
-| GE      { ">=" }
-| LE      { "<=" }
-| ADD     { "+"  }
-| MINUS   { "-"  }
-| x=OP1   { x    }
-| x=OP2   { x    }
-| x=OP3   { x    }
-| x=OP4   { x    }
-;
-
 %inline ordering_op:
 | GT { ">"  }
 | LT { "<"  }
 | GE { ">=" }
 | LE { "<=" }
 ;
+
+%inline uniop:
+| x=OP1 { Printf.sprintf "[%s]" x }
+| ADD   { "[+]" }
+| MINUS { "[-]" }
 
 (* -------------------------------------------------------------------- *)
 pside_:
@@ -545,7 +534,7 @@ expr_u:
 | op=loc(NOT) ti=tvars_app? e=expr
     { peapp_symb op.pl_loc "!" ti [e] }
 
-| op=loc(binop) ti=tvars_app? e=expr %prec prec_prefix_op
+| op=loc(uniop) ti=tvars_app? e=expr
     { peapp_symb op.pl_loc op.pl_desc ti [e] } 
 
 | e1=expr op=loc(OP1) ti=tvars_app? e2=expr 
@@ -729,7 +718,7 @@ form_u(P):
 | op=loc(NOT) ti=tvars_app? e=form_r(P) 
     { pfapp_symb  op.pl_loc "!" ti [e] }
 
-| op=loc(binop) ti=tvars_app? e=form_r(P) %prec prec_prefix_op
+| op=loc(uniop) ti=tvars_app? e=form_r(P)
    { pfapp_symb op.pl_loc op.pl_desc ti [e] } 
 
 | e1=form_r(P) op=loc(OP1) ti=tvars_app? e2=form_r(P)
