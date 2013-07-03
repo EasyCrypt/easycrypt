@@ -34,8 +34,8 @@
   (concat "^\\(" (proof-ids-to-regexp easycrypt-keywords-proof-save) "\\)\\b"))
 
 (defconst easycrypt-goal-command-regexp
-  (concat "^\\(?:" (proof-ids-to-regexp easycrypt-keywords-proof-goal) "\\)"
-          "\\s-+\\(\\sw+\\)"))
+  (concat "^\\(?:local\\s-+\\)?\\(?:" (proof-ids-to-regexp easycrypt-keywords-proof-goal) "\\)"
+          "\\s-+\\(?:nosmt\\s-+\\)?\\(\\sw+\\)"))
 
 (defun easycrypt-save-command-p (span str)
   "Decide whether argument is a [save|qed] command or not"
@@ -83,7 +83,7 @@
   "Regexp matching any EasyCrypt command start or the terminator character.")
 
 (defconst easycrypt-keywords-indent-open
-  (append easycrypt-keywords-proof-goal
+  (append (append '("local") easycrypt-keywords-proof-goal)
           easycrypt-keywords-code-open))
 
 (defconst easycrypt-keywords-indent-close
