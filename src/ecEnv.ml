@@ -264,6 +264,12 @@ let lookup_error cause =
 (* -------------------------------------------------------------------- *)
 exception DuplicatedBinding of symbol
 
+let _ = EcPException.register (fun fmt exn ->
+  match exn with 
+  | DuplicatedBinding s ->
+    Format.fprintf fmt "the symbol %s already exists" s
+  | _ -> raise exn)
+
 (* -------------------------------------------------------------------- *)
 let unsuspend _ (_, o) _ = o
 
