@@ -16,10 +16,16 @@ module M = {
   }
 }.
 
-equiv test : M.main ~ M.main : ={M.m,w} ==> ={M.m,res}.
+equiv test_0 : M.main ~ M.main : ={M.m,w} ==> ={M.m,res}.
 fun.
-eqobs_in (={M.m, w}).
+eqobs_in : (={M.m, w}).
 save.
+
+equiv test_1 : M.main ~ M.main : ={M.m,w} ==> ={M.m,res}.
+fun.
+eqobs_in.
+save.
+
 
 module type Orcl = {
   fun o (x:int) : int 
@@ -48,14 +54,26 @@ module G (A:Adv) = {
   }
 }.
 
-equiv foo (A<:Adv {O} ) : G(A).main ~ G(A).main : ={x,O.m,glob A} ==> ={res,O.m}.
+equiv foo_0 (A<:Adv {O} ) : G(A).main ~ G(A).main : ={x,O.m,glob A} ==> ={res,O.m}.
 fun.
-eqobs_in (={O.m, x}).
+eqobs_in : (={O.m, x}).
 save.
 
-equiv foo1 (A<:Adv {O} ) : G(A).main ~ G(A).main : ={x,O.m,glob A} ==> ={res,O.m,glob A}.
+equiv foo_1 (A<:Adv {O} ) : G(A).main ~ G(A).main : ={x,O.m,glob A} ==> ={res,O.m}.
 fun.
-eqobs_in (={O.m,glob A, x}).
+eqobs_in.
 save.
+
+equiv foo1_0 (A<:Adv {O} ) : G(A).main ~ G(A).main : ={x,O.m,glob A} ==> ={res,O.m,glob A}.
+fun.
+eqobs_in : (={O.m,glob A, x}).
+save.
+
+equiv foo1_1 (A<:Adv {O} ) : G(A).main ~ G(A).main : ={x,O.m,glob A} ==> ={res,O.m,glob A}.
+fun.
+eqobs_in.
+save.
+
+
 
 

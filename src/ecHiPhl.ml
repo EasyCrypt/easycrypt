@@ -687,24 +687,35 @@ let process_exists_intro fs g =
 let process_eqobs_in (geq', ginv, eqs') g = 
   let env, hyps, concl = get_goal_e g in
   let ienv = LDecl.inv_memenv hyps in
-  let ml, mr, eenv = 
-    match concl.f_node with
-    | FequivS es ->
-      fst es.es_ml, fst es.es_mr, LDecl.push_all [es.es_ml; es.es_mr] hyps 
-    | _ -> tacuerror "The goal should be an equiv on statements." in
+  let es = destr_equivS concl in
+  let ml, mr =  fst es.es_ml, fst es.es_mr in
  
-  let geq = omap_dfl geq' f_true (fun f -> process_form ienv f tbool) in
-  let ginv = omap_dfl ginv f_true (fun f -> process_form ienv f tbool) in
-  let eqs = process_form eenv eqs' tbool in
-   
   let toeq ml mr f = 
     try EcPV.Mpv2.of_form env ml mr f 
     with _ -> 
       let ppe = EcPrinting.PPEnv.ofenv env in
       tacuerror "can not reconize %a as a set of equality" 
         (EcPrinting.pp_form ppe) f in
-  let geq = toeq mleft mright geq in
-  let eqs = set_loc eqs'.pl_loc (toeq ml mr) eqs in
+
+  let geq =
+    match geq' with
+    | None -> toeq mleft mright f_true
+    | Some geq' ->
+      let geq = process_form ienv geq' tbool in
+      set_loc geq'.pl_loc (toeq mleft mright) geq in
+
+  let ginv = omap_dfl ginv f_true (fun f -> process_form ienv f tbool) in
+
+  let eqs = 
+    match eqs' with 
+    | None -> 
+      begin 
+        try EcPV.Mpv2.needed_eq env ml mr es.es_po 
+        with _ -> tacuerror "can not infer the set of equality" 
+      end
+    | Some eqs' -> 
+      let eqs = process_prhl_formula g eqs' in
+      set_loc eqs'.pl_loc (toeq ml mr) eqs in
 
   let log = ref Mf.empty in
  
@@ -753,11 +764,7 @@ let process_eqobs_in (geq', ginv, eqs') g =
         (t_eqobs (EcPhl.eqobs_inF (ref Mf.empty) geq) eqs) g 
     | Some (EORI_unknown (Some id)) ->
       t_hyp id g
-    | _ -> 
-      let ppe = EcPrinting.PPEnv.ofenv env in
-      Format.printf "form = %a@." 
-        (EcPrinting.pp_form ppe) concl;
-      t_fail g in
+    | _ -> t_fail g in
   
   t_on_last 
     (t_seq (t_eqobs (EcPhl.eqobs_inF (ref Mf.empty) geq) eqs)

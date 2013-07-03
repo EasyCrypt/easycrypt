@@ -83,6 +83,7 @@ module Mpv2 : sig
   type t 
   val to_form : EcIdent.t -> EcIdent.t -> t -> form -> form
   val of_form : env -> EcIdent.t -> EcIdent.t -> form -> t
+  val needed_eq : env -> EcIdent.t -> EcIdent.t -> form -> t
   val union   : t -> t -> t
   val subset   : t -> t -> bool
 

@@ -63,23 +63,42 @@ module G2 (A:Adv) = {
   }
 }.
 
-equiv foo (A<:Adv {O1,O2} ) : G1(A).main ~ G2(A).main : 
+equiv foo_0 (A<:Adv {O1,O2} ) : G1(A).main ~ G2(A).main : 
   ={x} /\ O1.m{1} = O2.m{2} /\ O1.l{1} = O2.l{2} ==> 
     ={res} /\ O1.m{1} = O2.m{2} /\ O1.l{1} = O2.l{2}.
 proof.
  fun.
  eqobs_in (O1.m{1} = O2.m{2} /\ O1.l{1} = O2.l{2}) (O1.w{1} = 2)
-          (O1.m{1} = O2.m{2} /\ O1.l{1} = O2.l{2} /\ ={x}).
+          : (O1.m{1} = O2.m{2} /\ O1.l{1} = O2.l{2} /\ ={x}).
    fun;wp;skip;trivial.
  wp;skip;trivial.
 save.
 
-equiv foo1 (A<:Adv {O1,O2} ) : G1(A).main ~ G2(A).main : 
+equiv foo_1 (A<:Adv {O1,O2} ) : G1(A).main ~ G2(A).main : 
+  ={x} /\ O1.m{1} = O2.m{2} /\ O1.l{1} = O2.l{2} ==> 
+    ={res} /\ O1.m{1} = O2.m{2} /\ O1.l{1} = O2.l{2}.
+proof.
+ fun.
+ eqobs_in (O1.m{1} = O2.m{2} /\ O1.l{1} = O2.l{2}) (O1.w{1} = 2) : .
+   fun;wp;skip;trivial.
+ wp;skip;trivial.
+save.
+
+equiv foo1_0 (A<:Adv {O1,O2} ) : G1(A).main ~ G2(A).main : 
       ={x} /\ O1.m{1} = O2.m{2} /\ O1.l{1} = O2.l{2} ==> 
       ={res,glob A} /\ O1.m{1} = O2.m{2} /\ O1.l{1} = O2.l{2}.
 fun.
-  eqobs_in (O1.m{1} = O2.m{2} /\ O1.l{1} = O2.l{2}) (O1.w{1} = 2)
+  eqobs_in (O1.m{1} = O2.m{2} /\ O1.l{1} = O2.l{2}) (O1.w{1} = 2) :
      (O1.m{1} = O2.m{2} /\ O1.l{1} = O2.l{2} /\ ={x,glob A}). 
+   fun;wp;skip;trivial.
+ wp;skip;trivial.
+save.
+
+equiv foo1_1 (A<:Adv {O1,O2} ) : G1(A).main ~ G2(A).main : 
+      ={x} /\ O1.m{1} = O2.m{2} /\ O1.l{1} = O2.l{2} ==> 
+      ={res,glob A} /\ O1.m{1} = O2.m{2} /\ O1.l{1} = O2.l{2}.
+fun.
+  eqobs_in (O1.m{1} = O2.m{2} /\ O1.l{1} = O2.l{2}) (O1.w{1} = 2) : .
    fun;wp;skip;trivial.
  wp;skip;trivial.
 save.

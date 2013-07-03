@@ -1774,9 +1774,10 @@ phltactic:
 ;
 
 eqobs_in:
-| f3=sform                    { (None   , None   , f3) }
-| f1=sform f3=sform           { (Some f1, None   , f3) } 
-| f1=sform f2=sform f3=sform  { (Some f1, Some f2, f3) }
+| empty                              { (None   , None   , None) }
+| COLON f3=sform                     { (None   , None   , Some f3)   }
+| f1=sform COLON f3=sform?           { (Some f1, None   , f3)   } 
+| f1=sform f2=sform COLON f3=sform?  { (Some f1, Some f2, f3)   }
 ;
 
 tactic_core_r:

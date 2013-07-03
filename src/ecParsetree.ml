@@ -357,7 +357,7 @@ type phltactic =
   | Pprfalse
   | Ppror
   | Pbdeq 
-  | Peqobs_in  of (pformula option * pformula option * pformula)
+  | Peqobs_in  of (pformula option * pformula option * pformula option)
 
 and pinline_arg =
   [ `ByName    of tac_side * (pgamepath list * int list option)
