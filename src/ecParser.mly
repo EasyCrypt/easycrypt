@@ -11,6 +11,11 @@
   let pqsymb_of_symb loc x : pqsymbol =
     mk_loc loc ([], x)
 
+  let isordering (nm, x) =
+    match nm, x with
+    | ([], ("<" | ">" | "<=" | ">=")) -> true
+    | _ -> false
+
   let mk_mod ?(modtypes = []) params body = Pm_struct {
     ps_params    = params;
     ps_signature = modtypes;
@@ -36,7 +41,7 @@
     mk_loc loc (PFident (pqsymb_of_symb loc s, ti))
 
   let peapp_symb loc s ti es = 
-    PEapp(mk_peid_symb loc s ti, es)
+    PEapp (mk_peid_symb loc s ti, es)
 
   let peget loc ti e1 e2    = 
     peapp_symb loc EcCoreLib.s_get ti [e1;e2]
@@ -301,7 +306,7 @@
 %token ZETA 
 
 %token <string> OP1 OP2 OP3 OP4
-%token LTCOLON GT GE LE
+%token LTCOLON GT LT GE LE
 
 %nonassoc COMMA ELSE
 
@@ -315,7 +320,8 @@
 
 %nonassoc EQ NE
 
-%left OP1 GT GE LE
+%left GT LT GE LE
+%left OP1
 %right QUESTION
 %left OP2 MINUS ADD
 %right ARROW
@@ -426,16 +432,24 @@ fident:
 | EQ      { "=" }
 | x=AND   { str_and x }
 | x=OR    { str_or  x }
-| STAR    { "*" }
-| GT      { ">" }
+| STAR    { "*"  }
+| GT      { ">"  }
+| LT      { "<"  }
 | GE      { ">=" }
 | LE      { "<=" }
-| ADD     { "+" }
-| MINUS   { "-" }
-| x=OP1   { x   }
-| x=OP2   { x   }
-| x=OP3   { x   }
-| x=OP4   { x   }
+| ADD     { "+"  }
+| MINUS   { "-"  }
+| x=OP1   { x    }
+| x=OP2   { x    }
+| x=OP3   { x    }
+| x=OP4   { x    }
+;
+
+%inline ordering_op:
+| GT { ">"  }
+| LT { "<"  }
+| GE { ">=" }
+| LE { "<=" }
 ;
 
 (* -------------------------------------------------------------------- *)
@@ -537,14 +551,16 @@ expr_u:
 | e1=expr op=loc(OP1) ti=tvars_app? e2=expr 
     { peapp_symb op.pl_loc op.pl_desc ti [e1; e2] }
 
-| e1=expr op=loc(GT) ti=tvars_app? e2=expr  
-    { peapp_symb op.pl_loc ">" ti [e1; e2] }
+| e1=expr op=loc(ordering_op) ti=tvars_app? e2=expr
+    { match unloc e1 with
+      | PEapp ({ pl_desc = PEident (subop, _) }, [_; el])
+          when isordering (unloc subop)
+        ->
+	let lc = EcLocation.make $startpos $endpos in
+          peapp_symb lc (str_and true) None
+	    [e1; mk_loc lc (peapp_symb op.pl_loc (unloc op) ti [el; e2])]
 
-| e1=expr op=loc(LE) ti=tvars_app? e2=expr
-    { peapp_symb op.pl_loc "<=" ti [e1; e2] }
-
-| e1=expr op=loc(GE) ti=tvars_app? e2=expr
-    { peapp_symb op.pl_loc ">=" ti [e1; e2] }
+      | _ -> peapp_symb op.pl_loc (unloc op) ti [e1; e2] }
 
 | e1=expr op=loc(EQ) ti=tvars_app? e2=expr
     { peapp_symb op.pl_loc "=" ti [e1; e2] }
@@ -719,14 +735,16 @@ form_u(P):
 | e1=form_r(P) op=loc(OP1) ti=tvars_app? e2=form_r(P)
     { pfapp_symb op.pl_loc op.pl_desc ti [e1; e2] } 
 
-| e1=form_r(P) op=loc(GT) ti=tvars_app? e2=form_r(P)
-    { pfapp_symb op.pl_loc ">" ti [e1; e2] } 
+| e1=form_r(P) op=loc(ordering_op) ti=tvars_app? e2=form_r(P)
+    { match unloc e1 with
+      | PFapp ({ pl_desc = PFident (subop, _) }, [_; el])
+          when isordering (unloc subop)
+        ->
+	let lc = EcLocation.make $startpos $endpos in
+          pfapp_symb lc (str_and true) None
+	    [e1; mk_loc lc (pfapp_symb op.pl_loc (unloc op) ti [el; e2])]
 
-| e1=form_r(P) op=loc(LE) ti=tvars_app? e2=form_r(P)
-    { pfapp_symb op.pl_loc "<=" ti [e1; e2] } 
-
-| e1=form_r(P) op=loc(GE) ti=tvars_app? e2=form_r(P)
-    { pfapp_symb op.pl_loc ">=" ti [e1; e2] } 
+      | _ -> pfapp_symb op.pl_loc (unloc op) ti [e1; e2] }
 
 | e1=form_r(P) op=loc(EQ) ti=tvars_app? e2=form_r(P)
     { pfapp_symb op.pl_loc "=" ti [e1; e2] }
@@ -801,6 +819,26 @@ form_u(P):
 
 | LOSSLESS mp=loc(fident)
     { PFlsless mp }
+;
+
+form_ordering(P):
+| f1=form_r(P) op=loc(ordering_op) ti=tvars_app? f2=form_r(P)
+    { (op, ti, f1, f2) }
+;
+
+form_chained_orderings(P):
+| f=form_ordering(P)
+    { let (op, ti, f1, f2) = f in
+        (pfapp_symb op.pl_loc (unloc op) ti [f1; f2], f2) }
+
+| f1=loc(form_chained_orderings(P)) op=loc(ordering_op) ti=tvars_app? f2=form_r(P)
+    { let (lcf1, (f1, le)) = (f1.pl_loc, unloc f1) in
+      let loc = EcLocation.make $startpos $endpos in
+        (pfapp_symb loc (str_and true) None
+           [EcLocation.mk_loc lcf1 f1;
+            EcLocation.mk_loc loc
+              (pfapp_symb op.pl_loc (unloc op) ti [le; f2])],
+         f2) }
 ;
 
 hoare_bd_cmp :

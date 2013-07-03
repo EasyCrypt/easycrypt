@@ -143,17 +143,17 @@ projPlain((r || p)) = p by [].
 lemma proj_merge : forall(c : ciphertext),
 (projRand c || projPlain c) = c.
 proof.
-intros c.
-apply Ciphertext.extensionality.
-delta Ciphertext.(==)(||);simplify.
-intros i Hpos Hle.
-rewrite (Ciphertext.from_array_get
-     (Array.(||) (to_array (projRand c)) (Plaintext.to_array (projPlain c))) i _ _ _);try smt.
-elim (append_get<:bool> (to_array (projRand c)) 
-          (Plaintext.to_array (projPlain c)) i).
-intros H1 H2.
-case (i < l);intros H3;first smt.
-(* TODO: rewrite H2; smt. *) admit.
+ intros c.
+ apply Ciphertext.extensionality.
+ delta Ciphertext.(==)(||);simplify.
+ intros i Hpos Hle.
+ rewrite (Ciphertext.from_array_get
+     (Array.(||) (to_array (projRand c)) (Plaintext.to_array (projPlain c))) i _ _ _); progress;trivial;first smt.
+ elim (append_get<:bool> (to_array (projRand c)) 
+             (Plaintext.to_array (projPlain c)) i).
+ intros H1 H2.
+ case (i<l);intros H3;first smt.
+ rewrite H2;smt.
 qed.
 
 module Rnd ={
@@ -203,7 +203,7 @@ proof.
  fun.
  inline Correct(BR).SE.dec Correct(BR).SE.enc RO.o.
  do 4! (wp;rnd);rnd;skip;progress;[ | |smt|smt].
-  rewrite (projPlain_c (f x1 r) 
+ rewrite (projPlain_c (f x1 r) 
  (Plaintext.(^^) m (proj (Map.OptionGet.__get (Map.__set RO.m{hr} r y) r)))).
  rewrite (projRand_c (f x1 r) 
  (Plaintext.(^^) m (proj (Map.OptionGet.__get (Map.__set RO.m{hr} r y) r))));smt.
@@ -278,7 +278,7 @@ BR(RO).enc ~ BR2(RO).enc :
 ={pk,m,RO.m} ==> 
 !in_dom Rnd.r{2} RO.m{2} => 
        (={res,Rnd.r} /\ eq_except RO.m{1} RO.m{2} Rnd.r{2})
-by (fun;inline RO.o;do 2!(wp;rnd);skip;smt).
+by (fun;inline RO.o;do 2!(wp;rnd);skip;progress;smt).
 (** end eq1enc *)
 
 
@@ -323,7 +323,7 @@ lemma real_le_trans : forall(a, b, c : real),
  Real.(<=) a b => Real.(<=) b  c => a <= c by [].
 
 (** begin prob1 *)
-lemma prob1_1 :
+lemma prob1 :
  forall (A <: Adv {Rnd,RO}),
 (forall (O <: ARO), islossless O.o_a => islossless A(O).a1) =>
 (forall (O <: ARO), islossless O.o_a => islossless A(O).a2) =>
@@ -401,15 +401,15 @@ call (_ : ={RO.s,RO.m,pk} /\ (glob A){1} = (glob A){2} ==>
 fun (={RO.s,RO.m});[smt|smt|].
 fun;if;[smt|inline RO.o;wp;rnd|];wp;skip;progress;smt.
 inline RO.init CPA(BR2,A).SO.kg CPA(BR3,A).SO.kg.
-wp;rnd;wp;skip;progress.
+wp;rnd;wp;skip;progress;smt.
 qed.
 (** end eq2 *)
 
 
 (** begin prob2 *)
 lemma prob2 : forall (A <: Adv {RO,Rnd}) &m,
-(forall (R<:ARO), islossless R.o_a => islossless A(R).a1) =>
-(forall (R<:ARO), islossless R.o_a => islossless A(R).a2) =>
+(forall (O<:ARO), islossless O.o_a => islossless A(O).a1) =>
+(forall (O<:ARO), islossless O.o_a => islossless A(O).a2) =>
 Pr[CPA(BR2,A).main() @ &m : res] + Pr[CPA(BR2,A).main() @ &m : mem Rnd.r RO.s] = 
 Pr[CPA(BR3,A).main() @ &m : res] + Pr[CPA(BR3,A).main() @ &m : mem Rnd.r RO.s].
 proof.
@@ -417,12 +417,11 @@ proof.
 cut H: (Pr[CPA(BR2,A).main() @ &m : res] = Pr[CPA(BR3,A).main() @ &m : res] /\
 (Pr[CPA(BR2,A).main() @ &m : mem Rnd.r RO.s] = 
 Pr[CPA(BR3,A).main() @ &m : mem Rnd.r RO.s])).
-
 split;
  (equiv_deno (_ : (glob A){1} = (glob A){2} ==> ={res,Rnd.r,RO.s});
   [apply (eq2 A);assumption|trivial| smt]).
 elim H => Heq1 Heq2;rewrite Heq1 Heq2 //.
-save.
+qed.
 (** end prob2 *)
 
  
@@ -470,7 +469,7 @@ proof.
  fun (={RO.s,RO.m});[smt|smt|].
  fun;if;[smt|inline RO.o;wp;rnd|];wp;skip;progress;smt.
  inline RO.init CPA(BR3,A).SO.kg CPA2(BR3,A).SO.kg.
- wp;rnd;wp;skip;progress.      
+ wp;rnd;wp;skip;progress;smt.
 qed.
 (** end eq3 *)
 
@@ -507,10 +506,94 @@ proof.
  case (result);delta charfun;simplify;smt.
  bdhoare_deno Hbd; smt.
  rewrite Hleq //.
-save.
+qed.
 (** end prob3 *)
 
+(** begin inverter *)
+module BR_OW(A_ : Adv) : Inverter = {
+ module A = A_(RO)
+  fun i(pk : pkey,y : randomness) : randomness ={
+  var m0 : plaintext;
+  var m1 : plaintext;
+  var h : plaintext;
+  var b : bool;
+  var x : randomness;
+  RO.init();
+  (m0,m1)  = A.a1(pk);
+  h = $uniform_plain; 
+  b  = A.a2(y || h);
+  x = Option.proj (Map.find (lambda p0 p1,f pk p0 = y) RO.m);
+   return (x);
+ }
+}.
+(** end inverter *)
 
+(** begin finy *)
+lemma f_iny :
+forall (x, y : randomness, pk: pkey, sk : skey), 
+in_supp (pk,sk) keypairs  =>
+f pk x = f pk y => x = y.
+proof.
+ intros x y pk sk Hsupp Heqf.
+ rewrite -(finvof pk sk _ _);first smt.
+ rewrite -(finvof pk sk _ _);first smt.
+ rewrite Heqf;smt.
+qed.
+(** end finy *)
+
+(** begin eq4 *)
+lemma eq4 : forall (A <: Adv {RO,Rnd}), 
+(forall (R<:ARO), islossless R.o_a => islossless A(R).a1) =>
+(forall (R<:ARO), islossless R.o_a => islossless A(R).a2) =>
+equiv [ CPA2(BR3,A).main ~ OW(BR_OW(A)).main : 
+(glob A){1} = (glob A){2} ==>  (mem Rnd.r RO.s){1} => res{2}].
+proof.
+ intros A Hll1 Hll2.
+ fun;inline BR_OW(A).i.
+ rnd{1}.
+ wp.
+ call (_:  ={RO.s,RO.m} /\ 
+      (forall (x : randomness), in_dom x RO.m{1} = mem x RO.s{1})).
+ fun;if;[smt|inline RO.o;wp;rnd|];wp;skip;progress;smt.
+ inline CPA2(BR3,A).SO.enc;wp;rnd;swap{1} -5.
+ wp.
+ call (_:  ={RO.s,RO.m} /\ 
+      (forall (x : randomness), in_dom x RO.m{1} = mem x RO.s{1})).
+ fun;if;[smt|inline RO.o;wp;rnd|];wp;skip;progress;smt.
+ inline RO.init CPA2(BR3,A).SO.kg;do 2!(wp;rnd);skip;progress;try smt.
+  elim (find_in
+      (lambda (p0:randomness) (p1:plaintext), f x1 p0 = f x1 rL)
+      m_R0
+      _); first exists rL; split;smt.
+ intros x' Hfind.
+ rewrite Hfind.
+ elim (find_cor
+      (lambda (p0:randomness) (p1:plaintext), f x1 p0 = f x1 rL)
+      m_R0
+      x' _).
+ assumption.
+ delta;simplify.
+ intros Hin_dom Hf.
+ rewrite (Option.proj_def<:randomness> x').
+ apply (f_iny _ _ x1 x2 _ _);smt.
+qed.
+(** end eq4 *)
+
+(** begin prob4 *)
+lemma prob4 : 
+forall (A <: Adv {Rnd, RO}) &m,
+(forall (O <: ARO),  islossless O.o_a => islossless A(O).a1) =>
+(forall (O <: ARO),  islossless O.o_a => islossless A(O).a2) =>
+Pr[ CPA2(BR3,A).main() @ &m : mem Rnd.r RO.s] <= 
+Pr[ OW(BR_OW(A)).main () @ &m : res].
+proof.
+ intros A &m Hll1 Hll2.
+ equiv_deno (_ : ={glob A} ==>  (mem Rnd.r RO.s){1} => res{2}).
+ apply (eq4 A);assumption.
+ trivial.
+ smt.
+qed. 
+(** end prob4 *)
 
 (** begin conclusion *)
 lemma Conclusion :
@@ -520,4 +603,22 @@ forall (A <: Adv {Rnd, RO}) &m,
  exists (I<:Inverter), 
 Pr[CPA(BR,A).main() @ &m : res] - 1%r / 2%r <= 
 Pr[OW(I).main() @ &m : res].
+proof.
+ intros A &m Hll1 Hll2.
+ exists (BR_OW(A)).
+ cut H: 
+ (Pr[CPA(BR, A).main() @ &m : res] <= 1%r / 2%r +
+  Pr[OW(BR_OW(A)).main() @ &m : res]).
+   apply (real_le_trans _ 
+   ( Pr[CPA(BR2,A).main() @ &m : res] +
+             Pr[CPA(BR2,A).main() @ &m : mem Rnd.r RO.s]) _ _ _).
+ apply (prob1 A _ _ &m);assumption.
+ rewrite (prob2 A &m _ _);[assumption|assumption|].
+ rewrite (prob3 A &m _ _);[assumption|assumption|].
+ cut H1 : (Pr[CPA2(BR3, A).main() @ &m : mem Rnd.r RO.s] <=
+           Pr[OW(BR_OW(A)).main() @ &m : res]).
+ apply (prob4 A &m _ _);assumption.
+ smt.
+ smt.
+qed.
 (** end conclusion *)

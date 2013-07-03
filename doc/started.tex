@@ -688,6 +688,34 @@ definition of the \ec{\{0,1\}} distribution.
 
 
 \paragraph{Constructing the inverter}
+At this point, we construct an inverter that witnesses the reduction:
+we construct module \ec{BR_OW}, parametrized on an adversary \ec{A},
+that implements a function \ec{i} representing the inverter
+\ecimport{ }{../examples/br93_tutorial.ec}{inverter}
+
+The main idea is that we construct the challenge \ec{c} in such a way
+that we place the challenge \ec{y}, received from the \ec{OW} game in
+the position of the application of function \ec{f}. The function
+initilializes the oracle, calls \ec{a1} with the public key \ec{pk}
+recived from the one way experiment, samples the random value \ec{h}
+to be used in the cipher and calls \ec{a2} with the challenge \ec{y ||
+  h}. Afterwards, we look for a value \ec{x} in the adversary queries,
+such that \ec{f pk x = y} and we return it. Then, we prove that if the
+adversary manages to query \ec{Rnd.r} to the random oracle, our search
+is succesful and the result of the \ec{OW} experiment is true. 
+
+\ecimport{ }{../examples/br93_tutorial.ec}{eq4}
+
+The proof uses similar invariants than the ones we have been using
+witnessing the fact that we are able to succesfully simulate the
+environment in which the adversary \ec{A} is run originally. The proof
+is concluded by reasoning about the \ec{find} operator and using the
+fact that the function $f$ is ``injective'' in the following sense
+
+\ecimport{ }{../examples/br93_tutorial.ec}{finy}
+
+
+
 
 %%% Local Variables: 
 %%% mode: latex
