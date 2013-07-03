@@ -1291,10 +1291,14 @@ end
 module Mod = struct
   type t = module_expr
 
-  let unsuspend_r f (i, args) (spi, params) o =
-    (* FIXME: it seems that the substitution is performed even if params = [] *)
-    if i <> spi || List.length args <> List.length params then
+  let unsuspend_r f istop (i, args) (spi, params) o =
+    if i <> spi || List.length args > List.length params then
       assert false;
+    if (not istop && List.length args <> List.length params) then
+      assert false;
+
+    let params = List.take (List.length args) params in
+
     let s =
       List.fold_left2
         (fun s (x, _) a -> EcSubst.add_module s x a)
@@ -1302,21 +1306,32 @@ module Mod = struct
     in
       f s o
 
-  let clear_sig sig_ =
-    { mis_params = [];
+  let clearparams n sig_ =
+    let used, remaining = List.take_n n sig_.mis_params in
+
+    let keepcall =
+      let used = EcIdent.Sid.of_list (List.map fst used) in
+        fun xp ->
+          match xp.EcPath.x_top.EcPath.m_top with
+          | `Local id -> not (EcIdent.Sid.mem id used)
+          | _ -> true
+    in
+
+    { mis_params = remaining;
       mis_body   =
         List.map
-          (function Tys_function(s, oi) -> 
-            Tys_function(s, {oi_calls = []; oi_in = oi.oi_in }))
+          (function Tys_function (s, oi) -> 
+            Tys_function (s, { oi_calls = List.filter keepcall oi.oi_calls;
+                               oi_in    = oi.oi_in; }))
           sig_.mis_body }
 
-  let unsuspend (i, args) (spi, params) me =
+  let unsuspend istop (i, args) (spi, params) me =
     let me =
       match args with
       | [] -> me
-      | _  -> { me with me_sig = clear_sig me.me_sig }
+      | _  -> { me with me_sig = clearparams (List.length args) me.me_sig }
     in
-      unsuspend_r EcSubst.subst_module (i, args) (spi, params) me
+      unsuspend_r EcSubst.subst_module istop (i, args) (spi, params) me
 
   let by_ipath_r (spsc : bool) (p : ipath) (env : env) =
     let obj = MC.by_path (fun mc -> mc.mc_modules) p env in
@@ -1342,21 +1357,21 @@ module Mod = struct
 
       | Some (params, o) ->
           let ((spi, params), op) = MC._downpath_for_mod false env ip params in
-          let (params, _istop) =
+          let (params, istop) =
             match op.EcPath.m_top with
-            | `Concrete (_, Some _) ->
-                assert (o.me_sig.mis_params <> []);
+            | `Concrete (p, Some _) ->
+                assert ((params = []) || ((spi+1) = EcPath.p_size p));
                 (params, false)
-        
+
             | `Concrete (p, None) ->
                 assert ((params = []) || ((spi+1) = EcPath.p_size p));
                 ((if args = [] then [] else o.me_sig.mis_params), true)
-        
+
             | `Local _m ->
                 assert ((params = []) || spi = 0);
                 ((if args = [] then [] else o.me_sig.mis_params), true)
           in
-          unsuspend (i, args) (spi, params) o
+            unsuspend istop (i, args) (spi, params) o
 
   let by_mpath_opt (p : EcPath.mpath) (env : env) =
     try_lf (fun () -> by_mpath p env)
@@ -1541,9 +1556,12 @@ module NormMp = struct
     match Mod.by_ipath_r true ip env with
     | Some ((spi, params), ({ me_body = ME_Alias alias } as m)) ->
       assert (m.me_sig.mis_params = []);
-      let p = 
-        Mod.unsuspend_r EcSubst.subst_mpath (i, args) (spi, params) alias in
-      norm_mpath env p
+      let p =
+        Mod.unsuspend_r EcSubst.subst_mpath
+          true (i, args) (spi, params) alias
+      in
+        norm_mpath env p
+
     | _ -> begin
       match p.EcPath.m_top with
       | `Local _

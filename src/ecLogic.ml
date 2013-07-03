@@ -360,8 +360,14 @@ let t_clear ids (juc,n as g) =
   let rule = { pr_name = RN_clear ids; pr_hyps = [RA_node n1] } in
   upd_rule rule (juc,n)
 
-let check_modtype_restr env mp mt i restr = 
-  EcTyping.check_sig_mt_cnv env mt i;
+let check_modtype_restr env mp mt i restr =
+  begin
+    try  EcTyping.check_sig_mt_cnv env mt i
+    with EcTyping.TymodCnvFailure e ->
+      Format.eprintf "%t@\n%!"
+        (fun fmt -> EcTyping.pp_cnv_failure fmt env e);
+      assert false
+  end;
   let restr = EcEnv.NormMp.norm_restr env restr in
   let us = EcEnv.NormMp.top_uses env mp in
   let check u = 

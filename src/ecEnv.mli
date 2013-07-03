@@ -249,6 +249,7 @@ module Op : sig
   val bind : symbol -> operator -> env -> env
 
   val all : (operator -> bool) -> qsymbol -> env -> (path * t) list
+
   val reducible : env -> path -> bool
   val reduce    : env -> path -> ty list -> form
 end

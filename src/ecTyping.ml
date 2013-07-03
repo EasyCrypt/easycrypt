@@ -817,7 +817,8 @@ let rec check_sig_cnv mode (env:EcEnv.env) (sin:module_sig) (sout:module_sig) =
           let norm oi = 
             List.fold_left (fun s f -> 
               EcPath.Sx.add (EcEnv.NormMp.norm_xpath env f) s)
-              EcPath.Sx.empty oi.oi_calls in
+              EcPath.Sx.empty oi.oi_calls
+          in
           let icalls = norm oin in
           let ocalls = norm oout in
           match mode with
@@ -952,71 +953,56 @@ let rec trans_msymbol (env : EcEnv.env) (msymb : pmsymbol located) =
     (top_path, mod_expr.me_sig)
 
   | Some args ->
-    let top_path = top_path.EcPath.m_top in
-      if List.length params <> List.length args then
+      if List.length args > List.length params then
         tyerror loc env (InvalidModAppl MAE_WrongArgCount);
-    List.iter2
-      (fun (_, p) (_, a) ->
-        try check_sig_mt_cnv env a p
-        with TymodCnvFailure _ ->
-          tyerror loc env (InvalidModAppl MAE_InvalidArgType))
-      params args;
-    let args = List.map fst args in
-    let subst = 
-        List.fold_left2
-          (fun s (x,_) a -> EcSubst.add_module s x a) 
-          EcSubst.empty params args
-    in
-    let body = EcSubst.subst_modsig_body subst mod_expr.me_sig.mis_body in
-    let body = 
-      List.map 
-        (fun (Tys_function(s,oi)) -> 
-          Tys_function(s,{oi_calls = []; oi_in = oi.oi_in})) body in
-    let mp = EcPath.mpath top_path args in
-    (mp, {mis_params = []; mis_body = body})
+
+      let params = List.take (List.length args) params in
+
+      List.iter2
+        (fun (_, p) (_, a) ->
+          try check_sig_mt_cnv env a p
+          with TymodCnvFailure _ ->
+            tyerror loc env (InvalidModAppl MAE_InvalidArgType))
+        params args;
+
+      let args  = List.map fst args in
+      let subst = 
+          List.fold_left2
+            (fun s (x,_) a -> EcSubst.add_module s x a) 
+            EcSubst.empty params args
+      in
+
+      let keepcall =
+        let used = EcIdent.Sid.of_list (List.map fst params) in
+          fun xp ->
+            match xp.EcPath.x_top.EcPath.m_top with
+            | `Local id -> not (EcIdent.Sid.mem id used)
+            | _ -> true
+      in
+
+      let body =
+        List.map 
+          (fun (Tys_function (s, oi)) ->
+            Tys_function(s, { oi_calls = List.filter keepcall oi.oi_calls;
+                              oi_in    = oi.oi_in; }))
+          mod_expr.me_sig.mis_body
+      in
+      let body = EcSubst.subst_modsig_body subst body in
+
+        (EcPath.mpath top_path.EcPath.m_top args, {mis_params = []; mis_body = body})
 
 (* -------------------------------------------------------------------- *)
-let rec transmod (env : EcEnv.env) (x : symbol) (me : pmodule_expr) =
+let rec transmod (env : EcEnv.env) ~internal (x : symbol) (me : pmodule_expr) =
   match me.pl_desc with
   | Pm_ident m -> 
-    let (mp, _sig) = trans_msymbol env {pl_desc = m; pl_loc = me.pl_loc} in
-    let params = _sig.mis_params in
-    if params <> [] then (* FIXME do it only for internal module *)
-      tyerror me.pl_loc env (InvalidModAppl MAE_WrongArgCount);
-    (* FIXME Normally this is the expected code: but 
-       I think that by_mpath is buggy :
-    
-    let me = EcEnv.Mod.by_mpath mp env in
-    { me with me_name  = x; me_body  = ME_Alias mp; } *)
-    begin match mp.EcPath.m_top with
-    | `Concrete(_, Some _) 
-    | _ when mp.EcPath.m_args = [] ->
+      let (mp, sig_) = trans_msymbol env {pl_desc = m; pl_loc = me.pl_loc} in
+      let params = sig_.mis_params in
+
+      if params <> [] && internal then
+        tyerror me.pl_loc env (InvalidModAppl MAE_WrongArgCount);
+
       let me = EcEnv.Mod.by_mpath mp env in
-      { me with me_name  = x; me_body  = ME_Alias mp; }
-    | _ -> 
-      let mpf = EcPath.mpath mp.EcPath.m_top [] in
-      let mef = EcEnv.Mod.by_mpath mpf env in
-      let subst = 
-        List.fold_left2
-          (fun subst (x,_) arg -> EcSubst.add_module subst x arg)
-          EcSubst.empty mef.me_sig.mis_params mp.EcPath.m_args
-      in
-      let res = 
-      { me_name  = x;
-        me_body  = ME_Alias mp;
-        me_comps = EcSubst.subst_module_comps subst mef.me_comps;
-        me_sig   = {
-          mis_params = [];
-          mis_body   = 
-            let rm_oi = function 
-              | Tys_function (fsig,oi) -> 
-                Tys_function(fsig, {oi_calls = []; oi_in = oi.oi_in}) in
-            let body = List.map rm_oi mef.me_sig.mis_body in
-            EcSubst.subst_modsig_body subst body;
-        };
-      } in
-      res
-    end 
+        { me with me_name  = x; me_body  = ME_Alias mp; }
 
   | Pm_struct st -> transstruct env x st
 
@@ -1064,7 +1050,7 @@ and transstruct (env : EcEnv.env) (x : symbol) (st : pstructure) =
         Sm.add (EcPath.mident id) mparams) Sm.empty stparams in 
     let tymod1 = function
       | MI_Module   _ -> None
-      | MI_Variable _ -> None           (* Some (Tys_variable v)  *)
+      | MI_Variable _ -> None
       | MI_Function f -> 
         let all_calls = 
           match f.f_def with
@@ -1083,7 +1069,7 @@ and transstruct (env : EcEnv.env) (x : symbol) (st : pstructure) =
           let ftop = EcPath.m_functor f.EcPath.x_top in
           Sm.mem ftop mparams in
         let calls = List.filter filter (EcPath.Sx.elements all_calls) in
-        Some (Tys_function (f.f_sig, {oi_calls  = calls; oi_in = true }))
+        Some (Tys_function (f.f_sig, { oi_calls = calls; oi_in = true; }))
     in
 
     let sigitems = List.pmap tymod1 items in
@@ -1105,11 +1091,11 @@ and transstruct (env : EcEnv.env) (x : symbol) (st : pstructure) =
         try  check_sig_mt_cnv env tymod aty
         with TymodCnvFailure err -> tyerror loc env (TypeModMismatch err)
       end
-    else (* In that case we check the applied signature *)
+    else (* In that case we check the fully applied signature *)
       let sig_ = 
         { mis_params = [];
           mis_body = List.map 
-            (fun (Tys_function(s,oi)) -> 
+            (fun (Tys_function (s, oi)) ->
               Tys_function (s, { oi_calls = []; oi_in = oi.oi_in }))
             tymod.mis_body } in
       try  check_sig_mt_cnv env0 sig_ aty
@@ -1175,7 +1161,7 @@ and transstruct (env : EcEnv.env) (x : symbol) (st : pstructure) =
 and transstruct1 (env : EcEnv.env) (st : pstructure_item located) =
   match unloc st with
   | Pst_mod ({ pl_desc = m }, me) ->
-      let me = transmod env m me in
+      let me = transmod env ~internal:true m me in
         [(m, MI_Module me)]
 
   | Pst_var (xs, ty) ->

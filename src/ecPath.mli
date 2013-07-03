@@ -74,9 +74,9 @@ type xpath = private {
   x_tag : int;
 }
 
-val xpath  : mpath -> path -> xpath
+val xpath     : mpath -> path -> xpath
 val xpath_fun : mpath -> symbol -> xpath
-val xqname : xpath -> symbol -> xpath
+val xqname    : xpath -> symbol -> xpath
 
 val x_equal   : xpath -> xpath -> bool
 val x_compare : xpath -> xpath -> int
