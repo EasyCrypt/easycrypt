@@ -83,7 +83,7 @@ cat <<EOF
 %%%
 %%% To use it, type:"
 %%% 
-%%%    $(./scripts/activate-toolchain.sh)
+%%%    \$(./scripts/activate-toolchain.sh)
 %%% 
 %%% Don't forget to [make clean] the easycrypt source tree
 %%%
