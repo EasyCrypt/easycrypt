@@ -699,6 +699,8 @@ let process_eqobs_in (geq', ginv, eqs') g =
       set_loc geq'.pl_loc (toeq mleft mright) geq in
 
   let ginv = omap_dfl ginv f_true (fun f -> process_form ienv f tbool) in
+  let ifvl = EcPV.PV.fv env ml ginv in
+  let ifvr = EcPV.PV.fv env mr ginv in
 
   let eqs = 
     match eqs' with 
@@ -711,9 +713,17 @@ let process_eqobs_in (geq', ginv, eqs') g =
       let eqs = process_prhl_formula g eqs' in
       set_loc eqs'.pl_loc (toeq ml mr) eqs in
 
-  let log = ref Mf.empty in
- 
-  let t_eqobs onF eqs g =
+  let _, _, (log,_), _ = 
+    EcPV.eqobs_in env
+      (EcPhl.eqobs_inF env geq (ginv,ifvl,ifvr))
+      { query = []; forproof = Mf.empty } es.es_sl es.es_sr eqs (ifvl,ifvr) in
+    
+  let onF _ fl fr eqo = 
+    match find_eqobs_in_log log fl fr eqo with
+    | Some (eqo,spec) -> (), eqo, spec 
+    | None -> assert false in
+
+  let t_eqobs eqs g =
     let concl = get_concl g in
     let es = destr_equivS concl in
     let ml, mr = fst es.es_ml, fst es.es_mr in
@@ -727,41 +737,41 @@ let process_eqobs_in (geq', ginv, eqs') g =
           t_on_last (t_try (t_seq EcPhl.t_skip t_trivial))
             (t_eqobs_inS onF eqs ginv g))] 
       g in
- 
-  ignore (t_eqobs (EcPhl.eqobs_inF log geq) eqs g);
-  
+   
   let tocut = 
     Mf.fold (fun spec eori l ->
       match eori with
       | EORI_unknown None -> spec :: l
-      | _ -> l) !log [] in
+      | _ -> l) log.forproof [] in
  
+  let forproof = ref log.forproof in
+
   let rec t_cut_spec l g = 
     match l with
     | [] -> t_id None g
     | spec :: l ->
       let hyps = get_hyps g in
       let id = LDecl.fresh_id hyps "H" in
-      log := Mf.add spec (EORI_unknown (Some id)) !log;
+      forproof := Mf.add spec (EORI_unknown (Some id)) !forproof;
       t_seq_subgoal (t_cut spec)
         [ t_id None;
           t_seq (t_intros_i [id]) (t_cut_spec l)] g in
  
   let t_rec g = 
     let concl = get_concl g in
-    match Mf.find_opt concl !log with
+    match Mf.find_opt concl !forproof with
     | Some (EORI_adv geq) ->
       let gs = t_equivF_abs (EcPV.Mpv2.to_form mleft mright geq ginv) g in
       t_on_firsts t_trivial 2 gs 
     | Some (EORI_fun eqs) ->
       t_seq t_equivF_fun_def
-        (t_eqobs (EcPhl.eqobs_inF (ref Mf.empty) geq) eqs) g 
+        (t_eqobs eqs) g 
     | Some (EORI_unknown (Some id)) ->
       t_hyp id g
     | _ -> t_fail g in
   
   t_on_last 
-    (t_seq (t_eqobs (EcPhl.eqobs_inF (ref Mf.empty) geq) eqs)
+    (t_seq (t_eqobs eqs)
        (t_repeat t_rec))
     (t_cut_spec tocut g) 
   
