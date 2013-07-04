@@ -1290,7 +1290,7 @@ module Ax = struct
           match tc with
           | Some tc -> [tc]
           | None    ->
-              let dtc = Plogic (Psmt empty_pprover) in
+              let dtc = Plogic (Psmt (None, empty_pprover)) in
               let dtc = [{ pl_loc = loc; pl_desc = dtc }] in
               let dtc = List.map (fun t -> { pt_core = t; pt_intros = []; }) dtc in
                 dtc

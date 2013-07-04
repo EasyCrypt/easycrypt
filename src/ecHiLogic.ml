@@ -178,13 +178,20 @@ let process_formula hyps pf =
   process_form hyps pf tbool
 
 (* -------------------------------------------------------------------- *)
-let process_smt hitenv pi g =
+let process_smt hitenv (db, pi) g =
+  let usehyps =
+    match omap db unloc with
+    | None -> true
+    | Some "nolocals" -> false
+    | Some db -> tacuerror "unknown SMT DB: `%s'" db
+  in
+
   let pi = hitenv.hte_provers pi in
 
   match hitenv.hte_smtmode with
   | `Admit    -> t_admit g
-  | `Standard -> t_seq (t_simplify_nodelta) (t_smt false pi) g
-  | `Strict   -> t_seq (t_simplify_nodelta) (t_smt true  pi) g
+  | `Standard -> t_seq (t_simplify_nodelta) (t_smt ~usehyps ~strict:false pi) g
+  | `Strict   -> t_seq (t_simplify_nodelta) (t_smt ~usehyps ~strict:true  pi) g
 
 (* -------------------------------------------------------------------- *)
 let process_clear l g =

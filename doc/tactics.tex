@@ -145,9 +145,28 @@ iteratively, up to the point where no goals remain.
 
 \section{Program Transformation Tactics}
 
-TODO: inline, swap, unroll, splitwhile, fusion, fission, condt, condf, 
+TODO: fun, inline, swap, unroll, splitwhile, fusion, fission, condt, condf, 
 
 \section{Program Logics Tactics}
+
+\subsection{: the \rawec{skip} tactic}
+
+\Syntax \rawec{skip}
+
+\Description Reduces logical program judgements with empty statements
+to a first-order logical goal, as in the following rule for relational
+Hoare Logic.
+%
+\begin{displaymath}
+\infrule{
+  \pre \Rightarrow \post
+}{
+  \equiv{}{}{\pre}{\post}
+}
+\end{displaymath}
+%
+Similar rules apply for Hoare judgements and probabilistic Hoare
+judgements.
 
 \subsection{Reasoning about random samplings: the \rawec{rnd} tactic}
 %
@@ -611,6 +630,10 @@ adversaries $A$ and $B$, ...
   \Hoare{A}{\pre}{\post}
 } [\verb+fun+~\chi]
 \end{displaymath}
+
+\subsection{??????: The \rawec{exfalso} rule}
+
+\subsection{Frame rules ?? : The \rawec{eqobsin} rule}
 
 \subsection{Weakening judgements: The \rawec{conseq} rule}
 
@@ -1103,7 +1126,7 @@ modified in the loop body $c$.
 }
 \end{displaymath}
 
-\subsection{Reasoning with function invocation: the \rawec{call}
+\subsection{Reasoning on function invocation: the \rawec{call}
   tactic}
 
 \subsubsection{Hoare Logic}
@@ -1117,7 +1140,7 @@ modified in the loop body $c$.
 %
 The following rule describes the application of the tactic
 $\verb+fel+\ k\ q\ c\ \delta\ F\ P$.  Assume $f$ is defined and
-$c_1,c_2$ stands for the splitting of its body at position $k$. Let
+$c_1,c_2$ stands for the splitting of its body at position $n$. Let
 $\left\{O_i\right\}_{i=0}^k$ stand for all oracles accessed by any
 adversary called at $c_2$. Assume that variables in $F$ can at most be
 modified by $\left\{O_i\right\}_{i=0}^k$.
@@ -1139,7 +1162,7 @@ modified by $\left\{O_i\right\}_{i=0}^k$.
   \end{array}
 }{
   \Prm{f}{m}{\varphi} \leq \epsilon  
-} \left[\verb+fel+\ k\ q\ c\ \delta\ F\ P\right]
+} \left[\verb+fel+\ n\ q\ c\ \delta\ F\ P\right]
 \end{displaymath}
 
 \subsection{Proving equivalences by probability computation: 
