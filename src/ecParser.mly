@@ -1468,6 +1468,11 @@ fpattern(F):
    { mk_fpattern hd args }
 ;
 
+pterm:
+| p=qident tvi=tvars_app? args=loc(fpattern_arg)*
+    { { pt_name = p; pt_tys = tvi; pt_args = args; } }
+;
+
 rwside:
 | MINUS { `RtoL }
 | empty { `LtoR }
@@ -1687,6 +1692,9 @@ logtactic:
 
 | CUT ip=intro_pattern COLON p=form BY t=tactic_core
    { Pcut (ip, p, Some t) }
+
+| CUT ip=intro_pattern CEQ fp=pterm
+   { Pcutdef (ip, fp) }
 
 | POSE o=rwocc? x=lident CEQ p=form_h %prec prec_below_IMPL
    { Ppose (x, omap o EcMaps.Sint.of_list, p) }

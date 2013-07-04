@@ -81,7 +81,6 @@ let error loc e = EcLocation.locate_error loc (TacError e)
 (* -------------------------------------------------------------------- *)
 let process_trivial = t_trivial
 
-
 (* -------------------------------------------------------------------- *)
 let process_done g =
   match process_trivial g with
@@ -738,8 +737,7 @@ let process_exists fs g =
 (* -------------------------------------------------------------------- *)
 let process_change pf g =
   let f = process_formula (get_hyps g) pf in
-  set_loc pf.pl_loc (t_change f) g
-
+    set_loc pf.pl_loc (t_change f) g
 
 (* -------------------------------------------------------------------- *)
 let process_intros ?(cf = true) pis (juc, n) =
@@ -897,6 +895,33 @@ let process_cut (engine : engine) ip phi t g =
     t_on_last (process_intros [ip]) g
 
 (* -------------------------------------------------------------------- *)
+let process_cutdef loc ip cd g =
+  let (hyps, _) = (get_hyps g, get_concl g) in
+  let (p, typs, ue, ax) = process_named_pterm loc hyps (cd.pt_name, cd.pt_tys) in
+  let args = List.map (trans_pterm_argument hyps ue) cd.pt_args in
+  let (ax, ids) = check_pterm_arguments hyps ue ax args in
+  let ev = evmap_of_pterm_arguments ids in
+
+    if not (can_concretize_pterm_arguments (ue, ev) ids) then
+      tacuerror ~loc "cannot infer all placeholders";
+
+  let tue = EcUnify.UniEnv.close ue in
+  let args = concretize_pterm_arguments (tue, ev) ids in
+  let ax   = concretize_pterm (tue, ev) ids ax in
+  let typs = List.map (Tuni.subst tue) typs in
+  let g    = t_cut ax g in
+  let g    =
+    let tt g =
+      match p with
+      | `Global p -> gen_t_apply_glob (fun _ _ x -> x) p typs args g
+      | `Local  x -> gen_t_apply_hyp  (fun _ _ x -> x) x args g
+      | `Cut    _ -> assert false
+    in
+      t_on_first tt g
+  in
+    t_on_last (process_intros [ip]) g
+
+(* -------------------------------------------------------------------- *)
 let process_pose loc xsym o p g =
   let (hyps, concl) = get_goal g in
   let env = LDecl.toenv hyps in
@@ -982,6 +1007,7 @@ let process_logic (engine, hitenv) loc t =
   | Pelim pe       -> process_elim loc pe
   | Papply pe      -> process_apply loc pe
   | Pcut (ip, f, t)-> process_cut engine ip f t
+  | Pcutdef (ip, f)-> process_cutdef loc ip f
   | Pgeneralize l  -> process_generalize l
   | Pclear l       -> process_clear l
   | Prewrite ri    -> process_rewrite loc ri

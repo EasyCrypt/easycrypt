@@ -1,3 +1,5 @@
+pragma nocheck.
+
 require import RandOrcl.
 require import Array.
 require import Bitstring.
@@ -354,6 +356,8 @@ proof.
  by smt.
 save.
 
+pragma check.
+
 lemma Conclusion (A <: Adv {M,RO,ARO}) &m :
 (forall (O <: ARO), islossless O.o => islossless A(O).a1) =>
 (forall (O <: ARO), islossless O.o => islossless A(O).a2) =>
@@ -361,8 +365,5 @@ exists (I<:Inverter), Pr[CPA(BR,A).main() @ &m : res] - 1%r / 2%r <=
                       Pr[OW(I).main() @ &m : res].
 proof.
  intros Hlossless1 Hlossless2;exists (BR_OW(A)).
- cut H :
-   (Pr[CPA(BR,A).main() @ &m : res] <= 1%r / 2%r + Pr[OW(BR_OW(A)).main() @ &m : res]).
-   apply (Reduction A &m);assumption.
- smt.
+ cut h := Reduction A &m _ _; try assumption; smt.
 save.
