@@ -58,9 +58,9 @@ with operators for logical conjunction and disjunction
 (\rawec{/\\}\index{easycrypt}{operators!and@\ec{(/\\) : bool -> bool -> bool}} and
 \rawec{\\\/}\index{easycrypt}{operators!or@\ec{(\\/) : bool -> bool -> bool}}),
 short-circuiting conjunction and disjunction
-(\rawec{\&\&}\index{easycrypt}{operators!and2@\ec{(&&) : bool -> bool -> bool}}
+(\rawec{\&\&}\index{easycrypt}{operators!anda@\ec{(&&) : bool -> bool -> bool}}
 and
-\rawec{||}\index{easycrypt}{operators!or2@\ec{(''ora) : bool -> bool -> bool}}),
+\rawec{||}\index{easycrypt}{operators!ora@\ec{(''ora) : bool -> bool -> bool}}),
 and xor
 (\rawec{\^\^}\index{easycrypt}{operators!xor@\ec{(\^\^) : bool -> bool -> bool}}).
 Additional operators and simple rewriting rules are made available in the
@@ -104,31 +104,36 @@ From these base types, many more can be built. \EasyCrypt allows the user to dec
  (polymorphic) abstract types, and combine existing types into tuple types or
 function types.
 
-Types are declared using the \rawec{type} keyword followed by an identifier and,
-if desired, an \rawec{=} sign and a concrete definition. Listing~\ref{lst:types}
-declares a polymorphic abstract \rawec{multiset} type, and (rather daftly)
-defines naturals as multisets of units.
-
-\begin{easycrypt}[label={lst:types}]{Declaring and applying polymorphic types}
-type 'a multiset.
-type nat = unit multiset.
-\end{easycrypt}
-
 \subsubsection*{Tuple types}
 Given two types $\tau$ and $\tau'$, one can easily define the type of pairs of
 elements of $\tau$ and $\tau'$ as $\left(\tau * \tau'\right)$. More generally,
 the product can be iterated to produce tuple types of arbitrary arity.
 
+For example, Listing~\ref{lst:tuples} declares two abstract types, \rawec{pkey}
+and \rawec{skey}, and then defines a type \rawec{keypairs} as the type of pairs
+of elements of \rawec{pkey} and \rawec{skey}. Intepreting types as sets of
+values, the \rawec{*} on types morally corresponds to the cartesian product.
+
 \warningbox{Types $\left(\tau * \tau' * \tau''\right)$,
-$\left(\left(\tau *\tau'\right) * \tau''\right)$ and
-$\left(\tau * \left(\tau' * \tau''\right)\right)$ are distinct.}
+$\left(\left(\tau * \tau'\right) * \tau''\right)$ and
+$\left(\tau * \left(\tau' * \tau''\right)\right)$ are distinct
+(but isomorphic).}
+
+\begin{easycrypt}[label={lst:tuples}]{An example of tuple type.}
+type pkey.
+type skey.
+
+type keypair = (pkey * skey).
+\end{easycrypt}
 
 \subsubsection*{Function types}
+
+\paragraph{On currying}
 
 \subsubsection*{A note on polymorphism}
 
 
-\subsection{Building Operators}
+\subsection{Building Terms}
 
 \subsection{Predicates, Axioms and Ambient Lemmas\label{sec:ec-specifics}}
 In \EasyCrypt, booleans are used not only to represent binary program variables, but
@@ -385,8 +390,6 @@ module type RO_adv(O:RO) = {
 }.
 \end{easycrypt}
 
-\section{Sections}
-
 \section{Lemmas and Judgements}
 
 \warningbox{Note that we use different implication symbols. $\Rightarrow$ is implication in the ambient logic (corresponding to the \rawec{=>} predicate), whereas $\Longrightarrow$ is used to express contracts on functions.\footnote{From Francois: it may be worth considering the use of another arrow symbol (for example $\Rrightarrow$) for contracts.}}
@@ -430,10 +433,11 @@ Property?:
 \HoareEq{c}{\pre}{\post}{1}
 \end{displaymath}
 
-
 \subsection{Relational Hoare Judgements}
 
-\section{Requiring, Cloning and Realizing Theories\label{sec:cloning}}
+\section{Sections}
+
+\section{Working with Theories\label{sec:cloning}}
 
 
 
