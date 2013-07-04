@@ -146,7 +146,8 @@ distcheck: dist
 
 # --------------------------------------------------------------------
 pg:
-	$(MAKE) -C proofgeneral run-local
+	if [ ! -d _tools ]; then $$(./scripts/activate-toolchain.sh); fi; \
+	  $(MAKE) -C proofgeneral run-local
 
 # --------------------------------------------------------------------
 TOOLCHAIN_URL := http://ci.easycrypt.info/scripts/ec-build-toolchain
