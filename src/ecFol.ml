@@ -676,6 +676,12 @@ let destr_or f =
   | Fapp({f_node = Fop(p,_)},[f1;f2]) when is_op_or p -> f1,f2
   | _ -> destr_error "or" 
 
+let destr_or_kind f = 
+  match f.f_node with
+  | Fapp({f_node = Fop(p,_)},[f1;f2]) when is_op_or p ->
+    EcPath.p_equal p EcCoreLib.p_ora, f1,f2
+  | _ -> destr_error "or" 
+
 let destr_imp f = 
   match f.f_node with
   | Fapp({f_node = Fop(p,_)},[f1;f2]) when EcPath.p_equal p EcCoreLib.p_imp -> 
