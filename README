@@ -45,7 +45,7 @@ Note that $DEST cannot contain spaces.
 
 The toolchain is not activated by default. You have to:
 
-  source $DEST/ocaml-$VERSION/etc/ocamlbrew.bashrc
+  `./scripts/activate-toolchain.sh`
 
 This command has to be repeated each time you start a fresh terminal.
 
@@ -57,6 +57,13 @@ configuration file from a custom location. For instance:
 
   why3config --detect -C $DEST/why3.conf
   ./ec.native -why3 $DEST/why3.conf
+
+We also provide an automated way to install a set of core
+provers. After having installing the toolchain, type:
+
+  make provers
+
+Then activate the toolchain and rerun why3config has described above.
 
 * COMPILATION
 ====================================================================

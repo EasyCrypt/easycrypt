@@ -28,7 +28,8 @@ CHECK     = scripts/runtest.py --bin-args="$(ECARGS)" config/tests.config
 # --------------------------------------------------------------------
 .PHONY: all build byte native tests check check-xunit examples tags
 .PHONY: clean install uninstall uninstall-purge dist distcheck why3
-.PHONY: pg toolchain update-toolchain %.ml %.mli %.inferred.mli
+.PHONY: pg toolchain update-toolchain provers
+.PHONY: %.ml %.mli %.inferred.mli
 
 all: build
 
@@ -158,3 +159,10 @@ update-toolchain:
 	  && opam update  -y \
 	  && opam remove  -y ec-toolchain \
 	  && opam install -y ec-toolchain
+
+provers:
+	$$(./scripts/activate-toolchain.sh) \
+	  && opam update  -y \
+	  && opam remove  -y ec-provers \
+	  && opam install -y ec-provers \
+	  && why3config --detect -C _tools/why3.local.conf
