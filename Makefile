@@ -146,7 +146,7 @@ distcheck: dist
 
 # --------------------------------------------------------------------
 pg:
-	if [ ! -d _tools ]; then $$(./scripts/activate-toolchain.sh); fi; \
+	if [ -d _tools ]; then $$(./scripts/activate-toolchain.sh); fi; \
 	  $(MAKE) -C proofgeneral run-local
 
 # --------------------------------------------------------------------

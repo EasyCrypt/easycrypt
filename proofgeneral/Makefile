@@ -62,5 +62,4 @@ run-local:
 	  --execute '(load-file "_local/emacs.rc")' \
 	  --execute '(load-file "$(CURDIR)/emacs.local.rc")' \
 	  --execute '(cd "$(CURDIR)/..")' \
-	  --execute '(setq easycrypt-prog-name "$(CURDIR)/../ec.native -emacs -I /home/strub/Projects/GCircuits/proof")' \
 	  --no-init-file
