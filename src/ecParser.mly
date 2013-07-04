@@ -252,7 +252,6 @@
 %token PRINT
 %token PROGRESS
 %token PROOF
-%token PROR
 %token PROVER
 %token QED
 %token QUESTION
@@ -1795,7 +1794,7 @@ phltactic:
 | HOARE {Phoare}
 | BDHOARE {Pbdhoare}
 | PRBOUNDED {Pprbounded}
-| PROR {Ppror}
+| REWRITE PR s=LIDENT {Ppr_rewrite s}
 | PRFALSE {Pprfalse}
 | BDEQ {Pbdeq}
 ;

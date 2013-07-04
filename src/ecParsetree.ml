@@ -355,7 +355,7 @@ type phltactic =
   | Pbdhoare
   | Pprbounded
   | Pprfalse
-  | Ppror
+  | Ppr_rewrite   of symbol
   | Pbdeq 
   | Peqobs_in  of (pformula option * pformula option * pformula option)
 

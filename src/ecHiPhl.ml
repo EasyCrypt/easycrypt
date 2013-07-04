@@ -667,7 +667,6 @@ let process_fel at_pos (cntr, delta, q, f_event, some_p) g =
 let process_hoare_bd_hoare g = t_hoare_bd_hoare g
 let process_prbounded = t_prbounded
 let process_prfalse = t_prfalse
-let process_pror = t_pror
 let process_bdeq = t_bdeq
 
 let process_exists_intro fs g = 
@@ -807,7 +806,7 @@ let process_phl loc ptac g =
     | Phoare | Pbdhoare         -> process_hoare_bd_hoare
     | Pprbounded                -> process_prbounded
     | Pprfalse                  -> process_prfalse
-    | Ppror                     -> process_pror
+    | Ppr_rewrite s             -> t_pr_rewrite s 
     | Pbdeq                     -> process_bdeq
     | Peqobs_in info            -> process_eqobs_in info
   in
