@@ -7,11 +7,31 @@ module T = EcTerminal
 
 (* -------------------------------------------------------------------- *)
 let _ =
+  let myname = Filename.basename Sys.executable_name
+  and mydir  = Filename.dirname  Sys.executable_name in
+  let locali = ["ec.native"; "ec.byte"] in
+
   options := EcOptions.parse ();
 
   (* Initialize why3 engine *)
   begin
-    try  EcProvers.initialize !options.o_why3
+    let why3conf =
+      match !options.o_why3 with
+      | None when List.mem myname locali -> begin
+        let why3conf =
+          List.fold_left Filename.concat mydir
+            [Filename.parent_dir_name;
+             Filename.parent_dir_name;
+             "_tools"; "why3.local.conf"]
+        in
+          match Sys.file_exists why3conf with
+          | false -> None
+          | true  -> Some why3conf
+      end
+      | why3conf -> why3conf
+    in
+
+    try  EcProvers.initialize why3conf
     with e ->
       Format.eprintf
         "cannot initialize Why3 engine: %a@."
@@ -22,10 +42,8 @@ let _ =
   (* Initialize load path *)
   begin
     let theories =
-      let myname = Filename.basename Sys.executable_name
-      and mydir  = Filename.dirname  Sys.executable_name in
         match myname with
-        | "ec.native" | "ec.byte" -> begin
+        | _ when List.mem myname locali -> begin
             if Filename.basename (Filename.dirname mydir) = "_build" then
               List.fold_left Filename.concat mydir
                 [Filename.parent_dir_name;
