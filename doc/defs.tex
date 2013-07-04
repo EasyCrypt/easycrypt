@@ -1,4 +1,20 @@
 % !TeX root = easycrypt.tex
+%% Names
+% Tools
+ \newcommand{\EasyCrypt}{\textsf{EasyCrypt}\xspace}
+ \newcommand{\CertiCrypt}{\textsf{CertiCrypt}\xspace}
+ \newcommand{\CertiPriv}{\textsf{CertiPriv}\xspace}
+ \newcommand{\SsReflect}{\textsf{SsReflect}\xspace}
+ \newcommand{\Coq}{\textsf{Coq}\xspace}
+ \newcommand{\WhyThree}{\textsf{Why3}\xspace}
+
+% Languages and Logics
+ \newcommand{\pWHILE}{\textsf{p}\textsc{While}\xspace}
+ \newcommand{\pRHL}{\textsf{pRHL}\xspace}
+
+% Version numbers
+ \newcommand{\ECversion}{0.$\beta$\xspace}
+
 %% Misc
 \newcommand{\DONE}{}% {{\color{red}DONE}}
 \newcommand{\Example}{\paragraph*{Example}}
@@ -36,19 +52,8 @@
 
 % \providecommand{\eqref}[1]{\textup{(\ref{#1})}}
 % \providecommand{\eqdef}{\raisebox{-.2ex}[.2ex]{$\stackrel{\textrm{\tiny def}}{~=~}$}}
+\newcommand{\rname}[1]{[\textsc{#1}]}
 \newcommand{\result}{\mathsf{res}}
-
-%% Names
-
-% \newcommand{\CertiCrypt}{\textsf{CertiCrypt}\xspace}
-% \newcommand{\CertiPriv}{\textsf{CertiPriv}\xspace}
-% \newcommand{\ProVerif}{\textsf{ProVerif}\xspace}
-% \newcommand{\CryptoVerif}{\textsf{CryptoVerif}\xspace}
-% \newcommand{\Coq}{\textsf{Coq}\xspace}
-% \newcommand{\CIL}{\textsf{CIL}\xspace}
-% \newcommand{\pWHILE}{\textsf{p}\textsc{While}\xspace}
-% \newcommand{\Why}{\textsf{Why}\xspace}
-\newcommand{\WhyThree}{\textsf{Why3}\xspace}
 
 %% Security properties and schemes
 
@@ -110,14 +115,6 @@
 \newcommand{\Env}{\mathcal{E}}
 
 %% Well-formed adversaries
-
-
-\newcommand{\EC}{\textsc{EasyCrypt}\xspace}
-\newcommand{\ECversion}{0.$\beta$\xspace}
-
-\newcommand{\pRHL}{\mathsf{pRHL}\xspace}
-\newcommand{\rname}[1]{[\textsc{#1}]}
-
 %% Program Judgements 
 \newcommand{\Hoare}[3]{\left[{#1}:{#2}\Longrightarrow{#3}\right]}
 \newcommand{\Equiv}[4]{\left[{#1}\sim{#2}:{#3}\Longrightarrow{#4}\right]}
@@ -275,6 +272,7 @@
               {\/\\}{{$\wedge$}}1
               {\\\/}{{$\vee$}}1
               {.\[}{{[}}1
+              {''ora}{{$\mathrel{||}$}}1 %needed for correct display in index
               {'a}{{\color{OliveGreen}$\alpha\,$}}1
               {'b}{{\color{OliveGreen}$\beta\,$}}1
               {'c}{{\color{OliveGreen}$\gamma\,$}}1
@@ -286,6 +284,7 @@
 %% Typesetting
 \newcommand{\titledbox}[4]{{\color{#1}\fbox{\begin{minipage}{#2}{\textbf{#3:} \color{black}#4}\end{minipage}}}}
 \newcommand{\warningbox}[1]{\titledbox{red}{.9\textwidth}{Warning}{#1}}
+\newcommand{\futurebox}[1]{\titledbox{blue}{.9\textwidth}{Future}{#1}}
 
 %%% Local Variables: 
 %%% mode: latex

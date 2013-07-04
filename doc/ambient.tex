@@ -50,7 +50,11 @@
 
 \newcommand{\env}[2]{\ec{#1 : #2}\\}
 
-\newcommand{\tacarg}[2]{($#1$:\var{#2})}
+\newcommand{\vararg}[1]{\ec{#1}}
+\newcommand{\cstarg}[1]{\ec{#1}}
+\newcommand{\typarg}[1]{\textit{#1}}
+
+\newcommand{\tacarg}[2]{(\vararg{#1}:\typarg{#2})}
 
 \newcommand{\refdef}[1]{\emph{#1}(\ref{#1})}
 
@@ -82,6 +86,12 @@ The ambient logic is based on a higher-order logic. TODO
 % LAMBDA
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+%change
+\addLambda{change}{\tacarg{f}{formula}}{This tactics permits to change the current goal to f.
+\begin{displaymath}
+  \infrule{G \equiv F ~ ~ ~ F}{G}
+\end{displaymath}}
+
 %beta
 \addLambda{beta}{}{Apply all possible beta-reduction}
 
@@ -95,17 +105,21 @@ The ambient logic is based on a higher-order logic. TODO
 \addLambda{logic}{}{Do logical simplification}
 
 %delta
-\addLambda{delta}{\tacarg{name}{ident}*}{Replace all occurence of all the specify $name$ by their values if no $name$ is  specify it replaces all possible names.}
+\addLambda{delta}{\tacarg{name}{ident*}}{Replace all occurence of all ident present in \vararg{names} by their values if no \vararg{name} is specify it replaces everithing possible.}
 
 %simplify
-\addLambda{simplify}{\tacarg{name}{ident}|\var{delta}?}{Compute the normal form by applying the previous tactics in the given order and it applys delta if delta is specify and just delta names if namess is specify}
+\addLambda{simplify}{\tacarg{names}{ident*} | \var{delta}?}{Compute the normal form by applying the previous tactics in the given order and it applys delta if delta is specify and just delta names if names is specify}
 
 %congr
 \addLambda{congr}{}{If the current goal is a function equality of arity $n$, it replaces this goal by $n$ new goals corresponfin to the argument equality.\\
 You must be aware that this tactics will transform your goal in a stronger one.}
 
 %pose
-\addLambda{pose}{TODO}{TODO}
+\addLambda{pose}{\tacarg{x}{ident} \cstarg{:=} \tacarg{expr}{pattern}}{
+This tactic permits to introduce a new variable in your context with a
+specific value. You don't have to specify the complete expression, \vararg{expr} is a pattern matching.\\
+\futurebox{For now you can only introduce something that appears in your goal but in a near future you will ba able to
+introduce an arbitrary value}}
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -113,12 +127,6 @@ You must be aware that this tactics will transform your goal in a stronger one.}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %Tactics working only on the goal
-
-%change
-\addLogic{change}{\tacarg{f}{formula}}{This tactics permits to change the current goal to f.
-\begin{displaymath}
-  \infrule{G \equiv F ~ ~ ~ F}{G}
-\end{displaymath}}
 
 %split
 \addLogic{split}{}
@@ -145,13 +153,13 @@ You must be aware that this tactics will transform your goal in a stronger one.}
 }
 
 %left
-\addLogic{left}{}{This tactic permits to prove a or statement by proving only the left side. You must be aware that this tactics will transform your goal in a stronger one.
+\addLogic{left}{}{This tactic permits to prove a $\lor$ statement by proving only the left side. You must be aware that this tactics will transform your goal in a stronger one.
 \begin{displaymath}
   \infrule{\Gamma \vdash A}{\Gamma \vdash A \lor B}
 \end{displaymath}}
 
 %right
-\addLogic{right}{}{This tactic permits to prove a or statement by proving only the right side. You must be aware that this tactics will transform your goal in a stronger one.
+\addLogic{right}{}{This tactic permits to prove a $\lor$ statement by proving only the right side. You must be aware that this tactics will transform your goal in a stronger one.
 \begin{displaymath}
   \infrule{\Gamma \vdash B}{\Gamma \vdash A \lor B}
 \end{displaymath}}
@@ -164,18 +172,18 @@ You must be aware that this tactics will transform your goal in a stronger one.
 \end{displaymath}}
 
 %case
-\addLogic{case}{\tacarg{F}{formula}}{This tactic creates two subgoals, one where \emph{f} is true and an other where \emph{f} is false.
+\addLogic{case}{\tacarg{F}{formula}}{This tactic creates two subgoals, one where \vararg{F} is true and an other where \vararg{F} is false.
 \begin{displaymath}
   \infrule{\Gamma \vdash f => G ~ ~ ~ \Gamma \vdash \neg f => G}{\Gamma \vdash G}
 \end{displaymath}}
 
 
 
-%Tactics working with the env
+%Tactics working with the locals
 
 %assumption
-\addLogic{assumption}{\tacarg{h}{ident}?}{It close the current goal by checking you have it in your context up to \refdef{conversion}. If you don't specify
-\emph{h} it test all the \refdef{judgement} present in the context, else it just tests \emph{h}
+\addLogic{assumption}{\tacarg{h}{ident}?}{It close the current goal by checking you have it in your context up to \refdef{conversion}.
+If you don't specify \vararg{h} it test all the \refdef{judgement} present in the context, else it just tests \vararg{h}
 \begin{displaymath}
   \infrule{H \equiv G}{\Gamma,h:H \vdash G}
 \end{displaymath}}
@@ -185,7 +193,7 @@ You must be aware that this tactics will transform your goal in a stronger one.
 {intros}
 {\tacarg{x}{\_|ident}}
 {This tactics permits to remove of your goal : a forall, the left side af an application or a let assignement by pushing it into your \refdef{context}.
-Easycrypt checks that x is not already present in the \refdef{environment}.
+Easycrypt checks that \vararg{x} is not already present in the \refdef{environment}.
 \begin{displaymath}
   \infrule{\Gamma,x = a \vdash G(x)}{\Gamma \vdash let x = a in G(x)}
   ~~~~~~
@@ -224,7 +232,7 @@ Easycrypt checks that x is not already present in the \refdef{environment}.
 \end{displaymath}}
 
 %clear
-\addLogic{clear}{\tacarg{h}{ident}?}{It removes the judgement $h$ from the context
+\addLogic{clear}{\tacarg{h}{ident}?}{It removes the judgement \vararg{h} from the context
 \begin{displaymath}
   \infrule{\Gamma \vdash G}{\Gamma,h:H \vdash G}
 \end{displaymath}}
@@ -236,28 +244,34 @@ Easycrypt checks that x is not already present in the \refdef{environment}.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %smt
-\addLogic{smt}{TODO}{This tactic send your current goal to provers.\\
+\addAuto{smt}{\tacarg{db}{lident} \tacarg{max}{int}? \tacarg{time}{int}?  \tacarg{names}{string*}}{
+This tactic send your goal to provers.\\
+You can give as first argument nolocals and your local context($\Gamma$) won't be sent to smt. The second
+argument permits to precise some information, the number of provers run at the same time.\\
+\futurebox{The argument sgould evolve in the future, you will be able to specify which lemma you want to send
+to provers. The number of simultaneous prover you want to run at the same time should not appears in scripts
+and the limitation time should be just an indicator on the diffuclty of the lemma to proof.}\\
 \warningbox{Some judgements can't be converted see \ref{smtProgram} TODO} }
 
 %apply
-\addLogic{apply}{TODO}{Apply a lemma in order to prove the current goal TODO}
+\addAuto{apply}{TODO}{Apply a lemma in order to prove the current goal TODO}
 
 %rewrite
 \addAuto{rewrite}{TODO}{Rewrite an expression in your goal according to a lemma TODO}
 
 %elimT
-\addAuto{elimT}{TODO}{Apply an induction princple to your current goal TODO}
+\addAuto{elimT}{\tacarg{h}{ident} \tacarg{x}{value}}{Apply an induction principle \vararg{h} on object \vararg{x}}
 
 %subst
-\addAuto{subst}{\tacarg{x}{ident}?}{Find a value for var \emph{x} in the hypothesis, subsitute it everywhere and remove it. If \emph{x} is not specify
-it does it for all variable. TODO}
+\addAuto{subst}{\tacarg{x}{ident}?}{Find a value for var \vararg{x} in the hypothesis, subsitute it everywhere and remove it.
+If \vararg{x} is not specify it does it for all variable.}
 
 %progress
-\addAuto{progress}{TODO}{Split all you hypothesis, make all subsitution possible and then split your goal and do it again on all subgoals. It
-permits to easly break a big judgements in smaller one TODO}
+\addAuto{progress}{}{Split all you hypothesis, make all subsitution possible and then split your goal and do it again on all subgoals. It
+permits to easly break a big judgements in smaller one.}
 
 %trivial
-\addAuto{trivial}{TODO}{TODO}
+\addAuto{trivial}{}{If what remains in yout goal is very simple and not need an smt you can try using this tactic. TODO}
 
 
 
@@ -269,12 +283,13 @@ permits to easly break a big judgements in smaller one TODO}
 \addOther
 {idtac}
 {\tacarg{x}{string}}
-{TODO\\
-\example
-{env}{formula(env)}
-{\vtacname}{}
-{env}{formula(env)}
-}
+{This tactic does nothing except printing the string put as argument if there is one.}
+
+%print
+\addOther
+{print}
+{\cstarg{type} | \cstarg{op} | \cstarg{theory} | \cstarg{pred} | \cstarg{axiom} ~ \tacarg{x}{ident}}
+{This tactic takes a type of object and such an object ant print it.}
 
 %same
 \addOther{same}{}{TODO}
