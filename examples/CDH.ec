@@ -67,10 +67,10 @@ theory Set_CDH.
       var x, y : int;
       var s : group set;
 
-      x = $[0..q-1]; 
+      x = $[0..q-1];
       y = $[0..q-1];
       s = B.solve(g ^ x, g ^ y);
-      return (mem (g ^ (x * y)) s /\ #s <= n);
+      return (mem (g ^ (x * y)) s /\ card s <= n);
     }
   }.
 
@@ -80,7 +80,7 @@ theory Set_CDH.
       var i : int;
 
       s = A.solve(gx, gy);
-      i = $[0..#s - 1];
+      i = $[0.. card s - 1];
       return (nth i s);
     }
   }.
@@ -121,9 +121,9 @@ theory Set_CDH.
     fun; inline CDH_from_SCDH(A).solve.
     seq 6 : (nth i s = g ^ (x * y)) 1%r.
     rnd (1%r / n%r) (lambda i, nth i s = g ^ (x * y)).
-    conseq (_ : _ ==> mem (g ^ (x * y)) s /\ #s <= n).
+    conseq (_ : _ ==> mem (g ^ (x * y)) s /\ card s <= n).
     intros &m1 H1; simplify.
-    apply (Trans _ (1%r / (#s{m1})%r)).  
+    apply (Trans _ (1%r / (card s{m1})%r)).
     apply div_le; smt.
     apply (mu_choose_mem s{m1} (g ^ (x{m1} * y{m1})) _); first smt. 
     (* This is exactly the SCDH(A) game in the bound *)

@@ -69,7 +69,7 @@ theory WRO_Fset.
     fun o(x:from) : to = {
       var r : to;
 
-      if (#log < qO) {
+      if (card log < qO) {
         log = add x log;
         r = R.o(x);
       }
@@ -283,7 +283,7 @@ by [].
 lemma add_mem (x:'a) (s:'a set) : mem x s => add x s = s
 by (intros _; apply extensionality; smt).
 
-lemma card_add (x:'a) (s:'a set) : #add x s <= #s + 1
+lemma card_add (x:'a) (s:'a set) : card (add x s) <= card s + 1
 by [].
 
 
@@ -293,7 +293,7 @@ lemma G2_SCDH (A <: Adv {CPA, G1, G2, SCDH.SCDH, RO, ARO, Hashed_ElGamal}) :
   equiv 
   [ G2(A).main ~ SCDH.SCDH(SCDH_from_CPA(A)).main : 
     (glob A){1} = (glob A){2} ==> 
-    (mem G2.gxy ARO.log){1} = res{2} /\ #ARO.log{1} <= qH ].
+    (mem G2.gxy ARO.log){1} = res{2} /\ card ARO.log{1} <= qH ].
 proof.
   intros _ _; fun.
   inline SCDH_from_CPA(A).solve SCDH_from_CPA(A).AO.init G2(A).AO.init RO.init.
@@ -301,15 +301,15 @@ proof.
   rnd{1}; wp.  
   seq 9 8 : 
     ((glob A){1} = (glob A){2} /\ ={ARO.log, RO.m} /\
-    c{1} = (gy, h){2} /\ G2.gxy{1} = g ^ (x * y){2} /\ #ARO.log{1} <= qH).
+    c{1} = (gy, h){2} /\ G2.gxy{1} = g ^ (x * y){2} /\ card ARO.log{1} <= qH).
   wp; rnd.
-  call ( _ : ={ARO.log, RO.m} /\ #ARO.log{1} <= qH).
+  call ( _ : ={ARO.log, RO.m} /\ card ARO.log{1} <= qH).
   fun; inline RO.o; wp; if; first smt.
   by wp; rnd; wp; skip; smt.
   by wp; skip; smt.
   by wp; do rnd; wp; skip; smt.
 
-  call ( _ : RO.m{1} = RO.m{2} /\ ARO.log{1} = ARO.log{2} /\ #ARO.log{1} <= qH).
+  call ( _ : RO.m{1} = RO.m{2} /\ ARO.log{1} = ARO.log{2} /\ card ARO.log{1} <= qH).
 
   fun; inline RO.o; wp; if; first smt.
   by wp; rnd; wp; skip; smt.
@@ -344,7 +344,7 @@ proof.
     (Pr[G1(A).main() @ &m : res] + Pr[G1(A).main() @ &m : mem G1.gxy ARO.log]) 
      _ _).
   cut W: (forall (x y:real), x = y => x <= y); first smt.
-  by apply W; pr_or; smt.
+  by apply W; rewrite Pr mu_or; smt.
   smt.
 qed.
 
