@@ -1,4 +1,5 @@
 (* -------------------------------------------------------------------- *)
+open EcMaps
 open EcSymbols
 open EcUtils
 open EcTypes
@@ -22,13 +23,15 @@ module PPEnv = struct
   type t = {
     ppe_env    : EcEnv.env;
     ppe_locals : symbol Mid.t;
-    ppe_inuse  : Ssym.t
+    ppe_inuse  : Ssym.t;
+    ppe_univar : (symbol Mint.t * Ssym.t) ref;
   }
 
   let ofenv (env : EcEnv.env) =
     { ppe_env    = env;
       ppe_locals = Mid.empty;
-      ppe_inuse  = Ssym.empty; }
+      ppe_inuse  = Ssym.empty;
+      ppe_univar = ref (Mint.empty, Ssym.empty); }
 
   let enter_by_memid ppe id =
     match EcEnv.Memory.byid id ppe.ppe_env with
@@ -57,7 +60,9 @@ module PPEnv = struct
   let create_and_push_mems ppe ids =
     List.fold_left (create_and_push_mem ?active:None) ppe ids
 
-  let add_local ppe =
+  let inuse ppe name =
+    let env = ppe.ppe_env in
+
     let in_active_mem name =
       let env = ppe.ppe_env in
 
@@ -68,20 +73,19 @@ module PPEnv = struct
             EcMemory.lookup name mem <> None
     in
 
-    let inuse name =
-      let env = ppe.ppe_env in
          (Ssym.mem name ppe.ppe_inuse)
+      || (Ssym.mem name (snd !(ppe.ppe_univar)))
       || (EcEnv.Mod.sp_lookup_opt      ([], name) env <> None)
       || (EcEnv.Var.lookup_local_opt        name  env <> None)
       || (EcEnv.Var.lookup_progvar_opt ([], name) env <> None)
       || (in_active_mem name)
-    in
 
+  let add_local ppe =
     fun id ->
       let name = ref (EcIdent.name id) in
       let i    = ref 0 in
   
-        while inuse !name do
+        while inuse ppe !name do
           name := Printf.sprintf "%s%d" (EcIdent.name id) !i;
           incr i
         done;
@@ -233,6 +237,36 @@ module PPEnv = struct
     match Mid.find_opt x ppe.ppe_locals with
     | None   -> EcIdent.tostring x
     | Some x -> x
+
+  exception FoundUnivarSym of symbol
+
+  let tyunivar (ppe : t) i =
+    if not (Mint.mem i (fst !(ppe.ppe_univar))) then begin
+      let alpha  = "abcdefghijklmnopqrstuvwxyz" in
+  
+      let rec findx prefix i =
+        let for1 x =
+          let x = prefix ^ (String.make 1 x) in
+  
+          if i <= 0 then begin
+            if not (inuse ppe x) then
+              raise (FoundUnivarSym x)
+          end else
+            findx x (i-1)
+        in
+          String.iter for1 alpha
+      in
+  
+      let x =
+        try  for i = 0 to max_int do findx "'u" i done; assert false
+        with FoundUnivarSym x -> x
+      in
+  
+      let (map, uses) = !(ppe.ppe_univar) in
+        ppe.ppe_univar := (Mint.add i x map, Ssym.add x uses)
+    end;
+
+    oget (Mint.find_opt i (fst !(ppe.ppe_univar)))
 end
 
 (* -------------------------------------------------------------------- *)
@@ -286,8 +320,8 @@ let pp_tyvar ppe fmt x =
   Format.fprintf fmt "%s" (PPEnv.tyvar ppe x)
 
 (* -------------------------------------------------------------------- *)
-let pp_tyunivar _ppe fmt x =
-  Format.fprintf fmt "#%d" x
+let pp_tyunivar ppe fmt x =
+  Format.fprintf fmt "%s" (PPEnv.tyunivar ppe x)
 
 (* -------------------------------------------------------------------- *)
 let pp_tyname ppe fmt p =
@@ -526,7 +560,7 @@ let pp_let (ppe : PPEnv.t) pp_sub outer fmt (pt, e1, e2) =
     let ids    = lp_ids pt in
     let subppe = PPEnv.add_locals ppe ids in
       Format.fprintf fmt "@[<hov 0>let %a =@;<1 2>@[%a@]@ in@ %a@]"
-        (pp_tuple `ForBinding ppe (fun ppe _ -> pp_local ppe)) ids
+        (pp_tuple `ForBinding subppe (fun ppe _ -> pp_local ppe)) ids
         (pp_sub ppe (e_bin_prio_letin, `NonAssoc)) e1
         (pp_sub subppe (e_bin_prio_letin, `NonAssoc)) e2
   in

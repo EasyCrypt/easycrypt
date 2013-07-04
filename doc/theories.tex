@@ -1,10 +1,9 @@
 % !TeX root = easycrypt.tex
 
-\chapter{Theories (Fran\c{c}ois + Gilles)\label{chap:theories}}
-
+\chapter{The Languages of \EasyCrypt\label{chap:theories}}
 Definitions and lemmas can be grouped in theories, that can be imported to
 provide new language functionalities as required for a particular proof.
-Currently, \EC supports user-defined types and operators
+Currently, \EasyCrypt supports user-defined types and operators
 (Section~\ref{sec:types}) and user-defined distributions
 (Section~\ref{sec:distributions}). In addition, theories can declare modules and
 functors (Section~\ref{sec:modules}), used to represent schemes, oracles and
@@ -15,128 +14,93 @@ consider small variants of a theory without having to create a new one from
 scratch, or to consider concrete implementation details only when necessary for
 the proof.
 
-% TODO: adapt depending on what I actually end up doing
-We illustrate each of the basic concepts with commented excerpts from the
-standard library distributed with \EC. The standard library is documented
-further in Chapter~\ref{chap:libraries}.
 
-\section{The \EC Expression Language}
-
-At the core of any \EC specification is a collection of types and functional
-operators on those types, that create and extend a rich language of expressions
-for use in cryptographic games. Informally, \EC types can be seen as
-\emph{non-empty} sets, and operators are \emph{mathematical} functions between
-them.
-%
-The reader familiar with polymorphic lambda-calculus~\cite{} may skip forward to
-Section~\ref{sec:ec-specifics}.
-
-\subsection{A quick overview}
-Following this analogy and standard functional programming notation, we write
-denote with \ec{f : 'a -> 'b}  the fact that \ec{f} is a function from
-type \ec{'a} to type \ec{'b}. Given function \ec{f} above, and an
-\ec{x : 'a}, we denote with \ec{f x} the value (of type \ec{'b})
-resulting from applying \ec{f} to \ec{x}.
-
-Functions expecting several arguments take their arguments separated by spaces.
-For example, the logarithm base 2 of an integer \ec{n} would be denoted
-\ec{log 2 n}, where the type of \ec{log} is
-\ec{log: int -> int -> int}. For now, the reader unfamiliar with functional
-languages should just read this type as the type of functions that take two
-integers and return an integer.
-
-
-
-\section{Types and Operators\label{sec:types}}
-
-At the core of any \EC specification is a collection of types and functional
-operators on those types. Formally, \EC types are \emph{non-empty} sets of
+\section{The \EasyCrypt Expression Language\label{sec:types}}
+At the core of any \EasyCrypt specification is a collection of types and functional
+operators on those types. Formally, \EasyCrypt types are \emph{non-empty} sets of
 values, and operators are \emph{mathematical} functions between them.
 
 \warningbox{Currently, the easiest way to define types and operators is to
 declare them abstractly and specify them using axioms. It is \emph{very}
 important for the consistency of the logical context to remember that types are
-\emph{always} assumed to be non-empty, and that operators are functionals
-(total, deterministic and side-effect free) when writing such definitions.}
+\emph{always} assumed to be non-empty, and that operators are total mathematical
+functions when writing such definitions.}
 
-The \EC type system supports polymorphic, higher-order types: the type of lists
-can be declared independently of the type of their contents, and operators can
-take and return other operators.
+The \EasyCrypt type system supports polymorphic, higher-order types: the type of
+lists can be declared independently of the type of their contents, and operators
+can take and return other operators. We first describe the various built-in
+types and relevant operators before moving on to explaining how new definitions
+can be built from them.
 
 \subsection{Built-Ins}
 The language is equipped with a few built-in types\footnote{This is only to
 bridge our language with \WhyThree's logic and avoid the introduction of
 indirection layers in the proof obligations sent to the SMT solvers: all these
-built-in types could in theory be defined in \EC itself.}:
-\begin{itemize}
-\item the \rawec{unit} type,
+built-in types could in theory be defined in \EasyCrypt itself.}:
+\begin{itemize}\itemsep-.5em
+\item the \rawec{unit}\index{easycrypt}{types!unit@\ec{unit}} type, which
+        contains a unique element
+        \rawec{tt}\index{easycrypt}{constants!tt@\ec{tt : unit}},
 \item the \rawec{bool} type of booleans,
 \item the \rawec{int} type of arithmetic integers (in $\mathbb{Z}$),
 \item the \rawec{real} type of real numbers (in $\mathbb{R}$).
 \end{itemize}
 
 Some symbols are defined, declared or imported from \WhyThree in the
-corresponding libraries, and are discussed further in
-Chapter~\ref{chap:libraries}.
+corresponding libraries, and are discussed further in the library documentation.
 
-\subsubsection*{The \rawec{unit} type}
-The \rawec{unit} type contains a unique element \rawec{tt}. It is \emph{not}
-equal to the empty tuple type in \EC.
-
-\subsubsection*{The \rawec{bool} type: termination, operators and predicates}
-In \EC, booleans are used not only to represent binary program variables, but
-also to type logical formulas. The \rawec{bool} type is therefore equipped with
-symbols for universal and existential quantification, implication, logical and
-short-circuiting conjunction and disjunction and xor. However, since the program
-logic assumes that expressions are terminating, we need to restrict the class of
-boolean formulas that can be used when defining operators and writing programs.
-To this effect, we consider two distinct classes of functional symbols:
-\emph{predicates}, that may not be computable in general, and cannot be used to
-write programs (although they can be used to specify them), and
-\emph{operators}, that are computable and can be used for defining predicates
-and other operators, and to write programs.
-
-Universal and existential quantification (\rawec{forall} and \rawec{exists}),
-implication (\rawec{=>}) and equivalence (\rawec{<=>}) are internally defined as
-predicate symbols, and therefore cannot be used to define operators. All other
-boolean function symbols are defined as operators and can be used in any
-context. They include logical conjunction and disjunction (\rawec{/\\} and
-\rawec{\\\/}), short-circuiting conjunction and disjunction (\rawec{\&\&} and
-\rawec{\|\|}), and xor (\rawec{+} or \rawec{\^\^}).
+\subsubsection*{The \rawec{bool} type}
+\index{easycrypt}{types!bool@\ec{bool}}
+Boolean expression terms can be built from the constant
+\rawec{true}\index{easycrypt}{constants!true@\ec{true : bool}} and
+\rawec{false}\index{easycrypt}{constants!true@\ec{true : bool}}, in combination
+with operators for logical conjunction and disjunction
+(\rawec{/\\}\index{easycrypt}{operators!and@\ec{(/\\) : bool -> bool -> bool}} and
+\rawec{\\\/}\index{easycrypt}{operators!or@\ec{(\\/) : bool -> bool -> bool}}),
+short-circuiting conjunction and disjunction
+(\rawec{\&\&}\index{easycrypt}{operators!and2@\ec{(&&) : bool -> bool -> bool}}
+and
+\rawec{||}\index{easycrypt}{operators!or2@\ec{(''ora) : bool -> bool -> bool}}),
+and xor
+(\rawec{\^\^}\index{easycrypt}{operators!xor@\ec{(\^\^) : bool -> bool -> bool}}).
+Additional operators and simple rewriting rules are made available in the
+\rawec{Bool} theory.
 
 \subsubsection*{The \rawec{int} type}
-The \rawec{int} type represents mathematical integers. It is possible to
-directly write constants between $0$ and $2^{62} - 1$ (non-negative OCaml
-integers). The unary negation operator is denoted \rawec{-!}, and all arithmetic
-and comparison operators use standard notations (\rawec{+}, \rawec{-},
-\rawec{*}, \rawec{/}, \rawec{\%}, \rawec{^}, \rawec{=}, \rawec{<}, \rawec{<=},
-\rawec{>}, \rawec{>=} \ldots). It may be necessary to import the integer library
-(\rawec{require import Int.}) to have access to these operators. Since this type
-is identified with the \WhyThree type of integers, all \WhyThree lemmas on it
-can be used by the SMT solvers, but may not be accessible by name for use in
-interactive proofs.
+\index{easycrypt}{types!int@\ec{int}}
+Integer expression terms can be built from numerical constants between $0$ and
+$2^{62} - 1$ (non-negative OCaml integers), in combintation with operators for
+unary negation (\rawec{-}), and all arithmetic and comparison (\rawec{+},
+\rawec{-}, \rawec{*}, \rawec{/}, \rawec{\%}, \rawec{^}, \rawec{=}, \rawec{<},
+\rawec{<=}, \rawec{>}, \rawec{>=} \ldots). It is necessary to import the integer
+library (via \rawec{require import Int.}, see Section~\ref{sec:cloning}) to have
+access to these operators. Since this type is identified with the \WhyThree type
+of integers, all \WhyThree lemmas on it can be used by the SMT solvers, and are
+accessible by name for use in interactive proofs. We will eventually be
+providing uniformly named wrappers and algebraic structures.
 
 \subsubsection*{The \rawec{real} type}
-The \rawec{real} type represents real numbers. Integer variables and constants
-can be cast to reals by suffixing them with a \rawec{\%r}. Basic operations and
-comparisons are defined, with standard notations, on real numbers. Here again,
-it may be necessary to import the library (using \rawec{require import Real.})
-to put the real operators in scope. This type is also identified with the
-\WhyThree type of reals, but SMT solvers often have very limited support for
-real numbers and will often fail to prove seemingly trivial results.
-%
-We will be working on enriching the library of lemmas available in this theory
-to allow more complex interactive proofs.
+\index{easycrypt}{types!real@\ec{real}}
+Real expression terms can be built from integer constants suffixed with a
+\rawec{\%r} (for example, \rawec{0\%r} is 0 in the \rawec{real} type), in
+combination with the same operators available on integers. It is necessary to
+import the library (using \rawec{require import Real.}) to access these
+operators in scope. This type is also identified with the \WhyThree type of
+reals, which provides some lemmas and tighter integration with the underlying
+theories, but SMT solvers often have very limited support for real numbers and
+will often fail to prove seemingly trivial results, with Z3 often outperforming
+other solvers. We will be working on enriching the library of lemmas available
+in this theory to allow more complex interactive proofs when automation fails.
 
-\warningbox{Note that \rawec{(1/2)\%r} and \rawec{1\%r/2\%r} are very different
+\warningbox{\rawec{(1/2)\%r} and \rawec{1\%r/2\%r} are very different
 expressions. The former evaluates to $0$ (the division is in $\mathbb{Z}$, and
 the result ($0$) is interpreted in $\mathbb{R}$) whereas the latter evaluates to
 $0.5$ (the operands are interpreted and the operator is applied in
 $\mathbb{R}$). Eventually, we will introduce notations for scoping that should
 allow less cluttered real expressions.}
 
-\subsection{Types}
-From these base types, many more can be built. \EC allows the user to declare
+\subsection{Building Types}
+From these base types, many more can be built. \EasyCrypt allows the user to declare
  (polymorphic) abstract types, and combine existing types into tuple types or
 function types.
 
@@ -164,13 +128,33 @@ $\left(\tau * \left(\tau' * \tau''\right)\right)$ are distinct.}
 \subsubsection*{A note on polymorphism}
 
 
-\subsection{Operators}
+\subsection{Building Operators}
 
 \subsection{Predicates, Axioms and Ambient Lemmas\label{sec:ec-specifics}}
+In \EasyCrypt, booleans are used not only to represent binary program variables, but
+also to type logical formulas. The \rawec{bool} type is therefore equipped with
+symbols for universal and existential quantification, implication, logical and
+short-circuiting conjunction and disjunction and xor. However, since the program
+logic assumes that expressions are terminating, we need to restrict the class of
+boolean formulas that can be used when defining operators and writing programs.
+To this effect, we consider two distinct classes of functional symbols:
+\emph{predicates}, that may not be computable in general, and cannot be used to
+write programs (although they can be used to specify them), and
+\emph{operators}, that are computable and can be used for defining predicates
+and other operators, and to write programs.
+
+Universal and existential quantification (\rawec{forall} and \rawec{exists}),
+implication (\rawec{=>}) and equivalence (\rawec{<=>}) are internally defined as
+predicate symbols, and therefore cannot be used to define operators. All other
+boolean function symbols are defined as operators and can be used in any
+context. They include logical conjunction and disjunction (\rawec{/\\} and
+\rawec{\\\/}), short-circuiting conjunction and disjunction (\rawec{\&\&} and
+\rawec{\|\|}), and xor (\rawec{\^\^}).
+
 
 % TODO: redistribute the following
 %
-%The following \EC code (Listing~\ref{lst:bitstrings}) declares an abstract type of bitstrings, equipped
+%The following \EasyCrypt code (Listing~\ref{lst:bitstrings}) declares an abstract type of bitstrings, equipped
 %with a length operator (whose result is never negative) and an infix addition
 %operator that enjoys interesting properties both with respect to length and by
 %itself.
@@ -190,7 +174,7 @@ $\left(\tau * \left(\tau' * \tau''\right)\right)$ are distinct.}
 %\end{easycrypt}
 %
 %\subsubsection{Types}
-%\EC expressions are equipped with polymorphic, higher-order types, that can be declared abstractly (as in Listing~\ref{lst:bitstrings}), or given concrete definitions, depending on the needs of the proof.
+%\EasyCrypt expressions are equipped with polymorphic, higher-order types, that can be declared abstractly (as in Listing~\ref{lst:bitstrings}), or given concrete definitions, depending on the needs of the proof.
 %
 %
 %\warningbox{One could expect the type annotations in the \rawec{extensionality}
@@ -247,12 +231,12 @@ $\left(\tau * \left(\tau' * \tau''\right)\right)$ are distinct.}
 \section{Describing Distributions\label{sec:distributions}}
 
 %%%% From Gilles:
-\EC features a polymorphic type \rawec{'a distr} of \emph{discrete
+\EasyCrypt features a polymorphic type \rawec{'a distr} of \emph{discrete
 sub-distributions} over a base type \rawec{'a}. The primary operation over
 sub-distributions is the function \rawec{op mu: 'a distr -> ('a -> bool) ->
 real.} which measures the probability of an event. The function is assumed to
 satisfy the basic axioms of probability sub-distributions:
-\begin{itemize}
+\begin{itemize}\itemsep-.5em
 \item probabilities lie in the unit interval;
 \item the probability of the union of events is equal to the sum of
   their probabilities, minus the sum of their intersection;
@@ -296,21 +280,6 @@ With these auxiliary operators, it is in fact fairly easy to check that the simp
 \begin{easycrypt}[]{}
 lemma lossless : weight dbool = 1%r.
 \end{easycrypt}
-
-\subsection{Old Stuff}
-\EC offers support for user-defined distributions. Distributions are defined by
-formally defining their density function, represented by the built-in operator
-\rawec{op mu: 'a distr -> ('a -> bool) -> real.} For example, the uniform
-distribution on booleans is defined, in the standard library, as displayed in
-Listing~\ref{lst:dbool}, where \rawec{caract P x} is \rawec{1\%r} if \rawec{P}
-holds on \rawec{x} and \rawec{0\%r} otherwise.
-
-It may not always be this easy to define distributions. More examples of
-user-provided definitions, and some distribution transformers that make it
-possible to define new distributions from existing ones, can be found in the
-standard library (Chapter~\ref{chap:libraries}).
-
-\warningbox{Distributions are defined axiomatically, and no well-formedness checks are performed.}
 
 \section{Modules and Functors\label{sec:modules}}
 
@@ -416,11 +385,11 @@ module type RO_adv(O:RO) = {
 }.
 \end{easycrypt}
 
+\section{Sections}
+
 \section{Lemmas and Judgements}
 
 \warningbox{Note that we use different implication symbols. $\Rightarrow$ is implication in the ambient logic (corresponding to the \rawec{=>} predicate), whereas $\Longrightarrow$ is used to express contracts on functions.\footnote{From Francois: it may be worth considering the use of another arrow symbol (for example $\Rrightarrow$) for contracts.}}
-
-\subsection{Ambient Lemmas}
 
 \subsection{(Possibilistic) Hoare Judgements}
 

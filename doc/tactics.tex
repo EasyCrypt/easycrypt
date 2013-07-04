@@ -4,7 +4,7 @@
 
 \chapter{Writing Proofs}
 
-\EC comes with a proof engine that allows to state, in the \EC
+\EasyCrypt comes with a proof engine that allows to state, in the \EasyCrypt
 underneath formalism, properties about the user defined programs
 and to prove them.
 %
@@ -18,7 +18,7 @@ subgoals are trivial and can be solved by the system.
 
 This chapter is about the description of this proof engine, and is
 structured as follow. We first define the notion of goals and show
-how it relates to the \EC formalism. We then introduce the notion
+how it relates to the \EasyCrypt formalism. We then introduce the notion
 of tactics as logically valid goal transformers. Finally, a listing
 of all the existing tactics, along with their detailed descriptions,
 is given.
@@ -110,7 +110,7 @@ For instance, Figure~\ref{fig:LJproof} gives a proof of
 
 \bigskip
 
-The \EC proof engine helps the user building such proof. At each step
+The \EasyCrypt proof engine helps the user building such proof. At each step
 of the proof building, the system presents to the user the set of goals
 that has to be proved. The user can then \emph{apply} a tactic to one of
 them, each tactic corresponding to a deduction rule. If the conclusion
@@ -120,7 +120,7 @@ premises of the applied rule - the subgoals. This application may generate
 no, one or several subgoals depending on the rule. This process is repeated
 iteratively, up to the point where no goals remain.
 
-\section{Ambient Logic (Guillaume)}
+\section{Ambient Logic}
 
 \begin{center}
 \begin{tabular}{l@{$\quad$}l@{$\quad$}ll}
