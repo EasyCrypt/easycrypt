@@ -1,5 +1,3 @@
-pragma nocheck.
-
 require import RandOrcl.
 require import Array.
 require import Bitstring.
@@ -355,8 +353,6 @@ proof.
    equiv_deno (eq2 A _ _);try assumption;trivial.
  by smt.
 save.
-
-pragma check.
 
 lemma Conclusion (A <: Adv {M,RO,ARO}) &m :
 (forall (O <: ARO), islossless O.o => islossless A(O).a1) =>
