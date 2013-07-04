@@ -22,7 +22,8 @@ lemma nosmt bool_case : forall (p:bool -> bool),
 by [].
 
 (** boolean rewriting *)
-(* the two implications will soon become obsolete as we become able to use views *)
+lemma nosmt rw_eq_iff : forall (a b:bool), (a = b) = (a <=> b) by [].
+
 lemma nosmt eqT  : forall (x:bool), x => (x = true) by [].
 lemma nosmt neqF : forall (x:bool), !x => (x = false) by [].
 

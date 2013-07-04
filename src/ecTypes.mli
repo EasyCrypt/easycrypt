@@ -44,6 +44,7 @@ val tbool   : ty
 val tint    : ty
 val treal   : ty
 val tdistr  : ty -> ty
+val tfset   : ty -> ty
 val tcpred  : ty -> ty
 val toarrow : ty list -> ty -> ty
 

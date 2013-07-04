@@ -632,17 +632,14 @@ let process_exfalso g =
 let process_ppr (phi1,phi2) g =
   let hyps,concl = get_goal g in
   let ef = destr_equivF concl in
-
   let _penv,qenv = LDecl.equivF ef.ef_fl ef.ef_fr hyps in
-
   let phi1 = process_form qenv phi1 tbool in
   let phi2 = process_form qenv phi2 tbool in
   t_ppr phi1 phi2 g
 
-let process_fel at_pos (cntr, delta, q, f_event, some_p) g = 
+let process_fel at_pos (cntr, ash, q, f_event, some_p) g = 
   let hyps,concl = get_goal g in
   (* let hyps = LDecl.inv_memenv hyps in  *)
-
   (* code duplication from t_failure *)
   let f = match concl.f_node with
     | Fapp ({f_node=Fop(op,_)},[pr;_]) when is_pr pr 
@@ -653,16 +650,14 @@ let process_fel at_pos (cntr, delta, q, f_event, some_p) g =
       cannot_apply "failure event lemma" 
         "A goal of the form Pr[ _ ] <= _ was expected"
   in
-
   (* let env = EcEnv.Fun.prF f env in *)
   let hyps,_ = LDecl.hoareF f hyps in 
-
   let cntr = process_form hyps cntr tint in
-  let delta = process_form hyps delta treal in
+  let ash = process_form hyps ash (tfun tint treal) in
   let q = process_form hyps q tint in
   let f_event = process_form hyps f_event tbool in
   let some_p = process_form hyps some_p tbool in
-  t_failure_event at_pos cntr delta q f_event some_p g
+  t_failure_event at_pos cntr ash q f_event some_p g
 
 let process_hoare_bd_hoare g = t_hoare_bd_hoare g
 let process_prbounded = t_prbounded

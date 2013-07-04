@@ -324,17 +324,19 @@ let t_glob p tys (juc,n as g) =
   let juc, nh = mkn_glob juc hyps p tys in
   use_node juc nh n, []
 
-let t_smt strict pi g =
+let t_smt ~strict ~usehyps pi g =
   let error = tacuerror ~catchable:(not strict) in
 
   let _,concl as goal = get_goal g in
   match concl.f_node with
-    | FequivF _ | FequivS _ | FhoareF _ | FhoareS _ | FbdHoareF _  | FbdHoareS _ -> 
-      tacuerror 
-        "Cannot process program judgement, use skip tactic first"
+    | FequivF   _  | FequivS   _
+    | FhoareF   _  | FhoareS   _
+    | FbdHoareF _  | FbdHoareS _ -> 
+      tacuerror "Cannot process program judgement, use skip tactic first"
+
     | _ ->
         try
-          if EcEnv.check_goal pi goal then
+          if EcEnv.check_goal ~usehyps pi goal then
             let rule = { pr_name = RN_prover (); pr_hyps = [] } in
             upd_rule_done rule g
           else error "cannot prove goal"

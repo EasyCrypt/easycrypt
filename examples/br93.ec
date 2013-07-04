@@ -249,10 +249,7 @@ proof.
  apply (real_le_trans _ 
              Pr[CPA2(BR2,A).main() @ &m : res \/ mem M.r ARO.log] _).
  equiv_deno (eq1 A _);try assumption;progress;smt.
- cut H:
- (Pr[CPA2(BR2,A).main() @ &m : res \/ mem M.r ARO.log] =
-  Pr[CPA2(BR2,A).main() @ &m : res] +  Pr[CPA2(BR2,A).main() @ &m : mem M.r ARO.log] -
-  Pr[CPA2(BR2,A).main() @ &m : res /\ mem M.r ARO.log]);[pr_or;trivial | smt].
+ pr_or.  smt.
 save.
 
 module type Inverter = {

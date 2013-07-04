@@ -321,6 +321,8 @@
 
 %nonassoc EQ NE
 
+%nonassoc prec_below_order
+
 %left GT LT GE LE
 %left OP1
 %right QUESTION
@@ -537,19 +539,11 @@ expr_u:
 | op=loc(uniop) ti=tvars_app? e=expr
     { peapp_symb op.pl_loc op.pl_desc ti [e] } 
 
+| e=expr_chained_orderings %prec prec_below_order
+   { fst e }
+
 | e1=expr op=loc(OP1) ti=tvars_app? e2=expr 
     { peapp_symb op.pl_loc op.pl_desc ti [e1; e2] }
-
-| e1=expr op=loc(ordering_op) ti=tvars_app? e2=expr
-    { match unloc e1 with
-      | PEapp ({ pl_desc = PEident (subop, _) }, [_; el])
-          when isordering (unloc subop)
-        ->
-	let lc = EcLocation.make $startpos $endpos in
-          peapp_symb lc (str_and true) None
-	    [e1; mk_loc lc (peapp_symb op.pl_loc (unloc op) ti [el; e2])]
-
-      | _ -> peapp_symb op.pl_loc (unloc op) ti [e1; e2] }
 
 | e1=expr op=loc(EQ) ti=tvars_app? e2=expr
     { peapp_symb op.pl_loc "=" ti [e1; e2] }
@@ -603,6 +597,26 @@ expr_u:
         PEapp (mk_loc loc id, [e]) }
 
 | LAMBDA pd=ptybindings COMMA e=expr { PElambda (pd, e) } 
+;
+
+expr_ordering:
+| e1=expr op=loc(ordering_op) ti=tvars_app? e2=expr
+    { (op, ti, e1, e2) }
+;
+
+expr_chained_orderings:
+| e=expr_ordering
+    { let (op, ti, e1, e2) = e in
+        (peapp_symb op.pl_loc (unloc op) ti [e1; e2], e2) }
+
+| e1=loc(expr_chained_orderings) op=loc(ordering_op) ti=tvars_app? e2=expr
+    { let (lce1, (e1, le)) = (e1.pl_loc, unloc e1) in
+      let loc = EcLocation.make $startpos $endpos in
+        (peapp_symb loc (str_and true) None
+           [EcLocation.mk_loc lce1 e1;
+            EcLocation.mk_loc loc
+              (peapp_symb op.pl_loc (unloc op) ti [le; e2])],
+         e2) }
 ;
 
 %inline pty_varty:
@@ -724,16 +738,8 @@ form_u(P):
 | e1=form_r(P) op=loc(OP1) ti=tvars_app? e2=form_r(P)
     { pfapp_symb op.pl_loc op.pl_desc ti [e1; e2] } 
 
-| e1=form_r(P) op=loc(ordering_op) ti=tvars_app? e2=form_r(P)
-    { match unloc e1 with
-      | PFapp ({ pl_desc = PFident (subop, _) }, [_; el])
-          when isordering (unloc subop)
-        ->
-	let lc = EcLocation.make $startpos $endpos in
-          pfapp_symb lc (str_and true) None
-	    [e1; mk_loc lc (pfapp_symb op.pl_loc (unloc op) ti [el; e2])]
-
-      | _ -> pfapp_symb op.pl_loc (unloc op) ti [e1; e2] }
+| f=form_chained_orderings(P) %prec prec_below_order
+    { fst f }
 
 | e1=form_r(P) op=loc(EQ) ti=tvars_app? e2=form_r(P)
     { pfapp_symb op.pl_loc "=" ti [e1; e2] }
@@ -1632,8 +1638,8 @@ logtactic:
 | TRIVIAL
    { Ptrivial }
 
-| SMT pi=prover_info
-   { Psmt pi }
+| SMT db=lident? pi=prover_info
+   { Psmt (db, pi) }
 
 | INTROS a=intro_pattern*
    { Pintro a }
