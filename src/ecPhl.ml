@@ -2428,7 +2428,7 @@ let pr_or m f args por p1 p2 =
   let pr1 = f_pr m f args p1 in
   let pr2 = f_pr m f args p2 in
   let pr12 = f_pr m f args (f_and p1 p2) in
-  let pr = f_real_sub (f_real_sum pr1 pr2) pr12 in
+  let pr = f_real_sub (f_real_add pr1 pr2) pr12 in
   f_eq (f_pr m f args (por p1 p2)) pr
 
 let pr_disjoint env m f args por p1 p2 = 
@@ -2436,7 +2436,7 @@ let pr_disjoint env m f args por p1 p2 =
   let hyp = gen_mems [mem] (f_not (f_and p1 p2)) in 
   let pr1 = f_pr m f args p1 in
   let pr2 = f_pr m f args p2 in
-  let pr =  f_real_sum pr1 pr2 in
+  let pr =  f_real_add pr1 pr2 in
   f_imp hyp (f_eq (f_pr m f args (por p1 p2)) pr)
 
 let select_pr on_ev sid f = 
@@ -2480,7 +2480,6 @@ let t_pr_rewrite s g =
     try ignore (EcMetaProg.FPosition.select select concl);
         tacuerror "can not find a pattern for %s" s
     with Found f -> f in
-<<<<<<< HEAD
   let lemma, args = 
     match kind with
     | `MuEq | `MuSub -> 
@@ -2508,21 +2507,6 @@ let t_pr_rewrite s g =
 
   t_on_first (t_pr_lemma lemma)
     (t_rewrite_form `LtoR lemma args g)
-=======
-  let cut = 
-    let m,f,args,ev = destr_pr torw in
-    let p1,p2 = destr_or ev in
-    let pr1 = f_pr m f args p1 in
-    let pr2 = f_pr m f args p2 in
-    let pr12 = f_pr m f args (f_and p1 p2) in
-    let pr = f_real_add pr1 pr2 in
-    let pr = f_real_sub pr pr12 in
-    f_eq torw pr in
-  t_seq_subgoal 
-    (t_rewrite_form `LtoR cut [])
-    [ t_seq t_pror t_trivial;
-      t_id None] g
->>>>>>> 7cb777f058ef37b4b96c2353351d176df0a6d644
 
 let t_bdeq g = 
   let concl = get_concl g in
