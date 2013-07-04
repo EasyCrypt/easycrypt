@@ -755,7 +755,7 @@ let rec add_eqs env local eqs e1 e2 : Mpv2.t =
 let add_eqs env eqs e1 e2 =  add_eqs env Mid.empty eqs e1 e2
   
 (* Invariant ifvl,ifvr = PV.fv env ml inv, PV.fv env mr inv *)
-let eqobs_in env fun_spec c1 c2 eqo (inv,ifvl,ifvr) =
+let eqobs_in env fun_spec c1 c2 eqO (inv,ifvl,ifvr) =
 
   let add_eqs eqs e1 e2 = add_eqs env eqs e1 e2 in
 
@@ -804,9 +804,9 @@ let eqobs_in env fun_spec c1 c2 eqo (inv,ifvl,ifvr) =
       end else raise EqObsInError in
 
     match lvl, lvr with
-    | LvVar xl, LvVar xr -> aux eqo xl xr 
+    | LvVar xl, LvVar xr -> aux eqs xl xr 
     | LvTuple ll, LvTuple lr when List.length ll = List.length lr->
-      List.fold_left2 aux eqo ll lr
+      List.fold_left2 aux eqs ll lr
     | LvMap((pl,tysl), pvl, el, tyl),
         LvMap((pr,tysr), pvr, er,tyr) when EcPath.p_equal pl pr &&
       List.all2  (EcReduction.equal_type env) (tyl::tysl) (tyr::tysr) ->
@@ -886,7 +886,7 @@ let eqobs_in env fun_spec c1 c2 eqo (inv,ifvl,ifvr) =
     | _, _ -> raise EqObsInError
   in
 
-  let rl,rr, hyps, eqi = s_eqobs_in (rev c1) (rev c2) [] eqo in
+  let rl,rr, hyps, eqi = s_eqobs_in (rev c1) (rev c2) [] eqO in
   rstmt rl, rstmt rr, hyps, eqi
 
 (* Same function but specialized to the case where c1 and c2 are equal,
