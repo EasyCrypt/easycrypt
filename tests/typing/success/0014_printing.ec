@@ -33,7 +33,6 @@ op f1 (x:int, y:int) : int = x + y.
 axiom foo6 : forall (x:int, y:int), - (f1 x y) = x.
 
 require import Map.
-import OptionGet.
 
 axiom foo7 : forall (x:int, y:int, m:(int,int)map),
    m.[x<-y] = m.
