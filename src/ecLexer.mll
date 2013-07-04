@@ -104,7 +104,6 @@
     "bdhoare_deno", BDHOAREDENO;        (* KW: tactic *)
     "pr_bounded"  , PRBOUNDED  ;        (* KW: tactic *)
     "pr_false"    , PRFALSE    ;        (* KW: tactic *)
-    "pr_or"       , PROR       ;        (* KW: tactic *)
     "bd_eq"       , BDEQ       ;        (* KW: tactic *)
     "bypr"        , BYPR       ;        (* KW: tactic *)
     "fel"         , FEL        ;        (* KW: tactic *)
