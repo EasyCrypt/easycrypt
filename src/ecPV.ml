@@ -761,7 +761,7 @@ let eqobs_in env fun_spec c1 c2 eqo (inv,ifvl,ifvr) =
 
   let rev st = List.rev st.s_node in
 
-  let check pv fv _eqs = 
+  let check pv fv = 
     if PV.mem_pv env pv fv then false 
     else 
       try 
@@ -771,7 +771,6 @@ let eqobs_in env fun_spec c1 c2 eqo (inv,ifvl,ifvr) =
           let check1 mp = 
             let restr = get_restr env mp in
             Mpv.check_npv_mp env pv top mp restr in
-        (*      Sm.iter check1 eqs.Mpv2.s_gl; *) (* Not needed *)
           Sm.iter check1 fv.PV.s_gl
         end;
         true
@@ -779,7 +778,7 @@ let eqobs_in env fun_spec c1 c2 eqo (inv,ifvl,ifvr) =
 
   let check_not_l lvl eqo =
     let aux (pv,_) =
-      check pv ifvl eqo &&
+      check pv ifvl &&
       not (Mpv2.mem_pv_l env pv eqo) in
     match lvl with
     | LvVar xl   -> aux xl
@@ -788,7 +787,7 @@ let eqobs_in env fun_spec c1 c2 eqo (inv,ifvl,ifvr) =
 
   let check_not_r lvr eqo =
     let aux (pv,_) =
-      check pv ifvr eqo && 
+      check pv ifvr && 
       not (Mpv2.mem_pv_r env pv eqo) in
     match lvr with
     | LvVar xr   -> aux xr
@@ -799,7 +798,7 @@ let eqobs_in env fun_spec c1 c2 eqo (inv,ifvl,ifvr) =
     (* TODO : ensure that the invariant is not modified *)
     let aux eqs (pvl,tyl) (pvr,tyr) = 
       if EcReduction.equal_type env tyl tyr then begin
-        if not (check pvl ifvl eqs && check pvr ifvr eqs) then
+        if not (check pvl ifvl && check pvr ifvr) then
           raise EqObsInError;
         Mpv2.remove env pvl pvr eqs
       end else raise EqObsInError in
@@ -823,12 +822,12 @@ let eqobs_in env fun_spec c1 c2 eqo (inv,ifvl,ifvr) =
   let rec s_eqobs_in rsl rsr fhyps (eqo:Mpv2.t) = 
     match rsl, rsr with
     | { i_node = Sasgn(LvVar (xl,_), el)}::rsl, _ when is_var el ->
-      if check xl ifvl eqo then
+      if check xl ifvl then
         let x = destr_var el in
         s_eqobs_in rsl rsr fhyps (Mpv2.subst_l env xl x eqo)
       else rsl, rsr, fhyps, eqo
     | _, { i_node = Sasgn(LvVar (xr,_), er)} :: rsr when is_var er ->
-      if check xr ifvr eqo then 
+      if check xr ifvr then 
         let x = destr_var er in
         s_eqobs_in rsl rsr fhyps (Mpv2.subst_r env xr x eqo)
       else rsl, rsr, fhyps, eqo
