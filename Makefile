@@ -153,16 +153,16 @@ pg:
 TOOLCHAIN_URL := http://ci.easycrypt.info/scripts/ec-build-toolchain
 
 toolchain:
-	bash ./scripts/ec-build-toolchain
+	export OPAMVERBOSE=1; bash ./scripts/ec-build-toolchain
 
 update-toolchain:
-	$$(./scripts/activate-toolchain.sh) \
+	export OPAMVERBOSE=1; $$(./scripts/activate-toolchain.sh) \
 	  && opam update  -y \
 	  && opam remove  -y ec-toolchain \
 	  && opam install -y ec-toolchain
 
 provers:
-	$$(./scripts/activate-toolchain.sh) \
+	export OPAMVERBOSE=1; $$(./scripts/activate-toolchain.sh) \
 	  && opam update  -y \
 	  && opam remove  -y ec-provers \
 	  && opam install -y ec-provers \
