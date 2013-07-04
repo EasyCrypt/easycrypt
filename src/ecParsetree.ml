@@ -283,6 +283,12 @@ type preduction = {
   pmodpath : bool;   (* normalize modpath *)
 }
 
+type pterm = {
+  pt_name : pqsymbol;
+  pt_tys  : ptyannot option;
+  pt_args : fpattern_arg located list;
+}
+
 (* -------------------------------------------------------------------- *)
 type 'a doption = 
   | Single of 'a
@@ -355,7 +361,7 @@ type phltactic =
   | Pbdhoare
   | Pprbounded
   | Pprfalse
-  | Ppror
+  | Ppr_rewrite   of symbol
   | Pbdeq 
   | Peqobs_in  of (pformula option * pformula option * pformula option)
 
@@ -400,6 +406,7 @@ type logtactic =
   | Pelim       of ffpattern 
   | Papply      of ffpattern
   | Pcut        of (intropattern1 * pformula * ptactic_core option)
+  | Pcutdef     of (intropattern1 * pterm)
   | Pgeneralize of (rwocc * pformula) list
   | Pclear      of psymbol list
   | Prewrite    of rwarg list

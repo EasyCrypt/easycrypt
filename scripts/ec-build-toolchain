@@ -79,11 +79,13 @@ function box {
 box "EasyCrypt toolchain installed"
 
 cat <<EOF
+%%% --------------------------------------------------------------------
 %%%
 %%% To use it, type:"
 %%% 
-%%%    source "${OCONFIG}"
+%%%    \$(./scripts/activate-toolchain.sh)
 %%% 
 %%% Don't forget to [make clean] the easycrypt source tree
 %%%
+%%% --------------------------------------------------------------------
 EOF

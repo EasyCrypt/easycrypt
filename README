@@ -45,18 +45,28 @@ Note that $DEST cannot contain spaces.
 
 The toolchain is not activated by default. You have to:
 
-  source $DEST/ocaml-$VERSION/etc/ocamlbrew.bashrc
+  `./scripts/activate-toolchain.sh`
 
 This command has to be repeated each time you start a fresh terminal.
 
 Regarding the Why3 configuration file, easycrypt is using the default
-Why3 location, i.e. ~/.why3.conf. If you have several versions of Why3
-installed, it may be impossible to share the same configuration file
-among them. EasyCrypt, via the option -why3, allows you to load a Why3
-configuration file from a custom location. For instance:
+Why3 location, i.e. ~/.why3.conf, or _tools/why3.local.conf when it
+exists. If you have several versions of Why3 installed, it may be
+impossible to share the same configuration file among them. EasyCrypt,
+via the option -why3, allows you to load a Why3 configuration file
+from a custom location. For instance:
 
   why3config --detect -C $DEST/why3.conf
   ./ec.native -why3 $DEST/why3.conf
+
+We also provide an automated way to install a set of core
+provers. After having installing the toolchain, type:
+
+  make provers
+
+This also create a configuration file for Why3 in
+_tools/why3.local.conf. This file is automatically loaded by EasyCrypt
+when started locally.
 
 * COMPILATION
 ====================================================================

@@ -28,7 +28,8 @@ CHECK     = scripts/runtest.py --bin-args="$(ECARGS)" config/tests.config
 # --------------------------------------------------------------------
 .PHONY: all build byte native tests check check-xunit examples tags
 .PHONY: clean install uninstall uninstall-purge dist distcheck why3
-.PHONY: pg toolchain update-toolchain %.ml %.mli %.inferred.mli
+.PHONY: pg toolchain update-toolchain provers
+.PHONY: %.ml %.mli %.inferred.mli
 
 all: build
 
@@ -145,16 +146,25 @@ distcheck: dist
 
 # --------------------------------------------------------------------
 pg:
-	$(MAKE) -C proofgeneral run-local
+	if [ -d _tools ]; then $$(./scripts/activate-toolchain.sh); fi; \
+	  $(MAKE) -C proofgeneral run-local
 
 # --------------------------------------------------------------------
 TOOLCHAIN_URL := http://ci.easycrypt.info/scripts/ec-build-toolchain
 
 toolchain:
-	bash ./scripts/ec-build-toolchain
+	export OPAMVERBOSE=1; bash ./scripts/ec-build-toolchain
 
 update-toolchain:
-	$$(./scripts/activate-toolchain.sh) \
+	export OPAMVERBOSE=1; $$(./scripts/activate-toolchain.sh) \
 	  && opam update  -y \
 	  && opam remove  -y ec-toolchain \
 	  && opam install -y ec-toolchain
+
+provers:
+	export OPAMVERBOSE=1; $$(./scripts/activate-toolchain.sh) \
+	  && opam update  -y \
+	  && opam remove  -y ec-provers \
+	  && opam install -y ec-provers \
+	  && rm -f _tools/why3.local.conf \
+	  && why3config --detect -C _tools/why3.local.conf

@@ -2398,51 +2398,116 @@ let t_prfalse g =
   let concl_po = gen_mems [me] (f_imp f_false ev) in
   prove_goal_by [is_zero;concl_po] RN_hl_prfalse g
 
-let t_pror g = 
+(** The following should be changed latter *)
+let t_pr_lemma lemma g = 
   let concl = get_concl g in
-  match concl.f_node with
-  | Fapp({f_node=Fop(op1,_)}, [{f_node=Fpr(m,f,ps,ev)}; bd]) ->
-    if EcPath.p_equal op1 EcCoreLib.p_eq then 
-      if is_or ev then
-        let p1, p2 = destr_or ev in
-        let pr1 = f_pr m f ps p1 in
-        let pr2 = f_pr m f ps p2 in
-        let pr12 = f_pr m f ps (f_and p1 p2) in
-        let pr = f_real_add pr1 pr2 in
-        let pr = f_real_sub pr pr12 in
-        let concl = f_eq pr bd in
-        prove_goal_by [concl] RN_hl_pror g
-      else assert false
-    else assert false
-  | _ -> 
-    cannot_apply "pr_op" "Pr[_ @ _ : _ \\/ _ ] expression was expected"
-      
+  assert (f_equal concl lemma);
+  prove_goal_by [] RN_hl_pr_lemma g
+
+let pr_false m f args = 
+  f_eq (f_pr m f args f_false) f_r0
+
 exception Found of form
-    
-let t_pror g =
-  let concl = get_concl g in
-  let select1 sid f = 
-    match f.f_node with
-    | Fpr(_,_,_,ev) -> 
-      if is_or ev && Mid.set_disjoint f.f_fv sid then raise (Found f) else false
-    | _ -> false in
+      
+let pr_eq env m f args p1 p2 = 
+  let mem = Fun.prF_memenv mhr f env in
+  let hyp = gen_mems [mem] (f_iff p1 p2) in
+  let concl = f_eq (f_pr m f args p1) (f_pr m f args p2) in
+  f_imp hyp (f_eq concl f_true)
+
+let pr_sub env m f args p1 p2 = 
+  let mem = Fun.prF_memenv mhr f env in
+  let hyp = gen_mems [mem] (f_imp p1 p2) in
+  let concl = f_real_le (f_pr m f args p1) (f_pr m f args p2) in
+  f_imp hyp (f_eq concl f_true)
+
+let pr_not m f args p = 
+  f_eq (f_pr m f args (f_not p))
+    (f_real_sub (f_pr m f args f_true) (f_pr m f args p))
+
+let pr_or m f args por p1 p2 = 
+  let pr1 = f_pr m f args p1 in
+  let pr2 = f_pr m f args p2 in
+  let pr12 = f_pr m f args (f_and p1 p2) in
+  let pr = f_real_sub (f_real_add pr1 pr2) pr12 in
+  f_eq (f_pr m f args (por p1 p2)) pr
+
+let pr_disjoint env m f args por p1 p2 = 
+  let mem = Fun.prF_memenv mhr f env in
+  let hyp = gen_mems [mem] (f_not (f_and p1 p2)) in 
+  let pr1 = f_pr m f args p1 in
+  let pr2 = f_pr m f args p2 in
+  let pr =  f_real_add pr1 pr2 in
+  f_imp hyp (f_eq (f_pr m f args (por p1 p2)) pr)
+
+let select_pr on_ev sid f = 
+  match f.f_node with
+  | Fpr(_,_,_,ev) -> 
+      if on_ev ev && Mid.set_disjoint f.f_fv sid then raise (Found f) else false
+  | _ -> false
+ 
+let select_pr_cmp on_cmp sid f = 
+  match f.f_node with
+  | Fapp({f_node = Fop(op,_)},
+         [{f_node = Fpr(m1,f1,arg1,_)};{f_node = Fpr(m2,f2,arg2,_)}]) ->
+    if on_cmp op &&
+      EcIdent.id_equal m1 m2 &&
+      EcPath.x_equal f1 f2 &&
+      List.all2 f_equal arg1 arg2 && 
+      Mid.set_disjoint f.f_fv sid then raise (Found f) else false
+  | _ -> false
+
+let pr_rewrite_lemma = 
+  ["mu_eq"      , `MuEq;
+   "mu_sub"     , `MuSub;
+   "mu_false"   , `MuFalse;
+   "mu_not"     , `MuNot;
+   "mu_or"      , `MuOr;
+   "mu_disjoint", `MuDisj]
+
+let t_pr_rewrite s g = 
+  let kind = 
+    try List.assoc s pr_rewrite_lemma with Not_found -> 
+      tacuerror "Do not reconize %s as a probability lemma" s in
+  let select = 
+    match kind with 
+    | `MuEq    -> select_pr_cmp (EcPath.p_equal EcCoreLib.p_eq)
+    | `MuSub   -> select_pr_cmp (EcPath.p_equal EcCoreLib.p_real_le)
+    | `MuFalse -> select_pr is_false
+    | `MuNot   -> select_pr is_not
+    | `MuOr | `MuDisj  -> select_pr is_or in
+  let env, _, concl = get_goal_e g in
   let torw = 
-    try ignore (EcMetaProg.FPosition.select select1 concl);
-        tacuerror "can not find a pattern of the form Pr[_ @ _ : _ \\/ _]"
+    try ignore (EcMetaProg.FPosition.select select concl);
+        tacuerror "can not find a pattern for %s" s
     with Found f -> f in
-  let cut = 
-    let m,f,args,ev = destr_pr torw in
-    let p1,p2 = destr_or ev in
-    let pr1 = f_pr m f args p1 in
-    let pr2 = f_pr m f args p2 in
-    let pr12 = f_pr m f args (f_and p1 p2) in
-    let pr = f_real_add pr1 pr2 in
-    let pr = f_real_sub pr pr12 in
-    f_eq torw pr in
-  t_seq_subgoal 
-    (t_rewrite_form `LtoR cut [])
-    [ t_seq t_pror t_trivial;
-      t_id None] g
+  let lemma, args = 
+    match kind with
+    | `MuEq | `MuSub -> 
+      begin  match torw.f_node with
+      | Fapp(_, [{f_node = Fpr(m,f,args,ev1)};{f_node = Fpr(_,_,_,ev2)}]) ->
+        if kind = `MuEq then pr_eq env m f args ev1 ev2, [AAnode] 
+        else pr_sub env m f args ev1 ev2, [AAnode]
+      | _ -> assert false
+      end
+    | `MuFalse ->
+      let m,f,args,_ = destr_pr torw in
+      pr_false m f args, []
+    | `MuNot ->
+      let m,f,args,ev = destr_pr torw in
+      let ev = destr_not ev in
+      pr_not m f args ev, []
+    | `MuOr ->
+      let m,f,args,ev = destr_pr torw in
+      let asym,ev1,ev2 = destr_or_kind ev in
+      pr_or m f args (if asym then f_ora else f_or) ev1 ev2, []
+    | `MuDisj ->
+      let m,f,args,ev = destr_pr torw in
+      let asym,ev1,ev2 = destr_or_kind ev in
+      pr_disjoint env m f args (if asym then f_ora else f_or) ev1 ev2, [AAnode] in
+
+  t_on_first (t_pr_lemma lemma)
+    (t_rewrite_form `LtoR lemma args g)
 
 let t_bdeq g = 
   let concl = get_concl g in

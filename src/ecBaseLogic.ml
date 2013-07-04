@@ -102,7 +102,7 @@ type rule_name =
   | RN_hl_hoare_bd_hoare      
   | RN_hl_prbounded      
   | RN_hl_prfalse      
-  | RN_hl_pror
+  | RN_hl_pr_lemma
   | RN_hl_bdeq      
   | RN_hl_fel       of (form * form * form * form * form)
 

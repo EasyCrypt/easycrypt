@@ -755,13 +755,13 @@ let rec add_eqs env local eqs e1 e2 : Mpv2.t =
 let add_eqs env eqs e1 e2 =  add_eqs env Mid.empty eqs e1 e2
   
 (* Invariant ifvl,ifvr = PV.fv env ml inv, PV.fv env mr inv *)
-let eqobs_in env fun_spec c1 c2 eqo (inv,ifvl,ifvr) =
+let eqobs_in env fun_spec c1 c2 eqO (inv,ifvl,ifvr) =
 
   let add_eqs eqs e1 e2 = add_eqs env eqs e1 e2 in
 
   let rev st = List.rev st.s_node in
 
-  let check pv fv _eqs = 
+  let check pv fv = 
     if PV.mem_pv env pv fv then false 
     else 
       try 
@@ -771,7 +771,6 @@ let eqobs_in env fun_spec c1 c2 eqo (inv,ifvl,ifvr) =
           let check1 mp = 
             let restr = get_restr env mp in
             Mpv.check_npv_mp env pv top mp restr in
-        (*      Sm.iter check1 eqs.Mpv2.s_gl; *) (* Not needed *)
           Sm.iter check1 fv.PV.s_gl
         end;
         true
@@ -779,7 +778,7 @@ let eqobs_in env fun_spec c1 c2 eqo (inv,ifvl,ifvr) =
 
   let check_not_l lvl eqo =
     let aux (pv,_) =
-      check pv ifvl eqo &&
+      check pv ifvl &&
       not (Mpv2.mem_pv_l env pv eqo) in
     match lvl with
     | LvVar xl   -> aux xl
@@ -788,7 +787,7 @@ let eqobs_in env fun_spec c1 c2 eqo (inv,ifvl,ifvr) =
 
   let check_not_r lvr eqo =
     let aux (pv,_) =
-      check pv ifvr eqo && 
+      check pv ifvr && 
       not (Mpv2.mem_pv_r env pv eqo) in
     match lvr with
     | LvVar xr   -> aux xr
@@ -799,15 +798,15 @@ let eqobs_in env fun_spec c1 c2 eqo (inv,ifvl,ifvr) =
     (* TODO : ensure that the invariant is not modified *)
     let aux eqs (pvl,tyl) (pvr,tyr) = 
       if EcReduction.equal_type env tyl tyr then begin
-        if not (check pvl ifvl eqs && check pvr ifvr eqs) then
+        if not (check pvl ifvl && check pvr ifvr) then
           raise EqObsInError;
         Mpv2.remove env pvl pvr eqs
       end else raise EqObsInError in
 
     match lvl, lvr with
-    | LvVar xl, LvVar xr -> aux eqo xl xr 
+    | LvVar xl, LvVar xr -> aux eqs xl xr 
     | LvTuple ll, LvTuple lr when List.length ll = List.length lr->
-      List.fold_left2 aux eqo ll lr
+      List.fold_left2 aux eqs ll lr
     | LvMap((pl,tysl), pvl, el, tyl),
         LvMap((pr,tysr), pvr, er,tyr) when EcPath.p_equal pl pr &&
       List.all2  (EcReduction.equal_type env) (tyl::tysl) (tyr::tysr) ->
@@ -823,12 +822,12 @@ let eqobs_in env fun_spec c1 c2 eqo (inv,ifvl,ifvr) =
   let rec s_eqobs_in rsl rsr fhyps (eqo:Mpv2.t) = 
     match rsl, rsr with
     | { i_node = Sasgn(LvVar (xl,_), el)}::rsl, _ when is_var el ->
-      if check xl ifvl eqo then
+      if check xl ifvl then
         let x = destr_var el in
         s_eqobs_in rsl rsr fhyps (Mpv2.subst_l env xl x eqo)
       else rsl, rsr, fhyps, eqo
     | _, { i_node = Sasgn(LvVar (xr,_), er)} :: rsr when is_var er ->
-      if check xr ifvr eqo then 
+      if check xr ifvr then 
         let x = destr_var er in
         s_eqobs_in rsl rsr fhyps (Mpv2.subst_r env xr x eqo)
       else rsl, rsr, fhyps, eqo
@@ -887,7 +886,7 @@ let eqobs_in env fun_spec c1 c2 eqo (inv,ifvl,ifvr) =
     | _, _ -> raise EqObsInError
   in
 
-  let rl,rr, hyps, eqi = s_eqobs_in (rev c1) (rev c2) [] eqo in
+  let rl,rr, hyps, eqi = s_eqobs_in (rev c1) (rev c2) [] eqO in
   rstmt rl, rstmt rr, hyps, eqi
 
 (* Same function but specialized to the case where c1 and c2 are equal,
