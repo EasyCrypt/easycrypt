@@ -31,6 +31,7 @@ val p_bool       : path
 val p_int        : path
 val p_real       : path
 val p_distr      : path 
+val p_fset       : path 
 val p_cpred      : path 
 val p_from_int   : path
 
@@ -53,11 +54,14 @@ val p_real_le    : path
 val p_real_lt    : path
 
 val p_int_prod   : path
-val p_int_sum    : path
+val p_int_add    : path
 val p_int_sub    : path
 val p_int_pow    : path
 
-val p_real_sum     : path
+val p_int_intval : path
+val p_int_sum : path
+
+val p_real_add     : path
 val p_real_sub     : path
 val p_real_prod    : path
 val p_real_div     : path

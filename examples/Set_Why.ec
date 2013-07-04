@@ -7,7 +7,7 @@ require Distr.
 theory Fset.
 
   import why3 "set" "Fset"
-    op "cardinal" as "#";
+    op "cardinal" as "card";
     op "subset" as "<=".
 
   op cpMem (s:'a set) (x:'a) = mem x s.
@@ -53,13 +53,13 @@ theory FsetNth.
 
   lemma mu_choose_mem : forall (S:'a set, x:'a),
     mem x S =>
-    1%r / (#S)%r <= mu [0..#S - 1] (lambda i, nth i S = x).
+    1%r / (card S)%r <= mu [0..card S - 1] (lambda i, nth i S = x).
   proof.
    intros S x H.
-    cut H1 : (exists i, 0 <= i /\ i < #S /\ x = nth i S); first smt.
+    cut H1 : (exists i, 0 <= i /\ i < card S /\ x = nth i S); first smt.
     elim H1; clear H1; intros i Hi.
-    apply (Real.Trans (1%r / (#S)%r) (Distr.mu_x [0..#S - 1] i)).
-    rewrite (Distr.Dinter.mu_x_def_in 0 (#S - 1) i _); smt.
+    apply (Real.Trans (1%r / (card S)%r) (Distr.mu_x [0..card S - 1] i)).
+    rewrite (Distr.Dinter.mu_x_def_in 0 (card S - 1) i _); smt.
     delta Distr.mu_x; simplify.
     apply Distr.mu_sub; smt.   
    qed.
@@ -100,12 +100,12 @@ theory Duni.
   axiom supp_def : forall (x:'a) X, in_supp x (duni X) <=> mem x X.
 
   axiom mu_def : forall (X:'a set) P, 
-    !is_empty X => mu (duni X) P = (#filter P X)%r / (#X)%r. 
+    !is_empty X => mu (duni X) P = (card (filter P X))%r / (card X)%r. 
 
   axiom mu_def_empty : forall (P:'a cpred), mu (duni empty) P = 0%r.
  
   axiom mu_x_def_in : forall (x:'a) X, 
-    mem x X => mu_x (duni X) x = 1%r / (#X)%r. 
+    mem x X => mu_x (duni X) x = 1%r / (card X)%r. 
 
   axiom mu_x_def_notin : forall (x:'a) X, 
     !mem x X => mu_x (duni X) x = 0%r.
@@ -121,7 +121,7 @@ theory Duni.
     rewrite (mu_def<:'a> X Fun.cpTrue _).
     assumption.
     rewrite (filter_true<:'a> X).
-    cut W : ((#X)%r <> 0%r); smt.
+    cut W : ((card X)%r <> 0%r); smt.
   qed.
 
 end Duni.
@@ -183,7 +183,7 @@ end Dexcepted.
 
 theory SetMap.
 
-  require import Map. import OptionGet.
+  require import Map.
 
   type 'a set = ('a, bool) map.
 

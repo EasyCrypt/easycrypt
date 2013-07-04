@@ -335,8 +335,13 @@ lemma filter_cpTrue: forall (X:'a set),
 by (intros=> X; apply set_ext; smt).
 
 lemma filter_cpEq_in: forall (x:'a) (X:'a set),
-  mem x X => filter (cpEq x) X = single x
-by (intros=> x X x_in_X; apply set_ext; smt).
+  mem x X => filter (cpEq x) X = single x.
+proof strict.
+intros=> x X x_in_X; apply set_ext=> x';
+rewrite mem_filter; delta cpEq beta; case (x = x').
+  by intros=> <-; simplify; split=> _ //; apply mem_single_eq.
+  by rewrite rw_eq_sym => x_x'; simplify; apply mem_single_neq=> //.
+qed.
 
 lemma leq_filter: forall (p:'a cpred) (X:'a set),
   filter p X <= X
@@ -458,6 +463,57 @@ case (a=x)=> ?.
     rewrite mem_rm_neq.    
       apply H2.
       apply h2.
+save.
+
+op interval : int -> int -> int set.
+axiom interval_neg : forall (x y:int), x > y => interval x y = empty.
+axiom interval_pos : forall (x y:int), x <= y => interval x y = add y (interval x (y-1)).
+
+lemma mem_interval : forall (x y a:int), (mem a (interval x y)) <=> (x <= a /\ a <= y).
+  intros x y a.
+  case (x <= y)=> h;last smt.
+  rewrite (_ : y = (y-x+1)-1+x);first smt.
+  apply (Int.Induction.induction
+    (lambda i, mem a (interval x ((i-1)+x)) <=> Int.(<=) x a /\ Int.(<=) a ((i-1)+x))
+    _ _ (y-x+1) _);[smt| |smt].
+  simplify.
+  intros j hh hrec.
+  rewrite interval_pos;first smt.
+  rewrite (_:j - 1 + x - 1=j - 1 - 1 + x);first smt.
+  rewrite mem_add hrec.
+  smt.
+save.
+
+lemma dec_interval : forall (x y:int),
+    x <= y =>
+    (img (lambda (x : int), x-1) (rm x (interval x y)) =
+    (rm y (interval x y))
+    ).
+  intros x y h.
+  apply set_ext=> a.
+  rewrite img_def.
+  rewrite ! mem_rm ! mem_interval.
+  split.
+  intros=> /= [x0] [h1].
+  subst.
+  smt.
+  intros=> hh.
+  exists (a+1).
+  simplify.
+  rewrite ! mem_rm ! mem_interval.
+  smt.
+save.
+
+lemma card_interval_max : forall x y, card (interval x y) = max (y - x + 1) 0.
+  intros x y.
+  case (x <= y);last smt.
+  intros h.
+  rewrite (_:interval x y=interval x (x+(y-x+1)-1));first smt.
+  rewrite (_:max (y - x + 1) 0 = y-x+1);first smt.
+  apply (Int.Induction.induction (lambda i, card (interval x (x+i-1)) = i) _ _ (y-x+1) _);[smt| |smt].
+  simplify.
+  intros j hh hrec.
+  rewrite (interval_pos x (x+j-1) _);smt.
 save.
 
 require import Real.

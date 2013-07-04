@@ -587,12 +587,12 @@ let f_pr m f args e = mk_form (Fpr (m, f, args, e)) ty_real
 let fop_int_le    = f_op EcCoreLib.p_int_le    [] (tfun tint  (tfun tint ty_bool))
 let fop_int_lt    = f_op EcCoreLib.p_int_lt    [] (tfun tint  (tfun tint ty_bool))
 let fop_int_prod = f_op EcCoreLib.p_int_prod [] (tfun tint  (tfun tint ty_int))
-let fop_int_sum  = f_op EcCoreLib.p_int_sum  [] (tfun tint  (tfun tint ty_int))
+let fop_int_add  = f_op EcCoreLib.p_int_add  [] (tfun tint  (tfun tint ty_int))
 let fop_int_sub  = f_op EcCoreLib.p_int_sub  [] (tfun tint  (tfun tint ty_int))
-let fop_int_pow  = f_op EcCoreLib.p_int_sum  [] (tfun tint  (tfun tint ty_int))
+let fop_int_pow  = f_op EcCoreLib.p_int_pow  [] (tfun tint  (tfun tint ty_int))
 let fop_real_le   = f_op EcCoreLib.p_real_le   [] (tfun treal (tfun treal ty_bool))
 let fop_real_lt   = f_op EcCoreLib.p_real_lt   [] (tfun treal (tfun treal ty_bool))
-let fop_real_sum  = f_op EcCoreLib.p_real_sum  [] (tfun treal (tfun treal treal))
+let fop_real_add  = f_op EcCoreLib.p_real_add  [] (tfun treal (tfun treal treal))
 let fop_real_sub  = f_op EcCoreLib.p_real_sub  [] (tfun treal (tfun treal treal))
 let fop_real_prod = f_op EcCoreLib.p_real_prod [] (tfun treal (tfun treal treal))
 let fop_real_div  = f_op EcCoreLib.p_real_div  [] (tfun treal (tfun treal treal))
@@ -610,9 +610,24 @@ let f_int_binop op f1 f2 =
   f_app op [f1; f2] ty_int
 
 let f_int_prod = f_int_binop fop_int_prod
-let f_int_sum  = f_int_binop fop_int_sum
+let f_int_add  = f_int_binop fop_int_add
 let f_int_sub  = f_int_binop fop_int_sub
 let f_int_pow  = f_int_binop fop_int_pow
+
+let fop_int_intval = f_op EcCoreLib.p_int_intval [] (tfun tint (tfun tint (tfset tint)))
+
+let f_int_intval k1 k2 = 
+  assert (ty_equal k1.f_ty tint);
+  assert (ty_equal k2.f_ty tint);
+  f_app fop_int_intval [k1;k2] (tfset tint)
+
+let fop_int_sum ty = f_op EcCoreLib.p_int_sum [ty] (tfun (tfun tint ty) (tfun (tfset tint) ty))
+
+let f_int_sum op intval ty =
+  assert (ty_equal op.f_ty (tfun tint ty));
+  assert (ty_equal intval.f_ty (tfset tint));
+  f_app (fop_int_sum treal) [op;intval] ty
+
 
 (* -------------------------------------------------------------------- *)
 let f_real_cmp cmp f1 f2 =
@@ -628,7 +643,7 @@ let f_real_binop op f1 f2 =
   assert (ty_equal f2.f_ty treal);
   f_app op [f1; f2] ty_real
 
-let f_real_sum  = f_real_binop fop_real_sum
+let f_real_add  = f_real_binop fop_real_add
 let f_real_sub  = f_real_binop fop_real_sub
 let f_real_prod = f_real_binop fop_real_prod
 let f_real_div  = f_real_binop fop_real_div
@@ -1288,7 +1303,7 @@ let can_subst f =
 (* -------------------------------------------------------------------- *)
 let rec gcd a b = if b = 0 then a else gcd b (a mod b)
 
-let rec f_real_sum_simpl f1 f2 =
+let rec f_real_add_simpl f1 f2 =
   match f1.f_node, f2.f_node with
     | Fapp (op1,[{f_node=Fint n1}]), Fapp (op2,[{f_node=Fint n2}]) 
       when f_equal f_op_real_of_int op1 && f_equal f_op_real_of_int op2 ->

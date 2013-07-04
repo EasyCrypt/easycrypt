@@ -27,8 +27,9 @@ CHECK     = scripts/runtest.py --bin-args="$(ECARGS)" config/tests.config
 
 # --------------------------------------------------------------------
 .PHONY: all build byte native tests check check-xunit examples tags
-.PHONY: clean install uninstall dist distcheck why3
-.PHONY: pg toolchain update-toolchain %.ml %.mli %.inferred.mli
+.PHONY: clean install uninstall uninstall-purge dist distcheck why3
+.PHONY: pg toolchain update-toolchain provers
+.PHONY: %.ml %.mli %.inferred.mli
 
 all: build
 
@@ -44,25 +45,46 @@ byte: tags
 native: tags
 	$(call do-build,src/ec.native)
 
-install: ec.native
+define check-for-staled-files
+	if [ -d "$(DESTDIR)$(PREFIX)/lib/easycrypt/" ]; then   \
+	  cd "$(DESTDIR)$(PREFIX)/lib/easycrypt/" &&           \
+	    find theories -type f -name '*.ec' 2>/dev/null |   \
+	    sed 's/^/!! FOUND STALED FILE: /';                 \
+	fi
+endef
+
+define install-theories
+	$(INSTALL) -m 0755 -d $(DESTDIR)$(PREFIX)/lib/easycrypt/theories/$(1)
+	$(INSTALL) -m 0644 -t $(DESTDIR)$(PREFIX)/lib/easycrypt/theories/$(1) $(2)
+endef
+
+install: ec.native uninstall
+	-@$(call check-for-staled-files)
 	$(INSTALL) -m 0755 -d $(DESTDIR)$(PREFIX)/bin
 	$(INSTALL) -m 0755 -T ec.native $(DESTDIR)$(PREFIX)/bin/easycrypt
-	$(INSTALL) -m 0755 -d $(DESTDIR)$(PREFIX)/lib/easycrypt/theories
-	$(INSTALL) -m 0644 -t $(DESTDIR)$(PREFIX)/lib/easycrypt/theories $(THEORIES)
-	$(INSTALL) -m 0755 -d $(DESTDIR)$(PREFIX)/lib/easycrypt/theories/prelude
-	$(INSTALL) -m 0644 -t $(DESTDIR)$(PREFIX)/lib/easycrypt/theories/prelude $(PRELUDE)
-	$(INSTALL) -m 0755 -d $(DESTDIR)$(PREFIX)/lib/easycrypt/theories/realizations
-	$(INSTALL) -m 0644 -t $(DESTDIR)$(PREFIX)/lib/easycrypt/theories/realizations $(REALIZED)
+	$(call install-theories,,$(THEORIES))
+	$(call install-theories,prelude,$(PRELUDE))
+	$(call install-theories,realizations,$(REALIZED))
+
+define rmdir
+	-	@if [ -d "$(1)" ]; then rmdir "$(1)"; fi
+endef
+
+define uninstall-theories
+	rm -f $(patsubst %,$(DESTDIR)$(PREFIX)/lib/easycrypt/%,$(2))
+	$(call rmdir,$(DESTDIR)$(PREFIX)/lib/easycrypt/theories/$(1))
+endef
 
 uninstall:
 	rm -f $(DESTDIR)$(PREFIX)/bin/easycrypt
-	rm -f $(patsubst %,$(DESTDIR)$(PREFIX)/lib/easycrypt/%,$(PRELUDE))
-	rm -f $(patsubst %,$(DESTDIR)$(PREFIX)/lib/easycrypt/%,$(REALIZED))
-	rm -f $(patsubst %,$(DESTDIR)$(PREFIX)/lib/easycrypt/%,$(THEORIES))
-	-@rmdir $(DESTDIR)$(PREFIX)/lib/easycrypt/theories/prelude
-	-@rmdir $(DESTDIR)$(PREFIX)/lib/easycrypt/theories/realizations
-	-@rmdir $(DESTDIR)$(PREFIX)/lib/easycrypt/theories
-	-@rmdir $(DESTDIR)$(PREFIX)/lib/easycrypt
+	$(call uninstall-theories,realizations,$(REALIZED))
+	$(call uninstall-theories,prelude,$(PRELUDE))
+	$(call uninstall-theories,,$(THEORIES))
+	$(call rmdir,$(DESTDIR)$(PREFIX)/lib/easycrypt)
+
+uninstall-purge:
+	rm  -f $(DESTDIR)$(PREFIX)/bin/easycrypt
+	rm -rf $(DESTDIR)$(PREFIX)/lib/easycrypt
 
 tests: check
 
@@ -124,16 +146,25 @@ distcheck: dist
 
 # --------------------------------------------------------------------
 pg:
-	$(MAKE) -C proofgeneral run-local
+	if [ -d _tools ]; then $$(./scripts/activate-toolchain.sh); fi; \
+	  $(MAKE) -C proofgeneral run-local
 
 # --------------------------------------------------------------------
 TOOLCHAIN_URL := http://ci.easycrypt.info/scripts/ec-build-toolchain
 
 toolchain:
-	bash ./scripts/ec-build-toolchain
+	export OPAMVERBOSE=1; bash ./scripts/ec-build-toolchain
 
 update-toolchain:
-	$$(./scripts/activate-toolchain.sh) \
+	export OPAMVERBOSE=1; $$(./scripts/activate-toolchain.sh) \
 	  && opam update  -y \
 	  && opam remove  -y ec-toolchain \
 	  && opam install -y ec-toolchain
+
+provers:
+	export OPAMVERBOSE=1; $$(./scripts/activate-toolchain.sh) \
+	  && opam update  -y \
+	  && opam remove  -y ec-provers \
+	  && opam install -y ec-provers \
+	  && rm -f _tools/why3.local.conf \
+	  && why3config --detect -C _tools/why3.local.conf

@@ -1,7 +1,7 @@
 require import Int.
 require import Real.
-require import Map.
-
+require import Map. import OptionGet.
+require import Set.
 
 
 type from.
@@ -21,34 +21,32 @@ module type Adv(Foo : O) = {
   fun g() : unit
 }.
 
+require import List.
+
 module O : O = {
   var bad : bool
-  var counter : int
   var m : (from, to) map
+  var s : to list
 
   fun init() : unit = {
     bad = false;
-    m = empty;
-    counter = 0;
+    m = Map.empty;
+    s = [];
   }
 
   fun o(x:from) : to = {
     var y : to;
     var r : to;
-    if (counter < qO) {
-      counter = counter + 1;
-      y = $dsample;
-      if (in_rng y m) bad = true;
-      if (!in_dom x m) {
-        m.[x] = y;
-      }
-      r = proj (m.[x]);
-    } else {
-      r = default;
-    }
-      return r;
-  }
 
+    if (length s < qO ) {
+      y = $dsample;
+      if (List.mem y s) bad = true;
+      if (!in_dom x m) m.[x] = y;
+      s = y :: s;
+    }
+    r = proj (m.[x]);
+    return r;
+  }
 }.
  
 
@@ -63,26 +61,55 @@ module M(A:Adv)  = {
 }
 .
 
+require import Sum.
+axiom qO_pos : 0 < qO.
+
+require import Distr.
+
+(* BUG: this returns a weird error message *) 
+(* axiom distr_ax : *)
+(*   forall (s: to set), *)
+(*   (mu dsample (lambda (z : to), Set.mem z s)) ((card s)%r * bd). *)
+
+axiom distr_ax :
+  forall (s: to list),
+  (mu dsample (lambda (z : to), mem z s)) = ((length s)%r * bd).
 
 lemma test : forall (A<:Adv), forall &m,
-Pr[M(A).main() @ &m : O.bad /\ O.counter <= qO] <= qO%r * (qO-1)%r * bd.
+Pr[M(A).main() @ &m : O.bad /\ (length O.s) <= qO] <= qO%r * (qO-1)%r * bd.
 intros A &m.
-fel 1 (O.counter) bd qO (O.bad) (O.counter < qO).
-(* *)
-smt.
-(* *)
-trivial.
-call ( _ : true ==> !O.bad /\ O.counter = 0);
-  [fun;wp; skip; trivial| skip; trivial].
-(* with probability reasoning *)
+fel 1 (length O.s) (lambda x, (x%r)*bd) qO O.bad (length O.s < qO).
+  (* subgoal on sum *)
   admit.
-(* *)
-intros c; fun.
-if; [wp;rnd;wp;skip;smt|wp;skip;smt].
-(* *)
-intros b c;fun.
-if; [wp;rnd;wp;skip;smt|wp;skip;smt].
+  (* event holds as postcondition *)
+  trivial.
+  (* initialization of bad and counter *)
+  inline O.init; wp; skip; smt.
+  (* sugoals for oracle o *)
+
+  (** pr of setting bad *)
+  fun.
+  if;[|admit]. (* trivial, but missing tactic *)
+  wp.
+  simplify.
+  rnd ((length O.s)%r * bd) (lambda z, mem z O.s).
+  skip; simplify.
+  intros &hr H.
+   rewrite distr_ax.
+   smt.
+
+   (** counter increases *)
+   intros c.
+   fun.
+   if;[wp;rnd;skip;smt|wp; skip; smt].
+
+   (** last subgoal for oracle *)
+   intros b c.   
+   fun.
+   if; [wp;rnd;skip;smt|wp; skip; trivial].
 save.
+
+
 
 
 

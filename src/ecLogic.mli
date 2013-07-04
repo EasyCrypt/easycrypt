@@ -126,7 +126,7 @@ val t_right : tactic
 
 val t_congr : form -> (form * form) list * EcTypes.ty -> tactic
 
-val t_smt : bool -> EcProvers.prover_infos -> tactic
+val t_smt : strict:bool -> usehyps:bool -> EcProvers.prover_infos -> tactic
 
 val t_cut : form -> tactic
 
