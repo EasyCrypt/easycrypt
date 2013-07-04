@@ -909,13 +909,14 @@ let t_bdHoare_app dir i phi bd_info g =
       let a = f_hoareS bhs.bhs_m bhs.bhs_pr (stmt s1) phi in
       let b = f_bdHoareS_r { bhs with bhs_pr = phi; bhs_s = stmt s2} in
       prove_goal_by [a;b] (RN_hl_append (dir, Single i,phi,bd_info)) g
-    | AppMult (f1,f2,g1,g2), FHle ->
+    | AppMult (s,f1,f2,g1,g2), FHle ->
+      let goal_s = f_hoareS bhs.bhs_m bhs.bhs_pr (stmt s1) s in
       let a1 = f_bdHoareS_r { bhs with bhs_po = phi; bhs_s = stmt s1; bhs_bd=f1}  in
-      let b1 = f_bdHoareS_r { bhs with bhs_pr = phi; bhs_s = stmt s2; bhs_bd=f2} in
+      let b1 = f_bdHoareS_r { bhs with bhs_pr = f_and s phi; bhs_s = stmt s2; bhs_bd=f2} in
       let a2 = f_bdHoareS_r { bhs with bhs_po = f_not phi; bhs_s = stmt s1; bhs_bd=g1}  in
-      let b2 = f_bdHoareS_r { bhs with bhs_pr = f_not phi; bhs_s = stmt s2; bhs_bd=g2} in
+      let b2 = f_bdHoareS_r { bhs with bhs_pr = f_and s (f_not phi); bhs_s = stmt s2; bhs_bd=g2} in
       let bd_g = f_real_le (f_real_add (f_real_prod f1 f2) (f_real_prod g1 g2)) bhs.bhs_bd in
-      prove_goal_by [a1;b1;a2;b2;bd_g] (RN_hl_append (dir, Single i,phi,bd_info)) g
+      prove_goal_by [goal_s;a1;b1;a2;b2;bd_g] (RN_hl_append (dir, Single i,phi,bd_info)) g
 
     | _, FHle when dir <>Backs -> 
       cannot_apply "app" 

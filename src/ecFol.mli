@@ -111,7 +111,7 @@ and pr = memory * EcPath.xpath * form list * form
 type app_bd_info =
 | AppNone
 | AppSingle of form
-| AppMult   of (form * form * form * form)
+| AppMult   of (form * form * form * form * form)
 
 (* -------------------------------------------------------------------- *)
 val f_equal   : form -> form -> bool

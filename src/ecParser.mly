@@ -1617,7 +1617,7 @@ occurences:
 app_bd_info:
   | empty { PAppNone }
   | f=sform { PAppSingle f }
-  | f1=sform f2=sform g1=sform g2=sform { PAppMult (f1,f2,g1,g2) }
+  | s=sform f1=sform f2=sform g1=sform g2=sform { PAppMult (s,f1,f2,g1,g2) }
 
 logtactic:
 | ASSUMPTION
