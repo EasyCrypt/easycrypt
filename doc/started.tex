@@ -1,35 +1,35 @@
 % !TeX root = easycrypt.tex
 
 \chapter{Getting Started}
-\section{Installing and running \EC}
-A nightly build of \EC is available from \url{http://ci.easycrypt.info/nightly}
+\section{Installing and running \EasyCrypt}
+A nightly build of \EasyCrypt is available from \url{http://ci.easycrypt.info/nightly}
 and contains several scripts facilitating installation on Mac and Debian-based
 Linux distributions. Windows is currently not supported, even via Cygwin.
 
-\subsection{Building \EC}
-There are two ways of resolving \EC's build dependencies. The first one is to
+\subsection{Building \EasyCrypt}
+There are two ways of resolving \EasyCrypt's build dependencies. The first one is to
 build a local toolchain, the second one is to manually install all dependencies.
 Once the dependencies are resolved using either one of the methods below,
-\EC can easily be built by calling \texttt{make} in the relevant directory.
+\EasyCrypt can easily be built by calling \texttt{make} in the relevant directory.
 
 \paragraph{Using the local toolchain}
 It is possible, starting from a machine with only \texttt{make}, \texttt{gcc}
-and \texttt{curl} to get a full installation of \EC up and running. After
+and \texttt{curl} to get a full installation of \EasyCrypt up and running. After
 decompressing the nightly tarball, running \texttt{make toolchain} will fetch
-and locally build the latest version of Ocaml and \EC's dependencies. Once
+and locally build the latest version of Ocaml and \EasyCrypt's dependencies. Once
 built, the toolchain can be activated with \texttt{sh scripts/activate-toolchain.sh}
-(and will need to be activated in such a way each time you wish to rebuild \EC
+(and will need to be activated in such a way each time you wish to rebuild \EasyCrypt
 in a new terminal).
 
 \paragraph{Manual installation}
 Feel free to resolve dependencies yourself, although we can only offer limited
 support in this case. The readme file included in the distribution contains an
-up to date list of \EC's build dependencies.
+up to date list of \EasyCrypt's build dependencies.
 
 \subsection{Installing and configuring provers}
 Our core libraries make use of three SMT solvers: Z3~\cite{}, Alt-Ergo~\cite{}
 and Eprover~\cite{}, that have complementary strengths and weaknesses. We
-recommend that any user of \EC have at least those three solvers installed and
+recommend that any user of \EasyCrypt have at least those three solvers installed and
 configured, and expect that other solvers will often be required for specific
 cases. Once installed, provers should be detected by \WhyThree using
 \texttt{why3config --detect}.
@@ -44,20 +44,20 @@ installation. This may initially take some time, but greatly simplifies the
 installation process. If you prefer to install provers yourself, some links are
 provided in the distribution's readme file.
 
-\subsection{\EC's interactive mode}
-\EC's interactive mode uses emacs 23.3 or higher. A script is included in the
+\subsection{\EasyCrypt's interactive mode}
+\EasyCrypt's interactive mode uses emacs 23.3 or higher. A script is included in the
 distribution, that performs a local installation of ProofGeneral and runs emacs
-using these. This is the recommended way of using \EC, but nothing should
-prevent you from performing a global install of ProofGeneral's \EC mode. We
+using these. This is the recommended way of using \EasyCrypt, but nothing should
+prevent you from performing a global install of ProofGeneral's \EasyCrypt mode. We
 cannot, however, guarantee that we will solve all configuration problems that
 may arise from doing so.
 
 \paragraph{Locally installing the ProofGeneral files}
 From the main folder, run \texttt{make -C proofgeneral local} to download the
-latest version of ProofGeneral and compile it, along with the relevant \EC files
+latest version of ProofGeneral and compile it, along with the relevant \EasyCrypt files
 for your installed version of emacs.
 
-\paragraph{Running \EC in interactive mode}
+\paragraph{Running \EasyCrypt in interactive mode}
 From the main folder, run \texttt{make pg \&} to start up a new instance of emacs
 using the local install of ProofGeneral.
 
@@ -66,7 +66,7 @@ Please use the GForge tracker
 (\url{https://gforge.inria.fr/tracker/?group_id=2622}, requires an account at
 GForge) to report bugs and unsightly behaviours.
 
-\section{Basic Example (Tutorial)\label{sec:tutorial}}
+\section{A Basic Example: Public-Key Encryption\label{sec:tutorial}}
 In this section we present a formalization of the proof of security
 against chosen plaintext attacks of a public-key encryption scheme
 introduced by \citet{br93}.
@@ -79,7 +79,7 @@ the adversary) that succeds in inverting the underlying trapdoor
 permutation with at least as much probability.
 
 While the proof of this scheme is not involved, it allows us to
-introduce several features of \EC both on the modelling and on
+introduce several features of \EasyCrypt both on the modelling and on
 the proving side.
 
 On the modelling side, we will describe how to define abstract operators
@@ -92,10 +92,10 @@ of events in games.
 
 \subsection{Setting}
 We begin by introducing some basic concepts of cryptography and how we
-model them in \EC.
+model them in \EasyCrypt.
 
 \paragraph{Bitstrings}
-As part of its standard library, \EC provides a theory of fixed-length
+As part of its standard library, \EasyCrypt provides a theory of fixed-length
 bitstrings coined \ec{Word}. For the purpose of this example, we will
 need bitstrings of three different lengths, \ec{k} for messages,
 \ec{l} for randomness and \ec{n} for ciphers; such that \ec{k + l =
@@ -159,7 +159,7 @@ $\KG$, $f_{pk}$ and $f^{-1}_{sk}$ are permutations on
 \ec{T} and inverse of each other. 
 
 In this case, we are interested in trapdoor permutations on type
-\ec{randomness}. In \EC we model them as follows
+\ec{randomness}. In \EasyCrypt we model them as follows
 
 \ecimport{ }{../examples/br93_tutorial.ec}{one_way}
 
@@ -203,7 +203,7 @@ $(\KG,\Enc,\Dec)$:
 We require that for pairs of keys $(pk,sk)$ generated by $\KG$,
 $\Dec_{sk}(\Enc_{pk}(m))= m$ holds for any message $m$. 
 
-In \EC, we model public-key encryption schemes in the following way
+In \EasyCrypt, we model public-key encryption schemes in the following way
 
 \ecimport{ }{../examples/br93_tutorial.ec}{scheme}
 
@@ -244,7 +244,7 @@ randomness. Afterwards, we query the oracle with the randomness and
 xor the result with the second part of \ec{c}.
 
 \paragraph{The \textsf{IND-CPA} experiment}
-The CPA experiment can be described in \EC as follows:
+The CPA experiment can be described in \EasyCrypt as follows:
 
 \ecimport{ }{../examples/br93_tutorial.ec}{cpa}
 
@@ -285,7 +285,7 @@ $\frac{1}{2}$. What we are measuring is essentially how much better
 can an adversary do, and we are bounding it in terms of the
 probability of suceeding in the one-way experiment.
 
-This property is formalized in \EC as follows
+This property is formalized in \EasyCrypt as follows
 
 \ecimport{ }{../examples/br93_tutorial.ec}{conclusion}
 
@@ -310,7 +310,7 @@ in initial memory \ec{m}. These two expressions are of type real and
 the \ec{<=} real less or equal operator.
 
 The rest of the tutorial is devoted to introducing and explaining the
-reasoning principles of \EC required to establih this property.
+reasoning principles of \EasyCrypt required to establih this property.
 %TODO: put forward pointers to françois' and guillaume's section
 
 \subsection{Overview of the proof}
@@ -585,7 +585,7 @@ as follows
 
 We can prove that the results of the two versions of the encryption
 are indistinguishable resorting to optimistic sampling. The following
-\EC script shows the desired property
+\EasyCrypt script shows the desired property
 
 \ecimport{ }{../examples/br93_tutorial.ec}{eq2enc}
 
@@ -632,7 +632,7 @@ follows
 \ecimport{ }{../examples/br93_tutorial.ec}{cpa2}
 
 Again, we are interested in showing the equivalence of the events of
-interest. In \EC we carry out this step in the following way
+interest. In \EasyCrypt we carry out this step in the following way
 \ecimport{ }{../examples/br93_tutorial.ec}{eq3}
 
 The key step in this case, is \ec{swap{2} -2}. This tactic moves the
