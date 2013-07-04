@@ -560,7 +560,7 @@ let pp_let (ppe : PPEnv.t) pp_sub outer fmt (pt, e1, e2) =
     let ids    = lp_ids pt in
     let subppe = PPEnv.add_locals ppe ids in
       Format.fprintf fmt "@[<hov 0>let %a =@;<1 2>@[%a@]@ in@ %a@]"
-        (pp_tuple `ForBinding ppe (fun ppe _ -> pp_local ppe)) ids
+        (pp_tuple `ForBinding subppe (fun ppe _ -> pp_local ppe)) ids
         (pp_sub ppe (e_bin_prio_letin, `NonAssoc)) e1
         (pp_sub subppe (e_bin_prio_letin, `NonAssoc)) e2
   in
