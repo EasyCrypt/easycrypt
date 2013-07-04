@@ -640,6 +640,8 @@ module Mpv2 = struct
         let f2' = NormMp.norm_glob env mr mpr in
         if f_equal f1 f1' && f_equal f2 f2' then add_glob env mpl mpr eqs 
         else aux (f_eq f1' f2') eqs
+      | SFeq({f_node = Ftuple fs1}, {f_node = Ftuple fs2}) ->
+        List.fold_left2 (fun eqs f1 f2 -> aux (f_eq f1 f2) eqs) eqs fs1 fs2
       | SFand(_, (f1, f2)) -> aux f1 (aux f2 eqs)
       | _ -> raise Not_found in
     aux f empty 
