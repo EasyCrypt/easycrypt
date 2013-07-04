@@ -1,5 +1,5 @@
 require import Map.
-require import Set.
+require import FSet.
 require import Int.
 require import Distr.
 require import Bool.
@@ -49,7 +49,7 @@ module RO:Oracle,ARO = {
  var s : randomness set
  fun init() : unit = {
   m = Map.empty;
-  s = Set.empty;
+  s = FSet.empty;
  }
  fun o(x:randomness) : plaintext = {
   var y : plaintext;
@@ -59,8 +59,8 @@ module RO:Oracle,ARO = {
  }
  fun o_a(x : randomness) : plaintext ={
   var y : plaintext;
-  if (Set.card s < qO) {
-   s = Set.add x s;
+  if (FSet.card s < qO) {
+   s = FSet.add x s;
    y =o(x);
   } else {y = Plaintext.zeros;}
   return y;
@@ -344,7 +344,7 @@ proof.
  cut H:
  (Pr[CPA(BR2,A).main() @ &m : res \/ mem Rnd.r RO.s] =
   Pr[CPA(BR2,A).main() @ &m : res] +  Pr[CPA(BR2,A).main() @ &m : mem Rnd.r RO.s] -
-  Pr[CPA(BR2,A).main() @ &m : res /\ mem Rnd.r RO.s]);[pr_or|];smt.
+  Pr[CPA(BR2,A).main() @ &m : res /\ mem Rnd.r RO.s]);[rewrite Pr mu_or|];smt.
 qed.
 (** end prob1 *)
 

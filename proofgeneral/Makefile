@@ -63,4 +63,4 @@ run-local:
 	  --execute '(load-file "$(CURDIR)/emacs.local.rc")' \
 	  --execute '(cd "$(CURDIR)/..")' \
 	  --execute '(setq easycrypt-prog-name "$(CURDIR)/../ec.native -emacs")' \
-	  --no-init-file
+	  --no-init-file --no-site-file

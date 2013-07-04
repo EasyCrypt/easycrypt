@@ -43,12 +43,13 @@ let process_prhl_formula = process_prhl_form tbool
 let process_phl_bd_info g bd_info = match bd_info with
   | PAppNone -> AppNone
   | PAppSingle f -> AppSingle (process_phl_form treal g f)
-  | PAppMult(f1,f2,f3,f4) ->
+  | PAppMult(s,f1,f2,f3,f4) ->
+    let s  = process_phl_formula    g s  in
     let f1 = process_phl_form treal g f1 in
     let f2 = process_phl_form treal g f2 in
     let f3 = process_phl_form treal g f3 in
     let f4 = process_phl_form treal g f4 in
-    AppMult(f1,f2,f3,f4)
+    AppMult(s,f1,f2,f3,f4)
 
 let process_app dir k phi bd_info g =
   let concl = get_concl g in

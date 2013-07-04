@@ -303,7 +303,7 @@ lemma Pr4_aux (A<:Adv) :
 proof.
  intros Ha1 Ha2.
  fun.
- rnd (1%r / 2%r) (= b').
+ rnd (1%r / 2%r) ((=) b').
  conseq  (_ : ==> true) .
  intros &m;progress.
  apply (Dbool.mu_x_def (b'{m})).

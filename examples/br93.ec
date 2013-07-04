@@ -2,7 +2,7 @@ require import RandOrcl.
 require import Array.
 require import Bitstring.
 require import Map.
-require import Set.
+require import FSet.
 require import ISet.
 require import Int.
 require import Distr.

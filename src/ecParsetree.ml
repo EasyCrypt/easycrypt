@@ -324,7 +324,7 @@ type call_info =
    AppNone is required for the rest of judgments 
 *)
 type p_app_bd_info = PAppNone | PAppSingle of pformula 
-                   | PAppMult of (pformula * pformula * pformula * pformula)
+                   | PAppMult of (pformula * pformula * pformula * pformula * pformula)
 
 type tac_dir = Backs | Fwds
  
