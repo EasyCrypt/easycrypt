@@ -44,3 +44,5 @@ val pp_path  : EcPath.path pp
 
 val pp_equivS : PPEnv.t -> EcFol.equivS pp
 val pp_goal   : PPEnv.t -> (int * EcBaseLogic.l_decl) pp
+
+val pp_instr : PPEnv.t -> EcModules.instr pp 
