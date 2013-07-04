@@ -828,7 +828,6 @@ let t_generalize_hyps clear ids g =
     t_seq (t_generalize_hyps ids) (t_clear (EcIdent.Sid.of_list ids)) g
   else t_generalize_hyps ids g
 
-
 let t_elimT f p g =
   let hyps,concl = get_goal g in
   let ax = EcEnv.Ax.by_path p (LDecl.toenv hyps) in
@@ -1201,7 +1200,7 @@ let t_congr f (args, ty) g =
 
 
 (* -------------------------------------------------------------------- *)
-
-let t_trivial = 
-  t_or (t_lseq [t_progress (t_id None); t_assumption;t_fail])
+let t_trivial =
+  t_or
+    (t_lseq [t_progress (t_id None); t_assumption; t_fail])
     (t_id None)

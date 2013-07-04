@@ -378,8 +378,6 @@ type rwarg =
 
 and rwside = [`LtoR | `RtoL]
 and rwocc  = Sint.t option
-and renaming = [`noName | `findName | `withRename of string |
-  `noRename of string]
 
 type intropattern1 =
   | IPCore  of renaming located
@@ -390,6 +388,10 @@ type intropattern1 =
   | IPSimplify
 
 and intropattern = intropattern1 list
+
+and renaming = [
+  `NoName | `FindName | `WithRename of string | `NoRename of string
+]
 
 type logtactic =
   | Passumption of (pqsymbol option * ptyannot option)
