@@ -409,7 +409,9 @@ let rec f_write ?(except_fs=Sx.empty) env w f =
   match func.f_def with
   | FBabs oi ->
     let mp = get_abs_functor f in
-    List.fold_left (fun w o -> if Sx.mem o except_fs then w else f_write env w o)
+    List.fold_left (fun w o -> 
+      if Sx.mem o except_fs then w 
+      else f_write ~except_fs env w o)
       (PV.add_glob env mp w) oi.oi_calls
   | FBdef fdef ->
     s_write ~except_fs env w fdef.f_body

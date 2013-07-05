@@ -1933,25 +1933,29 @@ let t_rcond side b at_pos g =
 
 (* takes an xpath, returns xpath set *)
 let rec callable_oracles_f env modv os f =
-  let f = NormMp.norm_xpath env f in
-  let func = Fun.by_xpath f env in
-  let called_fs = 
-    match func.f_def with
-      | FBabs oi ->
+  let f' = NormMp.norm_xpath env f in
+  let func = Fun.by_xpath f' env in
+  match func.f_def with
+    | FBabs oi ->
+      let called_fs = 
         List.fold_left (fun s o -> 
           if PV.indep env modv (f_write env o) then s else EcPath.Sx.add o s)
           EcPath.Sx.empty oi.oi_calls
-      | FBdef fdef ->
+      in
+      List.fold_left (callable_oracles_f env modv)  os (EcPath.Sx.elements called_fs)
+        
+    | FBdef fdef ->
+      let called_fs = 
         List.fold_left (fun s o -> 
           if PV.indep env modv (f_write env o) then s else EcPath.Sx.add o s)
           EcPath.Sx.empty fdef.f_uses.us_calls
-  in
-  let f_written = f_write ~except_fs:called_fs env f in
-  if PV.indep env f_written modv then
-    List.fold_left (callable_oracles_f env modv)  os (EcPath.Sx.elements called_fs)
-  else
-    EcPath.Sx.add f os
-  
+      in
+      let f_written = f_write ~except_fs:called_fs env f in
+      if PV.indep env f_written modv then
+        List.fold_left (callable_oracles_f env modv)  os (EcPath.Sx.elements called_fs)
+      else
+        EcPath.Sx.add f os
+          
 and callable_oracles_s env modv os s =
   callable_oracles_is env modv os s.s_node
 and callable_oracles_is env modv os is = 
@@ -1984,9 +1988,11 @@ let t_failure_event at_pos cntr ash q f_event pred_specs g =
       let fv = PV.fv env mhr f_event in
       let os = callable_oracles_stmt env fv (stmt s_tl) in
       (* check that bad event is only modified in oracles *)
-      (* let fv = PV.fv env mhr f_event in *)
-      (* if not (PV.indep env (s_write ~except_fs:os env (stmt s_tl)) (fv) ) then *)
-      (*   cannot_apply "fel" "fail event is modified outside oracles"; *)
+      let fv = PV.fv env mhr f_event in
+      let written_except_os = s_write ~except_fs:os env (stmt s_tl) in
+      if not (PV.indep env written_except_os fv ) then
+        tacuerror "fail event is modified outside oracles, ie: @. @[%a@] is not disjoint to @[%a@]@." 
+          (PV.pp env) written_except_os (PV.pp env) fv;
       (* subgoal on the bounds *)
       let bound_goal = 
         let intval = f_int_intval (f_int 0) (f_int_sub q (f_int 1)) in
