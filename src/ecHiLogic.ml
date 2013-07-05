@@ -904,24 +904,36 @@ let process_pose loc xsym o p g =
   let (hyps, concl) = get_goal g in
   let env = LDecl.toenv hyps in
   let (ps, ue) = (ref Mid.empty, unienv_of_hyps hyps) in
-  let p = TT.trans_pattern env (ps, ue) p in
-  let ev = EV.of_idents (Mid.keys !ps) in
+  let p   = TT.trans_pattern env (ps, ue) p in
+  let ids = Mid.keys !ps in
+  let ev  = EV.of_idents ids in
 
-  let (_ue, tue, ev) =
+  let (_ue, tue, ev, dopat) =
     match try_match hyps (ue, ev) p concl with
-    | None   -> tacuerror "cannot find an occurence for [pose]"
-    | Some x -> x
+    | Some (ue, tue, ev) -> (ue, tue, ev, true)
+    | None -> begin
+        let ids = List.map (fun x -> `UnknownVar (x, ())) ids in
+        if not (can_concretize_pterm_arguments (ue, ev) ids) then
+          tacuerror "cannot find an occurence for [pose]";
+        let ue = EcUnify.UniEnv.copy ue in
+          (ue, EcUnify.UniEnv.close ue, ev, false)
+    end
   in
 
-  let p    = concretize_form (tue, ev) p in
-  let cpos =
-    try  FPosition.select_form hyps o p concl
-    with InvalidOccurence -> tacuerror "invalid occurence selector"
+  let p = concretize_form (tue, ev) p in
+  let (x, letin) =
+    match dopat with
+    | false -> (EcIdent.create (unloc xsym), concl)
+    | true  -> begin
+        let cpos =
+          try  FPosition.select_form hyps o p concl
+          with InvalidOccurence -> tacuerror "invalid occurence selector"
+        in
+          FPosition.topattern ~x:(EcIdent.create (unloc xsym)) cpos concl
+    end
   in
 
-  let (x, letin) = FPosition.topattern ~x:(EcIdent.create (unloc xsym)) cpos concl in
   let letin = EcFol.f_let1 x p letin in
-
     set_loc loc
       (t_seq (t_change letin) (t_intros [mk_loc xsym.pl_loc x]))
       g
