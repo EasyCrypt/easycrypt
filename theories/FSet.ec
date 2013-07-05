@@ -465,6 +465,8 @@ case (a=x)=> ?.
       apply h2.
 save.
 
+theory Interval.
+
 op interval : int -> int -> int set.
 axiom interval_neg : forall (x y:int), x > y => interval x y = empty.
 axiom interval_pos : forall (x y:int), x <= y => interval x y = add y (interval x (y-1)).
@@ -482,6 +484,18 @@ lemma mem_interval : forall (x y a:int), (mem a (interval x y)) <=> (x <= a /\ a
   rewrite (_:j - 1 + x - 1=j - 1 - 1 + x);first smt.
   rewrite mem_add hrec.
   smt.
+save.
+
+lemma card_interval_max : forall x y, card (interval x y) = max (y - x + 1) 0.
+  intros x y.
+  case (x <= y);last smt.
+  intros h.
+  rewrite (_:interval x y=interval x (x+(y-x+1)-1));first smt.
+  rewrite (_:max (y - x + 1) 0 = y-x+1);first smt.
+  apply (Int.Induction.induction (lambda i, card (interval x (x+i-1)) = i) _ _ (y-x+1) _);[smt| |smt].
+  simplify.
+  intros j hh hrec.
+  rewrite (interval_pos x (x+j-1) _);smt.
 save.
 
 lemma dec_interval : forall (x y:int),
@@ -504,17 +518,7 @@ lemma dec_interval : forall (x y:int),
   smt.
 save.
 
-lemma card_interval_max : forall x y, card (interval x y) = max (y - x + 1) 0.
-  intros x y.
-  case (x <= y);last smt.
-  intros h.
-  rewrite (_:interval x y=interval x (x+(y-x+1)-1));first smt.
-  rewrite (_:max (y - x + 1) 0 = y-x+1);first smt.
-  apply (Int.Induction.induction (lambda i, card (interval x (x+i-1)) = i) _ _ (y-x+1) _);[smt| |smt].
-  simplify.
-  intros j hh hrec.
-  rewrite (interval_pos x (x+j-1) _);smt.
-save.
+end Interval.
 
 require import Real.
 require import Distr.
