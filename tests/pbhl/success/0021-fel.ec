@@ -75,10 +75,12 @@ axiom distr_ax :
   forall (s: to list),
   (mu dsample (lambda (z : to), mem z s)) = ((length s)%r * bd).
 
-lemma test : forall (A<:Adv), forall &m,
+lemma test : forall (A<:Adv{O}), forall &m,
 Pr[M(A).main() @ &m : O.bad /\ (length O.s) <= qO] <= qO%r * (qO-1)%r * bd.
 intros A &m.
 fel 1 (length O.s) (lambda x, (x%r)*bd) qO O.bad [O.o : (length O.s < qO /\ x=x)].
+
+
   (* subgoal on sum *)
   admit.
   (* event holds as postcondition *)

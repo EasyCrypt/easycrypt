@@ -114,33 +114,21 @@ theory Dword.
     smt.  
   qed.
 
-  lemma mu_cpMemw : 
-    forall (s : word set),
+  lemma mu_cpMemw: forall (s : word set),
     mu dword (cpMem s) = (card s)%r *( 1%r / (2^length)%r).
    proof.
     intros X;rewrite (mu_cpMem _ _ ( 1%r / (2^length)%r));last trivial.
     intros x;rewrite mu_x_def;smt.
-  save.
+  qed.
   import FSet.Dexcepted.
   
-  axiom div_pos : forall (x : real),0%r < x => 0%r < 1%r / x.
-  
-  axiom prod_pos_mon : forall (x y z : real), x < y => 0%r < z => x * z < y * z.
-  
-  axiom real_lt_trans : forall (a b c: real), 
-   a < b => b <= c => a < c.
-
-  lemma lossless_restrw : 
-    forall (X : word set),
+  lemma lossless_restrw: forall (X : word set),
     FSet.card X < 2^length =>
     weight (dword \ X) = 1%r. 
   proof.
-   intros X Hcard.
-   apply lossless_restr.
-   apply lossless. 
-   rewrite mu_cpMemw.
-   apply (real_lt_trans _ ((2^length)%r * (1%r / (2 ^ length)%r)) _);last smt.
-   apply prod_pos_mon;smt.
-  save.
-
+   intros=> X Hcard; rewrite lossless_restr ?lossless ?mu_cpMemw //;
+   (apply (real_lt_trans _ ((2^length)%r * (1%r / (2 ^ length)%r)) _);last smt);
+   (apply mulrM; last rewrite from_intM //);
+   smt.
+  qed.
 end Dword.
