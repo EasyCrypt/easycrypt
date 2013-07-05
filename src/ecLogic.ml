@@ -1248,5 +1248,5 @@ let t_congr f (args, ty) g =
 (* -------------------------------------------------------------------- *)
 let t_trivial =
   t_or
-    (t_lseq [t_progress (t_id None); t_assumption; t_fail])
+    (t_lseq [t_try t_assumption; t_progress (t_id None); t_assumption; t_fail])
     (t_id None)

@@ -523,6 +523,36 @@ end Interval.
 require import Real.
 require import Distr.
 
+
+(* General result regarding cpMem *)
+lemma mu_cpMem : 
+forall (s : 'a set, d : 'a distr, bd : real),
+(forall (x : 'a), mu_x d x = bd) =>
+mu d (cpMem s) = (card s)%r * bd.
+proof.
+ intros s;elimT set_ind s.
+ intros d bd Hmu_x.
+ rewrite (mu_eq d _ Fun.cpFalse).
+  delta Fun.(==) cpMem cpFalse;simplify;smt.
+ rewrite mu_false card_empty //; smt.
+ clear s;intros x s Hnmem IH d bd Hmu_x.
+ cut ->: (card (add x s))%r * bd = 
+          bd + (card s)%r * bd. 
+  rewrite card_add_nin //=;smt.
+ rewrite (mu_eq d _ (Fun.cpOr (Fun.cpEq x) (cpMem s))).
+ delta Fun.(==) cpMem cpOr cpEq;simplify;smt.
+ rewrite mu_or.
+ cut ->: (mu d (Fun.cpAnd (Fun.cpEq x) (cpMem s)) =
+          mu d (Fun.cpFalse)).
+  apply mu_eq;delta Fun.(==) cpMem cpFalse;simplify;smt.
+ rewrite mu_false (IH d bd _);first assumption.
+ cut ->: (mu d (Fun.cpEq x) = mu_x d x).
+  delta mu_x;simplify; apply mu_eq.
+  delta Fun.(==) cpEq;simplify;trivial.
+ rewrite Hmu_x;smt.
+save.
+
+
 (* Uniform distribution on a (finite) set *)
 theory Duni.
   op duni: 'a set -> 'a distr.
@@ -584,7 +614,7 @@ theory Dexcepted.
   save.
     
   lemma mu_x_def : forall (x:'a) d X,
-    mu_x (d \ X) x = 
+    mu_x (d \ X) x =
     (in_supp x (d \ X)) ? mu_x d x / (weight d - mu d (cpMem X)) : 0%r.
   proof.
     intros x d X; delta (\) beta; smt.
@@ -593,4 +623,16 @@ theory Dexcepted.
   lemma mu_weight_def : forall (d:'a distr) X,
     weight (d \ X) = (weight d = mu d (cpMem X)) ? 0%r : 1%r
   by [].
+    
+  lemma lossless_restr : forall (d : 'a distr) X,
+    weight d = 1%r =>
+    mu d (cpMem X) < 1%r =>
+    Distr.weight (d \ X) = 1%r. 
+  proof.
+   intros s d Hll Hmu.
+   delta (\);simplify.
+   rewrite Distr.Dscale.weight_pos;last smt.
+   rewrite Drestr.weight_def;smt.
+  save.
+
 end Dexcepted.

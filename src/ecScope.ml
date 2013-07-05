@@ -1148,7 +1148,7 @@ module Theory = struct
       hierror "cannot clone a theory while a section is active";
 
     let (name, nth) = EcThCloning.clone scope.sc_env thcl in
-    let scope = { scope with sc_env = EcEnv.Theory.bind name nth scope.sc_env; } in
+    let scope = bind scope (name, nth) in
       (name, scope)
 
   (* ------------------------------------------------------------------ *)
