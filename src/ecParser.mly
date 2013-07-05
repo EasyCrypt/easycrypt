@@ -171,6 +171,7 @@
 %token COMPUTE
 %token CONGR
 %token CONSEQ
+%token CONSEQBD
 %token EXFALSO
 %token CONST
 %token CUT
@@ -1533,6 +1534,7 @@ conseq:
 | f1=form LONGARROW f2=form     { Some f1, Some f2 }
 ;
 
+
 call_info: 
  | f1=form LONGARROW f2=form             { CI_spec (f1, f2) }
  | f=form                                { CI_inv  f }
@@ -1793,6 +1795,9 @@ phltactic:
 
 | CONSEQ nm=STAR? info=fpattern(conseq)
     { Pconseq (nm<>None, info) }
+
+| CONSEQBD bd=sform
+    { Pconseq_bd bd }
 
 | ELIM STAR { Phr_exists_elim }
 | EXIST STAR l=plist1(sform,COMMA) { Phr_exists_intro l }

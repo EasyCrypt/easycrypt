@@ -306,6 +306,31 @@ let t_bdHoareS_conseq pre post g =
   let concl3 = f_bdHoareS_r { bhs with bhs_pr = pre; bhs_po = post } in
   prove_goal_by [concl1; concl2; concl3] (RN_hl_conseq) g
 
+let t_bdHoareF_conseq_bd bd g =
+  let env,_,concl = get_goal_e g in
+  let bhf = destr_bdHoareF concl in
+  (* let mpr,mpo = EcEnv.Fun.hoareF_memenv bhf.bhf_f env in *)
+  let bd_goal = match bhf.bhf_cmp with
+    | FHle -> f_real_le bd bhf.bhf_bd
+    | FHeq -> f_eq bd bhf.bhf_bd
+    | FHge -> f_real_le bhf.bhf_bd bd
+  in
+  let concl = f_bdHoareF bhf.bhf_pr bhf.bhf_f bhf.bhf_po bhf.bhf_cmp bd in
+  prove_goal_by [bd_goal;concl] (RN_hl_conseq_bd) g  
+
+let t_bdHoareS_conseq_bd bd g =
+  let env,_,concl = get_goal_e g in
+  let bhs = destr_bdHoareS concl in
+  (* let mpr,mpo = EcEnv.Fun.hoareF_memenv bhf.bhf_f env in *)
+  let bd_goal = match bhs.bhs_cmp with
+    | FHle -> f_real_le bd bhs.bhs_bd
+    | FHeq -> f_eq bd bhs.bhs_bd
+    | FHge -> f_real_le bhs.bhs_bd bd
+  in
+  let concl = f_bdHoareS bhs.bhs_m bhs.bhs_pr bhs.bhs_s bhs.bhs_po bhs.bhs_cmp bd in
+  prove_goal_by [bd_goal;concl] (RN_hl_conseq_bd) g  
+
+
 let t_equivF_conseq pre post g =
   let env,_,concl = get_goal_e g in
   let ef = destr_equivF concl in
@@ -465,11 +490,9 @@ let t_bdHoareS_notmod post g =
   let cond2 = f_bdHoareS_r {hs with bhs_po = post} in
   prove_goal_by [cond1;cond2] RN_notmod g
 
-let t_bdHoareF_conseq_nm = 
-  gen_conseq_nm t_bdHoareF_notmod t_bdHoareF_conseq 
+let t_bdHoareF_conseq_nm = gen_conseq_nm t_bdHoareF_notmod t_bdHoareF_conseq 
 
-let t_bdHoareS_conseq_nm = 
-  gen_conseq_nm t_bdHoareS_notmod t_bdHoareS_conseq
+let t_bdHoareS_conseq_nm = gen_conseq_nm t_bdHoareS_notmod t_bdHoareS_conseq
 
 
 (* -------------------------------------------------------------------- *)
