@@ -675,6 +675,8 @@ let process_rewrite1_core (s, o) (p, typs, ue, ax) args g =
 
 (* -------------------------------------------------------------------- *)
 let process_rewrite1 loc ri g =
+  let env = LDecl.toenv (get_hyps g) in
+
   match ri with
   | RWDone b ->
       let t = if b then t_simplify_nodelta else (t_id None) in
@@ -682,6 +684,53 @@ let process_rewrite1 loc ri g =
 
   | RWSimpl ->
       t_simplify_nodelta g
+
+  | RWDelta (o, name) ->
+      let (path, tparams, body) =
+        match EcEnv.Op.lookup_opt (unloc name) env with
+        | None -> tacuerror ~loc:name.pl_loc "cannot find symbol to unfold"
+        | Some (path, op) -> begin
+            match op.EcDecl.op_kind with
+            | EcDecl.OB_oper None | EcDecl.OB_pred None ->
+                tacuerror ~loc:name.pl_loc "this operator/predicate is abstract"
+            | EcDecl.OB_oper (Some e) -> (path, op.EcDecl.op_tparams, form_of_expr EcFol.mhr e)
+            | EcDecl.OB_pred (Some f) -> (path, op.EcDecl.op_tparams, f)
+        end
+      in
+
+      let cpos =
+        let f_match _ subject =
+          match sform_of_form subject with
+          | SFop ((p, _), _) when EcPath.p_equal p path -> true
+          | _ -> false
+        in
+          FPosition.select f_match (get_concl g)
+      in
+
+      let cpos =
+        match o with
+        | None   -> cpos
+        | Some o ->
+            if not (FPosition.is_occurences_valid o cpos) then
+              tacuerror "invalid occurences selector";
+            FPosition.filter o cpos
+      in
+
+      let concl =
+        FPosition.map cpos
+          (fun fp ->
+            match sform_of_form fp with
+            | SFop ((_, tvi), args) -> begin
+              let subst = EcTypes.Tvar.init tparams tvi in
+              let body  = EcFol.Fsubst.subst_tvar subst body in
+              let fp    = f_app body args fp.f_ty in
+                try  EcReduction.h_red EcReduction.beta_red (get_hyps g) fp
+                with EcBaseLogic.NotReducible -> fp
+              end
+            | _ -> assert false)
+          (get_concl g)
+      in
+        t_change concl g
 
   | RWRw (s, r, o, pe) ->
       let do1 g =
@@ -755,20 +804,7 @@ let process_intros ?(cf = true) pis (juc, n) =
     let f       = snd (get_node (g, n)) in
       t_on_goals
         (t_clear (EcIdent.Sid.of_list [h]))
-        (t_on_first (t_use n []) (t_elim f (g, an)))
-
-  and simplify g =
-    let ri = {
-      EcReduction.beta    = true;
-      EcReduction.delta_p = None;
-      EcReduction.delta_h = None;
-      EcReduction.zeta    = true;
-      EcReduction.iota    = true;
-      EcReduction.logic   = false; 
-      EcReduction.modpath = false;
-    } in
-      t_simplify ri g
-  in
+        (t_on_first (t_use n []) (t_elim f (g, an))) in
 
   let rec collect acc core pis =
     let maybe_core () =
@@ -810,13 +846,13 @@ let process_intros ?(cf = true) pis (juc, n) =
           | `Done b   ->
               let t =
                 match b with
-                | true  -> t_seq simplify process_trivial
+                | true  -> t_seq t_simplify_nodelta process_trivial
                 | false -> process_trivial
               in
                 (nointro, t_on_goals t gs)
 
           | `Simpl ->
-              (nointro, t_on_goals simplify gs)
+              (nointro, t_on_goals t_simplify_nodelta gs)
 
           | `Clear xs ->
               (nointro, t_on_goals (process_clear xs) gs)

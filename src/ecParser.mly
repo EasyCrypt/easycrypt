@@ -1515,6 +1515,14 @@ rwarg:
 
 | s=rwside r=rwrepeat? o=rwocc? fp=fpattern(form)
     { RWRw (s, r, omap o EcMaps.Sint.of_list, fp) }
+
+| s=rwside r=rwrepeat? o=rwocc? SLASH x=qoident
+    { let loc = EcLocation.make $startpos $endpos in
+        if s <> `LtoR then
+          error loc (Some "delta-folding not supported");
+        if r <> None then
+          error loc (Some "delta-repeat not supported");
+        RWDelta (omap o EcMaps.Sint.of_list, x); }
 ;
 
 genpattern:
@@ -1548,9 +1556,9 @@ conseq:
 ;
 
 conseq_bd:
-| c=conseq                    { c, None }
-| c=conseq COLON bd=form      { c, Some bd } 
-| c= UNDERSCORE COLON bd=form { (None, None), Some bd }
+| c=conseq                 { c, None }
+| c=conseq COLON bd=form   { c, Some bd } 
+| UNDERSCORE COLON bd=form { (None, None), Some bd }
 
 call_info: 
  | f1=form LONGARROW f2=form             { CI_spec (f1, f2) }

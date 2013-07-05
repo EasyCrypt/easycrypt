@@ -475,12 +475,35 @@ let process_alias (side, cpos, id) g =
   t_alias side cpos id g
 
 let process_rnd side tac_info g =
-  let concl = get_concl g in
+  let env, _, concl = get_goal_e g in
   match side, tac_info with 
     | None, (None, None) when is_hoareS concl -> t_hoare_rnd g
     | None, (opt_bd, opt_event) when is_bdHoareS concl ->
-      let opt_bd = omap opt_bd (process_phl_form treal g)  in
-      let event ty = omap opt_event (process_phl_form (tfun ty tbool) g) in
+      let opt_bd = omap opt_bd (process_phl_form treal g) in
+      let bhs = destr_bdHoareS concl in
+      let (lv,_),_ = s_last_rnd "bd_hoare_rnd" bhs.bhs_s in
+      let m = fst bhs.bhs_m in
+      let fv = EcPV.PV.fv env m bhs.bhs_po in
+      let check_indep = 
+        match lv with
+        | LvVar (x,_) -> not (EcPV.PV.mem_pv env x fv)
+        | LvTuple pvs -> 
+          List.for_all (fun (x,_) -> not (EcPV.PV.mem_pv env x fv)) pvs
+        | LvMap(_, x,_,_) -> not (EcPV.PV.mem_pv env x fv) in
+      let opt_bd = 
+        if check_indep && bhs.bhs_cmp <> FHle then Some (odfl f_r1 opt_bd)
+        else opt_bd in
+      let event ty = 
+        match opt_event with
+        | Some ev -> Some (process_phl_form (tfun ty tbool) g ev)
+        | None ->
+          let x = EcIdent.create "x" in 
+          if check_indep then Some (f_lambda [x,GTty ty] f_true)
+          else match lv with
+          | LvVar (pv,_) -> 
+            Some (f_lambda [x,GTty ty] 
+                    (EcPV.PVM.subst1 env pv m (f_local x ty) bhs.bhs_po))
+          | _ -> None in
       t_bd_hoare_rnd (opt_bd,event) g
     | _ when is_equivS concl ->
       let process_form f ty1 ty2 = process_prhl_form (tfun ty1 ty2) g f in
