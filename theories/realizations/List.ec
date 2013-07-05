@@ -102,6 +102,17 @@ op (++)(xs ys:'a list): 'a list = fold_right (::) ys xs.
 lemma app_nil: forall (ys:'a list), [] ++ ys = ys by [].
 lemma app_cons: forall (x:'a) xs ys, (x::xs) ++ ys = x::(xs ++ ys) by [].
 
+(** rev *)
+op rev = fold_right<:'a list,'a> (lambda x xs, xs ++ (x::[])) [].
+
+(* Direct inductive definition *)
+lemma rev_nil: rev<:'a> [] = [] by [].
+
+lemma rev_cons: forall (x:'a) xs, rev (x::xs) = (rev xs) ++ (x::[]).
+proof strict.
+intros=> x xs; delta rev beta; rewrite fold_right_cons; beta=> //.
+qed.
+
 (** all *)
 pred all(p:'a cpred) xs = forall x, mem x xs => p x.
 
@@ -156,30 +167,13 @@ by intros=> p x xs;
 qed.
 
 (** map *)
-op map (f:'a -> 'b) = fold_right (lambda x xs, (f x  )::xs) [].
+op map (f:'a -> 'b) = fold_right (lambda x xs, (f x)::xs) [].
 
 (* Direct inductive definition *)
 lemma map_nil: forall (f:'a -> 'b), map f [] = [] by [].
 lemma map_cons: forall (f:'a -> 'b) x xs,
   map f (x::xs) = (f x)::(map f xs)
 by [].
-
-(** unique *)
-require import Pair.
-
-op unique: 'a list cpred =
-  list_rect true (lambda x xs v, v /\ !mem x xs).
-
-(* Direct inductive definition *)
-lemma unique_nil: unique<:'a> []
-by (delta unique beta; rewrite list_rect_nil=> //).
-
-lemma unique_cons: forall (x:'a) xs,
-  unique (x::xs) = (unique xs /\ !mem x xs).
-proof strict.
-by intros=> x xs;
-   delta unique beta; rewrite list_rect_cons; beta=> //.
-qed.
 
 (** nth *)
 require import Option.
@@ -197,3 +191,44 @@ lemma nth_cons0: forall (x:'a) xs,
 lemma nth_consN: forall (x:'a) xs n,
   0 <> n =>
   nth (x::xs) n = nth xs (n - 1) by [].
+
+(** count *)
+op count (x:'a) =
+  list_rect 0 (lambda y xs n, n + ((x = y) ? 1 : 0)).
+
+(** Direct inductive definition *)
+lemma count_nil: forall (x:'a), count x [] = 0 by [].
+
+lemma count_cons: forall (x y:'a) xs,
+  count y (x::xs) = count y xs + (if (x = y) then 1 else 0)
+by [].
+
+(** unique *)
+op unique: 'a list cpred =
+  list_rect true (lambda x xs v, v /\ !mem x xs).
+
+(* Direct inductive definition *)
+lemma unique_nil: unique<:'a> []
+by (delta unique beta; rewrite list_rect_nil=> //).
+
+lemma unique_cons: forall (x:'a) xs,
+  unique (x::xs) = (unique xs /\ !mem x xs).
+proof strict.
+by intros=> x xs;
+   delta unique beta; rewrite list_rect_cons; beta=> //.
+qed.
+
+(** rm *)
+op rm (x:'a) (xs:'a list) =
+  list_rect [] (lambda y ys v, if (x = y) then ys else y::v) xs.
+
+lemma rm_nil: forall (x:'a), rm x [] = [] by [].
+lemma rm_cons: forall (x y:'a) xs,
+  rm y (x::xs) = ((x = y) ? xs : (x::rm y xs))
+by [].
+
+(** Equality up to permutation *)
+pred (<->) (xs xs':'a list) =
+  forall (x:'a), count x xs = count x xs'.
+
+lemma toto: forall (a b c:bool), (a \/ b) \/ c.
