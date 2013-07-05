@@ -306,29 +306,29 @@ let t_bdHoareS_conseq pre post g =
   let concl3 = f_bdHoareS_r { bhs with bhs_pr = pre; bhs_po = post } in
   prove_goal_by [concl1; concl2; concl3] (RN_hl_conseq) g
 
-let t_bdHoareF_conseq_bd bd g =
+let bd_goal fcmp fbd cmp bd = 
+  match fcmp, cmp with
+  | FHle, (FHle | FHeq) -> f_real_le bd fbd
+  | FHle, FHge -> tacuerror "can not swap comparison"
+  | FHeq, FHeq -> f_eq bd fbd
+  | FHeq, _ -> tacuerror "can only equality is accepted"
+  | FHge, (FHge | FHeq)  -> f_real_le fbd bd
+  | FHge, FHle -> tacuerror "can not swap comparison"
+
+let t_bdHoareF_conseq_bd cmp bd g =
   let env,_,concl = get_goal_e g in
   let bhf = destr_bdHoareF concl in
   let mpr,_ = EcEnv.Fun.hoareF_memenv bhf.bhf_f env in
-  let bd_goal = match bhf.bhf_cmp with
-    | FHle -> f_real_le bd bhf.bhf_bd
-    | FHeq -> f_eq bd bhf.bhf_bd
-    | FHge -> f_real_le bhf.bhf_bd bd
-  in
-  let concl = f_bdHoareF bhf.bhf_pr bhf.bhf_f bhf.bhf_po bhf.bhf_cmp bd in
+  let bd_goal =  bd_goal bhf.bhf_cmp bhf.bhf_bd cmp bd in
+  let concl = f_bdHoareF bhf.bhf_pr bhf.bhf_f bhf.bhf_po cmp bd in
   let bd_goal = gen_mems [mpr] (f_imp bhf.bhf_pr bd_goal) in
   prove_goal_by [bd_goal;concl] (RN_hl_conseq_bd) g  
 
-let t_bdHoareS_conseq_bd bd g =
+let t_bdHoareS_conseq_bd cmp bd g =
   let concl = get_concl g in
   let bhs = destr_bdHoareS concl in
-  (* let mpr,mpo = EcEnv.Fun.hoareF_memenv bhf.bhf_f env in *)
-  let bd_goal = match bhs.bhs_cmp with
-    | FHle -> f_real_le bd bhs.bhs_bd
-    | FHeq -> f_eq bd bhs.bhs_bd
-    | FHge -> f_real_le bhs.bhs_bd bd
-  in
-  let concl = f_bdHoareS bhs.bhs_m bhs.bhs_pr bhs.bhs_s bhs.bhs_po bhs.bhs_cmp bd in
+  let bd_goal =  bd_goal bhs.bhs_cmp bhs.bhs_bd cmp bd in
+  let concl = f_bdHoareS bhs.bhs_m bhs.bhs_pr bhs.bhs_s bhs.bhs_po cmp bd in
   let bd_goal = gen_mems [bhs.bhs_m] (f_imp bhs.bhs_pr bd_goal) in
   prove_goal_by [bd_goal;concl] (RN_hl_conseq_bd) g  
 
