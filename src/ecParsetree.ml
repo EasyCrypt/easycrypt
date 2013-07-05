@@ -273,6 +273,8 @@ type 'a fpattern = {
 type ffpattern = pformula fpattern
 
 type cfpattern = (pformula option * pformula option) fpattern
+type ccfpattern =  
+  ((pformula option * pformula option) * pformula option) fpattern
 
 type preduction = {
   pbeta    : bool;
@@ -327,6 +329,8 @@ type p_app_bd_info = PAppNone | PAppSingle of pformula
                    | PAppMult of (pformula * pformula * pformula * pformula * pformula)
 
 type tac_dir = Backs | Fwds
+
+type pfel_spec_preds = (pgamepath*pformula) list
  
 type phltactic = 
   | Pfun_def  
@@ -349,7 +353,7 @@ type phltactic =
   | Pkill       of (tac_side * codepos * int option)
   | Prnd        of tac_side * pformula rnd_tac_info
   | Palias      of (tac_side * codepos * psymbol option)
-  | Pconseq     of bool * cfpattern 
+  | Pconseq     of bool * ccfpattern 
   | Pconseq_bd  of pformula
   | Phr_exists_elim  
   | Phr_exists_intro of pformula list 
@@ -357,7 +361,7 @@ type phltactic =
   | Pbdhoaredeno  of cfpattern
   | Pequivdeno    of cfpattern
   | PPr           of pformula * pformula
-  | Pfel          of int * (pformula * pformula * pformula * pformula * pformula)
+  | Pfel          of int * (pformula * pformula * pformula * pformula * pfel_spec_preds)
   | Phoare
   | Pbdhoare
   | Pprbounded
@@ -373,6 +377,7 @@ and pinline_arg =
 type trepeat = [`All | `Maybe] * int option
 
 type rwarg =
+  | RWDelta of (rwocc * pqsymbol)
   | RWRw    of (rwside * trepeat option * rwocc * ffpattern)
   | RWDone  of bool
   | RWSimpl
@@ -408,8 +413,8 @@ type logtactic =
   | Pcongr
   | Pelim       of ffpattern 
   | Papply      of ffpattern
-  | Pcut        of (intropattern1 * pformula * ptactic_core option)
-  | Pcutdef     of (intropattern1 * pterm)
+  | Pcut        of (intropattern1 option * pformula * ptactic_core option)
+  | Pcutdef     of (intropattern1 option * pterm)
   | Pgeneralize of (rwocc * pformula) list
   | Pclear      of psymbol list
   | Prewrite    of rwarg list

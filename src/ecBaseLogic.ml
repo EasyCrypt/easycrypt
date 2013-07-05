@@ -105,7 +105,7 @@ type rule_name =
   | RN_hl_prfalse      
   | RN_hl_pr_lemma
   | RN_hl_bdeq      
-  | RN_hl_fel       of (form * form * form * form * form)
+  | RN_hl_fel       of (form * form * form * form * (EcPath.xpath*form) list)
 
   | RN_bhl_rnd of (EcFol.form option * EcFol.form)
   | RN_eqobs_in

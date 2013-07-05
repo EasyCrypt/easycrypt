@@ -316,11 +316,11 @@ let t_bdHoareF_conseq_bd bd g =
     | FHge -> f_real_le bhf.bhf_bd bd
   in
   let concl = f_bdHoareF bhf.bhf_pr bhf.bhf_f bhf.bhf_po bhf.bhf_cmp bd in
-  let bd_goal = gen_mems [mpr] bd_goal in
+  let bd_goal = gen_mems [mpr] (f_imp bhf.bhf_pr bd_goal) in
   prove_goal_by [bd_goal;concl] (RN_hl_conseq_bd) g  
 
 let t_bdHoareS_conseq_bd bd g =
-  let _,_,concl = get_goal_e g in
+  let concl = get_concl g in
   let bhs = destr_bdHoareS concl in
   (* let mpr,mpo = EcEnv.Fun.hoareF_memenv bhf.bhf_f env in *)
   let bd_goal = match bhs.bhs_cmp with
@@ -329,7 +329,7 @@ let t_bdHoareS_conseq_bd bd g =
     | FHge -> f_real_le bhs.bhs_bd bd
   in
   let concl = f_bdHoareS bhs.bhs_m bhs.bhs_pr bhs.bhs_s bhs.bhs_po bhs.bhs_cmp bd in
-  let bd_goal = gen_mems [bhs.bhs_m] bd_goal in
+  let bd_goal = gen_mems [bhs.bhs_m] (f_imp bhs.bhs_pr bd_goal) in
   prove_goal_by [bd_goal;concl] (RN_hl_conseq_bd) g  
 
 
@@ -1932,30 +1932,40 @@ let t_rcond side b at_pos g =
 
 
 (* takes an xpath, returns xpath set *)
-let callable_oracles_f env os f =
+let rec callable_oracles_f env modv os f =
   let f = NormMp.norm_xpath env f in
   let func = Fun.by_xpath f env in
-  match func.f_def with
-    | FBabs oi ->
-      List.fold_left (fun s o -> EcPath.Sx.add o s) os oi.oi_calls
-  | FBdef fdef ->
-    List.fold_left (fun s o -> EcPath.Sx.add o s) 
-      os fdef.f_uses.us_calls
-
-let rec callable_oracles_s env os s =
-  callable_oracles_is env os s.s_node
-and callable_oracles_is env os is = 
-  List.fold_left (callable_oracles_i env) os is
-and callable_oracles_i env os i = 
+  let called_fs = 
+    match func.f_def with
+      | FBabs oi ->
+        List.fold_left (fun s o -> 
+          if PV.indep env modv (f_write env o) then s else EcPath.Sx.add o s)
+          EcPath.Sx.empty oi.oi_calls
+      | FBdef fdef ->
+        List.fold_left (fun s o -> 
+          if PV.indep env modv (f_write env o) then s else EcPath.Sx.add o s)
+          EcPath.Sx.empty fdef.f_uses.us_calls
+  in
+  let f_written = f_write ~except_fs:called_fs env f in
+  if PV.indep env f_written modv then
+    List.fold_left (callable_oracles_f env modv)  os (EcPath.Sx.elements called_fs)
+  else
+    EcPath.Sx.add f os
+  
+and callable_oracles_s env modv os s =
+  callable_oracles_is env modv os s.s_node
+and callable_oracles_is env modv os is = 
+  List.fold_left (callable_oracles_i env modv) os is
+and callable_oracles_i env modv os i = 
   match i.i_node with
-    | Scall(_,f,_) -> callable_oracles_f env os f
-    | Sif (_,s1,s2) -> callable_oracles_s env (callable_oracles_s env os s1) s2
-    | Swhile (_,s) -> callable_oracles_s env os s
+    | Scall(_,f,_) -> callable_oracles_f env modv os f
+    | Sif (_,s1,s2) -> callable_oracles_s env modv (callable_oracles_s env modv os s1) s2
+    | Swhile (_,s) -> callable_oracles_s env modv os s
     | Sasgn _ | Srnd _ | Sassert _ -> os 
 
-let callable_oracles_stmt env = callable_oracles_s env EcPath.Sx.empty
+let callable_oracles_stmt env (modv:PV.t) = callable_oracles_s env modv EcPath.Sx.empty
 
-let t_failure_event at_pos cntr ash q f_event some_p g =
+let t_failure_event at_pos cntr ash q f_event pred_specs g =
   let env,_,concl = get_goal_e g in
   match concl.f_node with
     | Fapp ({f_node=Fop(op,_)},[pr;bd]) when is_pr pr 
@@ -1971,7 +1981,8 @@ let t_failure_event at_pos cntr ash q f_event some_p g =
           cannot_apply "fel" "not applicable to abstract functions"
       in
       let s_hd,s_tl = s_split "fel" at_pos fdef.f_body in
-      let os = callable_oracles_stmt env (stmt s_tl) in
+      let fv = PV.fv env mhr f_event in
+      let os = callable_oracles_stmt env fv (stmt s_tl) in
       (* check that bad event is only modified in oracles *)
       (* let fv = PV.fv env mhr f_event in *)
       (* if not (PV.indep env (s_write ~except_fs:os env (stmt s_tl)) (fv) ) then *)
@@ -1998,7 +2009,7 @@ let t_failure_event at_pos cntr ash q f_event some_p g =
       let oracle_goal o = 
         let not_F_to_F_goal = 
           let bound = f_app_simpl ash [cntr] treal in
-          let pre = f_not f_event in
+          let pre = f_and (f_int_le (f_int 0) cntr) (f_not f_event) in
           let post = f_event in
           f_bdHoareF pre o post FHle bound
         in
@@ -2006,9 +2017,16 @@ let t_failure_event at_pos cntr ash q f_event some_p g =
         let old_b_id = EcIdent.create "b" in
         let old_cntr = f_local old_cntr_id tint in
         let old_b = f_local old_b_id tbool in
+        let _,some_p = 
+          try 
+            List.find (fun (o',_) -> o=o') pred_specs 
+          with Not_found ->
+            o,f_true
+            (* tacuerror "Cannot find precondition for oracle %s" (EcPath.x_tostring o) *)
+        in
         let cntr_decr_goal = 
           let pre  = f_and some_p (f_eq old_cntr cntr) in
-          let post = f_int_lt old_cntr cntr in
+          let post = f_and (f_int_lt old_cntr cntr) (f_int_le cntr q) in
           f_forall_simpl [old_cntr_id,GTty tint] 
             (f_hoareF pre o post)
         in
@@ -2022,7 +2040,7 @@ let t_failure_event at_pos cntr ash q f_event some_p g =
       in
       let os_goals = List.concat (List.map oracle_goal (Sx.elements os)) in
       prove_goal_by ([bound_goal;post_goal;init_goal]@os_goals) 
-        (RN_hl_fel (cntr,ash,q,f_event,some_p) )  g
+        (RN_hl_fel (cntr,ash,q,f_event,pred_specs) )  g
     | _ -> 
       cannot_apply "failure event lemma" 
         "A goal of the form Pr[ _ ] <= _ was expected"
@@ -2377,8 +2395,12 @@ let t_hoare_bd_hoare g =
   if is_bdHoareS concl then
     let bhs = destr_bdHoareS concl in
     let concl1 = f_hoareS bhs.bhs_m bhs.bhs_pr bhs.bhs_s (f_not bhs.bhs_po) in
-    let concl2 = f_eq bhs.bhs_bd f_r0  in
-    prove_goal_by [concl1;concl2] RN_hl_hoare_bd_hoare g
+    if f_equal bhs.bhs_bd f_r0 then
+      prove_goal_by [concl1] RN_hl_hoare_bd_hoare g
+    else 
+      (* Rewrite this : it is a consequence rule *)
+      let concl2 = f_eq bhs.bhs_bd f_r0  in
+      prove_goal_by [concl1;concl2] RN_hl_hoare_bd_hoare g
   else if is_hoareS concl then
     let hs = destr_hoareS concl in
     let concl1 = f_bdHoareS hs.hs_m hs.hs_pr hs.hs_s (f_not hs.hs_po) FHeq f_r0 in

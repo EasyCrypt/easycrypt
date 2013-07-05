@@ -1515,6 +1515,14 @@ rwarg:
 
 | s=rwside r=rwrepeat? o=rwocc? fp=fpattern(form)
     { RWRw (s, r, omap o EcMaps.Sint.of_list, fp) }
+
+| s=rwside r=rwrepeat? o=rwocc? SLASH x=qoident
+    { let loc = EcLocation.make $startpos $endpos in
+        if s <> `LtoR then
+          error loc (Some "delta-folding not supported");
+        if r <> None then
+          error loc (Some "delta-repeat not supported");
+        RWDelta (omap o EcMaps.Sint.of_list, x); }
 ;
 
 genpattern:
@@ -1547,6 +1555,10 @@ conseq:
 | f1=form LONGARROW f2=form     { Some f1, Some f2 }
 ;
 
+conseq_bd:
+| c=conseq                 { c, None }
+| c=conseq COLON bd=form   { c, Some bd } 
+| UNDERSCORE COLON bd=form { (None, None), Some bd }
 
 call_info: 
  | f1=form LONGARROW f2=form             { CI_spec (f1, f2) }
@@ -1705,13 +1717,13 @@ logtactic:
 | SUBST l=sform*
    { Psubst l }
 
-| CUT ip=intro_pattern COLON p=form %prec prec_below_IMPL
+| CUT ip=intro_pattern? COLON p=form %prec prec_below_IMPL
    { Pcut (ip, p, None) }
 
-| CUT ip=intro_pattern COLON p=form BY t=tactic_core
+| CUT ip=intro_pattern? COLON p=form BY t=tactic_core
    { Pcut (ip, p, Some t) }
 
-| CUT ip=intro_pattern CEQ fp=pterm
+| CUT ip=intro_pattern? CEQ fp=pterm
    { Pcutdef (ip, fp) }
 
 | POSE o=rwocc? x=lident CEQ p=form_h %prec prec_below_IMPL
@@ -1809,7 +1821,7 @@ phltactic:
 | BDHOAREDENO info=fpattern(conseq)
     { Pbdhoaredeno info }
 
-| CONSEQ nm=STAR? info=fpattern(conseq)
+| CONSEQ nm=STAR? info=fpattern(conseq_bd)
     { Pconseq (nm<>None, info) }
 
 | CONSEQBD bd=sform
@@ -1826,8 +1838,8 @@ phltactic:
 
 | BYPR f1=sform f2=sform { PPr(f1,f2) }
 
-| FEL at_pos=NUM cntr=sform delta=sform q=sform f_event=sform some_p=sform
-   { Pfel (at_pos, (cntr, delta, q, f_event, some_p)) }
+| FEL at_pos=NUM cntr=sform delta=sform q=sform f_event=sform some_p=fel_pred_specs
+   {Pfel (at_pos,(cntr,delta,q,f_event,some_p))}
 
 | EQOBSIN info=eqobs_in
     { Peqobs_in info }
@@ -1840,6 +1852,12 @@ phltactic:
 | PRFALSE {Pprfalse}
 | BDEQ {Pbdeq}
 ;
+
+fel_pred_spec:
+| f=loc(fident) COLON p=sform  { f,p } 
+fel_pred_specs:
+  | LBRACKET assoc_ps = plist0(fel_pred_spec,SEMICOLON) RBRACKET
+      {assoc_ps}
 
 eqobs_in:
 | empty                              { (None   , None   , None) }
