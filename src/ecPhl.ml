@@ -316,7 +316,7 @@ let t_bdHoareF_conseq_bd bd g =
     | FHge -> f_real_le bhf.bhf_bd bd
   in
   let concl = f_bdHoareF bhf.bhf_pr bhf.bhf_f bhf.bhf_po bhf.bhf_cmp bd in
-  let bd_goal = gen_mems [mpr] bd_goal in
+  let bd_goal = gen_mems [mpr] (f_imp bhf.bhf_pr bd_goal) in
   prove_goal_by [bd_goal;concl] (RN_hl_conseq_bd) g  
 
 let t_bdHoareS_conseq_bd bd g =
@@ -329,7 +329,7 @@ let t_bdHoareS_conseq_bd bd g =
     | FHge -> f_real_le bhs.bhs_bd bd
   in
   let concl = f_bdHoareS bhs.bhs_m bhs.bhs_pr bhs.bhs_s bhs.bhs_po bhs.bhs_cmp bd in
-  let bd_goal = gen_mems [bhs.bhs_m] bd_goal in
+  let bd_goal = gen_mems [bhs.bhs_m] (f_imp bhs.bhs_pr bd_goal) in
   prove_goal_by [bd_goal;concl] (RN_hl_conseq_bd) g  
 
 
