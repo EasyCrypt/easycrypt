@@ -870,14 +870,12 @@ let t_elimT tys p f sk g =
         | _ -> noelim ()
       in
 
-      let ppe = EcPrinting.PPEnv.ofenv env in
-
       if not (EcReduction.equal_type env prty (tfun f.f_ty tbool)) then
         noelim();
 
       let (aa1, ax) = skip None [] ax in
 
-      let (x, xty, ax) =
+      let (x, _xty, ax) =
         match sform_of_form ax with
         | SFquant (Lforall, (x, GTty xty), ax) -> (x, xty, ax)
         | _ -> noelim ()
@@ -907,7 +905,7 @@ let t_elimT tys p f sk g =
           then (aa, sk)
           else
             match destruct_product hyps pf_inst with
-            | Some (`Imp (f1, f2)) -> doit f2 (AAnode :: aa, sk+1)
+            | Some (`Imp (_, f2)) -> doit f2 (AAnode :: aa, sk+1)
             | _ -> noelim ()
         in
           doit pf_inst ([], sk)
