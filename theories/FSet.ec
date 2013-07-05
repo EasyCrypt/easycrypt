@@ -312,24 +312,36 @@ axiom mem_union: forall x (X1 X2:'a set),
   mem x (union X1 X2) <=> (mem x X1 \/ mem x X2).
 
 lemma unionC: forall (X1 X2:'a set),
-  union X1 X2 = union X2 X1
-by (intros=> X1 X2; apply set_ext; smt).
+  union X1 X2 = union X2 X1.
+proof strict.
+by intros=> X1 X2; apply set_ext=> x; rewrite 2!mem_union orC //.
+qed.
 
 lemma unionA: forall (X1 X2 X3:'a set),
-  union (union X1 X2) X3 = union X1 (union X2 X3)
-by (intros=> X1 X2 X3; apply set_ext; smt).
+  union (union X1 X2) X3 = union X1 (union X2 X3).
+proof strict.
+by intros=> X1 X2 X3; apply set_ext=> x; rewrite !mem_union orA //.
+qed.
 
 lemma union0s: forall (X:'a set),
-  union empty X = X
-by (intros=> X; apply set_ext; smt).
+  union empty X = X.
+proof strict.
+intros=> X; apply set_ext=> x; rewrite mem_union; split.
+  by intros=> [empty | x_in_X] //; generalize empty; apply absurd=> _; apply mem_empty.
+  by intros=> x_in_X; right.
+qed.
 
 lemma unionLs: forall (X1 X2:'a set),
-  X1 <= union X1 X2
-by [].
+  X1 <= union X1 X2.
+proof strict.
+by intros=> X1 X2 x x_in_X1; rewrite mem_union; left.
+qed.
 
 lemma unionK: forall (X:'a set),
-  union X X = X
-by (intros=> X; apply set_ext; smt).
+  union X X = X.
+proof strict.
+by intros=> X; apply set_ext=> x; rewrite mem_union orK.
+qed.
 
 (** inter *)
 op inter:'a set -> 'a set -> 'a set.
@@ -337,24 +349,35 @@ axiom mem_inter: forall x (X1 X2:'a set),
   mem x (inter X1 X2) <=> (mem x X1 /\ mem x X2).
 
 lemma interC: forall (X1 X2:'a set),
-  inter X1 X2 = inter X2 X1
-by (intros=> X1 X2; apply set_ext; smt).
+  inter X1 X2 = inter X2 X1.
+proof strict.
+by intros=> X1 X2; apply set_ext=> x; rewrite !mem_inter andC.
+qed.
 
 lemma interA: forall (X1 X2 X3:'a set),
-  inter (inter X1 X2) X3 = inter X1 (inter X2 X3)
-by (intros=> X1 X2 X3; apply set_ext; smt).
+  inter (inter X1 X2) X3 = inter X1 (inter X2 X3).
+proof strict.
+by intros=> X1 X2 X3; apply set_ext=> x; rewrite !mem_inter andA.
+qed.
 
 lemma interGs: forall (X1 X2:'a set),
-  inter X1 X2 <= X1
-by [].
+  inter X1 X2 <= X1.
+proof strict.
+by intros=> X1 X2 x; rewrite mem_inter=> [x_in_X1 _] //.
+qed.
 
 lemma interK: forall (X:'a set),
-  inter X X = X
-by (intros=> X; apply set_ext; smt).
+  inter X X = X.
+proof strict.
+by intros=> X; apply set_ext=> x; rewrite mem_inter=> //=.
+qed.
 
 lemma inter0s: forall (X:'a set),
-  inter empty X = empty
-by (intros=> X; apply set_ext; smt).
+  inter empty X = empty.
+proof strict.
+by intros=> X; apply set_ext=> x; rewrite mem_inter; split=> //;
+    apply absurd=> _; apply mem_empty.
+qed.
 
 (** all *)
 op all:'a cpred -> 'a set -> bool.
@@ -372,8 +395,10 @@ axiom mem_filter: forall x (p:'a cpred) (X:'a set),
   mem x (filter p X) <=> (mem x X /\ p x).
 
 lemma filter_cpTrue: forall (X:'a set),
-  filter cpTrue X = X
-by (intros=> X; apply set_ext; smt).
+  filter cpTrue X = X.
+proof strict.
+by intros=> X; apply set_ext=> x; rewrite mem_filter //.
+qed.
 
 lemma filter_cpEq_in: forall (x:'a) (X:'a set),
   mem x X => filter (cpEq x) X = single x.
@@ -391,8 +416,10 @@ by intros=> x X x_in_X; rewrite filter_cpEq_in ?card_single //.
 qed.
 
 lemma leq_filter: forall (p:'a cpred) (X:'a set),
-  filter p X <= X
-by [].
+  filter p X <= X.
+proof strict.
+by intros=> p X x; rewrite mem_filter=> [x_in_X _] //.
+qed.
 
 (* fold *)
 op fold : ('a -> 'b -> 'b) -> 'b -> 'a set -> 'b.
@@ -407,12 +434,10 @@ lemma fold_set_list:
   forall (f:'a -> 'b -> 'b) (e:'b) xs,
     (forall a b X, f a (f b X) = f b (f a X)) =>
       fold f e xs = List.fold_right f e (elems xs).
-intros=> f e xs C.
-elim/set_comp xs;
-  first by rewrite fold_empty elems_empty fold_right_nil //.
-intros s nempty Hind.
-elim/list_case_eq (elems s);
-  first by apply absurd=> _;rewrite -elems_empty elems_eq //.
+intros=> f e xs C; elim/set_comp xs;
+  first by rewrite fold_empty elems_empty fold_right_nil.
+intros s nempty Hind; elim/list_case_eq (elems s);
+  first by apply absurd=> _;rewrite -elems_empty elems_eq.
 intros=> x l' h.
 cut xval : pick s = x;first rewrite pick_def h hd_cons //.
 subst x.

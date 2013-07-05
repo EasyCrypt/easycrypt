@@ -69,15 +69,19 @@ lemma nosmt andA : forall (a b c : bool),
   ((a /\ b) /\ c) = (a /\ (b /\ c))
 by [].
 
-lemma nosmt andC : forall (a b:bool),
+lemma nosmt andC : forall (a b : bool),
   (a /\ b) = (b /\ a)
 by [].
 
-lemma nosmt andT : forall (b:bool),
+lemma nosmt andK : forall (b : bool),
+  (b /\ b) = b
+by [].
+
+lemma nosmt andT : forall (b : bool),
   (b /\ true) = b
 by [].
 
-lemma nosmt andF : forall (b:bool),
+lemma nosmt andF : forall (b : bool),
   (b /\ false) = false
 by [].
 
@@ -100,6 +104,10 @@ by [].
 
 lemma nosmt orC : forall (a b : bool),
   (a \/ b) = (b \/ a)
+by [].
+
+lemma nosmt orK : forall (b : bool),
+  (b \/ b) = b
 by [].
 
 lemma nosmt orT : forall (b : bool),
