@@ -316,11 +316,11 @@ let t_bdHoareF_conseq_bd bd g =
     | FHge -> f_real_le bhf.bhf_bd bd
   in
   let concl = f_bdHoareF bhf.bhf_pr bhf.bhf_f bhf.bhf_po bhf.bhf_cmp bd in
-  let bd_goal = gen_mems [mpr] bd_goal in
+  let bd_goal = gen_mems [mpr] (f_imp bhf.bhf_pr bd_goal) in
   prove_goal_by [bd_goal;concl] (RN_hl_conseq_bd) g  
 
 let t_bdHoareS_conseq_bd bd g =
-  let _,_,concl = get_goal_e g in
+  let concl = get_concl g in
   let bhs = destr_bdHoareS concl in
   (* let mpr,mpo = EcEnv.Fun.hoareF_memenv bhf.bhf_f env in *)
   let bd_goal = match bhs.bhs_cmp with
@@ -329,7 +329,7 @@ let t_bdHoareS_conseq_bd bd g =
     | FHge -> f_real_le bhs.bhs_bd bd
   in
   let concl = f_bdHoareS bhs.bhs_m bhs.bhs_pr bhs.bhs_s bhs.bhs_po bhs.bhs_cmp bd in
-  let bd_goal = gen_mems [bhs.bhs_m] bd_goal in
+  let bd_goal = gen_mems [bhs.bhs_m] (f_imp bhs.bhs_pr bd_goal) in
   prove_goal_by [bd_goal;concl] (RN_hl_conseq_bd) g  
 
 
@@ -2384,8 +2384,12 @@ let t_hoare_bd_hoare g =
   if is_bdHoareS concl then
     let bhs = destr_bdHoareS concl in
     let concl1 = f_hoareS bhs.bhs_m bhs.bhs_pr bhs.bhs_s (f_not bhs.bhs_po) in
-    let concl2 = f_eq bhs.bhs_bd f_r0  in
-    prove_goal_by [concl1;concl2] RN_hl_hoare_bd_hoare g
+    if f_equal bhs.bhs_bd f_r0 then
+      prove_goal_by [concl1] RN_hl_hoare_bd_hoare g
+    else 
+      (* Rewrite this : it is a consequence rule *)
+      let concl2 = f_eq bhs.bhs_bd f_r0  in
+      prove_goal_by [concl1;concl2] RN_hl_hoare_bd_hoare g
   else if is_hoareS concl then
     let hs = destr_hoareS concl in
     let concl1 = f_bdHoareS hs.hs_m hs.hs_pr hs.hs_s (f_not hs.hs_po) FHeq f_r0 in

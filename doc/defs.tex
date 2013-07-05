@@ -203,8 +203,8 @@
   {\lstset{language=easycrypt,caption=#2,#1}}%
   {}
 
-\newcommand{\rawec}[2][]{\lstinline[language=easycrypt,#1]{#2}}
-\newcommand{\ec}[2][]{\lstinline[language=easycrypt,style=easycrypt-pretty,#1]{#2}}
+\newcommand{\rawec}[2][basicstyle=\normalsize\sffamily]{\lstinline[language=easycrypt,#1]{#2}}
+\newcommand{\ec}[2][basicstyle=\normalsize\sffamily]{\lstinline[language=easycrypt,style=easycrypt-pretty,#1]{#2}}
 
 \newcommand{\ecimport}[4][]{\lstinputlisting[language=easycrypt,linerange=#4,caption=#2,#1]{#3}}
 

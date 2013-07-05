@@ -547,46 +547,52 @@ let process_equiv_deno info (_,n as g) =
   t_on_first (t_use an gs) (t_equiv_deno pre post (juc,n))
 
 let process_conseq notmod info (_, n as g) =
-  let t_pre = ref (t_id None) and t_post = ref (t_id None) in
-  let process_cut g (pre,post) =
+  let process_cut g ((pre,post),bd) =
     let hyps,concl = get_goal g in        
+    let ensure_none o =
+      if o <> None then tacuerror "Can not give a bound here." in
     let penv, qenv, gpre, gpost, fmake = 
       match concl.f_node with
       | FhoareF hf ->
         let penv, qenv = LDecl.hoareF hf.hf_f hyps in
         penv, qenv, hf.hf_pr, hf.hf_po, 
-        (fun pre post -> f_hoareF pre hf.hf_f post)
+        (fun pre post bd -> ensure_none bd;f_hoareF pre hf.hf_f post)
       | FhoareS hs ->
         let env = LDecl.push_active hs.hs_m hyps in
         env, env, hs.hs_pr, hs.hs_po,
-        (fun pre post -> f_hoareS_r { hs with hs_pr = pre; hs_po = post })
+        (fun pre post bd -> ensure_none bd;f_hoareS_r { hs with hs_pr = pre; hs_po = post })
       | FbdHoareF bhf ->
         let penv, qenv = LDecl.hoareF bhf.bhf_f hyps in
         penv, qenv, bhf.bhf_pr, bhf.bhf_po, 
-        (fun pre post -> f_bdHoareF pre bhf.bhf_f post bhf.bhf_cmp bhf.bhf_bd)
+        (fun pre post bd -> f_bdHoareF pre bhf.bhf_f post bhf.bhf_cmp (odfl bhf.bhf_bd bd))
       | FbdHoareS bhs ->
         let env = LDecl.push_active bhs.bhs_m hyps in
         env, env, bhs.bhs_pr, bhs.bhs_po,
-        (fun pre post -> f_bdHoareS_r { bhs with bhs_pr = pre; bhs_po = post })
+        (fun pre post bd -> f_bdHoareS_r { bhs with bhs_pr = pre; bhs_po = post; bhs_bd = (odfl bhs.bhs_bd bd) })
       | FequivF ef ->
         let penv, qenv = LDecl.equivF ef.ef_fl ef.ef_fr hyps in
         penv, qenv, ef.ef_pr, ef.ef_po,
-        (fun pre post -> f_equivF pre ef.ef_fl ef.ef_fr post)
+        (fun pre post bd -> ensure_none bd;f_equivF pre ef.ef_fl ef.ef_fr post)
       | FequivS es -> 
         let env = LDecl.push_all [es.es_ml; es.es_mr] hyps in
         env, env, es.es_pr, es.es_po,
-        (fun pre post -> f_equivS_r { es with es_pr = pre; es_po = post }) 
+        (fun pre post bd -> ensure_none bd;f_equivS_r { es with es_pr = pre; es_po = post }) 
       | _ -> tacuerror "cannot apply conseq rule, not a phl/prhl judgement"
     in
     let pre = match pre with
-      | None -> t_pre := t_progress (t_id None); gpre 
+      | None -> gpre 
       | Some pre -> process_form penv pre tbool in
     let post = match post with
-      | None -> t_post := t_progress (t_id None); gpost 
+      | None -> gpost 
       | Some post -> process_form qenv post tbool in
-    fmake pre post
+    let bd = match bd with
+      | None -> None
+      | Some bd -> Some (process_form penv bd treal) in
+    fmake pre post bd
   in
   let (juc,an), gs = process_mkn_apply (process_cut g) info g in
+  let lt = ref [t_use an gs] in
+  let t_trivial = t_try (t_lseq [t_simplify_nodelta;t_split;t_fail]) in
   let t_conseq = 
     let (_,f) = get_node (juc,an) in
     match f.f_node with
@@ -595,13 +601,21 @@ let process_conseq notmod info (_, n as g) =
       else t_hoareF_conseq hf.hf_pr hf.hf_po
     | FhoareS hs   -> 
       if notmod then t_hoareS_conseq_nm hs.hs_pr hs.hs_po
-      else t_hoareS_conseq hs.hs_pr hs.hs_po
+      else t_hoareS_conseq hs.hs_pr hs.hs_po 
     | FbdHoareF hf ->
-      if notmod then t_bdHoareF_conseq_nm hf.bhf_pr hf.bhf_po
-      else t_bdHoareF_conseq hf.bhf_pr hf.bhf_po
+      let t1 = 
+        if notmod then t_bdHoareF_conseq_nm hf.bhf_pr hf.bhf_po
+        else t_bdHoareF_conseq hf.bhf_pr hf.bhf_po in
+      let t2 = t_bdHoareF_conseq_bd hf.bhf_bd in
+      lt := t_trivial :: !lt;
+      t_seq_subgoal t1 [t_id None; t_id None; t2]
     | FbdHoareS hs -> 
-      if notmod then t_bdHoareS_conseq_nm hs.bhs_pr hs.bhs_po
-      else t_bdHoareS_conseq hs.bhs_pr hs.bhs_po
+      let t1 = 
+        if notmod then t_bdHoareS_conseq_nm hs.bhs_pr hs.bhs_po
+        else t_bdHoareS_conseq hs.bhs_pr hs.bhs_po in
+      let t2 = t_bdHoareS_conseq_bd hs.bhs_bd in
+      lt := t_trivial :: !lt;
+      t_seq_subgoal t1 [t_id None; t_id None; t2]
     | FequivF ef   -> 
       if notmod then t_equivF_conseq_nm ef.ef_pr ef.ef_po
       else t_equivF_conseq ef.ef_pr ef.ef_po
@@ -609,10 +623,8 @@ let process_conseq notmod info (_, n as g) =
       if notmod then t_equivS_conseq_nm es.es_pr es.es_po 
       else t_equivS_conseq es.es_pr es.es_po 
     | _ -> tacuerror "cannot apply conseq rule, not a phl/prhl judgement" in
-  t_seq_subgoal t_conseq
-    [!t_pre; !t_post; t_use an gs] (juc,n)
-
-
+  t_subgoal (t_trivial :: t_trivial :: !lt) 
+    (t_conseq (juc,n)) 
 
 let process_conseq_bd bd g =
   let hyps,concl = get_goal g in        

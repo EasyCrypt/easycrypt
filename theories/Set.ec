@@ -118,7 +118,7 @@ lemma induction: forall (P:('a set) cpred),
   forall S, P S.
 intros P empt hyp S.
 cut lem : ((S <> empty) => P S);last smt.
-elimT induction_det S;first (simplify;split).
+elim/induction_det S;first (simplify;split).
 intros S0 x h nempty.
 rewrite -(add_rm<:'a> x S0 _);first smt.
 apply hyp;smt.

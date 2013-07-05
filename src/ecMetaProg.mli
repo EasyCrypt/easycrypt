@@ -136,5 +136,4 @@ module FPosition : sig
   val filter : Sint.t -> ptnpos -> ptnpos
 
   val topattern : ?x:EcIdent.t -> ptnpos -> form -> EcIdent.t * form
-
 end
