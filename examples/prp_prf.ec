@@ -231,3 +231,20 @@ rnd;skip;smt.
 if;[wp;rnd|];wp;skip;smt.
 skip;smt.
 save.
+
+
+lemma concl : forall (A <: Adv{PRP,PRF}) &m, 
+ (forall (M0 <: AAC), islossless M0.f => islossless A(M0).a) =>
+ Pr[ M(PRF,A).main() @ &m : res] <= 
+ Pr[ M(PRP,A).main() @ &m : res] + q%r * (q-1)%r * (1%r / (2^l)%r).
+proof.
+ intros A &m Hll.
+ apply (real_le_trans _  
+ (Pr[ M(PRP,A).main() @ &m : res] + 
+ Pr[ M(PRP,A).main() @ &m : PRP.bad /\ card PRP.s <= q]) _).
+ apply (prob1 A &m);first assumption.
+ cut H: Pr[M(PRP, A).main() @ &m : PRP.bad /\ card PRP.s <= q] <= 
+        q%r * (q - 1)%r * (1%r / (2 ^ l)%r).
+ apply (prob2 A &m);first assumption.
+ smt.
+save.
