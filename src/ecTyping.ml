@@ -362,13 +362,13 @@ let gen_select_op ~actonly ~pred (fpv, fop, flc) opsc tvi env name ue psig =
   | None ->
       let ops = EcUnify.select_op pred tvi env name ue psig in
       let ops =
-        match opsc with
-        | None -> ops
-        | Some opsc ->
+        match ops, opsc with
+        | _ :: _ :: _, Some opsc ->
             List.filter
               (fun ((p, _), _, _) ->
                   EcPath.isprefix opsc (oget (EcPath.prefix p)))
               ops
+        | _, _ -> ops
       in
       let me, pvs =
         match EcEnv.Memory.get_active env, actonly with

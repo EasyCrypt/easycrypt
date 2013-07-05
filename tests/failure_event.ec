@@ -56,7 +56,7 @@ module M (A_ : Adv) ={
 
 require Sum.
 lemma asd :
-forall(A <: Adv {M,ARO,RO}) &m,Pr[M(A).main() @ &m : mem M.r ARO.log /\ card ARO.log <= qH] <= (qH%r * 1%r / (2%r ^ k)).
+forall(A <: Adv {M,ARO,RO}) &m,Pr[M(A).main() @ &m : FSet.mem M.r ARO.log /\ FSet.card ARO.log <= qH] <= (qH%r * 1%r / (2%r ^ k)).
 proof.
  intros A &m.
  fel 2 (card ARO.log) (lambda i, 1%r / (2%r ^ k) ) qH (mem M.r ARO.log) true.

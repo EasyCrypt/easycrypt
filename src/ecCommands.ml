@@ -169,7 +169,9 @@ and process_th_open (scope : EcScope.scope) name =
 and process_th_close (scope : EcScope.scope) name =
   EcScope.check_state `InTop "theory closing" scope;
   if (EcScope.name scope) <> name then
-    failwith "invalid theory name";     (* FIXME *)
+    EcScope.hierror
+      "active theory has name `%s', not `%s'"
+      (EcScope.name scope) name;
   snd (EcScope.Theory.exit scope)
 
 (* -------------------------------------------------------------------- *)

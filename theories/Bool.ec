@@ -22,7 +22,7 @@ theory Dbool.
   lemma supp_def : forall (b:bool), in_supp b dbool.
   proof.
     intros b; delta in_supp mu_x beta.
-    rewrite (mu_def ((=) b)).
+    rewrite (mu_def (cpEq b)).
     delta; simplify; smt.
   qed.
   
@@ -30,7 +30,7 @@ theory Dbool.
   proof.
     intros b.
     delta mu_x; simplify.
-    rewrite (mu_def ((=) b)).
+    rewrite (mu_def (cpEq b)).
     delta; simplify; smt.
   qed.
 
