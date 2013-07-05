@@ -33,6 +33,12 @@ val tacuerror    : ?catchable:bool -> ('a, Format.formatter, unit, 'b) format4 -
 val set_loc : EcLocation.t -> ('a -> 'b) -> 'a -> 'b
 
 (* -------------------------------------------------------------------- *)
+val destruct_product : EcEnv.LDecl.hyps -> EcFol.form ->
+  [ `Forall of EcIdent.t * EcFol.gty * EcFol.form
+  | `Imp of EcFol.form * EcFol.form
+  ]  option
+
+(* -------------------------------------------------------------------- *)
 val get_pj     : goal -> pre_judgment
 val get_goal   : goal -> LDecl.hyps * form
 val get_goal_e : goal -> env * LDecl.hyps * form
@@ -107,7 +113,7 @@ val t_intros   : EcIdent.t located list -> tactic
 val t_elim_hyp : EcIdent.t -> tactic
 val t_elim     : form -> tactic
 
-val t_elimT : form -> EcPath.path -> tactic
+val t_elimT : EcTypes.ty list -> EcPath.path -> form -> int -> tactic
 
 val t_case : form -> tactic
 

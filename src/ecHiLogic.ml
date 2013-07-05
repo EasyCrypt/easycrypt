@@ -234,14 +234,6 @@ let process_simplify ri g =
   t_simplify ri g
 
 (* -------------------------------------------------------------------- *)
-let process_elimT loc (pf,qs) g =
-  let env,hyps,_ = get_goal_e g in
-  let p = set_loc qs.pl_loc (EcEnv.Ax.lookup_path qs.pl_desc) env in
-  let f = process_form_opt hyps pf None in
-  t_seq (set_loc loc (t_elimT f p))
-    (t_simplify EcReduction.beta_red) g
-
-(* -------------------------------------------------------------------- *)
 let process_subst loc ri g =
   if ri = [] then t_subst_all g
   else
@@ -347,19 +339,6 @@ let trans_pterm_argument hyps ue arg =
 
   | EA_none ->
       None
-
-(* -------------------------------------------------------------------- *)
-let rec destruct_product hyps fp =
-  let module R = EcReduction in
-
-  match EcFol.sform_of_form fp with
-  | SFquant (Lforall, (x, t), f) -> Some (`Forall (x, t, f))
-  | SFimp (f1, f2) -> Some (`Imp (f1, f2))
-  | _ -> begin
-    match R.h_red_opt R.full_red hyps fp with
-    | None   -> None
-    | Some f -> destruct_product hyps f
-  end
 
 (* -------------------------------------------------------------------- *)
 exception RwMatchFound of EcUnify.unienv * ty EcUidgen.Muid.t * form evmap
@@ -520,7 +499,6 @@ let can_concretize_pterm_arguments (tue, ev) ids =
   in
      EcUnify.UniEnv.closed tue && List.for_all is_known_id ids
 
-
 (* -------------------------------------------------------------------- *)
 let evmap_of_pterm_arguments ids =
   let forid id ev =
@@ -668,7 +646,7 @@ let process_rewrite1_core (s, o) (p, typs, ue, ax) args g =
     let ev = evmap_of_pterm_arguments ids in
 
     match try_match hyps (ue, ev) fp concl with
-    | None   -> tacuerror "cannot find an occurence for [pose]"
+    | None   -> tacuerror "cannot find an occurence for [rewrite]"
     | Some x -> x
   in
 
@@ -890,7 +868,8 @@ let process_cut (engine : engine) ip phi t g =
     | None   -> g
     | Some t -> t_on_first (engine t) g
   in
-    t_on_last (process_intros [ip]) g
+
+  match ip with None -> g | Some ip -> t_on_last (process_intros [ip]) g
 
 (* -------------------------------------------------------------------- *)
 let process_cutdef loc ip cd g =
@@ -917,7 +896,8 @@ let process_cutdef loc ip cd g =
     in
       t_on_first tt g
   in
-    t_on_last (process_intros [ip]) g
+
+  match ip with None -> g | Some ip -> t_on_last (process_intros [ip]) g
 
 (* -------------------------------------------------------------------- *)
 let process_pose loc xsym o p g =
@@ -987,6 +967,67 @@ let process_generalize l =
 
   in
     t_lseq (List.rev_map pr1 l)
+
+(* -------------------------------------------------------------------- *)
+let process_elimT loc (pf, qs) g =
+  let noelim () = tacuerror "cannot recognize elimination principle" in
+
+  let (env, hyps, concl) = get_goal_e g in
+
+  let pf = process_form_opt hyps pf None in
+  let (p, typs, ue, ax) =
+    match process_named_pterm loc hyps (qs, None) with
+    | (`Global p, typs, ue, ax) -> (p, typs, ue, ax)
+    | _ -> noelim ()
+  in
+
+  let (_xp, xpty, ax) =
+    match destruct_product hyps ax with
+    | Some (`Forall (xp, GTty xpty, f)) -> (xp, xpty, f)
+    | _ -> noelim ()
+  in
+
+  begin
+    try  EcUnify.unify env ue (tfun pf.f_ty tbool) xpty
+    with EcUnify.UnificationFailure _ -> noelim ()
+  end;
+
+  let tue =
+    try  EcUnify.UniEnv.close ue
+    with EcUnify.UninstanciateUni _ -> noelim ()
+  in
+
+  let ax = Fsubst.uni tue ax in
+
+  let rec skip ax =
+    match destruct_product hyps ax with
+    | Some (`Imp (_f1, f2)) -> skip f2
+    | Some (`Forall (x, GTty xty, f)) -> ((x, xty), f)
+    | _ -> noelim ()
+  in
+
+  let ((x, _xty), ax) = skip ax in
+
+  let ptnpos = FPosition.select_form hyps None pf concl in
+
+  if FPosition.is_empty ptnpos then noelim ();
+
+  let (_xabs, body) = FPosition.topattern ~x:x ptnpos concl in
+
+  let rec skipmatch ax body sk =
+    match destruct_product hyps ax, destruct_product hyps body with
+    | Some (`Imp (i1, f1)), Some (`Imp (i2, f2)) ->
+        if   EcReduction.is_alpha_eq hyps i1 i2
+        then skipmatch f1 f2 (sk+1)
+        else sk
+    | _ -> sk
+  in
+
+  let sk = skipmatch ax body 0 in
+
+  t_seq
+    (set_loc loc (t_elimT (List.map (Tuni.subst tue) typs) p pf sk))
+    (t_simplify EcReduction.beta_red) g
 
 (* -------------------------------------------------------------------- *)
 let process_logic (engine, hitenv) loc t =

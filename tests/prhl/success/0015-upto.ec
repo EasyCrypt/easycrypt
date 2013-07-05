@@ -1,5 +1,5 @@
 require import Distr.
-require import Set.
+require import FSet.
 require import Map. 
 require import Int.
 
@@ -41,7 +41,7 @@ module F1(A:Adv) = {
     var h: int;
     var r : int;
     RO.mH    = Map.empty;
-    RO.logA  = Set.empty;
+    RO.logA  = FSet.empty;
     h        = RO.hash(xs);
     r        = A1.a(h);
     return r;
@@ -57,7 +57,7 @@ module F2(A:Adv) = {
     var h: int;
     var r : int;
     RO.mH    = Map.empty;
-    RO.logA  = Set.empty;
+    RO.logA  = FSet.empty;
     h        = $[0..10];
     r        = A1.a(h);
     return r;
