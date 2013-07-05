@@ -956,7 +956,7 @@ let rec trans_msymbol (env : EcEnv.env) (msymb : pmsymbol located) =
       if List.length args > List.length params then
         tyerror loc env (InvalidModAppl MAE_WrongArgCount);
 
-      let params = List.take (List.length args) params in
+      let params, remn = List.take_n (List.length args) params in
 
       List.iter2
         (fun (_, p) (_, a) ->
@@ -989,7 +989,7 @@ let rec trans_msymbol (env : EcEnv.env) (msymb : pmsymbol located) =
       in
       let body = EcSubst.subst_modsig_body subst body in
 
-        (EcPath.mpath top_path.EcPath.m_top args, {mis_params = []; mis_body = body})
+        (EcPath.mpath top_path.EcPath.m_top args, {mis_params = remn; mis_body = body})
 
 (* -------------------------------------------------------------------- *)
 let rec transmod (env : EcEnv.env) ~internal (x : symbol) (me : pmodule_expr) =
