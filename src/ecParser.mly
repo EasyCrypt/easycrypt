@@ -1540,6 +1540,10 @@ conseq:
 | f1=form LONGARROW f2=form     { Some f1, Some f2 }
 ;
 
+conseq_bd:
+| c=conseq                       { c, None }
+| c=conseq COLON bd=form { c, Some bd } 
+
 
 call_info: 
  | f1=form LONGARROW f2=form             { CI_spec (f1, f2) }
@@ -1799,7 +1803,7 @@ phltactic:
 | BDHOAREDENO info=fpattern(conseq)
     { Pbdhoaredeno info }
 
-| CONSEQ nm=STAR? info=fpattern(conseq)
+| CONSEQ nm=STAR? info=fpattern(conseq_bd)
     { Pconseq (nm<>None, info) }
 
 | CONSEQBD bd=sform
