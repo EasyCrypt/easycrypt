@@ -376,16 +376,16 @@ lemma filter_cpTrue: forall (X:'a set),
 by (intros=> X; apply set_ext; smt).
 
 lemma filter_cpEq_in: forall (x:'a) (X:'a set),
-  mem x X => filter (cpEq x) X = single x.
+  mem x X => filter ((=) x) X = single x.
 proof strict.
 intros=> x X x_in_X; apply set_ext=> x';
-rewrite mem_filter; delta cpEq beta; case (x = x').
+rewrite mem_filter; case (x = x').
   by intros=> <-; simplify; split=> _ //; apply mem_single_eq.
   by rewrite rw_eq_sym => x_x'; simplify; apply mem_single_neq.
 qed.
 
 lemma card_filter_cpEq: forall (x:'a) (X:'a set),
-  mem x X => card (filter (cpEq x) X) = 1.
+  mem x X => card (filter ((=) x) X) = 1.
 proof strict.
 by intros=> x X x_in_X; rewrite filter_cpEq_in ?card_single //.
 qed.
@@ -585,14 +585,14 @@ proof.
  cut ->: (card (add x s))%r * bd = 
           bd + (card s)%r * bd. 
   rewrite card_add_nin //=;smt.
- rewrite (mu_eq d _ (Fun.cpOr (Fun.cpEq x) (cpMem s))).
- simplify Fun.(==) cpMem cpOr cpEq;smt.
+ rewrite (mu_eq d _ (Fun.cpOr ((=) x) (cpMem s))).
+ simplify Fun.(==) cpMem cpOr;smt.
  rewrite mu_or.
- cut ->: (mu d (Fun.cpAnd (Fun.cpEq x) (cpMem s)) =
+ cut ->: (mu d (Fun.cpAnd ((=) x) (cpMem s)) =
           mu d (Fun.cpFalse)).
   apply mu_eq;simplify Fun.(==) cpMem cpFalse;smt.
  rewrite mu_false (IH d bd _);first assumption.
- cut ->: (mu d (Fun.cpEq x) = mu_x d x).
+ cut ->: (mu d ((=) x) = mu_x d x).
   simplify mu_x=> //.
  rewrite Hmu_x;smt.
 save.

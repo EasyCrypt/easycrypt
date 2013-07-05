@@ -182,10 +182,10 @@ axiom filter_card: forall (P:'a cpred) X,
   card (filter P X) = card X - card (filter (cpNot P) X). 
 
 axiom filter_cPeq_in: forall (x:'a) X,
-  mem x X => filter (cpEq x) X = singleton x.
+  mem x X => filter ((=) x) X = singleton x.
 
 axiom filter_cPeq_card_in : forall (x:'a) X,
-  mem x X => card (filter (cpEq x) X) = 1.
+  mem x X => card (filter ((=) x) X) = 1.
 
 axiom filter_cPtrue : forall (X:'a set), filter cpTrue X = X.
 
