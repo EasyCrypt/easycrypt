@@ -39,18 +39,17 @@ fun.
 rnd (1%r) (lambda (x:bool), true).
 rnd (1%r/2%r) (lambda (x:bool), x).
 skip.
-trivial.
+smt.
 simplify.
 rewrite (Dbool.mu_def  (lambda (x : bool), true)).
 rewrite (Dbool.mu_def  (lambda (x : bool), x)).
 split.
-trivial.
+smt.
 intros H v H'.
 split.
-trivial.
-trivial.
+smt.
+smt.
 save.
-
 
 
 require import Bitstring. 
