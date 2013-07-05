@@ -936,7 +936,7 @@ let t_bdHoare_app dir i phi bd_info g =
       let a = f_hoareS bhs.bhs_m bhs.bhs_pr (stmt s1) phi in
       let b = f_bdHoareS_r { bhs with bhs_pr = phi; bhs_s = stmt s2} in
       prove_goal_by [a;b] (RN_hl_append (dir, Single i,phi,bd_info)) g
-    | AppMult (s,f1,f2,g1,g2), FHle ->
+    | AppMult (s,f1,f2,g1,g2), _ ->
       let goal_s = f_hoareS bhs.bhs_m bhs.bhs_pr (stmt s1) s in
       let a1 = f_bdHoareS_r { bhs with bhs_po = phi; bhs_s = stmt s1; bhs_bd=f1}  in
       let b1 = f_bdHoareS_r { bhs with bhs_pr = f_and s phi; bhs_s = stmt s2; bhs_bd=f2} in
@@ -950,11 +950,14 @@ let t_bdHoare_app dir i phi bd_info g =
       cannot_apply "app" 
         "forward direction not supported with upper bounded Hoare judgments "
       
-    | AppSingle _ , FHle ->
+    | AppSingle _ , (FHeq | FHle) ->
       cannot_apply "app" 
         "single optional bound parameter not supported with upper bounded Hoare judgments"
 
-    | AppSingle bd, FHeq | AppSingle bd, FHge ->
+    (* | AppSingle bd, FHeq *) 
+       (* The condition of the next rule are not suffisant here we should
+          add a range condition *)
+    | AppSingle bd, FHge ->
       let bd1,bd2,cmp1,cmp2 = 
         if dir=Backs then f_real_div_simpl bhs.bhs_bd bd, bd, bhs.bhs_cmp, bhs.bhs_cmp
         else bd, f_real_div_simpl bhs.bhs_bd bd, bhs.bhs_cmp, bhs.bhs_cmp
