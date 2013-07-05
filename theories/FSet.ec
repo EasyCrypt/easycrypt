@@ -579,22 +579,21 @@ proof.
  intros s;elimT set_ind s.
  intros d bd Hmu_x.
  rewrite (mu_eq d _ Fun.cpFalse).
-  delta Fun.(==) cpMem cpFalse;simplify;smt.
+  simplify Fun.(==) cpMem cpFalse;smt.
  rewrite mu_false card_empty //; smt.
  clear s;intros x s Hnmem IH d bd Hmu_x.
  cut ->: (card (add x s))%r * bd = 
           bd + (card s)%r * bd. 
   rewrite card_add_nin //=;smt.
  rewrite (mu_eq d _ (Fun.cpOr (Fun.cpEq x) (cpMem s))).
- delta Fun.(==) cpMem cpOr cpEq;simplify;smt.
+ simplify Fun.(==) cpMem cpOr cpEq;smt.
  rewrite mu_or.
  cut ->: (mu d (Fun.cpAnd (Fun.cpEq x) (cpMem s)) =
           mu d (Fun.cpFalse)).
-  apply mu_eq;delta Fun.(==) cpMem cpFalse;simplify;smt.
+  apply mu_eq;simplify Fun.(==) cpMem cpFalse;smt.
  rewrite mu_false (IH d bd _);first assumption.
  cut ->: (mu d (Fun.cpEq x) = mu_x d x).
-  delta mu_x;simplify; apply mu_eq.
-  delta Fun.(==) cpEq;simplify;trivial.
+  simplify mu_x=> //.
  rewrite Hmu_x;smt.
 save.
 
@@ -735,10 +734,8 @@ theory Dexcepted.
     mu d (cpMem X) < 1%r =>
     Distr.weight (d \ X) = 1%r. 
   proof.
-   intros s d Hll Hmu.
-   delta (\);simplify.
-   rewrite Distr.Dscale.weight_pos;last smt.
+   intros s d Hll Hmu; simplify (\);
+   (rewrite Distr.Dscale.weight_pos;last smt);
    rewrite Drestr.weight_def;smt.
   save.
-
 end Dexcepted.
