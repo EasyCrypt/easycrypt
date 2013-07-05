@@ -385,8 +385,7 @@ intros=> ? ? ? ? C M.
 rewrite ! fold_set_list;first 2 assumption.
 rewrite (foldC x f z (elems xs));first assumption.
 rewrite mem_def //.
-rewrite (fold_permC f z (elems (rm x xs)) (rm x (elems xs))) //;
-  first assumption.
+rewrite (fold_permC f z (elems (rm x xs)) (rm x (elems xs))) //.
 apply elems_rm.
 save.
 
