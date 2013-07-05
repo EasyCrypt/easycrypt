@@ -1955,7 +1955,7 @@ and callable_oracles_i env os i =
 
 let callable_oracles_stmt env = callable_oracles_s env EcPath.Sx.empty
 
-let t_failure_event at_pos cntr ash q f_event some_p g =
+let t_failure_event at_pos cntr ash q f_event pred_specs g =
   let env,_,concl = get_goal_e g in
   match concl.f_node with
     | Fapp ({f_node=Fop(op,_)},[pr;bd]) when is_pr pr 
@@ -2006,6 +2006,13 @@ let t_failure_event at_pos cntr ash q f_event some_p g =
         let old_b_id = EcIdent.create "b" in
         let old_cntr = f_local old_cntr_id tint in
         let old_b = f_local old_b_id tbool in
+        let _,some_p = 
+          try 
+            List.find (fun (o',_) -> o=o') pred_specs 
+          with Not_found ->
+            o,f_true
+            (* tacuerror "Cannot find precondition for oracle %s" (EcPath.x_tostring o) *)
+        in
         let cntr_decr_goal = 
           let pre  = f_and some_p (f_eq old_cntr cntr) in
           let post = f_int_lt old_cntr cntr in
@@ -2022,7 +2029,7 @@ let t_failure_event at_pos cntr ash q f_event some_p g =
       in
       let os_goals = List.concat (List.map oracle_goal (Sx.elements os)) in
       prove_goal_by ([bound_goal;post_goal;init_goal]@os_goals) 
-        (RN_hl_fel (cntr,ash,q,f_event,some_p) )  g
+        (RN_hl_fel (cntr,ash,q,f_event,pred_specs) )  g
     | _ -> 
       cannot_apply "failure event lemma" 
         "A goal of the form Pr[ _ ] <= _ was expected"

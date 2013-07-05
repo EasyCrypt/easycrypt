@@ -327,6 +327,8 @@ type p_app_bd_info = PAppNone | PAppSingle of pformula
                    | PAppMult of (pformula * pformula * pformula * pformula * pformula)
 
 type tac_dir = Backs | Fwds
+
+type pfel_spec_preds = (pgamepath*pformula) list
  
 type phltactic = 
   | Pfun_def  
@@ -357,7 +359,7 @@ type phltactic =
   | Pbdhoaredeno  of cfpattern
   | Pequivdeno    of cfpattern
   | PPr           of pformula * pformula
-  | Pfel          of int * (pformula * pformula * pformula * pformula * pformula)
+  | Pfel          of int * (pformula * pformula * pformula * pformula * pfel_spec_preds)
   | Phoare
   | Pbdhoare
   | Pprbounded

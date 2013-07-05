@@ -1,6 +1,6 @@
 require import Int.
 require import Real.
-require import Map. import OptionGet.
+require import Map. 
 require import Set.
 
 
@@ -78,7 +78,7 @@ axiom distr_ax :
 lemma test : forall (A<:Adv), forall &m,
 Pr[M(A).main() @ &m : O.bad /\ (length O.s) <= qO] <= qO%r * (qO-1)%r * bd.
 intros A &m.
-fel 1 (length O.s) (lambda x, (x%r)*bd) qO O.bad (length O.s < qO).
+fel 1 (length O.s) (lambda x, (x%r)*bd) qO O.bad [O.o : (length O.s < qO /\ x=x)].
   (* subgoal on sum *)
   admit.
   (* event holds as postcondition *)

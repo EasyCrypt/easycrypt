@@ -658,7 +658,7 @@ let process_ppr (phi1,phi2) g =
   let phi2 = process_form qenv phi2 tbool in
   t_ppr phi1 phi2 g
 
-let process_fel at_pos (cntr, ash, q, f_event, some_p) g = 
+let process_fel at_pos (cntr, ash, q, f_event, pred_specs) g = 
   let hyps,concl = get_goal g in
   (* let hyps = LDecl.inv_memenv hyps in  *)
   (* code duplication from t_failure *)
@@ -677,8 +677,14 @@ let process_fel at_pos (cntr, ash, q, f_event, some_p) g =
   let ash = process_form hyps ash (tfun tint treal) in
   let q = process_form hyps q tint in
   let f_event = process_form hyps f_event tbool in
-  let some_p = process_form hyps some_p tbool in
-  t_failure_event at_pos cntr ash q f_event some_p g
+  let process_pred (f,pre) = 
+    let env = LDecl.toenv hyps in
+    let f = EcTyping.trans_gamepath env f in
+    let penv, _ = LDecl.hoareF f hyps in
+    f,process_form penv pre tbool
+  in
+  let pred_specs = List.map process_pred pred_specs in
+  t_failure_event at_pos cntr ash q f_event pred_specs g
 
 let process_hoare_bd_hoare g = t_hoare_bd_hoare g
 let process_prbounded = t_prbounded

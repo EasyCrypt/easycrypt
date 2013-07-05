@@ -1812,8 +1812,9 @@ phltactic:
 
 | BYPR f1=sform f2=sform { PPr(f1,f2) }
 
-| FEL at_pos=NUM cntr=sform delta=sform q=sform f_event=sform some_p=sform
+| FEL at_pos=NUM cntr=sform delta=sform q=sform f_event=sform some_p=fel_pred_specs
    {Pfel (at_pos,(cntr,delta,q,f_event,some_p))}
+
 | EQOBSIN info=eqobs_in {Peqobs_in info}
 (* basic pr based tacs *)
 | HOARE {Phoare}
@@ -1823,6 +1824,12 @@ phltactic:
 | PRFALSE {Pprfalse}
 | BDEQ {Pbdeq}
 ;
+
+fel_pred_spec:
+| f=loc(fident) COLON p=sform  { f,p } 
+fel_pred_specs:
+  | LBRACKET assoc_ps = plist0(fel_pred_spec,SEMICOLON) RBRACKET
+      {assoc_ps}
 
 eqobs_in:
 | empty                              { (None   , None   , None) }
