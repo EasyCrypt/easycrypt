@@ -20,7 +20,7 @@ let tydecl_dump (tyd : tydecl) =
 (* -------------------------------------------------------------------- *)
 type locals = EcIdent.t list 
 
-type operator_kind = 
+type operator_kind =
   | OB_oper of EcTypes.expr option 
   | OB_pred of EcFol.form option
 

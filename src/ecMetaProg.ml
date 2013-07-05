@@ -468,10 +468,13 @@ exception InvalidPosition
 exception InvalidOccurence
 
 module FPosition = struct
+  (* ------------------------------------------------------------------ *)
   let empty : ptnpos = Mint.empty
 
+  (* ------------------------------------------------------------------ *)
   let is_empty (p : ptnpos) = Mint.is_empty p
 
+  (* ------------------------------------------------------------------ *)
   let rec tostring (p : ptnpos) =
     let items = Mint.bindings p in
     let items =
@@ -481,10 +484,12 @@ module FPosition = struct
     in
       String.concat ", " items
 
+  (* ------------------------------------------------------------------ *)
   and tostring1 = function
     | `Select -> "-"
     | `Sub p -> tostring p
 
+  (* ------------------------------------------------------------------ *)
   let select test =
     let rec doit1 ctxt fp =
       if   test ctxt fp
@@ -520,6 +525,7 @@ module FPosition = struct
         | None   -> Mint.empty
         | Some p -> p
 
+  (* ------------------------------------------------------------------ *)
   let occurences =
     let rec doit1 n p =
       match p with
@@ -548,6 +554,12 @@ module FPosition = struct
     in
       fun p -> snd (doit 1 p)
 
+  (* ------------------------------------------------------------------ *)
+  let is_occurences_valid o cpos =
+    let (min, max) = (Sint.min_elt o, Sint.max_elt o) in
+      not (min < 1 || max > occurences cpos)
+
+  (* ------------------------------------------------------------------ *)
   let select_form hyps o p target =
     let cpos =
       let test _ tp = EcReduction.is_alpha_eq hyps p tp in
@@ -559,17 +571,15 @@ module FPosition = struct
     match o with
     | None   -> cpos
     | Some o ->
-      let (min, max) = (Sint.min_elt o, Sint.max_elt o) in
-        if min < 1 || max > occurences cpos then
+        if not (is_occurences_valid o cpos) then
           raise InvalidOccurence;
         filter o cpos
 
-  let topattern ?x (p : ptnpos) (f : form) =
-    let x = match x with None -> EcIdent.create "_p" | Some x -> x in
-  
+  (* ------------------------------------------------------------------ *)
+  let map (p : ptnpos) (tx : form -> form) (f : form) =
     let rec doit1 p fp =
       match p with
-      | `Select -> f_local x fp.f_ty
+      | `Select -> tx fp
       | `Sub p  -> begin
           match fp.f_node with
           | Flocal _ -> raise InvalidPosition
@@ -623,5 +633,12 @@ module FPosition = struct
             fps
   
     in
-      (x, as_seq1 (doit p [f]))
+      as_seq1 (doit p [f])
+
+  (* ------------------------------------------------------------------ *)
+  let topattern ?x (p : ptnpos) (f : form) =
+    let x = match x with None -> EcIdent.create "_p" | Some x -> x in
+    let tx fp = f_local x fp.f_ty in
+
+      (x, map p tx f)
 end
