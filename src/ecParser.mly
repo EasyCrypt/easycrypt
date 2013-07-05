@@ -1705,13 +1705,13 @@ logtactic:
 | SUBST l=sform*
    { Psubst l }
 
-| CUT ip=intro_pattern COLON p=form %prec prec_below_IMPL
+| CUT ip=intro_pattern? COLON p=form %prec prec_below_IMPL
    { Pcut (ip, p, None) }
 
-| CUT ip=intro_pattern COLON p=form BY t=tactic_core
+| CUT ip=intro_pattern? COLON p=form BY t=tactic_core
    { Pcut (ip, p, Some t) }
 
-| CUT ip=intro_pattern CEQ fp=pterm
+| CUT ip=intro_pattern? CEQ fp=pterm
    { Pcutdef (ip, fp) }
 
 | POSE o=rwocc? x=lident CEQ p=form_h %prec prec_below_IMPL

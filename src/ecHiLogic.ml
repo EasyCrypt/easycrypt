@@ -868,7 +868,8 @@ let process_cut (engine : engine) ip phi t g =
     | None   -> g
     | Some t -> t_on_first (engine t) g
   in
-    t_on_last (process_intros [ip]) g
+
+  match ip with None -> g | Some ip -> t_on_last (process_intros [ip]) g
 
 (* -------------------------------------------------------------------- *)
 let process_cutdef loc ip cd g =
@@ -895,7 +896,8 @@ let process_cutdef loc ip cd g =
     in
       t_on_first tt g
   in
-    t_on_last (process_intros [ip]) g
+
+  match ip with None -> g | Some ip -> t_on_last (process_intros [ip]) g
 
 (* -------------------------------------------------------------------- *)
 let process_pose loc xsym o p g =
