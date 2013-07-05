@@ -500,6 +500,7 @@ let priority_of_binop name =
   | Some EP.MINUS -> Some e_bin_prio_op2
   | Some EP.OP3 _ -> Some e_bin_prio_op3
   | Some EP.STAR  -> Some e_bin_prio_op3
+  | Some EP.SLASH -> Some e_bin_prio_op3
   | Some EP.OP4 _ -> Some e_bin_prio_op4
 
   | _ -> None

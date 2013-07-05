@@ -52,7 +52,7 @@ by [].
 lemma hd_tl_cons: forall (xs:'a list),
   xs <> [] => (hd xs)::(tl xs) = xs.
 proof strict.
-by intros=> xs; elimT list_ind xs=> // x xs' IH h {h};
+by intros=> xs; elim/list_ind xs=> // x xs' IH h {h};
    rewrite hd_cons tl_cons=> //.
 qed.
 
