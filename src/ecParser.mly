@@ -1548,9 +1548,9 @@ conseq:
 ;
 
 conseq_bd:
-| c=conseq                    { c, None }
-| c=conseq COLON bd=form      { c, Some bd } 
-| c= UNDERSCORE COLON bd=form { (None, None), Some bd }
+| c=conseq                 { c, None }
+| c=conseq COLON bd=form   { c, Some bd } 
+| UNDERSCORE COLON bd=form { (None, None), Some bd }
 
 call_info: 
  | f1=form LONGARROW f2=form             { CI_spec (f1, f2) }
