@@ -324,7 +324,7 @@ type call_info =
    AppNone is required for the rest of judgments 
 *)
 type p_app_bd_info = PAppNone | PAppSingle of pformula 
-                   | PAppMult of (pformula * pformula * pformula * pformula)
+                   | PAppMult of (pformula * pformula * pformula * pformula * pformula)
 
 type tac_dir = Backs | Fwds
  
@@ -349,7 +349,8 @@ type phltactic =
   | Pkill       of (tac_side * codepos * int option)
   | Prnd        of tac_side * pformula rnd_tac_info
   | Palias      of (tac_side * codepos * psymbol option)
-  | Pconseq     of bool * cfpattern
+  | Pconseq     of bool * cfpattern 
+  | Pconseq_bd  of pformula
   | Phr_exists_elim  
   | Phr_exists_intro of pformula list 
   | Pexfalso
@@ -378,8 +379,6 @@ type rwarg =
 
 and rwside = [`LtoR | `RtoL]
 and rwocc  = Sint.t option
-and renaming = [`noName | `findName | `withRename of string |
-  `noRename of string]
 
 type intropattern1 =
   | IPCore  of renaming located
@@ -390,6 +389,10 @@ type intropattern1 =
   | IPSimplify
 
 and intropattern = intropattern1 list
+
+and renaming = [
+  `NoName | `FindName | `WithRename of string | `NoRename of string
+]
 
 type logtactic =
   | Passumption of (pqsymbol option * ptyannot option)

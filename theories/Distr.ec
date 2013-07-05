@@ -20,9 +20,34 @@ axiom mu_false : forall (d:'a distr), mu d cpFalse = 0%r.
 axiom mu_or : forall (d:'a distr, p, q:'a cpred), 
   mu d (cpOr p q) = mu d p + mu d q - mu d (cpAnd p q).
 
+axiom mu_in_supp : forall (d:'a distr, p:'a cpred),
+  mu d p = mu d (cpAnd p (lambda x, in_supp x d)).
+
 axiom mu_sub : forall (d:'a distr, p, q:'a cpred),
   p <= q => mu d p <= mu d q.
 
+lemma mu_eq : forall (d:'a distr, p, q:'a cpred),
+  p == q => mu d p = mu d q.
+proof. smt. qed.
+
+(* TODO : FIX this bug *)
+(*lemma mu_in_supp_sub : forall (d:'a distr, p, q:'a cpred),
+  (forall (a:'a), in_supp a d => p a => q a) =>
+  mu d p <= mu d q.*) 
+
+lemma mu_in_supp_sub : forall (d:'a distr, p q:'a cpred),
+  (forall (a:'a), in_supp a d => p a => q a) =>
+  mu d p <= mu d q.
+proof.
+  intros d p q H;rewrite (mu_in_supp d p).
+  apply mu_sub;simplify cpAnd => x [H1 H2];apply H=> //.
+save.
+
+lemma mu_in_supp_eq : forall (d:'a distr, p q:'a cpred),
+  (forall (a:'a), in_supp a d => (p a <=> q a)) =>
+  mu d p = mu d q.
+proof. smt. save.
+  
 pred (==)(d d':'a distr) =
   (forall x, mu_x d x = mu_x d' x).
 
@@ -56,8 +81,8 @@ theory Dempty.
   lemma unique : forall (d:'a distr),
     weight d = 0%r <=> d = dempty.
   proof.
-  intros d; split; last smt.
-  intros weight_0; rewrite -(mu_ext<:'a> d dempty); smt.
+    intros d; split; last smt.
+    intros weight_0; rewrite -(mu_ext<:'a> d dempty); smt.
   qed.
 end Dempty.
 
@@ -90,7 +115,7 @@ theory Dinter.
   op dinter : int -> int -> int distr.
 
   axiom supp_def : forall (i j x:int),
-    in_supp x (dinter i j) <=> i <= x /\ x <= j.
+    in_supp x (dinter i j) <=> i <= x <= j.
 
   (* We could use sums to generalize this:
   axiom mu_x_def : forall (i j:int) (p:int cPred),
@@ -106,6 +131,16 @@ theory Dinter.
 
   axiom weight_def : forall (i j:int), 
     weight (dinter i j) = if i <= j then 1%r else 0%r.
+
+  
+  lemma mu_in_supp : forall (i j : int),
+    i <= j => 
+    mu (dinter i j) (lambda x, i <= x <= j) = 1%r.
+  proof.
+    intros i j H.
+    rewrite -(mu_in_supp_eq (dinter i j) cpTrue);smt.
+  save.
+
 end Dinter.
 
 (** Normalization of a sub-distribution *)

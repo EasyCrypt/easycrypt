@@ -1,6 +1,6 @@
 require import Distr.
 require import Set.
-require import Map. import OptionGet.
+require import Map. 
 require import Int.
 
 module type O = { 
