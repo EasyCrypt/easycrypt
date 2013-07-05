@@ -353,15 +353,19 @@ For upper bounded judgments, the most general variant of the
 \begin{displaymath}
   \infrule{
     \begin{array}{c}
-      \HoareLe{s1}{P}{R}{f_1} \qquad \HoareLe{s2}{R}{Q}{f_2}
+      \Hoare{s1}{P}{\varphi}
       \\
-      \HoareLe{s1}{P}{\neg R}{g_1} \qquad \HoareLe{s2}{\neg R}{Q}{g_2}
+      \HoareLe{s1}{P}{R}{f_1} \qquad 
+             \HoareLe{s2}{\varphi \land R}{Q}{f_2}
+      \\
+      \HoareLe{s1}{P}{\neg R}{g_1} \qquad 
+             \HoareLe{s2}{\varphi \land \neg R}{Q}{g_2}
       \\
       f_1 f_2 + g_1 g_2 \leq f 
     \end{array}
   }{
     \HoareLe{s1;s2}{P}{Q}{f}
-  }\left[\verb+seq+\ \right]
+  }\left[\verb+seq+\ \varphi\ f_1\ f_2\ g_1\ g_2 \right]
 \end{displaymath}
 %
 If no argument is given then the following rule is applied:

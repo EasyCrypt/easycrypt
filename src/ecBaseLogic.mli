@@ -84,6 +84,7 @@ type rule_name =
   | RN_hl_hoare_rnd
   | RN_hl_equiv_rnd of rnd_tac_info
   | RN_hl_conseq 
+  | RN_hl_conseq_bd
   | RN_hl_exfalso 
   | RN_hl_hoare_equiv 
   | RN_hl_deno      
