@@ -54,7 +54,7 @@ lemma mem_rm_neq: forall (x x':'a) X,
 by [].
 
 (** single *)
-op single (x:'a) = cpEq x.
+op single (x:'a) = (=) x.
 lemma mem_single_eq: forall (x:'a),
   mem x (single x)
 by [].

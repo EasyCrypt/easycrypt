@@ -24,7 +24,6 @@ pred (>)  (p q:'a cpred) = p >= q /\ p <> q.
 (** Operators on predicates *)
 op cpTrue (x:'a) : bool = true.
 op cpFalse (x:'a) : bool = false.
-op cpEq (x:'a) : 'a -> bool = (=) x.
 
 op cpNot(p:'a cpred, x:'a) : bool = !p x.
 op cpAnd(p q:'a cpred, x:'a) : bool = p x /\ q x.

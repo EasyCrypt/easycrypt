@@ -171,7 +171,6 @@
 %token COMPUTE
 %token CONGR
 %token CONSEQ
-%token CONSEQBD
 %token EXFALSO
 %token CONST
 %token CUT
@@ -1556,9 +1555,9 @@ conseq:
 ;
 
 conseq_bd:
-| c=conseq                 { c, None }
-| c=conseq COLON bd=form   { c, Some bd } 
-| UNDERSCORE COLON bd=form { (None, None), Some bd }
+| c=conseq                                   { c, None }
+| c=conseq   COLON cmp=hoare_bd_cmp? bd=sform { c, Some (cmp, bd) } 
+| UNDERSCORE COLON cmp=hoare_bd_cmp? bd=sform { (None, None), Some(cmp, bd) }
 
 call_info: 
  | f1=form LONGARROW f2=form             { CI_spec (f1, f2) }
@@ -1823,9 +1822,6 @@ phltactic:
 
 | CONSEQ nm=STAR? info=fpattern(conseq_bd)
     { Pconseq (nm<>None, info) }
-
-| CONSEQBD bd=sform
-    { Pconseq_bd bd }
 
 | ELIM STAR
     { Phr_exists_elim }

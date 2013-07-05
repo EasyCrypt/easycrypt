@@ -110,7 +110,6 @@
 
     "equiv_deno"  , EQUIVDENO  ;        (* KW: tactic *) 
     "conseq"      , CONSEQ     ;        (* KW: tactic *)
-    "conseq_bd"   , CONSEQBD   ;        (* KW: tactic *)
     "exfalso"     , EXFALSO    ;        (* KW: tactic *)
     "inline"      , INLINE     ;        (* KW: tactic *)
     "alias"       , ALIAS      ;        (* KW: tactic *)

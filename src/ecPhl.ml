@@ -306,29 +306,29 @@ let t_bdHoareS_conseq pre post g =
   let concl3 = f_bdHoareS_r { bhs with bhs_pr = pre; bhs_po = post } in
   prove_goal_by [concl1; concl2; concl3] (RN_hl_conseq) g
 
-let t_bdHoareF_conseq_bd bd g =
+let bd_goal fcmp fbd cmp bd = 
+  match fcmp, cmp with
+  | FHle, (FHle | FHeq) -> f_real_le bd fbd
+  | FHle, FHge -> tacuerror "can not swap comparison"
+  | FHeq, FHeq -> f_eq bd fbd
+  | FHeq, _ -> tacuerror "can only equality is accepted"
+  | FHge, (FHge | FHeq)  -> f_real_le fbd bd
+  | FHge, FHle -> tacuerror "can not swap comparison"
+
+let t_bdHoareF_conseq_bd cmp bd g =
   let env,_,concl = get_goal_e g in
   let bhf = destr_bdHoareF concl in
   let mpr,_ = EcEnv.Fun.hoareF_memenv bhf.bhf_f env in
-  let bd_goal = match bhf.bhf_cmp with
-    | FHle -> f_real_le bd bhf.bhf_bd
-    | FHeq -> f_eq bd bhf.bhf_bd
-    | FHge -> f_real_le bhf.bhf_bd bd
-  in
-  let concl = f_bdHoareF bhf.bhf_pr bhf.bhf_f bhf.bhf_po bhf.bhf_cmp bd in
+  let bd_goal =  bd_goal bhf.bhf_cmp bhf.bhf_bd cmp bd in
+  let concl = f_bdHoareF bhf.bhf_pr bhf.bhf_f bhf.bhf_po cmp bd in
   let bd_goal = gen_mems [mpr] (f_imp bhf.bhf_pr bd_goal) in
   prove_goal_by [bd_goal;concl] (RN_hl_conseq_bd) g  
 
-let t_bdHoareS_conseq_bd bd g =
+let t_bdHoareS_conseq_bd cmp bd g =
   let concl = get_concl g in
   let bhs = destr_bdHoareS concl in
-  (* let mpr,mpo = EcEnv.Fun.hoareF_memenv bhf.bhf_f env in *)
-  let bd_goal = match bhs.bhs_cmp with
-    | FHle -> f_real_le bd bhs.bhs_bd
-    | FHeq -> f_eq bd bhs.bhs_bd
-    | FHge -> f_real_le bhs.bhs_bd bd
-  in
-  let concl = f_bdHoareS bhs.bhs_m bhs.bhs_pr bhs.bhs_s bhs.bhs_po bhs.bhs_cmp bd in
+  let bd_goal =  bd_goal bhs.bhs_cmp bhs.bhs_bd cmp bd in
+  let concl = f_bdHoareS bhs.bhs_m bhs.bhs_pr bhs.bhs_s bhs.bhs_po cmp bd in
   let bd_goal = gen_mems [bhs.bhs_m] (f_imp bhs.bhs_pr bd_goal) in
   prove_goal_by [bd_goal;concl] (RN_hl_conseq_bd) g  
 
@@ -936,7 +936,7 @@ let t_bdHoare_app dir i phi bd_info g =
       let a = f_hoareS bhs.bhs_m bhs.bhs_pr (stmt s1) phi in
       let b = f_bdHoareS_r { bhs with bhs_pr = phi; bhs_s = stmt s2} in
       prove_goal_by [a;b] (RN_hl_append (dir, Single i,phi,bd_info)) g
-    | AppMult (s,f1,f2,g1,g2), FHle ->
+    | AppMult (s,f1,f2,g1,g2), _ ->
       let goal_s = f_hoareS bhs.bhs_m bhs.bhs_pr (stmt s1) s in
       let a1 = f_bdHoareS_r { bhs with bhs_po = phi; bhs_s = stmt s1; bhs_bd=f1}  in
       let b1 = f_bdHoareS_r { bhs with bhs_pr = f_and s phi; bhs_s = stmt s2; bhs_bd=f2} in
@@ -950,11 +950,14 @@ let t_bdHoare_app dir i phi bd_info g =
       cannot_apply "app" 
         "forward direction not supported with upper bounded Hoare judgments "
       
-    | AppSingle _ , FHle ->
+    | AppSingle _ , (FHeq | FHle) ->
       cannot_apply "app" 
         "single optional bound parameter not supported with upper bounded Hoare judgments"
 
-    | AppSingle bd, FHeq | AppSingle bd, FHge ->
+    (* | AppSingle bd, FHeq *) 
+       (* The condition of the next rule are not suffisant here we should
+          add a range condition *)
+    | AppSingle bd, FHge ->
       let bd1,bd2,cmp1,cmp2 = 
         if dir=Backs then f_real_div_simpl bhs.bhs_bd bd, bd, bhs.bhs_cmp, bhs.bhs_cmp
         else bd, f_real_div_simpl bhs.bhs_bd bd, bhs.bhs_cmp, bhs.bhs_cmp
@@ -975,12 +978,6 @@ let t_bdHoare_app dir i phi bd_info g =
       let b = f_bdHoareS_r { bhs with bhs_pr = phi; bhs_s = stmt s2;
         bhs_bd = bd2; bhs_cmp = cmp2 } in
       prove_goal_by [a;b] (RN_hl_append (dir, Single i,phi,bd_info)) g
-      
-    | AppMult _, _ ->
-      cannot_apply "app" 
-        "multiple bound parameters not supported with lower bounded and exact Hoare judgments"
-
-
 
 let t_equiv_app (i,j) phi g =
   let concl = get_concl g in

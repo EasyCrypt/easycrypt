@@ -5,7 +5,7 @@ require import Real.
 
 op charfun (p:'a cpred, x:'a) : real = if p x then 1%r else 0%r.
 
-op mu_x(d:'a distr, x) : real = mu d (cpEq x).
+op mu_x(d:'a distr, x) : real = mu d ((=) x).
 
 op weight(d:'a distr) : real = mu d cpTrue.
 
