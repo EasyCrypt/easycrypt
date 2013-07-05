@@ -307,21 +307,18 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
           (subst, EcEnv.Mod.bind me.me_name (EcSubst.subst_module subst me) scenv)
 
       | CTh_theory (x, cth) -> begin
-        match Msym.find_opt x ovrds.evc_ths with
-        | None ->
-            (subst, EcEnv.Theory.bindx x (EcSubst.subst_ctheory subst cth) scenv)
-  
-        | Some subovrds ->
-            let (subst, nth) =
-              let subscenv = EcEnv.Theory.enter name scenv in
-              let (subst, subscenv) =
-                List.fold_left
-                  (ovr1 (prefix @ [x]) subovrds)
-                  (subst, subscenv) cth.cth_struct
-              in
-                (subst, EcEnv.ctheory_of_ctheory_w3 (EcEnv.Theory.close subscenv))
+          let subovrds = Msym.find_opt x ovrds.evc_ths in
+          let subovrds = EcUtils.odfl evc_empty subovrds in
+          let (subst, nth) =
+            let subscenv = EcEnv.Theory.enter x scenv in
+            let (subst, subscenv) =
+              List.fold_left
+                (ovr1 (prefix @ [x]) subovrds)
+                (subst, subscenv) cth.cth_struct
             in
-              (subst, EcEnv.Theory.bindx x nth scenv)
+              (subst, EcEnv.Theory.close subscenv)
+          in
+            (subst, EcEnv.Theory.bind x nth scenv)
       end
 
       | CTh_export p ->               (* FIXME: subst in p? *)
