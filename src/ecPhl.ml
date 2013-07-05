@@ -1932,28 +1932,38 @@ let t_rcond side b at_pos g =
 
 
 (* takes an xpath, returns xpath set *)
-let callable_oracles_f env os f =
+let rec callable_oracles_f env modv os f =
   let f = NormMp.norm_xpath env f in
   let func = Fun.by_xpath f env in
-  match func.f_def with
-    | FBabs oi ->
-      List.fold_left (fun s o -> EcPath.Sx.add o s) os oi.oi_calls
-  | FBdef fdef ->
-    List.fold_left (fun s o -> EcPath.Sx.add o s) 
-      os fdef.f_uses.us_calls
-
-let rec callable_oracles_s env os s =
-  callable_oracles_is env os s.s_node
-and callable_oracles_is env os is = 
-  List.fold_left (callable_oracles_i env) os is
-and callable_oracles_i env os i = 
+  let called_fs = 
+    match func.f_def with
+      | FBabs oi ->
+        List.fold_left (fun s o -> 
+          if PV.indep env modv (f_write env o) then s else EcPath.Sx.add o s)
+          EcPath.Sx.empty oi.oi_calls
+      | FBdef fdef ->
+        List.fold_left (fun s o -> 
+          if PV.indep env modv (f_write env o) then s else EcPath.Sx.add o s)
+          EcPath.Sx.empty fdef.f_uses.us_calls
+  in
+  let f_written = f_write ~except_fs:called_fs env f in
+  if PV.indep env f_written modv then
+    List.fold_left (callable_oracles_f env modv)  os (EcPath.Sx.elements called_fs)
+  else
+    EcPath.Sx.add f os
+  
+and callable_oracles_s env modv os s =
+  callable_oracles_is env modv os s.s_node
+and callable_oracles_is env modv os is = 
+  List.fold_left (callable_oracles_i env modv) os is
+and callable_oracles_i env modv os i = 
   match i.i_node with
-    | Scall(_,f,_) -> callable_oracles_f env os f
-    | Sif (_,s1,s2) -> callable_oracles_s env (callable_oracles_s env os s1) s2
-    | Swhile (_,s) -> callable_oracles_s env os s
+    | Scall(_,f,_) -> callable_oracles_f env modv os f
+    | Sif (_,s1,s2) -> callable_oracles_s env modv (callable_oracles_s env modv os s1) s2
+    | Swhile (_,s) -> callable_oracles_s env modv os s
     | Sasgn _ | Srnd _ | Sassert _ -> os 
 
-let callable_oracles_stmt env = callable_oracles_s env EcPath.Sx.empty
+let callable_oracles_stmt env (modv:PV.t) = callable_oracles_s env modv EcPath.Sx.empty
 
 let t_failure_event at_pos cntr ash q f_event pred_specs g =
   let env,_,concl = get_goal_e g in
@@ -1971,7 +1981,8 @@ let t_failure_event at_pos cntr ash q f_event pred_specs g =
           cannot_apply "fel" "not applicable to abstract functions"
       in
       let s_hd,s_tl = s_split "fel" at_pos fdef.f_body in
-      let os = callable_oracles_stmt env (stmt s_tl) in
+      let fv = PV.fv env mhr f_event in
+      let os = callable_oracles_stmt env fv (stmt s_tl) in
       (* check that bad event is only modified in oracles *)
       (* let fv = PV.fv env mhr f_event in *)
       (* if not (PV.indep env (s_write ~except_fs:os env (stmt s_tl)) (fv) ) then *)
@@ -1998,7 +2009,7 @@ let t_failure_event at_pos cntr ash q f_event pred_specs g =
       let oracle_goal o = 
         let not_F_to_F_goal = 
           let bound = f_app_simpl ash [cntr] treal in
-          let pre = f_not f_event in
+          let pre = f_and (f_int_le (f_int 0) cntr) (f_not f_event) in
           let post = f_event in
           f_bdHoareF pre o post FHle bound
         in
@@ -2015,7 +2026,7 @@ let t_failure_event at_pos cntr ash q f_event pred_specs g =
         in
         let cntr_decr_goal = 
           let pre  = f_and some_p (f_eq old_cntr cntr) in
-          let post = f_int_lt old_cntr cntr in
+          let post = f_and (f_int_lt old_cntr cntr) (f_int_le cntr q) in
           f_forall_simpl [old_cntr_id,GTty tint] 
             (f_hoareF pre o post)
         in
