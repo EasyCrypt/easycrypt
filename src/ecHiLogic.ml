@@ -755,20 +755,7 @@ let process_intros ?(cf = true) pis (juc, n) =
     let f       = snd (get_node (g, n)) in
       t_on_goals
         (t_clear (EcIdent.Sid.of_list [h]))
-        (t_on_first (t_use n []) (t_elim f (g, an)))
-
-  and simplify g =
-    let ri = {
-      EcReduction.beta    = true;
-      EcReduction.delta_p = None;
-      EcReduction.delta_h = None;
-      EcReduction.zeta    = true;
-      EcReduction.iota    = true;
-      EcReduction.logic   = false; 
-      EcReduction.modpath = false;
-    } in
-      t_simplify ri g
-  in
+        (t_on_first (t_use n []) (t_elim f (g, an))) in
 
   let rec collect acc core pis =
     let maybe_core () =
@@ -810,13 +797,13 @@ let process_intros ?(cf = true) pis (juc, n) =
           | `Done b   ->
               let t =
                 match b with
-                | true  -> t_seq simplify process_trivial
+                | true  -> t_seq t_simplify_nodelta process_trivial
                 | false -> process_trivial
               in
                 (nointro, t_on_goals t gs)
 
           | `Simpl ->
-              (nointro, t_on_goals simplify gs)
+              (nointro, t_on_goals t_simplify_nodelta gs)
 
           | `Clear xs ->
               (nointro, t_on_goals (process_clear xs) gs)
