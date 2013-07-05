@@ -53,7 +53,7 @@ theory SumSet.
     pose xs := s.
     cut lem : xs <= s => sum f xs = sum f' xs;
       last apply lem;delta xs;apply leq_refl.
-    elimT set_comp xs;first rewrite ! sum_nil //.
+    elim/set_comp xs;first rewrite ! sum_nil //.
     intros ? ? ? ?.
     rewrite (sum_rm _ _ (pick s0));first apply mem_pick;trivial.
     rewrite (sum_rm<:'a> f' _ (pick s0));first apply mem_pick;trivial.
@@ -69,7 +69,7 @@ theory SumSet.
     (sum f s) + (sum g s) = sum (lambda x, f x + g x) s.
   proof.
     intros ? ? ?.
-    elimT set_comp s;first rewrite ! sum_nil addZ //.
+    elim/set_comp s;first rewrite ! sum_nil addZ //.
     intros ? ? ?.
     rewrite (sum_rm f _ (pick s0));first apply mem_pick;trivial.
     rewrite (sum_rm g _ (pick s0));first apply mem_pick;trivial.
@@ -88,7 +88,7 @@ theory SumSet.
     pose xs := s.
     cut lem : (xs <= s => (sum f xs) = sum (lambda x, f (gg x)) (img g xs));
       last apply lem;delta xs;apply leq_refl.
-    elimT set_comp xs;first rewrite ! sum_nil //;
+    elim/set_comp xs;first rewrite ! sum_nil //;
       first rewrite img_empty;rewrite sum_nil;trivial.
     intros ? ? ? ?.
     rewrite (sum_rm _ _ (pick s0));first apply mem_pick;trivial.
@@ -124,7 +124,7 @@ theory NatMul.
     intros ? ? ? ?.
     pose xs := s.
     cut lem : xs <= s => sum f xs = (card xs)*k;last apply lem;delta xs;apply leq_refl.
-    elimT set_comp xs;first rewrite sum_nil card_empty=> ?;
+    elim/set_comp xs;first rewrite sum_nil card_empty=> ?;
       first rewrite MulZ //.
     intros ? ? ? ?.
     rewrite (sum_rm _ _ (pick s0));first apply mem_pick;by trivial.

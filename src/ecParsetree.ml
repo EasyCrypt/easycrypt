@@ -410,8 +410,8 @@ type logtactic =
   | Pcongr
   | Pelim       of ffpattern 
   | Papply      of ffpattern
-  | Pcut        of (intropattern1 * pformula * ptactic_core option)
-  | Pcutdef     of (intropattern1 * pterm)
+  | Pcut        of (intropattern1 option * pformula * ptactic_core option)
+  | Pcutdef     of (intropattern1 option * pterm)
   | Pgeneralize of (rwocc * pformula) list
   | Pclear      of psymbol list
   | Prewrite    of rwarg list

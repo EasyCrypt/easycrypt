@@ -125,6 +125,20 @@ let upd_rule d pr (juc,n as g) =
 let upd_rule_done = upd_rule true
 let upd_rule      = upd_rule false
 
+(* -------------------------------------------------------------------- *)
+let rec destruct_product hyps fp =
+  let module R = EcReduction in
+
+  match EcFol.sform_of_form fp with
+  | SFquant (Lforall, (x, t), f) -> Some (`Forall (x, t, f))
+  | SFimp (f1, f2) -> Some (`Imp (f1, f2))
+  | _ -> begin
+    match R.h_red_opt R.full_red hyps fp with
+    | None   -> None
+    | Some f -> destruct_product hyps f
+  end
+
+(* -------------------------------------------------------------------- *)
 let t_id msg (juc,n) =
   oiter msg (fun x -> Printf.fprintf stderr "DEBUG: %s\n%!" x);
   (juc, [n])
@@ -828,50 +842,82 @@ let t_generalize_hyps clear ids g =
     t_seq (t_generalize_hyps ids) (t_clear (EcIdent.Sid.of_list ids)) g
   else t_generalize_hyps ids g
 
-let t_elimT f p g =
-  let hyps,concl = get_goal g in
-  let ax = EcEnv.Ax.by_path p (LDecl.toenv hyps) in
-  let rec skip_imp a f =
-    if is_imp f then skip_imp (AAnode::a) (snd (destr_imp f))
-    else a, f in
+(* -------------------------------------------------------------------- *)
+let t_elimT tys p f sk g =
+  let noelim () = tacuerror "not a valid elimination principle" in
 
+  let (hyps, concl) = get_goal g in
   let env = LDecl.toenv hyps in
-  match ax.EcDecl.ax_spec with
-  | None -> tacuerror "Cannot recognize elimination lemma"
-  | Some fax ->
-    let tys =
-      let tpred =
-        try
-          match destr_forall1 fax with
-          | _, GTty ty, _ -> ty
-          | _             -> raise Not_found
-        with _ -> tacuerror "Cannot recognize the elimination lemma" in
-      let ue = EcUnify.UniEnv.create (Some (LDecl.tohyps hyps).h_tvar) in
-      let (ue, tpred,tys) =
-        EcUnify.UniEnv.freshen ue ax.EcDecl.ax_tparams None tpred in
-      EcUnify.unify env ue tpred (tfun f.f_ty tbool);
-      let subst = Tuni.subst (EcUnify.UniEnv.close ue) in
-      List.map subst tys in
-    let fax = EcEnv.Ax.instanciate p tys env in
-    let vx, _, fax = destr_forall1 fax in
-    let pf =
-      let x, body = pattern_form (Some (EcIdent.name vx)) hyps f concl in
-      f_lambda [x,GTty f.f_ty] body in
-    let aa =
-      if is_forall fax then
-        let _,_,fax = destr_forall1 fax in
-        let aa, _ = skip_imp [] fax in
-        AAform f::aa
-      else
-        let aa,fax = skip_imp [] fax in
-        if not (is_forall fax) then 
-          tacuerror "Cannot recognize elimination lemma";
-        List.rev_append aa [AAform f] in
-    t_apply_glob p tys (AAform pf::aa) g
+  let ax  = EcEnv.Ax.by_path p env in
 
+  let rec skip i a f =
+    match i, EcFol.sform_of_form f with
+    | Some i, _ when i <= 0 -> (a, f)
+    | Some i, SFimp (_, f2) -> skip (Some (i-1)) (AAnode :: a) f2
+    | None  , SFimp (_, f2) -> skip None (AAnode :: a) f2
+    | Some _, _ -> noelim ()
+    | None  , _ -> (a, f)
+  in
+
+  match ax.EcDecl.ax_spec with
+  | None -> noelim ()
+
+  | Some _ ->
+      let ax = EcEnv.Ax.instanciate p tys env in
+      let (pr, prty, ax) =
+        match sform_of_form ax with
+        | SFquant (Lforall, (pr, GTty prty), ax) -> (pr, prty, ax)
+        | _ -> noelim ()
+      in
+
+      if not (EcReduction.equal_type env prty (tfun f.f_ty tbool)) then
+        noelim();
+
+      let (aa1, ax) = skip None [] ax in
+
+      let (x, _xty, ax) =
+        match sform_of_form ax with
+        | SFquant (Lforall, (x, GTty xty), ax) -> (x, xty, ax)
+        | _ -> noelim ()
+      in
+
+      let (aa2, ax) =
+        let rec doit ax aa =
+          match destruct_product hyps ax with
+          | Some (`Imp (f1, f2)) when Mid.mem pr f1.f_fv ->
+              doit f2 (AAnode :: aa)
+          | _ -> (aa, ax)
+        in
+          doit ax []
+      in
+
+      let pf =
+        let (_, concl) = skip (Some sk) [] concl in
+        let (z, concl) = pattern_form (Some (EcIdent.name x)) hyps f concl in
+          Fsubst.f_subst_local pr (f_lambda [(z, GTty f.f_ty)] concl) ax
+      in
+
+      let pf_inst = Fsubst.f_subst_local x f pf in
+
+      let (aa3, sk) =
+        let rec doit pf_inst (aa, sk) =
+          if   EcReduction.is_conv hyps pf_inst concl
+          then (aa, sk)
+          else
+            match destruct_product hyps pf_inst with
+            | Some (`Imp (_, f2)) -> doit f2 (AAnode :: aa, sk+1)
+            | _ -> noelim ()
+        in
+          doit pf_inst ([], sk)
+      in
+
+      let pf = f_lambda [(x, GTty f.f_ty)] (snd (skip (Some sk) [] pf)) in
+        t_apply_glob p tys (AAform pf :: aa1 @ (AAform f :: (aa2 @ aa3))) g
+
+(* -------------------------------------------------------------------- *)
 let t_case f g =
   check_logic (LDecl.toenv (get_hyps g)) p_case_eq_bool;
-  t_elimT f p_case_eq_bool g
+  t_elimT [] p_case_eq_bool f 0 g
 
 let prove_goal_by sub_gs rule (juc,n as g) =
   let hyps,_ = get_goal g in
@@ -1144,7 +1190,7 @@ let t_progress tac g =
       t_seq (t_intros_i ids) aux g
     | Flet (LTuple fs,f1,_) ->
       let p = p_tuple_ind (List.length fs) in
-      t_seq (t_elimT f1 p) aux g
+      t_seq (t_elimT (List.map snd fs) p f1 0) aux g
     | Fapp({f_node = Fop(p,_)}, [f1;_]) when EcPath.p_equal p EcCoreLib.p_imp ->
       let id = LDecl.fresh_id hyps "H" in
       t_seq (t_intros_i [id]) (aux2 id f1) g
