@@ -741,33 +741,31 @@ let process_change pf g =
 
 (* -------------------------------------------------------------------- *)
 let process_intros ?(cf = true) pis (juc, n) =
-  
   let mk_intro ids g =
-    let hyps = ref (fst (get_goal g)) in
-    let form = ref (snd (get_goal g)) in
-    t_intros (List.map (fun s ->
+    t_intros (snd (List.map_fold (fun (hyps, form) s ->
       let rec destruct fp =
-        let module R = EcReduction in
         match EcFol.sform_of_form fp with
-        | SFquant (Lforall, (x, _), newF) -> (EcIdent.name x, newF)
-        | SFlet (LSymbol(x,_), _, newF) -> (EcIdent.name x, newF)
-        | SFimp (_, newF) -> ("H", newF)
+        | SFquant (Lforall, (x, _)  , fp) -> (EcIdent.name x, fp)
+        | SFlet   (LSymbol (x, _), _, fp) -> (EcIdent.name x, fp)
+        | SFimp   (_                , fp) -> ("H", fp)
         | _ -> begin
-          match R.h_red_opt R.full_red !hyps fp with
+          match EcReduction.h_red_opt EcReduction.full_red hyps fp with
           | None   -> ("_", f_true)
           | Some f -> destruct f
         end
       in
-      let name, newF = destruct !form in
-      let id = (lmap (function
-        | `noName -> EcIdent.create "_"
-        | `findName -> LDecl.fresh_id !hyps name
-        | `noRename s -> EcIdent.create s
-        | `withRename s -> LDecl.fresh_id !hyps s
-      ) s) in
-      hyps := LDecl.add_local id.pl_desc (LD_var(tbool,None)) !hyps;
-      form := newF;
-      id) ids) g
+      let name, form = destruct form in
+      let id = 
+        lmap (function
+        | `NoName       -> EcIdent.create "_"
+        | `FindName     -> LDecl.fresh_id hyps name
+        | `NoRename s   -> EcIdent.create s
+        | `WithRename s -> LDecl.fresh_id hyps s) s
+      in
+
+      let hyps = LDecl.add_local id.pl_desc (LD_var (tbool, None)) hyps in
+        (hyps, form), id)
+      (get_goal g) ids)) g
   in
 
   let elim_top g =
