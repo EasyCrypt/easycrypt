@@ -361,10 +361,10 @@ lemma fold_set_list:
     (forall a b X, f a (f b X) = f b (f a X)) =>
       fold f e xs = List.fold_right f e (elems xs).
 intros=> f e xs C.
-elimT set_comp xs;
+elim/set_comp xs;
   first by rewrite fold_empty elems_empty fold_right_nil //.
 intros s nempty Hind.
-elimT list_case_eq (elems s);
+elim/list_case_eq (elems s);
   first by apply absurd=> _;rewrite -elems_empty elems_eq //.
 intros=> x l' h.
 cut xval : pick s = x;first rewrite pick_def h hd_cons //.

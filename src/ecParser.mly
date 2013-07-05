@@ -275,6 +275,7 @@
 %token SEQ
 %token SIMPLIFY
 %token SKIP
+%token SLASH
 %token SLASHEQ
 %token SLASHSLASH
 %token SLASHSLASHEQ
@@ -327,7 +328,7 @@
 %right QUESTION
 %left OP2 MINUS ADD
 %right ARROW
-%left OP3 STAR
+%left OP3 STAR SLASH
 %left OP4 
 
 %nonassoc LBRACE
@@ -581,6 +582,9 @@ expr_u:
 | e1=expr op=loc(STAR) ti=tvars_app?  e2=expr  
     { peapp_symb op.pl_loc "*" ti [e1; e2] }
 
+| e1=expr op=loc(SLASH) ti=tvars_app?  e2=expr  
+    { peapp_symb op.pl_loc "/" ti [e1; e2] }
+
 | c=expr QUESTION e1=expr COLON e2=expr %prec OP2
    { PEif (c, e1, e2) }
 
@@ -774,8 +778,11 @@ form_u(P):
 | e1=form_r(P) op=loc(AND) ti=tvars_app? e2=form_r(P)  
     { pfapp_symb op.pl_loc (str_and op.pl_desc) ti [e1; e2] }
 
-| e1=form_r(P) op=loc(STAR ) ti=tvars_app? e2=form_r(P)  
+| e1=form_r(P) op=loc(STAR) ti=tvars_app? e2=form_r(P)  
     { pfapp_symb op.pl_loc "*" ti [e1; e2] }
+
+| e1=form_r(P) op=loc(SLASH) ti=tvars_app? e2=form_r(P)  
+    { pfapp_symb op.pl_loc "/" ti [e1; e2] }
 
 | c=form_r(P) QUESTION e1=form_r(P) COLON e2=form_r(P) %prec OP2
     { PFif (c, e1, e2) }
@@ -1678,6 +1685,9 @@ logtactic:
 | ELIMT p=qident f=sform
    { PelimT (f, p) }
 
+| ELIM SLASH p=qident f=sform
+   { PelimT (f, p) }
+
 | APPLY e=fpattern(form)
    { Papply e }
 
@@ -1800,16 +1810,23 @@ phltactic:
 | CONSEQ nm=STAR? info=fpattern(conseq)
     { Pconseq (nm<>None, info) }
 
-| ELIM STAR { Phr_exists_elim }
-| EXIST STAR l=plist1(sform,COMMA) { Phr_exists_intro l }
+| ELIM STAR
+    { Phr_exists_elim }
+
+| EXIST STAR l=plist1(sform, COMMA)
+    { Phr_exists_intro l }
+
 | EXFALSO
     { Pexfalso }
 
 | BYPR f1=sform f2=sform { PPr(f1,f2) }
 
 | FEL at_pos=NUM cntr=sform delta=sform q=sform f_event=sform some_p=sform
-   {Pfel (at_pos,(cntr,delta,q,f_event,some_p))}
-| EQOBSIN info=eqobs_in {Peqobs_in info}
+   { Pfel (at_pos, (cntr, delta, q, f_event, some_p)) }
+
+| EQOBSIN info=eqobs_in
+    { Peqobs_in info }
+
 (* basic pr based tacs *)
 | HOARE {Phoare}
 | BDHOARE {Pbdhoare}

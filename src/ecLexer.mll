@@ -278,6 +278,7 @@ rule main = parse
   | '?'  { QUESTION }
   | '%'  { PCENT }
   | "*"  { STAR }
+  | "/"  { SLASH }
   | "$"  { SAMPLE }
   | "|"  { PIPE }
   | "`|" { TICKPIPE }
