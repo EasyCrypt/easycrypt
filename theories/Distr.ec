@@ -5,7 +5,7 @@ require import Real.
 
 op charfun (p:'a cpred, x:'a) : real = if p x then 1%r else 0%r.
 
-op mu_x(d:'a distr, x) : real = mu d ((=) x).
+op mu_x(d:'a distr, x) : real = mu d (cpEq x).
 
 op weight(d:'a distr) : real = mu d cpTrue.
 
@@ -118,7 +118,7 @@ theory Dinter.
     in_supp x (dinter i j) <=> i <= x <= j.
 
   (* We could use sums to generalize this:
-  axiom mu_x_def : forall (i j:int) (p:int cPred),
+  axiom mu_def : forall (i j:int) (p:int cPred),
     mu (dinter i j) p = (sum i j p)%r / (j - i + 1)%r.
   *)
 
