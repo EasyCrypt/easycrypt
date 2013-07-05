@@ -747,7 +747,8 @@ theory Dexcepted.
     mu_x (d \ X) x =
     (in_supp x (d \ X)) ? mu_x d x / (weight d - mu d (cpMem X)) : 0%r.
   proof.
-    intros x d X; delta (\) beta; smt.
+    intros x d X; rewrite /(\).
+    case (weight d = 0%r)=> weight_d; smt.
   qed.
 
   lemma mu_weight_def : forall (d:'a distr) X,
