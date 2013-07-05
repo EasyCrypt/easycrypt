@@ -131,10 +131,13 @@ module FPosition : sig
 
   val select_form : LDecl.hyps -> Sint.t option -> form -> form -> ptnpos
 
+  val is_occurences_valid : Sint.t -> ptnpos -> bool
+
   val occurences : ptnpos -> int
 
   val filter : Sint.t -> ptnpos -> ptnpos
 
-  val topattern : ?x:EcIdent.t -> ptnpos -> form -> EcIdent.t * form
+  val map : ptnpos -> (form -> form) -> form -> form
 
+  val topattern : ?x:EcIdent.t -> ptnpos -> form -> EcIdent.t * form
 end

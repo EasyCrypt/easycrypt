@@ -1154,19 +1154,19 @@ modified by $\left\{O_i\right\}_{i=0}^k$.
   \begin{array}{c}
     \left\{
     \begin{array}{l}
-      \HoareLe{O_i}{\neg F}{F}{c \delta} \\
+      \HoareLe{O_i}{\neg F}{F}{h(c)} \\
       \forall c_0,\ \Hoare{O_i}{P\land c=c_0}{c_0 < c} \\
       \forall c_0,\ \forall f_0,\ \Hoare{O_i}{\neg P\land F=f_0 \land c=c_0}{F=f_0 \land c=c_0} \\
     \end{array}\right\}_{i=0}^k\\[5ex]
     \forall m', (\varphi \Rightarrow F \land c\leq q) 
     \qquad 
-    q (q-1) \delta \leq \epsilon 
+    \sum_{i=0}^{q-1} h(i) \leq \epsilon 
     \qquad
     \Hoare{c_1}{\true}{\neg F \land c=0}
   \end{array}
 }{
   \Prm{f}{m}{\varphi} \leq \epsilon  
-} \left[\verb+fel+\ n\ q\ c\ \delta\ F\ P\right]
+} \left[\verb+fel+\ n\ q\ h\ c\ F\ P\right]
 \end{displaymath}
 
 \subsection{Proving equivalences by probability computation: 

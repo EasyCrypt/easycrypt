@@ -276,6 +276,7 @@
 %token SEQ
 %token SIMPLIFY
 %token SKIP
+%token SLASH
 %token SLASHEQ
 %token SLASHSLASH
 %token SLASHSLASHEQ
@@ -328,7 +329,7 @@
 %right QUESTION
 %left OP2 MINUS ADD
 %right ARROW
-%left OP3 STAR
+%left OP3 STAR SLASH
 %left OP4 
 
 %nonassoc LBRACE
@@ -582,6 +583,9 @@ expr_u:
 | e1=expr op=loc(STAR) ti=tvars_app?  e2=expr  
     { peapp_symb op.pl_loc "*" ti [e1; e2] }
 
+| e1=expr op=loc(SLASH) ti=tvars_app?  e2=expr  
+    { peapp_symb op.pl_loc "/" ti [e1; e2] }
+
 | c=expr QUESTION e1=expr COLON e2=expr %prec OP2
    { PEif (c, e1, e2) }
 
@@ -775,8 +779,11 @@ form_u(P):
 | e1=form_r(P) op=loc(AND) ti=tvars_app? e2=form_r(P)  
     { pfapp_symb op.pl_loc (str_and op.pl_desc) ti [e1; e2] }
 
-| e1=form_r(P) op=loc(STAR ) ti=tvars_app? e2=form_r(P)  
+| e1=form_r(P) op=loc(STAR) ti=tvars_app? e2=form_r(P)  
     { pfapp_symb op.pl_loc "*" ti [e1; e2] }
+
+| e1=form_r(P) op=loc(SLASH) ti=tvars_app? e2=form_r(P)  
+    { pfapp_symb op.pl_loc "/" ti [e1; e2] }
 
 | c=form_r(P) QUESTION e1=form_r(P) COLON e2=form_r(P) %prec OP2
     { PFif (c, e1, e2) }
@@ -1508,6 +1515,14 @@ rwarg:
 
 | s=rwside r=rwrepeat? o=rwocc? fp=fpattern(form)
     { RWRw (s, r, omap o EcMaps.Sint.of_list, fp) }
+
+| s=rwside r=rwrepeat? o=rwocc? SLASH x=qoident
+    { let loc = EcLocation.make $startpos $endpos in
+        if s <> `LtoR then
+          error loc (Some "delta-folding not supported");
+        if r <> None then
+          error loc (Some "delta-repeat not supported");
+        RWDelta (omap o EcMaps.Sint.of_list, x); }
 ;
 
 genpattern:
@@ -1540,6 +1555,10 @@ conseq:
 | f1=form LONGARROW f2=form     { Some f1, Some f2 }
 ;
 
+conseq_bd:
+| c=conseq                 { c, None }
+| c=conseq COLON bd=form   { c, Some bd } 
+| UNDERSCORE COLON bd=form { (None, None), Some bd }
 
 call_info: 
  | f1=form LONGARROW f2=form             { CI_spec (f1, f2) }
@@ -1680,6 +1699,9 @@ logtactic:
 | ELIMT p=qident f=sform
    { PelimT (f, p) }
 
+| ELIM SLASH p=qident f=sform
+   { PelimT (f, p) }
+
 | APPLY e=fpattern(form)
    { Papply e }
 
@@ -1695,13 +1717,13 @@ logtactic:
 | SUBST l=sform*
    { Psubst l }
 
-| CUT ip=intro_pattern COLON p=form %prec prec_below_IMPL
+| CUT ip=intro_pattern? COLON p=form %prec prec_below_IMPL
    { Pcut (ip, p, None) }
 
-| CUT ip=intro_pattern COLON p=form BY t=tactic_core
+| CUT ip=intro_pattern? COLON p=form BY t=tactic_core
    { Pcut (ip, p, Some t) }
 
-| CUT ip=intro_pattern CEQ fp=pterm
+| CUT ip=intro_pattern? CEQ fp=pterm
    { Pcutdef (ip, fp) }
 
 | POSE o=rwocc? x=lident CEQ p=form_h %prec prec_below_IMPL
@@ -1799,22 +1821,29 @@ phltactic:
 | BDHOAREDENO info=fpattern(conseq)
     { Pbdhoaredeno info }
 
-| CONSEQ nm=STAR? info=fpattern(conseq)
+| CONSEQ nm=STAR? info=fpattern(conseq_bd)
     { Pconseq (nm<>None, info) }
 
 | CONSEQBD bd=sform
     { Pconseq_bd bd }
 
-| ELIM STAR { Phr_exists_elim }
-| EXIST STAR l=plist1(sform,COMMA) { Phr_exists_intro l }
+| ELIM STAR
+    { Phr_exists_elim }
+
+| EXIST STAR l=plist1(sform, COMMA)
+    { Phr_exists_intro l }
+
 | EXFALSO
     { Pexfalso }
 
 | BYPR f1=sform f2=sform { PPr(f1,f2) }
 
-| FEL at_pos=NUM cntr=sform delta=sform q=sform f_event=sform some_p=sform
+| FEL at_pos=NUM cntr=sform delta=sform q=sform f_event=sform some_p=fel_pred_specs
    {Pfel (at_pos,(cntr,delta,q,f_event,some_p))}
-| EQOBSIN info=eqobs_in {Peqobs_in info}
+
+| EQOBSIN info=eqobs_in
+    { Peqobs_in info }
+
 (* basic pr based tacs *)
 | HOARE {Phoare}
 | BDHOARE {Pbdhoare}
@@ -1823,6 +1852,12 @@ phltactic:
 | PRFALSE {Pprfalse}
 | BDEQ {Pbdeq}
 ;
+
+fel_pred_spec:
+| f=loc(fident) COLON p=sform  { f,p } 
+fel_pred_specs:
+  | LBRACKET assoc_ps = plist0(fel_pred_spec,SEMICOLON) RBRACKET
+      {assoc_ps}
 
 eqobs_in:
 | empty                              { (None   , None   , None) }

@@ -316,11 +316,11 @@ let t_bdHoareF_conseq_bd bd g =
     | FHge -> f_real_le bhf.bhf_bd bd
   in
   let concl = f_bdHoareF bhf.bhf_pr bhf.bhf_f bhf.bhf_po bhf.bhf_cmp bd in
-  let bd_goal = gen_mems [mpr] bd_goal in
+  let bd_goal = gen_mems [mpr] (f_imp bhf.bhf_pr bd_goal) in
   prove_goal_by [bd_goal;concl] (RN_hl_conseq_bd) g  
 
 let t_bdHoareS_conseq_bd bd g =
-  let _,_,concl = get_goal_e g in
+  let concl = get_concl g in
   let bhs = destr_bdHoareS concl in
   (* let mpr,mpo = EcEnv.Fun.hoareF_memenv bhf.bhf_f env in *)
   let bd_goal = match bhs.bhs_cmp with
@@ -329,7 +329,7 @@ let t_bdHoareS_conseq_bd bd g =
     | FHge -> f_real_le bhs.bhs_bd bd
   in
   let concl = f_bdHoareS bhs.bhs_m bhs.bhs_pr bhs.bhs_s bhs.bhs_po bhs.bhs_cmp bd in
-  let bd_goal = gen_mems [bhs.bhs_m] bd_goal in
+  let bd_goal = gen_mems [bhs.bhs_m] (f_imp bhs.bhs_pr bd_goal) in
   prove_goal_by [bd_goal;concl] (RN_hl_conseq_bd) g  
 
 
@@ -1955,7 +1955,7 @@ and callable_oracles_i env os i =
 
 let callable_oracles_stmt env = callable_oracles_s env EcPath.Sx.empty
 
-let t_failure_event at_pos cntr ash q f_event some_p g =
+let t_failure_event at_pos cntr ash q f_event pred_specs g =
   let env,_,concl = get_goal_e g in
   match concl.f_node with
     | Fapp ({f_node=Fop(op,_)},[pr;bd]) when is_pr pr 
@@ -2006,6 +2006,13 @@ let t_failure_event at_pos cntr ash q f_event some_p g =
         let old_b_id = EcIdent.create "b" in
         let old_cntr = f_local old_cntr_id tint in
         let old_b = f_local old_b_id tbool in
+        let _,some_p = 
+          try 
+            List.find (fun (o',_) -> o=o') pred_specs 
+          with Not_found ->
+            o,f_true
+            (* tacuerror "Cannot find precondition for oracle %s" (EcPath.x_tostring o) *)
+        in
         let cntr_decr_goal = 
           let pre  = f_and some_p (f_eq old_cntr cntr) in
           let post = f_int_lt old_cntr cntr in
@@ -2022,7 +2029,7 @@ let t_failure_event at_pos cntr ash q f_event some_p g =
       in
       let os_goals = List.concat (List.map oracle_goal (Sx.elements os)) in
       prove_goal_by ([bound_goal;post_goal;init_goal]@os_goals) 
-        (RN_hl_fel (cntr,ash,q,f_event,some_p) )  g
+        (RN_hl_fel (cntr,ash,q,f_event,pred_specs) )  g
     | _ -> 
       cannot_apply "failure event lemma" 
         "A goal of the form Pr[ _ ] <= _ was expected"
@@ -2377,8 +2384,12 @@ let t_hoare_bd_hoare g =
   if is_bdHoareS concl then
     let bhs = destr_bdHoareS concl in
     let concl1 = f_hoareS bhs.bhs_m bhs.bhs_pr bhs.bhs_s (f_not bhs.bhs_po) in
-    let concl2 = f_eq bhs.bhs_bd f_r0  in
-    prove_goal_by [concl1;concl2] RN_hl_hoare_bd_hoare g
+    if f_equal bhs.bhs_bd f_r0 then
+      prove_goal_by [concl1] RN_hl_hoare_bd_hoare g
+    else 
+      (* Rewrite this : it is a consequence rule *)
+      let concl2 = f_eq bhs.bhs_bd f_r0  in
+      prove_goal_by [concl1;concl2] RN_hl_hoare_bd_hoare g
   else if is_hoareS concl then
     let hs = destr_hoareS concl in
     let concl1 = f_bdHoareS hs.hs_m hs.hs_pr hs.hs_s (f_not hs.hs_po) FHeq f_r0 in

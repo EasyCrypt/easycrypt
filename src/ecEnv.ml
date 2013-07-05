@@ -1890,7 +1890,7 @@ module Op = struct
 
   let reduce env p tys =
     let op = try by_path p env with _ -> assert false in
-    let f = 
+    let f =
       match op.op_kind with
       | OB_oper(Some e) -> EcFol.form_of_expr EcFol.mhr e
       | OB_pred(Some idsf) -> idsf
