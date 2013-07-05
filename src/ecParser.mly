@@ -1824,9 +1824,6 @@ phltactic:
 | CONSEQ nm=STAR? info=fpattern(conseq_bd)
     { Pconseq (nm<>None, info) }
 
-| CONSEQBD bd=sform
-    { Pconseq_bd bd }
-
 | ELIM STAR
     { Phr_exists_elim }
 

@@ -354,7 +354,6 @@ type phltactic =
   | Prnd        of tac_side * pformula rnd_tac_info
   | Palias      of (tac_side * codepos * psymbol option)
   | Pconseq     of bool * ccfpattern 
-  | Pconseq_bd  of pformula
   | Phr_exists_elim  
   | Phr_exists_intro of pformula list 
   | Pexfalso

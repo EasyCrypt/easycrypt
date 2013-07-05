@@ -648,23 +648,6 @@ let process_conseq notmod info (_, n as g) =
     | _ -> tacuerror "cannot apply conseq rule, not a phl/prhl judgement" in
   t_subgoal (t_trivial :: t_trivial :: !lt) 
     (t_conseq (juc,n)) 
-
-let process_conseq_bd bd g =
-  let hyps,concl = get_goal g in        
-  match concl.f_node with
-    | FbdHoareF bhf ->
-      let penv, _ = LDecl.hoareF bhf.bhf_f hyps in
-      let bd = process_form penv bd treal in
-      t_bdHoareF_conseq_bd bd g
-    | FbdHoareS bhs ->
-      let env = LDecl.push_active bhs.bhs_m hyps in
-      let bd = process_form env bd treal in
-      t_bdHoareS_conseq_bd bd g
-    | _ -> tacuerror "A probabilistic Hoare judgement was expected"
-  
-    
-
-
   
 let process_fun_abs inv g =
   let hyps,concl = get_goal g in
@@ -863,7 +846,6 @@ let process_phl loc ptac g =
     | Palias info               -> process_alias info
     | Prnd (side, info)         -> process_rnd side info
     | Pconseq (nm,info)         -> process_conseq nm info
-    | Pconseq_bd bd             -> process_conseq_bd bd
     | Phr_exists_elim           -> t_hr_exists_elim
     | Phr_exists_intro fs       -> process_exists_intro fs
     | Pexfalso                  -> process_exfalso
