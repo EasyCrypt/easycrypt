@@ -15,7 +15,7 @@ scratch, or to consider concrete implementation details only when necessary for
 the proof.
 
 
-\section{The \EasyCrypt Expression Language\label{sec:types}}
+\section{The Expression Language\label{sec:types}}
 At the core of any \EasyCrypt specification is a collection of types and functional
 operators on those types. Formally, \EasyCrypt types are \emph{non-empty} sets of
 values, and operators are \emph{mathematical} functions between them.
@@ -104,22 +104,19 @@ From these base types, many more can be built. \EasyCrypt allows the user to dec
  (polymorphic) abstract types, and combine existing types into tuple types or
 function types.
 
+
+
 \subsubsection*{Tuple types}
-Given two types $\tau$ and $\tau'$, one can easily define the type of pairs of
-elements of $\tau$ and $\tau'$ as $\left(\tau * \tau'\right)$. More generally,
-the product can be iterated to produce tuple types of arbitrary arity.
+Given two types \ec{'t} and \ec{'t'}, \ec{('t * 't')} denotes the type of pairs
+of elements of \ec{'t} and \ec{'t'}. More generally, the product can be iterated
+to produce tuple types of arbitrary arity. For example, Listing~\ref{lst:tuples}
+declares two abstract types, \ec{pkey} and \ec{skey}, and then defines a type
+\ec{keypairs} as the type of pairs of elements of \ec{pkey} and \ec{skey}.
 
-For example, Listing~\ref{lst:tuples} declares two abstract types, \rawec{pkey}
-and \rawec{skey}, and then defines a type \rawec{keypairs} as the type of pairs
-of elements of \rawec{pkey} and \rawec{skey}. Intepreting types as sets of
-values, the \rawec{*} on types morally corresponds to the cartesian product.
+\warningbox{Types \ec{('t * 't' * 't'')}, \ec{(('t * 't') * 't'')} and
+\ec{('t * ('t' * 't''))} are distinct (but isomorphic).}
 
-\warningbox{Types $\left(\tau * \tau' * \tau''\right)$,
-$\left(\left(\tau * \tau'\right) * \tau''\right)$ and
-$\left(\tau * \left(\tau' * \tau''\right)\right)$ are distinct
-(but isomorphic).}
-
-\begin{easycrypt}[label={lst:tuples}]{An example of tuple type.}
+\begin{easycrypt}[label={lst:tuples}]{A simple tuple type.}
 type pkey.
 type skey.
 
@@ -127,11 +124,28 @@ type keypair = (pkey * skey).
 \end{easycrypt}
 
 \subsubsection*{Function types}
+Given two types \ec{'t} and \ec{'t'}, \ec{'t -> 't'} is the type of total
+functions from \ec{'t} to \ec{'t'}. Listing~\ref{lst:functions} illustrates such
+a type definition, and the use of polymorphism, by defining a polymorphic type
+of predicates. For any type \rawec{'a}, we construct a type \rawec{'a cpred} of
+functions from \rawec{'a} to \rawec{bool}.
 
-\paragraph{On currying}
+\begin{easycrypt}[label={lst:functions}]{A simple polymorphic function type.}
+type 'a cpred = 'a -> bool.
+\end{easycrypt}
 
-\subsubsection*{A note on polymorphism}
+\subsubsection*{Type application}
+Polymorphic types can be instantiated with particular type parameters if
+desired. For example, sets of integers could be defined as predicates on
+integers as shown in Listing~\ref{lst:type_app}. Using the polymorphic type of
+predicates defined in Listing~\ref{lst:functions}, we simply apply it to
+\ec{int} to instatiate \rawec{'a} with \rawec{int}.
 
+\begin{easycrypt}[label={lst:type_app}]{A simple type application.}
+type intSet = int cpred.
+\end{easycrypt}
+
+\subsubsection*{On currying}
 
 \subsection{Building Terms}
 
@@ -233,7 +247,7 @@ context. They include logical conjunction and disjunction (\rawec{/\\} and
 %The \rawec{lambda} notation works as expected. The argument types can be
 %specified where necessary. Equality on lambda terms is extensional.
 
-\section{Describing Distributions\label{sec:distributions}}
+\section{Probabilistic Expressions\label{sec:distributions}}
 
 %%%% From Gilles:
 \EasyCrypt features a polymorphic type \rawec{'a distr} of \emph{discrete
@@ -288,12 +302,14 @@ lemma lossless : weight dbool = 1%r.
 
 \section{Modules and Functors\label{sec:modules}}
 
+\subsection{\pWHILE: Schemes, Oracles and Experiments}
 So far, we have only considered features whose goal is to extend the language of
 expressions and the semantic domain of values. Specifications of schemes,
 oracles, assumptions and game-based security properties all use modules (and
 module signatures) and functors, which we now discuss, using a simple modular
 definition of a random oracle from bitstrings to bitstrings as an example.
 
+\subsection{Module Signatures}
 We first formally define the functionalities a random oracle is expected to
 provide, as a \emph{module type}, or \emph{signature}
 (Listing~\ref{lst:modulesig}). Any module implementation \rawec{M} that provides
