@@ -978,12 +978,6 @@ let t_bdHoare_app dir i phi bd_info g =
       let b = f_bdHoareS_r { bhs with bhs_pr = phi; bhs_s = stmt s2;
         bhs_bd = bd2; bhs_cmp = cmp2 } in
       prove_goal_by [a;b] (RN_hl_append (dir, Single i,phi,bd_info)) g
-      
-    | AppMult _, _ ->
-      cannot_apply "app" 
-        "multiple bound parameters not supported with lower bounded and exact Hoare judgments"
-
-
 
 let t_equiv_app (i,j) phi g =
   let concl = get_concl g in
