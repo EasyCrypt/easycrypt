@@ -86,7 +86,7 @@ module Mpv2 : sig
   val needed_eq : env -> EcIdent.t -> EcIdent.t -> form -> t
   val union   : t -> t -> t
   val subset   : t -> t -> bool
-
+  val equal    : t -> t -> bool
   val remove : EcEnv.env -> EcTypes.prog_var -> EcTypes.prog_var -> t -> t
   (* remove_glob mp t, mp should be a top abstract functor *)
   val remove_glob : mpath -> t -> t
@@ -97,15 +97,15 @@ end
 
 val add_eqs : EcEnv.env -> Mpv2.t -> EcTypes.expr -> EcTypes.expr -> Mpv2.t
 
-
 val eqobs_in :
-  env ->
-  (env -> form * PV.t * PV.t ->
-   EcPath.xpath -> EcPath.xpath -> Mpv2.t -> Mpv2.t * 'a) ->
-  stmt ->
-  stmt ->
+  EcEnv.env ->
+  ('log ->
+   EcPath.xpath -> EcPath.xpath -> Mpv2.t -> 'log * Mpv2.t * 'spec) ->
+  'log ->
+  EcModules.stmt ->
+  EcModules.stmt ->
   Mpv2.t ->
-  form * PV.t * PV.t ->
-  stmt * stmt * 'a list * Mpv2.t
+  PV.t * PV.t ->
+  EcModules.stmt * EcModules.stmt * ('log * 'spec list) * Mpv2.t
 
 val check_module_in : env -> mpath -> module_type -> unit

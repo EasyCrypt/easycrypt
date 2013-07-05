@@ -1400,7 +1400,6 @@ tselect:
 (* -------------------------------------------------------------------- *)
 (* tactic                                                               *)
 
-
 intro_pattern_1_name:
 | s=LIDENT   { s }
 | s=UIDENT   { s }
@@ -1408,10 +1407,17 @@ intro_pattern_1_name:
 ;
 
 intro_pattern_1:
-| UNDERSCORE { `noName }
-| QUESTION { `findName }
-| s=intro_pattern_1_name {`noRename s}
-| s=intro_pattern_1_name NOT {`withRename s}
+| UNDERSCORE
+    { `NoName }
+
+| QUESTION
+   { `FindName }
+
+| s=intro_pattern_1_name
+    {`NoRename s}
+
+| s=intro_pattern_1_name NOT
+    {`WithRename s}
 ;
 
 intro_pattern:
@@ -1621,7 +1627,7 @@ occurences:
 app_bd_info:
   | empty { PAppNone }
   | f=sform { PAppSingle f }
-  | f1=sform f2=sform g1=sform g2=sform { PAppMult (f1,f2,g1,g2) }
+  | s=sform f1=sform f2=sform g1=sform g2=sform { PAppMult (s,f1,f2,g1,g2) }
 
 logtactic:
 | ASSUMPTION

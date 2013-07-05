@@ -1,6 +1,6 @@
 require import Distr.
 require import Set.
-require import Map. import OptionGet.
+require import Map. 
 require import Int.
 
 module type O = { 
@@ -64,13 +64,6 @@ module F2(A:Adv) = {
   }
 }.
 
-
-
-(* false?? *)
-axiom d_inter_lossless : mu [0..10] (lambda (x1 : int), 0 <= x1 /\ x1 <= 10) = 1%r.
-
-
-
 lemma foo : forall (A<:Adv{RO,F1,F2}), 
   (forall (O<:O),  
       bd_hoare [O.hashA : true ==> true] = 1%r => 
@@ -91,23 +84,20 @@ proof.
     fun.
     inline RO.hash.
     wp.
-    rnd (1%r) (lambda (x:int), 0 <= x /\ x <= 10) .
+    rnd (1%r) (lambda (x:int), 0 <= x <= 10) .
     wp; skip.
     trivial.
     intros &hr h2.
-    split; first apply d_inter_lossless.
-    smt.
+    split;[apply Distr.Dinter.mu_in_supp | ];smt.
     (* *)
     intros &1.
     fun.
     inline RO.hash.
     wp.
-    rnd (1%r) (lambda (x:int), 0 <= x /\ x <= 10) .
+    rnd (1%r) (lambda (x:int), 0 <= x <= 10) .
     wp;skip.
     trivial.
     intros &hr _.
-    split; first apply d_inter_lossless.
-    smt.
-
+    split;[apply Distr.Dinter.mu_in_supp | ];smt.
   inline RO.hash;wp;rnd;wp;skip;simplify;smt.
 save.

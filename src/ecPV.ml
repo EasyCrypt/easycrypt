@@ -543,7 +543,11 @@ module Mpv2 = struct
   let subset eqs1 eqs2 = 
     Mnpv.submap (fun _ (s1,_) (s2,_) -> 
       Snpv.subset s1 s2) eqs1.s_pv eqs2.s_pv &&
-      Sm.subset eqs1.s_gl eqs2.s_gl
+    Sm.subset eqs1.s_gl eqs2.s_gl
+
+  let equal eqs1 eqs2 = 
+    Mnpv.equal (fun (s1,_) (s2,_) -> Snpv.equal s1 s2) eqs1.s_pv eqs2.s_pv &&
+    Sm.equal eqs1.s_gl eqs2.s_gl
       
 
   let split_nmod modl modr eqo =
@@ -623,19 +627,21 @@ module Mpv2 = struct
           when EcIdent.id_equal ml ml' && EcIdent.id_equal mr mr' ->
         add env ty pvl pvr eqs
       | SFeq(({f_node = Fglob(mpl, ml')} as f1),
-             ({f_node = Fglob(mpr,mr')} as f2))
+             ({f_node = Fglob(mpr, mr')} as f2))
           when EcIdent.id_equal ml ml' && EcIdent.id_equal mr mr' -> 
         let f1' = NormMp.norm_glob env ml mpl in
         let f2' = NormMp.norm_glob env mr mpr in
-        if f_equal f1 f1' && f_equal f2 f2' then add_glob env mpl mpr eqs 
+        if f_equal f1 f1' && f_equal f2 f2' then add_glob env mpl mpr eqs
         else aux (f_eq f1' f2') eqs
       | SFeq(({f_node = Fglob(mpr, mr')} as f2),
-             ({f_node = Fglob(mpl,ml')} as f1))
+             ({f_node = Fglob(mpl, ml')} as f1))
           when EcIdent.id_equal ml ml' && EcIdent.id_equal mr mr' -> 
         let f1' = NormMp.norm_glob env ml mpl in
         let f2' = NormMp.norm_glob env mr mpr in
         if f_equal f1 f1' && f_equal f2 f2' then add_glob env mpl mpr eqs 
         else aux (f_eq f1' f2') eqs
+      | SFeq({f_node = Ftuple fs1}, {f_node = Ftuple fs2}) ->
+        List.fold_left2 (fun eqs f1 f2 -> aux (f_eq f1 f2) eqs) eqs fs1 fs2
       | SFand(_, (f1, f2)) -> aux f1 (aux f2 eqs)
       | _ -> raise Not_found in
     aux f empty 
@@ -755,13 +761,16 @@ let rec add_eqs env local eqs e1 e2 : Mpv2.t =
 let add_eqs env eqs e1 e2 =  add_eqs env Mid.empty eqs e1 e2
   
 (* Invariant ifvl,ifvr = PV.fv env ml inv, PV.fv env mr inv *)
-let eqobs_in env fun_spec c1 c2 eqo (inv,ifvl,ifvr) =
+let eqobs_in env 
+   (fun_spec : 'log -> EcPath.xpath -> EcPath.xpath ->
+                Mpv2.t -> 'log * Mpv2.t * 'spec) 
+   loG c1 c2 eqO (ifvl,ifvr) =
 
   let add_eqs eqs e1 e2 = add_eqs env eqs e1 e2 in
 
   let rev st = List.rev st.s_node in
 
-  let check pv fv _eqs = 
+  let check pv fv = 
     if PV.mem_pv env pv fv then false 
     else 
       try 
@@ -771,7 +780,6 @@ let eqobs_in env fun_spec c1 c2 eqo (inv,ifvl,ifvr) =
           let check1 mp = 
             let restr = get_restr env mp in
             Mpv.check_npv_mp env pv top mp restr in
-        (*      Sm.iter check1 eqs.Mpv2.s_gl; *) (* Not needed *)
           Sm.iter check1 fv.PV.s_gl
         end;
         true
@@ -779,7 +787,7 @@ let eqobs_in env fun_spec c1 c2 eqo (inv,ifvl,ifvr) =
 
   let check_not_l lvl eqo =
     let aux (pv,_) =
-      check pv ifvl eqo &&
+      check pv ifvl &&
       not (Mpv2.mem_pv_l env pv eqo) in
     match lvl with
     | LvVar xl   -> aux xl
@@ -788,7 +796,7 @@ let eqobs_in env fun_spec c1 c2 eqo (inv,ifvl,ifvr) =
 
   let check_not_r lvr eqo =
     let aux (pv,_) =
-      check pv ifvr eqo && 
+      check pv ifvr && 
       not (Mpv2.mem_pv_r env pv eqo) in
     match lvr with
     | LvVar xr   -> aux xr
@@ -799,15 +807,15 @@ let eqobs_in env fun_spec c1 c2 eqo (inv,ifvl,ifvr) =
     (* TODO : ensure that the invariant is not modified *)
     let aux eqs (pvl,tyl) (pvr,tyr) = 
       if EcReduction.equal_type env tyl tyr then begin
-        if not (check pvl ifvl eqs && check pvr ifvr eqs) then
+        if not (check pvl ifvl && check pvr ifvr) then
           raise EqObsInError;
         Mpv2.remove env pvl pvr eqs
       end else raise EqObsInError in
 
     match lvl, lvr with
-    | LvVar xl, LvVar xr -> aux eqo xl xr 
+    | LvVar xl, LvVar xr -> aux eqs xl xr 
     | LvTuple ll, LvTuple lr when List.length ll = List.length lr->
-      List.fold_left2 aux eqo ll lr
+      List.fold_left2 aux eqs ll lr
     | LvMap((pl,tysl), pvl, el, tyl),
         LvMap((pr,tysr), pvr, er,tyr) when EcPath.p_equal pl pr &&
       List.all2  (EcReduction.equal_type env) (tyl::tysl) (tyr::tysr) ->
@@ -823,12 +831,12 @@ let eqobs_in env fun_spec c1 c2 eqo (inv,ifvl,ifvr) =
   let rec s_eqobs_in rsl rsr fhyps (eqo:Mpv2.t) = 
     match rsl, rsr with
     | { i_node = Sasgn(LvVar (xl,_), el)}::rsl, _ when is_var el ->
-      if check xl ifvl eqo then
+      if check xl ifvl then
         let x = destr_var el in
         s_eqobs_in rsl rsr fhyps (Mpv2.subst_l env xl x eqo)
       else rsl, rsr, fhyps, eqo
     | _, { i_node = Sasgn(LvVar (xr,_), er)} :: rsr when is_var er ->
-      if check xr ifvr eqo then 
+      if check xr ifvr then 
         let x = destr_var er in
         s_eqobs_in rsl rsr fhyps (Mpv2.subst_r env xr x eqo)
       else rsl, rsr, fhyps, eqo
@@ -859,11 +867,12 @@ let eqobs_in env fun_spec c1 c2 eqo (inv,ifvl,ifvr) =
       let outf = Mpv2.split_mod  modl modr eqo in
       Mpv2.check_glob outf;
       (* TODO : ensure that generalize mod can be applied here ? *)
-      let inf, fhyp = 
-        try fun_spec env (inv,ifvl,ifvr) fl fr outf 
+      let log,fhyps = fhyps in
+      let log, inf, fhyp = 
+        try fun_spec log fl fr outf 
         with Not_found -> raise EqObsInError in
       let eqi = List.fold_left2 add_eqs (Mpv2.union eqnm inf) argsl argsr in
-      fhyp::fhyps, eqi
+      (log, fhyp::fhyps), eqi
 
     | Sif(el,stl,sfl), Sif(er,str,sfr) ->
       let r1,r2,fhyps1, eqs1 = s_eqobs_in (rev stl) (rev str) fhyps eqo in
@@ -883,11 +892,11 @@ let eqobs_in env fun_spec c1 c2 eqo (inv,ifvl,ifvr) =
         else aux (Mpv2.union eqi eqo) in
       aux (add_eqs eqo el er)
 
-    | Sassert el, Sassert er -> [], add_eqs eqo el er
+    | Sassert el, Sassert er -> fhyps, add_eqs eqo el er
     | _, _ -> raise EqObsInError
   in
 
-  let rl,rr, hyps, eqi = s_eqobs_in (rev c1) (rev c2) [] eqo in
+  let rl,rr, hyps, eqi = s_eqobs_in (rev c1) (rev c2) (loG,[]) eqO in
   rstmt rl, rstmt rr, hyps, eqi
 
 (* Same function but specialized to the case where c1 and c2 are equal,
