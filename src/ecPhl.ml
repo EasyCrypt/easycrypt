@@ -927,57 +927,48 @@ let t_hoare_app i phi g =
   let b = f_hoareS_r { hs with hs_pr = phi; hs_s = stmt s2 } in
   prove_goal_by [a;b] (RN_hl_append (Backs,Single i,phi,AppNone)) g
 
-let t_bdHoare_app dir i phi bd_info g =
+(* bd_hoare App 
+{P}c1{phi}
+{P}c1{R} ? f1
+{phi /\ R}c2{Q} ? f2
+{P}c1{!R} ? g1
+{phi /\ !R}c2{Q} ? g2
+===============================
+{P}c1;c2{Q} ? f1 * f2 + g1 * g2
+*)
+
+let t_bdHoare_app i (phi, pR,f1,f2,g1,g2) g =
   let concl = get_concl g in
   let bhs = destr_bdHoareS concl in
   let s1,s2 = s_split "app" i bhs.bhs_s in
-  match bd_info, bhs.bhs_cmp with
-    | AppNone, FHle when dir=Backs ->
-      let a = f_hoareS bhs.bhs_m bhs.bhs_pr (stmt s1) phi in
-      let b = f_bdHoareS_r { bhs with bhs_pr = phi; bhs_s = stmt s2} in
-      prove_goal_by [a;b] (RN_hl_append (dir, Single i,phi,bd_info)) g
-    | AppMult (s,f1,f2,g1,g2), _ ->
-      let goal_s = f_hoareS bhs.bhs_m bhs.bhs_pr (stmt s1) s in
-      let a1 = f_bdHoareS_r { bhs with bhs_po = phi; bhs_s = stmt s1; bhs_bd=f1}  in
-      let b1 = f_bdHoareS_r { bhs with bhs_pr = f_and s phi; bhs_s = stmt s2; bhs_bd=f2} in
-      let a2 = f_bdHoareS_r { bhs with bhs_po = f_not phi; bhs_s = stmt s1; bhs_bd=g1}  in
-      let b2 = f_bdHoareS_r { bhs with bhs_pr = f_and s (f_not phi); bhs_s = stmt s2; bhs_bd=g2} in
-      let bd_g = f_real_le (f_real_add (f_real_prod f1 f2) (f_real_prod g1 g2)) bhs.bhs_bd in
-      let bd_g = gen_mems [bhs.bhs_m] bd_g in
-      prove_goal_by [goal_s;a1;b1;a2;b2;bd_g] (RN_hl_append (dir, Single i,phi,bd_info)) g
-
-    | _, FHle when dir <>Backs -> 
-      cannot_apply "app" 
-        "forward direction not supported with upper bounded Hoare judgments "
-      
-    | AppSingle _ , (FHeq | FHle) ->
-      cannot_apply "app" 
-        "single optional bound parameter not supported with upper bounded Hoare judgments"
-
-    (* | AppSingle bd, FHeq *) 
-       (* The condition of the next rule are not suffisant here we should
-          add a range condition *)
-    | AppSingle bd, FHge ->
-      let bd1,bd2,cmp1,cmp2 = 
-        if dir=Backs then f_real_div_simpl bhs.bhs_bd bd, bd, bhs.bhs_cmp, bhs.bhs_cmp
-        else bd, f_real_div_simpl bhs.bhs_bd bd, bhs.bhs_cmp, bhs.bhs_cmp
-      in
-      let a = f_bdHoareS_r { bhs with bhs_s = stmt s1; bhs_po = phi; 
-        bhs_bd = bd1; bhs_cmp = cmp1 } in
-      let b = f_bdHoareS_r { bhs with bhs_pr = phi; bhs_s = stmt s2;
-        bhs_bd = bd2; bhs_cmp = cmp2 } in
-      prove_goal_by [a;b] (RN_hl_append (dir, Single i,phi,bd_info)) g
-
-    | AppNone, _ -> 
-      let bd1,bd2,cmp1,cmp2 = 
-        if dir=Backs then f_r1, bhs.bhs_bd, FHeq, bhs.bhs_cmp
-        else bhs.bhs_bd, f_r1, bhs.bhs_cmp, FHeq
-      in
-      let a = f_bdHoareS_r { bhs with bhs_s = stmt s1; bhs_po = phi; 
-        bhs_bd = bd1; bhs_cmp = cmp1 } in
-      let b = f_bdHoareS_r { bhs with bhs_pr = phi; bhs_s = stmt s2;
-        bhs_bd = bd2; bhs_cmp = cmp2 } in
-      prove_goal_by [a;b] (RN_hl_append (dir, Single i,phi,bd_info)) g
+  let s1, s2 = stmt s1, stmt s2 in
+  let nR = f_not pR in
+  let cond_phi = f_hoareS bhs.bhs_m bhs.bhs_pr s1 phi in
+  let condf1 = f_bdHoareS_r { bhs with bhs_s = s1; bhs_po = pR; bhs_bd=f1} in
+  let condg1 = f_bdHoareS_r { bhs with bhs_s = s1; bhs_po = nR; bhs_bd=g1} in
+  let condf2 = f_bdHoareS_r 
+    { bhs with bhs_s = s2; bhs_pr = f_and_simpl phi pR;bhs_bd=f2} in
+  let condg2 = f_bdHoareS_r 
+    { bhs with bhs_s = s2; bhs_pr = f_and_simpl phi nR;bhs_bd=g2} in
+  let bd = (f_real_add (f_real_prod f1 f2) (f_real_prod g1 g2)) in
+  (* TODO : this a conseq_bd rule *)
+  let condbd = 
+    match bhs.bhs_cmp with
+    | FHle -> f_real_le bd bhs.bhs_bd
+    | FHeq -> f_eq bd bhs.bhs_bd
+    | FHge -> f_real_le bhs.bhs_bd bd in
+  let conds = [gen_mems [bhs.bhs_m] condbd] in
+  let conds = 
+    if f_equal g1 f_r0 then condg1 :: conds
+    else if f_equal g2 f_r0 then condg2 :: conds
+    else condg1 :: condg2 :: conds in
+  let conds = 
+    if f_equal f1 f_r0 then condf1 :: conds
+    else if f_equal f2 f_r0 then condf2 :: conds
+    else condf1 :: condf2 :: conds in
+  let conds = cond_phi :: conds in
+  (* TODO The information make no sens here *)
+  prove_goal_by conds (RN_hl_append (Backs,Single i,pR,AppNone)) g
 
 let t_equiv_app (i,j) phi g =
   let concl = get_concl g in
@@ -2413,17 +2404,27 @@ let t_hoare_bd_hoare g =
   else 
     cannot_apply "hoare/bd_hoare" "a hoare or bd_hoare judgment was expected" 
 
-let t_prbounded g = 
+let t_pr_bounded conseq g = 
   let concl = get_concl g in
-  let bhs = destr_bdHoareS concl in 
-  let cond = match bhs.bhs_cmp with
-    | FHle -> f_real_le f_r1 bhs.bhs_bd
-    | FHge -> f_real_le bhs.bhs_bd f_r0
-    | FHeq ->
-      cannot_apply "pr_bounded" "cannot solve the probabilistic judgement" 
-  in
-  prove_goal_by [cond] RN_hl_prbounded g
+  let po, cmp, bd = 
+    match concl.f_node with
+    | FbdHoareF hf -> hf.bhf_po, hf.bhf_cmp, hf.bhf_bd 
+    | FbdHoareS hf -> hf.bhs_po, hf.bhs_cmp, hf.bhs_bd
+    | _ -> tacuerror "bd_hoare excepted" in
+  let cond = 
+    match cmp with
+    | FHle when f_equal bd f_r1 -> []
+    | FHge when f_equal bd f_r0 -> []
+    | _ when f_equal po f_false && f_equal bd f_r0 -> []
+    (* TODO use the conseq rule instead *)
+    | FHle when conseq -> [f_real_le f_r1 bd]
+    | FHge when conseq -> [f_real_le bd f_r0]
+    | _ -> cannot_apply "pr_bounded" "cannot solve the probabilistic judgement" in
+  prove_goal_by cond RN_hl_prbounded g
 
+let t_prbounded = t_pr_bounded true
+
+(* TODO : Remove this : can be done by rewrite_pr *)
 let t_prfalse g = 
   let env,_, concl = get_goal_e g in
   let f,ev,bd =
@@ -2720,8 +2721,28 @@ let rec eqobs_inF env eqg (inv,ifvl,ifvr as inve) log fl fr eqO =
       end
     | _, _ -> raise EqObsInError 
  
+let t_hoare_true g = 
+  let concl = get_concl g in
+  match concl.f_node with
+  | FhoareF hf when f_equal hf.hf_po f_true ->
+    prove_goal_by [] RN_hoare_true g   
+  | FhoareS hs when f_equal hs.hs_po f_true ->
+    prove_goal_by [] RN_hoare_true g    
+  | _ -> tacuerror "the conclusion should have the form hoare[_ : _ ==> true]"
 
-
+  
+let t_trivial = 
+  let t1 = 
+    t_lor [t_hoare_true;
+           t_hr_exfalso;   
+           t_pr_bounded false;
+           t_skip] in
+  t_or
+    (t_lseq [t_try t_assumption; t_progress (t_id None); t_try t_assumption; 
+             t1; t_trivial; t_fail])
+    (t_id None)
+  
+ 
 
 
   

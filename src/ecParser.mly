@@ -1865,6 +1865,7 @@ phltactic:
 | BDHOARE {Pbdhoare}
 | PRBOUNDED {Pprbounded}
 | REWRITE PR s=LIDENT {Ppr_rewrite s}
+(* TODO : remove this tactic *)
 | PRFALSE {Pprfalse}
 | BDEQ {Pbdeq}
 ;
