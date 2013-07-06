@@ -256,6 +256,13 @@ let rec h_red ri env hyps f =
       | OK_int_lt, [f1;f2] -> f_int_lt_simpl f1 f2
       | OK_real_le, [f1;f2] -> f_real_le_simpl f1 f2
       | OK_real_lt, [f1;f2] -> f_real_lt_simpl f1 f2
+      | OK_int_add, [f1;f2] -> f_int_add_simpl f1 f2
+      | OK_int_sub, [f1;f2] -> f_int_sub_simpl f1 f2
+      | OK_int_prod, [f1;f2] -> f_int_prod_simpl f1 f2
+      | OK_real_add, [f1;f2] -> f_real_add_simpl f1 f2
+      | OK_real_sub, [f1;f2] -> f_real_sub_simpl f1 f2
+      | OK_real_prod, [f1;f2] -> f_real_prod_simpl f1 f2
+      | OK_real_div, [f1;f2] ->f_real_div_simpl f1 f2
       | _                 -> f in
     if f_equal f f' then f_app fo (h_red_args ri env hyps args) f.f_ty
     else f' 

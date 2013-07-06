@@ -489,6 +489,8 @@ let f_true   = f_op EcCoreLib.p_true [] ty_bool
 let f_false  = f_op EcCoreLib.p_false [] ty_bool
 let f_bool   = fun b -> if b then f_true else f_false
 let f_int    = fun n -> mk_form (Fint n) ty_int
+let f_i0     = f_int 0
+let f_i1     = f_int 1
 
 let f_op_real_of_int = f_op EcCoreLib.p_from_int [] (tfun ty_int ty_real)
 let f_real_of_int f  = f_app f_op_real_of_int [f] ty_real
@@ -1303,56 +1305,112 @@ let can_subst f =
 (* -------------------------------------------------------------------- *)
 let rec gcd a b = if b = 0 then a else gcd b (a mod b)
 
-let rec f_real_add_simpl f1 f2 =
+let f_int_add_simpl f1 f2 =
   match f1.f_node, f2.f_node with
-    | Fapp (op1,[{f_node=Fint n1}]), Fapp (op2,[{f_node=Fint n2}]) 
-      when f_equal f_op_real_of_int op1 && f_equal f_op_real_of_int op2 ->
-      f_real_of_int (f_int (n1 + n2))
+  | Fint n1, Fint n2 -> f_int (n1 + n2)
+  | _ ->
+    if f_equal f_i0 f1 then f2
+    else if f_equal f_i0 f2 then f1
+    else f_int_add f1 f2
+
+let f_int_sub_simpl f1 f2 =
+  if f_equal f1 f2 then f_i0
+  else
+    match f1.f_node, f2.f_node with
+    | Fint n1, Fint n2 ->f_rint (n1 - n2)
     | _ ->
+      if f_equal f_i0 f2 then f1
+      else f_int_sub f1 f2
+
+let f_int_prod_simpl f1 f2 =
+  match f1.f_node, f2.f_node with
+  | Fint n1, Fint n2 -> f_int (n1 * n2)
+  | _ ->
+    if f_equal f_i0 f1 || f_equal f_i0 f2 then f_i0
+    else if f_equal f_i1 f1 then f2
+    else if f_equal f_i1 f2 then f1
+    else f_int_prod f1 f2
+
+let destr_rint f = 
+  match f.f_node with
+  | Fapp (op,[{f_node=Fint n}]) when f_equal f_op_real_of_int op-> n
+  | _ -> destr_error "rint"
+
+let destr_rdivint f =
+  match f.f_node with
+  | Fapp(op,[f1;f2]) when f_equal op fop_real_div ->
+    begin 
+      try destr_rint f1, destr_rint f2 
+      with DestrError _ -> destr_error "rdivint" 
+    end
+  | _ -> destr_error "rdivint" 
+
+let norm_real_int_div n1 n2 = 
+  let n = gcd n1 n2 in
+  let n1, n2 = if n <> 1 then n1/n, n2/n else n1, n2 in
+  if n1 = 0 then f_r0 
+  else if n2 = 1 then f_rint n1
+  else f_real_div (f_rint n1) (f_rint n2)
+
+let f_real_add_simpl f1 f2 =
+  try f_rint (destr_rint f1 + destr_rint f2)
+  with DestrError _ -> 
+    try 
+      let (n1,d1), (n2,d2) = destr_rdivint f1, destr_rdivint f2 in
+      if d1 = 0 || d2 = 0 then destr_error "";
+      norm_real_int_div (n1*d2 + n2*d1) (d1*d2)
+    with DestrError _ ->
       if f_equal f_r0 f1 then f2
       else if f_equal f_r0 f2 then f1
-      else f_real_prod f1 f2
+      else f_real_add f1 f2
+
+let f_real_sub_simpl f1 f2 =
+  try f_rint (destr_rint f1 - destr_rint f2)
+  with DestrError _ -> 
+    try 
+      let (n1,d1), (n2,d2) = destr_rdivint f1, destr_rdivint f2 in
+      if d1 = 0 || d2 = 0 then destr_error "";
+      norm_real_int_div (n1*d2 - n2*d1) (d1*d2)
+    with DestrError _ ->
+      if f_equal f_r0 f1 then f2
+      else if f_equal f_r0 f2 then f1
+      else f_real_add f1 f2
 
 let rec f_real_prod_simpl f1 f2 =
   match f1.f_node, f2.f_node with
-    | Fapp (op1,[f1_1;f1_2]), Fapp (op2,[f2_1;f2_2]) 
-      when f_equal op1 fop_real_div && f_equal op2 fop_real_div ->
-      f_real_div_simpl (f_real_prod_simpl f1_1 f2_1) (f_real_prod_simpl f1_2 f2_2)
-    | _, Fapp (op2,[f2_1;f2_2]) when f_equal op2 fop_real_div ->
-      f_real_div_simpl (f_real_prod_simpl f1 f2_1) f2_2
-    | Fapp (op1,[f1_1;f1_2]), _ when f_equal op1 fop_real_div ->
-      f_real_div_simpl (f_real_prod_simpl f1_1 f2) f1_2
-    | Fapp (op1,[{f_node=Fint n1}]), Fapp (op2,[{f_node=Fint n2}]) 
-      when f_equal f_op_real_of_int op1 && f_equal f_op_real_of_int op2 ->
-      f_real_of_int (f_int (n1 * n2))
-    | _ ->
-      if f_equal f_r0 f1 || f_equal f_r0 f2 then f_r0
-      else if f_equal f_r1 f1 then f2
-      else if f_equal f_r1 f2 then f1
-      else f_real_prod f1 f2
+  | Fapp (op1,[f1_1;f1_2]), Fapp (op2,[f2_1;f2_2]) 
+    when f_equal op1 fop_real_div && f_equal op2 fop_real_div ->
+    f_real_div_simpl (f_real_prod_simpl f1_1 f2_1) (f_real_prod_simpl f1_2 f2_2)
+  | _, Fapp (op2,[f2_1;f2_2]) when f_equal op2 fop_real_div ->
+    f_real_div_simpl (f_real_prod_simpl f1 f2_1) f2_2
+  | Fapp (op1,[f1_1;f1_2]), _ when f_equal op1 fop_real_div ->
+    f_real_div_simpl (f_real_prod_simpl f1_1 f2) f1_2
+  | Fapp (op1,[{f_node=Fint n1}]), Fapp (op2,[{f_node=Fint n2}]) 
+    when f_equal f_op_real_of_int op1 && f_equal f_op_real_of_int op2 ->
+    f_rint (n1 * n2)
+  | _ ->
+    if f_equal f_r0 f1 || f_equal f_r0 f2 then f_r0
+    else if f_equal f_r1 f1 then f2
+    else if f_equal f_r1 f2 then f1
+    else f_real_prod f1 f2
 
 and f_real_div_simpl f1 f2 =
   match f1.f_node, f2.f_node with
-    | Fapp (op1,[f1_1;f1_2]), Fapp (op2,[f2_1;f2_2]) 
-      when f_equal op1 fop_real_div && f_equal op2 fop_real_div ->
-      f_real_div_simpl (f_real_prod_simpl f1_1 f2_2) (f_real_prod_simpl f1_2 f2_1)
-    | _, Fapp (op2,[f2_1;f2_2]) 
-      when f_equal op2 fop_real_div ->
-      f_real_div_simpl (f_real_prod_simpl f1 f2_2) f2_1
-    | Fapp (op,[f1_1;f1_2]), _ 
-      when f_equal op fop_real_div ->
-      f_real_div_simpl f1_1 (f_real_prod_simpl f1_2 f2)
-    | _ , Fapp (op2,[{f_node=Fint 1}]) 
-      when f_equal f_op_real_of_int op2 -> f1
-    | Fapp (op1,[{f_node=Fint n1}]), Fapp (op2,[{f_node=Fint n2}]) 
-      when f_equal f_op_real_of_int op1 && f_equal f_op_real_of_int op2 && n2<>0 ->
-      begin
-        let n = gcd n1 n2 in
-        if n <> 1 then 
-          f_real_div_simpl (f_real_of_int (f_int (n1/n))) (f_real_of_int (f_int (n2/n)))
-        else f_real_div (f_real_of_int (f_int n1)) (f_real_of_int (f_int n2))
-      end
-    | _ -> f_real_div f1 f2
+  | Fapp (op1,[f1_1;f1_2]), Fapp (op2,[f2_1;f2_2]) 
+    when f_equal op1 fop_real_div && f_equal op2 fop_real_div ->
+    f_real_div_simpl (f_real_prod_simpl f1_1 f2_2) (f_real_prod_simpl f1_2 f2_1)
+  | _, Fapp (op2,[f2_1;f2_2]) 
+    when f_equal op2 fop_real_div ->
+    f_real_div_simpl (f_real_prod_simpl f1 f2_2) f2_1
+  | Fapp (op,[f1_1;f1_2]), _ 
+    when f_equal op fop_real_div ->
+    f_real_div_simpl f1_1 (f_real_prod_simpl f1_2 f2)
+  | _ , Fapp (op2,[{f_node=Fint 1}]) 
+    when f_equal f_op_real_of_int op2 -> f1
+  | Fapp (op1,[{f_node=Fint n1}]), Fapp (op2,[{f_node=Fint n2}]) 
+    when f_equal f_op_real_of_int op1 && f_equal f_op_real_of_int op2 && n2<>0 ->
+    norm_real_int_div n1 n2
+  | _ -> f_real_div f1 f2
 
 (* -------------------------------------------------------------------- *)
 let f_let_simpl lp f1 f2 =
@@ -1557,6 +1615,13 @@ type op_kind =
   | OK_int_lt
   | OK_real_le
   | OK_real_lt
+  | OK_int_add
+  | OK_int_sub
+  | OK_int_prod
+  | OK_real_add
+  | OK_real_sub
+  | OK_real_prod
+  | OK_real_div
   | OK_other 
 
 let operators =
@@ -1574,7 +1639,14 @@ let operators =
      EcCoreLib.p_int_le, OK_int_le;
      EcCoreLib.p_int_lt, OK_int_lt;
      EcCoreLib.p_real_le, OK_real_le;
-     EcCoreLib.p_real_lt, OK_real_lt
+     EcCoreLib.p_real_lt, OK_real_lt;
+     EcCoreLib.p_int_add, OK_int_add;
+     EcCoreLib.p_int_sub, OK_int_sub;
+     EcCoreLib.p_int_prod, OK_int_prod;
+     EcCoreLib.p_real_add, OK_real_add;
+     EcCoreLib.p_real_sub, OK_real_sub;
+     EcCoreLib.p_real_prod, OK_real_prod;
+     EcCoreLib.p_real_div, OK_real_div
     ]
   in
 
@@ -1588,7 +1660,9 @@ let op_kind (p : EcPath.path) =
 let is_logical_op op =
   match op_kind op with
   | OK_not | OK_and _ | OK_or _ | OK_imp | OK_iff | OK_eq 
-  | OK_int_le| OK_int_lt | OK_real_le | OK_real_lt -> true
+  | OK_int_le| OK_int_lt | OK_real_le | OK_real_lt 
+  | OK_int_add | OK_int_sub | OK_int_prod 
+  | OK_real_add | OK_real_sub| OK_real_prod | OK_real_div -> true
   | _ -> false
 
 (* -------------------------------------------------------------------- *)

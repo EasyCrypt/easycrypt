@@ -298,7 +298,12 @@ val f_int_lt_simpl : form -> form -> form
 val f_real_le_simpl : form -> form -> form
 val f_real_lt_simpl : form -> form -> form
 
+val f_int_add_simpl  : form -> form -> form
+val f_int_sub_simpl  : form -> form -> form
+val f_int_prod_simpl : form -> form -> form
+
 val f_real_add_simpl  : form -> form -> form
+val f_real_sub_simpl  : form -> form -> form
 val f_real_prod_simpl : form -> form -> form
 val f_real_div_simpl  : form -> form -> form
 
@@ -406,6 +411,13 @@ type op_kind =
   | OK_int_lt
   | OK_real_le
   | OK_real_lt
+  | OK_int_add
+  | OK_int_sub
+  | OK_int_prod
+  | OK_real_add
+  | OK_real_sub
+  | OK_real_prod
+  | OK_real_div
   | OK_other 
 
 val op_kind       : EcPath.path -> op_kind
