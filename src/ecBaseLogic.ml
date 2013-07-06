@@ -111,6 +111,7 @@ type rule_name =
   | RN_eqobs_in
   | RN_notmod
   | RN_hl_exists_elim 
+  | RN_hoare_true
 
 type 'a rule_arg = 
   | RA_form of EcFol.form             (* formula             *)

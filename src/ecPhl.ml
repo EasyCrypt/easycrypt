@@ -2720,6 +2720,14 @@ let rec eqobs_inF env eqg (inv,ifvl,ifvr as inve) log fl fr eqO =
       end
     | _, _ -> raise EqObsInError 
  
+let t_hoare_true g = 
+  let concl = get_concl g in
+  match concl.f_node with
+  | FhoareF hf when f_equal hf.hf_po f_true ->
+    prove_goal_by [] RN_hoare_true g   
+  | FhoareS hs when f_equal hs.hs_po f_true ->
+    prove_goal_by [] RN_hoare_true g    
+  | _ -> tacuerror "the conclusion should have the form hoare[_ : _ ==> true]"
 
 
 
