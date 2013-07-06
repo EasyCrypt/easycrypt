@@ -293,6 +293,10 @@ val f_imps       : form list -> form -> form
 val f_imps_simpl : form list -> form -> form
 val f_iff_simpl  : form -> form -> form
 val f_eq_simpl   : form -> form -> form
+val f_int_le_simpl : form -> form -> form
+val f_int_lt_simpl : form -> form -> form
+val f_real_le_simpl : form -> form -> form
+val f_real_lt_simpl : form -> form -> form
 
 val f_real_add_simpl  : form -> form -> form
 val f_real_prod_simpl : form -> form -> form
@@ -398,6 +402,10 @@ type op_kind =
   | OK_imp
   | OK_iff
   | OK_eq
+  | OK_int_le
+  | OK_int_lt
+  | OK_real_le
+  | OK_real_lt
   | OK_other 
 
 val op_kind       : EcPath.path -> op_kind

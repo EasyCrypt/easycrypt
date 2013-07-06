@@ -51,7 +51,7 @@ let process_phl_bd_info g bd_info = match bd_info with
     let f4 = process_phl_form treal g f4 in
     (phi,f1,f2,f3,f4)
 
-let process_app dir k phi bd_info g =
+let process_app _dir k phi bd_info g =
   let concl = get_concl g in
   match k, bd_info with
   | Single i, PAppNone when is_hoareS concl ->

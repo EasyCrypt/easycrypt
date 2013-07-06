@@ -1326,7 +1326,7 @@ let rec f_real_prod_simpl f1 f2 =
       when f_equal f_op_real_of_int op1 && f_equal f_op_real_of_int op2 ->
       f_real_of_int (f_int (n1 * n2))
     | _ ->
-      if f_equal f_r0 f1 || f_equal f_r0 f1 then f_r0
+      if f_equal f_r0 f1 || f_equal f_r0 f2 then f_r0
       else if f_equal f_r1 f1 then f2
       else if f_equal f_r1 f2 then f1
       else f_real_prod f1 f2
@@ -1485,12 +1485,47 @@ let f_eq_simpl f1 f2 =
   if f_equal f1 f2 then f_true
   else match f1.f_node, f2.f_node with
   | Fint _ , Fint _ -> f_false
-  | Fop (op1, []) , Fop (op2, []) when
+  | Fapp(op1, [{f_node = Fint _}]), Fapp(op2,[{f_node = Fint _}]) 
+    when f_equal op1 f_op_real_of_int && 
+      f_equal op2 f_op_real_of_int ->
+    f_false 
+  | Fop(op1, []) ,Fop (op2, []) when
     (EcPath.p_equal op1 EcCoreLib.p_true &&
      EcPath.p_equal op2 EcCoreLib.p_false) ||
      (EcPath.p_equal op2 EcCoreLib.p_true &&
      EcPath.p_equal op1 EcCoreLib.p_false) -> f_false
   | _ -> f_eq f1 f2
+
+let f_int_le_simpl f1 f2 = 
+  if f_equal f1 f2 then f_true
+  else match f1.f_node, f2.f_node with
+  | Fint x1 , Fint x2 -> f_bool (x1 <= x2)
+  | _, _ -> f_int_le f1 f2 
+
+let f_int_lt_simpl f1 f2 = 
+  if f_equal f1 f2 then f_false
+  else match f1.f_node, f2.f_node with
+  | Fint x1 , Fint x2 -> f_bool (x1 < x2)
+  | _, _ -> f_int_lt f1 f2 
+
+let f_real_le_simpl f1 f2 =
+  if f_equal f1 f2 then f_true
+  else match f1.f_node, f2.f_node with
+  | Fapp(op1, [{f_node = Fint x1}]), Fapp(op2, [{f_node = Fint x2}]) 
+    when f_equal op1 f_op_real_of_int && f_equal op2 f_op_real_of_int -> 
+    f_bool (x1 <= x2)
+  | _, _ -> f_real_le f1 f2 
+
+let f_real_lt_simpl f1 f2 =
+  if f_equal f1 f2 then f_false
+  else match f1.f_node, f2.f_node with
+  | Fapp(op1, [{f_node = Fint x1}]), Fapp(op2, [{f_node = Fint x2}]) 
+    when f_equal op1 f_op_real_of_int && f_equal op2 f_op_real_of_int -> 
+    f_bool (x1 < x2)
+  | _, _ -> f_real_lt f1 f2  
+
+  
+
 
 (* -------------------------------------------------------------------- *)
 let rec form_of_expr mem (e: expr) = 
@@ -1518,6 +1553,10 @@ type op_kind =
   | OK_imp
   | OK_iff
   | OK_eq
+  | OK_int_le
+  | OK_int_lt
+  | OK_real_le
+  | OK_real_lt
   | OK_other 
 
 let operators =
@@ -1531,7 +1570,12 @@ let operators =
      EcCoreLib.p_or   , OK_or  false;
      EcCoreLib.p_imp  , OK_imp;
      EcCoreLib.p_iff  , OK_iff;
-     EcCoreLib.p_eq   , OK_eq]
+     EcCoreLib.p_eq   , OK_eq;
+     EcCoreLib.p_int_le, OK_int_le;
+     EcCoreLib.p_int_lt, OK_int_lt;
+     EcCoreLib.p_real_le, OK_real_le;
+     EcCoreLib.p_real_lt, OK_real_lt
+    ]
   in
 
   let tbl = EcPath.Hp.create 11 in
@@ -1543,7 +1587,8 @@ let op_kind (p : EcPath.path) =
 
 let is_logical_op op =
   match op_kind op with
-  | OK_not | OK_and _ | OK_or _ | OK_imp | OK_iff | OK_eq -> true
+  | OK_not | OK_and _ | OK_or _ | OK_imp | OK_iff | OK_eq 
+  | OK_int_le| OK_int_lt | OK_real_le | OK_real_lt -> true
   | _ -> false
 
 (* -------------------------------------------------------------------- *)
@@ -1588,7 +1633,6 @@ let sform_of_op (op, ty) args =
   | OK_imp  , [f1; f2] -> SFimp (f1, f2)
   | OK_iff  , [f1; f2] -> SFiff (f1, f2)
   | OK_eq   , [f1; f2] -> SFeq  (f1, f2)
-
   | _ -> SFop ((op, ty), args)
 
 let rec sform_of_form fp =

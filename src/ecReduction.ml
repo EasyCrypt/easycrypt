@@ -252,6 +252,10 @@ let rec h_red ri env hyps f =
       | OK_imp  , [f1;f2] -> f_imp_simpl f1 f2 
       | OK_iff  , [f1;f2] -> f_iff_simpl f1 f2 
       | OK_eq   , [f1;f2] -> f_eq_simpl f1 f2 
+      | OK_int_le, [f1;f2] -> f_int_le_simpl f1 f2
+      | OK_int_lt, [f1;f2] -> f_int_lt_simpl f1 f2
+      | OK_real_le, [f1;f2] -> f_real_le_simpl f1 f2
+      | OK_real_lt, [f1;f2] -> f_real_lt_simpl f1 f2
       | _                 -> f in
     if f_equal f f' then f_app fo (h_red_args ri env hyps args) f.f_ty
     else f' 
