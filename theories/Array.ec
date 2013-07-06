@@ -24,7 +24,7 @@ op length: 'x array -> int.
 axiom length_pos: forall (xs:'x array), 0 <= length xs.
 
 (* And a bunch of elements *)
-op __get: 'x array -> int -> 'x.
+op "_.[_]": 'x array -> int -> 'x.
 
 (* Equality is extensional *)
 pred (==) (xs0:'x array, xs1:'x array) =
@@ -53,7 +53,7 @@ intros xs H; apply extensionality; smt.
 save.
 
 (* cons *)
-op (::) : 'x -> 'x array -> 'x array.
+op "_::_" : 'x -> 'x array -> 'x array.
 
 axiom cons_length: forall (x:'x, xs:'x array),
   length (x::xs) = 1 + length xs.
@@ -244,7 +244,7 @@ save.
 (*********************************)
 (*      Imperative Operators     *)
 (*********************************)
-op __set: 'x array -> int -> 'x -> 'x array.
+op "_.[_<-_]": 'x array -> int -> 'x -> 'x array.
 
 axiom set_length: forall (xs:'x array, i:int, x:'x),
   length (xs.[i <- x]) = length xs.

@@ -208,11 +208,11 @@ proof.
  inline Correct(BR).SE.dec Correct(BR).SE.enc RO.o.
  do 4! (wp;rnd);rnd;skip;progress;[ | |smt|smt].
  rewrite (projPlain_c (f x1 r) 
- (Plaintext.(^^) m (proj (Map.OptionGet.__get (Map.__set RO.m{hr} r y) r)))).
+ (Plaintext.(^^) m (proj (Map.OptionGet."_.[_]" (Map."_.[_<-_]" RO.m{hr} r y) r)))).
  rewrite (projRand_c (f x1 r) 
- (Plaintext.(^^) m (proj (Map.OptionGet.__get (Map.__set RO.m{hr} r y) r))));smt.
+ (Plaintext.(^^) m (proj (Map.OptionGet."_.[_]" (Map."_.[_<-_]" RO.m{hr} r y) r))));smt.
  rewrite (projRand_c (f x1 r) 
- (Plaintext.(^^) m (proj (Map.OptionGet.__get (Map.__set RO.m{hr} r y) r))));smt.
+ (Plaintext.(^^) m (proj (Map.OptionGet."_.[_]" (Map."_.[_<-_]" RO.m{hr} r y) r))));smt.
 qed.
 
 

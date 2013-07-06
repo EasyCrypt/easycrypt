@@ -5,11 +5,13 @@ open EcSymbols
 open EcPath
 
 (* Symbol with specific parsing *)
-val s_get  : string
-val s_set  : string
-val s_nil  : string
-val s_cons : string
-val s_abs  : string
+val s_get  : symbol
+val s_set  : symbol
+val s_nil  : symbol
+val s_cons : symbol
+val s_abs  : symbol
+
+val is_mixfix_op : symbol -> bool
 
 (* qsymbol *)
 val s_dbool      : qsymbol

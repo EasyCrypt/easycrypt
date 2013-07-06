@@ -619,17 +619,17 @@ let pp_opapp (ppe : PPEnv.t) t_ty pp_sub outer fmt (pred, op, tvi, es) =
 
     let (pp, prio) =
       match opname, es with
-      | "__nil", [] ->
+      | x, [] when x = EcCoreLib.s_nil ->
           ((fun fmt -> pp_string fmt "[]"), max_op_prec)
 
-      | "__abs", [e] ->
+      | x, [e] when x = EcCoreLib.s_abs ->
           let pp fmt =
             Format.fprintf fmt "`|%a|"
               (pp_sub ppe (inm, (min_op_prec, `NonAssoc))) e
           in
             (pp, e_app_prio)
 
-      | "__get", [e1; e2] ->
+      | x, [e1; e2] when x = EcCoreLib.s_get ->
           let pp fmt =
             Format.fprintf fmt "@[%a.[%a]@]"
               (pp_sub ppe (inm, (e_get_prio , `Left    ))) e1
@@ -637,7 +637,7 @@ let pp_opapp (ppe : PPEnv.t) t_ty pp_sub outer fmt (pred, op, tvi, es) =
           in
             (pp, e_get_prio)
 
-      | "__set", [e1; e2; e3] ->
+      | x, [e1; e2; e3] when x = EcCoreLib.s_set ->
           let pp fmt =
             Format.fprintf fmt "@[<hov 2>%a.[%a <-@ %a]@]"
               (pp_sub ppe (inm, (e_get_prio , `Left    ))) e1

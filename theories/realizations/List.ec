@@ -4,8 +4,8 @@ require import Fun.
 
 (** Type Definition is imported from Why3 *)
 import why3 "list" "List"
-   op "Nil" as "__nil";
-   op "Cons" as "::".
+   op "Nil" as "[]";
+   op "Cons" as "_::_".
 
 (*** Recursion and Induction Principles *)
 (** Recursion principle *)
