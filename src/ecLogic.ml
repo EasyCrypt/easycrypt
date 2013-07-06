@@ -206,6 +206,11 @@ let t_or t1 t2 g =
   | `Failure _ -> t2 g
   | `Success g -> g
 
+let rec t_lor lt g = 
+  match lt with
+  | [] -> t_fail g 
+  | t1::lt -> t_or t1 (t_lor lt) g
+
 let t_do b omax t g =
   let max = max (odfl max_int omax) 0 in
 
