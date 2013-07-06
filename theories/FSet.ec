@@ -546,9 +546,7 @@ lemma mem_interval : forall (x y a:int), (mem a (interval x y)) <=> (x <= a <= y
   intros x y a.
   case (x <= y)=> h;last smt.
   rewrite (_ : y = (y-x+1)-1+x);first smt.
-  apply (Int.Induction.induction
-    (lambda i, mem a (interval x ((i-1)+x)) <=> x <= a <= ((i-1)+x))
-    _ _ (y-x+1) _);[smt| |smt].
+  elimT Int.Induction.induction (y-x+1);[smt| |smt].
   simplify.
   intros j hh hrec.
   rewrite interval_pos;first smt.
