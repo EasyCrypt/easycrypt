@@ -1,9 +1,15 @@
 (* -------------------------------------------------------------------- *)
-let s_get  = "__get"
-let s_set  = "__set"
-let s_nil  = "__nil"
-let s_cons = "::"
-let s_abs  = "__abs"
+let s_get  = "_.[_]"
+let s_set  = "_.[_<-_]"
+let s_nil  = "[]"
+let s_cons = "_::_"
+let s_abs  = "`|_|"
+
+(* -------------------------------------------------------------------- *)
+let mixfix_ops = [s_get; s_set; s_nil; s_cons; s_abs]
+
+let is_mixfix_op op =
+  List.mem op mixfix_ops
 
 (* -------------------------------------------------------------------- *)
 let s_dbool      = (["<top>"; "Bool" ; "Dbool"     ], "dbool")

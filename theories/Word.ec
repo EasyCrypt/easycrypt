@@ -7,7 +7,7 @@ axiom length_pos: 0 <= length.
 (* A word only has the get operator: its size is fixed. *)
 (* Ideally, we would have cloned bitstrings, but they are equipped with an empty operator. *)
 type word.
-op __get: word -> int -> bool.
+op "_.[_]": word -> int -> bool.
 
 pred (==)(w0, w1:word) = forall i,
   0 <= i => i < length =>
@@ -17,7 +17,7 @@ axiom extensionality: forall w0 w1,
   w0 == w1 => w0 = w1.
 
 (* set *)
-op __set: word -> int -> bool -> word.
+op "_.[_<-_]": word -> int -> bool -> word.
 axiom set_get: forall w i j b,
   0 <= i => i < length =>
   w.[i <- b].[j] = (i = j) ? b : w.[j].
@@ -71,13 +71,13 @@ axiom to_array_length: forall w,
   Array.length (to_array w) = length.
 axiom to_array_get: forall w i,
   0 <= i => i < length =>
-  Array.__get (to_array w) i = w.[i].
+  Array."_.[_]" (to_array w) i = w.[i].
 
 op from_array: bool Array.array -> word.
 axiom from_array_get: forall a i,
   Array.length a = length =>
   0 <= i => i < length =>
-  (from_array a).[i] = Array.__get a i.
+  (from_array a).[i] = Array."_.[_]" a i.
 
 lemma to_array_from_array: forall a,
   Array.length a = length =>

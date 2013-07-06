@@ -175,6 +175,7 @@
 %token CONST
 %token CUT
 %token DATATYPE
+%token DCOLON
 %token DEBUG
 %token DECLARE
 %token DELTA
@@ -329,7 +330,7 @@
 %left OP2 MINUS ADD
 %right ARROW
 %left OP3 STAR SLASH
-%left OP4 
+%left OP4 DCOLON
 
 %nonassoc LBRACE
 
@@ -395,6 +396,14 @@ uqident:
 | x=UIDENT { x }
 | x=PUNIOP { x }
 | x=PBINOP { x }
+
+| paren(DCOLON) { EcCoreLib.s_cons }
+
+| x=loc(STRING) {
+    if not (EcCoreLib.is_mixfix_op (unloc x)) then
+      error x.pl_loc (Some "invalid mixfix operator");
+    unloc x
+  }
 ;
 
 %inline oident:
@@ -571,6 +580,9 @@ expr_u:
 
 | e1=expr op=loc(OP4) ti=tvars_app? e2=expr 
     { peapp_symb op.pl_loc op.pl_desc ti [e1; e2] }
+
+| e1=expr op=loc(DCOLON) ti=tvars_app? e2=expr 
+    { peapp_symb op.pl_loc EcCoreLib.s_cons ti [e1; e2] }
 
 | e1=expr op=loc(IMPL) ti=tvars_app? e2=expr
     { peapp_symb op.pl_loc "=>" ti [e1; e2] }
@@ -770,6 +782,9 @@ form_u(P):
 
 | e1=form_r(P) op=loc(OP4) ti=tvars_app? e2=form_r(P)  
     { pfapp_symb op.pl_loc op.pl_desc ti [e1; e2] }
+
+| e1=form_r(P) op=loc(DCOLON) ti=tvars_app? e2=form_r(P)
+    { pfapp_symb op.pl_loc EcCoreLib.s_cons ti [e1; e2] }
 
 | e1=form_r(P) op=loc(IMPL) ti=tvars_app? e2=form_r(P)  
     { pfapp_symb op.pl_loc "=>" ti [e1; e2] }

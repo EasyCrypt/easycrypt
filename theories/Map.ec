@@ -7,12 +7,12 @@ require        ISet.
 type ('a,'b) map = ('a,'b Option.option) Map_why.map.
 
 op empty:('a,'b) map = Map_why.const_ Option.None.
-op get (m:('a,'b) map) (x:'a): 'b Option.option = Map_why.__get m x.
-op __set (m:('a,'b) map) (x:'a) (y:'b): ('a,'b) map = Map_why.__set m x (Option.Some y).
+op get (m:('a,'b) map) (x:'a): 'b Option.option = Map_why."_.[_]" m x.
+op "_.[_<-_]" (m:('a,'b) map) (x:'a) (y:'b): ('a,'b) map = Map_why."_.[_<-_]" m x (Option.Some y).
 
 theory OptionGet.
   require export Option.
-  op __get (m:('a,'b) map): 'a -> 'b option = get m.
+  op "_.[_]" (m:('a,'b) map): 'a -> 'b option = get m.
 end OptionGet.
 export OptionGet.
 
@@ -178,7 +178,7 @@ lemma find_empty: forall (p:'a -> 'b cpred),
 by [].
 
 (** rm *)
-op rm (x:'a) (m:('a,'b) map) = Map_why.__set m x None.
+op rm (x:'a) (m:('a,'b) map) = Map_why."_.[_<-_]" m x None.
 
 (* Lemmas *)
 lemma rm_nin_dom: forall (x:'a) (m:('a,'b) map),

@@ -212,7 +212,7 @@ let op_char_1234 = op_char_1 | op_char_234
 let op1 = op_char_1234* op_char_1 op_char_1234*
 let op2 = op_char_234*  op_char_2 op_char_234+
 let op3 = op_char_34*   op_char_3 op_char_34*
-let op4 = op_char_4+ | ':'+
+let op4 = op_char_4+ | ("::" ':'+)
 
 let uniop = '+' | '-' | '!' | op1
 
@@ -255,6 +255,7 @@ rule main = parse
   | ".."    { DOTDOT }
   | ".["    { DLBRACKET }
   | ":="    { CEQ }
+  | "::"    { DCOLON }
   | "%r"    { FROM_INT }
   | "{0,1}" { RBOOL }
 

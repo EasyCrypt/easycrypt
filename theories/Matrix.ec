@@ -10,7 +10,7 @@ op size: 'a matrix -> (int * int).
 axiom size_pos: forall (M:'a matrix),
   0 <= fst (size M) /\ 0 <= snd (size M).
 
-op __get: 'a matrix -> (int * int) -> 'a.
+op "_.[_]": 'a matrix -> (int * int) -> 'a.
 
 pred (==) (M0 M1:'a matrix) =
   size M0 = size M1 /\
@@ -31,7 +31,7 @@ axiom new_size: forall m n,
   size (new<:'a> (m,n)) = (m,n).
 
 (* set M (i,j) a: M.[(i,j) <- a] whenever (i,j) < size M [pairwise] *)
-op __set:  'a matrix -> (int * int) -> 'a -> 'a matrix.
+op "_.[_<-_]":  'a matrix -> (int * int) -> 'a -> 'a matrix.
 
 axiom set_size: forall (M: 'a matrix) i j a,
   0 <= i => i < fst (size M) =>
@@ -129,7 +129,7 @@ axiom to_array_length: forall (M:'a matrix),
 axiom to_array_get: forall (M:'a matrix) i,
   fst (size M) = 1 =>
   0 <= i => i < snd (size M) =>
-  Array.__get (to_array M) i = M.[(i,0)].
+  Array."_.[_]" (to_array M) i = M.[(i,0)].
 
 (* Extracting a row *)
 op row: 'a matrix -> int -> 'a Array.array.
@@ -141,7 +141,7 @@ axiom row_length: forall (M:'a matrix) j,
 axiom row_get: forall (M:'a matrix) j i,
   0 <= j => j < snd (size M) =>
   0 <= i => i < fst (size M) =>
-  Array.__get (row M j) i = M.[(i,j)].
+  Array."_.[_]" (row M j) i = M.[(i,j)].
 
 (* Extracting a column *)
 op column: 'a matrix -> int -> 'a Array.array.
@@ -153,7 +153,7 @@ axiom column_length: forall (M:'a matrix) i,
 axiom column_get: forall (M:'a matrix) i j,
   0 <= i => i < fst (size M) =>
   0 <= j => j < snd (size M) =>
-  Array.__get (column M i) j = M.[(i,j)].
+  Array."_.[_]" (column M i) j = M.[(i,j)].
 
 lemma column_transpose_row: forall (M:'a matrix) i,
   0 <= i => i < snd (size M) =>
@@ -163,8 +163,8 @@ intros M i i_0 i_bound; apply Array.extensionality.
 cut ext_eq: (Array.length (row M i) = fst (size M) /\
              Array.length (column (transpose M) i) = fst (size M) /\
              forall j, 0 <= j => j < fst (size M) =>
-               Array.__get (row M i) j = M.[(j,i)] /\
-               Array.__get (column (transpose M) i) j = (transpose M).[(i,j)] /\
+               Array."_.[_]" (row M i) j = M.[(j,i)] /\
+               Array."_.[_]" (column (transpose M) i) j = (transpose M).[(i,j)] /\
                (transpose M).[(i,j)] = M.[(j,i)]);[ | smt ];
 progress; smt.
 save.

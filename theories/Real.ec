@@ -6,7 +6,7 @@ import why3 "real" "Real"
 theory Abs.
 
   import why3 "real" "Abs"
-    op "abs" as "__abs".
+    op "abs" as "`|_|".
   (* unset triangular_inequality *)
 
 end Abs.
