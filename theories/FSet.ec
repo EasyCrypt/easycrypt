@@ -547,7 +547,6 @@ lemma mem_interval : forall (x y a:int), (mem a (interval x y)) <=> (x <= a <= y
   case (x <= y)=> h;last smt.
   rewrite (_ : y = (y-x+1)-1+x);first smt.
   elimT Int.Induction.induction (y-x+1);[smt| |smt].
-  simplify.
   intros j hh hrec.
   rewrite interval_pos;first smt.
   rewrite (_:j - 1 + x - 1=j - 1 - 1 + x);first smt.
@@ -561,8 +560,7 @@ lemma card_interval_max : forall x y, card (interval x y) = max (y - x + 1) 0.
   intros h.
   rewrite (_:interval x y=interval x (x+(y-x+1)-1));first smt.
   rewrite (_:max (y - x + 1) 0 = y-x+1);first smt.
-  apply (Int.Induction.induction (lambda i, card (interval x (x+i-1)) = i) _ _ (y-x+1) _);[smt| |smt].
-  simplify.
+  elimT Int.Induction.induction (y-x+1);[smt| |smt].
   intros j hh hrec.
   rewrite (interval_pos x (x+j-1) _);smt.
 save.
@@ -580,9 +578,8 @@ lemma dec_interval : forall (x y:int),
   intros=> /= [x0] [h1].
   subst.
   smt.
-  intros=> hh.
+  intros=> hh /=.
   exists (a+1).
-  simplify.
   rewrite ! mem_rm ! mem_interval.
   smt.
 save.
