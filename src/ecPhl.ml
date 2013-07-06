@@ -2413,17 +2413,27 @@ let t_hoare_bd_hoare g =
   else 
     cannot_apply "hoare/bd_hoare" "a hoare or bd_hoare judgment was expected" 
 
-let t_prbounded g = 
+let t_pr_bounded conseq g = 
   let concl = get_concl g in
-  let bhs = destr_bdHoareS concl in 
-  let cond = match bhs.bhs_cmp with
-    | FHle -> f_real_le f_r1 bhs.bhs_bd
-    | FHge -> f_real_le bhs.bhs_bd f_r0
-    | FHeq ->
-      cannot_apply "pr_bounded" "cannot solve the probabilistic judgement" 
-  in
-  prove_goal_by [cond] RN_hl_prbounded g
+  let po, cmp, bd = 
+    match concl.f_node with
+    | FbdHoareF hf -> hf.bhf_po, hf.bhf_cmp, hf.bhf_bd 
+    | FbdHoareS hf -> hf.bhs_po, hf.bhs_cmp, hf.bhs_bd
+    | _ -> tacuerror "bd_hoare excepted" in
+  let cond = 
+    match cmp with
+    | FHle when f_equal bd f_r1 -> []
+    | FHge when f_equal bd f_r0 -> []
+    | _ when f_equal po f_false && f_equal bd f_r0 -> []
+    (* TODO use the conseq rule instead *)
+    | FHle when conseq -> [f_real_le f_r1 bd]
+    | FHge when conseq -> [f_real_le bd f_r0]
+    | _ -> cannot_apply "pr_bounded" "cannot solve the probabilistic judgement" in
+  prove_goal_by cond RN_hl_prbounded g
 
+let t_prbounded = t_pr_bounded true
+
+(* TODO : Remove this : can be done by rewrite_pr *)
 let t_prfalse g = 
   let env,_, concl = get_goal_e g in
   let f,ev,bd =
