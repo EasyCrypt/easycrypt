@@ -487,8 +487,13 @@ tyvar_annot:
 %inline  expr: x=loc( expr_u) { x };
 
 sexpr_u:
-| e=sexpr PCENT p=qident
+| e=sexpr PCENT p=uqident
    { PEscope (p, e) }
+
+| e=sexpr PCENT p=lident
+   { if unloc p <> "top" then
+       error p.pl_loc (Some "invalid scope name");
+     PEscope (pqsymb_of_symb p.pl_loc "<top>", e) }
 
 | n=number
    { PEint n }
