@@ -2739,7 +2739,19 @@ let t_hoare_true g =
     prove_goal_by [] RN_hoare_true g    
   | _ -> tacuerror "the conclusion should have the form hoare[_ : _ ==> true]"
 
-
+  
+let t_trivial = 
+  let t1 = 
+    t_lor [t_hoare_true;
+           t_hr_exfalso;   
+           t_pr_bounded false;
+           t_skip] in
+  t_or
+    (t_lseq [t_try t_assumption; t_progress (t_id None); t_try t_assumption; 
+             t1; t_trivial; t_fail])
+    (t_id None)
+  
+ 
 
 
   
