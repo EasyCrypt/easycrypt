@@ -40,6 +40,7 @@ let id_lt        = "<"
 
 let id_add         = "+"
 let id_sub         = "-"
+let id_opp         = "[-]"
 let id_prod        = "*"
 let id_div         = "/"
 let id_pow         = "^"
@@ -81,6 +82,7 @@ let _Int id      = EcPath.pqname p_Int id
 let p_int_le     = _Int  id_le
 let p_int_lt     = _Int  id_lt
 
+let p_int_opp    = _Int id_opp
 let p_int_add    = _Int id_add
 let p_int_sub    = _Int id_sub
 let p_int_prod   = _Int id_prod

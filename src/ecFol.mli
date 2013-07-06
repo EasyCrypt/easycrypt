@@ -222,6 +222,7 @@ val f_int_lt : form -> form -> form
 val f_int_prod : form -> form -> form
 val f_int_add  : form -> form -> form
 val f_int_sub  : form -> form -> form
+val f_int_opp  : form -> form
 val f_int_pow  : form -> form -> form
 
 val f_int_intval : form -> form -> form
