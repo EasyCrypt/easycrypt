@@ -26,7 +26,6 @@ let qsymb_of_symb (x : symbol) : qsymbol = ([], x)
 (* -------------------------------------------------------------------- *)
 type psymbol  = symbol  located
 type pqsymbol = qsymbol located
-
 type pmsymbol = (psymbol * ((pmsymbol located) list) option) list
 
 (* -------------------------------------------------------------------- *)
@@ -523,6 +522,7 @@ type theory_cloning = {
   pthc_base : pqsymbol;
   pthc_name : psymbol option;
   pthc_ext  : (pqsymbol * theory_override) list;
+  pthc_prf  : [`All of pqsymbol option | `Named of pqsymbol] list;
 }
 
 and theory_override =

@@ -172,8 +172,11 @@ end
 type proof_uc = {
   puc_name   : string;
   puc_jdg    : proof_state;
-  puc_flags  : pucflags
+  puc_flags  : pucflags;
+  puc_cont   : [`Save | `Clone of proof_ctxt list * EcEnv.env];
 }
+
+and proof_ctxt = EcThCloning.axclone
 
 and proof_state =
 | PSCheck   of (EcLogic.judgment_uc * int list)
@@ -1020,6 +1023,188 @@ module ModType = struct
       bind scope (name, tysig)
 end
 
+
+(* -------------------------------------------------------------------- *)
+module Ax = struct
+  open EcParsetree
+  open EcTypes
+  open EcDecl
+
+  module TT = EcTyping
+
+  type mode = [`WeakCheck | `Check]
+
+  (* ------------------------------------------------------------------ *)
+  let bind (scope : scope) local ((x, ax) : _ * axiom) =
+    assert (scope.sc_pr_uc = None);
+    let scope = { scope with sc_env = EcEnv.Ax.bind x ax scope.sc_env; } in
+    let scope = maybe_add_to_section scope (EcTheory.CTh_axiom (x, ax)) in
+    let scope =
+      match local with
+      | false -> scope
+      | true  ->
+        let axpath = EcPath.pqname (path scope) x in
+        let ec = CoreSection.addlocal `Lemma axpath scope.sc_section in
+          { scope with sc_section = ec }
+    in
+      scope
+
+  (* ------------------------------------------------------------------ *)
+  let start_lemma scope (cont, axflags) check name tparams concl =
+    let puc =
+      match check with
+      | false -> PSNoCheck (tparams, concl)
+      | true  ->
+          let hyps = EcEnv.LDecl.init scope.sc_env tparams in
+            PSCheck (EcLogic.open_juc (hyps, concl), [0])
+    in 
+    let puc = { puc_name  = name;
+                puc_jdg   = puc;
+                puc_flags = axflags;
+                puc_cont  = cont; }
+    in
+      { scope with sc_pr_uc = Some (None, puc) }
+
+  (* ------------------------------------------------------------------ *)
+  let rec add_r (scope : scope) mode cont (ax : paxiom located) =
+    assert (scope.sc_pr_uc = None);
+
+    let loc = ax.pl_loc and ax = ax.pl_desc in
+    let ue  = TT.ue_for_decl scope.sc_env (loc, ax.pa_tyvars) in
+
+    if ax.pa_local && not (CoreSection.in_section scope.sc_section) then
+      hierror "cannot declare a local lemma outside of a section";
+
+    let (pconcl, tintro) =
+      match ax.pa_vars with
+      | None    -> (ax.pa_formula, [])
+      | Some vs -> 
+          let pconcl = { pl_loc = loc; pl_desc = PFforall (vs, ax.pa_formula) } in
+            (pconcl, List.flatten (List.map fst vs))
+    in
+
+    let tintro =
+      List.map
+        (fun x -> IPCore (mk_loc x.pl_loc (`NoRename x.pl_desc)))
+        tintro in
+    let tintro = mk_loc loc (Plogic (Pintro tintro)) in
+
+    let concl    = TT.trans_prop scope.sc_env ue pconcl in
+    let concl    = EcFol.Fsubst.uni (EcUnify.UniEnv.close ue) concl in
+    let tparams  = EcUnify.UniEnv.tparams ue in
+    let check    = Check_mode.check scope.sc_options in
+    let pucflags = { puc_nosmt = ax.pa_nosmt; puc_local = ax.pa_local; } in
+    let pucflags = (cont, pucflags) in
+
+    if not ax.pa_local then begin
+      match CoreSection.olocals scope.sc_section with
+      | None -> ()
+      | Some locals ->
+          if CoreSection.form_use_local concl locals then
+            hierror "this lemma uses local modules and must be declared as local"
+    end;
+
+    match ax.pa_kind with
+    | PILemma ->
+        let scope = start_lemma scope pucflags check (unloc ax.pa_name) tparams concl in
+        let scope = Tactics.process_core false `Check scope [tintro] in
+          None, scope
+
+    | PLemma tc ->
+        let scope = start_lemma scope pucflags check (unloc ax.pa_name) tparams concl in
+        let scope = Tactics.process_core false `Check scope [tintro] in
+        let scope = Tactics.proof scope mode (if tc = None then true else false) in
+
+        let tc =
+          match tc with
+          | Some tc -> [tc]
+          | None    ->
+              let dtc = Plogic (Psmt (None, empty_pprover)) in
+              let dtc = [{ pl_loc = loc; pl_desc = dtc }] in
+              let dtc = List.map (fun t -> { pt_core = t; pt_intros = []; }) dtc in
+                dtc
+        in
+
+        let scope = Tactics.process_r false mode scope tc in
+          save scope loc
+
+    | PAxiom ->
+        let axd = { ax_tparams = tparams;
+                    ax_spec    = Some concl;
+                    ax_kind    = `Axiom;
+                    ax_nosmt   = ax.pa_nosmt; }
+        in
+          Some (unloc ax.pa_name),
+          bind scope (snd pucflags).puc_local (unloc ax.pa_name, axd)
+
+  (* ------------------------------------------------------------------ *)
+  and add_for_cloning (scope : scope) proofs =
+    match proofs with
+    | [] -> scope
+    | ((x, ax), axenv) :: proofs ->
+        assert (ax.ax_kind = `Lemma);
+        assert (ax.ax_spec <> None);
+
+        let pucflags = { puc_nosmt = ax.ax_nosmt; puc_local = false; } in
+        let pucflags = (`Clone (proofs, axenv), pucflags) in
+        let check    = Check_mode.check scope.sc_options in
+
+        let scope = { scope with sc_env = axenv } in
+        let scope = start_lemma scope pucflags check x ax.ax_tparams (oget ax.ax_spec) in
+
+          scope
+
+  (* ------------------------------------------------------------------ *)
+  and save scope _loc =
+    check_state `InProof "save" scope;
+
+    let (_, puc) = oget scope.sc_pr_uc in
+
+    let scope =
+      match puc.puc_cont with
+      | `Save -> begin
+          let (tparams, concl, kind) =
+            match puc.puc_jdg with
+            | PSCheck (juc, _) ->
+                ignore (EcLogic.close_juc juc);
+                let hyps, concl = (EcLogic.get_pj (juc, 0)).EcLogic.pj_decl in
+                let hyps = EcEnv.LDecl.tohyps hyps in
+                let tparams = hyps.EcBaseLogic.h_tvar in
+                  assert (hyps.EcBaseLogic.h_local = []);
+                  (tparams, concl, `Lemma)
+      
+            | PSNoCheck (tparams, concl) ->
+                (tparams, concl, `Axiom)
+          in
+          let axd = { ax_tparams = tparams;
+                      ax_spec    = Some concl;
+                      ax_kind    = kind;
+                      ax_nosmt   = puc.puc_flags.puc_nosmt; }
+          in
+          let scope = { scope with sc_pr_uc = None } in
+          let scope = bind scope puc.puc_flags.puc_local (puc.puc_name, axd) in
+            scope
+      end
+
+      | `Clone (ps, scenv) -> begin
+        begin match puc.puc_jdg with
+        | PSCheck (juc, _) -> ignore (EcLogic.close_juc juc)
+        | PSNoCheck _ -> () end;
+
+        let scope = { scope with sc_env = scenv } in
+          match ps with
+          | [] -> scope
+          | _  -> add_for_cloning scope ps
+      end
+
+    in
+      (Some puc.puc_name, scope)
+
+  (* ------------------------------------------------------------------ *)
+  let add (scope : scope) mode (ax : paxiom located) =
+    add_r scope mode `Save ax
+end
+
 (* -------------------------------------------------------------------- *)
 module Theory = struct
   open EcTheory
@@ -1147,8 +1332,9 @@ module Theory = struct
     if CoreSection.in_section scope.sc_section then
       hierror "cannot clone a theory while a section is active";
 
-    let (name, nth) = EcThCloning.clone scope.sc_env thcl in
+    let (name, proofs, nth) = EcThCloning.clone scope.sc_env thcl in
     let scope = bind scope (name, nth) in
+    let scope = Ax.add_for_cloning scope proofs in
       (name, scope)
 
   (* ------------------------------------------------------------------ *)
@@ -1171,142 +1357,6 @@ module Theory = struct
     let renaming = List.map mk_renaming renaming in
     let env      = fst (EcEnv.import_w3_dir scope.sc_env dir file renaming) in
       { scope with sc_env = env }
-end
-
-(* -------------------------------------------------------------------- *)
-module Ax = struct
-  open EcParsetree
-  open EcTypes
-  open EcDecl
-
-  module TT = EcTyping
-
-  type mode = [`WeakCheck | `Check]
-
-  (* ------------------------------------------------------------------ *)
-  let bind (scope : scope) local ((x, ax) : _ * axiom) =
-    assert (scope.sc_pr_uc = None);
-    let scope = { scope with sc_env = EcEnv.Ax.bind x ax scope.sc_env; } in
-    let scope = maybe_add_to_section scope (EcTheory.CTh_axiom (x, ax)) in
-    let scope =
-      match local with
-      | false -> scope
-      | true  ->
-        let axpath = EcPath.pqname (path scope) x in
-        let ec = CoreSection.addlocal `Lemma axpath scope.sc_section in
-          { scope with sc_section = ec }
-    in
-      scope
-
-  (* ------------------------------------------------------------------ *)
-  let start_lemma scope axflags check name tparams concl =
-    let puc =
-      match check with
-      | false -> PSNoCheck (tparams, concl)
-      | true  ->
-          let hyps = EcEnv.LDecl.init scope.sc_env tparams in
-            PSCheck (EcLogic.open_juc (hyps, concl), [0])
-    in 
-    let puc = { puc_name = name; puc_jdg = puc; puc_flags = axflags; } in
-      { scope with sc_pr_uc = Some (None, puc) }
-
-  (* ------------------------------------------------------------------ *)
-  let save scope _loc =
-    check_state `InProof "save" scope;
-
-    let (_, puc) = oget scope.sc_pr_uc in
-    let (tparams, concl, kind) =
-      match puc.puc_jdg with
-      | PSCheck (juc, _) ->
-          ignore (EcLogic.close_juc juc);
-          let hyps, concl = (EcLogic.get_pj (juc, 0)).EcLogic.pj_decl in
-          let hyps = EcEnv.LDecl.tohyps hyps in
-          let tparams = hyps.EcBaseLogic.h_tvar in
-            assert (hyps.EcBaseLogic.h_local = []);
-            (tparams, concl, `Lemma)
-
-      | PSNoCheck (tparams, concl) ->
-          (tparams, concl, `Axiom)
-    in
-    let axd = { ax_tparams = tparams;
-                ax_spec    = Some concl;
-                ax_kind    = kind;
-                ax_nosmt   = puc.puc_flags.puc_nosmt; }
-    in
-    let scope = { scope with sc_pr_uc = None } in
-    let scope = bind scope puc.puc_flags.puc_local (puc.puc_name, axd) in
-      (Some puc.puc_name, scope)
-
-  (* ------------------------------------------------------------------ *)
-  let add (scope : scope) mode (ax : paxiom located) =
-    assert (scope.sc_pr_uc = None);
-
-    let loc = ax.pl_loc and ax = ax.pl_desc in
-    let ue  = TT.ue_for_decl scope.sc_env (loc, ax.pa_tyvars) in
-
-    if ax.pa_local && not (CoreSection.in_section scope.sc_section) then
-      hierror "cannot declare a local lemma outside of a section";
-
-    let (pconcl, tintro) =
-      match ax.pa_vars with
-      | None    -> (ax.pa_formula, [])
-      | Some vs -> 
-          let pconcl = { pl_loc = loc; pl_desc = PFforall (vs, ax.pa_formula) } in
-            (pconcl, List.flatten (List.map fst vs))
-    in
-
-    let tintro =
-      List.map
-        (fun x -> IPCore (mk_loc x.pl_loc (`NoRename x.pl_desc)))
-        tintro in
-    let tintro = mk_loc loc (Plogic (Pintro tintro)) in
-
-    let concl    = TT.trans_prop scope.sc_env ue pconcl in
-    let concl    = EcFol.Fsubst.uni (EcUnify.UniEnv.close ue) concl in
-    let tparams  = EcUnify.UniEnv.tparams ue in
-    let check    = Check_mode.check scope.sc_options in
-    let pucflags = { puc_nosmt = ax.pa_nosmt; puc_local = ax.pa_local; } in
-
-    if not ax.pa_local then begin
-      match CoreSection.olocals scope.sc_section with
-      | None -> ()
-      | Some locals ->
-          if CoreSection.form_use_local concl locals then
-            hierror "this lemma uses local modules and must be declared as local"
-    end;
-
-    match ax.pa_kind with
-    | PILemma ->
-        let scope = start_lemma scope pucflags check (unloc ax.pa_name) tparams concl in
-        let scope = Tactics.process_core false `Check scope [tintro] in
-          None, scope
-
-    | PLemma tc ->
-        let scope = start_lemma scope pucflags check (unloc ax.pa_name) tparams concl in
-        let scope = Tactics.process_core false `Check scope [tintro] in
-        let scope = Tactics.proof scope mode (if tc = None then true else false) in
-
-        let tc =
-          match tc with
-          | Some tc -> [tc]
-          | None    ->
-              let dtc = Plogic (Psmt (None, empty_pprover)) in
-              let dtc = [{ pl_loc = loc; pl_desc = dtc }] in
-              let dtc = List.map (fun t -> { pt_core = t; pt_intros = []; }) dtc in
-                dtc
-        in
-
-        let scope = Tactics.process_r false mode scope tc in
-          save scope loc
-
-    | PAxiom ->
-        let axd = { ax_tparams = tparams;
-                    ax_spec    = Some concl;
-                    ax_kind    = `Axiom;
-                    ax_nosmt   = ax.pa_nosmt; }
-        in
-          Some (unloc ax.pa_name),
-          bind scope pucflags.puc_local (unloc ax.pa_name, axd)
 end
 
 (* -------------------------------------------------------------------- *)

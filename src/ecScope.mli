@@ -14,8 +14,11 @@ type scope
 type proof_uc = {
   puc_name   : string;
   puc_jdg    : proof_state;
-  puc_flags  : pucflags
+  puc_flags  : pucflags;
+  puc_cont   : [`Save | `Clone of proof_ctxt list * EcEnv.env];
 }
+
+and proof_ctxt = EcThCloning.axclone
 
 and proof_state =
 | PSCheck   of (EcLogic.judgment_uc * int list)

@@ -366,29 +366,19 @@
 | nm=rlist1(UIDENT, DOT) { nm }
 ;
 
-qident:
-| x=ident { pqsymb_of_psymb x }
-
-| xs=namespace DOT x=_ident {
-    { pl_desc = (xs, x);
-      pl_loc  = EcLocation.make $startpos(xs) $endpos(xs);
-    }
-  }
+_genqident(X):
+| x=X { ([], x) }
+| xs=namespace DOT x=X { (xs, x) }
 ;
+
+genqident(X):
+| x=loc(_genqident(X)) { x }
+;
+
 
 (* -------------------------------------------------------------------- *)
-uqident:
-| x=UIDENT {
-    { pl_desc = ([], x);
-      pl_loc  = EcLocation.make $startpos $endpos; }
-  }
-
-| xs=namespace DOT x=UIDENT {
-    { pl_desc = (xs, x);
-      pl_loc  = EcLocation.make $startpos $endpos;
-    }
-  }
-;
+%inline  qident: x=genqident(_ident) { x };
+%inline uqident: x=genqident(UIDENT) { x };
 
 (* -------------------------------------------------------------------- *)
 %inline _oident:
@@ -1990,25 +1980,48 @@ tactics_or_prf:
 (* Theory cloning                                                       *)
 
 theory_clone:
-| CLONE ip=import_flag? x=uqident cw=clone_with?
+| CLONE ip=import_flag? x=uqident cw=clone_with? cp=clone_proof?
    { let oth =
        { pthc_base = x;
          pthc_name = None;
-         pthc_ext  = EcUtils.odfl [] cw; }
+         pthc_ext  = EcUtils.odfl [] cw;
+         pthc_prf  = EcUtils.odfl [] cp; }
      in
        (oth, ip) }
 
-| CLONE ip=import_flag? x=uqident AS y=uident cw=clone_with?
+| CLONE ip=import_flag? x=uqident AS y=uident cw=clone_with? cp=clone_proof?
    { let oth =
        { pthc_base = x;
          pthc_name = Some y;
-         pthc_ext  = EcUtils.odfl [] cw; }
+         pthc_ext  = EcUtils.odfl [] cw;
+         pthc_prf  = EcUtils.odfl [] cp; }
      in
        (oth, ip) }
 ;
 
 clone_with:
 | WITH x=plist1(clone_override, COMMA) { x }
+;
+
+clone_lemma_base:
+| STAR     { `All }
+| x=_ident { `Named x }
+; 
+
+clone_lemma_1:
+| l=genqident(clone_lemma_base) {
+    match unloc l with
+    | (xs, `Named x) -> `Named (mk_loc l.pl_loc (xs, x))
+    | (xs, `All    ) -> begin
+      match List.rev xs with
+      | []      -> `All None
+      | x :: xs -> `All (Some (mk_loc l.pl_loc (List.rev xs, x)))
+    end
+  }
+;
+
+clone_proof:
+| PROOF x=plist1(clone_lemma_1, COMMA) { x }
 ;
 
 clone_override:

@@ -252,7 +252,7 @@ and process_tactics (scope : EcScope.scope) t =
 and process_save (scope : EcScope.scope) loc =
   let (name, scope) = EcScope.Ax.save scope loc in
     EcUtils.oiter name
-      (fun x -> notify scope "added axiom: `%s'" x);
+      (fun x -> notify scope "added lemma: `%s'" x);
     scope
 
 (* -------------------------------------------------------------------- *)
