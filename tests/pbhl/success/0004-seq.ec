@@ -15,7 +15,7 @@ lemma test : bd_hoare [M.f : true ==> M.x /\ M.y ] = (1%r/4%r).
 proof.
  fun.
  seq 1 : (M.y) true (1%r/2%r) (1%r/2%r) (1%r/2%r) 0%r => //.
- rnd (lambda (x:bool),x=true).
+ rnd ((=) true).
  skip; smt.
  rnd (lambda (x:bool),x).
  skip.
