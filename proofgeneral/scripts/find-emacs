@@ -3,12 +3,14 @@
 function report { echo "$@"; exit 0; }
 
 System="$(uname)"
-Darwin=/Applications/Emacs.app/Contents/MacOS/Emacs
+Darwin1=/Applications/Emacs.app/Contents/MacOS/Emacs
+Darwin2=/Applications/MacPorts/Emacs.app
 
 if [ ! -z "${EMACS}" ]; then report "${EMACS}"; fi
 
 if [ ${System} == "Darwin" ]; then
-  if [ -f ${Darwin} ]; then report "${Darwin}"; fi
+  if [ -f ${Darwin1} ]; then report "${Darwin1}"; fi
+  if [ -f ${Darwin2} ]; then report "${Darwin2}"; fi
 fi
 
 report "emacs"
