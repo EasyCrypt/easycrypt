@@ -15,7 +15,7 @@ module M = {
 lemma test: bd_hoare [ M.f : true ==> res] = (1%r/2%r).
 proof.
 fun.
-rnd (1%r/2%r) (lambda (x:bool), x=y).
+rnd (lambda (x:bool), x=y).
 skip.
 trivial.
 simplify.
@@ -36,19 +36,18 @@ module F = {
 
 lemma test2: bd_hoare [ F.f : true ==> res] = (1%r/2%r). proof.
 fun.
-rnd (1%r) (lambda (x:bool), true).
-rnd (1%r/2%r) (lambda (x:bool), x).
-skip.
-smt.
-simplify.
-rewrite (Dbool.mu_def  (lambda (x : bool), true)).
-rewrite (Dbool.mu_def  (lambda (x : bool), x)).
-split.
-smt.
-intros H v H'.
-split.
-smt.
-smt.
+rnd (F.b1) (1%r/2%r) (1%r) (1%r/2%r) (0%r) (lambda (x:bool), F.b1).
+  (*1st *)
+  trivial.
+  (* snd *)
+  rnd (lambda (x:bool), x).
+  skip. smt.
+  (* thrd *)
+  smt.
+  rnd (lambda (x:bool), !x).
+  skip. smt.
+  (* fourth *)
+  smt.
 save.
 
 
@@ -83,7 +82,7 @@ lemma test' : forall &m (a:bitstring), length a = k1+k2 => Pr[Test.test() @ &m :
 intros &m a length_a.
 bdhoare_deno (_ : (true) ==> (a=res)).
 fun.
-rnd (1%r/(2 ^ (k1 + k2))%r) (lambda (z:bitstring), a=z).
+rnd ((=)a).
 skip.
 trivial.
 simplify.
@@ -94,78 +93,87 @@ apply (Dbitstring.mu_x_def_in (k1+k2) a _).
 assumption.
 generalize H.
 delta mu_x.
-delta cPeq.
 simplify.
-intros H1.
-apply H1.
-trivial.
-trivial.
-(* ======= *)
 smt.
+trivial.
+trivial.
 save.
 
 (* not required in previous case?? *)
 axiom k1_pos : 0<= k1.
 axiom k2_pos : 0<= k2.
 
+require import Array.
+
+lemma extensionality : forall (f g : 'a -> 'b), (forall z, f z = g z) => f = g.  
+smt.
+save.
 
 lemma test'' : forall &m (a:bitstring), length a = k1+k2 => Pr[Test'.test() @ &m : a=res]=1%r/(2^(k1+k2))%r.
+cut pow_distr :  ((2 ^ k2)%r * (2 ^ k1)%r = (2 ^ (k1+k2))%r).
+smt.
 intros &m a length_a.
 bdhoare_deno (_ : (true) ==> (a=res)).
 fun.
-rnd (1%r/(2 ^ (k2))%r) (lambda (z:bitstring), sub a k1 k2 =z).
-rnd (1%r/(2 ^ (k1))%r) (lambda (z:bitstring), sub a 0 k1 =z).
+rnd (sub a 0 k1 =z1) (1%r/(2 ^ (k1))%r) (1%r/(2 ^ (k2))%r) (1%r - 1%r/(2 ^ (k1))%r) (0%r) 
+    (lambda z, sub a 0 k1 = z1 /\ z= (sub a k1 k2)).
+simplify;rewrite -pow_distr; trivial. admit.
+rnd ((=) (sub a 0 k1)).
 simplify.
 skip.
 (* cut pow_distr :  ((2 ^ k2)%r * (2 ^ k1)%r = (2 ^ (k2+k1))%r). *) (* BUG *)
-cut pow_distr :  ((2 ^ k2)%r * (2 ^ k1)%r = (2 ^ (k1+k2))%r).
-trivial.
-rewrite pow_distr.
-cut test :  (forall (x:real), x<>0%r => x/x = 1%r).
-trivial.
-trivial.
-intros &hr _.
-split.
 cut H : (mu_x (Dbitstring.dbitstring k1) (sub a 0 k1) = 1%r/(2^k1)%r).
-apply (Dbitstring.mu_x_def_in k1 (sub a 0 k1) _).
+rewrite (Dbitstring.mu_x_def_in k1 (sub a 0 k1) _).
+smt.
+smt.
+generalize H; delta mu_x; simplify; intros H.
 trivial.
-assumption.
-intros _ v v_in_supp.
-split.
-intros Hv.
-split.
-
+(* *)
+intros &hr h.
 cut H : (mu_x (Dbitstring.dbitstring k2) (sub a k1 k2) = 1%r/(2^k2)%r).
-apply (Dbitstring.mu_x_def_in k2 (sub a k1 k2) _).
-trivial.
-assumption.
-intros _ v0 v0_in_supp.
+rewrite (Dbitstring.mu_x_def_in k2 (sub a k1 k2) _).
+smt.
+smt.
+generalize H; delta mu_x; simplify; intros H.
 split.
-intros H.
-rewrite -H.
-rewrite -Hv.
-
-cut Trivial : (sub a k1 k2 = sub a (0+k1) k2).
+rewrite h.
+simplify.
+  cut Why : ((lambda (z : bool Bits.array), z = sub a k1 k2) = (=)(sub a k1 k2)) .
+  delta (=).
+  apply extensionality.
+  simplify.
+  smt.
+rewrite Why.
 trivial.
-rewrite Trivial.
-rewrite (sub_append_sub<:bool> a 0 k1 k2 _ _ _ _ ).
-trivial.
-trivial.
-trivial.
-trivial.
-rewrite -length_a.
-rewrite (sub_append_full<:bool> a). 
+(* *)
+intros _ v H'.
+rewrite -h.
+simplify.
 split.
-intros H.
-rewrite H.
+intros H3; rewrite H3.
+  (* how can I use Array.sub_append_full directly?? *)
+cut Again : a = sub a 0 (k1+k2) by smt.
+rewrite Again.
+smt.
+intros Eq; rewrite Eq.
+cut AndAgain : forall (xs:bitstring), (length xs = k1) => (sub (xs || v) k1 k2 = v) by smt.
+rewrite AndAgain.
+smt.
 trivial.
-intros H'.
-cut H'' : (
-      (sub a k1 k2 = (sub a k1 k2) => a = (v || sub a k1 k2))).
-trivial.
-rewrite (H'' _).
-trivial.
-trivial.
+admit.
+(* *)
+intros &hr F.
+split.
+cut J :  (lambda z, false) = lambda z, (sub a 0 k1 = z1{hr} /\ z = sub a k1 k2).
+apply extensionality.
+smt.
+rewrite -J.
+cut H :  mu ((Dbitstring.dbitstring k2))%Dbitstring
+  (cpFalse) =
+0%r.
+apply mu_false.
+smt.
+smt.
 trivial.
 trivial.
 save.
