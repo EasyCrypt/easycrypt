@@ -149,7 +149,7 @@ TODO: fun, inline, swap, unroll, splitwhile, fusion, fission, condt, condf,
 
 \section{Program Logics Tactics}
 
-\subsection{: the \rawec{skip} tactic}
+\subsection{The \rawec{skip} tactic}
 
 \Syntax \rawec{skip}
 
@@ -161,7 +161,7 @@ Hoare Logic.
 \infrule{
   \pre \Rightarrow \post
 }{
-  \equiv{}{}{\pre}{\post}
+  \Equiv{\Skip}{\Skip}{\pre}{\post}
 }
 \end{displaymath}
 %
@@ -175,7 +175,7 @@ judgements.
 
 \Description
 
-Assume $d:A\, \verb+distr+$...
+% Assume $d:A\, \verb+distr+$...
 
 \begin{displaymath}
 \infrule{
@@ -188,11 +188,35 @@ Assume $d:A\, \verb+distr+$...
 \subsubsection{Probabilistic Hoare Logic}
 \index{phl}{Program Reasoning!rnd@\rawec{rnd}}
 \Syntax 
-\verb+rnd+ (\textit{formula} $|$ \_ ) (\textit{formula} $|$ \_ )
+\verb+rnd+ [\textit{formula} | \textit{formula} \textit{formula}
+\textit{formula} \textit{formula} \textit{formula} \textit{formula} ] 
 
 \Description
-the first optional parameter $p$ is a computable predicate (i.e., \verb+'a cPred+)
-(i.e., \verb+'a -> bool+ ). Assume $d$ of type \verb+A Distr.distr+. 
+
+The following rule describes the most general variant implemented by
+the \rawec{rnd} tactic for \rawec{bd_hoare} judgements:
+
+\begin{displaymath}
+\infrule{
+  \begin{array}{c}
+    \delta_1 \delta_2 + \delta_3 \delta_4 \leq \delta \\
+    \HoareLe{c}{\pre}{\varphi}{\delta_1} \\
+    \varphi \Rightarrow \mu\, d\, p \leq \delta_2 \land (\forall v\in \mathsf{support}(d).~
+    \post\subst{x}{v} \Rightarrow p\, v) \\
+    \HoareLe{c}{\pre}{\neg \varphi}{\delta_3} \\
+    \neg\varphi \Rightarrow \mu\, d\, p \leq \delta_4 \land (\forall v\in \mathsf{support}(d).~
+    \post\subst{x}{v} \Rightarrow p\, v) \\
+  \end{array}
+}{
+  \HoareLe{c;\Rand{x}{d}}{\pre}{\post}{\delta}
+}
+[\verb+rnd+\ \varphi\ \delta_1\ \delta_2\ \delta_3\ \delta_4\ p]
+\end{displaymath}
+
+(idem for $(=)$ and $(\geq)$)
+
+When a single parameter is given, the following rule variants are
+implemented:
 \begin{displaymath}
 \begin{array}{c}
   \infrule{
@@ -204,31 +228,65 @@ the first optional parameter $p$ is a computable predicate (i.e., \verb+'a cPred
 \\[4ex]
 \end{array}
 \end{displaymath}
-If $p$ is not given then the tool attempts to build it from $\post$
-(not implemented yet).
 
-For lower-bounded and exact probabilistic judgments the tactic
-additionally accepts an optional parameter $g$ of type \verb+real+
-representing a bound:
 \begin{displaymath}
   \infrule{
-    \HoareGe{c}{\pre}{\mu\, d\, p \geq g \land 
-      (\forall v\in \mathsf{support}(d).~ p\, v \Rightarrow \post\subst{x}{v} )}{\frac{f}{g}} 
+    \HoareEq{c}{\pre}{\mu\, d\, p \geq \delta \land 
+      (\forall v\in \mathsf{support}(d).~ p\, v \Rightarrow \post\subst{x}{v} )}{1} 
   }{
-    \HoareGe{c;\Rand{x}{d}}{\pre}{\post}{f}
-  }\left[\verb+rnd+\ p\ g\right]
+    \HoareGe{c;\Rand{x}{d}}{\pre}{\post}{\delta}
+  }\left[\verb+rnd+\ p\right]
 \end{displaymath}
 %
 \begin{displaymath}
   \infrule{
-    \HoareEq{c}{\pre}{\mu\, d\, p = g \land 
-      (\forall v\in \mathsf{support}(d).~ p\, v \Leftrightarrow \post\subst{x}{v} )}{\frac{f}{g}} 
+    \HoareEq{c}{\pre}{\mu\, d\, p = \delta \land 
+      (\forall v\in \mathsf{support}(d).~ p\, v \Leftrightarrow \post\subst{x}{v} )}{1} 
   }{
-    \HoareEq{c;\Rand{x}{d}}{\pre}{\post}{f}
-  }\left[\verb+rnd+\ p\ g\right]
+    \HoareEq{c;\Rand{x}{d}}{\pre}{\post}{\delta}
+  }\left[\verb+rnd+\ p\right]
 \end{displaymath}
-%
-If $g$ is not given then $g=f$ in the rule.
+
+
+
+% the first optional parameter $p$ is a computable predicate (i.e., \verb+'a cPred+)
+% (i.e., \verb+'a -> bool+ ). Assume $d$ of type \verb+A Distr.distr+. 
+% \begin{displaymath}
+% \begin{array}{c}
+%   \infrule{
+%     \Hoare{c}{\pre}{\mu\, d\, p \leq f \land 
+%       (\forall v\in \mathsf{support}(d).~ \post\subst{x}{v} \Rightarrow p\, v)}
+%   }{
+%     \HoareLe{c;\Rand{x}{d}}{\pre}{\post}{f}
+%   }\left[\verb+rnd+\ p\right]
+% \\[4ex]
+% \end{array}
+% \end{displaymath}
+% If $p$ is not given then the tool attempts to build it from $\post$
+% (not implemented yet).
+
+% For lower-bounded and exact probabilistic judgments the tactic
+% additionally accepts an optional parameter $g$ of type \verb+real+
+% representing a bound:
+% \begin{displaymath}
+%   \infrule{
+%     \HoareGe{c}{\pre}{\mu\, d\, p \geq g \land 
+%       (\forall v\in \mathsf{support}(d).~ p\, v \Rightarrow \post\subst{x}{v} )}{\frac{f}{g}} 
+%   }{
+%     \HoareGe{c;\Rand{x}{d}}{\pre}{\post}{f}
+%   }\left[\verb+rnd+\ p\ g\right]
+% \end{displaymath}
+% %
+% \begin{displaymath}
+%   \infrule{
+%     \HoareEq{c}{\pre}{\mu\, d\, p = g \land 
+%       (\forall v\in \mathsf{support}(d).~ p\, v \Leftrightarrow \post\subst{x}{v} )}{\frac{f}{g}} 
+%   }{
+%     \HoareEq{c;\Rand{x}{d}}{\pre}{\post}{f}
+%   }\left[\verb+rnd+\ p\ g\right]
+% \end{displaymath}
+% %
+% If $g$ is not given then $g=f$ in the rule.
 
 \subsubsection{Relational Hoare Logic}
 \index{prhl}{Program Reasoning!rnd@\rawec{rnd}}
@@ -312,7 +370,7 @@ is used is similar to the random sampling rule for Hoare judgements:
 \index{hoare}{Program Reasoning!seq@\rawec{seq}}
 
 \Syntax 
-\verb+app+ \textit{codepos} \textit{formula} 
+\verb+seq+ \textit{codepos} \textit{formula} 
 
 \Description
 
@@ -323,7 +381,7 @@ $$
          \Hoare{c'}{\post'}{\post''}}
         {\Hoare{c;c'}{\post}{\post''}}
 $$
-The application of tactic \verb+app k p+ defines $c$ as the first
+The application of tactic \verb+seq k p+ defines $c$ as the first
 \verb+k+ instructions of the statement $c;c'$ and $\post'$ as
 \verb+p+.
 
@@ -331,92 +389,106 @@ The application of tactic \verb+app k p+ defines $c$ as the first
 \subsubsection{Probabilistic Hoare Logic}
 \index{phl}{Program Reasoning!seq@\rawec{seq}}
 \Syntax 
-\verb+app+ \verb+[>>|<<]+ \textit{codepos} \textit{formula} (
+\verb+seq+  \textit{codepos} \textit{formula} (
 [\textit{formula} \verb+|+ \textit{formula} \textit{formula}
 \textit{formula} \textit{formula}]
 
 \Description
-The application of the \verb+seq+ tactic is more complicated when
-dealing with Probabilistic Hoare Logic judgements. 
 
-The direction parameter is accepted for \emph{lower-bounded} and \emph{exact}
-judgments. The direction \verb+<<+ is assumed by default (as it is globally).
-The first formula represents the intermediate predicate that must hold
-at the splitting program point.
-
-In the following, the rule descriptions assume that $n$ indicates the
-program position of statement $s_2$.
-
-\paragraph*{Upper bounded judgements.}
-For upper bounded judgments, the most general variant of the
-\verb+app+ rule (i.e., when four bounds are given as parameters) implements the following rule:
 \begin{displaymath}
   \infrule{
     \begin{array}{c}
       \Hoare{s1}{P}{\varphi}
       \\
-      \HoareLe{s1}{P}{R}{f_1} \qquad 
-             \HoareLe{s2}{\varphi \land R}{Q}{f_2}
+      \HoareLe{s1}{P}{\chi}{f_1} \qquad 
+          \HoareLe{s2}{\varphi \land \chi }{Q}{f_2}
       \\
-      \HoareLe{s1}{P}{\neg R}{g_1} \qquad 
-             \HoareLe{s2}{\varphi \land \neg R}{Q}{g_2}
+      \HoareLe{s1}{P}{\neg R}{f_3} \qquad 
+             \HoareLe{s2}{\varphi \land \neg\chi}{Q}{f_4}
       \\
-      f_1 f_2 + g_1 g_2 \leq f 
+      f_1 f_2 + f_3 f_4 \leq f 
     \end{array}
   }{
     \HoareLe{s1;s2}{P}{Q}{f}
-  }\left[\verb+seq+\ \varphi\ f_1\ f_2\ g_1\ g_2 \right]
+  }\left[\verb+seq+\ \varphi\ \chi\ f_1\ f_2\ f_3\ f_4 \right]
 \end{displaymath}
-%
-If no argument is given then the following rule is applied:
-\begin{displaymath}
-  \infrule{
-    \Hoare{s1}{P}{R} \qquad \HoareLe{s2}{R}{Q}{f}
-  }{
-    \HoareLe{s1;s2}{P}{Q}{f}
-  }\left[\verb+app+\ n\ R\right]
-\end{displaymath}
-%
-% \warningbox{Which, if preferred, can be rewritten to:}
+
+(idem with ($=$) and ($\geq$)).
+
+% The application of the \verb+seq+ tactic is more complicated when
+% dealing with Probabilistic Hoare Logic judgements. 
+
+% The direction parameter is accepted for \emph{lower-bounded} and \emph{exact}
+% judgments. The direction \verb+<<+ is assumed by default (as it is globally).
+% The first formula represents the intermediate predicate that must hold
+% at the splitting program point.
+
+% In the following, the rule descriptions assume that $n$ indicates the
+% program position of statement $s_2$.
+
+% \warningbox{The functionality described below is currently disabled}
+
+% \paragraph*{Upper bounded judgements.}
+% For upper bounded judgments, the most general variant of the
+% \verb+seq+ rule (i.e., when four bounds are given as parameters) implements the following rule:
 % \begin{displaymath}
 %   \infrule{
-%     \Hoare{s1}{P}{\lambda m. \Prm{s_2}{m}{Q}\leq f} \qquad 
+%     \begin{array}{c}
+%       \Hoare{s1}{P}{\varphi}
+%       \\
+%       \HoareLe{s1}{P}{R}{f_1} \qquad 
+%              \HoareLe{s2}{\varphi \land R}{Q}{f_2}
+%       \\
+%       \HoareLe{s1}{P}{\neg R}{g_1} \qquad 
+%              \HoareLe{s2}{\varphi \land \neg R}{Q}{g_2}
+%       \\
+%       f_1 f_2 + g_1 g_2 \leq f 
+%     \end{array}
 %   }{
 %     \HoareLe{s1;s2}{P}{Q}{f}
-%   }\left[\verb+app+\ n\ R\right]
+%   }\left[\verb+seq+\ \varphi\ f_1\ f_2\ g_1\ g_2 \right]
+% \end{displaymath}
+% %
+% If no argument is given then the following rule is applied:
+% \begin{displaymath}
+%   \infrule{
+%     \Hoare{s1}{P}{R} \qquad \HoareLe{s2}{R}{Q}{f}
+%   }{
+%     \HoareLe{s1;s2}{P}{Q}{f}
+%   }\left[\verb+seq+\ n\ R\right]
 % \end{displaymath}
 
-Single bound parameters are not accepted for upper-bounded judgements.
+% Single bound parameters are not accepted for upper-bounded judgements.
 
-\paragraph*{Lower-bounded and exact  judgements.}
+% \paragraph*{Lower-bounded and exact  judgements.}
 
-The application of the \verb+seq+ tactic have similar regardless of
-lower or exact bounds. 
+% The application of the \verb+seq+ tactic have similar regardless of
+% lower or exact bounds. 
 
-The second optional parameter of type $\verb+real+$ represents a
-probability bound (only supported for $=$ and $\geq$), and the
-optional direction parameter indicates whether this bound is to be
-applied to the first or second half of the split statement.
+% The second optional parameter of type $\verb+real+$ represents a
+% probability bound (only supported for $=$ and $\geq$), and the
+% optional direction parameter indicates whether this bound is to be
+% applied to the first or second half of the split statement.
 
-\begin{displaymath}
-\begin{array}{c}
-  \infrule{
-    \HoareGe{s1}{P}{R}{f/g} \qquad \HoareGe{s2}{R}{Q}{g}
-  }{
-    \HoareGe{s1;s2}{P}{Q}{f}
-  }\left[\verb+app+\ n\ R\ g\right]
-\\[4ex]
-  \infrule{
-    \HoareGe{s1}{P}{R}{g} \qquad \HoareGe{s2}{R}{Q}{f/g}
-  }{
-    \HoareGe{s1;s2}{P}{Q}{f}
-  }\left[\verb+app>>+\ n\ R\ g\right]
-\end{array}
-\end{displaymath}
-%
-%
-Similar rules hold for $=$. If the bound parameter $g$ is not given then
-$g$ is defined as $f$ in the above rule description.
+% \begin{displaymath}
+% \begin{array}{c}
+%   \infrule{
+%     \HoareGe{s1}{P}{R}{f/g} \qquad \HoareGe{s2}{R}{Q}{g}
+%   }{
+%     \HoareGe{s1;s2}{P}{Q}{f}
+%   }\left[\verb+seq+\ n\ R\ g\right]
+% \\[4ex]
+%   \infrule{
+%     \HoareGe{s1}{P}{R}{g} \qquad \HoareGe{s2}{R}{Q}{f/g}
+%   }{
+%     \HoareGe{s1;s2}{P}{Q}{f}
+%   }\left[\verb+seq>>+\ n\ R\ g\right]
+% \end{array}
+% \end{displaymath}
+% %
+% %
+% Similar rules hold for $=$. If the bound parameter $g$ is not given then
+% $g$ is defined as $f$ in the above rule description.
 
 \subsubsection{Relational Hoare Logic}
 \index{prhl}{Program Reasoning!seq@\rawec{seq}}
