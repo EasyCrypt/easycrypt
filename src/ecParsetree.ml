@@ -296,7 +296,6 @@ type 'a doption =
   | Single of 'a
   | Double of 'a * 'a
 
-type 'a rnd_tac_info = ('a option) * ('a option)
 
 type tac_side = bool option
 
@@ -328,6 +327,13 @@ type call_info =
 type p_app_bd_info = PAppNone | PAppSingle of pformula 
                    | PAppMult of (pformula * pformula * pformula * pformula * pformula)
 
+
+type ('a, 'b) rnd_tac_info = 
+  | PNoRndParams 
+  | PSingleRndParam of 'b 
+  | PTwoRndParams of 'a * 'a 
+  | PMultRndParams of (('a tuple5) * 'b)
+
 type tac_dir = Backs | Fwds
 
 type pfel_spec_preds = (pgamepath*pformula) list
@@ -351,7 +357,7 @@ type phltactic =
   | Pcfold      of (tac_side * codepos * int option)
   | Pinline     of pinline_arg
   | Pkill       of (tac_side * codepos * int option)
-  | Prnd        of tac_side * pformula rnd_tac_info
+  | Prnd        of tac_side * (pformula, pformula) rnd_tac_info
   | Palias      of (tac_side * codepos * psymbol option)
   | Pconseq     of bool * ccfpattern 
   | Phr_exists_elim  

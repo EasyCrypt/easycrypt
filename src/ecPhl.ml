@@ -2254,7 +2254,7 @@ let wp_equiv_rnd (f,finv) g =
   let post = (f_in_supp x muL) ==> ((f_in_supp y muR) ==> post) in
   let post = f_forall_simpl [(x_id,GTty tyL);(y_id,GTty tyR)] post in
   let concl = f_equivS_r {es with es_sl=sl'; es_sr=sr'; es_po=post} in
-  prove_goal_by [concl] (RN_hl_equiv_rnd ((Some tf, Some tfinv))) g
+  prove_goal_by [concl] (RN_hl_equiv_rnd (PTwoRndParams (tf, tfinv))) g
 
 let t_equiv_rnd side bij_info =
   match side with
@@ -2274,68 +2274,76 @@ let t_equiv_rnd side bij_info =
         bij, bij
     in wp_equiv_rnd (f, finv) 
 
-let t_bd_hoare_rnd (opt_bd,opt_event) g =
+let t_bd_hoare_rnd (tac_info:(form,ty-> form) EcParsetree.rnd_tac_info) g = 
   let env,_,concl = get_goal_e g in
   let bhs = destr_bdHoareS concl in
   let (lv,distr),s = s_last_rnd "bd_hoare_rnd" bhs.bhs_s in
   let ty_distr = proj_distr_ty (e_ty distr) in
   let distr = EcFol.form_of_expr (EcMemory.memory bhs.bhs_m) distr in
-  let event = match opt_event ty_distr with 
-    | Some event -> event 
-    | None -> cannot_apply "rnd" "Optional events still not supported"
+
+  let mk_event_cond event = 
+    let v_id = EcIdent.create "v" in
+    let v = f_local v_id ty_distr in
+    let post_v = subst_form_lv env (EcMemory.memory bhs.bhs_m) lv v bhs.bhs_po in
+    let event_v = f_app event [v] tbool in
+    let v_in_supp = f_in_supp v distr in
+    f_forall_simpl [v_id,GTty ty_distr] 
+      begin
+        match bhs.bhs_cmp with 
+          | FHle -> f_imps_simpl [v_in_supp;post_v] event_v
+          | FHge -> f_imps_simpl [v_in_supp;event_v] post_v
+          | FHeq -> f_imp_simpl v_in_supp (f_iff_simpl event_v post_v)
+      end 
   in
 
-  let v_id = EcIdent.create "v" in
-  let v = f_local v_id ty_distr in
-  let post_v = subst_form_lv env (EcMemory.memory bhs.bhs_m) lv v bhs.bhs_po in
-  let event_v = f_app event [v] tbool in
-  let v_in_supp = f_in_supp v distr in
-
-  let concl = 
-    match bhs.bhs_cmp, opt_bd with
-      | FHle, Some bd' when not (EcFol.f_equal bhs.bhs_bd bd') ->
-        cannot_apply "bd_hoare_rnd"
-          "Rule for upper-bounded hoare triples requires a total bound"
-      | FHle, _ ->
-        let bounded_distr = f_real_le (f_mu distr event) bhs.bhs_bd in
-        let post_equiv_event = f_forall_simpl [v_id,GTty ty_distr] 
-          (f_imps_simpl [v_in_supp;post_v] event_v) in
-        let post = bounded_distr &&& post_equiv_event in
-        f_hoareS bhs.bhs_m bhs.bhs_pr s post 
-
-      | FHge, Some bd' when not (EcFol.f_equal bhs.bhs_bd bd') -> 
-        let new_hoare_bd, bounded_distr =
-          EcFol.f_real_div_simpl bhs.bhs_bd bd', f_real_le bd' (f_mu distr event)
-        in
-        let post_equiv_event = f_forall_simpl [v_id,GTty ty_distr] 
-          (f_imps_simpl [v_in_supp;event_v] post_v) in
-        let post = bounded_distr &&& post_equiv_event in
-        f_bdHoareS_r {bhs with bhs_s=s; bhs_po=post; bhs_bd=new_hoare_bd}
-
-      | FHge, _ -> 
-        let bounded_distr = f_real_le bhs.bhs_bd (f_mu distr event) in
-        let post_equiv_event = f_forall_simpl [v_id,GTty ty_distr] 
-          (f_imps_simpl [v_in_supp;event_v] post_v) in
-        let post = bounded_distr &&& post_equiv_event in
-        f_bdHoareS_r {bhs with bhs_s=s; bhs_po=post; bhs_cmp=FHeq; bhs_bd=EcFol.f_r1} 
-
-      | FHeq, Some bd' when not (EcFol.f_equal bhs.bhs_bd bd') -> 
-        let new_hoare_bd, bounded_distr =
-          EcFol.f_real_div_simpl bhs.bhs_bd bd', f_eq (f_mu distr event) bd'
-        in
-        let post_equiv_event = f_forall_simpl [v_id,GTty ty_distr] 
-          (f_imp_simpl v_in_supp (f_iff_simpl event_v post_v)) in
-        let post = bounded_distr &&& post_equiv_event in
-        f_bdHoareS_r {bhs with bhs_s=s; bhs_po=post; bhs_bd=new_hoare_bd} 
-
-      | FHeq, _ -> 
-        let bounded_distr = f_eq (f_mu distr event) bhs.bhs_bd in
-        let post_equiv_event = f_forall_simpl [v_id,GTty ty_distr] 
-          (f_imp_simpl v_in_supp (f_iff_simpl event_v post_v)) in
-        let post = bounded_distr &&& post_equiv_event in
-        f_bdHoareS_r {bhs with bhs_s=s; bhs_po=post; bhs_bd=EcFol.f_r1} 
+  let f_cmp = match bhs.bhs_cmp with
+    | FHle -> f_real_le
+    | FHge -> fun x y -> f_real_le y x
+    | FHeq -> f_eq
   in
-  prove_goal_by [concl] (RN_bhl_rnd (opt_bd,event) ) g
+
+  let check_indep () = 
+    let fv_bd = PV.fv env mhr bhs.bhs_bd in 
+    let modif_s = s_write env s in
+    if not (PV.indep env modif_s fv_bd) then
+      tacuerror "Cannot apply if the bound is modified by remaining statement.@. Use the generalised rnd tactic variant instead."
+  in
+
+  let subgoals = match tac_info, bhs.bhs_cmp with 
+    | PSingleRndParam event, FHle ->
+      let event = event ty_distr in
+      check_indep();
+      let bounded_distr = f_real_le (f_mu distr event) bhs.bhs_bd in
+      let post = bounded_distr &&& (mk_event_cond event) in
+      let concl = f_hoareS bhs.bhs_m bhs.bhs_pr s post in
+      [concl]
+    | PSingleRndParam event, _ ->
+      let event = event ty_distr in
+      check_indep();
+      let bounded_distr = f_cmp (f_mu distr event) bhs.bhs_bd in
+      let post = bounded_distr &&& (mk_event_cond event) in
+      let concl = f_bdHoareS_r {bhs with bhs_s=s; bhs_po=post; bhs_cmp=FHeq; bhs_bd=f_r1} in
+      [concl]
+    | PMultRndParams ((phi,d1,d2,d3,d4),event), _ -> 
+      let event = event ty_distr in
+      let bd_sgoal = f_cmp (f_real_add (f_real_prod d1 d2) (f_real_prod d3 d4)) bhs.bhs_bd in 
+      let sgoal1 = f_bdHoareS_r {bhs with bhs_s=s; bhs_po=phi; bhs_bd=d1} in
+      let sgoal2 = 
+        let bounded_distr = f_cmp (f_mu distr event) d2 in
+        let post = bounded_distr &&& (mk_event_cond event) in
+        gen_mems [bhs.bhs_m] (f_imp phi post)
+      in
+      let sgoal3 = f_bdHoareS_r {bhs with bhs_s=s; bhs_po=f_not phi; bhs_bd=d3} in
+      let sgoal4 = 
+        let bounded_distr = f_cmp (f_mu distr event) d4 in
+        let post = bounded_distr &&& (mk_event_cond event) in
+        gen_mems [bhs.bhs_m] (f_imp (f_not phi) post)
+      in
+      [bd_sgoal;sgoal1;sgoal2;sgoal3;sgoal4]
+    | _, _ -> tacuerror "wrong tactic arguments"
+  in
+  prove_goal_by subgoals (RN_bhl_rnd tac_info ) g
+
 
 
 

@@ -475,42 +475,32 @@ let process_alias (side, cpos, id) g =
   t_alias side cpos id g
 
 let process_rnd side tac_info g =
-  let env, _, concl = get_goal_e g in
+  let _, _, concl = get_goal_e g in
   match side, tac_info with 
-    | None, (None, None) when is_hoareS concl -> t_hoare_rnd g
-    | None, (opt_bd, opt_event) when is_bdHoareS concl ->
-      let opt_bd = omap opt_bd (process_phl_form treal g) in
-      let bhs = destr_bdHoareS concl in
-      let (lv,_),_ = s_last_rnd "bd_hoare_rnd" bhs.bhs_s in
-      let m = fst bhs.bhs_m in
-      let fv = EcPV.PV.fv env m bhs.bhs_po in
-      let check_indep = 
-        match lv with
-        | LvVar (x,_) -> not (EcPV.PV.mem_pv env x fv)
-        | LvTuple pvs -> 
-          List.for_all (fun (x,_) -> not (EcPV.PV.mem_pv env x fv)) pvs
-        | LvMap(_, x,_,_) -> not (EcPV.PV.mem_pv env x fv) in
-      let opt_bd = 
-        if check_indep && bhs.bhs_cmp <> FHle then Some (odfl f_r1 opt_bd)
-        else opt_bd in
-      let event ty = 
-        match opt_event with
-        | Some ev -> Some (process_phl_form (tfun ty tbool) g ev)
-        | None ->
-          let x = EcIdent.create "x" in 
-          if check_indep then Some (f_lambda [x,GTty ty] f_true)
-          else match lv with
-          | LvVar (pv,_) -> 
-            Some (f_lambda [x,GTty ty] 
-                    (EcPV.PVM.subst1 env pv m (f_local x ty) bhs.bhs_po))
-          | _ -> None in
-      t_bd_hoare_rnd (opt_bd,event) g
+    | None, PNoRndParams when is_hoareS concl -> t_hoare_rnd g
+    | None, _ when is_bdHoareS concl ->
+      let tac_info = match tac_info with 
+        | PSingleRndParam p ->
+          PSingleRndParam (fun t -> process_phl_form (tfun t tbool) g p)
+        | PMultRndParams ((phi,d1,d2,d3,d4),p) -> 
+          let p t = process_phl_form (tfun t tbool) g p in
+          let phi = process_phl_form tbool g phi in
+          let d1 = process_phl_form treal g d1 in
+          let d2 = process_phl_form treal g d2 in
+          let d3 = process_phl_form treal g d3 in
+          let d4 = process_phl_form treal g d4 in
+          PMultRndParams ((phi,d1,d2,d3,d4),p)
+        | _ ->
+          tacuerror "Wrong tactic arguments"
+      in
+      t_bd_hoare_rnd tac_info g
     | _ when is_equivS concl ->
       let process_form f ty1 ty2 = process_prhl_form (tfun ty1 ty2) g f in
       let bij_info = match tac_info with
-        | None,None -> None, None
-        | Some f, None | None, Some f -> Some (process_form f), None
-        | Some f, Some finv -> Some (process_form f), Some (process_form finv)
+        | PNoRndParams -> None, None
+        | PSingleRndParam f -> Some (process_form f), None
+        | PTwoRndParams (f, finv) -> Some (process_form f), Some (process_form finv)
+        | _ -> tacuerror "Wrong tactic arguments"
       in
       t_equiv_rnd side bij_info g
     | _ -> cannot_apply "rnd" "unexpected instruction or wrong arguments"

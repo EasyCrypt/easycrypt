@@ -1600,15 +1600,12 @@ while_tac_info :
     { (inv, Some vrnt, Some (bd, n_iter)) }
 
 rnd_info:
-| e1=sform e2=sform 
-    { Some e1, Some e2 }
-| e=sform UNDERSCORE 
-    { Some e, None }
-| UNDERSCORE e=sform 
-    { None, Some e }
-| empty
-    {None, None }
-;
+| empty {PNoRndParams (* None,None *) }
+| f=sform {PSingleRndParam f}
+| f=sform g=sform {PTwoRndParams (f,g) }
+| phi=sform d1=sform d2=sform d3=sform d4=sform p=sform 
+  {PMultRndParams ((phi,d1,d2,d3,d4),p) }
+
 
 swap_info:
 | s=side? p=swap_pos { s,p }
