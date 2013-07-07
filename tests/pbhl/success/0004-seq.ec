@@ -14,11 +14,21 @@ module M = {
 lemma test : bd_hoare [M.f : true ==> M.x /\ M.y ] = (1%r/4%r).
 proof.
  fun.
- seq 1 : (M.y) (1%r/2%r).
- rnd (1%r/2%r) (lambda (x:bool),x=true).
- skip; smt.
- rnd (1%r/2%r) (lambda (x:bool),x=true).
+ seq 1 : (M.y) (true) (1%r/2%r) (1%r/2%r) (1%r/2%r) (0%r).
+ trivial.
+ rnd ((=) true).
+ skip; simplify; smt. 
+ rnd (lambda (x:bool),M.y /\ x=true).
  skip.
+ simplify.
+ intros &hr H.
+ cut G : (lambda (x : bool), M.y{hr} /\ x = true)
+   =  (lambda (x : bool), x = true) by smt.
+ rewrite G.
+ smt.
+ (* *)
+ rnd (lambda (x:bool),false).
+ skip. smt.
  smt.
 save.
 
@@ -33,11 +43,11 @@ module M2 = {
 
 lemma test2 : bd_hoare [M2.f : true ==> M2.x /\ M2.y ] <= (1%r/2%r).
 proof.
- fun.
- seq 1 : (M2.y) .
- wp; skip; smt.
- rnd (1%r/2%r) (lambda (x:bool),x=true).
- wp; skip; smt.
+ fun. 
+  rnd ((=)true).
+  wp.
+  simplify.
+  skip; smt.
 save.
 
 
@@ -53,12 +63,12 @@ module M3 = {
 lemma test3 : bd_hoare [M3.f : true ==> M3.x /\ M3.y ] <= (1%r/2%r).
 proof.
  fun.
- seq 1 : (M3.x) (1%r/2%r) (1%r) (1%r/2%r) (0%r) .
- rnd (1%r/2%r) (lambda (x:bool),x=true);skip; smt.
+ seq 1 : (M3.x) (true) (1%r/2%r) (1%r) (1%r/2%r) (0%r) .
+ trivial.
+ rnd ((=)true);skip; smt.
  wp; pr_bounded; smt. 
- rnd (1%r/2%r) (lambda (x:bool),x=false);skip; smt.
- bd_eq; hoare; [wp; skip; smt | smt].
- smt.
+ wp; bd_eq; hoare; skip; smt. 
+ trivial.
 save.
 
 
