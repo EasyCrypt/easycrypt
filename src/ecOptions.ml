@@ -1,4 +1,7 @@
 (* -------------------------------------------------------------------- *)
+open EcUtils
+
+(* -------------------------------------------------------------------- *)
 type options = {
   o_input      : string option;
   o_idirs      : string list;
@@ -35,9 +38,14 @@ let specs () =
 
   let add_idir    x = idirs := x :: !idirs
   and set_why3    x = why3  := Some x
-  and set_input   x = input := Some x 
   and set_max     x = max_provers := x
-  and set_provers x = provers := x :: !provers in
+  and set_provers x = provers := x :: !provers
+
+  and set_input x =
+    if !input <> None then
+      raise (Arg.Bad "you must give at most on EasyCrypt file");
+    input := Some x
+  in
 
   let specs =
       [ "-I"          , Arg.String add_idir   , "Add <dir> to the list of include directories";
@@ -47,8 +55,9 @@ let specs () =
         "-full_check" , Arg.Set    full_check , "Check every loaded file, disable checkproof off";
         "-max_provers", Arg.Int    set_max    , "Maximum number of prover running in the same time";
         "-p"          , Arg.String set_provers, "Add a prover to the set of provers"
-      ]
-  in
+      ] in
+  let specs = Arg.align (List.map (fun (x, o, d) -> (x, o, " " ^ d)) specs) in
+
     fun () ->
       Arg.parse specs set_input "";
       let provers = if !provers = [] then None else Some !provers in
