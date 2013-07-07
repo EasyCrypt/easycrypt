@@ -8,7 +8,7 @@ val from_string  : string -> ecreader
 
 (* -------------------------------------------------------------------- *)
 val finalize : ecreader -> unit
-val parse    : ecreader -> EcParsetree.prog
+val parse    : ecreader -> (EcParsetree.prog   EcLocation.located)
 val parseall : ecreader -> (EcParsetree.global EcLocation.located) list
 val drain    : ecreader -> unit
 val lexbuf   : ecreader -> Lexing.lexbuf

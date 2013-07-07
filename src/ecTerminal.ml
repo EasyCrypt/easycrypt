@@ -10,7 +10,7 @@ type status =[
 class type terminal =
 object
   method interactive : bool
-  method next        : EcParsetree.prog
+  method next        : EcParsetree.prog EcLocation.located
   method notice      : immediate:bool -> string -> unit
   method finish      : status -> unit
   method finalize    : unit
@@ -115,13 +115,27 @@ let from_tty () = new from_tty ()
 
 (* -------------------------------------------------------------------- *)
 class from_channel ~name (stream : in_channel) : terminal =
-object
-  val iparser = EcIo.from_channel ~name stream
+object(self)
+  val ticks = "-\\|/"
+
+  val (*---*) iparser = EcIo.from_channel ~name stream
+  val mutable sz    = -1
+  val mutable tick  = -1
+  val (*---*) doprg = (Sys.os_type = "Unix")
+
+  method private _update_progress position =
+    if sz >= 0 && doprg then
+      tick <- (tick + 1) mod (String.length ticks);
+      Format.eprintf "[%c] %.1f %%\r%!"
+        ticks.[tick]
+        (100. *. ((float_of_int position) /. (float_of_int sz)))
 
   method interactive = false
 
   method next =
-    EcIo.parse iparser
+    let aout = EcIo.parse iparser in
+    let loc  = aout.EcLocation.pl_loc in
+      self#_update_progress loc.EcLocation.loc_echar; aout
 
   method notice ~(immediate:bool) (_msg : string) =
     ignore (immediate)
@@ -131,6 +145,7 @@ object
     | `ST_Ok -> ()
 
     | `ST_Failure e -> begin
+        if doprg then Format.eprintf "%*s\r%!" 15 "";
         match e with
         | EcCommands.TopError (loc, e) ->
             Format.eprintf "%s: %a\n%!"
@@ -143,7 +158,16 @@ object
       end
 
   method finalize =
+    if doprg then Format.eprintf "%*s\r%!" 15 "";
     EcIo.finalize iparser
+
+  initializer begin
+    try
+      let fd   = Unix.descr_of_in_channel stream in
+      let stat = Unix.fstat fd in
+        sz <- stat.Unix.st_size
+    with Unix.Unix_error _ -> ()
+  end
 end
 
 let from_channel ~name stream = new from_channel ~name stream

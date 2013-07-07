@@ -339,7 +339,7 @@
 %nonassoc prec_tactic
 
 %type <EcParsetree.global EcLocation.located> global
-%type <EcParsetree.prog> prog
+%type <EcParsetree.prog   EcLocation.located> prog
 
 %start prog global
 %%
@@ -2151,7 +2151,7 @@ global:
 | g=loc(global_) FINAL { g }
 ;
 
-prog:
+prog_r:
 | g=global { P_Prog ([g], false) }
 | stop     { P_Prog ([ ], true ) }
 
@@ -2160,6 +2160,10 @@ prog:
 
 | error
    { error (EcLocation.make $startpos $endpos) None }
+;
+
+prog:
+| x=loc(prog_r) { x }
 ;
 
 (* -------------------------------------------------------------------- *)
