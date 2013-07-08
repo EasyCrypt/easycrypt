@@ -40,18 +40,48 @@ let process_phl_formula = process_phl_form tbool
 
 let process_prhl_formula = process_prhl_form tbool
 
-let process_phl_bd_info g bd_info = match bd_info with
-  | PAppNone -> assert false  
-  | PAppSingle _ -> assert false 
-  | PAppMult(phi,f1,f2,f3,f4) ->
-    let phi  = process_phl_formula    g phi  in
-    let f1 = process_phl_form treal g f1 in
-    let f2 = process_phl_form treal g f2 in
-    let f3 = process_phl_form treal g f3 in
-    let f4 = process_phl_form treal g f4 in
-    (phi,f1,f2,f3,f4)
+let process_phl_bd_info dir g bd_info = 
+  match bd_info with
+  | PAppNone -> 
+    let hs = destr_bdHoareS (get_concl g) in
+    let f1, f2 = 
+       match dir with
+      | Backs  -> hs.bhs_bd, f_r1 
+      | Fwds   -> f_r1, hs.bhs_bd in
+    f_true, f1, f2, f_r0, f_r1 (* The last argument will not be used *)
+  | PAppSingle f -> 
+    let f = process_phl_formula g f in
+    let hs = destr_bdHoareS (get_concl g) in
+    let f1, f2 = 
+      match dir with
+      | Backs  -> f_real_div hs.bhs_bd f, f 
+      | Fwds   -> f, f_real_div hs.bhs_bd f in
+    f_true, f1, f2, f_r0, f_r1
+    
+  | PAppMult(phi,f1,f2,g1,g2) ->
+    let phi = omap_dfl phi f_true (process_phl_formula g) in
+    let check_0 f = 
+      if not (f_equal f f_r0) then tacuerror "the formula should be 0%%r" in
+    let process_f (f1,f2) = 
+      match f1, f2 with
+      | None, None -> assert false (* Not accepted by the parser *)
+      | Some f, None -> 
+        let loc = f.pl_loc in
+        let f = process_phl_form treal g f in
+        set_loc loc check_0 f;
+        f, f_r1
+      | None, Some f ->
+        let loc = f.pl_loc in
+        let f = process_phl_form treal g f in
+        set_loc loc check_0 f;
+        f_r1, f
+      | Some f1, Some f2 ->
+        process_phl_form treal g f1, process_phl_form treal g f2 in
+    let f1, f2 = process_f (f1,f2) in
+    let g1, g2 = process_f (g1,g2) in
+    (phi,f1,f2,g1,g2)
 
-let process_app _dir k phi bd_info g =
+let process_app dir k phi bd_info g =
   let concl = get_concl g in
   match k, bd_info with
   | Single i, PAppNone when is_hoareS concl ->
@@ -59,7 +89,7 @@ let process_app _dir k phi bd_info g =
     t_hoare_app i phi g
   | Single i, _ when is_bdHoareS concl ->
     let pR = process_phl_formula g phi in
-    let (phi,f1,f2,f3,f4) = process_phl_bd_info g bd_info in
+    let (phi,f1,f2,f3,f4) = process_phl_bd_info dir g bd_info in
     t_bdHoare_app i (phi,pR,f1,f2,f3,f4) g
   | Double(i,j), PAppNone ->
     let phi = process_prhl_formula g phi in
@@ -272,23 +302,23 @@ let process_call side info (_, n as g) =
   t_seq_subgoal t_call [t_seq (t_use an gs) !tac_sub; t_id None] (juc,n)
 
   
-
-  
-  
-
-
-
-
-
-let process_cond side g =
+let process_cond side r g =
   let concl = get_concl g in
-  if is_equivS concl then t_equiv_cond side g
-  else if is_hoareS concl || is_bdHoareS concl then
-    match side with
-      | Some _ -> cannot_apply "cond" "Unexpected side in non relational goal"
-      | None ->
-        if is_hoareS concl then t_hoare_cond g else t_bdHoare_cond g
-  else cannot_apply "cond" "the conclusion is not a hoare or a equiv goal"
+  let check_N () = 
+    if side <> None then
+      cannot_apply "cond" "Unexpected side in non relational goal" in
+  match r with
+  | Some (r1,r2) ->
+    check_N ();
+    let r1 = process_phl_form treal g r1 in
+    let r2 = process_phl_form treal g r2 in
+    t_bdHoare_cond (Some (r1,r2)) g
+  | None ->
+    if is_equivS concl then t_equiv_cond side g
+    else if is_hoareS concl then (check_N (); t_hoare_cond g)
+    else if is_bdHoareS concl then (check_N (); t_bdHoare_cond None g)
+    else cannot_apply "cond" "the conclusion is not a hoare or a equiv goal"
+
 
 let stmt_length side concl = 
   match concl.f_node, side with
@@ -475,15 +505,38 @@ let process_alias (side, cpos, id) g =
   t_alias side cpos id g
 
 let process_rnd side tac_info g =
-  let _, _, concl = get_goal_e g in
+  let env, _, concl = get_goal_e g in
   match side, tac_info with 
     | None, PNoRndParams when is_hoareS concl -> t_hoare_rnd g
     | None, _ when is_bdHoareS concl ->
+      let bhs = destr_bdHoareS concl in
+      let (lv,_),_ = s_last_rnd "bd_hoare_rnd" bhs.bhs_s in
+      let m = fst bhs.bhs_m in
+      let fv = EcPV.PV.fv env m bhs.bhs_po in
+      let check_indep = 
+        match lv with
+        | LvVar (x,_) -> not (EcPV.PV.mem_pv env x fv)
+        | LvTuple pvs -> 
+          List.for_all (fun (x,_) -> not (EcPV.PV.mem_pv env x fv)) pvs
+        | LvMap(_, x,_,_) -> not (EcPV.PV.mem_pv env x fv) 
+      in
+      let mk_event ty = 
+        let x = EcIdent.create "x" in 
+        if check_indep then f_lambda [x,GTty ty] f_true
+        else match lv with
+          | LvVar (pv,_) -> 
+            f_lambda [x,GTty ty] 
+                    (EcPV.PVM.subst1 env pv m (f_local x ty) bhs.bhs_po)
+          | _ -> tacuerror "Cannot infer a valid event, it must be provided"
+      in
       let tac_info = match tac_info with 
+        | PNoRndParams -> 
+          PSingleRndParam mk_event 
         | PSingleRndParam p ->
           PSingleRndParam (fun t -> process_phl_form (tfun t tbool) g p)
         | PMultRndParams ((phi,d1,d2,d3,d4),p) -> 
-          let p t = process_phl_form (tfun t tbool) g p in
+          let p t = match p with 
+            | None -> mk_event t | Some p -> process_phl_form (tfun t tbool) g p in
           let phi = process_phl_form tbool g phi in
           let d1 = process_phl_form treal g d1 in
           let d2 = process_phl_form treal g d2 in
@@ -832,7 +885,7 @@ let process_phl loc ptac g =
     | Papp (dir, k, phi, f)     -> process_app dir k phi f
     | Pwp k                     -> t_wp k
     | Prcond (side, b, i)       -> t_rcond side b i
-    | Pcond side                -> process_cond side
+    | Pcond (side,r)            -> process_cond side r
     | Pwhile (side, (phi, vopt, info))  -> process_while side phi vopt info
     | Pfission info             -> process_fission info
     | Pfusion info              -> process_fusion info

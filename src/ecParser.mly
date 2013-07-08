@@ -1604,7 +1604,7 @@ rnd_info:
 | empty {PNoRndParams (* None,None *) }
 | f=sform {PSingleRndParam f}
 | f=sform g=sform {PTwoRndParams (f,g) }
-| phi=sform d1=sform d2=sform d3=sform d4=sform p=sform 
+| phi=sform d1=sform d2=sform d3=sform d4=sform p=sform? 
   {PMultRndParams ((phi,d1,d2,d3,d4),p) }
 
 
@@ -1652,10 +1652,19 @@ occurences:
   }
 ;
 
+
+%inline prod_form:
+  | f1=sform f2=sform      { Some f1, Some f2 }
+  | UNDERSCORE f2=sform { None   , Some f2 }
+  | f1=sform UNDERSCORE { Some f1, None    }
+;
+
 app_bd_info:
-  | empty { PAppNone }
-  | f=sform { PAppSingle f }
-  | s=sform f1=sform f2=sform g1=sform g2=sform { PAppMult (s,f1,f2,g1,g2) }
+  | empty    { PAppNone }
+  | f=sform  { PAppSingle f }
+  | f=prod_form g=prod_form s=sform?
+             { PAppMult (s,fst f,snd f,fst g, snd g) }
+;
 
 logtactic:
 | ASSUMPTION
@@ -1769,7 +1778,9 @@ phltactic:
     { Prcond (s, false, i) }
 
 | IF s=side?
-    { Pcond s }
+    { Pcond (s,None) }
+| IF s=side? r1=sform r2=sform 
+    { Pcond (s,Some(r1,r2)) }
 
 | SWAP info=plist1(loc(swap_info),COMMA)
     { Pswap info }
@@ -1900,7 +1911,9 @@ tactic_core_r:
    { Padmit }
 
 | CASE f=sform
-   { Pcase f }
+   { Pcase (f,None) }
+| CASE f=sform r1=sform r2=sform
+   { Pcase (f,Some(r1, r2)) }
 
 | PROGRESS t=tactic_core?
    { Pprogress t }

@@ -957,7 +957,7 @@ let t_bdHoare_app i (phi, pR,f1,f2,g1,g2) g =
     | FHle -> f_real_le bd bhs.bhs_bd
     | FHeq -> f_eq bd bhs.bhs_bd
     | FHge -> f_real_le bhs.bhs_bd bd in
-  let conds = [gen_mems [bhs.bhs_m] condbd] in
+  let conds = [gen_mems [bhs.bhs_m] (f_imp bhs.bhs_pr condbd)] in
   let conds = 
     if f_equal g1 f_r0 then condg1 :: conds
     else if f_equal g2 f_r0 then condg2 :: conds
@@ -1376,12 +1376,34 @@ let t_hoare_case f g =
   let concl2 = f_hoareS_r { hs with hs_pr = f_and_simpl hs.hs_pr (f_not f) } in
   prove_goal_by [concl1;concl2] (RN_hl_case f) g
 
-let t_bdHoare_case f g =
+let t_bdHoare_case f r g =
   let concl = get_concl g in
   let bhs = destr_bdHoareS concl in
-  let concl1 = f_bdHoareS_r { bhs with bhs_pr = f_and_simpl bhs.bhs_pr f } in
-  let concl2 = f_bdHoareS_r { bhs with bhs_pr = f_and_simpl bhs.bhs_pr (f_not f) } in
-  prove_goal_by [concl1;concl2] (RN_hl_case f) g
+  let bd,r1,r2 = 
+    match r with
+    | Some(r1,r2) -> f_real_add r1 r2, r1, r2 
+    | None -> bhs.bhs_bd, bhs.bhs_bd, bhs.bhs_bd 
+      (* Remark in reality r1 will be caract f *  bhs.bhs_bd and
+         r2 = caract !f *  bhs.bhs_bd.
+         under f,  r1 simplify to bhs.bhs_bd and 
+         under !f, r2 simplify to bhs.bhs_bd and 
+         r1 + r2 simplify to  bhs.bhs_bd. *) in
+  let concl1 = f_bdHoareS_r 
+    { bhs with bhs_pr = f_and_simpl bhs.bhs_pr f; bhs_bd = r1 } in
+  let concl2 = f_bdHoareS_r 
+    { bhs with bhs_pr = f_and_simpl bhs.bhs_pr (f_not f); bhs_bd = r2 } in
+  let concls = 
+    if r = None then [] 
+    else
+      let concl3 = 
+    (* TODO : this a conseq_bd rule *)
+        match bhs.bhs_cmp with
+        | FHle -> f_real_le bd bhs.bhs_bd
+        | FHeq -> f_eq bd bhs.bhs_bd
+        | FHge -> f_real_le bhs.bhs_bd bd in
+      let concl3 = gen_mems [bhs.bhs_m] (f_imp bhs.bhs_pr concl3) in
+      [concl3] in
+  prove_goal_by (concl1::concl2::concls) (RN_hl_case f) g
 
 let t_equiv_case f g = 
   let concl = get_concl g in
@@ -1390,8 +1412,12 @@ let t_equiv_case f g =
   let concl2 = f_equivS_r { es with es_pr = f_and es.es_pr (f_not f) } in
   prove_goal_by [concl1;concl2] (RN_hl_case f) g
 
-let t_he_case f g =
-  t_hS_or_bhS_or_eS (t_hoare_case f) (t_bdHoare_case f) (t_equiv_case f) g 
+let t_he_case f r g =
+  match r with
+  | Some _ -> t_bdHoare_case f r g
+  | None -> 
+    t_hS_or_bhS_or_eS (t_hoare_case f) 
+      (t_bdHoare_case f None) (t_equiv_case f) g 
 
 (* --------------------------------------------------------------------- *)
 let _inline_freshen me v =
@@ -2109,7 +2135,7 @@ let s_first_if s =
     try destr_if i with Not_found -> 
       cannot_apply "if" "the first instruction should be a if"
 
-let t_gen_cond side e g =
+let t_gen_cond side e r g =
   let hyps = get_hyps g in
   let m1,m2,h,h1,h2 = match LDecl.fresh_ids hyps ["&m";"&m";"_";"_";"_"] with
     | [m1;m2;h;h1;h2] -> m1,m2,h,h1,h2
@@ -2125,19 +2151,20 @@ let t_gen_cond side e g =
                  (t_hyp h)
               ];
        t_id None] g in
-  t_seq_subgoal (t_he_case e) [t_sub true; t_sub false] g
+  let subtacs = if r = None then [] else [t_id None] in
+  t_seq_subgoal (t_he_case e r) (t_sub true :: t_sub false :: subtacs) g
 
 let t_hoare_cond g = 
   let concl = get_concl g in
   let hs = destr_hoareS concl in 
   let (e,_,_) = s_first_if hs.hs_s in
-  t_gen_cond None (form_of_expr (EcMemory.memory hs.hs_m) e) g
+  t_gen_cond None (form_of_expr (EcMemory.memory hs.hs_m) e) None g
 
-let t_bdHoare_cond g = 
+let t_bdHoare_cond r g = 
   let concl = get_concl g in
   let bhs = destr_bdHoareS concl in 
   let (e,_,_) = s_first_if bhs.bhs_s in
-  t_gen_cond None (form_of_expr (EcMemory.memory bhs.bhs_m) e) g
+  t_gen_cond None (form_of_expr (EcMemory.memory bhs.bhs_m) e) r g
 
 let rec t_equiv_cond side g =
   let hyps,concl = get_goal g in
@@ -2151,7 +2178,7 @@ let rec t_equiv_cond side g =
       else
         let (e,_,_) = s_first_if es.es_sr in
         form_of_expr (EcMemory.memory es.es_mr) e in
-    t_gen_cond side e g
+    t_gen_cond side e None g
   | None -> 
       let el,_,_ = s_first_if es.es_sl in
       let er,_,_ = s_first_if es.es_sr in
@@ -2274,7 +2301,7 @@ let t_equiv_rnd side bij_info =
         bij, bij
     in wp_equiv_rnd (f, finv) 
 
-let t_bd_hoare_rnd (tac_info:(form,ty-> form) EcParsetree.rnd_tac_info) g = 
+let t_bd_hoare_rnd tac_info g = 
   let env,_,concl = get_goal_e g in
   let bhs = destr_bdHoareS concl in
   let (lv,distr),s = s_last_rnd "bd_hoare_rnd" bhs.bhs_s in
@@ -2403,7 +2430,8 @@ let t_hoare_bd_hoare g =
       prove_goal_by [concl1] RN_hl_hoare_bd_hoare g
     else 
       (* Rewrite this : it is a consequence rule *)
-      let concl2 = f_eq bhs.bhs_bd f_r0  in
+      let concl2 = 
+        gen_mems [bhs.bhs_m] (f_imp bhs.bhs_pr (f_eq bhs.bhs_bd f_r0)) in
       prove_goal_by [concl1;concl2] RN_hl_hoare_bd_hoare g
   else if is_hoareS concl then
     let hs = destr_hoareS concl in
@@ -2413,11 +2441,13 @@ let t_hoare_bd_hoare g =
     cannot_apply "hoare/bd_hoare" "a hoare or bd_hoare judgment was expected" 
 
 let t_pr_bounded conseq g = 
-  let concl = get_concl g in
-  let po, cmp, bd = 
+  let env, _, concl = get_goal_e g in
+  let m, pr, po, cmp, bd = 
     match concl.f_node with
-    | FbdHoareF hf -> hf.bhf_po, hf.bhf_cmp, hf.bhf_bd 
-    | FbdHoareS hf -> hf.bhs_po, hf.bhs_cmp, hf.bhs_bd
+    | FbdHoareF hf ->
+      let m, _ = Fun.hoareF_memenv hf.bhf_f env in
+      m, hf.bhf_pr, hf.bhf_po, hf.bhf_cmp, hf.bhf_bd 
+    | FbdHoareS hf -> hf.bhs_m, hf.bhs_pr, hf.bhs_po, hf.bhs_cmp, hf.bhs_bd
     | _ -> tacuerror "bd_hoare excepted" in
   let cond = 
     match cmp with
@@ -2425,8 +2455,8 @@ let t_pr_bounded conseq g =
     | FHge when f_equal bd f_r0 -> []
     | _ when f_equal po f_false && f_equal bd f_r0 -> []
     (* TODO use the conseq rule instead *)
-    | FHle when conseq -> [f_real_le f_r1 bd]
-    | FHge when conseq -> [f_real_le bd f_r0]
+    | FHle when conseq -> [gen_mems [m] (f_imp pr (f_real_le f_r1 bd))]
+    | FHge when conseq -> [gen_mems [m] (f_imp pr (f_real_le bd f_r0))]
     | _ -> cannot_apply "pr_bounded" "cannot solve the probabilistic judgement" in
   prove_goal_by cond RN_hl_prbounded g
 
