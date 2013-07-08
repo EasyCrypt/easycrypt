@@ -184,7 +184,7 @@ theory Dlap.
     0%r <= scale => 
     mu_x (dlap mean scale) x = 
       (1%r / (2%r*scale))
-    * real.exp( -! (| x%r - mean%r|)) / scale. 
+    * real.exp( - (| x%r - mean%r|)) / scale. 
 *)
   axiom lossless: forall mean scale, 
     0%r <= scale => weight (dlap mean scale) = 1%r.
