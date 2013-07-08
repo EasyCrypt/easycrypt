@@ -336,9 +336,9 @@ type p_app_bd_info =
 
 type ('a, 'b, 'c) rnd_tac_info = 
   | PNoRndParams 
-  | PSingleRndParam of 'b 
+  | PSingleRndParam of 'c 
   | PTwoRndParams of 'a * 'a 
-  | PMultRndParams of (('a tuple5) * 'c)
+  | PMultRndParams of (('a tuple5) * 'b)
 
 type tac_dir = Backs | Fwds
 
@@ -363,7 +363,7 @@ type phltactic =
   | Pcfold      of (tac_side * codepos * int option)
   | Pinline     of pinline_arg
   | Pkill       of (tac_side * codepos * int option)
-  | Prnd        of tac_side * (pformula, pformula, pformula option) rnd_tac_info
+  | Prnd        of tac_side * (pformula, pformula option, pformula) rnd_tac_info
   | Palias      of (tac_side * codepos * psymbol option)
   | Pconseq     of bool * ccfpattern 
   | Phr_exists_elim  
