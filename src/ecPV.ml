@@ -44,7 +44,8 @@ let pvm = EcEnv.NormMp.norm_pvar
 
 let get_restr env mp = 
   match (EcEnv.Mod.by_mpath mp env).me_body with
-  | EcModules.ME_Decl(_,restr) -> restr 
+  | EcModules.ME_Decl(_,restr) ->
+    NormMp.norm_restr env restr 
   | _ -> assert false 
 
 let uerror env c = 

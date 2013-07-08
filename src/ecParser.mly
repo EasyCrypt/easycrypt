@@ -1779,9 +1779,7 @@ phltactic:
     { Prcond (s, false, i) }
 
 | IF s=side?
-    { Pcond (s,None) }
-| IF s=side? r1=sform r2=sform 
-    { Pcond (s,Some(r1,r2)) }
+    { Pcond s }
 
 | SWAP info=iplist1(loc(swap_info), COMMA) %prec prec_below_comma
     { Pswap info }
@@ -1914,9 +1912,7 @@ tactic_core_r:
    { Padmit }
 
 | CASE f=sform
-   { Pcase (f,None) }
-| CASE f=sform r1=sform r2=sform
-   { Pcase (f,Some(r1, r2)) }
+   { Pcase f }
 
 | PROGRESS t=tactic_core?
    { Pprogress t }

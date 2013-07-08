@@ -72,7 +72,7 @@ axiom d_inter_lossless : mu [0..10] (lambda (x1 : int), 0 <= x1 /\ x1 <= 10) = 1
 
 
 lemma foo : forall (A<:Adv{RO,F1,F2}), 
-  (forall (O<:O),  
+  (forall (O<:O {A}),  
       bd_hoare [O.hashA : true ==> true] = 1%r => 
       bd_hoare [A(O).a : true ==> true] = 1%r) =>  
   equiv [F1(A).main ~ F2(A).main : 

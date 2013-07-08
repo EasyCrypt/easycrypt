@@ -302,22 +302,18 @@ let process_call side info (_, n as g) =
   t_seq_subgoal t_call [t_seq (t_use an gs) !tac_sub; t_id None] (juc,n)
 
   
-let process_cond side r g =
+let process_cond side g =
   let concl = get_concl g in
   let check_N () = 
     if side <> None then
       cannot_apply "cond" "Unexpected side in non relational goal" in
-  match r with
-  | Some (r1,r2) ->
+  if is_equivS concl then t_equiv_cond side g
+  else begin 
     check_N ();
-    let r1 = process_phl_form treal g r1 in
-    let r2 = process_phl_form treal g r2 in
-    t_bdHoare_cond (Some (r1,r2)) g
-  | None ->
-    if is_equivS concl then t_equiv_cond side g
-    else if is_hoareS concl then (check_N (); t_hoare_cond g)
-    else if is_bdHoareS concl then (check_N (); t_bdHoare_cond None g)
+    if is_hoareS concl then t_hoare_cond g
+    else if is_bdHoareS concl then t_bdHoare_cond g
     else cannot_apply "cond" "the conclusion is not a hoare or a equiv goal"
+  end
 
 
 let stmt_length side concl = 
@@ -864,7 +860,7 @@ let process_phl loc ptac g =
     | Papp (dir, k, phi, f)     -> process_app dir k phi f
     | Pwp k                     -> t_wp k
     | Prcond (side, b, i)       -> t_rcond side b i
-    | Pcond (side,r)            -> process_cond side r
+    | Pcond side                -> process_cond side
     | Pwhile (side, (phi, vopt, info))  -> process_while side phi vopt info
     | Pfission info             -> process_fission info
     | Pfusion info              -> process_fusion info

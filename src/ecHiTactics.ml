@@ -14,26 +14,16 @@ open EcHiLogic
 open EcHiPhl
 
 (* -------------------------------------------------------------------- *)
-let process_case loc pf r g =
+let process_case loc pf g =
   let concl = get_concl g in
-  let check_N () = 
-    if r <> None then
-      cannot_apply "case" "Unexpected arguments" in
   match concl.f_node with
-  | FbdHoareS _ ->
+  | FbdHoareS _ | FhoareS _ -> 
     let f = process_phl_formula g pf in
-    let r = match r with
-      | None -> None
-      | Some (r1,r2) ->
-        Some(process_phl_form treal g r1, process_phl_form treal g r2) in
-    EcPhl.t_bdHoare_case f r g
-  | FhoareS _ -> check_N ();
-    let f = process_phl_formula g pf in
-    EcPhl.t_hoare_case f g
-  | FequivS _ -> check_N ();
+    EcPhl.t_he_case f g
+  | FequivS _ -> 
     let f = process_prhl_formula g pf in
     EcPhl.t_equiv_case f g
-  | _ -> check_N ();
+  | _ ->
     let f = process_formula (get_hyps g) pf in
     t_seq (set_loc loc (t_case f))
       (t_simplify EcReduction.betaiota_red) g
@@ -96,7 +86,7 @@ and process_tactic_core mkpv (tac : ptactic_core) (gs : goals) : goals =
     | Ptry t          -> `One (t_try (process_tactic_core1 mkpv t))
     | Pby t           -> `One (process_by mkpv t)
     | Pseq tacs       -> `One (fun (juc, n) -> process_tactics mkpv tacs (juc, [n]))
-    | Pcase(i,r)      -> `One (process_case loc i r)
+    | Pcase i         -> `One (process_case loc i)
     | Pprogress t     -> `One (process_progress (process_tactic_core1, mkpv) t)
     | Padmit          -> `One (t_admit)
     | Pdebug          -> `One (process_debug)
