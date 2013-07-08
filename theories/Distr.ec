@@ -194,3 +194,29 @@ theory Dlap.
 
 (* x = $dlap(x1,s)   ~ x = $dlap(0,s) + x1 : ={x1,s} ==> ={x}. *)
 end Dlap.
+
+(* Distribution resulting from applying a function to a distribution *)
+theory Dapply.
+  op dapply : ('a -> 'b) -> 'a distr -> 'b distr.
+
+  axiom mu_def: forall (d : 'a distr) (f : 'a -> 'b) P,
+    mu (dapply f d) P = mu d (lambda x, P (f x)).
+
+  lemma mu_x_def (d : 'a distr) (f : 'a -> 'b) x:
+    mu_x (dapply f d) x = mu d (lambda y, x = f y).
+  proof strict.
+    rewrite /mu_x mu_def; trivial.
+  save.
+
+  lemma supp_def (d : 'a distr) (f : 'a -> 'b) x:
+    in_supp x (dapply f d) <=> exists y, in_supp y d /\ f y = x.
+  proof strict.
+    rewrite /in_supp /mu_x mu_def.
+    split=> in_sup. smt.
+    smt.
+  save.
+
+  lemma lossless (d : 'a distr) (f : 'a -> 'b):
+    weight (dapply f d) = weight d by [].
+
+end Dapply.
