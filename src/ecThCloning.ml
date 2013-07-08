@@ -214,11 +214,13 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
               | Some th -> th
             in
 
-            begin match EcEnv.Theory.lookup_opt (unloc xsth) scenv with
-            | None -> clone_error scenv (CE_UnkOverride (OVK_Theory, unloc xsth))
-            | Some _ -> () end;
+            let sp =
+              match EcEnv.Theory.lookup_opt (unloc xsth) scenv with
+              | None -> clone_error scenv (CE_UnkOverride (OVK_Theory, unloc xsth))
+              | Some (sp, _) -> sp
+            in
   
-            let xsth = let xsth = unloc xsth in (fst xsth @ [snd xsth]) in
+            let xsth = let xsth = EcPath.toqsymbol sp in (fst xsth @ [snd xsth]) in
             let xdth = nm @ [x] in
 
             let rec doit prefix (proofs, evc) dth =
