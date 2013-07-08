@@ -271,9 +271,11 @@ type 'a fpattern = {
 
 type ffpattern = pformula fpattern
 
-type cfpattern = (pformula option * pformula option) fpattern
+type pformula_o = pformula option
+
+type cfpattern = (pformula_o * pformula_o) fpattern
 type ccfpattern =  
-  ((pformula option * pformula option) * 
+  ((pformula_o * pformula_o) * 
    (phoarecmp option * pformula) option) fpattern
 
 type preduction = {
@@ -318,14 +320,18 @@ type codepos = int * ((int * codepos) option)
 type call_info = 
   | CI_spec of (pformula * pformula)
   | CI_inv  of pformula
-  | CI_upto of (pformula * pformula * pformula option)
+  | CI_upto of (pformula * pformula * pformula_o)
   
 (* AppSingle are optional for bounded Phl judgments
    AppMult is required by most general rule for upper bounded Phl
    AppNone is required for the rest of judgments 
 *)
-type p_app_bd_info = PAppNone | PAppSingle of pformula 
-                   | PAppMult of (pformula * pformula * pformula * pformula * pformula)
+
+
+type p_app_bd_info = 
+  | PAppNone 
+  | PAppSingle of pformula 
+  | PAppMult of (pformula_o * pformula_o * pformula_o * pformula_o * pformula_o)
 
 
 type ('a, 'b) rnd_tac_info = 
@@ -341,11 +347,11 @@ type pfel_spec_preds = (pgamepath*pformula) list
 type phltactic = 
   | Pfun_def  
   | Pfun_abs    of pformula
-  | Pfun_upto   of (pformula * pformula * pformula option)
+  | Pfun_upto   of (pformula * pformula * pformula_o)
   | Pskip
   | Papp        of (tac_dir * int doption * pformula * p_app_bd_info)
   | Pwp         of int doption option 
-  | Pwhile      of tac_side * (pformula * pformula option * (pformula * pformula) option)
+  | Pwhile      of tac_side * (pformula * pformula_o * (pformula * pformula) option)
   | Pfission    of (tac_side * codepos * (int * (int * int)))
   | Pfusion     of (tac_side * codepos * (int * (int * int)))
   | Punroll     of (tac_side * codepos)
@@ -373,7 +379,7 @@ type phltactic =
   | Pprfalse
   | Ppr_rewrite   of symbol
   | Pbdeq 
-  | Peqobs_in  of (pformula option * pformula option * pformula option)
+  | Peqobs_in  of (pformula_o * pformula_o * pformula_o)
 
 and pinline_arg =
   [ `ByName    of tac_side * (pgamepath list * int list option)
@@ -472,7 +478,7 @@ type paxiom = {
 (* -------------------------------------------------------------------- *)
 type ident_spec = psymbol list
 
-type inv = (pformula, (pformula * pformula) * pformula option) EcAstlogic.g_inv
+type inv = (pformula, (pformula * pformula) * pformula_o) EcAstlogic.g_inv
 
 type equiv_concl =
   | Aequiv_spec of (pformula * pformula) * (pexpr * pexpr) option
