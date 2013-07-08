@@ -93,7 +93,7 @@ type rule_name =
   | RN_hl_kill      of bool option * codepos * int option
   | RN_hl_alias     of bool option * codepos
   | RN_hl_hoare_rnd
-  | RN_hl_equiv_rnd of (form,form) EcParsetree.rnd_tac_info
+  | RN_hl_equiv_rnd of (form,form,form) EcParsetree.rnd_tac_info
   | RN_hl_conseq 
   | RN_hl_conseq_bd
   | RN_hl_exfalso 
@@ -106,7 +106,7 @@ type rule_name =
   | RN_hl_bdeq      
   | RN_hl_fel       of (form * form * form * form * (EcPath.xpath*form) list)
 
-  | RN_bhl_rnd of (form,ty-> form) EcParsetree.rnd_tac_info
+  | RN_bhl_rnd of (form,ty-> form,ty-> form) EcParsetree.rnd_tac_info
   | RN_eqobs_in
   | RN_notmod
   | RN_hl_exists_elim 
