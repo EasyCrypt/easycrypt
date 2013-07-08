@@ -294,7 +294,6 @@ module Hsform = Why3.Hashcons.Make (struct
        ty_equal f1.f_ty f2.f_ty
     && equal_node f1.f_node f2.f_node
 
-
   let hash f =
     match f.f_node with 
     | Fquant(q, b, f) ->
@@ -607,15 +606,12 @@ let fop_real_prod = f_op EcCoreLib.p_real_prod [] (tfun treal (tfun treal treal)
 let fop_real_div  = f_op EcCoreLib.p_real_div  [] (tfun treal (tfun treal treal))
 
 let f_int_binop op f1 f2 =
-  assert (ty_equal f1.f_ty tint);
   f_app op [f1;f2] ty_bool
 
 let f_int_le = f_int_binop fop_int_le
 let f_int_lt = f_int_binop fop_int_lt
 
 let f_int_binop op f1 f2 =
-  assert (ty_equal f1.f_ty tint);
-  assert (ty_equal f2.f_ty tint);
   f_app op [f1; f2] ty_int
 
 let f_int_prod = f_int_binop fop_int_prod
@@ -626,30 +622,21 @@ let f_int_pow  = f_int_binop fop_int_pow
 let fop_int_intval = f_op EcCoreLib.p_int_intval [] (tfun tint (tfun tint (tfset tint)))
 
 let f_int_intval k1 k2 = 
-  assert (ty_equal k1.f_ty tint);
-  assert (ty_equal k2.f_ty tint);
   f_app fop_int_intval [k1;k2] (tfset tint)
 
 let fop_int_sum ty = f_op EcCoreLib.p_int_sum [ty] (tfun (tfun tint ty) (tfun (tfset tint) ty))
 
 let f_int_sum op intval ty =
-  assert (ty_equal op.f_ty (tfun tint ty));
-  assert (ty_equal intval.f_ty (tfset tint));
   f_app (fop_int_sum treal) [op;intval] ty
-
 
 (* -------------------------------------------------------------------- *)
 let f_real_cmp cmp f1 f2 =
-  assert (ty_equal f1.f_ty treal);
-  assert (ty_equal f2.f_ty treal);
   f_app cmp [f1; f2] ty_bool
 
 let f_real_le = f_real_cmp fop_real_le
 let f_real_lt = f_real_cmp fop_real_lt
 
 let f_real_binop op f1 f2 =
-  assert (ty_equal f1.f_ty treal);
-  assert (ty_equal f2.f_ty treal);
   f_app op [f1; f2] ty_real
 
 let f_real_add  = f_real_binop fop_real_add
