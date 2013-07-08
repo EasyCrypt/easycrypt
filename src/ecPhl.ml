@@ -1985,7 +1985,7 @@ and callable_oracles_i env modv os i =
 
 let callable_oracles_stmt env (modv:PV.t) = callable_oracles_s env modv EcPath.Sx.empty
 
-let t_failure_event at_pos cntr ash q f_event pred_specs g =
+let t_failure_event at_pos cntr ash q f_event pred_specs inv g =
   let env,_,concl = get_goal_e g in
   match concl.f_node with
     | Fapp ({f_node=Fop(op,_)},[pr;bd]) when is_pr pr 
@@ -2026,12 +2026,14 @@ let t_failure_event at_pos cntr ash q f_event pred_specs g =
       (* not fail and cntr=0 holds at designated program point *)
       let init_goal = 
         let p = f_and (f_not f_event) (f_eq cntr (f_int 0)) in
+        let p = f_and_simpl p inv in
         f_hoareS memenv f_true (stmt s_hd) p
       in
       let oracle_goal o = 
         let not_F_to_F_goal = 
           let bound = f_app_simpl ash [cntr] treal in
           let pre = f_and (f_int_le (f_int 0) cntr) (f_not f_event) in
+          let pre = f_and_simpl pre inv in
           let post = f_event in
           f_bdHoareF pre o post FHle bound
         in
@@ -2048,13 +2050,17 @@ let t_failure_event at_pos cntr ash q f_event pred_specs g =
         in
         let cntr_decr_goal = 
           let pre  = f_and some_p (f_eq old_cntr cntr) in
+          let pre = f_and_simpl pre inv in
           let post = f_and (f_int_lt old_cntr cntr) (f_int_le cntr q) in
+          let post = f_and_simpl post inv in
           f_forall_simpl [old_cntr_id,GTty tint] 
             (f_hoareF pre o post)
         in
         let cntr_stable_goal =
           let pre  = f_ands [f_not some_p;f_eq f_event old_b;f_eq cntr old_cntr] in
+          let pre = f_and_simpl pre inv in
           let post = f_ands [f_eq f_event old_b;f_eq cntr old_cntr] in
+          let post = f_and_simpl post inv in
           f_forall_simpl [old_b_id,GTty tbool; old_cntr_id,GTty tint] 
             (f_hoareF pre o post)
         in
