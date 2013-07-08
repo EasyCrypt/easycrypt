@@ -2280,6 +2280,7 @@ let t_bd_hoare_rnd tac_info g =
   let (lv,distr),s = s_last_rnd "bd_hoare_rnd" bhs.bhs_s in
   let ty_distr = proj_distr_ty (e_ty distr) in
   let distr = EcFol.form_of_expr (EcMemory.memory bhs.bhs_m) distr in
+  let m = fst bhs.bhs_m in
 
   let mk_event_cond event = 
     let v_id = EcIdent.create "v" in
@@ -2302,30 +2303,84 @@ let t_bd_hoare_rnd tac_info g =
     | FHeq -> f_eq
   in
 
-  let check_indep () = 
+  let is_post_indep =
+    let fv = EcPV.PV.fv env m bhs.bhs_po in
+    match lv with
+      | LvVar (x,_) -> not (EcPV.PV.mem_pv env x fv)
+      | LvTuple pvs ->
+        List.for_all (fun (x,_) -> not (EcPV.PV.mem_pv env x fv)) pvs
+      | LvMap(_, x,_,_) -> not (EcPV.PV.mem_pv env x fv)
+  in
+
+
+  let is_bd_indep = 
     let fv_bd = PV.fv env mhr bhs.bhs_bd in 
     let modif_s = s_write env s in
-    if not (PV.indep env modif_s fv_bd) then
-      tacuerror "Cannot apply if the bound is modified by remaining statement.@. Use the generalised rnd tactic variant instead."
+    PV.indep env modif_s fv_bd
+  in
+
+  let mk_event ty = 
+    let x = EcIdent.create "x" in 
+    if is_post_indep then f_lambda [x,GTty ty] f_true
+    else match lv with
+      | LvVar (pv,_) -> 
+        f_lambda [x,GTty ty] 
+          (EcPV.PVM.subst1 env pv m (f_local x ty) bhs.bhs_po)
+      | _ -> tacuerror "Cannot infer a valid event, it must be provided"
   in
 
   let subgoals = match tac_info, bhs.bhs_cmp with 
+    | PNoRndParams, FHle -> 
+      if is_post_indep then
+        (* event is true *)
+        let concl = f_bdHoareS_r {bhs with bhs_s=s} in
+        [concl]
+      else if is_bd_indep then
+        let event = mk_event ty_distr in
+        let bounded_distr = f_real_le (f_mu distr event) bhs.bhs_bd in
+        let post = bounded_distr &&& (mk_event_cond event) in
+        let concl = f_hoareS bhs.bhs_m bhs.bhs_pr s post in
+        [concl]
+      else 
+        tacuerror "Bound is not independent, intermediate predicate is required."
+
+    | PNoRndParams, _ -> 
+      if is_post_indep then
+        (* event is true *)
+        let event = mk_event ty_distr in
+        let bounded_distr = f_eq (f_mu distr event) f_r1 in
+        let concl = f_bdHoareS_r {bhs with bhs_s=s} in
+        [bounded_distr;concl]
+      else if is_bd_indep then
+        let event = mk_event ty_distr in
+        let bounded_distr = f_cmp (f_mu distr event) bhs.bhs_bd in
+        let post = bounded_distr &&& (mk_event_cond event) in
+        let concl = f_bdHoareS_r {bhs with bhs_s=s; bhs_po=post; bhs_bd=f_r1} in
+        [concl]
+      else 
+        tacuerror "Bound is not independent, intermediate predicate is required."
+
     | PSingleRndParam event, FHle ->
-      let event = event ty_distr in
-      check_indep();
-      let bounded_distr = f_real_le (f_mu distr event) bhs.bhs_bd in
-      let post = bounded_distr &&& (mk_event_cond event) in
-      let concl = f_hoareS bhs.bhs_m bhs.bhs_pr s post in
-      [concl]
+      if is_bd_indep then
+        let event = event ty_distr in
+        let bounded_distr = f_real_le (f_mu distr event) bhs.bhs_bd in
+        let post = bounded_distr &&& (mk_event_cond event) in
+        let concl = f_hoareS bhs.bhs_m bhs.bhs_pr s post in
+        [concl]
+      else 
+        tacuerror "Bound is not independent, intermediate predicate is required."
+
     | PSingleRndParam event, _ ->
-      let event = event ty_distr in
-      check_indep();
-      let bounded_distr = f_cmp (f_mu distr event) bhs.bhs_bd in
-      let post = bounded_distr &&& (mk_event_cond event) in
-      let concl = f_bdHoareS_r {bhs with bhs_s=s; bhs_po=post; bhs_cmp=FHeq; bhs_bd=f_r1} in
-      [concl]
+      if is_bd_indep then
+        let event = event ty_distr in
+        let bounded_distr = f_cmp (f_mu distr event) bhs.bhs_bd in
+        let post = bounded_distr &&& (mk_event_cond event) in
+        let concl = f_bdHoareS_r {bhs with bhs_s=s; bhs_po=post; bhs_cmp=FHeq; bhs_bd=f_r1} in
+        [concl]
+      else 
+        tacuerror "Bound is not independent, intermediate predicate is required."
     | PMultRndParams ((phi,d1,d2,d3,d4),event), _ -> 
-      let event = event ty_distr in
+      let event = match event ty_distr with | None -> mk_event ty_distr | Some event -> event in
       let bd_sgoal = f_cmp (f_real_add (f_real_prod d1 d2) (f_real_prod d3 d4)) bhs.bhs_bd in 
       let sgoal1 = f_bdHoareS_r {bhs with bhs_s=s; bhs_po=phi; bhs_bd=d1} in
       let sgoal2 = 
