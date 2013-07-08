@@ -40,10 +40,15 @@ let process_phl_formula = process_phl_form tbool
 
 let process_prhl_formula = process_prhl_form tbool
 
-let process_phl_bd_info dir g bd_info = match bd_info with
+let process_phl_bd_info dir g bd_info = 
+  match bd_info with
   | PAppNone -> 
     let hs = destr_bdHoareS (get_concl g) in
-    f_true, f_r1, hs.bhs_bd, f_r0, f_r1 (* The last argument will not be used *)
+    let f1, f2 = 
+       match dir with
+      | Backs  -> hs.bhs_bd, f_r1 
+      | Fwds   -> f_r1, hs.bhs_bd in
+    f_true, f1, f2, f_r0, f_r1 (* The last argument will not be used *)
   | PAppSingle f -> 
     let f = process_phl_formula g f in
     let hs = destr_bdHoareS (get_concl g) in
