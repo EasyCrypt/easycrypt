@@ -12,17 +12,23 @@ val hierror : ?loc:EcLocation.t -> ('a, Format.formatter, unit, 'b) format4 -> '
 type scope
 
 type proof_uc = {
-  puc_name   : string;
-  puc_jdg    : proof_state;
-  puc_flags  : pucflags;
-  puc_cont   : [`Save | `Clone of proof_ctxt list * EcEnv.env];
+  puc_active : proof_auc option;
+  puc_cont   : proof_ctxt list * (EcEnv.env option);
 }
 
-and proof_ctxt = EcThCloning.axclone
+and proof_auc = {
+  puc_name   : string;
+  puc_mode   : bool option;
+  puc_jdg    : proof_state;
+  puc_flags  : pucflags;
+  puc_crt    : EcDecl.axiom;
+}
+
+and proof_ctxt = (symbol * EcDecl.axiom) * EcPath.path * EcEnv.env
 
 and proof_state =
 | PSCheck   of (EcLogic.judgment_uc * int list)
-| PSNoCheck of (EcIdent.t list * EcFol.form)
+| PSNoCheck
 
 and pucflags = {
   puc_nosmt : bool;
@@ -34,8 +40,8 @@ val path    : scope -> EcPath.path
 val name    : scope -> symbol
 val env     : scope -> EcEnv.env
 val attop   : scope -> bool
-val goal    : scope -> proof_uc option
-val xgoal   : scope -> (bool option * proof_uc) option
+val goal    : scope -> proof_auc option
+val xgoal   : scope -> proof_uc option
 
 val verbose     : scope -> bool
 val set_verbose : scope -> bool -> scope
@@ -55,6 +61,8 @@ module Ax : sig
 
   val add  : scope -> mode -> paxiom located -> string option * scope
   val save : scope -> EcLocation.t -> string option * scope
+
+  val activate : scope -> EcParsetree.pqsymbol -> scope
 end
 
 module Ty : sig
@@ -102,7 +110,7 @@ module Theory : sig
    * scope [scope]. Cloned theory name is [dst] if not None. If
    * [dst] is None, the basename of [src] is used as the cloned
    * theory name. *)
-  val clone : scope -> theory_cloning -> symbol * scope
+  val clone : scope -> Ax.mode -> theory_cloning -> symbol * scope
 
   (* FIXME: DOC *)
   val import_w3 : scope -> string list -> string -> w3_renaming list -> scope

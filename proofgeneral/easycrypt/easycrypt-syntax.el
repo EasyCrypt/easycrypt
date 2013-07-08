@@ -7,7 +7,7 @@
 (defconst easycrypt-terminal-string    ".")
 (defconst easycrypt-command-end-regexp "[^\\.]\\.\\(\\s \\|\n\\|$\\)")
 
-(defconst easycrypt-keywords-proof-goal '("lemma" "equiv" "hoare"))
+(defconst easycrypt-keywords-proof-goal '("lemma" "equiv" "hoare" "realize"))
 (defconst easycrypt-keywords-proof-save '("save" "qed"))
 
 (defconst easycrypt-non-undoables-regexp "^pragma\\b")

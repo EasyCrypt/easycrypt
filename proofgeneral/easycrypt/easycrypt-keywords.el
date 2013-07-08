@@ -1,4 +1,4 @@
-; Generated on Wed Jun 26 14:10:08 2013
+; Generated on Mon Jul  8 11:17:16 2013
 
 (defvar easycrypt-bytac-keywords '(
   "assumption"
@@ -13,6 +13,7 @@
 (defvar easycrypt-global-keywords '(
   "axiom"
   "lemma"
+  "realize"
   "proof"
   "save"
   "qed"
@@ -22,6 +23,7 @@
   "import"
   "export"
   "local"
+  "declare"
   "nosmt"
   "module"
   "of"
@@ -119,7 +121,6 @@
   "bdhoare_deno"
   "pr_bounded"
   "pr_false"
-  "pr_or"
   "bd_eq"
   "bypr"
   "fel"

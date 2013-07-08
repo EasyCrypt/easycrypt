@@ -219,7 +219,8 @@ and process_th_export (scope : EcScope.scope) name =
 (* -------------------------------------------------------------------- *)
 and process_th_clone (scope : EcScope.scope) (thcl, io) =
   EcScope.check_state `InTop "theory cloning" scope;
-  let (name, scope) = EcScope.Theory.clone scope thcl in
+  let mode = if (!pragma).pm_check then `Check else `WeakCheck in
+  let (name, scope) = EcScope.Theory.clone scope mode thcl in
     match io with
     | None         -> scope
     | Some `Export -> process_th_export scope ([], name)
@@ -256,6 +257,10 @@ and process_save (scope : EcScope.scope) loc =
     scope
 
 (* -------------------------------------------------------------------- *)
+and process_realize (scope : EcScope.scope) name =
+  EcScope.Ax.activate scope name
+
+(* -------------------------------------------------------------------- *)
 and process_proverinfo scope pi = 
   let scope = EcScope.Prover.process scope pi in
     scope
@@ -268,8 +273,8 @@ and process_checkproof scope b =
 (* -------------------------------------------------------------------- *)
 and process_pragma (scope : EcScope.scope) opt =
   let check mode =
-    match EcScope.xgoal scope with
-    | Some (Some false, _) ->
+    match EcScope.goal scope with
+    | Some { EcScope.puc_mode = Some false } ->
         EcScope.hierror "pragma [check|nocheck] in non-strict proof script";
     | _ -> pragma := { !pragma with pm_check = mode }
   in
@@ -311,6 +316,7 @@ and process (ld : EcLoader.ecloader) (scope : EcScope.scope) g =
       | GthW3      a    -> `Fct   (fun scope -> process_w3_import  scope  a)
       | Gprint     p    -> `Fct   (fun scope -> process_print      scope  p; scope)
       | Gtactics   t    -> `Fct   (fun scope -> process_tactics    scope  t)
+      | Grealize   p    -> `Fct   (fun scope -> process_realize    scope  p)
       | Gprover_info pi -> `Fct   (fun scope -> process_proverinfo scope  pi)
       | Gcheckproof b   -> `Fct   (fun scope -> process_checkproof scope  b)
       | Gsave      loc  -> `Fct   (fun scope -> process_save       scope  loc)
@@ -398,19 +404,33 @@ module L = EcBaseLogic
 let pp_current_goal stream =
   let (_, lazy scope, _) = !context in
 
-  match S.goal scope with
-  | None
-  | Some { S.puc_jdg = S.PSNoCheck _ } -> ()
+  match S.xgoal scope with
+  | None -> ()
 
-  | Some { S.puc_jdg = S.PSCheck (juc, ns) } ->
-      let ppe = EcPrinting.PPEnv.ofenv (S.env scope) in
+  | Some { S.puc_active = None; S.puc_cont = ct } ->
+      Format.fprintf stream "Remaining lemmas to prove:@\n%!";
+      List.iter
+        (fun ((_, ax), p, env) ->
+           let ppe = EcPrinting.PPEnv.ofenv env in
+           Format.fprintf stream " %s: %a@\n%!"
+             (EcPath.tostring p)
+             (EcPrinting.pp_form ppe) (oget ax.EcDecl.ax_spec))
+        (fst ct)
 
-      match List.ohead ns with
-      | None   -> Format.fprintf stream "No more goals@\n%!"
-      | Some n -> 
-        let hyps, concl = get_goal (juc, n) in
-        let g = EcEnv.LDecl.tohyps hyps, concl in
-        EcPrinting.pp_goal ppe stream (List.length ns, g)
+  | Some { S.puc_active = Some puc } -> begin
+      match puc.S.puc_jdg with
+      | S.PSNoCheck -> ()
+
+      | S.PSCheck (juc, ns) ->
+        let ppe = EcPrinting.PPEnv.ofenv (S.env scope) in
+
+          match List.ohead ns with
+          | None   -> Format.fprintf stream "No more goals@\n%!"
+          | Some n -> 
+            let hyps, concl = get_goal (juc, n) in
+            let g = EcEnv.LDecl.tohyps hyps, concl in
+              EcPrinting.pp_goal ppe stream (List.length ns, g)
+  end
 
 let pp_maybe_current_goal stream =
   match (!pragma).pm_verbose with

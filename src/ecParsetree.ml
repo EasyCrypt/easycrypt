@@ -358,7 +358,7 @@ type phltactic =
   | Psplitwhile of (pexpr * tac_side * codepos )
   | Pcall       of tac_side * call_info fpattern 
   | Prcond      of (bool option * bool * int)
-  | Pcond       of tac_side
+  | Pcond       of tac_side * (pformula * pformula) option
   | Pswap       of ((tac_side * swap_kind) located list)
   | Pcfold      of (tac_side * codepos * int option)
   | Pinline     of pinline_arg
@@ -441,7 +441,7 @@ and ptactic_core_r =
   | Ptry        of ptactic_core
   | Pby         of ptactic list
   | Pseq        of ptactic list
-  | Pcase       of pformula 
+  | Pcase       of pformula * (pformula * pformula) option
   | Plogic      of logtactic
   | PPhl        of phltactic
   | Pprogress   of ptactic_core option
@@ -534,13 +534,20 @@ type theory_cloning = {
   pthc_base : pqsymbol;
   pthc_name : psymbol option;
   pthc_ext  : (pqsymbol * theory_override) list;
-  pthc_prf  : [`All of pqsymbol option | `Named of pqsymbol] list;
+  pthc_prf  : theory_cloning_proof list;
+}
+
+and theory_cloning_proof = {
+  pthp_mode   : [ `All   of pqsymbol option
+                | `Named of pqsymbol];
+  pthp_tactic : ptactic_core option;
 }
 
 and theory_override =
-| PTHO_Type of ty_override
-| PTHO_Op   of op_override
-| PTHO_Pred of pr_override
+| PTHO_Type   of ty_override
+| PTHO_Op     of op_override
+| PTHO_Pred   of pr_override
+| PTHO_Theory of pqsymbol
 
 and ty_override = psymbol list * pty * [`Alias | `Inline]
 
@@ -583,6 +590,7 @@ type global =
   | GthW3        of (string list * string * w3_renaming list)
   | GsctOpen
   | GsctClose
+  | Grealize     of pqsymbol
   | Gtactics     of [`Proof of bool | `Actual of ptactic list]
   | Gprover_info of pprover_infos
   | Gcheckproof  of bool

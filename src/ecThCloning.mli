@@ -24,6 +24,11 @@ exception CloneError of EcEnv.env * clone_error
 val clone_error : EcEnv.env -> clone_error -> 'a
 
 (* -------------------------------------------------------------------- *)
-type axclone = (symbol * EcDecl.axiom) * EcEnv.env
+type axclone = {
+  axc_axiom : symbol * EcDecl.axiom;
+  axc_path  : EcPath.path;
+  axc_env   : EcEnv.env;
+  axc_tac   : EcParsetree.ptactic_core option;
+}
 
 val clone : EcEnv.env -> theory_cloning -> symbol * axclone list * ctheory_w3
