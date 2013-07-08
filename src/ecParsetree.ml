@@ -334,11 +334,11 @@ type p_app_bd_info =
   | PAppMult of (pformula_o * pformula_o * pformula_o * pformula_o * pformula_o)
 
 
-type ('a, 'b) rnd_tac_info = 
+type ('a, 'b, 'c) rnd_tac_info = 
   | PNoRndParams 
   | PSingleRndParam of 'b 
   | PTwoRndParams of 'a * 'a 
-  | PMultRndParams of (('a tuple5) * 'b)
+  | PMultRndParams of (('a tuple5) * 'c)
 
 type tac_dir = Backs | Fwds
 
@@ -358,12 +358,12 @@ type phltactic =
   | Psplitwhile of (pexpr * tac_side * codepos )
   | Pcall       of tac_side * call_info fpattern 
   | Prcond      of (bool option * bool * int)
-  | Pcond       of tac_side
+  | Pcond       of tac_side * (pformula * pformula) option
   | Pswap       of ((tac_side * swap_kind) located list)
   | Pcfold      of (tac_side * codepos * int option)
   | Pinline     of pinline_arg
   | Pkill       of (tac_side * codepos * int option)
-  | Prnd        of tac_side * (pformula, pformula) rnd_tac_info
+  | Prnd        of tac_side * (pformula, pformula, pformula option) rnd_tac_info
   | Palias      of (tac_side * codepos * psymbol option)
   | Pconseq     of bool * ccfpattern 
   | Phr_exists_elim  
@@ -441,7 +441,7 @@ and ptactic_core_r =
   | Ptry        of ptactic_core
   | Pby         of ptactic list
   | Pseq        of ptactic list
-  | Pcase       of pformula 
+  | Pcase       of pformula * (pformula * pformula) option
   | Plogic      of logtactic
   | PPhl        of phltactic
   | Pprogress   of ptactic_core option

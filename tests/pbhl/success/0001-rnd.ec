@@ -15,7 +15,7 @@ module M = {
 lemma test: bd_hoare [ M.f : true ==> res] = (1%r/2%r).
 proof.
 fun.
-rnd (lambda (x:bool), x=y).
+rnd. (* (lambda (x:bool), x=y). *)
 skip.
 trivial.
 simplify.
@@ -40,11 +40,11 @@ rnd (F.b1) (1%r/2%r) (1%r) (1%r/2%r) (0%r) (lambda (x:bool), F.b1).
   (*1st *)
   trivial.
   (* snd *)
-  rnd (lambda (x:bool), x).
+  rnd (* (lambda (x:bool), x) *).
   skip. smt.
   (* thrd *)
   smt.
-  rnd (lambda (x:bool), !x).
+  rnd (* (lambda (x:bool), !x) *).
   skip. smt.
   (* fourth *)
   smt.

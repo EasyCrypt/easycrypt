@@ -43,7 +43,7 @@ let specs () =
 
   and set_input x =
     if !input <> None then
-      raise (Arg.Bad "you must give at most on EasyCrypt file");
+      raise (Arg.Bad "you must give at most one EasyCrypt file");
     input := Some x
   in
 
@@ -53,7 +53,7 @@ let specs () =
         "-emacs"      , Arg.Set    emacs      , "Output format set to <emacs>";
         "-why3"       , Arg.String set_why3   , "Load why3 configuration from given files";
         "-full_check" , Arg.Set    full_check , "Check every loaded file, disable checkproof off";
-        "-max_provers", Arg.Int    set_max    , "Maximum number of prover running in the same time";
+        "-max_provers", Arg.Int    set_max    , "Maximum number of provers running in parallel";
         "-p"          , Arg.String set_provers, "Add a prover to the set of provers"
       ] in
   let specs = Arg.align (List.map (fun (x, o, d) -> (x, o, " " ^ d)) specs) in
