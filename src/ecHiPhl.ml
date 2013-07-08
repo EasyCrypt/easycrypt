@@ -40,11 +40,19 @@ let process_phl_formula = process_phl_form tbool
 
 let process_prhl_formula = process_prhl_form tbool
 
-let process_phl_bd_info g bd_info = match bd_info with
+let process_phl_bd_info dir g bd_info = match bd_info with
   | PAppNone -> 
     let hs = destr_bdHoareS (get_concl g) in
-    f_true, f_r1, hs.bhs_po, f_r0, f_r1 (* The last argument will not be used *)
-  | PAppSingle _ -> assert false 
+    f_true, f_r1, hs.bhs_bd, f_r0, f_r1 (* The last argument will not be used *)
+  | PAppSingle f -> 
+    let f = process_phl_formula g f in
+    let hs = destr_bdHoareS (get_concl g) in
+    let f1, f2 = 
+      match dir with
+      | Backs  -> f_real_div hs.bhs_bd f, f 
+      | Fwds   -> f, f_real_div hs.bhs_bd f in
+    f_true, f1, f2, f_r0, f_r1
+    
   | PAppMult(phi,f1,f2,g1,g2) ->
     let phi = omap_dfl phi f_true (process_phl_formula g) in
     let check_0 f = 
@@ -68,7 +76,7 @@ let process_phl_bd_info g bd_info = match bd_info with
     let g1, g2 = process_f (g1,g2) in
     (phi,f1,f2,g1,g2)
 
-let process_app _dir k phi bd_info g =
+let process_app dir k phi bd_info g =
   let concl = get_concl g in
   match k, bd_info with
   | Single i, PAppNone when is_hoareS concl ->
@@ -76,7 +84,7 @@ let process_app _dir k phi bd_info g =
     t_hoare_app i phi g
   | Single i, _ when is_bdHoareS concl ->
     let pR = process_phl_formula g phi in
-    let (phi,f1,f2,f3,f4) = process_phl_bd_info g bd_info in
+    let (phi,f1,f2,f3,f4) = process_phl_bd_info dir g bd_info in
     t_bdHoare_app i (phi,pR,f1,f2,f3,f4) g
   | Double(i,j), PAppNone ->
     let phi = process_prhl_formula g phi in
