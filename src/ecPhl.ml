@@ -1380,34 +1380,14 @@ let t_hoare_case f g =
   let concl2 = f_hoareS_r { hs with hs_pr = f_and_simpl hs.hs_pr (f_not f) } in
   prove_goal_by [concl1;concl2] (RN_hl_case f) g
 
-let t_bdHoare_case f r g =
+let t_bdHoare_case f g =
   let concl = get_concl g in
   let bhs = destr_bdHoareS concl in
-  let bd,r1,r2 = 
-    match r with
-    | Some(r1,r2) -> f_real_add r1 r2, r1, r2 
-    | None -> bhs.bhs_bd, bhs.bhs_bd, bhs.bhs_bd 
-      (* Remark in reality r1 will be caract f *  bhs.bhs_bd and
-         r2 = caract !f *  bhs.bhs_bd.
-         under f,  r1 simplify to bhs.bhs_bd and 
-         under !f, r2 simplify to bhs.bhs_bd and 
-         r1 + r2 simplify to  bhs.bhs_bd. *) in
   let concl1 = f_bdHoareS_r 
-    { bhs with bhs_pr = f_and_simpl bhs.bhs_pr f; bhs_bd = r1 } in
+    { bhs with bhs_pr = f_and_simpl bhs.bhs_pr f } in
   let concl2 = f_bdHoareS_r 
-    { bhs with bhs_pr = f_and_simpl bhs.bhs_pr (f_not f); bhs_bd = r2 } in
-  let concls = 
-    if r = None then [] 
-    else
-      let concl3 = 
-    (* TODO : this a conseq_bd rule *)
-        match bhs.bhs_cmp with
-        | FHle -> f_real_le bd bhs.bhs_bd
-        | FHeq -> f_eq bd bhs.bhs_bd
-        | FHge -> f_real_le bhs.bhs_bd bd in
-      let concl3 = gen_mems [bhs.bhs_m] (f_imp bhs.bhs_pr concl3) in
-      [concl3] in
-  prove_goal_by (concl1::concl2::concls) (RN_hl_case f) g
+    { bhs with bhs_pr = f_and_simpl bhs.bhs_pr (f_not f) } in
+  prove_goal_by [concl1;concl2] (RN_hl_case f) g
 
 let t_equiv_case f g = 
   let concl = get_concl g in
@@ -1416,12 +1396,9 @@ let t_equiv_case f g =
   let concl2 = f_equivS_r { es with es_pr = f_and es.es_pr (f_not f) } in
   prove_goal_by [concl1;concl2] (RN_hl_case f) g
 
-let t_he_case f r g =
-  match r with
-  | Some _ -> t_bdHoare_case f r g
-  | None -> 
-    t_hS_or_bhS_or_eS (t_hoare_case f) 
-      (t_bdHoare_case f None) (t_equiv_case f) g 
+let t_he_case f g =
+  t_hS_or_bhS_or_eS (t_hoare_case f) 
+    (t_bdHoare_case f) (t_equiv_case f) g 
 
 (* --------------------------------------------------------------------- *)
 let _inline_freshen me v =
@@ -2139,7 +2116,7 @@ let s_first_if s =
     try destr_if i with Not_found -> 
       cannot_apply "if" "the first instruction should be a if"
 
-let t_gen_cond side e r g =
+let t_gen_cond side e g =
   let hyps = get_hyps g in
   let m1,m2,h,h1,h2 = match LDecl.fresh_ids hyps ["&m";"&m";"_";"_";"_"] with
     | [m1;m2;h;h1;h2] -> m1,m2,h,h1,h2
@@ -2155,20 +2132,19 @@ let t_gen_cond side e r g =
                  (t_hyp h)
               ];
        t_id None] g in
-  let subtacs = if r = None then [] else [t_id None] in
-  t_seq_subgoal (t_he_case e r) (t_sub true :: t_sub false :: subtacs) g
+  t_seq_subgoal (t_he_case e) [t_sub true; t_sub false] g
 
 let t_hoare_cond g = 
   let concl = get_concl g in
   let hs = destr_hoareS concl in 
   let (e,_,_) = s_first_if hs.hs_s in
-  t_gen_cond None (form_of_expr (EcMemory.memory hs.hs_m) e) None g
+  t_gen_cond None (form_of_expr (EcMemory.memory hs.hs_m) e) g
 
-let t_bdHoare_cond r g = 
+let t_bdHoare_cond g = 
   let concl = get_concl g in
   let bhs = destr_bdHoareS concl in 
   let (e,_,_) = s_first_if bhs.bhs_s in
-  t_gen_cond None (form_of_expr (EcMemory.memory bhs.bhs_m) e) r g
+  t_gen_cond None (form_of_expr (EcMemory.memory bhs.bhs_m) e) g
 
 let rec t_equiv_cond side g =
   let hyps,concl = get_goal g in
@@ -2182,7 +2158,7 @@ let rec t_equiv_cond side g =
       else
         let (e,_,_) = s_first_if es.es_sr in
         form_of_expr (EcMemory.memory es.es_mr) e in
-    t_gen_cond side e None g
+    t_gen_cond side e g
   | None -> 
       let el,_,_ = s_first_if es.es_sl in
       let er,_,_ = s_first_if es.es_sr in
