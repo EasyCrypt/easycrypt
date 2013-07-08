@@ -40,7 +40,7 @@ theory ROM.
 
   lemma lossless_o : mu dsample cpTrue = 1%r => islossless RO.o.
   proof strict.
-  by intros Hs; fun; wp=> /=; rnd 1%r cpTrue; skip=> //.
+  by intros Hs; fun; wp=> /=; rnd cpTrue; skip=> //.
   qed.
 end ROM.
 

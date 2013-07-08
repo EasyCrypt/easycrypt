@@ -8,7 +8,7 @@ import why3 "int" "Int"
 theory Abs.
 
   import why3 "int" "Abs"
-    op "abs" as "__abs".
+    op "abs" as "`|_|".
 
 end Abs.
 export Abs.

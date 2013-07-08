@@ -34,6 +34,20 @@ if [ "${DEST}" != "${DEST//[ ]/}" ]; then
 fi
 
 # --------------------------------------------------------------------
+function check_cmd {
+  if ! type -P "$1" >/dev/null 2>&1; then
+    echo "missing program: $1. install it first" >&2
+    exit 1
+  fi
+}
+
+check_cmd m4
+check_cmd autoconf
+check_cmd gcc
+check_cmd g++
+check_cmd curl
+
+# --------------------------------------------------------------------
 set -x
 
 rm -rf "${DEST}" && mkdir "${DEST}" "${DEST}/src"

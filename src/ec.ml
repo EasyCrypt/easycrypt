@@ -94,7 +94,7 @@ let _ =
 
     try
       begin
-        match EcTerminal.next terminal with
+        match EcLocation.unloc (EcTerminal.next terminal) with
         | EcParsetree.P_Prog (commands, locterm) ->
             terminate := locterm;
             List.iter

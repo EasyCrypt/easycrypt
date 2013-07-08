@@ -79,7 +79,7 @@ let _ = EcPException.register (fun fmt exn ->
 let error loc e = EcLocation.locate_error loc (TacError e)
 
 (* -------------------------------------------------------------------- *)
-let process_trivial = t_trivial
+let process_trivial = EcPhl.t_trivial
 
 (* -------------------------------------------------------------------- *)
 let process_done g =

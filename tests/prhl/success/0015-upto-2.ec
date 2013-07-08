@@ -84,7 +84,7 @@ proof.
     fun.
     inline RO.hash.
     wp.
-    rnd (1%r) (lambda (x:int), 0 <= x <= 10) .
+    rnd (lambda (x:int), 0 <= x <= 10) .
     wp; skip.
     trivial.
     intros &hr h2.
@@ -94,7 +94,7 @@ proof.
     fun.
     inline RO.hash.
     wp.
-    rnd (1%r) (lambda (x:int), 0 <= x <= 10) .
+    rnd (lambda (x:int), 0 <= x <= 10) .
     wp;skip.
     trivial.
     intros &hr _.

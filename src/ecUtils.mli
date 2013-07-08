@@ -112,6 +112,7 @@ module List : sig
   val index :  'a -> 'a list -> int option
 
   val uniqf : ('a -> 'a -> bool) -> 'a list -> bool
+
   val uniq : 'a list -> bool
 
   val take_n : int -> 'a list -> 'a list
@@ -161,6 +162,10 @@ module List : sig
   val smart_map_fold : ('a -> 'b -> 'a * 'b) -> 'a -> 'b list -> 'a * 'b list
 
   val sum : int list -> int
+
+  val min : 'a -> 'a list -> 'a
+
+  val max : 'a -> 'a list -> 'a
 end
 
 (* -------------------------------------------------------------------- *)

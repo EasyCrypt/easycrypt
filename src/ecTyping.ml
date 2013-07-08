@@ -348,8 +348,8 @@ let select_pv env side name ue tvi psig =
       let select (pv,ty) = 
         let subue = UE.copy ue in
         let texpected = EcUnify.tfun_expected subue psig in
-        EcUnify.unify env subue ty texpected;
-        [(pv, ty, subue)]
+          EcUnify.unify env subue ty texpected;
+          [(pv, ty, subue)]
       in
         select pvs
     with EcEnv.LookupFailure _ -> []
@@ -362,13 +362,13 @@ let gen_select_op ~actonly ~pred (fpv, fop, flc) opsc tvi env name ue psig =
   | None ->
       let ops = EcUnify.select_op pred tvi env name ue psig in
       let ops =
-        match opsc with
-        | None -> ops
-        | Some opsc ->
+        match ops, opsc with
+        | _ :: _ :: _, Some opsc ->
             List.filter
               (fun ((p, _), _, _) ->
-                  EcPath.isprefix opsc (oget (EcPath.prefix p)))
+                  EcPath.p_equal opsc (oget (EcPath.prefix p)))
               ops
+        | _, _ -> ops
       in
       let me, pvs =
         match EcEnv.Memory.get_active env, actonly with
@@ -390,6 +390,16 @@ let select_form_op env opsc name ue tvi psig =
   and flc = (fun (id, ty, ue) -> (f_local id ty, ue)) in
     gen_select_op ~actonly:true ~pred:true (ppv, pop, flc)
       opsc tvi env name ue psig 
+
+(* -------------------------------------------------------------------- *)
+let lookup_scope env popsc =
+  match unloc popsc with
+  | ([], x) when x = EcCoreLib.id_top -> EcCoreLib.p_top
+  | _ -> begin
+    match EcEnv.Theory.lookup_opt (unloc popsc) env with
+    | None -> tyerror popsc.pl_loc env (UnknownScope (unloc popsc))
+    | Some opsc -> fst opsc
+  end
 
 (* -------------------------------------------------------------------- *)
 type typolicy = {
@@ -563,11 +573,7 @@ let transexp (env : EcEnv.env) (ue : EcUnify.unienv) e =
         end
 
     | PEscope (popsc, e) ->
-        let opsc =
-          match EcEnv.Theory.lookup_opt (unloc popsc) env with
-          | None -> tyerror popsc.pl_loc env (UnknownScope (unloc popsc))
-          | Some opsc -> fst opsc
-        in
+        let opsc = lookup_scope env popsc in
           transexp_r (Some opsc) env e
 
     | PEapp ({pl_desc = PEident({ pl_desc = name; pl_loc = loc }, tvi)}, es) ->
@@ -1532,11 +1538,7 @@ let trans_form_or_pattern env (ps, ue) pf tt =
     end
 
     | PFscope (popsc, f) ->
-        let opsc =
-          match EcEnv.Theory.lookup_opt (unloc popsc) env with
-          | None -> tyerror popsc.pl_loc env (UnknownScope (unloc popsc))
-          | Some opsc -> fst opsc
-        in
+        let opsc = lookup_scope env popsc in
           transf_r (Some opsc) env f
 
     | PFglob gp ->

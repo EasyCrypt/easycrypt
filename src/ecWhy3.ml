@@ -1161,7 +1161,7 @@ let trans_op env p tys =
   | OK_eq    ->
       let ty = trans_ty env (List.hd tys) in
       ([Some ty;Some ty],None), w3_ls_eq, mk_eq
-  | OK_other ->
+  | _ ->
       let ls,ls', tvs =
         try Mp.find p env.env_op
         with _ ->

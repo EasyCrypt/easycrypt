@@ -24,7 +24,7 @@ op length: 'x array -> int.
 axiom length_pos: forall (xs:'x array), 0 <= length xs.
 
 (* And a bunch of elements *)
-op __get: 'x array -> int -> 'x.
+op "_.[_]": 'x array -> int -> 'x.
 
 (* Equality is extensional *)
 pred (==) (xs0:'x array, xs1:'x array) =
@@ -33,6 +33,10 @@ pred (==) (xs0:'x array, xs1:'x array) =
 
 axiom extensionality: forall (xs0:'x array, xs1:'x array),
   xs0 == xs1 => xs0 = xs1.
+
+lemma rw_ext: forall (xs0:'x array, xs1:'x array),
+  xs0 == xs1 <=> xs0 = xs1
+by [].
 
 (*********************************)
 (*      Functional Operators     *)
@@ -49,7 +53,7 @@ intros xs H; apply extensionality; smt.
 save.
 
 (* cons *)
-op (::) : 'x -> 'x array -> 'x array.
+op "_::_" : 'x -> 'x array -> 'x array.
 
 axiom cons_length: forall (x:'x, xs:'x array),
   length (x::xs) = 1 + length xs.
@@ -61,6 +65,31 @@ axiom cons_get: forall (x:'x, xs:'x array, i:int),
 lemma cons_nonempty: forall (x:'x, xs:'x array),
   x::xs <> empty
 by [].
+
+lemma cons_inj: forall (x y:'x, xs ys:'x array),
+  x::xs = y::ys <=> x = y /\ xs = ys.
+intros=> x y xs ys.
+split;last by intros=>[? ?];subst=> //.
+rewrite - !rw_ext.
+delta (==)=> /=.
+intros=> [len val].
+split.
+cut h := val 0.
+generalize h.
+by rewrite ! cons_get;smt.
+split.
+cut -> : forall i j, i = j <=> 1 + i = 1 + j;first smt.
+by rewrite -(cons_length x) -(cons_length y) //.
+intros=> ? ? ?.
+cut h := val (i+1).
+generalize h.
+rewrite ! cons_get;first 4 smt.
+cut -> : ((0 = i + 1) = false);first smt.
+simplify.
+cut -> : i + 1 - 1 = i;first smt.
+intros=> h.
+by apply h;smt.
+qed.
 
 (* snoc *)
 op (:::): 'x array -> 'x -> 'x array.
@@ -215,7 +244,7 @@ save.
 (*********************************)
 (*      Imperative Operators     *)
 (*********************************)
-op __set: 'x array -> int -> 'x -> 'x array.
+op "_.[_<-_]": 'x array -> int -> 'x -> 'x array.
 
 axiom set_length: forall (xs:'x array, i:int, x:'x),
   length (xs.[i <- x]) = length xs.
@@ -252,15 +281,33 @@ axiom write_get: forall (dst src:'x array) (dOff sOff l i:int),
   (dOff + l <= i => i < length dst => (write dst dOff src sOff l).[i] = dst.[i]).
 
 (* init *)
-op init: int -> 'x -> 'x array.
+op init: int -> (int -> 'a) -> 'a array.
 
-axiom init_length: forall (x:'x) l,
+axiom init_length: forall (n:int, f:int -> 'a), 0 <= n =>
+  length (init n f) = n.
+
+axiom init_get: forall (n:int, f:int -> 'a, i:int),
+  0 <= i => i < n =>
+  (init n f).[i] = f i
+
+(* create *).
+op create(n:int, k:'x) : 'x array = init n (lambda x, k).
+
+lemma create_length: forall (x:'x) l,
   0 <= l =>
-  length (init l x) = l.
+  length (create l x) = l.
+intros=> ? ? ?.
+delta create=> /=.
+apply init_length=> //.
+qed.
 
-axiom init_get: forall (x:'x) l i,
+lemma create_get: forall l (x:'x) i,
   0 <= l => 0 <= i => i < l =>
-  (init l x).[i] = x.
+  (create l x).[i] = x.
+intros=> ? ? ? ? ? ?.
+delta create=> /=.
+rewrite (init_get _ (lambda (x0 : int), x))=> //.
+qed.
 
 (*********************************)
 (*       Some Mixed Lemmas       *)

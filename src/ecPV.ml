@@ -393,20 +393,6 @@ let get_abs_functor f =
   | `Local _ -> EcPath.mpath (f.EcPath.m_top) []
   | _ -> assert false
 
-let rec f_write ?(except_fs=Sx.empty) env w f =
-  let f = NormMp.norm_xpath env f in
-  let func = Fun.by_xpath f env in
-  match func.f_def with
-  | FBabs oi ->
-    let mp = get_abs_functor f in
-    List.fold_left (fun w o -> if Sx.mem o except_fs then w else f_write env w o)
-      (PV.add_glob env mp w) oi.oi_calls
-  | FBdef fdef ->
-    let add x w = 
-      let vb = Var.by_xpath x env in
-      PV.add env (pv_glob x) vb.vb_type w in
-    let w = EcPath.Sx.fold add fdef.f_uses.us_writes w in
-    List.fold_left (f_write env) w fdef.f_uses.us_calls
 
 (* computes the program variables occurring free in f with memory m *)
 
@@ -417,7 +403,20 @@ let lp_write env w lp =
   | LvTuple pvs -> List.fold_left add w pvs 
   | LvMap ((_p,_tys),pv,_,ty) -> add w (pv,ty) 
 
-let rec is_write ?(except_fs=Sx.empty) env w s = 
+let rec f_write ?(except_fs=Sx.empty) env w f =
+  let f = NormMp.norm_xpath env f in
+  let func = Fun.by_xpath f env in
+  match func.f_def with
+  | FBabs oi ->
+    let mp = get_abs_functor f in
+    List.fold_left (fun w o -> 
+      if Sx.mem o except_fs then w 
+      else f_write ~except_fs env w o)
+      (PV.add_glob env mp w) oi.oi_calls
+  | FBdef fdef ->
+    s_write ~except_fs env w fdef.f_body
+
+and is_write ?(except_fs=Sx.empty) env w s = 
   List.fold_left (i_write ~except_fs env) w s
 
 and s_write ?(except_fs=Sx.empty) env w s = 
@@ -428,10 +427,11 @@ and i_write ?(except_fs=Sx.empty) env w i =
   | Sasgn (lp,_) -> lp_write env w lp
   | Srnd (lp,_) -> lp_write env w lp
   | Scall(lp,f,_) -> 
-    let w  = match lp with None -> w | Some lp -> lp_write env w lp in    
-    f_write ~except_fs env w f 
-  | Sif (_,s1,s2) -> s_write env (s_write env w s1) s2
-  | Swhile (_,s) -> s_write env w s
+    if Sx.mem f except_fs then w else 
+      let w  = match lp with None -> w | Some lp -> lp_write env w lp in    
+      f_write ~except_fs env w f 
+  | Sif (_,s1,s2) -> s_write ~except_fs env (s_write ~except_fs env w s1) s2
+  | Swhile (_,s) -> s_write ~except_fs env w s
   | Sassert _ -> w 
     
 let rec f_read env r f = 

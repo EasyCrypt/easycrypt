@@ -182,10 +182,10 @@ axiom filter_card: forall (P:'a cpred) X,
   card (filter P X) = card X - card (filter (cpNot P) X). 
 
 axiom filter_cPeq_in: forall (x:'a) X,
-  mem x X => filter (cpEq x) X = singleton x.
+  mem x X => filter ((=) x) X = singleton x.
 
 axiom filter_cPeq_card_in : forall (x:'a) X,
-  mem x X => card (filter (cpEq x) X) = 1.
+  mem x X => card (filter ((=) x) X) = 1.
 
 axiom filter_cPtrue : forall (X:'a set), filter cpTrue X = X.
 
@@ -421,7 +421,13 @@ theory Dexcepted.
     mu_x (d \ X) x = 
     (in_supp x (d \ X)) ? mu_x d x / (weight d - mu d (cPmem X)) : 0%r.
   proof.
-    intros x d X; delta (\); last smt.
+    intros x d X; rewrite /(\).
+    case (weight d - mu d (cPmem X) = 0%r)=> weight.
+      by rewrite /mu_x Dscale.mu_x_def_0 ?Drestr.weight_def //
+                 /in_supp
+                 (_: (0%r < mu_x (Dscale.dscale (Drestr.drestr d X)) x) = false)=> //=;
+         first smt.
+      by smt.
   qed.
 
   lemma mu_weight_def : forall (d:'a distr) X,

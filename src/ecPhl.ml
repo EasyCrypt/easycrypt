@@ -306,29 +306,29 @@ let t_bdHoareS_conseq pre post g =
   let concl3 = f_bdHoareS_r { bhs with bhs_pr = pre; bhs_po = post } in
   prove_goal_by [concl1; concl2; concl3] (RN_hl_conseq) g
 
-let t_bdHoareF_conseq_bd bd g =
+let bd_goal fcmp fbd cmp bd = 
+  match fcmp, cmp with
+  | FHle, (FHle | FHeq) -> f_real_le bd fbd
+  | FHle, FHge -> tacuerror "can not swap comparison"
+  | FHeq, FHeq -> f_eq bd fbd
+  | FHeq, _ -> tacuerror "can only equality is accepted"
+  | FHge, (FHge | FHeq)  -> f_real_le fbd bd
+  | FHge, FHle -> tacuerror "can not swap comparison"
+
+let t_bdHoareF_conseq_bd cmp bd g =
   let env,_,concl = get_goal_e g in
   let bhf = destr_bdHoareF concl in
   let mpr,_ = EcEnv.Fun.hoareF_memenv bhf.bhf_f env in
-  let bd_goal = match bhf.bhf_cmp with
-    | FHle -> f_real_le bd bhf.bhf_bd
-    | FHeq -> f_eq bd bhf.bhf_bd
-    | FHge -> f_real_le bhf.bhf_bd bd
-  in
-  let concl = f_bdHoareF bhf.bhf_pr bhf.bhf_f bhf.bhf_po bhf.bhf_cmp bd in
+  let bd_goal =  bd_goal bhf.bhf_cmp bhf.bhf_bd cmp bd in
+  let concl = f_bdHoareF bhf.bhf_pr bhf.bhf_f bhf.bhf_po cmp bd in
   let bd_goal = gen_mems [mpr] (f_imp bhf.bhf_pr bd_goal) in
   prove_goal_by [bd_goal;concl] (RN_hl_conseq_bd) g  
 
-let t_bdHoareS_conseq_bd bd g =
+let t_bdHoareS_conseq_bd cmp bd g =
   let concl = get_concl g in
   let bhs = destr_bdHoareS concl in
-  (* let mpr,mpo = EcEnv.Fun.hoareF_memenv bhf.bhf_f env in *)
-  let bd_goal = match bhs.bhs_cmp with
-    | FHle -> f_real_le bd bhs.bhs_bd
-    | FHeq -> f_eq bd bhs.bhs_bd
-    | FHge -> f_real_le bhs.bhs_bd bd
-  in
-  let concl = f_bdHoareS bhs.bhs_m bhs.bhs_pr bhs.bhs_s bhs.bhs_po bhs.bhs_cmp bd in
+  let bd_goal =  bd_goal bhs.bhs_cmp bhs.bhs_bd cmp bd in
+  let concl = f_bdHoareS bhs.bhs_m bhs.bhs_pr bhs.bhs_s bhs.bhs_po cmp bd in
   let bd_goal = gen_mems [bhs.bhs_m] (f_imp bhs.bhs_pr bd_goal) in
   prove_goal_by [bd_goal;concl] (RN_hl_conseq_bd) g  
 
@@ -880,10 +880,12 @@ let t_bdHoare_skip g =
   if bhs.bhs_s.s_node <> [] then tacerror NoSkipStmt;
   if (bhs.bhs_cmp <> FHeq && bhs.bhs_cmp <> FHge) then
     cannot_apply "skip" "bound must be \">= 1\"";
-  let eq_to_one = f_eq bhs.bhs_bd f_r1 in
   let concl = f_imp bhs.bhs_pr bhs.bhs_po in
   let concl = gen_mems [bhs.bhs_m] concl in
-  prove_goal_by [eq_to_one;concl] RN_hl_skip g
+  let gs = 
+    if f_equal bhs.bhs_bd f_r1 then [concl] 
+    else [f_eq bhs.bhs_bd f_r1; concl] in
+  prove_goal_by gs RN_hl_skip g
 
 let t_equiv_skip g =
   let concl = get_concl g in
@@ -925,60 +927,48 @@ let t_hoare_app i phi g =
   let b = f_hoareS_r { hs with hs_pr = phi; hs_s = stmt s2 } in
   prove_goal_by [a;b] (RN_hl_append (Backs,Single i,phi,AppNone)) g
 
-let t_bdHoare_app dir i phi bd_info g =
+(* bd_hoare App 
+{P}c1{phi}
+{P}c1{R} ? f1
+{phi /\ R}c2{Q} ? f2
+{P}c1{!R} ? g1
+{phi /\ !R}c2{Q} ? g2
+===============================
+{P}c1;c2{Q} ? f1 * f2 + g1 * g2
+*)
+
+let t_bdHoare_app i (phi, pR,f1,f2,g1,g2) g =
   let concl = get_concl g in
   let bhs = destr_bdHoareS concl in
   let s1,s2 = s_split "app" i bhs.bhs_s in
-  match bd_info, bhs.bhs_cmp with
-    | AppNone, FHle when dir=Backs ->
-      let a = f_hoareS bhs.bhs_m bhs.bhs_pr (stmt s1) phi in
-      let b = f_bdHoareS_r { bhs with bhs_pr = phi; bhs_s = stmt s2} in
-      prove_goal_by [a;b] (RN_hl_append (dir, Single i,phi,bd_info)) g
-    | AppMult (s,f1,f2,g1,g2), FHle ->
-      let goal_s = f_hoareS bhs.bhs_m bhs.bhs_pr (stmt s1) s in
-      let a1 = f_bdHoareS_r { bhs with bhs_po = phi; bhs_s = stmt s1; bhs_bd=f1}  in
-      let b1 = f_bdHoareS_r { bhs with bhs_pr = f_and s phi; bhs_s = stmt s2; bhs_bd=f2} in
-      let a2 = f_bdHoareS_r { bhs with bhs_po = f_not phi; bhs_s = stmt s1; bhs_bd=g1}  in
-      let b2 = f_bdHoareS_r { bhs with bhs_pr = f_and s (f_not phi); bhs_s = stmt s2; bhs_bd=g2} in
-      let bd_g = f_real_le (f_real_add (f_real_prod f1 f2) (f_real_prod g1 g2)) bhs.bhs_bd in
-      let bd_g = gen_mems [bhs.bhs_m] bd_g in
-      prove_goal_by [goal_s;a1;b1;a2;b2;bd_g] (RN_hl_append (dir, Single i,phi,bd_info)) g
-
-    | _, FHle when dir <>Backs -> 
-      cannot_apply "app" 
-        "forward direction not supported with upper bounded Hoare judgments "
-      
-    | AppSingle _ , FHle ->
-      cannot_apply "app" 
-        "single optional bound parameter not supported with upper bounded Hoare judgments"
-
-    | AppSingle bd, FHeq | AppSingle bd, FHge ->
-      let bd1,bd2,cmp1,cmp2 = 
-        if dir=Backs then f_real_div_simpl bhs.bhs_bd bd, bd, bhs.bhs_cmp, bhs.bhs_cmp
-        else bd, f_real_div_simpl bhs.bhs_bd bd, bhs.bhs_cmp, bhs.bhs_cmp
-      in
-      let a = f_bdHoareS_r { bhs with bhs_s = stmt s1; bhs_po = phi; 
-        bhs_bd = bd1; bhs_cmp = cmp1 } in
-      let b = f_bdHoareS_r { bhs with bhs_pr = phi; bhs_s = stmt s2;
-        bhs_bd = bd2; bhs_cmp = cmp2 } in
-      prove_goal_by [a;b] (RN_hl_append (dir, Single i,phi,bd_info)) g
-
-    | AppNone, _ -> 
-      let bd1,bd2,cmp1,cmp2 = 
-        if dir=Backs then f_r1, bhs.bhs_bd, FHeq, bhs.bhs_cmp
-        else bhs.bhs_bd, f_r1, bhs.bhs_cmp, FHeq
-      in
-      let a = f_bdHoareS_r { bhs with bhs_s = stmt s1; bhs_po = phi; 
-        bhs_bd = bd1; bhs_cmp = cmp1 } in
-      let b = f_bdHoareS_r { bhs with bhs_pr = phi; bhs_s = stmt s2;
-        bhs_bd = bd2; bhs_cmp = cmp2 } in
-      prove_goal_by [a;b] (RN_hl_append (dir, Single i,phi,bd_info)) g
-      
-    | AppMult _, _ ->
-      cannot_apply "app" 
-        "multiple bound parameters not supported with lower bounded and exact Hoare judgments"
-
-
+  let s1, s2 = stmt s1, stmt s2 in
+  let nR = f_not pR in
+  let cond_phi = f_hoareS bhs.bhs_m bhs.bhs_pr s1 phi in
+  let condf1 = f_bdHoareS_r { bhs with bhs_s = s1; bhs_po = pR; bhs_bd=f1} in
+  let condg1 = f_bdHoareS_r { bhs with bhs_s = s1; bhs_po = nR; bhs_bd=g1} in
+  let condf2 = f_bdHoareS_r 
+    { bhs with bhs_s = s2; bhs_pr = f_and_simpl phi pR;bhs_bd=f2} in
+  let condg2 = f_bdHoareS_r 
+    { bhs with bhs_s = s2; bhs_pr = f_and_simpl phi nR;bhs_bd=g2} in
+  let bd = (f_real_add (f_real_prod f1 f2) (f_real_prod g1 g2)) in
+  (* TODO : this a conseq_bd rule *)
+  let condbd = 
+    match bhs.bhs_cmp with
+    | FHle -> f_real_le bd bhs.bhs_bd
+    | FHeq -> f_eq bd bhs.bhs_bd
+    | FHge -> f_real_le bhs.bhs_bd bd in
+  let conds = [gen_mems [bhs.bhs_m] condbd] in
+  let conds = 
+    if f_equal g1 f_r0 then condg1 :: conds
+    else if f_equal g2 f_r0 then condg2 :: conds
+    else condg1 :: condg2 :: conds in
+  let conds = 
+    if f_equal f1 f_r0 then condf1 :: conds
+    else if f_equal f2 f_r0 then condf2 :: conds
+    else condf1 :: condf2 :: conds in
+  let conds = cond_phi :: conds in
+  (* TODO The information make no sens here *)
+  prove_goal_by conds (RN_hl_append (Backs,Single i,pR,AppNone)) g
 
 let t_equiv_app (i,j) phi g =
   let concl = get_concl g in
@@ -1932,28 +1922,42 @@ let t_rcond side b at_pos g =
 
 
 (* takes an xpath, returns xpath set *)
-let callable_oracles_f env os f =
-  let f = NormMp.norm_xpath env f in
-  let func = Fun.by_xpath f env in
+let rec callable_oracles_f env modv os f =
+  let f' = NormMp.norm_xpath env f in
+  let func = Fun.by_xpath f' env in
   match func.f_def with
     | FBabs oi ->
-      List.fold_left (fun s o -> EcPath.Sx.add o s) os oi.oi_calls
-  | FBdef fdef ->
-    List.fold_left (fun s o -> EcPath.Sx.add o s) 
-      os fdef.f_uses.us_calls
-
-let rec callable_oracles_s env os s =
-  callable_oracles_is env os s.s_node
-and callable_oracles_is env os is = 
-  List.fold_left (callable_oracles_i env) os is
-and callable_oracles_i env os i = 
+      let called_fs = 
+        List.fold_left (fun s o -> 
+          if PV.indep env modv (f_write env o) then s else EcPath.Sx.add o s)
+          EcPath.Sx.empty oi.oi_calls
+      in
+      List.fold_left (callable_oracles_f env modv)  os (EcPath.Sx.elements called_fs)
+        
+    | FBdef fdef ->
+      let called_fs = 
+        List.fold_left (fun s o -> 
+          if PV.indep env modv (f_write env o) then s else EcPath.Sx.add o s)
+          EcPath.Sx.empty fdef.f_uses.us_calls
+      in
+      let f_written = f_write ~except_fs:called_fs env f in
+      if PV.indep env f_written modv then
+        List.fold_left (callable_oracles_f env modv)  os (EcPath.Sx.elements called_fs)
+      else
+        EcPath.Sx.add f os
+          
+and callable_oracles_s env modv os s =
+  callable_oracles_is env modv os s.s_node
+and callable_oracles_is env modv os is = 
+  List.fold_left (callable_oracles_i env modv) os is
+and callable_oracles_i env modv os i = 
   match i.i_node with
-    | Scall(_,f,_) -> callable_oracles_f env os f
-    | Sif (_,s1,s2) -> callable_oracles_s env (callable_oracles_s env os s1) s2
-    | Swhile (_,s) -> callable_oracles_s env os s
+    | Scall(_,f,_) -> callable_oracles_f env modv os f
+    | Sif (_,s1,s2) -> callable_oracles_s env modv (callable_oracles_s env modv os s1) s2
+    | Swhile (_,s) -> callable_oracles_s env modv os s
     | Sasgn _ | Srnd _ | Sassert _ -> os 
 
-let callable_oracles_stmt env = callable_oracles_s env EcPath.Sx.empty
+let callable_oracles_stmt env (modv:PV.t) = callable_oracles_s env modv EcPath.Sx.empty
 
 let t_failure_event at_pos cntr ash q f_event pred_specs g =
   let env,_,concl = get_goal_e g in
@@ -1971,11 +1975,14 @@ let t_failure_event at_pos cntr ash q f_event pred_specs g =
           cannot_apply "fel" "not applicable to abstract functions"
       in
       let s_hd,s_tl = s_split "fel" at_pos fdef.f_body in
-      let os = callable_oracles_stmt env (stmt s_tl) in
+      let fv = PV.fv env mhr f_event in
+      let os = callable_oracles_stmt env fv (stmt s_tl) in
       (* check that bad event is only modified in oracles *)
-      (* let fv = PV.fv env mhr f_event in *)
-      (* if not (PV.indep env (s_write ~except_fs:os env (stmt s_tl)) (fv) ) then *)
-      (*   cannot_apply "fel" "fail event is modified outside oracles"; *)
+      let fv = PV.fv env mhr f_event in
+      let written_except_os = s_write ~except_fs:os env (stmt s_tl) in
+      if not (PV.indep env written_except_os fv ) then
+        tacuerror "fail event is modified outside oracles, ie: @. @[%a@] is not disjoint to @[%a@]@." 
+          (PV.pp env) written_except_os (PV.pp env) fv;
       (* subgoal on the bounds *)
       let bound_goal = 
         let intval = f_int_intval (f_int 0) (f_int_sub q (f_int 1)) in
@@ -1998,7 +2005,7 @@ let t_failure_event at_pos cntr ash q f_event pred_specs g =
       let oracle_goal o = 
         let not_F_to_F_goal = 
           let bound = f_app_simpl ash [cntr] treal in
-          let pre = f_not f_event in
+          let pre = f_and (f_int_le (f_int 0) cntr) (f_not f_event) in
           let post = f_event in
           f_bdHoareF pre o post FHle bound
         in
@@ -2015,7 +2022,7 @@ let t_failure_event at_pos cntr ash q f_event pred_specs g =
         in
         let cntr_decr_goal = 
           let pre  = f_and some_p (f_eq old_cntr cntr) in
-          let post = f_int_lt old_cntr cntr in
+          let post = f_and (f_int_lt old_cntr cntr) (f_int_le cntr q) in
           f_forall_simpl [old_cntr_id,GTty tint] 
             (f_hoareF pre o post)
         in
@@ -2247,7 +2254,7 @@ let wp_equiv_rnd (f,finv) g =
   let post = (f_in_supp x muL) ==> ((f_in_supp y muR) ==> post) in
   let post = f_forall_simpl [(x_id,GTty tyL);(y_id,GTty tyR)] post in
   let concl = f_equivS_r {es with es_sl=sl'; es_sr=sr'; es_po=post} in
-  prove_goal_by [concl] (RN_hl_equiv_rnd ((Some tf, Some tfinv))) g
+  prove_goal_by [concl] (RN_hl_equiv_rnd (PTwoRndParams (tf, tfinv))) g
 
 let t_equiv_rnd side bij_info =
   match side with
@@ -2267,68 +2274,76 @@ let t_equiv_rnd side bij_info =
         bij, bij
     in wp_equiv_rnd (f, finv) 
 
-let t_bd_hoare_rnd (opt_bd,opt_event) g =
+let t_bd_hoare_rnd (tac_info:(form,ty-> form) EcParsetree.rnd_tac_info) g = 
   let env,_,concl = get_goal_e g in
   let bhs = destr_bdHoareS concl in
   let (lv,distr),s = s_last_rnd "bd_hoare_rnd" bhs.bhs_s in
   let ty_distr = proj_distr_ty (e_ty distr) in
   let distr = EcFol.form_of_expr (EcMemory.memory bhs.bhs_m) distr in
-  let event = match opt_event ty_distr with 
-    | Some event -> event 
-    | None -> cannot_apply "rnd" "Optional events still not supported"
+
+  let mk_event_cond event = 
+    let v_id = EcIdent.create "v" in
+    let v = f_local v_id ty_distr in
+    let post_v = subst_form_lv env (EcMemory.memory bhs.bhs_m) lv v bhs.bhs_po in
+    let event_v = f_app event [v] tbool in
+    let v_in_supp = f_in_supp v distr in
+    f_forall_simpl [v_id,GTty ty_distr] 
+      begin
+        match bhs.bhs_cmp with 
+          | FHle -> f_imps_simpl [v_in_supp;post_v] event_v
+          | FHge -> f_imps_simpl [v_in_supp;event_v] post_v
+          | FHeq -> f_imp_simpl v_in_supp (f_iff_simpl event_v post_v)
+      end 
   in
 
-  let v_id = EcIdent.create "v" in
-  let v = f_local v_id ty_distr in
-  let post_v = subst_form_lv env (EcMemory.memory bhs.bhs_m) lv v bhs.bhs_po in
-  let event_v = f_app event [v] tbool in
-  let v_in_supp = f_in_supp v distr in
-
-  let concl = 
-    match bhs.bhs_cmp, opt_bd with
-      | FHle, Some bd' when not (EcFol.f_equal bhs.bhs_bd bd') ->
-        cannot_apply "bd_hoare_rnd"
-          "Rule for upper-bounded hoare triples requires a total bound"
-      | FHle, _ ->
-        let bounded_distr = f_real_le (f_mu distr event) bhs.bhs_bd in
-        let post_equiv_event = f_forall_simpl [v_id,GTty ty_distr] 
-          (f_imps_simpl [v_in_supp;post_v] event_v) in
-        let post = bounded_distr &&& post_equiv_event in
-        f_hoareS bhs.bhs_m bhs.bhs_pr s post 
-
-      | FHge, Some bd' when not (EcFol.f_equal bhs.bhs_bd bd') -> 
-        let new_hoare_bd, bounded_distr =
-          EcFol.f_real_div_simpl bhs.bhs_bd bd', f_real_le bd' (f_mu distr event)
-        in
-        let post_equiv_event = f_forall_simpl [v_id,GTty ty_distr] 
-          (f_imps_simpl [v_in_supp;event_v] post_v) in
-        let post = bounded_distr &&& post_equiv_event in
-        f_bdHoareS_r {bhs with bhs_s=s; bhs_po=post; bhs_bd=new_hoare_bd}
-
-      | FHge, _ -> 
-        let bounded_distr = f_real_le bhs.bhs_bd (f_mu distr event) in
-        let post_equiv_event = f_forall_simpl [v_id,GTty ty_distr] 
-          (f_imps_simpl [v_in_supp;event_v] post_v) in
-        let post = bounded_distr &&& post_equiv_event in
-        f_bdHoareS_r {bhs with bhs_s=s; bhs_po=post; bhs_cmp=FHeq; bhs_bd=EcFol.f_r1} 
-
-      | FHeq, Some bd' when not (EcFol.f_equal bhs.bhs_bd bd') -> 
-        let new_hoare_bd, bounded_distr =
-          EcFol.f_real_div_simpl bhs.bhs_bd bd', f_eq (f_mu distr event) bd'
-        in
-        let post_equiv_event = f_forall_simpl [v_id,GTty ty_distr] 
-          (f_imp_simpl v_in_supp (f_iff_simpl event_v post_v)) in
-        let post = bounded_distr &&& post_equiv_event in
-        f_bdHoareS_r {bhs with bhs_s=s; bhs_po=post; bhs_bd=new_hoare_bd} 
-
-      | FHeq, _ -> 
-        let bounded_distr = f_eq (f_mu distr event) bhs.bhs_bd in
-        let post_equiv_event = f_forall_simpl [v_id,GTty ty_distr] 
-          (f_imp_simpl v_in_supp (f_iff_simpl event_v post_v)) in
-        let post = bounded_distr &&& post_equiv_event in
-        f_bdHoareS_r {bhs with bhs_s=s; bhs_po=post; bhs_bd=EcFol.f_r1} 
+  let f_cmp = match bhs.bhs_cmp with
+    | FHle -> f_real_le
+    | FHge -> fun x y -> f_real_le y x
+    | FHeq -> f_eq
   in
-  prove_goal_by [concl] (RN_bhl_rnd (opt_bd,event) ) g
+
+  let check_indep () = 
+    let fv_bd = PV.fv env mhr bhs.bhs_bd in 
+    let modif_s = s_write env s in
+    if not (PV.indep env modif_s fv_bd) then
+      tacuerror "Cannot apply if the bound is modified by remaining statement.@. Use the generalised rnd tactic variant instead."
+  in
+
+  let subgoals = match tac_info, bhs.bhs_cmp with 
+    | PSingleRndParam event, FHle ->
+      let event = event ty_distr in
+      check_indep();
+      let bounded_distr = f_real_le (f_mu distr event) bhs.bhs_bd in
+      let post = bounded_distr &&& (mk_event_cond event) in
+      let concl = f_hoareS bhs.bhs_m bhs.bhs_pr s post in
+      [concl]
+    | PSingleRndParam event, _ ->
+      let event = event ty_distr in
+      check_indep();
+      let bounded_distr = f_cmp (f_mu distr event) bhs.bhs_bd in
+      let post = bounded_distr &&& (mk_event_cond event) in
+      let concl = f_bdHoareS_r {bhs with bhs_s=s; bhs_po=post; bhs_cmp=FHeq; bhs_bd=f_r1} in
+      [concl]
+    | PMultRndParams ((phi,d1,d2,d3,d4),event), _ -> 
+      let event = event ty_distr in
+      let bd_sgoal = f_cmp (f_real_add (f_real_prod d1 d2) (f_real_prod d3 d4)) bhs.bhs_bd in 
+      let sgoal1 = f_bdHoareS_r {bhs with bhs_s=s; bhs_po=phi; bhs_bd=d1} in
+      let sgoal2 = 
+        let bounded_distr = f_cmp (f_mu distr event) d2 in
+        let post = bounded_distr &&& (mk_event_cond event) in
+        gen_mems [bhs.bhs_m] (f_imp phi post)
+      in
+      let sgoal3 = f_bdHoareS_r {bhs with bhs_s=s; bhs_po=f_not phi; bhs_bd=d3} in
+      let sgoal4 = 
+        let bounded_distr = f_cmp (f_mu distr event) d4 in
+        let post = bounded_distr &&& (mk_event_cond event) in
+        gen_mems [bhs.bhs_m] (f_imp (f_not phi) post)
+      in
+      [bd_sgoal;sgoal1;sgoal2;sgoal3;sgoal4]
+    | _, _ -> tacuerror "wrong tactic arguments"
+  in
+  prove_goal_by subgoals (RN_bhl_rnd tac_info ) g
+
 
 
 
@@ -2397,17 +2412,27 @@ let t_hoare_bd_hoare g =
   else 
     cannot_apply "hoare/bd_hoare" "a hoare or bd_hoare judgment was expected" 
 
-let t_prbounded g = 
+let t_pr_bounded conseq g = 
   let concl = get_concl g in
-  let bhs = destr_bdHoareS concl in 
-  let cond = match bhs.bhs_cmp with
-    | FHle -> f_real_le f_r1 bhs.bhs_bd
-    | FHge -> f_real_le bhs.bhs_bd f_r0
-    | FHeq ->
-      cannot_apply "pr_bounded" "cannot solve the probabilistic judgement" 
-  in
-  prove_goal_by [cond] RN_hl_prbounded g
+  let po, cmp, bd = 
+    match concl.f_node with
+    | FbdHoareF hf -> hf.bhf_po, hf.bhf_cmp, hf.bhf_bd 
+    | FbdHoareS hf -> hf.bhs_po, hf.bhs_cmp, hf.bhs_bd
+    | _ -> tacuerror "bd_hoare excepted" in
+  let cond = 
+    match cmp with
+    | FHle when f_equal bd f_r1 -> []
+    | FHge when f_equal bd f_r0 -> []
+    | _ when f_equal po f_false && f_equal bd f_r0 -> []
+    (* TODO use the conseq rule instead *)
+    | FHle when conseq -> [f_real_le f_r1 bd]
+    | FHge when conseq -> [f_real_le bd f_r0]
+    | _ -> cannot_apply "pr_bounded" "cannot solve the probabilistic judgement" in
+  prove_goal_by cond RN_hl_prbounded g
 
+let t_prbounded = t_pr_bounded true
+
+(* TODO : Remove this : can be done by rewrite_pr *)
 let t_prfalse g = 
   let env,_, concl = get_goal_e g in
   let f,ev,bd =
@@ -2704,8 +2729,28 @@ let rec eqobs_inF env eqg (inv,ifvl,ifvr as inve) log fl fr eqO =
       end
     | _, _ -> raise EqObsInError 
  
+let t_hoare_true g = 
+  let concl = get_concl g in
+  match concl.f_node with
+  | FhoareF hf when f_equal hf.hf_po f_true ->
+    prove_goal_by [] RN_hoare_true g   
+  | FhoareS hs when f_equal hs.hs_po f_true ->
+    prove_goal_by [] RN_hoare_true g    
+  | _ -> tacuerror "the conclusion should have the form hoare[_ : _ ==> true]"
 
-
+  
+let t_trivial = 
+  let t1 = 
+    t_lor [t_hoare_true;
+           t_hr_exfalso;   
+           t_pr_bounded false;
+           t_skip] in
+  t_or
+    (t_lseq [t_try t_assumption; t_progress (t_id None); t_try t_assumption; 
+             t1; t_trivial; t_fail])
+    (t_id None)
+  
+ 
 
 
   

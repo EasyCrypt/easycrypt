@@ -1,6 +1,9 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
 
+module P = EcParser
+module L = Lexing
+
 (* -------------------------------------------------------------------- *)
 let lexbuf_from_channel = fun name channel ->
   let lexbuf = Lexing.from_channel channel in
@@ -17,7 +20,7 @@ let parserfun = fun () ->
     MenhirLib.Convert.Simplified.traditional2revised EcParser.prog
 
 type parser_t =
-  (EcParser.token * Lexing.position * Lexing.position, EcParsetree.prog)
+  (P.token * L.position * L.position, EcParsetree.prog EcLocation.located)
     MenhirLib.Convert.revised
 
 (* -------------------------------------------------------------------- *)
@@ -97,7 +100,7 @@ let parse (ecreader : ecreader) =
 (* -------------------------------------------------------------------- *)
 let parseall (ecreader : ecreader) =
   let rec aux acc =
-    match parse ecreader with
+    match EcLocation.unloc (parse ecreader) with
     | EcParsetree.P_Prog (commands, terminate) ->
         let acc = List.rev_append commands acc in
           if terminate then List.rev acc else aux acc

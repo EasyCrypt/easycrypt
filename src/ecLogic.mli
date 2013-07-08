@@ -81,6 +81,7 @@ val t_repeat : tactic -> tactic
 val t_do     : [`All | `Maybe] -> int option -> tactic -> tactic
 val t_try    : tactic -> tactic
 val t_or     : tactic -> tactic -> tactic
+val t_lor     : tactic list -> tactic
 
 val t_close : tactic -> tactic
 

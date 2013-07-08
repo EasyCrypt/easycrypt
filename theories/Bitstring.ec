@@ -18,7 +18,7 @@ axiom to_array_length: forall bs,
 
 axiom to_array_get: forall bs i,
   0 <= i => i < length bs =>
-  Array.__get (to_array bs) i = bs.[i].
+  Array."_.[_]" (to_array bs) i = bs.[i].
 
 op from_array: bool Array.array -> bitstring.
 
@@ -27,7 +27,7 @@ axiom from_array_length: forall bs,
 
 axiom from_array_get: forall bs i,
   0 <= i => i < Array.length bs =>
-  (from_array bs).[i] = Array.__get bs i.
+  (from_array bs).[i] = Array."_.[_]" bs i.
 
 lemma to_array_from_array: forall bs,
   from_array (to_array bs) = bs.

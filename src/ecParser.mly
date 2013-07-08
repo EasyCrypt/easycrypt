@@ -171,11 +171,11 @@
 %token COMPUTE
 %token CONGR
 %token CONSEQ
-%token CONSEQBD
 %token EXFALSO
 %token CONST
 %token CUT
 %token DATATYPE
+%token DCOLON
 %token DEBUG
 %token DECLARE
 %token DELTA
@@ -330,7 +330,7 @@
 %left OP2 MINUS ADD
 %right ARROW
 %left OP3 STAR SLASH
-%left OP4 
+%left OP4 DCOLON
 
 %nonassoc LBRACE
 
@@ -339,7 +339,7 @@
 %nonassoc prec_tactic
 
 %type <EcParsetree.global EcLocation.located> global
-%type <EcParsetree.prog> prog
+%type <EcParsetree.prog   EcLocation.located> prog
 
 %start prog global
 %%
@@ -366,29 +366,19 @@
 | nm=rlist1(UIDENT, DOT) { nm }
 ;
 
-qident:
-| x=ident { pqsymb_of_psymb x }
-
-| xs=namespace DOT x=_ident {
-    { pl_desc = (xs, x);
-      pl_loc  = EcLocation.make $startpos(xs) $endpos(xs);
-    }
-  }
+_genqident(X):
+| x=X { ([], x) }
+| xs=namespace DOT x=X { (xs, x) }
 ;
+
+genqident(X):
+| x=loc(_genqident(X)) { x }
+;
+
 
 (* -------------------------------------------------------------------- *)
-uqident:
-| x=UIDENT {
-    { pl_desc = ([], x);
-      pl_loc  = EcLocation.make $startpos $endpos; }
-  }
-
-| xs=namespace DOT x=UIDENT {
-    { pl_desc = (xs, x);
-      pl_loc  = EcLocation.make $startpos $endpos;
-    }
-  }
-;
+%inline  qident: x=genqident(_ident) { x };
+%inline uqident: x=genqident(UIDENT) { x };
 
 (* -------------------------------------------------------------------- *)
 %inline _oident:
@@ -396,6 +386,14 @@ uqident:
 | x=UIDENT { x }
 | x=PUNIOP { x }
 | x=PBINOP { x }
+
+| paren(DCOLON) { EcCoreLib.s_cons }
+
+| x=loc(STRING) {
+    if not (EcCoreLib.is_mixfix_op (unloc x)) then
+      error x.pl_loc (Some "invalid mixfix operator");
+    unloc x
+  }
 ;
 
 %inline oident:
@@ -488,8 +486,13 @@ tyvar_annot:
 %inline  expr: x=loc( expr_u) { x };
 
 sexpr_u:
-| e=sexpr PCENT p=qident
+| e=sexpr PCENT p=uqident
    { PEscope (p, e) }
+
+| e=sexpr PCENT p=lident
+   { if unloc p <> "top" then
+       error p.pl_loc (Some "invalid scope name");
+     PEscope (pqsymb_of_symb p.pl_loc "<top>", e) }
 
 | n=number
    { PEint n }
@@ -567,6 +570,9 @@ expr_u:
 
 | e1=expr op=loc(OP4) ti=tvars_app? e2=expr 
     { peapp_symb op.pl_loc op.pl_desc ti [e1; e2] }
+
+| e1=expr op=loc(DCOLON) ti=tvars_app? e2=expr 
+    { peapp_symb op.pl_loc EcCoreLib.s_cons ti [e1; e2] }
 
 | e1=expr op=loc(IMPL) ti=tvars_app? e2=expr
     { peapp_symb op.pl_loc "=>" ti [e1; e2] }
@@ -766,6 +772,9 @@ form_u(P):
 
 | e1=form_r(P) op=loc(OP4) ti=tvars_app? e2=form_r(P)  
     { pfapp_symb op.pl_loc op.pl_desc ti [e1; e2] }
+
+| e1=form_r(P) op=loc(DCOLON) ti=tvars_app? e2=form_r(P)
+    { pfapp_symb op.pl_loc EcCoreLib.s_cons ti [e1; e2] }
 
 | e1=form_r(P) op=loc(IMPL) ti=tvars_app? e2=form_r(P)  
     { pfapp_symb op.pl_loc "=>" ti [e1; e2] }
@@ -1556,9 +1565,9 @@ conseq:
 ;
 
 conseq_bd:
-| c=conseq                 { c, None }
-| c=conseq COLON bd=form   { c, Some bd } 
-| UNDERSCORE COLON bd=form { (None, None), Some bd }
+| c=conseq                                   { c, None }
+| c=conseq   COLON cmp=hoare_bd_cmp? bd=sform { c, Some (cmp, bd) } 
+| UNDERSCORE COLON cmp=hoare_bd_cmp? bd=sform { (None, None), Some(cmp, bd) }
 
 call_info: 
  | f1=form LONGARROW f2=form             { CI_spec (f1, f2) }
@@ -1591,15 +1600,12 @@ while_tac_info :
     { (inv, Some vrnt, Some (bd, n_iter)) }
 
 rnd_info:
-| e1=sform e2=sform 
-    { Some e1, Some e2 }
-| e=sform UNDERSCORE 
-    { Some e, None }
-| UNDERSCORE e=sform 
-    { None, Some e }
-| empty
-    {None, None }
-;
+| empty {PNoRndParams (* None,None *) }
+| f=sform {PSingleRndParam f}
+| f=sform g=sform {PTwoRndParams (f,g) }
+| phi=sform d1=sform d2=sform d3=sform d4=sform p=sform 
+  {PMultRndParams ((phi,d1,d2,d3,d4),p) }
+
 
 swap_info:
 | s=side? p=swap_pos { s,p }
@@ -1645,10 +1651,19 @@ occurences:
   }
 ;
 
+
+%inline prod_form:
+  | f1=sform f2=sform      { Some f1, Some f2 }
+  | UNDERSCORE f2=sform { None   , Some f2 }
+  | f1=sform UNDERSCORE { Some f1, None    }
+;
+
 app_bd_info:
-  | empty { PAppNone }
-  | f=sform { PAppSingle f }
-  | s=sform f1=sform f2=sform g1=sform g2=sform { PAppMult (s,f1,f2,g1,g2) }
+  | empty    { PAppNone }
+  | f=sform  { PAppSingle f }
+  | f=prod_form g=prod_form s=sform?
+             { PAppMult (s,fst f,snd f,fst g, snd g) }
+;
 
 logtactic:
 | ASSUMPTION
@@ -1824,9 +1839,6 @@ phltactic:
 | CONSEQ nm=STAR? info=fpattern(conseq_bd)
     { Pconseq (nm<>None, info) }
 
-| CONSEQBD bd=sform
-    { Pconseq_bd bd }
-
 | ELIM STAR
     { Phr_exists_elim }
 
@@ -1849,6 +1861,7 @@ phltactic:
 | BDHOARE {Pbdhoare}
 | PRBOUNDED {Pprbounded}
 | REWRITE PR s=LIDENT {Ppr_rewrite s}
+(* TODO : remove this tactic *)
 | PRFALSE {Pprfalse}
 | BDEQ {Pbdeq}
 ;
@@ -1973,25 +1986,48 @@ tactics_or_prf:
 (* Theory cloning                                                       *)
 
 theory_clone:
-| CLONE ip=import_flag? x=uqident cw=clone_with?
+| CLONE ip=import_flag? x=uqident cw=clone_with? cp=clone_proof?
    { let oth =
        { pthc_base = x;
          pthc_name = None;
-         pthc_ext  = EcUtils.odfl [] cw; }
+         pthc_ext  = EcUtils.odfl [] cw;
+         pthc_prf  = EcUtils.odfl [] cp; }
      in
        (oth, ip) }
 
-| CLONE ip=import_flag? x=uqident AS y=uident cw=clone_with?
+| CLONE ip=import_flag? x=uqident AS y=uident cw=clone_with? cp=clone_proof?
    { let oth =
        { pthc_base = x;
          pthc_name = Some y;
-         pthc_ext  = EcUtils.odfl [] cw; }
+         pthc_ext  = EcUtils.odfl [] cw;
+         pthc_prf  = EcUtils.odfl [] cp; }
      in
        (oth, ip) }
 ;
 
 clone_with:
 | WITH x=plist1(clone_override, COMMA) { x }
+;
+
+clone_lemma_base:
+| STAR     { `All }
+| x=_ident { `Named x }
+; 
+
+clone_lemma_1:
+| l=genqident(clone_lemma_base) {
+    match unloc l with
+    | (xs, `Named x) -> `Named (mk_loc l.pl_loc (xs, x))
+    | (xs, `All    ) -> begin
+      match List.rev xs with
+      | []      -> `All None
+      | x :: xs -> `All (Some (mk_loc l.pl_loc (List.rev xs, x)))
+    end
+  }
+;
+
+clone_proof:
+| PROOF x=plist1(clone_lemma_1, COMMA) { x }
 ;
 
 clone_override:
@@ -2124,7 +2160,7 @@ global:
 | g=loc(global_) FINAL { g }
 ;
 
-prog:
+prog_r:
 | g=global { P_Prog ([g], false) }
 | stop     { P_Prog ([ ], true ) }
 
@@ -2133,6 +2169,10 @@ prog:
 
 | error
    { error (EcLocation.make $startpos $endpos) None }
+;
+
+prog:
+| x=loc(prog_r) { x }
 ;
 
 (* -------------------------------------------------------------------- *)

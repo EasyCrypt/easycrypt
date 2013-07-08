@@ -198,7 +198,7 @@ lemma filter_cpTrue: forall (X:'a set),
 by (intros=> X; apply set_ext; smt).
 
 lemma filter_cpEq_in: forall (x:'a) X,
-  mem x X => filter (cpEq x) X = single x
+  mem x X => filter ((=) x) X = single x
 by (intros=> x X x_in_X; apply set_ext; smt).
 
 lemma leq_filter: forall (p:'a cpred) X,

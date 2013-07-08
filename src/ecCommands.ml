@@ -169,7 +169,9 @@ and process_th_open (scope : EcScope.scope) name =
 and process_th_close (scope : EcScope.scope) name =
   EcScope.check_state `InTop "theory closing" scope;
   if (EcScope.name scope) <> name then
-    failwith "invalid theory name";     (* FIXME *)
+    EcScope.hierror
+      "active theory has name `%s', not `%s'"
+      (EcScope.name scope) name;
   snd (EcScope.Theory.exit scope)
 
 (* -------------------------------------------------------------------- *)
@@ -250,7 +252,7 @@ and process_tactics (scope : EcScope.scope) t =
 and process_save (scope : EcScope.scope) loc =
   let (name, scope) = EcScope.Ax.save scope loc in
     EcUtils.oiter name
-      (fun x -> notify scope "added axiom: `%s'" x);
+      (fun x -> notify scope "added lemma: `%s'" x);
     scope
 
 (* -------------------------------------------------------------------- *)

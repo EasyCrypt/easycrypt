@@ -4,8 +4,8 @@ require import Fun.
 
 (*** Type Definition is imported from Why3 *)
 import why3 "list" "List"
-   op "Nil" as "__nil";
-   op "Cons" as "::".
+   op "Nil" as "[]";
+   op "Cons" as "_::_".
 
 (*** Recursion and Induction Principles *)
 (** Recursion principle *)
@@ -89,7 +89,7 @@ lemma nil_nmem: forall (xs:'a list), xs = [] <=> (forall x, !mem x xs) by [].
 
 (*** length *)
 op length:'a list -> int.
-op __abs:'a list -> int  = length. (* notation *)
+op "`|_|":'a list -> int  = length. (* notation *)
 axiom length_nil: length<:'a> [] = 0.
 axiom length_cons: forall (x:'a) xs, length (x::xs) = 1 + length xs.
 

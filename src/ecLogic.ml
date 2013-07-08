@@ -206,6 +206,11 @@ let t_or t1 t2 g =
   | `Failure _ -> t2 g
   | `Success g -> g
 
+let rec t_lor lt g = 
+  match lt with
+  | [] -> t_fail g 
+  | t1::lt -> t_or t1 (t_lor lt) g
+
 let t_do b omax t g =
   let max = max (odfl max_int omax) 0 in
 
@@ -1248,5 +1253,5 @@ let t_congr f (args, ty) g =
 (* -------------------------------------------------------------------- *)
 let t_trivial =
   t_or
-    (t_lseq [t_progress (t_id None); t_assumption; t_fail])
+    (t_lseq [t_try t_assumption; t_progress (t_id None); t_assumption; t_fail])
     (t_id None)

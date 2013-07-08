@@ -8,7 +8,7 @@ type status = [
 
 (* -------------------------------------------------------------------- *)
 val interactive : terminal -> bool
-val next        : terminal -> EcParsetree.prog
+val next        : terminal -> EcParsetree.prog EcLocation.located
 val notice      : immediate:bool -> string -> terminal -> unit
 val finish      : status -> terminal -> unit
 val finalize    : terminal -> unit

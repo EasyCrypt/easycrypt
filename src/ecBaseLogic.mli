@@ -39,7 +39,6 @@ type i_pat =
 (* the first pair value represents the number of instructions to skip *)
 and s_pat = (int * i_pat) list        
 
-type rnd_tac_info = form EcParsetree.rnd_tac_info
 type prover_info  = unit
 
 type rule_name = 
@@ -82,7 +81,7 @@ type rule_name =
   | RN_hl_kill      of bool option * codepos * int option
   | RN_hl_alias     of bool option * codepos
   | RN_hl_hoare_rnd
-  | RN_hl_equiv_rnd of rnd_tac_info
+  | RN_hl_equiv_rnd of (form,form) EcParsetree.rnd_tac_info
   | RN_hl_conseq 
   | RN_hl_conseq_bd
   | RN_hl_exfalso 
@@ -95,10 +94,12 @@ type rule_name =
   | RN_hl_bdeq      
   | RN_hl_fel       of (form * form * form * form * (EcPath.xpath*form) list)
 
-  | RN_bhl_rnd of (EcFol.form option * EcFol.form)
+  | RN_bhl_rnd of (form,ty-> form) EcParsetree.rnd_tac_info
+
   | RN_eqobs_in 
   | RN_notmod
   | RN_hl_exists_elim 
+  | RN_hoare_true
 
 type 'a rule_arg = 
   | RA_form of EcFol.form             (* formula             *)

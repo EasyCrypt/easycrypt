@@ -5,6 +5,7 @@ README
 # ocamlbuild configuration
 config/_tags
 config/myocamlbuild.ml
+config/tests.config
 
 # documentation
 doc/Makefile
@@ -30,6 +31,7 @@ src/*.mll
 # EasyCrypt theories
 theories/*.ec
 theories/prelude/*.ec
+theories/realizations/*.ec
 
 # EasyCrypt examples
 examples/*.ec

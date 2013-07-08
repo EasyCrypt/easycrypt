@@ -118,7 +118,7 @@ theory Dinter.
     in_supp x (dinter i j) <=> i <= x <= j.
 
   (* We could use sums to generalize this:
-  axiom mu_x_def : forall (i j:int) (p:int cPred),
+  axiom mu_def : forall (i j:int) (p:int cPred),
     mu (dinter i j) p = (sum i j p)%r / (j - i + 1)%r.
   *)
 

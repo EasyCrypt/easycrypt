@@ -12,6 +12,8 @@ type ovkind =
 | OVK_Type
 | OVK_Operator
 | OVK_Predicate
+| OVK_Theory
+| OVK_Lemma
 
 type clone_error =
 | CE_DupOverride    of ovkind * qsymbol
@@ -31,6 +33,11 @@ let string_of_ovkind = function
   | OVK_Type      -> "type"
   | OVK_Operator  -> "operator"
   | OVK_Predicate -> "predicate"
+  | OVK_Theory    -> "theory"
+  | OVK_Lemma     -> "lemma/axiom"
+
+(* -------------------------------------------------------------------- *)
+type axclone = (symbol * EcDecl.axiom) * EcEnv.env
 
 (* -------------------------------------------------------------------- *)
 let pp_clone_error fmt _env error =
@@ -71,17 +78,19 @@ let () =
 
 (* ------------------------------------------------------------------ *)
 type evclone = {
-  evc_types : (ty_override located) Msym.t;
-  evc_ops   : (op_override located) Msym.t;
-  evc_preds : (pr_override located) Msym.t;
-  evc_ths   : evclone Msym.t;
+  evc_types  : (ty_override located) Msym.t;
+  evc_ops    : (op_override located) Msym.t;
+  evc_preds  : (pr_override located) Msym.t;
+  evc_lemmas : [`All | `Named of Ssym.t];
+  evc_ths    : evclone Msym.t;
 }
 
 let evc_empty = {
-  evc_types = Msym.empty;
-  evc_ops   = Msym.empty;
-  evc_preds = Msym.empty;
-  evc_ths   = Msym.empty;
+  evc_types  = Msym.empty;
+  evc_ops    = Msym.empty;
+  evc_preds  = Msym.empty;
+  evc_lemmas = `Named Ssym.empty;
+  evc_ths    = Msym.empty;
 }
 
 let rec evc_update (upt : evclone -> evclone) (nm : symbol list) (evc : evclone) =
@@ -182,15 +191,53 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
       List.fold_left do1 evc_empty thcl.pthc_ext
   in
 
-  let nth =
-    let rec ovr1 prefix ovrds (subst, scenv) item =
+  let ovrds =
+    let do1 evc prf =
+      let xpath name = EcPath.pappend opath (EcPath.fromqsymbol name) in
+
+      match prf with
+      | `All None -> { evc with evc_lemmas = `All }
+
+      | `All (Some name) -> begin
+          match EcEnv.Theory.by_path_opt (xpath (unloc name)) scenv with
+          | None -> clone_error scenv (CE_UnkOverride (OVK_Theory, unloc name))
+          | Some _ ->
+            let (nm, name) = unloc name in
+              evc_update
+                (fun evc -> { evc with evc_lemmas = `All })
+                (nm @ [name]) evc
+      end
+
+      | `Named name -> begin
+          match EcEnv.Ax.by_path_opt (xpath (unloc name)) scenv with
+          | None -> clone_error scenv (CE_UnkOverride (OVK_Lemma, unloc name))
+          | Some ax ->
+              if ax.ax_kind <> `Axiom || ax.ax_spec = None then
+                clone_error scenv (CE_CrtOverride (OVK_Lemma, unloc name));
+              let (nm, name) = unloc name in
+                evc_update
+                  (fun evc ->
+                    let lms =
+                      match evc.evc_lemmas with
+                      | `All -> `All
+                      | `Named axs -> `Named (Ssym.add name axs)
+                    in { evc with evc_lemmas = lms })
+                  nm evc
+      end
+    in
+      List.fold_left do1 ovrds thcl.pthc_prf
+  in
+
+  let (proofs, nth) =
+    let rec ovr1 prefix ovrds (subst, proofs, scenv) item =
       let xpath x = EcPath.pappend opath (EcPath.fromqsymbol (prefix, x)) in
 
       match item with
       | CTh_type (x, otyd) -> begin
           match Msym.find_opt x ovrds.evc_types with
           | None ->
-              (subst, EcEnv.Ty.bind x (EcSubst.subst_tydecl subst otyd) scenv)
+              let otyd = EcSubst.subst_tydecl subst otyd in
+                (subst, proofs, EcEnv.Ty.bind x otyd scenv)
 
           | Some { pl_desc = (nargs, ntyd, mode) } -> begin
             (* Already checked:
@@ -206,20 +253,20 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
                     { tyd_params = nargs;
                       tyd_type   = Some ntyd; }
                   in
-                    (subst, EcEnv.Ty.bind x binding scenv)
+                    (subst, proofs, EcEnv.Ty.bind x binding scenv)
 
               | `Inline ->
                   let subst = 
                     EcSubst.add_tydef subst (xpath x) (nargs, ntyd)
                   in
-                    (subst, scenv)
+                    (subst, proofs, scenv)
           end
       end
 
       | CTh_operator (x, ({ op_kind = OB_oper None } as oopd)) -> begin
           match Msym.find_opt x ovrds.evc_ops with
           | None ->
-              (subst, EcEnv.Op.bind x (EcSubst.subst_op subst oopd) scenv)
+              (subst, proofs, EcEnv.Op.bind x (EcSubst.subst_op subst oopd) scenv)
 
           | Some { pl_desc = opov; pl_loc = loc; } ->
             let (newop, subst, dobind) =
@@ -255,13 +302,13 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
             in
               if not (ty_compatible scenv (reftyvars, refty) (newtyvars, newty)) then
                 clone_error scenv (CE_OpIncompatible (prefix, x));
-              (subst, if dobind then EcEnv.Op.bind x newop scenv else scenv)
+              (subst, proofs, if dobind then EcEnv.Op.bind x newop scenv else scenv)
           end
 
       | CTh_operator (x, ({ op_kind = OB_pred None} as oopr)) -> begin
           match Msym.find_opt x ovrds.evc_preds with
           | None ->
-              (subst, EcEnv.Op.bind x (EcSubst.subst_op subst oopr) scenv)
+              (subst, proofs, EcEnv.Op.bind x (EcSubst.subst_op subst oopr) scenv)
 
           | Some { pl_desc = prov; pl_loc = loc; } ->
               let newpr =
@@ -291,44 +338,63 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
               in
                 if not (ty_compatible scenv (reftyvars, refty) (newtyvars, newty)) then
                   clone_error scenv (CE_OpIncompatible (prefix, x));
-                (subst, EcEnv.Op.bind x newpr scenv)
+                (subst, proofs, EcEnv.Op.bind x newpr scenv)
         end
 
       | CTh_operator (x, oopd) ->
-          (subst, EcEnv.Op.bind x (EcSubst.subst_op subst oopd) scenv)
+          let oopd = EcSubst.subst_op subst oopd in
+            (subst, proofs, EcEnv.Op.bind x oopd scenv)
 
-      | CTh_axiom (x, ax) ->
-          (subst, EcEnv.Ax.bind x (EcSubst.subst_ax subst ax) scenv)
+      | CTh_axiom (x, ax) -> begin
+          let ax = EcSubst.subst_ax subst ax in
+          let (ax, proofs) =
+            let doproof =
+              match ax.ax_kind with
+              | `Lemma -> false
+              | `Axiom ->
+                match ovrds.evc_lemmas with
+                | `All       -> true
+                | `Named axs -> Ssym.mem x axs
+            in
+              match doproof with
+              | false -> (ax, proofs)
+              | true  ->
+                  let ax = { ax with ax_kind = `Lemma } in
+                    (ax, ((x, ax), scenv) :: proofs)
+          in
+            (subst, proofs, EcEnv.Ax.bind x ax scenv)
+      end
 
       | CTh_modtype (x, modty) ->
-          (subst, EcEnv.ModTy.bind x (EcSubst.subst_modsig subst modty) scenv)
+          let modty = EcSubst.subst_modsig subst modty in
+            (subst, proofs, EcEnv.ModTy.bind x modty scenv)
 
       | CTh_module me ->
-          (subst, EcEnv.Mod.bind me.me_name (EcSubst.subst_module subst me) scenv)
+          let me = EcSubst.subst_module subst me in
+            (subst, proofs, EcEnv.Mod.bind me.me_name me scenv)
 
       | CTh_theory (x, cth) -> begin
-        match Msym.find_opt x ovrds.evc_ths with
-        | None ->
-            (subst, EcEnv.Theory.bindx x (EcSubst.subst_ctheory subst cth) scenv)
-  
-        | Some subovrds ->
-            let (subst, nth) =
-              let subscenv = EcEnv.Theory.enter name scenv in
-              let (subst, subscenv) =
-                List.fold_left
-                  (ovr1 (prefix @ [x]) subovrds)
-                  (subst, subscenv) cth.cth_struct
-              in
-                (subst, EcEnv.ctheory_of_ctheory_w3 (EcEnv.Theory.close subscenv))
+          let subovrds = Msym.find_opt x ovrds.evc_ths in
+          let subovrds = EcUtils.odfl evc_empty subovrds in
+          let (subst, proofs, nth) =
+            let subscenv = EcEnv.Theory.enter x scenv in
+            let (subst, proofs, subscenv) =
+              List.fold_left
+                (ovr1 (prefix @ [x]) subovrds)
+                (subst, proofs, subscenv) cth.cth_struct
             in
-              (subst, EcEnv.Theory.bindx x nth scenv)
+              (subst, proofs, EcEnv.Theory.close subscenv)
+          in
+            (subst, proofs, EcEnv.Theory.bind x nth scenv)
       end
 
       | CTh_export p ->               (* FIXME: subst in p? *)
-          (subst, EcEnv.Theory.export p scenv)
+          (subst, proofs, EcEnv.Theory.export p scenv)
     in
       let scenv = EcEnv.Theory.enter name scenv in
-      let _, scenv = List.fold_left (ovr1 [] ovrds) (subst, scenv) oth.cth_struct in
-        EcEnv.Theory.close scenv
+      let _, proofs, scenv =
+        List.fold_left (ovr1 [] ovrds) (subst, [], scenv) oth.cth_struct
+      in
+        (List.rev proofs, EcEnv.Theory.close scenv)
   in
-    (name, nth)
+    (name, proofs, nth)

@@ -1,9 +1,15 @@
 (* -------------------------------------------------------------------- *)
-let s_get  = "__get"
-let s_set  = "__set"
-let s_nil  = "__nil"
-let s_cons = "::"
-let s_abs  = "__abs"
+let s_get  = "_.[_]"
+let s_set  = "_.[_<-_]"
+let s_nil  = "[]"
+let s_cons = "_::_"
+let s_abs  = "`|_|"
+
+(* -------------------------------------------------------------------- *)
+let mixfix_ops = [s_get; s_set; s_nil; s_cons; s_abs]
+
+let is_mixfix_op op =
+  List.mem op mixfix_ops
 
 (* -------------------------------------------------------------------- *)
 let s_dbool      = (["<top>"; "Bool" ; "Dbool"     ], "dbool")
@@ -40,6 +46,7 @@ let id_lt        = "<"
 
 let id_add         = "+"
 let id_sub         = "-"
+let id_opp         = "[-]"
 let id_prod        = "*"
 let id_div         = "/"
 let id_pow         = "^"
@@ -81,6 +88,7 @@ let _Int id      = EcPath.pqname p_Int id
 let p_int_le     = _Int  id_le
 let p_int_lt     = _Int  id_lt
 
+let p_int_opp    = _Int id_opp
 let p_int_add    = _Int id_add
 let p_int_sub    = _Int id_sub
 let p_int_prod   = _Int id_prod
