@@ -22,12 +22,11 @@ let process_case loc pf r g =
   match concl.f_node with
   | FbdHoareS _ ->
     let f = process_phl_formula g pf in
-    let r1, r2 = 
-      match r with
-      | None -> cannot_apply "case" "bounds needed"
+    let r = match r with
+      | None -> None
       | Some (r1,r2) ->
-        process_phl_form treal g r1, process_phl_form treal g r2 in
-    EcPhl.t_bdHoare_case f r1 r2 g
+        Some(process_phl_form treal g r1, process_phl_form treal g r2) in
+    EcPhl.t_bdHoare_case f r g
   | FhoareS _ -> check_N ();
     let f = process_phl_formula g pf in
     EcPhl.t_hoare_case f g

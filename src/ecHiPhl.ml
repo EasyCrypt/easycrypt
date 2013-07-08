@@ -302,14 +302,6 @@ let process_call side info (_, n as g) =
   t_seq_subgoal t_call [t_seq (t_use an gs) !tac_sub; t_id None] (juc,n)
 
   
-
-  
-  
-
-
-
-
-
 let process_cond side r g =
   let concl = get_concl g in
   let check_N () = 
@@ -320,12 +312,13 @@ let process_cond side r g =
     check_N ();
     let r1 = process_phl_form treal g r1 in
     let r2 = process_phl_form treal g r2 in
-    t_bdHoare_cond (r1,r2) g
+    t_bdHoare_cond (Some (r1,r2)) g
   | None ->
     if is_equivS concl then t_equiv_cond side g
     else if is_hoareS concl then (check_N (); t_hoare_cond g)
-    else if is_bdHoareS concl then cannot_apply "cond" "bounds needed"
+    else if is_bdHoareS concl then (check_N (); t_bdHoare_cond None g)
     else cannot_apply "cond" "the conclusion is not a hoare or a equiv goal"
+
 
 let stmt_length side concl = 
   match concl.f_node, side with

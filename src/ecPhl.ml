@@ -1376,22 +1376,34 @@ let t_hoare_case f g =
   let concl2 = f_hoareS_r { hs with hs_pr = f_and_simpl hs.hs_pr (f_not f) } in
   prove_goal_by [concl1;concl2] (RN_hl_case f) g
 
-let t_bdHoare_case f r1 r2 g =
+let t_bdHoare_case f r g =
   let concl = get_concl g in
   let bhs = destr_bdHoareS concl in
+  let bd,r1,r2 = 
+    match r with
+    | Some(r1,r2) -> f_real_add r1 r2, r1, r2 
+    | None -> bhs.bhs_bd, bhs.bhs_bd, bhs.bhs_bd 
+      (* Remark in reality r1 will be caract f *  bhs.bhs_bd and
+         r2 = caract !f *  bhs.bhs_bd.
+         under f,  r1 simplify to bhs.bhs_bd and 
+         under !f, r2 simplify to bhs.bhs_bd and 
+         r1 + r2 simplify to  bhs.bhs_bd. *) in
   let concl1 = f_bdHoareS_r 
     { bhs with bhs_pr = f_and_simpl bhs.bhs_pr f; bhs_bd = r1 } in
   let concl2 = f_bdHoareS_r 
     { bhs with bhs_pr = f_and_simpl bhs.bhs_pr (f_not f); bhs_bd = r2 } in
-  let bd = f_real_add r1 r2 in
-  let concl3 = 
-     (* TODO : this a conseq_bd rule *)
-    match bhs.bhs_cmp with
-    | FHle -> f_real_le bd bhs.bhs_bd
-    | FHeq -> f_eq bd bhs.bhs_bd
-    | FHge -> f_real_le bhs.bhs_bd bd in
-  let concl3 = gen_mems [bhs.bhs_m] (f_imp bhs.bhs_pr concl3) in
-  prove_goal_by [concl1;concl2;concl3] (RN_hl_case f) g
+  let concls = 
+    if r = None then [] 
+    else
+      let concl3 = 
+    (* TODO : this a conseq_bd rule *)
+        match bhs.bhs_cmp with
+        | FHle -> f_real_le bd bhs.bhs_bd
+        | FHeq -> f_eq bd bhs.bhs_bd
+        | FHge -> f_real_le bhs.bhs_bd bd in
+      let concl3 = gen_mems [bhs.bhs_m] (f_imp bhs.bhs_pr concl3) in
+      [concl3] in
+  prove_goal_by (concl1::concl2::concls) (RN_hl_case f) g
 
 let t_equiv_case f g = 
   let concl = get_concl g in
@@ -1402,8 +1414,10 @@ let t_equiv_case f g =
 
 let t_he_case f r g =
   match r with
-  | Some (r1,r2) -> t_bdHoare_case f r1 r2 g
-  | None -> t_hS_or_eS (t_hoare_case f) (t_equiv_case f) g 
+  | Some _ -> t_bdHoare_case f r g
+  | None -> 
+    t_hS_or_bhS_or_eS (t_hoare_case f) 
+      (t_bdHoare_case f None) (t_equiv_case f) g 
 
 (* --------------------------------------------------------------------- *)
 let _inline_freshen me v =
@@ -2150,7 +2164,7 @@ let t_bdHoare_cond r g =
   let concl = get_concl g in
   let bhs = destr_bdHoareS concl in 
   let (e,_,_) = s_first_if bhs.bhs_s in
-  t_gen_cond None (form_of_expr (EcMemory.memory bhs.bhs_m) e) (Some r) g
+  t_gen_cond None (form_of_expr (EcMemory.memory bhs.bhs_m) e) r g
 
 let rec t_equiv_cond side g =
   let hyps,concl = get_goal g in
