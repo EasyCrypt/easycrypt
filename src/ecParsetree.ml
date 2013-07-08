@@ -358,7 +358,7 @@ type phltactic =
   | Psplitwhile of (pexpr * tac_side * codepos )
   | Pcall       of tac_side * call_info fpattern 
   | Prcond      of (bool option * bool * int)
-  | Pcond       of tac_side
+  | Pcond       of tac_side * (pformula * pformula) option
   | Pswap       of ((tac_side * swap_kind) located list)
   | Pcfold      of (tac_side * codepos * int option)
   | Pinline     of pinline_arg
@@ -441,7 +441,7 @@ and ptactic_core_r =
   | Ptry        of ptactic_core
   | Pby         of ptactic list
   | Pseq        of ptactic list
-  | Pcase       of pformula 
+  | Pcase       of pformula * (pformula * pformula) option
   | Plogic      of logtactic
   | PPhl        of phltactic
   | Pprogress   of ptactic_core option
