@@ -2287,7 +2287,7 @@ let t_equiv_rnd side bij_info =
         bij, bij
     in wp_equiv_rnd (f, finv) 
 
-let t_bd_hoare_rnd (tac_info:(form,ty-> form) EcParsetree.rnd_tac_info) g = 
+let t_bd_hoare_rnd tac_info g = 
   let env,_,concl = get_goal_e g in
   let bhs = destr_bdHoareS concl in
   let (lv,distr),s = s_last_rnd "bd_hoare_rnd" bhs.bhs_s in

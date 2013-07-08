@@ -1603,7 +1603,7 @@ rnd_info:
 | empty {PNoRndParams (* None,None *) }
 | f=sform {PSingleRndParam f}
 | f=sform g=sform {PTwoRndParams (f,g) }
-| phi=sform d1=sform d2=sform d3=sform d4=sform p=sform 
+| phi=sform d1=sform d2=sform d3=sform d4=sform p=sform? 
   {PMultRndParams ((phi,d1,d2,d3,d4),p) }
 
 
