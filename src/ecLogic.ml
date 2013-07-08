@@ -397,10 +397,17 @@ let check_modtype_restr env mp mt i restr =
     | EcModules.ME_Decl(_,nu) ->
       let nu = EcEnv.NormMp.norm_restr env nu in
       let diff = EcPath.Sm.diff restr nu in
-      if not (EcPath.Sm.is_empty diff) then assert false; 
-                                    (* FIXME error message *)
+      if not (EcPath.Sm.is_empty diff) then 
+        let ppe = EcPrinting.PPEnv.ofenv env in
+        tacuerror "the module %a should not be able to use %a" 
+          (EcPrinting.pp_topmod ppe) mp
+          (EcPrinting.pp_list ",@ " (EcPrinting.pp_topmod ppe)) (EcPath.Sm.elements diff)
     | EcModules.ME_Structure _ -> 
-      if EcPath.Sm.mem u restr then assert false (* FIXME error message *)
+      if EcPath.Sm.mem u restr then 
+        let ppe = EcPrinting.PPEnv.ofenv env in
+        tacuerror "the module %a should not be able to use %a" 
+          (EcPrinting.pp_topmod ppe) mp (EcPrinting.pp_topmod ppe) u
+
     | _ -> assert false in
   EcPath.Sm.iter check us; 
 
