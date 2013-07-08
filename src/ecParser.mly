@@ -261,6 +261,7 @@
 %token RBRACKET
 %token RCONDF
 %token RCONDT
+%token REALIZE
 %token REQUIRE
 %token RES
 %token RETURN
@@ -2005,7 +2006,7 @@ clone_lemma_base:
 | x=_ident { `Named x }
 ; 
 
-clone_lemma_1:
+clone_lemma_1_core:
 | l=genqident(clone_lemma_base) {
     match unloc l with
     | (xs, `Named x) -> `Named (mk_loc l.pl_loc (xs, x))
@@ -2017,8 +2018,21 @@ clone_lemma_1:
   }
 ;
 
+clone_lemma_1:
+| cl=clone_lemma_1_core
+    { { pthp_mode = cl; pthp_tactic = None; } }
+
+| cl=clone_lemma_1_core BY t=tactic_core
+    { { pthp_mode = cl; pthp_tactic = Some t; } }
+;
+
+clone_lemma:
+| x=clone_lemma_1 { [x] }
+| xs=clone_lemma COMMA x=clone_lemma_1 { x :: xs }
+;
+
 clone_proof:
-| PROOF x=plist1(clone_lemma_1, COMMA) { x }
+| PROOF x=clone_lemma { List.rev x }
 ;
 
 clone_override:
@@ -2073,6 +2087,10 @@ clone_override:
        prov_body   = f;
      } in
        (x, PTHO_Pred ov) }
+;
+
+realize:
+| REALIZE x=qident { x }
 ;
 
 (* -------------------------------------------------------------------- *)
@@ -2133,6 +2151,7 @@ global_:
 | axiom            { Gaxiom       $1 }
 | claim            { Gclaim       $1 }
 | tactics_or_prf   { Gtactics     $1 }
+| realize          { Grealize     $1 }
 | gprover_info     { Gprover_info $1 }
 | checkproof       { Gcheckproof  $1 }
 

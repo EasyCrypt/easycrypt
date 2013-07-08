@@ -37,7 +37,12 @@ let string_of_ovkind = function
   | OVK_Lemma     -> "lemma/axiom"
 
 (* -------------------------------------------------------------------- *)
-type axclone = (symbol * EcDecl.axiom) * EcEnv.env
+type axclone = {
+  axc_axiom : symbol * EcDecl.axiom;
+  axc_path  : EcPath.path;
+  axc_env   : EcEnv.env;
+  axc_tac   : EcParsetree.ptactic_core option;
+}
 
 (* -------------------------------------------------------------------- *)
 let pp_clone_error fmt _env error =
@@ -81,17 +86,22 @@ type evclone = {
   evc_types  : (ty_override located) Msym.t;
   evc_ops    : (op_override located) Msym.t;
   evc_preds  : (pr_override located) Msym.t;
-  evc_lemmas : [`All | `Named of Ssym.t];
+  evc_lemmas : evlemma;
   evc_ths    : evclone Msym.t;
 }
 
-let evc_empty = {
-  evc_types  = Msym.empty;
-  evc_ops    = Msym.empty;
-  evc_preds  = Msym.empty;
-  evc_lemmas = `Named Ssym.empty;
-  evc_ths    = Msym.empty;
+and evlemma = {
+  ev_global  : (ptactic_core option) option;
+  ev_bynames : (ptactic_core option) Msym.t;
 }
+
+let evc_empty =
+  let evl = { ev_global = None; ev_bynames = Msym.empty; } in
+    { evc_types  = Msym.empty;
+      evc_ops    = Msym.empty;
+      evc_preds  = Msym.empty;
+      evc_lemmas = evl;
+      evc_ths    = Msym.empty; }
 
 let rec evc_update (upt : evclone -> evclone) (nm : symbol list) (evc : evclone) =
   match nm with
@@ -195,34 +205,49 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
     let do1 evc prf =
       let xpath name = EcPath.pappend opath (EcPath.fromqsymbol name) in
 
-      match prf with
-      | `All None -> { evc with evc_lemmas = `All }
+      match prf.pthp_mode with
+      | `All name -> begin
+          let (name, dname) =
+            match name with
+            | None -> ([], ([], "<current>"))
+            | Some name ->
+                match EcEnv.Theory.by_path_opt (xpath (unloc name)) scenv with
+                | None   -> clone_error scenv (CE_UnkOverride (OVK_Theory, unloc name))
+                | Some _ -> let (nm, name) = unloc name in (nm @ [name], (nm, name))
+          in
 
-      | `All (Some name) -> begin
-          match EcEnv.Theory.by_path_opt (xpath (unloc name)) scenv with
-          | None -> clone_error scenv (CE_UnkOverride (OVK_Theory, unloc name))
-          | Some _ ->
-            let (nm, name) = unloc name in
-              evc_update
-                (fun evc -> { evc with evc_lemmas = `All })
-                (nm @ [name]) evc
+          let update1 evc =
+            match evc.evc_lemmas.ev_global with
+            | Some (Some _) ->
+                clone_error scenv (CE_DupOverride (OVK_Theory, dname))
+            | _ ->
+                let evl = evc.evc_lemmas in
+                let evl = { evl with ev_global = Some prf.pthp_tactic } in
+                  { evc with evc_lemmas = evl }
+          in
+            evc_update update1 name evc
       end
 
       | `Named name -> begin
-          match EcEnv.Ax.by_path_opt (xpath (unloc name)) scenv with
-          | None -> clone_error scenv (CE_UnkOverride (OVK_Lemma, unloc name))
+          let name = unloc name in
+
+          match EcEnv.Ax.by_path_opt (xpath name) scenv with
+          | None -> clone_error scenv (CE_UnkOverride (OVK_Lemma, name))
           | Some ax ->
               if ax.ax_kind <> `Axiom || ax.ax_spec = None then
-                clone_error scenv (CE_CrtOverride (OVK_Lemma, unloc name));
-              let (nm, name) = unloc name in
-                evc_update
-                  (fun evc ->
-                    let lms =
-                      match evc.evc_lemmas with
-                      | `All -> `All
-                      | `Named axs -> `Named (Ssym.add name axs)
-                    in { evc with evc_lemmas = lms })
-                  nm evc
+                clone_error scenv (CE_CrtOverride (OVK_Lemma, name));
+
+              let update1 evc =
+                match Msym.find_opt (snd name) evc.evc_lemmas.ev_bynames with
+                | Some (Some _) ->
+                    clone_error scenv (CE_DupOverride (OVK_Lemma, name))
+                | _ ->
+                    let map = evc.evc_lemmas.ev_bynames in
+                    let map = Msym.add (snd name) prf.pthp_tactic map in
+                    let evl = { evc.evc_lemmas with ev_bynames = map } in
+                      { evc with evc_lemmas = evl }
+              in
+                evc_update update1 (fst name) evc
       end
     in
       List.fold_left do1 ovrds thcl.pthc_prf
@@ -350,18 +375,25 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
           let (ax, proofs) =
             let doproof =
               match ax.ax_kind with
-              | `Lemma -> false
+              | `Lemma -> None
               | `Axiom ->
-                match ovrds.evc_lemmas with
-                | `All       -> true
-                | `Named axs -> Ssym.mem x axs
+                  match ovrds.evc_lemmas.ev_global with
+                  | Some pt -> Some pt
+                  | None ->
+                      let map = ovrds.evc_lemmas.ev_bynames in
+                        Msym.find_opt x map
             in
               match doproof with
-              | false -> (ax, proofs)
-              | true  ->
-                  let ax = { ax with ax_kind = `Lemma } in
-                    (ax, ((x, ax), scenv) :: proofs)
+              | None     -> (ax, proofs)
+              | Some pt  ->
+                  let ax  = { ax with ax_kind = `Lemma } in
+                  let axc = { axc_axiom = (x, ax);
+                              axc_path  = EcPath.fromqsymbol (prefix, x);
+                              axc_tac   = pt;
+                              axc_env   = scenv; } in
+                    (ax, axc :: proofs)
           in
+
             (subst, proofs, EcEnv.Ax.bind x ax scenv)
       end
 

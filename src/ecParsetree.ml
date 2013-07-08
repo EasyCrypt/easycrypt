@@ -528,7 +528,13 @@ type theory_cloning = {
   pthc_base : pqsymbol;
   pthc_name : psymbol option;
   pthc_ext  : (pqsymbol * theory_override) list;
-  pthc_prf  : [`All of pqsymbol option | `Named of pqsymbol] list;
+  pthc_prf  : theory_cloning_proof list;
+}
+
+and theory_cloning_proof = {
+  pthp_mode   : [ `All   of pqsymbol option
+                | `Named of pqsymbol];
+  pthp_tactic : ptactic_core option;
 }
 
 and theory_override =
@@ -577,6 +583,7 @@ type global =
   | GthW3        of (string list * string * w3_renaming list)
   | GsctOpen
   | GsctClose
+  | Grealize     of pqsymbol
   | Gtactics     of [`Proof of bool | `Actual of ptactic list]
   | Gprover_info of pprover_infos
   | Gcheckproof  of bool
