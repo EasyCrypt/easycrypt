@@ -1651,10 +1651,19 @@ occurences:
   }
 ;
 
+
+%inline prod_form:
+  | f1=sform f2=sform      { Some f1, Some f2 }
+  | UNDERSCORE f2=sform { None   , Some f2 }
+  | f1=sform UNDERSCORE { Some f1, None    }
+;
+
 app_bd_info:
-  | empty { PAppNone }
-  | f=sform { PAppSingle f }
-  | s=sform f1=sform f2=sform g1=sform g2=sform { PAppMult (s,f1,f2,g1,g2) }
+  | empty    { PAppNone }
+  | f=sform  { PAppSingle f }
+  | f=prod_form g=prod_form s=sform?
+             { PAppMult (s,fst f,snd f,fst g, snd g) }
+;
 
 logtactic:
 | ASSUMPTION
