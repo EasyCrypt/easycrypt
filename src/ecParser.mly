@@ -2106,6 +2106,9 @@ clone_override:
        prov_body   = f;
      } in
        (x, PTHO_Pred ov) }
+
+| THEORY x=uqident EQ y=uqident
+   { (x, PTHO_Theory y) }
 ;
 
 realize:
