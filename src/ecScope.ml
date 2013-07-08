@@ -476,7 +476,7 @@ end = struct
     if is_mp_local mp lc then
       raise UseLocal
 
-  let check_use_local_or_abd lc mp =
+  let check_use_local_or_abs lc mp =
     if is_mp_local mp lc || is_mp_abstract mp lc then
       raise UseLocal
 
@@ -485,7 +485,7 @@ end = struct
     with UseLocal -> true
 
   let module_use_local_or_abs m lc =
-    try  on_mpath_module (check_use_local lc) m; false
+    try  on_mpath_module (check_use_local_or_abs lc) m; false
     with UseLocal -> true
 
   let abstracts lc = lc.lc_abstracts
