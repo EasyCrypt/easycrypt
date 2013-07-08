@@ -1852,8 +1852,8 @@ phltactic:
 
 | BYPR f1=sform f2=sform { PPr(f1,f2) }
 
-| FEL at_pos=NUM cntr=sform delta=sform q=sform f_event=sform some_p=fel_pred_specs
-   {Pfel (at_pos,(cntr,delta,q,f_event,some_p))}
+| FEL at_pos=NUM cntr=sform delta=sform q=sform f_event=sform some_p=fel_pred_specs inv=sform?
+   {Pfel (at_pos,(cntr,delta,q,f_event,some_p,inv))}
 
 | EQOBSIN info=eqobs_in
     { Peqobs_in info }
@@ -2102,6 +2102,9 @@ clone_override:
        prov_body   = f;
      } in
        (x, PTHO_Pred ov) }
+
+| THEORY x=uqident EQ y=uqident
+   { (x, PTHO_Theory y) }
 ;
 
 realize:

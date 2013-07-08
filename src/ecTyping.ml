@@ -158,7 +158,7 @@ let pp_tyerror fmt env error =
       msg "This void function cannot return a value"
 
   | TypeMismatch ((ty1, ty2), _) ->
-      msg "This expression as type@\n";
+      msg "This expression has type@\n";
       msg "  @[<hov 2> %a@]@\n" pp_type ty2;
       msg "but is expected to have type@\n";
       msg "  @[<hov 2> %a@]" pp_type ty1
@@ -172,7 +172,6 @@ let pp_tyerror fmt env error =
       | [] -> msg "unknown variable or constant: `%a'" pp_qsymbol name
       | _  -> msg "unknown operator `%a' for signature (%a)"
                 pp_qsymbol name (EcPrinting.pp_list " *@ " pp_type) tys
-      
   end
 
   | MultipleOpMatch (name, _) ->
