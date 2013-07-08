@@ -184,8 +184,10 @@ let mqname mp x =
   
 let m_apply mp args = 
   let args' = mp.m_args in
-  if args' = [] then mpath mp.m_top args 
-  else (assert (args = []); mp)
+  mpath mp.m_top (args'@args) 
+(* PY check that it is safe. previous code *)
+(* if args' = [] then mpath mp.m_top args 
+  else (assert (args = []); mp) *)
 
 let m_functor mp = 
   let top = 
