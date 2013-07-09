@@ -1723,7 +1723,7 @@ let trans_form_or_pattern env (ps, ue) pf tt =
         let penv, qenv = EcEnv.Fun.hoareF fpath env in
         let pre'  = transf penv pre in
         let post' = transf qenv post in
-        let bd'   = transf env bd in
+        let bd'   = transf penv bd in
         let hcmp  = match hcmp with PFHle -> FHle | PFHeq -> FHeq | PFHge -> FHge in
           (* FIXME: check that there are not pvars in bd *)
           unify_or_fail penv ue pre .pl_loc ~expct:tbool pre' .f_ty;

@@ -381,21 +381,14 @@ let t_clear ids (juc,n as g) =
   let rule = { pr_name = RN_clear ids; pr_hyps = [RA_node n1] } in
   upd_rule rule (juc,n)
 
-let check_modtype_restr env mp mt i restr =
-  begin
-    try  EcTyping.check_sig_mt_cnv env mt i
-    with EcTyping.TymodCnvFailure e ->
-      Format.eprintf "%t@\n%!"
-        (fun fmt -> EcTyping.pp_cnv_failure fmt env e);
-      assert false
-  end;
-  let restr = EcEnv.NormMp.norm_restr env restr in
-  let us = EcEnv.NormMp.top_uses env mp in
+let check_restr env mp restr = 
+  let restr = NormMp.norm_restr env restr in
+  let us = NormMp.top_uses env mp in
   let check u = 
     let me = EcEnv.Mod.by_mpath u env in
     match me.EcModules.me_body with 
     | EcModules.ME_Decl(_,nu) ->
-      let nu = EcEnv.NormMp.norm_restr env nu in
+      let nu = NormMp.norm_restr env nu in
       let diff = EcPath.Sm.diff restr nu in
       if not (EcPath.Sm.is_empty diff) then 
         let ppe = EcPrinting.PPEnv.ofenv env in
@@ -407,9 +400,20 @@ let check_modtype_restr env mp mt i restr =
         let ppe = EcPrinting.PPEnv.ofenv env in
         tacuerror "the module %a should not be able to use %a" 
           (EcPrinting.pp_topmod ppe) mp (EcPrinting.pp_topmod ppe) u
-
     | _ -> assert false in
-  EcPath.Sm.iter check us; 
+  EcPath.Sm.iter check us
+  
+
+let check_modtype_restr env mp mt i restr =
+  begin
+    try EcTyping.check_sig_mt_cnv env mt i
+    with EcTyping.TymodCnvFailure e ->
+      let ppe = EcPrinting.PPEnv.ofenv env in
+      tacuerror "%a : %a"
+        (EcPrinting.pp_topmod ppe) mp
+        (fun fmt e -> EcTyping.pp_cnv_failure fmt env e) e
+  end;
+  check_restr env mp restr
 
 type app_arg =
   | AAform of form

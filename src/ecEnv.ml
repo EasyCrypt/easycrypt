@@ -1582,7 +1582,8 @@ module NormMp = struct
     let mp  = norm_mpath env mp in
     let top = EcPath.m_functor mp in
     let us  =
-      if EcPath.Sm.mem top rm then us 
+      if EcPath.Sm.mem top rm || EcPath.Sm.mem top us then us 
+          (* If top is in us the module has already be added, nothing to do *)
       else
         let us = 
           match (Mod.by_mpath top env).me_body with
