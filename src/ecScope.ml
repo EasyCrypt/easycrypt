@@ -1183,7 +1183,14 @@ module Ax = struct
     let pac =
       match puc.puc_active with
       | None -> hierror "no active lemma"
-      | Some pac -> pac
+      | Some pac -> begin
+          match pac.puc_jdg with
+          | PSNoCheck  -> ()
+          | PSCheck gs ->
+              try  ignore (EcLogic.close_juc (fst gs))
+              with EcBaseLogic.StillOpenGoal _ ->
+                hierror "cannot save an incomplete proof"
+      end; pac
     in
 
     let scope = { scope with sc_pr_uc = Some { puc with puc_active = None; } } in
