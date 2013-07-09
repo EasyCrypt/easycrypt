@@ -406,11 +406,12 @@ let check_restr env mp restr =
 
 let check_modtype_restr env mp mt i restr =
   begin
-    try  EcTyping.check_sig_mt_cnv env mt i
+    try EcTyping.check_sig_mt_cnv env mt i
     with EcTyping.TymodCnvFailure e ->
-      Format.eprintf "%t@\n%!"
-        (fun fmt -> EcTyping.pp_cnv_failure fmt env e);
-      assert false
+      let ppe = EcPrinting.PPEnv.ofenv env in
+      tacuerror "%a : %a"
+        (EcPrinting.pp_topmod ppe) mp
+        (fun fmt e -> EcTyping.pp_cnv_failure fmt env e) e
   end;
   check_restr env mp restr
 
