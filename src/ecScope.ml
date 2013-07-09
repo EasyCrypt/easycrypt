@@ -870,6 +870,9 @@ module Op = struct
             lam.EcTypes.e_ty, Some lam
     in
 
+    if not (EcUnify.UniEnv.closed ue) then
+      hierror "this operator type contains free type variables";
+
     let uni     = Tuni.subst (EcUnify.UniEnv.close ue) in
     let body    = omap body (e_mapty uni) in
     let ty      = uni ty in
@@ -911,7 +914,12 @@ module Pred = struct
         let dom = List.map snd xs in
         let xs = List.map (fun (x,ty) -> x, EcFol.GTty ty) xs in
         let lam = EcFol.f_lambda xs body in
-        dom, Some lam in
+          (dom, Some lam)
+    in
+
+    if not (EcUnify.UniEnv.closed ue) then
+      hierror "this predicate type contains free type variables";
+
     let uni     = EcUnify.UniEnv.close ue in
     let body    = omap body (EcFol.Fsubst.uni uni) in
     let dom     = List.map (Tuni.subst uni) dom in
@@ -1102,9 +1110,13 @@ module Ax = struct
         tintro in
     let tintro = mk_loc loc (Plogic (Pintro tintro)) in
 
-    let concl    = TT.trans_prop scope.sc_env ue pconcl in
-    let concl    = EcFol.Fsubst.uni (EcUnify.UniEnv.close ue) concl in
-    let tparams  = EcUnify.UniEnv.tparams ue in
+    let concl = TT.trans_prop scope.sc_env ue pconcl in
+
+    if not (EcUnify.UniEnv.closed ue) then
+      hierror "the formula contains free type variables";
+
+    let concl   = EcFol.Fsubst.uni (EcUnify.UniEnv.close ue) concl in
+    let tparams = EcUnify.UniEnv.tparams ue in
 
     let axd  =
       let kind = match ax.pa_kind with PAxiom -> `Axiom | _ -> `Lemma in
