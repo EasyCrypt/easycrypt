@@ -719,20 +719,7 @@ let lossless_hyps env top sub =
   f_forall bd (f_imps hyps concl) 
 
 let check_wr env top o = 
-  let w = f_write env o in
-  let r = f_read env o in
-  let tr = PV.mem_glob env top r in
-  let tw = PV.mem_glob env top w in
-  (*if not needed then*) begin
-    let error f msg = 
-      let ppe = EcPrinting.PPEnv.ofenv env in
-      EcLogic.tacuerror "The function %a should not %s variables of %a"
-        (EcPrinting.pp_funname ppe) f msg
-        (EcPrinting.pp_topmod ppe) top in
-    if tr then error o "read";
-    if tw then error o "write";
-  end;
-  tr, tw
+  check_restr env o.x_top (Sm.singleton top)
 
 let bdHoareF_abs_spec env f inv = 
   let top,_,oi,_fsig = abstract_info env f in
@@ -773,11 +760,6 @@ let abstract_info2 env fl' fr' =
       (EcPrinting.pp_funname ppe) fr1
   else 
     topl, fl, oil, sigl, topr, fr, oir, sigr
-
-let check_wr2 env _needed top o_l o_r = 
-  let trl, twl = check_wr env top o_l in
-  let trr, twr = check_wr env top o_r in
-  trl || trr, twl || twr 
         
 let equivF_abs_spec env fl fr inv = 
   let topl, fl, oil,sigl, topr, fr, oir,sigr = abstract_info2 env fl fr in
@@ -789,18 +771,15 @@ let equivF_abs_spec env fl fr inv =
   let eqglob = f_eqglob topl ml topr mr in
   
   let ospec o_l o_r = 
-    let w,r = check_wr2 env oil.oi_in topl o_l o_r in
+    if EcPath.x_equal o_l o_r then check_wr env topl o_l
+    else (check_wr env topl o_l;check_wr env topl o_r);
     let fo_l = EcEnv.Fun.by_xpath o_l env in
     let fo_r = EcEnv.Fun.by_xpath o_r env in
     let eq_params = 
       f_eqparams o_l fo_l.f_sig.fs_params ml o_r fo_r.f_sig.fs_params mr in
     let eq_res = f_eqres o_l fo_l.f_sig.fs_ret ml o_r fo_r.f_sig.fs_ret mr in
-    (* TODO : Did we really want this eqglob, or just that oracle do not 
-       modify glob ? *)  
-    let lpre = if oil.oi_in && (w||r) then [eqglob;inv] else [inv] in
-    let pre = EcFol.f_ands (eq_params::lpre) in
-    let lpost = if w then [eqglob;inv] else [inv] in
-    let post = EcFol.f_ands (eq_res::lpost) in
+    let pre = EcFol.f_and eq_params inv in
+    let post = EcFol.f_and eq_res inv in
     f_equivF pre o_l o_r post in
   let sg = List.map2 ospec oil.oi_calls oir.oi_calls in
   let eq_params = 
@@ -831,16 +810,15 @@ let equivF_abs_upto env fl fr bad invP invQ =
   let eqglob = f_eqglob topl ml topr mr in
   
   let ospec o_l o_r = 
-    let w,r = check_wr2 env oil.oi_in topl o_l o_r in
+    if EcPath.x_equal o_l o_r then check_wr env topl o_l
+    else (check_wr env topl o_l;check_wr env topl o_r);
     let fo_l = EcEnv.Fun.by_xpath o_l env in
     let fo_r = EcEnv.Fun.by_xpath o_r env in
     let eq_params = 
       f_eqparams o_l fo_l.f_sig.fs_params ml o_r fo_r.f_sig.fs_params mr in
     let eq_res = f_eqres o_l fo_l.f_sig.fs_ret ml o_r fo_r.f_sig.fs_ret mr in
-    let lpre = if oil.oi_in && (w||r) then [eqglob;invP] else [invP] in
-    let pre = EcFol.f_ands (EcFol.f_not bad2 :: eq_params :: lpre) in
-    let lpost = if w then [eqglob;invP] else [invP] in
-    let post = EcFol.f_if_simpl bad2 invQ (f_ands (eq_res::lpost)) in
+    let pre = EcFol.f_ands [EcFol.f_not bad2; eq_params; invP] in
+    let post = EcFol.f_if_simpl bad2 invQ (f_and eq_res invP) in
     let cond1 = f_equivF pre o_l o_r post in
       let cond2 =
       let q = Fsubst.f_subst_mem ml EcFol.mhr invQ in

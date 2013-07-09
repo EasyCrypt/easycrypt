@@ -88,6 +88,8 @@ val t_close : tactic -> tactic
 val t_rotate : [`Left | `Right] -> int -> goals -> goals
 
 (* -------------------------------------------------------------------- *)
+(* TODO : move this in ecEnv.Mod *)
+val check_restr :  EcEnv.env -> EcPath.mpath -> EcPath.Sm.t -> unit
 val check_modtype_restr :
   EcEnv.env -> EcPath.mpath -> module_sig -> module_type -> EcPath.Sm.t -> unit
 
