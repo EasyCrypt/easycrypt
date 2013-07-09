@@ -158,7 +158,7 @@ let pp_tyerror fmt env error =
       msg "This void function cannot return a value"
 
   | TypeMismatch ((ty1, ty2), _) ->
-      msg "This expression as type@\n";
+      msg "This expression has type@\n";
       msg "  @[<hov 2> %a@]@\n" pp_type ty2;
       msg "but is expected to have type@\n";
       msg "  @[<hov 2> %a@]" pp_type ty1
@@ -172,7 +172,6 @@ let pp_tyerror fmt env error =
       | [] -> msg "unknown variable or constant: `%a'" pp_qsymbol name
       | _  -> msg "unknown operator `%a' for signature (%a)"
                 pp_qsymbol name (EcPrinting.pp_list " *@ " pp_type) tys
-      
   end
 
   | MultipleOpMatch (name, _) ->
@@ -1724,7 +1723,7 @@ let trans_form_or_pattern env (ps, ue) pf tt =
         let penv, qenv = EcEnv.Fun.hoareF fpath env in
         let pre'  = transf penv pre in
         let post' = transf qenv post in
-        let bd'   = transf env bd in
+        let bd'   = transf penv bd in
         let hcmp  = match hcmp with PFHle -> FHle | PFHeq -> FHeq | PFHge -> FHge in
           (* FIXME: check that there are not pvars in bd *)
           unify_or_fail penv ue pre .pl_loc ~expct:tbool pre' .f_ty;

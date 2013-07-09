@@ -703,8 +703,9 @@ let t_hoareF_abs inv g =
 let lossless_hyps env top sub = 
   let sig_ = (EcEnv.Mod.by_mpath top env).me_sig in
   let bd = 
-    List.map (fun (id,mt) -> id,GTmodty(mt,EcPath.Sm.empty))
-      sig_.mis_params in               (* Should we put restriction here *)
+    List.map (fun (id,mt) -> id,GTmodty(mt,Sm.singleton top))
+      sig_.mis_params in         
+    (* Warning this implies that the oracle do not have access to top *)
   let args = List.map (fun (id,_) -> EcPath.mident id) sig_.mis_params in
   let concl = 
     f_losslessF (EcPath.xpath (EcPath.m_apply top args) sub) in
@@ -717,12 +718,17 @@ let lossless_hyps env top sub =
   let hyps = List.map f_losslessF calls in
   f_forall bd (f_imps hyps concl) 
 
+let check_wr env top o = 
+  check_restr env o.x_top (Sm.singleton top)
+
 let bdHoareF_abs_spec env f inv = 
   let top,_,oi,_fsig = abstract_info env f in
   let m = mhr in
   let fv = PV.fv env m inv in
   PV.check_depend env fv top;
-  let ospec o = f_bdHoareF inv o inv FHeq f_r1 in
+  let ospec o = 
+    ignore (check_wr env top o);
+    f_bdHoareF inv o inv FHeq f_r1 in
   let sg = List.map ospec oi.oi_calls in
   inv, inv, lossless_hyps env top f.x_sub :: sg
 
@@ -735,7 +741,7 @@ let t_bdHoareF_abs inv g =
       let tac g' = prove_goal_by sg (RN_hl_fun_abs inv) g' in
       t_on_last tac (t_bdHoareF_conseq pre post g)
     | _ ->
-      cannot_apply "fun" "expected \"= 1\" as bound"
+      cannot_apply "fun" "expected \"= 1\" as bound" 
 
 let abstract_info2 env fl' fr' =
   let topl, fl, oil, sigl = abstract_info env fl' in
@@ -754,26 +760,6 @@ let abstract_info2 env fl' fr' =
       (EcPrinting.pp_funname ppe) fr1
   else 
     topl, fl, oil, sigl, topr, fr, oir, sigr
-
-let check_wr env needed top o_l o_r = 
-  let wl,wr = f_write env o_l, f_write env o_r in
-  let rl,rr = f_read env o_l, f_read env o_r in
-  let trl = PV.mem_glob env top rl in
-  let trr = PV.mem_glob env top rr in
-  let twl = PV.mem_glob env top wl in
-  let twr = PV.mem_glob env top wr in
-  if not needed then begin
-    let error f msg = 
-      let ppe = EcPrinting.PPEnv.ofenv env in
-      EcLogic.tacuerror "The function %a should not %s variables of %a"
-        (EcPrinting.pp_funname ppe) f msg
-        (EcPrinting.pp_topmod ppe) top in
-    if trl then error o_l "read";
-    if trr then error o_r "read";
-    if twl then error o_l "write";
-    if twr then error o_r "write"
-  end;
-  trl || trr, twl || twr
         
 let equivF_abs_spec env fl fr inv = 
   let topl, fl, oil,sigl, topr, fr, oir,sigr = abstract_info2 env fl fr in
@@ -783,20 +769,17 @@ let equivF_abs_spec env fl fr inv =
   PV.check_depend env fvl topl;
   PV.check_depend env fvr topr;
   let eqglob = f_eqglob topl ml topr mr in
-
+  
   let ospec o_l o_r = 
-    let w,r = check_wr env oil.oi_in topl o_l o_r in
+    if EcPath.x_equal o_l o_r then check_wr env topl o_l
+    else (check_wr env topl o_l;check_wr env topl o_r);
     let fo_l = EcEnv.Fun.by_xpath o_l env in
     let fo_r = EcEnv.Fun.by_xpath o_r env in
     let eq_params = 
       f_eqparams o_l fo_l.f_sig.fs_params ml o_r fo_r.f_sig.fs_params mr in
     let eq_res = f_eqres o_l fo_l.f_sig.fs_ret ml o_r fo_r.f_sig.fs_ret mr in
-    (* TODO : Did we really want this eqglob, or just that oracle do not 
-              modify glob ? *)  
-    let lpre = if oil.oi_in && (w||r) then [eqglob;inv] else [inv] in
-    let pre = EcFol.f_ands (eq_params::lpre) in
-    let lpost = if w then [eqglob;inv] else [inv] in
-    let post = EcFol.f_ands (eq_res::lpost) in
+    let pre = EcFol.f_and eq_params inv in
+    let post = EcFol.f_and eq_res inv in
     f_equivF pre o_l o_r post in
   let sg = List.map2 ospec oil.oi_calls oir.oi_calls in
   let eq_params = 
@@ -806,7 +789,7 @@ let equivF_abs_spec env fl fr inv =
   let pre = f_ands (eq_params::lpre) in
   let post = f_ands [eq_res; eqglob; inv] in
   pre, post, sg
-
+    
 let t_equivF_abs inv g = 
   let env,_,concl = get_goal_e g in
   let ef = destr_equivF concl in
@@ -825,20 +808,19 @@ let equivF_abs_upto env fl fr bad invP invQ =
   PV.check_depend env fvr topr;
   (* TODO check there is only global variable *)
   let eqglob = f_eqglob topl ml topr mr in
-
+  
   let ospec o_l o_r = 
-    let w,r = check_wr env oil.oi_in topl o_l o_r in
+    if EcPath.x_equal o_l o_r then check_wr env topl o_l
+    else (check_wr env topl o_l;check_wr env topl o_r);
     let fo_l = EcEnv.Fun.by_xpath o_l env in
     let fo_r = EcEnv.Fun.by_xpath o_r env in
     let eq_params = 
       f_eqparams o_l fo_l.f_sig.fs_params ml o_r fo_r.f_sig.fs_params mr in
     let eq_res = f_eqres o_l fo_l.f_sig.fs_ret ml o_r fo_r.f_sig.fs_ret mr in
-    let lpre = if oil.oi_in && (w||r) then [eqglob;invP] else [invP] in
-    let pre = EcFol.f_ands (EcFol.f_not bad2 :: eq_params :: lpre) in
-    let lpost = if w then [eqglob;invP] else [invP] in
-    let post = EcFol.f_if_simpl bad2 invQ (f_ands (eq_res::lpost)) in
+    let pre = EcFol.f_ands [EcFol.f_not bad2; eq_params; invP] in
+    let post = EcFol.f_if_simpl bad2 invQ (f_and eq_res invP) in
     let cond1 = f_equivF pre o_l o_r post in
-    let cond2 =
+      let cond2 =
       let q = Fsubst.f_subst_mem ml EcFol.mhr invQ in
       f_forall [mr,GTmem None] (f_imp bad2 (f_bdHoareF q o_l q FHeq f_r1)) in
     let cond3 = 
@@ -1376,22 +1358,14 @@ let t_hoare_case f g =
   let concl2 = f_hoareS_r { hs with hs_pr = f_and_simpl hs.hs_pr (f_not f) } in
   prove_goal_by [concl1;concl2] (RN_hl_case f) g
 
-let t_bdHoare_case f r1 r2 g =
+let t_bdHoare_case f g =
   let concl = get_concl g in
   let bhs = destr_bdHoareS concl in
   let concl1 = f_bdHoareS_r 
-    { bhs with bhs_pr = f_and_simpl bhs.bhs_pr f; bhs_bd = r1 } in
+    { bhs with bhs_pr = f_and_simpl bhs.bhs_pr f } in
   let concl2 = f_bdHoareS_r 
-    { bhs with bhs_pr = f_and_simpl bhs.bhs_pr (f_not f); bhs_bd = r2 } in
-  let bd = f_real_add r1 r2 in
-  let concl3 = 
-     (* TODO : this a conseq_bd rule *)
-    match bhs.bhs_cmp with
-    | FHle -> f_real_le bd bhs.bhs_bd
-    | FHeq -> f_eq bd bhs.bhs_bd
-    | FHge -> f_real_le bhs.bhs_bd bd in
-  let concl3 = gen_mems [bhs.bhs_m] (f_imp bhs.bhs_pr concl3) in
-  prove_goal_by [concl1;concl2;concl3] (RN_hl_case f) g
+    { bhs with bhs_pr = f_and_simpl bhs.bhs_pr (f_not f) } in
+  prove_goal_by [concl1;concl2] (RN_hl_case f) g
 
 let t_equiv_case f g = 
   let concl = get_concl g in
@@ -1400,10 +1374,9 @@ let t_equiv_case f g =
   let concl2 = f_equivS_r { es with es_pr = f_and es.es_pr (f_not f) } in
   prove_goal_by [concl1;concl2] (RN_hl_case f) g
 
-let t_he_case f r g =
-  match r with
-  | Some (r1,r2) -> t_bdHoare_case f r1 r2 g
-  | None -> t_hS_or_eS (t_hoare_case f) (t_equiv_case f) g 
+let t_he_case f g =
+  t_hS_or_bhS_or_eS (t_hoare_case f) 
+    (t_bdHoare_case f) (t_equiv_case f) g 
 
 (* --------------------------------------------------------------------- *)
 let _inline_freshen me v =
@@ -1971,7 +1944,7 @@ and callable_oracles_i env modv os i =
 
 let callable_oracles_stmt env (modv:PV.t) = callable_oracles_s env modv EcPath.Sx.empty
 
-let t_failure_event at_pos cntr ash q f_event pred_specs g =
+let t_failure_event at_pos cntr ash q f_event pred_specs inv g =
   let env,_,concl = get_goal_e g in
   match concl.f_node with
     | Fapp ({f_node=Fop(op,_)},[pr;bd]) when is_pr pr 
@@ -2012,12 +1985,14 @@ let t_failure_event at_pos cntr ash q f_event pred_specs g =
       (* not fail and cntr=0 holds at designated program point *)
       let init_goal = 
         let p = f_and (f_not f_event) (f_eq cntr (f_int 0)) in
+        let p = f_and_simpl p inv in
         f_hoareS memenv f_true (stmt s_hd) p
       in
       let oracle_goal o = 
         let not_F_to_F_goal = 
           let bound = f_app_simpl ash [cntr] treal in
           let pre = f_and (f_int_le (f_int 0) cntr) (f_not f_event) in
+          let pre = f_and_simpl pre inv in
           let post = f_event in
           f_bdHoareF pre o post FHle bound
         in
@@ -2034,13 +2009,17 @@ let t_failure_event at_pos cntr ash q f_event pred_specs g =
         in
         let cntr_decr_goal = 
           let pre  = f_and some_p (f_eq old_cntr cntr) in
+          let pre = f_and_simpl pre inv in
           let post = f_and (f_int_lt old_cntr cntr) (f_int_le cntr q) in
+          let post = f_and_simpl post inv in
           f_forall_simpl [old_cntr_id,GTty tint] 
             (f_hoareF pre o post)
         in
         let cntr_stable_goal =
           let pre  = f_ands [f_not some_p;f_eq f_event old_b;f_eq cntr old_cntr] in
+          let pre = f_and_simpl pre inv in
           let post = f_ands [f_eq f_event old_b;f_eq cntr old_cntr] in
+          let post = f_and_simpl post inv in
           f_forall_simpl [old_b_id,GTty tbool; old_cntr_id,GTty tint] 
             (f_hoareF pre o post)
         in
@@ -2121,7 +2100,7 @@ let s_first_if s =
     try destr_if i with Not_found -> 
       cannot_apply "if" "the first instruction should be a if"
 
-let t_gen_cond side e r g =
+let t_gen_cond side e g =
   let hyps = get_hyps g in
   let m1,m2,h,h1,h2 = match LDecl.fresh_ids hyps ["&m";"&m";"_";"_";"_"] with
     | [m1;m2;h;h1;h2] -> m1,m2,h,h1,h2
@@ -2137,20 +2116,19 @@ let t_gen_cond side e r g =
                  (t_hyp h)
               ];
        t_id None] g in
-  let subtacs = if r = None then [] else [t_id None] in
-  t_seq_subgoal (t_he_case e r) (t_sub true :: t_sub false :: subtacs) g
+  t_seq_subgoal (t_he_case e) [t_sub true; t_sub false] g
 
 let t_hoare_cond g = 
   let concl = get_concl g in
   let hs = destr_hoareS concl in 
   let (e,_,_) = s_first_if hs.hs_s in
-  t_gen_cond None (form_of_expr (EcMemory.memory hs.hs_m) e) None g
+  t_gen_cond None (form_of_expr (EcMemory.memory hs.hs_m) e) g
 
-let t_bdHoare_cond r g = 
+let t_bdHoare_cond g = 
   let concl = get_concl g in
   let bhs = destr_bdHoareS concl in 
   let (e,_,_) = s_first_if bhs.bhs_s in
-  t_gen_cond None (form_of_expr (EcMemory.memory bhs.bhs_m) e) (Some r) g
+  t_gen_cond None (form_of_expr (EcMemory.memory bhs.bhs_m) e) g
 
 let rec t_equiv_cond side g =
   let hyps,concl = get_goal g in
@@ -2164,7 +2142,7 @@ let rec t_equiv_cond side g =
       else
         let (e,_,_) = s_first_if es.es_sr in
         form_of_expr (EcMemory.memory es.es_mr) e in
-    t_gen_cond side e None g
+    t_gen_cond side e g
   | None -> 
       let el,_,_ = s_first_if es.es_sl in
       let er,_,_ = s_first_if es.es_sr in
@@ -2293,6 +2271,7 @@ let t_bd_hoare_rnd tac_info g =
   let (lv,distr),s = s_last_rnd "bd_hoare_rnd" bhs.bhs_s in
   let ty_distr = proj_distr_ty (e_ty distr) in
   let distr = EcFol.form_of_expr (EcMemory.memory bhs.bhs_m) distr in
+  let m = fst bhs.bhs_m in
 
   let mk_event_cond event = 
     let v_id = EcIdent.create "v" in
@@ -2315,30 +2294,84 @@ let t_bd_hoare_rnd tac_info g =
     | FHeq -> f_eq
   in
 
-  let check_indep () = 
+  let is_post_indep =
+    let fv = EcPV.PV.fv env m bhs.bhs_po in
+    match lv with
+      | LvVar (x,_) -> not (EcPV.PV.mem_pv env x fv)
+      | LvTuple pvs ->
+        List.for_all (fun (x,_) -> not (EcPV.PV.mem_pv env x fv)) pvs
+      | LvMap(_, x,_,_) -> not (EcPV.PV.mem_pv env x fv)
+  in
+
+
+  let is_bd_indep = 
     let fv_bd = PV.fv env mhr bhs.bhs_bd in 
     let modif_s = s_write env s in
-    if not (PV.indep env modif_s fv_bd) then
-      tacuerror "Cannot apply if the bound is modified by remaining statement.@. Use the generalised rnd tactic variant instead."
+    PV.indep env modif_s fv_bd
+  in
+
+  let mk_event ty = 
+    let x = EcIdent.create "x" in 
+    if is_post_indep then f_lambda [x,GTty ty] f_true
+    else match lv with
+      | LvVar (pv,_) -> 
+        f_lambda [x,GTty ty] 
+          (EcPV.PVM.subst1 env pv m (f_local x ty) bhs.bhs_po)
+      | _ -> tacuerror "Cannot infer a valid event, it must be provided"
   in
 
   let subgoals = match tac_info, bhs.bhs_cmp with 
+    | PNoRndParams, FHle -> 
+      if is_post_indep then
+        (* event is true *)
+        let concl = f_bdHoareS_r {bhs with bhs_s=s} in
+        [concl]
+      else if is_bd_indep then
+        let event = mk_event ty_distr in
+        let bounded_distr = f_real_le (f_mu distr event) bhs.bhs_bd in
+        let post = bounded_distr &&& (mk_event_cond event) in
+        let concl = f_hoareS bhs.bhs_m bhs.bhs_pr s post in
+        [concl]
+      else 
+        tacuerror "Bound is not independent, intermediate predicate is required."
+
+    | PNoRndParams, _ -> 
+      if is_post_indep then
+        (* event is true *)
+        let event = mk_event ty_distr in
+        let bounded_distr = f_eq (f_mu distr event) f_r1 in
+        let concl = f_bdHoareS_r {bhs with bhs_s=s} in
+        [bounded_distr;concl]
+      else if is_bd_indep then
+        let event = mk_event ty_distr in
+        let bounded_distr = f_cmp (f_mu distr event) bhs.bhs_bd in
+        let post = bounded_distr &&& (mk_event_cond event) in
+        let concl = f_bdHoareS_r {bhs with bhs_s=s; bhs_po=post; bhs_bd=f_r1} in
+        [concl]
+      else 
+        tacuerror "Bound is not independent, intermediate predicate is required."
+
     | PSingleRndParam event, FHle ->
-      let event = event ty_distr in
-      check_indep();
-      let bounded_distr = f_real_le (f_mu distr event) bhs.bhs_bd in
-      let post = bounded_distr &&& (mk_event_cond event) in
-      let concl = f_hoareS bhs.bhs_m bhs.bhs_pr s post in
-      [concl]
+      if is_bd_indep then
+        let event = event ty_distr in
+        let bounded_distr = f_real_le (f_mu distr event) bhs.bhs_bd in
+        let post = bounded_distr &&& (mk_event_cond event) in
+        let concl = f_hoareS bhs.bhs_m bhs.bhs_pr s post in
+        [concl]
+      else 
+        tacuerror "Bound is not independent, intermediate predicate is required."
+
     | PSingleRndParam event, _ ->
-      let event = event ty_distr in
-      check_indep();
-      let bounded_distr = f_cmp (f_mu distr event) bhs.bhs_bd in
-      let post = bounded_distr &&& (mk_event_cond event) in
-      let concl = f_bdHoareS_r {bhs with bhs_s=s; bhs_po=post; bhs_cmp=FHeq; bhs_bd=f_r1} in
-      [concl]
+      if is_bd_indep then
+        let event = event ty_distr in
+        let bounded_distr = f_cmp (f_mu distr event) bhs.bhs_bd in
+        let post = bounded_distr &&& (mk_event_cond event) in
+        let concl = f_bdHoareS_r {bhs with bhs_s=s; bhs_po=post; bhs_cmp=FHeq; bhs_bd=f_r1} in
+        [concl]
+      else 
+        tacuerror "Bound is not independent, intermediate predicate is required."
     | PMultRndParams ((phi,d1,d2,d3,d4),event), _ -> 
-      let event = event ty_distr in
+      let event = match event ty_distr with | None -> mk_event ty_distr | Some event -> event in
       let bd_sgoal = f_cmp (f_real_add (f_real_prod d1 d2) (f_real_prod d3 d4)) bhs.bhs_bd in 
       let sgoal1 = f_bdHoareS_r {bhs with bhs_s=s; bhs_po=phi; bhs_bd=d1} in
       let sgoal2 = 

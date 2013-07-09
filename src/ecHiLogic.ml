@@ -828,7 +828,7 @@ let process_intros ?(cf = true) pis (juc, n) =
         collect (`Clear xs :: maybe_core ()) [] pis
 
     | IPCase x :: pis ->
-        let x = List.map (collect [] []) x in
+        let x = List.map (List.rev -| collect [] []) x in
           collect (`Case x :: maybe_core ()) [] pis
 
     | IPRw x :: pis ->
@@ -866,8 +866,7 @@ let process_intros ?(cf = true) pis (juc, n) =
                     | [] -> t_on_goals elim_top gs
                     | _  ->
                         let t gs =
-                          t_subgoal
-                            (List.map (dointro1 false) pis) (elim_top gs)
+                          t_subgoal (List.map (dointro1 false) pis) (elim_top gs)
                         in
                           t_on_goals t gs
                 end

@@ -1582,7 +1582,8 @@ module NormMp = struct
     let mp  = norm_mpath env mp in
     let top = EcPath.m_functor mp in
     let us  =
-      if EcPath.Sm.mem top rm then us 
+      if EcPath.Sm.mem top rm || EcPath.Sm.mem top us then us 
+          (* If top is in us the module has already be added, nothing to do *)
       else
         let us = 
           match (Mod.by_mpath top env).me_body with
@@ -1592,11 +1593,11 @@ module NormMp = struct
         EcPath.Sm.add top us in
     List.fold_left (add_uses env rm) us mp.EcPath.m_args 
 
-  let top_uses env mp = add_uses env EcPath.Sm.empty EcPath.Sm.empty mp
-
   let norm_restr env restr = 
     EcPath.Sm.fold (fun mp r -> add_uses env EcPath.Sm.empty r mp)
-      EcPath.Sm.empty restr
+      restr EcPath.Sm.empty 
+
+  let top_uses env mp = add_uses env EcPath.Sm.empty EcPath.Sm.empty mp
 
   let norm_xpath env p =
     EcPath.xpath (norm_mpath env p.EcPath.x_top) p.EcPath.x_sub

@@ -121,6 +121,7 @@
 
     "axiom"       , AXIOM      ;        (* KW: global *)
     "lemma"       , LEMMA      ;        (* KW: global *)
+    "realize"     , REALIZE    ;        (* KW: global *)
     "proof"       , PROOF      ;        (* KW: global *)
     "save"        , SAVE       ;        (* KW: global *)
     "qed"         , QED        ;        (* KW: global *)

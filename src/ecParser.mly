@@ -261,6 +261,7 @@
 %token RBRACKET
 %token RCONDF
 %token RCONDT
+%token REALIZE
 %token REQUIRE
 %token RES
 %token RETURN
@@ -310,6 +311,7 @@
 %token <string> OP1 OP2 OP3 OP4
 %token LTCOLON GT LT GE LE
 
+%nonassoc prec_below_comma
 %nonassoc COMMA ELSE
 
 %nonassoc IN
@@ -1699,7 +1701,7 @@ logtactic:
 | FIELDSIMP plus=sform times=sform inv=sform minus=sform z=sform o=sform  eq=sform
     { Pfieldsimp (plus,times,inv,minus,z,o,eq)}
 
-| EXIST a=plist1(loc(fpattern_arg), COMMA)
+| EXIST a=iplist1(loc(fpattern_arg), COMMA) %prec prec_below_comma
    { Pexists a }
 
 | LEFT
@@ -1777,11 +1779,9 @@ phltactic:
     { Prcond (s, false, i) }
 
 | IF s=side?
-    { Pcond (s,None) }
-| IF s=side? r1=sform r2=sform 
-    { Pcond (s,Some(r1,r2)) }
+    { Pcond s }
 
-| SWAP info=plist1(loc(swap_info),COMMA)
+| SWAP info=iplist1(loc(swap_info), COMMA) %prec prec_below_comma
     { Pswap info }
 
 | CFOLD s=side? c=codepos NOT n=NUM
@@ -1844,7 +1844,7 @@ phltactic:
 | ELIM STAR
     { Phr_exists_elim }
 
-| EXIST STAR l=plist1(sform, COMMA)
+| EXIST STAR l=iplist1(sform, COMMA) %prec prec_below_comma
     { Phr_exists_intro l }
 
 | EXFALSO
@@ -1852,8 +1852,8 @@ phltactic:
 
 | BYPR f1=sform f2=sform { PPr(f1,f2) }
 
-| FEL at_pos=NUM cntr=sform delta=sform q=sform f_event=sform some_p=fel_pred_specs
-   {Pfel (at_pos,(cntr,delta,q,f_event,some_p))}
+| FEL at_pos=NUM cntr=sform delta=sform q=sform f_event=sform some_p=fel_pred_specs inv=sform?
+   {Pfel (at_pos,(cntr,delta,q,f_event,some_p,inv))}
 
 | EQOBSIN info=eqobs_in
     { Peqobs_in info }
@@ -1869,10 +1869,12 @@ phltactic:
 ;
 
 fel_pred_spec:
-| f=loc(fident) COLON p=sform  { f,p } 
+| f=loc(fident) COLON p=sform
+    { (f, p) } 
+
 fel_pred_specs:
-  | LBRACKET assoc_ps = plist0(fel_pred_spec,SEMICOLON) RBRACKET
-      {assoc_ps}
+| LBRACKET assoc_ps = plist0(fel_pred_spec, SEMICOLON) RBRACKET
+    {assoc_ps}
 
 eqobs_in:
 | empty                              { (None   , None   , None) }
@@ -1910,9 +1912,7 @@ tactic_core_r:
    { Padmit }
 
 | CASE f=sform
-   { Pcase (f,None) }
-| CASE f=sform r1=sform r2=sform
-   { Pcase (f,Some(r1, r2)) }
+   { Pcase f }
 
 | PROGRESS t=tactic_core?
    { Pprogress t }
@@ -2018,7 +2018,7 @@ clone_lemma_base:
 | x=_ident { `Named x }
 ; 
 
-clone_lemma_1:
+clone_lemma_1_core:
 | l=genqident(clone_lemma_base) {
     match unloc l with
     | (xs, `Named x) -> `Named (mk_loc l.pl_loc (xs, x))
@@ -2030,8 +2030,24 @@ clone_lemma_1:
   }
 ;
 
+clone_lemma_1:
+| cl=clone_lemma_1_core
+    { { pthp_mode = cl; pthp_tactic = None; } }
+
+| cl=clone_lemma_1_core BY t=tactic_core
+    { { pthp_mode = cl; pthp_tactic = Some t; } }
+;
+
+clone_lemma:
+| x=clone_lemma_1
+    { [x] }
+
+| xs=clone_lemma COMMA x=clone_lemma_1
+    { x :: xs }
+;
+
 clone_proof:
-| PROOF x=plist1(clone_lemma_1, COMMA) { x }
+| PROOF x=clone_lemma { List.rev x }
 ;
 
 clone_override:
@@ -2086,6 +2102,13 @@ clone_override:
        prov_body   = f;
      } in
        (x, PTHO_Pred ov) }
+
+| THEORY x=uqident EQ y=uqident
+   { (x, PTHO_Theory y) }
+;
+
+realize:
+| REALIZE x=qident { x }
 ;
 
 (* -------------------------------------------------------------------- *)
@@ -2146,6 +2169,7 @@ global_:
 | axiom            { Gaxiom       $1 }
 | claim            { Gclaim       $1 }
 | tactics_or_prf   { Gtactics     $1 }
+| realize          { Grealize     $1 }
 | gprover_info     { Gprover_info $1 }
 | checkproof       { Gcheckproof  $1 }
 
@@ -2182,6 +2206,15 @@ prog:
 (* -------------------------------------------------------------------- *)
 %inline plist0(X, S):
 | aout=separated_list(S, X) { aout }
+;
+
+iplist1_r(X, S):
+| x=X { [x] }
+| xs=iplist1_r(X, S) S x=X { x :: xs }
+;
+
+%inline iplist1(X, S):
+| xs=iplist1_r(X, S) { List.rev xs }
 ;
 
 %inline plist1(X, S):
