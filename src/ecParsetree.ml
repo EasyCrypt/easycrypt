@@ -388,7 +388,7 @@ and pinline_arg =
 type trepeat = [`All | `Maybe] * int option
 
 type rwarg =
-  | RWDelta of (rwocc * pqsymbol)
+  | RWDelta of (rwside * rwocc * pformula)
   | RWRw    of (rwside * trepeat option * rwocc * ffpattern)
   | RWDone  of bool
   | RWSimpl
