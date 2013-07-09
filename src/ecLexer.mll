@@ -204,18 +204,22 @@ let mident = '&'  (lident | number)
 
 let op_char_1    = ['=' '<' '>']
 let op_char_2    = ['+' '-']
-let op_char_3    = ['*' '/' '%' '\\']
-let op_char_4    = ['!' '$' '&' '?' '@' '^' '|' '#']
+let op_char_3_r  = ['*' '%' '\\']
+let op_char_3    = op_char_3_r | '/'
+let op_char_4    = ['$' '&' '?' '@' '^' '|' '#']
 let op_char_34   = op_char_3 | op_char_4
 let op_char_234  = op_char_2 | op_char_34
 let op_char_1234 = op_char_1 | op_char_234
 
+let op_char_34_r  = op_char_4 | op_char_3_r
+let op_char_234_r = op_char_2 | op_char_34_r
+
 let op1 = op_char_1234* op_char_1 op_char_1234*
-let op2 = op_char_234*  op_char_2 op_char_234+
-let op3 = op_char_34*   op_char_3 op_char_34*
+let op2 = op_char_2 | op_char_2 op_char_234_r op_char_234*
+let op3 = op_char_34* op_char_3 op_char_34*
 let op4 = op_char_4+ | ("::" ':'+)
 
-let uniop = '+' | '-' | '!' | op1
+let uniop = '!' | op2
 
 let binop = 
   op1 | op2 | op3 | op4 | '+' | '-' |
@@ -231,8 +235,8 @@ rule main = parse
   | tident       { TIDENT (Lexing.lexeme lexbuf) }
   | mident       { MIDENT (Lexing.lexeme lexbuf) }
   | number       { NUM (int_of_string (Lexing.lexeme lexbuf)) }
-  | "<<"         {BACKS}
-  | ">>"         {FWDS }
+  | "<<"         { BACKS }
+  | ">>"         { FWDS }
 
   | "(*" binop "*)" { main lexbuf }
   | '(' blank* (binop as s) blank* ')' { PBINOP s }

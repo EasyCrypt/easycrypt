@@ -1,7 +1,7 @@
 require Int.
 
 import why3 "real" "Real"
-  op "prefix -" as "-!".
+  op "prefix -" as "[-]".
 
 theory Abs.
 

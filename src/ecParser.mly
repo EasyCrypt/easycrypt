@@ -1527,13 +1527,11 @@ rwarg:
 | s=rwside r=rwrepeat? o=rwocc? fp=fpattern(form)
     { RWRw (s, r, omap o EcMaps.Sint.of_list, fp) }
 
-| s=rwside r=rwrepeat? o=rwocc? SLASH x=qoident
+| s=rwside r=rwrepeat? o=rwocc? SLASH x=sform_h
     { let loc = EcLocation.make $startpos $endpos in
-        if s <> `LtoR then
-          error loc (Some "delta-folding not supported");
         if r <> None then
           error loc (Some "delta-repeat not supported");
-        RWDelta (omap o EcMaps.Sint.of_list, x); }
+        RWDelta (s, omap o EcMaps.Sint.of_list, x); }
 ;
 
 genpattern:

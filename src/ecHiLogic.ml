@@ -675,7 +675,7 @@ let process_rewrite1_core (s, o) (p, typs, ue, ax) args g =
 
 (* -------------------------------------------------------------------- *)
 let process_rewrite1 loc ri g =
-  let env = LDecl.toenv (get_hyps g) in
+  let (hyps, concl) = get_goal g in
 
   match ri with
   | RWDone b ->
@@ -685,52 +685,106 @@ let process_rewrite1 loc ri g =
   | RWSimpl ->
       t_simplify_nodelta g
 
-  | RWDelta (o, name) ->
-      let (path, tparams, body) =
-        match EcEnv.Op.lookup_opt (unloc name) env with
-        | None -> tacuerror ~loc:name.pl_loc "cannot find symbol to unfold"
-        | Some (path, op) -> begin
+  | RWDelta (s, o, f) -> begin
+      let env      = LDecl.toenv hyps in
+      let (ps, ue) = (ref Mid.empty, unienv_of_hyps hyps) in
+      let p        = TT.trans_pattern env (ps, ue) f in
+      let ev       = EV.of_idents (Mid.keys !ps) in
+    
+      let (tvi, tparams, body, args) =
+        match sform_of_form p with
+        | SFop (p, args) -> begin
+            let op = EcEnv.Op.by_path (fst p) env in
             match op.EcDecl.op_kind with
             | EcDecl.OB_oper None | EcDecl.OB_pred None ->
-                tacuerror ~loc:name.pl_loc "this operator/predicate is abstract"
-            | EcDecl.OB_oper (Some e) -> (path, op.EcDecl.op_tparams, form_of_expr EcFol.mhr e)
-            | EcDecl.OB_pred (Some f) -> (path, op.EcDecl.op_tparams, f)
+                tacuerror "this operator/predicate is abstract"
+            | EcDecl.OB_oper (Some e) ->
+                (snd p, op.EcDecl.op_tparams, form_of_expr EcFol.mhr e, args)
+            | EcDecl.OB_pred (Some f) ->
+                (snd p, op.EcDecl.op_tparams, f, args)
         end
+
+        | SFlocal x when LDecl.reducible_var x hyps ->
+            ([], [], LDecl.reduce_var x hyps, [])
+
+        | _ -> tacuerror "not headed by an operator/predicate"
       in
 
-      let cpos =
-        let f_match _ subject =
-          match sform_of_form subject with
-          | SFop ((p, _), _) when EcPath.p_equal p path -> true
-          | _ -> false
+      let na = List.length args in
+
+      match s with
+      | `LtoR -> begin
+        let ctxt = try_match hyps (ue, ev) p concl in
+  
+        match ctxt with
+        | None -> t_id None g
+        | Some (_ue, tue, ev) -> begin
+            let p    = concretize_form (tue, ev) p in
+            let cpos =
+              let test = fun _ fp ->
+                let fp =
+                  match fp.f_node with
+                  | Fapp (h, hargs) when List.length hargs > na ->
+                      let (a1, a2) = List.take_n na hargs in
+                        f_app h a1 (toarrow (List.map f_ty a2) fp.f_ty)
+                  | _ -> fp
+                in
+                  EcReduction.is_alpha_eq hyps p fp
+              in
+                try  FPosition.select ?o test concl
+                with InvalidOccurence ->
+                  tacuerror "invalid occurences selector"
+            in
+      
+            let concl =
+              FPosition.map cpos
+                (fun fp ->
+                  match sform_of_form fp with
+                  | SFop ((_, tvi), args) -> begin
+                    let subst = EcTypes.Tvar.init tparams tvi in
+                    let body  = EcFol.Fsubst.subst_tvar subst body in
+                    let fp    = f_app body args fp.f_ty in
+                      try  EcReduction.h_red EcReduction.beta_red (get_hyps g) fp
+                      with EcBaseLogic.NotReducible -> fp
+                  end
+
+                  | SFlocal _ ->
+                      assert (args = [] && tparams = []);
+                      body
+
+                  | _ -> assert false)
+                (get_concl g)
+            in
+              t_change concl g
+        end
+      end
+
+      | `RtoL ->
+        let fp =
+          let subst = EcTypes.Tvar.init tparams tvi in
+          let body  = EcFol.Fsubst.subst_tvar subst body in
+          let fp    = f_app body args p.f_ty in
+            try  EcReduction.h_red EcReduction.beta_red (get_hyps g) fp
+            with EcBaseLogic.NotReducible -> fp
         in
-          FPosition.select f_match (get_concl g)
-      in
 
-      let cpos =
-        match o with
-        | None   -> cpos
-        | Some o ->
-            if not (FPosition.is_occurences_valid o cpos) then
-              tacuerror "invalid occurences selector";
-            FPosition.filter o cpos
-      in
+        let ctxt = try_match hyps (ue, ev) fp concl in
+  
+        match ctxt with
+        | None -> t_id None g
+        | Some (_ue, tue, ev) -> begin
+          let p    = concretize_form (tue, ev) p  in
+          let fp   = concretize_form (tue, ev) fp in
+          let cpos =
+            try  FPosition.select_form hyps o fp concl
+            with InvalidOccurence ->
+              tacuerror "invalid occurences selector"
+          in
 
-      let concl =
-        FPosition.map cpos
-          (fun fp ->
-            match sform_of_form fp with
-            | SFop ((_, tvi), args) -> begin
-              let subst = EcTypes.Tvar.init tparams tvi in
-              let body  = EcFol.Fsubst.subst_tvar subst body in
-              let fp    = f_app body args fp.f_ty in
-                try  EcReduction.h_red EcReduction.beta_red (get_hyps g) fp
-                with EcBaseLogic.NotReducible -> fp
-              end
-            | _ -> assert false)
-          (get_concl g)
-      in
-        t_change concl g
+          let concl = FPosition.map cpos (fun _ -> p)  concl in
+            t_change concl g
+        end
+  end
 
   | RWRw (s, r, o, pe) ->
       let do1 g =
