@@ -1238,7 +1238,7 @@ module Ax = struct
         doit [] (fst puc.puc_cont)
     in
     let pucflags = { puc_nosmt = ax.ax_nosmt; puc_local = false; } in
-    let pucflags = ((proofs, Some axenv), pucflags) in
+    let pucflags = ((proofs, snd puc.puc_cont), pucflags) in
     let check    = Check_mode.check scope.sc_options in
 
     let scope = { scope with sc_env = axenv } in
