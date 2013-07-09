@@ -691,7 +691,7 @@ let process_rewrite1 loc ri g =
       let p        = TT.trans_pattern env (ps, ue) f in
       let ev       = EV.of_idents (Mid.keys !ps) in
     
-      let ((_path, tvi), tparams, body, args) =
+      let (tvi, tparams, body, args) =
         match sform_of_form p with
         | SFop (p, args) -> begin
             let op = EcEnv.Op.by_path (fst p) env in
@@ -699,10 +699,14 @@ let process_rewrite1 loc ri g =
             | EcDecl.OB_oper None | EcDecl.OB_pred None ->
                 tacuerror "this operator/predicate is abstract"
             | EcDecl.OB_oper (Some e) ->
-                (p, op.EcDecl.op_tparams, form_of_expr EcFol.mhr e, args)
+                (snd p, op.EcDecl.op_tparams, form_of_expr EcFol.mhr e, args)
             | EcDecl.OB_pred (Some f) ->
-                (p, op.EcDecl.op_tparams, f, args)
-          end
+                (snd p, op.EcDecl.op_tparams, f, args)
+        end
+
+        | SFlocal x when LDecl.reducible_var x hyps ->
+            ([], [], LDecl.reduce_var x hyps, [])
+
         | _ -> tacuerror "not headed by an operator/predicate"
       in
 
@@ -742,7 +746,12 @@ let process_rewrite1 loc ri g =
                     let fp    = f_app body args fp.f_ty in
                       try  EcReduction.h_red EcReduction.beta_red (get_hyps g) fp
                       with EcBaseLogic.NotReducible -> fp
-                    end
+                  end
+
+                  | SFlocal _ ->
+                      assert (args = [] && tparams = []);
+                      body
+
                   | _ -> assert false)
                 (get_concl g)
             in
