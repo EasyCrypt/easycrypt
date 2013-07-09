@@ -490,42 +490,6 @@ module FPosition = struct
     | `Sub p -> tostring p
 
   (* ------------------------------------------------------------------ *)
-  let select test =
-    let rec doit1 ctxt fp =
-      if   test ctxt fp
-      then Some `Select
-      else begin
-        let subp =
-          match fp.f_node with
-          | Fif    (c, f1, f2) -> doit ctxt [c; f1; f2]
-          | Fapp   (f, fs)     -> doit ctxt (f :: fs)
-          | Ftuple fs          -> doit ctxt fs
-          | Flet   (_, f1, f2) -> doit ctxt [f1; f2]
-
-          | Fquant (_, b, f) ->
-            let xs   = List.pmap (function (x, GTty _) -> Some x | _ -> None) b in
-            let ctxt = List.fold_left ((^~) Sid.add) ctxt xs in
-              doit ctxt [f]
-  
-          | _ -> None
-        in
-          omap subp (fun p -> `Sub p)
-      end
-
-    and doit ctxt fps =
-      let fps = List.mapi (fun i fp -> omap (doit1 ctxt fp) (fun p -> (i, p))) fps in
-      let fps = List.pmap identity fps in
-        match fps with
-        | [] -> None
-        | _  -> Some (Mint.of_list fps)
-
-    in
-      fun fp ->
-        match doit Sid.empty [fp] with
-        | None   -> Mint.empty
-        | Some p -> p
-
-  (* ------------------------------------------------------------------ *)
   let occurences =
     let rec doit1 n p =
       match p with
@@ -560,20 +524,53 @@ module FPosition = struct
       not (min < 1 || max > occurences cpos)
 
   (* ------------------------------------------------------------------ *)
-  let select_form hyps o p target =
-    let cpos =
-      let test _ tp = EcReduction.is_alpha_eq hyps p tp in
-        select test target
+  let select ?o test =
+    let rec doit1 ctxt fp =
+      if   test ctxt fp
+      then Some `Select
+      else begin
+        let subp =
+          match fp.f_node with
+          | Fif    (c, f1, f2) -> doit ctxt [c; f1; f2]
+          | Fapp   (f, fs)     -> doit ctxt (f :: fs)
+          | Ftuple fs          -> doit ctxt fs
+          | Flet   (_, f1, f2) -> doit ctxt [f1; f2]
+
+          | Fquant (_, b, f) ->
+            let xs   = List.pmap (function (x, GTty _) -> Some x | _ -> None) b in
+            let ctxt = List.fold_left ((^~) Sid.add) ctxt xs in
+              doit ctxt [f]
+  
+          | _ -> None
+        in
+          omap subp (fun p -> `Sub p)
+      end
+
+    and doit ctxt fps =
+      let fps = List.mapi (fun i fp -> omap (doit1 ctxt fp) (fun p -> (i, p))) fps in
+      let fps = List.pmap identity fps in
+        match fps with
+        | [] -> None
+        | _  -> Some (Mint.of_list fps)
+
     in
+      fun fp ->
+        let cpos =
+          match doit Sid.empty [fp] with
+          | None   -> Mint.empty
+          | Some p -> p
+        in
+          match o with
+          | None   -> cpos
+          | Some o ->
+            if not (is_occurences_valid o cpos) then
+              raise InvalidOccurence;
+            filter o cpos
 
-    assert (not (is_empty cpos));
-
-    match o with
-    | None   -> cpos
-    | Some o ->
-        if not (is_occurences_valid o cpos) then
-          raise InvalidOccurence;
-        filter o cpos
+  (* ------------------------------------------------------------------ *)
+  let select_form hyps o p target =
+    let test _ tp = EcReduction.is_alpha_eq hyps p tp in
+      select ?o test target
 
   (* ------------------------------------------------------------------ *)
   let map (p : ptnpos) (tx : form -> form) (f : form) =

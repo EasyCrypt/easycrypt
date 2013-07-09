@@ -127,7 +127,7 @@ module FPosition : sig
 
   val tostring : ptnpos -> string
 
-  val select : (Sid.t -> form -> bool) -> form -> ptnpos
+  val select : ?o:Sint.t -> (Sid.t -> form -> bool) -> form -> ptnpos
 
   val select_form : LDecl.hyps -> Sint.t option -> form -> form -> ptnpos
 

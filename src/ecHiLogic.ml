@@ -726,18 +726,10 @@ let process_rewrite1 loc ri g =
               in
                 EcReduction.is_alpha_eq hyps p fp
             in
-              FPosition.select test concl
+              try  FPosition.select ?o test concl
+              with InvalidOccurence ->
+                tacuerror "invalid occurences selector"
           in
-
-          let cpos =
-            match o with
-            | None   -> cpos
-            | Some o ->
-                if not (FPosition.is_occurences_valid o cpos) then
-                  tacuerror "invalid occurences selector";
-                FPosition.filter o cpos
-          in
-
     
           let concl =
             FPosition.map cpos
