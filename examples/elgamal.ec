@@ -303,18 +303,18 @@ lemma Pr4_aux (A<:Adv) :
 proof.
  intros Ha1 Ha2.
  fun.
- rnd (1%r / 2%r) ((=) b').
+ rnd ((=) b').
  conseq  (_ : ==> true) .
  intros &m;progress.
  apply (Dbool.mu_x_def (b'{m})).
  call ( _ : true ==> true);try assumption.
  cut H1 : mu [0..Int.(-) q 1] Fun.cpTrue = 1%r by smt.
- wp; rnd (1%r) Fun.cpTrue.
+ wp; rnd Fun.cpTrue.
  conseq (_ : _ ==> true);[assumption | ].
  call (_ : true ==> true);[assumption | ].
- wp; rnd (1%r) Fun.cpTrue.
+ wp; rnd Fun.cpTrue.
  conseq (_ : _ ==> true);[trivial | ].
- rnd (1%r) Fun.cpTrue.
+ rnd Fun.cpTrue.
  conseq (_ : _ ==> true);[trivial | ].
  skip;trivial.
 save.
