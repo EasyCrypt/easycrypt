@@ -10,8 +10,7 @@ module type Adv (O:Or) = {
 }. 
 
 module O = { 
-  var w:int
-  fun o (x:int) : int = { return x + w; }
+  fun o (x:int) : int = { return x; }
 }.
 
 module G (A:Adv) = { 
@@ -26,16 +25,18 @@ module G (A:Adv) = {
   }
 }.
 
-lemma foo3 : forall (A<:Adv{O}), 
-  equiv[G(A).main ~ G(A).main : ={O.w} ==> ={res} && (glob A){1} = (glob A){2}].
+lemma foo3 : forall (A<:Adv), 
+  equiv[G(A).main ~ G(A).main : true ==> ={res} && (glob A){1} = (glob A){2}].
 intros A.
 fun.
-call (_ : ={x,O.w} /\ (glob A){1} = (glob A){2} ==>
+call (_ : ={x} /\ (glob A){1} = (glob A){2} ==>
          ={res} /\ (glob A){1} = (glob A){2}).
-fun (={O.w});[trivial | trivial | ].
+(* It could be greate to detect that since 
+   O do not have state it is not a problem *)
+fun true;[trivial | trivial | ].
 fun;skip;trivial.
-call (_ : ={O.w} ==> ={res} /\ (glob A){1} = (glob A){2}).
-fun (={O.w}) ;try skip;trivial.
+call (_ : true ==> ={res} /\ (glob A){1} = (glob A){2}).
+fun true;try skip;trivial.
 skip;trivial.
 save.
 
