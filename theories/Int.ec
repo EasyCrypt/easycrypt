@@ -77,12 +77,12 @@ end EuclDiv.
 export EuclDiv.
 
 theory Induction.
-  axiom induction: forall (p:int -> bool),
+  axiom nosmt induction: forall (p:int -> bool),
     (p 0) =>
     (forall i, 0 <= i => p i => p (i + 1)) =>
     (forall i, 0 <= i => p i).
 
-  lemma strongInduction: forall (p:int -> bool),
+  lemma nosmt strongInduction: forall (p:int -> bool),
     (forall j, 0 <= j => (forall k, 0 <= k => k < j => p k) => p j) =>
     (forall i, 0 <= i => p i).
   proof strict.
