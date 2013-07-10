@@ -36,7 +36,7 @@ lemma test' : forall &m (a:bitstring), length a = k1+k2 => Pr[Test.test() @ &m :
 intros &m a length_a.
 bdhoare_deno (_ : (true) ==> (a=res)); [|trivial|trivial].
 fun.
-rnd (1%r/(2 ^ (k1 + k2))%r) (=a);skip;smt.
+rnd ((=)a);skip;smt.
 save.
 
 
@@ -45,67 +45,73 @@ axiom k1_pos : 0<= k1.
 axiom k2_pos : 0<= k2.
 
 
+require import Fun.
+
+axiom mu_neg : forall (d:'a distr, p:'a cpred), 
+  mu d (Fun.cpNot p) = mu d (Fun.cpTrue) - mu d p .
+
 lemma test'' : forall &m (a:bitstring), length a = k1+k2 => Pr[Test'.test() @ &m : a=res]=1%r/(2^(k1+k2))%r.
 intros &m a length_a.
 bdhoare_deno (_ : (true) ==> (a=res));[|trivial|trivial].
 fun.
-rnd (1%r/(2 ^ (k2))%r) (=sub a k1 k2).
-rnd (1%r/(2 ^ (k1))%r) (=sub a 0 k1).
-simplify.
-cut pow_distr :  ((2 ^ k2)%r * (2 ^ k1)%r = (2 ^ (k1+k2))%r).
+rnd (z1=sub a 0 k1) (1%r/(2 ^ (k1))%r) (1%r/(2 ^ (k2))%r) (1%r-1%r/(2 ^ (k1))%r) (0%r) (lambda z, z1=sub a 0 k1 /\ z=sub a k1 k2).
 smt.
-rewrite <- pow_distr.
-cut test :  (forall (x:real), x<>0%r => x/x = 1%r).
-smt.
-smt.
-intros &hr _.
-split.
+rnd; skip; progress.
 cut H : (mu_x (Dbitstring.dbitstring k1) (sub a 0 k1) = 1%r/(2^k1)%r).
 apply (Dbitstring.mu_x_def_in k1 (sub a 0 k1) _).
 smt.
-rewrite <- H.
+rewrite - H.
 delta mu_x.
 simplify.
-trivial.
-intros _ v v_in_supp.
+cut -> : (lambda (x : bitstring), x = sub a 0 k1) = ((=) (sub a 0 k1));[apply Fun.fun_ext; smt|trivial].
+(* rnd (1%r/(2 ^ (k1))%r) (=sub a 0 k1). *)
+(* simplify. *)
+(* cut pow_distr :  ((2 ^ k2)%r * (2 ^ k1)%r = (2 ^ (k1+k2))%r). *)
+(* smt. *)
+(* rewrite <- pow_distr. *)
+(* cut test :  (forall (x:real), x<>0%r => x/x = 1%r). *)
+(* smt. *)
+(* smt. *)
+intros &hr J.
 split.
-intros Hv.
-split.
-
-cut H : (mu_x (Dbitstring.dbitstring k2) (sub a k1 k2) = 1%r/(2^k2)%r).
-apply (Dbitstring.mu_x_def_in k2 (sub a k1 k2) _).
-smt.
-(* rewrite <- H. delta. simplify. trivial. *)
-assumption. (* BUG?? *)
-intros _ v0 v0_in_supp.
-split.
+cut H: (mu_x (Dbitstring.dbitstring k2) (sub a k1 k2) = 1%r/(2^k2)%r);
+    [apply (Dbitstring.mu_x_def_in k2 (sub a k1 k2) _);smt|].
+cut -> :  (lambda (z : bool array), z1{hr} = sub a 0 k1 /\ z = sub a k1 k2) =  (lambda (z : bool array), z = sub a k1 k2);
+    [apply Fun.fun_ext; smt|].
+generalize H; delta mu_x; beta; intros H.
+cut -> : (lambda (z : bool array), z = sub a k1 k2) = ((=) (sub a k1 k2)); [apply Fun.fun_ext;smt|].
+rewrite - H. trivial.
 intros H.
-rewrite <- H.
-rewrite <- Hv.
-
-cut Trivial : (sub a k1 k2 = sub a (0+k1) k2).
-smt.
-rewrite Trivial.
-rewrite (sub_append_sub<:bool> a 0 k1 k2 _ _ _ _ ).
-smt.
-smt.
-smt.
-smt.
-rewrite <- length_a.
-rewrite (sub_append_full<:bool> a). 
+intros v _.
 split.
-intros H.
+intros G.
+cut -> : v = sub a k1 k2; [smt|].
+cut -> : z1{hr} = sub a 0 k1; [smt|].
+rewrite - {1} (sub_append_full a). 
+rewrite length_a.
+smt.
+intros.
+intros G.
+simplify.
+split.
+smt.
+smt.
+(********)
+rnd; skip; progress; try smt.
+
+cut -> : (lambda (x : bitstring), ! x = sub a 0 k1) = (Fun.cpNot ( (=) (sub a 0 k1) )).
+apply fun_ext. smt.
+rewrite mu_neg.
+cut -> : (mu ((Dbitstring.dbitstring k1))%Dbitstring (Fun.cpTrue)) = 1%r.
+smt.
+cut H : (mu_x (Dbitstring.dbitstring k1) (sub a 0 k1) = 1%r/(2^k1)%r).
+apply (Dbitstring.mu_x_def_in k1 (sub a 0 k1) _).
+smt.
+generalize H; delta mu_x; simplify; intros H.
 rewrite H.
-smt.
-intros H'.
-cut H'' : (
-      (sub a k1 k2 = (sub a k1 k2) => a = (v || sub a k1 k2))).
-smt.
-rewrite (H'' _).
-smt.
-smt.
 trivial.
-trivial.
+(*****)
+smt.
 save.
 
 
