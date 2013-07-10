@@ -213,6 +213,7 @@ theory Dapply.
   proof strict.
     rewrite /in_supp /mu_x mu_def.
     split=> in_sup. smt.
+    elim in_sup => w. rewrite /in_supp /mu_x => in_sup_w.
     smt.
   save.
 
