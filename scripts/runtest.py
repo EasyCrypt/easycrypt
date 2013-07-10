@@ -153,7 +153,7 @@ def _xunit_dump(config, results):
         root.append(node)
 
     xml = E.tostring(root, method = 'xml', encoding = 'utf-8')
-    return '<?xml version="1.0" encoding="utf-8"?>%s\n' % (xml,)
+    return '<?xml version="1.0" encoding="utf-8"?>\n%s\n' % (xml,)
 
 # --------------------------------------------------------------------
 def _run_test(config, options):

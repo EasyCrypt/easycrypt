@@ -98,7 +98,7 @@ check: ec.native
 	$(CHECK) prelude theories realized unit
 
 check-xunit: ec.native
-	$(CHECK) --xunit="$(XUNITOUT)" prelude theories realized unit
+	$(CHECK) --xunit="$(XUNITOUT)" prelude
 
 checklibs: ec.native
 	$(CHECK) --xunit=libresults.xml prelude theories realized
