@@ -113,7 +113,7 @@ def _xunit_dump(config, results):
         ok = [x for x in group if     x.success]
         ko = [x for x in group if not x.success]
 
-        node = E.Element('node',
+        node = E.Element('testsuite',
                          name      = gname,
                          hostname  = config.hostname,
                          timestamp = config.timestamp.isoformat(),
@@ -153,7 +153,7 @@ def _xunit_dump(config, results):
         root.append(node)
 
     xml = E.tostring(root, method = 'xml', encoding = 'utf-8')
-    return '<?xml version="1.0" encoding="utf-8"?>\n%s\n' % (xml,)
+    return '<?xml version="1.0" encoding="utf-8"?>%s\n' % (xml,)
 
 # --------------------------------------------------------------------
 def _run_test(config, options):
