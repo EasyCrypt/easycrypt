@@ -201,6 +201,15 @@ case (x0 = x)=> x0_x.
     rewrite dom_def ISet.mem_rm_neq //; smt.
 qed.
 
+lemma in_dom_rm: forall x y (m:('a,'b) map),
+  in_dom x (rm y m) = (in_dom x m /\ !x = y).
+intros=> x y m; rewrite -2!dom_def; case (x = y)=> x_y.
+  by subst y; simplify; rewrite dom_rm; (cut h: !ISet.mem x (ISet.rm x (dom m));
+       first apply ISet.mem_rm_eq);
+       smt.
+  by simplify; simplify; rewrite dom_rm; rewrite ISet.mem_rm_neq.
+qed.
+
 (** eq_except*)
 pred eq_except (m1 m2:('a,'b) map) x =
   forall y, x <> y => m1.[y] = m2.[y].
@@ -232,7 +241,7 @@ intros=> m1 m2 x eqe m1_x_nnone;
 apply map_ext; delta (==) beta=> x';
 cut m1_x_some: exists z, m1.[x] = Some z.
   generalize m1_x_nnone; apply absurd; simplify; smt.
-elim m1_x_some=> {m1_x_some} z m1_x_some; rewrite m1_x_some proj_def; smt.
+elim m1_x_some=> {m1_x_some} z m1_x_some; rewrite m1_x_some proj_some; smt.
 qed.
 
 (** disj *)
@@ -287,8 +296,11 @@ lemma splitm_rm: forall (m m1 m2:('a,'b) map) x,
   !in_dom x m2 =>
   splitm (rm x m) (rm x m1) m2.
 proof strict.
-by intros=> m m1 m2 x splitm_m x_nin_m2; delta splitm beta;
-   progress; smt.
+intros=> m m1 m2 x splitm_m x_nin_m2; rewrite /splitm;
+progress; first 2 smt.
+  by elim splitm_m=> disj {disj} [doms _]; rewrite in_dom_rm doms; smt.
+  smt.
+  smt.
 qed.
 
 (** pre *)

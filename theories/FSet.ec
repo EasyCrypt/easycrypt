@@ -544,13 +544,14 @@ axiom interval_pos : forall (x y:int), x <= y => interval x y = add y (interval 
 
 lemma mem_interval : forall (x y a:int), (mem a (interval x y)) <=> (x <= a <= y).
   intros x y a.
-  case (x <= y)=> h;last smt.
-  rewrite (_ : y = (y-x+1)-1+x);first smt.
-  elimT Int.Induction.induction (y-x+1);[smt| |smt].
-  intros j hh hrec.
+  case (x <= y)=> x_le_y;last smt.
+  cut ->: y = (y - x + 1) - 1 + x;first smt.
+  elim/Int.Induction.induction (y - x + 1);[smt| |smt].
+  intros j j_pos IH.
   rewrite interval_pos;first smt.
-  rewrite (_:j - 1 + x - 1=j - 1 - 1 + x);first smt.
-  rewrite mem_add hrec.
+  rewrite mem_add.
+  rewrite (_:j + 1 - 1 + x - 1 = j - 1 + x);first smt.
+  rewrite IH.
   smt.
 save.
 
@@ -560,9 +561,9 @@ lemma card_interval_max : forall x y, card (interval x y) = max (y - x + 1) 0.
   intros h.
   rewrite (_:interval x y=interval x (x+(y-x+1)-1));first smt.
   rewrite (_:max (y - x + 1) 0 = y-x+1);first smt.
-  elimT Int.Induction.induction (y-x+1);[smt| |smt].
+  elim/Int.Induction.induction (y-x+1);[smt| |smt].
   intros j hh hrec.
-  rewrite (interval_pos x (x+j-1) _);smt.
+  rewrite (interval_pos x (x+(j+1)-1) _);smt.
 save.
 
 lemma dec_interval : forall (x y:int),
@@ -690,7 +691,7 @@ theory Dinter_uni.
 
   lemma dinter_is_dinter: forall i j, dinter i j = Distr.Dinter.dinter i j.
   proof strict.
-  intros=> i j; rewrite -mu_ext=> x; case (in_supp x (dinter i j))=> supp_x.
+  intros=> i j; rewrite -pw_eq=> x; case (in_supp x (dinter i j))=> supp_x.
     rewrite mu_x_def_in // Distr.Dinter.mu_x_def_in; smt. (* cut in_supp dinter = in_supp dinter_uni *)
     rewrite mu_x_def_nin // Distr.Dinter.mu_x_def_notin; smt.
   qed.
