@@ -9,33 +9,14 @@
 \newcommand{\tacname}{Error tacname}
 \newcommand{\vtacname}{Error tacname}
 
-\newcommand{\makeAmbient}[3]{
+\newcommand{\addTactic}[3]{
   \expandafter\def\expandafter\ambientKeywords\expandafter{\ambientKeywords,#1}
   \renewcommand{\tacname}{\rawec{#1}}
   \renewcommand{\vtacname}{#1}
   \index{ambient}{#1@\rawec{#1}}
   \subsubsection{#1}
-  \Syntax \rawec{#1} #2
-  \Description #3
-  \renewcommand{\tacname}{Error tacname}
-  \renewcommand{\vtacname}{Error tacname}
-}
-
-\newcommand{\ambientLambda}{}
-\newcommand{\addLambda}[3]{
-  \expandafter\def\expandafter\ambientLambda\expandafter{\ambientLambda\makeAmbient{#1}{#2}{#3}}
-}
-\newcommand{\ambientLogic}{}
-\newcommand{\addLogic}[3]{
-  \expandafter\def\expandafter\ambientLogic\expandafter{\ambientLogic\makeAmbient{#1}{#2}{#3}}
-}
-\newcommand{\ambientAuto}{}
-\newcommand{\addAuto}[3]{
-  \expandafter\def\expandafter\ambientAuto\expandafter{\ambientAuto\makeAmbient{#1}{#2}{#3}}
-}
-\newcommand{\ambientOther}{}
-\newcommand{\addOther}[3]{
-  \expandafter\def\expandafter\ambientOther\expandafter{\ambientOther\makeAmbient{#1}{#2}{#3}}
+  \Syntax \ec{#1} #2
+  \Description
 }
 
 
@@ -58,7 +39,11 @@
 
 \newcommand{\refdef}[1]{\emph{#1}(\ref{#1})}
 
-\newcommand{\ambientDesc}{
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% END DEFS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 \subsection{Generalities}
 
 \EasyCrypt ambient logic is based on non-dependent higher-order logic.
@@ -87,71 +72,59 @@ that are equal up to a given amount of computations.
 \end{tabular}
 \end{center}
 
-    \ambientLambda
-
-\subsection{Logic}
-    \ambientLogic
-
-\subsection{Automatic}
-    \ambientAuto
-
-\subsection{Others}
-    \ambientOther
-}
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % LAMBDA
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+\subsection{Lambda}
+
 %change
-\addLambda{change}
-{\tacarg{f}{formula}}
-{Change the current goal to the $\leftrightarrow^*$-equivalent one \ec{f}
+\addTactic{change}{\tacarg{f}{formula}}
+Change the current goal to the $\leftrightarrow^*$-equivalent one \ec{f}
 \begin{displaymath}
   \infrule{\phi_1 \leftrightarrow^*_{\Env;\Gamma} \phi_2 \quad
            \Env; \Gamma \vdash \phi_1}
           {\Env; \Gamma \vdash \phi_2}
-\end{displaymath}}
+\end{displaymath}
 
 %beta
-\addLambda{beta}{}
-{Change the goal with its $\beta$-head normal-form.}
+\addTactic{beta}{}
+Change the goal with its $\beta$-head normal-form.
 
 %iota
-\addLambda{iota}{}
-{Change the goal with its $\iota$-head normal-form.}
+\addTactic{iota}{}
+Change the goal with its $\iota$-head normal-form.
 
 %zeta
-\addLambda{zeta}{}
-{Change the goal with its $\zeta$-head normal-form.}
+\addTactic{zeta}{}
+Change the goal with its $\zeta$-head normal-form.
 
 %logic
-\addLambda{logic}{}
-{Change the goal with its $\Lambda$-head normal-form.}
+\addTactic{logic}{}
+Change the goal with its $\Lambda$-head normal-form.
 
 %delta
-\addLambda{delta}{\tacarg{names}{ident*}}
-{Do one step of parallel, strong $\delta$-reduction, restricted to
+\addTactic{delta}{\tacarg{names}{ident*}}
+Do one step of parallel, strong $\delta$-reduction, restricted to
  the symbols designed by \ec{names}. If \ec{names} if empty, no restriction
- on the $\delta$-reduction is applied.}
+ on the $\delta$-reduction is applied.
 
 %simplify
-\addLambda{simplify}{\tacarg{names}{ident*} | \var{delta}$\!\!$?}
-{Change the goal with its $\beta\iota\zeta\Lambda$-head normal-form, followed
+\addTactic{simplify}{\tacarg{names}{ident*} | \var{delta}$\!\!$?}
+Change the goal with its $\beta\iota\zeta\Lambda$-head normal-form, followed
  by one step of parallel, strong $\delta$-reduction if \ec{delta} is given.
  The $\delta$-reduction can be restricted to a set of defined symbols by
- replacing \ec{delta} by the non-empty sequence of targeted symbols.}
+ replacing \ec{delta} by the non-empty sequence of targeted symbols.
 
 %congr
-\addLambda
-{congr}{}
-{This tactic applies to a goal of the form \ec{f t1 ... tn = f u1 ... un}
+\addTactic{congr}{}
+This tactic applies to a goal of the form \ec{f t1 ... tn = f u1 ... un}
  replacing it by  the subgoals \ec{ti = ui} for all \ec{i}. Note that subgoals
- solvable by \ec{reflexivity} are automatically closed.}
+ solvable by \ec{reflexivity} are automatically closed.
 
 %generalize
-\addLogic{generalize}{\tacarg{p}{pattern}}{
+\addTactic{generalize}{\tacarg{p}{pattern}}
 Search for the first subterm of the goal matching \ec{p} and leading
 to the full instantiation of the pattern. Then, do a logical
 generalization of all the occurrences of \ec{p}, after instantiation,
@@ -160,11 +133,11 @@ in the goal.
   \infrule{\Env; \Gamma \vdash p \quad
            \Env; \Gamma \vdash \forall x, \phi(x)}
           {\Env; \Gamma \vdash \phi(p)}
-\end{displaymath}}
+\end{displaymath}
 
 %pose
-\addLambda{pose}{\tacarg{x}{ident} \rawec{:=} \tacarg{p}{pattern}}
-{Search for the first subterm of the goal matching \ec{p} and leading
+\addTactic{pose}{\tacarg{x}{ident} \rawec{:=} \tacarg{p}{pattern}}
+Search for the first subterm of the goal matching \ec{p} and leading
 to the full instantiation of the pattern. Then, introduce, after
 instantiation, the local definition \rawec{x := p} and abstract
 all the occurrences of \ec{p} in the goal by \ec{x}
@@ -172,11 +145,17 @@ all the occurrences of \ec{p} in the goal by \ec{x}
   \infrule{\Env; \Gamma \vdash p \quad
            \Env; \Gamma, x := p \vdash \phi(x)}
           {\Env; \Gamma \vdash \phi(p)}
-\end{displaymath}}
+\end{displaymath}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% LOGIC
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection{Logic}
 
 %split
-\addLogic{split}{}
-{\tacname{} breaks a goal that is intrinsically conjunctive into multiple subgoals.
+\addTactic{split}{}
+\tacname{} breaks a goal that is intrinsically conjunctive into multiple subgoals.
  For instance, it
  \begin{itemize}
   \item closes any goal that is \refdef{convertible} to \ec{true} or provable
@@ -217,44 +196,42 @@ all the occurrences of \ec{p} in the goal by \ec{x}
            \Env; \Gamma \vdash a_n = b_n}
           {\Gamma \vdash (a_1, ..., a_n) = (b_1, ..., b_n)}
   \end{displaymath}
-\end{itemize}}
+\end{itemize}
 
 %left
-\addLogic{left}{}
-{Reduce a disjunctive goal to its left part
+\addTactic{left}{}
+Reduce a disjunctive goal to its left part
 \begin{displaymath}
   \infrule{\Env; \Gamma \vdash \phi_1}{\Env; \Gamma \vdash \phi_1 \lor \phi_2}
-\end{displaymath}}
+\end{displaymath}
 
 %right
-\addLogic{right}{}
-{Reduce a disjunctive goal to its right part
+\addTactic{right}{}
+Reduce a disjunctive goal to its right part
 \begin{displaymath}
   \infrule{\Env; \Gamma \vdash \phi_2}{\Env; \Gamma \vdash \phi_1 \lor \phi_2}
-\end{displaymath}}
+\end{displaymath}
 
 %case
-\addLogic{case}{\tacarg{f}{formula}}
-{Do an excluded-middle case analysis on \ec{f}
+\addTactic{case}{\tacarg{f}{formula}}
+Do an excluded-middle case analysis on \ec{f}
 \begin{displaymath}
   \infrule{\Env; \Gamma \vdash b \Rightarrow \phi(true) \quad
            \Env; \Gamma \vdash \neg b \Rightarrow \phi(false)}
           {\Env; \Gamma \vdash \phi(b)}
-\end{displaymath}}
+\end{displaymath}
 
 %assumption
-\addLogic{assumption}{}
-{Search in the context an hypothesis \refdef{convertible} to the goal and close it.
+\addTactic{assumption}{}
+Search in the context an hypothesis \refdef{convertible} to the goal and close it.
  If no such hypothesis exists, the tactic fails
 \begin{displaymath}
   \infrule{(h : \phi) \in \Gamma}{\Env; \Gamma \vdash \phi}
-\end{displaymath}}
+\end{displaymath}
 
 %intros
-\addLogic
-{intros}
-{\tacarg{x}{\_|ident}}
-{This tactics permits to remove of your goal : a forall, the left side af an application or a let assignement by pushing it into your \refdef{context}.
+\addTactic{intros}{\tacarg{x}{\_|ident}}
+This tactics permits to remove of your goal : a forall, the left side af an application or a let assignement by pushing it into your \refdef{context}.
 Easycrypt checks that \vararg{x} is not already present in the \refdef{environment}.
 \begin{displaymath}
   \infrule{\Gamma,x = a \vdash G(x)}{\Gamma \vdash let x = a in G(x)}
@@ -274,22 +251,22 @@ Easycrypt checks that \vararg{x} is not already present in the \refdef{environme
 \env{h1}{a=3}
 }
 {b = 3}
-}
+
 
 %cut
-\addLogic{cut}
-{\tacarg{ip}{intro-pattern} : \tacarg{C}{formula}}
-{Logical cut. Generates two subgoals: on for $C$ (the cut formula),
+\addTactic{cut}{\tacarg{ip}{intro-pattern} : \tacarg{C}{formula}}
+Logical cut. Generates two subgoals: on for $C$ (the cut formula),
  and one for $C \Rightarrow G$ where $G$ is the initial goal. Moreover,
  the intro-pattern \ec{ip} is applied to the second subgoal.
 \begin{displaymath}
   \infrule{\Env; \Gamma \vdash C \quad
            \Env; \Gamma, \vdash C \Rightarrow G}
           {\Env; \Gamma \vdash G}
-\end{displaymath}}
+\end{displaymath}
 
 %elim
-\addLogic{elim}{\tacarg{h}{ident}}{This tactics take as argument the name of a \refdef{judgment} from the \refdef{context} or the \refdef{scope}.
+\addTactic{elim}{\tacarg{h}{ident}}
+This tactics take as argument the name of a \refdef{judgment} from the \refdef{context} or the \refdef{scope}.
 \begin{displaymath}
   \infrule{\Gamma, h:A \land B \vdash A \Rightarrow B \Rightarrow G}{\Gamma, h:A \land B \vdash G}
   ~~~~~~
@@ -297,43 +274,45 @@ Easycrypt checks that \vararg{x} is not already present in the \refdef{environme
 \end{displaymath}\\
 \begin{displaymath}
   \infrule{\Gamma, h:(a_1, ..., a_n) = (b_1, ..., b_n) \vdash a_1 = b_1 \Rightarrow ... \Rightarrow a_n = b_n \Rightarrow G}{\Gamma, h:(a_1, ..., a_n) = (b_1, ..., b_n) \vdash G}
-\end{displaymath}}
+\end{displaymath}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% AUTO
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection{Automatic}
 
 %smt
-\addAuto
-{smt}
-{[\ec{nolocal}]}
-{Try to solve the goal using SMT solvers. The goal is sent along with all the
+\addTactic{smt}{[\ec{nolocal}]}
+Try to solve the goal using SMT solvers. The goal is sent along with all the
  lemmas proved so far plus the local hypotheses, unless the \ec{nolocal} is
  given.
  
  \noindent
  \warningbox{Not all lemmas can be sent translated in such a way that they can
   be sent to the SMT provers. For instance, any formulas involving pRHL
-  constructions are ignored.}}
+  constructions are ignored.}
 
 %apply
-\addAuto{apply}
-{\tacarg{p}{proof-term}}
-{Modus Ponens. If \ec{p} is a proof-term for the pattern (formula) for
+\addTactic{apply}{\tacarg{p}{proof-term}}
+Modus Ponens. If \ec{p} is a proof-term for the pattern (formula) for
   \begin{center}
     \ec{forall (x1 : t1) ... (xn : tn), A1 -> ... -> An -> B}
   \end{center}
   \noindent then \tacname{} tries to match B with the current G. If the
   match succeeds and leads to the full instantiation of the pattern,
   then the goal is replaced, after instantiation, with the $n$ subgoals
-  \ec{A1, ..., An}}
+  \ec{A1, ..., An}
 
 %rewrite
-\addAuto
-{rewrite}
-{rw1 ... rw${}_n$ where the rw${}_i$ are of the form \ec{//},
+\addTactic{rewrite}{rw1 ... rw${}_n$ where the rw${}_i$ are of the form \ec{//},
 \ec{/=}, \ec{//=}, a proof-term or a pattern prefixed by \ec{/}
 (slash). The two last forms can be prefixed by a direction indicator (the sign
 \ec{-}), followed by an occurrence selector (\ec{\{i1 ... in\}}),
 followed by repetition marker (\ec{!}, \ec{?}, \ec{i!} or \ec{i?}). All
 these prefixes are optional.}
-{Depending on the form of \ec{rw}, \tacname{} \ec{rw} does the following:
+Depending on the form of \ec{rw}, \tacname{} \ec{rw} does the following:
   \begin{itemize}
    \item Call \rawec{trivial} if \ec{rw} is \ec{//},
    \item Call \rawec{simplify} if \ec{rw} is \ec{/=},
@@ -382,32 +361,37 @@ these prefixes are optional.}
   \medskip
 
   Last, \tacname{} \ec{rw1 ... rwn} is equivalent to
-  \tacname{} \ec{rw1}; ...; \tacname{} \ec{rwn}}
+  \tacname{} \ec{rw1}; ...; \tacname{} \ec{rwn}
 
 %elimT
-\addAuto
-{elim}
-{$\!\!$/\tacarg{h}{ident} \tacarg{f}{pattern}}
-{Apply the induction principle \vararg{h} on \vararg{x}}
+\addTactic{elim}{$\!\!$/\tacarg{h}{ident} \tacarg{f}{pattern}}
+Apply the induction principle \vararg{h} on \vararg{x}
 
 %subst
-\addAuto
-{subst}
-{\tacarg{x}{ident}?}
-{Search for the first equation of the form \ec{x = f} or \ec{f = x} in the context
+\addTactic{subst}{\tacarg{x}{ident}?}
+Search for the first equation of the form \ec{x = f} or \ec{f = x} in the context
  and replace all the occurrences of \ec{x} by \ec{f} everywhere in the context and the
  goal before clearing it. If no idents are given, repeatedly apply the tactic to
- all identifiers for which such an equation exists.}
+ all identifiers for which such an equation exists.
 
 %progress
-\addAuto{progress}{}{Split all you hypothesis, make all subsitution possible and then split your goal and do it again on all subgoals. It
-permits to easly break a big judgements in smaller one.}
+\addTactic{progress}{}
+Split all you hypothesis, make all subsitution possible and then split your goal and do it again on all subgoals. It
+permits to easly break a big judgements in smaller one.
 
 %trivial
-\addAuto{trivial}{}{If what remains in yout goal is very simple and not need an smt you can try using this tactic. TODO}
+\addTactic{trivial}{}
+If what remains in yout goal is very simple and not need an smt you can try using this tactic. TODO
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% OTHER
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection{Other}
 
 %idtac
-\addOther
-{idtac}
-{\tacarg{x}{string}?}
-{The identity tactic, leaving the goal unchanged and printing the string argument, if any.}
+\addTactic{idtac}{\tacarg{x}{string}?}
+The identity tactic, leaving the goal unchanged and printing the string argument, if any.
+

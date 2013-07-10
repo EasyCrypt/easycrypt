@@ -211,7 +211,6 @@
 
 \newcommand{\ecimport}[4][]{\lstinputlisting[language=easycrypt,linerange=#4,caption=#2,#1]{#3}}
 
-\def\createEasycrypt#1\relax{
 \lstdefinelanguage{easycrypt}{
   style=easycrypt-default,
 %  procnamekeys={op,pred,fun},
@@ -223,15 +222,13 @@
   morekeywords=[4]{while,if},
   morekeywords=[5]{theory,end,clone,import,export,as,with,section},
   morekeywords=[6]{forall,exists,lambda},
-  morekeywords=[7]{#1},
+  morekeywords=[7]{idtac,change,beta,iota,zeta,logic,delta,simplify,congr,generalize,pose,split,left,right,case,intros,cut,elim,apply,rewrite,elimT,subst,progress,trivial},
+  morekeywords=[8]{by,assumption,smt},
+  morekeywords=[9]{first,last},
 %  moredirectives={prover,print}, % Incomplete
   morecomment=[n][\itshape]{(*}{*)},
   morecomment=[n][\bfseries]{(**}{*)}
 }
-}
-
-\input{ambient}
-\expandafter\createEasycrypt \ambientKeywords \relax
 
 \lstdefinestyle{easycrypt-default}{
   columns=fullflexible,
@@ -251,7 +248,9 @@
   keywordstyle=[4]{\bfseries},
   keywordstyle=[5]{\bfseries\color{OliveGreen}},
   keywordstyle=[6]{\itshape\color{Blue}},
-  keywordstyle=[7]{\itshape\color{Red}},
+  keywordstyle=[7]{\itshape\color{Blue}},
+  keywordstyle=[8]{\itshape\color{Red}},
+  keywordstyle=[9]{\itshape\color{Green}},
   literate={phi}{{$\!\phi\,$}}1
            {phi1}{{$\!\phi_1$}}1
            {phi2}{{$\!\phi_2$}}1

@@ -79,7 +79,7 @@ export EuclDiv.
 theory Induction.
   axiom induction: forall (p:int -> bool),
     (p 0) =>
-    (forall j, 0 < j => p (j - 1) => p j) =>
+    (forall j, 0 <= j => p j => p (j + 1)) =>
     (forall i, 0 <= i => p i).
 
   lemma strongInduction:
@@ -104,7 +104,7 @@ theory Power.
     apply (Induction.induction (lambda n, 0 < x ^ n) _ _ n _).
     smt.
     simplify; intros j _ _.
-    cut W: (x ^ j = x * (x ^ (j - 1))); smt.
+    cut W: (x ^ (j + 1) = x * (x ^ j)); smt.
     smt.
   qed.
 end Power.
