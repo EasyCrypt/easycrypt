@@ -360,47 +360,44 @@ module Hsform = Why3.Hashcons.Make (struct
     | Fif (f1, f2, f3) -> union f_fv [f1; f2; f3]
 
     | Fquant(_, b, f) -> 
-        let do1 fv (id, ty) = fv_union (gty_fv ty) (Mid.remove id fv) in
-          List.fold_left do1 (f_fv f) b 
+      let do1 (id, ty) fv = fv_union (gty_fv ty) (Mid.remove id fv) in
+      List.fold_right do1 b (f_fv f) 
 
     | Flet(lp, f1, f2) ->
-        let fv2 = fv_diff (f_fv f2) (lp_fv lp) in
-          fv_union (f_fv f1) fv2
+      let fv2 = fv_diff (f_fv f2) (lp_fv lp) in
+      fv_union (f_fv f1) fv2
 
     | FhoareF hf ->
-        let fv = fv_union (Mid.remove mhr (f_fv hf.hf_pr)) 
-          (Mid.remove mhr (f_fv hf.hf_po)) in
-        EcPath.x_fv fv hf.hf_f
+      let fv = fv_union (f_fv hf.hf_pr) (f_fv hf.hf_po) in
+      EcPath.x_fv (Mid.remove mhr fv) hf.hf_f
 
     | FhoareS hs ->
-        let fv = fv_union (f_fv hs.hs_pr) (f_fv hs.hs_po) in
-        let fv = Mid.remove mhr fv in
-          fv_union (EcModules.s_fv hs.hs_s) fv
+      let fv = fv_union (f_fv hs.hs_pr) (f_fv hs.hs_po) in
+      fv_union (EcModules.s_fv hs.hs_s) (Mid.remove (fst hs.hs_m) fv)
 
     | FbdHoareF bhf ->
-        let fv = fv_union
-          (Mid.remove mhr  (f_fv bhf.bhf_pr)) 
-          (Mid.remove mhr (f_fv bhf.bhf_po)) in
-        let fv = EcPath.x_fv fv bhf.bhf_f in
-          fv_union (f_fv bhf.bhf_bd) fv
+      let fv = 
+        fv_union (f_fv bhf.bhf_pr)
+          (fv_union (f_fv bhf.bhf_po) (f_fv bhf.bhf_bd)) in
+      EcPath.x_fv (Mid.remove mhr fv) bhf.bhf_f
 
     | FbdHoareS bhs ->
-        let fv = fv_union (f_fv bhs.bhs_pr) (f_fv bhs.bhs_po) in
-        let fv = Mid.remove mhr fv in
-        let fv = fv_union (EcModules.s_fv bhs.bhs_s) fv in
-        fv_union (f_fv bhs.bhs_bd) fv
+      let fv = 
+        fv_union (f_fv bhs.bhs_pr) 
+          (fv_union (f_fv bhs.bhs_po) (f_fv bhs.bhs_bd)) in
+      fv_union (EcModules.s_fv bhs.bhs_s) (Mid.remove (fst bhs.bhs_m) fv)
 
     | FequivF ef ->
         let fv = fv_union (f_fv ef.ef_pr) (f_fv ef.ef_po) in
         let fv = fv_diff fv fv_mlr in
-          EcPath.x_fv (EcPath.x_fv fv ef.ef_fl) ef.ef_fr
+        EcPath.x_fv (EcPath.x_fv fv ef.ef_fl) ef.ef_fr
 
     | FequivS es ->
         let fv = fv_union (f_fv es.es_pr) (f_fv es.es_po) in
-        let fv = fv_diff fv fv_mlr in
-          fv_union fv (fv_union
-                         (EcModules.s_fv es.es_sl)
-                         (EcModules.s_fv es.es_sr))
+        let ml, mr = fst es.es_ml, fst es.es_mr in
+        let fv = fv_diff fv (Sid.add ml (Sid.singleton mr)) in
+        fv_union fv 
+          (fv_union (EcModules.s_fv es.es_sl) (EcModules.s_fv es.es_sr))
 
     | Fpr (m,mp,args,event) ->
         let fve = Mid.remove mhr (f_fv event) in
@@ -1187,75 +1184,76 @@ module Fsubst = struct
             { hf_pr = pr'; hf_po = po'; hf_f = mp'; }
 
     | FhoareS hs ->
-        assert (not (Mid.mem mhr s.fs_mem));
+        assert (not (Mid.mem (fst hs.hs_m) s.fs_mem));
         let es  = e_subst_init s.fs_freshen s.fs_sty.ts_p s.fs_ty s.fs_mp in
         let pr' = f_subst s hs.hs_pr in
         let po' = f_subst s hs.hs_po in
         let st' = EcModules.s_subst es hs.hs_s in
-        let me' = EcMemory.me_substm s.fs_sty.ts_p s.fs_mp s.fs_mem s.fs_ty hs.hs_m in
-          FSmart.f_hoareS (fp, hs)
-            { hs_pr = pr'; hs_po = po'; hs_s = st'; hs_m = me'; }
+        let me' = 
+          EcMemory.me_substm s.fs_sty.ts_p s.fs_mp s.fs_mem s.fs_ty hs.hs_m in
+        FSmart.f_hoareS (fp, hs)
+          { hs_pr = pr'; hs_po = po'; hs_s = st'; hs_m = me'; }
   
     | FbdHoareF bhf ->
-        assert (not (Mid.mem mhr s.fs_mem) && not (Mid.mem mhr s.fs_mem));
-        let pr' = f_subst s bhf.bhf_pr in
-        let po' = f_subst s bhf.bhf_po in
-        let mp' = EcPath.x_substm s.fs_sty.ts_p s.fs_mp bhf.bhf_f in
-        let bd' = f_subst s bhf.bhf_bd in
-          FSmart.f_bdHoareF (fp, bhf)
-            { bhf with bhf_pr = pr'; bhf_po = po'; bhf_f = mp'; bhf_bd = bd'; }
+      assert (not (Mid.mem mhr s.fs_mem) && not (Mid.mem mhr s.fs_mem));
+      let pr' = f_subst s bhf.bhf_pr in
+      let po' = f_subst s bhf.bhf_po in
+      let mp' = EcPath.x_substm s.fs_sty.ts_p s.fs_mp bhf.bhf_f in
+      let bd' = f_subst s bhf.bhf_bd in
+      FSmart.f_bdHoareF (fp, bhf)
+        { bhf with bhf_pr = pr'; bhf_po = po'; bhf_f = mp'; bhf_bd = bd'; }
 
     | FbdHoareS bhs ->
-        assert (not (Mid.mem mhr s.fs_mem));
-        let es  = e_subst_init s.fs_freshen s.fs_sty.ts_p s.fs_ty s.fs_mp in
-        let pr' = f_subst s bhs.bhs_pr in
-        let po' = f_subst s bhs.bhs_po in
-        let st' = EcModules.s_subst es bhs.bhs_s in
-        let me' = EcMemory.me_substm s.fs_sty.ts_p s.fs_mp s.fs_mem s.fs_ty bhs.bhs_m in
-        let bd' = f_subst s bhs.bhs_bd in
-          FSmart.f_bdHoareS (fp, bhs)
-            { bhs with bhs_pr = pr'; bhs_po = po'; bhs_s = st';
-                       bhs_bd = bd'; bhs_m  = me'; }
+      assert (not (Mid.mem (fst bhs.bhs_m) s.fs_mem));
+      let es  = e_subst_init s.fs_freshen s.fs_sty.ts_p s.fs_ty s.fs_mp in
+      let pr' = f_subst s bhs.bhs_pr in
+      let po' = f_subst s bhs.bhs_po in
+      let st' = EcModules.s_subst es bhs.bhs_s in
+      let me' = 
+        EcMemory.me_substm s.fs_sty.ts_p s.fs_mp s.fs_mem s.fs_ty bhs.bhs_m in
+      let bd' = f_subst s bhs.bhs_bd in
+      FSmart.f_bdHoareS (fp, bhs)
+        { bhs with bhs_pr = pr'; bhs_po = po'; bhs_s = st';
+          bhs_bd = bd'; bhs_m  = me'; }
   
     | FequivF ef ->
-        assert (not (Mid.mem mleft s.fs_mem) && not (Mid.mem mright s.fs_mem));
-        let m_subst = EcPath.x_substm s.fs_sty.ts_p s.fs_mp in 
-
-        let pr' = f_subst s ef.ef_pr in
-        let po' = f_subst s ef.ef_po in
-        let fl' = m_subst ef.ef_fl in
-        let fr' = m_subst ef.ef_fr in
-
-          FSmart.f_equivF (fp, ef)
-            { ef_pr = pr'; ef_po = po'; ef_fl = fl'; ef_fr = fr'; }
+      assert (not (Mid.mem mleft s.fs_mem) && not (Mid.mem mright s.fs_mem));
+      let m_subst = EcPath.x_substm s.fs_sty.ts_p s.fs_mp in 
+      let pr' = f_subst s ef.ef_pr in
+      let po' = f_subst s ef.ef_po in
+      let fl' = m_subst ef.ef_fl in
+      let fr' = m_subst ef.ef_fr in
+      FSmart.f_equivF (fp, ef)
+        { ef_pr = pr'; ef_po = po'; ef_fl = fl'; ef_fr = fr'; }
 
     | FequivS eqs -> 
-        assert (not (Mid.mem mleft s.fs_mem) && not (Mid.mem mright s.fs_mem));
-        let es = e_subst_init s.fs_freshen s.fs_sty.ts_p s.fs_ty s.fs_mp in
-        let s_subst = EcModules.s_subst es in
+      assert (not (Mid.mem (fst eqs.es_ml) s.fs_mem) && 
+                not (Mid.mem (fst eqs.es_mr) s.fs_mem));
+      let es = e_subst_init s.fs_freshen s.fs_sty.ts_p s.fs_ty s.fs_mp in
+      let s_subst = EcModules.s_subst es in
 
-        let pr' = f_subst s eqs.es_pr in
-        let po' = f_subst s eqs.es_po in
-        let sl' = s_subst eqs.es_sl in
-        let sr' = s_subst eqs.es_sr in
-        let ml' = 
-          EcMemory.me_substm s.fs_sty.ts_p s.fs_mp s.fs_mem s.fs_ty eqs.es_ml in
-        let mr' = 
-          EcMemory.me_substm s.fs_sty.ts_p s.fs_mp s.fs_mem s.fs_ty eqs.es_mr in
+      let pr' = f_subst s eqs.es_pr in
+      let po' = f_subst s eqs.es_po in
+      let sl' = s_subst eqs.es_sl in
+      let sr' = s_subst eqs.es_sr in
+      let ml' = 
+        EcMemory.me_substm s.fs_sty.ts_p s.fs_mp s.fs_mem s.fs_ty eqs.es_ml in
+      let mr' = 
+        EcMemory.me_substm s.fs_sty.ts_p s.fs_mp s.fs_mem s.fs_ty eqs.es_mr in
 
-          FSmart.f_equivS (fp, eqs)
-            { es_ml = ml'; es_mr = mr';
-              es_pr = pr'; es_po = po';
-              es_sl = sl'; es_sr = sr'; }
+      FSmart.f_equivS (fp, eqs)
+        { es_ml = ml'; es_mr = mr';
+          es_pr = pr'; es_po = po';
+          es_sl = sl'; es_sr = sr'; }
 
     | Fpr (m, mp, args, e) ->
-        assert (not (Mid.mem mhr s.fs_mem));
-        let m'    = Mid.find_def m m s.fs_mem in
-        let mp'   = EcPath.x_substm s.fs_sty.ts_p s.fs_mp mp in
-        let args' = List.smart_map (f_subst s) args in
-        let e'    = (f_subst s) e in
+      assert (not (Mid.mem mhr s.fs_mem));
+      let m'    = Mid.find_def m m s.fs_mem in
+      let mp'   = EcPath.x_substm s.fs_sty.ts_p s.fs_mp mp in
+      let args' = List.smart_map (f_subst s) args in
+      let e'    = (f_subst s) e in
 
-          FSmart.f_pr (fp, (m, mp, args, e)) (m', mp', args', e')
+      FSmart.f_pr (fp, (m, mp, args, e)) (m', mp', args', e')
   
     | _ -> f_map s.fs_ty (f_subst s) fp
 

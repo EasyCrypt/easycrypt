@@ -61,14 +61,32 @@
 \newcommand{\ambientDesc}{
 \subsection{Generalities}
 
-The ambient logic is based on a higher-order logic. TODO
+\EasyCrypt ambient logic is based on non-dependent higher-order logic.
 
-\subsubsection{convertible}\label{convertible}
+\subsection{Convertibility}\label{convertible}
 
-\subsection{Lambda calculus}
-    The tactics of this section correspond to lambda calculus reduction. It will find a redex, reduce it
-    and do it again until there is no more redex. You can chain tactics by separating them with space and it
-    will act as a new tactic that search for the redex of the two tactics and reduce them and do it again.
+\EasyCrypt ambient logic enjoys a mechanism that identifies all formulas
+that are equal up to a given amount of computations.
+
+\begin{center}
+\begin{tabular}{l@{$\quad$}l@{$\quad$}ll}
+{\rawec{(lambda (x : t), phi1)\ phi2}} & $\rightarrow_\beta$ &
+  \multicolumn{2}{@{}l}{{\rawec{phi2} \{\rawec{x} $\leftarrow$ \rawec{phi1}\}}}\\
+{\rawec{if (true) \{ phi1 \} else \{ phi2 \}}} & $\rightarrow_\iota$ &
+  {\rawec{phi1}}\\
+{\rawec{if (false) \{ phi1 \} else \{ phi2 \}}} & $\rightarrow_\iota$ &
+  \multicolumn{2}{@{}l}{{\rawec{phi2}}}\\
+{\rawec{let (x1, ..., xn) = (phi1, ..., phin) in phi}} & $\rightarrow_\iota$ &
+  \multicolumn{2}{@{}l}{{\rawec{phi} \{ \rawec{x1, ..., xn} $\leftarrow$ \rawec{phi1, ..., phin} \}}}\\
+{\rawec{let x = phi1 in phi2}} & $\rightarrow_\zeta$ &
+  \multicolumn{2}{@{}l}{{\rawec{phi2} \{ \rawec{x} $\leftarrow$ \rawec{phi1} \}}}\\
+{\rawec{o}} & $\rightarrow_\delta^{\Env,\Gamma}$ &
+  {\rawec{e}} & if {\rawec{op o := e}} $\in \Env$\\
+{\rawec{x}} & $\rightarrow_\delta^{\Env,\Gamma}$ &
+  {\rawec{phi}} & if {\rawec{x := phi}} $\in \Gamma$\\
+\end{tabular}
+\end{center}
+
     \ambientLambda
 
 \subsection{Logic}
@@ -87,105 +105,149 @@ The ambient logic is based on a higher-order logic. TODO
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %change
-\addLambda{change}{\tacarg{f}{formula}}{This tactics permits to change the current goal to f.
+\addLambda{change}
+{\tacarg{f}{formula}}
+{Change the current goal to the $\leftrightarrow^*$-equivalent one \ec{f}
 \begin{displaymath}
-  \infrule{G \equiv F ~ ~ ~ F}{G}
+  \infrule{\phi_1 \leftrightarrow^*_{\Env;\Gamma} \phi_2 \quad
+           \Env; \Gamma \vdash \phi_1}
+          {\Env; \Gamma \vdash \phi_2}
 \end{displaymath}}
 
 %beta
-\addLambda{beta}{}{Apply all possible beta-reduction}
+\addLambda{beta}{}
+{Change the goal with its $\beta$-head normal-form.}
 
 %iota
-\addLambda{iota}{}{Reduce let tuple and if}
+\addLambda{iota}{}
+{Change the goal with its $\iota$-head normal-form.}
 
 %zeta
-\addLambda{zeta}{}{Reduce let}
+\addLambda{zeta}{}
+{Change the goal with its $\zeta$-head normal-form.}
 
 %logic
-\addLambda{logic}{}{Do logical simplification}
+\addLambda{logic}{}
+{Change the goal with its $\Lambda$-head normal-form.}
 
 %delta
-\addLambda{delta}{\tacarg{name}{ident*}}{Replace all occurence of all ident present in \vararg{names} by their values if no \vararg{name} is specify it replaces everithing possible.}
+\addLambda{delta}{\tacarg{names}{ident*}}
+{Do one step of parallel, strong $\delta$-reduction, restricted to
+ the symbols designed by \ec{names}. If \ec{names} if empty, no restriction
+ on the $\delta$-reduction is applied.}
 
 %simplify
-\addLambda{simplify}{\tacarg{names}{ident*} | \var{delta}?}{Compute the normal form by applying the previous tactics in the given order and it applys delta if delta is specify and just delta names if names is specify}
+\addLambda{simplify}{\tacarg{names}{ident*} | \var{delta}$\!\!$?}
+{Change the goal with its $\beta\iota\zeta\Lambda$-head normal-form, followed
+ by one step of parallel, strong $\delta$-reduction if \ec{delta} is given.
+ The $\delta$-reduction can be restricted to a set of defined symbols by
+ replacing \ec{delta} by the non-empty sequence of targeted symbols.}
 
 %congr
-\addLambda{congr}{}{If the current goal is a function equality of arity $n$, it replaces this goal by $n$ new goals corresponfin to the argument equality.\\
-You must be aware that this tactics will transform your goal in a stronger one.}
+\addLambda
+{congr}{}
+{This tactic applies to a goal of the form \ec{f t1 ... tn = f u1 ... un}
+ replacing it by  the subgoals \ec{ti = ui} for all \ec{i}. Note that subgoals
+ solvable by \ec{reflexivity} are automatically closed.}
+
+%generalize
+\addLogic{generalize}{\tacarg{p}{pattern}}{
+Search for the first subterm of the goal matching \ec{p} and leading
+to the full instantiation of the pattern. Then, do a logical
+generalization of all the occurrences of \ec{p}, after instantiation,
+in the goal.
+\begin{displaymath}
+  \infrule{\Env; \Gamma \vdash p \quad
+           \Env; \Gamma \vdash \forall x, \phi(x)}
+          {\Env; \Gamma \vdash \phi(p)}
+\end{displaymath}}
 
 %pose
-\addLambda{pose}{\tacarg{x}{ident} \cstarg{:=} \tacarg{expr}{pattern}}{
-This tactic permits to introduce a new variable in your context with a
-specific value. You don't have to specify the complete expression, \vararg{expr} is a pattern matching.\\
-\futurebox{For now you can only introduce something that appears in your goal but in a near future you will ba able to
-introduce an arbitrary value}}
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% LOGIC
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-%Tactics working only on the goal
+\addLambda{pose}{\tacarg{x}{ident} \rawec{:=} \tacarg{p}{pattern}}
+{Search for the first subterm of the goal matching \ec{p} and leading
+to the full instantiation of the pattern. Then, introduce, after
+instantiation, the local definition \rawec{x := p} and abstract
+all the occurrences of \ec{p} in the goal by \ec{x}
+\begin{displaymath}
+  \infrule{\Env; \Gamma \vdash p \quad
+           \Env; \Gamma, x := p \vdash \phi(x)}
+          {\Env; \Gamma \vdash \phi(p)}
+\end{displaymath}}
 
 %split
 \addLogic{split}{}
-{\tacname{} tactic permits to do several things :
-\begin{itemize}
-  \item end a proof when you just have a term \refdef{convertible} to true.
-  \item end a proof when you just have an equality between two terms that are \refdef{convertible}.
-  \item replace a iff by the direct and indirect implication.
-  \item replace an and statement by two goals : the left side and the right side.
-  \item replace a n-tuple equality by n equality of the component.
-\end{itemize}
-\begin{displaymath}
-  \infrule{a \equiv true}{a}
+{\tacname{} breaks a goal that is intrinsically conjunctive into multiple subgoals.
+ For instance, it
+ \begin{itemize}
+  \item closes any goal that is \refdef{convertible} to \ec{true} or provable
+        by \ec{reflexivity},
+
+  \begin{displaymath}
+  \infrule{\Env; \Gamma \vdash a \equiv true}{a}
   ~~~~~~
-  \infrule{a \equiv b}{a = b}
+  \infrule{\Env; \Gamma \vdash a \equiv b}{a = b}
+  \end{displaymath}
+       
+  \item replaces a logical equivalence by the direct and indirect implication,
+
+  \begin{displaymath}
+  \infrule{\Env; \Gamma \vdash \phi_1 \Rightarrow \phi_2 \quad
+           \Env; \Gamma \vdash \phi_2 \Rightarrow \phi_1}
+          {\Gamma \vdash \phi_1 \Leftrightarrow \phi_2}
+  \end{displaymath}
+  
+  \item replaces a goal of the form \rawec{f1 /\\ f2} or \rawec{f1 \&\& f2} by the two
+        subgoals for \ec{f1} and \ec{f2},
+
+  \begin{displaymath}
+  \infrule{\Env; \Gamma \vdash \phi_1 \quad
+           \Env; \Gamma \vdash \phi_2}
+          {\Env; \Gamma \vdash \phi_1 \land \phi_2}
   ~~~~~~
-  \infrule{\Gamma \vdash A \Rightarrow B ~ ~ ~ \Gamma \vdash B \Rightarrow A}{\Gamma \vdash A \Leftrightarrow B}
-  ~~~~~~
-  \infrule{\Gamma \vdash A ~ ~ ~ \Gamma \vdash B}{\Gamma \vdash A \land B}
-  ~~~~~~
-  \infrule{\Gamma \vdash a_1 = b_1  ~ ~ ~ ...  ~ ~ ~ \Gamma \vdash a_n = b_n}{\Gamma \vdash (a_1, ..., a_n) = (b_1, ..., b_n)}
-  ~~~~~~
-\end{displaymath}
-}
+  \infrule{\Env; \Gamma \vdash \phi_1 \quad
+           \Env; \Gamma \vdash \phi_2}
+          {\Env; \Gamma \vdash \phi_1 \&\& \phi_2}
+  \end{displaymath}
+        
+  \item replaces an equality between two $n$-tuples by the $n$ equalities of
+        of the paired components.
+
+  \begin{displaymath}
+  \infrule{\Env; \Gamma \vdash a_1 = b_1  \quad \cdots \quad
+           \Env; \Gamma \vdash a_n = b_n}
+          {\Gamma \vdash (a_1, ..., a_n) = (b_1, ..., b_n)}
+  \end{displaymath}
+\end{itemize}}
 
 %left
-\addLogic{left}{}{This tactic permits to prove a $\lor$ statement by proving only the left side. You must be aware that this tactics will transform your goal in a stronger one.
+\addLogic{left}{}
+{Reduce a disjunctive goal to its left part
 \begin{displaymath}
-  \infrule{\Gamma \vdash A}{\Gamma \vdash A \lor B}
+  \infrule{\Env; \Gamma \vdash \phi_1}{\Env; \Gamma \vdash \phi_1 \lor \phi_2}
 \end{displaymath}}
 
 %right
-\addLogic{right}{}{This tactic permits to prove a $\lor$ statement by proving only the right side. You must be aware that this tactics will transform your goal in a stronger one.
+\addLogic{right}{}
+{Reduce a disjunctive goal to its right part
 \begin{displaymath}
-  \infrule{\Gamma \vdash B}{\Gamma \vdash A \lor B}
-\end{displaymath}}
-
-%generalize
-\addLogic{generalize}{\tacarg{C}{formula}}{
-You must be aware that this tactics will transform your goal in a stronger one.
-\begin{displaymath}
-  \infrule{\Gamma \vdash C ~ ~ ~ \Gamma \vdash \forall x, G[C <- x]}{\Gamma \vdash G}
+  \infrule{\Env; \Gamma \vdash \phi_2}{\Env; \Gamma \vdash \phi_1 \lor \phi_2}
 \end{displaymath}}
 
 %case
-\addLogic{case}{\tacarg{F}{formula}}{This tactic creates two subgoals, one where \vararg{F} is true and an other where \vararg{F} is false.
+\addLogic{case}{\tacarg{f}{formula}}
+{Do an excluded-middle case analysis on \ec{f}
 \begin{displaymath}
-  \infrule{\Gamma \vdash f => G ~ ~ ~ \Gamma \vdash \neg f => G}{\Gamma \vdash G}
+  \infrule{\Env; \Gamma \vdash b \Rightarrow \phi(true) \quad
+           \Env; \Gamma \vdash \neg b \Rightarrow \phi(false)}
+          {\Env; \Gamma \vdash \phi(b)}
 \end{displaymath}}
 
-
-
-%Tactics working with the locals
-
 %assumption
-\addLogic{assumption}{\tacarg{h}{ident}?}{It close the current goal by checking you have it in your context up to \refdef{conversion}.
-If you don't specify \vararg{h} it test all the \refdef{judgement} present in the context, else it just tests \vararg{h}
+\addLogic{assumption}{}
+{Search in the context an hypothesis \refdef{convertible} to the goal and close it.
+ If no such hypothesis exists, the tactic fails
 \begin{displaymath}
-  \infrule{H \equiv G}{\Gamma,h:H \vdash G}
+  \infrule{(h : \phi) \in \Gamma}{\Env; \Gamma \vdash \phi}
 \end{displaymath}}
 
 %intros
@@ -215,9 +277,15 @@ Easycrypt checks that \vararg{x} is not already present in the \refdef{environme
 }
 
 %cut
-\addLogic{cut}{\tacarg{h}{ident} : \tacarg{C}{formula}}{It will ask you to first prove the lemma and then push it into your \refdef{context}.
+\addLogic{cut}
+{\tacarg{ip}{intro-pattern} : \tacarg{C}{formula}}
+{Logical cut. Generates two subgoals: on for $C$ (the cut formula),
+ and one for $C \Rightarrow G$ where $G$ is the initial goal. Moreover,
+ the intro-pattern \ec{ip} is applied to the second subgoal.
 \begin{displaymath}
-  \infrule{\Gamma \vdash C ~ \Gamma,C \vdash G}{\Gamma \vdash G}
+  \infrule{\Env; \Gamma \vdash C \quad
+           \Env; \Gamma, \vdash C \Rightarrow G}
+          {\Env; \Gamma \vdash G}
 \end{displaymath}}
 
 %elim
@@ -231,40 +299,105 @@ Easycrypt checks that \vararg{x} is not already present in the \refdef{environme
   \infrule{\Gamma, h:(a_1, ..., a_n) = (b_1, ..., b_n) \vdash a_1 = b_1 \Rightarrow ... \Rightarrow a_n = b_n \Rightarrow G}{\Gamma, h:(a_1, ..., a_n) = (b_1, ..., b_n) \vdash G}
 \end{displaymath}}
 
-%clear
-\addLogic{clear}{\tacarg{h}{ident}?}{It removes the judgement \vararg{h} from the context
-\begin{displaymath}
-  \infrule{\Gamma \vdash G}{\Gamma,h:H \vdash G}
-\end{displaymath}}
-
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% AUTO
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 %smt
-\addAuto{smt}{\tacarg{db}{lident} \tacarg{max}{int}? \tacarg{time}{int}?  \tacarg{names}{string*}}{
-This tactic send your goal to provers.\\
-You can give as first argument nolocals and your local context($\Gamma$) won't be sent to smt. The second
-argument permits to precise some information, the number of provers run at the same time.\\
-\futurebox{The argument sgould evolve in the future, you will be able to specify which lemma you want to send
-to provers. The number of simultaneous prover you want to run at the same time should not appears in scripts
-and the limitation time should be just an indicator on the diffuclty of the lemma to proof.}\\
-\warningbox{Some judgements can't be converted see \ref{smtProgram} TODO} }
+\addAuto
+{smt}
+{[\ec{nolocal}]}
+{Try to solve the goal using SMT solvers. The goal is sent along with all the
+ lemmas proved so far plus the local hypotheses, unless the \ec{nolocal} is
+ given.
+ 
+ \noindent
+ \warningbox{Not all lemmas can be sent translated in such a way that they can
+  be sent to the SMT provers. For instance, any formulas involving pRHL
+  constructions are ignored.}}
 
 %apply
-\addAuto{apply}{TODO}{Apply a lemma in order to prove the current goal TODO}
+\addAuto{apply}
+{\tacarg{p}{proof-term}}
+{Modus Ponens. If \ec{p} is a proof-term for the pattern (formula) for
+  \begin{center}
+    \ec{forall (x1 : t1) ... (xn : tn), A1 -> ... -> An -> B}
+  \end{center}
+  \noindent then \tacname{} tries to match B with the current G. If the
+  match succeeds and leads to the full instantiation of the pattern,
+  then the goal is replaced, after instantiation, with the $n$ subgoals
+  \ec{A1, ..., An}}
 
 %rewrite
-\addAuto{rewrite}{TODO}{Rewrite an expression in your goal according to a lemma TODO}
+\addAuto
+{rewrite}
+{rw1 ... rw${}_n$ where the rw${}_i$ are of the form \ec{//},
+\ec{/=}, \ec{//=}, a proof-term or a pattern prefixed by \ec{/}
+(slash). The two last forms can be prefixed by a direction indicator (the sign
+\ec{-}), followed by an occurrence selector (\ec{\{i1 ... in\}}),
+followed by repetition marker (\ec{!}, \ec{?}, \ec{i!} or \ec{i?}). All
+these prefixes are optional.}
+{Depending on the form of \ec{rw}, \tacname{} \ec{rw} does the following:
+  \begin{itemize}
+   \item Call \rawec{trivial} if \ec{rw} is \ec{//},
+   \item Call \rawec{simplify} if \ec{rw} is \ec{/=},
+   \item Call \rawec{simplify; trivial} as \ec{rw} is \ec{//=},
+   \item If \ec{rw} is a proof-term for the pattern (formula)
+     \begin{center}
+      \ec{forall (x1 : t1) ... (xn : tn), A1 -> ... -> An -> f1 = f2}
+     \end{center}
+     \noindent then \tacname{} searches for the first subterm of the goal
+     matching \ec{f1} and resulting in the full instantiation of the pattern.
+     It then replaces, after instantiation of the pattern, all the occurrences
+     of \ec{f1} by \ec{f2} in the goal, and creates $n$ new subgoals for the
+     \ec{Ai}'s. If no subterms of the goal match \ec{f1} or if the pattern
+     cannot be fully instanciated by matching, the tactic fails.
+     The tactic works the same if the pattern ends by \ec{f1 <-> f2}. If the
+     direction indicator \ec{-} is given, \tacname{} works in the reverse
+     direction, searching for a match of \ec{f2} and then replacing all
+     occurrences of \ec{f2} by \ec{f1}.
+   \item If \ec{rw} is a \ec{/}-prefixed pattern of the form \ec{(o p1 ... pn)},
+     with \ec{o} a defined symbol, then \tacname{} searches for the first subterm
+     of the goal matching \ec{(o p1 ... pn)} and resulting in the full instantiation
+     of the pattern. It then replaces, after instantiation of the pattern, all
+     the occurrences of \ec{(o p1 ... pn)} by the $\beta\delta_{\rm o}$ head-normal form
+     of \ec{(o p1 ... pn)}. If no subterms of the goal match \ec{(o p1 ... pn)} or
+     if the pattern cannot be fully instanciated by matching, the tactic fails. If the
+     direction indicator \ec{-} is given, \tacname{} works in the reverse
+     direction, searching for a match of the $\beta\delta_{\rm o}$ head-normal
+     of \ec{(o p1 ... pn)} and then replacing all occurrences of this head-normal
+     form with \ec{(o p1 ... pn)}.
+  \end{itemize}
+  
+  \smallskip
+  
+  The occurrence selector \ec{\{i1 ... in\}} allows to restrict which occurrences
+  of the matching pattern are replaced in the goal. If given, only the
+  \ec{i1}-th, ..., \ec{in}-th ones are replaced (considering that the goal is
+  traversed in DFS mode). Note that this selection applies after the matching has
+  been done.
+  
+  \medskip
+  
+  Repetition markers allow the repetition of the same rewriting. For instance,
+  \tacname{} \ec{!rw} leads to \ec{do!} \tacname{} \ec{rw}. See \ec{do} for
+  more information.
+  
+  \medskip
+
+  Last, \tacname{} \ec{rw1 ... rwn} is equivalent to
+  \tacname{} \ec{rw1}; ...; \tacname{} \ec{rwn}}
 
 %elimT
-\addAuto{elimT}{\tacarg{h}{ident} \tacarg{x}{value}}{Apply an induction principle \vararg{h} on object \vararg{x}}
+\addAuto
+{elim}
+{$\!\!$/\tacarg{h}{ident} \tacarg{f}{pattern}}
+{Apply the induction principle \vararg{h} on \vararg{x}}
 
 %subst
-\addAuto{subst}{\tacarg{x}{ident}?}{Find a value for var \vararg{x} in the hypothesis, subsitute it everywhere and remove it.
-If \vararg{x} is not specify it does it for all variable.}
+\addAuto
+{subst}
+{\tacarg{x}{ident}?}
+{Search for the first equation of the form \ec{x = f} or \ec{f = x} in the context
+ and replace all the occurrences of \ec{x} by \ec{f} everywhere in the context and the
+ goal before clearing it. If no idents are given, repeatedly apply the tactic to
+ all identifiers for which such an equation exists.}
 
 %progress
 \addAuto{progress}{}{Split all you hypothesis, make all subsitution possible and then split your goal and do it again on all subgoals. It
@@ -273,38 +406,8 @@ permits to easly break a big judgements in smaller one.}
 %trivial
 \addAuto{trivial}{}{If what remains in yout goal is very simple and not need an smt you can try using this tactic. TODO}
 
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% OTHER
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 %idtac
 \addOther
 {idtac}
-{\tacarg{x}{string}}
-{This tactic does nothing except printing the string put as argument if there is one.}
-
-%print
-\addOther
-{print}
-{\cstarg{type} | \cstarg{op} | \cstarg{theory} | \cstarg{pred} | \cstarg{axiom} ~ \tacarg{x}{ident}}
-{This tactic takes a type of object and such an object ant print it.}
-
-%same
-\addOther{same}{}{TODO}
-
-%modpath
-\addOther{modpath}{}{TODO}
-
-%using
-\addOther{using}{}{TODO}
-
-%compute
-\addOther{compute}{}{TODO}
-
-%field
-\addOther{field}{}{TODO}
-
-%fieldsimplify
-\addOther{fieldsimplify}{}{TODO}
+{\tacarg{x}{string}?}
+{The identity tactic, leaving the goal unchanged and printing the string argument, if any.}

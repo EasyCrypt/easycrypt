@@ -44,6 +44,7 @@ type tyerror =
 | UnitFunWithReturn
 | TypeMismatch         of (ty * ty) * (ty * ty)
 | TypeModMismatch      of tymod_cnv_failure
+| NotAFunction
 | UnknownVarOrOp       of qsymbol * ty list
 | MultipleOpMatch      of qsymbol * ty list
 | UnknownModName       of qsymbol

@@ -26,8 +26,10 @@ module G(Adv2 : ADV2) = {
   }
 }.
 
+(* Same remark than 0017_init_adv2.ec could be greate to see that the
+   restriction Or in not needed since Or do not have state *)
 lemma G :
-  forall (Adv2 <: ADV2),
+  forall (Adv2 <: ADV2{Or}),
   (forall (O <: OR{Adv2}), islossless O.f => islossless Adv2(O).h) =>
   equiv[G(Adv2).g ~ G(Adv2).g : true ==> ={res}].
 proof.

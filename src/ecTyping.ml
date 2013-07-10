@@ -59,6 +59,7 @@ type tyerror =
 | UnitFunWithReturn
 | TypeMismatch         of (ty * ty) * (ty * ty)
 | TypeModMismatch      of tymod_cnv_failure
+| NotAFunction
 | UnknownVarOrOp       of qsymbol * ty list
 | MultipleOpMatch      of qsymbol * ty list
 | UnknownModName       of qsymbol
@@ -166,6 +167,9 @@ let pp_tyerror fmt env error =
   | TypeModMismatch err ->
       msg "this module body does not meet its interface:@\n";
       msg "  @[<hov 2>%t@]" (fun fmt -> pp_cnv_failure fmt env err)
+
+  | NotAFunction ->
+      msg "too many arguments"
 
   | UnknownVarOrOp (name, tys) -> begin
       match tys with
@@ -524,20 +528,26 @@ let rec destr_tfun env ue tf =
   match tf.ty_node with
   | Tunivar _ ->
       let tf' = UE.repr ue tf in
-      assert (not (tf == tf')); (* FIXME error message *)
-      destr_tfun env ue tf' 
-  | Tfun(ty1,ty2) -> ty1, ty2
-  | Tconstr(p,tys) when EcEnv.Ty.defined p env ->
-      destr_tfun env ue (EcEnv.Ty.unfold p tys env) 
-  | _ -> assert false (* FIXME error message *)
+        assert (not (tf == tf'));
+        destr_tfun env ue tf'
 
-let rec ty_fun_app env ue tf targs = 
+  | Tfun (ty1, ty2) -> Some (ty1, ty2)
+
+  | Tconstr (p, tys) when EcEnv.Ty.defined p env ->
+      destr_tfun env ue (EcEnv.Ty.unfold p tys env) 
+
+  | _ -> None
+
+let rec ty_fun_app loc env ue tf targs = 
   match targs with
   | [] -> tf
-  | t1 :: targs ->
-      let dom,codom = destr_tfun env ue tf in
-      (try EcUnify.unify env ue t1 dom with _ -> assert false);
-      ty_fun_app env ue codom targs
+  | t1 :: targs -> begin
+      match destr_tfun env ue tf with
+      | None -> tyerror loc env NotAFunction
+      | Some (dom, codom) ->
+          unify_or_fail env ue t1.pl_loc ~expct:dom t1.pl_desc;
+          ty_fun_app loc env ue codom targs
+  end
 
 let transbinding env ue bd =
   let trans_bd1 env (xs, pty) = 
@@ -575,9 +585,9 @@ let transexp (env : EcEnv.env) (ue : EcUnify.unienv) e =
         let opsc = lookup_scope env popsc in
           transexp_r (Some opsc) env e
 
-    | PEapp ({pl_desc = PEident({ pl_desc = name; pl_loc = loc }, tvi)}, es) ->
+    | PEapp ({pl_desc = PEident({ pl_desc = name; pl_loc = loc }, tvi)}, pes) ->
         let tvi  = omap tvi (transtvi env ue) in  
-        let es   = List.map (transexp env) es in
+        let es   = List.map (transexp env) pes in
         let esig = snd (List.split es) in
         let ops  = select_exp_op env osc name ue tvi esig in
         begin match ops with
@@ -591,15 +601,16 @@ let transexp (env : EcEnv.env) (ue : EcUnify.unienv) e =
               
         | [op, ty, subue] ->
             EcUnify.UniEnv.restore ~src:subue ~dst:ue;
-            let codom = ty_fun_app env ue ty esig in
+            let esig = List.map2 (fun e l -> mk_loc l.pl_loc e) esig pes in
+            let codom = ty_fun_app _dummy env ue ty esig in
               (e_app op (List.map fst es) codom, codom)
         end
 
     | PEapp (pe, pes) ->
-        let e,ty = transexp env pe in
+        let e, ty = transexp env pe in
         let es = List.map (transexp env) pes in
-        let esig = snd (List.split es) in
-        let codom = ty_fun_app env ue ty esig in
+        let esig = List.map2 (fun (_, ty) l -> mk_loc l.pl_loc ty) es pes in
+        let codom = ty_fun_app loc env ue ty esig in
           (e_app e (List.map fst es) codom, codom)
 
     | PElet (p, pe1, pe2) ->
@@ -1610,9 +1621,9 @@ let trans_form_or_pattern env (ps, ue) pf tt =
         let eqs = List.map do1 xs in
         EcFol.f_ands eqs
 
-    | PFapp ({pl_desc = PFident ({ pl_desc = name; pl_loc = loc }, tvi)}, es) ->
+    | PFapp ({pl_desc = PFident ({ pl_desc = name; pl_loc = loc }, tvi)}, pes) ->
         let tvi  = omap tvi (transtvi env ue) in  
-        let es   = List.map (transf env) es in
+        let es   = List.map (transf env) pes in
         let esig = List.map EcFol.f_ty es in 
         let ops  = select_form_op env opsc name ue tvi esig in
           begin match ops with
@@ -1626,15 +1637,16 @@ let trans_form_or_pattern env (ps, ue) pf tt =
   
           | [op, subue] ->
               EcUnify.UniEnv.restore ~src:subue ~dst:ue;
-              let codom = ty_fun_app env ue op.f_ty esig in
+              let esig = List.map2 (fun e l -> mk_loc l.pl_loc e) esig pes in
+              let codom = ty_fun_app _dummy env ue op.f_ty esig in
                 f_app op es codom
           end
 
-    | PFapp (e, es) ->
-        let es   = List.map (transf env) es in
-        let esig = List.map EcFol.f_ty es in 
-        let op  = transf env e in
-        let codom = ty_fun_app env ue op.f_ty esig in
+    | PFapp (e, pes) ->
+        let es    = List.map (transf env) pes in
+        let esig  = List.map2 (fun f l -> mk_loc l.pl_loc f.f_ty) es pes in
+        let op    = transf env e in
+        let codom = ty_fun_app f.pl_loc env ue op.f_ty esig in
         f_app op es codom
 
     | PFif (pf1, pf2, pf3) ->

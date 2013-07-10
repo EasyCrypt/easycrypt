@@ -932,14 +932,23 @@ let t_bdHoare_app i (phi, pR,f1,f2,g1,g2) g =
     { bhs with bhs_s = s2; bhs_pr = f_and_simpl phi pR;bhs_bd=f2} in
   let condg2 = f_bdHoareS_r 
     { bhs with bhs_s = s2; bhs_pr = f_and_simpl phi nR;bhs_bd=g2} in
-  let bd = (f_real_add (f_real_prod f1 f2) (f_real_prod g1 g2)) in
-  (* TODO : this a conseq_bd rule *)
+  let (m0,m0ty) = bhs.bhs_m in
+  let mt = EcIdent.fresh m0 in
+  let mf = EcIdent.fresh m0 in
+  let m0mt = Fsubst.f_subst_mem m0 mt in
+  let m0mf = Fsubst.f_subst_mem m0 mf in
+  let bd = 
+    let f2 = m0mt f2 in
+    let g2 = m0mf g2 in
+    (f_real_add_simpl (f_real_prod_simpl f1 f2) (f_real_prod_simpl g1 g2)) in
   let condbd = 
     match bhs.bhs_cmp with
     | FHle -> f_real_le bd bhs.bhs_bd
     | FHeq -> f_eq bd bhs.bhs_bd
     | FHge -> f_real_le bhs.bhs_bd bd in
-  let conds = [gen_mems [bhs.bhs_m] (f_imp bhs.bhs_pr condbd)] in
+  let condbd = 
+    f_imps [bhs.bhs_pr; m0mt pR; m0mt phi; m0mf nR; m0mf phi] condbd in
+  let conds = [ gen_mems [bhs.bhs_m; (mt,m0ty); (mf,m0ty)] condbd ] in
   let conds = 
     if f_equal g1 f_r0 then condg1 :: conds
     else if f_equal g2 f_r0 then condg2 :: conds
