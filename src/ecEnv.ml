@@ -1585,12 +1585,12 @@ module NormMp = struct
       if EcPath.Sm.mem top rm || EcPath.Sm.mem top us then us 
           (* If top is in us the module has already be added, nothing to do *)
       else
-        let us = 
-          match (Mod.by_mpath top env).me_body with
-          | ME_Structure ms -> EcPath.Sm.union ms.ms_uses us
-          | ME_Decl _       -> us
-          | _ -> assert false in
-        EcPath.Sm.add top us in
+        match (Mod.by_mpath top env).me_body with
+        | ME_Structure ms -> 
+          let us = if Mx.is_empty ms.ms_vars then us else EcPath.Sm.add top us in
+          EcPath.Sm.union ms.ms_uses us
+        | ME_Decl _       -> EcPath.Sm.add top us
+        | _ -> assert false in
     List.fold_left (add_uses env rm) us mp.EcPath.m_args 
 
   let norm_restr env restr = 
