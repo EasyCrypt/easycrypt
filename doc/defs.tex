@@ -200,6 +200,28 @@
 \newcommand{\Return}{\mathsf{return}}
 % \newcommand{\Assert}[1]{\mathsf{assert}~#1}
 
+%% Tactics
+\newcommand{\tacname}{Error tacname}
+\newcommand{\vtacname}{Error tacname}
+\newcommand{\vararg}[1]{\ec{#1}}
+\newcommand{\cstarg}[1]{\ec{#1}}
+\newcommand{\typarg}[1]{\textit{#1}}
+\newcommand{\tacarg}[2]{(\vararg{#1}:\typarg{#2})}
+\newcommand{\refdef}[1]{\emph{#1}(\ref{#1})}
+
+\newcommand{\addTacticIdx}[2]{\index{#1}{#2@\rawec{#2}}}
+
+\newcommand{\addTacticNoIdx}[2]{
+  \renewcommand{\tacname}{\rawec{#1}}
+  \renewcommand{\vtacname}{#1}
+  \subsubsection{#1}
+  \Syntax \ec{#1} #2
+  \Description}
+
+\newcommand{\addTactic}[3]{
+  \addTacticIdx{#1}{#2}
+  \addTacticNoIdx{#2}{#3}}
+
 %% Language definition
 \lstnewenvironment{easycrypt}[2][]%
   {\lstset{language=easycrypt,caption=#2,#1}}%
