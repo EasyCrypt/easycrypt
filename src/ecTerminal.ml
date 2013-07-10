@@ -121,7 +121,9 @@ object(self)
   val (*---*) iparser = EcIo.from_channel ~name stream
   val mutable sz    = -1
   val mutable tick  = -1
-  val (*---*) doprg = (Sys.os_type = "Unix")
+  val (*---*) doprg =
+    (Sys.os_type = "Unix") &&
+    (Unix.isatty (Unix.descr_of_out_channel stdout))
 
   method private _update_progress position =
     if sz >= 0 && doprg then
