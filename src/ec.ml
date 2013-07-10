@@ -17,11 +17,15 @@ let _ =
   let why3conf =
     match !options.o_why3 with
     | None when List.mem myname locali -> begin
+      let why3conf = Filename.concat "_tools" "why3.local.conf" in
       let why3conf =
-        List.fold_left Filename.concat mydir
-          [Filename.parent_dir_name;
-           Filename.parent_dir_name;
-           "_tools"; "why3.local.conf"]
+        if Filename.basename (Filename.dirname mydir) = "_build" then
+          List.fold_left Filename.concat mydir
+            [Filename.parent_dir_name;
+             Filename.parent_dir_name;
+             why3conf]
+        else
+           Filename.concat mydir why3conf
       in
         match Sys.file_exists why3conf with
         | false -> None
