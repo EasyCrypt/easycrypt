@@ -1,6 +1,6 @@
 require import Int.
 require import Bitstring.
-require import Set.
+require import FSet.
 
 (* A library of definitions for EF-CMA signatures schemes based on the ROM. *)
 (* Some further things could be parameterized.                              *)
