@@ -115,7 +115,7 @@ theory NatMul.
 
   axiom MulZ : forall (x:t), 0*x = Z.
 
-  axiom MulI : forall n (x:t), n*x = x + (n-1)*x.
+  axiom MulI : forall n (x:t), 0 <= n => (n + 1) * x = x + n * x.
 
   lemma sum_const : forall (k:t) (f:'a->t) (s:'a set),
     (forall (x:'a), mem x s => f x = k) =>
@@ -131,6 +131,6 @@ theory NatMul.
     rewrite H1;first apply (leq_tran _ s0);[apply rm_leq|by trivial].
     rewrite H;first apply H2;apply mem_pick;by trivial.
     rewrite card_rm_in;first apply mem_pick;by trivial.
-    by rewrite -MulI //.
+    rewrite -MulI //; smt.
   save.
 end NatMul.

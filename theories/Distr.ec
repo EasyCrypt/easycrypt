@@ -47,25 +47,28 @@ lemma mu_in_supp_eq : forall (d:'a distr, p q:'a cpred),
   (forall (a:'a), in_supp a d => (p a <=> q a)) =>
   mu d p = mu d q.
 proof. smt. save.
-  
+
+(** Point-wise equality *)
 pred (==)(d d':'a distr) =
   (forall x, mu_x d x = mu_x d' x).
 
-axiom mu_ext : forall (d d':'a distr),
+axiom pw_eq : forall (d d':'a distr),
   d == d' <=> d = d'.
 
 (** Lemmas *)
-lemma mu_disjoint : forall (d:'a distr, p, q:'a cpred),
+lemma mu_disjoint (d:'a distr) (p q:'a cpred):
   (cpAnd p q <= cpFalse) =>
-  mu d (cpOr p q) = mu d p + mu d q
-by [].
+  mu d (cpOr p q) = mu d p + mu d q.
+proof strict.
+intros=> and_p_q_false; cut inter_empty: cpAnd p q = cpFalse; first by apply leq_asym.
+by rewrite mu_or inter_empty mu_false.
+qed.
 
-lemma mu_not : forall (d:'a distr, p:'a cpred), 
+lemma mu_not (d:'a distr) (p:'a cpred):
   mu d (cpNot p) = mu d cpTrue - mu d p.
-proof.
-  intros d p;
-  cut H: (forall (x y z:real), x = y - z <=> x + z = y); first smt.
-  rewrite H; smt.
+proof strict.
+cut ->: (forall (x y z:real), x = y - z <=> x + z = y); first smt.
+by rewrite -mu_disjoint ?cpEM //; apply leq_refl; rewrite cpC.
 qed.
 
 lemma mu_weight_0 : forall (d:'a distr),
@@ -82,7 +85,7 @@ theory Dempty.
     weight d = 0%r <=> d = dempty.
   proof.
     intros d; split; last smt.
-    intros weight_0; rewrite -(mu_ext<:'a> d dempty); smt.
+    intros weight_0; rewrite -(pw_eq<:'a> d dempty); smt.
   qed.
 end Dempty.
 
