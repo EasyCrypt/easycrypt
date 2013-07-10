@@ -517,8 +517,7 @@ let process_rnd side tac_info g =
           let d3 = process_phl_form treal g d3 in
           let d4 = process_phl_form treal g d4 in
           PMultRndParams ((phi,d1,d2,d3,d4),p)
-        | _ ->
-          tacuerror "Wrong tactic arguments"
+        | _ -> tacuerror "Wrong tactic arguments"
       in
       t_bd_hoare_rnd tac_info g
     | _ when is_equivS concl ->

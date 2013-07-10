@@ -61,14 +61,32 @@
 \newcommand{\ambientDesc}{
 \subsection{Generalities}
 
-The ambient logic is based on a higher-order logic. TODO
+\EasyCrypt ambient logic is based on non-dependent higher-order logic.
 
-\subsubsection{convertible}\label{convertible}
+\subsection{Convertibility}\label{convertible}
 
-\subsection{Lambda calculus}
-    The tactics of this section correspond to lambda calculus reduction. It will find a redex, reduce it
-    and do it again until there is no more redex. You can chain tactics by separating them with space and it
-    will act as a new tactic that search for the redex of the two tactics and reduce them and do it again.
+\EasyCrypt ambient logic enjoys a mechanism that identifies all formulas
+that are equal up to a given amount of computations.
+
+\begin{center}
+\begin{tabular}{l@{$\quad$}l@{$\quad$}ll}
+{\rawec{(lambda (x : t), phi1)\ phi2}} & $\rightarrow_\beta$ &
+  \multicolumn{2}{@{}l}{{\rawec{phi2} \{\rawec{x} $\leftarrow$ \rawec{phi1}\}}}\\
+{\rawec{if (true) \{ phi1 \} else \{ phi2 \}}} & $\rightarrow_\iota$ &
+  {\rawec{phi1}}\\
+{\rawec{if (false) \{ phi1 \} else \{ phi2 \}}} & $\rightarrow_\iota$ &
+  \multicolumn{2}{@{}l}{{\rawec{phi2}}}\\
+{\rawec{let (x1, ..., xn) = (phi1, ..., phin) in phi}} & $\rightarrow_\iota$ &
+  \multicolumn{2}{@{}l}{{\rawec{phi} \{ \rawec{x1, ..., xn} $\leftarrow$ \rawec{phi1, ..., phin} \}}}\\
+{\rawec{let x = phi1 in phi2}} & $\rightarrow_\zeta$ &
+  \multicolumn{2}{@{}l}{{\rawec{phi2} \{ \rawec{x} $\leftarrow$ \rawec{phi1} \}}}\\
+{\rawec{o}} & $\rightarrow_\delta^{\Env,\Gamma}$ &
+  {\rawec{e}} & if {\rawec{op o := e}} $\in \Env$\\
+{\rawec{x}} & $\rightarrow_\delta^{\Env,\Gamma}$ &
+  {\rawec{phi}} & if {\rawec{x := phi}} $\in \Gamma$\\
+\end{tabular}
+\end{center}
+
     \ambientLambda
 
 \subsection{Logic}
@@ -87,28 +105,43 @@ The ambient logic is based on a higher-order logic. TODO
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %change
-\addLambda{change}{\tacarg{f}{formula}}{This tactics permits to change the current goal to f.
+\addLambda{change}
+{\tacarg{f}{formula}}
+{Change the current goal to the $\leftrightarrow^*$-equivalent one \ec{f}
 \begin{displaymath}
-  \infrule{G \equiv F ~ ~ ~ F}{G}
+  \infrule{\phi_1 \leftrightarrow^*_{\Env;\Gamma} \phi_2 \quad
+           \Env; \Gamma \vdash \phi_1}
+          {\Env; \Gamma \vdash \phi_2}
 \end{displaymath}}
 
 %beta
-\addLambda{beta}{}{Apply all possible beta-reduction}
+\addLambda{beta}{}
+{Change the goal with its $\beta$-head normal-form.}
 
 %iota
-\addLambda{iota}{}{Reduce let tuple and if}
+\addLambda{iota}{}
+{Change the goal with its $\iota$-head normal-form.}
 
 %zeta
-\addLambda{zeta}{}{Reduce let}
+\addLambda{zeta}{}
+{Change the goal with its $\zeta$-head normal-form.}
 
 %logic
-\addLambda{logic}{}{Do logical simplification}
+\addLambda{logic}{}
+{Change the goal with its $\Lambda$-head normal-form.}
 
 %delta
-\addLambda{delta}{\tacarg{name}{ident*}}{Replace all occurrence of all ident present in \vararg{names} by their values if no \vararg{name} is specify it replaces everithing possible.}
+\addLambda{delta}{\tacarg{names}{ident*}}
+{Do one step of parallel, strong $\delta$-reduction, restricted to
+ the symbols designed by \ec{names}. If \ec{names} if empty, no restriction
+ on the $\delta$-reduction is applied.}
 
 %simplify
-\addLambda{simplify}{\tacarg{names}{ident*} | \var{delta}?}{Compute the normal form by applying the previous tactics in the given order and it applys delta if delta is specify and just delta names if names is specify}
+\addLambda{simplify}{\tacarg{names}{ident*} | \var{delta}$\!\!$?}
+{Change the goal with its $\beta\iota\zeta\Lambda$-head normal-form, followed
+ by one step of parallel, strong $\delta$-reduction if \ec{delta} is given.
+ The $\delta$-reduction can be restricted to a set of defined symbols by
+ replacing \ec{delta} by the non-empty sequence of targeted symbols.}
 
 %congr
 \addLambda
@@ -125,8 +158,8 @@ generalization of all the occurrences of \ec{p}, after instantiation,
 in the goal.
 \begin{displaymath}
   \infrule{\Env; \Gamma \vdash p \quad
-           \Env; \Gamma \vdash \forall x, G(x)}
-          {\Env; \Gamma \vdash G(p)}
+           \Env; \Gamma \vdash \forall x, \phi(x)}
+          {\Env; \Gamma \vdash \phi(p)}
 \end{displaymath}}
 
 %pose
@@ -137,8 +170,8 @@ instantiation, the local definition \rawec{x := p} and abstract
 all the occurrences of \ec{p} in the goal by \ec{x}
 \begin{displaymath}
   \infrule{\Env; \Gamma \vdash p \quad
-           \Env; \Gamma, x := p \vdash G(x)}
-          {\Env; \Gamma \vdash G(p)}
+           \Env; \Gamma, x := p \vdash \phi(x)}
+          {\Env; \Gamma \vdash \phi(p)}
 \end{displaymath}}
 
 %split
@@ -158,22 +191,22 @@ all the occurrences of \ec{p} in the goal by \ec{x}
   \item replaces a logical equivalence by the direct and indirect implication,
 
   \begin{displaymath}
-  \infrule{\Env; \Gamma \vdash A \Rightarrow B \quad
-           \Env; \Gamma \vdash B \Rightarrow A}
-          {\Gamma \vdash A \Leftrightarrow B}
+  \infrule{\Env; \Gamma \vdash \phi_1 \Rightarrow \phi_2 \quad
+           \Env; \Gamma \vdash \phi_2 \Rightarrow \phi_1}
+          {\Gamma \vdash \phi_1 \Leftrightarrow \phi_2}
   \end{displaymath}
   
   \item replaces a goal of the form \rawec{f1 /\\ f2} or \rawec{f1 \&\& f2} by the two
         subgoals for \ec{f1} and \ec{f2},
 
   \begin{displaymath}
-  \infrule{\Env; \Gamma \vdash A \quad
-           \Env; \Gamma \vdash B}
-          {\Env; \Gamma \vdash A \land B}
+  \infrule{\Env; \Gamma \vdash \phi_1 \quad
+           \Env; \Gamma \vdash \phi_2}
+          {\Env; \Gamma \vdash \phi_1 \land \phi_2}
   ~~~~~~
-  \infrule{\Env; \Gamma \vdash A \quad
-           \Env; \Gamma \vdash B}
-          {\Env; \Gamma \vdash A \&\& B}
+  \infrule{\Env; \Gamma \vdash \phi_1 \quad
+           \Env; \Gamma \vdash \phi_2}
+          {\Env; \Gamma \vdash \phi_1 \&\& \phi_2}
   \end{displaymath}
         
   \item replaces an equality between two $n$-tuples by the $n$ equalities of
@@ -190,23 +223,23 @@ all the occurrences of \ec{p} in the goal by \ec{x}
 \addLogic{left}{}
 {Reduce a disjunctive goal to its left part
 \begin{displaymath}
-  \infrule{\Env; \Gamma \vdash A}{\Env; \Gamma \vdash A \lor B}
+  \infrule{\Env; \Gamma \vdash \phi_1}{\Env; \Gamma \vdash \phi_1 \lor \phi_2}
 \end{displaymath}}
 
 %right
 \addLogic{right}{}
 {Reduce a disjunctive goal to its right part
 \begin{displaymath}
-  \infrule{\Env; \Gamma \vdash B}{\Env; \Gamma \vdash A \lor B}
+  \infrule{\Env; \Gamma \vdash \phi_2}{\Env; \Gamma \vdash \phi_1 \lor \phi_2}
 \end{displaymath}}
 
 %case
 \addLogic{case}{\tacarg{f}{formula}}
 {Do an excluded-middle case analysis on \ec{f}
 \begin{displaymath}
-  \infrule{\Env; \Gamma \vdash f \Rightarrow G(true) \quad
-           \Env; \Gamma \vdash \neg f \Rightarrow G(false)}
-          {\Env; \Gamma \vdash G(f)}
+  \infrule{\Env; \Gamma \vdash b \Rightarrow \phi(true) \quad
+           \Env; \Gamma \vdash \neg b \Rightarrow \phi(false)}
+          {\Env; \Gamma \vdash \phi(b)}
 \end{displaymath}}
 
 %assumption
@@ -214,7 +247,7 @@ all the occurrences of \ec{p} in the goal by \ec{x}
 {Search in the context an hypothesis \refdef{convertible} to the goal and close it.
  If no such hypothesis exists, the tactic fails
 \begin{displaymath}
-  \infrule{(h : G) \in \Gamma}{\Env; \Gamma \vdash G}
+  \infrule{(h : \phi) \in \Gamma}{\Env; \Gamma \vdash \phi}
 \end{displaymath}}
 
 %intros

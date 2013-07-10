@@ -146,10 +146,44 @@ type intSet = int cpred.
 \end{easycrypt}
 
 \subsubsection*{On currying}
+It is standard practice to write functions of several arguments in curried form,
+where applying the function symbol to the first argument returns a function that
+takes the second argument, and so on. This very easily allows the user to
+partially apply functions to fix some of their arguments. This does not restrict
+or increase the expressivity of the language in any way, although it may
+initially cause some syntax issues for users unfamiliar with the concept. When
+applying a curried function to several arguments, the arguments should be
+separated by spaces rather than the more standard commas.
+Listing~\ref{lst:currying} illustrates this.
+
+\begin{easycrypt}[label={lst:currying}]{Currying.}
+op log: int -> int -> int.
+op log2: int-> int = log_curried 2.
+
+op log_pair: (int * int) -> int.
+op log2_pair (n:int): int = log (2,n).
+\end{easycrypt}
+
+The \rawec{log} is declared as an integer function of two (curried) integer
+arguments, and the log base 2, \rawec{log2}, is defined as its partial
+application to 2. This definition could have been equivalently written as
+follows.
+\begin{easycrypt}[frame=none]{}
+op log2 (n:int): int = log 2 n.
+\end{easycrypt}
+Contrasting with the curried form described above, \rawec{log_pair} is declared
+as an integer function of a single argument (whose type is a pair type).
+Partial application is slightly more verbose, but the syntax of application may
+look more familiar to imperative programmers.
 
 \subsection{Building Terms}
+The partial applications in Listing~\ref{lst:currying} are small examples of
+building terms of a given type. We will now discuss this more generally. The
+reader eager to perform proofs can start drawing parallels between this
+subsection and the term reduction (computation) rules at the beginning of
+Chapter~\ref{chap:tactics}. %TODO: More precise cross-reference
 
-\subsection{Predicates, Axioms and Ambient Lemmas\label{sec:ec-specifics}}
+\subsection{Predicates and Ambient Lemmas\label{sec:ec-specifics}}
 In \EasyCrypt, booleans are used not only to represent binary program variables, but
 also to type logical formulas. The \rawec{bool} type is therefore equipped with
 symbols for universal and existential quantification, implication, logical and

@@ -15,11 +15,18 @@
 \usepackage[usenames,dvipsnames]{xcolor}
 
 
+\DeclareMathVersion{sans}
+\SetSymbolFont{operators}{sans}{OT1}{cmbr}{m}{n}
+\SetSymbolFont{letters}{sans}{OML}{cmbrm}{m}{it}
+\SetSymbolFont{symbols}{sans}{OMS}{cmbrs}{m}{n}
+\SetMathAlphabet{\mathit}{sans}{OT1}{cmbr}{m}{sl}
+\SetMathAlphabet{\mathbf}{sans}{OT1}{cmbr}{bx}{n}
+\SetMathAlphabet{\mathtt}{sans}{OT1}{cmtl}{m}{n}
+\SetSymbolFont{largesymbols}{sans}{OMX}{iwona}{m}{n}
+
 \makeindex{easycrypt}
 \makeindex{ambient}
-\makeindex{hoare}
-\makeindex{phl}
-\makeindex{prhl}
+\makeindex{pL}
 
 \input{defs}
 
@@ -58,8 +65,6 @@
 \addcontentsline{toc}{part}{Index}
 \printindex{easycrypt}{General Index}
 \printindex{ambient}{Index of Ambient Logic Tactics}
-\printindex{hoare}{Index of Possibilistic Hoare Logic Tactics}
-\printindex{phl}{Index of Probabilistic Hoare Logic Tactics}
-\printindex{prhl}{Index of Probabilistic Relational Hoare Logic Tactics}
+\printindex{pL}{Index of Program Logics Tactics}
 
 \end{document}

@@ -384,24 +384,37 @@ let t_clear ids (juc,n as g) =
 let check_restr env mp restr = 
   let restr = NormMp.norm_restr env restr in
   let us = NormMp.top_uses env mp in
-  let check u = 
-    let me = EcEnv.Mod.by_mpath u env in
-    match me.EcModules.me_body with 
-    | EcModules.ME_Decl(_,nu) ->
-      let nu = NormMp.norm_restr env nu in
-      let diff = EcPath.Sm.diff restr nu in
-      if not (EcPath.Sm.is_empty diff) then 
-        let ppe = EcPrinting.PPEnv.ofenv env in
-        tacuerror "the module %a should not be able to use %a" 
-          (EcPrinting.pp_topmod ppe) mp
-          (EcPrinting.pp_list ",@ " (EcPrinting.pp_topmod ppe)) (EcPath.Sm.elements diff)
-    | EcModules.ME_Structure _ -> 
-      if EcPath.Sm.mem u restr then 
-        let ppe = EcPrinting.PPEnv.ofenv env in
-        tacuerror "the module %a should not be able to use %a" 
-          (EcPrinting.pp_topmod ppe) mp (EcPrinting.pp_topmod ppe) u
-    | _ -> assert false in
-  EcPath.Sm.iter check us
+  let ppe = EcPrinting.PPEnv.ofenv env in
+  let pp_mp = EcPrinting.pp_topmod ppe in
+  let check u r = 
+    (* u and r are top module in normal form *)
+    if EcPath.m_equal u r then 
+      tacuerror "the module %a should not use %a" pp_mp mp pp_mp r;
+    let meu, mer = EcEnv.Mod.by_mpath u env, EcEnv.Mod.by_mpath r env in 
+    match meu.EcModules.me_body, mer.EcModules.me_body with
+    | EcModules.ME_Structure _, EcModules.ME_Structure _ -> ()
+    | EcModules.ME_Structure _, EcModules.ME_Decl(_,rrestr) ->
+      let rrestr = NormMp.norm_restr env rrestr in
+      if not (Sm.mem u rrestr) then
+        tacuerror "the module %a, using %a, should not use %a (which can use %a); add restriction %a to %a"
+          pp_mp mp pp_mp u pp_mp r pp_mp u 
+          pp_mp u pp_mp r
+    | EcModules.ME_Decl(_,urestr), EcModules.ME_Structure _ -> 
+      let urestr = NormMp.norm_restr env urestr in
+      if not (Sm.mem r urestr) then
+        tacuerror "the module %a, using %a, should not use %a; add restriction %a to %a"
+          pp_mp mp pp_mp u pp_mp r 
+          pp_mp r pp_mp u 
+    | EcModules.ME_Decl(_,urestr), EcModules.ME_Decl(_,rrestr) ->
+      let urestr = NormMp.norm_restr env urestr in
+      if not (Sm.mem r urestr) then
+        let rrestr = NormMp.norm_restr env rrestr in
+        if not (Sm.mem u rrestr) then
+          tacuerror "the module %a, using %a, should not use %a; add restriction %a to %a or %a to %a"
+            pp_mp mp pp_mp u pp_mp r 
+            pp_mp u pp_mp r pp_mp r pp_mp u 
+    | EcModules.ME_Alias _, _ | _, EcModules.ME_Alias _ -> assert false in
+  EcPath.Sm.iter (fun u -> EcPath.Sm.iter (check u) restr) us
   
 
 let check_modtype_restr env mp mt i restr =

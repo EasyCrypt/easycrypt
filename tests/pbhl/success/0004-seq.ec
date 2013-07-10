@@ -14,7 +14,7 @@ module M = {
 lemma test : bd_hoare [M.f : true ==> M.x /\ M.y ] = (1%r/4%r).
 proof.
  fun.
- seq 1 : (M.y) true (1%r/2%r) (1%r/2%r) (1%r/2%r) 0%r => //.
+ seq 1 : (M.y) (1%r/2%r) (1%r/2%r) (1%r/2%r) 0%r => //.
  rnd ((=) true).
  skip; smt.
  rnd (lambda (x:bool),x).
@@ -35,7 +35,7 @@ module M2 = {
 lemma test2 : bd_hoare [M2.f : true ==> M2.x /\ M2.y ] <= (1%r/2%r).
 proof.
  fun.
- seq 1 : (M2.y) true 1%r (1%r/2%r) 0%r 0%r=> //.
+ seq 1 : (M2.y) 1%r (1%r/2%r) 0%r 0%r=> //.
  rnd (lambda (x:bool),x=true).
  skip;progress;smt.
  hoare;wp;trivial.
@@ -54,7 +54,7 @@ module M3 = {
 lemma test3 : bd_hoare [M3.f : true ==> M3.x /\ M3.y ] <= (1%r/2%r).
 proof.
  fun.
- seq 1 : (M3.x) true (1%r/2%r) (1%r) (1%r/2%r) (0%r)=> //.
+ seq 1 : (M3.x) (1%r/2%r) (1%r) (1%r/2%r) (0%r)=> //.
  rnd (lambda (x:bool),x=true);skip; smt.
  wp;hoare=> //.
 save.

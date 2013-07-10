@@ -14,9 +14,15 @@ axiom Leq : q < 2 ^ l.
 
 
 clone Word as Block with op length = l.
-(* clone Monoid as Mint with type t = int. *)
 
+(* require Monoid. *)
+(* clone Monoid as MInt with *)
+(*   type t = int, *)
+(*   op (+) = Int.(+), *)
+(*   op Z = 0. *)
 
+(* import MInt. *)
+(* Fel uses sum_int from sum library *)
 type block = Block.word.
 
 op uniform : block distr = Block.Dword.dword.
@@ -144,10 +150,10 @@ proof.
  rewrite Pr mu_or;by smt.
 save.
 
-(* admitted property *)
+(* assumed property *)
 axiom sum_prop :
 forall (n : int),
-0 <= n => 
+0 <= n =>
 int_sum (lambda (x : int), x%r * (1%r / (2 ^ l)%r)) (intval 0 (n - 1)) <=
 n%r * (n - 1)%r * (1%r / (2 ^ l)%r).
 
@@ -199,7 +205,8 @@ proof.
  cut H: Pr[M(PRP, A).main() @ &m : PRP.bad /\ card PRP.s <= q] <= 
         q%r * (q - 1)%r * (1%r / (2 ^ l)%r).
  by apply (prob2 &m).
- by smt.
+ cut H1: forall (x y z : real), x <= y => z + x <= z + y;first by smt.
+ by apply H1 => //.    
 save.
 
 end section.
