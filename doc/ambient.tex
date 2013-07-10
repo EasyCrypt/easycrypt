@@ -9,14 +9,14 @@
 \newcommand{\tacname}{Error tacname}
 \newcommand{\vtacname}{Error tacname}
 
-\newcommand{\addTactic}[3]{
+\newcommand{\addTactic}[2]{
   \expandafter\def\expandafter\ambientKeywords\expandafter{\ambientKeywords,#1}
   \renewcommand{\tacname}{\rawec{#1}}
   \renewcommand{\vtacname}{#1}
   \index{ambient}{#1@\rawec{#1}}
   \subsubsection{#1}
   \Syntax \ec{#1} #2
-  \Description
+  \Description%
 }
 
 
