@@ -4,11 +4,11 @@ require import Real.
 require import Distr.
 
 type group.
-op g:group. (* the generator *)
+const g:group. (* the generator *)
 
 op ( * ): group -> group -> group.   (* multiplication of group elements *)
 op ( ^ ): group -> gf_q -> group.    (* exponentiation *)
-op log:group -> gf_q.             (* discrete logarithm *)
+op log:group -> gf_q.                (* discrete logarithm *)
 
 op (/) (a b:group): group = g^(log a - log b).
 
@@ -37,10 +37,3 @@ theory Dgroup.
   axiom lossless: weight dgroup = 1%r.
 
 end Dgroup.
-
-(* tests 
-
-lemma a: forall (a b : gf_q), (g^a)^b = (g^b)^a.
-
-lemma b: forall (a : group, x : gf_q), (g^(log(a) + x - x)) / a = g^gf_q0.
-*)
