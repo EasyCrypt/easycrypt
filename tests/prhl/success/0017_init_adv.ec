@@ -34,8 +34,8 @@ call (_ : ={x,O.w} /\ (glob A){1} = (glob A){2} ==>
          ={res} /\ (glob A){1} = (glob A){2}).
 fun (={O.w});[trivial | trivial | ].
 fun;skip;trivial.
-call (_ : true ==> ={res} /\ (glob A){1} = (glob A){2}).
-fun true;try skip;trivial.
+call (_ : ={O.w} ==> ={res} /\ (glob A){1} = (glob A){2}).
+fun (={O.w}) ;try skip;trivial.
 skip;trivial.
 save.
 
