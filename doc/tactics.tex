@@ -122,25 +122,6 @@ iteratively, up to the point where no goals remain.
 
 \section{Ambient Logic}
 
-\begin{center}
-\begin{tabular}{l@{$\quad$}l@{$\quad$}ll}
-{\rawec{(lambda (x : t), phi1)\ phi2}} & $\rightarrow_\beta$ &
-  \multicolumn{2}{@{}l}{{\rawec{phi2} \{\rawec{x} $\leftarrow$ \rawec{phi1}\}}}\\
-{\rawec{if (true) \{ phi1 \} else \{ phi2 \}}} & $\rightarrow_\iota$ &
-  {\rawec{phi1}}\\
-{\rawec{if (false) \{ phi1 \} else \{ phi2 \}}} & $\rightarrow_\iota$ &
-  \multicolumn{2}{@{}l}{{\rawec{phi2}}}\\
-{\rawec{let (x1, ..., xn) = (phi1, ..., phin) in phi}} & $\rightarrow_\iota$ &
-  \multicolumn{2}{@{}l}{{\rawec{phi} \{ \rawec{x1, ..., xn} $\leftarrow$ \rawec{phi1, ..., phin} \}}}\\
-{\rawec{let x = phi1 in phi2}} & $\rightarrow_\zeta$ &
-  \multicolumn{2}{@{}l}{{\rawec{phi2} \{ \rawec{x} $\leftarrow$ \rawec{phi1} \}}}\\
-{\rawec{o}} & $\rightarrow_\delta^{\Env,\Gamma}$ &
-  {\rawec{e}} & if {\rawec{op o := e}} $\in \Env$\\
-{\rawec{x}} & $\rightarrow_\delta^{\Env,\Gamma}$ &
-  {\rawec{phi}} & if {\rawec{x := phi}} $\in \Gamma$\\
-\end{tabular}
-\end{center}
-
 \ambientDesc
 
 \section{Program Transformation Tactics}
