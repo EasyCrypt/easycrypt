@@ -1313,15 +1313,16 @@ let t_equiv_call1 side fpre fpost g =
   let modi   = f_write env f in
   let post   = f_imp_simpl fpost post in
   let post   = generalize_mod env me modi post in
+  let post   = f_forall_simpl [(vres, GTty fsig.fs_ret)] post in
   let spre   = PVM.empty in
   let spre   = subst_args_call env me f fsig.fs_params args spre in
-  let post   = f_anda_simpl (PVM.subst env spre (Fsubst.f_subst msubst fpre)) post in
+  let post   = 
+    f_anda_simpl (PVM.subst env spre (Fsubst.f_subst msubst fpre)) post in
   let concl  =
     match side with
     | true  -> { equiv with es_sl = fstmt; es_po = post; }
     | false -> { equiv with es_sr = fstmt; es_po = post; } in
   let concl  = f_equivS_r concl in
-  let concl  = f_forall [(vres, GTty fsig.fs_ret)] concl in
   prove_goal_by [fconcl; concl] (RN_hl_call (Some side, fpre, fpost)) g
 
 (* --------------------------------------------------------------------- *)
