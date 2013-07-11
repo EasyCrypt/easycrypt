@@ -2334,20 +2334,30 @@ let t_bd_hoare_rnd tac_info g =
       | _ -> tacuerror "Cannot infer a valid event, it must be provided"
   in
 
+  let bound,pre_bound,binders = 
+    if is_bd_indep then
+      bhs.bhs_bd, f_true, []
+    else 
+      let bd_id = EcIdent.create "bd" in
+      let bd = f_local bd_id treal in
+      bd, f_eq bhs.bhs_bd bd, [(bd_id,GTty treal)] 
+  in
+
+
   let subgoals = match tac_info, bhs.bhs_cmp with 
     | PNoRndParams, FHle -> 
       if is_post_indep then
         (* event is true *)
         let concl = f_bdHoareS_r {bhs with bhs_s=s} in
         [concl]
-      else if is_bd_indep then
-        let event = mk_event ty_distr in
-        let bounded_distr = f_real_le (f_mu distr event) bhs.bhs_bd in
-        let post = bounded_distr &&& (mk_event_cond event) in
-        let concl = f_hoareS bhs.bhs_m bhs.bhs_pr s post in
-        [concl]
       else 
-        tacuerror "Bound is not independent, intermediate predicate is required."
+        let event = mk_event ty_distr in
+        let bounded_distr = f_real_le (f_mu distr event) bound in
+        let pre = f_and bhs.bhs_pr pre_bound in 
+        let post = bounded_distr &&& (mk_event_cond event) in
+        let concl = f_hoareS bhs.bhs_m pre s post in
+        let concl = f_forall_simpl binders concl in
+        [concl]
 
     | PNoRndParams, _ -> 
       if is_post_indep then
@@ -2356,34 +2366,32 @@ let t_bd_hoare_rnd tac_info g =
         let bounded_distr = f_eq (f_mu distr event) f_r1 in
         let concl = f_bdHoareS_r {bhs with bhs_s=s} in
         [bounded_distr;concl]
-      else if is_bd_indep then
-        let event = mk_event ty_distr in
-        let bounded_distr = f_cmp (f_mu distr event) bhs.bhs_bd in
-        let post = bounded_distr &&& (mk_event_cond event) in
-        let concl = f_bdHoareS_r {bhs with bhs_s=s; bhs_po=post; bhs_bd=f_r1} in
-        [concl]
       else 
-        tacuerror "Bound is not independent, intermediate predicate is required."
+        let event = mk_event ty_distr in
+        let bounded_distr = f_cmp (f_mu distr event) bound in
+        let pre = f_and bhs.bhs_pr pre_bound in 
+        let post = bounded_distr &&& (mk_event_cond event) in
+        let concl = f_bdHoareS_r {bhs with bhs_s=s; bhs_pr=pre; bhs_po=post; bhs_bd=f_r1} in
+        let concl = f_forall_simpl binders concl in
+        [concl]
 
     | PSingleRndParam event, FHle ->
-      if is_bd_indep then
         let event = event ty_distr in
-        let bounded_distr = f_real_le (f_mu distr event) bhs.bhs_bd in
+        let bounded_distr = f_real_le (f_mu distr event) bound in
+        let pre = f_and bhs.bhs_pr pre_bound in 
         let post = bounded_distr &&& (mk_event_cond event) in
-        let concl = f_hoareS bhs.bhs_m bhs.bhs_pr s post in
+        let concl = f_hoareS bhs.bhs_m pre s post in
+        let concl = f_forall_simpl binders concl in
         [concl]
-      else 
-        tacuerror "Bound is not independent, intermediate predicate is required."
 
     | PSingleRndParam event, _ ->
-      if is_bd_indep then
         let event = event ty_distr in
-        let bounded_distr = f_cmp (f_mu distr event) bhs.bhs_bd in
+        let bounded_distr = f_cmp (f_mu distr event) bound in
+        let pre = f_and bhs.bhs_pr pre_bound in 
         let post = bounded_distr &&& (mk_event_cond event) in
-        let concl = f_bdHoareS_r {bhs with bhs_s=s; bhs_po=post; bhs_cmp=FHeq; bhs_bd=f_r1} in
+        let concl = f_bdHoareS_r {bhs with bhs_s=s; bhs_pr=pre; bhs_po=post; bhs_cmp=FHeq; bhs_bd=f_r1} in
+        let concl = f_forall_simpl binders concl in
         [concl]
-      else 
-        tacuerror "Bound is not independent, intermediate predicate is required."
     | PMultRndParams ((phi,d1,d2,d3,d4),event), _ -> 
       let event = match event ty_distr with | None -> mk_event ty_distr | Some event -> event in
       let bd_sgoal = f_cmp (f_real_add (f_real_prod d1 d2) (f_real_prod d3 d4)) bhs.bhs_bd in 
@@ -2401,8 +2409,8 @@ let t_bd_hoare_rnd tac_info g =
       in
       [bd_sgoal;sgoal1;sgoal2;sgoal3;sgoal4]
     | _, _ -> tacuerror "wrong tactic arguments"
-  in
-  prove_goal_by subgoals (RN_bhl_rnd tac_info ) g
+in
+prove_goal_by subgoals (RN_bhl_rnd tac_info ) g
 
 
 
