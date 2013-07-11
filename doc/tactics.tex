@@ -136,7 +136,9 @@ iteratively, up to the point where no goals remain.
 \Syntax \rawec{skip}
 
 \Description Reduces logical program judgements with empty statements
-to a first-order logical goal, as in the following rules:
+to a higher-order logical goal. The generated subgoals can then be
+processed using the ambient logic. The behaviour of the \rawec{skip}
+tactic can be briefly described by the following rules:
 %
 \begin{displaymath}
 \begin{array}{ccc}
@@ -163,6 +165,12 @@ to a first-order logical goal, as in the following rules:
 
 \subsection{Random samplings: the \rawec{rnd} tactic}
 \index{pL}{\rawec{rnd}}
+
+This tactic allows dealing with random samplings for arbitrary
+distribution expressions. It is supported by the Hoare Logic, the
+Probabilistic Hoare Logic, and the Probabilistic Relational Logic. It
+accepts different parameters and provides varied functionalitiesq
+depending on the goal under verification.
 
 \subsubsection{Hoare Logic}
 
@@ -273,7 +281,7 @@ following rule variants are applied:
 \begin{displaymath}
   \infrule{
     \HoareEq{c}{\pre}{\post}{\bound} \qquad
-    \mu\, d\, {true} = 1
+    \mu\, d\, \mathec{cpTrue} = 1
   }{
     \HoareEq{c;\Rand{x}{d}}{\pre}{\post}{\delta}
   }\left[\mathec{rnd}\ p\right]
@@ -282,7 +290,7 @@ following rule variants are applied:
 \begin{displaymath}
   \infrule{
     \HoareGe{c}{\pre}{\post}{\bound} \qquad
-    \mu\, d\, {true} = 1
+    \mu\, d\, {cpTrue} = 1
   }{
     \HoareGe{c;\Rand{x}{d}}{\pre}{\post}{\bound}
   }\left[\mathec{rnd}\ p\right]
@@ -372,7 +380,7 @@ for some types \rawec{'a} and \rawec{'b}:
 \item $d_1$ \rawec{: 'a Distr.distr}, 
 \item $d_2$ \rawec{: 'b Distr.distr}
 \item $f$ \rawec{: 'a} $\to$ \rawec{'b},
-\item $f^{-1}$ \rawec{: 'b} $\to$ \rawec{'a}, 
+\item $g$ \rawec{: 'b} $\to$ \rawec{'a}, 
 \end{itemize}
 
 \begin{displaymath}
@@ -380,21 +388,21 @@ for some types \rawec{'a} and \rawec{'b}:
   \Equiv{c_1}{c_2}{\pre} 
   { % \begin{array}{l}
       \forall z\,v,\insupp{z}{d_1}\Rightarrow
-      \insupp{v}{d_2}\Rightarrow \mathsf{bij}\,f\,f^{-1}
+      \insupp{v}{d_2}\Rightarrow \mathsf{bij}\,f\,g
        \land
       \post\subst{x}{z}\subst{y}{f\,z}
     % \end{array}
   }
 }{
   \Equiv{c_1;\Rand{x}{d_1}}{c_2;\Rand{y}{d_2}}{\pre}{\post}
-}
+}\left[\mathec{rnd}\ f\ g\right]
 \end{displaymath}
 where
-$\mathsf{bij}\,f\,f^{-1}$ stands for
+$\mathsf{bij}\,f\,g$ stands for
 \begin{displaymath}
   \mu\,d_1\,\charfun_{\{z\}}=\mu\,d_2\,\charfun_{\{f\,z\}} 
-  \land \insupp{(f^{-1}\,v)} {d_1} \land
-  f^{-1}\,(f\,z)=z \land f\,(f^{-1}\,v)=v
+  \land \insupp{(g\,v)} {d_1} \land
+  g\,(f\,z)=z \land f\,(g\,v)=v
 \end{displaymath}
     
 
@@ -404,11 +412,13 @@ tactic implements the following rule:
 %
 \begin{displaymath}
 \infrule{
-  \Equiv{c}{c'}{\pre}{\forall z,\insupp{z}{d} \Rightarrow \post\subst{x}{z}}
+  \Equiv{c}{c'}{\pre}{\mathsf{weight}\ d=1 \land  \forall z,\insupp{z}{d} \Rightarrow \post\subst{x}{z}}
 }{
   \Equiv{c;\Rand{x}{d}}{c'}{\pre}{\post}
 }\left[\mathec{rnd}\{1\}\right]
 \end{displaymath}
+where $\mathsf{weight}\ d$ stands for the expression
+$\mathec{Distr.weight}\ d$ defined as $\mathec{mu}\ d\ \mathec{cpTrue}$.
 %
 A similar rule holds for an invocation to $\left[\mathec{rnd}\{2\}\right]$.
 
@@ -419,8 +429,6 @@ A similar rule holds for an invocation to $\left[\mathec{rnd}\{2\}\right]$.
 
 \Syntax 
 \rawec{seq} \textit{codepos} \textit{formula} 
-
-\Description
 
 \Description
 Applies the Hoare Logic rule for sequential composition:
@@ -445,22 +453,22 @@ $p$.
 \begin{displaymath}
   \infrule{
     \begin{array}{c}
-      \Hoare{s1}{P}{\varphi}
+      \Hoare{c_1}{\pre}{\varphi}
       \\
-      \HoareLe{s1}{P}{\chi}{f_1} \qquad 
-          \HoareLe{s2}{\varphi \land \chi }{Q}{f_2}
+      \HoareLe{c_1}{\pre}{\chi}{\bound_1} \qquad 
+          \HoareLe{c_2}{\varphi \land \chi }{\post}{\bound_2}
       \\
-      \HoareLe{s1}{P}{\neg \chi}{f_3} \qquad 
-             \HoareLe{s2}{\varphi \land \neg\chi}{Q}{f_4}
+      \HoareLe{c_1}{\pre}{\neg \chi}{\bound_3} \qquad 
+             \HoareLe{c_2}{\varphi \land \neg\chi}{\post}{\bound_4}
       \\
-      f_1 f_2 + f_3 f_4 \leq f 
+      \bound_1 \bound_2 + \bound_3 \bound_4 \leq \bound
     \end{array}
   }{
-    \HoareLe{s1;s2}{P}{Q}{f}
+    \HoareLe{c_1;c_2}{\pre}{\post}{\bound}
   }\left[\mathec{seq}\ \varphi\ \chi\ f_1\ f_2\ f_3\ f_4 \right]
 \end{displaymath}
 
-(idem with ($=$) and ($\geq$)).
+(idem with the comparison operators ($=$) and ($\geq$)).
 
 % The application of the \verb+seq+ tactic is more complicated when
 % dealing with Probabilistic Hoare Logic judgements. 
@@ -540,7 +548,7 @@ $p$.
 \subsubsection{Relational Hoare Logic}
 
 \Syntax
-\rawec{app} \textit{codepos} \textit{form}
+\rawec{seq} \textit{codepos} \textit{form}
 
 \Description
 Applies the RHL rule for sequential composition:
@@ -571,32 +579,32 @@ conditional statement at the first program position.
 \begin{displaymath}
 \begin{array}{c}
   \infrule{
-    \Hoare{c_1}{\pre \land b}{\post}\qquad
-    \Hoare{c_2}{\pre \land \neg b}{\post}
+    \Hoare{c_1;c}{\pre \land b}{\post}\qquad
+    \Hoare{c_2;c}{\pre \land \neg b}{\post}
   }{
-    \Hoare{\Cond{b}{c_1}{c_2}}{\pre}{\post}
+    \Hoare{\Cond{b}{c_1}{c_2};c}{\pre}{\post}
   }\left[\mathec{if} \right] 
 \\[4ex]
 \end{array}
 \end{displaymath}
 
 
-\subsubsection{Hoare and Probabilistic Hoare Logic}
+\subsubsection{Probabilistic Hoare Logic}
 
 Applies the following rule for conditional statements. It expects a
 conditional statement at the first program position.
 \begin{displaymath}
 \begin{array}{c}
   \infrule{
-    \HoareLe{c_1}{\pre \land b}{\post}{f}\qquad
-    \HoareLe{c_2}{\pre \land \neg b}{\post}{f}
+    \HoareLe{c_1;c}{\pre \land b}{\post}{f}\qquad
+    \HoareLe{c_2;c}{\pre \land \neg b}{\post}{f}
   }{
-    \HoareLe{\Cond{b}{c_1}{c_2}}{\pre}{\post}{f}
+    \HoareLe{\Cond{b}{c_1}{c_2};c}{\pre}{\post}{f}
   }\left[\mathec{if} \right] 
 \\[4ex]
 \end{array}
 \end{displaymath}
-Similar rules hold for $=,\geq$.
+Similar rules hold for the other comparison operators $=,\geq$.
 
 \subsubsection{Relational Hoare Logic}
 
@@ -604,20 +612,20 @@ Similar rules hold for $=,\geq$.
 
 \Description Applies the pRHL rule for conditional.
 If the \textit{side} argument is given then the corresponding
-one side rule is used, else the two side rule is used.
+one-side rule is used, else the two side rule is used.
 The \rawec{if} tactic expects a conditional as first instruction. 
 \begin{center}
 \begin{tabular}{c|c}
 Syntax & Rule \\
 \hline\\
-\mathec{if{1}} &
+\mathec{if\{1\}} &
 $
 \infrule{\Equiv{c_1;c}{c'}{\pre \land e\sidel}{\post}
         \quad \Equiv{c_2;c}{c'}{\pre \land \neg e\sidel}{\post}}
         {\Equiv{\Cond{e}{c_1}{c_2};c}{c'}{\pre}{\post}}
 $\\
 \\\hline\\
-\mathec{if{2}} &
+\mathec{if\{2\}} &
 $
 \infrule{\Equiv{c'}{c_1;c}{\pre \land e\sider}{\post}
         \quad \Equiv{c'}{c_2;c}{\pre \land \neg e\sider}{\post}}
@@ -647,15 +655,17 @@ $\\
 
 \Description The \rawec{wp} tactic computes the weakest-precondition of
 deterministic, loop and procedure-call free program fragments
-(i.e. deterministic assignments and conditionals).  If the op code
-position parameter is not provided, The tactic processes instructions
-bottom-up until a random sampling, a loop or a function call is
-reached. The computation of the weakest precondition over a
-conditional instruction is only possible if its branches do not
+(i.e. deterministic assignments and conditionals).   
+The computation of the weakest precondition over a
+conditional statement is only possible if its branches do not
 contain random samplings, while-loops nor function calls.
 
 The optional code position parameter \textit{pos} restricts the range
 of instructions that may be affected by the tactic invocation. 
+%
+If the optional code position parameter is not provided, The tactic
+processes instructions bottom-up until a random sampling, a loop or a
+function call is reached.
 
 \subsubsection{Hoare Logic}
 
@@ -736,33 +746,30 @@ variables modifiable by $f$.
       \HoareEq{c}{\pre}{\pre_f\subst{\vec{p}}{\vec{y}} \land
         \forall v.~ \forall \vec{z}.~ 
         \post_f\subst{\result_f}{v}\subst{\vec{m}}{\vec{z}}
-        \Rightarrow \post\subst{x}{v}\subst{\vec{m}}{\vec{z}}}{\frac{\delta}{\delta'}}
+        \Rightarrow \post\subst{x}{v}\subst{\vec{m}}{\vec{z}}}{1}
     \\[.5ex]
-    \HoareEq{f}{\pre_f}{\post_f}{\delta'}
+    \HoareEq{f}{\pre_f}{\post_f}{\delta}
   \end{array}
   }{
     \HoareEq{c;\Call{x}{f}{\vec{y}}}{\pre}{\post}{\delta}
-  } \left[\mathec{call}~ \pre_f~ \post_f~ \delta' \right]
+  } \left[\mathec{call}~ \pre_f~ \post_f \right]
 \end{displaymath}
 
 \begin{displaymath}
   \infrule{
     \begin{array}{c}
-      \HoareGe{c}{\pre}{\pre_f\subst{\vec{p}}{\vec{y}} \land
+      \HoareEq{c}{\pre}{\pre_f\subst{\vec{p}}{\vec{y}} \land
         \forall v.~ \forall \vec{z}.~ 
         \post_f\subst{\result_f}{v}\subst{\vec{m}}{\vec{z}}
         \Rightarrow \post\subst{x}{v}\subst{\vec{m}}{\vec{z}}}
-      {\frac{\delta}{\delta'}}
+      {1}
     \\[.5ex]
-    \HoareGe{f}{\pre_f}{\post_f}{\delta'}
+    \HoareGe{f}{\pre_f}{\post_f}{\delta}
   \end{array}
   }{
     \HoareGe{c;\Call{x}{f}{\vec{y}}}{\pre}{\post}{\delta}
-  } \left[\mathec{call}~ \pre_f~ \post_f ~\delta' \right]
+  } \left[\mathec{call}~ \pre_f~ \post_f \right]
 \end{displaymath}
-
-If no parameter is given for the lower-bounded and exact judgements
-then $\delta'=1$.
 
 
 \subsection{While loop statements: the \rawec{while} tactic}
@@ -901,11 +908,12 @@ loop bodies.
 the first parameter \textit{form} as loop invariant and the second
 parameter \textit{form} as a decreasing \textit{variant}
 expression. The variant is used to verify the loop termination. The
-one-sided rule are described below. Only the left (\rawec{{1}}) variant
-is shown; the right (\rawec{{2}}) variant is symmetric. The expressions
-$\forall X,~\varphi$ and $\exists X,~\varphi$ denote, respectively,
-universal and existential quantification over the set of variables $X$
-modified in the loop body $c$.
+one-sided rule are described below. Only the left (i.e., flagged with
+\rawec{\{1\}}) variant is shown; the right (i.e., flagged with
+\rawec{\{2\}}) variant is symmetric. The expressions $\forall
+X,~\varphi$ and $\exists X,~\varphi$ denote, respectively, universal
+and existential quantification over the set of variables $X$ modified
+in the loop body $c$. 
 
 \begin{displaymath}
 \infrule{
@@ -930,12 +938,8 @@ modified in the loop body $c$.
 \paragraph*{Probabilistic Hoare Logic}
 \begin{displaymath}
 \infrule{
-  \begin{array}{c}
-    \pre \Rightarrow \chi  \qquad 
-    \chi \Leftrightarrow\post
-    \\[.5ex]
+    \pre \Rightarrow \chi  \qquad \chi \Leftrightarrow\post \qquad
     \HoareEq{O_i}{\chi}{\chi}{1}
-  \end{array}
 }{
   \HoareEq{A}{\pre}{\post}{1}
 } [\mathec{fun}~\chi]
@@ -944,12 +948,9 @@ modified in the loop body $c$.
 \paragraph*{Hoare Logic}
 \begin{displaymath}
 \infrule{
-  \begin{array}{c}
-    \pre \Rightarrow \chi  \qquad 
-    \chi \Rightarrow\post
-    \\[.5ex]
+    \pre \Rightarrow \chi  \qquad \chi \Rightarrow\post
+    \qquad
     \Hoare{O_i}{\chi}{\chi}
-  \end{array}
 }{
   \Hoare{A}{\pre}{\post}
 } [\mathec{fun}~\chi]
@@ -992,18 +993,22 @@ adversaries $A$ and $B$, ...
 
 \subsection{Trivial judgements: the \rawec{exfalso} tactic}
 \index{pL}{\rawec{exfalso}}
-\NotDocumented
+
+The \rawec{exfalso} tactic discharges a Hoare, Probabilistic Hoare or
+Probabilistic relational Hoare judgement if the precondition can be
+trivially proved false. The \rawec{trivial} tactic incorporates the
+functionality of the \rawec{exfalso} tactic.
+
 
 \subsection{Trivial judgements: the \rawec{eqobsin} tactic}
 \index{pL}{\rawec{eqobsin}}
 \NotDocumented
 
-\subsection{Trivial judgements: the \rawec{pr\_bounded} tactic}
+\subsection{Trivial judgements: the \rawec{pr_bounded} tactic}
 \index{pL}{\rawec{pr_bounded}}
 
-\subsubsection{Probabilistic Hoare Logic}
-\Syntax \rawec{pr_bounded}
-discharges goals by applying trivial probability properties:
+The \rawec{pr_bounded} tactic is only applicable to probabilistic
+Hoare judgements. It discharges proof goals by trivial probability axioms:
 \begin{displaymath}
 \begin{array}{cc}
 \infrule{
@@ -1018,12 +1023,19 @@ discharges goals by applying trivial probability properties:
 \end{array}
 \end{displaymath}
 
+\subsection{Trivial judgements: the \rawec{pr_bounded} tactic}
+\index{pL}{\rawec{trivial}}
 
+Discharges trivial judgements by applying the \rawec{exfalso} and
+\rawec{pr_bounded} tactics, removing Hoare judgements with
+postconditions equivalent to true, modulo trivial reasoning
+in the ambient logic.
 
 \subsection{Strengthening goals: the \rawec{conseq} tactic}
 \index{pL}{\rawec{conseq}}
 
-\Syntax \rawec{conseq} \textit{formula} \textit{formula}
+\Syntax \rawec{conseq} (\_ : \textit{formula} \rawec{==>} \textit{formula} )
+
 \subsubsection{Hoare Logic}
 
 \begin{displaymath}
@@ -1040,7 +1052,7 @@ discharges goals by applying trivial probability properties:
   \HoareLe{c}{\pre'}{\post'}{\delta} \qquad \pre\Rightarrow\pre' \qquad  \post\Rightarrow\post'
 }{
   \HoareLe{c}{\pre}{\post}{\delta}
-}\left[\mathec{conseq}~ \pre'~ \post' \right]
+}\left[\mathec{conseq}~ (\_ : \pre'~ \mathec{==>}~ \post') \right]
 \end{displaymath}
 
 \begin{displaymath}
@@ -1048,7 +1060,7 @@ discharges goals by applying trivial probability properties:
   \HoareEq{c}{\pre'}{\post'}{\delta} \qquad \pre\Rightarrow\pre' \qquad  \post\Leftrightarrow\post'
 }{
   \HoareEq{c}{\pre}{\post}{\delta}
-}\left[\mathec{conseq}~ \pre'~ \post' \right]
+}\left[\mathec{conseq}~ (\_ : \pre'~ \mathec{==>}~ \post') \right]
 \end{displaymath}
 
 \begin{displaymath}
@@ -1056,10 +1068,34 @@ discharges goals by applying trivial probability properties:
   \HoareGe{c}{\pre'}{\post'}{\delta} \qquad \pre\Rightarrow\pre' \qquad  \post'\Rightarrow\post
 }{
   \HoareGe{c}{\pre}{\post}{\delta}
-}\left[\mathec{conseq}~ \pre'~ \post' \right]
+}\left[\mathec{conseq}~ (\_ : \pre'~ \mathec{==>}~ \post') \right]
 \end{displaymath}
 
-\warningbox{(changing the bound is not yet implemented)}
+
+One can additionally strengthen the bounding condition with the syntax:
+
+\rawec{conseq} (\_ : \_ \rawec{==>} \_ : [\textit{cmp}]
+\textit{formula} ) 
+
+that implements strengthening rules like the following:
+
+\begin{displaymath}
+\infrule{
+  \HoareLe{c}{\pre}{\post}{\delta'} \qquad \delta'\leq\delta 
+}{
+  \HoareLe{c}{\pre}{\post}{\delta}
+}\left[\mathec{conseq}~ (\_ : \_ ~\mathec{==>}~ \_) : \delta' \right]
+\end{displaymath}
+
+\begin{displaymath}
+\infrule{
+  \HoareEq{c}{\pre}{\post}{\delta'} \qquad \delta\leq\delta' 
+}{
+  \HoareGe{c}{\pre}{\post}{\delta}
+}\left[\mathec{conseq}~ (\_ : \_ ~\mathec{==>}~ \_) : = \delta' \right]
+\end{displaymath}
+
+
 
 \subsubsection{Relational Hoare Logic}
 
@@ -1068,7 +1104,7 @@ discharges goals by applying trivial probability properties:
   \Equiv{c_1}{c_2}{\pre'}{\post'} \qquad \pre\Rightarrow\pre' \qquad  \post'\Rightarrow\post
 }{
   \Equiv{c_1}{c_2}{\pre}{\post}
-}\left[\mathec{conseq}~ \pre'~ \post' \right]
+}\left[\mathec{conseq}~ ( \_ : \pre'~\mathec{==>}~ \post' \right]
 \end{displaymath}
 
 \subsection{Strengthening goals: the \rawec{bd\_eq}}
@@ -1374,12 +1410,6 @@ modified by $\left\{O_i\right\}_{i=0}^k$.
 % \Equiv{c_1;\While{b}{(c(i);d)}}{c_2;\While{b}{(c(f\,i);d)}}{\pre}{\post}
 % }
 % \end{displaymath}
-
-
-\section{Tacticals}
-
-
-\section{Automated Tactics}
 
 
 %%% Local Variables: 

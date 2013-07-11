@@ -465,8 +465,6 @@ proof.
   inline Hashed_ElGamal(RO).kg Hashed_ElGamal(RO).enc Hashed_ElGamal(RO).dec. 
   inline RO.o RO.init.
   do (wp; rnd); wp; skip; progress; [smt | | smt | smt].
-    cut ->: g ^ y ^ sk0 = g ^ sk0 ^ y; first smt.
-    rewrite Map.get_setE Option.proj_some.
-    cut ->: (y0 ^^ (y0 ^^ m{hr}) = (y0 ^^ y0) ^^ m{hr});first by smt.
-    by smt.
+    cut ->: g ^ y2 ^ sk0 = g ^ sk0 ^ y2; first smt.
+    rewrite Map.get_setE Option.proj_some; smt.
 qed.
