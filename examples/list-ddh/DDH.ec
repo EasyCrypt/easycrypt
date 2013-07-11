@@ -12,18 +12,18 @@ require import Distr.
    - DDH_random: The random DDH experiment
 
    - Sample_DH_distr: Provide functions that sample real
-       and random DH triples. This time defined in terms
+       and random DH triples defined in terms
        of distributions using Dprod and Dapply.
-   - DDH_distr_real and DDH_distr_random: same experiments
-       as above, only defined in term Sample_DH_
+   - DDH_distr_real and DDH_distr_random: Same experiments
+       as above, only defined in term Sample_DH_distr.
 
    We prove the following lemmas:
-   - Eq_Sample_DH_distr_real: the functions for
+   - Eq_Sample_DH_distr_real: The functions for
      sampling real DH triples in Sample_DH and Sample_DH_distr
-     are equivalent
-   - Eq_Sample_DH_distr_random: the functions for
+     are equivalent.
+   - Eq_Sample_DH_distr_random: The functions for
        sampling random DH triples in Sample_DH and Sample_DH_distr
-       are equivalent
+       are equivalent.
    - Eq_DDH_real_distr, Eq_DDH_random_distr: The two versions of
        the DDH games coincide.
 *)
