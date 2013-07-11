@@ -1067,33 +1067,37 @@ let t_hoare_while inv g =
   let concl = f_hoareS_r { hs with hs_s = s; hs_po=post} in
   prove_goal_by [b_concl;concl] (RN_hl_while (inv,None,None)) g
 
-let t_bdHoare_while inv (* vrnt info *) g =
+let t_bdHoare_while inv vrnt info g =
   let env, _, concl = get_goal_e g in
   let bhs = destr_bdHoareS concl in
   let ((e,c),s) = s_last_while "while" bhs.bhs_s in
   let m = EcMemory.memory bhs.bhs_m in
   let e = form_of_expr m e in
-
+  match info with 
+    | None ->
       (* the body preserve the invariant *)
-      (* let k_id = EcIdent.create "z" in *)
-      (* let k = f_local k_id tint in *)
-      (* let vrnt_eq_k = f_eq vrnt k in *)
-      (* let vrnt_lt_k = f_int_lt vrnt k in *)
-      let b_pre  = f_and_simpl inv e in
-      let b_post = inv in
-      let b_concl = match bhs.bhs_cmp with 
-        | FHle -> f_hoareS bhs.bhs_m b_pre c b_post
-        | FHeq | FHge -> 
-          f_bdHoareS_r 
-            { bhs with bhs_pr=b_pre; bhs_s=c; bhs_po=b_post; bhs_cmp=FHeq; bhs_bd=f_r1}
+      let k_id = EcIdent.create "z" in
+      let k = f_local k_id tint in
+      let vrnt_eq_k = f_eq vrnt k in
+      let vrnt_lt_k = f_int_lt vrnt k in
+      let b_pre  = f_and_simpl (f_and_simpl inv e) vrnt_eq_k in
+      let b_post = f_and_simpl inv vrnt_lt_k in
+      let b_concl = f_bdHoareS_r 
+        { bhs with bhs_pr=b_pre; bhs_s=c; bhs_po=b_post;
+          bhs_cmp=FHeq; bhs_bd=f_r1} 
       in
+      let b_concl = f_forall_simpl [(k_id,GTty tint)] b_concl in
       (* the wp of the while *)
       let post = f_imps_simpl [f_not_simpl e; inv] bhs.bhs_po in
+      let term_condition = f_imps_simpl [inv;f_int_le vrnt (f_int 0)] (f_not_simpl e) in
+      let post = f_and term_condition post in
       let modi = s_write env c in
       let post = generalize_mod env m modi post in
       let post = f_and_simpl inv post in
       let concl = f_bdHoareS_r { bhs with bhs_s = s; bhs_po=post} in
-      prove_goal_by [b_concl;concl] (RN_hl_while (inv,None,None)) g
+      prove_goal_by [b_concl;concl] (RN_hl_while (inv,Some vrnt, info)) g
+    | _ ->
+      cannot_apply "while" "not implemented"
 
 let t_equiv_while_disj side vrnt inv g =
   let env, _, concl = get_goal_e g in
@@ -1188,7 +1192,21 @@ let t_hoare_call fpre fpost g =
   prove_goal_by [f_concl;concl] (RN_hl_call (None, fpre, fpost)) g
 
 
-
+let bdHoare_call_spec fpre fpost f cmp bd opt_bd = 
+  match cmp, opt_bd with
+  | FHle, Some _ -> cannot_apply "call" 
+    "optional bound parameter not allowed for upper-bounded judgements"
+  | FHle, None -> 
+    f_bdHoareF fpre f fpost FHle bd 
+  | FHeq, Some bd ->
+    f_bdHoareF fpre f fpost FHeq bd 
+  | FHeq, None -> 
+    f_bdHoareF fpre f fpost FHeq bd 
+  | FHge, Some bd -> 
+    f_bdHoareF fpre f fpost FHge bd 
+  | FHge, None -> 
+    f_bdHoareF fpre f fpost FHge bd 
+  
 let t_bdHoare_call fpre fpost opt_bd g =
   (* FIXME : check the well formess of the pre and the post ? *)
   let env,_,concl = get_goal_e g in
@@ -1210,7 +1228,7 @@ let t_bdHoare_call fpre fpost opt_bd g =
   let post = f_anda_simpl (PVM.subst env spre fpre) post in
 
   (* most of the above code is duplicated from t_hoare_call *)
-  let f_concl = f_bdHoareF fpre f fpost bhs.bhs_cmp bhs.bhs_bd in
+  let f_concl = bdHoare_call_spec fpre fpost f bhs.bhs_cmp bhs.bhs_bd opt_bd in
   let concl = match bhs.bhs_cmp, opt_bd with
     | FHle, None -> f_hoareS bhs.bhs_m bhs.bhs_pr s post 
     | FHeq, Some bd ->
@@ -2316,20 +2334,30 @@ let t_bd_hoare_rnd tac_info g =
       | _ -> tacuerror "Cannot infer a valid event, it must be provided"
   in
 
+  let bound,pre_bound,binders = 
+    if is_bd_indep then
+      bhs.bhs_bd, f_true, []
+    else 
+      let bd_id = EcIdent.create "bd" in
+      let bd = f_local bd_id treal in
+      bd, f_eq bhs.bhs_bd bd, [(bd_id,GTty treal)] 
+  in
+
+
   let subgoals = match tac_info, bhs.bhs_cmp with 
     | PNoRndParams, FHle -> 
       if is_post_indep then
         (* event is true *)
         let concl = f_bdHoareS_r {bhs with bhs_s=s} in
         [concl]
-      else if is_bd_indep then
-        let event = mk_event ty_distr in
-        let bounded_distr = f_real_le (f_mu distr event) bhs.bhs_bd in
-        let post = bounded_distr &&& (mk_event_cond event) in
-        let concl = f_hoareS bhs.bhs_m bhs.bhs_pr s post in
-        [concl]
       else 
-        tacuerror "Bound is not independent, intermediate predicate is required."
+        let event = mk_event ty_distr in
+        let bounded_distr = f_real_le (f_mu distr event) bound in
+        let pre = f_and bhs.bhs_pr pre_bound in 
+        let post = bounded_distr &&& (mk_event_cond event) in
+        let concl = f_hoareS bhs.bhs_m pre s post in
+        let concl = f_forall_simpl binders concl in
+        [concl]
 
     | PNoRndParams, _ -> 
       if is_post_indep then
@@ -2338,34 +2366,32 @@ let t_bd_hoare_rnd tac_info g =
         let bounded_distr = f_eq (f_mu distr event) f_r1 in
         let concl = f_bdHoareS_r {bhs with bhs_s=s} in
         [bounded_distr;concl]
-      else if is_bd_indep then
-        let event = mk_event ty_distr in
-        let bounded_distr = f_cmp (f_mu distr event) bhs.bhs_bd in
-        let post = bounded_distr &&& (mk_event_cond event) in
-        let concl = f_bdHoareS_r {bhs with bhs_s=s; bhs_po=post; bhs_bd=f_r1} in
-        [concl]
       else 
-        tacuerror "Bound is not independent, intermediate predicate is required."
+        let event = mk_event ty_distr in
+        let bounded_distr = f_cmp (f_mu distr event) bound in
+        let pre = f_and bhs.bhs_pr pre_bound in 
+        let post = bounded_distr &&& (mk_event_cond event) in
+        let concl = f_bdHoareS_r {bhs with bhs_s=s; bhs_pr=pre; bhs_po=post; bhs_bd=f_r1} in
+        let concl = f_forall_simpl binders concl in
+        [concl]
 
     | PSingleRndParam event, FHle ->
-      if is_bd_indep then
         let event = event ty_distr in
-        let bounded_distr = f_real_le (f_mu distr event) bhs.bhs_bd in
+        let bounded_distr = f_real_le (f_mu distr event) bound in
+        let pre = f_and bhs.bhs_pr pre_bound in 
         let post = bounded_distr &&& (mk_event_cond event) in
-        let concl = f_hoareS bhs.bhs_m bhs.bhs_pr s post in
+        let concl = f_hoareS bhs.bhs_m pre s post in
+        let concl = f_forall_simpl binders concl in
         [concl]
-      else 
-        tacuerror "Bound is not independent, intermediate predicate is required."
 
     | PSingleRndParam event, _ ->
-      if is_bd_indep then
         let event = event ty_distr in
-        let bounded_distr = f_cmp (f_mu distr event) bhs.bhs_bd in
+        let bounded_distr = f_cmp (f_mu distr event) bound in
+        let pre = f_and bhs.bhs_pr pre_bound in 
         let post = bounded_distr &&& (mk_event_cond event) in
-        let concl = f_bdHoareS_r {bhs with bhs_s=s; bhs_po=post; bhs_cmp=FHeq; bhs_bd=f_r1} in
+        let concl = f_bdHoareS_r {bhs with bhs_s=s; bhs_pr=pre; bhs_po=post; bhs_cmp=FHeq; bhs_bd=f_r1} in
+        let concl = f_forall_simpl binders concl in
         [concl]
-      else 
-        tacuerror "Bound is not independent, intermediate predicate is required."
     | PMultRndParams ((phi,d1,d2,d3,d4),event), _ -> 
       let event = match event ty_distr with | None -> mk_event ty_distr | Some event -> event in
       let bd_sgoal = f_cmp (f_real_add (f_real_prod d1 d2) (f_real_prod d3 d4)) bhs.bhs_bd in 
@@ -2383,8 +2409,8 @@ let t_bd_hoare_rnd tac_info g =
       in
       [bd_sgoal;sgoal1;sgoal2;sgoal3;sgoal4]
     | _, _ -> tacuerror "wrong tactic arguments"
-  in
-  prove_goal_by subgoals (RN_bhl_rnd tac_info ) g
+in
+prove_goal_by subgoals (RN_bhl_rnd tac_info ) g
 
 
 

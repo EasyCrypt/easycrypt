@@ -784,24 +784,9 @@ variables modifiable by $f$.
 
 \subsubsection{Probabilistic Hoare Logic}
 
-\Syntax \rawec{while} \textit{formula} 
-% \textit{formula} 
-% [\textit{formula} \textit{formula}]
+\Syntax \rawec{while} \textit{formula} \textit{formula} 
+[\textit{formula} \textit{formula}]
 %
-
-\begin{displaymath}
-  \infrule{
-    \begin{array}{c}
-    \Hoare{c'}{\pre }{\chi \land 
-      \forall M.~ \chi \land \neg b \Rightarrow \post}
-    \\[.5ex]
-    \Hoare{c}{\chi \land b}{\chi }
-  \end{array}
-}{
-    \Hoare{c';\While{b}{c}}{\pre}{\post}
-  }\left[\mathec{while}\ \chi \right] 
-\end{displaymath}
-
 
 \Description
 %
@@ -818,85 +803,58 @@ that may be modified by $c$.
 \begin{displaymath}
   \infrule{
     \begin{array}{c}
-    \HoareLe{c'}{\pre }{\chi \land 
-      \forall M.~ \chi \land \neg b \Rightarrow \post}{\bound} 
-    \\[.5ex]
-    \Hoare{c}{\chi \land b}{\chi }
-  \end{array}
-}{
-    \HoareLe{c';\While{b}{c}}{\pre}{\post}{\bound}
-  }\left[\mathec{while}\ \chi \right] 
-\end{displaymath}
-
-For the other comparison operators $=$ and $\geq$, the proof obligation involving
-the loop body is stronger.
-
-\begin{displaymath}
-  \infrule{
-    \begin{array}{c}
-    \HoareEq{c'}{\pre }{\chi \land 
-      \forall M.~ \chi \land \neg b \Rightarrow \post}{\bound} 
-    \\[.5ex]
-    \HoareEq{c}{\chi \land b}{\chi }{1}
-  \end{array}
-}{
-    \HoareEq{c';\While{b}{c}}{\pre}{\post}{\bound}
-  }\left[\mathec{while}\ \chi \right] 
-\end{displaymath}
-
-\begin{displaymath}
-  \infrule{
-    \begin{array}{c}
     \HoareGe{c'}{\pre }{\chi \land 
-      \forall M.~ \chi \land \neg b \Rightarrow \post}{\bound} 
+      \forall M.~ (\chi \land 0 \leq e \Rightarrow \neg b)  \land
+      \chi \land \neg b \Rightarrow \post}{f} 
     \\[.5ex]
-    \HoareEq{c}{\chi \land b}{\chi }{1}
+    \forall k.~ \HoareEq{c}{\chi \land b \land e = k}{\chi \land e
+      < k}{1}
   \end{array}
 }{
-    \HoareGe{c';\While{b}{c}}{\pre}{\post}{\bound}
-  }\left[\mathec{while}\ \chi \right] 
+    \HoareGe{c';\While{b}{c}}{\pre}{\post}{f}
+  }\left[\mathec{while}\ \chi\ e \right] 
+\end{displaymath}
+Similarly for (=).
+
+\warningbox{The following variants are not implemented}
+
+For an arbitrary bound $g$ the following rule generalizes the one
+above for lower bounded judgments:
+\begin{displaymath}
+  \infrule{
+    \begin{array}{c}
+    \HoareGe{c'}{\pre }{\chi \land e \leq n \land 
+      \forall M.~ (\chi \land 0 \leq e \Rightarrow \neg b) 
+      \land (\chi \land \neg b \Rightarrow \post)}{\frac{f}{g^n}} 
+    \\[.5ex]
+    \HoareGe{c}{\chi \land b}{\chi}{g}
+    \\[.5ex]
+    \forall k.~ \HoareEq{c}{\chi \land b \land e = k}{e<k}{1}
+  \end{array}
+}{
+    \HoareGe{c';\While{b}{c}}{\pre}{\post}{f}
+  }\left[\mathec{while}\ \chi\ e\ g\ n \right] 
 \end{displaymath}
 
+and the folowing one for exact judgments (=):
+\begin{displaymath}
+  \infrule{
+    \begin{array}{c}
+    \HoareGe{c'}{\pre }{\chi \land e = n \land 
+      \forall M.~ (\chi\Rightarrow (0\leq e \Leftrightarrow \neg b)) 
+        \land (\chi \land \neg b \Rightarrow \post)}
+      {\frac{f}{g^n}}
+    \\[.5ex]
+    \HoareGe{c}{\chi \land b}{\chi}{g}
+    \\[.5ex]
+    \forall k.~ \HoareEq{c}{\chi \land b \land e = k}{e=k-1}{1}
+  \end{array}
+}{
+    \HoareGe{c';\While{b}{c}}{\pre}{\post}{f}
+  }\left[\mathec{while}\ \chi\ e\ g\ n \right] 
+\end{displaymath}
 
-% \warningbox{The following variants are not implemented}
-
-% For an arbitrary bound $g$ the following rule generalizes the one
-% above for lower bounded judgments:
-% \begin{displaymath}
-%   \infrule{
-%     \begin{array}{c}
-%     \HoareGe{c'}{\pre }{\chi \land e \leq n \land 
-%       \forall M.~ (\chi \land 0 \leq e \Rightarrow \neg b) 
-%       \land (\chi \land \neg b \Rightarrow \post)}{\frac{f}{g^n}} 
-%     \\[.5ex]
-%     \HoareGe{c}{\chi \land b}{\chi}{g}
-%     \\[.5ex]
-%     \forall k.~ \HoareEq{c}{\chi \land b \land e = k}{e<k}{1}
-%   \end{array}
-% }{
-%     \HoareGe{c';\While{b}{c}}{\pre}{\post}{f}
-%   }\left[\mathec{while}\ \chi\ e\ g\ n \right] 
-% \end{displaymath}
-
-% and the following one for exact judgments (=):
-% \begin{displaymath}
-%   \infrule{
-%     \begin{array}{c}
-%     \HoareGe{c'}{\pre }{\chi \land e = n \land 
-%       \forall M.~ (\chi\Rightarrow (0\leq e \Leftrightarrow \neg b)) 
-%         \land (\chi \land \neg b \Rightarrow \post)}
-%       {\frac{f}{g^n}}
-%     \\[.5ex]
-%     \HoareGe{c}{\chi \land b}{\chi}{g}
-%     \\[.5ex]
-%     \forall k.~ \HoareEq{c}{\chi \land b \land e = k}{e=k-1}{1}
-%   \end{array}
-% }{
-%     \HoareGe{c';\While{b}{c}}{\pre}{\post}{f}
-%   }\left[\mathec{while}\ \chi\ e\ g\ n \right] 
-% \end{displaymath}
-
-% There is no appropriate rule for $(\leq)$.
+There is no appropriate rule for $(\leq)$.
 
 
 \subsubsection{Relational Hoare Logic}
@@ -950,11 +908,12 @@ loop bodies.
 the first parameter \textit{form} as loop invariant and the second
 parameter \textit{form} as a decreasing \textit{variant}
 expression. The variant is used to verify the loop termination. The
-one-sided rule are described below. Only the left (\rawec{{1}}) variant
-is shown; the right (\rawec{{2}}) variant is symmetric. The expressions
-$\forall X,~\varphi$ and $\exists X,~\varphi$ denote, respectively,
-universal and existential quantification over the set of variables $X$
-modified in the loop body $c$.
+one-sided rule are described below. Only the left (i.e., flagged with
+\rawec{\{1\}}) variant is shown; the right (i.e., flagged with
+\rawec{\{2\}}) variant is symmetric. The expressions $\forall
+X,~\varphi$ and $\exists X,~\varphi$ denote, respectively, universal
+and existential quantification over the set of variables $X$ modified
+in the loop body $c$. 
 
 \begin{displaymath}
 \infrule{
@@ -1034,7 +993,12 @@ adversaries $A$ and $B$, ...
 
 \subsection{Trivial judgements: the \rawec{exfalso} tactic}
 \index{pL}{\rawec{exfalso}}
-\NotDocumented
+
+The \rawec{exfalso} tactic discharges a Hoare, Probabilistic Hoare or
+Probabilistic relational Hoare judgement if the precondition can be
+trivially proved false. The \rawec{trivial} tactic incorporates the
+functionality of the \rawec{exfalso} tactic.
+
 
 \subsection{Trivial judgements: the \rawec{eqobsin} tactic}
 \index{pL}{\rawec{eqobsin}}
@@ -1043,9 +1007,8 @@ adversaries $A$ and $B$, ...
 \subsection{Trivial judgements: the \rawec{pr_bounded} tactic}
 \index{pL}{\rawec{pr_bounded}}
 
-\subsubsection{Probabilistic Hoare Logic}
-\Syntax \rawec{pr_bounded}
-discharges goals by applying trivial probability properties:
+The \rawec{pr_bounded} tactic is only applicable to probabilistic
+Hoare judgements. It discharges proof goals by trivial probability axioms:
 \begin{displaymath}
 \begin{array}{cc}
 \infrule{
@@ -1060,12 +1023,19 @@ discharges goals by applying trivial probability properties:
 \end{array}
 \end{displaymath}
 
+\subsection{Trivial judgements: the \rawec{pr_bounded} tactic}
+\index{pL}{\rawec{trivial}}
 
+Discharges trivial judgements by applying the \rawec{exfalso} and
+\rawec{pr_bounded} tactics, removing Hoare judgements with
+postconditions equivalent to true, modulo trivial reasoning
+in the ambient logic.
 
 \subsection{Strengthening goals: the \rawec{conseq} tactic}
 \index{pL}{\rawec{conseq}}
 
-\Syntax \rawec{conseq} \textit{formula} \textit{formula}
+\Syntax \rawec{conseq} (\_ : \textit{formula} \rawec{==>} \textit{formula} )
+
 \subsubsection{Hoare Logic}
 
 \begin{displaymath}
@@ -1082,7 +1052,7 @@ discharges goals by applying trivial probability properties:
   \HoareLe{c}{\pre'}{\post'}{\delta} \qquad \pre\Rightarrow\pre' \qquad  \post\Rightarrow\post'
 }{
   \HoareLe{c}{\pre}{\post}{\delta}
-}\left[\mathec{conseq}~ \pre'~ \post' \right]
+}\left[\mathec{conseq}~ (\_ : \pre'~ \mathec{==>}~ \post') \right]
 \end{displaymath}
 
 \begin{displaymath}
@@ -1090,7 +1060,7 @@ discharges goals by applying trivial probability properties:
   \HoareEq{c}{\pre'}{\post'}{\delta} \qquad \pre\Rightarrow\pre' \qquad  \post\Leftrightarrow\post'
 }{
   \HoareEq{c}{\pre}{\post}{\delta}
-}\left[\mathec{conseq}~ \pre'~ \post' \right]
+}\left[\mathec{conseq}~ (\_ : \pre'~ \mathec{==>}~ \post') \right]
 \end{displaymath}
 
 \begin{displaymath}
@@ -1098,10 +1068,34 @@ discharges goals by applying trivial probability properties:
   \HoareGe{c}{\pre'}{\post'}{\delta} \qquad \pre\Rightarrow\pre' \qquad  \post'\Rightarrow\post
 }{
   \HoareGe{c}{\pre}{\post}{\delta}
-}\left[\mathec{conseq}~ \pre'~ \post' \right]
+}\left[\mathec{conseq}~ (\_ : \pre'~ \mathec{==>}~ \post') \right]
 \end{displaymath}
 
-\warningbox{(changing the bound is not yet implemented)}
+
+One can additionally strengthen the bounding condition with the syntax:
+
+\rawec{conseq} (\_ : \_ \rawec{==>} \_ : [\textit{cmp}]
+\textit{formula} ) 
+
+that implements strengthening rules like the following:
+
+\begin{displaymath}
+\infrule{
+  \HoareLe{c}{\pre}{\post}{\delta'} \qquad \delta'\leq\delta 
+}{
+  \HoareLe{c}{\pre}{\post}{\delta}
+}\left[\mathec{conseq}~ (\_ : \_ ~\mathec{==>}~ \_) : \delta' \right]
+\end{displaymath}
+
+\begin{displaymath}
+\infrule{
+  \HoareEq{c}{\pre}{\post}{\delta'} \qquad \delta\leq\delta' 
+}{
+  \HoareGe{c}{\pre}{\post}{\delta}
+}\left[\mathec{conseq}~ (\_ : \_ ~\mathec{==>}~ \_) : = \delta' \right]
+\end{displaymath}
+
+
 
 \subsubsection{Relational Hoare Logic}
 
@@ -1110,7 +1104,7 @@ discharges goals by applying trivial probability properties:
   \Equiv{c_1}{c_2}{\pre'}{\post'} \qquad \pre\Rightarrow\pre' \qquad  \post'\Rightarrow\post
 }{
   \Equiv{c_1}{c_2}{\pre}{\post}
-}\left[\mathec{conseq}~ \pre'~ \post' \right]
+}\left[\mathec{conseq}~ ( \_ : \pre'~\mathec{==>}~ \post' \right]
 \end{displaymath}
 
 \subsection{Strengthening goals: the \rawec{bd\_eq}}
@@ -1416,12 +1410,6 @@ modified by $\left\{O_i\right\}_{i=0}^k$.
 % \Equiv{c_1;\While{b}{(c(i);d)}}{c_2;\While{b}{(c(f\,i);d)}}{\pre}{\post}
 % }
 % \end{displaymath}
-
-
-\section{Tacticals}
-
-
-\section{Automated Tactics}
 
 
 %%% Local Variables: 
