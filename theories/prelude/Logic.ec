@@ -201,6 +201,10 @@ lemma nosmt rewrite_iff_r : forall (x1 x2:bool) (p:bool -> bool),
   (x1 <=> x2) => p x1 => p x2
 by [].
 
+lemma nosmt rewrite_bool (x : bool) (p:bool -> bool):
+  x => p true => p x
+by [].
+
 lemma nosmt fcongr :
   forall (f : 'a -> 'b) (x1 x2 : 'a),
     x1 = x2 => f x1 = f x2

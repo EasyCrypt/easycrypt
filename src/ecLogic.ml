@@ -533,26 +533,33 @@ type dofpattern = LDecl.hyps -> form -> form -> (EcIdent.t * form)
 let t_rewrite_gen fpat side f g = 
   let side = match side with `LtoR -> true | `RtoL -> false in
   let hyps,concl = get_goal g in
+  let env = LDecl.toenv hyps in
   let rec find_rewrite f =
-    if is_eq f then destr_eq f, true
-    else if is_iff f then destr_iff f, false
+    if is_eq f then destr_eq f, `Eq
+    else if is_iff f then destr_iff f, `Eqv
     else
       match h_red_opt full_red hyps f with
       | Some f -> find_rewrite f
-      | None   -> 
-        let ppe = EcPrinting.PPEnv.ofenv (LDecl.toenv hyps) in
-        tacuerror "Do not known how to rewrite %a" (EcPrinting.pp_form ppe) f in
-  let (f1,f2),eq = find_rewrite f in
-  let p,tys =
-    if eq then (if side then p_rewrite_l else p_rewrite_r), [f1.f_ty]
-    else (if side then p_rewrite_iff_l else p_rewrite_iff_r), [] in
+      | None   -> begin
+        if side && (EcReduction.equal_type env f.f_ty EcTypes.tbool)
+        then ((f, f_true), `Bool)
+        else
+          let ppe = EcPrinting.PPEnv.ofenv (LDecl.toenv hyps) in
+            tacuerror "Do not known how to rewrite %a" (EcPrinting.pp_form ppe) f
+      end in
+  let (f1,f2),mode = find_rewrite f in
+  let p,tys, fs =
+    match mode with
+    | `Eq   -> (if side then p_rewrite_l else p_rewrite_r), [f1.f_ty], [AAform f1; AAform f2]
+    | `Eqv  -> (if side then p_rewrite_iff_l else p_rewrite_iff_r), [], [AAform f1; AAform f2]
+    | `Bool -> p_rewrite_bool, [], [AAform f1] in
   let pred =
     let f = if side then f1 else f2 in
     let x, body = fpat hyps f concl in
     f_lambda [x,GTty f.f_ty] body in
   t_on_last
     t_red 
-    (t_apply_logic p tys [AAform f1;AAform f2;AAform pred;AAnode;AAnode] g)
+    (t_apply_logic p tys (fs @ [AAform pred;AAnode;AAnode]) g)
 
 let t_rewrite = t_rewrite_gen (pattern_form None)
 
