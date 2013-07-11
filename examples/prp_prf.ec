@@ -178,7 +178,9 @@ proof.
    delta Block.length; by smt.
 
    hoare;if;[rnd;wp |];skip;by smt.
-   conseq (_ : _ : 0%r); [smt |hoare => //].
+   (conseq (_ : _ : 0%r); last hoare=> //); intros=> _ _;
+     (cut H: forall x y, 0%r <= x => 0%r < y => 0%r <= x * y; first smt);
+     apply H; smt.
    intros c;fun;if;last by skip;smt.
  
    wp;seq 1: ((! in_dom x PRP.m /\ card PRP.s < q) /\ c = card PRP.s /\

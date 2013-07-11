@@ -208,11 +208,11 @@ proof.
  inline Correct(BR).SE.dec Correct(BR).SE.enc RO.o.
  do 4! (wp;rnd);rnd;skip;progress;[ | |smt|smt].
  rewrite (projPlain_c (f x1 r) 
- (Plaintext.(^^) m (proj (Map.OptionGet."_.[_]" (Map."_.[_<-_]" RO.m{hr} r y) r)))).
+ (Plaintext.(^^) m1 (proj (Map.OptionGet."_.[_]" (Map."_.[_<-_]" RO.m{hr} r y1) r)))).
  rewrite (projRand_c (f x1 r) 
- (Plaintext.(^^) m (proj (Map.OptionGet."_.[_]" (Map."_.[_<-_]" RO.m{hr} r y) r))));smt.
+ (Plaintext.(^^) m1 (proj (Map.OptionGet."_.[_]" (Map."_.[_<-_]" RO.m{hr} r y1) r))));smt.
  rewrite (projRand_c (f x1 r) 
- (Plaintext.(^^) m (proj (Map.OptionGet."_.[_]" (Map."_.[_<-_]" RO.m{hr} r y) r))));smt.
+ (Plaintext.(^^) m1 (proj (Map.OptionGet."_.[_]" (Map."_.[_<-_]" RO.m{hr} r y1) r))));smt.
 qed.
 
 
@@ -288,8 +288,8 @@ by (fun;inline RO.o;do 2!(wp;rnd);skip;progress;smt).
 
 (** begin eq1 *)
 lemma eq1 : forall (A <: Adv {RO,Rnd}), 
-(forall (R<:ARO), islossless R.o_a => islossless A(R).a1) =>
-(forall (R<:ARO), islossless R.o_a => islossless A(R).a2) =>
+(forall (R<:ARO{A}), islossless R.o_a => islossless A(R).a1) =>
+(forall (R<:ARO{A}), islossless R.o_a => islossless A(R).a2) =>
 equiv [ CPA(BR,A).main ~ CPA(BR2,A).main : 
 (glob A){1} = (glob A){2} ==> !mem Rnd.r{2} RO.s{2} => ={res}].
 proof.
@@ -302,10 +302,8 @@ call
 fun (mem Rnd.r RO.s) 
     (={RO.s} /\ eq_except RO.m{1} RO.m{2} Rnd.r{2});[smt|smt|assumption| | |].
 fun;inline RO.o;if;[smt | wp;rnd | ];wp;skip;progress;smt.
-intros &m2 H;fun;if;[inline RO.o;wp;rnd 1%r (cpTrue)| ];
-                                     wp;skip;progress;smt.
-intros &m1;fun;if;[inline RO.o;wp;rnd 1%r (cpTrue)| ];
-                                     wp;skip;progress;smt.
+intros &m2 H;fun;if;[inline RO.o;wp;rnd;try (wp;skip=> //);smt|wp;skip=> //].
+intros &m1;fun;if;[inline RO.o;wp;rnd;try (wp;skip=> //);smt|wp;skip=> //].
 call 
 ( _ : ={pk,m,RO.m} ==> 
 !in_dom Rnd.r{2} RO.m{2} => 
@@ -317,7 +315,10 @@ call (_ : ={RO.m,RO.s,pk} /\ (glob A){1} = (glob A){2}
      ={RO.m,RO.s,res} /\ (glob A){1} = (glob A){2} 
                       /\ (forall x, in_dom x RO.m{2} = mem x RO.s{2})).
 fun (={RO.m,RO.s} /\ (forall x, in_dom x RO.m{2} = mem x RO.s{2}));[smt | smt | ].
-fun;inline RO.o;if;[smt | wp;rnd | ];wp;skip;progress;smt.
+fun;inline RO.o;if;[smt | wp;rnd | ];wp;skip;progress=> //=.
+  by rewrite mem_add in_dom_set H.
+  by rewrite mem_add -H; case (x1 = x{2})=> // -> /=; rewrite rw_eqT.
+  by apply H.
 inline CPA(BR,A).SO.kg RO.init CPA(BR2,A).SO.kg;wp;rnd;wp;skip;progress;smt.
 qed.
 (** end eq1 *)
@@ -329,8 +330,8 @@ lemma real_le_trans : forall(a, b, c : real),
 (** begin prob1 *)
 lemma prob1 :
  forall (A <: Adv {Rnd,RO}),
-(forall (O <: ARO), islossless O.o_a => islossless A(O).a1) =>
-(forall (O <: ARO), islossless O.o_a => islossless A(O).a2) =>
+(forall (O <: ARO{A}), islossless O.o_a => islossless A(O).a1) =>
+(forall (O <: ARO{A}), islossless O.o_a => islossless A(O).a2) =>
  forall &m , Pr[CPA(BR,A).main() @ &m: res] <=
              Pr[CPA(BR2,A).main() @ &m : res] +
              Pr[CPA(BR2,A).main() @ &m : mem Rnd.r RO.s].
@@ -387,8 +388,8 @@ qed.
 
 (** begin eq2 *)
 lemma eq2 : forall (A <: Adv {RO,Rnd}), 
-(forall (R<:ARO), islossless R.o_a => islossless A(R).a1) =>
-(forall (R<:ARO), islossless R.o_a => islossless A(R).a2) =>
+(forall (R<:ARO{A}), islossless R.o_a => islossless A(R).a1) =>
+(forall (R<:ARO{A}), islossless R.o_a => islossless A(R).a2) =>
 equiv [ CPA(BR2,A).main ~ CPA(BR3,A).main : 
 (glob A){1} = (glob A){2} ==>  ={res,Rnd.r,RO.s}].
 proof.
@@ -412,8 +413,8 @@ qed.
 
 (** begin prob2 *)
 lemma prob2 : forall (A <: Adv {RO,Rnd}) &m,
-(forall (O<:ARO), islossless O.o_a => islossless A(O).a1) =>
-(forall (O<:ARO), islossless O.o_a => islossless A(O).a2) =>
+(forall (O<:ARO{A}), islossless O.o_a => islossless A(O).a1) =>
+(forall (O<:ARO{A}), islossless O.o_a => islossless A(O).a2) =>
 Pr[CPA(BR2,A).main() @ &m : res] + Pr[CPA(BR2,A).main() @ &m : mem Rnd.r RO.s] = 
 Pr[CPA(BR3,A).main() @ &m : res] + Pr[CPA(BR3,A).main() @ &m : mem Rnd.r RO.s].
 proof.
@@ -454,8 +455,8 @@ module CPA2 (S : Scheme, A_: Adv) ={
 
 (** begin eq3 *)
 lemma eq3 : forall (A <: Adv {RO,Rnd}), 
-(forall (R<:ARO), islossless R.o_a => islossless A(R).a1) =>
-(forall (R<:ARO), islossless R.o_a => islossless A(R).a2) =>
+(forall (R<:ARO{A}), islossless R.o_a => islossless A(R).a1) =>
+(forall (R<:ARO{A}), islossless R.o_a => islossless A(R).a2) =>
 equiv [ CPA(BR3,A).main ~ CPA2(BR3,A).main : 
 (glob A){1} = (glob A){2} ==>  ={res,Rnd.r,RO.s}].
 proof.
@@ -480,8 +481,8 @@ qed.
 (** begin prob3 *)
 lemma prob3 : 
  forall (A <: Adv {RO,Rnd}) &m,
-(forall (R<:ARO), islossless R.o_a => islossless A(R).a1) =>
-(forall (R<:ARO), islossless R.o_a => islossless A(R).a2) =>
+(forall (R<:ARO{A}), islossless R.o_a => islossless A(R).a1) =>
+(forall (R<:ARO{A}), islossless R.o_a => islossless A(R).a2) =>
 Pr[CPA(BR3,A).main() @ &m : res] + Pr[CPA(BR3,A).main() @ &m : mem Rnd.r RO.s] =
 1%r/2%r + Pr[CPA2(BR3,A).main() @ &m : mem Rnd.r RO.s].
 proof.
@@ -496,16 +497,16 @@ proof.
   elim H => Heq1 Heq2;rewrite Heq1 Heq2 //.
  cut Hleq:  (Pr[CPA2(BR3,A).main() @ &m : res] = 1%r/2%r).
  cut Hbd : (bd_hoare[CPA2(BR3,A).main : true ==> res] = (1%r / 2%r)).
- fun; rnd (1%r / 2%r) (lambda b, b = b'); simplify.
+ fun; rnd (lambda b, b = b'); simplify.
  call (_ : true ==> true).
  fun (true);[smt|smt|assumption|].
- fun;if;[inline RO.o;wp;rnd 1%r (cpTrue)|];wp;skip;smt.
- inline CPA2(BR3,A).SO.enc;do 2! (wp;rnd 1%r (cpTrue));wp.
+ fun;if;[inline RO.o;wp;rnd (cpTrue)|];wp;skip;smt.
+ inline CPA2(BR3,A).SO.enc;do 2! (wp;rnd (cpTrue));wp.
  call (_ : true ==> true).
  fun (true);[smt|smt|assumption|].
- fun;if;[inline RO.o;wp;rnd 1%r (cpTrue)|];wp;skip;smt.
+ fun;if;[inline RO.o;wp;rnd (cpTrue)|];wp;skip;smt.
  inline CPA2(BR3,A).SO.kg RO.init.
- wp;rnd 1%r (cpTrue);wp;skip;progress;[smt|smt|smt|].
+ wp;rnd (cpTrue);wp;skip;progress;[smt|smt|smt|].
  rewrite Dbool.mu_def.
  case (result);delta charfun;simplify;smt.
  bdhoare_deno Hbd; smt.
@@ -547,8 +548,8 @@ qed.
 
 (** begin eq4 *)
 lemma eq4 : forall (A <: Adv {RO,Rnd}), 
-(forall (R<:ARO), islossless R.o_a => islossless A(R).a1) =>
-(forall (R<:ARO), islossless R.o_a => islossless A(R).a2) =>
+(forall (R<:ARO{A}), islossless R.o_a => islossless A(R).a1) =>
+(forall (R<:ARO{A}), islossless R.o_a => islossless A(R).a2) =>
 equiv [ CPA2(BR3,A).main ~ OW(BR_OW(A)).main : 
 (glob A){1} = (glob A){2} ==>  (mem Rnd.r RO.s){1} => res{2}].
 proof.
@@ -558,12 +559,18 @@ proof.
  wp.
  call (_:  ={RO.s,RO.m} /\ 
       (forall (x : randomness), in_dom x RO.m{1} = mem x RO.s{1})).
- fun;if;[smt|inline RO.o;wp;rnd|];wp;skip;progress;smt.
+ fun;if;[smt|inline RO.o;wp;rnd|];wp;skip;progress=> //=.
+   by rewrite mem_add in_dom_set H.
+   by rewrite mem_add -H; case (x1 = x{2})=> //= -> //=; rewrite rw_eqT.
+   by apply H.
  inline CPA2(BR3,A).SO.enc;wp;rnd;swap{1} -5.
  wp.
  call (_:  ={RO.s,RO.m} /\ 
       (forall (x : randomness), in_dom x RO.m{1} = mem x RO.s{1})).
- fun;if;[smt|inline RO.o;wp;rnd|];wp;skip;progress;smt.
+ fun;if;[smt|inline RO.o;wp;rnd|];wp;skip;progress=> //=.
+   by rewrite mem_add in_dom_set H.
+   by rewrite mem_add -H; case (x1 = x{2})=> //= -> //=; rewrite rw_eqT.
+   by apply H.
  inline RO.init CPA2(BR3,A).SO.kg;do 2!(wp;rnd);skip;progress;try smt.
   elim (find_in
       (lambda (p0:randomness) (p1:plaintext), f x1 p0 = f x1 rL)
@@ -586,8 +593,8 @@ qed.
 (** begin prob4 *)
 lemma prob4 : 
 forall (A <: Adv {Rnd, RO}) &m,
-(forall (O <: ARO),  islossless O.o_a => islossless A(O).a1) =>
-(forall (O <: ARO),  islossless O.o_a => islossless A(O).a2) =>
+(forall (O <: ARO{A}),  islossless O.o_a => islossless A(O).a1) =>
+(forall (O <: ARO{A}),  islossless O.o_a => islossless A(O).a2) =>
 Pr[ CPA2(BR3,A).main() @ &m : mem Rnd.r RO.s] <= 
 Pr[ OW(BR_OW(A)).main () @ &m : res].
 proof.
@@ -602,8 +609,8 @@ qed.
 (** begin conclusion *)
 lemma Conclusion :
 forall (A <: Adv {Rnd, RO}) &m,
-(forall (O <: ARO),  islossless O.o_a => islossless A(O).a1) =>
-(forall (O <: ARO),  islossless O.o_a => islossless A(O).a2) =>
+(forall (O <: ARO{A}),  islossless O.o_a => islossless A(O).a1) =>
+(forall (O <: ARO{A}),  islossless O.o_a => islossless A(O).a2) =>
  exists (I<:Inverter), 
 Pr[CPA(BR,A).main() @ &m : res] - 1%r / 2%r <= 
 Pr[OW(I).main() @ &m : res].
