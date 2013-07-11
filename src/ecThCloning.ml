@@ -508,8 +508,8 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
             (subst, proofs, EcEnv.Theory.bind x nth scenv)
       end
 
-      | CTh_export p ->               (* FIXME: subst in p? *)
-          (subst, proofs, EcEnv.Theory.export p scenv)
+      | CTh_export p ->
+          (subst, proofs, EcEnv.Theory.export (EcSubst.subst_path subst p) scenv)
     in
       let scenv = EcEnv.Theory.enter name scenv in
       let _, proofs, scenv =

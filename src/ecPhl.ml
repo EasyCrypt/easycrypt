@@ -601,36 +601,40 @@ let check_concrete env f =
 let t_hoareF_fun_def g = 
   let env,_,concl = get_goal_e g in
   let hf = destr_hoareF concl in
-  check_concrete env hf.hf_f;
-  let memenv, fdef, env = Fun.hoareS hf.hf_f env in (* FIXME catch exception *)
+  let f = NormMp.norm_xpath env hf.hf_f in
+  check_concrete env f;
+  let memenv, fdef, env = Fun.hoareS f env in 
   let m = EcMemory.memory memenv in
   let fres = 
     match fdef.f_ret with
     | None -> f_tt
     | Some e -> form_of_expr m e in
-  let post = PVM.subst1 env (pv_res hf.hf_f) m fres hf.hf_po in
+  let post = PVM.subst1 env (pv_res f) m fres hf.hf_po in
   let concl' = f_hoareS memenv hf.hf_pr fdef.f_body post in
   prove_goal_by [concl'] RN_hl_fun_def g
 
 let t_bdHoareF_fun_def g = 
   let env,_,concl = get_goal_e g in
   let bhf = destr_bdHoareF concl in
-  check_concrete env bhf.bhf_f;
-  let memenv, fdef, env = Fun.hoareS bhf.bhf_f env in(* FIXME catch exception *)
+  let f = NormMp.norm_xpath env bhf.bhf_f in
+  check_concrete env f;
+  let memenv, fdef, env = Fun.hoareS f env in
   let m = EcMemory.memory memenv in
   let fres = 
     match fdef.f_ret with
     | None -> f_tt
     | Some e -> form_of_expr m e in
-  let post = PVM.subst1 env (pv_res bhf.bhf_f) m fres bhf.bhf_po in
+  let post = PVM.subst1 env (pv_res f) m fres bhf.bhf_po in
   let concl' = f_bdHoareS memenv bhf.bhf_pr fdef.f_body post bhf.bhf_cmp bhf.bhf_bd  in
   prove_goal_by [concl'] RN_hl_fun_def g
 
 let t_equivF_fun_def g = 
   let env,_,concl = get_goal_e g in
   let ef = destr_equivF concl in
-  check_concrete env ef.ef_fl; check_concrete env ef.ef_fr;
-  let memenvl,fdefl,memenvr,fdefr,env = Fun.equivS ef.ef_fl ef.ef_fr env in
+  let fl, fr = 
+    NormMp.norm_xpath env ef.ef_fl,  NormMp.norm_xpath env ef.ef_fr in
+  check_concrete env fl; check_concrete env fr;
+  let memenvl,fdefl,memenvr,fdefr,env = Fun.equivS fl fr env in
   let ml, mr = EcMemory.memory memenvl, EcMemory.memory memenvr in
   let fresl = 
     match fdefl.f_ret with
@@ -640,8 +644,8 @@ let t_equivF_fun_def g =
     match fdefr.f_ret with
     | None -> f_tt
     | Some e -> form_of_expr mr e in
-  let s = PVM.add env (pv_res ef.ef_fl) ml fresl PVM.empty in
-  let s = PVM.add env (pv_res ef.ef_fr) mr fresr s in
+  let s = PVM.add env (pv_res fl) ml fresl PVM.empty in
+  let s = PVM.add env (pv_res fr) mr fresr s in
   let post = PVM.subst env s ef.ef_po in
   let concl' = 
     f_equivS memenvl memenvr ef.ef_pr fdefl.f_body fdefr.f_body post in
@@ -1291,15 +1295,16 @@ let t_equiv_call1 side fpre fpost g =
   let modi   = f_write env f in
   let post   = f_imp_simpl fpost post in
   let post   = generalize_mod env me modi post in
+  let post   = f_forall_simpl [(vres, GTty fsig.fs_ret)] post in
   let spre   = PVM.empty in
   let spre   = subst_args_call env me f fsig.fs_params args spre in
-  let post   = f_anda_simpl (PVM.subst env spre (Fsubst.f_subst msubst fpre)) post in
+  let post   = 
+    f_anda_simpl (PVM.subst env spre (Fsubst.f_subst msubst fpre)) post in
   let concl  =
     match side with
     | true  -> { equiv with es_sl = fstmt; es_po = post; }
     | false -> { equiv with es_sr = fstmt; es_po = post; } in
   let concl  = f_equivS_r concl in
-  let concl  = f_forall [(vres, GTty fsig.fs_ret)] concl in
   prove_goal_by [fconcl; concl] (RN_hl_call (Some side, fpre, fpost)) g
 
 (* --------------------------------------------------------------------- *)

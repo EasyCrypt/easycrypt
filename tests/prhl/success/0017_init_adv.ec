@@ -39,10 +39,11 @@ fun (={O.w}) ;try skip;trivial.
 skip;trivial.
 save.
 
-lemma foo : forall &m1 &m2(A<:Adv), 
+lemma foo : forall &m1 &m2(A<:Adv{O}), 
+  O.w{m1} = O.w{m2} =>
   Pr[G(A).main() @ &m1 : res = 3] = 
   Pr[G(A).main() @ &m2 : res = 3].
-intros &m1 &m2 A.
+intros &m1 &m2 A Heq.
 equiv_deno (foo3 A);trivial.
 save.
 
@@ -66,6 +67,7 @@ module A (O:Or) = {
 }.
 
 lemma foo1 : forall &m1 &m2,
+  O.w{m1} = O.w{m2} =>
   Pr[G(A).main() @ &m1 : res = 3] = 
   Pr[G(A).main() @ &m2 : res = 3]. 
 intros &m1 &m2.

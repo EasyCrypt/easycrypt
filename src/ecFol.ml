@@ -1328,7 +1328,7 @@ let f_int_sub_simpl f1 f2 =
   else
     try f_int (destr_int f1 - destr_int f2)
     with DestrError _ -> 
-      if f_equal f_i0 f1 then f_int_opp_simpl f1
+      if f_equal f_i0 f1 then f_int_opp_simpl f2
       else if f_equal f_i0 f2 then f1
       else f_int_sub f1 f2
 
