@@ -2305,12 +2305,14 @@ module LDecl = struct
       | _ -> raise NotReducible
     with _ -> raise NotReducible
 
-  let has_symbol s hyps = 
+  let has_symbol strict s hyps = 
     let test (x,k) = 
       s = EcIdent.name x || 
-      match k with
-      | LD_mem (Some lmt) -> Msym.mem s (lmt_bindings lmt)
-      | _ -> false in
+      (if strict then 
+          match k with
+          | LD_mem (Some lmt) -> Msym.mem s (lmt_bindings lmt)
+          | _ -> false
+       else false) in
     List.exists test hyps.h_local 
 
   let has_ident id hyps = 
@@ -2320,7 +2322,7 @@ module LDecl = struct
     if has_ident id hyps then error (DuplicateIdent id)
     else 
       let s = EcIdent.name id in
-      if s <> "_" && has_symbol s hyps then error (DuplicateSymbol s) 
+      if s <> "_" && has_symbol false s hyps then error (DuplicateSymbol s) 
 
   let add_local id ld hyps = 
     check_id id hyps;
@@ -2328,11 +2330,11 @@ module LDecl = struct
 
   let fresh_id hyps s = 
     let s = 
-      if s = "_" || not (has_symbol s hyps) then s
+      if s = "_" || not (has_symbol true s hyps) then s
       else 
         let rec aux n = 
           let s = s ^ string_of_int n in
-          if has_symbol s hyps then aux (n+1) else s in
+          if has_symbol true s hyps then aux (n+1) else s in
         aux 0 in
     EcIdent.create s
       
@@ -2431,7 +2433,7 @@ module LDecl = struct
   let has_hyp s h = has_hyp s (tohyps h)
   let lookup_hyp s h = lookup_hyp s (tohyps h)
 
-  let has_symbol s h = has_symbol s (tohyps h)
+  let has_symbol s h = has_symbol false s (tohyps h)
 
   let fresh_id  h s = fresh_id (tohyps h) s 
   let fresh_ids h ls = fresh_ids (tohyps h) ls
