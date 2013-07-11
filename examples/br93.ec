@@ -1,6 +1,5 @@
 require import RandOrcl.
 require import Array.
-require import Bitstring.
 require import Map.
 require import FSet.
 require import Int.
