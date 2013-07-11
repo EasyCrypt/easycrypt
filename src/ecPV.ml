@@ -67,7 +67,7 @@ module Mpv = struct
     } 
       
   let empty = { s_pv = Mnpv.empty; s_gl = Mm.empty }
-    
+
   let check_npv_mp env npv top mp restr = 
     if not (Sm.mem top restr) then 
       raise (AliasClash (env,AC_concrete_abstract(mp,npv,top)))
@@ -154,12 +154,7 @@ module PVM = struct
 
   let empty = Mid.empty 
 
-  let pvm = EcEnv.NormMp.norm_pvar
-
-  let get_restr env mp = 
-    match (EcEnv.Mod.by_mpath mp env).me_body with
-    | EcModules.ME_Decl(_,restr) -> restr 
-    | _ -> assert false 
+  let of_mpv s m = Mid.singleton m s 
     
   let add env pv m f s = 
     try Mid.change (fun o -> Some (Mpv.add env pv f (odfl Mpv.empty o))) m s
