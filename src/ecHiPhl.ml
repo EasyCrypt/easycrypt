@@ -758,7 +758,7 @@ let process_eqobs_in (geq', ginv, eqs') g =
     try EcPV.Mpv2.of_form env ml mr f 
     with _ -> 
       let ppe = EcPrinting.PPEnv.ofenv env in
-      tacuerror "can not reconize %a as a set of equality" 
+      tacuerror "cannot recognize %a as a set of equalities" 
         (EcPrinting.pp_form ppe) f in
 
   let geq =
@@ -777,7 +777,7 @@ let process_eqobs_in (geq', ginv, eqs') g =
     | None -> 
       begin 
         try EcPV.Mpv2.needed_eq env ml mr es.es_po 
-        with _ -> tacuerror "can not infer the set of equality" 
+        with _ -> tacuerror "cannot infer the set of equalities" 
       end
     | Some eqs' -> 
       let eqs = process_prhl_formula g eqs' in
