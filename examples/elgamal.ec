@@ -122,13 +122,7 @@ lemma valid_ElGamal : hoare [ ValidScheme(ElGamal).main : true ==> res ].
 proof.
   fun.
   inline ElGamal.kg ElGamal.enc ElGamal.dec.
-  wp.
-  rnd.
-  wp.
-  rnd.
-  skip.
-  simplify.
-  intros &m1 x Hx y Hy.
+  do (wp;rnd); skip => /= &m1 x Hx y Hy.
   rewrite (group_pow_mult y x); rewrite (group_pow_mult x y). 
   rewrite (Int.Comm.Comm y x).
   rewrite (mul_div (g ^ (x * y)) (m{m1}));split.

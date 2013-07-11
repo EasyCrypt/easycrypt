@@ -99,28 +99,26 @@ let process_app dir k phi bd_info g =
   | _, _ ->
       cannot_apply "app" "optional bound parameter not supported"
 
-let process_while side_opt phi vrnt_opt info g =
+let process_while side_opt phi vrnt_opt g =
   let concl = get_concl g in
   if is_hoareS concl then
-    match vrnt_opt,info with
-      | None, None ->
+    match vrnt_opt with
+      | None ->
         t_hoare_while (process_phl_formula g phi) g
       | _ -> cannot_apply "while" "wrong arguments"
   else if is_bdHoareS concl then
-    match vrnt_opt,info with
-      | Some vrnt, info ->
+    match vrnt_opt with
+      | Some vrnt ->
         t_bdHoare_while 
           (process_phl_formula g phi) 
           (process_phl_form tint g vrnt) 
-          (omap info (fun (bd,i) -> process_phl_form treal g bd,
-            process_phl_form tint g i))
           g
       | _ -> cannot_apply "while" "wrong arguments"
   else if is_equivS concl then
-    match side_opt, vrnt_opt,info with
-      | None, None, None ->
+    match side_opt, vrnt_opt with
+      | None, None ->
         t_equiv_while (process_prhl_formula g phi) g
-      | Some side, Some vrnt, None ->
+      | Some side, Some vrnt ->
         t_equiv_while_disj side (process_prhl_form tint g vrnt) (process_prhl_formula g phi) g
       | _ -> cannot_apply "while" "wrong arguments"
   else cannot_apply "while" "the conclusion is not a hoare or a equiv"
@@ -860,7 +858,7 @@ let process_phl loc ptac g =
     | Pwp k                     -> t_wp k
     | Prcond (side, b, i)       -> t_rcond side b i
     | Pcond side                -> process_cond side
-    | Pwhile (side, (phi, vopt, info))  -> process_while side phi vopt info
+    | Pwhile (side, (phi, vopt))  -> process_while side phi vopt
     | Pfission info             -> process_fission info
     | Pfusion info              -> process_fusion info
     | Punroll info              -> process_unroll info

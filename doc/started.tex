@@ -1,70 +1,90 @@
 % !TeX root = easycrypt.tex
 
 \chapter{Getting Started}
-\section{Installing and running \EasyCrypt}
-A nightly build of \EasyCrypt is available from \url{http://ci.easycrypt.info/nightly}
-and contains several scripts facilitating installation on Mac and Debian-based
-Linux distributions. Windows is currently not supported, even via Cygwin.
+\section{Building and Running \EasyCrypt}
+The easiest way to install \EasyCrypt on a Unix-based OS is to use the local
+toolchain-based installation scripts available from our public \texttt{git}
+repository. Other solutions exist, but the wide variety of machines and
+configurations we expect \EasyCrypt users to own prevent us from documenting or
+supporting them all. We strongly recommend using the local installation scripts
+unless you are ready to deal with configuration issues yourself.
 
 \subsection{Building \EasyCrypt}
-There are two ways of resolving \EasyCrypt's build dependencies. The first one is to
-build a local toolchain, the second one is to manually install all dependencies.
-Once the dependencies are resolved using either one of the methods below,
-\EasyCrypt can easily be built by calling \texttt{make} in the relevant directory.
+To build \EasyCrypt from scratch, you will need the following standard tools:
+\texttt{git}, \texttt{make}, \texttt{curl}, \texttt{autoconf}, \texttt{gcc} and \texttt{g++}.
 
-\paragraph{Using the local toolchain}
-It is possible, starting from a machine with only \texttt{make}, \texttt{gcc}
-and \texttt{curl} to get a full installation of \EasyCrypt up and running. After
-decompressing the nightly tarball, running \texttt{make toolchain} will fetch
-and locally build the latest version of Ocaml and \EasyCrypt's dependencies. Once
-built, the toolchain can be activated with \texttt{sh scripts/activate-toolchain.sh}
-(and will need to be activated in such a way each time you wish to rebuild \EasyCrypt
-in a new terminal).
+The following bash script clones our public \texttt{git} repository, builds the
+local toolchain (including the provers), activates it and builds \EasyCrypt.
 
-\paragraph{Manual installation}
-Feel free to resolve dependencies yourself, although we can only offer limited
-support in this case. The readme file included in the distribution contains an
-up to date list of \EasyCrypt's build dependencies.
+\begin{verbatim}
+  git clone http://ci.easycrypt.info/easycrypt.git 
+  cd easycrypt
+  make toolchain provers
+  $(./scripts/activate-toolchain.sh)
+  make && make check
+\end{verbatim}
 
-\subsection{Installing and configuring provers}
-Our core libraries make use of three SMT solvers: Z3~\cite{}, Alt-Ergo~\cite{}
-and Eprover~\cite{}, that have complementary strengths and weaknesses. We
-recommend that any user of \EasyCrypt have at least those three solvers installed and
-configured, and expect that other solvers will often be required for specific
-cases. Once installed, provers should be detected by \WhyThree using
-\texttt{why3config --detect}.
+The toolchain and provers may take up to an hour to build, but this only has to
+be done once. To keep your version of \EasyCrypt up to date, simply run the
+following command.
 
-\paragraph{Debian-based Linux distributions}
-We have set up a ppa containing up to date binary versions of the provers we
-use most of the time (\url{https://launchpad.net/~strub/+archive/easycrypt}).
+\begin{verbatim}
+  git pull && make
+\end{verbatim}
 
-\paragraph{Other platforms}
-For other platforms, the provers can be installed as part of the local toolchain
-installation. This may initially take some time, but greatly simplifies the
-installation process. If you prefer to install provers yourself, some links are
-provided in the distribution's readme file.
+\paragraph{On the test suite}
+The final \texttt{make check} runs \EasyCrypt on our test suite and the standard
+libraries. Please do report any failure in the test suite (if possible, attach
+the .xml file produced by \texttt{make check-xunit}) to
+\url{easycrypt-support@lists.gforge.inria.fr}. Unless a large number of tests
+fail, a failure at this point does not necessarily meant that the installation
+failed: SMT solvers can be fickle beasts and the computing capacity of computers
+varies greatly. We are doing our best to make calls to SMT in the standard
+library as stable as possible over a wide variety of machines, but we need your
+help to test them in as many scenarios as possible and are counting on you to
+report failures.
+
+\paragraph{Included provers}
+The local toolchain contains a minimal set of provers to which you can easily
+add your own. Please look at \WhyThree's and your favourite prover's
+documentation for installation instructions. By default, all installed provers
+are used when SMT is called. This behaviour can be changed using a command-line
+option and language pragmas.
 
 \subsection{\EasyCrypt's interactive mode}
-\EasyCrypt's interactive mode uses emacs 23.3 or higher. A script is included in the
-distribution, that performs a local installation of ProofGeneral and runs emacs
-using these. This is the recommended way of using \EasyCrypt, but nothing should
-prevent you from performing a global install of ProofGeneral's \EasyCrypt mode. We
-cannot, however, guarantee that we will solve all configuration problems that
-may arise from doing so.
+The instructions above give you a command-line version of \EasyCrypt that can be
+used to check proof scripts, but is difficult to use to develop proofs. We also
+provide an interactive interface based on \texttt{emacs} and ProofGeneral.
+Again, we recommend using our local installation scripts and will only provide
+limited support if you choose not to.
 
-\paragraph{Locally installing the ProofGeneral files}
-From the main folder, run \texttt{make -C proofgeneral local} to download the
-latest version of ProofGeneral and compile it, along with the relevant \EasyCrypt files
-for your installed version of emacs.
-
-\paragraph{Running \EasyCrypt in interactive mode}
-From the main folder, run \texttt{make pg \&} to start up a new instance of emacs
-using the local install of ProofGeneral.
+To install \EasyCrypt's interactive mode, ensure that you have \texttt{emacs}
+version 23.3 or higher, and that it is in your \texttt{\$PATH}. Under MacOSX,
+\texttt{emacs} is detected when installed in the system Applications or using
+MacPorts. The following command, run from the public repository's root, will
+fetch and compile the latest version of Proof General, along with the \EasyCrypt
+definitions.
+\begin{verbatim}
+  make -C proofgeneral local
+\end{verbatim}
+You can then run \texttt{emacs} using this fresh configuration of Proof General
+by running the following command from the repository's root and opening files as
+normal.
+\begin{verbatim}
+  make pg
+\end{verbatim}
 
 \subsection{Bug reporting}
-Please use the GForge tracker
-(\url{https://gforge.inria.fr/tracker/?group_id=2622}, requires an account at
-GForge) to report bugs and unsightly behaviours.
+For now, please use the GForge tracker
+(\url{https://gforge.inria.fr/tracker/?group_id=2622}) to report bugs and
+unsightly behaviours. This requires an account on the forge (which will ask you
+for an INRIA project-team name %that you can probably fill in at random
+to create an account). We are working on setting up an alternative bug tracking
+system.
+
+\subsection{This documentation}
+The source for this document, along with the macros and language definitions
+used, are available in the public repository.
 
 \section{A Basic Example: Public-Key Encryption\label{sec:tutorial}}
 In this section we present a formalization of the proof of security

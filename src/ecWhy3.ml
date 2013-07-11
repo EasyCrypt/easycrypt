@@ -1582,7 +1582,7 @@ let check_goal me_of_mt env pi (hyps, concl) =
           | Some e ->
             let nenv, _, e = trans_form !env e in
             env := nenv;
-            Decl.create_logic_decl [Decl.make_ls_defn ls [] e] in
+            Decl.create_logic_decl [Decl.make_ls_defn ls [] (force_bool e)] in
         env := 
           { !env with env_id = Mid.add id (t_app ls [] codom) !env.env_id;
             logic_task = add_decl_with_tuples !env.logic_task decl }

@@ -622,6 +622,7 @@ let process_apply loc pe g =
 (* -------------------------------------------------------------------- *)
 let process_rewrite1_core (s, o) (p, typs, ue, ax) args g =
   let (hyps, concl) = get_goal g in
+  let env = LDecl.toenv hyps in
 
   let ((_ax, ids), (_mode, (f1, f2))) =
     let rec find_rewrite_pattern (ax, ids) =
@@ -630,7 +631,11 @@ let process_rewrite1_core (s, o) (p, typs, ue, ax) args g =
       | EcFol.SFiff (f1, f2) -> ((ax, ids), (`Ev, (f1, f2)))
       | _ -> begin
         match destruct_product hyps ax with
-        | None -> tacuerror "not an equation to rewrite"
+        | None ->
+            if s = `LtoR && EcReduction.equal_type env ax.f_ty tbool then
+              ((ax, ids), (`Bool, (ax, f_true)))
+            else
+              tacuerror "not an equation to rewrite"
         | Some _ ->
             let (ax, id) = check_pterm_argument hyps ue ax None in
               find_rewrite_pattern (ax, id :: ids)

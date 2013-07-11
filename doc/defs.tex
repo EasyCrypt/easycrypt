@@ -231,7 +231,7 @@
 
 %% Language definition
 \lstnewenvironment{easycrypt}[2][]%
-  {\lstset{language=easycrypt,caption=#2,#1}}%
+  {\lstset{language=easycrypt,caption={#2},#1}}%
   {}
 
 \newcommand{\rawec}[2][basicstyle=\normalsize\sffamily,mathescape]{\lstinline[language=easycrypt,#1]{#2}}
@@ -300,6 +300,7 @@
               {exists}{{$\exists$}}1
               {->}{{$\rightarrow\;$}}1
               {<-}{{$\leftarrow\;$}}1
+              {<->}{{$\leftrightarrow\;$}}1
               {=>}{{$\Rightarrow\;$}}1
               {==>}{{$\Rrightarrow\;$}}1
               {\/\\}{{$\wedge$}}1
