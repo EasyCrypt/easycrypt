@@ -246,16 +246,8 @@ proof.
   by wp; rnd; wp; skip; smt.
   by wp; skip; smt.
   wp; do rnd; wp; skip; progress=> //;first 2 by smt.
-  case (bL) => _.
-  cut -> : hL ^^ x2 ^^ x2 = hL ^^ (x2 ^^ x2); first by smt.
-  by smt.
-  cut -> : hL ^^ x1 ^^ x1 = hL ^^ (x1 ^^ x1); first by smt.
-  by smt.
-  case (bL) => _.
-  cut -> : hR ^^ x2 ^^ x2 = hR ^^ (x2 ^^ x2); first by smt.
-  by smt.
-  cut -> : hR ^^ x1 ^^ x1 = hR ^^ (x1 ^^ x1); first by smt.
-  by smt.
+  by generalize (if bL then x2 else x1) => x; smt.
+  by generalize (if bL then x2 else x1) => x; smt.
 qed.
 
 module SCDH_from_CPA (A_:Adv) : SCDH.Adversary = {
