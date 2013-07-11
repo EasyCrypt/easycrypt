@@ -108,14 +108,14 @@ let process_while side_opt phi vrnt_opt info g =
       | _ -> cannot_apply "while" "wrong arguments"
   else if is_bdHoareS concl then
     match vrnt_opt,info with
-      | None, None ->
+      | Some vrnt, info ->
         t_bdHoare_while 
           (process_phl_formula g phi) 
-          (* (process_phl_form tint g vrnt)  *)
-          (* (omap info (fun (bd,i) -> process_phl_form treal g bd, *)
-          (*   process_phl_form tint g i)) *)
+          (process_phl_form tint g vrnt) 
+          (omap info (fun (bd,i) -> process_phl_form treal g bd,
+            process_phl_form tint g i))
           g
-      | _ -> cannot_apply "while" "Wrong arguments for Probabilistic Hoare judgement"
+      | _ -> cannot_apply "while" "wrong arguments"
   else if is_equivS concl then
     match side_opt, vrnt_opt,info with
       | None, None, None ->
@@ -185,7 +185,7 @@ let process_call side info (_, n as g) =
       let (_,f,_),_ = s_last_call "call" bhs.bhs_s in
       let penv, qenv = LDecl.hoareF f hyps in
       penv,qenv, fun pre post -> 
-        f_bdHoareF pre f post bhs.bhs_cmp bhs.bhs_bd
+        bdHoare_call_spec pre post f bhs.bhs_cmp bhs.bhs_bd None
     | FbdHoareS _, Some _ | FhoareS _, Some _ ->
       cannot_apply "call" "side can only be given for prhl judgements"
     | FequivS es, None ->
@@ -212,7 +212,7 @@ let process_call side info (_, n as g) =
     | FbdHoareS bhs ->
       let (_,f,_),_ = s_last_call "call" bhs.bhs_s in
       let penv = LDecl.inv_memenv1 hyps in
-      penv, fun inv -> f_bdHoareF inv f inv bhs.bhs_cmp bhs.bhs_bd
+      penv, fun inv -> bdHoare_call_spec inv inv f bhs.bhs_cmp bhs.bhs_bd None
     | FequivS es ->
       let (_,fl,_),(_,fr,_),_,_ = s_last_calls "call" es.es_sl es.es_sr in
       let penv = LDecl.inv_memenv hyps in
