@@ -332,7 +332,7 @@ proof.
  assumption.
  delta;simplify.
  intros Hin_dom Hf.
- rewrite (Option.proj_some<:from> x2).
+ rewrite Option.proj_some.
  apply (f_iny _ _ pk{2} sk{2} _ _);smt.
 save.
 
