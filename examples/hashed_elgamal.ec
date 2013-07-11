@@ -154,7 +154,7 @@ lemma CPA_G1 (A <: Adv {CPA, G1, RO, ARO, Hashed_ElGamal}) :
   [ CPA(Hashed_ElGamal(RO), A(ARO(RO)), ARO(RO)).main ~ G1(A).main : 
     (glob A){1} = (glob A){2} ==> !(mem G1.gxy ARO.log){2} => ={res} ].
 proof.
-  intros _ _; fun.
+  intros Hll1 Hll2; fun.
   inline ARO(RO).init G1(A).AO.init RO.init 
     Hashed_ElGamal(RO).kg Hashed_ElGamal(RO).enc.
   swap{1} 9 -5.
@@ -175,21 +175,22 @@ proof.
   by wp; skip; smt.
   by skip; smt.
 
-  call (_ : (mem G1.gxy ARO.log), (={ARO.log} /\ eq_except RO.m{1} RO.m{2} G1.gxy{2})).
-
+  call (_ : (mem G1.gxy ARO.log), 
+       (={ARO.log} /\ eq_except RO.m{1} RO.m{2} G1.gxy{2})) => //.
+  by intros O _; apply (Hll2 O) => //.
   fun; inline RO.o; wp; if; first smt.
   by wp; rnd; wp; skip; smt.
   by wp; skip; smt.
 
   intros _ _; fun; if; inline RO.o; wp.
-  by rnd 1%r Fun.cpTrue; wp; skip; smt.
+  by rnd Fun.cpTrue; wp; skip; smt.
   by wp; skip; smt.
   
   intros _; fun; if; inline RO.o; wp.
-  by rnd 1%r Fun.cpTrue; wp; skip; smt.
+  by rnd Fun.cpTrue; wp; skip; smt.
   by wp; skip; smt.
   
-  by inline RO.o; wp; rnd; wp; skip; smt.
+  by inline RO.o; wp; rnd; wp; skip; progress; smt.
 qed.
 
 
@@ -244,7 +245,17 @@ proof.
   fun; inline RO.o; wp; if; first smt.
   by wp; rnd; wp; skip; smt.
   by wp; skip; smt.
-  by wp; do rnd; wp; skip; progress; smt.
+  wp; do rnd; wp; skip; progress=> //;first 2 by smt.
+  case (bL) => _.
+  cut -> : hL ^^ x2 ^^ x2 = hL ^^ (x2 ^^ x2); first by smt.
+  by smt.
+  cut -> : hL ^^ x1 ^^ x1 = hL ^^ (x1 ^^ x1); first by smt.
+  by smt.
+  case (bL) => _.
+  cut -> : hR ^^ x2 ^^ x2 = hR ^^ (x2 ^^ x2); first by smt.
+  by smt.
+  cut -> : hR ^^ x1 ^^ x1 = hR ^^ (x1 ^^ x1); first by smt.
+  by smt.
 qed.
 
 module SCDH_from_CPA (A_:Adv) : SCDH.Adversary = {
@@ -366,7 +377,7 @@ qed.
 lemma islossless_AO : islossless ARO(RO).o.
 proof.
   fun; inline ARO(RO).o RO.o; wp; if; wp.
-  by rnd 1%r Fun.cpTrue; wp; skip; smt.
+  by rnd Fun.cpTrue; wp; skip; smt.
   by skip; trivial.
 qed.
 
@@ -376,18 +387,16 @@ lemma Pr_G2 (A <: Adv {CPA, G1, G2, SCDH.SCDH, RO, ARO, Hashed_ElGamal}) &m :
   (forall (O <: ARO), islossless O.o => islossless A(O).guess) =>
   Pr[G2(A).main() @ &m : res] = 1%r / 2%r.
 proof.
-  intros _ _.
+  intros Hll1 Hll2.
   bdhoare_deno (_ : true ==> _); [ | trivial | trivial ].
-  fun; rnd (1%r / 2%r) ((=) b').
-  call (_ : true).
-
-  assumption.
+  fun; rnd ((=) b').
+  call (_ : true) => //.
+  by intros => O _;apply (Hll2 O) => //.
   by apply islossless_AO.
-  wp; rnd 1%r Fun.cpTrue; call (_ : true).
-
-  assumption.
+  wp; rnd Fun.cpTrue; call (_ : true).
+  by intros => O _;apply (Hll1 O) => //.
   by apply islossless_AO.
-  by wp; do rnd 1%r Fun.cpTrue; inline G2(A).AO.init RO.init; wp; skip; smt.
+  by wp; do rnd Fun.cpTrue; inline G2(A).AO.init RO.init; wp; skip; progress; smt.
 qed.
 
 
@@ -465,5 +474,7 @@ proof.
   inline RO.o RO.init.
   do (wp; rnd); wp; skip; progress; [smt | | smt | smt].
     cut ->: g ^ y ^ sk0 = g ^ sk0 ^ y; first smt.
-    rewrite Map.get_setE Option.proj_def; smt.
+    rewrite Map.get_setE Option.proj_some.
+    cut ->: (y0 ^^ (y0 ^^ m{hr}) = (y0 ^^ y0) ^^ m{hr});first by smt.
+    by smt.
 qed.
