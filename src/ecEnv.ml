@@ -2302,7 +2302,12 @@ module LDecl = struct
     with _ -> raise NotReducible
 
   let has_symbol s hyps = 
-    try ignore(lookup s hyps); true with _ -> false 
+    let test (x,k) = 
+      s = EcIdent.name x || 
+      match k with
+      | LD_mem (Some lmt) -> Msym.mem s (lmt_bindings lmt)
+      | _ -> false in
+    List.exists test hyps.h_local 
 
   let has_ident id hyps = 
     try ignore(lookup_by_id id hyps); true with _ -> false 
@@ -2361,7 +2366,8 @@ module LDecl = struct
   let init env tparams = 
     { le_initial_env = env; 
       le_env         = env;
-      le_hyps        = { h_tvar = tparams; h_local = [] }; }
+      le_hyps        = { h_tvar = tparams; h_local = []; };
+    }
 
   let add_local_env x k env = 
     match k with
@@ -2370,13 +2376,14 @@ module LDecl = struct
     | LD_modty (i,r) -> Mod.bind_local x i r env
     | LD_hyp   _     -> env
 
-  let add_local x k h = 
+   let add_local x k h = 
     let nhyps = add_local x k (tohyps h) in
     let env = h.le_env in
     let nenv = add_local_env x k env in
     { le_initial_env = h.le_initial_env;
       le_env         = nenv;
-      le_hyps        = nhyps }
+      le_hyps        = nhyps;
+    }
 
   let clear ids lenv = 
     let fv_lk = function
