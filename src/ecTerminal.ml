@@ -121,14 +121,17 @@ object(self)
   val (*---*) iparser = EcIo.from_channel ~name stream
   val mutable sz    = -1
   val mutable tick  = -1
-  val (*---*) doprg = (Sys.os_type = "Unix")
+  val (*---*) doprg =
+    (Sys.os_type = "Unix") &&
+    (Unix.isatty (Unix.descr_of_out_channel stdout))
 
   method private _update_progress position =
-    if sz >= 0 && doprg then
+    if sz >= 0 && doprg then begin
       tick <- (tick + 1) mod (String.length ticks);
       Format.eprintf "[%c] %.1f %%\r%!"
         ticks.[tick]
         (100. *. ((float_of_int position) /. (float_of_int sz)))
+    end
 
   method interactive = false
 

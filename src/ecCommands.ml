@@ -345,6 +345,9 @@ let loader  = EcLoader.create ()
 let addidir ?system (idir : string) =
   EcLoader.addidir ?system idir loader
 
+let loadpath () =
+  EcLoader.aslist loader
+
 (* -------------------------------------------------------------------- *)
 let initial () =
   let prelude = (mk_loc _dummy "prelude", Some `Export) in

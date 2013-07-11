@@ -3,12 +3,10 @@ require import Array.
 require import Bitstring.
 require import Map.
 require import FSet.
-require import ISet.
 require import Int.
 require import Distr.
 require import Bool.
 require import Real.
-require import Pair.
 require import Word.
 
 
@@ -139,7 +137,11 @@ lemma eq1_enc :
 proof.
  fun;inline RO.o.
  wp;rnd ((^^) m{1}) ((^^) m{1}).
- wp;rnd;skip;progress;smt.
+ wp;rnd;skip;progress => //;first 2 by smt.
+ by rewrite Plaintext.xor_assoc Plaintext.xor_nilpotent;smt.
+ by rewrite Plaintext.xor_assoc Plaintext.xor_nilpotent;smt.
+ by smt.
+ by smt.
 save.
 
 module CPA2(S : Scheme, A_ : Adv) = {
@@ -162,6 +164,7 @@ module CPA2(S : Scheme, A_ : Adv) = {
  } 
 }.
 
+
 lemma lossless_ARO_init : islossless ARO(RO).init.
 proof. apply RO_lossless_init. qed.
 
@@ -170,20 +173,25 @@ proof.
   apply RO_lossless_o;apply Plaintext.Dword.lossless. 
 qed.
 
-lemma eq1 : forall (A <: Adv {M,RO,ARO}), 
-(forall (O <: ARO), islossless O.o =>  islossless A(O).a2) =>
- equiv [ CPA(BR,A).main ~ CPA2(BR2,A).main : 
+section.
+
+declare module A : Adv {M,RO,ARO}.
+
+axiom lossless1 : (forall (O <: ARO), islossless O.o =>  islossless A(O).a1).
+axiom lossless2 : (forall (O <: ARO), islossless O.o =>  islossless A(O).a2).
+
+equiv eq1 :  CPA(BR,A).main ~ CPA2(BR2,A).main : 
 (glob A){1} = (glob A){2} ==>
- (!mem M.r ARO.log){2} => ={res}].
+ (!mem M.r ARO.log){2} => ={res}.
 proof.
- intros A HALossless2.
  fun.
  swap{2} -2.
  call (_ : (mem M.r ARO.log), 
            (={ARO.log} /\ eq_except RO.m{1} RO.m{2} M.r{2})).
- fun;if;[smt|inline RO.o;wp;rnd|];wp;skip;progress;smt.
+ intros => O Hll;apply (lossless2 O) => //.
+ fun;if;[smt|inline RO.o;wp;rnd|];wp;skip;progress => //;smt.
  intros _ _;apply lossless_ARO_o.
- intros &m;fun;if;[inline RO.o;wp;rnd 1%r cpTrue|];wp;skip;progress;smt.
+ intros &m;fun;if;[inline RO.o;wp;rnd cpTrue|];wp;skip;progress;smt.
  call eq1_enc.
  rnd.
  call  (_: ={RO.m,ARO.log} /\
@@ -191,7 +199,7 @@ proof.
   fun;if;[smt|inline RO.o;wp;rnd|];wp;skip;progress;smt.
   inline CPA(BR,A).SO.kg CPA2(BR2,A).SO.kg.
   inline CPA(BR,A).ARO.init CPA2(BR2,A).ARO.init RO.init;wp;rnd;wp;skip.
-  progress;smt.
+  progress;by smt.
 save.
 
 lemma foo1 : forall (b:bool), mu {0,1} ((=) b) = 1%r / 2%r.
@@ -204,47 +212,40 @@ lemma foo3 : mu uniform cpTrue = 1%r.
 proof. apply Plaintext.Dword.lossless. save.
 
 lemma prob1_1 : 
- forall (A <: Adv {M,RO,ARO}), 
-(forall (O <: ARO), islossless O.o => islossless A(O).a1) =>
-(forall (O <: ARO), islossless O.o => islossless A(O).a2) =>
  forall &m,Pr[CPA2(BR2,A).main()  @ &m : res] = 1%r / 2%r.
 proof.
- intros A Hlossless1 Hlossless2.
  intros &m.
  bdhoare_deno (_ : true ==> res); trivial.
    fun.
-   rnd (1%r / 2%r) ((=) b').
+   rnd ((=) b').
    conseq ( _ : ==> true).
-(*    apply (Bool.Dbool.mu_x_def (CPA2(BR2,A).main.b'{hr})). (* parse error *) *) 
-(*   generalize  (CPA2(BR2,A).main.b'{hr}).  (* parse error *) *)
-     progress;apply foo1.
-   call ( _ :true); first by assumption.
+    progress;apply foo1.
+   call ( _ :true). 
+   intros => O Hll;apply (lossless2 O) => //.
+
     apply lossless_ARO_o.   
-   inline CPA2(BR2,A).SO.enc;do 2! (wp;rnd 1%r (cpTrue));wp.
-   (* rewrite foo2. cannot find an occurence for [pose] *)
+   inline CPA2(BR2,A).SO.enc;do 2! (wp;rnd (cpTrue));wp.
    conseq ( _ : ==> true).
      rewrite foo2; rewrite foo3;progress.
-   call (_ : true);try assumption.
+   call (_ : true).
+   intros => O Hll;apply (lossless1 O) => //.
      apply lossless_ARO_o.  
    inline CPA2(BR2,A).SO.kg.
-   wp;rnd 1%r (cpTrue);wp.
+   wp;rnd (cpTrue);wp.
    conseq ( _ : ==> true).
      progress;apply keypair_lossless. 
    call lossless_ARO_init;skip;trivial.
 save.
 
-lemma prob1_2 :
- forall (A <: Adv {M,RO,ARO}) &m,
-(forall (O <: ARO), islossless O.o => islossless A(O).a1) =>
-(forall (O <: ARO), islossless O.o => islossless A(O).a2) =>
+lemma prob1_2 : forall &m,
 Pr[CPA(BR,A).main() @ &m: res] <=
 1%r/2%r + Pr[CPA2(BR2,A).main() @ &m : mem M.r ARO.log].
 proof.
- intros A &m Hlossless1 Hlossless2.
- rewrite -(prob1_1 A _ _ &m);[assumption | assumption | ].
+ intros &m.
+ rewrite -(prob1_1 &m) //.
  apply (Real.Trans _ 
              Pr[CPA2(BR2,A).main() @ &m : res \/ mem M.r ARO.log]).
- equiv_deno (eq1 A _);try assumption;progress;smt.
+ equiv_deno (eq1 ) => //;progress;smt.
  rewrite Pr mu_or.  smt.
 save.
 
@@ -296,13 +297,9 @@ proof.
  rewrite Heqf;smt.
 save.
 
-lemma eq2 : forall (A <: Adv {M,RO,ARO}), 
-(forall (O <: ARO), islossless O.o => islossless A(O).a1) =>
-(forall (O <: ARO), islossless O.o => islossless A(O).a2) =>
- equiv [ CPA2(BR2,A).main ~ OW(BR_OW(A)).main : 
- (glob A){1} = (glob A){2} ==> (mem M.r{1} ARO.log{1} => res{2})].
+equiv eq2 : CPA2(BR2,A).main ~ OW(BR_OW(A)).main : 
+ (glob A){1} = (glob A){2} ==> (mem M.r{1} ARO.log{1} => res{2}).
 proof.
- intros A Hlossless1 Hlossless2.
  fun.
  rnd{1}.
  inline  BR_OW(A).i.
@@ -335,31 +332,29 @@ proof.
  assumption.
  delta;simplify.
  intros Hin_dom Hf.
- rewrite (Option.proj_def<:from> x2).
+ rewrite Option.proj_some.
  apply (f_iny _ _ pk{2} sk{2} _ _);smt.
 save.
 
-lemma Reduction (A <: Adv {M,RO,ARO}) &m : 
-(forall (O <: ARO), islossless O.o => islossless A(O).a1) =>
-(forall (O <: ARO), islossless O.o => islossless A(O).a2) =>
+lemma Reduction &m : 
 Pr[CPA(BR,A).main() @ &m : res] <= 1%r / 2%r + Pr[OW(BR_OW(A)).main() @ &m : res].
 proof.
- intros Hlossless1 Hlossless2.
  apply (Real.Trans _  
                (1%r/2%r + Pr[CPA2(BR2,A).main() @ &m : mem M.r ARO.log])).
- apply (prob1_2 A &m _ _ );assumption.
+ apply (prob1_2 &m) => //.
  cut H: (Pr[CPA2(BR2,A).main() @ &m : mem M.r ARO.log] <=
          Pr[OW(BR_OW(A)).main() @ &m : res]).
-   equiv_deno (eq2 A _ _);try assumption;trivial.
+   equiv_deno eq2 => //.
  by smt.
 save.
 
-lemma Conclusion (A <: Adv {M,RO,ARO}) &m :
-(forall (O <: ARO), islossless O.o => islossless A(O).a1) =>
-(forall (O <: ARO), islossless O.o => islossless A(O).a2) =>
+lemma Conclusion  &m :
 exists (I<:Inverter), Pr[CPA(BR,A).main() @ &m : res] - 1%r / 2%r <= 
                       Pr[OW(I).main() @ &m : res].
 proof.
- intros Hlossless1 Hlossless2;exists (BR_OW(A)).
- cut h := Reduction A &m _ _; try assumption; smt.
+ exists (BR_OW(A)). 
+ by cut h := Reduction &m => //;smt.
 save.
+
+end section.
+

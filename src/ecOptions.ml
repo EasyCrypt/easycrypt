@@ -6,6 +6,7 @@ type options = {
   o_input      : string option;
   o_idirs      : string list;
   o_boot       : bool;
+  o_pconfig    : bool;
   o_emacs      : bool;
   o_why3       : string option;
   o_full_check : bool;
@@ -18,6 +19,7 @@ let options = ref {
   o_input      = None;
   o_idirs      = [];
   o_boot       = false;
+  o_pconfig    = false;
   o_emacs      = false;
   o_why3       = None;
   o_full_check = false;
@@ -34,6 +36,7 @@ let specs () =
   and why3        = ref None 
   and full_check  = ref false 
   and max_provers = ref 4
+  and pconfig     = ref false
   and provers     = ref [] in
 
   let add_idir    x = idirs := x :: !idirs
@@ -54,7 +57,8 @@ let specs () =
         "-why3"       , Arg.String set_why3   , "Load why3 configuration from given files";
         "-full_check" , Arg.Set    full_check , "Check every loaded file, disable checkproof off";
         "-max_provers", Arg.Int    set_max    , "Maximum number of provers running in parallel";
-        "-p"          , Arg.String set_provers, "Add a prover to the set of provers"
+        "-p"          , Arg.String set_provers, "Add a prover to the set of provers";
+        "-config"     , Arg.Set    pconfig    , "Print configuration";
       ] in
   let specs = Arg.align (List.map (fun (x, o, d) -> (x, o, " " ^ d)) specs) in
 
@@ -64,6 +68,7 @@ let specs () =
 
       { o_input      = !input;
         o_boot       = !boot;
+        o_pconfig    = !pconfig;
         o_idirs      = List.rev !idirs;
         o_emacs      = !emacs;
         o_why3       = !why3;

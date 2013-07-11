@@ -85,7 +85,6 @@ let restartable_syscall (call : unit -> 'a) : 'a =
     EcUtils.oget !output
 
 let para_call max_provers provers timelimit task =
-  (*Format.printf "%a@." Why3.Pretty.print_task task;*)
   let module CP = Call_provers in
 
   let pcs    = Array.create max_provers None in
@@ -94,8 +93,6 @@ let para_call max_provers provers timelimit task =
   let run i prover =
     try
       let (_, pr, dr)  = get_prover prover in
-(*      Format.printf "Start prover %s@." prover; *)
-      (*Format.eprintf "%a@." (Why3.Driver.print_task dr) task;*)
       let pc =
         Driver.prove_task ~command:pr.Whyconf.command ~timelimit dr task () in
 
@@ -105,7 +102,6 @@ let para_call max_provers provers timelimit task =
         with Unix.Unix_error _ -> ()
       end;
       pcs.(i) <- Some(prover, pc)
- (*  Format.printf "Prover %s started and set at %i@." prover i *)
     with e ->
       Format.printf "Error when starting %s: %a" prover
         EcPException.exn_printer e;
@@ -126,7 +122,10 @@ let para_call max_provers provers timelimit task =
     (fun () ->
       let alives = ref (-1) in
       while !alives <> 0 && !status = None do
-        let pid, st = restartable_syscall Unix.wait in
+        let pid, st =
+          try  restartable_syscall Unix.wait
+          with Unix.Unix_error _ -> (-1, Unix.WEXITED 127)
+        in
         alives := 0;
         for i = 0 to (Array.length pcs) - 1 do
           match pcs.(i) with
@@ -135,8 +134,6 @@ let para_call max_provers provers timelimit task =
               if CP.prover_call_pid pc = pid then begin
                 pcs.(i) <- None;            (* DO IT FIRST *)
                 let ans = (CP.post_wait_call pc st ()).CP.pr_answer in
-                (*Format.eprintf "prover `%s' return %a@."
-                  prover CP.print_prover_answer ans; *)
                 match ans with
                 | CP.Valid   -> status := Some true
                 | CP.Invalid -> status := Some false
@@ -158,13 +155,9 @@ let para_call max_provers provers timelimit task =
             let pid = CP.prover_call_pid pc in
             pcs.(i) <- None;
             begin try
-(*              Format.printf
-                "Killing (SIGTERM) prover `%s' (pid = %d)@."
-                prover pid; *)
               Unix.kill (-pid) 15;      (* kill process group *)
             with Unix.Unix_error _ -> ()
             end;
-(*            Format.printf "prover %s finished@." prover; *)
             let _, st =
               restartable_syscall (fun () -> Unix.waitpid [] pid)
             in

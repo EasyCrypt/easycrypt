@@ -14,28 +14,32 @@ let _ =
   options := EcOptions.parse ();
 
   (* Initialize why3 engine *)
-  begin
-    let why3conf =
-      match !options.o_why3 with
-      | None when List.mem myname locali -> begin
-        let why3conf =
+  let why3conf =
+    match !options.o_why3 with
+    | None when List.mem myname locali -> begin
+      let why3conf = Filename.concat "_tools" "why3.local.conf" in
+      let why3conf =
+        if Filename.basename (Filename.dirname mydir) = "_build" then
           List.fold_left Filename.concat mydir
             [Filename.parent_dir_name;
              Filename.parent_dir_name;
-             "_tools"; "why3.local.conf"]
-        in
-          match Sys.file_exists why3conf with
-          | false -> None
-          | true  -> Some why3conf
-      end
-      | why3conf -> why3conf
-    in
+             why3conf]
+        else
+           Filename.concat mydir why3conf
+      in
+        match Sys.file_exists why3conf with
+        | false -> None
+        | true  -> Some why3conf
+    end
+    | why3conf -> why3conf
+  in
 
+  begin
     try  EcProvers.initialize why3conf
     with e ->
       Format.eprintf
-        "cannot initialize Why3 engine: %a@."
-        EcPException.exn_printer e;
+      "cannot initialize Why3 engine: %a@."
+      EcPException.exn_printer e;
       exit 1
   end;
 
@@ -73,6 +77,22 @@ let _ =
 
   (* Initialize the proof mode *)
   EcCommands.full_check !options.o_full_check !options.o_max_prover !options.o_provers;
+
+  (* Print configuration is wanted *)
+  if !options.o_pconfig then begin
+    Format.eprintf "load-path:@\n%!";
+    List.iter
+      (fun (sys, dir) ->
+         Format.eprintf "  <%.6s>@@%s@\n%!" (if sys then "system" else "user") dir)
+      (EcCommands.loadpath ());
+    Format.eprintf "why3 configuration file@\n%!";
+    begin match why3conf with
+    | None   -> Format.eprintf "  <why3 default>@\n%!"
+    | Some f -> Format.eprintf "  %s@\n%!" f end;
+    Format.eprintf "known provers: %s@\n%!"
+      (String.concat ", " (EcProvers.known_provers ()));
+    exit 0
+  end;
 
   (* Initialize I/O + interaction module *)
   let terminal =

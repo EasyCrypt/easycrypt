@@ -1,7 +1,7 @@
 require import Int.
 require import Real.
 require import Map. 
-require import Set.
+require import FSet.
 
 
 type from.
@@ -69,7 +69,7 @@ require import Distr.
 (* BUG: this returns a weird error message *) 
 (* axiom distr_ax : *)
 (*   forall (s: to set), *)
-(*   (mu dsample (lambda (z : to), Set.mem z s)) ((card s)%r * bd). *)
+(*   (mu dsample (lambda (z : to), FSet.mem z s)) ((card s)%r * bd). *)
 
 axiom distr_ax :
   forall (s: to list),

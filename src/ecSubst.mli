@@ -35,6 +35,7 @@ val subst_tydecl  : subst -> tydecl -> tydecl
 val subst_ctheory : subst -> ctheory -> ctheory
 
 (* -------------------------------------------------------------------- *)
+val subst_path         : subst -> path  -> path
 val subst_mpath        : subst -> mpath -> mpath
 val subst_function     : subst -> function_ -> function_ 
 val subst_module       : subst -> module_expr -> module_expr

@@ -100,7 +100,7 @@ def _options():
 
 # --------------------------------------------------------------------
 def _xunit_dump(config, results):
-    import lxml, lxml.builder; E = lxml.builder.ElementMaker()
+    import xml.etree.ElementTree as E
 
     totaltime = sum([x.time for x in results])
     grouped   = dict()
@@ -108,20 +108,21 @@ def _xunit_dump(config, results):
     for result in results:
         grouped.setdefault(result.config.group, []).append(result)
 
-    root = E.testsuites()
+    root = E.Element('testsuites')
     for gname, group in grouped.iteritems():
         ok = [x for x in group if     x.success]
         ko = [x for x in group if not x.success]
 
-        node = E.testsuite(name      = gname,
-                           hostname  = config.hostname,
-                           timestamp = config.timestamp.isoformat(),
-                           tests     = str(len(group)),
-                           errors    = "0",
-                           failures  = str(len(ko)),
-                           time      = "%.3f" % totaltime)
+        node = E.Element('testsuite',
+                         name      = gname,
+                         hostname  = config.hostname,
+                         timestamp = config.timestamp.isoformat(),
+                         tests     = str(len(group)),
+                         errors    = "0",
+                         failures  = str(len(ko)),
+                         time      = "%.3f" % totaltime)
 
-        node.append(E.properties())
+        node.append(E.Element('properties'))
 
         for result in group:
             name = os.path.basename(result.config.filename)
@@ -133,27 +134,26 @@ def _xunit_dump(config, results):
                 classname.insert(0, 'tests')
             classname = '.'.join(classname)
 
-            rnode = E.testcase(
+            rnode = E.Element('testcase',
                 name      = name,
                 classname = classname,
                 time      = "%.3f" % (result.time,))
             if not result.success:
-                rnode.append(E.failure(result.stderr, \
+                rnode.append(E.Element('failure',
                         message = \
                             'invalid-exit-status (should-pass: %r)' % \
                                 (result.config.isvalid,),
                         type = 'should-pass: %r' % (result.config.isvalid,),))
+                rnode.text = result.stderr
             node.append(rnode)
 
-        node.append(E("system-out"))
-        node.append(E("system-err"))
+        node.append(E.Element("system-out"))
+        node.append(E.Element("system-err"))
 
         root.append(node)
 
-    return lxml.etree.tostring(root,
-                               pretty_print    = True   ,
-                               xml_declaration = True   ,
-                               encoding        = 'utf-8')
+    xml = E.tostring(root, method = 'xml', encoding = 'utf-8')
+    return '<?xml version="1.0" encoding="utf-8"?>%s\n' % (xml,)
 
 # --------------------------------------------------------------------
 def _run_test(config, options):

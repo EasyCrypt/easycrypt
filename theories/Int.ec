@@ -77,20 +77,18 @@ end EuclDiv.
 export EuclDiv.
 
 theory Induction.
-  axiom induction: forall (p:int -> bool),
+  axiom nosmt induction: forall (p:int -> bool),
     (p 0) =>
-    (forall j, 0 < j => p (j - 1) => p j) =>
+    (forall i, 0 <= i => p i => p (i + 1)) =>
     (forall i, 0 <= i => p i).
 
-  lemma strongInduction:
-    forall (p:int -> bool),
-      (forall j, 0 <= j => (forall k, k >= 0 => k < j => p k) => p j) =>
-        (forall i, 0 <= i => p i).
-    proof.
-      intros p hyp i iVal.
-      cut temp : (forall k, k > 0 => k <= i => p k);[|smt].
-      apply (Induction.induction (lambda i, forall k, k > 0 => k <= i => p k) _ _ i _);smt.
-  save.
+  lemma nosmt strongInduction: forall (p:int -> bool),
+    (forall j, 0 <= j => (forall k, 0 <= k => k < j => p k) => p j) =>
+    (forall i, 0 <= i => p i).
+  proof strict.
+  by intros p hyp i iVal;
+     apply (induction (lambda i, forall k, 0 <= k <= i => p k) _ _ i); smt.
+  qed.
 end Induction.
 
 (* Not sure we should use this one *)
@@ -100,12 +98,7 @@ theory Power.
 
   lemma Power_pos : forall (x n:int), 0 <= n => 0 < x => 0 < x ^ n.
   proof.
-    intros x n _ _.  
-    apply (Induction.induction (lambda n, 0 < x ^ n) _ _ n _).
-    smt.
-    simplify; intros j _ _.
-    cut W: (x ^ j = x * (x ^ (j - 1))); smt.
-    smt.
+  by intros x n n_pos x_pos; elim/Induction.induction n=> //; smt.
   qed.
 end Power.
 

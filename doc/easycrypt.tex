@@ -1,7 +1,8 @@
-\documentclass[a4paper,notitlepage]{book}
+\documentclass[a4paper,notitlepage,oneside]{book}
 
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
+\usepackage{lmodern}
 
 \usepackage{multicol}
 \usepackage[authoryear,longnamesfirst,round]{natbib}
@@ -13,7 +14,7 @@
 \usepackage{infer}
 \usepackage[pagebackref,colorlinks=true,linkcolor=black,linktoc=all,citecolor=blue]{hyperref}
 \usepackage[usenames,dvipsnames]{xcolor}
-
+\usepackage{tabularx}
 
 \DeclareMathVersion{sans}
 \SetSymbolFont{operators}{sans}{OT1}{cmbr}{m}{n}
@@ -39,7 +40,9 @@
 \author{The \EasyCrypt Team}
 
 \begin{document}
+
 \maketitle
+\thispagestyle{empty}
 
 \tableofcontents
 
