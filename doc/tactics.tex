@@ -784,24 +784,9 @@ variables modifiable by $f$.
 
 \subsubsection{Probabilistic Hoare Logic}
 
-\Syntax \rawec{while} \textit{formula} 
-% \textit{formula} 
-% [\textit{formula} \textit{formula}]
+\Syntax \rawec{while} \textit{formula} \textit{formula} 
+[\textit{formula} \textit{formula}]
 %
-
-\begin{displaymath}
-  \infrule{
-    \begin{array}{c}
-    \Hoare{c'}{\pre }{\chi \land 
-      \forall M.~ \chi \land \neg b \Rightarrow \post}
-    \\[.5ex]
-    \Hoare{c}{\chi \land b}{\chi }
-  \end{array}
-}{
-    \Hoare{c';\While{b}{c}}{\pre}{\post}
-  }\left[\mathec{while}\ \chi \right] 
-\end{displaymath}
-
 
 \Description
 %
@@ -818,85 +803,58 @@ that may be modified by $c$.
 \begin{displaymath}
   \infrule{
     \begin{array}{c}
-    \HoareLe{c'}{\pre }{\chi \land 
-      \forall M.~ \chi \land \neg b \Rightarrow \post}{\bound} 
-    \\[.5ex]
-    \Hoare{c}{\chi \land b}{\chi }
-  \end{array}
-}{
-    \HoareLe{c';\While{b}{c}}{\pre}{\post}{\bound}
-  }\left[\mathec{while}\ \chi \right] 
-\end{displaymath}
-
-For the other comparison operators $=$ and $\geq$, the proof obligation involving
-the loop body is stronger.
-
-\begin{displaymath}
-  \infrule{
-    \begin{array}{c}
-    \HoareEq{c'}{\pre }{\chi \land 
-      \forall M.~ \chi \land \neg b \Rightarrow \post}{\bound} 
-    \\[.5ex]
-    \HoareEq{c}{\chi \land b}{\chi }{1}
-  \end{array}
-}{
-    \HoareEq{c';\While{b}{c}}{\pre}{\post}{\bound}
-  }\left[\mathec{while}\ \chi \right] 
-\end{displaymath}
-
-\begin{displaymath}
-  \infrule{
-    \begin{array}{c}
     \HoareGe{c'}{\pre }{\chi \land 
-      \forall M.~ \chi \land \neg b \Rightarrow \post}{\bound} 
+      \forall M.~ (\chi \land 0 \leq e \Rightarrow \neg b)  \land
+      \chi \land \neg b \Rightarrow \post}{f} 
     \\[.5ex]
-    \HoareEq{c}{\chi \land b}{\chi }{1}
+    \forall k.~ \HoareEq{c}{\chi \land b \land e = k}{\chi \land e
+      < k}{1}
   \end{array}
 }{
-    \HoareGe{c';\While{b}{c}}{\pre}{\post}{\bound}
-  }\left[\mathec{while}\ \chi \right] 
+    \HoareGe{c';\While{b}{c}}{\pre}{\post}{f}
+  }\left[\mathec{while}\ \chi\ e \right] 
+\end{displaymath}
+Similarly for (=).
+
+\warningbox{The following variants are not implemented}
+
+For an arbitrary bound $g$ the following rule generalizes the one
+above for lower bounded judgments:
+\begin{displaymath}
+  \infrule{
+    \begin{array}{c}
+    \HoareGe{c'}{\pre }{\chi \land e \leq n \land 
+      \forall M.~ (\chi \land 0 \leq e \Rightarrow \neg b) 
+      \land (\chi \land \neg b \Rightarrow \post)}{\frac{f}{g^n}} 
+    \\[.5ex]
+    \HoareGe{c}{\chi \land b}{\chi}{g}
+    \\[.5ex]
+    \forall k.~ \HoareEq{c}{\chi \land b \land e = k}{e<k}{1}
+  \end{array}
+}{
+    \HoareGe{c';\While{b}{c}}{\pre}{\post}{f}
+  }\left[\mathec{while}\ \chi\ e\ g\ n \right] 
 \end{displaymath}
 
+and the folowing one for exact judgments (=):
+\begin{displaymath}
+  \infrule{
+    \begin{array}{c}
+    \HoareGe{c'}{\pre }{\chi \land e = n \land 
+      \forall M.~ (\chi\Rightarrow (0\leq e \Leftrightarrow \neg b)) 
+        \land (\chi \land \neg b \Rightarrow \post)}
+      {\frac{f}{g^n}}
+    \\[.5ex]
+    \HoareGe{c}{\chi \land b}{\chi}{g}
+    \\[.5ex]
+    \forall k.~ \HoareEq{c}{\chi \land b \land e = k}{e=k-1}{1}
+  \end{array}
+}{
+    \HoareGe{c';\While{b}{c}}{\pre}{\post}{f}
+  }\left[\mathec{while}\ \chi\ e\ g\ n \right] 
+\end{displaymath}
 
-% \warningbox{The following variants are not implemented}
-
-% For an arbitrary bound $g$ the following rule generalizes the one
-% above for lower bounded judgments:
-% \begin{displaymath}
-%   \infrule{
-%     \begin{array}{c}
-%     \HoareGe{c'}{\pre }{\chi \land e \leq n \land 
-%       \forall M.~ (\chi \land 0 \leq e \Rightarrow \neg b) 
-%       \land (\chi \land \neg b \Rightarrow \post)}{\frac{f}{g^n}} 
-%     \\[.5ex]
-%     \HoareGe{c}{\chi \land b}{\chi}{g}
-%     \\[.5ex]
-%     \forall k.~ \HoareEq{c}{\chi \land b \land e = k}{e<k}{1}
-%   \end{array}
-% }{
-%     \HoareGe{c';\While{b}{c}}{\pre}{\post}{f}
-%   }\left[\mathec{while}\ \chi\ e\ g\ n \right] 
-% \end{displaymath}
-
-% and the following one for exact judgments (=):
-% \begin{displaymath}
-%   \infrule{
-%     \begin{array}{c}
-%     \HoareGe{c'}{\pre }{\chi \land e = n \land 
-%       \forall M.~ (\chi\Rightarrow (0\leq e \Leftrightarrow \neg b)) 
-%         \land (\chi \land \neg b \Rightarrow \post)}
-%       {\frac{f}{g^n}}
-%     \\[.5ex]
-%     \HoareGe{c}{\chi \land b}{\chi}{g}
-%     \\[.5ex]
-%     \forall k.~ \HoareEq{c}{\chi \land b \land e = k}{e=k-1}{1}
-%   \end{array}
-% }{
-%     \HoareGe{c';\While{b}{c}}{\pre}{\post}{f}
-%   }\left[\mathec{while}\ \chi\ e\ g\ n \right] 
-% \end{displaymath}
-
-% There is no appropriate rule for $(\leq)$.
+There is no appropriate rule for $(\leq)$.
 
 
 \subsubsection{Relational Hoare Logic}
