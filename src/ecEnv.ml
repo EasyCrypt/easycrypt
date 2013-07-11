@@ -913,6 +913,10 @@ exception MEError of meerror
 
 (* -------------------------------------------------------------------- *)
 module Memory = struct
+
+  let all env = 
+    MMsym.fold (fun _ l all -> List.rev_append l all) env.env_memories []
+
   let byid (me : memory) (env : env) =
     let memories = MMsym.all (EcIdent.name me) env.env_memories in
     let memories =

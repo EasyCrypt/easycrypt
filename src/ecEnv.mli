@@ -50,6 +50,7 @@ type meerror =
 exception MEError of meerror
 
 module Memory : sig
+  val all         : env -> memenv list
   val set_active  : memory -> env -> env
   val get_active  : env -> memory option
 

@@ -63,14 +63,11 @@ module PPEnv = struct
   let inuse ppe name =
     let env = ppe.ppe_env in
 
-    let in_active_mem name =
+    let in_memories name =
       let env = ppe.ppe_env in
-
-      match EcEnv.Memory.get_active env with
-      | None -> false
-      | Some mid ->
-          let mem = oget (EcEnv.Memory.byid mid env) in
-            EcMemory.lookup name mem <> None
+      let check mem = EcMemory.lookup name mem <> None in
+      List.exists check (EcEnv.Memory.all env)
+        
     in
 
          (Ssym.mem name ppe.ppe_inuse)
@@ -78,7 +75,7 @@ module PPEnv = struct
       || (EcEnv.Mod.sp_lookup_opt      ([], name) env <> None)
       || (EcEnv.Var.lookup_local_opt        name  env <> None)
       || (EcEnv.Var.lookup_progvar_opt ([], name) env <> None)
-      || (in_active_mem name)
+      || (in_memories name)
 
   let add_local ppe =
     fun id ->
