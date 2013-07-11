@@ -465,5 +465,5 @@ proof.
   inline RO.o RO.init.
   do (wp; rnd); wp; skip; progress; [smt | | smt | smt].
     cut ->: g ^ y ^ sk0 = g ^ sk0 ^ y; first smt.
-    rewrite Map.get_setE Option.proj_def; smt.
+    rewrite Map.get_setE Option.proj_some; smt.
 qed.
