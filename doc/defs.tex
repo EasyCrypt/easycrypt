@@ -218,6 +218,13 @@
   \Syntax \ec{#1} #2
   \Description}
 
+\newcommand{\addTacticPlain}[2]{
+  \renewcommand{\tacname}{\rawec{#1}}
+  \renewcommand{\vtacname}{#1}
+  \subsubsection{#1}
+  \Syntax {#2}
+  \Description}
+
 \newcommand{\addTactic}[3]{
   \addTacticIdx{#1}{#2}
   \addTacticNoIdx{#2}{#3}}
@@ -274,7 +281,7 @@
   keywordstyle=[6]{\itshape\color{Blue}},
   keywordstyle=[7]{\color{Blue}},
   keywordstyle=[8]{\color{Red}},
-  keywordstyle=[9]{\color{Green}},
+  keywordstyle=[9]{\color{OliveGreen}},
   literate={phi}{{$\!\phi\,$}}1
            {phi1}{{$\!\phi_1$}}1
            {phi2}{{$\!\phi_2$}}1
@@ -293,6 +300,7 @@
               {exists}{{$\exists$}}1
               {->}{{$\rightarrow\;$}}1
               {<-}{{$\leftarrow\;$}}1
+              {<->}{{$\leftrightarrow\;$}}1
               {=>}{{$\Rightarrow\;$}}1
               {==>}{{$\Rrightarrow\;$}}1
               {\/\\}{{$\wedge$}}1

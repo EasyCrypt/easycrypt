@@ -92,7 +92,11 @@ lemma write_sub: forall (M M':'a matrix) i j,
   sub (write M (i,j) M' (0,0) (size M')) (i,j) (size M') = M'.
 proof.
 intros M M' i j i_0 i_bound j_0 j_bound.
-apply extensionality; smt.
+apply extensionality; rewrite /(==);
+pose m := fst (size M'); pose n := snd (size M'); cut ->: size M' = (m,n); first smt.
+split.
+  rewrite sub_size //=; smt.
+  intros=> i' j' i'_pos i'_bnd j'_pos j'_bnd; rewrite sub_get //=; smt.
 save.
 
 (* transpose M *)

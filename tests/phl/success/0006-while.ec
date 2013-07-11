@@ -41,8 +41,5 @@ proof.
    wp;skip.
    intros _ h.
    elim h;intros h1 _; assumption h1.
- wp;skip.
- intros _ _;split.
- split .
- intros x h _;rewrite h;split.
+ wp;skip => /= x -> //.
 save.

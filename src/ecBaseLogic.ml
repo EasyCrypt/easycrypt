@@ -120,7 +120,7 @@ type 'a rule_arg =
 
 type 'a rule = {
   pr_name : rule_name;
-  pr_hyps : 'a rule_arg list
+  pr_hyps : 'a rule_arg list;
 }
 
 type l_decl = hyps * form

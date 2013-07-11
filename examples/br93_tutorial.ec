@@ -578,7 +578,7 @@ proof.
  assumption.
  delta;simplify.
  intros Hin_dom Hf.
- rewrite (Option.proj_def<:randomness> x').
+ rewrite (Option.proj_some<:randomness> x').
  apply (f_iny _ _ x1 x2 _ _);smt.
 qed.
 (** end eq4 *)
