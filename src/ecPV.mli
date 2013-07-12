@@ -13,6 +13,10 @@ module Mpv : sig
 
   val empty : ('a,'b) t
 
+  val check_npv : env -> prog_var -> ('a,'b) t -> unit
+
+  val check_glob : env -> mpath -> ('a,'b) t -> unit 
+
   val add : env -> prog_var -> 'a -> ('a,'b) t -> ('a,'b) t
 
   val add_glob : env -> mpath -> 'b -> ('a,'b) t -> ('a,'b) t
@@ -33,12 +37,15 @@ module PVM : sig
   val add : env -> prog_var -> EcIdent.t -> form -> subst -> subst
 
   val add_glob : env -> mpath -> EcIdent.t -> form -> subst -> subst
+    
+  val of_mpv : (form,form) Mpv.t -> EcIdent.t -> subst
 
   val find : env -> prog_var -> memory -> subst -> form
 
   val subst   : env -> subst -> form  -> form
 
   val subst1  : env -> prog_var -> EcIdent.t -> form -> form -> form
+    
 end
 
 (* -------------------------------------------------------------------- *)

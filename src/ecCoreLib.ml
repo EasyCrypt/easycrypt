@@ -148,6 +148,7 @@ let p_rewrite_l     = _Logic "rewrite_l"
 let p_rewrite_r     = _Logic "rewrite_r"
 let p_rewrite_iff_l = _Logic "rewrite_iff_l"
 let p_rewrite_iff_r = _Logic "rewrite_iff_r"
+let p_rewrite_bool  = _Logic "rewrite_bool"
 
 let p_case_eq_bool  = _Logic "bool_case_eq"
 

@@ -102,6 +102,7 @@ val p_rewrite_l     : path
 val p_rewrite_r     : path 
 val p_rewrite_iff_l : path 
 val p_rewrite_iff_r : path 
+val p_rewrite_bool  : path
 
 val p_case_eq_bool  : path 
 val p_tuple_ind      : int -> path

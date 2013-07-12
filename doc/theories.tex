@@ -156,7 +156,7 @@ applying a curried function to several arguments, the arguments should be
 separated by spaces rather than the more standard commas.
 Listing~\ref{lst:currying} illustrates this.
 
-\begin{easycrypt}[label={lst:currying}]{Currying.}
+\begin{easycrypt}[label={lst:currying}]{Currying and partial function application.}
 op log: int -> int -> int.
 op log2: int-> int = log_curried 2.
 
@@ -177,32 +177,47 @@ Partial application is slightly more verbose, but the syntax of application may
 look more familiar to imperative programmers.
 
 \subsection{Building Terms}
-The partial applications in Listing~\ref{lst:currying} are small examples of
-building terms of a given type. We will now discuss this more generally. The
-reader eager to perform proofs can start drawing parallels between this
-subsection and the term reduction (computation) rules at the beginning of
-Chapter~\ref{chap:tactics}. %TODO: More precise cross-reference
+Under the assumption that all abstract types are inhabited, all types that can
+be constructed using the operations above are also inhabited. We now show how
+terms of each of the types can be constructed, serving as witnesses. The partial
+applications in Listing~\ref{lst:currying} are small examples of building terms
+of type \rawec{int -> int} given terms of other types.
+%The reader eager to
+%perform proofs can start drawing parallels between this subsection and the term
+%reduction (computation) rules at the beginning of Chapter~\ref{chap:tactics}.
+%TODO: More precise cross-reference
+
+We provide almost all standard constructions of the polymophic
+$\lambda$-calculus, with the notable exception of pattern-matching and fixpoint
+constructions, since we do not currently support inductive types or recursion
+directly. This limitation is easily worked around by axiomatically defining the
+recursion and induction principle whenever declaring a type that is meant to be
+inductive, and using them to provide realizations of axiomatically specified
+theories. For example, the \textsf{List} standard theory of inductive lists
+currently uses this two-stage architecture.
+
+\warningbox{This version of the documentation is incomplete on this subject,
+and only provides pointers to examples that may not be sufficient to fully
+document the language. Please contact us as needed.}
 
 \subsection{Predicates and Ambient Lemmas\label{sec:ec-specifics}}
 In \EasyCrypt, booleans are used not only to represent binary program variables, but
-also to type logical formulas. The \rawec{bool} type is therefore equipped with
-symbols for universal and existential quantification, implication, logical and
-short-circuiting conjunction and disjunction and xor. However, since the program
-logic assumes that expressions are terminating, we need to restrict the class of
-boolean formulas that can be used when defining operators and writing programs.
-To this effect, we consider two distinct classes of functional symbols:
-\emph{predicates}, that may not be computable in general, and cannot be used to
-write programs (although they can be used to specify them), and
-\emph{operators}, that are computable and can be used for defining predicates
-and other operators, and to write programs.
+also to type logical formulas. In addition to the operator symbols already
+introduced, the \rawec{bool} type is therefore equipped with
+symbols for universal and existential quantification, equivalence and
+implication. However, since the program logic assumes that expressions are
+terminating, we need to restrict the class of boolean formulas that can be used
+when defining operators and writing programs. To this effect, we consider two
+distinct classes of functional symbols: \emph{predicates}, that may not be
+computable in general, and cannot be used to write programs (although they can
+be used to specify them), and \emph{operators}, that are computable and can be
+used for defining predicates and other operators, and to write programs.
 
 Universal and existential quantification (\rawec{forall} and \rawec{exists}),
 implication (\rawec{=>}) and equivalence (\rawec{<=>}) are internally defined as
 predicate symbols, and therefore cannot be used to define operators. All other
-boolean function symbols are defined as operators and can be used in any
-context. They include logical conjunction and disjunction (\rawec{/\\} and
-\rawec{\\\/}), short-circuiting conjunction and disjunction (\rawec{\&\&} and
-\rawec{\|\|}), and xor (\rawec{\^\^}).
+boolean function symbols (in particular those discussed previously) are defined
+as operators and can be used in any context.
 
 
 % TODO: redistribute the following
