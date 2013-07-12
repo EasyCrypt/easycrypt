@@ -104,41 +104,44 @@ let _ =
         EcTerminal.from_channel ~name:input (open_in input)
   in
 
-  (* Set notifier (TODO: fix this global stuff *)
-  EcCommands.set_notifier
-    (fun msg -> EcTerminal.notice ~immediate:true msg terminal);
-
-  (* Interaction loop *)
-  while true do
-    let terminate = ref false in
-
-    try
-      begin
-        match EcLocation.unloc (EcTerminal.next terminal) with
-        | EcParsetree.P_Prog (commands, locterm) ->
-            terminate := locterm;
-            List.iter
-              (fun p ->
-                 let loc = p.EcLocation.pl_loc in
-                   try  EcCommands.process p
-                   with e -> begin
-                     if not (EcTerminal.interactive terminal) then
-                       Printf.fprintf stderr "%t\n%!" Printexc.print_backtrace;
-                   raise (EcCommands.toperror_of_exn ~gloc:loc e)
-                 end)
-              commands
-
-        | EcParsetree.P_Undo i ->
-            EcCommands.undo i
-      end;
-      EcTerminal.finish `ST_Ok terminal;
-      if !terminate then exit 0
-
-    with e -> begin
-      EcTerminal.finish
-        (`ST_Failure (EcCommands.toperror_of_exn e))
-        terminal;
-      if not (EcTerminal.interactive terminal) then
-        exit 1
-    end
-  done
+  try
+    (* Set notifier (TODO: fix this global stuff *)
+    EcCommands.set_notifier
+      (fun msg -> EcTerminal.notice ~immediate:true msg terminal);
+  
+    (* Interaction loop *)
+    while true do
+      let terminate = ref false in
+  
+      try
+        begin
+          match EcLocation.unloc (EcTerminal.next terminal) with
+          | EcParsetree.P_Prog (commands, locterm) ->
+              terminate := locterm;
+              List.iter
+                (fun p ->
+                   let loc = p.EcLocation.pl_loc in
+                     try  EcCommands.process p
+                     with e -> begin
+                       if not (EcTerminal.interactive terminal) then
+                         Printf.fprintf stderr "%t\n%!" Printexc.print_backtrace;
+                     raise (EcCommands.toperror_of_exn ~gloc:loc e)
+                   end)
+                commands
+  
+          | EcParsetree.P_Undo i ->
+              EcCommands.undo i
+        end;
+        EcTerminal.finish `ST_Ok terminal;
+        if !terminate then (EcTerminal.finalize terminal; exit 0)
+      with e -> begin
+        EcTerminal.finish
+          (`ST_Failure (EcCommands.toperror_of_exn e))
+          terminal;
+        if not (EcTerminal.interactive terminal) then
+          exit 1
+      end
+    done
+  with e ->
+    (try EcTerminal.finalize terminal with _ -> ());
+    raise e

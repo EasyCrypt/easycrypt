@@ -121,7 +121,7 @@ object(self)
   val (*---*) iparser = EcIo.from_channel ~name stream
   val mutable sz    = -1
   val mutable tick  = -1
-  val (*---*) doprg =
+  val mutable doprg =
     (Sys.os_type = "Unix") &&
     (Unix.isatty (Unix.descr_of_out_channel stdout))
 
@@ -132,6 +132,12 @@ object(self)
         ticks.[tick]
         (100. *. ((float_of_int position) /. (float_of_int sz)))
     end
+
+  method private _clear_update =
+    let fmt = "[*] ---.- %" in
+      if sz >= 0 && doprg then
+        Format.eprintf "%*s\r%!" (String.length fmt) "";
+      doprg <- false
 
   method interactive = false
 
@@ -148,7 +154,7 @@ object(self)
     | `ST_Ok -> ()
 
     | `ST_Failure e -> begin
-        if doprg then Format.eprintf "%*s\r%!" 15 "";
+        self#_clear_update;
         match e with
         | EcCommands.TopError (loc, e) ->
             Format.eprintf "%s: %a\n%!"
@@ -161,8 +167,8 @@ object(self)
       end
 
   method finalize =
-    if doprg then Format.eprintf "%*s\r%!" 15 "";
-    EcIo.finalize iparser
+    self#_clear_update;
+    EcIo.finalize iparser;
 
   initializer begin
     try

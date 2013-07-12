@@ -99,9 +99,9 @@ let gen_op tparams ty kind =
     op_kind    = kind;
   }
 
-let mk_pred tparams dom body = 
+let mk_pred tparams dom body =
   let kind = OB_pred body in
-  gen_op tparams (EcTypes.toarrow dom EcTypes.tbool) kind
+    gen_op tparams (EcTypes.toarrow dom EcTypes.tbool) kind
 
 let mk_op tparams ty body = 
   let kind = OB_oper body in
