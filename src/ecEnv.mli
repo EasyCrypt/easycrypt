@@ -201,9 +201,15 @@ module NormMp : sig
   val norm_xpath : env -> xpath -> xpath
   val norm_pvar  : env -> EcTypes.prog_var -> EcTypes.prog_var
   val norm_form  : env -> form -> form
-  val add_uses   : env -> Sm.t -> Sm.t -> mpath -> Sm.t 
-  val top_uses   : env -> mpath -> Sm.t 
-  val norm_restr : env -> Sm.t -> Sm.t
+  type use =
+    { us_pv : ty EcPath.Mx.t; 
+      us_gl : EcIdent.Sid.t;  
+    }  
+  val mod_use    : env -> mpath -> use
+  val norm_restr : env -> Sm.t  -> use 
+  val get_restr  : env -> mpath -> use
+  val use_mem_xp : xpath -> use -> bool
+  val use_mem_gl : mpath -> use -> bool
   val norm_glob  : env -> EcMemory.memory -> mpath -> EcFol.form 
   val norm_tglob : env -> mpath -> EcTypes.ty 
   val tglob_reducible : env -> mpath -> bool

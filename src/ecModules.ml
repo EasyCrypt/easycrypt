@@ -380,11 +380,6 @@ and module_body =
 
 and module_structure = {
   ms_body : module_item list;
-  ms_vars : EcTypes.ty Mx.t; (* The set of global variables declared by the
-                                module and it submodules *)
-  ms_uses : Sm.t; (* The set of external top-level modules used by the module.
-                     It is an invariant that those modules are defined 
-                     (i.e are ME_structure). *)
 }
 
 and module_item =

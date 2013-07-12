@@ -196,6 +196,11 @@ let m_functor mp =
     | t -> t in
   mpath top []
 
+let mget_ident mp = 
+  match mp.m_top with
+  | `Local id -> id
+  | _ -> assert false
+
 let rec m_fv fv mp = 
   let fv = 
     match mp.m_top with 

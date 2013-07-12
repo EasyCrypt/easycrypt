@@ -1582,7 +1582,7 @@ module NormMp = struct
           EcPath.mpath_crt p1 pr.EcPath.m_args (Some (EcPath.pqoname p2 name))
       end
     end
-  (* We can have different situations:
+  (* 
      module F : A -> B -> C
      module M1 = F A
      module M2 = M1 B
@@ -1639,33 +1639,97 @@ module NormMp = struct
         EcPath.mpath p.EcPath.m_top (List.map (norm_mpath env) args)
       end
  
-      
-
- 
-
-  let rec add_uses env rm us mp =
-    let mp  = norm_mpath env mp in
-    let top = EcPath.m_functor mp in
-    let us  =
-      if EcPath.Sm.mem top rm || EcPath.Sm.mem top us then us 
-          (* If top is in us the module has already be added, nothing to do *)
-      else
-        match (Mod.by_mpath top env).me_body with
-        | ME_Structure ms -> 
-          let us = if Mx.is_empty ms.ms_vars then us else EcPath.Sm.add top us in
-          EcPath.Sm.union ms.ms_uses us
-        | ME_Decl _       -> EcPath.Sm.add top us
-        | _ -> assert false in
-    List.fold_left (add_uses env rm) us mp.EcPath.m_args 
-
-  let norm_restr env restr = 
-    EcPath.Sm.fold (fun mp r -> add_uses env EcPath.Sm.empty r mp)
-      restr EcPath.Sm.empty 
-
-  let top_uses env mp = add_uses env EcPath.Sm.empty EcPath.Sm.empty mp
-
   let norm_xpath env p =
     EcPath.xpath (norm_mpath env p.EcPath.x_top) p.EcPath.x_sub
+      
+  type use =
+    { us_pv : ty Mx.t; 
+      us_gl : Sid.t;  
+    } 
+
+  let use_empty = { us_pv = Mx.empty; us_gl = Sid.empty }
+  let use_union us1 us2 = 
+    { us_pv = Mx.union  (fun _ ty _ -> Some ty) us1.us_pv us2.us_pv;
+      us_gl = Sid.union us1.us_gl us2.us_gl }
+  let use_mem_xp xp us = Mx.mem xp us.us_pv 
+  let use_mem_gl mp us = 
+    assert (mp.m_args = []);
+    match mp.m_top with
+    | `Local id -> Sid.mem id us.us_gl
+    | _ -> assert false
+
+  let add_var env xp us = 
+    let vb = Var.by_xpath (norm_xpath env xp) env in
+    let pv = EcTypes.pv_glob xp in
+    { us with us_pv = Mx.add pv.pv_name vb.vb_type us.us_pv }
+
+  let add_glob id us = 
+    { us with us_gl = Sid.add id us.us_gl }
+    
+  let mod_use env mp =
+    let mp = norm_mpath env mp in
+    let me = Mod.by_mpath mp env in
+    let params = me.me_sig.mis_params in
+    let rm = 
+      List.fold_left (fun rm (id,_) -> Sid.add id rm) Sid.empty params in
+    let env' = Mod.bind_locals params env in
+    let add_glob id us = 
+      if Sid.mem id rm then us else add_glob id us in
+    let mp' = 
+      EcPath.m_apply mp (List.map (fun (id,_) -> EcPath.mident id) params) in 
+
+    let fdone = ref Sx.empty in
+
+    let rec mod_use us mp = 
+      let mp = norm_mpath env' mp in
+      let me = Mod.by_mpath mp env' in 
+      assert (me.me_sig.mis_params = []);
+      body_use mp us me.me_comps me.me_body
+        
+    and body_use mp us comps body = 
+      match body with
+      | ME_Alias _ -> assert false 
+      | ME_Decl _ ->
+        List.fold_left (item_use mp) us comps
+      | ME_Structure ms ->
+        List.fold_left (item_use mp) us ms.ms_body  
+
+    and item_use mp us item = 
+      match item with
+      | MI_Module me -> mod_use us (EcPath.mqname mp me.me_name)
+      | MI_Variable v -> add_var env' (xpath_fun mp v.v_name) us
+      | MI_Function f -> fun_use us (xpath_fun mp f.f_name) 
+
+    and fun_use us f =
+      let f = norm_xpath env' f in
+      if Mx.mem f !fdone then us 
+      else 
+        let f1 = Fun.by_xpath f env' in
+        fdone := Sx.add f !fdone;
+        match f1.f_def with
+        | FBdef fdef ->
+          let f_uses = fdef.f_uses in
+          let vars = Sx.union f_uses.us_reads f_uses.us_writes in
+          let us = Sx.fold (add_var env') vars us in
+          List.fold_left fun_use us f_uses.us_calls
+        | FBabs oi ->
+          let id = 
+            match f.x_top.m_top with
+            | `Local id -> id
+            | _ -> assert false in
+          let us = add_glob id us in
+          List.fold_left fun_use us oi.oi_calls in
+    mod_use use_empty mp'
+
+  let norm_restr env restr = 
+    EcPath.Sm.fold (fun mp r -> use_union r (mod_use env mp))
+      restr use_empty
+
+  let get_restr env mp = 
+    match (Mod.by_mpath mp env).me_body with
+    | EcModules.ME_Decl(_,restr) -> 
+      norm_restr env restr
+    | _ -> assert false 
 
   let norm_pvar env pv = 
     let p = norm_xpath env pv.pv_name in
@@ -1674,36 +1738,15 @@ module NormMp = struct
     else EcTypes.pv p pv.pv_kind 
 
   let globals env m mp =
-    match (Mod.by_mpath mp env).me_body with
-    | ME_Structure ms ->
-        (* FIXME: What to do with the module parameter *)
-        let sx =
-          EcPath.Mx.fold (fun x ty l -> 
-            f_pvar (pv_glob x) ty m :: l) 
-            ms.ms_vars []
-        in
-          (f_tuple sx, ms.ms_uses)
+    let us = mod_use env mp in
+    let l =
+      Sid.fold (fun id l -> f_glob (EcPath.mident id) m :: l) us.us_gl [] in
+    let l = 
+      Mx.fold 
+        (fun xp ty l -> f_pvar (EcTypes.pv_glob xp) ty m :: l) us.us_pv l in
+    f_tuple l
 
-      (* Section abstract modules *)
-    | ME_Decl _ ->
-        (f_glob (EcPath.m_functor mp) m, Sm.empty)
-
-    | ME_Alias _ ->
-        assert false
-
-  let rec norm_glob env m mp = 
-    let mp = norm_mpath env mp in
-    let gtop = 
-      match mp.EcPath.m_top with
-      | `Local _ -> f_glob (EcPath.m_functor mp) m
-      | `Concrete _ -> 
-        let top = EcPath.m_functor mp in
-        let sx,us = globals env m top in
-        let us = 
-          List.map (fun mp -> fst (globals env m mp)) (EcPath.Sm.elements us) in
-        f_tuple (sx::us) in
-    let gargs = List.map (norm_glob env m) mp.EcPath.m_args in
-    f_tuple (gtop :: gargs)
+  let norm_glob env m mp = globals env m mp
 
   let norm_tglob env mp =
     let g = (norm_glob env mhr mp) in
@@ -1716,13 +1759,12 @@ module NormMp = struct
 
   let norm_ty env = 
     EcTypes.Hty.memo_rec 107 (
-
       fun aux ty ->
         match ty.ty_node with
         | Tglob mp -> norm_tglob env mp
         | _ -> ty_map aux ty) 
     
-  let norm_form env =
+  let rec norm_form env =
     let norm_xp = EcPath.Hx.memo 107 (norm_xpath env) in
     let norm_pv pv =
       let p = norm_xp pv.pv_name in
@@ -1730,27 +1772,36 @@ module NormMp = struct
       then pv
       else EcTypes.pv p pv.pv_kind 
     in
-    let norm_ty : ty -> ty = norm_ty env in
+    let norm_ty1 : ty -> ty = norm_ty env in
 
-    let norm_gty (id,gty) = 
+    let norm_gty env (id,gty) = 
       let gty = 
         match gty with
-        | GTty ty -> GTty (norm_ty ty)
-        | GTmodty (mt,restr) ->
-          GTmodty(mt, Sm.fold (fun mp r -> Sm.add (norm_mpath env mp) r) restr Sm.empty)
-        | GTmem None -> GTmem None
+        | GTty ty -> GTty (norm_ty env ty)
+        | GTmodty _ -> gty
+        | GTmem None -> gty
         | GTmem (Some mt) -> 
-          let me = EcMemory.empty_local id (norm_xp (EcMemory.lmt_xpath mt)) in
+          let me = 
+            EcMemory.empty_local id (norm_xpath env (EcMemory.lmt_xpath mt)) in
           let me = Msym.fold (fun id ty me ->
-            EcMemory.bind id (norm_ty ty) me) (EcMemory.lmt_bindings mt) me  in
+            EcMemory.bind id (norm_ty env ty) me) (EcMemory.lmt_bindings mt) me  in
           GTmem (snd me) in
       id,gty in
-                
+
+    let has_mod b = 
+      List.exists (fun (_,gty) -> 
+        match gty with GTmodty _ -> true | _ -> false) b in
+
     let norm_form =
       EcFol.Hf.memo_rec 107 (fun aux f ->
         match f.f_node with
         | Fquant(q,bd,f) ->     
-          let bd = List.map norm_gty bd in
+          if has_mod bd then
+            let env = Mod.add_mod_binding bd env in
+            let bd = List.map (norm_gty env) bd in
+            f_quant q bd (norm_form env f)
+          else
+          let bd = List.map (norm_gty env) bd in
           f_quant q bd (aux f)
 
         | Fpvar(p,m) ->
@@ -1784,7 +1835,7 @@ module NormMp = struct
           if p == p' && args == args' && e == e' then f else
           f_pr m p' args' e'
 
-        | _ -> EcFol.f_map norm_ty aux f) in
+        | _ -> EcFol.f_map norm_ty1 aux f) in
     norm_form
 
   let norm_op env op =
@@ -2548,3 +2599,5 @@ let check_goal ~usehyps pi (hyps, concl) =
   let ld  = norm_l_decl env (ld, concl) in
   let res = EcWhy3.check_goal (Mod.me_of_mt env) env.env_w3 pi ld in
   res
+
+(* -------------------------------------------------------------------- *)

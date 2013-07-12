@@ -67,6 +67,8 @@ val m_fv      : int EcIdent.Mid.t -> mpath -> int EcIdent.Mid.t
 
 val m_functor : mpath -> mpath
 
+val mget_ident : mpath -> ident
+
 (* -------------------------------------------------------------------- *)
 type xpath = private {
   x_top : mpath;

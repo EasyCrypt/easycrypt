@@ -1050,14 +1050,6 @@ and transstruct (env : EcEnv.env) (x : symbol) (st : pstructure) =
       (env0, []) st.ps_body
   in
   let items = List.map snd items in
-  let mroot = EcEnv.mroot envi in
-  let top   = EcPath.m_functor mroot in
-
-  let mparams = 
-    List.fold_left (fun rm mp -> EcPath.Sm.add mp rm) 
-      EcPath.Sm.empty mroot.EcPath.m_args in
-
-  let rm = EcPath.Sm.add top mparams in
 
   (* Generate structure signature *)
   let tymod =
@@ -1119,55 +1111,10 @@ and transstruct (env : EcEnv.env) (x : symbol) (st : pstructure) =
   in
     List.iter check1 st.ps_signature;
 
-  (* Computes used variables / calls *)
-  let vars = 
-    List.fold_left (fun vs item ->
-      match item with
-      | MI_Module me ->
-        begin match me.me_body with
-        | ME_Structure ms -> 
-          EcPath.Mx.union (fun _ _ _ -> assert false) vs ms.ms_vars
-        | _ -> vs 
-        end 
-      | MI_Variable x ->
-        let mp = EcEnv.mroot env0 in
-        let xp  = EcPath.xpath mp (EcPath.psymbol x.v_name) in
-        EcPath.Mx.add xp x.v_type vs
-      | MI_Function _ -> vs) EcPath.Mx.empty items in
-
-   let rec uses us items =
-    List.fold_left (fun us item ->
-      match item with
-      | MI_Module me ->
-        begin match me.me_body with
-        | ME_Structure ms -> EcPath.Sm.union us ms.ms_uses 
-        | ME_Alias     mp -> EcEnv.NormMp.add_uses envi rm us mp
-        | ME_Decl      _  -> assert false
-        end
-      | MI_Variable _  -> us
-      | MI_Function fd ->
-        begin match fd.f_def with
-        | FBdef fdef ->
-          let fus = fdef.f_uses in
-          let us = 
-            List.fold_left (fun us fn ->
-              EcEnv.NormMp.add_uses envi rm us fn.EcPath.x_top) 
-              us fus.us_calls in
-          EcPath.Sx.fold (fun xp us ->
-            EcEnv.NormMp.add_uses envi rm us xp.EcPath.x_top)
-            (EcPath.Sx.union fus.us_reads fus.us_writes) us
-        | FBabs _ -> assert false
-        end) us items in
-  let uses = uses EcPath.Sm.empty items in
-
   (* Construct structure representation *)
   let me =
     { me_name  = x;
-      me_body  = 
-        ME_Structure 
-          { ms_body = items; 
-            ms_vars = vars; 
-            ms_uses = uses };
+      me_body  = ME_Structure { ms_body = items; };
       me_comps = items;
       me_sig   = tymod; }
   in

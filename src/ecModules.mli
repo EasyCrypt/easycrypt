@@ -162,8 +162,6 @@ and module_body =
  *)
 and module_structure = {
   ms_body : module_item list;
-  ms_vars : ty Mx.t;
-  ms_uses : Sm.t;
 }
 
 and module_item =
