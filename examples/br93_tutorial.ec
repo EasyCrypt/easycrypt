@@ -112,7 +112,7 @@ module OW(I :Inverter) ={
  }.
 (** end scheme *) 
 
-(** begin br93 *)
+
 op (||) (x : randomness, y : plaintext) : ciphertext =
  Ciphertext.from_array ((to_array x) || (to_array y)).
 
@@ -159,6 +159,10 @@ proof.
  cut ->: length (to_array (projRand c)) = l; first smt.
  rewrite projPlain_eq=> //; first 2 smt.
 qed.
+
+
+
+(** begin br93 *)
 
 module Rnd ={
    var r : randomness

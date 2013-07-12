@@ -33,16 +33,18 @@ following command.
 \end{verbatim}
 
 \paragraph{On the test suite}
-The final \texttt{make check} runs \EasyCrypt on our test suite and the standard
-libraries. Please do report any failure in the test suite (if possible, attach
-the .xml file produced by \texttt{make check-xunit}) to
-\url{easycrypt-support@lists.gforge.inria.fr}. Unless a large number of tests
-fail, a failure at this point does not necessarily meant that the installation
-failed: SMT solvers can be fickle beasts and the computing capacity of computers
-varies greatly. We are doing our best to make calls to SMT in the standard
-library as stable as possible over a wide variety of machines, but we need your
-help to test them in as many scenarios as possible and are counting on you to
-report failures.
+The final \texttt{make check} runs \EasyCrypt on our test suite and
+the standard libraries. Please do report any failure in the test suite
+(if possible, attach the .xml file produced by \texttt{make
+  check-xunit}) to
+\url{easycrypt-support@lists.gforge.inria.fr}. Unless a large number
+of tests fail, a failure at this point does not necessarily mean that
+the installation failed: SMT solvers can be fickle beasts and the
+computing capacity of computers varies greatly. We are doing our best
+to make calls to SMT in the standard library as stable as possible
+over a wide variety of machines, but we need your help to test them in
+as many scenarios as possible and are counting on you to report
+failures.
 
 \paragraph{Included provers}
 The local toolchain contains a minimal set of provers to which you can easily
@@ -89,30 +91,20 @@ used, are available in the public repository.
 \section{A Basic Example: Public-Key Encryption\label{sec:tutorial}}
 This section introduces key features of \EasyCrypt through the simple
 but representative example of a public-key encryption scheme from
-\citet{br93}. On the modelling side, the example shows how to model
-cryptographic schemes, security notions and security assumptions, and
-in particular how to to define abstract operators and axioms; how to
-clone theories; how to define module types, modules and how to model
-adversaries as abstract procedures. On the proving side, the example
-shows how to use the different logics supported by \EasyCrypt, and in
-particular how to perform common reasoning patterns such as reasoning
-up to failure; optimistic sampling and simple reasoning about
-probabilites of events in games.
+\citet{Bellare:1993}. On the modelling side, the example shows how to
+model cryptographic schemes, security notions and security
+assumptions, and in particular how to to define abstract operators and
+axioms; how to clone theories; how to define module types, modules and
+how to model adversaries as abstract procedures. On the proving side,
+the example shows how to use the different logics supported by
+\EasyCrypt, and in particular how to perform common reasoning patterns
+such as reasoning up to failure; optimistic sampling and simple
+reasoning about probabilites of events in games.
 
-
-%% currently the statement is wrong
-%% \subsection{Provable security in a nutshell}
-
-%% This scheme is based on one-way trapdoor permutation and uses a
-%% random oracle. The proof of security follows by reduction: given an
-%% adversary against the chosen plaintext attack experiment that has
-%% access to the random oracle, there exists an inverter (making use of
-%% the adversary) that succeds in inverting the underlying trapdoor
-%% permutation with at least as much probability.
 
 \subsection{Statement}
 \EasyCrypt supports reductionist proofs in the style of provable
-security~\cite{Goldwasser:1982}. This approach involves:
+security~\citet{Goldwasser:1984}. This approach involves:
 \begin{enumerate}
 \item formalize a class of cryptographic constructions, and state
   precisely their intended security guarantees. For the latter, one
@@ -136,7 +128,7 @@ security~\cite{Goldwasser:1982}. This approach involves:
 In our case study, we consider chosen-plaintext security of public-key
 encryption schemes, and focus on schemes built from one-way trapdoor
 permutations and random oracles. We prove, for the concrete scheme
-considered in~\cite{br93}, the following statement:
+considered in~\citet{Bellare:1993}, the following statement:
 % TODO FIX STATEMENT USING ECIMPORT, POSSIBLY ADD MORE EXPLANATIONS
 \begin{easycrypt}[]{}
 lemma Conclusion :
@@ -148,7 +140,7 @@ where the experiment \texttt{CPA} formalizes chosen-plaintext security
 and \texttt{Adv} is the associated type of adversaries, whereas the
 experiment \texttt{OW} formalizes one-wayness and \texttt{Inverter} is
 the associated type of adversaries, \texttt{BR} is the public-key
-encryption scheme from \citet{br93}. 
+encryption scheme from \citet{Bellare:1993}. 
 
 The remaining of the section provides a detailed explanation of the
 statement, and an outline of its proof.
@@ -180,6 +172,8 @@ the standard library, but we define shortcuts to them as follows
 
 \ecimport{ }{../examples/br93_tutorial.ec}{distributions}
 
+where \ec{'a distr} is the type of discrete sub-distributions over
+\ec{'a} (see Section~\ref{sec:distributions} for details on sub-distributions).
 
 \paragraph{Random oracles}
 A hash function in the random oracle model is a consistent random
@@ -216,12 +210,14 @@ result; otherwise, it returns a bitstring consisting of zeros.
 
 
 \paragraph{One-way trapdoor permutations}
-Trapdoor permutations are functions that are ``easy'' to compute, but
-hard to invert without knowing a secret key. Formally, a family
-of trapdoor permutations on a type \ec{T} is a triple of algorithms
-$(\KG,f,f^{-1})$ such that for any pair of keys $(pk,sk)$ output by
-$\KG$, $f_{pk}$ and $f^{-1}_{sk}$ are permutations on
-\ec{T} and inverse of each other. 
+Trapdoor permutations are families of keyed functions that are \lq\lq
+easy\rq\rq\ to compute but are \lq\lq hard\rq\rq\ to invert without
+knowing the secret key. Formally, a family of trapdoor permutations is
+modeled by a triple $(\KG,f,f^{-1})$, where $\KG$ is a probabilistic
+key generation algorithm, and $f$ is a keyed permutation, and $f^{-1}$
+is its inverse, i.e.\ for any pair of keys $(pk,sk)$ output by $\KG$,
+$f(pk,\cdot)$ and $f^{-1}(sk,\cdot)$ are permutations and inverse of
+each other.
 
 In this case, we are interested in trapdoor permutations on type
 \ec{randomness}. In \EasyCrypt we model them as follows
@@ -235,16 +231,18 @@ keys. We then declare an abstract predicate that will model when two
 keys are matching and specify that all the pairs of keys that can be
 sampled from \ec{keypairs} are matching. Afterwards, we declare \ec{f}
 and \ec{finv} with the appropriate type and we state the axioms saying
-that one is inverse of eachother for valid key pairs.
+that one is inverse of each other for valid pair of keys.
 %% TODO (Francois -> JuanMa): you are missing the "matching keys" axiom
  
 The module \ec{OW} is defined by declaring an interface corresponding
 to the inverter, which comprises a function that given a challenge
 value and a public key returns a guess for the pre-image of the
-challenge. The OW experiment is then defined by sampling a value
-\ec{x} and a pair of keys \ec{pk} and \ec{sk} and providing the
-inverter with \ec{f pk x}. The inverter returns a value \ec{x'} and
-the experiment succeds if \ec{x = x'}.
+challenge. The one-wayness experiment is then defined by sampling a
+value \ec{x} uniformly over the carrier of the trapdoor permutation
+and a pair of keys \ec{pk} and \ec{sk} and providing the inverter with
+the public key \ec{pk} and the image \ec{f pk x} of \ec{x}. The
+inverter returns a value \ec{x'} and the experiment succeds if \ec{x =
+  x'}.
 
 \paragraph{Public-key encryption}
 A public-key encryption scheme consists of a triple of algorithms
