@@ -2492,7 +2492,7 @@ let t_ppr ty phi_l phi_r g =
   let concl = f_forall_simpl binders_l (f_forall_simpl binders_r concl) in
   let concl = f_forall_simpl [a_id,GTty ty] concl in
   let concl_post = f_imps_simpl [f_eq phi_l a_f;f_eq phi_r a_f] ef.ef_po in
-  let memenvl,fdefl,memenvr,fdefr,env = Fun.equivS fl fr env in
+  let memenvl,_,memenvr,_,_ = Fun.equivS fl fr env in
   let concl_post = gen_mems [memenvl;memenvr] concl_post in
   let concl_post = f_forall_simpl [a_id,GTty ty] concl_post in
   prove_goal_by [concl_post;concl] RN_hl_deno g
