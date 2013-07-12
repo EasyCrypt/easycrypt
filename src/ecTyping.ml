@@ -351,8 +351,10 @@ let select_pv env side name ue tvi psig =
       let select (pv,ty) = 
         let subue = UE.copy ue in
         let texpected = EcUnify.tfun_expected subue psig in
-          EcUnify.unify env subue ty texpected;
-          [(pv, ty, subue)]
+          try
+            EcUnify.unify env subue ty texpected;
+            [(pv, ty, subue)]
+          with EcUnify.UnificationFailure _ -> []
       in
         select pvs
     with EcEnv.LookupFailure _ -> []

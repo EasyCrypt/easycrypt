@@ -99,12 +99,10 @@ $0.5$ (the operands are interpreted and the operator is applied in
 $\mathbb{R}$). Eventually, we will introduce notations for scoping that should
 allow less cluttered real expressions.}
 
-\subsection{Building Types}
+\subsection{Types}
 From these base types, many more can be built. \EasyCrypt allows the user to declare
  (polymorphic) abstract types, and combine existing types into tuple types or
 function types.
-
-
 
 \subsubsection*{Tuple types}
 Given two types \ec{'t} and \ec{'t'}, \ec{('t * 't')} denotes the type of pairs
@@ -176,7 +174,7 @@ as an integer function of a single argument (whose type is a pair type).
 Partial application is slightly more verbose, but the syntax of application may
 look more familiar to imperative programmers.
 
-\subsection{Building Terms}
+\subsection{Terms}
 Under the assumption that all abstract types are inhabited, all types that can
 be constructed using the operations above are also inhabited. We now show how
 terms of each of the types can be constructed, serving as witnesses. The partial
@@ -212,89 +210,39 @@ distinct classes of functional symbols: \emph{predicates}, that may not be
 computable in general, and cannot be used to write programs (although they can
 be used to specify them), and \emph{operators}, that are computable and can be
 used for defining predicates and other operators, and to write programs.
-
 Universal and existential quantification (\rawec{forall} and \rawec{exists}),
 implication (\rawec{=>}) and equivalence (\rawec{<=>}) are internally defined as
 predicate symbols, and therefore cannot be used to define operators. All other
 boolean function symbols (in particular those discussed previously) are defined
 as operators and can be used in any context.
 
+Using these symbols, and since functions are values, one can express complex
+logical formulas in higher-order logic, that can then be wrapped into
+predicates, lemmas or axioms. We call this fragment of our logic that only
+deals with operators the \emph{ambient logic}. Listing~\ref{lst:formulas}
+displays a possible definition for a commutativity predicate on internal
+operators, and expresses the fact that integer addition is commutative by
+applying it. We also display a simple proof using the \rawec{smt} tactic, which
+simply asks the SMT solvers to discharge the lemma. (The proof system and
+tactics are documented more throroughly in Chapter~\ref{chap:tactics}.
 
-% TODO: redistribute the following
-%
-%The following \EasyCrypt code (Listing~\ref{lst:bitstrings}) declares an abstract type of bitstrings, equipped
-%with a length operator (whose result is never negative) and an infix addition
-%operator that enjoys interesting properties both with respect to length and by
-%itself.
-%
-%\begin{easycrypt}[label={lst:bitstrings}]{[A type for bitstrings]A core type for bitstrings}
-%type bitstring.
-%
-%op length: bitstring -> int.
-%axiom length_pos: forall bs, 0 <= length bs.
-%
-%op (+): bitstring -> bitstring -> bitstring.
-%axiom length_xor: forall b0 b1,
-%  length b0 = length b1 => length (b0 + b1) = length b0.
-%axiom xor_associative: forall b0 b1 b2,
-%  (b0 + b1) + b2 = b0 + (b1 + b2).
-%axiom xor_commutative: forall b0 b1, b0 + b1 = b1 + b0.
-%\end{easycrypt}
-%
-%\subsubsection{Types}
-%\EasyCrypt expressions are equipped with polymorphic, higher-order types, that can be declared abstractly (as in Listing~\ref{lst:bitstrings}), or given concrete definitions, depending on the needs of the proof.
-%
-%
-%\warningbox{One could expect the type annotations in the \rawec{extensionality}
-%axiom to be optional. However, they are currently required so that the type
-%variable can be instantiated.}
-%
-%\subsubsection{Operators}
-%The language of operators and predicates is functional in style, and
-%comma-separated lists of parameters are in fact currified, in this context, to
-%yield functional symbols that can be partially applied. (For example, the infix
-%extensional equality predicate \ec{(==)} defined in Listing~\ref{lst:arrays} has
-%type \ec{'x array -> 'x array -> bool}.)
-%
-%\paragraph{Mixfix operators}
-%Special syntax is used to introduce two hard-coded mixfix operators (generally
-%considered to correspond to set and get operations on various types). The
-%``\rawec[literate={\_}{{$\cdot$}}1]{_.[_]}'' operator (named \emph{get}
-%throughout this manual) is hard-coded as a binary operator. The
-%``\rawec[literate={_}{{$\cdot$}}1]{_.[_<-_]}'' operator (not yet encountered,
-%and named \emph{set} in the rest of this manual) is hard-coded as a ternary
-%operator. In addition, a constant operator ``\rawec{[]}'' can be defined, and
-%will often be referred to as the \emph{empty} constant, depending on its type
-%and the current scope.
-%
-%\paragraph{Infix operators}
-%Infix operators are declared between parentheses, and can be used either in
-%infix syntax using the symbol itself (for example, \rawec{x == y}), or in prefix
-%syntax using their parenthesized form (for example, \rawec{(==) x y}).
-%
-%\subsection{Higher-Order Operators}
-%Operators can be higher-order. For example, the code sample shown in
-%Listing~\ref{lst:init_arrays} illustrates how one can axiomatically specify an
-%operator which creates a fresh array and initializes its elements with
-%index-dependent values. We illustrate its usage by defining an operator
-%\ec{init} that, given an integer $n$, produces the array containing integers $0$
-%through $n$, in ascending order.
-%
-%\begin{easycrypt}[label={lst:init_arrays}]{[Index-dependent array initializer]An operator initializing an array with index-dependent values}
-%op init: (int -> 'x) -> int -> 'x array.
-%
-%axiom init_length: forall (f:int -> 'x) l,
-%  0 <= l => length (init f l) = l.
-%
-%axiom init_get: forall (f:int -> 'x) l i,
-%  0 <= l => 0 <= i => i < l =>
-%  (init f l).[i] = f i.
-%
-%op first_ints n = init (lambda i, i) n.
-%\end{easycrypt}
-%
-%The \rawec{lambda} notation works as expected. The argument types can be
-%specified where necessary. Equality on lambda terms is extensional.
+\begin{easycrypt}[label={lst:formulas}]{Examples of ambient formulas: predicates and lemmas}
+pred commutative (ope: 'a -> 'a -> 'b) =
+  forall x y, ope x y = ope y x.
+
+lemma addiC: commutative Int.(+) by smt.
+\end{easycrypt}
+
+Any lemma or axiom that starts with universal quantifiers can instead be
+parameterized by those quantified variables. This does not change the semantics,
+but may make proofs slightly more elegant. For example, the two lemmas below
+are strictly equivalent.\footnote{To as lesser extent, this trick also works on
+predicate definitions, except that it changes the predicate's type.}
+\begin{easycrypt}[label={lst:formulas}]{Examples of ambient formulas: predicates and lemmas}
+lemma xorbC: forall (b b' : bool), b ^^ b' = b' ^^ b.
+
+lemma xorbC' (b b' : bool): b ^^ b' = b' ^^ b.
+\end{easycrypt}
 
 \section{Probabilistic Expressions\label{sec:distributions}}
 
@@ -306,156 +254,219 @@ real.} which measures the probability of an event. The function is assumed to
 satisfy the basic axioms of probability sub-distributions:
 \begin{itemize}\itemsep-.5em
 \item probabilities lie in the unit interval;
-\item the probability of the union of events is equal to the sum of
-  their probabilities, minus the sum of their intersection;
+\item the probability of false is null;
+\item the probability of a union of events is equal to the sum of
+  their probabilities, minus the probability of their intersection;
 \item probabilities are monotonic with respect to event inclusion;
-\item two sub-distributions over the same base type are equal if and only if
-  they are equal on each of the elements in the base type.
+\item the probability of an event is equal to the probability of the
+  intersection of that event and the distribution's support;
+\item two sub-distributions are equal if and only if they are pointwise equal.
 \end{itemize}
 
 Sub-distributions are introduced axiomatically, and no well-formedness checks
 are performed. For example, the uniform distribution on booleans is defined, in
 the standard library, as displayed in Listing~\ref{lst:dbool}, where
-\rawec{caract P x} is \rawec{1\%r} if \rawec{P} holds on \rawec{x} and
-\rawec{0\%r} otherwise.
+\rawec{charfun P x} is the characteristic function of \rawec{P} evaluated in
+\rawec{x} (that is, \rawec{1\%r} if \rawec{P} holds on \rawec{x} and
+\rawec{0\%r} otherwise).
 
 \begin{easycrypt}[label={lst:dbool}]{[Uniform Boolean distribution]Defining the uniform distribution on booleans}
 op dbool: bool distr.
 
 axiom mu_def: forall (p:bool -> bool), 
   mu dbool p =
-    (1%r/2%r) * caract p true +
-    (1%r/2%r) * caract p false.
+    (1%r/2%r) * charfun p true +
+    (1%r/2%r) * charfun p false.
 \end{easycrypt}
 
-The standard library on distributions, discussed further in
-Chapter~\ref{chap:libraries}, introduces several auxiliary quantities on
-distributions that are useful in probability computations and for defining more
-complex distributions that are difficult, or impossible, to describe purely
-using \rawec{mu}. The definitions of these quantities is shown in
-Listing~\ref{lst:mu_aux}, where \rawec{cPtrue} is the constantly true predicate.
-Note the use of partial application to the equality operator when defining
-\rawec{mu_x}.
+The standard library on distributions
+%, discussed further in Chapter~\ref{chap:libraries},
+introduces several auxiliary quantities on distributions that are useful in
+probability computations and for defining more complex distributions (that may
+be difficult, or even impossible, to describe purely using \rawec{mu}). The
+definitions of these quantities is shown in Listing~\ref{lst:mu_aux}, where
+\rawec{cpTrue} is the constantly true predicate. Note the use of partial
+application to the equality operator when defining \rawec{mu_x}.
 
 \begin{easycrypt}[label={lst:mu_aux}]{Auxiliary operators on distributions}
-op mu_x(d:'a distr, x:'a) = mu d ((=) x).
-op mu_weight(d:'a distr) = mu d cPtrue.
-op in_supp(x:'a, d:'a distr) = 0%r < mu_x d x.
+op mu_x (d:'a distr) (x:'a): real = mu d ((=) x).
+op weight (d:'a distr): real = mu d cPtrue.
+op in_supp (x:'a) (d:'a distr): bool = 0%r < mu_x d x.
 \end{easycrypt}
 
-With these auxiliary operators, it is in fact fairly easy to check that the simple axiom from Listing~\ref{lst:dbool} does indeed define a distribution, by proving the following lemma, which is discharged automatically by the SMT solvers.
+With these auxiliary operators, it is in fact fairly easy to check that the
+simple axiom from Listing~\ref{lst:dbool} does indeed define a distribution, by
+proving the following lemma, which can be discharged automatically.
 
 \begin{easycrypt}[]{}
-lemma lossless : weight dbool = 1%r.
+lemma lossless : weight dbool = 1%r by smt.
 \end{easycrypt}
 
-\section{Modules and Functors\label{sec:modules}}
+\section{\pWHILE, Modules and Functors\label{sec:modules}}
+Although the languages for expressions and probabilistic expressions are quite
+powerful, they fail to properly capture the kind of objects cryptographers
+manipulate. \EasyCrypt uses the same language, \pWHILE, to describe
+cryptographic schemes, oracles, and experiments as modules. Modules are
+wrappers that declare a collection of typed global variables and define a set
+of imperative procedures, or \emph{functions} %Terminology! "operators" are functions, "functions" are procedures
+that may read and write (amongst other things) the module's globals. We first
+briefly describe the \pWHILE language before giving an overview of the two main
+mechanisms for module composition: direct usage and functor application.
 
-\subsection{\pWHILE: Schemes, Oracles and Experiments}
-So far, we have only considered features whose goal is to extend the language of
-expressions and the semantic domain of values. Specifications of schemes,
-oracles, assumptions and game-based security properties all use modules (and
-module signatures) and functors, which we now discuss, using a simple modular
-definition of a random oracle from bitstrings to bitstrings as an example.
+\subsection{The \pWHILE language}
+\pWHILE programs are composed of a set of typed local variables and a
+sequential compositions of statements that include:
+\begin{itemize}\itemsep-.5em
+\item assignment of an expression to a local or global variable,
+\item assignment of the result of a function call (on expressions) to a local
+  or global variable,
+\item assignment of a freshly sampled random value to a local or global
+  variable,
+\item conditional branching,
+\item looping (only in the form of \rawec{while} loops)
+\item ... % missing things?
+\end{itemize}
+Unless the return type of the function is \rawec{unit}, the final statement in
+the function's body needs to be a \rawec{return}.
 
-\subsection{Module Signatures}
-We first formally define the functionalities a random oracle is expected to
-provide, as a \emph{module type}, or \emph{signature}
-(Listing~\ref{lst:modulesig}). Any module implementation \rawec{M} that provides
-\emph{at least} the functions from a module type \rawec{Mt} is said to be of
-type \rawec{Mt} (denoted \rawec{M :> Mt}). Module types cannot specify state
-directly. Instead, if a global variable of the module should be exposed to the
-outside, getter and setter functions can be added to the module signature.
+Listing~\ref{lst:pWhile} shows a module implementing a random oracle where the
+number of queries is bounded and the responses are sampled (but not assigned to
+any particular queries) during initialization. In this display, we use the type
+\rawec{word} to model bitstrings of an arbitrary fixed length, and
+\rawec{dword} to model the uniform distribution on words. Random sampling is
+denoted by preceding a distribution with the \textsf{\$} symbol.
 
-\begin{easycrypt}[label={lst:modulesig}]{[A signature for random oracles]A signature for random oracles from bitstrings to bitstrings}
-module type RO = {
-  fun init():unit
-  fun h(x:bitstring):bitstring }.
-\end{easycrypt}
+\begin{easycrypt}[label={lst:pWhile}]{Example of a module}
+module RO_E = {
+  var tape: word list
+  var mG: (word,word) map
 
-Such a module signature can then be given various realizations. For example, Listing~\ref{lst:modules} shows two possible realizations of a random oracle, both of which assume a positive integer constant \rawec{qH}, used to bound the number of calls to the oracle, and two positive integer constants \rawec{inLen} and \rawec{outLen} representing the input and output lengths of the random oracles.
-
-%% The following is probably the single most disgusting thing I've ever typeset in Latex... and I've done ugly things.
-\begin{minipage}{\textwidth}
-\hrule
-\begin{multicols}{2}
-\begin{easycrypt}[frame=none,xleftmargin=0pt,xrightmargin=0pt]{}
-module RO_L: RO = {
-  var cG: int
-  var mG: (bitstring,bitstring) map
-
-  fun init() = {
-    mG = empty;
-    cG = 0;
-  }
-
-  fun h(x:bitstring) = {
-    var r:bitstring;
-    var res:bitstring = empty;
-    if (length x = inLen && cG < qG)
-    {
-      cG = cG + 1;
-      r = $dbitstring(outLen);
-      if (!mem(x,dom mG)) mG[x] = r;
-      res = mG[x];
-    }
-    return res;
-  }
-}.
-\end{easycrypt}
-\columnbreak
-\begin{easycrypt}[frame=none,xleftmargin=0pt,xrightmargin=0pt]{}
-module RO_E: RO = {
-  var tape: bitstring list
-  var mG: (bitstring,bitstring) map
-
-  fun init() = {
-    var r:bitstring;
+  fun init():unit = {
+    var r:word;
     tape = [];
     mG = empty;
-    while (length tape < qG)
+    while (`|tape| < qG)
     {
-      r = $dbitstring(outLen);
+      r = $dword;
       tape = r :: tape;
     }
   }
 
-  fun h(x:bitstring) = {
-    var r:bitstring;
-    var res:bitstring = empty;
-    if (length x = inLen &&
-       length tape <> 0)
+  fun h(x:word): word = {
+    var r:word;
+    var res:word;
+    if (`|tape| <> 0)
     {
-      r = hd tape;
-      if (!mem(x,dom mG))
-        mG[x] = r;
+      if (!mem(x,dom mG)) mG[x] = hd tape;
       res = mG[x];
       tape = tl tape;
     }
+    else
+      res = zeros;
     return res;
   }
 }.
 \end{easycrypt}
-\end{multicols}
-\hrule
-\begin{easycrypt}[frame=non,xleftmargin=0pt,xrightmargin=0pt,label={lst:modules}]{[Two random oracles]Two possible implementations of module type \rawec{RO}}
-\end{easycrypt}
-\end{minipage}
 
-\subsection{Functors and Oracle Annotations}
-Modules can in fact be specified as functors, parameterized by other modules
-whose functions can be accessed as oracles. For example, the signature shown in
-Listing~\ref{lst:functorsig} describes a class of modules that are given access
-to a random oracle but whose unique function can in fact only call the \rawec{h}
-function provided by the parameter.
+%
+%\subsection{Module Signatures}
+%We first formally define the functionalities a random oracle is expected to
+%provide, as a \emph{module type}, or \emph{signature}
+%(Listing~\ref{lst:modulesig}). Any module implementation \rawec{M} that provides
+%\emph{at least} the functions from a module type \rawec{Mt} is said to be of
+%type \rawec{Mt} (denoted \rawec{M :> Mt}). Module types cannot specify state
+%directly. Instead, if a global variable of the module should be exposed to the
+%outside, getter and setter functions can be added to the module signature.
+%
+%\begin{easycrypt}[label={lst:modulesig}]{[A signature for random oracles]A signature for random oracles from bitstrings to bitstrings}
+%module type RO = {
+%  fun init():unit
+%  fun h(x:bitstring):bitstring }.
+%\end{easycrypt}
+%
+%Such a module signature can then be given various realizations. For example, Listing~\ref{lst:modules} shows two possible realizations of a random oracle, both of which assume a positive integer constant \rawec{qH}, used to bound the number of calls to the oracle, and two positive integer constants \rawec{inLen} and \rawec{outLen} representing the input and output lengths of the random oracles.
+%
+%%% The following is probably the single most disgusting thing I've ever typeset in Latex... and I've done ugly things.
+%\begin{minipage}{\textwidth}
+%\hrule
+%\begin{multicols}{2}
+%\begin{easycrypt}[frame=none,xleftmargin=0pt,xrightmargin=0pt]{}
+%module RO_L: RO = {
+%  var cG: int
+%  var mG: (bitstring,bitstring) map
+%
+%  fun init() = {
+%    mG = empty;
+%    cG = 0;
+%  }
+%
+%  fun h(x:bitstring) = {
+%    var r:bitstring;
+%    var res:bitstring = empty;
+%    if (length x = inLen && cG < qG)
+%    {
+%      cG = cG + 1;
+%      r = $dbitstring(outLen);
+%      if (!mem(x,dom mG)) mG[x] = r;
+%      res = mG[x];
+%    }
+%    return res;
+%  }
+%}.
+%\end{easycrypt}
+%\columnbreak
+%\begin{easycrypt}[frame=none,xleftmargin=0pt,xrightmargin=0pt]{}
+%module RO_E: RO = {
+%  var tape: bitstring list
+%  var mG: (bitstring,bitstring) map
+%
+%  fun init() = {
+%    var r:bitstring;
+%    tape = [];
+%    mG = empty;
+%    while (length tape < qG)
+%    {
+%      r = $dbitstring(outLen);
+%      tape = r :: tape;
+%    }
+%  }
+%
+%  fun h(x:bitstring) = {
+%    var r:bitstring;
+%    var res:bitstring = empty;
+%    if (length x = inLen &&
+%       length tape <> 0)
+%    {
+%      r = hd tape;
+%      if (!mem(x,dom mG))
+%        mG[x] = r;
+%      res = mG[x];
+%      tape = tl tape;
+%    }
+%    return res;
+%  }
+%}.
+%\end{easycrypt}
+%\end{multicols}
+%\hrule
+%\begin{easycrypt}[frame=non,xleftmargin=0pt,xrightmargin=0pt,label={lst:modules}]{[Two random oracles]Two possible implementations of module type \rawec{RO}}
+%\end{easycrypt}
+%\end{minipage}
+%
+%\subsection{Functors and Oracle Annotations}
+%Modules can in fact be specified as functors, parameterized by other modules
+%whose functions can be accessed as oracles. For example, the signature shown in
+%Listing~\ref{lst:functorsig} describes a class of modules that are given access
+%to a random oracle but whose unique function can in fact only call the \rawec{h}
+%function provided by the parameter.
+%
+%\begin{easycrypt}[label={lst:functorsig}]{[A functor signature]A functor signature}
+%module type RO_adv(O:RO) = {
+%  fun a(): bool { O.h }
+%}.
+%\end{easycrypt}
 
-\begin{easycrypt}[label={lst:functorsig}]{[A functor signature]A functor signature}
-module type RO_adv(O:RO) = {
-  fun a(): bool { O.h }
-}.
-\end{easycrypt}
-
-\section{Lemmas and Judgements}
+\section{Program Judgements}
 
 \warningbox{Note that we use different implication symbols. $\Rightarrow$ is implication in the ambient logic (corresponding to the \rawec{=>} predicate), whereas $\Longrightarrow$ is used to express contracts on functions.\footnote{From Francois: it may be worth considering the use of another arrow symbol (for example $\Rrightarrow$) for contracts.}}
 
@@ -501,9 +512,18 @@ Property?:
 \subsection{Relational Hoare Judgements}
 
 \section{Sections}
+The section mechanism allows parts of a proof to be abstracted away. In
+particular proof steps that require the use of intermediate games often leave
+traces in the final theorem statement in the form of access restrictions on the
+adversary. Sections corrects these unsightly appearances by allowing the user
+to declare some modules and lemmas as local to a section, erasing them entirely
+from the environment once the section is closed.
+
+\warningbox{This feature is not yet fully documented.}
 
 \section{Working with Theories\label{sec:cloning}}
 
+\subsection{\rawec{print}}
 
 
 

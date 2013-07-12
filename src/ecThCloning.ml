@@ -426,20 +426,21 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
           | Some { pl_desc = prov; pl_loc = loc; } ->
               let newpr =
                 let ue = EcTyping.ue_for_decl scenv (loc, prov.prov_tyvars) in
-                let (dom, body) =
+                let body =
                   let env     = scenv in
                   let env, xs = EcTyping.transbinding env ue prov.prov_args in
-                  let body    = EcTyping.trans_prop env ue prov.prov_body in
-                  let dom     = List.map snd xs in
+                  let body    = EcTyping.trans_form_opt env ue prov.prov_body None in
                   let xs      = List.map (fun (x,ty) -> x, EcFol.GTty ty) xs in
                   let lam     = EcFol.f_lambda xs body in
-                    (dom, lam)
+                    lam
                 in
+
                 let uni     = EcUnify.UniEnv.close ue in
                 let body    = EcFol.Fsubst.uni uni body in
-                let dom     = List.map (EcTypes.Tuni.subst uni) dom in
                 let tparams = EcUnify.UniEnv.tparams ue in
-                  mk_pred tparams dom (Some body)
+                  { op_tparams = tparams;
+                    op_ty      = body.EcFol.f_ty;
+                    op_kind    = OB_pred (Some body); }
               in
 
               let (reftyvars, refty) =

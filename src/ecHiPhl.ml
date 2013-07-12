@@ -696,9 +696,11 @@ let process_ppr (phi1,phi2) g =
   let hyps,concl = get_goal g in
   let ef = destr_equivF concl in
   let _penv,qenv = LDecl.equivF ef.ef_fl ef.ef_fr hyps in
-  let phi1 = process_form qenv phi1 tbool in
-  let phi2 = process_form qenv phi2 tbool in
-  t_ppr phi1 phi2 g
+  let phi1 = process_form_opt qenv phi1 None in
+  let phi2 = process_form_opt qenv phi2 None in
+  (* TODO: check for type unification *)
+  let ty = f_ty phi1 in
+  t_ppr ty phi1 phi2 g
 
 let process_fel at_pos (cntr, ash, q, f_event, pred_specs,o_inv) g = 
   let hyps,concl = get_goal g in
