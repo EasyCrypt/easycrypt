@@ -2411,7 +2411,7 @@ prove_goal_by subgoals (RN_bhl_rnd tac_info ) g
 
 
 
-let t_ppr phi_l phi_r g =
+let t_ppr ty phi_l phi_r g =
   let env,_,concl = get_goal_e g in
   let ef = destr_equivF concl in
   let fl,fr = ef.ef_fl,ef.ef_fr in
@@ -2430,6 +2430,8 @@ let t_ppr phi_l phi_r g =
 
   let m1_id = EcIdent.create "&m1" in
   let m2_id = EcIdent.create "&m2" in
+  let a_id = EcIdent.create "a" in
+  let a_f = f_local a_id ty in
 
   (* let m1 = EcEnv.Fun.prF_memenv m1_id fl env in *)
   (* let m2 = EcEnv.Fun.prF_memenv m2_id fr env in *)
@@ -2441,11 +2443,11 @@ let t_ppr phi_l phi_r g =
   let smem2 = Fsubst.f_bind_mem Fsubst.f_subst_id mright mhr in
   let phi1 = Fsubst.f_subst smem1 phi_l in
   let phi2 = Fsubst.f_subst smem2 phi_r in
-  let pr1 = f_pr m1_id fl (List.map snd argsl) phi1 in
-  let pr2 = f_pr m2_id fr (List.map snd argsr) phi2 in
+  let pr1 = f_pr m1_id fl (List.map snd argsl) (f_eq a_f phi1) in
+  let pr2 = f_pr m2_id fr (List.map snd argsr) (f_eq a_f phi2) in
 
   let concl_pr = f_eq pr1 pr2 in
-  let smem = 
+  let smem =  
     Fsubst.f_bind_mem (Fsubst.f_bind_mem Fsubst.f_subst_id mright m2_id) mleft m1_id
   in
   let pre = Fsubst.f_subst smem ef.ef_pr in
@@ -2454,7 +2456,11 @@ let t_ppr phi_l phi_r g =
   let binders_l = List.map (fun ((v,t),_) -> v,GTty t ) argsl in
   let binders_r = List.map (fun ((v,t),_) -> v,GTty t ) argsr in
   let concl = f_forall_simpl binders_l (f_forall_simpl binders_r concl) in
-  let concl_post = f_imps_simpl [phi_l;phi_r] ef.ef_po in
+  let concl = f_forall_simpl [a_id,GTty ty] concl in
+  let concl_post = f_imps_simpl [f_eq phi_l a_f;f_eq phi_r a_f] ef.ef_po in
+  let memenvl,fdefl,memenvr,fdefr,env = Fun.equivS fl fr env in
+  let concl_post = gen_mems [memenvl;memenvr] concl_post in
+  let concl_post = f_forall_simpl [a_id,GTty ty] concl_post in
   prove_goal_by [concl_post;concl] RN_hl_deno g
 
 
