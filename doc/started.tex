@@ -87,28 +87,73 @@ The source for this document, along with the macros and language definitions
 used, are available in the public repository.
 
 \section{A Basic Example: Public-Key Encryption\label{sec:tutorial}}
-In this section we present a formalization of the proof of security
-against chosen plaintext attacks of a public-key encryption scheme
-introduced by \citet{br93}.
+This section introduces key features of \EasyCrypt through the simple
+but representative example of a public-key encryption scheme from
+\citet{br93}. On the modelling side, the example shows how to model
+cryptographic schemes, security notions and security assumptions, and
+in particular how to to define abstract operators and axioms; how to
+clone theories; how to define module types, modules and how to model
+adversaries as abstract procedures. On the proving side, the example
+shows how to use the different logics supported by \EasyCrypt, and in
+particular how to perform common reasoning patterns such as reasoning
+up to failure; optimistic sampling and simple reasoning about
+probabilites of events in games.
 
-This scheme is based on one-way trapdoor permutations and uses a
-random oracle. The proof of security follows by reduction: given an
-adversary against the chosen plaintext attack experiment that has
-access to the random oracle, there exists an inverter (making use of
-the adversary) that succeds in inverting the underlying trapdoor
-permutation with at least as much probability.
 
-While the proof of this scheme is not involved, it allows us to
-introduce several features of \EasyCrypt both on the modelling and on
-the proving side.
+%% currently the statement is wrong
+%% \subsection{Provable security in a nutshell}
 
-On the modelling side, we will describe how to define abstract operators
-and axioms; how to clone theories; how to define module types, modules
-and how to model adversaries as abstract procedures.
+%% This scheme is based on one-way trapdoor permutation and uses a
+%% random oracle. The proof of security follows by reduction: given an
+%% adversary against the chosen plaintext attack experiment that has
+%% access to the random oracle, there exists an inverter (making use of
+%% the adversary) that succeds in inverting the underlying trapdoor
+%% permutation with at least as much probability.
 
-On the proving side, we will explain how to perform reasoning up to
-failure; optimistic sampling and simple reasoning about probabilites
-of events in games.
+\subsection{Statement}
+\EasyCrypt supports reductionist proofs in the style of provable
+security~\cite{Goldwasser:1982}. This approach involves:
+\begin{enumerate}
+\item formalize a class of cryptographic constructions, and state
+  precisely their intended security guarantees. For the latter, one
+  must set the capacities of the adversary, and give a probabilistic
+  experiment that defines the security goal. Security can then be
+  quantified as the probability of an event in the experiment;
+
+\item specify the primitives from which cryptographic constructions
+  are built, and state explicitly the security properties that are
+  assumed for them. Like security goals, they are generally formalized
+  by means of experiments between a challenger and an adversary (an
+  assumption could play the role of a security goal in a lower level
+  proof);
+
+\item define concrete cryptographic constructions that use primitives
+  as black-boxes, and prove rigorously that every adversary against
+  the construction can be turned into an adversary against one of the
+  primitives, and prove that the probability that the former wins the
+  experiment is small, provided the probability of the latter is.
+\end{enumerate}
+In our case study, we consider chosen-plaintext security of public-key
+encryption schemes, and focus on schemes built from one-way trapdoor
+permutations and random oracles. We prove, for the concrete scheme
+considered in~\cite{br93}, the following statement:
+% TODO FIX STATEMENT USING ECIMPORT, POSSIBLY ADD MORE EXPLANATIONS
+\begin{easycrypt}[]{}
+lemma Conclusion :
+forall (A <: Adv) &m, exists (I<:Inverter), 
+Pr[CPA(BR,A).main() @ &m : res] - 1%r / 2%r 
+<= Pr[OW(I).main() @ &m : res].
+\end{easycrypt}
+where the experiment \texttt{CPA} formalizes chosen-plaintext security
+and \texttt{Adv} is the associated type of adversaries, whereas the
+experiment \texttt{OW} formalizes one-wayness and \texttt{Inverter} is
+the associated type of adversaries, \texttt{BR} is the public-key
+encryption scheme from \citet{br93}. 
+
+The remaining of the section provides a detailed explanation of the
+statement, and an outline of its proof.
+
+
 
 \subsection{Setting}
 We begin by introducing some basic concepts of cryptography and how we

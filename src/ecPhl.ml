@@ -1101,37 +1101,33 @@ let t_hoare_while inv g =
   let concl = f_hoareS_r { hs with hs_s = s; hs_po=post} in
   prove_goal_by [b_concl;concl] (RN_hl_while (inv,None,None)) g
 
-let t_bdHoare_while inv vrnt info g =
+let t_bdHoare_while inv vrnt g =
   let env, _, concl = get_goal_e g in
   let bhs = destr_bdHoareS concl in
   let ((e,c),s) = s_last_while "while" bhs.bhs_s in
   let m = EcMemory.memory bhs.bhs_m in
   let e = form_of_expr m e in
-  match info with 
-    | None ->
-      (* the body preserve the invariant *)
-      let k_id = EcIdent.create "z" in
-      let k = f_local k_id tint in
-      let vrnt_eq_k = f_eq vrnt k in
-      let vrnt_lt_k = f_int_lt vrnt k in
-      let b_pre  = f_and_simpl (f_and_simpl inv e) vrnt_eq_k in
-      let b_post = f_and_simpl inv vrnt_lt_k in
-      let b_concl = f_bdHoareS_r 
-        { bhs with bhs_pr=b_pre; bhs_s=c; bhs_po=b_post;
-          bhs_cmp=FHeq; bhs_bd=f_r1} 
-      in
-      let b_concl = f_forall_simpl [(k_id,GTty tint)] b_concl in
-      (* the wp of the while *)
-      let post = f_imps_simpl [f_not_simpl e; inv] bhs.bhs_po in
-      let term_condition = f_imps_simpl [inv;f_int_le vrnt (f_int 0)] (f_not_simpl e) in
-      let post = f_and term_condition post in
-      let modi = s_write env c in
-      let post = generalize_mod env m modi post in
-      let post = f_and_simpl inv post in
-      let concl = f_bdHoareS_r { bhs with bhs_s = s; bhs_po=post} in
-      prove_goal_by [b_concl;concl] (RN_hl_while (inv,Some vrnt, info)) g
-    | _ ->
-      cannot_apply "while" "not implemented"
+  (* the body preserve the invariant *)
+  let k_id = EcIdent.create "z" in
+  let k = f_local k_id tint in
+  let vrnt_eq_k = f_eq vrnt k in
+  let vrnt_lt_k = f_int_lt vrnt k in
+  let b_pre  = f_and_simpl (f_and_simpl inv e) vrnt_eq_k in
+  let b_post = f_and_simpl inv vrnt_lt_k in
+  let b_concl = f_bdHoareS_r 
+    { bhs with bhs_pr=b_pre; bhs_s=c; bhs_po=b_post;
+      bhs_cmp=FHeq; bhs_bd=f_r1} 
+  in
+  let b_concl = f_forall_simpl [(k_id,GTty tint)] b_concl in
+  (* the wp of the while *)
+  let post = f_imps_simpl [f_not_simpl e; inv] bhs.bhs_po in
+  let term_condition = f_imps_simpl [inv;f_int_le vrnt (f_int 0)] (f_not_simpl e) in
+  let post = f_and term_condition post in
+  let modi = s_write env c in
+  let post = generalize_mod env m modi post in
+  let post = f_and_simpl inv post in
+  let concl = f_bdHoareS_r { bhs with bhs_s = s; bhs_po=post} in
+  prove_goal_by [b_concl;concl] (RN_hl_while (inv,Some vrnt,None)) g
 
 let t_equiv_while_disj side vrnt inv g =
   let env, _, concl = get_goal_e g in

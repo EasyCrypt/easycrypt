@@ -691,7 +691,7 @@ theory Dinter_uni.
 
   lemma dinter_is_dinter: forall i j, dinter i j = Distr.Dinter.dinter i j.
   proof strict.
-  intros=> i j; rewrite -pw_eq=> x; case (in_supp x (dinter i j))=> supp_x.
+  intros=> i j; apply pw_eq=> x; case (in_supp x (dinter i j))=> supp_x.
     rewrite mu_x_def_in // Distr.Dinter.mu_x_def_in; smt. (* cut in_supp dinter = in_supp dinter_uni *)
     rewrite mu_x_def_nin // Distr.Dinter.mu_x_def_notin; smt.
   qed.
@@ -745,7 +745,7 @@ theory Dexcepted.
   proof.
     intros x d X; rewrite /(\).
     case (weight d - mu d (cpMem X) = 0%r)=> weight.
-      by rewrite /mu_x Dscale.mu_x_def_0 ?Drestr.weight_def //
+      by rewrite /mu_x Dscale.mu_def_0 ?Drestr.weight_def //
                  /in_supp
                  (_: (0%r < mu_x (Dscale.dscale (Drestr.drestr d X)) x) = false)=> //=;
          first smt.
