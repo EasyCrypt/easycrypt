@@ -227,10 +227,21 @@ simply asks the SMT solvers to discharge the lemma. (The proof system and
 tactics are documented more throroughly in Chapter~\ref{chap:tactics}.
 
 \begin{easycrypt}[label={lst:formulas}]{Examples of ambient formulas: predicates and lemmas}
-pred commutative (ope: 'a -> 'a -> 'a) =
+pred commutative (ope: 'a -> 'a -> 'b) =
   forall x y, ope x y = ope y x.
 
 lemma addiC: commutative Int.(+) by smt.
+\end{easycrypt}
+
+Any lemma or axiom that starts with universal quantifiers can instead be
+parameterized by those quantified variables. This does not change the semantics,
+but may make proofs slightly more elegant. For example, the two lemmas below
+are strictly equivalent.\footnote{To as lesser extent, this trick also works on
+predicate definitions, except that it changes the predicate's type.}
+\begin{easycrypt}[label={lst:formulas}]{Examples of ambient formulas: predicates and lemmas}
+lemma xorbC: forall (b b' : bool), b ^^ b' = b' ^^ b.
+
+lemma xorbC' (b b' : bool): b ^^ b' = b' ^^ b.
 \end{easycrypt}
 
 \section{Probabilistic Expressions\label{sec:distributions}}
@@ -292,116 +303,170 @@ lemma lossless : weight dbool = 1%r by smt.
 \end{easycrypt}
 
 \section{\pWHILE, Modules and Functors\label{sec:modules}}
-
 Although the languages for expressions and probabilistic expressions are quite
 powerful, they fail to properly capture the kind of objects cryptographers
 manipulate. \EasyCrypt uses the same language, \pWHILE, to describe
-cryptographic schemes, oracles, and experiments as modules and functors.
+cryptographic schemes, oracles, and experiments as modules. Modules are
+wrappers that declare a collection of typed global variables and define a set
+of imperative procedures, or \emph{functions} %Terminology! "operators" are functions, "functions" are procedures
+that may read and write (amongst other things) the module's globals. We first
+briefly describe the \pWHILE language before giving an overview of the two main
+mechanisms for module composition: direct usage and functor application.
 
-We first briefly describe the \pWHILE language before giving an overview of
-modules, as well as the two main mechanisms for their composition: direct usage
-and functor application.
+\subsection{The \pWHILE language}
+\pWHILE programs are composed of a set of typed local variables and a
+sequential compositions of statements that include:
+\begin{itemize}\itemsep-.5em
+\item assignment of an expression to a local or global variable,
+\item assignment of the result of a function call (on expressions) to a local
+  or global variable,
+\item assignment of a freshly sampled random value to a local or global
+  variable,
+\item conditional branching,
+\item looping (only in the form of \rawec{while} loops)
+\item ... % missing things?
+\end{itemize}
+Unless the return type of the function is \rawec{unit}, the final statement in
+the function's body needs to be a \rawec{return}.
 
+Listing~\ref{lst:pWhile} shows a module implementing a random oracle where the
+number of queries is bounded and the responses are sampled (but not assigned to
+any particular queries) during initialization. In this display, we use the type
+\rawec{word} to model bitstrings of an arbitrary fixed length, and
+\rawec{dword} to model the uniform distribution on words. Random sampling is
+denoted by preceding a distribution with the \textsf{\$} symbol.
 
+\begin{easycrypt}[label={lst:pWhile}]{Example of a module}
+module RO_E = {
+  var tape: word list
+  var mG: (word,word) map
 
-\subsection{Module Signatures}
-We first formally define the functionalities a random oracle is expected to
-provide, as a \emph{module type}, or \emph{signature}
-(Listing~\ref{lst:modulesig}). Any module implementation \rawec{M} that provides
-\emph{at least} the functions from a module type \rawec{Mt} is said to be of
-type \rawec{Mt} (denoted \rawec{M :> Mt}). Module types cannot specify state
-directly. Instead, if a global variable of the module should be exposed to the
-outside, getter and setter functions can be added to the module signature.
-
-\begin{easycrypt}[label={lst:modulesig}]{[A signature for random oracles]A signature for random oracles from bitstrings to bitstrings}
-module type RO = {
-  fun init():unit
-  fun h(x:bitstring):bitstring }.
-\end{easycrypt}
-
-Such a module signature can then be given various realizations. For example, Listing~\ref{lst:modules} shows two possible realizations of a random oracle, both of which assume a positive integer constant \rawec{qH}, used to bound the number of calls to the oracle, and two positive integer constants \rawec{inLen} and \rawec{outLen} representing the input and output lengths of the random oracles.
-
-%% The following is probably the single most disgusting thing I've ever typeset in Latex... and I've done ugly things.
-\begin{minipage}{\textwidth}
-\hrule
-\begin{multicols}{2}
-\begin{easycrypt}[frame=none,xleftmargin=0pt,xrightmargin=0pt]{}
-module RO_L: RO = {
-  var cG: int
-  var mG: (bitstring,bitstring) map
-
-  fun init() = {
-    mG = empty;
-    cG = 0;
-  }
-
-  fun h(x:bitstring) = {
-    var r:bitstring;
-    var res:bitstring = empty;
-    if (length x = inLen && cG < qG)
-    {
-      cG = cG + 1;
-      r = $dbitstring(outLen);
-      if (!mem(x,dom mG)) mG[x] = r;
-      res = mG[x];
-    }
-    return res;
-  }
-}.
-\end{easycrypt}
-\columnbreak
-\begin{easycrypt}[frame=none,xleftmargin=0pt,xrightmargin=0pt]{}
-module RO_E: RO = {
-  var tape: bitstring list
-  var mG: (bitstring,bitstring) map
-
-  fun init() = {
-    var r:bitstring;
+  fun init():unit = {
+    var r:word;
     tape = [];
     mG = empty;
-    while (length tape < qG)
+    while (`|tape| < qG)
     {
-      r = $dbitstring(outLen);
+      r = $dword;
       tape = r :: tape;
     }
   }
 
-  fun h(x:bitstring) = {
-    var r:bitstring;
-    var res:bitstring = empty;
-    if (length x = inLen &&
-       length tape <> 0)
+  fun h(x:word): word = {
+    var r:word;
+    var res:word;
+    if (`|tape| <> 0)
     {
-      r = hd tape;
-      if (!mem(x,dom mG))
-        mG[x] = r;
+      if (!mem(x,dom mG)) mG[x] = hd tape;
       res = mG[x];
       tape = tl tape;
     }
+    else
+      res = zeros;
     return res;
   }
 }.
 \end{easycrypt}
-\end{multicols}
-\hrule
-\begin{easycrypt}[frame=non,xleftmargin=0pt,xrightmargin=0pt,label={lst:modules}]{[Two random oracles]Two possible implementations of module type \rawec{RO}}
-\end{easycrypt}
-\end{minipage}
 
-\subsection{Functors and Oracle Annotations}
-Modules can in fact be specified as functors, parameterized by other modules
-whose functions can be accessed as oracles. For example, the signature shown in
-Listing~\ref{lst:functorsig} describes a class of modules that are given access
-to a random oracle but whose unique function can in fact only call the \rawec{h}
-function provided by the parameter.
+%
+%\subsection{Module Signatures}
+%We first formally define the functionalities a random oracle is expected to
+%provide, as a \emph{module type}, or \emph{signature}
+%(Listing~\ref{lst:modulesig}). Any module implementation \rawec{M} that provides
+%\emph{at least} the functions from a module type \rawec{Mt} is said to be of
+%type \rawec{Mt} (denoted \rawec{M :> Mt}). Module types cannot specify state
+%directly. Instead, if a global variable of the module should be exposed to the
+%outside, getter and setter functions can be added to the module signature.
+%
+%\begin{easycrypt}[label={lst:modulesig}]{[A signature for random oracles]A signature for random oracles from bitstrings to bitstrings}
+%module type RO = {
+%  fun init():unit
+%  fun h(x:bitstring):bitstring }.
+%\end{easycrypt}
+%
+%Such a module signature can then be given various realizations. For example, Listing~\ref{lst:modules} shows two possible realizations of a random oracle, both of which assume a positive integer constant \rawec{qH}, used to bound the number of calls to the oracle, and two positive integer constants \rawec{inLen} and \rawec{outLen} representing the input and output lengths of the random oracles.
+%
+%%% The following is probably the single most disgusting thing I've ever typeset in Latex... and I've done ugly things.
+%\begin{minipage}{\textwidth}
+%\hrule
+%\begin{multicols}{2}
+%\begin{easycrypt}[frame=none,xleftmargin=0pt,xrightmargin=0pt]{}
+%module RO_L: RO = {
+%  var cG: int
+%  var mG: (bitstring,bitstring) map
+%
+%  fun init() = {
+%    mG = empty;
+%    cG = 0;
+%  }
+%
+%  fun h(x:bitstring) = {
+%    var r:bitstring;
+%    var res:bitstring = empty;
+%    if (length x = inLen && cG < qG)
+%    {
+%      cG = cG + 1;
+%      r = $dbitstring(outLen);
+%      if (!mem(x,dom mG)) mG[x] = r;
+%      res = mG[x];
+%    }
+%    return res;
+%  }
+%}.
+%\end{easycrypt}
+%\columnbreak
+%\begin{easycrypt}[frame=none,xleftmargin=0pt,xrightmargin=0pt]{}
+%module RO_E: RO = {
+%  var tape: bitstring list
+%  var mG: (bitstring,bitstring) map
+%
+%  fun init() = {
+%    var r:bitstring;
+%    tape = [];
+%    mG = empty;
+%    while (length tape < qG)
+%    {
+%      r = $dbitstring(outLen);
+%      tape = r :: tape;
+%    }
+%  }
+%
+%  fun h(x:bitstring) = {
+%    var r:bitstring;
+%    var res:bitstring = empty;
+%    if (length x = inLen &&
+%       length tape <> 0)
+%    {
+%      r = hd tape;
+%      if (!mem(x,dom mG))
+%        mG[x] = r;
+%      res = mG[x];
+%      tape = tl tape;
+%    }
+%    return res;
+%  }
+%}.
+%\end{easycrypt}
+%\end{multicols}
+%\hrule
+%\begin{easycrypt}[frame=non,xleftmargin=0pt,xrightmargin=0pt,label={lst:modules}]{[Two random oracles]Two possible implementations of module type \rawec{RO}}
+%\end{easycrypt}
+%\end{minipage}
+%
+%\subsection{Functors and Oracle Annotations}
+%Modules can in fact be specified as functors, parameterized by other modules
+%whose functions can be accessed as oracles. For example, the signature shown in
+%Listing~\ref{lst:functorsig} describes a class of modules that are given access
+%to a random oracle but whose unique function can in fact only call the \rawec{h}
+%function provided by the parameter.
+%
+%\begin{easycrypt}[label={lst:functorsig}]{[A functor signature]A functor signature}
+%module type RO_adv(O:RO) = {
+%  fun a(): bool { O.h }
+%}.
+%\end{easycrypt}
 
-\begin{easycrypt}[label={lst:functorsig}]{[A functor signature]A functor signature}
-module type RO_adv(O:RO) = {
-  fun a(): bool { O.h }
-}.
-\end{easycrypt}
-
-\section{Lemmas and Judgements}
+\section{Program Judgements}
 
 \warningbox{Note that we use different implication symbols. $\Rightarrow$ is implication in the ambient logic (corresponding to the \rawec{=>} predicate), whereas $\Longrightarrow$ is used to express contracts on functions.\footnote{From Francois: it may be worth considering the use of another arrow symbol (for example $\Rrightarrow$) for contracts.}}
 
@@ -447,9 +512,18 @@ Property?:
 \subsection{Relational Hoare Judgements}
 
 \section{Sections}
+The section mechanism allows parts of a proof to be abstracted away. In
+particular proof steps that require the use of intermediate games often leave
+traces in the final theorem statement in the form of access restrictions on the
+adversary. Sections corrects these unsightly appearances by allowing the user
+to declare some modules and lemmas as local to a section, erasing them entirely
+from the environment once the section is closed.
+
+\warningbox{This feature is not yet fully documented.}
 
 \section{Working with Theories\label{sec:cloning}}
 
+\subsection{\rawec{print}}
 
 
 
