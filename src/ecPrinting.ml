@@ -410,7 +410,7 @@ let rec pp_type_r ppe btuple fmt ty =
     end
 
   | Tfun (t1, t2) ->
-      Format.fprintf fmt "%a ->@ %a"
+      Format.fprintf fmt "@[%a ->@ %a@]"
         (pp_type_r ppe true) t1 (pp_type_r ppe false) t2
 
 let pp_type ppe fmt ty =
