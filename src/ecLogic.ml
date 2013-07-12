@@ -381,22 +381,20 @@ let t_clear ids (juc,n as g) =
   let rule = { pr_name = RN_clear ids; pr_hyps = [RA_node n1] } in
   upd_rule rule (juc,n)
 
-let check_restr env mp restr = 
-  let restr = NormMp.norm_restr env restr in
-  let us = NormMp.mod_use env mp in
+let gen_check_restr env pp_a a use restr =
+  let restr = NormMp.norm_restr env restr in 
   let ppe = EcPrinting.PPEnv.ofenv env in
   let pp_mp = EcPrinting.pp_topmod ppe in
-  
   let check_xp xp _ = 
     if NormMp.use_mem_xp xp restr then
-      tacuerror "The module %a should not use the variable %a."
-       pp_mp mp (EcPrinting.pp_pv ppe) (pv_glob xp) in
-  EcPath.Mx.iter check_xp (us.NormMp.us_pv);
+      tacuerror "%a should not use the variable %a."
+       (pp_a ppe) a (EcPrinting.pp_pv ppe) (pv_glob xp) in
+  EcPath.Mx.iter check_xp (use.NormMp.us_pv);
   let check_gl id = 
     let mp1 = EcPath.mident id in
     if NormMp.use_mem_gl mp1 restr then
-      tacuerror "The module %a should not use the module %a."
-        pp_mp mp pp_mp mp1
+      tacuerror "%a should not use the module %a."
+        (pp_a ppe) a pp_mp mp1
     else 
       let r1 = NormMp.get_restr env mp1 in
       let check id2 = 
@@ -405,12 +403,19 @@ let check_restr env mp restr =
           let r2 = NormMp.get_restr env mp2 in
           if not (NormMp.use_mem_gl mp1 r2) then
             tacuerror 
-              "the module %a, using %a, should not use %a; add restriction %a to %a or %a to %a"
-            pp_mp mp pp_mp mp1 pp_mp mp2 
+              "%a, using %a, should not use %a; add restriction %a to %a or %a to %a"
+            (pp_a ppe) a pp_mp mp1 pp_mp mp2 
             pp_mp mp1 pp_mp mp2 pp_mp mp2 pp_mp mp1 in
       EcIdent.Sid.iter check restr.NormMp.us_gl in
-  EcIdent.Sid.iter check_gl us.NormMp.us_gl
-      
+  EcIdent.Sid.iter check_gl use.NormMp.us_gl
+
+
+let check_restr env mp restr = 
+  let use = NormMp.mod_use env mp in
+  let pp_mod ppe fmt mp = 
+    Format.fprintf fmt "The module %a" (EcPrinting.pp_topmod ppe) mp in
+  gen_check_restr env pp_mod mp use restr
+       
 let check_modtype_restr env mp mt i restr =
   begin
     try EcTyping.check_sig_mt_cnv env mt i

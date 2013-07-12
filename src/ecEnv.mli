@@ -206,6 +206,7 @@ module NormMp : sig
       us_gl : EcIdent.Sid.t;  
     }  
   val mod_use    : env -> mpath -> use
+  val fun_use    : env -> xpath -> use
   val norm_restr : env -> Sm.t  -> use 
   val get_restr  : env -> mpath -> use
   val use_mem_xp : xpath -> use -> bool

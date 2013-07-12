@@ -1665,6 +1665,34 @@ module NormMp = struct
 
   let add_glob id us = 
     { us with us_gl = Sid.add id us.us_gl }
+  
+  let add_glob_except rm id us = 
+    if Sid.mem id rm then us else add_glob id us 
+
+  let gen_fun_use env fdone rm =
+    let rec fun_use us f = 
+      let f = norm_xpath env f in
+      if Mx.mem f !fdone then us 
+      else 
+        let f1 = Fun.by_xpath f env in
+        fdone := Sx.add f !fdone;
+        match f1.f_def with
+        | FBdef fdef ->
+          let f_uses = fdef.f_uses in
+          let vars = Sx.union f_uses.us_reads f_uses.us_writes in
+          let us = Sx.fold (add_var env) vars us in
+          List.fold_left fun_use us f_uses.us_calls
+        | FBabs oi ->
+          let id = 
+            match f.x_top.m_top with
+            | `Local id -> id
+            | _ -> assert false in
+          let us = add_glob_except rm id us in
+          List.fold_left fun_use us oi.oi_calls in
+    fun_use
+  
+  let fun_use env xp = 
+    gen_fun_use env (ref Sx.empty) Sid.empty use_empty xp
     
   let mod_use env mp =
     let mp = norm_mpath env mp in
@@ -1673,8 +1701,7 @@ module NormMp = struct
     let rm = 
       List.fold_left (fun rm (id,_) -> Sid.add id rm) Sid.empty params in
     let env' = Mod.bind_locals params env in
-    let add_glob id us = 
-      if Sid.mem id rm then us else add_glob id us in
+
     let mp' = 
       EcPath.m_apply mp (List.map (fun (id,_) -> EcPath.mident id) params) in 
 
@@ -1700,25 +1727,8 @@ module NormMp = struct
       | MI_Variable v -> add_var env' (xpath_fun mp v.v_name) us
       | MI_Function f -> fun_use us (xpath_fun mp f.f_name) 
 
-    and fun_use us f =
-      let f = norm_xpath env' f in
-      if Mx.mem f !fdone then us 
-      else 
-        let f1 = Fun.by_xpath f env' in
-        fdone := Sx.add f !fdone;
-        match f1.f_def with
-        | FBdef fdef ->
-          let f_uses = fdef.f_uses in
-          let vars = Sx.union f_uses.us_reads f_uses.us_writes in
-          let us = Sx.fold (add_var env') vars us in
-          List.fold_left fun_use us f_uses.us_calls
-        | FBabs oi ->
-          let id = 
-            match f.x_top.m_top with
-            | `Local id -> id
-            | _ -> assert false in
-          let us = add_glob id us in
-          List.fold_left fun_use us oi.oi_calls in
+    and fun_use us f = gen_fun_use env' fdone rm us f in
+
     mod_use use_empty mp'
 
   let norm_restr env restr = 

@@ -792,8 +792,11 @@ let lossless_hyps env top sub =
   let hyps = List.map f_losslessF calls in
   f_forall bd (f_imps hyps concl) 
 
-let check_wr env top o = 
-  check_restr env o.x_top (Sm.singleton top)
+let check_oracle_use env adv o = 
+  let use = NormMp.fun_use env o in
+  let pp ppe fmt o = 
+    Format.fprintf fmt "The function %a" (EcPrinting.pp_funname ppe) o in
+  gen_check_restr env pp o use (Sm.singleton adv)
 
 let bdHoareF_abs_spec env f inv = 
   let top,_,oi,_fsig = abstract_info env f in
@@ -801,7 +804,7 @@ let bdHoareF_abs_spec env f inv =
   let fv = PV.fv env m inv in
   PV.check_depend env fv top;
   let ospec o = 
-    ignore (check_wr env top o);
+    ignore (check_oracle_use env top o);
     f_bdHoareF inv o inv FHeq f_r1 in
   let sg = List.map ospec oi.oi_calls in
   inv, inv, lossless_hyps env top f.x_sub :: sg
@@ -845,15 +848,20 @@ let equivF_abs_spec env fl fr inv =
   let eqglob = f_eqglob topl ml topr mr in
   
   let ospec o_l o_r = 
-    if EcPath.x_equal o_l o_r then check_wr env topl o_l
-    else (check_wr env topl o_l;check_wr env topl o_r);
+    let use =
+      try
+        if EcPath.x_equal o_l o_r then check_oracle_use env topl o_l
+        else (check_oracle_use env topl o_l;check_oracle_use env topl o_r);
+        false
+      with e -> if oil.oi_in then true else raise e in
     let fo_l = EcEnv.Fun.by_xpath o_l env in
     let fo_r = EcEnv.Fun.by_xpath o_r env in
     let eq_params = 
       f_eqparams o_l fo_l.f_sig.fs_params ml o_r fo_r.f_sig.fs_params mr in
     let eq_res = f_eqres o_l fo_l.f_sig.fs_ret ml o_r fo_r.f_sig.fs_ret mr in
-    let pre = EcFol.f_and eq_params inv in
-    let post = EcFol.f_and eq_res inv in
+    let invs = if use then [eqglob;inv] else [inv] in
+    let pre = EcFol.f_ands (eq_params :: invs) in
+    let post = EcFol.f_ands (eq_res :: invs) in
     f_equivF pre o_l o_r post in
   let sg = List.map2 ospec oil.oi_calls oir.oi_calls in
   let eq_params = 
@@ -884,8 +892,8 @@ let equivF_abs_upto env fl fr bad invP invQ =
   let eqglob = f_eqglob topl ml topr mr in
   
   let ospec o_l o_r = 
-    if EcPath.x_equal o_l o_r then check_wr env topl o_l
-    else (check_wr env topl o_l;check_wr env topl o_r);
+    if EcPath.x_equal o_l o_r then check_oracle_use env topl o_l
+    else (check_oracle_use env topl o_l;check_oracle_use env topl o_r);
     let fo_l = EcEnv.Fun.by_xpath o_l env in
     let fo_r = EcEnv.Fun.by_xpath o_r env in
     let eq_params = 
