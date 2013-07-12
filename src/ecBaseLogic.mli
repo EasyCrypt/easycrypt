@@ -120,6 +120,9 @@ type judgment = {
 }
 
 (* -------------------------------------------------------------------- *)
+val jucdepends : judgment -> EcPath.Sp.t
+
+(* -------------------------------------------------------------------- *)
 type tac_error =
   | UnknownAx             of EcPath.path
   | NotAHypothesis        of EcIdent.t
