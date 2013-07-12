@@ -1495,14 +1495,18 @@ module Section = struct
               else
                 scope
 
-          | T.CTh_axiom (x, ax) ->
-            let axp = EcPath.pqname (path scope) x in
-              if not (CoreSection.is_local `Lemma axp locals) then
-                Ax.bind scope false
-                  (x, { ax with ax_spec =
-                          omap ax.ax_spec (CoreSection.generalize scenv locals) })
-              else
-                scope
+          | T.CTh_axiom (x, ax) -> begin
+            match ax.ax_kind with
+            | `Axiom -> scope
+            | `Lemma ->
+                let axp = EcPath.pqname (path scope) x in
+                  if not (CoreSection.is_local `Lemma axp locals) then
+                    Ax.bind scope false
+                      (x, { ax with ax_spec =
+                              omap ax.ax_spec (CoreSection.generalize scenv locals) })
+                  else
+                    scope
+          end
 
           | T.CTh_export p ->
               { scope with sc_env = EcEnv.Theory.export p scope.sc_env }
