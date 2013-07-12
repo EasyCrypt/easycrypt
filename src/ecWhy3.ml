@@ -1036,7 +1036,11 @@ let trans_tydecl env path td =
 (* --------------------------- Formulas ------------------------------- *)
 
 let trans_lv env lv =
-  try Mid.find lv env.env_id with _ -> assert false
+  try Mid.find lv env.env_id with _ ->             
+    (
+      Format.printf "cannot find %s@." (EcIdent.tostring lv);
+      assert false
+    ) 
 
 let trans_mp env p = try Mm.find p env.env_mp with _ -> assert false
 
