@@ -49,7 +49,7 @@ section.
 
 declare module Adv1 : ADV1{Or}.
 
-module Adv2(Adv1:ADV1, Or : OR) = {
+local module FAdv2(Adv1:ADV1, Or : OR) = {
   module A = Adv1(Or)
 
   fun h() : int = {
@@ -59,13 +59,35 @@ module Adv2(Adv1:ADV1, Or : OR) = {
   }
 }.
 
-lemma G_Inst :
-  (forall (O <: OR{Adv2(Adv1)}), islossless O.f => islossless Adv1(O).g) =>
-  equiv[G(Adv2(Adv1)).g ~ G(Adv2(Adv1)).g : true ==> ={res}].
+local module Adv2 = FAdv2(Adv1).
+
+local lemma G_Inst :
+  (forall (O <: OR{Adv2}), islossless O.f => islossless Adv1(O).g) =>
+  equiv[G(Adv2).g ~ G(Adv2).g : true ==> ={res}].
 proof.
 intros LossAdv1.
-apply (G (Adv2(Adv1))).
+apply (G (Adv2)).
 intros O LossF.
 fun.
  call (LossAdv1 O _);trivial.
 save.
+
+axiom G' :
+  forall (Adv2 <: ADV2{Or}),
+  (forall (O <: OR), islossless O.f => islossless Adv2(O).h) =>
+  equiv[G(Adv2).g ~ G(Adv2).g : true ==> ={res}].
+
+local lemma G_Inst' :
+  (forall (O <: OR), islossless O.f => islossless Adv1(O).g) =>
+  equiv[G(Adv2).g ~ G(Adv2).g : true ==> ={res}].
+proof.
+intros LossAdv1.
+apply (G' (Adv2)).
+intros O LossF.
+fun.
+ call (LossAdv1 O _);trivial.
+save.
+
+end section.
+
+
