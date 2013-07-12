@@ -117,12 +117,14 @@ save.
 
 lemma test : forall (a:bitstring), length a = k1+k2 => equiv [ Test.test ~ Test'.test : true ==> ={res}]. 
 intros a h.
-bypr (a=res{1}) (a=res{2}).
-trivial.
-intros &m1 &m2 _.
-rewrite  (test' &m1 a _); [assumption |].
-rewrite  (test'' &m2 a _); [assumption |].
+bypr (res{1}) (res{2}).
+smt.
+intros a0 &m1 &m2 _.
+rewrite  (test' &m1 a0 _); [admit |].
+rewrite  (test'' &m2 a0 _); [admit |].
 trivial.
 save.
+
+
 
 
