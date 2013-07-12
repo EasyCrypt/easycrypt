@@ -1753,6 +1753,9 @@ phltactic:
 | FUN bad=sform p=sform q=sform? 
     { Pfun_upto(bad, p, q) }
 
+| FUN STAR 
+    { Pfun_to_code }
+
 | SEQ d=tac_dir pos=code_position COLON p=sform f=app_bd_info
    { Papp (d, pos, p, f) }
 

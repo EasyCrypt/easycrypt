@@ -853,6 +853,7 @@ let process_phl loc ptac g =
     | Pfun_def                  -> EcPhl.t_fun_def
     | Pfun_abs f                -> process_fun_abs f
     | Pfun_upto info            -> process_fun_upto info 
+    | Pfun_to_code              -> EcPhl.t_fun_to_code 
     | Pskip                     -> EcPhl.t_skip
     | Papp (dir, k, phi, f)     -> process_app dir k phi f
     | Pwp k                     -> t_wp k

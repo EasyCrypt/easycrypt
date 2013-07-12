@@ -694,13 +694,49 @@ let t_fun_def g =
   else if is_equivF concl then t_equivF_fun_def g
   else tacerror (NotPhl None)
 
+
+let _inline_freshen me v =
+  let rec for_idx idx =
+    let x = Printf.sprintf "%s%d" v.v_name idx in
+      if EcMemory.is_bound x me then
+        for_idx (idx+1)
+      else
+        (EcMemory.bind x v.v_type me, x)
+  in
+    if EcMemory.is_bound v.v_name me then
+      for_idx 0
+    else
+      (EcMemory.bind v.v_name v.v_type me, v.v_name)
+
+let t_fun_to_code g =
+  let env, _, concl = get_goal_e g in
+  let ef = destr_equivF concl in
+  let (ml,mr), _ = Fun.equivF_memenv ef.ef_fl ef.ef_fr env in
+  let fl,fr = ef.ef_fl, ef.ef_fr in
+  let do1 f m = 
+    let fd = Fun.by_xpath f env in
+    let args = 
+      List.map (fun v -> e_var (pv_loc f v.v_name) v.v_type) 
+        fd.f_sig.fs_params in
+    let m, res = _inline_freshen m {v_name = "r"; v_type = fd.f_sig.fs_ret} in
+    let r = pv_loc f res in
+    let i = i_call (Some(LvVar(r,fd.f_sig.fs_ret)), f, args) in
+    let s = stmt [i] in
+    m, s, r, fd.f_sig.fs_ret in
+  let ml, sl, rl, tyl = do1 fl ml in
+  let mr, sr, rr, tyr = do1 fr mr in
+  let s = PVM.add env (pv_res fl) (fst ml) (f_pvar rl tyl (fst ml)) PVM.empty in
+  let s = PVM.add env (pv_res fr) (fst mr) (f_pvar rr tyr (fst mr)) s in
+  let post = PVM.subst env s ef.ef_po in  
+  let concl = f_equivS ml mr ef.ef_pr sl sr post in
+  (* TODO change the name of the rule *)
+  prove_goal_by [concl] RN_hl_fun_def g
   
 (* TODO FIXME : oracle should ensure that the adversary state still equal:
    two solutions : 
      - add the equality in the pre and post.
      - ensure that oracle do not write the adversary state
  *)
-
 
 let abstract_info env f1 = 
   let f = EcEnv.NormMp.norm_xpath env f1 in
@@ -1423,18 +1459,6 @@ let t_he_case f g =
     (t_bdHoare_case f) (t_equiv_case f) g 
 
 (* --------------------------------------------------------------------- *)
-let _inline_freshen me v =
-  let rec for_idx idx =
-    let x = Printf.sprintf "%s%d" v.v_name idx in
-      if EcMemory.is_bound x me then
-        for_idx (idx+1)
-      else
-        (EcMemory.bind x v.v_type me, x)
-  in
-    if EcMemory.is_bound v.v_name me then
-      for_idx 0
-    else
-      (EcMemory.bind v.v_name v.v_type me, v.v_name)
 
 let _inline hyps me sp s =
   let env = LDecl.toenv hyps in
