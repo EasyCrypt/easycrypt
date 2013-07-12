@@ -144,14 +144,16 @@ theory Equiv_Dprod.
     }
   }.
 
-  lemma eq_twice_dprod_aux (ra' : a) (rb' : b):
+  lemma eq_twice_dprod:
       equiv[  Sample_twice.sample ~ Sample_dprod.sample :
              true ==> ={res} ].
   proof strict.
-    bypr ((ra', rb') = res{1}) ((ra', rb') = res{2}).
+    bypr (res{1}) (res{2}).
       progress.
-    intros=> &m1 &m2 _.
-    cut -> :(  Pr[Sample_dprod.sample() @ &m2 : (ra', rb') = res]
+    intros=> rab &m1 &m2 _.
+    pose ra' := fst rab. 
+    pose rb' := snd rab.
+    cut -> :(  Pr[Sample_dprod.sample() @ &m2 : rab = res]
              = mu_x da ra' * mu_x db rb').
     bdhoare_deno (_ : true ==> (ra', rb')=res).
       fun.
@@ -163,7 +165,7 @@ theory Equiv_Dprod.
       rewrite /mu_x. congr. apply fun_ext => //.
     rewrite Dprod.mu_x_def => //.
     by trivial.
-    by trivial.
+    by smt.
     bdhoare_deno (_ : true ==> (ra', rb')=res).
       fun.
     rnd (ra' = ra)
@@ -196,14 +198,9 @@ theory Equiv_Dprod.
     cut -> : ((lambda (rb : b), rb' = rb /\ ra{hr} = ra') = cpFalse).
       apply fun_ext. smt. smt.
     by trivial.
-    by trivial.
+    by smt.
   qed.
-  
-  lemma eq_twice_dprod:
-    equiv[  Sample_twice.sample ~ Sample_dprod.sample : true ==> ={res} ].
-  proof.
-    apply eq_twice_dprod_aux.
-  qed.
+
 end Equiv_Dprod.
 
 theory Equiv_Dapply.
@@ -230,13 +227,13 @@ theory Equiv_Dapply.
     }
   }.
 
-  lemma eq_apply_dapply_aux (rb : b):
+  lemma eq_apply_dapply:
       equiv[ Sample_then_apply.sample ~ Sample_dapply.sample :
              true ==> ={res} ].
   proof strict.
-    bypr (rb = res{1}) (rb = res{2}).
+    bypr (res{1}) (res{2}).
       progress.
-    intros=> &m1 &m2 _.
+    intros=> rb &m1 &m2 _.
     cut -> :(  Pr[Sample_dapply.sample() @ &m2 : rb= res]
                = mu da (lambda r, f r = rb)).
     bdhoare_deno (_ : true ==> (rb=res)).
@@ -263,11 +260,6 @@ theory Equiv_Dapply.
       by trivial.
   qed.
 
-  lemma eq_apply_dapply:
-      equiv[ Sample_then_apply.sample ~ Sample_dapply.sample : true ==> ={res} ].
-  proof strict.
-    apply eq_apply_dapply_aux.
-  qed.
 end Equiv_Dapply.
 
 (** We now perform the equivalence proofs between Sample_DH and Sample_DH_distr
