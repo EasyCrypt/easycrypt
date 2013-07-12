@@ -1555,7 +1555,8 @@ end
 
 (* -------------------------------------------------------------------- *)
 module NormMp = struct
-  let rec norm_mpath env p =
+
+  let rec norm_mpath_for_typing env p =
     let (ip, (i, args)) = ipath_of_mpath p in
     match Mod.by_ipath_r true ip env with
     | Some ((spi, params), ({ me_body = ME_Alias alias } as m)) ->
@@ -1564,7 +1565,7 @@ module NormMp = struct
         Mod.unsuspend_r EcSubst.subst_mpath
           true (i, args) (spi, params) alias
       in
-        norm_mpath env p
+        norm_mpath_for_typing env p
 
     | _ -> begin
       match p.EcPath.m_top with
@@ -1574,13 +1575,73 @@ module NormMp = struct
       | `Concrete (p1, Some p2) -> begin
         let name = EcPath.basename p2 in
         let pr   = EcPath.mpath_crt p1 p.EcPath.m_args (EcPath.prefix p2) in
-        let pr   = norm_mpath env pr in
+        let pr   = norm_mpath_for_typing env pr in
         match pr.EcPath.m_top with
         | `Local _ -> p
         | `Concrete (p1, p2) ->
           EcPath.mpath_crt p1 pr.EcPath.m_args (Some (EcPath.pqoname p2 name))
       end
     end
+  (* We can have different situations:
+     module F : A -> B -> C
+     module M1 = F A
+     module M2 = M1 B
+
+     first we normalise the top functor.
+     second we apply top to args 
+     we check that top is fully apply 
+        if not we normalize the argument and we return 
+     if yes we do as usual 
+     
+  *)
+  let rec norm_mpath env p =
+    let top = EcPath.m_functor p in
+    let args = p.EcPath.m_args in
+    let sub = 
+      match p.EcPath.m_top with | `Local _ -> None | `Concrete(_,o) -> o in
+    (* p is (top args).sub *)
+    
+    match Mod.by_mpath_opt top env with
+    | None -> norm_mpath_for_typing env p
+    | Some me ->
+      begin match me.me_body with
+      | ME_Alias mp -> 
+        let args' = mp.EcPath.m_args in
+        let args2 = if args = [] then args' else args' @ args in
+        let mp = 
+          match mp.EcPath.m_top with
+          | `Local _ as x -> assert (sub = None); EcPath.mpath x args2
+          | `Concrete(top',None) -> (* ((top' args') args).sub *)
+            EcPath.mpath_crt top' args2 sub
+          | `Concrete(top',(Some p' as sub')) -> (* ((top' args').sub').sub *)
+            assert (args = []); (* A submodule cannot by a functor *)
+            match sub with
+            | None   -> EcPath.mpath_crt top' args2 sub'
+            | Some p -> EcPath.mpath_crt top' args2 (Some (pappend p' p)) in
+        norm_mpath env mp 
+      | ME_Structure _ when sub <> None ->
+        begin
+          let (ip, (i, args)) = ipath_of_mpath p in
+          match Mod.by_ipath_r true ip env with
+          | Some ((spi, params), ({ me_body = ME_Alias alias } as m)) ->
+            assert (m.me_sig.mis_params = []); 
+            let p =
+              Mod.unsuspend_r EcSubst.subst_mpath
+                false (i, args) (spi, params) alias
+            in
+            norm_mpath env p
+          | _ ->
+            EcPath.mpath p.EcPath.m_top (List.map (norm_mpath env) args)
+        end     
+          
+      | _ -> 
+      (* The top is in normal form simply normalize the arguments *)
+        EcPath.mpath p.EcPath.m_top (List.map (norm_mpath env) args)
+      end
+ 
+      
+
+ 
 
   let rec add_uses env rm us mp =
     let mp  = norm_mpath env mp in

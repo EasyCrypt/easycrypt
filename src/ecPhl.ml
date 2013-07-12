@@ -64,18 +64,52 @@ let id_of_mp mp m =
     | `Local id -> EcIdent.name id 
     | _ -> assert false in
   add_side name m
+(* Suppose the modifyed variable are 
+   glob N1, glob N2, glob N4
+   M.x1, M.x2
+
+   and the formula depend of 
+   glob N1, glob N3, 
+   M.x1 M1.y
+
+   we need to check that
+   disjoint N1 with N3, M.x1, M1.y
+   disjoint N2 with N1, M.x1, M1.y
+   disjoint N4 with N1, N3, M.x1, M1.y
+   disjoint M.x1 with N1, N3, M1.y
+   disjoint M.x2 with N1, N3, M.x1, M.x2
+   but we do not need to check that N2 do not clash with N4.
+   I other word that substitution will not clash
+*)
+
 
 let generalize_mod env m modi f =
   let elts,glob = PV.elements modi in
+  (* We compute the pv and the glob used in f *)
+  let fv = PV.fv env m f in
+  (* We split the modi in two part the one used in the fv and the other *)
+  let uelts, nelts = List.partition (fun (pv,_) -> PV.mem_pv env pv fv) elts in
+  let uglob, nglob = List.partition (fun mp -> PV.mem_glob env mp fv) glob in
+  (* We build the substitution which will be used *)
+  (* We start by adding the global variable *)
   let create (pv,ty) = id_of_pv pv m, GTty ty in
-  let b = List.map create elts in
+  let b = List.map create uelts in
   let s = List.fold_left2 (fun s (pv,ty) (id, _) ->
-    PVM.add env pv m (f_local id ty) s) PVM.empty elts b in
+    Mpv.add env pv (f_local id ty) s) Mpv.empty uelts b in
   let create mp = id_of_mp mp m, GTty (tglob mp) in
-  let b' = List.map create glob in
+  let b' = List.map create uglob in
   let s = List.fold_left2 (fun s mp (id,_) ->
-    PVM.add_glob env mp m (f_local id (tglob mp)) s) s glob b' in
-  let f = PVM.subst env s f in
+    Mpv.add_glob env mp (f_local id (tglob mp)) s) s uglob b' in
+  (* Now we check that the substituion do not clash with other 
+     modified variable *)
+  List.iter (fun (pv,_) -> Mpv.check_npv env pv s) nelts;
+  List.iter (fun mp -> Mpv.check_glob env mp s) nglob;
+  (* We perform the substitution *)
+  let s = PVM.of_mpv s m in
+  let f = 
+    try PVM.subst env s f 
+    with EcBaseLogic.TacError _ -> assert false (* should not appear *)
+  in
   f_forall_simpl (b'@b) f
 
 let lv_subst m lv f =
