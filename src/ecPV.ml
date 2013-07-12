@@ -517,9 +517,9 @@ module Mpv2 = struct
       s_pv = 
         Mnpv.change (function
         | None ->  None
-        | Some (s,ty) -> 
+        | Some (s,_) -> 
           let s = Snpv.remove pv2 s in
-          if Snpv.is_empty s then None else Some (s,ty))
+          if Snpv.is_empty s then None else raise EqObsInError)
           pv1 eqs.s_pv }
 
   let remove_glob mp eqs = 
@@ -573,7 +573,8 @@ module Mpv2 = struct
   let subst_l env xl x eqs = 
     let xl = pvm env xl in
     let x = pvm env x in
-    match Mnpv.find_opt xl eqs.s_pv with
+    if pv_equal xl x then eqs 
+    else match Mnpv.find_opt xl eqs.s_pv with
     | None -> eqs
     | Some (s,ty) ->
       { eqs with
@@ -582,16 +583,18 @@ module Mpv2 = struct
             match o with
             | None -> Some (s,ty)
             | Some(s',_) -> Some (Snpv.union s s', ty))
-            x eqs.s_pv }
+            x (Mnpv.remove xl eqs.s_pv) }
 
   let subst_r env xl x eqs = 
     let xl = pvm env xl in
     let x = pvm env x in
-    { eqs with
-      s_pv = Mnpv.map (fun (s,ty) ->
-        Snpv.fold (fun x' s ->
-          let x' = if pv_equal xl x' then x else x' in
-          Snpv.add x' s) s Snpv.empty, ty) eqs.s_pv }
+    if pv_equal xl x then eqs 
+    else
+      { eqs with
+        s_pv = Mnpv.map (fun (s,ty) ->
+          Snpv.fold (fun x' s ->
+            let x' = if pv_equal xl x' then x else x' in
+            Snpv.add x' s) s Snpv.empty, ty) eqs.s_pv }
 
   let mem_pv_l env x eqs = 
     let x = pvm env x in
