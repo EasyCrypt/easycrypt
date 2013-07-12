@@ -619,6 +619,14 @@ let pp_opapp (ppe : PPEnv.t) t_ty pp_sub outer fmt (pred, op, tvi, es) =
       | x, [] when x = EcCoreLib.s_nil ->
           ((fun fmt -> pp_string fmt "[]"), max_op_prec)
 
+      | x, [e1; e2] when x = EcCoreLib.s_cons ->
+          let pp fmt =
+            Format.fprintf fmt "%a :: %a"
+              (pp_sub ppe (inm, (e_bin_prio_op4, `Left ))) e1
+              (pp_sub ppe (inm, (e_bin_prio_op4, `Right))) e2
+          in
+            (pp, e_bin_prio_op4)
+
       | x, [e] when x = EcCoreLib.s_abs ->
           let pp fmt =
             Format.fprintf fmt "`|%a|"
@@ -723,7 +731,7 @@ let pp_opapp (ppe : PPEnv.t) t_ty pp_sub outer fmt (pred, op, tvi, es) =
     (odfl
        pp_as_std_op
        (List.fpick [try_pp_special ;
-                    try_pp_as_uniop; 
+                    try_pp_as_uniop;
                     try_pp_as_binop])) fmt ()
 
 (* -------------------------------------------------------------------- *)
