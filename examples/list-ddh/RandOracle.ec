@@ -56,16 +56,21 @@ theory RandOracle.
     }
   }.
 
+  type ro_user_from.
+  type ro_user_to.
+
   module type RO_USER(RO : RO) = {
-    fun f() : unit
+    fun f(x : ro_user_from) : ro_user_to
   }.
 
   module G(RO : RO, UF : RO_USER) = {
     module U = UF(RO)
 
-    fun main() : unit = {
+    fun main(x : ro_user_from) : ro_user_to = {
+      var r : ro_user_to;
       RO.init();
-      U.f();
+      r = U.f(x);
+      return r;
     }
   }.
 
