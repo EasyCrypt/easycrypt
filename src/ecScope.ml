@@ -1092,7 +1092,7 @@ module Ax = struct
           let lvl2 = if ax.ax_kind = `Axiom then `Axiom else `Lemma in
 
           if lvl2 = `Axiom && ax.ax_tparams <> [] then
-            hierror "axiom mut be monomorphic in sections";
+            hierror "axiom must be monomorphic in sections";
 
           let axpath = EcPath.pqname (path scope) x in
           let ec = CoreSection.add_lemma axpath (lvl1, lvl2) scope.sc_section in
