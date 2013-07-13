@@ -359,6 +359,7 @@ let select_pv env side name ue tvi psig =
         select pvs
     with EcEnv.LookupFailure _ -> []
 
+
 let gen_select_op ~actonly ~pred (fpv, fop, flc) opsc tvi env name ue psig =
   match (if tvi = None then select_local env name else None) with
   | Some (id, ty) ->
@@ -1262,7 +1263,7 @@ and transbody ue symbols (env : EcEnv.env) retty pbody =
 
   List.iter add_local pbody.pfb_locals;
 
-  let body   = transstmt ue !env pbody.pfb_body in
+  let body   = transstmt !env ue pbody.pfb_body in
   let result =
     match pbody.pfb_return with
     | None ->
@@ -1319,11 +1320,11 @@ and fundef_check_iasgn subst_uni env ((mode, pl), init, loc) =
     List.map (fun lv -> i_asgn (lv, init)) pl
 
 (* -------------------------------------------------------------------- *)
-and transstmt ue (env : EcEnv.env) (stmt : pstmt) : stmt =
-  EcModules.stmt (List.map (transinstr ue env) stmt)
+and transstmt (env : EcEnv.env) ue (stmt : pstmt) : stmt =
+  EcModules.stmt (List.map (transinstr env ue) stmt)
 
 (* -------------------------------------------------------------------- *)
-and transinstr ue (env : EcEnv.env) (i : pinstr) =
+and transinstr (env : EcEnv.env) ue (i : pinstr) =
   let transcall name args =
     let fpath, fdef = lookup_fun env name in
       if List.length args <> List.length fdef.f_sig.fs_params then
@@ -1371,18 +1372,18 @@ and transinstr ue (env : EcEnv.env) (i : pinstr) =
         let ope =
           mk_loc (EcLocation.merge fe.pl_loc args.pl_loc) (PEapp (fe, [args]))
         in
-        transinstr ue env (mk_loc i.pl_loc (PSasgn (lvalue, ope)))
+        transinstr env ue (mk_loc i.pl_loc (PSasgn (lvalue, ope)))
 
   | PSif (pe, s1, s2) ->
       let e, ety = transexp env ue pe in
-      let s1 = transstmt ue env s1 in
-      let s2 = transstmt ue env s2 in
+      let s1 = transstmt env ue  s1 in
+      let s2 = transstmt env ue s2 in
       unify_or_fail env ue pe.pl_loc ~expct:tbool ety;
       i_if (e, s1, s2)
 
   | PSwhile (pe, pbody) ->
       let e, ety = transexp env ue pe in
-      let body = transstmt ue env pbody in
+      let body = transstmt env ue pbody in
       unify_or_fail env ue pe.pl_loc ~expct:tbool ety;
       i_while (e, body)
 
@@ -1393,7 +1394,8 @@ and transinstr ue (env : EcEnv.env) (i : pinstr) =
 
 (* -------------------------------------------------------------------- *)
 and trans_pv env { pl_desc = x; pl_loc = loc } = 
-  match EcEnv.Var.lookup_progvar_opt x env with
+  let side = EcEnv.Memory.get_active env in
+  match EcEnv.Var.lookup_progvar_opt ?side x env with
   | None -> tyerror loc env (UnknownModVar x)
   | Some(pv,xty) -> pv, xty 
 

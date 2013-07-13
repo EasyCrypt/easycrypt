@@ -92,8 +92,11 @@ val transbinding :  EcEnv.env -> EcUnify.unienv -> ptybindings ->
   EcEnv.env * (EcIdent.t * EcTypes.ty) list
 
 (* -------------------------------------------------------------------- *)
-val transexp : EcEnv.env -> EcUnify.unienv -> pexpr -> expr * ty
+val transexp     : EcEnv.env -> EcUnify.unienv -> pexpr -> expr * ty
 val transexpcast : EcEnv.env -> EcUnify.unienv -> ty -> pexpr -> expr
+
+(* -------------------------------------------------------------------- *)
+val transstmt    : EcEnv.env -> EcUnify.unienv -> pstmt -> stmt
 
 (* -------------------------------------------------------------------- *)
 type ptnmap = ty EcIdent.Mid.t ref

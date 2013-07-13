@@ -306,6 +306,7 @@
 %token WITH
 %token WP
 %token EQOBSIN
+%token TRANSITIVITY
 %token ZETA 
 
 %token <string> OP1 OP2 OP3 OP4
@@ -1856,7 +1857,8 @@ phltactic:
 
 | EQOBSIN info=eqobs_in
     { Peqobs_in info }
-
+| TRANSITIVITY tk=trans_kind h1=trans_hyp h2=trans_hyp
+    { Ptrans_stmt (tk, fst h1, snd h1, fst h2, snd h2) }
 (* basic pr based tacs *)
 | HOARE {Phoare}
 | BDHOARE {Pbdhoare}
@@ -1865,6 +1867,15 @@ phltactic:
 (* TODO : remove this tactic *)
 | PRFALSE {Pprfalse}
 | BDEQ {Pbdeq}
+;
+
+trans_kind:
+ | s=side  c=brace(stmt) { TKstmt(Some s, c) }
+ | f=loc(fident) { TKfun (f) }
+;
+
+trans_hyp:
+| LPAREN p=form LONGARROW q=form RPAREN { (p,q) }
 ;
 
 fel_pred_spec:

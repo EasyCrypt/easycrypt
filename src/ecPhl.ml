@@ -82,6 +82,17 @@ let id_of_mp mp m =
    I other word that substitution will not clash
 *)
 
+(* Remark: is only used to create fresh name, si id_of_pv *)
+let generalize_subst env m uelts uglob = 
+  let create (pv,ty) = id_of_pv pv m, GTty ty in
+  let b = List.map create uelts in
+  let s = List.fold_left2 (fun s (pv,ty) (id, _) ->
+    Mpv.add env pv (f_local id ty) s) Mpv.empty uelts b in
+  let create mp = id_of_mp mp m, GTty (tglob mp) in
+  let b' = List.map create uglob in
+  let s = List.fold_left2 (fun s mp (id,_) ->
+    Mpv.add_glob env mp (f_local id (tglob mp)) s) s uglob b' in
+  b' @ b, s
 
 let generalize_mod env m modi f =
   let elts,glob = PV.elements modi in
@@ -92,14 +103,7 @@ let generalize_mod env m modi f =
   let uglob, nglob = List.partition (fun mp -> PV.mem_glob env mp fv) glob in
   (* We build the substitution which will be used *)
   (* We start by adding the global variable *)
-  let create (pv,ty) = id_of_pv pv m, GTty ty in
-  let b = List.map create uelts in
-  let s = List.fold_left2 (fun s (pv,ty) (id, _) ->
-    Mpv.add env pv (f_local id ty) s) Mpv.empty uelts b in
-  let create mp = id_of_mp mp m, GTty (tglob mp) in
-  let b' = List.map create uglob in
-  let s = List.fold_left2 (fun s mp (id,_) ->
-    Mpv.add_glob env mp (f_local id (tglob mp)) s) s uglob b' in
+  let bd, s = generalize_subst env m uelts uglob in
   (* Now we check that the substituion do not clash with other 
      modified variable *)
   List.iter (fun (pv,_) -> Mpv.check_npv env pv s) nelts;
@@ -110,7 +114,7 @@ let generalize_mod env m modi f =
     try PVM.subst env s f 
     with EcBaseLogic.TacError _ -> assert false (* should not appear *)
   in
-  f_forall_simpl (b'@b) f
+  f_forall_simpl bd f
 
 let lv_subst m lv f =
   match lv with
@@ -366,7 +370,6 @@ let t_bdHoareS_conseq_bd cmp bd g =
   let bd_goal = gen_mems [bhs.bhs_m] (f_imp bhs.bhs_pr bd_goal) in
   prove_goal_by [bd_goal;concl] (RN_hl_conseq_bd) g  
 
-
 let t_equivF_conseq pre post g =
   let env,_,concl = get_goal_e g in
   let ef = destr_equivF concl in
@@ -396,6 +399,7 @@ let t_hr_conseq pre post g =
   | FequivF _   -> t_equivF_conseq pre post g
   | FequivS _   -> t_equivS_conseq pre post g
   | _           -> tacerror (NotPhl None)
+
 (* -------------------------------------------------------------------- *)
 
 let t_equivF_notmod post g = 
@@ -530,6 +534,68 @@ let t_bdHoareF_conseq_nm = gen_conseq_nm t_bdHoareF_notmod t_bdHoareF_conseq
 
 let t_bdHoareS_conseq_nm = gen_conseq_nm t_bdHoareS_notmod t_bdHoareS_conseq
 
+(* -------------------------------------------------------------------- *)
+(* Transitivity rule for equiv                                          *)
+
+(* forall m1 m3, P m1 m3 => exists m2, P1 m1 m2 /\ P2 m2 m3
+   forall m1 m2 m3, Q1 m1 m2 => Q2 m2 m3 => Q m1 m3
+   c1 ~ c2 : P1 ==> Q1
+   c2 ~ c3 : P2 ==> Q2
+   --------------------------------------------------------
+       c1 ~ c3 : P ==> Q
+Remark: the most basic rule is normally 
+Q = exists m2, Q1 m1 m2 /\ Q2 m2 m3
+So the actual rule is in fact this basic rule + conseq. 
+But I prefers this one, which will be more conveniant *)
+
+let transitivity_side_cond hyps prml prmr poml pomr 
+    p q p1 q1 pomt p2 q2 = 
+  let env = LDecl.toenv hyps in
+  let cond1 = 
+    let fv1 = PV.fv env mright p1 in
+    let fv2 = PV.fv env mleft  p2 in
+    let fv  = PV.union fv1 fv2 in
+    let elts,glob = PV.elements fv in
+    let bd, s = generalize_subst env mhr elts glob in
+    let s1 = PVM.of_mpv s mright in 
+    let s2 = PVM.of_mpv s mleft in 
+    let concl = f_and (PVM.subst env s1 p1) (PVM.subst env s2 p2) in
+    gen_mems [prml;prmr] (f_imp p (f_exists bd concl)) in
+  let cond2 = 
+    let m2 = LDecl.fresh_id hyps "&m" in
+    let q1 = Fsubst.f_subst_mem mright m2 q1 in
+    let q2 = Fsubst.f_subst_mem mleft  m2 q2 in
+    gen_mems [poml;(m2,pomt);pomr] (f_imps [q1;q2] q) in
+  cond1, cond2 
+
+let t_equivS_trans (mt,c2) p1 q1 p2 q2 g =
+  let hyps,concl = get_goal g in
+  let es     = destr_equivS concl in
+  let m1, m3 = es.es_ml, es.es_mr in
+  let cond1, cond2 = 
+    transitivity_side_cond hyps m1 m3 m1 m3
+      es.es_pr es.es_po p1 q1 mt p2 q2 in
+  let cond3 = 
+    f_equivS_r { es with
+      es_mr = (mright,mt); es_sr = c2;
+      es_pr = p1; es_po = q1 } in
+  let cond4 = 
+    f_equivS_r { es with
+      es_ml = (mleft,mt); es_sl = c2;
+      es_pr = p2; es_po = q2 } in
+  prove_goal_by [cond1;cond2;cond3;cond4] RN_equiv_trans g
+
+let t_equivF_trans f p1 q1 p2 q2 g =
+  let env,hyps,concl = get_goal_e g in
+  let ef     = destr_equivF concl in
+  let (prml,prmr), (poml,pomr) = Fun.equivF_memenv ef.ef_fl ef.ef_fr env in
+  let _,(_,pomt) = Fun.hoareF_memenv f env in
+  let cond1, cond2 = 
+    transitivity_side_cond hyps prml prmr poml pomr
+      ef.ef_pr ef.ef_po p1 q1 pomt p2 q2 in
+  let cond3 = f_equivF p1 ef.ef_fl f q1 in
+  let cond4 = f_equivF p2 f ef.ef_fr q2 in
+  prove_goal_by [cond1;cond2;cond3;cond4] RN_equiv_trans g
 
 (* -------------------------------------------------------------------- *)
 

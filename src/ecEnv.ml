@@ -1246,8 +1246,7 @@ module Var = struct
       match fst qname with
       | [] ->
           let memenv = oget (Memory.byid side env) in
-          if EcMemory.memtype memenv = None then
-            None
+          if EcMemory.memtype memenv = None then None
           else
             let mp = EcMemory.xpath memenv in
             begin match EcMemory.lookup (snd qname) memenv with
@@ -1260,7 +1259,7 @@ module Var = struct
       | _ -> None
     in
     match obind side inmem with
-    | None -> 
+    | None ->
         (* TODO FIXME, suspended for local program variable *)
         let (((_, _), p), x) = MC.lookup_var qname env in
         (pv p x.vb_kind, x.vb_type)
