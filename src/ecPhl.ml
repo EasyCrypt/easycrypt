@@ -573,7 +573,7 @@ let t_equivS_trans (mt,c2) p1 q1 p2 q2 g =
   let es     = destr_equivS concl in
   let m1, m3 = es.es_ml, es.es_mr in
   let cond1, cond2 = 
-    transitivity_side_cond hyps m1 m1 m3 m3
+    transitivity_side_cond hyps m1 m3 m1 m3
       es.es_pr es.es_po p1 q1 mt p2 q2 in
   let cond3 = 
     f_equivS_r { es with
