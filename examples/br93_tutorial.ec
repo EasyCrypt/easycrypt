@@ -73,15 +73,20 @@ type pkey.
 type skey.
 const keypairs: (pkey * skey) distr.
 
+op valid_keys : pkey -> skey -> bool.
+
+axiom valid_keys_def :
+ forall (pk : pkey, sk: skey), in_supp (pk,sk) keypairs => valid_keys pk sk.
+
 op f : pkey -> randomness -> randomness.
 op finv : skey -> randomness -> randomness.
 
 
 axiom finvof : forall(pk : pkey, sk : skey, x : randomness),
- in_supp (pk,sk) keypairs => finv sk (f pk x) = x.
+ valid_keys pk sk => finv sk (f pk x) = x.
 
 axiom fofinv : forall(pk : pkey, sk : skey, x : randomness),
- in_supp (pk,sk) keypairs => f pk (finv sk x) = x.
+ valid_keys pk sk => f pk (finv sk x) = x.
 
 axiom keypair_lossless : mu keypairs cpTrue = 1%r.
 
@@ -114,11 +119,10 @@ module OW(I :Inverter) ={
  module type Scheme(R : Oracle) = {
   fun kg() : (pkey * skey)
   fun enc(pk:pkey, m:plaintext) : ciphertext
-  fun dec(sk:skey, c:ciphertext) : plaintext
+  fun dec(sk:skey, c:ciphertext) : plaintext option
  }.
 (** end scheme *) 
 
-(** begin br93 *)
 op (||) (x : randomness, y : plaintext) : ciphertext =
  Ciphertext.from_array ((to_array x) || (to_array y)).
 
@@ -167,7 +171,7 @@ proof.
 qed.
  
 
-
+(** begin br93 *)
 module BR(R : Oracle) : Scheme(R)= {
  var r : randomness
  fun kg() : (pkey * skey) = {
@@ -183,10 +187,10 @@ module BR(R : Oracle) : Scheme(R)= {
   return (f pk r ||   m ^^ h);
  }
  
- fun dec(sk:skey, c : ciphertext) : plaintext = {
+ fun dec(sk:skey, c : ciphertext) : plaintext option = {
   var h : plaintext;
   h = R.o(finv sk (projRand c));
-  return (projPlain c ^^ h);
+  return (Some (projPlain c ^^ h));
  }
 }.
 (** end br93 *)
@@ -196,13 +200,13 @@ module Correct (S : Scheme) ={
   var pk : pkey;
   var sk : skey;
   var m : plaintext;
-  var m' : plaintext;
+  var m' : plaintext option;
   var c : ciphertext;
   (pk,sk) = $keypairs;
   m = $uniform_plain;
   c = SE.enc(pk,m);
   m' = SE.dec(sk,c);
-  return (m = m');
+  return (m = proj m');
  }
 }.
 
@@ -211,12 +215,16 @@ hoare [Correct(BR).main : true ==> res = true].
 proof.
  fun.
  inline Correct(BR).SE.dec Correct(BR).SE.enc RO.o.
- do 4! (wp;rnd);rnd;skip;progress;[smt| | |].
-  by rewrite !projPlain_c !projRand_c !(finvof x1 x2 r) // 
-  -Plaintext.xor_assoc Plaintext.xor_nilpotent;smt.
-  by smt.
-  by rewrite !projPlain_c !projRand_c !(finvof x1 x2 r) //  
-  -Plaintext.xor_assoc Plaintext.xor_nilpotent;smt.
+ do 4! (wp;rnd);rnd;skip;progress.
+  by generalize H5;rewrite !projPlain_c !projRand_c !(finvof x1 x2 r) //;smt.
+  
+  rewrite !projPlain_c !projRand_c !(finvof x1 x2 r);first by smt. 
+  by rewrite -Plaintext.xor_assoc Plaintext.xor_nilpotent;smt.
+
+  by generalize H5;rewrite !projPlain_c !projRand_c !(finvof x1 x2 r) //;smt.
+
+  rewrite !projPlain_c !projRand_c !(finvof x1 x2 r);first by smt. 
+  by rewrite -Plaintext.xor_assoc Plaintext.xor_nilpotent;smt.
 qed.
 
 
@@ -276,10 +284,10 @@ local module BR2(R : Oracle) : Scheme(R)= {
   return (f pk r ||   m ^^ h);
  }
  
- fun dec(sk:skey, c : ciphertext) : plaintext = {
+ fun dec(sk:skey, c : ciphertext) : plaintext option = {
   var h : plaintext;
   h = R.o(finv sk (projRand c));
-  return (projPlain c ^^ h);
+  return Some (projPlain c ^^ h);
  }
 }.
 (** end br2 *)
@@ -370,10 +378,10 @@ local module BR3(R : Oracle) : Scheme(R)= {
   return (f pk r ||  h);
  }
  
- fun dec(sk:skey, c : ciphertext) : plaintext = {
+ fun dec(sk:skey, c : ciphertext) : plaintext option = {
   var h : plaintext;
   h = R.o(finv sk (projRand c));
-  return (projPlain c ^^ h);
+  return Some (projPlain c ^^ h);
  }
 }.
 (** end br3 *)
