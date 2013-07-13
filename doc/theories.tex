@@ -324,7 +324,7 @@ sequential compositions of statements that include:
   variable,
 \item conditional branching,
 \item looping (only in the form of \rawec{while} loops)
-\item ... % missing things?
+% missing things?
 \end{itemize}
 Unless the return type of the function is \rawec{unit}, the final statement in
 the function's body needs to be a \rawec{return}.
@@ -357,7 +357,7 @@ module RO_E = {
     var res:word;
     if (`|tape| <> 0)
     {
-      if (!mem(x,dom mG)) mG[x] = hd tape;
+      if (!in_dom x mG)) mG[x] = hd tape;
       res = mG[x];
       tape = tl tape;
     }
@@ -466,48 +466,144 @@ module RO_E = {
 %}.
 %\end{easycrypt}
 
+\subsection{Module types}
+Modules can be abstracted as module types, that hide details of the module's
+internal state and implementation, and listing only some of the procedures the
+module provides. For example, the \rawec{RO_E} module from
+Listing~\ref{lst:pWhile} can be typed with both of the signatures given in
+Listing~\ref{lst:signatures}. In the first signature, which could for example
+be used by an experiment, the \rawec{\{*\}}  annotation on \rawec{init}
+indicates that this function serves as initialization function and may be called
+(in relational proofs) in desynchronized states.
+
+\begin{easycrypt}[label={lst:signatures}]{Examples of module signatures.}
+module type RO = {
+  fun init(): unit {*}
+  fun h(x:word): word
+}.
+
+module type ARO = {
+  fun h(x:word): word
+}.
+\end{easycrypt}
+
+For a module to provide a signature, it needs to provide an implementation of
+all the listed functions \emph{with the same names, types, and formal
+parameters}.
+
+\warningbox{Error messaging for module typing may still be a bit obscure, and
+some of the typing constraints---in particular the one concerning the naming of
+formal parameters---can easily be overseen. These constraints will hopefully
+make sense by the end of this Chapter, after discussions on module
+quantification.}
+
+Module type information, although it can be listed after a module's name in the
+manner of a type annotation (for example,
+\rawec{module RO_E: RO, ARO = \{...\}}.) is not attached to the module itself.
+Instead, it is checked whenever a module is instantiated that it provides the
+expected interface.
+
+\subsection{Accessing module state}
+A module can directly access the state of any other module that is currently in
+scope. For example, the definitions listed in Listing~\ref{lst:dependencies} is
+perfectly valid, and can in fact be used to model memory sharing and simplify
+definitions.
+
+\begin{easycrypt}[label={lst:dependencies}]{Memory accesses}
+module Mem = {
+  var c: int
+}.
+
+module Counter = {
+  fun get(): int = {
+    return Mem.c;
+  }
+
+  fun incr(): unit = {
+    Mem.c = Mem.c + 1;
+  }
+}.
+\end{easycrypt}
+
+When such access exists, we say that a module \emph{depends} on another module.
+(In Listing~\ref{lst:dependencies}, \rawec{Counter} depends on \rawec{Mem}.)
+
+\subsection{Modelling oracle access}
+
+\begin{itemize}
+\item Functors
+\item Functor signatures, oracle access restrictions
+\end{itemize}
+
 \section{Program Judgements}
 
-\warningbox{Note that we use different implication symbols. $\Rightarrow$ is implication in the ambient logic (corresponding to the \rawec{=>} predicate), whereas $\Longrightarrow$ is used to express contracts on functions.\footnote{From Francois: it may be worth considering the use of another arrow symbol (for example $\Rrightarrow$) for contracts.}}
+With modules and functors in place, it is now possible to express properties
+pertaining to stateful functions, rather than simply to operators. In addition,
+the use of module signatures, with additional restrictions, allows us to
+universally and existentially quantify over modules of a certain type. We are
+interested in three kinds of judgements about programs:
+\begin{itemize}\itemsep-.5em
+\item Standard Hoare logic judgements, consisting of two predicates over
+  memories: a precondition and a postcondition;
+\item Probabilistic Hoare logic judgements, consisting of two predicates over
+  memories, a relation on reals, and a real bound lying in the unit interval;
+\item Probabilistic relational Hoare logic judgements, consisting of two
+  relations on memories.
+\end{itemize}
+This section informally describes their syntax and semantic interpretations.
+
+\warningbox{In the following, note the distinct implication symbols.
+$\Rightarrow$ is implication in the ambient logic (corresponding to the
+\rawec{=>} predicate), whereas $\Longrightarrow$ is used to express contracts on
+functions.\footnote{From Francois: it may be worth considering the use of
+another arrow symbol (for example $\Rrightarrow$) for contracts.}}
 
 \subsection{(Possibilistic) Hoare Judgements}
+Given a statement $\mathsf{c}$ and two predicates $\pre$ and $\post$ on
+memories, judgement $\Hoare{c}{\pre}{\post}$ means that for any memory
+$\mathsf{m}$ such that $\pre\ \mathsf{m}$ and any memory $\mathsf{m'}$ that may
+be obtained by executing $\mathsf{c}$ in $\mathsf{m}$, $\post\ \mathsf{m'}$.
 
-Interpretation:
-\begin{displaymath}
-\Hoare{c}{\pre}{\post}
-\quad\doteq\quad
-\forall m.~ \pre\,m \Rightarrow \range Q ([\![ c ]\!]\,m)
-\end{displaymath}
-%
-where $\range \varphi \mu \doteq \forall f.~ (\forall x.~ \varphi\,x
-\Rightarrow f\,x=0) \Rightarrow \mu\,f=0$
-
-
-
+%Interpretation:
+%\begin{displaymath}
+%\Hoare{c}{\pre}{\post}
+%\quad\doteq\quad
+%\forall m.~ \pre\,m \Rightarrow \range Q ([\![ c ]\!]\,m)
+%\end{displaymath}
+%%
+%where $\range \varphi \mu \doteq \forall f.~ (\forall x.~ \varphi\,x
+%\Rightarrow f\,x=0) \Rightarrow \mu\,f=0$
 
 \subsection{Probabilistic Hoare Judgements}
+Given a statement $\mathsf{c}$, two predicates $\pre$ and $\post$ on
+memories, a relation $\mathfrak{R}$ over the reals and a real bound $\delta$,
+judgement $\Hoare{c}{\pre}{\post} \mathrel{\mathfrak{R}} \delta$ means that for
+any memory $\mathsf{m}$ such that $\pre\ \mathsf{m}$ the probability that
+$\post$ holds after executing $\mathsf{c}$ in $\mathsf{m}$ is related to
+$\delta$ by $\mathfrak{R}$.
 
-Interpretation:
-\begin{displaymath}
-\HoareLe{c}{\pre}{\post}{\delta} 
-\quad\doteq\quad
-\forall m.~ \pre\,m \Rightarrow [\![ c ]\!]\,m\,\charfun_\post \leq
-\delta\,m
-\end{displaymath}
 
-Property?:
-\begin{displaymath}
-\Hoare{c}{\pre}{\post}
-\Leftrightarrow
-\HoareEq{c}{\pre}{\neg\post}{0}
-\end{displaymath}
-
-Property?:
-\begin{displaymath}
-\Hoare{c}{\pre}{\post} \land \HoareEq{c}{\pre}{\true}{1}
-\Leftrightarrow
-\HoareEq{c}{\pre}{\post}{1}
-\end{displaymath}
+%Interpretation:
+%\begin{displaymath}
+%\HoareLe{c}{\pre}{\post}{\delta} 
+%\quad\doteq\quad
+%\forall m.~ \pre\,m \Rightarrow [\![ c ]\!]\,m\,\charfun_\post \leq
+%\delta\,m
+%\end{displaymath}
+%
+%Property?:
+%\begin{displaymath}
+%\Hoare{c}{\pre}{\post}
+%\Leftrightarrow
+%\HoareEq{c}{\pre}{\neg\post}{0}
+%\end{displaymath}
+%
+%Property?:
+%\begin{displaymath}
+%\Hoare{c}{\pre}{\post} \land \HoareEq{c}{\pre}{\true}{1}
+%\Leftrightarrow
+%\HoareEq{c}{\pre}{\post}{1}
+%\end{displaymath}
 
 \subsection{Relational Hoare Judgements}
 
