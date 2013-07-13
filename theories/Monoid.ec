@@ -46,21 +46,20 @@ theory SumSet.
 
   lemma sum_in :
     forall (f:'a -> t) (s:'a set),
-    let f' = lambda x, if mem x s then f x else Z in
-    sum f s = sum f' s.
+    sum f s = sum (lambda x, if mem x s then f x else Z) s.
   proof.
-    intros ? ? ?.
-    pose xs := s.
-    cut lem : xs <= s => sum f xs = sum f' xs;
-      last apply lem;delta xs;apply leq_refl.
+    intros ? ?.
+    pose {1 3} xs := s.
+    cut : (xs <= s);first by delta xs;apply leq_refl.
     elim/set_comp xs;first rewrite ! sum_nil //.
     intros ? ? ? ?.
-    rewrite (sum_rm _ _ (pick s0));first apply mem_pick;trivial.
-    rewrite (sum_rm<:'a> f' _ (pick s0));first apply mem_pick;trivial.
-    rewrite H0;first apply (leq_tran _ s0);[apply rm_leq|trivial].
-    delta f';simplify.
+    rewrite (sum_rm _ _ (pick s0));
+      first by apply mem_pick.
+    rewrite (sum_rm<:'a> (lambda x, if mem x s then f x else Z) _ (pick s0));
+      first by apply mem_pick.
+    rewrite H0 /=;first by apply (leq_tran _ s0);
+      first apply rm_leq.
     rewrite (_: mem (pick s0) s = true) //.
-    generalize H1;delta xs=> ?.
     by apply eqT;apply H1;apply mem_pick=> //.
   save.
 
