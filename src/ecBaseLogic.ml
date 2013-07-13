@@ -31,7 +31,7 @@ let _ = EcPException.register pp_error
 type local_kind =
   | LD_var   of ty * form option
   | LD_mem   of EcMemory.memtype
-  | LD_modty of EcModules.module_type * EcPath.Sm.t
+  | LD_modty of EcModules.module_type * EcModules.mod_restr
   | LD_hyp   of form  (* of type bool *)
 
 type l_local = EcIdent.t * local_kind

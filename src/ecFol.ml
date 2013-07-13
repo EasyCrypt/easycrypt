@@ -10,9 +10,10 @@ open EcModules
 type memory = EcMemory.memory
 
 (* -------------------------------------------------------------------- *)
+
 type gty =
   | GTty    of EcTypes.ty
-  | GTmodty of module_type * EcPath.Sm.t
+  | GTmodty of module_type * mod_restr 
   | GTmem   of EcMemory.memtype
 
 type quantif = 
@@ -117,8 +118,8 @@ let gty_equal ty1 ty2 =
   | GTty ty1, GTty ty2 ->
       EcTypes.ty_equal ty1 ty2
 
-  | GTmodty (p1, r1), GTmodty (p2,r2)  ->
-      EcModules.mty_equal p1 p2 && EcPath.Sm.equal r1 r2
+  | GTmodty (p1, r1), GTmodty (p2, r2)  ->
+    EcModules.mty_equal p1 p2 && mr_equal r1 r2
 
   | GTmem mt1, GTmem mt2 ->
       EcMemory.mt_equal mt1 mt2
@@ -132,8 +133,10 @@ let gty_hash = function
 
 let gty_fv = function
   | GTty ty -> ty.ty_fv
-  | GTmodty(_, r) ->
-      EcPath.Sm.fold (fun mp fv -> EcPath.m_fv fv mp) r EcIdent.Mid.empty
+  | GTmodty(_, (rx,r)) -> 
+    let fv = 
+      EcPath.Sm.fold (fun mp fv -> EcPath.m_fv fv mp) r EcIdent.Mid.empty in
+    EcPath.Sx.fold (fun xp fv -> EcPath.x_fv fv xp) rx fv
   | GTmem mt -> EcMemory.mt_fv mt
 
 (*-------------------------------------------------------------------- *)
@@ -1106,15 +1109,21 @@ module Fsubst = struct
       let ty' = s.fs_ty ty in
         if ty == ty' then gty else GTty ty'
 
-    | GTmodty(p, r) ->
+    | GTmodty(p, (rx, r)) ->
       let sub = s.fs_sty.ts_mp in
       let p'  = mty_subst s.fs_sty.ts_p sub p in
+      let xsub = EcPath.x_substm s.fs_sty.ts_p s.fs_mp in
+      let rx' = 
+        EcPath.Sx.fold
+          (fun m rx' -> EcPath.Sx.add (xsub m) rx') rx
+          EcPath.Sx.empty in
       let r'  = 
         EcPath.Sm.fold
           (fun m r' -> EcPath.Sm.add (sub m) r') r
           EcPath.Sm.empty
       in
-        if p == p' && EcPath.Sm.equal r r' then gty else GTmodty(p', r')
+        if p == p' && EcPath.Sx.equal rx rx' && EcPath.Sm.equal r r' then gty 
+        else GTmodty(p', (rx', r'))
 
     | GTmem mt ->
       let mt' = EcMemory.mt_substm s.fs_sty.ts_p s.fs_mp s.fs_ty mt in

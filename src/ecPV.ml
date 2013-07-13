@@ -987,7 +987,7 @@ let check_module_in env mp mt =
   let params = sig_.mis_params in
   let global = PV.fv env mhr (NormMp.norm_glob env mhr mp) in
   let env = List.fold_left 
-    (fun env (id,mt) -> Mod.bind_local id mt Sm.empty env) env params in
+    (fun env (id,mt) -> Mod.bind_local id mt (Sx.empty,Sm.empty) env) env params in
   let extra = List.map (fun (id,_) -> EcPath.mident id) params in
   let mp = EcPath.mpath mp.m_top (mp.m_args @ extra) in
   let check = function

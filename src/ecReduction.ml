@@ -344,8 +344,9 @@ let check_alpha_equal ri hyps f1 f2 =
       ensure (equal_type env ty1 ty2);
       env, 
       if id_equal x1 x2 then subst else Fsubst.f_bind_local subst x2 (f_local x1 ty1)
-    | GTmodty (p1,r1) , GTmodty(p2,r2) -> 
-      ensure (ModTy.mod_type_equiv env p1 p2 && EcPath.Sm.equal r1 r2);
+    | GTmodty (p1, r1) , GTmodty(p2, r2) -> 
+      ensure (ModTy.mod_type_equiv env p1 p2 &&
+                NormMp.equal_restr env r1 r2);
       Mod.bind_local x1 p1 r1 env, 
       if id_equal x1 x2 then subst 
       else Fsubst.f_bind_mod subst x2 (EcPath.mident x1)

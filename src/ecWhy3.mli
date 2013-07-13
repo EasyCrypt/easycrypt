@@ -38,12 +38,12 @@ val add_mod_exp :
     env -> EcPath.path -> module_expr -> env * rebinding
 
 val add_abs_mod : 
-  (EcIdent.t -> module_type -> EcPath.Sm.t -> module_expr) ->
-env -> EcIdent.t -> module_type -> EcPath.Sm.t -> env 
+  (EcIdent.t -> module_type -> mod_restr -> module_expr) ->
+  env -> EcIdent.t -> module_type -> mod_restr -> env 
 
 (*****************************************************************************)
 exception CanNotTranslate of string
 
 val check_goal : 
-  (EcIdent.t -> module_type -> EcPath.Sm.t -> module_expr) ->
+  (EcIdent.t -> module_type -> mod_restr -> module_expr) ->
   env -> EcProvers.prover_infos -> EcBaseLogic.l_decl -> bool

@@ -843,7 +843,7 @@ let t_hoareF_abs inv g =
 let lossless_hyps env top sub = 
   let sig_ = (EcEnv.Mod.by_mpath top env).me_sig in
   let bd = 
-    List.map (fun (id,mt) -> id,GTmodty(mt,Sm.singleton top))
+    List.map (fun (id,mt) -> id,GTmodty(mt,(Sx.empty,Sm.singleton top)))
       sig_.mis_params in         
     (* Warning this implies that the oracle do not have access to top *)
   let args = List.map (fun (id,_) -> EcPath.mident id) sig_.mis_params in
@@ -862,7 +862,7 @@ let check_oracle_use env adv o =
   let use = NormMp.fun_use env o in
   let pp ppe fmt o = 
     Format.fprintf fmt "The function %a" (EcPrinting.pp_funname ppe) o in
-  gen_check_restr env pp o use (Sm.singleton adv)
+  gen_check_restr env pp o use (Sx.empty,Sm.singleton adv)
 
 let bdHoareF_abs_spec env f inv = 
   let top,_,oi,_fsig = abstract_info env f in

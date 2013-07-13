@@ -1457,13 +1457,16 @@ module Mod = struct
           env_w3     = w3;
           env_modlcs = Sid.add id env.env_modlcs; }
 
-  let add_restr_to_locals p env =
-    let p = EcPath.mpath_crt p [] None in
+  let add_restr_to_locals restr env =
+
+    let union_restr (rx1,r1) (rx2,r2) = 
+      Sx.union rx1 rx2, Sm.union r1 r2 in
 
     let update_id id mods =
       let update me =
         match me.me_body with
-        | ME_Decl (mt, restr) -> { me with me_body = ME_Decl (mt, Sm.add p restr) }
+        | ME_Decl (mt, r) -> 
+          { me with me_body = ME_Decl (mt, union_restr restr r) }
         | _ -> me
       in
         MMsym.map_at
@@ -1483,7 +1486,7 @@ module Mod = struct
 
   let bind_locals bindings env =
     List.fold_left
-      (fun env (name, me) -> bind_local name me EcPath.Sm.empty env)
+      (fun env (name, me) -> bind_local name me (Sx.empty,Sm.empty) env)
       env bindings
 
   let enter name params env =
@@ -1647,6 +1650,10 @@ module NormMp = struct
     } 
 
   let use_empty = { us_pv = Mx.empty; us_gl = Sid.empty }
+  let use_equal us1 us2 =
+    Mx.equal (fun _ _ -> true) us1.us_pv us2.us_pv &&
+      Sid.equal us1.us_gl us2.us_gl 
+
   let use_union us1 us2 = 
     { us_pv = Mx.union  (fun _ ty _ -> Some ty) us1.us_pv us2.us_pv;
       us_gl = Sid.union us1.us_gl us2.us_gl }
@@ -1730,15 +1737,17 @@ module NormMp = struct
 
     mod_use use_empty mp'
 
-  let norm_restr env restr = 
-    EcPath.Sm.fold (fun mp r -> use_union r (mod_use env mp))
-      restr use_empty
+  let norm_restr env (rx,r) = 
+    let restr = Sx.fold (fun xp r -> add_var env xp r) rx use_empty in
+    Sm.fold (fun mp r -> use_union r (mod_use env mp)) r restr
 
   let get_restr env mp = 
     match (Mod.by_mpath mp env).me_body with
     | EcModules.ME_Decl(_,restr) -> 
       norm_restr env restr
     | _ -> assert false 
+
+  let equal_restr env r1 r2 = use_equal (norm_restr env r1) (norm_restr env r2)
 
   let norm_pvar env pv = 
     let p = norm_xpath env pv.pv_name in
@@ -2473,12 +2482,10 @@ module LDecl = struct
     | LD_mem mt ->
       LD_mem (EcMemory.mt_substm s.fs_sty.ts_p s.fs_mp s.fs_ty mt)
     | LD_modty(p,r) ->
-      let sub = s.fs_sty.ts_mp in
-      let p' = EcModules.mty_subst s.fs_sty.ts_p sub p in
-      let r' = 
-        EcPath.Sm.fold (fun m r' -> EcPath.Sm.add (sub m) r') r 
-          EcPath.Sm.empty in
-      LD_modty(p',r')
+      begin match Fsubst.gty_subst s (GTmodty(p,r)) with 
+      | GTmodty(p',r') -> LD_modty(p',r') 
+      | _ -> assert false 
+      end 
     | LD_hyp f -> LD_hyp (Fsubst.f_subst s f)
 
   type hyps = {
@@ -2518,8 +2525,7 @@ module LDecl = struct
       | LD_var (ty,Some f) -> fv_union ty.ty_fv f.f_fv
       | LD_mem mt -> EcMemory.mt_fv mt 
       | LD_hyp f -> f.f_fv
-      | LD_modty(_,r) ->
-        EcPath.Sm.fold (fun mp fv -> EcPath.m_fv fv mp) r EcIdent.Mid.empty in
+      | LD_modty(p,r) -> gty_fv (GTmodty(p,r)) in
     let check (id,lk) = 
       if EcIdent.Sid.mem id ids then false
       else

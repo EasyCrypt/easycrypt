@@ -166,10 +166,11 @@ module Mod : sig
   val bind : symbol -> module_expr -> env -> env
 
   val enter : symbol -> (EcIdent.t * module_type) list -> env -> env
-  val bind_local : EcIdent.t -> module_type -> EcPath.Sm.t -> env -> env
+  val bind_local : EcIdent.t -> module_type -> mod_restr -> env -> env
 
-  val declare_local : EcIdent.t -> module_type -> EcPath.Sm.t -> env -> env
-  val add_restr_to_locals : EcPath.path -> env -> env
+  val declare_local : EcIdent.t -> module_type -> mod_restr -> env -> env
+
+  val add_restr_to_locals : mod_restr -> env -> env
 
   (* Only bind module, ie no memory and no local variable *)
   val add_mod_binding : EcFol.binding -> env -> env
@@ -207,7 +208,8 @@ module NormMp : sig
     }  
   val mod_use    : env -> mpath -> use
   val fun_use    : env -> xpath -> use
-  val norm_restr : env -> Sm.t  -> use 
+  val norm_restr : env -> mod_restr  -> use 
+  val equal_restr : env -> mod_restr -> mod_restr -> bool
   val get_restr  : env -> mpath -> use
   val use_mem_xp : xpath -> use -> bool
   val use_mem_gl : mpath -> use -> bool

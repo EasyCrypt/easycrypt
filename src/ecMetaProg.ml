@@ -435,7 +435,7 @@ let f_match hyps ue ev ptn subject =
         | GTmodty (p1, r1), GTmodty (p2, r2) ->
             if not (ModTy.mod_type_equiv env p1 p2) then
               raise MatchFailure;
-            if not (EcPath.Sm.equal r1 r2) then
+            if not (NormMp.equal_restr env r1 r2) then
               raise MatchFailure;
 
             if   id_equal x1 x2

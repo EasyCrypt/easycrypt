@@ -14,7 +14,7 @@ val mright : memory
 
 type gty =
   | GTty    of EcTypes.ty
-  | GTmodty of module_type * EcPath.Sm.t
+  | GTmodty of module_type * mod_restr 
   | GTmem   of EcMemory.memtype
 
 val destr_gty : gty -> EcTypes.ty

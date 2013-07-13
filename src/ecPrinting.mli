@@ -31,11 +31,11 @@ val pp_topmod : PPEnv.t -> EcPath.mpath pp
 val pp_form : PPEnv.t -> EcFol.form pp
 val pp_type : PPEnv.t -> EcTypes.ty pp
 
-val pp_typedecl : PPEnv.t -> (EcPath.path * EcDecl.tydecl        ) pp
-val pp_opdecl   : PPEnv.t -> (EcPath.path * EcDecl.operator      ) pp
-val pp_axiom    : PPEnv.t -> (EcPath.path * EcDecl.axiom         ) pp
-val pp_theory   : PPEnv.t -> (EcPath.path * EcTheory.ctheory     ) pp
-val pp_modtype  : PPEnv.t -> (EcModules.module_type * EcPath.Sm.t) pp
+val pp_typedecl : PPEnv.t -> (EcPath.path * EcDecl.tydecl                ) pp
+val pp_opdecl   : PPEnv.t -> (EcPath.path * EcDecl.operator              ) pp
+val pp_axiom    : PPEnv.t -> (EcPath.path * EcDecl.axiom                 ) pp
+val pp_theory   : PPEnv.t -> (EcPath.path * EcTheory.ctheory             ) pp
+val pp_modtype  : PPEnv.t -> (EcModules.module_type * EcModules.mod_restr) pp
 
 val pp_mem : PPEnv.t -> EcIdent.t pp
 

@@ -208,7 +208,7 @@ module CoreSection : sig
   val form_use_local : form  -> locals -> bool
   val module_use_local_or_abs : module_expr -> locals -> bool
 
-  val abstracts : locals -> (EcIdent.t * (module_type * Sm.t)) list * Sid.t
+  val abstracts : locals -> (EcIdent.t * (module_type * mod_restr)) list * Sid.t
 
   val generalize : EcEnv.env -> locals -> form -> form
 
@@ -234,7 +234,7 @@ module CoreSection : sig
   val add_local_mod : path -> t -> t
   val add_lemma     : path -> lvl -> t -> t
   val add_item      : EcTheory.ctheory_item -> t -> t
-  val add_abstract  : EcIdent.t -> (module_type * Sm.t) -> t -> t
+  val add_abstract  : EcIdent.t -> (module_type * mod_restr) -> t -> t
 end = struct
   exception NoSectionOpened
 
@@ -244,7 +244,7 @@ end = struct
     lc_env       : EcEnv.env;
     lc_lemmas    : (path * lvl) list * lvl Mp.t;
     lc_modules   : Sp.t;
-    lc_abstracts : (EcIdent.t * (module_type * Sm.t)) list * Sid.t;
+    lc_abstracts : (EcIdent.t * (module_type * mod_restr)) list * Sid.t;
     lc_items     : EcTheory.ctheory_item list;
   }
 
@@ -351,7 +351,10 @@ end = struct
   let on_mpath_binding cb b =
     match b with
     | EcFol.GTty    ty        -> on_mpath_ty cb ty
-    | EcFol.GTmodty (mty, sm) -> on_mpath_modty cb mty; Sm.iter cb sm
+    | EcFol.GTmodty (mty, (rx,r)) -> 
+      on_mpath_modty cb mty; 
+      Sx.iter (fun x -> cb x.x_top) rx; 
+      Sm.iter cb r
     | EcFol.GTmem   None      -> ()
     | EcFol.GTmem   (Some m)  -> on_mpath_lcmem cb m
 
@@ -432,10 +435,11 @@ end = struct
     | ME_Structure st   -> on_mpath_mstruct cb st
     | ME_Decl (mty, sm) -> on_mpath_mdecl cb (mty, sm)
 
-  and on_mpath_mdecl cb dc =
-    on_mpath_modty cb (fst dc);
-    Sm.iter cb (snd dc)
-
+  and on_mpath_mdecl cb (mty,(rx,r)) =
+    on_mpath_modty cb mty; 
+    Sx.iter (fun x -> cb x.x_top) rx; 
+    Sm.iter cb r
+  
   and on_mpath_mstruct cb st =
     List.iter (on_mpath_mstruct1 cb) st.ms_body
 
@@ -1006,10 +1010,23 @@ module Mod = struct
       | false -> scope
       | true  ->
         let mpath = EcPath.pqname (path scope) m.me_name in
+        let env = 
+          match m.me_body with
+          | ME_Alias _ | ME_Decl _ -> scope.sc_env
+          | ME_Structure _ ->
+            let env = scope.sc_env in
+            (* We keep only the internal part, i.e. the inner global variables *)
+            let mp = EcPath.mpath_crt mpath [] None in
+            let use = EcEnv.NormMp.mod_use env mp in
+            let rx = 
+              let add x _ rx = 
+                if EcPath.m_equal (EcPath.m_functor x.EcPath.x_top) mp then
+                  Sx.add x rx 
+                else rx in
+              Mx.fold add use.EcEnv.NormMp.us_pv EcPath.Sx.empty in
+            EcEnv.Mod.add_restr_to_locals (rx,EcPath.Sm.empty) env in
         let ec = CoreSection.add_local_mod mpath scope.sc_section in
-          { scope with
-              sc_section = ec;
-              sc_env = EcEnv.Mod.add_restr_to_locals mpath scope.sc_env; }
+        { scope with sc_section = ec; sc_env = env }
     in
       scope
 
@@ -1042,11 +1059,12 @@ module Mod = struct
     let restr = List.map (TT.trans_topmsymbol scope.sc_env) (snd modty) in
     let name  = EcIdent.create (unloc m.ptmd_name) in
     let scope =
+      let restr = Sx.empty, Sm.of_list restr in
       { scope with
           sc_env = EcEnv.Mod.declare_local
-            name tysig (Sm.of_list restr) scope.sc_env;
+            name tysig restr scope.sc_env;
           sc_section = CoreSection.add_abstract
-            name (tysig, (Sm.of_list restr)) scope.sc_section }
+            name (tysig, restr) scope.sc_section }
     in
       scope
 end

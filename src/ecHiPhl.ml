@@ -887,7 +887,6 @@ let process_equiv_trans (tk, p1, q1, p2, q2) g =
   | TKstmt (s,c) -> process_trans_stmt s c p1 q1 p2 q2 g
 
 
-  
 
 (* -------------------------------------------------------------------- *)
 let process_phl loc ptac g =

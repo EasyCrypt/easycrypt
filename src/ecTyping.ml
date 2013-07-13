@@ -1746,7 +1746,7 @@ let trans_form_or_pattern env (ps, ue) pf tt =
   
         | PGTY_ModTy(mi,restr) ->
           let (mi, _) = transmodtype env mi in
-          let restr = EcPath.Sm.of_list (List.map (trans_topmsymbol env) restr) in
+          let restr = Sx.empty, Sm.of_list (List.map (trans_topmsymbol env) restr) in
           let ty = GTmodty (mi, restr) in
           let add1 env x = 
             let x = EcIdent.create x.pl_desc in

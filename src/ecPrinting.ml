@@ -360,11 +360,17 @@ let pp_pv ppe fmt p =
 
 (* -------------------------------------------------------------------- *)
 let pp_modtype (ppe : PPEnv.t) fmt ((mty, r) : module_type * _) =
-  let pp_restr fmt r =
-    if EcPath.Sm.is_empty r then ()
-    else 
-      Format.fprintf fmt "{@[%a@]}"
-        (pp_list ",@ " (pp_topmod ppe)) (EcPath.Sm.elements r) in
+  let pp_restr fmt (rx,r) =
+    let pp_rx fmt rx = 
+      let pp_x fmt x = pp_pv ppe fmt (pv_glob x) in
+      pp_list ",@ " pp_x fmt (EcPath.Sx.elements rx) in
+    let pp_r fmt r = 
+      pp_list ",@ " (pp_topmod ppe) fmt (EcPath.Sm.elements r) in
+    match EcPath.Sx.is_empty rx, EcPath.Sm.is_empty r with
+    | true, true -> ()
+    | true, false -> Format.fprintf fmt "{@[%a@]}" pp_r r
+    | false, true -> Format.fprintf fmt "{@[%a@]}" pp_rx rx
+    | false, false -> Format.fprintf fmt "{@[%a,@ %a@]}" pp_rx rx pp_r r in
   Format.fprintf fmt "%a%a"
     EcSymbols.pp_msymbol (PPEnv.modtype_symb ppe mty) pp_restr r
 
