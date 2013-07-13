@@ -846,7 +846,7 @@ let process_eqobs_in (geq', ginv, eqs') g =
     (t_seq (t_eqobs eqs) (t_repeat t_rec))
     (t_cut_spec tocut g) 
 
-let process_trans_stmt (s,c,p1,q1,p2,q2) g = 
+let process_trans_stmt s c p1 q1 p2 q2 g = 
   let hyps,concl = get_goal g in
   let es = destr_equivS concl in
   let mt = snd (if oget s then es.es_ml else es.es_mr) in
@@ -867,8 +867,24 @@ let process_trans_stmt (s,c,p1,q1,p2,q2) g =
     s_subst esub c in
   t_equivS_trans (mt,c) p1 q1 p2 q2 g 
 
-
+let process_trans_fun f p1 q1 p2 q2 g = 
+  let env,hyps,concl = get_goal_e g in
+  let ef = destr_equivF concl in
+  let f = EcTyping.trans_gamepath env f in
+  let (_,prmt),(_,pomt) = Fun.hoareF_memenv f env in
+  let (prml,prmr), (poml,pomr) = Fun.equivF_memenv ef.ef_fl ef.ef_fr env in
+  let process ml mr fo = 
+    process_form (LDecl.push_all [ml; mr] hyps) fo tbool in
+  let p1 = process prml (mright, prmt) p1 in
+  let q1 = process poml (mright, pomt) q1 in
+  let p2 = process (mleft,prmt) prmr p2 in
+  let q2 = process (mleft,pomt) pomr q2 in
+  t_equivF_trans f p1 q1 p2 q2 g 
       
+let process_equiv_trans (tk, p1, q1, p2, q2) g =
+  match tk with
+  | TKfun f -> process_trans_fun f p1 q1 p2 q2 g
+  | TKstmt (s,c) -> process_trans_stmt s c p1 q1 p2 q2 g
 
 
   
@@ -912,6 +928,6 @@ let process_phl loc ptac g =
     | Ppr_rewrite s             -> t_pr_rewrite s 
     | Pbdeq                     -> process_bdeq
     | Peqobs_in info            -> process_eqobs_in info
-    | Ptrans_stmt info          -> process_trans_stmt info
+    | Ptrans_stmt info          -> process_equiv_trans info
   in
     set_loc loc t g

@@ -1857,9 +1857,8 @@ phltactic:
 
 | EQOBSIN info=eqobs_in
     { Peqobs_in info }
-| TRANSITIVITY s=side c=brace(stmt) p1=sform q1=sform p2=sform q2=sform
-    { Ptrans_stmt (Some s,c,p1,q1,p2,q2) }
-
+| TRANSITIVITY tk=trans_kind p1=sform q1=sform p2=sform q2=sform
+    { Ptrans_stmt (tk,p1,q1,p2,q2) }
 (* basic pr based tacs *)
 | HOARE {Phoare}
 | BDHOARE {Pbdhoare}
@@ -1868,6 +1867,11 @@ phltactic:
 (* TODO : remove this tactic *)
 | PRFALSE {Pprfalse}
 | BDEQ {Pbdeq}
+;
+
+trans_kind:
+ | s=side c=brace(stmt) { TKstmt(Some s, c) }
+ | f=loc(fident)       { TKfun f }
 ;
 
 fel_pred_spec:

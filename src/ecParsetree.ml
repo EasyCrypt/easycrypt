@@ -344,8 +344,12 @@ type tac_dir = Backs | Fwds
 
 type pfel_spec_preds = (pgamepath*pformula) list
  
+type trans_kind = 
+  | TKfun of pgamepath 
+  | TKstmt of tac_side * pstmt
+
 type trans_info = 
-  tac_side * pstmt * pformula * pformula * pformula * pformula
+  trans_kind * pformula * pformula * pformula * pformula
 
 type phltactic = 
   | Pfun_def  
