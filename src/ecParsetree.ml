@@ -344,6 +344,9 @@ type tac_dir = Backs | Fwds
 
 type pfel_spec_preds = (pgamepath*pformula) list
  
+type trans_info = 
+  tac_side * pstmt * pformula * pformula * pformula * pformula
+
 type phltactic = 
   | Pfun_def  
   | Pfun_abs    of pformula
@@ -380,7 +383,8 @@ type phltactic =
   | Pprfalse
   | Ppr_rewrite   of symbol
   | Pbdeq 
-  | Peqobs_in  of (pformula_o * pformula_o * pformula_o)
+  | Peqobs_in   of (pformula_o * pformula_o * pformula_o)
+  | Ptrans_stmt of trans_info
 
 and pinline_arg =
   [ `ByName    of tac_side * (pgamepath list * int list option)

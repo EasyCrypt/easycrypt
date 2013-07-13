@@ -306,6 +306,7 @@
 %token WITH
 %token WP
 %token EQOBSIN
+%token TRANSITIVITY
 %token ZETA 
 
 %token <string> OP1 OP2 OP3 OP4
@@ -1856,6 +1857,8 @@ phltactic:
 
 | EQOBSIN info=eqobs_in
     { Peqobs_in info }
+| TRANSITIVITY s=side c=brace(stmt) p1=sform q1=sform p2=sform q2=sform
+    { Ptrans_stmt (Some s,c,p1,q1,p2,q2) }
 
 (* basic pr based tacs *)
 | HOARE {Phoare}

@@ -60,8 +60,9 @@ module PV : sig
   val add      : env -> prog_var -> ty -> t -> t
   val add_glob : env -> mpath -> t -> t
   val remove   : env -> prog_var -> t -> t
+  val union    : t -> t -> t
   val diff     : t -> t -> t
-
+    
   val interdep : env -> t -> t -> t
   val indep    : env -> t -> t -> bool
   val check_depend : env -> t -> mpath -> unit

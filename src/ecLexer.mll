@@ -91,6 +91,7 @@
     "by"          , BY         ;        (* KW: bytac *)
 
     (* PHL: tactics *)
+    "transitivity", TRANSITIVITY;       (* KW: tactic *)
     "seq"         , SEQ        ;        (* KW: tactic *)
     "wp"          , WP         ;        (* KW: tactic *)
     "eqobs_in"    , EQOBSIN    ;        (* KW: tactic *)

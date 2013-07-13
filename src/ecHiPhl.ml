@@ -843,9 +843,34 @@ let process_eqobs_in (geq', ginv, eqs') g =
     | _ -> t_fail g in
   
   t_on_last 
-    (t_seq (t_eqobs eqs)
-       (t_repeat t_rec))
+    (t_seq (t_eqobs eqs) (t_repeat t_rec))
     (t_cut_spec tocut g) 
+
+let process_trans_stmt (s,c,p1,q1,p2,q2) g = 
+  let hyps,concl = get_goal g in
+  let es = destr_equivS concl in
+  let mt = snd (if oget s then es.es_ml else es.es_mr) in
+  let p1,q1 = 
+    let hyps = LDecl.push_all [es.es_ml; (mright, mt)] hyps in
+    process_form hyps p1 tbool, process_form hyps q1 tbool in
+  let p2,q2 = 
+    let hyps = LDecl.push_all [(mleft, mt); es.es_mr] hyps in
+    process_form hyps p2 tbool, process_form hyps q2 tbool in
+  (* Translation of the stmt *)
+  let c = 
+    let hyps = LDecl.push_active (mhr,mt) hyps in
+    let env  = LDecl.toenv hyps in
+    let ue   = EcUnify.UniEnv.create (Some (LDecl.tohyps hyps).h_tvar) in
+    let c    = EcTyping.transstmt env ue c in
+    let esub = 
+      { e_subst_id with es_ty = Tuni.subst (EcUnify.UniEnv.close ue) } in
+    s_subst esub c in
+  t_equivS_trans (mt,c) p1 q1 p2 q2 g 
+
+
+      
+
+
   
 
 (* -------------------------------------------------------------------- *)
@@ -887,5 +912,6 @@ let process_phl loc ptac g =
     | Ppr_rewrite s             -> t_pr_rewrite s 
     | Pbdeq                     -> process_bdeq
     | Peqobs_in info            -> process_eqobs_in info
+    | Ptrans_stmt info          -> process_trans_stmt info
   in
     set_loc loc t g
