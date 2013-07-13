@@ -1857,8 +1857,8 @@ phltactic:
 
 | EQOBSIN info=eqobs_in
     { Peqobs_in info }
-| TRANSITIVITY tk=trans_kind p1=sform q1=sform p2=sform q2=sform
-    { Ptrans_stmt (tk,p1,q1,p2,q2) }
+| TRANSITIVITY tk=trans_kind h1=trans_hyp h2=trans_hyp
+    { Ptrans_stmt (tk, fst h1, snd h1, fst h2, snd h2) }
 (* basic pr based tacs *)
 | HOARE {Phoare}
 | BDHOARE {Pbdhoare}
@@ -1870,8 +1870,12 @@ phltactic:
 ;
 
 trans_kind:
- | s=side c=brace(stmt) { TKstmt(Some s, c) }
- | f=loc(fident)       { TKfun f }
+ | s=side  c=brace(stmt) { TKstmt(Some s, c) }
+ | f=loc(fident) { TKfun (f) }
+;
+
+trans_hyp:
+| LPAREN p=form LONGARROW q=form RPAREN { (p,q) }
 ;
 
 fel_pred_spec:

@@ -37,13 +37,13 @@ module M1' = {
 
 equiv foo : M.f ~ M'.f : M.w{1} = M'.w{2} + 1 ==> ={res}.
 proof.
-  transitivity M1.f (={M.w}) (={M.w,res}) 
-                    (M.w{1} = M'.w{2} + 1) (={res}).
+  transitivity M1.f (={M.w} ==>  ={M.w,res}) 
+                    (M.w{1} = M'.w{2} + 1 ==> ={res}).
     intros &m1 &m2 H; exists M.w{m1} => //.
     trivial.
     fun;eqobs_in.
-  transitivity M1'.f (M.w{1} = M'.w{2} + 1) (={res})
-                     (={M'.w}) (={M'.w,res}).
+  transitivity M1'.f (M.w{1} = M'.w{2} + 1 ==> ={res})
+                     (={M'.w} ==> ={M'.w,res}).
     intros &m1 &m2 H; exists M'.w{m2} => //.
     trivial.
   fun;wp;skip;smt.
