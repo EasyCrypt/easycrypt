@@ -1,0 +1,382 @@
+
+
+\subsection{Reasoning on the program structure}
+\subsubsection*{Empty statements: the \rawec{skip} tactic}
+\index{prhl}{\rawec{skip}}
+
+\Syntax \rawec{skip}
+
+\Description Reduces logical program judgements with empty statements
+to a higher-order logical goal. The generated subgoals can then be
+processed using the ambient logic. The behaviour of the \rawec{skip}
+tactic can be briefly described by the following rule:
+%
+\begin{displaymath}
+\infrule{
+  \pre \Rightarrow \post
+}{
+  \Equiv{\Skip}{\Skip}{\pre}{\post}
+}
+\end{displaymath}
+%
+
+
+\subsubsection*{Random samplings: the \rawec{rnd} tactic}
+\index{prhl}{\rawec{rnd}}
+
+\Syntax \rawec{rnd}[\textit{side}] [\textit{form} | \textit{form} \textit{form}]
+
+\Description
+
+The logical rule implemented by the \rawec{rnd} tactic depends on the
+the optional parameter \textit{side}. If a left/right side flag is
+provided then the one-sided logical rule for random sampling is
+applied. If missing, then the two-sided rule for random assignment is
+considered.
+%
+
+\paragraph*{Two-sided application.} 
+When no side flag is provided, then the \rawec{rnd} tactic takes as
+parameter a representation of a bijective function.
+
+When two formulae are provided as the bijection parameter,
+they are verified to be bijective functions and inverse of each
+other. If only one function is provided then this function is verified
+to be an involution, and lastly if no argument is given then the
+identity function is considered.
+
+The description of the rule below assumes that a bijective function
+$f$ and its inverse is provided and generates according verification
+conditions. Furthermore, it requires the following type constraints
+for some types \rawec{'a} and \rawec{'b}: 
+\begin{itemize}
+\item $d_1$ \rawec{: 'a Distr.distr}, 
+\item $d_2$ \rawec{: 'b Distr.distr}
+\item $f$ \rawec{: 'a} $\to$ \rawec{'b},
+\item $g$ \rawec{: 'b} $\to$ \rawec{'a}, 
+\end{itemize}
+
+\begin{displaymath}
+\infrule{
+  \Equiv{c_1}{c_2}{\pre} 
+  { % \begin{array}{l}
+      \forall z\,v,\insupp{z}{d_1}\Rightarrow
+      \insupp{v}{d_2}\Rightarrow \mathsf{bij}\,f\,g
+       \land
+      \post\subst{x}{z}\subst{y}{f\,z}
+    % \end{array}
+  }
+}{
+  \Equiv{c_1;\Rand{x}{d_1}}{c_2;\Rand{y}{d_2}}{\pre}{\post}
+}\left[\mathec{rnd}\ f\ g\right]
+\end{displaymath}
+where
+$\mathsf{bij}\,f\,g$ stands for
+\begin{displaymath}
+  \mu\,d_1\,\charfun_{\{z\}}=\mu\,d_2\,\charfun_{\{f\,z\}} 
+  \land \insupp{(g\,v)} {d_1} \land
+  g\,(f\,z)=z \land f\,(g\,v)=v
+\end{displaymath}
+    
+
+\paragraph*{One-sided application.} 
+If the \emph{side} optional argument is provided, then the \rawec{rnd}
+tactic implements the following rule:
+%
+\begin{displaymath}
+\infrule{
+  \Equiv{c}{c'}{\pre}{\mathsf{weight}\ d=1 \land  \forall z,\insupp{z}{d} \Rightarrow \post\subst{x}{z}}
+}{
+  \Equiv{c;\Rand{x}{d}}{c'}{\pre}{\post}
+}\left[\mathec{rnd}\{1\}\right]
+\end{displaymath}
+where $\mathsf{weight}\ d$ stands for the expression
+$\mathec{Distr.weight}\ d$ defined as $\mathec{mu}\ d\ \mathec{cpTrue}$.
+%
+A similar rule holds for an invocation to $\left[\mathec{rnd}\{2\}\right]$.
+
+
+
+\subsubsection*{Sequential composition: the \rawec{seq} tactic}
+\index{prhl}{\rawec{seq}}
+
+
+\Syntax
+\rawec{seq} \textit{codepos} \textit{form}
+
+\Description
+Applies the RHL rule for sequential composition:
+$$
+\infrule{\Equiv{c_1}{c_2}{\post}{\post'} \quad
+         \Equiv{c_1'}{c_2'}{\post'}{\post''}}
+        {\Equiv{c_1;c_1'}{c_2;c_2'}{\post}{\post''}}[\textrm{R-Seq}]
+$$
+The application of tactic $\mathec{app}\ m\ n\ p$ defines $c_1$ as the first
+$m$ instructions of the program on the left-hand side and $c_2$ as
+the first $n$ instructions of the program on the right-hand side
+and $\post'$ as $p$.
+
+
+
+
+
+
+
+\subsubsection*{Conditional statements: the \rawec{condt,condf} tactic}
+\index{prhl}{\rawec{condt,condf}}
+%
+\NotDocumented
+
+
+\subsubsection*{Conditional statements: the \rawec{if} tactic}
+\index{prhl}{\rawec{if}}
+
+\Syntax \rawec{if} [\textit{side}]
+
+\Description Applies the pRHL rule for conditional.
+If the \textit{side} argument is given then the corresponding
+one-side rule is used, else the two side rule is used.
+The \rawec{if} tactic expects a conditional as first instruction. 
+\begin{center}
+\begin{tabular}{c|c}
+Syntax & Rule \\
+\hline\\
+\mathec{if\{1\}} &
+$
+\infrule{\Equiv{c_1;c}{c'}{\pre \land e\sidel}{\post}
+        \quad \Equiv{c_2;c}{c'}{\pre \land \neg e\sidel}{\post}}
+        {\Equiv{\Cond{e}{c_1}{c_2};c}{c'}{\pre}{\post}}
+$\\
+\\\hline\\
+\mathec{if\{2\}} &
+$
+\infrule{\Equiv{c'}{c_1;c}{\pre \land e\sider}{\post}
+        \quad \Equiv{c'}{c_2;c}{\pre \land \neg e\sider}{\post}}
+        {\Equiv{c'}{\Cond{e}{c_1}{c_2};c}{\pre}{\post}}
+$\\
+\\\hline\\
+\mathec{if} &
+$
+\infrule{
+ \begin{array}{c}
+   \vdash \pre \Rightarrow e\sidel = e'\sider \\
+   \Equiv{c_1;c}{c'_1;c'}{\pre \land e\sidel \land e'\sider}{\post}\\
+   \Equiv{c_2;c}{c'_2;c'}{\pre \land \neg e\sidel \land \neg e'\sider}{\post}
+ \end{array}
+}{\Equiv{\Cond{e}{c_1}{c_2};c}
+        {\Cond{e'}{c'_1}{c'_2};c'}
+        {\pre}{\post}}
+$\\
+\end{tabular}
+\end{center}
+
+
+
+
+
+\subsubsection*{Deterministic straight-line code: the \rawec{wp} tactic}
+\index{prhl}{\rawec{wp}}
+
+
+\Syntax \rawec{wp} [\textit{codepos}]
+
+\Description The \rawec{wp} tactic computes the weakest-precondition of
+deterministic, loop and procedure-call free program fragments
+(i.e. deterministic assignments and conditionals).   
+The computation of the weakest precondition over a
+conditional statement is only possible if its branches do not
+contain random samplings, while-loops nor function calls.
+
+The optional code position parameter \textit{pos} restricts the range
+of instructions that may be affected by the tactic invocation. 
+%
+If the optional code position parameter is not provided, The tactic
+processes instructions bottom-up until a random sampling, a loop or a
+function call is reached.
+
+
+\subsubsection*{Function call statements: the \rawec{call} tactic}
+\index{prhl}{\rawec{call}}
+
+
+
+\subsubsection*{While loop statements: the \rawec{while} tactic}
+\index{prhl}{\rawec{while}}
+
+\Syntax  \rawec{while} [\textit{side}] \textit{form} [\textit{form}]
+
+\Description This tactic applies the pRHL verification rules for
+loops:
+\begin{itemize}
+\item the optional argument \textit{side} can be either \rawec{{1}} or
+  \rawec{{2}} to indicate the application of one-sided versions of the
+  rule. If missing, the two-sided rule for loops is considered.
+\item the first \textit{form} argument is mandatory and is used as
+  loop invariant. It can refer to variables in both the left and right
+  programs.
+\item the optional parameter \textit{form} is required (and accepted
+  only) in the one-sided application of the rule. This parameter
+  corresponds to the decreasing variant expression used to prove loop
+  termination.
+\end{itemize}
+
+
+
+\paragraph{Two-sided version.}
+%
+\Syntax \rawec{while} \textit{form} 
+%
+\Description Applies the two-sided RHL rule for while loops, using the
+\textit{form} parameter as loop invariant. This tactic requires that
+the last instruction of both left and right statements are while loops.
+In the rule, $M$ refers to the variables that may be modified by the
+loop bodies.
+
+\begin{displaymath}
+\infrule{ 
+  \begin{array}{c}
+    \Equiv{c_2}{c'_2}{I \land e\sidel \land e'\sider}{I \land  e\sidel = e'\sider}\\
+    \Equiv{c_1}{c'_1}{\pre}{ I \land e\sidel = e'\sider \land 
+      \forall M, (I \land \neg e\sidel \land \neg e'\sider \Rightarrow \post)}
+  \end{array}
+}{
+  \Equiv{c_1;\While{e}{c_2}}{c'_1;\While{e'}{c'_1}}{\pre}{\post}
+}
+\end{displaymath}
+
+\paragraph{One-sided version.}
+
+\Syntax \rawec{while} \textit{side} \textit{form} \textit{form} 
+
+\Description Applies the one-sided pRHL rule for while loops, using
+the first parameter \textit{form} as loop invariant and the second
+parameter \textit{form} as a decreasing \textit{variant}
+expression. The variant is used to verify the loop termination. The
+one-sided rule are described below. Only the left (i.e., flagged with
+\rawec{\{1\}}) variant is shown; the right (i.e., flagged with
+\rawec{\{2\}}) variant is symmetric. The expressions $\forall
+X,~\varphi$ and $\exists X,~\varphi$ denote, respectively, universal
+and existential quantification over the set of variables $X$ modified
+in the loop body $c$. 
+
+\begin{displaymath}
+\infrule{
+  \begin{array}{c}
+    \vdash I \land v \leq b \Rightarrow \neg e  \\
+    \Equiv{c}{\Skip}{b=B \land v=C \land e \land I }{b=B \land v<C \land I} \\
+    \Equiv{c_1}{c_2}{\pre}{I \land \forall X, (I \land \neg e
+      \Rightarrow \post)}
+  \end{array}
+}{
+  \Equiv{c_1;\While{e}{c}}{c_2}{\pre}{\post}
+}
+\end{displaymath}
+
+
+\subsection{Abstract adversaries: the \rawec{fun} tactic}
+\index{prhl}{\rawec{fun}}
+
+\paragraph*{ }
+The formula given as parameter represents the general oracle
+invariant. 
+%
+The tactic implements the following rule:
+\begin{displaymath}
+\infrule{
+  \begin{array}{c}
+    \pre \Rightarrow \chi \land \glob_A = \glob_B \land \vec{p}_A=\vec{p}_B
+    \\[.5ex]
+    \chi\land\glob_A=\glob_B\land\result_A=\result_B\Rightarrow\post
+    \\ 
+    \Equiv{O_i}{O_i'}{\chi\land
+      \vec{p}_{O_i}=\vec{p}_{O'_i}}{\chi\land \result_{o_i}=\result_{o'_i}}
+  \end{array}
+}{
+  \Equiv{A}{B}{\pre}{\post}
+} [\mathec{fun}~\chi]
+\end{displaymath}
+%
+where $\vec{p}_f$ represent the formal parameters of a function
+(abstract adversary or oracle) $f$, $\result_f$ represents the result of
+a function (abstract adversary or oracle) $f$, $\left\{O_i\right\}_{i=0}^k$ and
+$\left\{O'_i\right\}_{i=0}^k$ are the oracles of the abstract adversaries $A$ and
+$B$, $\glob_A$ and $\glob_B$ represent the global state of the abstract
+adversaries $A$ and $B$.
+
+\subsubsection{Verifying invariants upto bad}
+\NotDocumented
+
+\subsection{Strengthening goals}
+\index{prhl}{\rawec{conseq}}
+
+\subsubsection*{The \rawec{conseq} tactic}
+
+\subsubsection*{The \rawec{conseq} tactic}
+\index{prhl}{\rawec{conseq}}
+
+\Syntax \rawec{conseq} (\_ : \textit{formula} \rawec{==>} \textit{formula} )
+
+\begin{displaymath}
+\infrule{
+  \Equiv{c_1}{c_2}{\pre'}{\post'} \qquad \pre\Rightarrow\pre' \qquad  \post'\Rightarrow\post
+}{
+  \Equiv{c_1}{c_2}{\pre}{\post}
+}\left[\mathec{conseq}~ ( \_ : \pre'~\mathec{==>}~ \post' \right]
+\end{displaymath}
+
+
+\subsubsection*{The \rawec{bypr} tactic}
+\index{prhl}{\rawec{bypr}}
+%
+
+\begin{displaymath}
+\infrule{
+  \forall m_1,\ \forall m_2,\ 
+  \Prm{f_1}{m_1}{\varphi_1} = \Prm{f_2}{m_2}{\varphi_2}
+}{
+  \Equiv{f_1}{f_2}{\pre}{\post}
+}
+\end{displaymath}
+
+
+
+
+
+
+
+
+
+\subsection{Probability expressions: \rawec{deno} tactics}
+
+\index{prhl}{\rawec{deno}}
+
+\begin{displaymath}
+\infrule{
+  \Equiv{c_1}{c_2}{\pre}{\post} 
+  \qquad
+  \pre
+  \qquad
+  \post \Rightarrow \chi_1 \Rightarrow \chi_2
+}{
+  \Prm{c_1}{m_1}{\chi_1} \leq \Prm{c_2}{m_2}{\chi_2}
+}\left[\mathec{deno}\ \pre\ \post\right]
+\end{displaymath}
+
+\begin{displaymath}
+\infrule{
+  \Equiv{c_1}{c_2}{\pre}{\post} 
+  \qquad
+  \pre
+  \qquad
+  \post \Rightarrow (\chi_1 \Leftrightarrow \chi_2)
+}{
+  \Prm{c_1}{m_1}{\chi_1} = \Prm{c_2}{m_2}{\chi_2}
+}\left[\mathec{deno}\ \pre\ \post\right]
+\end{displaymath}
+
+
+
+%%% Local Variables: 
+%%% mode: latex
+%%% TeX-master: "easycrypt"
+%%% End: 
