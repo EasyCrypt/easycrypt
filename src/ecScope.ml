@@ -1017,7 +1017,7 @@ module Mod = struct
             let env = scope.sc_env in
             (* We keep only the internal part, i.e the inner global variables *)
             (* TODO : using mod_use here to compute the set of inner global 
-               variables is inefficiant, change the algo *)
+               variables is inefficiant, change this algo *)
             let mp = EcPath.mpath_crt mpath [] None in
             let use = EcEnv.NormMp.mod_use env mp in
             let rx = 
