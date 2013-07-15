@@ -520,6 +520,15 @@ proof.
 qed.
 (** end finy *)
 
+lemma one_way_p_unique :
+forall (pk : pkey, sk : skey, z x y : randomness), 
+    in_supp (pk, sk) keypairs =>
+    f pk x = f pk z => f pk y = f pk z => x = y.
+proof.
+ intros => pk sk z x y ? Heq1 Heq2.
+ by apply (f_iny _ _ pk sk _ _) => //; rewrite Heq1 Heq2 //.
+save.
+
 (** begin eq4 *)
 
 local equiv eq4 : CPA2(BR3,A).main ~ OW(BR_OW(A)).main : 
@@ -543,22 +552,14 @@ proof.
    by rewrite mem_add -H; case (x1 = x{2})=> //= -> //=; rewrite rw_eqT.
    by apply H.
  inline RO.init CPA2(BR3,A).SO.kg OW(BR_OW(A)).kg;swap {2} 3 -2;
-  do 2!(wp;rnd);skip;progress=> //;first 3 smt.
-  elim (find_in
-      (lambda (p0:randomness) (p1:plaintext), f x1 p0 = f x1 rL)
-      m_R0
-      _); first exists rL; split;smt.
- intros x' Hfind.
- rewrite Hfind.
- elim (find_cor
-      (lambda (p0:randomness) (p1:plaintext), f x1 p0 = f x1 rL)
-      m_R0
-      x' _).
- assumption.
- delta;simplify.
- intros Hin_dom Hf.
- rewrite (Option.proj_some<:randomness> x').
- apply (f_iny _ _ x1 x2 _ _);smt.
+ do 2!(wp;rnd);skip;progress=> //;first 3 smt.
+
+ rewrite (find_in_p_unique 
+      (lambda (p0:randomness) (p1:plaintext), f x1 p0 = f x1 rL) m_R0 rL _) => //=.
+  by rewrite H11. 
+
+  by intros => x y Heq1 Heq2;apply (one_way_p_unique x1 x2 rL) => //.
+  by rewrite proj_some.
 qed.
 (** end eq4 *)
 
