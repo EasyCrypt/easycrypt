@@ -141,6 +141,11 @@ type function_ = {
 }
 
 (* -------------------------------------------------------------------- *)
+
+type mod_restr = EcPath.Sx.t * EcPath.Sm.t
+
+val mr_equal : mod_restr -> mod_restr -> bool
+
 type module_expr = {
   me_name  : symbol;
   me_body  : module_body;
@@ -151,7 +156,7 @@ type module_expr = {
 and module_body =
   | ME_Alias       of EcPath.mpath
   | ME_Structure   of module_structure
-  | ME_Decl        of module_type * EcPath.Sm.t 
+  | ME_Decl        of module_type * mod_restr 
 
 (* [ms_vars]: the set of global variables declared by the module and
  * all it submodules.
@@ -162,8 +167,6 @@ and module_body =
  *)
 and module_structure = {
   ms_body : module_item list;
-  ms_vars : ty Mx.t;
-  ms_uses : Sm.t;
 }
 
 and module_item =

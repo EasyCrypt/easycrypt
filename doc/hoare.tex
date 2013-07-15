@@ -1,0 +1,197 @@
+
+
+\subsection{Reasoning on the program structure}
+
+\subsubsection*{Empty statements: the \rawec{skip} tactic}
+\index{hoare}{\rawec{skip}}
+
+\Syntax \rawec{skip}
+
+\Description Reduces logical program judgements with empty statements
+to a higher-order logical goal. The generated subgoals can then be
+processed using the ambient logic. The behaviour of the \rawec{skip}
+tactic can be briefly described by the following rule:
+%
+\begin{displaymath}
+\infrule{
+  \pre \Rightarrow \post
+}{
+  \Hoare{\Skip}{\pre}{\post}
+}
+\end{displaymath}
+%
+
+
+\subsubsection*{Random samplings: the \rawec{rnd} tactic}
+\index{hoare}{\rawec{rnd}}
+
+This tactic allows dealing with random samplings for arbitrary
+distribution expressions. It is supported by the Hoare Logic, the
+Probabilistic Hoare Logic, and the Probabilistic Relational Logic. It
+accepts different parameters and provides varied functionalities
+depending on the goal under verification.
+
+\Description
+
+The application of this tactic expects a goal of the form:
+\begin{displaymath}
+  \Hoare{c;\Rand{x}{d}}{\pre}{\post}
+\end{displaymath}
+where $d$ is of type \rawec{'a Distr.distr} for some type \rawec{'a}.
+
+Invocations to this tactic expect no arguments and applies the
+following rule:
+\begin{displaymath}
+\infrule{
+  \Hoare{c}{\pre}{\forall z,\insupp{z}{d} \Rightarrow \post\subst{x}{z}}
+}{
+  \Hoare{c;\Rand{x}{d}}{\pre}{\post}
+}
+\end{displaymath}
+where $\insupp{z}{d}$ stands for the predicate $\ECinsupp{z}{d}$.
+
+
+\subsubsection*{Sequential composition: the \rawec{seq} tactic}
+\index{hoare}{\rawec{seq}}
+%
+
+\Syntax 
+\rawec{seq} \textit{codepos} \textit{formula} 
+
+\Description
+Applies the Hoare Logic rule for sequential composition:
+$$
+\infrule{\Hoare{c}{\post}{\post'} \quad
+         \Hoare{c'}{\post'}{\post''}}
+        {\Hoare{c;c'}{\post}{\post''}}
+$$
+The application of tactic $\mathec{seq}\ k\ p$ defines $c$ as the first
+$k$ instructions of the statement $c;c'$ and $\post'$ as
+$p$.
+
+\subsubsection*{Conditional statements: the \rawec{condt,condf} tactic}
+\index{hoare}{\rawec{condt,condf}}
+%
+\NotDocumented
+
+
+\subsubsection*{Conditional statements: the \rawec{if} tactic}
+\index{hoare}{\rawec{if}}
+%
+Applies the following rule for conditional statements. It expects a
+conditional statement at the first program position.
+\begin{displaymath}
+\begin{array}{c}
+  \infrule{
+    \Hoare{c_1;c}{\pre \land b}{\post}\qquad
+    \Hoare{c_2;c}{\pre \land \neg b}{\post}
+  }{
+    \Hoare{\Cond{b}{c_1}{c_2};c}{\pre}{\post}
+  }\left[\mathec{if} \right] 
+\\[4ex]
+\end{array}
+\end{displaymath}
+
+\subsubsection*{Deterministic straight-line code: the \rawec{wp} tactic}
+\index{hoare}{\rawec{wp}}
+
+\Syntax \rawec{wp} [\textit{codepos}]
+
+\Description The \rawec{wp} tactic computes the weakest-precondition of
+deterministic, loop and procedure-call free program fragments
+(i.e. deterministic assignments and conditionals).   
+The computation of the weakest precondition over a
+conditional statement is only possible if its branches do not
+contain random samplings, while-loops nor function calls.
+
+The optional code position parameter \textit{pos} restricts the range
+of instructions that may be affected by the tactic invocation. 
+%
+If the optional code position parameter is not provided, The tactic
+processes instructions bottom-up until a random sampling, a loop or a
+function call is reached.
+
+\subsubsection*{Function call statements: the \rawec{call} tactic}
+\index{hoare}{\rawec{call}}
+%
+\Syntax \rawec{call} \textit{formula} \textit{formula}
+\Description
+
+Let $p$ stand for the formal parameters of function $f$, $\result_f$
+the result variable of function $f$, and $\vec{m}$ the set of
+variables modifiable by $f$.
+\begin{displaymath}
+  \infrule{
+    \begin{array}{c}
+      \Hoare{c}{\pre}{\pre_f\subst{\vec{p}}{\vec{y}} \land
+        \forall v.~ \forall \vec{z}.~ 
+        \post_f\subst{\result_f}{v}\subst{\vec{m}}{\vec{z}}
+        \Rightarrow \post\subst{x}{v}\subst{\vec{m}}{\vec{z}}
+      }
+      \\[.5ex]
+      \Hoare{f}{\pre_f}{\post_f}
+    \end{array}
+  }{
+    \Hoare{c;\Call{x}{f}{\vec{y}}}{\pre}{\post}
+  }\left[\mathec{call}~ \pre_f~ \post_f \right]
+\end{displaymath}
+
+
+
+\subsubsection*{While loop statements: the \rawec{while} tactic}
+\index{hoare}{\rawec{while}}
+
+\Syntax
+
+\Description
+
+
+\subsection*{Abstract adversaries: the \rawec{fun} tactic}
+\index{hoare}{\rawec{fun}}
+
+\paragraph*{Verifying invariants}
+
+\begin{displaymath}
+\infrule{
+    \pre \Rightarrow \chi  \qquad \chi \Rightarrow\post
+    \qquad
+    \Hoare{O_i}{\chi}{\chi}
+}{
+  \Hoare{A}{\pre}{\post}
+} [\mathec{fun}~\chi]
+\end{displaymath}
+
+
+% \subsubsection{Verifying invariants upto bad}
+% \NotDocumented
+
+
+
+\subsection{Strengthening goals: the \rawec{conseq} tactic}
+\index{hoare}{\rawec{conseq}}
+
+\Syntax \rawec{conseq} (\_ : \textit{formula} \rawec{==>} \textit{formula} )
+
+\begin{displaymath}
+\infrule{
+  \Hoare{c}{\pre'}{\post'} \qquad \pre\Rightarrow\pre' \qquad  \post'\Rightarrow\post
+}{
+  \Hoare{c}{\pre}{\post}
+}\left[\mathec{conseq}~ \pre'~ \post' \right]
+\end{displaymath}
+
+
+
+\subsection{Possibilistic or probabilistic: the \rawec{hoare,hoare\_bd} tactic}
+\index{hoare}{\rawec{hoare,hoare_db}}
+
+\Syntax \mathec{hoare}, \mathec{hoare_bd}
+allows to switch between possibilistic and probabilistic logics
+according to these rules:
+\begin{displaymath}
+\infrule{
+  \HoareEq{c}{\pre}{\neg\post}{0}
+}{
+  \Hoare{c}{\pre}{\post}
+}
+\end{displaymath}

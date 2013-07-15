@@ -82,6 +82,17 @@ let id_of_mp mp m =
    I other word that substitution will not clash
 *)
 
+(* Remark: is only used to create fresh name, si id_of_pv *)
+let generalize_subst env m uelts uglob = 
+  let create (pv,ty) = id_of_pv pv m, GTty ty in
+  let b = List.map create uelts in
+  let s = List.fold_left2 (fun s (pv,ty) (id, _) ->
+    Mpv.add env pv (f_local id ty) s) Mpv.empty uelts b in
+  let create mp = id_of_mp mp m, GTty (tglob mp) in
+  let b' = List.map create uglob in
+  let s = List.fold_left2 (fun s mp (id,_) ->
+    Mpv.add_glob env mp (f_local id (tglob mp)) s) s uglob b' in
+  b' @ b, s
 
 let generalize_mod env m modi f =
   let elts,glob = PV.elements modi in
@@ -92,14 +103,7 @@ let generalize_mod env m modi f =
   let uglob, nglob = List.partition (fun mp -> PV.mem_glob env mp fv) glob in
   (* We build the substitution which will be used *)
   (* We start by adding the global variable *)
-  let create (pv,ty) = id_of_pv pv m, GTty ty in
-  let b = List.map create uelts in
-  let s = List.fold_left2 (fun s (pv,ty) (id, _) ->
-    Mpv.add env pv (f_local id ty) s) Mpv.empty uelts b in
-  let create mp = id_of_mp mp m, GTty (tglob mp) in
-  let b' = List.map create uglob in
-  let s = List.fold_left2 (fun s mp (id,_) ->
-    Mpv.add_glob env mp (f_local id (tglob mp)) s) s uglob b' in
+  let bd, s = generalize_subst env m uelts uglob in
   (* Now we check that the substituion do not clash with other 
      modified variable *)
   List.iter (fun (pv,_) -> Mpv.check_npv env pv s) nelts;
@@ -110,7 +114,7 @@ let generalize_mod env m modi f =
     try PVM.subst env s f 
     with EcBaseLogic.TacError _ -> assert false (* should not appear *)
   in
-  f_forall_simpl (b'@b) f
+  f_forall_simpl bd f
 
 let lv_subst m lv f =
   match lv with
@@ -366,7 +370,6 @@ let t_bdHoareS_conseq_bd cmp bd g =
   let bd_goal = gen_mems [bhs.bhs_m] (f_imp bhs.bhs_pr bd_goal) in
   prove_goal_by [bd_goal;concl] (RN_hl_conseq_bd) g  
 
-
 let t_equivF_conseq pre post g =
   let env,_,concl = get_goal_e g in
   let ef = destr_equivF concl in
@@ -396,6 +399,7 @@ let t_hr_conseq pre post g =
   | FequivF _   -> t_equivF_conseq pre post g
   | FequivS _   -> t_equivS_conseq pre post g
   | _           -> tacerror (NotPhl None)
+
 (* -------------------------------------------------------------------- *)
 
 let t_equivF_notmod post g = 
@@ -530,6 +534,68 @@ let t_bdHoareF_conseq_nm = gen_conseq_nm t_bdHoareF_notmod t_bdHoareF_conseq
 
 let t_bdHoareS_conseq_nm = gen_conseq_nm t_bdHoareS_notmod t_bdHoareS_conseq
 
+(* -------------------------------------------------------------------- *)
+(* Transitivity rule for equiv                                          *)
+
+(* forall m1 m3, P m1 m3 => exists m2, P1 m1 m2 /\ P2 m2 m3
+   forall m1 m2 m3, Q1 m1 m2 => Q2 m2 m3 => Q m1 m3
+   c1 ~ c2 : P1 ==> Q1
+   c2 ~ c3 : P2 ==> Q2
+   --------------------------------------------------------
+       c1 ~ c3 : P ==> Q
+Remark: the most basic rule is normally 
+Q = exists m2, Q1 m1 m2 /\ Q2 m2 m3
+So the actual rule is in fact this basic rule + conseq. 
+But I prefers this one, which will be more conveniant *)
+
+let transitivity_side_cond hyps prml prmr poml pomr 
+    p q p1 q1 pomt p2 q2 = 
+  let env = LDecl.toenv hyps in
+  let cond1 = 
+    let fv1 = PV.fv env mright p1 in
+    let fv2 = PV.fv env mleft  p2 in
+    let fv  = PV.union fv1 fv2 in
+    let elts,glob = PV.elements fv in
+    let bd, s = generalize_subst env mhr elts glob in
+    let s1 = PVM.of_mpv s mright in 
+    let s2 = PVM.of_mpv s mleft in 
+    let concl = f_and (PVM.subst env s1 p1) (PVM.subst env s2 p2) in
+    gen_mems [prml;prmr] (f_imp p (f_exists bd concl)) in
+  let cond2 = 
+    let m2 = LDecl.fresh_id hyps "&m" in
+    let q1 = Fsubst.f_subst_mem mright m2 q1 in
+    let q2 = Fsubst.f_subst_mem mleft  m2 q2 in
+    gen_mems [poml;(m2,pomt);pomr] (f_imps [q1;q2] q) in
+  cond1, cond2 
+
+let t_equivS_trans (mt,c2) p1 q1 p2 q2 g =
+  let hyps,concl = get_goal g in
+  let es     = destr_equivS concl in
+  let m1, m3 = es.es_ml, es.es_mr in
+  let cond1, cond2 = 
+    transitivity_side_cond hyps m1 m3 m1 m3
+      es.es_pr es.es_po p1 q1 mt p2 q2 in
+  let cond3 = 
+    f_equivS_r { es with
+      es_mr = (mright,mt); es_sr = c2;
+      es_pr = p1; es_po = q1 } in
+  let cond4 = 
+    f_equivS_r { es with
+      es_ml = (mleft,mt); es_sl = c2;
+      es_pr = p2; es_po = q2 } in
+  prove_goal_by [cond1;cond2;cond3;cond4] RN_equiv_trans g
+
+let t_equivF_trans f p1 q1 p2 q2 g =
+  let env,hyps,concl = get_goal_e g in
+  let ef     = destr_equivF concl in
+  let (prml,prmr), (poml,pomr) = Fun.equivF_memenv ef.ef_fl ef.ef_fr env in
+  let _,(_,pomt) = Fun.hoareF_memenv f env in
+  let cond1, cond2 = 
+    transitivity_side_cond hyps prml prmr poml pomr
+      ef.ef_pr ef.ef_po p1 q1 pomt p2 q2 in
+  let cond3 = f_equivF p1 ef.ef_fl f q1 in
+  let cond4 = f_equivF p2 f ef.ef_fr q2 in
+  prove_goal_by [cond1;cond2;cond3;cond4] RN_equiv_trans g
 
 (* -------------------------------------------------------------------- *)
 
@@ -694,13 +760,49 @@ let t_fun_def g =
   else if is_equivF concl then t_equivF_fun_def g
   else tacerror (NotPhl None)
 
+
+let _inline_freshen me v =
+  let rec for_idx idx =
+    let x = Printf.sprintf "%s%d" v.v_name idx in
+      if EcMemory.is_bound x me then
+        for_idx (idx+1)
+      else
+        (EcMemory.bind x v.v_type me, x)
+  in
+    if EcMemory.is_bound v.v_name me then
+      for_idx 0
+    else
+      (EcMemory.bind v.v_name v.v_type me, v.v_name)
+
+let t_fun_to_code g =
+  let env, _, concl = get_goal_e g in
+  let ef = destr_equivF concl in
+  let (ml,mr), _ = Fun.equivF_memenv ef.ef_fl ef.ef_fr env in
+  let fl,fr = ef.ef_fl, ef.ef_fr in
+  let do1 f m = 
+    let fd = Fun.by_xpath f env in
+    let args = 
+      List.map (fun v -> e_var (pv_loc f v.v_name) v.v_type) 
+        fd.f_sig.fs_params in
+    let m, res = _inline_freshen m {v_name = "r"; v_type = fd.f_sig.fs_ret} in
+    let r = pv_loc f res in
+    let i = i_call (Some(LvVar(r,fd.f_sig.fs_ret)), f, args) in
+    let s = stmt [i] in
+    m, s, r, fd.f_sig.fs_ret in
+  let ml, sl, rl, tyl = do1 fl ml in
+  let mr, sr, rr, tyr = do1 fr mr in
+  let s = PVM.add env (pv_res fl) (fst ml) (f_pvar rl tyl (fst ml)) PVM.empty in
+  let s = PVM.add env (pv_res fr) (fst mr) (f_pvar rr tyr (fst mr)) s in
+  let post = PVM.subst env s ef.ef_po in  
+  let concl = f_equivS ml mr ef.ef_pr sl sr post in
+  (* TODO change the name of the rule *)
+  prove_goal_by [concl] RN_hl_fun_def g
   
 (* TODO FIXME : oracle should ensure that the adversary state still equal:
    two solutions : 
      - add the equality in the pre and post.
      - ensure that oracle do not write the adversary state
  *)
-
 
 let abstract_info env f1 = 
   let f = EcEnv.NormMp.norm_xpath env f1 in
@@ -741,7 +843,7 @@ let t_hoareF_abs inv g =
 let lossless_hyps env top sub = 
   let sig_ = (EcEnv.Mod.by_mpath top env).me_sig in
   let bd = 
-    List.map (fun (id,mt) -> id,GTmodty(mt,Sm.singleton top))
+    List.map (fun (id,mt) -> id,GTmodty(mt,(Sx.empty,Sm.singleton top)))
       sig_.mis_params in         
     (* Warning this implies that the oracle do not have access to top *)
   let args = List.map (fun (id,_) -> EcPath.mident id) sig_.mis_params in
@@ -756,8 +858,11 @@ let lossless_hyps env top sub =
   let hyps = List.map f_losslessF calls in
   f_forall bd (f_imps hyps concl) 
 
-let check_wr env top o = 
-  check_restr env o.x_top (Sm.singleton top)
+let check_oracle_use env adv o = 
+  let use = NormMp.fun_use env o in
+  let pp ppe fmt o = 
+    Format.fprintf fmt "The function %a" (EcPrinting.pp_funname ppe) o in
+  gen_check_restr env pp o use (Sx.empty,Sm.singleton adv)
 
 let bdHoareF_abs_spec env f inv = 
   let top,_,oi,_fsig = abstract_info env f in
@@ -765,7 +870,7 @@ let bdHoareF_abs_spec env f inv =
   let fv = PV.fv env m inv in
   PV.check_depend env fv top;
   let ospec o = 
-    ignore (check_wr env top o);
+    ignore (check_oracle_use env top o);
     f_bdHoareF inv o inv FHeq f_r1 in
   let sg = List.map ospec oi.oi_calls in
   inv, inv, lossless_hyps env top f.x_sub :: sg
@@ -809,15 +914,20 @@ let equivF_abs_spec env fl fr inv =
   let eqglob = f_eqglob topl ml topr mr in
   
   let ospec o_l o_r = 
-    if EcPath.x_equal o_l o_r then check_wr env topl o_l
-    else (check_wr env topl o_l;check_wr env topl o_r);
+    let use =
+      try
+        if EcPath.x_equal o_l o_r then check_oracle_use env topl o_l
+        else (check_oracle_use env topl o_l;check_oracle_use env topl o_r);
+        false
+      with e -> if oil.oi_in then true else raise e in
     let fo_l = EcEnv.Fun.by_xpath o_l env in
     let fo_r = EcEnv.Fun.by_xpath o_r env in
     let eq_params = 
       f_eqparams o_l fo_l.f_sig.fs_params ml o_r fo_r.f_sig.fs_params mr in
     let eq_res = f_eqres o_l fo_l.f_sig.fs_ret ml o_r fo_r.f_sig.fs_ret mr in
-    let pre = EcFol.f_and eq_params inv in
-    let post = EcFol.f_and eq_res inv in
+    let invs = if use then [eqglob;inv] else [inv] in
+    let pre = EcFol.f_ands (eq_params :: invs) in
+    let post = EcFol.f_ands (eq_res :: invs) in
     f_equivF pre o_l o_r post in
   let sg = List.map2 ospec oil.oi_calls oir.oi_calls in
   let eq_params = 
@@ -848,8 +958,8 @@ let equivF_abs_upto env fl fr bad invP invQ =
   let eqglob = f_eqglob topl ml topr mr in
   
   let ospec o_l o_r = 
-    if EcPath.x_equal o_l o_r then check_wr env topl o_l
-    else (check_wr env topl o_l;check_wr env topl o_r);
+    if EcPath.x_equal o_l o_r then check_oracle_use env topl o_l
+    else (check_oracle_use env topl o_l;check_oracle_use env topl o_r);
     let fo_l = EcEnv.Fun.by_xpath o_l env in
     let fo_r = EcEnv.Fun.by_xpath o_r env in
     let eq_params = 
@@ -1423,18 +1533,6 @@ let t_he_case f g =
     (t_bdHoare_case f) (t_equiv_case f) g 
 
 (* --------------------------------------------------------------------- *)
-let _inline_freshen me v =
-  let rec for_idx idx =
-    let x = Printf.sprintf "%s%d" v.v_name idx in
-      if EcMemory.is_bound x me then
-        for_idx (idx+1)
-      else
-        (EcMemory.bind x v.v_type me, x)
-  in
-    if EcMemory.is_bound v.v_name me then
-      for_idx 0
-    else
-      (EcMemory.bind v.v_name v.v_type me, v.v_name)
 
 let _inline hyps me sp s =
   let env = LDecl.toenv hyps in
@@ -2492,7 +2590,7 @@ let t_ppr ty phi_l phi_r g =
   let concl = f_forall_simpl binders_l (f_forall_simpl binders_r concl) in
   let concl = f_forall_simpl [a_id,GTty ty] concl in
   let concl_post = f_imps_simpl [f_eq phi_l a_f;f_eq phi_r a_f] ef.ef_po in
-  let memenvl,fdefl,memenvr,fdefr,env = Fun.equivS fl fr env in
+  let memenvl,_,memenvr,_,_ = Fun.equivS fl fr env in
   let concl_post = gen_mems [memenvl;memenvr] concl_post in
   let concl_post = f_forall_simpl [a_id,GTty ty] concl_post in
   prove_goal_by [concl_post;concl] RN_hl_deno g

@@ -311,6 +311,53 @@ intros=> xs; elim/list_ind xs; first smt.
 by clear xs=> x xs IH n n_len; rewrite nth_consN 1?IH; smt.
 qed.
 
+lemma nth_mem: forall (xs:'a list) (i:int),
+  0 <= i => i < length xs => 
+  mem (proj (nth xs i)) xs.
+proof strict.
+intros=> xs; elim/list_ind xs; first smt.
+intros=> {xs} x xs IH i le_0_i lt_i_lxs; rewrite mem_cons; case (i = 0)=> eq0_i.
+  by subst i; rewrite nth_cons0 proj_some; left.
+  rewrite nth_consN; first smt.
+    by right; apply IH; smt.
+qed.
+
+lemma mem_nth: forall (x:'a) (xs:'a list),
+  mem x xs =>
+  exists (i : int), 0 <= i <= length xs /\  nth xs i = Some x.
+proof strict.
+intros=> x xs; elim/list_ind xs; first smt.
+intros=> {xs} x' xs IH x_in_x'xs; case (x' = x)=> x_x'.
+  by subst x'; exists 0; rewrite nth_cons0; progress; apply length_nneg.
+  generalize x_in_x'xs; rewrite mem_consNE // => x_in_xs;
+  cut H : exists i, 0 <= i <= length xs /\ nth xs i = Some x; first by apply IH.
+  elim H=> i [[le_0_i le_i_lxs] nth_xs_i]; exists (i + 1); progress; first smt.
+    by rewrite length_cons; smt.
+    by (rewrite nth_consN; first smt); cut ->: i + 1 - 1 = i; first smt.
+qed.
+
+lemma nth_append_fst: forall (i:int) (xs ys:'a list),
+  0 <= i => i < length xs =>
+  proj (nth (xs ++ ys) i) = proj (nth xs i).
+proof strict.
+intros=> i xs; generalize i; elim/list_ind xs; first smt.
+intros=> {xs} x xs IH i ys le_0_i le_i_lxxs; rewrite app_cons; case (0 = i)=> i_0.
+  by subst i; rewrite 2!nth_cons0.
+  by rewrite nth_consN // nth_consN // IH; smt.
+qed.
+
+lemma nth_append_snd: forall (i:int) (xs ys:'a list),
+  length xs <= i => i < length xs + length ys =>
+  proj (nth (xs ++ ys) i) = proj (nth ys (i - length xs)).
+proof strict.
+intros=> i xs; generalize i; elim/list_ind xs; first smt.
+intros=> {xs} x xs IH i ys le_lxxs_i le_i_lxxsys; rewrite app_cons; case (length (x::xs) = i)=> i_lxxs.
+  subst i; rewrite nth_consN.
+    by rewrite length_cons; smt.
+    by rewrite IH;smt.
+  by rewrite nth_consN ?IH; smt.
+qed.
+
 (** nth_default *)
 op nth_default (xs:'a list) (dv:'a) n =
   let r = nth xs n in

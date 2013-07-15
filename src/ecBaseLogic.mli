@@ -18,7 +18,7 @@ exception NotReducible
 type local_kind =
   | LD_var   of ty * form option
   | LD_mem   of EcMemory.memtype
-  | LD_modty of EcModules.module_type * EcPath.Sm.t
+  | LD_modty of EcModules.module_type * EcModules.mod_restr
   | LD_hyp   of form
 
 type l_local = EcIdent.t * local_kind
@@ -100,6 +100,7 @@ type rule_name =
   | RN_notmod
   | RN_hl_exists_elim 
   | RN_hoare_true
+  | RN_equiv_trans 
 
 type 'a rule_arg = 
   | RA_form of EcFol.form             (* formula             *)
@@ -118,6 +119,9 @@ type judgment = {
   j_decl : l_decl;
   j_rule : judgment rule
 }
+
+(* -------------------------------------------------------------------- *)
+val jucdepends : judgment -> EcPath.Sp.t
 
 (* -------------------------------------------------------------------- *)
 type tac_error =

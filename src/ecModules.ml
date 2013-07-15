@@ -365,6 +365,11 @@ type function_ = {
 }
 
 (* -------------------------------------------------------------------- *)
+type mod_restr = EcPath.Sx.t * EcPath.Sm.t
+
+let mr_equal (rx1,r1) (rx2,r2) = 
+  EcPath.Sx.equal rx1 rx2 && EcPath.Sm.equal r1 r2
+
 type module_expr = {
   me_name      : symbol;
   me_body      : module_body;
@@ -376,15 +381,10 @@ type module_expr = {
 and module_body =
   | ME_Alias       of EcPath.mpath
   | ME_Structure   of module_structure
-  | ME_Decl        of module_type * EcPath.Sm.t 
+  | ME_Decl        of module_type * mod_restr
 
 and module_structure = {
   ms_body : module_item list;
-  ms_vars : EcTypes.ty Mx.t; (* The set of global variables declared by the
-                                module and it submodules *)
-  ms_uses : Sm.t; (* The set of external top-level modules used by the module.
-                     It is an invariant that those modules are defined 
-                     (i.e are ME_structure). *)
 }
 
 and module_item =

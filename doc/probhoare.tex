@@ -1,0 +1,513 @@
+
+
+\subsection{Reasoning on the program structure}
+\subsubsection*{Empty statements: the \rawec{skip} tactic}
+\index{phl}{\rawec{skip}}
+
+\Syntax \rawec{skip}
+
+\Description Reduces logical program judgements with empty statements
+to a higher-order logical goal. The generated subgoals can then be
+processed using the ambient logic. The behaviour of the \rawec{skip}
+tactic can be briefly described by the following rules:
+%
+\begin{displaymath}
+\infrule{
+  \pre \Rightarrow \post \qquad \bound = 1
+}{
+  \HoareLe{\Skip}{\pre}{\post}{\bound}
+}
+\end{displaymath}
+%
+
+
+\subsubsection*{Random samplings: the \rawec{rnd} tactic}
+\index{phl}{\rawec{rnd}}
+
+\Syntax 
+\rawec{rnd} [\textit{formula} | \textit{formula} \textit{formula}
+\textit{formula} \textit{formula} \textit{formula} \textit{formula} ] 
+
+\Description
+
+The invocation of this tactic expects a goal of any of the following
+forms:
+\begin{itemize}
+\item $\HoareLe{\pre}{c;\Rand{x}{d}}{\post}{\bound}$
+\item $\HoareEq{\pre}{c;\Rand{x}{d}}{\post}{\bound}$
+\item $\HoareGe{\pre}{c;\Rand{x}{d}}{\post}{\bound}$
+\end{itemize}
+
+The following rule, corresponding to the invocation of
+$
+\left[\mbox{\rawec{rnd}}\ \varphi\ \bound_1\ \bound_2\ \bound_3\ \bound_4\ p\right],
+$
+describes the most general variant implemented by
+the \rawec{rnd} tactic for probabilistic Hoare judgements:
+%
+\begin{displaymath}
+\infrule{
+  \begin{array}{c}
+    \bound_1 \bound_2 + \bound_3 \bound_4 \leq \bound \\
+    \HoareLe{c}{\pre}{\varphi}{\bound_1} \\
+    \varphi \Rightarrow \mu\, d\, p \leq \bound_2 \land (\forall v,~\insupp{v}{d}\Rightarrow
+    \post\subst{x}{v} \Rightarrow p\, v) \\
+    \HoareLe{c}{\pre}{\neg \varphi}{\bound_3} \\
+    \neg\varphi \Rightarrow \mu\, d\, p \leq \bound_4 \land (\forall v,~\insupp{v}{d}\Rightarrow
+    \post\subst{x}{v} \Rightarrow p\, v) \\
+  \end{array}
+}{
+  \HoareLe{c;\Rand{x}{d}}{\pre}{\post}{\bound}
+}
+\end{displaymath}
+%
+where $\insupp{z}{d}$ stands for the predicate $\ECinsupp{z}{d}$.
+%
+Similar rules hold by substituting every occurrence of the
+comparison operator $\leq$ by the operator $=$, or by the operator $\geq$.
+
+If a single parameter is given, then the \rawec{rnd} tactic implements
+the following simpler rules:
+\begin{displaymath}
+  \infrule{
+    \Hoare{c}{\pre}{\mu\, d\, p \leq f \land 
+      (\forall v,~\insupp{v}{d}\Rightarrow \post\subst{x}{v} \Rightarrow p\, v)}
+  }{
+    \HoareLe{c;\Rand{x}{d}}{\pre}{\post}{f}
+  }\left[\mathec{rnd}\ p\right]
+\end{displaymath}
+%
+\begin{displaymath}
+  \infrule{
+    \HoareEq{c}{\pre}{\mu\, d\, p \geq \delta \land 
+      (\forall v,~\insupp{v}{d} \Rightarrow p\, v \Rightarrow \post\subst{x}{v} )}{1} 
+  }{
+    \HoareGe{c;\Rand{x}{d}}{\pre}{\post}{\delta}
+  }\left[\mathec{rnd}\ p\right]
+\end{displaymath}
+%
+\begin{displaymath}
+  \infrule{
+    \HoareEq{c}{\pre}{\mu\, d\, p = \delta \land 
+      \forall v,~ (\insupp{v}{d} \Rightarrow (p\, v \Leftrightarrow \post\subst{x}{v} ))}{1} 
+  }{
+    \HoareEq{c;\Rand{x}{d}}{\pre}{\post}{\delta}
+  }\left[\mathec{rnd}\ p\right]
+\end{displaymath}
+
+If the \rawec{rnd} tactic is invoked with no parameters, and the
+assigned variable does not occur in the postcondition, then the
+following rule variants are applied:
+%
+\begin{displaymath}
+  \infrule{
+    \HoareLe{c}{\pre}{\post}{\bound}
+  }{
+    \HoareLe{c;\Rand{x}{d}}{\pre}{\post}{\bound}
+  }\left[\mathec{rnd}\ p\right]
+\end{displaymath}
+%
+\begin{displaymath}
+  \infrule{
+    \HoareEq{c}{\pre}{\post}{\bound} \qquad
+    \mu\, d\, \mathec{cpTrue} = 1
+  }{
+    \HoareEq{c;\Rand{x}{d}}{\pre}{\post}{\delta}
+  }\left[\mathec{rnd}\ p\right]
+\end{displaymath}
+%
+\begin{displaymath}
+  \infrule{
+    \HoareGe{c}{\pre}{\post}{\bound} \qquad
+    \mu\, d\, {cpTrue} = 1
+  }{
+    \HoareGe{c;\Rand{x}{d}}{\pre}{\post}{\bound}
+  }\left[\mathec{rnd}\ p\right]
+\end{displaymath}
+
+
+If the judgement bound expression contains variables that are modified
+by the judgement statement, then the same rules are applied after a
+renaming of the bound expression enabled by the following equivalence: 
+\begin{displaymath}
+  \HoareLe{c;\Rand{x}{d}}{\pre}{\post}{\bound}
+  \Longleftrightarrow
+  \forall \bound', \HoareLe{c;\Rand{x}{d}}{\pre \land \bound=\bound'}{\post}{\bound'}
+\end{displaymath}
+
+
+
+\subsubsection*{Sequential composition: the \rawec{seq} tactic}
+\index{phl}{\rawec{seq}}
+
+\Syntax 
+\rawec{seq}  \textit{codepos} \textit{formula}
+[\textit{formula} | \textit{formula} \textit{formula}
+\textit{formula} \textit{formula}]
+
+\Description
+
+\begin{displaymath}
+  \infrule{
+    \begin{array}{c}
+      \Hoare{c_1}{\pre}{\varphi}
+      \\
+      \HoareLe{c_1}{\pre}{\chi}{\bound_1} \qquad 
+          \HoareLe{c_2}{\varphi \land \chi }{\post}{\bound_2}
+      \\
+      \HoareLe{c_1}{\pre}{\neg \chi}{\bound_3} \qquad 
+             \HoareLe{c_2}{\varphi \land \neg\chi}{\post}{\bound_4}
+      \\
+      \bound_1 \bound_2 + \bound_3 \bound_4 \leq \bound
+    \end{array}
+  }{
+    \HoareLe{c_1;c_2}{\pre}{\post}{\bound}
+  }\left[\mathec{seq}\ \varphi\ \chi\ f_1\ f_2\ f_3\ f_4 \right]
+\end{displaymath}
+
+(idem with the comparison operators ($=$) and ($\geq$)).
+
+
+
+\subsubsection*{Conditional statements: the \rawec{condt,condf} tactic}
+\index{phl}{\rawec{condt,condf}}
+%
+\NotDocumented
+
+
+\subsubsection*{Conditional statements: the \rawec{if} tactic}
+\index{phl}{\rawec{if}}
+Applies the following rule for conditional statements. It expects a
+conditional statement at the first program position.
+\begin{displaymath}
+\begin{array}{c}
+  \infrule{
+    \HoareLe{c_1;c}{\pre \land b}{\post}{f}\qquad
+    \HoareLe{c_2;c}{\pre \land \neg b}{\post}{f}
+  }{
+    \HoareLe{\Cond{b}{c_1}{c_2};c}{\pre}{\post}{f}
+  }\left[\mathec{if} \right] 
+\\[4ex]
+\end{array}
+\end{displaymath}
+Similar rules hold for the other comparison operators $=,\geq$.
+
+\subsubsection*{Deterministic straight-line code: the \rawec{wp} tactic}
+\index{phl}{\rawec{wp}}
+
+
+\Syntax \rawec{wp} [\textit{codepos}]
+
+\Description The \rawec{wp} tactic computes the weakest-precondition of
+deterministic, loop and procedure-call free program fragments
+(i.e. deterministic assignments and conditionals).   
+The computation of the weakest precondition over a
+conditional statement is only possible if its branches do not
+contain random samplings, while-loops nor function calls.
+
+The optional code position parameter \textit{pos} restricts the range
+of instructions that may be affected by the tactic invocation. 
+%
+If the optional code position parameter is not provided, The tactic
+processes instructions bottom-up until a random sampling, a loop or a
+function call is reached.
+
+\begin{displaymath}
+  \infrule{
+    \HoareLe{c_1}{\pre }{\mathsf{wp}(c_2,\post)}{f}
+  }{
+    \HoareLe{c_1;c_2}{\pre}{\post}{f}
+  }\left[\mathec{wp} \right] 
+\end{displaymath}
+Similar rules hold for $=,\geq$.
+
+\subsubsection*{Function call statements: the \rawec{call} tactic}
+\index{phl}{\rawec{call}}
+
+\Syntax \mathec{call} \textit{formula} \textit{formula} [\textit{formula}]
+
+\Description
+
+Let $p$ stand for the formal parameters of function $f$, $\result_f$
+the result variable of function $f$, and $\vec{m}$ the set of
+variables modifiable by $f$.
+\begin{displaymath}
+  \infrule{
+    \begin{array}{c}
+      \Hoare{c}{\pre}{\pre_f\subst{\vec{p}}{\vec{y}} \land
+        \forall v.~ \forall \vec{z}.~ 
+        \post_f\subst{\result_f}{v}\subst{\vec{m}}{\vec{z}}
+        \Rightarrow \post\subst{x}{v}\subst{\vec{m}}{\vec{z}}
+      }
+      \\[.5ex]
+      \HoareLe{f}{\pre_f}{\post_f}{\delta}
+    \end{array}
+  }{
+    \HoareLe{c;\Call{x}{f}{\vec{y}}}{\pre}{\post}{\delta}
+  } \left[\mathec{call}~ \pre_f~ \post_f \right]
+\end{displaymath}
+
+\begin{displaymath}
+  \infrule{
+    \begin{array}{c}
+      \HoareEq{c}{\pre}{\pre_f\subst{\vec{p}}{\vec{y}} \land
+        \forall v.~ \forall \vec{z}.~ 
+        \post_f\subst{\result_f}{v}\subst{\vec{m}}{\vec{z}}
+        \Rightarrow \post\subst{x}{v}\subst{\vec{m}}{\vec{z}}}{1}
+    \\[.5ex]
+    \HoareEq{f}{\pre_f}{\post_f}{\delta}
+  \end{array}
+  }{
+    \HoareEq{c;\Call{x}{f}{\vec{y}}}{\pre}{\post}{\delta}
+  } \left[\mathec{call}~ \pre_f~ \post_f \right]
+\end{displaymath}
+
+\begin{displaymath}
+  \infrule{
+    \begin{array}{c}
+      \HoareEq{c}{\pre}{\pre_f\subst{\vec{p}}{\vec{y}} \land
+        \forall v.~ \forall \vec{z}.~ 
+        \post_f\subst{\result_f}{v}\subst{\vec{m}}{\vec{z}}
+        \Rightarrow \post\subst{x}{v}\subst{\vec{m}}{\vec{z}}}
+      {1}
+    \\[.5ex]
+    \HoareGe{f}{\pre_f}{\post_f}{\delta}
+  \end{array}
+  }{
+    \HoareGe{c;\Call{x}{f}{\vec{y}}}{\pre}{\post}{\delta}
+  } \left[\mathec{call}~ \pre_f~ \post_f \right]
+\end{displaymath}
+
+
+\subsubsection*{While loop statements: the \rawec{while} tactic}
+\index{phl}{\rawec{while}}
+
+\Syntax \rawec{while} \textit{formula} \textit{formula} 
+%
+
+\Description
+%
+The argument is the loop invariant, and the second one is a variant
+expression used to prove termination. 
+%
+$M$ stands for the variables that may be modified by $c$.
+
+\begin{displaymath}
+  \infrule{
+    \begin{array}{c}
+    \HoareLe{c'}{\pre }{\chi \land 
+      \forall M.~ (\chi \land 0 \leq e \Rightarrow \neg b)  \land
+      \chi \land \neg b \Rightarrow \post}{f} 
+    \\[.5ex]
+    \forall k.~ \HoareEq{c}{\chi \land b \land e = k}{\chi \land e
+      < k}{1}
+  \end{array}
+}{
+    \HoareLe{c';\While{b}{c}}{\pre}{\post}{f}
+  }\left[\mathec{while}\ \chi\ e \right] 
+\end{displaymath}
+Similarly for the comparison operators $=$ and $\leq$.
+
+
+\subsection{Abstract adversaries: the \rawec{fun} tactic}
+\index{phl}{\rawec{fun}}
+
+
+\begin{displaymath}
+\infrule{
+    \pre \Rightarrow \chi  \qquad \chi \Leftrightarrow\post \qquad
+    \HoareEq{O_i}{\chi}{\chi}{1}
+}{
+  \HoareEq{A}{\pre}{\post}{1}
+} [\mathec{fun}~\chi]
+\end{displaymath}
+
+
+\subsection{Trivial judgements: the \rawec{pr_bounded} tactic}
+\index{phl}{\rawec{pr_bounded}}
+
+The \rawec{pr_bounded} tactic is only applicable to probabilistic
+Hoare judgements. It discharges proof goals by trivial probability axioms:
+\begin{displaymath}
+\begin{array}{cc}
+\infrule{
+}{
+  \HoareLe{c}{\pre}{\post}{1}
+}
+&
+\infrule{
+}{
+  \HoareGe{c}{\pre}{\post}{0}
+}
+\end{array}
+\end{displaymath}
+
+
+\subsection{Strengthening goals}
+
+\subsubsection*{The \rawec{conseq} tactic}
+\index{phl}{\rawec{conseq}}
+
+
+\begin{displaymath}
+\infrule{
+  \HoareLe{c}{\pre'}{\post'}{\delta} \qquad \pre\Rightarrow\pre' \qquad  \post\Rightarrow\post'
+}{
+  \HoareLe{c}{\pre}{\post}{\delta}
+}\left[\mathec{conseq}~ (\_ : \pre'~ \mathec{==>}~ \post') \right]
+\end{displaymath}
+
+\begin{displaymath}
+\infrule{
+  \HoareEq{c}{\pre'}{\post'}{\delta} \qquad \pre\Rightarrow\pre' \qquad  \post\Leftrightarrow\post'
+}{
+  \HoareEq{c}{\pre}{\post}{\delta}
+}\left[\mathec{conseq}~ (\_ : \pre'~ \mathec{==>}~ \post') \right]
+\end{displaymath}
+
+\begin{displaymath}
+\infrule{
+  \HoareGe{c}{\pre'}{\post'}{\delta} \qquad \pre\Rightarrow\pre' \qquad  \post'\Rightarrow\post
+}{
+  \HoareGe{c}{\pre}{\post}{\delta}
+}\left[\mathec{conseq}~ (\_ : \pre'~ \mathec{==>}~ \post') \right]
+\end{displaymath}
+
+
+One can additionally strengthen the bounding condition with the syntax:
+
+\rawec{conseq} (\_ : \_ \rawec{==>} \_ : [\textit{cmp}]
+\textit{formula} ) 
+
+that implements strengthening rules like the following:
+
+\begin{displaymath}
+\infrule{
+  \HoareLe{c}{\pre}{\post}{\delta'} \qquad \delta'\leq\delta 
+}{
+  \HoareLe{c}{\pre}{\post}{\delta}
+}\left[\mathec{conseq}~ (\_ : \_ ~\mathec{==>}~ \_) : \delta' \right]
+\end{displaymath}
+
+\begin{displaymath}
+\infrule{
+  \HoareEq{c}{\pre}{\post}{\delta'} \qquad \delta\leq\delta' 
+}{
+  \HoareGe{c}{\pre}{\post}{\delta}
+}\left[\mathec{conseq}~ (\_ : \_ ~\mathec{==>}~ \_) : = \delta' \right]
+\end{displaymath}
+
+
+
+\subsubsection*{The \rawec{bd\_eq}}
+\index{phl}{\rawec{bd_eq}}
+%
+\Syntax \rawec{bd_eq}
+\begin{displaymath}
+\begin{array}{cc}
+\infrule{
+  \HoareEq{c}{\pre}{\post}{f}
+}{
+  \HoareLe{c}{\pre}{\post}{f}
+}
+&
+\infrule{
+  \HoareEq{c}{\pre}{\post}{f}
+}{
+  \HoareGe{c}{\pre}{\post}{f}
+}
+\end{array}
+\end{displaymath}
+
+
+\subsection{Possibilistic or probabilistic: the \rawec{hoare,hoare\_bd} tactic}
+\index{phl}{\rawec{hoare,hoare_db}}
+
+\Syntax \mathec{hoare}, \mathec{hoare_bd}
+allows to switch between possibilistic and probabilistic logics
+according to these rules:
+\begin{displaymath}
+\infrule{
+  \Hoare{c}{\pre}{\neg \post} \quad f = 0
+}{
+  \HoareEq{c}{\pre}{\post}{f}
+}
+\end{displaymath}
+
+\subsection{Probability expressions: \rawec{deno} tactics}
+
+\index{phl}{\rawec{deno,hoare_deno}}
+
+\begin{displaymath}
+\infrule{
+    \pre 
+    \qquad 
+    \chi\Rightarrow\post 
+    \qquad 
+    \HoareLe{f}{\pre}{\post}{\delta}
+}{
+  \Prm{c}{m}{\chi} \leq \delta
+}\left[\mathec{hoare_deno}\ \pre\ \post\right]
+\end{displaymath}
+
+\begin{displaymath}
+\infrule{
+    \pre 
+    \qquad 
+    \post\Leftrightarrow \chi 
+    \qquad 
+    \HoareEq{f}{\pre}{\post}{\delta}
+}{
+  \Prm{c}{m}{\chi} = \delta
+}\left[\mathec{hoare_deno}\ \pre\ \post\right]
+\end{displaymath}
+
+\begin{displaymath}
+\infrule{
+    \pre 
+    \qquad 
+    \post\Rightarrow\chi
+    \qquad 
+    \HoareGe{f}{\pre}{\post}{\delta}
+}{
+  \delta \leq \Prm{c}{m}{\chi}
+}\left[\mathec{hoare_deno}\ \pre\ \post\right]
+\end{displaymath}
+
+
+
+\subsection{Failure events: the \rawec{fel} tactic}
+\index{phl}{\rawec{fel}}
+%
+The following rule describes the application of the tactic
+$\mathec{fel}\ k\ q\ c\ \delta\ F\ P$.  Assume $f$ is defined and
+$c_1,c_2$ stands for the splitting of its body at position $n$. Let
+$\left\{O_i\right\}_{i=0}^k$ stand for all oracles accessed by any
+adversary called at $c_2$. Assume that variables in $F$ can at most be
+modified by $\left\{O_i\right\}_{i=0}^k$.
+ 
+\begin{displaymath}
+\infrule{
+  \begin{array}{c}
+    \left\{
+    \begin{array}{l}
+      \HoareLe{O_i}{\neg F}{F}{h(c)} \\
+      \forall c_0,\ \Hoare{O_i}{P\land c=c_0}{c_0 < c} \\
+      \forall c_0,\ \forall f_0,\ \Hoare{O_i}{\neg P\land F=f_0 \land c=c_0}{F=f_0 \land c=c_0} \\
+    \end{array}\right\}_{i=0}^k\\[5ex]
+    \forall m', (\varphi \Rightarrow F \land c\leq q) 
+    \qquad 
+    \sum_{i=0}^{q-1} h(i) \leq \epsilon 
+    \qquad
+    \Hoare{c_1}{\true}{\neg F \land c=0}
+  \end{array}
+}{
+  \Prm{f}{m}{\varphi} \leq \epsilon  
+} \left[\mathec{fel}\ n\ q\ h\ c\ F\ P\right]
+\end{displaymath}
+
+
+%%% Local Variables: 
+%%% mode: latex
+%%% TeX-master: "easycrypt"
+%%% End: 

@@ -205,14 +205,7 @@ and subst_module_items (s : _subst) (items : module_item list) =
 
 (* -------------------------------------------------------------------- *)
 and subst_module_struct (s : _subst) (bstruct : module_structure) =
-  let es = e_subst_of_subst s in
-    { ms_body   = subst_module_items s bstruct.ms_body; 
-      ms_vars   = 
-        Mx.fold
-          (fun x ty w -> Mx.add (es.es_xp x) (es.es_ty ty) w)
-          bstruct.ms_vars Mx.empty;
-      ms_uses   =
-        Sm.fold (fun m u -> Sm.add (es.es_mp m) u) bstruct.ms_uses Sm.empty; }
+    { ms_body   = subst_module_items s bstruct.ms_body; }
 
 (* -------------------------------------------------------------------- *)
 and subst_module_body (s : _subst) (body : module_body) =
@@ -223,12 +216,15 @@ and subst_module_body (s : _subst) (body : module_body) =
   | ME_Structure bstruct ->
       ME_Structure (subst_module_struct s bstruct)
 
-  | ME_Decl (p, r) -> 
-      let sr r = 
-        EcPath.Sm.fold 
-          (fun x r -> EcPath.Sm.add (s.s_fmp x) r) r EcPath.Sm.empty
+  | ME_Decl (p, (rx,r)) -> 
+    let rx = 
+      EcPath.Sx.fold
+        (fun x r -> EcPath.Sx.add (EcPath.x_subst s.s_fmp x) r) rx EcPath.Sx.empty in
+    let r = 
+      EcPath.Sm.fold 
+        (fun x r -> EcPath.Sm.add (s.s_fmp x) r) r EcPath.Sm.empty
       in
-        ME_Decl (subst_modtype s p, sr r)
+        ME_Decl (subst_modtype s p, (rx, r))
 
 (* -------------------------------------------------------------------- *)
 and subst_module_comps (s : _subst) (comps : module_comps) =

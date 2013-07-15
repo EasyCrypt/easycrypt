@@ -208,9 +208,9 @@ module CoreSection : sig
   val form_use_local : form  -> locals -> bool
   val module_use_local_or_abs : module_expr -> locals -> bool
 
-  val abstracts : locals -> (EcIdent.t * (module_type * Sm.t)) list * Sid.t
+  val abstracts : locals -> (EcIdent.t * (module_type * mod_restr)) list * Sid.t
 
-  val generalize : locals -> form -> form
+  val generalize : EcEnv.env -> locals -> form -> form
 
   type t
 
@@ -229,17 +229,22 @@ module CoreSection : sig
   val locals  : t -> locals
   val olocals : t -> locals option
 
-  val addlocal    : [`Lemma | `Module] -> path -> t -> t
-  val additem     : EcTheory.ctheory_item -> t -> t
-  val addabstract : EcIdent.t -> (module_type * Sm.t) -> t -> t
+  type lvl = [`Local | `Global] * [`Axiom | `Lemma]
+
+  val add_local_mod : path -> t -> t
+  val add_lemma     : path -> lvl -> t -> t
+  val add_item      : EcTheory.ctheory_item -> t -> t
+  val add_abstract  : EcIdent.t -> (module_type * mod_restr) -> t -> t
 end = struct
   exception NoSectionOpened
 
+  type lvl = [`Local | `Global] * [`Axiom | `Lemma]
+
   type locals = {
     lc_env       : EcEnv.env;
-    lc_lemmas    : Sp.t;
+    lc_lemmas    : (path * lvl) list * lvl Mp.t;
     lc_modules   : Sp.t;
-    lc_abstracts : (EcIdent.t * (module_type * Sm.t)) list * Sid.t;
+    lc_abstracts : (EcIdent.t * (module_type * mod_restr)) list * Sid.t;
     lc_items     : EcTheory.ctheory_item list;
   }
 
@@ -248,12 +253,9 @@ end = struct
   let items_of_locals (lc : locals) = lc.lc_items
 
   let is_local who p (lc : locals) =
-    let set =
-      match who with
-      | `Lemma  -> lc.lc_lemmas
-      | `Module -> lc.lc_modules
-    in
-      Sp.mem p set
+    match who with
+    | `Lemma  -> omap (Mp.find_opt p (snd lc.lc_lemmas)) fst = Some `Local
+    | `Module -> Sp.mem p lc.lc_modules
 
   let rec is_mp_local mp (lc : locals) =
     let toplocal =
@@ -349,7 +351,10 @@ end = struct
   let on_mpath_binding cb b =
     match b with
     | EcFol.GTty    ty        -> on_mpath_ty cb ty
-    | EcFol.GTmodty (mty, sm) -> on_mpath_modty cb mty; Sm.iter cb sm
+    | EcFol.GTmodty (mty, (rx,r)) -> 
+      on_mpath_modty cb mty; 
+      Sx.iter (fun x -> cb x.x_top) rx; 
+      Sm.iter cb r
     | EcFol.GTmem   None      -> ()
     | EcFol.GTmem   (Some m)  -> on_mpath_lcmem cb m
 
@@ -430,10 +435,11 @@ end = struct
     | ME_Structure st   -> on_mpath_mstruct cb st
     | ME_Decl (mty, sm) -> on_mpath_mdecl cb (mty, sm)
 
-  and on_mpath_mdecl cb dc =
-    on_mpath_modty cb (fst dc);
-    Sm.iter cb (snd dc)
-
+  and on_mpath_mdecl cb (mty,(rx,r)) =
+    on_mpath_modty cb mty; 
+    Sx.iter (fun x -> cb x.x_top) rx; 
+    Sm.iter cb r
+  
   and on_mpath_mstruct cb st =
     List.iter (on_mpath_mstruct1 cb) st.ms_body
 
@@ -490,22 +496,46 @@ end = struct
 
   let abstracts lc = lc.lc_abstracts
 
-  let generalize lc (f : EcFol.form) =
-    let mods = Sid.of_list (List.map fst (fst lc.lc_abstracts)) in
-      if   Mid.set_disjoint mods f.EcFol.f_fv
-      then f
-      else begin
-        List.fold_right
-          (fun (x, (mty, rt)) f ->
-             match Mid.mem x f.EcFol.f_fv with
-             | false -> f
-             | true  -> EcFol.f_forall [(x, EcFol.GTmodty (mty, rt))] f)
-          (fst lc.lc_abstracts) f
-      end
+  let generalize env lc (f : EcFol.form) =
+    let axioms =
+      List.pmap
+        (fun (p, lvl) ->
+           match lvl with `Global, `Axiom -> Some p | _ -> None)
+        (fst lc.lc_lemmas)
+    in
+
+    match axioms with
+    | [] ->
+      let mods = Sid.of_list (List.map fst (fst lc.lc_abstracts)) in
+        if   Mid.set_disjoint mods f.EcFol.f_fv
+        then f
+        else begin
+          List.fold_right
+            (fun (x, (mty, rt)) f ->
+               match Mid.mem x f.EcFol.f_fv with
+               | false -> f
+               | true  -> EcFol.f_forall [(x, EcFol.GTmodty (mty, rt))] f)
+            (fst lc.lc_abstracts) f
+        end
+
+    | _ ->
+      let f =
+        let do1 p f =
+          let ax = EcEnv.Ax.by_path p env in
+            EcFol.f_imp (oget ax.ax_spec) f
+        in
+            List.fold_right do1 axioms f in
+      let f =
+        let do1 (x, (mty, rt)) f =
+          EcFol.f_forall [(x, EcFol.GTmodty (mty, rt))] f
+        in
+          List.fold_right do1 (fst lc.lc_abstracts) f
+      in
+        f
 
   let elocals (env : EcEnv.env) : locals =
     { lc_env       = env;
-      lc_lemmas    = Sp.empty;
+      lc_lemmas    = ([], Mp.empty);
       lc_modules   = Sp.empty;
       lc_abstracts = ([], Sid.empty);
       lc_items     = []; }
@@ -534,7 +564,8 @@ end = struct
     | [] -> raise NoSectionOpened
     | ec :: cs ->
         ({ ec with lc_items     = List.rev ec.lc_items;
-                   lc_abstracts = fst_map List.rev ec.lc_abstracts; },
+                   lc_abstracts = fst_map List.rev ec.lc_abstracts;
+                   lc_lemmas    = fst_map List.rev ec.lc_lemmas},
          cs)
 
   let path (cs : t) : path =
@@ -558,19 +589,20 @@ end = struct
     | []      -> raise NoSectionOpened
     | c :: cs -> (f c) :: cs
 
-  let addlocal who (p : path) (cs : t) : t =
-    let doit ec =
-      match who with
-      | `Lemma  -> { ec with lc_lemmas  = Sp.add p ec.lc_lemmas  }
-      | `Module -> { ec with lc_modules = Sp.add p ec.lc_modules }
-    in
-      onactive doit cs
+  let add_local_mod (p : path) (cs : t) : t =
+    onactive (fun ec -> { ec with lc_modules = Sp.add p ec.lc_modules }) cs
 
-  let additem item (cs : t) : t =
+  let add_lemma (p : path) (lvl : lvl) (cs : t) : t =
+    onactive (fun ec ->
+      let (axs, map) = ec.lc_lemmas in
+        { ec with lc_lemmas = ((p, lvl) :: axs, Mp.add p lvl map) })
+      cs
+
+  let add_item item (cs : t) : t =
     let doit ec = { ec with lc_items = item :: ec.lc_items } in
       onactive doit cs
 
-  let addabstract id mt (cs : t) : t =
+  let add_abstract id mt (cs : t) : t =
     let doit ec =
       match Sid.mem id (snd ec.lc_abstracts) with
       | true  -> assert false
@@ -680,7 +712,7 @@ let maybe_add_to_section scope item =
       match EcPath.p_equal sp (EcEnv.root scope.sc_env) with
       | false -> scope
       | true  ->
-        let ec = CoreSection.additem item scope.sc_section in
+        let ec = CoreSection.add_item item scope.sc_section in
           { scope with sc_section = ec }
   end
 
@@ -978,10 +1010,25 @@ module Mod = struct
       | false -> scope
       | true  ->
         let mpath = EcPath.pqname (path scope) m.me_name in
-        let ec = CoreSection.addlocal `Module mpath scope.sc_section in
-          { scope with
-              sc_section = ec;
-              sc_env = EcEnv.Mod.add_restr_to_locals mpath scope.sc_env; }
+        let env = 
+          match m.me_body with
+          | ME_Alias _ | ME_Decl _ -> scope.sc_env
+          | ME_Structure _ ->
+            let env = scope.sc_env in
+            (* We keep only the internal part, i.e the inner global variables *)
+            (* TODO : using mod_use here to compute the set of inner global 
+               variables is inefficiant, change the algo *)
+            let mp = EcPath.mpath_crt mpath [] None in
+            let use = EcEnv.NormMp.mod_use env mp in
+            let rx = 
+              let add x _ rx = 
+                if EcPath.m_equal (EcPath.m_functor x.EcPath.x_top) mp then
+                  Sx.add x rx 
+                else rx in
+              Mx.fold add use.EcEnv.NormMp.us_pv EcPath.Sx.empty in
+            EcEnv.Mod.add_restr_to_locals (rx,EcPath.Sm.empty) env in
+        let ec = CoreSection.add_local_mod mpath scope.sc_section in
+        { scope with sc_section = ec; sc_env = env }
     in
       scope
 
@@ -1014,11 +1061,12 @@ module Mod = struct
     let restr = List.map (TT.trans_topmsymbol scope.sc_env) (snd modty) in
     let name  = EcIdent.create (unloc m.ptmd_name) in
     let scope =
+      let restr = Sx.empty, Sm.of_list restr in
       { scope with
           sc_env = EcEnv.Mod.declare_local
-            name tysig (Sm.of_list restr) scope.sc_env;
-          sc_section = CoreSection.addabstract
-            name (tysig, (Sm.of_list restr)) scope.sc_section }
+            name tysig restr scope.sc_env;
+          sc_section = CoreSection.add_abstract
+            name (tysig, restr) scope.sc_section }
     in
       scope
 end
@@ -1057,12 +1105,18 @@ module Ax = struct
     let scope = { scope with sc_env = EcEnv.Ax.bind x ax scope.sc_env; } in
     let scope = maybe_add_to_section scope (EcTheory.CTh_axiom (x, ax)) in
     let scope =
-      match local with
-      | false -> scope
-      | true  ->
-        let axpath = EcPath.pqname (path scope) x in
-        let ec = CoreSection.addlocal `Lemma axpath scope.sc_section in
-          { scope with sc_section = ec }
+      match CoreSection.opath scope.sc_section with
+      | None -> scope
+      | Some _ ->
+          let lvl1 = if local then `Local else `Global in
+          let lvl2 = if ax.ax_kind = `Axiom then `Axiom else `Lemma in
+
+          if lvl2 = `Axiom && ax.ax_tparams <> [] then
+            hierror "axiom must be monomorphic in sections";
+
+          let axpath = EcPath.pqname (path scope) x in
+          let ec = CoreSection.add_lemma axpath (lvl1, lvl2) scope.sc_section in
+            { scope with sc_section = ec }
     in
       scope
 
@@ -1137,6 +1191,9 @@ module Ax = struct
           if CoreSection.form_use_local concl locals then
             hierror "this lemma uses local modules and must be declared as local"
     end;
+
+    if ax.pa_local && ax.pa_kind = PAxiom then
+      hierror "an axiom cannot be local";
 
     match ax.pa_kind with
     | PILemma ->
@@ -1442,6 +1499,7 @@ module Section = struct
         let (locals, osc) = CoreSection.exit scope.sc_section in
         let oenv   = CoreSection.env_of_locals locals in
         let oitems = CoreSection.items_of_locals locals in
+        let scenv  = scope.sc_env in
         let scope  = { scope with sc_env = oenv; sc_section = osc; } in
 
         let rec bind1 scope item =
@@ -1457,14 +1515,18 @@ module Section = struct
               else
                 scope
 
-          | T.CTh_axiom (x, ax) ->
-            let axp = EcPath.pqname (path scope) x in
-              if not (CoreSection.is_local `Lemma axp locals) then
-                Ax.bind scope false
-                  (x, { ax with ax_spec =
-                          omap ax.ax_spec (CoreSection.generalize locals) })
-              else
-                scope
+          | T.CTh_axiom (x, ax) -> begin
+            match ax.ax_kind with
+            | `Axiom -> scope
+            | `Lemma ->
+                let axp = EcPath.pqname (path scope) x in
+                  if not (CoreSection.is_local `Lemma axp locals) then
+                    Ax.bind scope false
+                      (x, { ax with ax_spec =
+                              omap ax.ax_spec (CoreSection.generalize scenv locals) })
+                  else
+                    scope
+          end
 
           | T.CTh_export p ->
               { scope with sc_env = EcEnv.Theory.export p scope.sc_env }

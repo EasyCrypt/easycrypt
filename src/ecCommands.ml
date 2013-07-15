@@ -36,8 +36,12 @@ let rec toperror_of_exn ?gloc exn =
         Some (odfl _dummy gloc, e)
 
   | EcScope.HiScopeError (loc, msg) ->
-      let gloc = odfl _dummy loc in
-        Some (gloc, EcScope.HiScopeError (None, msg))
+      let gloc =
+        match loc with
+        | None     -> gloc
+        | Some loc -> if EcLocation.isdummy loc then gloc else Some loc
+      in
+        Some (odfl _dummy gloc, EcScope.HiScopeError (None, msg))
 
   | _ -> None
 

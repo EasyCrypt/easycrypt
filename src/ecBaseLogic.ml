@@ -6,6 +6,8 @@ open EcIdent
 open EcTypes
 open EcFol
 
+module Sp = EcPath.Sp
+
 exception UnknownSubgoal of int
 exception NotAnOpenGoal of int option
 exception InvalidNumberOfTactic of int * int
@@ -29,7 +31,7 @@ let _ = EcPException.register pp_error
 type local_kind =
   | LD_var   of ty * form option
   | LD_mem   of EcMemory.memtype
-  | LD_modty of EcModules.module_type * EcPath.Sm.t
+  | LD_modty of EcModules.module_type * EcModules.mod_restr
   | LD_hyp   of form  (* of type bool *)
 
 type l_local = EcIdent.t * local_kind
@@ -111,6 +113,7 @@ type rule_name =
   | RN_notmod
   | RN_hl_exists_elim 
   | RN_hoare_true
+  | RN_equiv_trans 
 
 type 'a rule_arg = 
   | RA_form of EcFol.form             (* formula             *)
@@ -178,6 +181,7 @@ let _ = EcPException.register (fun fmt exn ->
   | TacError (_, error) -> pp_tac_error fmt error
   | _ -> raise exn)
 
+(* -------------------------------------------------------------------- *)
 let tacerror ?(catchable = true) error =
   raise (TacError (catchable, error))
 
@@ -189,3 +193,17 @@ let tacuerror ?(catchable = true) fmt =
          Format.pp_print_flush fbuf ();
          raise (TacError (catchable, User (Buffer.contents buf))))
       fbuf fmt
+
+(* -------------------------------------------------------------------- *)
+let rec jucdepends sp juc =
+  let sp =
+    match juc.j_rule.pr_name with
+    | RN_glob (p, _) -> Sp.add p sp
+    | _ -> sp
+  in
+    List.fold_left jucdepends sp
+      (List.pmap
+         (function RA_node x -> Some x | _ -> None)
+         juc.j_rule.pr_hyps)
+
+let jucdepends juc = jucdepends Sp.empty juc
