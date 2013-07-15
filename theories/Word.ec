@@ -64,6 +64,11 @@ cut xorb_zeros: (forall i, 0 <= i => i < length =>
 smt.
 save.
 
+lemma xor_opt : forall x y , x ^^ y ^^ y = x.
+proof.
+ by intros => x y; rewrite -xor_assoc xor_nilpotent xor_zeros //.
+save.
+
 (* TODO: Finish writing the conversions *)
 require        Array.
 op to_array: word -> bool Array.array.
