@@ -43,7 +43,6 @@
     "last"        , LAST       ;        (* KW: tactical *)
     "do"          , DO         ;        (* KW: tactical *)
     "strict"      , STRICT     ;        (* KW: tactical *)
-
     
     (* Lambda tactics *)
     "beta"        , BETA       ;        (* KW: tactic *)
@@ -89,6 +88,7 @@
     "assumption"  , ASSUMPTION ;        (* KW: bytac *)
     "smt"         , SMT        ;        (* KW: bytac *)
     "by"          , BY         ;        (* KW: bytac *)
+    "reflexivity" , REFLEX     ;        (* KW: bytac *)
 
     (* PHL: tactics *)
     "transitivity", TRANSITIVITY;       (* KW: tactic *)
