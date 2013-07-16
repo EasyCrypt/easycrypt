@@ -32,8 +32,7 @@ in the ambient logic.
 
 \begin{displaymath}
 \infrule{
-\Prm{c}{m}{\pre} \land
-  \Prm{c}{m}{\post} \land \Prm{c}{m}{\pre \wedge \post} = \delta
+\Prm{c}{m}{\pre} +  \Prm{c}{m}{\post} - \Prm{c}{m}{\pre \wedge \post} = \delta
 }{
   \Prm{c}{m}{\pre \vee \post} = \delta
 }

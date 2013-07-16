@@ -19,11 +19,7 @@ module type Adversary = {
   fun guess(c:ciphertext) : bool                  
 }.
 
-module type Init = {
-  fun init() : unit
-}.
-
-module CPA (S:Scheme, A:Adversary, I:Init) = {
+module CPA (S:Scheme, A:Adversary) = {
   fun main() : bool = {
     var pk : pkey;
     var sk : skey;
@@ -31,7 +27,6 @@ module CPA (S:Scheme, A:Adversary, I:Init) = {
     var c : ciphertext;
     var b, b' : bool;
 
-    I.init();
     (pk, sk) = S.kg();
     (m0, m1) = A.choose(pk);
     b        = ${0,1};
@@ -51,7 +46,7 @@ const qD : int.
 
 axiom qD_pos : 0 < qD.
 
-module CCA (S:Scheme, A:Adversary, I:Init) = {
+module CCA (S:Scheme, A:Adversary) = {
   var log : ciphertext list
   var cstar : ciphertext
   var guess : bool
@@ -74,7 +69,6 @@ module CCA (S:Scheme, A:Adversary, I:Init) = {
     var c : ciphertext;
     var b, b' : bool;
 
-    I.init();
     log = [];
     guess = false;
     (pk, sk) = S.kg();
@@ -87,14 +81,13 @@ module CCA (S:Scheme, A:Adversary, I:Init) = {
   } 
 }.
 
-module Correctness (S:Scheme, I:Init) = {
+module Correctness (S:Scheme) = {
   fun main(m:plaintext) : bool = {
     var pk : pkey;
     var sk : skey;
     var c  : ciphertext;
     var m' : plaintext option;
 
-    I.init();
     (pk, sk) = S.kg();
     c        = S.enc(pk, m);
     m'       = S.dec(sk, c); 

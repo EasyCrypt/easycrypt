@@ -177,6 +177,27 @@ lemma find_empty: forall (p:'a -> 'b cpred),
   find p empty = None
 by [].
 
+lemma find_in_p : forall (p:'a -> 'b cpred) (m:('a,'b) map),
+  forall x, in_dom x m => p x (proj m.[x]) =>
+  (exists x, find p m = Some x /\ in_dom x m /\ p x (proj m.[x])).
+proof.
+ intros => p m x Hindom Hproj.
+ elim (find_in p m _);first by exists x.
+ intros x' Hfind.
+ by exists x';split => //;apply find_cor => //.
+save. 
+
+lemma find_in_p_unique : forall (p:'a -> 'b cpred) (m:('a,'b) map),
+  forall x, in_dom x m => p x (proj m.[x]) =>
+  (forall x y, (p x (proj m.[x])) => (p y (proj m.[y])) => x = y) =>
+  find p m = Some x.
+proof.
+ intros => p m x Hindom Hproj Hp.
+ elim (find_in_p p m x _ _) => // x' [->][_] Hp'.
+ by rewrite (Hp x' x) => //.
+save. 
+
+
 (** rm *)
 op rm (x:'a) (m:('a,'b) map) = Map_why."_.[_<-_]" m x None.
 

@@ -84,9 +84,10 @@ import WRO_Fset.
 
 
 module Hashed_ElGamal (O:Oracle) : Scheme = {
+ module AO = ARO(RO)
   fun kg() : pkey * skey = {
     var sk : int;
-
+    AO.init();
     sk = $[0..q-1];
     return (g ^ sk, sk);   
   }
@@ -151,18 +152,18 @@ lemma CPA_G1 (A <: Adv {CPA, G1, RO, ARO, Hashed_ElGamal}) :
   (forall (O <: ARO), islossless O.o => islossless A(O).choose) =>
   (forall (O <: ARO), islossless O.o => islossless A(O).guess) =>
   equiv 
-  [ CPA(Hashed_ElGamal(RO), A(ARO(RO)), ARO(RO)).main ~ G1(A).main : 
+  [ CPA(Hashed_ElGamal(RO), A(ARO(RO))).main ~ G1(A).main : 
     (glob A){1} = (glob A){2} ==> !(mem G1.gxy ARO.log){2} => ={res} ].
 proof.
   intros Hll1 Hll2; fun.
   inline ARO(RO).init G1(A).AO.init RO.init 
-    Hashed_ElGamal(RO).kg Hashed_ElGamal(RO).enc.
+    Hashed_ElGamal(RO).kg Hashed_ElGamal(RO).enc Hashed_ElGamal(RO).AO.init.
   swap{1} 9 -5.
   seq 5 6 : 
     ((glob A){1} = (glob A){2} /\ ={ARO.log, RO.m, y} /\
      RO.m{1} = Map.empty /\ ARO.log{2} = Fset.empty /\
      pk{1} = gx{2} /\ (G1.gxy = gx ^ y){2}).
-  by wp; do rnd; wp; skip; smt.
+  wp; do rnd; wp; skip; progress; try smt.
   seq 2 2 : 
     ((glob A){1} = (glob A){2} /\ ={ARO.log, RO.m, y, b, m0, m1} /\
      pk{1} = gx{2} /\ (G1.gxy = gx ^ y){2} /\
@@ -324,7 +325,7 @@ qed.
 lemma Pr_CPA_G1 (A <: Adv {CPA, G1, G2, SCDH.SCDH, RO, ARO, Hashed_ElGamal}) &m :
   (forall (O <: ARO), islossless O.o => islossless A(O).choose) =>
   (forall (O <: ARO), islossless O.o => islossless A(O).guess) =>
-  Pr[CPA(Hashed_ElGamal(RO), A(ARO(RO)), ARO(RO)).main() @ &m : res] <=
+  Pr[CPA(Hashed_ElGamal(RO), A(ARO(RO))).main() @ &m : res] <=
   Pr[G1(A).main() @ &m : res \/ mem G1.gxy ARO.log]. 
 proof.
   intros _ _.
@@ -406,7 +407,7 @@ qed.
 lemma Reduction (A <: Adv {CPA, G1, G2, SCDH.SCDH, RO, ARO, Hashed_ElGamal}) &m :  
   (forall (O <: ARO), islossless O.o => islossless A(O).choose) =>
   (forall (O <: ARO), islossless O.o => islossless A(O).guess) =>
-  Pr[CPA(Hashed_ElGamal(RO), A(ARO(RO)), ARO(RO)).main() @ &m : res] <=
+  Pr[CPA(Hashed_ElGamal(RO), A(ARO(RO))).main() @ &m : res] <=
   1%r / 2%r + Pr[SCDH.SCDH(SCDH_from_CPA(A)).main() @ &m : res].
 proof. 
   intros _ _.  
@@ -426,7 +427,7 @@ lemma Security (A <: Adv {CPA, G1, G2, SCDH.SCDH, RO, ARO, Hashed_ElGamal}) &m :
   (forall (O <: ARO), islossless O.o => islossless A(O).choose) =>
   (forall (O <: ARO), islossless O.o => islossless A(O).guess) =>
   exists (B <: SCDH.Adversary),
-    Pr[CPA(Hashed_ElGamal(RO), A(ARO(RO)), ARO(RO)).main() @ &m : res] - 1%r / 2%r <= 
+    Pr[CPA(Hashed_ElGamal(RO), A(ARO(RO))).main() @ &m : res] - 1%r / 2%r <= 
     Pr[SCDH.SCDH(B).main() @ &m : res].
 proof.
   intros _ _.
@@ -442,7 +443,7 @@ lemma Security_CDH
   (forall (O <: ARO), islossless O.o => islossless A(O).choose) =>
   (forall (O <: ARO), islossless O.o => islossless A(O).guess) =>
   exists (B <: CDH.Adversary),
-    Pr[CPA(Hashed_ElGamal(RO), A(ARO(RO)), ARO(RO)).main() @ &m : res] - 1%r / 2%r 
+    Pr[CPA(Hashed_ElGamal(RO), A(ARO(RO))).main() @ &m : res] - 1%r / 2%r 
     <= qH%r * Pr[CDH.CDH(B).main() @ &m : res].
 proof.
   intros _ _.
@@ -459,11 +460,11 @@ qed.
 
 
 lemma Correctness : 
-  hoare [Correctness(Hashed_ElGamal(RO), RO).main : true ==> res].
+  hoare [Correctness(Hashed_ElGamal(RO)).main : true ==> res].
 proof.
   fun.
   inline Hashed_ElGamal(RO).kg Hashed_ElGamal(RO).enc Hashed_ElGamal(RO).dec. 
-  inline RO.o RO.init.
+  inline RO.o RO.init Hashed_ElGamal(RO).AO.init.
   do (wp; rnd); wp; skip; progress; [smt | | smt | smt].
     cut ->: g ^ y2 ^ sk0 = g ^ sk0 ^ y2; first smt.
     rewrite Map.get_setE Option.proj_some; smt.
