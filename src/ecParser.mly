@@ -262,6 +262,7 @@
 %token RCONDF
 %token RCONDT
 %token REALIZE
+%token REFLEX
 %token REQUIRE
 %token RES
 %token RETURN
@@ -1459,7 +1460,7 @@ intro_pattern:
 | o=rwocc? LEFTARROW
    { IPRw (omap o EcMaps.Sint.of_list, `RtoL) }
 
-| LBRACE xs=lident+ RBRACE
+| LBRACE xs=ident+ RBRACE
    { IPClear xs }
 
 | SLASHSLASH
@@ -1665,6 +1666,9 @@ app_bd_info:
 ;
 
 logtactic:
+| REFLEX
+    { Preflexivity }
+
 | ASSUMPTION
     { Passumption (None, None) }
 

@@ -22,11 +22,41 @@ module M = {
 }.
 
 lemma foo : bd_hoare [M.f : (b1 => M.y=e1) && (b2 => M.y=e2) && (b1||b2) ==> 
-                         M.x=M.y ] [=] [1%r].
+                         M.x=M.y ] = (1%r).
 proof.
  fun.
  if; wp; skip; smt.
 save.
 
 
+require import Distr.
+require import Fset.
+clone import Dexcepted.
+
+module M2 = {
+  var b,b' : bool
+  fun f () : unit = {
+    if (b) {
+      b' = false;
+    } else {
+      b' = $ {0,1}\(single b);
+    }
+  }
+}.
+
+
+lemma test : bd_hoare [M2.f : true ==> M2.b \/ M2.b' ] = (1%r).
+fun.
+if.
+wp; skip; trivial.
+rnd;skip. 
+simplify. intros &hr H.
+cut -> : M2.b{hr} = false;[ smt|simplify]. 
+rewrite - (lossless_restr ({0,1}) (single M2.b{hr}) _ _). 
+smt.
+delta cpMem; simplify.
+cut -> : (lambda x, mem x (single M2.b{hr})) = ( (=) M2.b{hr}); [apply fun_ext;smt|].
+smt.
+cut -> : M2.b{hr} = false;[ smt|simplify;smt]. 
+save.
 

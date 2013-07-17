@@ -1,0 +1,109 @@
+
+\subsection{Trivial judgements: the \rawec{exfalso} tactic}
+
+\subsubsection*{The \rawec{exfalso} tactic}
+\index{commonhl}{\rawec{exfalso}}
+
+The \rawec{exfalso} tactic discharges a Hoare, Probabilistic Hoare or
+Probabilistic relational Hoare judgement if the precondition can be
+trivially proved false. The \rawec{trivial} tactic incorporates the
+functionality of the \rawec{exfalso} tactic.
+
+
+\subsubsection*{The \rawec{trivial} tactic}
+\index{commonhl}{\rawec{trivial}}
+
+Discharges trivial judgements by applying the \rawec{exfalso} and
+\rawec{pr_bounded} tactics, removing Hoare judgements with
+postconditions equivalent to true, modulo trivial reasoning
+in the ambient logic.
+
+
+\subsection{Probability expressions: the \rawec{pr_false, pr_or} tactics}
+\index{commonhl}{\rawec{pr_false,pr_or}}
+
+\begin{displaymath}
+\infrule{
+  \false \Rightarrow \post
+}{
+  \Prm{c}{m}{\post} = 0
+}
+\end{displaymath}
+
+\begin{displaymath}
+\infrule{
+\Prm{c}{m}{\pre} +  \Prm{c}{m}{\post} - \Prm{c}{m}{\pre \wedge \post} = \delta
+}{
+  \Prm{c}{m}{\pre \vee \post} = \delta
+}
+\end{displaymath}
+
+
+
+\subsection{Program transformations}
+%
+
+\subsubsection*{The \rawec{inline} tactic}
+\index{commonhl}{\rawec{inline}}
+%
+
+\subsubsection*{The \rawec{swap} tactic}
+\index{commonhl}{\rawec{swap}}
+%
+\Syntax \rawec{swap} [\textit{side}] \textit{swap\_pos}
+
+\textbf{where:} 
+\begin{tabular}[t]{l}
+  \textit{swap\_pos} ::= 
+  \textit{n} \textit{n} \textit{n} $\mid$ \textit{n} \textit{z} $\mid$ [\textit{n}:\textit{n}] \textit{z}
+  \\
+  $n$ a natural number
+  \\
+  $z$ an integer number
+\end{tabular}
+  
+
+The tactic [\rawec{swap} $p_1$ $p_2$ $p_3$] swaps the code between
+positions $p_1$ and $p_2$ with the code between positions $p_2$ and
+$p_3$. That is, assuming that $c_1$ and $c_2$ are syntactically
+independent, that $c_1$ is between positions $p_1$ and $p_2$ and that
+$c_2$ is between positions $p_2$ and $p_3$, the tactic implements the
+following rule:
+\begin{displaymath}
+\infrule{
+  \Hoare{c;c_2;c_1;c_3}{\pre}{\post}
+}{
+  \Hoare{c;c_1;c_2;c_3}{\pre}{\post}
+} [\mathec{swap}\ p_1\ p_2\ p_3]
+\end{displaymath}
+
+If $k$ is positive (negative) then [\rawec{swap} $k$] moves the first
+(last) instruction $k$ positions forwards (backwards). Similarly,
+[\rawec{swap} $i$ $k$] moves the $i^{th}$ instruction forwards or
+backwards, and [\rawec{swap} $[i_1:i_2]$ $k$] moves the instructions
+between positions $i_1$ and $i_2$.
+
+\subsubsection*{The \rawec{fun} tactic}
+\index{commonhl}{\rawec{fun}}
+\NotDocumented
+\subsubsection*{The \rawec{unroll} tactic}
+\index{commonhl}{\rawec{unroll}}
+\NotDocumented
+\subsubsection*{The \rawec{splitwhile} tactic}
+\index{commonhl}{\rawec{splitwhile}}
+\NotDocumented
+\subsubsection*{The \rawec{fusion,fission} tactic}
+\index{commonhl}{\rawec{fusion,fission}}
+\NotDocumented
+\subsubsection*{The \rawec{condt,condf} tactic}
+\index{commonhl}{\rawec{condt,condf}}
+\NotDocumented
+\subsubsection*{The \rawec{kill} tactic}
+\index{commonhl}{\rawec{kill}}
+\NotDocumented
+
+
+%%% Local Variables: 
+%%% mode: latex
+%%% TeX-master: "easycrypt"
+%%% End: 

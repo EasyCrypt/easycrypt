@@ -80,7 +80,6 @@ Pr[M(A).main() @ &m : O.bad /\ (length O.s) <= qO] <= qO%r * (qO-1)%r * bd.
 intros A &m.
 fel 1 (length O.s) (lambda x, (x%r)*bd) qO O.bad [O.o : (length O.s < qO /\ x=x)].
 
-
   (* subgoal on sum *)
   admit.
   (* event holds as postcondition *)
@@ -91,10 +90,10 @@ fel 1 (length O.s) (lambda x, (x%r)*bd) qO O.bad [O.o : (length O.s < qO /\ x=x)
 
   (** pr of setting bad *)
   fun.
-  if;[|admit]. (* trivial, but missing tactic *)
+  if;[|conseq (_ : _ : = 0%r);[smt|hoare;wp; skip; smt]]. 
   wp.
   simplify.
-  rnd ((length O.s)%r * bd) (lambda z, mem z O.s).
+  rnd (lambda z, mem z O.s).
   skip; simplify.
   intros &hr H.
    rewrite distr_ax.

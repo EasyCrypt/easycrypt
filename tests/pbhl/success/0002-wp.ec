@@ -37,9 +37,11 @@ module M2 = {
 lemma test2: bd_hoare [ M2.f : b ==> res] = (1%r/2%r). 
 fun.
 wp.
-rnd (1%r/2%r) (lambda (x:bool), x=y).
+rnd ((=) y).
 skip.
-intros _ n; split; [smt|smt].
+simplify.
+intros &hr b.
+split;[smt|smt].
 save.
 
 
@@ -57,15 +59,27 @@ lemma test3: bd_hoare [ M3.f : true ==> res=b] >= 1%r.
 proof.
 fun.
 wp.
-rnd 1%r (lambda x, true) .
+rnd (lambda x, true) .
 skip; smt.
 save.
 
 
 
+module M4 = {
+  var x : real
+  var y : bool
+  fun foo () : unit = {
+    if (true) {
+      y = ${0,1};
+    }
+    x = 1%r; 
+  }
+}
+.
 
-
-
-
-
-
+require import Real.
+lemma test : bd_hoare[M4.foo : M4.x=(Real.(/) 1%r2%r) ==> M4.y=true] = M4.x.
+fun.
+wp.
+rcondt 1; [trivial|].
+rnd;skip; smt.
