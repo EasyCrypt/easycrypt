@@ -30,6 +30,8 @@ module Mpv : sig
 
 end 
 
+exception MemoryClash
+
 module PVM : sig
   type subst
 

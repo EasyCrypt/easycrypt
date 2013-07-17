@@ -140,6 +140,8 @@ module Mpv = struct
 
 end
 
+exception MemoryClash
+
 module PVM = struct
   type subst = (form, form) Mpv.t Mid.t
 
@@ -163,7 +165,9 @@ module PVM = struct
     try Mpv.find_glob env mp (Mid.find m s)
     with AliasClash (env,c) -> uerror env c
 
-  let check_binding m s = assert (not (Mid.mem m s))
+
+  let check_binding m s =
+    if (Mid.mem m s) then raise MemoryClash
 
   let has_mod b = 
     List.exists (fun (_,gty) -> match gty with GTmodty _ -> true | _ -> false) b

@@ -1188,11 +1188,15 @@ let is_subst_pv_eq hyps fx (hid,lk) =
 
 let t_subst1_pv fx g =
   let hyps = get_hyps g in
-  match List.pick (is_subst_pv_eq hyps fx) (LDecl.tohyps hyps).h_local with
-  | None -> tacuerror "subst"           (* FIXME: error message *)
-  | Some(h, _x, side) ->
-    t_subst_pv_gen h side g
-
+  let rec aux local = 
+    match local with 
+    | [] -> tacuerror "cannot find something to subst"
+    | h :: l ->
+      match is_subst_pv_eq hyps fx h with
+      | Some(h, _x, side) ->
+        (try t_subst_pv_gen h side g with EcPV.MemoryClash -> aux l)
+      | _ -> aux l in
+  aux (LDecl.tohyps hyps).h_local 
 
 let t_subst1 fx g = 
   match fx with
