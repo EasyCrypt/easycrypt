@@ -420,6 +420,7 @@ and renaming = [
 ]
 
 type logtactic =
+  | Preflexivity
   | Passumption of (pqsymbol option * ptyannot option)
   | Psmt        of (string located option * pprover_infos)
   | Pintro      of intropattern

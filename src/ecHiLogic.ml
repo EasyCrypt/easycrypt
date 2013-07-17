@@ -163,6 +163,10 @@ let process_assumption loc (pq, tvi) g =
       | _ -> process_global loc (pq,tvi) g
 
 (* -------------------------------------------------------------------- *)
+let process_reflexivity loc g =
+  set_loc loc EcLogic.t_reflex g
+
+(* -------------------------------------------------------------------- *)
 let process_form_opt hyps pf oty =
   let ue  = unienv_of_hyps hyps in
   let ff  = TT.trans_form_opt (LDecl.toenv hyps) ue pf oty in
@@ -1138,6 +1142,7 @@ let process_elimT loc (pf, qs) g =
 (* -------------------------------------------------------------------- *)
 let process_logic (engine, hitenv) loc t =
   match t with
+  | Preflexivity   -> process_reflexivity loc
   | Passumption pq -> process_assumption loc pq
   | Psmt pi        -> process_smt hitenv pi
   | Pintro pi      -> process_intros pi

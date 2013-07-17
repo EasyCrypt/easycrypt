@@ -262,6 +262,7 @@
 %token RCONDF
 %token RCONDT
 %token REALIZE
+%token REFLEX
 %token REQUIRE
 %token RES
 %token RETURN
@@ -1665,6 +1666,9 @@ app_bd_info:
 ;
 
 logtactic:
+| REFLEX
+    { Preflexivity }
+
 | ASSUMPTION
     { Passumption (None, None) }
 

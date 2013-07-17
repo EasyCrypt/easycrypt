@@ -1,9 +1,10 @@
-; Generated on Mon Jul  8 11:17:16 2013
+; Generated on Tue Jul 16 20:44:16 2013
 
 (defvar easycrypt-bytac-keywords '(
   "assumption"
   "smt"
   "by"
+  "reflexivity"
 ))
 
 (defvar easycrypt-dangerous-keywords '(
@@ -108,6 +109,7 @@
   "compute"
   "field"
   "field_simplify"
+  "transitivity"
   "seq"
   "wp"
   "eqobs_in"
