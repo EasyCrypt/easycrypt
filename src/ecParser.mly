@@ -1460,7 +1460,7 @@ intro_pattern:
 | o=rwocc? LEFTARROW
    { IPRw (omap o EcMaps.Sint.of_list, `RtoL) }
 
-| LBRACE xs=lident+ RBRACE
+| LBRACE xs=ident+ RBRACE
    { IPClear xs }
 
 | SLASHSLASH

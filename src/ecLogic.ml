@@ -386,9 +386,19 @@ let gen_check_restr env pp_a a use restr =
   let ppe = EcPrinting.PPEnv.ofenv env in
   let pp_mp = EcPrinting.pp_topmod ppe in
   let check_xp xp _ = 
+    (* We check that the variable is not a variable in restr *)
     if NormMp.use_mem_xp xp restr then
       tacuerror "%a should not use the variable %a."
-       (pp_a ppe) a (EcPrinting.pp_pv ppe) (pv_glob xp) in
+       (pp_a ppe) a (EcPrinting.pp_pv ppe) (pv_glob xp);
+    (* We check that the variable is in the restriction of the abstract module
+       in restr *)
+    let check id2 = 
+      let mp2 = EcPath.mident id2 in
+      let r2  = NormMp.get_restr env mp2 in
+      if not (NormMp.use_mem_xp xp r2) then
+        tacuerror "%a use the variable %a, but should not use the module %a (which can use %a)" (pp_a ppe) a (EcPrinting.pp_pv ppe) (pv_glob xp)
+          pp_mp mp2 (EcPrinting.pp_pv ppe) (pv_glob xp) in
+    EcIdent.Sid.iter check restr.NormMp.us_gl in
   EcPath.Mx.iter check_xp (use.NormMp.us_pv);
   let check_gl id = 
     let mp1 = EcPath.mident id in

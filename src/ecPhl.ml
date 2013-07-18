@@ -2493,6 +2493,7 @@ let t_bd_hoare_rnd tac_info g =
         let event = mk_event ty_distr in
         let bounded_distr = f_eq (f_mu distr event) f_r1 in
         let concl = f_bdHoareS_r {bhs with bhs_s=s} in
+        let bounded_distr = gen_mems [bhs.bhs_m] bounded_distr in
         [bounded_distr;concl]
       else 
         let event = mk_event ty_distr in
