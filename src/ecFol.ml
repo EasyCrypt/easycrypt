@@ -624,10 +624,10 @@ let fop_int_intval = f_op EcCoreLib.p_int_intval [] (tfun tint (tfun tint (tfset
 let f_int_intval k1 k2 = 
   f_app fop_int_intval [k1;k2] (tfset tint)
 
-let fop_int_sum ty = f_op EcCoreLib.p_int_sum [ty] (tfun (tfun tint ty) (tfun (tfset tint) ty))
+let fop_int_sum = f_op EcCoreLib.p_int_sum [] (tfun (tfun tint treal) (tfun (tfset tint) treal))
 
 let f_int_sum op intval ty =
-  f_app (fop_int_sum treal) [op;intval] ty
+  f_app fop_int_sum [op;intval] ty
 
 (* -------------------------------------------------------------------- *)
 let f_real_cmp cmp f1 f2 =

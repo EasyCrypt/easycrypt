@@ -2113,7 +2113,7 @@ let t_failure_event at_pos cntr ash q f_event pred_specs inv g =
       (* subgoal on the bounds *)
       let bound_goal = 
         let intval = f_int_intval (f_int 0) (f_int_sub q (f_int 1)) in
-        let v = f_int_sum ash intval treal  in
+        let v = f_int_sum ash intval treal in
         f_real_le v bd
       in
       (* we must quantify over memories *)
