@@ -2113,7 +2113,7 @@ let t_failure_event at_pos cntr ash q f_event pred_specs inv g =
       (* subgoal on the bounds *)
       let bound_goal = 
         let intval = f_int_intval (f_int 0) (f_int_sub q (f_int 1)) in
-        let v = f_int_sum ash intval treal  in
+        let v = f_int_sum ash intval treal in
         f_real_le v bd
       in
       (* we must quantify over memories *)
@@ -2452,9 +2452,9 @@ let t_bd_hoare_rnd tac_info g =
     PV.indep env modif_s fv_bd
   in
 
-  let mk_event ty = 
+  let mk_event ?(simpl=true) ty = 
     let x = EcIdent.create "x" in 
-    if is_post_indep then f_lambda [x,GTty ty] f_true
+    if is_post_indep && simpl then f_lambda [x,GTty ty] f_true
     else match lv with
       | LvVar (pv,_) -> 
         f_lambda [x,GTty ty] 
@@ -2522,7 +2522,9 @@ let t_bd_hoare_rnd tac_info g =
         let concl = f_forall_simpl binders concl in
         [concl]
     | PMultRndParams ((phi,d1,d2,d3,d4),event), _ -> 
-      let event = match event ty_distr with | None -> mk_event ty_distr | Some event -> event in
+      let event = match event ty_distr with 
+        | None -> mk_event ~simpl:false ty_distr | Some event -> event 
+      in
       let bd_sgoal = f_cmp (f_real_add (f_real_prod d1 d2) (f_real_prod d3 d4)) bhs.bhs_bd in 
       let sgoal1 = f_bdHoareS_r {bhs with bhs_s=s; bhs_po=phi; bhs_bd=d1} in
       let sgoal2 = 

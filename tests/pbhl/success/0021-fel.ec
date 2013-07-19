@@ -12,6 +12,7 @@ op qO : int.           (* Maximum number of calls by the adversary *)
 op default : to.       (* Default element to return on error by wrapper *)
 
 op bd : real.
+axiom bdPos : bd >= 0%r.
 
 module type O = {
   fun o(x:from) : to
@@ -81,7 +82,18 @@ intros A &m.
 fel 1 (length O.s) (lambda x, (x%r)*bd) qO O.bad [O.o : (length O.s < qO /\ x=x)].
 
   (* subgoal on sum *)
-  admit.
+  rewrite /int_sum /intval (_:qO=qO-1+1);first smt.
+  elim/Induction.induction (qO-1);last smt.
+    cut h1 : (0 <= 0 + 1 - 1);first smt.
+    cut h2 : (0 > 0 + 1 - 1 - 1);first smt.
+    by rewrite Interval.interval_pos // Interval.interval_neg //
+      MReal.SumSet.sum_add ? mem_empty // MReal.SumSet.sum_nil;smt.
+    intros=> i h hrec.
+    cut h1 : 0 <= i + 1 + 1 - 1 by smt.
+    cut h2 : ! 0 <= i + 1 + 1 - 1 <= i + 1 + 1 - 1 - 1 by smt.
+    cut h3 : i + 1 + 1 - 1 - 1=i+1-1 by smt.
+    by rewrite Interval.interval_pos // MReal.SumSet.sum_add ?
+      Interval.mem_interval // h3;smt.
   (* event holds as postcondition *)
   trivial.
   (* initialization of bad and counter *)
