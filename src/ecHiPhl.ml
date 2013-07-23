@@ -928,5 +928,6 @@ let process_phl loc ptac g =
     | Pbdeq                     -> process_bdeq
     | Peqobs_in info            -> process_eqobs_in info
     | Ptrans_stmt info          -> process_equiv_trans info
+    | Psp      arg              -> t_sp arg
   in
     set_loc loc t g
