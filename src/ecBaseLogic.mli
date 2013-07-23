@@ -54,6 +54,7 @@ type rule_name =
   | RN_exists_elim  
   | RN_exists_intro 
   | RN_conv    
+  | RN_sp 
 
     (* Rings && fields *)
   | RN_field 

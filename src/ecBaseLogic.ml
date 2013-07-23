@@ -69,6 +69,7 @@ type rule_name =
   | RN_exists_elim  
   | RN_exists_intro 
   | RN_conv    
+  | RN_sp 
 	(* Field & Ring*)
   | RN_field 
   | RN_field_simp 

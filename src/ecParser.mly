@@ -283,6 +283,7 @@
 %token SLASHSLASH
 %token SLASHSLASHEQ
 %token SMT
+%token SP
 %token SPLIT
 %token SPLITWHILE
 %token STAR
@@ -1863,6 +1864,10 @@ phltactic:
     { Peqobs_in info }
 | TRANSITIVITY tk=trans_kind h1=trans_hyp h2=trans_hyp
     { Ptrans_stmt (tk, fst h1, snd h1, fst h2, snd h2) }
+
+| SP s=side?
+   {Psp s}
+
 (* basic pr based tacs *)
 | HOARE {Phoare}
 | BDHOARE {Pbdhoare}

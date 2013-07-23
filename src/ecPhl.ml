@@ -3001,6 +3001,63 @@ let t_trivial =
     (t_id None)
   
  
+(* ---SP--------------------------------------------------------------- *)
+let rec sp_st side env mem pre (st : stmt) =
+  let is = st.s_node in
+  let f r i = sp_inst side env mem r (i.i_node) in
+  List.fold_left (fun r i -> f r i) pre is
+and 
+  sp_inst side env mem (pre : form) (inst : instr_node) : form=
+  match inst with
+  | Sasgn (LvVar(lf,lty) as lvL, muL) ->
+    let fl   = f_pvar lf lty side in
+    let x_id = if (EcIdent.id_equal mleft side ) then EcIdent.create (symbol_of_lv lvL ^ "L")
+               else  EcIdent.create (symbol_of_lv lvL ^ "R")in
+    let x    = f_local x_id lty in
+    let muL  = EcFol.form_of_expr (EcMemory.memory mem) muL in
+    let muL' = (subst_form_lv env (EcMemory.memory mem) lvL x muL) in
+    let eq p q = mk_form (Fapp (fop_eq lty, p :: q :: [])) tbool in
+    let fvl  = EcPV.PV.fv env (EcMemory.memory mem) pre in (* FV(pre) *)
+    let fvm  = EcPV.PV.fv env (EcMemory.memory mem) muL in (* FV(e) *)
+    if (EcPV.PV.mem_pv env lf fvl) || (EcPV.PV.mem_pv env lf fvm) then
+      let pr = subst_form_lv env (EcMemory.memory mem) lvL x pre in
+      f_exists [(x_id, GTty lty)]  (f_and_simpl (eq fl muL') pr)
+    else
+      f_and_simpl (eq fl muL) pre 
+  | Sif (e,st1,st2) ->
+    let b = EcFol.form_of_expr (EcMemory.memory mem) e in (* condition *)
+    let pb = f_and_simpl pre b in
+    let pnb = f_and_simpl pre (f_not b) in
+    let sp1 = sp_st side env mem pb st1 in
+    let sp2 = sp_st side env mem pnb st2 in
+      f_or sp1 sp2
+  | _ -> cannot_apply "sp" "sp only works with single asgn or if"
 
+let t_sp_aux side g =
+  let (env, _, concl) = get_goal_e g in
+  let es = destr_equivS concl in
+  let err ()  = cannot_apply "sp" "with an empty goal" in
+  let spl = sp_inst mleft env es.es_ml es.es_pr in
+  let spr pr = sp_inst mright env es.es_mr pr in
+  if side then
+    let l   = s_fst err es.es_sl in
+    let ls  = s_tail err es.es_sl in
+    let pr  = spl (l.i_node) in
+    let wes = f_equivS_r {es with es_sl=ls; es_pr=pr} in
+      t_on_last t_simplify_nodelta (prove_goal_by [wes] RN_sp g )
+  else
+    let r  = s_fst err es.es_sr in
+    let rs = s_tail err es.es_sr in
+    let pr = spr es.es_pr (r.i_node) in
+    let wes = f_equivS_r {es with es_sr=rs; es_pr=pr} in
+      t_on_last t_simplify_nodelta (prove_goal_by [wes] RN_sp g )
 
-  
+let t_sp side g =
+  let sp s = t_repeat (t_sp_aux s) in
+  match side with
+  | None   ->
+    t_on_last (sp false) (sp true g)
+  | Some s ->
+    t_repeat (t_sp_aux s) g
+
+(* -------------------------------------------------------------------- *)
