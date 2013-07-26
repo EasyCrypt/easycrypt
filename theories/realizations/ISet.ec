@@ -114,7 +114,7 @@ lemma mem_filter: forall x (p:'a cpred) X,
   mem x (filter p X) <=> (mem x X /\ p x)
 by [].
 
-op create (x:'a cpred) : 'a set = x.
-lemma mem_create :
-  forall (x:'a) p,
-    mem x (create p) = p x by trivial.
+op create (p:'a cpred): 'a set = p.
+lemma mem_create (x:'a) p:
+  mem x (create p) = p x
+by trivial.

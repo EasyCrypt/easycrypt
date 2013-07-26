@@ -421,6 +421,20 @@ proof strict.
 by intros=> p X x; rewrite mem_filter=> [x_in_X _] //.
 qed.
 
+lemma filter_empty (p:'a -> bool):
+  filter p empty = empty.
+proof strict.
+by apply set_ext=> x;
+   rewrite mem_filter -(nnot (mem x empty)) mem_empty.
+qed.
+
+lemma rm_filter x (p:'a -> bool) (s:'a set):
+  rm x (filter p s) = filter p (rm x s).
+proof strict.
+by apply set_ext=> a;
+   rewrite mem_filter mem_rm mem_filter mem_rm.
+qed.
+
 (* fold *)
 op fold : ('a -> 'b -> 'b) -> 'b -> 'a set -> 'b.
 

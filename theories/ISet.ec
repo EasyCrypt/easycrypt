@@ -72,6 +72,13 @@ axiom mem_rm_eq: forall (x:'a) X,
 axiom mem_rm_neq: forall (x x':'a) X,
   x <> x' => mem x (rm x' X) = mem x X.
 
+lemma mem_rm: forall (x x':'a) (X:'a set),
+  mem x (rm x' X) = (mem x X /\ x <> x').
+intros x x' X; case (x = x')=> x_x'.
+  by subst x'; logic; apply neqF; apply mem_rm_eq.
+  by logic; apply mem_rm_neq.
+save.
+
 lemma rm_add_eq: forall (x:'a) X,
   rm x (add x X) = rm x X
 by (intros=> x X; apply set_ext; smt).
@@ -205,6 +212,20 @@ lemma leq_filter: forall (p:'a cpred) X,
   filter p X <= X
 by [].
 
+lemma filter_empty (p:'a -> bool):
+  filter p empty = empty.
+proof strict.
+by apply set_ext=> x;
+   rewrite mem_filter -(nnot (mem x empty)) mem_empty.
+qed.
+
+lemma rm_filter x (p:'a -> bool) s:
+  rm x (filter p s) = filter p (rm x s).
+proof strict.
+by apply set_ext=> a;
+   rewrite mem_filter mem_rm mem_filter mem_rm.
+qed.
+
 theory Finite.
   require        FSet.
 
@@ -269,10 +290,16 @@ theory Finite.
   (* We should then show that all set operations correspond as expected *)
 end Finite.
 
-op create : 'a cpred -> 'a set.
-axiom mem_create :
-  forall (x:'a) p,
-    mem x (create p) = p x.
+op create: 'a cpred -> 'a set.
+axiom mem_create (x:'a) p:
+  mem x (create p) <=> p x.
+
+lemma create_def (p:'a cpred):
+  create p = filter p univ.
+proof strict.
+by apply set_ext=> x; rewrite mem_filter mem_univ /=;
+   apply mem_create.
+qed.
 
 require Distr.
 op support (d:'a distr) = create (lambda x, Distr.in_supp x d).

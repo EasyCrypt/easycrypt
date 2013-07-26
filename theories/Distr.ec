@@ -44,40 +44,42 @@ lemma mu_disjoint (d:'a distr) (p q:'a cpred):
   (cpAnd p q <= cpFalse) =>
   mu d (cpOr p q) = mu d p + mu d q.
 proof strict.
-intros=> and_p_q_false; cut inter_empty: cpAnd p q = cpFalse; first by apply leq_asym.
+intros=> and_p_q_false;
+cut inter_empty: cpAnd p q = cpFalse by apply leq_asym=> //;
 by rewrite mu_or inter_empty mu_false.
 qed.
 
 lemma mu_not (d:'a distr) (p:'a cpred):
   mu d (cpNot p) = mu d cpTrue - mu d p.
 proof strict.
-cut ->: (forall (x y z:real), x = y - z <=> x + z = y) by smt.
+cut ->: (forall (x y z:real), x = y - z <=> x + z = y) by smt;
 by rewrite -mu_disjoint ?cpEM //; apply leq_refl; rewrite cpC.
 qed.
 
 lemma mu_in_supp (d:'a distr) (p:'a cpred):
   mu d p = mu d (cpAnd p (lambda x, in_supp x d)).
-apply (_:forall (x y:real), y <= x => x <= y => x = y);first by smt.
-  by apply mu_sub=> x;rewrite /cpAnd //.
-  cut -> : (forall (p q:'a cpred), (cpAnd p q) = (cpNot (cpOr (cpNot p) (cpNot q))))
-    by (intros=> p' q';apply fun_ext;smt).
-  by rewrite mu_not mu_or !mu_not mu_supp;smt.
+proof strict.
+apply Antisymm; last by apply mu_sub=> x; rewrite /cpAnd.
+by cut -> : (forall (p q:'a cpred), (cpAnd p q) = (cpNot (cpOr (cpNot p) (cpNot q))))
+     by (intros=> p' q'; apply fun_ext; smt);
+   rewrite mu_not mu_or !mu_not mu_supp; smt.
 qed.
 
 lemma mu_in_supp_sub (d:'a distr) (p q:'a cpred):
   (forall a, in_supp a d => p a => q a) =>
   mu d p <= mu d q.
-proof.
+proof strict.
 by intros=> ple_p_q; rewrite mu_in_supp;
    apply mu_sub; rewrite /cpAnd=> x [mu_p mu_supp];
-   apply ple_p_q=> //.
+   apply ple_p_q.
 qed.
 
 lemma mu_in_supp_eq (d:'a distr) (p q:'a cpred):
   (forall (a:'a), in_supp a d => (p a <=> q a)) =>
   mu d p = mu d q.
-proof.
-smt.
+proof strict.
+by intros=> eq_on_supp; rewrite mu_in_supp (mu_in_supp _ q);
+   apply mu_eq; rewrite /cpAnd=> x /=; smt.
 qed.
 
 lemma mu_weight_0 (d:'a distr):
@@ -205,8 +207,10 @@ theory Dapply.
   qed.
 
   lemma lossless (d : 'a distr) (f : 'a -> 'b):
-    weight (dapply f d) = weight d
-  by [].
+    weight (dapply f d) = weight d.
+  proof strict.
+  by rewrite /weight mu_def /cpTrue.
+  qed.
 end Dapply.
 
 (** Laplacian *) (* TODO: This is drafty! *)
