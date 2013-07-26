@@ -221,6 +221,17 @@ theory Finite.
   axiom fromFSet_cor: forall (X:'a FSet.set),
     fromFSet X == X.
 
+  lemma mem_toFSet : forall (x:'a) X, finite X =>
+    FSet.mem x (toFSet X) <=> mem x X.
+  proof strict.
+  intros x X h.
+  rewrite -rw_eq_iff rw_eq_sym rw_eq_iff.
+  generalize x.
+  change (X == (toFSet X)).
+  apply toFSet_cor.
+  assumption.
+  qed.
+
   lemma finite_fromFSet: forall (X:'a FSet.set),
     finite (fromFSet X)
   by (intros=> X; exists X; apply fromFSet_cor).
@@ -257,3 +268,11 @@ theory Finite.
 
   (* We should then show that all set operations correspond as expected *)
 end Finite.
+
+op create : 'a cpred -> 'a set.
+axiom mem_create :
+  forall (x:'a) p,
+    mem x (create p) = p x.
+
+require Distr.
+op support (d:'a distr) = create (lambda x, Distr.in_supp x d).

@@ -113,3 +113,8 @@ op filter (p:'a cpred) (X:'a set) = inter p X.
 lemma mem_filter: forall x (p:'a cpred) X,
   mem x (filter p X) <=> (mem x X /\ p x)
 by [].
+
+op create (x:'a cpred) : 'a set = x.
+lemma mem_create :
+  forall (x:'a) p,
+    mem x (create p) = p x by trivial.
