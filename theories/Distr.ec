@@ -3,11 +3,11 @@ require export Fun.
 require import Int.
 require import Real.
 
-op charfun (p:'a cpred, x:'a) : real = if p x then 1%r else 0%r.
+op charfun (p:'a cpred) (x:'a) : real = if p x then 1%r else 0%r.
 
-op mu_x(d:'a distr, x) : real = mu d ((=) x).
+op mu_x (d:'a distr) x : real = mu d ((=) x).
 
-op weight(d:'a distr) : real = mu d cpTrue.
+op weight (d:'a distr) : real = mu d cpTrue.
 
 op in_supp x (d:'a distr) : bool = 0%r < mu_x d x.
 
@@ -27,8 +27,8 @@ axiom mu_or (d:'a distr) (p q:'a cpred):
 axiom mu_sub (d:'a distr) (p q:'a cpred):
   p <= q => mu d p <= mu d q.
 
-axiom mu_in_supp (d:'a distr) (p:'a cpred):
-  mu d p = mu d (cpAnd p (lambda x, in_supp x d)).
+axiom mu_supp (d:'a distr) :
+  mu d (lambda x, in_supp x d) = mu d cpTrue.
 
 axiom pw_eq (d d':'a distr):
   d == d' => d = d'.
@@ -38,6 +38,30 @@ lemma mu_eq (d:'a distr) (p q:'a cpred):
   p == q => mu d p = mu d q.
 proof.
 by intros=> ext_p_q; congr=> //; apply fun_ext=> //.
+qed.
+
+lemma mu_disjoint (d:'a distr) (p q:'a cpred):
+  (cpAnd p q <= cpFalse) =>
+  mu d (cpOr p q) = mu d p + mu d q.
+proof strict.
+intros=> and_p_q_false; cut inter_empty: cpAnd p q = cpFalse; first by apply leq_asym.
+by rewrite mu_or inter_empty mu_false.
+qed.
+
+lemma mu_not (d:'a distr) (p:'a cpred):
+  mu d (cpNot p) = mu d cpTrue - mu d p.
+proof strict.
+cut ->: (forall (x y z:real), x = y - z <=> x + z = y) by smt.
+by rewrite -mu_disjoint ?cpEM //; apply leq_refl; rewrite cpC.
+qed.
+
+lemma mu_in_supp (d:'a distr) (p:'a cpred):
+  mu d p = mu d (cpAnd p (lambda x, in_supp x d)).
+apply (_:forall (x y:real), y <= x => x <= y => x = y);first by smt.
+  by apply mu_sub=> x;rewrite /cpAnd //.
+  cut -> : (forall (p q:'a cpred), (cpAnd p q) = (cpNot (cpOr (cpNot p) (cpNot q))))
+    by (intros=> p' q';apply fun_ext;smt).
+  by rewrite mu_not mu_or !mu_not mu_supp;smt.
 qed.
 
 lemma mu_in_supp_sub (d:'a distr) (p q:'a cpred):
@@ -54,21 +78,6 @@ lemma mu_in_supp_eq (d:'a distr) (p q:'a cpred):
   mu d p = mu d q.
 proof.
 smt.
-qed.
-
-lemma mu_disjoint (d:'a distr) (p q:'a cpred):
-  (cpAnd p q <= cpFalse) =>
-  mu d (cpOr p q) = mu d p + mu d q.
-proof strict.
-intros=> and_p_q_false; cut inter_empty: cpAnd p q = cpFalse; first by apply leq_asym.
-by rewrite mu_or inter_empty mu_false.
-qed.
-
-lemma mu_not (d:'a distr) (p:'a cpred):
-  mu d (cpNot p) = mu d cpTrue - mu d p.
-proof strict.
-cut ->: (forall (x y z:real), x = y - z <=> x + z = y); first smt.
-by rewrite -mu_disjoint ?cpEM //; apply leq_refl; rewrite cpC.
 qed.
 
 lemma mu_weight_0 (d:'a distr):
