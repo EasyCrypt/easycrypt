@@ -1,7 +1,8 @@
 theory Foo.
   section.
     theory U.
-      axiom foo : true.
+      (* was: axiom foo : true. but could not be found, breaking the test case. *)
+      lemma foo : true by trivial.
     end U.
   end section.
 

@@ -1,5 +1,3 @@
-
-
 require import Distr. import Dinter.
 require import Int. 
 
@@ -66,7 +64,7 @@ proof.
  fun.
  rnd (lambda z, z + 1) (lambda z, z - 1).
  skip.
- smt.
+ progress; smt.
 save.
 
 
