@@ -95,7 +95,7 @@ lemma in_rng_setE: forall (m:('a,'b) map) x v, in_rng v m.[x <- v] by [].
 lemma rng_empty: rng empty<:'a,'b> = ISet.empty.
 proof strict.
 by apply ISet.set_ext; delta ISet.(==); beta=> v;
-   rewrite rng_def; smt.
+   rewrite rng_def; split; apply absurd=> _; smt.
 qed.
 
 lemma in_rng_empty: forall (v:'b), !(in_rng v empty<:'a,'b>) by [].
