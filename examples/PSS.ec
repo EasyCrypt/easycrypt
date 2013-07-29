@@ -2,7 +2,7 @@ require import RandOrcl.
 require import Array.
 require import Bitstring.
 require import Map.
-require import Set.
+require import FSet.
 require import Int.
 require import Distr.
 require import Bool.
@@ -143,7 +143,7 @@ module PSS:SigScheme_ROM = {
 
   (* Keygen: make it a wrapped pop *)
   fun keygen():(pkey * skey) = {
-    var pk, sk:(pkey * skey);
+    var (pk, sk):(pkey * skey);
     (pk,sk) = $keypairs;
     return (pk,sk);
   }
