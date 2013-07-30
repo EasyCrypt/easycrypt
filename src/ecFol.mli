@@ -313,6 +313,7 @@ exception DestrError of string
 
 val destr_local     : form -> EcIdent.t 
 val destr_tuple     : form -> form list
+val destr_app       : form -> form * form list
 val destr_not       : form -> form
 val destr_and       : form -> form * form
 val destr_or        : form -> form * form
