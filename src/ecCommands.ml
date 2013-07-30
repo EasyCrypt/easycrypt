@@ -185,7 +185,7 @@ and process_th_require ld scope (x, io) =
   let name  = x.pl_desc in
     match EcLoader.locate name ld with
     | None ->
-        failwith ("cannot locate: " ^ name) (* FIXME *)
+        EcScope.hierror "cannot locate theory `%s'" name
 
     | Some filename ->
         let dirname = Filename.dirname filename in
