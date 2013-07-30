@@ -674,11 +674,22 @@ let createVarForBinding t =
 let createVarForLet t =
   let v = EcIdent.create "_" in ((v, t), EcFol.f_local v t)
 
-(* This tactic works only if the conclusion is exactly a reflexive equality *)
-let t_reflex g =
-  let _, concl = get_goal g in
-  let (f,_) = destr_eq concl in
-  t_apply_logic p_eq_refl [f.f_ty] [AAform f] g
+let t_reflex ?(reduce = false) g =
+  let hyps = get_hyps g in
+
+  let rec doit goal =
+    let notaneq () = tacuerror "reflexivity: not an equality" in
+      match EcFol.sform_of_form goal with
+      | SFeq (f, _) ->
+          t_apply_logic p_eq_refl [f.f_ty] [AAform f] g
+      | _ when reduce -> begin
+        match EcReduction.h_red_opt EcReduction.full_red hyps goal with
+        | None      -> notaneq ()
+        | Some goal -> doit goal
+      end
+      | _ -> notaneq ()
+  in
+    doit (get_concl g)
 
 let t_transitivity f g =
   let concl = snd (get_goal g) in
@@ -739,7 +750,7 @@ let gen_eq_tuple_elim_proof types =
         t_lseq [t_rewrite_hyp `RtoL h1 [];
         t_apply_hyp h2 [];
         t_apply_logic p_true_intro [] []]
-      )::(List.map (fun _ -> t_reflex) types))
+      )::(List.map (fun _ -> t_reflex ~reduce:false) types))
   ]
   
 (* Generate a lemma that permits to split tuple *)
@@ -1027,7 +1038,7 @@ let t_split g =
         | OK_iff   ->
           t_apply_logic p_iff_intro []
                 [AAform f1;AAform f2;AAnode;AAnode] g
-        | OK_eq when EcReduction.is_conv hyps f1 f2 -> t_reflex g
+        | OK_eq when EcReduction.is_conv hyps f1 f2 -> t_reflex ~reduce:true g
         | OK_eq when is_tuple f1 && is_tuple f2 ->
           let fs1 = destr_tuple f1 in
           let fs2 = destr_tuple f2 in
