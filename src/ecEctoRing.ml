@@ -40,10 +40,11 @@ let ring_to_form (f : pol) (plus : form) (minus : form) (times : form) (exp : fo
 	let rsub f1 f2 = mk_form (Fapp (minus, f1 :: f2 :: [])) ty in
 	let rpow f1 n = mk_form (Fapp (exp, f1 :: (mk_form (Fint n) tint) :: [])) ty in
   let rec mkIn (t : int) : form = if (t = 1) then one else radd one (mkIn (t-1)) in 
-	let fint n = if (ceq n c0) then zero
-               else if (ceq n c1) then one
-               else if (n = (-1)) then rsub zero one
-               else if (ty_equal ty tint) then (f_int n) else (mkIn n) in
+  let fint n = if (ceq n c0) then zero
+               else if (ceq n c1) then one                                                                                                               
+               else if (n = (-1)) then rsub zero one                                                                                                     
+               else if (ty_equal ty tint) then (f_int n)                                                                                                 
+               else if (n < 0) then rsub zero (mkIn (-n)) else (mkIn n) in     
   let rec rtf p c' = match p with
         | Pc c -> fint c 
         | Pinj (j,q) -> rtf q (c' - j)
