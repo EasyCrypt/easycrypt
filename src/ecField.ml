@@ -1,300 +1,171 @@
-open Printf
-open EcFol
-(****** field Type  ******)
-type 'a field = Plus of 'a field list (* (+ [t1,...,tn])  *)
-	| Times of 'a field list
-	(* | Exp of form field * form field*)
-	| Minus of 'a field  (* (- t)*)
-	| Inv of 'a field  (* inv(t) = 1/t  *)
-	| One 
-	| Zero
-	| Value of form
-	| Op of 'a * form * 'a field list
-(*************************)
-exception Div_by_Zero
-exception Err
+(*
+(************************************************************************)
+(*  v      *   The Coq Proof Assistant  /  The Coq Development Team     *)
+(* <O___,, *   INRIA - CNRS - LIX - LRI - PPS - Copyright 1999-2010     *)
+(*   \VV/  **************************************************************)
+(*    //   *      This file is distributed under the terms of the       *)
+(*         *       GNU Lesser General Public License Version 2.1        *)
+(************************************************************************)
+*)
+open EcRing
 
-(*************************)
-(******Aux functions******)
+type fexpr =  FEc of c
+             | FEX of int
+             | FEadd of (fexpr * fexpr)
+             | FEsub of (fexpr * fexpr)
+             | FEmul of (fexpr * fexpr)
+             | FEopp of fexpr
+             | FEinv of fexpr
+             | FEdiv of (fexpr * fexpr)
+             | FEpow of (fexpr * int)
 
-let rec list_cmp ts ps =
-	match (ts,ps) with
-		|([],[]) -> 0
-		|(_::_,[]) -> 1
-		|([],_::_) -> -1
-		| (x::xs,y::ys) -> (match cmp x y with
-									| 0 -> list_cmp xs ys
-									| a -> a)
-and cmp (t1 : 'a field) (t2 : 'a field) : int =
-	match (t1,t2) with
-	| (Zero, Zero) -> 0
-	| (_, Zero) -> 1
-	| (Zero, _) -> -1
-	| (One, One) -> 0
-	| (_, One) -> 1
-	| (One, _) -> -1
-	| (Value a, Value b) -> f_compare a b (*  <<<--- Replace this  *)
-	| (_, Value _) -> 1
-	| (Value _, _) -> -1
-	| (Inv a, Inv b) -> cmp a b
-	| (_, Inv _) -> 1
-	| (Inv _, _) -> -1
-	| (Minus a, Minus b) -> cmp a b
-	| (_, Minus _) -> 1
-	| (Minus _, _) -> -1
-	| (Plus xs, Plus ys) -> let ys' = List.fast_sort cmp ys in
-							let xs' = List.fast_sort cmp xs in
-							list_cmp xs' ys'
-	| (_, Plus _) -> 1
-	| (Plus _, _) -> -1
-	| (Times xs, Times ys) -> let ys' = List.fast_sort cmp ys in
-							let xs' = List.fast_sort cmp xs in
-							list_cmp xs' ys'
-	| (_, Times _) -> 1
-	| (Times _, _) -> -1
-	| (Op (_,op1, args1) , Op (_,op2,args2) ) -> (match (f_compare op1 op2) with
-												| 0 -> list_cmp args1 args2 
-												| a -> a)
+type rsplit =  (pexpr * pexpr * pexpr)
 
-let rec drop (n : int)  (xs : 'a list) : 'a list = match (n,xs) with
-													| (0,_) -> xs
-													| (_,[]) -> [] 
-													| (n,_::ys) -> drop (n-1) ys
-let rec rmvinvs (ts : 'a field list) : 'a field list =
-  let (invs,noinvs) = List.fold_left (fun (is,ns) i ->
-										match i with
-											| Inv _ -> (i :: is,ns)
-											| _ -> (is,i::ns)
-									) ([],[]) ts in
-  let rec removing ((is,ns) : 'a field list * 'a field list) : 'a field list =
-		(match (is,ns) with
-			| ([],_) -> ns
-			| (_,[]) -> is
-			| (x :: _, _) -> 
-						let (exs, dxs) = List.fold_left (fun (ls,rs) i ->
-														if (cmp i x) = 0 then (i::ls,rs) else (ls,i::rs)) ([],[]) is in
-						let ix = (match x with
-									| Inv i -> i
-									| _ -> raise Err) in
-						let (ixs, nixs) = List.fold_left (fun (ls,rs) i ->
-														if (cmp i ix = 0) then (i::ls,rs) else (ls,i::rs)) ([],[]) ns in
-						let (exslen,ixslen) = (List.length exs, List.length ixs) in (* we can compute this with the folds*)
-						let res = removing(dxs,nixs) in
-						if (exslen = ixslen) then res else
-							(if (exslen < ixslen) then (drop exslen ixs) @ res else
-										(drop ixslen exs) @ res)
-			) in
-	removing (invs,noinvs)
+let left ((t,_,_) : rsplit) : pexpr = t
+let right ((_,_,t) : rsplit) : pexpr = t
+let common ((_,t,_) : rsplit) : pexpr = t
 
-let rec rmvinvs2 (ts : 'a field list) : 'a field list =
-  let (invs,noinvs) = List.fold_left (fun (is,ns) i ->
-										match i with
-											| Minus _ -> (i :: is,ns)
-											| _ -> (is,i::ns)
-									) ([],[]) ts in
-  let rec removing (is,ns) =
-		(match (is,ns) with
-			| ([],_) -> ns
-			| (_,[]) -> is
-			| (x :: _, _) -> 
-						let (exs, dxs) = List.fold_left (fun (ls,rs) i ->
-														if (cmp i x =0) then (i::ls,rs) else (ls,i::rs)) ([],[]) is in
-						let ix = (match x with
-									| Minus i -> i
-									| _ -> print_string "Si aca \n"; raise Err) in
-						let (ixs, nixs) = List.fold_left (fun (ls,rs) i ->
-														if (cmp i ix = 0) then (i::ls,rs) else (ls,i::rs)) ([],[]) ns in
-						let (exslen,ixslen) = (List.length exs, List.length ixs) in (* we can compute this with the folds*)
-						let res = removing(dxs,nixs) in
-						if (exslen = ixslen) then res else
-							if (exslen < ixslen) then (drop exslen ixs) @ res else
-										(drop ixslen exs) @ res 
-			) in
-	removing (invs,noinvs)
+let rec pexpr_eq (e1 : pexpr) (e2 : pexpr) : bool =
+  match (e1,e2) with
+    | (PEc c, PEc c') -> ceq c c'
+    | (PEX p1, PEX p2) -> p1 = p2
+    | (PEadd (e3,e5), PEadd (e4,e6)) -> 
+      if (pexpr_eq e3 e4) then pexpr_eq e5 e6 else false
+    | (PEsub (e3,e5), PEsub (e4,e6)) -> 
+      if (pexpr_eq e3 e4) then pexpr_eq e5 e6 else false
+    | (PEmul (e3,e5), PEmul (e4,e6)) -> 
+      if (pexpr_eq e3 e4) then pexpr_eq e5 e6 else false
+    | (PEopp e3, PEopp e4) -> pexpr_eq e3 e4
+    | (PEpow (e3,n3), PEpow (e4,n4)) -> 
+      if (n3 = n4) then pexpr_eq e3 e4 else false
+    | (_,_) -> false
 
-let rec search (ts : 'a field list) : ('a field option * 'a field list) =
-	(match ts with
-		| [] -> (None, [])
-		| (Plus t)::ts -> (Some (Plus t), ts)
-		| t :: ts -> let (b,v) = search ts in
-						(b,t::v))
 
-	
-(*************************)
-(* Given a field term, return a list of different-zero proof obligations
-and a new field term (with no fresh variables) but normalized *)
-let field_norm (term : 'a field) : 'a field list * 'a field =
-	let poblg = ref [] in
-	let rec norm (t : 'a field) : 'a field =
-		(match t with
-			| One -> One
-			| Zero -> Zero
-			| Value a -> Value a
-			| Minus f -> let f' = norm f in
-							(match f' with
-								| Zero -> Zero
-								| One -> Minus f'
-								| Value _ -> Minus f'
-								| Plus xs -> norm (Plus (List.fold_left (fun is i -> (Minus i) :: is
-													) [] xs))
-								| Minus a -> a
-								| _ -> Minus f'
-							)
-			| Inv f -> let f' = norm f in
-						(match f' with
-							| Zero -> raise Div_by_Zero
-							| One -> One
-							| Inv a -> a
-							| Minus a -> norm (Minus (Inv a))
-							| Times xs -> norm (Times (List.fold_left (fun is i -> (Inv i) :: is
-													) [] xs))
-							| _ -> poblg := f' :: !poblg ; Inv f'
-						)
-			| Times ts ->  
-					let (p,ts') = List.fold_left (fun (p,is) i ->
-													let i' = norm i in
-													 (match i' with
-														| Minus (Times is') -> (p+1,is' @ is)
-														| Minus i'' -> (p+1, i'' :: is)
-														| Times is' -> (p, is' @ is)
-														| One -> (p,is)
-														| _ -> (p,i' :: is))) (0,[]) ts in
-					(*remove as invs as I can*)
-					let ss = rmvinvs ts' in
-					let (invs,noinvs) = List.fold_left (fun (is,ns) i ->
-										match i with
-											| Inv _ -> (i :: is,ns)
-											| _ -> (is,i::ns)
-									) ([],[]) ss in
-					let nis = (match (invs,noinvs) with
-										| ([],_) -> Times noinvs
-										| (_, x :: []) -> x
-										| _ -> norm (Times noinvs)) in
-					let nfs = (match nis with
-										| Times nis' -> invs @ nis'
-										| _ -> nis :: invs) in
-					let ts'' = rmvinvs nfs in
-					let resultado = (match ts'' with
-										| [] -> One
-										| _ -> if (List.mem Zero ts'') then 
-														Zero
-												else
-													 (match search ts'' with
-														| (None, x :: []) -> x
-														| (None, res) -> Times res
-														| (Some sum, []) -> sum
-														| (Some (Plus xs), res) ->
-															let dist = List.fold_left (fun is i ->(Times (i::res)) :: is) [] xs in
-															norm (Plus dist)
-														| _ -> raise Err
-													))
-					in if (p mod 2 <> 0) then norm (Minus resultado) else resultado
-			| Plus xs ->
-					let ts' = List.fold_left (fun is i ->
-													let i' = norm i in
-													match i' with
-															| Plus is' -> is' @ is 
-															| Zero -> is 
-															| _ -> i' :: is) [] xs in
-					let ss = rmvinvs2 ts' in
-					(match ss with
-						| [] -> Zero
-						| [x] -> x
-						| _ -> Plus ss)
-			| Op (a, op, args) -> Op (a, op, List.map norm args) 
-		) in (!poblg,norm term)
+let npepow x n =
+  match n with
+    | 0 -> PEc c1
+    | p -> if (p = 1) then x else
+               match x with
+                | PEc c -> if (ceq c c1) then PEc c1 else
+                            if (ceq c c0) then PEc c0 else 
+                              let res = Big_int.power_int_positive_int c p in
+                              let sr = Big_int.int_of_big_int res in
+                               PEc sr
+                | _ -> PEpow (x,n)
 
-let rec eqfield (t1 : 'a field) (t2 : 'a field) : ('a field list * ('a field * 'a field) list) = 
-	match (t1,t2) with
-		| (Times ts1, Times ts2) -> 
-			let mts1 = List.fold_left (fun is i -> let (_,i') = field_norm i in
-																match i' with
-																	| Times ts -> ts @ is
-																	| _ -> i' :: is) [] ts1 in
-			let mts2 = List.fold_left (fun is i -> let (_,i') = field_norm i in
-																match i' with
-																	| Times ts -> ts @ is
-																	| _ -> i' :: is) [] ts2 in
-			let (i1,r1) = List.fold_left (fun (ls,rs) i -> match i with
-															| Inv i' -> (i' :: ls,rs)
-															| _ -> (ls,i::rs)) ([],[]) mts1 in
-			let (i2,r2) = List.fold_left (fun (ls,rs) i -> match i with
-															| Inv i' -> (i' :: ls,rs)
-															| _ -> (ls,i::rs)) ([],[]) mts2 in
-			let rem1 = match r1 with
-						| [] -> One
-						| x :: [] -> x
-						| _ -> Times r1 in
-			let rem2 = match r2 with
-						| [] -> One
-						| x :: [] -> x
-						| _ -> Times r2 in
-			(match (i1,i2) with
-					| ([],[]) -> let ((o1,t1'),(o2,t2')) = (field_norm t1, field_norm t2) in
-									if (cmp t1' t2' = 0) then (o1 @ o2,[]) else
-												(o1 @ o2, (t1',t2'):: [])
-					| (_,[]) -> let (o1,o2) = eqfield rem1 (Times (rem2 :: i1)) in
-												(i1 @ o1, o2)
-					| ([],_) -> let (o1,o2) = eqfield (Times (rem1 :: i2)) rem2 in
-												(i2 @ o1, o2)
-					| _ -> let (o1,o2) = eqfield (Times (rem1 :: i2)) (Times (rem2 :: i1)) in
-												(i1 @ i2 @ o1,o2))
-		| (Times ts1, _) -> 
-			let mts1 = List.fold_left (fun is i -> let (_,i') = field_norm i in
-																match i' with
-																	| Times ts -> ts @ is
-																	| _ -> i' :: is) [] ts1 in
-			let (i1,r1) = List.fold_left (fun (ls,rs) i -> match i with
-															| Inv i' -> (i' :: ls,rs)
-															| _ -> (ls,i::rs)) ([],[]) mts1 in
-			let rem1 = match r1 with
-						| [] -> One
-						| x :: [] -> x
-						| _ -> Times r1 in
-			(match i1 with
-					| [] -> 
-							let (o2,t2') = field_norm t2 in
-							(match t2' with
-								| Times _ -> let (ob1,eqt) = eqfield t1 t2' in
-												(o2 @ ob1, eqt)
-								| _ -> let (o1,t1') = field_norm t1 in
-											if (cmp t1' t2' = 0) then (o2 @ o1,[]) else
-											(o2 @ o1,(t1',t2') :: []))
-					| _ -> let (o1,o2) = eqfield rem1 (Times (t2 :: i1)) in
-											(i1 @ o1,o2))
-		| (_, Times ts2) ->
-			let mts2 = List.fold_left (fun is i -> let (_,i') = field_norm i in
-																match i' with
-																	| Times ts -> ts @ is
-																	| _ -> i' :: is) [] ts2 in
-			let (i2,r2) = List.fold_left (fun (ls,rs) i -> match i with
-															| Inv i' -> (i' :: ls,rs)
-															| _ -> (ls,i::rs)) ([],[]) mts2 in
-			let rem2 = match r2 with
-						| [] -> One
-						| x :: [] -> x
-						| _ -> Times r2 in
-			(match i2 with
-				| [] -> let (tss1,t1') = field_norm t1 in
-						(match t1' with
-								| Times _ -> let (ob2, eqt) =  eqfield t1' t2 in
-															(tss1 @ ob2, eqt)
-								| _ -> let (tss2,t2') = field_norm t2 in
-									if (cmp t1' t2' = 0) then (tss1 @ tss2 ,[]) else (tss1 @ tss2,(t1',t2') :: []))
-				| _ -> let (o1,o2) = eqfield (Times (t1 :: i2)) rem2  in
- 													( i2 @ o1, o2))
-		| (Op (a1,op1,args1) , Op (a2,op2, args2)) -> (match (f_compare op1 op2) with (* replace this...*)
-														| 0 -> List.fold_left (fun (zs,pb) (l,r) -> let (z,pbs) = eqfield l r in (z @ zs,pbs @ pb)
-																			) ([],[]) (List.combine args1 args2)
-														| _ -> ([],(Op (a1,op1,args1) , Op (a2,op2,args2)) :: []))
-		| (Plus xs, Plus ys) -> let (pbs,t') = (field_norm (Plus ((Minus (Plus xs)) :: ys))) in (*We can do a better search...*)
-								let (z,pp) = eqfield t' Zero in
-									(pbs @ z, pp)
-		| _ -> let ((o1,t1'),(o2,t2')) = (field_norm t1, field_norm t2) in
-				let obligaciones = o1 @ o2 in
-				(match (t1',t2') with
-						| (Times _, _) -> let (l,r) = eqfield t1' t2' in
-											(l @ obligaciones, r)
-						| (_, Times _) -> let (l,r) = eqfield t1' t2' in
-											(l @ obligaciones, r)
-						| _ -> if (cmp t1' t2' = 0) then (obligaciones, []) else (obligaciones, [(t1',t2')]))
+let rec npemul (x : pexpr) (y : pexpr) : pexpr =
+  match (x,y) with
+    | (PEc c, PEc c') -> PEc (cmul c c')
+    | (PEc c, _) -> if (ceq c c1) then y else if (ceq c c0) then PEc c0 else PEmul (x,y)
+    | (_,PEc c) -> if (ceq c c1) then x else if (ceq c c0) then PEc c0 else PEmul (x,y)
+    | (PEpow (e1,n1),PEpow (e2,n2)) -> if (n1 = n2) then npepow (npemul e1 e2) n1 else PEmul (x,y)
+    | (_,_) -> PEmul (x,y)
+
+let rec isIn (e1 : pexpr) (p1 : int) (e2 : pexpr) (p2 : int) : (int * pexpr) option =
+  match e2 with
+    | PEmul (e3,e4) ->
+      (match (isIn e1 p1 e3 p2) with
+        | Some (0,e5) -> Some (0, npemul e5 (npepow e4 p2))                
+        | Some (p, e5) ->
+          (match (isIn e1 p e4 p2) with
+            | Some (n, e6) -> Some (n, npemul e5 e6)
+            | None -> Some (p, npemul e5 (npepow e4 p2)))
+        | None -> 
+          (match (isIn e1 p1 e4 p2) with
+            | Some (n,e5) -> Some (n,npemul (npepow e3 p2) e5)
+            | None -> None))
+          
+    | PEpow (_,0)   -> None
+    | PEpow (e3,p3) -> isIn e1 p1 e3 (p3 * p2)
+    | _ -> 
+      if (pexpr_eq e1 e2) then
+        if (p1 = p2) then Some (0, PEc c1) else
+          if (p1 > p2) then Some (p1-p2, PEc c1)
+            else Some (0, npepow e2 (p2-p1))
+      else None
+
+let rec split_aux (e1 : pexpr) (p : int) (e2 : pexpr) : rsplit =
+  match e1 with
+    | PEmul (e3,e4) ->
+      let r1 = split_aux e3 p e2 in
+      let r2 = split_aux e4 p (right r1) in
+        (npemul (left r1) (left r2),
+         npemul (common r1) (common r2),
+         right r2)
+    | PEpow (_,0) -> (PEc c1, PEc c1, e2)
+    | PEpow (e3,p3) -> split_aux e3 (p3 * p) e2
+    | _ ->
+          match isIn e1 p e2 1 with
+            | Some (0,e3) -> (PEc c1, npepow e1 p, e3)
+            | Some (q , e3) -> (npepow e1 q, npepow e1 (p - q), e3)
+            | None -> (npepow e1 p, PEc c1, e2)
+let split e1 e2 = split_aux e1 1 e2
+
+(* BS: make record *)
+type linear = (pexpr * pexpr * (pexpr list))
+let num (t,_,_) = t
+let denum (_,t,_) = t
+let condition (_,_,t) = t
+
+let npeadd (e1 : pexpr) (e2 : pexpr) =
+  match (e1,e2) with
+    | (PEc c, PEc c') -> PEc (cadd c c')
+    | (PEc c, _) -> if (ceq c c0) then e2 else PEadd (e1,e2)
+    | (_, PEc c) -> if (ceq c c0) then e1 else PEadd (e1,e2)
+    | _ -> PEadd (e1,e2)
+
+let npesub e1 e2 = 
+  match (e1,e2) with
+    | (PEc c, PEc c') -> PEc (csub c c')
+    | (PEc c, _ ) -> if (ceq c c0) then PEopp e2 else PEsub (e1,e2)
+    | ( _, PEc c) -> if (ceq c c0) then e1 else PEsub (e1,e2)
+    | _ -> PEsub (e1,e2)
+
+let npeopp e1 =
+  match e1 with
+    | PEc c -> PEc (copp c)
+    | _ -> PEopp e1
+
+let rec fnorm (e : fexpr) : linear =
+  match e with
+    | FEc c -> (PEc c, PEc c1, [])
+    | FEX x -> (PEX x, PEc c1, [])
+    | FEadd (e1,e2) -> 
+      let x = fnorm e1 in
+      let y = fnorm e2 in
+      let s = split (denum x) (denum y) in
+      (npeadd (npemul (num x) (right s)) (npemul (num y) (left s)),
+      npemul (left s) (npemul (right s) (common s)),
+      condition x @ condition y)
+    | FEsub (e1,e2) ->
+      let x = fnorm e1 in
+      let y = fnorm e2 in
+      let s = split (denum x) (denum y) in
+      (npesub (npemul (num x) (right s)) (npemul (num y) (left s)),
+      npemul (left s) (npemul (right s) (common s)),
+      condition x @ condition y)
+    | FEmul (e1,e2) ->
+      let x = fnorm e1 in
+      let y = fnorm e2 in
+      let s1 = split (num x) (denum y) in
+      let s2 = split (num y) (denum x) in
+      (npemul (left s1) (left s2),
+      npemul (right s2) (right s1),
+      condition x @ condition y)
+    | FEopp e1 ->
+      let x = fnorm e1 in
+      (npeopp (num x), denum x, condition x)
+    | FEinv e ->
+      let x = fnorm e in
+      (denum x, num x, (num x) :: (condition x))
+    | FEdiv (e1,e2) -> 
+      let x = fnorm e1 in
+      let y = fnorm e2 in
+      let s1 = split (num x) (num y) in
+      let s2 = split (denum x) (denum y) in
+      (npemul (left s1) (right s2),
+      npemul (left s2) (right s1),
+      (num y) :: ((condition x) @ (condition y)))
+    | FEpow (e1,n) ->
+      let x = fnorm e1 in
+      (npepow (num x) n, npepow (denum x) n, condition x)

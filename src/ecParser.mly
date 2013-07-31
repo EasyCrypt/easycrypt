@@ -197,6 +197,8 @@
 %token FEL
 %token FIELD
 %token FIELDSIMP
+%token RING
+%token RINGSIMP
 %token FINAL
 %token FIRST
 %token FISSION
@@ -1697,11 +1699,17 @@ logtactic:
 | SPLIT
     { Psplit }
 
-| FIELD plus=sform times=sform inv=sform minus=sform z=sform o=sform eq=sform
-    { Pfield (plus,times,inv,minus,z,o,eq)}
+| FIELD plus=sform times=sform exp=sform inv=sform minus=sform d=sform z=sform o=sform eq=sform l=ident*
+    { Pfield (plus,times,inv,exp,minus,d,z,o,eq,l)}
 
-| FIELDSIMP plus=sform times=sform inv=sform minus=sform z=sform o=sform  eq=sform
-    { Pfieldsimp (plus,times,inv,minus,z,o,eq)}
+| FIELDSIMP plus=sform times=sform exp=sform inv=sform minus=sform d=sform z=sform o=sform eq=sform l=ident*
+    { Pfieldsimp (plus,times,inv,exp,minus,d,z,o,eq,l)}
+
+| RING plus=sform times=sform exp=sform minus=sform z=sform o=sform eq=sform l=ident*
+    { Pring (plus,times,exp,minus,z,o,eq,l)}
+
+| RINGSIMP plus=sform times=sform exp=sform minus=sform z=sform o=sform eq=sform l=ident*
+    { Pringsimp (plus,times,exp,minus,z,o,eq,l)}
 
 | EXIST a=iplist1(loc(fpattern_arg), COMMA) %prec prec_below_comma
    { Pexists a }

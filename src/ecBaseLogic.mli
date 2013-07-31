@@ -59,6 +59,7 @@ type rule_name =
     (* Rings && fields *)
   | RN_field 
   | RN_field_simp 
+  | RN_ring
 
     (* Phl rules *)    
   | RN_hl_fun_def 

@@ -250,39 +250,129 @@ let process_subst loc ri g =
     set_loc loc (t_lseq tacs) g
 
 (* -------------------------------------------------------------------- *)
-let process_field (p,t,i,m,z,o,e) g =
-  let (hyps,concl) = get_goal g in
-    (match concl.f_node with
-      | Fapp(eq',[arg1;arg2]) ->
-        let ty = f_ty arg1 in
-        let eq = process_form hyps e (tfun ty (tfun ty tbool)) in
-        if (f_equal eq eq' ) then
-          let p' = process_form hyps p (tfun ty (tfun ty ty)) in 
-          let t' = process_form hyps t (tfun ty (tfun ty ty)) in 
-          let i' = process_form hyps i (tfun ty ty) in 
-          let m' = process_form hyps m (tfun ty ty) in 
-          let z' = process_form hyps z ty in 
-          let o' = process_form hyps o ty in 
-          t_field (p',t',i',m',z',o',eq) (arg1,arg2) g
-        else
-          cannot_apply "field" "the eq doesn't coincide"
-      | _ -> cannot_apply "field" "Think more about the goal")
+  let process_field_aux (p,t,i,exp,m,d,z,o,e,eqs) g =
+		let (hyps,concl) = get_goal g in
+			(match concl.f_node with
+				| Fapp(eq',[arg1;arg2]) ->
+					let ty = f_ty arg1 in
+					let eq = process_form hyps e (tfun ty (tfun ty tbool)) in
+					if (f_equal eq eq' ) then
+						let p' = process_form hyps p (tfun ty (tfun ty ty)) in 
+						let t' = process_form hyps t (tfun ty (tfun ty ty)) in 
+						let exp' = process_form hyps exp (tfun ty (tfun tint ty)) in 
+						let i' = process_form hyps i (tfun ty ty) in 
+		 				let m' = process_form hyps m (tfun ty (tfun ty ty)) in 
+		 				let d' = process_form hyps d (tfun ty (tfun ty ty)) in 
+						let z' = process_form hyps z ty in 
+						let o' = process_form hyps o ty in 
+            let eqs' = List.fold_left (fun is i ->
+              let s = i.pl_desc in
+              if (LDecl.has_hyp s hyps) then
+                (match ((snd (LDecl.lookup_hyp s hyps)).f_node) with
+                  | Fapp (op, m :: t :: []) when f_equal op eq' -> (m,t) :: is
+                  | _ -> cannot_apply "ring" "Wrong structure.")
+              else error i.pl_loc (UnknownHypSymbol s) ) [] eqs
+            in
+          t_field (p',t',i',exp',m',d',z',o',eq,eqs') (arg1,arg2) g
+          else
+						cannot_apply "field" "The eq doesn't coincide."
+				| _ -> cannot_apply "field" "You can only apply field with a comp between terms.")
 
-let process_field_simp (p,t,i,m,z,o,e) g =
-  let (hyps,concl) = get_goal g in
-    (match concl.f_node with
-      | Fapp(_,arg1 :: _) ->
-        let ty = f_ty arg1 in
-        let e' = process_form hyps e (tfun ty (tfun ty tbool)) in 
-        let p' = process_form hyps p (tfun ty (tfun ty ty)) in 
-        let t' = process_form hyps t (tfun ty (tfun ty ty)) in 
-        let i' = process_form hyps i (tfun ty ty) in 
-        let m' = process_form hyps m (tfun ty ty) in 
-        let z' = process_form hyps z ty in 
-        let o' = process_form hyps o ty in 
-        t_field_simp (p',t',i',m',z',o',e') concl g
-      | _ -> cannot_apply "field_simplify" "Think more about the goal")
+  let process_field_simp_aux (p,t,i,exp,m,d,z,o,e,eqs) g =
+		let (hyps,concl) = get_goal g in
+			(match concl.f_node with
+				| Fapp(_,arg1 :: arg2 :: []) ->
+					let ty = f_ty arg1 in
+					let e' = process_form hyps e (tfun ty (tfun ty tbool)) in 
+					let p' = process_form hyps p (tfun ty (tfun ty ty)) in 
+					let t' = process_form hyps t (tfun ty (tfun ty ty)) in 
+					let exp' = process_form hyps exp (tfun ty (tfun tint ty)) in 
+					let i' = process_form hyps i (tfun ty ty) in 
+		 			let m' = process_form hyps m (tfun ty (tfun ty ty)) in 
+		 			let d' = process_form hyps d (tfun ty (tfun ty ty)) in 
+					let z' = process_form hyps z ty in 
+					let o' = process_form hyps o ty in 
+          let eqs' = List.fold_left (fun is i ->
+            let s = i.pl_desc in
+            if (LDecl.has_hyp s hyps) then
+              (match ((snd (LDecl.lookup_hyp s hyps)).f_node) with
+                | Fapp (op, m :: t :: []) when f_equal op e' -> (m,t) :: is
+                | _ -> cannot_apply "ring" "Wrong structure.")
+            else error i.pl_loc (UnknownHypSymbol s) ) [] eqs
+          in
+            t_field_simp (p',t',i',exp',m',d',z',o',e',eqs') (arg1,arg2) g
+				| _ -> cannot_apply "field_simplify" "You can only apply field_simplify with a comp between terms.")
 
+  let process_ring_aux  (p,t,exp,m,z,o,e,eqs) g =
+		let (hyps,concl) = get_goal g in
+			(match concl.f_node with
+				| Fapp(eq',[arg1;arg2]) ->
+					let ty = f_ty arg1 in
+					let eq = process_form hyps e (tfun ty (tfun ty tbool)) in
+					if (f_equal eq eq' ) then
+						let p' = process_form hyps p (tfun ty (tfun ty ty)) in 
+						let t' = process_form hyps t (tfun ty (tfun ty ty)) in 
+						let exp' = process_form hyps exp (tfun ty (tfun tint ty)) in 
+		 				let m' = process_form hyps m (tfun ty (tfun ty ty)) in 
+						let z' = process_form hyps z ty in 
+						let o' = process_form hyps o ty in 
+            let eqs' = List.fold_left (fun is i ->
+              let s = i.pl_desc in
+              if (LDecl.has_hyp s hyps) then
+                (match ((snd (LDecl.lookup_hyp s hyps)).f_node) with
+                  | Fapp (op, m :: t :: []) when f_equal op eq' -> (m,t) :: is
+                  | _ -> cannot_apply "ring" "Wrong structure.")
+              else error i.pl_loc (UnknownHypSymbol s) ) [] eqs
+            in
+            t_ring  (p',t',exp',m',z',o',eq,eqs') (arg1,arg2) g
+					else
+						cannot_apply "ring" "the eq doesn't coincide"
+				| _ -> cannot_apply "ring" "You can only apply ring with a comp between terms.")
+
+  let process_ring_simp_aux  (p,t,exp,m,z,o,e,eqs) g =
+		let (hyps,concl) = get_goal g in
+			(match concl.f_node with
+				| Fapp(_,[arg1;arg2]) ->
+					let ty = f_ty arg1 in
+					let p' = process_form hyps p (tfun ty (tfun ty ty)) in 
+					let t' = process_form hyps t (tfun ty (tfun ty ty)) in 
+					let e' = process_form hyps e (tfun ty (tfun ty tbool)) in 
+					let exp' = process_form hyps exp (tfun ty (tfun tint ty)) in 
+		 			let m' = process_form hyps m (tfun ty (tfun ty ty)) in 
+					let z' = process_form hyps z ty in 
+					let o' = process_form hyps o ty in 
+          let eqs' = List.fold_left (fun is i ->
+            let s = i.pl_desc in
+            if (LDecl.has_hyp s hyps) then
+              (match ((snd (LDecl.lookup_hyp s hyps))).f_node with
+                | Fapp (op, m :: t :: []) when f_equal op e' -> (m,t) :: is
+                | _ -> cannot_apply "ring" "Wrong structure")
+            else error i.pl_loc (UnknownHypSymbol s) ) [] eqs
+          in
+            t_ring_simp  (p',t',exp',m',z',o',e',eqs') (arg1,arg2) g
+				| _ -> cannot_apply "ring" "You can only apply ring with a comp between terms.")
+
+  let smt_on h =
+  t_on_goals (t_try (process_smt h (None, empty_pprover)))
+ 
+  let ass_on l =
+  t_on_goals (t_try (process_assumption l (None,None))) 
+
+  let process_ring (p,t,exp,m,z,o,e,eqs) h l g =
+    let rring = process_ring_aux (p,t,exp,m,z,o,e,eqs) g in
+    smt_on h (ass_on l rring)
+
+  let process_ring_simp (p,t,exp,m,z,o,e,eqs) h l g =
+    let rring = process_ring_simp_aux (p,t,exp,m,z,o,e,eqs) g in
+    smt_on h (ass_on l rring)
+
+  let process_field (p,t,i,exp,m,d,z,o,e,eqs) h l g =
+    let rfield = process_field_aux (p,t,i,exp,m,d,z,o,e,eqs) g in
+    smt_on h (ass_on l rfield)
+
+  let process_field_simp (p,t,i,exp,m,d,z,o,e,eqs) h l g =
+    let rfield = process_field_simp_aux (p,t,i,exp,m,d,z,o,e,eqs) g in
+    smt_on h (ass_on l rfield)
 (* -------------------------------------------------------------------- *)
 let rec pmsymbol_of_pform fp : pmsymbol option =
   match unloc fp with
@@ -1152,8 +1242,10 @@ let process_logic (engine, hitenv) loc t =
   | Psmt pi        -> process_smt hitenv pi
   | Pintro pi      -> process_intros pi
   | Psplit         -> t_split
-  | Pfield st      -> process_field st
-  | Pfieldsimp st  -> process_field_simp st
+  | Pfield st      -> process_field st hitenv loc 
+  | Pfieldsimp st  -> process_field_simp st hitenv loc
+  | Pring  st      -> process_ring  st hitenv loc
+  | Pringsimp  st  -> process_ring_simp st hitenv loc
   | Pexists fs     -> process_exists fs
   | Pleft          -> t_left
   | Pright         -> t_right

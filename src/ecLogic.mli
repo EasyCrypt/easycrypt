@@ -163,8 +163,12 @@ val t_progress : tactic -> tactic
 
 val t_trivial : tactic
 
-val t_field      : form tuple7 -> form * form -> tactic
-val t_field_simp : form tuple7 -> form -> tactic
+val fieldax        : form -> form -> form -> form -> form -> form -> form -> form -> form -> form list
+val ringax         : form -> form -> form -> form -> form -> form -> form -> form list
+val t_field        : (form * form * form * form * form * form * form * form * form * ((form * form ) list)) -> form * form -> tactic
+val t_field_simp   : (form * form * form * form * form * form * form * form * form * ((form * form ) list)) -> form * form -> tactic
+val t_ring         : (form * form * form * form * form * form * form * ((form * form ) list)) -> form * form -> tactic
+val t_ring_simp    : (form * form * form * form * form * form * form * ((form * form ) list)) -> form * form -> tactic
 
 val t_admit : tactic
 

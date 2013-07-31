@@ -1,4 +1,3 @@
-(* -------------------------------------------------------------------- *)
 open EcLocation
 open EcUtils
 open EcMaps
@@ -11,7 +10,9 @@ open EcFol
 open EcBaseLogic
 open EcEnv
 open EcReduction
+
 open EcEctoField
+open EcEctoRing
 
 type pre_judgment = {
   pj_decl : LDecl.hyps * form;
@@ -823,6 +824,171 @@ let t_elim_hyp h g =
   let f = LDecl.lookup_hyp_by_id h (get_hyps g) in
   t_on_first (t_hyp h) (t_elim f g)
 
+(*Field and Ring Tactic****************************************************************************************)
+let prove_goal_by sub_gs rule (juc,n as g) : goals =
+  let hyps,_ = get_goal g in
+  let add_sgoal (juc,ns) sg = 
+    let juc,n = new_goal juc (hyps,sg) in juc, RA_node n::ns
+  in
+  let juc,ns = List.fold_left add_sgoal (juc,[]) sub_gs in
+  let rule = { pr_name = rule ; pr_hyps = List.rev ns} in
+  upd_rule rule (juc,n)
+
+let ringax plus times exp minus z o eq =
+  let ty = z.f_ty in
+  let mkf f = mk_form f ty in
+  let cid t = let i = EcIdent.create t in (mkf (Flocal i),i) in 
+  let a1 = (* forall (a b c : ty), (a (+) b) (+) c = a (+) (b (+) c) *)
+    let (fa, a) = cid "a" in
+    let (fb, b) = cid "b" in
+    let (fc, c) = cid "c" in
+    let tab = mkf (Fapp (plus, fa :: fb :: [])) in
+    let tbc = mkf (Fapp (plus, fb :: fc :: [])) in
+    let t1 = mkf (Fapp (plus, fa :: tbc :: [])) in
+    let t2 = mkf (Fapp (plus, tab :: fc :: [])) in
+    let t = mk_form (Fapp (eq, t1 :: t2 :: [])) tbool in
+    f_forall [(a,GTty ty);(b,GTty ty);(c,GTty ty)] t in
+  let a2 = (* forall (a b : ty), a (+) b = b (+) a *)
+    let (fa, a) = cid "a" in
+    let (fb, b) = cid "b" in
+    let t1 = Fapp (plus, fa :: fb :: []) in
+    let t2 = Fapp (plus, fb :: fa :: []) in
+    let t = mk_form (Fapp (eq, (mkf t1) :: (mkf t2) :: [])) tbool in
+    f_forall ([(a, GTty ty);(b,GTty ty)]) t in
+  let a3 = (* forall (a : ty), a (+) O = a *)
+    let (fa, a) = cid "a" in
+    let t1 = Fapp (plus, fa :: z :: []) in
+    let t = mk_form (Fapp (eq, (mkf t1) :: fa :: [])) tbool in
+    f_forall [a, GTty ty] t in
+  let a4 = (* forall (a : ty), a (-) a = O *)
+    let (fa, a) = cid "a" in
+    let t1 = mkf (Fapp (minus, fa :: fa :: [])) in
+    let t = mk_form (Fapp (eq, t1 :: z :: [])) tbool in
+    f_forall [a, GTty ty] t in
+  let m1 = (* forall (a b c : ty), (a*b)*c =a*(b*c) *)
+    let (fa, a) = cid "a" in
+    let (fb, b) = cid "b" in
+    let (fc, c) = cid "c" in
+    let tab = mkf (Fapp (times, fa :: fb :: [])) in
+    let tbc = mkf (Fapp (times, fb :: fc :: [])) in
+    let t1 = mkf (Fapp (times, fa :: tbc :: [])) in
+    let t2 = mkf (Fapp (times, tab :: fc :: [])) in
+    let t = mk_form (Fapp (eq, t1 :: t2 :: [])) tbool in
+    f_forall [(a,GTty ty);(b,GTty ty);(c,GTty ty)] t in
+  let d1 = (*forall (a b c : ty), a * (b (+) c) = a * b (+) a * c *)
+    let (fa, a) = cid "a" in
+    let (fb, b) = cid "b" in
+    let (fc, c) = cid "c" in
+    let fbc = mkf (Fapp (plus, fb :: fc :: [])) in
+    let t1 = mkf (Fapp (times , fa :: fbc :: [])) in
+    let fab = mkf (Fapp (times , fa :: fb :: [])) in
+    let fac = mkf (Fapp (times , fa :: fc :: [])) in
+    let t2 = mkf (Fapp (plus, fab :: fac :: [])) in
+    let t = mk_form (Fapp (eq, t1 :: t2 :: [])) tbool in
+    f_forall [(a,GTty ty);(b,GTty ty);(c,GTty ty)] t in
+  let m2 =(* forall (a b : ty), a * b = b * a *)
+    let (fa, a) = cid "a" in
+    let (fb, b) = cid "b" in
+    let t1 = Fapp (times, fa :: fb :: []) in
+    let t2 = Fapp (times, fb :: fa :: []) in
+    let t = mk_form (Fapp (eq, (mkf t1) :: (mkf t2) :: [])) tbool in
+    f_forall ([(a, GTty ty);(b,GTty ty)]) t in
+  let e2 = (* forall p <> O => p ^ 0 = 1 *)
+    let (fa,a) = cid "a" in
+    let pc = f_not (mk_form (Fapp (eq, fa :: z :: []))  tbool) in
+    let t1 = mkf (Fapp (exp, fa :: (f_int 0) :: [])) in
+    let t = mk_form (Fapp (eq,t1 :: o :: [])) tbool in
+    f_forall [(a,GTty ty)] (f_imp pc t) in
+  let e3 = (* forall p \in ty, forall i \in Int, p <> O /\ i > 0 => p ^ i = p * p ^ i *)
+    let (fp,p) = cid "p" in
+    let (fi, i) = let j = EcIdent.create "i" in (mk_form (Flocal j) tint, j) in
+    let precd1 = f_not(mk_form (Fapp (eq, fp :: z :: [])) tbool) in
+    let precd2 = f_int_lt (f_int 0) fi in
+    let fim1 = f_int_sub fi (f_int 1) in
+    let t = mkf (Fapp (exp, fp :: fi :: [])) in
+    let t1 = mkf (Fapp (exp, fp :: fim1 :: [])) in
+    let t' = mkf (Fapp (times, fp :: t1 :: [])) in
+    let ee = mk_form (Fapp (eq, t' :: t :: [])) tbool in
+    f_forall [(p,GTty ty);(i,GTty tint)] (f_imp precd1 (f_imp precd2 ee)) in
+    e2 :: e3 :: a1 :: a2 :: a3 :: a4 :: m1 :: m2 :: d1 :: []
+
+let fieldax plus times exp minus inv div z o eq =
+  let ring = ringax plus times exp minus z o eq in
+  let ty = z.f_ty in
+  let mkf f = mk_form f ty in
+  let cid t = let i = EcIdent.create t in (mkf (Flocal i),i) in 
+  let m3 = (* forall (a : ty), a * 1 = 1 *)
+    let (fa, a) = cid "a" in
+    let t1 = Fapp (times, fa :: o :: []) in
+    let t = mk_form (Fapp (eq, (mkf t1) :: fa :: [])) tbool in
+    f_forall [a, GTty ty] t in
+  let m4 = (* forall (a : ty), a <> O => a * inv a = 1 *)
+    let (fa, a) = cid "a" in
+    let precond =  f_not (mkf (Fapp (eq, fa :: z :: []))) in
+    let infa = mkf (Fapp (inv, fa :: [])) in
+    let t1 = mkf (Fapp (times, fa :: infa :: [])) in
+    let t = mk_form (Fapp (eq, t1 :: o :: [])) tbool in
+    f_forall [a, GTty ty] (f_imp precond t) in
+  let dff = f_not (mk_form (Fapp(eq, o :: z :: [])) tbool) in
+  let divinv = (* forall (x : ty), inv(x) = 1 / x *)
+    let (fa, a) = cid "a" in
+    let precond =  f_not (mkf (Fapp (eq, fa :: z :: []))) in
+    let x1 = mkf (Fapp (div, o :: fa :: [])) in
+    let ix = mkf (Fapp (inv, fa :: [])) in
+    let t = mk_form (Fapp (eq,x1 :: ix :: [])) tbool in
+    f_forall [(a, GTty ty)] (f_imp precond t) in
+  divinv :: dff :: m3 :: m4 :: ring
+
+let t_field (plus,times,inv,exp,minus,div,z,o,eq,eqs) (t1,t2) : tactic =
+  (fun g ->
+	let (pzs,(d1,d2),(n1,n2)) = appfield (t1, t2) plus minus times inv exp div z o eqs in
+  let rg = (fun (t1,t2) -> ring_eq t1 t2 plus minus times exp z o eqs) in
+  let res = rg (mk_form (Fapp (times, n1 :: d2 :: [])) z.f_ty,mk_form (Fapp (times, n2 :: d1 :: [])) z.f_ty) in
+	let pzs' = List.fold_left (fun is i -> (f_not (mk_form (Fapp (eq, [i;z])) tbool)) :: is) [] pzs in
+  let ax = fieldax plus times exp minus inv div z o eq in
+  if (f_equal res z) then
+    prove_goal_by (pzs' @ ax) RN_field g 
+  else
+    let t = mk_form (Fapp (eq, res :: z :: [])) tbool in 
+    prove_goal_by ( t :: pzs' @ ax) RN_field g)
+
+let t_field_simp (plus,times,inv,exp,minus,div,z,o,eq,eqs) (t1,t2) : tactic =
+  (fun g ->
+	let (pzs,rn,rd) = appfield_simp t1 plus minus times inv exp div z o eqs in
+	let (pzs',rn',rd') = appfield_simp t2 plus minus times inv exp div z o eqs in
+  let r    = mk_form (Fapp (div, rn :: rd :: [])) z.f_ty in
+  let r'   = mk_form (Fapp (div, rn' :: rd' :: [])) z.f_ty in
+  let t    = mk_form (Fapp (eq, r :: r' :: [])) tbool in
+	let ps'  = List.fold_left (fun is i -> (f_not (mk_form (Fapp (eq, [i;z])) tbool)) :: is) [] pzs in
+	let psa' = List.fold_left (fun is i -> (f_not (mk_form (Fapp (eq, [i;z])) tbool)) :: is) [] pzs' in
+  let ax   = fieldax plus times exp minus inv div z o eq in
+  prove_goal_by (t :: (ps' @ psa') @ ax) RN_field g) 
+
+let t_field_simp_s (plus,times,inv,exp,minus,div,z,o) t1 : (form list * form * form) =
+  appfield_simp t1 plus minus times inv exp div z o []
+
+let t_ring_simp_s (plus,times,exp,minus,z,o) t1 : form =
+  ring_simp t1 plus minus times exp z o []
+
+  
+let t_ring_simp  (plus,times,exp,minus,z,o,eq,eqs) (t1,t2) : tactic =
+  (fun g ->
+  let pbs1 = ring_simp t1 plus minus times exp z o eqs in
+  let pbs2 = ring_simp t2 plus minus times exp z o eqs in
+  let ax = ringax plus times exp minus z o eq in
+	prove_goal_by ((mk_form (Fapp (eq,pbs1::pbs2::[])) tbool) :: ax) RN_ring g)
+
+let t_ring  (plus,times,exp,minus,z,o,eq,eqs) (t1,t2) : tactic =
+  (fun g ->
+  let res = ring_eq t1 t2 plus minus times exp z o eqs in
+  let ax = ringax plus times exp minus z o eq in
+  if (f_equal res z) then
+    prove_goal_by ax RN_ring g
+  else  
+    prove_goal_by ((mk_form (Fapp (eq,res :: z :: [])) tbool) :: ax) RN_ring g)
+
+(**************************************************************************************************************)
+
 let t_or_intro b g =
   let hyps, concl = get_goal g in
   let rec aux f =
@@ -974,26 +1140,6 @@ let t_elimT tys p f sk g =
 let t_case f g =
   check_logic (LDecl.toenv (get_hyps g)) p_case_eq_bool;
   t_elimT [] p_case_eq_bool f 0 g
-
-let prove_goal_by sub_gs rule (juc,n as g) =
-  let hyps,_ = get_goal g in
-  let add_sgoal (juc,ns) sg = 
-    let juc,n = new_goal juc (hyps,sg) in juc, RA_node n::ns
-  in
-  let juc,ns = List.fold_left add_sgoal (juc,[]) sub_gs in
-  let rule = { pr_name = rule ; pr_hyps = List.rev ns} in
-  upd_rule rule (juc,n)
-
-let t_field (plus,times,inv,minus,z,o,eq) (t1,t2) g =
-	let (pzs,pbs) = appfield (t1, t2) plus minus times inv z o in
-	let pzs' = List.fold_left (fun is i -> (f_not (mk_form (Fapp (eq, [i;z])) tbool)) :: is) [] pzs in
-	let pbs' = List.fold_left (fun is (l,r) -> (mk_form (Fapp(eq, l :: r :: [])) tbool) :: is) [] pbs in
-	prove_goal_by (pzs' @ pbs') RN_field g
-
-let t_field_simp (plus,times,inv,minus,z,o,eq) t1 g =
-	let (pzs,res) = appfield_simp t1 plus minus times inv z o in
-	let pzs' = List.fold_left (fun is i -> (f_not (mk_form (Fapp (eq, [i;z])) tbool)) :: is) [] pzs in
-	prove_goal_by (res :: pzs') RN_field g
 
 let gen_t_exists do_arg fs (juc,n as g) =
   let hyps,concl = get_goal g in

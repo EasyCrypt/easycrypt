@@ -216,8 +216,9 @@ val f_eqglob   : EcPath.mpath -> memory ->
                  EcPath.mpath -> memory -> form 
 
 (* soft-constructors - ordering *)
-val f_int_le : form -> form -> form
-val f_int_lt : form -> form -> form
+val f_int_le  : form -> form -> form
+val f_int_lt  : form -> form -> form
+val f_int_sub : form -> form -> form
 
 val f_int_prod : form -> form -> form
 val f_int_add  : form -> form -> form

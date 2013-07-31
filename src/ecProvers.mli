@@ -6,6 +6,7 @@ type prover_infos =
 val call_prover_task : prover_infos -> Why3.Task.task -> bool
 
 val dft_prover_infos : prover_infos
+val t_prover_infos : prover_infos
 
 val check_prover_name : string -> bool
 
