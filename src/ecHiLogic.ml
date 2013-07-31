@@ -268,12 +268,12 @@ let process_subst loc ri g =
             let eqs' = List.fold_left (fun is i ->
               let s = i.pl_desc in
               if (LDecl.has_hyp s hyps) then
-                (match ((snd (LDecl.lookup_hyp s hyps)).f_node) with
-                  | Fapp (op, m :: t :: []) when f_equal op eq' -> (m,t) :: is
-                  | _ -> cannot_apply "ring" "Wrong structure.")
+                (match EcFol.sform_of_form (((snd (LDecl.lookup_hyp s hyps)))) with
+                | EcFol.SFeq (m,t) -> (m,t) :: is
+                | _ -> cannot_apply "field" "Wrong structure")
               else error i.pl_loc (UnknownHypSymbol s) ) [] eqs
             in
-          t_field (p',t',i',exp',m',d',z',o',eq,eqs') (arg1,arg2) g
+            t_field (p',t',i',exp',m',d',z',o',eq,eqs') (arg1,arg2) g
           else
 						cannot_apply "field" "The eq doesn't coincide."
 				| _ -> cannot_apply "field" "You can only apply field with a comp between terms.")
@@ -295,9 +295,9 @@ let process_subst loc ri g =
           let eqs' = List.fold_left (fun is i ->
             let s = i.pl_desc in
             if (LDecl.has_hyp s hyps) then
-              (match ((snd (LDecl.lookup_hyp s hyps)).f_node) with
-                | Fapp (op, m :: t :: []) when f_equal op e' -> (m,t) :: is
-                | _ -> cannot_apply "ring" "Wrong structure.")
+              (match EcFol.sform_of_form (((snd (LDecl.lookup_hyp s hyps)))) with
+              | EcFol.SFeq (m,t) -> (m,t) :: is
+              | _ -> cannot_apply "field" "Wrong structure")
             else error i.pl_loc (UnknownHypSymbol s) ) [] eqs
           in
             t_field_simp (p',t',i',exp',m',d',z',o',e',eqs') (arg1,arg2) g
@@ -317,12 +317,12 @@ let process_subst loc ri g =
 						let z' = process_form hyps z ty in 
 						let o' = process_form hyps o ty in 
             let eqs' = List.fold_left (fun is i ->
-              let s = i.pl_desc in
-              if (LDecl.has_hyp s hyps) then
-                (match ((snd (LDecl.lookup_hyp s hyps)).f_node) with
-                  | Fapp (op, m :: t :: []) when f_equal op eq' -> (m,t) :: is
-                  | _ -> cannot_apply "ring" "Wrong structure.")
-              else error i.pl_loc (UnknownHypSymbol s) ) [] eqs
+             let s = i.pl_desc in
+             if (LDecl.has_hyp s hyps) then
+               (match EcFol.sform_of_form (((snd (LDecl.lookup_hyp s hyps)))) with
+               | EcFol.SFeq (m,t) -> (m,t) :: is
+               | _ -> cannot_apply "ring" "Wrong structure")
+             else error i.pl_loc (UnknownHypSymbol s) ) [] eqs
             in
             t_ring  (p',t',exp',m',z',o',eq,eqs') (arg1,arg2) g
 					else
@@ -342,12 +342,12 @@ let process_subst loc ri g =
 					let z' = process_form hyps z ty in 
 					let o' = process_form hyps o ty in 
           let eqs' = List.fold_left (fun is i ->
-            let s = i.pl_desc in
-            if (LDecl.has_hyp s hyps) then
-              (match ((snd (LDecl.lookup_hyp s hyps))).f_node with
-                | Fapp (op, m :: t :: []) when f_equal op e' -> (m,t) :: is
-                | _ -> cannot_apply "ring" "Wrong structure")
-            else error i.pl_loc (UnknownHypSymbol s) ) [] eqs
+           let s = i.pl_desc in
+           if (LDecl.has_hyp s hyps) then
+             (match EcFol.sform_of_form (((snd (LDecl.lookup_hyp s hyps)))) with
+             | EcFol.SFeq (m,t) -> (m,t) :: is
+             | _ -> cannot_apply "field" "Wrong structure")
+           else error i.pl_loc (UnknownHypSymbol s) ) [] eqs
           in
             t_ring_simp  (p',t',exp',m',z',o',e',eqs') (arg1,arg2) g
 				| _ -> cannot_apply "ring" "You can only apply ring with a comp between terms.")
