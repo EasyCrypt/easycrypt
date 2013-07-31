@@ -48,9 +48,8 @@ let npepow x n =
                match x with
                 | PEc c -> if (ceq c c1) then PEc c1 else
                             if (ceq c c0) then PEc c0 else 
-                              let res = Big_int.power_int_positive_int c p in
-                              let sr = Big_int.int_of_big_int res in
-                               PEc sr
+                              let res = Big_int.power_big_int_positive_int c p in
+                               PEc res 
                 | _ -> PEpow (x,n)
 
 let rec npemul (x : pexpr) (y : pexpr) : pexpr =
@@ -101,7 +100,6 @@ let rec split_aux (e1 : pexpr) (p : int) (e2 : pexpr) : rsplit =
             | None -> (npepow e1 p, PEc c1, e2)
 let split e1 e2 = split_aux e1 1 e2
 
-(* BS: make record *)
 type linear = (pexpr * pexpr * (pexpr list))
 let num (t,_,_) = t
 let denum (_,t,_) = t

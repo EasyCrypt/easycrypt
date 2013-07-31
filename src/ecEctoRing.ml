@@ -24,9 +24,9 @@ let form_to_ring (f : form) (eqs : (form * form) list) (plus : form) (minus : fo
 																		| Fint n -> PEpow (ftr arg1,n) 
 																		| _ -> raise Bad_Type)
 													
-			| Fint n -> PEc n
-			| _ when f_equal f one -> PEc 1
-			| _ when f_equal f zero -> PEc 0
+			| Fint n -> PEc (Big_int.big_int_of_int n)
+			| _ when f_equal f one -> PEc c1
+			| _ when f_equal f zero -> PEc c0
 			| _  -> PEX (update f) in
   let newf = ftr f in
   let eqs' = List.fold_left (fun is (i,j) -> (ftr i, ftr j) :: is ) [] eqs in
@@ -39,19 +39,21 @@ let ring_to_form (f : pol) (plus : form) (minus : form) (times : form) (exp : fo
 	let rmul f1 f2 = mk_form (Fapp (times, f1 :: f2 :: [])) ty in
 	let rsub f1 f2 = mk_form (Fapp (minus, f1 :: f2 :: [])) ty in
 	let rpow f1 n = mk_form (Fapp (exp, f1 :: (mk_form (Fint n) tint) :: [])) ty in
-  let rec mkIn (t : int) : form = if (t = 1) then one else radd one (mkIn (t-1)) in 
-  let fint n = if (ceq n c0) then zero
-               else if (ceq n c1) then one                                                                                                               
-               else if (n = (-1)) then rsub zero one                                                                                                     
-               else if (ty_equal ty tint) then (f_int n)                                                                                                 
-               else if (n < 0) then rsub zero (mkIn (-n)) else (mkIn n) in     
+  (*let rec mkIn (t : int) : form = if (t = 1) then one else radd one (mkIn (t-1)) in *)
+  let rec mkIn t : form =
+    if (ceq t c1) then one else radd one (mkIn (Big_int.pred_big_int t)) in 
+	let fint (n : c) = if (ceq n c0) then zero
+               else if (ceq n c1) then one
+               (*else if (n = (-1)) then rsub zero one*)
+               else if (ty_equal ty tint) then (f_int (Big_int.int_of_big_int n))  (*It fails when the big int is bigger than 32 bits*)
+               else if (Big_int.lt_big_int n c0) then rsub zero (mkIn (Big_int.minus_big_int n)) else (mkIn n) in
   let rec rtf p c' = match p with
         | Pc c -> fint c 
         | Pinj (j,q) -> rtf q (c' - j)
         | PX (p,i,q) ->
-          let xi = if i=1 then map (gr -c') else rpow (map (gr - c')) i in
-          let pxi = if (peq p (Pc 1)) then xi else rmul (rtf p c') xi in         
-          if (peq q (Pc 0)) then pxi else radd pxi (rtf q (c'-1)) in
+          let xi = if i=1 then map (gr - c') else rpow (map (gr - c')) i in
+          let pxi = if (peq p (Pc c1)) then xi else rmul (rtf p c') xi in         
+          if (peq q (Pc c0)) then pxi else radd pxi (rtf q (c'-1)) in
    rtf f (gr - 1)
 
 let ring_simp (f1: form) (plus : form) (minus : form) (times : form) (exp : form) (zero : form) (one : form) (eqs : (form * form) list):

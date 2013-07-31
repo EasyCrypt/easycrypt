@@ -8,19 +8,20 @@
 (*         *       GNU Lesser General Public License Version 2.1        *)
 (************************************************************************)
 *)
+open Big_int
 
-(* FIXME: use bigint *)
-type c = int
+type c = big_int;;
+(*type c = int;;*)
 
-let c0 = 0
-let c1 = 1
+let c0 = zero_big_int
+let c1 = unit_big_int
 
-let cadd a b = a + b
-let csub a b = a - b
-let cmul a b = a * b
-let copp a = - a
-let ceq a b = a = b
-let cdiv a b = (a / b, a mod b)
+let cadd a b = add_big_int a  b
+let csub a b = sub_big_int a  b
+let cmul a b = mult_big_int a  b
+let copp a =  minus_big_int a
+let ceq a b = eq_big_int a b
+let cdiv a b = quomod_big_int a b
 
 type pexpr = PEc of c 
   | PEX of int
