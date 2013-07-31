@@ -1,70 +1,40 @@
 (* Definitions for Public-Key Signatures Schemes *)
 require import FSet.
+require import Pair.
 
-theory PKS.
-  type pkey.
-  type skey.
-  type message.
-  type signature.
+type pkey.
+type skey.
+type message.
+type signature.
 
-  module type Scheme = {
-    fun keygen(): (pkey * skey)
-    fun sign(sk:skey, m:message): signature
-    fun verify(pk:pkey, m:message, s:signature): bool
-  }.
+module type Scheme = {
+  fun keygen(): (pkey * skey)
+  fun sign(sk:skey, m:message): signature
+  fun verify(pk:pkey, m:message, s:signature): bool
+}.
 
-  module type Oracles = { fun sign(m:message): signature }.
+module type AdvOracles = { fun sign(m:message): signature }.
 
-  module Wrap(S:Scheme): Oracles = {
-    var qs: message set
-    var pk: pkey
-    var sk: skey
+module type AdvCMA = {
+  fun forge(pk:pkey): (message * signature)
+}.
 
-    fun init(): pkey = {
-      qs = empty;
-      (pk,sk) = S.keygen();
-      return pk;
-    }
-
-    fun sign(m:message): signature = {
-      var s:signature;
-      qs = add m qs;
-      s = S.sign(sk,m);
-      return s;
-    }
-
-    fun fresh(m:message): bool = {
-      return !mem m qs;
-    }
-  }.
-end PKS.
-
-theory PKS_ROM.
-  type pkey.
-  type skey.
-  type message.
-  type signature.
-
-  require        RandOrcl.
-    clone import RandOrcl.
-
-  module type Scheme = {
-    fun keygen(): (pkey * skey)
-    fun sign(sk:skey, m:message): signature
-    fun verify(pk:pkey, m:message, s:signature): bool
-  }.
-
+theory EF_CMA.
   module type Oracles = {
+    fun init(): pkey
     fun sign(m:message): signature
+    fun verify(m:message,s:signature): bool
+    fun fresh(m:message): bool
   }.
 
-  module Wrap(H:Oracle,S:Scheme): Oracles = {
+  (* A wrapper providing oracles for existential
+     unforgeability from a PKS scheme. *)
+  module WrapEF(S:Scheme): Oracles = {
     var qs: message set
     var pk: pkey
     var sk: skey
 
     fun init(): pkey = {
-      H.init();
       qs = empty;
       (pk,sk) = S.keygen();
       return pk;
@@ -77,40 +47,49 @@ theory PKS_ROM.
       return s;
     }
 
+    fun verify(m:message,s:signature): bool = {
+      var b:bool;
+      b = S.verify(pk,m,s);
+      return b;
+    }
+
     fun fresh(m:message): bool = {
       return !mem m qs;
     }
   }.
-end PKS_ROM.
 
-theory PKS_2ROM.
-  type pkey.
-  type skey.
-  type message.
-  type signature.
+  module EF_CMA(O:Oracles, A:AdvCMA) = {
+    fun main(): bool = {
+      var pk:pkey;
+      var m:message;
+      var s:signature;
+      var forged, fresh:bool;
 
-  require        RandOrcl.
-    clone RandOrcl as Gt.
-    clone RandOrcl as Ht.
-
-  module type Scheme = {
-    fun keygen(): (pkey * skey)
-    fun sign(sk:skey, m:message): signature
-    fun verify(pk:pkey, m:message, s:signature): bool
+      pk = O.init();
+      (m,s) = A.forge(pk);
+      forged = O.verify(m,s);
+      fresh = O.fresh(m);
+      return forged /\ fresh;
+    }
   }.
+end EF_CMA.
 
+theory UF_CMA.
   module type Oracles = {
+    fun init(): pkey
     fun sign(m:message): signature
+    fun verify(m:message,s:signature): bool
+    fun fresh(m:message,s:signature): bool
   }.
 
-  module Wrap(G:Gt.Oracle,H:Ht.Oracle,S:Scheme): Oracles = {
-    var qs: message set
+  (* A wrapper providing oracles for universal
+     unforgeability from a PKS scheme. *)
+  module WrapUF(S:Scheme): Oracles = {
+    var qs: (message * signature) set
     var pk: pkey
     var sk: skey
 
     fun init(): pkey = {
-      H.init();
-      G.init();
       qs = empty;
       (pk,sk) = S.keygen();
       return pk;
@@ -118,13 +97,34 @@ theory PKS_2ROM.
 
     fun sign(m:message): signature = {
       var s:signature;
-      qs = add m qs;
       s = S.sign(sk,m);
+      qs = add (m,s) qs;
       return s;
     }
 
-    fun fresh(m:message): bool = {
-      return !mem m qs;
+    fun verify(m:message,s:signature): bool = {
+      var b:bool;
+      b = S.verify(pk,m,s);
+      return b;
+    }
+
+    fun fresh(m:message,s:signature): bool = {
+      return !mem (m,s) qs;
     }
   }.
-end PKS_2ROM.
+
+  module UF_CMA(O:Oracles, A:AdvCMA) = {
+    fun main(): bool = {
+      var pk:pkey;
+      var m:message;
+      var s:signature;
+      var forged, fresh:bool;
+
+      pk = O.init();
+      (m,s) = A.forge(pk);
+      forged = O.verify(m,s);
+      fresh = O.fresh(m,s);
+      return forged /\ fresh;
+    }
+  }.
+end UF_CMA.
