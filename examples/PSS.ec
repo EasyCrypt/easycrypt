@@ -1,5 +1,6 @@
 require import Fun.
 require import Int.
+require import Real.
 
 (*** General definitions *)
 (** Lengths *)
@@ -85,14 +86,12 @@ clone export OW as RSA with
 clone export RandOrcl as H with
   type from <- message,
   type to <- htag,
-  op dsample <- sample_htag,
-  op default = HTag.zeros.
+  op dsample <- sample_htag.
 
 clone export RandOrcl as G with
   type from <- htag,
   type to <- gtag,
-  op dsample <- sample_gtag,
-  op default = GTag.zeros.
+  op dsample <- sample_gtag.
 
 clone export PKS as PKSi with
   type pkey <- pkey,
@@ -101,7 +100,6 @@ clone export PKS as PKSi with
   type signature <- signature.
 
 (*** Defining PSS *)
-print theory GTag.
 module PSS(G:G.Oracle,H:H.Oracle): Scheme = {
   fun init(): unit = {
     G.init();
@@ -169,3 +167,119 @@ module PSS(G:G.Oracle,H:H.Oracle): Scheme = {
     return (w = w' /\ gamma = gamma' /\ !b);
   }
 }.
+
+(** EF-CMA security of PSS *)
+(* A CMA adversary with access to two random oracles *)
+module type CMA_2RO(G:G.ARO,H:H.ARO) = {
+  fun forge(pk:pkey): message * signature
+}.
+
+module PSSi = PSS(G.ROM.RO,H.ROM.RO).
+module PSSo = PKSi.EF_CMA.WrapEF(PSSi).
+module PSS_CMA = PKSi.EF_CMA.EF_CMA(PSSo).
+
+module G' = G.WRO_Set.ARO(G.ROM.RO).
+module H' = H.WRO_Set.ARO(H.ROM.RO).
+
+section.
+declare module Adv:CMA_2RO.
+axiom AdvL (G<:G.ARO) (H<:H.ARO):
+  islossless G.o => islossless H.o =>
+  islossless Adv(G,H).forge.
+
+print theory PKS.
+
+local module G0_Oracles = {
+  var sk:skey
+
+  fun g1(x:htag): salt = {
+    var r:gtag;
+    r = G.ROM.RO.o(x);
+    return Salt.from_bits (sub (to_bits r) 0 k0);
+  }
+
+  fun g2(x:htag): g2tag = {
+    var r:gtag;
+    r = G.ROM.RO.o(x);
+    return G2Tag.from_bits (sub (to_bits r) k0 kg2);
+  }
+
+  fun sign(m:message): signature = {
+    var r:salt;
+    var rMask:salt;
+    var maskedR:salt;
+    var w:htag;
+    var gamma:g2tag;
+    var y:signature;
+
+    r = $sample_salt;
+    w  = H.ROM.RO.o(m || (to_bits r));
+    rMask  = g1(w);
+    maskedR = rMask ^ r;
+    gamma  = g2(w);
+    y = Signature.from_bits (zeros 1 || (to_bits w) || (to_bits maskedR) || (to_bits gamma));
+    return (finv sk y);
+  }
+}.
+
+local lemma PSS_G0_sign:
+  equiv [PSSo.sign ~ G0_Oracles.sign: ={H.ROM.RO.m, G.ROM.RO.m, m} /\ PSSo.sk{1} = G0_Oracles.sk{2} ==> ={res}].
+proof.
+fun; seq 1 0: (={H.ROM.RO.m,G.ROM.RO.m,m} /\ PSSo.sk{1} = G0_Oracles.sk{2});
+  first by wp.
+inline PSS(G.ROM.RO,H.ROM.RO).sign; wp.
+seq 7 5: (={w,maskedR,gamma} /\ sk{1} = G0_Oracles.sk{2})=> //.
+by eqobs_in.
+qed.
+
+(* PROOF GOES HERE *)
+
+
+(* For Pierre-Yves: the slowness only appears if you run the tactics one by one,
+   running the whole buffer goes frighteningly fast.
+   IDEA: is this about formatting and printing that monstrous postcondition?
+ *)
+module Correctness = {
+  var m:message
+
+  fun main(): bool = {
+    var (pk,sk):pkey * skey;
+    var s:signature;
+    var b:bool;
+
+    (pk,sk) = PSSi.keygen();
+    s = PSSi.sign(sk,m);
+    b = PSSi.verify(pk,m,s);
+    return b;
+  }
+}.
+
+lemma correct &m m':
+  Correctness.m{m} = m' =>
+  Pr[Correctness.main() @ &m: res] = 1%r.
+proof.
+intros=> init_m; bdhoare_deno (_: Correctness.m{hr} = m' ==> res)=> //.
+fun;
+inline PSSi.verify PSSi.sign PSSi.keygen
+       PSS(G.ROM.RO,H.ROM.RO).g2 PSS(G.ROM.RO,H.ROM.RO).g1
+       G.ROM.RO.o G.ROM.RO.init H.ROM.RO.o H.ROM.RO.init.
+wp; rnd=> //=.
+wp; rnd=> //=.
+wp; rnd=> //=.
+wp; rnd=> //=.
+wp; rnd=> //=. (* This one is slow *)
+wp; rnd=> //=. (* This one is very slow *)
+wp; rnd=> //=. (* This one is extremely slow *)
+wp=> //=. (* This one is coffee-drinking material *)
+admit.
+qed.
+
+(* We bound the probability, for all lossless
+   adversary A of type CMA_2RO of
+   PSS_CMA(A(G',H')).main returning true. *)
+declare module I:Inverter.
+lemma conclusion &m:
+  Pr[PSS_CMA(Adv(G',H')).main() @ &m: res] <= Pr[RSA.OW(I).main() @ &m: res].
+admit.
+qed.
+end section.
