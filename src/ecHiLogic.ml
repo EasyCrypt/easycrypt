@@ -747,19 +747,24 @@ let process_rewrite1 loc ri g =
       
             let concl =
               FPosition.map cpos
-                (fun fp ->
+                (fun topfp ->
+                  let (fp, args) = EcFol.destr_app topfp in
+
                   match sform_of_form fp with
-                  | SFop ((_, tvi), args) -> begin
+                  | SFop ((_, tvi), []) -> begin
                     let subst = EcTypes.Tvar.init tparams tvi in
                     let body  = EcFol.Fsubst.subst_tvar subst body in
-                    let fp    = f_app body args fp.f_ty in
-                      try  EcReduction.h_red EcReduction.beta_red (get_hyps g) fp
-                      with EcBaseLogic.NotReducible -> fp
+                    let body  = f_app body args topfp.f_ty in
+                      try  EcReduction.h_red EcReduction.beta_red (get_hyps g) body
+                      with EcBaseLogic.NotReducible -> body
                   end
 
-                  | SFlocal _ ->
-                      assert (args = [] && tparams = []);
-                      body
+                  | SFlocal _ -> begin
+                      assert (tparams = []);
+                      let body = f_app body args topfp.f_ty in
+                        try  EcReduction.h_red EcReduction.beta_red (get_hyps g) body
+                        with EcBaseLogic.NotReducible -> body
+                  end
 
                   | _ -> assert false)
                 (get_concl g)

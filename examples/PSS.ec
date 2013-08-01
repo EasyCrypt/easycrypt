@@ -1,193 +1,171 @@
-require import RandOrcl.
-require import Array.
-require import Bitstring.
-require import Map.
-require import Set.
+require import Fun.
 require import Int.
-require import Distr.
-require import Bool.
 
-theory SignatureScheme.
-
-  type pkey.
-  type skey.
-
-  module type SigScheme_ROM = {
-    fun init(): unit (* This is unfortunate, but the ROM needs to be initialized *)
-    fun h(x:bitstring): bitstring
-    fun keygen(): (pkey * skey)
-    fun sign(sk:skey, m:bitstring): bitstring
-    fun verify(pk:pkey, m:bitstring, s:bitstring): bool
-  }.
-
-  op qH:int.
-  op qS:int.
-
-  module type SigScheme_Oracles_ROM = {
-    fun init(): pkey
-    fun wasQueried(m:bitstring): bool
-    fun h(x:bitstring): bitstring
-    fun sign(m:bitstring): bitstring
-    fun verify(pk:pkey, m:bitstring, s:bitstring): bool (* In theory, we don't give this one to the adversary. Check with P-Y for bug in functor application *)
-  }.
-
-  module Sig_Oracles_ROM(S:SigScheme_ROM): SigScheme_Oracles_ROM = {
-    var qs:bitstring set
-    var cH:int
-    var cS:int
-    var sk:skey
-
-    fun init():pkey = {
-      var pk:pkey;
-      S.init();
-      (pk,sk)  = S.keygen();
-      return pk; }
-
-    fun wasQueried(m:bitstring):bool = { return mem m qs; }
-
-    fun h(x:bitstring):bitstring = {
-      var r:bitstring = zeros(0);
-      if (cH < qH)
-      {
-        cH = cH + 1;
-        r  = S.h(x);
-      }
-      return r;
-    }
-
-    fun sign(m:bitstring):bitstring = {
-      var r:bitstring = zeros(0);
-      if (cS < qS)
-      {
-        cS = cS + 1;
-        qs = add m qs;
-        r  = S.sign(sk,m);
-      }
-      return r;
-    }
-
-    fun verify(pk:pkey, m:bitstring, s:bitstring):bool = {
-      var b:bool;
-      b  = S.verify(pk,m,s);
-      return b;
-    }
-  }.
-
-  module type SigAdversary_ROM(Sig:SigScheme_Oracles_ROM) = {
-    fun a(pk:pkey): (bitstring * bitstring)
-  }.
-
-  module EF_CMA(S:SigScheme_ROM, Adv:SigAdversary_ROM) = {
-    module O = Sig_Oracles_ROM(S)
-    module A = Adv(O)
-
-    fun main(): bool = {
-      var pk:pkey;
-      var m:bitstring;
-      var s:bitstring;
-      var forged:bool;
-      var queried:bool;
-      pk  = O.init();
-      (m,s)  = A.a(pk);
-      forged  = O.verify(pk,m,s);
-      queried  = O.wasQueried(m);
-      return forged /\ !queried;
-    }
-  }.
-
-(* Note: This is not necessarily the standard, this is PSS as presented in Coron 2006 (or something). *)
+(*** General definitions *)
+(** Lengths *)
 op k:int.
+axiom leq0_k: 0 < k.
+
 op k0:int.
+axiom leq0_k0: 0 < k0.
+
 op k1:int.
+axiom leq0_k1: 0 < k1.
 
-op keypairs: (pkey * skey) distr.
-op rsa: pkey -> bitstring -> bitstring.
-op rsa': skey -> bitstring -> bitstring.
+axiom constraints:
+  k0 + k1 <= k - 1.
 
-module PSS:SigScheme_ROM = {
-  (* H *)
-  var mH:(bitstring,bitstring) map
-  fun h(x:bitstring): bitstring = {
-    var r:bitstring;
-    r = $Dbitstring.dbitstring(k1);
-    if (!in_dom x mH) mH = mH.[x <- r];
-    return proj mH.[x]; (* Yurk. We need to deal with this *)
-  }
+op kg:int = k - k1 - 1.
+lemma leq0_kg1: 0 < kg by [].
 
-  (* G *)
-  var mG:(bitstring,bitstring) map
-  fun g(x:bitstring):bitstring = {
-    var r:bitstring;
-    r = $Dbitstring.dbitstring(k - k1 - 1);
-    if (!in_dom x mG) mG = mG.[x <- r];
-    return proj mG.[x];
-  }
+op kg2:int = k - k0 - k1 - 1.
+lemma leq0_kg2: 0 <= kg2 by [].
 
-  (* init *)
+op k':int = k - 1.
+lemma leq0_k': 0 <= k' by [].
+
+(** Types *)
+require AWord.
+require import ABitstring.
+
+type message = bitstring.
+
+(* Signatures *)
+type signature.
+clone import AWord as Signature with
+  type word <- signature,
+  op length <- k.
+
+(* Nonce *)
+type salt.
+clone import AWord as Salt with
+  type word <- salt,
+  op length <- k0.
+op sample_salt = Salt.Dword.dword.
+
+(* Output of H *)
+type htag.
+clone import AWord as HTag with
+  type word <- htag,
+  op length <- k1.
+op sample_htag = HTag.Dword.dword.
+
+(* Output of G *)
+type gtag.
+clone import AWord as GTag with
+  type word <- gtag,
+  op length = kg.
+op sample_gtag = GTag.Dword.dword.
+
+(* Output of G2 [G1 produces an HTag] *)
+type g2tag.
+clone import AWord as G2Tag with
+  type word <- g2tag,
+  op length = kg2.
+
+(* Domain of RSA *)
+op sample_plain: signature distr. (* Whereby we sample only with the first byte/bit set to 0 *)
+
+(** Instantiating *)
+require PKS.
+require OW.
+require RandOrcl.
+
+clone export OW as RSA with
+  type t <- signature,
+  op sample_t <- sample_plain,
+  op f_dom = (lambda (pk:pkey) (x:signature), cpTrue x),
+  op f_rng = (lambda (pk:pkey) (x:signature), cpTrue x),
+  op finv_dom = (lambda (sk:skey) (x:signature), cpTrue x),
+  op finv_rng = (lambda (sk:skey) (x:signature), cpTrue x)
+  proof f_rng_sub_finv_dom by smt,
+        finv_rng_sub_f_dom by smt,
+        f_dom_sample_t by smt.
+
+clone export RandOrcl as H with
+  type from <- message,
+  type to <- htag,
+  op dsample <- sample_htag,
+  op default = HTag.zeros.
+
+clone export RandOrcl as G with
+  type from <- htag,
+  type to <- gtag,
+  op dsample <- sample_gtag,
+  op default = GTag.zeros.
+
+clone export PKS as PKSi with
+  type pkey <- pkey,
+  type skey <- skey,
+  type message <- message,
+  type signature <- signature.
+
+(*** Defining PSS *)
+print theory GTag.
+module PSS(G:G.Oracle,H:H.Oracle): Scheme = {
   fun init(): unit = {
-    mG = Map.empty;
-    mH = Map.empty;
+    G.init();
+    H.init();
   }
 
-  fun g1(x:bitstring):bitstring = {
-    var r:bitstring;
-    r  = g(x);
-    return sub r 0 k0;
+  fun g1(x:htag):salt = {
+    var r:gtag;
+    r  = G.o(x);
+    return Salt.from_bits (sub (to_bits r) 0 k0);
   }
 
-  fun g2(x:bitstring):bitstring = {
-    var r:bitstring;
-    r  = g(x);
-    return sub r k0 (k - k0 - k1 - 1);
+  fun g2(x:htag):g2tag = {
+    var r:gtag;
+    r  = G.o(x);
+    return G2Tag.from_bits (sub (to_bits r) k0 kg2);
   }
 
   (* Keygen: make it a wrapped pop *)
   fun keygen():(pkey * skey) = {
-    var pk, sk:(pkey * skey);
+    var (pk, sk):(pkey * skey);
     (pk,sk) = $keypairs;
     return (pk,sk);
   }
 
   (* Sign *)
-  fun sign(sk:skey, m:bitstring):bitstring = {
-    var r:bitstring;
-    var rMask:bitstring;
-    var maskedR:bitstring;
-    var w:bitstring;
-    var gamma:bitstring;
-    var y:bitstring;
+  fun sign(sk:skey, m:message):signature = {
+    var r:salt;
+    var rMask:salt;
+    var maskedR:salt;
+    var w:htag;
+    var gamma:g2tag;
+    var y:signature;
 
-    r = $Dbitstring.dbitstring(k0);
-    w  = h(m || r);
+    r = $sample_salt;
+    w  = H.o(m || (to_bits r));
     rMask  = g1(w);
-    maskedR = rMask ^^ r;
+    maskedR = rMask ^ r;
     gamma  = g2(w);
-    y = zeros(1) || w || maskedR || gamma;
-    return (rsa' sk m); (* For fault injection, we will later refine this; we should make it a function so it can be reasoned about separately *)
+    y = Signature.from_bits (zeros 1 || (to_bits w) || (to_bits maskedR) || (to_bits gamma));
+    return (finv sk y); (* For fault injection, we will later refine this; we should make it a function so it can be reasoned about separately *)
   }
 
   (* Verify *)
-  fun verify(pk:pkey, m:bitstring, s:bitstring):bool = {
-    var y:bitstring;
-    var w:bitstring;
-    var w':bitstring;
-    var maskedR:bitstring;
-    var gamma:bitstring;
-    var gamma':bitstring;
-    var rMask:bitstring;
-    var r:bitstring;
+  fun verify(pk:pkey, m:message, s:signature):bool = {
+    var y:signature;
+    var w:htag;
+    var w':htag;
+    var maskedR:salt;
+    var gamma:g2tag;
+    var gamma':g2tag;
+    var rMask:salt;
+    var r:salt;
     var b:bool;
-    y = (rsa pk s);
-    b = y.[0];
-    w = sub y 1 k1;
-    maskedR = sub y (k1 + 1) k0;
-    gamma = sub y (k1 + k0 + 1) (k - k1 - k0 - 1);
+
+    y = (f pk s);
+    b = (sub (to_bits y) 0 1 <> zeros 1);
+    w = HTag.from_bits (sub (to_bits y) 1 k1);
+    maskedR = Salt.from_bits (sub (to_bits y) (k1 + 1) k0);
+    gamma = G2Tag.from_bits (sub (to_bits y) (k1 + k0 + 1) kg2);
     rMask  = g1(w);
-    r = rMask ^^ maskedR;
-    w'  = h(m || r);
+    r = rMask ^ maskedR;
+    w'  = H.o(m || to_bits r);
     gamma'  = g2(w);
     return (w = w' /\ gamma = gamma' /\ !b);
   }
 }.
-
-module PSS_Oracles = Sig_Oracles_ROM(PSS).

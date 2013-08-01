@@ -271,7 +271,7 @@ end = struct
       | `Concrete _ -> false
       | `Local i -> Sid.mem i (snd lc.lc_abstracts)
     in
-      toplocal || (List.exists (is_mp_local^~ lc) mp.m_args)
+      toplocal || (List.exists (is_mp_abstract^~ lc) mp.m_args)
 
   let rec on_mpath_ty cb (ty : ty) =
     match ty.ty_node with

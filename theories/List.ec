@@ -3,25 +3,28 @@ require import Int.
 require import Fun.
 
 (*** Type Definition is imported from Why3 *)
-import why3 "list" "List"
-   op "Nil" as "[]";
-   op "Cons" as "_::_".
+theory Core.
+  import why3 "list" "List"
+    op "Nil" as "[]";
+    op "Cons" as "_::_".
 
-(*** Recursion and Induction Principles *)
-(** Recursion principle *)
-op list_rect: 'b -> ('a -> 'a list -> 'b -> 'b) -> 'a list -> 'b.
-axiom list_rect_nil: forall v f,
-  list_rect<:'b,'a> v f [] = v.
-axiom list_rect_cons: forall v f x xs,
-  list_rect<:'b,'a> v f (x::xs) = f x xs (list_rect v f xs).
+  (*** Recursion and Induction Principles *)
+  (** Recursion principle *)
+  op list_rect: 'b -> ('a -> 'a list -> 'b -> 'b) -> 'a list -> 'b.
+  axiom list_rect_nil: forall v f,
+    list_rect<:'b,'a> v f [] = v.
+  axiom list_rect_cons: forall v f x xs,
+    list_rect<:'b,'a> v f (x::xs) = f x xs (list_rect v f xs).
 
-(** Induction principle. *)
-(* We cannot prove it from list_rect because
-   types and terms are disjoint. *)
-axiom list_ind: forall (p:('a list) cpred),
-  p [] =>
-  (forall x xs, p xs => p (x::xs)) =>
-  (forall xs, p xs).
+  (** Induction principle. *)
+  (* We cannot prove it from list_rect because
+     types and terms are disjoint. *)
+  axiom list_ind: forall (p:('a list) cpred),
+    p [] =>
+    (forall x xs, p xs => p (x::xs)) =>
+    (forall xs, p xs).
+end Core.
+export Core.
 
 (*** Destructors (partially specified) *)
 (** Head *)

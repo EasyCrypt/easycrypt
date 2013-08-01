@@ -54,7 +54,8 @@ axiom dom_def: forall (m:('a,'b) map) x,
 (* Lemmas *)
 lemma dom_empty: dom empty<:'a,'b> = ISet.empty<:'a>.
 proof strict.
-by apply ISet.set_ext; smt.
+apply ISet.set_ext=> x;
+rewrite dom_def; smt.
 qed.
 
 lemma nosmt in_dom_setE: forall (x:'a) (m:('a,'b) map) v,
@@ -94,7 +95,7 @@ lemma in_rng_setE: forall (m:('a,'b) map) x v, in_rng v m.[x <- v] by [].
 lemma rng_empty: rng empty<:'a,'b> = ISet.empty.
 proof strict.
 by apply ISet.set_ext; delta ISet.(==); beta=> v;
-   rewrite rng_def; smt.
+   rewrite rng_def; split; apply absurd=> _; smt.
 qed.
 
 lemma in_rng_empty: forall (v:'b), !(in_rng v empty<:'a,'b>) by [].

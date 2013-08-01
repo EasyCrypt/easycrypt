@@ -1587,7 +1587,13 @@ let _inline hyps me sp s =
     let fdef = 
       match f.f_def with
       | FBdef def -> def 
-      | _ -> assert false in (* FIXME error message *)
+      | _ -> begin
+        let ppe = EcPrinting.PPEnv.ofenv env in
+        tacuerror
+          "Abstract function `%a' cannot be inlined"
+          (EcPrinting.pp_funname ppe) p
+      end
+    in
     let me, anames = 
       List.map_fold _inline_freshen me f.f_sig.fs_params in
     let me, lnames = 

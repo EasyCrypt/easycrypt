@@ -375,7 +375,6 @@ type module_expr = {
   me_body      : module_body;
   me_comps     : module_comps;
   me_sig       : module_sig; 
-(*  me_types     : module_type list; *)
 }
 
 and module_body =
