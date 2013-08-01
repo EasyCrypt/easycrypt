@@ -224,9 +224,3 @@ module Parray : sig
 
   val for_all : ('a -> bool) -> 'a t -> bool
 end
-
-(* -------------------------------------------------------------------- *)
-module Os : sig
-  val listdir : string -> string list
-end
-
