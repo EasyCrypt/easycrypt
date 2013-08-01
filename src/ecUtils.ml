@@ -477,3 +477,21 @@ module Stream = struct
     try  Some (Stream.next stream)
     with Stream.Failure -> None
 end
+
+(* -------------------------------------------------------------------- *)
+module Os = struct
+  let listdir (dir : string) =
+    let rec doit db acc =
+      match (try Some (Unix.readdir db) with End_of_file -> None) with
+      | None      -> List.rev acc
+      | Some name -> doit db (name :: acc)
+    in
+
+    let db = Unix.opendir dir in
+
+      try
+        let files = doit db [] in Unix.closedir db; files
+      with e ->
+        (try Unix.closedir db with Unix.Unix_error _ -> ());
+        raise e
+end

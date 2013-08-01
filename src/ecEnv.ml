@@ -516,10 +516,19 @@ module MC = struct
 
   (* ------------------------------------------------------------------ *)
   let lookup_all proj (qn, x) env =
-    let mc = lookup_mc qn env in
-      List.map
-        (fun (p, obj) -> (p, (_params_of_ipath p env, obj)))
-        (odfl [] (omap mc (fun mc -> MMsym.all x (proj mc))))
+    let mc   = lookup_mc qn env in
+    let objs = odfl [] (omap mc (fun mc -> MMsym.all x (proj mc))) in
+    let _, objs =
+      List.map_fold
+        (fun ps ((p, _) as obj)->
+          if   Sip.mem p ps
+          then (ps, None)
+          else (Sip.add p ps, Some obj))
+        Sip.empty objs
+    in
+      List.pmap
+        (omap^~ (fun (p, obj) -> (p, (_params_of_ipath p env, obj))))
+        objs
 
   (* ------------------------------------------------------------------ *)
   let bind up x obj env =
