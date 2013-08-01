@@ -389,40 +389,6 @@ let pp_mem (ppe : PPEnv.t) fmt x =
     Format.fprintf fmt "%s" x
 
 (* -------------------------------------------------------------------- *)
-let rec pp_type_r ppe btuple fmt ty =
-  match ty.ty_node with
-  | Tglob m -> Format.fprintf fmt "(glob %a)" (pp_topmod ppe) m
-
-  | Tunivar x -> pp_tyunivar ppe fmt x
-  | Tvar    x -> pp_tyvar ppe fmt x
-
-  | Ttuple tys ->
-      pp_maybe_paren btuple
-        (pp_list " *@ " (pp_type_r ppe true)) fmt tys
-
-  | Tconstr (name, tyargs) -> begin
-      match tyargs with
-      | [] ->
-          pp_tyname ppe fmt name
-
-      | [x] ->
-          Format.fprintf fmt "%a %a"
-            (pp_type_r ppe true) x (pp_tyname ppe) name
-
-      | xs ->
-          Format.fprintf fmt "%a %a"
-            (pp_paren (pp_list ",@ " (pp_type_r ppe false))) xs
-            (pp_tyname ppe) name
-    end
-
-  | Tfun (t1, t2) ->
-      Format.fprintf fmt "@[%a ->@ %a@]"
-        (pp_type_r ppe true) t1 (pp_type_r ppe false) t2
-
-let pp_type ppe fmt ty =
-  pp_type_r ppe true fmt ty
-
-(* -------------------------------------------------------------------- *)
 type assoc  = [`Left | `Right | `NonAssoc]
 type fixity = [`Prefix | `Postfix | `Infix of assoc]
 type opprec = int * fixity
@@ -463,6 +429,14 @@ let maybe_paren (onm, (outer, side)) (inm, inner) pp =
         let inm = if inm = [EcCoreLib.id_top] then ["top"] else inm in
           fun fmt x ->
             Format.fprintf fmt "(%a)%%%s" pp x (String.concat "." inm)
+
+let maybe_paren_nosc outer inner pp =
+  maybe_paren ([], outer) ([], inner) pp
+
+(* -------------------------------------------------------------------- *)
+let t_prio_fun  = (10, `Infix `Right)
+let t_prio_tpl  = (20, `NonAssoc)
+let t_prio_name = (30, `Postfix)
 
 (* -------------------------------------------------------------------- *)
 let e_bin_prio_lambda = ( 5, `Prefix)
@@ -530,6 +504,51 @@ let is_binop name =
 
 let is_unbinop name = is_unop name || is_binop name
   
+(* -------------------------------------------------------------------- *)
+let rec pp_type_r ppe outer fmt ty =
+  match ty.ty_node with
+  | Tglob m -> Format.fprintf fmt "(glob %a)" (pp_topmod ppe) m
+
+  | Tunivar x -> pp_tyunivar ppe fmt x
+  | Tvar    x -> pp_tyvar ppe fmt x
+
+  | Ttuple tys ->
+      let pp fmt tys =
+        pp_list " *@ " (pp_type_r ppe (t_prio_tpl, `Left)) fmt tys
+      in
+        maybe_paren_nosc outer t_prio_tpl pp fmt tys
+
+  | Tconstr (name, tyargs) -> begin
+      let pp fmt (name, tyargs) =
+        match tyargs with
+        | [] ->
+            pp_tyname ppe fmt name
+  
+        | [x] ->
+            Format.fprintf fmt "%a %a"
+              (pp_type_r ppe (t_prio_name, `Left)) x
+              (pp_tyname ppe) name
+  
+        | xs ->
+            let subpp = pp_type_r ppe (min_op_prec, `NonAssoc) in
+              Format.fprintf fmt "%a %a"
+                (pp_paren (pp_list ",@ " subpp)) xs
+                (pp_tyname ppe) name
+      in
+        maybe_paren_nosc outer t_prio_name pp fmt (name, tyargs)
+    end
+
+  | Tfun (t1, t2) ->
+      let pp fmt (t1, t2) =
+        Format.fprintf fmt "@[%a ->@ %a@]"
+          (pp_type_r ppe (t_prio_fun, `Left )) t1
+          (pp_type_r ppe (t_prio_fun, `Right)) t2
+      in
+        maybe_paren_nosc outer t_prio_fun pp fmt (t1, t2)
+
+let pp_type ppe fmt ty =
+  pp_type_r ppe (min_op_prec, `NonAssoc) fmt ty
+
 (* -------------------------------------------------------------------- *)
 let pp_if3 (ppe : PPEnv.t) pp_sub outer fmt (b, e1, e2) =
   let pp fmt (b, e1, e2)=
@@ -1271,7 +1290,7 @@ let pp_typedecl (ppe : PPEnv.t) fmt (x, tyd) =
   and pp_body fmt =
     match tyd.tyd_type with
     | None    -> ()
-    | Some ty -> Format.fprintf fmt " =@ %a" (pp_type_r ppe false) ty
+    | Some ty -> Format.fprintf fmt " =@ %a" (pp_type ppe) ty
 
   in
     Format.fprintf fmt "@[%t%t.@]" pp_prelude pp_body
@@ -1290,7 +1309,7 @@ let pp_opdecl_pr (ppe : PPEnv.t) fmt (x, ts, ty, op) =
   let pp_body fmt =
     match op with
     | None ->
-        Format.fprintf fmt " : %a" (pp_type_r ppe false) ty
+        Format.fprintf fmt " : %a" (pp_type ppe) ty
 
     | Some f ->
         let ((subppe, pp_vds), f) =
@@ -1319,7 +1338,7 @@ let pp_opdecl_op (ppe : PPEnv.t) fmt (x, ts, ty, op) =
   let pp_body fmt =
     match op with
     | None ->
-        Format.fprintf fmt ": %a" (pp_type_r ppe false) ty
+        Format.fprintf fmt ": %a" (pp_type ppe) ty
 
     | Some e ->
         let ((subppe, pp_vds), e) =
