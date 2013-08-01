@@ -1016,8 +1016,13 @@ let process_pose loc xsym o p g =
     | Some (ue, tue, ev) -> (ue, tue, ev, true)
     | None -> begin
         let ids = List.map (fun x -> `UnknownVar (x, ())) ids in
-        if not (can_concretize_pterm_arguments (ue, ev) ids) then
-          tacuerror "cannot find an occurence for [pose]";
+        if not (can_concretize_pterm_arguments (ue, ev) ids) then begin
+          if   ids = []
+          then tacuerror "%s - %s"
+                 "cannot find an occurence for [pose]"
+                 "instanciate type variables manually"
+          else tacuerror "cannot find an occurence for [pose]";
+        end;
         let ue = EcUnify.UniEnv.copy ue in
           (ue, EcUnify.UniEnv.close ue, ev, false)
     end
