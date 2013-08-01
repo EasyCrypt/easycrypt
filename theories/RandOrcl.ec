@@ -7,6 +7,7 @@ type to.
 
 op dsample : to distr. (* Distribution to use on the target type *)
 op qO : int.           (* Maximum number of calls by the adversary *)
+axiom leq0_qO: 0 <= qO.
 op default : to.       (* Default element to return on error by wrapper *)
 
 (* A signature for random oracles from "from" to "to". *)
@@ -35,12 +36,15 @@ theory ROM.
     }
   }.
 
-  lemma lossless_init : islossless RO.init
-  by (fun; wp; skip=> //).
-
-  lemma lossless_o : mu dsample cpTrue = 1%r => islossless RO.o.
+  lemma lossless_init : islossless RO.init.
   proof strict.
-  by intros Hs; fun; wp=> /=; rnd cpTrue; skip=> //.
+  by fun; wp; skip.
+  qed.
+
+  lemma lossless_o:
+    mu dsample cpTrue = 1%r => islossless RO.o.
+  proof strict.
+  by intros=> Hd; fun; wp; rnd.
   qed.
 end ROM.
 
@@ -70,20 +74,18 @@ theory WRO_Int.
     }
   }.
 
-  lemma lossless_init: forall (R <: Oracle),
+  lemma lossless_init (R <: Oracle):
     islossless R.init =>
     islossless ARO(R).init.
   proof strict.
-  by intros=> R HR; fun; wp; call HR; skip=> //.
+  by intros=> HR; fun; wp; call HR; skip.
   qed.
 
-  lemma lossless_o: forall (R <: Oracle),
+  lemma lossless_o (R <: Oracle):
     islossless R.o =>
     islossless ARO(R).o.
   proof strict.
-  intros=> R HR; fun; wp; if.
-    by call HR; wp; skip=> //.
-    by wp; skip=> //.
+  by intros=> HR; fun; wp; if; [call HR | ]; wp; skip.
   save.
 
   lemma RO_lossless_init: islossless ARO(ROM.RO).init.
@@ -95,23 +97,22 @@ theory WRO_Int.
     mu dsample cpTrue = 1%r =>
     islossless ARO(ROM.RO).o.
   proof strict.
-  by intros=> Hs; apply (lossless_o ROM.RO); apply ROM.lossless_o; apply Hs.
+  intros=> Hs; apply (lossless_o ROM.RO); apply ROM.lossless_o; apply Hs.
   qed.
 
-  lemma log_stable: forall x (RO <: Oracle{ARO}),
+  lemma log_stable x (RO <: Oracle{ARO}):
     islossless RO.o =>
     bd_hoare[ ARO(RO).o : x = ARO.log ==> x <= ARO.log] = 1%r.
   proof strict.
-  intros=> x RO Ho; fun; if.
-    by call Ho; wp; skip=> //; last progress; smt.
-    by wp; skip=> //; last progress; smt.
+  intros=> Ho; fun; if; [call Ho | ];
+     wp; skip=> //; progress; smt.
   qed.
 
-  lemma RO_log_stable: forall x,
+  lemma RO_log_stable x:
      mu dsample cpTrue = 1%r => 
      bd_hoare[ ARO(ROM.RO).o: x = ARO.log ==> x <= ARO.log ] = 1%r.
   proof strict.
-  by intros=> x Hs; apply (log_stable x ROM.RO); apply ROM.lossless_o.
+  by intros=> Hs; apply (log_stable x ROM.RO); apply ROM.lossless_o.
   qed.
 end WRO_Int.
 
@@ -138,18 +139,18 @@ theory WRO_Set.
     }
   }.
 
-  lemma lossless_init: forall (R <: Oracle),
+  lemma lossless_init (R <: Oracle):
     islossless R.init =>
     islossless ARO(R).init.
   proof strict.
-  by intros=> R HR; fun; wp; call HR; skip.
+  by intros=> HR; fun; wp; call HR; skip.
   qed.
 
-  lemma lossless_o: forall (R <: Oracle),
+  lemma lossless_o (R <: Oracle):
     islossless R.o =>
     islossless ARO(R).o.
   proof strict.
-  by intros=> R HR; fun; wp; (if; first call HR); wp; skip.
+  by intros=> HR; fun; wp; if; [call HR | ]; wp; skip.
   qed.
 
   lemma RO_lossless_init: islossless ARO(ROM.RO).init.
@@ -164,23 +165,22 @@ theory WRO_Set.
   by intros=> Hs; apply (lossless_o ROM.RO); apply ROM.lossless_o; apply Hs.
   qed.
 
-  lemma log_stable: forall r (RO<:Oracle{ARO}), 
+  lemma log_stable r (RO<:Oracle{ARO}):
     islossless RO.o =>
     bd_hoare[ ARO(RO).o : mem r ARO.log ==> mem r ARO.log ] = 1%r.
   proof strict.
-  intros=> r RO Ho; fun; if.
-    by call Ho; wp; skip=> //; progress; rewrite mem_add; left.
-    by wp; skip=> //; progress.
+  by intros=> Ho; fun; if; [call Ho | ];
+     wp; skip=> //; progress; rewrite mem_add; left.
   qed.
 
-  lemma RO_log_stable: forall r,
+  lemma RO_log_stable r:
      mu dsample cpTrue = 1%r => 
      bd_hoare[ ARO(ROM.RO).o: mem r ARO.log ==> mem r ARO.log ] = 1%r.
   proof strict.
-  by intros=> r Hs; apply (log_stable r ROM.RO); apply ROM.lossless_o.
+  by intros=> Hs; apply (log_stable r ROM.RO); apply ROM.lossless_o.
   qed.
 
-  lemma RO_upto_o: forall r, 
+  lemma RO_upto_o r:
     equiv [ARO(ROM.RO).o ~ ARO(ROM.RO).o : 
       !mem r ARO.log{2} /\
       ={x, ARO.log} /\
@@ -188,7 +188,7 @@ theory WRO_Set.
       !mem r ARO.log{2} =>
         ={res, ARO.log} /\ eq_except ROM.RO.m{1} ROM.RO.m{2} r].
   proof strict.
-  intros=> r; fun; if.
+  fun; if.
     by intros=> &1 &2 [r_nin_log] [[x_eq log_eq]] m_eq_exc;
        rewrite (fcongr card ARO.log{1} ARO.log{2}) //.
     by inline ROM.RO.o; wp; rnd; wp; skip; progress=> //; smt.
