@@ -164,6 +164,7 @@
 %token CHANGE
 %token CHECKPROOF
 %token CLAIM
+%token CLASS
 %token CLEAR
 %token CLONE
 %token COLON
@@ -274,6 +275,7 @@
 %token SAMPLE
 %token SAVE
 %token SECTION
+%token SELF
 %token SEMICOLON
 %token SEQ
 %token SIMPLIFY
@@ -384,6 +386,7 @@ genqident(X):
 (* -------------------------------------------------------------------- *)
 %inline  qident: x=genqident(_ident) { x };
 %inline uqident: x=genqident(UIDENT) { x };
+%inline lqident: x=genqident(LIDENT) { x };
 
 (* -------------------------------------------------------------------- *)
 %inline _oident:
@@ -887,7 +890,8 @@ pgtybindings:
 
 simpl_type_exp:
 | UNDERSCORE                  { PTunivar       }
-| x=qident                    { PTnamed x      }
+| SELF                        { PTself         }
+| x=lqident                   { PTnamed x      }
 | x=tident                    { PTvar x        }
 | tya=type_args x=qident      { PTapp (x, tya) }
 | LPAREN ty=type_exp RPAREN   { ty             }
@@ -1202,6 +1206,27 @@ dt_ctor_def:
 | x=uident { (x, None) }
 | x=uident OF ty=loc(simpl_type_exp) { (x, (Some ty)) }
 ;
+
+(* -------------------------------------------------------------------- *)
+(* Type classes                                                         *)
+typeclass:
+| TYPE CLASS x=lident inth=tc_inth? EQ LBRACE body=tc_body RBRACE {
+    { ptc_name = x;
+      ptc_inth = inth;
+      ptc_ops  = fst body;
+      ptc_axs  = snd body; }
+  }
+;
+
+tc_inth:
+| LTCOLON x=lqident { x }
+;
+
+tc_body: ops=tc_op* axs=tc_ax* { (ops, axs) };
+
+tc_op: OP x=lident COLON ty=loc(type_exp) { (x, ty) };
+
+tc_ax: AXIOM ax=form { ax };
 
 (* -------------------------------------------------------------------- *)
 (* Operator definitions                                                 *)
@@ -2182,6 +2207,7 @@ global_:
 | top_mod_decl     { Gdeclare     $1 }
 | sig_def          { Ginterface   $1 }
 | type_decl_or_def { Gtype        $1 }
+| typeclass        { Gtypeclass   $1 }
 | datatype_def     { Gdatatype    $1 }
 | operator         { Goperator    $1 }
 | predicate        { Gpredicate   $1 }

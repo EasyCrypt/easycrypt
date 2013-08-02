@@ -106,3 +106,9 @@ let mk_pred tparams dom body =
 let mk_op tparams ty body = 
   let kind = OB_oper body in
   gen_op tparams ty kind
+
+(* -------------------------------------------------------------------- *)
+type typeclass = {
+  tc_ops : (EcIdent.t * EcTypes.ty) list;
+  tc_axs : EcFol.form list;
+}

@@ -938,7 +938,7 @@ module Pred = struct
     let tp     = TT.tp_relax in
     let dom, body = 
       match op.pp_def with
-      | PPabstr ptys -> 
+      | PPabstr ptys ->
         List.map (TT.transty tp scope.sc_env ue) ptys, None
       | PPconcr(bd,pe) ->
         let env, xs = TT.transbinding scope.sc_env ue bd in
@@ -981,6 +981,11 @@ module Ty = struct
       tyd_type   = None;
     } in
       bind scope (unloc name, tydecl)
+
+  let addclass (scope : scope) tcd =
+    assert (scope.sc_pr_uc = None);
+    let tclass = EcTyping.trans_tclass scope.sc_env tcd in
+      scope
 
   let define (scope : scope) info body =
     assert (scope.sc_pr_uc = None);

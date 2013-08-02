@@ -47,12 +47,14 @@ type mem_error =
 type tyerror =
 | UniVarNotAllowed
 | TypeVarNotAllowed
+| SelfNotAllowed
 | OnlyMonoTypeAllowed
 | UnboundTypeParameter of symbol
 | UnknownTypeName      of qsymbol
 | InvalidTypeAppl      of qsymbol * int * int
 | DuplicatedTyVar
 | DuplicatedLocal      of symbol
+| DuplicatedField      of symbol
 | NonLinearPattern
 | LvNonLinear
 | NonUnitFunWithoutReturn
@@ -128,6 +130,9 @@ let pp_tyerror fmt env error =
   | TypeVarNotAllowed ->
       msg "type variables not allowed"
 
+  | SelfNotAllowed ->
+      msg "`self' not allowed in this context"
+
   | OnlyMonoTypeAllowed ->
       msg "only monomorph types allowed here"
 
@@ -144,7 +149,10 @@ let pp_tyerror fmt env error =
       msg "a type variable appear at least twice"
 
   | DuplicatedLocal name ->
-      msg "duplicated local/parameters name: %s" name
+      msg "duplicated local/parameters name: `%s'" name
+
+  | DuplicatedField name ->
+      msg "duplicated field name: `%s'" name
 
   | NonLinearPattern ->
       msg "non-linear pattern matching"
@@ -411,12 +419,15 @@ let lookup_scope env popsc =
 type typolicy = {
   tp_uni  : bool;   (* "_" (Tuniar) allowed  *)
   tp_tvar : bool;   (* type variable allowed *)
+  tp_self : bool;   (* in type class         *)
 }
 
-let tp_tydecl  = { tp_uni = false; tp_tvar = true ; } (* type decl. *)
-let tp_relax   = { tp_uni = true ; tp_tvar = true ; } (* ops/forms/preds *)
-let tp_nothing = { tp_uni = false; tp_tvar = false; } (* module type annot. *)
-let tp_uni     = { tp_uni = true ; tp_tvar = false; } (* params/local vars. *)
+let tp_tydecl  = { tp_uni = false; tp_tvar = true ; tp_self = false; } (* type decl. *)
+let tp_tclass  = { tp_uni = false; tp_tvar = true ; tp_self = true ; } (* type class *)
+let tp_relax   = { tp_uni = true ; tp_tvar = true ; tp_self = false; } (* ops/forms/preds *)
+let tp_nothing = { tp_uni = false; tp_tvar = false; tp_self = false; } (* module type annot. *)
+let tp_uni     = { tp_uni = true ; tp_tvar = false; tp_self = false; } (* params/local vars. *)
+let selfname   = EcIdent.create "$self"
 
 (* -------------------------------------------------------------------- *)
 let ue_for_decl (env : EcEnv.env) (loc, tparams) =
@@ -432,17 +443,22 @@ let ue_for_decl (env : EcEnv.env) (loc, tparams) =
 (* -------------------------------------------------------------------- *)
 let rec transty (tp : typolicy) (env : EcEnv.env) ue ty =
   match ty.pl_desc with
-   | PTunivar ->
-       if   tp.tp_uni
-       then UE.fresh_uid ue
-       else tyerror ty.pl_loc env UniVarNotAllowed
+  | PTself ->
+      if   tp.tp_self
+      then tvar selfname
+      else tyerror ty.pl_loc env SelfNotAllowed
 
-   | PTvar s ->
-       if tp.tp_tvar then 
-         try tvar (UE.get_var ue s.pl_desc)
-         with _ -> tyerror s.pl_loc env (UnboundTypeParameter s.pl_desc)
-       else
-         tyerror s.pl_loc env TypeVarNotAllowed;
+  | PTunivar ->
+      if   tp.tp_uni
+      then UE.fresh_uid ue
+      else tyerror ty.pl_loc env UniVarNotAllowed
+
+  | PTvar s ->
+      if tp.tp_tvar then 
+        try tvar (UE.get_var ue s.pl_desc)
+        with _ -> tyerror s.pl_loc env (UnboundTypeParameter s.pl_desc)
+      else
+        tyerror s.pl_loc env TypeVarNotAllowed;
 
   | PTtuple tys   -> 
       ttuple (transtys tp env ue tys)
@@ -1490,7 +1506,7 @@ let trans_topmsymbol env gp =
   mp
 
 (* -------------------------------------------------------------------- *)
-let trans_form_or_pattern env (ps, ue) pf tt =
+let trans_form_or_pattern env tc (ps, ue) pf tt =
   let rec transf_r opsc env f =
     let transf = transf_r opsc in
 
@@ -1744,7 +1760,7 @@ let trans_form_or_pattern env (ps, ue) pf tt =
     let trans1 env (xs, pgty) =
         match pgty with
         | PGTY_Type ty -> 
-          let ty = transty tp_relax env ue ty in
+          let ty = transty (if tc then tp_tclass else tp_relax) env ue ty in
           let xs = List.map (fun x -> EcIdent.create x.pl_desc, ty) xs in
           let env = EcEnv.Var.bind_locals xs env in
           let xs = List.map (fun (x,ty) -> x,GTty ty) xs in
@@ -1776,7 +1792,7 @@ let trans_form_or_pattern env (ps, ue) pf tt =
 
 (* -------------------------------------------------------------------- *)
 let trans_form_opt env ue pf oty =
-  trans_form_or_pattern env (None, ue) pf oty
+  trans_form_or_pattern env false (None, ue) pf oty
 
 (* -------------------------------------------------------------------- *)
 let trans_form env ue pf ty =
@@ -1787,5 +1803,35 @@ let trans_prop env ue pf =
   trans_form env ue pf tbool
 
 (* -------------------------------------------------------------------- *)
+let trans_tcprop env ue pf =
+  trans_form_or_pattern env true (None, ue) pf (Some tbool)
+
+(* -------------------------------------------------------------------- *)
 let trans_pattern env (ps, ue) pf =
-  trans_form_or_pattern env (Some ps, ue) pf None
+  trans_form_or_pattern env false (Some ps, ue) pf None
+
+(* -------------------------------------------------------------------- *)
+let trans_tclass env { pl_loc = _; pl_desc = tcd; } =
+  (* Check for duplicated field names *)
+  Msym.odup unloc (List.map fst tcd.ptc_ops)
+    |> oiter (fun (x, y) -> tyerror y.pl_loc env (DuplicatedField x.pl_desc) );
+
+  (* Check operators types *)
+  let operators =
+    let check1 (x, ty) =
+      let ue = EcUnify.UniEnv.create (Some []) in
+        (EcIdent.create (unloc x), transty tp_tclass env ue ty)
+    in
+      tcd.ptc_ops |> List.map check1 in
+
+  (* Check axioms *)
+  let axioms =
+    let env = EcEnv.Var.bind_locals operators env in
+    let check1 ax =
+      let ue = EcUnify.UniEnv.create (Some []) in
+        trans_tcprop env ue ax
+    in
+      tcd.ptc_axs |> List.map check1 in
+
+  (* Construct actual type-class *)
+  { tc_ops = operators; tc_axs = axioms; }

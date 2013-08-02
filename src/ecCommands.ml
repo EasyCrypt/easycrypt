@@ -119,6 +119,13 @@ let rec process_type (scope : EcScope.scope) (tyd : ptydecl located) =
     scope
   
 (* -------------------------------------------------------------------- *)
+and process_typeclass (scope : EcScope.scope) (tcd : ptypeclass located) =
+  EcScope.check_state `InTop "type class" scope;
+  let scope = EcScope.Ty.addclass scope tcd in
+    notify scope "added type class: `%s'" (unloc tcd.pl_desc.ptc_name);
+    scope
+
+(* -------------------------------------------------------------------- *)
 and process_datatype (_scope : EcScope.scope) _ =
   failwith "not-implemented-yet"
 
@@ -301,6 +308,7 @@ and process (ld : EcLoader.ecloader) (scope : EcScope.scope) g =
     match
       match g.pl_desc with
       | Gtype      t    -> `Fct   (fun scope -> process_type       scope  (mk_loc loc t))
+      | Gtypeclass t    -> `Fct   (fun scope -> process_typeclass  scope  (mk_loc loc t))
       | Gdatatype  t    -> `Fct   (fun scope -> process_datatype   scope  (mk_loc loc t))
       | Gmodule    m    -> `Fct   (fun scope -> process_module     scope  m)
       | Gdeclare   m    -> `Fct   (fun scope -> process_declare    scope  m)
