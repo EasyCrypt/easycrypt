@@ -8,6 +8,7 @@ type message.
 type signature.
 
 module type Scheme = {
+  fun init(): unit
   fun keygen(): (pkey * skey)
   fun sign(sk:skey, m:message): signature
   fun verify(pk:pkey, m:message, s:signature): bool
@@ -15,7 +16,7 @@ module type Scheme = {
 
 module type AdvOracles = { fun sign(m:message): signature }.
 
-module type AdvCMA = {
+module type AdvCMA(O:AdvOracles) = {
   fun forge(pk:pkey): (message * signature)
 }.
 
@@ -35,6 +36,7 @@ theory EF_CMA.
     var sk: skey
 
     fun init(): pkey = {
+      S.init();
       qs = empty;
       (pk,sk) = S.keygen();
       return pk;
@@ -59,6 +61,8 @@ theory EF_CMA.
   }.
 
   module EF_CMA(O:Oracles, A:AdvCMA) = {
+    module A = A(O)
+
     fun main(): bool = {
       var pk:pkey;
       var m:message;
@@ -90,6 +94,7 @@ theory UF_CMA.
     var sk: skey
 
     fun init(): pkey = {
+      S.init();
       qs = empty;
       (pk,sk) = S.keygen();
       return pk;
@@ -114,6 +119,8 @@ theory UF_CMA.
   }.
 
   module UF_CMA(O:Oracles, A:AdvCMA) = {
+    module A = A(O)
+
     fun main(): bool = {
       var pk:pkey;
       var m:message;
