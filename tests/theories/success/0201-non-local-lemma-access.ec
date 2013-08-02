@@ -1,7 +1,7 @@
 theory Foo.
   section.
     theory U.
-      axiom foo : true.
+      lemma foo : true by admit.
     end U.
   end section.
 

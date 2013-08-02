@@ -667,6 +667,11 @@ let is_op_and p =
 let is_op_or p = 
   EcPath.p_equal p EcCoreLib.p_or || EcPath.p_equal p EcCoreLib.p_ora
 
+let destr_app f =
+  match f.f_node with
+  | Fapp (f, fs) -> (f, fs)
+  | _ -> (f, [])
+
 let destr_tuple f = 
   match f.f_node with
   | Ftuple fs -> fs

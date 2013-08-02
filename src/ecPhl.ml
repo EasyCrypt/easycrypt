@@ -1397,6 +1397,8 @@ let t_bdHoare_call fpre fpost opt_bd g =
   let m = EcMemory.memory bhs.bhs_m in
   let fsig = (Fun.by_xpath f env).f_sig in
 
+  let f_concl = bdHoare_call_spec fpre fpost f bhs.bhs_cmp bhs.bhs_bd opt_bd in
+
   (* The wp *)
   let pvres = pv_res f in
   let vres = EcIdent.create "result" in
@@ -1410,7 +1412,6 @@ let t_bdHoare_call fpre fpost opt_bd g =
   let post = f_anda_simpl (PVM.subst env spre fpre) post in
 
   (* most of the above code is duplicated from t_hoare_call *)
-  let f_concl = bdHoare_call_spec fpre fpost f bhs.bhs_cmp bhs.bhs_bd opt_bd in
   let concl = match bhs.bhs_cmp, opt_bd with
     | FHle, None -> f_hoareS bhs.bhs_m bhs.bhs_pr s post 
     | FHeq, Some bd ->
@@ -1586,7 +1587,13 @@ let _inline hyps me sp s =
     let fdef = 
       match f.f_def with
       | FBdef def -> def 
-      | _ -> assert false in (* FIXME error message *)
+      | _ -> begin
+        let ppe = EcPrinting.PPEnv.ofenv env in
+        tacuerror
+          "Abstract function `%a' cannot be inlined"
+          (EcPrinting.pp_funname ppe) p
+      end
+    in
     let me, anames = 
       List.map_fold _inline_freshen me f.f_sig.fs_params in
     let me, lnames = 

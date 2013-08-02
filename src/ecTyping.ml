@@ -529,10 +529,16 @@ let transtvi env ue tvi =
   
 let rec destr_tfun env ue tf = 
   match tf.ty_node with
-  | Tunivar _ ->
+  | Tunivar id -> begin
       let tf' = UE.repr ue tf in
-        assert (not (tf == tf'));
-        destr_tfun env ue tf'
+        match tf == tf' with
+        | false -> destr_tfun env ue tf'
+        | true  ->
+            let ty1 = UE.fresh_uid ue in
+            let ty2 = UE.fresh_uid ue in
+              EcUnify.UniEnv.bind ue id (tfun ty1 ty2);
+              Some (ty1, ty2)
+  end
 
   | Tfun (ty1, ty2) -> Some (ty1, ty2)
 
