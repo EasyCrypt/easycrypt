@@ -1456,10 +1456,10 @@ intro_pattern:
    { IPCase ip }
 
 | o=rwocc? ARROW
-   { IPRw (omap o EcMaps.Sint.of_list, `LtoR) }
+   { IPRw (o |> omap EcMaps.Sint.of_list, `LtoR) }
 
 | o=rwocc? LEFTARROW
-   { IPRw (omap o EcMaps.Sint.of_list, `RtoL) }
+   { IPRw (o |> omap EcMaps.Sint.of_list, `RtoL) }
 
 | LBRACE xs=ident+ RBRACE
    { IPClear xs }
@@ -1528,17 +1528,17 @@ rwarg:
    { RWSimpl }
 
 | s=rwside r=rwrepeat? o=rwocc? fp=fpattern(form)
-    { RWRw (s, r, omap o EcMaps.Sint.of_list, fp) }
+    { RWRw (s, r, o |> omap EcMaps.Sint.of_list, fp) }
 
 | s=rwside r=rwrepeat? o=rwocc? SLASH x=sform_h
     { let loc = EcLocation.make $startpos $endpos in
         if r <> None then
           error loc (Some "delta-repeat not supported");
-        RWDelta (s, omap o EcMaps.Sint.of_list, x); }
+        RWDelta (s, o |> omap EcMaps.Sint.of_list, x); }
 ;
 
 genpattern:
-| o=rwocc? l=sform_h %prec prec_tactic { (omap o EcMaps.Sint.of_list, l) }
+| o=rwocc? l=sform_h %prec prec_tactic { (o |> omap EcMaps.Sint.of_list, l) }
 ;
 
 simplify_arg: 
@@ -1746,7 +1746,7 @@ logtactic:
    { Pcutdef (ip, fp) }
 
 | POSE o=rwocc? x=lident CEQ p=form_h %prec prec_below_IMPL
-   { Ppose (x, omap o EcMaps.Sint.of_list, p) }
+   { Ppose (x, o |> omap EcMaps.Sint.of_list, p) }
 ;
 
 phltactic:

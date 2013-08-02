@@ -26,8 +26,11 @@ let identity x = x
 
 let (^~) f = fun x y -> f y x
 
-let (-|) (f : 'a -> 'b) (g : 'c -> 'a) =
-  fun x -> f (g x)
+let (-|) f g = fun x -> f (g x)
+let (|-) g f = fun x -> g (f x)
+
+let (|>) x f = f x
+let (<|) f x = f x
 
 (* -------------------------------------------------------------------- *)
 let copy (x : 'a) : 'a =
@@ -74,16 +77,16 @@ let opt_equal (f : 'a -> 'a -> bool) o1 o2 =
 let none = None
 let some = fun x -> Some x
 
-let oiter (x : 'a option) (f : 'a -> unit) =
+let oiter (f : 'a -> unit) (x : 'a option) =
   match x with None -> () | Some x -> f x
 
-let obind (x : 'a option) (f : 'a -> 'b option) =
+let obind (f : 'a -> 'b option) (x : 'a option) =
   match x with None -> None | Some x -> f x
 
 let otolist (x : 'a option) =
   match x with None -> [] | Some x -> [x]
 
-let ofold (x : 'a option) (f : 'a -> 'b -> 'b) (v : 'b) =
+let ofold (f : 'a -> 'b -> 'b) (v : 'b) (x : 'a option) =
   match x with
   | None   -> v
   | Some x -> f x v
@@ -95,13 +98,13 @@ let ocompare cmp x1 x2 =
   | None   , Some _  -> -1
   | Some _ , None    -> 1
 
-let omap (x : 'a option) (f : 'a -> 'b) =
+let omap (f : 'a -> 'b) (x : 'a option) =
   match x with None -> None | Some x -> Some (f x)
 
-let omap_dfl (x:'a option) (d:'b) (f:'a -> 'b) =
+let omap_dfl (f : 'a -> 'b) (d : 'b) (x : 'a option) =
   match x with None -> d  | Some x -> f x
 
-let osmart_map (x : 'a option) (f : 'a -> 'b) =
+let osmart_map (f : 'a -> 'b) (x : 'a option) =
   match x with 
   | None -> x 
   | Some y -> 

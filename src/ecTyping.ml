@@ -309,7 +309,7 @@ let (i_inuse, s_inuse, se_inuse) =
     | Scall (lv, p, es) -> begin
       let map = List.fold_left se_inuse map es in
       let map = add_call map p in
-      let map = ofold lv ((^~) lv_inuse) map in
+      let map = lv |> ofold ((^~) lv_inuse) map in
         map
     end
 
@@ -420,7 +420,7 @@ let tp_uni     = { tp_uni = true ; tp_tvar = false; } (* params/local vars. *)
 
 (* -------------------------------------------------------------------- *)
 let ue_for_decl (env : EcEnv.env) (loc, tparams) =
-  let tparams = omap tparams
+  let tparams = tparams |> omap
     (fun tparams ->
       let tparams = List.map unloc tparams in
         if not (List.uniq tparams) then
@@ -577,7 +577,7 @@ let transexp (env : EcEnv.env) (ue : EcUnify.unienv) e =
     | PEint i -> (e_int i, tint)
 
     | PEident ({ pl_desc = name }, tvi) -> 
-        let tvi = omap tvi (transtvi env ue) in
+        let tvi = tvi |> omap (transtvi env ue) in
         let ops = select_exp_op env osc name ue tvi [] in
         begin match ops with
         | [] -> tyerror loc env (UnknownVarOrOp (name, []))
@@ -595,7 +595,7 @@ let transexp (env : EcEnv.env) (ue : EcUnify.unienv) e =
           transexp_r (Some opsc) env e
 
     | PEapp ({pl_desc = PEident({ pl_desc = name; pl_loc = loc }, tvi)}, pes) ->
-        let tvi  = omap tvi (transtvi env ue) in  
+        let tvi  = tvi |> omap (transtvi env ue) in  
         let es   = List.map (transexp env) pes in
         let esig = snd (List.split es) in
         let ops  = select_exp_op env osc name ue tvi esig in
@@ -968,7 +968,7 @@ let rec trans_msymbol (env : EcEnv.env) (msymb : pmsymbol located) =
         (mod_expr.me_sig.mis_params, true)
   in
 
-  let args = omap args (List.map (trans_msymbol env)) in
+  let args = args |> omap (List.map (trans_msymbol env)) in
 
   match args with
   | None ->
@@ -1179,11 +1179,11 @@ and transstruct1 (env : EcEnv.env) (st : pstructure_item located) =
 
       let clsubst = { EcTypes.e_subst_id with es_ty = su } in
       let stmt    = s_subst clsubst stmt
-      and result  = omap result (e_subst clsubst) in
+      and result  = result |> omap (e_subst clsubst) in
       let stmt    = EcModules.stmt (List.flatten prelude @ stmt.s_node) in
 
       (* Computes reads/writes/calls *)
-      let uses = ofold result ((^~) se_inuse) (s_inuse stmt) in
+      let uses = result |> ofold ((^~) se_inuse) (s_inuse stmt) in
 
       (* Compose all results *)
       let fun_ =
@@ -1222,8 +1222,8 @@ and transbody ue symbols (env : EcEnv.env) retty pbody =
 
     let xs     = snd (unloc local.pfl_names) in
     let mode   = fst (unloc local.pfl_names) in
-    let init   = omap local.pfl_init (fst -| transexp !env ue) in
-    let ty     = omap local.pfl_type (transty tp_uni !env ue) in
+    let init   = local.pfl_init |> omap (fst -| transexp !env ue) in
+    let ty     = local.pfl_type |> omap (transty tp_uni !env ue) in
 
     let ty =
       match ty, init with
@@ -1261,7 +1261,7 @@ and transbody ue symbols (env : EcEnv.env) retty pbody =
         (List.map (fun (v, _, _, pl) -> (v, pl)) mylocals)
         !locals;
 
-    oiter init
+    init |> oiter
       (fun init ->
         let iasgn = List.map (fun (_, v, xty, _) -> (v, xty)) mylocals in
           prelude := ((mode, iasgn), init, _dummy) :: !prelude)
@@ -1419,7 +1419,7 @@ and translvalue ue (env : EcEnv.env) lvalue =
       (LvTuple xs, ty)
 
   | PLvMap (x, tvi, e) ->
-      let tvi = omap tvi (transtvi env ue) in
+      let tvi = tvi |> omap (transtvi env ue) in
       let codomty = UE.fresh_uid ue in
       let pv,xty = trans_pv env x in
       let e, ety = transexp env ue e in
@@ -1529,7 +1529,7 @@ let trans_form_or_pattern env (ps, ue) pf tt =
     end
 
     | PFident ({ pl_desc = name;pl_loc = loc }, tvi) -> 
-        let tvi = omap tvi (transtvi env ue) in
+        let tvi = tvi |> omap (transtvi env ue) in
         let ops = select_form_op env opsc name ue tvi [] in
         begin match ops with
         | [] ->
@@ -1579,7 +1579,7 @@ let trans_form_or_pattern env (ps, ue) pf tt =
         EcFol.f_ands eqs
 
     | PFapp ({pl_desc = PFident ({ pl_desc = name; pl_loc = loc }, tvi)}, pes) ->
-        let tvi  = omap tvi (transtvi env ue) in  
+        let tvi  = tvi |> omap (transtvi env ue) in  
         let es   = List.map (transf env) pes in
         let esig = List.map EcFol.f_ty es in 
         let ops  = select_form_op env opsc name ue tvi esig in
@@ -1772,7 +1772,7 @@ let trans_form_or_pattern env (ps, ue) pf tt =
   in
 
   let f = transf_r None env pf in
-    oiter tt (unify_or_fail env ue pf.pl_loc ~expct:f.f_ty); f
+    tt |> oiter (unify_or_fail env ue pf.pl_loc ~expct:f.f_ty); f
 
 (* -------------------------------------------------------------------- *)
 let trans_form_opt env ue pf oty =

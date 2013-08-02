@@ -15,7 +15,7 @@ let tydecl_dump (tyd : tydecl) =
 
   dnode "type-declaration"
     [dleaf "parameters (%s)" (String.concat ", " params);
-     dnode "body" (otolist (omap tyd.tyd_type EcTypes.ty_dump))]
+     dnode "body" (otolist (tyd.tyd_type |> omap EcTypes.ty_dump))]
 
 (* -------------------------------------------------------------------- *)
 type locals = EcIdent.t list 

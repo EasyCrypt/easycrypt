@@ -63,7 +63,7 @@ module ATree = struct
       let next = Stream.next_opt seq in
       let enum = if enum then Some ((Stream.count seq) - 1) else None in
       let pp   = ppup pp ?enum (next = None) in
-        first pp; oiter next aux
+        first pp; next |> oiter aux
     in
   
     let txt =
@@ -73,7 +73,7 @@ module ATree = struct
     in
       Printf.fprintf pp.ppstream "%s%s\n%!"
         (ppindent pp.ppindent) txt;
-      oiter (Stream.next_opt seq) aux
+       Stream.next_opt seq |> oiter aux
 end
 
 (* -------------------------------------------------------------------- *)
@@ -97,7 +97,7 @@ module Xml = struct
       let next = Stream.next_opt seq in
       let enum = if enum then Some ((Stream.count seq) - 1) else None in
       let pp   = ppup pp ?enum (next = None) in
-        first pp; oiter next aux
+        first pp; next |> oiter aux
     in
   
     let txt =
@@ -107,7 +107,7 @@ module Xml = struct
     and indent = 2 * (List.length pp.ppindent) in
       Printf.fprintf pp.ppstream
         "%.*s<node data=\"%s\">\n%!" indent "" (escape txt);
-      oiter (Stream.next_opt seq) aux;
+      Stream.next_opt seq |> oiter aux;
       Printf.fprintf pp.ppstream "%.*s</node>\n%!" indent "";
 end
 

@@ -74,7 +74,7 @@ let locate ?(onlysys = false) (name : string) (ecl : ecloader) =
               (List.map
                  (fun name ->
                    let fullname = Filename.concat idir name in
-                     fun () -> omap (try_stat fullname) (fun s -> (s, name)))
+                     fun () -> try_stat fullname |> omap (fun s -> (s, name)))
                  [iname; oname])
         in
           match stat with

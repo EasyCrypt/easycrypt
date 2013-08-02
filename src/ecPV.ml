@@ -127,7 +127,7 @@ module Mpv = struct
     match i.i_node with
     | Sasgn  (lv, e)     -> i_asgn   (lvsubst env s lv, esubst e)
     | Srnd   (lv, e)     -> i_rnd    (lvsubst env s lv, esubst e)
-    | Scall  (lv, f, es) -> i_call   (omap lv (lvsubst env s), f, List.map esubst es)
+    | Scall  (lv, f, es) -> i_call   (lv |> omap (lvsubst env s), f, List.map esubst es)
     | Sif    (c, s1, s2) -> i_if     (esubst c, ssubst s1, ssubst s2)
     | Swhile (e, stmt)   -> i_while  (esubst e, ssubst stmt)
     | Sassert e          -> i_assert (esubst e)

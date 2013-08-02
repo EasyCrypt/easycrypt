@@ -254,7 +254,7 @@ end = struct
 
   let is_local who p (lc : locals) =
     match who with
-    | `Lemma  -> omap (Mp.find_opt p (snd lc.lc_lemmas)) fst = Some `Local
+    | `Lemma  -> Mp.find_opt p (snd lc.lc_lemmas) |> omap fst = Some `Local
     | `Module -> Sp.mem p lc.lc_modules
 
   let rec is_mp_local mp (lc : locals) =
@@ -465,7 +465,7 @@ end = struct
   and on_mpath_fun_def cb fdef =
     List.iter (fun v -> on_mpath_ty cb v.v_type) fdef.f_locals;
     on_mpath_stmt cb fdef.f_body;
-    oiter fdef.f_ret (on_mpath_expr cb);
+    fdef.f_ret |> oiter (on_mpath_expr cb);
     on_mpath_uses cb fdef.f_uses
 
   and on_mpath_uses cb uses =
@@ -657,7 +657,7 @@ let attop (scope : scope) =
 
 (* -------------------------------------------------------------------- *)
 let goal (scope : scope) =
-  obind scope.sc_pr_uc (fun x -> x.puc_active)
+  scope.sc_pr_uc |> obind (fun x -> x.puc_active)
 
 (* -------------------------------------------------------------------- *)
 let xgoal (scope : scope) =
@@ -767,16 +767,16 @@ module Prover = struct
     let max  = pi.pprov_max in
     let time = pi.pprov_time in
     let ns   = pi.pprov_names in
-    let ns   = omap ns (List.map check_prover_name) in
-    let ns   = omap ns Array.of_list in
+    let ns   = ns |> omap (List.map check_prover_name) in
+    let ns   = ns |> omap Array.of_list in
     set_prover_info scope max time ns
 
   let mk_prover_info scope pi =
     let max  = pi.pprov_max in
     let time = pi.pprov_time in
     let ns   = pi.pprov_names in
-    let ns   = omap ns (List.map check_prover_name) in
-    let ns   = omap ns Array.of_list in
+    let ns   = ns |> omap (List.map check_prover_name) in
+    let ns   = ns |> omap Array.of_list in
     mk_prover_info scope max time ns
 
   let full_check scope =
@@ -906,7 +906,7 @@ module Op = struct
       hierror "this operator type contains free type variables";
 
     let uni     = Tuni.subst (EcUnify.UniEnv.close ue) in
-    let body    = omap body (e_mapty uni) in
+    let body    = body |> omap (e_mapty uni) in
     let ty      = uni ty in
     let tparams = EcUnify.UniEnv.tparams ue in
     let tyop    = EcDecl.mk_op tparams ty body in
@@ -953,7 +953,7 @@ module Pred = struct
       hierror "this predicate type contains free type variables";
 
     let uni     = EcUnify.UniEnv.close ue in
-    let body    = omap body (EcFol.Fsubst.uni uni) in
+    let body    = body |> omap (EcFol.Fsubst.uni uni) in
     let dom     = List.map (Tuni.subst uni) dom in
     let tparams = EcUnify.UniEnv.tparams ue in
     let tyop    = EcDecl.mk_pred tparams dom body in
@@ -1523,7 +1523,7 @@ module Section = struct
                   if not (CoreSection.is_local `Lemma axp locals) then
                     Ax.bind scope false
                       (x, { ax with ax_spec =
-                              omap ax.ax_spec (CoreSection.generalize scenv locals) })
+                              ax.ax_spec |> omap (CoreSection.generalize scenv locals) })
                   else
                     scope
           end
