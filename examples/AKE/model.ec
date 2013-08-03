@@ -14,6 +14,8 @@ type Pk.  (* static public keys: A, B, .. *)
 type Esk. (* ephemeral secret key: x, y, *)
 type Epk. (* ephemeral public key: X, y *)
 
+const dEpk : Epk. (* default value for Epk type *)
+
 type Eexp. (* ephemeral exponent: \tilde{x}=h(x,a) for NAXOS-style protocols *)
 
 type Agent = Pk.     (* for now, we identify agents and public keys *)
@@ -21,7 +23,7 @@ type Session_string. (* Input to hash to compute session string *)
 
 const k : int.
 
-clone import Word as Key with op length = k.
+clone import Word as Key with op length <- k.
 
 type Key = Key.word.
 
@@ -127,6 +129,7 @@ gsstr x' a B Y r1 = gsstr y' b A X r2 <=>
               | Accept of Sid *)
 type Event.
 
+op Start : PSid -> Event.
 op StaticRev : Agent -> Event.
 op EphemeralRev : PSid -> Event.
 op SessionRev : Sid -> Event.
@@ -134,6 +137,7 @@ op Accept : Sid -> Event.
 
 
 op matching(t : Sid) = let (A,B,X,Y,r) = t in (B,A,Y,X,!r).
+op partial_matching(t : Sid) = let (A,B,X,Y,r) = t in (B,A,Y,!r).
 
 op fresh(t : Sid,  evs : Event list)  =
   let (t_actor, t_peer, t_epk, t_recvd, r) = t in
@@ -147,14 +151,22 @@ op fresh(t : Sid,  evs : Event list)  =
               /\ List.mem (StaticRev t_peer) evs))          (* not y and b *)
          (* There is no matching session *)
       \/ (   !List.mem (Accept s) evs
-          /\ !List.mem (StaticRev t_peer) evs)). (* not b *)
+          /\ !List.mem (StaticRev t_peer) evs)) (* not b *)
+  /\  (let ps = partial_matching(t) in (* There is a partially matching session s *)
+         (   List.mem (Start ps) evs
+          /\ !(List.mem (EphemeralRev(ps))) evs
+              /\ List.mem (StaticRev t_peer) evs)         (* not y and b *)
+         (* There is no possibly matching session *)
+      \/ (   !List.mem (Start ps) evs
+          /\ !List.mem (StaticRev t_peer) evs)).
 
 axiom Event_no_junk:
   forall (Ev : Event),
        (exists (A : Agent), Ev = StaticRev(A))
     || (exists (s : PSid), Ev = EphemeralRev(s))
     || (exists (s : Sid), Ev = SessionRev(s))
-    || (exists (s : Sid), Ev = Accept(s)).
+    || (exists (s : Sid), Ev = Accept(s))
+    || (exists (s : PSid), Ev = Start(s)).
 
 axiom Event_free1: forall (A : Agent, s : PSid), StaticRev(A) <> EphemeralRev(s).
 axiom Event_free2: forall (A : Agent, s : Sid), StaticRev(A) <> SessionRev(s).
@@ -162,6 +174,10 @@ axiom Event_free3: forall (A : Agent, s : Sid), StaticRev(A) <> Accept(s).
 axiom Event_free4: forall (s1 : PSid, s2 : Sid), EphemeralRev(s1) <> SessionRev(s2).
 axiom Event_free5: forall (s1 : PSid, s2 : Sid), EphemeralRev(s1) <> Accept(s2).
 axiom Event_free6: forall (s1, s2 : Sid), SessionRev(s1) <> Accept(s2).
+axiom Event_free7: forall (s1 : PSid, s2 : Sid), Start(s1) <> SessionRev(s2).
+axiom Event_free8: forall (s1 : PSid, s2 : Sid), Start(s1) <> Accept(s2).
+axiom Event_free9: forall (A : Agent, s : PSid), StaticRev(A) <> Start(s).
+axiom Event_free10: forall (s1 s2 : PSid), Start(s1) <> EphemeralRev(s2).
 
 axiom StaticRev_inj:    forall (A, B : Agent), 
  StaticRev(A) = StaticRev(B) => A = B.
@@ -174,6 +190,10 @@ axiom SessionRev_inj:   forall (s1, s2 : Sid),
 
 axiom Accept_inj :  forall (s1, s2 : Sid), 
  Accept(s1) = Accept(s2) => s1 = s2.
+
+
+axiom Start_inj: forall (s1, s2 : PSid), 
+ Start(s1) = Start(s2) => s1 = s2.
 
 const qSess : int.
 const qH1 : int.
@@ -352,13 +372,16 @@ module AKE : Proto = {
     var xepk : Epk;
     var r : Epk option = None; 
     (* break if one agent is invalid or if Eid not fresh *)
-    if (cSess < qSess /\ in_dom A mSk /\ in_dom B mSk /\ !in_dom i mStarted) {
+    if (cSess < qSess && in_dom A mSk && in_dom B mSk && !in_dom i mStarted &&
+     (let  evs' = Start (A,B,dEpk,init) :: evs in
+        test <> None => fresh (proj test) evs)) {
       cSess = cSess + 1;
       xesk  = $sample_esk;
       x' = h2(proj (mSk.[A]),xesk);
       xepk = gen_epk(x');
       mStarted.[i] = (A,B,xesk,x',init);
       r = Some(xepk);
+      evs = Start(psid_of_sessionData(proj mStarted.[i]))::evs;
     }
     return r;
   }
@@ -370,22 +393,26 @@ module AKE : Proto = {
     var yepk : Epk;
     var r : Epk option = None; 
     (* break if one agent is invalid or if Eid not fresh *)
-    if (cSess < qSess /\ in_dom A mSk /\ in_dom B mSk /\ !in_dom i mStarted /\
-        !in_dom i mCompleted) {
+    if (cSess < qSess && in_dom A mSk && in_dom B mSk && !in_dom i mStarted &&
+        !in_dom i mCompleted &&
+      (let  evs' = Accept (B,A,dEpk,X,resp) :: evs in
+        test <> None => fresh (proj test) evs)) {
       cSess = cSess + 1;
       yesk  = $sample_esk;
       y' = h2(proj (mSk.[B]),yesk);
       yepk = gen_epk(y');
       mStarted.[i] = (B,A,yesk,y',resp);
       mCompleted.[i] = X;
-      r = Some(X);
+      r = Some(yepk);
       evs = Accept(sid_of_sessionData (proj mStarted.[i]) X)::evs;
     }
     return r;
   }
 
   fun init2(i : EId, Y : Epk) : unit = {
-    if (!in_dom i mCompleted /\ in_dom i mStarted) {
+    if (!in_dom i mCompleted && in_dom i mStarted &&
+    (let  evs' = Accept(sid_of_sessionData(proj mStarted.[i]) Y):: evs in
+     test <> None => fresh (proj test) evs)) {
      mCompleted.[i] = Y;
      evs = Accept(sid_of_sessionData(proj mStarted.[i]) Y)::evs;
     }
@@ -397,7 +424,9 @@ module AKE : Proto = {
 
   fun staticReveal(A : Agent) : Sk option = {
     var r : Sk option = None;
-    if (in_dom A mSk) { 
+    if (in_dom A mSk && 
+    (let  evs' = StaticRev(A) :: evs in
+     test <> None => fresh (proj test) evs)) { 
      r = (mSk.[A]);
      evs = StaticRev(A)::evs;
     }
@@ -406,7 +435,9 @@ module AKE : Proto = {
 
   fun ephemeralReveal(i : EId) : Esk option = {
     var r : Esk option = None;
-    if (in_dom i mStarted  && cEpkKR < qEphKR) {
+    if (in_dom i mStarted  && cEpkKR < qEphKR &&
+    (let  evs' = EphemeralRev(psid_of_sessionData(proj mStarted.[i])) :: evs in
+     test <> None => fresh (proj test) evs)) {
       r = Some(sd_esk(proj mStarted.[i]));
       evs = EphemeralRev(psid_of_sessionData(proj mStarted.[i]))::evs;
       cEpkKR = cEpkKR + 1;
@@ -432,7 +463,10 @@ module AKE : Proto = {
   fun sessionReveal(i : EId) : Key option = {
     var r : Key option = None;
     var s : Sid;
-    if (in_dom i mCompleted && cSessKR < qSessKR) {
+    if (in_dom i mCompleted && cSessKR < qSessKR &&
+    (let  evs' = SessionRev(sid_of_sessionData 
+      (proj mStarted.[i]) (proj mCompleted.[i]))::evs in
+     test <> None => fresh (proj test) evs)) {
     s = sid_of_sessionData (proj mStarted.[i]) (proj mCompleted.[i]);
     evs = SessionRev(sid_of_sessionData 
      (proj mStarted.[i]) (proj mCompleted.[i]))::evs;
@@ -513,48 +547,6 @@ lemma le_congr : forall (a b c d : real),
   a <= c => b <= d => a + b <= c + d by [].
 
 
-local lemma Pr1 &m : 
-Pr[ECK(AKE,A).main() @ &m : res] <=
-Pr[ECK(AKE,A).main() @ &m : (ECK.test_id <> None /\ 
-   Map.in_dom (getStringFromEId (proj ECK.test_id) 
-              AKE.mStarted AKE.mCompleted AKE.mSk) AKE.mH1)]  +
-Pr[ECK(AKE,A).main() @ &m : res /\ !(ECK.test_id <> None /\ 
-   Map.in_dom (getStringFromEId (proj ECK.test_id) 
-              AKE.mStarted AKE.mCompleted AKE.mSk) AKE.mH1)].
-proof.
-cut ->:(
-Pr[ECK(AKE,A).main() @ &m : res] =
-Pr[ECK(AKE,A).main() @ &m : (res /\ (ECK.test_id <> None /\ 
-   Map.in_dom (getStringFromEId (proj ECK.test_id) 
-              AKE.mStarted AKE.mCompleted AKE.mSk) AKE.mH1)) \/
-(res /\ !(ECK.test_id <> None /\ 
-   Map.in_dom (getStringFromEId (proj ECK.test_id) 
-              AKE.mStarted AKE.mCompleted AKE.mSk) AKE.mH1))]).
-rewrite Pr mu_eq => // &hr.
-by case (! ECK.test_id{hr} = None /\
-in_dom
-  (getStringFromEId (proj ECK.test_id{hr}) AKE.mStarted{hr}
-     AKE.mCompleted{hr} AKE.mSk{hr}) AKE.mH1{hr}).
-rewrite Pr mu_or.
-apply (Real.Trans _ 
-(Pr[ECK(AKE, A).main() @ &m :
-   res /\
-   ! ECK.test_id = None /\
-   in_dom
-     (getStringFromEId (proj ECK.test_id) AKE.mStarted AKE.mCompleted AKE.mSk)
-     AKE.mH1] +
-Pr[ECK(AKE, A).main() @ &m :
-   res /\
-   ! (! ECK.test_id = None /\
-      in_dom
-        (getStringFromEId (proj ECK.test_id) AKE.mStarted AKE.mCompleted
-           AKE.mSk) AKE.mH1)]) _); first by smt.
-apply le_congr => //.
-by rewrite Pr mu_sub.
-save.
-
-
-
 local module G1 : Proto = {
  var cSess, cH1, cH2, cSessKR, cEpkKR : int (* counters for queries *)
  var mH1 : (Session_string, Key) map
@@ -569,8 +561,8 @@ local module G1 : Proto = {
  var testid : EId option
 
  fun h1(sstring : Session_string) : Key = {
- var ke : Key;
- ke = $sample_bstr_k;
+  var ke : Key;
+  ke = $sample_bstr_k;
  if (!in_dom sstring mH1) {
    mH1.[sstring] = ke;
  }
@@ -589,9 +581,9 @@ local module G1 : Proto = {
  }
 
   fun h2(a : Sk, x : Esk) : Eexp = {
-   var e : Eexp;
-   e = $sample_eexp;
-   if (!in_dom (a,x) mH2) {
+    var e : Eexp;
+    e = $sample_eexp;
+    if (!in_dom (a,x) mH2) {
       cH2 = cH2 + 1;
       mH2.[(a,x)] = e;
     }
@@ -621,7 +613,7 @@ local module G1 : Proto = {
       pka = gen_pk(ska);
       l = add pka l;
       mSk.[pka] = ska;
-    }
+    } 
     cSess = 0;
     cH1 = 0;
     cH2 = 0;
@@ -653,13 +645,16 @@ local module G1 : Proto = {
     var xepk : Epk;
     var r : Epk option = None; 
     (* break if one agent is invalid or if Eid not fresh *)
-    if (cSess < qSess /\ in_dom A mSk /\ in_dom B mSk /\ !in_dom i mStarted) {
+    if (cSess < qSess && in_dom A mSk && in_dom B mSk && !in_dom i mStarted &&
+     (let  evs' = Start (A,B,dEpk,init) :: evs in
+        test <> None => fresh (proj test) evs)) {
       cSess = cSess + 1;
       xesk  = $sample_esk;
       x' = h2(proj (mSk.[A]),xesk);
       xepk = gen_epk(x');
       mStarted.[i] = (A,B,xesk,x',init);
       r = Some(xepk);
+      evs = Start(psid_of_sessionData(proj mStarted.[i]))::evs;
     }
     return r;
   }
@@ -671,22 +666,26 @@ local module G1 : Proto = {
     var yepk : Epk;
     var r : Epk option = None; 
     (* break if one agent is invalid or if Eid not fresh *)
-    if (cSess < qSess /\ in_dom A mSk /\ in_dom B mSk /\ !in_dom i mStarted 
-       /\ !in_dom i mCompleted) {
+    if (cSess < qSess && in_dom A mSk && in_dom B mSk && !in_dom i mStarted &&
+        !in_dom i mCompleted &&
+      (let  evs' = Accept (B,A,dEpk,X,resp) :: evs in
+        test <> None => fresh (proj test) evs)) {
       cSess = cSess + 1;
       yesk  = $sample_esk;
       y' = h2(proj (mSk.[B]),yesk);
       yepk = gen_epk(y');
       mStarted.[i] = (B,A,yesk,y',resp);
       mCompleted.[i] = X;
-      r = Some(X);
+      r = Some(yepk);
       evs = Accept(sid_of_sessionData (proj mStarted.[i]) X)::evs;
     }
     return r;
   }
 
   fun init2(i : EId, Y : Epk) : unit = {
-    if (!in_dom i mCompleted /\ in_dom i mStarted) {
+    if (!in_dom i mCompleted && in_dom i mStarted &&
+    (let  evs' = Accept(sid_of_sessionData(proj mStarted.[i]) Y):: evs in
+     test <> None => fresh (proj test) evs)) {
      mCompleted.[i] = Y;
      evs = Accept(sid_of_sessionData(proj mStarted.[i]) Y)::evs;
     }
@@ -696,6 +695,28 @@ local module G1 : Proto = {
   (* Key Reveals                                                    *)
   (******************************************************************)
 
+  fun staticReveal(A : Agent) : Sk option = {
+    var r : Sk option = None;
+    if (in_dom A mSk && 
+    (let  evs' = StaticRev(A) :: evs in
+     test <> None => fresh (proj test) evs)) { 
+     r = (mSk.[A]);
+     evs = StaticRev(A)::evs;
+    }
+    return r;
+  }
+
+  fun ephemeralReveal(i : EId) : Esk option = {
+    var r : Esk option = None;
+    if (in_dom i mStarted  && cEpkKR < qEphKR &&
+    (let  evs' = EphemeralRev(psid_of_sessionData(proj mStarted.[i])) :: evs in
+     test <> None => fresh (proj test) evs)) {
+      r = Some(sd_esk(proj mStarted.[i]));
+      evs = EphemeralRev(psid_of_sessionData(proj mStarted.[i]))::evs;
+      cEpkKR = cEpkKR + 1;
+    }
+    return r;
+   }
 
   fun computeKeyKR(i : EId) : Key option = {
     var rv : Key option = None;
@@ -729,30 +750,13 @@ local module G1 : Proto = {
     return rv;
   }
 
-  fun staticReveal(A : Agent) : Sk option = {
-    var r : Sk option = None;
-    if (in_dom A mSk) { 
-     r = (mSk.[A]);
-     evs = StaticRev(A)::evs;
-    }
-    return r;
-  }
-
-  fun ephemeralReveal(i : EId) : Esk option = {
-    var r : Esk option = None;
-    if (in_dom i mStarted  && cEpkKR < qEphKR) {
-      r = Some(sd_esk(proj mStarted.[i]));
-      evs = EphemeralRev(psid_of_sessionData(proj mStarted.[i]))::evs;
-      cEpkKR = cEpkKR + 1;
-    }
-    return r;
-   }
-
-
- fun sessionReveal(i : EId) : Key option = {
+  fun sessionReveal(i : EId) : Key option = {
     var r : Key option = None;
     var s : Sid;
-    if (in_dom i mCompleted && cSessKR < qSessKR) {
+    if (in_dom i mCompleted && cSessKR < qSessKR &&
+    (let  evs' = SessionRev(sid_of_sessionData 
+      (proj mStarted.[i]) (proj mCompleted.[i]))::evs in
+     test <> None => fresh (proj test) evs)) {
     s = sid_of_sessionData (proj mStarted.[i]) (proj mCompleted.[i]);
     evs = SessionRev(sid_of_sessionData 
      (proj mStarted.[i]) (proj mCompleted.[i]))::evs;
@@ -782,12 +786,10 @@ local module G1 : Proto = {
 
 local equiv Eq_AKE_G1 :
 ECK(AKE,A).main ~ ECK(G1,A).main : ={glob A} ==> 
-(res /\ !(ECK.test_id <> None /\ 
+res{1} =>
+(!(ECK.test_id <> None /\ 
    Map.in_dom (getStringFromEId (proj ECK.test_id) 
-              AKE.mStarted AKE.mCompleted AKE.mSk) AKE.mH1)){1} =>
-(res /\ !(ECK.test_id <> None /\ 
-   Map.in_dom (getStringFromEId (proj ECK.test_id) 
-              G1.mStarted G1.mCompleted G1.mSk) G1.mH1)){2}.
+              G1.mStarted G1.mCompleted G1.mSk) G1.mH1) => res){2}.
 proof.
  fun.
 seq 4 4:
@@ -826,9 +828,7 @@ seq 2 2:
   (fr{2} => in_dom eid{2} G1.mStarted{2} /\ in_dom eid{2} G1.mCompleted{2}) /\
  (fr{1} => in_dom eid{1} AKE.mStarted{1} /\ in_dom eid{1} AKE.mCompleted{1})).
 by inline AKE.isCompleteAndFresh G1.isCompleteAndFresh;rnd;wp;skip;progress;smt.
-if => //.
-inline AKE.isCompleteAndFresh G1.isCompleteAndFresh.
-wp.
+if => //;inline AKE.isCompleteAndFresh G1.isCompleteAndFresh;wp.
 inline AKE.setTest G1.setTest.
 sp.
 if;last first.
@@ -846,338 +846,10 @@ seq 3 3: ( (={glob A,b,b',fr,eid, ECK.test_id} /\
   AKE.mCompleted{1} = G1.mCompleted{2} /\
   AKE.test{1} = G1.test{2} /\
   AKE.testid{1} = G1.testid{2} /\
-  AKE.evs{1} = G1.evs{2}) /\
-  (fr{2} => in_dom eid{2} G1.mStarted{2} /\ in_dom eid{2} G1.mCompleted{2}) /\
- (fr{1} => in_dom eid{1} AKE.mStarted{1} /\ in_dom eid{1} AKE.mCompleted{1})).
+  AKE.evs{1} = G1.evs{2})).
 eqobs_in => //.
 by progress.
 by progress.
-case
-((ECK.test_id <> None /\ 
-   Map.in_dom (getStringFromEId (proj ECK.test_id) 
-              AKE.mStarted AKE.mCompleted AKE.mSk) AKE.mH1)){1}.
-conseq ( _ :
-(ECK.test_id <> None /\ 
-   Map.in_dom (getStringFromEId (proj ECK.test_id) 
-              AKE.mStarted AKE.mCompleted AKE.mSk) AKE.mH1){1} /\
-(ECK.test_id <> None /\ 
-   Map.in_dom (getStringFromEId (proj ECK.test_id) 
-              G1.mStarted G1.mCompleted G1.mSk) G1.mH1){2}
- ==>
-(ECK.test_id <> None /\ 
-   Map.in_dom (getStringFromEId (proj ECK.test_id) 
-              AKE.mStarted AKE.mCompleted AKE.mSk) AKE.mH1){1} /\
-(ECK.test_id <> None /\ 
-   Map.in_dom (getStringFromEId (proj ECK.test_id) 
-              G1.mStarted G1.mCompleted G1.mSk) G1.mH1){2}).
-by smt.
-by smt.
-
-call 
-(_: Map.in_dom (getStringFromEId (proj ECK.test_id) 
-              G1.mStarted G1.mCompleted G1.mSk) G1.mH1,
- (ECK.test_id <> None /\ 
-  Map.in_dom (getStringFromEId (proj ECK.test_id) 
-  AKE.mStarted AKE.mCompleted AKE.mSk) AKE.mH1){1} /\
- (ECK.test_id <> None /\ 
-  Map.in_dom (getStringFromEId (proj ECK.test_id) 
-  G1.mStarted G1.mCompleted G1.mSk) G1.mH1){2} /\
- (ECK.test_id <> None /\ in_dom (proj ECK.test_id) AKE.mStarted /\
-  in_dom (proj ECK.test_id) AKE.mCompleted){1} /\
- (ECK.test_id <> None /\ in_dom (proj ECK.test_id) G1.mStarted /\
-  in_dom (proj ECK.test_id) G1.mCompleted){2},
-(ECK.test_id <> None /\ 
-  Map.in_dom (getStringFromEId (proj ECK.test_id) 
-  AKE.mStarted AKE.mCompleted AKE.mSk) AKE.mH1){1} /\
- (ECK.test_id <> None /\ 
-  Map.in_dom (getStringFromEId (proj ECK.test_id) 
-  G1.mStarted G1.mCompleted G1.mSk) G1.mH1){2} /\
- (ECK.test_id <> None /\ in_dom (proj ECK.test_id) AKE.mStarted /\
-  in_dom (proj ECK.test_id) AKE.mCompleted){1} /\
- (ECK.test_id <> None /\ in_dom (proj ECK.test_id) G1.mStarted /\
-  in_dom (proj ECK.test_id) G1.mCompleted){2}) => //.
-
-by apply ll.
-(* h1_a relational spec *)
- fun;wp;inline AKE.h1 G1.h1;sp;if{1};if{2};wp => //=.
-  by rnd;wp;skip;smt.
-  by rnd{1};wp;skip;smt.
-  by rnd{2};wp;skip;smt.
-
-
-  (* h1_a lossless on the left *)
-  intros => &2 H;fun. 
-  seq 1: ((! ECK.test_id = None /\
-   in_dom
-     (getStringFromEId (proj ECK.test_id) AKE.mStarted AKE.mCompleted AKE.mSk)
-     AKE.mH1) /\
-  (! ECK.test_id{2} = None /\
-   in_dom
-     (getStringFromEId (proj ECK.test_id{2}) G1.mStarted{2} G1.mCompleted{2}
-        G1.mSk{2}) G1.mH1{2}) /\
-  (! ECK.test_id = None /\
-   in_dom (proj ECK.test_id) AKE.mStarted /\
-   in_dom (proj ECK.test_id) AKE.mCompleted) /\
-  ! ECK.test_id{2} = None /\
-  in_dom (proj ECK.test_id{2}) G1.mStarted{2} /\
-  in_dom (proj ECK.test_id{2}) G1.mCompleted{2}).
-  wp; skip; smt.  
-  wp; skip; smt.  
-  if.
-  inline AKE.h1;wp;rnd;wp; skip;  intros => &1; progress.
-  by apply sample_bstr_k_mu_one => y /=;smt.
-  by wp;skip;smt.
-  by hoare;wp;skip;smt.  
-  by smt.
- 
- (* h1_a on the right preserves bad *)
-  intros => &1.                 
-  fun.
-  seq 1: 
-  ( in_dom
-    (getStringFromEId (proj ECK.test_id) G1.mStarted G1.mCompleted G1.mSk)
-    G1.mH1 /\
-  (! ECK.test_id{1} = None /\
-   in_dom
-     (getStringFromEId (proj ECK.test_id{1}) AKE.mStarted{1}
-        AKE.mCompleted{1} AKE.mSk{1}) AKE.mH1{1}) /\
-  (! ECK.test_id = None /\
-   in_dom
-     (getStringFromEId (proj ECK.test_id) G1.mStarted G1.mCompleted G1.mSk)
-     G1.mH1) /\
-  (! ECK.test_id{1} = None /\
-   in_dom (proj ECK.test_id{1}) AKE.mStarted{1} /\
-   in_dom (proj ECK.test_id{1}) AKE.mCompleted{1}) /\
-  ! ECK.test_id = None /\
-  in_dom (proj ECK.test_id) G1.mStarted /\
-  in_dom (proj ECK.test_id) G1.mCompleted); try wp => //.
-  if.
-  inline G1.h1;wp;rnd;wp;skip;progress => //=.
-  by apply sample_bstr_k_mu_one => y /=;smt.
-  by skip;progress.
-  by wp;hoare.
-
-(* h2_a relational spec *)
- fun;wp;inline AKE.h2 G1.h2;sp;if{1};if{2};wp => //=.
-  by rnd;wp;skip;progress => //; smt.
-  by rnd{1};wp;skip;progress => //; smt.
-  by rnd{2};wp;skip;progress => //; smt.
-
-  (* h2_a lossless on the left *)
-  intros => &2 H;fun. 
-  seq 1: 
- ((! ECK.test_id = None /\
-   in_dom
-     (getStringFromEId (proj ECK.test_id) AKE.mStarted AKE.mCompleted AKE.mSk)
-     AKE.mH1) /\
-  (! ECK.test_id{2} = None /\
-   in_dom
-     (getStringFromEId (proj ECK.test_id{2}) G1.mStarted{2} G1.mCompleted{2}
-        G1.mSk{2}) G1.mH1{2}) /\
-  (! ECK.test_id = None /\
-   in_dom (proj ECK.test_id) AKE.mStarted /\
-   in_dom (proj ECK.test_id) AKE.mCompleted) /\
-  ! ECK.test_id{2} = None /\
-  in_dom (proj ECK.test_id{2}) G1.mStarted{2} /\
-  in_dom (proj ECK.test_id{2}) G1.mCompleted{2}) => //.
-  wp; skip; smt.  
-  if.
-  inline AKE.h2;wp;rnd => //;first (by apply sample_eexp_ll).
-  by wp; skip; progress => //.
-  by wp; skip; smt.
-  by hoare; wp; skip; smt.  
-
- 
- (* h1_a on the right preserves bad *)
-  intros => &1.                 
-  fun.
-  seq 1: 
-  (in_dom
-    (getStringFromEId (proj ECK.test_id) G1.mStarted G1.mCompleted G1.mSk)
-    G1.mH1 /\
-  (! ECK.test_id{1} = None /\
-   in_dom
-     (getStringFromEId (proj ECK.test_id{1}) AKE.mStarted{1}
-        AKE.mCompleted{1} AKE.mSk{1}) AKE.mH1{1}) /\
-  (! ECK.test_id = None /\
-   in_dom
-     (getStringFromEId (proj ECK.test_id) G1.mStarted G1.mCompleted G1.mSk)
-     G1.mH1) /\
-  (! ECK.test_id{1} = None /\
-   in_dom (proj ECK.test_id{1}) AKE.mStarted{1} /\
-   in_dom (proj ECK.test_id{1}) AKE.mCompleted{1}) /\
-  ! ECK.test_id = None /\
-  in_dom (proj ECK.test_id) G1.mStarted /\
-  in_dom (proj ECK.test_id) G1.mCompleted); try wp => //.
-  if.
-  inline G1.h2;wp;rnd => //; first by apply sample_eexp_ll.
-  by wp;skip;progress => //=.
-  by skip;progress.
-  by wp;hoare.
-   
-(* init1 relational spec *)
- fun;wp;inline AKE.h2 G1.h2;sp;if{1};if{2};wp => //=.
-  by do 2!(rnd;wp);skip;smt.
-  by do 2!(rnd{1};wp);wp;skip;smt.
-  by do 2!(rnd{2};wp);wp;skip;smt.
-
-
-  (* init1 lossless on the left *)
-  intros => &2 H;fun. 
-  seq 1: 
- ((! ECK.test_id = None /\
-   in_dom
-     (getStringFromEId (proj ECK.test_id) AKE.mStarted AKE.mCompleted AKE.mSk)
-     AKE.mH1) /\
-  (! ECK.test_id{2} = None /\
-   in_dom
-     (getStringFromEId (proj ECK.test_id{2}) G1.mStarted{2} G1.mCompleted{2}
-        G1.mSk{2}) G1.mH1{2}) /\
-  (! ECK.test_id = None /\
-   in_dom (proj ECK.test_id) AKE.mStarted /\
-   in_dom (proj ECK.test_id) AKE.mCompleted) /\
-  ! ECK.test_id{2} = None /\
-  in_dom (proj ECK.test_id{2}) G1.mStarted{2} /\
-  in_dom (proj ECK.test_id{2}) G1.mCompleted{2}) => //=.
-  wp; skip; smt.  
-  if.
-  inline AKE.h2;do !(wp;rnd);wp;skip;  intros => &1; progress.
-  by apply sample_esk_mu_one => y /=;apply sample_eexp_mu_one => z /=;
-      progress; smt.
-
-
-  by wp;skip;smt.
-  by hoare;wp;skip;smt.  
- 
- (* init1 on the right preserves bad *)
-  intros => &1.                 
-  fun.
-  seq 1: 
-  (in_dom
-    (getStringFromEId (proj ECK.test_id) G1.mStarted G1.mCompleted G1.mSk)
-    G1.mH1 /\
-  (! ECK.test_id{1} = None /\
-   in_dom
-     (getStringFromEId (proj ECK.test_id{1}) AKE.mStarted{1}
-        AKE.mCompleted{1} AKE.mSk{1}) AKE.mH1{1}) /\
-  (! ECK.test_id = None /\
-   in_dom
-     (getStringFromEId (proj ECK.test_id) G1.mStarted G1.mCompleted G1.mSk)
-     G1.mH1) /\
-  (! ECK.test_id{1} = None /\
-   in_dom (proj ECK.test_id{1}) AKE.mStarted{1} /\
-   in_dom (proj ECK.test_id{1}) AKE.mCompleted{1}) /\
-  ! ECK.test_id = None /\
-  in_dom (proj ECK.test_id) G1.mStarted /\
-  in_dom (proj ECK.test_id) G1.mCompleted); try wp => //.
-  if.
-  inline G1.h2;do 2! (wp;rnd);wp;skip;progress => //=.
-  by apply sample_esk_mu_one => y /=;apply sample_eexp_mu_one => z /=;
-      progress; smt.
-  by skip;progress.
-  by wp;hoare.
-
-(* init2 relational spec *)
-  by fun;if{2};if{1};wp => //;skip;progress;smt.
- 
-   (* init1 lossless on the left *)
-  by intros => &2 H;fun; wp; skip; smt.  
-
- (* init2 on the right preserves bad *)
-  by intros => &1;fun;wp;skip;smt.                 
-
-   (* resp relational spec *)
- fun; sp; inline AKE.h2 G1.h2; if{1};if{2} => //;wp.
-  by do !(rnd;wp);skip;smt.
-  by do !(rnd{1};wp);skip;smt. 
-  by do !(rnd{2};wp);skip;smt. 
- 
-  (* resp lossless on the left *)
-  intros => &2 H;fun. 
-  seq 1: 
- ((! ECK.test_id = None /\
-   in_dom
-     (getStringFromEId (proj ECK.test_id) AKE.mStarted AKE.mCompleted AKE.mSk)
-     AKE.mH1) /\
-  (! ECK.test_id{2} = None /\
-   in_dom
-     (getStringFromEId (proj ECK.test_id{2}) G1.mStarted{2} G1.mCompleted{2}
-        G1.mSk{2}) G1.mH1{2}) /\
-  (! ECK.test_id = None /\
-   in_dom (proj ECK.test_id) AKE.mStarted /\
-   in_dom (proj ECK.test_id) AKE.mCompleted) /\
-  ! ECK.test_id{2} = None /\
-  in_dom (proj ECK.test_id{2}) G1.mStarted{2} /\
-  in_dom (proj ECK.test_id{2}) G1.mCompleted{2}) => //=.
-  by wp; skip; smt.  
-  if => //.
-  inline AKE.h2;do !(wp;rnd);wp;skip;  intros => &1; progress.
-  by apply sample_esk_mu_one => y /=;apply sample_eexp_mu_one => z /=;
-      progress; smt.
-
-
-  by hoare;wp;skip;smt.  
- 
- (* resp on the right preserves bad *)
-  intros => &1.                 
-  fun.
-  seq 1: 
-  (in_dom
-    (getStringFromEId (proj ECK.test_id) G1.mStarted G1.mCompleted G1.mSk)
-    G1.mH1 /\
-  (! ECK.test_id{1} = None /\
-   in_dom
-     (getStringFromEId (proj ECK.test_id{1}) AKE.mStarted{1}
-        AKE.mCompleted{1} AKE.mSk{1}) AKE.mH1{1}) /\
-  (! ECK.test_id = None /\
-   in_dom
-     (getStringFromEId (proj ECK.test_id) G1.mStarted G1.mCompleted G1.mSk)
-     G1.mH1) /\
-  (! ECK.test_id{1} = None /\
-   in_dom (proj ECK.test_id{1}) AKE.mStarted{1} /\
-   in_dom (proj ECK.test_id{1}) AKE.mCompleted{1}) /\
-  ! ECK.test_id = None /\
-  in_dom (proj ECK.test_id) G1.mStarted /\
-  in_dom (proj ECK.test_id) G1.mCompleted); try wp => //.
-  if.
-  inline G1.h2;do 2! (wp;rnd);wp;skip;progress => //=.
-  by apply sample_esk_mu_one => y /=;apply sample_eexp_mu_one => z /=;
-      progress; smt.
-  by skip;progress.
-  by wp;hoare.
-
- (* staticReveal relational spec *)
-  by fun; wp.
- (* staticReveal left lossless *)
-  by intros => &2 ?; fun; wp; skip.
- (* staticReveal right lossless *)
-  by intros => &1; fun; wp; skip.
-
- (* ephReveal relational spec *)
-  by fun; wp.
- (* ephReveal left *)
-  by intros => &2 ?; fun; wp; skip.
- (* ephReveal right *)
-  by intros => &1; fun; wp; skip.
-
-  (* session reveal relational spec *)
-  fun; sp; inline AKE.computeKey G1.computeKeyKR AKE.h1 G1.h1;
-   if{1};if{2};sp => //; try (if{1};if{2};wp).
-   by rnd; wp; skip; smt.
-   by rnd{1}; wp; skip; smt.
-   by rnd{2}; wp; skip; smt.
-   by skip;smt.
-   by if{1}; try (wp; rnd{1}); wp; skip; smt.
-   by if{2}; try (wp; rnd{2}); wp; skip; smt.
-
-  admit.
-   admit.
- inline AKE.computeKey G1.computeKey AKE.h1. 
-sp.
-if{1};if{2};wp => //.
-rnd.
-wp.
-skip; progress; try smt.
 
 call 
 (_: Map.in_dom (getStringFromEId (proj ECK.test_id) 
@@ -1527,20 +1199,16 @@ call
   by hoare; skip; progress; smt.
   by hoare; skip; progress; smt.
   (* Main *)
-rewrite /=.
-  inline AKE.computeKey G1.computeKey AKE.setTest G1.setTest.
-  sp.
-  if => //.
+  rewrite /=.
+  inline AKE.computeKey G1.computeKey.
   sp.
   rcondt{1} 1.
    intros => &m;skip;progress;elim (H _) => //.
   rcondt{2} 1.
    intros => &m;skip;progress;elim (H _) => //.
-   inline AKE.h1; wp; rnd; wp; skip; progress; try smt.
-   
-   by wp; skip; smt.
-   by wp; rnd; skip; progress; smt.
+   by inline AKE.h1; wp; rnd; wp; skip; progress; smt.
 save.
+
 local lemma Pr1 &m:
 Pr[ECK(AKE,A).main() @ &m : res] <= 
 Pr[ECK(G1,A).main() @ &m : res] +
@@ -1558,3 +1226,19 @@ proof.
   by equiv_deno  Eq_AKE_G1=> //;first smt.
   by rewrite Pr mu_or;smt.
 save.
+
+
+(* move up *)
+lemma non_fresh_mon :
+forall t e evs,
+fresh t (e::evs) =>
+fresh t evs.
+proof.
+ intros => t e evs hnf.
+ elim (Event_no_junk e)=> hex.
+generalize hnf.
+  elim hex => A ->;clear hex.
+rewrite /fresh.
+elim/tuple5_ind t => /=; rewrite /psid_of_sid /matching /partial_matching /=.
+progress; try smt.
+
