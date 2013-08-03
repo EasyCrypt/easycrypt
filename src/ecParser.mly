@@ -891,7 +891,7 @@ pgtybindings:
 simpl_type_exp:
 | UNDERSCORE                  { PTunivar       }
 | SELF                        { PTself         }
-| x=lqident                   { PTnamed x      }
+| x=qident                    { PTnamed x      }
 | x=tident                    { PTvar x        }
 | tya=type_args x=qident      { PTapp (x, tya) }
 | LPAREN ty=type_exp RPAREN   { ty             }
