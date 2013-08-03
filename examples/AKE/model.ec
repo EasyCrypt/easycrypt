@@ -139,6 +139,89 @@ op Accept : Sid -> Event.
 op matching(t : Sid) = let (A,B,X,Y,r) = t in (B,A,Y,X,!r).
 op partial_matching(t : Sid) = let (A,B,X,Y,r) = t in (B,A,Y,!r).
 
+
+(* The (completed) session t is fresh unless *)
+pred notfresh(t : Sid,  evs : Event list)  =
+  let (t_actor, t_peer, t_epk, t_recvd, r) = t in
+  let pt = psid_of_sid t in
+  let s = matching t in
+  let ps = psid_of_sid s in
+  (* 1. t's session key has been revealed, or *)
+     List.mem (SessionRev t) evs
+  (* 2. t's ephemeral secret key has been revealed, or *)
+  \/ (List.mem (EphemeralRev pt) evs /\ List.mem (StaticRev t_actor) evs)
+  (* 3. the session key of a matching session of t has been revealed, or *)
+  \/ List.mem (SessionRev s) evs
+  (* 4. the ephemeral key and static secret key of a partially matching session have
+        been revealed, or *)
+  \/ (List.mem (EphemeralRev ps) evs  /\ List.mem (StaticRev t_peer) evs)
+  (* 5. there is neither a *)
+  \/ (   (* fully matching session nor *)
+         !List.mem (Accept s) evs
+         (* a partially matching session and *)
+      /\ (   !List.mem (Start ps) evs
+          \/ (exists (z : Epk), List.mem (Accept (t_peer,t_actor,t_recvd,z,!r)) evs))
+         (* the static key of t's peer has been revealed. *)
+      /\ List.mem (StaticRev t_peer) evs).
+
+(* We want to prove that notfresh is monotonic, i.e.,
+   notfresh(tr,t) implies that for all extensions tr'
+   of tr, notfresh(tr',t).
+
+   The problem is that notfresh is not monotonic for all traces.
+   For traces that contain collisions of ephemeral public keys,
+   the following can happen:
+   1. test = (A,B,X,Y,resp) completes and there is no
+      session that sends Y.
+   2. StaticRev(B) \in evs
+   3. Later on, a session (B,A,Y) is started (Y collision) and
+      test becomes fresh.
+
+   We should be able to perform an up-to-bad step where we disallow
+   this (halt if this happens or ignore Init/Resp query). Then
+   No-collision is an invariant and we can also adapt nofresh such that
+   nofresh'(tr,t) = nofresh(tr,t) /\ no-collision(tr) and nofresh' is
+   monotonic then.
+
+   We could define no-collision as
+   forall i A B X r, evs[i] = Start(A,B,X,r)
+     => X \notin evs[0..i-1]
+
+   where X \notin evs[0..i-1] checks if X occurs in Start or Accept event, i.e.,
+   forall (j < i) C D r Y. evs[j] <> Start(C,D,X,r) /\
+                           evs[j] <> Accept(C,D,Y,X,r) /\
+                           evs[j] <> Accept(C,D,X,Y,r) /\
+*)
+
+(* Tried to define fresh
+pred fresh(t : Sid,  evs : Event list)  =
+  let (t_actor, t_peer, t_epk, t_recvd, r) = t in
+  let s = matching t in
+  let ps = psid_of_sid s in
+  (* 1. No session key reveal for t *)
+     (!List.mem (SessionRev t) evs)
+  (* 2. Not ephemeral reveal for t *)
+  /\ !(   List.mem (EphemeralRev(psid_of_sid(t))) evs) 
+       (* and static reveal for t_actor *)
+       /\ List.mem (StaticRev t_actor) evs
+  (* 3. Not session key reveal for matching session (if it exists) *)
+  /\ (!List.mem (SessionRev s) evs)
+  (* 4. If there is fully matching session or a partially matching session*)
+  /\ ((   (    List.mem (Accept s) evs
+           \/ (   List.mem (Start ps) evs)
+               /\ (forall (z : Epk),
+                     !List.mem (Accept (t_peer, t_actor, t_recvd, z, !r)) evs))
+        (* then not both ephemeral and static revealed *)
+        /\ !(List.mem (EphemeralRev ps) evs
+              /\ List.mem (StaticRev t_peer) evs)))
+         (* If there is neither a fully nor a partially matching session, *)
+      \/ ( !List.mem (Accept s) evs /\
+            (!List.mem (Start ps) evs
+             \/ (exists (z : Epk), List.mem (Accept (t_peer,t_actor,t_recvd,z,!r)) evs))
+          (* then no static reveal. *)
+          /\ !List.mem (StaticRev t_peer) evs).
+*)
+
 op fresh(t : Sid,  evs : Event list)  =
   let (t_actor, t_peer, t_epk, t_recvd, r) = t in
      (!List.mem (SessionRev t) evs)    (* no session key reveal for t *)
