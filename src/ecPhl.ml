@@ -3040,24 +3040,48 @@ and
       f_or sp1 sp2
   | _ -> cannot_apply "sp" "sp only works with single asgn or if"
 
+
 let t_sp_aux side g =
   let (env, _, concl) = get_goal_e g in
-  let es = destr_equivS concl in
   let err ()  = cannot_apply "sp" "with an empty goal" in
-  let spl = sp_inst mleft env es.es_ml es.es_pr in
-  let spr pr = sp_inst mright env es.es_mr pr in
-  if side then
-    let l   = s_fst err es.es_sl in
-    let ls  = s_tail err es.es_sl in
-    let pr  = spl (l.i_node) in
-    let wes = f_equivS_r {es with es_sl=ls; es_pr=pr} in
-      t_on_last t_simplify_nodelta (prove_goal_by [wes] RN_sp g )
-  else
-    let r  = s_fst err es.es_sr in
-    let rs = s_tail err es.es_sr in
-    let pr = spr es.es_pr (r.i_node) in
-    let wes = f_equivS_r {es with es_sr=rs; es_pr=pr} in
-      t_on_last t_simplify_nodelta (prove_goal_by [wes] RN_sp g )
+  let stmt, m, menv, pre, prove_goal = 
+    try 
+      let es = destr_equivS concl in
+      if side then 
+          es.es_sl,mleft, es.es_ml, es.es_pr, 
+           fun pr st -> 
+             let wes = f_equivS_r {es with es_sl=st; es_pr=pr} in
+             t_on_last t_simplify_nodelta (prove_goal_by [wes] RN_sp g)
+      else es.es_sr, mright, es.es_mr, es.es_pr, 
+        fun pr st -> 
+          let wes = f_equivS_r {es with es_sr=st; es_pr=pr} in
+          t_on_last t_simplify_nodelta (prove_goal_by [wes] RN_sp g)
+    with EcBaseLogic.TacError _ ->
+      try
+        let hs = destr_hoareS concl in
+        hs.hs_s, mhr, hs.hs_m, hs.hs_pr, 
+        fun pr st -> 
+          let wes = f_hoareS_r {hs with hs_s=st; hs_pr=pr} in
+          t_on_last t_simplify_nodelta (prove_goal_by [wes] RN_sp g)
+      with EcBaseLogic.TacError _ ->
+        try
+          let bhs = destr_bdHoareS concl in
+          bhs.bhs_s, mhr, bhs.bhs_m, bhs.bhs_pr, 
+          fun pr st -> 
+            let wes = f_bdHoareS_r {bhs with bhs_s=st; bhs_pr=pr} in
+            t_on_last t_simplify_nodelta (prove_goal_by [wes] RN_sp g)
+        with EcBaseLogic.TacError _ ->
+          tacuerror "Unexpected goal"
+  in
+  let pr,stmt = 
+    let l   = s_fst err stmt in
+    let ls  = s_tail err stmt in
+    let pr  = sp_inst m env menv pre (l.i_node) in
+    pr,ls
+  in
+  prove_goal pr stmt
+
+
 
 let t_sp side g =
   let sp s = t_repeat (t_sp_aux s) in
