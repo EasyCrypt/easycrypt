@@ -246,10 +246,10 @@ op fresh(t : Sid,  evs : Event list)  =
 axiom Event_no_junk:
   forall (Ev : Event),
        (exists (A : Agent), Ev = StaticRev(A))
-    || (exists (s : PSid), Ev = EphemeralRev(s))
-    || (exists (s : Sid), Ev = SessionRev(s))
-    || (exists (s : Sid), Ev = Accept(s))
-    || (exists (s : PSid), Ev = Start(s)).
+    \/ (exists (s : PSid), Ev = EphemeralRev(s))
+    \/ (exists (s : Sid), Ev = SessionRev(s))
+    \/ (exists (s : Sid), Ev = Accept(s))
+    \/ (exists (s : PSid), Ev = Start(s)).
 
 axiom Event_free1: forall (A : Agent, s : PSid), StaticRev(A) <> EphemeralRev(s).
 axiom Event_free2: forall (A : Agent, s : Sid), StaticRev(A) <> SessionRev(s).
@@ -261,6 +261,9 @@ axiom Event_free7: forall (s1 : PSid, s2 : Sid), Start(s1) <> SessionRev(s2).
 axiom Event_free8: forall (s1 : PSid, s2 : Sid), Start(s1) <> Accept(s2).
 axiom Event_free9: forall (A : Agent, s : PSid), StaticRev(A) <> Start(s).
 axiom Event_free10: forall (s1 s2 : PSid), Start(s1) <> EphemeralRev(s2).
+
+ 
+
 
 axiom StaticRev_inj:    forall (A, B : Agent), 
  StaticRev(A) = StaticRev(B) => A = B.
@@ -291,6 +294,45 @@ axiom qH2_pos : 0 < qH2.
 axiom qSessKR_pos : 0 < qSessKR.
 axiom qEphKR_pos : 0 < qEphKR.
 axiom qAg_pos : 0 < qAg.
+
+
+lemma absurd : forall P Q, !P => P => Q by smt.
+
+lemma not_or_and :
+forall P Q, (! (P \/ Q)) = (! P /\ ! Q) by [].
+
+lemma not_and_or :
+forall P Q, (! (P /\ Q)) = (! P \/ ! Q) by [].
+
+lemma diff_cons : forall (x y : 'a)(xs : 'a list),
+! mem x xs => 
+mem x (y::xs) => y = x by smt.
+
+lemma notfresh_fresh :
+forall t tr e,
+notfresh t tr =>
+!notfresh t (e::tr) =>
+e = Accept (matching t) \/ 
+e = Start (psid_of_sid (matching t)).
+proof.
+ intros => t.
+ elim/tuple5_ind t => t_actor t_peer t_sent t_rcvd role cl tr e hnfresh hfresh.
+ clear cl t.
+ generalize hfresh;rewrite /notfresh /= !not_or_and !not_and_or !not_or_and /=; 
+   progress.
+ generalize hnfresh;rewrite /notfresh /= => [|[|[|[|]]]];first 4 by smt.
+ intros => [hmemacc][] hnmem_or hmem.
+ generalize H3 =>  [hnmem | [[hmem2] hnex |]];first by left;apply (diff_cons _ _ tr).
+ right.
+ generalize hnmem_or => [hnmem2 |].
+ apply (diff_cons _ _ tr) => //.
+ intros => [z] hmemz.
+ cut  abs : (exists (z : Epk),
+           mem (Accept (t_peer, t_actor, t_rcvd, z, ! role)) (e :: tr))
+  by exists z; smt.
+  by smt.
+save.
+
 
 type EId = int.
 
@@ -460,7 +502,7 @@ module AKE : Proto = {
         test <> None => fresh (proj test) evs)) {
       cSess = cSess + 1;
       xesk  = $sample_esk;
-      x' = h2(proj (mSk.[A]),xesk);
+     x' = h2(proj (mSk.[A]),xesk);
       xepk = gen_epk(x');
       mStarted.[i] = (A,B,xesk,x',init);
       r = Some(xepk);
@@ -965,37 +1007,18 @@ call
 
   (* h1_a lossless on the left *)
   intros => &2 H;fun. 
-  seq 1: (! ECK.test_id{2} = None /\ in_dom (proj ECK.test_id{2}) G1.mStarted{2} /\
-           in_dom (proj ECK.test_id{2}) G1.mCompleted{2}).
-  wp; skip; smt.  
-  wp; skip; smt.  
+  sp.
   if.
   inline AKE.h1;wp;rnd.
   by intros => &m;apply Key.Dword.lossless.
   by wp;skip;smt.
   by skip;smt.
-  by hoare;wp;skip;smt.  
-  by smt.
  
  (* h1_a on the right preserves bad *)
-  intros => &1.                 
-  fun.
-  seq 1: 
-   (in_dom
-    (getStringFromEId (proj ECK.test_id) G1.mStarted G1.mCompleted G1.mSk)
-    G1.mH1 /\
-  ! ECK.test_id = None /\ in_dom (proj ECK.test_id) G1.mStarted
-   /\ in_dom (proj ECK.test_id) G1.mCompleted).
-  wp.
-  by skip.
-  by wp;skip.
-  if.
+  intros => &1; fun; sp; wp; if.
   inline G1.h1;wp;rnd;wp;skip;progress => //=.
-  apply sample_bstr_k_mu_one => y /=.
-  by smt.
+  by apply sample_bstr_k_mu_one => y /=; smt.
   by skip;progress.
-  by wp;hoare.
-  by progress.
 
  (*h2_a relational spec *)
   fun.
@@ -1022,32 +1045,19 @@ call
   AKE.test{1} = G1.test{2} /\
   AKE.testid{1} = G1.testid{2}).
 (* h2_a lossless on the left *)  
-  intros => &2 h.
-  fun.
-  seq 1: (! ECK.test_id{2} = None /\ 
-            in_dom (proj ECK.test_id{2}) G1.mStarted{2} /\
-            in_dom (proj ECK.test_id{2}) G1.mCompleted{2}) => //;try wp=> //.
-  if; wp => //.
+  intros => &2 h; fun; sp; if; wp => //.
   inline AKE.h2;wp.
   rnd => //.  
   by intros => _;apply sample_eexp_ll.
   by wp; skip.
-  by hoare => //.
+
+
 (* h2_a preserves bad on the right *)
-  intros => &1; fun.
-  seq 1: (in_dom
-    (getStringFromEId (proj ECK.test_id) G1.mStarted G1.mCompleted G1.mSk)
-    G1.mH1 /\
-  ! ECK.test_id = None /\ in_dom (proj ECK.test_id) G1.mStarted /\
-                          in_dom (proj ECK.test_id) G1.mCompleted).
-  by wp; skip.
-  by wp;skip.
-  if.
+  intros => &1; fun; sp; if.
   inline G1.h2;wp;rnd;first by intros => _;apply sample_eexp_ll.
   by wp;skip;progress;smt.
   by skip; progress; smt.
-  by hoare;wp.
-  by progress.
+
 (* init1 relational spec *)
   fun.
   eqobs_in (
@@ -1071,33 +1081,18 @@ call
     AKE.mStarted{1} = G1.mStarted{2} /\ AKE.mCompleted{1} = G1.mCompleted{2} /\
     AKE.evs{1} = G1.evs{2}).
 (* init1 lossless on the left *)  
-  intros => &2 H.
-  fun.
-  seq 1:  (! ECK.test_id{2} = None /\
-           in_dom (proj ECK.test_id{2}) G1.mStarted{2} /\
-           in_dom (proj ECK.test_id{2}) G1.mCompleted{2}) => //;try wp=> //.
-  if.
-   wp => //.
-   inline AKE.h2;wp.
-   rnd => //.  
+  intros => &2 H; fun; sp; if.
+   inline AKE.h2; wp => //; rnd => //.  
   by intros => _;apply sample_eexp_ll.
   by wp; rnd; wp; skip; smt.
   by skip.
-  by hoare.
+
    (* init1 preserves bad on the right *)  
-  intros => &1.
-  fun.
-  seq 1:(in_dom
-    (getStringFromEId (proj ECK.test_id) G1.mStarted G1.mCompleted G1.mSk)
-    G1.mH1 /\
-  ! ECK.test_id = None /\ in_dom (proj ECK.test_id) G1.mStarted
-   /\ in_dom (proj ECK.test_id) G1.mCompleted) ; try wp => //.
-  if.
+  intros => &1;fun; sp; if.
    inline G1.h2; do 2! (wp; rnd); wp; skip; progress => /=.
    by apply sample_esk_mu_one => x /=;apply sample_eexp_mu_one => y /=;
    rewrite -getStringFromEIdUpdStarted //;smt.
    by skip => //.
-   by hoare.
 
 (* init2 relational spec *)
    fun.
@@ -1122,15 +1117,9 @@ call
     AKE.testid{1} = G1.testid{2} /\
     AKE.evs{1} = G1.evs{2}).
 (* init2 lossless on the left *)  
-  intros => &2 H.
-  fun.
-  if.
-   wp => //.
-  by skip.
+   by intros => &2 H; fun; wp; skip.
    (* init2 preserves bad on the right *)  
-  intros => &1.
-  fun.
-  by wp;skip;progress; smt.
+   by intros => &1; fun; wp;skip;progress; smt.
 (* resp relational spec *)
   fun.
   eqobs_in (
@@ -1154,34 +1143,17 @@ call
     AKE.testid{1} = G1.testid{2} /\
     AKE.evs{1} = G1.evs{2}).
 (* resp lossless on the left *)  
-  intros => &2 H.
-  fun.
-  seq 1:  (! ECK.test_id{2} = None /\
-           in_dom (proj ECK.test_id{2}) G1.mStarted{2} /\
-           in_dom (proj ECK.test_id{2}) G1.mCompleted{2}) => //;try wp=> //.
-  if.
-   wp => //.
-   inline AKE.h2;wp.
-   rnd => //.  
-  by intros => _;apply sample_eexp_ll.
+  intros => &2 H; fun; sp; if.
+  inline AKE.h2;wp; rnd => //;first by intros => _;apply sample_eexp_ll.
   by wp; rnd; wp; skip; smt.
   by skip.
-  by hoare.
    (* resp preserves bad on the right *)  
-  intros => &1.
-  fun.
-  seq 1:(in_dom
-    (getStringFromEId (proj ECK.test_id) G1.mStarted G1.mCompleted G1.mSk)
-    G1.mH1 /\
-  ! ECK.test_id = None /\ in_dom (proj ECK.test_id) G1.mStarted
-   /\ in_dom (proj ECK.test_id) G1.mCompleted) ; try wp => //.
-  if.
+  intros => &1; fun; sp; if; last by skip.
    inline G1.h2; do 2! (wp; rnd); wp; skip; progress => /=.
-   apply sample_esk_mu_one => x /=;apply sample_eexp_mu_one => y /=;
-   rewrite -getStringFromEIdUpdStarted //;try smt.
+   by apply sample_esk_mu_one => x /=;apply sample_eexp_mu_one => y /=;
+    rewrite -getStringFromEIdUpdStarted //;try smt.
 
-   by skip => //.
-   by hoare.
+
    (* staticReveal relational spec *)
    fun.
    eqobs_in (
@@ -1241,50 +1213,19 @@ call
     by wp; skip; progress; smt.
 
    (* sessionReveal lossless left *)
-   intros => &2 h.
-   fun.
-   seq 1: (  ! ECK.test_id{2} = None /\
-         in_dom (proj ECK.test_id{2}) G1.mStarted{2} /\
-         in_dom (proj ECK.test_id{2}) G1.mCompleted{2});try wp => //.
-   if => //.
+   intros => &2 h; fun; sp; if => //.
    inline AKE.computeKey AKE.h1.  
-   seq 5: (  ! ECK.test_id{2} = None /\
-         in_dom (proj ECK.test_id{2}) G1.mStarted{2} /\
-         in_dom (proj ECK.test_id{2}) G1.mCompleted{2}); try wp => //.
-   if => //; wp; rnd => //.
-    by rewrite -Word.Dword.lossless;smt.
-    by wp.
-   by hoare.
-   by hoare.
+   sp; if => //; wp => //. 
+    by rnd; try wp => //; rewrite -Word.Dword.lossless;smt.
+
    (* sessionReveal preserves bad on the right *)
-   intros => &1; fun.
-   seq 1: 
-    (in_dom
-    (getStringFromEId (proj ECK.test_id) G1.mStarted G1.mCompleted G1.mSk)
-    G1.mH1 /\
-    ! ECK.test_id = None /\
-    in_dom (proj ECK.test_id) G1.mStarted /\
-    in_dom (proj ECK.test_id) G1.mCompleted);try wp => //.
-   if => //.
-   inline G1.computeKeyKR G1.h1.
-   seq 5:
-   ((in_dom
-     (getStringFromEId (proj ECK.test_id) G1.mStarted G1.mCompleted G1.mSk)
-     G1.mH1 /\
-   ! ECK.test_id = None /\
-   in_dom (proj ECK.test_id) G1.mStarted /\
-   in_dom (proj ECK.test_id) G1.mCompleted) /\
-  in_dom i G1.mCompleted /\ G1.cSessKR <= qSessKR); try wp => //.
-   skip; progress; try smt.
-  if => //.
+   intros => &1; fun; sp; if => //; wp => //.
+   inline G1.computeKeyKR G1.h1; sp; if => //; try wp => //.
   wp; rnd => //; wp; skip; progress.
   apply sample_bstr_k_mu_one => //; smt.
-  by hoare; skip; progress; smt.
-  by hoare; skip; progress; smt.
+
   (* Main *)
-  rewrite /=.
-  inline AKE.computeKey G1.computeKey.
-  sp.
+  rewrite /=;inline AKE.computeKey G1.computeKey; sp.
   rcondt{1} 1.
    intros => &m;skip;progress;elim (H _) => //.
   rcondt{2} 1.
@@ -1309,19 +1250,3 @@ proof.
   by equiv_deno  Eq_AKE_G1=> //;first smt.
   by rewrite Pr mu_or;smt.
 save.
-
-
-(* move up *)
-lemma non_fresh_mon :
-forall t e evs,
-fresh t (e::evs) =>
-fresh t evs.
-proof.
- intros => t e evs hnf.
- elim (Event_no_junk e)=> hex.
-generalize hnf.
-  elim hex => A ->;clear hex.
-rewrite /fresh.
-elim/tuple5_ind t => /=; rewrite /psid_of_sid /matching /partial_matching /=.
-progress; try smt.
-
