@@ -31,7 +31,7 @@ module type LDDH_DISTINGUISHER(S:LDDH_ORACLES) = {
 
 (* bound on getTriple queries *)
 op q_t : int.
-axiom q_t_pos: q_t < 0.
+axiom q_t_pos: 0 < q_t.
 
 (* ----------------------------------------------------------------------*)
 (* The real list-DDH game *)
@@ -359,54 +359,6 @@ proof strict.
   eqobs_in.
 qed.
 
-lemma Eq_random_Hyb2_Lazy_G_App_Lazy:
-  forall (A <: LDDH_DISTINGUISHER {LDDH_Hyb2, LRO_random,
-                                   RO_dh_random.G, User_LDDH_Hyb2}),
-    equiv [   LDDH_Hyb2(A, LRO_random).main
-            ~ RO_dh_random.G(LRO_random, User_LDDH_Hyb2(A)).main
-            : (ia{1} = x{2}) ==> ={res} ].
-proof strict.
-  intros=> A.
-  fun.
-  inline RO_dh_random.G(RO_dh_random.LRO, User_LDDH_Hyb2(A)).U.main.
-  wp.
-  swap {1} 2 -1.
-  swap {2} 3 -1.
-  eqobs_in.
-qed.
-
-lemma Eq_random_G_App_Lazy_G_App_Fixed:
-  forall (A <: LDDH_DISTINGUISHER {User_LDDH_Hyb2,LRO_random,RO_dh_random.G}),
-    equiv[   RO_dh_random.G(RO_dh_random.LRO, User_LDDH_Hyb2(A)).main
-           ~ RO_dh_random.G(RO_dh_random.FRO, User_LDDH_Hyb2(A)).main :
-            true ==> ={res,glob User_LDDH_Hyb2(A)} ].
-proof strict.
-  intros=> A.
-  cut H := RO_dh_random.Lazy_Fixed_dh_equiv (User_LDDH_Hyb2(A)).
-  apply H.
-qed.
-
-lemma Eq_random_G_App_Fixed_Hyb2_Fixed:
-  forall (A <: LDDH_DISTINGUISHER {LDDH_Hyb2, User_LDDH_Hyb2,
-                                   FRO_random, RO_dh_random.G}),
-    equiv [   RO_dh_random.G(FRO_random, User_LDDH_Hyb2(A)).main
-            ~ LDDH_Hyb2(A, FRO_random).main
-            : (x{1} = ia{2}) ==> ={res} ].
-proof strict.
-  intros=> A.
-  fun.
-  inline RO_dh_random.G(RO_dh_random.FRO, User_LDDH_Hyb2(A)).U.main.
-  swap {1} 3 -2.
-  eqobs_in.
-qed.
-
-(* TODO: define distinguishers such that
-   Module indexed by integer?
-     LDDH_Hyb2(A, FRO_real).main ~ DDH_real(Dist(A)).main : ia{1} = i{2} 
-   and
-     LDDH_Hyb2(A, FRO_random).main ~ DDH_random(Dist(A)).main : ia{1} = i{2}
-*)
-
 module Dist(A : LDDH_DISTINGUISHER) : DDH_DISTINGUISHER= {
 
   module O : LDDH_ORACLES = {
@@ -510,26 +462,144 @@ wp. rnd. skip. smt. skip. smt. skip. smt.
 qed.
 
 
-(* TODO: continue here, used FRO_random and result that
-   Hyb2(i).real = Hyb(i+1).random? *)
+lemma Eq_LDDH_Hyb_i_DDH_real(A <: LDDH_DISTINGUISHER
+                                 {FRO_random,LDDH_Hyb2,Dist}):
+  forall (i: int) &m1 &m2,
+    Pr[ LDDH_Hyb(A).main(i) @ &m1: res ]
+  = Pr[ DDH_distr_real(Dist(A)).main(i) @ &m2 : res ].
+proof strict.
+  intros=> i &m1 &m2.
+  cut -> :    Pr[ LDDH_Hyb(A).main(i) @ &m1: res ]
+            = Pr[ LDDH_Hyb2(A, LRO_real).main(i) @ &m1 : res ].
+  by equiv_deno (Eq_Hyb_Hyb2_real A).
+  cut -> :
+      Pr[ LDDH_Hyb2(A, LRO_real).main(i) @ &m1 : res ]
+    = Pr[ RO_dh_real.G(LRO_real, User_LDDH_Hyb2(A)).main(i) @ &m1 : res ].
+  by equiv_deno (Eq_real_Hyb2_Lazy_G_App_Lazy A).
+  cut -> :
+     Pr[ RO_dh_real.G(LRO_real, User_LDDH_Hyb2(A)).main(i) @ &m1 : res ]
+   = Pr[ RO_dh_real.G(FRO_real, User_LDDH_Hyb2(A)).main(i) @ &m1 : res ].
+  by equiv_deno (Eq_real_G_App_Lazy_G_App_Fixed A).
+  cut -> :
+     Pr[ RO_dh_real.G(FRO_real, User_LDDH_Hyb2(A)).main(i) @ &m1 : res ]
+   = Pr[ LDDH_Hyb2(A, FRO_real).main(i) @ &m1 : res ].
+  by equiv_deno (Eq_real_G_App_Fixed_Hyb2_Fixed A).
+  by equiv_deno (Eq_LDDH_Hyb2_Fixed_DDH_real A).
+qed. (* FIXME: I should need more restrictions *)
+
+
+(* ********************************************************************* *)
+(* Similar steps for random *)
+
+lemma Eq_Hyb2_Lazy_real_Hyb2_Lazy_random:
+  forall (A <: LDDH_DISTINGUISHER {LDDH_Hyb2, LRO_random, LRO_real}),
+    equiv [   LDDH_Hyb2(A, LRO_real).main
+            ~ LDDH_Hyb2(A, LRO_random).main
+            : (ia{1} = ia{2} + 1) ==> ={res} ].
+proof strict.
+intros A.
+fun.
+seq 4 4:
+  (   LRO.m{2} = Map.empty /\ RO_dh_real.LRO.m{1} = Map.empty
+   /\ LDDH_Hyb2.O.c{1} = 0 /\  LDDH_Hyb2.O.c{2} = 0
+   /\ LDDH_Hyb2.O.i{1} = LDDH_Hyb2.O.i{2} + 1
+   /\ ={glob A}).
+  inline RO_dh_real.LRO.init LRO.init.
+  wp.
+  call (_ : true). skip. smt.
+call (_ : LDDH_Hyb2.O.c{1} = LDDH_Hyb2.O.c{2}  /\ 
+          LDDH_Hyb2.O.i{1} = LDDH_Hyb2.O.i{2} + 1 /\
+          (LDDH_Hyb2.O.c{2} <= LDDH_Hyb2.O.i{2}
+             => LRO.m{2} = Map.empty) /\
+          (LDDH_Hyb2.O.c{1} <= LDDH_Hyb2.O.i{1}
+             => RO_dh_real.LRO.m{1} = Map.empty)
+          ).
+fun.
+sp.
+if. smt.
+inline LRO.query RO_dh_real.LRO.query.
+wp.
+case (LDDH_Hyb2.O.c{2} < LDDH_Hyb2.O.i{2}).
+rcondt {2} 1. intros &m. skip. progress.
+rcondt {1} 1. intros &m. skip. progress. smt.
+rnd. skip. smt.
+rcondf {2} 1. intros &m. skip. smt.
+case (LDDH_Hyb2.O.c{2} = LDDH_Hyb2.O.i{2}).
+rcondt {2} 1. intros &m. skip. smt.
+rcondt {1} 1. intros &m. skip. smt.
+sp.
+rcondt {2} 1. intros &m. skip. smt.
+wp. rnd. skip. progress. smt. smt. smt. smt.
+rcondf {1} 1. intros &m. skip. smt.
+rcondf {2} 1. intros &m. skip. smt.
+case (LDDH_Hyb2.O.c{1} = LDDH_Hyb2.O.i{1}).
+rcondt {1} 1. intros &m. skip. smt.
+sp. rcondt {1} 1. intros &m. skip. progress. smt. wp. rnd. skip. smt.
+rcondf {1} 1. intros &m. skip. smt.
+rnd. skip. smt. skip. smt. skip. smt.
+qed.
+
+lemma Eq_random_Hyb2_Lazy_G_App_Lazy:
+  forall (A <: LDDH_DISTINGUISHER {LDDH_Hyb2, LRO_random,
+                                   RO_dh_random.G, User_LDDH_Hyb2}),
+    equiv [   LDDH_Hyb2(A, LRO_random).main
+            ~ RO_dh_random.G(LRO_random, User_LDDH_Hyb2(A)).main
+            : (ia{1} = x{2}) ==> ={res} ].
+proof strict.
+  intros=> A.
+  fun.
+  inline RO_dh_random.G(RO_dh_random.LRO, User_LDDH_Hyb2(A)).U.main.
+  wp.
+  swap {1} 2 -1.
+  swap {2} 3 -1.
+  eqobs_in.
+qed.
+
+lemma Eq_random_G_App_Lazy_G_App_Fixed:
+  forall (A <: LDDH_DISTINGUISHER {User_LDDH_Hyb2,LRO_random,RO_dh_random.G}),
+    equiv[   RO_dh_random.G(RO_dh_random.LRO, User_LDDH_Hyb2(A)).main
+           ~ RO_dh_random.G(RO_dh_random.FRO, User_LDDH_Hyb2(A)).main :
+            true ==> ={res,glob User_LDDH_Hyb2(A)} ].
+proof strict.
+  intros=> A.
+  cut H := RO_dh_random.Lazy_Fixed_dh_equiv (User_LDDH_Hyb2(A)).
+  apply H.
+qed.
+
+lemma Eq_random_G_App_Fixed_Hyb2_Fixed:
+  forall (A <: LDDH_DISTINGUISHER {LDDH_Hyb2, User_LDDH_Hyb2,
+                                   FRO_random, RO_dh_random.G}),
+    equiv [   RO_dh_random.G(FRO_random, User_LDDH_Hyb2(A)).main
+            ~ LDDH_Hyb2(A, FRO_random).main
+            : (x{1} = ia{2}) ==> ={res} ].
+proof strict.
+  intros=> A.
+  fun.
+  inline RO_dh_random.G(RO_dh_random.FRO, User_LDDH_Hyb2(A)).U.main.
+  swap {1} 3 -2.
+  eqobs_in.
+qed.
+
 lemma Eq_LDDH_Hyb2_Fixed_DDH_random(A <: LDDH_DISTINGUISHER
-                                         {FRO_real, LDDH_Hyb2,Dist}):
-  equiv[  LDDH_Hyb2(A, FRO_real).main
-        ~ DDH_distr_real(Dist(A)).main
-        : ia{1} + 1 = i{2} ==> ={res} ].
+                                         {FRO_random,LDDH_Hyb2,Dist}):
+  equiv[  LDDH_Hyb2(A, FRO_random).main
+        ~ DDH_distr_random(Dist(A)).main
+        : ia{1} = i{2} ==> ={res} ].
 proof strict.
 fun.
-inline Dist(A).distinguish RO_dh_real.FRO.init Sample_DH_distr.sample_dh_real.
+inline
+  Dist(A).distinguish RO_dh_random.FRO.init
+  Sample_DH_distr.sample_dh_random.
 wp.
 seq 6 12  :
-  (RO_dh_real.FRO.m.[tt]{1} <> None &&
-   proj (RO_dh_real.FRO.m.[tt]{1}) = (Dist.O.x,Dist.O.y,Dist.O.z){2} &&
+  (RO_dh_random.FRO.m.[tt]{1} <> None &&
+   proj (RO_dh_random.FRO.m.[tt]{1}) = (Dist.O.x,Dist.O.y,Dist.O.z){2} &&
    LDDH_Hyb2.O.i{1} = Dist.O.i{2} &&
    LDDH_Hyb2.O.c{1} = Dist.O.c{2} &&
    ={glob A}).
   swap {2} 10 -9.
   seq 3 1 : (={glob A} && ia{1} = i{2} &&
-             xs{1} = single tt && RO_dh_real.FRO.m{1} = Map.empty).
+             xs{1} = single tt && RO_dh_random.FRO.m{1} = Map.empty).
   wp.
   call (_ : true). skip. progress.
   apply set_ext.
@@ -542,8 +612,8 @@ seq 6 12  :
   swap {1} 6 -1.
   swap {1} 7 -1.
   seq 6 11 :
-  (! RO_dh_real.FRO.m{1}.[tt] = None &&
-   proj RO_dh_real.FRO.m{1}.[tt] = (Dist.O.x{2}, Dist.O.y{2}, Dist.O.z{2}) &&
+  (! RO_dh_random.FRO.m{1}.[tt] = None &&
+   proj RO_dh_random.FRO.m{1}.[tt] = (Dist.O.x{2}, Dist.O.y{2}, Dist.O.z{2}) &&
    LDDH_Hyb2.O.i{1} = Dist.O.i{2} &&
    LDDH_Hyb2.O.c{1} = Dist.O.c{2} && ={glob A} &&
    xs{1} = FSet.empty).
@@ -555,8 +625,8 @@ seq 6 12  :
     intros &m. skip. smt.
     skip. smt.
 call (_ :
-  (RO_dh_real.FRO.m.[tt]{1} <> None &&
-   proj (RO_dh_real.FRO.m.[tt]{1}) = (Dist.O.x,Dist.O.y,Dist.O.z){2} &&
+  (RO_dh_random.FRO.m.[tt]{1} <> None &&
+   proj (RO_dh_random.FRO.m.[tt]{1}) = (Dist.O.x,Dist.O.y,Dist.O.z){2} &&
    LDDH_Hyb2.O.i{1} = Dist.O.i{2} &&
    LDDH_Hyb2.O.c{1} = Dist.O.c{2})).
 fun.
@@ -565,8 +635,130 @@ if. smt.
 if. smt.
 wp. rnd. skip. smt.
 if. smt.
-inline RO_dh_real.FRO.query.
+inline RO_dh_random.FRO.query.
 wp. skip. smt.
 wp. rnd. skip. smt. skip. smt. skip. smt.
 qed.
 
+
+
+lemma Eq_LDDH_Hyb_i_plus_one_DDH_random(A <: LDDH_DISTINGUISHER
+                                             {FRO_random,LDDH_Hyb2,Dist}):
+  forall (i: int) &m1 &m2,
+    Pr[ LDDH_Hyb(A).main((i+1)) @ &m1: res ]
+  = Pr[ DDH_distr_random(Dist(A)).main(i) @ &m2 : res ].
+proof strict.
+  intros=> i &m1 &m2.
+  cut -> :    Pr[ LDDH_Hyb(A).main((i+1)) @ &m1: res ]
+            = Pr[ LDDH_Hyb2(A, LRO_real).main((i+1)) @ &m1 : res ].
+  by equiv_deno (Eq_Hyb_Hyb2_real A).
+  cut -> :
+      Pr[ LDDH_Hyb2(A, LRO_real).main((i+1)) @ &m1 : res ]
+    = Pr[ LDDH_Hyb2(A, LRO_random).main(i) @ &m1 : res ].
+  by equiv_deno (Eq_Hyb2_Lazy_real_Hyb2_Lazy_random A).
+  cut -> :
+      Pr[ LDDH_Hyb2(A, LRO_random).main(i) @ &m1 : res ]
+    = Pr[ RO_dh_random.G(LRO_random, User_LDDH_Hyb2(A)).main(i) @ &m1 : res ].
+  by equiv_deno (Eq_random_Hyb2_Lazy_G_App_Lazy A).
+  cut -> :
+     Pr[ RO_dh_random.G(LRO_random, User_LDDH_Hyb2(A)).main(i) @ &m1 : res ]
+   = Pr[ RO_dh_random.G(FRO_random, User_LDDH_Hyb2(A)).main(i) @ &m1 : res ].
+  by equiv_deno (Eq_random_G_App_Lazy_G_App_Fixed A).
+  cut -> :
+     Pr[ RO_dh_random.G(FRO_random, User_LDDH_Hyb2(A)).main(i) @ &m1 : res ]
+   = Pr[ LDDH_Hyb2(A, FRO_random).main(i) @ &m1 : res ].
+  by equiv_deno (Eq_random_G_App_Fixed_Hyb2_Fixed A).
+  by equiv_deno (Eq_LDDH_Hyb2_Fixed_DDH_random A).
+qed.
+
+require import Real.
+
+lemma Step_diff(A <: LDDH_DISTINGUISHER {FRO_random,LDDH_Hyb2,Dist}):
+  forall (i: int) &m1 &m2,
+    `|  Pr[ LDDH_Hyb(A).main(i) @ &m1: res ]
+      - Pr[ LDDH_Hyb(A).main((i+1)) @ &m1: res ] |
+  = `|  Pr[ DDH_distr_real(Dist(A)).main(i) @ &m2 : res ]
+      - Pr[ DDH_distr_random(Dist(A)).main(i) @ &m2 : res ] |.
+proof strict.
+intros=> i &m1 &m2.
+rewrite (Eq_LDDH_Hyb_i_plus_one_DDH_random A i &m1 &m2).
+rewrite (Eq_LDDH_Hyb_i_DDH_real A i &m1 &m2).
+trivial.
+qed.
+
+op sum : int -> int -> (int -> real) -> real.
+
+axiom sum_smaller(from  to : int) (f : int -> real):
+  to < from => sum from to f = 0%r.
+
+axiom sum_step(from to : int) (f : int -> real):
+  to >= from => sum from to f = sum from (to-1) f + f to.
+
+lemma A(A <: LDDH_DISTINGUISHER {FRO_random,LDDH_Hyb2,Dist}):
+  forall &m (i : int), 0 <= i =>
+    `|  Pr[ LDDH_Hyb(A).main(0) @ &m : res ]
+      - Pr[ LDDH_Hyb(A).main(i) @ &m : res ] |
+     <= sum 0 (i-1)
+              (lambda j,
+                `|  Pr[ DDH_distr_real(Dist(A)).main(j) @ &m : res ]
+                  - Pr[ DDH_distr_random(Dist(A)).main(j) @ &m : res ] |).
+proof strict.
+intros=> &m.
+apply (Int.Induction.induction
+         (lambda i, 
+            `|  Pr[ LDDH_Hyb(A).main(0) @ &m: res ]
+              - Pr[ LDDH_Hyb(A).main(i) @ &m: res ] |
+          <= sum 0 (i-1)
+                 (lambda j,
+                   `|  Pr[ DDH_distr_real(Dist(A)).main(j) @ &m: res ]
+                     - Pr[ DDH_distr_random(Dist(A)).main(j) @ &m: res ] |)) _ _).
+simplify.
+rewrite sum_smaller. smt.
+smt.
+simplify.
+intros=> i i_leq_z Hyp.
+cut H:
+`|Pr[LDDH_Hyb(A).main(0) @ &m : res] -
+  Pr[LDDH_Hyb(A).main((i + 1)) @ &m : res]|
+ <=
+`|Pr[LDDH_Hyb(A).main(0) @ &m : res] -
+  Pr[LDDH_Hyb(A).main(i) @ &m : res]|
+ + `|Pr[LDDH_Hyb(A).main(i) @ &m : res] -
+    Pr[LDDH_Hyb(A).main((i+1)) @ &m : res]|.
+smt.
+cut G:
+`|Pr[LDDH_Hyb(A).main(0) @ &m : res] -
+  Pr[LDDH_Hyb(A).main(i) @ &m : res]|
+ + `|Pr[LDDH_Hyb(A).main(i) @ &m : res] -
+    Pr[LDDH_Hyb(A).main((i+1)) @ &m : res]|
+<= sum 0 (i + 1 - 1)
+  (lambda (j : int),
+            `|  Pr[ DDH_distr_real(Dist(A)).main(j) @ &m: res ]
+              - Pr[ DDH_distr_random(Dist(A)).main(j) @ &m: res ] |).
+rewrite (_ : i + 1 - 1 = i). smt.
+rewrite sum_step. smt.
+simplify.
+rewrite (Step_diff A i &m &m).
+smt.
+smt.
+qed.
+
+lemma Final(A <: LDDH_DISTINGUISHER {FRO_random,LDDH_Hyb2,Dist}) &m:
+    `|  Pr[ LDDH_real(A).main() @ &m : res ]
+      - Pr[ LDDH_random(A).main() @ &m : res ] |
+     <= sum 0 (q_t-1)
+              (lambda j,
+                `|  Pr[ DDH_distr_real(Dist(A)).main(j) @ &m : res ]
+                  - Pr[ DDH_distr_random(Dist(A)).main(j) @ &m : res ] |).
+proof strict.
+cut ->:   Pr[ LDDH_real(A).main() @ &m : res ]
+        = Pr[ LDDH_Hyb(A).main(0) @ &m : res ].
+apply eq_sym.
+by equiv_deno (Eq_LDDH_Hyb0_real A).
+cut ->:   Pr[ LDDH_random(A).main() @ &m : res ]
+        = Pr[ LDDH_Hyb(A).main(q_t) @ &m : res ].
+apply eq_sym.
+by equiv_deno (DDH1_Hybk A).
+cut H:= A A &m q_t _. smt.
+apply H.
+qed.
