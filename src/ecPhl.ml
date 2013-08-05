@@ -1211,7 +1211,7 @@ let t_bdHoare_wp i g =
 let t_equiv_wp ij g = 
   let env,_,concl = get_goal_e g in
   let es = destr_equivS concl in
-  let i = omap ij fst and j = omap ij snd in
+  let i = omap fst ij and j = omap snd ij in
   let s_hdl,s_wpl = s_split_o "wp" i es.es_sl in
   let s_hdr,s_wpr = s_split_o "wp" j es.es_sr in
   let s_wpl,post = 
@@ -1730,7 +1730,7 @@ let t_kill side cpos olen g =
 let alias_stmt id _ me i =
   match i.i_node with
   | Srnd (lv, e) ->
-      let id       = odfl "x" (omap id EcLocation.unloc) in
+      let id       = odfl "x" (omap EcLocation.unloc id) in
       let ty       = ty_of_lv lv in
       let id       = { v_name = id; v_type = ty; } in
       let (me, id) = _inline_freshen me id in

@@ -13,7 +13,7 @@ op default : to.       (* Default element to return on error by wrapper *)
 (* A signature for random oracles from "from" to "to". *)
 module type Oracle =
 {
-  fun init():unit
+  fun init():unit {*}
   fun o(x:from):to
 }.
 

@@ -164,6 +164,7 @@
 %token CHANGE
 %token CHECKPROOF
 %token CLAIM
+%token CLASS
 %token CLEAR
 %token CLONE
 %token COLON
@@ -274,6 +275,7 @@
 %token SAMPLE
 %token SAVE
 %token SECTION
+%token SELF
 %token SEMICOLON
 %token SEQ
 %token SIMPLIFY
@@ -384,6 +386,7 @@ genqident(X):
 (* -------------------------------------------------------------------- *)
 %inline  qident: x=genqident(_ident) { x };
 %inline uqident: x=genqident(UIDENT) { x };
+%inline lqident: x=genqident(LIDENT) { x };
 
 (* -------------------------------------------------------------------- *)
 %inline _oident:
@@ -887,6 +890,7 @@ pgtybindings:
 
 simpl_type_exp:
 | UNDERSCORE                  { PTunivar       }
+| SELF                        { PTself         }
 | x=qident                    { PTnamed x      }
 | x=tident                    { PTvar x        }
 | tya=type_args x=qident      { PTapp (x, tya) }
@@ -1204,6 +1208,27 @@ dt_ctor_def:
 ;
 
 (* -------------------------------------------------------------------- *)
+(* Type classes                                                         *)
+typeclass:
+| TYPE CLASS x=lident inth=tc_inth? EQ LBRACE body=tc_body RBRACE {
+    { ptc_name = x;
+      ptc_inth = inth;
+      ptc_ops  = fst body;
+      ptc_axs  = snd body; }
+  }
+;
+
+tc_inth:
+| LTCOLON x=lqident { x }
+;
+
+tc_body: ops=tc_op* axs=tc_ax* { (ops, axs) };
+
+tc_op: OP x=lident COLON ty=loc(type_exp) { (x, ty) };
+
+tc_ax: AXIOM ax=form { ax };
+
+(* -------------------------------------------------------------------- *)
 (* Operator definitions                                                 *)
 
 op_tydom:
@@ -1456,10 +1481,10 @@ intro_pattern:
    { IPCase ip }
 
 | o=rwocc? ARROW
-   { IPRw (omap o EcMaps.Sint.of_list, `LtoR) }
+   { IPRw (o |> omap EcMaps.Sint.of_list, `LtoR) }
 
 | o=rwocc? LEFTARROW
-   { IPRw (omap o EcMaps.Sint.of_list, `RtoL) }
+   { IPRw (o |> omap EcMaps.Sint.of_list, `RtoL) }
 
 | LBRACE xs=ident+ RBRACE
    { IPClear xs }
@@ -1528,17 +1553,17 @@ rwarg:
    { RWSimpl }
 
 | s=rwside r=rwrepeat? o=rwocc? fp=fpattern(form)
-    { RWRw (s, r, omap o EcMaps.Sint.of_list, fp) }
+    { RWRw (s, r, o |> omap EcMaps.Sint.of_list, fp) }
 
 | s=rwside r=rwrepeat? o=rwocc? SLASH x=sform_h
     { let loc = EcLocation.make $startpos $endpos in
         if r <> None then
           error loc (Some "delta-repeat not supported");
-        RWDelta (s, omap o EcMaps.Sint.of_list, x); }
+        RWDelta (s, o |> omap EcMaps.Sint.of_list, x); }
 ;
 
 genpattern:
-| o=rwocc? l=sform_h %prec prec_tactic { (omap o EcMaps.Sint.of_list, l) }
+| o=rwocc? l=sform_h %prec prec_tactic { (o |> omap EcMaps.Sint.of_list, l) }
 ;
 
 simplify_arg: 
@@ -1746,7 +1771,7 @@ logtactic:
    { Pcutdef (ip, fp) }
 
 | POSE o=rwocc? x=lident CEQ p=form_h %prec prec_below_IMPL
-   { Ppose (x, omap o EcMaps.Sint.of_list, p) }
+   { Ppose (x, o |> omap EcMaps.Sint.of_list, p) }
 ;
 
 phltactic:
@@ -2182,6 +2207,7 @@ global_:
 | top_mod_decl     { Gdeclare     $1 }
 | sig_def          { Ginterface   $1 }
 | type_decl_or_def { Gtype        $1 }
+| typeclass        { Gtypeclass   $1 }
 | datatype_def     { Gdatatype    $1 }
 | operator         { Goperator    $1 }
 | predicate        { Gpredicate   $1 }

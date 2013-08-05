@@ -150,7 +150,7 @@ module Hinstr = Why3.Hashcons.Make (struct
         EcIdent.fv_union (lv_fv lv) (EcTypes.e_fv e)
     | Scall(olv,f,args) ->
         let ffv = EcPath.x_fv EcIdent.Mid.empty f in
-        let ofv = ofold olv (fun lv s -> EcIdent.fv_union s (lv_fv lv)) ffv in
+        let ofv = olv |> ofold (fun lv s -> EcIdent.fv_union s (lv_fv lv)) ffv in
         List.fold_left
           (fun s a -> EcIdent.fv_union s (EcTypes.e_fv a)) ofv args
     | Sif(e,s1,s2) -> 
@@ -278,7 +278,7 @@ let s_subst (s: EcTypes.e_subst) =
         if lv == lv' && e == e' then i else 
           i_rnd(lv',e')
       | Scall(olv,mp,args) ->
-        let olv' = osmart_map olv lv_subst in
+        let olv' = olv |> osmart_map lv_subst in
         let mp'  = s.EcTypes.es_xp mp in
         let args' = List.smart_map e_subst args in
         if olv == olv' && mp == mp' && args == args' then i else 

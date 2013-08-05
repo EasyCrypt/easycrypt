@@ -170,7 +170,7 @@ let subst_function_def (s : _subst) (def : function_def) =
   let es = e_subst_of_subst s in
   { f_locals = List.map (subst_variable s) def.f_locals;
     f_body   = s_subst es def.f_body;
-    f_ret    = omap def.f_ret (e_subst es);
+    f_ret    =  def.f_ret |> omap (e_subst es);
     f_uses   = subst_fun_uses s def.f_uses; }
 
 (* -------------------------------------------------------------------- *)

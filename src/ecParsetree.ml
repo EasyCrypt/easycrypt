@@ -30,6 +30,7 @@ type pmsymbol = (psymbol * ((pmsymbol located) list) option) list
 
 (* -------------------------------------------------------------------- *)
 type pty_r =
+  | PTself
   | PTunivar
   | PTtuple  of pty list
   | PTnamed  of pqsymbol
@@ -221,6 +222,14 @@ let rec pf_ident f =
   | _ -> None
 
 (* -------------------------------------------------------------------- *)
+type ptypeclass = {
+  ptc_name : psymbol;
+  ptc_inth : pqsymbol option;
+  ptc_ops  : (psymbol * pty) list;
+  ptc_axs  : pformula list;
+}
+
+(* -------------------------------------------------------------------- *)
 type pop_def =
   | POabstr of pty
   | POconcr of ptybindings * pty * pexpr
@@ -327,12 +336,10 @@ type call_info =
    AppNone is required for the rest of judgments 
 *)
 
-
 type p_app_bd_info = 
   | PAppNone 
   | PAppSingle of pformula 
   | PAppMult of (pformula_o * pformula_o * pformula_o * pformula_o * pformula_o)
-
 
 type ('a, 'b, 'c) rnd_tac_info = 
   | PNoRndParams 
@@ -590,6 +597,7 @@ type global =
   | Gaxiom       of paxiom
   | Gclaim       of claim
   | Gtype        of ptydecl
+  | Gtypeclass   of ptypeclass
   | Gdatatype    of pdatatype
   | Gprint       of pprint
   | GthOpen      of psymbol

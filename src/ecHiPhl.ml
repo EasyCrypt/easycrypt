@@ -59,7 +59,7 @@ let process_phl_bd_info dir g bd_info =
     f_true, f1, f2, f_r0, f_r1
     
   | PAppMult(phi,f1,f2,g1,g2) ->
-    let phi = omap_dfl phi f_true (process_phl_formula g) in
+    let phi = phi |> omap_dfl (process_phl_formula g) f_true in
     let check_0 f = 
       if not (f_equal f f_r0) then tacuerror "the formula should be 0%%r" in
     let process_f (f1,f2) = 
@@ -508,7 +508,7 @@ let process_rnd side tac_info g =
         | PSingleRndParam p ->
           PSingleRndParam (fun t -> process_phl_form (tfun t tbool) g p)
         | PMultRndParams ((phi,d1,d2,d3,d4),p) -> 
-          let p t = omap p (process_phl_form (tfun t tbool) g) in
+          let p t = p |> omap (process_phl_form (tfun t tbool) g) in
           let phi = process_phl_form tbool g phi in
           let d1 = process_phl_form treal g d1 in
           let d2 = process_phl_form treal g d2 in
@@ -550,8 +550,8 @@ let process_bdHoare_deno info (_,n as g) =
         "the conclusion is not a suitable Pr expression" in (* FIXME error message *) 
     let _,f,_,event = destr_pr f in
     let penv, qenv = LDecl.hoareF f hyps in
-    let pre  = omap_dfl pre  f_true (fun p -> process_form penv p tbool) in
-    let post = omap_dfl post event  (fun p -> process_form qenv p tbool) in
+    let pre  = pre  |> omap_dfl (fun p -> process_form penv p tbool) f_true in
+    let post = post |> omap_dfl (fun p -> process_form qenv p tbool) event in
     f_bdHoareF pre f post cmp bd 
   in
   let (juc,an), gs = process_mkn_apply (process_cut g) info g in
@@ -572,9 +572,9 @@ let process_equiv_deno info (_,n as g) =
     let _,fl,_,_ = destr_pr f1 in
     let _,fr,_,_ = destr_pr f2 in
     let penv, qenv = LDecl.equivF fl fr hyps in
-    let pre  = omap_dfl pre  f_true (fun p -> process_form penv p tbool) in
+    let pre  = pre |> omap_dfl (fun p -> process_form penv p tbool) f_true in
     (* FIXME: Benjamin : below: put a better default event instead of f_true *)
-    let post = omap_dfl post f_true (fun p -> process_form qenv p tbool) in
+    let post = post |> omap_dfl (fun p -> process_form qenv p tbool) f_true in
     f_equivF pre fl fr post in
   let (juc,an), gs = process_mkn_apply (process_cut g) info g in
   let pre,post =
@@ -633,7 +633,7 @@ let process_conseq notmod info (_, n as g) =
       | None -> None
       | Some (cmp,bd) -> 
         let bd = process_form penv bd treal in
-        let cmp  = omap cmp (function PFHle -> FHle | PFHeq -> FHeq | PFHge -> FHge) in
+        let cmp  = cmp |> omap (function PFHle -> FHle | PFHeq -> FHeq | PFHge -> FHge) in
         Some (cmp,bd) in
     fmake pre post bd
   in
@@ -770,7 +770,7 @@ let process_eqobs_in (geq', ginv, eqs') g =
       let geq = process_form ienv geq' tbool in
       set_loc geq'.pl_loc (toeq mleft mright) geq in
 
-  let ginv = omap_dfl ginv f_true (fun f -> process_form ienv f tbool) in
+  let ginv = ginv |> omap_dfl (fun f -> process_form ienv f tbool) f_true in
   let ifvl = EcPV.PV.fv env ml ginv in
   let ifvr = EcPV.PV.fv env mr ginv in
 

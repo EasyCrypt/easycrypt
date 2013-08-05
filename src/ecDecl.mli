@@ -46,3 +46,9 @@ type axiom = {
 }
 
 val ax_dump : axiom -> dnode
+
+(* -------------------------------------------------------------------- *)
+type typeclass = {
+  tc_ops : (EcIdent.t * EcTypes.ty) list;
+  tc_axs : form list;
+}

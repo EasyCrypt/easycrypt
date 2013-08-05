@@ -182,7 +182,7 @@ module PPEnv = struct
     let msymb =
         (List.map (fun x -> (x, [])) nm)
       @ [(x, List.map (mod_symb ppe) mp.P.m_args)]
-      @ (List.map (fun x -> (x, [])) (odfl [] (omap p2 P.tolist)))
+      @ (List.map (fun x -> (x, [])) (odfl [] (p2 |> omap P.tolist)))
     in
       msymb
 
@@ -337,7 +337,7 @@ let msymbol_of_pv (ppe : PPEnv.t) p =
   let inscope =
     let mem =
       let env = ppe.PPEnv.ppe_env in
-        obind (EcEnv.Memory.get_active env) (EcEnv.Memory.byid^~ env)
+        obind (EcEnv.Memory.byid^~ env) (EcEnv.Memory.get_active env)
     in
     match mem  with
     | None | Some (_, None) -> false
@@ -1433,7 +1433,7 @@ let at n i =
 
 let rec collect2_i i1 i2 : ppnode list =
   let rec doit n =
-    match obind i1 (at n), obind i2 (at n) with
+    match i1 |> obind (at n), i2 |> obind (at n) with
     | None, None -> []
 
     | Some (p1, c1, s1), None -> collect1_i `Left  p1 s1 c1 :: doit (n+1)
@@ -1475,7 +1475,7 @@ let c_split ?width pp x =
   let buf = Buffer.create 127 in
     begin
       let fmt = Format.formatter_of_buffer buf in
-        oiter width (Format.pp_set_margin fmt);
+        width |> oiter (Format.pp_set_margin fmt);
         Format.fprintf fmt "@[<hov 2>%a@]@." pp x
     end;
     Str.split (Str.regexp "\\(\r?\n\\)+") (Buffer.contents buf)
@@ -1531,8 +1531,8 @@ let c_ppnode1 ~width ppe (pp1 : ppnode1) =
 
 let rec c_ppnode ~width ?mem ppe (pps : ppnode list list) =
   let do1 ((p1, p2, c, subs) : ppnode) : cppnode =
-    let p1   = c_ppnode1 ~width (ofold (omap mem fst) ((^~) PPEnv.enter_by_memid) ppe) p1 in
-    let p2   = c_ppnode1 ~width (ofold (omap mem snd) ((^~) PPEnv.enter_by_memid) ppe) p2 in
+    let p1   = c_ppnode1 ~width (mem |> omap fst |> ofold ((^~) PPEnv.enter_by_memid) ppe) p1 in
+    let p2   = c_ppnode1 ~width (mem |> omap snd |> ofold ((^~) PPEnv.enter_by_memid) ppe) p2 in
     let subs = c_ppnode  ~width ?mem ppe subs in
     let c    = match c with `B -> ' ' | `P -> '.' | `Q -> '?' in
       (p1, p2, c, subs)

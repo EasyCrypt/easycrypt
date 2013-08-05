@@ -32,12 +32,14 @@ type mem_error =
 type tyerror =
 | UniVarNotAllowed
 | TypeVarNotAllowed
+| SelfNotAllowed
 | OnlyMonoTypeAllowed
 | UnboundTypeParameter of symbol
 | UnknownTypeName      of qsymbol
 | InvalidTypeAppl      of qsymbol * int * int
 | DuplicatedTyVar
 | DuplicatedLocal      of symbol
+| DuplicatedField      of symbol
 | NonLinearPattern
 | LvNonLinear
 | NonUnitFunWithoutReturn
@@ -73,6 +75,9 @@ type typolicy
 
 val tp_tydecl : typolicy
 val tp_relax  : typolicy
+val tp_tclass : typolicy
+
+val selfname :  EcIdent.t
 
 (* -------------------------------------------------------------------- *)
 val ue_for_decl :
@@ -88,7 +93,7 @@ val transtys :
 
 val transtvi : EcEnv.env -> EcUnify.unienv -> ptyannot -> EcUnify.UniEnv.tvar_inst_kind
 
-val transbinding :  EcEnv.env -> EcUnify.unienv -> ptybindings ->
+val transbinding : EcEnv.env -> EcUnify.unienv -> ptybindings ->
   EcEnv.env * (EcIdent.t * EcTypes.ty) list
 
 (* -------------------------------------------------------------------- *)
@@ -106,6 +111,9 @@ val trans_form_opt : EcEnv.env -> EcUnify.unienv -> pformula -> ty option -> EcF
 val trans_form     : EcEnv.env -> EcUnify.unienv -> pformula -> ty -> EcFol.form
 val trans_prop     : EcEnv.env -> EcUnify.unienv -> pformula -> EcFol.form
 val trans_pattern  : EcEnv.env -> (ptnmap * EcUnify.unienv) -> pformula -> EcFol.form
+
+(* -------------------------------------------------------------------- *)
+val trans_tclass : EcEnv.env -> ptypeclass located -> typeclass
 
 (* -------------------------------------------------------------------- *)
 val transmodsig  : EcEnv.env -> symbol -> pmodule_sig  -> module_sig

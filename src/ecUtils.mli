@@ -14,6 +14,10 @@ val identity : 'a -> 'a
 
 val (^~) : ('a -> 'b -> 'c) -> ('b -> 'a -> 'c)
 val (-|) : ('a -> 'b) -> ('c -> 'a) -> 'c -> 'b
+val (|-) : ('a -> 'b) -> ('c -> 'a) -> 'c -> 'b
+
+val (|>) : 'a -> ('a -> 'b) -> 'b
+val (<|) : ('a -> 'b) -> 'a -> 'b
 
 (* -------------------------------------------------------------------- *)
 val copy : 'a -> 'a
@@ -54,18 +58,18 @@ val none : 'a option
 val some : 'a -> 'a option
 
 (* -------------------------------------------------------------------- *)
-val oiter      : 'a option -> ('a -> unit) -> unit
-val obind      : 'a option -> ('a -> 'b option) -> 'b option
-val ofold      : 'a option -> ('a -> 'b -> 'b) -> 'b -> 'b
-val omap       : 'a option -> ('a -> 'b) -> 'b option
+val oiter      : ('a -> unit) -> 'a option -> unit
+val obind      : ('a -> 'b option) -> 'a option -> 'b option
+val ofold      : ('a -> 'b -> 'b) -> 'b -> 'a option -> 'b
+val omap       : ('a -> 'b) -> 'a option -> 'b option
 val odfl       : 'a -> 'a option -> 'a
 val ofdfl      : (unit -> 'a) -> 'a option -> 'a
 val oget       : 'a option -> 'a
 val oall2      : ('a -> 'b -> bool) -> 'a option -> 'b option -> bool
 val otolist    : 'a option -> 'a list
 val ocompare   : 'a cmp -> 'a option cmp
-val omap_dfl   : 'a option -> 'b -> ('a -> 'b) -> 'b
-val osmart_map : 'a option -> ('a -> 'a) -> 'a option
+val omap_dfl   : ('a -> 'b) -> 'b -> 'a option -> 'b
+val osmart_map : ('a -> 'a) -> 'a option -> 'a option
 
 (* -------------------------------------------------------------------- *)
 module Counter : sig
