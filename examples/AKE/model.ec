@@ -246,10 +246,10 @@ op fresh(t : Sid,  evs : Event list)  =
 axiom Event_no_junk:
   forall (Ev : Event),
        (exists (A : Agent), Ev = StaticRev(A))
-    || (exists (s : PSid), Ev = EphemeralRev(s))
-    || (exists (s : Sid), Ev = SessionRev(s))
-    || (exists (s : Sid), Ev = Accept(s))
-    || (exists (s : PSid), Ev = Start(s)).
+    \/ (exists (s : PSid), Ev = EphemeralRev(s))
+    \/ (exists (s : Sid), Ev = SessionRev(s))
+    \/ (exists (s : Sid), Ev = Accept(s))
+    \/ (exists (s : PSid), Ev = Start(s)).
 
 axiom Event_free1: forall (A : Agent, s : PSid), StaticRev(A) <> EphemeralRev(s).
 axiom Event_free2: forall (A : Agent, s : Sid), StaticRev(A) <> SessionRev(s).
@@ -261,6 +261,9 @@ axiom Event_free7: forall (s1 : PSid, s2 : Sid), Start(s1) <> SessionRev(s2).
 axiom Event_free8: forall (s1 : PSid, s2 : Sid), Start(s1) <> Accept(s2).
 axiom Event_free9: forall (A : Agent, s : PSid), StaticRev(A) <> Start(s).
 axiom Event_free10: forall (s1 s2 : PSid), Start(s1) <> EphemeralRev(s2).
+
+ 
+
 
 axiom StaticRev_inj:    forall (A, B : Agent), 
  StaticRev(A) = StaticRev(B) => A = B.
@@ -291,6 +294,45 @@ axiom qH2_pos : 0 < qH2.
 axiom qSessKR_pos : 0 < qSessKR.
 axiom qEphKR_pos : 0 < qEphKR.
 axiom qAg_pos : 0 < qAg.
+
+
+lemma absurd : forall P Q, !P => P => Q by smt.
+
+lemma not_or_and :
+forall P Q, (! (P \/ Q)) = (! P /\ ! Q) by [].
+
+lemma not_and_or :
+forall P Q, (! (P /\ Q)) = (! P \/ ! Q) by [].
+
+lemma diff_cons : forall (x y : 'a)(xs : 'a list),
+! mem x xs => 
+mem x (y::xs) => y = x by smt.
+
+lemma notfresh_fresh :
+forall t tr e,
+notfresh t tr =>
+!notfresh t (e::tr) =>
+e = Accept (matching t) \/ 
+e = Start (psid_of_sid (matching t)).
+proof.
+ intros => t.
+ elim/tuple5_ind t => t_actor t_peer t_sent t_rcvd role cl tr e hnfresh hfresh.
+ clear cl t.
+ generalize hfresh;rewrite /notfresh /= !not_or_and !not_and_or !not_or_and /=; 
+   progress.
+ generalize hnfresh;rewrite /notfresh /= => [|[|[|[|]]]];first 4 by smt.
+ intros => [hmemacc][] hnmem_or hmem.
+ generalize H3 =>  [hnmem | [[hmem2] hnex |]];first by left;apply (diff_cons _ _ tr).
+ right.
+ generalize hnmem_or => [hnmem2 |].
+ apply (diff_cons _ _ tr) => //.
+ intros => [z] hmemz.
+ cut  abs : (exists (z : Epk),
+           mem (Accept (t_peer, t_actor, t_rcvd, z, ! role)) (e :: tr))
+  by exists z; smt.
+  by smt.
+save.
+
 
 type EId = int.
 
@@ -460,7 +502,7 @@ module AKE : Proto = {
         test <> None => fresh (proj test) evs)) {
       cSess = cSess + 1;
       xesk  = $sample_esk;
-      x' = h2(proj (mSk.[A]),xesk);
+     x' = h2(proj (mSk.[A]),xesk);
       xepk = gen_epk(x');
       mStarted.[i] = (A,B,xesk,x',init);
       r = Some(xepk);
