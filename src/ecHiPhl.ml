@@ -11,6 +11,7 @@ open EcReduction
 open EcBaseLogic
 open EcLogic
 open EcHiLogic
+open EcCorePhl
 open EcPhl
 
 module TT = EcTyping
