@@ -52,6 +52,7 @@ clone import AWord as HTag with
   type word <- htag,
   op length <- k1.
 op sample_htag = HTag.Dword.dword.
+axiom htagL: mu sample_htag cpTrue = 1%r.
 
 (* Output of G *)
 type gtag.
@@ -59,6 +60,7 @@ clone import AWord as GTag with
   type word <- gtag,
   op length = kg.
 op sample_gtag = GTag.Dword.dword.
+axiom gtagL: mu sample_gtag cpTrue = 1%r.
 
 (* Output of G2 [G1 produces an HTag] *)
 type g2tag.
@@ -72,7 +74,7 @@ op sample_plain: signature distr. (* Whereby we sample only with the first byte/
 (** Instantiating *)
 require PKS.
 require OW.
-require RandOrcl.
+require RandomOracle.
 
 clone export OW as RSA with
   type t <- signature,
@@ -85,12 +87,12 @@ clone export OW as RSA with
         finv_rng_sub_f_dom by smt,
         f_dom_sample_t by smt.
 
-clone export RandOrcl as Ht with
+clone export RandomOracle as Ht with
   type from <- message,
   type to <- htag,
   op dsample <- sample_htag.
 
-clone export RandOrcl as Gt with
+clone export RandomOracle as Gt with
   type from <- htag,
   type to <- gtag,
   op dsample <- sample_gtag.
@@ -103,12 +105,9 @@ clone export PKS as PKSi with
 
 (*** Defining PSS *)
 module PSS(G:Gt.Oracle,H:Ht.Oracle): Scheme = {
-  module G' = Gt.WRO_Set.ARO(G)
-  module H' = Ht.WRO_Set.ARO(H)
-
   fun init(): unit = {
-    H'.init();
-    G'.init();
+    G.init();
+    H.init();
   }
 
   fun g1(x:htag):salt = {
@@ -180,40 +179,23 @@ module type CMA_2RO(G:Gt.ARO,H:Ht.ARO,S:AdvOracles) = {
 }.
 
 section.
-declare module G:Gt.Oracle {EF_CMA.WrapEF,Gt.WRO_Set.ARO,Ht.WRO_Set.ARO}.
+declare module G:Gt.Oracle {EF_CMA.WrapEF}.
+axiom correct_G: mu sample_gtag cpTrue = 1%r =>
+  equiv [Gt.Correct(G).call2 ~ Gt.Correct(G).call1: ={glob G, x} ==> ={glob G} /\ res{1} = (res,res){2}].
+local module CorrectG = Correct(G).
 
-module Correct_G(G:Gt.Oracle) = {
-  fun call2(x:htag): gtag * gtag = {
-    var g, g':gtag;
-    g = G.o(x);
-    g' = G.o(x);
-    return (g,g');
-  }
+declare module H:Ht.Oracle {EF_CMA.WrapEF,G}.
 
-  fun call1(x:htag): gtag = {
-    var g:gtag;
-    g = G.o(x);
-    return g;
-  } 
-}.
-axiom correct_G: equiv [Correct_G(G).call2 ~ Correct_G(G).call1: ={x, glob G} ==> ={glob G} /\ res{1} = (res,res){2}].
-
-declare module H:Ht.Oracle {EF_CMA.WrapEF,Ht.WRO_Set.ARO,Gt.WRO_Set.ARO(G)}.
-
-declare module Adv:CMA_2RO {Gt.WRO_Set.ARO(G),Ht.WRO_Set.ARO(H),EF_CMA.WrapEF(PSS(G,H))}.
+declare module Adv:CMA_2RO {G,H,EF_CMA.WrapEF(PSS(G,H))}.
 axiom AdvL (G<:Gt.Oracle) (H<:Ht.Oracle):
   islossless G.o => islossless H.o =>
-  islossless Adv(Gt.WRO_Set.ARO(G),Ht.WRO_Set.ARO(H),EF_CMA.WrapEF(PSS(G,H))).forge.
+  islossless Adv(G,H,EF_CMA.WrapEF(PSS(G,H))).forge.
 
 (* Folding in the two calls to G *)
-module PSS'(G:Gt.Oracle,H:Ht.Oracle): Scheme = {
-  module G2 = Correct_G(G)
-  module G' = Gt.WRO_Set.ARO(G)
-  module H' = Ht.WRO_Set.ARO(H)
-
+local module PSS'(G:Gt.Oracle,H:Ht.Oracle): Scheme = {
   fun init(): unit = {
-    H'.init();
-    G'.init();
+    G.init();
+    H.init();
   }
 
   (* Keygen: make it a wrapped pop *)
@@ -235,7 +217,7 @@ module PSS'(G:Gt.Oracle,H:Ht.Oracle): Scheme = {
 
     r = $sample_salt;
     w  = H.o(m || (to_bits r));
-    (g,g') = G2.call2(w);
+    (g,g') = CorrectG.call2(w);
     rMask = Salt.from_bits (sub (to_bits g) 0 k0);
     maskedR = rMask ^ r;
     gamma  = G2Tag.from_bits (sub (to_bits g') k0 kg2);
@@ -261,7 +243,7 @@ module PSS'(G:Gt.Oracle,H:Ht.Oracle): Scheme = {
     w = HTag.from_bits (sub (to_bits y) 1 k1);
     maskedR = Salt.from_bits (sub (to_bits y) (k1 + 1) k0);
     gamma = G2Tag.from_bits (sub (to_bits y) (k1 + k0 + 1) kg2);
-    (g,g') = G2.call2(w);
+    (g,g') = CorrectG.call2(w);
     rMask  = Salt.from_bits (sub (to_bits g) 0 k0);
     r = rMask ^ maskedR;
     w'  = H.o(m || to_bits r);
@@ -271,8 +253,8 @@ module PSS'(G:Gt.Oracle,H:Ht.Oracle): Scheme = {
 }.
 
 local equiv PSS_PSS':
-  PKSi.EF_CMA.EF_CMA(EF_CMA.WrapEF(PSS(G,H)),Adv(Gt.WRO_Set.ARO(G),Ht.WRO_Set.ARO(H))).main ~
-  PKSi.EF_CMA.EF_CMA(EF_CMA.WrapEF(PSS'(G,H)),Adv(Gt.WRO_Set.ARO(G),Ht.WRO_Set.ARO(H))).main:
+  PKSi.EF_CMA.EF_CMA(EF_CMA.WrapEF(PSS(G,H)),Adv(G,H)).main ~
+  PKSi.EF_CMA.EF_CMA(EF_CMA.WrapEF(PSS'(G,H)),Adv(G,H)).main:
   ={glob Adv} ==> ={res}.
 proof.
 fun.
@@ -280,27 +262,23 @@ call (_: ={EF_CMA.WrapEF.qs, m} ==> ={res});
   first by fun; wp.
 call (_: ={glob H, glob G, EF_CMA.WrapEF.pk, m, s} ==> ={res});
   first by fun; call (_: ={glob H, glob G, EF_CMA.WrapEF.pk, pk, m, s} ==> ={res})=> //;
-             fun; inline PSS(G,H).g1 PSS(G,H).g2 PSS'(G,H).G2.call2;
+             fun; inline PSS(G,H).g1 PSS(G,H).g2 CorrectG.call2;
                   swap{1} 11 -4; swap{1} 12 -3; eqobs_in; wp; eqobs_in.
-call (_: ={glob H, glob G, glob EF_CMA.WrapEF, glob Gt.WRO_Set.ARO, glob Ht.WRO_Set.ARO}).
+call (_: ={glob H, glob G, glob EF_CMA.WrapEF}).
   fun; call (_: ={glob H, glob G, EF_CMA.WrapEF.sk, sk, m} ==> ={glob H, glob G, EF_CMA.WrapEF.sk, res});
     last by wp.
-    fun; inline PSS(G,H).g1 PSS(G,H).g2 PSS'(G,H).G2.call2;
+    fun; inline PSS(G,H).g1 PSS(G,H).g2 CorrectG.call2;
          swap{1} 7 -3; swap{1} 8 -2; eqobs_in; wp; eqobs_in.
-  by fun; eqobs_in.
-  by fun; eqobs_in.
-call (_: true ==> ={glob Ht.WRO_Set.ARO(H), glob Gt.WRO_Set.ARO(G), glob EF_CMA.WrapEF, res})=> //.
+  by fun (={glob G, glob EF_CMA.WrapEF}).
+  by fun (={glob H, glob EF_CMA.WrapEF}).
+call (_: true ==> ={glob H, glob G, glob EF_CMA.WrapEF, res})=> //.
   by fun; eqobs_in.
 qed.
 
-module PSS''(G:Gt.Oracle,H:Ht.Oracle): Scheme = {
-  module G2 = Correct_G(G)
-  module G' = Gt.WRO_Set.ARO(G)
-  module H' = Ht.WRO_Set.ARO(H)
-
+local module PSS''(G:Gt.Oracle,H:Ht.Oracle): Scheme = {
   fun init(): unit = {
-    H'.init();
-    G'.init();
+    G.init();
+    H.init();
   }
 
   (* Keygen: make it a wrapped pop *)
@@ -322,7 +300,7 @@ module PSS''(G:Gt.Oracle,H:Ht.Oracle): Scheme = {
 
     r = $sample_salt;
     w  = H.o(m || (to_bits r));
-    g = G2.call1(w);
+    g = CorrectG.call1(w);
     rMask = Salt.from_bits (sub (to_bits g) 0 k0);
     maskedR = rMask ^ r;
     gamma  = G2Tag.from_bits (sub (to_bits g) k0 kg2);
@@ -348,7 +326,7 @@ module PSS''(G:Gt.Oracle,H:Ht.Oracle): Scheme = {
     w = HTag.from_bits (sub (to_bits y) 1 k1);
     maskedR = Salt.from_bits (sub (to_bits y) (k1 + 1) k0);
     gamma = G2Tag.from_bits (sub (to_bits y) (k1 + k0 + 1) kg2);
-    g = G2.call1(w);
+    g = CorrectG.call1(w);
     rMask  = Salt.from_bits (sub (to_bits g) 0 k0);
     r = rMask ^ maskedR;
     w'  = H.o(m || to_bits r);
@@ -358,30 +336,30 @@ module PSS''(G:Gt.Oracle,H:Ht.Oracle): Scheme = {
 }.
 
 local equiv PSS'_PSS'':
-  PKSi.EF_CMA.EF_CMA(EF_CMA.WrapEF(PSS'(G,H)),Adv(Gt.WRO_Set.ARO(G),Ht.WRO_Set.ARO(H))).main ~
-  PKSi.EF_CMA.EF_CMA(EF_CMA.WrapEF(PSS''(G,H)),Adv(Gt.WRO_Set.ARO(G),Ht.WRO_Set.ARO(H))).main:
+  PKSi.EF_CMA.EF_CMA(EF_CMA.WrapEF(PSS'(G,H)),Adv(G,H)).main ~
+  PKSi.EF_CMA.EF_CMA(EF_CMA.WrapEF(PSS''(G,H)),Adv(G,H)).main:
   ={glob Adv} ==> ={res}.
 proof.
-fun.
+fun;
 call (_: ={EF_CMA.WrapEF.qs, m} ==> ={res});
   first by fun; wp.
 call (_: ={glob H, glob G, EF_CMA.WrapEF.pk, m, s} ==> ={res});
   first by fun; call (_: ={glob H, glob G, EF_CMA.WrapEF.pk, pk, m, s} ==> ={res})=> //;
-             fun; eqobs_in; call correct_G; wp.
-call (_: ={glob H, glob G, glob EF_CMA.WrapEF, glob Gt.WRO_Set.ARO, glob Ht.WRO_Set.ARO}).
+             fun; eqobs_in; (call (correct_G _); first by apply gtagL); wp.
+call (_: ={glob H, glob G, glob EF_CMA.WrapEF}).
   fun; call (_: ={glob H, glob G, EF_CMA.WrapEF.sk, sk, m} ==> ={glob H, glob G, EF_CMA.WrapEF.sk, res});
     last by wp.
-    fun; eqobs_in; call correct_G; wp;
+    fun; eqobs_in; (call (correct_G _); first by apply gtagL); wp;
     call (_: ={glob H, x} ==> ={glob H, res});
       first by fun (true).
     by rnd.
-  by fun; eqobs_in.
-  by fun; eqobs_in.
-call (_: true ==> ={glob Ht.WRO_Set.ARO(H), glob Gt.WRO_Set.ARO(G), glob EF_CMA.WrapEF, res})=> //;
+  by fun (={glob G, glob EF_CMA.WrapEF}).
+  by fun (={glob H, glob EF_CMA.WrapEF}).
+call (_: true ==> ={glob H, glob G, glob EF_CMA.WrapEF, res})=> //;
   by fun; eqobs_in.
 qed.
 
-(** EF-CMA security of PSS *)
+(** Back to the real proof *)
 (* A CMA adversary with access to two random oracles *)
 module type PartialOracles(G:Gt.Oracle,H:Ht.Oracle) = {
   fun init(): pkey
@@ -390,17 +368,14 @@ module type PartialOracles(G:Gt.Oracle,H:Ht.Oracle) = {
 }.
 
 local module G0o(G:Gt.Oracle,H:Ht.Oracle): PartialOracles(G H) = {
-  module G' = Gt.WRO_Set.ARO(G)
-  module H' = Ht.WRO_Set.ARO(H)
-
   var pk:pkey
   var sk:skey
 
   var qs:message set
 
   fun init(): pkey = {
-    H'.init();
-    G'.init();
+    G.init();
+    H.init();
     qs = empty;
     (pk,sk) = $keypairs;
     return pk;
@@ -433,7 +408,7 @@ local module G0o(G:Gt.Oracle,H:Ht.Oracle): PartialOracles(G H) = {
 
 local module G0(G:Gt.Oracle,H:Ht.Oracle,O:PartialOracles,A:CMA_2RO) = {
   module O = O(G,H)
-  module A = A(Gt.WRO_Set.ARO(G),Ht.WRO_Set.ARO(H),O)
+  module A = A(G,H,O)
 
   fun main(): bool = {
     var pk:pkey;
@@ -490,7 +465,7 @@ local lemma PSS''_G0_sign:
     ={m,glob G, glob H} /\ EF_CMA.WrapEF.qs{1} = G0o.qs{2} /\ EF_CMA.WrapEF.sk{1} = G0o.sk{2} ==>
     ={glob G,glob H, res} /\ EF_CMA.WrapEF.qs{1} = G0o.qs{2} /\ EF_CMA.WrapEF.sk{1} = G0o.sk{2}].
 proof.
-fun; inline PSS''(G,H).sign PSS''(G,H).G2.call1.
+fun; inline PSS''(G,H).sign CorrectG.call1.
 seq 12 8: (={glob G, glob H, y} /\
            EF_CMA.WrapEF.qs{1} = G0o.qs{2} /\
            EF_CMA.WrapEF.sk{1} = G0o.sk{2} /\
@@ -499,53 +474,55 @@ seq 12 8: (={glob G, glob H, y} /\
   by wp.
 qed.
 
-local module PSS_G' = PSS''(G,H).G'.
-local module PSS_H' = PSS''(G,H).H'.
-local module G0_G' = G0o(G,H).G'.
-local module G0_H' = G0o(G,H).H'.
-
 local module PSSo'' = EF_CMA.WrapEF(PSS''(G,H)).
 
 local equiv PSS''_G0_init: PSSo''.init ~ G0o(G,H).init:
   true ==>
-  ={res} /\
+  ={glob G, glob H, res} /\
   PSSo''.qs{1} = G0o.qs{2} /\
-  (glob PSS_G'){1} = (glob G0_G'){2} /\
-  (glob PSS_H'){1} = (glob G0_H'){2} /\
   PSSo''.pk{1} = G0o.pk{2} /\
   PSSo''.sk{1} = G0o.sk{2} /\
   G0o.pk{2} = res{2}.
 proof.
-fun. inline PSS''(G,H).init PSS''(G,H).keygen PSS(G,H).init.
+fun; inline PSS''(G,H).init PSS''(G,H).keygen PSS(G,H).init.
 wp; rnd; wp.
-seq 2 2: ((glob PSS_G'){1} = (glob G0_G'){2} /\
-          (glob PSS_H'){1} = (glob G0_H'){2})=> //.
-call (_: true ==> (glob PSS_G'){1} = (glob G0_G'){2})=> //;
-  first by fun; wp; call (_: true ==> ={glob G})=> //; fun (true)=> //.
-call (_: true ==> (glob PSS_H'){1} = (glob G0_H'){2})=> //;
-  first by fun; wp; call (_: true ==> ={glob H})=> //; fun (true)=> //.
+seq 2 2: (={glob G, glob H})=> //.
+call (_: true ==> ={glob H})=> //;
+  first by fun (true).
+call (_: true ==> ={glob G})=> //;
+  first by fun (true).
 qed.
 
-local lemma PSS''_G0:
-  equiv [PKSi.EF_CMA.EF_CMA(PSSo'',Adv(Gt.WRO_Set.ARO(G),Ht.WRO_Set.ARO(H))).main ~
-         G0(G,H,G0o,Adv).main:
-           ={glob Adv} ==> ={res}].
+(** We really *really* **really** want to be able to prove PSS_G0
+    in one step, which requires being able to use correct_G to discharge
+    an objective of the form:
+
+
+    pre: x{1} = w{2} /\ x0{1} = w{2}
+
+    g = G.o(x)                       (1)  g = G.o(x)
+    g' = G.o(x0)                     (2)
+
+    post: (g,g'){1} = (g,g){2} *)
+local equiv PSS''_G0:
+  PKSi.EF_CMA.EF_CMA(PSSo'',Adv(G,H)).main ~ G0(G,H,G0o,Adv).main:
+    ={glob Adv} ==> ={res}.
 proof.
 fun;
 call PSS''_G0_fresh.
-seq 2 2: (={glob Gt.WRO_Set.ARO(G), glob Ht.WRO_Set.ARO(H), m, s} /\
+seq 2 2: (={glob G, glob H, m, s} /\
           EF_CMA.WrapEF.qs{1} = G0o.qs{2} /\
           EF_CMA.WrapEF.pk{1} = G0o.pk{2} /\
           G0o.pk{2} = pk{2}).
-  call (_: ={glob Gt.WRO_Set.ARO(G), glob Ht.WRO_Set.ARO(H)} /\
+  call (_: ={glob G, glob H} /\
            EF_CMA.WrapEF.qs{1} = G0o.qs{2} /\
            EF_CMA.WrapEF.pk{1} = G0o.pk{2} /\
            EF_CMA.WrapEF.sk{1} = G0o.sk{2}).
     by conseq* PSS''_G0_sign.
-    by fun; eqobs_in.
-    by fun; eqobs_in.
+    by conseq* (_: ={glob H, x} ==> ={glob H, res})=> //; fun (true).
+    by conseq* (_: ={glob G, x} ==> ={glob G, res})=> //; fun (true).
   by call PSS''_G0_init.
-inline EF_CMA.WrapEF(PSS''(G,H)).verify PSS''(G,H).verify PSS''(G,H).G2.call1.
+inline EF_CMA.WrapEF(PSS''(G,H)).verify PSS''(G,H).verify CorrectG.call1.
 conseq * (_: ={glob H, glob G, m, s} /\ EF_CMA.WrapEF.pk{1} = G0o.pk{2} /\ G0o.pk{2} = pk{2} ==>
              ={glob H, glob G, forged} /\ EF_CMA.WrapEF.pk{1} = G0o.pk{2})=> //.
 wp.
@@ -557,6 +534,85 @@ call (_: ={glob G, x} ==> ={glob G, res});
 by wp; skip.
 qed.
 
+(** First real proof step *)
+local module G2o(G:Gt.Oracle,H:Ht.Oracle): PartialOracles(G H) = {
+  var pk:pkey
+  var sk:skey
+
+  var qs:message set
+
+  fun init(): pkey = {
+    G.init();
+    H.init();
+    qs = empty;
+    (pk,sk) = $keypairs;
+    return pk;
+  }
+
+  fun sign(m:message): signature = {
+    var r:salt;
+    var g:gtag;
+    var rMask:salt;
+    var maskedR:salt;
+    var w:htag;
+    var gamma:g2tag;
+    var y:signature;
+
+    qs = add m qs;
+    r = $sample_salt;
+    w  = H.o(m || (to_bits r));
+    g = G.o(w);
+    rMask  = Salt.from_bits (sub (to_bits g) 0 k0);
+    maskedR = rMask ^ r;
+    gamma  = G2Tag.from_bits (sub (to_bits g) k0 kg2);
+    y = Signature.from_bits (zeros 1 || (to_bits w) || (to_bits maskedR) || (to_bits gamma));
+    return finv sk y;
+  } 
+
+  fun fresh(m:message): bool = {
+    return !mem m qs;
+  }
+}.
+
+local module G2(G:Gt.Oracle,H:Ht.Oracle,O:PartialOracles,A:CMA_2RO) = {
+  module O = O(G,H)
+  module A = A(G,H,O)
+
+  fun main(): bool = {
+    var pk:pkey;
+    var m:message;
+    var s:signature;
+    var y:signature;
+    var w:htag;
+    var w':htag;
+    var g:gtag;
+    var maskedR:salt;
+    var gamma:g2tag;
+    var gamma':g2tag;
+    var rMask:salt;
+    var r:salt;
+    var forged, fresh:bool;
+
+    pk = O.init();
+    (m,s) = A.forge(pk);
+
+    y = (f pk s);
+    forged = (sub (to_bits y) 0 1 <> zeros 1);
+    w = HTag.from_bits (sub (to_bits y) 1 k1);
+    maskedR = Salt.from_bits (sub (to_bits y) (k1 + 1) k0);
+    gamma = G2Tag.from_bits (sub (to_bits y) (k1 + k0 + 1) kg2);
+    g = G.o(w);
+    rMask  = Salt.from_bits (sub (to_bits g) 0 k0);
+    r = rMask ^ maskedR;
+    w'  = H.o(m || to_bits r);
+    gamma'  = G2Tag.from_bits (sub (to_bits g) k0 kg2);
+    forged =  w = w' /\ gamma = gamma' /\ !forged;
+
+    fresh = O.fresh(m);
+    return forged /\ fresh;
+  }
+}.
+
 (* PROOF GOES HERE *)
 
 
@@ -565,12 +621,12 @@ qed.
    PSS_CMA(A(G',H')).main returning true. *)
 declare module I:Inverter.
 local lemma local_conclusion &m:
-  Pr[PKSi.EF_CMA.EF_CMA(PSSo,Adv(Gt.WRO_Set.ARO(G),Ht.WRO_Set.ARO(H))).main() @ &m: res] <= Pr[RSA.OW(I).main() @ &m: res].
+  Pr[PKSi.EF_CMA.EF_CMA(PSSo,Adv(G,H)).main() @ &m: res] <= Pr[RSA.OW(I).main() @ &m: res].
 admit.
 qed.
 
 lemma conclusion &m: exists (I<:Inverter),
-  Pr[PKSi.EF_CMA.EF_CMA(PKSi.EF_CMA.WrapEF(PSS(G,H)),Adv(Gt.WRO_Set.ARO(G),Ht.WRO_Set.ARO(H))).main() @ &m: res] <= Pr[RSA.OW(I).main() @ &m: res].
+  Pr[PKSi.EF_CMA.EF_CMA(PKSi.EF_CMA.WrapEF(PSS(G,H)),Adv(G,H)).main() @ &m: res] <= Pr[RSA.OW(I).main() @ &m: res].
 proof.
 exists I; apply (local_conclusion &m).
 qed.
