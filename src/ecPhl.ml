@@ -2213,14 +2213,6 @@ let t_equiv_swap side p1 p2 p3 g =
   prove_goal_by [concl] (RN_hl_swap(Some side,p1,p2,p3)) g
     
 (* -------------------------------------------------------------------- *)
-
-let s_first_if s = 
-  match s.s_node with
-  | [] -> cannot_apply "if" "the first instruction should be a if"
-  | i::_ -> 
-    try destr_if i with Not_found -> 
-      cannot_apply "if" "the first instruction should be a if"
-
 let t_gen_cond side e g =
   let hyps = get_hyps g in
   let m1,m2,h,h1,h2 = match LDecl.fresh_ids hyps ["&m";"&m";"_";"_";"_"] with
@@ -2242,13 +2234,13 @@ let t_gen_cond side e g =
 let t_hoare_cond g = 
   let concl = get_concl g in
   let hs = destr_hoareS concl in 
-  let (e,_,_) = s_first_if hs.hs_s in
+  let (e,_,_) = fst (s_first_if "if" hs.hs_s) in
   t_gen_cond None (form_of_expr (EcMemory.memory hs.hs_m) e) g
 
 let t_bdHoare_cond g = 
   let concl = get_concl g in
   let bhs = destr_bdHoareS concl in 
-  let (e,_,_) = s_first_if bhs.bhs_s in
+  let (e,_,_) = fst (s_first_if "if" bhs.bhs_s) in
   t_gen_cond None (form_of_expr (EcMemory.memory bhs.bhs_m) e) g
 
 let rec t_equiv_cond side g =
@@ -2258,15 +2250,15 @@ let rec t_equiv_cond side g =
   | Some s ->
     let e = 
       if s then 
-        let (e,_,_) = s_first_if es.es_sl in
+        let (e,_,_) = fst (s_first_if "if" es.es_sl) in
         form_of_expr (EcMemory.memory es.es_ml) e
       else
-        let (e,_,_) = s_first_if es.es_sr in
+        let (e,_,_) = fst (s_first_if "if" es.es_sr) in
         form_of_expr (EcMemory.memory es.es_mr) e in
     t_gen_cond side e g
   | None -> 
-      let el,_,_ = s_first_if es.es_sl in
-      let er,_,_ = s_first_if es.es_sr in
+      let el,_,_ = fst (s_first_if "if" es.es_sl) in
+      let er,_,_ = fst (s_first_if "if" es.es_sr) in
       let el = form_of_expr (EcMemory.memory es.es_ml) el in
       let er = form_of_expr (EcMemory.memory es.es_mr) er in
       let fiff = gen_mems [es.es_ml;es.es_mr] (f_imp es.es_pr (f_iff el er)) in
