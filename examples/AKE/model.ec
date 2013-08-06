@@ -1,5 +1,6 @@
+require import Bool.
 require import Int.
-require import Word.
+require import AWord.
 require import FSet.
 require import Map. 
 require import List.
@@ -23,7 +24,7 @@ type Session_string. (* Input to hash to compute session string *)
 
 const k : int.
 
-clone import Word as Key with op length <- k.
+clone import AWord as Key with op length <- k.
 
 type Key = Key.word.
 
@@ -1216,7 +1217,7 @@ call
    intros => &2 h; fun; sp; if => //.
    inline AKE.computeKey AKE.h1.  
    sp; if => //; wp => //. 
-    by rnd; try wp => //; rewrite -Word.Dword.lossless;smt.
+    by rnd; try wp => //; rewrite -AWord.Dword.lossless;smt.
 
    (* sessionReveal preserves bad on the right *)
    intros => &1; fun; sp; if => //; wp => //.

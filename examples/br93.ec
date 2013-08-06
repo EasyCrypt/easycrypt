@@ -6,7 +6,7 @@ require import Int.
 require import Distr.
 require import Bool.
 require import Real.
-require import Word.
+require import AWord.
 
 
 op k : int. (* size of message *)
@@ -17,9 +17,9 @@ axiom sizes : k + l = n.
 
 op qH : int. (* bound on adversary calls to hash H *)
 
-clone Word as Plaintext with op length = k.
-clone Word as Ciphertext with op length = n.
-clone Word as Randomness with op length = l.
+clone AWord as Plaintext with op length = k.
+clone AWord as Ciphertext with op length = n.
+clone AWord as Randomness with op length = l.
 
 type plaintext = Plaintext.word.
 type ciphertext = Ciphertext.word.
@@ -88,8 +88,8 @@ module CPA(S : Scheme, A_ : Adv) = {
  } 
 }.
 
-op (||) (x : randomness, y : plaintext) : ciphertext =
- Ciphertext.from_array ((to_array x) || (to_array y)).
+op (||) (x:randomness) (y:plaintext):ciphertext =
+ Ciphertext.from_bits ((to_bits x) || (to_bits y)).
 
 
 module M = {
@@ -107,7 +107,7 @@ module BR(R : Oracle) : Scheme(R) = {
   var h : plaintext;
   M.r = $uniform_rand; 
   h  = R.o(M.r);
-  return ((f pk M.r) ||   m ^^ h);
+  return ((f pk M.r) ||   m ^ h);
  }
 }.
 
@@ -135,10 +135,10 @@ lemma eq1_enc :
 !in_dom M.r{2} RO.m{2} => (={res} /\ eq_except RO.m{1} RO.m{2} M.r{2}) ].
 proof.
  fun;inline RO.o.
- wp;rnd ((^^) m{1}) ((^^) m{1}).
+ wp;rnd ((^) m{1}) ((^) m{1}).
  wp;rnd;skip;progress => //;first 2 by smt.
- by rewrite Plaintext.xor_assoc Plaintext.xor_nilpotent;smt.
- by rewrite Plaintext.xor_assoc Plaintext.xor_nilpotent;smt.
+ by rewrite Plaintext.xorwA Plaintext.xorwK;smt.
+ by rewrite Plaintext.xorwA Plaintext.xorwK;smt.
  by smt.
  by smt.
 save.
