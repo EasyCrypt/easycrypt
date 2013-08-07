@@ -12,79 +12,9 @@ open EcPV
 open EcLogic
 open EcModules
 open EcMetaProg
+open EcCorePhl
 
 module Zpr = EcMetaProg.Zipper
-
-
-(* -------------------------------------------------------------------- *)
-let s_first destr_i error s =
-  match s.s_node with
-  | [] -> error ()
-  | i :: r ->
-    try destr_i i, stmt r
-    with Not_found -> error ()
-
-let s_fst error s =
-  match s.s_node with
-  | [] -> error ()
-  | x :: _ -> x 
-
-let s_firsts destr_i error sl sr =
-  let hl,tl = s_first destr_i error sl in
-  let hr,tr = s_first destr_i error sr in
-  hl,hr,tl,tr
-
-let first_error si st () = 
-  cannot_apply st ("the first instruction should be a"^si)
-
-let s_first_asgn    st = s_first  destr_asgn   (first_error " asgn" st)
-let s_first_asgns   st = s_firsts destr_asgn   (first_error " asgn" st)
-let s_first_rnd     st = s_first  destr_rnd    (first_error " rnd" st)
-let s_first_rnds    st = s_firsts destr_rnd    (first_error " rnd" st)
-let s_first_call    st = s_first  destr_call   (first_error " call" st)
-let s_first_calls   st = s_firsts destr_call   (first_error " call" st)
-let s_first_if      st = s_first  destr_if     (first_error "n if" st)
-let s_first_ifs     st = s_firsts destr_if     (first_error "n if" st)
-let s_first_while   st = s_first  destr_while  (first_error " while" st)
-let s_first_whiles  st = s_firsts destr_while  (first_error " while" st)
-let s_first_assert  st = s_first  destr_assert (first_error "n assert" st)
-let s_first_asserts st = s_firsts destr_assert (first_error "n assert" st)
-
-let s_tail error s =
-  match s.s_node with
-  | [] -> error ()
-  | _ :: r -> stmt r
-
-let s_tails error sl sr =
-  match (sl.s_node, sr.s_node) with
-  | (_ :: xs, _ :: ys) -> (stmt xs,stmt ys)
-  | _ -> error ()
-
-let s_last destr_i error s =
-  match List.rev s.s_node with
-  | [] -> error ()
-  | i :: r ->
-    try destr_i i, rstmt r 
-    with Not_found -> error ()
-
-let s_lasts destr_i error sl sr =
-  let hl,tl = s_last destr_i error sl in
-  let hr,tr = s_last destr_i error sr in
-  hl,hr,tl,tr
-
-let last_error si st () = 
-  cannot_apply st ("the last instruction should be a"^si)
-
-let s_last_rnd     st = s_last  destr_rnd    (last_error " rnd" st)
-let s_last_rnds    st = s_lasts destr_rnd    (last_error " rnd" st)
-let s_last_call    st = s_last  destr_call   (last_error " call" st)
-let s_last_calls   st = s_lasts destr_call   (last_error " call" st)
-let s_last_if      st = s_last  destr_if     (last_error "n if" st)
-let s_last_ifs     st = s_lasts destr_if     (last_error "n if" st)
-let s_last_while   st = s_last  destr_while  (last_error " while" st)
-let s_last_whiles  st = s_lasts destr_while  (last_error " while" st)
-let s_last_assert  st = s_last  destr_assert (last_error "n assert" st)
-let s_last_asserts st = s_lasts destr_assert (last_error "n assert" st)
 
 (* -------------------------------------------------------------------- *)
 (* -------------------------------  Wp -------------------------------- *)
@@ -2283,14 +2213,6 @@ let t_equiv_swap side p1 p2 p3 g =
   prove_goal_by [concl] (RN_hl_swap(Some side,p1,p2,p3)) g
     
 (* -------------------------------------------------------------------- *)
-
-let s_first_if s = 
-  match s.s_node with
-  | [] -> cannot_apply "if" "the first instruction should be a if"
-  | i::_ -> 
-    try destr_if i with Not_found -> 
-      cannot_apply "if" "the first instruction should be a if"
-
 let t_gen_cond side e g =
   let hyps = get_hyps g in
   let m1,m2,h,h1,h2 = match LDecl.fresh_ids hyps ["&m";"&m";"_";"_";"_"] with
@@ -2312,13 +2234,13 @@ let t_gen_cond side e g =
 let t_hoare_cond g = 
   let concl = get_concl g in
   let hs = destr_hoareS concl in 
-  let (e,_,_) = s_first_if hs.hs_s in
+  let (e,_,_) = fst (s_first_if "if" hs.hs_s) in
   t_gen_cond None (form_of_expr (EcMemory.memory hs.hs_m) e) g
 
 let t_bdHoare_cond g = 
   let concl = get_concl g in
   let bhs = destr_bdHoareS concl in 
-  let (e,_,_) = s_first_if bhs.bhs_s in
+  let (e,_,_) = fst (s_first_if "if" bhs.bhs_s) in
   t_gen_cond None (form_of_expr (EcMemory.memory bhs.bhs_m) e) g
 
 let rec t_equiv_cond side g =
@@ -2328,15 +2250,15 @@ let rec t_equiv_cond side g =
   | Some s ->
     let e = 
       if s then 
-        let (e,_,_) = s_first_if es.es_sl in
+        let (e,_,_) = fst (s_first_if "if" es.es_sl) in
         form_of_expr (EcMemory.memory es.es_ml) e
       else
-        let (e,_,_) = s_first_if es.es_sr in
+        let (e,_,_) = fst (s_first_if "if" es.es_sr) in
         form_of_expr (EcMemory.memory es.es_mr) e in
     t_gen_cond side e g
   | None -> 
-      let el,_,_ = s_first_if es.es_sl in
-      let er,_,_ = s_first_if es.es_sr in
+      let el,_,_ = fst (s_first_if "if" es.es_sl) in
+      let er,_,_ = fst (s_first_if "if" es.es_sr) in
       let el = form_of_expr (EcMemory.memory es.es_ml) el in
       let er = form_of_expr (EcMemory.memory es.es_mr) er in
       let fiff = gen_mems [es.es_ml;es.es_mr] (f_imp es.es_pr (f_iff el er)) in
@@ -3073,9 +2995,8 @@ let t_sp_aux side g =
         with EcBaseLogic.TacError _ ->
           tacuerror "Unexpected goal"
   in
-  let pr,stmt = 
-    let l   = s_fst err stmt in
-    let ls  = s_tail err stmt in
+  let pr,stmt =
+    let (l, ls) =  match stmt.s_node with [] -> err () | i::s -> (i, EcModules.stmt s) in
     let pr  = sp_inst m env menv pre (l.i_node) in
     pr,ls
   in

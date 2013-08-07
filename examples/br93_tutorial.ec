@@ -5,7 +5,7 @@ require import Distr.
 require import Bool.
 require import Real.
 require import Pair.
-require import Word.
+require import AWord.
 require import Array.
 
 (** begin bitstrings *)
@@ -18,9 +18,9 @@ axiom l_pos : 0 <= l.
 
 axiom sizes : k + l = n.
 
-clone import Word as Plaintext with op length = k.
-clone import Word as Ciphertext with op length = n.
-clone import Word as Randomness with op length = l.
+clone import AWord as Plaintext with op length = k.
+clone import AWord as Ciphertext with op length = n.
+clone import AWord as Randomness with op length = l.
 
 type plaintext = Plaintext.word.
 type ciphertext = Ciphertext.word.
@@ -124,15 +124,15 @@ module OW(I :Inverter) ={
 (** end scheme *) 
 
 op (||) (x : randomness, y : plaintext) : ciphertext =
- Ciphertext.from_array ((to_array x) || (to_array y)).
+ Ciphertext.from_bits ((to_bits x) || (to_bits y)).
 
 op projRand(c : ciphertext) : randomness =
- Randomness.from_array (sub (to_array c) 0 l).
+ Randomness.from_bits (sub (to_bits c) 0 l).
 
 op projPlain(c : ciphertext) : plaintext =
- Plaintext.from_array (sub (to_array c) l k).
+ Plaintext.from_bits (sub (to_bits c) l k).
 
-lemma projRand_eq : forall (c : ciphertext, i : int),
+(*lemma projRand_eq : forall (c : ciphertext, i : int),
  0 <= i => i < l => (projRand c).[i] = c.[i].
 proof.
  intros c i Hgz Hlel.
@@ -143,7 +143,7 @@ lemma projPlain_eq : forall (c : ciphertext, i : int),
 proof.
  intros c i Hgz Hlel;
  delta; simplify; smt.
-qed.
+qed.*)
 lemma projRand_c : forall (r : randomness,p : plaintext),
 projRand((r || p)) = r by [].
 
@@ -153,24 +153,13 @@ projPlain((r || p)) = p by [].
 lemma proj_merge : forall(c : ciphertext),
 (projRand c || projPlain c) = c.
 proof.
- intros c.
- apply Ciphertext.extensionality.
- delta Ciphertext.(==)(||);simplify.
- intros i Hpos Hle.
- rewrite (Ciphertext.from_array_get
-     (Array.(||) (to_array (projRand c)) (Plaintext.to_array (projPlain c))) i _ _ _); progress;trivial;first smt.
- elim (append_get<:bool> (to_array (projRand c)) 
-             (Plaintext.to_array (projPlain c)) i).
- intros H1 H2.
- case (i<l);intros H3;first smt.
- rewrite H2; first 2 smt.
- cut ->: (to_array (projPlain c)).[i - length (to_array (projRand c))] =
-           (projPlain c).[i - length (to_array (projRand c))]; first smt.
- cut ->: length (to_array (projRand c)) = l; first smt.
- rewrite projPlain_eq=> //; first 2 smt.
+intros=> c; rewrite /((||) (projRand c) (projPlain c)).
+rewrite /projRand Randomness.pcan_to_from; first by smt.
+rewrite /projPlain Plaintext.pcan_to_from; first by smt.
+rewrite app_sub ?Ciphertext.can_from_to //;
+last 3 by smt.
 qed.
- 
-
+  
 (** begin br93 *)
 module BR(R : Oracle) : Scheme(R)= {
  var r : randomness
@@ -184,13 +173,13 @@ module BR(R : Oracle) : Scheme(R)= {
   var h : plaintext;
   r = $uniform_rand; 
   h  = R.o(r);
-  return (f pk r ||   m ^^ h);
+  return (f pk r ||   m ^ h);
  }
  
  fun dec(sk:skey, c : ciphertext) : plaintext option = {
   var h : plaintext;
   h = R.o(finv sk (projRand c));
-  return (Some (projPlain c ^^ h));
+  return (Some (projPlain c ^ h));
  }
 }.
 (** end br93 *)
@@ -219,12 +208,12 @@ proof.
   by generalize H5;rewrite !projPlain_c !projRand_c !(finvof x1 x2 r) //;smt.
   
   rewrite !projPlain_c !projRand_c !(finvof x1 x2 r);first by smt. 
-  by rewrite -Plaintext.xor_assoc Plaintext.xor_nilpotent;smt.
+  by rewrite -Plaintext.xorwA Plaintext.xorwK;smt.
 
   by generalize H5;rewrite !projPlain_c !projRand_c !(finvof x1 x2 r) //;smt.
 
   rewrite !projPlain_c !projRand_c !(finvof x1 x2 r);first by smt. 
-  by rewrite -Plaintext.xor_assoc Plaintext.xor_nilpotent;smt.
+  by rewrite -Plaintext.xorwA Plaintext.xorwK; smt.
 qed.
 
 
@@ -281,13 +270,13 @@ local module BR2(R : Oracle) : Scheme(R)= {
   var h : plaintext;
   r = $uniform_rand; 
   h  = $uniform_plain;
-  return (f pk r ||   m ^^ h);
+  return (f pk r ||   m ^ h);
  }
  
  fun dec(sk:skey, c : ciphertext) : plaintext option = {
   var h : plaintext;
   h = R.o(finv sk (projRand c));
-  return Some (projPlain c ^^ h);
+  return Some (projPlain c ^ h);
  }
 }.
 (** end br2 *)
@@ -381,7 +370,7 @@ local module BR3(R : Oracle) : Scheme(R)= {
  fun dec(sk:skey, c : ciphertext) : plaintext option = {
   var h : plaintext;
   h = R.o(finv sk (projRand c));
-  return Some (projPlain c ^^ h);
+  return Some (projPlain c ^ h);
  }
 }.
 (** end br3 *)
@@ -393,7 +382,7 @@ BR2(RO).enc ~ BR3(RO).enc :
 ={res,RO.m} /\ BR2.r{1} = BR3.r{2}.
 proof.
   fun.
-  rnd (lambda v, m{2} ^^ v); rnd.
+  rnd (lambda v, m{2} ^ v); rnd.
   by skip;progress => //;rewrite ?Plaintext.xor_assoc;smt.
 qed.
 (** end eq2enc *)

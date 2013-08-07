@@ -1,5 +1,5 @@
 require import Int.
-require import Word.
+require import AWord.
 require import FSet.
 require import Map.
 require import Real.
@@ -13,7 +13,7 @@ axiom q_pos : 0 <= q.
 axiom Leq : q < 2 ^ l.
 
 
-clone Word as Block with op length = l.
+clone AWord as Block with op length = l.
 
 (* require Monoid. *)
 (* clone Monoid as MInt with *)

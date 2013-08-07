@@ -50,6 +50,15 @@ axiom length_sub (a:bitstring) (s l:int):
   0 <= s => 0 <= l => s + l <= `|a| =>
   `|sub a s l| = l.
 
+axiom sub_app_fst (b1 b2:bitstring):
+  sub (b1 || b2) 0 `|b1| = b1.
+axiom sub_app_snt (b1 b2:bitstring):
+  sub (b1 || b2) `|b1| `|b2| = b2.
+
+axiom app_sub (b:bitstring) l1 l2:
+  0 <= l1 => 0 <= l2 => l1 + l2 = `|b| =>
+  ((sub b 0 l1) || (sub b l1 l2)) = b.
+
 theory DBitstring.
   require import Distr.
 
