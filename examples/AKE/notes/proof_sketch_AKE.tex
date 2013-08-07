@@ -31,6 +31,7 @@
 \newcommand{\sid}{\mathit{sid}}
 \newcommand{\agent}{\mathit{agent}}
 \newcommand{\epk}{\mathit{epk}}
+\newcommand{\esk}{\mathit{esk}}
 
 % session data
 \newcommand{\actor}[1]{#1_{\mathit{actor}}}
@@ -38,7 +39,7 @@
 \newcommand{\peer}[1]{#1_{\mathit{peer}}}
 \newcommand{\sent}[1]{#1_{\mathit{sent}}}
 \newcommand{\rcvd}[1]{#1_{\mathit{rcvd}}}
-\newcommand{\isfresh}{\mathit{fresh}}
+\newcommand{\fresh}{\mathit{fresh}}
 
 \section{The eCK model}
 
@@ -71,18 +72,18 @@ The following events can occur in the trace and correspond roughly to oracle que
 
 
 \begin{definition}
-We say a test session $t$ is fresh with respect to a trace $\tr$ (written $\isfresh(\tr, t)$)
+We say a test session $t$ is fresh with respect to a trace $\tr$ (written $\fresh(\tr, t)$)
   unless one of the following statements hold:
 \begin{enumerate}
 \item $\SessionRev(t) \in \tr$.
 \item $\EphemeralRev(t) \in \tr \land \StaticRev(\actor{t}) \in \tr$.
-\item $\SessionRev(s) \in \tr$.
-\item $\StaticRev(\peer{t}) \in \tr \land (\EphemeralRev(p(t)) \lor \neg \HasMatching(\tr, t))$.
+\item $\SessionRev(t^*) \in \tr$.
+\item $\StaticRev(\peer{t}) \in \tr \land (\EphemeralRev(p(t^*)) \in \tr \lor \neg \HasMatching(\tr, t))$.
 \end{enumerate}
 where
 \[
-  \HasMatching(\tr, t)) = \Accept(t^*) \in \tr\; \lor\; (\Start(p(t^*)) \in \tr
-    \land \neg (\exists Y.\, \Accept(c(p(t^*),Y))))
+  \HasMatching(\tr, t)) = (\Accept(t^*) \in \tr\; \lor\; (\Start(p(t^*)) \in \tr
+    \land \neg (\exists Y.\, \Accept(c(p(t^*),Y)))))
 \]
 \end{definition}
 
@@ -95,6 +96,9 @@ Note that this intuition is not excactly captured if there are collisions, e.g.,
   with the same session id $s=p(t^*)$ have been started and one has been completed to $s' \neq t^*$,
   then $\HasMatching(\tr, t)$ is false, but the second session with session id $s$ can
   still be completed to~$t^*$. 
+
+\newcommand{\Ake}{\mathsf{AKE}}
+\newcommand{\Ev}[1]{\mathit{Ev}_{#1}}
 
 \section{Initial Game $AKE$ and winning condition}
 
@@ -112,12 +116,76 @@ They do not enforce freshness.
 
 We want to prove an upper bound on
 \[
-  Pr[Ake : \isfresh(t, \tr) \land b = b'].
+  Pr[\Ake : \fresh(t, \tr) \land b = b'].
 \]
 
-\newcommand{\Ake}{\mathsf{AKE}}
-\newcommand{\Ev}[1]{\mathit{Ev}_{#1}}
-\newcommand{\fresh}{\mathit{fresh}}
+\subsection{No collisions of ephemeral secret keys}
+
+Bound probability of collisions in sampling ephemeral secret keys:
+\begin{align*}
+  & Pr[\Ake : \fresh(t, \tr) \land b = b'] \\
+  \leq{}&   Pr[\Ake : \fresh(t, \tr) \land b = b' \land \neg collision]
+          + Pr[\Ake : collision]
+\end{align*}
+
+
+\subsection{No $H_1$ guessing of ephemeral secret keys by adversary}
+
+Change $H_1^A$ to
+
+\begin{verbatim}
+H1A(a,x) =
+res = None
+if (exists psinfo in mstarted. EphemeralRev(public(psinfo)) notin tr
+                               /\ esk(psinfo) = x) {
+  bad = true
+} else {
+  < normal code >
+}
+return res
+\end{verbatim}
+%
+Guess $i_{sess}$ which is $eid$ of the given session, and $i_{H_1}$ which is critical
+  hash query.
+%
+Where is $x$ used
+\begin{itemize}
+\item in $Init_1$ (forget $Resp$)
+\item used in H1A
+\end{itemize}
+
+\section{Choices for up-to failure steps}
+
+For
+
+\[
+  Pr[G_1 : A] \leq Pr[G_2 : A \land \neg F] + Pr[G_2 : F]
+\]
+%
+it suffices to show that
+\[
+  Pr[G_1 : A \land \neg F] \leq Pr[G_2 : A \land \neg F]
+\]
+and
+ \[
+   Pr[G_1 : F] \leq Pr[G_2 : F].
+ \]
+%
+Or we can even directly prove an equiv of the form
+\begin{verbatim}
+  G_1 ~ G_2 : true ==> A<1> => (F \/ (A /\ !F})<2>
+\end{verbatim}
+which implies the first inequality.
+
+Alternatively, we can conclude that
+\[
+  Pr[G_1 : A] \leq Pr[G_2 : A \land \neg F] + Pr[G_1 : A \land F]
+\]
+%
+if we can show that
+\[
+  Pr[G_1 : A \land \neg F] \leq Pr[G_2 : A \land \neg F].
+\]
 
 \end{document}
 
