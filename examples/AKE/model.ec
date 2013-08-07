@@ -308,7 +308,7 @@ lemma diff_cons : forall (x y : 'a)(xs : 'a list),
 ! mem x xs => 
 mem x (y::xs) => y = x by smt.
 
-lemma notfresh_fresh :
+lemma notfresh_fresh_ev :
 forall t tr e,
 notfresh t tr =>
 !notfresh t (e::tr) =>
@@ -333,6 +333,12 @@ proof.
   by smt.
 save.
 
+lemma notfresh_fresh :
+forall t tr e, 
+  e <> Accept (matching t) => 
+  e <> Start (psid_of_sid (matching t)) =>
+  notfresh t tr =>
+notfresh t (e::tr) by smt.
 
 type EId = int.
 
