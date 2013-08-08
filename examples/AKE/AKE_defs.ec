@@ -1,0 +1,325 @@
+require import Bool.
+require import Int.
+require import AWord.
+require import FSet.
+require import Map. 
+require import List.
+require import Distr.
+require import Real.
+
+(* {{{ Basic types and operations for protocol messages *)
+type Sk.  (* static secret keys: a,b, .. *)
+type Pk.  (* static public keys: A, B, .. *)
+
+type Esk. (* ephemeral secret key: x, y, *)
+type Epk. (* ephemeral public key: X, y *)
+
+type Eexp. (* ephemeral exponent: \tilde{x}=h(x,a) for NAXOS-style protocols *)
+
+type Agent = Pk.     (* for now, we identify agents and public keys *)
+type Sstring.        (* Input to hash H_2 to compute session key *)
+
+const key_len : int.
+clone import AWord as Key with op length <- key_len.
+type Key = Key.word.
+
+(* {{{ Define univ_type and sampling operators *)
+op univ_Sk : Sk set.
+axiom univ_Sk_all_mem : forall (x : Sk), mem x univ_Sk.
+op sample_Sk = Duni.duni univ_Sk.
+
+op univ_Esk : Esk set.
+axiom univ_Esk_all_mem : forall (x : Esk), mem x univ_Esk.
+op sample_Esk = Duni.duni univ_Esk.
+
+op univ_Eexp : Eexp set.
+axiom univ_Eexp_all_mem : forall (x : Eexp), mem x univ_Eexp.
+op sample_Eexp = Duni.duni univ_Eexp.
+
+op univ_Key : Key set.
+axiom univ_Key_all_mem : forall (x : Key), mem x univ_Key.
+op sample_Key = Dword.dword.
+(* }}} *)
+
+op gen_pk : Sk -> Pk.
+op gen_epk : Eexp -> Epk.
+op gen_sstring_init : Eexp -> Sk -> Pk -> Epk -> Sstring.
+op gen_sstring_resp : Eexp -> Sk -> Pk -> Epk -> Sstring.
+
+(* }}} *)
+
+(* {{{ Basic types and operations for protocol sessions *)
+
+(* type role = Init | Resp *)
+type Role = bool.
+
+const init : bool = true.
+const resp : bool = false.
+
+op gen_sstring (x' : Eexp, a : Sk, B : Pk, Y : Epk, r : Role) = 
+  if r then gen_sstring_init x' a B Y else gen_sstring_resp x' a B Y.
+
+(* Session-id for completed session *)
+type Sid = (Agent * Agent * Epk * Epk * Role).
+
+(* {{{ Accessors for Sid *)
+op sid_actor(sid : Sid) = let (A,B,X,Y,r) = sid in A.
+op sid_peer(sid : Sid) = let (A,B,X,Y,r) = sid in B.
+op sid_sent(sid : Sid) = let (A,B,X,Y,r) = sid in X.
+op sid_rcvd(sid : Sid) = let (A,B,X,Y,r) = sid in Y.
+op sid_role(sid : Sid) = let (A,B,X,Y,r) = sid in r.
+(* }}} *)
+
+(* Session-id for incomplete session *)
+type Psid = (Agent * Agent * Epk * Role).
+
+(* {{{ Accessors for PSid *)
+op psid_actor(psid : Psid) = let (A,B,X,r) = psid in A.
+op psid_peer(psid : Psid) = let (A,B,X,r) = psid in B.
+op psid_sent(psid : Psid) = let (A,B,X,r) = psid in X.
+op psid_role(psid : Psid) = let (A,B,X,r) = psid in r.
+(* }}} *)
+
+op psid_of_sid(sid : Sid) =  let (A,B,X,Y,r) = sid in (A,B,X,r).
+
+(* (Private) data of incomplete session *)
+type Sdata = (Agent * Agent * Esk * Eexp * Role).
+
+(* {{{ Accessors for PSid *)
+op sd_actor(sdata : Sdata) = let (A,B,x,x',r) = sdata in A.
+op sd_peer(sdata : Sdata)  = let (A,B,x,x',r) = sdata in B.
+op sd_eexp(sdata : Sdata)  = let (A,B,x,x',r) = sdata in x'.
+op sd_esk(sdata : Sdata)   = let (A,B,x,x',r) = sdata in x.
+op sd_role(sdata : Sdata)  = let (A,B,x,x',r) = sdata in r.
+(* }}} *)
+
+op psid_of_sdata(sdata : Sdata) =
+  let (A,B,x,x',r) = sdata in (A,B,gen_epk(x'),r).
+
+op sid_of_sdata(sdata : Sdata, Y : Epk) =
+  let (A,B,x,x',r) = sdata in (A,B,gen_epk(x'),Y,r).
+
+(* Strong partnering property *)
+axiom strong_partnering(x', y' : Eexp) (a, b : Sk) (A, B : Pk) (X, Y : Epk) (r1, r2 : Role):
+    gen_sstring x' a B Y r1 = gen_sstring y' b A X r2 <=>
+    ((a = b /\ x' = y' /\ A = B /\ X = Y /\ r1 = r2) \/
+    (A = gen_pk(a) /\ B = gen_pk(b) /\ X = gen_epk(x') /\ Y = gen_epk(y') /\ r1 <> r2)).
+
+(* }}} *)
+
+(* {{{ Events for trace, matching, and freshness *)
+
+(* type Event = StaticRev of Agent 
+              | EphemeralRev of PSid 
+              | SessionRev of Sid 
+              | Start of psid
+              | Accept of Sid *)
+type Event.
+
+op StaticRev : Agent -> Event.
+op EphemeralRev : Psid -> Event.
+op SessionRev : Sid -> Event.
+op Start : Psid -> Event.
+op Accept : Sid -> Event.
+
+(* {{{ Axioms for inductive data type Event *)
+axiom Event_no_junk(Ev : Event):
+     (exists (A : Agent), Ev = StaticRev(A))
+  \/ (exists (s : Psid), Ev = EphemeralRev(s))
+  \/ (exists (s : Sid), Ev = SessionRev(s))
+  \/ (exists (s : Sid), Ev = Accept(s))
+  \/ (exists (s : Psid), Ev = Start(s)).
+
+axiom Event_free1(A : Agent) (s : Psid):  StaticRev(A)     <> EphemeralRev(s).
+axiom Event_free2(A : Agent) (s : Sid):   StaticRev(A)     <> SessionRev(s).
+axiom Event_free3(A : Agent) (s : Psid):  StaticRev(A)     <> Start(s).
+axiom Event_free4(A : Agent) (s : Sid):   StaticRev(A)     <> Accept(s).
+axiom Event_free5(s1 : Psid) (s2 : Sid):  EphemeralRev(s1) <> SessionRev(s2).
+axiom Event_free6(s1 : Psid) (s2 : Psid): EphemeralRev(s1) <> Start(s2).
+axiom Event_free7(s1 : Psid) (s2 : Sid):  EphemeralRev(s1) <> Accept(s2).
+axiom Event_free8(s1 : Sid) (s2 : Psid):  SessionRev(s1)   <> Start(s2).
+axiom Event_free9(s1, s2 : Sid):          SessionRev(s1)   <> Accept(s2).
+axiom Event_free10(s1 : Psid) (s2 : Sid): Start(s1)        <> Accept(s2).
+
+axiom StaticRev_inj(A, B : Agent): StaticRev(A) = StaticRev(B) => A = B.
+
+axiom EphemeralRev_inj(s1, s2 : Psid): EphemeralRev(s1) = EphemeralRev(s2) => s1 = s2.
+
+axiom SessionRev_inj(s1, s2 : Sid): SessionRev(s1) = SessionRev(s2) => s1 = s2.
+
+axiom Start_inj(s1, s2 : Psid): Start(s1) = Start(s2) => s1 = s2.
+
+axiom Accept_inj(s1, s2 : Sid): Accept(s1) = Accept(s2) => s1 = s2.
+(* }}} *)
+
+(* Returns complete matching session of given session *)
+op cmatching(t : Sid) = let (A,B,X,Y,r) = t in (B,A,Y,X,!r).
+
+(* The (completed) session t is fresh if *)
+pred fresh(t : Sid,  evs : Event list) =
+  let (t_actor, t_peer, t_epk, t_recvd, r) = t in
+  let pt = psid_of_sid t in
+  let s = cmatching t in
+  let ps = psid_of_sid s in
+  (* 1. t's session key has not been revealed, and *)
+     !(List.mem (SessionRev t) evs)
+  (* 2. t's ephemeral secret key and static secret key have not been both revealed, and *)
+  /\ !(List.mem (EphemeralRev pt) evs /\ List.mem (StaticRev t_actor) evs)
+  (* 3. the session key of a matching session of t has not been revealed, and *)
+  /\ !(List.mem (SessionRev s) evs)
+  (* 4. If the static secret key of t's peer has been revealed, then *)
+  /\ (   List.mem (StaticRev t_peer) evs
+      =>
+         (  ( (* a) there is a complete matching session, or *)
+                 List.mem (Accept s) evs
+              \/ (* an incomplete matching session *)
+                 (   List.mem (Start ps) evs
+                  /\ !(exists (z : Epk), List.mem (Accept (t_peer,t_actor,t_recvd,z,!r)) evs)))
+          /\ (* b) there is no ephemeral key reveal for a (complete or incomplete) matching session *)
+             !(List.mem (EphemeralRev ps) evs))).
+
+(* {{{ Some properties of notfresh *)
+
+(* The (completed) session t is fresh unless *)
+pred notfresh(t : Sid,  evs : Event list)  =
+  let (t_actor, t_peer, t_epk, t_recvd, r) = t in
+  let pt = psid_of_sid t in
+  let s = cmatching t in
+  let ps = psid_of_sid s in
+  (* 1. t's session key has been revealed, or *)
+     List.mem (SessionRev t) evs
+  (* 2. t's ephemeral secret and static keys have been revealed, or *)
+  \/ (List.mem (EphemeralRev pt) evs /\ List.mem (StaticRev t_actor) evs)
+  (* 3. the session key of a matching session of t has been revealed, or *)
+  \/ List.mem (SessionRev s) evs
+  (* 4. the static key of t's peer has been revealed, and *)
+  \/ (   List.mem (StaticRev t_peer) evs
+      /\ (   (* a) there is no complete matching session, and *)
+             (    !List.mem (Accept s) evs
+              (* no incomplete matching session *)
+              /\  (   !List.mem (Start ps) evs
+                   \/ (exists (z : Epk), List.mem (Accept (t_peer,t_actor,t_recvd,z,!r)) evs)))
+          \/ (* b) there is an ephemeral reveal for a (complete or incomplete) matching session *)
+             List.mem (EphemeralRev ps) evs)).
+
+lemma not_fresh_imp_notfresh(t : Sid) (evs : Event list):
+  !(fresh t evs) => (notfresh t evs) by [].
+
+lemma not_def(P): (P => false) => !P by [].
+
+lemma notfresh_imp_notfresh(t : Sid) (evs : Event list):
+  (notfresh t evs) => !(fresh t evs)
+by (elim /tuple5_ind t; smt).
+
+lemma not_fresh_notfresh(t : Sid) (evs : Event list):
+  (notfresh t evs) => !(fresh t evs) by [].
+
+lemma absurd : forall P Q, !P => P => Q by [].
+
+lemma not_or:
+  forall P Q, (! (P \/ Q)) = (! P /\ ! Q) by [].
+
+lemma not_and:
+  forall P Q, (! (P /\ Q)) = (! P \/ ! Q) by [].
+
+lemma diff_cons(x y : 'a) (xs : 'a list):
+  ! mem x xs =>
+  mem x (y::xs) => y = x by [].
+
+lemma notfresh_fresh_ev(t : Sid) (evs : Event list) (e : Event):
+  notfresh t evs =>
+  fresh t (e::evs) =>
+  e = Accept (cmatching t) \/ 
+  e = Start (psid_of_sid (cmatching t)).
+proof.
+  elim/tuple5_ind t => A B X Y r.
+  intros=> teq hnfresh hfresh. clear teq.
+  generalize hnfresh. rewrite /notfresh /= => hnfresh.
+  generalize hfresh; rewrite /fresh /=. progress.
+  elim hnfresh => {hnfresh}; first smt.
+  intros=> hnfresh. elim hnfresh => {hnfresh}. smt.
+  intros=> hnfresh. elim hnfresh => {hnfresh}. smt.
+  intros=> h.
+  elim h => {h} h1 h2.
+  cut G:= H2 _. smt.
+  elim h2 => {h2} h2; last smt.
+  elim h2 => {h2} Hacc Hst.
+  elim Hst => {Hst} Hst.
+  elim G => hno_match hnoeph.
+  elim hno_match => no_accept.
+  smt. smt.
+  elim G => hno_match hnoeph.
+  elim hno_match => no_accept.
+  smt. smt.
+qed.
+
+lemma notfresh_fresh(t : Sid) (evs : Event list) (e Event):
+  e <> Accept (cmatching t) => 
+  e <> Start (psid_of_sid (cmatching t)) =>
+  notfresh t evs =>
+  notfresh t (e::evs) by smt.
+
+(* {{{ Our definition is stronger than the original NAXOS definition *)
+
+(* The (completed) session t is fresh if *)
+pred fresh_eCK(t : Sid,  evs : Event list)  =
+  let (t_actor, t_peer, t_epk, t_recvd, r) = t in
+  let pt = psid_of_sid t in
+  let s = cmatching t in
+  let ps = psid_of_sid s in
+  (* 1. t's session key has not been revealed, and *)
+     !(List.mem (SessionRev t) evs)
+  (* 2. t's ephemeral secret key and static secret key have not been both revealed, and *)
+  /\ !(List.mem (EphemeralRev pt) evs /\ List.mem (StaticRev t_actor) evs)
+  (* 3. the session key of a matching session of t has not been revealed, and *)
+  /\ !(List.mem (SessionRev s) evs)
+  (* 4. If the static secret key of t's peer has been revealed, then *)
+  /\ (   List.mem (StaticRev t_peer) evs
+      =>
+         (   (* a) there is a complete matching session, or *)
+             List.mem (Accept s) evs
+          /\ (* b) there is no ephemeral key reveal for a (complete or incomplete) matching session *)
+             !(List.mem (EphemeralRev ps) evs))).
+
+lemma fresh_eCK_imp_fresh(t : Sid) (evs : Event list):
+  (fresh_eCK t evs) => (fresh t evs) by [].
+(* }}} *)
+
+(* }}} *)
+
+(* }}} *)
+
+(* {{{ Basic types and definitions for initial AKE game *)
+
+const qSession :     int.
+const qSessionRev :   int.
+const qEphemeralRev : int.
+const qAgent :       int.
+const qH1 :           int.
+const qH2 :           int.
+
+axiom qSession_pos:      0 < qSession.
+axiom qSesssionRev_pos:  0 < qSessionRev.
+axiom qEphemeralRev_pos: 0 < qEphemeralRev.
+axiom qAgent_pos:        0 < qAgent.
+axiom qH1_pos:           0 < qH1.
+axiom qH2_pos:           0 < qH2.
+
+(* Session index: uniquely identifies sessions even in the presence of collisions *)
+type Sidx = int.
+
+module type AKE_Oracles = {
+  fun h1_a(a : Sk, x : Esk) : Eexp option
+  fun h2_a(sstring : Sstring) : Key option
+  fun init1(i : Sidx, A : Agent, B : Agent) : Epk option
+  fun init2(i : Sidx, Y : Epk) : unit
+  fun resp(i : Sidx, B : Agent, A : Agent, X : Epk) : Epk option
+  fun staticRev(A : Agent) : Sk option
+  fun ephemeralRev(i : Sidx) : Esk option
+  fun sessionRev(i : Sidx) : Key option
+}.
+
+module type Adv (O : AKE_Oracles) = {
+  fun choose(s : Pk list) : Sidx
+  fun guess(k : Key option) : bool
+}.
