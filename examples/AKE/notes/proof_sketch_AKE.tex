@@ -17,6 +17,7 @@
 % events
 \newcommand{\StaticRev}{\mathsf{StaticRev}}
 \newcommand{\EphemeralRev}{\mathsf{EphemeralRev}}
+\newcommand{\EexpRev}{\mathsf{EexpRev}}
 \newcommand{\SessionRev}{\mathsf{SessionRev}}
 \newcommand{\Start}{\mathsf{Start}}
 \newcommand{\Accept}{\mathsf{Accept}}
@@ -32,6 +33,7 @@
 \newcommand{\agent}{\mathit{agent}}
 \newcommand{\epk}{\mathit{epk}}
 \newcommand{\esk}{\mathit{esk}}
+\newcommand{\eexp}{\mathit{eexp}}
 
 % session data
 \newcommand{\actor}[1]{#1_{\mathit{actor}}}
@@ -40,6 +42,8 @@
 \newcommand{\sent}[1]{#1_{\mathit{sent}}}
 \newcommand{\rcvd}[1]{#1_{\mathit{rcvd}}}
 \newcommand{\fresh}{\mathit{fresh}}
+
+\mathchardef\mhyphen="2D
 
 \section{The eCK model}
 
@@ -119,40 +123,193 @@ We want to prove an upper bound on
   Pr[\Ake : \fresh(t, \tr) \land b = b'].
 \]
 
-\subsection{No collisions of ephemeral secret keys}
+\newcommand{\eskColl}{\mathit{esk \mhyphen collision}}
+
+\subsection{No collisions between ephemeral secret keys}
 
 Bound probability of collisions in sampling ephemeral secret keys:
 \begin{align*}
   & Pr[\Ake : \fresh(t, \tr) \land b = b'] \\
-  \leq{}&   Pr[\Ake : \fresh(t, \tr) \land b = b' \land \neg collision]
-          + Pr[\Ake : collision]
+  \leq{}&   Pr[\Ake : \fresh(t, \tr) \land b = b' \land \neg \eskColl]
+          + Pr[\Ake : \eskColl] \\
+ \leq{}&   Pr[\Ake : \fresh(t, \tr) \land b = b' \land \neg \eskColl]
+          + (q_{sess} * q_{sess}) / |\esk|
+\end{align*}
+
+\subsection{No collisions between ephemeral secret keys $x$ and prior queries $H_1(*,x)$}
+
+\newcommand{\eskHColl}{\mathit{esk \mhyphen collision_{H_1}}}
+
+We add a bad flag $\eskHColl$ to $\Init$ and $\Resp$ (or common function used by both)
+  and use $\Ake'$ to denote resulting game.
+\begin{align*}
+ &   Pr[\Ake : \fresh(t, \tr) \land b = b' \land \neg \eskColl] \\
+   \leq{}&   Pr[\Ake' : \fresh(t, \tr) \land b = b' \land \neg \eskColl \land \neg \eskHColl] \\
+         & + Pr[\Ake' : \eskHColl] \\
+   \leq{}&   Pr[\Ake' : \fresh(t, \tr) \land b = b' \land \neg \eskColl \land \neg \eskHColl] \\
+         & + (q_{sess} * q_{H_1}) / |\esk|
 \end{align*}
 
 
-\subsection{No $H_1$ guessing of ephemeral secret keys by adversary}
+\subsection{$H_1$ query of existing ephemeral secret key without prior $\EphemeralRev$}
 
-Change $H_1^A$ to
+We first change $H_1^A$ to set the bad flag
 
 \begin{verbatim}
 H1A(a,x) =
-res = None
-if (exists psinfo in mstarted. EphemeralRev(public(psinfo)) notin tr
-                               /\ esk(psinfo) = x) {
-  bad = true
-} else {
+  if (exists psinfo in rng(mstarted).
+        esk(psinfo) = x /\ EphemeralRev(pid(psinfo)) notin tr) {
+    bad = true;
+  }
   < normal code >
-}
-return res
 \end{verbatim}
 %
-Guess $i_{sess}$ which is $eid$ of the given session, and $i_{H_1}$ which is critical
-  hash query.
+and call the resulting game $G_1$.
+Define $G_2$ as the game that is identical to $G_1$ except that it
+  returns $\bot$ in $H_1^A$-queries that set $bad$.
+\begin{align*}
+  &        Pr[\Ake' : \fresh(t, \tr) \land b = b' \land \neg \eskColl \land \neg \eskHColl] \\
+  \leq{}&  Pr[G_1 : \fresh(t, \tr) \land b = b' \land \neg \eskColl \land \neg \eskHColl \land \neg bad] \\
+        &  + Pr[G_1 : \eskColl \land \neg \eskHColl \land bad] \\
+  \leq{}&  Pr[G_2 : \fresh(t, \tr) \land b = b' \land \neg \eskColl \land \neg \eskHColl \land \neg bad] \\
+        &  + Pr[G_1 : \eskColl \land \neg \eskHColl \land bad]
+\end{align*}
 %
-Where is $x$ used
+We then guess the hash query where $bad$ is set as $i_{H_1}$ and
+ the $eid$ of the given session as $i_{sess}$.
+%
+We can now define $G_3$ with the following
+\begin{verbatim}
+H1A(a,x) =
+  if (c = i_H_1 && esk(mstarted[eid])) = x) {
+    bad = true;
+  }
+  < normal code >
+\end{verbatim}
+To bound the probability of $bad$, we want to move the sampling of $esk(mstarted[eid])$
+  to the start of $H_1^A$.
+To achieve this, we modify $\Init$ and $\Resp$ to return a random value $\tilde{x}$ instead
+  of calling $H_1(a,x)$ in the $i_{sess}$ query and call the resulting game $G_3$.
+We can prove that
+\[
+  Pr[G_3 : \eskColl \land \eskHColl \land bad] = Pr[G_3 : \eskColl \land \eskHColl \land bad]
+\]
+%
+  since all $\Init/\Resp$ queries before $i_{sess}$ behave exactly the same,
+  before the $i_{sess}$-query, $(*,x)$ has not been queried (otherwise $\eskColl$ or $\eskHColl$),
+  and so on.
+%
+Now $x$ is first used in the $i_{H_1}$-th query to $H_1^A$ if $bad$ is set (no $\EphemeralRev$ for
+  the given session before.
+We can therefore move the sampling to $H_1^A$ wrapped in \verb+if (c = i_H_1)+.
+Note that we might have to enforce \verb+EphemeralRev(pid(psinfo)) notin tr+ to perform
+  these steps.
+  
+\begin{align*}
+        Pr[G_3 : \eskColl \land \neg \eskHColl \land bad] \leq (q_{sess} * q_{H_1})/ |\eexp|
+\end{align*}
+
+\subsection{Reduction: Replace $H_1^A$ by $\EexpRev$ oracle}
+
+We want to bound
+\[
+  Pr[G_2 : \fresh(t, \tr) \land b = b' \land \neg \eskColl \land \neg \eskHColl \land \neg bad].
+\]
+In all executions for which the event is true, the protocol never queries values already queried
+  by the adversary.
+Furthermore, the adversary only queries values to $H_1^A$ that have been queried by the protocol
+  after revealing the ephemeral keys and he has to know the static secret key $a$ of the
+  sessions actor to achieve this.
+
+\begin{verbatim}
+EexpRev(psid, a) = {
+  res = None;
+  if (compute_pk(a) = pk(psid) && EphemeralRev(psid) in tr) {
+    res = eexp(psid);
+  }
+  return res;
+}
+\end{verbatim}
+%
+In the reduction, we must split the map of $H_1$ and check ourselves using \verb+compute_pk+
+  if we have to call \verb+EexpRev+.
+
+In $\Init$ and $\Resp$, we now sample $\tilde{x}$ ourselves. We exploit here that there are no
+  collisions for $x$.
+
+We let the modified game be $G_3$
+
+\subsection{Collisions for ephemeral exponents $\tilde{x}$}
+
+This should be a simple application of the Failure-event Lemma.
+Absence of ephemeral exponent collisions implies absence of
+  ephemeral public key collisions.
+We can prove that all traces now satisfy.
+
+\noindent
+\fbox{
+\parbox{\linewidth}{
+  {\bf FIXME:} We also have to prevent collisions of $g^{\tilde{x}}$ with
+  ephemeral public keys previously received by other sessions.
+}}
+  
+\subsection{Enforcement of freshness for test session}
+We want to enforce the freshness property for the test session. Let $G_4$ be the same game
+as $G_3$, except that we wrap the oracles Init, Respond, ephRev, sessionRev and staticRev
+with the following code:
+\begin{verbatim}
+e = compute_event
+if (test <> None => fresh(proj(test),e::evs)) {
+	normal code
+}
+\end{verbatim}
+
+$G_3$ and $G_4$ are equivalent  up to not fresh. Since the event we are interested in bounding contains \verb+!fresh(test,evs)+, it is clear that the adversary can only distinguish the two games in a situation where he cannot win. Therefore, we have
+
+\begin{align*}
+Pr[G_3 : fresh(t,tr) \land b = b' \land \neg esk-collision \land \neg esk-collision_{H_1} \land \neg bad] &=&\\
+  Pr[G_4 : fresh(t,tr) \land b = b' \land \neg esk-collision \land \neg esk-collision_{H_1} \land \neg bad] 
+\end{align*}
+
+Note that in order to perform this step, $\neg fresh(t,tr)$ has to be monotonic. This is achieved by the previous steps where possible collisions that may render the test session fresh after it was not fresh are eliminated.
+
+\subsection{Remove hash call from test}
+We define $G_5$ to be exactly the same as $G_4$, except we replace the hash call in the computation of the key for the test session by a randomly sampled value. Clearly $x = H(computestring(proj(test))$ and $x=\$sample_{key} $ are  indistinguishable when the query to the hash is fresh. 
+
+Hence, we have
+
+\begin{align*}
+  Pr[G_4 : fresh(t,tr) \land b = b' \land \neg esk-collision \land \neg esk-collision_{H_1} \land \neg bad]  &\leq&\\ 
+  Pr[G_5 : fresh(t,tr) \land b = b' \land \neg esk-collision \land \neg esk-collision_{H_1} \land \neg bad]  &+&\\
+  Pr[G_5 : computestring(proj(test)) \in dom(H_1) ]. 
+\end{align*}
+
+
+Note that  in $G_5$ a value $x\in dom(H_1)$ iff:
 \begin{itemize}
-\item in $Init_1$ (forget $Resp$)
-\item used in H1A
+\item There is an event keyRev for a session $s$, such that $computestring(s) = x$
+\item $x \in LH1_{A}$
 \end{itemize}
+
+In the case of the session string of the test session the first situation cannot occur: two sessions have the same sesssion string iff they are matching (strong partnering) and querying either the test session or its matching session to keyRev is forbidden by the enforcement of fresh(test,ev).
+
+Therefore, we have
+\begin{align*}
+ Pr[G_5 : computestring(proj(test)) \in dom(H_1) ]  &=& \\
+ Pr[G_5 : computestring(proj(test)) \in LH1_A ].
+\end{align*}
+
+Moreover, note that in game $G_5$, the value supplied to the adversary in the second round does not depend anymore on the bit $b$. Hence, we can move the sampling of $b$ towards the end of the game and show that 
+\[
+  Pr[G_5 : fresh(t,tr) \land b = b' \land \neg esk-collision \land \neg esk-collision_{H_1} \land \neg bad] =
+  \frac{1}{2}
+\]
+
+Putting everything together, we have shown 
+\begin{align*}
+  Pr[G_4 : fresh(t,tr) \land b = b' \land \neg esk-collision \land \neg esk-collision_{H_1} \land \neg bad]  &\leq&\\ 
+\frac{1}{2} +  Pr[G_5 : computestring(proj(test)) \in LH1_A ].
+\end{align*}
 
 \section{Choices for up-to failure steps}
 
@@ -188,8 +345,3 @@ if we can show that
 \]
 
 \end{document}
-
-
-
-
-
