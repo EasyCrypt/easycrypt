@@ -58,11 +58,11 @@ val ty_check_uni : ty -> unit
 
 (* -------------------------------------------------------------------- *)
 type ty_subst = {
-  ts_p   : EcPath.path  -> EcPath.path;
+  ts_p   : EcPath.path -> EcPath.path;
   ts_mp  : EcPath.mpath -> EcPath.mpath;
   ts_def : (EcIdent.t list * ty) EcPath.Mp.t;
-  ts_u   : ty Muid.t;
-  ts_v   : ty Mid.t;
+  ts_u   : EcUidgen.uid -> ty option;
+  ts_v   : EcIdent.t -> ty option;
 }
 
 val ty_subst_id    : ty_subst
@@ -74,7 +74,7 @@ module Tuni : sig
   val subst1    : (uid * ty) -> ty -> ty
   val subst     : ty Muid.t -> ty -> ty
   val subst_dom : ty Muid.t -> dom -> dom
-  val occur     : uid -> ty -> bool
+  val occurs    : uid -> ty -> bool
   val fv        : ty -> Suid.t
 end
 

@@ -9,7 +9,6 @@ open EcTypes
 exception TypeVarCycle of uid * ty
 exception UnificationFailure of ty * ty
 exception UninstanciateUni of uid
-exception DuplicateTvar of EcSymbols.symbol
 
 type unienv = 
     { mutable unival  : ty Muid.t;
@@ -17,7 +16,7 @@ type unienv =
       mutable varval  : EcIdent.t Mstr.t;
       mutable vardecl : EcIdent.t list;
       mutable strict  : bool;
-    } 
+    }
 
 module UniEnv = struct
   type tvar_inst_kind = 
@@ -51,7 +50,7 @@ module UniEnv = struct
     match vd with
     | None -> ue
     | Some l -> List.iter add l; ue.strict <- true; ue
-        
+
   let copy (ue : unienv) =
     { unival  = ue.unival;
       unidecl = ue.unidecl;
@@ -130,7 +129,7 @@ module UniEnv = struct
         let uv = ue.unival in 
         assert (not (Muid.mem id uv));
         let t = Tuni.subst uv t in
-        if Tuni.occur id t then raise (TypeVarCycle (id, t));
+        if Tuni.occurs id t then raise (TypeVarCycle (id, t));
         ue.unival <- 
           Muid.add id t
             (Muid.map (Tuni.subst1 (id, t)) uv)
@@ -148,7 +147,6 @@ module UniEnv = struct
   let asmap ue = ue.unival
 
   let tparams ue = List.rev ue.vardecl
-
 end
 
 (* -------------------------------------------------------------------- *)
@@ -158,10 +156,6 @@ let unify (env : EcEnv.env) (ue : unienv) =
     if ty_equal r1 r2 then ()
     else
       match r1.ty_node, r2.ty_node with
-(*      | Tvar i1, Tvar i2 -> 
-        if not (EcIdent.id_equal i1 i2) then 
-          raise (UnificationFailure (t1, t2)) *)
-            
       | Tunivar id, _ -> UniEnv.bind ue id r2
       | _, Tunivar id -> UniEnv.bind ue id r1
 

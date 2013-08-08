@@ -199,23 +199,23 @@ type ty_subst = {
   ts_p   : EcPath.path -> EcPath.path;
   ts_mp  : EcPath.mpath -> EcPath.mpath;
   ts_def : (EcIdent.t list * ty) EcPath.Mp.t;
-  ts_u   : ty Muid.t;
-  ts_v   : ty Mid.t;
+  ts_u   : EcUidgen.uid -> ty option;
+  ts_v   : EcIdent.t -> ty option;
 }
 
 let ty_subst_id = 
   { ts_p   = identity;
     ts_mp  = identity;
     ts_def = Mp.empty;
-    ts_u   = Muid.empty;
-    ts_v   = Mid.empty; }
+    ts_u   = funnone ;
+    ts_v   = funnone ; }
 
 let is_ty_subst_id s = 
-     s.ts_p == identity
+     s.ts_p  == identity
   && s.ts_mp == identity
+  && s.ts_u  == funnone
+  && s.ts_v  == funnone
   && Mp.is_empty s.ts_def
-  && Muid.is_empty s.ts_u
-  && Mid.is_empty s.ts_v
 
 let rec ty_subst s =
   if is_ty_subst_id s then identity
@@ -223,8 +223,8 @@ let rec ty_subst s =
     Hty.memo_rec 107 (fun aux ty ->
       match ty.ty_node with 
       | Tglob m       -> TySmart.tglob (ty, m) (s.ts_mp m)
-      | Tunivar id    -> odfl ty (Muid.find_opt id s.ts_u) 
-      | Tvar id       -> odfl ty (Mid.find_opt  id s.ts_v)
+      | Tunivar id    -> odfl ty (s.ts_u id)
+      | Tvar id       -> odfl ty (s.ts_v id)
       | Ttuple lty    -> TySmart.ttuple (ty, lty) (List.smart_map aux lty)
       | Tfun (t1, t2) -> TySmart.tfun (ty, (t1, t2)) (aux t1, aux t2)
 
@@ -240,20 +240,20 @@ let rec ty_subst s =
               try  Mid.of_list (List.combine args (List.map aux lty))
               with Failure _ -> assert false
             in
-              ty_subst { ty_subst_id with ts_v = s; } body
+              ty_subst { ty_subst_id with ts_v = Mid.find_opt^~ s; } body
       end)
 
 module Tuni = struct
-  let subst1 ((id, t) : uid * ty) =
-    ty_subst { ty_subst_id with ts_u = Muid.singleton id t }
-        
   let subst (uidmap : ty Muid.t) =
-    ty_subst { ty_subst_id with ts_u = uidmap } 
+    ty_subst { ty_subst_id with ts_u = Muid.find_opt^~ uidmap } 
+
+  let subst1 ((id, t) : uid * ty) =
+    subst (Muid.singleton id t)
 
   let subst_dom uidmap =
     List.map (subst uidmap) 
 
-  let occur u = 
+  let occurs u = 
     let rec aux t = 
       match t.ty_node with
       | Tunivar u' -> uid_equal u u'
@@ -270,11 +270,11 @@ module Tuni = struct
 end
 
 module Tvar = struct 
-  let subst1 (id,t) = 
-    ty_subst { ty_subst_id with ts_v = Mid.singleton id t }
-
   let subst (s : ty Mid.t) =
-    ty_subst { ty_subst_id with ts_v = s }
+    ty_subst { ty_subst_id with ts_v = Mid.find_opt^~ s }
+
+  let subst1 (id,t) = 
+    subst (Mid.singleton id t)
 
   let init lv lt = 
     assert (List.length lv = List.length lt);
@@ -293,11 +293,6 @@ end
 type pvar_kind = 
   | PVglob
   | PVloc 
-
-(* TODO : 
-   make the type private
-   ensure that the m_path does not contain arguments *)
-   
 
 type prog_var = {
   pv_name : EcPath.xpath;

@@ -57,6 +57,8 @@ val opt_equal  : 'a eq -> 'a option eq
 val none : 'a option
 val some : 'a -> 'a option
 
+val funnone : 'a -> 'b option
+
 (* -------------------------------------------------------------------- *)
 val oiter      : ('a -> unit) -> 'a option -> unit
 val obind      : ('a -> 'b option) -> 'a option -> 'b option

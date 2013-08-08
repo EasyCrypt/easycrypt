@@ -77,6 +77,8 @@ let opt_equal (f : 'a -> 'a -> bool) o1 o2 =
 let none = None
 let some = fun x -> Some x
 
+let funnone (_ : 'a) : 'b option = None
+
 let oiter (f : 'a -> unit) (x : 'a option) =
   match x with None -> () | Some x -> f x
 

@@ -1293,7 +1293,7 @@ module Fsubst = struct
     f_subst { f_subst_id with fs_sty = sty; fs_ty = ty_subst sty }
  
   let uni uidmap = 
-    mapty { ty_subst_id with ts_u = uidmap }
+    mapty { ty_subst_id with ts_u = EcUidgen.Muid.find_opt^~ uidmap }
 
   (* ------------------------------------------------------------------ *)  
   let subst_locals s = 
@@ -1308,12 +1308,11 @@ module Fsubst = struct
 
   (* ------------------------------------------------------------------ *)  
   let init_subst_tvar s = 
-    let sty = { ty_subst_id with ts_v = s } in
+    let sty = { ty_subst_id with ts_v = Mid.find_opt^~ s } in
     { f_subst_id with fs_freshen = true; fs_sty = sty; fs_ty = ty_subst sty }
 
   let subst_tvar s = 
-    let sf  = init_subst_tvar s in
-    f_subst sf
+    f_subst (init_subst_tvar s)
 end
 
 let can_subst f = 

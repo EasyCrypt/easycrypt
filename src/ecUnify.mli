@@ -5,13 +5,12 @@ open EcTypes
 (* -------------------------------------------------------------------- *)
 exception TypeVarCycle of uid * ty
 exception UnificationFailure of ty * ty
-exception DuplicateTvar of EcSymbols.symbol
 exception UninstanciateUni of uid
 
 type unienv
 
 module UniEnv : sig
-  type tvar_inst_kind = 
+  type tvar_inst_kind =
     | TVIunamed of ty list
     | TVInamed  of (EcSymbols.symbol * ty) list
 
