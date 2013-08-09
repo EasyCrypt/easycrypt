@@ -7,23 +7,25 @@ require import List.
 require import Distr.
 require import Real.
 
-(* {{{ Basic types and operations for protocol messages *)
-type Sk.  (* static secret keys: a,b, .. *)
-type Pk.  (* static public keys: A, B, .. *)
+(*{ * Basic types and operators for protocol messages *)
 
-type Esk. (* ephemeral secret key: x, y, *)
-type Epk. (* ephemeral public key: X, y *)
+type Sk.         (* static secret keys: a,b, .. *)
+type Pk.         (* static public keys: A, B, .. *)
 
-type Eexp. (* ephemeral exponent: \tilde{x}=h(x,a) for NAXOS-style protocols *)
+type Esk.        (* ephemeral secret key: x, y, *)
+type Epk.        (* ephemeral public key: X, y *)
 
-type Agent = Pk.     (* for now, we identify agents and public keys *)
-type Sstring.        (* Input to hash H_2 to compute session key *)
+type Eexp.       (* ephemeral exponent: \tilde{x}=h(x,a) *)
+
+type Agent = Pk. (* for now, we identify agents and public keys *)
+type Sstring.    (* Input to hash H_2 to compute session key *)
 
 const key_len : int.
-clone import AWord as Key with op length <- key_len.
-type Key = Key.word.
+clone import AWord as TKey with op length <- key_len.
+type Key = TKey.word.
 
-(* {{{ Define univ_type and sampling operators *)
+(*{ ** Define univ_type and sampling operators *)
+
 op univ_Sk : Sk set.
 axiom univ_Sk_all_mem : forall (x : Sk), mem x univ_Sk.
 op sample_Sk = Duni.duni univ_Sk.
@@ -39,16 +41,16 @@ op sample_Eexp = Duni.duni univ_Eexp.
 op univ_Key : Key set.
 axiom univ_Key_all_mem : forall (x : Key), mem x univ_Key.
 op sample_Key = Dword.dword.
-(* }}} *)
+(*} *)
 
 op gen_pk : Sk -> Pk.
 op gen_epk : Eexp -> Epk.
 op gen_sstring_init : Eexp -> Sk -> Pk -> Epk -> Sstring.
 op gen_sstring_resp : Eexp -> Sk -> Pk -> Epk -> Sstring.
 
-(* }}} *)
+(*} *)
 
-(* {{{ Basic types and operations for protocol sessions *)
+(*{ * Basic types and operators for protocol sessions *)
 
 (* type role = Init | Resp *)
 type Role = bool.
@@ -62,36 +64,36 @@ op gen_sstring (x' : Eexp, a : Sk, B : Pk, Y : Epk, r : Role) =
 (* Session-id for completed session *)
 type Sid = (Agent * Agent * Epk * Epk * Role).
 
-(* {{{ Accessors for Sid *)
+(*{ ** Accessors for Sid *)
 op sid_actor(sid : Sid) = let (A,B,X,Y,r) = sid in A.
 op sid_peer(sid : Sid) = let (A,B,X,Y,r) = sid in B.
 op sid_sent(sid : Sid) = let (A,B,X,Y,r) = sid in X.
 op sid_rcvd(sid : Sid) = let (A,B,X,Y,r) = sid in Y.
 op sid_role(sid : Sid) = let (A,B,X,Y,r) = sid in r.
-(* }}} *)
+(*} *)
 
 (* Session-id for incomplete session *)
 type Psid = (Agent * Agent * Epk * Role).
 
-(* {{{ Accessors for PSid *)
+(*{ ** Accessors for PSid *)
 op psid_actor(psid : Psid) = let (A,B,X,r) = psid in A.
 op psid_peer(psid : Psid) = let (A,B,X,r) = psid in B.
 op psid_sent(psid : Psid) = let (A,B,X,r) = psid in X.
 op psid_role(psid : Psid) = let (A,B,X,r) = psid in r.
-(* }}} *)
+(*} *)
 
 op psid_of_sid(sid : Sid) =  let (A,B,X,Y,r) = sid in (A,B,X,r).
 
 (* (Private) data of incomplete session *)
 type Sdata = (Agent * Agent * Esk * Eexp * Role).
 
-(* {{{ Accessors for PSid *)
+(*{ ** Accessors for PSid *)
 op sd_actor(sdata : Sdata) = let (A,B,x,x',r) = sdata in A.
 op sd_peer(sdata : Sdata)  = let (A,B,x,x',r) = sdata in B.
 op sd_eexp(sdata : Sdata)  = let (A,B,x,x',r) = sdata in x'.
 op sd_esk(sdata : Sdata)   = let (A,B,x,x',r) = sdata in x.
 op sd_role(sdata : Sdata)  = let (A,B,x,x',r) = sdata in r.
-(* }}} *)
+(*} *)
 
 op psid_of_sdata(sdata : Sdata) =
   let (A,B,x,x',r) = sdata in (A,B,gen_epk(x'),r).
@@ -105,9 +107,9 @@ axiom strong_partnering(x', y' : Eexp) (a, b : Sk) (A, B : Pk) (X, Y : Epk) (r1,
     ((a = b /\ x' = y' /\ A = B /\ X = Y /\ r1 = r2) \/
     (A = gen_pk(a) /\ B = gen_pk(b) /\ X = gen_epk(x') /\ Y = gen_epk(y') /\ r1 <> r2)).
 
-(* }}} *)
+(*} *)
 
-(* {{{ Events for trace, matching, and freshness *)
+(*{ * Query events, matching, and freshness *)
 
 (* type Event = StaticRev of Agent 
               | EphemeralRev of PSid 
@@ -122,7 +124,7 @@ op SessionRev : Sid -> Event.
 op Start : Psid -> Event.
 op Accept : Sid -> Event.
 
-(* {{{ Axioms for inductive data type Event *)
+(*{ ** Axioms for inductive data type Event *)
 axiom Event_no_junk(Ev : Event):
      (exists (A : Agent), Ev = StaticRev(A))
   \/ (exists (s : Psid), Ev = EphemeralRev(s))
@@ -150,7 +152,7 @@ axiom SessionRev_inj(s1, s2 : Sid): SessionRev(s1) = SessionRev(s2) => s1 = s2.
 axiom Start_inj(s1, s2 : Psid): Start(s1) = Start(s2) => s1 = s2.
 
 axiom Accept_inj(s1, s2 : Sid): Accept(s1) = Accept(s2) => s1 = s2.
-(* }}} *)
+(*} *)
 
 (* Returns complete matching session of given session *)
 op cmatching(t : Sid) = let (A,B,X,Y,r) = t in (B,A,Y,X,!r).
@@ -178,7 +180,7 @@ pred fresh(t : Sid,  evs : Event list) =
           /\ (* b) there is no ephemeral key reveal for a (complete or incomplete) matching session *)
              !(List.mem (EphemeralRev ps) evs))).
 
-(* {{{ Some properties of notfresh *)
+(*{ ** Some properties of notfresh *)
 
 (* The (completed) session t is fresh unless *)
 pred notfresh(t : Sid,  evs : Event list)  =
@@ -259,7 +261,7 @@ lemma notfresh_fresh(t : Sid) (evs : Event list) (e Event):
   notfresh t evs =>
   notfresh t (e::evs) by smt.
 
-(* {{{ Our definition is stronger than the original NAXOS definition *)
+(*{ *** Our definition is stronger than the original NAXOS definition *)
 
 (* The (completed) session t is fresh if *)
 pred fresh_eCK(t : Sid,  evs : Event list)  =
@@ -283,13 +285,13 @@ pred fresh_eCK(t : Sid,  evs : Event list)  =
 
 lemma fresh_eCK_imp_fresh(t : Sid) (evs : Event list):
   (fresh_eCK t evs) => (fresh t evs) by [].
-(* }}} *)
+(*} *)
 
-(* }}} *)
+(*} *)
 
-(* }}} *)
+(*} *)
 
-(* {{{ Basic types and definitions for initial AKE game *)
+(*{ * Basic types and definitions for initial AKE game *)
 
 const qSession :     int.
 const qSessionRev :   int.
@@ -320,6 +322,8 @@ module type AKE_Oracles = {
 }.
 
 module type Adv (O : AKE_Oracles) = {
-  fun choose(s : Pk list) : Sidx
+  fun choose(s : Pk list) : Sidx {*}
   fun guess(k : Key option) : bool
 }.
+
+(*} *)
