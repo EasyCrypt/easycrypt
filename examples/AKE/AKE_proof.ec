@@ -435,8 +435,14 @@ module AKE_EexpRev(FA : Adv2) = {
   }
 }.
 
-pred collision_eexp(m : (int, Eexp) map) =
+pred collision_eexp_eexp(m : (int, Eexp) map) =
   exists i j, in_dom i m /\ m.[i] = m.[j] /\ i <> j.
+
+pred collision_eexp_rcvd(evs : Event list) =
+  exists (i : int) (j : int) s1 s2 s3,
+     i < j /\  nth evs i = Some (Accept s1) /\
+     (   (nth evs j  = Some (Start s2)  /\ psid_sent s2 = sid_rcvd s1)
+      \/ (nth evs j  = Some (Accept s3) /\ sid_sent s3 = sid_rcvd s1)).
 
 section.
   (* At this point, we still have to show the following: *)
@@ -444,7 +450,9 @@ section.
     forall (A <: Adv2) &m,
       2%r * Pr[ AKE_EexpRev(A).main() @ &m : res
                     /\ test_fresh AKE_EexpRev.test AKE_EexpRev.evs
-                    /\ ! collision_eexp(AKE_EexpRev.mEexp) ] - 1%r < eps.
+                    /\ ! collision_eexp_eexp(AKE_EexpRev.mEexp) 
+                    /\ ! collision_eexp_rcvd(AKE_EexpRev.evs) ]
+      - 1%r < eps.
 end section.
 
 (*} *)
