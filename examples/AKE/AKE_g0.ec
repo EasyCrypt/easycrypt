@@ -7,11 +7,11 @@ require import Fun.
 
 require import AKE_defs.
 
-(* The initial module, we keep it simple and inline the
-   definitions of h1 and h2 *)
+(* The initial module: we keep it simple and inline the
+   definitions of h1 and h2. *)
 module AKE(FA : Adv) = {
   
-  var evs  : Event list               (* events capturing queries performed by adversary *)
+  var evs  : Event list               (* events for queries performed by adversary *)
   var test : Sid option               (* session id of test session *)
 
   var cSession, cH1, cH2 : int        (* counters for queries *)
@@ -23,31 +23,10 @@ module AKE(FA : Adv) = {
   var sH2 : Sstring set               (* adversary queries for h2 *)
 
   var mSk        : (Agent, Sk) map    (* map for static secret keys *)
-  var mStarted   : (Sidx, Sdata) map  (* map of started initiator session *)
+  var mStarted   : (Sidx, Sdata) map  (* map of started sessions *)
   var mCompleted : (Sidx, Epk)   map  (* additional data for completed sessions *)
   
-  module O : AKE_Oracles= {
-
-    fun h2(sstring : Sstring) : Key = {
-      var ke : Key;
-      ke = $sample_Key;
-      if (!in_dom sstring mH2) {
-        mH2.[sstring] = ke;
-      }
-      return Option.proj ((mH2.[sstring]));
-    }
- 
-    fun h2_a(sstring : Sstring) : Key option = {
-      var r : Key option = None;
-      var ks : Key;
-      if (cH2 < qH2) {
-        cH2 = cH2 + 1;
-        sH2 = add sstring sH2;
-        ks = h2(sstring);
-        r = Some(ks);
-      }
-      return r;
-    }
+  module O : AKE_Oracles = {
 
     fun h1(a : Sk, x : Esk) : Eexp = {
       var e : Eexp;
@@ -56,7 +35,7 @@ module AKE(FA : Adv) = {
         cH1 = cH1 + 1;
         mH1.[(a,x)] = e;
       } 
-      return proj (mH1.[(a,x)]);
+      return proj mH1.[(a,x)];
     }
 
     fun h1_a(a : Sk, x : Esk) : Eexp option = {
@@ -67,6 +46,27 @@ module AKE(FA : Adv) = {
         sH1 = add (a,x) sH1;
         xe = h1(a,x);
         r = Some(xe);
+      }
+      return r;
+    }
+
+    fun h2(sstring : Sstring) : Key = {
+      var ke : Key;
+      ke = $sample_Key;
+      if (!in_dom sstring mH2) {
+        mH2.[sstring] = ke;
+      }
+      return proj mH2.[sstring];
+    }
+ 
+    fun h2_a(sstring : Sstring) : Key option = {
+      var r : Key option = None;
+      var ks : Key;
+      if (cH2 < qH2) {
+        cH2 = cH2 + 1;
+        sH2 = add sstring sH2;
+        ks = h2(sstring);
+        r = Some(ks);
       }
       return r;
     }
@@ -134,15 +134,14 @@ module AKE(FA : Adv) = {
 
     fun computeKey(i : Sidx) : Key option = {
       var rv : Key option = None;
-      var xepk : Epk;
       var a, b : Agent;
       var r : Role;
       var x' : Eexp;
-      var xesk : Esk;
+      var x : Esk;
       var key : Key;
       if (in_dom i mCompleted) {
-        (a,b,xesk,x',r) = proj mStarted.[i];
-        key  = h2(gen_sstring x' (proj mSk.[a]) b (proj mCompleted.[i]) r);
+        (a,b,x,x',r) = proj mStarted.[i];
+        key = h2(gen_sstring x' (proj mSk.[a]) b (proj mCompleted.[i]) r);
         rv = Some key;
       }
       return rv;
@@ -173,6 +172,7 @@ module AKE(FA : Adv) = {
     var ska : Sk;
     var pka : Pk;
 
+    mSk = Map.empty;
     while (i < qAgent) {
       ska = $sample_Sk;
       pka = gen_pk(ska);
@@ -186,7 +186,6 @@ module AKE(FA : Adv) = {
     sH1 = FSet.empty;
     mH2 = Map.empty;
     sH2 = FSet.empty;
-    mSk = Map.empty;
     mStarted = Map.empty;
     mCompleted = Map.empty;
     evs = [];
