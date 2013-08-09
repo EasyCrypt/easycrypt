@@ -299,6 +299,7 @@ const qEphemeralRev : int.
 const qAgent :       int.
 const qH1 :           int.
 const qH2 :           int.
+op def : 'a. (* types are inhabited, we define a polymorphic default value *)
 
 axiom qSession_pos:      0 < qSession.
 axiom qSesssionRev_pos:  0 < qSessionRev.

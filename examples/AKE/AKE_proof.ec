@@ -165,15 +165,15 @@ module AKE(FA : Adv) = {
   module A = FA(O)
 
   fun main() : bool = {
-    var b : bool;
+    var b : bool = def;
     var pks : Pk list = [];
-    var t_idx : Sidx;
-    var key : Key;
-    var keyo : Key option;
-    var b' : bool = false;
+    var t_idx : Sidx = def;
+    var key : Key = def;
+    var keyo : Key option = def;
+    var b' : bool = false = def;
     var i : int = 0;
-    var ska : Sk;
-    var pka : Pk;
+    var ska : Sk = def;
+    var pka : Pk = def;
 
     mSk = Map.empty;
     while (i < qAgent) {
@@ -324,7 +324,7 @@ module AKE_EexpRev(FA : Adv2) = {
 
     fun resp(i : Sidx, B : Agent, A : Agent, X : Epk) : Epk option = {
       var pY : Epk;
-      var r : Epk option = None; 
+      var r : Epk option = None;
       if (   cSession < qSession && in_dom A mSk && in_dom B mSk
           && !in_dom i mStarted && !in_dom i mCompleted) {
         cSession = cSession + 1;
@@ -358,8 +358,6 @@ module AKE_EexpRev(FA : Adv2) = {
       var a : Agent;
       var b : Agent;
       var ro : Role;
-      var x' : Eexp;
-      var x : Esk;
       var k : Key;
       if (in_dom i mCompleted) {
         (a,b,ro) = proj mStarted.[i];
@@ -382,16 +380,16 @@ module AKE_EexpRev(FA : Adv2) = {
   module A = FA(O)
 
   fun main() : bool = {
-    var b : bool;
+    var b : bool = def;
     var pks : Pk list = [];
-    var t_idx : Sidx;
-    var key : Key;
-    var keyo : Key option;
-    var b' : bool = false;
+    var t_idx : Sidx = def;
+    var key : Key = def;
+    var keyo : Key option = def;
+    var b' : bool = def;
     var i : int = 0;
-    var ska : Sk;
-    var pka : Pk;
-    var xa' : Eexp;
+    var ska : Sk = def;
+    var pka : Pk = def;
+    var xa' : Eexp = def;
 
     mSk = Map.empty;
     while (i < qAgent) {
