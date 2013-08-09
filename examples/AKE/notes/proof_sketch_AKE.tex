@@ -274,29 +274,29 @@ Pr[G_3 : fresh(t,tr) \land b = b' \land \neg esk-collision \land \neg esk-collis
 Note that in order to perform this step, $\neg fresh(t,tr)$ has to be monotonic. This is achieved by the previous steps where possible collisions that may render the test session fresh after it was not fresh are eliminated.
 
 \subsection{Remove hash call from test}
-We define $G_5$ to be exactly the same as $G_4$, except we replace the hash call in the computation of the key for the test session by a randomly sampled value. Clearly $x = H(computestring(proj(test))$ and $x=\$sample_{key} $ are  indistinguishable when the query to the hash is fresh. 
+We define $G_5$ to be exactly the same as $G_4$, except we replace the hash call in the computation of the key for the test session by a randomly sampled value. Clearly $x = H2(computestring(proj(test))$ and $x=\$sample_{key} $ are  indistinguishable when the query to the hash is fresh. 
 
 Hence, we have
 
 \begin{align*}
   Pr[G_4 : fresh(t,tr) \land b = b' \land \neg esk-collision \land \neg esk-collision_{H_1} \land \neg bad]  &\leq&\\ 
   Pr[G_5 : fresh(t,tr) \land b = b' \land \neg esk-collision \land \neg esk-collision_{H_1} \land \neg bad]  &+&\\
-  Pr[G_5 : computestring(proj(test)) \in dom(H_1) ]. 
+  Pr[G_5 : computestring(proj(test)) \in dom(H_2) ]. 
 \end{align*}
 
 
-Note that  in $G_5$ a value $x\in dom(H_1)$ iff:
+Note that  in $G_5$ a value $x\in dom(H_2)$ iff:
 \begin{itemize}
 \item There is an event keyRev for a session $s$, such that $computestring(s) = x$
-\item $x \in LH1_{A}$
+\item $x \in LH2_{A}$
 \end{itemize}
 
 In the case of the session string of the test session the first situation cannot occur: two sessions have the same sesssion string iff they are matching (strong partnering) and querying either the test session or its matching session to keyRev is forbidden by the enforcement of fresh(test,ev).
 
 Therefore, we have
 \begin{align*}
- Pr[G_5 : computestring(proj(test)) \in dom(H_1) ]  &=& \\
- Pr[G_5 : computestring(proj(test)) \in LH1_A ].
+ Pr[G_5 : computestring(proj(test)) \in dom(H_2) ]  &=& \\
+ Pr[G_5 : computestring(proj(test)) \in LH2_A ].
 \end{align*}
 
 Moreover, note that in game $G_5$, the value supplied to the adversary in the second round does not depend anymore on the bit $b$. Hence, we can move the sampling of $b$ towards the end of the game and show that 
@@ -308,8 +308,65 @@ Moreover, note that in game $G_5$, the value supplied to the adversary in the se
 Putting everything together, we have shown 
 \begin{align*}
   Pr[G_4 : fresh(t,tr) \land b = b' \land \neg esk-collision \land \neg esk-collision_{H_1} \land \neg bad]  &\leq&\\ 
-\frac{1}{2} +  Pr[G_5 : computestring(proj(test)) \in LH1_A ].
+\frac{1}{2} +  Pr[G_5 : computestring(proj(test)) \in LH2_A ].
 \end{align*}
+
+\subsection{Making $keyRev$ and $H_2$ public}
+At this point, $keyRev$ and $H_2$ are independent of test. Therefore, we can make them public and just keep them consistent with each other. In order to do this, we need an operator that allows us to decide if a session string is corresponds to a session (without using private information). We call this operator $eqS$.
+
+First, we wrap this operator in an oracle, ensuring that is only called with complete sessions different than the test session or its matching session
+
+\begin{verbatim}
+fun eq_s(x : session_string, s : session) =
+if (completed(s) /\ (test<> None => ! s = proj(test) /\ !matching(test) = s)) {
+ return eqS_op(x,s);	
+}
+\end{verbatim}
+
+We can then reimplement the function $compute_key$ used in keyRev as follows
+
+\begin{verbatim}
+compute_key(s)  : key = {
+if (in_dom s revealed) return revealed.[s];
+else if (in_dom (matching s) revealed) return revealed.[matching s]; 
+         else {
+                 aux = dom(LH2);	
+                 while (aux <> nil) {
+                    x = pick aux; aux = rm x aux;
+                    eq = eqS(x, s);
+                    if (eq) then return (LH2[x]);
+                 }
+        }
+z = $sample_key;
+revealed[s] = z;
+return z; 	
+} 
+
+\end{verbatim}
+We reimplement  the hash oracle $H_2$ in a similar way
+
+
+\begin{verbatim}
+h2(x)  : key = {
+if (in_dom s LH2) return revealed.[s];
+else {
+         aux = dom(revealed);	
+         while (aux <> nil) {
+          s = pick aux; aux = rm s aux;
+          eq = eqS(x, s);
+          if (eq) then return (LH2[x]);
+         }
+z = $sample_key;
+LH2[x] = z;
+return z; 	
+} 
+\end{verbatim}
+We call this game $G_6$ and we have
+\[
+Pr[G_5 : computestring(proj(test)) \in LH2_A ] = 
+Pr[G_6 : computestring(proj(test)) \in LH2_A ]
+\]
+At this point, both oracles become public and hence can be simulated by the adversary.
 
 \section{Choices for up-to failure steps}
 

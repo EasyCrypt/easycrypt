@@ -32,20 +32,16 @@ module Correct(O:Oracle) = {
 
 theory ROM.
   require import FSet.
-    import ISet.Finite.
 
   module RO:Oracle = {
     var m:(from, to) map
-    var qs:from set
 
-    fun init() : unit = {
+    fun init():unit = {
       m = Map.empty;
-      qs = FSet.empty;
     }
   
-    fun o(x:from) : to = {
+    fun o(x:from):to = {
       var y : to;
-      qs = add x qs;
       y = $dsample;
       if (!in_dom x m) m.[x] = y;
       return proj (m.[x]);
@@ -64,27 +60,10 @@ theory ROM.
   by intros=> r_def; fun; wp; rnd (cpTrue); wp.
   qed.
 
-  (** There is currently no way of using termination_o to prove lossless_o *)
   lemma lossless_o:
     mu dsample cpTrue = 1%r => islossless RO.o.
   proof strict.
   by intros=> Hd; apply (termination_o 1%r).
-  qed.
-
-  lemma init_m_qs:
-    bd_hoare [RO.init: true ==> dom RO.m == RO.qs] = 1%r.
-  proof.
-  by fun; wp; skip; progress; smt.
-  qed.
-
-  lemma o_m_qs r:
-    mu dsample cpTrue = r =>
-    bd_hoare [RO.o: dom RO.m == RO.qs ==>
-                    dom RO.m == RO.qs] = r.
-  proof.
-  intros=> r_def; fun; wp; rnd (cpTrue); wp; skip; progress.
-    by rewrite dom_set; smt.
-    by smt.
   qed.
 
   lemma correct_RO: mu dsample cpTrue = 1%r =>
@@ -112,3 +91,73 @@ theory ROM.
     qed.*)
 *)
 end ROM.
+
+
+(** Budget-tracking wrapper *)
+require import FSet.
+module Count(H:Oracle) = {
+  var qs:from set
+
+  fun init(): unit = {
+    H.init();
+    qs = FSet.empty;
+  }
+
+  fun o(x:from): to = {
+    var r:to;
+    qs = add x qs;
+    r = H.o(x);
+    return r;
+  }
+
+  fun queries(): int = {
+    return card qs;
+  }
+}.
+
+(** Query-tracking wrapper *)
+require import Int.
+module Index(H:Oracle) = {
+  var qs:(int,from) map
+  var qc:int
+
+  fun init(): unit = {
+    H.init();
+    qs = Map.empty;
+    qc = 0;
+  }
+
+  fun o(x:from): to = {
+    var r:to;
+    if (!in_rng x qs)
+    {
+      qs.[qc] = x;
+      qc = qc + 1;
+    }
+    r = H.o(x);
+    return r;
+  }
+}.
+
+(** Query-numbering wrapper *)
+module Number(H:Oracle) = {
+  var qs:(from,int) map
+  var qc:int
+
+  fun init(): unit = {
+    H.init();
+    qs = Map.empty;
+    qc = 0;
+  }
+
+  fun o(x:from): to = {
+    var r:to;
+    if (!in_dom x qs)
+    {
+      qs.[x] = qc;
+      qc = qc + 1;
+    }
+    r = H.o(x);
+    return r;
+  }
+}.
