@@ -256,6 +256,10 @@ op compute_sid(mStarted : (Sidx, Sdata2) map) (mEexp : (Sidx, Eexp) map)
   let (A,B,r) = proj mStarted.[i] in
   (A,B,gen_epk(proj mEexp.[i]),proj mCompleted.[i],r).
 
+op compute_psid(mStarted : (Sidx, Sdata2) map) (mEexp : (Sidx, Eexp) map)
+               (i : Sidx) : Psid =
+  let (A,B,r) = proj mStarted.[i] in (A,B,gen_epk(proj mEexp.[i]),r).
+
 module AKE_EexpRev(FA : Adv2) = {
   
   var evs  : Event list               (* events for queries performed by adversary *)
@@ -276,7 +280,7 @@ module AKE_EexpRev(FA : Adv2) = {
     fun eexpRev(i : Sidx, a : Sk) : Eexp option = {
       var r : Eexp option = None;
       if (in_dom i mStarted) {
-        evs = EphemeralRev(compute_sid mStarted mEexp mCompleted i)::evs;
+        evs = EphemeralRev(compute_psid mStarted mEexp i)::evs;
         if (sd2_actor(proj mStarted.[i]) = gen_pk(a)) {
           r = mEexp.[i];
         }
@@ -431,8 +435,8 @@ module AKE_EexpRev(FA : Adv2) = {
   }
 }.
 
-pred no_collision(m : (int, Eexp) map) =
-  ! (exists i j, in_dom i m /\ m.[i] = m.[j] /\ i <> j).
+pred collision_eexp(m : (int, Eexp) map) =
+  exists i j, in_dom i m /\ m.[i] = m.[j] /\ i <> j.
 
 section.
   (* At this point, we still have to show the following: *)
@@ -440,7 +444,7 @@ section.
     forall (A <: Adv2) &m,
       2%r * Pr[ AKE_EexpRev(A).main() @ &m : res
                     /\ test_fresh AKE_EexpRev.test AKE_EexpRev.evs
-                    /\ no_collision(AKE_EexpRev.mEexp) ] - 1%r < eps.
+                    /\ ! collision_eexp(AKE_EexpRev.mEexp) ] - 1%r < eps.
 end section.
 
 (*} *)
