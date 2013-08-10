@@ -167,9 +167,7 @@ module AKE(FA : Adv) = {
 
     fun sessionRev(i : Sidx) : Key option = {
       var r : Key option = None;
-      var s : Sid;
       if (in_dom i mCompleted) {
-        s = sid_of_sdata (proj mStarted.[i]) (proj mCompleted.[i]);
         evs = SessionRev(sid_of_sdata(proj mStarted.[i]) (proj mCompleted.[i]))::evs;
         r = computeKey(i);
       }
@@ -279,7 +277,21 @@ module AKE_EexpRev(FA : Adv2) = {
   var mEexp      : (Sidx, Eexp) map   (* map for ephemeral exponents of sessions *)
   var mStarted   : (Sidx, Sdata2) map (* map of started sessions *)
   var mCompleted : (Sidx, Epk)   map  (* additional data for completed sessions *)
-  
+    
+  fun init() : unit = {
+    evs = [];
+    test = None;
+    cSession = 0;
+    cH1 = 0;
+    cH2 = 0;
+    mH2 = Map.empty;
+    sH2 = FSet.empty;
+    mSk = Map.empty;    
+    mEexp = Map.empty;
+    mStarted = Map.empty;
+    mCompleted = Map.empty;
+  }
+
   module O : AKE_Oracles2 = {
     
     fun eexpRev(i : Sidx, a : Sk) : Eexp option = {
@@ -396,30 +408,19 @@ module AKE_EexpRev(FA : Adv2) = {
     var pka : Pk = def;
     var xa' : Eexp = def;
     
-    mSk = Map.empty;
+    init();
     while (i < qAgent) {
       ska = $sample_Sk;
       pka = gen_pk(ska);
       pks = pka :: pks;
       mSk.[pka] = ska;
     }
-    
-    mEexp = Map.empty;
-    i = 0;
+
     while (i < qSession) {
       xa' = $sample_Eexp;
       mEexp.[i] = xa';
     } 
 
-    cSession = 0;
-    cH1 = 0;
-    cH2 = 0;
-    mH2 = Map.empty;
-    sH2 = FSet.empty;
-    mStarted = Map.empty;
-    mCompleted = Map.empty;
-    evs = [];
-    test = None;
 
     t_idx = A.choose(pks);
     b = ${0,1};
@@ -473,7 +474,7 @@ print op fdom.
 op queried_esks(mH1 : ((Sk * Esk), Eexp)  map) : Esk set =
   img snd (fdom mH1).
 
-(* Introduce bad flags for collision events *)
+(* Introduce bad flags for collision events and split mStarted *)
 module AKE_1(FA : Adv) = {
   
   var evs  : Event list               (* events for queries performed by adversary *)
@@ -646,9 +647,7 @@ module AKE_1(FA : Adv) = {
 
     fun sessionRev(i : Sidx) : Key option = {
       var r : Key option = None;
-      var s : Sid;
       if (in_dom i mCompleted) {
-        s = sid_of_sdata (proj mStarted.[i]) (proj mCompleted.[i]);
         evs = SessionRev(sid_of_sdata(proj mStarted.[i]) (proj mCompleted.[i]))::evs;
         r = computeKey(i);
       }
@@ -701,7 +700,6 @@ lemma Eq_AKE_AKE_1_O_h1(A <: Adv{AKE, AKE_1}):
   fun.
   eqobs_in.
 qed.
-
 
 lemma Eq_AKE_AKE_1(A <: Adv{AKE, AKE_1}):
   equiv[ AKE(A).main ~ AKE_1(A).main : true ==>
@@ -760,6 +758,274 @@ proof strict.
     call (Eq_AKE_AKE_1_O_h1 A).
     skip. smt.
 qed.
+
+(* Split mStarted *)
+module AKE_2(FA : Adv) = {
+  
+  var evs  : Event list               (* events for queries performed by adversary *)
+  var test : Sid option               (* session id of test session *)
+
+  var cSession, cH1, cH2 : int        (* counters for queries *)
+
+  var mH1 : ((Sk * Esk), Eexp) map    (* map for h1 *)
+  var sH1 : (Sk * Esk) set            (* adversary queries for h1 *)
+
+  var mH2 : (Sstring, Key) map        (* map for h2 *)
+  var sH2 : Sstring set               (* adversary queries for h2 *)
+
+  var mSk        : (Agent, Sk) map    (* map for static secret keys *)
+  var mEsk       : (Sidx, Esk) map    (* map for ephemeral secret keys *)
+  var mEexp      : (Sidx, Eexp) map   (* map for ephemeral exponents of sessions *)
+  var mStarted   : (Sidx, Sdata2) map (* map of started sessions *)
+  var mCompleted : (Sidx, Epk)   map  (* additional data for completed sessions *)
+
+  var bad_esk_col : bool              (* esk collision with dom(mH1) *)
+    (* The esk sampled in init1/resp is already in dom(mH1). Since
+       dom(mH1) = sH1 u <earlier esks>, this corresponds to
+       esk-earlier-esk collisions and esk-earlier-h1_a collisions *)
+
+  var bad_esk_norev : bool            (* h1_a query without previous reveal *)
+  
+
+  fun init() : unit = {
+    evs = [];
+    test = None;
+    cSession = 0;
+    cH1 = 0;
+    cH2 = 0;
+    mH1 = Map.empty;
+    sH1 = FSet.empty;
+    mH2 = Map.empty;
+    sH2 = FSet.empty;
+    mSk = Map.empty;
+    mEsk = Map.empty;
+    mEexp = Map.empty;
+    mStarted = Map.empty;
+    mCompleted = Map.empty;
+    bad_esk_col = false;
+    bad_esk_norev = false;
+  }
+
+  module O : AKE_Oracles = {
+
+    fun h1(a : Sk, x : Esk) : Eexp = {
+      var e : Eexp;
+      e = $sample_Eexp;
+      if (!in_dom (a,x) mH1) {
+        mH1.[(a,x)] = e;
+      } 
+      return proj mH1.[(a,x)];
+    }
+
+    fun h1_a(a : Sk, x : Esk) : Eexp option = {
+      var r : Eexp option = None;
+      var xe : Eexp;
+      if (cH1 < qH1) {
+        cH1 = cH1 + 1;
+        if (any (lambda i, proj mEsk.[i] = x /\
+                           ! (mem (EphemeralRev (compute_psid mStarted mEexp i)) evs))
+                (fdom mStarted)) {
+          bad_esk_norev = true;
+        }
+        sH1 = add (a,x) sH1;
+        xe = h1(a,x);
+        r = Some(xe);
+      }
+      return r;
+    }
+
+    fun h2(sstring : Sstring) : Key = {
+      var ke : Key;
+      ke = $sample_Key;
+      if (!in_dom sstring mH2) {
+        mH2.[sstring] = ke;
+      }
+      return proj mH2.[sstring];
+    }
+ 
+    fun h2_a(sstring : Sstring) : Key option = {
+      var r : Key option = None;
+      var ks : Key;
+      if (cH2 < qH2) {
+        cH2 = cH2 + 1;
+        sH2 = add sstring sH2;
+        ks = h2(sstring);
+        r = Some(ks);
+      }
+      return r;
+    }
+
+    fun init1(i : Sidx, A : Agent, B : Agent) : Epk option = {
+      var pX : Epk;
+      var x : Esk;
+      var r : Epk option = None; 
+      if (cSession < qSession && in_dom A mSk && in_dom B mSk && !in_dom i mStarted) {
+        cSession = cSession + 1;
+        x = $sample_Esk;
+        mEsk.[i] = x;
+        if (mem x (queried_esks mH1)) bad_esk_col = true;
+        mEexp.[i] = h1(proj (mSk.[A]),x);
+        pX = gen_epk(proj mEexp.[i]);
+        mStarted.[i] = (A,B,init);
+        r = Some(pX);
+        evs = Start(compute_psid mStarted mEexp i)::evs;
+      }
+      return r;
+    }
+
+    fun resp(i : Sidx, B : Agent, A : Agent, X : Epk) : Epk option = {
+      var y : Esk;
+      var pY : Epk;
+      var r : Epk option = None; 
+      if (   cSession < qSession && in_dom A mSk && in_dom B mSk
+          && !in_dom i mStarted && !in_dom i mCompleted) {
+        cSession = cSession + 1;
+        y  = $sample_Esk;
+        mEsk.[i] = y;
+        if (mem y (queried_esks mH1)) bad_esk_col = true;
+        mEexp.[i] = h1(proj (mSk.[B]),y);
+        pY = gen_epk(proj mEexp.[i]);
+        mStarted.[i] = (B,A,resp);
+        mCompleted.[i] = X;
+        r = Some(pY);
+        evs = Accept(compute_sid mStarted mEexp mCompleted i)::evs;
+      }
+      return r;
+    }
+
+    fun init2(i : Sidx, Y : Epk) : unit = {
+      if (!in_dom i mCompleted && in_dom i mStarted) {
+        mCompleted.[i] = Y;
+        evs = Accept(compute_sid mStarted mEexp mCompleted i)::evs;
+      }
+    }
+
+    fun staticRev(A : Agent) : Sk option = {
+      var r : Sk option = None;
+      if (in_dom A mSk) {
+        r = mSk.[A];
+        evs = StaticRev(A)::evs;
+      }
+      return r;
+    }
+
+    fun ephemeralRev(i : Sidx) : Esk option = {
+      var r : Esk option = None;
+      if (in_dom i mStarted) {
+        r = mEsk.[i];
+        evs = EphemeralRev(compute_psid mStarted mEexp i)::evs;
+      }
+      return r;
+    }
+
+    fun computeKey(i : Sidx) : Key option = {
+      var r : Key option = None;
+      var a, b : Agent;
+      var ro : Role;
+      var x' : Eexp;
+      var x : Esk;
+      var key : Key;
+      if (in_dom i mCompleted) {
+        (a,b,ro) = proj mStarted.[i];
+        key = h2(gen_sstring (proj mEexp.[i]) (proj mSk.[a])
+                             b (proj mCompleted.[i]) ro);
+        r = Some key;
+      }
+      return r;
+    }
+
+    fun sessionRev(i : Sidx) : Key option = {
+      var r : Key option = None;
+      if (in_dom i mCompleted) {
+        evs = SessionRev(compute_sid mStarted mEexp mCompleted i)::evs;
+        r = computeKey(i);
+      }
+      return r;
+    }
+  }
+  
+  module A = FA(O)
+
+  fun main() : bool = {
+    var b : bool = def;
+    var pks : Pk list = [];
+    var t_idx : Sidx = def;
+    var key : Key = def;
+    var keyo : Key option = def;
+    var b' : bool = def;
+    var i : int = 0;
+    var ska : Sk = def;
+    var pka : Pk = def;
+
+    init();
+    while (i < qAgent) {
+      ska = $sample_Sk;
+      pka = gen_pk(ska);
+      pks = pka :: pks;
+      mSk.[pka] = ska;
+    } 
+
+    t_idx = A.choose(pks);
+    b = ${0,1};
+    if (mStarted.[t_idx] <> None && mCompleted.[t_idx] <> None) {
+      test = Some (compute_sid mStarted mEexp mCompleted t_idx);
+        (* the if-condition implies "mem (Accept (proj O.test)) O.evs" *)
+      if (b) {
+        keyo = O.computeKey(t_idx);
+      } else {
+        key  = $sample_Key;
+        keyo = Some key;
+      }
+      b' = A.guess(keyo);
+    }
+    return (b = b');
+  }
+}.
+
+lemma Eq_AKE_1_AKE_2_O_h1(A <: Adv{AKE, AKE_1}):
+  equiv[ AKE_1(A).O.h1 ~ AKE_2(A).O.h1 :
+         (AKE_1.mH1{1} = AKE_2.mH1{2} /\ AKE_1.sH1{1} = AKE_2.sH1{2} /\ ={x,a})
+         ==> (AKE_1.mH1{1} = AKE_2.mH1{2} /\ AKE_1.sH1{1} = AKE_2.sH1{2} /\ ={res}) ].
+  fun.
+  eqobs_in.
+qed.
+
+lemma Eq_AKE_1_AKE_2_O_h2(A <: Adv{AKE, AKE_1}):
+  equiv[ AKE_1(A).O.h2 ~ AKE_2(A).O.h2 :
+         (AKE_1.mH2{1} = AKE_2.mH2{2} /\ AKE_1.sH2{1} = AKE_2.sH2{2} /\ ={sstring})
+         ==> (AKE_1.mH2{1} = AKE_2.mH2{2} /\ AKE_1.sH2{1} = AKE_2.sH2{2} /\ ={res}) ].
+  fun.
+  eqobs_in.
+qed.
+  
+lemma Eq_AKE_1_AKE_2_O_h2_a(A <: Adv{AKE, AKE_1}):
+  equiv[ AKE_1(A).O.h2_a ~ AKE_2(A).O.h2_a :
+         (   AKE_1.mH2{1} = AKE_2.mH2{2} /\ AKE_1.sH2{1} = AKE_2.sH2{2}
+          /\ AKE_1.cH2{1} = AKE_2.cH2{2} /\ ={sstring})
+         ==>
+         (   AKE_1.mH2{1} = AKE_2.mH2{2} /\ AKE_1.sH2{1} = AKE_2.sH2{2}
+          /\ AKE_1.cH2{1} = AKE_2.cH2{2} /\ ={res}) ].
+  fun.
+  eqobs_in.
+qed.
+
+lemma Eq_AKE_1_AKE_2_O_staticRev(A <: Adv{AKE, AKE_1}):
+  equiv[ AKE_1(A).O.staticRev ~ AKE_2(A).O.staticRev :
+         (AKE_1.mSk{1} = AKE_2.mSk{2} /\ AKE_1.evs{1} = AKE_2.evs{2} /\ ={A})
+         ==>
+         (AKE_1.mSk{1} = AKE_2.mSk{2} /\ AKE_1.evs{1} = AKE_2.evs{2} /\ ={res})].
+  fun.
+  eqobs_in.
+qed.
+
+(*
+  h1_a(a : Sk, x : Esk) ==> mStarted required for test
+  init1(i : Sidx, A : Agent, B : Agent) : Epk option
+  init2(i : Sidx, Y : Epk) : unit
+  resp(i : Sidx, B : Agent, A : Agent, X : Epk) : Epk option
+  ephemeralRev(i : Sidx) : Esk option
+  sessionRev(i : Sidx) : Key option
+*)
 
 lemma Pr_AKE_1_bad(A <: Adv) &m:
        Pr[ AKE_1(A).main() @ &m : res /\ test_fresh AKE_1.test AKE_1.evs ]
