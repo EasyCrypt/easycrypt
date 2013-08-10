@@ -51,7 +51,6 @@ module AKE(FA : Adv) = {
       var e : Eexp;
       e = $sample_Eexp;
       if (!in_dom (a,x) mH1) {
-        cH1 = cH1 + 1;
         mH1.[(a,x)] = e;
       } 
       return proj mH1.[(a,x)];
@@ -523,7 +522,6 @@ module AKE_1(FA : Adv) = {
       var e : Eexp;
       e = $sample_Eexp;
       if (!in_dom (a,x) mH1) {
-        cH1 = cH1 + 1;
         mH1.[(a,x)] = e;
       } 
       return proj mH1.[(a,x)];
@@ -696,92 +694,22 @@ module AKE_1(FA : Adv) = {
   }
 }.
 
+lemma Eq_AKE_AKE_1_O_h1(A <: Adv{AKE, AKE_1}):
+  equiv[ AKE(A).O.h1 ~ AKE_1(A).O.h1 :
+         (AKE.mH1{1} = AKE_1.mH1{2} /\ AKE.sH1{1} = AKE_1.sH1{2} /\ ={x,a})
+         ==> (AKE.mH1{1} = AKE_1.mH1{2} /\ AKE.sH1{1} = AKE_1.sH1{2} /\ ={res}) ].
+  fun.
+  eqobs_in.
+qed.
+
+
 lemma Eq_AKE_AKE_1(A <: Adv{AKE, AKE_1}):
   equiv[ AKE(A).main ~ AKE_1(A).main : true ==>
             (res /\ test_fresh AKE.test AKE.evs){1}
          => (res /\ test_fresh AKE_1.test AKE_1.evs){2}].
 proof strict.
-  (* Simulate forward proof manually for which automated proof should be possible *)
   fun.
-  seq 10 10: (* we would do this step by step and add variables to the post *)
-    (={b,pks,t_idx,key,keyo,b',i,ska,pka} /\
-     AKE.mSk{1}        = AKE_1.mSk{2} /\
-     AKE.cSession{1}   = AKE_1.cSession{2} /\
-     AKE.cH1{1}        = AKE_1.cH1{2} /\
-     AKE.cH2{1}        = AKE_1.cH2{2} /\
-     AKE.mH1{1}        = AKE_1.mH1{2} /\
-     AKE.sH1{1}        = AKE_1.sH1{2} /\
-     AKE.mH2{1}        = AKE_1.mH2{2} /\
-     AKE.sH2{1}        = AKE_1.sH2{2} /\
-     AKE.mStarted{1}   = AKE_1.mStarted{2} /\
-     AKE.mCompleted{1} = AKE_1.mCompleted{2} /\
-     AKE.evs{1}        = AKE_1.evs{2} /\
-     AKE.test{1}       = AKE_1.test{2}).
-  inline AKE(A).init AKE_1(A).init.
-  wp. trivial.
-  seq 1 1:
-    (={b,pks,t_idx,key,keyo,b',i,ska,pka} /\
-     AKE.mSk{1}        = AKE_1.mSk{2} /\
-     AKE.cSession{1}   = AKE_1.cSession{2} /\
-     AKE.cH1{1}        = AKE_1.cH1{2} /\
-     AKE.cH2{1}        = AKE_1.cH2{2} /\
-     AKE.mH1{1}        = AKE_1.mH1{2} /\
-     AKE.sH1{1}        = AKE_1.sH1{2} /\
-     AKE.mH2{1}        = AKE_1.mH2{2} /\
-     AKE.sH2{1}        = AKE_1.sH2{2} /\
-     AKE.mStarted{1}   = AKE_1.mStarted{2} /\
-     AKE.mCompleted{1} = AKE_1.mCompleted{2} /\
-     AKE.evs{1}        = AKE_1.evs{2} /\
-     AKE.test{1}       = AKE_1.test{2}).
-  eqobs_in. (* slow *) 
-  seq 1 1:
-    (={b,pks,t_idx,key,keyo,b',i,ska,pka} /\
-     AKE.mSk{1}        = AKE_1.mSk{2} /\
-     AKE.cSession{1}   = AKE_1.cSession{2} /\
-     AKE.cH1{1}        = AKE_1.cH1{2} /\
-     AKE.cH2{1}        = AKE_1.cH2{2} /\
-     AKE.mH1{1}        = AKE_1.mH1{2} /\
-     AKE.sH1{1}        = AKE_1.sH1{2} /\
-     AKE.mH2{1}        = AKE_1.mH2{2} /\
-     AKE.sH2{1}        = AKE_1.sH2{2} /\
-     AKE.mStarted{1}   = AKE_1.mStarted{2} /\
-     AKE.mCompleted{1} = AKE_1.mCompleted{2} /\
-     AKE.evs{1}        = AKE_1.evs{2} /\
-     AKE.test{1}       = AKE_1.test{2}).
-  eqobs_in. (* again slow *)
-  seq 1 1:
-    (={b,pks,t_idx,key,keyo,b',i,ska,pka} /\
-     AKE.mSk{1}        = AKE_1.mSk{2} /\
-     AKE.cSession{1}   = AKE_1.cSession{2} /\
-     AKE.cH1{1}        = AKE_1.cH1{2} /\
-     AKE.cH2{1}        = AKE_1.cH2{2} /\
-     AKE.mH1{1}        = AKE_1.mH1{2} /\
-     AKE.sH1{1}        = AKE_1.sH1{2} /\
-     AKE.mH2{1}        = AKE_1.mH2{2} /\
-     AKE.sH2{1}        = AKE_1.sH2{2} /\
-     AKE.mStarted{1}   = AKE_1.mStarted{2} /\
-     AKE.mCompleted{1} = AKE_1.mCompleted{2} /\
-     AKE.evs{1}        = AKE_1.evs{2} /\
-     AKE.test{1}       = AKE_1.test{2}).
-  rnd. skip. progress. (* slow *)
-  if; [ by progress | | by skip; progress ].
-  seq 2 2:
-    (={b,pks,t_idx,key,keyo,b',i,ska,pka} /\
-     AKE.mSk{1}        = AKE_1.mSk{2} /\
-     AKE.cSession{1}   = AKE_1.cSession{2} /\
-     AKE.cH1{1}        = AKE_1.cH1{2} /\
-     AKE.cH2{1}        = AKE_1.cH2{2} /\
-     AKE.mH1{1}        = AKE_1.mH1{2} /\
-     AKE.sH1{1}        = AKE_1.sH1{2} /\
-     AKE.mH2{1}        = AKE_1.mH2{2} /\
-     AKE.sH2{1}        = AKE_1.sH2{2} /\
-     AKE.mStarted{1}   = AKE_1.mStarted{2} /\
-     AKE.mCompleted{1} = AKE_1.mCompleted{2} /\
-     AKE.evs{1}        = AKE_1.evs{2} /\
-     AKE.test{1}       = AKE_1.test{2} /\
-     ={glob A}).
-  eqobs_in.
-  call (_:
+  eqobs_in
     (AKE.mSk{1}        = AKE_1.mSk{2} /\
      AKE.cSession{1}   = AKE_1.cSession{2} /\
      AKE.cH1{1}        = AKE_1.cH1{2} /\
@@ -793,9 +721,8 @@ proof strict.
      AKE.mStarted{1}   = AKE_1.mStarted{2} /\
      AKE.mCompleted{1} = AKE_1.mCompleted{2} /\
      AKE.evs{1}        = AKE_1.evs{2} /\
-     AKE.test{1}       = AKE_1.test{2})).
-  skip. progress.
-  seq 1 1:
+     AKE.test{1}       = AKE_1.test{2})
+    true :
     (={b,pks,t_idx,key,keyo,b',i,ska,pka} /\
      AKE.mSk{1}        = AKE_1.mSk{2} /\
      AKE.cSession{1}   = AKE_1.cSession{2} /\
@@ -808,144 +735,31 @@ proof strict.
      AKE.mStarted{1}   = AKE_1.mStarted{2} /\
      AKE.mCompleted{1} = AKE_1.mCompleted{2} /\
      AKE.evs{1}        = AKE_1.evs{2} /\
-     AKE.test{1}       = AKE_1.test{2} /\
-    ={glob A}).
-  rnd. skip. progress.
-  if; [ by progress| | skip; progress].
-  seq 1 1:
-    (={b,pks,t_idx,key,keyo,b',i,ska,pka} /\
-     AKE.mSk{1}        = AKE_1.mSk{2} /\
-     AKE.cSession{1}   = AKE_1.cSession{2} /\
-     AKE.cH1{1}        = AKE_1.cH1{2} /\
-     AKE.cH2{1}        = AKE_1.cH2{2} /\
-     AKE.mH1{1}        = AKE_1.mH1{2} /\
-     AKE.sH1{1}        = AKE_1.sH1{2} /\
-     AKE.mH2{1}        = AKE_1.mH2{2} /\
-     AKE.sH2{1}        = AKE_1.sH2{2} /\
-     AKE.mStarted{1}   = AKE_1.mStarted{2} /\
-     AKE.mCompleted{1} = AKE_1.mCompleted{2} /\
-     AKE.evs{1}        = AKE_1.evs{2} /\
-     AKE.test{1}       = AKE_1.test{2} /\
-    ={glob A}).
-  wp; skip; progress.
-  (* skip IF *)
-  seq 1 1:
-    (={b,pks,t_idx,key,keyo,b',i,ska,pka} /\
-     AKE.mSk{1}        = AKE_1.mSk{2} /\
-     AKE.cSession{1}   = AKE_1.cSession{2} /\
-     AKE.cH1{1}        = AKE_1.cH1{2} /\
-     AKE.cH2{1}        = AKE_1.cH2{2} /\
-     AKE.mH1{1}        = AKE_1.mH1{2} /\
-     AKE.sH1{1}        = AKE_1.sH1{2} /\
-     AKE.mH2{1}        = AKE_1.mH2{2} /\
-     AKE.sH2{1}        = AKE_1.sH2{2} /\
-     AKE.mStarted{1}   = AKE_1.mStarted{2} /\
-     AKE.mCompleted{1} = AKE_1.mCompleted{2} /\
-     AKE.evs{1}        = AKE_1.evs{2} /\
-     AKE.test{1}       = AKE_1.test{2} /\
-    ={glob A}).
-  if. progress.
-  call (_:
-    (AKE.mSk{1}        = AKE_1.mSk{2} /\
-     AKE.cSession{1}   = AKE_1.cSession{2} /\
-     AKE.cH1{1}        = AKE_1.cH1{2} /\
-     AKE.cH2{1}        = AKE_1.cH2{2} /\
-     AKE.mH1{1}        = AKE_1.mH1{2} /\
-     AKE.sH1{1}        = AKE_1.sH1{2} /\
-     AKE.mH2{1}        = AKE_1.mH2{2} /\
-     AKE.sH2{1}        = AKE_1.sH2{2} /\
-     AKE.mStarted{1}   = AKE_1.mStarted{2} /\
-     AKE.mCompleted{1} = AKE_1.mCompleted{2} /\
-     AKE.evs{1}        = AKE_1.evs{2} /\
-     AKE.test{1}       = AKE_1.test{2})).
-  eqobs_in. skip; progress.
-  wp. rnd. skip; progress.
-  call (_:
-    (AKE.mSk{1}        = AKE_1.mSk{2} /\
-     AKE.cSession{1}   = AKE_1.cSession{2} /\
-     AKE.cH1{1}        = AKE_1.cH1{2} /\
-     AKE.cH2{1}        = AKE_1.cH2{2} /\
-     AKE.mH1{1}        = AKE_1.mH1{2} /\
-     AKE.sH1{1}        = AKE_1.sH1{2} /\
-     AKE.mH2{1}        = AKE_1.mH2{2} /\
-     AKE.sH2{1}        = AKE_1.sH2{2} /\
-     AKE.mStarted{1}   = AKE_1.mStarted{2} /\
-     AKE.mCompleted{1} = AKE_1.mCompleted{2} /\
-     AKE.evs{1}        = AKE_1.evs{2} /\
-     AKE.test{1}       = AKE_1.test{2})).
-     
-     (* h1_a *)
-     fun. sp. if. progress. sp.
-     seq 1 1:
-      (={xe} /\
-       AKE.mSk{1}        = AKE_1.mSk{2} /\
-       AKE.cSession{1}   = AKE_1.cSession{2} /\
-       AKE.cH1{1}        = AKE_1.cH1{2} /\
-       AKE.cH2{1}        = AKE_1.cH2{2} /\
-       AKE.mH1{1}        = AKE_1.mH1{2} /\
-       AKE.sH1{1}        = AKE_1.sH1{2} /\
-       AKE.mH2{1}        = AKE_1.mH2{2} /\
-       AKE.sH2{1}        = AKE_1.sH2{2} /\
-       AKE.mStarted{1}   = AKE_1.mStarted{2} /\
-       AKE.mCompleted{1} = AKE_1.mCompleted{2} /\
-       AKE.evs{1}        = AKE_1.evs{2} /\
-       AKE.test{1}       = AKE_1.test{2}).
-       inline AKE_1(A).O.h1 AKE(A).O.h1.
-       eqobs_in. smt. wp. skip. smt. skip. smt.
-     (* h2_a *)
-     fun; eqobs_in.
-     (* init1 *)
-     fun. sp. if. progress.
-     wp.
-     seq 3 4:
-      (={i,x',x,A,B} /\
-       AKE.mSk{1}        = AKE_1.mSk{2} /\
-       AKE.cSession{1}   = AKE_1.cSession{2} /\
-       AKE.cH1{1}        = AKE_1.cH1{2} /\
-       AKE.cH2{1}        = AKE_1.cH2{2} /\
-       AKE.mH1{1}        = AKE_1.mH1{2} /\
-       AKE.sH1{1}        = AKE_1.sH1{2} /\
-       AKE.mH2{1}        = AKE_1.mH2{2} /\
-       AKE.sH2{1}        = AKE_1.sH2{2} /\
-       AKE.mStarted{1}   = AKE_1.mStarted{2} /\
-       AKE.mCompleted{1} = AKE_1.mCompleted{2} /\
-       AKE.evs{1}        = AKE_1.evs{2} /\
-       AKE.test{1}       = AKE_1.test{2}).
-       inline AKE_1(A).O.h1 AKE(A).O.h1.
-       eqobs_in. wp. rnd. wp.
-       skip. progress.
-     skip; progress. skip. progress.
-     (* init2 *)
-     fun; eqobs_in.
-     (* resp *)
-     fun. sp. if. progress.
-     wp.
-     seq 3 4:
-      (={i,y',y,X,A,B} /\
-       AKE.mSk{1}        = AKE_1.mSk{2} /\
-       AKE.cSession{1}   = AKE_1.cSession{2} /\
-       AKE.cH1{1}        = AKE_1.cH1{2} /\
-       AKE.cH2{1}        = AKE_1.cH2{2} /\
-       AKE.mH1{1}        = AKE_1.mH1{2} /\
-       AKE.sH1{1}        = AKE_1.sH1{2} /\
-       AKE.mH2{1}        = AKE_1.mH2{2} /\
-       AKE.sH2{1}        = AKE_1.sH2{2} /\
-       AKE.mStarted{1}   = AKE_1.mStarted{2} /\
-       AKE.mCompleted{1} = AKE_1.mCompleted{2} /\
-       AKE.evs{1}        = AKE_1.evs{2} /\
-       AKE.test{1}       = AKE_1.test{2}).
-       inline AKE_1(A).O.h1 AKE(A).O.h1.
-       eqobs_in. wp. rnd. wp.
-       skip. progress.
-     skip; progress. skip. progress.
-     (* staticRev *)
-     fun; eqobs_in.
-     (* ephemeralRev *)
-     fun; eqobs_in.
-     (* sessionRev *)
-     fun; eqobs_in.
-  skip. smt.
-qed. (* we only add ghost state, there should be an automated tactic *)
+     AKE.test{1}       = AKE_1.test{2}).
+    (* resp *)
+    fun.
+    sp.
+    if; [ smt | | skip; smt].
+    sp. wp.
+    call (Eq_AKE_AKE_1_O_h1 A).
+    wp.
+    rnd. skip. smt.
+    (* init1 *)
+    fun.
+    sp.
+    if; [ smt | | skip; smt].
+    sp. wp.
+    call (Eq_AKE_AKE_1_O_h1 A).
+    wp.
+    rnd. skip. smt.
+    (* h1_a *)
+    fun.
+    sp.
+    if; [ smt | | skip; smt].
+    sp. wp.
+    call (Eq_AKE_AKE_1_O_h1 A).
+    skip. smt.
+qed.
 
 lemma Pr_AKE_1_bad(A <: Adv) &m:
        Pr[ AKE_1(A).main() @ &m : res /\ test_fresh AKE_1.test AKE_1.evs ]
@@ -956,7 +770,5 @@ lemma Pr_AKE_1_bad(A <: Adv) &m:
 proof strict.
   admit.
 qed.
-
-
 
 (*} end: Proof: Pr[ AKE : win ] <= eps + Pr[ AKE_EexpRev : win ] *)
