@@ -6,6 +6,31 @@ require import Map.
 require import List.
 require import Distr.
 require import Real.
+require ISet.
+
+(*{ Extensions to standard library *)
+
+op def : 'a. (* types are inhabited, we define a polymorphic default value *)
+
+(* Zero based intervals {0, .., k} of natural numbers *)
+theory ZInter.
+  const bound : int.
+  axiom bound_geq_zero: bound >= 0.
+  type t.
+  op bounded(i : int) = 0 <= i /\ i <= bound.
+  op abs : int -> t.
+  op rep : t -> int.
+  axiom rep_abs(i : int): bounded i => rep (abs i) = i.
+  axiom abs_rep(x : t): abs (rep x) = x.
+end ZInter.
+
+op fdom(m : ('a,'b) map) : 'a set =
+  ISet.Finite.toFSet (dom m).
+
+op frng (m : ('a,'b) map) : 'b set =
+  ISet.Finite.toFSet (rng m).
+
+(*} *)
 
 (*{ * Basic types and operators for protocol messages *)
 
@@ -27,19 +52,19 @@ type Key = TKey.word.
 (*{ ** Define univ_type and sampling operators *)
 
 op univ_Sk : Sk set.
-axiom univ_Sk_all_mem : forall (x : Sk), mem x univ_Sk.
+axiom nosmt univ_Sk_all_mem : forall (x : Sk), mem x univ_Sk.
 op sample_Sk = Duni.duni univ_Sk.
 
 op univ_Esk : Esk set.
-axiom univ_Esk_all_mem : forall (x : Esk), mem x univ_Esk.
+axiom nosmt univ_Esk_all_mem : forall (x : Esk), mem x univ_Esk.
 op sample_Esk = Duni.duni univ_Esk.
 
 op univ_Eexp : Eexp set.
-axiom univ_Eexp_all_mem : forall (x : Eexp), mem x univ_Eexp.
+axiom nosmt univ_Eexp_all_mem : forall (x : Eexp), mem x univ_Eexp.
 op sample_Eexp = Duni.duni univ_Eexp.
 
 op univ_Key : Key set.
-axiom univ_Key_all_mem : forall (x : Key), mem x univ_Key.
+axiom nosmt univ_Key_all_mem : forall (x : Key), mem x univ_Key.
 op sample_Key = Dword.dword.
 (*} *)
 
@@ -102,7 +127,7 @@ op sid_of_sdata(sdata : Sdata, Y : Epk) =
   let (A,B,x,x',r) = sdata in (A,B,gen_epk(x'),Y,r).
 
 (* Strong partnering property *)
-axiom strong_partnering(x', y' : Eexp) (a, b : Sk) (A, B : Pk) (X, Y : Epk) (r1, r2 : Role):
+axiom nosmt strong_partnering(x', y' : Eexp) (a, b : Sk) (A, B : Pk) (X, Y : Epk) (r1, r2 : Role):
     gen_sstring x' a B Y r1 = gen_sstring y' b A X r2 <=>
     ((a = b /\ x' = y' /\ A = B /\ X = Y /\ r1 = r2) \/
     (A = gen_pk(a) /\ B = gen_pk(b) /\ X = gen_epk(x') /\ Y = gen_epk(y') /\ r1 <> r2)).
@@ -204,31 +229,31 @@ pred notfresh(t : Sid,  evs : Event list)  =
           \/ (* b) there is an ephemeral reveal for a (complete or incomplete) matching session *)
              List.mem (EphemeralRev ps) evs)).
 
-lemma not_fresh_imp_notfresh(t : Sid) (evs : Event list):
+lemma nosmt not_fresh_imp_notfresh(t : Sid) (evs : Event list):
   !(fresh t evs) => (notfresh t evs) by [].
 
-lemma not_def(P): (P => false) => !P by [].
+lemma nosmt not_def(P): (P => false) => !P by [].
 
-lemma notfresh_imp_notfresh(t : Sid) (evs : Event list):
+lemma nosmt notfresh_imp_notfresh(t : Sid) (evs : Event list):
   (notfresh t evs) => !(fresh t evs)
 by (elim /tuple5_ind t; smt).
 
-lemma not_fresh_notfresh(t : Sid) (evs : Event list):
+lemma nosmt not_fresh_notfresh(t : Sid) (evs : Event list):
   (notfresh t evs) => !(fresh t evs) by [].
 
-lemma absurd : forall P Q, !P => P => Q by [].
+lemma nosmt absurd : forall P Q, !P => P => Q by [].
 
-lemma not_or:
+lemma nosmt not_or:
   forall P Q, (! (P \/ Q)) = (! P /\ ! Q) by [].
 
-lemma not_and:
+lemma nosmt not_and:
   forall P Q, (! (P /\ Q)) = (! P \/ ! Q) by [].
 
-lemma diff_cons(x y : 'a) (xs : 'a list):
+lemma nosmt diff_cons(x y : 'a) (xs : 'a list):
   ! mem x xs =>
   mem x (y::xs) => y = x by [].
 
-lemma notfresh_fresh_ev(t : Sid) (evs : Event list) (e : Event):
+lemma nosmt notfresh_fresh_ev(t : Sid) (evs : Event list) (e : Event):
   notfresh t evs =>
   fresh t (e::evs) =>
   e = Accept (cmatching t) \/ 
@@ -255,7 +280,7 @@ proof.
   smt. smt.
 qed.
 
-lemma notfresh_fresh(t : Sid) (evs : Event list) (e Event):
+lemma nosmt notfresh_fresh(t : Sid) (evs : Event list) (e Event):
   e <> Accept (cmatching t) => 
   e <> Start (psid_of_sid (cmatching t)) =>
   notfresh t evs =>
@@ -283,7 +308,7 @@ pred fresh_eCK(t : Sid,  evs : Event list)  =
           /\ (* b) there is no ephemeral key reveal for a (complete or incomplete) matching session *)
              !(List.mem (EphemeralRev ps) evs))).
 
-lemma fresh_eCK_imp_fresh(t : Sid) (evs : Event list):
+lemma nosmt fresh_eCK_imp_fresh(t : Sid) (evs : Event list):
   (fresh_eCK t evs) => (fresh t evs) by [].
 (*} *)
 
@@ -299,7 +324,6 @@ const qEphemeralRev : int.
 const qAgent :       int.
 const qH1 :           int.
 const qH2 :           int.
-op def : 'a. (* types are inhabited, we define a polymorphic default value *)
 
 axiom qSession_pos:      0 < qSession.
 axiom qSesssionRev_pos:  0 < qSessionRev.
