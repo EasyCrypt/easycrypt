@@ -986,6 +986,7 @@ lemma Eq_AKE_1_AKE_2_O_h1(A <: Adv{AKE, AKE_1}):
   equiv[ AKE_1(A).O.h1 ~ AKE_2(A).O.h1 :
          (AKE_1.mH1{1} = AKE_2.mH1{2} /\ AKE_1.sH1{1} = AKE_2.sH1{2} /\ ={x,a})
          ==> (AKE_1.mH1{1} = AKE_2.mH1{2} /\ AKE_1.sH1{1} = AKE_2.sH1{2} /\ ={res}) ].
+proof strict.
   fun.
   eqobs_in.
 qed.
@@ -994,6 +995,7 @@ lemma Eq_AKE_1_AKE_2_O_h2(A <: Adv{AKE, AKE_1}):
   equiv[ AKE_1(A).O.h2 ~ AKE_2(A).O.h2 :
          (AKE_1.mH2{1} = AKE_2.mH2{2} /\ AKE_1.sH2{1} = AKE_2.sH2{2} /\ ={sstring})
          ==> (AKE_1.mH2{1} = AKE_2.mH2{2} /\ AKE_1.sH2{1} = AKE_2.sH2{2} /\ ={res}) ].
+proof strict.
   fun.
   eqobs_in.
 qed.
@@ -1005,6 +1007,7 @@ lemma Eq_AKE_1_AKE_2_O_h2_a(A <: Adv{AKE, AKE_1}):
          ==>
          (   AKE_1.mH2{1} = AKE_2.mH2{2} /\ AKE_1.sH2{1} = AKE_2.sH2{2}
           /\ AKE_1.cH2{1} = AKE_2.cH2{2} /\ ={res}) ].
+proof strict.
   fun.
   eqobs_in.
 qed.
@@ -1014,16 +1017,136 @@ lemma Eq_AKE_1_AKE_2_O_staticRev(A <: Adv{AKE, AKE_1}):
          (AKE_1.mSk{1} = AKE_2.mSk{2} /\ AKE_1.evs{1} = AKE_2.evs{2} /\ ={A})
          ==>
          (AKE_1.mSk{1} = AKE_2.mSk{2} /\ AKE_1.evs{1} = AKE_2.evs{2} /\ ={res})].
+proof strict.
   fun.
   eqobs_in.
 qed.
 
+pred eq_map_split(mStarted1 : (Sidx, Sdata)  map) 
+                 (mStarted2 : (Sidx, Sdata2) map) 
+                 (mEsk      : (Sidx, Esk)    map)
+                 (mEexp     : (Sidx, Eexp)   map)
+   =    dom mStarted1 = dom mStarted2 /\ dom mStarted2 = dom mEsk
+     /\ dom mStarted2 = dom mEexp /\
+     (forall (i : Sidx) (sd1 : Sdata) (A B : Agent) (r : Role),
+        ISet.mem i (dom mStarted1) =>
+        let sd1 = proj mStarted1.[i] in
+        let (A,B,r) = proj mStarted2.[i] in
+        sd1 = (A,B,proj mEsk.[i],proj mEexp.[i],r)).
+
+lemma Eq_AKE_1_AKE_2_O_h1_a(A <: Adv{AKE, AKE_1}):
+  equiv[ AKE_1(A).O.h1_a ~ AKE_2(A).O.h1_a :
+         (   AKE_1.mH1{1} = AKE_2.mH1{2} /\ AKE_1.sH1{1} = AKE_2.sH1{2}
+          /\ eq_map_split AKE_1.mStarted{1} AKE_2.mStarted{2} AKE_2.mEsk{2} AKE_2.mEexp{2}
+          /\ AKE_1.cH1{1} = AKE_2.cH1{2} /\ ={x,a})
+         ==>
+         (   AKE_1.mH1{1} = AKE_2.mH1{2} /\ AKE_1.sH1{1} = AKE_2.sH1{2}
+          /\ eq_map_split AKE_1.mStarted{1} AKE_2.mStarted{2} AKE_2.mEsk{2} AKE_2.mEexp{2}
+          /\ AKE_1.cH1{1} = AKE_2.cH1{2} /\ ={res}) ].
+proof strict.
+  fun.
+  sp.
+  if. smt.
+  sp. wp.
+  call (Eq_AKE_1_AKE_2_O_h1 A).
+  progress. skip. smt. skip. smt.
+qed.
+
+lemma Eq_AKE_1_AKE_2_O_init1(A <: Adv{AKE, AKE_1}):
+  equiv[ AKE_1(A).O.init1 ~ AKE_2(A).O.init1 :
+         (   AKE_1.mH1{1} = AKE_2.mH1{2} /\ AKE_1.sH1{1} = AKE_2.sH1{2}
+          /\ eq_map_split AKE_1.mStarted{1} AKE_2.mStarted{2} AKE_2.mEsk{2} AKE_2.mEexp{2}
+          /\ AKE_1.cH1{1} = AKE_2.cH1{2} /\ AKE_1.cSession{1} = AKE_2.cSession{2}
+          /\ AKE_1.mSk{1} = AKE_2.mSk{2} /\ AKE_1.bad_esk_col{1} = AKE_2.bad_esk_col{2}
+          /\ AKE_1.evs{1} = AKE_2.evs{2}
+          /\ ={i, A, B}
+         )
+         ==>
+         (   AKE_1.mH1{1} = AKE_2.mH1{2} /\ AKE_1.sH1{1} = AKE_2.sH1{2}
+          /\ eq_map_split AKE_1.mStarted{1} AKE_2.mStarted{2} AKE_2.mEsk{2} AKE_2.mEexp{2}
+          /\ AKE_1.cH1{1} = AKE_2.cH1{2} /\ AKE_1.cSession{1} = AKE_2.cSession{2}
+          /\ AKE_1.mSk{1} = AKE_2.mSk{2} /\ AKE_1.bad_esk_col{1} = AKE_2.bad_esk_col{2}
+          /\ AKE_1.evs{1} = AKE_2.evs{2}
+          /\ ={res}) ].
+proof strict.
+  fun.
+  sp.
+  if; [ smt | | skip; smt ].
+  sp. wp.
+  call (Eq_AKE_1_AKE_2_O_h1 A).
+  wp. rnd. skip. progress. smt. smt. smt. smt.
+  case ( i0 = i{2}).
+    progress.
+    generalize H9.
+    smt.
+  progress.
+  cut ->: proj AKE_2.mEsk{2}.[i{2} <- xL].[i0] = proj AKE_2.mEsk{2}.[i0]. smt.
+  cut ->: proj AKE_2.mEexp{2}.[i{2} <- result_R].[i0] = proj AKE_2.mEexp{2}.[i0]. smt.
+  smt. smt. smt. smt. smt. smt.
+  case (i{2} = i0).
+    progress.
+    generalize H9.
+    smt.
+  progress.
+  cut ->: proj AKE_2.mEsk{2}.[i{2} <- xL].[i0] = proj AKE_2.mEsk{2}.[i0]. smt.
+  cut ->: proj AKE_2.mEexp{2}.[i{2} <- result_R].[i0] = proj AKE_2.mEexp{2}.[i0]. smt.
+  smt.
+  smt.
+  smt.
+qed.
+
+lemma Eq_AKE_1_AKE_2_O_init2(A <: Adv{AKE, AKE_1}):
+  equiv[ AKE_1(A).O.init2 ~ AKE_2(A).O.init2 :
+         (   eq_map_split AKE_1.mStarted{1} AKE_2.mStarted{2} AKE_2.mEsk{2} AKE_2.mEexp{2}
+          /\ AKE_1.mCompleted{1} = AKE_2.mCompleted{2} /\ AKE_1.evs{1} = AKE_2.evs{2}
+          /\ ={i,Y}
+         )
+         ==>
+         (   eq_map_split AKE_1.mStarted{1} AKE_2.mStarted{2} AKE_2.mEsk{2} AKE_2.mEexp{2}
+          /\ AKE_1.mCompleted{1} = AKE_2.mCompleted{2} /\ AKE_1.evs{1} = AKE_2.evs{2}
+          /\ ={res}) ].
+proof strict.
+  fun.
+  if. smt.
+  wp. skip. progress. smt. smt. smt.
+  progress. smt.
+  rewrite /compute_sid /sid_of_sdata. progress.
+  cut ->: proj AKE_2.mCompleted{2}.[i{2} <- Y{2}].[i{2}] = Y{2}. smt.
+  (* FIXME: elim tuple5_ind proj AKE_1.mStarted{1}.[i{2}] ... *)
+  admit.
+  skip. progress. smt. smt. smt. smt.
+qed.
+
+lemma Eq_AKE_1_AKE_2_O_ephemeralRev(A <: Adv{AKE, AKE_1}):
+  equiv[ AKE_1(A).O.ephemeralRev ~ AKE_2(A).O.ephemeralRev :
+         (   eq_map_split AKE_1.mStarted{1} AKE_2.mStarted{2} AKE_2.mEsk{2} AKE_2.mEexp{2}
+          /\ AKE_1.mCompleted{1} = AKE_2.mCompleted{2} /\ AKE_1.evs{1} = AKE_2.evs{2}
+          /\ ={i}
+         )
+         ==>
+         (   eq_map_split AKE_1.mStarted{1} AKE_2.mStarted{2} AKE_2.mEsk{2} AKE_2.mEexp{2}
+          /\ AKE_1.mCompleted{1} = AKE_2.mCompleted{2} /\ AKE_1.evs{1} = AKE_2.evs{2}
+          /\ ={res}) ].
+proof strict.
+  fun.
+  wp.
+  skip.
+  progress. smt. smt. smt. smt.
+  rewrite /psid_of_sdata /compute_psid. progress. congr. trivial. congr.
+    admit.
+  generalize H.
+  rewrite /eq_map_split. progress.
+  cut H5 := H4 i{2} _. smt.
+  print axiom tuple5_ind.
+  smt.
+  smt. smt. smt. smt. smt.
+  smt. smt. smt. smt. smt.
+  smt. smt. smt. smt. smt.
+  smt.
+qed.
+
 (*
-  h1_a(a : Sk, x : Esk) ==> mStarted required for test
-  init1(i : Sidx, A : Agent, B : Agent) : Epk option
-  init2(i : Sidx, Y : Epk) : unit
   resp(i : Sidx, B : Agent, A : Agent, X : Epk) : Epk option
-  ephemeralRev(i : Sidx) : Esk option
   sessionRev(i : Sidx) : Key option
 *)
 
