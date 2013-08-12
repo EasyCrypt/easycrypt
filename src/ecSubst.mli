@@ -43,3 +43,6 @@ val subst_module_comps : subst -> module_comps -> module_comps
 val subst_modtype      : subst -> module_type -> module_type
 val subst_modsig       : ?params:(ident list) -> subst -> module_sig -> module_sig
 val subst_modsig_body  : subst -> module_sig_body -> module_sig_body
+
+(* -------------------------------------------------------------------- *)
+val subst_form : subst -> form -> form

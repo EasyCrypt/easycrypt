@@ -264,3 +264,95 @@ let field_simplify (cr : cfield) (eqs : eqs) (f : form) =
   let norm form = ofring (norm form eqs) in
 
     (List.map norm cond, norm num, norm denum)
+
+(* -------------------------------------------------------------------- *)
+module Axioms = struct
+  open EcDecl
+
+  let tmod  = "AlgTactic"
+  let tname = "domain"
+
+  let zero = "rzero"
+  let one  = "rone"
+  let add  = "add"
+  let opp  = "opp"
+  let sub  = "sub"
+  let mul  = "mul"
+  let inv  = "inv"
+  let div  = "div"
+  let expr = "expr"
+
+  let core   = ("RingCore"    , ["oner_eq0"; "addr0"; "addrA"; "addrC"; "addrN";
+                                 "mulr1"; "mulrA"; "mulrC"; "mulrDl"])
+  let natmul = ("RingNatMul"  , ["expr0"; "exprS"])
+  let ofint  = ("RingOfInt"   , ["ofint0"; "ofint1"; "ofintS"; "ofintN"])
+  let ofsub  = ("RingWithSub" , ["subrE"])
+  let field  = ("FieldCore"   , ["mulrV"; "exprN"])
+  let ofdiv  = ("FieldWithDiv", ["divrE"])
+
+  let subst_of_ring thname (cr : ring) =
+    let crcore = [(zero, cr.r_zero);
+                  (one , cr.r_one );
+                  (add , cr.r_add );
+                  (opp , cr.r_opp );
+                  (mul , cr.r_mul );
+                  (expr, cr.r_exp )] in
+
+    let thpath = EcPath.fromqsymbol ([tmod], thname) in
+    let xpath  = fun x -> EcPath.pqname thpath x in
+    let add    = fun subst x p -> EcSubst.add_path subst (xpath x) p in
+
+    let subst  = EcSubst.add_tydef EcSubst.empty (xpath tname) ([], cr.r_type) in
+    let subst  = List.fold_left (fun subst (x, p) -> add subst x p) subst crcore in
+    let subst  = odfl subst (cr.r_sub |> omap (fun p -> add subst sub p)) in
+    let subst  = cr.r_intmul |> (function `Embed -> subst | `IntMul p -> add subst expr p) in
+      subst
+
+  let subst_of_field thname (cr : field) =
+    let thpath = EcPath.fromqsymbol ([tmod], thname) in
+    let xpath  = fun x -> EcPath.pqname thpath x in
+    let add    = fun subst x p -> EcSubst.add_path subst (xpath x) p in
+
+    let subst = subst_of_ring thname cr.f_ring in
+    let subst = add subst inv cr.f_inv in
+    let subst = odfl subst (cr.f_div |> omap (fun p -> add subst div p)) in
+      subst
+
+  (* FIXME: should use operators inlining when available *)
+  let get (thname, axs) env cr =
+    let thpath = EcPath.fromqsymbol ([tmod], thname) in
+    let subst  =
+      match cr with
+      | `Ring  cr -> subst_of_ring  thname cr
+      | `Field cr -> subst_of_field thname cr
+    in
+
+    let for1 axname =
+      let ax = EcEnv.Ax.by_path (EcPath.pqname thpath axname) env in
+        assert (ax.ax_tparams = [] && ax.ax_kind = `Axiom && ax.ax_spec <> None);
+        (axname, EcSubst.subst_form subst (oget ax.ax_spec))
+    in
+      List.map for1 axs
+
+  let get_core   = fun env cr -> get core   env (`Ring  cr)
+  let get_natmul = fun env cr -> get natmul env (`Ring  cr)
+  let get_ofint  = fun env cr -> get ofint  env (`Ring  cr)
+  let get_ofsub  = fun env cr -> get ofsub  env (`Ring  cr)
+  let get_field  = fun env cr -> get field  env (`Field cr)
+  let get_ofdiv  = fun env cr -> get ofdiv  env (`Field cr)
+
+  let ring_axioms env (cr : ring) =
+    let axcore = (get_core env cr) @ (get_natmul env cr) in
+    let axint  = match cr.r_intmul with `Embed -> [] | `IntMul _ -> get_ofint env cr in
+    let axsub  = match cr.r_sub with None -> [] | Some _ -> get_ofsub env cr in
+      List.flatten [axcore; axint; axsub]
+
+  let field_axioms env (cr : field) =
+    let axring = ring_axioms env cr.f_ring in
+    let axcore = get_field env cr in
+    let axdiv  = match cr.f_div with None -> [] | Some _ -> get_ofdiv env cr in
+      List.flatten [axring; axcore; axdiv]
+end
+
+let ring_axioms  = Axioms.ring_axioms
+let field_axioms = Axioms.field_axioms

@@ -36,10 +36,10 @@
 (* -------------------------------------------------------------------- *)
 require import Int.
 
-type domain.
-
 (* -------------------------------------------------------------------- *)
 theory RingCore.
+  type domain.
+
   op rzero : domain.
   op rone  : domain.
   op add   : domain -> domain -> domain.

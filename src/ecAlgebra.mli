@@ -1,4 +1,5 @@
 (* -------------------------------------------------------------------- *)
+open EcSymbols
 open EcFol
 
 (* -------------------------------------------------------------------- *)
@@ -33,9 +34,11 @@ val cring_of_ring   : ring  -> cring
 val cfield_of_field : field -> cfield
 
 (* -------------------------------------------------------------------- *)
+val ring_axioms : EcEnv.env -> ring -> (symbol * form) list
 val ring_simplify : cring -> eqs -> form -> form
 val ring_eq : cring -> eqs -> form -> form -> form
 
 (* -------------------------------------------------------------------- *)
+val field_axioms : EcEnv.env -> field -> (symbol * form) list
 val field_simplify : cfield -> eqs -> form -> form list * form * form
 val field_eq : cfield -> eqs -> form -> form -> form list * (form * form) * (form * form)
