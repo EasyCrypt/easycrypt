@@ -66,7 +66,7 @@ let _ =
   end;
 
   List.iter EcCommands.addidir !options.o_idirs;
-  oiter !options.o_input
+  !options.o_input |> oiter
     (fun input ->
       EcCommands.addidir (Filename.dirname input));
   if !options.o_emacs then

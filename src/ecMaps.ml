@@ -8,6 +8,8 @@ module Map = struct
   module type S = sig
     include Why3.Extmap.S
 
+    val odup : ('a -> key) -> 'a list -> ('a * 'a) option
+
     val to_stream : 'a t -> (key * 'a) Stream.t
 
     val dump :
@@ -19,6 +21,19 @@ module Map = struct
 
   module Make(O : OrderedType) : S with type key = O.t = struct
     include Why3.Extmap.Make(O)
+
+    let odup (type a) (f : a -> key) (xs : a list) =
+      let module E = struct exception Found of a * a end in
+        try
+          List.fold_left
+            (fun sm x ->
+               let key = f x in
+                 match find_opt key sm with
+                 | Some y -> raise (E.Found (y, x))
+                 | None -> add (f x) x sm)
+            empty xs
+          |> ignore; None
+        with E.Found (x, y) -> Some (x, y)
 
     let to_stream (m : 'a t) =
       let next =

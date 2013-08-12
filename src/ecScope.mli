@@ -67,6 +67,7 @@ end
 
 module Ty : sig
   val add : scope -> (psymbol list * psymbol) located -> scope
+  val addclass : scope -> ptypeclass located -> scope
   val define : scope -> (psymbol list * psymbol) located -> pty -> scope
 end
 

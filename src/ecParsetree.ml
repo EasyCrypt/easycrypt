@@ -30,6 +30,7 @@ type pmsymbol = (psymbol * ((pmsymbol located) list) option) list
 
 (* -------------------------------------------------------------------- *)
 type pty_r =
+  | PTself
   | PTunivar
   | PTtuple  of pty list
   | PTnamed  of pqsymbol
@@ -327,12 +328,10 @@ type call_info =
    AppNone is required for the rest of judgments 
 *)
 
-
 type p_app_bd_info = 
   | PAppNone 
   | PAppSingle of pformula 
   | PAppMult of (pformula_o * pformula_o * pformula_o * pformula_o * pformula_o)
-
 
 type ('a, 'b, 'c) rnd_tac_info = 
   | PNoRndParams 
@@ -489,6 +488,21 @@ type paxiom = {
 }
 
 (* -------------------------------------------------------------------- *)
+type ptypeclass = {
+  ptc_name : psymbol;
+  ptc_inth : pqsymbol option;
+  ptc_ops  : (psymbol * pty) list;
+  ptc_axs  : pformula list;
+}
+
+type ptycinstance = {
+  pti_name : pqsymbol;
+  pti_type : pqsymbol;
+  pti_ops  : (psymbol * pqsymbol) list;
+  pti_axs  : (psymbol * ptactic_core) list;
+}
+
+(* -------------------------------------------------------------------- *)
 type ident_spec = psymbol list
 
 type inv = (pformula, (pformula * pformula) * pformula_o) EcAstlogic.g_inv
@@ -592,6 +606,8 @@ type global =
   | Gaxiom       of paxiom
   | Gclaim       of claim
   | Gtype        of ptydecl
+  | Gtypeclass   of ptypeclass
+  | Gtycinstance of ptycinstance
   | Gdatatype    of pdatatype
   | Gprint       of pprint
   | GthOpen      of psymbol

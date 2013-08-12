@@ -4,14 +4,14 @@ require import Map.
 require import Set_Why.
 require import CDH.
 require Logic.
-require Word.
+require AWord.
 require RandOrcl.
 require PKE.
 
 
 const k : int.
 
-clone Word as Bitstring with op length = k.
+clone AWord as Bitstring with op length = k.
 
 type bitstring = Bitstring.word.
 
@@ -30,7 +30,7 @@ type skey       = int.
 type plaintext  = bitstring.
 type ciphertext = group * bitstring.
 
-op (^^) : bitstring -> bitstring -> bitstring = Bitstring.(^^).
+op (^^) : bitstring -> bitstring -> bitstring = Bitstring.(^).
 
 op uniform : bitstring distr = Bitstring.Dword.dword.
 

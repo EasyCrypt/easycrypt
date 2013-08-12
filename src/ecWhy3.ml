@@ -715,7 +715,7 @@ and zipper = zipper_elem list
 let import_w3_tydef rn path (env,rb,z) ty =
   let tvm = Wtvm.create () in
   let params = List.map (Wtvm.get tvm) ty.Ty.ts_args in
-  let def = omap ty.Ty.ts_def (import_w3_ty env tvm) in
+  let def = ty.Ty.ts_def |> omap (import_w3_ty env tvm) in
   let eid = Renaming.get_ts rn ty in
   let td = { tyd_params = params; tyd_type = def } in
   let p = EcPath.pqname path eid in
@@ -760,7 +760,7 @@ let import_w3_term env tvm =
         let args = List.map (import vm) wargs in
         let import_ty = import_w3_ty env tvm in
         let wty = t.Term.t_ty in
-        let codom = odfl tbool (omap wty import_ty) in
+        let codom = odfl tbool (wty |> omap import_ty) in
         begin try
           let p,tvs =
             try Ident.Mid.find f.Term.ls_name env.env_w3
@@ -835,7 +835,7 @@ let rbadd_w3_ls rb p ls wparams odecl =
 let import_w3_ls rn path (env,rb,z) ls =
   let tvm = Wtvm.create () in
   let dom = List.map (import_w3_ty env tvm) ls.Term.ls_args in
-  let codom = omap ls.Term.ls_value (import_w3_ty env tvm) in
+  let codom =  ls.Term.ls_value |> omap (import_w3_ty env tvm) in
   let wparams = Ty.Stv.elements (Term.ls_ty_freevars ls) in
   let params = List.map (Wtvm.get tvm) wparams in
   let eid = Renaming.get_ls rn ls in
@@ -1030,7 +1030,7 @@ let trans_typarams =
 let trans_tydecl env path td =
   let pid = preid_p path in
   let env, tparams = trans_typarams env td.tyd_params in
-  let body = omap td.tyd_type (trans_ty env) in
+  let body = td.tyd_type |> omap (trans_ty env) in
   Ty.create_tysymbol pid tparams body
 
 (* --------------------------- Formulas ------------------------------- *)
@@ -1185,7 +1185,7 @@ let trans_op env p tys =
         | e -> raise e *)
       in
       let targs = List.map (fun t -> Some (Ty.ty_inst mtv t)) ls.Term.ls_args in
-      let tres  = omap ls.Term.ls_value (Ty.ty_inst mtv) in
+      let tres  =  ls.Term.ls_value |> omap (Ty.ty_inst mtv) in
       let mk args = Term.t_app ls args tres in
       (targs,tres), ls', mk
 
@@ -1424,7 +1424,7 @@ let destr_ty_fun ty =
 let trans_oper_body env ty body = 
   let body = 
     match body with
-    | OB_oper o -> omap o (EcFol.form_of_expr EcFol.mhr)
+    | OB_oper o -> o |> omap (EcFol.form_of_expr EcFol.mhr)
     | OB_pred o -> o in
   match body with
   | None ->

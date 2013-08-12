@@ -182,7 +182,7 @@ module PPEnv = struct
     let msymb =
         (List.map (fun x -> (x, [])) nm)
       @ [(x, List.map (mod_symb ppe) mp.P.m_args)]
-      @ (List.map (fun x -> (x, [])) (odfl [] (omap p2 P.tolist)))
+      @ (List.map (fun x -> (x, [])) (odfl [] (p2 |> omap P.tolist)))
     in
       msymb
 
@@ -337,7 +337,7 @@ let msymbol_of_pv (ppe : PPEnv.t) p =
   let inscope =
     let mem =
       let env = ppe.PPEnv.ppe_env in
-        obind (EcEnv.Memory.get_active env) (EcEnv.Memory.byid^~ env)
+        obind (EcEnv.Memory.byid^~ env) (EcEnv.Memory.get_active env)
     in
     match mem  with
     | None | Some (_, None) -> false
@@ -389,40 +389,6 @@ let pp_mem (ppe : PPEnv.t) fmt x =
     Format.fprintf fmt "%s" x
 
 (* -------------------------------------------------------------------- *)
-let rec pp_type_r ppe btuple fmt ty =
-  match ty.ty_node with
-  | Tglob m -> Format.fprintf fmt "(glob %a)" (pp_topmod ppe) m
-
-  | Tunivar x -> pp_tyunivar ppe fmt x
-  | Tvar    x -> pp_tyvar ppe fmt x
-
-  | Ttuple tys ->
-      pp_maybe_paren btuple
-        (pp_list " *@ " (pp_type_r ppe true)) fmt tys
-
-  | Tconstr (name, tyargs) -> begin
-      match tyargs with
-      | [] ->
-          pp_tyname ppe fmt name
-
-      | [x] ->
-          Format.fprintf fmt "%a %a"
-            (pp_type_r ppe true) x (pp_tyname ppe) name
-
-      | xs ->
-          Format.fprintf fmt "%a %a"
-            (pp_paren (pp_list ",@ " (pp_type_r ppe false))) xs
-            (pp_tyname ppe) name
-    end
-
-  | Tfun (t1, t2) ->
-      Format.fprintf fmt "@[%a ->@ %a@]"
-        (pp_type_r ppe true) t1 (pp_type_r ppe false) t2
-
-let pp_type ppe fmt ty =
-  pp_type_r ppe true fmt ty
-
-(* -------------------------------------------------------------------- *)
 type assoc  = [`Left | `Right | `NonAssoc]
 type fixity = [`Prefix | `Postfix | `Infix of assoc]
 type opprec = int * fixity
@@ -463,6 +429,14 @@ let maybe_paren (onm, (outer, side)) (inm, inner) pp =
         let inm = if inm = [EcCoreLib.id_top] then ["top"] else inm in
           fun fmt x ->
             Format.fprintf fmt "(%a)%%%s" pp x (String.concat "." inm)
+
+let maybe_paren_nosc outer inner pp =
+  maybe_paren ([], outer) ([], inner) pp
+
+(* -------------------------------------------------------------------- *)
+let t_prio_fun  = (10, `Infix `Right)
+let t_prio_tpl  = (20, `NonAssoc)
+let t_prio_name = (30, `Postfix)
 
 (* -------------------------------------------------------------------- *)
 let e_bin_prio_lambda = ( 5, `Prefix)
@@ -530,6 +504,51 @@ let is_binop name =
 
 let is_unbinop name = is_unop name || is_binop name
   
+(* -------------------------------------------------------------------- *)
+let rec pp_type_r ppe outer fmt ty =
+  match ty.ty_node with
+  | Tglob m -> Format.fprintf fmt "(glob %a)" (pp_topmod ppe) m
+
+  | Tunivar x -> pp_tyunivar ppe fmt x
+  | Tvar    x -> pp_tyvar ppe fmt x
+
+  | Ttuple tys ->
+      let pp fmt tys =
+        pp_list " *@ " (pp_type_r ppe (t_prio_tpl, `Left)) fmt tys
+      in
+        maybe_paren_nosc outer t_prio_tpl pp fmt tys
+
+  | Tconstr (name, tyargs) -> begin
+      let pp fmt (name, tyargs) =
+        match tyargs with
+        | [] ->
+            pp_tyname ppe fmt name
+  
+        | [x] ->
+            Format.fprintf fmt "%a %a"
+              (pp_type_r ppe (t_prio_name, `Left)) x
+              (pp_tyname ppe) name
+  
+        | xs ->
+            let subpp = pp_type_r ppe (min_op_prec, `NonAssoc) in
+              Format.fprintf fmt "%a %a"
+                (pp_paren (pp_list ",@ " subpp)) xs
+                (pp_tyname ppe) name
+      in
+        maybe_paren_nosc outer t_prio_name pp fmt (name, tyargs)
+    end
+
+  | Tfun (t1, t2) ->
+      let pp fmt (t1, t2) =
+        Format.fprintf fmt "@[%a ->@ %a@]"
+          (pp_type_r ppe (t_prio_fun, `Left )) t1
+          (pp_type_r ppe (t_prio_fun, `Right)) t2
+      in
+        maybe_paren_nosc outer t_prio_fun pp fmt (t1, t2)
+
+let pp_type ppe fmt ty =
+  pp_type_r ppe (min_op_prec, `NonAssoc) fmt ty
+
 (* -------------------------------------------------------------------- *)
 let pp_if3 (ppe : PPEnv.t) pp_sub outer fmt (b, e1, e2) =
   let pp fmt (b, e1, e2)=
@@ -1271,7 +1290,7 @@ let pp_typedecl (ppe : PPEnv.t) fmt (x, tyd) =
   and pp_body fmt =
     match tyd.tyd_type with
     | None    -> ()
-    | Some ty -> Format.fprintf fmt " =@ %a" (pp_type_r ppe false) ty
+    | Some ty -> Format.fprintf fmt " =@ %a" (pp_type ppe) ty
 
   in
     Format.fprintf fmt "@[%t%t.@]" pp_prelude pp_body
@@ -1290,7 +1309,7 @@ let pp_opdecl_pr (ppe : PPEnv.t) fmt (x, ts, ty, op) =
   let pp_body fmt =
     match op with
     | None ->
-        Format.fprintf fmt " : %a" (pp_type_r ppe false) ty
+        Format.fprintf fmt " : %a" (pp_type ppe) ty
 
     | Some f ->
         let ((subppe, pp_vds), f) =
@@ -1319,7 +1338,7 @@ let pp_opdecl_op (ppe : PPEnv.t) fmt (x, ts, ty, op) =
   let pp_body fmt =
     match op with
     | None ->
-        Format.fprintf fmt ": %a" (pp_type_r ppe false) ty
+        Format.fprintf fmt ": %a" (pp_type ppe) ty
 
     | Some e ->
         let ((subppe, pp_vds), e) =
@@ -1414,7 +1433,7 @@ let at n i =
 
 let rec collect2_i i1 i2 : ppnode list =
   let rec doit n =
-    match obind i1 (at n), obind i2 (at n) with
+    match i1 |> obind (at n), i2 |> obind (at n) with
     | None, None -> []
 
     | Some (p1, c1, s1), None -> collect1_i `Left  p1 s1 c1 :: doit (n+1)
@@ -1456,7 +1475,7 @@ let c_split ?width pp x =
   let buf = Buffer.create 127 in
     begin
       let fmt = Format.formatter_of_buffer buf in
-        oiter width (Format.pp_set_margin fmt);
+        width |> oiter (Format.pp_set_margin fmt);
         Format.fprintf fmt "@[<hov 2>%a@]@." pp x
     end;
     Str.split (Str.regexp "\\(\r?\n\\)+") (Buffer.contents buf)
@@ -1512,8 +1531,8 @@ let c_ppnode1 ~width ppe (pp1 : ppnode1) =
 
 let rec c_ppnode ~width ?mem ppe (pps : ppnode list list) =
   let do1 ((p1, p2, c, subs) : ppnode) : cppnode =
-    let p1   = c_ppnode1 ~width (ofold (omap mem fst) ((^~) PPEnv.enter_by_memid) ppe) p1 in
-    let p2   = c_ppnode1 ~width (ofold (omap mem snd) ((^~) PPEnv.enter_by_memid) ppe) p2 in
+    let p1   = c_ppnode1 ~width (mem |> omap fst |> ofold ((^~) PPEnv.enter_by_memid) ppe) p1 in
+    let p2   = c_ppnode1 ~width (mem |> omap snd |> ofold ((^~) PPEnv.enter_by_memid) ppe) p2 in
     let subs = c_ppnode  ~width ?mem ppe subs in
     let c    = match c with `B -> ' ' | `P -> '.' | `Q -> '?' in
       (p1, p2, c, subs)

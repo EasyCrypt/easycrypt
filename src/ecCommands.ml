@@ -119,6 +119,18 @@ let rec process_type (scope : EcScope.scope) (tyd : ptydecl located) =
     scope
   
 (* -------------------------------------------------------------------- *)
+and process_typeclass (scope : EcScope.scope) (tcd : ptypeclass located) =
+  EcScope.check_state `InTop "type class" scope;
+  let scope = EcScope.Ty.addclass scope tcd in
+    notify scope "added type class: `%s'" (unloc tcd.pl_desc.ptc_name);
+    scope
+
+(* -------------------------------------------------------------------- *)
+and process_tycinst (scope : EcScope.scope) (_tci : ptycinstance located) =
+  EcScope.check_state `InTop "type class instance" scope;
+  scope
+
+(* -------------------------------------------------------------------- *)
 and process_datatype (_scope : EcScope.scope) _ =
   failwith "not-implemented-yet"
 
@@ -156,7 +168,7 @@ and process_axiom (scope : EcScope.scope) (ax : paxiom located) =
   EcScope.check_state `InTop "axiom" scope;
   let mode = if (!pragma).pm_check then `Check else `WeakCheck in
   let (name, scope) = EcScope.Ax.add scope mode ax in
-    EcUtils.oiter name
+    name |> EcUtils.oiter
       (fun x -> notify scope "added axiom: `%s'" x);
     scope
 
@@ -256,7 +268,7 @@ and process_tactics (scope : EcScope.scope) t =
 (* -------------------------------------------------------------------- *)
 and process_save (scope : EcScope.scope) loc =
   let (name, scope) = EcScope.Ax.save scope loc in
-    EcUtils.oiter name
+    name |> EcUtils.oiter
       (fun x -> notify scope "added lemma: `%s'" x);
     scope
 
@@ -300,37 +312,39 @@ and process (ld : EcLoader.ecloader) (scope : EcScope.scope) g =
   let scope =
     match
       match g.pl_desc with
-      | Gtype      t    -> `Fct   (fun scope -> process_type       scope  (mk_loc loc t))
-      | Gdatatype  t    -> `Fct   (fun scope -> process_datatype   scope  (mk_loc loc t))
-      | Gmodule    m    -> `Fct   (fun scope -> process_module     scope  m)
-      | Gdeclare   m    -> `Fct   (fun scope -> process_declare    scope  m)
-      | Ginterface i    -> `Fct   (fun scope -> process_interface  scope  i)
-      | Goperator  o    -> `Fct   (fun scope -> process_operator   scope  (mk_loc loc o))
-      | Gpredicate p    -> `Fct   (fun scope -> process_predicate  scope  (mk_loc loc p))
-      | Gaxiom     a    -> `Fct   (fun scope -> process_axiom      scope  (mk_loc loc a))
-      | Gclaim     c    -> `Fct   (fun scope -> process_claim      scope  c)
-      | GthOpen    name -> `Fct   (fun scope -> process_th_open    scope  name.pl_desc)
-      | GthClose   name -> `Fct   (fun scope -> process_th_close   scope  name.pl_desc)
-      | GthRequire name -> `Fct   (fun scope -> process_th_require ld scope name)
-      | GthImport  name -> `Fct   (fun scope -> process_th_import  scope  name.pl_desc)
-      | GthExport  name -> `Fct   (fun scope -> process_th_export  scope  name.pl_desc)
-      | GthClone   thcl -> `Fct   (fun scope -> process_th_clone   scope  thcl)
-      | GsctOpen        -> `Fct   (fun scope -> process_sct_open   scope)
-      | GsctClose       -> `Fct   (fun scope -> process_sct_close  scope)
-      | GthW3      a    -> `Fct   (fun scope -> process_w3_import  scope  a)
-      | Gprint     p    -> `Fct   (fun scope -> process_print      scope  p; scope)
-      | Gtactics   t    -> `Fct   (fun scope -> process_tactics    scope  t)
-      | Grealize   p    -> `Fct   (fun scope -> process_realize    scope  p)
-      | Gprover_info pi -> `Fct   (fun scope -> process_proverinfo scope  pi)
-      | Gcheckproof b   -> `Fct   (fun scope -> process_checkproof scope  b)
-      | Gsave      loc  -> `Fct   (fun scope -> process_save       scope  loc)
-      | Gpragma    opt  -> `State (fun scope -> process_pragma     scope  opt)
+      | Gtype        t    -> `Fct   (fun scope -> process_type       scope  (mk_loc loc t))
+      | Gtypeclass   t    -> `Fct   (fun scope -> process_typeclass  scope  (mk_loc loc t))
+      | Gtycinstance t    -> `Fct   (fun scope -> process_tycinst    scope  (mk_loc loc t))
+      | Gdatatype    t    -> `Fct   (fun scope -> process_datatype   scope  (mk_loc loc t))
+      | Gmodule      m    -> `Fct   (fun scope -> process_module     scope  m)
+      | Gdeclare     m    -> `Fct   (fun scope -> process_declare    scope  m)
+      | Ginterface   i    -> `Fct   (fun scope -> process_interface  scope  i)
+      | Goperator    o    -> `Fct   (fun scope -> process_operator   scope  (mk_loc loc o))
+      | Gpredicate   p    -> `Fct   (fun scope -> process_predicate  scope  (mk_loc loc p))
+      | Gaxiom       a    -> `Fct   (fun scope -> process_axiom      scope  (mk_loc loc a))
+      | Gclaim       c    -> `Fct   (fun scope -> process_claim      scope  c)
+      | GthOpen      name -> `Fct   (fun scope -> process_th_open    scope  name.pl_desc)
+      | GthClose     name -> `Fct   (fun scope -> process_th_close   scope  name.pl_desc)
+      | GthRequire   name -> `Fct   (fun scope -> process_th_require ld scope name)
+      | GthImport    name -> `Fct   (fun scope -> process_th_import  scope  name.pl_desc)
+      | GthExport    name -> `Fct   (fun scope -> process_th_export  scope  name.pl_desc)
+      | GthClone     thcl -> `Fct   (fun scope -> process_th_clone   scope  thcl)
+      | GsctOpen          -> `Fct   (fun scope -> process_sct_open   scope)
+      | GsctClose         -> `Fct   (fun scope -> process_sct_close  scope)
+      | GthW3        a    -> `Fct   (fun scope -> process_w3_import  scope  a)
+      | Gprint       p    -> `Fct   (fun scope -> process_print      scope  p; scope)
+      | Gtactics     t    -> `Fct   (fun scope -> process_tactics    scope  t)
+      | Grealize     p    -> `Fct   (fun scope -> process_realize    scope  p)
+      | Gprover_info pi   -> `Fct   (fun scope -> process_proverinfo scope  pi)
+      | Gcheckproof  b    -> `Fct   (fun scope -> process_checkproof scope  b)
+      | Gsave        loc  -> `Fct   (fun scope -> process_save       scope  loc)
+      | Gpragma      opt  -> `State (fun scope -> process_pragma     scope  opt)
     with
     | `Fct   f -> Some (f scope)
     | `State f -> f scope; None
   in
     begin
-      oiter scope
+      scope |> oiter
         (fun scope ->
           try
             ignore (Sys.getenv "ECDEBUG");

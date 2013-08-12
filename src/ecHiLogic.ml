@@ -114,7 +114,7 @@ let unienv_of_hyps hyps =
 (* -------------------------------------------------------------------- *)
 let process_tyargs hyps tvi =
   let ue = unienv_of_hyps hyps in
-    omap tvi (TT.transtvi (LDecl.toenv hyps) ue)
+    omap (TT.transtvi (LDecl.toenv hyps) ue) tvi
 
 (* -------------------------------------------------------------------- *)
 let process_instanciate hyps ({pl_desc = pq; pl_loc = loc} ,tvi) =
@@ -183,7 +183,7 @@ let process_formula hyps pf =
 (* -------------------------------------------------------------------- *)
 let process_smt hitenv (db, pi) g =
   let usehyps =
-    match omap db unloc with
+    match omap unloc db with
     | None -> true
     | Some "nolocals" -> false
     | Some db -> tacuerror "unknown SMT DB: `%s'" db
@@ -385,7 +385,7 @@ let rec pmsymbol_of_pform fp : pmsymbol option =
     let mod_ = List.map (fun nm1 -> (mk_loc loc nm1, None)) nm in
     let args =
       List.map
-        (fun a -> omap (pmsymbol_of_pform a) (mk_loc a.pl_loc))
+        (fun a -> pmsymbol_of_pform a |> omap (mk_loc a.pl_loc))
         args
     in
 
@@ -472,7 +472,7 @@ let process_named_pterm _loc hyps (fp, tvi) =
   in
 
   let ue  = unienv_of_hyps hyps in
-  let tvi = omap tvi (TT.transtvi env ue) in
+  let tvi = omap (TT.transtvi env ue) tvi in
 
   begin
     match tvi with
@@ -1106,8 +1106,13 @@ let process_pose loc xsym o p g =
     | Some (ue, tue, ev) -> (ue, tue, ev, true)
     | None -> begin
         let ids = List.map (fun x -> `UnknownVar (x, ())) ids in
-        if not (can_concretize_pterm_arguments (ue, ev) ids) then
-          tacuerror "cannot find an occurence for [pose]";
+        if not (can_concretize_pterm_arguments (ue, ev) ids) then begin
+          if   ids = []
+          then tacuerror "%s - %s"
+                 "cannot find an occurence for [pose]"
+                 "instanciate type variables manually"
+          else tacuerror "cannot find an occurence for [pose]";
+        end;
         let ue = EcUnify.UniEnv.copy ue in
           (ue, EcUnify.UniEnv.close ue, ev, false)
     end
