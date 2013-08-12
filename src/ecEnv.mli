@@ -298,6 +298,11 @@ val import_w3_dir :
   -> EcWhy3.renaming_decl
   -> env * ctheory_item list
 
+(* -------------------------------------------------------------------- *)
+module Algebra : sig
+  val get_ring  : ty -> env -> EcAlgebra.ring  option
+  val get_field : ty -> env -> EcAlgebra.field option
+end
 
 (* -------------------------------------------------------------------- *)
 open EcBaseLogic

@@ -59,6 +59,8 @@ val find_all_goals : judgment_uc -> goals
 
 val find_in_hyps : form -> LDecl.hyps -> EcIdent.t
 
+val prove_goal_by : form list -> rule_name -> tactic
+
 (* -------------------------------------------------------------------- *)
 val t_id : string option -> tactic
 val t_fail : tactic
@@ -162,13 +164,6 @@ val t_assumption : tactic
 val t_progress : tactic -> tactic
 
 val t_trivial : tactic
-
-val fieldax        : form -> form -> form -> form -> form -> form -> form -> form -> form -> form list
-val ringax         : form -> form -> form -> form -> form -> form -> form -> form list
-val t_field        : (form * form * form * form * form * form * form * form * form * ((form * form ) list)) -> form * form -> tactic
-val t_field_simp   : (form * form * form * form * form * form * form * form * form * ((form * form ) list)) -> form * form -> tactic
-val t_ring         : (form * form * form * form * form * form * form * ((form * form ) list)) -> form * form -> tactic
-val t_ring_simp    : (form * form * form * form * form * form * form * ((form * form ) list)) -> form * form -> tactic
 
 val t_admit : tactic
 

@@ -2360,7 +2360,12 @@ let bindall (items : (symbol * ebinding) list) (env : env) =
   List.fold_left ((^~) bind1) env items
 
 (* -------------------------------------------------------------------- *)
+module Algebra = struct
+  let get_ring  _ty _env = assert false
+  let get_field _ty _env = assert false
+end
 
+(* -------------------------------------------------------------------- *)
 module LDecl = struct
   open EcIdent
   type error = 

@@ -1744,17 +1744,17 @@ logtactic:
 | SPLIT
     { Psplit }
 
-| FIELD plus=sform times=sform exp=sform inv=sform minus=sform d=sform z=sform o=sform eq=sform l=ident*
-    { Pfield (plus,times,inv,exp,minus,d,z,o,eq,l)}
+| FIELD eqs=ident*
+    { Pfield eqs }
 
-| FIELDSIMP plus=sform times=sform exp=sform inv=sform minus=sform d=sform z=sform o=sform eq=sform l=ident*
-    { Pfieldsimp (plus,times,inv,exp,minus,d,z,o,eq,l)}
+| FIELDSIMP eqs=ident*
+    { Pfieldsimp eqs }
 
-| RING plus=sform times=sform exp=sform minus=sform z=sform o=sform eq=sform l=ident*
-    { Pring (plus,times,exp,minus,z,o,eq,l)}
+| RING eqs=ident*
+    { Pring eqs }
 
-| RINGSIMP plus=sform times=sform exp=sform minus=sform z=sform o=sform eq=sform l=ident*
-    { Pringsimp (plus,times,exp,minus,z,o,eq,l)}
+| RINGSIMP  eqs=ident*
+    { Pringsimp eqs }
 
 | EXIST a=iplist1(loc(fpattern_arg), COMMA) %prec prec_below_comma
    { Pexists a }

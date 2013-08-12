@@ -23,6 +23,28 @@ type field = {
 }
 
 (* -------------------------------------------------------------------- *)
+val rapp    : ring -> EcPath.path -> form list -> form
+val rzero   : ring -> form
+val rone    : ring -> form
+val radd    : ring -> form -> form -> form
+val ropp    : ring -> form -> form
+val rmul    : ring -> form -> form -> form
+val rexp    : ring -> form -> int -> form
+val rsub    : ring -> form -> form -> form
+val rintmul : ring -> int -> form
+
+(* -------------------------------------------------------------------- *)
+val fzero : field -> form
+val fone  : field -> form
+val fadd  : field -> form -> form -> form
+val fopp  : field -> form -> form
+val fmul  : field -> form -> form -> form
+val fexp  : field -> form -> int -> form
+val fsub  : field -> form -> form -> form
+val finv  : field -> form -> form
+val fdiv  : field -> form -> form -> form
+
+(* -------------------------------------------------------------------- *)
 type eq  = form * form
 type eqs = eq list
 
@@ -34,11 +56,9 @@ val cring_of_ring   : ring  -> cring
 val cfield_of_field : field -> cfield
 
 (* -------------------------------------------------------------------- *)
-val ring_axioms : EcEnv.env -> ring -> (symbol * form) list
 val ring_simplify : cring -> eqs -> form -> form
 val ring_eq : cring -> eqs -> form -> form -> form
 
 (* -------------------------------------------------------------------- *)
-val field_axioms : EcEnv.env -> field -> (symbol * form) list
 val field_simplify : cfield -> eqs -> form -> form list * form * form
 val field_eq : cfield -> eqs -> form -> form -> form list * (form * form) * (form * form)
