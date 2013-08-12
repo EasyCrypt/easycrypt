@@ -1,12 +1,14 @@
-(*
-(************************************************************************)
-(*  v      *   The Coq Proof Assistant  /  The Coq Development Team     *)
-(* <O___,, *   INRIA - CNRS - LIX - LRI - PPS - Copyright 1999-2010     *)
-(*   \VV/  **************************************************************)
-(*    //   *      This file is distributed under the terms of the       *)
-(*         *       GNU Lesser General Public License Version 2.1        *)
-(************************************************************************)
-*)
+(* Copyright The Coq Development Team, 1999-2010
+ * Copyright INRIA - CNRS - LIX - LRI - PPS, 1999-2010
+ *
+ * This file is distributed under the terms of the:
+ *   GNU Lesser General Public License Version 2.1
+ *
+ * This file originates from the `Coq Proof Assistant'
+ * It has been modified for the needs of EasyCrypt
+ *)
+
+(* -------------------------------------------------------------------- *)
 open EcRing
 
 type fexpr =  FEc of c
