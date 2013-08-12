@@ -1,17 +1,17 @@
+(* Copyright The Coq Development Team, 1999-2010
+ * Copyright INRIA - CNRS - LIX - LRI - PPS, 1999-2010
+ *
+ * This file is distributed under the terms of the:
+ *   GNU Lesser General Public License Version 2.1
+ *
+ * This file originates from the `Coq Proof Assistant'
+ * It has been modified for the needs of EasyCrypt
+ *)
 
-(*
-(************************************************************************)
-(*  v      *   The Coq Proof Assistant  /  The Coq Development Team     *)
-(* <O___,, *   INRIA - CNRS - LIX - LRI - PPS - Copyright 1999-2010     *)
-(*   \VV/  **************************************************************)
-(*    //   *      This file is distributed under the terms of the       *)
-(*         *       GNU Lesser General Public License Version 2.1        *)
-(************************************************************************)
-*)
+(* -------------------------------------------------------------------- *)
 open Big_int
 
-type c = big_int;;
-(*type c = int;;*)
+type c = big_int
 
 let c0 = zero_big_int
 let c1 = unit_big_int
@@ -36,6 +36,22 @@ type pol = Pc of c
   | PX of pol * int * pol
 
 type mon = Mon0 | Zmon of (int * mon) | Vmon of (int * mon)
+
+
+let rec pexpr_eq (e1 : pexpr) (e2 : pexpr) : bool =
+  match (e1,e2) with
+    | (PEc c, PEc c') -> ceq c c'
+    | (PEX p1, PEX p2) -> p1 = p2
+    | (PEadd (e3,e5), PEadd (e4,e6)) -> 
+      if (pexpr_eq e3 e4) then pexpr_eq e5 e6 else false
+    | (PEsub (e3,e5), PEsub (e4,e6)) -> 
+      if (pexpr_eq e3 e4) then pexpr_eq e5 e6 else false
+    | (PEmul (e3,e5), PEmul (e4,e6)) -> 
+      if (pexpr_eq e3 e4) then pexpr_eq e5 e6 else false
+    | (PEopp e3, PEopp e4) -> pexpr_eq e3 e4
+    | (PEpow (e3,n3), PEpow (e4,n4)) -> 
+      if (n3 = n4) then pexpr_eq e3 e4 else false
+    | (_,_) -> false
 
 (**)
 
@@ -328,7 +344,6 @@ let rec norm_aux (e : pexpr) : pol =
     | PEpow (e1,p) -> ppow_n (norm_aux e1) p 
 
 let norm_subst (n : int) (lmp : ((c * mon) * pol) list) (p : pexpr) : pol  =  pnsubstl (norm_aux p) lmp n n
-(*let norm p = norm_subst  0 [] p*)
 
 let rec mon_of_pol (p : pol) : (c * mon) option =
   match p with

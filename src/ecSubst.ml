@@ -405,3 +405,5 @@ let subst_modsig_body  s = subst_modsig_body (_subst_of_subst s)
 
 let subst_mpath        s = (_subst_of_subst s).s_fmp
 let subst_path         s = (_subst_of_subst s).s_p
+
+let subst_form         s = fun f -> (Fsubst.f_subst (f_subst_of_subst (_subst_of_subst s)) f)

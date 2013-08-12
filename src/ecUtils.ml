@@ -37,6 +37,10 @@ let copy (x : 'a) : 'a =
   Obj.obj (Obj.dup (Obj.repr x))
 
 (* -------------------------------------------------------------------- *)
+let reffold (f : 'a -> 'b * 'a) (r : 'a ref) : 'b =
+  let (x, v) = f !r in r := v; x
+
+(* -------------------------------------------------------------------- *)
 type 'a tuple0 = unit
 type 'a tuple1 = 'a
 type 'a tuple2 = 'a * 'a

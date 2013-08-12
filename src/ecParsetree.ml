@@ -222,14 +222,6 @@ let rec pf_ident f =
   | _ -> None
 
 (* -------------------------------------------------------------------- *)
-type ptypeclass = {
-  ptc_name : psymbol;
-  ptc_inth : pqsymbol option;
-  ptc_ops  : (psymbol * pty) list;
-  ptc_axs  : pformula list;
-}
-
-(* -------------------------------------------------------------------- *)
 type pop_def =
   | POabstr of pty
   | POconcr of ptybindings * pty * pexpr
@@ -496,6 +488,21 @@ type paxiom = {
 }
 
 (* -------------------------------------------------------------------- *)
+type ptypeclass = {
+  ptc_name : psymbol;
+  ptc_inth : pqsymbol option;
+  ptc_ops  : (psymbol * pty) list;
+  ptc_axs  : pformula list;
+}
+
+type ptycinstance = {
+  pti_name : pqsymbol;
+  pti_type : pqsymbol;
+  pti_ops  : (psymbol * pqsymbol) list;
+  pti_axs  : (psymbol * ptactic_core) list;
+}
+
+(* -------------------------------------------------------------------- *)
 type ident_spec = psymbol list
 
 type inv = (pformula, (pformula * pformula) * pformula_o) EcAstlogic.g_inv
@@ -600,6 +607,7 @@ type global =
   | Gclaim       of claim
   | Gtype        of ptydecl
   | Gtypeclass   of ptypeclass
+  | Gtycinstance of ptycinstance
   | Gdatatype    of pdatatype
   | Gprint       of pprint
   | GthOpen      of psymbol

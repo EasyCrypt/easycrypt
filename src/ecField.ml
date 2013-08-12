@@ -1,12 +1,14 @@
-(*
-(************************************************************************)
-(*  v      *   The Coq Proof Assistant  /  The Coq Development Team     *)
-(* <O___,, *   INRIA - CNRS - LIX - LRI - PPS - Copyright 1999-2010     *)
-(*   \VV/  **************************************************************)
-(*    //   *      This file is distributed under the terms of the       *)
-(*         *       GNU Lesser General Public License Version 2.1        *)
-(************************************************************************)
-*)
+(* Copyright The Coq Development Team, 1999-2010
+ * Copyright INRIA - CNRS - LIX - LRI - PPS, 1999-2010
+ *
+ * This file is distributed under the terms of the:
+ *   GNU Lesser General Public License Version 2.1
+ *
+ * This file originates from the `Coq Proof Assistant'
+ * It has been modified for the needs of EasyCrypt
+ *)
+
+(* -------------------------------------------------------------------- *)
 open EcRing
 
 type fexpr =  FEc of c
@@ -24,22 +26,6 @@ type rsplit =  (pexpr * pexpr * pexpr)
 let left ((t,_,_) : rsplit) : pexpr = t
 let right ((_,_,t) : rsplit) : pexpr = t
 let common ((_,t,_) : rsplit) : pexpr = t
-
-let rec pexpr_eq (e1 : pexpr) (e2 : pexpr) : bool =
-  match (e1,e2) with
-    | (PEc c, PEc c') -> ceq c c'
-    | (PEX p1, PEX p2) -> p1 = p2
-    | (PEadd (e3,e5), PEadd (e4,e6)) -> 
-      if (pexpr_eq e3 e4) then pexpr_eq e5 e6 else false
-    | (PEsub (e3,e5), PEsub (e4,e6)) -> 
-      if (pexpr_eq e3 e4) then pexpr_eq e5 e6 else false
-    | (PEmul (e3,e5), PEmul (e4,e6)) -> 
-      if (pexpr_eq e3 e4) then pexpr_eq e5 e6 else false
-    | (PEopp e3, PEopp e4) -> pexpr_eq e3 e4
-    | (PEpow (e3,n3), PEpow (e4,n4)) -> 
-      if (n3 = n4) then pexpr_eq e3 e4 else false
-    | (_,_) -> false
-
 
 let npepow x n =
   match n with

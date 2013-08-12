@@ -219,6 +219,7 @@
 %token IMPOSSIBLE
 %token IN
 %token INLINE
+%token INSTANCE
 %token INTROS
 %token IOTA
 %token KILL
@@ -1231,6 +1232,25 @@ tc_op: OP x=lident COLON ty=loc(type_exp) { (x, ty) };
 tc_ax: AXIOM ax=form { ax };
 
 (* -------------------------------------------------------------------- *)
+(* Type classes (instances)                                             *)
+tycinstance:
+| INSTANCE x=qident WITH ty=qident ops=tyci_op* axs=tyci_ax* {
+    { pti_name = x;
+      pti_type = ty;
+      pti_ops  = ops;
+      pti_axs  = axs; }
+  }
+;
+
+tyci_op:
+| OP x=ident EQ tg=qident { (x, tg) }
+;
+
+tyci_ax:
+| PROOF x=ident BY tg=tactic_core { (x, tg) }
+;
+
+(* -------------------------------------------------------------------- *)
 (* Operator definitions                                                 *)
 
 op_tydom:
@@ -2216,6 +2236,7 @@ global_:
 | sig_def          { Ginterface   $1 }
 | type_decl_or_def { Gtype        $1 }
 | typeclass        { Gtypeclass   $1 }
+| tycinstance      { Gtycinstance $1 }
 | datatype_def     { Gdatatype    $1 }
 | operator         { Goperator    $1 }
 | predicate        { Gpredicate   $1 }
