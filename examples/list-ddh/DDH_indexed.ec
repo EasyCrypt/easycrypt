@@ -31,7 +31,7 @@ require import Distr.
 type gtriple =  (group * group * group).
 
 module type DDH_DISTINGUISHER = { 
-  fun distinguish(X Y Z : group) : bool
+  fun distinguish(i : int, X Y Z : group) : bool
 }.
 
 module Sample_DH = {
@@ -52,21 +52,21 @@ module Sample_DH = {
 }.
 
 module DDH_real (D:DDH_DISTINGUISHER) = { 
-  fun main() : bool = {
+  fun main(i : int) : bool = {
     var x, y, z : group;
     var b : bool;
     (x,y,z) = Sample_DH.sample_dh_real();
-    b = D.distinguish(x,y,z);
+    b = D.distinguish(i,x,y,z);
     return b;
   }     
 }.
 
 module DDH_random (D:DDH_DISTINGUISHER) = { 
-  fun main() : bool = {
+  fun main(i:int) : bool = {
     var x, y, z : group;
     var b : bool;
     (x,y,z) = Sample_DH.sample_dh_random();
-    b = D.distinguish(x,y,z);
+    b = D.distinguish(i,x,y,z);
     return b;
   }
 }.
@@ -98,21 +98,21 @@ module Sample_DH_distr = {
 }.
 
 module DDH_distr_real (D:DDH_DISTINGUISHER) = { 
-  fun main() : bool = {
+  fun main(i : int) : bool = {
     var x, y, z : group;
     var b : bool;
     (x,y,z) = Sample_DH_distr.sample_dh_real();
-    b = D.distinguish(x,y,z);
+    b = D.distinguish(i,x,y,z);
     return b;
   }     
 }.
 
 module DDH_distr_random (D:DDH_DISTINGUISHER) = { 
-  fun main() : bool = {
+  fun main(i : int) : bool = {
     var x, y, z : group;
     var b : bool;
     (x,y,z) = Sample_DH_distr.sample_dh_random();
-    b = D.distinguish(x,y,z);
+    b = D.distinguish(i,x,y,z);
     return b;
   }
 }.
@@ -473,7 +473,7 @@ qed.
 lemma Eq_DDH_real_distr:
   forall (D <: DDH_DISTINGUISHER {DDH_real, DDH_distr_real}),
     equiv[ DDH_real(D).main ~ DDH_distr_real(D).main :
-           ={glob D} ==> ={res} ].
+           ={glob D,i} ==> ={res} ].
 proof strict.
   intros=> D.
   fun. call (_ : true). call Eq_Sample_DH_distr_real. skip; smt.
@@ -482,7 +482,7 @@ qed.
 lemma Eq_DDH_random_distr:
   forall (D <: DDH_DISTINGUISHER {DDH_real, DDH_distr_real}),
     equiv[ DDH_random(D).main ~ DDH_distr_random(D).main :
-           ={glob D} ==> ={res} ].
+           ={glob D, i} ==> ={res} ].
 proof strict.
   intros=> D.
   fun. call (_ : true). call Eq_Sample_DH_distr_random. skip; smt.

@@ -49,6 +49,13 @@ proof strict.
 intros=> p; apply fun_ext; smt.
 qed.
 
+lemma congr_fun_app : forall (f g : 'a -> 'b) (x y : 'a),
+  f == g => x = y => f x = g y.
+proof.
+ intros => f g x y heqf ->.
+ by rewrite (fun_ext f g _).
+qed.
+ 
 (*
 (** Properties of functions *)
 op id (x:'a): 'a = x.

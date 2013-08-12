@@ -86,6 +86,17 @@ lemma mu_weight_0 (d:'a distr):
   weight d = 0%r => forall p, mu d p = 0%r
 by [].
 
+lemma mu_one : forall (P : 'a Fun.cpred)(d : 'a distr),
+  P == Fun.cpTrue => 
+  weight d = 1%r =>
+  mu d P = 1%r.
+proof.
+  intros => P d heq <-.
+  rewrite /weight.
+  congr => //.
+  by apply Fun.fun_ext.
+qed.  
+
 (*** Some useful distributions *)
 (** Empty distribution *)
 theory Dempty.

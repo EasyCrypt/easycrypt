@@ -141,7 +141,7 @@ let rec destruct_product hyps fp =
 
 (* -------------------------------------------------------------------- *)
 let t_id msg (juc,n) =
-  oiter msg (fun x -> Printf.fprintf stderr "DEBUG: %s\n%!" x);
+  msg |> oiter (fun x -> Printf.fprintf stderr "DEBUG: %s\n%!" x);
   (juc, [n])
 
 let t_on_goals t (juc,ln) = 

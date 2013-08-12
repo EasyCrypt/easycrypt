@@ -151,8 +151,10 @@ module Hsmpath = Why3.Hashcons.Make (struct
       match m.m_top with
       | `Local id -> EcIdent.id_hash id
       | `Concrete(p, o) -> 
-        ofold o (fun s h -> Why3.Hashcons.combine h (p_hash s))
-          (p_hash p) in
+        o |> ofold
+              (fun s h -> Why3.Hashcons.combine h (p_hash s))
+              (p_hash p)
+    in
     Why3.Hashcons.combine_list m_hash hash m.m_args
           
   let tag n p = { p with m_tag = n }
@@ -263,8 +265,7 @@ let rec m_tostring (m : mpath) =
 
     | `Concrete (p, sub) ->
       let strsub = 
-        ofold sub (fun p _ ->
-          Format.sprintf ".%s" (tostring p)) ""
+        sub |> ofold (fun p _ -> Format.sprintf ".%s" (tostring p)) ""
       in
         (tostring p, strsub)
   in

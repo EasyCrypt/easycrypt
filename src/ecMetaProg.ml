@@ -543,11 +543,11 @@ module FPosition = struct
   
           | _ -> None
         in
-          omap subp (fun p -> `Sub p)
+          omap (fun p -> `Sub p) subp
       end
 
     and doit ctxt fps =
-      let fps = List.mapi (fun i fp -> omap (doit1 ctxt fp) (fun p -> (i, p))) fps in
+      let fps = List.mapi (fun i fp -> doit1 ctxt fp |> omap (fun p -> (i, p))) fps in
       let fps = List.pmap identity fps in
         match fps with
         | [] -> None

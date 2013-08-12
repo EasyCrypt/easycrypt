@@ -140,7 +140,7 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
   let cpath = EcEnv.root scenv in
 
   let opath, oth = EcEnv.Theory.lookup (unloc thcl.pthc_base) scenv in
-  let name  = odfl (EcPath.basename opath) (omap thcl.pthc_name unloc) in
+  let name  = odfl (EcPath.basename opath) (thcl.pthc_name |> omap unloc) in
   let npath = EcPath.pqname cpath name in
   let subst = EcSubst.add_path EcSubst.empty opath npath in
 
@@ -396,7 +396,7 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
                       (lam.EcTypes.e_ty, Some lam)
                   in
                   let uni     = EcTypes.Tuni.subst (EcUnify.UniEnv.close ue) in
-                  let body    = omap body (EcTypes.e_mapty uni) in
+                  let body    = body |> omap (EcTypes.e_mapty uni) in
                   let ty      = uni ty in
                   let tparams = EcUnify.UniEnv.tparams ue in
                     (mk_op tparams ty body, subst, true)

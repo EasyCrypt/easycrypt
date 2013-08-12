@@ -47,12 +47,14 @@ type mem_error =
 type tyerror =
 | UniVarNotAllowed
 | TypeVarNotAllowed
+| SelfNotAllowed
 | OnlyMonoTypeAllowed
 | UnboundTypeParameter of symbol
 | UnknownTypeName      of qsymbol
 | InvalidTypeAppl      of qsymbol * int * int
 | DuplicatedTyVar
 | DuplicatedLocal      of symbol
+| DuplicatedField      of symbol
 | NonLinearPattern
 | LvNonLinear
 | NonUnitFunWithoutReturn
@@ -128,6 +130,9 @@ let pp_tyerror fmt env error =
   | TypeVarNotAllowed ->
       msg "type variables not allowed"
 
+  | SelfNotAllowed ->
+      msg "`self' not allowed in this context"
+
   | OnlyMonoTypeAllowed ->
       msg "only monomorph types allowed here"
 
@@ -144,7 +149,10 @@ let pp_tyerror fmt env error =
       msg "a type variable appear at least twice"
 
   | DuplicatedLocal name ->
-      msg "duplicated local/parameters name: %s" name
+      msg "duplicated local/parameters name: `%s'" name
+
+  | DuplicatedField name ->
+      msg "duplicated field name: `%s'" name
 
   | NonLinearPattern ->
       msg "non-linear pattern matching"
@@ -309,7 +317,7 @@ let (i_inuse, s_inuse, se_inuse) =
     | Scall (lv, p, es) -> begin
       let map = List.fold_left se_inuse map es in
       let map = add_call map p in
-      let map = ofold lv ((^~) lv_inuse) map in
+      let map = lv |> ofold ((^~) lv_inuse) map in
         map
     end
 
@@ -411,16 +419,19 @@ let lookup_scope env popsc =
 type typolicy = {
   tp_uni  : bool;   (* "_" (Tuniar) allowed  *)
   tp_tvar : bool;   (* type variable allowed *)
+  tp_self : bool;   (* in type class         *)
 }
 
-let tp_tydecl  = { tp_uni = false; tp_tvar = true ; } (* type decl. *)
-let tp_relax   = { tp_uni = true ; tp_tvar = true ; } (* ops/forms/preds *)
-let tp_nothing = { tp_uni = false; tp_tvar = false; } (* module type annot. *)
-let tp_uni     = { tp_uni = true ; tp_tvar = false; } (* params/local vars. *)
+let tp_tydecl  = { tp_uni = false; tp_tvar = true ; tp_self = false; } (* type decl. *)
+let tp_tclass  = { tp_uni = false; tp_tvar = true ; tp_self = true ; } (* type class *)
+let tp_relax   = { tp_uni = true ; tp_tvar = true ; tp_self = false; } (* ops/forms/preds *)
+let tp_nothing = { tp_uni = false; tp_tvar = false; tp_self = false; } (* module type annot. *)
+let tp_uni     = { tp_uni = true ; tp_tvar = false; tp_self = false; } (* params/local vars. *)
+let selfname   = EcIdent.create "$self"
 
 (* -------------------------------------------------------------------- *)
 let ue_for_decl (env : EcEnv.env) (loc, tparams) =
-  let tparams = omap tparams
+  let tparams = tparams |> omap
     (fun tparams ->
       let tparams = List.map unloc tparams in
         if not (List.uniq tparams) then
@@ -432,17 +443,22 @@ let ue_for_decl (env : EcEnv.env) (loc, tparams) =
 (* -------------------------------------------------------------------- *)
 let rec transty (tp : typolicy) (env : EcEnv.env) ue ty =
   match ty.pl_desc with
-   | PTunivar ->
-       if   tp.tp_uni
-       then UE.fresh_uid ue
-       else tyerror ty.pl_loc env UniVarNotAllowed
+  | PTself ->
+      if   tp.tp_self
+      then tvar selfname
+      else tyerror ty.pl_loc env SelfNotAllowed
 
-   | PTvar s ->
-       if tp.tp_tvar then 
-         try tvar (UE.get_var ue s.pl_desc)
-         with _ -> tyerror s.pl_loc env (UnboundTypeParameter s.pl_desc)
-       else
-         tyerror s.pl_loc env TypeVarNotAllowed;
+  | PTunivar ->
+      if   tp.tp_uni
+      then UE.fresh_uid ue
+      else tyerror ty.pl_loc env UniVarNotAllowed
+
+  | PTvar s ->
+      if tp.tp_tvar then 
+        try tvar (UE.get_var ue s.pl_desc)
+        with _ -> tyerror s.pl_loc env (UnboundTypeParameter s.pl_desc)
+      else
+        tyerror s.pl_loc env TypeVarNotAllowed;
 
   | PTtuple tys   -> 
       ttuple (transtys tp env ue tys)
@@ -577,7 +593,7 @@ let transexp (env : EcEnv.env) (ue : EcUnify.unienv) e =
     | PEint i -> (e_int i, tint)
 
     | PEident ({ pl_desc = name }, tvi) -> 
-        let tvi = omap tvi (transtvi env ue) in
+        let tvi = tvi |> omap (transtvi env ue) in
         let ops = select_exp_op env osc name ue tvi [] in
         begin match ops with
         | [] -> tyerror loc env (UnknownVarOrOp (name, []))
@@ -595,7 +611,7 @@ let transexp (env : EcEnv.env) (ue : EcUnify.unienv) e =
           transexp_r (Some opsc) env e
 
     | PEapp ({pl_desc = PEident({ pl_desc = name; pl_loc = loc }, tvi)}, pes) ->
-        let tvi  = omap tvi (transtvi env ue) in  
+        let tvi  = tvi |> omap (transtvi env ue) in  
         let es   = List.map (transexp env) pes in
         let esig = snd (List.split es) in
         let ops  = select_exp_op env osc name ue tvi esig in
@@ -968,7 +984,7 @@ let rec trans_msymbol (env : EcEnv.env) (msymb : pmsymbol located) =
         (mod_expr.me_sig.mis_params, true)
   in
 
-  let args = omap args (List.map (trans_msymbol env)) in
+  let args = args |> omap (List.map (trans_msymbol env)) in
 
   match args with
   | None ->
@@ -1179,11 +1195,11 @@ and transstruct1 (env : EcEnv.env) (st : pstructure_item located) =
 
       let clsubst = { EcTypes.e_subst_id with es_ty = su } in
       let stmt    = s_subst clsubst stmt
-      and result  = omap result (e_subst clsubst) in
+      and result  = result |> omap (e_subst clsubst) in
       let stmt    = EcModules.stmt (List.flatten prelude @ stmt.s_node) in
 
       (* Computes reads/writes/calls *)
-      let uses = ofold result ((^~) se_inuse) (s_inuse stmt) in
+      let uses = result |> ofold ((^~) se_inuse) (s_inuse stmt) in
 
       (* Compose all results *)
       let fun_ =
@@ -1222,8 +1238,8 @@ and transbody ue symbols (env : EcEnv.env) retty pbody =
 
     let xs     = snd (unloc local.pfl_names) in
     let mode   = fst (unloc local.pfl_names) in
-    let init   = omap local.pfl_init (fst -| transexp !env ue) in
-    let ty     = omap local.pfl_type (transty tp_uni !env ue) in
+    let init   = local.pfl_init |> omap (fst -| transexp !env ue) in
+    let ty     = local.pfl_type |> omap (transty tp_uni !env ue) in
 
     let ty =
       match ty, init with
@@ -1261,7 +1277,7 @@ and transbody ue symbols (env : EcEnv.env) retty pbody =
         (List.map (fun (v, _, _, pl) -> (v, pl)) mylocals)
         !locals;
 
-    oiter init
+    init |> oiter
       (fun init ->
         let iasgn = List.map (fun (_, v, xty, _) -> (v, xty)) mylocals in
           prelude := ((mode, iasgn), init, _dummy) :: !prelude)
@@ -1419,7 +1435,7 @@ and translvalue ue (env : EcEnv.env) lvalue =
       (LvTuple xs, ty)
 
   | PLvMap (x, tvi, e) ->
-      let tvi = omap tvi (transtvi env ue) in
+      let tvi = tvi |> omap (transtvi env ue) in
       let codomty = UE.fresh_uid ue in
       let pv,xty = trans_pv env x in
       let e, ety = transexp env ue e in
@@ -1490,7 +1506,7 @@ let trans_topmsymbol env gp =
   mp
 
 (* -------------------------------------------------------------------- *)
-let trans_form_or_pattern env (ps, ue) pf tt =
+let trans_form_or_pattern env tc (ps, ue) pf tt =
   let rec transf_r opsc env f =
     let transf = transf_r opsc in
 
@@ -1529,7 +1545,7 @@ let trans_form_or_pattern env (ps, ue) pf tt =
     end
 
     | PFident ({ pl_desc = name;pl_loc = loc }, tvi) -> 
-        let tvi = omap tvi (transtvi env ue) in
+        let tvi = tvi |> omap (transtvi env ue) in
         let ops = select_form_op env opsc name ue tvi [] in
         begin match ops with
         | [] ->
@@ -1579,7 +1595,7 @@ let trans_form_or_pattern env (ps, ue) pf tt =
         EcFol.f_ands eqs
 
     | PFapp ({pl_desc = PFident ({ pl_desc = name; pl_loc = loc }, tvi)}, pes) ->
-        let tvi  = omap tvi (transtvi env ue) in  
+        let tvi  = tvi |> omap (transtvi env ue) in  
         let es   = List.map (transf env) pes in
         let esig = List.map EcFol.f_ty es in 
         let ops  = select_form_op env opsc name ue tvi esig in
@@ -1744,7 +1760,7 @@ let trans_form_or_pattern env (ps, ue) pf tt =
     let trans1 env (xs, pgty) =
         match pgty with
         | PGTY_Type ty -> 
-          let ty = transty tp_relax env ue ty in
+          let ty = transty (if tc then tp_tclass else tp_relax) env ue ty in
           let xs = List.map (fun x -> EcIdent.create x.pl_desc, ty) xs in
           let env = EcEnv.Var.bind_locals xs env in
           let xs = List.map (fun (x,ty) -> x,GTty ty) xs in
@@ -1772,11 +1788,11 @@ let trans_form_or_pattern env (ps, ue) pf tt =
   in
 
   let f = transf_r None env pf in
-    oiter tt (unify_or_fail env ue pf.pl_loc ~expct:f.f_ty); f
+    tt |> oiter (unify_or_fail env ue pf.pl_loc ~expct:f.f_ty); f
 
 (* -------------------------------------------------------------------- *)
 let trans_form_opt env ue pf oty =
-  trans_form_or_pattern env (None, ue) pf oty
+  trans_form_or_pattern env false (None, ue) pf oty
 
 (* -------------------------------------------------------------------- *)
 let trans_form env ue pf ty =
@@ -1787,5 +1803,35 @@ let trans_prop env ue pf =
   trans_form env ue pf tbool
 
 (* -------------------------------------------------------------------- *)
+let trans_tcprop env ue pf =
+  trans_form_or_pattern env true (None, ue) pf (Some tbool)
+
+(* -------------------------------------------------------------------- *)
 let trans_pattern env (ps, ue) pf =
-  trans_form_or_pattern env (Some ps, ue) pf None
+  trans_form_or_pattern env false (Some ps, ue) pf None
+
+(* -------------------------------------------------------------------- *)
+let trans_tclass env { pl_loc = _; pl_desc = tcd; } =
+  (* Check for duplicated field names *)
+  Msym.odup unloc (List.map fst tcd.ptc_ops)
+    |> oiter (fun (x, y) -> tyerror y.pl_loc env (DuplicatedField x.pl_desc) );
+
+  (* Check operators types *)
+  let operators =
+    let check1 (x, ty) =
+      let ue = EcUnify.UniEnv.create (Some []) in
+        (EcIdent.create (unloc x), transty tp_tclass env ue ty)
+    in
+      tcd.ptc_ops |> List.map check1 in
+
+  (* Check axioms *)
+  let axioms =
+    let env = EcEnv.Var.bind_locals operators env in
+    let check1 ax =
+      let ue = EcUnify.UniEnv.create (Some []) in
+        trans_tcprop env ue ax
+    in
+      tcd.ptc_axs |> List.map check1 in
+
+  (* Construct actual type-class *)
+  { tc_ops = operators; tc_axs = axioms; }

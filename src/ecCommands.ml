@@ -119,6 +119,13 @@ let rec process_type (scope : EcScope.scope) (tyd : ptydecl located) =
     scope
   
 (* -------------------------------------------------------------------- *)
+and process_typeclass (scope : EcScope.scope) (tcd : ptypeclass located) =
+  EcScope.check_state `InTop "type class" scope;
+  let scope = EcScope.Ty.addclass scope tcd in
+    notify scope "added type class: `%s'" (unloc tcd.pl_desc.ptc_name);
+    scope
+
+(* -------------------------------------------------------------------- *)
 and process_datatype (_scope : EcScope.scope) _ =
   failwith "not-implemented-yet"
 
@@ -156,7 +163,7 @@ and process_axiom (scope : EcScope.scope) (ax : paxiom located) =
   EcScope.check_state `InTop "axiom" scope;
   let mode = if (!pragma).pm_check then `Check else `WeakCheck in
   let (name, scope) = EcScope.Ax.add scope mode ax in
-    EcUtils.oiter name
+    name |> EcUtils.oiter
       (fun x -> notify scope "added axiom: `%s'" x);
     scope
 
@@ -256,7 +263,7 @@ and process_tactics (scope : EcScope.scope) t =
 (* -------------------------------------------------------------------- *)
 and process_save (scope : EcScope.scope) loc =
   let (name, scope) = EcScope.Ax.save scope loc in
-    EcUtils.oiter name
+    name |> EcUtils.oiter
       (fun x -> notify scope "added lemma: `%s'" x);
     scope
 
@@ -301,6 +308,7 @@ and process (ld : EcLoader.ecloader) (scope : EcScope.scope) g =
     match
       match g.pl_desc with
       | Gtype      t    -> `Fct   (fun scope -> process_type       scope  (mk_loc loc t))
+      | Gtypeclass t    -> `Fct   (fun scope -> process_typeclass  scope  (mk_loc loc t))
       | Gdatatype  t    -> `Fct   (fun scope -> process_datatype   scope  (mk_loc loc t))
       | Gmodule    m    -> `Fct   (fun scope -> process_module     scope  m)
       | Gdeclare   m    -> `Fct   (fun scope -> process_declare    scope  m)
@@ -330,7 +338,7 @@ and process (ld : EcLoader.ecloader) (scope : EcScope.scope) g =
     | `State f -> f scope; None
   in
     begin
-      oiter scope
+      scope |> oiter
         (fun scope ->
           try
             ignore (Sys.getenv "ECDEBUG");

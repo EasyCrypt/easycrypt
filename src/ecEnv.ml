@@ -344,14 +344,14 @@ module MC = struct
                              (EcPath.prefix q))
                           (EcPath.psymbol (EcPath.basename q))
                     in
-                      (ap, odfl false (omap prefix (EcPath.p_equal p)))
+                      (ap, odfl false (prefix |> omap (EcPath.p_equal p)))
                 end
           end
 
           | IPIdent (m, x) -> begin
               if i <> 0 then assert false;
 
-              match omap x (fun x -> x.EcPath.p_node) with
+              match x |> omap (fun x -> x.EcPath.p_node) with
               | Some (EcPath.Psymbol x) ->
                   let ap =
                     EcPath.xpath
@@ -404,7 +404,7 @@ module MC = struct
            (* p,q = frontier with the first module *)
             let (p, q) = _cutpath (i+1) p in
               (EcPath.mpath_crt p (List.map EcPath.mident n) q,
-               odfl false (omap prefix (EcPath.p_equal p)))
+               odfl false (prefix |> omap (EcPath.p_equal p)))
 
         | IPIdent (m, None) ->
             if i <> 0 then assert false;
@@ -461,8 +461,8 @@ module MC = struct
               
         | EcPath.Pqname (p, x) ->
             omap
-              (Mip.find_opt (IPPath p) env.env_comps)
               (fun mc -> (mc, x))
+              (Mip.find_opt (IPPath p) env.env_comps)
       end
 
       | IPIdent (id, None) ->
@@ -472,8 +472,8 @@ module MC = struct
           let prefix = EcPath.prefix p in
           let name   = EcPath.basename p in
             omap
-              (Mip.find_opt (IPIdent (m, prefix)) env.env_comps)
               (fun mc -> (mc, name))
+              (Mip.find_opt (IPIdent (m, prefix)) env.env_comps)
     in
 
     let lookup (mc, x) =
@@ -481,7 +481,7 @@ module MC = struct
         (fun (ip, _) -> IPathC.compare ip p = 0)
         (MMsym.all x (proj mc))
     in
-      match omap mcx lookup with
+      match mcx |> omap lookup with
       | None | Some [] -> None
       | Some (obj :: _) -> Some (_params_of_ipath p env, snd obj)
 
@@ -497,29 +497,39 @@ module MC = struct
       | [] -> Some env.env_current
 
       | x :: qn ->
-          let p =
-            obind (MMsym.last x env.env_current.mc_components)
-              (fun p ->
-                match p, qn with
-                | IPIdent _, [] -> Some p
-                | IPIdent _, _  -> None
-                | IPPath  p, _  -> Some (IPPath (path_of_qn p qn)))
+          let p = 
+            (MMsym.last x env.env_current.mc_components) |>
+              obind
+                (fun p ->
+                  match p, qn with
+                  | IPIdent _, [] -> Some p
+                  | IPIdent _, _  -> None
+                  | IPPath  p, _  -> Some (IPPath (path_of_qn p qn)))
           in
-            obind p (fun p -> Mip.find_opt p env.env_comps)
+            p |> obind (fun p -> Mip.find_opt p env.env_comps)
 
   (* ------------------------------------------------------------------ *)
   let lookup proj (qn, x) env =
     let mc = lookup_mc qn env in
       omap
-        (obind mc (fun mc -> MMsym.last x (proj mc)))
         (fun (p, obj) -> (p, (_params_of_ipath p env, obj)))
+        (mc |> obind (fun mc -> MMsym.last x (proj mc)))
 
   (* ------------------------------------------------------------------ *)
   let lookup_all proj (qn, x) env =
-    let mc = lookup_mc qn env in
-      List.map
-        (fun (p, obj) -> (p, (_params_of_ipath p env, obj)))
-        (odfl [] (omap mc (fun mc -> MMsym.all x (proj mc))))
+    let mc   = lookup_mc qn env in
+    let objs = odfl [] (mc |> omap (fun mc -> MMsym.all x (proj mc))) in
+    let _, objs =
+      List.map_fold
+        (fun ps ((p, _) as obj)->
+          if   Sip.mem p ps
+          then (ps, None)
+          else (Sip.add p ps, Some obj))
+        Sip.empty objs
+    in
+      List.pmap
+        (omap (fun (p, obj) -> (p, (_params_of_ipath p env, obj))))
+        objs
 
   (* ------------------------------------------------------------------ *)
   let bind up x obj env =
@@ -972,7 +982,7 @@ let ipath_of_mpath_opt (p : mpath_top) =
       IPIdent (i, None)
 
   | `Concrete (p1, p2) ->
-      let pr = odfl p1 (omap p2 (MC.pcat p1)) in
+      let pr = odfl p1 (p2 |> omap (MC.pcat p1)) in
         IPPath pr
 
 let ipath_of_mpath (p : mpath) =
@@ -981,7 +991,7 @@ let ipath_of_mpath (p : mpath) =
       (IPIdent (i, None), (0, p.EcPath.m_args))
 
   | `Concrete (p1, p2) ->
-      let pr = odfl p1 (omap p2 (MC.pcat p1)) in
+      let pr = odfl p1 (p2 |> omap (MC.pcat p1)) in
         (IPPath pr, ((EcPath.p_size p1)-1, p.EcPath.m_args))
 
 let ipath_of_xpath (p : xpath) =
@@ -995,7 +1005,7 @@ let ipath_of_xpath (p : xpath) =
       in
 
       let (p, (i, a)) = ipath_of_mpath p.EcPath.x_top in
-        omap (xt p) (fun p -> (p, (i+1, a)))
+        (xt p) |> omap (fun p -> (p, (i+1, a)))
 
   | _ -> None
 
@@ -1258,7 +1268,7 @@ module Var = struct
 
       | _ -> None
     in
-    match obind side inmem with
+    match obind inmem side with
     | None ->
         (* TODO FIXME, suspended for local program variable *)
         let (((_, _), p), x) = MC.lookup_var qname env in
@@ -1338,9 +1348,9 @@ module Mod = struct
 
   let by_ipath_r (spsc : bool) (p : ipath) (env : env) =
     let obj = MC.by_path (fun mc -> mc.mc_modules) p env in
-      omap obj
-        (fun (args, obj) ->
-          (fst (MC._downpath_for_mod spsc env p args), obj))
+      obj |> omap
+               (fun (args, obj) ->
+                 (fst (MC._downpath_for_mod spsc env p args), obj))
 
   let by_ipath (p : ipath) (env : env) =
     by_ipath_r true p env
@@ -1421,10 +1431,10 @@ module Mod = struct
       let modsig =
         match
           omap
+            check_not_suspended
             (MC.by_path
                (fun mc -> mc.mc_modsigs)
                (IPPath modty.mt_name) env)
-            check_not_suspended
         with
         | None -> lookup_error (`Path modty.mt_name)
         | Some x -> x
@@ -1508,8 +1518,8 @@ module Ty = struct
 
   let by_path_opt (p : EcPath.path) (env : env) =
     omap 
-      (MC.by_path (fun mc -> mc.mc_tydecls) (IPPath p) env)
       check_not_suspended
+      (MC.by_path (fun mc -> mc.mc_tydecls) (IPPath p) env)
 
   let by_path (p : EcPath.path) (env : env) =
     match by_path_opt p env with
@@ -1863,7 +1873,7 @@ module NormMp = struct
     | _ -> op
 
   let norm_ax env ax =
-    { ax with ax_spec = omap ax.ax_spec (norm_form env) }
+    { ax with ax_spec = ax.ax_spec |> omap (norm_form env) }
 
   let is_abstract_fun f env = 
     let f = norm_xpath env f in
@@ -1879,8 +1889,8 @@ module ModTy = struct
 
   let by_path_opt (p : EcPath.path) (env : env) =
     omap
-      (MC.by_path (fun mc -> mc.mc_modsigs) (IPPath p) env)
       check_not_suspended
+      (MC.by_path (fun mc -> mc.mc_modsigs) (IPPath p) env)
 
   let by_path (p : EcPath.path) (env : env) =
     match by_path_opt p env with
@@ -1969,8 +1979,8 @@ module Op = struct
 
   let by_path_opt (p : EcPath.path) (env : env) =
     omap 
-      (MC.by_path (fun mc -> mc.mc_operators) (IPPath p) env)
       check_not_suspended
+      (MC.by_path (fun mc -> mc.mc_operators) (IPPath p) env)
 
   let by_path (p : EcPath.path) (env : env) =
     match by_path_opt p env with
@@ -2040,8 +2050,8 @@ module Ax = struct
 
   let by_path_opt (p : EcPath.path) (env : env) =
     omap 
-      (MC.by_path (fun mc -> mc.mc_axioms) (IPPath p) env)
       check_not_suspended
+      (MC.by_path (fun mc -> mc.mc_axioms) (IPPath p) env)
 
   let by_path (p : EcPath.path) (env : env) =
     match by_path_opt p env with
@@ -2111,8 +2121,8 @@ module Theory = struct
   (* ------------------------------------------------------------------ *)
   let by_path_opt (p : EcPath.path) (env : env) =
     omap 
-      (MC.by_path (fun mc -> mc.mc_theories) (IPPath p) env)
       check_not_suspended
+      (MC.by_path (fun mc -> mc.mc_theories) (IPPath p) env)
 
   let by_path (p : EcPath.path) (env : env) =
     match by_path_opt p env with
@@ -2478,7 +2488,7 @@ module LDecl = struct
   let ld_subst s ld = 
     match ld with
     | LD_var (ty, body) ->
-      LD_var (s.fs_ty ty, omap body (Fsubst.f_subst s))
+      LD_var (s.fs_ty ty, body |> omap (Fsubst.f_subst s))
     | LD_mem mt ->
       LD_mem (EcMemory.mt_substm s.fs_sty.ts_p s.fs_mp s.fs_ty mt)
     | LD_modty(p,r) ->
@@ -2593,7 +2603,7 @@ let norm_l_decl env (hyps,concl) =
   let norm = NormMp.norm_form env in
   let onh (x,lk) =
     match lk with
-    | LD_var (ty,o) -> x, LD_var (ty, omap o norm)
+    | LD_var (ty,o) -> x, LD_var (ty, o |> omap norm)
     | LD_mem _ -> x, lk
     | LD_modty _ -> x, lk
     | LD_hyp f -> x, LD_hyp (norm f) in
@@ -2614,5 +2624,3 @@ let check_goal ~usehyps pi (hyps, concl) =
   let ld  = norm_l_decl env (ld, concl) in
   let res = EcWhy3.check_goal (Mod.me_of_mt env) env.env_w3 pi ld in
   res
-
-(* -------------------------------------------------------------------- *)

@@ -20,7 +20,7 @@ theory RandOracle.
   op dsample : to distr.
 
   module type RO = {
-    fun init() : unit
+    fun init() : unit {*}
     fun query(x : from) : to
   }.
 
@@ -62,8 +62,9 @@ theory RandOracle.
   }.
 
   lemma LRO_lossless_query:
-    mu dsample cpTrue = 1%r => islossless LRO.query.
-  proof strict.
+    mu dsample Fun.cpTrue = 1%r => islossless LRO.query.
+    (* FIXME: cpTrue unqualified should work *)
+  proof strict.             
   intros=> samp.
   fun.
     if.
@@ -85,7 +86,7 @@ theory RandOracle.
   qed.
 
   lemma FRO_lossless_init:
-    mu dsample cpTrue = 1%r => islossless FRO.init.
+    mu dsample Fun.cpTrue = 1%r => islossless FRO.init.
   proof strict.
   intros=> dsamp.
   fun.
@@ -103,11 +104,9 @@ theory RandOracle.
   type ro_user_from.
   type ro_user_to.
 
-
   (* A random oracle user *)
   module type RO_USER(RO : RO) = {
-    fun init() : unit {}
-    fun f(x : ro_user_from) : ro_user_to {RO.query}
+    fun main(x : ro_user_from) : ro_user_to {*RO.query}
   }.
 
   (* A module that initializes a random oracles and "runs" the random
@@ -117,36 +116,25 @@ theory RandOracle.
 
     fun main(x : ro_user_from) : ro_user_to = {
       var r : ro_user_to;
-      U.init();
       RO.init();
-      r = U.f(x);
+      r = U.main(x);
       return r;
     }
   }.
 
   (* We could prove this using the old 'eager' tactic *)
   axiom Lazy_Fixed_dh_equiv(UF <: RO_USER{FRO,LRO}):
-    equiv [ G(LRO,UF).U.init ~ G(FRO,UF).U.init : true ==> ={glob UF} ] =>
     equiv [ G(LRO,UF).main ~ G(FRO,UF).main : true ==> ={res, glob UF} ].
 
-  (* If we could quantify over relations, then we could state the
-     the following version which would directly work with modules UF
-     that use adversaries because we could could instantiate
-     rel with ={Glob A}.
-  axiom Lazy_Fixed_dh_equiv(UF <: RO_USER{FRO,LRO}) rel:
-    equiv [ G(LRO,UF).U.init ~ G(FRO,UF).U.init : rel ==> ={glob UF} ] =>
-    equiv [ G(LRO,UF).main ~ G(FRO,UF).main : rel ==> ={res, glob UF} ].
-  *)
+  (* We could prove this using the old 'eager' tactic *)
+  axiom Fixed_Lazy_dh_equiv(UF <: RO_USER{FRO,LRO}):
+    equiv [ G(FRO,UF).main ~ G(LRO,UF).main : true ==> ={res, glob UF} ].
 
   (* This is just a proof sketch of the axiom above *)
   lemma Lazy_Fixed_dh_equiv_proof_sketch(UF <: RO_USER{FRO,LRO}):
-    equiv [ G(LRO,UF).U.init ~ G(FRO,UF).U.init : true ==> ={glob UF} ] =>
     equiv [ G(LRO,UF).main ~ G(FRO,UF).main : true ==> ={res, glob UF} ].
   proof strict.
-    intros=> H.
     fun.
-    seq 1 1: (={glob UF}).
-    admit. (* apply H. (* why doesn't this work? *) *)
     inline LRO.init FRO.init.
     admit. (* This should be provable using eager if we add the same while loop
               to the end of the left game.
