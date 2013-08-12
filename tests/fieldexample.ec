@@ -1,12 +1,12 @@
 require import Logic.
 require import Int.
-require import Prime_Field.
+require import Prime_field.
 
 const k : int.
 
 axiom k_pos : 0 <= k.
 
-clone import Prime_Field as Zq with op q = k.
+clone import Prime_field as Zq with op q = k.
 
 type zq = Zq.gf_q.
 
