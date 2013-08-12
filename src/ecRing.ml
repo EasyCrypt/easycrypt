@@ -37,6 +37,22 @@ type pol = Pc of c
 
 type mon = Mon0 | Zmon of (int * mon) | Vmon of (int * mon)
 
+
+let rec pexpr_eq (e1 : pexpr) (e2 : pexpr) : bool =
+  match (e1,e2) with
+    | (PEc c, PEc c') -> ceq c c'
+    | (PEX p1, PEX p2) -> p1 = p2
+    | (PEadd (e3,e5), PEadd (e4,e6)) -> 
+      if (pexpr_eq e3 e4) then pexpr_eq e5 e6 else false
+    | (PEsub (e3,e5), PEsub (e4,e6)) -> 
+      if (pexpr_eq e3 e4) then pexpr_eq e5 e6 else false
+    | (PEmul (e3,e5), PEmul (e4,e6)) -> 
+      if (pexpr_eq e3 e4) then pexpr_eq e5 e6 else false
+    | (PEopp e3, PEopp e4) -> pexpr_eq e3 e4
+    | (PEpow (e3,n3), PEpow (e4,n4)) -> 
+      if (n3 = n4) then pexpr_eq e3 e4 else false
+    | (_,_) -> false
+
 (**)
 
 let p0 = Pc c0
@@ -328,7 +344,6 @@ let rec norm_aux (e : pexpr) : pol =
     | PEpow (e1,p) -> ppow_n (norm_aux e1) p 
 
 let norm_subst (n : int) (lmp : ((c * mon) * pol) list) (p : pexpr) : pol  =  pnsubstl (norm_aux p) lmp n n
-(*let norm p = norm_subst  0 [] p*)
 
 let rec mon_of_pol (p : pol) : (c * mon) option =
   match p with
