@@ -229,16 +229,16 @@ pred notfresh(t : Sid,  evs : Event list)  =
           \/ (* b) there is an ephemeral reveal for a (complete or incomplete) matching session *)
              List.mem (EphemeralRev ps) evs)).
 
-lemma nosmt not_fresh_imp_notfresh(t : Sid) (evs : Event list):
+lemma not_fresh_imp_notfresh(t : Sid) (evs : Event list):
   !(fresh t evs) => (notfresh t evs) by [].
 
 lemma nosmt not_def(P): (P => false) => !P by [].
 
-lemma nosmt notfresh_imp_notfresh(t : Sid) (evs : Event list):
+lemma notfresh_imp_notfresh(t : Sid) (evs : Event list):
   (notfresh t evs) => !(fresh t evs)
 by (elim /tuple5_ind t; smt).
 
-lemma nosmt not_fresh_notfresh(t : Sid) (evs : Event list):
+lemma not_fresh_notfresh(t : Sid) (evs : Event list):
   (notfresh t evs) => !(fresh t evs) by [].
 
 lemma nosmt absurd : forall P Q, !P => P => Q by [].
@@ -253,7 +253,7 @@ lemma nosmt diff_cons(x y : 'a) (xs : 'a list):
   ! mem x xs =>
   mem x (y::xs) => y = x by [].
 
-lemma nosmt notfresh_fresh_ev(t : Sid) (evs : Event list) (e : Event):
+lemma notfresh_fresh_ev(t : Sid) (evs : Event list) (e : Event):
   notfresh t evs =>
   fresh t (e::evs) =>
   e = Accept (cmatching t) \/ 
@@ -347,7 +347,8 @@ module type AKE_Oracles = {
 }.
 
 module type Adv (O : AKE_Oracles) = {
-  fun choose(s : Pk list) : Sidx {*}
+  fun choose(s : Pk list) : Sidx
+    {* O.h1_a O.h2_a O.init1 O.init2 O.resp O.staticRev O.ephemeralRev O.sessionRev}
   fun guess(k : Key option) : bool
 }.
 
