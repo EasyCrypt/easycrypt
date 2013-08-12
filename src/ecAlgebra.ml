@@ -60,6 +60,10 @@ type field = {
 }
 
 (* -------------------------------------------------------------------- *)
+type eq  = form * form
+type eqs = eq list
+
+(* -------------------------------------------------------------------- *)
 let rapp r op args =
   let opty = toarrow (List.map f_ty args) r.r_type in
     f_app (f_op op [] opty) args r.r_type
@@ -202,7 +206,7 @@ let ofring (r : ring) (rmap : RState.rstate) (e : pol) : form =
     doit (RState.current rmap) e
 
 (* -------------------------------------------------------------------- *)
-let ring_simplify (cr : cring) (eqs : (form * form) list) (form : form) =
+let ring_simplify (cr : cring) (eqs : eqs) (form : form) =
   let map = ref RState.empty in
   let toring form = reffold (fun map -> toring cr map form) map in
 
@@ -211,7 +215,7 @@ let ring_simplify (cr : cring) (eqs : (form * form) list) (form : form) =
     ofring (fst cr) !map (norm form eqs)
 
 (* -------------------------------------------------------------------- *)
-let ring_eq (cr : cring) (eqs : (form * form) list) (f1 : form) (f2 : form) =
+let ring_eq (cr : cring) (eqs : eqs) (f1 : form) (f2 : form) =
   ring_simplify cr eqs (rsub (fst cr) f1 f2)
 
 (* -------------------------------------------------------------------- *)
@@ -221,7 +225,7 @@ let get_field_equation (f1, f2) =
   | _ -> None
 
 (* -------------------------------------------------------------------- *)
-let field_eq (cr : cfield) (eqs : (form * form) list) (f1 : form) (f2 : form) =
+let field_eq (cr : cfield) (eqs : eqs) (f1 : form) (f2 : form) =
   let map = ref RState.empty in
 
   let tofield form = reffold (fun map -> tofield cr map form) map in
@@ -247,7 +251,7 @@ let field_eq (cr : cfield) (eqs : (form * form) list) (f1 : form) (f2 : form) =
     (cond1 @ cond2, (num1, num2), (denum1, denum2))
 
 (* -------------------------------------------------------------------- *)
-let field_simplify (cr : cfield) (eqs : (form * form) list) (f : form) =
+let field_simplify (cr : cfield) (eqs : eqs) (f : form) =
   let map = ref RState.empty in
 
   let tofield form = reffold (fun map -> tofield cr map form) map in
