@@ -82,7 +82,9 @@
     "using"       , USING      ;        (* KW: tactic *)
     "compute"     , COMPUTE    ;        (* KW: tactic *)
     "field"       , FIELD      ;        (* KW: tactic *)
-    "field_simplify", FIELDSIMP;        (* KW: tactic *)
+    "field_simplify", FIELDSIMP ;        (* KW: tactic *)
+    "ring"       , RING        ;        (* KW: tactic *)
+    "ring_simplify"       , RINGSIMP        ;        (* KW: tactic *)
 
 
     "assumption"  , ASSUMPTION ;        (* KW: bytac *)

@@ -174,7 +174,6 @@ let dft_prover_infos =
     prover_names     = [||];
     prover_timelimit = 3; }
 
-
 let call_prover_task pi task =
   para_call pi.prover_max_run pi.prover_names pi.prover_timelimit task =
   Some true

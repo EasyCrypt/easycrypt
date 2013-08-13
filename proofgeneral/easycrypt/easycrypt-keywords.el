@@ -1,4 +1,4 @@
-; Generated on Tue Jul 16 20:44:16 2013
+; Generated on Tue Aug 13 12:49:47 2013
 
 (defvar easycrypt-bytac-keywords '(
   "assumption"
@@ -35,6 +35,9 @@
   "theory"
   "section"
   "type"
+  "self"
+  "class"
+  "instance"
   "datatype"
   "print"
   "why3"
@@ -109,9 +112,12 @@
   "compute"
   "field"
   "field_simplify"
+  "ring"
+  "ring_simplify"
   "transitivity"
   "seq"
   "wp"
+  "sp"
   "eqobs_in"
   "skip"
   "call"

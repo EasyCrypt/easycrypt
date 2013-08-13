@@ -198,6 +198,8 @@
 %token FEL
 %token FIELD
 %token FIELDSIMP
+%token RING
+%token RINGSIMP
 %token FINAL
 %token FIRST
 %token FISSION
@@ -1231,8 +1233,14 @@ tc_ax: AXIOM ax=form { ax };
 
 (* -------------------------------------------------------------------- *)
 (* Type classes (instances)                                             *)
+instname:
+| x=qident { unloc x }
+| RING     { ([], "$ring" ) }
+| FIELD    { ([], "$field") }
+;
+
 tycinstance:
-| INSTANCE x=qident WITH ty=qident ops=tyci_op* axs=tyci_ax* {
+| INSTANCE x=loc(instname) WITH ty=qident ops=tyci_op* axs=tyci_ax* {
     { pti_name = x;
       pti_type = ty;
       pti_ops  = ops;
@@ -1241,7 +1249,7 @@ tycinstance:
 ;
 
 tyci_op:
-| OP x=ident EQ tg=qident { (x, tg) }
+| OP x=ident EQ tg=qoident { (x, tg) }
 ;
 
 tyci_ax:
@@ -1742,11 +1750,17 @@ logtactic:
 | SPLIT
     { Psplit }
 
-| FIELD plus=sform times=sform inv=sform minus=sform z=sform o=sform eq=sform
-    { Pfield (plus,times,inv,minus,z,o,eq)}
+| FIELD eqs=ident*
+    { Pfield eqs }
 
-| FIELDSIMP plus=sform times=sform inv=sform minus=sform z=sform o=sform  eq=sform
-    { Pfieldsimp (plus,times,inv,minus,z,o,eq)}
+| FIELDSIMP eqs=ident*
+    { Pfieldsimp eqs }
+
+| RING eqs=ident*
+    { Pring eqs }
+
+| RINGSIMP  eqs=ident*
+    { Pringsimp eqs }
 
 | EXIST a=iplist1(loc(fpattern_arg), COMMA) %prec prec_below_comma
    { Pexists a }

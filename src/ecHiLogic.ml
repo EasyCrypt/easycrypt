@@ -250,40 +250,6 @@ let process_subst loc ri g =
     set_loc loc (t_lseq tacs) g
 
 (* -------------------------------------------------------------------- *)
-let process_field (p,t,i,m,z,o,e) g =
-  let (hyps,concl) = get_goal g in
-    (match concl.f_node with
-      | Fapp(eq',[arg1;arg2]) ->
-        let ty = f_ty arg1 in
-        let eq = process_form hyps e (tfun ty (tfun ty tbool)) in
-        if (f_equal eq eq' ) then
-          let p' = process_form hyps p (tfun ty (tfun ty ty)) in 
-          let t' = process_form hyps t (tfun ty (tfun ty ty)) in 
-          let i' = process_form hyps i (tfun ty ty) in 
-          let m' = process_form hyps m (tfun ty ty) in 
-          let z' = process_form hyps z ty in 
-          let o' = process_form hyps o ty in 
-          t_field (p',t',i',m',z',o',eq) (arg1,arg2) g
-        else
-          cannot_apply "field" "the eq doesn't coincide"
-      | _ -> cannot_apply "field" "Think more about the goal")
-
-let process_field_simp (p,t,i,m,z,o,e) g =
-  let (hyps,concl) = get_goal g in
-    (match concl.f_node with
-      | Fapp(_,arg1 :: _) ->
-        let ty = f_ty arg1 in
-        let e' = process_form hyps e (tfun ty (tfun ty tbool)) in 
-        let p' = process_form hyps p (tfun ty (tfun ty ty)) in 
-        let t' = process_form hyps t (tfun ty (tfun ty ty)) in 
-        let i' = process_form hyps i (tfun ty ty) in 
-        let m' = process_form hyps m (tfun ty ty) in 
-        let z' = process_form hyps z ty in 
-        let o' = process_form hyps o ty in 
-        t_field_simp (p',t',i',m',z',o',e') concl g
-      | _ -> cannot_apply "field_simplify" "Think more about the goal")
-
-(* -------------------------------------------------------------------- *)
 let rec pmsymbol_of_pform fp : pmsymbol option =
   match unloc fp with
   | PFident ({ pl_desc = (nm, x); pl_loc = loc }, _) when EcIo.is_mod_ident x ->
@@ -1150,6 +1116,57 @@ let process_elimT loc (pf, qs) g =
     (t_simplify EcReduction.beta_red) g
 
 (* -------------------------------------------------------------------- *)
+let process_algebra loc hitenv mode kind eqs g =
+  let smt_on = t_on_goals (t_try (process_smt hitenv (None, empty_pprover))) in
+  let ass_on = t_on_goals (t_try (process_assumption loc (None, None))) in
+
+  let (env, hyps, concl) = get_goal_e g in
+
+  let (ty, f1, f2) =
+    match sform_of_form concl with
+    | SFeq (f1, f2) -> (f1.f_ty, f1, f2)
+    | _ -> tacuerror "conclusion must be an equation"
+  in
+
+  let eqs =
+    let eq1 { pl_desc = x } =
+      match LDecl.has_hyp x hyps with
+      | false -> tacuerror "cannot find equation referenced by `%s'" x
+      | true  -> begin
+        match sform_of_form (snd (LDecl.lookup_hyp x hyps)) with
+        | SFeq (f1, f2) ->
+            if not (EcReduction.equal_type env ty f1.f_ty) then
+              tacuerror "assumption `%s' is not an equation over the right type" x;
+            (f1, f2)
+        | _ -> tacuerror "assumption `%s' is not an equation" x
+      end
+    in List.map eq1 eqs
+  in
+
+  let tactic =
+    match
+      match mode, kind with
+      | `Simpl, `Ring  -> `Ring  EcAlgTactic.t_ring_simplify
+      | `Simpl, `Field -> `Field EcAlgTactic.t_field_simplify
+      | `Solve, `Ring  -> `Ring  EcAlgTactic.t_ring
+      | `Solve, `Field -> `Field EcAlgTactic.t_field
+    with
+    | `Ring t ->
+        let r =
+          match EcEnv.Algebra.get_ring ty env with
+          | None   -> tacuerror "cannot find a ring structure"
+          | Some r -> r
+        in t r eqs (f1, f2)
+    | `Field t ->
+        let r =
+          match EcEnv.Algebra.get_field ty env with
+          | None   -> tacuerror "cannot find a field structure"
+          | Some r -> r
+        in t r eqs (f1, f2)
+  in
+    smt_on (ass_on (tactic g))
+
+(* -------------------------------------------------------------------- *)
 let process_logic (engine, hitenv) loc t =
   match t with
   | Preflexivity   -> process_reflexivity loc
@@ -1157,8 +1174,10 @@ let process_logic (engine, hitenv) loc t =
   | Psmt pi        -> process_smt hitenv pi
   | Pintro pi      -> process_intros pi
   | Psplit         -> t_split
-  | Pfield st      -> process_field st
-  | Pfieldsimp st  -> process_field_simp st
+  | Pfield st      -> process_algebra loc hitenv `Solve `Field st
+  | Pfieldsimp st  -> process_algebra loc hitenv `Simpl `Field st
+  | Pring st       -> process_algebra loc hitenv `Solve `Ring  st
+  | Pringsimp  st  -> process_algebra loc hitenv `Simpl `Ring  st
   | Pexists fs     -> process_exists fs
   | Pleft          -> t_left
   | Pright         -> t_right

@@ -1067,9 +1067,9 @@ module Fsubst = struct
   let f_subst_init freshen smp sty =
     { f_subst_id
         with fs_freshen = freshen;
-             fs_mp = smp;
+             fs_mp  = smp;
              fs_sty = sty;
-             fs_ty = ty_subst sty }
+             fs_ty  = ty_subst sty }
 
   (* ------------------------------------------------------------------ *)
   let f_bind_local s x t = 

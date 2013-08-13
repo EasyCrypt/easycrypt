@@ -962,44 +962,6 @@ module Pred = struct
 end
 
 (* -------------------------------------------------------------------- *)
-module Ty = struct
-  open EcDecl
-  open EcTyping
-
-  let bind (scope : scope) ((x, tydecl) : (_ * tydecl)) =
-    assert (scope.sc_pr_uc = None);
-    let scope = { scope with sc_env = EcEnv.Ty.bind x tydecl scope.sc_env; } in
-    let scope = maybe_add_to_section scope (EcTheory.CTh_type (x, tydecl)) in
-      scope
-
-  let add (scope : scope) info =
-    assert (scope.sc_pr_uc = None);
-    let (args, name) = info.pl_desc and loc = info.pl_loc in
-    let ue     = ue_for_decl scope.sc_env (loc, Some args) in
-    let tydecl = {
-      tyd_params = EcUnify.UniEnv.tparams ue;
-      tyd_type   = None;
-    } in
-      bind scope (unloc name, tydecl)
-
-  let addclass (scope : scope) tcd =
-    assert (scope.sc_pr_uc = None);
-    let tclass = EcTyping.trans_tclass scope.sc_env tcd in
-      scope
-
-  let define (scope : scope) info body =
-    assert (scope.sc_pr_uc = None);
-    let (args, name) = info.pl_desc and loc = info.pl_loc in
-    let ue     = ue_for_decl scope.sc_env (loc, Some args) in
-    let body   = transty tp_tydecl scope.sc_env ue body in
-    let tydecl = {
-      tyd_params = EcUnify.UniEnv.tparams ue;
-      tyd_type   = Some body;
-    } in
-      bind scope (unloc name, tydecl)
-end
-
-(* -------------------------------------------------------------------- *)
 module Mod = struct
   module TT = EcTyping
 
@@ -1310,6 +1272,185 @@ module Ax = struct
 end
 
 (* -------------------------------------------------------------------- *)
+module Ty = struct
+  open EcDecl
+  open EcTyping
+  open EcAlgebra
+
+  (* ------------------------------------------------------------------ *)
+  let bind (scope : scope) ((x, tydecl) : (_ * tydecl)) =
+    assert (scope.sc_pr_uc = None);
+    let scope = { scope with sc_env = EcEnv.Ty.bind x tydecl scope.sc_env; } in
+    let scope = maybe_add_to_section scope (EcTheory.CTh_type (x, tydecl)) in
+      scope
+
+  (* ------------------------------------------------------------------ *)
+  let add (scope : scope) info =
+    assert (scope.sc_pr_uc = None);
+    let (args, name) = info.pl_desc and loc = info.pl_loc in
+    let ue = ue_for_decl scope.sc_env (loc, Some args) in
+    let tydecl = {
+      tyd_params = EcUnify.UniEnv.tparams ue;
+      tyd_type   = None;
+    } in
+      bind scope (unloc name, tydecl)
+
+  (* ------------------------------------------------------------------ *)
+  let define (scope : scope) info body =
+    assert (scope.sc_pr_uc = None);
+    let (args, name) = info.pl_desc and loc = info.pl_loc in
+    let ue     = ue_for_decl scope.sc_env (loc, Some args) in
+    let body   = transty tp_tydecl scope.sc_env ue body in
+    let tydecl = {
+      tyd_params = EcUnify.UniEnv.tparams ue;
+      tyd_type   = Some body;
+    } in
+      bind scope (unloc name, tydecl)
+
+  (* ------------------------------------------------------------------ *)
+  let addclass (scope : scope) tcd =
+    assert (scope.sc_pr_uc = None);
+    let _tclass = EcTyping.trans_tclass scope.sc_env tcd in
+      scope
+
+  (* ------------------------------------------------------------------ *)
+  let check_tci_operators env ops reqs =
+    let rmap = Mstr.of_list reqs in
+    let ops =
+      List.fold_left
+        (fun m (x, op) ->
+          if not (Mstr.mem (unloc x) rmap) then
+            hierror ~loc:x.pl_loc "invalid operator name: `%s'" (unloc x);
+          let op =
+            let filter op = match op.op_kind with OB_oper _ -> true | _ -> false in
+            match EcEnv.Op.all filter (unloc op) env with
+            | []      -> hierror ~loc:op.pl_loc "unknown operator"
+            | _::_::_ -> hierror ~loc:op.pl_loc "ambiguous operator"
+            | [op]    -> op
+          in
+            Mstr.change
+              (function
+               | None   -> Some (x.pl_loc, op)
+               | Some _ -> hierror ~loc:(x.pl_loc)
+                             "duplicated operator name: `%s'" (unloc x))
+              (unloc x) m)
+        Mstr.empty ops
+    in
+      List.iter
+        (fun (x, (req, _)) ->
+           if req && not (Mstr.mem x ops) then
+             hierror "no definition for operator `%s'" x)
+        reqs;
+      List.fold_left
+        (fun m (x, (_, ty)) ->
+           match Mstr.find_opt x ops with
+           | None -> m
+           | Some (loc, (p, op)) ->
+               if not (EcReduction.equal_type env ty (op_ty op)) then
+                 hierror ~loc "invalid type for operator `%s'" x;
+               Mstr.add x p m)
+        Mstr.empty reqs
+
+  (* ------------------------------------------------------------------ *)
+  let check_tci_axioms scope mode axs reqs =
+    let rmap = Mstr.of_list reqs in
+    let symbs, axs =
+      List.map_fold
+        (fun m (x, t) ->
+          if not (Mstr.mem (unloc x) rmap) then
+            hierror ~loc:x.pl_loc "invalid axiom name: `%s'" (unloc x);
+          if Sstr.mem (unloc x) m then
+            hierror ~loc:(x.pl_loc) "duplicated axiom name: `%s'" (unloc x);
+          (Sstr.add (unloc x) m, (unloc x, t, Mstr.find (unloc x) rmap)))
+        Sstr.empty axs
+    in
+      List.iter
+        (fun (x, _) ->
+           if not (Mstr.mem x symbs) then
+             hierror "no proof for axiom `%s'" x)
+        reqs;
+      List.iter
+        (fun (x, pt, f) ->
+          let t  = { pt_core = pt; pt_intros = []; } in
+          let ax = { ax_tparams = [];
+                     ax_spec    = Some f;
+                     ax_kind    = `Axiom;
+                     ax_nosmt   = true; } in
+
+          let pucflags = { puc_nosmt = false; puc_local = false; } in
+          let pucflags = (([], None), pucflags) in
+          let check    = Check_mode.check scope.sc_options in
+
+          let escope = scope in
+          let escope = Ax.start_lemma escope pucflags check x ax in
+          let escope = Tactics.proof escope mode true in
+          let escope = Tactics.process_r false mode escope [t] in
+            ignore (Ax.save escope pt.pl_loc))
+        axs
+
+  (* ------------------------------------------------------------------ *)
+  let ring_of_symmap ty symbols =
+    { r_type  = ty;
+      r_zero  = oget (Mstr.find_opt "rzero" symbols);
+      r_one   = oget (Mstr.find_opt "rone"  symbols);
+      r_add   = oget (Mstr.find_opt "add"   symbols);
+      r_opp   = oget (Mstr.find_opt "opp"   symbols);
+      r_mul   = oget (Mstr.find_opt "mul"   symbols);
+      r_exp   = oget (Mstr.find_opt "expr"  symbols);
+      r_sub   = Mstr.find_opt "sub" symbols;
+      r_embed =
+        match Mstr.find_opt "ofint" symbols with
+        | None   -> `Direct
+        | Some p -> `Embed p }
+
+  let addring (scope : scope) mode { pl_desc = tci; pl_loc = loc } =
+    let (ty, p) =
+      let ue = ue_for_decl scope.sc_env (loc, Some []) in
+      let ty = mk_loc tci.pti_type.pl_loc (PTnamed tci.pti_type) in
+      let ty = transty tp_tydecl scope.sc_env ue ty in
+        match ty.ty_node with
+        | Tconstr (p, []) -> (ty, p)
+        | _ -> assert false
+    in
+    let symbols = EcAlgTactic.ring_symbols scope.sc_env ty in
+    let symbols = check_tci_operators scope.sc_env tci.pti_ops symbols in
+    let cr      = ring_of_symmap ty symbols in
+    let axioms  = EcAlgTactic.ring_axioms scope.sc_env cr in
+      check_tci_axioms scope mode tci.pti_axs axioms;
+      { scope with sc_env = EcEnv.Algebra.add_ring p cr scope.sc_env }
+
+  (* ------------------------------------------------------------------ *)
+  let field_of_symmap ty symbols =
+    { f_ring = ring_of_symmap ty symbols;
+      f_inv  = oget (Mstr.find_opt "inv" symbols);
+      f_div  = Mstr.find_opt "div" symbols; }
+
+  let addfield (scope : scope) mode { pl_desc = tci; pl_loc = loc } =
+    let (ty, p) =
+      let ue = ue_for_decl scope.sc_env (loc, Some []) in
+      let ty = mk_loc tci.pti_type.pl_loc (PTnamed tci.pti_type) in
+      let ty = transty tp_tydecl scope.sc_env ue ty in
+        match ty.ty_node with
+        | Tconstr (p, []) -> (ty, p)
+        | _ -> assert false
+    in
+    let symbols = EcAlgTactic.field_symbols scope.sc_env ty in
+    let symbols = check_tci_operators scope.sc_env tci.pti_ops symbols in
+    let cr      = field_of_symmap ty symbols in
+    let axioms  = EcAlgTactic.field_axioms scope.sc_env cr in
+      check_tci_axioms scope mode tci.pti_axs axioms;
+      { scope with sc_env = EcEnv.Algebra.add_field p cr scope.sc_env }
+
+  (* ------------------------------------------------------------------ *)
+  (* We currently only deal with [ring] and [field] *)
+  let addinstance (scope : scope) mode ({ pl_desc = tci } as toptci) =
+    match unloc tci.pti_name with
+    | ([], "$ring" ) -> addring  scope  mode toptci
+    | ([], "$field") -> addfield scope  mode toptci
+    | _ -> hierror "unknown type class"
+end
+
+(* -------------------------------------------------------------------- *)
 module Theory = struct
   open EcTheory
 
@@ -1541,6 +1682,12 @@ module Section = struct
               let scope = List.fold_left bind1 scope th.EcTheory.cth_struct in
               let _, scope = Theory.exit scope in
                 scope
+
+          | T.CTh_instance (p, cr) -> begin
+              match cr with
+              | `Ring  cr -> { scope with sc_env = EcEnv.Algebra.add_ring  p cr scope.sc_env }
+              | `Field cr -> { scope with sc_env = EcEnv.Algebra.add_field p cr scope.sc_env }
+          end
         in
 
         List.fold_left bind1 scope oitems

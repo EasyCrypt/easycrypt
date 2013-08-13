@@ -198,15 +198,6 @@ let t_hS_or_bhS_or_eS th tbh te g =
   else if is_equivS concl then te g
   else tacerror (NotPhl None)
 
-let prove_goal_by sub_gs rule (juc,n as g) =
-  let hyps,_ = get_goal g in
-  let add_sgoal (juc,ns) sg = 
-    let juc,n = new_goal juc (hyps,sg) in juc, RA_node n::ns
-  in
-  let juc,ns = List.fold_left add_sgoal (juc,[]) sub_gs in
-  let rule = { pr_name = rule ; pr_hyps = List.rev ns} in
-  upd_rule rule (juc,n)
-
 let gen_mems m f = 
   let bds = List.map (fun (m,mt) -> (m,GTmem mt)) m in
   f_forall bds f

@@ -37,6 +37,10 @@ let copy (x : 'a) : 'a =
   Obj.obj (Obj.dup (Obj.repr x))
 
 (* -------------------------------------------------------------------- *)
+let reffold (f : 'a -> 'b * 'a) (r : 'a ref) : 'b =
+  let (x, v) = f !r in r := v; x
+
+(* -------------------------------------------------------------------- *)
 type 'a tuple0 = unit
 type 'a tuple1 = 'a
 type 'a tuple2 = 'a * 'a
@@ -45,6 +49,8 @@ type 'a tuple4 = 'a * 'a * 'a * 'a
 type 'a tuple5 = 'a * 'a * 'a * 'a * 'a
 type 'a tuple6 = 'a * 'a * 'a * 'a * 'a * 'a
 type 'a tuple7 = 'a * 'a * 'a * 'a * 'a * 'a * 'a
+type 'a tuple8 = 'a * 'a * 'a * 'a * 'a * 'a * 'a * 'a
+type 'a tuple9 = 'a * 'a * 'a * 'a * 'a * 'a * 'a * 'a * 'a
 
 (* -------------------------------------------------------------------- *)
 let as_seq0 = function [] -> () | _ -> assert false

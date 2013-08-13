@@ -23,6 +23,9 @@ val (<|) : ('a -> 'b) -> 'a -> 'b
 val copy : 'a -> 'a
 
 (* -------------------------------------------------------------------- *)
+val reffold : ('a -> 'b * 'a) -> 'a ref -> 'b
+
+(* -------------------------------------------------------------------- *)
 type 'a tuple0 = unit
 type 'a tuple1 = 'a
 type 'a tuple2 = 'a * 'a
@@ -31,6 +34,8 @@ type 'a tuple4 = 'a * 'a * 'a * 'a
 type 'a tuple5 = 'a * 'a * 'a * 'a * 'a
 type 'a tuple6 = 'a * 'a * 'a * 'a * 'a * 'a
 type 'a tuple7 = 'a * 'a * 'a * 'a * 'a * 'a * 'a
+type 'a tuple8 = 'a * 'a * 'a * 'a * 'a * 'a * 'a * 'a
+type 'a tuple9 = 'a * 'a * 'a * 'a * 'a * 'a * 'a * 'a * 'a
 
 (* -------------------------------------------------------------------- *)
 val as_seq0 : 'a list -> 'a tuple0

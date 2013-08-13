@@ -3,6 +3,7 @@ open EcDebug
 open EcUtils
 open EcSymbols
 open EcDecl
+open EcAlgebra
 
 open EcModules
 
@@ -20,6 +21,7 @@ and theory_item =
   | Th_module    of module_expr
   | Th_theory    of (symbol * theory)
   | Th_export    of EcPath.path
+  | Th_instance  of EcPath.path * [`Ring of ring | `Field of field]
 
 (* -------------------------------------------------------------------- *)
 type ctheory = {
@@ -41,6 +43,7 @@ and ctheory_item =
   | CTh_module    of module_expr
   | CTh_theory    of (symbol * ctheory)
   | CTh_export    of EcPath.path
+  | CTh_instance  of EcPath.path * [`Ring of ring | `Field of field]
 
 and ctheory_clone = {
   cthc_base : EcPath.path;
@@ -109,12 +112,12 @@ and cthi_dump (item : ctheory_item) =
   | CTh_export p ->
       dleaf "CTh_export (%s)" (EcPath.tostring p)
 
+  | CTh_instance _ ->
+      dleaf "CTh_instance"
+
 (* -------------------------------------------------------------------- *)
 let module_comps_of_module_sig_comps (comps : module_sig_body) =
   let onitem = function
-(*    | Tys_variable vd ->
-        MI_Variable vd *)
-
     | Tys_function(funsig, oi) ->
         MI_Function { 
           f_name = funsig.fs_name;
