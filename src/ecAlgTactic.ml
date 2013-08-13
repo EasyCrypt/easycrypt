@@ -136,16 +136,16 @@ let t_ring r eqs (f1, f2) g =
   let cr = cring_of_ring r in
   let f  = ring_eq cr eqs f1 f2 in
 
-    if   EcReduction.is_conv (get_hyps g) f (rofint r 0)
+    if   EcReduction.is_conv (get_hyps g) f (emb_rzero r)
     then prove_goal_by [] RN_ring g
-    else prove_goal_by [f_eq f (rofint r 0)] RN_ring g
+    else prove_goal_by [f_eq f (emb_rzero r)] RN_ring g
 
 let t_field_simplify r eqs (f1, f2) g =
   let cr = cfield_of_field r in
   let (c1, n1, d1) = field_simplify cr eqs f1 in
   let (c2, n2, d2) = field_simplify cr eqs f2 in
 
-  let c = List.map (fun f -> f_not (f_eq f (fofint r 0))) (c1 @ c2) in
+  let c = List.map (fun f -> f_not (f_eq f (emb_fzero r))) (c1 @ c2) in
   let f = f_eq (fdiv r n1 d1) (fdiv r n2 d2) in
 
     prove_goal_by (c @ [f]) RN_field g
@@ -153,14 +153,14 @@ let t_field_simplify r eqs (f1, f2) g =
 let t_field r eqs (f1, f2) g =
   let cr = cfield_of_field r in
   let (c, (n1, n2), (d1, d2)) = field_eq cr eqs f1 f2 in
-  let c  = List.map (fun f -> f_not (f_eq f (fofint r 0))) c in
+  let c  = List.map (fun f -> f_not (f_eq f (emb_fzero r))) c in
   let r1 = fmul r n1 d2
   and r2 = fmul r n2 d1 in
   let f  = ring_eq (cring_of_ring r.f_ring) eqs r1 r2 in
 
-    if   EcReduction.is_conv (get_hyps g) f (fofint r 0)
+    if   EcReduction.is_conv (get_hyps g) f (emb_fzero r)
     then prove_goal_by c RN_field g
-    else prove_goal_by (c @ [f_eq f (fofint r 0)]) RN_field g
+    else prove_goal_by (c @ [f_eq f (emb_fzero r)]) RN_field g
 
 (* -------------------------------------------------------------------- *)
 let is_module_loaded env =

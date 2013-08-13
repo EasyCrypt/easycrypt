@@ -104,6 +104,16 @@ let fdiv f e1 e2 =
   | Some p -> rapp f.f_ring p [e1; e2]
 
 (* -------------------------------------------------------------------- *)
+let emb_rzero r =
+  match r.r_embed with `Direct -> f_int 0 | _ -> rzero r
+
+let emb_rone r =
+  match r.r_embed with `Direct -> f_int 1 | _ -> rone r
+
+let emb_fzero r = emb_rzero r.f_ring
+let emb_fone  r = emb_rone  r.f_ring
+
+(* -------------------------------------------------------------------- *)
 type cringop = [`Zero | `One | `Add | `Opp | `Sub | `Mul | `Exp | `OfInt]
 type cring   = ring * (cringop Mp.t)
 
@@ -217,9 +227,9 @@ let tofield ((r, cr) : cfield) (rmap : RState.rstate) (form : form) =
 let ofring (r : ring) (rmap : RState.rstate) (e : pol) : form =
   let rec doit idx e =
     match e with
-    | Pc c ->
-      let c = Big_int.int_of_big_int c in (* FIXME: possible overflow *)
-        rofint r c
+    | Pc c when ceq c c0 -> emb_rzero r
+    | Pc c when ceq c c1 -> emb_rone  r
+    | Pc c -> rofint r (Big_int.int_of_big_int c)
 
     | Pinj (j, e) -> doit (idx-j) e
 

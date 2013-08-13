@@ -46,6 +46,13 @@ val fdiv   : field -> form -> form -> form
 val fofint : field -> int -> form
 
 (* -------------------------------------------------------------------- *)
+val emb_rzero : ring  -> form
+val emb_fzero : field -> form
+
+val emb_rone : ring  -> form
+val emb_fone : field -> form
+
+(* -------------------------------------------------------------------- *)
 type eq  = form * form
 type eqs = eq list
 
