@@ -396,6 +396,7 @@ genqident(X):
 | x=LIDENT { x }
 | x=UIDENT { x }
 | x=PUNIOP { x }
+| x=paren(PUNIOP) { x }
 | x=PBINOP { x }
 
 | paren(DCOLON) { EcCoreLib.s_cons }
