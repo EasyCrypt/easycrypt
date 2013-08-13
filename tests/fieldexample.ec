@@ -114,6 +114,11 @@ instance field with zq
 lemma rbinom (x y : zq): (x - y)^^2 = x^^2 - (ofint 2) * x * y + y^^2.
 proof. by field. qed.
 
+lemma test (x : zq): x <> gf_q0 => inv x = inv x.
+proof. by intros=> h; field. qed.
+
+
+(* FIXME: to be sync'ed with new ring/field tactics
 lemma b24 : forall (a b c: zq) ,
     a = b =>
     c = (ofint 2) * a =>  
