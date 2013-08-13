@@ -511,6 +511,10 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
 
       | CTh_export p ->
           (subst, proofs, EcEnv.Theory.export (EcSubst.subst_path subst p) scenv)
+
+      | CTh_instance _ ->
+          (* Currently, instances don't survive cloning *)
+          ( subst, proofs, scenv)
     in
       let scenv = EcEnv.Theory.enter name scenv in
       let _, proofs, scenv =

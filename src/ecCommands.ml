@@ -126,9 +126,10 @@ and process_typeclass (scope : EcScope.scope) (tcd : ptypeclass located) =
     scope
 
 (* -------------------------------------------------------------------- *)
-and process_tycinst (scope : EcScope.scope) (_tci : ptycinstance located) =
+and process_tycinst (scope : EcScope.scope) (tci : ptycinstance located) =
   EcScope.check_state `InTop "type class instance" scope;
-  scope
+  let scope = EcScope.Ty.addinstance scope tci in
+    scope
 
 (* -------------------------------------------------------------------- *)
 and process_datatype (_scope : EcScope.scope) _ =

@@ -1985,6 +1985,8 @@ let rec pp_theory ppe (fmt:Format.formatter) (path, cth) =
     (* Fixme should not use a pp_list, it should be a fold *)
     Format.fprintf fmt "export %a."  
       EcSymbols.pp_qsymbol (PPEnv.th_symb ppe p)
+  | EcTheory.CTh_instance _ ->
+    Format.fprintf fmt "instance <FIXME>."
 
   
 

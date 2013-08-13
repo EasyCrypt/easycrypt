@@ -124,6 +124,7 @@ type preenv = {
   env_locals   : (EcIdent.t * EcTypes.ty) MMsym.t;
   env_memories : EcMemory.memenv MMsym.t;
   env_actmem   : EcMemory.memory option;
+  env_tci      : (tcinstance list) Mp.t;
   env_modlcs   : Sid.t;                 (* declared modules *)
   env_w3       : EcWhy3.env;
   env_rb       : EcWhy3.rebinding;      (* in reverse order *)
@@ -136,6 +137,8 @@ and escope = {
              | `Module of EcPath.mpath
              | `Fun    of EcPath.xpath ];
 }
+
+and tcinstance = [ `Ring of EcAlgebra.ring | `Field of EcAlgebra.field ]
 
 (* -------------------------------------------------------------------- *)
 type env = preenv
@@ -219,6 +222,7 @@ let empty =
       env_locals   = MMsym.empty;
       env_memories = MMsym.empty;
       env_actmem   = None;
+      env_tci      = Mp.empty;
       env_modlcs   = Sid.empty;
       env_w3       = EcWhy3.empty;
       env_rb       = [];
@@ -794,6 +798,8 @@ module MC = struct
             (add2mc _up_theory xsubth subth mc, Some submcs)
 
       | CTh_export _ -> (mc, None)
+
+      | CTh_instance _ -> (mc, None)
     in 
 
     let (mc, submcs) =
@@ -1560,9 +1566,14 @@ module Ty = struct
 
   let unfold (name : EcPath.path) (args : EcTypes.ty list) (env : env) =
     match by_path_opt name env with
-    | Some ({ tyd_type = Some body} as tyd) ->
+    | Some ({ tyd_type = Some body } as tyd) ->
         EcTypes.Tvar.subst (EcTypes.Tvar.init tyd.tyd_params args) body
     | _ -> raise (LookupFailure (`Path name))
+
+  let rec hnorm (ty : ty) (env : env) =
+    match ty.ty_node with
+    | Tconstr (p, tys) when defined p env -> hnorm (unfold p tys env) env
+    | _ -> ty
 end
 
 (* -------------------------------------------------------------------- *)
@@ -2094,6 +2105,45 @@ module Ax = struct
     | _ -> raise (LookupFailure (`Path p))
 end
 
+(* -------------------------------------------------------------------- *)
+module Algebra = struct
+  open EcAlgebra
+
+  let add_ring p cr env =
+    { env with env_tci =
+        Mp.change
+          (function tci -> Some (`Ring cr :: odfl [] tci))
+          p env.env_tci }
+
+  let add_field p cr env =
+    { env with env_tci =
+        Mp.change
+          (function tci -> Some (`Field cr :: odfl [] tci))
+          p env.env_tci }
+
+  let get_instances ty env =
+    match (Ty.hnorm ty env).ty_node with
+    | Tconstr (p, []) -> odfl [] (Mp.find_opt p env.env_tci)
+    | _ -> []
+
+  let get_ring ty env =
+    let module E = struct exception Found of ring end in
+      try
+        List.iter
+          (function `Ring cr -> raise (E.Found cr) | _ -> ())
+          (get_instances ty env);
+        None
+      with E.Found cr -> Some cr
+
+  let get_field ty env =
+    let module E = struct exception Found of field end in
+      try
+        List.iter
+          (function `Field cr -> raise (E.Found cr) | _ -> ())
+          (get_instances ty env);
+        None
+      with E.Found cr -> Some cr
+end
 
 (* -------------------------------------------------------------------- *)
 module Theory = struct
@@ -2113,6 +2163,7 @@ module Theory = struct
     | Th_module    m       -> CTh_module   m
     | Th_theory    (x, th) -> CTh_theory   (x, ctheory_of_theory th)
     | Th_export    name    -> CTh_export   name
+    | Th_instance  (p, cr) -> CTh_instance (p, cr)
 
   (* ------------------------------------------------------------------ *)
   let enter name env =
@@ -2161,6 +2212,7 @@ module Theory = struct
         | CTh_module   me      -> EcWhy3.add_mod_exp w3env (xpath me.me_name) me
         | CTh_export   _       -> (w3env, [])
         | CTh_theory (x, th)   -> compile (xpath x) w3env th
+        | CTh_instance _       -> (w3env, [])
 
         | CTh_axiom (x, ax) -> begin
           match ax.ax_nosmt with
@@ -2218,6 +2270,12 @@ module Theory = struct
             let env = MC.import_theory (xpath x) th env in
             let env = MC.import_mc (IPPath (xpath x)) env in
               env
+
+        | CTh_instance (p, cr) -> begin
+            match cr with
+            | `Ring  cr -> Algebra.add_ring  p cr env
+            | `Field cr -> Algebra.add_field p cr env
+        end
       in
         List.fold_left import_cth_item env cth.cth_struct
 
@@ -2358,12 +2416,6 @@ let bind1 ((x, eb) : symbol * ebinding) (env : env) =
 
 let bindall (items : (symbol * ebinding) list) (env : env) =
   List.fold_left ((^~) bind1) env items
-
-(* -------------------------------------------------------------------- *)
-module Algebra = struct
-  let get_ring  _ty _env = assert false
-  let get_field _ty _env = assert false
-end
 
 (* -------------------------------------------------------------------- *)
 module LDecl = struct

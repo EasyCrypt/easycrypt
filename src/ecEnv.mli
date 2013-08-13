@@ -280,6 +280,7 @@ module Ty : sig
 
   val defined : path -> env -> bool
   val unfold  : path -> EcTypes.ty list -> env -> EcTypes.ty
+  val hnorm   : EcTypes.ty -> env -> EcTypes.ty
 end
 
 (* -------------------------------------------------------------------- *)
@@ -300,6 +301,9 @@ val import_w3_dir :
 
 (* -------------------------------------------------------------------- *)
 module Algebra : sig
+  val add_ring  : path -> EcAlgebra.ring  -> env -> env
+  val add_field : path -> EcAlgebra.field -> env -> env
+
   val get_ring  : ty -> env -> EcAlgebra.ring  option
   val get_field : ty -> env -> EcAlgebra.field option
 end

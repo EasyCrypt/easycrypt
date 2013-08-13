@@ -984,8 +984,11 @@ module Ty = struct
 
   let addclass (scope : scope) tcd =
     assert (scope.sc_pr_uc = None);
-    let tclass = EcTyping.trans_tclass scope.sc_env tcd in
+    let _tclass = EcTyping.trans_tclass scope.sc_env tcd in
       scope
+
+  let addinstance (scope : scope) _tci =
+    scope
 
   let define (scope : scope) info body =
     assert (scope.sc_pr_uc = None);
@@ -1541,6 +1544,12 @@ module Section = struct
               let scope = List.fold_left bind1 scope th.EcTheory.cth_struct in
               let _, scope = Theory.exit scope in
                 scope
+
+          | T.CTh_instance (p, cr) -> begin
+              match cr with
+              | `Ring  cr -> { scope with sc_env = EcEnv.Algebra.add_ring  p cr scope.sc_env }
+              | `Field cr -> { scope with sc_env = EcEnv.Algebra.add_field p cr scope.sc_env }
+          end
         in
 
         List.fold_left bind1 scope oitems
