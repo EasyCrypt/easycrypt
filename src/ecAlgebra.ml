@@ -231,16 +231,16 @@ let ofring (r : ring) (rmap : RState.rstate) (e : pol) : form =
     | Pc c when ceq c c1 -> emb_rone  r
     | Pc c -> rofint r (Big_int.int_of_big_int c)
 
-    | Pinj (j, e) -> doit (idx-j) e
+    | Pinj (j, e) -> doit (idx+j) e
 
     | PX (p, i, q) ->
         let f = oget (RState.get idx rmap) in
         let f = match i with 1 -> f | _ -> rexp r f i in
         let f = if peq p (Pc c1) then f else rmul r (doit idx p) f in
-        let f = if peq q (Pc c0) then f else radd r f (doit (idx-1) q) in
+        let f = if peq q (Pc c0) then f else radd r f (doit (idx+1) q) in
           f
   in
-    doit (RState.current rmap) e
+    doit 1 e
 
 (* -------------------------------------------------------------------- *)
 let ring_simplify (cr : cring) (eqs : eqs) (form : form) =
