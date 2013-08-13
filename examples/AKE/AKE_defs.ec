@@ -280,7 +280,7 @@ proof.
   smt. smt.
 qed.
 
-lemma nosmt notfresh_fresh(t : Sid) (evs : Event list) (e Event):
+lemma nosmt notfresh_fresh(t : Sid) (evs : Event list) (e : Event):
   e <> Accept (cmatching t) => 
   e <> Start (psid_of_sid (cmatching t)) =>
   notfresh t evs =>
