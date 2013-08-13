@@ -1116,10 +1116,7 @@ let process_elimT loc (pf, qs) g =
     (t_simplify EcReduction.beta_red) g
 
 (* -------------------------------------------------------------------- *)
-let process_algebra loc hitenv mode kind eqs g =
-  let smt_on = t_on_goals (t_try (process_smt hitenv (None, empty_pprover))) in
-  let ass_on = t_on_goals (t_try (process_assumption loc (None, None))) in
-
+let process_algebra mode kind eqs g =
   let (env, hyps, concl) = get_goal_e g in
 
   if not (EcAlgTactic.is_module_loaded env) then
@@ -1167,7 +1164,7 @@ let process_algebra loc hitenv mode kind eqs g =
           | Some r -> r
         in t r eqs (f1, f2)
   in
-    smt_on (ass_on (tactic g))
+    tactic g
 
 (* -------------------------------------------------------------------- *)
 let process_logic (engine, hitenv) loc t =
@@ -1177,10 +1174,10 @@ let process_logic (engine, hitenv) loc t =
   | Psmt pi        -> process_smt hitenv pi
   | Pintro pi      -> process_intros pi
   | Psplit         -> t_split
-  | Pfield st      -> process_algebra loc hitenv `Solve `Field st
-  | Pfieldsimp st  -> process_algebra loc hitenv `Simpl `Field st
-  | Pring st       -> process_algebra loc hitenv `Solve `Ring  st
-  | Pringsimp  st  -> process_algebra loc hitenv `Simpl `Ring  st
+  | Pfield st      -> process_algebra `Solve `Field st
+  | Pfieldsimp st  -> process_algebra `Simpl `Field st
+  | Pring st       -> process_algebra `Solve `Ring  st
+  | Pringsimp  st  -> process_algebra `Simpl `Ring  st
   | Pexists fs     -> process_exists fs
   | Pleft          -> t_left
   | Pright         -> t_right
