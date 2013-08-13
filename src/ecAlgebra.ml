@@ -81,19 +81,20 @@ let rsub r e1 e2 =
   | None   -> radd r e1 (ropp r e2)
   | Some p -> rapp r p [e1; e2]
 
-let rintmul r i =
+let rofint r i =
   match r.r_embed with
   | `Direct  -> f_int i
   | `Embed p -> rapp r p [f_int i]
 
 (* -------------------------------------------------------------------- *)
-let fzero f = rzero f.f_ring
-let fone  f = rone  f.f_ring
-let fadd  f = radd  f.f_ring
-let fopp  f = ropp  f.f_ring
-let fmul  f = rmul  f.f_ring
-let fexp  f = rexp  f.f_ring
-let fsub  f = rsub  f.f_ring
+let fzero  f = rzero  f.f_ring
+let fone   f = rone   f.f_ring
+let fadd   f = radd   f.f_ring
+let fopp   f = ropp   f.f_ring
+let fmul   f = rmul   f.f_ring
+let fexp   f = rexp   f.f_ring
+let fsub   f = rsub   f.f_ring
+let fofint f = rofint f.f_ring
 
 let finv f e = rapp f.f_ring f.f_inv [e]
 
@@ -208,7 +209,7 @@ let ofring (r : ring) (rmap : RState.rstate) (e : pol) : form =
     match e with
     | Pc c ->
       let c = Big_int.int_of_big_int c in (* FIXME: possible overflow *)
-        rintmul r c
+        rofint r c
 
     | Pinj (j, e) -> doit (idx-j) e
 

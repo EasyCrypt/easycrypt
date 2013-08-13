@@ -50,7 +50,7 @@ lemma b25  (a b : int):
 b + (a ^ 25).
 proof. by ring. qed.
 
-lemma binom (x y : int): ((x+y) ^2) = (x^2 + 2* x * y + y^2).
+lemma binom (x y : int): (x+y)^2 = x^2 + 2 * x * y + y^2.
 proof. by ring. qed.
 
 (*

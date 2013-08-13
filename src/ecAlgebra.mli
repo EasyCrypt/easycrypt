@@ -23,26 +23,27 @@ type field = {
 }
 
 (* -------------------------------------------------------------------- *)
-val rapp    : ring -> EcPath.path -> form list -> form
-val rzero   : ring -> form
-val rone    : ring -> form
-val radd    : ring -> form -> form -> form
-val ropp    : ring -> form -> form
-val rmul    : ring -> form -> form -> form
-val rexp    : ring -> form -> int -> form
-val rsub    : ring -> form -> form -> form
-val rintmul : ring -> int -> form
+val rapp   : ring -> EcPath.path -> form list -> form
+val rzero  : ring -> form
+val rone   : ring -> form
+val radd   : ring -> form -> form -> form
+val ropp   : ring -> form -> form
+val rmul   : ring -> form -> form -> form
+val rexp   : ring -> form -> int -> form
+val rsub   : ring -> form -> form -> form
+val rofint : ring -> int -> form
 
 (* -------------------------------------------------------------------- *)
-val fzero : field -> form
-val fone  : field -> form
-val fadd  : field -> form -> form -> form
-val fopp  : field -> form -> form
-val fmul  : field -> form -> form -> form
-val fexp  : field -> form -> int -> form
-val fsub  : field -> form -> form -> form
-val finv  : field -> form -> form
-val fdiv  : field -> form -> form -> form
+val fzero  : field -> form
+val fone   : field -> form
+val fadd   : field -> form -> form -> form
+val fopp   : field -> form -> form
+val fmul   : field -> form -> form -> form
+val fexp   : field -> form -> int -> form
+val fsub   : field -> form -> form -> form
+val finv   : field -> form -> form
+val fdiv   : field -> form -> form -> form
+val fofint : field -> int -> form
 
 (* -------------------------------------------------------------------- *)
 type eq  = form * form
