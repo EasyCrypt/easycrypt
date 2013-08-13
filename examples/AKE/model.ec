@@ -678,6 +678,9 @@ qed.
 lemma le_congr : forall (a b c d : real), 
   a <= c => b <= d => a + b <= c + d by [].
 
+op dv : 'a = proj None.
+
+print op dv.
 
 local module G1 : Proto = {
  var cSess, cH1, cH2, cSessKR, cEpkKR : int (* counters for queries *)
@@ -693,7 +696,7 @@ local module G1 : Proto = {
  var testid : EId option
 
  fun h1(sstring : Session_string) : Key = {
-  var ke : Key;
+  var ke : Key = dv;
   ke = $sample_bstr_k;
  if (!in_dom sstring mH1) {
    mH1.[sstring] = ke;
