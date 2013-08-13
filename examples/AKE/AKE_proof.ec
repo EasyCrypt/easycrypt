@@ -754,11 +754,11 @@ proof strict.
     (* resp *)
     fun.
     sp.
+    if => //;
     if; [ by smt | | skip; by smt].
     wp.
     call (Eq_AKE_AKE_1_O_h1 A).
     by wp; rnd; wp; skip; smt.
-
 
     (* init1 *)
     fun.
@@ -997,45 +997,7 @@ module AKE_2(FA : Adv) = {
   }
 }.
 
-(*{ First handle oracles that are unaffected by changes *)
-
-lemma Eq_AKE_1_AKE_2_O_h1(A <: Adv{AKE, AKE_1}):
-  equiv[ AKE_1(A).O.h1 ~ AKE_2(A).O.h1 :
-         (AKE_1.mH1{1} = AKE_2.mH1{2} /\ ={x,a})
-         ==> (AKE_1.mH1{1} = AKE_2.mH1{2} /\ ={res}) ].
-proof strict.
-  by fun; eqobs_in.
-qed.
-
-lemma Eq_AKE_1_AKE_2_O_h2(A <: Adv{AKE, AKE_1}):
-  equiv[ AKE_1(A).O.h2 ~ AKE_2(A).O.h2 :
-         (AKE_1.mH2{1} = AKE_2.mH2{2} /\ ={sstring})
-         ==> (AKE_1.mH2{1} = AKE_2.mH2{2} /\ ={res}) ].
-proof strict.
-  by fun; eqobs_in.
-qed.
-  
-lemma Eq_AKE_1_AKE_2_O_h2_a(A <: Adv{AKE, AKE_1}):
-  equiv[ AKE_1(A).O.h2_a ~ AKE_2(A).O.h2_a :
-         (   AKE_1.mH2{1} = AKE_2.mH2{2} /\ AKE_1.sH2{1} = AKE_2.sH2{2}
-          /\ AKE_1.cH2{1} = AKE_2.cH2{2} /\ ={sstring})
-         ==>
-         (   AKE_1.mH2{1} = AKE_2.mH2{2} /\ AKE_1.sH2{1} = AKE_2.sH2{2}
-          /\ AKE_1.cH2{1} = AKE_2.cH2{2} /\ ={res}) ].
-proof strict.
-  by fun; eqobs_in.
-qed.
-
-lemma Eq_AKE_1_AKE_2_O_staticRev(A <: Adv{AKE, AKE_1}):
-  equiv[ AKE_1(A).O.staticRev ~ AKE_2(A).O.staticRev :
-         (AKE_1.mSk{1} = AKE_2.mSk{2} /\ AKE_1.evs{1} = AKE_2.evs{2} /\ ={A})
-         ==>
-         (AKE_1.mSk{1} = AKE_2.mSk{2} /\ AKE_1.evs{1} = AKE_2.evs{2} /\ ={res})].
-proof strict.
-  by fun; eqobs_in.
-qed.
-
-(*} end: First handle oracles that are unaffected by changes *)
+(*{ Definitions required for relational invariant between AKE_1 and AKE_2 *)
 
 pred eq_map_split(mStarted1 : (Sidx, Sdata)  map) 
                  (mStarted2 : (Sidx, Sdata2) map) 
@@ -1115,22 +1077,149 @@ proof strict.
   smt.
 qed.
 
+(*} end: Definitions required for relational invariant between AKE_1 and AKE_2 *)
+
+(*{ First handle oracles that are unaffected by changes *)
+
+lemma Eq_AKE_1_AKE_2_O_h1(A <: Adv{AKE, AKE_1}):
+  equiv[ AKE_1(A).O.h1 ~ AKE_2(A).O.h1 :
+         (AKE_1.mH1{1} = AKE_2.mH1{2} /\ ={x,a})
+         ==> (AKE_1.mH1{1} = AKE_2.mH1{2} /\ ={res}) ].
+proof strict.
+  by fun; eqobs_in.
+qed.
+
+lemma Eq_AKE_1_AKE_2_O_h2(A <: Adv{AKE, AKE_1}):
+  equiv[ AKE_1(A).O.h2 ~ AKE_2(A).O.h2 :
+         (AKE_1.mH2{1} = AKE_2.mH2{2} /\ ={sstring})
+         ==> (AKE_1.mH2{1} = AKE_2.mH2{2} /\ ={res}) ].
+proof strict.
+  by fun; eqobs_in.
+qed.
+  
+lemma Eq_AKE_1_AKE_2_O_h2_a(A <: Adv{AKE, AKE_1}):
+  equiv[ AKE_1(A).O.h2_a ~ AKE_2(A).O.h2_a :
+         ( ={sstring} /\
+           AKE_1.evs{1}         = AKE_2.evs{2} /\
+           AKE_1.test{1}        = AKE_2.test{2} /\
+           AKE_1.cSession{1}    = AKE_2.cSession{2} /\
+           AKE_1.cH1{1}         = AKE_2.cH1{2} /\
+           AKE_1.cH2{1}         = AKE_2.cH2{2} /\
+           AKE_1.mH1{1}         = AKE_2.mH1{2} /\
+           AKE_1.sH1{1}         = AKE_2.sH1{2} /\
+           AKE_1.mH2{1}         = AKE_2.mH2{2} /\
+           AKE_1.sH2{1}         = AKE_2.sH2{2} /\
+           AKE_1.mSk{1}         = AKE_2.mSk{2} /\
+           AKE_1.mCompleted{1}  = AKE_2.mCompleted{2} /\
+           AKE_1.bad_esk_col{1} = AKE_2.bad_esk_col{2} /\
+           AKE_1.bad_esk_norev{1} = AKE_2.bad_esk_norev{2} /\
+           eq_map_split AKE_1.mStarted{1} AKE_2.mStarted{2}
+                        AKE_2.mEsk{2} AKE_2.mEexp{2})
+         ==>
+         ( ={res} /\
+           AKE_1.evs{1}         = AKE_2.evs{2} /\
+           AKE_1.test{1}        = AKE_2.test{2} /\
+           AKE_1.cSession{1}    = AKE_2.cSession{2} /\
+           AKE_1.cH1{1}         = AKE_2.cH1{2} /\
+           AKE_1.cH2{1}         = AKE_2.cH2{2} /\
+           AKE_1.mH1{1}         = AKE_2.mH1{2} /\
+           AKE_1.sH1{1}         = AKE_2.sH1{2} /\
+           AKE_1.mH2{1}         = AKE_2.mH2{2} /\
+           AKE_1.sH2{1}         = AKE_2.sH2{2} /\
+           AKE_1.mSk{1}         = AKE_2.mSk{2} /\
+           AKE_1.mCompleted{1}  = AKE_2.mCompleted{2} /\
+           AKE_1.bad_esk_col{1} = AKE_2.bad_esk_col{2} /\
+           AKE_1.bad_esk_norev{1} = AKE_2.bad_esk_norev{2} /\
+           eq_map_split AKE_1.mStarted{1} AKE_2.mStarted{2}
+                        AKE_2.mEsk{2} AKE_2.mEexp{2}) ].
+proof strict.
+  fun.
+  sp.
+  if; [ by smt | | by skip; smt ].
+  wp.
+  call (Eq_AKE_1_AKE_2_O_h2 A).
+  wp.
+  skip; smt.
+qed.
+
+lemma Eq_AKE_1_AKE_2_O_staticRev(A <: Adv{AKE, AKE_1}):
+  equiv[ AKE_1(A).O.staticRev ~ AKE_2(A).O.staticRev :
+         ( ={A} /\
+           AKE_1.evs{1}         = AKE_2.evs{2} /\
+           AKE_1.test{1}        = AKE_2.test{2} /\
+           AKE_1.cSession{1}    = AKE_2.cSession{2} /\
+           AKE_1.cH1{1}         = AKE_2.cH1{2} /\
+           AKE_1.cH2{1}         = AKE_2.cH2{2} /\
+           AKE_1.mH1{1}         = AKE_2.mH1{2} /\
+           AKE_1.sH1{1}         = AKE_2.sH1{2} /\
+           AKE_1.mH2{1}         = AKE_2.mH2{2} /\
+           AKE_1.sH2{1}         = AKE_2.sH2{2} /\
+           AKE_1.mSk{1}         = AKE_2.mSk{2} /\
+           AKE_1.mCompleted{1}  = AKE_2.mCompleted{2} /\
+           AKE_1.bad_esk_col{1} = AKE_2.bad_esk_col{2} /\
+           AKE_1.bad_esk_norev{1} = AKE_2.bad_esk_norev{2} /\
+           eq_map_split AKE_1.mStarted{1} AKE_2.mStarted{2}
+                        AKE_2.mEsk{2} AKE_2.mEexp{2})
+         ==>
+         ( ={res} /\
+           AKE_1.evs{1}         = AKE_2.evs{2} /\
+           AKE_1.test{1}        = AKE_2.test{2} /\
+           AKE_1.cSession{1}    = AKE_2.cSession{2} /\
+           AKE_1.cH1{1}         = AKE_2.cH1{2} /\
+           AKE_1.cH2{1}         = AKE_2.cH2{2} /\
+           AKE_1.mH1{1}         = AKE_2.mH1{2} /\
+           AKE_1.sH1{1}         = AKE_2.sH1{2} /\
+           AKE_1.mH2{1}         = AKE_2.mH2{2} /\
+           AKE_1.sH2{1}         = AKE_2.sH2{2} /\
+           AKE_1.mSk{1}         = AKE_2.mSk{2} /\
+           AKE_1.mCompleted{1}  = AKE_2.mCompleted{2} /\
+           AKE_1.bad_esk_col{1} = AKE_2.bad_esk_col{2} /\
+           AKE_1.bad_esk_norev{1} = AKE_2.bad_esk_norev{2} /\
+           eq_map_split AKE_1.mStarted{1} AKE_2.mStarted{2}
+                        AKE_2.mEsk{2} AKE_2.mEexp{2}) ].
+proof strict.
+  fun; wp; skip; smt.
+qed.
+
+(*} end: First handle oracles that are unaffected by changes *)
+
 (*{ Then handle oracles that only read the modified maps. *)
 
 lemma Eq_AKE_1_AKE_2_O_init2(A <: Adv{AKE, AKE_1}):
   equiv[ AKE_1(A).O.init2 ~ AKE_2(A).O.init2 :
-         (   eq_map_split AKE_1.mStarted{1} AKE_2.mStarted{2}
-                          AKE_2.mEsk{2} AKE_2.mEexp{2}
-          /\ AKE_1.mCompleted{1} = AKE_2.mCompleted{2}
-          /\ AKE_1.evs{1} = AKE_2.evs{2}
-          /\ ={i,Y}
-         )
+          ( ={i,Y} /\
+           AKE_1.evs{1}         = AKE_2.evs{2} /\
+           AKE_1.test{1}        = AKE_2.test{2} /\
+           AKE_1.cSession{1}    = AKE_2.cSession{2} /\
+           AKE_1.cH1{1}         = AKE_2.cH1{2} /\
+           AKE_1.cH2{1}         = AKE_2.cH2{2} /\
+           AKE_1.mH1{1}         = AKE_2.mH1{2} /\
+           AKE_1.sH1{1}         = AKE_2.sH1{2} /\
+           AKE_1.mH2{1}         = AKE_2.mH2{2} /\
+           AKE_1.sH2{1}         = AKE_2.sH2{2} /\
+           AKE_1.mSk{1}         = AKE_2.mSk{2} /\
+           AKE_1.mCompleted{1}  = AKE_2.mCompleted{2} /\
+           AKE_1.bad_esk_col{1} = AKE_2.bad_esk_col{2} /\
+           AKE_1.bad_esk_norev{1} = AKE_2.bad_esk_norev{2} /\
+           eq_map_split AKE_1.mStarted{1} AKE_2.mStarted{2}
+                        AKE_2.mEsk{2} AKE_2.mEexp{2})
          ==>
-         (   eq_map_split AKE_1.mStarted{1} AKE_2.mStarted{2}
-                          AKE_2.mEsk{2} AKE_2.mEexp{2}
-          /\ AKE_1.mCompleted{1} = AKE_2.mCompleted{2}
-          /\ AKE_1.evs{1} = AKE_2.evs{2}
-          /\ ={res}) ].
+          ( ={res} /\
+           AKE_1.evs{1}         = AKE_2.evs{2} /\
+           AKE_1.test{1}        = AKE_2.test{2} /\
+           AKE_1.cSession{1}    = AKE_2.cSession{2} /\
+           AKE_1.cH1{1}         = AKE_2.cH1{2} /\
+           AKE_1.cH2{1}         = AKE_2.cH2{2} /\
+           AKE_1.mH1{1}         = AKE_2.mH1{2} /\
+           AKE_1.sH1{1}         = AKE_2.sH1{2} /\
+           AKE_1.mH2{1}         = AKE_2.mH2{2} /\
+           AKE_1.sH2{1}         = AKE_2.sH2{2} /\
+           AKE_1.mSk{1}         = AKE_2.mSk{2} /\
+           AKE_1.mCompleted{1}  = AKE_2.mCompleted{2} /\
+           AKE_1.bad_esk_col{1} = AKE_2.bad_esk_col{2} /\
+           AKE_1.bad_esk_norev{1} = AKE_2.bad_esk_norev{2} /\
+           eq_map_split AKE_1.mStarted{1} AKE_2.mStarted{2}
+                        AKE_2.mEsk{2} AKE_2.mEexp{2}) ].
 proof strict.
   fun.
   if; [ by smt | | skip; by smt ].
@@ -1139,18 +1228,39 @@ qed.
 
 lemma Eq_AKE_1_AKE_2_O_ephemeralRev(A <: Adv{AKE, AKE_1}):
   equiv[ AKE_1(A).O.ephemeralRev ~ AKE_2(A).O.ephemeralRev :
-         (   eq_map_split AKE_1.mStarted{1} AKE_2.mStarted{2}
-                          AKE_2.mEsk{2} AKE_2.mEexp{2}
-          /\ AKE_1.mCompleted{1} = AKE_2.mCompleted{2}
-          /\ AKE_1.evs{1} = AKE_2.evs{2}
-          /\ ={i}
-         )
+          ( ={i} /\
+           AKE_1.evs{1}         = AKE_2.evs{2} /\
+           AKE_1.test{1}        = AKE_2.test{2} /\
+           AKE_1.cSession{1}    = AKE_2.cSession{2} /\
+           AKE_1.cH1{1}         = AKE_2.cH1{2} /\
+           AKE_1.cH2{1}         = AKE_2.cH2{2} /\
+           AKE_1.mH1{1}         = AKE_2.mH1{2} /\
+           AKE_1.sH1{1}         = AKE_2.sH1{2} /\
+           AKE_1.mH2{1}         = AKE_2.mH2{2} /\
+           AKE_1.sH2{1}         = AKE_2.sH2{2} /\
+           AKE_1.mSk{1}         = AKE_2.mSk{2} /\
+           AKE_1.mCompleted{1}  = AKE_2.mCompleted{2} /\
+           AKE_1.bad_esk_col{1} = AKE_2.bad_esk_col{2} /\
+           AKE_1.bad_esk_norev{1} = AKE_2.bad_esk_norev{2} /\
+           eq_map_split AKE_1.mStarted{1} AKE_2.mStarted{2}
+                        AKE_2.mEsk{2} AKE_2.mEexp{2})
          ==>
-         (   eq_map_split AKE_1.mStarted{1} AKE_2.mStarted{2}
-                          AKE_2.mEsk{2} AKE_2.mEexp{2}
-          /\ AKE_1.mCompleted{1} = AKE_2.mCompleted{2}
-          /\ AKE_1.evs{1} = AKE_2.evs{2}
-          /\ ={res}) ].
+          ( ={res} /\
+           AKE_1.evs{1}         = AKE_2.evs{2} /\
+           AKE_1.test{1}        = AKE_2.test{2} /\
+           AKE_1.cSession{1}    = AKE_2.cSession{2} /\
+           AKE_1.cH1{1}         = AKE_2.cH1{2} /\
+           AKE_1.cH2{1}         = AKE_2.cH2{2} /\
+           AKE_1.mH1{1}         = AKE_2.mH1{2} /\
+           AKE_1.sH1{1}         = AKE_2.sH1{2} /\
+           AKE_1.mH2{1}         = AKE_2.mH2{2} /\
+           AKE_1.sH2{1}         = AKE_2.sH2{2} /\
+           AKE_1.mSk{1}         = AKE_2.mSk{2} /\
+           AKE_1.mCompleted{1}  = AKE_2.mCompleted{2} /\
+           AKE_1.bad_esk_col{1} = AKE_2.bad_esk_col{2} /\
+           AKE_1.bad_esk_norev{1} = AKE_2.bad_esk_norev{2} /\
+           eq_map_split AKE_1.mStarted{1} AKE_2.mStarted{2}
+                        AKE_2.mEsk{2} AKE_2.mEexp{2}) ].
 proof strict.
   fun.
   wp; skip; smt.
@@ -1158,20 +1268,39 @@ qed.
 
 lemma Eq_AKE_1_AKE_2_O_computeKey(A <: Adv{AKE, AKE_1}):
   equiv[ AKE_1(A).O.computeKey ~ AKE_2(A).O.computeKey :
-         (   AKE_1.mH2{1} = AKE_2.mH2{2}
-          /\ eq_map_split AKE_1.mStarted{1} AKE_2.mStarted{2}
-                          AKE_2.mEsk{2} AKE_2.mEexp{2}
-          /\ AKE_1.mSk{1} = AKE_2.mSk{2}
-          /\ AKE_1.mCompleted{1} = AKE_2.mCompleted{2}
-          /\ ={i}
-         )
+          ( ={i} /\
+           AKE_1.evs{1}         = AKE_2.evs{2} /\
+           AKE_1.test{1}        = AKE_2.test{2} /\
+           AKE_1.cSession{1}    = AKE_2.cSession{2} /\
+           AKE_1.cH1{1}         = AKE_2.cH1{2} /\
+           AKE_1.cH2{1}         = AKE_2.cH2{2} /\
+           AKE_1.mH1{1}         = AKE_2.mH1{2} /\
+           AKE_1.sH1{1}         = AKE_2.sH1{2} /\
+           AKE_1.mH2{1}         = AKE_2.mH2{2} /\
+           AKE_1.sH2{1}         = AKE_2.sH2{2} /\
+           AKE_1.mSk{1}         = AKE_2.mSk{2} /\
+           AKE_1.mCompleted{1}  = AKE_2.mCompleted{2} /\
+           AKE_1.bad_esk_col{1} = AKE_2.bad_esk_col{2} /\
+           AKE_1.bad_esk_norev{1} = AKE_2.bad_esk_norev{2} /\
+           eq_map_split AKE_1.mStarted{1} AKE_2.mStarted{2}
+                        AKE_2.mEsk{2} AKE_2.mEexp{2})
          ==>
-         (   AKE_1.mH2{1} = AKE_2.mH2{2}
-          /\ eq_map_split AKE_1.mStarted{1} AKE_2.mStarted{2}
-                          AKE_2.mEsk{2} AKE_2.mEexp{2}
-          /\ AKE_1.mSk{1} = AKE_2.mSk{2}
-          /\ AKE_1.mCompleted{1} = AKE_2.mCompleted{2}
-          /\ ={res}) ].
+          ( ={res} /\
+           AKE_1.evs{1}         = AKE_2.evs{2} /\
+           AKE_1.test{1}        = AKE_2.test{2} /\
+           AKE_1.cSession{1}    = AKE_2.cSession{2} /\
+           AKE_1.cH1{1}         = AKE_2.cH1{2} /\
+           AKE_1.cH2{1}         = AKE_2.cH2{2} /\
+           AKE_1.mH1{1}         = AKE_2.mH1{2} /\
+           AKE_1.sH1{1}         = AKE_2.sH1{2} /\
+           AKE_1.mH2{1}         = AKE_2.mH2{2} /\
+           AKE_1.sH2{1}         = AKE_2.sH2{2} /\
+           AKE_1.mSk{1}         = AKE_2.mSk{2} /\
+           AKE_1.mCompleted{1}  = AKE_2.mCompleted{2} /\
+           AKE_1.bad_esk_col{1} = AKE_2.bad_esk_col{2} /\
+           AKE_1.bad_esk_norev{1} = AKE_2.bad_esk_norev{2} /\
+           eq_map_split AKE_1.mStarted{1} AKE_2.mStarted{2}
+                        AKE_2.mEsk{2} AKE_2.mEexp{2}) ].
 proof strict.
   fun.
   sp.
@@ -1183,22 +1312,39 @@ qed.
 
 lemma Eq_AKE_1_AKE_2_O_sessionRev(A <: Adv{AKE, AKE_1}):
   equiv[ AKE_1(A).O.sessionRev ~ AKE_2(A).O.sessionRev :
-         (   AKE_1.mH2{1} = AKE_2.mH2{2}
-          /\ eq_map_split AKE_1.mStarted{1} AKE_2.mStarted{2}
-                          AKE_2.mEsk{2} AKE_2.mEexp{2}
-          /\ AKE_1.mSk{1} = AKE_2.mSk{2}
-          /\ AKE_1.mCompleted{1} = AKE_2.mCompleted{2}
-          /\ AKE_1.evs{1} = AKE_2.evs{2}
-          /\ ={i}
-         )
+          ( ={i} /\
+           AKE_1.evs{1}         = AKE_2.evs{2} /\
+           AKE_1.test{1}        = AKE_2.test{2} /\
+           AKE_1.cSession{1}    = AKE_2.cSession{2} /\
+           AKE_1.cH1{1}         = AKE_2.cH1{2} /\
+           AKE_1.cH2{1}         = AKE_2.cH2{2} /\
+           AKE_1.mH1{1}         = AKE_2.mH1{2} /\
+           AKE_1.sH1{1}         = AKE_2.sH1{2} /\
+           AKE_1.mH2{1}         = AKE_2.mH2{2} /\
+           AKE_1.sH2{1}         = AKE_2.sH2{2} /\
+           AKE_1.mSk{1}         = AKE_2.mSk{2} /\
+           AKE_1.mCompleted{1}  = AKE_2.mCompleted{2} /\
+           AKE_1.bad_esk_col{1} = AKE_2.bad_esk_col{2} /\
+           AKE_1.bad_esk_norev{1} = AKE_2.bad_esk_norev{2} /\
+           eq_map_split AKE_1.mStarted{1} AKE_2.mStarted{2}
+                        AKE_2.mEsk{2} AKE_2.mEexp{2})
          ==>
-         (   AKE_1.mH2{1} = AKE_2.mH2{2}
-          /\ eq_map_split AKE_1.mStarted{1} AKE_2.mStarted{2}
-                          AKE_2.mEsk{2} AKE_2.mEexp{2}
-          /\ AKE_1.mSk{1} = AKE_2.mSk{2}
-          /\ AKE_1.mCompleted{1} = AKE_2.mCompleted{2}
-          /\ AKE_1.evs{1} = AKE_2.evs{2}
-          /\ ={res}) ].
+         ( ={res} /\
+           AKE_1.evs{1}         = AKE_2.evs{2} /\
+           AKE_1.test{1}        = AKE_2.test{2} /\
+           AKE_1.cSession{1}    = AKE_2.cSession{2} /\
+           AKE_1.cH1{1}         = AKE_2.cH1{2} /\
+           AKE_1.cH2{1}         = AKE_2.cH2{2} /\
+           AKE_1.mH1{1}         = AKE_2.mH1{2} /\
+           AKE_1.sH1{1}         = AKE_2.sH1{2} /\
+           AKE_1.mH2{1}         = AKE_2.mH2{2} /\
+           AKE_1.sH2{1}         = AKE_2.sH2{2} /\
+           AKE_1.mSk{1}         = AKE_2.mSk{2} /\
+           AKE_1.mCompleted{1}  = AKE_2.mCompleted{2} /\
+           AKE_1.bad_esk_col{1} = AKE_2.bad_esk_col{2} /\
+           AKE_1.bad_esk_norev{1} = AKE_2.bad_esk_norev{2} /\
+           eq_map_split AKE_1.mStarted{1} AKE_2.mStarted{2}
+                        AKE_2.mEsk{2} AKE_2.mEexp{2}) ].
 proof strict.
   fun.
   sp.
@@ -1243,44 +1389,45 @@ lemma Eq_AKE_1_AKE_2_O_h1_a(A <: Adv{AKE, AKE_1}):
            eq_map_split AKE_1.mStarted{1} AKE_2.mStarted{2}
                         AKE_2.mEsk{2} AKE_2.mEexp{2}) ].
 proof strict.
-  admit.
-(*
   fun.
   sp.
   if; [ by smt | | by skip; smt ].
   (* we want to use 'if' for the command setting bad *)
   seq 1 1:
-    ( AKE_1.evs{1}         = AKE_2.evs{2} /\
-      AKE_1.test{1}        = AKE_2.test{2} /\
-      AKE_1.cSession{1}    = AKE_2.cSession{2} /\
-      AKE_1.cH1{1}         = AKE_2.cH1{2} /\
-      AKE_1.cH2{1}         = AKE_2.cH2{2} /\
-      AKE_1.mH1{1}         = AKE_2.mH1{2} /\
-      AKE_1.sH1{1}         = AKE_2.sH1{2} /\
-      AKE_1.mH2{1}         = AKE_2.mH2{2} /\
-      AKE_1.sH2{1}         = AKE_2.sH2{2} /\
-      AKE_1.mSk{1}         = AKE_2.mSk{2} /\
-      AKE_1.mCompleted{1}  = AKE_2.mCompleted{2} /\
-      AKE_1.bad_esk_col{1} = AKE_2.bad_esk_col{2} /\
-      eq_map_split AKE_1.mStarted{1} AKE_2.mStarted{2}
-                   AKE_2.mEsk{2} AKE_2.mEexp{2} /\
-      ={x,a,r}); first by wp; skip; smt.
+     ( ={a,x} /\
+           AKE_1.evs{1}         = AKE_2.evs{2} /\
+           AKE_1.test{1}        = AKE_2.test{2} /\
+           AKE_1.cSession{1}    = AKE_2.cSession{2} /\
+           AKE_1.cH1{1}         = AKE_2.cH1{2} /\
+           AKE_1.cH2{1}         = AKE_2.cH2{2} /\
+           AKE_1.mH1{1}         = AKE_2.mH1{2} /\
+           AKE_1.sH1{1}         = AKE_2.sH1{2} /\
+           AKE_1.mH2{1}         = AKE_2.mH2{2} /\
+           AKE_1.sH2{1}         = AKE_2.sH2{2} /\
+           AKE_1.mSk{1}         = AKE_2.mSk{2} /\
+           AKE_1.mCompleted{1}  = AKE_2.mCompleted{2} /\
+           AKE_1.bad_esk_col{1} = AKE_2.bad_esk_col{2} /\
+           AKE_1.bad_esk_norev{1} = AKE_2.bad_esk_norev{2} /\
+           eq_map_split AKE_1.mStarted{1} AKE_2.mStarted{2}
+                        AKE_2.mEsk{2} AKE_2.mEexp{2});
+    first by wp; skip; smt.
   seq 2 2:
-    ( AKE_1.evs{1}         = AKE_2.evs{2} /\
-      AKE_1.test{1}        = AKE_2.test{2} /\
-      AKE_1.cSession{1}    = AKE_2.cSession{2} /\
-      AKE_1.cH1{1}         = AKE_2.cH1{2} /\
-      AKE_1.cH2{1}         = AKE_2.cH2{2} /\
-      AKE_1.mH1{1}         = AKE_2.mH1{2} /\
-      AKE_1.sH1{1}         = AKE_2.sH1{2} /\
-      AKE_1.mH2{1}         = AKE_2.mH2{2} /\
-      AKE_1.sH2{1}         = AKE_2.sH2{2} /\
-      AKE_1.mSk{1}         = AKE_2.mSk{2} /\
-      AKE_1.mCompleted{1}  = AKE_2.mCompleted{2} /\
-      AKE_1.bad_esk_col{1} = AKE_2.bad_esk_col{2} /\
-      eq_map_split AKE_1.mStarted{1} AKE_2.mStarted{2}
-                   AKE_2.mEsk{2} AKE_2.mEexp{2} /\
-      ={x,a,r}).
+    ( ={a,x} /\
+           AKE_1.evs{1}         = AKE_2.evs{2} /\
+           AKE_1.test{1}        = AKE_2.test{2} /\
+           AKE_1.cSession{1}    = AKE_2.cSession{2} /\
+           AKE_1.cH1{1}         = AKE_2.cH1{2} /\
+           AKE_1.cH2{1}         = AKE_2.cH2{2} /\
+           AKE_1.mH1{1}         = AKE_2.mH1{2} /\
+           AKE_1.sH1{1}         = AKE_2.sH1{2} /\
+           AKE_1.mH2{1}         = AKE_2.mH2{2} /\
+           AKE_1.sH2{1}         = AKE_2.sH2{2} /\
+           AKE_1.mSk{1}         = AKE_2.mSk{2} /\
+           AKE_1.mCompleted{1}  = AKE_2.mCompleted{2} /\
+           AKE_1.bad_esk_col{1} = AKE_2.bad_esk_col{2} /\
+           AKE_1.bad_esk_norev{1} = AKE_2.bad_esk_norev{2} /\
+           eq_map_split AKE_1.mStarted{1} AKE_2.mStarted{2}
+                        AKE_2.mEsk{2} AKE_2.mEexp{2}).
     if.
       simplify.
       intros &1 &2 H.
@@ -1294,10 +1441,8 @@ proof strict.
     wp; skip; smt.
   wp.
   call (Eq_AKE_1_AKE_2_O_h1 A).
-  skip; smt.*)
+  skip; smt.
 qed.
-
-pragma nocheck.
 
 (*} end: Then handle oracles that only read the modified maps*)
 
@@ -1305,24 +1450,39 @@ pragma nocheck.
 
 lemma Eq_AKE_1_AKE_2_O_init1(A <: Adv{AKE, AKE_1}):
   equiv[ AKE_1(A).O.init1 ~ AKE_2(A).O.init1 :
-         (   AKE_1.mH1{1} = AKE_2.mH1{2}
-          /\ eq_map_split AKE_1.mStarted{1} AKE_2.mStarted{2}
-                          AKE_2.mEsk{2} AKE_2.mEexp{2}
-          /\ AKE_1.cSession{1} = AKE_2.cSession{2}
-          /\ AKE_1.mSk{1} = AKE_2.mSk{2}
-          /\ AKE_1.bad_esk_col{1} = AKE_2.bad_esk_col{2}
-          /\ AKE_1.evs{1} = AKE_2.evs{2}
-          /\ ={i, A, B}
-         )
+         ( ={i,A,B} /\
+           AKE_1.evs{1}         = AKE_2.evs{2} /\
+           AKE_1.test{1}        = AKE_2.test{2} /\
+           AKE_1.cSession{1}    = AKE_2.cSession{2} /\
+           AKE_1.cH1{1}         = AKE_2.cH1{2} /\
+           AKE_1.cH2{1}         = AKE_2.cH2{2} /\
+           AKE_1.mH1{1}         = AKE_2.mH1{2} /\
+           AKE_1.sH1{1}         = AKE_2.sH1{2} /\
+           AKE_1.mH2{1}         = AKE_2.mH2{2} /\
+           AKE_1.sH2{1}         = AKE_2.sH2{2} /\
+           AKE_1.mSk{1}         = AKE_2.mSk{2} /\
+           AKE_1.mCompleted{1}  = AKE_2.mCompleted{2} /\
+           AKE_1.bad_esk_col{1} = AKE_2.bad_esk_col{2} /\
+           AKE_1.bad_esk_norev{1} = AKE_2.bad_esk_norev{2} /\
+           eq_map_split AKE_1.mStarted{1} AKE_2.mStarted{2}
+                        AKE_2.mEsk{2} AKE_2.mEexp{2})
          ==>
-         (   AKE_1.mH1{1} = AKE_2.mH1{2}
-          /\ eq_map_split AKE_1.mStarted{1} AKE_2.mStarted{2}
-                          AKE_2.mEsk{2} AKE_2.mEexp{2}
-          /\ AKE_1.cSession{1} = AKE_2.cSession{2}
-          /\ AKE_1.mSk{1} = AKE_2.mSk{2}
-          /\ AKE_1.bad_esk_col{1} = AKE_2.bad_esk_col{2}
-          /\ AKE_1.evs{1} = AKE_2.evs{2}
-          /\ ={res}) ].
+         ( ={res} /\
+           AKE_1.evs{1}         = AKE_2.evs{2} /\
+           AKE_1.test{1}        = AKE_2.test{2} /\
+           AKE_1.cSession{1}    = AKE_2.cSession{2} /\
+           AKE_1.cH1{1}         = AKE_2.cH1{2} /\
+           AKE_1.cH2{1}         = AKE_2.cH2{2} /\
+           AKE_1.mH1{1}         = AKE_2.mH1{2} /\
+           AKE_1.sH1{1}         = AKE_2.sH1{2} /\
+           AKE_1.mH2{1}         = AKE_2.mH2{2} /\
+           AKE_1.sH2{1}         = AKE_2.sH2{2} /\
+           AKE_1.mSk{1}         = AKE_2.mSk{2} /\
+           AKE_1.mCompleted{1}  = AKE_2.mCompleted{2} /\
+           AKE_1.bad_esk_col{1} = AKE_2.bad_esk_col{2} /\
+           AKE_1.bad_esk_norev{1} = AKE_2.bad_esk_norev{2} /\
+           eq_map_split AKE_1.mStarted{1} AKE_2.mStarted{2}
+                        AKE_2.mEsk{2} AKE_2.mEexp{2}) ].
 proof strict.
   fun.
   sp.
@@ -1332,31 +1492,47 @@ proof strict.
   wp.
   call (Eq_AKE_1_AKE_2_O_h1 A).
   seq 1 1:
-    (   AKE_1.mH1{1} = AKE_2.mH1{2}
-     /\ eq_map_split AKE_1.mStarted{1} AKE_2.mStarted{2}
-                     AKE_2.mEsk{2} AKE_2.mEexp{2}
-     /\ AKE_1.cSession{1} = AKE_2.cSession{2}
-     /\ AKE_1.mSk{1} = AKE_2.mSk{2}
-     /\ AKE_1.bad_esk_col{1} = AKE_2.bad_esk_col{2}
-     /\ AKE_1.evs{1} = AKE_2.evs{2}
-     /\ ={r,x,A,B,i}).
+    ( ={i,A,B,r,x} /\
+     AKE_1.evs{1}         = AKE_2.evs{2} /\
+     AKE_1.test{1}        = AKE_2.test{2} /\
+     AKE_1.cSession{1}    = AKE_2.cSession{2} /\
+     AKE_1.cH1{1}         = AKE_2.cH1{2} /\
+     AKE_1.cH2{1}         = AKE_2.cH2{2} /\
+     AKE_1.mH1{1}         = AKE_2.mH1{2} /\
+     AKE_1.sH1{1}         = AKE_2.sH1{2} /\
+     AKE_1.mH2{1}         = AKE_2.mH2{2} /\
+     AKE_1.sH2{1}         = AKE_2.sH2{2} /\
+     AKE_1.mSk{1}         = AKE_2.mSk{2} /\
+     AKE_1.mCompleted{1}  = AKE_2.mCompleted{2} /\
+     AKE_1.bad_esk_col{1} = AKE_2.bad_esk_col{2} /\
+     AKE_1.bad_esk_norev{1} = AKE_2.bad_esk_norev{2} /\
+     eq_map_split AKE_1.mStarted{1} AKE_2.mStarted{2}
+                  AKE_2.mEsk{2} AKE_2.mEexp{2}).
   rnd; skip; smt.
   seq 1 1:
-    (   AKE_1.mH1{1} = AKE_2.mH1{2}
-     /\ eq_map_split AKE_1.mStarted{1} AKE_2.mStarted{2}
-                     AKE_2.mEsk{2} AKE_2.mEexp{2}
-     /\ AKE_1.cSession{1} = AKE_2.cSession{2}
-     /\ AKE_1.mSk{1} = AKE_2.mSk{2}
-     /\ AKE_1.bad_esk_col{1} = AKE_2.bad_esk_col{2}
-     /\ AKE_1.evs{1} = AKE_2.evs{2}
-     /\ ={r,x,A,B,i}).
+    ( ={i,A,B,r,x} /\
+     AKE_1.evs{1}         = AKE_2.evs{2} /\
+     AKE_1.test{1}        = AKE_2.test{2} /\
+     AKE_1.cSession{1}    = AKE_2.cSession{2} /\
+     AKE_1.cH1{1}         = AKE_2.cH1{2} /\
+     AKE_1.cH2{1}         = AKE_2.cH2{2} /\
+     AKE_1.mH1{1}         = AKE_2.mH1{2} /\
+     AKE_1.sH1{1}         = AKE_2.sH1{2} /\
+     AKE_1.mH2{1}         = AKE_2.mH2{2} /\
+     AKE_1.sH2{1}         = AKE_2.sH2{2} /\
+     AKE_1.mSk{1}         = AKE_2.mSk{2} /\
+     AKE_1.mCompleted{1}  = AKE_2.mCompleted{2} /\
+     AKE_1.bad_esk_col{1} = AKE_2.bad_esk_col{2} /\
+     AKE_1.bad_esk_norev{1} = AKE_2.bad_esk_norev{2} /\
+     eq_map_split AKE_1.mStarted{1} AKE_2.mStarted{2}
+                  AKE_2.mEsk{2} AKE_2.mEexp{2}).
   if.
     smt. wp. skip. smt. skip. smt.
   wp. skip.
   simplify.
   intros &1 &2 H.
   generalize H.
-  progress. smt. smt. smt.
+  progress. smt. smt. smt. smt. smt.
   case (i{2} = i0).
     intros eq. rewrite !eq !get_setE; smt.
   intros neq. rewrite !get_setNE; smt.
@@ -1373,32 +1549,43 @@ proof strict.
   case (i{2} = i0).
     intros eq. rewrite !eq !get_setE; smt.
   intros neq. rewrite !get_setNE; smt.
-  smt.
-  smt.
 qed.
 
 lemma Eq_AKE_1_AKE_2_O_resp(A <: Adv{AKE, AKE_1}):
   equiv[ AKE_1(A).O.resp ~ AKE_2(A).O.resp :
-         (   AKE_1.mH1{1} = AKE_2.mH1{2}
-          /\ eq_map_split AKE_1.mStarted{1} AKE_2.mStarted{2}
-                          AKE_2.mEsk{2} AKE_2.mEexp{2}
-          /\ AKE_1.cSession{1} = AKE_2.cSession{2}
-          /\ AKE_1.mSk{1} = AKE_2.mSk{2}
-          /\ AKE_1.bad_esk_col{1} = AKE_2.bad_esk_col{2}
-          /\ AKE_1.evs{1} = AKE_2.evs{2}
-          /\ AKE_1.mCompleted{1} = AKE_2.mCompleted{2}
-          /\ ={i, A, B, X}
-         )
+         ( ={i, B, A, X} /\
+           AKE_1.evs{1}         = AKE_2.evs{2} /\
+           AKE_1.test{1}        = AKE_2.test{2} /\
+           AKE_1.cSession{1}    = AKE_2.cSession{2} /\
+           AKE_1.cH1{1}         = AKE_2.cH1{2} /\
+           AKE_1.cH2{1}         = AKE_2.cH2{2} /\
+           AKE_1.mH1{1}         = AKE_2.mH1{2} /\
+           AKE_1.sH1{1}         = AKE_2.sH1{2} /\
+           AKE_1.mH2{1}         = AKE_2.mH2{2} /\
+           AKE_1.sH2{1}         = AKE_2.sH2{2} /\
+           AKE_1.mSk{1}         = AKE_2.mSk{2} /\
+           AKE_1.mCompleted{1}  = AKE_2.mCompleted{2} /\
+           AKE_1.bad_esk_col{1} = AKE_2.bad_esk_col{2} /\
+           AKE_1.bad_esk_norev{1} = AKE_2.bad_esk_norev{2} /\
+           eq_map_split AKE_1.mStarted{1} AKE_2.mStarted{2}
+                        AKE_2.mEsk{2} AKE_2.mEexp{2})
          ==>
-         (   AKE_1.mH1{1} = AKE_2.mH1{2}
-          /\ eq_map_split AKE_1.mStarted{1} AKE_2.mStarted{2}
-                          AKE_2.mEsk{2} AKE_2.mEexp{2}
-          /\ AKE_1.cSession{1} = AKE_2.cSession{2}
-          /\ AKE_1.mSk{1} = AKE_2.mSk{2}
-          /\ AKE_1.bad_esk_col{1} = AKE_2.bad_esk_col{2}
-          /\ AKE_1.evs{1} = AKE_2.evs{2}
-          /\ AKE_1.mCompleted{1} = AKE_2.mCompleted{2}
-          /\ ={res}) ].
+         ( ={res} /\
+           AKE_1.evs{1}         = AKE_2.evs{2} /\
+           AKE_1.test{1}        = AKE_2.test{2} /\
+           AKE_1.cSession{1}    = AKE_2.cSession{2} /\
+           AKE_1.cH1{1}         = AKE_2.cH1{2} /\
+           AKE_1.cH2{1}         = AKE_2.cH2{2} /\
+           AKE_1.mH1{1}         = AKE_2.mH1{2} /\
+           AKE_1.sH1{1}         = AKE_2.sH1{2} /\
+           AKE_1.mH2{1}         = AKE_2.mH2{2} /\
+           AKE_1.sH2{1}         = AKE_2.sH2{2} /\
+           AKE_1.mSk{1}         = AKE_2.mSk{2} /\
+           AKE_1.mCompleted{1}  = AKE_2.mCompleted{2} /\
+           AKE_1.bad_esk_col{1} = AKE_2.bad_esk_col{2} /\
+           AKE_1.bad_esk_norev{1} = AKE_2.bad_esk_norev{2} /\
+           eq_map_split AKE_1.mStarted{1} AKE_2.mStarted{2}
+                        AKE_2.mEsk{2} AKE_2.mEexp{2}) ].
 proof strict.
   fun.
   sp.
@@ -1408,32 +1595,46 @@ proof strict.
   swap {2} 3 1.
   sp.
   seq 1 1 :
-    (   AKE_1.mH1{1} = AKE_2.mH1{2}
-     /\ eq_map_split AKE_1.mStarted{1} AKE_2.mStarted{2}
-                     AKE_2.mEsk{2} AKE_2.mEexp{2}
-    /\ AKE_1.cSession{1} = AKE_2.cSession{2}
-    /\ AKE_1.mSk{1} = AKE_2.mSk{2}
-    /\ AKE_1.bad_esk_col{1} = AKE_2.bad_esk_col{2}
-    /\ AKE_1.evs{1} = AKE_2.evs{2}
-    /\ AKE_1.mCompleted{1} = AKE_2.mCompleted{2}
-    /\ ={i, A, B, X, r, y}).
+    ( ={i,A,B,r,y,X} /\
+     AKE_1.evs{1}         = AKE_2.evs{2} /\
+     AKE_1.test{1}        = AKE_2.test{2} /\
+     AKE_1.cSession{1}    = AKE_2.cSession{2} /\
+     AKE_1.cH1{1}         = AKE_2.cH1{2} /\
+     AKE_1.cH2{1}         = AKE_2.cH2{2} /\
+     AKE_1.mH1{1}         = AKE_2.mH1{2} /\
+     AKE_1.sH1{1}         = AKE_2.sH1{2} /\
+     AKE_1.mH2{1}         = AKE_2.mH2{2} /\
+     AKE_1.sH2{1}         = AKE_2.sH2{2} /\
+     AKE_1.mSk{1}         = AKE_2.mSk{2} /\
+     AKE_1.mCompleted{1}  = AKE_2.mCompleted{2} /\
+     AKE_1.bad_esk_col{1} = AKE_2.bad_esk_col{2} /\
+     AKE_1.bad_esk_norev{1} = AKE_2.bad_esk_norev{2} /\
+     eq_map_split AKE_1.mStarted{1} AKE_2.mStarted{2}
+                  AKE_2.mEsk{2} AKE_2.mEexp{2}).
   rnd. skip. smt.
   seq 1 1 :
-    (   AKE_1.mH1{1} = AKE_2.mH1{2}
-     /\ eq_map_split AKE_1.mStarted{1} AKE_2.mStarted{2}
-                     AKE_2.mEsk{2} AKE_2.mEexp{2}
-    /\ AKE_1.cSession{1} = AKE_2.cSession{2}
-    /\ AKE_1.mSk{1} = AKE_2.mSk{2}
-    /\ AKE_1.bad_esk_col{1} = AKE_2.bad_esk_col{2}
-    /\ AKE_1.evs{1} = AKE_2.evs{2}
-    /\ AKE_1.mCompleted{1} = AKE_2.mCompleted{2}
-    /\ ={i, A, B, X, r, y}).
+    ( ={i,A,B,r,y,X} /\
+     AKE_1.evs{1}         = AKE_2.evs{2} /\
+     AKE_1.test{1}        = AKE_2.test{2} /\
+     AKE_1.cSession{1}    = AKE_2.cSession{2} /\
+     AKE_1.cH1{1}         = AKE_2.cH1{2} /\
+     AKE_1.cH2{1}         = AKE_2.cH2{2} /\
+     AKE_1.mH1{1}         = AKE_2.mH1{2} /\
+     AKE_1.sH1{1}         = AKE_2.sH1{2} /\
+     AKE_1.mH2{1}         = AKE_2.mH2{2} /\
+     AKE_1.sH2{1}         = AKE_2.sH2{2} /\
+     AKE_1.mSk{1}         = AKE_2.mSk{2} /\
+     AKE_1.mCompleted{1}  = AKE_2.mCompleted{2} /\
+     AKE_1.bad_esk_col{1} = AKE_2.bad_esk_col{2} /\
+     AKE_1.bad_esk_norev{1} = AKE_2.bad_esk_norev{2} /\
+     eq_map_split AKE_1.mStarted{1} AKE_2.mStarted{2}
+                  AKE_2.mEsk{2} AKE_2.mEexp{2}).
   if. smt. wp; skip; smt. skip; smt.
   wp; skip.
   simplify.
   intros &1 &2 H.
   generalize H.
-  progress. smt. smt. smt.
+  progress. smt. smt. smt. smt. smt.
   case (i{2} = i0).
     intros eq. rewrite !eq !get_setE; smt.
   intros neq. rewrite !get_setNE; smt.
@@ -1450,13 +1651,9 @@ proof strict.
   case (i{2} = i0).
     intros eq. rewrite !eq !get_setE; smt.
   intros neq. rewrite !get_setNE; smt.
-  smt.
-  smt.
 qed.
 
 (*} end: Lastly handle oracles that write the modified maps. *)
-
-pragma check.
 
 lemma Eq_AKE_1_AKE_2(A <: Adv{AKE_1, AKE_2}):
   equiv[ AKE_1(A).main ~ AKE_2(A).main : true ==>
@@ -1484,7 +1681,7 @@ proof strict.
       AKE_1.bad_esk_norev{1} = AKE_2.bad_esk_norev{2} /\
       eq_map_split AKE_1.mStarted{1} AKE_2.mStarted{2}
                    AKE_2.mEsk{2} AKE_2.mEexp{2}).
-  wp; skip; smt.
+  by wp; skip; smt.
   seq 1 1:
     ( ={b,pks,t_idx,key,keyo,b',i,ska,pka} /\
       AKE_1.evs{1}         = AKE_2.evs{2} /\
@@ -1519,7 +1716,8 @@ proof strict.
       AKE_1.bad_esk_norev{1} = AKE_2.bad_esk_norev{2} /\
       eq_map_split AKE_1.mStarted{1} AKE_2.mStarted{2}
                    AKE_2.mEsk{2} AKE_2.mEexp{2}).
-  wp; rnd; skip; smt. skip; smt.
+  by wp; rnd; skip; smt.
+  by skip; smt.
   seq 1 1:
     ( ={b,pks,t_idx,key,keyo,b',i,ska,pka} /\
       AKE_1.evs{1}         = AKE_2.evs{2} /\
@@ -1536,7 +1734,8 @@ proof strict.
       AKE_1.bad_esk_col{1} = AKE_2.bad_esk_col{2} /\
       AKE_1.bad_esk_norev{1} = AKE_2.bad_esk_norev{2} /\
       eq_map_split AKE_1.mStarted{1} AKE_2.mStarted{2}
-                   AKE_2.mEsk{2} AKE_2.mEexp{2}).
+                   AKE_2.mEsk{2} AKE_2.mEexp{2} /\
+      ={glob A}).
   call 
      (_: 
       AKE_1.evs{1}         = AKE_2.evs{2} /\
@@ -1554,24 +1753,70 @@ proof strict.
       AKE_1.bad_esk_norev{1} = AKE_2.bad_esk_norev{2} /\
       eq_map_split AKE_1.mStarted{1} AKE_2.mStarted{2}
                    AKE_2.mEsk{2} AKE_2.mEexp{2}).
-    cut H := Eq_AKE_1_AKE_2_O_h1_a A.
-    apply H.
-    call Eq_AKE_1_AKE_2_O_h1_a.
-    call H.
+    apply (Eq_AKE_1_AKE_2_O_h1_a A).
+    apply (Eq_AKE_1_AKE_2_O_h2_a A).
+    apply (Eq_AKE_1_AKE_2_O_init1 A).
+    apply (Eq_AKE_1_AKE_2_O_init2 A).
+    apply (Eq_AKE_1_AKE_2_O_resp A).
+    apply (Eq_AKE_1_AKE_2_O_staticRev A).
+    apply (Eq_AKE_1_AKE_2_O_ephemeralRev A).
+    apply (Eq_AKE_1_AKE_2_O_sessionRev A).
+    by skip; smt.
+    seq 1 1:
+    ( ={b,pks,t_idx,key,keyo,b',i,ska,pka} /\
+      AKE_1.evs{1}         = AKE_2.evs{2} /\
+      AKE_1.test{1}        = AKE_2.test{2} /\
+      AKE_1.cSession{1}    = AKE_2.cSession{2} /\
+      AKE_1.cH1{1}         = AKE_2.cH1{2} /\
+      AKE_1.cH2{1}         = AKE_2.cH2{2} /\
+      AKE_1.mH1{1}         = AKE_2.mH1{2} /\
+      AKE_1.sH1{1}         = AKE_2.sH1{2} /\
+      AKE_1.mH2{1}         = AKE_2.mH2{2} /\
+      AKE_1.sH2{1}         = AKE_2.sH2{2} /\
+      AKE_1.mSk{1}         = AKE_2.mSk{2} /\
+      AKE_1.mCompleted{1}  = AKE_2.mCompleted{2} /\
+      AKE_1.bad_esk_col{1} = AKE_2.bad_esk_col{2} /\
+      AKE_1.bad_esk_norev{1} = AKE_2.bad_esk_norev{2} /\
+      eq_map_split AKE_1.mStarted{1} AKE_2.mStarted{2}
+                   AKE_2.mEsk{2} AKE_2.mEexp{2} /\
+      ={glob A}).
+    by rnd; skip; smt.
+    if; [ by smt | | by skip; smt ].
+    call 
+     (_: 
+      AKE_1.evs{1}         = AKE_2.evs{2} /\
+      AKE_1.test{1}        = AKE_2.test{2} /\
+      AKE_1.cSession{1}    = AKE_2.cSession{2} /\
+      AKE_1.cH1{1}         = AKE_2.cH1{2} /\
+      AKE_1.cH2{1}         = AKE_2.cH2{2} /\
+      AKE_1.mH1{1}         = AKE_2.mH1{2} /\
+      AKE_1.sH1{1}         = AKE_2.sH1{2} /\
+      AKE_1.mH2{1}         = AKE_2.mH2{2} /\
+      AKE_1.sH2{1}         = AKE_2.sH2{2} /\
+      AKE_1.mSk{1}         = AKE_2.mSk{2} /\
+      AKE_1.mCompleted{1}  = AKE_2.mCompleted{2} /\
+      AKE_1.bad_esk_col{1} = AKE_2.bad_esk_col{2} /\
+      AKE_1.bad_esk_norev{1} = AKE_2.bad_esk_norev{2} /\
+      eq_map_split AKE_1.mStarted{1} AKE_2.mStarted{2}
+                   AKE_2.mEsk{2} AKE_2.mEexp{2}).
+    apply (Eq_AKE_1_AKE_2_O_h1_a A).
+    apply (Eq_AKE_1_AKE_2_O_h2_a A).
+    apply (Eq_AKE_1_AKE_2_O_init1 A).
+    apply (Eq_AKE_1_AKE_2_O_init2 A).
+    apply (Eq_AKE_1_AKE_2_O_resp A).
+    apply (Eq_AKE_1_AKE_2_O_staticRev A).
+    apply (Eq_AKE_1_AKE_2_O_ephemeralRev A).
+    apply (Eq_AKE_1_AKE_2_O_sessionRev A).
+    sp.
+    if; first by smt.
+    call (Eq_AKE_1_AKE_2_O_computeKey A).
+    by skip; progress; smt.
+    by wp; rnd; skip; progress; smt.
+qed.
 
-
-
-(* Do not query h1 in init1 and resp, instead sample Eexp and store
-   it in mEexp (as before).
-   For queries h1_a(a,x), check if there is i such that
-     x = proj mEexp.[i] /\ proj mSk.[sd2_actor (proj mStarted.[i])].
-   If yes, take this value.
-   Invariant:
-   .. disjoint mH1{2} and mEexp ..
-   forall x a x',
-     mH1{1}.[(x,a)] = Some x' <=>
-     (mH1{2}.[(x,a)] = Some x' \/
-      exists i, .. see above ..)
+(* Move sampling of ephemeral exponents to loop in main.
+   Can be justified by making domain finite (subtype of int)
+   and using lazy/eager RO transformation.
 *)
 module AKE_3(FA : Adv) = {
   
@@ -1598,7 +1843,6 @@ module AKE_3(FA : Adv) = {
        esk-earlier-esk collisions and esk-earlier-h1_a collisions *)
 
   var bad_esk_norev : bool            (* h1_a query without previous reveal *)
-  
 
   fun init() : unit = {
     evs = [];
@@ -1674,8 +1918,7 @@ module AKE_3(FA : Adv) = {
       var r : Epk option = None; 
       if (cSession < qSession && in_dom A mSk && in_dom B mSk && !in_dom i mStarted) {
         cSession = cSession + 1;
-        x = $sample_Esk;
-        mEsk.[i] = x;
+        x = proj mEsk.[i];
         if (mem x (queried_esks mH1)) bad_esk_col = true;
         mEexp.[i] = h1(proj (mSk.[A]),x);
         pX = gen_epk(proj mEexp.[i]);
@@ -1693,8 +1936,7 @@ module AKE_3(FA : Adv) = {
       if (   cSession < qSession && in_dom A mSk && in_dom B mSk
           && !in_dom i mStarted && !in_dom i mCompleted) {
         cSession = cSession + 1;
-        y  = $sample_Esk;
-        mEsk.[i] = y;
+        y = proj mEsk.[i];
         if (mem y (queried_esks mH1)) bad_esk_col = true;
         mEexp.[i] = h1(proj (mSk.[B]),y);
         pY = gen_epk(proj mEexp.[i]);
@@ -1707,7 +1949,7 @@ module AKE_3(FA : Adv) = {
     }
 
     fun init2(i : Sidx, Y : Epk) : unit = {
-      if (!in_dom i mCompleted && in_dom i mStarted) {
+      if (!in_dom i mCompleted && in_dom i mStarted && in_dom i mEexp) {
         mCompleted.[i] = Y;
         evs = Accept(compute_sid mStarted mEexp mCompleted i)::evs;
       }
@@ -1724,7 +1966,7 @@ module AKE_3(FA : Adv) = {
 
     fun ephemeralRev(i : Sidx) : Esk option = {
       var r : Esk option = None;
-      if (in_dom i mStarted) {
+      if (in_dom i mStarted && in_dom i mEexp) {
         r = mEsk.[i];
         evs = EphemeralRev(compute_psid mStarted mEexp i)::evs;
       }
@@ -1733,15 +1975,13 @@ module AKE_3(FA : Adv) = {
 
     fun computeKey(i : Sidx) : Key option = {
       var r : Key option = None;
-      var a, b : Agent;
-      var ro : Role;
-      var x' : Eexp;
-      var x : Esk;
+      var sd : Sdata2;
       var k : Key;
-      if (in_dom i mCompleted) {
-        (a,b,ro) = proj mStarted.[i];
-        k = h2(gen_sstring (proj mEexp.[i]) (proj mSk.[a])
-                           b (proj mCompleted.[i]) ro);
+      if (in_dom i mCompleted && in_dom i mStarted && in_dom i mEexp) {
+        sd = proj mStarted.[i];
+        k = h2(gen_sstring (proj mEexp.[i]) (proj mSk.[sd2_actor sd])
+                           (sd2_peer sd) (proj mCompleted.[i])
+                           (sd2_role sd));
         r = Some k;
       }
       return r;
@@ -1749,7 +1989,7 @@ module AKE_3(FA : Adv) = {
 
     fun sessionRev(i : Sidx) : Key option = {
       var r : Key option = None;
-      if (in_dom i mCompleted) {
+      if (in_dom i mCompleted && in_dom i mStarted && in_dom i mEexp) {
         evs = SessionRev(compute_sid mStarted mEexp mCompleted i)::evs;
         r = computeKey(i);
       }
@@ -1777,10 +2017,13 @@ module AKE_3(FA : Adv) = {
       pks = pka :: pks;
       mSk.[pka] = ska;
     } 
+    while (i < qSession) {
+      mEsk.[i]= $sample_Esk;
+    }
 
     t_idx = A.choose(pks);
     b = ${0,1};
-    if (mStarted.[t_idx] <> None && mCompleted.[t_idx] <> None) {
+    if (in_dom t_idx mStarted && in_dom t_idx mCompleted && in_dom t_idx mEexp) {
       test = Some (compute_sid mStarted mEexp mCompleted t_idx);
         (* the if-condition implies "mem (Accept (proj O.test)) O.evs" *)
       if (b) {
@@ -1795,6 +2038,257 @@ module AKE_3(FA : Adv) = {
   }
 }.
 
+lemma Eq_AKE_2_AKE_3(A <: Adv{AKE_2, AKE_3}):
+  equiv[ AKE_2(A).main ~ AKE_3(A).main : true ==>
+            (res /\ test_fresh AKE_2.test AKE_2.evs /\
+             !AKE_2.bad_esk_col /\ !AKE_2.bad_esk_norev){1}
+         => (res /\ test_fresh AKE_3.test AKE_3.evs /\
+             !AKE_3.bad_esk_col /\ !AKE_3.bad_esk_norev){2} ].
+proof strict.
+  admit. (* Use Interval type for domain. Lazy to eager random oracle *)
+qed.
+
+(* Do not query h1 in init1 and resp, instead sample Eexp and store
+   it in mEexp (as before).
+   For queries h1_a(a,x), check if there is i such that
+     x = proj mEexp.[i] /\ proj mSk.[sd2_actor (proj mStarted.[i])].
+   If yes, take this value.
+   Invariant:
+   .. disjoint mH1{2} and mEexp ..
+   forall x a x',
+     mH1{1}.[(x,a)] = Some x' <=>
+     (mH1{2}.[(x,a)] = Some x' \/
+      exists i, .. see above ..)
+*)
+module AKE_4(FA : Adv) = {
+  
+  var evs  : Event list               (* events for queries performed by adversary *)
+  var test : Sid option               (* session id of test session *)
+
+  var cSession, cH1, cH2 : int        (* counters for queries *)
+
+  var mH1 : ((Sk * Esk), Eexp) map    (* map for h1 *)
+  var sH1 : (Sk * Esk) set            (* adversary queries for h1 *)
+
+  var mH2 : (Sstring, Key) map        (* map for h2 *)
+  var sH2 : Sstring set               (* adversary queries for h2 *)
+
+  var mSk        : (Agent, Sk) map    (* map for static secret keys *)
+  var mEsk       : (Sidx, Esk) map    (* map for ephemeral secret keys *)
+  var mEexp      : (Sidx, Eexp) map   (* map for ephemeral exponents of sessions *)
+  var mStarted   : (Sidx, Sdata2) map (* map of started sessions *)
+  var mCompleted : (Sidx, Epk)   map  (* additional data for completed sessions *)
+
+  var bad_esk_col : bool              (* esk collision with dom(mH1) *)
+    (* The esk sampled in init1/resp is already in dom(mH1). Since
+       dom(mH1) = sH1 u <earlier esks>, this corresponds to
+       esk-earlier-esk collisions and esk-earlier-h1_a collisions *)
+
+  var bad_esk_norev : bool            (* h1_a query without previous reveal *)
+
+  fun init() : unit = {
+    evs = [];
+    test = None;
+    cSession = 0;
+    cH1 = 0;
+    cH2 = 0;
+    mH1 = Map.empty;
+    sH1 = FSet.empty;
+    mH2 = Map.empty;
+    sH2 = FSet.empty;
+    mSk = Map.empty;
+    mEsk = Map.empty;
+    mEexp = Map.empty;
+    mStarted = Map.empty;
+    mCompleted = Map.empty;
+    bad_esk_col = false;
+    bad_esk_norev = false;
+  }
+
+  module O : AKE_Oracles = {
+
+    fun h1(a : Sk, x : Esk) : Eexp = {
+      var e : Eexp;
+      e = $sample_Eexp;
+      if (!in_dom (a,x) mH1) {
+        mH1.[(a,x)] = e;
+      } 
+      return proj mH1.[(a,x)];
+    }
+
+    fun h1_a(a : Sk, x : Esk) : Eexp option = {
+      var r : Eexp option = None;
+      var xe : Eexp;
+      if (cH1 < qH1) {
+        cH1 = cH1 + 1;
+        if (any (lambda i, proj mEsk.[i] = x /\
+                           ! (mem (EphemeralRev (compute_psid mStarted mEexp i)) evs))
+                (fdom mStarted)) {
+          bad_esk_norev = true;
+        }
+        sH1 = add (a,x) sH1;
+        xe = h1(a,x);
+        r = Some(xe);
+      }
+      return r;
+    }
+
+    fun h2(sstring : Sstring) : Key = {
+      var ke : Key;
+      ke = $sample_Key;
+      if (!in_dom sstring mH2) {
+        mH2.[sstring] = ke;
+      }
+      return proj mH2.[sstring];
+    }
+ 
+    fun h2_a(sstring : Sstring) : Key option = {
+      var r : Key option = None;
+      var ks : Key;
+      if (cH2 < qH2) {
+        cH2 = cH2 + 1;
+        sH2 = add sstring sH2;
+        ks = h2(sstring);
+        r = Some(ks);
+      }
+      return r;
+    }
+
+    fun init1(i : Sidx, A : Agent, B : Agent) : Epk option = {
+      var pX : Epk;
+      var x : Esk;
+      var r : Epk option = None; 
+      if (cSession < qSession && in_dom A mSk && in_dom B mSk && !in_dom i mStarted) {
+        cSession = cSession + 1;
+        x = proj mEsk.[i];
+        if (mem x (queried_esks mH1)) bad_esk_col = true;
+        mEexp.[i] = h1(proj (mSk.[A]),x);
+        pX = gen_epk(proj mEexp.[i]);
+        mStarted.[i] = (A,B,init);
+        r = Some(pX);
+        evs = Start(compute_psid mStarted mEexp i)::evs;
+      }
+      return r;
+    }
+
+    fun resp(i : Sidx, B : Agent, A : Agent, X : Epk) : Epk option = {
+      var y : Esk;
+      var pY : Epk;
+      var r : Epk option = None; 
+      if (   cSession < qSession && in_dom A mSk && in_dom B mSk
+          && !in_dom i mStarted && !in_dom i mCompleted) {
+        cSession = cSession + 1;
+        y = proj mEsk.[i];
+        if (mem y (queried_esks mH1)) bad_esk_col = true;
+        mEexp.[i] = h1(proj (mSk.[B]),y);
+        pY = gen_epk(proj mEexp.[i]);
+        mStarted.[i] = (B,A,resp);
+        mCompleted.[i] = X;
+        r = Some(pY);
+        evs = Accept(compute_sid mStarted mEexp mCompleted i)::evs;
+      }
+      return r;
+    }
+
+    fun init2(i : Sidx, Y : Epk) : unit = {
+      if (!in_dom i mCompleted && in_dom i mStarted && in_dom i mEexp) {
+        mCompleted.[i] = Y;
+        evs = Accept(compute_sid mStarted mEexp mCompleted i)::evs;
+      }
+    }
+
+    fun staticRev(A : Agent) : Sk option = {
+      var r : Sk option = None;
+      if (in_dom A mSk) {
+        r = mSk.[A];
+        evs = StaticRev(A)::evs;
+      }
+      return r;
+    }
+
+    fun ephemeralRev(i : Sidx) : Esk option = {
+      var r : Esk option = None;
+      if (in_dom i mStarted && in_dom i mEexp) {
+        r = mEsk.[i];
+        evs = EphemeralRev(compute_psid mStarted mEexp i)::evs;
+      }
+      return r;
+    }
+
+    fun computeKey(i : Sidx) : Key option = {
+      var r : Key option = None;
+      var sd : Sdata2;
+      var k : Key;
+      if (in_dom i mCompleted && in_dom i mStarted && in_dom i mEexp) {
+        sd = proj mStarted.[i];
+        k = h2(gen_sstring (proj mEexp.[i]) (proj mSk.[sd2_actor sd])
+                           (sd2_peer sd) (proj mCompleted.[i])
+                           (sd2_role sd));
+        r = Some k;
+      }
+      return r;
+    }
+
+    fun sessionRev(i : Sidx) : Key option = {
+      var r : Key option = None;
+      if (in_dom i mCompleted && in_dom i mStarted && in_dom i mEexp) {
+        evs = SessionRev(compute_sid mStarted mEexp mCompleted i)::evs;
+        r = computeKey(i);
+      }
+      return r;
+    }
+  }
+  
+  module A = FA(O)
+
+  fun main() : bool = {
+    var b : bool = def;
+    var pks : Pk list = [];
+    var t_idx : Sidx = def;
+    var key : Key = def;
+    var keyo : Key option = def;
+    var b' : bool = def;
+    var i : int = 0;
+    var ska : Sk = def;
+    var pka : Pk = def;
+
+    init();
+    while (i < qAgent) {
+      ska = $sample_Sk;
+      pka = gen_pk(ska);
+      pks = pka :: pks;
+      mSk.[pka] = ska;
+    } 
+    while (i < qSession) {
+      mEsk.[i]= $sample_Esk;
+    }
+
+    t_idx = A.choose(pks);
+    b = ${0,1};
+    if (in_dom t_idx mStarted && in_dom t_idx mCompleted && in_dom t_idx mEexp) {
+      test = Some (compute_sid mStarted mEexp mCompleted t_idx);
+        (* the if-condition implies "mem (Accept (proj O.test)) O.evs" *)
+      if (b) {
+        keyo = O.computeKey(t_idx);
+      } else {
+        key  = $sample_Key;
+        keyo = Some key;
+      }
+      b' = A.guess(keyo);
+    }
+    return (b = b');
+  }
+}.
+
+lemma Eq_AKE_2_AKE_3(A <: Adv{AKE_2, AKE_3}):
+  equiv[ AKE_2(A).main ~ AKE_3(A).main : true ==>
+            (res /\ test_fresh AKE_2.test AKE_2.evs /\
+             !AKE_2.bad_esk_col /\ !AKE_2.bad_esk_norev){1}
+         => (res /\ test_fresh AKE_3.test AKE_3.evs /\
+             !AKE_3.bad_esk_col /\ !AKE_3.bad_esk_norev){2} ].
+proof strict.
+  admit. (* Use Interval type for domain. Lazy to eager random oracle *)
+qed.
 
 lemma Pr_AKE_1_bad(A <: Adv) &m:
        Pr[ AKE_1(A).main() @ &m : res /\ test_fresh AKE_1.test AKE_1.evs ]
