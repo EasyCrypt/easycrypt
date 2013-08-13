@@ -101,7 +101,7 @@ theory Requires.
     forall (x : domain), x <> rzero => mul x (inv x) = rone.
 
   axiom nosmt exprN:
-    forall (x : domain) (n : int), n <= 0 => expr x (-n) = inv (expr x n).
+    forall (x : domain) (n : int), 0 <= n => expr x (-n) = inv (expr x n).
 
   axiom nosmt divrE:
     forall (x y : domain), div x y = mul x (inv y).
