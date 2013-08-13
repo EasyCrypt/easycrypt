@@ -6,6 +6,9 @@ open EcLogic
 open EcAlgebra
 
 (* -------------------------------------------------------------------- *)
+val is_module_loaded : EcEnv.env -> bool
+
+(* -------------------------------------------------------------------- *)
 val ring_symbols  : EcEnv.env -> ty -> (symbol * (bool * ty)) list
 val field_symbols : EcEnv.env -> ty -> (symbol * (bool * ty)) list
 

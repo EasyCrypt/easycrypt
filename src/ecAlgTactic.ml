@@ -161,3 +161,7 @@ let t_field r eqs (f1, f2) g =
     if   EcReduction.is_conv (get_hyps g) f (fzero r)
     then prove_goal_by c RN_field g
     else prove_goal_by (c @ [f_eq f (fzero r)]) RN_field g
+
+(* -------------------------------------------------------------------- *)
+let is_module_loaded env =
+  EcEnv.Theory.by_path_opt Axioms.tmod env <> None

@@ -1404,6 +1404,9 @@ module Ty = struct
         | Some p -> `Embed p }
 
   let addring (scope : scope) mode { pl_desc = tci; pl_loc = loc } =
+    if not (EcAlgTactic.is_module_loaded scope.sc_env) then
+      hierror "load AlgTactic first";
+
     let (ty, p) =
       let ue = ue_for_decl scope.sc_env (loc, Some []) in
       let ty = mk_loc tci.pti_type.pl_loc (PTnamed tci.pti_type) in
@@ -1426,6 +1429,9 @@ module Ty = struct
       f_div  = Mstr.find_opt "div" symbols; }
 
   let addfield (scope : scope) mode { pl_desc = tci; pl_loc = loc } =
+    if not (EcAlgTactic.is_module_loaded scope.sc_env) then
+      hierror "load AlgTactic first";
+
     let (ty, p) =
       let ue = ue_for_decl scope.sc_env (loc, Some []) in
       let ty = mk_loc tci.pti_type.pl_loc (PTnamed tci.pti_type) in

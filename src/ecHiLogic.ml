@@ -1122,6 +1122,9 @@ let process_algebra loc hitenv mode kind eqs g =
 
   let (env, hyps, concl) = get_goal_e g in
 
+  if not (EcAlgTactic.is_module_loaded env) then
+    tacuerror "ring/field cannot be used when AlgTactic is not loaded";
+
   let (ty, f1, f2) =
     match sform_of_form concl with
     | SFeq (f1, f2) -> (f1.f_ty, f1, f2)
