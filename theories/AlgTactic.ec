@@ -75,7 +75,7 @@ theory RingCore.
 end RingCore.
 
 (* -------------------------------------------------------------------- *)
-theory RingNatMul.
+theory RingIntPow.
   clone export RingCore.
 
   op expr : domain -> int -> domain.

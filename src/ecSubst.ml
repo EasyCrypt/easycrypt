@@ -305,18 +305,18 @@ let subst_ax (s : _subst) (ax : axiom) =
 
 (* -------------------------------------------------------------------- *)
 let subst_ring (s : _subst) cr =
-  { r_type   = s.s_ty cr.r_type;
-    r_zero   = s.s_p cr.r_zero;
-    r_one    = s.s_p cr.r_one;
-    r_add    = s.s_p cr.r_add;
-    r_opp    = s.s_p cr.r_opp;
-    r_mul    = s.s_p cr.r_mul;
-    r_exp    = s.s_p cr.r_exp;
-    r_sub    = cr.r_sub |> omap s.s_p;
-    r_intmul =
-      match cr.r_intmul with
-      | `Embed    -> `Embed
-      | `IntMul p -> `IntMul (s.s_p p); }
+  { r_type  = s.s_ty cr.r_type;
+    r_zero  = s.s_p cr.r_zero;
+    r_one   = s.s_p cr.r_one;
+    r_add   = s.s_p cr.r_add;
+    r_opp   = s.s_p cr.r_opp;
+    r_mul   = s.s_p cr.r_mul;
+    r_exp   = s.s_p cr.r_exp;
+    r_sub   = cr.r_sub |> omap s.s_p;
+    r_embed =
+      match cr.r_embed with
+      | `Direct  -> `Direct
+      | `Embed p -> `Embed (s.s_p p); }
 
 let subst_field (s : _subst) cr =
   { f_ring = subst_ring s cr.f_ring;

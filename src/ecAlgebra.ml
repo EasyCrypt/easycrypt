@@ -42,15 +42,15 @@ end
 
 (* -------------------------------------------------------------------- *)
 type ring = {
-  r_type   : EcTypes.ty;
-  r_zero   : path;
-  r_one    : path;
-  r_add    : path;
-  r_opp    : path;
-  r_mul    : path;
-  r_exp    : path;
-  r_sub    : path option;
-  r_intmul : [`Embed | `IntMul of path];
+  r_type  : EcTypes.ty;
+  r_zero  : EcPath.path;
+  r_one   : EcPath.path;
+  r_add   : EcPath.path;
+  r_opp   : EcPath.path;
+  r_mul   : EcPath.path;
+  r_exp   : EcPath.path;
+  r_sub   : EcPath.path option;
+  r_embed : [ `Direct | `Embed of EcPath.path ];
 }
 
 type field = {
@@ -82,9 +82,9 @@ let rsub r e1 e2 =
   | Some p -> rapp r p [e1; e2]
 
 let rintmul r i =
-  match r.r_intmul with
-  | `Embed    -> f_int i
-  | `IntMul p -> rapp r p [f_int i]
+  match r.r_embed with
+  | `Direct  -> f_int i
+  | `Embed p -> rapp r p [f_int i]
 
 (* -------------------------------------------------------------------- *)
 let fzero f = rzero f.f_ring
@@ -122,7 +122,7 @@ let cring_of_ring (r : ring) : cring =
 
   let cr = List.fold_left (fun m (p, op) -> Mp.add p op m) Mp.empty cr in
   let cr = odfl cr (r.r_sub |> omap (fun p -> Mp.add p `Sub cr)) in
-  let cr = r.r_intmul |> (function `Embed -> cr | `IntMul p -> Mp.add p `IntMul cr) in
+  let cr = r.r_embed |> (function `Direct -> cr | `Embed p -> Mp.add p `IntMul cr) in
     (r, cr)
 
 (* -------------------------------------------------------------------- *)
@@ -159,7 +159,7 @@ let toring ((r, cr) : cring) (rmap : RState.rstate) (form : form) =
             | _, _ -> abstract form
         end
     end
-    | SFint i when r.r_intmul = `Embed -> PEc (Big_int.big_int_of_int i)
+    | SFint i when r.r_embed = `Direct -> PEc (Big_int.big_int_of_int i)
     | _ -> abstract form
 
   and abstract form = PEX (int_of_form form) in
@@ -195,7 +195,7 @@ let tofield ((r, cr) : cfield) (rmap : RState.rstate) (form : form) =
             | _, _ -> abstract form
         end
     end
-    | SFint i when r.f_ring.r_intmul = `Embed -> FEc (Big_int.big_int_of_int i)
+    | SFint i when r.f_ring.r_embed = `Direct -> FEc (Big_int.big_int_of_int i)
     | _ -> abstract form
 
   and abstract form = FEX (int_of_form form) in

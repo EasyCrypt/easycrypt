@@ -13,23 +13,47 @@ module Axioms = struct
   let tmod  = "AlgTactic"
   let tname = "domain"
 
-  let zero = "rzero"
-  let one  = "rone"
-  let add  = "add"
-  let opp  = "opp"
-  let sub  = "sub"
-  let mul  = "mul"
-  let inv  = "inv"
-  let div  = "div"
-  let expr = "expr"
+  let zero  = "rzero"
+  let one   = "rone"
+  let add   = "add"
+  let opp   = "opp"
+  let sub   = "sub"
+  let mul   = "mul"
+  let inv   = "inv"
+  let div   = "div"
+  let expr  = "expr"
+  let embed = "ofint"
 
   let core   = ("RingCore"    , ["oner_eq0"; "addr0"; "addrA"; "addrC"; "addrN";
                                  "mulr1"; "mulrA"; "mulrC"; "mulrDl"])
-  let natmul = ("RingNatMul"  , ["expr0"; "exprS"])
+  let intpow = ("RingIntPow"  , ["expr0"; "exprS"])
   let ofint  = ("RingOfInt"   , ["ofint0"; "ofint1"; "ofintS"; "ofintN"])
   let ofsub  = ("RingWithSub" , ["subrE"])
   let field  = ("FieldCore"   , ["mulrV"; "exprN"])
   let ofdiv  = ("FieldWithDiv", ["divrE"])
+
+  let ty0 ty = ty
+  let ty1 ty = tfun ty (ty0 ty)
+  let ty2 ty = tfun ty (ty1 ty)
+
+  let ring_symbols env ty =
+    let symbols =
+      [(zero, (true , ty0 ty));
+       (one , (true , ty0 ty));
+       (add , (true , ty2 ty));
+       (opp , (true , ty1 ty));
+       (sub , (false, ty2 ty));
+       (mul , (true , ty2 ty));
+       (expr, (true , toarrow [ty; tint] ty))]
+    in
+      if   EcReduction.equal_type env ty tint
+      then symbols
+      else symbols @ [(embed, (true, tfun tint ty))]
+
+  let field_symbols env ty =
+    (ring_symbols env ty)
+      @ [(inv, (true , ty1 ty));
+         (div, (false, ty2 ty))]
 
   let subst_of_ring thname (cr : ring) =
     let crcore = [(zero, cr.r_zero);
@@ -46,7 +70,7 @@ module Axioms = struct
     let subst  = EcSubst.add_tydef EcSubst.empty (xpath tname) ([], cr.r_type) in
     let subst  = List.fold_left (fun subst (x, p) -> add subst x p) subst crcore in
     let subst  = odfl subst (cr.r_sub |> omap (fun p -> add subst sub p)) in
-    let subst  = cr.r_intmul |> (function `Embed -> subst | `IntMul p -> add subst expr p) in
+    let subst  = cr.r_embed |> (function `Direct -> subst | `Embed p -> add subst embed p) in
       subst
 
   let subst_of_field thname (cr : field) =
@@ -76,15 +100,15 @@ module Axioms = struct
       List.map for1 axs
 
   let get_core   = fun env cr -> get core   env (`Ring  cr)
-  let get_natmul = fun env cr -> get natmul env (`Ring  cr)
+  let get_expr   = fun env cr -> get intpow env (`Ring  cr)
   let get_ofint  = fun env cr -> get ofint  env (`Ring  cr)
   let get_ofsub  = fun env cr -> get ofsub  env (`Ring  cr)
   let get_field  = fun env cr -> get field  env (`Field cr)
   let get_ofdiv  = fun env cr -> get ofdiv  env (`Field cr)
 
   let ring_axioms env (cr : ring) =
-    let axcore = (get_core env cr) @ (get_natmul env cr) in
-    let axint  = match cr.r_intmul with `Embed -> [] | `IntMul _ -> get_ofint env cr in
+    let axcore = (get_core env cr) @ (get_expr env cr) in
+    let axint  = match cr.r_embed with `Direct -> [] | `Embed _ -> get_ofint env cr in
     let axsub  = match cr.r_sub with None -> [] | Some _ -> get_ofsub env cr in
       List.flatten [axcore; axint; axsub]
 
@@ -94,6 +118,9 @@ module Axioms = struct
     let axdiv  = match cr.f_div with None -> [] | Some _ -> get_ofdiv env cr in
       List.flatten [axring; axcore; axdiv]
 end
+
+let ring_symbols  = Axioms.ring_symbols
+let field_symbols = Axioms.field_symbols
 
 let ring_axioms  = Axioms.ring_axioms
 let field_axioms = Axioms.field_axioms

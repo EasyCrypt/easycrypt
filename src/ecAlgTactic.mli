@@ -1,10 +1,14 @@
 (* -------------------------------------------------------------------- *)
 open EcSymbols
+open EcTypes
 open EcFol
 open EcLogic
 open EcAlgebra
 
 (* -------------------------------------------------------------------- *)
+val ring_symbols  : EcEnv.env -> ty -> (symbol * (bool * ty)) list
+val field_symbols : EcEnv.env -> ty -> (symbol * (bool * ty)) list
+
 val ring_axioms  : EcEnv.env -> ring  -> (symbol * form) list
 val field_axioms : EcEnv.env -> field -> (symbol * form) list
 

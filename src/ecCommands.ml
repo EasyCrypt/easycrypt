@@ -128,7 +128,8 @@ and process_typeclass (scope : EcScope.scope) (tcd : ptypeclass located) =
 (* -------------------------------------------------------------------- *)
 and process_tycinst (scope : EcScope.scope) (tci : ptycinstance located) =
   EcScope.check_state `InTop "type class instance" scope;
-  let scope = EcScope.Ty.addinstance scope tci in
+  let mode = if (!pragma).pm_check then `Check else `WeakCheck in
+  let scope = EcScope.Ty.addinstance scope mode tci in
     scope
 
 (* -------------------------------------------------------------------- *)
