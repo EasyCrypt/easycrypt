@@ -1411,8 +1411,8 @@ module Ty = struct
       let ue = ue_for_decl scope.sc_env (loc, Some []) in
       let ty = mk_loc tci.pti_type.pl_loc (PTnamed tci.pti_type) in
       let ty = transty tp_tydecl scope.sc_env ue ty in
-        match ty.ty_node with
-        | Tconstr (p, []) -> (ty, p)
+        match (EcEnv.Ty.hnorm ty scope.sc_env).ty_node with
+        | Tconstr (p, []) -> (ty,  p)
         | _ -> assert false
     in
     let symbols = EcAlgTactic.ring_symbols scope.sc_env ty in
@@ -1436,7 +1436,7 @@ module Ty = struct
       let ue = ue_for_decl scope.sc_env (loc, Some []) in
       let ty = mk_loc tci.pti_type.pl_loc (PTnamed tci.pti_type) in
       let ty = transty tp_tydecl scope.sc_env ue ty in
-        match ty.ty_node with
+        match (EcEnv.Ty.hnorm ty scope.sc_env).ty_node with
         | Tconstr (p, []) -> (ty, p)
         | _ -> assert false
     in

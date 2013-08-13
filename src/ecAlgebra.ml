@@ -104,7 +104,7 @@ let fdiv f e1 e2 =
   | Some p -> rapp f.f_ring p [e1; e2]
 
 (* -------------------------------------------------------------------- *)
-type cringop = [`Zero | `One | `Add | `Opp | `Sub | `Mul | `Exp | `IntMul]
+type cringop = [`Zero | `One | `Add | `Opp | `Sub | `Mul | `Exp | `OfInt]
 type cring   = ring * (cringop Mp.t)
 
 (* -------------------------------------------------------------------- *)
@@ -123,7 +123,7 @@ let cring_of_ring (r : ring) : cring =
 
   let cr = List.fold_left (fun m (p, op) -> Mp.add p op m) Mp.empty cr in
   let cr = odfl cr (r.r_sub |> omap (fun p -> Mp.add p `Sub cr)) in
-  let cr = r.r_embed |> (function `Direct -> cr | `Embed p -> Mp.add p `IntMul cr) in
+  let cr = r.r_embed |> (function `Direct -> cr | `Embed p -> Mp.add p `OfInt cr) in
     (r, cr)
 
 (* -------------------------------------------------------------------- *)
@@ -156,6 +156,11 @@ let toring ((r, cr) : cring) (rmap : RState.rstate) (form : form) =
                 match arg2.f_node with
                 | Fint n when n >= 0 -> PEpow (doit arg1, n)
                 | _ -> abstract form
+            end
+            | `OfInt, [arg1] -> begin
+              match arg1.f_node with
+              | Fint n -> PEc (Big_int.big_int_of_int n)
+              | _ -> abstract form
             end
             | _, _ -> abstract form
         end
@@ -192,6 +197,11 @@ let tofield ((r, cr) : cfield) (rmap : RState.rstate) (form : form) =
                 match arg2.f_node with
                 | Fint n -> FEpow (doit arg1, n)
                 | _ -> abstract form
+            end
+            | `OfInt, [arg1] -> begin
+              match arg1.f_node with
+              | Fint n -> FEc (Big_int.big_int_of_int n)
+              | _ -> abstract form
             end
             | _, _ -> abstract form
         end
