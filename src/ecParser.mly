@@ -1233,8 +1233,14 @@ tc_ax: AXIOM ax=form { ax };
 
 (* -------------------------------------------------------------------- *)
 (* Type classes (instances)                                             *)
+instname:
+| x=qident { unloc x }
+| RING     { ([], "$ring" ) }
+| FIELD    { ([], "$field") }
+;
+
 tycinstance:
-| INSTANCE x=qident WITH ty=qident ops=tyci_op* axs=tyci_ax* {
+| INSTANCE x=loc(instname) WITH ty=qident ops=tyci_op* axs=tyci_ax* {
     { pti_name = x;
       pti_type = ty;
       pti_ops  = ops;
@@ -1243,7 +1249,7 @@ tycinstance:
 ;
 
 tyci_op:
-| OP x=ident EQ tg=qident { (x, tg) }
+| OP x=ident EQ tg=qoident { (x, tg) }
 ;
 
 tyci_ax:

@@ -10,7 +10,7 @@ open EcAlgebra
 module Axioms = struct
   open EcDecl
 
-  let tmod  = "AlgTactic"
+  let tmod  = EcPath.fromqsymbol ([EcCoreLib.id_top; "AlgTactic"], "Requires")
   let tname = "domain"
 
   let zero  = "rzero"
@@ -24,13 +24,13 @@ module Axioms = struct
   let expr  = "expr"
   let embed = "ofint"
 
-  let core   = ("RingCore"    , ["oner_eq0"; "addr0"; "addrA"; "addrC"; "addrN";
-                                 "mulr1"; "mulrA"; "mulrC"; "mulrDl"])
-  let intpow = ("RingIntPow"  , ["expr0"; "exprS"])
-  let ofint  = ("RingOfInt"   , ["ofint0"; "ofint1"; "ofintS"; "ofintN"])
-  let ofsub  = ("RingWithSub" , ["subrE"])
-  let field  = ("FieldCore"   , ["mulrV"; "exprN"])
-  let ofdiv  = ("FieldWithDiv", ["divrE"])
+  let core   = ["oner_neq0"; "addr0"; "addrA"; "addrC"; "addrN";
+                "mulr1"; "mulrA"; "mulrC"; "mulrDl"]
+  let intpow = ["expr0"; "exprS"]
+  let ofint  = ["ofint0"; "ofint1"; "ofintS"; "ofintN"]
+  let ofsub  = ["subrE"]
+  let field  = ["mulrV"; "exprN"]
+  let ofdiv  = ["divrE"]
 
   let ty0 ty = ty
   let ty1 ty = tfun ty (ty0 ty)
@@ -55,7 +55,7 @@ module Axioms = struct
       @ [(inv, (true , ty1 ty));
          (div, (false, ty2 ty))]
 
-  let subst_of_ring thname (cr : ring) =
+  let subst_of_ring (cr : ring) =
     let crcore = [(zero, cr.r_zero);
                   (one , cr.r_one );
                   (add , cr.r_add );
@@ -63,8 +63,7 @@ module Axioms = struct
                   (mul , cr.r_mul );
                   (expr, cr.r_exp )] in
 
-    let thpath = EcPath.fromqsymbol ([tmod], thname) in
-    let xpath  = fun x -> EcPath.pqname thpath x in
+    let xpath  = fun x -> EcPath.pqname tmod x in
     let add    = fun subst x p -> EcSubst.add_path subst (xpath x) p in
 
     let subst  = EcSubst.add_tydef EcSubst.empty (xpath tname) ([], cr.r_type) in
@@ -73,27 +72,25 @@ module Axioms = struct
     let subst  = cr.r_embed |> (function `Direct -> subst | `Embed p -> add subst embed p) in
       subst
 
-  let subst_of_field thname (cr : field) =
-    let thpath = EcPath.fromqsymbol ([tmod], thname) in
-    let xpath  = fun x -> EcPath.pqname thpath x in
+  let subst_of_field (cr : field) =
+    let xpath  = fun x -> EcPath.pqname tmod x in
     let add    = fun subst x p -> EcSubst.add_path subst (xpath x) p in
 
-    let subst = subst_of_ring thname cr.f_ring in
+    let subst = subst_of_ring cr.f_ring in
     let subst = add subst inv cr.f_inv in
     let subst = odfl subst (cr.f_div |> omap (fun p -> add subst div p)) in
       subst
 
   (* FIXME: should use operators inlining when available *)
-  let get (thname, axs) env cr =
-    let thpath = EcPath.fromqsymbol ([tmod], thname) in
+  let get axs env cr =
     let subst  =
       match cr with
-      | `Ring  cr -> subst_of_ring  thname cr
-      | `Field cr -> subst_of_field thname cr
+      | `Ring  cr -> subst_of_ring  cr
+      | `Field cr -> subst_of_field cr
     in
 
     let for1 axname =
-      let ax = EcEnv.Ax.by_path (EcPath.pqname thpath axname) env in
+      let ax = EcEnv.Ax.by_path (EcPath.pqname tmod axname) env in
         assert (ax.ax_tparams = [] && ax.ax_kind = `Axiom && ax.ax_spec <> None);
         (axname, EcSubst.subst_form subst (oget ax.ax_spec))
     in

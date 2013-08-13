@@ -1391,12 +1391,12 @@ module Ty = struct
   (* ------------------------------------------------------------------ *)
   let ring_of_symmap ty symbols =
     { r_type  = ty;
-      r_zero  = oget (Mstr.find_opt "zero" symbols);
-      r_one   = oget (Mstr.find_opt "one"  symbols);
-      r_add   = oget (Mstr.find_opt "add"  symbols);
-      r_opp   = oget (Mstr.find_opt "sub"  symbols);
-      r_mul   = oget (Mstr.find_opt "mul"  symbols);
-      r_exp   = oget (Mstr.find_opt "expr" symbols);
+      r_zero  = oget (Mstr.find_opt "rzero" symbols);
+      r_one   = oget (Mstr.find_opt "rone"  symbols);
+      r_add   = oget (Mstr.find_opt "add"   symbols);
+      r_opp   = oget (Mstr.find_opt "opp"   symbols);
+      r_mul   = oget (Mstr.find_opt "mul"   symbols);
+      r_exp   = oget (Mstr.find_opt "expr"  symbols);
       r_sub   = Mstr.find_opt "sub" symbols;
       r_embed =
         match Mstr.find_opt "ofint" symbols with
@@ -1445,8 +1445,8 @@ module Ty = struct
   (* We currently only deal with [ring] and [field] *)
   let addinstance (scope : scope) mode ({ pl_desc = tci } as toptci) =
     match unloc tci.pti_name with
-    | ([], "ring" ) -> addring  scope  mode toptci
-    | ([], "field") -> addfield scope  mode toptci
+    | ([], "$ring" ) -> addring  scope  mode toptci
+    | ([], "$field") -> addfield scope  mode toptci
     | _ -> hierror "unknown type class"
 end
 

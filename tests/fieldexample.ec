@@ -1,5 +1,59 @@
-require import Logic.
+(* -------------------------------------------------------------------- *)
 require import Int.
+require AlgTactic.
+
+instance ring with int
+  op rzero = Int.zero
+  op rone  = Int.one
+  op add   = Int.( + )
+  op opp   = [-]
+  op mul   = Int.( * )
+  op expr  = Int.Power.( ^ )
+  op sub   = Int.(-)
+
+  proof oner_neq0 by smt
+  proof addr0     by smt
+  proof addrA     by smt
+  proof addrC     by smt
+  proof addrN     by smt
+  proof mulr1     by smt
+  proof mulrA     by smt
+  proof mulrC     by smt
+  proof mulrDl    by smt
+  proof expr0     by smt
+  proof exprS     by smt
+  proof subrE     by smt.
+
+lemma b25  (a b : int):
+  (a + b) ^ 25 = ((((((((((((((((((((((((b + 25 * a) * b + 300 * a ^ 2) * b + 2300 * a ^ 3) *
+                     b + 12650 * a ^ 4) *
+                    b + 53130 * a ^ 5) *
+                   b + 177100 * a ^ 6) *
+                  b + 480700 * a ^ 7) *
+                 b + 1081575 * a ^ 8) *
+                b + 2042975 * a ^ 9) *
+               b + 3268760 * a ^ 10) *
+              b + 4457400 * a ^ 11) *
+             b + 5200300 * a ^ 12) *
+            b + 5200300 * a ^ 13) *
+           b + 4457400 * a ^ 14) *
+          b + 3268760 * a ^ 15) *
+         b + 2042975 * a ^ 16) *
+        b + 1081575 * a ^ 17) *
+       b + 480700 * a ^ 18) *
+      b + 177100 * a ^ 19) *
+     b + 53130 * a ^ 20) *
+    b + 12650 * a ^ 21) *
+   b + 2300 * a ^ 22) *
+  b + 300 * a ^ 23) *
+ b + 25 * a ^ 24) *
+b + (a ^ 25).
+proof. by ring. qed.
+
+lemma binom (x y : int): ((x+y) ^2) = (x^2 + 2* x * y + y^2).
+proof. by ring. qed.
+
+(*
 require import Prime_field.
 
 const k : int.
@@ -157,3 +211,4 @@ split.
 field Zq.(+) Zq.( * ) ( ^^ ) Zq.inv Zq.(-) Zq.(/) Zq.gf_q0 Zq.gf_q1 (=).
 field Zq.(+) Zq.( * ) ( ^^ ) Zq.inv Zq.(-) Zq.(/) Zq.gf_q0 Zq.gf_q1 (=).
 qed.
+*)
