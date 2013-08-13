@@ -214,7 +214,7 @@ let ofring (r : ring) (rmap : RState.rstate) (e : pol) : form =
     | Pinj (j, e) -> doit (idx-j) e
 
     | PX (p, i, q) ->
-        let f = oget (RState.get i rmap) in
+        let f = oget (RState.get idx rmap) in
         let f = match i with 1 -> f | _ -> rexp r f i in
         let f = if peq p (Pc c1) then f else rmul r (doit idx p) f in
         let f = if peq q (Pc c0) then f else radd r f (doit (idx-1) q) in
