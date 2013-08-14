@@ -132,8 +132,20 @@ int main(int argc, char *const *argv) {
         signals_wait();
 
         if (sigismember(SIGNALED, SIGCHLD) > 0) {
-            (void) waitpid(pid, NULL, 0);
-            break ;
+            int status = 0;
+
+            while (waitpid(pid, &status, 0) < 0) {
+                if (errno != EINTR)
+                    eprintf_exit("wait(2) failed");
+            }
+
+            if (WIFEXITED(status))
+                return WEXITSTATUS(status);
+
+            if (WIFSIGNALED(status))
+                return 127;
+
+            abort();
         }
 
         for (size_t i = 0; i < ARRAYSIZE(csignals); ++i) {
