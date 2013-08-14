@@ -75,6 +75,19 @@ let check_prover_name name =
   try ignore(get_prover name); true with _ -> false
 
 (* -------------------------------------------------------------------- *)
+type prover_infos =
+  { pr_maxprocs  : int;
+    pr_provers   : string list;
+    pr_timelimit : int; }
+
+let dft_prover_infos =
+  { pr_maxprocs  = 3;
+    pr_provers   = [];
+    pr_timelimit = 3; }
+
+let dft_prover_names = ["Alt-Ergo"; "Z3"; "Vampire"; "Eprover"; "Yices"]
+
+(* -------------------------------------------------------------------- *)
 let restartable_syscall (call : unit -> 'a) : 'a =
   let output = ref None in
     while !output = None do
@@ -84,42 +97,45 @@ let restartable_syscall (call : unit -> 'a) : 'a =
     done;
     EcUtils.oget !output
 
-let para_call max_provers provers timelimit task =
+let call_prover_task pi task =
   let module CP = Call_provers in
 
-  let pcs    = Array.create max_provers None in
+  let pcs = Array.create pi.pr_maxprocs None in
 
   (* Run process, ignoring prover failing to start *)
   let run i prover =
     try
       let (_, pr, dr)  = get_prover prover in
       let pc =
-        Driver.prove_task ~command:pr.Whyconf.command ~timelimit dr task () in
+        Driver.prove_task
+          ~command:pr.Whyconf.command
+          ~timelimit:pi.pr_timelimit
+          dr task ()
+      in
 
       begin
         try
           ExtUnix.All.setpgid (CP.prover_call_pid pc) 0
         with Unix.Unix_error _ -> ()
       end;
-      pcs.(i) <- Some(prover, pc)
+      pcs.(i) <- Some (prover, pc)
     with e ->
       Format.printf "Error when starting %s: %a" prover
         EcPException.exn_printer e;
       ()
   in
 
-  (* Start the provers, at most max_provers run in the same time *)
-  let nb_provers = Array.length provers in
-  let min = if max_provers < nb_provers then max_provers else nb_provers in
-  for i = 0 to min - 1 do run i provers.(i) done;
-  (* Other provers are set in a queue *)
-  let pqueue = Queue.create () in
-  for i = min to nb_provers - 1 do Queue.add provers.(i) pqueue done;
-
-  (* Wait for the first prover giving a definitive answer *)
-  let status = ref None in
   EcUtils.try_finally
     (fun () ->
+      (* Start the provers, at most maxprocs run in the same time *)
+      let pqueue = Queue.create () in
+      List.iteri
+        (fun i prover ->
+           if i < pi.pr_maxprocs then run i prover else Queue.add prover pqueue)
+        pi.pr_provers;
+           
+      (* Wait for the first prover giving a definitive answer *)
+      let status = ref None in
       let alives = ref (-1) in
       while !alives <> 0 && !status = None do
         let pid, st =
@@ -150,7 +166,7 @@ let para_call max_provers provers timelimit task =
     (fun () ->
       for i = 0 to (Array.length pcs) - 1 do
         match pcs.(i) with
-        | None    -> ()
+        | None -> ()
         | Some (_prover,pc) ->
             let pid = CP.prover_call_pid pc in
             pcs.(i) <- None;
@@ -163,17 +179,3 @@ let para_call max_provers provers timelimit task =
             in
             ignore (CP.post_wait_call pc st ());
       done)
-
-type prover_infos =
-  { prover_max_run   : int;
-    prover_names     : string array;
-    prover_timelimit : int; }
-
-let dft_prover_infos =
-  { prover_max_run   = 7;
-    prover_names     = [||];
-    prover_timelimit = 3; }
-
-let call_prover_task pi task =
-  para_call pi.prover_max_run pi.prover_names pi.prover_timelimit task =
-  Some true

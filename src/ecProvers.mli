@@ -1,11 +1,15 @@
-type prover_infos =
-  { prover_max_run   : int;
-    prover_names     : string array;
-    prover_timelimit : int; }
-
-val call_prover_task : prover_infos -> Why3.Task.task -> bool
+(* -------------------------------------------------------------------- *)
+type prover_infos = {
+  pr_maxprocs  : int;
+  pr_provers   : string list;
+  pr_timelimit : int;
+}
 
 val dft_prover_infos : prover_infos
+val dft_prover_names : string list
+
+(* -------------------------------------------------------------------- *)
+val call_prover_task : prover_infos -> Why3.Task.task -> bool option
 
 val check_prover_name : string -> bool
 
