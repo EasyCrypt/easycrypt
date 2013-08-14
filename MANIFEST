@@ -33,6 +33,10 @@ theories/*.ec
 theories/prelude/*.ec
 theories/realizations/*.ec
 
+# system
+system/Makefile
+system/*.c
+
 # EasyCrypt examples
 examples/*.ec
 examples/list-ddh/*.ec

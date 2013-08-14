@@ -28,12 +28,12 @@ CHECK     = scripts/runtest.py --bin-args="$(ECARGS)" config/tests.config
 # --------------------------------------------------------------------
 .PHONY: all build byte native tests check check-xunit examples tags
 .PHONY: clean install uninstall uninstall-purge dist distcheck why3
-.PHONY: pg toolchain update-toolchain provers update
+.PHONY: callprover pg toolchain update-toolchain provers update
 .PHONY: %.ml %.mli %.inferred.mli
 
 all: build
 
-build: native
+build: callprover native
 
 define do-build
 	$(OCAMLBUILD) "$(1)"
@@ -44,6 +44,9 @@ byte: tags
 
 native: tags
 	$(call do-build,src/ec.native)
+
+callprover:
+	$(MAKE) -C system
 
 define check-for-staled-files
 	if [ -d "$(DESTDIR)$(PREFIX)/lib/easycrypt/" ]; then   \
@@ -106,6 +109,7 @@ checklibs: ec.native
 clean:
 	$(OCAMLBUILD) -clean
 	rm -f ec.native ec.byte
+	$(MAKE) -C system clean
 	set -e; for i in $(CONFIG); do [ \! -h "$$i" ] || rm -f "$$i"; done
 
 tags:
