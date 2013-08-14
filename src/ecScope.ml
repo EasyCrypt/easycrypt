@@ -728,11 +728,15 @@ module Prover = struct
 
   let _ = EcPException.register pp_error
 
-  let check_prover_name name =
-    let s = unloc name in
-    if not (EcProvers.check_prover_name s) then
-      EcLocation.locate_error name.pl_loc (Unknown_prover s);
-    s
+  let check_prover_name { pl_desc = name; pl_loc = loc } =
+    if not (EcProvers.check_prover_name name) then
+      EcLocation.locate_error loc (Unknown_prover name);
+    name
+
+  let set_wrapper scope wrapper =
+    let pi = Prover_info.get scope.sc_options in
+    let pi = { pi with EcProvers.pr_wrapper = wrapper } in
+      { scope with sc_options = Prover_info.set scope.sc_options pi; }
 
   let mk_prover_info scope maxprocs time ns =
     let dft      = Prover_info.get scope.sc_options in
@@ -741,7 +745,8 @@ module Prover = struct
     let maxprocs = odfl dft.EcProvers.pr_maxprocs maxprocs in
       { EcProvers.pr_maxprocs  = maxprocs;
         EcProvers.pr_provers   = provers;
-        EcProvers.pr_timelimit = time; }
+        EcProvers.pr_timelimit = time;
+        EcProvers.pr_wrapper   = dft.EcProvers.pr_wrapper; }
 
   let set_prover_info scope max time ns =
     let pi = mk_prover_info scope max time ns in

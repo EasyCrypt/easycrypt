@@ -75,15 +75,19 @@ let check_prover_name name =
   try ignore(get_prover name); true with _ -> false
 
 (* -------------------------------------------------------------------- *)
-type prover_infos =
-  { pr_maxprocs  : int;
-    pr_provers   : string list;
-    pr_timelimit : int; }
+type prover_infos = {
+  pr_maxprocs  : int;
+  pr_provers   : string list;
+  pr_timelimit : int;
+  pr_wrapper   : string option;
+}
 
-let dft_prover_infos =
-  { pr_maxprocs  = 3;
-    pr_provers   = [];
-    pr_timelimit = 3; }
+let dft_prover_infos = {
+  pr_maxprocs  = 3;
+  pr_provers   = [];
+  pr_timelimit = 3;
+  pr_wrapper   = None;
+}
 
 let dft_prover_names = ["Alt-Ergo"; "Z3"; "Vampire"; "Eprover"; "Yices"]
 
@@ -107,18 +111,15 @@ let call_prover_task pi task =
     try
       let (_, pr, dr)  = get_prover prover in
       let pc =
-        Driver.prove_task
-          ~command:pr.Whyconf.command
-          ~timelimit:pi.pr_timelimit
-          dr task ()
+        let command = pr.Whyconf.command in
+        let command =
+          match pi.pr_wrapper with
+          | None -> command
+          | Some wrapper -> Printf.sprintf "%s %s" wrapper command
+        in
+          Driver.prove_task ~command  ~timelimit:pi.pr_timelimit dr task ()
       in
-
-      begin
-        try
-          ExtUnix.All.setpgid (CP.prover_call_pid pc) 0
-        with Unix.Unix_error _ -> ()
-      end;
-      pcs.(i) <- Some (prover, pc)
+        pcs.(i) <- Some (prover, pc)
     with e ->
       Format.printf "Error when starting %s: %a" prover
         EcPException.exn_printer e;
@@ -170,10 +171,7 @@ let call_prover_task pi task =
         | Some (_prover,pc) ->
             let pid = CP.prover_call_pid pc in
             pcs.(i) <- None;
-            begin try
-              Unix.kill (-pid) 15;      (* kill process group *)
-            with Unix.Unix_error _ -> ()
-            end;
+            begin try Unix.kill pid 15 with Unix.Unix_error _ -> () end;
             let _, st =
               restartable_syscall (fun () -> Unix.waitpid [] pid)
             in

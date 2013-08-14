@@ -9,6 +9,7 @@ type options = {
   o_full_check : bool;
   o_max_prover : int;
   o_provers    : string list option;
+  o_pwrapper   : string option;
 }
 
 (* -------------------------------------------------------------------- *)

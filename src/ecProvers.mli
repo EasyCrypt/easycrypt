@@ -3,6 +3,7 @@ type prover_infos = {
   pr_maxprocs  : int;
   pr_provers   : string list;
   pr_timelimit : int;
+  pr_wrapper   : string option;
 }
 
 val dft_prover_infos : prover_infos

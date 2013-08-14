@@ -376,6 +376,7 @@ let initial () =
   let scope   = if   !options.o_boot
                 then scope
                 else process_th_require loader scope prelude in
+  let scope   = EcScope.Prover.set_wrapper scope !options.o_pwrapper in
     scope
 
 (* -------------------------------------------------------------------- *)

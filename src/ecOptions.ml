@@ -12,6 +12,7 @@ type options = {
   o_full_check : bool;
   o_max_prover : int;
   o_provers    : string list option;
+  o_pwrapper   : string option;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -25,6 +26,7 @@ let options = ref {
   o_full_check = false;
   o_max_prover = 4;
   o_provers    = None;
+  o_pwrapper   = None;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -75,6 +77,7 @@ let specs () =
         o_full_check = !full_check;
         o_max_prover = !max_provers;
         o_provers    = provers;
+        o_pwrapper   = None;
       }
 
 (* -------------------------------------------------------------------- *)
