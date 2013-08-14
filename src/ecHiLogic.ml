@@ -1175,9 +1175,7 @@ let process_logic (engine, hitenv) loc t =
   | Pintro pi      -> process_intros pi
   | Psplit         -> t_split
   | Pfield st      -> process_algebra `Solve `Field st
-  | Pfieldsimp st  -> process_algebra `Simpl `Field st
   | Pring st       -> process_algebra `Solve `Ring  st
-  | Pringsimp  st  -> process_algebra `Simpl `Ring  st
   | Pexists fs     -> process_exists fs
   | Pleft          -> t_left
   | Pright         -> t_right

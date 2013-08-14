@@ -426,9 +426,7 @@ type logtactic =
   | Pintro      of intropattern
   | Psplit                        
   | Pfield		of psymbol list
-  | Pfieldsimp	of psymbol list
   | Pring 		of psymbol list
-  | Pringsimp	of psymbol list
   | Pexists     of fpattern_arg located list 
   | Pleft                         
   | Pright                        

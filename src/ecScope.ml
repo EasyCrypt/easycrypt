@@ -1451,8 +1451,8 @@ module Ty = struct
   (* We currently only deal with [ring] and [field] *)
   let addinstance (scope : scope) mode ({ pl_desc = tci } as toptci) =
     match unloc tci.pti_name with
-    | ([], "$ring" ) -> addring  scope  mode toptci
-    | ([], "$field") -> addfield scope  mode toptci
+    | ([], "ring" ) -> addring  scope  mode toptci
+    | ([], "field") -> addfield scope  mode toptci
     | _ -> hierror "unknown type class"
 end
 

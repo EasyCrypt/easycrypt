@@ -1,4 +1,4 @@
-; Generated on Tue Aug 13 12:49:47 2013
+; Generated on Wed Aug 14 12:58:22 2013
 
 (defvar easycrypt-bytac-keywords '(
   "assumption"
@@ -110,10 +110,8 @@
   "modpath"
   "using"
   "compute"
-  "field"
-  "field_simplify"
-  "ring"
-  "ring_simplify"
+  "fieldeq"
+  "ringeq"
   "transitivity"
   "seq"
   "wp"
