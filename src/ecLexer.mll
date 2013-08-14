@@ -81,11 +81,8 @@
     "modpath"     , MODPATH    ;        (* KW: tactic *)
     "using"       , USING      ;        (* KW: tactic *)
     "compute"     , COMPUTE    ;        (* KW: tactic *)
-    "field"       , FIELD      ;        (* KW: tactic *)
-    "field_simplify", FIELDSIMP ;        (* KW: tactic *)
-    "ring"       , RING        ;        (* KW: tactic *)
-    "ring_simplify"       , RINGSIMP        ;        (* KW: tactic *)
-
+    "fieldeq"     , FIELD      ;        (* KW: tactic *)
+    "ringeq"      , RING       ;        (* KW: tactic *)
 
     "assumption"  , ASSUMPTION ;        (* KW: bytac *)
     "smt"         , SMT        ;        (* KW: bytac *)

@@ -50,10 +50,10 @@ lemma b25  (a b : int):
   b + 300 * a ^ 23) *
  b + 25 * a ^ 24) *
 b + (a ^ 25).
-proof. by ring. qed.
+proof. by ringeq. qed.
 
 lemma binom (x y : int): (x+y)^2 = x^2 + 2 * x * y + y^2.
-proof. by ring. qed.
+proof. by ringeq. qed.
 
 (* -------------------------------------------------------------------- *)
 require Prime_field.
@@ -112,10 +112,10 @@ instance field with zq
   proof ofintN    by smt.
 
 lemma rbinom (x y : zq): (x - y)^^2 = x^^2 - (ofint 2) * x * y + y^^2.
-proof. by field. qed.
+proof. by fieldeq. qed.
 
 lemma test (x : zq): x <> gf_q0 => inv x = inv x.
-proof. by intros=> h; field. qed.
+proof. by intros=> h; fieldeq. qed.
 
 
 (* FIXME: to be sync'ed with new ring/field tactics
@@ -125,7 +125,7 @@ lemma b24 : forall (a b c: zq) ,
     c ^^ 2 = Zq.( * )( b ^^ 2) (ofint 4).
 proof.
 intros a b c T U.
-by field T U.
+by fieldeq T U.
 qed.
 
 lemma bij1_fst:
@@ -138,7 +138,7 @@ forall (a b c d : zq),
           (a - b * c) = r.
 proof.
 intros a b c d H r s.
-(*by field.*)
+(*by fieldeq.*)
 admit.
 qed.
 
@@ -151,7 +151,7 @@ forall (a b c d : zq), a - b * c <> Zq.gf_q0 =>
  (a - b * c) = s.
 proof.
 intros a b c d H r s.
-(*by field.*)
+(*by fieldeq.*)
 admit.
 qed.
 
@@ -163,9 +163,9 @@ forall (a b c d : zq), a - b * c <> Zq.gf_q0 =>
 proof.
 intros a b c d H r s.
 split.
-(*by field.*)
+(*by fieldeq.*)
 admit.
-(*by field.*)
+(*by fieldeq.*)
 admit.
 qed.
 
@@ -175,7 +175,7 @@ forall (a b c d : zq), a - b * c <> Zq.gf_q0 =>
   ((a * (u - d - b * v)) / (a - b * c)) + ( b * ((a * v + c * d - c * u) / (a - b * c))+ d) = u.
 proof.
 intros a b c d H u v.
-(*by field.*)
+(*by fieldeq.*)
 admit.
 qed.
 
@@ -185,7 +185,7 @@ forall (a b c d : zq), a - b * c <> Zq.gf_q0 =>
    ((c * ((u - d) - (b * v))) / (a - (b * c))) + ((a * v + c * d - c * u) / (a - (b * c))) = v.
 proof.
 intros a b c d H u v.
-(* by field. *)
+(* by fieldeq. *)
 admit.
 qed.
 
@@ -197,8 +197,8 @@ forall (a b c d : zq), a - b * c <> Zq.gf_q0 =>
 proof.
 intros a b c d H u v.
 split.
-(*by field.*)
+(*by fieldeq.*)
 admit.
-(*by field.*)
+(*by fieldeq.*)
 admit.
 qed.
