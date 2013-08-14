@@ -728,56 +728,62 @@ module Prover = struct
 
   let _ = EcPException.register pp_error
 
-  let check_prover_name name =
-    let s = unloc name in
-    if not (EcProvers.check_prover_name s) then
-      EcLocation.locate_error name.pl_loc (Unknown_prover s);
-    s
+  let check_prover_name { pl_desc = name; pl_loc = loc } =
+    if not (EcProvers.check_prover_name name) then
+      EcLocation.locate_error loc (Unknown_prover name);
+    name
 
-  let mk_prover_info scope max time ns =
-    let dft = Prover_info.get scope.sc_options in
-    let time = odfl dft.EcProvers.prover_timelimit time in
-    let time = if time < 1 then 1 else time in
-    let provers = odfl dft.EcProvers.prover_names ns in
-    let provers = Array.to_list provers in
-    let max     = odfl dft.EcProvers.prover_max_run max in
-    { EcProvers.prover_max_run   = max;
-      EcProvers.prover_names     = Array.of_list provers;
-      EcProvers.prover_timelimit = time }
+  let set_wrapper scope wrapper =
+    let pi = Prover_info.get scope.sc_options in
+    let pi = { pi with EcProvers.pr_wrapper = wrapper } in
+      { scope with sc_options = Prover_info.set scope.sc_options pi; }
+
+  let mk_prover_info scope maxprocs time ns =
+    let dft      = Prover_info.get scope.sc_options in
+    let time     = max 1 (odfl dft.EcProvers.pr_timelimit time) in
+    let provers  = odfl dft.EcProvers.pr_provers ns in
+    let maxprocs = odfl dft.EcProvers.pr_maxprocs maxprocs in
+      { EcProvers.pr_maxprocs  = maxprocs;
+        EcProvers.pr_provers   = provers;
+        EcProvers.pr_timelimit = time;
+        EcProvers.pr_wrapper   = dft.EcProvers.pr_wrapper; }
 
   let set_prover_info scope max time ns =
     let pi = mk_prover_info scope max time ns in
       { scope with sc_options = Prover_info.set scope.sc_options pi }
 
   let set_all scope =
-    let provers = Array.of_list (EcProvers.known_provers ()) in
-    set_prover_info scope None None (Some provers)
+    let provers = EcProvers.known_provers () in
+      set_prover_info scope None None (Some provers)
 
   let set_default scope max provers =
     let provers =
       match provers with
-      | None -> List.filter EcProvers.check_prover_name ["Alt-Ergo";"Z3";"Vampire";"Eprover";"Yices"]
-      | Some ps -> List.iter (fun s -> if not (EcProvers.check_prover_name s) then raise (Unknown_prover s)) ps;ps
+      | None ->
+         let provers = EcProvers.dft_prover_names in
+           List.filter EcProvers.check_prover_name provers
+      | Some provers ->
+          List.iter
+            (fun name ->
+              if not (EcProvers.check_prover_name name) then
+                raise (Unknown_prover name)) provers;
+          provers
     in
-    let provers = Array.of_list provers in
-    let time = 3 in
-      set_prover_info scope (Some max) (Some time) (Some provers)
+      set_prover_info scope (Some max) (Some 3) (Some provers)
 
   let process scope pi =
     let max  = pi.pprov_max in
     let time = pi.pprov_time in
     let ns   = pi.pprov_names in
     let ns   = ns |> omap (List.map check_prover_name) in
-    let ns   = ns |> omap Array.of_list in
-    set_prover_info scope max time ns
+      set_prover_info scope max time ns
 
   let mk_prover_info scope pi =
     let max  = pi.pprov_max in
     let time = pi.pprov_time in
     let ns   = pi.pprov_names in
     let ns   = ns |> omap (List.map check_prover_name) in
-    let ns   = ns |> omap Array.of_list in
-    mk_prover_info scope max time ns
+      mk_prover_info scope max time ns
 
   let full_check scope =
     { scope with sc_options = Check_mode.full_check scope.sc_options }

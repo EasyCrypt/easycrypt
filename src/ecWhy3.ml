@@ -1545,7 +1545,7 @@ let check_w3_formula pi task f =
   let pr   = Decl.create_prsymbol (Ident.id_fresh "goal") in
   let decl = Decl.create_prop_decl Decl.Pgoal pr f in
   let task = add_decl_with_tuples task decl in
-  EcProvers.call_prover_task pi task
+  EcProvers.call_prover_task pi task = Some true
 
 exception CanNotProve of axiom
 

@@ -7,26 +7,42 @@ module T = EcTerminal
 
 (* -------------------------------------------------------------------- *)
 let _ =
-  let myname = Filename.basename Sys.executable_name
-  and mydir  = Filename.dirname  Sys.executable_name in
-  let locali = ["ec.native"; "ec.byte"] in
+  let myname  = Filename.basename Sys.executable_name
+  and mydir   = Filename.dirname  Sys.executable_name in
+  let eclocal = List.mem myname ["ec.native"; "ec.byte"] in
+
+  let resource name =
+    match eclocal with
+    | true ->
+        if Filename.basename (Filename.dirname mydir) = "_build" then
+          List.fold_left Filename.concat mydir
+            ([Filename.parent_dir_name;
+              Filename.parent_dir_name] @ name)
+        else
+          List.fold_left Filename.concat mydir name
+
+    | false ->
+        List.fold_left Filename.concat mydir
+          ([Filename.parent_dir_name; "lib"; "easycrypt"] @ name)
+  in    
 
   options := EcOptions.parse ();
+
+  (* Find provers wrapper *)
+  begin
+    match !options.o_pwrapper with
+    | Some _ -> ()
+    | None   ->
+        let wrapper = resource ["system"; "callprover"] in
+          if Sys.file_exists wrapper then
+            options := { !options with EcOptions.o_pwrapper = Some wrapper }
+  end;
 
   (* Initialize why3 engine *)
   let why3conf =
     match !options.o_why3 with
-    | None when List.mem myname locali -> begin
-      let why3conf = Filename.concat "_tools" "why3.local.conf" in
-      let why3conf =
-        if Filename.basename (Filename.dirname mydir) = "_build" then
-          List.fold_left Filename.concat mydir
-            [Filename.parent_dir_name;
-             Filename.parent_dir_name;
-             why3conf]
-        else
-           Filename.concat mydir why3conf
-      in
+    | None when eclocal -> begin
+      let why3conf = resource ["_tools"; "why3.local.conf"] in
         match Sys.file_exists why3conf with
         | false -> None
         | true  -> Some why3conf
@@ -45,22 +61,7 @@ let _ =
 
   (* Initialize load path *)
   begin
-    let theories =
-        match myname with
-        | _ when List.mem myname locali -> begin
-            if Filename.basename (Filename.dirname mydir) = "_build" then
-              List.fold_left Filename.concat mydir
-                [Filename.parent_dir_name;
-                 Filename.parent_dir_name;
-                 "theories"]
-            else
-              Filename.concat mydir "theories"
-          end
-
-        | _ ->
-            List.fold_left Filename.concat mydir
-              [Filename.parent_dir_name; "lib"; "easycrypt"; "theories"]
-    in
+    let theories = resource ["theories"] in
       EcCommands.addidir ~system:true (Filename.concat theories "prelude");
       EcCommands.addidir ~system:true theories
   end;
@@ -89,6 +90,10 @@ let _ =
     begin match why3conf with
     | None   -> Format.eprintf "  <why3 default>@\n%!"
     | Some f -> Format.eprintf "  %s@\n%!" f end;
+    Format.eprintf "prover wrapper@\n%!";
+    begin match !options.o_pwrapper with
+    | None -> Format.eprintf "  <none>@\n%!"
+    | Some wrapper -> Format.eprintf "  %s@\n%!" wrapper end;
     Format.eprintf "known provers: %s@\n%!"
       (String.concat ", " (EcProvers.known_provers ()));
     exit 0

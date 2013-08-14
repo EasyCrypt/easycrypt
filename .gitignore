@@ -12,6 +12,9 @@ setup.data
 setup.log
 /attic
 
+/system/*.o
+/system/callprover
+
 /doc/*.aux
 /doc/*.bbl
 /doc/*.blg
