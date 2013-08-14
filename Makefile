@@ -21,6 +21,11 @@ PRELUDE  := $(wildcard theories/prelude/*.ec)
 INSTALL  := scripts/install-sh
 
 # --------------------------------------------------------------------
+BINDIR := $(PREFIX)/bin
+LIBDIR := $(PREFIX)/lib/easycrypt
+SYSDIR := $(LIBDIR)/system
+
+# --------------------------------------------------------------------
 XUNITOUT ?= xunit.xml
 ECARGS   ?=
 CHECK     = scripts/runtest.py --bin-args="$(ECARGS)" config/tests.config
@@ -50,44 +55,48 @@ callprover:
 
 define check-for-staled-files
 	if [ -d "$(DESTDIR)$(PREFIX)/lib/easycrypt/" ]; then   \
-	  cd "$(DESTDIR)$(PREFIX)/lib/easycrypt/" &&           \
+	  cd "$(DESTDIR)$(LIBDIR)/" &&           \
 	    find theories -type f -name '*.ec' 2>/dev/null |   \
 	    sed 's/^/!! FOUND STALED FILE: /';                 \
 	fi
 endef
 
 define install-theories
-	$(INSTALL) -m 0755 -d $(DESTDIR)$(PREFIX)/lib/easycrypt/theories/$(1)
-	$(INSTALL) -m 0644 -t $(DESTDIR)$(PREFIX)/lib/easycrypt/theories/$(1) $(2)
+	$(INSTALL) -m 0755 -d $(DESTDIR)$(LIBDIR)/theories/$(1)
+	$(INSTALL) -m 0644 -t $(DESTDIR)$(LIBDIR)/theories/$(1) $(2)
 endef
 
 install: ec.native uninstall
 	-@$(call check-for-staled-files)
-	$(INSTALL) -m 0755 -d $(DESTDIR)$(PREFIX)/bin
-	$(INSTALL) -m 0755 -T ec.native $(DESTDIR)$(PREFIX)/bin/easycrypt
+	$(INSTALL) -m 0755 -d $(DESTDIR)$(BINDIR)
+	$(INSTALL) -m 0755 -T ec.native $(DESTDIR)$(BINDIR)/easycrypt
+	$(INSTALL) -m 0755 -d $(DESTDIR)$(SYSDIR)
+	$(INSTALL) -m 0755 -T system/callprover $(DESTDIR)$(SYSDIR)/callprover
 	$(call install-theories,,$(THEORIES))
 	$(call install-theories,prelude,$(PRELUDE))
 	$(call install-theories,realizations,$(REALIZED))
 
 define rmdir
-	-	@if [ -d "$(1)" ]; then rmdir "$(1)"; fi
+	-@if [ -d "$(1)" ]; then rmdir "$(1)"; fi
 endef
 
 define uninstall-theories
-	rm -f $(patsubst %,$(DESTDIR)$(PREFIX)/lib/easycrypt/%,$(2))
-	$(call rmdir,$(DESTDIR)$(PREFIX)/lib/easycrypt/theories/$(1))
+	rm -f $(patsubst %,$(DESTDIR)$(LIBDIR)/%,$(2))
+	$(call rmdir,$(DESTDIR)$(LIBDIR)/theories/$(1))
 endef
 
 uninstall:
-	rm -f $(DESTDIR)$(PREFIX)/bin/easycrypt
+	rm -f $(DESTDIR)$(BINDIR)/easycrypt
+	rm -f $(DESTDIR)$(SYSDIR)/callprover
+	$(call rmdir,$(DESTDIR)$(SYSDIR))
 	$(call uninstall-theories,realizations,$(REALIZED))
 	$(call uninstall-theories,prelude,$(PRELUDE))
 	$(call uninstall-theories,,$(THEORIES))
-	$(call rmdir,$(DESTDIR)$(PREFIX)/lib/easycrypt)
+	$(call rmdir,$(DESTDIR)$(LIBDIR))
 
 uninstall-purge:
-	rm  -f $(DESTDIR)$(PREFIX)/bin/easycrypt
-	rm -rf $(DESTDIR)$(PREFIX)/lib/easycrypt
+	rm  -f $(DESTDIR)$(BINDIR)/easycrypt
+	rm -rf $(DESTDIR)$(LIBDIR)
 
 tests: check
 
