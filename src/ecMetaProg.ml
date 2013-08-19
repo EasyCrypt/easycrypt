@@ -531,23 +531,38 @@ module FPosition = struct
       else begin
         let subp =
           match fp.f_node with
-          | Fif    (c, f1, f2) -> doit ctxt [c; f1; f2]
-          | Fapp   (f, fs)     -> doit ctxt (f :: fs)
-          | Ftuple fs          -> doit ctxt fs
-          | Flet   (_, f1, f2) -> doit ctxt [f1; f2]
+          | Fif    (c, f1, f2) -> doit (`WithCtxt (ctxt, [c; f1; f2]))
+          | Fapp   (f, fs)     -> doit (`WithCtxt (ctxt, f :: fs))
+          | Ftuple fs          -> doit (`WithCtxt (ctxt, fs))
 
           | Fquant (_, b, f) ->
             let xs   = List.pmap (function (x, GTty _) -> Some x | _ -> None) b in
             let ctxt = List.fold_left ((^~) Sid.add) ctxt xs in
-              doit ctxt [f]
-  
+              doit (`WithCtxt (ctxt, [f]))
+
+          | Flet (lp, f1, f2) ->
+            let subctxt = List.fold_left ((^~) Sid.add) ctxt (lp_ids lp) in
+              doit (`WithSubCtxt [(ctxt, f1); (subctxt, f2)])
+
           | _ -> None
         in
           omap (fun p -> `Sub p) subp
       end
 
-    and doit ctxt fps =
-      let fps = List.mapi (fun i fp -> doit1 ctxt fp |> omap (fun p -> (i, p))) fps in
+    and doit fps =
+      let fps =
+        match fps with
+        | `WithCtxt (ctxt, fps) ->
+            List.mapi
+              (fun i fp -> doit1 ctxt fp |> omap (fun p -> (i, p)))
+              fps
+
+        | `WithSubCtxt fps ->
+            List.mapi
+              (fun i (ctxt, fp) -> doit1 ctxt fp |> omap (fun p -> (i, p)))
+              fps
+      in
+
       let fps = List.pmap identity fps in
         match fps with
         | [] -> None
@@ -556,7 +571,7 @@ module FPosition = struct
     in
       fun fp ->
         let cpos =
-          match doit Sid.empty [fp] with
+          match doit (`WithCtxt (Sid.empty, [fp])) with
           | None   -> Mint.empty
           | Some p -> p
         in
