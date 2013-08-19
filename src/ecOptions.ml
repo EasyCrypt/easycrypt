@@ -211,7 +211,7 @@ let specs = {
   xp_groups = [
     ("provers", "Options related to provers", [
       `Spec ("p"          , `String, "Add a prover to the set of provers");
-      `Spec ("max_provers", `Int   , "Maximum number of prover running in the same time");
+      `Spec ("max-provers", `Int   , "Maximum number of prover running in the same time");
       `Spec ("check-all"  , `Flag  , "Force checking all files")]);
 
     ("loader", "Options related to loader", [
@@ -257,7 +257,7 @@ let prv_options_of_values values =
     match get_strings "p" values with
     | [] -> None | provers -> Some provers
   in
-    { prvo_maxjobs  = odfl 4 (get_int "maxjobs" values);
+    { prvo_maxjobs  = odfl 4 (get_int "max-provers" values);
       prvo_provers  = provers;
       pvro_checkall = get_flag "check-all" values; }
 
