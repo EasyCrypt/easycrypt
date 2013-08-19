@@ -36,6 +36,8 @@ theories/realizations/*.ec
 # system
 system/Makefile
 system/*.c
+system/win32/*.c
+system/unix/*.c
 
 # EasyCrypt examples
 examples/*.ec
