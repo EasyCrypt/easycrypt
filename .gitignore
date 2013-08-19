@@ -14,6 +14,7 @@ setup.log
 
 /system/*.o
 /system/callprover
+/system/callprover.exe
 
 /doc/*.aux
 /doc/*.bbl
