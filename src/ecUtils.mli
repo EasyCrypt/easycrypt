@@ -97,7 +97,6 @@ end
 
 (* -------------------------------------------------------------------- *)
 module List : sig
-
   include module type of List
 
   val ocons : 'a option -> 'a list -> 'a list
@@ -189,6 +188,10 @@ module String : sig
   include module type of String
 
   val map : (char -> char) -> string -> string
+
+  val startswith : string -> string -> bool
+
+  val endswith : string -> string -> bool
 
   val slice : ?first:int -> ?last:int -> string -> string
 

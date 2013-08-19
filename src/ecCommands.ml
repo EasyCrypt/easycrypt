@@ -369,34 +369,39 @@ let loadpath () =
   EcLoader.aslist loader
 
 (* -------------------------------------------------------------------- *)
-let initial () =
+let initial ~boot ~wrapper =
   let prelude = (mk_loc _dummy "prelude", Some `Export) in
   let loader  = EcLoader.forsys loader in
   let scope   = EcScope.empty in
-  let scope   = if   !options.o_boot
+  let scope   = if   boot
                 then scope
                 else process_th_require loader scope prelude in
-  let scope   = EcScope.Prover.set_wrapper scope !options.o_pwrapper in
+  let scope   = EcScope.Prover.set_wrapper scope wrapper in
     scope
 
 (* -------------------------------------------------------------------- *)
-let context = ref (0, lazy (initial ()), [])
+let context = ref None
+
+(* -------------------------------------------------------------------- *)
+let initialize ~boot ~wrapper =
+  assert (!context = None);
+  context := Some (0, initial ~boot ~wrapper, [])
 
 (* -------------------------------------------------------------------- *)
 let current () =
-  let (_, lazy scope, _) = !context in scope
+  let (_, scope, _) = oget !context in scope
 
 (* -------------------------------------------------------------------- *)
 let full_check b max_provers provers =
-  let (idx, lazy scope, l) = !context in
+  let (idx, scope, l) = oget !context in
   assert (idx = 0 && l = []);  
   let scope = EcScope.Prover.set_default scope max_provers provers in
   let scope = if b then EcScope.Prover.full_check scope else scope in
-    context := (idx, lazy scope, l)
+    context := Some (idx, scope, l)
 
 (* -------------------------------------------------------------------- *)
 let uuid () : int =
-  let (idx, _, _) = !context in idx
+  let (idx, _, _) = oget !context in idx
 
 (* -------------------------------------------------------------------- *)
 let mode () : string =
@@ -409,24 +414,24 @@ let undo (olduuid : int) =
   if olduuid < (uuid ()) then
     begin
       for i = (uuid ()) - 1 downto olduuid do
-        let (_, _scope, stack) = !context in
-        context := (i, lazy (List.hd stack), List.tl stack)
+        let (_, _scope, stack) = oget !context in
+        context := Some (i, List.hd stack, List.tl stack)
       done
     end
 
 (* -------------------------------------------------------------------- *)
 let process (g : global located) =
-  let (idx, lazy scope, stack) = !context in
+  let (idx, scope, stack) = oget !context in
     match process loader scope g with
     | None -> ()
-    | Some newscope -> context := (idx+1, lazy newscope, scope :: stack)
+    | Some newscope -> context := Some (idx+1, newscope, scope :: stack)
 
 (* -------------------------------------------------------------------- *)
 module S = EcScope
 module L = EcBaseLogic
 
 let pp_current_goal stream =
-  let (_, lazy scope, _) = !context in
+  let (_, scope, _) = oget !context in
 
   match S.xgoal scope with
   | None -> ()

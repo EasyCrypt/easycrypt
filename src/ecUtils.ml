@@ -461,6 +461,26 @@ module String = struct
       done;
       r
 
+  let startswith ptn subject =
+    let rec doit i =
+      if   i = String.length ptn
+      then true
+      else ptn.[i] = subject.[i] && doit (i+1)
+    in
+      if   String.length ptn > String.length subject
+      then false
+      else doit 0
+
+  let endswith ptn subject =
+    let rec doit off i =
+      if   i = String.length ptn
+      then true
+      else ptn.[i] = subject.[i+off] && doit off (i+1)
+    in
+      if   String.length ptn > String.length subject
+      then false
+      else doit (String.length subject - String.length ptn) 0
+
   let slice ?first ?last (s : string) =
     let first = odfl 0 first in
     let last  = odfl (String.length s) last in

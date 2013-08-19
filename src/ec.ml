@@ -32,21 +32,20 @@ let _ =
           ([Filename.parent_dir_name; "lib"; "easycrypt"] @ name)
   in    
 
-  options := EcOptions.parse ();
+  let pwrapper =
+    (* Find provers wrapper *)
+    let wrapper = resource ["system"; bin "callprover"] in
+      if   Sys.file_exists wrapper
+      then Some wrapper
+      else None
+  in
 
-  (* Find provers wrapper *)
-  begin
-    match !options.o_pwrapper with
-    | Some _ -> ()
-    | None   ->
-        let wrapper = resource ["system"; bin "callprover"] in
-          if Sys.file_exists wrapper then
-            options := { !options with EcOptions.o_pwrapper = Some wrapper }
-  end;
+  (* Parse command line arguments *)
+  let options = EcOptions.parse Sys.argv in
 
   (* Initialize why3 engine *)
   let why3conf =
-    match !options.o_why3 with
+    match options.o_options.o_why3 with
     | None when eclocal -> begin
       let why3conf = resource ["_tools"; "why3.local.conf"] in
         match Sys.file_exists why3conf with
@@ -72,48 +71,63 @@ let _ =
       EcCommands.addidir ~system:true theories
   end;
 
-  List.iter EcCommands.addidir !options.o_idirs;
-  !options.o_input |> oiter
-    (fun input ->
-      EcCommands.addidir (Filename.dirname input));
-  if !options.o_emacs then
-    EcCommands.addidir Filename.current_dir_name;
+  (* Initialize I/O + interaction module *)
+  let (ldropts, prvopts, input, terminal) =
+    match options.o_command with
+    | `Config -> begin
+        Format.eprintf "load-path:@\n%!";
+        List.iter
+          (fun (sys, dir) ->
+             Format.eprintf "  <%.6s>@@%s@\n%!" (if sys then "system" else "user") dir)
+          (EcCommands.loadpath ());
+        Format.eprintf "why3 configuration file@\n%!";
+        begin match why3conf with
+        | None   -> Format.eprintf "  <why3 default>@\n%!"
+        | Some f -> Format.eprintf "  %s@\n%!" f end;
+        Format.eprintf "prover wrapper@\n%!";
+        begin match pwrapper with
+        | None -> Format.eprintf "  <none>@\n%!"
+        | Some wrapper -> Format.eprintf "  %s@\n%!" wrapper end;
+        Format.eprintf "known provers: %s@\n%!"
+          (String.concat ", " (EcProvers.known_provers ()));
+        exit 0
+    end
+  
+    | `Cli cliopts -> begin
+        let terminal =
+          match cliopts.clio_emacs with
+          | true  -> lazy (EcTerminal.from_emacs ())
+          | false -> lazy (EcTerminal.from_tty ())
+        in
+          (cliopts.clio_loader, cliopts.clio_provers, None, terminal)
+    end
 
-  (* Force loading of prelude here *)
-  ignore (EcCommands.current () : EcScope.scope);
+    | `Compile cmpopts -> begin
+        let input = cmpopts.cmpo_input in
+        let terminal = lazy (EcTerminal.from_channel ~name:input (open_in input)) in
+          (cmpopts.cmpo_loader, cmpopts.cmpo_provers, Some input, terminal)
+    end
+  in
 
-  (* Initialize the proof mode *)
-  EcCommands.full_check !options.o_full_check !options.o_max_prover !options.o_provers;
+  (* Initialize global scope *)
+  EcCommands.initialize ~boot:ldropts.ldro_boot  ~wrapper:pwrapper;
 
-  (* Print configuration is wanted *)
-  if !options.o_pconfig then begin
-    Format.eprintf "load-path:@\n%!";
-    List.iter
-      (fun (sys, dir) ->
-         Format.eprintf "  <%.6s>@@%s@\n%!" (if sys then "system" else "user") dir)
-      (EcCommands.loadpath ());
-    Format.eprintf "why3 configuration file@\n%!";
-    begin match why3conf with
-    | None   -> Format.eprintf "  <why3 default>@\n%!"
-    | Some f -> Format.eprintf "  %s@\n%!" f end;
-    Format.eprintf "prover wrapper@\n%!";
-    begin match !options.o_pwrapper with
-    | None -> Format.eprintf "  <none>@\n%!"
-    | Some wrapper -> Format.eprintf "  %s@\n%!" wrapper end;
-    Format.eprintf "known provers: %s@\n%!"
-      (String.concat ", " (EcProvers.known_provers ()));
-    exit 0
+  (* Initialize loader *)
+  begin
+    List.iter EcCommands.addidir ldropts.ldro_idirs;
+    match input with
+    | None -> EcCommands.addidir Filename.current_dir_name
+    | Some input -> EcCommands.addidir (Filename.dirname input)
   end;
 
-  (* Initialize I/O + interaction module *)
-  let terminal =
-    match !options.o_emacs, !options.o_input with
-    | true , None -> EcTerminal.from_emacs ()
-    | false, None -> EcTerminal.from_tty   ()
+  (* Initialize the proof mode *)
+  EcCommands.full_check
+    prvopts.pvro_checkall
+    prvopts.prvo_maxjobs
+    prvopts.prvo_provers;
 
-    | _, Some input ->
-        EcTerminal.from_channel ~name:input (open_in input)
-  in
+  (* Instantiate terminal *)
+  let lazy terminal = terminal in
 
   try
     (* Set notifier (TODO: fix this global stuff *)
@@ -144,7 +158,7 @@ let _ =
               EcCommands.undo i
         end;
         EcTerminal.finish `ST_Ok terminal;
-        if !terminate then (EcTerminal.finalize terminal; exit 0)
+        if !terminate then (EcTerminal.finalize terminal; exit 0);
       with e -> begin
         EcTerminal.finish
           (`ST_Failure (EcCommands.toperror_of_exn e))
