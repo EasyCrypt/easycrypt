@@ -11,6 +11,12 @@ let _ =
   and mydir   = Filename.dirname  Sys.executable_name in
   let eclocal = List.mem myname ["ec.native"; "ec.byte"] in
 
+  let bin =
+    match Sys.os_type with
+    | "Win32" | "Cygwin" -> fun (x : string) -> x ^ ".exe"
+    | _ -> fun (x : string) -> x
+  in
+
   let resource name =
     match eclocal with
     | true ->
@@ -33,7 +39,7 @@ let _ =
     match !options.o_pwrapper with
     | Some _ -> ()
     | None   ->
-        let wrapper = resource ["system"; "callprover"] in
+        let wrapper = resource ["system"; bin "callprover"] in
           if Sys.file_exists wrapper then
             options := { !options with EcOptions.o_pwrapper = Some wrapper }
   end;

@@ -9,16 +9,26 @@ CFLAGS   = -Wall -W -Wno-unused-function -std=gnu99
 LDFLAGS  =
 
 # --------------------------------------------------------------------
+OS  = $(shell uname -o)
 BIN = callprover
+EXE =
+
+ifeq ($(OS),Cygwin)
+CFLAGS  += -municode
+LDFLAGS += -municode
+EXE      = .exe
+endif
 
 # --------------------------------------------------------------------
-all: $(BIN)
+all: $(BIN)$(EXE)
 
-$(BIN): $(BIN).o
+$(BIN)$(EXE): $(BIN).o
 	$(CC) -o $@ $(LDFLAGS) $^
 
 clean:
-	rm -f $(BIN) $(BIN).o
+	rm -f $(BIN)$(EXE) $(BIN).o
 
 %.o: %.c
 	$(CC) -c -o $@ $(CPPFLAGS) $(CFLAGS) $<
+
+callprover.o: win32/callprover.c unix/callprover.c
