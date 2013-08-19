@@ -1181,15 +1181,18 @@ module Ax = struct
 
         let tc =
           match tc with
-          | Some tc -> [tc]
+          | Some tc -> tc
           | None    ->
               let dtc = Plogic (Psmt (None, empty_pprover)) in
-              let dtc = [{ pl_loc = loc; pl_desc = dtc }] in
-              let dtc = List.map (fun t -> { pt_core = t; pt_intros = []; }) dtc in
+              let dtc = { pl_loc = loc; pl_desc = dtc } in
+              let dtc = { pt_core = dtc; pt_intros = []; } in
                 dtc
         in
 
-        let scope = Tactics.process_r false mode scope tc in
+        let tc = { pl_loc = loc; pl_desc = Pby [tc] } in
+        let tc = { pt_core = tc; pt_intros = []; } in
+
+        let scope = Tactics.process_r false mode scope [tc] in
           save scope loc
 
     | PAxiom ->
@@ -1378,6 +1381,8 @@ module Ty = struct
       List.iter
         (fun (x, pt, f) ->
           let t  = { pt_core = pt; pt_intros = []; } in
+          let t  = { pl_loc = pt.pl_loc; pl_desc = Pby [t] } in
+          let t  = { pt_core = t; pt_intros = []; } in
           let ax = { ax_tparams = [];
                      ax_spec    = Some f;
                      ax_kind    = `Axiom;
@@ -1598,6 +1603,8 @@ module Theory = struct
       | None -> Some (axc.C.axc_axiom, axc.C.axc_path, axc.C.axc_env)
       | Some pt ->
           let t = { pt_core = pt; pt_intros = []; } in
+          let t = { pl_loc = pt.pl_loc; pl_desc = Pby [t]; } in
+          let t = { pt_core = t; pt_intros = []; } in
           let (x, ax) = axc.C.axc_axiom in
 
           let pucflags = { puc_nosmt = false; puc_local = false; } in
