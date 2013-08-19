@@ -117,88 +117,43 @@ proof. by fieldeq. qed.
 lemma test (x : zq): x <> gf_q0 => inv x = inv x.
 proof. by intros=> h; fieldeq. qed.
 
-
-(* FIXME: to be sync'ed with new ring/field tactics
-lemma b24 : forall (a b c: zq) ,
+lemma b24 (a b c: zq):
     a = b =>
     c = (ofint 2) * a =>  
     c ^^ 2 = Zq.( * )( b ^^ 2) (ofint 4).
-proof.
-intros a b c T U.
-by fieldeq T U.
-qed.
+proof. by intros=> h1 h2; fieldeq h1 h2. qed.
 
-lemma bij1_fst:
-forall (a b c d : zq),
+lemma bij1_fst (a b c d r s : zq):
     a - (b * c) <> gf_q0 =>
-  forall (r s : zq),
     (( a * (c * s + r)) +
        c * d - 
        c * (a * s + b * r + d)) /
           (a - b * c) = r.
-proof.
-intros a b c d H r s.
-(*by fieldeq.*)
-admit.
-qed.
+proof. by intros h; fieldeq; smt. qed.
 
+lemma bij1_snd (a b c d r s : zq):
+   a - b * c <> Zq.gf_q0 =>
+   ((a * s + b * r + d - d) - (b * (c * s + r))) / (a - b * c) = s.
+proof. by intros=> h; fieldeq; smt. qed.
 
-lemma bij1_snd:
-forall (a b c d : zq), a - b * c <> Zq.gf_q0 =>
-  forall (r s : zq),
-      ((a * s + b * r + d - d) -
-        (b * (c * s + r))) /
- (a - b * c) = s.
-proof.
-intros a b c d H r s.
-(*by fieldeq.*)
-admit.
-qed.
+lemma bij1 (a b c d r s : zq):
+  a - b * c <> Zq.gf_q0 =>
+    let (u, v) = (a * s + b * r + d, c * s + r) in 
+      ((a * v + c * d - (c * u)) / (a - b * c),(u - d - b * v) / (a - b * c)) = (r,s).
+proof. by intros=> h; split; fieldeq; smt. qed.
 
-lemma bij1:
-forall (a b c d : zq), a - b * c <> Zq.gf_q0 =>
-  forall (r s : zq),
-    let (u,v) = (a * s + b * r + d, c * s + r) in 
-    ((a * v + c * d - (c * u)) / (a - b * c),(u - d - b * v) / (a - b * c)) = (r,s).
-proof.
-intros a b c d H r s.
-split.
-(*by fieldeq.*)
-admit.
-(*by fieldeq.*)
-admit.
-qed.
+lemma bij2_fst (a b c d u v : zq):
+  a - b * c <> Zq.gf_q0 =>
+    ((a * (u - d - b * v)) / (a - b * c)) + ( b * ((a * v + c * d - c * u) / (a - b * c))+ d) = u.
+proof. by intros=> h; fieldeq; smt. qed.
 
-lemma bij2_fst:
-forall (a b c d : zq), a - b * c <> Zq.gf_q0 =>
-  forall (u  v : zq),
-  ((a * (u - d - b * v)) / (a - b * c)) + ( b * ((a * v + c * d - c * u) / (a - b * c))+ d) = u.
-proof.
-intros a b c d H u v.
-(*by fieldeq.*)
-admit.
-qed.
-
-lemma bij2_snd:
-forall (a b c d : zq), a - b * c <> Zq.gf_q0 =>
-  forall (u  v : zq),
+lemma bij2_snd (a b c d u v : zq):
+  a - b * c <> Zq.gf_q0 =>
    ((c * ((u - d) - (b * v))) / (a - (b * c))) + ((a * v + c * d - c * u) / (a - (b * c))) = v.
-proof.
-intros a b c d H u v.
-(* by fieldeq. *)
-admit.
-qed.
+proof. by intros=> h; fieldeq; smt. qed.
 
-lemma bij2:
-forall (a b c d : zq), a - b * c <> Zq.gf_q0 =>
-  forall (u  v : zq),
-   let (r,s) = ((a * v + c * d - c * u) / (a - b * c),( u - d - b * v) / (a - b * c)) in 
-   (a * s + b * r + d,c * s + r) = (u,v).
-proof.
-intros a b c d H u v.
-split.
-(*by fieldeq.*)
-admit.
-(*by fieldeq.*)
-admit.
-qed.
+lemma bij2 (a b c d u v : zq):
+  a - b * c <> Zq.gf_q0 =>
+    let (r, s) = ((a * v + c * d - c * u) / (a - b * c),( u - d - b * v) / (a - b * c)) in 
+      (a * s + b * r + d,c * s + r) = (u,v).
+proof. by intros=> h; split; fieldeq; smt. qed.
