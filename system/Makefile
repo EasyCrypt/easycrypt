@@ -9,14 +9,20 @@ CFLAGS   = -Wall -W -Wno-unused-function -std=gnu99
 LDFLAGS  =
 
 # --------------------------------------------------------------------
-OS  = $(shell uname -o)
 BIN = callprover
 EXE =
 
-ifeq ($(OS),Cygwin)
+MACHINE = $(shell $(CC) -dumpmachine)
+
+# Use gcc to check if we are compiling for Cygwin or MinGW-w64.
+ifneq (,$(findstring w64,$(MACHINE)))
 CFLAGS  += -municode
 LDFLAGS += -municode
 EXE      = .exe
+else
+ifneq (,$(findstring cygwin,$(MACHINE)))
+EXE      = .exe
+endif
 endif
 
 # --------------------------------------------------------------------
