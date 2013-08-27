@@ -728,7 +728,7 @@ let force_bool codom =
   | None ->  EcTypes.tbool
   | Some t -> t
 
-exception CanNotTranslateW3Ec
+exception CannotTranslateW3Ec
 exception UnboundLS of Term.lsymbol
 
 let import_w3_quant = function
@@ -755,7 +755,7 @@ let import_w3_term env tvm =
   let rec import vm t =
     match t.Term.t_node with
     | Term.Tvar v -> f_local (Term.Mvs.find v vm) (import_ty t.Term.t_ty)
-    | Term.Tconst _ -> raise CanNotTranslateW3Ec (* FIXME *)
+    | Term.Tconst _ -> raise CannotTranslateW3Ec (* FIXME *)
     | Term.Tapp(f,wargs) ->
         let args = List.map (import vm) wargs in
         let import_ty = import_w3_ty env tvm in
@@ -791,8 +791,8 @@ let import_w3_term env tvm =
         let (id,_), vm = add_local v vm in
         let f2 = import vm t in
         f_let (LSymbol (id,f1.f_ty)) f1 f2
-    | Term.Tcase _ -> raise CanNotTranslateW3Ec (* FIXME : tuple *)
-    | Term.Teps _ ->  raise CanNotTranslateW3Ec
+    | Term.Tcase _ -> raise CannotTranslateW3Ec (* FIXME : tuple *)
+    | Term.Teps _ ->  raise CannotTranslateW3Ec
     | Term.Tquant(q,tq) ->
         let vs,_,t = Term.t_open_quant tq in
         let ids, vm = add_locals vs vm in
@@ -874,7 +874,7 @@ let import_w3_pr rn path (env,rb,z as envld) k pr t =
       let _, _, import = import_w3_term env tvm in
       let spec =
         try Some (import Term.Mvs.empty t);
-        with CanNotTranslateW3Ec -> None in
+        with CannotTranslateW3Ec -> None in
       let ax = {
         ax_tparams = Wtvm.tparams tvm; (* FIXME assert unicity of string *)
         ax_spec = spec;
@@ -1228,12 +1228,12 @@ let merge_branches lb =
   if List.exists (fun b -> b.Term.t_ty = None) lb then List.map force_prop lb
   else lb
 
-exception CanNotTranslate of string
+exception CannotTranslate of string
 
 let trans_gty env gty =
   match gty with
   | GTty ty   -> env, trans_ty env ty
-  | GTmodty _ -> raise (CanNotTranslate "binding of module")
+  | GTmodty _ -> raise (CannotTranslate "binding of module")
   | GTmem   mt -> 
     match mt with
     | None -> env, ty_mem 
@@ -1337,12 +1337,12 @@ let trans_form env f =
       let args = List.map trans_form_b args in
       Term.t_tuple args
 
-    | FhoareF _   -> raise (CanNotTranslate "FhoareF")
-    | FhoareS _   -> raise (CanNotTranslate "FhoareS")
-    | FbdHoareF _ -> raise (CanNotTranslate "FbdHoareF")
-    | FbdHoareS _ -> raise (CanNotTranslate "FbdHoareS")
-    | FequivF _   -> raise (CanNotTranslate "FequivF")
-    | FequivS _   -> raise (CanNotTranslate "FequivS")
+    | FhoareF _   -> raise (CannotTranslate "FhoareF")
+    | FhoareS _   -> raise (CannotTranslate "FhoareS")
+    | FbdHoareF _ -> raise (CannotTranslate "FbdHoareF")
+    | FbdHoareS _ -> raise (CannotTranslate "FbdHoareS")
+    | FequivF _   -> raise (CannotTranslate "FequivF")
+    | FequivS _   -> raise (CannotTranslate "FequivS")
 
     | Fpvar(pv,m) ->
         let pv = trans_pv !env pv f.f_ty m in
@@ -1487,7 +1487,7 @@ let add_ax env path ax =
         let env,rb,f = trans_form env f in
         let decl = Decl.create_prop_decl Decl.Paxiom pr (force_prop f) in
         add_pr env path pr decl, RBax(path,pr,decl)::rb
-      with CanNotTranslate _ ->
+      with CannotTranslate _ ->
         { env with env_tv = mty}, [] in
     { env with env_tv = mty; env_id = mid }, rb
 
@@ -1541,13 +1541,15 @@ let add_mod_exp_mp env mp me =
 
 let add_mod_exp env p me = add_mod_exp_mp env (mpath_crt p [] None) me
   
-let check_w3_formula pi task f =
+let check_w3_formula pi hints task f =
   let pr   = Decl.create_prsymbol (Ident.id_fresh "goal") in
   let decl = Decl.create_prop_decl Decl.Pgoal pr f in
   let task = add_decl_with_tuples task decl in
-  EcProvers.call_prover_task pi task = Some true
+    EcProvers.execute_task pi hints task = Some true
 
-exception CanNotProve of axiom
+exception CannotProve of axiom
+
+type me_of_mt = EcIdent.t -> module_type -> mod_restr -> module_expr
 
 let trans_tv env id = 
   let ts = Ty.create_tysymbol (preid id) [] None in
@@ -1570,7 +1572,7 @@ let add_abs_mod me_of_mt env id mt restr =
   let nenv,_ = add_mod_exp_mp env (EcPath.mident id) me in
   nenv
 
-let check_goal me_of_mt env pi (hyps, concl) =
+let check_goal me_of_mt env pi hints (hyps, concl) =
   let env = ref env in
   let trans_tv id = env := trans_tv !env id in
 
@@ -1609,9 +1611,9 @@ let check_goal me_of_mt env pi (hyps, concl) =
           
       | LD_modty (mt,restr) ->
         env := add_abs_mod me_of_mt !env id mt restr
-    with CanNotTranslate _ -> ()
+    with CannotTranslate _ -> ()
   in
   List.iter trans_tv hyps.h_tvar;
   List.iter trans_hyp (List.rev hyps.h_local);
   let env, _, concl = trans_form !env concl in
-  check_w3_formula pi env.logic_task (force_prop concl)
+  check_w3_formula pi hints env.logic_task (force_prop concl)

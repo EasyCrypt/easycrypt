@@ -367,7 +367,7 @@ let t_smt ~strict ~usehyps pi g =
             let rule = { pr_name = RN_prover (); pr_hyps = [] } in
             upd_rule_done rule g
           else error "cannot prove goal"
-        with EcWhy3.CanNotTranslate _ ->
+        with EcWhy3.CannotTranslate _ ->
           error "cannot prove goal"
 
 let t_clear ids (juc,n as g) =

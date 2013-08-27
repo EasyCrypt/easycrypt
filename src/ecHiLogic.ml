@@ -461,13 +461,13 @@ let check_pterm_arguments hyps ue ax args =
 
 (* -------------------------------------------------------------------- *)
 let can_concretize_pterm_arguments (tue, ev) ids =
-  let is_known_id = function
+  let is_prover_known_id = function
     | `UnknownVar (x, _) -> begin
       match EV.get x ev with Some (`Set _) -> true | _ -> false
     end
     | _ -> true
   in
-     EcUnify.UniEnv.closed tue && List.for_all is_known_id ids
+     EcUnify.UniEnv.closed tue && List.for_all is_prover_known_id ids
 
 (* -------------------------------------------------------------------- *)
 let evmap_of_pterm_arguments ids =

@@ -61,16 +61,19 @@ end
 let initialize    = Config.load
 let known_provers = Config.known_provers
 
-let get_w3_th dirname name =
-  Env.find_theory (Config.w3_env ()) dirname name
-
+(* -------------------------------------------------------------------- *)
 exception UnknownProver of string
 
 let get_prover name =
-  List.find (fun (s,_,_) -> s = name) (Config.provers ())
+  try  List.find (fun (s,_,_) -> s = name) (Config.provers ())
+  with Not_found -> raise (UnknownProver name)
 
-let check_prover_name name =
-  try ignore(get_prover name); true with _ -> false
+let is_prover_known name =
+  try ignore (get_prover name); true with Not_found -> false
+
+(* -------------------------------------------------------------------- *)
+let get_w3_th dirname name =
+  Env.find_theory (Config.w3_env ()) dirname name
 
 (* -------------------------------------------------------------------- *)
 type prover_infos = {
@@ -90,6 +93,17 @@ let dft_prover_infos = {
 let dft_prover_names = ["Alt-Ergo"; "Z3"; "Vampire"; "Eprover"; "Yices"]
 
 (* -------------------------------------------------------------------- *)
+type hints = Hints
+
+module Hints = struct
+  let empty = Hints
+  let full  = Hints
+
+  let add1 (_p : EcPath.path) (m : hints) = m
+  let addm (_p : EcPath.path) (m : hints) = m
+end
+
+(* -------------------------------------------------------------------- *)
 let restartable_syscall (call : unit -> 'a) : 'a =
   let output = ref None in
     while !output = None do
@@ -99,7 +113,7 @@ let restartable_syscall (call : unit -> 'a) : 'a =
     done;
     EcUtils.oget !output
 
-let call_prover_task pi task =
+let execute_task (pi : prover_infos) (_ : hints) task =
   let module CP = Call_provers in
 
   let pcs = Array.create pi.pr_maxprocs None in

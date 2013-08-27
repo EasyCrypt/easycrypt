@@ -729,7 +729,7 @@ module Prover = struct
   let _ = EcPException.register pp_error
 
   let check_prover_name { pl_desc = name; pl_loc = loc } =
-    if not (EcProvers.check_prover_name name) then
+    if not (EcProvers.is_prover_known name) then
       EcLocation.locate_error loc (Unknown_prover name);
     name
 
@@ -761,11 +761,11 @@ module Prover = struct
       match provers with
       | None ->
          let provers = EcProvers.dft_prover_names in
-           List.filter EcProvers.check_prover_name provers
+           List.filter EcProvers.is_prover_known provers
       | Some provers ->
           List.iter
             (fun name ->
-              if not (EcProvers.check_prover_name name) then
+              if not (EcProvers.is_prover_known name) then
                 raise (Unknown_prover name)) provers;
           provers
     in

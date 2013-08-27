@@ -1,7 +1,9 @@
 (* -------------------------------------------------------------------- *)
 open EcSymbols
 open EcModules
+open EcProvers
 
+(* -------------------------------------------------------------------- *)
 type env
 
 val empty : env
@@ -42,8 +44,9 @@ val add_abs_mod :
   env -> EcIdent.t -> module_type -> mod_restr -> env 
 
 (*****************************************************************************)
-exception CanNotTranslate of string
+exception CannotTranslate of string
 
-val check_goal : 
-  (EcIdent.t -> module_type -> mod_restr -> module_expr) ->
-  env -> EcProvers.prover_infos -> EcBaseLogic.l_decl -> bool
+type me_of_mt = EcIdent.t -> module_type -> mod_restr -> module_expr
+
+val check_goal :
+  me_of_mt -> env -> prover_infos -> hints -> EcBaseLogic.l_decl -> bool

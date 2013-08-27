@@ -2678,6 +2678,6 @@ let check_goal ~usehyps pi (hyps, concl) =
         let filter = function (_, LD_hyp _) -> false | _ -> true in
           { ld with h_local = List.filter filter ld.h_local }
   in
-  let ld  = norm_l_decl env (ld, concl) in
-  let res = EcWhy3.check_goal (Mod.me_of_mt env) env.env_w3 pi ld in
-  res
+  let ld    = norm_l_decl env (ld, concl) in
+  let hints = EcProvers.Hints.full in
+    EcWhy3.check_goal (Mod.me_of_mt env) env.env_w3 pi hints ld
