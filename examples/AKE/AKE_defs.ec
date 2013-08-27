@@ -347,22 +347,34 @@ save.
 
 (*{ * Basic types and definitions for initial AKE game *)
 
-const qSession :     int.
-const qSessionRev :   int.
-const qEphemeralRev : int.
-const qAgent :       int.
-const qH1 :           int.
-const qH2 :           int.
+const qSession : int.
+const qAgent :   int.
+const qH1 :      int.
+const qH2 :      int.
 
-axiom qSession_pos:      0 < qSession.
-axiom qSesssionRev_pos:  0 < qSessionRev.
-axiom qEphemeralRev_pos: 0 < qEphemeralRev.
-axiom qAgent_pos:        0 < qAgent.
-axiom qH1_pos:           0 < qH1.
-axiom qH2_pos:           0 < qH2.
+axiom qSession_pos: 0 < qSession.
+axiom qAgent_pos:   0 < qAgent.
+axiom qH1_pos:      0 < qH1.
+axiom qH2_pos:      0 < qH2.
 
 (* Session index: uniquely identifies sessions even in the presence of collisions *)
-type Sidx = int.
+type Sidx. (* we use an abstract, finite type with qSession elements *)
+
+op univ_Sidx : Sidx set.
+axiom univ_Sidx_all_mem : forall (x : Sidx), mem x univ_Sidx.
+op sample_Sidx = Duni.duni univ_Sidx.
+axiom Sidx_card: card univ_Sidx = qSession.
+
+lemma Sidx_iset_finite(s : Sidx ISet.set):
+  ISet.Finite.finite s.
+proof strict.
+  rewrite /ISet.Finite.finite.
+  exists (filter (lambda x, ISet.mem x s) univ_Sidx).
+  rewrite /ISet.Finite.(==).
+  intros x.
+  rewrite mem_filter.
+  smt.
+qed.
 
 module type AKE_Oracles = {
   fun h1_a(a : Sk, x : Esk) : Eexp option
