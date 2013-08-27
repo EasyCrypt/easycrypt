@@ -229,25 +229,36 @@ pred notfresh(t : Sid,  evs : Event list)  =
           \/ (* b) there is an ephemeral reveal for a (complete or incomplete) matching session *)
              List.mem (EphemeralRev ps) evs)).
 
-lemma not_fresh_imp_notfresh(t : Sid) (evs : Event list):
-  !(fresh t evs) => (notfresh t evs) by [].
-
-lemma nosmt not_def(P): (P => false) => !P by [].
-
-lemma notfresh_imp_notfresh(t : Sid) (evs : Event list):
-  (notfresh t evs) => !(fresh t evs)
-by (elim /tuple5_ind t; smt).
-
-lemma not_fresh_notfresh(t : Sid) (evs : Event list):
-  (notfresh t evs) => !(fresh t evs) by [].
-
-lemma nosmt absurd : forall P Q, !P => P => Q by [].
-
 lemma nosmt not_or:
   forall P Q, (! (P \/ Q)) = (! P /\ ! Q) by [].
 
 lemma nosmt not_and:
   forall P Q, (! (P /\ Q)) = (! P \/ ! Q) by [].
+
+lemma nosmt not_not : 
+  forall (P : bool), ! ! P = P by [].
+
+
+lemma not_fresh_imp_notfresh(t : Sid) (evs : Event list):
+  !(fresh t evs) => (notfresh t evs).
+proof.
+ rewrite /fresh /notfresh.
+ by elim /tuple5_ind t => /=;progress; generalize H; rewrite !not_and;smt.
+save.
+
+lemma nosmt not_def(P): (P => false) => !P by [].
+
+lemma notfresh_imp_notfresh(t : Sid) (evs : Event list):
+  (notfresh t evs) => !(fresh t evs).
+proof.
+ rewrite /fresh /notfresh.
+ by elim /tuple5_ind t => /=;progress; generalize H; rewrite !not_and;smt.
+save.
+
+lemma not_fresh_notfresh(t : Sid) (evs : Event list):
+  (notfresh t evs) => !(fresh t evs) by [].
+
+lemma nosmt absurd : forall P Q, !P => P => Q by [].
 
 lemma nosmt diff_cons(x y : 'a) (xs : 'a list):
   ! mem x xs =>
@@ -255,14 +266,14 @@ lemma nosmt diff_cons(x y : 'a) (xs : 'a list):
 
 lemma notfresh_fresh_ev(t : Sid) (evs : Event list) (e : Event):
   notfresh t evs =>
-  fresh t (e::evs) =>
-  e = Accept (cmatching t) \/ 
-  e = Start (psid_of_sid (cmatching t)).
+  fresh t (e::evs) => (mem (StaticRev (sid_peer t)) evs /\
+  (e = Accept (cmatching t) \/ 
+  e = Start (psid_of_sid (cmatching t)))).
 proof.
   elim/tuple5_ind t => A B X Y r.
   intros=> teq hnfresh hfresh. clear teq.
   generalize hnfresh. rewrite /notfresh /= => hnfresh.
-  generalize hfresh; rewrite /fresh /=. progress.
+  generalize hfresh; rewrite /fresh /= => [H][H0][H1] H2.
   elim hnfresh => {hnfresh}; first smt.
   intros=> hnfresh. elim hnfresh => {hnfresh}. smt.
   intros=> hnfresh. elim hnfresh => {hnfresh}. smt.
@@ -274,17 +285,31 @@ proof.
   elim Hst => {Hst} Hst.
   elim G => hno_match hnoeph.
   elim hno_match => no_accept.
-  smt. smt.
+  generalize no_accept; rewrite mem_cons => [|]; smt.
+  elim  no_accept => {no_accept} no_start no_other_accept.
+  generalize no_start; rewrite mem_cons => [|]; smt.
   elim G => hno_match hnoeph.
   elim hno_match => no_accept.
-  smt. smt.
+  generalize no_accept; rewrite mem_cons => [|]; smt.
+  elim  no_accept => {no_accept} no_start no_other_accept.
+  elim Hst => Z hZ.
+  cut _ : (exists (z : Epk),
+                      mem (Accept (B, A, Y, z, ! r)) (e :: evs)); last by smt.
+  by exists Z; rewrite mem_cons; right; assumption.
 qed.
 
 lemma nosmt notfresh_fresh(t : Sid) (evs : Event list) (e : Event):
   e <> Accept (cmatching t) => 
   e <> Start (psid_of_sid (cmatching t)) =>
   notfresh t evs =>
-  notfresh t (e::evs) by smt.
+  notfresh t (e::evs).
+proof.
+ intros hneq1 hneq2 hnfresh.
+ apply not_fresh_imp_notfresh.
+ apply not_def => hfresh.
+ by elim (notfresh_fresh_ev t evs e _ _) => // _ [|]; smt.
+save.
+
 
 (*{ *** Our definition is stronger than the original NAXOS definition *)
 
@@ -309,7 +334,11 @@ pred fresh_eCK(t : Sid,  evs : Event list)  =
              !(List.mem (EphemeralRev ps) evs))).
 
 lemma nosmt fresh_eCK_imp_fresh(t : Sid) (evs : Event list):
-  (fresh_eCK t evs) => (fresh t evs) by [].
+  (fresh_eCK t evs) => (fresh t evs).
+proof.
+ rewrite /fresh_eCK /fresh;
+ elim /tuple5_ind t => ? ? ? ? ? heq /=; progress => //; smt.
+save.
 (*} *)
 
 (*} *)
