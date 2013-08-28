@@ -1525,7 +1525,7 @@ let trans_form_or_pattern env tc (ps, ue) pf tt =
           transf_r (Some opsc) env f
 
     | PFglob gp ->
-        let mp = trans_topmsymbol env gp in
+        let (mp,_) = trans_msymbol env gp in
         let me =  
           match EcEnv.Memory.current env with
           | None -> tyerror f.pl_loc env NoActiveMemory
@@ -1585,7 +1585,7 @@ let trans_form_or_pattern env tc (ps, ue) pf tt =
             let x2 = lookup EcFol.mright x in
             f_eq x1 x2
           | GVglob gp ->
-            let mp = trans_topmsymbol env gp in
+            let (mp,_) = trans_msymbol env gp in
             check_mem gp.pl_loc EcFol.mleft;
             check_mem gp.pl_loc EcFol.mright;
             let x1 = f_glob mp EcFol.mleft in
@@ -1768,6 +1768,8 @@ let trans_form_or_pattern env tc (ps, ue) pf tt =
   
         | PGTY_ModTy(mi,restr) ->
           let (mi, _) = transmodtype env mi in
+          (* FIXME ? why do we use trans_topmsymbol 
+             and not trans_msymbol here *)
           let restr = Sx.empty, Sm.of_list (List.map (trans_topmsymbol env) restr) in
           let ty = GTmodty (mi, restr) in
           let add1 env x = 
