@@ -250,10 +250,10 @@ let mk_w3_opp2 s mk =
   let decl_spec = Decl.create_prop_decl Decl.Paxiom pr form in
   ls, decl, decl_spec
 
-let w3_ls_and, decl_and, spec_and = mk_w3_opp2 "AND" Term.t_and
+let w3_ls_and, decl_and, spec_and = mk_w3_opp2 "ANDS" Term.t_and
 let w3_ls_anda, decl_anda, spec_anda = mk_w3_opp2 "ANDA" Term.t_and_asym
-let w3_ls_or, decl_or, spec_or = mk_w3_opp2 "OR" Term.t_or
-let w3_ls_ora, decl_ora, spec_ora = mk_w3_opp2 "OR" Term.t_or_asym
+let w3_ls_or, decl_or, spec_or = mk_w3_opp2 "ORS" Term.t_or
+let w3_ls_ora, decl_ora, spec_ora = mk_w3_opp2 "ORA" Term.t_or_asym
 let w3_ls_imp, decl_imp, spec_imp = mk_w3_opp2 "IMP" Term.t_implies
 let w3_ls_iff, decl_iff, spec_iff = mk_w3_opp2 "IFF" Term.t_iff
 
