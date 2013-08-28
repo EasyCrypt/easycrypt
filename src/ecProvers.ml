@@ -115,7 +115,7 @@ let call_prover_task pi task =
           | None -> command
           | Some wrapper -> Printf.sprintf "%s %s" wrapper command
         in
-          Driver.prove_task ~command  ~timelimit:pi.pr_timelimit dr task ()
+          Driver.prove_task ~command ~timelimit:pi.pr_timelimit dr task ()
       in
         pcs.(i) <- Some (prover, pc)
     with e ->
@@ -148,13 +148,17 @@ let call_prover_task pi task =
           | Some (_prover, pc) ->
               if CP.prover_call_pid pc = pid then begin
                 pcs.(i) <- None;            (* DO IT FIRST *)
-                let ans = (CP.post_wait_call pc st ()).CP.pr_answer in
+                let result = CP.post_wait_call pc st () in
+                let ans = result.CP.pr_answer in
                 match ans with
                 | CP.Valid   -> status := Some true
                 | CP.Invalid -> status := Some false
-                | _          ->
-                    if not (Queue.is_empty pqueue) then
-                      run i (Queue.take pqueue)
+                | CP.Failure _ | CP.HighFailure ->
+                  Format.printf "[info] Warning: prover %s exited with %a\n%!" 
+                    _prover CP.print_prover_answer ans;
+                  if not (Queue.is_empty pqueue) then run i (Queue.take pqueue)
+                | _ ->
+                  if not (Queue.is_empty pqueue) then run i (Queue.take pqueue)
               end;
               if pcs.(i) <> None then incr alives
         done
