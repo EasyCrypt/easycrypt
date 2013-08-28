@@ -53,6 +53,7 @@
 
   ; Options
   (setq  proof-three-window-enable             t
+         proof-three-window-mode-policy        (quote hybrid)
          proof-auto-multiple-files             t)
 
   ; Setting indents 
