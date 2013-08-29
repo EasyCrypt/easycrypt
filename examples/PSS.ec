@@ -770,3 +770,5 @@ call (_: true ==> ={glob Ht.ROM.RO}); first by fun; eqobs_in.
 call (_: true ==> ={glob Gt.ROM.RO}); first by fun; eqobs_in.
 skip; progress=> //; smt.
 qed.
+
+end section.
