@@ -419,7 +419,7 @@ let gen_check_restr env pp_a a use restr =
       let r1 = NormMp.get_restr env mp1 in
       let check_v xp2 _ = 
         if not (NormMp.use_mem_xp xp2 r1) then
-          tacuerror "%a, using %a, should not be able to use %a (add restriction %a to %a)" (pp_a ppe) a pp_mp mp1 
+          tacuerror "%a should not be able to use %a (add restriction %a to %a)" (pp_a ppe) a pp_mp mp1 
             (EcPrinting.pp_pv ppe) (pv_glob xp2) pp_mp xp2.x_top pp_mp mp1  in
       Mx.iter check_v restr.NormMp.us_pv;
                     
@@ -429,7 +429,7 @@ let gen_check_restr env pp_a a use restr =
           let r2 = NormMp.get_restr env mp2 in
           if not (NormMp.use_mem_gl mp1 r2) then
             tacuerror 
-              "%a, using %a, should not use %a; add restriction %a to %a or %a to %a"
+              "%a should not use %a; add restriction %a to %a or %a to %a"
             (pp_a ppe) a pp_mp mp1 pp_mp mp2 
             pp_mp mp1 pp_mp mp2 pp_mp mp2 pp_mp mp1 in
       EcIdent.Sid.iter check_g restr.NormMp.us_gl in
