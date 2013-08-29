@@ -54,7 +54,7 @@ let id_of_mp mp m =
    I other word that substitution will not clash
 *)
 
-(* Remark: is only used to create fresh name, si id_of_pv *)
+(* Remark: m is only used to create fresh name, id_of_pv *)
 let generalize_subst env m uelts uglob = 
   let create (pv,ty) = id_of_pv pv m, GTty ty in
   let b = List.map create uelts in
@@ -67,25 +67,24 @@ let generalize_subst env m uelts uglob =
   b' @ b, s
 
 let generalize_mod env m modi f =
+  
   let elts,glob = PV.elements modi in
   (* We compute the pv and the glob used in f *)
   let fv = PV.fv env m f in
+
   (* We split the modi in two part the one used in the fv and the other *)
   let uelts, nelts = List.partition (fun (pv,_) -> PV.mem_pv env pv fv) elts in
   let uglob, nglob = List.partition (fun mp -> PV.mem_glob env mp fv) glob in
   (* We build the substitution which will be used *)
-  (* We start by adding the global variable *)
+  (* We start by adding the global variables *)
   let bd, s = generalize_subst env m uelts uglob in
   (* Now we check that the substituion do not clash with other 
-     modified variable *)
+     not modified variables *)
   List.iter (fun (pv,_) -> Mpv.check_npv env pv s) nelts;
   List.iter (fun mp -> Mpv.check_glob env mp s) nglob;
   (* We perform the substitution *)
   let s = PVM.of_mpv s m in
-  let f = 
-    try PVM.subst env s f 
-    with EcBaseLogic.TacError _ -> assert false (* should not appear *)
-  in
+  let f = PVM.subst env s f in
   f_forall_simpl bd f
 
 let lv_subst m lv f =
