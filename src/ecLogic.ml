@@ -393,6 +393,8 @@ let gen_check_restr env pp_a a use restr =
   let restr = NormMp.norm_restr env restr in 
   let ppe = EcPrinting.PPEnv.ofenv env in
   let pp_mp = EcPrinting.pp_topmod ppe in
+
+
   let check_xp xp _ = 
     (* We check that the variable is not a variable in restr *)
     if NormMp.use_mem_xp xp restr then
@@ -415,7 +417,13 @@ let gen_check_restr env pp_a a use restr =
         (pp_a ppe) a pp_mp mp1
     else 
       let r1 = NormMp.get_restr env mp1 in
-      let check id2 = 
+      let check_v xp2 _ = 
+        if not (NormMp.use_mem_xp xp2 r1) then
+          tacuerror "%a, using %a, should not be able to use %a (add restriction %a to %a)" (pp_a ppe) a pp_mp mp1 
+            (EcPrinting.pp_pv ppe) (pv_glob xp2) pp_mp xp2.x_top pp_mp mp1  in
+      Mx.iter check_v restr.NormMp.us_pv;
+                    
+      let check_g id2 = 
         let mp2 = EcPath.mident id2 in
         if not (NormMp.use_mem_gl mp2 r1) then
           let r2 = NormMp.get_restr env mp2 in
@@ -424,9 +432,8 @@ let gen_check_restr env pp_a a use restr =
               "%a, using %a, should not use %a; add restriction %a to %a or %a to %a"
             (pp_a ppe) a pp_mp mp1 pp_mp mp2 
             pp_mp mp1 pp_mp mp2 pp_mp mp2 pp_mp mp1 in
-      EcIdent.Sid.iter check restr.NormMp.us_gl in
+      EcIdent.Sid.iter check_g restr.NormMp.us_gl in
   EcIdent.Sid.iter check_gl use.NormMp.us_gl
-
 
 let check_restr env mp restr = 
   let use = NormMp.mod_use env mp in
