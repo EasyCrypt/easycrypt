@@ -9,6 +9,7 @@ open EcReduction
 open EcBaseLogic
 open EcEnv
 open EcFol
+open EcProvers
 
 (* -------------------------------------------------------------------- *)
 type pre_judgment = {
@@ -145,7 +146,7 @@ val t_right : tactic
 
 val t_congr : form -> (form * form) list * EcTypes.ty -> tactic
 
-val t_smt : strict:bool -> usehyps:bool -> EcProvers.prover_infos -> tactic
+val t_smt : strict:bool -> bool * hints -> EcProvers.prover_infos -> tactic
 
 val t_cut : form -> tactic
 

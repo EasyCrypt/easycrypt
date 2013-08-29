@@ -19,14 +19,15 @@ val is_prover_known : string -> bool
 val initialize : string option -> unit
 
 (* -------------------------------------------------------------------- *)
+type hflag = [ `Include | `Exclude ]
 type hints
 
 module Hints : sig
   val empty : hints
   val full  : hints
 
-  val add1 : path -> hints -> hints
-  val addm : path -> hints -> hints
+  val add1 : path -> hflag -> hints -> hints
+  val addm : path -> hflag -> hints -> hints
 end
 
 (* -------------------------------------------------------------------- *)

@@ -419,15 +419,26 @@ and renaming = [
   `NoName | `FindName | `WithRename of string | `NoRename of string
 ]
 
+type pdbmap1 = {
+  pht_flag : [ `Include | `Exclude ];
+  pht_kind : [ `Theory  | `Lemma   ];
+  pht_name : pqsymbol;
+}
+
+and pdbhint = {
+  pht_nolocals : bool;
+  pht_map : pdbmap1 list;
+}
+
 type logtactic =
   | Preflexivity
   | Passumption of (pqsymbol option * ptyannot option)
-  | Psmt        of (string located option * pprover_infos)
+  | Psmt        of (pdbhint option * pprover_infos)
   | Pintro      of intropattern
   | Psplit                        
   | Pfield		of psymbol list
   | Pring 		of psymbol list
-  | Pexists     of fpattern_arg located list 
+  | Pexists     of fpattern_arg located list
   | Pleft                         
   | Pright                        
   | Ptrivial

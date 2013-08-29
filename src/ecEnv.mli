@@ -8,6 +8,7 @@ open EcDecl
 open EcFol
 open EcModules
 open EcTheory
+open EcProvers
 
 (* -------------------------------------------------------------------- *)
 type 'a suspension = {
@@ -363,6 +364,4 @@ module LDecl : sig
 end
 
 (* -------------------------------------------------------------------- *)
-val check_goal :
-  usehyps:bool -> EcProvers.prover_infos ->
-    LDecl.hyps * form -> bool
+val check_goal : bool * hints -> EcProvers.prover_infos -> LDecl.hyps * form -> bool

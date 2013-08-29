@@ -1,5 +1,6 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
+open EcSymbols
 open Why3
 
 (* ----------------------------------------------------------------------*)
@@ -69,7 +70,7 @@ let get_prover name =
   with Not_found -> raise (UnknownProver name)
 
 let is_prover_known name =
-  try ignore (get_prover name); true with Not_found -> false
+  try ignore (get_prover name); true with UnknownProver _ -> false
 
 (* -------------------------------------------------------------------- *)
 let get_w3_th dirname name =
@@ -93,14 +94,52 @@ let dft_prover_infos = {
 let dft_prover_names = ["Alt-Ergo"; "Z3"; "Vampire"; "Eprover"; "Yices"]
 
 (* -------------------------------------------------------------------- *)
-type hints = Hints
+type hflag = [ `Include | `Exclude ]
+type xflag = [ hflag | `Inherit ]
+
+type hints = {
+  ht_this : xflag;
+  ht_axs  : hflag Msym.t;
+  ht_sub  : hints Msym.t;
+}
 
 module Hints = struct
-  let empty = Hints
-  let full  = Hints
+  open EcPath
 
-  let add1 (_p : EcPath.path) (m : hints) = m
-  let addm (_p : EcPath.path) (m : hints) = m
+  let create (xflag : xflag) = {
+    ht_this = xflag;
+    ht_axs  = Msym.empty;
+    ht_sub  = Msym.empty;
+  }
+
+  let empty : hints = create `Exclude
+  let full  : hints = create `Include
+
+  let rec acton (cb : hints -> hints) (p : path option) (m : hints) =
+    match p with
+    | None   -> cb m
+    | Some p ->
+        let x = EcPath.basename p in
+        let p = EcPath.prefix p in
+          acton (fun m ->
+            { m with ht_sub =
+                Msym.change
+                  (fun s -> Some (cb (odfl (create `Inherit) s)))
+                  x m.ht_sub })
+            p m
+
+  let add1 (p : path) (h : hflag) (m : hints) =
+    let x = EcPath.basename p in
+    let p = EcPath.prefix p in
+      acton (fun m -> { m with ht_axs = Msym.add x h m.ht_axs }) p m
+
+  let addm (p : path) (h : hflag) (m : hints) =
+    let x = EcPath.basename p in
+    let p = EcPath.prefix p in
+      acton
+        (fun m ->
+           { m with ht_sub = Msym.add x (create (h :> xflag)) m.ht_sub })
+        p m
 end
 
 (* -------------------------------------------------------------------- *)

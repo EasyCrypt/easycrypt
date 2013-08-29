@@ -2656,7 +2656,7 @@ module LDecl = struct
 end
 
 (* -------------------------------------------------------------------- *)
-let norm_l_decl env (hyps,concl) =
+let norm_l_decl env (hyps, concl) =
   let norm = NormMp.norm_form env in
   let onh (x,lk) =
     match lk with
@@ -2666,9 +2666,9 @@ let norm_l_decl env (hyps,concl) =
     | LD_hyp f -> x, LD_hyp (norm f) in
   let concl = norm concl in
   let lhyps = List.map onh hyps.h_local in
-  ({ hyps with h_local = lhyps}, concl)
+    ({ hyps with h_local = lhyps }, concl)
 
-let check_goal ~usehyps pi (hyps, concl) =
+let check_goal (usehyps, db) pi (hyps, concl) =
   let env = LDecl.toenv hyps in
   let ld  = LDecl.tohyps hyps in
   let ld  =
@@ -2678,6 +2678,5 @@ let check_goal ~usehyps pi (hyps, concl) =
         let filter = function (_, LD_hyp _) -> false | _ -> true in
           { ld with h_local = List.filter filter ld.h_local }
   in
-  let ld    = norm_l_decl env (ld, concl) in
-  let hints = EcProvers.Hints.full in
-    EcWhy3.check_goal (Mod.me_of_mt env) env.env_w3 pi hints ld
+  let ld = norm_l_decl env (ld, concl) in
+    EcWhy3.check_goal (Mod.me_of_mt env) env.env_w3 pi db ld

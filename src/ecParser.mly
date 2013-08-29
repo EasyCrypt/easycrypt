@@ -238,6 +238,7 @@
 %token MODPATH
 %token MODULE
 %token NE
+%token NOLOCALS
 %token NOSMT
 %token NOT
 %token OF
@@ -1698,9 +1699,32 @@ occurences:
   }
 ;
 
+dbmap1:
+| f=dbmap_flag? x=dbmap_target {
+    { pht_flag = odfl `Include f;
+      pht_kind = (fst x);
+      pht_name = (snd x); }
+  }
+;
+
+dbmap_flag:
+| ADD   { `Include }
+| MINUS { `Exclude }
+;
+
+dbmap_target:
+| AT x=uqident { (`Theory, x) }
+| x=qident { (`Lemma, x) }
+;
+
+dbhint:
+| nl=boption(NOLOCALS) m=dbmap1* {
+    { pht_nolocals = nl; pht_map = m; }
+  }
+;
 
 %inline prod_form:
-  | f1=sform f2=sform      { Some f1, Some f2 }
+  | f1=sform f2=sform   { Some f1, Some f2 }
   | UNDERSCORE f2=sform { None   , Some f2 }
   | f1=sform UNDERSCORE { Some f1, None    }
 ;
@@ -1734,8 +1758,8 @@ logtactic:
 | TRIVIAL
    { Ptrivial }
 
-| SMT db=lident? pi=prover_info
-   { Psmt (db, pi) }
+| SMT db=dbhint pi=prover_info
+   { Psmt (Some db, pi) }
 
 | INTROS a=intro_pattern*
    { Pintro a }

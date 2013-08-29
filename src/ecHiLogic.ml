@@ -181,20 +181,46 @@ let process_formula hyps pf =
   process_form hyps pf tbool
 
 (* -------------------------------------------------------------------- *)
-let process_smt hitenv (db, pi) g =
-  let usehyps =
-    match omap unloc db with
-    | None -> true
-    | Some "nolocals" -> false
-    | Some db -> tacuerror "unknown SMT DB: `%s'" db
-  in
+let process_dbhint env db =
+  let add hints x =
+    let nf kind p =
+      let s = string_of_qsymbol (unloc p) in
+        set_loc p.pl_loc
+          (fun () -> tacuerror "cannot find %s `%s'" kind s)
+          ()
+    in
+  
+    let addm hints hflag p =
+      match EcEnv.Theory.lookup_opt (unloc p) env with
+      | None -> nf "theory" p
+      | Some (p, _) -> EcProvers.Hints.addm p hflag hints
+  
+    and add1 hints hflag p =
+      match EcEnv.Ax.lookup_opt (unloc p) env with
+      | None -> nf "lemma" p
+      | Some (p, _) -> EcProvers.Hints.add1 p hflag hints
+    in
+      match x.pht_kind with
+      | `Theory -> addm hints x.pht_flag x.pht_name
+      | `Lemma  -> add1 hints x.pht_flag x.pht_name
 
-  let pi = hitenv.hte_provers pi in
+  in
+    match db with
+    | None    -> (true, EcProvers.Hints.full)
+    | Some db ->
+      let hints = EcProvers.Hints.full in
+      let hints = List.fold_left add hints db.pht_map in
+        (not db.pht_nolocals, hints)
+
+let process_smt hitenv (db, pi) g =
+  let env = LDecl.toenv (get_hyps g) in
+  let db  = process_dbhint env db in
+  let pi  = hitenv.hte_provers pi in
 
   match hitenv.hte_smtmode with
   | `Admit    -> t_admit g
-  | `Standard -> t_seq (t_simplify_nodelta) (t_smt ~usehyps ~strict:false pi) g
-  | `Strict   -> t_seq (t_simplify_nodelta) (t_smt ~usehyps ~strict:true  pi) g
+  | `Standard -> t_seq (t_simplify_nodelta) (t_smt ~strict:false db pi) g
+  | `Strict   -> t_seq (t_simplify_nodelta) (t_smt ~strict:true  db pi) g
 
 (* -------------------------------------------------------------------- *)
 let process_clear l g =
