@@ -81,6 +81,7 @@ clone import AWord as G2Tag with
 
 (* Domain of RSA *)
 op sample_plain: signature distr.
+axiom plainL: mu sample_plain cpTrue = 1%r.
 
 (** Instantiating *)
 require PKS.
@@ -194,7 +195,7 @@ module type CMA_2RO(G:Gt.ARO,H:Ht.ARO,S:AdvOracles) = {
   fun forge(pk:pkey): message * signature
 }.
 
-(** Inlining the oracles that do not get modified much *)
+(** Inlining the oracles that do not need to change *)
 module type PartialOracles = {
   fun init(): pkey
   fun sign(m:message): signature
@@ -728,3 +729,44 @@ module I(A:CMA_2RO): Inverter = {
 equiv equiv_G7_OW (A<:CMA_2RO):
   G7(A(G,Ha(H7))).main ~ OW(I(A)).main: ={glob A} ==> ={res}.
 admit. qed.
+
+section.
+declare module A:CMA_2RO {EF_CMA,Wrap,PSS,GGen,SGen,OW,G,Ha,Hs,H,H1,H2,H3,H4,H5,H6,H7}.
+local module Ag = A(G).
+
+local equiv equiv_PSS_G0:
+  EF_CMA(Wrap(PSS(G,H)),Ag(H)).main ~ G0(Ag(H)).main: ={glob A} ==> ={res}.
+proof strict.
+fun.
+inline Wrap(PSS(Gt.ROM.RO,Ht.ROM.RO)).verify
+       PSS(Gt.ROM.RO,Ht.ROM.RO).verify
+       PSS(Gt.ROM.RO,Ht.ROM.RO).g2
+       Gt.ROM.RO.o
+       PSS(Gt.ROM.RO,Ht.ROM.RO).g1.
+swap{1} [21..25] -3;
+eqobs_in;
+rcondf{1} 21.
+  intros=> &m; wp; rnd; wp; rnd; wp; call (_: true)=> //; call (_: true)=> //.
+    skip; smt.
+inline G.o.
+wp; rnd{1}; wp;
+rnd; wp;
+call (_: ={glob Gt.ROM.RO, glob Ht.ROM.RO} /\
+         Wrap.sk{1} = SGen.sk{2} /\
+         Wrap.pk{1} = SGen.pk{2} /\
+         Wrap.qs{1} = SGen.qs{2}).
+  fun; inline PSS(Gt.ROM.RO,Ht.ROM.RO).sign
+              PSS(Gt.ROM.RO,Ht.ROM.RO).g2 PSS(Gt.ROM.RO,Ht.ROM.RO).g1
+              Gt.ROM.RO.o G.o; wp; rnd{1}; wp; rnd; wp;
+       call (_: ={glob Ht.ROM.RO}); first by eqobs_in.
+       rnd; wp; skip; progress=> //; smt.
+  by fun; eqobs_in.
+  by fun; eqobs_in.
+inline Wrap(PSS(Gt.ROM.RO,Ht.ROM.RO)).init SGen(Ht.ROM.RO).init
+       PSS(Gt.ROM.RO,Ht.ROM.RO).init PSS(Gt.ROM.RO,Ht.ROM.RO).keygen
+       Mem.init.
+wp; rnd{2}; wp; rnd; wp.
+call (_: true ==> ={glob Ht.ROM.RO}); first by fun; eqobs_in.
+call (_: true ==> ={glob Gt.ROM.RO}); first by fun; eqobs_in.
+skip; progress=> //; smt.
+qed.
