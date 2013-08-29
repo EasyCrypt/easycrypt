@@ -353,8 +353,10 @@ let pv_glob x =
   let top = x.EcPath.x_top in
   let x = 
     if top.EcPath.m_args = [] then x
-    else EcPath.xpath (EcPath.m_functor top) x.EcPath.x_sub in
-    { pv_name = x; pv_kind = PVglob }
+    else 
+      let ntop = EcPath.mpath top.m_top [] in (* remove the functor argument *)
+      EcPath.xpath ntop x.EcPath.x_sub in
+  { pv_name = x; pv_kind = PVglob }
 
 let pv x k = 
   if k = PVglob then pv_glob x 

@@ -257,6 +257,10 @@ module PV = struct
       
   let remove env pv fv = 
     { fv with s_pv = Mnpv.remove (pvm env pv) fv.s_pv }
+
+  (* Works only for abstract module *)
+  let remove_glob mp fv = 
+    { fv with s_gl = Sm.remove mp fv.s_gl } 
       
   let mem_pv env pv fv = Mnpv.mem (pvm env pv) fv.s_pv 
     
@@ -976,14 +980,20 @@ and eqobs_inF_refl env f' eqo =
   | FBabs oi -> 
     let do1 eqo o = PV.union (eqobs_inF_refl env o eqo) eqo in
     let top = EcPath.m_functor f.x_top in
-    let add_in eqo = 
-      if oi.oi_in then PV.add_glob env top eqo else eqo in
     let rec aux eqo = 
       let eqi = List.fold_left do1 eqo oi.oi_calls in
-      let eqi = add_in eqi in
       if PV.subset eqi eqo then eqo 
       else aux eqi in
-    aux eqo
+    if oi.oi_in then aux (PV.add_glob env top eqo)
+    else 
+      let eqi = aux (PV.remove_glob top eqo) in
+      if PV.mem_glob env top eqi then begin
+        let ppe = EcPrinting.PPEnv.ofenv env in
+        EcBaseLogic.tacuerror "Function %a may use oracles that need equality on glob %a."
+        (EcPrinting.pp_funname ppe) f' (EcPrinting.pp_topmod ppe) top 
+      end;
+      eqi
+
 
 
 let check_module_in env mp mt =
@@ -991,14 +1001,18 @@ let check_module_in env mp mt =
   let params = sig_.mis_params in
   let global = PV.fv env mhr (NormMp.norm_glob env mhr mp) in
   let env = List.fold_left 
-    (fun env (id,mt) -> Mod.bind_local id mt (Sx.empty,Sm.empty) env) env params in
+    (fun env (id,mt) -> 
+      Mod.bind_local id mt (Sx.empty,Sm.empty) env) env params in
   let extra = List.map (fun (id,_) -> EcPath.mident id) params in
   let mp = EcPath.mpath mp.m_top (mp.m_args @ extra) in
   let check = function
     | Tys_function(fs,oi) ->
       let f = EcPath.xpath_fun mp fs.fs_name in
-      let eqi = eqobs_inF_refl env f global in      
-      if not (oi.oi_in) && not (Mnpv.is_empty eqi.PV.s_pv) then
+      let eqi = eqobs_inF_refl env f global in 
+      (* We remove the paramater not take into account *)
+      let eqi = 
+        List.fold_left (fun eqi mp -> PV.remove_glob mp eqi) eqi extra in 
+      if not (oi.oi_in) && not (PV.is_empty eqi) then
         let ppe = EcPrinting.PPEnv.ofenv env in
         EcBaseLogic.tacuerror "The function %a should initialize %a"
           (EcPrinting.pp_funname ppe) f (PV.pp env) eqi in
