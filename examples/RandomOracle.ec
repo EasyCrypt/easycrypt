@@ -9,7 +9,7 @@ op dsample : to distr. (* Distribution to use on the target type *)
 (* A signature for random oracles from "from" to "to". *)
 module type Oracle =
 {
-  fun init():unit {*}
+  fun init():unit
   fun o(x:from):to
 }.
 

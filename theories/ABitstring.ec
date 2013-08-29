@@ -8,6 +8,10 @@ op zeros: int -> bitstring.
 axiom length_zeros l:
   0 <= l => `|zeros l| = l.
 
+op ones: int -> bitstring.
+axiom length_ones l:
+  0 <= l => `|ones l| = l.
+
 op ( ^ ): bitstring -> bitstring -> bitstring.
 axiom length_xor (b:bitstring):
   `|b ^ b| = `|b|.
@@ -20,6 +24,7 @@ axiom xorC (a b:bitstring):
 axiom xor0 (b:bitstring): b ^ zeros `|b| = b.
 axiom xorN (b:bitstring): b ^ b = zeros `|b|.
 
+(*
 lemma xorI (a b b':bitstring):
   `|a| = `|b| => `|b| = `|b'| =>
   a ^ b = a ^ b' => b = b'.
@@ -29,7 +34,7 @@ rewrite -xor0 -(xor0 b') -eql_b_b' -eql_a_b -xorN
         ?(xorC _ (a ^ a)) ?length_xor - ?eql_b_b' ?eql_a_b //
         -2?xorA - ?eql_b_b' //
         (fcongr ((^) a) (a ^ b) (a ^ b')) //.
-qed.
+qed. *)
 
 op (||): bitstring -> bitstring -> bitstring.
 axiom length_app (a b:bitstring):

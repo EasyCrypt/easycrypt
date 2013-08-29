@@ -42,10 +42,10 @@ require RandomOracle.
 clone import OW as RSA with
   type t <- signature,
   op sample_t <- sample_plain,
-  op f_dom = (lambda (pk:pkey) (x:signature), cpTrue x),
-  op f_rng = (lambda (pk:pkey) (x:signature), cpTrue x),
-  op finv_dom = (lambda (sk:skey) (x:signature), cpTrue x),
-  op finv_rng = (lambda (sk:skey) (x:signature), cpTrue x)
+  op f_dom = (lambda (pk:pkey) (x:signature), true),
+  op f_rng = (lambda (pk:pkey) (x:signature), true),
+  op finv_dom = (lambda (sk:skey) (x:signature), true),
+  op finv_rng = (lambda (sk:skey) (x:signature), true)
   proof f_rng_sub_finv_dom by smt,
         finv_rng_sub_f_dom by smt,
         f_dom_sample_t by smt.
