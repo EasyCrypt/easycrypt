@@ -563,7 +563,7 @@ module ExprSmart = struct
   let e_if (e, (e1, e2, e3)) (e1', e2', e3') =
     if   e1 == e1' && e2 == e2' && e3 == e3'
     then e
-    else e_if e1 e2 e3
+    else e_if e1' e2' e3'
 
   let e_lam (e, (b, body)) (b', body') =
     if   b == b' && body == body'
