@@ -940,7 +940,7 @@ let f_map gt g fp =
           if gty == gty' then b1 else (x, gty')
       in
 
-      let b' = List.smart_map map_gty b in
+      let b' = List.Smart.map map_gty b in
       let f' = g f in
         FSmart.f_quant (fp, (q, b, f)) (q, b', f')
 
@@ -962,18 +962,18 @@ let f_map gt g fp =
         FSmart.f_pvar (fp, (id, fp.f_ty, s)) (id, ty', s)
 
   | Fop (p, tys) -> 
-      let tys' = List.smart_map gt tys in
+      let tys' = List.Smart.map gt tys in
       let ty'  = gt fp.f_ty in
         FSmart.f_op (fp, (p, tys, fp.f_ty)) (p, tys', ty')
 
   | Fapp (f, fs) ->
       let f'  = g f in
-      let fs' = List.smart_map g fs in
+      let fs' = List.Smart.map g fs in
       let ty' = gt fp.f_ty in
         FSmart.f_app (fp, (f, fs, fp.f_ty)) (f', fs', ty')
 
   | Ftuple fs -> 
-      let fs' = List.smart_map g fs in
+      let fs' = List.Smart.map g fs in
         FSmart.f_tuple (fp, fs) fs'
 
   | FhoareF hf ->
@@ -1015,7 +1015,7 @@ let f_map gt g fp =
           { es with es_pr = pr'; es_po = po'; }
 
   | Fpr (m, mp, args, ev) -> 
-      let args' = List.smart_map g args in
+      let args' = List.Smart.map g args in
       let ev'   = g ev in
         FSmart.f_pr (fp, (m, mp, args, ev)) (m, mp, args', ev')
 
@@ -1094,7 +1094,7 @@ module Fsubst = struct
       then (s, xt)
       else f_bind_local s x (f_local x' t'), (x',t')
 
-  let add_locals = List.smart_map_fold add_local
+  let add_locals = List.Smart.map_fold add_local
 
   let subst_lpattern (s: f_subst) (lp:lpattern) = 
     match lp with
@@ -1173,7 +1173,7 @@ module Fsubst = struct
 
     | Fop (p, tys) ->
         let ty'  = s.fs_ty fp.f_ty in
-        let tys' = List.smart_map s.fs_ty tys in
+        let tys' = List.Smart.map s.fs_ty tys in
         let p'   = s.fs_sty.ts_p p in
           FSmart.f_op (fp, (p, tys, fp.f_ty)) (p', tys', ty')
 
@@ -1263,7 +1263,7 @@ module Fsubst = struct
       assert (not (Mid.mem mhr s.fs_mem));
       let m'    = Mid.find_def m m s.fs_mem in
       let mp'   = EcPath.x_substm s.fs_sty.ts_p s.fs_mp mp in
-      let args' = List.smart_map (f_subst s) args in
+      let args' = List.Smart.map (f_subst s) args in
       let e'    = (f_subst s) e in
 
       FSmart.f_pr (fp, (m, mp, args, e)) (m', mp', args', e')

@@ -387,24 +387,23 @@ module List = struct
         else r
     | _, _ -> invalid_arg "List.filter2"
 
-  let rec smart_map f l = 
-    match l with
-    | [] -> l
-    | h::tl ->
-        let h' = f h in
-        let tl' = smart_map f tl in
-	if h'==h && tl'==tl then l else 
-        h'::tl'
-
-  let smart_map_fold (f : 'a -> 'b -> 'a * 'c) (a : 'a) (xs : 'b list) =
-    let r = ref a in
-    let f b = 
-      let (a,c) = f !r b in
-      r := a; c in
-    let l = smart_map f xs in
-    !r, l
-
   let sum xs = List.fold_left (+) 0 xs
+
+  module Smart = struct
+    let rec map f l = 
+      match l with
+      | []    -> []
+      | x::xs ->
+        let x'  = f x in
+        let xs' = map f xs in
+          if x == x' && xs == xs' then l else x'::xs'
+
+    let map_fold f a xs =
+      let r = ref a in
+      let f x = let (a, x) = f !r x in r := a; x in
+      let xs = map f xs in
+        (!r, xs)
+  end
 end
 
 (* -------------------------------------------------------------------- *)

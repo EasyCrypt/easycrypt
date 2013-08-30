@@ -1833,7 +1833,7 @@ module NormMp = struct
 
         | Fpr(m,p,args,e) ->
           let p' = norm_xp p in
-          let args' = List.smart_map aux args in
+          let args' = List.Smart.map aux args in
           let e' = aux e in
           if p == p' && args == args' && e == e' then f else
           f_pr m p' args' e'

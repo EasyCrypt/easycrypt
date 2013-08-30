@@ -254,11 +254,11 @@ let s_subst (s: EcTypes.e_subst) =
         if pvt == pvt' then lv else
           LvVar pvt'
       | LvTuple pvs ->
-        let pvs' = List.smart_map pvt_subst pvs in
+        let pvs' = List.Smart.map pvt_subst pvs in
         if pvs == pvs' then lv else LvTuple pvs'
       | LvMap((p,tys), pv, e, ty) ->
         let p'   = s.EcTypes.es_p p in
-        let tys' = List.smart_map s.EcTypes.es_ty tys in
+        let tys' = List.Smart.map s.EcTypes.es_ty tys in
         let pv'  = EcTypes.pv_subst s.EcTypes.es_xp pv in
         let e'   = e_subst e in
         let ty'  = s.EcTypes.es_ty ty in
@@ -280,7 +280,7 @@ let s_subst (s: EcTypes.e_subst) =
       | Scall(olv,mp,args) ->
         let olv' = olv |> osmart_map lv_subst in
         let mp'  = s.EcTypes.es_xp mp in
-        let args' = List.smart_map e_subst args in
+        let args' = List.Smart.map e_subst args in
         if olv == olv' && mp == mp' && args == args' then i else 
           i_call(olv',mp',args')
       | Sif(e,s1,s2) ->
@@ -301,7 +301,7 @@ let s_subst (s: EcTypes.e_subst) =
             
     and s_subst s = 
       let is = s.s_node in
-      let is' = List.smart_map i_subst is in
+      let is' = List.Smart.map i_subst is in
       if is == is' then s else stmt is' in
 
     s_subst 

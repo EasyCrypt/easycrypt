@@ -165,15 +165,17 @@ module List : sig
 
   val prmap : ('a -> 'b option) -> 'a list -> 'b list
 
-  val smart_map : ('a -> 'a) -> 'a list -> 'a list
-
-  val smart_map_fold : ('a -> 'b -> 'a * 'b) -> 'a -> 'b list -> 'a * 'b list
-
   val sum : int list -> int
 
   val min : 'a -> 'a list -> 'a
 
   val max : 'a -> 'a list -> 'a
+
+  module Smart : sig
+    val map : ('a -> 'a) -> 'a list -> 'a list
+
+    val map_fold : ('a -> 'b -> 'a * 'b) -> 'a -> 'b list -> 'a * 'b list
+  end
 end
 
 (* -------------------------------------------------------------------- *)

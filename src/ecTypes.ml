@@ -133,10 +133,10 @@ let ty_map f t =
   | Tglob _ | Tunivar _ | Tvar _ -> t
 
   | Ttuple lty -> 
-      TySmart.ttuple (t, lty) (List.smart_map f lty)
+      TySmart.ttuple (t, lty) (List.Smart.map f lty)
 
   | Tconstr (p, lty) -> 
-      let lty' = List.smart_map f lty in
+      let lty' = List.Smart.map f lty in
         TySmart.tconstr (t, (p, lty)) (p, lty')
 
   | Tfun (t1, t2) -> 
@@ -201,14 +201,14 @@ let rec ty_subst s =
       | Tglob m       -> TySmart.tglob (ty, m) (s.ts_mp m)
       | Tunivar id    -> odfl ty (Muid.find_opt id s.ts_u) 
       | Tvar id       -> odfl ty (Mid.find_opt  id s.ts_v)
-      | Ttuple lty    -> TySmart.ttuple (ty, lty) (List.smart_map aux lty)
+      | Ttuple lty    -> TySmart.ttuple (ty, lty) (List.Smart.map aux lty)
       | Tfun (t1, t2) -> TySmart.tfun (ty, (t1, t2)) (aux t1, aux t2)
 
       | Tconstr(p, lty) -> begin
         match Mp.find_opt p s.ts_def with
         | None -> 
             let p'   = s.ts_p p in
-            let lty' = List.smart_map aux lty in
+            let lty' = List.Smart.map aux lty in
               TySmart.tconstr (ty, (p, lty)) (p', lty')
 
         | Some (args, body) ->
@@ -531,13 +531,13 @@ let e_map fty fe e =
   | Elocal _
   | Evar _                -> e
   | Eop (p, tys)          -> 
-      let tys' = List.smart_map fty tys in
+      let tys' = List.Smart.map fty tys in
       let ty'  = fty e.e_ty in
       if tys == tys' && e.e_ty == ty' then e else
       e_op p tys' ty'
   | Eapp (e1, args)       -> 
       let e1' = fe e1 in
-      let args' = List.smart_map fe args in
+      let args' = List.Smart.map fe args in
       let ty'  = fty e.e_ty in
       if e1 == e1' && args == args' && e.e_ty = ty' then e else 
       e_app e1' args' ty'
@@ -547,7 +547,7 @@ let e_map fty fe e =
       if e1 == e1' && e2 == e2' then e else
       e_let lp e1' e2'
   | Etuple le             -> 
-      let le' = List.smart_map fe le in
+      let le' = List.Smart.map fe le in
       if le == le' then e else
       e_tuple le'
   | Eif (e1, e2, e3)      -> 
@@ -560,7 +560,7 @@ let e_map fty fe e =
     let dop (x,ty as xty) =
       let ty' = fty ty in
       if ty == ty' then xty else (x,ty') in
-    let b' = List.smart_map dop b in
+    let b' = List.Smart.map dop b in
     let e1' = fe e1 in
     if b == b' && e1 == e1' then e else
     e_lam b' e1'
@@ -625,7 +625,7 @@ let add_local s (x,t as xt) =
     let merger o = assert (o = None); Some (e_local x' t') in
     { s with es_loc = Mid.change merger x s.es_loc }, (x',t')
       
-let add_locals = List.smart_map_fold add_local
+let add_locals = List.Smart.map_fold add_local
 
 let subst_lpattern (s: e_subst) (lp:lpattern) = 
   match lp with
@@ -652,7 +652,7 @@ let rec e_subst (s: e_subst) e =
       else e_var pv' ty'
   | Eop(p,tys) ->
       let p'   = s.es_p p in
-      let tys' = List.smart_map s.es_ty tys in
+      let tys' = List.Smart.map s.es_ty tys in
       let ty'  = s.es_ty e.e_ty in
       if p == p' && tys == tys' && e.e_ty == ty' then e else
       e_op p' tys' ty'
