@@ -525,45 +525,89 @@ let e_app x args ty =
     | _ -> mk_expr (Eapp (x, args)) ty
 
 (* -------------------------------------------------------------------- *)
+module ExprSmart = struct
+  let l_symbol (lp, x) x' =
+    if x == x then lp else LSymbol x'
+
+  let l_tuple (lp, xs) xs' =
+    if xs == xs' then lp else LTuple xs'
+
+  let e_local (e, (x, ty)) (x', ty') =
+    if   x == x' && ty == ty'
+    then e
+    else e_local x' ty'
+
+  let e_var (e, (pv, ty)) (pv', ty') =
+    if   pv == pv' && ty == ty'
+    then e
+    else e_var pv' ty'
+
+  let e_op (e, (p, tys, ty)) (p', tys', ty') =
+    if   p == p' && tys == tys' && ty == ty'
+    then e
+    else e_op p' tys' ty'
+
+  let e_app (e, (x, args, ty)) (x', args', ty') =
+    if   x == x' && args == args' && ty == ty'
+    then e
+    else e_app x' args' ty'
+
+  let e_let (e, (lp, e1, e2)) (lp', e1', e2') =
+    if   lp == lp' && e1 == e1' && e2 == e2'
+    then e
+    else e_let lp' e1' e2'
+
+  let e_tuple (e, es) es' =
+    if es == es' then e else e_tuple es'
+
+  let e_if (e, (e1, e2, e3)) (e1', e2', e3') =
+    if   e1 == e1' && e2 == e2' && e3 == e3'
+    then e
+    else e_if e1 e2 e3
+
+  let e_lam (e, (b, body)) (b', body') =
+    if   b == b' && body == body'
+    then e
+    else e_lam b' body'
+end
+
 let e_map fty fe e =
   match e.e_node with 
-  | Eint _
-  | Elocal _
-  | Evar _                -> e
-  | Eop (p, tys)          -> 
+  | Eint _ | Elocal _ | Evar _ -> e
+
+  | Eop (p, tys) -> 
       let tys' = List.Smart.map fty tys in
       let ty'  = fty e.e_ty in
-      if tys == tys' && e.e_ty == ty' then e else
-      e_op p tys' ty'
-  | Eapp (e1, args)       -> 
-      let e1' = fe e1 in
+        ExprSmart.e_op (e, (p, tys, e.e_ty)) (p, tys', ty')
+
+  | Eapp (e1, args) -> 
+      let e1'   = fe e1 in
       let args' = List.Smart.map fe args in
-      let ty'  = fty e.e_ty in
-      if e1 == e1' && args == args' && e.e_ty = ty' then e else 
-      e_app e1' args' ty'
-  | Elet (lp, e1, e2)     -> 
+      let ty'   = fty e.e_ty in
+        ExprSmart.e_app (e, (e1, args, e.e_ty)) (e1', args', ty')
+
+  | Elet (lp, e1, e2) -> 
       let e1' = fe e1 in
-      let e2' = fe e2 in 
-      if e1 == e1' && e2 == e2' then e else
-      e_let lp e1' e2'
-  | Etuple le             -> 
+      let e2' = fe e2 in
+        ExprSmart.e_let (e, (lp, e1, e2)) (lp, e1', e2')
+
+  | Etuple le -> 
       let le' = List.Smart.map fe le in
-      if le == le' then e else
-      e_tuple le'
+        ExprSmart.e_tuple (e, le) le'
+
   | Eif (e1, e2, e3)      -> 
       let e1' = fe e1 in
       let e2' = fe e2 in 
-      let e3' = fe e3 in 
-      if e1 == e1' && e2 == e2' && e3 = e3' then e else
-      e_if e1' e2' e3' 
-  | Elam(b,e1) ->
-    let dop (x,ty as xty) =
-      let ty' = fty ty in
-      if ty == ty' then xty else (x,ty') in
-    let b' = List.Smart.map dop b in
-    let e1' = fe e1 in
-    if b == b' && e1 == e1' then e else
-    e_lam b' e1'
+      let e3' = fe e3 in
+        ExprSmart.e_if (e, (e1, e2, e3)) (e1', e2', e3')
+
+  | Elam(b, bd) ->
+      let dop (x, ty as xty) =
+        let ty' = fty ty in
+          if ty == ty' then xty else (x, ty') in
+      let b'  = List.Smart.map dop b in
+      let bd' = fe bd in
+        ExprSmart.e_lam (e, (b, bd)) (b', bd')
 
 let rec e_fold fe state e =
   match e.e_node with
@@ -630,43 +674,45 @@ let add_locals = List.Smart.map_fold add_local
 let subst_lpattern (s: e_subst) (lp:lpattern) = 
   match lp with
   | LSymbol x ->
-      let s, x' = add_local s x in
-      if x == x' then s,lp else
-      s , LSymbol x'
+      let (s, x') = add_local s x in
+        (s, ExprSmart.l_symbol (lp, x) x')
+
   | LTuple xs ->
-      let s',xs'  = add_locals s xs in
-      if xs == xs' then s, lp else
-      s', LTuple xs'
+      let (s, xs') = add_locals s xs in
+        (s, ExprSmart.l_tuple (lp, xs) xs')
 
 let rec e_subst (s: e_subst) e =
   match e.e_node with
-  | Elocal id -> 
-      (try Mid.find id s.es_loc with _ -> 
+  | Elocal id -> begin
+      match Mid.find_opt id s.es_loc with
+      | Some e' -> e'
+      | None    ->
         assert (not s.es_freshen);
-        let ty' = s.es_ty e.e_ty in
-        if e.e_ty == ty' then e else e_local id ty')
+        ExprSmart.e_local (e, (id, e.e_ty)) (id, s.es_ty e.e_ty)
+  end
+
   | Evar pv -> 
       let pv' = pv_subst s.es_xp pv in
       let ty' = s.es_ty e.e_ty in
-      if pv == pv' && e.e_ty == ty' then e 
-      else e_var pv' ty'
-  | Eop(p,tys) ->
+        ExprSmart.e_var (e, (pv, e.e_ty)) (pv', ty')
+
+  | Eop(p, tys) ->
       let p'   = s.es_p p in
       let tys' = List.Smart.map s.es_ty tys in
       let ty'  = s.es_ty e.e_ty in
-      if p == p' && tys == tys' && e.e_ty == ty' then e else
-      e_op p' tys' ty'
-  | Elet(lp,e1,e2) -> 
+        ExprSmart.e_op (e, (p, tys, e.e_ty)) (p', tys', ty')
+
+  | Elet (lp, e1, e2) -> 
       let e1' = e_subst s e1 in
-      let s,lp' = subst_lpattern s lp in
+      let s, lp' = subst_lpattern s lp in
       let e2' = e_subst s e2 in
-      if lp == lp' && e1 == e1' && e2 == e2' then e else 
-      e_let lp' e1' e2'
-  | Elam(b,e1) ->
+        ExprSmart.e_let (e, (lp, e1, e2)) (lp', e1', e2')
+
+  | Elam (b, e1) ->
     let s, b' = add_locals s b in
     let e1' = e_subst s e1 in
-    if b == b' && e1 == e1' then e else
-    e_lam b' e1'  
+      ExprSmart.e_lam (e, (b, e1)) (b', e1')
+
   | _ -> e_map s.es_ty (e_subst s) e
 
 let is_subst_id s = 
