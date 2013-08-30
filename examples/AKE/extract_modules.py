@@ -23,13 +23,15 @@ def get_modules(filename):
           in_module = False
           yield module
 
+outdir = 'modules'
+
 modules = list(get_modules('AKE_proof.ec'))
 
-if not (os.path.isdir('modules')):
-  os.mkdir('modules')
+if not (os.path.isdir(outdir)):
+  os.mkdir(outdir)
 
 for m in modules:
-  filename = "modules/%s.ec" % m['name']
+  filename = "%s/%s.ec" % (outdir,m['name'])
   print "Writing file `%s'" % filename
   f = open(filename, "w")
   f.write("".join(m['content']))

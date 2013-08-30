@@ -12,6 +12,7 @@ require ISet.
 
 op def : 'a. (* types are inhabited, we define a polymorphic default value *)
 
+(*
 (* Zero based intervals {0, .., k} of natural numbers *)
 theory ZInter.
   const bound : int.
@@ -23,6 +24,7 @@ theory ZInter.
   axiom rep_abs(i : int): bounded i => rep (abs i) = i.
   axiom abs_rep(x : t): abs (rep x) = x.
 end ZInter.
+*)
 
 op fdom(m : ('a,'b) map) : 'a set =
   ISet.Finite.toFSet (dom m).
@@ -53,15 +55,24 @@ type Key = TKey.word.
 
 op univ_Sk : Sk set.
 axiom nosmt univ_Sk_all_mem : forall (x : Sk), mem x univ_Sk.
+axiom univ_Sk_non_empty : univ_Sk <> FSet.empty.
 op sample_Sk = Duni.duni univ_Sk.
+lemma lossless_sample_Sk: weight sample_Sk = 1%r
+  by (rewrite /sample_Sk Duni.weight_def; smt).
 
 op univ_Esk : Esk set.
 axiom nosmt univ_Esk_all_mem : forall (x : Esk), mem x univ_Esk.
+axiom univ_Esk_non_empty : univ_Esk <> FSet.empty.
 op sample_Esk = Duni.duni univ_Esk.
+lemma lossless_sample_Esk: weight sample_Esk = 1%r
+  by (rewrite /sample_Esk Duni.weight_def; smt).
 
 op univ_Eexp : Eexp set.
 axiom nosmt univ_Eexp_all_mem : forall (x : Eexp), mem x univ_Eexp.
+axiom univ_Eexp_non_empty : univ_Eexp <> FSet.empty.
 op sample_Eexp = Duni.duni univ_Eexp.
+lemma lossless_sample_Eexp: weight sample_Eexp = 1%r
+  by (rewrite /sample_Eexp Duni.weight_def; smt).
 
 op univ_Key : Key set.
 axiom nosmt univ_Key_all_mem : forall (x : Key), mem x univ_Key.
