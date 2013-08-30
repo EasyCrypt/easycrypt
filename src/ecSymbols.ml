@@ -28,13 +28,6 @@ module MMsym : sig
   val all    : symbol -> 'a t -> 'a list
   val fold   : (symbol -> 'a list -> 'b -> 'b) -> 'a t -> 'b -> 'b
   val map_at : ('a list -> 'a list) -> symbol -> 'a t -> 'a t
-
-  val dump :
-       name:string
-    -> (EcDebug.ppdebug -> 'a -> unit)
-    -> EcDebug.ppdebug
-    -> 'a t
-    -> unit
 end = struct
   type 'a t = ('a list) Msym.t
 
@@ -62,24 +55,6 @@ end = struct
         | [] -> None
         | v  -> Some v)
       x m
-
-  let dump ~name valuepp pp (m : 'a t) =
-    let keyprinter k v =
-      match v with
-      | [] -> Printf.sprintf "%s (empty)" k
-      | _  -> k
-            
-    and valuepp pp (x, vs) =
-      match vs with
-      | [] -> ()
-      | _  ->
-          EcDebug.onhlist pp
-            (Printf.sprintf "%d binding(s)" (List.length vs))
-            (fun pp v ->
-              EcDebug.onhlist pp x valuepp [v])
-            vs
-    in
-      Msym.dump ~name keyprinter valuepp pp m
 end
 
 (* -------------------------------------------------------------------- *)

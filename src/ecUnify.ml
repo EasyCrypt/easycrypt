@@ -108,15 +108,6 @@ module UniEnv = struct
     dst.unival <- src.unival;
     dst.unidecl <- src.unidecl
 
-  let dump pp (ue : unienv) =
-    let pp_binding pp (a, ty) =
-      EcDebug.onhlist pp (string_of_int a)
-        (EcTypes.Dump.ty_dump) [ty]
-    in
-      EcDebug.onhseq
-        pp "Unification Environment" pp_binding
-        (EcUidgen.Muid.to_stream ue.unival)
-
   let rec repr (ue : unienv) (t : ty) : ty = 
     match t.ty_node with
     | Tunivar id -> odfl t (Muid.find_opt id ue.unival)

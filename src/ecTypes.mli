@@ -1,5 +1,4 @@
 (* -------------------------------------------------------------------- *)
-open EcDebug
 open EcMaps
 open EcUtils
 open EcSymbols
@@ -47,9 +46,6 @@ val tdistr  : ty -> ty
 val tfset   : ty -> ty
 val tcpred  : ty -> ty
 val toarrow : ty list -> ty -> ty
-
-(* -------------------------------------------------------------------- *)
-val ty_dump  : ty -> EcDebug.dnode
 
 (* -------------------------------------------------------------------- *)
 exception FoundUnivar
@@ -152,8 +148,6 @@ and expr_node =
   | Etuple of expr list                    (* tuple constructor     *)
   | Eif    of expr * expr * expr           (* _ ? _ : _             *)
 
-val expr_dump   : expr -> dnode
-
 (* -------------------------------------------------------------------- *)
 val e_equal   : expr -> expr -> bool
 val e_compare : expr -> expr -> int
@@ -210,11 +204,6 @@ val e_mapty : (ty -> ty) -> expr -> expr
 val e_uni   : ty Muid.t -> expr -> expr
 
 (* -------------------------------------------------------------------- *)
-module Dump : sig
-  val ty_dump : EcDebug.ppdebug -> ty -> unit
-  val ex_dump : EcDebug.ppdebug -> expr -> unit
-end
-
 (* projects 'a Distr type into 'a *)
 val proj_distr_ty : ty -> ty
 

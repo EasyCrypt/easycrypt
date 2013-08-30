@@ -1,5 +1,4 @@
 (* -------------------------------------------------------------------- *)
-open EcDebug
 open EcUtils
 open EcSymbols
 open EcIdent
@@ -112,29 +111,6 @@ let treal      = tconstr EcCoreLib.p_real  []
  
 let toarrow dom ty = 
   List.fold_right tfun dom ty
-
-(* -------------------------------------------------------------------- *)
-let rec ty_dump (ty : ty) =
-  match ty.ty_node with
-  | Tglob m ->
-      dleaf "Tglob(%s)" (EcPath.m_tostring m)
-
-  | Tunivar i ->
-      dleaf "Tunivar (%d)" i
-
-  | Tvar x ->
-      dleaf "Tvar (%s)" (EcIdent.tostring x)
-
-  | Ttuple ts ->
-      dnode "Ttuple" (List.map ty_dump ts)
-
-  | Tconstr (p, ts) ->
-      dnode
-        (Printf.sprintf "Tconstr (%s)" (EcPath.tostring p))
-        (List.map ty_dump ts)
-
-  | Tfun (ty1, ty2) ->
-      dnode "Tfun" [ty_dump ty1; ty_dump ty2]
 
 (* -------------------------------------------------------------------- *)
 module TySmart = struct
@@ -607,11 +583,6 @@ module Se = MSHe.S
 module He = MSHe.H  
 
 (* -------------------------------------------------------------------- *)
-let rec expr_dump (e : expr) =
-  match e.e_node with
-  | _ -> dleaf "expression"
-
-(* -------------------------------------------------------------------- *)
 type e_subst = { 
     es_freshen : bool; (* true means realloc local *)
     es_p       : EcPath.path -> EcPath.path;
@@ -723,71 +694,6 @@ let destr_var e =
    match e.e_node with
   | Evar pv -> pv
   | _ -> assert false
-
-(* -------------------------------------------------------------------- *)
-module Dump = struct
-  let ty_dump pp =
-    let rec ty_dump pp ty = 
-      match ty.ty_node with 
-      | Tglob m ->
-        EcDebug.single pp ~extra:(EcPath.m_tostring m) "Tglob"
-
-      | Tunivar i ->
-          EcDebug.single pp ~extra:(string_of_int i) "Tunivar"
-  
-      | Tvar a ->
-          EcDebug.single pp ~extra:(EcIdent.tostring a) "Tvar"
-  
-      | Ttuple tys ->
-          EcDebug.onhlist pp "Ttuple" ty_dump tys
-  
-      | Tconstr (p, tys) ->
-          let strp = EcPath.tostring p in
-            EcDebug.onhlist pp ~extra:strp "Tconstr" ty_dump tys
-      | Tfun (t1, t2) ->
-          EcDebug.onhlist pp "Tfun" ty_dump [t1;t2]
-    in
-      fun ty -> ty_dump pp ty
-
-  let ex_dump pp =
-    let rec ex_dump pp e =
-      match e.e_node with
-      | Eint i ->
-          EcDebug.single pp ~extra:(string_of_int i) "Eint"
-
-      | Elocal x ->
-          EcDebug.onhlist pp
-            "Elocal" ~extra:(EcIdent.tostring x)
-            ty_dump []
-        
-      | Evar x ->
-          EcDebug.onhlist pp
-            "Evar" ~extra:(EcPath.x_tostring x.pv_name)
-            ty_dump []
-
-      | Eop (x, tys) ->
-          EcDebug.onhlist pp "Eop" ~extra:(EcPath.tostring x)
-            ty_dump tys
-          
-      | Eapp (e, args) -> 
-          EcDebug.onhlist pp "Eapp" ex_dump (e::args)
-
-      | Elet (_p, e1, e2) ->            (* FIXME *)
-          let printers = [ex_dump^~ e1; ex_dump^~ e2] in
-            EcDebug.onseq pp "Elet" (Stream.of_list printers)
-        
-      | Etuple es ->
-          EcDebug.onhlist pp ~enum:true "Etuple" ex_dump es
-        
-      | Eif (c, e1, e2) ->
-          EcDebug.onhlist pp "Eif" ex_dump [c; e1; e2]
-
-      | Elam(_b,e) ->                   (* FIXME *)
-        EcDebug.onhlist pp "Elam" ex_dump [e]
-    in
-      fun e -> ex_dump pp e
-end
-
 
 let proj_distr_ty ty = match ty.ty_node with
   | Tconstr(_,lty) when List.length lty = 1  -> 

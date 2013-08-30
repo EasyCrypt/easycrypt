@@ -1,5 +1,4 @@
 (* -------------------------------------------------------------------- *)
-open EcDebug
 open EcUtils
 open EcTypes
 open EcFol
@@ -11,8 +10,6 @@ type tydecl = {
   tyd_params : ty_params;
   tyd_type   : EcTypes.ty option;
 }
-
-val tydecl_dump : tydecl -> dnode
 
 (* -------------------------------------------------------------------- *)
 type locals = EcIdent.t list 
@@ -33,8 +30,6 @@ val is_pred : operator -> bool
 val mk_op   : EcIdent.t list -> ty -> expr option -> operator
 val mk_pred : EcIdent.t list -> ty list -> form option -> operator
 
-val op_dump : operator -> dnode
-
 (* -------------------------------------------------------------------- *)
 type axiom_kind = [`Axiom | `Lemma]
 
@@ -44,8 +39,6 @@ type axiom = {
   ax_kind    : axiom_kind;
   ax_nosmt   : bool;
 }
-
-val ax_dump : axiom -> dnode
 
 (* -------------------------------------------------------------------- *)
 type typeclass = {

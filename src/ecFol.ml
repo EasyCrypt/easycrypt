@@ -1,5 +1,4 @@
 (* -------------------------------------------------------------------- *)
-open EcDebug
 open EcUtils
 open EcMaps
 open EcIdent
@@ -1773,74 +1772,3 @@ let f_check_uni f =
     | Fop(_,tys) -> List.iter ty_check_uni tys
     | _ -> f_iter aux f in
   try aux f;true with EcTypes.FoundUnivar -> false
-
-(* -------------------------------------------------------------------- *)
-let rec lp_dump (lp : lpattern) =
-  match lp with
-  | LSymbol (x,_) ->
-      dleaf "LSymbol (%s)" (EcIdent.tostring x)
-
-  | LTuple xs ->
-      let xs = List.map (fun (x,_) -> EcIdent.tostring x) xs in
-        dleaf "LTuple (%s)" (String.concat ", " xs)
-
-let string_of_quantif = function
-  | Lforall -> "Lforall"
-  | Lexists -> "Lexists"
-  | Llambda -> "Llambda"
-
-let gty_dump (gty : gty) =
-  match gty with
-  | GTty    t -> dnode "GTty" [ty_dump t]
-  | GTmodty _ -> dleaf "GTmodty"
-  | GTmem   _ -> dleaf "GTmem"
-
-let bd_dump (x, gty) =
-  dnode
-    (Printf.sprintf "binding (%s)" (EcIdent.tostring x))
-    [gty_dump gty]
-
-let rec f_dump (f : form) : dnode =
-  let node =
-    match f.f_node with
-    | Fquant (q, b, f) ->
-        dnode
-          (Printf.sprintf "Fquant (%s)" (string_of_quantif q))
-          (List.flatten [List.map bd_dump b; [f_dump f]])
-  
-    | Flocal x ->
-        dleaf "Flocal (%s)" (EcIdent.tostring x)
-  
-    | Fint i ->
-        dleaf "Fint (%d)"  i
-  
-    | Fpvar (x, m) ->
-        dleaf "Fpvar (%s, %s)" (string_of_pvar x) (EcIdent.tostring m)
-  
-    | Fif (c, f1, f2) ->
-        dnode "Fif" (List.map f_dump [c; f1; f2])
-  
-    | Flet (p, f1, f2) ->
-        dnode "Flet" [lp_dump p; f_dump f1; f_dump f2]
-  
-    | Fapp (f, fs) ->
-        dnode "Fapp" [f_dump f; dnode "arguments" (List.map f_dump fs)]
-  
-    | Fop (p, tys) ->
-        dnode
-          (Printf.sprintf "Fop (%s)" (EcPath.tostring p))
-          [dnode "type-arguments" (List.map ty_dump tys)]
-  
-    | Ftuple fs ->
-        dnode "Ftuple" (List.map f_dump fs)
-  
-    | Fglob _ -> dleaf "Fglob"
-    | FhoareF _ -> dleaf "FhoareF"
-    | FhoareS _ -> dleaf "FhoareS"
-    | FbdHoareF _ -> dleaf "FbdHoareF"
-    | FbdHoareS _ -> dleaf "FbdHoareS"
-    | FequivF _ -> dleaf "FequivF"
-    | FequivS _ -> dleaf "FequivS"
-    | Fpr     _ -> dleaf "Fpr"
-  in
-     dnode "Form" [ty_dump f.f_ty; node]

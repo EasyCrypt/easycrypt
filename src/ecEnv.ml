@@ -159,42 +159,6 @@ let xroot (env : env) =
   | _ -> None
 
 (* -------------------------------------------------------------------- *)
-module Dump = struct
-  let rec dump ?(name = "Environment") pp (env : env) =
-      EcDebug.onseq pp name ~extra:(EcPath.tostring (root env))
-        (Stream.of_list [
-          (fun pp -> dump_mc ~name:"Root" pp env.env_current);
-          (fun pp ->
-             Mip.dump ~name:"Components"
-               (fun k mc ->
-                 Printf.sprintf "%s (%s)"
-                   (itostring k)
-                   (match mc.mc_parameters with
-                    | None   -> "none"
-                    | Some p -> string_of_int (List.length p)))
-               (fun pp (_, mc) ->
-                  dump_mc ~name:"Component" pp mc)
-               pp env.env_comps)
-        ])
-
-  and dump_mc ~name pp mc =
-    EcDebug.onseq pp name
-      (Stream.of_list [
-         (fun pp -> MMsym.dump "Variables"  (fun _ _ -> ()) pp mc.mc_variables );
-         (fun pp -> MMsym.dump "Functions"  (fun _ _ -> ()) pp mc.mc_functions );
-         (fun pp -> MMsym.dump "Modules"    (fun _ _ -> ()) pp mc.mc_modules   );
-         (fun pp -> MMsym.dump "Modtypes"   (fun _ _ -> ()) pp mc.mc_modsigs   );
-         (fun pp -> MMsym.dump "Typedecls"  (fun _ _ -> ()) pp mc.mc_tydecls   );
-         (fun pp -> MMsym.dump "Operators"  (fun _ _ -> ()) pp mc.mc_operators );
-         (fun pp -> MMsym.dump "Axioms"     (fun _ _ -> ()) pp mc.mc_axioms    );
-         (fun pp -> MMsym.dump "Theories"   (fun _ _ -> ()) pp mc.mc_theories  );
-         (fun pp -> MMsym.dump "Components" (fun _ _ -> ()) pp mc.mc_components);
-      ])
-end
-
-let dump = Dump.dump
-
-(* -------------------------------------------------------------------- *)
 let empty_mc params = {
   mc_parameters = params;
   mc_modules    = MMsym.empty;

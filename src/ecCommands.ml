@@ -345,14 +345,6 @@ and process (ld : EcLoader.ecloader) (scope : EcScope.scope) g =
     | `Fct   f -> Some (f scope)
     | `State f -> f scope; None
   in
-    begin
-      scope |> oiter
-        (fun scope ->
-          try
-            ignore (Sys.getenv "ECDEBUG");
-            EcEnv.dump EcDebug.initial (EcScope.env scope)
-          with Not_found -> ())
-    end;
     scope
 
 (* -------------------------------------------------------------------- *)

@@ -31,9 +31,6 @@ val mroot : env -> EcPath.mpath
 val xroot : env -> EcPath.xpath option
 
 (* -------------------------------------------------------------------- *)
-val dump : ?name:string -> EcDebug.ppdebug -> env -> unit
-
-(* -------------------------------------------------------------------- *)
 type lookup_error = [
   | `XPath   of xpath
   | `MPath   of mpath
