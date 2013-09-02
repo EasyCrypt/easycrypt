@@ -2375,7 +2375,6 @@ let t_bd_hoare_rnd tac_info g =
   let ty_distr = proj_distr_ty (e_ty distr) in
   let distr = EcFol.form_of_expr (EcMemory.memory bhs.bhs_m) distr in
   let m = fst bhs.bhs_m in
-
   let mk_event_cond event = 
     let v_id = EcIdent.create "v" in
     let v = f_local v_id ty_distr in
@@ -2390,13 +2389,11 @@ let t_bd_hoare_rnd tac_info g =
           | FHeq -> f_imp_simpl v_in_supp (f_iff_simpl event_v post_v)
       end 
   in
-
   let f_cmp = match bhs.bhs_cmp with
     | FHle -> f_real_le
     | FHge -> fun x y -> f_real_le y x
     | FHeq -> f_eq
   in
-
   let is_post_indep =
     let fv = EcPV.PV.fv env m bhs.bhs_po in
     match lv with
@@ -2405,14 +2402,11 @@ let t_bd_hoare_rnd tac_info g =
         List.for_all (fun (x,_) -> not (EcPV.PV.mem_pv env x fv)) pvs
       | LvMap(_, x,_,_) -> not (EcPV.PV.mem_pv env x fv)
   in
-
-
   let is_bd_indep = 
     let fv_bd = PV.fv env mhr bhs.bhs_bd in 
     let modif_s = s_write env s in
     PV.indep env modif_s fv_bd
   in
-
   let mk_event ?(simpl=true) ty = 
     let x = EcIdent.create "x" in 
     if is_post_indep && simpl then f_lambda [x,GTty ty] f_true
@@ -2422,7 +2416,6 @@ let t_bd_hoare_rnd tac_info g =
           (EcPV.PVM.subst1 env pv m (f_local x ty) bhs.bhs_po)
       | _ -> tacuerror "Cannot infer a valid event, it must be provided"
   in
-
   let bound,pre_bound,binders = 
     if is_bd_indep then
       bhs.bhs_bd, f_true, []
@@ -2431,8 +2424,6 @@ let t_bd_hoare_rnd tac_info g =
       let bd = f_local bd_id treal in
       bd, f_eq bhs.bhs_bd bd, [(bd_id,GTty treal)] 
   in
-
-
   let subgoals = match tac_info, bhs.bhs_cmp with 
     | PNoRndParams, FHle -> 
       if is_post_indep then
@@ -2447,15 +2438,14 @@ let t_bd_hoare_rnd tac_info g =
         let concl = f_hoareS bhs.bhs_m pre s post in
         let concl = f_forall_simpl binders concl in
         [concl]
-
     | PNoRndParams, _ -> 
       if is_post_indep then
         (* event is true *)
         let event = mk_event ty_distr in
         let bounded_distr = f_eq (f_mu distr event) f_r1 in
-        let concl = f_bdHoareS_r {bhs with bhs_s=s} in
-        let bounded_distr = gen_mems [bhs.bhs_m] bounded_distr in
-        [bounded_distr;concl]
+        let concl = f_bdHoareS_r 
+          {bhs with bhs_s=s; bhs_po=f_and bhs.bhs_po bounded_distr} in
+        [concl]
       else 
         let event = mk_event ty_distr in
         let bounded_distr = f_cmp (f_mu distr event) bound in
@@ -2464,7 +2454,6 @@ let t_bd_hoare_rnd tac_info g =
         let concl = f_bdHoareS_r {bhs with bhs_s=s; bhs_pr=pre; bhs_po=post; bhs_bd=f_r1} in
         let concl = f_forall_simpl binders concl in
         [concl]
-
     | PSingleRndParam event, FHle ->
         let event = event ty_distr in
         let bounded_distr = f_real_le (f_mu distr event) bound in
@@ -2473,7 +2462,6 @@ let t_bd_hoare_rnd tac_info g =
         let concl = f_hoareS bhs.bhs_m pre s post in
         let concl = f_forall_simpl binders concl in
         [concl]
-
     | PSingleRndParam event, _ ->
         let event = event ty_distr in
         let bounded_distr = f_cmp (f_mu distr event) bound in
