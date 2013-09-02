@@ -785,7 +785,7 @@ qed.
 local equiv equiv_G0_G1:
   G0(Ag(H)).main ~ G1(Ag(H1)).main: ={glob A} ==> !H1.bad{2} => ={res}.
 proof strict.
-fun.
+(* fun.
 inline SGen(ROM.RO).fresh SGen(H1).fresh; wp.
 
 
@@ -798,21 +798,20 @@ fun; eqobs_in (={glob H}) true: (!H1.bad{1} => ={glob H}).
     rcondt{1} 2; first by intros=> &m; rnd.
     rcondt{2} 4; first by intros=> &m; rnd; wp.
     
-
+*)
 admit. qed.
 
-lemma G0_G1 (A <: CMA_2RO) &m:
+lemma G0_G1 &m:
   Pr[G0(A(G,H)).main() @ &m: res] <= Pr[G1(A(G,H1)).main() @ &m: res] + Pr[G1(A(G,H1)).main() @ &m: H1.bad].
 proof.
 apply (Trans _ Pr[G1(A(G,H1)).main() @ &m: res \/ H1.bad] _).
-equiv_deno (equiv_G0_G1 A)=> //; smt.
+equiv_deno (equiv_G0_G1)=> //; smt.
 rewrite Pr mu_or; smt.
 qed.
 
 (** Maybe we need to fix the event to add a bound on the number of queries in the game *)
-lemma Bad1 (A <: CMA_2RO) &m:
+lemma Bad1 &m:
   Pr[G1(A(G,H1)).main() @ &m: H1.bad] <= (qS + qH)%r/(2^kg2)%r.
 admit. qed.
-
 
 end section.
