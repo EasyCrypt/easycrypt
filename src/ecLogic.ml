@@ -13,7 +13,7 @@ open EcReduction
 
 type pre_judgment = {
   pj_decl : LDecl.hyps * form;
-  pj_rule : (bool * int rule) option;
+  pj_rule : (bool * int rnode) option;
 }
 
 type judgment_uc = {
@@ -283,7 +283,7 @@ let t_subgoal lt gs =
       tacerror (InvalNumOfTactic (i1, i2))
 
 let t_admit g =
-  let rule = { pr_name = RN_admit; pr_hyps = [] } in
+  let rule = { pr_name = RN_admit; pr_hyps = []; } in
   upd_rule_done rule g
 
 let check_hyps hyps1 hyps2 =
@@ -330,7 +330,7 @@ let t_simplify_nodelta g =
 let mkn_hyp juc hyps id =
   let f = LDecl.lookup_hyp_by_id id hyps in
   let juc,n = new_goal juc (hyps,f) in
-  let rule = { pr_name = RN_hyp id; pr_hyps = [] } in
+  let rule = { pr_name = RN_hypothesis id; pr_hyps = [] } in
   let juc, _ = upd_rule_done rule (juc,n) in
   juc, n
 
@@ -342,7 +342,7 @@ let t_hyp id (juc,n as g) =
 let mkn_glob juc hyps p tys =
   let f = Ax.instanciate p tys (LDecl.toenv hyps) in
   let juc, n = new_goal juc (hyps,f) in
-  let rule = { pr_name = RN_glob(p,tys); pr_hyps = [] } in
+  let rule = { pr_name = RN_lemma (p, tys); pr_hyps = [] } in
   let juc, _ = upd_rule_done rule (juc, n) in
   juc, n
 
@@ -364,7 +364,7 @@ let t_smt ~strict ~usehyps pi g =
     | _ ->
         try
           if EcEnv.check_goal ~usehyps pi goal then
-            let rule = { pr_name = RN_prover (); pr_hyps = [] } in
+            let rule = { pr_name = RN_smt; pr_hyps = [] } in
             upd_rule_done rule g
           else error "cannot prove goal"
         with EcWhy3.CanNotTranslate _ ->
@@ -386,7 +386,7 @@ let t_clear ids (juc,n as g) =
       tacuerror "Cannot clear %a it is used in %a"
         pp_id id1 pp_id id2 in
   let juc,n1 = new_goal juc (hyps,concl) in
-  let rule = { pr_name = RN_clear ids; pr_hyps = [RA_node n1] } in
+  let rule = { pr_name = RN_weak ids; pr_hyps = [RA_node n1] } in
   upd_rule rule (juc,n)
 
 let gen_check_restr env pp_a a use restr =
@@ -669,7 +669,7 @@ let t_intros ids (juc,n as g) =
   let hyps, concl = check_intros hyps ids Fsubst.f_subst_id concl in
   let (juc,n1) = new_goal juc (hyps,concl) in
   let ids = List.map unloc ids in
-  let rule = { pr_name = RN_intros ids; pr_hyps = [RA_node n1]} in
+  let rule = { pr_name = RN_intro (`Raw ids); pr_hyps = [RA_node n1]} in
   upd_rule rule (juc,n)
 
 (* internal use *)
@@ -821,7 +821,7 @@ let t_elim f (juc,n) =
     | Fquant(Lexists,bd,f') ->
       let juc,n1 = new_goal juc (hyps, f) in
       let juc,n2 = new_goal juc (hyps,f_forall bd (f_imp f' concl)) in
-      let rule = { pr_name = RN_exists_elim; pr_hyps = [RA_node n1; RA_node n2] } in
+      let rule = { pr_name = RN_elim `Exist; pr_hyps = [RA_node n1; RA_node n2] } in
       upd_rule rule (juc, n)
     | _ -> aux_red f
 
@@ -1011,7 +1011,7 @@ let gen_t_exists do_arg fs (juc,n as g) =
   let args,concl = aux Fsubst.f_subst_id [] fs concl in
   let (juc,n1) = new_goal juc (hyps,concl) in
   let rule =
-    {pr_name = RN_exists_intro; pr_hyps = List.rev_append args [RA_node n1] } in
+    {pr_name = RN_intro `Exist; pr_hyps = List.rev_append args [RA_node n1] } in
   upd_rule rule (juc,n)
 
 let t_exists = gen_t_exists (fun _ _ a -> a)

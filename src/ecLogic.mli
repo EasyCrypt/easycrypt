@@ -13,7 +13,7 @@ open EcFol
 (* -------------------------------------------------------------------- *)
 type pre_judgment = {
   pj_decl : LDecl.hyps * form;
-  pj_rule : (bool * int rule) option;
+  pj_rule : (bool * int rnode) option;
 }
 
 type judgment_uc = {
@@ -47,8 +47,8 @@ val get_hyps   : goal -> LDecl.hyps
 val get_node   : goal -> LDecl.hyps * form
 val new_goal   : judgment_uc -> LDecl.hyps * form -> goal
 
-val upd_rule : int rule -> goal -> goals
-val upd_rule_done : int rule -> goal -> goals
+val upd_rule : int rnode -> goal -> goals
+val upd_rule_done : int rnode -> goal -> goals
 
 val upd_done : judgment_uc -> judgment_uc
 
@@ -59,7 +59,7 @@ val find_all_goals : judgment_uc -> goals
 
 val find_in_hyps : form -> LDecl.hyps -> EcIdent.t
 
-val prove_goal_by : form list -> rule_name -> tactic
+val prove_goal_by : form list -> rule -> tactic
 
 (* -------------------------------------------------------------------- *)
 val t_id : string option -> tactic

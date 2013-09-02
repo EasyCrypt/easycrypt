@@ -126,19 +126,25 @@ let field_axioms = Axioms.field_axioms
 open EcBaseLogic
 open EcLogic
 
+class rn_ring  = object inherit xrule "ring"  end
+class rn_field = object inherit xrule "field" end
+
+let rn_ring  = RN_xtd (new rn_ring)
+let rn_field = RN_xtd (new rn_field)
+
 let t_ring_simplify cr eqs (f1, f2) g =
   let cr = cring_of_ring cr in
   let f1 = ring_simplify cr eqs f1 in
   let f2 = ring_simplify cr eqs f2 in
-	prove_goal_by [f_eq f1 f2] RN_ring g
+	prove_goal_by [f_eq f1 f2] rn_ring g
 
 let t_ring r eqs (f1, f2) g =
   let cr = cring_of_ring r in
   let f  = ring_eq cr eqs f1 f2 in
 
     if   EcReduction.is_conv (get_hyps g) f (emb_rzero r)
-    then prove_goal_by [] RN_ring g
-    else prove_goal_by [f_eq f (emb_rzero r)] RN_ring g
+    then prove_goal_by [] rn_ring g
+    else prove_goal_by [f_eq f (emb_rzero r)] rn_ring g
 
 let t_field_simplify r eqs (f1, f2) g =
   let cr = cfield_of_field r in
@@ -148,7 +154,7 @@ let t_field_simplify r eqs (f1, f2) g =
   let c = List.map (fun f -> f_not (f_eq f (emb_fzero r))) (c1 @ c2) in
   let f = f_eq (fdiv r n1 d1) (fdiv r n2 d2) in
 
-    prove_goal_by (c @ [f]) RN_field g
+    prove_goal_by (c @ [f]) rn_field g
 
 let t_field r eqs (f1, f2) g =
   let cr = cfield_of_field r in
@@ -159,8 +165,8 @@ let t_field r eqs (f1, f2) g =
   let f  = ring_eq (cring_of_ring r.f_ring) eqs r1 r2 in
 
     if   EcReduction.is_conv (get_hyps g) f (emb_fzero r)
-    then prove_goal_by c RN_field g
-    else prove_goal_by (c @ [f_eq f (emb_fzero r)]) RN_field g
+    then prove_goal_by c rn_field g
+    else prove_goal_by (c @ [f_eq f (emb_fzero r)]) rn_field g
 
 (* -------------------------------------------------------------------- *)
 let is_module_loaded env =
