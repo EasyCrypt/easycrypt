@@ -769,9 +769,10 @@ theory Dexcepted.
   lemma nosmt mu_weight_def (d:'a distr) X:
     weight (d \ X) = (weight d = mu d (cpMem X)) ? 0%r : 1%r.
   proof strict.
+  (* cut weight_cpMem: mu d (cpMem X) <= weight d by (by rewrite /weight mu_sub). *)
   case (weight d = mu d (cpMem X))=> weight_d //=.
     by rewrite /weight /(\) Dscale.mu_def_0 // Drestr.weight_def weight_d; smt.
-    by smt.
+    by rewrite /(\) Dscale.weight_pos // Drestr.weight_def; smt.
   qed.
     
   lemma lossless_restr (d:'a distr) X:
