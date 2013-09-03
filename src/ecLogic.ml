@@ -394,7 +394,6 @@ let gen_check_restr env pp_a a use restr =
   let ppe = EcPrinting.PPEnv.ofenv env in
   let pp_mp = EcPrinting.pp_topmod ppe in
 
-
   let check_xp xp _ = 
     (* We check that the variable is not a variable in restr *)
     if NormMp.use_mem_xp xp restr then
@@ -419,8 +418,10 @@ let gen_check_restr env pp_a a use restr =
       let r1 = NormMp.get_restr env mp1 in
       let check_v xp2 _ = 
         if not (NormMp.use_mem_xp xp2 r1) then
-          tacuerror "%a should not be able to use %a (add restriction %a to %a)" (pp_a ppe) a pp_mp mp1 
-            (EcPrinting.pp_pv ppe) (pv_glob xp2) pp_mp xp2.x_top pp_mp mp1  in
+          tacuerror "%a should not be able to use %a (add restriction %a to %a)"
+           (pp_a ppe) a 
+           (EcPrinting.pp_pv ppe) (pv_glob xp2)
+           pp_mp xp2.x_top pp_mp mp1  in
       Mx.iter check_v restr.NormMp.us_pv;
                     
       let check_g id2 = 
