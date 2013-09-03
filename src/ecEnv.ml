@@ -1650,7 +1650,8 @@ module NormMp = struct
     | _ -> assert false
 
   let add_var env xp us = 
-    let vb = Var.by_xpath (norm_xpath env xp) env in
+    let xp = norm_xpath env xp in
+    let vb = Var.by_xpath xp env in
     let pv = EcTypes.pv_glob xp in
     { us with us_pv = Mx.add pv.pv_name vb.vb_type us.us_pv }
 
@@ -1728,8 +1729,7 @@ module NormMp = struct
 
   let get_restr env mp = 
     match (Mod.by_mpath mp env).me_body with
-    | EcModules.ME_Decl(_,restr) -> 
-      norm_restr env restr
+    | EcModules.ME_Decl(_,restr) -> norm_restr env restr
     | _ -> assert false 
 
   let equal_restr env r1 r2 = use_equal (norm_restr env r1) (norm_restr env r2)
