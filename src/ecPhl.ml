@@ -36,23 +36,7 @@ let id_of_mp mp m =
     | `Local id -> EcIdent.name id 
     | _ -> assert false in
   add_side name m
-(* Suppose the modifyed variable are 
-   glob N1, glob N2, glob N4
-   M.x1, M.x2
 
-   and the formula depend of 
-   glob N1, glob N3, 
-   M.x1 M1.y
-
-   we need to check that
-   disjoint N1 with N3, M.x1, M1.y
-   disjoint N2 with N1, M.x1, M1.y
-   disjoint N4 with N1, N3, M.x1, M1.y
-   disjoint M.x1 with N1, N3, M1.y
-   disjoint M.x2 with N1, N3, M.x1, M.x2
-   but we do not need to check that N2 do not clash with N4.
-   I other word that substitution will not clash
-*)
 
 (* Remark: m is only used to create fresh name, id_of_pv *)
 let generalize_subst env m uelts uglob = 
