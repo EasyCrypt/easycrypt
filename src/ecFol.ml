@@ -593,10 +593,10 @@ let f_pr m f args e = mk_form (Fpr (m, f, args, e)) ty_real
 (* -------------------------------------------------------------------- *)
 let fop_int_le    = f_op EcCoreLib.p_int_le    [] (tfun tint  (tfun tint ty_bool))
 let fop_int_lt    = f_op EcCoreLib.p_int_lt    [] (tfun tint  (tfun tint ty_bool))
-let fop_int_prod = f_op EcCoreLib.p_int_prod [] (tfun tint  (tfun tint ty_int))
-let fop_int_add  = f_op EcCoreLib.p_int_add  [] (tfun tint  (tfun tint ty_int))
-let fop_int_sub  = f_op EcCoreLib.p_int_sub  [] (tfun tint  (tfun tint ty_int))
-let fop_int_pow  = f_op EcCoreLib.p_int_pow  [] (tfun tint  (tfun tint ty_int))
+let fop_int_prod  = f_op EcCoreLib.p_int_prod  [] (tfun tint  (tfun tint ty_int))
+let fop_int_add   = f_op EcCoreLib.p_int_add   [] (tfun tint  (tfun tint ty_int))
+let fop_int_sub   = f_op EcCoreLib.p_int_sub   [] (tfun tint  (tfun tint ty_int))
+let fop_int_pow   = f_op EcCoreLib.p_int_pow   [] (tfun tint  (tfun tint ty_int))
 let fop_real_le   = f_op EcCoreLib.p_real_le   [] (tfun treal (tfun treal ty_bool))
 let fop_real_lt   = f_op EcCoreLib.p_real_lt   [] (tfun treal (tfun treal ty_bool))
 let fop_real_add  = f_op EcCoreLib.p_real_add  [] (tfun treal (tfun treal treal))
@@ -742,8 +742,6 @@ let decompose_forall f =
   match f.f_node with
   | Fquant(Lforall,bd,p) -> bd, p 
   | _ -> [], f
-
-  
 
 let destr_exists1 f = 
   match f.f_node with

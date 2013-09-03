@@ -16,26 +16,6 @@ open EcCorePhl
 
 module Zpr = EcMetaProg.Zipper
 
-(* -------------------------------------------------------------------- *)
-(* -------------------------------  Wp -------------------------------- *)
-(* -------------------------------------------------------------------- *)
-
-let add_side name m = 
-  let name = 
-    if EcIdent.id_equal m mleft then name ^ "_L" 
-    else if EcIdent.id_equal m mright then name ^ "_R"
-    else name in
-  EcIdent.create name       
-
-let id_of_pv pv m =
-  add_side (EcPath.basename pv.pv_name.EcPath.x_sub) m 
-
-let id_of_mp mp m = 
-  let name = 
-    match mp.EcPath.m_top with
-    | `Local id -> EcIdent.name id 
-    | _ -> assert false in
-  add_side name m
 (* Suppose the modifyed variable are 
    glob N1, glob N2, glob N4
    M.x1, M.x2
@@ -87,80 +67,6 @@ let generalize_mod env m modi f =
   let f = PVM.subst env s f in
   f_forall_simpl bd f
 
-let lv_subst m lv f =
-  match lv with
-  | LvVar(pv,t) ->
-    let id = id_of_pv pv m in 
-    (LSymbol (id,t), f), [pv,m,f_local id t]
-  | LvTuple vs ->
-    let ids = List.map (fun (pv,t) -> id_of_pv pv m, t) vs in
-    let s = List.map2 (fun (pv,_) (id,t) -> pv,m,f_local id t) vs ids in
-    (LTuple ids, f), s
-  | LvMap((p,tys),pv,e,ty) ->
-    let id = id_of_pv pv m in 
-    let set = f_op p tys (toarrow [ty; e.e_ty; f.f_ty] ty) in
-    let f = f_app set [f_pvar pv ty m; form_of_expr m e; f] ty in
-    (LSymbol (id,ty), f), [pv,m,f_local id ty]
-      
-let wp_asgn_aux m lv e (lets,f) =
-  let let1 = lv_subst m lv (form_of_expr m e) in
-  (let1::lets,f)
-
-exception HLerror
-
-let mk_let env (lets,f) = 
-  let rec aux s lets = 
-    match lets with
-    | [] -> PVM.subst env s f 
-    | ((lp,f1), toadd) :: lets ->
-      let f1 = PVM.subst env s f1 in
-      let s = 
-        List.fold_left (fun s (pv,m,fp) -> PVM.add env pv m fp s) s toadd in
-      f_let_simpl lp f1 (aux s lets) in
-  if lets = [] then f else aux PVM.empty lets 
-  
-exception No_wp
-
-(* wp functions operate only over assignments and conditional statements.
-   Any weakening on this restriction may break the soundness of bounded hoare logic 
-*)
-let rec wp_stmt env m (stmt: EcModules.instr list) letsf = 
-  match stmt with
-  | [] -> stmt, letsf
-  | i :: stmt' -> 
-      try 
-        let letsf = wp_instr env m i letsf in
-        wp_stmt env m stmt' letsf
-      with No_wp -> stmt, letsf
-and wp_instr env m i letsf = 
-  match i.i_node with
-  | Sasgn (lv,e) ->
-      wp_asgn_aux m lv e letsf
-  | Sif (e,s1,s2) -> 
-      let r1,letsf1 = wp_stmt env m (List.rev s1.s_node) letsf in
-      let r2,letsf2 = wp_stmt env m (List.rev s2.s_node) letsf in
-      if r1=[] && r2=[] then
-        let post1 = mk_let env letsf1 in 
-        let post2 = mk_let env letsf2 in
-        let post  = f_if (form_of_expr m e) post1 post2 in
-        [], post
-      else raise No_wp
-  | _ -> raise No_wp
-
-let wp env m s post = 
-  let r,letsf = wp_stmt env m (List.rev s.s_node) ([],post) in
-  List.rev r, mk_let env letsf 
-
-
-
-(* let subst_form env m lv e f = *)
-(*   let s = PVM.add env "pv" PVM.empty in *)
-(*   mk_let env letsf *)
-
-let subst_form_lv env m lv t f =
-  let lets = lv_subst m lv t in
-  mk_let env ([lets],f)
-
 (* -------------------------------------------------------------------- *)
 (* ----------------------  Auxiliary functions  ----------------------- *)
 (* -------------------------------------------------------------------- *)
@@ -188,13 +94,6 @@ let t_hS_or_bhS th te g =
   let concl = get_concl g in
   if is_hoareS concl then th g
   else if is_bdHoareS concl then te g
-  else tacerror (NotPhl None)
-
-let t_hS_or_bhS_or_eS th tbh te g =
-  let concl = get_concl g in
-  if is_hoareS concl then th g
-  else if is_bdHoareS concl then tbh g
-  else if is_equivS concl then te g
   else tacerror (NotPhl None)
 
 let gen_mems m f = 
@@ -1029,25 +928,8 @@ let t_equiv_skip g =
   let concl = gen_mems [es.es_ml; es.es_mr] concl in
   prove_goal_by [concl] rn_hl_skip g
 
-let t_skip = 
-  t_hS_or_bhS_or_eS t_hoare_skip t_bdHoare_skip t_equiv_skip 
-
-(* -------------------------------------------------------------------- *)
-let s_split_i msg i s = 
-  let len = List.length s.s_node in
-  if not (0 < i && i <= len) then tacerror (InvalidCodePosition (msg,i,1,len));
-  let hd,tl = s_split (i-1) s in
-  hd, List.hd tl, (List.tl tl)
-
-let s_split msg i s =
-  let len = List.length s.s_node in
-  if i < 0 ||  len < i then tacerror (InvalidCodePosition (msg,i,0,len))
-  else s_split i s
-
-let s_split_o msg i s = 
-  match i with
-  | None -> [], s.s_node
-  | Some i -> s_split msg i s 
+let t_skip =
+  t_hS_or_bhS_or_eS ~th:t_hoare_skip ~tbh:t_bdHoare_skip ~te:t_equiv_skip 
 
 (* -------------------------------------------------------------------- *)
 class ['a] rn_hl_append td (dp : 'a doption) phi bdi =
@@ -1131,86 +1013,6 @@ let t_equiv_app (i,j) phi g =
   let a = f_equivS_r {es with es_sl=stmt sl1; es_sr=stmt sr1; es_po=phi} in
   let b = f_equivS_r {es with es_pr=phi; es_sl=stmt sl2; es_sr=stmt sr2} in
   prove_goal_by [a;b] (rn_hl_append Backs (Double (i, j)) phi AppNone) g
-
-  
-(* -------------------------------------------------------------------- *)
-class ['a] rn_hl_wp dp = object
-  inherit xrule "[hl] wp"
-
-  method doption : 'a doption = dp
-end
-
-let rn_hl_wp td =
-  RN_xtd (new rn_hl_wp td :> xrule)
-
-let check_wp_progress msg i s remain =
-  match i with
-  | None -> List.length s.s_node - List.length remain
-  | Some i ->
-    let len = List.length remain in
-    if len = 0 then i
-    else
-      cannot_apply msg 
-        (Format.sprintf "remaining %i instruction%s" len 
-           (if len = 1 then "" else "s"))
-
-let t_hoare_wp i g =
-  let env,_,concl = get_goal_e g in
-  let hs = destr_hoareS concl in
-  let s_hd,s_wp = s_split_o "wp" i hs.hs_s in
-  let s_wp,post = 
-    wp env (EcMemory.memory hs.hs_m) (EcModules.stmt s_wp) hs.hs_po in
-  let i = check_wp_progress "wp" i hs.hs_s s_wp in
-  let s = EcModules.stmt (s_hd @ s_wp) in
-  let concl = f_hoareS_r { hs with hs_s = s; hs_po = post} in
-  prove_goal_by [concl] (rn_hl_wp (Single i)) g
-
-let t_bdHoare_wp i g =
-  let env,_,concl = get_goal_e g in
-  let bhs = destr_bdHoareS concl in
-  let s_hd,s_wp = s_split_o "wp" i bhs.bhs_s in
-  let s_wp = EcModules.stmt s_wp in
-
-  let m = EcMemory.memory bhs.bhs_m in
-
-  (* let fv_bd = PV.fv env m bhs.bhs_bd in *)
-  (* let modi = s_write env s_wp in *)
-
-  (* if not (PV.indep env fv_bd modi) then  *)
-  (*   cannot_apply "wp" "Not_implemented: bound is modified by the statement"; *)
-
-  let s_wp,post = 
-    wp env m s_wp bhs.bhs_po in
-  let i = check_wp_progress "wp" i bhs.bhs_s s_wp in
-  let s = EcModules.stmt (s_hd @ s_wp) in
-  let concl = f_bdHoareS_r { bhs with bhs_s = s; bhs_po = post} in
-  prove_goal_by [concl] (rn_hl_wp (Single i)) g
-
-
-let t_equiv_wp ij g = 
-  let env,_,concl = get_goal_e g in
-  let es = destr_equivS concl in
-  let i = omap fst ij and j = omap snd ij in
-  let s_hdl,s_wpl = s_split_o "wp" i es.es_sl in
-  let s_hdr,s_wpr = s_split_o "wp" j es.es_sr in
-  let s_wpl,post = 
-    wp env (EcMemory.memory es.es_ml) (EcModules.stmt s_wpl) es.es_po in
-  let s_wpr, post =
-    wp env (EcMemory.memory es.es_mr) (EcModules.stmt s_wpr) post in
-  let i = check_wp_progress "wp" i es.es_sl s_wpl in
-  let j = check_wp_progress "wp" j es.es_sr s_wpr in
-  let sl = EcModules.stmt (s_hdl @ s_wpl) in
-  let sr = EcModules.stmt (s_hdr @ s_wpr) in
-  let concl = f_equivS_r {es with es_sl = sl; es_sr=sr; es_po = post} in
-  prove_goal_by [concl] (rn_hl_wp (Double(i, j))) g
-
-
-let t_wp k = match k with
-  | None -> 
-    t_hS_or_bhS_or_eS (t_hoare_wp None) (t_bdHoare_wp None) (t_equiv_wp None)
-  | Some (Single i) -> t_hS_or_bhS (t_hoare_wp (Some i)) (t_bdHoare_wp (Some i))
-  | Some (Double(i,j)) -> t_equiv_wp (Some (i,j))
-
 
 (* -------------------------------------------------------------------- *)
 class rn_hl_while (_ : form) (_ : form option) (_ : (form * form) option) =
@@ -1330,7 +1132,7 @@ let wp_asgn_call env m lv res post =
   | None -> post
   | Some lv ->
     let lets = lv_subst m lv res in
-    mk_let env ([lets],post)
+      mk_let_of_lv_substs env ([lets],post)
 
 let subst_args_call env m f =
   List.fold_right2 (fun v e s ->
@@ -1582,8 +1384,10 @@ let t_equiv_case f g =
   prove_goal_by [concl1;concl2] (rn_hl_case f) g
 
 let t_he_case f g =
-  t_hS_or_bhS_or_eS (t_hoare_case f) 
-    (t_bdHoare_case f) (t_equiv_case f) g 
+  t_hS_or_bhS_or_eS
+    ~th:(t_hoare_case f) 
+    ~tbh:(t_bdHoare_case f)
+    ~te:(t_equiv_case f) g 
 
 (* --------------------------------------------------------------------- *)
 

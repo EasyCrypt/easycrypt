@@ -4,7 +4,9 @@ true : debug
 true : warn_Z, warn_Y, warn_+28, warn_-23
 
 # --------------------------------------------------------------------
-<src>    : include
+<src>     : include
+<src/phl> : include
+
 <why3>   : -traverse
 <_tools> : -traverse
 <system> : -traverse
