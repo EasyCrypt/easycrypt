@@ -685,8 +685,10 @@ theory Dinter_uni.
   lemma nosmt mu_def_nz (i j:int) (p:int cpred):
     i <= j =>
     mu (dinter i j) p =
-      (card (filter p (interval i j)))%r / (card (interval i j))%r
-  by [].
+      (card (filter p (interval i j)))%r / (card (interval i j))%r.
+  proof strict.
+  by intros=> i_leq_j; rewrite /dinter Duni.mu_def; smt.
+  qed.
 
   lemma mu_x_def_in (i j x:int):
     in_supp x (dinter i j) =>
