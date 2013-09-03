@@ -82,13 +82,13 @@ let t_code_transform side ?(bdhoare = false) cpos tr tx g =
       let hyps, concl = get_goal g in
 
       if is_hoareS concl then
-        let hoare    = destr_hoareS concl in
+        let hoare    = t_as_hoareS concl in
         let pr, po   = hoare.hs_pr, hoare.hs_po in
         let (me, stmt, cs) = tx hyps cpos (pr, po) (hoare.hs_m, hoare.hs_s) in
         let concl = f_hoareS_r { hoare with hs_m = me; hs_s = stmt; } in
           prove_goal_by (cs @ [concl]) (tr None) g
       else if bdhoare && is_bdHoareS concl then
-        let hoare    = destr_bdHoareS concl in
+        let hoare    = t_as_bdHoareS concl in
         let pr, po   = hoare.bhs_pr, hoare.bhs_po in
         let (me, stmt, cs) = tx hyps cpos (pr, po) (hoare.bhs_m, hoare.bhs_s) in
         let concl = f_bdHoareS_r { hoare with bhs_m = me; bhs_s = stmt; } in
@@ -99,7 +99,7 @@ let t_code_transform side ?(bdhoare = false) cpos tr tx g =
 
   | Some side ->
       let hyps, concl  = get_goal g in
-      let es        = destr_equivS concl in
+      let es        = t_as_equivS concl in
       let pre, post = es.es_pr, es.es_po in
       let me, stmt     = if side then (es.es_ml, es.es_sl) else (es.es_mr, es.es_sr) in
       let me, stmt, cs = tx hyps cpos (pre, post) (me, stmt) in
@@ -127,7 +127,7 @@ let conseq_cond pre post spre spost =
  
 let t_hoareF_conseq pre post g =
   let env,_,concl = get_goal_e g in
-  let hf = destr_hoareF concl in
+  let hf = t_as_hoareF concl in
   let mpr,mpo = EcEnv.Fun.hoareF_memenv hf.hf_f env in
   let cond1, cond2 = conseq_cond hf.hf_pr hf.hf_po pre post in
   let concl1 = f_forall_mems [mpr] cond1 in
@@ -137,7 +137,7 @@ let t_hoareF_conseq pre post g =
     
 let t_hoareS_conseq pre post g =
   let concl = get_concl g in
-  let hs = destr_hoareS concl in
+  let hs = t_as_hoareS concl in
   let cond1, cond2 = conseq_cond hs.hs_pr hs.hs_po pre post in
   let concl1 = f_forall_mems [hs.hs_m] cond1 in
   let concl2 = f_forall_mems [hs.hs_m] cond2 in
@@ -146,7 +146,7 @@ let t_hoareS_conseq pre post g =
 
 let t_bdHoareF_conseq pre post g =
   let env,_,concl = get_goal_e g in
-  let bhf = destr_bdHoareF concl in
+  let bhf = t_as_bdHoareF concl in
   let mpr,mpo = EcEnv.Fun.hoareF_memenv bhf.bhf_f env in
   let cond1, cond2 = conseq_cond bhf.bhf_pr bhf.bhf_po pre post in
   let cond2 = match bhf.bhf_cmp with
@@ -161,7 +161,7 @@ let t_bdHoareF_conseq pre post g =
 
 let t_bdHoareS_conseq pre post g =
   let concl = get_concl g in
-  let bhs = destr_bdHoareS concl in
+  let bhs = t_as_bdHoareS concl in
   let cond1, cond2 = conseq_cond bhs.bhs_pr bhs.bhs_po pre post in
   let cond2 = match bhs.bhs_cmp with
     | FHle -> f_imp bhs.bhs_po post
@@ -184,7 +184,7 @@ let bd_goal fcmp fbd cmp bd =
 
 let t_bdHoareF_conseq_bd cmp bd g =
   let env,_,concl = get_goal_e g in
-  let bhf = destr_bdHoareF concl in
+  let bhf = t_as_bdHoareF concl in
   let mpr,_ = EcEnv.Fun.hoareF_memenv bhf.bhf_f env in
   let bd_goal =  bd_goal bhf.bhf_cmp bhf.bhf_bd cmp bd in
   let concl = f_bdHoareF bhf.bhf_pr bhf.bhf_f bhf.bhf_po cmp bd in
@@ -193,7 +193,7 @@ let t_bdHoareF_conseq_bd cmp bd g =
 
 let t_bdHoareS_conseq_bd cmp bd g =
   let concl = get_concl g in
-  let bhs = destr_bdHoareS concl in
+  let bhs = t_as_bdHoareS concl in
   let bd_goal =  bd_goal bhs.bhs_cmp bhs.bhs_bd cmp bd in
   let concl = f_bdHoareS bhs.bhs_m bhs.bhs_pr bhs.bhs_s bhs.bhs_po cmp bd in
   let bd_goal = f_forall_mems [bhs.bhs_m] (f_imp bhs.bhs_pr bd_goal) in
@@ -201,7 +201,7 @@ let t_bdHoareS_conseq_bd cmp bd g =
 
 let t_equivF_conseq pre post g =
   let env,_,concl = get_goal_e g in
-  let ef = destr_equivF concl in
+  let ef = t_as_equivF concl in
   let (mprl,mprr),(mpol,mpor) = 
     EcEnv.Fun.equivF_memenv ef.ef_fl ef.ef_fr env in
   let cond1, cond2 = conseq_cond ef.ef_pr ef.ef_po pre post in
@@ -212,7 +212,7 @@ let t_equivF_conseq pre post g =
 
 let t_equivS_conseq pre post g =
   let concl = get_concl g in
-  let es = destr_equivS concl in
+  let es = t_as_equivS concl in
   let cond1, cond2 = conseq_cond es.es_pr es.es_po pre post in
   let concl1 = f_forall_mems [es.es_ml;es.es_mr] cond1 in
   let concl2 = f_forall_mems [es.es_ml;es.es_mr] cond2 in
@@ -235,7 +235,7 @@ let rn_notmod = RN_xtd (new rn_notmod)
 
 let t_equivF_notmod post g = 
   let env,hyps,concl = get_goal_e g in
-  let ef = destr_equivF concl in
+  let ef = t_as_equivF concl in
   let fl, fr = ef.ef_fl, ef.ef_fr in
   let (mprl,mprr),(mpol,mpor) = Fun.equivF_memenv fl fr env in
   let fsigl = (Fun.by_xpath fl env).f_sig in
@@ -264,7 +264,7 @@ let t_equivF_notmod post g =
 
 let t_equivS_notmod post g = 
   let env,_,concl = get_goal_e g in
-  let es = destr_equivS concl in
+  let es = t_as_equivS concl in
   let sl, sr = es.es_sl, es.es_sr in
   let ml, mr = fst es.es_ml, fst es.es_mr in
   let cond = f_imp post es.es_po in
@@ -289,7 +289,7 @@ let t_equivS_conseq_nm =
 
 let t_hoareF_notmod post g = 
   let env,hyps,concl = get_goal_e g in
-  let hf = destr_hoareF concl in
+  let hf = t_as_hoareF concl in
   let f = hf.hf_f in
   let mpr,mpo = Fun.hoareF_memenv f env in
   let fsig = (Fun.by_xpath f env).f_sig in
@@ -311,7 +311,7 @@ let t_hoareF_notmod post g =
 
 let t_hoareS_notmod post g = 
   let env,_,concl = get_goal_e g in
-  let hs = destr_hoareS concl in
+  let hs = t_as_hoareS concl in
   let s = hs.hs_s in
   let m = fst hs.hs_m in
   let cond = f_imp post hs.hs_po in
@@ -329,7 +329,7 @@ let t_hoareS_conseq_nm =
 
 let t_bdHoareF_notmod post g = 
   let env,hyps,concl = get_goal_e g in
-  let hf = destr_bdHoareF concl in
+  let hf = t_as_bdHoareF concl in
   let f = hf.bhf_f in
   let mpr,mpo = Fun.hoareF_memenv f env in
   let fsig = (Fun.by_xpath f env).f_sig in
@@ -351,7 +351,7 @@ let t_bdHoareF_notmod post g =
 
 let t_bdHoareS_notmod post g = 
   let env,_,concl = get_goal_e g in
-  let hs = destr_bdHoareS concl in
+  let hs = t_as_bdHoareS concl in
   let s = hs.bhs_s in
   let m = fst hs.bhs_m in
   let cond = f_imp post hs.bhs_po in
@@ -404,7 +404,7 @@ let transitivity_side_cond hyps prml prmr poml pomr
 
 let t_equivS_trans (mt,c2) p1 q1 p2 q2 g =
   let hyps,concl = get_goal g in
-  let es     = destr_equivS concl in
+  let es     = t_as_equivS concl in
   let m1, m3 = es.es_ml, es.es_mr in
   let cond1, cond2 = 
     transitivity_side_cond hyps m1 m3 m1 m3
@@ -421,7 +421,7 @@ let t_equivS_trans (mt,c2) p1 q1 p2 q2 g =
 
 let t_equivF_trans f p1 q1 p2 q2 g =
   let env,hyps,concl = get_goal_e g in
-  let ef     = destr_equivF concl in
+  let ef     = t_as_equivF concl in
   let (prml,prmr), (poml,pomr) = Fun.equivF_memenv ef.ef_fl ef.ef_fr env in
   let _,(_,pomt) = Fun.hoareF_memenv f env in
   let cond1, cond2 = 
@@ -551,7 +551,7 @@ let rn_hl_fun_abs f = RN_xtd (new rn_hl_fun_abs f :> xrule)
 
 let t_hoareF_fun_def g = 
   let env,_,concl = get_goal_e g in
-  let hf = destr_hoareF concl in
+  let hf = t_as_hoareF concl in
   let f = NormMp.norm_xpath env hf.hf_f in
   check_concrete env f;
   let memenv, fdef, env = Fun.hoareS f env in 
@@ -566,7 +566,7 @@ let t_hoareF_fun_def g =
 
 let t_bdHoareF_fun_def g = 
   let env,_,concl = get_goal_e g in
-  let bhf = destr_bdHoareF concl in
+  let bhf = t_as_bdHoareF concl in
   let f = NormMp.norm_xpath env bhf.bhf_f in
   check_concrete env f;
   let memenv, fdef, env = Fun.hoareS f env in
@@ -581,7 +581,7 @@ let t_bdHoareF_fun_def g =
 
 let t_equivF_fun_def g = 
   let env,_,concl = get_goal_e g in
-  let ef = destr_equivF concl in
+  let ef = t_as_equivF concl in
   let fl, fr = 
     NormMp.norm_xpath env ef.ef_fl,  NormMp.norm_xpath env ef.ef_fr in
   check_concrete env fl; check_concrete env fr;
@@ -627,7 +627,7 @@ let _inline_freshen me v =
 
 let t_fun_to_code g =
   let env, _, concl = get_goal_e g in
-  let ef = destr_equivF concl in
+  let ef = t_as_equivF concl in
   let (ml,mr), _ = Fun.equivF_memenv ef.ef_fl ef.ef_fr env in
   let fl,fr = ef.ef_fl, ef.ef_fr in
   let do1 f m = 
@@ -686,7 +686,7 @@ let hoareF_abs_spec env f inv =
 
 let t_hoareF_abs inv g = 
   let env,_,concl = get_goal_e g in
-  let hf = destr_hoareF concl in
+  let hf = t_as_hoareF concl in
   let pre, post, sg = hoareF_abs_spec env hf.hf_f inv in
   let tac g' = prove_goal_by sg (rn_hl_fun_abs inv) g' in
   t_on_last tac (t_hoareF_conseq pre post g)
@@ -728,7 +728,7 @@ let bdHoareF_abs_spec env f inv =
 
 let t_bdHoareF_abs inv g = 
   let env,_,concl = get_goal_e g in
-  let bhf = destr_bdHoareF concl in
+  let bhf = t_as_bdHoareF concl in
   match bhf.bhf_cmp with
     | FHeq when f_equal bhf.bhf_bd f_r1 -> 
       let pre, post, sg = bdHoareF_abs_spec env bhf.bhf_f inv in
@@ -791,7 +791,7 @@ let equivF_abs_spec env fl fr inv =
     
 let t_equivF_abs inv g = 
   let env,_,concl = get_goal_e g in
-  let ef = destr_equivF concl in
+  let ef = t_as_equivF concl in
   let pre, post, sg = equivF_abs_spec env ef.ef_fl ef.ef_fr inv in
   let tac g' = prove_goal_by sg (rn_hl_fun_abs inv) g' in
   t_on_last tac (t_equivF_conseq pre post g)
@@ -853,7 +853,7 @@ let equivF_abs_upto env fl fr bad invP invQ =
 
 let t_equivF_abs_upto bad invP invQ g = 
   let env,_,concl = get_goal_e g in
-  let ef = destr_equivF concl in
+  let ef = t_as_equivF concl in
   let pre, post, sg = equivF_abs_upto env ef.ef_fl ef.ef_fr bad invP invQ in
   let tac g' = prove_goal_by sg (rn_hl_fun_upto bad invP invQ) g' in
   t_on_last tac (t_equivF_conseq pre post g)
@@ -874,7 +874,7 @@ let rn_hl_append td dp phi bdi =
 
 let t_hoare_app i phi g =
   let concl = get_concl g in
-  let hs = destr_hoareS concl in
+  let hs = t_as_hoareS concl in
   let s1,s2 = s_split "app" i hs.hs_s in
   let a = f_hoareS_r { hs with hs_s = stmt s1; hs_po = phi }  in
   let b = f_hoareS_r { hs with hs_pr = phi; hs_s = stmt s2 } in
@@ -892,7 +892,7 @@ let t_hoare_app i phi g =
 
 let t_bdHoare_app i (phi, pR,f1,f2,g1,g2) g =
   let concl = get_concl g in
-  let bhs = destr_bdHoareS concl in
+  let bhs = t_as_bdHoareS concl in
   let s1,s2 = s_split "app" i bhs.bhs_s in
   let s1, s2 = stmt s1, stmt s2 in
   let nR = f_not pR in
@@ -934,7 +934,7 @@ let t_bdHoare_app i (phi, pR,f1,f2,g1,g2) g =
 
 let t_equiv_app (i,j) phi g =
   let concl = get_concl g in
-  let es = destr_equivS concl in
+  let es = t_as_equivS concl in
   let sl1,sl2 = s_split "app" i es.es_sl in
   let sr1,sr2 = s_split "app" j es.es_sr in
   let a = f_equivS_r {es with es_sl=stmt sl1; es_sr=stmt sr1; es_po=phi} in
@@ -952,7 +952,7 @@ let rn_hl_while x1 x2 x3 =
   
 let t_hoare_while inv g =
   let env, _, concl = get_goal_e g in
-  let hs = destr_hoareS concl in
+  let hs = t_as_hoareS concl in
   let ((e,c),s) = s_last_while "while" hs.hs_s in
   let m = EcMemory.memory hs.hs_m in
   let e = form_of_expr m e in
@@ -970,7 +970,7 @@ let t_hoare_while inv g =
 
 let t_bdHoare_while inv vrnt g =
   let env, _, concl = get_goal_e g in
-  let bhs = destr_bdHoareS concl in
+  let bhs = t_as_bdHoareS concl in
   let ((e,c),s) = s_last_while "while" bhs.bhs_s in
   let m = EcMemory.memory bhs.bhs_m in
   let e = form_of_expr m e in
@@ -998,7 +998,7 @@ let t_bdHoare_while inv vrnt g =
 
 let t_equiv_while_disj side vrnt inv g =
   let env, _, concl = get_goal_e g in
-  let es = destr_equivS concl in
+  let es = t_as_equivS concl in
   let s,m_side,m_other = if side then es.es_sl, es.es_ml, es.es_mr 
     else es.es_sr, es.es_mr, es.es_ml in
   let ((e,c),s) = s_last_while "while" s in
@@ -1031,7 +1031,7 @@ let t_equiv_while_disj side vrnt inv g =
 
 let t_equiv_while inv g =
   let env,_,concl = get_goal_e g in
-  let es = destr_equivS concl in
+  let es = t_as_equivS concl in
   let (el,cl), (er,cr), sl, sr = s_last_whiles "while" es.es_sl es.es_sr in
   let ml = EcMemory.memory es.es_ml in
   let mr = EcMemory.memory es.es_mr in
@@ -1080,7 +1080,7 @@ let rn_hl_call side pr po =
 let t_hoare_call fpre fpost g =
   (* FIXME : check the well formess of the pre and the post ? *)
   let env,_,concl = get_goal_e g in
-  let hs = destr_hoareS concl in
+  let hs = t_as_hoareS concl in
   let (lp,f,args),s = s_last_call "call" hs.hs_s in
   let m = EcMemory.memory hs.hs_m in
   let fsig = (Fun.by_xpath f env).f_sig in
@@ -1119,7 +1119,7 @@ let bdHoare_call_spec fpre fpost f cmp bd opt_bd =
 let t_bdHoare_call fpre fpost opt_bd g =
   (* FIXME : check the well formess of the pre and the post ? *)
   let env,_,concl = get_goal_e g in
-  let bhs = destr_bdHoareS concl in
+  let bhs = t_as_bdHoareS concl in
   let (lp,f,args),s = s_last_call "call" bhs.bhs_s in
   let m = EcMemory.memory bhs.bhs_m in
   let fsig = (Fun.by_xpath f env).f_sig in
@@ -1160,7 +1160,7 @@ let t_bdHoare_call fpre fpost opt_bd g =
 let t_equiv_call fpre fpost g =
   (* FIXME : check the well formess of the pre and the post ? *)
   let env,_,concl = get_goal_e g in
-  let es = destr_equivS concl in
+  let es = t_as_equivS concl in
   let (lpl,fl,argsl),(lpr,fr,argsr),sl,sr = 
     s_last_calls "call" es.es_sl es.es_sr in
   let ml = EcMemory.memory es.es_ml in
@@ -1198,7 +1198,7 @@ let t_equiv_call fpre fpost g =
 (* TODO generalize the rule for any lossless statement *)
 let t_equiv_call1 side fpre fpost g =
   let env,_,concl = get_goal_e g in
-  let equiv = destr_equivS concl in
+  let equiv = t_as_equivS concl in
 
   let (me, stmt) =
     match side with
@@ -1241,7 +1241,7 @@ let rn_hl_hoare_equiv = RN_xtd (new rn_hl_hoare_equiv)
 
 let t_hoare_equiv p q p1 q1 p2 q2 g =
   let concl = get_concl g in
-  let es = destr_equivS concl in
+  let es = t_as_equivS concl in
   let s1 = Fsubst.f_bind_mem Fsubst.f_subst_id mhr (fst es.es_ml) in
   let s2 = Fsubst.f_bind_mem Fsubst.f_subst_id mhr (fst es.es_mr) in
   let concl1 = 
@@ -1289,14 +1289,14 @@ let rn_hl_case phi =
 
 let t_hoare_case f g =
   let concl = get_concl g in
-  let hs = destr_hoareS concl in
+  let hs = t_as_hoareS concl in
   let concl1 = f_hoareS_r { hs with hs_pr = f_and_simpl hs.hs_pr f } in
   let concl2 = f_hoareS_r { hs with hs_pr = f_and_simpl hs.hs_pr (f_not f) } in
   prove_goal_by [concl1;concl2] (rn_hl_case f) g
 
 let t_bdHoare_case f g =
   let concl = get_concl g in
-  let bhs = destr_bdHoareS concl in
+  let bhs = t_as_bdHoareS concl in
   let concl1 = f_bdHoareS_r 
     { bhs with bhs_pr = f_and_simpl bhs.bhs_pr f } in
   let concl2 = f_bdHoareS_r 
@@ -1305,7 +1305,7 @@ let t_bdHoare_case f g =
 
 let t_equiv_case f g = 
   let concl = get_concl g in
-  let es = destr_equivS concl in
+  let es = t_as_equivS concl in
   let concl1 = f_equivS_r { es with es_pr = f_and es.es_pr f } in
   let concl2 = f_equivS_r { es with es_pr = f_and es.es_pr (f_not f) } in
   prove_goal_by [concl1;concl2] (rn_hl_case f) g
@@ -1410,21 +1410,21 @@ let rn_hl_inline side pattern =
 
 let t_inline_bdHoare sp g =
   let hyps,concl = get_goal g in
-  let hoare      = destr_bdHoareS concl in
+  let hoare      = t_as_bdHoareS concl in
   let (me, stmt) = _inline hyps hoare.bhs_m sp hoare.bhs_s in
   let concl      = f_bdHoareS_r { hoare with bhs_m = me; bhs_s = stmt; } in
   prove_goal_by [concl] (rn_hl_inline None sp) g
 
 let t_inline_hoare sp g =
   let hyps,concl = get_goal g in
-  let hoare      = destr_hoareS concl in
+  let hoare      = t_as_hoareS concl in
   let (me, stmt) = _inline hyps hoare.hs_m sp hoare.hs_s in
   let concl      = f_hoareS_r { hoare with hs_m = me; hs_s = stmt; } in
   prove_goal_by [concl] (rn_hl_inline None sp) g
 
 let t_inline_equiv side sp g =
   let hyps,concl = get_goal g in
-  let equiv = destr_equivS concl in
+  let equiv = t_as_equivS concl in
   let concl =
     match side with
     | true  ->
@@ -1892,7 +1892,7 @@ let gen_rcond b m at_pos s =
 let t_hoare_rcond b at_pos g = 
   (* TODO: generalize the rule using assume *)
   let concl = get_concl g in
-  let hs = destr_hoareS concl in
+  let hs = t_as_hoareS concl in
   let m  = EcMemory.memory hs.hs_m in 
   let hd,e,s = gen_rcond b m at_pos hs.hs_s in
   let concl1  = f_hoareS_r { hs with hs_s = hd; hs_po = e } in
@@ -1901,7 +1901,7 @@ let t_hoare_rcond b at_pos g =
 
 let t_bdHoare_rcond b at_pos g = 
   let concl = get_concl g in
-  let bhs = destr_bdHoareS concl in
+  let bhs = t_as_bdHoareS concl in
   let m  = EcMemory.memory bhs.bhs_m in 
   let hd,e,s = gen_rcond b m at_pos bhs.bhs_s in
   let concl1  = f_hoareS bhs.bhs_m bhs.bhs_pr hd e in
@@ -1910,7 +1910,7 @@ let t_bdHoare_rcond b at_pos g =
 
 let t_equiv_rcond side b at_pos g =
   let concl = get_concl g in
-  let es = destr_equivS concl in
+  let es = t_as_equivS concl in
   let m,mo,s = 
     if side then es.es_ml,es.es_mr, es.es_sl 
     else         es.es_mr,es.es_ml, es.es_sr in
@@ -2123,21 +2123,21 @@ let swap_stmt env p1 p2 p3 s =
 
 let t_hoare_swap p1 p2 p3 g =
   let env,_,concl = get_goal_e g in
-  let hs    = destr_hoareS concl in
+  let hs    = t_as_hoareS concl in
   let s = swap_stmt env p1 p2 p3 hs.hs_s in
   let concl = f_hoareS_r {hs with hs_s = s } in
   prove_goal_by [concl] (rn_hl_swap None p1 p2 p3) g
 
 let t_bdHoare_swap p1 p2 p3 g =
   let env,_,concl = get_goal_e g in
-  let bhs    = destr_bdHoareS concl in
+  let bhs    = t_as_bdHoareS concl in
   let s = swap_stmt env p1 p2 p3 bhs.bhs_s in
   let concl = f_bdHoareS_r {bhs with bhs_s = s } in
   prove_goal_by [concl] (rn_hl_swap None p1 p2 p3) g
 
 let t_equiv_swap side p1 p2 p3 g =
   let env,_,concl = get_goal_e g in
-  let es    = destr_equivS concl in
+  let es    = t_as_equivS concl in
   let sl,sr = 
     if side 
     then swap_stmt env p1 p2 p3 es.es_sl, es.es_sr 
@@ -2167,19 +2167,19 @@ let t_gen_cond side e g =
 
 let t_hoare_cond g = 
   let concl = get_concl g in
-  let hs = destr_hoareS concl in 
+  let hs = t_as_hoareS concl in 
   let (e,_,_) = fst (s_first_if "if" hs.hs_s) in
   t_gen_cond None (form_of_expr (EcMemory.memory hs.hs_m) e) g
 
 let t_bdHoare_cond g = 
   let concl = get_concl g in
-  let bhs = destr_bdHoareS concl in 
+  let bhs = t_as_bdHoareS concl in 
   let (e,_,_) = fst (s_first_if "if" bhs.bhs_s) in
   t_gen_cond None (form_of_expr (EcMemory.memory bhs.bhs_m) e) g
 
 let rec t_equiv_cond side g =
   let hyps,concl = get_goal g in
-  let es = destr_equivS concl in
+  let es = t_as_equivS concl in
   match side with
   | Some s ->
     let e = 
@@ -2223,7 +2223,7 @@ let rec t_equiv_cond side g =
 (* -------------------------------------------------------------------- *)
 let t_ppr ty phi_l phi_r g =
   let env,_,concl = get_goal_e g in
-  let ef = destr_equivF concl in
+  let ef = t_as_equivF concl in
   let fl,fr = ef.ef_fl,ef.ef_fr in
 
   let funl = EcEnv.Fun.by_xpath fl env in
@@ -2284,7 +2284,7 @@ let rn_hl_hoare_bd_hoare =
 let t_hoare_bd_hoare g =
   let concl = get_concl g in
   if is_bdHoareS concl then
-    let bhs = destr_bdHoareS concl in
+    let bhs = t_as_bdHoareS concl in
     let concl1 = f_hoareS bhs.bhs_m bhs.bhs_pr bhs.bhs_s (f_not bhs.bhs_po) in
     if f_equal bhs.bhs_bd f_r0 then
       prove_goal_by [concl1] rn_hl_hoare_bd_hoare g
@@ -2294,7 +2294,7 @@ let t_hoare_bd_hoare g =
         f_forall_mems [bhs.bhs_m] (f_imp bhs.bhs_pr (f_eq bhs.bhs_bd f_r0)) in
       prove_goal_by [concl1;concl2] rn_hl_hoare_bd_hoare g
   else if is_hoareS concl then
-    let hs = destr_hoareS concl in
+    let hs = t_as_hoareS concl in
     let concl1 = f_bdHoareS hs.hs_m hs.hs_pr hs.hs_s (f_not hs.hs_po) FHeq f_r0 in
     prove_goal_by [concl1] rn_hl_hoare_bd_hoare g
   else 
@@ -2487,7 +2487,7 @@ let t_pr_rewrite s g =
 
 let t_bdeq g = 
   let concl = get_concl g in
-  let bhs = destr_bdHoareS concl in 
+  let bhs = t_as_bdHoareS concl in 
   let concl = f_bdHoareS_r {bhs with bhs_cmp=FHeq } in
   prove_goal_by [concl] rn_hl_prbounded g
     
@@ -2537,7 +2537,7 @@ let rn_eqobs_in =
 
 let t_eqobs_inS finfo eqo inv g =
   let env, hyps, concl = get_goal_e g in
-  let es = destr_equivS concl in
+  let es = t_as_equivS concl in
   let ml, mr = fst es.es_ml, fst es.es_mr in
   (* TODO check that inv contains only global *)
   let ifvl = PV.fv env ml inv in
@@ -2722,7 +2722,7 @@ let t_sp_aux side g =
   let err ()  = cannot_apply "sp" "with an empty goal" in
   let stmt, m, menv, pre, prove_goal = 
     try 
-      let es = destr_equivS concl in
+      let es = t_as_equivS concl in
       if side then 
           es.es_sl,mleft, es.es_ml, es.es_pr, 
            fun pr st -> 
@@ -2734,14 +2734,14 @@ let t_sp_aux side g =
           t_on_last t_simplify_nodelta (prove_goal_by [wes] rn_hl_sp g)
     with EcBaseLogic.TacError _ ->
       try
-        let hs = destr_hoareS concl in
+        let hs = t_as_hoareS concl in
         hs.hs_s, mhr, hs.hs_m, hs.hs_pr, 
         fun pr st -> 
           let wes = f_hoareS_r {hs with hs_s=st; hs_pr=pr} in
           t_on_last t_simplify_nodelta (prove_goal_by [wes] rn_hl_sp g)
       with EcBaseLogic.TacError _ ->
         try
-          let bhs = destr_bdHoareS concl in
+          let bhs = t_as_bdHoareS concl in
           bhs.bhs_s, mhr, bhs.bhs_m, bhs.bhs_pr, 
           fun pr st -> 
             let wes = f_bdHoareS_r {bhs with bhs_s=st; bhs_pr=pr} in

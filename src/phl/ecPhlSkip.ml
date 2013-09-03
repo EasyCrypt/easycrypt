@@ -18,7 +18,7 @@ let rn_hl_skip = RN_xtd (new rn_hl_skip)
 module LowInternal = struct
   let t_hoare_skip g =
     let concl = get_concl g in
-    let hs = destr_hoareS concl in
+    let hs = t_as_hoareS concl in
     if hs.hs_s.s_node <> [] then tacerror NoSkipStmt;
     let concl = f_imp hs.hs_pr hs.hs_po in
     let concl = f_forall_mems [hs.hs_m] concl in
@@ -26,7 +26,7 @@ module LowInternal = struct
   
   let t_bdHoare_skip g =
     let concl = get_concl g in
-    let bhs = destr_bdHoareS concl in
+    let bhs = t_as_bdHoareS concl in
     if bhs.bhs_s.s_node <> [] then tacerror NoSkipStmt;
     if (bhs.bhs_cmp <> FHeq && bhs.bhs_cmp <> FHge) then
       cannot_apply "skip" "bound must be \">= 1\"";
@@ -41,7 +41,7 @@ module LowInternal = struct
   
   let t_equiv_skip g =
     let concl = get_concl g in
-    let es = destr_equivS concl in
+    let es = t_as_equivS concl in
     if es.es_sl.s_node <> [] then tacerror NoSkipStmt;
     if es.es_sr.s_node <> [] then tacerror NoSkipStmt;
     let concl = f_imp es.es_pr es.es_po in

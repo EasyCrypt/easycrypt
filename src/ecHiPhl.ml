@@ -22,7 +22,7 @@ module UE = EcUnify.UniEnv
 let process_phl_bd_info dir g bd_info = 
   match bd_info with
   | PAppNone -> 
-    let hs = destr_bdHoareS (get_concl g) in
+    let hs = t_as_bdHoareS (get_concl g) in
     let f1, f2 = 
        match dir with
       | Backs  -> hs.bhs_bd, f_r1 
@@ -30,7 +30,7 @@ let process_phl_bd_info dir g bd_info =
     f_true, f1, f2, f_r0, f_r1 (* The last argument will not be used *)
   | PAppSingle f -> 
     let f = process_phl_formula g f in
-    let hs = destr_bdHoareS (get_concl g) in
+    let hs = t_as_bdHoareS (get_concl g) in
     let f1, f2 = 
       match dir with
       | Backs  -> f_real_div hs.bhs_bd f, f 
@@ -505,7 +505,7 @@ let process_bdHoare_deno info (_,n as g) =
   let (juc,an), gs = process_mkn_apply (process_cut g) info g in
   let pre,post =
     let (_,f) = get_node (juc,an) in
-    let bhf = destr_bdHoareF f in
+    let bhf = t_as_bdHoareF f in
     bhf.bhf_pr, bhf.bhf_po in
   t_on_first (t_use an gs) (t_bdHoare_deno pre post (juc,n))
 
@@ -527,7 +527,7 @@ let process_equiv_deno info (_,n as g) =
   let (juc,an), gs = process_mkn_apply (process_cut g) info g in
   let pre,post =
     let (_,f) = get_node (juc,an) in
-    let ef = destr_equivF f in
+    let ef = t_as_equivF f in
     ef.ef_pr, ef.ef_po in
   t_on_first (t_use an gs) (t_equiv_deno pre post (juc,n))
 
@@ -642,7 +642,7 @@ let process_exfalso g =
 
 let process_ppr (phi1,phi2) g =
   let hyps,concl = get_goal g in
-  let ef = destr_equivF concl in
+  let ef = t_as_equivF concl in
   let _penv,qenv = LDecl.equivF ef.ef_fl ef.ef_fr hyps in
   let phi1 = process_form_opt qenv phi1 None in
   let phi2 = process_form_opt qenv phi2 None in
@@ -701,7 +701,7 @@ let process_exists_intro fs g =
 let process_eqobs_in (geq', ginv, eqs') g = 
   let env, hyps, concl = get_goal_e g in
   let ienv = LDecl.inv_memenv hyps in
-  let es = destr_equivS concl in
+  let es = t_as_equivS concl in
   let ml, mr =  fst es.es_ml, fst es.es_mr in
  
   let toeq ml mr f = 
@@ -745,7 +745,7 @@ let process_eqobs_in (geq', ginv, eqs') g =
 
   let t_eqobs eqs g =
     let concl = get_concl g in
-    let es = destr_equivS concl in
+    let es = t_as_equivS concl in
     let ml, mr = fst es.es_ml, fst es.es_mr in
     let post = EcPV.Mpv2.to_form ml mr eqs ginv in
     let pre = es.es_pr in
@@ -796,7 +796,7 @@ let process_eqobs_in (geq', ginv, eqs') g =
 
 let process_trans_stmt s c p1 q1 p2 q2 g = 
   let hyps,concl = get_goal g in
-  let es = destr_equivS concl in
+  let es = t_as_equivS concl in
   let mt = snd (if oget s then es.es_ml else es.es_mr) in
   let p1,q1 = 
     let hyps = LDecl.push_all [es.es_ml; (mright, mt)] hyps in
@@ -817,7 +817,7 @@ let process_trans_stmt s c p1 q1 p2 q2 g =
 
 let process_trans_fun f p1 q1 p2 q2 g = 
   let env,hyps,concl = get_goal_e g in
-  let ef = destr_equivF concl in
+  let ef = t_as_equivF concl in
   let f = EcTyping.trans_gamepath env f in
   let (_,prmt),(_,pomt) = Fun.hoareF_memenv f env in
   let (prml,prmr), (poml,pomr) = Fun.equivF_memenv ef.ef_fl ef.ef_fr env in

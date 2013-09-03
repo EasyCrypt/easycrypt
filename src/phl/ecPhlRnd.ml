@@ -49,7 +49,7 @@ let rn_bhl_rnd infos =
 (* -------------------------------------------------------------------- *)
 let t_hoare_rnd g =
   let env,_,concl = get_goal_e g in
-  let hs = destr_hoareS concl in
+  let hs = t_as_hoareS concl in
   let (lv,distr),s= s_last_rnd "rnd" hs.hs_s in
   (* FIXME: exception when not rnds found *)
   let ty_distr = proj_distr_ty (e_ty distr) in
@@ -65,7 +65,7 @@ let t_hoare_rnd g =
 (* -------------------------------------------------------------------- *)
 let wp_equiv_disj_rnd side g =
   let env,_,concl = get_goal_e g in
-  let es = destr_equivS concl in
+  let es = t_as_equivS concl in
   let m,s = 
     if side then es.es_ml, es.es_sl 
     else         es.es_mr, es.es_sr 
@@ -90,7 +90,7 @@ let wp_equiv_disj_rnd side g =
 (* -------------------------------------------------------------------- *)
 let wp_equiv_rnd (f,finv) g =
   let env,_,concl = get_goal_e g in
-  let es = destr_equivS concl in
+  let es = t_as_equivS concl in
   let (lvL,muL),(lvR,muR),sl',sr'= s_last_rnds "rnd" es.es_sl es.es_sr in
   (* FIXME: exception when not rnds found *)
   let tyL = proj_distr_ty (e_ty muL) in
@@ -141,7 +141,7 @@ let t_equiv_rnd side bij_info =
 (* -------------------------------------------------------------------- *)
 let t_bd_hoare_rnd tac_info g = 
   let env,_,concl = get_goal_e g in
-  let bhs = destr_bdHoareS concl in
+  let bhs = t_as_bdHoareS concl in
   let (lv,distr),s = s_last_rnd "bd_hoare_rnd" bhs.bhs_s in
   let ty_distr = proj_distr_ty (e_ty distr) in
   let distr = EcFol.form_of_expr (EcMemory.memory bhs.bhs_m) distr in

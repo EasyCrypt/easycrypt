@@ -41,6 +41,14 @@ val s_last_assert  : expr sdestr_t
 val s_last_asserts : expr sdestr2_t
 
 (* -------------------------------------------------------------------- *)
+val t_as_hoareF   : form -> hoareF
+val t_as_hoareS   : form -> hoareS
+val t_as_bdHoareF : form -> bdHoareF
+val t_as_bdHoareS : form -> bdHoareS
+val t_as_equivF   : form -> equivF
+val t_as_equivS   : form -> equivS
+
+(* -------------------------------------------------------------------- *)
 val t_hS_or_bhS_or_eS : ?th:tactic -> ?tbh:tactic -> ?te:tactic -> tactic
 
 (* -------------------------------------------------------------------- *)

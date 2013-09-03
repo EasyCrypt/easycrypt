@@ -70,7 +70,7 @@ module TacInternal = struct
   
   let t_hoare_wp i g =
     let env,_,concl = get_goal_e g in
-    let hs = destr_hoareS concl in
+    let hs = t_as_hoareS concl in
     let s_hd,s_wp = s_split_o "wp" i hs.hs_s in
     let s_wp,post = 
       wp env (EcMemory.memory hs.hs_m) (EcModules.stmt s_wp) hs.hs_po in
@@ -81,7 +81,7 @@ module TacInternal = struct
   
   let t_bdHoare_wp i g =
     let env,_,concl = get_goal_e g in
-    let bhs = destr_bdHoareS concl in
+    let bhs = t_as_bdHoareS concl in
     let s_hd,s_wp = s_split_o "wp" i bhs.bhs_s in
     let s_wp = EcModules.stmt s_wp in
     let m = EcMemory.memory bhs.bhs_m in
@@ -93,7 +93,7 @@ module TacInternal = struct
   
   let t_equiv_wp ij g = 
     let env,_,concl = get_goal_e g in
-    let es = destr_equivS concl in
+    let es = t_as_equivS concl in
     let i = omap fst ij and j = omap snd ij in
     let s_hdl,s_wpl = s_split_o "wp" i es.es_sl in
     let s_hdr,s_wpr = s_split_o "wp" j es.es_sr in

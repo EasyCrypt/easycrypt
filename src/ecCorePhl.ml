@@ -68,6 +68,20 @@ let s_last_assert  st = s_last  destr_assert (last_error "assert" st)
 let s_last_asserts st = s_last2 destr_assert (last_error "assert" st)
 
 (* -------------------------------------------------------------------- *)
+let t_as_hoareF c =
+  try destr_hoareF c with DestrError _ -> tacerror (NotPhl (Some true))
+let t_as_hoareS c =
+  try destr_hoareS c with DestrError _ -> tacerror (NotPhl (Some true))
+let t_as_bdHoareF c =
+  try destr_bdHoareF c with DestrError _ -> tacerror (NotPhl (Some true))
+let t_as_bdHoareS c =
+  try destr_bdHoareS c with DestrError _ -> tacerror (NotPhl (Some true))
+let t_as_equivF c =
+  try destr_equivF c with DestrError _ -> tacerror (NotPhl (Some false))
+let t_as_equivS c =
+  try destr_equivS c with DestrError _ -> tacerror (NotPhl (Some false))
+
+(* -------------------------------------------------------------------- *)
 let t_hS_or_bhS_or_eS ?th ?tbh ?te g =
   match (get_concl g).f_node with
   | FhoareS   _ when th  <> None -> (oget th ) g
