@@ -264,6 +264,7 @@ type fpattern_arg =
   | EA_form of pformula
   | EA_mem  of pmemory
   | EA_none 
+  | EA_mod  of pmsymbol located
 
 type 'a fpattern = { 
   fp_kind : 'a fpattern_kind;

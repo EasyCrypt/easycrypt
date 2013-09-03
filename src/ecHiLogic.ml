@@ -310,6 +310,12 @@ let trans_pterm_argument hyps ue arg =
   | EA_none ->
       None
 
+  | EA_mod mp ->
+    let m = TT.trans_msymbol env mp in
+    Some (`FormOrMod (None, Some m))
+
+    
+
 (* -------------------------------------------------------------------- *)
 exception RwMatchFound of EcUnify.unienv * ty EcUidgen.Muid.t * form evmap
 

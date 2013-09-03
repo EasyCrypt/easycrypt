@@ -1530,6 +1530,7 @@ fpattern_head(F):
 
 fpattern_arg:
 | UNDERSCORE   { EA_none }
+| LPAREN LTCOLON m=loc(mod_qident) RPAREN  { EA_mod m }
 | f=sform      { EA_form f }
 | s=mident     { EA_mem s }
 ;
