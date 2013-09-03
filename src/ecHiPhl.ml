@@ -754,7 +754,7 @@ let process_eqobs_in (geq', ginv, eqs') g =
       [ t_trivial;
         t_trivial;
         (fun g -> 
-          t_on_last (t_try (t_seq EcPhl.t_skip t_trivial))
+          t_on_last (t_try (t_seq EcPhlSkip.t_skip t_trivial))
             (t_eqobs_inS onF eqs ginv g))] 
       g in
    
@@ -844,7 +844,7 @@ let process_phl loc ptac g =
     | Pfun_abs f                -> process_fun_abs f
     | Pfun_upto info            -> process_fun_upto info 
     | Pfun_to_code              -> EcPhl.t_fun_to_code 
-    | Pskip                     -> EcPhl.t_skip
+    | Pskip                     -> EcPhlSkip.t_skip
     | Papp (dir, k, phi, f)     -> process_app dir k phi f
     | Pwp k                     -> EcPhlWp.t_wp k
     | Prcond (side, b, i)       -> t_rcond side b i

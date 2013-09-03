@@ -858,43 +858,6 @@ let t_equivF_abs_upto bad invP invQ g =
   let tac g' = prove_goal_by sg (rn_hl_fun_upto bad invP invQ) g' in
   t_on_last tac (t_equivF_conseq pre post g)
 
-(* -------------------------------------------------------------------- *)  
-class rn_hl_skip = object inherit xrule "[hl] skip" end
-let rn_hl_skip = RN_xtd (new rn_hl_skip)
-
-let t_hoare_skip g =
-  let concl = get_concl g in
-  let hs = destr_hoareS concl in
-  if hs.hs_s.s_node <> [] then tacerror NoSkipStmt;
-  let concl = f_imp hs.hs_pr hs.hs_po in
-  let concl = f_forall_mems [hs.hs_m] concl in
-  prove_goal_by [concl] rn_hl_skip g
-
-let t_bdHoare_skip g =
-  let concl = get_concl g in
-  let bhs = destr_bdHoareS concl in
-  if bhs.bhs_s.s_node <> [] then tacerror NoSkipStmt;
-  if (bhs.bhs_cmp <> FHeq && bhs.bhs_cmp <> FHge) then
-    cannot_apply "skip" "bound must be \">= 1\"";
-  let concl = f_imp bhs.bhs_pr bhs.bhs_po in
-  let concl = f_forall_mems [bhs.bhs_m] concl in
-  let gs = 
-    if f_equal bhs.bhs_bd f_r1 then [concl] 
-    else [f_eq bhs.bhs_bd f_r1; concl] in
-  prove_goal_by gs rn_hl_skip g
-
-let t_equiv_skip g =
-  let concl = get_concl g in
-  let es = destr_equivS concl in
-  if es.es_sl.s_node <> [] then tacerror NoSkipStmt;
-  if es.es_sr.s_node <> [] then tacerror NoSkipStmt;
-  let concl = f_imp es.es_pr es.es_po in
-  let concl = f_forall_mems [es.es_ml; es.es_mr] concl in
-  prove_goal_by [concl] rn_hl_skip g
-
-let t_skip =
-  t_hS_or_bhS_or_eS ~th:t_hoare_skip ~tbh:t_bdHoare_skip ~te:t_equiv_skip 
-
 (* -------------------------------------------------------------------- *)
 class ['a] rn_hl_append td (dp : 'a doption) phi bdi =
 object
@@ -2194,7 +2157,7 @@ let t_gen_cond side e g =
   in
   let t_sub b g = 
     t_seq_subgoal (t_rcond side b 1)
-      [t_lseq [t_introm; t_skip; t_intros_i [m2;h];
+      [t_lseq [t_introm; EcPhlSkip.t_skip; t_intros_i [m2;h];
                t_or  
                  (t_lseq [t_elim_hyp h; t_intros_i [h1;h2]; t_hyp h2])
                  (t_hyp h)
@@ -2239,7 +2202,7 @@ let rec t_equiv_cond side g =
         | _ -> assert false in
       let t_aux = 
         t_lseq [t_intros_i [m1];
-                t_skip;
+                EcPhlSkip.t_skip;
                 t_intros_i [m2;h];
                 t_elim_hyp h;
                 t_intros_i [h1;h2];
@@ -2711,7 +2674,7 @@ let t_trivial =
     t_lor [t_hoare_true;
            t_hr_exfalso;   
            t_pr_bounded false;
-           t_skip] in
+           EcPhlSkip.t_skip] in
   t_or
     (t_lseq [t_try t_assumption; t_progress (t_id None); t_try t_assumption; 
              t1; t_trivial; t_fail])
