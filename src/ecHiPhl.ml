@@ -12,35 +12,13 @@ open EcBaseLogic
 open EcLogic
 open EcHiLogic
 open EcCorePhl
+open EcCoreHiPhl
 open EcPhl
 
 module TT = EcTyping
 module UE = EcUnify.UniEnv
 
 (* -------------------------------------------------------------------- *)
-let process_phl_form ty g phi =
-  let hyps, concl = get_goal g in
-  let m = 
-    try 
-      let hs = set_loc phi.pl_loc destr_hoareS concl in
-      hs.hs_m
-    with _ ->
-      let hs = set_loc phi.pl_loc destr_bdHoareS concl in
-      hs.bhs_m
-  in
-  let hyps = LDecl.push_active m hyps in
-  process_form hyps phi ty
-
-let process_prhl_form ty g phi =
-  let hyps, concl = get_goal g in
-  let es = set_loc phi.pl_loc destr_equivS concl in
-  let hyps = LDecl.push_all [es.es_ml; es.es_mr] hyps in
-  process_form hyps phi ty
-
-let process_phl_formula = process_phl_form tbool
-
-let process_prhl_formula = process_prhl_form tbool
-
 let process_phl_bd_info dir g bd_info = 
   match bd_info with
   | PAppNone -> 
@@ -499,37 +477,6 @@ let process_kill (side, cpos, len) g =
 let process_alias (side, cpos, id) g =
   t_alias side cpos id g
 
-let process_rnd side tac_info g =
-  let _, _, concl = get_goal_e g in
-  match side, tac_info with 
-    | None, PNoRndParams when is_hoareS concl -> t_hoare_rnd g
-    | None, _ when is_bdHoareS concl ->
-      let tac_info = match tac_info with 
-        | PNoRndParams -> PNoRndParams
-        | PSingleRndParam p ->
-          PSingleRndParam (fun t -> process_phl_form (tfun t tbool) g p)
-        | PMultRndParams ((phi,d1,d2,d3,d4),p) -> 
-          let p t = p |> omap (process_phl_form (tfun t tbool) g) in
-          let phi = process_phl_form tbool g phi in
-          let d1 = process_phl_form treal g d1 in
-          let d2 = process_phl_form treal g d2 in
-          let d3 = process_phl_form treal g d3 in
-          let d4 = process_phl_form treal g d4 in
-          PMultRndParams ((phi,d1,d2,d3,d4),p)
-        | _ -> tacuerror "Wrong tactic arguments"
-      in
-      t_bd_hoare_rnd tac_info g
-    | _ when is_equivS concl ->
-      let process_form f ty1 ty2 = process_prhl_form (tfun ty1 ty2) g f in
-      let bij_info = match tac_info with
-        | PNoRndParams -> None, None
-        | PSingleRndParam f -> Some (process_form f), None
-        | PTwoRndParams (f, finv) -> Some (process_form f), Some (process_form finv)
-        | _ -> tacuerror "Wrong tactic arguments"
-      in
-      t_equiv_rnd side bij_info g
-    | _ -> cannot_apply "rnd" "unexpected instruction or wrong arguments"
-
 (* César says: too much code repetition w.r.t. ecPhl *)
 let process_bdHoare_deno info (_,n as g) = 
   let process_cut g (pre,post) = 
@@ -913,7 +860,7 @@ let process_phl loc ptac g =
     | Pinline info              -> process_inline info
     | Pkill info                -> process_kill info
     | Palias info               -> process_alias info
-    | Prnd (side, info)         -> process_rnd side info
+    | Prnd (side, info)         -> EcPhlRnd.process_rnd side info
     | Pconseq (nm,info)         -> process_conseq nm info
     | Phr_exists_elim           -> t_hr_exists_elim
     | Phr_exists_intro fs       -> process_exists_intro fs
