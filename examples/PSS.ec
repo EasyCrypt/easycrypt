@@ -240,14 +240,6 @@ section.
     }
   }.
 
-  local module Ha (H:SplitOracle) = {
-    fun o(x:message * salt): htag = {
-        var r:htag;
-        r = H.o(true,x);
-        return r;
-    }
-  }.
-
   local module GAdv(H:SplitOracle, G:Gt.Oracle) = {
 
     module Hs = {
@@ -258,7 +250,13 @@ section.
       }
     }
 
-    module Ha = Ha(H)
+    module Ha = {
+      fun o(x:message * salt): htag = {
+        var r:htag;
+        r = H.o(true,x);
+        return r;
+      }
+    }
 
     module S = {
  
@@ -334,6 +332,29 @@ section.
       return r;
     }
   }.
+
+  local lemma lossless_GAdv : 
+     (forall (G<:Gt.ARO) (H<:Ht.ARO) (S<:AdvOracles), 
+     islossless G.o => islossless H.o => islossless S.sign => islossless A(G, H, S).forge) =>
+    forall (H <: SplitOracle{GAdv}) (G <: Gt.Oracle{GAdv}),
+      islossless G.o => islossless H.o => islossless GAdv(H, G).main.
+  proof.
+    intros Hloss Hm Gm LG LH.
+    fun.
+    call (_ : true ==> true); [fun;wp => // | wp].
+    call (_ : true ==> true); [fun;wp | wp].
+      call LH => //.
+    call LG;wp.
+    call (Hloss Gm (<: GAdv(Hm,Gm).Ha) (<: GAdv(Hm,Gm).S) _ _ _) => //.
+      fun;call LH => //.
+      fun;wp.
+        call LG.
+        call (_ : true ==> true);[fun | ].
+        call LH => //.
+        rnd;wp;skip; smt.
+    call (_:true ==> true) => //.
+    fun;rnd;wp;skip;smt.
+  save.
 
   local module G0 = Gen(GAdv, H0, G).
 
@@ -525,14 +546,11 @@ section.
     forall a, in_dom a m1 = in_dom a m2 && 
      (in_dom a m1 => proj (m1.[a]) = fst (proj m2.[a])).
 
-
   local lemma equiv_G4_G5_gen (Ga<:Gadv{H4,H5,G,K}) :
       (forall (H6 <: SplitOracle{Ga}) (G6 <: Gt.Oracle{Ga}),
          islossless G6.o => islossless H6.o => islossless Ga(H6, G6).main) => 
       equiv [Gen(Ga,H4,G).main ~ Gen(Ga,H5,G).main : true ==> !H5.bad{2} => ={res}].
   proof.
-admit.
-(* 
    intros Hlossless;fun.
    call (_: H5.bad, 
             eq_proj H.m{1} H5.m{2} /\ ={G.m,K.n} /\ 2^(k - 1) <= K.n{2} < 2^k, 
@@ -571,8 +589,8 @@ admit.
    while (H5.bad /\ 2 ^ (k - 1) <= K.n < 2 ^ k) (kg2 - i) => //.
      intros z;wp => //=.
      conseq * ( _ : _ ==> true); first progress;smt.
-     rnd. apply  gtagL.
-     rnd. apply  htagL.
+     rnd. conseq (_ : _ ==> true) => //=. apply gtagL.
+     rnd. conseq (_ : _ ==> true) => //=. apply htagL.
      rnd cpTrue; skip => //=; progress.
      rewrite mu_bool_nu // /charfun /cpTrue //=; smt.
    wp;skip;progress => //;smt.
@@ -584,24 +602,8 @@ admit.
    inline H4.init H5.init Gt.ROM.RO.init K.init H.init;wp;rnd;skip.
    intros &m1 &m2 _ keysL keysR HinL HinR //=;split => [// _].
    cut H := keypair_bounded keysL _ => //; generalize H;progress => //.
-   intros x;smt. *)
+   intros x;smt. 
  save.
-
- local lemma lossless_GAdv : 
-     (forall (G<:Gt.ARO) (H<:Ht.ARO) (S<:AdvOracles), 
-     islossless G.o => islossless H.o => islossless S.sign => islossless A(G, H, S).forge) =>
-    forall (H <: SplitOracle{GAdv}) (G <: Gt.Oracle{GAdv}),
-      islossless G.o => islossless H.o => islossless GAdv(H, G).main.
- proof.
-  intros Hloss Hm Gm LG LH.
-  fun.
-  call (_ : true ==> true); [fun;wp => // | wp].
-  call (_ : true ==> true); [fun;wp | wp].
-    call LH => //.
-  call LG;wp.
-  admit. 
-(*  call (Hloss Gm (Ha(Hm)) _ _ _). *)
-  save.
 
  local lemma equiv_G4_G5 :
    (forall (G<:Gt.ARO) (H<:Ht.ARO) (S<:AdvOracles), 
