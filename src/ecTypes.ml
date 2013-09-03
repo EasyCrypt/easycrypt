@@ -741,6 +741,16 @@ let destr_var e =
   | Evar pv -> pv
   | _ -> assert false
 
+let is_tuple_var e = 
+  match e.e_node with
+  | Etuple es -> List.for_all is_var es
+  | _ -> false
+
+let destr_tuple_var e = 
+   match e.e_node with
+  | Etuple es -> List.map destr_var es
+  | _ -> assert false
+
 let proj_distr_ty ty = match ty.ty_node with
   | Tconstr(_,lty) when List.length lty = 1  -> 
     List.hd lty

@@ -580,6 +580,9 @@ module Mpv2 = struct
             | None -> Some (s,ty)
             | Some(s',_) -> Some (Snpv.union s s', ty))
             x (Mnpv.remove xl eqs.s_pv) }
+        
+  let substs_l env xls xs eqs = 
+    List.fold_left2 (fun eqs (xl,_) x -> subst_l env xl x eqs) eqs xls xs 
 
   let subst_r env xl x eqs = 
     let xl = pvm env xl in
@@ -591,6 +594,9 @@ module Mpv2 = struct
           Snpv.fold (fun x' s ->
             let x' = if pv_equal xl x' then x else x' in
             Snpv.add x' s) s Snpv.empty, ty) eqs.s_pv }
+
+  let substs_r env xrs xs eqs = 
+    List.fold_left2 (fun eqs (xr,_) x -> subst_r env xr x eqs) eqs xrs xs 
 
   let mem_pv_l env x eqs = 
     let x = pvm env x in
@@ -779,6 +785,8 @@ let eqobs_in env
         true
       with _ -> false in
 
+  let checks pvs fv = List.for_all (fun (pv,_) -> check pv fv) pvs in
+
   let check_not_l lvl eqo =
     let aux (pv,_) =
       check pv ifvl &&
@@ -833,6 +841,16 @@ let eqobs_in env
       if check xr ifvr then 
         let x = destr_var er in
         s_eqobs_in rsl rsr fhyps (Mpv2.subst_r env xr x eqo)
+      else rsl, rsr, fhyps, eqo
+    | { i_node = Sasgn(LvTuple xls, el)}::rsl, _ when is_tuple_var el ->
+      if checks xls ifvl then
+        let xs = destr_tuple_var el in
+        s_eqobs_in rsl rsr fhyps (Mpv2.substs_l env xls xs eqo)
+      else rsl, rsr, fhyps, eqo
+    | _, { i_node = Sasgn(LvTuple xrs, er)} :: rsr when is_tuple_var er ->
+      if checks xrs ifvr then 
+        let xs = destr_tuple_var er in
+        s_eqobs_in rsl rsr fhyps (Mpv2.substs_r env xrs xs eqo)
       else rsl, rsr, fhyps, eqo
     | {i_node = Sasgn(lvl,_)} ::rsl, _ when check_not_l lvl eqo ->
       s_eqobs_in rsl rsr fhyps eqo 

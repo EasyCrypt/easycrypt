@@ -169,7 +169,8 @@ val e_lam      : (EcIdent.t * ty) list -> expr -> expr
 
 val is_var     : expr -> bool
 val destr_var  : expr -> prog_var 
-
+val is_tuple_var : expr -> bool
+val destr_tuple_var : expr -> prog_var list
 (* -------------------------------------------------------------------- *)
 val e_map :
      (ty   -> ty  ) (* 1-subtype op. *)
