@@ -37,7 +37,6 @@ let id_of_mp mp m =
     | _ -> assert false in
   add_side name m
 
-
 (* Remark: m is only used to create fresh name, id_of_pv *)
 let generalize_subst env m uelts uglob = 
   let create (pv,ty) = id_of_pv pv m, GTty ty in
@@ -71,80 +70,6 @@ let generalize_mod env m modi f =
   let f = PVM.subst env s f in
   f_forall_simpl bd f
 
-let lv_subst m lv f =
-  match lv with
-  | LvVar(pv,t) ->
-    let id = id_of_pv pv m in 
-    (LSymbol (id,t), f), [pv,m,f_local id t]
-  | LvTuple vs ->
-    let ids = List.map (fun (pv,t) -> id_of_pv pv m, t) vs in
-    let s = List.map2 (fun (pv,_) (id,t) -> pv,m,f_local id t) vs ids in
-    (LTuple ids, f), s
-  | LvMap((p,tys),pv,e,ty) ->
-    let id = id_of_pv pv m in 
-    let set = f_op p tys (toarrow [ty; e.e_ty; f.f_ty] ty) in
-    let f = f_app set [f_pvar pv ty m; form_of_expr m e; f] ty in
-    (LSymbol (id,ty), f), [pv,m,f_local id ty]
-      
-let wp_asgn_aux m lv e (lets,f) =
-  let let1 = lv_subst m lv (form_of_expr m e) in
-  (let1::lets,f)
-
-exception HLerror
-
-let mk_let env (lets,f) = 
-  let rec aux s lets = 
-    match lets with
-    | [] -> PVM.subst env s f 
-    | ((lp,f1), toadd) :: lets ->
-      let f1 = PVM.subst env s f1 in
-      let s = 
-        List.fold_left (fun s (pv,m,fp) -> PVM.add env pv m fp s) s toadd in
-      f_let_simpl lp f1 (aux s lets) in
-  if lets = [] then f else aux PVM.empty lets 
-  
-exception No_wp
-
-(* wp functions operate only over assignments and conditional statements.
-   Any weakening on this restriction may break the soundness of bounded hoare logic 
-*)
-let rec wp_stmt env m (stmt: EcModules.instr list) letsf = 
-  match stmt with
-  | [] -> stmt, letsf
-  | i :: stmt' -> 
-      try 
-        let letsf = wp_instr env m i letsf in
-        wp_stmt env m stmt' letsf
-      with No_wp -> stmt, letsf
-and wp_instr env m i letsf = 
-  match i.i_node with
-  | Sasgn (lv,e) ->
-      wp_asgn_aux m lv e letsf
-  | Sif (e,s1,s2) -> 
-      let r1,letsf1 = wp_stmt env m (List.rev s1.s_node) letsf in
-      let r2,letsf2 = wp_stmt env m (List.rev s2.s_node) letsf in
-      if r1=[] && r2=[] then
-        let post1 = mk_let env letsf1 in 
-        let post2 = mk_let env letsf2 in
-        let post  = f_if (form_of_expr m e) post1 post2 in
-        [], post
-      else raise No_wp
-  | _ -> raise No_wp
-
-let wp env m s post = 
-  let r,letsf = wp_stmt env m (List.rev s.s_node) ([],post) in
-  List.rev r, mk_let env letsf 
-
-
-
-(* let subst_form env m lv e f = *)
-(*   let s = PVM.add env "pv" PVM.empty in *)
-(*   mk_let env letsf *)
-
-let subst_form_lv env m lv t f =
-  let lets = lv_subst m lv t in
-  mk_let env ([lets],f)
-
 (* -------------------------------------------------------------------- *)
 (* ----------------------  Auxiliary functions  ----------------------- *)
 (* -------------------------------------------------------------------- *)
@@ -172,13 +97,6 @@ let t_hS_or_bhS th te g =
   let concl = get_concl g in
   if is_hoareS concl then th g
   else if is_bdHoareS concl then te g
-  else tacerror (NotPhl None)
-
-let t_hS_or_bhS_or_eS th tbh te g =
-  let concl = get_concl g in
-  if is_hoareS concl then th g
-  else if is_bdHoareS concl then tbh g
-  else if is_equivS concl then te g
   else tacerror (NotPhl None)
 
 let gen_mems m f = 
@@ -239,6 +157,10 @@ let t_code_transform side ?(bdhoare = false) cpos tr tx g =
    --------------------------------------------------
        {pre} . {post} 
 *)
+
+class rn_hl_conseq = object inherit xrule "[hl] conseq" end
+let rn_hl_conseq = RN_xtd (new rn_hl_conseq)
+
 let conseq_cond pre post spre spost = 
   f_imp pre spre, f_imp spost post
  
@@ -250,7 +172,7 @@ let t_hoareF_conseq pre post g =
   let concl1 = gen_mems [mpr] cond1 in
   let concl2 = gen_mems [mpo] cond2 in
   let concl3 = f_hoareF pre hf.hf_f post in
-  prove_goal_by [concl1; concl2; concl3] (RN_hl_conseq) g  
+  prove_goal_by [concl1; concl2; concl3] rn_hl_conseq g  
     
 let t_hoareS_conseq pre post g =
   let concl = get_concl g in
@@ -259,7 +181,7 @@ let t_hoareS_conseq pre post g =
   let concl1 = gen_mems [hs.hs_m] cond1 in
   let concl2 = gen_mems [hs.hs_m] cond2 in
   let concl3 = f_hoareS_r { hs with hs_pr = pre; hs_po = post } in
-  prove_goal_by [concl1; concl2; concl3] (RN_hl_conseq) g
+  prove_goal_by [concl1; concl2; concl3] rn_hl_conseq g
 
 let t_bdHoareF_conseq pre post g =
   let env,_,concl = get_goal_e g in
@@ -274,7 +196,7 @@ let t_bdHoareF_conseq pre post g =
   let concl1 = gen_mems [mpr] cond1 in
   let concl2 = gen_mems [mpo] cond2 in
   let concl3 = f_bdHoareF pre bhf.bhf_f post bhf.bhf_cmp bhf.bhf_bd in
-  prove_goal_by [concl1; concl2; concl3] (RN_hl_conseq) g  
+  prove_goal_by [concl1; concl2; concl3] rn_hl_conseq g  
 
 let t_bdHoareS_conseq pre post g =
   let concl = get_concl g in
@@ -288,7 +210,7 @@ let t_bdHoareS_conseq pre post g =
   let concl1 = gen_mems [bhs.bhs_m] cond1 in
   let concl2 = gen_mems [bhs.bhs_m] cond2 in
   let concl3 = f_bdHoareS_r { bhs with bhs_pr = pre; bhs_po = post } in
-  prove_goal_by [concl1; concl2; concl3] (RN_hl_conseq) g
+  prove_goal_by [concl1; concl2; concl3] rn_hl_conseq g
 
 let bd_goal fcmp fbd cmp bd = 
   match fcmp, cmp with
@@ -306,7 +228,7 @@ let t_bdHoareF_conseq_bd cmp bd g =
   let bd_goal =  bd_goal bhf.bhf_cmp bhf.bhf_bd cmp bd in
   let concl = f_bdHoareF bhf.bhf_pr bhf.bhf_f bhf.bhf_po cmp bd in
   let bd_goal = gen_mems [mpr] (f_imp bhf.bhf_pr bd_goal) in
-  prove_goal_by [bd_goal;concl] (RN_hl_conseq_bd) g  
+  prove_goal_by [bd_goal;concl] rn_hl_conseq g  
 
 let t_bdHoareS_conseq_bd cmp bd g =
   let concl = get_concl g in
@@ -314,7 +236,7 @@ let t_bdHoareS_conseq_bd cmp bd g =
   let bd_goal =  bd_goal bhs.bhs_cmp bhs.bhs_bd cmp bd in
   let concl = f_bdHoareS bhs.bhs_m bhs.bhs_pr bhs.bhs_s bhs.bhs_po cmp bd in
   let bd_goal = gen_mems [bhs.bhs_m] (f_imp bhs.bhs_pr bd_goal) in
-  prove_goal_by [bd_goal;concl] (RN_hl_conseq_bd) g  
+  prove_goal_by [bd_goal;concl] rn_hl_conseq g  
 
 let t_equivF_conseq pre post g =
   let env,_,concl = get_goal_e g in
@@ -325,7 +247,7 @@ let t_equivF_conseq pre post g =
   let concl1 = gen_mems [mprl;mprr] cond1 in
   let concl2 = gen_mems [mpol;mpor] cond2 in
   let concl3 = f_equivF pre ef.ef_fl ef.ef_fr post in
-  prove_goal_by [concl1; concl2; concl3] (RN_hl_conseq) g  
+  prove_goal_by [concl1; concl2; concl3] rn_hl_conseq g  
 
 let t_equivS_conseq pre post g =
   let concl = get_concl g in
@@ -334,7 +256,7 @@ let t_equivS_conseq pre post g =
   let concl1 = gen_mems [es.es_ml;es.es_mr] cond1 in
   let concl2 = gen_mems [es.es_ml;es.es_mr] cond2 in
   let concl3 = f_equivS_r { es with es_pr = pre; es_po = post } in
-  prove_goal_by [concl1; concl2; concl3] (RN_hl_conseq) g
+  prove_goal_by [concl1; concl2; concl3] rn_hl_conseq g
 
 let t_hr_conseq pre post g = 
   match (get_concl g).f_node with 
@@ -347,6 +269,8 @@ let t_hr_conseq pre post g =
   | _           -> tacerror (NotPhl None)
 
 (* -------------------------------------------------------------------- *)
+class rn_notmod = object inherit xrule "[hl] notmod" end
+let rn_notmod = RN_xtd (new rn_notmod)
 
 let t_equivF_notmod post g = 
   let env,hyps,concl = get_goal_e g in
@@ -375,7 +299,7 @@ let t_equivF_notmod post g =
   assert (fst mprl = ml && fst mprr = mr);
   let cond1 = gen_mems [mprl; mprr] (f_imp ef.ef_pr cond) in
   let cond2 = f_equivF ef.ef_pr fl fr post in
-  prove_goal_by [cond1;cond2] RN_notmod g
+  prove_goal_by [cond1;cond2] rn_notmod g
 
 let t_equivS_notmod post g = 
   let env,_,concl = get_goal_e g in
@@ -388,7 +312,7 @@ let t_equivS_notmod post g =
   let cond = generalize_mod env ml modil cond in
   let cond1 = gen_mems [es.es_ml; es.es_mr] (f_imp es.es_pr cond) in
   let cond2 = f_equivS_r {es with es_po = post} in
-  prove_goal_by [cond1;cond2] RN_notmod g
+  prove_goal_by [cond1;cond2] rn_notmod g
 
 let gen_conseq_nm tnm tc pre post = 
   t_seq_subgoal (tnm post)
@@ -422,7 +346,7 @@ let t_hoareF_notmod post g =
   assert (fst mpr = m);
   let cond1 = gen_mems [mpr] (f_imp hf.hf_pr cond) in
   let cond2 = f_hoareF hf.hf_pr f post in
-  prove_goal_by [cond1;cond2] RN_notmod g
+  prove_goal_by [cond1;cond2] rn_notmod g
 
 let t_hoareS_notmod post g = 
   let env,_,concl = get_goal_e g in
@@ -434,7 +358,7 @@ let t_hoareS_notmod post g =
   let cond = generalize_mod env m modi cond in
   let cond1 = gen_mems [hs.hs_m] (f_imp hs.hs_pr cond) in
   let cond2 = f_hoareS_r {hs with hs_po = post} in
-  prove_goal_by [cond1;cond2] RN_notmod g
+  prove_goal_by [cond1;cond2] rn_notmod g
 
 let t_hoareF_conseq_nm = 
   gen_conseq_nm t_hoareF_notmod t_hoareF_conseq 
@@ -462,7 +386,7 @@ let t_bdHoareF_notmod post g =
   assert (fst mpr = m);
   let cond1 = gen_mems [mpr] (f_imp hf.bhf_pr cond) in
   let cond2 = f_bdHoareF hf.bhf_pr f post hf.bhf_cmp hf.bhf_bd in
-  prove_goal_by [cond1;cond2] RN_notmod g
+  prove_goal_by [cond1;cond2] rn_notmod g
 
 let t_bdHoareS_notmod post g = 
   let env,_,concl = get_goal_e g in
@@ -474,7 +398,7 @@ let t_bdHoareS_notmod post g =
   let cond = generalize_mod env m modi cond in
   let cond1 = gen_mems [hs.bhs_m] (f_imp hs.bhs_pr cond) in
   let cond2 = f_bdHoareS_r {hs with bhs_po = post} in
-  prove_goal_by [cond1;cond2] RN_notmod g
+  prove_goal_by [cond1;cond2] rn_notmod g
 
 let t_bdHoareF_conseq_nm = gen_conseq_nm t_bdHoareF_notmod t_bdHoareF_conseq 
 
@@ -493,6 +417,9 @@ Remark: the most basic rule is normally
 Q = exists m2, Q1 m1 m2 /\ Q2 m2 m3
 So the actual rule is in fact this basic rule + conseq. 
 But I prefers this one, which will be more conveniant *)
+
+class rn_equiv_trans = object inherit xrule "[hl] trans" end
+let rn_equiv_trans = RN_xtd (new rn_equiv_trans)
 
 let transitivity_side_cond hyps prml prmr poml pomr 
     p q p1 q1 pomt p2 q2 = 
@@ -529,7 +456,7 @@ let t_equivS_trans (mt,c2) p1 q1 p2 q2 g =
     f_equivS_r { es with
       es_ml = (mleft,mt); es_sl = c2;
       es_pr = p2; es_po = q2 } in
-  prove_goal_by [cond1;cond2;cond3;cond4] RN_equiv_trans g
+  prove_goal_by [cond1;cond2;cond3;cond4] rn_equiv_trans g
 
 let t_equivF_trans f p1 q1 p2 q2 g =
   let env,hyps,concl = get_goal_e g in
@@ -541,7 +468,7 @@ let t_equivF_trans f p1 q1 p2 q2 g =
       ef.ef_pr ef.ef_po p1 q1 pomt p2 q2 in
   let cond3 = f_equivF p1 ef.ef_fl f q1 in
   let cond4 = f_equivF p2 f ef.ef_fr q2 in
-  prove_goal_by [cond1;cond2;cond3;cond4] RN_equiv_trans g
+  prove_goal_by [cond1;cond2;cond3;cond4] rn_equiv_trans g
 
 (* -------------------------------------------------------------------- *)
 
@@ -575,13 +502,16 @@ let set_pre pre f =
  | FequivS es   -> f_equivS_r { es with es_pr = pre }
  | _            -> tacerror (NotPhl None)
 
+class rn_hl_exists_elim = object inherit xrule "[hl] elim-exists" end
+let rn_hl_exists_elim = RN_xtd (new rn_hl_exists_elim)
+
 let t_hr_exists_elim g = 
   let concl = get_concl g in
   let pre = get_pre concl in
   let bd, pre = destr_exists pre in
   (* TODO check that bd is not bind in the post *)
   let concl = f_forall bd (set_pre pre concl) in
-  prove_goal_by [concl] RN_hl_exists_elim g
+  prove_goal_by [concl] rn_hl_exists_elim g
 
 let get_to_gen side f = 
   let do_side m = 
@@ -630,12 +560,14 @@ let t_hr_exists_intro fs g =
       t_trivial; t_id None] g
 
 (* -------------------------------------------------------------------- *)
+class rn_hl_exfalso = object inherit xrule "[hl] exfalso" end
+let rn_hl_exfalso = RN_xtd (new rn_hl_exfalso)
 
 let t_hr_exfalso g = 
   let concl = get_concl g in
   let pre = get_pre concl in
   if pre <> f_false then tacerror InvalidExfalso;
-  prove_goal_by [] (RN_hl_exfalso) g
+  prove_goal_by [] rn_hl_exfalso g
 
 (* -------------------------------------------------------------------- *)
 let check_concrete env f = 
@@ -643,6 +575,18 @@ let check_concrete env f =
     let ppe = EcPrinting.PPEnv.ofenv env in
     tacuerror "The function %a is abstract, it should be concrete"
       (EcPrinting.pp_funname ppe) f 
+
+class rn_hl_fun_def = object inherit xrule "[hl] fun-def" end
+
+class rn_hl_fun_abs (phi : form) =
+object
+  inherit xrule "[hl] fun-abs"
+
+  method phi : form = phi
+end
+
+let rn_hl_fun_def   = RN_xtd (new rn_hl_fun_def   :> xrule)
+let rn_hl_fun_abs f = RN_xtd (new rn_hl_fun_abs f :> xrule)
 
 let t_hoareF_fun_def g = 
   let env,_,concl = get_goal_e g in
@@ -657,7 +601,7 @@ let t_hoareF_fun_def g =
     | Some e -> form_of_expr m e in
   let post = PVM.subst1 env (pv_res f) m fres hf.hf_po in
   let concl' = f_hoareS memenv hf.hf_pr fdef.f_body post in
-  prove_goal_by [concl'] RN_hl_fun_def g
+  prove_goal_by [concl'] rn_hl_fun_def g
 
 let t_bdHoareF_fun_def g = 
   let env,_,concl = get_goal_e g in
@@ -672,7 +616,7 @@ let t_bdHoareF_fun_def g =
     | Some e -> form_of_expr m e in
   let post = PVM.subst1 env (pv_res f) m fres bhf.bhf_po in
   let concl' = f_bdHoareS memenv bhf.bhf_pr fdef.f_body post bhf.bhf_cmp bhf.bhf_bd  in
-  prove_goal_by [concl'] RN_hl_fun_def g
+  prove_goal_by [concl'] rn_hl_fun_def g
 
 let t_equivF_fun_def g = 
   let env,_,concl = get_goal_e g in
@@ -696,7 +640,7 @@ let t_equivF_fun_def g =
   let concl' = 
     f_equivS memenvl memenvr ef.ef_pr fdefl.f_body fdefr.f_body post in
   
-  prove_goal_by [concl'] RN_hl_fun_def g
+  prove_goal_by [concl'] rn_hl_fun_def g
 
 
 let t_fun_def g =
@@ -742,7 +686,7 @@ let t_fun_to_code g =
   let post = PVM.subst env s ef.ef_po in  
   let concl = f_equivS ml mr ef.ef_pr sl sr post in
   (* TODO change the name of the rule *)
-  prove_goal_by [concl] RN_hl_fun_def g
+  prove_goal_by [concl] rn_hl_fun_def g
   
 (* TODO FIXME : oracle should ensure that the adversary state still equal:
    two solutions : 
@@ -783,7 +727,7 @@ let t_hoareF_abs inv g =
   let env,_,concl = get_goal_e g in
   let hf = destr_hoareF concl in
   let pre, post, sg = hoareF_abs_spec env hf.hf_f inv in
-  let tac g' = prove_goal_by sg (RN_hl_fun_abs inv) g' in
+  let tac g' = prove_goal_by sg (rn_hl_fun_abs inv) g' in
   t_on_last tac (t_hoareF_conseq pre post g)
 
 let lossless_hyps env top sub = 
@@ -827,7 +771,7 @@ let t_bdHoareF_abs inv g =
   match bhf.bhf_cmp with
     | FHeq when f_equal bhf.bhf_bd f_r1 -> 
       let pre, post, sg = bdHoareF_abs_spec env bhf.bhf_f inv in
-      let tac g' = prove_goal_by sg (RN_hl_fun_abs inv) g' in
+      let tac g' = prove_goal_by sg (rn_hl_fun_abs inv) g' in
       t_on_last tac (t_bdHoareF_conseq pre post g)
     | _ ->
       cannot_apply "fun" "expected \"= 1\" as bound" 
@@ -888,8 +832,20 @@ let t_equivF_abs inv g =
   let env,_,concl = get_goal_e g in
   let ef = destr_equivF concl in
   let pre, post, sg = equivF_abs_spec env ef.ef_fl ef.ef_fr inv in
-  let tac g' = prove_goal_by sg (RN_hl_fun_abs inv) g' in
+  let tac g' = prove_goal_by sg (rn_hl_fun_abs inv) g' in
   t_on_last tac (t_equivF_conseq pre post g)
+
+class rn_hl_fun_upto bad inv1 inv2 =
+object
+  inherit xrule "[hl] fun-upto"
+
+  method bad  : form = bad
+  method inv1 : form = inv1
+  method inv2 : form = inv2
+end
+
+let rn_hl_fun_upto bad inv1 inv2 =
+  RN_xtd (new rn_hl_fun_upto bad inv1 inv2 :> xrule)
 
 let equivF_abs_upto env fl fr bad invP invQ = 
   let topl, fl, oil,sigl, topr, fr, oir,sigr = abstract_info2 env fl fr in
@@ -938,17 +894,20 @@ let t_equivF_abs_upto bad invP invQ g =
   let env,_,concl = get_goal_e g in
   let ef = destr_equivF concl in
   let pre, post, sg = equivF_abs_upto env ef.ef_fl ef.ef_fr bad invP invQ in
-  let tac g' = prove_goal_by sg (RN_hl_fun_upto(bad,invP,invQ)) g' in
+  let tac g' = prove_goal_by sg (rn_hl_fun_upto bad invP invQ) g' in
   t_on_last tac (t_equivF_conseq pre post g)
 
 (* -------------------------------------------------------------------- *)  
+class rn_hl_skip = object inherit xrule "[hl] skip" end
+let rn_hl_skip = RN_xtd (new rn_hl_skip)
+
 let t_hoare_skip g =
   let concl = get_concl g in
   let hs = destr_hoareS concl in
   if hs.hs_s.s_node <> [] then tacerror NoSkipStmt;
   let concl = f_imp hs.hs_pr hs.hs_po in
   let concl = gen_mems [hs.hs_m] concl in
-  prove_goal_by [concl] RN_hl_skip g
+  prove_goal_by [concl] rn_hl_skip g
 
 let t_bdHoare_skip g =
   let concl = get_concl g in
@@ -961,7 +920,7 @@ let t_bdHoare_skip g =
   let gs = 
     if f_equal bhs.bhs_bd f_r1 then [concl] 
     else [f_eq bhs.bhs_bd f_r1; concl] in
-  prove_goal_by gs RN_hl_skip g
+  prove_goal_by gs rn_hl_skip g
 
 let t_equiv_skip g =
   let concl = get_concl g in
@@ -970,30 +929,24 @@ let t_equiv_skip g =
   if es.es_sr.s_node <> [] then tacerror NoSkipStmt;
   let concl = f_imp es.es_pr es.es_po in
   let concl = gen_mems [es.es_ml; es.es_mr] concl in
-  prove_goal_by [concl] RN_hl_skip g
+  prove_goal_by [concl] rn_hl_skip g
 
-let t_skip = 
-  t_hS_or_bhS_or_eS t_hoare_skip t_bdHoare_skip t_equiv_skip 
-
-(* -------------------------------------------------------------------- *)
-
-let s_split_i msg i s = 
-  let len = List.length s.s_node in
-  if not (0 < i && i <= len) then tacerror (InvalidCodePosition (msg,i,1,len));
-  let hd,tl = s_split (i-1) s in
-  hd, List.hd tl, (List.tl tl)
-
-let s_split msg i s =
-  let len = List.length s.s_node in
-  if i < 0 ||  len < i then tacerror (InvalidCodePosition (msg,i,0,len))
-  else s_split i s
-
-let s_split_o msg i s = 
-  match i with
-  | None -> [], s.s_node
-  | Some i -> s_split msg i s 
+let t_skip =
+  t_hS_or_bhS_or_eS ~th:t_hoare_skip ~tbh:t_bdHoare_skip ~te:t_equiv_skip 
 
 (* -------------------------------------------------------------------- *)
+class ['a] rn_hl_append td (dp : 'a doption) phi bdi =
+object
+  inherit xrule "[hl] append"
+
+  method tacdir  : tac_dir     = td
+  method doption : 'a doption  = dp
+  method phi     : form        = phi
+  method bdi     : app_bd_info = bdi
+end
+
+let rn_hl_append td dp phi bdi =
+  RN_xtd (new rn_hl_append td dp phi bdi :> xrule)
 
 let t_hoare_app i phi g =
   let concl = get_concl g in
@@ -1001,7 +954,7 @@ let t_hoare_app i phi g =
   let s1,s2 = s_split "app" i hs.hs_s in
   let a = f_hoareS_r { hs with hs_s = stmt s1; hs_po = phi }  in
   let b = f_hoareS_r { hs with hs_pr = phi; hs_s = stmt s2 } in
-  prove_goal_by [a;b] (RN_hl_append (Backs,Single i,phi,AppNone)) g
+  prove_goal_by [a;b] (rn_hl_append Backs (Single i) phi AppNone) g
 
 (* bd_hoare App 
 {P}c1{phi}
@@ -1053,7 +1006,7 @@ let t_bdHoare_app i (phi, pR,f1,f2,g1,g2) g =
     else condf1 :: condf2 :: conds in
   let conds = cond_phi :: conds in
   (* TODO The information make no sens here *)
-  prove_goal_by conds (RN_hl_append (Backs,Single i,pR,AppNone)) g
+  prove_goal_by conds (rn_hl_append Backs (Single i) pR AppNone) g
 
 let t_equiv_app (i,j) phi g =
   let concl = get_concl g in
@@ -1062,82 +1015,16 @@ let t_equiv_app (i,j) phi g =
   let sr1,sr2 = s_split "app" j es.es_sr in
   let a = f_equivS_r {es with es_sl=stmt sl1; es_sr=stmt sr1; es_po=phi} in
   let b = f_equivS_r {es with es_pr=phi; es_sl=stmt sl2; es_sr=stmt sr2} in
-  prove_goal_by [a;b] (RN_hl_append (Backs,Double (i,j), phi,AppNone)) g
-
-  
-(* -------------------------------------------------------------------- *)
-
-
-let check_wp_progress msg i s remain =
-  match i with
-  | None -> List.length s.s_node - List.length remain
-  | Some i ->
-    let len = List.length remain in
-    if len = 0 then i
-    else
-      cannot_apply msg 
-        (Format.sprintf "remaining %i instruction%s" len 
-           (if len = 1 then "" else "s"))
-
-let t_hoare_wp i g =
-  let env,_,concl = get_goal_e g in
-  let hs = destr_hoareS concl in
-  let s_hd,s_wp = s_split_o "wp" i hs.hs_s in
-  let s_wp,post = 
-    wp env (EcMemory.memory hs.hs_m) (EcModules.stmt s_wp) hs.hs_po in
-  let i = check_wp_progress "wp" i hs.hs_s s_wp in
-  let s = EcModules.stmt (s_hd @ s_wp) in
-  let concl = f_hoareS_r { hs with hs_s = s; hs_po = post} in
-  prove_goal_by [concl] (RN_hl_wp (Single i)) g
-
-let t_bdHoare_wp i g =
-  let env,_,concl = get_goal_e g in
-  let bhs = destr_bdHoareS concl in
-  let s_hd,s_wp = s_split_o "wp" i bhs.bhs_s in
-  let s_wp = EcModules.stmt s_wp in
-
-  let m = EcMemory.memory bhs.bhs_m in
-
-  (* let fv_bd = PV.fv env m bhs.bhs_bd in *)
-  (* let modi = s_write env s_wp in *)
-
-  (* if not (PV.indep env fv_bd modi) then  *)
-  (*   cannot_apply "wp" "Not_implemented: bound is modified by the statement"; *)
-
-  let s_wp,post = 
-    wp env m s_wp bhs.bhs_po in
-  let i = check_wp_progress "wp" i bhs.bhs_s s_wp in
-  let s = EcModules.stmt (s_hd @ s_wp) in
-  let concl = f_bdHoareS_r { bhs with bhs_s = s; bhs_po = post} in
-  prove_goal_by [concl] (RN_hl_wp (Single i)) g
-
-
-let t_equiv_wp ij g = 
-  let env,_,concl = get_goal_e g in
-  let es = destr_equivS concl in
-  let i = omap fst ij and j = omap snd ij in
-  let s_hdl,s_wpl = s_split_o "wp" i es.es_sl in
-  let s_hdr,s_wpr = s_split_o "wp" j es.es_sr in
-  let s_wpl,post = 
-    wp env (EcMemory.memory es.es_ml) (EcModules.stmt s_wpl) es.es_po in
-  let s_wpr, post =
-    wp env (EcMemory.memory es.es_mr) (EcModules.stmt s_wpr) post in
-  let i = check_wp_progress "wp" i es.es_sl s_wpl in
-  let j = check_wp_progress "wp" j es.es_sr s_wpr in
-  let sl = EcModules.stmt (s_hdl @ s_wpl) in
-  let sr = EcModules.stmt (s_hdr @ s_wpr) in
-  let concl = f_equivS_r {es with es_sl = sl; es_sr=sr; es_po = post} in
-  prove_goal_by [concl] (RN_hl_wp (Double(i,j))) g
-
-
-let t_wp k = match k with
-  | None -> 
-    t_hS_or_bhS_or_eS (t_hoare_wp None) (t_bdHoare_wp None) (t_equiv_wp None)
-  | Some (Single i) -> t_hS_or_bhS (t_hoare_wp (Some i)) (t_bdHoare_wp (Some i))
-  | Some (Double(i,j)) -> t_equiv_wp (Some (i,j))
-
+  prove_goal_by [a;b] (rn_hl_append Backs (Double (i, j)) phi AppNone) g
 
 (* -------------------------------------------------------------------- *)
+class rn_hl_while (_ : form) (_ : form option) (_ : (form * form) option) =
+object
+  inherit xrule "[hl] while"
+end
+
+let rn_hl_while x1 x2 x3 =
+  RN_xtd (new rn_hl_while x1 x2 x3 :> xrule)
   
 let t_hoare_while inv g =
   let env, _, concl = get_goal_e g in
@@ -1155,7 +1042,7 @@ let t_hoare_while inv g =
   let post = generalize_mod env m modi post in
   let post = f_and_simpl inv post in
   let concl = f_hoareS_r { hs with hs_s = s; hs_po=post} in
-  prove_goal_by [b_concl;concl] (RN_hl_while (inv,None,None)) g
+  prove_goal_by [b_concl;concl] (rn_hl_while inv None None) g
 
 let t_bdHoare_while inv vrnt g =
   let env, _, concl = get_goal_e g in
@@ -1183,7 +1070,7 @@ let t_bdHoare_while inv vrnt g =
   let post = generalize_mod env m modi post in
   let post = f_and_simpl inv post in
   let concl = f_bdHoareS_r { bhs with bhs_s = s; bhs_po=post} in
-  prove_goal_by [b_concl;concl] (RN_hl_while (inv,Some vrnt,None)) g
+  prove_goal_by [b_concl;concl] (rn_hl_while inv (Some vrnt) None) g
 
 let t_equiv_while_disj side vrnt inv g =
   let env, _, concl = get_goal_e g in
@@ -1216,7 +1103,7 @@ let t_equiv_while_disj side vrnt inv g =
   let post = f_and_simpl inv post in
   let concl = if side then f_equivS_r { es with es_sl = s; es_po=post}
     else f_equivS_r { es with es_sr = s; es_po=post} in
-  prove_goal_by [b_concl;concl] (RN_hl_while (inv,Some vrnt, None)) g
+  prove_goal_by [b_concl;concl] (rn_hl_while inv (Some vrnt) None) g
 
 let t_equiv_while inv g =
   let env,_,concl = get_goal_e g in
@@ -1239,7 +1126,7 @@ let t_equiv_while inv g =
   let post = generalize_mod env ml modil post in
   let post = f_and_simpl inv post in
   let concl = f_equivS_r {es with es_sl = sl; es_sr = sr; es_po = post} in
-  prove_goal_by [b_concl; concl] (RN_hl_while (inv,None,None)) g 
+  prove_goal_by [b_concl; concl] (rn_hl_while inv None None) g 
 
 (* -------------------------------------------------------------------- *)
 
@@ -1248,12 +1135,24 @@ let wp_asgn_call env m lv res post =
   | None -> post
   | Some lv ->
     let lets = lv_subst m lv res in
-    mk_let env ([lets],post)
+      mk_let_of_lv_substs env ([lets],post)
 
 let subst_args_call env m f =
   List.fold_right2 (fun v e s ->
     PVM.add env (pv_loc f v.v_name) m (form_of_expr m e) s)
-  
+
+class rn_hl_call side pr po =
+object
+  inherit xrule "[hl] call"
+
+  method side : bool option = side
+  method pre  : form = pr
+  method post : form = po
+end
+
+let rn_hl_call side pr po =
+  RN_xtd (new rn_hl_call side pr po :> xrule)
+
 let t_hoare_call fpre fpost g =
   (* FIXME : check the well formess of the pre and the post ? *)
   let env,_,concl = get_goal_e g in
@@ -1275,7 +1174,7 @@ let t_hoare_call fpre fpost g =
   let spre = subst_args_call env m f fsig.fs_params args PVM.empty in
   let post = f_anda_simpl (PVM.subst env spre fpre) post in
   let concl = f_hoareS_r { hs with hs_s = s; hs_po=post} in
-  prove_goal_by [f_concl;concl] (RN_hl_call (None, fpre, fpost)) g
+  prove_goal_by [f_concl;concl] (rn_hl_call None fpre fpost) g
 
 
 let bdHoare_call_spec fpre fpost f cmp bd opt_bd = 
@@ -1330,7 +1229,7 @@ let t_bdHoare_call fpre fpost opt_bd g =
       f_bdHoareS_r { bhs with bhs_s = s; bhs_po=post; bhs_cmp=FHeq; bhs_bd=f_r1}
     | _, _ -> assert false
   in
-  prove_goal_by [f_concl;concl] (RN_hl_call (None, fpre, fpost)) g
+  prove_goal_by [f_concl;concl] (rn_hl_call None fpre fpost) g
 
       
 
@@ -1370,7 +1269,7 @@ let t_equiv_call fpre fpost g =
   let spre = subst_args_call env mr fr fsigr.fs_params argsr spre in
   let post = f_anda_simpl (PVM.subst env spre fpre) post in
   let concl = f_equivS_r { es with es_sl = sl; es_sr = sr; es_po=post} in
-  prove_goal_by [f_concl;concl] (RN_hl_call (None, fpre, fpost)) g
+  prove_goal_by [f_concl;concl] (rn_hl_call None fpre fpost) g
 
 (* TODO generalize the rule for any lossless statement *)
 let t_equiv_call1 side fpre fpost g =
@@ -1410,9 +1309,11 @@ let t_equiv_call1 side fpre fpost g =
     | true  -> { equiv with es_sl = fstmt; es_po = post; }
     | false -> { equiv with es_sr = fstmt; es_po = post; } in
   let concl  = f_equivS_r concl in
-  prove_goal_by [fconcl; concl] (RN_hl_call (Some side, fpre, fpost)) g
+  prove_goal_by [fconcl; concl] (rn_hl_call (Some side) fpre fpost) g
 
 (* --------------------------------------------------------------------- *)
+class rn_hl_hoare_equiv = object inherit xrule "[hl] hoare-equiv" end
+let rn_hl_hoare_equiv = RN_xtd (new rn_hl_hoare_equiv)
 
 let t_hoare_equiv p q p1 q1 p2 q2 g =
   let concl = get_concl g in
@@ -1432,7 +1333,7 @@ let t_hoare_equiv p q p1 q1 p2 q2 g =
   let concl5 = 
     f_equivS_r { es with es_pr = p; es_po = q } in
   prove_goal_by [concl1; concl2; concl3; concl4; concl5] 
-    RN_hl_hoare_equiv g
+    rn_hl_hoare_equiv g
 
 (*
 let t_equiv_mod 
@@ -1452,12 +1353,22 @@ lossless c2
 *)
 
 (* --------------------------------------------------------------------- *)
+class rn_hl_case phi =
+object
+  inherit xrule "[hl] case"
+
+  method phi : form = phi
+end
+
+let rn_hl_case phi =
+  RN_xtd (new rn_hl_case phi :> xrule)
+
 let t_hoare_case f g =
   let concl = get_concl g in
   let hs = destr_hoareS concl in
   let concl1 = f_hoareS_r { hs with hs_pr = f_and_simpl hs.hs_pr f } in
   let concl2 = f_hoareS_r { hs with hs_pr = f_and_simpl hs.hs_pr (f_not f) } in
-  prove_goal_by [concl1;concl2] (RN_hl_case f) g
+  prove_goal_by [concl1;concl2] (rn_hl_case f) g
 
 let t_bdHoare_case f g =
   let concl = get_concl g in
@@ -1466,18 +1377,20 @@ let t_bdHoare_case f g =
     { bhs with bhs_pr = f_and_simpl bhs.bhs_pr f } in
   let concl2 = f_bdHoareS_r 
     { bhs with bhs_pr = f_and_simpl bhs.bhs_pr (f_not f) } in
-  prove_goal_by [concl1;concl2] (RN_hl_case f) g
+  prove_goal_by [concl1;concl2] (rn_hl_case f) g
 
 let t_equiv_case f g = 
   let concl = get_concl g in
   let es = destr_equivS concl in
   let concl1 = f_equivS_r { es with es_pr = f_and es.es_pr f } in
   let concl2 = f_equivS_r { es with es_pr = f_and es.es_pr (f_not f) } in
-  prove_goal_by [concl1;concl2] (RN_hl_case f) g
+  prove_goal_by [concl1;concl2] (rn_hl_case f) g
 
 let t_he_case f g =
-  t_hS_or_bhS_or_eS (t_hoare_case f) 
-    (t_bdHoare_case f) (t_equiv_case f) g 
+  t_hS_or_bhS_or_eS
+    ~th:(t_hoare_case f) 
+    ~tbh:(t_bdHoare_case f)
+    ~te:(t_equiv_case f) g 
 
 (* --------------------------------------------------------------------- *)
 
@@ -1560,19 +1473,30 @@ let _inline hyps me sp s =
   let me, s = inline_s me sp s.s_node in
   me, stmt s 
 
+class rn_hl_inline side pattern =
+object
+  inherit xrule "[hl] inline"
+
+  method side    : bool option = side
+  method pattern : s_pat       = pattern
+end
+
+let rn_hl_inline side pattern =
+  RN_xtd (new rn_hl_inline side pattern :> xrule)
+
 let t_inline_bdHoare sp g =
   let hyps,concl = get_goal g in
   let hoare      = destr_bdHoareS concl in
   let (me, stmt) = _inline hyps hoare.bhs_m sp hoare.bhs_s in
   let concl      = f_bdHoareS_r { hoare with bhs_m = me; bhs_s = stmt; } in
-  prove_goal_by [concl] (RN_hl_inline (None, sp)) g
+  prove_goal_by [concl] (rn_hl_inline None sp) g
 
 let t_inline_hoare sp g =
   let hyps,concl = get_goal g in
   let hoare      = destr_hoareS concl in
   let (me, stmt) = _inline hyps hoare.hs_m sp hoare.hs_s in
   let concl      = f_hoareS_r { hoare with hs_m = me; hs_s = stmt; } in
-  prove_goal_by [concl] (RN_hl_inline (None, sp)) g
+  prove_goal_by [concl] (rn_hl_inline None sp) g
 
 let t_inline_equiv side sp g =
   let hyps,concl = get_goal g in
@@ -1586,9 +1510,21 @@ let t_inline_equiv side sp g =
       let (me, stmt) = _inline hyps equiv.es_mr sp equiv.es_sr in
       f_equivS_r { equiv with es_mr = me; es_sr = stmt; }
   in
-  prove_goal_by [concl] (RN_hl_inline (Some side, sp)) g
+  prove_goal_by [concl] (rn_hl_inline (Some side) sp) g
 
 (* -------------------------------------------------------------------- *)
+class rn_hl_kill side cpos len =
+object
+  inherit xrule "[hl] kill"
+
+  method side     : bool option = side
+  method position : codepos     = cpos
+  method length   : int option  = len
+end
+
+let rn_hl_kill side cpos len =
+  RN_xtd (new rn_hl_kill side cpos len :> xrule)
+
 let t_kill side cpos olen g =
   let env = LDecl.toenv (get_hyps g) in
   let kill_stmt _env (_, po) me zpr =
@@ -1627,10 +1563,21 @@ let t_kill side cpos olen g =
       (me, { zpr with Zpr.z_tail = tl; }, [kslconcl])
   in
 
-  let tr = fun side -> RN_hl_kill (side, cpos, olen) in
+  let tr = fun side -> rn_hl_kill side cpos olen in
     t_code_transform side ~bdhoare:true cpos tr (t_zip kill_stmt) g
 
 (* -------------------------------------------------------------------- *)
+class rn_hl_alias side pos =
+object
+  inherit xrule "[hl] alias"
+
+  method side     : bool option = side
+  method position : codepos     = pos
+end
+
+let rn_hl_alias side pos =
+  RN_xtd (new rn_hl_alias side pos :> xrule)
+
 let alias_stmt id _ me i =
   match i.i_node with
   | Srnd (lv, e) ->
@@ -1646,7 +1593,7 @@ let alias_stmt id _ me i =
       tacuerror "cannot create an alias for that kind of instruction"
 
 let t_alias side cpos id g =
-  let tr = fun side -> RN_hl_alias (side, cpos) in
+  let tr = fun side -> rn_hl_alias side cpos in
   t_code_transform side cpos tr (t_fold (alias_stmt id)) g
 
 (* -------------------------------------------------------------------- *)
@@ -1710,8 +1657,20 @@ let fission_stmt (il, (d1, d2)) env me zpr =
 
     (me, { zpr with Zpr.z_head = hd; Zpr.z_tail = fis @ tl }, [])
 
+class rn_hl_fission side pos split =
+object
+  inherit xrule "[hl] loop-fission"
+
+  method side     : bool option       = side
+  method position : codepos           = pos
+  method split    : int * (int * int) = split
+end
+
+let rn_hl_fission side pos split =
+  RN_xtd (new rn_hl_fission side pos split :> xrule)
+
 let t_fission side cpos infos g =
-  let tr = fun side -> RN_hl_fission (side, cpos, infos) in
+  let tr = fun side -> rn_hl_fission side cpos infos in
   let cb = fun hyps _ me zpr -> fission_stmt infos (LDecl.toenv hyps) me zpr in
     t_code_transform side cpos tr (t_zip cb) g
 
@@ -1760,22 +1719,57 @@ let fusion_stmt (il, (d1, d2)) env me zpr =
 
     (me, { zpr with Zpr.z_head = hd; Zpr.z_tail = fus @ tl; }, [])
 
+class rn_hl_fusion side pos split =
+object
+  inherit xrule "[hl] loop-fusion"
+
+  method side     : bool option       = side
+  method position : codepos           = pos
+  method split    : int * (int * int) = split
+end
+
+let rn_hl_fusion side pos split =
+  RN_xtd (new rn_hl_fusion side pos split :> xrule)
+
 let t_fusion side cpos infos g =
-  let tr = fun side -> RN_hl_fusion (side, cpos, infos) in
+  let tr = fun side -> rn_hl_fusion side cpos infos in
   let cb = fun hyps _ me zpr -> fusion_stmt infos (LDecl.toenv hyps) me zpr in
     t_code_transform side cpos tr (t_zip cb) g
 
 (* -------------------------------------------------------------------- *)
+class rn_hl_unroll side pos =
+object
+  inherit xrule "[hl] loop-unroll"
+
+  method side     : bool option = side
+  method position : codepos     = pos
+end
+
+let rn_hl_unroll side pos =
+  RN_xtd (new rn_hl_unroll side pos :> xrule)
+
 let unroll_stmt _ me i =
   match i.i_node with
   | Swhile (e, sw) -> (me, [i_if (e, sw, stmt []); i])
   | _ -> tacuerror "cannot find a while loop at given position"
 
 let t_unroll side cpos g =
-  let tr = fun side -> RN_hl_unroll (side, cpos) in
+  let tr = fun side -> rn_hl_unroll side cpos in
     t_code_transform side cpos tr (t_fold unroll_stmt) g
 
 (* -------------------------------------------------------------------- *)
+class rn_hl_splitwhile cond side pos =
+object
+  inherit xrule "[hl] split-while"
+
+  method condition : expr        = cond
+  method side      : bool option = side
+  method position  : codepos     = pos
+end
+
+let rn_hl_splitwhile cond side pos =
+  RN_xtd (new rn_hl_splitwhile cond side pos :> xrule)
+
 let splitwhile_stmt b _env me i =
   match i.i_node with
   | Swhile (e, sw) -> 
@@ -1786,7 +1780,7 @@ let splitwhile_stmt b _env me i =
   | _ -> tacuerror "cannot find a while loop at given position"
 
 let t_splitwhile b side cpos g =
-  let tr = fun side -> RN_hl_splitwhile (b, side, cpos) in
+  let tr = fun side -> rn_hl_splitwhile b side cpos in
     t_code_transform side cpos tr (t_fold (splitwhile_stmt b)) g
 
 (* -------------------------------------------------------------------- *)
@@ -1854,12 +1848,27 @@ let cfold_stmt env me olen zpr =
   in
     (me, zpr, [])
 
+class rn_hl_cfold side pos len =
+object
+  inherit xrule "[hl] cfold"
+
+  method side     : bool option = side
+  method position : codepos     = pos
+  method length   : int option  = len
+end
+
+let rn_hl_cfold side pos len =
+  RN_xtd (new rn_hl_cfold side pos len :> xrule)
+
 let t_cfold side cpos olen g =
-  let tr = fun side -> RN_hl_cfold (side, cpos, olen) in
+  let tr = fun side -> rn_hl_cfold side cpos olen in
   let cb = fun hyps _ me zpr -> cfold_stmt (LDecl.toenv hyps) me olen zpr in 
     t_code_transform ~bdhoare:true side cpos tr (t_zip cb) g
 
 (* -------------------------------------------------------------------- *)
+class rn_hl_deno = object inherit xrule "[hl] deno" end
+let rn_hl_deno = RN_xtd (new rn_hl_deno)
+
 let t_bdHoare_deno pre post g =
   let env,_,concl = get_goal_e g in
   let cmp, f, bd, concl_post =
@@ -1893,8 +1902,7 @@ let t_bdHoare_deno pre post g =
   (* let ev   = Fsubst.f_subst smem_ ev in *)
   let me = EcEnv.Fun.actmem_post mhr f fun_ in
   let concl_po = gen_mems [me] (concl_post ev) in
-  prove_goal_by [concl_e;concl_pr;concl_po] RN_hl_deno g  
-
+  prove_goal_by [concl_e;concl_pr;concl_po] rn_hl_deno g  
 
 let t_equiv_deno pre post g =
   let env, _, concl = get_goal_e g in
@@ -1929,10 +1937,20 @@ let t_equiv_deno pre post g =
   let mel = EcEnv.Fun.actmem_post mleft fl funl in
   let mer = EcEnv.Fun.actmem_post mright fr funr in
   let concl_po = gen_mems [mel;mer] (f_imp post (cmp evl evr)) in
-  prove_goal_by [concl_e;concl_pr;concl_po] RN_hl_deno g  
-
+  prove_goal_by [concl_e;concl_pr;concl_po] rn_hl_deno g  
 
 (* -------------------------------------------------------------------- *)
+class rn_hl_rcond side br pos =
+object
+  inherit xrule "[hl] rcond"
+
+  method side     : bool option = side
+  method branch   : bool        = br
+  method position : int         = pos
+end
+
+let rn_hl_rcond side br pos =
+  RN_xtd (new rn_hl_rcond side br pos :> xrule)
 
 let gen_rcond b m at_pos s =
   let head, i, tail = s_split_i "rcond" at_pos s in 
@@ -1955,7 +1973,7 @@ let t_hoare_rcond b at_pos g =
   let hd,e,s = gen_rcond b m at_pos hs.hs_s in
   let concl1  = f_hoareS_r { hs with hs_s = hd; hs_po = e } in
   let concl2  = f_hoareS_r { hs with hs_s = s } in
-  prove_goal_by [concl1;concl2] (RN_hl_rcond (None, b,at_pos)) g  
+  prove_goal_by [concl1;concl2] (rn_hl_rcond None b (at_pos)) g  
 
 let t_bdHoare_rcond b at_pos g = 
   let concl = get_concl g in
@@ -1964,7 +1982,7 @@ let t_bdHoare_rcond b at_pos g =
   let hd,e,s = gen_rcond b m at_pos bhs.bhs_s in
   let concl1  = f_hoareS bhs.bhs_m bhs.bhs_pr hd e in
   let concl2  = f_bdHoareS_r { bhs with bhs_s = s } in
-  prove_goal_by [concl1;concl2] (RN_hl_rcond (None, b,at_pos)) g  
+  prove_goal_by [concl1;concl2] (rn_hl_rcond None b (at_pos)) g  
 
 let t_equiv_rcond side b at_pos g =
   let concl = get_concl g in
@@ -1984,7 +2002,7 @@ let t_equiv_rcond side b at_pos g =
       (f_hoareS (EcFol.mhr,EcMemory.memtype m) pre1 hd e) in
   let sl,sr = if side then s, es.es_sr else es.es_sl, s in
   let concl2 = f_equivS_r { es with es_sl = sl; es_sr = sr } in
-  prove_goal_by [concl1;concl2] (RN_hl_rcond (Some side,b,at_pos)) g 
+  prove_goal_by [concl1;concl2] (rn_hl_rcond (Some side) b (at_pos)) g 
 
 let t_rcond side b at_pos g =
   let concl = get_concl g in
@@ -1994,12 +2012,21 @@ let t_rcond side b at_pos g =
     | Some side -> t_equiv_rcond side b at_pos g
 
 (* -------------------------------------------------------------------- *)
-
 (* FAILURE EVENT LEMMA  *)
 
-(* in EcPath.mli: *)
+class rn_hl_fel cntr ash q fevent preds =
+object
+  inherit xrule "[hl] FEL"
 
+  method cntr   : form = cntr
+  method ash    : form = ash
+  method q      : form = q
+  method fevent : form = fevent
+  method preds  : (xpath * form) list = preds
+end
 
+let rn_hl_fel cntr ash q fevent preds =
+  RN_xtd (new rn_hl_fel cntr ash q fevent preds :> xrule)
 
 (* takes an xpath, returns xpath set *)
 let rec callable_oracles_f env modv os f =
@@ -2122,16 +2149,25 @@ let t_failure_event at_pos cntr ash q f_event pred_specs inv g =
       in
       let os_goals = List.concat (List.map oracle_goal (Sx.elements os)) in
       prove_goal_by ([bound_goal;post_goal;init_goal]@os_goals) 
-        (RN_hl_fel (cntr,ash,q,f_event,pred_specs) )  g
+        (rn_hl_fel cntr ash q f_event pred_specs)  g
     | _ -> 
       cannot_apply "failure event lemma" 
         "A goal of the form Pr[ _ ] <= _ was expected"
 
-
-
-
-
 (* -------------------------------------------------------------------- *)
+class rn_hl_swap side pos1 pos2 pos3 =
+object
+  inherit xrule "[hl] swap"
+
+  method side : bool option = side
+  method pos1 : int = pos1
+  method pos2 : int = pos2
+  method pos3 : int = pos3
+end
+
+let rn_hl_swap side pos1 pos2 pos3 =
+  RN_xtd (new rn_hl_swap side pos1 pos2 pos3 :> xrule)
+
 let check_swap env s1 s2 = 
   let m1,m2 = s_write env s1, s_write env s2 in
   let r1,r2 = s_read env s1, s_read env s2 in
@@ -2166,14 +2202,14 @@ let t_hoare_swap p1 p2 p3 g =
   let hs    = destr_hoareS concl in
   let s = swap_stmt env p1 p2 p3 hs.hs_s in
   let concl = f_hoareS_r {hs with hs_s = s } in
-  prove_goal_by [concl] (RN_hl_swap(None,p1,p2,p3)) g
+  prove_goal_by [concl] (rn_hl_swap None p1 p2 p3) g
 
 let t_bdHoare_swap p1 p2 p3 g =
   let env,_,concl = get_goal_e g in
   let bhs    = destr_bdHoareS concl in
   let s = swap_stmt env p1 p2 p3 bhs.bhs_s in
   let concl = f_bdHoareS_r {bhs with bhs_s = s } in
-  prove_goal_by [concl] (RN_hl_swap(None,p1,p2,p3)) g
+  prove_goal_by [concl] (rn_hl_swap None p1 p2 p3) g
 
 let t_equiv_swap side p1 p2 p3 g =
   let env,_,concl = get_goal_e g in
@@ -2184,7 +2220,7 @@ let t_equiv_swap side p1 p2 p3 g =
     else es.es_sl, swap_stmt env p1 p2 p3 es.es_sr 
   in
   let concl = f_equivS_r {es with es_sl = sl; es_sr = sr } in
-  prove_goal_by [concl] (RN_hl_swap(Some side,p1,p2,p3)) g
+  prove_goal_by [concl] (rn_hl_swap (Some side) p1 p2 p3) g
     
 (* -------------------------------------------------------------------- *)
 let t_gen_cond side e g =
@@ -2261,6 +2297,35 @@ let rec t_equiv_cond side g =
         ] g
 
 (* -------------------------------------------------------------------- *)
+class rn_hl_hoare_rnd =
+object
+  inherit xrule "[hl] hoare-rnd"
+end
+
+class rn_hl_equiv_rnd infos =
+object
+  inherit xrule "[hl] equiv-rnd"
+
+  method infos : (form, form, form) rnd_tac_info = infos
+end
+
+class rn_hl_bhl_rnd infos =
+object
+  inherit xrule "[bhl] hoare-rnd"
+
+
+  method infos : (form, ty -> form option, ty -> form) rnd_tac_info = infos
+end
+
+let rn_hl_hoare_rnd =
+  RN_xtd (new rn_hl_hoare_rnd)
+
+let rn_hl_equiv_rnd infos =
+  RN_xtd (new rn_hl_equiv_rnd infos :> xrule)
+
+let rn_bhl_rnd infos =
+  RN_xtd (new rn_hl_bhl_rnd infos :> xrule)
+
 let (===) = f_eq 
 let (==>) = f_imp
 let (&&&) = f_anda
@@ -2278,7 +2343,7 @@ let t_hoare_rnd g =
   let post = (f_in_supp x distr) ==> post in
   let post = f_forall_simpl [(x_id,GTty ty_distr)] post in
   let concl = f_hoareS_r {hs with hs_s=s; hs_po=post} in
-  prove_goal_by [concl] RN_hl_hoare_rnd g
+  prove_goal_by [concl] rn_hl_hoare_rnd g
 
 let wp_equiv_disj_rnd side g =
   let env,_,concl = get_goal_e g in
@@ -2302,7 +2367,7 @@ let wp_equiv_disj_rnd side g =
     if side then f_equivS_r {es with es_sl=s; es_po=post} 
     else  f_equivS_r {es with es_sr=s; es_po=post} 
   in
-  prove_goal_by [concl] RN_hl_hoare_rnd g
+  prove_goal_by [concl] rn_hl_hoare_rnd g
 
 let wp_equiv_rnd (f,finv) g =
   let env,_,concl = get_goal_e g in
@@ -2332,7 +2397,7 @@ let wp_equiv_rnd (f,finv) g =
   let post = (f_in_supp x muL) ==> ((f_in_supp y muR) ==> post) in
   let post = f_forall_simpl [(x_id,GTty tyL);(y_id,GTty tyR)] post in
   let concl = f_equivS_r {es with es_sl=sl'; es_sr=sr'; es_po=post} in
-  prove_goal_by [concl] (RN_hl_equiv_rnd (PTwoRndParams (tf, tfinv))) g
+  prove_goal_by [concl] (rn_hl_equiv_rnd (PTwoRndParams (tf, tfinv))) g
 
 let t_equiv_rnd side bij_info =
   match side with
@@ -2359,7 +2424,6 @@ let t_bd_hoare_rnd tac_info g =
   let ty_distr = proj_distr_ty (e_ty distr) in
   let distr = EcFol.form_of_expr (EcMemory.memory bhs.bhs_m) distr in
   let m = fst bhs.bhs_m in
-
   let mk_event_cond event = 
     let v_id = EcIdent.create "v" in
     let v = f_local v_id ty_distr in
@@ -2374,13 +2438,11 @@ let t_bd_hoare_rnd tac_info g =
           | FHeq -> f_imp_simpl v_in_supp (f_iff_simpl event_v post_v)
       end 
   in
-
   let f_cmp = match bhs.bhs_cmp with
     | FHle -> f_real_le
     | FHge -> fun x y -> f_real_le y x
     | FHeq -> f_eq
   in
-
   let is_post_indep =
     let fv = EcPV.PV.fv env m bhs.bhs_po in
     match lv with
@@ -2389,14 +2451,11 @@ let t_bd_hoare_rnd tac_info g =
         List.for_all (fun (x,_) -> not (EcPV.PV.mem_pv env x fv)) pvs
       | LvMap(_, x,_,_) -> not (EcPV.PV.mem_pv env x fv)
   in
-
-
   let is_bd_indep = 
     let fv_bd = PV.fv env mhr bhs.bhs_bd in 
     let modif_s = s_write env s in
     PV.indep env modif_s fv_bd
   in
-
   let mk_event ?(simpl=true) ty = 
     let x = EcIdent.create "x" in 
     if is_post_indep && simpl then f_lambda [x,GTty ty] f_true
@@ -2406,7 +2465,6 @@ let t_bd_hoare_rnd tac_info g =
           (EcPV.PVM.subst1 env pv m (f_local x ty) bhs.bhs_po)
       | _ -> tacuerror "Cannot infer a valid event, it must be provided"
   in
-
   let bound,pre_bound,binders = 
     if is_bd_indep then
       bhs.bhs_bd, f_true, []
@@ -2415,8 +2473,6 @@ let t_bd_hoare_rnd tac_info g =
       let bd = f_local bd_id treal in
       bd, f_eq bhs.bhs_bd bd, [(bd_id,GTty treal)] 
   in
-
-
   let subgoals = match tac_info, bhs.bhs_cmp with 
     | PNoRndParams, FHle -> 
       if is_post_indep then
@@ -2431,15 +2487,14 @@ let t_bd_hoare_rnd tac_info g =
         let concl = f_hoareS bhs.bhs_m pre s post in
         let concl = f_forall_simpl binders concl in
         [concl]
-
     | PNoRndParams, _ -> 
       if is_post_indep then
         (* event is true *)
         let event = mk_event ty_distr in
         let bounded_distr = f_eq (f_mu distr event) f_r1 in
-        let concl = f_bdHoareS_r {bhs with bhs_s=s} in
-        let bounded_distr = gen_mems [bhs.bhs_m] bounded_distr in
-        [bounded_distr;concl]
+        let concl = f_bdHoareS_r 
+          {bhs with bhs_s=s; bhs_po=f_and bhs.bhs_po bounded_distr} in
+        [concl]
       else 
         let event = mk_event ty_distr in
         let bounded_distr = f_cmp (f_mu distr event) bound in
@@ -2448,7 +2503,6 @@ let t_bd_hoare_rnd tac_info g =
         let concl = f_bdHoareS_r {bhs with bhs_s=s; bhs_pr=pre; bhs_po=post; bhs_bd=f_r1} in
         let concl = f_forall_simpl binders concl in
         [concl]
-
     | PSingleRndParam event, FHle ->
         let event = event ty_distr in
         let bounded_distr = f_real_le (f_mu distr event) bound in
@@ -2457,7 +2511,6 @@ let t_bd_hoare_rnd tac_info g =
         let concl = f_hoareS bhs.bhs_m pre s post in
         let concl = f_forall_simpl binders concl in
         [concl]
-
     | PSingleRndParam event, _ ->
         let event = event ty_distr in
         let bounded_distr = f_cmp (f_mu distr event) bound in
@@ -2486,10 +2539,7 @@ let t_bd_hoare_rnd tac_info g =
       [bd_sgoal;sgoal1;sgoal2;sgoal3;sgoal4]
     | _, _ -> tacuerror "wrong tactic arguments"
 in
-prove_goal_by subgoals (RN_bhl_rnd tac_info ) g
-
-
-
+prove_goal_by subgoals (rn_bhl_rnd tac_info) g
 
 let t_ppr ty phi_l phi_r g =
   let env,_,concl = get_goal_e g in
@@ -2541,8 +2591,15 @@ let t_ppr ty phi_l phi_r g =
   let memenvl,_,memenvr,_,_ = Fun.equivS fl fr env in
   let concl_post = gen_mems [memenvl;memenvr] concl_post in
   let concl_post = f_forall_simpl [a_id,GTty ty] concl_post in
-  prove_goal_by [concl_post;concl] RN_hl_deno g
+  prove_goal_by [concl_post;concl] rn_hl_deno g
 
+class rn_hl_hoare_bd_hoare =
+object
+  inherit xrule "[hl] hoare-bd-hoare"
+end
+
+let rn_hl_hoare_bd_hoare =
+  RN_xtd (new rn_hl_hoare_bd_hoare)
 
 let t_hoare_bd_hoare g =
   let concl = get_concl g in
@@ -2550,18 +2607,26 @@ let t_hoare_bd_hoare g =
     let bhs = destr_bdHoareS concl in
     let concl1 = f_hoareS bhs.bhs_m bhs.bhs_pr bhs.bhs_s (f_not bhs.bhs_po) in
     if f_equal bhs.bhs_bd f_r0 then
-      prove_goal_by [concl1] RN_hl_hoare_bd_hoare g
+      prove_goal_by [concl1] rn_hl_hoare_bd_hoare g
     else 
       (* Rewrite this : it is a consequence rule *)
       let concl2 = 
         gen_mems [bhs.bhs_m] (f_imp bhs.bhs_pr (f_eq bhs.bhs_bd f_r0)) in
-      prove_goal_by [concl1;concl2] RN_hl_hoare_bd_hoare g
+      prove_goal_by [concl1;concl2] rn_hl_hoare_bd_hoare g
   else if is_hoareS concl then
     let hs = destr_hoareS concl in
     let concl1 = f_bdHoareS hs.hs_m hs.hs_pr hs.hs_s (f_not hs.hs_po) FHeq f_r0 in
-    prove_goal_by [concl1] RN_hl_hoare_bd_hoare g
+    prove_goal_by [concl1] rn_hl_hoare_bd_hoare g
   else 
     cannot_apply "hoare/bd_hoare" "a hoare or bd_hoare judgment was expected" 
+
+class rn_hl_prbounded =
+object
+  inherit xrule "[hl] pr-bounded"
+end
+
+let rn_hl_prbounded =
+  RN_xtd (new rn_hl_prbounded)
 
 let t_pr_bounded conseq g = 
   let env, _, concl = get_goal_e g in
@@ -2581,11 +2646,19 @@ let t_pr_bounded conseq g =
     | FHle when conseq -> [gen_mems [m] (f_imp pr (f_real_le f_r1 bd))]
     | FHge when conseq -> [gen_mems [m] (f_imp pr (f_real_le bd f_r0))]
     | _ -> cannot_apply "pr_bounded" "cannot solve the probabilistic judgement" in
-  prove_goal_by cond RN_hl_prbounded g
+  prove_goal_by cond rn_hl_prbounded g
 
 let t_prbounded = t_pr_bounded true
 
 (* TODO : Remove this : can be done by rewrite_pr *)
+class rn_hl_prfalse =
+object
+  inherit xrule "[hl] pr-false"
+end
+
+let rn_hl_prfalse =
+  RN_xtd (new rn_hl_prfalse)
+
 let t_prfalse g = 
   let env,_, concl = get_goal_e g in
   let f,ev,bd =
@@ -2611,13 +2684,21 @@ let t_prfalse g =
   let fun_ = EcEnv.Fun.by_xpath f env in
   let me = EcEnv.Fun.actmem_post mhr f fun_ in
   let concl_po = gen_mems [me] (f_imp f_false ev) in
-  prove_goal_by [is_zero;concl_po] RN_hl_prfalse g
+  prove_goal_by [is_zero;concl_po] rn_hl_prfalse g
 
 (** The following should be changed latter *)
+class rn_hl_pr_lemma =
+object
+  inherit xrule "[hl] pr-lemma"
+end
+
+let rn_hl_pr_lemma =
+  RN_xtd (new rn_hl_pr_lemma)
+
 let t_pr_lemma lemma g = 
   let concl = get_concl g in
   assert (f_equal concl lemma);
-  prove_goal_by [] RN_hl_pr_lemma g
+  prove_goal_by [] rn_hl_pr_lemma g
 
 let pr_false m f args = 
   f_eq (f_pr m f args f_false) f_r0
@@ -2728,7 +2809,7 @@ let t_bdeq g =
   let concl = get_concl g in
   let bhs = destr_bdHoareS concl in 
   let concl = f_bdHoareS_r {bhs with bhs_cmp=FHeq } in
-  prove_goal_by [concl] RN_hl_prbounded g
+  prove_goal_by [concl] rn_hl_prbounded g
     
 (* -------------------------------------------------------------------- *)
 
@@ -2765,7 +2846,15 @@ let mk_inv_spec env inv fl fr =
     let pre = f_and eq_params inv in
     let post = f_and eq_res inv in
     f_equivF pre fl fr post
-   
+
+class rn_eqobs_in =
+object
+  inherit xrule "[hl] eqobs-in"
+end
+
+let rn_eqobs_in =
+  RN_xtd (new rn_eqobs_in :> xrule)
+
 let t_eqobs_inS finfo eqo inv g =
   let env, hyps, concl = get_goal_e g in
   let es = destr_equivS concl in
@@ -2782,7 +2871,7 @@ let t_eqobs_inS finfo eqo inv g =
   let pre = Mpv2.to_form ml mr eqi inv in
   let concl = 
     f_equivS es.es_ml es.es_mr es.es_pr sl sr pre in
-  prove_goal_by (sg@[concl]) RN_eqobs_in g
+  prove_goal_by (sg@[concl]) rn_eqobs_in g
 
 type eqobs_in_rec_info = 
   | EORI_adv of Mpv2.t
@@ -2882,13 +2971,21 @@ let rec eqobs_inF env eqg (inv,ifvl,ifvr as inve) log fl fr eqO =
       end
     | _, _ -> raise EqObsInError 
  
+class rn_hoare_true =
+object
+  inherit xrule "[hl] hoare-true"
+end
+
+let rn_hoare_true =
+  RN_xtd (new rn_hoare_true :> xrule)
+
 let t_hoare_true g = 
   let concl = get_concl g in
   match concl.f_node with
   | FhoareF hf when f_equal hf.hf_po f_true ->
-    prove_goal_by [] RN_hoare_true g   
+    prove_goal_by [] rn_hoare_true g   
   | FhoareS hs when f_equal hs.hs_po f_true ->
-    prove_goal_by [] RN_hoare_true g    
+    prove_goal_by [] rn_hoare_true g    
   | _ -> tacuerror "the conclusion should have the form hoare[_ : _ ==> true]"
 
   
@@ -2905,6 +3002,9 @@ let t_trivial =
   
  
 (* ---SP--------------------------------------------------------------- *)
+class rn_hl_sp = object inherit xrule "[hl] SP" end
+let rn_hl_sp = RN_xtd (new rn_hl_sp :> xrule)
+
 let rec sp_st side env mem pre (st : stmt) =
   let is = st.s_node in
   let f r i = sp_inst side env mem r (i.i_node) in
@@ -2947,25 +3047,25 @@ let t_sp_aux side g =
           es.es_sl,mleft, es.es_ml, es.es_pr, 
            fun pr st -> 
              let wes = f_equivS_r {es with es_sl=st; es_pr=pr} in
-             t_on_last t_simplify_nodelta (prove_goal_by [wes] RN_sp g)
+             t_on_last t_simplify_nodelta (prove_goal_by [wes] rn_hl_sp g)
       else es.es_sr, mright, es.es_mr, es.es_pr, 
         fun pr st -> 
           let wes = f_equivS_r {es with es_sr=st; es_pr=pr} in
-          t_on_last t_simplify_nodelta (prove_goal_by [wes] RN_sp g)
+          t_on_last t_simplify_nodelta (prove_goal_by [wes] rn_hl_sp g)
     with EcBaseLogic.TacError _ ->
       try
         let hs = destr_hoareS concl in
         hs.hs_s, mhr, hs.hs_m, hs.hs_pr, 
         fun pr st -> 
           let wes = f_hoareS_r {hs with hs_s=st; hs_pr=pr} in
-          t_on_last t_simplify_nodelta (prove_goal_by [wes] RN_sp g)
+          t_on_last t_simplify_nodelta (prove_goal_by [wes] rn_hl_sp g)
       with EcBaseLogic.TacError _ ->
         try
           let bhs = destr_bdHoareS concl in
           bhs.bhs_s, mhr, bhs.bhs_m, bhs.bhs_pr, 
           fun pr st -> 
             let wes = f_bdHoareS_r {bhs with bhs_s=st; bhs_pr=pr} in
-            t_on_last t_simplify_nodelta (prove_goal_by [wes] RN_sp g)
+            t_on_last t_simplify_nodelta (prove_goal_by [wes] rn_hl_sp g)
         with EcBaseLogic.TacError _ ->
           tacuerror "Unexpected goal"
   in

@@ -1,7 +1,13 @@
 (* -------------------------------------------------------------------- *)
+open EcUtils
 open EcIdent
+open EcMemory
 open EcModules
+open EcTypes
+open EcFol
+open EcBaseLogic
 open EcLogic
+open EcPV
 
 (* -------------------------------------------------------------------- *)
 type 'a sdestr_t  = string -> stmt -> 'a * stmt
@@ -60,3 +66,85 @@ let s_last_while   st = s_last  destr_while  (last_error "while"  st)
 let s_last_whiles  st = s_last2 destr_while  (last_error "while"  st)
 let s_last_assert  st = s_last  destr_assert (last_error "assert" st)
 let s_last_asserts st = s_last2 destr_assert (last_error "assert" st)
+
+(* -------------------------------------------------------------------- *)
+let t_hS_or_bhS_or_eS ?th ?tbh ?te g =
+  match (get_concl g).f_node with
+  | FhoareS   _ when th  <> None -> (oget th ) g
+  | FbdHoareS _ when tbh <> None -> (oget tbh) g
+  | FequivS   _ when te  <> None -> (oget te ) g
+    
+  | _ -> tacerror (NotPhl None)
+
+(* -------------------------------------------------------------------- *)
+let s_split_i msg i s = 
+  let len = List.length s.s_node in
+    if not (0 < i && i <= len) then
+      tacerror (InvalidCodePosition (msg, i, 1, len));
+    let (hd, tl) = EcModules.s_split (i-1) s in
+      (hd, List.hd tl, (List.tl tl))
+
+let s_split msg i s =
+  let len = List.length s.s_node in
+    if i < 0 || len < i then
+      tacerror (InvalidCodePosition (msg, i, 0, len));
+    EcModules.s_split i s
+
+let s_split_o msg i s = 
+  match i with
+  | None   -> ([], s.s_node)
+  | Some i -> s_split msg i s 
+
+(* -------------------------------------------------------------------- *)
+let tag_sym_with_side name m =
+  if      EcIdent.id_equal m EcFol.mleft  then (name ^ "_L")
+  else if EcIdent.id_equal m EcFol.mright then (name ^ "_R")
+  else    name
+
+let id_of_pv pv m =
+  let id = EcPath.basename pv.pv_name.EcPath.x_sub in
+  let id = tag_sym_with_side id m in
+    EcIdent.create id
+
+let id_of_mp mp m = 
+  let name = 
+    match mp.EcPath.m_top with
+    | `Local id -> EcIdent.name id 
+    | _ -> assert false
+  in
+    EcIdent.create (tag_sym_with_side name m)
+
+(* -------------------------------------------------------------------- *)
+type lv_subst_t = (lpattern * form) * (prog_var * memory * form) list
+
+let lv_subst m lv f : lv_subst_t =
+  match lv with
+  | LvVar(pv,t) ->
+    let id = id_of_pv pv m in 
+    (LSymbol (id,t), f), [pv,m,f_local id t]
+
+  | LvTuple vs ->
+    let ids = List.map (fun (pv,t) -> id_of_pv pv m, t) vs in
+    let s = List.map2 (fun (pv,_) (id,t) -> pv,m,f_local id t) vs ids in
+    (LTuple ids, f), s
+
+  | LvMap((p,tys),pv,e,ty) ->
+    let id = id_of_pv pv m in 
+    let set = f_op p tys (toarrow [ty; e.e_ty; f.f_ty] ty) in
+    let f = f_app set [f_pvar pv ty m; form_of_expr m e; f] ty in
+    (LSymbol (id,ty), f), [pv,m,f_local id ty]
+
+let mk_let_of_lv_substs env (lets, f) = 
+  let rec aux s lets =
+    match lets with
+    | [] -> PVM.subst env s f 
+    | ((lp,f1), toadd) :: lets ->
+      let f1 = PVM.subst env s f1 in
+      let s = 
+        List.fold_left (fun s (pv,m,fp) -> PVM.add env pv m fp s) s toadd in
+      f_let_simpl lp f1 (aux s lets) in
+  if lets = [] then f else aux PVM.empty lets 
+
+let subst_form_lv env m lv t f =
+  let lets = lv_subst m lv t in
+    mk_let_of_lv_substs env ([lets],f)

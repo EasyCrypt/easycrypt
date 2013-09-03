@@ -1,7 +1,12 @@
 (* -------------------------------------------------------------------- *)
+open EcSymbols
 open EcPath
 open EcTypes
+open EcMemory
 open EcModules
+open EcFol
+open EcBaseLogic
+open EcLogic
 
 (* -------------------------------------------------------------------- *)
 type 'a sdestr_t  = string -> stmt -> 'a * stmt
@@ -34,3 +39,24 @@ val s_last_while   : (expr * stmt) sdestr_t
 val s_last_whiles  : (expr * stmt) sdestr2_t
 val s_last_assert  : expr sdestr_t
 val s_last_asserts : expr sdestr2_t
+
+(* -------------------------------------------------------------------- *)
+val t_hS_or_bhS_or_eS : ?th:tactic -> ?tbh:tactic -> ?te:tactic -> tactic
+
+(* -------------------------------------------------------------------- *)
+val s_split_i : string -> int -> stmt -> instr list * instr * instr list
+val s_split   : string -> int -> stmt -> instr list * instr list
+val s_split_o : string -> int option -> stmt -> instr list * instr list
+
+(* -------------------------------------------------------------------- *)
+val id_of_pv : prog_var -> memory -> EcIdent.t
+val id_of_mp : mpath    -> memory -> EcIdent.t
+
+(* -------------------------------------------------------------------- *)
+type lv_subst_t = (lpattern * form) * (prog_var * memory * form) list
+
+val mk_let_of_lv_substs : EcEnv.env -> (lv_subst_t list * form) -> form
+
+val lv_subst : memory -> lvalue -> form -> lv_subst_t
+
+val subst_form_lv : EcEnv.env -> memory -> lvalue -> form -> form -> form

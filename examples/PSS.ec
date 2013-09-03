@@ -9,25 +9,25 @@ require import Distr.
 (*** General definitions *)
 (** Lengths *)
 op k:int.
-axiom leq0_k: 0 < k.
+axiom lt0_k: 0 < k.
 
 op k0:int.
-axiom leq0_k0: 0 < k0.
+axiom lt0_k0: 0 < k0.
 
 op k1:int.
-axiom leq0_k1: 0 < k1.
+axiom lt0_k1: 0 < k1.
 
 axiom constraints:
-  k0 + k1 <= k - 1.
+  k0 + k1 < k - 1.
 
 op kg:int = k - k1 - 1.
-lemma leq0_kg1: 0 < kg by [].
+lemma lt0_kg1: 0 < kg by [].
 
 op kg2:int = k - k0 - k1 - 1.
-lemma leq0_kg2: 0 <= kg2 by [].
+lemma lt0_kg2: 0 < kg2 by [].
 
 op k':int = k - 1.
-lemma leq0_k': 0 <= k' by [].
+lemma lt0_k': 0 < k' by [].
 
 op qS:int.
 axiom leq0_qS: 0 <= qS.
@@ -887,7 +887,15 @@ op bool_nu: int -> bool distr.
 axiom mu_bool_nu N p:
   2^(k - 1) <= N < 2^k =>
   mu (bool_nu N) p =
-    (N%r - (2^(k-1))%r / N%r) * charfun p true + ((2^(k - 1))%r / N%r) * charfun p false.
+    ((N%r - (2^(k-1))%r) / N%r) * charfun p true + ((2^(k - 1))%r / N%r) * charfun p false.
+lemma bool_nuL N:
+  2^(k - 1) <= N < 2^k =>
+  mu (bool_nu N) cpTrue = 1%r.
+proof.
+intros=> bounds; rewrite mu_bool_nu // /charfun /cpTrue /=.
+cut ->: forall (a b:real), a / N%r + b / N%r = (a + b) / N%r by smt.
+smt.
+qed.
 
 module H1: Ht.Oracle = {
   var bad:bool
@@ -918,24 +926,6 @@ module H1: Ht.Oracle = {
 }.
 
 module G1 = GGen(H1,SGen(H1)).
-
-(** Proof is up to bad with BAD = (b = true) in final memory *)
-lemma equiv_G0_G1 (A <: CMA_2RO):
-  equiv [G0(A(G,H)).main ~ G1(A(G,H1)).main: ={glob A} ==> !H1.bad{2} => ={res}].
-admit. qed.
-
-lemma G0_G1 (A <: CMA_2RO) &m:
-  Pr[G0(A(G,H)).main() @ &m: res] <= Pr[G1(A(G,H1)).main() @ &m: res] + Pr[G1(A(G,H1)).main() @ &m: H1.bad].
-proof.
-apply (Trans _ Pr[G1(A(G,H1)).main() @ &m: res \/ H1.bad] _).
-equiv_deno (equiv_G0_G1 A)=> //; smt.
-rewrite Pr mu_or; smt.
-qed.
-
-(** Maybe we need to fix the event to add a bound on the number of queries in the game *)
-lemma Bad1 (A <: CMA_2RO) &m:
-  Pr[G1(A(G,H1)).main() @ &m: H1.bad] <= (qS + qH)%r/(2^kg2)%r.
-admit. qed.
 
 (** G2 *)
 module H2: Ht.Oracle = {
@@ -1587,5 +1577,58 @@ call (_: true ==> ={glob Ht.ROM.RO}); first by fun; eqobs_in.
 call (_: true ==> ={glob Gt.ROM.RO}); first by fun; eqobs_in.
 skip; progress=> //; smt.
 qed.
+
+(** Proof is up to bad with BAD = (b = true) in final memory *)
+local equiv equiv_G0_G1_H:
+  H.o ~ H1.o: ={x, glob H} /\ 2^(k - 1) <= Mem.n{2} < 2^k ==> !H1.bad{2} => ={res, glob H}.
+fun; case (in_dom x ROM.RO.m){1}.
+  rcondf{1} 2; [ | rcondf{2} 4 ]; first 2 by intros=> &m; rnd; wp.
+  by wp; rnd; wp.
+
+  rcondt{1} 2; [ | rcondt{2} 4 ]; first 2 by intros=> &m; rnd; wp.
+  wp 2 4; while{2} (2^(k - 1) <= Mem.n < 2^k /\
+                    eq_except H.m{1} H.m x /\
+                    (!b => H.m.[x] = Some w)){2} (kg2 - i){2}.
+    intros=> &m z; seq 1: (kg2 - i <= z /\ 2^(k - 1) <= Mem.n < 2^k /\ eq_except H.m{m} H.m x) 1%r 1%r 1%r 0%r.
+      by rnd.
+      by rnd (cpTrue); skip;
+         intros=> &hr [[[[bounds nBad] [i_bound bad]] kg2_z] h]; rewrite bool_nuL //; smt.
+      by wp; skip; progress=> //; smt.
+      hoare; wp; skip; progress=> //; smt.
+      by progress.
+  swap{2} 3 -2; wp; rnd; skip; progress=> //; smt.
+qed.
+
+local equiv equiv_G0_G1:
+  G0(Ag(H)).main ~ G1(Ag(H1)).main: ={glob A} ==> !H1.bad{2} => ={res}.
+proof strict.
+(* fun.
+inline SGen(ROM.RO).fresh SGen(H1).fresh; wp.
+
+
+fun; eqobs_in (={glob H}) true: (!H1.bad{1} => ={glob H}).
+  fun; case (in_dom x ROM.RO.m){1}.
+    rcondf{1} 2; first by intros=> &m; rnd.
+    rcondf{2} 4; first by intros=> &m; rnd; wp.
+    by wp; rnd; wp.
+
+    rcondt{1} 2; first by intros=> &m; rnd.
+    rcondt{2} 4; first by intros=> &m; rnd; wp.
+    
+*)
+admit. qed.
+
+lemma G0_G1 &m:
+  Pr[G0(A(G,H)).main() @ &m: res] <= Pr[G1(A(G,H1)).main() @ &m: res] + Pr[G1(A(G,H1)).main() @ &m: H1.bad].
+proof.
+apply (Trans _ Pr[G1(A(G,H1)).main() @ &m: res \/ H1.bad] _).
+equiv_deno (equiv_G0_G1)=> //; smt.
+rewrite Pr mu_or; smt.
+qed.
+
+(** Maybe we need to fix the event to add a bound on the number of queries in the game *)
+lemma Bad1 &m:
+  Pr[G1(A(G,H1)).main() @ &m: H1.bad] <= (qS + qH)%r/(2^kg2)%r.
+admit. qed.
 
 end section.

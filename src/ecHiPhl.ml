@@ -899,7 +899,7 @@ let process_phl loc ptac g =
     | Pfun_to_code              -> EcPhl.t_fun_to_code 
     | Pskip                     -> EcPhl.t_skip
     | Papp (dir, k, phi, f)     -> process_app dir k phi f
-    | Pwp k                     -> t_wp k
+    | Pwp k                     -> EcPhlWp.t_wp k
     | Prcond (side, b, i)       -> t_rcond side b i
     | Pcond side                -> process_cond side
     | Pwhile (side, (phi, vopt))  -> process_while side phi vopt
