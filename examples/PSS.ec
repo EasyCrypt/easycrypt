@@ -203,10 +203,8 @@ module type CMA_2RO(G:Gt.ARO,H:Ht.ARO,S:AdvOracles) = {
 
 section. 
   declare module A:CMA_2RO {G,H,EF_CMA,Wrap,OW}.
-  axiom adversaryL (G <: Gt.ARO) (H <: Ht.ARO) (S <: Oracles):
-    islossless G.o =>
-    islossless H.o =>
-    islossless S.sign =>
+  axiom adversaryL (G <: Gt.ARO{A}) (H <: Ht.ARO{A}) (S <: AdvOracles{A}):
+    islossless G.o => islossless H.o => islossless S.sign =>
     islossless A(G,H,S).forge.
 
   local module Mem = {
@@ -336,33 +334,28 @@ section.
     }
   }.
 
-  local lemma lossless_GAdv : 
-     (forall (G<:Gt.ARO) (H<:Ht.ARO) (S<:AdvOracles), 
-     islossless G.o => islossless H.o => islossless S.sign => islossless A(G, H, S).forge) =>
-    forall (H <: SplitOracle{GAdv}) (G <: Gt.Oracle{GAdv}),
-      islossless G.o => islossless H.o => islossless GAdv(H, G).main.
+  local lemma lossless_GAdv (H <: SplitOracle{GAdv}) (G <: Gt.Oracle{GAdv}):
+    islossless G.o => islossless H.o =>
+    islossless GAdv(H, G).main.
   proof strict.
-    intros Hloss Hm Gm LG LH.
-    fun.
-    call (_ : true ==> true); [fun;wp => // | wp].
-    call (_ : true ==> true); [fun;wp | wp].
-      call LH => //.
-    call LG;wp.
-    call (Hloss Gm (<: GAdv(Hm,Gm).Ha) (<: GAdv(Hm,Gm).S) _ _ _) => //.
-      fun;call LH => //.
-      fun;wp.
-        call LG.
-        call (_ : true ==> true);[fun | ].
-        call LH => //.
-        rnd;wp;skip; smt.
-    call (_:true ==> true) => //.
-    fun;rnd;wp;skip;smt.
+  intros=> GL HL; fun.
+  call (_: true ==> true); first by fun.
+  wp; call (_: true ==> true); first by fun; call HL.
+  wp; call GL.
+  wp; call (adversaryL G (<: GAdv(H,G).Ha) (<: GAdv(H,G).S) _ _ _)=> //.
+    by fun; call HL.
+    fun; wp.
+      call GL.
+      call (_: true ==> true); first by fun; call HL.
+      by rnd; wp; skip; smt.
+    by call (_: true ==> true);
+      first by fun; rnd; wp; skip; smt.
   qed.
 
   (** First Transition:
       We rewrite PSS into an adversary against Gen with G and a trivial split oracle H0. *)
   local module H0 : SplitOracle = { 
-    fun init(ks:pkey*skey): unit = { 
+    fun init(ks:pkey*skey): unit = {
       H.init();
     }
    
@@ -401,6 +394,10 @@ section.
       by wp; rnd{1}; wp; rnd; wp; skip; progress=> //; smt.
   qed.        
 
+  (** Second Transition:
+      The random oracle H is made to loop and sample a bit
+      following the distribution of the strong bit of integers
+      less than the modulus. *)
   (** H Oracle for G1 *)
   op bool_nu: int -> bool distr.
   
@@ -409,22 +406,10 @@ section.
      mu (bool_nu N) p =
      (N%r - (2^(k-1))%r) / N%r * charfun p true + ((2^(k - 1))%r / N%r) * charfun p false.
 
-  local module K = { 
-    var pk:pkey
-    var sk:skey
-    var n :int
-    
-    fun init(ks:pkey*skey) : unit = { 
-      (pk,sk) = ks;
-      n = modulus_p pk;
-    }   
-  }.
-
   local module H1: SplitOracle = {
     var bad:bool
     
     fun init(ks:pkey*skey): unit = {
-      K.init(ks);
       H.init();
       bad = false;
     }
@@ -435,9 +420,9 @@ section.
       var w:htag;
       w = $sample_htag;
       if (!in_dom x H.m) {
-        H.m.[x] = htag_dummy;
+        H.m.[x] = HTag.zeros;
         while (i < kg2 && b) {
-          b = $bool_nu K.n;
+          b = $bool_nu Mem.n;
           i = i + 1;
           if (!b) H.m.[x] = w;
         }
@@ -448,6 +433,79 @@ section.
   }.
 
   local module G1 = Gen(GAdv,H1,G).
+
+  local equiv G0_G1_H: H0.o ~ H1.o:
+    !H1.bad{2} /\ ={glob H, x} /\ 2^(k - 1) <= Mem.n{2} < 2^k ==>
+    !H1.bad{2} => ={glob H, res} /\ 2^(k - 1) <= Mem.n{2} < 2^k.
+  proof strict.
+  fun; inline H.o; case (in_dom x H.m){1}.
+    (* in_dom x H.m *)
+    rcondf{1} 3; [ | rcondf{2} 4]; first 2 by intros &m; rnd; wp.
+    by wp; rnd; wp.
+
+    (* !in_dom x H.m *)
+    rcondt{1} 3; [ | rcondt{2} 4]; first 2 by intros &m; rnd; wp.
+    wp; while{2} (i <= kg2 /\ eq_except H.m{1} H.m x /\
+                  (!b => H.m.[x] = Some w{2}) /\ 2^(k - 1) <= Mem.n < 2^k){2} (kg2 - i){2}.
+      intros=> &m z; wp; rnd (cpTrue); skip; progress=> //; last 6 smt.
+        by rewrite mu_bool_nu // /charfun /cpTrue //=; smt.
+    by wp; rnd; wp; skip; progress=> //; smt.
+  qed.
+
+  local equiv G0_G1: G0.main ~ G1.main: true ==> !H1.bad{2} => ={res}.
+  proof strict.
+  fun.
+  (* Initialization *)
+  seq 3 3: (={glob G, glob H, keys} /\ !H1.bad{2} /\ in_supp keys{2} keypairs).
+    call (_: ={ks} /\ in_supp ks{2} keypairs ==> ={glob H} /\ !H1.bad{2}).
+      by fun; wp; call (_: true ==> ={glob H});
+           first by fun; eqobs_in.
+    call (_: true ==> ={glob G});
+      first by fun; eqobs_in.
+    rnd; skip; progress=> //.
+  (* Experiment *)
+  call (_: ={glob G, glob H, ks} /\ !H1.bad{2} /\ in_supp ks{2} keypairs ==> (!H1.bad{2} => ={res}))=> //; fun.
+    seq 7 7: (2^(k - 1) <= Mem.n{2} < 2^k /\
+              (!H1.bad{2} =>
+                ={glob G, glob H, glob Mem} /\
+                ={ks, m, s, y, forged, w, maskedR, gamma})).
+      wp. call (_: !H1.bad{2} /\ ={glob G, glob H, glob Mem, pk} /\ 2^(k - 1) <= Mem.n{2} < 2^k ==>
+                   2^(k - 1) <= Mem.n{2} < 2^k /\ (!H1.bad{2} => ={glob G, glob H, glob Mem, res})).
+        fun (H1.bad)
+              (={glob G, glob H, glob Mem} /\ 2^(k - 1) <= Mem.n{2} < 2^k)
+              (2^(k - 1) <= Mem.n{2} < 2^k)=> //; first smt.  (* Could be replaced "by cut := H H0=> //." *)
+        admit. (* BUG? Why do I have to prove
+                    "forall (G2 <: Gt.ARO{A}) (H2 <: ARO{A}) (S <: AdvOracles{A}), islossless A(G2, H2, S).forge"
+                  when we really only want to prove it when the oracles of G2, H2 and S that are used by A
+                  are known to be lossless *)
+      call (_: ={ks} /\ in_supp ks{2} keypairs ==> ={glob Mem} /\ 2^(k - 1) <= Mem.n{2} < 2^k);
+        first by fun; rnd; wp; skip; smt.
+      by skip; smt. (* Same deal with a well-chosen cut *)
+    case (H1.bad{2}).
+      (* bad occurred during the adversary run *)
+      call (_: true ==> true); first by fun.
+      wp; call (_: H1.bad{2} /\ 2^(k - 1) <= Mem.n{2} < 2^k ==> H1.bad{2}).
+        fun; call (_: H1.bad{2} /\ 2^(k - 1) <= Mem.n{2} < 2^k ==> H1.bad{2})=> //.
+          fun; inline H.o; wp=> //=; case (in_dom x H.m){2}.
+            rcondf{2} 4; first intros=> &m; rnd; wp; skip; smt.
+            by rnd; wp.
+
+            rcondt{2} 4; first intros=> &m; rnd; wp; skip; smt.
+            while{2} (i <= kg2 /\ 2^(k - 1) <= Mem.n{2} < 2^k){2} (kg2 - i){2}.
+              intros=> &m z; wp; rnd (cpTrue); skip; progress=> //; last 2 smt.
+                by rewrite mu_bool_nu // /charfun /cpTrue //=; smt.
+              by wp; rnd; wp; skip; progress=> //; smt.
+      wp; call (_: true ==> true); first by fun; wp; rnd.
+      skip; progress=> //; smt. (* absurd branches... absurd branches everywhere! *)
+
+      (* bad did not occur during the adversary run *)
+      call (_: ={glob Mem}).
+      wp; call (_: ={glob H, x} /\ !H1.bad{2} /\ 2^(k - 1) <= Mem.n{2} < 2^k ==>
+                   2^(k - 1) <= Mem.n{2} < 2^k /\ (!H1.bad{2} => ={glob H, res}));
+        first fun; call G0_G1_H; skip; progress=> //; smt.
+      wp; call (_: ={glob G}); first by eqobs_in.
+      by skip; progress=> //; smt.
+  qed.
 
   (** G2 *)
   local module H2 = {
