@@ -11,6 +11,7 @@ open EcFol
 open EcBaseLogic
 open EcLogic
 open EcHiLogic
+open EcCoreHiPhl
 open EcHiPhl
 
 (* -------------------------------------------------------------------- *)

@@ -190,16 +190,18 @@ val fop_imp  : form
 val fop_iff  : form
 val fop_eq   : EcTypes.ty -> form
 
-val f_not  : form -> form
-val f_and  : form -> form -> form
-val f_ands : form list -> form
-val f_anda : form -> form -> form
-val f_or   : form -> form -> form
-val f_ors  : form list -> form
-val f_ora  : form -> form -> form
-val f_imp  : form -> form -> form
-val f_imps : form list -> form -> form
-val f_iff  : form -> form -> form
+val f_not   : form -> form
+val f_and   : form -> form -> form
+val f_ands  : form list -> form
+val f_anda  : form -> form -> form
+val f_andas : form list -> form
+val f_or    : form -> form -> form
+val f_ors   : form list -> form
+val f_ora   : form -> form -> form
+val f_oras  : form list -> form
+val f_imp   : form -> form -> form
+val f_imps  : form list -> form -> form
+val f_iff   : form -> form -> form
 
 val f_eq  : form -> form -> form
 val f_eqs : form list -> form list -> form
@@ -304,6 +306,8 @@ val f_real_add_simpl  : form -> form -> form
 val f_real_sub_simpl  : form -> form -> form
 val f_real_prod_simpl : form -> form -> form
 val f_real_div_simpl  : form -> form -> form
+
+val f_forall_mems : (EcIdent.t * memtype) list -> form -> form
 
 (* -------------------------------------------------------------------- *)
 exception DestrError of string

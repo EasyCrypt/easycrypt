@@ -481,6 +481,10 @@ let f_exists b f = f_quant Lexists b f
 let f_forall b f = f_quant Lforall b f
 let f_lambda b f = f_quant Llambda b f
 
+let f_forall_mems bds f = 
+  let bds = List.map (fun (m, mt) -> (m, GTmem mt)) bds in
+    f_forall bds f
+
 (* -------------------------------------------------------------------- *)
 let f_tt     = f_op EcCoreLib.p_tt [] ty_unit
 let f_true   = f_op EcCoreLib.p_true [] ty_bool
@@ -528,10 +532,20 @@ let f_ands fs =
   | [] -> f_true
   | f::fs -> List.fold_left ((^~) f_and) f fs
 
+let f_andas fs =
+  match fs with
+  | [] -> f_true
+  | f::fs -> List.fold_left f_anda f fs
+
 let f_ors fs =
   match List.rev fs with
-  | [] -> f_true
+  | [] -> f_false
   | f::fs -> List.fold_left ((^~) f_or) f fs
+
+let f_oras fs =
+  match fs with
+  | [] -> f_false
+  | f::fs -> List.fold_left f_ora f fs
 
 let f_imps = List.fold_right f_imp
 
