@@ -56,6 +56,7 @@ clone import AWord as Salt with
   type word <- salt,
   op length <- k0.
 op sample_salt = Salt.Dword.dword.
+axiom saltL: mu sample_salt cpTrue = 1%r.
 
 (* Output of H *)
 type htag.
@@ -101,6 +102,11 @@ clone import OW as RSA with
 
 op ( * ): signature -> signature -> pkey -> signature.
 axiom homo_f_mul (x y:signature) pk: f pk ((x * y) pk) = (f pk x * f pk y) pk.
+
+op modulus_p: pkey -> int.
+axiom modulus_size pk sk:
+  in_supp (pk,sk) keypairs =>
+  2^(k-1) <= modulus_p pk < 2^k.
 
 clone import RandomOracle as Gt with
   type from <- htag,
@@ -196,12 +202,12 @@ module type CMA_2RO(G:Gt.ARO,H:Ht.ARO,S:AdvOracles) = {
 }.
 
 section. 
-  declare module A:CMA_2RO {H,EF_CMA,Wrap,PSS,OW,Gt.ROM.RO,ROM.RO,Ht.ROM.RO }. (* PSS pas necessaire il y a pas de global *)
-
-  op htag_dummy : htag.
-  op modulus_p: pkey -> int.
-  axiom keypair_bounded : forall ks, 
-     in_supp ks keypairs => 2^(k-1) <= modulus_p (fst ks) < 2^k.
+  declare module A:CMA_2RO {G,H,EF_CMA,Wrap,OW}.
+  axiom adversaryL (G <: Gt.ARO) (H <: Ht.ARO) (S <: Oracles):
+    islossless G.o =>
+    islossless H.o =>
+    islossless S.sign =>
+    islossless A(G,H,S).forge.
 
   local module Mem = {
     var pk:pkey
@@ -223,6 +229,15 @@ section.
     fun o(c:bool,x:message * salt):htag
   }.
 
+  (** Since the proof mostly works by modifying H,
+      with some eager-style interactions with G,
+      we will mostly reason in terms of a concrete
+      adversary trying to distinguish various
+      implementations of G and H through the signing
+      oracle. This should allow some abstraction in the
+      proof, and in particular in the two eager steps
+      on G.
+  **)
   module type Gadv (H:SplitOracle, G:Gt.Oracle) = { 
     fun main (ks:pkey * skey) : bool { * G.o H.o }
   }.
@@ -321,24 +336,12 @@ section.
     }
   }.
 
-  local module H0 : SplitOracle = { 
-    fun init(ks:pkey*skey): unit = { 
-      H.init();
-    }
-   
-    fun o(c:bool,x:message * salt):htag = { 
-      var r : htag;
-      r = H.o(x);
-      return r;
-    }
-  }.
-
   local lemma lossless_GAdv : 
      (forall (G<:Gt.ARO) (H<:Ht.ARO) (S<:AdvOracles), 
      islossless G.o => islossless H.o => islossless S.sign => islossless A(G, H, S).forge) =>
     forall (H <: SplitOracle{GAdv}) (G <: Gt.Oracle{GAdv}),
       islossless G.o => islossless H.o => islossless GAdv(H, G).main.
-  proof.
+  proof strict.
     intros Hloss Hm Gm LG LH.
     fun.
     call (_ : true ==> true); [fun;wp => // | wp].
@@ -354,9 +357,49 @@ section.
         rnd;wp;skip; smt.
     call (_:true ==> true) => //.
     fun;rnd;wp;skip;smt.
-  save.
+  qed.
 
-  local module G0 = Gen(GAdv, H0, G).
+  (** First Transition:
+      We rewrite PSS into an adversary against Gen with G and a trivial split oracle H0. *)
+  local module H0 : SplitOracle = { 
+    fun init(ks:pkey*skey): unit = { 
+      H.init();
+    }
+   
+    fun o(c:bool,x:message * salt):htag = { 
+      var r : htag;
+      r = H.o(x);
+      return r;
+    }
+  }.
+
+  local module G0 = Gen(GAdv,H0,G).
+
+  local equiv PSS_G0:
+    EF_CMA(Wrap(PSS(G,H)),A(G,H)).main ~ G0.main: ={glob A} ==> ={res}.
+  proof strict.
+  fun.
+  inline G0.main Gen(GAdv,H0,Gt.ROM.RO).GA.main; wp.
+  call (_: ={m} /\ Wrap.qs{1} = Mem.qs{2} ==> ={res});
+    first by fun; eqobs_in.
+  inline Wrap(PSS(Gt.ROM.RO,ROM.RO)).verify PSS(Gt.ROM.RO,ROM.RO).verify
+         PSS(Gt.ROM.RO,ROM.RO).g1 PSS(Gt.ROM.RO,ROM.RO).g2;
+  swap{1} [18..19] -3. (* Grouping the two calls to G on the left *)
+  wp; call (_: ={glob H});
+        first by inline H0.o H.o; wp; rnd; wp; skip; smt.
+  (* We use seq to cut out the calls to G and limit the scope of the rcond call *)
+  wp; seq 12 11: (={glob G, glob H, w, m, maskedR, gamma} /\
+                  Wrap.qs{1} = Mem.qs{2} /\
+                  b0{1} = forged{2} /\
+                  m1{1} = m{2}).
+    eqobs_in; inline Wrap(PSS(Gt.ROM.RO,ROM.RO)).init PSS(Gt.ROM.RO,ROM.RO).init
+                     ROM.RO.init Gt.ROM.RO.init PSS(Gt.ROM.RO,ROM.RO).keygen
+                     H0.init H.init Mem.init; rnd{2}; wp; rnd; wp;
+              skip; progress=> //; smt.
+    inline Gt.ROM.RO.o; rcondf{1} 9.
+      by intros=> &m //=; rnd; wp; rnd; wp; skip; progress=> //; smt.
+      by wp; rnd{1}; wp; rnd; wp; skip; progress=> //; smt.
+  qed.        
 
   (** H Oracle for G1 *)
   op bool_nu: int -> bool distr.

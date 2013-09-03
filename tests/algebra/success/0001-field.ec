@@ -129,12 +129,12 @@ lemma bij1_fst (a b c d r s : zq):
        c * d - 
        c * (a * s + b * r + d)) /
           (a - b * c) = r.
-proof. by intros h; fieldeq; smt. qed.
+proof. by intros h; fieldeq; cut ->: ofint (-1) * b * c + a = a - b * c by smt. qed.
 
 lemma bij1_snd (a b c d r s : zq):
    a - b * c <> Zq.gf_q0 =>
    ((a * s + b * r + d - d) - (b * (c * s + r))) / (a - b * c) = s.
-proof. by intros=> h; fieldeq; smt. qed.
+proof. by intros=> h; fieldeq; cut ->: ofint (-1) * b * c + a = a - b * c by fieldeq. qed.
 
 lemma bij1 (a b c d r s : zq):
   a - b * c <> Zq.gf_q0 =>
