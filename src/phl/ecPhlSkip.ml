@@ -1,4 +1,4 @@
-(* -------------------------------------------------------------------- *)  
+(* -------------------------------------------------------------------- *)
 open EcUtils
 open EcTypes
 open EcModules
@@ -7,14 +7,14 @@ open EcBaseLogic
 open EcLogic
 open EcCorePhl
 
-(* -------------------------------------------------------------------- *)  
+(* -------------------------------------------------------------------- *)
 class rn_hl_skip = object
   inherit xrule "[hl] skip"
 end
 
 let rn_hl_skip = RN_xtd (new rn_hl_skip)
 
-(* -------------------------------------------------------------------- *)  
+(* -------------------------------------------------------------------- *)
 module LowInternal = struct
   let t_hoare_skip g =
     let concl = get_concl g in
@@ -23,7 +23,7 @@ module LowInternal = struct
     let concl = f_imp hs.hs_pr hs.hs_po in
     let concl = f_forall_mems [hs.hs_m] concl in
       prove_goal_by [concl] rn_hl_skip g
-  
+
   let t_bdHoare_skip g =
     let concl = get_concl g in
     let bhs = t_as_bdHoareS concl in
@@ -32,13 +32,13 @@ module LowInternal = struct
       cannot_apply "skip" "bound must be \">= 1\"";
     let concl = f_imp bhs.bhs_pr bhs.bhs_po in
     let concl = f_forall_mems [bhs.bhs_m] concl in
-    let gs = 
+    let gs =
       if   f_equal bhs.bhs_bd f_r1
-      then [concl] 
+      then [concl]
       else [f_eq bhs.bhs_bd f_r1; concl]
     in
       prove_goal_by gs rn_hl_skip g
-  
+
   let t_equiv_skip g =
     let concl = get_concl g in
     let es = t_as_equivS concl in
@@ -49,9 +49,9 @@ module LowInternal = struct
       prove_goal_by [concl] rn_hl_skip g
 end
 
-(* -------------------------------------------------------------------- *)  
+(* -------------------------------------------------------------------- *)
 let t_skip =
   t_hS_or_bhS_or_eS
     ~th: LowInternal.t_hoare_skip
     ~tbh:LowInternal.t_bdHoare_skip
-    ~te: LowInternal.t_equiv_skip 
+    ~te: LowInternal.t_equiv_skip

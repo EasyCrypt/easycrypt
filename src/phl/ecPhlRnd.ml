@@ -66,9 +66,9 @@ let t_hoare_rnd g =
 let wp_equiv_disj_rnd side g =
   let env,_,concl = get_goal_e g in
   let es = t_as_equivS concl in
-  let m,s = 
-    if side then es.es_ml, es.es_sl 
-    else         es.es_mr, es.es_sr 
+  let m,s =
+    if side then es.es_ml, es.es_sl
+    else         es.es_mr, es.es_sr
   in
   let (lv,distr),s= s_last_rnd "rnd" s in
 
@@ -81,9 +81,9 @@ let wp_equiv_disj_rnd side g =
   let post = f_imp (f_in_supp x distr) post in
   let post = f_forall_simpl [(x_id,GTty ty_distr)] post in
   let post = f_anda (f_eq (f_weight ty_distr distr) f_r1) post in
-  let concl = 
-    if side then f_equivS_r {es with es_sl=s; es_po=post} 
-    else  f_equivS_r {es with es_sr=s; es_po=post} 
+  let concl =
+    if side then f_equivS_r {es with es_sl=s; es_po=post}
+    else  f_equivS_r {es with es_sr=s; es_po=post}
   in
   prove_goal_by [concl] rn_hl_hoare_rnd g
 
@@ -114,7 +114,7 @@ let wp_equiv_rnd (f,finv) g =
   let post = subst_form_lv env (EcMemory.memory es.es_mr) lvR (f x) post in
   let post = f_andas [supp_cond1; supp_cond2; inv_cond1; inv_cond2; post] in
   let post = f_imp (f_in_supp y muR) post in
-  let post = f_imp (f_in_supp x muL) post in 
+  let post = f_imp (f_in_supp x muL) post in
   let post = f_forall_simpl [(x_id,GTty tyL);(y_id,GTty tyR)] post in
   let concl = f_equivS_r {es with es_sl=sl'; es_sr=sr'; es_po=post} in
   prove_goal_by [concl] (rn_hl_equiv_rnd (PTwoRndParams (tf, tfinv))) g
@@ -124,41 +124,41 @@ let t_equiv_rnd side bij_info =
   match side with
   | Some side -> wp_equiv_disj_rnd side
   | None  ->
-    let f,finv =  match bij_info with 
+    let f,finv =  match bij_info with
       | Some f, Some finv ->  f, finv
       | Some bij, None | None, Some bij -> bij, bij
-      | None, None -> 
+      | None, None ->
         let z_id = EcIdent.create "z" in
         let z = f_local z_id in
-        let bij = fun tyL tyR -> f_lambda [z_id,GTty tyR] (z tyL) in 
+        let bij = fun tyL tyR -> f_lambda [z_id,GTty tyR] (z tyL) in
           (* TODO Cezar : Can it be not well typed: normally tyL and tyR should
              be equal.
              I propose to replace tyL by tyR
           *)
         bij, bij
-    in wp_equiv_rnd (f, finv) 
+    in wp_equiv_rnd (f, finv)
 
 (* -------------------------------------------------------------------- *)
-let t_bd_hoare_rnd tac_info g = 
+let t_bd_hoare_rnd tac_info g =
   let env,_,concl = get_goal_e g in
   let bhs = t_as_bdHoareS concl in
   let (lv,distr),s = s_last_rnd "bd_hoare_rnd" bhs.bhs_s in
   let ty_distr = proj_distr_ty (e_ty distr) in
   let distr = EcFol.form_of_expr (EcMemory.memory bhs.bhs_m) distr in
   let m = fst bhs.bhs_m in
-  let mk_event_cond event = 
+  let mk_event_cond event =
     let v_id = EcIdent.create "v" in
     let v = f_local v_id ty_distr in
     let post_v = subst_form_lv env (EcMemory.memory bhs.bhs_m) lv v bhs.bhs_po in
     let event_v = f_app event [v] tbool in
     let v_in_supp = f_in_supp v distr in
-    f_forall_simpl [v_id,GTty ty_distr] 
+    f_forall_simpl [v_id,GTty ty_distr]
       begin
-        match bhs.bhs_cmp with 
+        match bhs.bhs_cmp with
           | FHle -> f_imps_simpl [v_in_supp;post_v] event_v
           | FHge -> f_imps_simpl [v_in_supp;event_v] post_v
           | FHeq -> f_imp_simpl v_in_supp (f_iff_simpl event_v post_v)
-      end 
+      end
   in
   let f_cmp = match bhs.bhs_cmp with
     | FHle -> f_real_le
@@ -173,54 +173,54 @@ let t_bd_hoare_rnd tac_info g =
         List.for_all (fun (x,_) -> not (EcPV.PV.mem_pv env x fv)) pvs
       | LvMap(_, x,_,_) -> not (EcPV.PV.mem_pv env x fv)
   in
-  let is_bd_indep = 
-    let fv_bd = PV.fv env mhr bhs.bhs_bd in 
+  let is_bd_indep =
+    let fv_bd = PV.fv env mhr bhs.bhs_bd in
     let modif_s = s_write env s in
     PV.indep env modif_s fv_bd
   in
-  let mk_event ?(simpl=true) ty = 
-    let x = EcIdent.create "x" in 
+  let mk_event ?(simpl=true) ty =
+    let x = EcIdent.create "x" in
     if is_post_indep && simpl then f_lambda [x,GTty ty] f_true
     else match lv with
-      | LvVar (pv,_) -> 
-        f_lambda [x,GTty ty] 
+      | LvVar (pv,_) ->
+        f_lambda [x,GTty ty]
           (EcPV.PVM.subst1 env pv m (f_local x ty) bhs.bhs_po)
       | _ -> tacuerror "Cannot infer a valid event, it must be provided"
   in
-  let bound,pre_bound,binders = 
+  let bound,pre_bound,binders =
     if is_bd_indep then
       bhs.bhs_bd, f_true, []
-    else 
+    else
       let bd_id = EcIdent.create "bd" in
       let bd = f_local bd_id treal in
-      bd, f_eq bhs.bhs_bd bd, [(bd_id,GTty treal)] 
+      bd, f_eq bhs.bhs_bd bd, [(bd_id,GTty treal)]
   in
-  let subgoals = match tac_info, bhs.bhs_cmp with 
-    | PNoRndParams, FHle -> 
+  let subgoals = match tac_info, bhs.bhs_cmp with
+    | PNoRndParams, FHle ->
       if is_post_indep then
         (* event is true *)
         let concl = f_bdHoareS_r {bhs with bhs_s=s} in
         [concl]
-      else 
+      else
         let event = mk_event ty_distr in
         let bounded_distr = f_real_le (f_mu distr event) bound in
-        let pre = f_and bhs.bhs_pr pre_bound in 
+        let pre = f_and bhs.bhs_pr pre_bound in
         let post = f_anda bounded_distr (mk_event_cond event) in
         let concl = f_hoareS bhs.bhs_m pre s post in
         let concl = f_forall_simpl binders concl in
         [concl]
-    | PNoRndParams, _ -> 
+    | PNoRndParams, _ ->
       if is_post_indep then
         (* event is true *)
         let event = mk_event ty_distr in
         let bounded_distr = f_eq (f_mu distr event) f_r1 in
-        let concl = f_bdHoareS_r 
+        let concl = f_bdHoareS_r
           {bhs with bhs_s=s; bhs_po=f_and bhs.bhs_po bounded_distr} in
         [concl]
-      else 
+      else
         let event = mk_event ty_distr in
         let bounded_distr = f_cmp (f_mu distr event) bound in
-        let pre = f_and bhs.bhs_pr pre_bound in 
+        let pre = f_and bhs.bhs_pr pre_bound in
         let post = f_anda bounded_distr (mk_event_cond event) in
         let concl = f_bdHoareS_r {bhs with bhs_s=s; bhs_pr=pre; bhs_po=post; bhs_bd=f_r1} in
         let concl = f_forall_simpl binders concl in
@@ -228,7 +228,7 @@ let t_bd_hoare_rnd tac_info g =
     | PSingleRndParam event, FHle ->
         let event = event ty_distr in
         let bounded_distr = f_real_le (f_mu distr event) bound in
-        let pre = f_and bhs.bhs_pr pre_bound in 
+        let pre = f_and bhs.bhs_pr pre_bound in
         let post = f_anda bounded_distr (mk_event_cond event) in
         let concl = f_hoareS bhs.bhs_m pre s post in
         let concl = f_forall_simpl binders concl in
@@ -236,24 +236,24 @@ let t_bd_hoare_rnd tac_info g =
     | PSingleRndParam event, _ ->
         let event = event ty_distr in
         let bounded_distr = f_cmp (f_mu distr event) bound in
-        let pre = f_and bhs.bhs_pr pre_bound in 
+        let pre = f_and bhs.bhs_pr pre_bound in
         let post = f_anda bounded_distr (mk_event_cond event) in
         let concl = f_bdHoareS_r {bhs with bhs_s=s; bhs_pr=pre; bhs_po=post; bhs_cmp=FHeq; bhs_bd=f_r1} in
         let concl = f_forall_simpl binders concl in
         [concl]
-    | PMultRndParams ((phi,d1,d2,d3,d4),event), _ -> 
-      let event = match event ty_distr with 
-        | None -> mk_event ~simpl:false ty_distr | Some event -> event 
+    | PMultRndParams ((phi,d1,d2,d3,d4),event), _ ->
+      let event = match event ty_distr with
+        | None -> mk_event ~simpl:false ty_distr | Some event -> event
       in
-      let bd_sgoal = f_cmp (f_real_add (f_real_prod d1 d2) (f_real_prod d3 d4)) bhs.bhs_bd in 
+      let bd_sgoal = f_cmp (f_real_add (f_real_prod d1 d2) (f_real_prod d3 d4)) bhs.bhs_bd in
       let sgoal1 = f_bdHoareS_r {bhs with bhs_s=s; bhs_po=phi; bhs_bd=d1} in
-      let sgoal2 = 
+      let sgoal2 =
         let bounded_distr = f_cmp (f_mu distr event) d2 in
         let post = f_anda bounded_distr (mk_event_cond event) in
         f_forall_mems [bhs.bhs_m] (f_imp phi post)
       in
       let sgoal3 = f_bdHoareS_r {bhs with bhs_s=s; bhs_po=f_not phi; bhs_bd=d3} in
-      let sgoal4 = 
+      let sgoal4 =
         let bounded_distr = f_cmp (f_mu distr event) d4 in
         let post = f_anda bounded_distr (mk_event_cond event) in
         f_forall_mems [bhs.bhs_m] (f_imp (f_not phi) post)
@@ -267,20 +267,20 @@ prove_goal_by subgoals (rn_bhl_rnd tac_info) g
 let process_rnd side tac_info g =
   let concl = get_concl g in
 
-  match side, tac_info with 
+  match side, tac_info with
   | None, PNoRndParams when is_hoareS concl ->
       t_hoare_rnd g
 
   | None, _ when is_bdHoareS concl ->
     let tac_info =
-      match tac_info with 
+      match tac_info with
       | PNoRndParams ->
           PNoRndParams
 
       | PSingleRndParam p ->
           PSingleRndParam (fun t -> process_phl_form (tfun t tbool) g p)
 
-      | PMultRndParams ((phi,d1,d2,d3,d4),p) -> 
+      | PMultRndParams ((phi,d1,d2,d3,d4),p) ->
           let p t = p |> omap (process_phl_form (tfun t tbool) g) in
           let phi = process_phl_form tbool g phi in
           let d1 = process_phl_form treal g d1 in
