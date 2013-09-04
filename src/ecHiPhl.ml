@@ -133,25 +133,7 @@ let process_splitwhile (b, side, cpos) g =
   let b = process_phl_exp side b tbool g in
     t_splitwhile b side cpos g
 
-let process_fun_upto_info (bad, p, o) g =
-  let hyps = get_hyps g in
-  let env' = LDecl.inv_memenv hyps in 
-  let p = process_form env' p tbool in
-  let q = 
-    match o with
-    | None -> EcFol.f_true
-    | Some q -> process_form env' q tbool in
-  let bad = 
-    let env' = LDecl.push_active (EcFol.mhr,None) hyps in
-    process_form env' bad tbool in
-  bad, p, q
-
-let process_fun_upto info g =
-  let (bad,p,q) = process_fun_upto_info info g in
-  t_equivF_abs_upto bad p q g
-
 let process_call side info (_, n as g) = 
-
   let process_spec side g =
     let hyps,concl = get_goal g in
     match concl.f_node, side with
@@ -198,7 +180,6 @@ let process_call side info (_, n as g) =
       penv, fun inv -> EcPhl.mk_inv_spec env inv fl fr
     | _ -> cannot_apply "call" "the conclusion is not a hoare or a equiv" in
 
-
   let process_upto side info g = 
     if side <> None then
       cannot_apply "call" "can not specify side for call with invariant";
@@ -206,8 +187,8 @@ let process_call side info (_, n as g) =
     match concl.f_node with
     | FequivS es ->
       let (_,fl,_),(_,fr,_),_,_ = s_last_calls "call" es.es_sl es.es_sr in
-      let bad,invP,invQ = process_fun_upto_info info g in
-      let topl,fl,oil,sigl,topr,fr,_,sigr = abstract_info2 env fl fr in
+      let bad,invP,invQ = EcPhlFun.process_fun_upto_info info g in
+      let (topl,fl,oil,sigl),(topr,fr,_,sigr) = abstract_info2 env fl fr in
       let ml, mr = mleft, mright in
       let bad2 = Fsubst.f_subst_mem mhr mr bad in
       let eqglob = f_eqglob topl ml topr mr in
@@ -219,20 +200,6 @@ let process_call side info (_, n as g) =
       let post = f_if_simpl bad2 invQ (f_ands [eq_res;eqglob;invP]) in
       bad,invP,invQ, f_equivF pre fl fr post 
     | _ -> cannot_apply "call" "the conclusion is not an equiv" in
-    
-  let t_fun inv g = 
-    let env, _, concl = get_goal_e g in
-    match concl.f_node with
-    | FhoareF h ->
-      if NormMp.is_abstract_fun h.hf_f env then t_hoareF_abs inv g
-      else t_hoareF_fun_def g
-    | FbdHoareF h ->
-       if NormMp.is_abstract_fun h.bhf_f env then t_bdHoareF_abs inv g
-      else t_bdHoareF_fun_def g
-    | FequivF e ->
-       if NormMp.is_abstract_fun e.ef_fl env then t_equivF_abs inv g
-      else t_equivF_fun_def g
-    | _ -> assert false in
 
 
   let tac_sub = ref (t_id None) in
@@ -247,12 +214,12 @@ let process_call side info (_, n as g) =
     | CI_inv inv ->
       let env, fmake = process_inv side g in
       let inv = process_form env inv tbool in
-      tac_sub :=  (fun g -> t_on_firsts t_trivial 2 (t_fun inv g));
+      tac_sub :=  (fun g -> t_on_firsts t_trivial 2 (EcPhlFun.t_fun inv g));
       fmake inv 
     | CI_upto info -> 
       let bad,p,q,form = process_upto side info g in
       let t_tr = t_or t_assumption t_trivial in
-      tac_sub := (fun g -> t_on_firsts t_tr 3 (t_equivF_abs_upto bad p q g));
+      tac_sub := (fun g -> t_on_firsts t_tr 3 (EcPhlFun.UpToLow.t_equivF_abs_upto bad p q g));
       form in
         
         
@@ -279,7 +246,6 @@ let process_call side info (_, n as g) =
 
   t_seq_subgoal t_call [t_seq (t_use an gs) !tac_sub; t_id None] (juc,n)
 
-  
 let process_cond side g =
   let concl = get_concl g in
   let check_N () = 
@@ -292,7 +258,6 @@ let process_cond side g =
     else if is_bdHoareS concl then t_bdHoare_cond g
     else cannot_apply "cond" "the conclusion is not a hoare or a equiv goal"
   end
-
 
 let stmt_length side concl = 
   match concl.f_node, side with
@@ -532,19 +497,6 @@ let process_equiv_deno info (_,n as g) =
     ef.ef_pr, ef.ef_po in
   t_on_first (t_use an gs) (t_equiv_deno pre post (juc,n))
   
-let process_fun_abs inv g =
-  let hyps,concl = get_goal g in
-  if is_equivF concl then
-    let env' = LDecl.inv_memenv hyps in
-    let inv = process_form env' inv tbool in
-    t_equivF_abs inv g
-  else
-    let env' = LDecl.inv_memenv1 hyps in
-    let inv = process_form env' inv tbool in
-    if is_bdHoareF concl then t_bdHoareF_abs inv g
-    else if is_hoareF concl then t_hoareF_abs inv g
-    else cannot_apply "fun" "equiv or probabilistic hoare triple was expected"
-
 let process_ppr (phi1,phi2) g =
   let hyps,concl = get_goal g in
   let ef = t_as_equivF concl in
@@ -686,10 +638,12 @@ let process_eqobs_in (geq', ginv, eqs') g =
     let concl = get_concl g in
     match Mf.find_opt concl !forproof with
     | Some (EORI_adv geq) ->
-      let gs = t_equivF_abs (EcPV.Mpv2.to_form mleft mright geq ginv) g in
+      let gs =
+        EcPhlFun.FunAbsLow.t_equivF_abs
+          (EcPV.Mpv2.to_form mleft mright geq ginv) g in
       t_on_firsts t_trivial 2 gs 
     | Some (EORI_fun eqs) ->
-      t_seq t_equivF_fun_def
+      t_seq EcPhlFun.FunDefLow.t_equivF_fun_def
         (t_eqobs eqs) g 
     | Some (EORI_unknown (Some id)) ->
       t_hyp id g
@@ -743,10 +697,10 @@ let process_equiv_trans (tk, p1, q1, p2, q2) g =
 let process_phl loc ptac g =
   let t =
     match ptac with
-    | Pfun_def                  -> EcPhl.t_fun_def
-    | Pfun_abs f                -> process_fun_abs f
-    | Pfun_upto info            -> process_fun_upto info 
-    | Pfun_to_code              -> EcPhl.t_fun_to_code 
+    | Pfun_def                  -> EcPhlFun.t_fun_def
+    | Pfun_abs f                -> EcPhlFun.process_fun_abs f
+    | Pfun_upto info            -> EcPhlFun.process_fun_upto info 
+    | Pfun_to_code              -> EcPhlFun.t_fun_to_code 
     | Pskip                     -> EcPhlSkip.t_skip
     | Papp (dir, k, phi, f)     -> process_app dir k phi f
     | Pwp k                     -> EcPhlWp.t_wp k

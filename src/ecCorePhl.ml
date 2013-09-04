@@ -1,6 +1,7 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open EcIdent
+open EcPath
 open EcMemory
 open EcModules
 open EcTypes
@@ -119,7 +120,15 @@ let t_hS_or_bhS_or_eS ?th ?tbh ?te g =
   | FbdHoareS _ when tbh <> None -> (oget tbh) g
   | FequivS   _ when te  <> None -> (oget te ) g
     
-  | _ -> tacerror (NotPhl None)
+  | _ -> tacerror (NotPhl None)         (* FIXME *)
+
+let t_hF_or_bhF_or_eF ?th ?tbh ?te g =
+  match (get_concl g).f_node with
+  | FhoareF   _ when th  <> None -> (oget th ) g
+  | FbdHoareF _ when tbh <> None -> (oget tbh) g
+  | FequivF   _ when te  <> None -> (oget te ) g
+    
+  | _ -> tacerror (NotPhl None)         (* FIXME *)
 
 (* -------------------------------------------------------------------- *)
 let s_split_i msg i s = 
@@ -160,6 +169,20 @@ let id_of_mp mp m =
     EcIdent.create (tag_sym_with_side name m)
 
 (* -------------------------------------------------------------------- *)
+let fresh_pv me v =
+  let rec for_idx idx =
+    let x = Printf.sprintf "%s%d" v.v_name idx in
+      if EcMemory.is_bound x me then
+        for_idx (idx+1)
+      else
+        (EcMemory.bind x v.v_type me, x)
+  in
+    if EcMemory.is_bound v.v_name me then
+      for_idx 0
+    else
+      (EcMemory.bind v.v_name v.v_type me, v.v_name)
+
+(* -------------------------------------------------------------------- *)
 type lv_subst_t = (lpattern * form) * (prog_var * memory * form) list
 
 let lv_subst m lv f : lv_subst_t =
@@ -193,6 +216,50 @@ let mk_let_of_lv_substs env (lets, f) =
 let subst_form_lv env m lv t f =
   let lets = lv_subst m lv t in
     mk_let_of_lv_substs env ([lets],f)
+
+(* -------------------------------------------------------------------- *)
+type ai_t = EcPath.mpath * EcPath.xpath * oracle_info * funsig
+
+(* -------------------------------------------------------------------- *)
+let abstract_info env f1 = 
+  let f   = EcEnv.NormMp.norm_xpath env f1 in
+  let top = EcPath.m_functor f.EcPath.x_top in
+  let def = EcEnv.Fun.by_xpath f env in
+  let oi  = 
+    match def.f_def with
+    | FBabs oi -> oi
+    | _ -> 
+      let ppe = EcPrinting.PPEnv.ofenv env in
+        if EcPath.x_equal f1 f then 
+          EcLogic.tacuerror
+            "The function %a should be abstract"
+            (EcPrinting.pp_funname ppe) f1
+        else 
+          EcLogic.tacuerror 
+            "The function %a, which reduce to %a, should be abstract"
+            (EcPrinting.pp_funname ppe) f1
+            (EcPrinting.pp_funname ppe) f
+  in
+    (top, f, oi, def.f_sig)
+
+(* -------------------------------------------------------------------- *)
+let abstract_info2 env fl' fr' =
+  let (topl, fl, oil, sigl) = abstract_info env fl' in
+  let (topr, fr, oir, sigr) = abstract_info env fr' in
+  let fl1 = EcPath.xpath topl fl.x_sub in
+  let fr1 = EcPath.xpath topr fr.x_sub in
+    if not (EcPath.x_equal fl1 fr1) then begin
+      let ppe = EcPrinting.PPEnv.ofenv env in
+        EcLogic.tacuerror 
+          "function %a reduce to %a and %a reduce to %a, %a and %a should be equal"
+          (EcPrinting.pp_funname ppe) fl'
+          (EcPrinting.pp_funname ppe) fl1
+          (EcPrinting.pp_funname ppe) fr'
+          (EcPrinting.pp_funname ppe) fr1
+          (EcPrinting.pp_funname ppe) fl1
+          (EcPrinting.pp_funname ppe) fr1
+    end;
+    ((topl, fl, oil, sigl), (topr, fr, oir, sigr))
 
 (* -------------------------------------------------------------------- *)
 (* Remark: m is only used to create fresh name, id_of_pv *)
