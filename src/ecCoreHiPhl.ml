@@ -18,7 +18,7 @@ let process_phl_form ty g phi =
   in
 
   let hyps = LDecl.push_active m hyps in
-    EcHiLogic.process_form hyps phi ty
+    EcCoreHiLogic.process_form hyps phi ty
 
 (* -------------------------------------------------------------------- *)
 let process_prhl_form ty g phi =
@@ -31,7 +31,7 @@ let process_prhl_form ty g phi =
   in
 
   let hyps = LDecl.push_all [ml; mr] hyps in
-    EcHiLogic.process_form hyps phi ty
+    EcCoreHiLogic.process_form hyps phi ty
 
 (* -------------------------------------------------------------------- *)
 let process_phl_formula  = process_phl_form tbool
