@@ -674,7 +674,7 @@ let process_phl loc ptac g =
     | Pskip                     -> EcPhlSkip.t_skip
     | Papp (dir, k, phi, f)     -> process_app dir k phi f
     | Pwp k                     -> EcPhlWp.t_wp k
-    | Prcond (side, b, i)       -> t_rcond side b i
+    | Prcond (side, b, i)       -> EcPhlRCond.t_rcond side b i
     | Pcond side                -> process_cond side
     | Pwhile (side, (phi, vopt))-> process_while side phi vopt
     | Pfission info             -> EcPhlLoopTx.process_fission info
