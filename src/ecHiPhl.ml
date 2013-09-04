@@ -103,36 +103,6 @@ let process_while side_opt phi vrnt_opt g =
       | _ -> cannot_apply "while" "wrong arguments"
   else cannot_apply "while" "the conclusion is not a hoare or a equiv"
 
-let process_fission (side, cpos, infos) g =
-  t_fission side cpos infos g
-
-let process_fusion (side, cpos, infos) g =
-  t_fusion side cpos infos g
-
-let process_unroll (side, cpos) g =
-  t_unroll side cpos g
-
-let process_exp hyps e oty =
-  let env = LDecl.toenv hyps in
-  let ue  = EcUnify.UniEnv.create (Some (LDecl.tohyps hyps).h_tvar) in
-  let e   = TT.transexpcast env ue oty e in
-    EcTypes.e_uni (EcUnify.UniEnv.close ue) e
-
-let process_phl_exp side e ty g =
-  let (hyps, concl) = get_goal g in
-
-  let (m, _) =
-    try  destr_programS side concl
-    with _ -> tacuerror "conclusion not of the right form"
-  in
-
-  let hyps = LDecl.push_active m hyps in
-  process_exp hyps e ty
-
-let process_splitwhile (b, side, cpos) g =
-  let b = process_phl_exp side b tbool g in
-    t_splitwhile b side cpos g
-
 let process_call side info (_, n as g) = 
   let process_spec side g =
     let hyps,concl = get_goal g in
@@ -706,11 +676,11 @@ let process_phl loc ptac g =
     | Pwp k                     -> EcPhlWp.t_wp k
     | Prcond (side, b, i)       -> t_rcond side b i
     | Pcond side                -> process_cond side
-    | Pwhile (side, (phi, vopt))  -> process_while side phi vopt
-    | Pfission info             -> process_fission info
-    | Pfusion info              -> process_fusion info
-    | Punroll info              -> process_unroll info
-    | Psplitwhile info          -> process_splitwhile info
+    | Pwhile (side, (phi, vopt))-> process_while side phi vopt
+    | Pfission info             -> EcPhlLoopTx.process_fission info
+    | Pfusion info              -> EcPhlLoopTx.process_fusion info
+    | Punroll info              -> EcPhlLoopTx.process_unroll info
+    | Psplitwhile info          -> EcPhlLoopTx.process_splitwhile info
     | Pcall (side, info)        -> process_call side info
     | Pswap info                -> process_swap info
     | Pcfold info               -> process_cfold info

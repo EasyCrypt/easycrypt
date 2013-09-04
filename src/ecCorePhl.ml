@@ -1,14 +1,18 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
+open EcParsetree
 open EcIdent
 open EcPath
 open EcMemory
 open EcModules
 open EcTypes
 open EcFol
+open EcEnv
 open EcBaseLogic
 open EcLogic
 open EcPV
+
+module Zpr = EcMetaProg.Zipper
 
 (* -------------------------------------------------------------------- *)
 type 'a sdestr_t  = string -> stmt -> 'a * stmt
@@ -129,6 +133,61 @@ let t_hF_or_bhF_or_eF ?th ?tbh ?te g =
   | FequivF   _ when te  <> None -> (oget te ) g
     
   | _ -> tacerror (NotPhl None)         (* FIXME *)
+
+(* -------------------------------------------------------------------- *)
+type 'a code_tx_t =
+     LDecl.hyps -> 'a -> form * form -> memenv * stmt
+  -> memenv * stmt * form list
+
+type zip_t = 
+     LDecl.hyps -> form * form -> memenv -> Zpr.zipper
+  -> memenv * Zpr.zipper * form list
+
+let t_fold f (hyps : LDecl.hyps) (cpos : codepos) (_ : form * form) (state, s) =
+  try
+    let (me, f) = Zpr.fold hyps cpos f state s in
+      ((me, f, []) : memenv * _ * form list)
+  with Zpr.InvalidCPos -> tacuerror "invalid code position"
+
+let t_zip f (hyps : LDecl.hyps) (cpos : codepos) (prpo : form * form) (state, s) =
+  try
+    let (me, zpr, gs) = f hyps prpo state (Zpr.zipper_of_cpos cpos s) in
+      ((me, Zpr.zip zpr, gs) : memenv * _ * form list)
+  with Zpr.InvalidCPos -> tacuerror "invalid code position"
+
+let t_code_transform side ?(bdhoare = false) cpos tr tx g =
+  match side with
+  | None -> begin
+      let hyps, concl = get_goal g in
+
+      if is_hoareS concl then
+        let hoare    = t_as_hoareS concl in
+        let pr, po   = hoare.hs_pr, hoare.hs_po in
+        let (me, stmt, cs) = tx hyps cpos (pr, po) (hoare.hs_m, hoare.hs_s) in
+        let concl = f_hoareS_r { hoare with hs_m = me; hs_s = stmt; } in
+          prove_goal_by (cs @ [concl]) (tr None) g
+      else if bdhoare && is_bdHoareS concl then
+        let hoare    = t_as_bdHoareS concl in
+        let pr, po   = hoare.bhs_pr, hoare.bhs_po in
+        let (me, stmt, cs) = tx hyps cpos (pr, po) (hoare.bhs_m, hoare.bhs_s) in
+        let concl = f_bdHoareS_r { hoare with bhs_m = me; bhs_s = stmt; } in
+          prove_goal_by (cs @ [concl]) (tr None) g
+      else
+        tacuerror "conclusion should be a hoare statement"
+  end
+
+  | Some side ->
+      let hyps, concl  = get_goal g in
+      let es        = t_as_equivS concl in
+      let pre, post = es.es_pr, es.es_po in
+      let me, stmt     = if side then (es.es_ml, es.es_sl) else (es.es_mr, es.es_sr) in
+      let me, stmt, cs = tx hyps cpos (pre, post) (me, stmt) in
+      let concl =
+        match side with
+        | true  -> f_equivS_r { es with es_ml = me; es_sl = stmt; }
+        | false -> f_equivS_r { es with es_mr = me; es_sr = stmt; }
+      in
+        prove_goal_by (cs @ [concl]) (tr (Some side)) g
 
 (* -------------------------------------------------------------------- *)
 let s_split_i msg i s = 

@@ -1,10 +1,13 @@
 (* -------------------------------------------------------------------- *)
 open EcSymbols
+open EcParsetree
 open EcPath
 open EcTypes
 open EcMemory
 open EcModules
 open EcFol
+open EcMetaProg.Zipper
+open EcEnv
 open EcBaseLogic
 open EcLogic
 
@@ -56,6 +59,25 @@ val set_pre  : pre:form -> form -> form
 (* -------------------------------------------------------------------- *)
 val t_hS_or_bhS_or_eS : ?th:tactic -> ?tbh:tactic -> ?te:tactic -> tactic
 val t_hF_or_bhF_or_eF : ?th:tactic -> ?tbh:tactic -> ?te:tactic -> tactic
+
+(* -------------------------------------------------------------------- *)
+type 'a code_tx_t =
+     LDecl.hyps -> 'a -> form * form -> memenv * stmt
+  -> memenv * stmt * form list
+
+type zip_t = 
+     LDecl.hyps -> form * form -> memenv -> zipper
+  -> memenv * zipper * form list
+
+val t_zip : zip_t -> codepos code_tx_t
+
+val t_fold : (LDecl.hyps, memenv) folder -> codepos code_tx_t
+
+val t_code_transform :
+      bool option -> ?bdhoare:bool -> 'state
+  -> (bool option -> EcBaseLogic.rule)
+  -> 'state code_tx_t
+  -> tactic
 
 (* -------------------------------------------------------------------- *)
 val s_split_i : string -> int -> stmt -> instr list * instr * instr list

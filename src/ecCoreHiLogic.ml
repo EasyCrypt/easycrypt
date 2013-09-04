@@ -41,6 +41,13 @@ let process_formula hyps pf =
   process_form hyps pf tbool
 
 (* -------------------------------------------------------------------- *)
+let process_exp hyps e oty =
+  let env = LDecl.toenv hyps in
+  let ue  = EcUnify.UniEnv.create (Some (LDecl.tohyps hyps).h_tvar) in
+  let e   = TT.transexpcast env ue oty e in
+    EcTypes.e_uni (EcUnify.UniEnv.close ue) e
+
+(* -------------------------------------------------------------------- *)
 type pterm_parg =
   [ `FormOrMod of form option * (mpath * module_sig) option
   | `Memory    of EcIdent.t ]
