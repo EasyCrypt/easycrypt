@@ -448,7 +448,7 @@ section.
        wp; inline PSS(Gt.ROM.RO, ROM.RO).g1 PSS(Gt.ROM.RO, ROM.RO).g2 Gt.ROM.RO.o
                   GAdv(H0, Gt.ROM.RO).Hs.o.
        rcondf{1} 16;
-         first by intros=> &m; inline ROM.RO.o; do ?(rnd; wp); skip; smt.
+         first intros=> &m; inline ROM.RO.o; do ?(rnd; wp); skip; progress=> //; smt.
        wp; rnd{1} (cpTrue); wp; rnd.
        wp; call PSS_G0_H.
        wp; rnd.
