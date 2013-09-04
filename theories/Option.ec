@@ -31,3 +31,24 @@ qed.
    figure out how Why3 deals with it. *)
 op proj:'a option -> 'a.
 axiom proj_some (x:'a): proj (Some x) = x.
+
+lemma nosmt projI (x y:'a) x' y':
+  x' = Some x =>
+  y' = Some y =>
+  proj x' = proj y' =>
+  x = y.
+proof strict.
+by intros=> -> ->; rewrite !proj_some.
+qed.
+
+lemma nosmt someI (x y:'a):
+  Some x = Some y =>
+  x = y.
+proof strict.
+by rewrite -{2}(proj_some x) -{2}(proj_some y)=> some_eq; congr.
+qed.
+
+lemma nosmt some_proj (x:'a option):
+  x <> None =>
+  Some (proj x) = x
+by [].
