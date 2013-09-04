@@ -55,6 +55,7 @@ val set_pre  : pre:form -> form -> form
 
 (* -------------------------------------------------------------------- *)
 val t_hS_or_bhS_or_eS : ?th:tactic -> ?tbh:tactic -> ?te:tactic -> tactic
+val t_hF_or_bhF_or_eF : ?th:tactic -> ?tbh:tactic -> ?te:tactic -> tactic
 
 (* -------------------------------------------------------------------- *)
 val s_split_i : string -> int -> stmt -> instr list * instr * instr list
@@ -66,6 +67,9 @@ val id_of_pv : prog_var -> memory -> EcIdent.t
 val id_of_mp : mpath    -> memory -> EcIdent.t
 
 (* -------------------------------------------------------------------- *)
+val fresh_pv : memenv -> variable -> memenv * symbol
+
+(* -------------------------------------------------------------------- *)
 type lv_subst_t = (lpattern * form) * (prog_var * memory * form) list
 
 val mk_let_of_lv_substs : EcEnv.env -> (lv_subst_t list * form) -> form
@@ -73,6 +77,12 @@ val mk_let_of_lv_substs : EcEnv.env -> (lv_subst_t list * form) -> form
 val lv_subst : memory -> lvalue -> form -> lv_subst_t
 
 val subst_form_lv : EcEnv.env -> memory -> lvalue -> form -> form -> form
+
+(* -------------------------------------------------------------------- *)
+type ai_t = mpath * xpath * oracle_info * funsig
+
+val abstract_info  : EcEnv.env -> xpath -> ai_t
+val abstract_info2 : EcEnv.env -> xpath -> xpath -> ai_t * ai_t
 
 (* -------------------------------------------------------------------- *)
 val generalize_subst :
