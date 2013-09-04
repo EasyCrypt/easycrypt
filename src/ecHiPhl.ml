@@ -20,65 +20,6 @@ module TT = EcTyping
 module UE = EcUnify.UniEnv
 
 (* -------------------------------------------------------------------- *)
-let process_phl_bd_info dir g bd_info = 
-  match bd_info with
-  | PAppNone -> 
-    let hs = t_as_bdHoareS (get_concl g) in
-    let f1, f2 = 
-       match dir with
-      | Backs  -> hs.bhs_bd, f_r1 
-      | Fwds   -> f_r1, hs.bhs_bd in
-    f_true, f1, f2, f_r0, f_r1 (* The last argument will not be used *)
-  | PAppSingle f -> 
-    let f = process_phl_formula g f in
-    let hs = t_as_bdHoareS (get_concl g) in
-    let f1, f2 = 
-      match dir with
-      | Backs  -> f_real_div hs.bhs_bd f, f 
-      | Fwds   -> f, f_real_div hs.bhs_bd f in
-    f_true, f1, f2, f_r0, f_r1
-    
-  | PAppMult(phi,f1,f2,g1,g2) ->
-    let phi = phi |> omap_dfl (process_phl_formula g) f_true in
-    let check_0 f = 
-      if not (f_equal f f_r0) then tacuerror "the formula should be 0%%r" in
-    let process_f (f1,f2) = 
-      match f1, f2 with
-      | None, None -> assert false (* Not accepted by the parser *)
-      | Some f, None -> 
-        let loc = f.pl_loc in
-        let f = process_phl_form treal g f in
-        set_loc loc check_0 f;
-        f, f_r1
-      | None, Some f ->
-        let loc = f.pl_loc in
-        let f = process_phl_form treal g f in
-        set_loc loc check_0 f;
-        f_r1, f
-      | Some f1, Some f2 ->
-        process_phl_form treal g f1, process_phl_form treal g f2 in
-    let f1, f2 = process_f (f1,f2) in
-    let g1, g2 = process_f (g1,g2) in
-    (phi,f1,f2,g1,g2)
-
-let process_app dir k phi bd_info g =
-  let concl = get_concl g in
-  match k, bd_info with
-  | Single i, PAppNone when is_hoareS concl ->
-    let phi = process_phl_formula g phi in
-    t_hoare_app i phi g
-  | Single i, _ when is_bdHoareS concl ->
-    let pR = process_phl_formula g phi in
-    let (phi,f1,f2,f3,f4) = process_phl_bd_info dir g bd_info in
-    t_bdHoare_app i (phi,pR,f1,f2,f3,f4) g
-  | Double(i,j), PAppNone ->
-    let phi = process_prhl_formula g phi in
-    t_equiv_app (i,j) phi g
-  | Single _, PAppNone ->
-    cannot_apply "app" "wrong position parameter"
-  | _, _ ->
-      cannot_apply "app" "optional bound parameter not supported"
-
 let process_while side_opt phi vrnt_opt g =
   let concl = get_concl g in
   if is_hoareS concl then
@@ -672,7 +613,7 @@ let process_phl loc ptac g =
     | Pfun_upto info            -> EcPhlFun.process_fun_upto info 
     | Pfun_to_code              -> EcPhlFun.t_fun_to_code 
     | Pskip                     -> EcPhlSkip.t_skip
-    | Papp (dir, k, phi, f)     -> process_app dir k phi f
+    | Papp (dir, k, phi, f)     -> EcPhlApp.process_app dir k phi f
     | Pwp k                     -> EcPhlWp.t_wp k
     | Prcond (side, b, i)       -> EcPhlRCond.t_rcond side b i
     | Pcond side                -> process_cond side

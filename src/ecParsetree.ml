@@ -332,13 +332,13 @@ type call_info =
 type p_app_bd_info = 
   | PAppNone 
   | PAppSingle of pformula 
-  | PAppMult of (pformula_o * pformula_o * pformula_o * pformula_o * pformula_o)
+  | PAppMult   of pformula_o tuple5
 
 type ('a, 'b, 'c) rnd_tac_info = 
   | PNoRndParams 
   | PSingleRndParam of 'c 
-  | PTwoRndParams of 'a * 'a 
-  | PMultRndParams of (('a tuple5) * 'b)
+  | PTwoRndParams   of 'a * 'a 
+  | PMultRndParams  of ('a tuple5) * 'b
 
 type tac_dir = Backs | Fwds
 
