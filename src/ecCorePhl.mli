@@ -49,6 +49,11 @@ val t_as_equivF   : form -> equivF
 val t_as_equivS   : form -> equivS
 
 (* -------------------------------------------------------------------- *)
+val get_pre  : form -> form
+val get_post : form -> form
+val set_pre  : pre:form -> form -> form
+
+(* -------------------------------------------------------------------- *)
 val t_hS_or_bhS_or_eS : ?th:tactic -> ?tbh:tactic -> ?te:tactic -> tactic
 
 (* -------------------------------------------------------------------- *)
@@ -68,3 +73,10 @@ val mk_let_of_lv_substs : EcEnv.env -> (lv_subst_t list * form) -> form
 val lv_subst : memory -> lvalue -> form -> lv_subst_t
 
 val subst_form_lv : EcEnv.env -> memory -> lvalue -> form -> form -> form
+
+(* -------------------------------------------------------------------- *)
+val generalize_subst :
+     EcEnv.env -> memory -> (prog_var * ty) list -> mpath list
+  -> (EcIdent.t * gty) list * (form, form) EcPV.Mpv.t
+
+val generalize_mod : EcEnv.env -> EcIdent.t -> EcPV.PV.t -> form -> form

@@ -10,6 +10,7 @@ open EcFol
 
 open EcBaseLogic
 open EcLogic
+open EcCoreHiLogic
 open EcHiLogic
 open EcCoreHiPhl
 open EcHiPhl

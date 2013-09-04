@@ -82,6 +82,37 @@ let t_as_equivS c =
   try destr_equivS c with DestrError _ -> tacerror (NotPhl (Some false))
 
 (* -------------------------------------------------------------------- *)
+let get_pre f = 
+  match f.f_node with
+  | FhoareF hf   -> hf.hf_pr
+  | FhoareS hs   -> hs.hs_pr
+  | FbdHoareF hf -> hf.bhf_pr
+  | FbdHoareS hs -> hs.bhs_pr
+  | FequivF ef   -> ef.ef_pr
+  | FequivS es   -> es.es_pr
+  | _            -> tacerror (NotPhl None)
+
+let get_post f = 
+  match f.f_node with
+  | FhoareF hf   -> hf.hf_po
+  | FhoareS hs   -> hs.hs_po
+  | FbdHoareF hf -> hf.bhf_po
+  | FbdHoareS hs -> hs.bhs_po
+  | FequivF ef   -> ef.ef_po
+  | FequivS es   -> es.es_po
+  | _            -> tacerror (NotPhl None)
+
+let set_pre ~pre f = 
+  match f.f_node with
+ | FhoareF hf   -> f_hoareF pre hf.hf_f hf.hf_po
+ | FhoareS hs   -> f_hoareS_r { hs with hs_pr = pre} 
+ | FbdHoareF hf -> f_bdHoareF pre hf.bhf_f hf.bhf_po hf.bhf_cmp hf.bhf_bd
+ | FbdHoareS hs -> f_bdHoareS_r { hs with bhs_pr = pre}
+ | FequivF ef   -> f_equivF pre ef.ef_fl ef.ef_fr ef.ef_po
+ | FequivS es   -> f_equivS_r { es with es_pr = pre }
+ | _            -> tacerror (NotPhl None)
+
+(* -------------------------------------------------------------------- *)
 let t_hS_or_bhS_or_eS ?th ?tbh ?te g =
   match (get_concl g).f_node with
   | FhoareS   _ when th  <> None -> (oget th ) g
@@ -162,3 +193,50 @@ let mk_let_of_lv_substs env (lets, f) =
 let subst_form_lv env m lv t f =
   let lets = lv_subst m lv t in
     mk_let_of_lv_substs env ([lets],f)
+
+(* -------------------------------------------------------------------- *)
+(* Remark: m is only used to create fresh name, id_of_pv *)
+let generalize_subst env m uelts uglob = 
+  let create (pv, ty) = id_of_pv pv m, GTty ty in
+  let b = List.map create uelts in
+  let s =
+    List.fold_left2
+      (fun s (pv, ty) (id, _) ->
+        Mpv.add env pv (f_local id ty) s)
+      Mpv.empty uelts b
+  in
+  let create mp = id_of_mp mp m, GTty (tglob mp) in
+  let b' = List.map create uglob in
+  let s  =
+    List.fold_left2
+      (fun s mp (id, _) ->
+        Mpv.add_glob env mp (f_local id (tglob mp)) s)
+      s uglob b'
+  in
+    (b' @ b, s)
+
+let generalize_mod env m modi f =
+  let (elts, glob) = PV.elements modi in
+
+  (* 1. Compute the prog-vars and the globals used in [f] *)
+  let fv = PV.fv env m f in
+
+  (* 2. Split [modi] into two parts:
+   *     the one used in the free-vars and the others *)
+  let (uelts, nelts) = List.partition (fun (pv, _) -> PV.mem_pv env pv fv) elts in
+  let (uglob, nglob) = List.partition (fun mp -> PV.mem_glob env mp fv) glob in
+
+  (* 3. We build the related substitution *)
+
+  (* 3.a. Add the global variables *)
+  let (bd, s) = generalize_subst env m uelts uglob in
+
+  (* 3.b. Check that the substituion don't clash with some
+          other unmodified variables *)
+  List.iter (fun (pv,_) -> Mpv.check_npv env pv s) nelts;
+  List.iter (fun mp -> Mpv.check_glob env mp s) nglob;
+
+  (* 3.c. Perform the substitution *)
+  let s = PVM.of_mpv s m in
+  let f = PVM.subst env s f in
+    f_forall_simpl bd f
