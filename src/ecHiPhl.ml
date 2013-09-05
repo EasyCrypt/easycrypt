@@ -379,20 +379,6 @@ let process_prbounded = t_prbounded
 let process_prfalse = t_prfalse
 let process_bdeq = t_bdeq
 
-let process_exists_intro fs g = 
-  let hyps,concl = get_goal g in
-  let penv = 
-    match concl.f_node with
-    | FhoareF hf -> fst (LDecl.hoareF hf.hf_f hyps)
-    | FhoareS hs -> LDecl.push_active hs.hs_m hyps 
-    | FbdHoareF bhf ->fst (LDecl.hoareF bhf.bhf_f hyps) 
-    | FbdHoareS bhs -> LDecl.push_active bhs.bhs_m hyps 
-    | FequivF ef -> fst (LDecl.equivF ef.ef_fl ef.ef_fr hyps)
-    | FequivS es -> LDecl.push_all [es.es_ml; es.es_mr] hyps 
-    | _ -> tacuerror "cannot apply conseq rule, not a phl/prhl judgement" in  
-  let fs = List.map (fun f -> process_form_opt penv f None) fs in
-  t_hr_exists_intro fs g 
-
 let process_eqobs_in (geq', ginv, eqs') g = 
   let env, hyps, concl = get_goal_e g in
   let ienv = LDecl.inv_memenv hyps in
@@ -518,8 +504,8 @@ let process_phl loc ptac g =
     | Palias info               -> EcPhlCodeTx.process_alias info
     | Prnd (side, info)         -> EcPhlRnd.process_rnd side info
     | Pconseq (nm,info)         -> EcPhlConseq.process_conseq nm info
-    | Phr_exists_elim           -> t_hr_exists_elim
-    | Phr_exists_intro fs       -> process_exists_intro fs
+    | Phr_exists_elim           -> EcPhlExists.t_hr_exists_elim
+    | Phr_exists_intro fs       -> EcPhlExists.process_exists_intro fs
     | Pexfalso                  -> EcPhlExfalso.t_exfalso
     | Pbdhoaredeno info         -> process_bdHoare_deno info
     | PPr (phi1,phi2)           -> process_ppr (phi1,phi2)

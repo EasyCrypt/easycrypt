@@ -14,63 +14,6 @@ open EcModules
 open EcMetaProg
 open EcCorePhl
 
-(* -------------------------------------------------------------------- *)
-class rn_hl_exists_elim = object inherit xrule "[hl] elim-exists" end
-let rn_hl_exists_elim = RN_xtd (new rn_hl_exists_elim)
-
-let t_hr_exists_elim g = 
-  let concl = get_concl g in
-  let pre = get_pre concl in
-  let bd, pre = destr_exists pre in
-  (* TODO check that bd is not bind in the post *)
-  let concl = f_forall bd (set_pre ~pre concl) in
-  prove_goal_by [concl] rn_hl_exists_elim g
-
-let get_to_gen side f = 
-  let do_side m = 
-    if side then 
-      if EcIdent.id_equal m mleft then true 
-      else (assert (EcIdent.id_equal m mright); false)
-    else (assert (EcIdent.id_equal m mhr); true) in
-  match f.f_node with
-  | Fpvar(pv,m) -> 
-    let id = id_of_pv pv m in
-    (id, do_side m, f_pvar pv f.f_ty, f)
-  | Fglob(mp,m) ->
-    assert (
-      if side then EcIdent.id_equal m mleft || EcIdent.id_equal m mright
-      else EcIdent.id_equal m mhr);
-    let id = id_of_mp mp m in
-    (id, do_side m, f_glob mp, f)
-  | _ -> tacuerror "global memory or variable expected"
-
-let get_to_gens side fs = 
-  List.map (get_to_gen side) fs
-
-let t_hr_exists_intro fs g = 
-  let hyps, concl = get_goal g in 
-  let pre = get_pre concl in
-  let post = get_post concl in
-  let side = is_equivS concl || is_equivF concl in
-  let gen = get_to_gens side fs in
-  let eqs = List.map (fun (id,_,_,f) -> f_eq (f_local id f.f_ty) f) gen in
-  let bd = List.map (fun (id,_,_,f) -> id, GTty f.f_ty) gen in
-  let pre = f_exists bd (f_and (f_ands eqs) pre) in
-  let ms = 
-    if side then LDecl.fresh_ids hyps ["&ml";"&mr";"H"] 
-    else LDecl.fresh_ids hyps ["&m";"H"] in
-  let h = List.hd (List.rev ms) in
-  let args = 
-    let ml = List.hd ms in
-    let mr = if side then List.hd (List.tl ms) else ml in
-    let do1 (_,side,mk,_) = 
-      AAform (mk (if side then ml else mr)) in
-    List.map do1 gen in
-  t_seq_subgoal (EcPhlConseq.t_conseq pre post)
-    [ t_lseq [ t_intros_i ms;
-               gen_t_exists (fun _ _ f -> f) args; 
-               t_hyp h ];
-      t_trivial; t_id None] g
 
 (* -------------------------------------------------------------------- *)
 class rn_hl_while (_ : form) (_ : form option) (_ : (form * form) option) =
