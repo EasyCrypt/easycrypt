@@ -1,7 +1,5 @@
 *~
 _build
-/_tags
-/myocamlbuild.ml
 *.native
 *.byte
 /local
