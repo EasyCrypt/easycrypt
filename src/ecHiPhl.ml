@@ -170,9 +170,6 @@ let process_cond side g =
     else cannot_apply "cond" "the conclusion is not a hoare or a equiv goal"
   end
 
-let process_cfold (side, cpos, olen) g =
-  t_cfold side cpos olen g
-
 (* TODO move this *)
 let pat_all fs s =
   let rec aux_i i = 
@@ -296,11 +293,6 @@ let process_inline infos g =
 
   | `ByPattern _ -> failwith "not-implemented"
 
-let process_kill (side, cpos, len) g =
-  t_kill side cpos len g
-
-let process_alias (side, cpos, id) g =
-  t_alias side cpos id g
 
 (* César says: too much code repetition w.r.t. ecPhl *)
 let process_bdHoare_deno info (_,n as g) = 
@@ -532,10 +524,10 @@ let process_phl loc ptac g =
     | Psplitwhile info          -> EcPhlLoopTx.process_splitwhile info
     | Pcall (side, info)        -> process_call side info
     | Pswap info                -> EcPhlSwap.process_swap info
-    | Pcfold info               -> process_cfold info
     | Pinline info              -> process_inline info
-    | Pkill info                -> process_kill info
-    | Palias info               -> process_alias info
+    | Pcfold info               -> EcPhlCodeTx.process_cfold info
+    | Pkill info                -> EcPhlCodeTx.process_kill info
+    | Palias info               -> EcPhlCodeTx.process_alias info
     | Prnd (side, info)         -> EcPhlRnd.process_rnd side info
     | Pconseq (nm,info)         -> EcPhlConseq.process_conseq nm info
     | Phr_exists_elim           -> t_hr_exists_elim
