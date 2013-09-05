@@ -58,6 +58,14 @@ let as_seq1 = function [x] -> x | _ -> assert false
 let as_seq2 = function [x1; x2] -> (x1, x2) | _ -> assert false
 let as_seq3 = function [x1; x2; x3] -> (x1, x2, x3) | _ -> assert false
 
+let as_seq4 = function
+  | [x1; x2; x3; x4] -> (x1, x2, x3, x4)
+  | _ -> assert false
+
+let as_seq5 = function
+  | [x1; x2; x3; x4; x5] -> (x1, x2, x3, x4, x5)
+  | _ -> assert false
+
 (* -------------------------------------------------------------------- *)
 let proj3_1 (x, _, _) = x
 let proj3_2 (_, x, _) = x

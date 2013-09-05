@@ -157,19 +157,6 @@ let process_call side info (_, n as g) =
 
   t_seq_subgoal t_call [t_seq (t_use an gs) !tac_sub; t_id None] (juc,n)
 
-let process_cond side g =
-  let concl = get_concl g in
-  let check_N () = 
-    if side <> None then
-      cannot_apply "cond" "Unexpected side in non relational goal" in
-  if is_equivS concl then t_equiv_cond side g
-  else begin 
-    check_N ();
-    if is_hoareS concl then t_hoare_cond g
-    else if is_bdHoareS concl then t_bdHoare_cond g
-    else cannot_apply "cond" "the conclusion is not a hoare or a equiv goal"
-  end
-
 (* TODO move this *)
 let pat_all fs s =
   let rec aux_i i = 
@@ -515,8 +502,9 @@ let process_phl loc ptac g =
     | Pskip                     -> EcPhlSkip.t_skip
     | Papp (dir, k, phi, f)     -> EcPhlApp.process_app dir k phi f
     | Pwp k                     -> EcPhlWp.t_wp k
+    | Psp k                     -> EcPhlSp.t_sp k
     | Prcond (side, b, i)       -> EcPhlRCond.t_rcond side b i
-    | Pcond side                -> process_cond side
+    | Pcond side                -> EcPhlCond.process_cond side
     | Pwhile (side, (phi, vopt))-> process_while side phi vopt
     | Pfission info             -> EcPhlLoopTx.process_fission info
     | Pfusion info              -> EcPhlLoopTx.process_fusion info
@@ -544,6 +532,5 @@ let process_phl loc ptac g =
     | Pbdeq                     -> process_bdeq
     | Peqobs_in info            -> process_eqobs_in info
     | Ptrans_stmt info          -> EcPhlTrans.process_equiv_trans info
-    | Psp      arg              -> t_sp arg
   in
     set_loc loc t g

@@ -743,79 +743,6 @@ let t_failure_event at_pos cntr ash q f_event pred_specs inv g =
       cannot_apply "failure event lemma" 
         "A goal of the form Pr[ _ ] <= _ was expected"
     
-(* -------------------------------------------------------------------- *)
-let t_gen_cond side e g =
-  let hyps = get_hyps g in
-  let m1,m2,h,h1,h2 = match LDecl.fresh_ids hyps ["&m";"&m";"_";"_";"_"] with
-    | [m1;m2;h;h1;h2] -> m1,m2,h,h1,h2
-    | _ -> assert false in
-  let t_introm = 
-    if side <> None then t_intros_i [m1] else t_id None 
-  in
-  let t_sub b g = 
-    t_seq_subgoal (EcPhlRCond.t_rcond side b 1)
-      [t_lseq [t_introm; EcPhlSkip.t_skip; t_intros_i [m2;h];
-               t_or  
-                 (t_lseq [t_elim_hyp h; t_intros_i [h1;h2]; t_hyp h2])
-                 (t_hyp h)
-              ];
-       t_id None] g in
-  t_seq_subgoal (EcPhlCase.t_hl_case e) [t_sub true; t_sub false] g
-
-let t_hoare_cond g = 
-  let concl = get_concl g in
-  let hs = t_as_hoareS concl in 
-  let (e,_,_) = fst (s_first_if "if" hs.hs_s) in
-  t_gen_cond None (form_of_expr (EcMemory.memory hs.hs_m) e) g
-
-let t_bdHoare_cond g = 
-  let concl = get_concl g in
-  let bhs = t_as_bdHoareS concl in 
-  let (e,_,_) = fst (s_first_if "if" bhs.bhs_s) in
-  t_gen_cond None (form_of_expr (EcMemory.memory bhs.bhs_m) e) g
-
-let rec t_equiv_cond side g =
-  let hyps,concl = get_goal g in
-  let es = t_as_equivS concl in
-  match side with
-  | Some s ->
-    let e = 
-      if s then 
-        let (e,_,_) = fst (s_first_if "if" es.es_sl) in
-        form_of_expr (EcMemory.memory es.es_ml) e
-      else
-        let (e,_,_) = fst (s_first_if "if" es.es_sr) in
-        form_of_expr (EcMemory.memory es.es_mr) e in
-    t_gen_cond side e g
-  | None -> 
-      let el,_,_ = fst (s_first_if "if" es.es_sl) in
-      let er,_,_ = fst (s_first_if "if" es.es_sr) in
-      let el = form_of_expr (EcMemory.memory es.es_ml) el in
-      let er = form_of_expr (EcMemory.memory es.es_mr) er in
-      let fiff = f_forall_mems [es.es_ml;es.es_mr] (f_imp es.es_pr (f_iff el er)) in
-      let hiff,m1,m2,h,h1,h2 = 
-        match LDecl.fresh_ids hyps ["hiff";"&m1";"&m2";"h";"h";"h"] with 
-        | [hiff;m1;m2;h;h1;h2] -> hiff,m1,m2,h,h1,h2 
-        | _ -> assert false in
-      let t_aux = 
-        t_lseq [t_intros_i [m1];
-                EcPhlSkip.t_skip;
-                t_intros_i [m2;h];
-                t_elim_hyp h;
-                t_intros_i [h1;h2];
-                t_seq_subgoal (t_rewrite_hyp `RtoL hiff 
-                                 [AAmem m1;AAmem m2;AAnode])
-                  [t_hyp h1; t_hyp h2]] in
-      t_seq_subgoal (t_cut fiff)
-        [ t_id None;
-          t_seq (t_intros_i [hiff])
-            (t_seq_subgoal (t_equiv_cond (Some true))
-               [t_seq_subgoal (EcPhlRCond.Low.t_equiv_rcond false true  1) 
-                   [t_aux; t_clear (Sid.singleton hiff)];
-                t_seq_subgoal (EcPhlRCond.Low.t_equiv_rcond false false 1) 
-                  [t_aux; t_clear (Sid.singleton hiff)]
-               ])
-        ] g
 
 (* -------------------------------------------------------------------- *)
 let t_ppr ty phi_l phi_r g =
@@ -1265,7 +1192,6 @@ let t_hoare_true g =
     prove_goal_by [] rn_hoare_true g    
   | _ -> tacuerror "the conclusion should have the form hoare[_ : _ ==> true]"
 
-  
 let t_trivial = 
   let t1 = 
     t_lor [t_hoare_true;
@@ -1276,88 +1202,3 @@ let t_trivial =
     (t_lseq [t_try t_assumption; t_progress (t_id None); t_try t_assumption; 
              t1; t_trivial; t_fail])
     (t_id None)
-  
- 
-(* ---SP--------------------------------------------------------------- *)
-class rn_hl_sp = object inherit xrule "[hl] SP" end
-let rn_hl_sp = RN_xtd (new rn_hl_sp :> xrule)
-
-let rec sp_st side env mem pre (st : stmt) =
-  let is = st.s_node in
-  let f r i = sp_inst side env mem r (i.i_node) in
-  List.fold_left (fun r i -> f r i) pre is
-and 
-  sp_inst side env mem (pre : form) (inst : instr_node) : form=
-  match inst with
-  | Sasgn (LvVar(lf,lty) as lvL, muL) ->
-    let fl   = f_pvar lf lty side in
-    let x_id = if (EcIdent.id_equal mleft side ) then EcIdent.create (symbol_of_lv lvL ^ "L")
-               else  EcIdent.create (symbol_of_lv lvL ^ "R")in
-    let x    = f_local x_id lty in
-    let muL  = EcFol.form_of_expr (EcMemory.memory mem) muL in
-    let muL' = (subst_form_lv env (EcMemory.memory mem) lvL x muL) in
-    let eq p q = mk_form (Fapp (fop_eq lty, p :: q :: [])) tbool in
-    let fvl  = EcPV.PV.fv env (EcMemory.memory mem) pre in (* FV(pre) *)
-    let fvm  = EcPV.PV.fv env (EcMemory.memory mem) muL in (* FV(e) *)
-    if (EcPV.PV.mem_pv env lf fvl) || (EcPV.PV.mem_pv env lf fvm) then
-      let pr = subst_form_lv env (EcMemory.memory mem) lvL x pre in
-      f_exists [(x_id, GTty lty)]  (f_and_simpl (eq fl muL') pr)
-    else
-      f_and_simpl (eq fl muL) pre 
-  | Sif (e,st1,st2) ->
-    let b = EcFol.form_of_expr (EcMemory.memory mem) e in (* condition *)
-    let pb = f_and_simpl pre b in
-    let pnb = f_and_simpl pre (f_not b) in
-    let sp1 = sp_st side env mem pb st1 in
-    let sp2 = sp_st side env mem pnb st2 in
-      f_or sp1 sp2
-  | _ -> cannot_apply "sp" "sp only works with single asgn or if"
-
-
-let t_sp_aux side g =
-  let (env, _, concl) = get_goal_e g in
-  let err ()  = cannot_apply "sp" "with an empty goal" in
-  let stmt, m, menv, pre, prove_goal = 
-    try 
-      let es = t_as_equivS concl in
-      if side then 
-          es.es_sl,mleft, es.es_ml, es.es_pr, 
-           fun pr st -> 
-             let wes = f_equivS_r {es with es_sl=st; es_pr=pr} in
-             t_on_last t_simplify_nodelta (prove_goal_by [wes] rn_hl_sp g)
-      else es.es_sr, mright, es.es_mr, es.es_pr, 
-        fun pr st -> 
-          let wes = f_equivS_r {es with es_sr=st; es_pr=pr} in
-          t_on_last t_simplify_nodelta (prove_goal_by [wes] rn_hl_sp g)
-    with EcBaseLogic.TacError _ ->
-      try
-        let hs = t_as_hoareS concl in
-        hs.hs_s, mhr, hs.hs_m, hs.hs_pr, 
-        fun pr st -> 
-          let wes = f_hoareS_r {hs with hs_s=st; hs_pr=pr} in
-          t_on_last t_simplify_nodelta (prove_goal_by [wes] rn_hl_sp g)
-      with EcBaseLogic.TacError _ ->
-        try
-          let bhs = t_as_bdHoareS concl in
-          bhs.bhs_s, mhr, bhs.bhs_m, bhs.bhs_pr, 
-          fun pr st -> 
-            let wes = f_bdHoareS_r {bhs with bhs_s=st; bhs_pr=pr} in
-            t_on_last t_simplify_nodelta (prove_goal_by [wes] rn_hl_sp g)
-        with EcBaseLogic.TacError _ ->
-          tacuerror "Unexpected goal"
-  in
-  let pr,stmt =
-    let (l, ls) =  match stmt.s_node with [] -> err () | i::s -> (i, EcModules.stmt s) in
-    let pr  = sp_inst m env menv pre (l.i_node) in
-    pr,ls
-  in
-  prove_goal pr stmt
-
-
-let t_sp side g =
-  let sp s = t_repeat (t_sp_aux s) in
-  match side with
-  | None   ->
-    t_on_last (sp false) (sp true g)
-  | Some s ->
-    t_repeat (t_sp_aux s) g
