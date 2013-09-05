@@ -170,58 +170,6 @@ let process_cond side g =
     else cannot_apply "cond" "the conclusion is not a hoare or a equiv goal"
   end
 
-let stmt_length side concl = 
-  match concl.f_node, side with
-  | FhoareS hs, None -> List.length hs.hs_s.s_node
-  | FbdHoareS bhs, None -> List.length bhs.bhs_s.s_node
-  | FequivS es, Some side -> 
-    List.length (if side then es.es_sl.s_node else es.es_sr.s_node)
-  | FequivS _, None -> assert false 
-  | _ -> cannot_apply "stmt_length" "a phl/pbhl/prhl judgement was expected"
-
-let rec process_swap1 info g =
-  let side,pos = info.pl_desc in
-  let concl = get_concl g in
-  if is_equivS concl && side = None then
-    t_seq (process_swap1 {info with pl_desc = (Some true, pos)})
-      (process_swap1 {info with pl_desc = (Some false, pos)}) g 
-  else
-    let p1, p2, p3 = match pos with
-      | SKbase(p1,p2,p3) -> p1, p2, p3
-      | SKmove p ->
-        if 0 < p then 1, 2, p+1
-        else if p < 0 then
-          let len = stmt_length side concl in
-          len+p, len, len
-        else (* p = 0 *) 0,0,0
-      | SKmovei(i,p) ->
-        if 0 < p then i, i+1, i+p
-        else if p < 0 then i+p, i, i
-        else (* p = 0 *) 0,0,0
-      | SKmoveinter(i1,i2,p) ->
-        if 0 < p then i1, i2+1, i2+p
-        else if p < 0 then i1+p, i1, i2
-        else (* p = 0 *) 0,0,0
-    in
-    let tac =
-      if p1 = 0 then t_id None else
-        match side with
-        | None when is_hoareS concl ->
-          t_hoare_swap p1 p2 p3
-        | None when is_bdHoareS concl ->
-          t_bdHoare_swap p1 p2 p3
-        | None ->
-          t_seq (process_swap1 {info with pl_desc = (Some true, pos)})
-            (process_swap1 {info with pl_desc = (Some false, pos)})
-        | Some side ->
-          t_equiv_swap side p1 p2 p3
-    in
-    set_loc info.pl_loc tac g
-
-
-let process_swap info =
-  t_lseq (List.map process_swap1 info)
-
 let process_cfold (side, cpos, olen) g =
   t_cfold side cpos olen g
 
@@ -583,7 +531,7 @@ let process_phl loc ptac g =
     | Punroll info              -> EcPhlLoopTx.process_unroll info
     | Psplitwhile info          -> EcPhlLoopTx.process_splitwhile info
     | Pcall (side, info)        -> process_call side info
-    | Pswap info                -> process_swap info
+    | Pswap info                -> EcPhlSwap.process_swap info
     | Pcfold info               -> process_cfold info
     | Pinline info              -> process_inline info
     | Pkill info                -> process_kill info
