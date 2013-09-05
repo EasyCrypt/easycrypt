@@ -15,28 +15,7 @@ open EcMetaProg
 open EcCorePhl
 
 module Zpr = EcMetaProg.Zipper
-
 (* -------------------------------------------------------------------- *)
-(* ----------------------  Auxiliary functions  ----------------------- *)
-(* -------------------------------------------------------------------- *)
-let t_hS_or_eS th te g =
-  let concl = get_concl g in
-  if is_hoareS concl then th g
-  else if is_equivS concl then te g
-  else tacerror (NotPhl None)
-
-let t_hS_or_bhS th te g =
-  let concl = get_concl g in
-  if is_hoareS concl then th g
-  else if is_bdHoareS concl then te g
-  else tacerror (NotPhl None)
-
-(* -------------------------------------------------------------------- *)
-(* -------------------------  Tactics --------------------------------- *)
-(* -------------------------------------------------------------------- *)
-
-(* -------------------------------------------------------------------- *)
-
 class rn_hl_exists_elim = object inherit xrule "[hl] elim-exists" end
 let rn_hl_exists_elim = RN_xtd (new rn_hl_exists_elim)
 
