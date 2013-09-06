@@ -3,8 +3,8 @@ MANIFEST
 README
 
 # ocamlbuild configuration
-config/_tags
-config/myocamlbuild.ml
+_tags
+myocamlbuild.ml
 config/tests.config
 
 # documentation
