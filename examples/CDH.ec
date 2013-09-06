@@ -107,7 +107,7 @@ theory Set_CDH.
 
   lemma mult_inv_le_r (x y z:real) : 
     0%r < x => (1%r / x) * y <= z => y <= x * z
-  by admit. (*[]*)
+  by [].
 
   lemma Reduction (A <: Adversary) &m :
     0 < n =>
@@ -118,30 +118,22 @@ theory Set_CDH.
     intros n_pos.
     exists (CDH_from_SCDH(A)).
     bdhoare_deno (_ : true ==> _); [ | trivial | trivial ].
-    fun; inline CDH_from_SCDH(A).solve.
-    seq 6 : (nth i s = g ^ (x * y)) (1%r / n%r) 1%r (1%r -(1%r / n%r))  0%r.
-    by rnd; call (_ : true); wp; do rnd; skip; smt.
-    rnd (lambda i, nth i s = g ^ (x * y)) => /=.
-    seq 5: (mem (g ^ (x * y)) s /\ card s <= n) 1%r 1%r 0%r 0%r.
+    fun; inline CDH_from_SCDH(A).solve; wp.    
+    seq 5 : (mem (g ^ (x * y)) s /\ card s <= n)
+      Pr[SCDH(A).main() @ &m : res] (1%r / n%r) (1%r - (1%r / n%r)) 0%r.
     by call (_ : true); wp; do rnd; skip; smt.
     (* This is exactly the SCDH(A) game in the bound *)
     admit.
-    skip; intros &m1 H.
+      
+    rnd (lambda i, nth i s = g ^ (x * y)).
+    skip => &m1 H1 //=.
     apply (Trans _ (1%r / (card s{m1})%r)).
     apply div_le; smt.
     apply (mu_choose_mem s{m1} (g ^ (x{m1} * y{m1})) _); first smt. 
-    (* This is exactly the SCDH(A) game in the bound *)
-    admit.
-    by smt.
-    by wp; skip; trivial.
-    by hoare;wp;skip;smt.
-    progress.
-    cut _: (Pr[SCDH(A).main() @ &m : res] <= 1%r); first by smt.
-    cut lem : forall (x y z : real), x <= y => 0%r < z => x / z <= y / z;
-    first by admit (*smt*).
-    by apply lem; smt.
-  qed.  
 
+    pr_bounded.
+    smt.
+  qed.  
 
   (** Shoup's reduction to CDH -- would be nice to prove a bound *)
 
