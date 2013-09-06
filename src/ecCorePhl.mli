@@ -107,6 +107,9 @@ val abstract_info  : EcEnv.env -> xpath -> ai_t
 val abstract_info2 : EcEnv.env -> xpath -> xpath -> ai_t * ai_t
 
 (* -------------------------------------------------------------------- *)
+val mk_inv_spec : EcEnv.env -> form -> xpath -> xpath -> form
+
+(* -------------------------------------------------------------------- *)
 val generalize_subst :
      EcEnv.env -> memory -> (prog_var * ty) list -> mpath list
   -> (EcIdent.t * gty) list * (form, form) EcPV.Mpv.t

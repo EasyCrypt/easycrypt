@@ -237,7 +237,7 @@ let process_call side info (_, n as g) =
       let (_,fl,_),(_,fr,_),_,_ = s_last_calls "call" es.es_sl es.es_sr in
       let penv = LDecl.inv_memenv hyps in
       let env = LDecl.toenv hyps in
-      penv, fun inv -> EcPhl.mk_inv_spec env inv fl fr
+      penv, fun inv -> EcCorePhl.mk_inv_spec env inv fl fr
     | _ -> cannot_apply "call" "the conclusion is not a hoare or a equiv" in
 
   let process_upto side info g = 

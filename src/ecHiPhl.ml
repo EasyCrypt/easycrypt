@@ -90,104 +90,6 @@ let process_prbounded = t_prbounded
 let process_prfalse = t_prfalse
 let process_bdeq = t_bdeq
 
-let process_eqobs_in (geq', ginv, eqs') g = 
-  let env, hyps, concl = get_goal_e g in
-  let ienv = LDecl.inv_memenv hyps in
-  let es = t_as_equivS concl in
-  let ml, mr =  fst es.es_ml, fst es.es_mr in
- 
-  let toeq ml mr f = 
-    try EcPV.Mpv2.of_form env ml mr f 
-    with _ -> 
-      let ppe = EcPrinting.PPEnv.ofenv env in
-      tacuerror "cannot recognize %a as a set of equalities" 
-        (EcPrinting.pp_form ppe) f in
-
-  let geq =
-    match geq' with
-    | None -> toeq mleft mright f_true
-    | Some geq' ->
-      let geq = process_form ienv geq' tbool in
-      set_loc geq'.pl_loc (toeq mleft mright) geq in
-
-  let ginv = ginv |> omap_dfl (fun f -> process_form ienv f tbool) f_true in
-  let ifvl = EcPV.PV.fv env ml ginv in
-  let ifvr = EcPV.PV.fv env mr ginv in
-
-  let eqs = 
-    match eqs' with 
-    | None -> 
-      begin 
-        try EcPV.Mpv2.needed_eq env ml mr es.es_po 
-        with _ -> tacuerror "cannot infer the set of equalities" 
-      end
-    | Some eqs' -> 
-      let eqs = process_prhl_formula g eqs' in
-      set_loc eqs'.pl_loc (toeq ml mr) eqs in
-
-  let _, _, (log,_), _ = 
-    EcPV.eqobs_in env
-      (EcPhl.eqobs_inF env geq (ginv,ifvl,ifvr))
-      { query = []; forproof = Mf.empty } es.es_sl es.es_sr eqs (ifvl,ifvr) in
-    
-  let onF _ fl fr eqo = 
-    match find_eqobs_in_log log fl fr eqo with
-    | Some (eqo,spec) -> (), eqo, spec 
-    | None -> assert false in
-
-  let t_eqobs eqs g =
-    let concl = get_concl g in
-    let es = t_as_equivS concl in
-    let ml, mr = fst es.es_ml, fst es.es_mr in
-    let post = EcPV.Mpv2.to_form ml mr eqs ginv in
-    let pre = es.es_pr in
-    t_seq_subgoal 
-      (EcPhlConseq.t_equivS_conseq pre post)
-      [ t_trivial;
-        t_trivial;
-        (fun g -> 
-          t_on_last (t_try (t_seq EcPhlSkip.t_skip t_trivial))
-            (t_eqobs_inS onF eqs ginv g))] 
-      g in
-   
-  let tocut = 
-    Mf.fold (fun spec eori l ->
-      match eori with
-      | EORI_unknown None -> spec :: l
-      | _ -> l) log.forproof [] in
- 
-  let forproof = ref log.forproof in
-
-  let rec t_cut_spec l g = 
-    match l with
-    | [] -> t_id None g
-    | spec :: l ->
-      let hyps = get_hyps g in
-      let id = LDecl.fresh_id hyps "H" in
-      forproof := Mf.add spec (EORI_unknown (Some id)) !forproof;
-      t_seq_subgoal (t_cut spec)
-        [ t_id None;
-          t_seq (t_intros_i [id]) (t_cut_spec l)] g in
- 
-  let t_rec g = 
-    let concl = get_concl g in
-    match Mf.find_opt concl !forproof with
-    | Some (EORI_adv geq) ->
-      let gs =
-        EcPhlFun.FunAbsLow.t_equivF_abs
-          (EcPV.Mpv2.to_form mleft mright geq ginv) g in
-      t_on_firsts t_trivial 2 gs 
-    | Some (EORI_fun eqs) ->
-      t_seq EcPhlFun.FunDefLow.t_equivF_fun_def
-        (t_eqobs eqs) g 
-    | Some (EORI_unknown (Some id)) ->
-      t_hyp id g
-    | _ -> t_fail g in
-  
-  t_on_last 
-    (t_seq (t_eqobs eqs) (t_repeat t_rec))
-    (t_cut_spec tocut g) 
-
 (* -------------------------------------------------------------------- *)
 let process_phl loc ptac g =
   let t =
@@ -227,7 +129,7 @@ let process_phl loc ptac g =
     | Pprfalse                  -> process_prfalse
     | Ppr_rewrite s             -> EcPhlPrRw.t_pr_rewrite s 
     | Pbdeq                     -> process_bdeq
-    | Peqobs_in info            -> process_eqobs_in info
+    | Peqobs_in info            -> EcPhlEqobs.process_eqobs_in info
     | Ptrans_stmt info          -> EcPhlTrans.process_equiv_trans info
   in
     set_loc loc t g
