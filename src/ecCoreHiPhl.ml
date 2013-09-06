@@ -18,7 +18,7 @@ let process_phl_form ty g phi =
   in
 
   let hyps = LDecl.push_active m hyps in
-    EcHiLogic.process_form hyps phi ty
+    EcCoreHiLogic.process_form hyps phi ty
 
 (* -------------------------------------------------------------------- *)
 let process_prhl_form ty g phi =
@@ -31,7 +31,19 @@ let process_prhl_form ty g phi =
   in
 
   let hyps = LDecl.push_all [ml; mr] hyps in
-    EcHiLogic.process_form hyps phi ty
+    EcCoreHiLogic.process_form hyps phi ty
+
+(* -------------------------------------------------------------------- *)
+let process_phl_exp side e ty g =
+  let (hyps, concl) = get_goal g in
+
+  let (m, _) =
+    try  EcFol.destr_programS side concl
+    with DestrError _ -> tacuerror "conclusion not of the right form"
+  in
+
+  let hyps = LDecl.push_active m hyps in
+    EcCoreHiLogic.process_exp hyps e ty
 
 (* -------------------------------------------------------------------- *)
 let process_phl_formula  = process_phl_form tbool

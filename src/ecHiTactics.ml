@@ -10,6 +10,7 @@ open EcFol
 
 open EcBaseLogic
 open EcLogic
+open EcCoreHiLogic
 open EcHiLogic
 open EcCoreHiPhl
 open EcHiPhl
@@ -20,10 +21,10 @@ let process_case loc pf g =
   match concl.f_node with
   | FbdHoareS _ | FhoareS _ -> 
     let f = process_phl_formula g pf in
-    EcPhl.t_he_case f g
+    EcPhlCase.t_hl_case f g
   | FequivS _ -> 
     let f = process_prhl_formula g pf in
-    EcPhl.t_equiv_case f g
+    EcPhlCase.t_equiv_case f g
   | _ ->
     let f = process_formula (get_hyps g) pf in
     t_seq (set_loc loc (t_case f))

@@ -1,7 +1,6 @@
 # -*- Makefile -*-
 
 # --------------------------------------------------------------------
-CONFIG           = _tags myocamlbuild.ml
 OCAMLBUILD_BIN   = ocamlbuild -use-ocamlfind
 OCAMLBUILD_EXTRA = -classic-display
 
@@ -31,8 +30,8 @@ ECARGS   ?=
 CHECK     = scripts/runtest.py --bin-args="$(ECARGS)" config/tests.config
 
 # --------------------------------------------------------------------
-.PHONY: all build byte native tests check check-xunit examples tags
-.PHONY: clean install uninstall uninstall-purge dist distcheck why3
+.PHONY: all build byte native tests check check-xunit examples
+.PHONY: clean install uninstall uninstall-purge dist distcheck
 .PHONY: callprover pg toolchain update-toolchain provers update
 .PHONY: %.ml %.mli %.inferred.mli
 
@@ -44,10 +43,10 @@ define do-build
 	$(OCAMLBUILD) "$(1)"
 endef
 
-byte: tags
+byte:
 	$(call do-build,src/ec.byte)
 
-native: tags
+native:
 	$(call do-build,src/ec.native)
 
 callprover:
@@ -119,10 +118,6 @@ clean:
 	$(OCAMLBUILD) -clean
 	rm -f ec.native ec.byte
 	$(MAKE) -C system clean
-	set -e; for i in $(CONFIG); do [ \! -h "$$i" ] || rm -f "$$i"; done
-
-tags:
-	set -e; for i in $(CONFIG); do [ -e "$$i" ] || ln -s config/"$$i" $$i; done
 
 # --------------------------------------------------------------------
 dist:

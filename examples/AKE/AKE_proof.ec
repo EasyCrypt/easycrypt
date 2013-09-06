@@ -1547,7 +1547,8 @@ axiom bad_esk_norev_op_def(mEsk : (Sidx, Esk) map)
   bad_esk_norev_op mEsk mStarted mEexp x evs =
   (exists i,
      mEsk.[i] = Some x /\
-     ! (mem (EphemeralRev (compute_psid mStarted mEexp i)) evs)).
+     ( ! (in_dom i mStarted) \/
+       ! (mem (EphemeralRev (compute_psid mStarted mEexp i)) evs))).
 
 (* Add bad flags bad_esk_col and bad_esk_guess *)
 local
@@ -1608,11 +1609,12 @@ module AKE_3(FA : Adv) = {
     fun h1_a(a : Sk, x : Esk) : Eexp option = {
       var r : Eexp option = None;
       var xe : Eexp;
-      if (bad_esk_norev_op mEsk mStarted mEexp x evs)
-        bad_esk_norev = true;
       if (cH1 < qH1) {
         cH1 = cH1 + 1;
         sH1 = add (a,x) sH1;
+        if (bad_esk_norev_op mEsk mStarted mEexp x evs) {
+          bad_esk_norev = true;
+        }
         xe = h1(a,x);
         r = Some(xe);
       }
@@ -1778,6 +1780,436 @@ proof strict.
   admit. (* We just added some ghost state and ghost code for setting bad. *)
 qed.
 
+
+(*{ Proof: Bound probability of bad_esk_norev *)
+
+op opick(S : 'a set) : 'a option =
+  if (S = FSet.empty) then None else Some (pick S).
+
+op find_esk_norev: Esk -> Sk -> (Sidx, Esk) map -> (Sidx, Sdata2) map -> Sidx option.
+
+axiom find_esk_norev_def(x : Esk) (a : Sk) (mEsk : (Sidx, Esk) map) (mStarted : (Sidx, Sdata2) map):
+  find_esk_norev x a mEsk mStarted =
+  opick (FSet.filter (lambda i, mEsk.[i] = Some x /\
+                                sd2_actor (proj mStarted.[i]) = gen_pk a)
+                     univ_Sidx).
+
+(* Store Sidx and cH1 for query that sets bad *)
+local
+module AKE_3__1(FA : Adv) = {
+  
+  var evs  : Event list               (* events for queries performed by adversary *)
+  var test : Sid option               (* session id of test session *)
+
+  var cH1, cH2 : int                  (* counters for queries *)
+
+  var mH1 : ((Sk * Esk), Eexp) map    (* map for h1 *)
+  var sH1 : (Sk * Esk) set            (* adversary queries for h1 *)
+
+  var mH2 : (Sstring, Key) map        (* map for h2 *)
+  var sH2 : Sstring set               (* adversary queries for h2 *)
+
+  var mSk        : (Agent, Sk) map    (* map for static secret keys *)
+  var mEsk       : (Sidx, Esk) map    (* map for ephemeral secret keys *)
+  var mEexp      : (Sidx, Eexp) map   (* map for ephemeral exponents of sessions *)
+  var mStarted   : (Sidx, Sdata2) map (* map of started sessions *)
+  var mCompleted : (Sidx, Epk)   map  (* additional data for completed sessions *)
+
+  var bad_esk_col : bool              (* esk collision *)
+    (* There are two session indexes with the same ephemeral key. *)
+
+  var bad_esk_norev : (Sidx * int) option (* h1_a query without previous reveal *)
+    (* There is a h1_a(x,_) query such that Ex i. mEsk[i] = Some x and no EphemeralRev for i *)
+
+  var bad_i_guess : Sidx
+  var bad_cH1_guess : int
+
+  fun init() : unit = {
+    evs = [];
+    test = None;
+    cH1 = 0;
+    cH2 = 0;
+    mH1 = Map.empty;
+    sH1 = FSet.empty;
+    mH2 = Map.empty;
+    sH2 = FSet.empty;
+    mSk = Map.empty;
+    mEsk = Map.empty;
+    mEexp = Map.empty;
+    mStarted = Map.empty;
+    mCompleted = Map.empty;
+    bad_esk_col = false;
+    bad_esk_norev = None;
+  }
+
+  module O : AKE_Oracles = {
+
+    fun h1(a : Sk, x : Esk) : Eexp = {
+      var e : Eexp;
+      e = $sample_Eexp;
+      if (!in_dom (a,x) mH1) {
+        mH1.[(a,x)] = e;
+      } 
+      return proj mH1.[(a,x)];
+    }
+
+    fun h1_a(a : Sk, x : Esk) : Eexp option = {
+      var r : Eexp option = None;
+      var xe : Eexp;
+      var i : Sidx;
+      if (cH1 < qH1) {
+        cH1 = cH1 + 1;
+        sH1 = add (a,x) sH1;
+        if (bad_esk_norev_op mEsk mStarted mEexp x evs /\ bad_esk_norev <> None) {
+          i = proj (find_esk_norev x a mEsk mStarted);
+          bad_esk_norev = Some (i,cH1);
+        }
+        xe = h1(a,x);
+        r = Some(xe);
+      }
+      return r;
+    }
+
+    fun h2(sstring : Sstring) : Key = {
+      var ke : Key;
+      ke = $sample_Key;
+      if (!in_dom sstring mH2) {
+        mH2.[sstring] = ke;
+      }
+      return proj mH2.[sstring];
+    }
+ 
+    fun h2_a(sstring : Sstring) : Key option = {
+      var r : Key option = None;
+      var ks : Key;
+      if (cH2 < qH2) {
+        cH2 = cH2 + 1;
+        sH2 = add sstring sH2;
+        ks = h2(sstring);
+        r = Some(ks);
+      }
+      return r;
+    }
+
+    fun init1(i : Sidx, A : Agent, B : Agent) : Epk option = {
+      var pX : Epk;
+      var x : Esk;
+      var r : Epk option = None; 
+      if (in_dom A mSk && in_dom B mSk && !in_dom i mStarted) {
+        x = proj mEsk.[i];
+        mEexp.[i] = h1(proj (mSk.[A]),x);
+        pX = gen_epk(proj mEexp.[i]);
+        mStarted.[i] = (A,B,init);
+        r = Some(pX);
+        evs = Start(compute_psid mStarted mEexp i)::evs;
+      }
+      return r;
+    }
+
+    fun resp(i : Sidx, B : Agent, A : Agent, X : Epk) : Epk option = {
+      var y : Esk;
+      var pY : Epk;
+      var r : Epk option = None; 
+      if (in_dom A mSk && in_dom B mSk && !in_dom i mStarted && !in_dom i mCompleted) {
+        y = proj mEsk.[i];
+        mEexp.[i] = h1(proj (mSk.[B]),y);
+        pY = gen_epk(proj mEexp.[i]);
+        mStarted.[i] = (B,A,resp);
+        mCompleted.[i] = X;
+        r = Some(pY);
+        evs = Accept(compute_sid mStarted mEexp mCompleted i)::evs;
+      }
+      return r;
+    }
+
+    fun init2(i : Sidx, Y : Epk) : unit = {
+      if (!in_dom i mCompleted && in_dom i mStarted && in_dom i mEexp) {
+        mCompleted.[i] = Y;
+        evs = Accept(compute_sid mStarted mEexp mCompleted i)::evs;
+      }
+    }
+
+    fun staticRev(A : Agent) : Sk option = {
+      var r : Sk option = None;
+      if (in_dom A mSk) {
+        r = mSk.[A];
+        evs = StaticRev(A)::evs;
+      }
+      return r;
+    }
+
+    fun ephemeralRev(i : Sidx) : Esk option = {
+      var r : Esk option = None;
+      if (in_dom i mStarted && in_dom i mEexp) {
+        r = mEsk.[i];
+        evs = EphemeralRev(compute_psid mStarted mEexp i)::evs;
+      }
+      return r;
+    }
+
+    fun computeKey(i : Sidx) : Key option = {
+      var r : Key option = None;
+      var sd : Sdata2;
+      var k : Key;
+      if (in_dom i mCompleted && in_dom i mStarted && in_dom i mEexp) {
+        sd = proj mStarted.[i];
+        k = h2(gen_sstring (proj mEexp.[i]) (proj mSk.[sd2_actor sd])
+                           (sd2_peer sd) (proj mCompleted.[i])
+                           (sd2_role sd));
+        r = Some k;
+      }
+      return r;
+    }
+
+    fun sessionRev(i : Sidx) : Key option = {
+      var r : Key option = None;
+      if (in_dom i mCompleted && in_dom i mStarted && in_dom i mEexp) {
+        evs = SessionRev(compute_sid mStarted mEexp mCompleted i)::evs;
+        r = computeKey(i);
+      }
+      return r;
+    }
+  }
+  
+  module A = FA(O)
+
+  fun main() : bool = {
+    var b : bool = def;
+    var pks : Pk list = [];
+    var t_idx : Sidx = def;
+    var key : Key = def;
+    var keyo : Key option = def;
+    var b' : bool = def;
+    var i : int = 0;
+    var sidxs : Sidx set = univ_Sidx;
+    var sidx : Sidx = def;
+    var ska : Sk = def;
+    var pka : Pk = def;
+
+    init();
+    while (i < qAgent) {
+      i = i + 1;
+      ska = $sample_Sk;
+      pka = gen_pk(ska);
+      pks = pka :: pks;
+      mSk.[pka] = ska;
+    }
+
+    while (sidxs <> FSet.empty) {
+      sidx = pick sidxs;
+      sidxs = rm sidx sidxs;
+      mEsk.[sidx] = $sample_Esk;
+    } 
+
+    if (bad_esk_col_op mEsk) bad_esk_col = true;
+    
+    t_idx = A.choose(pks);
+    b = ${0,1};
+    if (in_dom t_idx mStarted && in_dom t_idx mCompleted && in_dom t_idx mEexp) {
+      test = Some (compute_sid mStarted mEexp mCompleted t_idx);
+        (* the if-condition implies "mem (Accept (proj O.test)) O.evs" *)
+      if (b) {
+        keyo = O.computeKey(t_idx);
+      } else {
+        key  = $sample_Key;
+        keyo = Some key;
+      }
+      b' = A.guess(keyo);
+    }
+    bad_cH1_guess = $[0 .. qH1];
+    bad_i_guess = $sample_Sidx;
+    return (b = b');
+  }
+}.
+
+local lemma Eq_AKE_3_AKE_3__1_bad_esk_norev:
+  equiv[ AKE_3(A).main ~ AKE_3__1(A).main : true ==>
+            AKE_3.bad_esk_norev{1} =>  AKE_3__1.bad_esk_norev{2} <> None ].
+proof strict.
+  fun.
+  inline AKE_3(A).init. inline AKE_3__1(A).init.
+  swap {1} 26 3.
+  swap {2} 26 3.
+  seq 28 28:
+    ( ={b,pks,t_idx,key,keyo,b',i,sidx, sidxs,ska,pka} /\
+      AKE_3.evs{1}         = AKE_3__1.evs{2} /\
+      AKE_3.test{1}        = AKE_3__1.test{2} /\
+      AKE_3.cH1{1}         = AKE_3__1.cH1{2} /\
+      AKE_3.cH2{1}         = AKE_3__1.cH2{2} /\
+      AKE_3.mH1{1}         = AKE_3__1.mH1{2} /\
+      AKE_3.sH1{1}         = AKE_3__1.sH1{2} /\
+      AKE_3.mH2{1}         = AKE_3__1.mH2{2} /\
+      AKE_3.sH2{1}         = AKE_3__1.sH2{2} /\
+      AKE_3.mSk{1}         = AKE_3__1.mSk{2} /\
+      AKE_3.mCompleted{1}  = AKE_3__1.mCompleted{2} /\
+      AKE_3.mStarted{1}    = AKE_3__1.mStarted{2} /\
+      AKE_3.mEsk{1}        = AKE_3__1.mEsk{2} /\
+      AKE_3.mEexp{1}       = AKE_3__1.mEexp{2}).
+  eqobs_in.
+  seq 4 4 : (AKE_3.bad_esk_norev{1} = (AKE_3__1.bad_esk_norev{2} <> None));
+    last by rnd {2}; rnd {2}; skip; smt.
+  seq 2 2:
+    ( ={b,pks,t_idx,key,keyo,b',i,sidx, sidxs,ska,pka} /\
+      AKE_3.evs{1}         = AKE_3__1.evs{2} /\
+      AKE_3.test{1}        = AKE_3__1.test{2} /\
+      AKE_3.cH1{1}         = AKE_3__1.cH1{2} /\
+      AKE_3.cH2{1}         = AKE_3__1.cH2{2} /\
+      AKE_3.mH1{1}         = AKE_3__1.mH1{2} /\
+      AKE_3.sH1{1}         = AKE_3__1.sH1{2} /\
+      AKE_3.mH2{1}         = AKE_3__1.mH2{2} /\
+      AKE_3.sH2{1}         = AKE_3__1.sH2{2} /\
+      AKE_3.mSk{1}         = AKE_3__1.mSk{2} /\
+      AKE_3.mCompleted{1}  = AKE_3__1.mCompleted{2} /\
+      AKE_3.mStarted{1}    = AKE_3__1.mStarted{2} /\
+      AKE_3.mEsk{1}        = AKE_3__1.mEsk{2} /\
+      AKE_3.mEexp{1}       = AKE_3__1.mEexp{2} /\
+      AKE_3.bad_esk_norev{1} = (AKE_3__1.bad_esk_norev{2} <> None)).
+  call
+    ( _ :
+      AKE_3.evs{1}         = AKE_3__1.evs{2} /\
+      AKE_3.test{1}        = AKE_3__1.test{2} /\
+      AKE_3.cH1{1}         = AKE_3__1.cH1{2} /\
+      AKE_3.cH2{1}         = AKE_3__1.cH2{2} /\
+      AKE_3.mH1{1}         = AKE_3__1.mH1{2} /\
+      AKE_3.sH1{1}         = AKE_3__1.sH1{2} /\
+      AKE_3.mH2{1}         = AKE_3__1.mH2{2} /\
+      AKE_3.sH2{1}         = AKE_3__1.sH2{2} /\
+      AKE_3.mSk{1}         = AKE_3__1.mSk{2} /\
+      AKE_3.mCompleted{1}  = AKE_3__1.mCompleted{2} /\
+      AKE_3.mStarted{1}    = AKE_3__1.mStarted{2} /\
+      AKE_3.mEsk{1}        = AKE_3__1.mEsk{2} /\
+      AKE_3.mEexp{1}       = AKE_3__1.mEexp{2} /\
+      AKE_3.bad_esk_norev{1} = (AKE_3__1.bad_esk_norev{2} <> None)).
+      (* h1_a *)
+      admit.
+      (* h2_a *)
+      fun.
+      eqobs_in
+        (AKE_3.evs{1} = AKE_3__1.evs{2} /\
+         AKE_3.test{1} = AKE_3__1.test{2} /\
+         AKE_3.cH1{1} = AKE_3__1.cH1{2} /\
+         AKE_3.cH2{1} = AKE_3__1.cH2{2} /\
+         AKE_3.mH1{1} = AKE_3__1.mH1{2} /\
+         AKE_3.sH1{1} = AKE_3__1.sH1{2} /\
+         AKE_3.mH2{1} = AKE_3__1.mH2{2} /\
+         AKE_3.sH2{1} = AKE_3__1.sH2{2} /\
+         AKE_3.mSk{1} = AKE_3__1.mSk{2} /\
+         AKE_3.mCompleted{1} = AKE_3__1.mCompleted{2} /\
+         AKE_3.mStarted{1} = AKE_3__1.mStarted{2} /\
+         AKE_3.mEsk{1} = AKE_3__1.mEsk{2} /\
+         AKE_3.mEexp{1} = AKE_3__1.mEexp{2})
+        (AKE_3.bad_esk_norev{1} = (AKE_3__1.bad_esk_norev{2} <> None))
+       :
+        (AKE_3.evs{1} = AKE_3__1.evs{2} /\
+         AKE_3.test{1} = AKE_3__1.test{2} /\
+         AKE_3.cH1{1} = AKE_3__1.cH1{2} /\
+         AKE_3.cH2{1} = AKE_3__1.cH2{2} /\
+         AKE_3.mH1{1} = AKE_3__1.mH1{2} /\
+         AKE_3.sH1{1} = AKE_3__1.sH1{2} /\
+         AKE_3.mH2{1} = AKE_3__1.mH2{2} /\
+         AKE_3.sH2{1} = AKE_3__1.sH2{2} /\
+         AKE_3.mSk{1} = AKE_3__1.mSk{2} /\
+         AKE_3.mCompleted{1} = AKE_3__1.mCompleted{2} /\
+         AKE_3.mStarted{1} = AKE_3__1.mStarted{2} /\
+         AKE_3.mEsk{1} = AKE_3__1.mEsk{2} /\
+         AKE_3.mEexp{1} = AKE_3__1.mEexp{2} /\
+         ={r}).
+      (* init1 *)
+      admit.
+      (* init2 *)
+      admit.
+      (* resp *)
+      admit.
+      (* staticRev *)
+      fun.
+      eqobs_in true
+        (AKE_3.bad_esk_norev{1} = (AKE_3__1.bad_esk_norev{2} <> None))
+       :
+        (AKE_3.evs{1} = AKE_3__1.evs{2} /\
+         AKE_3.test{1} = AKE_3__1.test{2} /\
+         AKE_3.cH1{1} = AKE_3__1.cH1{2} /\
+         AKE_3.cH2{1} = AKE_3__1.cH2{2} /\
+         AKE_3.mH1{1} = AKE_3__1.mH1{2} /\
+         AKE_3.sH1{1} = AKE_3__1.sH1{2} /\
+         AKE_3.mH2{1} = AKE_3__1.mH2{2} /\
+         AKE_3.sH2{1} = AKE_3__1.sH2{2} /\
+         AKE_3.mSk{1} = AKE_3__1.mSk{2} /\
+         AKE_3.mCompleted{1} = AKE_3__1.mCompleted{2} /\
+         AKE_3.mStarted{1} = AKE_3__1.mStarted{2} /\
+         AKE_3.mEsk{1} = AKE_3__1.mEsk{2} /\
+         AKE_3.mEexp{1} = AKE_3__1.mEexp{2} /\
+         ={r}).
+      (* ephemeralRev *)
+      fun.
+      eqobs_in
+        (AKE_3.evs{1} = AKE_3__1.evs{2} /\
+         AKE_3.test{1} = AKE_3__1.test{2} /\
+         AKE_3.cH1{1} = AKE_3__1.cH1{2} /\
+         AKE_3.cH2{1} = AKE_3__1.cH2{2} /\
+         AKE_3.mH1{1} = AKE_3__1.mH1{2} /\
+         AKE_3.sH1{1} = AKE_3__1.sH1{2} /\
+         AKE_3.mH2{1} = AKE_3__1.mH2{2} /\
+         AKE_3.sH2{1} = AKE_3__1.sH2{2} /\
+         AKE_3.mSk{1} = AKE_3__1.mSk{2} /\
+         AKE_3.mCompleted{1} = AKE_3__1.mCompleted{2} /\
+         AKE_3.mStarted{1} = AKE_3__1.mStarted{2} /\
+         AKE_3.mEsk{1} = AKE_3__1.mEsk{2} /\
+         AKE_3.mEexp{1} = AKE_3__1.mEexp{2})
+        (AKE_3.bad_esk_norev{1} = (AKE_3__1.bad_esk_norev{2} <> None))
+       :
+        (AKE_3.evs{1} = AKE_3__1.evs{2} /\
+         AKE_3.test{1} = AKE_3__1.test{2} /\
+         AKE_3.cH1{1} = AKE_3__1.cH1{2} /\
+         AKE_3.cH2{1} = AKE_3__1.cH2{2} /\
+         AKE_3.mH1{1} = AKE_3__1.mH1{2} /\
+         AKE_3.sH1{1} = AKE_3__1.sH1{2} /\
+         AKE_3.mH2{1} = AKE_3__1.mH2{2} /\
+         AKE_3.sH2{1} = AKE_3__1.sH2{2} /\
+         AKE_3.mSk{1} = AKE_3__1.mSk{2} /\
+         AKE_3.mCompleted{1} = AKE_3__1.mCompleted{2} /\
+         AKE_3.mStarted{1} = AKE_3__1.mStarted{2} /\
+         AKE_3.mEsk{1} = AKE_3__1.mEsk{2} /\
+         AKE_3.mEexp{1} = AKE_3__1.mEexp{2} /\
+         ={r}).
+      (* sessionRev *)
+      fun.
+      eqobs_in
+        (AKE_3.evs{1} = AKE_3__1.evs{2} /\
+         AKE_3.test{1} = AKE_3__1.test{2} /\
+         AKE_3.cH1{1} = AKE_3__1.cH1{2} /\
+         AKE_3.cH2{1} = AKE_3__1.cH2{2} /\
+         AKE_3.mH1{1} = AKE_3__1.mH1{2} /\
+         AKE_3.sH1{1} = AKE_3__1.sH1{2} /\
+         AKE_3.mH2{1} = AKE_3__1.mH2{2} /\
+         AKE_3.sH2{1} = AKE_3__1.sH2{2} /\
+         AKE_3.mSk{1} = AKE_3__1.mSk{2} /\
+         AKE_3.mCompleted{1} = AKE_3__1.mCompleted{2} /\
+         AKE_3.mStarted{1} = AKE_3__1.mStarted{2} /\
+         AKE_3.mEsk{1} = AKE_3__1.mEsk{2} /\
+         AKE_3.mEexp{1} = AKE_3__1.mEexp{2})
+        (AKE_3.bad_esk_norev{1} = (AKE_3__1.bad_esk_norev{2} <> None))
+       :
+        (AKE_3.evs{1} = AKE_3__1.evs{2} /\
+         AKE_3.test{1} = AKE_3__1.test{2} /\
+         AKE_3.cH1{1} = AKE_3__1.cH1{2} /\
+         AKE_3.cH2{1} = AKE_3__1.cH2{2} /\
+         AKE_3.mH1{1} = AKE_3__1.mH1{2} /\
+         AKE_3.sH1{1} = AKE_3__1.sH1{2} /\
+         AKE_3.mH2{1} = AKE_3__1.mH2{2} /\
+         AKE_3.sH2{1} = AKE_3__1.sH2{2} /\
+         AKE_3.mSk{1} = AKE_3__1.mSk{2} /\
+         AKE_3.mCompleted{1} = AKE_3__1.mCompleted{2} /\
+         AKE_3.mStarted{1} = AKE_3__1.mStarted{2} /\
+         AKE_3.mEsk{1} = AKE_3__1.mEsk{2} /\
+         AKE_3.mEexp{1} = AKE_3__1.mEexp{2} /\
+         ={r}).
+      wp; skip. progress.
+  admit.
+
+qed.
+
+(*} end: Proof: Bound probability of bad_esk_norev *)
+
 (*{ Proof: Bound probability of bad_esk_col *)
 
 op bad_esk_col_x_op : (Sidx, Esk) map -> Esk -> bool.
@@ -1869,16 +2301,16 @@ local lemma bad_AKE_3_O_h1_a:
   bd_hoare[ AKE_3(A).O.h1_a : AKE_3.bad_esk_col ==> AKE_3.bad_esk_col] = 1%r.
 proof strict.
   fun. sp. if. wp. sp. inline AKE_3(A).O.h1. wp. sp. rnd.
-  rewrite -/cpTrue -/(Distr.weight sample_Eexp). smt.
-  skip; smt. skip; smt.
+  rewrite -/cpTrue -/(Distr.weight sample_Eexp). skip; smt.
+  skip; smt. 
 qed.
 
 local lemma bad_AKE_3_O_h2_a:
   bd_hoare[ AKE_3(A).O.h2_a : AKE_3.bad_esk_col ==> AKE_3.bad_esk_col] = 1%r.
 proof strict.
   fun. sp. if. wp. sp. inline AKE_3(A).O.h2. wp. sp. rnd.
-  rewrite -/cpTrue -/(Distr.weight sample_Eexp). smt.
-  skip; smt. skip; smt.
+  rewrite -/cpTrue -/(Distr.weight sample_Eexp). skip; smt.
+  skip; smt.
 qed.
 
 local lemma bad_AKE_3_O_init2:
@@ -1904,24 +2336,25 @@ local lemma bad_AKE_3_O_sessionRev:
 proof strict.
   fun. sp. if. inline AKE_3(A).O.computeKey.
   sp. if. inline AKE_3(A).O.h2. sp. wp. rnd.
-  rewrite -/cpTrue -/(Distr.weight sample_Eexp); smt.
-  skip; smt. wp; skip; smt. skip; smt.
+  by rewrite -/cpTrue -/(Distr.weight sample_Eexp); skip; smt.
+  by wp; skip; smt.
+  by skip; smt.
 qed.
 
 local lemma bad_AKE_3_O_init1:
   bd_hoare[ AKE_3(A).O.init1 : AKE_3.bad_esk_col ==> AKE_3.bad_esk_col] = 1%r.
 proof strict.
   fun. sp. if. inline AKE_3(A).O.h1. sp. wp. rnd.
-  rewrite -/cpTrue -/(Distr.weight sample_Eexp); smt.
-  skip; smt. wp; skip; smt.
+  by rewrite -/cpTrue -/(Distr.weight sample_Eexp); skip; smt.
+  by skip; smt.
 qed.
 
 local lemma bad_AKE_3_O_resp:
   bd_hoare[ AKE_3(A).O.resp : AKE_3.bad_esk_col ==> AKE_3.bad_esk_col] = 1%r.
 proof strict.
   fun. sp. if. inline AKE_3(A).O.h1. sp. wp. rnd.
-  rewrite -/cpTrue -/(Distr.weight sample_Eexp); smt.
-  skip; smt. wp; skip; smt.
+  by rewrite -/cpTrue -/(Distr.weight sample_Eexp); skip; smt.
+  by skip; smt.
 qed.
 
 (* FIXME: we would like to prove that bad_esk_col is preserved *)
@@ -1929,16 +2362,16 @@ local lemma not_bad_AKE_3_O_h1_a:
   bd_hoare[ AKE_3(A).O.h1_a : !AKE_3.bad_esk_col ==> !AKE_3.bad_esk_col] = 1%r.
 proof strict.
   fun. sp. if. wp. sp. inline AKE_3(A).O.h1. wp. sp. rnd.
-  rewrite -/cpTrue -/(Distr.weight sample_Eexp). smt.
-  skip; smt. skip; smt.
+  by rewrite -/cpTrue -/(Distr.weight sample_Eexp); skip; smt.
+  by skip; smt.
 qed.
 
 local lemma not_bad_AKE_3_O_h2_a:
   bd_hoare[ AKE_3(A).O.h2_a : !AKE_3.bad_esk_col ==> !AKE_3.bad_esk_col] = 1%r.
 proof strict.
   fun. sp. if. wp. sp. inline AKE_3(A).O.h2. wp. sp. rnd.
-  rewrite -/cpTrue -/(Distr.weight sample_Eexp). smt.
-  skip; smt. skip; smt.
+  by rewrite -/cpTrue -/(Distr.weight sample_Eexp) ; skip; smt.
+  by skip; smt.
 qed.
 
 local lemma not_bad_AKE_3_O_init2:
@@ -1964,25 +2397,25 @@ local lemma not_bad_AKE_3_O_sessionRev:
 proof strict.
   fun. sp. if. inline AKE_3(A).O.computeKey.
   sp. if. inline AKE_3(A).O.h2. sp. wp. rnd.
-  rewrite -/cpTrue -/(Distr.weight sample_Eexp); smt.
-  skip; smt. wp; skip; smt. skip; smt.
+  by rewrite -/cpTrue -/(Distr.weight sample_Eexp); skip; smt.
+  by wp; skip; smt.
+  by skip; smt.
 qed.
 
 local lemma not_bad_AKE_3_O_init1:
   bd_hoare[ AKE_3(A).O.init1 : !AKE_3.bad_esk_col ==> !AKE_3.bad_esk_col] = 1%r.
 proof strict.
   fun. sp. if. inline AKE_3(A).O.h1. sp. wp. rnd.
-  rewrite -/cpTrue -/(Distr.weight sample_Eexp); smt.
-  skip; smt. wp; skip; smt.
+  by rewrite -/cpTrue -/(Distr.weight sample_Eexp); skip; smt.
+  by skip; smt.
 qed.
-
 
 local lemma not_bad_AKE_3_O_resp:
   bd_hoare[ AKE_3(A).O.resp : !AKE_3.bad_esk_col ==> !AKE_3.bad_esk_col] = 1%r.
 proof strict.
   fun. sp. if. inline AKE_3(A).O.h1. sp. wp. rnd.
-  rewrite -/cpTrue -/(Distr.weight sample_Eexp); smt.
-  skip; smt. wp; skip; smt.
+  by rewrite -/cpTrue -/(Distr.weight sample_Eexp); skip; smt.
+  by skip; smt.
 qed.
 
 local
@@ -2018,11 +2451,10 @@ proof strict.
      /\ AKE_3.mEsk{1} = AKE_3_1.mEsk{2}) (qAgent - i{1}).
     progress.
     wp.
-    rnd. intros=> &hr. cut H:= lossless_sample_Sk.
-      generalize H. rewrite /Distr.weight => //.
+    rnd.
     wp.
-    skip; smt.
-    skip; smt.
+      by skip; smt.
+      by skip; smt.
   seq 1 1:
     (   ((bad_esk_col_op AKE_3.mEsk){1} = bad_esk_col{2})
      /\ AKE_3.bad_esk_col{1} = false
@@ -2108,127 +2540,333 @@ proof strict.
       skip; smt.
 qed.
 
+(* Call function in loop body so that we can use FEL.
+   Also remove sidxs and use fdom mEsk directly.
+*)
 local
 module AKE_3_2(FA : Adv) = {
-  
   var mEsk : (Sidx, Esk) map    (* map for ephemeral secret keys *)
+  var bad_esk_col : bool
 
-  fun main() : bool = {
-    var sidxs : Sidx set = univ_Sidx;
-    var sidx : Sidx = def;
-    var x : Esk = def;
-    var bad_esk_col : bool = false;
-    var s1 : Sidx = def;
-    var s2 : Sidx = def;
- 
-    mEsk = Map.empty;
-
-    while (sidxs <> FSet.empty) {
-      sidx = pick sidxs;
-      sidxs = rm sidx sidxs;
+  fun sample() : unit = {
+    var x : Esk;
+    var sidx : Sidx;
+    (* we need this redundant check because the fel tactic does not
+       exploit that sample is only called from the body of the while
+       loop *)
+    if (fdom mEsk <> univ_Sidx) {
+      sidx = pick (filter (lambda x, ! mem x (fdom mEsk)) univ_Sidx);
       x = $sample_Esk;
-      if (bad_esk_col_x_op mEsk x) bad_esk_col = true;
+      if (!bad_esk_col && bad_esk_col_x_op mEsk x) bad_esk_col = true;
       mEsk.[sidx] = x;
     }
+  }
 
-    s1 = $sample_Sidx; (* Can we place this directly at the beginning? *)
-    s2 = $sample_Sidx; (* Can we place this directly at the beginning? *)
-    
+  fun main() : bool = {
+    mEsk = Map.empty;
+    bad_esk_col = false;
+
+    while (fdom mEsk <> univ_Sidx) {
+      sample();
+    }
+
     return bad_esk_col;
   }
 }.
 
 local
 lemma Eq_AKE_3_1_AKE_3_2_bad_esk_col:
-  equiv[ AKE_3_1(A).main ~ AKE_3_2(A).main : true ==> res{1} = res{2} ].
+  equiv[ AKE_3_1(A).main ~ AKE_3_2(A).main
+         : true ==> res{1} => AKE_3_2.bad_esk_col{2} ].
 proof strict.
-  fun.
-  swap {2} 5 3.
-  swap {2} 5 2.
-  seq 6 6 :   (bad_esk_col{1} = bad_esk_col{2}).
-  eqobs_in.
-  rnd {2}. rnd {2}. wp. skip; smt.
+  fun. inline AKE_3_2(A).sample.
+  seq 5 2 :
+    (sidxs{1} = filter (lambda x, ! mem x (fdom AKE_3_2.mEsk{2})) univ_Sidx /\
+     AKE_3_1.mEsk{1} = AKE_3_2.mEsk{2}  /\
+     bad_esk_col{1}  = AKE_3_2.bad_esk_col{2}).
+    wp. skip. progress. rewrite fdom_empty.
+    cut H: (lambda (x : Sidx), ! mem x FSet.empty) = cpTrue.
+    apply fun_ext. rewrite /cpTrue /Fun.(==).
+    progress. smt.
+    rewrite H. smt.
+  while
+    (sidxs{1} = filter (lambda x, ! mem x (fdom AKE_3_2.mEsk{2})) univ_Sidx /\
+     AKE_3_1.mEsk{1} = AKE_3_2.mEsk{2}  /\
+     bad_esk_col{1}  = AKE_3_2.bad_esk_col{2}).
+    rcondt {2} 1. progress. skip. smt.
+    seq 1 1:
+    (sidxs{1} = filter (lambda x, ! mem x (fdom AKE_3_2.mEsk{2})) univ_Sidx /\
+     AKE_3_1.mEsk{1} = AKE_3_2.mEsk{2}  /\
+     bad_esk_col{1}  = AKE_3_2.bad_esk_col{2} /\
+     ={sidx}). wp. skip. smt.
+    swap {1} 1 2.
+    seq 1 1:
+    (sidxs{1} = filter (lambda x, ! mem x (fdom AKE_3_2.mEsk{2})) univ_Sidx /\
+     AKE_3_1.mEsk{1} = AKE_3_2.mEsk{2}  /\
+     bad_esk_col{1}  = AKE_3_2.bad_esk_col{2} /\
+     ={x,sidx}).
+    rnd. skip. smt.
+    seq 1 1:
+    (sidxs{1} = filter (lambda x, ! mem x (fdom AKE_3_2.mEsk{2})) univ_Sidx /\
+     AKE_3_1.mEsk{1} = AKE_3_2.mEsk{2}  /\
+     bad_esk_col{1}  = AKE_3_2.bad_esk_col{2} /\
+     ={x,sidx}).
+    wp. skip. smt.
+    wp. skip. progress.
+      (* sidxs = filter ... mEsk preserved *)
+      apply set_ext.
+      rewrite /FSet.(==).
+      intros=> i.
+      case (i = sidx{2}). intros=> H_i_sidx.
+        rewrite !H_i_sidx. progress. smt.
+        generalize H. 
+        rewrite !mem_filter. progress.
+        generalize H0. rewrite !mem_fdom. smt.
+      intros H_neq. rewrite mem_rm_neq => //.
+      rewrite !mem_filter. progress. trivial.
+      generalize H0. rewrite !mem_fdom. smt. trivial.
+      generalize H0. rewrite mem_fdom. smt.
+      (* relation between fdom mEsk = univ and rm (filter ..) .. = empty *)
+      apply not_def => Hfd.
+      cut Hex:
+        exists x,
+          mem x
+            (rm sidx{2} (filter (lambda x, !mem x (fdom AKE_3_2.mEsk{2})) 
+                                univ_Sidx)). smt.
+      elim Hex; intros=> z Hmem.
+      case (z = sidx{2}). intros=> Heq.
+        generalize Hmem. rewrite !Heq !mem_rm !mem_filter. smt.
+      intros Hneq. generalize Hmem. rewrite mem_rm_neq // mem_filter.
+      beta.
+      intros=> [mem_univ] not_mem_dom. smt.
+      (* relation between rm (filter ..) .. = empty and fdom mEsk = univ *)
+      apply not_def => Hnempty.
+      cut Hex: exists z, ! mem z (fdom AKE_3_2.mEsk{2}.[sidx{2} <- x{2}]).
+        case (forall z, mem z (fdom AKE_3_2.mEsk{2}.[sidx{2} <- x{2}]));
+          last by smt.
+        intros=> Hall.
+        cut L: fdom AKE_3_2.mEsk{2}.[sidx{2} <- x{2}] = univ_Sidx.
+          by apply set_ext; rewrite /FSet.(==); smt.
+        smt.
+      elim Hex. intros=> z Hnmem.
+      generalize Hnmem. rewrite mem_fdom. simplify.
+      cut L: forall z,
+       !mem z (rm sidx{2}
+                  (filter (lambda (x : Sidx), ! mem x (fdom AKE_3_2.mEsk{2}))
+                          univ_Sidx)).
+      smt.
+      cut Hmemz:= L z.
+      case (sidx{2} = z). intros Heq. generalize Hmemz.
+        rewrite !Heq mem_rm. smt.
+      intros=> Hneq. generalize Hmemz.
+      rewrite mem_rm mem_filter. progress. smt.
+    skip. smt.
 qed.
 
-local
-module AKE_3_3(FA : Adv) = {
-  
-  var mEsk : (Sidx, Esk) map    (* map for ephemeral secret keys *)
+lemma leq_div(x1 y x2 : real):
+  y > 0%r => x1 <= x2 => x1 / y <= x2 / y by [].
 
-  fun main() : bool = {
-    var sidxs : Sidx set = univ_Sidx;
-    var sidx : Sidx = def;
-    var x : Esk = def;
-    var bad_esk_col : bool = false;
-    var s1 : Sidx = def;
-    var s2 : Sidx = def;
- 
-    mEsk = Map.empty;
-
-    s1 = $sample_Sidx;
-    s2 = $sample_Sidx;
-
-    while (sidxs <> FSet.empty) {
-      sidx = pick sidxs;
-      sidxs = rm sidx sidxs;
-      x = $sample_Esk;
-      mEsk.[sidx] = x;
-    }
-    
-    return (sidx_to_int s1 < sidx_to_int s2) &&
-           mEsk.[s1] <> None && mEsk.[s1] = mEsk.[s2];
-  }
-}.
-
-local
-module AKE_3_4(FA : Adv) = {
-  
-  var mEsk : (Sidx, Esk) map    (* map for ephemeral secret keys *)
-
-  fun main() : bool = {
-    var sidxs : Sidx set = univ_Sidx;
-    var sidx : Sidx = def;
-    var x1 : Esk = def;
-    var x2 : Esk = def;
-    var bad_esk_col : bool = false;
-    var s1 : Sidx = def;
-    var s2 : Sidx = def;
- 
-    mEsk = Map.empty;
-
-    s1 = $sample_Sidx;
-    s2 = $sample_Sidx;
-
-    x1 = $sample_Esk;
-    x2 = $sample_Esk;
-    
-    return (sidx_to_int s1 < sidx_to_int s2) && x1 = x2;
-  }
-}.
-
-(* sample mEsk.[s1] first, then sample mEsk.[s2] *)
-local
-lemma Eq_AKE_3_3_AKE_3_4_bad_esk_col:
-  equiv[ AKE_3_3(A).main ~ AKE_3_4(A).main : true ==> res{1} = res{2} ].
+lemma zero_leq_divr(x y : real):
+  x >= 0%r => y > 0%r => 0%r <= x / y.
 proof strict.
-  fun.
-  seq 9 9 : (={s1,s2}). admit.
-  splitwhile (pick sidxs <> s1 /\ pick sidxs <> s2) : {1} 1.
-  unroll {1} 2.
-  swap {2} 9 1.
-  swap {2} 8 1.
-  eqobs_in.
+  progress.
+  cut G: 0%r = 0%r / y. smt.
+  rewrite G. apply leq_div.
+  smt. smt.
 qed.
 
-local
-lemma Eq_AKE_3_2_AKE_3_3_bad_esk_col:
-  bd_hoare[ AKE_3_3(A).main : true ==>  mEsk.[s] = x] < 1/2%r.
+lemma card_leq(X Y : 'a set):
+  X <= Y => card X <= card Y.
 proof strict.
-  fun.
-  swap {2} 7 1.
-  eqobs_in.
+  case (X = Y). smt.
+  progress.
+  cut G: card X < card Y. smt.
+  smt.
 qed.
 
+lemma finite_rng_dom(m : ('a,'b) map):
+  ISet.Finite.finite (dom m) => ISet.Finite.finite (rng m).
+proof strict.
+  admit. (* surjection from dom to rng: lamba x, proj m.[x] *)
+qed.
+
+lemma mem_frng(x : 'b) (m : (Sidx,'b) map):
+   mem x (frng m) = ISet.mem x (rng m).
+proof strict.
+  cut Fin: ISet.Finite.finite (rng m); first by smt.
+  by rewrite /frng; smt.
+qed.
+
+lemma card_frng_fdom(m : ('a,'b) map):
+  card (frng m) <= card (fdom m).
+proof strict.
+  admit. (* surjection from fdom to frng: lamba x, proj m.[x] *)
+qed.
+
+lemma filter_bad_esk_col_x(m : (Sidx, Esk) map):
+   filter (lambda x, bad_esk_col_x_op m x) univ_Esk <= frng m.
+proof strict.
+  cut Leq:   (lambda (x : Esk), bad_esk_col_x_op m x)
+           = (lambda (x : Esk), exists i, m.[i] = Some x).
+    apply fun_ext. rewrite /Fun.(==). progress. smt.
+  rewrite Leq /FSet.(<=).
+  progress.
+  cut Hex: exists i, m.[i] = Some x; first by smt.
+  rewrite mem_frng.
+  smt.
+qed.
+
+lemma leq_real_int(x y : int): x <= y => x%r <= y%r by smt.
+
+lemma int_leq_trans(a b c : int): a <= b => b <= c => a <= c by smt.
+
+lemma dom_set_add(m : (Sidx,'b) map) (x : Sidx) (y : 'b):
+   ! ISet.mem x (dom m) => (dom m.[x <- y]) = ISet.add x (dom m) by [].
+
+lemma add_FSet(X : 'a set) (x : 'a):
+  ISet.Finite.fromFSet (add x X) = ISet.add x (ISet.Finite.fromFSet X).
+proof strict.
+  apply ISet.set_ext; rewrite /ISet.(==); smt.
+qed.
+
+lemma add_FSet2(X : 'a ISet.set) (x : 'a):
+  ISet.Finite.finite X =>
+  ISet.Finite.toFSet (ISet.add x X) = add x (ISet.Finite.toFSet X).
+proof strict.
+  progress.
+  apply set_ext. rewrite /FSet.(==).
+  intros => z.
+  case (z = x). smt.
+  progress.
+    smt.
+  smt.
+qed.
+
+lemma fdom_set_add(m : (Sidx,'b) map) (x : Sidx) (y : 'b):
+   ! ISet.mem x (dom m) => (fdom m.[x <- y]) = add x (fdom m).
+proof strict.
+  rewrite /fdom /fdom. rewrite -add_FSet2. smt.
+  smt.
+qed.
+
+(*
+(** List case analysis *)
+lemma fset_case: forall (p: 'a set cpred), 
+    p FSet.empty => 
+    (forall x s, p (add x s)) =>
+    (forall s, p s)
+by [].
+
+lemma fset_case_eq: forall (p: 'a set cpred) (s:'a set),
+    (s = FSet.empty => p s) =>
+    (forall x s', s = add x s' => p s) =>
+    p s.
+proof strict.
+  intros=> p s.
+  elim/fset_case s => //.
+  intros=> x s' _ h.
+  apply (h x s').
+qed.
+*)
+
+lemma iset_less_exists(X Y : 'a ISet.set):
+  ISet.(<) X Y => exists x, ISet.mem x Y /\ ! ISet.mem x X by [].
+
+lemma mem_ToISet(X : 'a set) (x : 'a):
+   mem x X = ISet.mem x (ISet.Finite.fromFSet X) by [].
+
+lemma less_ToISet(X Y : 'a set):
+  (X < Y) = (ISet.(<) (ISet.Finite.fromFSet X) (ISet.Finite.fromFSet Y)) by [].
+
+lemma fset_less_exists(X Y : 'a set):
+  X < Y => exists x, mem x Y /\ ! mem x X.
+proof strict.
+  rewrite less_ToISet. smt.
+qed.
+
+lemma mem_pick_filter(X Y : 'a set):
+  X < Y => ! mem (pick (filter (lambda x, !mem x X) Y)) X.
+proof strict.
+  intros=> Hless. apply not_def => Hmem_pick.
+  cut H: mem (pick (filter (lambda (x : 'a), ! mem x X) Y))
+             (filter (lambda (x : 'a), ! mem x X) Y).
+   apply mem_pick.
+   apply not_def.
+   cut L: exists x, mem x ( filter (lambda (x : 'a), ! mem x X) Y); last by smt.
+   cut J:
+       (exists (x : 'a), mem x (filter (lambda (x0 : 'a), ! mem x0 X) Y))
+     = (exists (x : 'a), mem x Y /\ ! mem x X).
+     cut R: forall x,   mem x (filter (lambda (x0 : 'a), ! mem x0 X) Y)
+                      = (mem x Y /\ ! mem x X). smt.
+     smt.
+   rewrite J.
+   progress.
+   apply fset_less_exists => //.
+   generalize H. rewrite mem_filter. progress. smt.
+qed.
+
+require import Sum.
+
+local
+lemma pr_AKE_3_2 &m:
+    Pr[ AKE_3_2(A).main() @ &m: AKE_3_2.bad_esk_col ]
+    <= qSession%r * qSession%r * (1%r /(card univ_Esk)%r).
+proof strict.
+  fel 2
+      (card (fdom AKE_3_2.mEsk))
+      (lambda x, qSession%r * (1%r /(card univ_Esk)%r))
+      qSession
+      AKE_3_2.bad_esk_col
+      [ AKE_3_2(A).sample : (fdom AKE_3_2.mEsk <> univ_Sidx) ].
+          (* precond for increasing counter *)
+    (* This is an invariant for all function calls (to `sample'),
+       but the fel tactic does not exploit that `sample' is only
+       called in the body of the while loop
+      (fdom AKE_3_2.mEsk <> univ_Sidx) *)
+      
+  (* bound is right: sum .. = b *)
+  cut G:= Sum.int_sum_const
+           (lambda (x : int), qSession%r * (1%r / (card univ_Esk)%r))
+           (intval 0 (qSession - 1)).
+  rewrite (G _). smt.
+  progress.
+  rewrite intval_card_0. smt. smt.
+  (* post implied *)
+  progress; smt.
+  (* init ensures !bad and counter 0 *)
+  wp. skip.
+    intros=> &hr _. split. trivial.
+    by rewrite fdom_empty card_empty //.
+  (* bound probability of setting bad in one execution of sample *)
+  fun.
+  if; first 1 last.
+    conseq (_ : _ : =  0%r); first progress; apply zero_leq_divr; smt.
+      by hoare; skip; smt.
+  wp.
+  sp.
+  rnd (lambda x, bad_esk_col_x_op AKE_3_2.mEsk x).
+  skip.
+  progress.
+  rewrite /sample_Esk Duni.mu_def; first by smt.
+  apply leq_div; first by smt.
+  apply leq_real_int.
+  apply (int_leq_trans _ (card (frng AKE_3_2.mEsk{hr})) _); last by smt.
+    by apply card_leq; smt.
+  smt.
+  (* sample increases counter if precond is satisfied *)
+  progress. fun. rcondt 1. skip; smt.
+  wp. rnd. wp. skip; progress.
+  cut Hnotin:
+      ! ISet.mem (pick (filter (lambda x, !mem x (fdom AKE_3_2.mEsk{hr})) univ_Sidx))
+                 (dom AKE_3_2.mEsk{hr}).
+    rewrite -mem_fdom.
+    apply mem_pick_filter. smt.
+  rewrite fdom_set_add // card_add_nin. rewrite mem_fdom //. smt.
+  smt.
+  (* if precond is not satisfied, counter is not increased *)
+  progress.
+  fun. wp. rcondf 1. skip; smt. skip; smt.
+qed.
 
 (*{ end: Proof: Bound probability of bad_esk_col *)
 
@@ -2240,8 +2878,8 @@ module AKE_4(FA : Adv) = {
 
   var cH1, cH2 : int                  (* counters for queries *)
 
-  var mH1A : ((Sk * Esk), Eexp) map   (* map for h1_a *)
-  var sH1  : (Sk * Esk) set           (* adversary queries for h1 *)
+  var mH1 : ((Sk * Esk), Eexp) map   (* map for h1 *)
+  var sH1 : (Sk * Esk) set           (* adversary queries for h1 *)
 
   var mH2 : (Sstring, Key) map        (* map for h2 *)
   var sH2 : Sstring set               (* adversary queries for h2 *)
@@ -2278,6 +2916,7 @@ module AKE_4(FA : Adv) = {
 
   module O : AKE_Oracles = {
 
+    (* this function will be simulated later on *)
     fun h1(a : Sk, x : Esk) : Eexp = {
       var e : Eexp;
       e = $sample_Eexp;
@@ -2287,15 +2926,16 @@ module AKE_4(FA : Adv) = {
       return proj mH1.[(a,x)];
     }
 
+    (* this function will be simulated later on *)
     fun h1_a(a : Sk, x : Esk) : Eexp option = {
       var r : Eexp option = None;
       var xe : Eexp;
-      if (bad_esk_norev_op mEsk mStarted mEexp x evs)
-        bad_esk_norev = true;
-      (* modify here *)
       if (cH1 < qH1) {
         cH1 = cH1 + 1;
         sH1 = add (a,x) sH1;
+        if (bad_esk_norev_op mEsk mStarted mEexp x evs) {
+          bad_esk_norev = true;
+        }
         xe = h1(a,x);
         r = Some(xe);
       }
@@ -2326,11 +2966,244 @@ module AKE_4(FA : Adv) = {
     fun init1(i : Sidx, A : Agent, B : Agent) : Epk option = {
       var pX : Epk;
       var x : Esk;
+      var e : Eexp;
       var r : Epk option = None; 
       if (in_dom A mSk && in_dom B mSk && !in_dom i mStarted) {
         x = proj mEsk.[i];
-        (* modify here *)
-        mEexp.[i] = h1(proj (mSk.[A]),x);
+        e = $sample_Eexp;
+        mH1.[(proj (mSk.[A]),x)] = e;
+        mEexp.[i] = e;
+        pX = gen_epk(proj mEexp.[i]);
+        mStarted.[i] = (A,B,init);
+        r = Some(pX);
+        evs = Start(compute_psid mStarted mEexp i)::evs;
+      }
+      return r;
+    }
+
+    fun resp(i : Sidx, B : Agent, A : Agent, X : Epk) : Epk option = {
+      var y : Esk;
+      var pY : Epk;
+      var e : Eexp;
+      var r : Epk option = None; 
+      if (in_dom A mSk && in_dom B mSk && !in_dom i mStarted && !in_dom i mCompleted) {
+        y = proj mEsk.[i];
+        e = $sample_Eexp;
+        mH1.[(proj (mSk.[B]),y)] = e;
+        mEexp.[i] = e;
+        pY = gen_epk(proj mEexp.[i]);
+        mStarted.[i] = (B,A,resp);
+        mCompleted.[i] = X;
+        r = Some(pY);
+        evs = Accept(compute_sid mStarted mEexp mCompleted i)::evs;
+      }
+      return r;
+    }
+
+    fun init2(i : Sidx, Y : Epk) : unit = {
+      if (!in_dom i mCompleted && in_dom i mStarted && in_dom i mEexp) {
+        mCompleted.[i] = Y;
+        evs = Accept(compute_sid mStarted mEexp mCompleted i)::evs;
+      }
+    }
+
+    fun staticRev(A : Agent) : Sk option = {
+      var r : Sk option = None;
+      if (in_dom A mSk) {
+        r = mSk.[A];
+        evs = StaticRev(A)::evs;
+      }
+      return r;
+    }
+
+    fun ephemeralRev(i : Sidx) : Esk option = {
+      var r : Esk option = None;
+      if (in_dom i mStarted && in_dom i mEexp) {
+        r = mEsk.[i];
+        evs = EphemeralRev(compute_psid mStarted mEexp i)::evs;
+      }
+      return r;
+    }
+
+    fun computeKey(i : Sidx) : Key option = {
+      var r : Key option = None;
+      var sd : Sdata2;
+      var k : Key;
+      if (in_dom i mCompleted && in_dom i mStarted && in_dom i mEexp) {
+        sd = proj mStarted.[i];
+        k = h2(gen_sstring (proj mEexp.[i]) (proj mSk.[sd2_actor sd])
+                           (sd2_peer sd) (proj mCompleted.[i])
+                           (sd2_role sd));
+        r = Some k;
+      }
+      return r;
+    }
+
+    fun sessionRev(i : Sidx) : Key option = {
+      var r : Key option = None;
+      if (in_dom i mCompleted && in_dom i mStarted && in_dom i mEexp) {
+        evs = SessionRev(compute_sid mStarted mEexp mCompleted i)::evs;
+        r = computeKey(i);
+      }
+      return r;
+    }
+  }
+  
+  module A = FA(O)
+
+  fun main() : bool = {
+    var b : bool = def;
+    var pks : Pk list = [];
+    var t_idx : Sidx = def;
+    var key : Key = def;
+    var keyo : Key option = def;
+    var b' : bool = def;
+    var i : int = 0;
+    var sidxs : Sidx set = univ_Sidx;
+    var sidx : Sidx = def;
+    var ska : Sk = def;
+    var pka : Pk = def;
+
+    init();
+    while (i < qAgent) {
+      i = i + 1;
+      ska = $sample_Sk;
+      pka = gen_pk(ska);
+      pks = pka :: pks;
+      mSk.[pka] = ska;
+    }
+
+    while (sidxs <> FSet.empty) {
+      sidx = pick sidxs;
+      sidxs = rm sidx sidxs;
+      mEsk.[sidx] = $sample_Esk;
+    } 
+
+    if (bad_esk_col_op mEsk) bad_esk_col = true;
+    
+    t_idx = A.choose(pks);
+    b = ${0,1};
+    if (in_dom t_idx mStarted && in_dom t_idx mCompleted && in_dom t_idx mEexp) {
+      test = Some (compute_sid mStarted mEexp mCompleted t_idx);
+        (* the if-condition implies "mem (Accept (proj O.test)) O.evs" *)
+      if (b) {
+        keyo = O.computeKey(t_idx);
+      } else {
+        key  = $sample_Key;
+        keyo = Some key;
+      }
+      b' = A.guess(keyo);
+    }
+    return (b = b');
+  }
+}.
+
+module AKE_5(FA : Adv) = {
+  
+  var evs  : Event list               (* events for queries performed by adversary *)
+  var test : Sid option               (* session id of test session *)
+
+  var cH1, cH2 : int                  (* counters for queries *)
+
+  var mH1 : ((Sk * Esk), Eexp) map   (* map for h1 *)
+  var sH1 : (Sk * Esk) set           (* adversary queries for h1 *)
+
+  var mH2 : (Sstring, Key) map        (* map for h2 *)
+  var sH2 : Sstring set               (* adversary queries for h2 *)
+
+  var mSk        : (Agent, Sk) map    (* map for static secret keys *)
+  var mEsk       : (Sidx, Esk) map    (* map for ephemeral secret keys *)
+  var mEexp      : (Sidx, Eexp) map   (* map for ephemeral exponents of sessions *)
+  var mStarted   : (Sidx, Sdata2) map (* map of started sessions *)
+  var mCompleted : (Sidx, Epk)   map  (* additional data for completed sessions *)
+
+  var bad_esk_col : bool              (* esk collision *)
+    (* There are two session indexes with the same ephemeral key. *)
+
+  var bad_esk_norev : bool            (* h1_a query without previous reveal *)
+    (* There is a h1_a(x,_) query such that Ex i. mEsk[i] = Some x and no EphemeralRev for i *)
+
+  fun init() : unit = {
+    evs = [];
+    test = None;
+    cH1 = 0;
+    cH2 = 0;
+    mH1 = Map.empty;
+    sH1 = FSet.empty;
+    mH2 = Map.empty;
+    sH2 = FSet.empty;
+    mSk = Map.empty;
+    mEsk = Map.empty;
+    mEexp = Map.empty;
+    mStarted = Map.empty;
+    mCompleted = Map.empty;
+    bad_esk_col = false;
+    bad_esk_norev = false;
+  }
+
+  module O : AKE_Oracles = {
+
+    (* this function will be simulated later on *)
+    fun h1(a : Sk, x : Esk) : Eexp = {
+      var e : Eexp;
+      e = $sample_Eexp;
+      if (!in_dom (a,x) mH1) {
+        mH1.[(a,x)] = e;
+      } 
+      return proj mH1.[(a,x)];
+    }
+
+    (* this function will be simulated later on *)
+    fun h1_a(a : Sk, x : Esk) : Eexp option = {
+      var r : Eexp option = None;
+      var xe : Eexp;
+      var i: Sidx;
+      if (cH1 < qH1) {
+        cH1 = cH1 + 1;
+        sH1 = add (a,x) sH1;
+        if (bad_esk_norev_op mEsk mStarted mEexp x evs) {
+          bad_esk_norev = true;
+        } else {
+          if (find_session x a mEsk mStarted <> None) {
+            i = proj (find_session x a mEsk mStarted);
+            (* !bad_esk_norev implies that there is EphemeralRev for i *)
+            r = Some(proj mEexp.[i]);
+          } else {       
+            xe = h1(a,x);
+            r = Some(xe);
+          }
+        }
+      }
+      return r;
+    }
+
+    fun h2(sstring : Sstring) : Key = {
+      var ke : Key;
+      ke = $sample_Key;
+      if (!in_dom sstring mH2) {
+        mH2.[sstring] = ke;
+      }
+      return proj mH2.[sstring];
+    }
+ 
+    fun h2_a(sstring : Sstring) : Key option = {
+      var r : Key option = None;
+      var ks : Key;
+      if (cH2 < qH2) {
+        cH2 = cH2 + 1;
+        sH2 = add sstring sH2;
+        ks = h2(sstring);
+        r = Some(ks);
+      }
+      return r;
+    }
+
+    fun init1(i : Sidx, A : Agent, B : Agent) : Epk option = {
+      var pX : Epk;
+      var x : Esk;
+      var r : Epk option = None; 
+      if (in_dom A mSk && in_dom B mSk && !in_dom i mStarted) {
+        mEexp.[i] = $sample_Eexp;
         pX = gen_epk(proj mEexp.[i]);
         mStarted.[i] = (A,B,init);
         r = Some(pX);
@@ -2344,9 +3217,7 @@ module AKE_4(FA : Adv) = {
       var pY : Epk;
       var r : Epk option = None; 
       if (in_dom A mSk && in_dom B mSk && !in_dom i mStarted && !in_dom i mCompleted) {
-        y = proj mEsk.[i];
-        (* modify here *)
-        mEexp.[i] = h1(proj (mSk.[B]),y);
+        mEexp.[i] = $sample_Eexp;
         pY = gen_epk(proj mEexp.[i]);
         mStarted.[i] = (B,A,resp);
         mCompleted.[i] = X;

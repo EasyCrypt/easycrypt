@@ -6,6 +6,16 @@ require import Map.
 require import Pair.
 require import Distr.
 
+(*** These belong somewhere else *)
+op pi3_1 (t:'a * 'b * 'c): 'a =
+  let (a,b,c) = t in a.
+
+op pi3_2 (t:'a * 'b * 'c): 'b =
+  let (a,b,c) = t in b.
+
+op pi3_3 (t:'a * 'b * 'c): 'c =
+  let (a,b,c) = t in c.
+
 (*** General definitions *)
 (** Lengths *)
 op k:int.
@@ -100,13 +110,14 @@ clone import OW as RSA with
         finv_rng_sub_f_dom by smt,
         f_dom_sample_t by smt.
 
+pred valid_keys (k:pkey * skey) = in_supp k keypairs.
+
 op ( * ): signature -> signature -> pkey -> signature.
 axiom homo_f_mul (x y:signature) pk: f pk ((x * y) pk) = (f pk x * f pk y) pk.
 
 op modulus_p: pkey -> int.
 axiom modulus_size pk sk:
-  in_supp (pk,sk) keypairs =>
-  2^(k-1) <= modulus_p pk < 2^k.
+  valid_keys (pk,sk) => 2^(k-1) <= modulus_p pk < 2^k.
 
 clone import RandomOracle as Gt with
   type from <- htag,
@@ -146,7 +157,7 @@ module PSS(G:Gt.Oracle,H:Ht.Oracle): Scheme = {
     return G2Tag.from_bits (sub (to_bits r) k0 kg2);
   }
 
-  (* Keygen: make it a wrapped pop *)
+  (* Keygen *)
   fun keygen():(pkey * skey) = {
     var (pk, sk):(pkey * skey);
     (pk,sk) = $keypairs;
@@ -198,26 +209,27 @@ module PSS(G:Gt.Oracle,H:Ht.Oracle): Scheme = {
 
 (* A CMA adversary with access to two random oracles *)
 module type CMA_2RO(G:Gt.ARO,H:Ht.ARO,S:AdvOracles) = {
-  fun forge(pk:pkey): message * signature { * G.o H.o S.sign}
+  fun forge(pk:pkey): message * signature {* G.o H.o S.sign}
 }.
 
 section. 
   declare module A:CMA_2RO {G,H,EF_CMA,Wrap,OW}.
-  axiom adversaryL (G <: Gt.ARO{A}) (H <: Ht.ARO{A}) (S <: AdvOracles{A}):
+  axiom adversaryL (G <: Gt.ARO {A}) (H <: Ht.ARO {A}) (S <: AdvOracles {A}):
     islossless G.o => islossless H.o => islossless S.sign =>
     islossless A(G,H,S).forge.
 
+  (* This is the memory that is used by the concrete adversary during the proof *)
+  (* In the final transition, we rewrite the concrete adversary into an
+     adversary against OW, and therefore drop the secret key from its state.    *)
   local module Mem = {
     var pk:pkey
     var sk:skey
-    var n:int
     var xstar:signature
     var qs:message set
 
-    fun init(ks:pkey*skey): unit = {
+    fun init(ks:pkey * skey): unit = {
       (pk,sk) = ks;
       qs = FSet.empty;
-      n = modulus_p pk;
       xstar = $sample_plain;
     }
   }.
@@ -234,10 +246,9 @@ section.
       implementations of G and H through the signing
       oracle. This should allow some abstraction in the
       proof, and in particular in the two eager steps
-      on G.
-  **)
+      on G.                                             **)
   module type Gadv (H:SplitOracle, G:Gt.Oracle) = { 
-    fun main (ks:pkey * skey) : bool { * G.o H.o }
+    fun main (ks:pkey * skey) : bool {* G.o H.o}
   }.
 
   local module Gen (Gadv:Gadv, H:SplitOracle, G:Gt.Oracle) = {
@@ -254,7 +265,7 @@ section.
   }.
 
   local module GAdv(H:SplitOracle, G:Gt.Oracle) = {
-
+    (* Wrapping a split oracle for use by the signing oracle *)
     module Hs = {
       fun o(x:message * salt): htag = {
         var r:htag;
@@ -263,6 +274,7 @@ section.
       }
     }
 
+    (* Wrapping a split oracle for direct use by the adversary *)
     module Ha = {
       fun o(x:message * salt): htag = {
         var r:htag;
@@ -271,8 +283,8 @@ section.
       }
     }
 
+    (* Signing oracle *)
     module S = {
- 
       fun sign(m:message): signature = {
         var r:salt;
         var g:gtag;
@@ -284,14 +296,14 @@ section.
 
         Mem.qs = add m Mem.qs;
         r = $sample_salt;
-        w  = Hs.o((m,r));
+        w = Hs.o((m,r));
         g = G.o(w);
-        rMask  = Salt.from_bits (sub (to_bits g) 0 k0);
+        rMask = Salt.from_bits (sub (to_bits g) 0 k0);
         maskedR = rMask ^ r;
-        gamma  = G2Tag.from_bits (sub (to_bits g) k0 kg2);
+        gamma = G2Tag.from_bits (sub (to_bits g) k0 kg2);
         y = Signature.from_bits (zeros 1 || (to_bits w) || (to_bits maskedR) || (to_bits gamma));
         return finv Mem.sk y;
-      } 
+      }
 
       fun fresh(m:message): bool = {
         return !mem m Mem.qs;
@@ -323,10 +335,10 @@ section.
       maskedR = Salt.from_bits (sub (to_bits y) (k1 + 1) k0);
       gamma = G2Tag.from_bits (sub (to_bits y) (k1 + k0 + 1) kg2);
       g = G.o(w);
-      rMask  = Salt.from_bits (sub (to_bits g) 0 k0);
+      rMask = Salt.from_bits (sub (to_bits g) 0 k0);
       r = rMask ^ maskedR;
-      w'  = Hs.o((m,r));
-      gamma'  = G2Tag.from_bits (sub (to_bits g) k0 kg2);
+      w' = Hs.o((m,r));
+      gamma' = G2Tag.from_bits (sub (to_bits g) k0 kg2);
       forged =  w = w' /\ gamma = gamma' /\ !forged;
 
       fresh = S.fresh(m);
@@ -335,8 +347,7 @@ section.
   }.
 
   local lemma lossless_GAdv (H <: SplitOracle{GAdv}) (G <: Gt.Oracle{GAdv}):
-    islossless G.o => islossless H.o =>
-    islossless GAdv(H, G).main.
+    islossless G.o => islossless H.o => islossless GAdv(H, G).main.
   proof strict.
   intros=> GL HL; fun.
   call (_: true ==> true); first by fun.
@@ -352,22 +363,64 @@ section.
       first by fun; rnd; wp; skip; smt.
   qed.
 
-  (** First Transition:
+  (** A module to store the globals used
+      in most variants of H, along with
+      some useful equality predicates *)
+  local module Hmem = {
+    var pk:pkey
+    var sk:skey
+
+    fun init(ks:pkey*skey): unit = {
+      (pk,sk) = ks;
+    }
+  }.
+
+  local module Hmap = {
+    var m:(message * salt,htag * bool * signature) map
+
+    fun init(ks:pkey*skey) : unit = {
+      Hmem.init(ks);
+      m = Map.empty;
+    }
+  }.
+
+  local equiv Hmem_init:
+    Hmem.init ~ Hmem.init: ={ks} /\ valid_keys ks{2} ==>
+                           ={glob Hmem} /\ valid_keys (Hmem.pk,Hmem.sk){2}
+  by (by fun; wp).
+
+  local equiv Hmap_init:
+    Hmap.init ~ Hmap.init: ={ks} /\ valid_keys ks{2} ==>
+                           ={glob Hmap} /\ valid_keys (Hmem.pk,Hmem.sk){2}
+  by (by fun; wp; call Hmem_init).
+
+  pred (=<=) (m0:(message * salt,htag) map) (m1:(message * salt,htag * bool * signature) map) =
+    forall x, m0.[x] = if m1.[x] = None then None else Some (pi3_1 (proj m1.[x])).
+
+  (** Zeroth Transition:
       We rewrite PSS into an adversary against Gen with G and a trivial split oracle H0. *)
   local module H0 : SplitOracle = { 
     fun init(ks:pkey*skey): unit = {
-      H.init();
+      Hmap.init(ks);
     }
    
     fun o(c:bool,x:message * salt):htag = { 
       var r : htag;
-      r = H.o(x);
-      return r;
+      r = $sample_htag;
+      if (!in_dom x Hmap.m) Hmap.m.[x] = (r,c,Signature.zeros);
+      return pi3_1 (proj Hmap.m.[x]);
     }
   }.
 
   local module G0 = Gen(GAdv,H0,G).
 
+  local equiv PSS_G0_H:
+    H.o ~ H0.o: ={x} /\ H.m{1} =<= Hmap.m{2} ==> ={res} /\ H.m{1} =<= Hmap.m{2}.
+  proof strict.
+  by fun; inline H0.o; wp; rnd; wp; skip; rewrite /(=<=); progress=> //; smt.
+  qed.
+
+  (* More informed use of conseq* might speed up some of the smt calls *)
   local equiv PSS_G0:
     EF_CMA(Wrap(PSS(G,H)),A(G,H)).main ~ G0.main: ={glob A} ==> ={res}.
   proof strict.
@@ -378,38 +431,37 @@ section.
   inline Wrap(PSS(Gt.ROM.RO,ROM.RO)).verify PSS(Gt.ROM.RO,ROM.RO).verify
          PSS(Gt.ROM.RO,ROM.RO).g1 PSS(Gt.ROM.RO,ROM.RO).g2.
   swap{1} [18..19] -3. (* Grouping the two calls to G on the left *)
-  wp; call (_: ={glob H});
-        first by inline H0.o H.o; wp; rnd; wp; skip; smt.
+  inline GAdv(H0,Gt.ROM.RO).Hs.o; wp; call PSS_G0_H.
   (* We use seq to cut out the calls to G and limit the scope of the rcond call *)
-  wp; seq 12 11: (={glob G, glob H, w, m, maskedR, gamma} /\
+  wp; seq 12 11: (={glob G, w, m, maskedR, gamma} /\
+                  H.m{1} =<= Hmap.m{2} /\
                   Wrap.qs{1} = Mem.qs{2} /\
                   b0{1} = forged{2} /\
                   m1{1} = m{2}).
-    eqobs_in; inline Wrap(PSS(Gt.ROM.RO,ROM.RO)).init PSS(Gt.ROM.RO,ROM.RO).init
-                     ROM.RO.init Gt.ROM.RO.init PSS(Gt.ROM.RO,ROM.RO).keygen
-                     H0.init H.init Mem.init.
-    call (_: ={glob G, glob H} /\ Wrap.qs{1} = Mem.qs{2} /\ Wrap.sk{1} = Mem.sk{2}).
-     fun;eqobs_in.
-     fun;inline H0.o H.o. wp 2 5;eqobs_in.
-     fun. inline PSS(Gt.ROM.RO, ROM.RO).sign.
-       wp 9 8.
-       inline PSS(Gt.ROM.RO, ROM.RO).g1 PSS(Gt.ROM.RO, ROM.RO).g2 GAdv(H0, Gt.ROM.RO).Hs.o. 
-       eqobs_in. 
-       inline Gt.ROM.RO.o.
-       seq 12 11 : (proj Gt.ROM.RO.m.[w]{1} = g{2} /\ ={w, maskedR, ROM.RO.m, Gt.ROM.RO.m} /\ sk{1} = Mem.sk{2} /\
-                  Wrap.sk{1} = Mem.sk{2} /\ Wrap.qs{1} = Mem.qs{2} /\ (in_dom w Gt.ROM.RO.m){1}).
-          wp;rnd;wp;call (_: ={x, glob H} ==> ={res, glob H}).
-            fun;inline H.o. wp 2 3;eqobs_in.
-          wp;rnd;wp;skip;progress => //;smt.
-       wp;rnd{1};wp;skip;progress => //;smt.
-    rnd{2}; wp; rnd; wp;
-              skip; progress=> //; smt.
-    inline Gt.ROM.RO.o; rcondf{1} 9.
-      by intros=> &m //=; rnd; wp; rnd; wp; skip; progress=> //; smt.
-      by wp; rnd{1}; wp; rnd; wp; skip; progress=> //; smt.
+    wp; inline Wrap(PSS(Gt.ROM.RO,ROM.RO)).init PSS(Gt.ROM.RO,ROM.RO).init
+               ROM.RO.init Gt.ROM.RO.init PSS(Gt.ROM.RO,ROM.RO).keygen
+               H0.init H.init Mem.init.
+    call (_: ={glob G} /\ H.m{1} =<= Hmap.m{2} /\ Wrap.qs{1} = Mem.qs{2} /\ Wrap.sk{1} = Mem.sk{2}).
+     by conseq* (_: ={glob G, x} ==> ={glob G, res})=> //; fun; eqobs_in.
+     fun*; inline GAdv(H0,Gt.ROM.RO).Ha.o; sp; wp; call PSS_G0_H=> //.
+     fun; inline PSS(Gt.ROM.RO, ROM.RO).sign.
+       wp; inline PSS(Gt.ROM.RO, ROM.RO).g1 PSS(Gt.ROM.RO, ROM.RO).g2 Gt.ROM.RO.o
+                  GAdv(H0, Gt.ROM.RO).Hs.o.
+       rcondf{1} 16;
+         first intros=> &m; inline ROM.RO.o; do ?(rnd; wp); skip; progress=> //; smt.
+       wp; rnd{1} (cpTrue); wp; rnd.
+       wp; call PSS_G0_H.
+       wp; rnd.
+       wp; skip; smt.
+    inline Hmap.init Hmem.init; rnd{2}; wp; rnd.
+    wp; skip; progress=> //; smt.
+
+  inline Gt.ROM.RO.o; rcondf{1} 9.
+    by intros=> &m //=; do ?(rnd; wp); skip; progress=> //; smt.
+    by wp; rnd{1} (cpTrue); wp; rnd; wp; skip; progress=> //; smt.
   qed.        
 
-  (** Second Transition:
+  (** First Transition:
       The random oracle H is made to loop and sample a bit
       following the distribution of the strong bit of integers
       less than the modulus. *)
@@ -418,26 +470,21 @@ section.
   
   axiom mu_bool_nu N p:
     2^(k - 1) <= N < 2^k =>
-     mu (bool_nu N) p =
-     (N%r - (2^(k-1))%r) / N%r * charfun p true + ((2^(k - 1))%r / N%r) * charfun p false.
+    mu (bool_nu N) p =
+      (N%r - (2^(k-1))%r) / N%r * charfun p true + ((2^(k - 1))%r / N%r) * charfun p false.
 
-  local module K = { 
-    var pk:pkey
-    var sk:skey
-    var n :int
-    
-    fun init(ks:pkey*skey) : unit = { 
-      (pk,sk) = ks;
-      n = modulus_p pk;
-    }   
-  }.
+  lemma weight_bool_nu N:
+    2^(k - 1) <= N < 2^k =>
+    weight (bool_nu N) = 1%r.
+  proof strict.
+  by intros=> bounds; rewrite /weight mu_bool_nu // /charfun /cpTrue; smt.
+  qed.
 
   local module H1: SplitOracle = {
     var bad:bool
     
     fun init(ks:pkey*skey): unit = {
-      K.init(ks);
-      H.init();
+      Hmap.init(ks);
       bad = false;
     }
 
@@ -446,106 +493,107 @@ section.
       var i:int = 0;
       var w:htag;
       w = $sample_htag;
-      if (!in_dom x H.m) {
-        H.m.[x] = HTag.zeros;
+      if (!in_dom x Hmap.m) {
         while (i < kg2 && b) {
-          b = $bool_nu K.n;
+          b = $bool_nu (modulus_p Hmem.pk);
           i = i + 1;
-          if (!b) H.m.[x] = w;
+          if (!b) Hmap.m.[x] = (w,c,Signature.zeros);
         }
       }
       bad = bad \/ b;
-      return proj H.m.[x];
+      return pi3_1 (proj Hmap.m.[x]);
     }
   }.
 
   local module G1 = Gen(GAdv,H1,G).
 
   local equiv G0_G1_H: H0.o ~ H1.o:
-    !H1.bad{2} /\ ={glob H, x} /\ 2^(k - 1) <= K.n{2} < 2^k ==>
-    !H1.bad{2} => ={glob H, res} /\ 2^(k - 1) <= K.n{2} < 2^k.
+    !H1.bad{2} /\ ={glob Hmap, x, c} /\ valid_keys (Hmem.pk,Hmem.sk){2} ==>
+    valid_keys (Hmem.pk,Hmem.sk){2} /\ (!H1.bad{2} => ={glob Hmap, res}).
   proof strict.
-  fun; inline H.o; case (in_dom x H.m){1}.
-    (* in_dom x H.m *)
-    rcondf{1} 3; [ | rcondf{2} 4]; first 2 by intros &m; rnd; wp.
+  fun; case (in_dom x Hmap.m){1}.
+    (* in_dom x Hmap.m *)
+    rcondf{1} 2; [ | rcondf{2} 4]; first 2 by intros &m; rnd; wp.
     by wp; rnd; wp.
 
-    (* !in_dom x H.m *)
-    rcondt{1} 3; [ | rcondt{2} 4]; first 2 by intros &m; rnd; wp.
-    wp; while{2} (i <= kg2 /\ eq_except H.m{1} H.m x /\
-                  (!b => H.m.[x] = Some w{2}) /\ 2^(k - 1) <= K.n < 2^k){2} (kg2 - i){2}.
-      intros=> &m z; wp; rnd (cpTrue); skip; progress=> //; last 6 smt.
-        by rewrite mu_bool_nu // /charfun /cpTrue //=; smt.
-    by wp; rnd; wp; skip; progress=> //; smt.
+    (* !in_dom x Hmap.m *)
+    rcondt{1} 2; [ | rcondt{2} 4]; first 2 by intros &m; rnd; wp.
+    wp; while{2} (i <= kg2 /\ eq_except Hmap.m{1} Hmap.m x /\
+                  valid_keys (Hmem.pk,Hmem.sk) /\
+                  (!b => Hmap.m.[x] = Some (w,c,Signature.zeros){2})){2} (kg2 - i){2}.
+      by intros=> &m z; wp; rnd (cpTrue); skip; smt.
+    by wp; rnd; wp; skip; smt.
   qed.
 
-  lemma Glossless : islossless Gt.ROM.RO.o.
-  proof. apply Gt.ROM.lossless_o;smt. qed.
+  local lemma G0_G1_abstract (Ga <: Gadv {H0,H1,G,Hmem}):
+    (forall (H <: SplitOracle {Ga}) (G <: Gt.Oracle {Ga}),
+       islossless G.o => islossless H.o => islossless Ga(H,G).main) =>
+    equiv [Gen(Ga,H0,G).main ~ Gen(Ga,H1,G).main: true ==> !H1.bad{2} => ={res}].
+  proof strict.
+  intros=> GaL; fun.
+  call (_: H1.bad,
+             ={glob G, glob Hmap} /\ valid_keys (Hmem.pk,Hmem.sk){2},
+             valid_keys (Hmem.pk,Hmem.sk){2}).
+    (* G *)
+    by conseq* (_: _ ==> ={res, glob G}); last fun; eqobs_in.
+    by intros=> _ _; conseq* (Gt.ROM.lossless_o _); apply gtagL.
+    by intros=> _; conseq* (Gt.ROM.lossless_o _); apply gtagL.
+    (* H *)
+    by conseq* G0_G1_H=> //; smt.
+    by intros=> _ _; conseq* (_: true ==> true)=> //;
+         fun; wp; rnd (cpTrue); skip; smt.
+    intros=> _; fun.
+      wp; conseq* (_: _ ==> true); first smt.
+      wp; seq 3: (valid_keys (Hmem.pk,Hmem.sk))=> //;
+        first by rnd; wp; skip; smt.
+      if=> //; while (valid_keys (Hmem.pk,Hmem.sk)) (kg - i).
+        by intros=> z; wp; rnd (cpTrue); skip; smt.
+      by skip; smt.
+      by conseq* (_: _ ==> false).
+  call (_: ={ks} /\ valid_keys ks{2} ==>
+           ={glob Hmap} /\ !H1.bad{2} /\ valid_keys (Hmem.pk,Hmem.sk){2});
+    first by fun; wp; call Hmap_init.
+  call (_: true ==> ={glob G});
+    first by fun; wp.
+  by rnd; skip; smt.
+  qed.
 
   local equiv G0_G1: G0.main ~ G1.main: true ==> !H1.bad{2} => ={res}.
   proof strict.
-    apply ((_ : (forall (Ga<:Gadv{H0,H1,G,K}), 
-      (forall (H <: SplitOracle{Ga}) (G <: Gt.Oracle{Ga}),
-         islossless G.o => islossless H.o => islossless Ga(H, G).main) => 
-      equiv [Gen(Ga,H0,G).main ~ Gen(Ga,H1,G).main : true ==> !H1.bad{2} => ={res}])) GAdv).
-     intros Ga Hloosless;fun.
-     call (_: H1.bad,  (={glob G, glob H} /\ 2^(k - 1) <= K.n{2} < 2^k), (2^(k - 1) <= K.n{2} < 2^k)).
-      conseq * (_ : _ ==> ={res, glob G}) => //;fun;eqobs_in.
-      intros _ _;conseq * (_: true ==> true) => //;apply Glossless.
-      intros _;conseq * (_: true ==> true) => //;apply Glossless.
-     conseq * G0_G1_H => //.
-      intros &m1 &m2 H r1 r2 x1 x2 bad;generalize H.
-      case bad => //.
-     intros _ _;conseq * (_ : true ==> true) => //;fun.
-      call (Ht.ROM.lossless_o _) => //;smt.
-     intros _;fun.
-      wp;conseq * (_ : _ ==> true);first progress => //;smt.  
-      wp;seq 3 : (2 ^ (k - 1) <= K.n < 2 ^ k) => //.
-      rnd;wp;skip;progress => //;smt.
-      if => //.
-      while (2 ^ (k - 1) <= K.n < 2 ^ k) (kg2-i).
-       intros x;wp. conseq * (_ : _ ==> true); first progress=> //;smt.
-       rnd;skip;progress => //. 
-      by rewrite mu_bool_nu // /charfun /cpTrue //=; smt.
-      wp;skip;progress => //; smt.
-      conseq * (_: _ ==> false) => //.
-    inline Gt.ROM.RO.init H0.init H1.init H.init K.init.
-    wp;rnd;skip;progress => //;smt.
-   apply lossless_GAdv.
+  by apply (G0_G1_abstract GAdv); apply lossless_GAdv.
   qed.
+
+  (** TODO: Bound the probability of bad in {2}.
+            This requires to deal with failure events that may happen in loops. *)
 
   (** G2 *)
   local module H2 = {
     fun init(ks:pkey*skey): unit = {
-      K.init(ks);
-      H.init();
+      Hmap.init(ks);
     }
 
     fun o(c:bool, x:message * salt): htag = {
       var b:bool = true;
       var i:int = 0;
       var w:htag;
-      if (!in_dom x H.m) {
-        H.m.[x] = htag_dummy;
+      if (!in_dom x Hmap.m) {
         while (i < kg2 && b) {
-          b = $bool_nu K.n;
+          b = $bool_nu (modulus_p Hmem.pk);
           w = $sample_htag;
           i = i + 1;
-          if (!b) H.m.[x] = w;
+          if (!b) Hmap.m.[x] = (w,c,Signature.zeros);
         }
       }
-      return proj H.m.[x];
+      return pi3_1 (proj Hmap.m.[x]);
     }
   }.
 
   local module G2 = Gen(GAdv, H0, G).
 
   (** G3 *)
-
   local module H3 = {
     fun init(ks:pkey*skey): unit = {
-      K.init(ks);
-      H.init();
+      Hmap.init(ks);
     }
 
 
@@ -554,19 +602,18 @@ section.
       var i:int = 0;
       var w:htag;
       var st:gtag;
-      if (!in_dom x H.m) {
-        H.m.[x] = htag_dummy;
+      if (!in_dom x Hmap.m) {
         while (i < kg2 && b) {
-          b = $bool_nu K.n;
+          b = $bool_nu (modulus_p Hmem.pk);
           w = $sample_htag;
           i = i + 1;
           if (!b) {
-            H.m.[x] = w;
+            Hmap.m.[x] = (w,c,Signature.zeros);
             st = G.o(w);
           }
         }
       }
-      return proj H.m.[x];
+      return pi3_1 (proj Hmap.m.[x]);
     }
   }.
 
@@ -577,8 +624,7 @@ section.
     var bad:bool
 
     fun init(ks:pkey*skey): unit = {
-      K.init(ks);
-      H.init();
+      Hmap.init(ks);
       bad = false;
     }  
 
@@ -587,35 +633,32 @@ section.
       var i:int = 0;
       var w:htag;
       var st:gtag;
-      if (!in_dom x H.m) {
-        H.m.[x] = htag_dummy;
+      if (!in_dom x Hmap.m) {
         while (i < kg2 && b) {
-          b = $bool_nu K.n;
+          b = $bool_nu (modulus_p Hmem.pk);
           w = $sample_htag;
           st = $sample_gtag;
           i = i + 1;
           if (!b) {
-            H.m.[x] = w;
+            Hmap.m.[x] = (w,c,Signature.zeros);
             bad = bad \/ in_dom w G.m;
             G.m.[w] = st ^ (GTag.from_bits (to_bits (snd x) || zeros (kg - k0)));
           }
         }
       }
-      return proj H.m.[x];
+      return pi3_1 (proj Hmap.m.[x]);
     }
   }.
+
 
   local module G4 = Gen(GAdv, H4, G).
 
   (** G5 *)
-
   local module H5: SplitOracle = {
     var bad:bool
-    var m:(message * salt,htag * bool) map
 
     fun init(ks:pkey*skey): unit = {
-      K.init(ks);
-      m = Map.empty;
+      Hmap.init(ks);
       bad = false;
     }
 
@@ -624,197 +667,176 @@ section.
       var i:int = 0;
       var w:htag;
       var st:gtag;
-      if (!in_dom x m) {
-        m.[x] = (htag_dummy,c);
+      if (!in_dom x Hmap.m) {
         while (i < kg2 && b) {
-          b = $bool_nu K.n;
+          b = $bool_nu (modulus_p Hmem.pk);
           w = $sample_htag;
           st = $sample_gtag;
           i = i + 1;
           if (!b) {
-            m.[x] = (w,c);
+            Hmap.m.[x] = (w,c,Signature.zeros);
             G.m.[w] = st ^ (GTag.from_bits (to_bits (snd x) || zeros (kg - k0)));
           }
         }
       } else {
-        if (!c /\ snd (proj m.[x])) {
+        if (!c /\ pi3_2 (proj Hmap.m.[x])) {
           bad = true;
-          m.[x] = (HTag.zeros,c);
+          Hmap.m.[x] = (HTag.zeros,c,Signature.zeros);
         }
       }
-      return fst (proj m.[x]);
+      return pi3_1 (proj Hmap.m.[x]);
     }
   }.
 
   local module G5 = Gen(GAdv, H5, G).
 
-(** Proofs *)
+  (** Proofs *)
+  local equiv G4_G5_H:
+    H4.o ~ H5.o:
+      !H5.bad{2} /\ ={glob Hmap, glob G, c, x} /\ valid_keys (Hmem.pk,Hmem.sk){2} ==>
+      ={glob Hmem} /\ valid_keys (Hmem.pk,Hmem.sk){2} /\ (!H5.bad{2} => ={glob Hmap, glob G, res}).
+  proof strict.
+  fun; sp; if=> //.
+  while (={glob Hmap, glob G, b, i, c, x} /\ !H5.bad{2} /\ valid_keys (Hmem.pk,Hmem.sk){2})=> //.
+    by wp; do ?rnd.
+  by wp.
+  qed.
 
-  pred eq_proj (m1: ('a,'b) map) (m2: ('a,'b*'c) map) = 
-    forall a, in_dom a m1 = in_dom a m2 && 
-     (in_dom a m1 => proj (m1.[a]) = fst (proj m2.[a])).
+  local lemma G4_G5_abstract (Ga <: Gadv {H4,H5,G,Hmem}):
+    (forall (H <: SplitOracle{Ga}) (G <: Gt.Oracle{Ga}),
+       islossless G.o => islossless H.o => islossless Ga(H,G).main) => 
+    equiv [Gen(Ga,H4,G).main ~ Gen(Ga,H5,G).main: true ==> !H5.bad{2} => ={res}].
+  proof strict.
+  intros=> GaL; fun.
+  call (_: H5.bad,
+             ={glob Hmap, glob G} /\ valid_keys (Hmem.pk,Hmem.sk){2}, 
+             ={glob Hmem} /\ valid_keys (Hmem.pk,Hmem.sk){2}).
+  (* G *)
+  by conseq* (_: _ ==> ={glob G, res}); last fun; eqobs_in.
+  by intros _ _; conseq* (Gt.ROM.lossless_o _); apply gtagL.
+  by intros _; conseq* (Gt.ROM.lossless_o _); apply  gtagL.
+  (* H *)
+  by conseq* G4_G5_H=> //; smt.
+  intros=> &2 _; conseq* (_: valid_keys (Hmem.pk,Hmem.sk) ==>
+                             valid_keys (Hmem.pk,Hmem.sk))=> //.
+    fun; sp; if=> //; while (valid_keys (Hmem.pk,Hmem.sk)) (kg2 - i); last by skip; smt.
+      by intros=> z; wp; do ?rnd (cpTrue); skip; smt.
+  intros &m2; conseq* (_: H5.bad /\ valid_keys (Hmem.pk,Hmem.sk) ==>
+                          H5.bad /\ valid_keys (Hmem.pk,Hmem.sk))=> //.
+    fun; sp; if.
+    while (H5.bad /\ valid_keys (Hmem.pk,Hmem.sk)) (kg2 - i); last by skip; smt.
+      by intros=> z; wp; do ?rnd (cpTrue); skip; smt.
+    by wp.
 
-  local lemma equiv_G4_G5_gen (Ga<:Gadv{H4,H5,G,K}) :
-      (forall (H6 <: SplitOracle{Ga}) (G6 <: Gt.Oracle{Ga}),
-         islossless G6.o => islossless H6.o => islossless Ga(H6, G6).main) => 
-      equiv [Gen(Ga,H4,G).main ~ Gen(Ga,H5,G).main : true ==> !H5.bad{2} => ={res}].c
-  proof.
-   intros Hlossless;fun.
-   call (_: H5.bad, 
-            eq_proj H.m{1} H5.m{2} /\ ={G.m,K.n} /\ 2^(k - 1) <= K.n{2} < 2^k, 
-            ={K.n} /\ 2^(k - 1) <= K.n{2} < 2^k).
-   (* G.o *)
-   conseq * (_:_ ==> ={res,G.m});first progress => //.
-   fun;eqobs_in.
-   intros &m2 Hbad;conseq * (Gt.ROM.termination_o 1%r _); apply  gtagL.
-   intros &m1;conseq * (Gt.ROM.termination_o 1%r _); apply  gtagL.
-   (* H.o *)
-   (* equiv *)
-   fun.
-   seq 2 2 : (!H5.bad{2} /\ eq_proj H.m{1} H5.m{2} /\ ={b,i,c,x,G.m, K.n} /\ 2 ^ (k - 1) <= K.n{2} < 2 ^ k).
-     wp => //.
-   if. 
-     intros => &m1 &m2 [_ [X1 [[ _ [ _ [ _ [-> _ ]]]] _ ]]].
-     elim (X1 x{m2}) => -> //.
-   while (eq_proj H.m{1} H5.m{2} /\ (in_dom x H5.m){2} /\ !H5.bad{2} /\ ={b,i,x,G.m,K.n}).
-     wp; do ? rnd;skip;progress => //.
-       intros x';case (x' = x{2}); [intros => -> | intros Hdiff];smt. 
-     smt.
-   wp;skip;progress => //.
-    intros x';case (x' = x{2}); [intros => -> | intros Hdiff];smt.
-    smt.
-    elim (H6 x{2}) => -> HH;apply HH => //.
-   if{2};wp;skip;smt.
-   (* lossless 1 *)
-   intros &m2 _;conseq * (_ : 2 ^ (k - 1) <= K.n < 2 ^ k ==> true) => //.
-     admit. (* should be done for the previous proof *)
-   (* lossless 2 *)
-   intros &m2;conseq * (_ : H5.bad /\ 2 ^ (k - 1) <= K.n < 2 ^ k ==> H5.bad) => //.
-   fun;seq 2 : (i=0 /\ H5.bad /\ 2 ^ (k - 1) <= K.n < 2 ^ k).
-     trivial.
-     wp;skip;progress => //.
-   if.
-   while (H5.bad /\ 2 ^ (k - 1) <= K.n < 2 ^ k) (kg2 - i) => //.
-     intros z;wp => //=.
-     conseq * ( _ : _ ==> true); first progress;smt.
-     rnd. conseq (_ : _ ==> true) => //=. apply gtagL.
-     rnd. conseq (_ : _ ==> true) => //=. apply htagL.
-     rnd cpTrue; skip => //=; progress.
-     rewrite mu_bool_nu // /charfun /cpTrue //=; smt.
-   wp;skip;progress => //;smt.
-   wp;skip => //.
-   wp;conseq * ( _ : _ ==> false) => //. 
-   intros => //.
-   conseq (_ : _ ==> !H5.bad{2} /\ eq_proj H.m{1} H5.m{2} /\ ={G.m, K.n, keys} /\ 2 ^ (k - 1) <= K.n{2} < 2 ^ k).
-     smt.
-   inline H4.init H5.init Gt.ROM.RO.init K.init H.init;wp;rnd;skip.
-   intros &m1 &m2 _ keysL keysR HinL HinR //=;split => [// _].
-   cut H := keypair_bounded keysL _ => //; generalize H;progress => //.
-   intros x;smt. 
- save.
+  call (_: ={ks} /\ valid_keys ks{2} ==> ={glob Hmap} /\ valid_keys (Hmem.pk,Hmem.sk){2} /\ !H5.bad{2});
+    first by fun; wp; call Hmap_init.
+  call (_: true ==> ={glob G});
+    first by fun; eqobs_in.
+  by rnd; skip; smt.
+  qed.
 
- local lemma equiv_G4_G5 :
-   (forall (G<:Gt.ARO) (H<:Ht.ARO) (S<:AdvOracles), 
-     islossless G.o => islossless H.o => islossless S.sign => islossless A(G, H, S).forge) =>
-   equiv [Gen(GAdv,H4,G).main ~ Gen(GAdv,H5,G).main : true ==> !H5.bad{2} => ={res}].
- proof.
-   intros HLoss;apply (equiv_G4_G5_gen GAdv _).
-   apply ( lossless_GAdv _);apply HLoss.
- save.
+  local equiv G4_G5: Gen(GAdv,H4,G).main ~ Gen(GAdv,H5,G).main : true ==> !H5.bad{2} => ={res}.
+  proof strict.
+  by apply (G4_G5_abstract GAdv _); apply lossless_GAdv.
+  qed.
 
-lemma Bad5 (A <: CMA_2RO) &m:
-  Pr[G5(A(G,Ha(H5))).main() @ &m: H5.bad] <= qS%r * (qS + qH)%r/(2^k0)%r.
-admit. qed.
+  (** TODO: Bound the probability of bad in G5 *)
 
-(** G6 *)
-module H6: SplitOracle = {
-  var bad:bool
-  var m:(message * salt,htag * bool * signature) map
+  (** G6 *)
+  local module H6: SplitOracle = {
+    var bad:bool
 
-  fun init(): unit = {
-    m = Map.empty;
-  }
+    fun init(ks:pkey * skey): unit = {
+      Hmap.init(ks);
+      bad = false;
+    }
 
-  fun o(c:bool,x:message * salt): htag = {
-    var b:bool = true;
-    var i:int = 0;
-    var w:htag;
-    var st:gtag;
-    var z, u:signature;
+    fun o(c:bool,x:message * salt): htag = {
+      var b:bool = true;
+      var i:int = 0;
+      var w:htag;
+      var st:gtag;
+      var z, u:signature;
 
-    if (!in_dom x H.m)
-    {
-      while (i < kg2 && b)
+      if (!in_dom x Hmap.m)
       {
-        b = $bool_nu Mem.n;
-        w = $sample_htag;
-        st = $sample_gtag;
-        z = Signature.from_bits (if b then ones 1 else zeros 1 || to_bits w || to_bits st);
-        u = if c then (Mem.xstar * finv Mem.sk  z) Mem.pk else finv Mem.sk z;
-        i = i + 1;
-        if (!b)
+        while (i < kg2 && b)
         {
-          m.[x] = (w,c,u);
-          G.m.[w] = st ^ (GTag.from_bits (to_bits (snd x) || zeros (kg - k0)));
+          b = $bool_nu (modulus_p Hmem.pk);
+          w = $sample_htag;
+          st = $sample_gtag;
+          z = Signature.from_bits (if b then ones 1 else zeros 1 || to_bits w || to_bits st);
+          u = if c then (Mem.xstar * finv Mem.sk  z) Mem.pk else finv Mem.sk z;
+          i = i + 1;
+          if (!b)
+          {
+            Hmap.m.[x] = (w,c,u);
+            G.m.[w] = st ^ (GTag.from_bits (to_bits (snd x) || zeros (kg - k0)));
+          }
         }
       }
+      else
+      {
+        if (!c) { 
+          bad = true;
+          Hmap.m.[x] = (HTag.zeros,c,Signature.zeros);
+        }
+      }
+      return pi3_1 (proj Hmap.m.[x]);
     }
-    else
-    {
-      if (!c) { 
+  }.
+
+  local module G6 = Gen(GAdv,H6,G).
+
+  (** G7: No longer using sk to simulate the oracles *)
+  local module H7: SplitOracle = {
+    var bad:bool
+
+    fun init(ks:pkey * skey): unit = {
+      Hmap.init(ks);
+      bad = false;
+    }
+
+    fun o(c:bool,x:message * salt): htag = {
+      var b:bool = true;
+      var i:int = 0;
+      var w:htag;
+      var st:gtag;
+      var z, u:signature;
+
+      if (!in_dom x Hmap.m)
+      {
+        while (i < kg2 && b)
+        {
+          u = $sample_plain;
+          z = if c then (f Mem.pk Mem.xstar * f Mem.pk u) Mem.pk else f Mem.pk u;
+          b = (sub (to_bits z) 0 1 = ones 1);
+          w = HTag.from_bits (sub (to_bits z) 1 k1);
+          st = GTag.from_bits (sub (to_bits z) (k1 + 1) (kg));
+          i = i + 1;
+          if (!b)
+          {
+            Hmap.m.[x] = (w,c,u);
+            G.m.[w] = st ^ (GTag.from_bits (to_bits (snd x) || zeros (kg - k0)));
+          }
+        }
+      }
+      else
+      {
         bad = true;
-        m.[x] = (HTag.zeros,c,Signature.zeros);
+        if (!c) Hmap.m.[x] = (HTag.zeros,c,Signature.zeros);
       }
+      return pi3_1 (proj Hmap.m.[x]);
     }
-    return proj H.m.[x];
-  }
-}.
+  }.
 
-module G6 = GGen(Hs(H6),SGen(Hs(H6))).
+  local module G7 = Gen(GAdv,H7,G).
 
-(** G7: No longer using sk to simulate the oracles *)
-module H7: SplitOracle = {
-  var bad:bool
-  var m:(message * salt,htag * bool * signature) map
+end section.
 
-  fun init(): unit = {
-    m = Map.empty;
-  }
 
-  fun o(c:bool,x:message * salt): htag = {
-    var b:bool = true;
-    var i:int = 0;
-    var w:htag;
-    var st:gtag;
-    var z, u:signature;
 
-    if (!in_dom x H.m)
-    {
-      while (i < kg2 && b)
-      {
-        u = $sample_plain;
-        z = if c then (f Mem.pk Mem.xstar * f Mem.pk u) Mem.pk else f Mem.pk u;
-        b = (sub (to_bits z) 0 1 = ones 1);
-        w = HTag.from_bits (sub (to_bits z) 1 k1);
-        st = GTag.from_bits (sub (to_bits z) (k1 + 1) (kg));
-        i = i + 1;
-        if (!b)
-        {
-          m.[x] = (w,c,u);
-          G.m.[w] = st ^ (GTag.from_bits (to_bits (snd x) || zeros (kg - k0)));
-        }
-      }
-    }
-    else
-    {
-      bad = true;
-      if (!c) m.[x] = (HTag.zeros,c,Signature.zeros);
-    }
-    return (lambda abc, let (a,b,c) = abc in a) (proj m.[x]);
-  }
-}.
 
-module G7 = GGen(Hs(H7),SGen(Hs(H7))).
 
 
 
@@ -891,13 +913,7 @@ module G7 = GGen(Hs(H7),SGen(Hs(H7))).
 
 
 
-
-
-
-
-
-
-
+(****** Old Material
 (** Proof is up to bad with BAD = (b = true) in final memory *)
 lemma equiv_G0_G1 (A <: CMA_2RO):
   equiv [G0(A(G,H)).main ~ G1(A(G,H1)).main: ={glob A} ==> !H1.bad{2} => ={res}].
@@ -1742,3 +1758,4 @@ lemma Bad1 &m:
 admit. qed.
 
 end section.
+*)

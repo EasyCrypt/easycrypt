@@ -42,6 +42,8 @@ val as_seq0 : 'a list -> 'a tuple0
 val as_seq1 : 'a list -> 'a tuple1
 val as_seq2 : 'a list -> 'a tuple2
 val as_seq3 : 'a list -> 'a tuple3
+val as_seq4 : 'a list -> 'a tuple4
+val as_seq5 : 'a list -> 'a tuple5
 
 (* -------------------------------------------------------------------- *)
 val proj3_1 : 'a * 'b * 'c -> 'a

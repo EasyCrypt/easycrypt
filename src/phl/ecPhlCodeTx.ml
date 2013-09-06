@@ -1,0 +1,189 @@
+(* -------------------------------------------------------------------- *)
+open EcUtils
+open EcParsetree
+open EcTypes
+open EcModules
+open EcFol
+open EcEnv
+open EcBaseLogic
+open EcLogic
+open EcPV
+open EcCorePhl
+
+module Mid = EcIdent.Mid
+module Zpr = EcMetaProg.Zipper
+
+(* -------------------------------------------------------------------- *)
+class rn_hl_kill side cpos len =
+object
+  inherit xrule "[hl] kill"
+
+  method side     : bool option = side
+  method position : codepos     = cpos
+  method length   : int option  = len
+end
+
+let rn_hl_kill side cpos len =
+  RN_xtd (new rn_hl_kill side cpos len :> xrule)
+
+let t_kill side cpos olen g =
+  let env = LDecl.toenv (get_hyps g) in
+  let kill_stmt _env (_, po) me zpr =
+    let error fmt =
+      Format.ksprintf
+        (fun msg -> tacuerror "cannot kill code, %s" msg)
+        fmt
+    in
+
+    let (ks, tl) =
+      match olen with
+      | None -> (zpr.Zpr.z_tail, [])
+      | Some len ->
+          if List.length zpr.Zpr.z_tail < len then
+            tacuerror "cannot find %d consecutive instructions at given position" len;
+          List.take_n len zpr.Zpr.z_tail
+    in
+
+    let ks_wr = is_write env PV.empty ks in
+    (* TODO Benj : check the usage of po_rd *)
+    let po_rd = PV.fv env (fst me) po in
+
+    List.iteri
+      (fun i is ->
+         let is_rd = is_read env PV.empty is in
+           if not (PV.indep env ks_wr is_rd) then
+             match i with
+             | 0 -> error "code writes variables used by the current block"
+             | _ -> error "code writes variables used by the %dth parent block" i)
+      (Zpr.after ~strict:false { zpr with Zpr.z_tail = tl; });
+
+    if not (PV.indep env ks_wr po_rd) then
+      error "code writes variables used by the post-condition";
+
+    let kslconcl = EcFol.f_bdHoareS me f_true (stmt ks) f_true FHeq f_r1 in
+      (me, { zpr with Zpr.z_tail = tl; }, [kslconcl])
+  in
+
+  let tr = fun side -> rn_hl_kill side cpos olen in
+    t_code_transform side ~bdhoare:true cpos tr (t_zip kill_stmt) g
+
+(* -------------------------------------------------------------------- *)
+class rn_hl_alias side pos =
+object
+  inherit xrule "[hl] alias"
+
+  method side     : bool option = side
+  method position : codepos     = pos
+end
+
+let rn_hl_alias side pos =
+  RN_xtd (new rn_hl_alias side pos :> xrule)
+
+let alias_stmt id _ me i =
+  match i.i_node with
+  | Srnd (lv, e) ->
+      let id       = odfl "x" (omap EcLocation.unloc id) in
+      let ty       = ty_of_lv lv in
+      let id       = { v_name = id; v_type = ty; } in
+      let (me, id) = fresh_pv me id in
+      let pv       = pv_loc (EcMemory.xpath me) id in
+
+        (me, [i_rnd (LvVar (pv, ty), e); i_asgn (lv, e_var pv ty)])
+
+  | _ ->
+      tacuerror "cannot create an alias for that kind of instruction"
+
+let t_alias side cpos id g =
+  let tr = fun side -> rn_hl_alias side cpos in
+  t_code_transform side cpos tr (t_fold (alias_stmt id)) g
+
+(* -------------------------------------------------------------------- *)
+let cfold_stmt env me olen zpr =
+  let (asgn, i, tl) =
+    match zpr.Zpr.z_tail with
+    | ({ i_node = Sasgn (lv, e) } as i) :: tl -> begin
+      let asgn =
+        match lv with
+        | LvMap _ -> tacuerror "left-value is a map assignment"
+        | LvVar (x, ty) -> [(x, ty, e)]
+        | LvTuple xs -> begin
+          match e.e_node with
+          | Etuple es -> List.map2 (fun (x, ty) e -> (x, ty, e)) xs es
+          | _ -> assert false
+        end
+      in
+        (asgn, i, tl)
+    end
+
+    | _ -> 
+        tacuerror "cannot find a left-value assignment at given position"
+  in
+
+  let (tl1, tl2) =
+    match olen with
+    | None      -> (tl, [])
+    | Some olen ->
+        if List.length tl < olen then
+          tacuerror "expecting at least %d instructions after assignment" olen;
+        List.take_n olen tl
+  in
+
+  List.iter
+    (fun (x, _, _) ->
+      if x.pv_kind <> PVloc then
+        tacuerror "left-values must be local variables")
+    asgn;
+
+  List.iter
+    (fun (_, _, e) ->
+        if e_fv e <> Mid.empty || e_read env PV.empty e <> PV.empty then
+          tacuerror "right-values are not closed expression")
+    asgn;
+
+  let wrs = is_write env EcPV.PV.empty tl1 in
+  let asg = List.fold_left
+              (fun pv (x, ty, _) -> EcPV.PV.add env x ty pv)
+              EcPV.PV.empty asgn
+  in
+
+  if not (EcPV.PV.indep env wrs asg) then
+    tacuerror "cannot cfold non read-only local variables";
+
+  let subst =
+    List.fold_left
+      (fun subst (x, _ty, e) ->  Mpv.add env x e subst)
+      Mpv.empty asgn
+  in
+
+  let tl1 = Mpv.issubst env subst tl1 in
+
+  let zpr =
+    { zpr with Zpr.z_tail = tl1 @ (i :: tl2) }
+  in
+    (me, zpr, [])
+
+class rn_hl_cfold side pos len =
+object
+  inherit xrule "[hl] cfold"
+
+  method side     : bool option = side
+  method position : codepos     = pos
+  method length   : int option  = len
+end
+
+let rn_hl_cfold side pos len =
+  RN_xtd (new rn_hl_cfold side pos len :> xrule)
+
+let t_cfold side cpos olen g =
+  let tr = fun side -> rn_hl_cfold side cpos olen in
+  let cb = fun hyps _ me zpr -> cfold_stmt (LDecl.toenv hyps) me olen zpr in 
+    t_code_transform ~bdhoare:true side cpos tr (t_zip cb) g
+
+let process_cfold (side, cpos, olen) g =
+  t_cfold side cpos olen g
+
+let process_kill (side, cpos, len) g =
+  t_kill side cpos len g
+
+let process_alias (side, cpos, id) g =
+  t_alias side cpos id g
