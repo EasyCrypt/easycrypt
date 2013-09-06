@@ -74,3 +74,74 @@ let process_ppr (phi1,phi2) g =
   (* TODO: check for type unification *)
   let ty = f_ty phi1 in
     t_ppr ty phi1 phi2 g
+
+
+(* -------------------------------------------------------------------- *)
+class rn_hl_prbounded =
+object
+  inherit xrule "[hl] pr-bounded"
+end
+
+let rn_hl_prbounded =
+  RN_xtd (new rn_hl_prbounded)
+
+(* -------------------------------------------------------------------- *)
+let t_pr_bounded conseq g = 
+  let env, _, concl = get_goal_e g in
+  let m, pr, po, cmp, bd = 
+    match concl.f_node with
+    | FbdHoareF hf ->
+      let m, _ = Fun.hoareF_memenv hf.bhf_f env in
+      m, hf.bhf_pr, hf.bhf_po, hf.bhf_cmp, hf.bhf_bd 
+    | FbdHoareS hf -> hf.bhs_m, hf.bhs_pr, hf.bhs_po, hf.bhs_cmp, hf.bhs_bd
+    | _ -> tacuerror "bd_hoare excepted" in
+  let cond = 
+    match cmp with
+    | FHle when f_equal bd f_r1 -> []
+    | FHge when f_equal bd f_r0 -> []
+    | _ when f_equal po f_false && f_equal bd f_r0 -> []
+    (* TODO use the conseq rule instead *)
+    | FHle when conseq -> [f_forall_mems [m] (f_imp pr (f_real_le f_r1 bd))]
+    | FHge when conseq -> [f_forall_mems [m] (f_imp pr (f_real_le bd f_r0))]
+    | _ -> cannot_apply "pr_bounded" "cannot solve the probabilistic judgement" in
+  prove_goal_by cond rn_hl_prbounded g
+
+let t_prbounded = t_pr_bounded true
+
+(* -------------------------------------------------------------------- *)
+(* FIXME: can be replaced by rewrite_pr *)
+class rn_hl_prfalse =
+object
+  inherit xrule "[hl] pr-false"
+end
+
+let rn_hl_prfalse =
+  RN_xtd (new rn_hl_prfalse)
+
+(* -------------------------------------------------------------------- *)
+let t_prfalse g = 
+  let env,_, concl = get_goal_e g in
+  let f,ev,bd =
+    match concl.f_node with
+      | Fapp ({f_node = Fop(op,_)}, [f;bd]) when is_pr f &&
+          EcPath.p_equal op EcCoreLib.p_real_le
+          || EcPath.p_equal op EcCoreLib.p_eq->
+        let (_m,f,_args,ev) = destr_pr f in
+        f,ev,bd
+      | Fapp ({f_node = Fop(op,_)}, [bd;f]) when is_pr f &&
+          EcPath.p_equal op EcCoreLib.p_eq->
+        let (_m,f,_args,ev) = destr_pr f in
+        f,ev,bd
+      | _ ->
+        cannot_apply "pr_false" "Pr[..] expression was expected"
+  in
+  (* the bound is zero *)
+  let is_zero = f_real_le bd f_r0 in
+
+  (* the event is false *)
+  let smem_ = Fsubst.f_bind_mem Fsubst.f_subst_id mhr mhr in 
+  let ev   = Fsubst.f_subst smem_ ev in
+  let fun_ = EcEnv.Fun.by_xpath f env in
+  let me = EcEnv.Fun.actmem_post mhr f fun_ in
+  let concl_po = f_forall_mems [me] (f_imp f_false ev) in
+    prove_goal_by [is_zero;concl_po] rn_hl_prfalse g

@@ -1,29 +1,8 @@
 (* -------------------------------------------------------------------- *)
-open EcUtils
-open EcMaps
 open EcParsetree
 open EcLocation
-open EcTypes
-open EcModules
-open EcFol
-open EcEnv
-open EcReduction
 open EcBaseLogic
 open EcLogic
-open EcHiLogic
-open EcCorePhl
-open EcCoreHiPhl
-open EcCoreHiLogic
-open EcPhl
-
-module TT = EcTyping
-module UE = EcUnify.UniEnv
-
-(* -------------------------------------------------------------------- *)
-let process_hoare_bd_hoare g = t_hoare_bd_hoare g
-let process_prbounded = t_prbounded
-let process_prfalse = t_prfalse
-let process_bdeq = t_bdeq
 
 (* -------------------------------------------------------------------- *)
 let process_phl loc ptac g =
@@ -59,11 +38,11 @@ let process_phl loc ptac g =
     | PPr (phi1, phi2)          -> EcPhlPr.process_ppr (phi1, phi2)
     | Pfel (at_pos, info)       -> EcPhlFel.process_fel at_pos info
     | Pequivdeno info           -> EcPhlDeno.process_equiv_deno info
-    | Phoare | Pbdhoare         -> process_hoare_bd_hoare
-    | Pprbounded                -> process_prbounded
-    | Pprfalse                  -> process_prfalse
+    | Phoare | Pbdhoare         -> EcPhlBdHoare.t_hoare_bd_hoare
+    | Pprbounded                -> EcPhlPr.t_prbounded
+    | Pprfalse                  -> EcPhlPr.t_prfalse
     | Ppr_rewrite s             -> EcPhlPrRw.t_pr_rewrite s 
-    | Pbdeq                     -> process_bdeq
+    | Pbdeq                     -> EcPhlBdHoare.t_bdeq
     | Peqobs_in info            -> EcPhlEqobs.process_eqobs_in info
     | Ptrans_stmt info          -> EcPhlTrans.process_equiv_trans info
   in

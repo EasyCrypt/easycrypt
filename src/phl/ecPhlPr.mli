@@ -7,7 +7,13 @@ open EcBaseLogic
 open EcLogic
 
 (* -------------------------------------------------------------------- *)
-val t_ppr : ty -> form -> form -> tactic
+class rn_hl_prbounded : object inherit xrule end
+class rn_hl_prfalse   : object inherit xrule end
+
+(* -------------------------------------------------------------------- *)
+val t_ppr       : ty -> form -> form -> tactic
+val t_prbounded : tactic
+val t_prfalse   : tactic
 
 (* -------------------------------------------------------------------- *)
 val process_ppr : pformula tuple2 -> tactic
