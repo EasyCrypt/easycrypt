@@ -196,11 +196,12 @@ let process_eqobs_in (geq', ginv, eqs') g =
     let pre = es.es_pr in
     t_seq_subgoal 
       (EcPhlConseq.t_equivS_conseq pre post)
-      [ t_trivial;
-        t_trivial;
-        (fun g -> 
-          t_on_last (t_try (t_seq EcPhlSkip.t_skip t_trivial))
-            (t_eqobs_inS onF eqs ginv g))] 
+      [t_logic_trivial;
+       t_logic_trivial;
+       (fun g -> 
+         t_on_last
+           (t_try (t_seq EcPhlSkip.t_skip t_logic_trivial))
+           (t_eqobs_inS onF eqs ginv g))] 
       g in
    
   let tocut = 
@@ -229,7 +230,7 @@ let process_eqobs_in (geq', ginv, eqs') g =
       let gs =
         EcPhlFun.FunAbsLow.t_equivF_abs
           (EcPV.Mpv2.to_form mleft mright geq ginv) g in
-      t_on_firsts t_trivial 2 gs 
+      t_on_firsts t_logic_trivial 2 gs 
     | Some (EORI_fun eqs) ->
       t_seq EcPhlFun.FunDefLow.t_equivF_fun_def
         (t_eqobs eqs) g 

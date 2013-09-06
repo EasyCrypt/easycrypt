@@ -86,7 +86,7 @@ let rn_hl_prbounded =
   RN_xtd (new rn_hl_prbounded)
 
 (* -------------------------------------------------------------------- *)
-let t_pr_bounded conseq g = 
+let t_prbounded conseq g = 
   let env, _, concl = get_goal_e g in
   let m, pr, po, cmp, bd = 
     match concl.f_node with
@@ -105,8 +105,6 @@ let t_pr_bounded conseq g =
     | FHge when conseq -> [f_forall_mems [m] (f_imp pr (f_real_le bd f_r0))]
     | _ -> cannot_apply "pr_bounded" "cannot solve the probabilistic judgement" in
   prove_goal_by cond rn_hl_prbounded g
-
-let t_prbounded = t_pr_bounded true
 
 (* -------------------------------------------------------------------- *)
 (* FIXME: can be replaced by rewrite_pr *)

@@ -161,9 +161,10 @@ val t_subst_all : tactic
 val t_subst1    : form option -> tactic
 
 val t_assumption : tactic
+
 val t_progress : tactic -> tactic
 
-val t_trivial : tactic
+val t_logic_trivial : tactic
 
 val t_admit : tactic
 
