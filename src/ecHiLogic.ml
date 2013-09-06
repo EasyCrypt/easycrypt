@@ -13,7 +13,6 @@ open EcMetaProg
 open EcBaseLogic
 open EcEnv
 open EcLogic
-open EcPhl
 open EcCoreHiLogic
 
 module Sp = EcPath.Sp

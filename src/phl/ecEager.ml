@@ -159,7 +159,7 @@ let t_eager_if g =
   let tac1 = 
     t_seq (t_intros_i [m2])
       (t_seq_subgoal 
-         (EcPhl.t_hoareS_conseq_nm (f_and p eq2) eq2)
+         (EcPhlConseq.t_hoareS_conseq_nm (f_and p eq2) eq2)
          [ t_lseq [t_intros_i [m1;h2];t_elim_hyp h2;t_intros_i [h3;h4];tac0];
            t_lseq [t_intros_i [m1;h2];t_elim_hyp h2;
                    t_intros_i [h3;h4]; t_hyp h3];
@@ -170,7 +170,7 @@ let t_eager_if g =
     [t_id None; (* a *)
      t_seq (t_intros_i [a])
        (t_seq_subgoal 
-          (EcPhl.t_equivS_conseq (f_and es.es_pr eq) es.es_po)
+          (EcPhlConseq.t_equivS_conseq (f_and es.es_pr eq) es.es_po)
           [t_seq (t_intros_i [m1;m2;h1])
               (t_seq_subgoal t_split 
                  [t_hyp h1;
@@ -183,10 +183,10 @@ let t_eager_if g =
              (t_seq_subgoal (t_cut bT)
                 [ t_id None;
                   t_seq (t_intros_i [a])
-                    (t_seq_subgoal (EcPhl.t_equiv_cond (Some false))
-                       [t_seq_subgoal (EcPhl.t_equiv_rcond true true  at) 
+                    (t_seq_subgoal (EcPhlCond.t_equiv_cond (Some false))
+                       [t_seq_subgoal (EcPhlRCond.Low.t_equiv_rcond true true  at) 
                            [tac1; t_id None];
-                        t_seq_subgoal (EcPhl.t_equiv_rcond true false at)
+                        t_seq_subgoal (EcPhlRCond.Low.t_equiv_rcond true false at)
                           [tac1; t_id None]
                        ]) 
                 ])
