@@ -729,6 +729,34 @@ module Mpv2 = struct
       if is_loc pv || Snpv.exists is_loc s then raise EqObsInError)
       eqs.s_pv
 
+  let mem x1 x2 t =
+    try Snpv.mem x2 (fst (Mnpv.find x1 t.s_pv))
+    with Not_found -> false
+
+  let mem_glob m t = Sm.mem m t.s_gl
+
+  let iter fv fg t =
+    Mnpv.iter (fun x1 (s,ty) -> Snpv.iter (fun x2 -> fv x1 x2 ty) s) t.s_pv;
+    Sm.iter fg t.s_gl
+
+  let eq_fv2 t = 
+    let pv = ref Mnpv.empty in
+    let fv _ x2 ty = pv := Mnpv.add x2 (Snpv.singleton x2, ty) !pv in
+    let gl = ref Sm.empty in
+    let fg m = gl := Sm.add m !gl in
+    iter fv fg t;
+    { s_pv = !pv; s_gl = !gl }
+
+  let eq_refl (fv:PV.t) = 
+    let pv = ref Mnpv.empty in
+    let fx x ty = pv := Mnpv.add x (Snpv.singleton x, ty) !pv in
+    Mnpv.iter fx fv.PV.s_pv;
+    let gl = ref Sm.empty in
+    let fg m = gl := Sm.add m !gl in
+    Sm.iter fg fv.PV.s_gl;
+    { s_pv = !pv; s_gl = !gl }
+    
+
 end
 
 (*add_eqs env local eqs e1 e2 : collect a set of equalities with ensure the
