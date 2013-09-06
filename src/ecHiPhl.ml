@@ -19,119 +19,6 @@ open EcPhl
 module TT = EcTyping
 module UE = EcUnify.UniEnv
 
-(* -------------------------------------------------------------------- *)
-let process_call side info (_, n as g) = 
-  let process_spec side g =
-    let hyps,concl = get_goal g in
-    match concl.f_node, side with
-    | FhoareS hs, None ->
-      let (_,f,_),_ = s_last_call "call" hs.hs_s in
-      let penv, qenv = LDecl.hoareF f hyps in
-      penv,qenv, fun pre post -> f_hoareF pre f post
-    | FbdHoareS bhs, None ->
-      let (_,f,_),_ = s_last_call "call" bhs.bhs_s in
-      let penv, qenv = LDecl.hoareF f hyps in
-      penv,qenv, fun pre post -> 
-        bdHoare_call_spec pre post f bhs.bhs_cmp bhs.bhs_bd None
-    | FbdHoareS _, Some _ | FhoareS _, Some _ ->
-      cannot_apply "call" "side can only be given for prhl judgements"
-    | FequivS es, None ->
-      let (_,fl,_),(_,fr,_),_,_ = s_last_calls "call" es.es_sl es.es_sr in
-      let penv, qenv = LDecl.equivF fl fr hyps in
-      penv,qenv,fun pre post -> f_equivF pre fl fr post
-    | FequivS es, Some side ->
-      let fstmt = match side with true -> es.es_sl | false -> es.es_sr in
-      let (_,f,_),_ = s_last_call "call" fstmt in
-      let penv, qenv = LDecl.hoareF f hyps in
-      penv,qenv, fun pre post ->
-        f_bdHoareF pre f post FHeq f_r1
-    | _ -> cannot_apply "call" "the conclusion is not a hoare or a equiv" in
-
-  let process_inv side g = 
-    if side <> None then
-      cannot_apply "call" "can not specify side for call with invariant";
-    let hyps, concl = get_goal g in
-    match concl.f_node with
-    | FhoareS hs ->
-      let (_,f,_),_ = s_last_call "call" hs.hs_s in
-      let penv = LDecl.inv_memenv1 hyps in
-      penv, fun inv -> f_hoareF inv f inv
-    | FbdHoareS bhs ->
-      let (_,f,_),_ = s_last_call "call" bhs.bhs_s in
-      let penv = LDecl.inv_memenv1 hyps in
-      penv, fun inv -> bdHoare_call_spec inv inv f bhs.bhs_cmp bhs.bhs_bd None
-    | FequivS es ->
-      let (_,fl,_),(_,fr,_),_,_ = s_last_calls "call" es.es_sl es.es_sr in
-      let penv = LDecl.inv_memenv hyps in
-      let env = LDecl.toenv hyps in
-      penv, fun inv -> EcPhl.mk_inv_spec env inv fl fr
-    | _ -> cannot_apply "call" "the conclusion is not a hoare or a equiv" in
-
-  let process_upto side info g = 
-    if side <> None then
-      cannot_apply "call" "can not specify side for call with invariant";
-    let env, _, concl = get_goal_e g in
-    match concl.f_node with
-    | FequivS es ->
-      let (_,fl,_),(_,fr,_),_,_ = s_last_calls "call" es.es_sl es.es_sr in
-      let bad,invP,invQ = EcPhlFun.process_fun_upto_info info g in
-      let (topl,fl,oil,sigl),(topr,fr,_,sigr) = abstract_info2 env fl fr in
-      let ml, mr = mleft, mright in
-      let bad2 = Fsubst.f_subst_mem mhr mr bad in
-      let eqglob = f_eqglob topl ml topr mr in
-      let lpre = if oil.oi_in then [eqglob;invP] else [invP] in
-      let eq_params = 
-        f_eqparams fl sigl.fs_params ml fr sigr.fs_params mr in
-      let eq_res = f_eqres fl sigl.fs_ret ml fr sigr.fs_ret mr in
-      let pre = f_if_simpl bad2 invQ (f_ands (eq_params::lpre)) in
-      let post = f_if_simpl bad2 invQ (f_ands [eq_res;eqglob;invP]) in
-      bad,invP,invQ, f_equivF pre fl fr post 
-    | _ -> cannot_apply "call" "the conclusion is not an equiv" in
-
-
-  let tac_sub = ref (t_id None) in
-
-  let process_cut g info = 
-    match info with
-    | CI_spec (pre,post) ->
-      let penv,qenv,fmake = process_spec side g in
-      let pre  = process_form penv pre tbool in
-      let post = process_form qenv post tbool in
-      fmake pre post
-    | CI_inv inv ->
-      let env, fmake = process_inv side g in
-      let inv = process_form env inv tbool in
-      tac_sub :=  (fun g -> t_on_firsts t_trivial 2 (EcPhlFun.t_fun inv g));
-      fmake inv 
-    | CI_upto info -> 
-      let bad,p,q,form = process_upto side info g in
-      let t_tr = t_or t_assumption t_trivial in
-      tac_sub := (fun g -> t_on_firsts t_tr 3 (EcPhlFun.UpToLow.t_equivF_abs_upto bad p q g));
-      form in
-        
-        
-  let (juc,an), gs = process_mkn_apply (process_cut g) info g in
-  
-  let t_call g = 
-    let (_,f) = get_node (juc, an) in
-    let concl = get_concl g in
-    match f.f_node, concl.f_node with
-    | FhoareF hf, FhoareS _ -> 
-      t_hoare_call hf.hf_pr hf.hf_po g
-    | FbdHoareF hf, FbdHoareS _ ->
-      t_bdHoare_call hf.bhf_pr hf.bhf_po None g
-    | FequivF ef, FequivS _ ->
-      t_equiv_call ef.ef_pr ef.ef_po g
-    | FbdHoareF hf, FequivS _ ->
-      let side = 
-        match side with
-        | Some side -> side
-        | _ -> cannot_apply "call" "side can only be given for prhl judgements"
-      in
-      t_equiv_call1 side hf.bhf_pr hf.bhf_po g
-    | _, _ -> cannot_apply "call" "" in
-
-  t_seq_subgoal t_call [t_seq (t_use an gs) !tac_sub; t_id None] (juc,n)
 
 (* César says: too much code repetition w.r.t. ecPhl *)
 let process_bdHoare_deno info (_,n as g) = 
@@ -197,34 +84,6 @@ let process_ppr (phi1,phi2) g =
   let ty = f_ty phi1 in
   t_ppr ty phi1 phi2 g
 
-let process_fel at_pos (cntr, ash, q, f_event, pred_specs,o_inv) g = 
-  let hyps,concl = get_goal g in
-  (* let hyps = LDecl.inv_memenv hyps in  *)
-  (* code duplication from t_failure *)
-  let f = match concl.f_node with
-    | Fapp ({f_node=Fop(op,_)},[pr;_]) when is_pr pr 
-        && EcPath.p_equal op EcCoreLib.p_real_le ->
-      let (_,f,_,_) = destr_pr pr in
-      f
-    | _ -> 
-      cannot_apply "failure event lemma" 
-        "A goal of the form Pr[ _ ] <= _ was expected"
-  in
-  (* let env = EcEnv.Fun.prF f env in *)
-  let hyps,_ = LDecl.hoareF f hyps in 
-  let cntr = process_form hyps cntr tint in
-  let ash = process_form hyps ash (tfun tint treal) in
-  let q = process_form hyps q tint in
-  let f_event = process_form hyps f_event tbool in
-  let inv = match o_inv with | None -> f_true | Some inv -> process_form hyps inv tbool in
-  let process_pred (f,pre) = 
-    let env = LDecl.toenv hyps in
-    let f = EcTyping.trans_gamepath env f in
-    let penv, _ = LDecl.hoareF f hyps in
-    f,process_form penv pre tbool
-  in
-  let pred_specs = List.map process_pred pred_specs in
-  t_failure_event at_pos cntr ash q f_event pred_specs inv g
 
 let process_hoare_bd_hoare g = t_hoare_bd_hoare g
 let process_prbounded = t_prbounded
@@ -348,7 +207,7 @@ let process_phl loc ptac g =
     | Pfusion info              -> EcPhlLoopTx.process_fusion info
     | Punroll info              -> EcPhlLoopTx.process_unroll info
     | Psplitwhile info          -> EcPhlLoopTx.process_splitwhile info
-    | Pcall (side, info)        -> process_call side info
+    | Pcall (side, info)        -> EcPhlCall.process_call side info
     | Pswap info                -> EcPhlSwap.process_swap info
     | Pinline info              -> EcPhlInline.process_inline info
     | Pcfold info               -> EcPhlCodeTx.process_cfold info
@@ -361,7 +220,7 @@ let process_phl loc ptac g =
     | Pexfalso                  -> EcPhlExfalso.t_exfalso
     | Pbdhoaredeno info         -> process_bdHoare_deno info
     | PPr (phi1,phi2)           -> process_ppr (phi1,phi2)
-    | Pfel (at_pos,info)        -> process_fel at_pos info
+    | Pfel (at_pos,info)        -> EcPhlFel.process_fel at_pos info
     | Pequivdeno info           -> process_equiv_deno info
     | Phoare | Pbdhoare         -> process_hoare_bd_hoare
     | Pprbounded                -> process_prbounded
