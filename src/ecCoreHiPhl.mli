@@ -11,3 +11,5 @@ val process_phl_formula  : goal -> pformula -> form
 
 val process_prhl_form    : ty -> goal -> pformula -> form
 val process_prhl_formula : goal -> pformula -> form
+
+val process_prhl_stmt    : bool -> goal -> pstmt -> stmt

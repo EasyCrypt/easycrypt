@@ -805,14 +805,7 @@ let process_trans_stmt s c p1 q1 p2 q2 g =
     let hyps = LDecl.push_all [(mleft, mt); es.es_mr] hyps in
     process_form hyps p2 tbool, process_form hyps q2 tbool in
   (* Translation of the stmt *)
-  let c = 
-    let hyps = LDecl.push_active (mhr,mt) hyps in
-    let env  = LDecl.toenv hyps in
-    let ue   = EcUnify.UniEnv.create (Some (LDecl.tohyps hyps).h_tvar) in
-    let c    = EcTyping.transstmt env ue c in
-    let esub = 
-      { e_subst_id with es_ty = Tuni.subst (EcUnify.UniEnv.close ue) } in
-    s_subst esub c in
+  let c = EcCoreHiPhl.process_prhl_stmt (oget s) g c in
   t_equivS_trans (mt,c) p1 q1 p2 q2 g 
 
 let process_trans_fun f p1 q1 p2 q2 g = 
