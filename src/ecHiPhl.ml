@@ -514,7 +514,7 @@ let process_phl loc ptac g =
     | Phoare | Pbdhoare         -> process_hoare_bd_hoare
     | Pprbounded                -> process_prbounded
     | Pprfalse                  -> process_prfalse
-    | Ppr_rewrite s             -> t_pr_rewrite s 
+    | Ppr_rewrite s             -> EcPhlPrRw.t_pr_rewrite s 
     | Pbdeq                     -> process_bdeq
     | Peqobs_in info            -> process_eqobs_in info
     | Ptrans_stmt info          -> EcPhlTrans.process_equiv_trans info
