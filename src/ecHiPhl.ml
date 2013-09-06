@@ -157,130 +157,6 @@ let process_call side info (_, n as g) =
 
   t_seq_subgoal t_call [t_seq (t_use an gs) !tac_sub; t_id None] (juc,n)
 
-(* TODO move this *)
-let pat_all fs s =
-  let rec aux_i i = 
-    match i.i_node with
-    | Scall(_,f,_) -> 
-      if EcPath.Sx.mem f fs then Some IPpat else None
-    | Sif(_,s1,s2) -> 
-      let sp1 = aux_s 0 s1.s_node in
-      let sp2 = aux_s 0 s2.s_node in
-      if sp1 = [] && sp2 = [] then None 
-      else Some (IPif(sp1,sp2))
-    | Swhile(_,s) ->
-      let sp = aux_s 0 s.s_node in
-      if sp = [] then None else Some (IPwhile(sp)) 
-    | _ -> None
-  and aux_s n s = 
-    match s with
-    | [] -> []
-    | i::s ->
-      match aux_i i with
-      | Some ip -> (n,ip) :: aux_s 0 s 
-      | None -> aux_s (n+1) s in
-  aux_s 0 s.s_node
-  
-let rec process_inline_all side fs g =
-  let concl = get_concl g in
-  match concl.f_node, side with
-  | FequivS _, None ->
-      t_seq
-        (process_inline_all (Some true ) fs)
-        (process_inline_all (Some false) fs) g
-  | FequivS es, Some b ->
-      let sp = pat_all fs (if b then es.es_sl else es.es_sr) in
-        if   sp = []
-        then t_id None g
-        else t_seq
-               (t_inline_equiv b sp)
-               (process_inline_all side fs) g
-  | FhoareS hs, None ->
-      let sp = pat_all fs hs.hs_s in
-        if   sp = []
-        then t_id None g
-        else t_seq
-               (t_inline_hoare sp)
-               (process_inline_all side fs) g
-  | FbdHoareS bhs, None ->
-      let sp = pat_all fs bhs.bhs_s in
-      if   sp = []
-      then t_id None g
-      else t_seq
-        (t_inline_bdHoare sp)
-        (process_inline_all side fs) g
-
-  | _, _ -> cannot_apply "inline" "Wrong parameters or phl/prhl judgement not found" 
-  
-let pat_of_occs cond occs s =
-  let occs = ref occs in
-  let rec aux_i occ i = 
-    match i.i_node with
-    | Scall (_,f,_) -> 
-      if cond f then 
-        let occ = 1 + occ in
-        if Sint.mem occ !occs then begin
-          occs := Sint.remove occ !occs; 
-          occ, Some IPpat
-        end else occ, None
-      else occ, None
-    | Sif(_,s1,s2) ->
-      let occ, sp1 = aux_s occ 0 s1.s_node in
-      let occ, sp2 = aux_s occ 0 s2.s_node in
-      let ip = if sp1 = [] && sp2 = [] then None else Some(IPif(sp1,sp2)) in
-      occ, ip
-    | Swhile(_,s) ->
-      let occ, sp = aux_s occ 0 s.s_node in
-      let ip = if sp = [] then None else Some(IPwhile sp) in
-      occ, ip
-    | _ -> occ, None 
-  and aux_s occ n s =
-    match s with
-    | [] -> occ, []
-    | i::s ->
-      match aux_i occ i with
-      | occ, Some ip -> 
-        let occ, sp = aux_s occ 0 s in
-        occ, (n,ip) :: sp
-      | occ, None -> aux_s occ (n+1) s in
-  let _, sp = aux_s 0 0 s.s_node in
-  assert (Sint.is_empty !occs); (* FIXME error message *)
-  sp
-
-let process_inline_occs side fs occs g =
-  let cond = 
-    if EcPath.Sx.is_empty fs then fun _ -> true
-    else fun f -> EcPath.Sx.mem f fs in
-  let occs = Sint.of_list occs in
-  let concl = get_concl g in
-  match concl.f_node, side with
-  | FequivS es, Some b ->
-    let sp =  pat_of_occs cond occs (if b then es.es_sl else es.es_sr) in
-    t_inline_equiv b sp g 
-  | FhoareS hs, None ->
-    let sp =  pat_of_occs cond occs hs.hs_s in
-    t_inline_hoare sp g 
-  | _, _ -> assert false (* FIXME error message *)
-  
-
-let process_inline infos g =
-  match infos with
-  | `ByName (side, (fs, occs)) -> begin
-      let hyps = get_hyps g in
-      let env = LDecl.toenv hyps in
-      let fs = 
-        List.fold_left (fun fs f ->
-          let f = EcTyping.trans_gamepath env f in
-          EcPath.Sx.add f fs) EcPath.Sx.empty fs 
-      in
-      match occs with
-      | None -> process_inline_all side fs g
-      | Some occs -> process_inline_occs side fs occs g
-    end
-
-  | `ByPattern _ -> failwith "not-implemented"
-
-
 (* César says: too much code repetition w.r.t. ecPhl *)
 let process_bdHoare_deno info (_,n as g) = 
   let process_cut g (pre,post) = 
@@ -498,7 +374,7 @@ let process_phl loc ptac g =
     | Psplitwhile info          -> EcPhlLoopTx.process_splitwhile info
     | Pcall (side, info)        -> process_call side info
     | Pswap info                -> EcPhlSwap.process_swap info
-    | Pinline info              -> process_inline info
+    | Pinline info              -> EcPhlInline.process_inline info
     | Pcfold info               -> EcPhlCodeTx.process_cfold info
     | Pkill info                -> EcPhlCodeTx.process_kill info
     | Palias info               -> EcPhlCodeTx.process_alias info
