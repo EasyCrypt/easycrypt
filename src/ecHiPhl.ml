@@ -20,30 +20,6 @@ module TT = EcTyping
 module UE = EcUnify.UniEnv
 
 (* -------------------------------------------------------------------- *)
-let process_while side_opt phi vrnt_opt g =
-  let concl = get_concl g in
-  if is_hoareS concl then
-    match vrnt_opt with
-      | None ->
-        t_hoare_while (process_phl_formula g phi) g
-      | _ -> cannot_apply "while" "wrong arguments"
-  else if is_bdHoareS concl then
-    match vrnt_opt with
-      | Some vrnt ->
-        t_bdHoare_while 
-          (process_phl_formula g phi) 
-          (process_phl_form tint g vrnt) 
-          g
-      | _ -> cannot_apply "while" "wrong arguments"
-  else if is_equivS concl then
-    match side_opt, vrnt_opt with
-      | None, None ->
-        t_equiv_while (process_prhl_formula g phi) g
-      | Some side, Some vrnt ->
-        t_equiv_while_disj side (process_prhl_form tint g vrnt) (process_prhl_formula g phi) g
-      | _ -> cannot_apply "while" "wrong arguments"
-  else cannot_apply "while" "the conclusion is not a hoare or a equiv"
-
 let process_call side info (_, n as g) = 
   let process_spec side g =
     let hyps,concl = get_goal g in
@@ -367,7 +343,7 @@ let process_phl loc ptac g =
     | Psp k                     -> EcPhlSp.t_sp k
     | Prcond (side, b, i)       -> EcPhlRCond.t_rcond side b i
     | Pcond side                -> EcPhlCond.process_cond side
-    | Pwhile (side, (phi, vopt))-> process_while side phi vopt
+    | Pwhile (side, (phi, vopt))-> EcPhlWhile.process_while side phi vopt
     | Pfission info             -> EcPhlLoopTx.process_fission info
     | Pfusion info              -> EcPhlLoopTx.process_fusion info
     | Punroll info              -> EcPhlLoopTx.process_unroll info
