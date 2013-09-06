@@ -313,6 +313,7 @@
 %token EQOBSIN
 %token TRANSITIVITY
 %token ZETA 
+%token EAGER
 
 %token <string> OP1 OP2 OP3 OP4
 %token LTCOLON GT LT GE LE
@@ -1796,6 +1797,21 @@ logtactic:
    { Ppose (x, o |> omap EcMaps.Sint.of_list, p) }
 ;
 
+(* NEW : ADDED FOR EAGER *)
+eager_info:
+| h=ident 
+    { LE_done h }
+| LPAREN h=ident COLON s1=stmt TILD s2=stmt COLON pr=form LONGARROW po=form RPAREN
+    { LE_todo(h,s1,s2,pr,po) }
+;
+eager_tac:
+| SEQ n1=number n2=number i=eager_info COLON p=sform
+    { Peager_seq (i,(n1,n2),p) }
+| IF 
+    { Peager_if }
+;
+(* END EAGER *)
+
 phltactic:
 | FUN
     { Pfun_def }
@@ -1914,6 +1930,8 @@ phltactic:
 
 | SP s=side?
    {Psp s}
+(* NEW : ADDED FOR EAGER *)
+| EAGER t=eager_tac { t }
 
 (* basic pr based tacs *)
 | HOARE {Phoare}

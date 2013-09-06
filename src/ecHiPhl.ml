@@ -870,5 +870,7 @@ let process_phl loc ptac g =
     | Peqobs_in info            -> process_eqobs_in info
     | Ptrans_stmt info          -> process_equiv_trans info
     | Psp      arg              -> t_sp arg
+    | Peager_seq (info,pos,eqR) -> EcEager.process_seq info pos eqR
+    | Peager_if                 -> EcEager.t_eager_if
   in
     set_loc loc t g

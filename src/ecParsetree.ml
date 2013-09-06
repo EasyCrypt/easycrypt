@@ -351,6 +351,10 @@ type trans_kind =
 type trans_info = 
   trans_kind * pformula * pformula * pformula * pformula
 
+type eager_info = 
+  | LE_done of psymbol 
+  | LE_todo of psymbol * pstmt * pstmt * pformula * pformula
+
 type phltactic = 
   | Pfun_def  
   | Pfun_abs    of pformula
@@ -390,6 +394,9 @@ type phltactic =
   | Peqobs_in   of (pformula_o * pformula_o * pformula_o)
   | Ptrans_stmt of trans_info
   | Psp        of (bool option)
+  (* for eager *)
+  | Peager_seq of eager_info * (int * int) * pformula 
+  | Peager_if  
 
 and pinline_arg =
   [ `ByName    of tac_side * (pgamepath list * int list option)
