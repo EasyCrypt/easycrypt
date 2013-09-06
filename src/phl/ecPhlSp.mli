@@ -3,7 +3,7 @@ open EcBaseLogic
 open EcLogic
 
 (* -------------------------------------------------------------------- *)
-class rn_hl_sp = object
+class rn_hl_sp : object
   inherit xrule
 end
 
