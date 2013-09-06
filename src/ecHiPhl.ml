@@ -4,10 +4,6 @@ open EcLocation
 open EcBaseLogic
 open EcLogic
 
-<<<<<<< HEAD
-
-=======
->>>>>>> bd555bf29126ca69db6b7fc3d37aff385229e8ac
 (* -------------------------------------------------------------------- *)
 let process_phl loc ptac g =
   let t =
