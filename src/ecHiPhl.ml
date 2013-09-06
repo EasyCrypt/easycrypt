@@ -90,7 +90,10 @@ let process_prbounded = t_prbounded
 let process_prfalse = t_prfalse
 let process_bdeq = t_bdeq
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> bd555bf29126ca69db6b7fc3d37aff385229e8ac
 (* -------------------------------------------------------------------- *)
 let process_phl loc ptac g =
   let t =
