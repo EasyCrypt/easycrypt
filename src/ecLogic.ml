@@ -1302,7 +1302,9 @@ let t_congr f (args, ty) g =
 
 
 (* -------------------------------------------------------------------- *)
-let t_trivial =
-  t_or
-    (t_lseq [t_try t_assumption; t_progress (t_id None); t_assumption; t_fail])
-    (t_id None)
+let t_logic_trivial =
+  t_try
+    (t_lseq [t_try t_assumption;
+             t_progress (t_id None);
+             t_assumption;
+             t_fail])

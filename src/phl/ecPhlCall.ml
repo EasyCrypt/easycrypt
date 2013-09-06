@@ -274,11 +274,11 @@ let process_call side info (_, n as g) =
     | CI_inv inv ->
       let env, fmake = process_inv side g in
       let inv = process_form env inv tbool in
-      tac_sub :=  (fun g -> t_on_firsts t_trivial 2 (EcPhlFun.t_fun inv g));
+      tac_sub :=  (fun g -> t_on_firsts t_logic_trivial 2 (EcPhlFun.t_fun inv g));
       fmake inv 
     | CI_upto info -> 
       let bad,p,q,form = process_upto side info g in
-      let t_tr = t_or t_assumption t_trivial in
+      let t_tr = t_or t_assumption t_logic_trivial in
       tac_sub := (fun g -> t_on_firsts t_tr 3 (EcPhlFun.UpToLow.t_equivF_abs_upto bad p q g));
       form in
         

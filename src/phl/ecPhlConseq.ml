@@ -249,7 +249,7 @@ let gen_conseq_nm tnm tc pre post =
   t_seq_subgoal (tnm post)
     [ t_id None;
       t_seq_subgoal (tc pre post)
-        [t_id None; t_trivial; t_id None] ]
+        [t_id None; t_logic_trivial; t_id None] ]
 
 let t_hoareF_conseq_nm   = gen_conseq_nm t_hoareF_notmod   t_hoareF_conseq
 let t_hoareS_conseq_nm   = gen_conseq_nm t_hoareS_notmod   t_hoareS_conseq

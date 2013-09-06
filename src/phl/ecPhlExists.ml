@@ -72,7 +72,7 @@ let t_hr_exists_intro fs g =
       [t_lseq [t_intros_i ms;
                gen_t_exists (fun _ _ f -> f) args; 
                t_hyp h];
-       t_trivial; t_id None]
+       t_logic_trivial; t_id None]
       g
 
 (* -------------------------------------------------------------------- *)
