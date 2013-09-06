@@ -1493,8 +1493,8 @@ let transmem env m =
       tyerror m.pl_loc env (UnknownMemName (0, unloc m))
       
   | Some me -> 
-      if (EcMemory.memtype me) <> None then
-        tyerror m.pl_loc env (InvalidMem (unloc m, MAE_IsConcrete));
+(*      if (EcMemory.memtype me) <> None then
+        tyerror m.pl_loc env (InvalidMem (unloc m, MAE_IsConcrete)); *)
       (fst me)
 
 (* -------------------------------------------------------------------- *)
