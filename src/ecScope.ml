@@ -1518,7 +1518,7 @@ module Theory = struct
           | None -> ()
           | Some sp ->
               if p_equal sp (EcEnv.root scope.sc_env) then
-                hierror "cannot close a theory with active sessions";
+                hierror "cannot close a theory with active sections";
         end;
         let cth      = EcEnv.Theory.close scope.sc_env in
         let loaded   = scope.sc_loaded in
