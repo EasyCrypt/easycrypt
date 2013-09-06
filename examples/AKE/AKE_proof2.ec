@@ -4,6 +4,7 @@ require import Map.
 require import FSet.
 require import Int.
 require import AKE_defs.
+require import Real.
 
 (* { Hello *)
 (* dsfadfsdfdsf *)
@@ -107,7 +108,7 @@ module AKE_EexpRev(FA : Adv2) = {
     fun init1(i : Sidx, A : Agent, B : Agent) : Epk option = {
       var pX : Epk;
       var r : Epk option = None; 
-      if (0 <= i < qSession && in_dom A mSk && in_dom B mSk && !in_dom i mStarted) {
+      if (in_dom A mSk && in_dom B mSk && !in_dom i mStarted) {
         cSession = cSession + 1;
         pX = gen_epk(proj mEexp.[i]);
         mStarted.[i] = (A,B,init);
@@ -120,7 +121,7 @@ module AKE_EexpRev(FA : Adv2) = {
     fun resp(i : Sidx, B : Agent, A : Agent, X : Epk) : Epk option = {
       var pY : Epk;
       var r : Epk option = None;
-      if (   0 <= i < qSession && in_dom A mSk && in_dom B mSk
+      if (in_dom A mSk && in_dom B mSk
           && !in_dom i mStarted && !in_dom i mCompleted) {
         cSession = cSession + 1;
         pY = gen_epk(proj mEexp.[i]);
@@ -185,6 +186,8 @@ module AKE_EexpRev(FA : Adv2) = {
     var ska : Sk = def;
     var pka : Pk = def;
     var xa' : Eexp = def;
+    var sidxs : Sidx set = univ_Sidx;
+    var sidx : Sidx;
     
     init();
     while (i < qAgent) {
@@ -193,10 +196,11 @@ module AKE_EexpRev(FA : Adv2) = {
       pks = pka :: pks;
       mSk.[pka] = ska;
     }
-    i = 0;
-    while (i < qSession) {
+    while (sidxs <> FSet.empty) {
+      sidx = pick sidxs;
+      sidxs = rm sidx sidxs;
       xa' = $sample_Eexp;
-      mEexp.[i] = xa';
+      mEexp.[sidx] = xa';
     } 
 
 
@@ -219,8 +223,8 @@ module AKE_EexpRev(FA : Adv2) = {
 
 (* first we enforce no collisions on Init1 and Resp *)
 
-pred collision_eexp_eexp(m : (int, Eexp) map) =
-  exists i j, in_dom i m /\ in_dom j m /\ m.[i] = m.[j] /\ i <> j.
+pred collision_eexp_eexp(m : (Sidx, Eexp) map) =
+  exists i j, in_dom i m /\ m.[i] = m.[j] /\ i <> j.
 
 pred collision_eexp_rcvd(evs : Event list) =
   exists (i : int) (j : int) s1 s2 s3,
@@ -282,6 +286,7 @@ i = j.
 
 pred valid_accepts evs =
   forall s i,
+  0 <= i < length evs =>
   nth evs i = Some (Accept s) =>
   sid_role s = init => 
   exists j, i < j /\ j < length evs /\ nth evs j = Some (Start (psid_of_sid s)).
@@ -295,7 +300,7 @@ forall evs,
 (collision_eexp_rcvd_op evs) = 
 (collision_eexp_rcvd evs). 
 
-op collision_eexp_eexp_op : (int, Eexp) map -> bool.
+op collision_eexp_eexp_op : (Sidx, Eexp) map -> bool.
 
 axiom collision_eexp_eexp_op_def :
 forall eexps, 
@@ -353,7 +358,9 @@ proof.
   by smt.
   rewrite /s1 -hrole -hnth nth_consN; first 2 by smt.
   by right;rewrite nth_cons0 /s1 /cmatching /sid_sent /sid_rcvd /sid_role/=; smt.
-  elim (hvalid (B, A, Y, X, ! resp) 0 _ _);rewrite // ?nth_cons0 -heq1 ?hrole //= => j.
+  elim (hvalid (B, A, Y, X, ! resp) 0 _ _);rewrite // ?nth_cons0 -heq1 ?hrole //=.
+    by rewrite length_cons; smt.
+  intros => j.
   apply not_def => [[hjpos]].
   rewrite (_ : j = (j-1) + 1) ?nth_consN /psid_of_sid /=; first 2 by smt.
   apply not_def => [[hlength]] heq.
@@ -461,7 +468,7 @@ module AKE_NoColl(FA : Adv2) = {
     fun init1(i : Sidx, A : Agent, B : Agent) : Epk option = {
       var pX : Epk;
       var r : Epk option = None; 
-      if (0 <= i < qSession && in_dom A mSk && 
+      if (in_dom A mSk && 
          in_dom B mSk && !in_dom i mStarted &&
          ! collision_eexp_rcvd_op(Start((A,B,gen_epk(proj mEexp.[i]),init))::evs)){
         cSession = cSession + 1;
@@ -476,7 +483,7 @@ module AKE_NoColl(FA : Adv2) = {
     fun resp(i : Sidx, B : Agent, A : Agent, X : Epk) : Epk option = {
       var pY : Epk;
       var r : Epk option = None;
-      if (   0 <= i < qSession && in_dom A mSk && in_dom B mSk
+      if (in_dom A mSk && in_dom B mSk
           && !in_dom i mStarted && !in_dom i mCompleted &&
          ! collision_eexp_rcvd_op(Accept((B,A,gen_epk(proj mEexp.[i]),X,resp))::evs)) {
         cSession = cSession + 1;
@@ -543,6 +550,8 @@ module AKE_NoColl(FA : Adv2) = {
     var ska : Sk = def;
     var pka : Pk = def;
     var xa' : Eexp = def;
+    var sidxs : Sidx set = univ_Sidx;
+    var sidx : Sidx;
     
     init();
     while (i < qAgent) {
@@ -551,10 +560,11 @@ module AKE_NoColl(FA : Adv2) = {
       pks = pka :: pks;
       mSk.[pka] = ska;
     }
-    i = 0;
-    while (i < qSession) {
+    while (sidxs <> FSet.empty) {
+      sidx = pick sidxs;
+      sidxs = rm sidx sidxs;
       xa' = $sample_Eexp;
-      mEexp.[i] = xa';
+      mEexp.[sidx] = xa';
     } 
     if (!collision_eexp_eexp_op mEexp) {
      t_idx = A.choose(pks);
@@ -928,7 +938,7 @@ by skip; progress => //;smt.
 by skip; progress => //;smt.
 save.
 
-require import Real. (* move up *)
+
 
 lemma Eq_AKE_EexpRev_AKE_no_collision_Pr &m :
 Pr[AKE_EexpRev(A).main() @ &m : res /\ test_fresh AKE_EexpRev.test AKE_EexpRev.evs
@@ -1024,7 +1034,7 @@ local module AKE_Enforcement(FA : Adv2) = {
     fun init1(i : Sidx, A : Agent, B : Agent) : Epk option = {
       var pX : Epk;
       var r : Epk option = None; 
-      if (0 <= i < qSession && in_dom A mSk && 
+      if ( in_dom A mSk && 
          in_dom B mSk && !in_dom i mStarted &&
          ! collision_eexp_rcvd_op(Start((A,B,gen_epk(proj mEexp.[i]),init))::evs)) {
         cSession = cSession + 1;
@@ -1039,7 +1049,7 @@ local module AKE_Enforcement(FA : Adv2) = {
     fun resp(i : Sidx, B : Agent, A : Agent, X : Epk) : Epk option = {
       var pY : Epk;
       var r : Epk option = None;
-      if (0 <= i < qSession && in_dom A mSk && in_dom B mSk
+      if (in_dom A mSk && in_dom B mSk
           && !in_dom i mStarted && !in_dom i mCompleted &&
          ! collision_eexp_rcvd_op(Accept((B,A,gen_epk(proj mEexp.[i]),X,resp))::evs)) {
         cSession = cSession + 1;
@@ -1111,6 +1121,8 @@ local module AKE_Enforcement(FA : Adv2) = {
     var ska : Sk = def;
     var pka : Pk = def;
     var xa' : Eexp = def;
+    var sidxs : Sidx set = univ_Sidx;
+    var sidx : Sidx;
     
     init();
     while (i < qAgent) {
@@ -1119,12 +1131,12 @@ local module AKE_Enforcement(FA : Adv2) = {
       pks = pka :: pks;
       mSk.[pka] = ska;
     }
-    i = 0;
-    while (i < qSession) {
+    while (sidxs <> FSet.empty) {
+      sidx = pick sidxs;
+      sidxs = rm sidx sidxs;
       xa' = $sample_Eexp;
-      mEexp.[i] = xa';
+      mEexp.[sidx] = xa';
     } 
-
     if (!collision_eexp_eexp_op mEexp) {
      t_idx = A.choose(pks);
      b = ${0,1};
@@ -1149,7 +1161,7 @@ local module AKE_Enforcement(FA : Adv2) = {
 
 
 
-lemma no_start_coll_mon : 
+lemma no_start_coll_pres : 
 forall e evs, 
  (forall s, e <> Start s) =>
  no_start_coll evs =>
@@ -1173,7 +1185,53 @@ proof.
 save.
 
 
-lemma no_accept_coll_mon : 
+lemma mem_nth_simple x (xs : 'a list) j: 
+nth xs j = Some x =>
+List.mem x xs.
+proof.
+ intros => hjth.
+ rewrite -(proj_some x) -hjth.
+ apply nth_mem.
+ cut: (! 0 <= j) => false; last by smt.
+ intros => h; generalize hjth; rewrite nth_neg; smt.
+ cut: (! j < length xs) => false; last by smt.
+ intros => h;generalize hjth; rewrite nth_geq_len; smt.
+qed.
+
+lemma Some_inj :
+forall (s1 s2 : 'a), Some s1 = Some s2 => s1 = s2 by smt. 
+
+lemma no_start_coll_pres_ev : 
+forall s evs, 
+ no_start_coll evs =>
+ (forall s', mem (Start s') evs => psid_sent s <> psid_sent s') => 
+ no_start_coll (Start s :: evs).
+proof.
+ intros => s evs; rewrite /no_start_coll; progress.
+ case (0 = i); case (0 = j) => // hj hi.
+
+  generalize H3; rewrite -hi nth_cons0 => heq.
+  generalize H4; rewrite nth_consN // => heq'.
+  cut:= H0 (A2, B2, X, r2) _.
+   apply (mem_nth_simple _ _ (j-1)) => //.
+  cut -> : s =  (A1, B1, X, r1); 
+   first by apply Start_inj; apply Some_inj; rewrite heq.
+  by rewrite /psid_sent /=.
+
+  generalize H4; rewrite -hj nth_cons0 => heq.
+  generalize H3; rewrite nth_consN // => heq'.
+  cut:= H0 (A1, B1, X, r1) _.
+   apply (mem_nth_simple _ _ (i-1)) => //.
+  cut -> : s =  (A2, B2, X, r2);  
+    first by apply Start_inj; apply Some_inj; rewrite heq.
+  by rewrite /psid_sent /=.
+
+  generalize H3; rewrite nth_consN // => heq.
+  generalize H4; rewrite nth_consN // => heq'.
+  by cut := H X A1 A2 B1 B2 r1 r2 (i-1) (j-1) _ _ _ _; smt.
+qed.
+
+lemma no_accept_coll_pres : 
 forall e evs, 
  (forall s, e <> Accept s) =>
  no_accept_coll evs =>
@@ -1196,6 +1254,38 @@ proof.
  by generalize H4; rewrite length_cons; smt.
  by rewrite -H5 nth_consN  //.
  by rewrite -H6 nth_consN  //.
+save.
+
+lemma no_accept_coll_pres_ev : 
+forall s evs, 
+ no_accept_coll evs =>
+ (forall s', mem (Accept s') evs => sid_sent s <> sid_sent s') => 
+ no_accept_coll (Accept s :: evs).
+proof.
+ intros => s evs; rewrite /no_accept_coll; progress.
+ case (0 = i); case (0 = j) => // hj hi.
+ 
+  generalize H5; rewrite -hi nth_cons0 => heq.
+  generalize H6; rewrite nth_consN // => heq'.
+  cut:= H0 (A2, B2, X, Y2, r2) _. 
+   apply (mem_nth_simple _ _ (j-1)) => //.
+  cut -> : s =  (A1, B1, X, Y1, r1); 
+   first by apply Accept_inj; apply Some_inj; rewrite heq.
+  by rewrite /sid_sent /=.
+
+  generalize H5; rewrite nth_consN // => heq'.
+  generalize H6; rewrite -hj nth_cons0 => heq.
+  cut:= H0 (A1, B1, X, Y1, r1) _.
+   apply (mem_nth_simple _ _ (i-1)) => //.
+  cut -> : s =  (A2, B2, X, Y2, r2);  
+    first by apply Accept_inj; apply Some_inj; rewrite heq.
+  by rewrite /sid_sent /=.
+
+  generalize H5; rewrite nth_consN // => heq.
+  generalize H6; rewrite nth_consN // => heq'.
+  cut := H X A1 A2 B1 B2 Y1 Y2 r1 r2 (i-1) (j-1) _ _ _ _; last 3 by smt.
+   by generalize H1 H2; rewrite length_cons; smt. 
+   by generalize H3 H4; rewrite length_cons; smt.
 save.
 
 lemma n_exp_recvd_coll :
@@ -1309,12 +1399,14 @@ valid_accepts evs =>
 (forall s, e <> Accept s) => 
 valid_accepts (e::evs).
 proof.
- intros => e evs; rewrite /valid_accepts => htl hnotacc s i hith hrole.
+ intros => e evs; rewrite /valid_accepts => htl hnotacc s i hbnds hith hrole.
  case (0 = i) => hZ.
    generalize hZ hith => <-; rewrite nth_cons0 => heq.
    by cut h:= hnotacc s; generalize h; rewrite -(proj_some (Accept s)) -heq proj_some. 
    
-   elim (htl s (i-1) _ _) => //;first by rewrite -hith nth_consN //.
+   elim (htl s (i-1) _ _ _) => //.
+    by generalize hbnds; rewrite length_cons; smt.
+    by rewrite -hith nth_consN //.
    intros => j [hlt][hll] hjth.
    exists (j + 1); do split => //.
    smt.
@@ -1333,7 +1425,7 @@ valid_accepts evs =>
 mem (Start (psid_of_sid s)) evs =>
 valid_accepts (Accept s::evs).
 proof.
-  intros => evs s; rewrite /valid_accepts => htl hmem s' i hith hrole.
+  intros => evs s; rewrite /valid_accepts => htl hmem s' i hbnds hith hrole.
   case (0 = i) => hZ.
 
    generalize hZ hith => <-; rewrite nth_cons0 => heq.
@@ -1345,7 +1437,9 @@ proof.
     by rewrite length_cons; smt.
     by rewrite -heq' -hjth nth_consN; smt.
 
-   elim (htl s' (i-1) _ _) => //;first by rewrite -hith nth_consN //.
+   elim (htl s' (i-1) _ _ _) => //.
+   by generalize hbnds; rewrite length_cons; smt.
+   by rewrite -hith nth_consN //.
    intros => j [hlt][hll] hjth.
    exists (j + 1); do split => //.
      by smt.
@@ -1358,15 +1452,39 @@ proof.
      smt.
 save.
 
+
+lemma valid_accept_pres_ev2 : 
+forall evs s, 
+valid_accepts evs =>
+sid_role s = resp =>
+valid_accepts (Accept s::evs).
+proof.
+ intros => evs s hvalid hrole.
+ rewrite /valid_accepts => s' i.
+ case (0 = i).
+  
+  intros => <- hbnds; rewrite nth_cons0 => heq.
+  generalize hrole.
+  cut ->: s = s' by (apply Accept_inj; apply Some_inj => //); smt.
+  
+  intros => hneq; rewrite length_cons nth_consN // => h1 h2 h3.
+  elim (hvalid s' (i-1) _ _ _) => //.
+   by smt.
+   intros => j [hlt][hbnds'] hnth.
+   exists (j+1); progress => //; rewrite ?nth_consN; smt.
+save.     
+   
+  
 pred inv_started evs (mStarted : (Sidx, Sdata2) map)
                      (mEexp : (Sidx, Eexp) map)  =
 forall ps, 
-List.mem (Start ps) evs =>
-exists i,
+List.mem (Start ps) evs <=>
+(exists i,
 in_dom i mStarted /\
 in_dom i mEexp /\
 let (A, B, r) = proj (mStarted.[i]) in
-ps = (A, B, gen_epk (proj mEexp.[i]), r).
+ps = (A, B, gen_epk (proj mEexp.[i]), r) /\
+r = init).
 
 lemma inv_started_pres :
 forall evs e m1 m2,
@@ -1374,22 +1492,182 @@ inv_started evs m1 m2 =>
 (forall s, e <> Start s) =>
 inv_started (e::evs) m1 m2.
 proof.
- intros => evs e m1 m2; rewrite /inv_started => htl hnstrt ps; 
-  rewrite mem_cons => [heq | hmem].
-  by cut:= hnstrt ps; smt. 
-  by apply (htl ps _); smt.
-save.
+ intros => evs e m1 m2; rewrite /inv_started => htl hnstsrt ps; 
+  rewrite mem_cons; split.
+   intros => [|] h.
+    by cut:= hnstsrt ps; smt. 
+    by cut [h1 hcl]:= htl ps => {hcl};apply h1.
  
-(* pred inv_accepted evs (mCompleted : (Sidx, Sdata) map) *)
-(*                      (mEexp : (Sidx, Eexp) map)  = *)
-(* forall ps,  *)
-(* List.mem (Accept ps) evs => *)
-(* exists i, *)
-(* in_dom i mCompleted /\ *)
-(* in_dom i mEexp /\ *)
-(* let (A, B, X, Y, r) = proj (mCompleted.[i]) in *)
-(* ps = (A, B, X, Y, r). *)
+   intros => [i][hdom1][hdom2] heq.
+   cut [h1 hcl]:= htl ps => {h1}; right; apply hcl.
+   exists i; progress => //.
+   by generalize H heq => -> /=.
+   by generalize H heq => -> /=.
+save.
 
+(*  intros => evs e m1 m2; rewrite /inv_started => htl hnstsrt ps;  *)
+(*   rewrite mem_cons. *)
+(*    intros => [|] h. *)
+(*     by cut:= hnstsrt ps; smt.  *)
+(*     by cut h1:= htl ps;apply h1. *)
+(* save. *) 
+
+lemma inv_started_pres_ev :
+forall evs A0 B m1 m2 i ,
+inv_started evs m1 m2 =>
+in_dom i m2 =>
+! in_dom i m1 =>
+inv_started (Start (A0,B, gen_epk (proj m2.[i]), init)::evs) m1.[i <- (A0,B,init)] m2.
+proof.
+  intros => evs A0 B m1 m2 i; rewrite /inv_started => hinv hindom hnindom ps;
+   rewrite mem_cons; split.
+   intros => [heq|hmem].
+   cut: ps = (A0, B, gen_epk (proj m2.[i]), init); first by apply Start_inj.
+   intros => {heq} heq.
+   exists i; progress => //; last 4 by generalize H; rewrite get_setE proj_some.
+    by rewrite in_dom_setE.
+
+   elim (hinv ps) => h1 h2.
+   elim (h1 _) => //= i' [hindom2][hindom3 heq].
+   cut hneq: i <> i'.
+    by apply not_def => heq'; generalize heq' hindom2 hnindom => ->.
+   exists i'; progress => //.
+    by rewrite in_dom_set; smt.
+    by generalize H heq; rewrite get_setNE // => -> /=.
+    by generalize H heq; rewrite get_setNE // => -> /=.
+   intros => [i'][hdom2][hdom3] heq.
+   cut [[hl1 hl2]|hr]: ((i <> i' /\ in_dom i' m1) \/ i' = i).
+    case (i' = i) => // h; generalize hdom2; rewrite in_dom_setNE => //; smt.
+   right; cut:= hinv ps => [[hl']] hr'; apply hr'; exists i'; do !split => //.
+   by generalize heq; rewrite get_setNE //;elim /tuple3_ind (proj m1.[i']).
+   by left; generalize heq; rewrite hr get_setE proj_some => /= ->.
+save.
+
+(*
+lemma inv_started_pres_ev2 :
+forall evs A0 B m1 m2 i ,
+inv_started evs m1 m2 =>
+in_dom i m2 =>
+! in_dom i m1 =>
+inv_started (Start (A0,B, gen_epk (proj m2.[i]), resp)::evs) m1.[i <- (A0,B,resp)] m2.
+proof.
+  intros => evs A0 B m1 m2 i; rewrite /inv_started => hinv hindom hnindom ps;
+   rewrite mem_cons; split.
+   intros => [heq|hmem].
+*)   
+
+
+pred inv_accepted evs (mStarted : (Sidx, Sdata2) map) 
+                      (mEexp : (Sidx, Eexp) map)
+                      (mCompleted : (Sidx, Epk) map)  =
+forall (ps : Sid),
+List.mem (Accept ps) evs <=>
+(exists (i : Sidx),
+in_dom i mStarted /\
+in_dom i mCompleted /\
+in_dom i mEexp /\
+ps = compute_sid mStarted mEexp mCompleted i).
+
+lemma inv_accepted_pres :
+forall evs e m1 m2 m3,
+inv_accepted evs m1 m2 m3 =>
+(forall s, e <> Accept s) =>
+inv_accepted (e::evs) m1 m2 m3.
+proof.
+ intros => evs e m1 m2 m3; rewrite /inv_accepted => htl hnstsrt ps.
+  rewrite mem_cons; split.
+   intros => [|] h.
+    by cut:= hnstsrt ps; smt. 
+    by cut [h1 hcl]:= htl ps => {hcl};apply h1.
+ 
+   intros => [i][hdom1][hdom2][hdom3] heq.
+   cut [h1 hcl]:= htl ps => {h1}; right; apply hcl.
+   exists i; progress => //.
+save.
+
+
+lemma inv_accepted_pres_ev2 :
+forall evs e m1 m2 m3 i v,
+inv_accepted evs m1 m2 m3 =>
+!in_dom i m1 =>
+!in_dom i m3 =>
+(forall s, e <> Accept s) =>
+inv_accepted (e::evs) m1.[i <- v] m2 m3.
+proof.
+ intros => evs e m1 m2 m3 i v; rewrite /inv_accepted => htl hnindom hnindom' hnstsrt ps.
+  rewrite mem_cons; split.
+   intros => [|] h.
+    by cut:= hnstsrt ps; smt. 
+    cut [h1 hcl]:= htl ps => {hcl}.
+    cut := h1 _ => //.
+    intros => [i'][hindom1][hindom2][hindom3] heq.
+    cut hneq: i <> i'.
+    by apply not_def => heq'; generalize heq' hnindom hindom1 => ->.
+    exists i'; do !split => //.
+     by rewrite in_dom_set; left.
+     by rewrite /compute_sid get_setNE //.
+ 
+  intros => [i'][hdom1][hdom2][hdom3] heq.
+   cut [h1 hcl]:= htl ps => {h1}; right; apply hcl.
+   cut [[hl1 hl2]|hr]: ((i <> i' /\ in_dom i' m1) \/ i' = i).
+    generalize hdom1; rewrite in_dom_set => [hdom'|heq']; smt.
+   exists i'; progress => //.
+   by rewrite heq /compute_sid get_setNE //.
+   by generalize hr hnindom' hdom2 => ->; smt.
+save.
+
+lemma inv_accepted_pres_ev1 :
+forall evs m1 m2 m3 i Y,
+inv_accepted evs m1 m2 m3 =>
+in_dom i m1 =>
+in_dom i m2 =>
+! in_dom i m3 =>
+inv_accepted (Accept (compute_sid m1 m2 m3.[i <- Y] i)::evs) m1 m2 
+    m3.[i <- Y].
+proof.
+ intros => evs m1 m2 m3 i Y;
+ rewrite /inv_accepted => htl hindom1 hindom2 hnindom ps;
+ rewrite mem_cons; split.
+  intros => [|] heq.
+  rewrite (_ : ps = compute_sid m1 m2 m3.[i <- Y] i); first by apply Accept_inj.
+  exists i; do !split => //.
+   by rewrite in_dom_setE.
+  cut [h1 h2] := htl ps.
+  elim (h1 _) => //.
+  intros => {h1}{h2} i' [hdom1] [hdom2] [hdom3] heq'.
+   exists i'; do !split => //.
+   by rewrite in_dom_set; smt.
+   rewrite heq' /compute_sid /=.
+   case (i = i') => heq''.
+    by generalize heq'' hnindom hdom2 => ->; smt.
+    by rewrite get_setNE //.
+  
+  intros => [i'][hdom1][hdom2][hdom3] ->.
+   case (i' = i) => heq''.
+   by rewrite heq''; left.
+   right.
+   cut [h1 h2] := htl (compute_sid m1 m2 m3.[i <- Y] i').
+   apply h2 => // {h1}{h2}.
+   exists i'; progress => //.
+   generalize hdom2; rewrite in_dom_setNE //.
+   by rewrite /compute_sid get_setNE; smt.
+save.
+
+axiom gen_epk_inj : forall e1 e2,
+gen_epk e1 = gen_epk e2 =>
+e1 = e2.
+
+
+lemma proj_inj_some : 
+forall (x y : 'a option),
+x <> None => 
+y <> None =>
+proj x = proj y =>
+x = y.
+proof.
+ intros => x y;elim /option_case_eq x => //;elim /option_case_eq y => //.
+ by intros=> [x'] -> [y'] ->; rewrite !proj_some.
+save.
 
 
 local equiv Eq_AKE_EexpRev_AKE_Enforcement :
@@ -1414,25 +1692,23 @@ proof.
   AKE_NoColl.mEexp{2} = AKE_Enforcement.mEexp{1} /\
   AKE_NoColl.mStarted{2} = AKE_Enforcement.mStarted{1} /\
   AKE_NoColl.mCompleted{2} = AKE_Enforcement.mCompleted{1} /\
-  AKE_NoColl.evs{2} = []).
+  AKE_NoColl.evs{2} = [] /\ 
+  (forall (s : Sidx), in_dom s AKE_NoColl.mEexp{2})).
  inline AKE_Enforcement(A).init AKE_NoColl(A).init.
- eqobs_in  (true)
-  (AKE_NoColl.evs{2} = []) :
-  (={b,pks,t_idx,key,keyo,b',i,pks} /\
-  AKE_NoColl.evs{2} = AKE_Enforcement.evs{1} /\
-  AKE_NoColl.test{2} = AKE_Enforcement.test{1} /\
-  AKE_NoColl.cSession{2} = AKE_Enforcement.cSession{1} /\
-  AKE_NoColl.cH2{2} = AKE_Enforcement.cH2{1} /\
-  AKE_NoColl.mH2{2} = AKE_Enforcement.mH2{1} /\
-  AKE_NoColl.sH2{2} = AKE_Enforcement.sH2{1} /\
-  AKE_NoColl.mSk{2} = AKE_Enforcement.mSk{1} /\
-  AKE_NoColl.mEexp{2} = AKE_Enforcement.mEexp{1} /\
-  AKE_NoColl.mStarted{2} = AKE_Enforcement.mStarted{1} /\
-  AKE_NoColl.mCompleted{2} = AKE_Enforcement.mCompleted{1}).
-  by wp.
+ while
+(  ={sidxs} /\
+AKE_Enforcement.mEexp{1} = AKE_NoColl.mEexp{2}  /\
+  (forall (s : Sidx), !mem s sidxs{2} => in_dom s AKE_NoColl.mEexp{2})). 
+wp; rnd; wp; skip; progress; try smt.
+case  (s = (pick sidxs{2})) => h.
+ by rewrite h;apply in_dom_setE.
+generalize H5; rewrite mem_rm !not_and => [hl|]; last by smt.
+ by cut:= H s _ => //;rewrite in_dom_setNE //.
+while (={pks} /\ AKE_Enforcement.mSk{1} = AKE_NoColl.mSk{2}).
+by wp; rnd.
+by wp; skip; progress => //; smt.
   if=> //.
-   seq 2 2:(
- ={b,pks,t_idx,key,keyo,b',i,pks} /\
+   seq 2 2:(={b,pks,t_idx,key,keyo,b',i,pks} /\
   AKE_NoColl.evs{2} = AKE_Enforcement.evs{1} /\
   AKE_NoColl.test{2} = AKE_Enforcement.test{1} /\
   AKE_NoColl.cSession{2} = AKE_Enforcement.cSession{1} /\
@@ -1443,7 +1719,8 @@ proof.
   AKE_NoColl.mEexp{2} = AKE_Enforcement.mEexp{1} /\
   AKE_NoColl.mStarted{2} = AKE_Enforcement.mStarted{1} /\
   AKE_NoColl.mCompleted{2} = AKE_Enforcement.mCompleted{1} /\
-  AKE_NoColl.evs{2} = [] /\
+  AKE_NoColl.evs{2} = [] /\ 
+  (forall (s : Sidx), in_dom s AKE_NoColl.mEexp{2}) /\
   ! collision_eexp_eexp_op AKE_NoColl.mEexp{2}).
 rnd.
 call (_ :
@@ -1465,32 +1742,205 @@ call (_ :
   no_accept_coll(AKE_NoColl.evs{2}) /\
   valid_accepts (AKE_NoColl.evs{2}) /\
   inv_started AKE_NoColl.evs{2} AKE_NoColl.mStarted{2} AKE_NoColl.mEexp{2}  /\
-! collision_eexp_eexp_op AKE_NoColl.mEexp{2}).
-   fun; wp; skip; progress; try smt.
+  inv_accepted AKE_NoColl.evs{2} AKE_NoColl.mStarted{2} 
+             AKE_NoColl.mEexp{2} AKE_NoColl.mCompleted{2} /\
+  (forall (s : Sidx), in_dom s AKE_NoColl.mEexp{2}) /\
+! collision_eexp_eexp_op AKE_NoColl.mEexp{2} /\ 
+  (forall x, in_dom x AKE_NoColl.mCompleted{2} => in_dom x AKE_NoColl.mStarted{2}) /\
+  (forall x, in_dom x AKE_NoColl.mStarted{2} => !in_dom x AKE_NoColl.mCompleted{2} =>
+     sd2_role (proj (AKE_NoColl.mStarted{2}.[x])) = init)).
+   fun; wp; skip; progress => //.
     by apply n_exp_recvd_coll => //; smt.
     by apply accept_evs_eexps_pres => //; smt.
     by apply start_evs_eexps_pres => //; smt.
-    by apply no_start_coll_mon => //; smt. 
-    by apply no_accept_coll_mon => //; smt. 
+    by apply no_start_coll_pres => //; smt. 
+    by apply no_accept_coll_pres => //; smt. 
     by apply valid_accept_pres => //; smt. 
     by apply inv_started_pres => //; smt.  
+    by apply inv_accepted_pres => //; smt.  
+    by smt.
+    by smt.
+    by apply H10.
     by apply n_exp_recvd_coll => //; smt.
+    by apply accept_evs_eexps_pres => //; smt.
     by apply start_evs_eexps_pres => //; smt.
-    by apply no_start_coll_mon => //; smt. 
-    by apply no_accept_coll_mon => //; smt. 
+    by apply no_start_coll_pres => //; smt. 
+    by apply no_accept_coll_pres => //; smt. 
     by apply valid_accept_pres => //; smt.
-    by apply inv_started_pres => //; smt.  
+    by apply inv_started_pres => //; smt.
+    by apply inv_accepted_pres => //; smt.  
+    by smt.
+    by smt.
+    by apply H10.
+    by smt.
+    by smt.
+    by apply H10.
 
-   by fun; sp; if => //; 
+    fun; sp; (if; first smt);
     inline AKE_Enforcement(A).O.h2  AKE_NoColl(A).O.h2;
-    wp; rnd; wp; skip; progress => //.
+    wp; try rnd; wp; skip; [smt | 
+    intros => &1 &2 H1; do!split; smt].
 
-   fun; sp; if => //; wp; skip; progress; try smt.    
-a    by apply accept_evs_eexps_pres => //; smt.
-apply start_evs_eexps_pres_ev => //.
-exists i{2}; progress.
 
-   fun; sp; if => //.
+   fun; sp; (if; first by smt); wp; skip; progress; last 12 by (try apply H10; smt).
+    smt. 
+    by apply accept_evs_eexps_pres => //; smt.
+    by apply start_evs_eexps_pres_ev => //;exists i{2}; progress; apply H7.
+
+    apply no_start_coll_pres_ev => //.
+    intros s' hmem; apply not_def => h.
+    elim (H5 s') => [hl hr] {hr}.
+    elim (hl _) => // j [hstarted][hdom]heq {hl}.
+    cut hneq:  j <> i{2}; first by apply not_def => heq'; 
+      generalize H12 hstarted; rewrite heq'.
+    generalize heq; 
+    elim /tuple3_ind (proj AKE_Enforcement.mStarted{1}.[j]) => A B r /= heq1.
+    apply not_def => [[heq2 hrole']].
+    generalize h; rewrite heq2 /psid_sent /=; apply not_def => {heq2}{heq1} heq1.
+    cut: collision_eexp_eexp_op AKE_Enforcement.mEexp{1}; last by smt.
+    rewrite collision_eexp_eexp_op_def /collision_eexp_eexp.
+    exists i{2}; exists j; do !split => //.
+    apply H7.
+    cut: (proj AKE_Enforcement.mEexp{1}.[i{2}]) =
+         (proj AKE_Enforcement.mEexp{1}.[j]); first by apply gen_epk_inj.
+    cut h':= H7 i{2} => h''.
+    apply proj_inj_some.
+     by generalize h'; rewrite /in_dom.
+     by generalize hdom; rewrite /in_dom.
+     by rewrite h''.
+     by smt.
+
+   by apply no_accept_coll_pres => //; smt. 
+   by apply valid_accept_pres => //; smt.
+   by apply inv_started_pres_ev => //; apply H7 => //.
+   apply inv_accepted_pres_ev2 => //.
+    by apply not_def => h; cut: in_dom i{2} AKE_Enforcement.mStarted{1} by apply H9.
+    by smt.
+
+   by apply H7 => //.
+   by smt.
+   by rewrite in_dom_set; left; apply H9.
+   generalize H15; rewrite in_dom_set => [|] hor; last by rewrite hor  get_setE; smt.
+   rewrite get_setNE.
+    by apply not_def => heq; generalize heq hor H13 => ->.
+    by apply H10.
+   
+   fun; sp; if => //; wp; skip; progress => //.
+   by smt.
+   apply accept_evs_eexps_pres_ev => //.
+   exists i{2}; do !split => //.
+   apply H7 => //.
+   rewrite  /sid_sent /compute_sid /= get_setE proj_some /=.
+   by elim /tuple3_ind  (proj AKE_Enforcement.mStarted{1}.[i{2}]) => /=.
+   by apply start_evs_eexps_pres => //; smt.
+   by apply no_start_coll_pres => //; smt. 
+
+   apply no_accept_coll_pres_ev => //.
+   intros => s hmem.
+   rewrite /compute_sid get_setE.
+   elim /tuple3_ind (proj AKE_Enforcement.mStarted{1}.[i{2}]) => /=;
+    rewrite {1}/sid_sent /= => A B r heq;apply not_def => h.
+   cut [h1 h2]:= H6 s => {h2}.
+   elim (h1 _) => //. 
+   intros => {h1} j [hjstrt][hjcomp][heexp] heq'.
+   generalize  heq' h => ->; rewrite /sid_sent /compute_sid /=.
+   elim /tuple3_ind (proj AKE_Enforcement.mStarted{1}.[j]) => /= A' B' r' heq'.
+   case (i{2} = j) => hor.
+     by generalize hjstrt H10; rewrite hor; smt.
+
+     apply not_def => heq''; 
+     cut: collision_eexp_eexp_op AKE_Enforcement.mEexp{1}; last by smt.
+     rewrite collision_eexp_eexp_op_def /collision_eexp_eexp.
+     exists i{2}; exists j; do !split => //.
+      by apply H7.
+      apply proj_inj_some.
+       by cut:= H7 i{2}; rewrite /in_dom.
+       by cut:= H7 j; rewrite /in_dom.
+       by apply gen_epk_inj.
+       
+   apply valid_accept_pres_ev => //.   
+   rewrite /psid_of_sid/compute_sid get_setE.
+   elim /tuple3_ind (proj AKE_Enforcement.mStarted{1}.[i{2}]) => /= A' B' r' heq.
+   cut [h1 h2]:=
+    H5 (A', B', gen_epk (proj AKE_Enforcement.mEexp{1}.[i{2}]), r') => {h1}.
+   apply h2.
+   exists i{2}; rewrite heq; progress => //.
+    by apply H7.
+    by cut:= H10 i{2} _ _ => //; rewrite heq /sd2_role /=.
+
+  by apply inv_started_pres => //; smt.   
+
+  apply inv_accepted_pres_ev1 => //.
+  by apply H7.
+  by apply H7.
+  case (x = i{2}).
+   by intros ->.
+   by intros neq; generalize H14; rewrite in_dom_setNE // => h; apply H9.
+   case (x = i{2}).
+    by intros => ->; cut:= H10 i{2} _ _.
+    by intros => hneq; apply H10 => //; generalize H15; rewrite in_dom_set; smt.
+
+  by apply H7.
+  by apply H9.
+  by apply H10.
+
+   fun; sp; if => //; wp; skip; progress => //.
+   by smt.
+ 
+   apply accept_evs_eexps_pres_ev => //.
+    by rewrite /sid_sent /=; exists i{2}; split; smt.
+   
+   by apply start_evs_eexps_pres => //; smt.
+   by apply no_start_coll_pres => //; smt.
+  
+   apply no_accept_coll_pres_ev => //.
+   intros => s hmem; rewrite {1}/sid_sent /=.
+   apply not_def => heq.
+   cut [h1 h2]:= H6 s => {h2}.
+   elim (h1 _) => //. 
+   intros => {h1} j [hjstrt][hjcomp][heexp] heq'.
+   generalize  heq' heq => ->; rewrite /sid_sent /compute_sid /=.
+   elim /tuple3_ind (proj AKE_Enforcement.mStarted{1}.[j]) => /= A' B' r' heq'.
+   case (i{2} = j) => hor.
+     by generalize hjstrt H10; rewrite hor; smt.
+
+     apply not_def => heq''; 
+     cut: collision_eexp_eexp_op AKE_Enforcement.mEexp{1}; last by smt.
+     rewrite collision_eexp_eexp_op_def /collision_eexp_eexp.
+     exists i{2}; exists j; do !split => //.
+      by apply H7.
+      apply proj_inj_some.
+       by cut:= H7 i{2}; rewrite /in_dom.
+       by cut:= H7 j; rewrite /in_dom.
+       by apply gen_epk_inj.
+   
+   by apply valid_accept_pres_ev2.
+  rewrite /inv_started.
+  intros => ps; rewrite mem_cons; split.
+   intros => [|] hor.
+   smt.
+   cut [h1 h2 ]:= H5 ps => {h2}.
+    elim (h1 _) => // j [hdom1'][hdom2'] heq.
+   case (j = i{2}) => heq'.
+     by generalize heq' H13 hdom1' => ->; smt.
+     exists j; progress => //.
+     rewrite in_dom_setNE //.
+     generalize H16 heq; (rewrite get_setNE; first by smt) => -> //.
+     generalize H16 heq; (rewrite get_setNE; first by smt) => -> //.
+
+   intros => [j][hdom1][hdom2] heq.
+   case (j = i{2}) => hor.
+    generalize hor heq => ->; rewrite get_setE proj_some /=; smt.
+   right.
+   cut [h1 h2] := H5 ps; apply h2.
+   exists j; progress.
+    by generalize hdom1; rewrite in_dom_setNE.
+    by apply H7.
+    by generalize heq; (rewrite get_setNE; first smt); rewrite H16 /=.
+    by generalize heq; (rewrite get_setNE; first smt); rewrite H16 /=.
+
+   apply inv_accepted_pres_ev2.
+   
 
 call 
 (_ :
