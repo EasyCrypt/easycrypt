@@ -235,6 +235,7 @@ let t_eager_while h g =
     f_forall [mleft,GTmem (snd eC.es_ml); mright, GTmem (snd eC.es_mr)]
       (f_imp eqI (f_eq e1 e2)) in
   let b = f_equivS_r {eC with
+    es_pr = f_and_simpl eqI e1;
     es_sl = stmt (s.s_node@c.s_node); 
     es_sr = stmt (c'.s_node@s'.s_node); 
     es_po = eqI; } in
