@@ -212,7 +212,7 @@ let t_eager_if g =
 
 class rn_eager_while =
 object
-  inherit xrule "[eager] seq"
+  inherit xrule "[eager] while"
 end
 let rn_eager_while = RN_xtd (new rn_eager_while :> xrule)
   
