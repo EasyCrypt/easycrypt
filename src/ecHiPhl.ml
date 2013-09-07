@@ -47,5 +47,6 @@ let process_phl loc ptac g =
     | Ptrans_stmt info          -> EcPhlTrans.process_equiv_trans info
     | Peager_seq (info,pos,eqR) -> EcEager.process_seq info pos eqR
     | Peager_if                 -> EcEager.t_eager_if
+    | Peager_while info         -> EcEager.process_while info
   in
     set_loc loc t g

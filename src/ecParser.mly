@@ -1809,6 +1809,8 @@ eager_tac:
     { Peager_seq (i,(n1,n2),p) }
 | IF 
     { Peager_if }
+| WHILE i=eager_info 
+    { Peager_while i }
 ;
 (* END EAGER *)
 

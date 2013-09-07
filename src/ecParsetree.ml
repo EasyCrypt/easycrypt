@@ -397,6 +397,7 @@ type phltactic =
   (* for eager *)
   | Peager_seq of eager_info * (int * int) * pformula 
   | Peager_if  
+  | Peager_while of eager_info
 
 and pinline_arg =
   [ `ByName    of tac_side * (pgamepath list * int list option)
