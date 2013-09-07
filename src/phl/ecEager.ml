@@ -114,10 +114,12 @@ let process_seq info (i,j) eqR g =
 (* eager if: 
    (a) P => e{1} = e{2}
    (b) S;c1 ~ S';c1' : P /\ e{1} ==> Q
-   (c) S;c2 ~ S';c1' : P /\ !e{1} ==> Q
+   (c) S;c2 ~ S';c2' : P /\ !e{1} ==> Q
    (d) forall b &2, S  : P /\ e = b ==> e = b
 --------------------------------------------------------------------------
    S;if e then c1 else c2 ~ if e' then c1' else c2';S' : P ==> Q
+
+REMARK : This rule is implemented in term of other tactic ....
 *)
 
 let t_eager_if g =
@@ -132,6 +134,7 @@ let t_eager_if g =
     match LDecl.fresh_ids hyps ["&m";"&m";"H";"H";"H";"H";"H"] with
     | [m1;m2;a;h1;h2;h3;h4] -> m1,m2,a,h1,h2,h3,h4
     | _ -> assert false in
+  (* FIXME : use generalize_mem instead *)
   let aT = 
     f_forall [mleft,GTmem (snd es.es_ml); mright, GTmem (snd es.es_mr)]
       (f_imp es.es_pr eq) in
@@ -159,7 +162,7 @@ let t_eager_if g =
   let tac1 = 
     t_seq (t_intros_i [m2])
       (t_seq_subgoal 
-         (EcPhl.t_hoareS_conseq_nm (f_and p eq2) eq2)
+         (EcPhlConseq.t_hoareS_conseq_nm (f_and p eq2) eq2)
          [ t_lseq [t_intros_i [m1;h2];t_elim_hyp h2;t_intros_i [h3;h4];tac0];
            t_lseq [t_intros_i [m1;h2];t_elim_hyp h2;
                    t_intros_i [h3;h4]; t_hyp h3];
@@ -170,7 +173,7 @@ let t_eager_if g =
     [t_id None; (* a *)
      t_seq (t_intros_i [a])
        (t_seq_subgoal 
-          (EcPhl.t_equivS_conseq (f_and es.es_pr eq) es.es_po)
+          (EcPhlConseq.t_equivS_conseq (f_and es.es_pr eq) es.es_po)
           [t_seq (t_intros_i [m1;m2;h1])
               (t_seq_subgoal t_split 
                  [t_hyp h1;
@@ -183,15 +186,74 @@ let t_eager_if g =
              (t_seq_subgoal (t_cut bT)
                 [ t_id None;
                   t_seq (t_intros_i [a])
-                    (t_seq_subgoal (EcPhl.t_equiv_cond (Some false))
-                       [t_seq_subgoal (EcPhl.t_equiv_rcond true true  at) 
+                    (t_seq_subgoal (EcPhlCond.t_equiv_cond (Some false))
+                       [t_seq_subgoal 
+                           (EcPhlRCond.Low.t_equiv_rcond true true  at) 
                            [tac1; t_id None];
-                        t_seq_subgoal (EcPhl.t_equiv_rcond true false at)
+                        t_seq_subgoal 
+                          (EcPhlRCond.Low.t_equiv_rcond true false at)
                           [tac1; t_id None]
                        ]) 
                 ])
           ])]
     g
+
+(* eager while:
+   (a) ={I} => e{1} = e{2}
+   (b) S;c1 ~ S';c1' : ={I} /\ e{1} ==> ={I}
+   (c)  c' ~ c'    : ={I.2} ==> ={I.2}
+   (d) forall b &2, S  : e = b ==> e = b
+   (e) ={I} => ={Is}
+   (f) compat S S' R Xs 
+   (h) S ~ S' : ={Is} ==> ={Xs}
+   --------------------------------------------------
+   S;while e do c ~ while e' do c';S' : ={I} ==> ={I} /\ !e{1}
+*)
+
+class rn_eager_while =
+object
+  inherit xrule "[eager] seq"
+end
+let rn_eager_while = RN_xtd (new rn_eager_while :> xrule)
+  
+let t_eager_while h g = 
+  let env, hyps, concl = get_goal_e g in
+  (* h is a proof of (h) *)
+  let tH, (_, s, s', eqIs, eqXs) = get_hSS' hyps h in
+  let eC, wc, wc' = destr_eagerS s s' concl in
+  let (e,c),(e',c'),n1,n2 = EcCorePhl.s_first_whiles "eager while" wc wc' in
+  assert (n1.s_node = [] && n2.s_node = []);
+  let eqI = eC.es_pr in
+  let seqI = Mpv2.of_form env (fst eC.es_ml) (fst eC.es_mr) eqI in
+  let e1 = form_of_expr (fst eC.es_ml) e in
+  let e2 = form_of_expr (fst eC.es_mr) e' in
+  assert (f_equal eC.es_po (f_and eqI (f_not e1)));
+  (* check (e) *)assert (Mpv2.subset eqIs seqI); 
+  (* check (f) *)compat env (s_write env s) (s_write env s') seqI eqXs;
+  let to_form eq =  Mpv2.to_form (fst eC.es_ml) (fst eC.es_mr) eq f_true in
+  let a = 
+    f_forall [mleft,GTmem (snd eC.es_ml); mright, GTmem (snd eC.es_mr)]
+      (f_imp eqI (f_eq e1 e2)) in
+  let b = f_equivS_r {eC with
+    es_sl = stmt (s.s_node@c.s_node); 
+    es_sr = stmt (c'.s_node@s'.s_node); 
+    es_po = eqI; } in
+  let eqI2 = to_form (Mpv2.eq_fv2 seqI) in 
+  let c = f_equivS_r { eC with
+    es_ml = (fst eC.es_ml, snd eC.es_mr);
+    es_pr = eqI2;
+    es_sl = c';
+    es_sr = c';
+    es_po = eqI2 } in
+  t_on_first (t_hyp h) (prove_goal_by [tH;a;b;c] rn_eager_while g)
+  
+let process_while info  g = 
+  let gs, h = process_info info g in
+  t_on_last (t_eager_while h) gs
+
+
+
+  
 
 
 
