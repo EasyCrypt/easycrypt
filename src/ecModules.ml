@@ -197,6 +197,8 @@ let i_assert e            = mk_instr (Sassert e)
 let stmt s = 
   Hstmt.hashcons { s_node = s; s_tag = -1; s_fv = EcIdent.Mid.empty}
 
+let s_seq s1 s2 = stmt (s1.s_node @ s2.s_node)
+
 let rstmt s = stmt (List.rev s)
 
 let s_split n s = List.take_n n s.s_node

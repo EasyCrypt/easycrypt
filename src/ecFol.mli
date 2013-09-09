@@ -57,7 +57,18 @@ and f_node =
   | FequivF of equivF (* $left,$right / $left,$right *)
   | FequivS of equivS (* $left,$right / $left,$right *)
 
-  | Fpr     of pr (* hr *)
+  | FeagerF of eagerF
+    
+  | Fpr of pr (* hr *)
+
+and eagerF = { 
+  eg_pr : form;
+  eg_sl : stmt;  (* No local program variables *)
+  eg_fl : EcPath.xpath;
+  eg_fr : EcPath.xpath;
+  eg_sr : stmt;  (* No local program variables *)
+  eg_po : form
+}
 
 and equivF = { 
   ef_pr : form;
@@ -176,6 +187,11 @@ val f_losslessF  : EcPath.xpath -> form
 val f_equivF   : form -> EcPath.xpath -> EcPath.xpath -> form -> form 
 val f_equivS   : memenv -> memenv -> form -> EcModules.stmt -> EcModules.stmt -> form -> form
 val f_equivS_r : equivS -> form
+
+(* soft-constructors - eager *)
+val f_eagerF   : form -> EcModules.stmt -> EcPath.xpath -> 
+                 EcPath.xpath -> EcModules.stmt -> form -> 
+                 form 
 
 (* soft-constructors - PR *)
 val f_pr : memory -> EcPath.xpath -> form list -> form -> form
@@ -331,6 +347,7 @@ val destr_exists1   : form -> EcIdent.t * gty * form
 val destr_exists    : form -> binding * form
 val destr_equivF    : form -> equivF
 val destr_equivS    : form -> equivS
+val destr_eagerF    : form -> eagerF
 val destr_hoareF    : form -> hoareF
 val destr_hoareS    : form -> hoareS
 val destr_bdHoareF  : form -> bdHoareF
@@ -353,6 +370,7 @@ val is_eq       : form -> bool
 val is_local    : form -> bool 
 val is_equivF   : form -> bool
 val is_equivS   : form -> bool
+val is_eagerF   : form -> bool
 val is_hoareF   : form -> bool
 val is_hoareS   : form -> bool
 val is_bdHoareF : form -> bool

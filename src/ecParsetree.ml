@@ -203,6 +203,7 @@ and pformula_r =
   | PFhoareS   of pformula * pfunction_body located * pformula
   | PFhoareF   of pformula * pgamepath * pformula
   | PFequivF   of pformula * (pgamepath * pgamepath) * pformula
+  | PFeagerF    of pformula * (pstmt * pgamepath * pgamepath * pstmt) * pformula
   | PFprob     of pgamepath * (pformula list) * pmemory * pformula
   | PFBDhoareS of pformula * pfunction_body located * pformula * phoarecmp * pformula
   | PFBDhoareF of pformula * pgamepath * pformula * phoarecmp * pformula
@@ -393,11 +394,13 @@ type phltactic =
   | Pbdeq 
   | Peqobs_in   of (pformula_o * pformula_o * pformula_o)
   | Ptrans_stmt of trans_info
+  | Psymmetry   
   | Psp        of (bool option)
   (* for eager *)
   | Peager_seq of eager_info * (int * int) * pformula 
   | Peager_if  
   | Peager_while of eager_info
+  | Peager_fun_def 
 
 and pinline_arg =
   [ `ByName    of tac_side * (pgamepath list * int list option)

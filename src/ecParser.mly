@@ -312,6 +312,7 @@
 %token WP
 %token EQOBSIN
 %token TRANSITIVITY
+%token SYMMETRY
 %token ZETA 
 %token EAGER
 
@@ -723,6 +724,9 @@ sform_u(P):
 
 | EQUIV LBRACKET eb=equiv_body(P) RBRACKET { eb }
 
+(* ADDED FOR EAGER *)
+| EAGER LBRACKET eb=eager_body(P) RBRACKET { eb }
+
 | HOARE LBRACKET
     s=loc(fun_def_body)
     COLON pre=form_r(P) LONGARROW post=form_r(P)
@@ -873,6 +877,11 @@ equiv_body(P):
   COLON pre=form_r(P) LONGARROW post=form_r(P)
 
     { PFequivF (pre, (mp1, mp2), post) }
+
+eager_body(P):
+| s1=stmt COMMA  mp1=loc(fident) TILD mp2=loc(fident) COMMA s2=stmt
+    COLON pre=form_r(P) LONGARROW post=form_r(P)
+    { PFeagerF (pre, (s1, mp1, mp2,s2), post) }
 
 pgtybinding1:
 | x=ptybinding1 { List.map (fun (xs,ty) -> xs, PGTY_Type ty) x }
@@ -1811,6 +1820,8 @@ eager_tac:
     { Peager_if }
 | WHILE i=eager_info 
     { Peager_while i }
+| FUN 
+    { Peager_fun_def }
 ;
 (* END EAGER *)
 
@@ -1929,6 +1940,9 @@ phltactic:
     { Peqobs_in info }
 | TRANSITIVITY tk=trans_kind h1=trans_hyp h2=trans_hyp
     { Ptrans_stmt (tk, fst h1, snd h1, fst h2, snd h2) }
+(* ADDED *)
+| SYMMETRY 
+    { Psymmetry }    
 
 | SP s=side?
    {Psp s}

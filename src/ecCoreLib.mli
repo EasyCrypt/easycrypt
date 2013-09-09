@@ -54,6 +54,7 @@ val p_int_le     : path
 val p_int_lt     : path
 val p_real_le    : path
 val p_real_lt    : path
+val p_real_ge    : path
 
 val p_int_opp    : path
 val p_int_prod   : path

@@ -71,6 +71,7 @@ eager_seq:
   c1;c2;S ~ S;c1';c2' : P ==> Q
 
 *)
+
 class rn_eager_seq =
 object
   inherit xrule "[eager] seq"
@@ -198,6 +199,8 @@ let t_eager_if g =
           ])]
     g
 
+let process_if = t_eager_if
+
 (* eager while:
    (a) ={I} => e{1} = e{2}
    (b) S;c1 ~ S';c1' : ={I} /\ e{1} ==> ={I}
@@ -251,6 +254,55 @@ let t_eager_while h g =
 let process_while info  g = 
   let gs, h = process_info info g in
   t_on_last (t_eager_while h) gs
+
+(* eager fun :
+  S and S' depend only of global (* This should be an invariant of the typing *)
+  S;f.body;result = f.res; ~ S';f'.body;result' = f'.res; : P ==> Q{res{1}<- result, res{2} <- result'}
+  -------------------------
+   S, f ~ f', S' : P ==> Q
+*)
+
+class rn_eager_fun =
+object
+  inherit xrule "[eager] fun"
+end
+let rn_eager_fun = RN_xtd (new rn_eager_fun :> xrule)
+
+let t_eager_fun_def g = 
+  let env, _hyps, concl = get_goal_e g in
+  let eg = destr_eagerF concl in
+  let fl, fr = 
+    NormMp.norm_xpath env eg.eg_fl,  NormMp.norm_xpath env eg.eg_fr in
+  EcPhlFun.check_concrete env fl; EcPhlFun.check_concrete env fr;
+  let memenvl,fdefl,memenvr,fdefr,env = Fun.equivS fl fr env in
+  let extend mem fdef = 
+    match fdef.f_ret with
+    | None -> f_tt, mem, fdef.f_body 
+    | Some e ->
+      let v = {v_name = "result"; v_type = e.e_ty } in
+      let mem, s = EcCorePhl.fresh_pv mem v in
+      let f = EcMemory.xpath mem in
+      let x = EcTypes.pv_loc f s in
+      f_pvar x e.e_ty (fst mem), mem,
+      s_seq fdef.f_body (stmt [i_asgn(LvVar(x,e.e_ty), e)]) in
+  let el,meml, sfl = extend memenvl fdefl in
+  let er,memr, sfr = extend memenvr fdefr in
+  let s = 
+    PVM.add env (pv_res fl) (fst meml) el 
+    (PVM.add env (pv_res fr) (fst memr) er PVM.empty) in 
+  let cond = f_equivS_r { 
+    es_ml = meml;
+    es_mr = memr;
+    es_sl = s_seq eg.eg_sl sfl;
+    es_sr = s_seq sfr eg.eg_sr;
+    es_pr = eg.eg_pr;
+    es_po = PVM.subst env s eg.eg_po;
+  } in
+  prove_goal_by [cond] rn_eager_fun g
+ 
+  
+let process_fun_def  = t_eager_fun_def
+  
 
 
 

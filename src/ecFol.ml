@@ -56,7 +56,18 @@ and f_node =
   | FequivF of equivF (* $left,$right / $left,$right *)
   | FequivS of equivS 
 
+  | FeagerF of eagerF
+    
   | Fpr of pr (* hr *)
+
+and eagerF = { 
+  eg_pr : form;
+  eg_sl : stmt;  (* No local program variables *)
+  eg_fl : EcPath.xpath;
+  eg_fr : EcPath.xpath;
+  eg_sr : stmt;  (* No local program variables *)
+  eg_po : form
+}
 
 and equivF = { 
   ef_pr : form;
@@ -210,6 +221,14 @@ let eqs_equal es1 es2 =
   && EcMemory.me_equal es1.es_ml es2.es_ml
   && EcMemory.me_equal es1.es_mr es2.es_mr 
 
+let egf_equal eg1 eg2 = 
+     f_equal eg1.eg_pr eg2.eg_pr
+  && f_equal eg1.eg_po eg2.eg_po
+  && EcModules.s_equal eg1.eg_sl eg2.eg_sl
+  && EcPath.x_equal eg1.eg_fl eg2.eg_fl 
+  && EcPath.x_equal eg1.eg_fr eg2.eg_fr
+  && EcModules.s_equal eg1.eg_sr eg2.eg_sr
+
 (* -------------------------------------------------------------------- *)
 let hf_hash hf =
   Why3.Hashcons.combine2
@@ -238,6 +257,12 @@ let es_hash es =
   Why3.Hashcons.combine3
     (f_hash es.es_pr) (f_hash es.es_po)
     (EcModules.s_hash es.es_sl) (EcModules.s_hash es.es_sr)
+
+let eg_hash eg = 
+  Why3.Hashcons.combine3
+    (f_hash eg.eg_pr) (f_hash eg.eg_po)
+    (Why3.Hashcons.combine (EcModules.s_hash eg.eg_sl) (EcPath.x_hash eg.eg_fl))
+    (Why3.Hashcons.combine (EcModules.s_hash eg.eg_sr) (EcPath.x_hash eg.eg_fr))
 
 (* -------------------------------------------------------------------- *)
 module Hsform = Why3.Hashcons.Make (struct
@@ -283,6 +308,8 @@ module Hsform = Why3.Hashcons.Make (struct
         
     | FequivF eqf1, FequivF eqf2 -> eqf_equal eqf1 eqf2
     | FequivS eqs1, FequivS eqs2 -> eqs_equal eqs1 eqs2
+
+    | FeagerF eg1, FeagerF eg2   -> egf_equal eg1 eg2
 
     | Fpr (m1, mp1, args1, ev1), Fpr (m2, mp2, args2, ev2) ->
            EcIdent.id_equal m1  m2
@@ -334,6 +361,8 @@ module Hsform = Why3.Hashcons.Make (struct
 
     | FequivF ef -> ef_hash ef
     | FequivS es -> es_hash es
+
+    | FeagerF eg  -> eg_hash eg
 
     | Fpr (m, mp, args, ev) ->
         let id =
@@ -400,6 +429,13 @@ module Hsform = Why3.Hashcons.Make (struct
         let fv = fv_diff fv (Sid.add ml (Sid.singleton mr)) in
         fv_union fv 
           (fv_union (EcModules.s_fv es.es_sl) (EcModules.s_fv es.es_sr))
+
+    | FeagerF eg ->
+        let fv = fv_union (f_fv eg.eg_pr) (f_fv eg.eg_po) in
+        let fv = fv_diff fv fv_mlr in
+        let fv = EcPath.x_fv (EcPath.x_fv fv eg.eg_fl) eg.eg_fr in
+        fv_union fv 
+          (fv_union (EcModules.s_fv eg.eg_sl) (EcModules.s_fv eg.eg_sr))
 
     | Fpr (m,mp,args,event) ->
         let fve = Mid.remove mhr (f_fv event) in
@@ -602,6 +638,13 @@ let f_equivF pre fl fr post =
     mk_form (FequivF ef) ty_bool
 
 (* -------------------------------------------------------------------- *)
+let f_eagerF pre sl fl fr sr post = 
+  let eg = { eg_pr = pre; eg_sl = sl;eg_fl = fl; 
+             eg_fr = fr; eg_sr = sr; eg_po = post; } in
+  mk_form (FeagerF eg) ty_bool
+
+
+(* -------------------------------------------------------------------- *)
 let f_pr m f args e = mk_form (Fpr (m, f, args, e)) ty_real
 
 (* -------------------------------------------------------------------- *)
@@ -782,6 +825,11 @@ let destr_equivF f =
   | FequivF es -> es 
   | _ -> destr_error "equivF"
 
+let destr_eagerF f = 
+  match f.f_node with
+  | FeagerF eg -> eg 
+  | _ -> destr_error "eagerF"
+
 let destr_hoareS f = 
   match f.f_node with
   | FhoareS es -> es 
@@ -851,6 +899,7 @@ let is_exists   f = is_from_destr destr_exists1   f
 let is_let      f = is_from_destr destr_let1      f
 let is_equivF   f = is_from_destr destr_equivF    f
 let is_equivS   f = is_from_destr destr_equivS    f
+let is_eagerF   f = is_from_destr destr_eagerF    f
 let is_hoareS   f = is_from_destr destr_hoareS    f
 let is_hoareF   f = is_from_destr destr_hoareF    f
 let is_bdHoareS f = is_from_destr destr_bdHoareS  f
@@ -918,6 +967,9 @@ module FSmart = struct
 
   let f_equivS (fp, es) es' =
     if eqs_equal es es' then fp else f_equivS_r es'
+
+  let f_eagerF (fp, eg) eg' =
+    if egf_equal eg eg' then fp else mk_form (FeagerF eg') fp.f_ty
 
   let f_hoareF (fp, hf) hf' =
     if hf_equal hf hf' then fp else mk_form (FhoareF hf') fp.f_ty
@@ -1026,6 +1078,12 @@ let f_map gt g fp =
         FSmart.f_equivS (fp, es)
           { es with es_pr = pr'; es_po = po'; }
 
+  | FeagerF eg ->
+      let pr' = g eg.eg_pr in
+      let po' = g eg.eg_po in
+        FSmart.f_eagerF (fp, eg)
+          { eg with eg_pr = pr'; eg_po = po'; }
+
   | Fpr (m, mp, args, ev) -> 
       let args' = List.Smart.map g args in
       let ev'   = g ev in
@@ -1046,6 +1104,7 @@ let f_iter g f =
   | FbdHoareS bhs -> g bhs.bhs_pr; g bhs.bhs_po
   | FequivF ef -> g ef.ef_pr; g ef.ef_po
   | FequivS es -> g es.es_pr; g es.es_po
+  | FeagerF eg -> g eg.eg_pr; g eg.eg_po
   | Fpr(_,_,args,ev) -> List.iter g args; g ev
 
 (* -------------------------------------------------------------------- *)
@@ -1270,6 +1329,23 @@ module Fsubst = struct
         { es_ml = ml'; es_mr = mr';
           es_pr = pr'; es_po = po';
           es_sl = sl'; es_sr = sr'; }
+
+    | FeagerF eg ->
+      assert (not (Mid.mem mleft s.fs_mem) && not (Mid.mem mright s.fs_mem));
+      let m_subst = EcPath.x_substm s.fs_sty.ts_p s.fs_mp in 
+      let pr' = f_subst s eg.eg_pr in
+      let po' = f_subst s eg.eg_po in
+      let fl' = m_subst eg.eg_fl in
+      let fr' = m_subst eg.eg_fr in
+
+      let es = e_subst_init s.fs_freshen s.fs_sty.ts_p s.fs_ty s.fs_mp in
+      let s_subst = EcModules.s_subst es in
+      let sl' = s_subst eg.eg_sl in
+      let sr' = s_subst eg.eg_sr in
+
+      FSmart.f_eagerF (fp, eg)
+        { eg_pr = pr'; eg_sl = sl';eg_fl = fl'; 
+          eg_fr = fr'; eg_sr = sr'; eg_po = po'; }
 
     | Fpr (m, mp, args, e) ->
       assert (not (Mid.mem mhr s.fs_mem));

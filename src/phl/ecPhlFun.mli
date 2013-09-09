@@ -29,6 +29,8 @@ class rn_hl_fun_upto : form -> form -> form -> object
   method inv2 : form
 end
 
+(* TODO : move this ? *)
+val check_concrete : EcEnv.env -> EcPath.xpath -> unit
 (* -------------------------------------------------------------------- *)
 module FunDefLow : sig
   val t_hoareF_fun_def   : tactic

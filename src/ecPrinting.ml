@@ -1229,6 +1229,20 @@ and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
         (pp_form ppe) es.es_pr
         (pp_form ppe) es.es_po
 
+  | FeagerF eg ->
+      let ppe =
+        PPEnv.create_and_push_mems
+          ppe [(EcFol.mleft , eg.eg_fl); (EcFol.mright, eg.eg_fr)]
+      in
+      Format.fprintf fmt "eager[@[<hov 2>@ %a,@ %a ~@ %a,@ %a :@ @[%a ==>@ %a@]@]]"
+        (pp_stmt_for_form ppe) eg.eg_sl
+        (pp_funname ppe) eg.eg_fl
+        (pp_funname ppe) eg.eg_fr
+        (pp_stmt_for_form ppe) eg.eg_sr
+
+        (pp_form ppe) eg.eg_pr
+        (pp_form ppe) eg.eg_po
+
   | FbdHoareF hf ->
       let ppe = PPEnv.create_and_push_mem ppe ~active:true (EcFol.mhr, hf.bhf_f) in
       Format.fprintf fmt "bd_hoare[@[<hov 2>@ %a :@ @[%a ==>@ %a@]@]] %s %a"
