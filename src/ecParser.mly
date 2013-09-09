@@ -1820,6 +1820,8 @@ eager_tac:
     { Peager_if }
 | WHILE i=eager_info 
     { Peager_while i }
+| FUN 
+    { Peager_fun_def }
 ;
 (* END EAGER *)
 
