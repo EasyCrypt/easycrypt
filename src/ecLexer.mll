@@ -91,6 +91,7 @@
 
     (* PHL: tactics *)
     "transitivity", TRANSITIVITY;       (* KW: tactic *)
+    "symmetry"    , SYMMETRY   ;        (* KW: tactic *)
     "seq"         , SEQ        ;        (* KW: tactic *)
     "wp"          , WP         ;        (* KW: tactic *)
     "sp"          , SP         ;        (* KW: tactic *)

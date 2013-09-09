@@ -394,6 +394,7 @@ type phltactic =
   | Pbdeq 
   | Peqobs_in   of (pformula_o * pformula_o * pformula_o)
   | Ptrans_stmt of trans_info
+  | Psymmetry   
   | Psp        of (bool option)
   (* for eager *)
   | Peager_seq of eager_info * (int * int) * pformula 
