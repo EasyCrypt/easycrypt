@@ -305,7 +305,7 @@ module PV = struct
       | Fapp(e, es) -> List.fold_left (aux env) (aux env fv e) es
       | Ftuple es   -> List.fold_left (aux env) fv es
       | FhoareF _  | FhoareS _ | FbdHoareF _  | FbdHoareS _ 
-      | FequivF _ | FequivS _ | Fpr _ -> assert false 
+      | FequivF _ | FequivS _ | FeagerF _ | Fpr _ -> assert false 
     in
     aux env empty f
 

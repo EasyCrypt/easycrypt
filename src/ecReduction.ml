@@ -459,6 +459,14 @@ let check_alpha_equal ri hyps f1 f2 =
       aux env subst es1.es_pr es2.es_pr;
       aux env subst es1.es_po es2.es_po
 
+    | FeagerF eg1, FeagerF eg2 -> 
+      check_xp env subst eg1.eg_fl eg2.eg_fl;
+      check_xp env subst eg1.eg_fr eg2.eg_fr;
+      aux env subst eg1.eg_pr eg2.eg_pr;
+      aux env subst eg1.eg_po eg2.eg_po;
+      check_s env subst eg1.eg_sl eg2.eg_sl;
+      check_s env subst eg1.eg_sr eg2.eg_sr
+
     | Fpr(m1,p1,args1,f1'), Fpr(m2,p2,args2,f2') ->
       check_mem subst m1 m2;
       check_xp env subst p1 p2;

@@ -629,6 +629,7 @@ module FPosition = struct
           | FbdHoareS _ -> raise InvalidPosition
           | FequivF   _ -> raise InvalidPosition
           | FequivS   _ -> raise InvalidPosition
+          | FeagerF   _ -> raise InvalidPosition
           | Fpr       _ -> raise InvalidPosition
       end
   

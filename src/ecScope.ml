@@ -380,6 +380,7 @@ end = struct
       | EcFol.FhoareS   hs           -> on_mpath_hs  cb hs
       | EcFol.FequivF   ef           -> on_mpath_ef  cb ef
       | EcFol.FequivS   es           -> on_mpath_es  cb es
+      | EcFol.FeagerF   eg           -> on_mpath_eg  cb eg
       | EcFol.FbdHoareS bhs          -> on_mpath_bhs cb bhs
       | EcFol.FbdHoareF bhf          -> on_mpath_bhf cb bhf
       | EcFol.Fpr       pr           -> on_mpath_pr  cb pr
@@ -408,6 +409,14 @@ end = struct
       on_mpath_stmt cb es.EcFol.es_sr;
       on_mpath_memenv cb es.EcFol.es_ml;
       on_mpath_memenv cb es.EcFol.es_mr
+
+    and on_mpath_eg cb eg =
+      on_mpath_form cb eg.EcFol.eg_pr;
+      on_mpath_form cb eg.EcFol.eg_po;
+      cb eg.EcFol.eg_fl.x_top;
+      cb eg.EcFol.eg_fr.x_top;
+      on_mpath_stmt cb eg.EcFol.eg_sl;
+      on_mpath_stmt cb eg.EcFol.eg_sr;
 
     and on_mpath_bhf cb bhf =
       on_mpath_form cb bhf.EcFol.bhf_pr;
