@@ -301,18 +301,20 @@ module User_LDDH_Hyb2(A : LDDH_DISTINGUISHER, RO : RO_dh.RO) = {
 
   module AD = A(O)
 
+  (* 
   var c : int (* BUG: glob equality for User_LDDH_Hyb2 requires equality
                  on User_LDDH_Hyb2.c, even though only User_LDDH_Hyb2.O.c
                  is defined *)
-  var i : int (* so we just add them as globals *)
+  var i : int (* so we just add them as globals *) *)
   
   fun main(x : int) : bool = {
     var b : bool;
     AD.init();
     O.i = x;
     O.c = 0;
+    (* 
     c = 0;  (* see above *)
-    i = 0;  (* see above *)
+    i = 0;  (* see above *) *)
     b = AD.distinguish();
     return b;
   }
@@ -335,7 +337,7 @@ proof strict.
 qed.
 
 lemma Eq_real_G_App_Lazy_G_App_Fixed:
-  forall (A <: LDDH_DISTINGUISHER {User_LDDH_Hyb2,LRO_real,RO_dh_real.G}),
+  forall (A <: LDDH_DISTINGUISHER {User_LDDH_Hyb2,LRO_real,RO_dh_real.G, RO_dh_real.FRO}),
     equiv[   RO_dh_real.G(RO_dh_real.LRO, User_LDDH_Hyb2(A)).main
            ~ RO_dh_real.G(RO_dh_real.FRO, User_LDDH_Hyb2(A)).main :
             true ==> ={res,glob User_LDDH_Hyb2(A)} ].
@@ -461,9 +463,10 @@ wp. skip. smt.
 wp. rnd. skip. smt. skip. smt. skip. smt.
 qed.
 
-
 lemma Eq_LDDH_Hyb_i_DDH_real(A <: LDDH_DISTINGUISHER
-                                 {FRO_random,LDDH_Hyb2,Dist}):
+                                 {FRO_random,LDDH_Hyb2,Dist,LDDH_Hyb,
+                                  RO_dh_real.LRO, User_LDDH_Hyb2,
+                                  RO_dh_real.FRO}):
   forall (i: int) &m1 &m2,
     Pr[ LDDH_Hyb(A).main(i) @ &m1: res ]
   = Pr[ DDH_distr_real(Dist(A)).main(i) @ &m2 : res ].
@@ -485,8 +488,7 @@ proof strict.
    = Pr[ LDDH_Hyb2(A, FRO_real).main(i) @ &m1 : res ].
   by equiv_deno (Eq_real_G_App_Fixed_Hyb2_Fixed A).
   by equiv_deno (Eq_LDDH_Hyb2_Fixed_DDH_real A).
-qed. (* FIXME: I should need more restrictions *)
-
+qed.
 
 (* ********************************************************************* *)
 (* Similar steps for random *)
@@ -556,7 +558,8 @@ proof strict.
 qed.
 
 lemma Eq_random_G_App_Lazy_G_App_Fixed:
-  forall (A <: LDDH_DISTINGUISHER {User_LDDH_Hyb2,LRO_random,RO_dh_random.G}),
+  forall (A <: LDDH_DISTINGUISHER {User_LDDH_Hyb2,LRO_random,RO_dh_random.G,
+                                   FRO}),
     equiv[   RO_dh_random.G(RO_dh_random.LRO, User_LDDH_Hyb2(A)).main
            ~ RO_dh_random.G(RO_dh_random.FRO, User_LDDH_Hyb2(A)).main :
             true ==> ={res,glob User_LDDH_Hyb2(A)} ].
@@ -641,9 +644,10 @@ wp. rnd. skip. smt. skip. smt. skip. smt.
 qed.
 
 
-
 lemma Eq_LDDH_Hyb_i_plus_one_DDH_random(A <: LDDH_DISTINGUISHER
-                                             {FRO_random,LDDH_Hyb2,Dist}):
+                                             {FRO_random,LDDH_Hyb2,Dist,
+                                              LDDH_Hyb, RO_dh_real.LRO,
+                                              LRO, User_LDDH_Hyb2}):
   forall (i: int) &m1 &m2,
     Pr[ LDDH_Hyb(A).main((i+1)) @ &m1: res ]
   = Pr[ DDH_distr_random(Dist(A)).main(i) @ &m2 : res ].
@@ -673,7 +677,9 @@ qed.
 
 require import Real.
 
-lemma Step_diff(A <: LDDH_DISTINGUISHER {FRO_random,LDDH_Hyb2,Dist}):
+lemma Step_diff(A <: LDDH_DISTINGUISHER {FRO_random,LDDH_Hyb2,Dist,
+                                         LDDH_Hyb, RO_dh_real.LRO, LRO,
+                                         User_LDDH_Hyb2, RO_dh_real.FRO}):
   forall (i: int) &m1 &m2,
     `|  Pr[ LDDH_Hyb(A).main(i) @ &m1: res ]
       - Pr[ LDDH_Hyb(A).main((i+1)) @ &m1: res ] |
@@ -694,7 +700,8 @@ axiom sum_smaller(from  to : int) (f : int -> real):
 axiom sum_step(from to : int) (f : int -> real):
   to >= from => sum from to f = sum from (to-1) f + f to.
 
-lemma A(A <: LDDH_DISTINGUISHER {FRO_random,LDDH_Hyb2,Dist}):
+lemma A(A <: LDDH_DISTINGUISHER {FRO_random,LDDH_Hyb2,Dist,LDDH_Hyb,RO_dh_real.LRO,
+                                 RO_dh_real.FRO,LRO,User_LDDH_Hyb2}):
   forall &m (i : int), 0 <= i =>
     `|  Pr[ LDDH_Hyb(A).main(0) @ &m : res ]
       - Pr[ LDDH_Hyb(A).main(i) @ &m : res ] |
@@ -743,7 +750,9 @@ smt.
 smt.
 qed.
 
-lemma Final(A <: LDDH_DISTINGUISHER {FRO_random,LDDH_Hyb2,Dist}) &m:
+lemma Final(A <: LDDH_DISTINGUISHER {FRO_random,LDDH_Hyb2,Dist,LDDH_real,LDDH_Hyb,
+                                     LDDH_random,RO_dh_real.LRO,RO_dh_real.FRO,
+                                     LRO,User_LDDH_Hyb2}) &m:
     `|  Pr[ LDDH_real(A).main() @ &m : res ]
       - Pr[ LDDH_random(A).main() @ &m : res ] |
      <= sum 0 (q_t-1)

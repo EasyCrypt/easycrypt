@@ -18,7 +18,15 @@ theory Types.
 end Types.
 
 theory Lazy.
-  clone   import Types.
+  type from.
+  type to.
+
+  op dsample: to distr.
+
+  clone import Types with
+    type from <- from,
+    type to <- to,
+    op dsample <- dsample.
   require import FSet.
 
   module RO:Oracle = {
@@ -60,7 +68,15 @@ theory Eager.
     import Finite.
   require import FSet.
 
-  clone import Types.
+  type from.
+  type to.
+
+  op dsample: to distr.
+
+  clone import Types with
+    type from <- from,
+    type to <- to,
+    op dsample <- dsample.
 
   module RO: Oracle = {
     var m:(from,to) map
@@ -99,18 +115,24 @@ theory LazyEager.
   type from.
   axiom finite: finite univ<:from>.
 
+  type to.
+
+  op dsample: to distr.
+
   clone import Types with
-    type from <- from.
+    type from <- from,
+    type to <- to,
+    op dsample <- dsample.
 
   clone import Lazy with
-    type Types.from <- from,
-    type Types.to <- to,
-    op Types.dsample <- dsample.
+    type from <- from,
+    type to <- to,
+    op dsample <- dsample.
 
   clone import Eager with
-    type Types.from <- from,
-    type Types.to <- to,
-    op Types.dsample <- dsample.
+    type from <- from,
+    type to <- to,
+    op dsample <- dsample.
 
   module type Dist (H:ARO) = {
     fun distinguish(): bool {* H.o}
@@ -244,7 +266,7 @@ theory LazyEager.
     wp; skip; smt.
   qed.
 
-  lemma eager: mu dsample cpTrue = 1%r =>
+  lemma eagerRO: mu dsample cpTrue = 1%r =>
     equiv [IND(Lazy.RO,D).main ~ IND(Eager.RO,D).main: true ==> ={res}].
   proof strict.
   intros=> dsampleL; bypr (res{1}) (res{2})=> //; intros=> a &1 &2 _.

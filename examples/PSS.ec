@@ -80,7 +80,7 @@ axiom htagL: mu sample_htag cpTrue = 1%r.
 type gtag.
 clone import AWord as GTag with
   type word <- gtag,
-  op length = kg.
+  op length <- kg.
 op sample_gtag = GTag.Dword.dword.
 axiom gtagL: mu sample_gtag cpTrue = 1%r.
 
@@ -88,48 +88,88 @@ axiom gtagL: mu sample_gtag cpTrue = 1%r.
 type g2tag.
 clone import AWord as G2Tag with
   type word <- g2tag,
-  op length = kg2.
+  op length <- kg2.
 
 (* Domain of RSA *)
-op sample_plain: signature distr.
-axiom plainL: mu sample_plain cpTrue = 1%r.
 
 (** Instantiating *)
 require PKS.
 require OW.
 require RandomOracle.
 
+type pkey.
+type skey.
+op keypairs: (pkey * skey) distr.
+
+op sample_plain: pkey -> signature distr.
+
 clone import OW as RSA with
+  type pkey <- pkey,
+  type skey <- skey,
   type t <- signature,
-  op sample_t <- sample_plain,
-  op f_dom = (lambda (pk:pkey) (x:signature), true),
-  op f_rng = (lambda (pk:pkey) (x:signature), true),
-  op finv_dom = (lambda (sk:skey) (x:signature), true),
-  op finv_rng = (lambda (sk:skey) (x:signature), true)
-  proof f_rng_sub_finv_dom by smt,
-        finv_rng_sub_f_dom by smt,
-        f_dom_sample_t by smt.
+  op keypairs <- keypairs,
+  op challenge <- sample_plain.
 
-pred valid_keys (k:pkey * skey) = in_supp k keypairs.
+lemma plainL pk: weight (sample_plain pk) = 1%r.
+proof strict.
+rewrite /weight; apply Antisymm.
+  by cut [_ H]:= mu_bounded (sample_plain pk) cpTrue.
+  apply (Trans _ (mu (sample_plain pk) (f_dom pk))).
+    by rewrite f_dom_challenge.
+    by apply mu_sub=> x; rewrite /cpTrue.
+qed.
 
-op ( * ): signature -> signature -> pkey -> signature.
-axiom homo_f_mul (x y:signature) pk: f pk ((x * y) pk) = (f pk x * f pk y) pk.
+axiom f_dom_rng pk: valid_pkey pk => f_dom pk = f_rng pk.
+axiom finv_dom_rng sk: valid_skey sk => finv_dom sk = finv_rng sk.
 
 op modulus_p: pkey -> int.
 axiom modulus_size pk sk:
   valid_keys (pk,sk) => 2^(k-1) <= modulus_p pk < 2^k.
 
-clone import RandomOracle as Gt with
+op inv: signature -> pkey -> signature.
+op ( * ): signature -> signature -> pkey -> signature.
+
+axiom mulC (x y:signature) pk:
+  f_dom pk x =>
+  f_dom pk y =>
+  (x * y) pk = (y * x) pk.
+
+op one_sig: signature.
+
+axiom mul_one (x:signature) pk:
+  f_dom pk x =>
+  (x * one_sig) pk = x.
+
+axiom mul_inv (x:signature) pk:
+  x <> Signature.zeros =>
+  f_dom pk x =>
+  (x * (inv x pk)) pk = one_sig.
+
+axiom homo_f_mul (x y:signature) pk:
+  f_dom pk x =>
+  f_dom pk y =>
+  f pk ((x * y) pk) = (f pk x * f pk y) pk.
+
+axiom homo_finv_mul (x y:signature) pk sk:
+  valid_keys (pk,sk) =>
+  finv_dom sk x =>
+  finv_dom sk y =>
+  finv sk ((x * y) pk) = (finv sk x * finv sk y) pk.
+
+axiom f_zero pk: valid_pkey pk => f pk Signature.zeros = Signature.zeros.
+axiom f_one sk: valid_skey sk => finv sk (one_sig) = one_sig.
+
+clone import RandomOracle.Lazy as Gt with
   type from <- htag,
   type to <- gtag,
   op dsample <- sample_gtag.
-module G = Gt.ROM.RO.
+module G = Gt.RO.
 
-clone import RandomOracle as Ht with
+clone import RandomOracle.Lazy as Ht with
   type from <- (message * salt),
   type to <- htag,
   op dsample <- sample_htag.
-module H = Ht.ROM.RO.
+module H = Ht.RO.
 
 clone import PKS as PKSi with
   type pkey <- pkey,
@@ -139,7 +179,7 @@ clone import PKS as PKSi with
 import EF_CMA.
 
 (*** Defining PSS *)
-module PSS(G:Gt.Oracle,H:Ht.Oracle): Scheme = {
+module PSS(G:Gt.Types.Oracle,H:Ht.Types.Oracle): Scheme = {
   fun init(): unit = {
     G.init();
     H.init();
@@ -208,13 +248,13 @@ module PSS(G:Gt.Oracle,H:Ht.Oracle): Scheme = {
 }.
 
 (* A CMA adversary with access to two random oracles *)
-module type CMA_2RO(G:Gt.ARO,H:Ht.ARO,S:AdvOracles) = {
+module type CMA_2RO(G:Gt.Types.ARO,H:Ht.Types.ARO,S:AdvOracles) = {
   fun forge(pk:pkey): message * signature {* G.o H.o S.sign}
 }.
 
 section. 
   declare module A:CMA_2RO {G,H,EF_CMA,Wrap,OW}.
-  axiom adversaryL (G <: Gt.ARO {A}) (H <: Ht.ARO {A}) (S <: AdvOracles {A}):
+  axiom adversaryL (G <: Gt.Types.ARO {A}) (H <: Ht.Types.ARO {A}) (S <: AdvOracles {A}):
     islossless G.o => islossless H.o => islossless S.sign =>
     islossless A(G,H,S).forge.
 
@@ -224,13 +264,11 @@ section.
   local module Mem = {
     var pk:pkey
     var sk:skey
-    var xstar:signature
     var qs:message set
 
     fun init(ks:pkey * skey): unit = {
       (pk,sk) = ks;
       qs = FSet.empty;
-      xstar = $sample_plain;
     }
   }.
 
@@ -247,11 +285,11 @@ section.
       oracle. This should allow some abstraction in the
       proof, and in particular in the two eager steps
       on G.                                             **)
-  module type Gadv (H:SplitOracle, G:Gt.Oracle) = { 
+  module type Gadv (H:SplitOracle, G:Gt.Types.Oracle) = { 
     fun main (ks:pkey * skey) : bool {* G.o H.o}
   }.
 
-  local module Gen (Gadv:Gadv, H:SplitOracle, G:Gt.Oracle) = {
+  local module Gen (Gadv:Gadv, H:SplitOracle, G:Gt.Types.Oracle) = {
     module GA = Gadv(H,G)
     fun main () : bool = { 
       var keys : pkey * skey;
@@ -264,7 +302,7 @@ section.
     }
   }.
 
-  local module GAdv(H:SplitOracle, G:Gt.Oracle) = {
+  local module GAdv(H:SplitOracle, G:Gt.Types.Oracle) = {
     (* Wrapping a split oracle for use by the signing oracle *)
     module Hs = {
       fun o(x:message * salt): htag = {
@@ -346,7 +384,7 @@ section.
     }
   }.
 
-  local lemma lossless_GAdv (H <: SplitOracle{GAdv}) (G <: Gt.Oracle{GAdv}):
+  local lemma lossless_GAdv (H <: SplitOracle{GAdv}) (G <: Gt.Types.Oracle{GAdv}):
     islossless G.o => islossless H.o => islossless GAdv(H, G).main.
   proof strict.
   intros=> GL HL; fun.
@@ -360,7 +398,7 @@ section.
       call (_: true ==> true); first by fun; call HL.
       by rnd; wp; skip; smt.
     by call (_: true ==> true);
-      first by fun; rnd; wp; skip; smt.
+      first by fun; wp.
   qed.
 
   (** A module to store the globals used
@@ -369,9 +407,11 @@ section.
   local module Hmem = {
     var pk:pkey
     var sk:skey
+    var xstar:signature
 
     fun init(ks:pkey*skey): unit = {
       (pk,sk) = ks;
+      xstar = $sample_plain pk;
     }
   }.
 
@@ -387,7 +427,7 @@ section.
   local equiv Hmem_init:
     Hmem.init ~ Hmem.init: ={ks} /\ valid_keys ks{2} ==>
                            ={glob Hmem} /\ valid_keys (Hmem.pk,Hmem.sk){2}
-  by (by fun; wp).
+  by (fun; rnd; wp; skip; smt).
 
   local equiv Hmap_init:
     Hmap.init ~ Hmap.init: ={ks} /\ valid_keys ks{2} ==>
@@ -407,7 +447,7 @@ section.
     fun o(c:bool,x:message * salt):htag = { 
       var r : htag;
       r = $sample_htag;
-      if (!in_dom x Hmap.m) Hmap.m.[x] = (r,c,Signature.zeros);
+      if (!in_dom x Hmap.m) Hmap.m.[x] = (r,c,Signature.ones);
       return pi3_1 (proj Hmap.m.[x]);
     }
   }.
@@ -424,44 +464,47 @@ section.
   local equiv PSS_G0:
     EF_CMA(Wrap(PSS(G,H)),A(G,H)).main ~ G0.main: ={glob A} ==> ={res}.
   proof strict.
-  fun.
-  inline G0.main Gen(GAdv,H0,Gt.ROM.RO).GA.main; wp.
+  fun; inline G0.main Gen(GAdv,H0,Gt.RO).GA.main; wp.
   call (_: ={m} /\ Wrap.qs{1} = Mem.qs{2} ==> ={res});
     first by fun; eqobs_in.
-  inline Wrap(PSS(Gt.ROM.RO,ROM.RO)).verify PSS(Gt.ROM.RO,ROM.RO).verify
-         PSS(Gt.ROM.RO,ROM.RO).g1 PSS(Gt.ROM.RO,ROM.RO).g2.
+  (* In the following, we would really like to be able to write Ht.RO instead of RO,
+     for symmetry and ease of reading. This currently does not work. *)
+  inline Wrap(PSS(Gt.RO,RO)).verify PSS(Gt.RO,RO).verify
+         PSS(Gt.RO,RO).g1 PSS(Gt.RO,RO).g2.
   swap{1} [18..19] -3. (* Grouping the two calls to G on the left *)
-  inline GAdv(H0,Gt.ROM.RO).Hs.o; wp; call PSS_G0_H.
+  inline GAdv(H0,Gt.RO).Hs.o; wp; call PSS_G0_H.
   (* We use seq to cut out the calls to G and limit the scope of the rcond call *)
   wp; seq 12 11: (={glob G, w, m, maskedR, gamma} /\
                   H.m{1} =<= Hmap.m{2} /\
                   Wrap.qs{1} = Mem.qs{2} /\
                   b0{1} = forged{2} /\
                   m1{1} = m{2}).
-    wp; inline Wrap(PSS(Gt.ROM.RO,ROM.RO)).init PSS(Gt.ROM.RO,ROM.RO).init
-               ROM.RO.init Gt.ROM.RO.init PSS(Gt.ROM.RO,ROM.RO).keygen
+    wp; inline Wrap(PSS(Gt.RO,RO)).init PSS(Gt.RO,RO).init
+               RO.init Gt.RO.init PSS(Gt.RO,RO).keygen
                H0.init H.init Mem.init.
     call (_: ={glob G} /\ H.m{1} =<= Hmap.m{2} /\ Wrap.qs{1} = Mem.qs{2} /\ Wrap.sk{1} = Mem.sk{2}).
      by conseq* (_: ={glob G, x} ==> ={glob G, res})=> //; fun; eqobs_in.
-     fun*; inline GAdv(H0,Gt.ROM.RO).Ha.o; sp; wp; call PSS_G0_H=> //.
-     fun; inline PSS(Gt.ROM.RO, ROM.RO).sign.
-       wp; inline PSS(Gt.ROM.RO, ROM.RO).g1 PSS(Gt.ROM.RO, ROM.RO).g2 Gt.ROM.RO.o
-                  GAdv(H0, Gt.ROM.RO).Hs.o.
+     fun*; inline GAdv(H0,Gt.RO).Ha.o; sp; wp; call PSS_G0_H=> //.
+     fun; inline PSS(Gt.RO, RO).sign.
+       wp; inline PSS(Gt.RO, RO).g1 PSS(Gt.RO, RO).g2 Gt.RO.o
+                  GAdv(H0, Gt.RO).Hs.o.
        rcondf{1} 16;
-         first intros=> &m; inline ROM.RO.o; do ?(rnd; wp); skip; progress=> //; smt.
-       wp; rnd{1} (cpTrue); wp; rnd.
+         first intros=> &m; inline RO.o; do !(rnd; wp); skip; progress=> //; smt.
+       wp; rnd{1} (cpTrue).
+       wp; rnd.
        wp; call PSS_G0_H.
        wp; rnd.
        wp; skip; smt.
-    inline Hmap.init Hmem.init; rnd{2}; wp; rnd.
-    wp; skip; progress=> //; smt.
+    inline Hmap.init Hmem.init; wp; rnd{2} (cpTrue).
+    by wp; rnd; wp; skip; progress=> //; smt.
 
-  inline Gt.ROM.RO.o; rcondf{1} 9.
-    by intros=> &m //=; do ?(rnd; wp); skip; progress=> //; smt.
+  inline Gt.RO.o; rcondf{1} 9.
+    by intros=> &m //=; do !(rnd; wp); skip; progress=> //; smt.
     by wp; rnd{1} (cpTrue); wp; rnd; wp; skip; progress=> //; smt.
-  qed.        
+  qed.
 
-  (** First Transition:
+  (** First Transition: (This transition disappears completely if we
+      push the loop argument towards the end of the proof)
       The random oracle H is made to loop and sample a bit
       following the distribution of the strong bit of integers
       less than the modulus. *)
@@ -479,28 +522,16 @@ section.
   proof strict.
   by intros=> bounds; rewrite /weight mu_bool_nu // /charfun /cpTrue; smt.
   qed.
-
+(*
   local module H1: SplitOracle = {
-    var bad:bool
-    
     fun init(ks:pkey*skey): unit = {
       Hmap.init(ks);
-      bad = false;
     }
 
     fun o(c:bool, x:message * salt): htag = {
-      var b:bool = true;
-      var i:int = 0;
       var w:htag;
       w = $sample_htag;
-      if (!in_dom x Hmap.m) {
-        while (i < kg2 && b) {
-          b = $bool_nu (modulus_p Hmem.pk);
-          i = i + 1;
-          if (!b) Hmap.m.[x] = (w,c,Signature.zeros);
-        }
-      }
-      bad = bad \/ b;
+      if (!in_dom x Hmap.m) Hmap.m.[x] = (w,c,Signature.ones);
       return pi3_1 (proj Hmap.m.[x]);
     }
   }.
@@ -520,7 +551,7 @@ section.
     rcondt{1} 2; [ | rcondt{2} 4]; first 2 by intros &m; rnd; wp.
     wp; while{2} (i <= kg2 /\ eq_except Hmap.m{1} Hmap.m x /\
                   valid_keys (Hmem.pk,Hmem.sk) /\
-                  (!b => Hmap.m.[x] = Some (w,c,Signature.zeros){2})){2} (kg2 - i){2}.
+                  (!b => Hmap.m.[x] = Some (w,c,Signature.ones){2})){2} (kg2 - i){2}.
       by intros=> &m z; wp; rnd (cpTrue); skip; smt.
     by wp; rnd; wp; skip; smt.
   qed.
@@ -581,7 +612,7 @@ section.
           b = $bool_nu (modulus_p Hmem.pk);
           w = $sample_htag;
           i = i + 1;
-          if (!b) Hmap.m.[x] = (w,c,Signature.zeros);
+          if (!b) Hmap.m.[x] = (w,c,Signature.ones);
         }
       }
       return pi3_1 (proj Hmap.m.[x]);
@@ -589,7 +620,7 @@ section.
   }.
 
   local module G2 = Gen(GAdv, H0, G).
-
+*)
   (** G3 *)
   local module H3 = {
     fun init(ks:pkey*skey): unit = {
@@ -598,20 +629,13 @@ section.
 
 
     fun o (c:bool, x:message * salt): htag = {
-      var b:bool = true;
-      var i:int = 0;
       var w:htag;
       var st:gtag;
+
       if (!in_dom x Hmap.m) {
-        while (i < kg2 && b) {
-          b = $bool_nu (modulus_p Hmem.pk);
-          w = $sample_htag;
-          i = i + 1;
-          if (!b) {
-            Hmap.m.[x] = (w,c,Signature.zeros);
-            st = G.o(w);
-          }
-        }
+        w = $sample_htag;
+        Hmap.m.[x] = (w,c,Signature.ones);
+        st = G.o(w);
       }
       return pi3_1 (proj Hmap.m.[x]);
     }
@@ -619,7 +643,7 @@ section.
 
   local module G3 = Gen(GAdv, H3, G).
 
-  (** G4 *)
+  (** G4: two eager steps, one in each direction *)
   local module H4 = {
     var bad:bool
 
@@ -629,22 +653,15 @@ section.
     }  
 
     fun o (c:bool, x:message * salt): htag = {
-      var b:bool = true;
-      var i:int = 0;
       var w:htag;
       var st:gtag;
+
       if (!in_dom x Hmap.m) {
-        while (i < kg2 && b) {
-          b = $bool_nu (modulus_p Hmem.pk);
-          w = $sample_htag;
-          st = $sample_gtag;
-          i = i + 1;
-          if (!b) {
-            Hmap.m.[x] = (w,c,Signature.zeros);
-            bad = bad \/ in_dom w G.m;
-            G.m.[w] = st ^ (GTag.from_bits (to_bits (snd x) || zeros (kg - k0)));
-          }
-        }
+        w = $sample_htag;
+        st = $sample_gtag;
+        Hmap.m.[x] = (w,c,Signature.ones);
+        bad = bad \/ in_dom w G.m;
+        G.m.[w] = st ^ (GTag.from_bits (to_bits (snd x) || zeros (kg - k0)));
       }
       return pi3_1 (proj Hmap.m.[x]);
     }
@@ -663,25 +680,18 @@ section.
     }
 
     fun o(c:bool,x:message * salt): htag = {
-      var b:bool = true;
-      var i:int = 0;
       var w:htag;
       var st:gtag;
+
       if (!in_dom x Hmap.m) {
-        while (i < kg2 && b) {
-          b = $bool_nu (modulus_p Hmem.pk);
-          w = $sample_htag;
-          st = $sample_gtag;
-          i = i + 1;
-          if (!b) {
-            Hmap.m.[x] = (w,c,Signature.zeros);
-            G.m.[w] = st ^ (GTag.from_bits (to_bits (snd x) || zeros (kg - k0)));
-          }
-        }
+        w = $sample_htag;
+        st = $sample_gtag;
+        Hmap.m.[x] = (w,c,Signature.ones);
+        G.m.[w] = st ^ (GTag.from_bits (to_bits (snd x) || zeros (kg - k0)));
       } else {
         if (!c /\ pi3_2 (proj Hmap.m.[x])) {
           bad = true;
-          Hmap.m.[x] = (HTag.zeros,c,Signature.zeros);
+          Hmap.m.[x] = (HTag.zeros,c,Signature.ones);
         }
       }
       return pi3_1 (proj Hmap.m.[x]);
@@ -697,13 +707,12 @@ section.
       ={glob Hmem} /\ valid_keys (Hmem.pk,Hmem.sk){2} /\ (!H5.bad{2} => ={glob Hmap, glob G, res}).
   proof strict.
   fun; sp; if=> //.
-  while (={glob Hmap, glob G, b, i, c, x} /\ !H5.bad{2} /\ valid_keys (Hmem.pk,Hmem.sk){2})=> //.
-    by wp; do ?rnd.
-  by wp.
+    by wp; do !rnd.
+    by wp.
   qed.
 
   local lemma G4_G5_abstract (Ga <: Gadv {H4,H5,G,Hmem}):
-    (forall (H <: SplitOracle{Ga}) (G <: Gt.Oracle{Ga}),
+    (forall (H <: SplitOracle{Ga}) (G <: Gt.Types.Oracle{Ga}),
        islossless G.o => islossless H.o => islossless Ga(H,G).main) => 
     equiv [Gen(Ga,H4,G).main ~ Gen(Ga,H5,G).main: true ==> !H5.bad{2} => ={res}].
   proof strict.
@@ -713,20 +722,18 @@ section.
              ={glob Hmem} /\ valid_keys (Hmem.pk,Hmem.sk){2}).
   (* G *)
   by conseq* (_: _ ==> ={glob G, res}); last fun; eqobs_in.
-  by intros _ _; conseq* (Gt.ROM.lossless_o _); apply gtagL.
-  by intros _; conseq* (Gt.ROM.lossless_o _); apply  gtagL.
+  by intros _ _; conseq* (Gt.lossless_o _); apply gtagL.
+  by intros _; conseq* (Gt.lossless_o _); apply  gtagL.
   (* H *)
   by conseq* G4_G5_H=> //; smt.
-  intros=> &2 _; conseq* (_: valid_keys (Hmem.pk,Hmem.sk) ==>
-                             valid_keys (Hmem.pk,Hmem.sk))=> //.
-    fun; sp; if=> //; while (valid_keys (Hmem.pk,Hmem.sk)) (kg2 - i); last by skip; smt.
-      by intros=> z; wp; do ?rnd (cpTrue); skip; smt.
+  by intros=> &2 _; conseq* (_: valid_keys (Hmem.pk,Hmem.sk) ==>
+                                valid_keys (Hmem.pk,Hmem.sk))=> //;
+     fun; if=> //; wp; do !rnd (cpTrue); skip; smt.
   intros &m2; conseq* (_: H5.bad /\ valid_keys (Hmem.pk,Hmem.sk) ==>
                           H5.bad /\ valid_keys (Hmem.pk,Hmem.sk))=> //.
-    fun; sp; if.
-    while (H5.bad /\ valid_keys (Hmem.pk,Hmem.sk)) (kg2 - i); last by skip; smt.
-      by intros=> z; wp; do ?rnd (cpTrue); skip; smt.
-    by wp.
+    fun; if=> //.
+      by wp; do !rnd (cpTrue); skip; smt.
+      by wp.
 
   call (_: ={ks} /\ valid_keys ks{2} ==> ={glob Hmap} /\ valid_keys (Hmem.pk,Hmem.sk){2} /\ !H5.bad{2});
     first by fun; wp; call Hmap_init.
@@ -744,43 +751,27 @@ section.
 
   (** G6 *)
   local module H6: SplitOracle = {
-    var bad:bool
-
     fun init(ks:pkey * skey): unit = {
       Hmap.init(ks);
-      bad = false;
     }
 
     fun o(c:bool,x:message * salt): htag = {
-      var b:bool = true;
-      var i:int = 0;
       var w:htag;
       var st:gtag;
       var z, u:signature;
 
       if (!in_dom x Hmap.m)
       {
-        while (i < kg2 && b)
-        {
-          b = $bool_nu (modulus_p Hmem.pk);
-          w = $sample_htag;
-          st = $sample_gtag;
-          z = Signature.from_bits (if b then ones 1 else zeros 1 || to_bits w || to_bits st);
-          u = if c then (Mem.xstar * finv Mem.sk  z) Mem.pk else finv Mem.sk z;
-          i = i + 1;
-          if (!b)
-          {
-            Hmap.m.[x] = (w,c,u);
-            G.m.[w] = st ^ (GTag.from_bits (to_bits (snd x) || zeros (kg - k0)));
-          }
-        }
+        w = $sample_htag;
+        st = $sample_gtag;
+        z = Signature.from_bits (zeros 1 || to_bits w || to_bits st);
+        u = if c then ((inv Hmem.xstar Hmem.pk) * finv Hmem.sk  z) Hmem.pk else finv Hmem.sk z;
+        Hmap.m.[x] = (w,c,u);
+        G.m.[w] = st ^ (GTag.from_bits (to_bits (snd x) || zeros (kg - k0)));
       }
       else
       {
-        if (!c) { 
-          bad = true;
-          Hmap.m.[x] = (HTag.zeros,c,Signature.zeros);
-        }
+        if (!c /\ pi3_2 (proj Hmap.m.[x])) Hmap.m.[x] = (HTag.zeros,c,Signature.ones);
       }
       return pi3_1 (proj Hmap.m.[x]);
     }
@@ -808,8 +799,8 @@ section.
       {
         while (i < kg2 && b)
         {
-          u = $sample_plain;
-          z = if c then (f Mem.pk Mem.xstar * f Mem.pk u) Mem.pk else f Mem.pk u;
+          u = $sample_plain Hmem.pk;
+          z = if c then (f Hmem.pk Hmem.xstar * f Hmem.pk u) Hmem.pk else f Hmem.pk u;
           b = (sub (to_bits z) 0 1 = ones 1);
           w = HTag.from_bits (sub (to_bits z) 1 k1);
           st = GTag.from_bits (sub (to_bits z) (k1 + 1) (kg));
@@ -820,11 +811,11 @@ section.
             G.m.[w] = st ^ (GTag.from_bits (to_bits (snd x) || zeros (kg - k0)));
           }
         }
+        bad = bad \/ b;
       }
       else
       {
-        bad = true;
-        if (!c) Hmap.m.[x] = (HTag.zeros,c,Signature.zeros);
+        if (!c /\ pi3_2 (proj Hmap.m.[x])) Hmap.m.[x] = (HTag.zeros,c,Signature.ones);
       }
       return pi3_1 (proj Hmap.m.[x]);
     }
@@ -832,6 +823,119 @@ section.
 
   local module G7 = Gen(GAdv,H7,G).
 
+  (** Reduction to OW *)
+  local module I: Inverter = {
+    var ystar:signature
+    var pk:pkey
+
+    module H = {
+      var m:(message * salt,htag * bool * signature) map
+
+      fun init(): unit = { m = Map.empty; }
+
+      fun o(c:bool,x:message * salt): htag = {
+        var b:bool = true;
+        var i:int = 0;
+        var w:htag;
+        var st:gtag;
+        var z, u:signature;
+
+        if (!in_dom x m)
+        {
+          while (i < kg2 && b)
+          {
+            u = $sample_plain I.pk;
+            z = if c then (ystar * f pk u) pk else f pk u;
+            b = (sub (to_bits z) 0 1 = ones 1);
+            w = HTag.from_bits (sub (to_bits z) 1 k1);
+            st = GTag.from_bits (sub (to_bits z) (k1 + 1) (kg));
+            i = i + 1;
+            if (!b)
+            {
+              m.[x] = (w,c,u);
+              G.m.[w] = st ^ (GTag.from_bits (to_bits (snd x) || zeros (kg - k0)));
+            }
+          }
+        }
+        else
+        {
+          if (!c /\ pi3_2 (proj I.H.m.[x])) m.[x] = (HTag.zeros,c,Signature.ones);
+        }
+        return pi3_1 (proj m.[x]);
+      }
+    }
+
+    module Ha = {
+      fun o(x:message * salt): htag = {
+        var r:htag;
+        r = H.o(true,x);
+        return r;
+      }
+    }
+
+    module IOracles = {
+      var qs:message set
+
+      fun sign(m:message): signature = {
+        var r:salt;
+        var w:htag;
+        r = $sample_salt;
+        w = H.o(false,(m,r));
+        return pi3_3 (proj H.m.[(m,r)]);
+      }
+    }
+
+    module A = A(G,Ha,IOracles)
+
+    fun invert(pk:pkey,y:signature): signature = {
+      var m:message;
+      var s:signature;
+
+      IOracles.qs = FSet.empty;
+      I.pk = pk;
+      ystar = y;
+      (m,s) = A.forge(pk);
+
+      return if !mem m IOracles.qs then s else Signature.zeros;
+    }
+  }.
+
+  (** PROOF NOTE.
+      The invariant below is insufficient. We need to know, at least:
+        - forall m r w u,
+            H.m.[m,r] = Some (w,false,u) =>
+            w = sub (f pk u) 1 k1 /\
+            G.m.[w] = Some (sub (f pk u) (k1 = 1) kg) ^ (r || zeros)
+          (Note that this is currently not true when H is called directly,
+           then by the signing oracle... This requires a bit of thought.)
+        - forall m r w u,
+            H.m.[m,r] = Some (w,true,u) =>
+            w = sub ((f pk xstar) * (f pk u) [pk]) 1 k1 /\
+            G.m.[w] = Some (sub ((f pk xstar) * (f pk u) [pk]) (k1 = 1) kg) ^ (r || zeros) *)
+  local equiv G7_OW_H: H7.o ~ I.H.o:
+    ={glob G, x, c} /\
+    Hmap.m{1} = I.H.m{2} /\
+    Hmem.pk{1} = I.pk{2} /\
+    (f Hmem.pk Hmem.xstar){1} = I.ystar{2} ==>
+    ={glob G, res} /\
+    Hmap.m{1} = I.H.m{2} /\
+    Hmem.pk{1} = I.pk{2} /\
+    (f Hmem.pk Hmem.xstar){1} = I.ystar{2}.
+  proof strict.
+  fun; inline H7.o I.H.o; wp; sp; if=> //.
+    wp; while (={glob G, i, b, c, x} /\
+               Hmap.m{1} = I.H.m{2} /\
+               Hmem.pk{1} = I.pk{2} /\
+               (f Hmem.pk Hmem.xstar){1} = I.ystar{2})=> //.
+      seq 6 6: (={glob G, u, w, st, i, b, c, x} /\
+                Hmap.m{1} = I.H.m{2} /\
+                Hmem.pk{1} = I.pk{2} /\
+                (f Hmem.pk Hmem.xstar){1} = I.ystar{2} /\
+                i{1} <= kg2).
+        by wp; rnd; skip; smt.
+        by if; try wp.
+    by sp; if=> //; wp.
+  qed.
 end section.
 
 
