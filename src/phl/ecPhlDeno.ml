@@ -61,9 +61,14 @@ let t_equiv_deno pre post g =
     match concl.f_node with
     | Fapp({f_node = Fop(op,_)}, [f1;f2]) when is_pr f1 && is_pr f2 &&
         (EcPath.p_equal op EcCoreLib.p_eq || 
-           EcPath.p_equal op EcCoreLib.p_real_le) ->
-      EcPath.p_equal op EcCoreLib.p_eq, f1, f2
-    | _ -> cannot_apply "equiv_deno" "" in (* FIXME error message *)
+           EcPath.p_equal op EcCoreLib.p_real_le || 
+           EcPath.p_equal op EcCoreLib.p_real_ge) ->
+      let cmp = 
+        if EcPath.p_equal op EcCoreLib.p_eq then `Eq
+        else if EcPath.p_equal op EcCoreLib.p_real_le then `Le else `Ge in
+      cmp, f1, f2
+    | _ -> 
+      cannot_apply "equiv_deno" "" in (* FIXME error message *)
   let (ml,fl,argsl,evl) = destr_pr f1 in
   let (mr,fr,argsr,evr) = destr_pr f2 in
   let concl_e = f_equivF pre fl fr post in
@@ -83,11 +88,16 @@ let t_equiv_deno pre post g =
   (* building the substitution for the post *)
   let smeml = Fsubst.f_bind_mem Fsubst.f_subst_id mhr mleft in 
   let smemr = Fsubst.f_bind_mem Fsubst.f_subst_id mhr mright in
-  let evl   = Fsubst.f_subst smeml evl and evr = Fsubst.f_subst smemr evr in
-  let cmp   = if cmp then f_iff else f_imp in 
+  let evl   = Fsubst.f_subst smeml evl 
+  and evr   = Fsubst.f_subst smemr evr in
+  let cmp = 
+    match cmp with 
+    | `Eq -> f_iff evl evr 
+    | `Le -> f_imp evl evr 
+    | `Ge -> f_imp evr evl in 
   let mel = EcEnv.Fun.actmem_post mleft fl funl in
   let mer = EcEnv.Fun.actmem_post mright fr funr in
-  let concl_po = f_forall_mems [mel;mer] (f_imp post (cmp evl evr)) in
+  let concl_po = f_forall_mems [mel;mer] (f_imp post cmp) in
     prove_goal_by [concl_e;concl_pr;concl_po] rn_hl_deno g  
 
 (* -------------------------------------------------------------------- *)
@@ -131,7 +141,8 @@ let process_equiv_deno info (_,n as g) =
       match concl.f_node with
       | Fapp({f_node = Fop(op,_)}, [f1;f2]) when is_pr f1 && is_pr f2 -> 
         op, f1, f2
-      | _ -> cannot_apply "equiv_deno" "" in (* FIXME error message *) 
+      | _ ->  
+        cannot_apply "equiv_deno" "" in (* FIXME error message *) 
     let _,fl,_,_ = destr_pr f1 in
     let _,fr,_,_ = destr_pr f2 in
     let penv, qenv = LDecl.equivF fl fr hyps in
