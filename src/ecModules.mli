@@ -60,6 +60,7 @@ val i_call    : lvalue option * xpath * expr list -> instr
 val i_if      : expr * stmt * stmt -> instr
 val i_while   : expr * stmt -> instr
 val i_assert  : expr -> instr
+val s_seq     : stmt -> stmt -> stmt
 
 val stmt : instr list -> stmt
 (* [rstmt l] is stmt (List.rev l) *)
