@@ -765,7 +765,7 @@ section.
         w = $sample_htag;
         st = $sample_gtag;
         z = Signature.from_bits (zeros 1 || to_bits w || to_bits st);
-        u = if c then (Hmem.xstar * finv Hmem.sk  z) Hmem.pk else finv Hmem.sk z;
+        u = if c then ((inv Hmem.xstar Hmem.pk) * finv Hmem.sk  z) Hmem.pk else finv Hmem.sk z;
         Hmap.m.[x] = (w,c,u);
         G.m.[w] = st ^ (GTag.from_bits (to_bits (snd x) || zeros (kg - k0)));
       }
