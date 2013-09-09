@@ -723,6 +723,9 @@ sform_u(P):
 
 | EQUIV LBRACKET eb=equiv_body(P) RBRACKET { eb }
 
+(* ADDED FOR EAGER *)
+| EAGER LBRACKET eb=eager_body(P) RBRACKET { eb }
+
 | HOARE LBRACKET
     s=loc(fun_def_body)
     COLON pre=form_r(P) LONGARROW post=form_r(P)
@@ -873,6 +876,11 @@ equiv_body(P):
   COLON pre=form_r(P) LONGARROW post=form_r(P)
 
     { PFequivF (pre, (mp1, mp2), post) }
+
+eager_body(P):
+| s1=stmt COMMA  mp1=loc(fident) TILD mp2=loc(fident) COMMA s2=stmt
+    COLON pre=form_r(P) LONGARROW post=form_r(P)
+    { PFeagerF (pre, (s1, mp1, mp2,s2), post) }
 
 pgtybinding1:
 | x=ptybinding1 { List.map (fun (xs,ty) -> xs, PGTY_Type ty) x }

@@ -203,6 +203,7 @@ and pformula_r =
   | PFhoareS   of pformula * pfunction_body located * pformula
   | PFhoareF   of pformula * pgamepath * pformula
   | PFequivF   of pformula * (pgamepath * pgamepath) * pformula
+  | PFeagerF    of pformula * (pstmt * pgamepath * pgamepath * pstmt) * pformula
   | PFprob     of pgamepath * (pformula list) * pmemory * pformula
   | PFBDhoareS of pformula * pfunction_body located * pformula * phoarecmp * pformula
   | PFBDhoareF of pformula * pgamepath * pformula * phoarecmp * pformula
