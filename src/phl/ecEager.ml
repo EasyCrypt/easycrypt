@@ -13,34 +13,53 @@ open EcCorePhl
 let destr_eqobsS env f = 
   let es = destr_equivS f in
   let of_form =
-    (* FIXME catch exception *)
-    Mpv2.of_form env (fst es.es_ml) (fst es.es_mr) in
+    try Mpv2.of_form env (fst es.es_ml) (fst es.es_mr) 
+    with Not_found -> 
+      tacuerror "can not reconize a set of equalities"
+  in
   es, es.es_sl, es.es_sr, of_form es.es_pr, of_form es.es_po 
 
 let destr_eagerS s s' f = 
   let es = destr_equivS f in
   let c, c' = es.es_sl, es.es_sr in
-  (* FIXME catch exception and assert *)
-  let s1,c = EcModules.s_split (List.length s.s_node) c in
-  let c',s1' = EcModules.s_split (List.length c'.s_node - List.length s'.s_node) c' in
-  assert (List.all2 i_equal s1 s.s_node);
-  assert (List.all2 i_equal s1' s'.s_node);
+  let s1,c = s_split "eager" (List.length s.s_node) c in
+  let c',s1' = 
+    s_split "eager" (List.length c'.s_node - List.length s'.s_node) c' in
+  if not (List.all2 i_equal s1 s.s_node) then
+    tacuerror "the head of the left statement is not the good one";
+  if not (List.all2 i_equal s1' s'.s_node) then
+    tacuerror "the tail of the right statement is not the good one";
   es, stmt c, stmt c'
 
 let get_hSS' hyps h = 
-  (* FIXME catch exception *)
   let tH = LDecl.lookup_hyp_by_id h hyps in
   tH, destr_eqobsS (LDecl.toenv hyps) tH 
 
-(* This ensure condition (e) of the eager_seq rule *)
-let compat env modS modS' eqR eqXs =
-  (* FIXME assert *)
+(* This ensure condition (d) and (e) of the eager_seq rule *)
+let compat env modS modS' eqR eqIs eqXs =
+  if not (Mpv2.subset eqIs eqR) then begin
+    let ppe = EcPrinting.PPEnv.ofenv env in
+    let eqR = Mpv2.to_form mleft mright eqR f_true in
+    let eqIs = Mpv2.to_form mleft mright eqIs f_true in
+    tacuerror "%a should be include in %a"
+      (EcPrinting.pp_form ppe) eqIs (EcPrinting.pp_form ppe) eqR
+  end; 
   let check_pv x1 x2 _ = 
-    assert (Mpv2.mem x1 x2 eqXs ||
-      (not (PV.mem_pv env x1 modS) && not (PV.mem_pv env x2 modS'))) in
+    if not (Mpv2.mem x1 x2 eqXs ||
+              (not (PV.mem_pv env x1 modS) && not (PV.mem_pv env x2 modS')))
+    then
+      let ppe = EcPrinting.PPEnv.ofenv env in
+      tacuerror 
+        "equality of %a and %a should be ensured by the swapping statement"
+        (EcPrinting.pp_pv ppe) x1 (EcPrinting.pp_pv ppe) x2 in
   let check_glob m = 
-    assert (Mpv2.mem_glob m eqXs ||
-      (not (PV.mem_glob env m modS) && not (PV.mem_glob env m modS'))) in
+    if not (Mpv2.mem_glob m eqXs ||
+              (not (PV.mem_glob env m modS) && not (PV.mem_glob env m modS'))) 
+    then 
+      let ppe = EcPrinting.PPEnv.ofenv env in
+      tacuerror 
+        "equality of %a should be ensured by the swapping statement"
+        (EcPrinting.pp_topmod ppe) m in
   Mpv2.iter check_pv check_glob eqR 
 
 let process_info info g =
@@ -84,12 +103,12 @@ let t_eager_seq i j eqR h g =
   let tH, (_, s, s', eqIs, eqXs) = get_hSS' hyps h in
   let eC, c, c' = destr_eagerS s s' concl in
   let seqR = Mpv2.of_form env (fst eC.es_ml) (fst eC.es_mr) eqR in
-  (* check (d) *)assert (Mpv2.subset eqIs seqR); 
-  (* check (e) *)compat env (s_write env s) (s_write env s') seqR eqXs;
+  (* check (d) and (e) *)
+  compat env (s_write env s) (s_write env s') seqR eqIs eqXs;
   (* FIXME catch exception of s_split *)
   let eqO2 = Mpv2.eq_refl (PV.fv env (fst eC.es_mr) eC.es_po) in
-  let c1,c2 = EcModules.s_split i c in
-  let c1',c2' = EcModules.s_split j c' in
+  let c1,c2 = s_split "eager_seq" i c in
+  let c1',c2' = s_split "eager_seq" j c' in
   let to_form eq =  Mpv2.to_form (fst eC.es_ml) (fst eC.es_mr) eq f_true in
   let a = f_equivS_r {eC with
     es_sl = stmt (s.s_node@c1); 
@@ -225,14 +244,16 @@ let t_eager_while h g =
   let tH, (_, s, s', eqIs, eqXs) = get_hSS' hyps h in
   let eC, wc, wc' = destr_eagerS s s' concl in
   let (e,c),(e',c'),n1,n2 = EcCorePhl.s_first_whiles "eager while" wc wc' in
-  assert (n1.s_node = [] && n2.s_node = []);
+  if not (n1.s_node = [] && n2.s_node = []) then
+    tacuerror "can not apply eager while, unexpected statements";
   let eqI = eC.es_pr in
   let seqI = Mpv2.of_form env (fst eC.es_ml) (fst eC.es_mr) eqI in
   let e1 = form_of_expr (fst eC.es_ml) e in
   let e2 = form_of_expr (fst eC.es_mr) e' in
-  assert (f_equal eC.es_po (f_and eqI (f_not e1)));
-  (* check (e) *)assert (Mpv2.subset eqIs seqI); 
-  (* check (f) *)compat env (s_write env s) (s_write env s') seqI eqXs;
+  if not (f_equal eC.es_po (f_and eqI (f_not e1))) then
+    tacuerror "can not apply eager while, unexpected post-condition";
+  (* check (e) and (f) *)
+  compat env (s_write env s) (s_write env s') seqI eqIs eqXs;
   let to_form eq =  Mpv2.to_form (fst eC.es_ml) (fst eC.es_mr) eq f_true in
   let a = 
     f_forall [mleft,GTmem (snd eC.es_ml); mright, GTmem (snd eC.es_mr)]
@@ -331,7 +352,8 @@ let t_eager_fun_abs eqI h g =
   let env, hyps, concl = get_goal_e g in
   let tH, (_, s, s', eqIs, eqXs) = get_hSS' hyps h in  
   let eg = t_as_eagerF concl in
-  assert (s_equal s eg.eg_sl && s_equal s' eg.eg_sr);
+  if not (s_equal s eg.eg_sl && s_equal s' eg.eg_sr) then
+    tacuerror "can not reconize the swapping statement";
   let fl, fr = eg.eg_fl, eg.eg_fr in
   let pre,post,sg = EcPhlFun.FunAbsLow.equivF_abs_spec env fl fr eqI in
   let do1 og sg = 
@@ -343,15 +365,14 @@ let t_eager_fun_abs eqI h g =
       sg in
   let sg = List.fold_right do1 sg [] in
   let seqI = Mpv2.of_form env mleft mright eqI in
-  (* check (e) *)assert (Mpv2.subset eqIs seqI); 
-  (* check (f) *)compat env (s_write env s) (s_write env s') seqI eqXs;
+  (* check (e) and (f)*)
+  compat env (s_write env s) (s_write env s') seqI eqIs eqXs;
   (* TODO : check that S S' do not modify glob A *)
   let tac g' = 
     t_on_first (t_hyp h) 
       (prove_goal_by (tH::sg) rn_eager_fun_abs g') in
   t_on_last tac (EcPhlConseq.t_eagerF_conseq pre post g)
   
-
 let process_fun_abs info eqI g = 
   let hyps, _ = get_goal g in
   let env = LDecl.inv_memenv hyps in
