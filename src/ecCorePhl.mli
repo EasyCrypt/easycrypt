@@ -50,7 +50,7 @@ val t_as_bdHoareF : form -> bdHoareF
 val t_as_bdHoareS : form -> bdHoareS
 val t_as_equivF   : form -> equivF
 val t_as_equivS   : form -> equivS
-
+val t_as_eagerF   : form -> eagerF
 (* -------------------------------------------------------------------- *)
 val get_pre  : form -> form
 val get_post : form -> form

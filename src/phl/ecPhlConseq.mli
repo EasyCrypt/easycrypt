@@ -18,6 +18,7 @@ class rn_hl_notmod : object inherit xrule end
 (* -------------------------------------------------------------------- *)
 val t_equivF_conseq   : form -> form -> tactic
 val t_equivS_conseq   : form -> form -> tactic
+val t_eagerF_conseq   : form -> form -> tactic
 val t_hoareF_conseq   : form -> form -> tactic
 val t_hoareS_conseq   : form -> form -> tactic
 val t_bdHoareF_conseq : form -> form -> tactic

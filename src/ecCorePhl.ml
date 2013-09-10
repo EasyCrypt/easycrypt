@@ -85,6 +85,8 @@ let t_as_equivF c =
   try destr_equivF c with DestrError _ -> tacerror (NotPhl (Some false))
 let t_as_equivS c =
   try destr_equivS c with DestrError _ -> tacerror (NotPhl (Some false))
+let t_as_eagerF c =
+  try destr_eagerF c with DestrError _ -> tacerror (NotPhl (Some false))
 
 (* -------------------------------------------------------------------- *)
 let get_pre f = 

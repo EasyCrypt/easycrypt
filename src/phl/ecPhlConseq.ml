@@ -114,6 +114,17 @@ let t_equivF_conseq pre post g =
   let concl3 = f_equivF pre ef.ef_fl ef.ef_fr post in
   prove_goal_by [concl1; concl2; concl3] rn_hl_conseq g
 
+let t_eagerF_conseq pre post g =
+  let env,_,concl = get_goal_e g in
+  let eg = t_as_eagerF concl in
+  let (mprl,mprr),(mpol,mpor) =
+    EcEnv.Fun.equivF_memenv eg.eg_fl eg.eg_fr env in
+  let cond1, cond2 = conseq_cond eg.eg_pr eg.eg_po pre post in
+  let concl1 = f_forall_mems [mprl;mprr] cond1 in
+  let concl2 = f_forall_mems [mpol;mpor] cond2 in
+  let concl3 = f_eagerF pre eg.eg_sl eg.eg_fl eg.eg_fr eg.eg_sr post in
+  prove_goal_by [concl1; concl2; concl3] rn_hl_conseq g
+
 let t_equivS_conseq pre post g =
   let concl = get_concl g in
   let es = t_as_equivS concl in
@@ -131,6 +142,7 @@ let t_conseq pre post g =
   | FbdHoareS _ -> t_bdHoareS_conseq pre post g
   | FequivF _   -> t_equivF_conseq pre post g
   | FequivS _   -> t_equivS_conseq pre post g
+  | FeagerF _   -> t_eagerF_conseq pre post g
   | _           -> tacerror (NotPhl None)
 
 (* -------------------------------------------------------------------- *)
