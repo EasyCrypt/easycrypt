@@ -42,6 +42,8 @@ end
 module FunAbsLow : sig
   val t_hoareF_abs   : form -> tactic
   val t_bdHoareF_abs : form -> tactic
+  val equivF_abs_spec : EcEnv.env -> EcPath.xpath -> EcPath.xpath ->
+    EcFol.form -> EcFol.form * EcFol.form * EcFol.form list
   val t_equivF_abs   : form -> tactic
 end
 

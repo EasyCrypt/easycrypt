@@ -203,11 +203,11 @@ let process_if = t_eager_if
 
 (* eager while:
    (a) ={I} => e{1} = e{2}
-   (b) S;c1 ~ S';c1' : ={I} /\ e{1} ==> ={I}
+   (b) S;c1 ~ c1';S' : ={I} /\ e{1} ==> ={I}
    (c)  c' ~ c'    : ={I.2} ==> ={I.2}
    (d) forall b &2, S  : e = b ==> e = b
    (e) ={I} => ={Is}
-   (f) compat S S' R Xs 
+   (f) compat S S' I Xs 
    (h) S ~ S' : ={Is} ==> ={Xs}
    --------------------------------------------------
    S;while e do c ~ while e' do c';S' : ={I} ==> ={I} /\ !e{1}
@@ -255,18 +255,18 @@ let process_while info  g =
   let gs, h = process_info info g in
   t_on_last (t_eager_while h) gs
 
-(* eager fun :
+(* eager fun def :
   S and S' depend only of global (* This should be an invariant of the typing *)
   S;f.body;result = f.res; ~ S';f'.body;result' = f'.res; : P ==> Q{res{1}<- result, res{2} <- result'}
   -------------------------
    S, f ~ f', S' : P ==> Q
 *)
 
-class rn_eager_fun =
+class rn_eager_fun_def =
 object
-  inherit xrule "[eager] fun"
+  inherit xrule "[eager] fun def"
 end
-let rn_eager_fun = RN_xtd (new rn_eager_fun :> xrule)
+let rn_eager_fun_def = RN_xtd (new rn_eager_fun_def :> xrule)
 
 let t_eager_fun_def g = 
   let env, _hyps, concl = get_goal_e g in
@@ -298,14 +298,66 @@ let t_eager_fun_def g =
     es_pr = eg.eg_pr;
     es_po = PVM.subst env s eg.eg_po;
   } in
-  prove_goal_by [cond] rn_eager_fun g
+  prove_goal_by [cond] rn_eager_fun_def g
  
   
 let process_fun_def  = t_eager_fun_def
   
+(* eager fun abs : 
+  S and S' depend only of global (* This should be an invariant of the typing *)
+   (a) ={I} => e{1} = e{2}
+   for each oracles o o':
+        o and o' do not modify (glob A) (this is implied by (f) )
+    (b) S,o ~ o',S' : ={I,params} ==> ={I,res} 
+    (c) o'~ o' : ={I.2, o'.params} ==> ={I.2, res}
+   (e) ={I} => ={Is}
+   (f) compat S S' I Xs 
+   (h) S ~ S' : ={Is} ==> ={Xs}
+   glob A not in I (* this is checked in EcPhlFun.equivF_abs_spec *)
+   S S' do not modify glob A
+---------------------------------------------------
+  S, A.f{o} ~ A.f(o'), S' : ={I,glob A,A.f.params} ==> ={I,glob A,res}
+ 
+Remark : ={glob A} is not required in pre condition when A.f is an initializer 
+*)
 
+class rn_eager_fun_abs =
+object
+  inherit xrule "[eager] fun abs"
+end
+let rn_eager_fun_abs = RN_xtd (new rn_eager_fun_abs :> xrule)
 
+let t_eager_fun_abs eqI h g =
+  let env, hyps, concl = get_goal_e g in
+  let tH, (_, s, s', eqIs, eqXs) = get_hSS' hyps h in  
+  let eg = t_as_eagerF concl in
+  assert (s_equal s eg.eg_sl && s_equal s' eg.eg_sr);
+  let fl, fr = eg.eg_fl, eg.eg_fr in
+  let pre,post,sg = EcPhlFun.FunAbsLow.equivF_abs_spec env fl fr eqI in
+  let do1 og sg = 
+    let ef = destr_equivF og in
+    let torefl f = 
+      Mpv2.to_form mleft mright (Mpv2.eq_refl (PV.fv env mright f)) f_true in
+    f_eagerF ef.ef_pr s ef.ef_fl ef.ef_fr s' ef.ef_po ::
+      f_equivF (torefl ef.ef_pr) ef.ef_fr ef.ef_fr (torefl ef.ef_po) ::
+      sg in
+  let sg = List.fold_right do1 sg [] in
+  let seqI = Mpv2.of_form env mleft mright eqI in
+  (* check (e) *)assert (Mpv2.subset eqIs seqI); 
+  (* check (f) *)compat env (s_write env s) (s_write env s') seqI eqXs;
+  (* TODO : check that S S' do not modify glob A *)
+  let tac g' = 
+    t_on_first (t_hyp h) 
+      (prove_goal_by (tH::sg) rn_eager_fun_abs g') in
+  t_on_last tac (EcPhlConseq.t_eagerF_conseq pre post g)
+  
 
+let process_fun_abs info eqI g = 
+  let hyps, _ = get_goal g in
+  let env = LDecl.inv_memenv hyps in
+  let eqI  = EcCoreHiLogic.process_form env eqI tbool in
+  let gs, h = process_info info g in
+  t_on_last (t_eager_fun_abs eqI h) gs
   
 
 

@@ -1822,6 +1822,8 @@ eager_tac:
     { Peager_while i }
 | FUN 
     { Peager_fun_def }
+| FUN i=eager_info f=sform 
+    { Peager_fun_abs(i,f) }
 ;
 (* END EAGER *)
 
