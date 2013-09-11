@@ -70,9 +70,19 @@ end Extrema.
 export Extrema.
 
 theory EuclDiv.
-  import why3 "int" "EuclideanDivision"
-    op "div" as "/";
-    op "mod" as "%%".
+  op (/%): int -> int -> int.
+  op (%%): int -> int -> int.
+
+  axiom ediv_spec m d:
+    d <> 0 =>
+    0 <= m %% d < `|d| /\
+    m = (m /% d) * d + (m %% d).
+
+  axiom ediv_unique m d q r:
+    d <> 0 =>
+    0 <= r < `|d| =>
+    m = q * d + r =>
+    q = m /% d /\ r = m %% d.
 end EuclDiv.
 export EuclDiv.
 
