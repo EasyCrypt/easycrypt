@@ -623,13 +623,30 @@ section.
   local module G2 = Gen(GAdv, H0, G).
 *)
   (** G3 *)
-  local module H3 (G:Gt.Types.Oracle) = {
-    fun init(ks:pkey*skey): unit = {
+  module type PSplitOracle (G:Gt.Types.ARO) = {
+    fun init(ks:pkey * skey): unit {*}
+    fun o(c:bool,x:message * salt): htag {* G.o}
+  }.
+
+  local module H0' (G:Gt.Types.ARO) = {
+    fun init(ks:pkey * skey): unit = {
+      H0.init(ks);
+    }
+
+    fun o(c:bool,x:message * salt): htag = {
+      var r:htag;
+      r = H0.o(c,x);
+      return r;
+    }
+  }.
+
+  local module H3 (G:Gt.Types.ARO) = {
+    fun init(ks:pkey * skey): unit = {
       Hmap.init(ks);
     }
 
 
-    fun o (c:bool, x:message * salt): htag = {
+    fun o(c:bool, x:message * salt): htag = {
       var w:htag;
       var st:gtag;
 
@@ -642,7 +659,8 @@ section.
     }
   }.
 
-  local module D (Ga:Gadv, H:SplitOracle, G:Gt.Types.ARO) = {
+  local module D (Ga:Gadv, H:PSplitOracle, G:Gt.Types.ARO) = {
+    module H = H(G)
     module Ga = Ga(H,G)
 
     fun distinguish(): bool = {
@@ -656,33 +674,33 @@ section.
   }.
 
   local equiv G0_D (Ga <: Gadv {G, Hmap}):
-    Gen(Ga,H0,G).main ~ Gt.IND(G,D(Ga,H0)).main: true ==> ={res}.
+    Gen(Ga,H0'(G),G).main ~ Gt.IND(G,D(Ga,H0')).main: true ==> ={res}.
   proof strict.
   by fun;
-     inline IND(Lazy.RO,D(Ga,H0)).D.distinguish; swap{1} 1 1;
+     inline IND(Lazy.RO,D(Ga,H0')).D.distinguish; swap{1} 1 1;
      eqobs_in.
   qed.
 
   local equiv G0_G0e (Ga <: Gadv {G,G'}):
-    Gt.IND(G,D(Ga,H0)).main ~ Gt.IND(G',D(Ga,H0)).main: true ==> ={res}
-  by (apply (eagerRO (D(Ga,H0)) _); apply gtagL).
+    Gt.IND(G,D(Ga,H0')).main ~ Gt.IND(G',D(Ga,H0')).main: true ==> ={res}
+  by (apply (eagerRO (D(Ga,H0')) _); apply gtagL).
 
   local equiv G0e_G3e (Ga <: Gadv {G',Hmap}):
-    Gt.IND(G',D(Ga,H0)).main ~ Gt.IND(G',D(Ga,H3(G'))).main: true ==> ={res}.
+    Gt.IND(G',D(Ga,H0')).main ~ Gt.IND(G',D(Ga,H3)).main: true ==> ={res}.
   proof strict.
   fun.
   call (_: ={glob Eager.RO} /\ forall x, in_dom x G'.m{1}).
     call (_: ={glob Eager.RO, glob Hmap} /\ forall x, in_dom x G'.m{1}).
       (* H *)
-      fun; case (in_dom x Hmap.m){1}.
-        rcondf{1} 2; first by intros=> &m; rnd.
-        by rcondf{2} 1; last rnd{1}; skip; smt.
-        rcondt{1} 2; first by intros=> &m; rnd.
-        by rcondt{2} 1; last inline Eager.RO.o; wp; rnd; skip; smt.
-      (* G *)    
+      fun; inline H0.o; case (in_dom x Hmap.m){1}.
+        rcondf{1} 4; first by intros=> &m; rnd; wp.
+        by rcondf{2} 1; last wp; rnd{1}; wp; skip; smt.
+        rcondt{1} 4; first by intros=> &m; rnd; wp.
+        by rcondt{2} 1; last inline Eager.RO.o; wp; rnd; wp; skip; smt.
+      (* G *)
       conseq* (_: ={glob G', x} ==> ={glob G', res}); first 2 smt.
         fun; eqobs_in.
-    call (_: ={ks} ==> ={glob Hmap}); first by fun; eqobs_in.
+    call (_: ={ks} ==> ={glob Hmap}); first by fun; inline H0.init; eqobs_in.
     rnd; skip; smt.
   inline Eager.RO.init;
   while (={work, Eager.RO.m} /\ forall x, !mem x work{1} => in_dom x Eager.RO.m{1}).
@@ -690,10 +708,15 @@ section.
   by wp; skip; smt.
   qed.
 
-  (* The transition back from eager cannot be done as easily since H3 now uses G.
-     Even if we do the upto step below in the eager model, we are still stuck in
-     eager-land: any thoughts? *)
-
+  local equiv G3e_G3 (Ga <: Gadv {G,G'}):
+    Gt.IND(G',D(Ga,H3)).main ~ Gt.IND(G,D(Ga,H3)).main: true ==> ={res}.
+  proof strict.
+  by symmetry;
+     (* Note that we cannot apply the lemma directly because 'res{2} = res{1}' does not match '={res}' *)
+     conseq* (eagerRO (D(Ga,H3)) _)=> //;
+     apply gtagL.
+  qed.
+  
   (** G4: two eager steps, one in each direction *)
   local module H4 = {
     var bad:bool
