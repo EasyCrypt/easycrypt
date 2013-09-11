@@ -45,7 +45,7 @@ Change the current goal to the $\leftrightarrow^*$-equivalent one \ec{f}
 \begin{displaymath}
   \infrule{\phi_1 \leftrightarrow^*_{\Env;\Gamma} \phi_2 \quad
            \Env; \Gamma \vdash \phi_1}
-          {\Env; \Gamma \vdash \phi_2}
+          {\Env; \Gamma \vdash \phi_2}[{\color{Blue} \textsf{change}}\ \phi_1]
 \end{displaymath}
 
 %simplify
@@ -82,7 +82,7 @@ in the goal.
 \begin{displaymath}
   \infrule{\Env; \Gamma \vdash p \quad
            \Env; \Gamma \vdash \forall x, \phi(x)}
-          {\Env; \Gamma \vdash \phi(p)}
+          {\Env; \Gamma \vdash \phi(p)}[{\color{Blue} \textsf{generalize}}\ p]
 \end{displaymath}
 
 %pose
@@ -94,12 +94,15 @@ all instantiated occurrences of \ec{p} in the goal by \ec{x}.
 \begin{displaymath}
   \infrule{\Env; \Gamma \vdash p \quad
            \Env; \Gamma, x := p \vdash \phi(x)}
-          {\Env; \Gamma \vdash \phi(p)}
+          {\Env; \Gamma \vdash \phi(p)}[{\color{Blue} \textsf{pose}}\ x := p]
 \end{displaymath}
 
 %intros
-\addAmbTactic{intros}{}
-This is the identity tactic and should be used in combination with intro-patterns.
+\addAmbTactic{intros}{\tacarg{ip}{intro-pattern}}
+TODO
+
+\warningbox{This corresponds to the $\mathsf{move}$ tactic in \SsReflect.
+More documentation on intro patterns is upcoming.}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % LOGIC
@@ -109,61 +112,61 @@ This is the identity tactic and should be used in combination with intro-pattern
 
 %assumption
 \addAmbTactic{assumption}{}
-Search in the context an hypothesis convertible to the goal and close it.
- If no such hypothesis exists, the tactic fails
+Search in the context for a hypothesis that is convertible to the goal.
+If one exists, the goal is closed. If no such hypothesis exists, the tactic fails.
 \begin{displaymath}
-  \infrule{(h : \phi) \in \Gamma}{\Env; \Gamma \vdash \phi}
+  \infrule{(h : \phi) \in \Gamma}{\Env; \Gamma \vdash \phi}[{\color{Red} \textsf{assumption}}]
 \end{displaymath}
 
 %reflexivity
 \addAmbTactic{reflexivity}{}
 Solve goals of the form \ec{b = b} for any term \ec{b}.
 \begin{displaymath}
-  \infrule{ }{\Env; \Gamma \vdash b = b}
+  \infrule{ }{\Env; \Gamma \vdash b = b}[{\color{Red} \textsf{reflexivity}}]
 \end{displaymath}
 
 %split
 \addAmbTactic{split}{}
-\tacname{} breaks a goal that is intrinsically conjunctive into multiple subgoals.
- For instance, it
+Break an intrinsically conjunctive goal into its component subgoals.
+For instance, it can:
  \begin{itemize}
-  \item closes any goal that is convertible to \ec{true} or provable
+  \item close any goal that is convertible to \ec{true} or provable
         by \ec{reflexivity},
 
   \begin{displaymath}
-  \infrule{\Env; \Gamma \vdash a \equiv true}{a}
+  \infrule{\Env; \Gamma \vdash a \conv[\Env;\Gamma] true}{a}[{\color{Blue} \textsf{split}}]
   ~~~~~~
-  \infrule{\Env; \Gamma \vdash a \equiv b}{a = b}
+  \infrule{\Env; \Gamma \vdash a \conv[\Env;\Gamma] b}{a = b}[{\color{Blue} \textsf{split}}]
   \end{displaymath}
        
-  \item replaces a logical equivalence by the direct and indirect implication,
+  \item replace a logical equivalence by the direct and indirect implication,
 
   \begin{displaymath}
   \infrule{\Env; \Gamma \vdash \phi_1 \Rightarrow \phi_2 \quad
            \Env; \Gamma \vdash \phi_2 \Rightarrow \phi_1}
-          {\Gamma \vdash \phi_1 \Leftrightarrow \phi_2}
+          {\Gamma \vdash \phi_1 \Leftrightarrow \phi_2}[{\color{Blue} \textsf{split}}]
   \end{displaymath}
   
-  \item replaces a goal of the form \rawec{f1 /\\ f2} or \rawec{f1 \&\& f2} by the two
-        subgoals for \ec{f1} and \ec{f2},
+  \item replace a goal of the form \rawec{f1 /\\ f2} (or \rawec{f1 \&\& f2})
+        by the two subgoals for \ec{f1} and \ec{f2},
 
   \begin{displaymath}
   \infrule{\Env; \Gamma \vdash \phi_1 \quad
            \Env; \Gamma \vdash \phi_2}
-          {\Env; \Gamma \vdash \phi_1 \land \phi_2}
+          {\Env; \Gamma \vdash \phi_1 \land \phi_2}[{\color{Blue} \textsf{split}}]
   ~~~~~~
   \infrule{\Env; \Gamma \vdash \phi_1 \quad
-           \Env; \Gamma \vdash \phi_2}
-          {\Env; \Gamma \vdash \phi_1 \&\& \phi_2}
+           \Env; \Gamma \vdash \phi_1 \Rightarrow \phi_2}
+          {\Env; \Gamma \vdash \phi_1 \&\& \phi_2}[{\color{Blue} \textsf{split}}]
   \end{displaymath}
         
-  \item replaces an equality between two $n$-tuples by the $n$ equalities of
-        of the paired components.
+  \item replace an equality between $n$-tuples by $n$ equalities
+        on their components.
 
   \begin{displaymath}
   \infrule{\Env; \Gamma \vdash a_1 = b_1  \quad \cdots \quad
            \Env; \Gamma \vdash a_n = b_n}
-          {\Gamma \vdash (a_1, ..., a_n) = (b_1, ..., b_n)}
+          {\Gamma \vdash (a_1, ..., a_n) = (b_1, ..., b_n)}[{\color{Blue} \textsf{split}}]
   \end{displaymath}
 \end{itemize}
 
@@ -171,72 +174,85 @@ Solve goals of the form \ec{b = b} for any term \ec{b}.
 \addAmbTacticNoIdx{left / right}{}
 \addAmbTacticIdx{left}
 \addAmbTacticIdx{right}
-Reduce a disjunctive goal to its left (resp. right) part
+Reduce a disjunctive goal to its left (resp. right) member.
 \begin{displaymath}
-  \infrule{\Env; \Gamma \vdash \phi_1}{\Env; \Gamma \vdash \phi_1 \lor \phi_2}
+  \infrule{\Env; \Gamma \vdash \phi_1}{\Env; \Gamma \vdash \phi_1 \lor \phi_2}[{\color{Blue} \textsf{left}}]
   ~~~~~~
-  \infrule{\Env; \Gamma \vdash \phi_2}{\Env; \Gamma \vdash \phi_1 \lor \phi_2}
+  \infrule{\Env; \Gamma \vdash \phi_2}{\Env; \Gamma \vdash \phi_1 \lor \phi_2}[{\color{Blue} \textsf{right}}]
 \end{displaymath}
 
 %case
 \addAmbTactic{case}{\tacarg{f}{formula}}
-Do an excluded-middle case analysis on \ec{f}
+Do an excluded-middle case analysis on \ec{f}, substituting \ec{f} in the goal
+when possible.
 \begin{displaymath}
   \infrule{\Env; \Gamma \vdash b \Rightarrow \phi(true) \quad
            \Env; \Gamma \vdash \neg b \Rightarrow \phi(false)}
-          {\Env; \Gamma \vdash \phi(b)}
+          {\Env; \Gamma \vdash \phi(b)}[{\color{Blue} \textsf{case}}\ b]
 \end{displaymath}
 
 %cut
 \addAmbTactic{cut}{\tacarg{ip}{intro-pattern} : \tacarg{C}{formula}}
-Logical cut. Generates two subgoals: on for $C$ (the cut formula),
- and one for $C \Rightarrow G$ where $G$ is the initial goal. Moreover,
- the intro-pattern \ec{ip} is applied to the second subgoal.
+Logical cut. Generate two subgoals: one for the cut formula $C$,
+and one for $C \Rightarrow G$ where $G$ is the current goal. Moreover,
+the intro-pattern \ec{ip} is applied to the second subgoal.
 \begin{displaymath}
   \infrule{\Env; \Gamma \vdash \phi_1 \quad
-           \Env; \Gamma, \vdash \phi_2 \Rightarrow \phi_1}
-          {\Env; \Gamma \vdash \phi_1}
+           \Env; \Gamma \vdash \phi_2 \Rightarrow \phi_1}
+          {\Env; \Gamma \vdash \phi_1}[{\color{Blue} \textsf{cut}}\ \phi_2]
 \end{displaymath}
 
 %elim
 \addAmbTactic{elim}{\tacarg{h}{ident}}
-This tactics take as argument the name of a judgment from the environment or context.
+
+Apply the elimination principle for environment or context judgment \tacarg{h}
+and move the resulting hypotheses to the front of the current goal.
+
 \begin{displaymath}
-  \infrule{\Gamma, h:A \land B \vdash A \Rightarrow B \Rightarrow G}{\Gamma, h:A \land B \vdash G}
+  \infrule{\Gamma, h:A \land B \vdash A \Rightarrow B \Rightarrow G}{\Gamma, h:A \land B \vdash G}[{\color{Blue} \textsf{elim}}\ h]
   ~~~~~~
-  \infrule{\Gamma, h:\exists x, A(x) \vdash \forall x, A(x) \rightarrow G}{\Gamma, h:\exists x, A \vdash G}
+  \infrule{\Gamma, h:\exists x, A(x) \vdash \forall x, A(x) \rightarrow G}{\Gamma, h:\exists x, A \vdash G}[{\color{Blue} \textsf{elim}}\ h]
 \end{displaymath}\\
 \begin{displaymath}
-  \infrule{\Gamma, h:(a_1, ..., a_n) = (b_1, ..., b_n) \vdash a_1 = b_1 \Rightarrow ... \Rightarrow a_n = b_n \Rightarrow G}{\Gamma, h:(a_1, ..., a_n) = (b_1, ..., b_n) \vdash G}
+  \infrule{\Gamma, h:(a_1, ..., a_n) = (b_1, ..., b_n) \vdash a_1 = b_1 \Rightarrow ... \Rightarrow a_n = b_n \Rightarrow G}{\Gamma, h:(a_1, ..., a_n) = (b_1, ..., b_n) \vdash G}[{\color{Blue} \textsf{elim}}\ h]
 \end{displaymath}
 
 %elimT
-\addAmbTacticNoIdx{elim}{$\!\!$/\tacarg{h}{ident} \tacarg{f}{pattern}}
-\addAmbTacticIdx{elimT}
-Apply the induction principle \vararg{h} on \vararg{x}
+\addAmbTacticNoIdx{elim/}{$\!\!$\tacarg{h}{ident} \tacarg{f}{pattern}}
+\addAmbTacticIdx{elim/}
+Apply the induction principle \vararg{h} on \vararg{x}.
+
+\warningbox{Here, \emph{induction principle} is used in a broad sense.
+It captures any judgment (in environment or context) of a suitable shape.}
 
 %apply
 \addAmbTactic{apply}{\tacarg{p}{proof-term}}
-Modus Ponens. If \ec{p} is a proof-term for the pattern (formula) for
+Modus Ponens. If \ec{p} is a proof-term for the pattern (formula)
   \begin{center}
     \ec{forall (x1 : t1) ... (xn : tn), A1 -> ... -> An -> B}
   \end{center}
   \noindent then \tacname{} tries to match B with the current G. If the
   match succeeds and leads to the full instantiation of the pattern,
   then the goal is replaced, after instantiation, with the $n$ subgoals
-  \ec{A1, ..., An}
+  \ec{A1, ..., An}.
 
 %rewrite
-\addAmbTactic{rewrite}{rw1 ... rw${}_n$ where the rw${}_i$ are of the form \ec{//},
-\ec{/=}, \ec{//=}, a proof-term or a pattern prefixed by \ec{/}
-(slash). The two last forms can be prefixed by a direction indicator (the sign
+\addAmbTactic{rewrite}{\ec{rw}${}_1$ ... \ec{rw}${}_n$\\ \indent where the
+\ec{rw}${}_i$ are
+\begin{itemize}
+\item one of \ec{//}, \ec{/=}, \ec{//=},
+\item a proof-term, or
+\item a pattern prefixed by \ec{/} (slash).
+\end{itemize}
+The two last forms can be prefixed by a direction indicator (the sign
 \ec{-}), followed by an occurrence selector (\ec{\{i1 ... in\}}),
-followed by repetition marker (\ec{!}, \ec{?}, \ec{i!} or \ec{i?}). All
-these prefixes are optional.}
+followed by repetition marker (\ec{!}, \ec{?}, \ec{n!} or \ec{n?}).
+All these prefixes are optional.}
+
 Depending on the form of \ec{rw}, \tacname{} \ec{rw} does the following:
   \begin{itemize}
    \item For \ec{//}, \ec{/=}, and \ec{//=}, see \ec{intros}.
-   \item If \ec{rw} is a proof-term for the pattern (formula)
+   \item If \ec{rw} is a proof-term for the pattern
      \begin{center}
       \ec{forall (x1 : t1) ... (xn : tn), A1 -> ... -> An -> f1 = f2}
      \end{center}
@@ -246,7 +262,7 @@ Depending on the form of \ec{rw}, \tacname{} \ec{rw} does the following:
      of \ec{f1} by \ec{f2} in the goal, and creates $n$ new subgoals for the
      \ec{Ai}'s. If no subterms of the goal match \ec{f1} or if the pattern
      cannot be fully instantiated by matching, the tactic fails.
-     The tactic works the same if the pattern ends by \ec{f1 <-> f2}. If the
+     The tactic works the same if the pattern ends by \ec{f1 <=> f2}. If the
      direction indicator \ec{-} is given, \tacname{} works in the reverse
      direction, searching for a match of \ec{f2} and then replacing all
      occurrences of \ec{f2} by \ec{f1}.
@@ -255,7 +271,7 @@ Depending on the form of \ec{rw}, \tacname{} \ec{rw} does the following:
      of the goal matching \ec{(o p1 ... pn)} and resulting in the full instantiation
      of the pattern. It then replaces, after instantiation of the pattern, all
      the occurrences of \ec{(o p1 ... pn)} by the $\beta\delta$ head-normal form
-     of \ec{(o p1 ... pn)}, where the $\delta$-reduction are restricted to the one
+     of \ec{(o p1 ... pn)}, where the $\delta$-reduction is restricted to subterms
      headed by the symbol \ec{o}. If no subterms of the goal match \ec{(o p1 ... pn)} or
      if the pattern cannot be fully instantiated by matching, the tactic fails. If the
      direction indicator \ec{-} is given, \tacname{} works in the reverse
@@ -266,7 +282,7 @@ Depending on the form of \ec{rw}, \tacname{} \ec{rw} does the following:
   
   \smallskip
   
-  The occurrence selector \ec{\{i1 ... in\}} allows to restrict which occurrences
+  The occurrence selector \ec{\{i1 ... in\}} restricts which occurrences
   of the matching pattern are replaced in the goal. If given, only the
   \ec{i1}-th, ..., \ec{in}-th ones are replaced (considering that the goal is
   traversed in DFS mode). Note that this selection applies after the matching has
@@ -280,8 +296,8 @@ Depending on the form of \ec{rw}, \tacname{} \ec{rw} does the following:
   
   \medskip
 
-  Last, \tacname{} \ec{rw1 ... rwn} is equivalent to
-  \tacname{} \ec{rw1}; ...; \tacname{} \ec{rwn}
+  Last, \tacname{} \ec{rw}${}_1$ ... \ec{rw}${}_n$ is equivalent to
+  \tacname{} \ec{rw}${}_1$; ...; \tacname{} \ec{rw}${}_n$.
   
 %subst
 \addAmbTactic{subst}{\tacarg{x}{ident}?}
@@ -290,11 +306,16 @@ Search for the first equation of the form \ec{x = f} or \ec{f = x} in the contex
  goal before clearing it. If no idents are given, repeatedly apply the tactic to
  all identifiers for which such an equation exists.
 
+\warningbox{It has been reported that this tactic, and any other tactic that
+uses it (in particular, \ec{progress}) suffers some performance issues when the
+formula in which the substitution occurs is large. There is currently no
+work-around.}
+
 %congr
 \addAmbTactic{congr}{}
-This tactic applies to a goal of the form \ec{f t1 ... tn = f u1 ... un}
- replacing it by  the subgoals \ec{ti = ui} for all \ec{i}. Note that subgoals
- solvable by \ec{reflexivity} are automatically closed.
+Replace a goal of the form \ec{f t1 ... tn = f u1 ... un} with the subgoals
+\ec{ti = ui} for all \ec{i}. Subgoals solvable by \ec{reflexivity} are
+automatically closed.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % AUTO
@@ -305,14 +326,17 @@ This tactic applies to a goal of the form \ec{f t1 ... tn = f u1 ... un}
 %smt
 \addAmbTactic{smt}{[\ec{nolocal}]}
 Try to solve the goal using SMT solvers. The goal is sent along with all the
- lemmas proved so far plus the local hypotheses, unless the \ec{nolocal} is
- given.
+lemmas proved so far plus the local hypotheses, unless the \ec{nolocal} is
+given.
  
- \noindent\begin{center}
- \warningbox{Not all lemmas can be sent translated in such a way that they can
-  be sent to the SMT provers. For instance, any formulas involving pRHL
-  constructions are ignored.}
- \end{center}
+\warningbox{Not all lemmas can be translated in such a way that they can
+be sent to the SMT provers. For instance, any formulas involving pRHL
+constructions are ignored.}
+
+In \ec{strict} proof mode, failures in \ec{smt} are not ignored by \ec{try}.
+This allows the proof tree to be constructed properly even in weak-check mode
+(where \ec{smt} is assumed to succeed). Having a fully constructed proof tree
+allows the user to return to full-check mode in the middle of a proof.
 
 %progress
 \addAmbTactic{progress}{\ec{tactic}?}

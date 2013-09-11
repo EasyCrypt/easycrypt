@@ -116,25 +116,25 @@ iteratively, up to the point where no goals remain.
 \input{tacticals}
 
 \section{Ambient Logic}
-
 \input{ambient}
 
-\section{About Tactics for the Program Logics}
+\section{Common Hoare tactics}
 The tactics mentioned so far permit to build proofs of purely logical statements
 ranging over operators. The tactics introduced in the following sections allow
 the user to write and prove judgments on module functions. Many of them
 appear in some form or another in the various fragments of \EasyCrypt's logic,
-with varying interpretations. They are here sorted by judgment type, and we
-refer the reader to the index of common tactics for a sorting by tactic name.
+with varying interpretations. This section discusses those program tactics whose
+interpretation is similar in all logical fragments.
+\input{commonhoare}
 
 \section{Hoare Logic}
 \input{hoare}
+
 \section{Probabilistic Hoare Logic}
 \input{probhoare}
+
 \section{Probabilistic Relational Hoare Logic}
 \input{probrelhoare}
-\section{Common Hoare tactics}
-\input{commonhoare}
 
 
 %%% Local Variables: 
