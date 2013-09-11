@@ -159,11 +159,12 @@ axiom homo_finv_mul (x y:signature) pk sk:
 axiom f_zero pk: valid_pkey pk => f pk Signature.zeros = Signature.zeros.
 axiom f_one sk: valid_skey sk => finv sk (one_sig) = one_sig.
 
-clone import RandomOracle.Lazy as Gt with
+clone import RandomOracle.LazyEager as Gt with
   type from <- htag,
   type to <- gtag,
   op dsample <- sample_gtag.
-module G = Gt.RO.
+module G = Gt.Lazy.RO.
+module G' = Gt.Eager.RO.
 
 clone import RandomOracle.Lazy as Ht with
   type from <- (message * salt),
@@ -285,8 +286,8 @@ section.
       oracle. This should allow some abstraction in the
       proof, and in particular in the two eager steps
       on G.                                             **)
-  module type Gadv (H:SplitOracle, G:Gt.Types.Oracle) = { 
-    fun main (ks:pkey * skey) : bool {* G.o H.o}
+  module type Gadv (H:SplitOracle, G:Gt.Types.ARO) = { 
+    fun main (ks:pkey * skey) : bool {* H.o G.o}
   }.
 
   local module Gen (Gadv:Gadv, H:SplitOracle, G:Gt.Types.Oracle) = {
@@ -302,7 +303,7 @@ section.
     }
   }.
 
-  local module GAdv(H:SplitOracle, G:Gt.Types.Oracle) = {
+  local module GAdv(H:SplitOracle, G:Gt.Types.ARO) = {
     (* Wrapping a split oracle for use by the signing oracle *)
     module Hs = {
       fun o(x:message * salt): htag = {
@@ -462,32 +463,32 @@ section.
 
   (* More informed use of conseq* might speed up some of the smt calls *)
   local equiv PSS_G0:
-    EF_CMA(Wrap(PSS(G,H)),A(G,H)).main ~ G0.main: ={glob A} ==> ={res}.
+    EF_CMA(Wrap(PSS(G,H)),A(G,H)).main ~ G0.main: true ==> ={res}.
   proof strict.
-  fun; inline G0.main Gen(GAdv,H0,Gt.RO).GA.main; wp.
+  fun; inline G0.main Gen(GAdv,H0,Gt.Lazy.RO).GA.main; wp.
   call (_: ={m} /\ Wrap.qs{1} = Mem.qs{2} ==> ={res});
     first by fun; eqobs_in.
   (* In the following, we would really like to be able to write Ht.RO instead of RO,
      for symmetry and ease of reading. This currently does not work. *)
-  inline Wrap(PSS(Gt.RO,RO)).verify PSS(Gt.RO,RO).verify
-         PSS(Gt.RO,RO).g1 PSS(Gt.RO,RO).g2.
+  inline Wrap(PSS(Gt.Lazy.RO,RO)).verify PSS(Gt.Lazy.RO,RO).verify
+         PSS(Gt.Lazy.RO,RO).g1 PSS(Gt.Lazy.RO,RO).g2.
   swap{1} [18..19] -3. (* Grouping the two calls to G on the left *)
-  inline GAdv(H0,Gt.RO).Hs.o; wp; call PSS_G0_H.
+  inline GAdv(H0,Gt.Lazy.RO).Hs.o; wp; call PSS_G0_H.
   (* We use seq to cut out the calls to G and limit the scope of the rcond call *)
   wp; seq 12 11: (={glob G, w, m, maskedR, gamma} /\
                   H.m{1} =<= Hmap.m{2} /\
                   Wrap.qs{1} = Mem.qs{2} /\
                   b0{1} = forged{2} /\
                   m1{1} = m{2}).
-    wp; inline Wrap(PSS(Gt.RO,RO)).init PSS(Gt.RO,RO).init
-               RO.init Gt.RO.init PSS(Gt.RO,RO).keygen
+    wp; inline Wrap(PSS(Gt.Lazy.RO,RO)).init PSS(Gt.Lazy.RO,RO).init
+               RO.init Gt.Lazy.RO.init PSS(Gt.Lazy.RO,RO).keygen
                H0.init H.init Mem.init.
     call (_: ={glob G} /\ H.m{1} =<= Hmap.m{2} /\ Wrap.qs{1} = Mem.qs{2} /\ Wrap.sk{1} = Mem.sk{2}).
      by conseq* (_: ={glob G, x} ==> ={glob G, res})=> //; fun; eqobs_in.
-     fun*; inline GAdv(H0,Gt.RO).Ha.o; sp; wp; call PSS_G0_H=> //.
-     fun; inline PSS(Gt.RO, RO).sign.
-       wp; inline PSS(Gt.RO, RO).g1 PSS(Gt.RO, RO).g2 Gt.RO.o
-                  GAdv(H0, Gt.RO).Hs.o.
+     fun*; inline GAdv(H0,Gt.Lazy.RO).Ha.o; sp; wp; call PSS_G0_H=> //.
+     fun; inline PSS(Gt.Lazy.RO, RO).sign.
+       wp; inline PSS(Gt.Lazy.RO, RO).g1 PSS(Gt.Lazy.RO, RO).g2 Gt.Lazy.RO.o
+                  GAdv(H0, Gt.Lazy.RO).Hs.o.
        rcondf{1} 16;
          first intros=> &m; inline RO.o; do !(rnd; wp); skip; progress=> //; smt.
        wp; rnd{1} (cpTrue).
@@ -498,7 +499,7 @@ section.
     inline Hmap.init Hmem.init; wp; rnd{2} (cpTrue).
     by wp; rnd; wp; skip; progress=> //; smt.
 
-  inline Gt.RO.o; rcondf{1} 9.
+  inline Gt.Lazy.RO.o; rcondf{1} 9.
     by intros=> &m //=; do !(rnd; wp); skip; progress=> //; smt.
     by wp; rnd{1} (cpTrue); wp; rnd; wp; skip; progress=> //; smt.
   qed.
@@ -622,7 +623,7 @@ section.
   local module G2 = Gen(GAdv, H0, G).
 *)
   (** G3 *)
-  local module H3 = {
+  local module H3 (G:Gt.Types.Oracle) = {
     fun init(ks:pkey*skey): unit = {
       Hmap.init(ks);
     }
@@ -641,7 +642,57 @@ section.
     }
   }.
 
-  local module G3 = Gen(GAdv, H3, G).
+  local module D (Ga:Gadv, H:SplitOracle, G:Gt.Types.ARO) = {
+    module Ga = Ga(H,G)
+
+    fun distinguish(): bool = {
+      var b:bool;
+      var ks:pkey * skey;
+      ks = $keypairs;
+      H.init(ks);
+      b = Ga.main(ks);
+      return b;
+    }
+  }.
+
+  local equiv G0_D (Ga <: Gadv {G, Hmap}):
+    Gen(Ga,H0,G).main ~ Gt.IND(G,D(Ga,H0)).main: true ==> ={res}.
+  proof strict.
+  by fun;
+     inline IND(Lazy.RO,D(Ga,H0)).D.distinguish; swap{1} 1 1;
+     eqobs_in.
+  qed.
+
+  local equiv G0_G0e (Ga <: Gadv {G,G'}):
+    Gt.IND(G,D(Ga,H0)).main ~ Gt.IND(G',D(Ga,H0)).main: true ==> ={res}
+  by (apply (eagerRO (D(Ga,H0)) _); apply gtagL).
+
+  local equiv G0e_G3e (Ga <: Gadv {G',Hmap}):
+    Gt.IND(G',D(Ga,H0)).main ~ Gt.IND(G',D(Ga,H3(G'))).main: true ==> ={res}.
+  proof strict.
+  fun.
+  call (_: ={glob Eager.RO} /\ forall x, in_dom x G'.m{1}).
+    call (_: ={glob Eager.RO, glob Hmap} /\ forall x, in_dom x G'.m{1}).
+      (* H *)
+      fun; case (in_dom x Hmap.m){1}.
+        rcondf{1} 2; first by intros=> &m; rnd.
+        by rcondf{2} 1; last rnd{1}; skip; smt.
+        rcondt{1} 2; first by intros=> &m; rnd.
+        by rcondt{2} 1; last inline Eager.RO.o; wp; rnd; skip; smt.
+      (* G *)    
+      conseq* (_: ={glob G', x} ==> ={glob G', res}); first 2 smt.
+        fun; eqobs_in.
+    call (_: ={ks} ==> ={glob Hmap}); first by fun; eqobs_in.
+    rnd; skip; smt.
+  inline Eager.RO.init;
+  while (={work, Eager.RO.m} /\ forall x, !mem x work{1} => in_dom x Eager.RO.m{1}).
+    by wp; rnd; wp; skip; progress=> //; smt.
+  by wp; skip; smt.
+  qed.
+
+  (* The transition back from eager cannot be done as easily since H3 now uses G.
+     Even if we do the upto step below in the eager model, we are still stuck in
+     eager-land: any thoughts? *)
 
   (** G4: two eager steps, one in each direction *)
   local module H4 = {
@@ -823,7 +874,7 @@ section.
 
   local module G7 = Gen(GAdv,H7,G).
 
-  (** Reduction to OW *)
+  (** Reduction to OW: no longer using xstar to simulate the oracles *)
   local module I: Inverter = {
     var ystar:signature
     var pk:pkey
@@ -911,7 +962,9 @@ section.
         - forall m r w u,
             H.m.[m,r] = Some (w,true,u) =>
             w = sub ((f pk xstar) * (f pk u) [pk]) 1 k1 /\
-            G.m.[w] = Some (sub ((f pk xstar) * (f pk u) [pk]) (k1 = 1) kg) ^ (r || zeros) *)
+            G.m.[w] = Some (sub ((f pk xstar) * (f pk u) [pk]) (k1 = 1) kg) ^ (r || zeros)
+       There may also still be an upto bad step missing, that deals with the case where
+       the adversary gets lucky and gets a valid signature out of fresh queries to H and G. *)
   local equiv G7_OW_H: H7.o ~ I.H.o:
     ={glob G, x, c} /\
     Hmap.m{1} = I.H.m{2} /\
@@ -937,8 +990,6 @@ section.
     by sp; if=> //; wp.
   qed.
 end section.
-
-
 
 
 
