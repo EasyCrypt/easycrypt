@@ -3,17 +3,16 @@
 \newcommand{\addAmbTacticNoIdx}[1]{\addTacticNoIdx{#1}}
 \newcommand{\addAmbTacticIdx}[1]{\addTacticIdx{ambient}{#1}}
 \newcommand{\addAmbTactic}[2]{\addTactic{ambient}{#1}{#2}}
-  
-\subsection{Generalities}
 
-\EasyCrypt ambient logic is based on non-dependent higher-order logic.
+\EasyCrypt's ambient logic is based on non-dependent higher-order logic.
 
 \subsection{Convertibility}\label{convertible}
 
-\EasyCrypt ambient logic enjoys a mechanism that \emph{identifies} all formulas
-that are equal up to a given amount of computations. The computational power
-of \EasyCrypt if defined as the closure by equivalence of the following 
-rewriting system:
+\EasyCrypt's ambient logic enjoys a mechanism that identifies all formulas
+that are \define{convertible}, that is, formulas that are equal up to a given
+amount of computations. The computational power of \EasyCrypt if defined
+as the closure by equivalence of the following rewriting system augmented with
+a set of logical simplification rules denoted by $\rightarrow_\Lambda$.
 
 \begin{center}
 \begin{tabular}{l@{$\quad$}l@{$\quad$}ll}
@@ -34,11 +33,9 @@ rewriting system:
 \end{tabular}
 \end{center}
 
-\noindent augmented with a set of logical simplification rules denoted by
-$\rightarrow_\Lambda$. We write $\phi_1 \rightarrow_\delta \phi_2$ for
-$\phi_1 \rightarrow_\delta^{\Env;\Gamma}$ if $\Env; \Gamma$ can be deduced
-form the context. We write $\rightarrow_{\Env;\Gamma}$ for the union of all
-the $\beta\iota\delta\zeta\Lambda$-rewrite rules. As usual,
+We write $\rightarrow_\delta$ for $\rightarrow_\delta^{\Env;\Gamma}$ if
+$\Env; \Gamma$ is clear from context. We write $\rightarrow_{\Env;\Gamma}$ for
+the union of all the $\beta\iota\delta\zeta\Lambda$-rewrite rules. As usual,
 $\leftrightarrow^*_{\Env;\Gamma}$ denotes the closure by equivalence of
 $\rightarrow_{\Env;\Gamma}$.
 
@@ -60,24 +57,27 @@ Change the current goal to the $\leftrightarrow^*$-equivalent one \ec{f}
  Change the goal with its $\beta\iota\zeta\Lambda$-head normal-form, followed
  by one step of parallel, strong $\delta$-reduction if \ec{delta} is given.
  The $\delta$-reduction can be restricted to a set of defined symbols by
- replacing \ec{delta} by the non-empty sequence of targeted symbols. You can
+ replacing \ec{delta} by a non-empty sequence of targeted symbols. You can
  selectively change the goal with its $\beta$-head normal form
  (resp. $\iota$, $\zeta$, $\Lambda$-head normal form) by using the tactic
  \ec{beta} (resp. \ec{iota}, \ec{zeta}, \ec{logic}).
 
 %delta
 \addAmbTactic{delta}{\tacarg{names}{ident*}}
-Do one step of parallel, strong $\delta$-reduction, restricted to
- the symbols designed by \ec{names}. If \ec{names} if empty, no restriction
- on the $\delta$-reduction is applied.
+Perform one step of parallel, strong $\delta$-reduction, restricted to
+the symbols listed in \ec{names}. If \ec{names} is empty, all symbols are
+$\delta$-reduced.
 
-\subsection{Bookkeeping}
+\subsection{Bookkeeping tactics}
+
+The following bookkeeping tactics are used to move terms between context and
+goal, and to introduce new variables from known expressions.
 
 %generalize
 \addAmbTactic{generalize}{\tacarg{p}{pattern}}
 Search for the first subterm of the goal matching \ec{p} and leading
 to the full instantiation of the pattern. Then, do a logical
-generalization of all the occurrences of \ec{p}, after instantiation,
+generalization of all the instantiated occurrences of \ec{p}
 in the goal.
 \begin{displaymath}
   \infrule{\Env; \Gamma \vdash p \quad
@@ -88,9 +88,9 @@ in the goal.
 %pose
 \addAmbTactic{pose}{\tacarg{x}{ident} \rawec{:=} \tacarg{p}{pattern}}
 Search for the first subterm of the goal matching \ec{p} and leading
-to the full instantiation of the pattern. Then, introduce, after
+to the full instantiation of the pattern. Then introduce, after
 instantiation, the local definition \rawec{x := p} and abstract
-all the occurrences of \ec{p} in the goal by \ec{x}
+all instantiated occurrences of \ec{p} in the goal by \ec{x}.
 \begin{displaymath}
   \infrule{\Env; \Gamma \vdash p \quad
            \Env; \Gamma, x := p \vdash \phi(x)}
@@ -98,7 +98,8 @@ all the occurrences of \ec{p} in the goal by \ec{x}
 \end{displaymath}
 
 %intros
-\addAmbTactic{intros}{TODO}
+\addAmbTactic{intros}{}
+This is the identity tactic and should be used in combination with intro-patterns.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % LOGIC
@@ -108,7 +109,7 @@ all the occurrences of \ec{p} in the goal by \ec{x}
 
 %assumption
 \addAmbTactic{assumption}{}
-Search in the context an hypothesis \refdef{convertible} to the goal and close it.
+Search in the context an hypothesis convertible to the goal and close it.
  If no such hypothesis exists, the tactic fails
 \begin{displaymath}
   \infrule{(h : \phi) \in \Gamma}{\Env; \Gamma \vdash \phi}
@@ -126,7 +127,7 @@ Solve goals of the form \ec{b = b} for any term \ec{b}.
 \tacname{} breaks a goal that is intrinsically conjunctive into multiple subgoals.
  For instance, it
  \begin{itemize}
-  \item closes any goal that is \refdef{convertible} to \ec{true} or provable
+  \item closes any goal that is convertible to \ec{true} or provable
         by \ec{reflexivity},
 
   \begin{displaymath}
@@ -199,7 +200,7 @@ Logical cut. Generates two subgoals: on for $C$ (the cut formula),
 
 %elim
 \addAmbTactic{elim}{\tacarg{h}{ident}}
-This tactics take as argument the name of a \refdef{judgment} from the \refdef{context} or the \refdef{scope}.
+This tactics take as argument the name of a judgment from the environment or context.
 \begin{displaymath}
   \infrule{\Gamma, h:A \land B \vdash A \Rightarrow B \Rightarrow G}{\Gamma, h:A \land B \vdash G}
   ~~~~~~
@@ -315,11 +316,15 @@ Try to solve the goal using SMT solvers. The goal is sent along with all the
 
 %progress
 \addAmbTactic{progress}{\ec{tactic}?}
-Break the goal into multiple \emph{simpler} ones by repeatedly apply
+Break the goal into multiple \emph{simpler} ones by repeatedly applying
 \ec{split}, \ec{subst} and \ec{intros}. If a tactic is given to \tacname{},
 it is tentatively applied after each step.
+
+\warningbox{The optional parameter to \tacname{} may cause
+performance issues (with \ec{smt}, in particular). It is recommended
+to avoid using it.}
 
 %trivial
 \addAmbTactic{trivial}{}
 Try to solve the goal by calling \ec{try assumption; progress; assumption}.
-This is the tactic call by the intro-pattern \ec{//}.
+This tactic is called by the intro-pattern \ec{//}.

@@ -4,47 +4,44 @@
 
 \chapter{Writing Proofs\label{chap:tactics}}
 
-\EasyCrypt comes with a proof engine that allows to state, in the \EasyCrypt
-underneath formalism, properties about the user defined programs
-and to prove them.
+\EasyCrypt comes with a proof engine that allows to state and prove properties
+about programs written in the various languages described in
+Chapter~\ref{chap:theories}.
 %
-Proofs are built interactively, starting from final goal, by applying
-\emph{tactics} that transform a goal (the property we want to prove)
-to a set of subsequent goals (the subgoals) s.t. the latter logical
-implies the former.
+Proofs are built interactively by applying \define[tactic]{tactics}, that transform a
+current \define[goal]{proof goal} into a (possibly empty) set of
+\define[subgoal]{subgoals} such that the conjunction of the subgoals implies the
+original goal.
 %
-This process is repeated iteratively up to the point where all the
-subgoals are trivial and can be solved by the system.
+This process is repeated, starting from the theorem statement, up to the point
+where all the subgoals correspond to general axioms or premises of the theorem.
 
-This chapter is about the description of this proof engine, and is
-structured as follow. We first define the notion of goals and show
-how it relates to the \EasyCrypt formalism. We then introduce the notion
-of tactics as logically valid goal transformers. Finally, a listing
-of all the existing tactics, along with their detailed descriptions,
-is given.
+In this chapter, we describe this proof engine in general before listing and
+describing the existing tactics for various fragments of \EasyCrypt's
+underlying logic.
 
 \section{The proof engine}
 
-The proof engine deals with \emph{judgments} or \emph{goals} of the form
-$\Env; \Gamma \vdash \phi$ where $\Env$ is the (global) environments,
-$\Gamma$ is a set of local facts and $\phi$ is the formula we want
-to prove. Here is an example of such a judgment:
+The proof engine deals with \define[judgment]{judgments} or goals of the form
+$\Env; \Gamma \vdash \phi$ where $\Env$ is the (global) \define{environment},
+$\Gamma$ is the \define{context} (a set of local facts) and $\phi$ is the
+formula we want to prove. Here is an example of such a judgment:
 
 \begin{center}
 $\Int; x, y , z: \tint, x \le y \vdash x + z \le y + z$.
 \end{center}
 
-It states that in the \emph{environment} ($\Env$) solely composed of the
+It states that in the environment ($\Env$) solely composed of the
 theory $\Int$, having three local variables $x, y, z$ of type $\tint$ along
-with the fact $x \le y$ (the \emph{context} $\Gamma$), we are interested
+with the fact $x \le y$ (the context $\Gamma$), we are interested
 in proving $x + z \le y + z$.
 
 \medskip
 
-On top on this, a set of \emph{deduction rules} is given. They
+On top on this, a set of \define[deduction rule]{deduction rules} is given. They
 describe how one can derive a judgment $\Env; \Gamma \vdash \phi$ given
-that a set of prerequisites (or \emph{premises}) are fulfilled. The general
-form of such a rule is given as follow:
+that a set of prerequisites (or \define[premise]{premises}) are fulfilled. The
+general form of such a rule is given as follow:
 
 \begin{displaymath}
  \infrule{A_1 \cdots A_n}{\Env; \Gamma \vdash \phi}
@@ -78,18 +75,14 @@ a derivation of $\phi_2$, but with a context augmented by $\phi_1$.
 %
 The last states that $\Env; \Gamma, \phi, \Delta \vdash \phi$ is derivable as-is.
 
-\medskip
-
 Combining these deduction rules, it is possible to build a tree rooted by
 a judgment $\Env; \Gamma \vdash \phi$ and with leaves composed of deduction
 rules with no premises (as the third one in the previous example). Such a
-tree forms a \emph{proof} of $\Env; \Gamma \vdash \phi$.
+tree forms a \define{proof} of $\Env; \Gamma \vdash \phi$.
 %
 For instance, Figure~\ref{fig:LJproof} gives a proof of
 %
-\begin{center}
- $\Env; b_1, b_2 : \tbool \vdash (b_1 \Rightarrow b_2) \Rightarrow b_1 \Rightarrow b_2$
-\end{center}
+\[\Env; b_1, b_2 : \tbool \vdash (b_1 \Rightarrow b_2) \Rightarrow b_1 \Rightarrow b_2\]
 
 \begin{figure}
   \begin{displaymath}
@@ -108,13 +101,11 @@ For instance, Figure~\ref{fig:LJproof} gives a proof of
         (b_1 \Rightarrow b_2) \Rightarrow b_1 \Rightarrow b_2$}
 \end{figure}
 
-\bigskip
-
-The \EasyCrypt proof engine helps the user building such proof. At each step
+The \EasyCrypt proof engine helps the user build such proofs. At each step
 of the proof building, the system presents to the user the set of goals
-that has to be proved. The user can then \emph{apply} a tactic to one of
+that have to be proved. The user can then \emph{apply} a tactic to one of
 them, each tactic corresponding to a deduction rule. If the conclusion
-of the rule corresponding to the applied tactic matches the goal to witch
+of the rule corresponding to the applied tactic matches the goal to which
 it is applied, the proof engine replaces it with the set of the
 premises of the applied rule - the subgoals. This application may generate
 no, one or several subgoals depending on the rule. This process is repeated
