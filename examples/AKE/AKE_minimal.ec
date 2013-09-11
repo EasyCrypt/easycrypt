@@ -237,35 +237,6 @@ module AKE_3(FA : Adv) = {
     var pka : Pk = def;
 
     init();
-    while (i < qAgent) {
-      i = i + 1;
-      ska = $sample_Sk;
-      pka = gen_pk(ska);
-      pks = pka :: pks;
-      mSk.[pka] = ska;
-    }
-
-    while (sidxs <> FSet.empty) {
-      sidx = pick sidxs;
-      sidxs = rm sidx sidxs;
-      mEsk.[sidx] = $sample_Esk;
-    } 
-
-    if (bad_esk_col_op mEsk) bad_esk_col = true;
-    
-    t_idx = A.choose(pks);
-    b = ${0,1};
-    if (in_dom t_idx mStarted && in_dom t_idx mCompleted && in_dom t_idx mEexp) {
-      test = Some (compute_sid mStarted mEexp mCompleted t_idx);
-        (* the if-condition implies "mem (Accept (proj O.test)) O.evs" *)
-      if (b) {
-        keyo = O.computeKey(t_idx);
-      } else {
-        key  = $sample_Key;
-        keyo = Some key;
-      }
-      b' = A.guess(keyo);
-    }
     return (b = b');
   }
 }.
