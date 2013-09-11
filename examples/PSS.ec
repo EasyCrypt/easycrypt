@@ -254,7 +254,7 @@ module type CMA_2RO(G:Gt.Types.ARO,H:Ht.Types.ARO,S:AdvOracles) = {
 }.
 
 section. 
-  declare module A:CMA_2RO {G,H,EF_CMA,Wrap,OW}.
+  declare module A:CMA_2RO {G,G',H,EF_CMA,Wrap,OW}.
   axiom adversaryL (G <: Gt.Types.ARO {A}) (H <: Ht.Types.ARO {A}) (S <: AdvOracles {A}):
     islossless G.o => islossless H.o => islossless S.sign =>
     islossless A(G,H,S).forge.
@@ -640,7 +640,7 @@ section.
     }
   }.
 
-  local module H3 (G:Gt.Types.ARO) = {
+  local module H3' (G:Gt.Types.ARO) = {
     fun init(ks:pkey * skey): unit = {
       Hmap.init(ks);
     }
@@ -659,6 +659,27 @@ section.
     }
   }.
 
+  local module H3 = {
+    fun init(ks:pkey * skey): unit = {
+      Hmap.init(ks);
+    }
+
+
+    fun o(c:bool, x:message * salt): htag = {
+      var w:htag;
+      var st:gtag;
+
+      if (!in_dom x Hmap.m) {
+        w = $sample_htag;
+        Hmap.m.[x] = (w,c,Signature.ones);
+        st = G.o(w);
+      }
+      return pi3_1 (proj Hmap.m.[x]);
+    }
+  }.
+
+  local module G3 = Gen(GAdv,H3,G).
+
   local module D (Ga:Gadv, H:PSplitOracle, G:Gt.Types.ARO) = {
     module H = H(G)
     module Ga = Ga(H,G)
@@ -673,20 +694,27 @@ section.
     }
   }.
 
-  local equiv G0_D (Ga <: Gadv {G, Hmap}):
-    Gen(Ga,H0'(G),G).main ~ Gt.IND(G,D(Ga,H0')).main: true ==> ={res}.
+  local equiv G0_D0 (Ga <: Gadv {G,Hmap}):
+    Gen(Ga,H0,G).main ~ Gt.IND(G,D(Ga,H0')).main: true ==> ={res}.
   proof strict.
-  by fun;
-     inline IND(Lazy.RO,D(Ga,H0')).D.distinguish; swap{1} 1 1;
-     eqobs_in.
+  fun; inline IND(Lazy.RO,D(Ga,H0')).D.distinguish; swap{1} 1 1.
+  wp; call (_: ={glob Hmap, glob Lazy.RO}).
+    (* H *)
+    by conseq* (_: ={glob Hmap, c, x} ==> ={glob Hmap, res})=> //; fun*; inline H0'(Lazy.RO).o; eqobs_in.
+    (* G *)
+    by fun; eqobs_in.
+  call (_: ={ks} ==> ={glob Hmap}); first by fun; inline H0.init; eqobs_in.
+  rnd.
+  by call (_: true ==> ={glob Lazy.RO});
+       first fun; eqobs_in.
   qed.
 
-  local equiv G0_G0e (Ga <: Gadv {G,G'}):
+  local equiv D0_D0e (Ga <: Gadv {G,G'}):
     Gt.IND(G,D(Ga,H0')).main ~ Gt.IND(G',D(Ga,H0')).main: true ==> ={res}
   by (apply (eagerRO (D(Ga,H0')) _); apply gtagL).
 
-  local equiv G0e_G3e (Ga <: Gadv {G',Hmap}):
-    Gt.IND(G',D(Ga,H0')).main ~ Gt.IND(G',D(Ga,H3)).main: true ==> ={res}.
+  local equiv D0e_D3e (Ga <: Gadv {G',Hmap}):
+    Gt.IND(G',D(Ga,H0')).main ~ Gt.IND(G',D(Ga,H3')).main: true ==> ={res}.
   proof strict.
   fun.
   call (_: ={glob Eager.RO} /\ forall x, in_dom x G'.m{1}).
@@ -708,16 +736,42 @@ section.
   by wp; skip; smt.
   qed.
 
-  local equiv G3e_G3 (Ga <: Gadv {G,G'}):
-    Gt.IND(G',D(Ga,H3)).main ~ Gt.IND(G,D(Ga,H3)).main: true ==> ={res}.
+  local equiv D3e_D3 (Ga <: Gadv {G,G'}):
+    Gt.IND(G',D(Ga,H3')).main ~ Gt.IND(G,D(Ga,H3')).main: true ==> ={res}.
   proof strict.
   by symmetry;
      (* Note that we cannot apply the lemma directly because 'res{2} = res{1}' does not match '={res}' *)
-     conseq* (eagerRO (D(Ga,H3)) _)=> //;
+     conseq* (eagerRO (D(Ga,H3')) _)=> //;
      apply gtagL.
   qed.
-  
-  (** G4: two eager steps, one in each direction *)
+
+  local equiv D3_G3 (Ga <: Gadv {G,Hmap}):
+    Gt.IND(G,D(Ga,H3')).main ~ Gen(Ga,H3,G).main: true ==> ={res}.
+  proof strict.
+  by fun;
+     inline IND(Lazy.RO,D(Ga,H3')).D.distinguish; swap{1} 1 1;
+     eqobs_in.
+  qed.
+
+  local equiv G0_G3_abstract (Ga <: Gadv {G,G',Hmap}):
+    Gen(Ga,H0,G).main ~ Gen(Ga,H3,G).main: true ==> ={res}.
+  proof strict.
+  bypr (res{1}) (res{2})=> // a &1 &2 h {h}.
+  apply (eq_trans _ Pr[Gt.IND(G,D(Ga,H0')).main() @ &1: a = res]);
+    first by equiv_deno (G0_D0 Ga).
+  apply (eq_trans _ Pr[Gt.IND(G',D(Ga,H0')).main() @ &1: a = res]);
+    first by equiv_deno (D0_D0e Ga).
+  apply (eq_trans _ Pr[Gt.IND(G',D(Ga,H3')).main() @ &1: a = res]);
+    first by equiv_deno (D0e_D3e Ga).
+  apply (eq_trans _ Pr[Gt.IND(G,D(Ga,H3')).main() @ &1: a = res]);
+    first by equiv_deno (D3e_D3 Ga).
+  by equiv_deno (D3_G3 Ga).
+  qed.
+
+  local equiv G0_G3: G0.main ~ G3.main: true ==> ={res}
+  by apply (G0_G3_abstract GAdv).
+
+  (** G4: upto "having already called G on the same w that has just been freshly sampled by H" *)
   local module H4 = {
     var bad:bool
 
@@ -740,7 +794,6 @@ section.
       return pi3_1 (proj Hmap.m.[x]);
     }
   }.
-
 
   local module G4 = Gen(GAdv, H4, G).
 
