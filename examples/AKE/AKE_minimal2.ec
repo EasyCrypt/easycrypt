@@ -98,46 +98,23 @@ module AKE_3(FA : Adv) = {
 
     fun h1(a : Sk, x : Esk) : Eexp = {
       var e : Eexp;
-      e = $sample_Eexp;
-      if (!in_dom (a,x) mH1) {
-        mH1.[(a,x)] = e;
-      } 
       return proj mH1.[(a,x)];
     }
 
     fun h1_a(a : Sk, x : Esk) : Eexp option = {
       var r : Eexp option = None;
       var xe : Eexp;
-      if (cH1 < qH1) {
-        cH1 = cH1 + 1;
-        sH1 = add (a,x) sH1;
-        if (bad_esk_norev_op mEsk mStarted mEexp x evs) {
-          bad_esk_norev = true;
-        }
-        xe = h1(a,x);
-        r = Some(xe);
-      }
       return r;
     }
 
     fun h2(sstring : Sstring) : Key = {
       var ke : Key;
-      ke = $sample_Key;
-      if (!in_dom sstring mH2) {
-        mH2.[sstring] = ke;
-      }
       return proj mH2.[sstring];
     }
  
     fun h2_a(sstring : Sstring) : Key option = {
       var r : Key option = None;
       var ks : Key;
-      if (cH2 < qH2) {
-        cH2 = cH2 + 1;
-        sH2 = add sstring sH2;
-        ks = h2(sstring);
-        r = Some(ks);
-      }
       return r;
     }
 
@@ -145,14 +122,6 @@ module AKE_3(FA : Adv) = {
       var pX : Epk;
       var x : Esk;
       var r : Epk option = None; 
-      if (in_dom A mSk && in_dom B mSk && !in_dom i mStarted) {
-        x = proj mEsk.[i];
-        mEexp.[i] = h1(proj (mSk.[A]),x);
-        pX = gen_epk(proj mEexp.[i]);
-        mStarted.[i] = (A,B,init);
-        r = Some(pX);
-        evs = Start(compute_psid mStarted mEexp i)::evs;
-      }
       return r;
     }
 
@@ -160,40 +129,19 @@ module AKE_3(FA : Adv) = {
       var y : Esk;
       var pY : Epk;
       var r : Epk option = None; 
-      if (in_dom A mSk && in_dom B mSk && !in_dom i mStarted && !in_dom i mCompleted) {
-        y = proj mEsk.[i];
-        mEexp.[i] = h1(proj (mSk.[B]),y);
-        pY = gen_epk(proj mEexp.[i]);
-        mStarted.[i] = (B,A,resp);
-        mCompleted.[i] = X;
-        r = Some(pY);
-        evs = Accept(compute_sid mStarted mEexp mCompleted i)::evs;
-      }
       return r;
     }
 
     fun init2(i : Sidx, Y : Epk) : unit = {
-      if (!in_dom i mCompleted && in_dom i mStarted && in_dom i mEexp) {
-        mCompleted.[i] = Y;
-        evs = Accept(compute_sid mStarted mEexp mCompleted i)::evs;
-      }
     }
 
     fun staticRev(A : Agent) : Sk option = {
       var r : Sk option = None;
-      if (in_dom A mSk) {
-        r = mSk.[A];
-        evs = StaticRev(A)::evs;
-      }
       return r;
     }
 
     fun ephemeralRev(i : Sidx) : Esk option = {
       var r : Esk option = None;
-      if (in_dom i mStarted && in_dom i mEexp) {
-        r = mEsk.[i];
-        evs = EphemeralRev(compute_psid mStarted mEexp i)::evs;
-      }
       return r;
     }
 
@@ -201,22 +149,11 @@ module AKE_3(FA : Adv) = {
       var r : Key option = None;
       var sd : Sdata2;
       var k : Key;
-      if (in_dom i mCompleted && in_dom i mStarted && in_dom i mEexp) {
-        sd = proj mStarted.[i];
-        k = h2(gen_sstring (proj mEexp.[i]) (proj mSk.[sd2_actor sd])
-                           (sd2_peer sd) (proj mCompleted.[i])
-                           (sd2_role sd));
-        r = Some k;
-      }
       return r;
     }
 
     fun sessionRev(i : Sidx) : Key option = {
       var r : Key option = None;
-      if (in_dom i mCompleted && in_dom i mStarted && in_dom i mEexp) {
-        evs = SessionRev(compute_sid mStarted mEexp mCompleted i)::evs;
-        r = computeKey(i);
-      }
       return r;
     }
   }
@@ -237,35 +174,6 @@ module AKE_3(FA : Adv) = {
     var pka : Pk = def;
 
     init();
-    while (i < qAgent) {
-      i = i + 1;
-      ska = $sample_Sk;
-      pka = gen_pk(ska);
-      pks = pka :: pks;
-      mSk.[pka] = ska;
-    }
-
-    while (sidxs <> FSet.empty) {
-      sidx = pick sidxs;
-      sidxs = rm sidx sidxs;
-      mEsk.[sidx] = $sample_Esk;
-    } 
-
-    if (bad_esk_col_op mEsk) bad_esk_col = true;
-    
-    t_idx = A.choose(pks);
-    b = ${0,1};
-    if (in_dom t_idx mStarted && in_dom t_idx mCompleted && in_dom t_idx mEexp) {
-      test = Some (compute_sid mStarted mEexp mCompleted t_idx);
-        (* the if-condition implies "mem (Accept (proj O.test)) O.evs" *)
-      if (b) {
-        keyo = O.computeKey(t_idx);
-      } else {
-        key  = $sample_Key;
-        keyo = Some key;
-      }
-      b' = A.guess(keyo);
-    }
     return (b = b');
   }
 }.
