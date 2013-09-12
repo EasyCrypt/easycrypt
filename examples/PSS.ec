@@ -905,7 +905,9 @@ section.
       var w:htag;
       var st:gtag;
       var z, u:signature;
+      var i:int;
 
+      i = 0;
       b = true;
       if (!in_dom x Hmap.m)
       {
@@ -916,8 +918,12 @@ section.
           w = HTag.from_bits (sub (to_bits z) 1 k1);
           st = GTag.from_bits (sub (to_bits z) (k1 + 1) kg);
           u = if c then ((inv Hmem.xstar Hmem.pk) * finv Hmem.sk  z) Hmem.pk else finv Hmem.sk z;
-          Hmap.m.[x] = (w,c,u);
-          G.m.[w] = st ^ (GTag.from_bits (to_bits (snd x) || zeros (kg - k0)));
+          if (!b)
+          {
+            Hmap.m.[x] = (w,c,u);
+            G.m.[w] = st ^ (GTag.from_bits (to_bits (snd x) || zeros (kg - k0)));
+          }
+          i = i + 1;
         }
       }
       else
@@ -976,8 +982,47 @@ section.
 
   local module G6 = Gen(GAdv,H6,G).
 
-  (* G5_G6 will be a bit problematic because of the impossibility to synchronize the
-     loops unless an early exit is chosen *)
+  local lemma G5_G6_abstract (Ga <: Gadv {H5,H6,G,Hmem}):
+    (forall (H <: SplitOracle{Ga}) (G <: Gt.Types.ARO{Ga}),
+       islossless H.o => islossless G.o => islossless Ga(H,G).main) => 
+    equiv [Gen(Ga,H5,G).main ~ Gen(Ga,H6,G).main: true ==> !H6.bad{2} => ={res}].
+  proof strict.
+  intros=> GaL; fun.
+  call (_: H6.bad, ={glob Hmap, glob G}).
+    (* H *)
+    fun; sp; if=> //.
+      splitwhile (i < kg2): {1} 1.
+      seq 1 1: (={b, i, c, x, w, st, z, u, glob Hmap, glob G} /\ !H6.bad{2}).
+        while (={b, i, c, x, glob Hmap, glob G} /\ 0 <= i{1} /\ (i{1} > 0 => ={z, w, st, u}) /\ (i{1} = 0 => b{1})).
+          seq 5 5: (={b, i, c, x, w, st, z, u, glob Hmap, glob G} /\ 0 <= i{1}).
+            by wp; rnd; skip; smt.
+            by if=> //; wp; skip; smt.
+        by skip; progress=> //; smt.
+      case (b{1}).
+        seq 0 1: H6.bad{2}; first by wp; skip; progress=> //; right.
+          conseq* (_: _ ==> true). progress=> //; smt.
+          while{1} (true) (1)=> //. admit. (* termination cannot currently be proven? *)
+        by rcondf{1} 1=> //; wp.
+      by if=> //; wp.
+    intros=> _ _; admit. (* same thing *)
+    intros=> _; fun; sp; if.
+      wp; while true (kg2 - i); first by intros=> _; wp; rnd cpTrue; skip; smt.
+            skip; smt.
+      by wp.
+    (* G *)
+    by conseq* (_: ={glob G, x} ==> ={glob G, res})=> //;
+      first by fun; eqobs_in.
+    by intros=> _ _; apply (Gt.Lazy.lossless_o _); apply gtagL.
+    by intros=> _; conseq* (Gt.Lazy.lossless_o _); apply gtagL.
+  call (_: ={ks} /\ valid_keys ks{1} ==> ={glob Hmap});
+    first by fun; eqobs_in.
+  call (_: true ==> ={glob G});
+    first by fun; eqobs_in.
+  by rnd; skip; progress=> //; smt.
+  qed.
+
+  local equiv G5_G6_equiv: G5.main ~ G6.main: true ==> !H6.bad{2} => ={res}
+  by (apply (G5_G6_abstract GAdv); apply lossless_GAdv).
 
   (** G7: No longer using sk to simulate the oracles *)
   local module H7: SplitOracle = {
