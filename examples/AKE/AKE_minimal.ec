@@ -246,30 +246,34 @@ lemma Eq_AKE_3_AKE_3__1_bad_esk_norev(A <: Adv):
             AKE_3.bad_esk_norev{1} =>  AKE_3.bad_esk_norev{2} ].
 proof strict.
   fun.
+(*  conseq (_ : _ ==> ={AKE_3.bad_esk_norev}) => //.
+   eqobs_in.  
+save. *)
   inline AKE_3(A).init.
   (* 1: this takes about 5 seconds *)
-  seq 11 11:
+(*  seq 11 11:
     ( ={b,pks,t_idx,key,keyo,b',i,sidx, sidxs,ska,pka}).
   eqobs_in true true:
-    ( ={b,pks,t_idx,key,keyo,b',i,sidx, sidxs,ska,pka}).
+    ( ={b,pks,t_idx,key,keyo,b',i,sidx, sidxs,ska,pka}). *)
   (* 2: this takes about 31 seconds *)
-  (* 
+
   seq 25 25:
     ( ={b,pks,t_idx,key,keyo,b',i,sidx, sidxs,ska,pka} /\
-      AKE_3.evs{1}         = AKE_3__1.evs{2} /\
-      AKE_3.test{1}        = AKE_3__1.test{2} /\
-      AKE_3.cH1{1}         = AKE_3__1.cH1{2} /\
-      AKE_3.cH2{1}         = AKE_3__1.cH2{2} /\
-      AKE_3.mH1{1}         = AKE_3__1.mH1{2} /\
-      AKE_3.sH1{1}         = AKE_3__1.sH1{2} /\
-      AKE_3.mH2{1}         = AKE_3__1.mH2{2} /\
-      AKE_3.sH2{1}         = AKE_3__1.sH2{2} /\
-      AKE_3.mSk{1}         = AKE_3__1.mSk{2} /\
-      AKE_3.mCompleted{1}  = AKE_3__1.mCompleted{2} /\
-      AKE_3.mStarted{1}    = AKE_3__1.mStarted{2} /\
-      AKE_3.mEsk{1}        = AKE_3__1.mEsk{2} /\
-      AKE_3.mEexp{1}       = AKE_3__1.mEexp{2}).
-  eqobs_in. *)
+      AKE_3.evs{1}         = AKE_3.evs{2} /\
+      AKE_3.test{1}        = AKE_3.test{2} /\
+      AKE_3.cH1{1}         = AKE_3.cH1{2} /\
+      AKE_3.cH2{1}         = AKE_3.cH2{2} /\
+      AKE_3.mH1{1}         = AKE_3.mH1{2} /\
+      AKE_3.sH1{1}         = AKE_3.sH1{2} /\
+      AKE_3.mH2{1}         = AKE_3.mH2{2} /\
+      AKE_3.sH2{1}         = AKE_3.sH2{2} /\
+      AKE_3.mSk{1}         = AKE_3.mSk{2} /\
+      AKE_3.mCompleted{1}  = AKE_3.mCompleted{2} /\
+      AKE_3.mStarted{1}    = AKE_3.mStarted{2} /\
+      AKE_3.mEsk{1}        = AKE_3.mEsk{2} /\
+      AKE_3.mEexp{1}       = AKE_3.mEexp{2}).
+  eqobs_in. 
+
   admit.
 qed.
 
