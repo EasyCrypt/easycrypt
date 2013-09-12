@@ -14,7 +14,7 @@ export Abs.
 
 theory Triangle.
 
-  lemma triangular_inequality : forall (x:_,y:_,z:_),
+  lemma triangular_inequality x y z:
      `| x-y | <= `| x-z |  + `| y-z |
   by [].
 
@@ -35,7 +35,7 @@ theory PowerInt.
      
 end PowerInt.
 export PowerInt.
-
+print theory Int.
 theory Square.
   import why3 "real" "Square"
     op "sqrt" as "sqrt".
