@@ -116,6 +116,11 @@ type mc = {
   mc_components : ipath MMsym.t;
 }
 
+type env_norm = {
+  norm_mp : EcPath.mpath Mm.t;
+  norm_xp : EcPath.xpath Mx.t;
+}
+
 (* -------------------------------------------------------------------- *)
 type preenv = {
   env_scope    : escope;
@@ -128,7 +133,8 @@ type preenv = {
   env_modlcs   : Sid.t;                 (* declared modules *)
   env_w3       : EcWhy3.env;
   env_rb       : EcWhy3.rebinding;      (* in reverse order *)
-  env_item     : ctheory_item list      (* in reverse order *)
+  env_item     : ctheory_item list;     (* in reverse order *)
+  env_norm     : env_norm ref;
 }
 
 and escope = {
@@ -173,7 +179,7 @@ let empty_mc params = {
 }
 
 (* -------------------------------------------------------------------- *)
-let empty =
+let empty () =
   let name = EcCoreLib.id_top in
   let path = EcPath.psymbol name in
 
@@ -191,6 +197,7 @@ let empty =
       env_w3       = EcWhy3.empty;
       env_rb       = [];
       env_item     = [];
+      env_norm     = ref { norm_mp = Mm.empty; norm_xp = Mx.empty };
     }
   in
     env
@@ -1394,7 +1401,9 @@ module Mod = struct
       { env with
         env_w3   = w3;
         env_rb   = rb @ env.env_rb;
-        env_item = CTh_module me :: env.env_item }
+        env_item = CTh_module me :: env.env_item;
+        env_norm = ref !(env.env_norm);
+      }
 
   let me_of_mt env name modty restr = 
     let modsig =
@@ -1426,7 +1435,9 @@ module Mod = struct
             let current = MC._up_mc  true current path in
             let current = MC._up_mod true current me.me_name (path, me) in
               current);
-          env_comps = Mip.add path comps env.env_comps; }
+          env_comps = Mip.add path comps env.env_comps; 
+          env_norm  = ref !(env.env_norm);
+      }
     in
       env
 
@@ -1581,7 +1592,7 @@ module NormMp = struct
      if yes we do as usual 
      
   *)
-  let rec norm_mpath env p =
+  let rec norm_mpath_def env p =
     let top = EcPath.m_functor p in
     let args = p.EcPath.m_args in
     let sub = 
@@ -1625,10 +1636,21 @@ module NormMp = struct
       (* The top is in normal form simply normalize the arguments *)
         EcPath.mpath p.EcPath.m_top (List.map (norm_mpath env) args)
       end
+
+  and norm_mpath env p =
+    try Mm.find p !(env.env_norm).norm_mp with Not_found ->
+      let res = norm_mpath_def env p in
+      let en = !(env.env_norm) in
+      env.env_norm := { en with norm_mp = Mm.add p res en.norm_mp };
+      res
  
   let norm_xpath env p =
-    EcPath.xpath (norm_mpath env p.EcPath.x_top) p.EcPath.x_sub
-      
+    try Mx.find p !(env.env_norm).norm_xp with Not_found ->
+      let res = EcPath.xpath (norm_mpath env p.EcPath.x_top) p.EcPath.x_sub in
+      let en = !(env.env_norm) in
+      env.env_norm := { en with norm_xp = Mx.add p res en.norm_xp };
+      res
+
   type use =
     { us_pv : ty Mx.t; 
       us_gl : Sid.t;  
@@ -2323,7 +2345,7 @@ let import_w3_dir env dir name rd =
 
 (* -------------------------------------------------------------------- *)
 let initial =
-  let env0 = empty in
+  let env0 = empty () in
   let env = enter `Theory EcCoreLib.id_Pervasive env0 in
   let unit_rn =
     let tunit = Why3.Ty.ts_tuple 0 in
