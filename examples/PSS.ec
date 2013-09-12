@@ -655,8 +655,9 @@ section.
     Pr[G0.main() @ &m: res] = Pr[G1.main() @ &m: res]
   by equiv_deno G0_G1_equiv.
 
-  (** G4: upto "having already called G on the same w that has just been freshly sampled by H" *)
-  local module H4 = {
+  (** G2: upto "having already called G on the same w that has just been freshly sampled by H"
+        + optimistic sampling *)
+  local module H2 = {
     var bad:bool
 
     fun init(ks:pkey*skey): unit = {
@@ -679,10 +680,59 @@ section.
     }
   }.
 
-  local module G4 = Gen(GAdv, H4, G).
+  local module G2 = Gen(GAdv, H2, G).
 
-  (** G5 *)
-  local module H5: SplitOracle = {
+  local equiv G1_G2_H:
+    H1.o ~ H2.o:
+      !H2.bad{2} /\ ={glob Hmap, glob G, c, x} ==>
+      !H2.bad{2} => ={glob Hmap, glob G, res}.
+  proof strict.
+  by fun; if=> //; inline G.o; swap{1} 4 -2; wp;
+          rnd ((^) (GTag.from_bits (to_bits (snd x{2}) || zeros (kg - k0))));
+          rnd; skip; progress=> //; smt.
+  qed.
+
+  local lemma G1_G2_abstract (Ga <: Gadv {G, H1, H2}):
+    (forall (H <: SplitOracle{Ga}) (G <: Gt.Types.ARO{Ga}),
+       islossless H.o => islossless G.o => islossless Ga(H,G).main) => 
+    equiv [Gen(Ga,H1,G).main ~ Gen(Ga,H2,G).main: true ==> !H2.bad{2} => ={res}].
+  proof strict.  
+  intros=> GaL; fun.
+  call (_: H2.bad, ={glob G, glob Hmap}).
+    (* H *)
+    by conseq* G1_G2_H; smt.
+    intros=> _ _; fun.
+      if=> //;
+      call (Gt.Lazy.lossless_o _);
+        first by apply gtagL.
+      by wp; rnd; skip; progress=> //; apply htagL.
+    intros=> _; fun.
+      by if => //; wp; do !rnd cpTrue;
+         skip; smt.
+    (* G *)
+    by conseq* (_: ={glob G, x} ==> ={glob G, res})=> //;
+       fun; eqobs_in.
+    by intros=> _ _;
+       conseq* (Gt.Lazy.lossless_o _);
+       apply gtagL.
+    by intros=> _ /=;
+       conseq* (Gt.Lazy.lossless_o _);
+       apply gtagL.
+  call (_: ={ks} /\ valid_keys ks{1} ==> ={glob Hmap} /\ !H2.bad{2});
+    first by fun; wp; call Hmap_init.
+  call (_: true ==> ={glob G});
+    first by fun; eqobs_in.
+  by rnd; skip; smt.
+  qed.
+
+  local equiv G1_G2_equiv: G1.main ~ G2.main: true ==> !H2.bad{2} => ={res}
+  by (apply (G1_G2_abstract GAdv); apply lossless_GAdv).
+
+  (** TODO: bound the probability of bad in G2. *)
+
+  (** G3: upto "H is called by the signature oracle on a message * salt pair that has
+                previously been queries directly by the adversary" *)
+  local module H3: SplitOracle = {
     var bad:bool
 
     fun init(ks:pkey*skey): unit = {
@@ -709,58 +759,53 @@ section.
     }
   }.
 
-  local module G5 = Gen(GAdv, H5, G).
+  local module G3 = Gen(GAdv, H3, G).
 
   (** Proofs *)
-  local equiv G4_G5_H:
-    H4.o ~ H5.o:
-      !H5.bad{2} /\ ={glob Hmap, glob G, c, x} /\ valid_keys (Hmem.pk,Hmem.sk){2} ==>
-      ={glob Hmem} /\ valid_keys (Hmem.pk,Hmem.sk){2} /\ (!H5.bad{2} => ={glob Hmap, glob G, res}).
+  local equiv G2_G3_H:
+    H2.o ~ H3.o:
+      !H3.bad{2} /\ ={glob Hmap, glob G, c, x} ==>
+      !H3.bad{2} => ={glob Hmap, glob G, res}.
   proof strict.
   fun; sp; if=> //.
     by wp; do !rnd.
     by wp.
   qed.
 
-  local lemma G4_G5_abstract (Ga <: Gadv {H4,H5,G,Hmem}):
+  local lemma G2_G3_abstract (Ga <: Gadv {H2,H3,G,Hmem}):
     (forall (H <: SplitOracle{Ga}) (G <: Gt.Types.ARO{Ga}),
        islossless H.o => islossless G.o => islossless Ga(H,G).main) => 
-    equiv [Gen(Ga,H4,G).main ~ Gen(Ga,H5,G).main: true ==> !H5.bad{2} => ={res}].
+    equiv [Gen(Ga,H2,G).main ~ Gen(Ga,H3,G).main: true ==> !H3.bad{2} => ={res}].
   proof strict.
   intros=> GaL; fun.
-  call (_: H5.bad,
-             ={glob Hmap, glob G} /\ valid_keys (Hmem.pk,Hmem.sk){2}, 
-             ={glob Hmem} /\ valid_keys (Hmem.pk,Hmem.sk){2}).
+  call (_: H3.bad, ={glob Hmap, glob G}).
     (* H *)
-    by conseq* G4_G5_H=> //; smt.
-    by intros=> &2 _; conseq* (_: valid_keys (Hmem.pk,Hmem.sk) ==>
-                                  valid_keys (Hmem.pk,Hmem.sk))=> //;
-       fun; if=> //; wp; do !rnd (cpTrue); skip; smt.
-    intros &m2; conseq* (_: H5.bad /\ valid_keys (Hmem.pk,Hmem.sk) ==>
-                            H5.bad /\ valid_keys (Hmem.pk,Hmem.sk))=> //.
-      fun; if=> //.
-        by wp; do !rnd (cpTrue); skip; smt.
-        by wp.
+    by conseq* G2_G3_H=> //; smt.
+    by intros=> &2 _; conseq* (_: true ==> true)=> //;
+       fun; if=> //; wp; do !rnd cpTrue; skip; smt.
+    by intros=> _; fun; if=> //; wp; try (do !rnd cpTrue); skip; smt.
     (* G *)
-    by conseq* (_: _ ==> ={glob G, res}); last fun; eqobs_in.
+    by conseq* (_: _ ==> ={glob G, res})=> //; fun; eqobs_in.
     by intros _ _; conseq* (Gt.Lazy.lossless_o _); apply gtagL.
     by intros _; conseq* (Gt.Lazy.lossless_o _); apply  gtagL.
-  call (_: ={ks} /\ valid_keys ks{2} ==> ={glob Hmap} /\ valid_keys (Hmem.pk,Hmem.sk){2} /\ !H5.bad{2});
+  call (_: ={ks} /\ valid_keys ks{2} ==> ={glob Hmap} /\ !H3.bad{2});
     first by fun; wp; call Hmap_init.
   call (_: true ==> ={glob G});
     first by fun; eqobs_in.
   by rnd; skip; smt.
   qed.
 
-  local equiv G4_G5: Gen(GAdv,H4,G).main ~ Gen(GAdv,H5,G).main : true ==> !H5.bad{2} => ={res}.
+  local equiv G2_G3: Gen(GAdv,H2,G).main ~ Gen(GAdv,H3,G).main : true ==> !H3.bad{2} => ={res}.
   proof strict.
-  by apply (G4_G5_abstract GAdv _); apply lossless_GAdv.
+  by apply (G2_G3_abstract GAdv _); apply lossless_GAdv.
   qed.
 
   (** TODO: Bound the probability of bad in G5 *)
 
-  (** G6 *)
-  local module H6: SplitOracle = {
+  (** G4: compute z and u from the sampled values
+        Note: z is uniform in "bitstrings of length k starting with a zero bit" (denoted '0 || 2^k-1'), and
+              u is uniform in f^-1(0 || 2^k-1) *)
+  local module H4: SplitOracle = {
     fun init(ks:pkey * skey): unit = {
       Hmap.init(ks);
     }
@@ -787,10 +832,70 @@ section.
     }
   }.
 
-  local module G6 = Gen(GAdv,H6,G).
+  local module G4 = Gen(GAdv,H4,G).
 
-  (** G7: No longer using sk to simulate the oracles *)
-  local module H7: SplitOracle = {
+  local equiv G3_G4_H: H3.o ~ H4.o:
+    ={glob Hmem, glob G, c, x} /\
+    dom Hmap.m{1} = dom Hmap.m{2} /\
+    (forall x, in_dom x Hmap.m{1} =>
+       pi3_1 (proj Hmap.m.[x]{1}) = pi3_1 (proj Hmap.m.[x]{2})) /\
+    (forall x, in_dom x Hmap.m{1} =>
+       pi3_2 (proj Hmap.m.[x]{1}) = pi3_2 (proj Hmap.m.[x]{2})) ==>
+    ={glob Hmem, glob G, res} /\
+    dom Hmap.m{1} = dom Hmap.m{2} /\
+    (forall x, in_dom x Hmap.m{1} =>
+       pi3_1 (proj Hmap.m.[x]{1}) = pi3_1 (proj Hmap.m.[x]{2})) /\
+    (forall x, in_dom x Hmap.m{1} =>
+       pi3_2 (proj Hmap.m.[x]{1}) = pi3_2 (proj Hmap.m.[x]{2})).
+  proof strict.
+  fun;
+  if; first smt.
+    seq 2 4: (={glob Hmem, glob G, c, x, w, st} /\
+              dom Hmap.m{1} = dom Hmap.m{2} /\
+              (forall x, in_dom x Hmap.m{1} =>
+                pi3_1 (proj Hmap.m.[x]{1}) = pi3_1 (proj Hmap.m.[x]{2})) /\
+              (forall x, in_dom x Hmap.m{1} =>
+                pi3_2 (proj Hmap.m.[x]{1}) = pi3_2 (proj Hmap.m.[x]{2}))).
+      by wp; do !rnd; skip; progress=> //; smt.
+    seq 1 1: (={glob Hmem, glob G, c, x, w, st} /\
+              dom Hmap.m{1} = dom Hmap.m{2} /\
+              (forall x, in_dom x Hmap.m{1} =>
+                pi3_1 (proj Hmap.m.[x]{1}) = pi3_1 (proj Hmap.m.[x]{2})) /\
+              (forall x, in_dom x Hmap.m{1} =>
+                pi3_2 (proj Hmap.m.[x]{1}) = pi3_2 (proj Hmap.m.[x]{2}))).
+      wp; skip; progress=> //; first 2 smt.
+        by case (x{2} = x0); smt.
+    by wp; skip; progress=> //; smt.
+
+    by if; [smt | | ]; wp; skip; progress=> //; smt.  
+  qed.
+
+  local equiv G3_G4_abstract (Ga <: Gadv {H2,H3,G,Hmem}):
+    Gen(Ga,H3,G).main ~ Gen(Ga,H4,G).main: true ==> ={res}.
+  proof strict.
+  fun; call (_: ={glob Hmem, glob G} /\
+                dom Hmap.m{1} = dom Hmap.m{2} /\
+                (forall x, in_dom x Hmap.m{1} =>
+                  pi3_1 (proj Hmap.m.[x]{1}) = pi3_1 (proj Hmap.m.[x]{2})) /\
+                (forall x, in_dom x Hmap.m{1} =>
+                  pi3_2 (proj Hmap.m.[x]{1}) = pi3_2 (proj Hmap.m.[x]{2}))).
+    (* H *)
+    by conseq* G3_G4_H; smt.
+    (* G *)
+    conseq* (_: ={glob G, x} ==> ={glob G, res}); first 2 smt.
+      by fun; eqobs_in.
+  call (_: ={ks} /\ valid_keys ks{1} ==> ={glob Hmap});
+    first by fun; wp; call Hmap_init.
+  call (_: true ==> ={glob G});
+    first by fun; eqobs_in.
+  by rnd.
+  qed.
+
+  local equiv G3_G4: G3.main ~ G4.main: true ==> ={res}
+  by apply (G3_G4_abstract GAdv).
+
+  (** G5: No longer using sk to simulate the oracles *)
+  local module H5: SplitOracle = {
     var bad:bool
 
     fun init(ks:pkey * skey): unit = {
@@ -831,7 +936,7 @@ section.
     }
   }.
 
-  local module G7 = Gen(GAdv,H7,G).
+  local module G5 = Gen(GAdv,H5,G).
 
   (** Reduction to OW: no longer using xstar to simulate the oracles *)
   local module I: Inverter = {
@@ -924,7 +1029,7 @@ section.
             G.m.[w] = Some (sub ((f pk xstar) * (f pk u) [pk]) (k1 = 1) kg) ^ (r || zeros)
        There may also still be an upto bad step missing, that deals with the case where
        the adversary gets lucky and gets a valid signature out of fresh queries to H and G. *)
-  local equiv G7_OW_H: H7.o ~ I.H.o:
+  local equiv G5_OW_H: H5.o ~ I.H.o:
     ={glob G, x, c} /\
     Hmap.m{1} = I.H.m{2} /\
     Hmem.pk{1} = I.pk{2} /\
@@ -934,7 +1039,7 @@ section.
     Hmem.pk{1} = I.pk{2} /\
     (f Hmem.pk Hmem.xstar){1} = I.ystar{2}.
   proof strict.
-  fun; inline H7.o I.H.o; wp; sp; if=> //.
+  fun; inline H5.o I.H.o; wp; sp; if=> //.
     wp; while (={glob G, i, b, c, x} /\
                Hmap.m{1} = I.H.m{2} /\
                Hmem.pk{1} = I.pk{2} /\
