@@ -1205,6 +1205,19 @@ let t_subst1_pv fx g =
       | _ -> aux l in
   aux (LDecl.tohyps hyps).h_local 
 
+let t_subst1_id h g =
+  let hyps = get_hyps g in
+  let k = LDecl.lookup_by_id h hyps in
+  let error () = tacuerror "cannot find something to subst" in
+  match is_subst_eq hyps None (h,k) with
+  | Some(h,x,side) -> t_subst_gen x h side g
+  | _ ->
+    match is_subst_pv_eq hyps None (h,k) with
+    | Some(h, _x, side) ->
+      (try t_subst_pv_gen h side g with 
+        EcPV.MemoryClash -> error ())
+    | _ -> error() 
+
 let t_subst1 fx g = 
   match fx with
   | None -> t_or (t_subst1_loc None) (t_subst1_pv None) g
@@ -1243,29 +1256,31 @@ let t_progress tac g =
     | Fquant(Lforall,bd,_) ->
       let ids = 
         LDecl.fresh_ids hyps (List.map (fun (id,_) -> EcIdent.name id) bd) in
-      t_seq (t_intros_i ids) aux g
+      t_seq (t_intros_i ids) aux0 g
     | Flet (LTuple fs,f1,_) ->
       let p = p_tuple_ind (List.length fs) in
-      t_seq (t_elimT (List.map snd fs) p f1 0) aux g
+      t_seq (t_elimT (List.map snd fs) p f1 0) aux0 g
     | Fapp({f_node = Fop(p,_)}, [f1;_]) when EcPath.p_equal p EcCoreLib.p_imp ->
       let id = LDecl.fresh_id hyps "H" in
       t_seq (t_intros_i [id]) (aux2 id f1) g
-    | _ -> t_try (t_seq t_split aux) g
+    | _ -> t_try (t_seq t_split aux0) g
   and aux2 id f g = 
-    let t1 = 
+    let t1,aux = 
       match f.f_node with
-      | Fop(p,_) when EcPath.p_equal p p_false -> t_elim_hyp id
+      | Fop(p,_) when EcPath.p_equal p p_false -> t_elim_hyp id, aux
       | Fapp({f_node = Fop(p,_)}, [_;_] ) when is_op_and p -> 
-        t_seq (t_elim_hyp id) (t_clear (Sid.singleton id)) 
+        t_seq (t_elim_hyp id) (t_clear (Sid.singleton id)),
+        aux0
       | Fquant(Lexists,_,_) -> 
-        t_seq (t_elim_hyp id) (t_clear (Sid.singleton id))
+        t_seq (t_elim_hyp id) (t_clear (Sid.singleton id)),
+        aux0
       | _ when is_eq f -> 
         let f1, f2 = destr_eq f in
         if is_tuple f1 && is_tuple f2 then 
-          t_seq (t_elim_hyp id) (t_clear (Sid.singleton id))
-        else t_subst_all 
+          t_seq (t_elim_hyp id) (t_clear (Sid.singleton id)), aux0
+        else t_try (t_subst1_id id), aux 
           
-      | _ -> t_subst_all (* FIXME should allows to subst a given hyps *) in
+      | _ -> t_try (t_subst1_id id), aux in
     t_seq t1 aux g in
   aux g
 
