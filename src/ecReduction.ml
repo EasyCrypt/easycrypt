@@ -505,6 +505,14 @@ let h_red_opt ri hyps f = h_red_opt ri (LDecl.toenv hyps) hyps f
 
 let rec simplify ri hyps f = 
   let f' = try h_red ri hyps f with NotReducible -> f in
-  if f == f' then f_map (fun ty -> ty) (simplify ri hyps) f
+  if f == f' then simplify_rec ri hyps f 
+       (*f_map (fun ty -> ty) (simplify ri hyps) f*)
   else simplify ri hyps f'
+
+and simplify_rec ri hyps f = 
+  match f.f_node with
+  | Fapp({f_node = Fop(p,_)} as fo, args)
+      when ri.logic && is_logical_op p ->
+    f_app fo (List.map (simplify_rec ri hyps) args) f.f_ty    
+  | _ -> f_map (fun ty -> ty) (simplify ri hyps) f
 
