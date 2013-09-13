@@ -502,7 +502,12 @@ let eager env s s' inv eqIs eqXs c c' eqO =
     | il::rsl', ir::rsr' ->
       match (try Some (i_eager fhyps il ir eqo) with _ -> None) with
       | None -> rsl, rsr, fhyps, eqo
-      | Some (fhyps, eqi) -> s_eager fhyps rsl' rsr' eqi
+      | Some (fhyps, eqi) -> 
+        (* we ensure that the seq rule can be apply *)
+        let eqi2 = i_eqobs_in_refl env ir (Mpv2.fv2 eqo) in
+        if not (PV.subset eqi2 (Mpv2.fv2 eqi)) then raise EqObsInError;
+        compat env modi modi' eqi eqIs eqXs;
+        s_eager fhyps rsl' rsr' eqi
   and i_eager fhyps il ir eqo = 
     match il.i_node, ir.i_node with
     | Sasgn(lvl,el), Sasgn(lvr,er) | Srnd(lvl,el), Srnd(lvr,er) ->
