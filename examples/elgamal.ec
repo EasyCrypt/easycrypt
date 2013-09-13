@@ -15,7 +15,6 @@ op g : group.
    So we declare an operator (%%) which stand for the modulo ...
 *)
 
-op ( %% ) :int -> int -> int.
 op ( * ) : group -> group -> group.
 op ( ^ ) : group -> int -> group.
 op log   : group -> int.
@@ -35,7 +34,7 @@ axiom log_pow :
  forall (g':group), g ^ log(g') = g'.
 
 axiom pow_mod : 
- forall (z:int), g ^ (z%%q) = g ^ z.
+ forall (z:int), g ^ (z %% q) = g ^ z.
 
 axiom mod_add : 
  forall (x,y:int), (x%%q + y)%%q = (x + y)%%q.
@@ -43,11 +42,13 @@ axiom mod_add :
 axiom mod_small : 
  forall (x:int), 0 <= x => x < q => x%%q = x.
 
-axiom mod_sub : 
- forall (x, y:int), (x%%q - y)%%q = (x - y)%%q. 
+lemma nosmt mod_sub : 
+ forall (x, y:int), (x%%q - y)%%q = (x - y)%%q
+by [].
 
-axiom mod_bound : 
- forall (x:int), 0 <= x%%q && x%%q < q. 
+lemma nosmt mod_bound : 
+ forall (x:int), 0 <= x%%q && x%%q < q
+by [].
 
 axiom mul_div : forall (g1 g2:group), (g1 * g2) / g1 = g2.
 
@@ -286,6 +287,8 @@ proof.
  wp;rnd;simplify.
  call ( _ : ={pk} ==> ={res,glob A}).
    fun true;try (simplify;split).
+ wp; do rnd; skip; progress=> //.
+   smt.
  wp;do rnd;skip; progress; smt.
 save.
 
