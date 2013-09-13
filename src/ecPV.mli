@@ -64,6 +64,7 @@ module PV : sig
   val remove   : env -> prog_var -> t -> t
   val union    : t -> t -> t
   val diff     : t -> t -> t
+  val subset   : t -> t -> bool
     
   val interdep : env -> t -> t -> t
   val indep    : env -> t -> t -> bool
@@ -119,7 +120,11 @@ module Mpv2 : sig
     (prog_var -> prog_var -> ty -> unit) -> (mpath -> unit) -> t -> unit
 
   val eq_refl : PV.t -> t 
+  val fv2 : t -> PV.t
   val eq_fv2 : t -> t
+
+  val split_nmod : PV.t -> PV.t -> t -> t
+  val split_mod : PV.t -> PV.t -> t -> t
 end
 
 val add_eqs : EcEnv.env -> Mpv2.t -> EcTypes.expr -> EcTypes.expr -> Mpv2.t
@@ -134,5 +139,7 @@ val eqobs_in :
   Mpv2.t ->
   PV.t * PV.t ->
   EcModules.stmt * EcModules.stmt * ('log * 'spec list) * Mpv2.t
+
+val i_eqobs_in_refl : env -> instr -> PV.t -> PV.t
 
 val check_module_in : env -> mpath -> module_type -> unit

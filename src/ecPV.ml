@@ -751,6 +751,14 @@ module Mpv2 = struct
     iter fv fg t;
     { s_pv = !pv; s_gl = !gl }
 
+  let fv2 t =
+    let pv = ref Mnpv.empty in
+    let fv _ x2 ty = pv := Mnpv.add x2 ty !pv in
+    let gl = ref Sm.empty in
+    let fg m = gl := Sm.add m !gl in
+    iter fv fg t;
+    { PV.s_pv = !pv; PV.s_gl = !gl }
+
   let eq_refl (fv:PV.t) = 
     let pv = ref Mnpv.empty in
     let fx x ty = pv := Mnpv.add x (Snpv.singleton x, ty) !pv in
@@ -838,7 +846,6 @@ let eqobs_in env
     | LvMap(_, pvr, _, _) -> aux (pvr,tint) in
 
   let remove lvl lvr eqs = 
-    (* TODO : ensure that the invariant is not modified *)
     let aux eqs (pvl,tyl) (pvr,tyr) = 
       if EcReduction.equal_type env tyl tyr then begin
         if not (check pvl ifvl && check pvr ifvr) then
@@ -853,6 +860,8 @@ let eqobs_in env
     | LvMap((pl,tysl), pvl, el, tyl),
         LvMap((pr,tysr), pvr, er,tyr) when EcPath.p_equal pl pr &&
       List.all2  (EcReduction.equal_type env) (tyl::tysl) (tyr::tysr) ->
+      if not (check pvl ifvl && check pvr ifvr) then
+        raise EqObsInError;
       add_eqs (Mpv2.remove env pvl pvr eqs) el er
     | _, _ -> raise EqObsInError in
 

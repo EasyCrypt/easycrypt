@@ -52,5 +52,6 @@ let process_phl loc ptac g =
     | Peager_fun_def            -> EcEager.process_fun_def 
     | Peager_fun_abs(info,eqI)  -> EcEager.process_fun_abs info eqI
     | Peager_call info          -> EcEager.process_call info
+    | Peager(info, eqI)         -> EcEager.process_eager info eqI
   in
     set_loc loc t g
